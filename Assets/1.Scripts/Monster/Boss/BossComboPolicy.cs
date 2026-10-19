@@ -38,4 +38,23 @@ public static class BossComboPolicy
         if (!started) return StepGate.Wait;                                     // 개전 첫 타 — 다가가서 쓴다
         return chaseElapsed < chaseGrace ? StepGate.Wait : StepGate.Drop;       // 짧은 추격 유예 뒤 버림
     }
+
+    // ─── 즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) ─────────────────────────
+
+    /// <summary>다음 타까지 기다릴 간격(초). 즉시 연결이면 0 — 앞 타가 맞히는 순간 넘어간다.</summary>
+    public static float StepInterval(bool chainOnHit, float normalInterval) => chainOnHit ? 0f : normalInterval;
+
+    /// <summary>다음 타를 사거리 검사 없이 낼까. 즉시 연결이면 회피해도 친다(첫 타 방향 그대로).</summary>
+    public static bool IgnoresRange(bool chainOnHit, bool forceFire) => chainOnHit || forceFire;
+
+    /// <summary>
+    /// 지금 공격이 끝나는 순간 **다음 타로 바로 넘길** 콤보 타인가.
+    /// <paramref name="nextIndex"/> = 아직 안 나간 다음 타의 인덱스(진행 중 콤보의 _comboIndex).
+    /// </summary>
+    public static bool ShouldChain(bool comboActive, bool chainOnHit, int nextIndex, int stepCount) =>
+        comboActive && chainOnHit && nextIndex > 0 && nextIndex < stepCount;
+
+    /// <summary>훅·어퍼인가 — 즉시 연결에서 예고 없이 첫 타 방향으로 바로 치는 타이자, 바닥 예고 토글 대상.</summary>
+    public static bool IsHookOrUpper(BossAttackId id) =>
+        id == BossAttackId.LeftHook || id == BossAttackId.RightHook || id == BossAttackId.Upper;
 }

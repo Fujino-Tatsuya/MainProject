@@ -320,6 +320,7 @@ MonoBehaviour:
       forceFire: 0
     - attack: 5
       forceFire: 0
+    chainOnHit: 1
   - name: HookUpper
     weight: 15
     allowedFromPhase: 0
@@ -329,8 +330,9 @@ MonoBehaviour:
       forceFire: 0
     - attack: 2
       forceFire: 0
+    chainOnHit: 1
   - name: DashGrab
-    weight: 15
+    weight: 25
     allowedFromPhase: 0
     cooldown: 8
     steps:
@@ -338,10 +340,63 @@ MonoBehaviour:
       forceFire: 0
     - attack: 3
       forceFire: 1
+    chainOnHit: 1
+  - name: JumpDash
+    weight: 25
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 4
+      forceFire: 0
+    - attack: 5
+      forceFire: 0
+    chainOnHit: 1
+  - name: UpperGrab
+    weight: 10
+    allowedFromPhase: 0
+    cooldown: 10
+    steps:
+    - attack: 2
+      forceFire: 0
+    - attack: 3
+      forceFire: 1
+    chainOnHit: 1
+  - name: HookHookHook
+    weight: 15
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 0
+      forceFire: 0
+    - attack: 1
+      forceFire: 0
+    - attack: 0
+      forceFire: 0
+    chainOnHit: 1
+  - name: JumpJumpJump
+    weight: 21
+    allowedFromPhase: 0
+    cooldown: 12
+    steps:
+    - attack: 4
+      forceFire: 0
+    - attack: 4
+      forceFire: 0
+    - attack: 4
+      forceFire: 0
+    chainOnHit: 1
   openingCombo: 010000000000000005000000
   comboStepInterval: 0.3
   comboChaseGrace: 1
   raidOpeningStepInterval: 1
+  comboDashWindup: 0.7
+  comboGrabTelegraph: 0.3
+  comboGrabTelegraphAfterDash: 1
+  comboHookFollowThrough: 0.3
+  singleHookUpper: 0
+  comboJumpRecovery: 0
+  comboDashRecovery: 0.3
+  hookTelegraphMarkers: 0
   phases:
   - hpThreshold: 0.75
     sequence: 2

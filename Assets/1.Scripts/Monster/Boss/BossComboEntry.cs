@@ -5,6 +5,7 @@ using UnityEngine;
 /// 23호 콤보 공격 한 줄(PLAN-boss-combo §3.1, 팀장 10-18) — 기존 단타 행(<see cref="BossAttackEntry"/>)을 순서대로 묶는다.
 /// 룰렛에 가중치 항목으로 섞여 뽑히고, 타 사이는 <c>comboStepInterval</c>(0.3초)·쿨다운 무시·다음 타 거리창이 안 맞으면 버린다.
 /// 애니·예고·판정·간파 창은 각 단타 행 그대로다 — 콤보는 "무엇을 어떤 순서로"만 정한다.
+/// ⚠️ 단 <see cref="chainOnHit"/> 가 켜진 콤보(10-19 기본)는 위 간격·사거리 규칙 대신 즉시 연결로 이어진다.
 /// </summary>
 [Serializable]
 public class BossComboEntry
@@ -23,6 +24,13 @@ public class BossComboEntry
 
     [Tooltip("타 순서. 첫 타 = 룰렛에서 뽑힌 순간 바로 나가는 공격.")]
     public BossComboStep[] steps = new BossComboStep[0];
+
+    [Tooltip("즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) — 앞 타가 맞히는 순간 다음 타로 넘어간다.\n" +
+             "· 타 간격 0 · 사거리 검사 없음(회피해도 친다)\n" +
+             "· 후속 훅·어퍼 = 예고 없이 첫 타 방향 그대로 · 후속 돌진 준비 = comboDashWindup · 후속 잡기 예고 = comboGrabTelegraph\n" +
+             "· 앞 타가 점프면 착지 히트 순간(후딜 comboJumpRecovery) · 돌진이면 복귀 comboDashRecovery 뒤\n" +
+             "끄면 이전 동작(comboStepInterval 간격 + 각 타 예고 그대로).")]
+    public bool chainOnHit = true;
 }
 
 [Serializable]

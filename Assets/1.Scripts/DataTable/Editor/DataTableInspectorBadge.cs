@@ -16,6 +16,14 @@ using Object = UnityEngine.Object;
 /// 테이블은 xlsx 가 바뀔 때만 다시 읽는다(폴더 파일들의 수정 시각을 1초에 한 번 확인).
 /// </para>
 /// </summary>
+/// <summary>
+/// 칸마다 테이블 표시를 직접 그리는 에디터(예: MonsterDataSOEditor). 머리 박스는 요약 한 줄로 줄인다 —
+/// 같은 내용을 칸 옆과 머리에 두 번 쓰지 않으려고(PLAN-monster-data-inspector §7-5).
+/// </summary>
+public interface IDataTableFieldBadgeEditor
+{
+}
+
 [InitializeOnLoad]
 public static class DataTableInspectorBadge
 {
@@ -23,6 +31,27 @@ public static class DataTableInspectorBadge
     private const double StampCheckIntervalSeconds = 1.0;
 
     private static Dictionary<Object, List<DataTableWrite>> writesByTarget = new Dictionary<Object, List<DataTableWrite>>();
+    private static Dictionary<Object, Dictionary<string, DataTableWrite>> writesByPath = new Dictionary<Object, Dictionary<string, DataTableWrite>>();
+
+    /// <summary>테이블을 읽지 못했거나(폴더 없음) 오류가 있어 칸별 비교를 할 수 없다.</summary>
+    public static bool Unavailable
+    {
+        get
+        {
+            RefreshIfTableChanged();
+            return tableHasErrors || string.IsNullOrEmpty(loadedStamp);
+        }
+    }
+
+    /// <summary>이 객체의 이 칸을 테이블이 덮어쓰는가. 테이블은 xlsx 가 바뀔 때만 다시 읽으므로 매 프레임 불러도 된다.</summary>
+    public static bool TryGetWrite(Object target, string propertyPath, out DataTableWrite write)
+    {
+        RefreshIfTableChanged();
+        write = null;
+        return target != null
+            && writesByPath.TryGetValue(target, out Dictionary<string, DataTableWrite> byPath)
+            && byPath.TryGetValue(propertyPath, out write);
+    }
     private static bool tableHasErrors;
     private static string loadedStamp;
     private static double nextStampCheck;
@@ -52,9 +81,10 @@ public static class DataTableInspectorBadge
             return;
         }
 
+        bool compact = editor is IDataTableFieldBadgeEditor;
         foreach ((Object shown, List<DataTableWrite> writes) in Matches(editor.target))
         {
-            Draw(shown, writes);
+            Draw(shown, writes, compact);
         }
     }
 
@@ -119,7 +149,7 @@ public static class DataTableInspectorBadge
         return null;
     }
 
-    private static void Draw(Object shown, List<DataTableWrite> writes)
+    private static void Draw(Object shown, List<DataTableWrite> writes, bool compact)
     {
         var current = new SerializedObject(shown);
         var differing = new List<string>();
@@ -129,6 +159,14 @@ public static class DataTableInspectorBadge
             {
                 differing.Add($"{write.Source.Field}(인스펙터 {value} / 테이블 {write.Source.Value})");
             }
+        }
+
+        if (compact)
+        {
+            string summary = $"[표] 칸 {writes.Count}개는 테이블 모드 Play·빌드에서 xlsx 값으로 덮어쓴다.";
+            summary += differing.Count == 0 ? " 지금 값은 테이블과 같다." : $" 테이블과 다른 값 {differing.Count}개 — 칸 아래에 표 값을 적어 뒀다.";
+            EditorGUILayout.HelpBox(summary, differing.Count == 0 ? MessageType.Info : MessageType.Warning);
+            return;
         }
 
         var text = new StringBuilder();
@@ -170,6 +208,9 @@ public static class DataTableInspectorBadge
         writesByTarget = result.Writes
             .GroupBy(w => w.Target)
             .ToDictionary(g => g.Key, g => g.ToList());
+        writesByPath = writesByTarget.ToDictionary(
+            p => p.Key,
+            p => p.Value.GroupBy(w => w.PropertyPath).ToDictionary(g => g.Key, g => g.Last()));
     }
 
     /// <summary>폴더 xlsx 들의 이름·수정 시각 — 바뀌었을 때만 다시 읽는다.</summary>
