@@ -36,6 +36,8 @@ public static class CharacterSelectPanelAuthoring
     const string BackgroundLoopGammaSprite = "bg_typography_loop_gamma.png";
     // 목업 타이포 기울기(영문 문장 줄 기울기 ≈ 26°, 오른쪽 아래로).
     const float BackgroundAngle = 26f;
+    // 흐름 방향(회전 좌표 — 줄무늬를 따라 오른쪽, 사용자 결정 10-19).
+    static readonly Vector2 BackgroundDirection = new Vector2(1f, 0f);
 
     // 카드(가운데 기준 654×519 = card_selected). 위·아래 카드는 패널이 0.84 배(= 549 / 654)로 줄인다.
     static readonly Vector2 CardSize = new Vector2(654f, 519f);
@@ -278,6 +280,7 @@ public static class CharacterSelectPanelAuthoring
             var scrollSo = new SerializedObject(scroller);
             scrollSo.FindProperty("tileSize").vector2Value = tile;
             scrollSo.FindProperty("gridOrigin").vector2Value = origin;
+            scrollSo.FindProperty("direction").vector2Value = BackgroundDirection;
             scrollSo.ApplyModifiedPropertiesWithoutUndo();
 
             // 오른쪽 검은 판(SELECT 셰브론 자리 포함)

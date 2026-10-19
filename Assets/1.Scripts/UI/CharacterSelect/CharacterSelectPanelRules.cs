@@ -4,10 +4,9 @@ using System.Collections.Generic;
 public enum CharacterSelectCloseReason
 {
     Api = 0,       // 호출 측 Hide()
-    Button = 1,    // 뒤로가기 버튼
+    Button = 1,    // 그냥 닫기 — 뒤로가기 버튼, 또는 지금 캐릭터를 다시 골랐다(CharacterChosen 없음)
     Escape = 2,    // ESC
-    Chosen = 3,    // 다른 캐릭터를 골랐다(CharacterChosen 이 먼저 한 번 나간다)
-    Unchanged = 4  // 지금 캐릭터를 다시 골랐다(CharacterChosen 없음)
+    Chosen = 3     // 다른 캐릭터를 골랐다(CharacterChosen 이 먼저 한 번 나간다)
 }
 
 /// <summary>선택 확정(Enter·Space·가운데 카드 클릭) 판단 결과.</summary>
@@ -17,7 +16,7 @@ public enum CharacterSelectConfirmResult
     Empty = 1,       // 카드가 없다(로스터 비었음)
     Locked = 2,      // 준비 중 — 거부, 잠금 문구 강조
     Unavailable = 3, // 로스터 Available=false — 거부
-    Unchanged = 4,   // 지금 캐릭터 — 이벤트 없이 닫는다
+    SameAsCurrent = 4, // 지금 캐릭터 — CharacterChosen 없이 그냥 닫는다(Closed(Button))
     Chosen = 5       // 다른 캐릭터 — CharacterChosen(id) 한 번 내고 닫는다
 }
 
@@ -107,14 +106,33 @@ public sealed class CharacterSelectPanelRules
     public bool IsAvailable(int index) => index >= 0 && index < Count && _available[index];
 
     /// <summary>
-    /// 포커스된 카드로 확정. <see cref="CharacterSelectConfirmResult.Chosen"/>·<see cref="CharacterSelectConfirmResult.Unchanged"/> 면 닫힌다.
+    /// 포커스된 카드로 확정. <see cref="CharacterSelectConfirmResult.Chosen"/>·<see cref="CharacterSelectConfirmResult.SameAsCurrent"/> 면 닫힌다.
     /// </summary>
     public CharacterSelectConfirmResult Confirm()
     {
         CharacterSelectConfirmResult result = Evaluate(IsOpen, Count, Focus, CurrentId, IsLocked, IsAvailable(Focus));
-        if (result == CharacterSelectConfirmResult.Chosen || result == CharacterSelectConfirmResult.Unchanged)
+        if (TryGetCloseReason(result, out _))
             IsOpen = false;
         return result;
+    }
+
+    /// <summary>
+    /// 확정 결과가 패널을 닫으면 그 닫힘 사유. 다른 캐릭터 = Chosen, 지금 캐릭터 = Button(뒤로가기와 같은 그냥 닫기).
+    /// </summary>
+    public static bool TryGetCloseReason(CharacterSelectConfirmResult result, out CharacterSelectCloseReason reason)
+    {
+        switch (result)
+        {
+            case CharacterSelectConfirmResult.Chosen:
+                reason = CharacterSelectCloseReason.Chosen;
+                return true;
+            case CharacterSelectConfirmResult.SameAsCurrent:
+                reason = CharacterSelectCloseReason.Button;
+                return true;
+            default:
+                reason = default;
+                return false;
+        }
     }
 
     /// <summary>
@@ -132,7 +150,7 @@ public sealed class CharacterSelectPanelRules
         if (!focusAvailable)
             return CharacterSelectConfirmResult.Unavailable;
         if (focus == currentId)
-            return CharacterSelectConfirmResult.Unchanged;
+            return CharacterSelectConfirmResult.SameAsCurrent;
         return CharacterSelectConfirmResult.Chosen;
     }
 

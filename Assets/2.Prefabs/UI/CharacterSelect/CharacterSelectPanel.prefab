@@ -705,7 +705,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterSelectBackgroundScroll
   tileSize: {x: 2900, y: 1888}
   gridOrigin: {x: -1450, y: 944}
-  direction: {x: -1, y: 0}
+  direction: {x: 1, y: 0}
   speed: 40
 --- !u!1 &4894585641435449140
 GameObject:
