@@ -7,7 +7,43 @@
 - **Server/Host**: every system except player-owned movement, input, and animation is authoritative on the host.
 - Anti-cheat is unnecessary for cooperative PvE, so this split keeps player response fast while keeping the network model simple.
 
-## 연결 흐름
+## Lobby Demo (target, 2026-10-19)
+> Status: **implementation in progress** on `feature/LobbyDemo` (PLAN-48 v2, commits C1~C13). The code may still differ from this section until those commits land.
+> Where this section conflicts with the sections below marked **(old / current code)**, this section is the decision for the booth demo.
+> Scene flow details: [SceneFlow.md](../design/SceneFlow.md#-target-flow--lobby-demo-2026-10-19-implementation-in-progress).
+
+### Flow
+- `Bootstrap → 3.LobbyScene → 4.MapScene → 3.LobbyScene → …` with the session kept alive. No `Shutdown` per game. Title is skipped.
+- `3.LobbyScene` is a walkable **NGO scene**. `5.ResultScene` is removed; results open as a lobby result panel only after returning from 4.MapScene.
+- All transitions are host-driven `NetworkManager.SceneManager.LoadScene`. Clients never load gameplay scenes locally.
+- Map → Lobby: `GoToResult` captures and broadcasts the result payload → `DespawnDynamicNetworkObjects()` (log remaining count) → `LoadScene("3.LobbyScene", Single)`.
+
+### Connection config (`demo-connection.json`)
+- Location: `Path.GetDirectoryName(Application.dataPath)/demo-connection.json` — next to the exe in builds, project root in the Editor.
+- Fields: `role` (`host` / `client`), `hostAddress`, `port`, `playerId` (stable player ID), retry interval / connect timeout / disconnect timeout seconds.
+- Missing file → `host` · `127.0.0.1` · `7777`, and a 3-second notice "설정 파일 없음 — 호스트 모드".
+- The Host starts hosting on boot; Clients connect automatically. No connection buttons.
+- Clients run an **auto-connect / auto-reconnect loop**. While waiting or after a drop they sit in the local scene `6.DemoConnectScene` with the "호스트 대기 중" overlay.
+- **Wired direct IPv4 only.** Unity Relay is excluded: the lobby connection panel, Relay UI, and the `RelayConnectionProvider` runtime path are removed. The Relay package stays (no `Packages/manifest.json` change). Steamworks for release is a separate task.
+
+### Connection approval
+- `ConnectionApproval` is enabled. Approve only when: the host is in the lobby, the countdown is not running, and fewer than 3 players are connected.
+- During a game the request is rejected as "게임 진행 중". The Client keeps retrying and enters automatically once the Host returns to the lobby.
+- This keeps "no rejoining / no backfilling during InGame" (see [InGame Leave](#ingame-leave)) — **rejoining is allowed only in the Lobby.**
+- Full lobby → rejected as full (3/3).
+
+### Reconnect identity
+- A reconnecting Client gets a new `ClientId`. The server store for the last character selection and traits (augments) is keyed by `playerId`, so both are kept across reconnects.
+
+### Lobby rules
+- All input is allowed in the lobby (movement, attack, skills).
+- Character select object (`F`) → panel → despawn + respawn the new Variant at the same position.
+- Ready object (`F`) → when all connected players (1~3) are Ready, a 5-second server-time countdown → `4.MapScene`.
+- No character change while Ready or during the countdown. A new connection resets all Ready states. No Host "always Ready" exception.
+
+## 연결 흐름 (old / current code)
+> Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is skipped and Result is a lobby panel.
+
 1. **Title / Lobby / Loading / InGame / Result**
 2. If the Host leaves during InGame, the session ends. The remaining players transition to the Result Scene locally.
 
@@ -18,8 +54,9 @@
 - If the Host leaves the Lobby, no scene transition occurs, and all slots except the local player's character slot become `Empty`.
 - The game can start only when all connected players are Ready.
 - Solo, duo, and trio play are all supported.
-- When entering the Lobby Scene, the `NetworkManager` instance must be inactive or in a local-only state, not running as Host.
-- The Lobby Scene is always treated as a local scene and is not loaded through `NetworkSceneManager`.
+- (old / current code) When entering the Lobby Scene, the `NetworkManager` instance must be inactive or in a local-only state, not running as Host.
+- (old / current code) The Lobby Scene is always treated as a local scene and is not loaded through `NetworkSceneManager`.
+- **Target (lobby demo):** the two rules above are replaced — the Host is already running when the lobby loads, and `3.LobbyScene` is loaded through `NetworkSceneManager`. See [Lobby Demo (target)](#lobby-demo-target-2026-10-19).
 
 ## Lobby Ready / Start
 - The Lobby start button is bound to `Ready()` for both solo and multiplayer.
@@ -33,7 +70,9 @@
 - Clients only send a `RequestReady()` call, and the server validates whether the player can become Ready before changing the Ready state.
 - Lobby player data such as Ready state, character selection, and build selection is stored and synchronized using `NetworkVariable` or `NetworkList`.
 
-## Solo Flow
+## Solo Flow (old / current code)
+> Superseded for the demo: solo = `host` with no config file. The Host is started on boot, so the lobby countdown always uses server time.
+
 - Solo flow: `Ready()` -> 5-second countdown -> `StartHost()` -> Loading Scene -> InGame Scene.
 - In Solo play, the countdown is handled by a local timer because the Host has not started yet.
 - In Solo play, if the player becomes Unready during the countdown, the countdown is canceled and the player remains in the Lobby.
@@ -49,7 +88,9 @@
 - Clients cannot join after the game has already started.
 - The countdown is managed and synchronized by the server.
 
-## Result Scene
+## Result Scene (old / current code)
+> Superseded for the demo: `5.ResultScene` is removed. The same result data (`SessionResult` + payload named message) is shown in the lobby result panel. "Result Scene" below reads as "lobby result panel" for the demo.
+
 - The Result Scene requires network synchronization on normal game completion.
 - On normal game completion, category-based result ratios are calculated by the Host before entering the Result Scene.
 - On normal game completion, all players see the full team result in the Result Scene.
@@ -75,8 +116,9 @@
 - Damage caused by a disconnected Client's remaining projectiles or area effects after disconnection still affects gameplay, but is excluded from Result contribution data.
 - If a Client leaves during InGame, boss difficulty and HP scaling are not recalculated.
 - If only one player remains after a Client leaves during InGame, the session continues.
-- Rejoining is not allowed after a Client leaves during InGame.
+- Rejoining the running game is not allowed after a Client leaves during InGame. The Client may rejoin once the Host is back in the Lobby (connection approval, see [Lobby Demo (target)](#connection-approval)).
 - Backfilling is not allowed after a Client leaves during InGame.
+- (old / current code) A Client that leaves during InGame returns to the Title Scene. **Target (lobby demo):** it goes to `6.DemoConnectScene` and keeps retrying.
 - When a Client leaves during InGame, the Host finalizes that player's individual contribution snapshot at the moment of leaving.
 - If a Client leaves during InGame, that player's Result data is included up to the point of leaving.
 - For normal game completion, disconnected Clients' Result data is based only on authoritative data stored by the Host up to the point of leaving.
@@ -128,7 +170,7 @@
 - The project does not use a generic individual timer pause system.
 - Special mechanics that stop their own countdown, such as bomb fuse timing while flying, are handled as object-specific state rules instead of generic timer pause.
 - Lobby countdowns are separate from combat `GameTime`.
-- Solo Lobby countdowns use local real time because the Host has not started yet.
+- (old / current code) Solo Lobby countdowns use local real time because the Host has not started yet. **Target (lobby demo):** the Host always runs in the lobby, so every lobby countdown uses server time.
 - Multiplayer Lobby countdowns use server real time.
 - Matchmaking timeouts, connection timeouts, UI fades, loading spinners, and transport/heartbeat timeouts use real time.
 - NGO `NetworkConfig.TickRate` starts at 30 ticks per second and may be changed later.

@@ -1,6 +1,63 @@
 # Scene Flow
 
-Last updated: 2026-07-01
+Last updated: 2026-10-19 (target flow for the booth demo added — see below)
+
+## 🔴 Target Flow — Lobby Demo (2026-10-19, implementation in progress)
+
+> Status: **implementation in progress** on `feature/LobbyDemo` (PLAN-48 v2, commits C1~C13).
+> Until those commits land, the code still follows the old flow described in the sections marked **(old / current code)** below.
+> When this section and an old section disagree, this section is the decision; the old section describes what the code does today.
+> Plan: `_lane-artifacts/common/48-lobby/PLAN-48-lobby-demo-flow-v2.md` (§0-1 and §0-2 override its body). Network rules: [networking.md](../tech/networking.md#lobby-demo-target-2026-10-19).
+
+### Main loop (session kept alive)
+
+```text
+0.Bootstrap ─(host) StartHost → NGO LoadScene 3.LobbyScene (Single)
+   │(client) StartClient → NGO scene sync enters 3.LobbyScene
+   ▼
+3.LobbyScene ─all ready → 5 s countdown → Loading (Additive) → 4.MapScene → spawn
+   ▲                                                         │
+   └──── NGO LoadScene 3.LobbyScene (Single) ←─ GoToResult (server) ─┘
+         (result panel opens in the lobby)
+```
+
+- Main flow = `Bootstrap → Lobby (3.LobbyScene) → Map (4.MapScene) → Lobby → Map → …`.
+- The NGO session stays alive across games. **There is no `Shutdown` per game.**
+- **Title is skipped** in the demo build. `1.TitleScene` is not part of the loop.
+- **`5.ResultScene` is removed.** Results are shown by a **result panel inside the lobby** (see below). The scene is dropped from Build Settings in C13.
+- `3.LobbyScene` becomes a **walkable NGO scene** (scene-placed `NetworkObject`s, players are spawned in it). It is no longer a local UI scene.
+- `6.DemoConnectScene` is a new **local** scene used only while waiting for / reconnecting to the host ("호스트 대기 중" overlay).
+
+### Scene transitions
+
+- Every transition is **server (host) driven** through `NetworkManager.SceneManager.LoadScene`. Clients only follow NGO scene sync.
+- Clients do **not** call a local `UnityEngine.SceneManagement.SceneManager.LoadScene(Single)` for Lobby/Map/Result transitions.
+- Right before each transition the server calls `DespawnDynamicNetworkObjects()` and logs how many dynamic `NetworkObject`s remain.
+- **Map → Lobby:** `MapSceneManager.GoToResult` (server) captures the result → broadcasts the result payload (named message) → despawns dynamic objects → `NGO LoadScene("3.LobbyScene", Single)`. There is no Result scene in between.
+- **Lobby → Map:** unchanged loading path (Loading Additive → source scene cleanup → 4.MapScene Additive → spawn). If the source scene is an NGO scene, the server despawns and calls NGO `UnloadScene`; clients do not unload locally.
+
+### Lobby result panel
+
+- Opens **only when returning to the lobby after a 4.MapScene game ends.** It does not open on first boot or when a client enters the lobby by (re)connecting.
+- Each player closes it with a close button or `Esc`; it also closes automatically after **15 seconds**.
+- While open it is **modal** (gameplay input blocked through the UI modal blocker).
+- Until the next game starts, players can reopen it from a **result object** in the lobby.
+- Data source = existing `SessionResult` + the result payload named message. No new result data type.
+
+### Lobby rules (target)
+
+- **All input is allowed in the lobby** — movement, attacks, and skills.
+- **Character select object:** press `F` → selection panel → the server despawns the current player and spawns the new Variant at the same position (option A — no in-place Armature swap, see [player-prefabs.md](../tech/player-prefabs.md)).
+- **Ready object:** press `F` to toggle Ready. When all connected players (1~3) are Ready, a **5-second countdown** starts, then `4.MapScene` loads.
+- While Ready or during the countdown, the character cannot be changed.
+- A new connection resets everyone's Ready state.
+- The Host has **no "always Ready" exception** — the Host readies the same way as Clients.
+
+### Connection (target)
+
+- Connection is driven by `demo-connection.json` next to the exe (Editor: project root). No buttons. Details: [networking.md](../tech/networking.md#lobby-demo-target-2026-10-19).
+- Clients auto-connect and auto-reconnect in a loop. While disconnected or waiting they sit in `6.DemoConnectScene`.
+- Wired **direct IPv4 only.** Unity Relay is excluded (lobby connection panel, Relay UI, and the `RelayConnectionProvider` runtime path will be removed; the package stays, no `manifest.json` change). Steam for release is a separate task.
 
 ## Scene Manager Direction
 
@@ -29,7 +86,9 @@ The current scene manager structure is:
 - Scene names remain on the scene manager or existing global manager flow instead of being centralized into a shared constants class.
 - Enter fade is played by each scene manager on scene start only when a `blackImage` exists.
 
-## Current Scene Flow Direction
+## Current Scene Flow Direction (old / current code)
+
+> Superseded by [Target Flow — Lobby Demo](#-target-flow--lobby-demo-2026-10-19-implementation-in-progress): Lobby becomes an NGO scene and Result is removed. Kept because the code still works this way until PLAN-48 C7·C9 land.
 
 The scene flow is split between local UI scenes and NGO-managed network gameplay scenes.
 
@@ -43,7 +102,9 @@ Bootstrap -> Title -> Lobby -> Loading -> MainGame -> Result
 - `Lobby` and `Result` read synchronized session data from runtime network state objects and only render local UI.
 - The network session remains alive when moving from `Result` back to `Lobby`.
 
-## Session Data Direction
+## Session Data Direction (old / current code)
+
+> Superseded for the demo: `LobbyScene` becomes an NGO scene, Relay/invite-code joining is out of scope, and connection comes from `demo-connection.json` (see the target flow above).
 
 The session uses server-authoritative synchronized data instead of making `LobbyScene` or `ResultScene` network scenes.
 
@@ -102,6 +163,7 @@ ResultData.Result[ClientId]
 
 - `ClientId` is the primary key inside the current NGO session.
 - `ClientId` is not a persistent user identity across sessions.
+- **Target (lobby demo):** a reconnecting Client gets a new `ClientId`, so the server store for the last character selection and traits (augments) is keyed by the stable `playerId` from `demo-connection.json`, not by `ClientId`. See [networking.md](../tech/networking.md#lobby-demo-target-2026-10-19).
 - Steam ID or platform ID may be stored as optional supplemental information later.
 - `PlayerSlotIndex` is only a UI display order and must not be used as player identity.
 
@@ -149,7 +211,9 @@ Steam persona name
 -> synchronize through NGO
 ```
 
-## Ready Policy
+## Ready Policy (old / current code)
+
+> Superseded for the demo: no Host `Start` button or Host "always Ready"; Ready is toggled at the lobby ready object, and **a new connection resets all Ready states**. See [Lobby rules (target)](#lobby-rules-target).
 
 Ready means that a player agrees to start the next game with the current lobby configuration.
 
@@ -197,8 +261,11 @@ Result data is matched to common player data by `ClientId`.
 - MainGame systems collect and update result data by `ClientId`.
 - Boss death or game end causes Host to finalize result aggregation.
 - ResultScene subscribes to result data and common player data to render the final UI.
+- **Target (lobby demo):** the lobby result panel renders the same `SessionResult` data instead of ResultScene.
 
-## End Game To Result Flow
+## End Game To Result Flow (old / current code)
+
+> Superseded for the demo: `GoToResult` captures and broadcasts the result, despawns dynamic objects, then the server calls `NGO LoadScene("3.LobbyScene", Single)`. No `LoadResultSceneClientRpc`, no local Single load on Clients. See [Scene transitions](#scene-transitions).
 
 `ResultScene` is a local UI scene, but Result entry timing is synchronized by Host.
 
@@ -220,7 +287,9 @@ Boss defeated
 
 `LoadResultSceneClientRpc` is used because all connected Clients should enter ResultScene at nearly the same time.
 
-## Result To Lobby Flow
+## Result To Lobby Flow (old / current code)
+
+> Superseded for the demo: `5.ResultScene` and the per-client `Return To Lobby` button are removed. Map returns to the lobby through a host-driven NGO scene load, and results open as the lobby result panel. See [Lobby result panel](#lobby-result-panel).
 
 Result to Lobby return is not synchronized as a network scene transition.
 
