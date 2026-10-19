@@ -11,6 +11,19 @@
 `Canvas` 아래 `ResultStats`(= `ResultStatsView` 가 붙은 오브젝트로 추정 — 저작 메뉴에서 컴포넌트로 찾을 것)와
 `Text_Outcome` · `Text_Survival` · `Text_Kills` · `Button_GotoLobby` 가 있다.
 
+## 통계 정의 (서버 집계 → `SessionResultPayload` 로 원격 클라에 전달)
+| 필드 | 세는 것 | 빼는 것 |
+|---|---|---|
+| `Damage` | 몬스터(`MonsterBase`)에게 준 HP+실드 실제 감소량 | 공격자 없음, 더미·송전탑·플레이어 대상, 막타 초과분 |
+| `Kills` | 막타 수 | 공격자 없는 막타 |
+| `Counters` | 간파 성공 수 | 공격자 없음 |
+| `Deaths` | Alive→DeadPresentation 전이 수 | 같은 상태 통지 |
+| `Healing` 🆕 | **대상이 플레이어인** 실제 회복량 — 회복 주체(`Unit.HealHp(amount, countInStats, healerClientId)`, 안 주면 대상 자신)에게 | 오버힐, 플레이어 기본 체력 재생(`countInStats:false`), 몬스터·더미 회복 |
+| `DamageTaken` 🆕 | 그 플레이어 **HP 실제 감소량**(공격자 무관 — 환경·추락 포함) | 방어 경감분, 실드로 막힌 양, 막타 초과분 |
+
+- 입력 채널: `CombatStatsEvents.ServerHealthLost`(Unit 피해 적용 지점, HP 감소가 있을 때) · `ServerHealApplied`(대상, 회복 주체, 양).
+- 5.ResultScene 행에는 회복량·입은 피해 칸이 없다(`healingText`·`damageTakenText` 비어 있으면 무시). 로비 결과 패널은 표시한다 — [lobby-result-panel.md](lobby-result-panel.md).
+
 ## 코드가 기대하는 것
 
 ### `ResultStatsView` (`Assets/1.Scripts/UI/ResultStatsView.cs`)

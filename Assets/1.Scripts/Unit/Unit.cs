@@ -159,6 +159,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         {
             CombatStatsEvents.RaiseServerDamageApplied(this, _damageAttackerClientId,
                 healthLost + shieldDealt, _health.CurrentHealth <= 0);
+            // 입은 피해 통계 — HP 감소분만(실드로 막힌 양 제외). 위 피해 통지와 같은 지점이라 순서가 같다.
+            if (healthLost > 0)
+                CombatStatsEvents.RaiseServerHealthLost(this, healthLost);
             OnServerHealthDamageApplied(healthLost, shieldDealt);
         }
 
@@ -330,20 +333,39 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// </summary>
     public void HealHp(int healAmount, bool countInStats)
     {
+        if (!IsServer) return;
+        HealHp(healAmount, countInStats, OwnerClientId); // 회복 주체를 안 주면 자기 회복
+    }
+
+    /// <summary>
+    /// 회복 주체(<paramref name="healerClientId"/> — 결과 통계 "회복량"이 붙는 플레이어)를 지정해 회복한다.
+    /// 다른 플레이어를 회복시키는 스킬은 이 오버로드로 시전자 clientId 를 넘긴다.
+    /// </summary>
+    public void HealHp(int healAmount, bool countInStats, ulong healerClientId)
+    {
         if (!IsServer) return; // 서버에서만 체력 회복 처리
         int previousHealth = _health.CurrentHealth;
         _health.HealHp(healAmount);
         _currentHp.Value = _health.CurrentHealth;
-        ReportServerHeal(this, _health.CurrentHealth - previousHealth, countInStats);
+        ReportServerHeal(this, _health.CurrentHealth - previousHealth, countInStats, healerClientId);
     }
 
-    /// <summary>실제 회복량을 통계 채널에 알린다. 비집계 회복·0 회복은 발행하지 않는다(EditMode 테스트 대상).</summary>
+    /// <summary>실제 회복량을 통계 채널에 알린다(회복 주체 = 대상 자신). 비집계 회복·0 회복은 발행하지 않는다(EditMode 테스트 대상).</summary>
     public static void ReportServerHeal(Unit target, int healed, bool countInStats)
     {
         if (!countInStats || healed <= 0)
             return;
 
-        CombatStatsEvents.RaiseServerHealApplied(target, healed);
+        ReportServerHeal(target, healed, true,
+            target != null ? target.OwnerClientId : CombatStatsEvents.NoAttacker);
+    }
+
+    public static void ReportServerHeal(Unit target, int healed, bool countInStats, ulong healerClientId)
+    {
+        if (!countInStats || healed <= 0)
+            return;
+
+        CombatStatsEvents.RaiseServerHealApplied(target, healerClientId, healed);
     }
 
     /// <summary>

@@ -95,6 +95,100 @@ public sealed class SessionStatsAggregatorTests
         Assert.AreEqual(2, Get(a, Client2).Counters);
     }
 
+    // ─── 회복량 ───────────────────────────────────────────────────────
+
+    [Test]
+    public void 플레이어_대상_회복은_회복_주체에게_누적된다()
+    {
+        var a = new SessionStatsAggregator();
+        Assert.IsTrue(a.RecordHealing(Client1, true, 40));
+        Assert.IsTrue(a.RecordHealing(Client1, true, 15));
+        Assert.AreEqual(55, Get(a, Client1).Healing);
+        Assert.AreEqual(0, Get(a, Client1).Damage, "회복은 가한 피해에 섞이지 않는다");
+    }
+
+    [Test]
+    public void 다른_플레이어를_회복시키면_주체에게_간다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RegisterPlayer(Client2);
+        Assert.IsTrue(a.RecordHealing(Client1, true, 30)); // Client1 이 Client2 를 회복
+        Assert.AreEqual(30, Get(a, Client1).Healing);
+        Assert.AreEqual(0, Get(a, Client2).Healing);
+    }
+
+    [Test]
+    public void 플레이어가_아닌_대상_회복은_세지_않는다()
+    {
+        var a = new SessionStatsAggregator();
+        Assert.IsFalse(a.RecordHealing(Host, false, 500), "더미 자기 회복 등 — 호스트에게 붙지 않는다");
+        Assert.AreEqual(0, a.PlayerCount);
+    }
+
+    [Test]
+    public void 주체_없는_회복과_영_이하_회복은_무시한다()
+    {
+        var a = new SessionStatsAggregator();
+        Assert.IsFalse(a.RecordHealing(SessionStatsAggregator.NoAttacker, true, 10));
+        Assert.IsFalse(a.RecordHealing(Client1, true, 0));
+        Assert.IsFalse(a.RecordHealing(Client1, true, -3));
+        Assert.AreEqual(0, a.PlayerCount);
+    }
+
+    [Test]
+    public void 회복량은_포화한다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RecordHealing(Client1, true, int.MaxValue);
+        a.RecordHealing(Client1, true, 10);
+        Assert.AreEqual(int.MaxValue, Get(a, Client1).Healing);
+    }
+
+    // ─── 입은 피해 ────────────────────────────────────────────────────
+
+    [Test]
+    public void 플레이어가_입은_피해는_그_플레이어에게_누적된다()
+    {
+        var a = new SessionStatsAggregator();
+        Assert.IsTrue(a.RecordDamageTaken(Client2, true, 25));
+        Assert.IsTrue(a.RecordDamageTaken(Client2, true, 5));
+        Assert.AreEqual(30, Get(a, Client2).DamageTaken);
+        Assert.AreEqual(0, Get(a, Client2).Damage, "입은 피해는 가한 피해와 따로다");
+    }
+
+    [Test]
+    public void 플레이어가_아닌_대상의_감소는_입은_피해가_아니다()
+    {
+        var a = new SessionStatsAggregator();
+        Assert.IsFalse(a.RecordDamageTaken(Host, false, 50));
+        Assert.IsFalse(a.RecordDamageTaken(SessionStatsAggregator.NoAttacker, true, 50));
+        Assert.IsFalse(a.RecordDamageTaken(Client1, true, 0));
+        Assert.AreEqual(0, a.PlayerCount);
+    }
+
+    [Test]
+    public void 입은_피해는_포화한다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RecordDamageTaken(Client1, true, int.MaxValue);
+        a.RecordDamageTaken(Client1, true, 1);
+        Assert.AreEqual(int.MaxValue, Get(a, Client1).DamageTaken);
+    }
+
+    [Test]
+    public void 입은_피해와_회복은_가한_피해_처치를_바꾸지_않는다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RecordDamage(Client1, true, 90, true);
+        a.RecordDamageTaken(Client1, true, 40);
+        a.RecordHealing(Client1, true, 20);
+        PlayerSessionStats row = Get(a, Client1);
+        Assert.AreEqual(90, row.Damage);
+        Assert.AreEqual(1, row.Kills);
+        Assert.AreEqual(40, row.DamageTaken);
+        Assert.AreEqual(20, row.Healing);
+    }
+
     // ─── 사망 ─────────────────────────────────────────────────────────
 
     [Test]

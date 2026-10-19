@@ -8,7 +8,8 @@ using UnityEngine;
 ///
 /// 형식: bool hasValue — false 면 끝.
 ///       true 면 byte outcome · float survivalSeconds · byte count · count × 행.
-///       행 = ulong clientId · int characterId · int damage · int kills · int counters · int deaths.
+///       행 = ulong clientId · int characterId · int damage · int kills · int counters · int deaths
+///            · int healing · int damageTaken.
 /// 플레이어 수가 <see cref="MaxPlayers"/> 를 넘으면 경고 후 앞(clientId 작은 쪽)부터 자른다.
 /// </summary>
 public static class SessionResultPayload
@@ -17,7 +18,7 @@ public static class SessionResultPayload
     public const int MaxPlayers = 8;
 
     private const int HeaderSize = sizeof(bool) + sizeof(byte) + sizeof(float) + sizeof(byte);
-    private const int RowSize = sizeof(ulong) + sizeof(int) * 5;
+    private const int RowSize = sizeof(ulong) + sizeof(int) * 7;
 
     /// <summary>행 수에 맞는 버퍼 크기(상한 적용 후).</summary>
     public static int GetSize(int playerCount)
@@ -49,6 +50,8 @@ public static class SessionResultPayload
             writer.WriteValueSafe(row.Kills);
             writer.WriteValueSafe(row.Counters);
             writer.WriteValueSafe(row.Deaths);
+            writer.WriteValueSafe(row.Healing);
+            writer.WriteValueSafe(row.DamageTaken);
         }
     }
 
@@ -90,6 +93,8 @@ public static class SessionResultPayload
                 reader.ReadValueSafe(out row.Kills);
                 reader.ReadValueSafe(out row.Counters);
                 reader.ReadValueSafe(out row.Deaths);
+                reader.ReadValueSafe(out row.Healing);
+                reader.ReadValueSafe(out row.DamageTaken);
                 players.Add(row);
             }
 
