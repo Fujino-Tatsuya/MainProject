@@ -149,6 +149,11 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 서버 전용: 애니메이션 이벤트 수신 (판정 ON 등)
     public virtual void OnAnimationEvent(SkillAnimationEventType eventType) { }
 
+    // 모든 피어(이 스킬이 실행 중으로 보이는 피어 — 서버·오너·관전 클라): 이 피어 애니메이터의 클립 이벤트.
+    // 오너 이동 시작(owner.IsSimulating 일 때만)·로컬 연출 시점용이다. 🔴 판정·피해·상태 변경 금지 — 그건 OnAnimationEvent(서버).
+    // 서버에서는 같은 이벤트로 이것이 먼저, OnAnimationEvent 가 뒤에 불린다.
+    public virtual void OnLocalAnimationEvent(SkillAnimationEventType eventType) { }
+
     // 서버 전용: 홀드 조향 갱신 (오너가 주기 전송)
     public virtual void OnAimUpdated(Vector3 direction) { }
 
