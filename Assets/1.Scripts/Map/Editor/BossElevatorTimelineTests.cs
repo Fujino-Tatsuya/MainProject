@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEngine;
 
 /// <summary>
 /// 보스 엘리베이터 순수 시간표(<see cref="BossElevatorTimeline"/>) — 단계 시각, 이징 끝점·중간값, 경과 시간 → 단계·높이·상승 속도·문 포즈·페이드 알파·
@@ -233,6 +234,60 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(0.5f, t.WalkProgressAt(1, t.WalkStartAt(1) + 1.0), Eps, "등속");
         Assert.AreEqual(1f, t.WalkProgressAt(1, t.WalkEndAt(1)), Eps);
         Assert.AreEqual(1f, t.WalkProgressAt(1, t.DoorCloseAt), Eps, "도착 뒤 = 칸 안 고정");
+    }
+
+    [Test]
+    public void WalkStep_RemainingDistanceOverRemainingTime_Horizontal()
+    {
+        BossElevatorTimeline t = Default();
+        const float dt = 0.02f;
+        var toTarget = new Vector3(3f, 0.47f, 4f); // 수평 5m, 칸 바닥이 0.47m 높다
+
+        Vector3 step = BossElevatorTimeline.WalkStep(toTarget, t.WalkDuration, dt);
+        Assert.AreEqual(0f, step.y, Eps, "높이는 지면에 맡긴다 — 수직 성분 없음");
+        Assert.AreEqual(5f / t.WalkDuration * dt, step.magnitude, Eps, "남은 거리 ÷ 남은 시간 × dt");
+        Assert.AreEqual(0.6f, step.x / step.magnitude, Eps, "목표 방향");
+
+        Assert.AreEqual(2f * step.magnitude, BossElevatorTimeline.WalkStep(toTarget, t.WalkDuration * 0.5, dt).magnitude, Eps,
+            "막혀서 뒤처지면(시간이 절반 남음) 다음 틱 속도가 올라 따라잡는다");
+        Assert.AreEqual(5f, BossElevatorTimeline.WalkStep(toTarget, dt * 0.5, dt).magnitude, Eps, "남은 시간이 한 틱 이하면 남은 거리 전부");
+        Assert.AreEqual(Vector3.zero, BossElevatorTimeline.WalkStep(toTarget, 1.0, 0f), "dt 0 = 이동 없음");
+    }
+
+    [Test]
+    public void WalkStep_FollowedEachTick_ArrivesExactlyAtWalkEnd()
+    {
+        BossElevatorTimeline t = Default();
+        const float dt = 0.02f;
+        Vector3 position = Vector3.zero;
+        var target = new Vector3(-4f, 0f, 4.47f);
+        double start = t.WalkStartAt(1), end = t.WalkEndAt(1);
+        Vector3 half = Vector3.zero;
+        for (double now = start; now < end - 1e-6; now += dt)
+        {
+            position += BossElevatorTimeline.WalkStep(target - position, end - now, dt);
+            if (half == Vector3.zero && now + dt >= start + t.WalkDuration * 0.5 - 1e-6) half = position;
+        }
+
+        Assert.AreEqual(0f, (target - position).magnitude, 1e-3f, "도착 시각에 칸 안 지점");
+        Assert.AreEqual(0.5f, half.magnitude / target.magnitude, 0.02f, "막힘이 없으면 등속(절반 시간 = 절반 거리)");
+        Assert.AreEqual(2f, t.WalkDuration, Eps, "시간표 기대값은 그대로");
+    }
+
+    [Test]
+    public void WalkNeedsSnap_OnlyAfterWalkEndAndFarFromTarget()
+    {
+        BossElevatorTimeline t = Default();
+        double end = t.WalkEndAt(2);
+        var blocked = new Vector3(1.5f, 0.47f, 0f);   // 콜라이더에 막혀 1.5m 남음
+        var arrived = new Vector3(0.1f, 0.47f, 0.1f); // 허용 오차 안(높이 차이는 무관)
+
+        Assert.IsFalse(BossElevatorTimeline.WalkNeedsSnap(end - 0.01, end, blocked), "도착 시각 전엔 계속 걷는다");
+        Assert.IsTrue(BossElevatorTimeline.WalkNeedsSnap(end, end, blocked), "도착 시각에 못 닿았으면 옮긴다");
+        Assert.IsTrue(BossElevatorTimeline.WalkNeedsSnap(end + 1.0, end, blocked));
+        Assert.IsFalse(BossElevatorTimeline.WalkNeedsSnap(end, end, arrived), "걸어서 도착 = 그 발 높이 그대로 붙잡는다");
+        Assert.IsFalse(BossElevatorTimeline.WalkNeedsSnap(end, end, new Vector3(0f, 2f, 0f)), "수평으로 도착했으면 높이 차는 스냅 사유가 아니다");
+        Assert.IsTrue(BossElevatorTimeline.WalkNeedsSnap(end, end, new Vector3(BossElevatorTimeline.WalkArriveTolerance + 0.01f, 0f, 0f)));
     }
 
     [Test]

@@ -27,7 +27,7 @@ using UnityEngine;
 /// <b>숨김</b>(<see cref="SetCinematicHiddenServer"/> — 문이 닫힌 뒤 상승 동안)도 여기 한 곳이다. 둘 다 보스 등장 잠금과 독립된 복제 값이다.
 /// 숨김은 모델·실루엣(렌더러 forceRenderingOff)·머리 위 바를 감춘다. 입력은 둘 다 <see cref="PlayerLifeInputPolicy"/> 가 막고,
 /// 무적은 둘 중 하나라도 켜져 있는 동안 <see cref="InvulnerabilityCause.CinematicHidden"/> 토큰 하나가 맡는다.
-/// FSM 은 Cinematic 으로 바꾸지 않는다 — 걷는 동안 오너가 Motor 포즈·IsMoving 애니를 직접 쓰고(<see cref="BossTeleportManager"/>),
+/// FSM 은 Cinematic 으로 바꾸지 않는다 — 걷는 동안 오너가 Motor 걷기 변위·IsMoving 애니를 직접 쓰고(<see cref="BossTeleportManager"/>),
 /// 보스 등장 잠금(<see cref="BeginCinematicServer"/>)이 도착 뒤 겹쳐 걸려도 서로 풀지 않게.
 /// </summary>
 [DisallowMultipleComponent]

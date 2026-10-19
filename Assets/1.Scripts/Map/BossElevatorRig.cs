@@ -137,7 +137,7 @@ public sealed class BossElevatorRig : MonoBehaviour
 
     /// <summary>
     /// 슬롯의 칸 안 도착 지점(월드). 착지 중앙에서 (문 앞 지점 − 첫 지점) × <see cref="_insideSpread"/> 만큼 — 문 앞에 선 줄 모양 그대로 줄여 들어간다.
-    /// 높이는 문 앞 지점 높이(평지 보행).
+    /// 높이는 문 앞 지점 높이 — 보행은 수평만 쓰고 높이는 지면(칸 경사판·바닥 콜라이더)에 맡긴다.
     /// </summary>
     public Vector3 GetInsidePoint(int slot)
     {

@@ -110,16 +110,18 @@ public class BossTeleportManager : NetworkBehaviour
     // 이 피어에서 실루엣을 꺼 둔 참가자 — 연출이 끝나면(도착·취소·재도전·디스폰) 반드시 되켠다.
     private readonly List<PlayerSilhouetteTag> _suppressedSilhouettes = new List<PlayerSilhouetteTag>();
 
-    // 오너 보행(엘리베이터 문 앞 → 칸 안). 서버가 RPC 로 목표·시작 시각·시간을 주고, 오너가 Motor 포즈로 직선 이동한다.
+    // 오너 보행(엘리베이터 문 앞 → 칸 안). 서버가 RPC 로 목표·시작 시각·시간을 주고, 오너가 Motor 걷기 변위로 걸어 들어간다
+    // (칸 경사판·바닥 콜라이더를 타고 오른다). 도착 시각 뒤로는 그 자리를 Motor 포즈로 붙잡는다.
     private struct OwnerWalk
     {
         public bool Active;
         public double ElevatorStart;  // 어느 연출의 지시인가 — 시작 시각이 다른 값으로 바뀌면 버린다
-        public Vector3 Target;
+        public Vector3 Target;        // 칸 안 지점 — 수평만 쓴다(높이는 지면)
         public double StartAt;        // 서버시간
         public float Duration;
         public bool Started;
-        public Vector3 From;
+        public bool Arrived;          // 도착 시각이 지나 Hold 를 붙잡는 중
+        public Vector3 Hold;
     }
     private OwnerWalk _walk;
 
@@ -651,7 +653,7 @@ public class BossTeleportManager : NetworkBehaviour
 
     /// <summary>
     /// [오너] 엘리베이터 보행 지시 — <paramref name="startAt"/>(서버시간)부터 <paramref name="duration"/> 동안 지금 자리 → <paramref name="target"/>
-    /// 직선 보행(Walk 애니 = IsMoving). 도착 뒤에도 그 자리를 붙잡아 둔다(숨김·상승 동안 낙하·밀림 없음). 보스룸 도착·연출 끝에 풀린다.
+    /// Motor 걷기 변위로 보행(Walk 애니 = IsMoving, 칸 콜라이더를 타고 오른다). 도착 뒤에도 그 자리를 붙잡아 둔다(숨김·상승 동안 낙하·밀림 없음). 보스룸 도착·연출 끝에 풀린다.
     /// <paramref name="elevatorStart"/> = 어느 연출의 지시인가(복제 시작 시각과 RPC 의 도착 순서가 바뀌어도 맞춰 본다).
     /// </summary>
     [ClientRpc]
@@ -669,8 +671,10 @@ public class BossTeleportManager : NetworkBehaviour
         };
     }
 
-    // 오너 보행 — Motor 포즈 목표로 옮긴다. 포즈는 충돌 해석을 거치지 않아 문틀·칸 벽·다른 플레이어에 걸리지 않고,
-    // 수직 속도도 매 틱 0 이라 칸 안에서 떨어지지 않는다. 위치는 오너 NetworkTransform·IsMoving 은 NetworkAnimator(오너)로 복제된다.
+    // 오너 보행 — 평소 걷기와 같은 Motor 채널(AddGroundedDisplacement: 스윕 충돌·StepOffset·경사 투영·중력)로 걸어 칸 경사판·바닥을 타고 오른다.
+    // 입력 잠금(시네마틱)은 조작 입력만 막고 이 변위는 막지 않는다. 매 틱 남은 수평 거리 ÷ 남은 시간이라 시간표 도착 시각을 지킨다.
+    // 도착 시각 뒤로는 그 자리를 포즈로 붙잡는다(숨김·상승 동안 낙하·밀림 없음). 콜라이더에 막혀 못 들어왔으면 칸 안 지점(칸 바닥 높이)으로 옮겨 붙잡는다.
+    // 위치는 오너 NetworkTransform·IsMoving 은 NetworkAnimator(오너)로 복제된다.
     private void FixedUpdate()
     {
         if (!_walk.Active || _elevatorStartAt.Value != _walk.ElevatorStart) return;
@@ -686,22 +690,55 @@ public class BossTeleportManager : NetworkBehaviour
         if (!_walk.Started)
         {
             _walk.Started = true;
-            _walk.From = motor.Position;
-            _walk.Target.y = _walk.From.y; // 평지 보행 — 지금 발 높이 유지
 
             if (po.TryGetComponent(out PlayerStateController stateController)) stateController.EndDash();
             motor.ClearKnockbackVelocity();
+            // 줄 서서 걷는 참가자끼리(칸 안 지점 간격 0.72m < 캡슐 지름 0.76m) 막힘·밀어내기로 튀지 않게 — 보행·붙잡기 동안만. 벽·칸 콜라이더엔 그대로 막힌다.
+            motor.PassThroughUnitsOverride = true;
 
-            Vector3 dir = _walk.Target - _walk.From;
+            Vector3 dir = _walk.Target - motor.Position;
+            dir.y = 0f;
             if (po.TryGetComponent(out PlayerMovement movement)) movement.RotateImmediately(dir);
         }
 
-        float t = _walk.Duration > 0f ? Mathf.Clamp01((float)((now - _walk.StartAt) / _walk.Duration)) : 1f;
-        motor.SetPoseTarget(Vector3.Lerp(_walk.From, _walk.Target, t), po.transform.rotation);
-        if (player != null) player.SetAnimatorMoving(t < 1f);
+        // 시뮬레이션 기준 위치 — 직전 틱에 낸 변위까지 반영된 자리(실행 순서와 무관하게 이중 계산하지 않는다).
+        Vector3 position = motor.SimulationState.Position;
+        double walkEndAt = _walk.StartAt + _walk.Duration;
+        if (!_walk.Arrived && now >= walkEndAt)
+        {
+            _walk.Arrived = true;
+            _walk.Hold = position;
+            if (BossElevatorTimeline.WalkNeedsSnap(now, walkEndAt, _walk.Target - position))
+            {
+                _walk.Hold = CabFloorPoint(_walk.Target, motor);
+                Edit.LogWarning($"[ElevatorFlow] 보행이 칸 안 지점에 못 닿았다(남은 수평 {Vector3.ProjectOnPlane(_walk.Target - position, Vector3.up).magnitude:0.##}m) — " +
+                                $"{position} → {_walk.Hold} 로 옮긴다.", this);
+            }
+        }
+
+        if (_walk.Arrived)
+        {
+            motor.SetPoseTarget(_walk.Hold, po.transform.rotation);
+            if (player != null) player.SetAnimatorMoving(false);
+            return;
+        }
+
+        motor.AddGroundedDisplacement(BossElevatorTimeline.WalkStep(_walk.Target - position, walkEndAt - now, Time.fixedDeltaTime));
+        if (player != null) player.SetAnimatorMoving(true);
     }
 
-    /// <summary>오너 보행을 멈춘다(걷는 중이었으면 Walk 애니도 끈다). 멱등.</summary>
+    /// <summary>칸 안 지점 수평 자리의 칸 바닥(지면 마스크 첫 면) 높이. 못 찾으면 그 지점 그대로.</summary>
+    private static Vector3 CabFloorPoint(Vector3 target, PlayerMotor motor)
+    {
+        LayerMask groundMask = motor.GameRule != null
+            ? motor.GameRule.GetGroundMask(false)
+            : LayerMask.GetMask("Default", "Ground", "Env");
+        if (Physics.Raycast(target + Vector3.up * 2f, Vector3.down, out RaycastHit hit, 4f, groundMask, QueryTriggerInteraction.Ignore))
+            target.y = hit.point.y;
+        return target;
+    }
+
+    /// <summary>오너 보행을 멈춘다(걷는 중이었으면 Walk 애니·유닛 통과도 끈다). 멱등.</summary>
     private void StopOwnerWalk()
     {
         if (_walk.Active && _walk.Started)
@@ -710,6 +747,7 @@ public class BossTeleportManager : NetworkBehaviour
             NetworkObject po = nm != null ? nm.LocalClient?.PlayerObject : null;
             Player player = po != null ? po.GetComponent<Player>() : null;
             if (player != null) player.SetAnimatorMoving(false);
+            if (po != null && po.TryGetComponent(out PlayerMotor motor)) motor.PassThroughUnitsOverride = false;
         }
 
         _walk = default;

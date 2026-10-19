@@ -224,6 +224,33 @@ public sealed class BossElevatorTimeline
     /// <summary>슬롯의 보행 진행도(0 = 문 앞, 1 = 칸 안). 선형 — 걷는 속도가 일정하다.</summary>
     public float WalkProgressAt(int slot, double elapsed) => Progress(elapsed, WalkStartAt(slot), WalkDuration);
 
+    /// <summary>도착 시각에 칸 안 지점에서 이만큼(수평 m) 안이면 걸어서 도착한 것으로 본다 — 더 멀면 <see cref="WalkNeedsSnap"/>.</summary>
+    public const float WalkArriveTolerance = 0.25f;
+
+    /// <summary>
+    /// 오너 보행 한 틱의 수평 변위(m, y = 0) — 남은 수평 거리 ÷ 남은 시간 × <paramref name="deltaTime"/>. 남은 시간이 한 틱 이하면 남은 거리 전부.
+    /// 막혀서 뒤처지면 다음 틱 속도가 올라 따라잡는다. 높이는 지면(Motor 의 경사 투영·계단 오르기·중력)에 맡긴다.
+    /// </summary>
+    /// <param name="toTarget">지금 발 위치 → 칸 안 지점(수직 성분은 버린다).</param>
+    /// <param name="timeLeft">도착 시각까지 남은 시간(초).</param>
+    public static Vector3 WalkStep(Vector3 toTarget, double timeLeft, float deltaTime)
+    {
+        toTarget.y = 0f;
+        if (deltaTime <= 0f) return Vector3.zero;
+        if (timeLeft <= deltaTime) return toTarget;
+        return toTarget * (float)(deltaTime / timeLeft);
+    }
+
+    /// <summary>
+    /// 도착 시각(<paramref name="walkEndAt"/>, 같은 시간 도메인)이 지났는데 칸 안 지점에서 <see cref="WalkArriveTolerance"/> 보다 멀리 있는가 —
+    /// 콜라이더에 막혀 못 들어온 경우. 그러면 호출자가 칸 안 지점(그 자리 칸 바닥 높이)으로 옮긴다.
+    /// </summary>
+    public static bool WalkNeedsSnap(double now, double walkEndAt, Vector3 toTarget)
+    {
+        toTarget.y = 0f;
+        return now >= walkEndAt && toTarget.magnitude > WalkArriveTolerance;
+    }
+
     /// <summary>단계가 시작되는 경과 시각(초).</summary>
     public float StartOf(BossElevatorPhase phase)
     {

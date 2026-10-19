@@ -82,10 +82,23 @@ t = 0 은 카운트다운 끝(연출 시작). 괄호 = 이 수치로 짠 3인 �
 - **하강 = 암전 기준**(할 일 46 후속 5). 예전엔 페이드 인 끝 + 0.5 에 출발해 밝아진 화면에 멈춘 칸이 보였다. 이제 문 앞 이동 순간(`TeleportFrontAt`) + `descendDelay` —
   밝아질 때 이미 내려오는 중이다. 문 열림·보행·닫힘·상승은 하강 끝 기준이라 같이 앞당겨진다. 암전 유지·페이드 인은 하강과 겹치므로 단계 enum 에서 뺐다(`FadeAlphaAt` 별도 트랙).
 - **보행 = 오너 권한 연출 이동.** 서버가 페이드 인 끝(`FrontFadeInEndAt`, 하강 중 — 출발은 문 열림 뒤라 지시가 먼저 도착)에 오너에게 `ElevatorWalkOwnerClientRpc(목표, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
-  오너가 `FixedUpdate` 에서 `PlayerMotor.SetPoseTarget` 로 지금 자리 → 칸 안 지점을 **직선 보간**한다(시간 기준 — 출발 자리가 문 앞에서 조금 어긋나 있어도 같은 시각에 도착).
-  포즈 목표는 충돌 해석을 거치지 않아 문틀·칸 벽·다른 플레이어에 걸리지 않고, 매 틱 수직 속도 0 이라 떨어지지 않는다.
-  방향은 `PlayerMovement.RotateImmediately`, Walk 애니는 `Player.SetAnimatorMoving`(IsMoving) — 위치는 오너 NetworkTransform, 애니는 NetworkAnimator(오너)로 복제된다.
-  도착 뒤에도 보스방 도착 RPC·연출 끝까지 그 자리를 붙잡는다.
+  오너가 `FixedUpdate` 에서 평소 걷기와 같은 Motor 채널 `PlayerMotor.AddGroundedDisplacement` 로 지금 자리 → 칸 안 지점까지 **걸어 들어간다**(할 일 46 후속 9).
+  스윕 충돌·`StepOffset`·경사 투영·중력이 그대로 적용돼 칸 프리팹의 경사판(`Slope`)을 타고 칸 바닥(`Floor`)으로 올라간다 — 목표 높이는 고정하지 않고 지면에 맡긴다.
+  속도 = 매 틱 **남은 수평 거리 ÷ 남은 시간**(`BossElevatorTimeline.WalkStep`) — 시간표 도착 시각(`WalkEndAt`)을 지키고, 잠깐 막혀 뒤처지면 다음 틱에 따라잡는다.
+  시네마틱 입력 잠금은 조작 입력(`CanMove`)만 막고 이 변위는 막지 않는다. 걷는 동안·붙잡는 동안 `PassThroughUnitsOverride` 를 켜 참가자끼리 막힘·밀어내기를 끈다
+  (칸 안 지점 간격 0.72m < 캡슐 지름 0.76m — 줄 서 걷거나 도착할 때 튀지 않게. 벽·칸 콜라이더엔 그대로 막힌다). 보스방 도착 RPC·연출 끝(`StopOwnerWalk`)에 끈다.
+  방향은 `PlayerMovement.RotateImmediately`, Walk 애니는 `Player.SetAnimatorMoving`(IsMoving) — 위치는 오너 NetworkTransform, 애니는 NetworkAnimator(오너)로 복제된다
+  (오너 권위 브랜치라 서버 관측 시뮬레이션 `CapturesServerObservation` 은 꺼져 있다).
+  도착 시각부터는 **도착한 실제 발 높이** 그대로 `SetPoseTarget` 으로 붙잡는다(숨김·상승 동안 낙하·밀림 없음) — 보스방 도착 RPC·연출 끝까지.
+  **안전망 하나**: 도착 시각에 칸 안 지점에서 수평 `WalkArriveTolerance`(0.25m)보다 멀면(콜라이더가 너무 높거나 가팔라 막힘 — `WalkNeedsSnap`)
+  그 지점의 칸 바닥 높이(지면 마스크 레이캐스트)로 옮겨 붙잡고 `[ElevatorFlow]` 경고를 남긴다.
+- **칸 콜라이더 실측**(2026-10-19, 에디터 — 칸 착지 `localY 0.55`, 존 원점 기준): 문 앞 지면 y 0.49.
+  `Floor` 판(BoxCollider, Default) = 3.5×0.3×3, Y 45° → 월드 y 0.66~0.96, 윗면 **문 앞 지면 +0.47m**(StepOffset 0.3 초과 — 판 턱으로는 못 오른다), 보행 방향으로 칸 중심 ±1.75m.
+  `Slope` 경사판(BoxCollider, Default) = 0.5×0.17×2, **39.6°** 기울기(걸을 수 있는 한계 60° 이내), 중심 (-1.33, 0.75, 1.31), 앞 턱 지면 +0.17m(StepOffset 이내) → 윗 모서리 y 0.975 로 판 윗면에 이어진다.
+  폭(보행 직각) ±1m — P1 은 정중앙, P2·P3 은 경사판 구간에서 중심선 ±0.9m 로 세 슬롯 모두 경사판을 지난다.
+  플레이어: StepOffset 0.3 · MaxWalkableSlopeAngle 60° · 캡슐 반지름 0.38 / 높이 1.79. 보행 거리 5.37m(최장) ÷ 3m/s = 1.79초.
+  모터 스윕·접지 판정을 그대로 돌린 에디터 시뮬레이션에서 세 슬롯 모두 막힘 0틱으로 경사판 → 판 윗면(발 y 0.975)에 도착, 스냅 없음.
+  칸 착지 때 판·경사판과 문 앞 지점은 보행 방향으로 3.2m 이상(캡슐 반지름 빼고 2.8m) 떨어져 겹치지 않는다. 칸은 Rigidbody 없이 transform 으로만 움직인다.
 - **입력 잠금 = `PlayerEncounterLock.SetCinematicInputLockServer`**(새 복제 값). 숨김·보스 등장 잠금(`BeginCinematicServer`)과 독립 —
   FSM 을 Cinematic 으로 바꾸지 않아 보행 애니를 막지 않고, 도착 뒤 보스 등장 잠금이 겹쳐 걸려도 서로 풀지 않는다. 무적 토큰 `CinematicHidden` 은 입력 잠금·숨김 중 하나라도 켜진 동안.
 - **입력 잠금 구간 = 카운트다운이 끝난 순간(연출 시작, `FrontFadeOut` t=0) ~ 보스방 도착 뒤 보스 등장 잠금으로 넘길 때**(사용자 결정 2026-10-16).
