@@ -72,7 +72,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
     private bool activeEndsOnClipEvent;
     private bool hasClipFallback;
     private int activeStartFrame;
-    // 상태가 다시 시작됐다고 볼 안전망 연장 폭. 같은 바퀴 안에서는 매 틱 계산값이 거의 같아 이보다 작다.
+    // 상태가 다시 시작됐다고 볼 안전망 연장 폭. 같은 재생 안에서는 매 틱 계산값이 거의 같아 이보다 작다.
     private const float ClipRestartSlack = 0.05f;
     // 클립 길이를 못 구해 타이머 안전망으로 대체한 경고는 스킬당 1회.
     private readonly HashSet<PlayerSkillBase> clipFallbackWarned = new HashSet<PlayerSkillBase>();
@@ -708,10 +708,11 @@ public class PlayerSkillController : BaseNetworkBehaviour
         }
     }
 
-    // [서버] 이벤트 방식 안전망 = 지금부터 상태 클립 첫 바퀴 끝까지의 실제 시간 + padding.
+    // [서버] 이벤트 방식 안전망 = 지금부터 상태 클립 끝까지의 실제 시간 + padding.
     // 시작 프레임은 건너뛴다 — CrossFade 는 그 프레임 애니메이터 갱신 때 반영되므로 직전 상태(같은 상태 재시전 포함)를 읽을 수 있다.
-    // 첫 바퀴 동안은 계속 본다 — 원격 오너면 NetworkAnimator 가 오너의 CrossFade 를 늦게 받아 서버 상태를 다시 시작시키고
-    // (End 도 그만큼 늦게 온다), 그때 안전망을 늦춘다. 첫 바퀴를 넘기면(루프 클립) 더 늘리지 않는다.
+    // 클립 재생 동안은 계속 본다 — 원격 오너면 NetworkAnimator 가 오너의 CrossFade 를 늦게 받아 서버 상태를 다시 시작시키고
+    // (End 도 그만큼 늦게 온다), 그때 안전망을 늦춘다. 클립 끝(normalizedTime ≥ 1)을 넘기면 더 늘리지 않는다 —
+    // 한 번 재생 클립은 끝 프레임에 머문 채 normalizedTime 이 계속 커져 남은 시간이 0 이 되므로, 막지 않으면 매 틱 '지금 + padding' 으로 밀려 안 끊긴다.
     private void ResolveClipFallback()
     {
         if (Time.frameCount <= activeStartFrame)

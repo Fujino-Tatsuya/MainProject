@@ -53,6 +53,6 @@
 
 ### 안전망 = 클립 길이 (2026-10-19)
 R 은 이벤트 방식이다(요구 이벤트 Hit·End·Custom0 — `PlayerSkillBase.EndsOnClipEvent`). 서버 안전망·슈퍼아머 길이는
-`maxActiveDuration`(1.5) 이 아니라 **클립 실제 재생 시간** = 클립 길이 5.667 ÷ (상태 speed 1 × `UltimateSpeed` 1.2) = 4.722초 (+ 안전망 0.1 / 슈퍼아머 0.25).
+`maxActiveDuration`(1.5) 이 아니라 **클립 실제 재생 시간** = 한 번 재생(Loop Time 꺼짐) 클립 길이 5.667 ÷ (상태 speed 1 × `UltimateSpeed` 1.2) = 4.722초 (+ 안전망 0.1 / 슈퍼아머 0.25).
 컨트롤러가 상태 진입 뒤 런타임 `AnimatorStateInfo`·`AnimatorClipInfo` 로 읽는다(`PlayerSkillSafetyNet`). 그래서 **End 를 클립 안 어디로 옮겨도
 안전망이 먼저 끊지 않는다**(예전엔 1.6초에 끊겨 낙뢰가 걷혔다). 이벤트를 옮길 때 이펙트 쪽에서 바꿀 것은 없다.

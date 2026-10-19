@@ -68,6 +68,6 @@ public sealed class PlayerSkillSafetyNetTests
     {
         Assert.That(PlayerSkillSafetyNet.RemainingSeconds(4f, 0f), Is.EqualTo(4f).Within(1e-5f));
         Assert.That(PlayerSkillSafetyNet.RemainingSeconds(4f, 0.25f), Is.EqualTo(3f).Within(1e-5f));
-        Assert.That(PlayerSkillSafetyNet.RemainingSeconds(4f, 1.5f), Is.EqualTo(0f), "한 바퀴를 넘겼으면 0");
+        Assert.That(PlayerSkillSafetyNet.RemainingSeconds(4f, 1.5f), Is.EqualTo(0f), "클립 끝을 넘겼으면(끝 프레임에 머묾) 0");
     }
 }

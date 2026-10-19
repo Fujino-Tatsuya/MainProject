@@ -86,6 +86,16 @@ public sealed class FirstMeleeUltimateClipEventsTests
         Assert.That(end, Is.GreaterThan(hit), "End 는 Hit 뒤 — 같은 시각 두 이벤트의 발화 순서에 기대지 않는다");
     }
 
+    // R 은 한 번 재생 클립이다 — 안전망은 클립 끝(길이 ÷ 배율) + padding 이고, 끝에 머무는 동안 더 늘지 않는다.
+    [Test]
+    public void ClipPlaysOnce()
+    {
+        AnimationClip clip = LoadClip();
+
+        Assert.That(AnimationUtility.GetAnimationClipSettings(clip).loopTime, Is.False, "Loop Time 꺼짐");
+        Assert.That(clip.isLooping, Is.False);
+    }
+
     // 런타임은 상태 진입 뒤 AnimatorStateInfo 로 읽는 값을, 여기서는 에디터 컨트롤러에서 같은 공식으로 구한다.
     [Test]
     public void EndComesBeforeClipSafetyNet()
@@ -110,6 +120,7 @@ public sealed class FirstMeleeUltimateClipEventsTests
         float endRealTime = EventTime(clip, SkillAnimationEventType.End) / speed;
 
         Assert.That(usedClip, Is.True, "클립 길이 기준 안전망");
+        Assert.That(safetyNet, Is.EqualTo(clip.length / speed + EndFallbackPadding).Within(1e-4f), "클립 길이 ÷ 실제 속도 + padding");
         Assert.That(endRealTime, Is.LessThan(safetyNet),
             $"End 실제 {endRealTime:F3}s 가 안전망 {safetyNet:F3}s 뒤 — 안전망이 먼저 끊어 낙뢰가 걷힌다");
     }

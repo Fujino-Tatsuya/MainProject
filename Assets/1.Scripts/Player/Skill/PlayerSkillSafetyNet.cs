@@ -7,7 +7,7 @@ using UnityEngine;
 /// - 이벤트 방식(<see cref="PlayerSkillBase.EndsOnClipEvent"/> — 요구 이벤트에 End) = 상태 클립 실제 재생 시간 + padding.
 ///   실제 재생 시간 = 클립 길이 ÷ |상태 speed × speed 파라미터(speedMultiplier) × Animator.speed|.
 ///   클립을 못 찾거나 속도가 0 이면 타이머 방식으로 대체한다.
-/// 루프 클립도 한 바퀴 길이를 쓴다 — 이벤트 방식은 첫 바퀴의 End 로 끝나므로 한 바퀴가 상한이다.
+/// 이벤트 방식 상태 클립은 전부 한 번 재생(Loop Time 꺼짐)이다 — 끝에 머무는 동안 normalizedTime 은 1 을 넘어 커진다.
 /// </summary>
 public static class PlayerSkillSafetyNet
 {
@@ -26,7 +26,7 @@ public static class PlayerSkillSafetyNet
     public static float TimerSeconds(float maxActiveDuration, float padding) =>
         maxActiveDuration + Mathf.Max(0f, padding);
 
-    /// <summary>클립 한 바퀴의 실제 재생 시간(초). 클립 길이 ≤ 0 이거나 재생 속도가 0 이면 false.</summary>
+    /// <summary>클립 한 번 재생의 실제 시간(초). 클립 길이 ≤ 0 이거나 재생 속도가 0 이면 false.</summary>
     public static bool TryGetPlaybackSeconds(
         float clipLength, float stateSpeed, float speedMultiplier, float animatorSpeed, out float seconds)
     {
@@ -56,7 +56,7 @@ public static class PlayerSkillSafetyNet
         return usedClip ? playback + Mathf.Max(0f, padding) : TimerSeconds(maxActiveDuration, padding);
     }
 
-    /// <summary>지금 정규화 시각에서 클립 한 바퀴 끝까지 남은 실제 시간(초). 한 바퀴를 넘겼으면 0.</summary>
+    /// <summary>지금 정규화 시각에서 클립 끝까지 남은 실제 시간(초). 끝을 넘겼으면(normalizedTime ≥ 1) 0.</summary>
     public static float RemainingSeconds(float playbackSeconds, float normalizedTime) =>
         playbackSeconds * Mathf.Max(0f, 1f - normalizedTime);
 
