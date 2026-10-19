@@ -274,6 +274,34 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("레이드 ① 개전 콤보만 타 사이 간격(초) — 배우는 구간이라 느리게(팀장 10-18: 1.5 → 1초). 기존 23호 개전은 comboStepInterval.")]
     [Min(0f)] public float raidOpeningStepInterval = 1f;
 
+    // ─── 콤보 즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) — chainOnHit 콤보의 **후속 타에만** 적용. 단타 길이는 그대로 ───
+    [Tooltip("즉시 연결 콤보의 후속 돌진 준비 = 간파 창 길이(초). 단타 돌진은 행의 counterWindowDuration(1.3) 그대로.\n" +
+             "후속 돌진은 준비동작 클립을 건너뛰고 돌진 클립 첫 자세에서 이 시간만큼 멈췄다 나간다.")]
+    [DataTableIgnore] [Range(0.1f, 2f)] public float comboDashWindup = 0.7f;
+
+    [Tooltip("즉시 연결 콤보의 후속 잡기 예고(초). 단타 잡기는 행의 telegraphDuration(0.7) 그대로. 돌진 다음 잡기는 아래 칸.")]
+    [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraph = 0.3f;
+
+    [Tooltip("즉시 연결 콤보에서 **돌진 다음** 잡기의 예고(초) — 돌진 끝에서 바로 잡히면 피할 수 없다(경석 Play 10-19: 1초 여유).")]
+    [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraphAfterDash = 1f;
+
+    [Tooltip("즉시 연결 콤보에서 훅·어퍼가 맞힌 뒤 클립을 더 보여 주는 시간(초) — 바로 끊으면 너무 빨라 읽히지 않는다(경석 Play 10-19: 0.25~0.4).")]
+    [DataTableIgnore] [Min(0f)] public float comboHookFollowThrough = 0.3f;
+
+    [Tooltip("훅·어퍼를 **단타로**도 쓰는가. 끄면 룰렛에서 단타 훅·어퍼가 빠지고 콤보로만 나온다(경석 10-19 — 기존·레이드 끔).\n" +
+             "xlsx 가중치와 무관하게 적용된다(가중치 칸은 xlsx 가 덮어쓴다). 🔴 콤보가 없는 1인 Solo 는 켜 둘 것 — 끄면 근접 공격이 사라진다.")]
+    [DataTableIgnore] public bool singleHookUpper = true;
+
+    [Tooltip("즉시 연결 콤보에서 점프 다음 타가 있을 때 착지 후딜(초). 착지 히트 순간 착지 클립을 끊고 이 시간 뒤 다음 타. 단타 점프는 jumpRecoveryDuration.")]
+    [DataTableIgnore] [Min(0f)] public float comboJumpRecovery = 0f;
+
+    [Tooltip("즉시 연결 콤보에서 돌진 다음 타가 있을 때 돌진 복귀(초). 단타 돌진은 attackDuration(0.9) 그대로.")]
+    [DataTableIgnore] [Min(0f)] public float comboDashRecovery = 0.3f;
+
+    [Tooltip("훅·어퍼 **바닥 예고 표시**(네모·부채꼴). 끄면 표시만 빠지고 준비 자세 시간(telegraphDuration)은 그대로 — 모션을 보고 피한다.\n" +
+             "단타·콤보의 훅·어퍼 전부. 돌진 띠·잡기·점프 예고는 무관(팀장 10-19: 지금은 끔).")]
+    [DataTableIgnore] public bool hookTelegraphMarkers = true;
+
     [Header("페이즈 — hpThreshold 내림차순으로 저작")]
     public BossPhaseEntry[] phases =
     {

@@ -15,14 +15,31 @@ Update this file when a term becomes important enough that future agents or team
 - ⏸ 후속(범위 밖): 텍스처 남은 항목·v18.2 눈·입 UV 밀도(10/22 Codex 한도 해제 뒤 — PLAN §9 끝) · `Assassin_BaseColor` 4096 무압축(약 85 MiB → 4096 BC7 권장) · 판정 거리를 커진 몸에 맞출지 기획 확인 · 변신 R·Q 일섬 VFX 배율(민경) · 단검 전용 텍스처 · 로비 초상화 · `Run_Start`/`Run_Stop` 속도.
 - `Docs/tech/player-prefabs.md` 를 잠근 「거너 레이저건 정렬」 세션(`fix/GunnerGunAlign`)은 이미 병합됐다(`1d2e4b22`) — 그 잠금은 끝난 것으로 본다.
 
-## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **몬스터 데이터 인스펙터 1차(표시만)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-monster-data-inspector.md](PLAN-monster-data-inspector.md) ✅ 승인(§7 결정 · §8 교차검증) · 조사 원본 [monster-data-survey-1019.md](Docs/tech/monster-data-survey-1019.md)(333칸)
-- ✅ 1차 표시 구현(미커밋): `Monster/Editor/` `MonsterInspectorCatalog.cs`(칸 사전 — 이름·묶음·★ 은 여기 한 곳) · `MonsterDataSOEditor.cs` · `BossEntryDrawers.cs`(공격·콤보·타·페이즈 행) · `MonsterInspectorGUI.cs` · 테스트 `MonsterInspectorCatalogTests`(전투 러너에 등록) + `DataTableInspectorBadge.cs` 칸 단위 조회(`TryGetWrite`)·머리 요약 한 줄. 컴파일 error CS 0 · 전투 EditMode 240/0 · 인스펙터 화면 확인(No23·ChompBot) · 열고 펼쳐도 에셋 변경 0.
-- ⏳ 팀장·기획 눈 확인(★ 목록 조정은 사전 한 줄) · 다중 선택·Undo 손 확인.
-- ✅ 커밋 `b54596df`(인스펙터 1차).
-- ✅ `attackWindup` 연결 = [PLAN-attack-windup.md](PLAN-attack-windup.md)(미커밋) — `AttackAnticipation` 상태(Chomp·Humanoid)만 재생 속도로 windup ÷ attackSpeed 초에 끝나게. 히트는 계속 애니 이벤트. Humanoid 는 xlsx 0.55 로 지금(0.73)보다 빨라짐(경석 결정). 컴파일 0 · 전투 EditMode 246/0 · ✅ 경석 Play 확인(10-19) · ⏳ MPPM 2인.
-- ✅ 죽은 칸 6개 삭제(`jumpTelegraphPrefab`·`bombPrefab`·장판/드론 Obsolete 색 4 — xlsx r461 행 0 · Verify 필드 없음 0 · 차이 96 그대로). 2차는 안 한다(경석). 남은 미사용 9칸은 xlsx 행 정리(병합 Export) 뒤 삭제.
-- ⚠️ `[DataTableSheet]` SO 칸을 지우거나 이름 바꾸기 전에 **지금 xlsx** 를 다시 보고 Verify("필드 없음" 0) — 10-19 `raidSelfDestructDamageReduction` 삭제로 테이블 Play 가 막혔다(f5b48b27 로 복구).
-- (참고) 같은 작업 트리에 다른 세션의 미커밋 변경이 있다 — Dev 스크립트 `HIDE_DEBUG_UI` · `ProjectSettings` preloadedAssets · `BuildWindowsPlayer` 등. 이 작업과 무관.
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude) · **23호 콤보 즉시 연결 + 훅·어퍼 바닥 예고 토글**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-combo-chain.md](PLAN-boss-combo-chain.md) ✅ 승인 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · Verify 필드 없음 0 · ⏳ 경석 Play
+- 수정: `TwentyThreeBoss.cs`(즉시 연결·후속 타 분기·토글) · `BossComboEntry.chainOnHit` · `BossDataSO` 새 칸 5(comboDashWindup 0.7 · comboGrabTelegraph 0.3 · comboJumpRecovery 0 · comboDashRecovery 0.3 · hookTelegraphMarkers) · `BossComboPolicy`(+테스트) · 인스펙터 사전 · 에셋 No23·No23_Raid(콤보 6종 즉시 연결 · 새 HookHookHook w15·cd8 · 바닥 예고 끔). 개전 콤보는 즉시 연결 제외.
+- 같이 미커밋: 앞 단계 콤보 가중치(돌잡·점돌 w25·cd8 · UpperGrab) · PLAN-boss-balance.
+- 2차(경석 Play 후): 점프→돌진 이펙트 잔존 수정(끊긴 클립 루프 끄기 `StopCutClipLoopsClientRpc`) · 단타 훅·어퍼 끔(`singleHookUpper`) · 훅·어퍼 히트 뒤 0.3초(`comboHookFollowThrough`) · 돌진 다음 잡기 예고 1초(`comboGrabTelegraphAfterDash`) · 새 콤보 JumpJumpJump w15·cd12. 컴파일 0 · EditMode 257/0 · ⏳ Play.
+- ⚠️ 이 세션 중 Unity MCP 브리지(node, `mcp-bridge-launcher.js`)가 CPU 루프로 멈춰 PID 종료로 복구 — 메모리 [unity-mcp-bridge-hang] 대처 그대로 통했다.
+
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **23호 공격 빈도 밸런스**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-balance.md](PLAN-boss-balance.md) ✅ 승인
+- ⚠️ P1(가중치 10·쿨 16/12) → 경석 Play 에서 두 콤보가 한 번도 안 나옴 → **P1' 적용(미커밋)**: `DashGrab`·`JumpDash` 가중치 25·쿨 8 + **신규 `UpperGrab`(어퍼→잡기 무조건) 가중치 10·쿨 10** (No23·No23_Raid). 🔴 콤보 빈도 손잡이는 쿨이 아니라 **가중치**(첫 타 단타 쿨이 실제 제한). 시뮬 1인 근 기존 6.5초 · 레이드 7.7초.
+- ⏳ Play 체감(기존·레이드 1인 근 · 가능하면 원거리 2인) · P2(기존 전역 간격 0.75→1.0)·P3(잡기 예고 0.7→1.0) = 경석이 기획에 전달(xlsx).
+- 핵심: 원거리만 있는 조합이 가장 빡빡(5~6초)한데 숫자로는 거의 안 움직인다(주기 구조) — Play 로 보고 필요하면 규칙 논의. 시뮬 스크립트는 로컬(scratchpad) — 공유 여부 미정.
+
+## ▶▶ 다음 세션 (경석) — 미사용 8칸 삭제부터
+- 순서: ① 경석이 GameData.xlsx(Boss·Monster 시트)에서 8칸 행 삭제 → `svn update` → 충돌 0 → SVN 커밋 → 아트 핀 갱신 ② Claude 가 그 리비전에서 행이 다 빠졌는지 확인 → 코드에서 8칸 삭제 → 컴파일 · 전투 EditMode · Verify "필드 없음" 0.
+  8칸 = `maxShield`(Monster·Boss 둘 다) · `grabThrowDistance` · `bombThrowInterval` · `spreadAngle` · `raidSelfDestructCounterBonus` · `raidSelfDestructCounterInterval` · `raidSelfDestructCounterWindow` · `raidSelfDestructDamageReduction`.
+  🔴 순서를 거꾸로 하면 테이블 Play·빌드가 "필드 없음"으로 막힌다(10-19 f5b48b27).
+  같이 고칠 곳: `MonsterInspectorCatalog.cs` 의 Unused 줄 · `TwentyThreeBoss.cs`(grabThrowDistance 경고 · bombThrowInterval → `BossWells.ConfigureCycle`) · `BossDataSO` 의 미사용 주석.
+- ⏳ 남은 확인: `attackWindup` 선딜 MPPM 2인 · 팀장·기획 인스펙터 눈 확인(★ 목록) · 다중 선택·Undo.
+- 미커밋: `PLAN-monster-data-inspector.md`·`CONTEXT.md`(8칸 표기 정정·이 인수인계) — 다음 커밋에 같이. `Docs/design/boss/raid-23-phases.html` 은 이 작업과 무관(추적 안 함).
+
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **몬스터 데이터 인스펙터 + 선딜 연결 + 죽은 칸 삭제**, 브랜치 `feature/Boss23`) — ✅ 커밋(미푸시) · 계획 [PLAN-monster-data-inspector.md](PLAN-monster-data-inspector.md) · [PLAN-attack-windup.md](PLAN-attack-windup.md) · 조사 [monster-data-survey-1019.md](Docs/tech/monster-data-survey-1019.md)(333칸)
+- `b54596df` 인스펙터 1차 — `Monster/Editor/` `MonsterInspectorCatalog.cs`(칸 이름·묶음·★ 는 여기 한 곳) · `MonsterDataSOEditor.cs` · `BossEntryDrawers.cs` · `MonsterInspectorGUI.cs` · `DataTableInspectorBadge.TryGetWrite`. 표 값 ≠ SO 값은 맞추지 않는다(xlsx 가 정본 — 경석).
+- `2d9efa34` `attackWindup` = Chomp·Humanoid 예비동작 길이(÷ attackSpeed). 히트는 애니 이벤트 그대로. Humanoid 0.73 → 0.55(경석 결정). 경석 Play 확인.
+- `4f6bd2eb` 죽은 칸 6개 삭제(xlsx r461 행 0). 2차(장판·드론·예고 스타일·중간보스)는 안 한다.
+- 검증: 컴파일 0 · 전투 EditMode 246/0 · Verify 필드 없음 0 · 차이 96.
+- ⚠️ `[DataTableSheet]` SO 칸을 지우거나 이름 바꾸기 전에 **지금 xlsx** 를 다시 보고 Verify("필드 없음" 0).
 
 ## ▶▶ 작업 세션 (2026-10-18~19 · 경석(Claude) · 23호 콤보 · 레이드 ④ 실드 · HUD 레이캐스트, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r457(핀 457)
 - 콤보 = [PLAN-boss-combo.md](PLAN-boss-combo.md) — 룰렛 가중치(훅·훅·돌진 20 · 훅·어퍼 15 · 돌진·잡기 15 임시, 팀장이 정함) · 0.3초 · 추격 유예 1초 · 어그로 고정 · 개전 오른훅→왼훅→돌진(기존·레이드, 1인 제외). Codex 교차검증 반영.

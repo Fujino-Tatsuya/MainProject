@@ -107,6 +107,14 @@ public static class MonsterInspectorCatalog
         (Combos, "comboStepInterval", "콤보 타 사이 간격"),
         (Combos, "comboChaseGrace", "다음 타 추격 유예"),
         (Combos, "raidOpeningStepInterval", "레이드 ① 개전 타 간격"),
+        (Combos, "comboDashWindup", "즉시 연결 — 후속 돌진 준비(간파 창)"),
+        (Combos, "comboGrabTelegraph", "즉시 연결 — 후속 잡기 예고"),
+        (Combos, "comboGrabTelegraphAfterDash", "즉시 연결 — 돌진 다음 잡기 예고"),
+        (Combos, "comboHookFollowThrough", "즉시 연결 — 훅·어퍼 히트 뒤 더 재생"),
+        (Combos, "singleHookUpper", "훅·어퍼 단타 사용"),
+        (Combos, "comboJumpRecovery", "즉시 연결 — 점프 뒤 착지 후딜"),
+        (Combos, "comboDashRecovery", "즉시 연결 — 돌진 뒤 복귀"),
+        (Combos, "hookTelegraphMarkers", "훅·어퍼 바닥 예고 표시"),
 
         // ── 전투 기본 · 간파 · 그로기 ──
         (Combat, "archetype", "유형"),
@@ -328,6 +336,7 @@ public static class MonsterInspectorCatalog
         ["allowedFromPhase"] = "사용 시작 페이즈",
         ["cooldown"] = "콤보 쿨",
         ["steps"] = "순서",
+        ["chainOnHit"] = "즉시 연결 (맞히는 순간 다음 타)",
     };
 
     public static readonly IReadOnlyDictionary<string, string> PhaseFields = new Dictionary<string, string>
