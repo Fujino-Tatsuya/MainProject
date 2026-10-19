@@ -1612,6 +1612,7 @@ MonoBehaviour:
   rangeDecal: {fileID: 4898328899726629905}
   groundMarkerDecal: {fileID: 6379338664183841637}
   decalDepth: 5
+  targetMarkerMaterial: {fileID: 2100000, guid: ad285b3b24144f7686ff051897683f1f, type: 2}
 --- !u!1001 &6114957203948571001
 PrefabInstance:
   m_ObjectHideFlags: 0
