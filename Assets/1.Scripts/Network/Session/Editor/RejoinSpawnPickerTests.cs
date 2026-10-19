@@ -3,7 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 판 도중 재합류 스폰 지점(C14 Q-A) — 처음 스폰과 같은 칸 공식, 다른 플레이어가 없는 가장 앞 칸, 결정적, 보스 룸은 R3c 전까지 첫 스폰.
+/// 판 도중 재합류 스폰 지점(C14 Q-A) — 처음 스폰과 같은 칸 공식, 다른 플레이어가 없는 가장 앞 칸, 결정적. 보스 룸 모서리는 BossRoomRejoinTests.
 /// </summary>
 public sealed class RejoinSpawnPickerTests
 {
@@ -88,8 +88,9 @@ public sealed class RejoinSpawnPickerTests
     }
 
     [Test]
-    public void 보스_룸은_R3c_전까지_첫_스폰_공식이다()
+    public void 보스_룸이어도_모서리_입력이_없으면_첫_스폰_공식이다()
     {
+        // 모서리 선택은 BossRoomRejoinTests(R3c).
         var pick = RejoinSpawnPicker.Pick(Context(inBossRoom: true));
         Assert.That(pick.Pose.position, Is.EqualTo(Base + Offset));
     }

@@ -142,6 +142,9 @@ public class BossTeleportManager : NetworkBehaviour
     /// <summary>카운트다운 진행 중인지 (모든 피어에서 유효).</summary>
     public bool IsCountdownActive => _teleportAt.Value > 0d;
 
+    /// <summary>[서버 전용] 엘리베이터 연출이 진행 중인지(읽기 전용) — 판 도중 재합류 스폰 보류(C14 RejoinSpawnGate)가 읽는다.</summary>
+    public bool IsElevatorRunning => _elevatorRunning;
+
     public Vector2 EnterPadSize => enterPadSize;
     public Color IdleColor => idleColor;
     public Color ActiveColor => activeColor;

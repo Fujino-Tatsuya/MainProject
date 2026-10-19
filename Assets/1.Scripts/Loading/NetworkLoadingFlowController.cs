@@ -77,6 +77,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private readonly List<PendingRejoin> _pendingRejoin = new List<PendingRejoin>();
     private readonly List<PendingRejoin> _finishedRejoin = new List<PendingRejoin>();
     private readonly List<Vector3> _rejoinOtherPlayerPositions = new List<Vector3>();
+    private readonly List<Vector3> _rejoinBossRoomCandidates = new List<Vector3>();
+    private readonly List<Vector3> _rejoinBossPositions = new List<Vector3>();
+    private readonly List<Pose> _rejoinBossRoomCorners = new List<Pose>();
     private PartyWipeWatcher _partyWipeWatcher;
 
     private bool IsServerActive => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
@@ -711,11 +714,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
                              _sessionSceneLoadRoutine != null ||
                              (boss != null && boss.IsBossDefeatedServer);
 
-        // TODO(C14 R3c): 엘리베이터 재생 중(BossTeleportManager._elevatorRunning)은 아직 getter 가 없다 — R3c 가 IsElevatorRunning 을 붙여 연결한다.
-        var elevatorRunning = false;
         var teleport = BossTeleportManager.Instance;
-        var elevatorOrTeleportBusy = elevatorRunning ||
-                                     (teleport != null && (teleport.IsEncounterBusy || teleport.IsCountdownActive));
+        var elevatorOrTeleportBusy = teleport != null &&
+                                     (teleport.IsElevatorRunning || teleport.IsEncounterBusy || teleport.IsCountdownActive);
 
         var bossCinematic = boss != null && IsBossCinematicPhase(boss.Phase);
         var slowMotion = GlobalTimeScale.Instance != null && GlobalTimeScale.Instance.IsActive;
@@ -792,28 +793,61 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _finishedRejoin.Clear();
     }
 
-    // [서버] 맵 첫 스폰 지점(Q-A) — 처음 스폰과 같은 공식(RejoinSpawnPicker.SlotPose)의 빈 칸. 프리팹은 선택 저장소(playerId 로 승인 때 복원).
+    // [서버] 맵 첫 스폰 지점(Q-A) — 처음 스폰과 같은 공식(RejoinSpawnPicker.SlotPose)의 빈 칸. 보스 룸이면 모서리 4지점 중 가장 먼 곳(R3c).
+    // 프리팹은 선택 저장소(playerId 로 승인 때 복원).
     private void SpawnRejoiner(PendingRejoin entry)
     {
         var baseSpawnPoint = ResolveBasePlayerSpawnPoint();
         _rejoinOtherPlayerPositions.Clear();
+        _rejoinBossRoomCandidates.Clear();
         foreach (var other in _networkManager.ConnectedClientsList)
         {
             if (other.ClientId != entry.ClientId && other.PlayerObject != null)
             {
-                _rejoinOtherPlayerPositions.Add(other.PlayerObject.transform.position);
+                var position = other.PlayerObject.transform.position;
+                _rejoinOtherPlayerPositions.Add(position);
+
+                // 보스 룸 판정은 영구 사망자를 빼고 본다(메모 "생존·Soul" — 사망 연출 중도 아직 아레나 안이라 넣는다).
+                var lifeCycle = other.PlayerObject.GetComponent<PlayerLifeCycleController>();
+                if (lifeCycle == null || lifeCycle.State != PlayerLifeState.PermanentDead)
+                {
+                    _rejoinBossRoomCandidates.Add(position);
+                }
             }
         }
 
-        // TODO(C14 R3c): 보스 룸 판정 입력(Phase Combat·FailedSafe + BossArea 안 생존자) — 지금은 늘 false(첫 스폰).
-        var inBossRoom = false;
+        var boss = BossEncounterDirector.Instance;
+        var bossPhase = boss != null ? boss.Phase : BossEncounterPhase.Idle;
+        var inBossRoom = BossRoomRejoin.IsInBossRoom(bossPhase, BossRoomRejoin.AnyInsideBossArea(_rejoinBossRoomCandidates));
+
+        _rejoinBossPositions.Clear();
+        var cornersFromPrefab = false;
+        if (inBossRoom)
+        {
+            BossRoomRejoin.TryCollectCorners(_rejoinBossRoomCorners, out cornersFromPrefab);
+            // 보스 쪽 파일을 고치지 않으려고 Director 의 private 참조 대신 씬에서 찾는다(재합류 순간 1회).
+            foreach (var bossUnit in FindObjectsByType<TwentyThreeBoss>(FindObjectsSortMode.None))
+            {
+                if (bossUnit.isActiveAndEnabled)
+                {
+                    _rejoinBossPositions.Add(bossUnit.transform.position);
+                }
+            }
+        }
+        else
+        {
+            _rejoinBossRoomCorners.Clear();
+        }
+
         var pick = RejoinSpawnPicker.Pick(new RejoinSpawnContext(
             inBossRoom,
             baseSpawnPoint != null,
             baseSpawnPoint != null ? baseSpawnPoint.position : Vector3.zero,
             baseSpawnPoint != null ? baseSpawnPoint.rotation : Quaternion.identity,
             spawn_Offset,
-            _rejoinOtherPlayerPositions));
+            _rejoinOtherPlayerPositions,
+            _rejoinBossRoomCorners,
+            _rejoinBossPositions));
 
         var result = PlayerSpawnService.SpawnForClient(
             _networkManager, entry.ClientId, characterRoster, defaultPlayerPrefab, pick.Pose,
@@ -828,6 +862,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         Debug.Log(
             $"[Rejoin] 재합류 스폰 clientId={entry.ClientId} playerId={entry.PlayerId} prefab={result.Prefab.name} " +
             $"slot={pick.SlotIndex} others={_rejoinOtherPlayerPositions.Count} " +
+            $"bossRoom={inBossRoom}(phase={bossPhase}) corner={(pick.IsBossRoomCorner ? (cornersFromPrefab ? "prefab" : "fallback") : "-")} bosses={_rejoinBossPositions.Count} " +
             $"baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")} " +
             $"position={pick.Pose.position} waited={Time.unscaledTime - entry.EnqueuedAt:F1}s");
         BindRejoinedClient(entry, "spawn");
@@ -854,7 +889,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
             $"subscribers={subscribers} bound={MatchRoster.Server.BoundCount}/{MatchRoster.Server.Count} context={context}");
     }
 
-    // BossEncounterDirector.IsCinematicPhase(private)와 같은 값 — 보스 쪽 파일을 고치지 않으려고 공개 Phase 로 판정한다(R3c 에서 getter 로 바꿀 수 있다).
+    // BossEncounterDirector.IsCinematicPhase(private)와 같은 값 — 보스 쪽 파일을 고치지 않으려고 공개 Phase 로 판정한다.
+    // (R3c 판단: 사본 유지. Director 에 getter 를 열면 경석 영역 파일 수정이 생기고, 4줄 사본은 enum 이 바뀔 때만 어긋난다.)
     private static bool IsBossCinematicPhase(BossEncounterPhase phase)
     {
         return phase == BossEncounterPhase.Preparing ||
