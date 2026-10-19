@@ -1,8 +1,9 @@
 # 핸드오프 — 적 공격 범위표시 C3 패키지 (경석 담당)
 
-> 2026-10-19 · 브랜치 `feature/SkillIndicatorC3` · 작성: Claude(claude-alt).
+> 2026-10-19 · 작성: Claude(claude-alt).
 > 디자인 쪽에서 만든 **적 공격 범위표시 C3 시험 구현**을 몬스터 담당(경석)에게 넘기는 요약이다.
-> **이번 레인에서는 몬스터 스크립트를 고치지 않았다** — 스킬(플레이어) 범위표시만 적용했고, 적 쪽은 이 문서로만 전달한다.
+> 처음엔 문서로만 전달했으나(`feature/SkillIndicatorC3`), **할 일 57 에서 `feature/EnemyIndicatorC3` 에 몬스터 스크립트까지 적용했다**
+> — 적용 내역·되돌리기는 [§8 적용 완료](#8-적용-완료-할-일-57)를 볼 것.
 > 패키지 원본은 사용자가 별도로 전달한다. 상세(경로별 주의·되돌리기·웹 편집기 사용법)는 패키지 README 가 원본이다.
 
 ## 1. 한 줄 요약
@@ -53,7 +54,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | 기존 수정 (patch) | `Monster/Boss/BossAttackConeTelegraph.cs` | 01~05·08·10·11 데칼 |
 | | `Monster/Boss/BossElectricFloor.cs` | 15·16 |
 | | `Monster/Boss/GauntletBot.cs` | 09 — **패키지 기준 이후 development 에서 변경됨** |
-| | `Monster/Boss/TwentyThreeBoss.cs` | 06·07 점프 — **패키지 기준 이후 크게 변경됨(+305/−74)** |
+| | `Monster/Boss/TwentyThreeBoss.cs` | 06·07 점프 — **패키지 기준 이후 크게 변경됨(+471/−83, 2026-10-19 재확인)** |
 | | `Monster/Boss/WellsDroneAttack.cs` | 14 |
 | | `Monster/MonsterSkyStrike.cs` | 12 |
 | 신규 | `Monster/EnemyC3Visuals.cs` | JSON 파싱·텍스처 생성·캐시·점프 뷰 |
@@ -61,7 +62,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | 신규 | `Assets/Resources/Telegraph/EnemyC3Selected.json` | 런타임용 15개 펼친 설정 |
 
 - 경로는 `Assets/1.Scripts/` 기준. 신규 3개는 patch 에 없다 — meta 와 함께 따로 복사.
-- 패키지 patch 기준 HEAD 는 `6ed043d8`. 그 뒤로 `GauntletBot.cs`·`TwentyThreeBoss.cs` 가 바뀌었다(2026-10-19 확인) → **`git apply` 대신 diff 를 읽고 수동 통합** 권장.
+- 패키지 patch 기준 HEAD 는 `6ed043d8`. 그 뒤로 `GauntletBot.cs`·`TwentyThreeBoss.cs` 가 바뀌었다(2026-10-19 확인) → **`git apply` 대신 diff 를 읽고 수동 통합**했다(§8).
 - 신규 3개 meta guid(`acdcdb11…`·`727428fd…`·`b711abdb…`)는 현재 프로젝트와 충돌 없음(2026-10-19 확인).
 - prefab/scene 배선 변경 없음. 기존 Telegraph 재질·셰이더(`MA_TelegraphDecal`·`MA_TelegraphQuad`·`SG_TelegraphDecal`·`TelegraphQuad.shader`)에 그대로 의존.
 
@@ -99,3 +100,64 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - [ ] 전기 칸 경고→발동→점멸→해제, 타일 중첩
 - [ ] 첫 텍스처 생성 지연, 장시간 캐시 메모리, 재실행/씬 전환 정리
 - [ ] 철판 홈·지형 가림·다른 맵·다수 VFX 중첩·색각 차이에서 간파/일반 구분
+
+## 8. 적용 완료 (할 일 57)
+
+> 2026-10-19 · 브랜치 `feature/EnemyIndicatorC3` · 커밋 `637091b9` · 작성: Claude(claude-alt). **경석 통보용.**
+> 피해 범위·시간·서버 권한·RPC·쿨다운·애니 이벤트는 그대로이고 **바닥 예고 외형만** 바뀌었다.
+
+### 8.1 바뀐 파일
+
+| 구분 | 파일 (`Assets/` 기준) | 내용 |
+|---|---|---|
+| 신규 | `1.Scripts/Monster/EnemyC3Visuals.cs` | 패키지 그대로 복사, meta guid `acdcdb11…` 유지 |
+| 신규 | `1.Scripts/Monster/Editor/EnemyC3Validation.cs` | 패키지 그대로, guid `727428fd…` 유지 |
+| 신규 | `Resources/Telegraph/EnemyC3Selected.json` | 패키지 그대로, guid `b711abdb…` 유지 |
+| 수정 | `1.Scripts/Monster/Boss/BossAttackConeTelegraph.cs` | 01~05·08·10·11. 결과가 패키지 변경 후 전체본과 **동일** |
+| 수정 | `1.Scripts/Monster/Boss/BossElectricFloor.cs` | 15·16. 패키지 전체본과 동일 |
+| 수정 | `1.Scripts/Monster/Boss/WellsDroneAttack.cs` | 14. 패키지 전체본과 동일 |
+| 수정 | `1.Scripts/Monster/MonsterSkyStrike.cs` | 12. 패키지 전체본과 동일 |
+| 수정 | `1.Scripts/Monster/Boss/GauntletBot.cs` | 09. 아래 8.2 |
+| 수정 | `1.Scripts/Monster/Boss/TwentyThreeBoss.cs` | 06·07. 아래 8.2 |
+
+- 위 4개(전체본과 동일)는 패키지 기준 `6ed043d8` 이후 변경이 없어 패치 hunk 를 손으로 옮긴 결과가 전체본과 같다.
+- 기존 6개 `.meta`·prefab·scene·`Assets/50.Art`·`GameData.xlsx`·`TelegraphStyleSO` 와 그 에셋 값은 **안 건드렸다**.
+
+### 8.2 23호·건틀렛 — 현재 코드에 맞춰 옮긴 지점
+
+경석의 `6ed043d8` 이후 변경(23호 콤보 체인·점프 후딜·훅/어퍼 토글·예고 시간 `TelegraphTime`, 건틀렛 `IInterruptSlowMotionTarget`)은 **C3 hunk 와 겹치는 줄이 없었다.** 그래서 패키지 hunk 와 같은 내용을 현재 위치에 얹었고, 패키지와 다르게 바꾼 로직은 없다.
+
+| 파일 | 바뀐 지점 | 그대로 둔 것 |
+|---|---|---|
+| `GauntletBot.cs` | `LateUpdate` 의 스매시 예고 색칠 루프 — `TelegraphStyleSO.interrupt.fill` 파랑으로 SpriteRenderer 색을 바꾸던 것 → `EnemyC3Visuals.ApplySmash(go)` (sprite 를 C3 텍스처로 교체) | 카운터 창 판정·`_smashTintVersion` 재칠 조건·슬로우 모션 인터페이스(`_interruptSuccessCount`) |
+| `TwentyThreeBoss.cs` | 필드 `_c3JumpTelegraph` 추가 · `ShowJumpTelegraphClientRpc` 본문 = 카탈로그 루프(`Drop_Charge_Boundary/Indicator`) 대신 `EnemyC3Visuals.CreateJump(point, radius, growTime)` · `ReleaseJumpTelegraphs()` 첫 줄에서 C3 점프 뷰 파괴 | RPC 시그니처·호출 시점(서버 `BeginJumpHover` 표시 / `ApplyJumpLandingDamage`·`AbortAttackChain` 해제), 콤보·훅·돌진 로직 전부. `_boundaryHandle`/`_indicatorHandle`·`WarnNo…EntryOnce` 는 남겨 두었다(이제 쓰이지 않음 — 되돌리기 쉽게) |
+
+**알아 둘 점 (경석 변경과의 상호작용, 코드는 안 고침):**
+
+- `BossAttackConeTelegraph` 는 preset 을 **도형·팔레트·`growTime`** 으로 추론한다(`C3Id`). 즉시 연결 후속 훅·어퍼(`ChainedLight`)는 `growTime 0` 으로 표시를 띄우므로 **01(훅) 대신 05(레이지 돌진 · 쐐기 켬)** 로 분류된다. 지금은 `No23`·`No23_Raid` 에셋의 `hookTelegraphMarkers = 0` 이라 훅·어퍼 표시가 아예 안 떠 화면 영향이 없다. **토글을 켜면 연결 훅에 쐐기가 보일 수 있다** — 공격 ID 를 명시 전달할지 담당자 결정(§5 "preset 선택 방식").
+- 같은 이유로 예고 없는 즉발 공격(`telegraphDuration 0`, 기존 경로)도 05 로 분류된다(패키지 기준에서도 같았다).
+- 인터럽트 파랑(커밋 `de2df265`·`637104a1`)·공격 예고 색 조절(`3e28ddd0`)은 C3 경로에서 **JSON 팔레트로 대체**된다(간파 = 보라 `#d29ef5`). `TelegraphStyleSO` 값은 그대로라 `TelegraphStyleTests` 는 통과하지만, **그 에셋을 고쳐도 이 6개 경로의 색은 안 바뀐다** — 색은 `Resources/Telegraph/EnemyC3Selected.json` 에서 고친다.
+
+### 8.3 검증 (2026-10-19, 에디터 · Play 미진입)
+
+| 항목 | 결과 |
+|---|---|
+| 컴파일 | 에러 0 |
+| `Tools > Enemy C3 > Validate selected preset` | OK — 15 매핑·개별 override 3·원 경계/알파·어퍼 쐐기·돌진 쐐기 위치·스매시 쐐기·데칼 Show/Hide |
+| `Tools > Enemy C3 > Run existing telegraph tests` | 25 통과 / 0 실패 / 0 건너뜀 (TelegraphStyle·MonsterSkyStrike·BossElectricFloorPattern) |
+| `Tools > Tests > EditMode 전체 실행` | 2125 통과 / 0 실패 / 20 건너뜀 |
+
+증거 사본(생성 텍스처 PNG·결과 txt): `C:\UnityProject\_lane-artifacts\MainProject-WorkTree\enemy-c3-apply-20261019\`. 생성 텍스처이지 Play 화면이 아니다.
+
+### 8.4 되돌리기
+
+- **이번 적용만 통째로**: `git revert 637091b9` (신규 3개 삭제 + 6개 연결 원복이 한 커밋에 들어 있다).
+- **연결만 끄고 신규 파일은 남기기**: 6개 파일에서 `EnemyC3Visuals.` 호출 hunk 만 되돌린다(`git diff 637091b9~1 637091b9 -- <파일>` 의 반대). 패키지 `rollback/*.cs.txt` 는 `6ed043d8` 기준이라 **23호·건틀렛에는 덮어쓰면 안 된다**(경석 변경이 사라진다). 나머지 4개는 rollback 본과 원래 동일했다.
+- **신규 3개 제거**: 연결 hunk 를 먼저 되돌린 뒤 `EnemyC3Visuals.cs`·`Editor/EnemyC3Validation.cs`·`Resources/Telegraph/EnemyC3Selected.json` 을 meta 와 함께 삭제(순서를 바꾸면 컴파일 에러).
+
+### 8.5 남은 확인 — 사람이 Play 로 (§7 체크리스트와 같음)
+
+- [ ] 23호: 훅/어퍼(토글 켤 때)·잡기 부채꼴·일반/레이지 돌진·**콤보 연결 중** 예고, 점프 착지 원 성장·해제(콤보 즉시 연결·그로기·사망 포함)
+- [ ] 건틀렛 스매시 원 sprite 교체·페이드, 펀치 사각, 스피너 채찍/돌진
+- [ ] 박격포·웰즈 드론 착탄 원, 전기 장판 경고→발동→점멸→해제
+- [ ] MPPM 호스트/클라 양쪽 동일, 첫 텍스처 생성 지연·장시간 캐시 메모리
