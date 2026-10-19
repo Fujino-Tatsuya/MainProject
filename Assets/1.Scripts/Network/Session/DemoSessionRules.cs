@@ -41,14 +41,36 @@ public static class DemoSessionRules
     }
 
     /// <summary>
-    /// NGO 가 멈춘 사유. 거절 Reason 문자열 → 코드 변환은 C6(DemoJoinRule)에서 붙인다 — 지금은
-    /// 접속 중에 사유 없이 멈췄으면 응답 없음(Timeout), 그 밖은 Unknown.
+    /// NGO 가 멈춘 사유(<paramref name="disconnectReason"/> = NetworkManager.DisconnectReason).
+    /// <list type="number">
+    /// <item>서버 승인 거절 코드(<see cref="DemoJoinRule.ToApprovalReason"/>)면 그 사유. NGO 는 이 문자열을 DisconnectReasonMessage 로 보내고
+    /// 클라의 DisconnectReason 이 그대로 돌려준다.</item>
+    /// <item>접속 중에 사유가 없거나 전송 계층이 연결을 못 맺었으면(<c>[MaxConnectionAttempts]</c>·<c>[ProtocolTimeout]</c>) 응답 없음.</item>
+    /// <item>접속 중에 서버가 사유 없이 끊었으면(<c>[ClosedByRemote]</c>) 버전 불일치로 본다 — NGO 는 NetworkConfig 해시가 다르면
+    /// 승인 콜백 전에 사유 없이 끊는다(ConnectionRequestMessage.Deserialize). 우리 승인 콜백은 거절할 때 늘 사유를 넣으므로
+    /// 남는 경우는 해시 불일치, 그리고 드문 핸드셰이크 중 호스트 종료·연결 요청 버퍼 타임아웃뿐이다.</item>
+    /// <item>그 밖(접속 후 끊김 등)은 Unknown.</item>
+    /// </list>
+    /// NGO 의 DisconnectReason 은 <c>"[Disconnect Event][Client-N][TransportClientId-M][이벤트] 문구"</c> 형식이다.
     /// </summary>
     public static DemoJoinRejectReason ResolveStopReason(ReconnectState state, string disconnectReason)
     {
-        if (state == ReconnectState.Connecting && string.IsNullOrWhiteSpace(disconnectReason))
+        if (DemoJoinRule.TryParseApprovalReason(disconnectReason, out var rejected))
+            return rejected;
+        if (state != ReconnectState.Connecting)
+            return DemoJoinRejectReason.Unknown;
+        if (string.IsNullOrWhiteSpace(disconnectReason)
+            || ContainsTransportEvent(disconnectReason, "MaxConnectionAttempts")
+            || ContainsTransportEvent(disconnectReason, "ProtocolTimeout"))
             return DemoJoinRejectReason.Timeout;
+        if (ContainsTransportEvent(disconnectReason, "ClosedByRemote"))
+            return DemoJoinRejectReason.HashMismatch;
         return DemoJoinRejectReason.Unknown;
+    }
+
+    static bool ContainsTransportEvent(string disconnectReason, string eventName)
+    {
+        return disconnectReason.IndexOf($"[{eventName}]", StringComparison.Ordinal) >= 0;
     }
 
     /// <summary>

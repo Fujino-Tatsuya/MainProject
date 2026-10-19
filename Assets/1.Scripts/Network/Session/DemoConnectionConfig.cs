@@ -209,14 +209,36 @@ public sealed class DemoConnectionConfig
 #if UNITY_EDITOR
         if (!Unity.Multiplayer.PlayMode.CurrentPlayer.IsMainEditor)
         {
-            // 가상 플레이어의 dataPath 는 Library/VP/<인스턴스>/Assets 라서 그 폴더 이름이 인스턴스마다 다르다.
-            var instanceSuffix = Path.GetFileName(Path.GetDirectoryName(Application.dataPath));
-            result = ApplyMppmTags(result, Unity.Multiplayer.PlayMode.CurrentPlayer.Tags, instanceSuffix);
+            result = ApplyMppmTags(result, Unity.Multiplayer.PlayMode.CurrentPlayer.Tags, VirtualPlayerInstanceSuffix());
         }
 #endif
 
         return result;
     }
+
+    /// <summary>
+    /// 설정 파일을 거치지 않는 경로(Dev 부팅·태그 없는 MPPM·옛 타이틀 → 로비 수동 접속)의 playerId — PC 이름.
+    /// MPPM 가상 플레이어는 PC 이름이 같으므로 인스턴스 폴더 이름을 붙인다. 데모 흐름이면 DemoSessionDirector 가 설정 값으로 덮어쓴다.
+    /// </summary>
+    public static string ResolveLocalDefaultPlayerId()
+    {
+        var playerId = ResolveFallbackPlayerId(Environment.MachineName);
+#if UNITY_EDITOR
+        if (!Unity.Multiplayer.PlayMode.CurrentPlayer.IsMainEditor)
+        {
+            playerId = $"{playerId}-{VirtualPlayerInstanceSuffix()}";
+        }
+#endif
+        return playerId;
+    }
+
+#if UNITY_EDITOR
+    /// <summary>가상 플레이어의 dataPath 는 Library/VP/&lt;인스턴스&gt;/Assets 라서 그 폴더 이름이 인스턴스마다 다르다.</summary>
+    private static string VirtualPlayerInstanceSuffix()
+    {
+        return Path.GetFileName(Path.GetDirectoryName(Application.dataPath));
+    }
+#endif
 
     private static string ResolveFallbackPlayerId(string fallbackPlayerId)
     {

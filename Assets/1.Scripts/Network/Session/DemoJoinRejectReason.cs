@@ -13,6 +13,10 @@ public enum DemoJoinRejectReason
     HashMismatch,
     /// <summary>제한 시간 안에 접속되지 않았다(호스트가 꺼져 있거나 주소가 틀림).</summary>
     Timeout,
+    /// <summary>같은 playerId 가 이미 접속 중이다. 끊긴 직후 재접속이면 서버가 이전 연결을 정리한 뒤 들어간다.</summary>
+    DuplicatePlayerId,
+    /// <summary>ConnectionData 의 playerId 가 비었거나 깨졌다.</summary>
+    InvalidPlayerId,
     Unknown,
 }
 
@@ -30,6 +34,8 @@ public static class DemoJoinRejectReasonText
             case DemoJoinRejectReason.LobbyFull: return $"인원 가득 ({MaxPlayers}/{MaxPlayers})";
             case DemoJoinRejectReason.HashMismatch: return "버전 불일치 — 호스트와 같은 빌드인지 확인";
             case DemoJoinRejectReason.Timeout: return "응답 없음 — 호스트를 기다리는 중";
+            case DemoJoinRejectReason.DuplicatePlayerId: return "같은 플레이어 ID 가 이미 접속 중 — 설정 파일의 playerId 확인";
+            case DemoJoinRejectReason.InvalidPlayerId: return "플레이어 ID 가 올바르지 않음 — 설정 파일의 playerId 확인";
             default: return "알 수 없는 이유로 연결되지 않음";
         }
     }

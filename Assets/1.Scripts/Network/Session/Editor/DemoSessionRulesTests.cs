@@ -54,6 +54,34 @@ public sealed class DemoSessionRulesTests
         Assert.That(DemoSessionRules.ResolveStopReason(ReconnectState.Hosting, null), Is.EqualTo(DemoJoinRejectReason.Unknown));
     }
 
+    [TestCase(DemoJoinRejectReason.GameInProgress)]
+    [TestCase(DemoJoinRejectReason.LobbyFull)]
+    [TestCase(DemoJoinRejectReason.DuplicatePlayerId)]
+    [TestCase(DemoJoinRejectReason.InvalidPlayerId)]
+    public void 서버_거절_코드는_그_사유로_바꾼다(DemoJoinRejectReason reason)
+    {
+        var text = DemoJoinRule.ToApprovalReason(reason);
+        Assert.That(DemoSessionRules.ResolveStopReason(ReconnectState.Connecting, text), Is.EqualTo(reason));
+    }
+
+    [Test]
+    public void 전송_계층이_연결을_못_맺으면_응답_없음()
+    {
+        const string maxAttempts = "[Disconnect Event][Client-0][TransportClientId-0][MaxConnectionAttempts] Connection closed due to maximum connection attempts reached.";
+        const string protocolTimeout = "[Disconnect Event][Client-0][TransportClientId-0][ProtocolTimeout] Connection closed due to timed out.";
+        Assert.That(DemoSessionRules.ResolveStopReason(ReconnectState.Connecting, maxAttempts), Is.EqualTo(DemoJoinRejectReason.Timeout));
+        Assert.That(DemoSessionRules.ResolveStopReason(ReconnectState.Connecting, protocolTimeout), Is.EqualTo(DemoJoinRejectReason.Timeout));
+    }
+
+    [Test]
+    public void 접속_중_서버가_사유_없이_끊으면_버전_불일치()
+    {
+        const string closedByRemote = "[Disconnect Event][Client-0][TransportClientId-0][ClosedByRemote] Connection was closed by remote endpoint.";
+        Assert.That(DemoSessionRules.ResolveStopReason(ReconnectState.Connecting, closedByRemote), Is.EqualTo(DemoJoinRejectReason.HashMismatch));
+        Assert.That(DemoSessionRules.ResolveStopReason(ReconnectState.Connected, closedByRemote), Is.EqualTo(DemoJoinRejectReason.Unknown),
+            "접속한 뒤 끊긴 건 해시와 무관하다");
+    }
+
     // ─── 전송 타임아웃 ─────────────────────────────────────────────────
 
     [Test]

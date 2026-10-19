@@ -26,6 +26,9 @@ public sealed class DemoSessionDirector : MonoBehaviour
     /// <summary>이번 실행에서 데모 흐름이 켜졌는가. 로비의 옛 연결 패널을 숨기는 판단에 쓴다.</summary>
     public static bool IsDemoFlowActive { get; private set; }
 
+    /// <summary>접속 승인(<see cref="DemoJoinRule"/>)이 "로비인가" 를 판단할 씬 이름.</summary>
+    public string LobbySceneName => lobbySceneName;
+
     NetworkManager _networkManager;
     NetworkSessionLauncher _launcher;
     DemoConnectionLoadResult _loadResult;
@@ -85,6 +88,8 @@ public sealed class DemoSessionDirector : MonoBehaviour
 
         ApplyTransportTimeouts();
         _launcher.Mode = SessionConnectionMode.DirectIPv4;
+        // 재접속해도 같은 키로 이어지게 설정 파일의 playerId 를 ConnectionData 로 보낸다(Q4, C6).
+        _launcher.LocalPlayerId = _config.PlayerId;
         _loop = ReconnectLoop.FromConfig(_config);
         _overlay = DemoConnectionOverlay.Create();
         _bootTime = Time.realtimeSinceStartup;
