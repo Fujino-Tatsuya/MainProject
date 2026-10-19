@@ -607,69 +607,27 @@ public class NetworkLoadingFlowController : MonoBehaviour
         SpawnAllPlayers();
     }
 
+    // 위치 계산은 여기, 프리팹 결정·생성·SpawnAsPlayerObject 는 PlayerSpawnService(로비와 공용).
     private void SpawnPlayerForClient(ulong clientId, int spawnIndex, Transform baseSpawnPoint)
     {
-        if (!_networkManager.ConnectedClients.TryGetValue(clientId, out var client))
-        {
-            return;
-        }
-
-        if (client.PlayerObject != null)
-        {
-            // 조용히 넘기면 "왜 이 클라만 엉뚱한 곳에 있나"를 추적할 수 없다.
-            // 이미 PlayerObject 가 있으면 이 스폰은 건너뛰므로, 그 오브젝트가 어디에 있든 그대로 남는다.
-            Edit.LogWarning(
-                $"[Loading] clientId={clientId} 는 이미 PlayerObject 를 갖고 있어 스폰을 건너뜁니다. " +
-                $"기존 위치={client.PlayerObject.transform.position}, " +
-                $"이번에 스폰했을 위치={ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint).position}");
-            return;
-        }
-
-        var prefab = ResolvePlayerPrefabForClient(clientId);
-        if (prefab == null)
-        {
-            Edit.LogWarning($"[Loading] Player prefab is not assigned. clientId={clientId}");
-            return;
-        }
-
-        if (!prefab.TryGetComponent<NetworkObject>(out _))
-        {
-            Edit.LogWarning($"[Loading] Player prefab must have a {nameof(NetworkObject)} component. prefab={prefab.name}");
-            return;
-        }
-
         var spawnPose = ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint);
-        var player = Instantiate(prefab, spawnPose.position, spawnPose.rotation);
-        var targetScene = SceneManager.GetSceneByName(targetSceneName);
-        if (targetScene.IsValid() && targetScene.isLoaded)
+        var result = PlayerSpawnService.SpawnForClient(
+            _networkManager, clientId, characterRoster, defaultPlayerPrefab, spawnPose,
+            SceneManager.GetSceneByName(targetSceneName));
+        if (!result.Succeeded)
         {
-            SceneManager.MoveGameObjectToScene(player, targetScene);
+            return;
         }
-
-        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
 
         // 스폰 좌표는 "이 클라만 엉뚱한 위치" 류 문제의 1차 증거다. debugLogging 설정과 무관하게 남긴다.
         Edit.Log(
-            $"[Loading] Spawned player. clientId={clientId}, prefab={prefab.name}, " +
+            $"[Loading] Spawned player. clientId={clientId}, prefab={result.Prefab.name}, " +
             $"spawnIndex={spawnIndex}, baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")}, " +
             $"position={spawnPose.position}.");
     }
 
     /// <summary>스폰에 쓰는 캐릭터 로스터(튜토리얼 캐릭터 판별이 PrefabIdHash 역조회에 쓴다).</summary>
     public CharacterRoster CharacterRoster => characterRoster;
-
-    private GameObject ResolvePlayerPrefabForClient(ulong clientId)
-    {
-        if (ServerCharacterSelectionStore.TryGet(clientId, out var characterId) &&
-            characterRoster != null &&
-            characterRoster.TryGetAvailableCharacter(characterId, out var entry) &&
-            entry.PlayerPrefab != null)
-        {
-            return entry.PlayerPrefab;
-        }
-
-        return defaultPlayerPrefab;
-    }
 
     private Pose ResolvePlayerSpawnPose(int spawnIndex, Transform baseSpawnPoint)
     {
