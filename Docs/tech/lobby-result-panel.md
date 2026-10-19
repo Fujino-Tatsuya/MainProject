@@ -32,7 +32,7 @@
 | `event Action<LobbyResultCloseReason> Closed` | 닫힐 때 한 번(`Api`·`Button`·`Escape`·`AutoClose`) |
 | `static bool IsEscapeClaimed` | 패널이 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 
-- 표시 내용: 판 결과 라벨(CLEAR/FAILED/ABORTED, `UI.Result.*` 키) · 소요 시간 mm:ss · 플레이어 행(P1.., 초상화+이름, 가한 피해, 처치, 간파 성공, 사망) · "나" 행 금색 테두리.
+- 표시 내용: 판 결과 라벨(CLEAR/FAILED/ABORTED, `UI.Result.*` 키) · 소요 시간 mm:ss · 플레이어 행(아래 "열·순위") · "나" 행 금색 테두리.
 - **Show 시점에 값을 글자로 복사한다.** Show 직후 `SessionResult.Clear()` 해도 보이는 내용은 그대로다(단 그 뒤엔 다시 Show 할 수 없다).
 - "나" 강조 기준 = `NetworkManager.LocalClientId`(세션 유지 중이어야 한다).
 
@@ -50,8 +50,28 @@
 - 패널은 `SessionResult.Clear()` 를 부르지 않는다. 다음 판 시작 때(또는 끊김 정리 때) 흐름 쪽이 비운다.
   비우지 않으면 재접속·다음 로비 진입 때 지난 결과가 다시 열린다.
 
-## 레이아웃 (임시 확정, 목업 `UI_Panel/Mockups~/05_BattleResults_with_text.png` 와 다른 점)
-- 7열(순위/플레이어/가한피해/회복량/간파 성공/입은 피해/사망) → **6열**(번호/플레이어/가한 피해/처치/간파 성공/사망)을 가운데 정렬. 회복량·입은 피해는 데이터가 없어 뺐다. 순위 왕관(`icon_top_marker`)은 순위 데이터가 없어 안 쓴다.
+## 열·순위 (2차, 사용자 결정 10-19)
+- 열 = 목업 그대로 7열: **순위 / 플레이어 / 가한피해 / 회복량 / 간파 성공 / 입은 피해 / 사망** (셀 크기·위치 = 목업 manifest).
+  회복량·입은 피해 정의는 [result-stats-ui-setup.md](result-stats-ui-setup.md) "통계 정의".
+- **처치는 로비 패널에 표시하지 않는다**(목업에 없음). 데이터·페이로드·5.ResultScene 에는 그대로 있다.
+- 행은 **순위 순서**로 그린다. 순위 칸 = 1위 행만 왕관(`icon_top_marker`, 90×90 = PNG 180px/2, 칸 가운데), 나머지는 순위 숫자(2, 3 …). 플레이어 칸 = 초상화 + 캐릭터 이름. P 번호 열은 없다.
+- 순위 규칙 = `LobbyResultRanking`(순수, 테스트 `Editor/LobbyResultRankingTests.cs`):
+  - `score = 가한 피해 × (사망 0회 ? 1.5 : 1.0) × min(1.15 ^ 간파 성공 수, 4.0)` — 피해 0 이면 0. 간파 10회(1.15^10 ≈ 4.05)부터 상한.
+  - 점수 내림차순, **동점이면 슬롯 순**(clientId 오름차순 = `SessionResult.Players` 순서). 동점이어도 순위 번호는 다르다(1, 2 …).
+  - **최고 점수가 0 이면(아무도 피해를 못 냈다) 왕관 없음** — 1위 칸에 숫자 1.
+- 계수 = `LobbyResultPanel` 인스펙터(xlsx 없음):
+
+  | 필드 | 기본값 | 뜻 |
+  |---|---|---|
+  | `noDeathMultiplier` | 1.5 | 사망 0회 배수 |
+  | `deathMultiplier` | 1.0 | 1회 이상 사망 배수 |
+  | `counterBase` | 1.15 | 간파 1회마다 곱하는 밑 |
+  | `counterMultiplierCap` | 4.0 | 간파 배수 상한 |
+
+- 행 프리팹 자식: `Cell_Rank`(`Text_Rank`·`Image_Crown`) · `Cell_Player`(`Image_Portrait`·`Text_Character`) · `Text_Damage` · `Text_Healing` · `Text_Counters` · `Text_DamageTaken` · `Text_Deaths`.
+  `ResultPlayerRowView` 의 새 참조(`healingText`·`damageTakenText`·`rankText`·`crownImage`)는 비어 있으면 무시된다 — 5.ResultScene 행은 그대로.
+
+## 레이아웃 (목업 `UI_Panel/Mockups~/05_BattleResults_with_text.png` 와 다른 점)
 - 판 결과 라벨은 탭 제목 "전투결과" 오른쪽. 푸터 = "소요시간 :" + mm:ss, 오른쪽 큰 버튼 자리에 닫기 버튼 하나(`button_pill_neutral`). 왼쪽 작은 버튼 자리(다시하기)는 패널 그림의 빈 받침만 남는다.
 - 보이는 행은 3줄(실사용 3인). 4인 이상이면 행이 표 아래로 넘친다.
 - 폰트 = `NotoSansKR-VariableFont_wght SDF`(원본 SeoulAlrimTTF-Heavy 없음) — 목업보다 얇다.
@@ -60,11 +80,12 @@
 ## 다시 만들기·미리보기
 - `Tools/UI/Authoring/Lobby Result Panel` — 없는 프리팹만 만든다(있으면 손대지 않음, 다시 돌려도 바이트 동일).
 - `Tools/UI/Authoring/Lobby Result Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 열 폭·위치·색은 스크립트 상단 상수.
-- `Tools/UI/Preview/Lobby Result Panel 캡처` — 프리뷰 씬에서 가짜 결과(3인·P2 강조·CLEAR·12:34)로 1920×1080 PNG 와 목업 비교 PNG 를
+- `Tools/UI/Preview/Lobby Result Panel 캡처` — 프리뷰 씬에서 가짜 결과(3인·P2 강조·CLEAR·12:34, 순위 P3→P1→P2 로 슬롯과 다르게)로 1920×1080 PNG 와 목업 비교 PNG 를
   `C:/UnityProject/_lane-artifacts/MainProject-WorkTree/48-result-panel/` 에 저장하고 `SessionResult.Clear()` 로 되돌린다. 열린 씬은 건드리지 않는다.
-- 테스트: `Tools/Tests/결과 통계 EditMode 테스트 실행`(`LobbyResultPanelRulesTests` 포함).
+- 테스트: `Tools/Tests/결과 통계 EditMode 테스트 실행`(`LobbyResultPanelRulesTests`·`LobbyResultRankingTests` 포함).
 
 ## ⏳ 사람 Play 확인
 - 판 끝 → 로비 복귀 때 패널이 뜨고 값이 결과와 같은가(호스트·클라 각각, "나" 강조가 자기 행인가).
 - 닫기 버튼·ESC·15초 자동 닫힘, 열린 동안 이동·공격이 막히고 닫으면 풀리는가. 슬로모션 중에도 15초가 실제 시간인가.
 - 첫 부팅·재접속 로비에서는 안 뜨는가(호출 측 Clear 확인).
+- 행이 순위 순서인가, 1위만 왕관인가(아무도 피해 0 이면 왕관 없음). 회복량·입은 피해 값이 호스트·클라에서 같은가.

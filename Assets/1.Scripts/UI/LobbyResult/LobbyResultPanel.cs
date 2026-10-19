@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -7,7 +8,8 @@ using UnityEngine.UI;
 /// <summary>
 /// 로비 결과 패널(할 일 48) — 판이 끝나고 로비로 돌아왔을 때 직전 판 <see cref="SessionResult"/> 를 보여 준다.
 /// 표시는 <see cref="ResultStatsView"/>(판 결과·플레이어 행)를 재사용하고, 소요 시간·열고 닫기·모달만 여기서 한다.
-/// 열고 닫기 판단은 <see cref="LobbyResultPanelRules"/>. 사용법 = Docs/tech/lobby-result-panel.md.
+/// 열고 닫기 판단은 <see cref="LobbyResultPanelRules"/>, 행 순위·왕관은 <see cref="LobbyResultRanking"/>(계수 = 인스펙터).
+/// 사용법 = Docs/tech/lobby-result-panel.md.
 ///
 /// - 열려 있는 동안 <c>content</c> 의 <see cref="UiModalBlocker"/> 가 로컬 플레이어 입력을 막는다.
 /// - 닫기 버튼·ESC 로 각자(로컬) 닫고, 열린 뒤 <c>autoCloseSeconds</c>(unscaled) 가 지나면 저절로 닫힌다.
@@ -29,6 +31,16 @@ public sealed class LobbyResultPanel : MonoBehaviour
     [SerializeField] private float autoCloseSeconds = LobbyResultPanelRules.DefaultAutoCloseSeconds;
     [SerializeField] private bool closeWithEscape = true;
 
+    [Header("Ranking (score = 가한 피해 × 사망 배수 × min(간파 밑 ^ 간파 성공, 간파 상한))")]
+    [Tooltip("사망 0회일 때 배수.")]
+    [SerializeField] private float noDeathMultiplier = LobbyResultScoreWeights.DefaultNoDeathMultiplier;
+    [Tooltip("1회 이상 사망했을 때 배수.")]
+    [SerializeField] private float deathMultiplier = LobbyResultScoreWeights.DefaultDeathMultiplier;
+    [Tooltip("간파 배수의 밑 — 간파 성공 1회마다 이만큼 곱한다.")]
+    [SerializeField] private float counterBase = LobbyResultScoreWeights.DefaultCounterBase;
+    [Tooltip("간파 배수 상한.")]
+    [SerializeField] private float counterMultiplierCap = LobbyResultScoreWeights.DefaultCounterMultiplierCap;
+
     [Header("Outcome Colors")]
     [SerializeField] private Color clearedColor = new Color(1f, 0.8f, 0.25f, 1f);
     [SerializeField] private Color failedColor = new Color(1f, 0.42f, 0.38f, 1f);
@@ -37,6 +49,7 @@ public sealed class LobbyResultPanel : MonoBehaviour
     private static int s_openCount;
     private static int s_escapeClaimedFrame = -1;
 
+    private readonly List<LobbyResultRankEntry> _ranking = new List<LobbyResultRankEntry>();
     private LobbyResultPanelRules _rules;
     private bool _countedOpen;
 
@@ -126,10 +139,9 @@ public sealed class LobbyResultPanel : MonoBehaviour
     {
         if (statsView != null)
         {
-            if (localClientIdOverride.HasValue)
-                statsView.Apply(localClientIdOverride.Value);
-            else
-                statsView.Apply();
+            // 행은 순위 순서로 그린다(1위 = 왕관). 결과가 없으면 빈 순위 → 행 없음.
+            LobbyResultRanking.Rank(SessionResult.HasValue ? SessionResult.Players : null, ScoreWeights, _ranking);
+            statsView.Apply(localClientIdOverride ?? ResultStatsView.GetLocalClientId(), _ranking);
         }
 
         if (playTimeText != null)
@@ -138,6 +150,15 @@ public sealed class LobbyResultPanel : MonoBehaviour
         if (outcomeText != null && SessionResult.HasValue)
             outcomeText.color = OutcomeColor(SessionResult.Outcome);
     }
+
+    /// <summary>인스펙터 순위 계수.</summary>
+    public LobbyResultScoreWeights ScoreWeights => new LobbyResultScoreWeights
+    {
+        NoDeathMultiplier = noDeathMultiplier,
+        DeathMultiplier = deathMultiplier,
+        CounterBase = counterBase,
+        CounterMultiplierCap = counterMultiplierCap
+    };
 
     private Color OutcomeColor(SessionOutcome outcome)
     {

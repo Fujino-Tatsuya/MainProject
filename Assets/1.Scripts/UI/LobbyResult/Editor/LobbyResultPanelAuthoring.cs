@@ -10,7 +10,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 로비 결과 패널(할 일 48) — <c>LobbyResultPanel.prefab</c> 과 행 프리팹 <c>LobbyResultPlayerRow.prefab</c> 을 만든다.
 /// 배치 = UI_Panel 아트 05_BattleResults(1920×1080 좌표, Sprite 2배 해상도 PPU 200 → RectTransform = PNG 픽셀/2).
-/// 목업 7열(순위/플레이어/가한피해/회복량/간파 성공/입은 피해/사망) 대신 기존 데이터 6열을 가운데 정렬로 둔다.
+/// 목업 7열(순위/플레이어/가한피해/회복량/간파 성공/입은 피해/사망)을 목업 셀 크기·위치 그대로 둔다. 1위 행 순위 칸 = 왕관.
 ///
 /// 🔴 멱등 — 기본 메뉴는 프리팹이 이미 있으면 손대지 않는다(손으로 맞춘 레이아웃 보호).
 /// 처음부터 다시 만들려면 "(재생성)" 메뉴. 씬에는 배치하지 않는다(로비 배치는 Work3 레인).
@@ -40,15 +40,20 @@ public static class LobbyResultPanelAuthoring
         public bool Narrow;
     }
 
+    // 목업 7열 그대로. 처치(Kills)는 목업에 없어 로비 패널에서는 보이지 않는다(데이터·5.ResultScene 은 그대로).
     static readonly Column[] Columns =
     {
-        new Column { Name = "Slot",     Header = "번호",      Narrow = true },
-        new Column { Name = "Player",   Header = "플레이어" },
-        new Column { Name = "Damage",   Header = "가한 피해" },
-        new Column { Name = "Kills",    Header = "처치" },
-        new Column { Name = "Counters", Header = "간파 성공" },
-        new Column { Name = "Deaths",   Header = "사망",      Narrow = true },
+        new Column { Name = "Rank",        Header = "순위",      Narrow = true },
+        new Column { Name = "Player",      Header = "플레이어" },
+        new Column { Name = "Damage",      Header = "가한피해" },
+        new Column { Name = "Healing",     Header = "회복량" },
+        new Column { Name = "Counters",    Header = "간파 성공" },
+        new Column { Name = "DamageTaken", Header = "입은 피해" },
+        new Column { Name = "Deaths",      Header = "사망",      Narrow = true },
     };
+
+    // 왕관 배지 — icon_top_marker 180px → 90(PNG 픽셀/2), 목업처럼 순위 칸 가운데.
+    const string CrownSprite = "Icons/icon_top_marker.png";
 
     const float NarrowW = 150f;
     const float WideW = 235.3786f;
@@ -73,7 +78,7 @@ public static class LobbyResultPanelAuthoring
         return w + ColumnGap * (Columns.Length - 1);
     }
 
-    static float TableLeft => 960f - TableWidth() * 0.5f;
+    const float TableLeft = 192.0369f; // 목업 첫 칸 x(7열 표 = 패널 안 가운데)
     static float RowWidth => TableWidth() + RowPadX * 2f;
 
     static float ColumnLeft(int index)
@@ -140,7 +145,7 @@ public static class LobbyResultPanelAuthoring
 
     sealed class Sprites
     {
-        public Sprite Panel, HeaderCapsule, CellNarrow, CellWide, RowBacking, TimerCapsule, Pill;
+        public Sprite Panel, HeaderCapsule, CellNarrow, CellWide, RowBacking, TimerCapsule, Pill, Crown;
 
         public bool Load()
         {
@@ -151,8 +156,9 @@ public static class LobbyResultPanelAuthoring
             RowBacking = LoadSprite("Results/result_row_backing.png");
             TimerCapsule = LoadSprite("Results/result_timer_capsule.png");
             Pill = LoadSprite("Buttons/button_pill_neutral.png");
+            Crown = LoadSprite(CrownSprite);
             return Panel != null && HeaderCapsule != null && CellNarrow != null && CellWide != null &&
-                   RowBacking != null && TimerCapsule != null && Pill != null;
+                   RowBacking != null && TimerCapsule != null && Pill != null && Crown != null;
         }
 
         static Sprite LoadSprite(string relative)
@@ -225,6 +231,25 @@ public static class LobbyResultPanelAuthoring
                     continue;
                 }
 
+                if (column.Name == "Rank")
+                {
+                    // 1위 = 왕관만, 나머지 = 순위 숫자만(ResultPlayerRowView.SetRank 가 고른다).
+                    RectTransform crown = NewRect("Image_Crown", cell);
+                    crown.anchorMin = crown.anchorMax = new Vector2(0.5f, 0.5f);
+                    crown.pivot = new Vector2(0.5f, 0.5f);
+                    crown.anchoredPosition = Vector2.zero;
+                    crown.sizeDelta = NativeSize(sprites.Crown);
+                    Image crownImage = AddImage(crown.gameObject, sprites.Crown, false, Color.white);
+                    crownImage.preserveAspect = true;
+                    crownImage.enabled = false;
+                    refs["Image_Crown"] = crownImage;
+
+                    RectTransform rank = NewRect("Text_Rank", cell);
+                    StretchWithOffset(rank, -Padding);
+                    refs["Text_Rank"] = AddText(rank, font, "-", 52f, TextAlignmentOptions.Center, Color.white);
+                    continue;
+                }
+
                 RectTransform text = NewRect("Text_" + column.Name, cell);
                 StretchWithOffset(text, -Padding);
                 refs["Text_" + column.Name] = AddText(text, font, "-", 44f, TextAlignmentOptions.Center, Color.white);
@@ -232,13 +257,16 @@ public static class LobbyResultPanelAuthoring
 
             ResultPlayerRowView view = root.AddComponent<ResultPlayerRowView>();
             var so = new SerializedObject(view);
-            so.FindProperty("slotText").objectReferenceValue = refs["Text_Slot"];
+            // 슬롯(P1..)·처치 칸은 없다 — 비워 두면 ResultPlayerRowView 가 건너뛴다.
             so.FindProperty("characterText").objectReferenceValue = refs["Text_Character"];
             so.FindProperty("portraitImage").objectReferenceValue = refs["Image_Portrait"];
             so.FindProperty("damageText").objectReferenceValue = refs["Text_Damage"];
-            so.FindProperty("killsText").objectReferenceValue = refs["Text_Kills"];
             so.FindProperty("countersText").objectReferenceValue = refs["Text_Counters"];
             so.FindProperty("deathsText").objectReferenceValue = refs["Text_Deaths"];
+            so.FindProperty("healingText").objectReferenceValue = refs["Text_Healing"];
+            so.FindProperty("damageTakenText").objectReferenceValue = refs["Text_DamageTaken"];
+            so.FindProperty("rankText").objectReferenceValue = refs["Text_Rank"];
+            so.FindProperty("crownImage").objectReferenceValue = refs["Image_Crown"];
             so.FindProperty("localMarker").objectReferenceValue = marker.gameObject;
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -407,12 +435,16 @@ public static class LobbyResultPanelAuthoring
         Camera camera = null;
         try
         {
-            // 가짜 결과 — 3인, 로스터 캐릭터 0·1·2, P2 가 "나", 클리어, 12:34
+            // 가짜 결과 — 3인, 로스터 캐릭터 0·1·2, P2 가 "나", 클리어, 12:34.
+            // 순위가 슬롯 순서와 다르게 섞이도록: 피해 최다 P1(사망 1) < 무사망·간파 상한 P3 → 순위 P3, P1, P2.
             SessionResult.Capture(SessionOutcome.Cleared, 754.4f, new List<PlayerSessionStats>
             {
-                new PlayerSessionStats { ClientId = 0, CharacterId = 0, Damage = 48210, Kills = 37, Counters = 6, Deaths = 1 },
-                new PlayerSessionStats { ClientId = 1, CharacterId = 1, Damage = 61875, Kills = 52, Counters = 2, Deaths = 0 },
-                new PlayerSessionStats { ClientId = 2, CharacterId = 2, Damage = 39940, Kills = 29, Counters = 11, Deaths = 3 },
+                new PlayerSessionStats { ClientId = 0, CharacterId = 0, Damage = 48210, Kills = 37, Counters = 6, Deaths = 1,
+                    Healing = 1240, DamageTaken = 9840 },
+                new PlayerSessionStats { ClientId = 1, CharacterId = 1, Damage = 41875, Kills = 52, Counters = 2, Deaths = 0,
+                    Healing = 0, DamageTaken = 5310 },
+                new PlayerSessionStats { ClientId = 2, CharacterId = 2, Damage = 39940, Kills = 29, Counters = 11, Deaths = 0,
+                    Healing = 3460, DamageTaken = 4120 },
             });
 
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, preview);

@@ -14,7 +14,8 @@ internal static class ResultStatsEditModeTestRunner
     {
         "^SessionStatsAggregatorTests", // 집계 필터·막타·사망 전이
         "^SessionResultPayloadTests",   // GoToResult 가변 페이로드 왕복
-        "^LobbyResultPanelRulesTests"   // 로비 결과 패널 열고 닫기(할 일 48)
+        "^LobbyResultPanelRulesTests",  // 로비 결과 패널 열고 닫기(할 일 48)
+        "^LobbyResultRankingTests"      // 로비 결과 패널 순위 점수·왕관(할 일 48)
     };
 
     const string Tag = "[ResultStatsTests]";

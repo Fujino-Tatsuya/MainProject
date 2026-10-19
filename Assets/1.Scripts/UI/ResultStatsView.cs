@@ -54,7 +54,13 @@ public sealed class ResultStatsView : MonoBehaviour
     public void Apply() => Apply(GetLocalClientId());
 
     /// <summary>"나" 강조 기준 clientId 를 직접 준다(에디터 미리보기 등 NetworkManager 가 없을 때).</summary>
-    public void Apply(ulong localClientId)
+    public void Apply(ulong localClientId) => Apply(localClientId, null);
+
+    /// <summary>
+    /// <paramref name="ranking"/> 이 있으면 그 순서(순위 순)로 행을 그리고 순위 셀을 채운다(로비 결과 패널).
+    /// null 이면 슬롯 순서 그대로(5.ResultScene).
+    /// </summary>
+    public void Apply(ulong localClientId, IReadOnlyList<LobbyResultRankEntry> ranking)
     {
         // 팀 처치 합은 표시하지 않는다(PLAN-result-stats) — 처치 수는 플레이어 행에 있다.
         if (killsText != null)
@@ -65,13 +71,13 @@ public sealed class ResultStatsView : MonoBehaviour
             // 결과 없이 들어온 경우(직접 씬 실행 등) — 빈 값을 그대로 보여주지 않고 대시로 표기.
             SetText(outcomeText, "-");
             SetText(survivalText, SurvivalText(survivalPrefix, "--:--"));
-            RebuildRows(null, localClientId);
+            RebuildRows(null, localClientId, null);
             return;
         }
 
         SetText(outcomeText, OutcomeText(SessionResult.Outcome, clearedLabel, failedLabel, abortedLabel));
         SetText(survivalText, SurvivalText(survivalPrefix, SessionResult.FormatSurvival()));
-        RebuildRows(SessionResult.Players, localClientId);
+        RebuildRows(SessionResult.Players, localClientId, ranking);
     }
 
     /// <summary>판 결과 라벨 — <c>UI.Result.Cleared/Failed/Aborted</c>. 시트에 행이 없으면 직렬화 라벨.</summary>
@@ -92,7 +98,8 @@ public sealed class ResultStatsView : MonoBehaviour
     public static string SurvivalText(string prefix, string time) =>
         UiStrings.ResultSurvival.FormatOr((prefix ?? string.Empty) + "{time}", new Dictionary<string, string> { ["time"] = time });
 
-    private void RebuildRows(IReadOnlyList<PlayerSessionStats> players, ulong localClientId)
+    private void RebuildRows(IReadOnlyList<PlayerSessionStats> players, ulong localClientId,
+        IReadOnlyList<LobbyResultRankEntry> ranking)
     {
         for (int i = 0; i < _rows.Count; i++)
         {
@@ -115,12 +122,16 @@ public sealed class ResultStatsView : MonoBehaviour
             return;
         }
 
+        bool ranked = ranking != null && ranking.Count == players.Count;
         for (int i = 0; i < players.Count; i++)
         {
-            PlayerSessionStats stats = players[i];
+            int index = ranked ? ranking[i].PlayerIndex : i;
+            PlayerSessionStats stats = players[index];
             ResultPlayerRowView row = Instantiate(playerRowPrefab, playerRowContainer);
-            row.name = $"PlayerRow_P{i + 1}";
-            row.Bind(i + 1, stats, FindCharacter(stats.CharacterId), stats.ClientId == localClientId);
+            row.name = $"PlayerRow_P{index + 1}";
+            row.Bind(index + 1, stats, FindCharacter(stats.CharacterId), stats.ClientId == localClientId);
+            if (ranked)
+                row.SetRank(ranking[i].Rank, ranking[i].Crowned);
             _rows.Add(row);
         }
     }
@@ -133,7 +144,7 @@ public sealed class ResultStatsView : MonoBehaviour
     }
 
     // 결과 화면 시점에도 NetworkManager 연결은 유지된다. 오프라인이면 "나" 강조 없음.
-    private static ulong GetLocalClientId()
+    public static ulong GetLocalClientId()
     {
         NetworkManager networkManager = NetworkManager.Singleton;
         return networkManager != null && networkManager.IsListening
