@@ -36,7 +36,7 @@ public static class BossRaidVariantAuthoring
     {
         ("BOSS_RAID_OpeningDash",       "돌진이 <b>파랗게</b> 빛나면 <b>정면</b>에서 <b>우클릭</b>으로 간파하세요!", 4f),
         ("BOSS_RAID_ChargeGuide",       "드론 표식을 <b>송전탑 위로</b> 끌고 가서 떨어뜨리세요! 직접 때려도 부서집니다.", 6f),
-        ("BOSS_RAID_SelfDestructGuide", "23호가 <b>자폭</b>을 준비합니다! <b>공격</b>해서 게이지를 비우세요 — 파랗게 빛날 때 <b>간파</b>하면 크게 깎입니다!", 6f),
+        ("BOSS_RAID_SelfDestructGuide", "23호가 <b>자폭</b>을 준비합니다! <b>공격</b>해서 <b>실드</b>를 부수세요!", 6f),   // 10-19 실드로 교체
     };
 
     [MenuItem(BuildMenu)]

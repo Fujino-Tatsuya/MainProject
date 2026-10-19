@@ -433,9 +433,6 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: BOSS_RAID_SelfDestructGuide
-    text: "23\uD638\uAC00 <b>\uC790\uD3ED</b>\uC744 \uC900\uBE44\uD569\uB2C8\uB2E4!
-      <b>\uACF5\uACA9</b>\uD574\uC11C \uAC8C\uC774\uC9C0\uB97C \uBE44\uC6B0\uC138\uC694
-      \u2014 \uD30C\uB797\uAC8C \uBE5B\uB0A0 \uB54C <b>\uAC04\uD30C</b>\uD558\uBA74
-      \uD06C\uAC8C \uAE4E\uC785\uB2C8\uB2E4!"
+    text: "23\ud638\uac00 <b>\uc790\ud3ed</b>\uc744 \uc900\ube44\ud569\ub2c8\ub2e4! <b>\uacf5\uaca9</b>\ud574\uc11c <b>\uc2e4\ub4dc</b>\ub97c \ubd80\uc218\uc138\uc694!"
     durationSeconds: 6
     sfx: {fileID: 0}
