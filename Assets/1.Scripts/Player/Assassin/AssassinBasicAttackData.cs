@@ -22,9 +22,9 @@ public sealed class AssassinBasicAttackStepData
     [SerializeField, Min(0.01f)] private float playbackSpeed = 3f;
     [Tooltip("클립 하나에 든 타격 수(Hit 이벤트 수). 변신 평타 묶음 = 4, 나머지 = 1.")]
     [SerializeField, Min(1)] private int hitCount = 1;
-    [Tooltip("⚠️ 미사용 — 예약 창 열림은 클립의 ComboWindowOpen 이벤트(HandleDefaultAttackEvent int=1)다.")]
+    [Tooltip("⚠️ 미사용 — 예약 창 열림은 클립의 ComboWindowOpen 이벤트(HandleDefaultAttackEvent ComboWindowOpen=1)다.")]
     [SerializeField, Range(0f, 1f)] private float comboWindowOpen = 0.4f;
-    [Tooltip("⚠️ 미사용 — 예약 창 닫힘은 클립의 ComboWindowClose 이벤트(HandleDefaultAttackEvent int=2)다.")]
+    [Tooltip("⚠️ 미사용 — 예약 창 닫힘은 클립의 ComboWindowClose 이벤트(HandleDefaultAttackEvent ComboWindowClose=2)다.")]
     [SerializeField, Range(0f, 1f)] private float comboWindowClose = 0.95f;
 #pragma warning restore CS0414
 
