@@ -4,8 +4,10 @@ using UnityEngine;
 
 /// <summary>
 /// E 수호자의 의지 — 전방 방어 대기 → 첫 방어 성공 시 그 피해 흡수 + 반격 단계(피해·넉백 무시) → 종료.
-/// 단계·시간 경계는 <see cref="FirstMeleeGuardCounterModel"/>, 방향 판정은 <see cref="FirstMeleeGuardRules"/> 가 맡고
+/// 단계는 <see cref="FirstMeleeGuardCounterModel"/>, 방향 판정은 <see cref="FirstMeleeGuardRules"/> 가 맡고
 /// 이 클래스는 서버 배선만 한다. 피격 가로채기는 <see cref="Player"/>.ReceiveAttack 맨 위의 <see cref="IPlayerIncomingAttackGuard"/> 훅.
+/// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 방어 클립(SubSkillGuard) Custom0 방어 창 열림 · Custom1 닫힘,
+/// 반격 클립(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트를 옮기면 그대로 반영된다.
 /// 설계·결정: PLAN-paladin-counter-e (Re:C 변경안).
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
@@ -15,9 +17,14 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     [Tooltip("연출 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
     [SerializeField] private PlayerShieldVfx shieldVfx;
 
+    // 방어 성공 시 CrossFade 할 반격 자세 상태(PlayerAnimatorController Base Layer). 시작 상태(SubSkillGuard)는 데이터의
+    // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
+    private static readonly int CounterStateHash = Animator.StringToHash("SubSkillCounter");
+    // 시작 상태 CrossFade(PlayerSkillController.PlaySkillPresentation)와 같은 값.
+    private const float CounterCrossFadeSeconds = 0.05f;
+
     private readonly FirstMeleeGuardCounterModel model = new FirstMeleeGuardCounterModel();
     private PlayerInputReader inputReader;
-    private bool maxDurationWarned;
 
     // 방어 성공 뒤 반격 전에 E 가 끊겼을 때(구속·기타 Cancelled) 다음 프레임에 실행할 반격 1회(결정 2).
     // 모델은 OnEnd 에서 Reset 되므로 방향은 따로 들고 있는다.
@@ -58,40 +65,55 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             return; // 모델이 Idle 이라 막지 않는다 — 안전망(MaxDurationReached)이 끝낸다
         }
 
-        if (!maxDurationWarned && data.MaxActiveDuration < data.GuardDuration + data.CounterDuration)
-        {
-            maxDurationWarned = true;
-            Debug.LogWarning($"[Skill] 수호자의 의지 — maxActiveDuration({data.MaxActiveDuration})이 guardDuration + counterDuration({data.GuardDuration + data.CounterDuration})보다 작습니다. 반격 전에 안전망이 E 를 끊을 수 있습니다.", this);
-        }
-
-        // 방향 = Cast 시점 조준(결정 4). 반격 부채꼴도 이 방향을 쓴다.
-        model.Begin(Time.time, direction, data.GuardDuration, data.GuardAngle, data.CounterHitDelay, data.CounterDuration);
-        Edit.Log($"[Skill] 수호자의 의지 — 방어 대기 {data.GuardDuration}s (각도 {data.GuardAngle}°)", this);
+        // 방향 = Cast 시점 조준(결정 4). 반격 부채꼴도 이 방향을 쓴다. 방어 창은 방어 클립 Custom0 이 연다.
+        model.Begin(direction, data.GuardAngle);
+        Edit.Log($"[Skill] 수호자의 의지 — 방어 대기 (각도 {data.GuardAngle}°, 방어 창은 클립 Custom0~Custom1)", this);
     }
 
     public override void OnClientPlay(Vector3 direction)
     {
-        // 방어 자세 연출은 아직 없다(애니·VFX 기획 제외). 반격 연출은 서버에서 ServerInterruptWave 로 퍼뜨린다.
+        // 방어 자세 애니(SubSkillGuard)는 컨트롤러가 시작 상태로 전 피어에서 재생한다. 반격 자세는 방어 성공 때
+        // PlayerShieldVfx.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
     }
 
-    // 애니메이션 클립이 없다 — 종료는 모델 시간(OnTick)이 정한다. base 의 End → Completed 를 타지 않게 막는다.
-    public override void OnAnimationEvent(SkillAnimationEventType eventType) { }
-
-    public override void OnTick()
+    // 서버(또는 오프라인)에서만 온다(PlayerSkillController.HandleAnimationEvent). base 의 End → Completed 는 타지 않는다 —
+    // 반격 → 종료 순서는 이 스킬이 정한다. 단계에 맞지 않는 이벤트(CrossFade 중 늦게 온 방어 클립 Custom1,
+    // 오너 동기로 반격 상태가 다시 들어가 두 번 온 Hit·End)는 모델이 무시한다.
+    public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {
-        GuardTickResult tick = model.Tick(Time.time);
-
-        // 🔴 순서 고정: 반격 → 종료. 같은 틱에 둘 다 오면 종료를 먼저 처리할 경우 반격이 사라진다(모델 계약).
-        // CounterHitDue 를 받으면 반드시 MarkCounterFired — 안 하면 HasPendingCounter 가 남아 OnEnd 보장 반격이 중복된다.
-        if (tick.CounterHitDue)
+        switch (eventType)
         {
-            model.MarkCounterFired();
-            if (IsServerPeer && owner.CurrentHealth > 0)
-                ResolveCounterHit(owner.transform.position, model.GuardForward);
-        }
+            case SkillAnimationEventType.Custom0:
+                model.OnGuardWindowOpened();
+                break;
 
-        if (tick.HasEnded)
-            EndSelf(SkillEndReason.Completed);
+            case SkillAnimationEventType.Custom1:
+                if (model.OnGuardWindowClosed().HasEnded)
+                    EndSelf(SkillEndReason.Completed);
+                break;
+
+            case SkillAnimationEventType.Hit:
+                if (model.OnCounterHit())
+                    FireCounter();
+                break;
+
+            case SkillAnimationEventType.End:
+                GuardEventResult end = model.OnCounterEnd();
+                // 🔴 순서 고정: 반격 → 종료. Hit 없이 End 가 오면 둘 다 참이다 — 종료를 먼저 처리하면 반격이 사라진다(모델 계약).
+                if (end.CounterHitDue)
+                    FireCounter();
+                if (end.HasEnded)
+                    EndSelf(SkillEndReason.Completed);
+                break;
+        }
+    }
+
+    // CounterHitDue 를 받으면 반드시 MarkCounterFired — 안 하면 HasPendingCounter 가 남아 OnEnd 보장 반격이 중복된다.
+    private void FireCounter()
+    {
+        model.MarkCounterFired();
+        if (IsServerPeer && owner.CurrentHealth > 0)
+            ResolveCounterHit(owner.transform.position, model.GuardForward);
     }
 
     public override void OnEnd(SkillEndReason reason)
@@ -228,9 +250,16 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         var incoming = new GuardIncoming(
             hasAttacker, attackerPos, playerPos, attackInfo.damage, PlayerHitDamageCap.LethalOverride);
 
-        GuardVerdict verdict = model.Evaluate(Time.time, incoming);
+        GuardVerdict verdict = model.Evaluate(incoming);
         if (verdict == GuardVerdict.BlockAndCounter)
         {
+            // 반격 판정·종료는 반격 클립의 Hit·End 가 정한다 — 전 피어에서 그 상태로 넘긴다(오너 권한 NetworkAnimator).
+            // 연출 창구가 비어 있으면 Hit·End 가 안 와 안전망(maxActiveDuration)이 끝내고, OnEnd 가 보장 반격을 낸다.
+            if (shieldVfx != null)
+                shieldVfx.ServerPlayGuardCounterPose(CounterStateHash, CounterCrossFadeSeconds);
+            else
+                Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 반격 자세로 넘어가지 못합니다. 안전망이 E 를 끝냅니다.", this);
+
             Vector3 toAttacker = attackerPos - playerPos;
             toAttacker.y = 0f;
             Vector3 forward = model.GuardForward;
@@ -242,5 +271,5 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         return verdict != GuardVerdict.Pass;
     }
 
-    public bool ServerBlocksKnockback => model.BlocksKnockback(Time.time);
+    public bool ServerBlocksKnockback => model.BlocksKnockback;
 }

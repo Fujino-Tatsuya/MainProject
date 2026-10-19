@@ -45,11 +45,8 @@ MonoBehaviour:
   hoverMarkerDistance: 3
   animatorStateName: SubSkillGuard
   snapRotationOnStart: 1
-  guardDuration: 1
   guardAngle: 180
   counterAngle: 120
   counterRange: 3
-  counterHitDelay: 0.1
-  counterDuration: 0.4
   shieldAmount: 100
   shieldDuration: 10
