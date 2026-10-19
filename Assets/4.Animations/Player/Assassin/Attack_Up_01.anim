@@ -267213,7 +267213,7 @@ AnimationClip:
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
-  - time: 0.36666667
+  - time: 0.26666668
     functionName: HandleSkillEvent
     data: 
     objectReferenceParameter: {fileID: 0}
