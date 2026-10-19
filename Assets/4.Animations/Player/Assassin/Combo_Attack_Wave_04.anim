@@ -223999,14 +223999,14 @@ AnimationClip:
     floatParameter: 0
     intParameter: 1
     messageOptions: 0
-  - time: 0.88750017
+  - time: 0.76666665
     functionName: HandleDefaultAttackEvent
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 2
     messageOptions: 0
-  - time: 0.9166667
+  - time: 0.8
     functionName: HandleDefaultAttackEvent
     data: 
     objectReferenceParameter: {fileID: 0}
