@@ -31,10 +31,16 @@ public enum LobbyCharacterChangeReject
     CountdownActive,
     /// <summary>카운트다운이 끝나 게임 시작 래치가 걸렸다.</summary>
     GameStarting,
+    /// <summary>직전 교체(디스폰 → 새 Variant 스폰)가 아직 끝나지 않았다.</summary>
+    SwapInProgress,
     /// <summary>직전 교체 뒤 쿨다운이 안 지났다.</summary>
     Cooldown,
     /// <summary>로스터에 없거나 쓸 수 없는 캐릭터.</summary>
     UnavailableCharacter,
+    /// <summary>[서버 판정, 규칙 밖] 캐릭터 선택 오브젝트 반경 + 여유 밖 — LobbySession.</summary>
+    TooFar,
+    /// <summary>[서버 판정, 규칙 밖] 디스폰 → 새 Variant 스폰이 실패했다(PlayerObject·프리팹 없음 등) — LobbySession.</summary>
+    SwapFailed,
 }
 
 /// <summary>
@@ -42,7 +48,7 @@ public enum LobbyCharacterChangeReject
 /// <list type="bullet">
 /// <item>접속자 1~<see cref="MaxPlayers"/>명이 전원 Ready 가 되는 순간 카운트다운 시작. 0명이면 시작하지 않는다.</item>
 /// <item>누가 Unready 하면 카운트다운 취소. 퇴장·새 접속이면 카운트다운 취소 + 전원 Ready 초기화(인원이 바뀌면 다시 확인받는다).</item>
-/// <item>Ready 상태·카운트다운 중·시작 래치 뒤에는 캐릭터 변경 거부.</item>
+/// <item>Ready 상태·카운트다운 중·시작 래치 뒤·교체 진행 중·쿨다운 안에는 캐릭터 변경 거부.</item>
 /// <item>호스트 예외 없음 — 호스트도 똑같이 준비한다.</item>
 /// <item>서버 시각 ≥ 종료 시각이면 <see cref="TryConsumeStart"/> 가 한 번만 true(시작 래치). 래치 뒤에는 준비·인원 변경이 카운트다운을 건드리지 않는다.</item>
 /// </list>
@@ -58,6 +64,7 @@ public sealed class LobbyReadyRules
 
     readonly List<LobbySeat> _seats = new List<LobbySeat>();
     readonly Dictionary<ulong, double> _lastCharacterChangeTime = new Dictionary<ulong, double>();
+    readonly HashSet<ulong> _swapping = new HashSet<ulong>();
 
     public LobbyReadyRules(int maxPlayers)
     {
@@ -125,6 +132,7 @@ public sealed class LobbyReadyRules
 
         _seats.RemoveAt(index);
         _lastCharacterChangeTime.Remove(clientId);
+        _swapping.Remove(clientId);
         ResetAfterRosterChange();
         return true;
     }
@@ -169,6 +177,8 @@ public sealed class LobbyReadyRules
             return LobbyCharacterChangeReject.CountdownActive;
         if (_seats[index].Ready)
             return LobbyCharacterChangeReject.Ready;
+        if (_swapping.Contains(clientId))
+            return LobbyCharacterChangeReject.SwapInProgress;
         if (_lastCharacterChangeTime.TryGetValue(clientId, out var last) && now - last < cooldownSeconds)
             return LobbyCharacterChangeReject.Cooldown;
         return LobbyCharacterChangeReject.None;
@@ -194,6 +204,36 @@ public sealed class LobbyReadyRules
         _seats[index] = _seats[index].WithCharacter(characterId);
         _lastCharacterChangeTime[clientId] = now;
         return LobbyCharacterChangeReject.None;
+    }
+
+    /// <summary>
+    /// 교체가 끝난 캐릭터를 자리에 확정하고 쿨다운을 건다 — 검사 없이. 서버 교체 흐름(<see cref="CanChangeCharacter"/> → <see cref="BeginSwap"/>
+    /// → 프리팹 교체 성공) 뒤에 부른다. 같은 캐릭터면 아무것도 안 하고 false.
+    /// </summary>
+    public bool CommitCharacter(ulong clientId, int characterId, double now)
+    {
+        var index = IndexOf(clientId);
+        if (index < 0 || _seats[index].CharacterId == characterId)
+            return false;
+
+        _seats[index] = _seats[index].WithCharacter(characterId);
+        _lastCharacterChangeTime[clientId] = now;
+        return true;
+    }
+
+    /// <summary>이 사람의 교체가 진행 중인가(<see cref="BeginSwap"/> ~ <see cref="EndSwap"/>).</summary>
+    public bool IsSwapping(ulong clientId) => _swapping.Contains(clientId);
+
+    /// <summary>교체 시작 표시 — 끝날 때까지 <see cref="CanChangeCharacter"/> 가 SwapInProgress 로 거부한다. 자리에 없거나 이미 진행 중이면 false.</summary>
+    public bool BeginSwap(ulong clientId)
+    {
+        return IndexOf(clientId) >= 0 && _swapping.Add(clientId);
+    }
+
+    /// <summary>교체 끝 표시(성공·실패 무관).</summary>
+    public void EndSwap(ulong clientId)
+    {
+        _swapping.Remove(clientId);
     }
 
     /// <summary>카운트다운이 끝났으면(now ≥ 종료 시각) 시작 래치를 걸고 처음 한 번만 true.</summary>

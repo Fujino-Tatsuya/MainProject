@@ -10,6 +10,7 @@ using UnityEngine;
 /// <item>프리팹: <see cref="PlayerSpawnService"/>(선택 저장소 → <see cref="CharacterRoster"/> → Variant) — 맵 진입과 같은 결정.</item>
 /// <item>위치: 스폰 지점 3개 중 비어 있는 가장 앞 칸. 이미 PlayerObject 가 있는 클라는 건너뛴다(중복 스폰 없음).</item>
 /// <item>퇴장: NGO 가 PlayerObject 를 치운다(DontDestroyWithOwner=0). 한 프레임 뒤에도 남아 있으면 여기서 디스폰한다.</item>
+/// <item>캐릭터 교체(C12): <see cref="TrySwapCharacter"/> — 디스폰 → 같은 자리에 새 Variant. 자리(스폰 지점)는 유지된다.</item>
 /// <item>추락: 플레이어가 <see cref="fallRespawnY"/> 아래로 내려가면 피해 없이 자기 스폰 지점으로 되돌린다(<see cref="PlayerFallRecovery.RelocateServer"/>).</item>
 /// <item>로비를 떠날 때(카운트다운 → Loading): <c>NetworkLoadingFlowController.UnloadNetworkSourceScene</c> 가 동적 객체(로비 플레이어 포함)를 먼저 디스폰한다.
 /// 시작 래치가 걸린 뒤에는 새로 세우지 않는다.</item>
@@ -134,6 +135,55 @@ public sealed class LobbyPlayerSpawner : MonoBehaviour
         }
 
         Debug.Log($"[SceneFlow] {Tag} client {clientId} 스폰 prefab={result.Prefab.name} slot={slot} ({context})");
+    }
+
+    /// <summary>
+    /// [서버] 로비 캐릭터 교체(C12, PLAN-48 §4.5 A) — 지금 PlayerObject 의 위치·회전을 기억하고 디스폰한 뒤
+    /// 같은 자리에 <paramref name="characterId"/> 의 Variant 를 <see cref="PlayerSpawnService.SpawnCharacter"/> 로 세운다.
+    /// 디스폰 전에 프리팹을 먼저 확인해, 실패하면 기존 오브젝트를 그대로 둔다. 추락 복귀 스폰 지점(자리)은 clientId 기준이라 그대로 이어진다.
+    /// 규칙 검증(준비·카운트다운·쿨다운·거리)은 <see cref="LobbySession"/> 몫이다.
+    /// </summary>
+    public bool TrySwapCharacter(ulong clientId, int characterId, out string failure)
+    {
+        failure = null;
+        if (!IsServer)
+        {
+            failure = "서버 아님";
+            return false;
+        }
+
+        if (!_networkManager.ConnectedClients.TryGetValue(clientId, out var client) ||
+            client.PlayerObject == null || !client.PlayerObject.IsSpawned)
+        {
+            failure = "PlayerObject 없음";
+            return false;
+        }
+
+        var prefab = PlayerSpawnService.ResolvePlayerPrefab(characterId, characterRoster, defaultPlayerPrefab);
+        if (prefab == null || !prefab.TryGetComponent<NetworkObject>(out _))
+        {
+            failure = $"프리팹 없음(characterId={characterId})";
+            return false;
+        }
+
+        var oldObject = client.PlayerObject;
+        var pose = new Pose(oldObject.transform.position, oldObject.transform.rotation);
+        var oldName = oldObject.name;
+        oldObject.Despawn(true);   // NGO 가 client.PlayerObject 를 비운다 — 같은 프레임에 새로 세울 수 있다
+
+        var result = PlayerSpawnService.SpawnCharacter(
+            _networkManager, clientId, characterId, characterRoster, defaultPlayerPrefab, pose, gameObject.scene);
+        if (!result.Succeeded)
+        {
+            // 디스폰은 이미 끝났다 — 빈손으로 두지 않게 자기 스폰 지점에 저장소 기준으로 다시 세운다.
+            failure = $"새 Variant 스폰 실패: {result.Failure}";
+            Debug.LogError($"{Tag} client {clientId} 교체 스폰 실패({result.Failure}) — 스폰 지점에 다시 세운다.", this);
+            SpawnFor(clientId, "SwapFallback");
+            return false;
+        }
+
+        Debug.Log($"[SceneFlow] {Tag} client {clientId} 캐릭터 교체 {oldName} → {result.Prefab.name} pos={pose.position}");
+        return true;
     }
 
     private int AcquireSlot(ulong clientId)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -14,8 +15,8 @@ using UnityEngine;
 /// NetworkLoadingFlowController.CanStartFromLobby 는 <see cref="CanStartGame"/>(래치)를 본다.</item>
 /// <item>접속 승인: <see cref="NetworkSessionLauncher.LobbyCountdownActiveProvider"/> 를 스폰 때 걸고 디스폰 때 자기 것이면 푼다.</item>
 /// </list>
-/// 준비 요청은 서버가 준비 오브젝트(<see cref="LobbyInteractable"/>)와의 거리를 다시 본다(C10). 카운트다운 표시는 <see cref="LobbyCountdownView"/>,
-/// "준비 n/m" 은 <see cref="LobbyReadyCountLabel"/>. 실제 프리팹 교체 재스폰은 C12 몫이다.
+/// 준비·캐릭터 요청은 서버가 해당 오브젝트(<see cref="LobbyInteractable"/>)와의 거리를 다시 본다(C10·C12). 카운트다운 표시는 <see cref="LobbyCountdownView"/>,
+/// "준비 n/m" 은 <see cref="LobbyReadyCountLabel"/>. 캐릭터 교체 = <see cref="LobbyPlayerSpawner.TrySwapCharacter"/>(디스폰 → 같은 자리 새 Variant, C12).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbySession : NetworkBehaviour
@@ -25,6 +26,8 @@ public sealed class LobbySession : NetworkBehaviour
 
     [SerializeField] private LobbyRules rules;
     [SerializeField] private CharacterRoster characterRoster;
+    [Tooltip("캐릭터 교체(디스폰 → 같은 자리 새 Variant)를 맡는 같은 씬의 스포너.")]
+    [SerializeField] private LobbyPlayerSpawner playerSpawner;
 
     private readonly NetworkList<LobbyPlayerEntry> entries = new NetworkList<LobbyPlayerEntry>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -44,6 +47,9 @@ public sealed class LobbySession : NetworkBehaviour
 
     /// <summary>[전 피어] 자리·카운트다운이 바뀌었다(스폰·디스폰 포함) — UI 갱신용.</summary>
     public static event Action StateChanged;
+
+    /// <summary>[요청한 클라만] 내 캐릭터 교체 요청을 서버가 거부했다 — 피드백 UI 를 붙일 자리(지금은 로그만).</summary>
+    public static event Action<LobbyCharacterChangeReject> CharacterRequestRejected;
 
     public int EntryCount => IsSpawned ? entries.Count : 0;
 
@@ -176,7 +182,7 @@ public sealed class LobbySession : NetworkBehaviour
 
         // 준비 오브젝트 거리 재검증(C10) — 클라 프롬프트 판정만 믿으면 어디서든 준비할 수 있다.
         var clientId = p.Receive.SenderClientId;
-        if (!IsNearReadyObject(clientId))
+        if (!IsNearInteractable(LobbyInteractableKind.Ready, clientId, "준비 토글"))
             return;
 
         if (!_rules.ToggleReady(clientId, NetworkManager.ServerTime.Time, CountdownSeconds))
@@ -190,43 +196,94 @@ public sealed class LobbySession : NetworkBehaviour
         Debug.Log($"[SceneFlow] {Tag} client {clientId} ready={seat.Ready} ({_rules.ReadyCount}/{_rules.Seats.Count}) countdown={_rules.IsCountdownActive}");
     }
 
+    // 승인 순서: 거리(C12) → 규칙(준비·카운트다운·교체 중·쿨다운·로스터) → 프리팹 교체(디스폰 → 같은 자리 새 Variant) → 저장소·자리 반영.
+    // 교체가 실패하면 자리·저장소를 바꾸지 않는다. 거부는 보낸 사람에게만 알린다.
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     private void RequestCharacterServerRpc(int characterId, RpcParams p = default)
     {
         if (_rules == null)
             return;
 
-        // 캐릭터 선택 오브젝트 거리 재검증 자리 — C10. 실제 프리팹 재스폰 교체는 C12(지금은 저장소·자리만 바꾼다).
         var clientId = p.Receive.SenderClientId;
-        var available = IsCharacterAvailable(characterId);
-        var reject = _rules.TryChangeCharacter(clientId, characterId, available, NetworkManager.ServerTime.Time, SwapCooldownSeconds);
-        if (reject != LobbyCharacterChangeReject.None)
+        if (!IsNearInteractable(LobbyInteractableKind.CharacterSelect, clientId, "캐릭터 요청"))
         {
-            Debug.LogWarning($"{Tag} 캐릭터 요청 거부 client {clientId} → {characterId}: {reject}", this);
+            RejectCharacter(clientId, characterId, LobbyCharacterChangeReject.TooFar);
             return;
         }
 
-        ServerCharacterSelectionStore.Set(clientId, characterId);
+        var now = NetworkManager.ServerTime.Time;
+        var reject = _rules.CanChangeCharacter(clientId, now, SwapCooldownSeconds);
+        if (reject == LobbyCharacterChangeReject.None && !IsCharacterAvailable(characterId))
+            reject = LobbyCharacterChangeReject.UnavailableCharacter;
+        if (reject != LobbyCharacterChangeReject.None)
+        {
+            RejectCharacter(clientId, characterId, reject);
+            return;
+        }
+
+        if (_rules.TryGetSeat(clientId, out var seat) && seat.CharacterId == characterId)
+            return;   // 같은 캐릭터 — 교체도 쿨다운도 없다
+
+        if (playerSpawner == null)
+        {
+            Debug.LogError($"{Tag} LobbyPlayerSpawner 가 비어 캐릭터를 교체하지 못했다.", this);
+            RejectCharacter(clientId, characterId, LobbyCharacterChangeReject.SwapFailed);
+            return;
+        }
+
+        _rules.BeginSwap(clientId);
+        if (!playerSpawner.TrySwapCharacter(clientId, characterId, out var failure))
+        {
+            _rules.EndSwap(clientId);
+            Debug.LogWarning($"{Tag} client {clientId} → {characterId} 교체 실패: {failure}", this);
+            RejectCharacter(clientId, characterId, LobbyCharacterChangeReject.SwapFailed);
+            return;
+        }
+
+        _rules.CommitCharacter(clientId, characterId, now);
+        ServerCharacterSelectionStore.Set(clientId, characterId);   // playerId 기억(재접속 유지)도 여기서 갱신된다
         SyncReplicatedState();
-        Debug.Log($"[SceneFlow] {Tag} client {clientId} character={characterId}");
+        StartCoroutine(EndSwapNextFrame(clientId));
+        Debug.Log($"[SceneFlow] {Tag} client {clientId} character={characterId} (교체 완료)");
     }
 
-    // [서버] 보낸 사람 PlayerObject 가 준비 오브젝트(LobbyInteractable Ready) 반경 + 여유 안인가 — 평면 거리. 밖이면 경고하고 거부한다.
-    private bool IsNearReadyObject(ulong clientId)
+    // 옛 오브젝트는 이 프레임 끝에 파괴된다 — 그때까지 같은 사람의 다음 교체를 SwapInProgress 로 막는다.
+    private IEnumerator EndSwapNextFrame(ulong clientId)
+    {
+        yield return null;
+        _rules?.EndSwap(clientId);
+    }
+
+    private void RejectCharacter(ulong clientId, int characterId, LobbyCharacterChangeReject reason)
+    {
+        Debug.LogWarning($"{Tag} 캐릭터 요청 거부 client {clientId} → {characterId}: {reason}", this);
+        CharacterRequestRejectedClientRpc(reason, RpcTarget.Single(clientId, RpcTargetUse.Temp));
+    }
+
+    // 거부 피드백 — 보낸 사람만. 지금은 로그 + 이벤트뿐(패널은 이미 닫혀 있다, character-select-panel.md "붙이는 법" 5).
+    [Rpc(SendTo.SpecifiedInParams)]
+    private void CharacterRequestRejectedClientRpc(LobbyCharacterChangeReject reason, RpcParams p = default)
+    {
+        Debug.LogWarning($"{Tag} 내 캐릭터 교체 요청이 거부됐다: {reason}");
+        CharacterRequestRejected?.Invoke(reason);
+    }
+
+    // [서버] 보낸 사람 PlayerObject 가 그 종류 오브젝트(LobbyInteractable) 반경 + 여유 안인가 — 평면 거리. 밖이면 경고하고 거부한다.
+    private bool IsNearInteractable(LobbyInteractableKind kind, ulong clientId, string action)
     {
         var player = NetworkManager.ConnectedClients.TryGetValue(clientId, out var client) ? client.PlayerObject : null;
         if (player == null)
         {
-            Debug.LogWarning($"{Tag} 준비 토글 거부 client {clientId} — PlayerObject 없음(로비 스폰 전).", this);
+            Debug.LogWarning($"{Tag} {action} 거부 client {clientId} — PlayerObject 없음(로비 스폰 전).", this);
             return false;
         }
 
-        if (LobbyInteractable.AnyWithinServerReach(LobbyInteractableKind.Ready, player.transform.position, out var distance))
+        if (LobbyInteractable.AnyWithinServerReach(kind, player.transform.position, out var distance))
             return true;
 
         Debug.LogWarning(distance < float.MaxValue
-            ? $"{Tag} 준비 토글 거부 client {clientId} — 준비 오브젝트까지 {distance:F2}m(반경 + 여유 {LobbyInteractable.ServerReachTolerance}m 밖). 서버가 본 위치 {player.transform.position}."
-            : $"{Tag} 준비 토글 거부 client {clientId} — 씬에 준비 오브젝트(LobbyInteractable Ready)가 없다.", this);
+            ? $"{Tag} {action} 거부 client {clientId} — {kind} 오브젝트까지 {distance:F2}m(반경 + 여유 {LobbyInteractable.ServerReachTolerance}m 밖). 서버가 본 위치 {player.transform.position}."
+            : $"{Tag} {action} 거부 client {clientId} — 씬에 {kind} 오브젝트(LobbyInteractable)가 없다.", this);
         return false;
     }
 

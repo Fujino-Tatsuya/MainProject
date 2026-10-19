@@ -230,4 +230,83 @@ public sealed class LobbyReadyRulesTests
         Assert.That(LobbyReadyRules.RemainingSeconds(0d, 3d), Is.Zero);
         Assert.That(LobbyReadyRules.RemainingSeconds(-1d, 3d), Is.Zero);
     }
+
+    [Test]
+    public void 교체_진행_중이면_SwapInProgress_로_거부하고_끝나면_허용()
+    {
+        var rules = CreateWith(0);
+
+        Assert.That(rules.BeginSwap(0), Is.True);
+        Assert.That(rules.IsSwapping(0), Is.True);
+        Assert.That(rules.CanChangeCharacter(0, 100d, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.SwapInProgress));
+        Assert.That(rules.BeginSwap(0), Is.False, "같은 사람의 교체는 하나만");
+
+        rules.EndSwap(0);
+        Assert.That(rules.CanChangeCharacter(0, 100d, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.None));
+    }
+
+    [Test]
+    public void 교체_진행은_사람별이고_자리에_없으면_시작하지_않는다()
+    {
+        var rules = CreateWith(0, 1);
+
+        Assert.That(rules.BeginSwap(9), Is.False);
+        rules.BeginSwap(0);
+        Assert.That(rules.CanChangeCharacter(1, 0d, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.None));
+    }
+
+    [Test]
+    public void 준비가_교체_진행보다_먼저_보인다()
+    {
+        var rules = CreateWith(0, 1);
+        rules.BeginSwap(0);
+        rules.SetReady(0, true, 0d, Countdown);
+
+        Assert.That(rules.CanChangeCharacter(0, 0d, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.Ready));
+    }
+
+    [Test]
+    public void 퇴장하면_교체_진행_표시도_지운다()
+    {
+        var rules = CreateWith(0);
+        rules.BeginSwap(0);
+        rules.RemovePlayer(0);
+        rules.AddPlayer(0, 0);
+
+        Assert.That(rules.IsSwapping(0), Is.False);
+    }
+
+    [Test]
+    public void 교체_확정은_진행_중에도_자리를_바꾸고_쿨다운을_건다()
+    {
+        var rules = CreateWith(0);
+        rules.BeginSwap(0);
+
+        Assert.That(rules.CommitCharacter(0, 2, 10d), Is.True);
+        Assert.That(rules.TryGetSeat(0, out var seat) && seat.CharacterId == 2, Is.True);
+        Assert.That(rules.CommitCharacter(0, 2, 10d), Is.False, "같은 캐릭터");
+
+        rules.EndSwap(0);
+        Assert.That(rules.CanChangeCharacter(0, 10.3d, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.Cooldown));
+        Assert.That(rules.CanChangeCharacter(0, 10.5d, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.None));
+    }
+
+    // 서버 흐름(LobbySession.RequestCharacterServerRpc)과 같은 순서: 검사 → 진행 표시 → 확정 → 다음 프레임 해제.
+    [Test]
+    public void 교체_10회_연속은_쿨다운_간격이면_모두_허용()
+    {
+        var rules = CreateWith(0);
+        for (var i = 0; i < 10; i++)
+        {
+            var now = i * Cooldown;
+            var next = (i + 1) % 3;
+            Assert.That(rules.CanChangeCharacter(0, now, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.None), $"{i}회째 검사");
+            Assert.That(rules.BeginSwap(0), Is.True, $"{i}회째 시작");
+            Assert.That(rules.CommitCharacter(0, next, now), Is.True, $"{i}회째 확정");
+            Assert.That(rules.CanChangeCharacter(0, now, Cooldown), Is.EqualTo(LobbyCharacterChangeReject.SwapInProgress), $"{i}회째 연타");
+            rules.EndSwap(0);
+        }
+
+        Assert.That(rules.TryGetSeat(0, out var seat) && seat.CharacterId == 10 % 3, Is.True);
+    }
 }

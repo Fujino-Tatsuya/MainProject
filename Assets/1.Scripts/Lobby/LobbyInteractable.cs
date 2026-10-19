@@ -8,7 +8,7 @@ public enum LobbyInteractableKind
     /// <summary>F = 내 준비 토글(<see cref="LobbySession.RequestToggleReady"/>). 서버가 거리를 다시 본다.</summary>
     Ready = 0,
 
-    /// <summary>F = 캐릭터 선택 패널(C12). C10 에서는 자리만 있고 상호작용하지 않는다.</summary>
+    /// <summary>F = 캐릭터 선택 패널(<see cref="CharacterSelectPanel"/>, C12). 고르면 서버가 거리를 다시 보고 디스폰 → 같은 자리 새 Variant 로 교체한다.</summary>
     CharacterSelect = 1,
 }
 
