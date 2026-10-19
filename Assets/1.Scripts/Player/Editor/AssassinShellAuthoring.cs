@@ -258,9 +258,12 @@ public static class AssassinShellAuthoring
             DefaultAttackEvent(0.95f, DefaultAttackAnimationEventType.ComboWindowClose),
             DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
 
-        // Q 돌진은 돌진 종료(OnTick)가, 간파는 skillDuration 타이머가 먼저 끝낸다 — 클립보다 훨씬 짧아 End 는 안전망이다(47-1 예외).
-        ReplaceEvents("Combo_Attack_02_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
-        ReplaceEvents("Combo_Attack_03_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+        // Q 돌진(P2-3): Custom0 = 준비 끝(출발), End = 종료 — 클립보다 훨씬 짧아 End 를 앞에 둔다(47-1 예외). Hit 은 쓰지 않는다(경로 스윕).
+        // 비어 있을 때만 실제 시간 준비 0.1s·종료 ≈0.283s(준비 + 5m/60m/s + 0.1) 자리로 채운다 — 일반 1배속 1.283s, 변신 1.5배속 1.917s.
+        StampEventsIfEmpty("Combo_Attack_02_04", SkillEvent(0.0779f, SkillAnimationEventType.Custom0),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.2208f, SkillAnimationEventType.End));
+        StampEventsIfEmpty("Combo_Attack_03_04", SkillEvent(0.0783f, SkillAnimationEventType.Custom0),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.2217f, SkillAnimationEventType.End));
         ReplaceEvents("Buff", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
         ReplaceEvents("Skill_02_Move_000pct",
             SkillEvent(0.18f, SkillAnimationEventType.Hit), SkillEvent(0.32f, SkillAnimationEventType.Hit),
