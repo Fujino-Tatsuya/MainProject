@@ -23,18 +23,18 @@ public readonly struct AnimationEventRequirement
         EventName = eventName;
     }
 
-    /// <summary>스킬 — <see cref="PlayerAnimationEventRelay.HandleSkillEvent"/>(int) 를 상태 클립에서 찾는다.</summary>
+    /// <summary>스킬 — <see cref="PlayerAnimationEventRelay.HandleSkillEvent"/>(enum, 클립엔 intParameter 로 저장) 를 상태 클립에서 찾는다.</summary>
     public static AnimationEventRequirement ForSkillState(string stateName, SkillAnimationEventType eventType) =>
         new AnimationEventRequirement(null, stateName, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)eventType,
             eventType.ToString());
 
-    /// <summary>평타 — <see cref="PlayerAnimationEventRelay.HandleDefaultAttackEvent"/>(int) 를 스텝 클립에서 찾는다.</summary>
+    /// <summary>평타 — <see cref="PlayerAnimationEventRelay.HandleDefaultAttackEvent"/>(enum, 클립엔 intParameter 로 저장) 를 스텝 클립에서 찾는다.</summary>
     public static AnimationEventRequirement ForAttackClip(AnimationClip clip, DefaultAttackAnimationEventType eventType) =>
         new AnimationEventRequirement(clip, null, nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent), (int)eventType,
             eventType.ToString());
 
     public string Describe() =>
-        $"{FunctionName}(int={IntParameter}, {EventName}) @ " +
+        $"{FunctionName}({EventName}={IntParameter}) @ " +
         (Clip != null ? $"클립 '{Clip.name}'" : $"상태 '{StateName}'");
 }
 

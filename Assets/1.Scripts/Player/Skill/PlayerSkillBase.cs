@@ -116,7 +116,8 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
         }
     }
 
-    public void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
+    // 시작 상태 말고 다른 상태(코드 상수로 CrossFade 하는 상태 등)에도 요구가 있는 스킬은 base 를 부른 뒤 덧붙인다(팔라딘 E 반격 상태).
+    public virtual void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
     {
         if (data == null || string.IsNullOrEmpty(data.AnimatorStateName))
             return;

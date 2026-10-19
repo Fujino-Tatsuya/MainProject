@@ -50,7 +50,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     private Quaternion fixedCameraRotation;
     private bool hasFixedCameraRotation;
     private PlayerLifeCycleController ownerLifeCycle;
-    // 연출용 임시 추적 대상(보스 엘리베이터 칸). 있는 동안 플레이어 vcam 의 Follow 를 이것이 쥔다.
+    // 연출용 임시 추적 대상(보스 엘리베이터 칸 안 카메라 지점). 있는 동안 플레이어 vcam 의 Follow 를 이것이 쥔다.
     private Transform temporaryFollow;
 
     public bool IsInFallView { get; private set; }
@@ -277,7 +277,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     }
 
     /// <summary>
-    /// 연출 동안 플레이어 vcam 이 <paramref name="target"/> 을 따라가게 한다(보스 엘리베이터 상승 — 칸).
+    /// 연출 동안 플레이어 vcam 이 <paramref name="target"/> 을 따라가게 한다(보스 엘리베이터 하강~상승 — 칸 안 카메라 지점).
     /// 추적 대상 목록·<see cref="CurrentFollowTarget"/>(포그·벽 가림 기준)은 그대로 플레이어다. 낙하 뷰 중이면 플레이어 뷰로 돌린다.
     /// </summary>
     public void SetTemporaryFollow(Transform target)
@@ -295,6 +295,8 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         temporaryFollow = target;
         playerCamera.Follow = target;
+        // 컷 — 보스 엘리베이터는 암전 중에 넘기므로, 밝아질 때 이미 새 대상을 보고 있어야 한다(감쇠로 쓸고 지나가지 않게).
+        playerCamera.PreviousStateIsValid = false;
         if (IsInFallView)
         {
             ReturnToPlayerView();

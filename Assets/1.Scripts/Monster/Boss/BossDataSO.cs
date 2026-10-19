@@ -274,6 +274,34 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("레이드 ① 개전 콤보만 타 사이 간격(초) — 배우는 구간이라 느리게(팀장 10-18: 1.5 → 1초). 기존 23호 개전은 comboStepInterval.")]
     [Min(0f)] public float raidOpeningStepInterval = 1f;
 
+    // ─── 콤보 즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) — chainOnHit 콤보의 **후속 타에만** 적용. 단타 길이는 그대로 ───
+    [Tooltip("즉시 연결 콤보의 후속 돌진 준비 = 간파 창 길이(초). 단타 돌진은 행의 counterWindowDuration(1.3) 그대로.\n" +
+             "후속 돌진은 준비동작 클립을 건너뛰고 돌진 클립 첫 자세에서 이 시간만큼 멈췄다 나간다.")]
+    [DataTableIgnore] [Range(0.1f, 2f)] public float comboDashWindup = 0.7f;
+
+    [Tooltip("즉시 연결 콤보의 후속 잡기 예고(초). 단타 잡기는 행의 telegraphDuration(0.7) 그대로. 돌진 다음 잡기는 아래 칸.")]
+    [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraph = 0.3f;
+
+    [Tooltip("즉시 연결 콤보에서 **돌진 다음** 잡기의 예고(초) — 돌진 끝에서 바로 잡히면 피할 수 없다(경석 Play 10-19: 1초 여유).")]
+    [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraphAfterDash = 1f;
+
+    [Tooltip("즉시 연결 콤보에서 훅·어퍼가 맞힌 뒤 클립을 더 보여 주는 시간(초) — 바로 끊으면 너무 빨라 읽히지 않는다(경석 Play 10-19: 0.25~0.4).")]
+    [DataTableIgnore] [Min(0f)] public float comboHookFollowThrough = 0.3f;
+
+    [Tooltip("훅·어퍼를 **단타로**도 쓰는가. 끄면 룰렛에서 단타 훅·어퍼가 빠지고 콤보로만 나온다(경석 10-19 — 기존·레이드 끔).\n" +
+             "xlsx 가중치와 무관하게 적용된다(가중치 칸은 xlsx 가 덮어쓴다). 🔴 콤보가 없는 1인 Solo 는 켜 둘 것 — 끄면 근접 공격이 사라진다.")]
+    [DataTableIgnore] public bool singleHookUpper = true;
+
+    [Tooltip("즉시 연결 콤보에서 점프 다음 타가 있을 때 착지 후딜(초). 착지 히트 순간 착지 클립을 끊고 이 시간 뒤 다음 타. 단타 점프는 jumpRecoveryDuration.")]
+    [DataTableIgnore] [Min(0f)] public float comboJumpRecovery = 0f;
+
+    [Tooltip("즉시 연결 콤보에서 돌진 다음 타가 있을 때 돌진 복귀(초). 단타 돌진은 attackDuration(0.9) 그대로.")]
+    [DataTableIgnore] [Min(0f)] public float comboDashRecovery = 0.3f;
+
+    [Tooltip("훅·어퍼 **바닥 예고 표시**(네모·부채꼴). 끄면 표시만 빠지고 준비 자세 시간(telegraphDuration)은 그대로 — 모션을 보고 피한다.\n" +
+             "단타·콤보의 훅·어퍼 전부. 돌진 띠·잡기·점프 예고는 무관(팀장 10-19: 지금은 끔).")]
+    [DataTableIgnore] public bool hookTelegraphMarkers = true;
+
     [Header("페이즈 — hpThreshold 내림차순으로 저작")]
     public BossPhaseEntry[] phases =
     {
@@ -568,10 +596,7 @@ public class BossDataSO : MonsterDataSO
     //    이 자리에 있던 기존 주석이 "예고 이펙트가 확정되면 지운다(SO 값을 잃으므로 팀장 확인)" 였고,
     //    팀장 확인을 받았다(2026-09-21). 마지막 저작값 — OuterAlpha 0.4 / FillAlpha 0.85 / Prefab 비어 있음.
     //    예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.
-    [Tooltip("⚠️ **미사용** — 착지 예고는 EffectCatalog 의 Drop_Charge_Boundary(경계) + " +
-    "Drop_Charge_Indicator(차오르는 원) 이펙트가 그린다. 여기에 프리팹을 넣어도 아무 일도 안 난다.\n" +
-    "예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.")]
-    public GameObject jumpTelegraphPrefab;
+    // 남아 있던 `jumpTelegraphPrefab` 도 2026-10-19 에 지웠다(PLAN-monster-data-inspector §3.4 · xlsx 행 없음 확인 r461).
 
     [Tooltip("착지점을 대상에게서 **이만큼 떨어뜨린다**(m). 0 이면 플레이어 위에 정확히 내려앉는다.\n" +
     "🔴 0 으로 두면 안 된다 — 보스 캡슐을 플레이어 캡슐 안에 꽂으면 물리 디페네트레이션이 " +
@@ -685,8 +710,8 @@ public class BossDataSO : MonsterDataSO
              "스폰되지 않는 중첩 NetworkObject 라 자기 NetworkVariable 을 가질 수 없다.")]
     [Min(0f)] public float bombThrowInterval = 6f;
 
-    [Tooltip("[S8] 폭탄 프리팹(서버 스폰).")]
-    public GameObject bombPrefab;
+    // `bombPrefab` 은 2026-10-19 에 지웠다 — 폭탄 투척이 09-16 에 제거된 뒤 읽는 런타임 코드가 없었다
+    // (PLAN-monster-data-inspector §3.4 · xlsx 행 없음 확인 r461). 폭탄 모양은 투사체 프리팹에서 빌린다.
 
     // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
     //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.

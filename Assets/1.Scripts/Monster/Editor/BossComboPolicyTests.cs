@@ -122,4 +122,60 @@ public sealed class BossComboPolicyTests
         Assert.That(Next(started: false, lockValid: false, inWindow: false), Is.EqualTo(BossComboPolicy.StepGate.Wait));
         Assert.That(Next(started: false, lockValid: false, inWindow: true), Is.EqualTo(BossComboPolicy.StepGate.Fire));
     }
+
+    // ── 즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) ──
+
+    [Test]
+    public void Chain_IntervalIsZero_OtherwiseNormal()
+    {
+        Assert.That(BossComboPolicy.StepInterval(true, Interval), Is.EqualTo(0f));
+        Assert.That(BossComboPolicy.StepInterval(false, Interval), Is.EqualTo(Interval));
+    }
+
+    [Test]
+    public void Chain_FiresImmediatelyEvenOutOfRange()
+    {
+        // 맞힌 순간 넘어와 간격 0 · 회피로 사거리 밖이어도 친다.
+        bool inWindow = BossComboPolicy.IgnoresRange(chainOnHit: true, forceFire: false) || false;
+        Assert.That(BossComboPolicy.NextStep(true, true, 0f, BossComboPolicy.StepInterval(true, Interval), inWindow),
+                    Is.EqualTo(BossComboPolicy.StepGate.Fire));
+    }
+
+    [Test]
+    public void NoChain_KeepsOldRules()
+    {
+        Assert.That(BossComboPolicy.IgnoresRange(false, false), Is.False);
+        Assert.That(BossComboPolicy.IgnoresRange(false, true), Is.True, "forceFire(돌진 → 잡기)는 그대로 무조건");
+        Assert.That(BossComboPolicy.NextStep(true, true, 0f, BossComboPolicy.StepInterval(false, Interval), true),
+                    Is.EqualTo(BossComboPolicy.StepGate.Wait), "간격 0.3 은 기다린다");
+    }
+
+    [Test]
+    public void Chain_StillDropsWhenLockLost()
+    {
+        // 즉시 연결이어도 고정 대상이 죽거나 어그로가 바뀌면 버린다(사거리만 무시한다).
+        Assert.That(BossComboPolicy.NextStep(true, false, 0f, 0f, true), Is.EqualTo(BossComboPolicy.StepGate.Drop));
+    }
+
+    [TestCase(true, true, 1, 3, true)]    // 첫 타 뒤 — 다음 타 남음
+    [TestCase(true, true, 2, 3, true)]
+    [TestCase(true, true, 3, 3, false)]   // 마지막 타 — 넘길 곳 없음
+    [TestCase(true, false, 1, 3, false)]  // 즉시 연결 끔
+    [TestCase(false, true, 1, 3, false)]  // 콤보 없음
+    [TestCase(true, true, 0, 3, false)]   // 아직 첫 타 전(개전 대기)
+    public void ShouldChain_Cases(bool active, bool chain, int next, int count, bool expected)
+    {
+        Assert.That(BossComboPolicy.ShouldChain(active, chain, next, count), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void HookOrUpper_OnlyLightHits()
+    {
+        Assert.That(BossComboPolicy.IsHookOrUpper(BossAttackId.LeftHook), Is.True);
+        Assert.That(BossComboPolicy.IsHookOrUpper(BossAttackId.RightHook), Is.True);
+        Assert.That(BossComboPolicy.IsHookOrUpper(BossAttackId.Upper), Is.True);
+        Assert.That(BossComboPolicy.IsHookOrUpper(BossAttackId.Grab), Is.False);
+        Assert.That(BossComboPolicy.IsHookOrUpper(BossAttackId.Dash), Is.False);
+        Assert.That(BossComboPolicy.IsHookOrUpper(BossAttackId.Jump), Is.False);
+    }
 }

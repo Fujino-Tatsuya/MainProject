@@ -58,7 +58,7 @@ Transform:
   m_GameObject: {fileID: 174883655170953482}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0.4311816, y: 20.7368, z: 0.5292532}
+  m_LocalPosition: {x: 0.4311816, y: 31.8, z: 0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -76,7 +76,7 @@ Light:
   m_Type: 0
   m_Color: {r: 1, g: 0.51338345, b: 0.4764151, a: 1}
   m_Intensity: 100
-  m_Range: 32.3
+  m_Range: 44.842094
   m_SpotAngle: 67.20699
   m_InnerSpotAngle: 40.289284
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -2211,13 +2211,21 @@ PrefabInstance:
       propertyPath: m_Name
       value: Elevator
       objectReference: {fileID: 0}
+    - target: {fileID: 4316352941955417802, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_Name
+      value: Slope
+      objectReference: {fileID: 0}
+    - target: {fileID: 4652660908944932004, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_Name
+      value: Floor
+      objectReference: {fileID: 0}
     - target: {fileID: 5100180471567933783, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5100180471567933783, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 5100180471567933783, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2251,66 +2259,36 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7088136036000263933, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: '_frontPoints.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2356710386214288305}
+    - target: {fileID: 7088136036000263933, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: '_frontPoints.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1166688363084698214}
+    - target: {fileID: 7088136036000263933, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: '_frontPoints.Array.data[2]'
+      value: 
+      objectReference: {fileID: 909659294297857113}
+    - target: {fileID: 8199046613434142888, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8199046613434142888, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3907592954658071575, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 3836873616753504027}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
 --- !u!4 &620717727326253592 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5100180471567933783, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
   m_PrefabInstance: {fileID: 5645895889846358863}
   m_PrefabAsset: {fileID: 0}
---- !u!95 &4275907282767704744 stripped
-Animator:
-  m_CorrespondingSourceObject: {fileID: 8434489361013055975, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
-  m_PrefabInstance: {fileID: 5645895889846358863}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &8504306445987216819 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4061998106613427964, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
-  m_PrefabInstance: {fileID: 5645895889846358863}
-  m_PrefabAsset: {fileID: 0}
---- !u!1 &8674160965682984792 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 3907592954658071575, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
-  m_PrefabInstance: {fileID: 5645895889846358863}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &3836873616753504027
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8674160965682984792}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 81c4da17a0a191941ae6a626eb7c2902, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BossElevatorRig
-  _cab: {fileID: 8504306445987216819}
-  _doorAnimator: {fileID: 4275907282767704744}
-  _doorOpenClip: {fileID: 7400000, guid: 9d518dfaa6789214e8a0794e0126e990, type: 2}
-  _doorCloseClip: {fileID: 7400000, guid: 261156973ba470441b1f5a3130ec212a, type: 2}
-  _landedLocalY: 0.55
-  _frontPoints:
-  - {fileID: 2356710386214288305}
-  - {fileID: 1166688363084698214}
-  - {fileID: 909659294297857113}
-  _timing:
-    height: 0
-    waitBeforeDescend: 0.5
-    descendDuration: 1.2
-    doorOpenDuration: 0
-    closeDelayAfterVanish: 1.5
-    doorCloseDuration: 0
-    ascendDuration: 1.5
-    ascendSpeed: 24
-    fadeOutDelay: 0
-    fadeOutDuration: 1.5
 --- !u!1001 &6124110812454917498
 PrefabInstance:
   m_ObjectHideFlags: 0

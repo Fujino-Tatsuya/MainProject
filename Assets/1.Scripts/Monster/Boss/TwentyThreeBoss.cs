@@ -104,8 +104,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
 
     /// 지금 공격 행의 카운터 창 길이. 창을 여는 공격이 아니면 0.
     float CounterWindowDuration => _currentEntry != null && _currentEntry.opensCounterWindow
-        ? Mathf.Clamp(_currentEntry.counterWindowDuration, 0f, 2f)
+        ? Mathf.Clamp(ChainedDash ? _boss.comboDashWindup : _currentEntry.counterWindowDuration, 0f, 2f)
         : 0f;
+
+    // 즉시 연결의 후속 돌진 — 준비(= 간파 창)를 comboDashWindup 으로 줄인다(PLAN-boss-combo-chain C4).
+    bool ChainedDash => _chainedAttack && _boss != null && _currentEntry != null && _currentEntry.attackId == BossAttackId.Dash;
 
     // ─── Grab 체인 (서버 전용) ───────────────────────────────────────
     BossAttackPhase _attackPhase = BossAttackPhase.None;
@@ -282,10 +285,27 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     float _comboChaseSince = -1f; // 다음 타가 사거리 밖이 된 시각(-1 = 사거리 안·간격 대기) — 짧은 추격 유예
     bool _comboFaceAggroOnStart;  // 다음 StartAttack 에서 어그로 대상으로 즉시 회전(forceFire 타)
     float[] _comboWeightBuffer;
-    readonly BossComboEntry _openingComboRuntime = new BossComboEntry { name = "개전", weight = 0f, cooldown = 0f };
+    // 개전 콤보는 즉시 연결하지 않는다 — 레이드 ① 은 배우는 구간이라 일부러 느리다(raidOpeningStepInterval).
+    readonly BossComboEntry _openingComboRuntime = new BossComboEntry { name = "개전", weight = 0f, cooldown = 0f, chainOnHit = false };
     int _fightCombosStarted, _fightCombosDone, _fightCombosDropped;
 
+    // ─── 즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) — 서버 전용 ───
+    bool _chainNextPending;       // ConsumeCombo 가 즉시 연결의 후속 타를 냈다 — 다음 StartAttack 이 소비한다
+    bool _chainedAttack;          // 지금 공격이 즉시 연결의 후속 타(StartAttack 에서 정해 그 공격 내내 유지)
+    Quaternion _chainFacing;      // 후속 훅·어퍼가 지킬 방향 — 앞 타가 맞힌 순간의 방향(첫 타 방향 고정)
+    bool _chainFacingValid;
+    bool _chainArmed;             // 훅·어퍼가 맞혔다 — _chainAt 에 다음 타로 넘긴다(comboHookFollowThrough)
+    float _chainAt;
+    BossAttackId _chainPrevAttack; // 지금 후속 타 바로 앞 타 — 돌진 다음 잡기만 예고를 길게(comboGrabTelegraphAfterDash)
+
     bool ComboActive => _combo != null;
+
+    /// <summary>지금 공격이 끝나면 다음 타로 바로 넘길 즉시 연결 콤보 타인가(다음 타가 남아 있다).</summary>
+    bool ChainPending => _combo != null
+        && BossComboPolicy.ShouldChain(true, _combo.chainOnHit, _comboIndex, _combo.steps != null ? _combo.steps.Length : 0);
+
+    /// <summary>지금 공격이 예고 없이 첫 타 방향으로 바로 치는 후속 훅·어퍼인가.</summary>
+    bool ChainedLight => _chainedAttack && _currentEntry != null && BossComboPolicy.IsHookOrUpper(_currentEntry.attackId);
     bool _raidCharge;               // 지금 도는 송전기가 ② 전력 공급(드론 유도·방전)인가. 끄는 곳 = TickCharge 결과 · AbortAttackChain
     float _raidFloorHoldUntil;      // 방전 예고·발동이 끝날 때까지 상시 장판을 붙잡아 둔다
     readonly List<Vector2Int> _safeTileScratch = new List<Vector2Int>(4);
@@ -1082,6 +1102,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             BossAttackEntry e = rows[i];
             if (e == null || e.weight <= 0f) continue;
             if (CurrentPhase < e.allowedFromPhase) continue;
+            // 단타 훅·어퍼 끔(경석 10-19) — 콤보로만 나온다. 콤보 첫 타 판정(CollectComboCandidates)은 행 가중치를 안 보므로 영향 없다.
+            if (!_boss.singleHookUpper && BossComboPolicy.IsHookOrUpper(e.attackId)) continue;
 
             // 🔴 상한은 저작값이 아니라 **개시 상한**이다 — 접촉 공격은 attackRange 안까지 걸어
             //    들어간 뒤에만 시작한다(허공 훅 차단). 붙은 뒤에는 저작값까지 계속 때린다.
@@ -1362,10 +1384,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         BossAttackEntry e = rows[slot];
 
         bool lockValid = !started || (_comboLock != null && _comboLock == Target && MonsterTargeting.IsAttackable(_comboLock));
-        float interval = _comboIsOpening && IsRaid ? _boss.raidOpeningStepInterval : _boss.comboStepInterval;
+        // 즉시 연결(PLAN-boss-combo-chain) — 앞 타가 맞히는 순간 넘어오므로 간격 0 · 사거리 검사 없음(회피해도 친다).
+        bool chain = started && _combo.chainOnHit;
+        float interval = BossComboPolicy.StepInterval(chain,
+            _comboIsOpening && IsRaid ? _boss.raidOpeningStepInterval : _boss.comboStepInterval);
 
         // 사거리 판정 — forceFire 타(돌진 → 잡기)는 사거리 무시하고 무조건 시전한다(팀장 10-19).
-        bool inWindow = step.forceFire || InComboWindow(e, dist);
+        bool inWindow = BossComboPolicy.IgnoresRange(chain, step.forceFire) || InComboWindow(e, dist);
 
         // 짧은 추격 유예(팀장 10-19) — 간격이 지난 뒤 사거리 밖이면 시각을 찍고, comboChaseGrace 동안은 기다린다
         // (NoAttack 이라 SeekBoss 가 고정 대상에게 다가간다). 사거리 안이면 지운다.
@@ -1387,6 +1412,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
 
         // forceFire — 시작 순간 어그로 대상 쪽으로 즉시 몸을 돌린다(StartAttack 에서 소비). 돌진 끝엔 벽을 보고 있어서(팀장 10-19).
         _comboFaceAggroOnStart = step.forceFire;
+        _chainNextPending = chain;           // 다음 StartAttack 이 후속 타 분기(예고 생략·준비 단축·방향 고정)를 탄다
+        _chainPrevAttack = started ? steps[_comboIndex - 1].attack : step.attack;
         if (!started) _comboLock = Target;   // 개전 첫 타 — 이 순간 고정
 
         _comboIndex++;
@@ -1415,6 +1442,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     {
         _comboChaseSince = -1f;
         _comboFaceAggroOnStart = false;
+        _chainNextPending = false;
+        _chainFacingValid = false;
+        _chainArmed = false;
         _combo = null;
         _comboIndex = 0;
         _comboIsOpening = false;
@@ -1429,6 +1459,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     {
         BossAttackEntry e = EntryFor(CurrentAttackSlot);
         _currentEntry = e;
+
+        // 즉시 연결의 후속 타인가 — ConsumeCombo 가 세운 표시를 이 공격 몫으로 옮긴다(CounterWindowDuration 이 base 전에 읽는다).
+        _chainedAttack = _chainNextPending;
+        _chainNextPending = false;
+        _chainArmed = false;   // 앞 공격이 남긴 예약은 이 공격에 해당하지 않는다
 
         // 연속 카운트는 "실제로 쓴 것" 기준으로 센다(SelectAttackSlot 은 NoAttack 을 돌릴 수 있다).
         if (CurrentAttackSlot == _lastSlot)
@@ -1475,6 +1510,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             FaceTargetImmediate();
         }
 
+        // 즉시 연결의 후속 훅·어퍼 — **첫 타 방향 고정**(PLAN-boss-combo-chain C3). SeekBoss·base.StartAttack 의
+        // FaceTarget(감속 한 틱씩)이 대상 쪽으로 조금 틀어 놓은 것을 앞 타가 맞힌 순간의 방향으로 되돌린다.
+        if (ChainedLight && _chainFacingValid)
+            transform.rotation = _chainFacing;
+        _chainFacingValid = false;
+
         // 다단계 체인은 관용구 3 대로 base 의 종료 타이머를 **체인 전체 길이**로 덮어쓴다
         // — 안 늘리면 attackDuration 이 만료돼 다음 단계에 들어가기도 전에 Attack 을 벗어난다.
         // 여기서 세팅한 _stateTimer 가 곧 슈퍼아머 길이이자 데드락 안전망이 된다.
@@ -1492,7 +1533,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     if (IsSpawned) SetGrabCycleSpeedClientRpc(GrabCycleSpeed);
                     if (animator != null) animator.speed = GrabCycleSpeed;
 
-                    _stateTimer = e.telegraphDuration
+                    _stateTimer = TelegraphTime(e)
                                   + GrabPullDuration + GrabCatchDuration + GrabHold
                                   + GrabThrowTime * GrabSlamCount
                                   + GrabEndDuration + GrabRecovery + ChainBudgetSlack;
@@ -1580,7 +1621,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         //   ① 준비 자세에서 멈추고 부채꼴이 차오른다(Telegraph 단계)
         //   ② 다 차면 ReleaseTelegraph 가 자세를 풀고 **전진 + 공격**을 낸다
         // 🔴 예고가 판정보다 **먼저 끝나야** 피할 시간이 생긴다. 둘을 같이 시작하면 예고가 아니다.
-        if (!BeginTelegraph(e))
+        if (ChainedLight)
+        {
+            // 즉시 연결의 후속 훅·어퍼(PLAN-boss-combo-chain C1·C2) — 예고(준비 자세) 없이 공격 클립을
+            // **재개 지점부터** 바로 튼다. 클립 앞부분은 그 클립 자체의 준비동작이라 0 부터 틀면 그만큼 늦게 맞는다.
+            // 전진은 매 타 그대로다. 바닥 표시는 토글이 켜져 있을 때만 즉시 가득 찬 채로 뜬다.
+            ResumeAttackFromPoseClientRpc(CurrentAttackSlot, e.telegraphPoseNormalized);
+            BeginLunge(e);
+            if (HasTelegraphShape(e)) ShowAttackConeClientRpc(CurrentAttackSlot, 0f);
+        }
+        else if (!BeginTelegraph(e))
         {
             // 예고가 없는 공격(telegraphDuration 0 = 기존 즉발). 전진과 표시를 지금 시작한다.
             //
@@ -1690,7 +1740,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             case BossAttackId.Jump:
                 // 착지 클립의 히트 프레임. Land 단계가 아니면 도약 클립의 오발동이므로 무시한다.
                 if (_attackPhase == BossAttackPhase.Land)
+                {
                     ApplyJumpLandingDamage(e);
+                    // 즉시 연결 — 착지 히트 순간 착지 클립을 끊고 후딜(comboJumpRecovery) 뒤 다음 타(PLAN-boss-combo-chain C5).
+                    if (ChainPending)
+                    {
+                        _attackPhaseTimer = 0f;
+                        StopCutClipLoopsClientRpc();   // 착지 루프(JumpLanding)가 돌진까지 붙어 남던 것(경석 Play 10-19)
+                    }
+                }
                 break;
 
             case BossAttackId.Dash:
@@ -1821,6 +1879,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (e == null) return;
         if (e.coneRadius <= 0f && e.lungePathRadius <= 0f && e.boxWidth <= 0f) return;
 
+        // 훅·어퍼 바닥 예고 토글(PLAN-boss-combo-chain C6) — 표시만 끈다. 준비 자세 시간·판정은 그대로.
+        // 각 피어가 같은 SO 를 읽으므로 여기 한 곳이면 전 피어가 같다(서버 호출부 두 곳을 따로 막지 않는다).
+        if (_boss != null && !_boss.hookTelegraphMarkers && BossComboPolicy.IsHookOrUpper(e.attackId)) return;
+
         // 🔴 부채꼴 꼭짓점은 **전진 끝점**이다 — 판정도 전진을 마친 자리에서 나가기 때문이다.
         //    보스 현재 위치에 그리면 예고와 판정이 전진 거리만큼 어긋난다.
         // 🔴 네모 공격은 **사각형 하나**로 그린다(팀장 확정 2026-09-18).
@@ -1931,7 +1993,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
 
         // [G2-P] 돌진 준비동작(2026-09-23). 돌진은 `telegraphDuration: 0` 이라 BeginTelegraph 를
         //    타지 않으므로 여기가 prep 을 트는 유일한 자리다.
-        if (string.IsNullOrEmpty(e.prepStateName)) return;
+        // 🔴 즉시 연결의 후속 돌진은 prep 을 틀지 않는다(PLAN-boss-combo-chain C4). 창이 comboDashWindup(0.7)으로
+        //    짧아 1.5초짜리 prep 이 중간에 끊긴다. 대신 prep 이전 방식 — 돌진 클립의 OnAttackHit(0.15초)에서
+        //    자세를 멈추고(NotifyAttackHit → SetCounterPoseHeld) 창이 끝나면 나간다. prep 속도를 바꾸지 않는 이유:
+        //    자세 홀드가 "걸 때의 속도"를 저장·복원해서, 빨리 돌린 속도가 돌진 본체까지 남는다.
+        if (string.IsNullOrEmpty(e.prepStateName) || _chainedAttack) return;
 
         PlayPrepPoseClientRpc(CurrentAttackSlot);
 
@@ -1969,12 +2035,26 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     /// 예고를 시작한다 — <b>준비 자세에서 멈추고</b> 바닥 부채꼴을 채운다. 전진·판정은 아직 없다.
     /// </summary>
     /// <returns>예고 구간에 들어갔는가. false 면 예고 없는 즉발 공격이다(기존 동작).</returns>
+    /// <summary>
+    /// 이 공격의 예고 길이(초). 즉시 연결의 후속 잡기는 comboGrabTelegraph 로 줄이고(PLAN-boss-combo-chain C4),
+    /// 🔴 돌진 다음 잡기만 comboGrabTelegraphAfterDash(1초)로 길게 — 돌진 끝에서 바로 잡히면 피할 수 없었다(경석 Play 10-19).
+    /// 그 밖은 행 값 그대로. 예고 단계와 잡기 체인 예산이 **같은 값**을 써야 안전망이 먼저 터지지 않는다.
+    /// </summary>
+    float TelegraphTime(BossAttackEntry e)
+    {
+        if (e == null) return 0f;
+        if (!_chainedAttack || e.attackId != BossAttackId.Grab || _boss == null) return e.telegraphDuration;
+        return _chainPrevAttack == BossAttackId.Dash ? _boss.comboGrabTelegraphAfterDash : _boss.comboGrabTelegraph;
+    }
+
     bool BeginTelegraph(BossAttackEntry e)
     {
         if (e == null || e.telegraphDuration <= 0f) return false;
 
+        float telegraph = TelegraphTime(e);
+
         _attackPhase = BossAttackPhase.Telegraph;
-        _attackPhaseTimer = e.telegraphDuration;
+        _attackPhaseTimer = telegraph;
 
         // 🔴 **예고 시작에 한 번에 스냅해 조준을 확정한다**(팀장 확정 2026-09-18).
         //    예전에는 예고 동안 매 틱 FaceTarget() 으로 계속 돌았고, 그래서 장판이
@@ -1989,7 +2069,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         //    위 switch 가 이미 전체 길이를 잡아 뒀다 — 여기서 갈아치우면 체인 도중 안전망이 터진다.
         _stateTimer = Mathf.Max(
             _stateTimer,
-            e.telegraphDuration + (data != null ? data.attackDuration : 0.9f) + ChainBudgetSlack);
+            telegraph + (data != null ? data.attackDuration : 0.9f) + ChainBudgetSlack);
 
         // 슈퍼아머도 늘어난 길이로 다시 건다 — 위에서 옛 _stateTimer 로 걸렸기 때문이다.
         if (e.superArmor && status != null)
@@ -2003,7 +2083,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         else
             HoldAttackPoseClientRpc(CurrentAttackSlot, e.telegraphPoseNormalized);
 
-        if (HasTelegraphShape(e)) ShowAttackConeClientRpc(CurrentAttackSlot, e.telegraphDuration);
+        if (HasTelegraphShape(e)) ShowAttackConeClientRpc(CurrentAttackSlot, telegraph);
         return true;
     }
 
@@ -2376,6 +2456,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
 
         if (_attackPhase == BossAttackPhase.None)
         {
+            // 즉시 연결 — 훅·어퍼가 맞힌 뒤 comboHookFollowThrough 만큼 클립을 보여 주고 다음 타로(TryChainAfterLightHit 이 예약).
+            if (_chainArmed && Time.time >= _chainAt)
+            {
+                FireArmedChain();
+                return;
+            }
+
             base.HandleAttack(dt); // 단타 공격 — 히트는 애니 이벤트, 종료는 이벤트 + 타이머 폴백
             return;
         }
@@ -2493,7 +2580,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     break;
                 }
 
-                EnterPhase(BossAttackPhase.Recovery, JumpRecovery);
+                EnterPhase(BossAttackPhase.Recovery, ChainPending ? Mathf.Max(0f, _boss.comboJumpRecovery) : JumpRecovery);
                 break;
 
             // ── 페이즈 시퀀스 ─────────────────────────────────────────
@@ -3763,6 +3850,40 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     }
 
     /// <summary>
+    /// 즉시 연결로 클립을 **도중에 끊을 때** — 그 클립이 <c>StartEffect</c> 로 켜는 루프 이펙트를 전부 끈다(PLAN-boss-combo-chain).
+    ///
+    /// 🔴 왜 필요한가(10-19 경석 Play — "점프 후 돌진에 레이지 같은 이펙트가 붙는다"): 루프는 클립의 짝 이벤트가 끈다.
+    ///    착지 클립은 StartEffect(JumpLanding) 0.04 → OnAttackHit 0.21 → StopEffect 0.23, 훅은 StartEffect(Wind_L) 0.19 →
+    ///    OnAttackHit 0.40 → StopEffect 0.53 인데, 즉시 연결은 **히트 순간** 끊으므로 StopEffect 가 영영 안 온다.
+    ///    끄지 않은 루프는 다음 공격(돌진)까지 몸에 붙어 남는다.
+    /// 클립의 이벤트 목록을 런타임에 읽으므로 이펙트 이름을 여기 박지 않는다(아트가 클립 이벤트를 바꿔도 따라간다).
+    /// 켜지기 전이었던 루프도 끈다 — 꺼진 루프를 끄는 것은 무해하고, 피어마다 클립 진행이 조금씩 달라 "지금까지 켜진 것"만
+    /// 고르면 늦은 피어에서 놓친다. ⚠️ EffectAnimEvents(이펙트 공용)는 건드리지 않는다.
+    /// </summary>
+    [ClientRpc]
+    void StopCutClipLoopsClientRpc()
+    {
+        if (animator == null) return;
+        if (_effects == null && !TryGetComponent(out _effects)) return;
+
+        StopStartedLoops(animator.GetCurrentAnimatorClipInfo(0));
+        if (animator.IsInTransition(0)) StopStartedLoops(animator.GetNextAnimatorClipInfo(0));
+    }
+
+    void StopStartedLoops(AnimatorClipInfo[] clips)
+    {
+        foreach (AnimatorClipInfo info in clips)
+        {
+            if (info.clip == null) continue;
+            foreach (AnimationEvent ev in info.clip.events)
+            {
+                if (ev.functionName == "StartEffect" && !string.IsNullOrEmpty(ev.stringParameter))
+                    _effects.StopEffect(ev.stringParameter);
+            }
+        }
+    }
+
+    /// <summary>
     /// 팔다리 전기 펄스 시작 — 몸통에서 손·발까지 네 갈래가 동시에 흐른다.
     /// 일반 돌진과 레이지가 <b>같은 엔트리를 배율만 달리해</b> 쓴다.
     ///
@@ -4784,7 +4905,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         // 목적지에 **닿아서** 멈췄고 그 목적지가 보행면 끝이었으면 벽 충돌이다.
         // 시간이 먼저 끝났으면 거리를 소진한 것이라 데미지가 없다(라인하르트 규칙 ②).
         StopDash(hitWall: _dashBlockedAhead && arrived);
-        EnterPhase(BossAttackPhase.Recovery, data != null ? data.attackDuration : 0.9f);
+        // 즉시 연결 — 다음 타가 있으면 복귀를 comboDashRecovery 로 줄인다(PLAN-boss-combo-chain C5). 단타 돌진은 그대로.
+        EnterPhase(BossAttackPhase.Recovery, ChainPending && _boss != null
+            ? Mathf.Max(0f, _boss.comboDashRecovery)
+            : (data != null ? data.attackDuration : 0.9f));
     }
 
     // 라인하르트 규칙 ① — 직접 충돌한 **첫 1명**만 끌고 간다. 나머지는 스침 데미지만 받는다.
@@ -5490,6 +5614,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (!_counterWindup.IsActive)
         {
             base.NotifyAttackHit();
+            TryChainAfterLightHit();
             return;
         }
 
@@ -5507,6 +5632,38 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         _counterWindup.MarkAnimationReady();
         SetCounterPoseHeldClientRpc(true);   // 준비 자세에서 정지 — 창이 끝날 때까지 붙잡는다
         TryReleaseCounterAttack();
+    }
+
+    /// <summary>
+    /// [서버] 즉시 연결(PLAN-boss-combo-chain C1) — 훅·어퍼가 **맞히는 순간** 남은 클립을 버리고 다음 타로 넘긴다.
+    /// 공격을 여기서 끝내면(Idle) 다음 틱 SeekBoss → ConsumeCombo 가 간격 0 으로 다음 타를 낸다.
+    /// 방향은 이 순간 것을 저장해 후속 훅·어퍼가 그대로 쓴다(첫 타 방향 고정).
+    /// 🔴 단계 기계 밖(_attackPhase None = 예고가 끝난 단타 경로)일 때만 — 예고·체인 도중에 끊으면 상태가 섞인다.
+    /// </summary>
+    void TryChainAfterLightHit()
+    {
+        if (!IsServer || State != MonsterState.Attack || _attackPhase != BossAttackPhase.None) return;
+        if (_currentEntry == null || !BossComboPolicy.IsHookOrUpper(_currentEntry.attackId)) return;
+        if (!ChainPending) return;
+
+        // 방향은 **맞힌 순간** 것을 저장한다 — 남은 클립을 보여 주는 동안 몸이 틀어져도 다음 타는 이 방향(첫 타 방향 고정).
+        _chainFacing = transform.rotation;
+        _chainFacingValid = true;
+
+        // 바로 끊으면 너무 빨라 읽히지 않는다(경석 Play 10-19) — 클립을 조금 더 보여 준 뒤 넘긴다.
+        float followThrough = _boss != null ? Mathf.Max(0f, _boss.comboHookFollowThrough) : 0f;
+        _chainArmed = true;
+        _chainAt = Time.time + followThrough;
+        if (followThrough <= 0f) FireArmedChain();
+    }
+
+    // 예약해 둔 즉시 연결을 낸다 — 끊기는 클립의 루프를 끄고 공격을 끝내면 다음 틱 ConsumeCombo 가 간격 0 으로 다음 타를 낸다.
+    void FireArmedChain()
+    {
+        _chainArmed = false;
+        if (State != MonsterState.Attack) return;   // 그사이 클립 OnAttackEnd·간파 등으로 이미 끝났다 — 콤보는 평소대로 이어진다
+        StopCutClipLoopsClientRpc();   // 끊기는 클립의 바람 루프(Wind_L/Wind_R)가 남지 않게 — 짝 StopEffect 가 히트 뒤에 있다
+        DecideNextAfterAction();
     }
 
     /// <summary>
