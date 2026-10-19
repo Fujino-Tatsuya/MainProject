@@ -37,3 +37,50 @@ public static class GunnerSkillEventRules
 #endif
     }
 }
+
+/// <summary>
+/// 거너 우클릭 후폭풍(반동) 진행 (PLAN-anim-event-timing P3-2 ①). 시전 때 거리·시간을 실어 두고(<see cref="Arm"/>),
+/// 이 피어 애니메이터의 Hit 이벤트로 출발한다(<see cref="Release"/>). Hit 이 안 오면 움직이지 않고 안전망으로 끝난다 — 타이머 없음.
+/// </summary>
+public struct GunnerRecoilModel
+{
+    private float remaining;
+    private float speed;
+    private bool isArmed;
+    private bool isReleased;
+
+    public bool IsMoving => isReleased && remaining > 0f;
+
+    public void Arm(float distance, float duration)
+    {
+        remaining = Mathf.Max(0f, distance);
+        speed = duration > 0f ? remaining / duration : 0f;
+        isArmed = true;
+        isReleased = false;
+    }
+
+    /// <summary>Hit 수신. 시전 전·종료 뒤(<see cref="Clear"/>)의 Hit 은 무시한다. 중복 Hit 은 무해.</summary>
+    public void Release()
+    {
+        if (isArmed)
+            isReleased = true;
+    }
+
+    /// <summary>이번 고정 틱에 밀려날 거리. 출발 전이거나 다 밀렸으면 0.</summary>
+    public float Step(float deltaTime)
+    {
+        if (!IsMoving)
+            return 0f;
+
+        float step = Mathf.Min(speed * Mathf.Max(0f, deltaTime), remaining);
+        remaining -= step;
+        return step;
+    }
+
+    public void Clear()
+    {
+        remaining = 0f;
+        isArmed = false;
+        isReleased = false;
+    }
+}

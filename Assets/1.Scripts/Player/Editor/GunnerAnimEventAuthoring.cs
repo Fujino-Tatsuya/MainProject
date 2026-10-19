@@ -73,6 +73,7 @@ public static class GunnerAnimEventAuthoring
     {
         var specs = new List<ClipSpec>();
 
+        // 우클릭은 Hit·End 가 판정·종료·후폭풍 출발이라(P3-2 ①) hitDelay·skillDuration 은 미사용 칸이다 — 처음 위치는 옛 값으로 고정.
         var interrupt = Load<GunnerInterruptData>("GunnerInterruptData");
         if (interrupt != null)
             specs.Add(new ClipSpec
@@ -81,8 +82,8 @@ public static class GunnerAnimEventAuthoring
                 StateName = interrupt.AnimatorStateName,
                 Events = new[]
                 {
-                    new EventSpec(SkillAnimationEventType.Hit, interrupt.HitDelay, "GunnerInterruptData.hitDelay"),
-                    new EventSpec(SkillAnimationEventType.End, interrupt.SkillDuration, "GunnerInterruptData.skillDuration"),
+                    new EventSpec(SkillAnimationEventType.Hit, 0.2f, "처음 위치 고정(옛 hitDelay 0.2)"),
+                    new EventSpec(SkillAnimationEventType.End, 0.7f, "처음 위치 고정(옛 skillDuration 0.7)"),
                 },
             });
 
