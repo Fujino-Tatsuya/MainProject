@@ -1,3 +1,24 @@
+# ▶▶▶ 계획 = **어쌔신 좌클릭 VFX 반입·배선 — 일반 4타 · 일반 성공 · 변신 루프 (EffectSocketPlayer)** (2026-10-19 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 배선(컴파일은 MainProject Unity 를 켜야 확인) · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-19). 소켓 9개 = 민경이 `Player_Assassin/VFX/NormalSlash_1~4 · NormalSlash_Success_1~4 · TransformedSlash` 에 EffectSocketPlayer 를 넣어 둠(id·effect 비어 있음, 각자 Armature `BasicAttack01~04`·`TransformedAttack` 추종).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 반입 프리팹 | MyProject `LClick/BM Assassin_Slash_Arc200_BM`(원본 Arc200 은 원호 모델용 재질 V 0.625 를 링 200° 메시에 써서 어긋남 → 재질만 바로잡은 `_BM`) · `BM Assassin_Slash_Success_200`(원본, NamuFX 가산 + 그어진 섬광 중첩) · `BM Assassin_TransformedSlash`(원본, 민경 10-19 수정본 — 루프) |
+| 배치 | `50.Art/VFX/Common/Players/Player3/LClick/FX_Assassin_LClick_Slash`·`_Success`·`_Transformed`(+`_Entry`). 일반·성공 = 원샷(지속시간 지정), 변신 = 루프(outroDuration 0.3). `EffectCatalog` 에 `Assassin_LClick_Slash`·`_Success`·`_Transformed` 등록(prewarm) |
+| 의존 | 24개 신규(NamuFX 셰이더·서브그래프·텍스처 → `50.Art/VFX/*/NamuFX/`, Piloto BM 재질·텍스처 → 기존 `*/PilotoStudio/`, 재질 사본·링 200° 메시·그어진 섬광). 19개는 같은 guid 로 이미 있음. 🔴 새 아트 SVN add |
+| 🔸 재생 방식(유지보수) | 애니 이벤트(EffectAnimEvents) 대신 **코드의 기존 Hit 이벤트**에서 — 팔라딘 `DefaultAttackController` 선례. `AssassinSkillView` 가 `EffectSocketPlayer` 배열을 든다: 일반 1~4타 = Hit(전 피어) → `normalSlash[타].PlayOnce()`, 일반 성공 = 서버 `Fire()` 반환값 true → RPC(Unreliable) → `normalSlashSuccess[타].PlayOnce()`, 변신 = 묶음 시작(전 피어) `transformedSlash.Play()` / 묶음 끝·취소·변신 해제 `Stop()`. 이유: 판정·VFX 타이밍이 Hit 이벤트 하나, `hasPendingClip`·취소·모드 필터를 그대로 탐, 변신 루프가 끊겨도 확실히 멈춤 |
+| 4타 프리팹 | 4타 모두 같은 Arc200 엔트리, 방향 = 소켓 회전. 성공 4개도 같은 엔트리 |
+| 코드 정리 | `AssassinSkillView` 의 `normalSlashPrefabs`·`transformedSlashPrefab`·해당 소켓 필드·Instantiate 경로를 소켓 플레이어로 교체. 강화(`enhancedSlashPrefab`) 경로는 그대로 |
+| 재생 속도 | `ShurikenEffectSystem` 이 프리팹의 Simulation Speed 를 처음 본 값으로 기억해 `기본 × 배율` 로 쓰게(지금은 반납 때 1 로 덮어써 두 번째 재생부터 느려짐). 기본 1 인 기존 이펙트 동작 불변 |
+| 담당·공유 | `AssassinBasicAttack`·`AssassinSkillView` = 은희 영역 → `Docs/tech/handoff-assassin-r-vfx.md` 에 추가 |
+
+## 검증
+- 컴파일 에러 0 · 프리팹·카탈로그 guid 연결 확인. ⏳ 민경 Play / MPPM(호스트·클라 모두 4타 슬래쉬 · 맞을 때만 성공 · 변신 루프 시작·정지).
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 좌클릭 = Insight 슬래쉬 · E 강타 · 우클릭 올려치기/성공 재제작 (SlashReference 참고)** (2026-10-17 · grill 확정 · ✅ 승인 · 🛠 1단계 MyProject 제작 완료 → ⏳ 민경 컨펌)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-17). 참고 = MyProject `Export/Player3/SlashReference/`(SpecialSkillsEffectsPack EffectsSet_2 — 보이는 부분은 전부 순수 파티클, `Shader_IntegratedEffect`. 소환 스크립트 `MultipleObjectsMake` 는 MainProject EffectManager 풀링과 안 맞아 **시작 지연·버스트로 구워 순수 파티클 프리팹**으로 만든다).

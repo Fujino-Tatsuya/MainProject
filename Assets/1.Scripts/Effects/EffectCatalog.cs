@@ -103,6 +103,14 @@ public class EffectCatalog : ScriptableObject
     // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).
     [field: SerializeField] public EffectEntry Assassin_Q_StormSlash { get; private set; }
 
+    [Header("플레이어 — 어쌔신 좌클릭")]
+    // 일반 1~4타 = Hit 이벤트마다 소켓 원샷(FX_Assassin_LClick_Slash, 4타 공용 — 방향은 소켓 회전),
+    // 적중 성공 = 서버 판정 → RPC 로 같은 타 소켓에 원샷(FX_Assassin_LClick_Success, 일반 슬래쉬와 겹쳐 재생),
+    // 변신 묶음 = 묶음 동안 소켓 루프(FX_Assassin_LClick_Transformed). AssassinSkillView 의 EffectSocketPlayer 가 재생한다(2026-10-19 민경).
+    [field: SerializeField] public EffectEntry Assassin_LClick_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_LClick_Success { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_LClick_Transformed { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
