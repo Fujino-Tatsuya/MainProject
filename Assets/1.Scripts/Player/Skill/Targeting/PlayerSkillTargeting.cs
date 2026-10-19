@@ -22,7 +22,6 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerAimIndicator))]
 public class PlayerSkillTargeting : MonoBehaviour
 {
-    private const float RaycastMaxDistance = 200f;
     // 자동 이동 시 사거리 경계보다 살짝 안쪽에서 시전(서버 위치 오차로 인한 CanUse 거부 방지).
     private const float RangeBuffer = GroundPointTargeting.RangeBuffer;
 
@@ -35,6 +34,7 @@ public class PlayerSkillTargeting : MonoBehaviour
     private PlayerMovement movement;
     private PlayerMotor motor;
     private PlayerInputReader input;
+    private PlayerEnemyHoverOutline hoverOutline;
 
     private bool isTargeting;      // 조준 대기 모드(인디케이터 표시)
     private bool isMovingToCast;   // 사거리 확보 자동 이동 중
@@ -100,6 +100,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         movement = GetComponent<PlayerMovement>();
         motor = GetComponent<PlayerMotor>();
         input = GetComponent<PlayerInputReader>();
+        hoverOutline = GetComponent<PlayerEnemyHoverOutline>();
 
         // 인디케이터는 기본 비활성 — 조준 진입 시에만 켠다
         if (rangeIndicator != null)
@@ -400,19 +401,15 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
-        if (!Physics.Raycast(ray, out RaycastHit hit, RaycastMaxDistance,
-                currentData.TargetableLayers, QueryTriggerInteraction.Collide))
+        CursorPickResult pick = CursorUnitPick.Pick(ray, currentData.TargetableLayers, owner, out Unit unit);
+        // 호버 외곽선은 이 판정을 받아 쓴다 — 조준 중엔 레이를 한 번만 쏜다.
+        SetHighlightedTarget(unit);
+        if (pick != CursorPickResult.ValidTarget)
         {
             SetTargetMarker(null, 0f);
-            SetCursorState(SkillCursorState.Targeting);
-            return;
-        }
-
-        Unit unit = ResolveUnit(hit.collider);
-        if (unit == null || unit == owner || unit.CurrentHealth <= 0)
-        {
-            SetTargetMarker(null, 0f);
-            SetCursorState(SkillCursorState.InvalidTarget);
+            SetCursorState(pick == CursorPickResult.NoHit
+                ? SkillCursorState.Targeting
+                : SkillCursorState.InvalidTarget);
             return;
         }
 
@@ -421,7 +418,6 @@ public class PlayerSkillTargeting : MonoBehaviour
         hoveredInRange = IsWithinRange(unit.transform.position, currentData.CastRange);
         // 대상 주변 광역 원(거너 R 레이저 반경). 반경 0 단일 피해 스킬은 SetTargetMarker 가 숨긴다.
         SetTargetMarker(unit, GetGroundMarkerRadius(currentData));
-        SetHighlightedTarget(unit); // 아웃라인은 보류 — 현재 훅만 (no-op)
         SetCursorState(hoveredInRange ? SkillCursorState.ValidTarget : SkillCursorState.OutOfRange);
     }
 
@@ -758,22 +754,10 @@ public class PlayerSkillTargeting : MonoBehaviour
             cursorView.ApplyState(state);
     }
 
-    // 타겟 강조(아웃라인 색 변경)는 보류 — 아웃라인 구현 확인 후 여기 배선한다.
+    // 이번 프레임 조준 레이의 판정(없으면 null)을 호버 외곽선에 넘긴다. 외곽선 쪽은 이 프레임 자기 레이를 생략한다.
     private void SetHighlightedTarget(Unit target)
     {
-        // TODO(아웃라인 보류): target에 아웃라인 색을 적용하는 훅.
-    }
-
-    // 레이캐스트 히트 → Unit 해석 (Hurtbox 우선, 없으면 상위 Unit). FirstMeleeMainSkill.ResolveUnit 패턴과 동일.
-    private static Unit ResolveUnit(Collider hit)
-    {
-        if (hit == null)
-            return null;
-
-        Hurtbox hurtbox = hit.GetComponentInParent<Hurtbox>();
-        if (hurtbox != null && hurtbox.TryGetOwner(out Unit hurtboxOwner))
-            return hurtboxOwner;
-
-        return hit.GetComponentInParent<Unit>();
+        if (hoverOutline != null)
+            hoverOutline.ReportAimedTarget(target);
     }
 }
