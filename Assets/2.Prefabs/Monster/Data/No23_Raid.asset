@@ -338,6 +338,15 @@ MonoBehaviour:
       forceFire: 0
     - attack: 3
       forceFire: 1
+  - name: JumpDash
+    weight: 15
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 4
+      forceFire: 0
+    - attack: 5
+      forceFire: 0
   openingCombo: 010000000000000005000000
   comboStepInterval: 0.3
   comboChaseGrace: 1
