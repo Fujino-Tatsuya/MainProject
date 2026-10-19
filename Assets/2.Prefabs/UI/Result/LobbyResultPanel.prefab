@@ -333,7 +333,7 @@ MonoBehaviour:
   playTimeText: {fileID: 5574547595441213381}
   outcomeText: {fileID: 3138005481029935951}
   closeButton: {fileID: 1533343968998975998}
-  autoCloseSeconds: 15
+  autoCloseSeconds: 180
   closeWithEscape: 1
   noDeathMultiplier: 1.5
   deathMultiplier: 1

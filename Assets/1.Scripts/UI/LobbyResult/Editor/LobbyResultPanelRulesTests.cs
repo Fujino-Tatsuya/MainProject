@@ -23,8 +23,8 @@ public sealed class LobbyResultPanelRulesTests
 
         Assert.IsTrue(rules.TryOpen(true, 10f));
         Assert.IsTrue(rules.IsOpen);
-        Assert.AreEqual(15f, LobbyResultPanelRules.DefaultAutoCloseSeconds);
-        Assert.AreEqual(25f, rules.AutoCloseAt, 1e-4f);
+        Assert.AreEqual(180f, LobbyResultPanelRules.DefaultAutoCloseSeconds);
+        Assert.AreEqual(190f, rules.AutoCloseAt, 1e-4f);
     }
 
     [Test]
