@@ -18,7 +18,7 @@ using UnityEngine;
 /// E 강화를 소모하지 않는다. 일반 Q 는 유효 대상 적중 시 분노 게이지를 1회 충전한다(§4.2). 평타 순서 초기화는 스킬 상태 진입으로 <see cref="AssassinBasicAttack"/> 가 한다.
 ///
 /// 단계 시점 = 클립 이벤트(PLAN-anim-event-timing P2-3): 준비 → Custom0 = 돌진 시작(시뮬레이션 피어는 이동, 서버는 경로 재구성 시작 —
-/// 각자 자기 애니메이터 기준) → 경로 끝 → End = 종료. 클립 Hit 은 쓰지 않는다(판정은 경로 스윕). 안전망 = 컨트롤러 MaxActiveDuration.
+/// 각자 자기 애니메이터 기준) → 경로 끝 → End = 종료. 클립 Hit 은 쓰지 않는다(판정은 경로 스윕). 안전망 = 컨트롤러(상태 클립 실제 길이 + padding).
 /// </summary>
 public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 {

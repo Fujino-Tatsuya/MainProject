@@ -12,7 +12,8 @@ public sealed class AssassinInterruptSkill : PlayerInterruptSkillBase
 {
     private AssassinState assassinState;
 
-    protected override bool TimingFromAnimationEvents => true;
+    // 이벤트 방식(Hit·End) — 안전망 = Interrupt 상태 클립 실제 길이 + padding.
+    public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => HitAndEndEvents;
 
     // 애니메이션은 PlayerSkillController 가 animatorStateName 으로 재생한다. 연출은 임시(AssassinSkillView — 민경 교체).
     public override void OnClientPlay(Vector3 direction) =>

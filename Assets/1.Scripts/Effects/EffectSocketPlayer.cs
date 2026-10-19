@@ -77,6 +77,19 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     /// </summary>
     public void SetScale(float value) => scale = Mathf.Max(0.01f, value);
 
+    // 런타임 전용 — 저작 값이 아니라 호출자가 밀어 넣는 값이라 직렬화하지 않는다.
+    float _playRate = 1f;
+
+    /// <summary>
+    /// 재생 속도 배율(1 = 저작 그대로)을 런타임에 바꾼다. <see cref="SetScale"/>과 같은 이유다 —
+    /// 애니메이션 이벤트는 인자 하나를 "어느 이펙트인가"에 쓰므로 <b>속도는 코드가</b> 정한다
+    /// (팔라딘 R: 애니를 빨리 돌리면 그 위에 얹힌 이펙트도 같이 빨라야 한다).
+    ///
+    /// ⚠️ 배율도 대출 시점에 확정된다. <see cref="Play"/>·<see cref="PlayOnce"/>보다 먼저 부를 것.
+    /// 0 이하는 1로 본다.
+    /// </summary>
+    public void SetPlayRate(float value) => _playRate = value > 0f ? value : 1f;
+
     /// <summary>
     /// [애니메이션 이벤트] 재생 시작. 이미 재생 중이면 먼저 회수하고 새로 시작한다
     /// (같은 공격이 연속으로 들어와 시작이 두 번 불리는 경우).
@@ -93,7 +106,7 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
         if (EffectManager.Instance == null) return;
 
         Transform follow = socket != null ? socket : transform;
-        _handle = EffectManager.Instance.PlayLooping(effect, follow, offset, scale);
+        _handle = EffectManager.Instance.PlayLooping(effect, follow, offset, scale, 0f, _playRate);
         _elapsed = 0f;
     }
 
@@ -117,7 +130,7 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
         if (EffectManager.Instance == null) return;
 
         Transform from = socket != null ? socket : transform;
-        EffectManager.Instance.Play(effect, from.position + offset, from.rotation, scale);
+        EffectManager.Instance.Play(effect, from.position + offset, from.rotation, scale, 0f, _playRate);
     }
 
     /// <summary>
@@ -145,7 +158,7 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
 
         var info = new EffectHitPoint.HitPointInfo(surface.bounds.center, surface, surface.transform);
         Pose pose = EffectHitPoint.Resolve(EffectHitPoint.HitPointMode.CameraDir, info);
-        EffectManager.Instance.Play(effect, pose.position, pose.rotation, scale);
+        EffectManager.Instance.Play(effect, pose.position, pose.rotation, scale, 0f, _playRate);
     }
 
     /// <summary>

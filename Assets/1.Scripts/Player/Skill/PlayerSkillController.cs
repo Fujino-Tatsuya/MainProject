@@ -68,6 +68,14 @@ public class PlayerSkillController : BaseNetworkBehaviour
     private byte locallyAppliedOverrideMask;
     private PlayerSkillBase activeSkill;
     private float activeEndFallbackTime;
+    // [서버] 이벤트 방식 스킬 — 안전망을 상태 클립 길이로 맞춘다(ResolveClipFallback). hasClipFallback = 한 번이라도 클립 길이로 정했다.
+    private bool activeEndsOnClipEvent;
+    private bool hasClipFallback;
+    private int activeStartFrame;
+    // 상태가 다시 시작됐다고 볼 안전망 연장 폭. 같은 재생 안에서는 매 틱 계산값이 거의 같아 이보다 작다.
+    private const float ClipRestartSlack = 0.05f;
+    // 클립 길이를 못 구해 타이머 안전망으로 대체한 경고는 스킬당 1회.
+    private readonly HashSet<PlayerSkillBase> clipFallbackWarned = new HashSet<PlayerSkillBase>();
     private float nextAimSendTime;
     private bool hasNotifiedRelease;
     private bool isRequestingSkill;
@@ -591,7 +599,11 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         isRequestingSkill = false;
         activeSkill = skill;
-        activeEndFallbackTime = Time.time + skill.Data.MaxActiveDuration + Mathf.Max(0f, endFallbackPadding);
+        // 타이머 방식 안전망. 이벤트 방식은 상태에 들어간 뒤 클립 길이로 바꾼다(ResolveClipFallback) — 그 전까지 이 값이 임시 그물이다.
+        activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(skill.Data.MaxActiveDuration, endFallbackPadding);
+        activeEndsOnClipEvent = skill.EndsOnClipEvent;
+        hasClipFallback = false;
+        activeStartFrame = Time.frameCount;
 
         // 쿨타임은 승인 즉시 시작, 환불 없음 — 단 수동 커밋 스킬은 발동 시점에 스스로 시작한다(CommitCooldownServer)
         if (!skill.Data.CommitCooldownManually)
@@ -685,8 +697,63 @@ public class PlayerSkillController : BaseNetworkBehaviour
         activeSkill.OnTick();
 
         // OnTick 안에서 스킬이 스스로 종료했을 수 있다
+        if (activeSkill != null && activeEndsOnClipEvent)
+            ResolveClipFallback();
+
         if (activeSkill != null && activeEndFallbackTime > 0f && Time.time >= activeEndFallbackTime)
+        {
+            if (activeEndsOnClipEvent && !hasClipFallback)
+                WarnClipFallback(activeSkill, "상태에 들어가지 않았다");
             EndActiveSkillServer(SkillEndReason.MaxDurationReached);
+        }
+    }
+
+    // [서버] 이벤트 방식 안전망 = 지금부터 상태 클립 끝까지의 실제 시간 + padding.
+    // 시작 프레임은 건너뛴다 — CrossFade 는 그 프레임 애니메이터 갱신 때 반영되므로 직전 상태(같은 상태 재시전 포함)를 읽을 수 있다.
+    // 클립 재생 동안은 계속 본다 — 원격 오너면 NetworkAnimator 가 오너의 CrossFade 를 늦게 받아 서버 상태를 다시 시작시키고
+    // (End 도 그만큼 늦게 온다), 그때 안전망을 늦춘다. 클립 끝(normalizedTime ≥ 1)을 넘기면 더 늘리지 않는다 —
+    // 한 번 재생 클립은 끝 프레임에 머문 채 normalizedTime 이 계속 커져 남은 시간이 0 이 되므로, 막지 않으면 매 틱 '지금 + padding' 으로 밀려 안 끊긴다.
+    private void ResolveClipFallback()
+    {
+        if (Time.frameCount <= activeStartFrame)
+            return;
+
+        int stateHash = Animator.StringToHash(activeSkill.Data.AnimatorStateName ?? string.Empty);
+        switch (PlayerSkillSafetyNet.Probe(animator, stateHash, out float playbackSeconds, out float normalizedTime))
+        {
+            case PlayerSkillSafetyNet.ProbeResult.NotInState:
+                return; // 다음 틱에 다시 본다. 끝내 못 찾으면 임시(타이머) 안전망이 끊는다
+
+            case PlayerSkillSafetyNet.ProbeResult.Invalid:
+                if (!hasClipFallback)
+                {
+                    activeEndsOnClipEvent = false; // 이번 시전은 타이머 안전망 그대로
+                    WarnClipFallback(activeSkill, "클립이 없거나 재생 속도가 0");
+                }
+                return;
+        }
+
+        if (hasClipFallback && normalizedTime >= 1f)
+            return;
+
+        float remaining = PlayerSkillSafetyNet.RemainingSeconds(playbackSeconds, normalizedTime);
+        float fallbackTime = Time.time + remaining + Mathf.Max(0f, endFallbackPadding);
+        if (hasClipFallback && fallbackTime <= activeEndFallbackTime + ClipRestartSlack)
+            return;
+
+        hasClipFallback = true;
+        activeEndFallbackTime = fallbackTime;
+        activeSkill.OnClipPlaybackResolved(remaining);
+    }
+
+    private void WarnClipFallback(PlayerSkillBase skill, string why)
+    {
+        if (!clipFallbackWarned.Add(skill))
+            return;
+
+        Edit.LogWarning(
+            $"[Skill] {skill.GetType().Name} — 상태 '{skill.Data.AnimatorStateName}' 클립 길이를 못 구했다({why}). " +
+            $"안전망을 maxActiveDuration({skill.Data.MaxActiveDuration:0.##}s) + padding 으로 대체한다.", this);
     }
 
     // 오너: 실행 중 스킬의 조준 전송·좌클릭 전달·로컬 틱. 홀드 해제 판정은 TickOwnerHoldInput 이 따로 한다.

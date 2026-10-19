@@ -30,6 +30,11 @@ using UnityEngine;
 ///
 /// <b>둘의 시차는 엔트리가 만든다.</b> 전기는 낙뢰가 떨어진 <i>뒤에</i> 흘러야 하는데, 여기서 코루틴으로
 /// 재는 대신 <c>FX_Sword_Electric_Entry</c>의 파트 <c>delay</c>가 처리한다 — 두 소켓은 같은 순간에 켠다.
+///
+/// <b>재생 배율(<c>playRate</c>)은 부르는 쪽이 넘기고 RPC 에 함께 싣는다.</b> 값의 원본은 스킬 데이터
+/// (<c>FirstMeleeUltimateSkillData.VfxPlayRate</c>)이고, 결정한 피어(오너·서버)의 값을 모두가 쓴다 —
+/// 피어마다 자기 데이터를 읽게 하면 한쪽만 튜닝했을 때 화면끼리 속도가 갈린다.
+/// 배율은 파트 delay 에도 걸린다(전기 0.45초 → 1.2배면 실제 0.375초). 낙뢰도 같이 빨라지니 순서는 그대로다.
 /// </summary>
 [DisallowMultipleComponent]
 public class PlayerSkillVfx : BaseNetworkBehaviour
@@ -48,7 +53,8 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     [Tooltip("표식 배율. 저작 크기가 10유닛이라 대개 줄여 쓴다")]
     [SerializeField, Min(0.01f)] private float targetFloorScale = 1f;
 
-    [Tooltip("채널을 완주했을 때 대상 자리에 내리꽂을 낙뢰. FX_Lightening_Strike_Entry 를 물린다.\n" +
+    [Tooltip("클립 Garen_Ultimate_Skill 의 Custom0 이벤트(피해 Hit 보다 앞) 때 대상 자리에 내리꽂을 낙뢰. FX_Lightening_Strike_Entry 를 물린다.\n" +
+             "시각은 클립에서 Custom0 이벤트를 옮겨 맞춘다.\n" +
              "표식과 같은 자리에 떨어진다 — 좌표를 따로 넘기지 않는다")]
     [SerializeField] private EffectEntry targetStrike;
 
@@ -57,6 +63,10 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
 
     // 소켓 컴포넌트가 대신 들어 주지 않으므로 핸들을 직접 든다. 🔴 드는 쪽이 반드시 반납해야 한다.
     private EffectHandle _targetFloorHandle;
+
+    // 마무리 낙뢰는 원샷이라 스스로 반납된다. 핸들은 채널이 끊겼을 때 걷기 위해서만 든다
+    // (피해보다 앞서 쏘므로 — FinalStrikeVfxSchedule). 안 걷으면 그냥 수명대로 끝난다.
+    private EffectHandle _targetStrikeHandle;
 
     // 대시 잔상용. 셋 다 Awake 에서 찾는다 — 아래 Awake 주석 참고.
     private Player _player;
@@ -86,14 +96,14 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     /// <summary>
     /// [오너] 조준 연출을 켠다. 자기 화면은 즉시, 나머지 피어는 서버를 거쳐서.
     /// </summary>
-    public void OwnerPlayUltimateVfx()
+    public void OwnerPlayUltimateVfx(float playRate)
     {
-        PlayLocal();
+        PlayLocal(playRate);
 
         // 오프라인(싱글 테스트·VFXScene)에서는 스폰되지 않아 RPC를 부르면 예외가 난다.
         if (!IsNetworkActive || !IsOwner) return;
 
-        RequestPlayRpc();
+        RequestPlayRpc(playRate);
     }
 
     /// <summary>
@@ -119,10 +129,19 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
         swordElectric?.Stop();
     }
 
-    private void PlayLocal()
+    private void PlayLocal(float playRate)
     {
-        swordLightning?.Play();
-        swordElectric?.Play();
+        if (swordLightning != null)
+        {
+            swordLightning.SetPlayRate(playRate);
+            swordLightning.Play();
+        }
+
+        if (swordElectric != null)
+        {
+            swordElectric.SetPlayRate(playRate);
+            swordElectric.Play();
+        }
     }
 
     // ── 대상 표식 (서버 → 전 피어) ──────────────────────────────────
@@ -145,7 +164,7 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     /// 트레이드오프: 채널 1.5초 동안 몬스터가 걸어 나가면 표식은 <b>시전 자리에 남는다</b>.
     /// 마무리 낙뢰도 같은 자리에 떨어지므로 둘이 어긋나지는 않는다.
     /// </summary>
-    public void ServerPlayTargetFloor(Unit target)
+    public void ServerPlayTargetFloor(Unit target, float playRate)
     {
         if (target == null) return;
 
@@ -155,13 +174,13 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
         // 오프라인(싱글 테스트·VFXScene)에서는 스폰되지 않아 RPC를 부르면 예외가 난다.
         if (!IsNetworkActive)
         {
-            PlayTargetFloorLocal(target.transform, fallback);
+            PlayTargetFloorLocal(target.transform, fallback, playRate);
             return;
         }
 
         if (!IsServer) return;
 
-        PlayTargetFloorRpc(hasRef ? target.NetworkObject : default, hasRef, fallback);
+        PlayTargetFloorRpc(hasRef ? target.NetworkObject : default, hasRef, fallback, playRate);
     }
 
     /// <summary>
@@ -177,53 +196,69 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    private void PlayTargetFloorRpc(NetworkObjectReference targetRef, bool hasRef, Vector3 fallbackPosition)
+    private void PlayTargetFloorRpc(NetworkObjectReference targetRef, bool hasRef, Vector3 fallbackPosition,
+                                    float playRate)
     {
         // 트랜스폼을 찾아도 추종하지 않는다 — 위치를 한 번 읽는 용도다.
         Transform target = null;
         if (hasRef && targetRef.TryGet(out NetworkObject targetObject))
             target = targetObject.transform;
 
-        PlayTargetFloorLocal(target, fallbackPosition);
+        PlayTargetFloorLocal(target, fallbackPosition, playRate);
     }
 
     /// <summary>
-    /// [서버] 채널을 완주했다. <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
+    /// [서버] 클립 Custom0 이벤트다(<see cref="FinalStrikeVfxSchedule"/>, 시전당 1회). <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
+    /// 칼이 떨어져 닿는 데 시간이 걸려 피해 시각보다 앞서 쏜다 — 그 사이 채널이 끊기면 <see cref="StopTargetStrikeLocal"/>이 걷는다.
     ///
     /// <b>좌표를 다시 보내지 않는다.</b> 각 피어는 표식을 깔 때 자리를 이미 고정해 뒀다
     /// (<see cref="_targetPosition"/>). 그걸 그대로 쓰면 표식과 낙뢰가 <b>정의상 같은 자리</b>다 —
     /// 좌표를 새로 실어 보내면 서버가 본 위치와 그 피어가 보간으로 그리고 있는 위치가 달라
     /// 표식 옆에 떨어진다.
     /// </summary>
-    public void ServerPlayTargetStrike()
+    public void ServerPlayTargetStrike(float playRate)
     {
         if (!IsNetworkActive)
         {
-            PlayTargetStrikeLocal();
+            PlayTargetStrikeLocal(playRate);
             return;
         }
 
         if (!IsServer) return;
 
-        PlayTargetStrikeRpc();
+        PlayTargetStrikeRpc(playRate);
     }
 
     // 원샷이지만 Reliable 이다. 이 레포의 다른 원샷 연출(피격 파문 등)은 난타 중 한 발이 빠져도 표가 안 나서
     // Unreliable 인데, 이건 궁극기 마무리라 한 번뿐이다 — 유실되면 클라이맥스가 통째로 사라진다.
     [Rpc(SendTo.ClientsAndHost)]
-    private void PlayTargetStrikeRpc() => PlayTargetStrikeLocal();
+    private void PlayTargetStrikeRpc(float playRate) => PlayTargetStrikeLocal(playRate);
 
-    private void PlayTargetStrikeLocal()
+    private void PlayTargetStrikeLocal(float playRate)
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
 
         // 표식을 깔 때 고정해 둔 그 자리. 표식이 안 움직이므로 낙뢰도 따라 움직이면 안 된다 —
         // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
-        // 원샷은 핸들이 없다 — 엔트리의 computedDuration 뒤에 매니저가 알아서 반납한다.
-        EffectManager.Instance.Play(targetStrike, _targetPosition, Quaternion.identity, targetStrikeScale);
+        // 원샷이라 엔트리 수명 뒤에 매니저가 알아서 반납한다. 핸들은 도중에 걷을 때만 쓴다.
+        _targetStrikeHandle = EffectManager.Instance.PlayRecallable(targetStrike, _targetPosition, Quaternion.identity,
+            targetStrikeScale, 0f, playRate);
     }
 
-    private void PlayTargetFloorLocal(Transform target, Vector3 fallbackPosition)
+    /// <summary>
+    /// [전 피어] 떨어지던 마무리 낙뢰를 즉시 걷는다. 채널이 완주하지 못하고 끝났을 때(피해 없음) 스킬의 <c>OnEnd</c>가 부른다 —
+    /// <c>OnEnd</c>는 전 피어에서 도니 RPC 가 필요 없다. 낙뢰 RPC 와 종료 RPC 는 같은 서버에서 순서대로 나가 낙뢰가 먼저 도착한다.
+    /// 이미 수명이 끝났거나 쏜 적이 없으면 조용한 no-op 이다.
+    /// </summary>
+    public void StopTargetStrikeLocal()
+    {
+        if (!_targetStrikeHandle.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.ReleaseImmediate(_targetStrikeHandle);
+        _targetStrikeHandle = EffectHandle.None;
+    }
+
+    private void PlayTargetFloorLocal(Transform target, Vector3 fallbackPosition, float playRate)
     {
         // 🔴 자리를 **딱 한 번** 뽑아 고정한다. 표식도 마무리 낙뢰도 여기만 본다.
         //    대상 트랜스폼을 찾았으면 그걸 쓴다 — 서버가 실어 보낸 좌표보다
@@ -239,7 +274,7 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
         //    position 과 **rotation 을 같이** 베끼므로, 몬스터가 제자리에서 돌면 바닥 표식도
         //    같이 돈다(2026-09-30 반려 사유). 회전만 빼는 옵션은 EffectManager 에 없다.
         _targetFloorHandle = EffectManager.Instance.PlayLooping(
-            targetFloor, _targetPosition, Quaternion.identity, targetFloorScale);
+            targetFloor, _targetPosition, Quaternion.identity, targetFloorScale, 0f, playRate);
     }
 
     // 플레이어가 꺼지거나 파괴될 때(디스폰·씬 언로드) 마지막으로 회수한다.
@@ -339,14 +374,14 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     // 끄기를 놓치면 남들 화면에 영영 남고 풀 인스턴스도 안 돌아온다. 스킬당 두 발이라 비용도 무시할 만하다.
 
     [Rpc(SendTo.Server)] // RequireOwnership 기본값 true — 오너만 부를 수 있다
-    private void RequestPlayRpc() => PlayUltimateVfxRpc();
+    private void RequestPlayRpc(float playRate) => PlayUltimateVfxRpc(playRate);
 
     [Rpc(SendTo.Server)]
     private void RequestStopRpc() => StopUltimateVfxRpc();
 
     // 오너는 이미 로컬로 켜고 껐다. 여기서 다시 보내면 한 번 더 재생된다.
     [Rpc(SendTo.NotOwner)]
-    private void PlayUltimateVfxRpc() => PlayLocal();
+    private void PlayUltimateVfxRpc(float playRate) => PlayLocal(playRate);
 
     [Rpc(SendTo.NotOwner)]
     private void StopUltimateVfxRpc() => StopUltimateVfxLocal();
