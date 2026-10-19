@@ -159,6 +159,7 @@ GameData.xlsx (SVN, 잠금)
 - 화면 문구 문자열에는 `[DataTableText]`를 붙인다 — **Strings 시트 자동 키로만** 나가고 수치 시트 Export·병합·Verify·적용에서는 빠진다([localization.md §5](localization.md#5-l2--so-문구-자동-키)).
   코드 ID·기획 메모처럼 번역 대상이 아닌 문자열은 `[DataTableText(Localize = false)]` — 수치 시트 문자열 칸이 된다. 둘 다 없는 문자열(`animatorStateName` 등)은 어디에도 안 나간다.
 - `NetworkVariable` 안쪽은 자동 제외. 레거시 폴더·`Assets/50.Art/` 프리팹(검수용)은 템플릿 대상이 아니다.
+  다른 프리팹 안에만 중첩돼 단독 스폰되지 않는 프리팹은 `DataTableTemplate.NestedOnlyPrefabs`(파일 이름)에 넣어 뺀다 — 바깥 프리팹 행이 실제 값(예: `Elevator` → `BossElevatorRig` 은 `ZoneS_typeBossEnter` 행만). 보관용은 `ArchivedPrefabs`.
 - 필드 이름을 바꾸면(`FormerlySerializedAs`) 시트 머리글도 같이 바꾼다 — 안 그러면 오류.
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`.
 
