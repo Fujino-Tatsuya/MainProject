@@ -49,6 +49,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     };
 
     private Unit lockedTarget;
+    // 이번 시전의 애니메이터(OnClientPlay 에서 찾는다). Hit 뒤 속도를 바꿀 때 쓴다.
+    private Animator animator;
     // [서버] 마무리 낙뢰를 이번 시전에 쐈는지. 칼이 닿는 데 시간이 걸려 클립 Custom0 에서 피해(Hit)보다 앞서 쏜다.
     private readonly FinalStrikeVfxSchedule finalStrike = new FinalStrikeVfxSchedule();
     // 완료 판정 1회의 적중 대상(1명). Player.ServerAttackLanded 통지용 버퍼.
@@ -121,7 +123,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 여기도 전 피어다(서버는 TryStartSkillServer, 클라는 PlaySkillClientRpc → PlaySkillPresentation).
         //    방금 CrossFade 한 같은 프레임이라 첫 프레임부터 이 속도로 돈다. 원격 피어도 각자 같은 값을 넣는다.
         //    Animator 는 시전마다 찾는다 — 캐릭터 교체로 Armature 가 바뀔 수 있다.
-        Animator animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
+        animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
         if (animator != null)
             animator.SetFloat(UltimateSpeedHash, AnimationSpeed);
 
@@ -164,6 +166,13 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
         // Hit = 피해(완주 판정) / End = 종료 — base 가 처리한다.
         base.OnAnimationEvent(eventType);
+    }
+
+    // 전 피어. Hit 뒤 남은 구간을 각 피어가 자기 애니메이터에서 빠르게 돌린다(RPC 없음) — End 도 같이 당겨진다.
+    public override void OnLocalAnimationEvent(SkillAnimationEventType eventType)
+    {
+        if (eventType == SkillAnimationEventType.Hit && animator != null)
+            animator.SetFloat(UltimateSpeedHash, AnimationSpeed * AfterHitSpeedMultiplier);
     }
 
     protected override void OnChannelCompleted()
@@ -216,6 +225,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.
     private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;
+    private float AfterHitSpeedMultiplier => Data is FirstMeleeUltimateSkillData ult ? ult.AfterHitSpeedMultiplier : 1f;
     private float VfxPlayRate => Data is FirstMeleeUltimateSkillData ult ? ult.VfxPlayRate : 1f;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
