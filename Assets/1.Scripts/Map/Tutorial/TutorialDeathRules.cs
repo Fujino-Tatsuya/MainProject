@@ -178,7 +178,10 @@ public sealed class TutorialDeathRules : MonoBehaviour
 
     private void HandleServerLifeStateChanged(ulong clientId, PlayerLifeState from, PlayerLifeState to)
     {
-        if (from != PlayerLifeState.Alive || to != PlayerLifeState.DeadPresentation || !RulesActive) return;
+        // Alive → Soul 은 판 도중 재합류 생명 복원(할 일 48 C14 R5c — PlayerLifeCycleController.RestoreForRejoinServer)만 낸다.
+        // 퇴장 때 대기 부활이 취소됐으므로(HandleClientDisconnected) 새 사망처럼 다시 걸어 Soul 에 갇히지 않게 한다.
+        bool died = to == PlayerLifeState.DeadPresentation || to == PlayerLifeState.Soul;
+        if (from != PlayerLifeState.Alive || !died || !RulesActive) return;
 
         bool bossRoomReached = TutorialDeathRulesModel.IsLifeChargedAt(OpenedGateMask());
         _model.RecordDeath(clientId, _nm.ServerTime.Time, bossRoomReached);

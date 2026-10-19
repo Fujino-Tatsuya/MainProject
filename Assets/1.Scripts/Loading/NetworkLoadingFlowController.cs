@@ -335,6 +335,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return false;
         }
 
+        // 판 재시작은 처음 로드한 것처럼 전부 초기화한다 — 부재자 생명 기록도 버린다(돌아오면 Alive·만피). 특성 기록은 특성 디렉터가 새로 스폰될 때 버린다.
+        int clearedLives = RejoinMemory.Server.ClearLives();
+        if (clearedLives > 0)
+        {
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RejoinMemory clear lives context=restart count={clearedLives}");
+        }
+
         reason = null;
         return true;
     }
@@ -623,6 +630,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private void HandleClientDisconnected(ulong clientId)
     {
+        CommitRejoinLife(clientId);
+
         for (var i = _pendingRejoin.Count - 1; i >= 0; i--)
         {
             var entry = _pendingRejoin[i];
@@ -635,6 +644,31 @@ public class NetworkLoadingFlowController : MonoBehaviour
             Debug.Log(
                 $"[Rejoin] 대기 중 퇴장 — 대기열에서 뺀다 clientId={clientId} playerId={entry.PlayerId} " +
                 $"waited={Time.unscaledTime - entry.EnqueuedAt:F1}s pending={_pendingRejoin.Count}");
+        }
+    }
+
+    // [서버] 퇴장 확정(C14 R5c) — PlayerObject 디스폰 때 남긴 생명 메모를 playerId 키 기록으로 옮긴다(NGO 는 이 콜백보다 디스폰이 먼저다).
+    // 메모가 없으면(스폰 보류 중 다시 나감) 이전 기록을 그대로 둔다.
+    private void CommitRejoinLife(ulong clientId)
+    {
+        if (!IsServerActive || !MatchRoster.Server.IsActive)
+        {
+            return;
+        }
+
+        var memory = RejoinMemory.Server;
+        if (!MatchRoster.Server.TryGetPlayerIdByLastClient(clientId, out var playerId))
+        {
+            return;
+        }
+
+        if (memory.CommitLifeOnDisconnect(clientId, playerId, out var record))
+        {
+            Debug.Log($"[Rejoin] 퇴장 — 재합류용 생명 보관 clientId={clientId} playerId={playerId} life={record} (보관 {memory.Count}건)");
+        }
+        else
+        {
+            Debug.Log($"[Rejoin] 퇴장 — 생명 메모 없음(PlayerObject 없이 나감), 이전 기록 유지 clientId={clientId} playerId={playerId}");
         }
     }
 
@@ -900,6 +934,40 @@ public class NetworkLoadingFlowController : MonoBehaviour
         Debug.Log(
             $"[Rejoin] PlayerRejoined playerId={entry.PlayerId} oldClientId={oldClientId} newClientId={entry.ClientId} " +
             $"subscribers={subscribers} bound={MatchRoster.Server.BoundCount}/{MatchRoster.Server.Count} context={context}");
+
+        RestoreRejoinedLife(entry, restore: context == "spawn");
+    }
+
+    // [서버] 생명·체력 복원(C14 R5c) — PlayerRejoined 구독자 뒤. 기록이 없으면 새 PlayerObject 의 Alive·만피 그대로.
+    // 판 재시작 스폰이 먼저 세운 오브젝트(existingPlayerObject)는 "처음 로드한 것처럼" 초기화된 판이라 기록을 버린다.
+    private static void RestoreRejoinedLife(PendingRejoin entry, bool restore)
+    {
+        if (!RejoinMemory.Server.TryTakeLife(entry.PlayerId, out var record))
+        {
+            Debug.Log($"[Rejoin] 생명 기록 없음 — Alive·만피 그대로 clientId={entry.ClientId} playerId={entry.PlayerId}");
+            return;
+        }
+
+        if (!restore)
+        {
+            Debug.Log($"[Rejoin] 생명 기록 버림(판 재시작 스폰) clientId={entry.ClientId} playerId={entry.PlayerId} life={record}");
+            return;
+        }
+
+        var networkManager = NetworkManager.Singleton;
+        var lifeCycle = networkManager != null && networkManager.ConnectedClients.TryGetValue(entry.ClientId, out var client) &&
+                        client.PlayerObject != null
+            ? client.PlayerObject.GetComponent<PlayerLifeCycleController>()
+            : null;
+        if (lifeCycle == null || !lifeCycle.RestoreForRejoinServer(record.State, record.HpRatio))
+        {
+            Debug.LogWarning(
+                $"[Rejoin] 생명 복원 실패(PlayerLifeCycleController 없음·연출 잠금) — Alive·만피 그대로 " +
+                $"clientId={entry.ClientId} playerId={entry.PlayerId} life={record}");
+            return;
+        }
+
+        Debug.Log($"[Rejoin] 생명 복원 clientId={entry.ClientId} playerId={entry.PlayerId} life={record} 보관 {RejoinMemory.Server.Count}건");
     }
 
     // BossEncounterDirector.IsCinematicPhase(private)와 같은 값 — 보스 쪽 파일을 고치지 않으려고 공개 Phase 로 판정한다.
