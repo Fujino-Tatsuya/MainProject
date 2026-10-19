@@ -141565,27 +141565,27 @@ AnimationClip:
   m_HasMotionFloatCurves: 0
   m_Events:
   - time: 1.2
-    functionName: PlayEffect
-    data: Stick
-    objectReferenceParameter: {fileID: 0}
-    floatParameter: 0
-    intParameter: 0
-    messageOptions: 0
-  - time: 1.2
     functionName: HandleSkillEvent
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 2
     messageOptions: 0
-  - time: 1.8
+  - time: 1.2
+    functionName: PlayEffect
+    data: Stick
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0
+  - time: 1.3666667
     functionName: HandleSkillEvent
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
-  - time: 1.81
+  - time: 5.3333335
     functionName: HandleSkillEvent
     data: 
     objectReferenceParameter: {fileID: 0}
