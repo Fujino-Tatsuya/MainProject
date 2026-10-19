@@ -23,6 +23,7 @@ internal static class PlayerEditModeTestRunner
         "^BackAttackRulesTests$", // PLAN-assassin A11 — 보스 후방 판정·변신 강제·배율
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
+        "^GunnerAnimEventAuthoringTests$", // PLAN-anim-event-timing P3 — 거너 클립 이벤트 저작: 상태 속도 환산·정규화·병합(사용자 위치 보존)
         "^GunnerAttackFacingModelTests$", // 할 일 27 — 원인별 회전 잠금 토큰·평타 발 단위 잠금·발 사이 제한 회전
         "^AttackTurnTimingTests$", // 할 일 43 — 근접 평타 다 돈 뒤 공격: 각 → 회전 지연·스냅 각·오너 지연 상한
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게(맥동·플래시 끔)
