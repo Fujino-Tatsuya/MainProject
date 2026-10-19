@@ -266,7 +266,8 @@ public static class AssassinShellAuthoring
             SkillEvent(0.18f, SkillAnimationEventType.Hit), SkillEvent(0.32f, SkillAnimationEventType.Hit),
             SkillEvent(0.46f, SkillAnimationEventType.Hit), SkillEvent(0.60f, SkillAnimationEventType.Hit),
             SkillEvent(0.74f, SkillAnimationEventType.Hit), SkillEvent(ClipEndTime, SkillAnimationEventType.End));
-        ReplaceEvents("Attack_Up_01", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+        // 간파 = Hit·End 이벤트가 판정·종료(P2-2). 사용자가 옮겨 튜닝하므로 비어 있을 때만 채운다(Hit 0.15초·End 0.6초, 1배속).
+        StampEventsIfEmpty("Attack_Up_01", SkillEvent(0.10f, SkillAnimationEventType.Hit), SkillEvent(0.40f, SkillAnimationEventType.End));
         ReplaceEvents("Parry_R", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
 
         AssetDatabase.SaveAssets();
