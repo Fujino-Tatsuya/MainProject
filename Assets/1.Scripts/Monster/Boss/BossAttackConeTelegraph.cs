@@ -78,6 +78,21 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     }
 
     TelegraphDecalStyle CurrentStyle => Style.Decal(_palette);
+    string C3Id
+    {
+        get
+        {
+            if (_coneRadius > 0 && _pathLength > 0) return "02";
+            if (_coneRadius > 0) return "03";
+            MonsterBase owner=GetComponent<MonsterBase>();
+            string kind=owner!=null?owner.GetType().Name:"";
+            if (kind=="SpinnerBot") return _palette==Palette.Interrupt?"11":"10";
+            if (kind=="GauntletBot") return "08";
+            if (_palette==Palette.Interrupt) return "04";
+            return _growTime<=0?"05":"01";
+        }
+    }
+
 
     // 셰이더가 색을 입히는가(예고 재질). 아니면(대체 재질) 예전처럼 색을 텍스처에 굽는다.
     bool _shaderColor;
@@ -105,6 +120,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     bool _useUnion;
     const int UnionFillSteps = 24;   // 단계 0~24 = 25 상태
 
+    string _builtC3Id;
     bool _active;
     bool _fillInward;              // 바깥 → 보스로 차오르기(잡기)
     int _builtInwardStep = -1;
@@ -158,6 +174,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         _elapsed = 0f;
         _active = true;
 
+        if (_builtC3Id != C3Id) { _builtC3Id=C3Id; InvalidateShapes(); }
         float width = CurrentStyle.outlineWidth;
 
         // ── 끝점 부채꼴
@@ -171,7 +188,8 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
             RebuildConeTextures(halfAngle, width);
             _builtConeKey = coneKey;
         }
-        SetSquareSize(_coneOutline, _coneRadius);
+        var coneExtent=new Vector2(_coneRadius*2,_coneRadius*2);
+        SetSquareSize(_coneOutline, _coneRadius+(_coneRadius>0?EnemyC3Visuals.DecalPadding(C3Id,coneExtent,_coneRadius,0,0):0));
         _coneOutline.enabled = hasCone;
         _coneFill.enabled = hasCone;
 
@@ -185,7 +203,8 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
                 RebuildBandTextures(width);
                 _builtBandKey = bandKey;
             }
-            SetRectSize(_bandOutline, _pathRadius * 2f, _pathLength);
+            float pad=EnemyC3Visuals.DecalPadding(C3Id,new Vector2(_pathRadius*2,_pathLength),0,_pathRadius*2,_pathLength);
+            SetRectSize(_bandOutline, _pathRadius * 2f+pad*2, _pathLength+pad*2);
         }
         _bandOutline.enabled = hasBand;
         _bandFill.enabled = hasBand;
@@ -208,7 +227,8 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
             }
 
             Vector2 u = UnionExtent;
-            SetRectSize(_unionOutline, u.x, u.y);
+            float pad=EnemyC3Visuals.DecalPadding(C3Id,u,_coneRadius,_pathRadius*2,_pathLength);
+            SetRectSize(_unionOutline, u.x+pad*2, u.y+pad*2);
             SetRectSize(_unionFill, u.x, u.y);
         }
         _unionOutline.enabled = _unionFill.enabled = _useUnion;
@@ -380,7 +400,11 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         _appliedVersion = TelegraphStyleSO.Version;
         if (!_shaderColor) return;   // 대체 재질 — 색은 텍스처에 구워진다
 
-        TelegraphDecalStyle s = CurrentStyle;
+        TelegraphDecalStyle s = new TelegraphDecalStyle
+        {
+            outline = new TelegraphLayer(Color.white),
+            fill = new TelegraphLayer(EnemyC3Visuals.FillColor(C3Id))
+        };
         Vector2 cone = new Vector2(_coneRadius * 2f, _coneRadius * 2f);
         Vector2 band = new Vector2(_pathRadius * 2f, _pathLength);
         Vector2 union = UnionExtent;
@@ -504,6 +528,9 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         var decal = go.AddComponent<DecalProjector>();
         decal.material = new Material(source);          // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
         DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터·벽에 묻지 않게(표식과 같은 계약)
+        int artOrder=childName.EndsWith("Outline") ? 1 : 0;
+        if(decal.material.HasProperty("_DrawOrder"))decal.material.SetInt("_DrawOrder",artOrder);
+        decal.material.renderQueue = source.renderQueue + artOrder;
         decal.fadeFactor = 1f;                         // 🔴 알파는 셰이더에서 색 알파로 **한 번만** 곱한다
         decal.enabled = false;
         return decal;
@@ -517,9 +544,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         // 🔴 윤곽선은 **경계만** 그리고 내부는 비운다 — 장판 규약이 "윤곽선이 생기고 내부가 텅 빈
         //    상태에서 차오른다"이기 때문. 내부를 미리 칠하면 채움이 어디까지 찼는지 안 읽힌다.
         float rimUv = _coneRadius > 0f ? width / _coneRadius : 0.06f;
-        _coneOutlineTex = BossDirectionIndicator.BuildArcTexture(
-            ShapeColor(s.outline), halfAngle, isBack: false, inner: 0f, outer: 1f, size: TextureSize,
-            rimWidth: rimUv, interiorAlphaScale: 0f, reuse: _coneOutlineTex);
+        _coneOutlineTex = EnemyC3Visuals.Decal(C3Id,new Vector2(_coneRadius*2f,_coneRadius*2f),_coneRadius,0,halfAngle,0,0);
 
         _coneFillTex = BossDirectionIndicator.BuildArcTexture(
             ShapeColor(s.fill), halfAngle, isBack: false, inner: 0f, outer: 1f, size: TextureSize,
@@ -538,7 +563,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         float rimU = _pathRadius > 0f ? width / (_pathRadius * 2f) : 0.08f;
         float rimV = _pathLength > 0f ? width / _pathLength : 0.08f;
 
-        _bandOutlineTex = BuildRectTexture(ShapeColor(s.outline), TextureSize, rimU, rimV, 0f, _bandOutlineTex);
+        _bandOutlineTex = EnemyC3Visuals.Decal(C3Id,new Vector2(_pathRadius*2f,_pathLength),0,0,0,_pathRadius*2f,_pathLength);
         _bandFillTex = BuildRectTexture(ShapeColor(s.fill), TextureSize, 0f, 0f, 1f, _bandFillTex);
 
         AssignTexture(_bandOutline, _bandOutlineTex);
@@ -561,7 +586,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     void RebuildUnionOutline(float width)
     {
         Vector2 u = UnionExtent;
-        _unionOutlineTex = BuildUnionTexture(ShapeColor(CurrentStyle.outline), u, width, 0f, front: -1f, reuse: _unionOutlineTex);
+        _unionOutlineTex = EnemyC3Visuals.Decal(C3Id,u,_coneRadius,_coneForwardOffset,180,_pathRadius*2f,_pathLength);
         AssignTexture(_unionOutline, _unionOutlineTex);
     }
 
@@ -716,6 +741,6 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         DestroyMaterial(_unionOutline); DestroyMaterial(_unionFill);
     }
 
-    static void DestroyIf(Texture2D t) { if (t != null) Destroy(t); }
+    static void DestroyIf(Texture2D t) { if (t != null && !t.name.StartsWith("EnemyC3_")) Destroy(t); }
     static void DestroyMaterial(DecalProjector d) { if (d != null && d.material != null) Destroy(d.material); }
 }

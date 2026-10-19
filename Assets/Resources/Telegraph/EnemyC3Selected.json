@@ -1,0 +1,589 @@
+{
+  "entries": [
+    {
+      "id": "01",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 67,
+        "linearMarkerStart": 92,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "02",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": false,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "03",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "04",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#b982c4",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#d29ef5",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#d29ef5",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#d29ef5",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 91.51515151515152,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 75,
+        "linearMarkerStart": 69,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "05",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 75,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "06",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "07",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "08",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 78,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "09",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 1
+        },
+        "innerLine": {
+          "color": "#b982c4",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#d29ef5",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#d29ef5",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#d29ef5",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 81,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 58,
+        "linearMarkerStart": 69,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "10",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 78,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "11",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#b982c4",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#d29ef5",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#d29ef5",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#d29ef5",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 91.51515151515152,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 75,
+        "linearMarkerStart": 69,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "12",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "14",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "15",
+      "elements": {
+        "outline": {
+          "color": "#ffffff",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bc8178",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#ed8f82",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#ed8f82",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#ed8f82",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": true,
+        "markerRadiusPercent": 81.4,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 51,
+        "linearMarkerStart": 74,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    },
+    {
+      "id": "16",
+      "elements": {
+        "outline": {
+          "color": "#ffc3b5",
+          "opacity": 0.95
+        },
+        "innerLine": {
+          "color": "#bb726a",
+          "opacity": 1
+        },
+        "band": {
+          "color": "#e96b62",
+          "opacity": 0.25
+        },
+        "fill": {
+          "color": "#e96b62",
+          "opacity": 0.232
+        },
+        "markers": {
+          "color": "#e96b62",
+          "opacity": 0.42
+        }
+      },
+      "geometry": {
+        "outerWidth": 3.5,
+        "innerWidth": 2.5,
+        "gap": 2,
+        "gradientStart": 57,
+        "showMarkers": false,
+        "markerRadiusPercent": 91.51515151515152,
+        "dashShowMarkers": true,
+        "linearMarkerScalePercent": 100,
+        "linearMarkerSpacing": 80,
+        "linearMarkerStart": 104,
+        "upperShowMarkers": true,
+        "smashShowMarkers": true
+      }
+    }
+  ]
+}
