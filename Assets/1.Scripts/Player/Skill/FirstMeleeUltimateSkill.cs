@@ -6,9 +6,10 @@
 /// 대상 유효성(생존·사거리)은 서버 CanUse로 권위 검증하며, 채널 중(피해 전) 대상이 사라지면 취소한다.
 ///
 /// 시점은 전부 클립 Garen_Ultimate_Skill 의 이벤트(HandleSkillEvent)가 정한다 — 타이머가 없다.
-/// Custom0 = 마무리 낙뢰 발사 / Hit = 피해(완주 판정) / End = 종료. MaxActiveDuration 은 안전망(+padding)이다.
+/// Custom0 = 마무리 낙뢰 발사 / Hit = 피해(완주 판정) / End = 종료(<see cref="RequiredAnimationEvents"/> 로 선언 — 이벤트 방식).
 /// 이벤트는 애니 배율(UltimateSpeed)을 같이 타서 실제 시각 = 클립 시각 ÷ 배율.
-/// 🔴 End 를 maxActiveDuration + padding(0.1) 뒤로 옮기면 안전망이 먼저 끊는다 — 피해는 나도 낙뢰가 걷힌다.
+/// 안전망 = 클립 실제 재생 시간(클립 길이 ÷ 배율) + padding — 컨트롤러가 상태 진입 뒤 런타임에 읽는다. maxActiveDuration 은 쓰지 않는다
+/// (클립 길이를 못 구했을 때의 대체 안전망으로만 남는다). 그래서 End 를 클립 안 어디로 옮겨도 안전망이 먼저 끊지 않는다.
 ///
 /// 채널 동안 <b>슈퍼아머</b>를 건다(Q와 같은 방식). 부모 클래스 주석은 이 보호를 "Custom 애니 이벤트
 /// 구간에서" 건다고 적어 두었지만, 이 스킬은 채널 전체가 보호 구간이라 <c>OnServerStart</c>~<c>OnEnd</c>로 잡는다.
@@ -34,14 +35,13 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
 
     // 슈퍼아머 만료 안전망 여유. 정상·강제 종료는 OnEnd 가 바로 걷는다 — 만료는 OnEnd 가 안 돈 경우만이다.
+    // 지속 = 클립 실제 남은 길이(못 구하면 maxActiveDuration) + 이 여유.
     // 🔴 컨트롤러 안전망 padding(0.1)보다 길어야 한다. 짧으면 End 이벤트·안전망 종료 직전 프레임에 슈퍼아머가 먼저 풀린다.
     private const float SuperArmorExpiryPadding = 0.25f;
 
-    /// <summary>
-    /// 클립에 있어야 하는 HandleSkillEvent 이벤트. 하나라도 없으면 에디터에서 경고한다(타이머 대체 경로는 없다).
-    /// TODO(Work3 병합 뒤): 공용 선언 PlayerSkillBase.RequiredAnimationEvents 로 옮긴다.
-    /// </summary>
-    public static readonly SkillAnimationEventType[] UltimateClipEvents =
+    // 클립에 있어야 하는 HandleSkillEvent 이벤트(타이머 대체 경로는 없다). 누락은 공용 경고(AnimationEventRequirements)와
+    // EditMode 전수 검사(PlayerAnimationEventRequirementTests)가 잡는다.
+    private static readonly SkillAnimationEventType[] UltimateClipEvents =
     {
         SkillAnimationEventType.Hit,
         SkillAnimationEventType.End,
@@ -59,16 +59,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     // 채널 중 이동/회전 잠금
     public override bool CanMoveWhileActive => false;
 
-    // 피해(Hit)·종료(End)를 클립 이벤트로 정한다.
-    protected override bool CompletesOnClipEvents => true;
-
-    public override void Initialize(Player owner, PlayerSkillController controller)
-    {
-        base.Initialize(owner, controller);
-#if UNITY_EDITOR
-        WarnMissingClipEvents();
-#endif
-    }
+    // 피해(Hit)·종료(End)·마무리 낙뢰(Custom0)를 클립 이벤트로 정한다 — End 가 있어 이벤트 방식(EndsOnClipEvent).
+    public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => UltimateClipEvents;
 
     // 서버 권위 시전 조건: 대상이 살아있는 적이고 사거리 내여야 한다.
     public override bool CanUse(Vector3 direction, Unit target)
@@ -96,11 +88,24 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 채널 동안 CC 면역. 채널은 이동 잠금(CanMoveWhileActive=false)만으로는 지킬 수 없다 —
         // 그건 내 입력을 막을 뿐이고, 남이 미는 것은 PlayerStateController.BeginKnockback 이
         // 사망·연출잠금만 거부하므로 Skill 상태여도 그대로 들어온다.
-        // 만료 안전망은 지속시간(컨트롤러 안전망보다 길게), 정상/강제 종료 시엔 OnEnd 가 즉시 해제한다.
-        // 종료가 End 이벤트라 MaxActiveDuration 과 같은 시각 근처에서 끝날 수 있다 — 딱 맞추면 마지막 프레임에 풀린다.
+        // 정상/강제 종료 시엔 OnEnd 가 즉시 해제한다. 만료는 OnEnd 가 안 돈 경우의 그물 — 컨트롤러 안전망보다 길게 둔다.
+        // 여기서는 아직 클립 길이를 모른다(CrossFade 가 다음 애니메이터 갱신에 반영) — 대체 안전망 길이로 걸어 두고,
+        // 컨트롤러가 클립 실제 길이를 읽으면 OnClipPlaybackResolved 가 그 길이로 다시 건다.
         // (오프라인에서는 상태이상 시스템이 비활성 — 스탯 계열과 동일 제약)
+        ApplySuperArmor(Data.MaxActiveDuration);
+    }
+
+    // [서버] 클립 실제 남은 길이 + 여유로 슈퍼아머를 갱신한다(같은 출처라 시간만 리셋된다).
+    public override void OnClipPlaybackResolved(float remainingSeconds)
+    {
+        if (State == SkillState.Channeling)
+            ApplySuperArmor(remainingSeconds);
+    }
+
+    private void ApplySuperArmor(float protectedSeconds)
+    {
         if (owner != null && owner.StatusEffects != null)
-            owner.StatusEffects.Apply(StatusEffectType.SuperArmor, Data.MaxActiveDuration + SuperArmorExpiryPadding, SourceId);
+            owner.StatusEffects.Apply(StatusEffectType.SuperArmor, protectedSeconds + SuperArmorExpiryPadding, SourceId);
     }
 
     // 🔴 낙뢰는 여기서 켜지 않는다. R 은 조준만 켜고(ClickToConfirm), 실제 시전은 좌클릭 확정
@@ -221,84 +226,4 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         flat.y = 0f;
         return flat.sqrMagnitude <= Data.CastRange * Data.CastRange;
     }
-
-    /// <summary>클립에 HandleSkillEvent(int = <paramref name="eventType"/>) 이벤트가 있는가.</summary>
-    public static bool HasSkillClipEvent(AnimationClip clip, SkillAnimationEventType eventType)
-    {
-        if (clip == null)
-            return false;
-
-        foreach (AnimationEvent clipEvent in clip.events)
-        {
-            if (clipEvent.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) &&
-                clipEvent.intParameter == (int)eventType)
-                return true;
-        }
-
-        return false;
-    }
-
-#if UNITY_EDITOR
-    // 상태(Data.AnimatorStateName)의 클립에 UltimateClipEvents 가 다 있는지. 없으면 그 시점이 영영 안 온다 —
-    // Hit·End 없으면 안전망 종료(피해 없음), Custom0 없으면 마무리 낙뢰가 안 나간다.
-    private void WarnMissingClipEvents()
-    {
-        Animator animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
-        string stateName = Data != null ? Data.AnimatorStateName : null;
-        AnimationClip clip = FindStateClip(animator, stateName);
-        if (clip == null)
-            return;
-
-        foreach (SkillAnimationEventType eventType in UltimateClipEvents)
-        {
-            if (HasSkillClipEvent(clip, eventType))
-                continue;
-
-            Edit.LogWarning(
-                $"[Player] 클립 '{clip.name}'(상태 {stateName})에 {eventType} 이벤트" +
-                $"(HandleSkillEvent, int={(int)eventType})가 없습니다. 최후의 심판은 이 시점을 타이머로 대신하지 않습니다.",
-                this);
-        }
-    }
-
-    private static AnimationClip FindStateClip(Animator animator, string stateName)
-    {
-        if (animator == null || string.IsNullOrEmpty(stateName))
-            return null;
-
-        var animatorController = animator.runtimeAnimatorController as UnityEditor.Animations.AnimatorController;
-        if (animatorController == null)
-            return null;
-
-        foreach (UnityEditor.Animations.AnimatorControllerLayer layer in animatorController.layers)
-        {
-            AnimationClip clip = FindStateClip(layer.stateMachine, stateName);
-            if (clip != null)
-                return clip;
-        }
-
-        return null;
-    }
-
-    private static AnimationClip FindStateClip(UnityEditor.Animations.AnimatorStateMachine stateMachine, string stateName)
-    {
-        if (stateMachine == null)
-            return null;
-
-        foreach (UnityEditor.Animations.ChildAnimatorState child in stateMachine.states)
-        {
-            if (child.state != null && child.state.name == stateName)
-                return child.state.motion as AnimationClip;
-        }
-
-        foreach (UnityEditor.Animations.ChildAnimatorStateMachine child in stateMachine.stateMachines)
-        {
-            AnimationClip clip = FindStateClip(child.stateMachine, stateName);
-            if (clip != null)
-                return clip;
-        }
-
-        return null;
-    }
-#endif
 }

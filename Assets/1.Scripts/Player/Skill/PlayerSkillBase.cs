@@ -96,6 +96,26 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     /// </summary>
     public virtual System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => NoRequiredEvents;
 
+    /// <summary>
+    /// 이벤트 방식인가 — 요구 이벤트(<see cref="RequiredAnimationEvents"/>)에 End 가 있으면 참. 종료를 상태 클립 End 로 정하고,
+    /// 서버 안전망은 maxActiveDuration 이 아니라 그 클립 실제 재생 시간 + padding 이다(<see cref="PlayerSkillSafetyNet"/>).
+    /// 거짓 = 타이머 방식(안전망 = maxActiveDuration + padding). 채널·간파 베이스도 이 값 하나로 갈린다.
+    /// </summary>
+    public bool EndsOnClipEvent
+    {
+        get
+        {
+            System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> events = RequiredAnimationEvents;
+            for (int i = 0; i < events.Count; i++)
+            {
+                if (events[i] == SkillAnimationEventType.End)
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
     public void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
     {
         if (data == null || string.IsNullOrEmpty(data.AnimatorStateName))
@@ -153,6 +173,11 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 오너 이동 시작(owner.IsSimulating 일 때만)·로컬 연출 시점용이다. 🔴 판정·피해·상태 변경 금지 — 그건 OnAnimationEvent(서버).
     // 서버에서는 같은 이벤트로 이것이 먼저, OnAnimationEvent 가 뒤에 불린다.
     public virtual void OnLocalAnimationEvent(SkillAnimationEventType eventType) { }
+
+    // 서버 전용: 이벤트 방식(EndsOnClipEvent) 스킬의 상태 클립 실제 길이를 컨트롤러가 읽었다(시전 뒤 애니메이터 첫 갱신 후,
+    // 그리고 원격 오너 동기로 상태가 다시 시작돼 안전망을 늦출 때마다).
+    // remainingSeconds = 지금부터 클립 끝까지 실제 초. 안전망은 이 시각 + padding 에 끊는다. 클립 길이로 맞출 보호 지속(R 슈퍼아머)용.
+    public virtual void OnClipPlaybackResolved(float remainingSeconds) { }
 
     // 서버 전용: 홀드 조향 갱신 (오너가 주기 전송)
     public virtual void OnAimUpdated(Vector3 direction) { }

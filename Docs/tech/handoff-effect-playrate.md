@@ -50,3 +50,9 @@
 마무리 낙뢰는 클립 `Garen_Ultimate_Skill` 의 **Custom0 이벤트**(클립 1.2초 = 애니 배율 1.2 로 실제 1.0초, Stick 과 같은 시각)에
 서버가 시전당 1회 쏘고, End 이벤트(Completed)로 끝나지 않으면(대상 소실·사망·안전망 종료) 걷힌다. 시각을 바꾸려면 클립에서 Custom0 을 옮긴다(데이터 필드 없음).
 시각표: `C:\UnityProject\_lane-artifacts\MainProject\52-paladin-ult\521-timing-table.md`.
+
+### 안전망 = 클립 길이 (2026-10-19)
+R 은 이벤트 방식이다(요구 이벤트 Hit·End·Custom0 — `PlayerSkillBase.EndsOnClipEvent`). 서버 안전망·슈퍼아머 길이는
+`maxActiveDuration`(1.5) 이 아니라 **클립 실제 재생 시간** = 클립 길이 5.667 ÷ (상태 speed 1 × `UltimateSpeed` 1.2) = 4.722초 (+ 안전망 0.1 / 슈퍼아머 0.25).
+컨트롤러가 상태 진입 뒤 런타임 `AnimatorStateInfo`·`AnimatorClipInfo` 로 읽는다(`PlayerSkillSafetyNet`). 그래서 **End 를 클립 안 어디로 옮겨도
+안전망이 먼저 끊지 않는다**(예전엔 1.6초에 끊겨 낙뢰가 걷혔다). 이벤트를 옮길 때 이펙트 쪽에서 바꿀 것은 없다.

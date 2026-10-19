@@ -28,7 +28,9 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     [SerializeField] private bool commitCooldownManually = false;
     [SerializeField] private float attackDamageMultiplier = 1f;
     [SerializeField] private int flatDamageBonus;
-    // 홀드/채널 지속시간이자 서버 강제 종료 안전망 기준. Press 스킬도 이 시간을 넘기면 강제 종료된다.
+    [Tooltip("홀드/채널 지속시간이자 서버 강제 종료 안전망 기준(+ padding 0.1). Press 스킬도 이 시간을 넘기면 강제 종료된다.\n" +
+             "타이머 방식 스킬에서만 의미 — 이벤트 방식(스킬이 요구 이벤트에 End 를 선언)은 상태 클립 실제 길이(길이 ÷ 재생 속도)로 안전망을 잡고,\n" +
+             "이 값은 클립 길이를 못 구했을 때의 대체 안전망으로만 쓴다(스킬이 슈퍼아머·연출 길이로 따로 읽는 경우는 예외)")]
     [SerializeField, Min(0.1f)] private float maxActiveDuration = 5f;
     // 홀드/채널 틱 주기. 0이면 틱 없음
     [SerializeField, Min(0f)] private float tickInterval = 0f;

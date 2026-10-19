@@ -12,11 +12,12 @@ public interface IPlayerInterruptSkillData
 /// <summary>
 /// 플레이어 간파 공용 베이스. 앵커 오버랩을 한 번만 판정하고, 모든 피해에 간파 공격 표식을 싣는다.
 ///
-/// 판정·종료 시점(PLAN-anim-event-timing P0-2) — 캐릭터마다 둘 중 하나만 쓴다(<see cref="TimingFromAnimationEvents"/>):
-/// - 이벤트 방식: 상태 클립의 Hit 이벤트가 판정, End 이벤트가 종료. HitDelay·SkillDuration 은 쓰지 않는다.
-///   이벤트가 안 오면(애니메이터 꺼짐 등) 컨트롤러 안전망(MaxActiveDuration)만 끝낸다. 시점 튜닝 = 클립에서 이벤트를 옮긴다.
-/// - 타이머 방식(이벤트를 아직 안 심은 캐릭터): HitDelay·SkillDuration 타이머와 Hit·End 이벤트 중 먼저 온 쪽.
-///   클립에 Hit·End 를 심으면 그 캐릭터에서 <see cref="TimingFromAnimationEvents"/> 를 켜고, 셋 다 켜지면 타이머 경로를 지운다.
+/// 판정·종료 시점(PLAN-anim-event-timing P0-2) — 캐릭터마다 둘 중 하나만 쓴다(<see cref="PlayerSkillBase.EndsOnClipEvent"/>):
+/// - 이벤트 방식(RequiredAnimationEvents 에 <see cref="HitAndEndEvents"/> 를 선언): 상태 클립의 Hit 이벤트가 판정, End 이벤트가 종료.
+///   HitDelay·SkillDuration·MaxActiveDuration 은 쓰지 않는다. 이벤트가 안 오면(애니메이터 꺼짐 등) 컨트롤러 안전망
+///   (상태 클립 실제 재생 시간 + padding)만 끝낸다. 시점 튜닝 = 클립에서 이벤트를 옮긴다.
+/// - 타이머 방식(선언 없음 — 이벤트를 아직 안 심은 캐릭터): HitDelay·SkillDuration 타이머와 Hit·End 이벤트 중 먼저 온 쪽.
+///   안전망 = MaxActiveDuration + padding. 클립에 Hit·End 를 심으면 그 캐릭터에서 선언을 켜고, 셋 다 켜지면 타이머 경로를 지운다.
 ///
 /// 인터럽트 슬로우 모션(PLAN-interrupt-slowmo S3): 승인 시점에 같은 앵커 오버랩으로 유효타를 예측해
 /// (<see cref="IInterruptSlowMotionTarget"/> 이고 지금 인터럽트 가능한 대상이 있으면) 전역 슬로우를 시작한다.
@@ -37,19 +38,15 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private float endTime;
     private bool hasResolvedHit;
 
-    private static readonly SkillAnimationEventType[] EventTimingEvents =
+    /// <summary>
+    /// 이벤트 방식 간파의 요구 이벤트. 클립에 Hit·End 를 심은 캐릭터가 RequiredAnimationEvents 로 이걸 돌려준다(거너·어쌔신).
+    /// 선언하지 않으면 HitDelay·SkillDuration 타이머 방식(가붕이 — 클립 이벤트를 심은 뒤 켠다).
+    /// </summary>
+    protected static readonly SkillAnimationEventType[] HitAndEndEvents =
         { SkillAnimationEventType.Hit, SkillAnimationEventType.End };
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Interrupt;
     public override bool CanMoveWhileActive => false;
-    public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents =>
-        TimingFromAnimationEvents ? EventTimingEvents : base.RequiredAnimationEvents;
-
-    /// <summary>
-    /// 판정·종료를 클립 Hit·End 이벤트로만 정하는가. 클립에 Hit·End 를 심은 캐릭터가 켠다(어쌔신).
-    /// 꺼져 있으면 HitDelay·SkillDuration 타이머 방식(가붕이·거너 — 각 레인에서 클립 이벤트를 심은 뒤 켠다).
-    /// </summary>
-    protected virtual bool TimingFromAnimationEvents => false;
 
     protected IPlayerInterruptSkillData InterruptData => Data as IPlayerInterruptSkillData;
 
@@ -79,8 +76,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     public override void OnTick()
     {
-        // 이벤트 방식은 Hit·End 이벤트만 본다 — 타이머를 겹쳐 두지 않는다(안전망 = 컨트롤러 MaxActiveDuration).
-        if (TimingFromAnimationEvents)
+        // 이벤트 방식은 Hit·End 이벤트만 본다 — 타이머를 겹쳐 두지 않는다(안전망 = 컨트롤러, 상태 클립 길이 + padding).
+        if (EndsOnClipEvent)
             return;
 
         if (!hasResolvedHit && Time.time >= hitTime)
