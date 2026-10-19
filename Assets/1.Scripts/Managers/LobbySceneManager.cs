@@ -36,13 +36,10 @@ public class LobbySceneManager : NemoSceneManager
     [SerializeField] private string defaultIp = "127.0.0.1";
     [SerializeField] private ushort defaultPort = 7777;
 
-    [Header("Relay Connection")]
+    // Unity Relay 는 뺐다(PLAN-48 Q6 — 유선 IPv4 만). 씬의 Relay 패널·모드 전환 버튼은 숨기기만 하고 삭제는 C9.
+    [Header("Relay Connection (숨김 전용)")]
     [SerializeField] private GameObject relayPanel;
     [SerializeField] private GameObject directPanel;
-    [SerializeField] private TMP_InputField joinCodeInputField;
-    [SerializeField] private TMP_Text joinCodeDisplayText;
-    [SerializeField] private Button relayHostButton;
-    [SerializeField] private Button relayJoinButton;
     [SerializeField] private Button modeToggleButton;
 
     private NetworkManager _networkManager;
@@ -51,8 +48,6 @@ public class LobbySceneManager : NemoSceneManager
     private bool _connectionDataApplied;
     private bool _clientConnectPending;
     private bool _networkCallbacksRegistered;
-    private bool _relayStartPending;
-    private bool _relayHostPending;
 
     protected override void Awake()
     {
@@ -69,7 +64,6 @@ public class LobbySceneManager : NemoSceneManager
         ResolveSceneReferences();
         BindButtons();
         RegisterNetworkCallbacks();
-        RegisterSessionLauncherEvents();
 
         // 빌드에서만 나는 문제는 이름 기반 해석이 실패한 경우가 많다 — 어떤 참조가 비었는지
         // 한 줄로 남겨 둔다. (ResolveSceneReferences 의 WarnIfMissing 은 콘솔로만 간다.)
@@ -77,9 +71,8 @@ public class LobbySceneManager : NemoSceneManager
             $"{DiagTag}.Awake",
             $"networkManager={_networkManager != null} sessionLauncher={_sessionLauncher != null} " +
             $"relayPanel={relayPanel != null} directPanel={directPanel != null} " +
-            $"relayHostButton={relayHostButton != null} relayJoinButton={relayJoinButton != null} " +
-            $"modeToggleButton={modeToggleButton != null} joinCodeInput={joinCodeInputField != null} " +
-            $"joinCodeDisplay={joinCodeDisplayText != null} errorText={errorText != null}");
+            $"modeToggleButton={modeToggleButton != null} errorText={errorText != null} " +
+            $"demoFlow={DemoSessionDirector.IsDemoFlowActive}");
     }
 
     private void Start()
@@ -90,6 +83,12 @@ public class LobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         RegisterLobbyUiEvents();
         SelectDirectMode();
+        if (DemoSessionDirector.IsDemoFlowActive)
+        {
+            // 부스 데모는 설정 파일로 자동 접속한다 — 옛 IP/Port·StartHost/StartClient 패널은 쓰지 않는다.
+            SetSessionConnectPanel(false);
+        }
+
         ApplyRoleUi();
 
         // BGM 재생
@@ -99,7 +98,6 @@ public class LobbySceneManager : NemoSceneManager
     private void OnDestroy()
     {
         UnregisterNetworkCallbacks();
-        UnregisterSessionLauncherEvents();
         UnregisterLobbyUiEvents();
     }
 
@@ -169,6 +167,7 @@ public class LobbySceneManager : NemoSceneManager
         }
     }
 
+    /// <summary>연결은 DirectIPv4 하나뿐이다 — Relay 패널·모드 전환 버튼을 숨기고 IPv4 패널만 보인다.</summary>
     public void SelectDirectMode()
     {
         NetworkDiagnosticsLog.Log($"{DiagTag}.SelectDirectMode", $"hasSessionLauncher={_sessionLauncher != null}");
@@ -178,61 +177,10 @@ public class LobbySceneManager : NemoSceneManager
             _sessionLauncher.Mode = SessionConnectionMode.DirectIPv4;
         }
 
-        SetConnectionModePanels(false);
+        SetActiveIfPresent(relayPanel, false);
+        SetActiveIfPresent(modeToggleButton != null ? modeToggleButton.gameObject : null, false);
+        SetActiveIfPresent(directPanel, true);
         SetErrorMessage(string.Empty);
-    }
-
-    public void SelectRelayMode()
-    {
-        NetworkDiagnosticsLog.Log($"{DiagTag}.SelectRelayMode", $"hasSessionLauncher={_sessionLauncher != null}");
-
-        if (_sessionLauncher != null)
-        {
-            _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
-        }
-
-        SetConnectionModePanels(true);
-        SetErrorMessage(string.Empty);
-    }
-
-    public void StartRelayHost()
-    {
-        NetworkDiagnosticsLog.Log($"{DiagTag}.StartRelayHost", "버튼 입력");
-
-        if (!TryBeginRelayStart(true))
-        {
-            return;
-        }
-
-        if (joinCodeDisplayText != null)
-        {
-            joinCodeDisplayText.text = string.Empty;
-        }
-
-        SetErrorMessage("Relay 방 생성 중...");
-        _sessionLauncher.BeginHost();
-    }
-
-    public void StartRelayJoin()
-    {
-        var joinCode = joinCodeInputField != null ? joinCodeInputField.text : string.Empty;
-        NetworkDiagnosticsLog.Log(
-            $"{DiagTag}.StartRelayJoin",
-            $"버튼 입력 hasInputField={joinCodeInputField != null} joinCode='{joinCode}'");
-
-        if (string.IsNullOrWhiteSpace(joinCode))
-        {
-            ShowError(ErrorCatalog.RelayJoinCodeEmpty);
-            return;
-        }
-
-        if (!TryBeginRelayStart(false))
-        {
-            return;
-        }
-
-        SetErrorMessage("Relay 방 참가 준비 중...");
-        _sessionLauncher.BeginClient(joinCode);
     }
 
     public void ToggleReady()
@@ -422,7 +370,6 @@ public class LobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         SetSessionConnectPanel(false);
         SetConnectControlsInteractable(true);
-        SetRelayControlsInteractable(true);
         ApplyRoleUi();
     }
 
@@ -482,7 +429,6 @@ public class LobbySceneManager : NemoSceneManager
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
-        SetRelayControlsInteractable(true);
         ApplyRoleUi();
     }
 
@@ -491,38 +437,12 @@ public class LobbySceneManager : NemoSceneManager
         Debug.LogError("[SceneFlow] LobbySceneManager.HandleTransportFailure");
         NetworkDiagnosticsLog.LogError(
             $"{DiagTag}.HandleTransportFailure",
-            $"connectPending={_clientConnectPending} relayPending={_relayStartPending}");
+            $"connectPending={_clientConnectPending}");
         ShowError(ErrorCatalog.NetTransportFailure);
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
-        SetRelayControlsInteractable(true);
         ApplyRoleUi();
-    }
-
-    private bool TryBeginRelayStart(bool hosting)
-    {
-        if (_sessionLauncher == null)
-        {
-            WarnMissingReference(nameof(NetworkSessionLauncher));
-            ShowError(ErrorCatalog.LobbyLauncherMissing);
-            return false;
-        }
-
-        if (_relayStartPending)
-        {
-            NetworkDiagnosticsLog.LogWarning(
-                $"{DiagTag}.TryBeginRelayStart", $"이미 진행 중이라 무시 hosting={hosting}");
-            return false;
-        }
-
-        _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
-        _relayStartPending = true;
-        _relayHostPending = hosting;
-        SetConnectControlsInteractable(false);
-        SetRelayControlsInteractable(false);
-        NetworkDiagnosticsLog.Log($"{DiagTag}.TryBeginRelayStart", $"시작 hosting={hosting} mode={_sessionLauncher.Mode}");
-        return true;
     }
 
     /// <summary>
@@ -544,67 +464,6 @@ public class LobbySceneManager : NemoSceneManager
         }
 
         return $"cfg={_networkManager.NetworkConfig.GetConfig(false)}";
-    }
-
-    private void HandleSessionStartCompleted(SessionStartResult result)
-    {
-        NetworkDiagnosticsLog.Log(
-            $"{DiagTag}.HandleSessionStartCompleted",
-            $"success={result.Success} shareCode='{result.ShareCode}' error='{result.Error.LogText}' " +
-            $"relayPending={_relayStartPending} hostPending={_relayHostPending}");
-
-        if (!_relayStartPending)
-        {
-            return;
-        }
-
-        var wasHosting = _relayHostPending;
-        _relayStartPending = false;
-        _relayHostPending = false;
-
-        if (!result.Success)
-        {
-            ShowError(result.Error);
-            SetConnectControlsInteractable(true);
-            SetRelayControlsInteractable(true);
-            return;
-        }
-
-        if (wasHosting)
-        {
-            if (joinCodeDisplayText != null)
-            {
-                joinCodeDisplayText.text = result.ShareCode;
-            }
-
-            // 조인코드 옆에 설정 해시를 같이 띄운다 — 상대와 이 숫자가 다르면 무조건 못 붙는다.
-            SetErrorMessage(string.IsNullOrEmpty(result.ShareCode)
-                ? $"Relay Host가 시작되었습니다. ({DescribeConfigHash()})"
-                : $"Relay 조인코드: {result.ShareCode} ({DescribeConfigHash()})");
-            SetConnectControlsInteractable(false);
-            SetRelayControlsInteractable(false);
-            ApplyRoleUi();
-            return;
-        }
-
-        _clientConnectPending = true;
-        SetErrorMessage($"서버 접속 시도 중... ({DescribeConfigHash()})");
-    }
-
-    private void RegisterSessionLauncherEvents()
-    {
-        if (_sessionLauncher != null)
-        {
-            _sessionLauncher.SessionStartCompleted += HandleSessionStartCompleted;
-        }
-    }
-
-    private void UnregisterSessionLauncherEvents()
-    {
-        if (_sessionLauncher != null)
-        {
-            _sessionLauncher.SessionStartCompleted -= HandleSessionStartCompleted;
-        }
     }
 
     private void HandleLobbyStateChanged()
@@ -697,26 +556,12 @@ public class LobbySceneManager : NemoSceneManager
             sessionConnectPanel = FindInActiveScene("Pannel_SessionConnect");
         }
 
-        // Relay 통로도 같은 규약을 따른다 — 이 씬은 인스펙터 배선을 쓰지 않고 이름으로 찾는다
+        // Relay 패널·모드 전환 버튼은 숨기려고만 찾는다 — 이 씬은 인스펙터 배선을 쓰지 않고 이름으로 찾는다
         // (프리팹의 참조가 전부 fileID 0 인 이유). FindInActiveScene 은 트랜스폼 계층을 순회하므로
-        // 모드 전환으로 꺼져 있는 패널도 찾는다.
+        // 꺼져 있는 패널도 찾는다.
         relayPanel ??= FindInActiveScene("Panel_Relay");
         directPanel ??= FindInActiveScene("Panel_Direct");
-        relayHostButton ??= FindButton("Button_RelayHost");
-        relayJoinButton ??= FindButton("Button_RelayJoin");
         modeToggleButton ??= FindButton("Button_ModeToggle");
-
-        if (joinCodeInputField == null)
-        {
-            var target = FindInActiveScene("InputField_JoinCode");
-            joinCodeInputField = target != null ? target.GetComponent<TMP_InputField>() : null;
-        }
-
-        if (joinCodeDisplayText == null)
-        {
-            var target = FindInActiveScene("Text_JoinCode");
-            joinCodeDisplayText = target != null ? target.GetComponent<TMP_Text>() : null;
-        }
 
         if (characterButtons == null || characterButtons.Length != CharacterButtonCount)
         {
@@ -742,16 +587,7 @@ public class LobbySceneManager : NemoSceneManager
         WarnIfMissing(errorText, nameof(errorText));
         WarnIfMissing(sessionConnectPanel, nameof(sessionConnectPanel));
 
-        // 이름 기반 해석이라 오브젝트 이름이 바뀌면 조용히 null 이 된다 —
-        // 그러면 모드 전환이 안 되거나 조인코드를 못 읽는데 로그가 0줄이다. 반드시 짚고 넘어간다.
-        WarnIfMissing(relayPanel, nameof(relayPanel));
-        WarnIfMissing(directPanel, nameof(directPanel));
-        WarnIfMissing(relayHostButton, nameof(relayHostButton));
-        WarnIfMissing(relayJoinButton, nameof(relayJoinButton));
-        // modeToggleButton 은 선택 사항이라 경고하지 않는다 — 없으면 두 패널을 함께 보여준다
-        // (SetConnectionModePanels 주석 참조).
-        WarnIfMissing(joinCodeInputField, nameof(joinCodeInputField));
-        WarnIfMissing(joinCodeDisplayText, nameof(joinCodeDisplayText));
+        // relayPanel·directPanel·modeToggleButton 은 숨김 전용이라 없어도 경고하지 않는다.
 
         WarnIfMissing(_lobbyUIController, nameof(LobbyUIController));
     }
@@ -763,30 +599,11 @@ public class LobbySceneManager : NemoSceneManager
         BindButton(setConnectionDataButton, ApplyConnectionData);
         BindButton(gameStartButton, StartGameLoading);
         BindButton(readyButton, ToggleReady);
-        BindButton(relayHostButton, StartRelayHost);
-        BindButton(relayJoinButton, StartRelayJoin);
-        BindButton(modeToggleButton, ToggleConnectionMode);
 
         for (var i = 0; i < characterButtons.Length; i++)
         {
             var characterId = i;
             BindButton(characterButtons[i], () => SelectCharacter(characterId));
-        }
-    }
-
-    private void ToggleConnectionMode()
-    {
-        NetworkDiagnosticsLog.Log(
-            $"{DiagTag}.ToggleConnectionMode",
-            $"현재 mode={(_sessionLauncher != null ? _sessionLauncher.Mode.ToString() : "(런처 없음)")}");
-
-        if (_sessionLauncher != null && _sessionLauncher.Mode == SessionConnectionMode.UnityRelay)
-        {
-            SelectDirectMode();
-        }
-        else
-        {
-            SelectRelayMode();
         }
     }
 
@@ -816,44 +633,22 @@ public class LobbySceneManager : NemoSceneManager
         }
     }
 
-    private void SetRelayControlsInteractable(bool interactable)
+    private static void SetActiveIfPresent(GameObject target, bool active)
     {
-        SetButtonsInteractable(interactable, relayHostButton, relayJoinButton, modeToggleButton);
-
-        if (joinCodeInputField != null)
+        if (target != null)
         {
-            joinCodeInputField.interactable = interactable;
-        }
-    }
-
-    /// <summary>
-    /// 전환 버튼이 씬에 있을 때만 패널을 배타적으로 토글한다.
-    ///
-    /// ⚠️ 버튼이 없는데 토글하면 한쪽 패널이 숨겨진 뒤 되살릴 방법이 없어 그 통로가 통째로
-    /// 막힌다. 전환 버튼은 기능상 필수가 아니다 — IPv4 버튼은 동기 레거시 경로라 Mode 와
-    /// 무관하고, Relay 버튼은 TryBeginRelayStart 가 Mode 를 직접 UnityRelay 로 세팅한다.
-    /// 그래서 버튼이 없으면 두 패널을 저작된 그대로 함께 보여주는 것이 맞다.
-    /// </summary>
-    private void SetConnectionModePanels(bool relaySelected)
-    {
-        if (modeToggleButton == null)
-        {
-            return;
-        }
-
-        if (relayPanel != null)
-        {
-            relayPanel.SetActive(relaySelected);
-        }
-
-        if (directPanel != null)
-        {
-            directPanel.SetActive(!relaySelected);
+            target.SetActive(active);
         }
     }
 
     private void SetSessionConnectPanel(bool active)
     {
+        // 부스 데모 흐름에서는 끊겨도 패널을 다시 띄우지 않는다 — DemoSessionDirector 가 대기 씬으로 보내 재접속한다.
+        if (DemoSessionDirector.IsDemoFlowActive)
+        {
+            active = false;
+        }
+
         if (sessionConnectPanel != null)
         {
             sessionConnectPanel.SetActive(active);

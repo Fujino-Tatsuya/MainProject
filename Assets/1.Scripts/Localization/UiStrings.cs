@@ -174,6 +174,7 @@ public static class UiStrings
         all.AddRange(StatusEffectNames.Values);
         all.Add(StatusEffectGrabbed);
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
+        all.AddRange(DemoConnectUiStrings.All); // 부스 데모 연결 오버레이(UI.DemoConnect.*)
         return all;
     }
 

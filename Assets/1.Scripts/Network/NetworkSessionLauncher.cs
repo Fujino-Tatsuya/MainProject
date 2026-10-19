@@ -24,8 +24,8 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     NetworkManager _networkManager;
     NetworkLoadingFlowController _loadingFlowController;
+    // Unity Relay 는 런타임 경로에서 뺐다(PLAN-48 Q6 — 유선 IPv4 만). RelayConnectionProvider.cs·패키지는 남겨 둔다.
     DirectIPv4ConnectionProvider _directIPv4Provider;
-    RelayConnectionProvider _relayProvider;
     UnityTransport _transport;
 
     public SessionConnectionMode Mode { get; set; } = SessionConnectionMode.DirectIPv4;
@@ -52,14 +52,13 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (_transport != null)
         {
             _directIPv4Provider = new DirectIPv4ConnectionProvider(_transport);
-            _relayProvider = new RelayConnectionProvider(_transport);
         }
 
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.Awake hasNetworkManager={_networkManager != null} hasLoadingFlow={_loadingFlowController != null}");
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.Awake",
             $"hasNetworkManager={_networkManager != null} hasTransport={_transport != null} " +
-            $"hasDirectProvider={_directIPv4Provider != null} hasRelayProvider={_relayProvider != null} mode={Mode} " +
+            $"hasDirectProvider={_directIPv4Provider != null} mode={Mode} " +
             $"ngoLogLevel={(_networkManager != null ? _networkManager.LogLevel.ToString() : "(없음)")}");
     }
 
@@ -315,12 +314,8 @@ public class NetworkSessionLauncher : MonoBehaviour
         out ISessionConnectionProvider provider,
         out SessionStartResult failureResult)
     {
-        provider = Mode switch
-        {
-            SessionConnectionMode.DirectIPv4 => _directIPv4Provider,
-            SessionConnectionMode.UnityRelay => _relayProvider,
-            _ => null
-        };
+        // DirectIPv4 만 연결한다 — 그 밖의 모드(Relay·Steam)는 "프로바이더 없음" 으로 실패한다.
+        provider = Mode == SessionConnectionMode.DirectIPv4 ? _directIPv4Provider : null;
         if (provider == null)
         {
             failureResult = SessionStartResult.Failed(

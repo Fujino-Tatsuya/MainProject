@@ -250,7 +250,8 @@ public class GameManager : MonoBehaviour
 
     private void ApplyLobbySessionConnectPanelState()
     {
-        var shouldHide = _hideSessionConnectPanelOnLobbyLoad || IsInNetworkSession();
+        // 부스 데모 흐름은 설정 파일로 자동 접속하므로 옛 연결 패널을 늘 숨긴다(삭제는 PLAN-48 C9).
+        var shouldHide = _hideSessionConnectPanelOnLobbyLoad || IsInNetworkSession() || DemoSessionDirector.IsDemoFlowActive;
         _hideSessionConnectPanelOnLobbyLoad = IsInNetworkSession();
         Debug.Log($"[SceneFlow] GameManager.ApplyLobbySessionConnectPanelState shouldHide={shouldHide} inNetwork={_hideSessionConnectPanelOnLobbyLoad}");
 
