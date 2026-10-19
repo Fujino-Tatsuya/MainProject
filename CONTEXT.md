@@ -15,6 +15,13 @@ Update this file when a term becomes important enough that future agents or team
 - ⏸ 후속(범위 밖): 텍스처 남은 항목·v18.2 눈·입 UV 밀도(10/22 Codex 한도 해제 뒤 — PLAN §9 끝) · `Assassin_BaseColor` 4096 무압축(약 85 MiB → 4096 BC7 권장) · 판정 거리를 커진 몸에 맞출지 기획 확인 · 변신 R·Q 일섬 VFX 배율(민경) · 단검 전용 텍스처 · 로비 초상화 · `Run_Start`/`Run_Stop` 속도.
 - `Docs/tech/player-prefabs.md` 를 잠근 「거너 레이저건 정렬」 세션(`fix/GunnerGunAlign`)은 이미 병합됐다(`1d2e4b22`) — 그 잠금은 끝난 것으로 본다.
 
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **몬스터 데이터 인스펙터 1차(표시만)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-monster-data-inspector.md](PLAN-monster-data-inspector.md) ✅ 승인(§7 결정 · §8 교차검증) · 조사 원본 [monster-data-survey-1019.md](Docs/tech/monster-data-survey-1019.md)(333칸)
+- ✅ 1차 표시 구현(미커밋): `Monster/Editor/` `MonsterInspectorCatalog.cs`(칸 사전 — 이름·묶음·★ 은 여기 한 곳) · `MonsterDataSOEditor.cs` · `BossEntryDrawers.cs`(공격·콤보·타·페이즈 행) · `MonsterInspectorGUI.cs` · 테스트 `MonsterInspectorCatalogTests`(전투 러너에 등록) + `DataTableInspectorBadge.cs` 칸 단위 조회(`TryGetWrite`)·머리 요약 한 줄. 컴파일 error CS 0 · 전투 EditMode 240/0 · 인스펙터 화면 확인(No23·ChompBot) · 열고 펼쳐도 에셋 변경 0.
+- ⏳ 팀장·기획 눈 확인(★ 목록 조정은 사전 한 줄) · 다중 선택·Undo 손 확인.
+- 다음 ① 죽은 칸 6개 삭제(콤보는 `3a0d7e8d` 로 커밋됨 → 막힘 풀림. `BossDataWiring`·`BossVariantAuthoring` 같이) ② `attackWindup` 공격 선딜 연결(별도 — 조사 → 질문 → Play) ③ 2차(장판·드론·예고 스타일·중간보스).
+- ⚠️ `[DataTableSheet]` SO 칸을 지우거나 이름 바꾸기 전에 **지금 xlsx** 를 다시 보고 Verify("필드 없음" 0) — 10-19 `raidSelfDestructDamageReduction` 삭제로 테이블 Play 가 막혔다(f5b48b27 로 복구).
+- (참고) 같은 작업 트리에 다른 세션의 미커밋 변경이 있다 — Dev 스크립트 `HIDE_DEBUG_UI` · `ProjectSettings` preloadedAssets · `BuildWindowsPlayer` 등. 이 작업과 무관.
+
 ## ▶▶ 작업 세션 (2026-10-18~19 · 경석(Claude) · 23호 콤보 · 레이드 ④ 실드 · HUD 레이캐스트, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r457(핀 457)
 - 콤보 = [PLAN-boss-combo.md](PLAN-boss-combo.md) — 룰렛 가중치(훅·훅·돌진 20 · 훅·어퍼 15 · 돌진·잡기 15 임시, 팀장이 정함) · 0.3초 · 추격 유예 1초 · 어그로 고정 · 개전 오른훅→왼훅→돌진(기존·레이드, 1인 제외). Codex 교차검증 반영.
 - 레이드 ④ 자폭 = 체력바 실드(간파 게이지·창·전기 구슬 제거) · ③ 구출 자막 제거. 간파 보너스·창 칸은 xlsx 행 때문에 **미사용으로 남김**(다음 병합 Export 때 정리).
