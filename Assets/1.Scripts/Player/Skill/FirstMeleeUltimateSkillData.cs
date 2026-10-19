@@ -25,9 +25,9 @@ public class FirstMeleeUltimateSkillData : PlayerSkillData
              "파티클 simulationSpeed(저작값에 곱)·startDelay·엔트리 파트 delay·수명이 함께 빨라진다")]
     [SerializeField, Min(0.1f), DataTableIgnore] private float vfxPlayRate = 1.2f;
 
-    [Tooltip("피해(Hit) 이벤트 뒤 남은 애니메이션 속도 배율. 1 = 그대로, 2 = Hit 뒤 구간만 2배 빠르게.\n" +
+    [Tooltip("피해(Hit) 이벤트 뒤 남은 애니메이션 속도 배율. 1 = 그대로, 3 = Hit 뒤 구간만 3배 빠르게.\n" +
              "Hit 에서 UltimateSpeed 를 animationSpeed × 이 값으로 바꾼다 — End 도 그만큼 일찍 온다(안전망은 시작 때 길이라 먼저 끊지 않는다)")]
-    [SerializeField, Min(0.1f), DataTableIgnore] private float afterHitSpeedMultiplier = 2f;
+    [SerializeField, Min(0.1f), DataTableIgnore] private float afterHitSpeedMultiplier = 3f;
 
     public float AnimationSpeed => animationSpeed;
     public float AfterHitSpeedMultiplier => afterHitSpeedMultiplier;
