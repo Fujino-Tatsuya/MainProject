@@ -367,7 +367,7 @@ MonoBehaviour:
       forceFire: 0
     chainOnHit: 1
   - name: JumpJumpJump
-    weight: 15
+    weight: 21
     allowedFromPhase: 0
     cooldown: 12
     steps:

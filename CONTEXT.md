@@ -18,7 +18,7 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude) · **23호 콤보 즉시 연결 + 훅·어퍼 바닥 예고 토글**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-combo-chain.md](PLAN-boss-combo-chain.md) ✅ 승인 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · Verify 필드 없음 0 · ⏳ 경석 Play
 - 수정: `TwentyThreeBoss.cs`(즉시 연결·후속 타 분기·토글) · `BossComboEntry.chainOnHit` · `BossDataSO` 새 칸 5(comboDashWindup 0.7 · comboGrabTelegraph 0.3 · comboJumpRecovery 0 · comboDashRecovery 0.3 · hookTelegraphMarkers) · `BossComboPolicy`(+테스트) · 인스펙터 사전 · 에셋 No23·No23_Raid(콤보 6종 즉시 연결 · 새 HookHookHook w15·cd8 · 바닥 예고 끔). 개전 콤보는 즉시 연결 제외.
 - 같이 미커밋: 앞 단계 콤보 가중치(돌잡·점돌 w25·cd8 · UpperGrab) · PLAN-boss-balance.
-- 2차(경석 Play 후): 점프→돌진 이펙트 잔존 수정(끊긴 클립 루프 끄기 `StopCutClipLoopsClientRpc`) · 단타 훅·어퍼 끔(`singleHookUpper`) · 훅·어퍼 히트 뒤 0.3초(`comboHookFollowThrough`) · 돌진 다음 잡기 예고 1초(`comboGrabTelegraphAfterDash`) · 새 콤보 JumpJumpJump w15·cd12. 컴파일 0 · EditMode 257/0 · ⏳ Play.
+- 2차(경석 Play 후): 점프→돌진 이펙트 잔존 수정(끊긴 클립 루프 끄기 `StopCutClipLoopsClientRpc`) · 단타 훅·어퍼 끔(`singleHookUpper`) · 훅·어퍼 히트 뒤 0.3초(`comboHookFollowThrough`) · 돌진 다음 잡기 예고 1초(`comboGrabTelegraphAfterDash`) · 새 콤보 JumpJumpJump w21·cd12(15 → 1.3배 빈도). 컴파일 0 · EditMode 257/0 · ✅ 커밋 `f976803b` + 가중치 조정 커밋.
 - ⚠️ 이 세션 중 Unity MCP 브리지(node, `mcp-bridge-launcher.js`)가 CPU 루프로 멈춰 PID 종료로 복구 — 메모리 [unity-mcp-bridge-hang] 대처 그대로 통했다.
 
 ## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **23호 공격 빈도 밸런스**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-balance.md](PLAN-boss-balance.md) ✅ 승인
