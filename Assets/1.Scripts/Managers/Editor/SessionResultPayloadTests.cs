@@ -20,7 +20,9 @@ public sealed class SessionResultPayloadTests
                 Damage = 1000 + i,
                 Kills = 10 + i,
                 Counters = i,
-                Deaths = 2 * i
+                Deaths = 2 * i,
+                Healing = 300 + i,
+                DamageTaken = 700 + i
             });
         }
         return rows;
@@ -60,7 +62,37 @@ public sealed class SessionResultPayloadTests
             Assert.AreEqual(rows[i].Kills, read[i].Kills);
             Assert.AreEqual(rows[i].Counters, read[i].Counters);
             Assert.AreEqual(rows[i].Deaths, read[i].Deaths);
+            Assert.AreEqual(rows[i].Healing, read[i].Healing);
+            Assert.AreEqual(rows[i].DamageTaken, read[i].DamageTaken);
         }
+    }
+
+    [Test]
+    public void 행_크기는_ulong_하나와_int_일곱이다()
+    {
+        Assert.AreEqual(sizeof(ulong) + sizeof(int) * 7,
+            SessionResultPayload.GetSize(1) - SessionResultPayload.GetSize(0));
+    }
+
+    [Test]
+    public void 새_열이_빠진_구형_행은_거부한다()
+    {
+        // 새 열(healing·damageTaken)이 빠진 구형 행 — 마지막 두 int 를 안 쓰면 길이 부족으로 거부해야 한다.
+        using var writer = new FastBufferWriter(64, Allocator.Temp);
+        writer.WriteValueSafe(true);
+        writer.WriteValueSafe((byte)SessionOutcome.Cleared);
+        writer.WriteValueSafe(1f);
+        writer.WriteValueSafe((byte)1);
+        writer.WriteValueSafe(0UL);
+        for (int i = 0; i < 5; i++)
+            writer.WriteValueSafe(1);
+
+        using var reader = new FastBufferReader(writer, Allocator.Temp);
+        var payloadReader = reader;
+        var read = new List<PlayerSessionStats>();
+        Assert.IsFalse(SessionResultPayload.TryRead(ref payloadReader, out bool hasValue, out _, out _, read));
+        Assert.IsFalse(hasValue);
+        Assert.AreEqual(0, read.Count);
     }
 
     [Test]

@@ -175,7 +175,7 @@ public sealed class PlayerHealthRegenModelTests
     {
         int raised = 0;
         int lastAmount = 0;
-        System.Action<Unit, int> handler = (_, amount) => { raised++; lastAmount = amount; };
+        System.Action<Unit, ulong, int> handler = (_, _, amount) => { raised++; lastAmount = amount; };
         CombatStatsEvents.ServerHealApplied += handler;
         try
         {

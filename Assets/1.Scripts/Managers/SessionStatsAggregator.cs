@@ -8,6 +8,8 @@ using System.Collections.Generic;
 ///   · 데미지·처치 = 대상이 집계 대상 몬스터일 때만(호출부는 분류 결과만 넘긴다), 공격자 없음 제외, 0 이하 무시.
 ///   · 처치 = 이번 피해로 체력 0 에 도달한 피해(막타)의 공격자 1회.
 ///   · 간파 = 공격자 없음 제외.
+///   · 회복량 = 대상이 플레이어인 회복만, 회복 주체에게. 주체 없음·0 이하 무시.
+///   · 입은 피해 = 대상이 플레이어인 HP 감소만, 그 플레이어에게(공격자 무관). 0 이하 무시.
 ///   · 사망 = Alive → DeadPresentation 전이만 1회. 같은 상태 통지((s,s) — 스폰 초기 통지)는 행 등록만 한다.
 /// </summary>
 public sealed class SessionStatsAggregator
@@ -73,6 +75,34 @@ public sealed class SessionStatsAggregator
         PlayerSessionStats row = _rows[attackerClientId];
         row.Counters = SaturatingAdd(row.Counters, 1);
         _rows[attackerClientId] = row;
+        return true;
+    }
+
+    /// <summary>회복량 — 대상이 플레이어인 회복만 회복 주체에게 더한다(몬스터 자기 회복 제외). 오버힐 제외는 호출 측 실제 회복량이 보장.</summary>
+    /// <returns>집계에 반영했는가.</returns>
+    public bool RecordHealing(ulong healerClientId, bool targetIsPlayer, int amount)
+    {
+        if (!targetIsPlayer || healerClientId == NoAttacker || amount <= 0)
+            return false;
+
+        RegisterPlayer(healerClientId);
+        PlayerSessionStats row = _rows[healerClientId];
+        row.Healing = SaturatingAdd(row.Healing, amount);
+        _rows[healerClientId] = row;
+        return true;
+    }
+
+    /// <summary>입은 피해 — 대상이 플레이어일 때 그 플레이어에게 HP 실제 감소량을 더한다(공격자 무관).</summary>
+    /// <returns>집계에 반영했는가.</returns>
+    public bool RecordDamageTaken(ulong victimClientId, bool targetIsPlayer, int healthLost)
+    {
+        if (!targetIsPlayer || victimClientId == NoAttacker || healthLost <= 0)
+            return false;
+
+        RegisterPlayer(victimClientId);
+        PlayerSessionStats row = _rows[victimClientId];
+        row.DamageTaken = SaturatingAdd(row.DamageTaken, healthLost);
+        _rows[victimClientId] = row;
         return true;
     }
 
