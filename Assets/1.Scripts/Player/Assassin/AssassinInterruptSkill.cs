@@ -6,10 +6,13 @@ using UnityEngine;
 /// 다른 동작 중 우클릭 무시·예약 없음은 공통 FSM 이 처리한다. 변신 종료 대기 중이면 간파(Skill 상태)가 끝난 뒤
 /// <see cref="AssassinState"/> 가 변신을 끝낸다(§10.3 "현재 간파 공격 동작 완료").
 /// 간파 성공 방향 조건은 보스 쪽 판정이다 — 변신 중 백어택과 별개(배율만 싣고 간파 판정에는 관여하지 않는다, A11).
+/// 판정·종료 = Attack_Up_01 의 Hit·End 이벤트(PLAN-anim-event-timing P2-2). 시점 튜닝은 클립에서 이벤트를 옮긴다.
 /// </summary>
 public sealed class AssassinInterruptSkill : PlayerInterruptSkillBase
 {
     private AssassinState assassinState;
+
+    protected override bool TimingFromAnimationEvents => true;
 
     // 애니메이션은 PlayerSkillController 가 animatorStateName 으로 재생한다. 연출은 임시(AssassinSkillView — 민경 교체).
     public override void OnClientPlay(Vector3 direction) =>
