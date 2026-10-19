@@ -20,6 +20,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
         _MarkerStart ("First Fin Center (World Units)", Float) = 2.6
         _WorldSize ("World Size", Vector) = (1, 1, 0, 0)
         [Toggle] _Arrow ("Arrow", Float) = 0
+        _ArrowReferenceAlpha ("Arrow Full Visibility Alpha", Range(0.01, 1)) = 0.42
     }
     SubShader
     {
@@ -57,6 +58,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float _MarkerStart;
                 float4 _WorldSize;
                 half _Arrow;
+                half _ArrowReferenceAlpha;
             CBUFFER_END
             Varyings Vert(Attributes input)
             {
@@ -64,16 +66,6 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 output.positionHCS=TransformObjectToHClip(input.positionOS.xyz);
                 output.uv=input.uv;
                 return output;
-            }
-            half ArrowMask(float2 uv)
-            {
-                const float bodyEnd=0.62;
-                const float bodyHalfWidth=0.14;
-                float headT=saturate((uv.y-bodyEnd)/(1.0-bodyEnd));
-                float halfWidth=uv.y<bodyEnd?bodyHalfWidth:lerp(0.5,0.0,headT);
-                float signedDistance=halfWidth-abs(uv.x-0.5);
-                float antialias=max(fwidth(signedDistance),0.001);
-                return smoothstep(-antialias,antialias,signedDistance);
             }
             float SegmentDistance(float2 p,float2 a,float2 b)
             {
@@ -101,10 +93,42 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 composite.rgb=color*opacity+composite.rgb*(1.0h-opacity);
                 composite.a=opacity+composite.a*(1.0h-opacity);
             }
+            // Movement-preview arrow in the C3 language. Silhouette is unchanged (body to 62%,
+            // body half width 14%, head half width 50%); outline, inner line and face are drawn inward.
+            half4 ArrowC3(float2 uv)
+            {
+                float2 size=max(_WorldSize.xy,float2(0.001,0.001));
+                float2 p=float2((uv.x-0.5)*size.x,uv.y*size.y);
+                float bodyX=0.14*size.x;
+                float headX=0.5*size.x;
+                float headY=0.62*size.y;
+                float2 v[7]={float2(-bodyX,0.0),float2(bodyX,0.0),float2(bodyX,headY),float2(headX,headY),
+                             float2(0.0,size.y),float2(-headX,headY),float2(-bodyX,headY)};
+                float distance=1e6;
+                [unroll]for(int i=0;i<7;i++)
+                    distance=min(distance,SegmentDistance(p,v[i],v[(i+1)%7]));
+                float halfWidth=p.y<headY?bodyX:headX*saturate((size.y-p.y)/(size.y-headY));
+                bool inside=p.y>=0.0&&p.y<=size.y&&abs(p.x)<=halfWidth;
+                float sd=inside?distance:-distance;
+                float aa=max(0.5*(length(ddx(p))+length(ddy(p))),0.0001);
+                half shape=smoothstep(-aa,aa,sd);
+                float unit=size.x/max(_DesignWidthPixels,1.0);
+                float outerWidth=max(0.0,_OutlinePixels)*unit;
+                float innerStart=outerWidth+max(0.0,_GapPixels)*unit;
+                float innerWidth=max(0.0,_InnerPixels)*unit;
+                half outer=1.0h-smoothstep(outerWidth-aa,outerWidth+aa,sd);
+                half inner=smoothstep(innerStart-aa,innerStart+aa,sd)*(1.0h-smoothstep(innerStart+innerWidth-aa,innerStart+innerWidth+aa,sd));
+                half face=_MarkerColor.a*lerp(0.55h,1.0h,saturate(uv.y));
+                half4 result=half4(_MarkerColor.rgb*face,face);
+                Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
+                Over(result,_InnerColor.rgb,inner*_InnerColor.a);
+                half visibility=saturate(_Alpha/max(_ArrowReferenceAlpha,0.01h));
+                return half4(result.rgb/max(result.a,0.0001h),result.a*shape*visibility*_Color.a);
+            }
             half4 Frag(Varyings input):SV_Target
             {
-                // Preserve movement-preview arrows and their original alpha semantics.
-                if(_Arrow>0.5h)return half4(_Color.rgb,_Color.a*_Alpha*ArrowMask(input.uv));
+                // Movement-preview arrow keeps its quad, direction and _Alpha contract (.42 = full design).
+                if(_Arrow>0.5h)return ArrowC3(input.uv);
                 float2 size=max(_WorldSize.xy,float2(0.001,0.001));
                 float2 samplePos=float2((input.uv.x-0.5)*size.x,input.uv.y*size.y);
                 // Derivatives must use continuous coordinates, before the repeat wrap.
