@@ -1,7 +1,8 @@
 # 로비 결과 패널 — 붙이는 법 (할 일 48)
 
 > 5.ResultScene 을 없애고 판 결과를 로비 패널로 보여 준다(PLAN-48 v2 §0-1).
-> 이 문서는 **패널을 로비에 붙이는 쪽(Work3)** 이 볼 것만 적는다. 씬 배치·호출은 아직 안 했다.
+> 이 문서는 **패널을 로비에 붙이는 쪽(Work3)** 이 볼 것만 적는다.
+> 붙임 = C7b(`feature/LobbyDemo`): 3.LobbyScene 에 프리팹 인스턴스, `LobbySceneManager.Start` 가 `HasResult` 면 Show, 임시 다시 보기 버튼 `Canvas/Button_ShowLastResult`(`UI.Lobby.ShowLastResult`). 결과 비우기는 기존 두 곳(`SessionStatsTracker.Awake`·`DemoSessionDirector.CleanupAfterDrop`)으로 충분하다고 보고 새로 넣지 않았다.
 
 ## 파일
 | 무엇 | 경로 |

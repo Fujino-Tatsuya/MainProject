@@ -11,7 +11,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private const string ProgressMessageName = "LoadingScene.Progress";
     private const string StateMessageName = "LoadingScene.State";
     private const int ProgressMessageSize = sizeof(uint) + sizeof(float);
-    private const int StateMessageSize = sizeof(uint) + sizeof(byte) + sizeof(float);
+    // flowId · phase · 평균 진행률 · 소스가 NGO 씬인가(클라가 로컬 언로드를 건너뛸지).
+    private const int StateMessageSize = sizeof(uint) + sizeof(byte) + sizeof(float) + sizeof(byte);
 
     [SerializeField] private string loadingSceneName = "LoadingScene";
     [SerializeField] private string targetSceneName = "MapScene"; // Temp_inGameScene에서 변경.
@@ -51,7 +52,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private string _sourceSceneName;
     // 판 재시작(TryRestartTargetScene) — 로딩 씬이 뜬 뒤 소스(로컬) 씬 대신 타깃 씬을 네트워크 언로드한다.
     private bool _restartingTargetScene;
+    // 소스 씬이 NGO 가 로드한 씬인가 — 서버가 StartGameLoading 에서 정해 상태 메시지로 클라에 알린다(SourceSceneUnloadRule).
+    private bool _sourceIsNetworkScene;
+    // [서버] NGO LoadScene 으로 들어와 아직 떠 있는 씬 이름. 서버 자신의 LoadComplete 로 넣고 Unity sceneUnloaded 로 뺀다.
+    // NGO 의 ScenesLoaded 는 internal 이고, StartHost 때 이미 떠 있던 로컬 씬(지금의 로비)까지 담아 판별에 못 쓴다.
+    private readonly HashSet<string> _networkLoadedScenes = new HashSet<string>();
     private readonly List<NetworkObject> _despawnBuffer = new List<NetworkObject>();
+    // [서버] 판 종료 Single 전환(TryLoadSessionSceneSingle) 루틴.
+    private Coroutine _sessionSceneLoadRoutine;
 
     private bool IsServerActive => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
 
@@ -64,6 +72,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
     {
         _networkManager = GetComponent<NetworkManager>();
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.Awake hasNetworkManager={_networkManager != null}");
+
+        // 서버가 켜지자마자 씬 이벤트를 구독한다 — StartHost 직후 NGO 로 로드하는 씬(로비)도 _networkLoadedScenes 에 잡히게.
+        if (_networkManager != null)
+        {
+            _networkManager.OnServerStarted += RegisterNetworkCallbacks;
+        }
+
+        SceneManager.sceneUnloaded += HandleUnitySceneUnloaded;
     }
 
     private void OnDestroy()
@@ -74,7 +90,19 @@ public class NetworkLoadingFlowController : MonoBehaviour
             _registerCallbacksRoutine = null;
         }
 
+        if (_networkManager != null)
+        {
+            _networkManager.OnServerStarted -= RegisterNetworkCallbacks;
+        }
+
+        SceneManager.sceneUnloaded -= HandleUnitySceneUnloaded;
         UnregisterNetworkCallbacks();
+    }
+
+    // NGO 언로드든 로컬 언로드·Single 교체든 씬이 내려가면 "NGO 씬" 기록에서 뺀다.
+    private void HandleUnitySceneUnloaded(Scene scene)
+    {
+        _networkLoadedScenes.Remove(scene.name);
     }
 
     public void RegisterNetworkCallbacks()
@@ -109,6 +137,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         // 구독한 "대상"을 기억해 둔다 — 아래 IsRegistrationCurrent 가 이걸로 세대를 판별한다.
         _registeredSceneManager = _networkManager.SceneManager;
         _registeredMessagingManager = _networkManager.CustomMessagingManager;
+        _networkLoadedScenes.Clear(); // 새 세션 — 지난 세션의 NGO 씬 기록은 이 SceneManager 와 무관하다
 
         _registeredSceneManager.OnSceneEvent += HandleSceneEvent;
         _registeredMessagingManager.RegisterNamedMessageHandler(ProgressMessageName, HandleProgressMessage);
@@ -199,10 +228,11 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _phase = NetworkLoadingPhase.LoadingScene;
         _minimumTimerStartedAt = Time.unscaledTime;
         _sourceSceneName = SceneManager.GetActiveScene().name;
+        _sourceIsNetworkScene = _networkLoadedScenes.Contains(_sourceSceneName);
 
         Debug.Log(
             $"[SceneFlow] NetworkLoadingFlowController.StartGameLoading loadingScene={loadingSceneName} " +
-            $"targetScene={targetSceneName} sourceScene={_sourceSceneName} flowId={_flowId}");
+            $"targetScene={targetSceneName} sourceScene={_sourceSceneName} sourceIsNetworkScene={_sourceIsNetworkScene} flowId={_flowId}");
         LogDebug($"StartGameLoading flowId={_flowId}, loadingScene={loadingSceneName}, targetScene={targetSceneName}.");
         ApplyViewState();
         BroadcastState();
@@ -346,6 +376,78 @@ public class NetworkLoadingFlowController : MonoBehaviour
         return count;
     }
 
+    // [서버] 씬 전환 직전 정리(PLAN-48 §4.3·R1) — 동적 NetworkObject(PlayerObject 포함, IsSceneObject=false)를 전부 디스폰하고
+    // 남은 스폰 개수(씬 배치 객체 — 언로드가 정리)를 남긴다. 전환마다 남은 수가 불어나면 누적 누수다.
+    private void DespawnDynamicNetworkObjectsBeforeTransition(string context)
+    {
+        int despawned = DespawnDynamicNetworkObjects();
+        int remaining = _networkManager.SpawnManager.SpawnedObjectsList.Count;
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.DespawnBeforeTransition context={context} despawned={despawned} remaining={remaining}");
+    }
+
+    /// <summary>
+    /// [서버] 세션 유지형 Single 전환 — 판이 끝나면 4.MapScene 에서 로비로 바로 간다(PLAN-48 C7, 5.ResultScene 경유 없음).
+    /// 한 프레임 뒤에 동적 NetworkObject·플레이어를 디스폰하고(남은 개수 로그, R1) NGO <c>LoadScene(Single)</c> 을 부른다 — 클라는 NGO 가 따라 옮긴다.
+    /// 한 프레임 미루는 건 호출 전에 보낸 결과 페이로드(MapScene.GoToResult named message)를 씬 이벤트보다 앞선 프레임에 송신하기 위해서다
+    /// (둘 다 UnityTransport 의 같은 ReliableSequenced 파이프라인이라 같은 프레임이어도 순서는 지켜진다).
+    /// 로딩 흐름이 진행 중이면 끝날 때까지 기다렸다 전환한다. 서버가 아니거나 이미 전환 중이면 거부(false + 이유).
+    /// </summary>
+    public bool TryLoadSessionSceneSingle(string sceneName, out string reason)
+    {
+        RegisterNetworkCallbacks();
+
+        if (!IsServerActive)
+        {
+            reason = "서버가 아니다";
+            return false;
+        }
+
+        if (_sessionSceneLoadRoutine != null)
+        {
+            reason = "이미 Single 전환 중이다";
+            return false;
+        }
+
+        _sessionSceneLoadRoutine = StartCoroutine(LoadSessionSceneSingle(sceneName));
+        reason = null;
+        return true;
+    }
+
+    private IEnumerator LoadSessionSceneSingle(string sceneName)
+    {
+        yield return null;
+        while (IsServerActive && IsFlowInProgress)
+        {
+            yield return null;
+        }
+
+        if (!IsServerActive)
+        {
+            Debug.LogWarning($"[SceneFlow] NetworkLoadingFlowController.LoadSessionSceneSingle 서버가 멈춰 전환을 취소한다 scene={sceneName}");
+            _sessionSceneLoadRoutine = null;
+            yield break;
+        }
+
+        DespawnDynamicNetworkObjectsBeforeTransition($"single={sceneName}");
+
+        var status = _networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        var retries = 0;
+        while (status == SceneEventProgressStatus.SceneEventInProgress && retries < 30)
+        {
+            retries++;
+            yield return null;
+            status = _networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.LoadSessionSceneSingle LoadScene scene={sceneName} status={status} retries={retries}");
+        if (status != SceneEventProgressStatus.Started)
+        {
+            Debug.LogError($"[Loading] {sceneName} Single 로드 실패({status}) — 판 종료 전환이 멈췄다.");
+        }
+
+        _sessionSceneLoadRoutine = null;
+    }
+
     private bool CanStartFromLobby()
     {
         var lobby = LobbyUIController.Active;
@@ -444,6 +546,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
                 HandleLoadStarted(sceneEvent);
                 break;
             case SceneEventType.LoadComplete:
+                TrackNetworkLoadedScene(sceneEvent);
                 HandleLoadComplete(sceneEvent);
                 break;
             case SceneEventType.LoadEventCompleted:
@@ -453,6 +556,18 @@ public class NetworkLoadingFlowController : MonoBehaviour
                 HandleUnloadEventCompleted(sceneEvent);
                 break;
         }
+    }
+
+    // [서버] 서버 자신의 LoadComplete = 서버가 NGO LoadScene 으로 올린 씬이다(서버는 동기화 로드를 받지 않는다).
+    // 클라 쪽은 기록하지 않는다 — 클라는 접속 동기화 때 이미 떠 있던 로컬 로비에도 LoadComplete 를 받아 구분이 안 된다.
+    private void TrackNetworkLoadedScene(SceneEvent sceneEvent)
+    {
+        if (!IsServerActive || sceneEvent.ClientId != _networkManager.LocalClientId)
+        {
+            return;
+        }
+
+        _networkLoadedScenes.Add(sceneEvent.SceneName);
     }
 
     private void HandleUnloadEventCompleted(SceneEvent sceneEvent)
@@ -521,9 +636,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
             }
             else if (!IsServerActive)
             {
-                // Lobby/Result는 로컬 UI 씬이라 NGO가 언로드하지 않는다.
+                // 로컬 소스(지금의 Lobby/Result)는 NGO가 언로드하지 않는다.
                 // 서버는 StartTargetLoadAfterSceneEvent에서 로컬 소스 씬을 언로드하므로
                 // 클라이언트도 대칭적으로 자기 로컬 소스(Lobby) 씬을 여기서 언로드한다.
+                // NGO 소스면(서버 상태 메시지의 플래그) 서버의 NGO 언로드가 클라까지 내리므로 여기선 건너뛴다(SourceSceneUnloadRule).
                 StartCoroutine(UnloadSourceSceneIfNeeded());
             }
 
@@ -607,69 +723,27 @@ public class NetworkLoadingFlowController : MonoBehaviour
         SpawnAllPlayers();
     }
 
+    // 위치 계산은 여기, 프리팹 결정·생성·SpawnAsPlayerObject 는 PlayerSpawnService(로비와 공용).
     private void SpawnPlayerForClient(ulong clientId, int spawnIndex, Transform baseSpawnPoint)
     {
-        if (!_networkManager.ConnectedClients.TryGetValue(clientId, out var client))
-        {
-            return;
-        }
-
-        if (client.PlayerObject != null)
-        {
-            // 조용히 넘기면 "왜 이 클라만 엉뚱한 곳에 있나"를 추적할 수 없다.
-            // 이미 PlayerObject 가 있으면 이 스폰은 건너뛰므로, 그 오브젝트가 어디에 있든 그대로 남는다.
-            Edit.LogWarning(
-                $"[Loading] clientId={clientId} 는 이미 PlayerObject 를 갖고 있어 스폰을 건너뜁니다. " +
-                $"기존 위치={client.PlayerObject.transform.position}, " +
-                $"이번에 스폰했을 위치={ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint).position}");
-            return;
-        }
-
-        var prefab = ResolvePlayerPrefabForClient(clientId);
-        if (prefab == null)
-        {
-            Edit.LogWarning($"[Loading] Player prefab is not assigned. clientId={clientId}");
-            return;
-        }
-
-        if (!prefab.TryGetComponent<NetworkObject>(out _))
-        {
-            Edit.LogWarning($"[Loading] Player prefab must have a {nameof(NetworkObject)} component. prefab={prefab.name}");
-            return;
-        }
-
         var spawnPose = ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint);
-        var player = Instantiate(prefab, spawnPose.position, spawnPose.rotation);
-        var targetScene = SceneManager.GetSceneByName(targetSceneName);
-        if (targetScene.IsValid() && targetScene.isLoaded)
+        var result = PlayerSpawnService.SpawnForClient(
+            _networkManager, clientId, characterRoster, defaultPlayerPrefab, spawnPose,
+            SceneManager.GetSceneByName(targetSceneName));
+        if (!result.Succeeded)
         {
-            SceneManager.MoveGameObjectToScene(player, targetScene);
+            return;
         }
-
-        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
 
         // 스폰 좌표는 "이 클라만 엉뚱한 위치" 류 문제의 1차 증거다. debugLogging 설정과 무관하게 남긴다.
         Edit.Log(
-            $"[Loading] Spawned player. clientId={clientId}, prefab={prefab.name}, " +
+            $"[Loading] Spawned player. clientId={clientId}, prefab={result.Prefab.name}, " +
             $"spawnIndex={spawnIndex}, baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")}, " +
             $"position={spawnPose.position}.");
     }
 
     /// <summary>스폰에 쓰는 캐릭터 로스터(튜토리얼 캐릭터 판별이 PrefabIdHash 역조회에 쓴다).</summary>
     public CharacterRoster CharacterRoster => characterRoster;
-
-    private GameObject ResolvePlayerPrefabForClient(ulong clientId)
-    {
-        if (ServerCharacterSelectionStore.TryGet(clientId, out var characterId) &&
-            characterRoster != null &&
-            characterRoster.TryGetAvailableCharacter(characterId, out var entry) &&
-            entry.PlayerPrefab != null)
-        {
-            return entry.PlayerPrefab;
-        }
-
-        return defaultPlayerPrefab;
-    }
 
     private Pose ResolvePlayerSpawnPose(int spawnIndex, Transform baseSpawnPoint)
     {
@@ -1001,6 +1075,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
             writer.WriteValueSafe(_flowId);
             writer.WriteValueSafe((byte)_phase);
             writer.WriteValueSafe(_averageProgress);
+            writer.WriteValueSafe(_sourceIsNetworkScene);
             messagingManager.SendNamedMessage(StateMessageName, clientId, writer);
         }
 
@@ -1017,6 +1092,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         reader.ReadValueSafe(out uint flowId);
         reader.ReadValueSafe(out byte phaseValue);
         reader.ReadValueSafe(out float averageProgress);
+        reader.ReadValueSafe(out bool sourceIsNetworkScene);
 
         if (flowId < _flowId)
         {
@@ -1033,6 +1109,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _flowId = flowId;
         _phase = (NetworkLoadingPhase)phaseValue;
         _averageProgress = Mathf.Clamp01(averageProgress);
+        // 서버는 로딩 씬 LoadScene 전에 상태를 먼저 보내므로, 클라가 로딩 씬 LoadEventCompleted 를 받을 땐 이미 와 있다.
+        _sourceIsNetworkScene = sourceIsNetworkScene;
 
         LogDebug($"Received state. sender={senderClientId}, phase={_phase}, average={_averageProgress:P0}, flowId={_flowId}.");
 
@@ -1114,6 +1192,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _targetLoadEventCompleted = false;
         _averageProgress = 0f;
         _sourceSceneName = string.Empty;
+        _sourceIsNetworkScene = false;
         _restartingTargetScene = false;
 
         if (_phase != NetworkLoadingPhase.Completed)
@@ -1133,15 +1212,34 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private IEnumerator UnloadSourceSceneIfNeeded()
     {
-        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadSourceSceneIfNeeded source={_sourceSceneName} loading={loadingSceneName} target={targetSceneName}");
-        if (string.IsNullOrEmpty(_sourceSceneName) ||
-            _sourceSceneName == loadingSceneName ||
-            _sourceSceneName == targetSceneName)
+        var mode = SourceSceneUnloadRule.Decide(
+            _sourceSceneName, loadingSceneName, targetSceneName, _sourceIsNetworkScene, IsServerActive);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadSourceSceneIfNeeded source={_sourceSceneName} loading={loadingSceneName} target={targetSceneName} mode={mode}");
+        switch (mode)
         {
-            yield break;
+            case SourceSceneUnloadMode.Local:
+                yield return UnloadLocalScene(_sourceSceneName);
+                break;
+            case SourceSceneUnloadMode.Network:
+                yield return UnloadNetworkSourceScene(_sourceSceneName);
+                break;
+        }
+    }
+
+    // [서버] NGO 소스 씬(로비·결과) — 동적 객체·플레이어를 먼저 디스폰(DestroyWithScene=false 라 언로드로는 안 사라지고,
+    // 남은 PlayerObject 는 타깃 씬 SpawnAllPlayersOnce 를 막는다) → 활성 씬을 로딩 씬으로 옮기고(R2) → NGO 언로드. 클라는 NGO 가 따라 내린다.
+    private IEnumerator UnloadNetworkSourceScene(string sceneName)
+    {
+        DespawnDynamicNetworkObjectsBeforeTransition($"source={sceneName}");
+
+        var scene = SceneManager.GetSceneByName(sceneName);
+        if (scene.IsValid() && scene.isLoaded)
+        {
+            MoveActiveSceneBeforeLocalUnload(scene);
         }
 
-        yield return UnloadLocalScene(_sourceSceneName);
+        // 로딩 씬 LoadEventCompleted 직후라 NGO 씬 이벤트가 아직 닫히지 않았을 수 있다 — 판 재시작 언로드와 같은 재시도.
+        yield return UnloadNetworkScene(sceneName, inProgressRetries: 30);
     }
 
     private IEnumerator UnloadLoadingScene()
@@ -1150,7 +1248,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
         yield return UnloadNetworkScene(loadingSceneName);
     }
 
-    private IEnumerator UnloadNetworkScene(string sceneName)
+    // inProgressRetries — SceneEventInProgress 로 거절되면 한 프레임씩 이만큼 다시 요청한다(0 = 재시도 없음).
+    private IEnumerator UnloadNetworkScene(string sceneName, int inProgressRetries = 0)
     {
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene begin scene={sceneName} isServer={IsServerActive}");
         if (!IsServerActive)
@@ -1168,7 +1267,15 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         _completedUnloads.Remove(sceneName);
         var status = _networkManager.SceneManager.UnloadScene(scene);
-        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene requested scene={sceneName} status={status}");
+        var retries = 0;
+        while (status == SceneEventProgressStatus.SceneEventInProgress && retries < inProgressRetries)
+        {
+            retries++;
+            yield return null;
+            status = _networkManager.SceneManager.UnloadScene(scene);
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene requested scene={sceneName} status={status} retries={retries}");
         LogDebug($"Requested scene unload. scene={sceneName}, status={status}.");
         if (status != SceneEventProgressStatus.Started)
         {
