@@ -57,6 +57,36 @@ public sealed class PlayerAnimationEventRequirementTests
         }
     }
 
+    // 팔라딘 우클릭(Garen_Parry Hit·End)·E(방어 Custom0·Custom1 + 반격 SubSkillCounter Hit·End)가 실제로 대조되는가(PLAN-anim-event-timing P1-③·④).
+    [Test]
+    public void PaladinInterruptAndSub_DeclareAndHaveEventTimingEvents()
+    {
+        const string paladinPath = PlayerPrefabFolder + "/Paladin/Player_Paladin.prefab";
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(paladinPath);
+        Assert.That(prefab, Is.Not.Null, paladinPath);
+
+        Animator animator = prefab.GetComponentInChildren<Animator>(true);
+        RuntimeAnimatorController controller = animator != null ? animator.runtimeAnimatorController : null;
+
+        AssertRequirements(prefab.GetComponentInChildren<FirstMeleeInterruptSkill>(true), controller, 2,
+            nameof(FirstMeleeInterruptSkill));
+        AssertRequirements(prefab.GetComponentInChildren<FirstMeleeSubSkill>(true), controller, 4,
+            nameof(FirstMeleeSubSkill));
+    }
+
+    private static void AssertRequirements(
+        IAnimationEventRequirementSource source, RuntimeAnimatorController controller, int expectedCount, string label)
+    {
+        Assert.That(source, Is.Not.Null, label + " 가 팔라딘 프리팹에 없다");
+
+        List<AnimationEventRequirement> requirements = new List<AnimationEventRequirement>();
+        source.CollectAnimationEventRequirements(requirements);
+        List<string> missing = new List<string>();
+
+        Assert.That(AnimationEventRequirements.FindMissing(requirements, controller, missing), Is.EqualTo(expectedCount), label + " 요구 수");
+        Assert.That(missing, Is.Empty, label + " 누락 이벤트:\n" + string.Join("\n", missing));
+    }
+
     // 전수 검사 — Legacy 보관본은 스폰되지 않으므로 제외한다(Docs/tech/player-prefabs.md).
     [Test]
     public void PlayerPrefabs_HaveEveryDeclaredAnimationEvent()
