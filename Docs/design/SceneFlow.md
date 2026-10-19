@@ -78,6 +78,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 
 - Connection is driven by `demo-connection.json` next to the exe (Editor: project root). No buttons. Details: [networking.md](../tech/networking.md#lobby-demo-target-2026-10-19).
 - Clients auto-connect and auto-reconnect in a loop. While disconnected or waiting they sit in `6.DemoConnectScene`.
+- Mid-game rejoin (C14): a client that was in the game when it started goes `6.DemoConnectScene` → `4.MapScene` directly (NGO late-join sync, no Loading scene) and spawns at the first spawn point / a boss room corner. Others wait for the Lobby. Details: [networking.md](../tech/networking.md#mid-game-rejoin-c14).
 - Wired **direct IPv4 only.** Unity Relay is excluded (lobby connection panel, Relay UI, and the `RelayConnectionProvider` runtime path will be removed; the package stays, no `manifest.json` change). Steam for release is a separate task.
 
 ## Scene Manager Direction

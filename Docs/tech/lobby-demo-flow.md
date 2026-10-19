@@ -53,7 +53,9 @@ exe 실행 → (호스트) 바로 호스팅 / (클라) 자동 접속 — 버튼 
 | 호스트 대기 중 / 접속 시도 중 (n회째) | 클라가 붙는 중. 호스트가 켜지면 자동 입장 |
 | n초 후 재시도 (n회째) | 직전 시도 실패. 그 아래 줄이 사유 |
 | 응답 없음 — 호스트를 기다리는 중 | 호스트가 꺼졌거나 `hostAddress`·`port`·방화벽이 틀림 |
-| 게임 진행 중 — 판이 끝나면 자동 입장 | 호스트가 판 진행 중이거나 카운트다운 중. **기다리면 된다** |
+| 게임 진행 중 — 판이 끝나면 자동 입장 | 호스트가 판 진행 중이거나 카운트다운 중이고, 이 PC 는 그 판 시작 때 없었다. **기다리면 된다**(판 도중 새 사람은 못 들어간다) |
+| 판에 다시 합류하는 중 — 잠시 기다리세요 | 이 판에 있던 PC 가 다시 붙는 중인데 호스트가 씬을 바꾸는 중이거나 이전 연결을 아직 정리 중(최대 `disconnectTimeoutSeconds`). **기다리면 들어간다** |
+| 판에 합류하는 중… | 맵에 들어왔지만 내 캐릭터가 아직 안 나왔다 — 엘리베이터·보스 등장 연출·슬로모션·전멸 유예가 끝나면 나온다 |
 | 인원 가득 (3/3) | 이미 3명. 4번째 PC 는 들어갈 수 없다 |
 | 버전 불일치 — 호스트와 같은 빌드인지 확인 | §3 |
 | 같은 플레이어 ID 가 이미 접속 중 | 두 PC 의 `playerId` 가 같다. 끊긴 직후라면 서버가 이전 연결을 정리한 뒤 들어간다 |
@@ -63,8 +65,11 @@ exe 실행 → (호스트) 바로 호스팅 / (클라) 자동 접속 — 버튼 
 - 문구 원본: [DemoConnectionOverlayText.cs](../../Assets/1.Scripts/Network/Session/DemoConnectionOverlayText.cs) · [DemoJoinRejectReason.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRejectReason.cs). 판단: [DemoSessionRules.cs](../../Assets/1.Scripts/Network/Session/DemoSessionRules.cs) · [DemoJoinRule.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRule.cs).
 
 ## 5. 재접속
-- 판 도중 클라가 끊기면 대기 화면 → "게임 진행 중" 으로 계속 재시도 → **호스트가 로비로 돌아오면 자동 입장**. 판 도중 합류는 안 된다.
-- 다시 들어오면 **마지막 캐릭터가 유지**된다(`playerId` 기준).
+- **판 도중 재합류:** 판 시작 때 있던 PC(`playerId`)가 끊기면 대기 화면에서 계속 재시도하다 **그 판으로 다시 들어간다**. 맵 첫 스폰 지점에 나오고, 보스 룸이면 네 모서리 중 다른 플레이어·보스에서 가장 먼 곳에 나온다.
+  - 유지되는 것: 캐릭터 · 특성(리셋 팝업이 떠 있었으면 그 팝업도) · 생명 상태(살아 있었으면 체력 비율, 영혼이면 영혼, 완전 사망이면 관전) · 결과 패널 행(같은 사람 1행). 스킬 쿨다운은 0부터.
+  - 나가 있는 동안 전멸 리스폰이 일어났으면 돌아올 때 살아 있는 만피 상태다.
+  - 그 판 시작 때 없던 PC 는 "게임 진행 중" 으로 기다리다 **호스트가 로비로 돌아오면 자동 입장**한다(백필 없음).
+- 다시 들어오면 **마지막 캐릭터가 유지**된다(`playerId` 기준). 상세: [networking.md](networking.md#mid-game-rejoin-c14).
 - 호스트가 꺼지면 클라는 전부 "호스트 대기 중" 으로 간다. 호스트 exe 를 다시 켜면 전원 자동 재입장.
 
 ## 6. MPPM 에서 검증 (에디터 1개)
@@ -77,7 +82,8 @@ exe 실행 → (호스트) 바로 호스팅 / (클라) 자동 접속 — 버튼 
 - **캐릭터 선택(C12)** — 로비의 캐릭터 선택 오브젝트(`Environment/LobbyInteractables/CharacterSelectStation`, 스폰 지점 왼쪽) 앞에서 F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
   - **준비 중·카운트다운 중에는 바꿀 수 없다**(패널은 열리지만 잠금 문구). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
   - 고른 캐릭터는 다음 판 스폰·판 사이·재접속(`playerId`)에 유지된다. 코드: [LobbyInteractor.cs](../../Assets/1.Scripts/Lobby/LobbyInteractor.cs)(패널 연결) · [LobbySession.cs](../../Assets/1.Scripts/Lobby/LobbySession.cs)(`RequestCharacterServerRpc` 검증) · [LobbyPlayerSpawner.cs](../../Assets/1.Scripts/Lobby/LobbyPlayerSpawner.cs)(`TrySwapCharacter`).
-- **증강(특성)은 재접속·판 사이에 유지되지 않는다** — 미결. [networking.md "Reconnect identity"](networking.md#reconnect-identity).
+- **증강(특성)은 판 도중 재합류에만 유지된다**(C14). 판 사이(로비로 돌아갔다 다음 판)에는 새로 시작한다. [networking.md "Mid-game rejoin"](networking.md#mid-game-rejoin-c14).
+- **판 도중 재합류(C14)는 사람이 MPPM·빌드 2대로 아직 확인하지 않았다** — 영혼으로 돌아온 사람은 튜토리얼 밖에서는 기존 부활 규칙(현재 사실상 보스 강제 개시 부활·전멸 리스폰)까지 영혼이다.
 - 해시는 대기 화면에서만 보인다(§3).
 - 무입력 리셋·스태프 키·코스 스킵·전멸 상한·관람객 디버그 키 차단은 범위 밖(별도 작업). 디버그 단축키(`DEV_HOTKEYS`)는 빌드에 들어 있다 — [debug-hotkeys.md](debug-hotkeys.md).
 - Unity Relay 는 쓰지 않는다. **유선 직접 IPv4 만.**

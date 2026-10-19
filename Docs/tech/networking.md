@@ -28,15 +28,27 @@
 - **Wired direct IPv4 only.** Unity Relay is excluded: the lobby connection panel, Relay UI, and the `RelayConnectionProvider` runtime path are removed. The Relay package stays (no `Packages/manifest.json` change). Steamworks for release is a separate task.
 
 ### Connection approval
-- `ConnectionApproval` is enabled. Approve only when: the host is in the lobby, the countdown is not running, and fewer than 3 players are connected.
-- During a game the request is rejected as "게임 진행 중". The Client keeps retrying and enters automatically once the Host returns to the lobby.
-- This keeps "no rejoining / no backfilling during InGame" (see [InGame Leave](#ingame-leave)) — **rejoining is allowed only in the Lobby.**
+- `ConnectionApproval` is enabled. In the lobby, approve only when the countdown is not running and fewer than 3 players are connected.
+- During a game, only a `playerId` on the **match roster** (players connected when the game started) is approved — a **mid-game rejoin** ([Mid-game rejoin](#mid-game-rejoin-c14)). Everyone else is rejected as "게임 진행 중" and enters automatically once the Host returns to the lobby. **No backfilling** of new people; the 3-player cap holds because the roster is at most 3.
+- A roster player is rejected as `RejoinWaiting` ("판에 다시 합류하는 중") while a scene transition is running (loading flow · Map → Lobby) or while the old connection is still alive (`DuplicatePlayerId` for a roster id). The Client retries and gets in.
 - Full lobby → rejected as full (3/3).
 
 ### Reconnect identity
 - A reconnecting Client gets a new `ClientId`. The server store for the last character selection and traits (augments) is keyed by `playerId`, so both are kept across reconnects.
 - ✅ **Character (C8):** on approval `NetworkSessionLauncher` calls `ServerCharacterSelectionStore.BindPlayer(clientId, playerId)`; leaving removes only the `clientId` side, so the same `playerId` gets its last character back (pure core: `CharacterSelectionMemory`). Session stop clears everything.
-- ⏳ **Traits:** not persisted. Trait state lives in the Map scene's `TutorialTraitDirector` and is dropped on leave and on every Map unload, and rejoining mid-game is rejected — open question, see PLAN-48 C8 report.
+- ✅ **Traits (C14 R4c):** kept for a mid-game rejoin — on leave `TutorialTraitDirector` stores the acquired traits (+ current corridor round, reset popup state) in `RejoinMemory` by `playerId` and re-applies them on rejoin. Dropped on every Map unload (a new game starts clean). Details: [tutorial-traits.md](tutorial-traits.md).
+
+### Mid-game rejoin (C14)
+- **Who:** only `playerId`s on the match roster `MatchRoster` (snapshot at `NetworkLoadingFlowController.StartGameLoading`, ended on Map → Lobby and session start/stop). Demo flow only — outside it (Dev boot, untagged MPPM) the roster is off. New people are never backfilled.
+- **Approval → spawn:** approved → NGO late-join sync loads `4.MapScene` → on `SynchronizeComplete` the server sends the Completed loading state (client `MainGameReady`) and queues the client. The client sees "판에 합류하는 중…" (`JoiningMatch`) until its player spawns.
+- **Spawn hold (`RejoinSpawnGate`):** held during elevator / teleport countdown, boss cinematic, slow motion, party-wipe grace; dropped when the result transition is reserved (the Lobby transition takes them) or a PlayerObject already exists.
+- **Spawn point (`RejoinSpawnPicker`):** always the map's first spawn point (`ZoneRole.PlayerSpawn`, free slot). In the boss room: of the four `RejoinCornerPoints` (fallback: computed from the boundaries), the corner farthest from other players and the boss. The last party-wipe respawn point is **not** used.
+- **Kept across the rejoin** (all keyed by `playerId`, server only, `RejoinMemory`, cleared at the roster boundaries):
+  - character (`CharacterSelectionMemory`) · traits + trait reset popup (R4c) · tutorial checks / permanent-dead mark (`TutorialFlowModel.RebindPlayer`, back barrier reset to 0)
+  - **life state + HP ratio (R5c):** recorded when the PlayerObject despawns (NGO despawns it before `OnClientDisconnectCallback`) and committed on disconnect. Leaving during `DeadPresentation` is resolved then (`PartyLivesRules`: Soul / PermanentDead). Restored by `PlayerLifeCycleController.RestoreForRejoinServer` right after the `PlayerRejoined` subscribers: Alive → HP ratio (skill cooldowns start from 0), Soul → Soul (no life consumed; tutorial auto-revive re-armed), PermanentDead → PermanentDead (spectating, no corpse). A party-wipe respawn while absent overwrites the record to Alive · full HP.
+  - result row: `SessionStatsAggregator.Rebind(old, new)` merges the old `clientId` row into the new one (one row per person, keeps the old slot order).
+- Debug map restart (`TryRestartTargetScene`) drops the life records (fresh start).
+- Design memo (out of repo): `_lane-artifacts/MainProject-Worktree3/C14/C14-rejoin-design.md`. Boss room corners: [handoff-boss-room-rejoin-corners.md](handoff-boss-room-rejoin-corners.md).
 
 ### Lobby rules
 - All input is allowed in the lobby (movement, attack, skills).
@@ -120,7 +132,7 @@
 - Damage caused by a disconnected Client's remaining projectiles or area effects after disconnection still affects gameplay, but is excluded from Result contribution data.
 - If a Client leaves during InGame, boss difficulty and HP scaling are not recalculated.
 - If only one player remains after a Client leaves during InGame, the session continues.
-- Rejoining the running game is not allowed after a Client leaves during InGame. The Client may rejoin once the Host is back in the Lobby (connection approval, see [Lobby Demo (target)](#connection-approval)).
+- A Client that leaves during InGame may rejoin the running game if its `playerId` is on the match roster — character, traits, life state and HP ratio are kept ([Mid-game rejoin](#mid-game-rejoin-c14)). Anyone else waits until the Host is back in the Lobby (see [Connection approval](#connection-approval)).
 - Backfilling is not allowed after a Client leaves during InGame.
 - (old / current code) A Client that leaves during InGame returns to the Title Scene. **Target (lobby demo):** it goes to `6.DemoConnectScene` and keeps retrying.
 - When a Client leaves during InGame, the Host finalizes that player's individual contribution snapshot at the moment of leaving.
