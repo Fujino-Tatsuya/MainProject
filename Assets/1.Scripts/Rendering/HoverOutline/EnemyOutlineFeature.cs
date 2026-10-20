@@ -5,6 +5,7 @@
 //    1) 마스크: EnemyOutlineDrawList 의 렌더러만 전용 컬러+깊이 RT 에 다시 그린다(DrawRenderer).
 //               R=커버리지 G=색 인덱스(0 빨강 / 1 나를 노림 회색) B=그 픽셀 맨 앞 대상 표면의 eye 깊이(m) A=커버리지
 //    2) 합성:   마스크를 N px 원판으로 넓힌 것 − 원래 마스크 = 바깥 윤곽만 → 카메라 컬러에 알파 블렌딩.
+//               N 은 색 묶음별(빨강·회색) — 한 마스크·한 합성에서 이웃 픽셀의 색 인덱스로 반경을 고른다.
 //               윤곽 픽셀의 씬 깊이가 대상보다 앞이면(벽 등) 그 픽셀은 버린다 = 가려진 부분은 안 그림.
 //
 //  🔴 대상은 레이어도 렌더링 레이어 비트도 아니라 **렌더러 목록**이다. 레이어·원본 머티리얼을 바꾸지 않는다.
@@ -108,7 +109,7 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
         ColorSpace colorSpace = QualitySettings.activeColorSpace;
         _pass.Setup(ToShaderColor(EnemyOutlineDrawList.PrimaryColor, colorSpace),
             ToShaderColor(EnemyOutlineDrawList.AggroColor, colorSpace),
-            EnemyOutlineDrawList.WidthPixels, _occludeBias);
+            EnemyOutlineDrawList.PrimaryWidthPixels, EnemyOutlineDrawList.AggroWidthPixels, _occludeBias);
 
         // 합성 셰이더가 _CameraDepthTexture 를 읽는다 — 여기서 요청해야 URP 가 만든다.
         _pass.ConfigureInput(ScriptableRenderPassInput.Depth);
@@ -138,6 +139,7 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
         private static readonly int IdPrimaryColor = Shader.PropertyToID("_OutlinePrimaryColor");
         private static readonly int IdAggroColor = Shader.PropertyToID("_OutlineAggroColor");
         private static readonly int IdOutline = Shader.PropertyToID("_OutlineParams");
+        private static readonly int IdWidths = Shader.PropertyToID("_OutlineWidths");
 
         private static readonly Vector4 FullScreenScaleBias = new Vector4(1f, 1f, 0f, 0f);
 
@@ -147,7 +149,8 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
 
         private Color _primaryColor;
         private Color _aggroColor;
-        private int _widthPixels;
+        private int _primaryWidthPixels;
+        private int _aggroWidthPixels;
         private float _occludeBias;
 
         private class MaskPassData
@@ -172,11 +175,12 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
             profilingSampler = new ProfilingSampler("EnemyOutline");
         }
 
-        public void Setup(Color primary, Color aggro, int widthPixels, float occludeBias)
+        public void Setup(Color primary, Color aggro, int primaryWidthPixels, int aggroWidthPixels, float occludeBias)
         {
             _primaryColor = primary;
             _aggroColor = aggro;
-            _widthPixels = widthPixels;
+            _primaryWidthPixels = primaryWidthPixels;
+            _aggroWidthPixels = aggroWidthPixels;
             _occludeBias = occludeBias;
         }
 
@@ -259,8 +263,9 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
             _composite.SetVector(IdOutline, new Vector4(
                 1f / Mathf.Max(1, maskDesc.width),
                 1f / Mathf.Max(1, maskDesc.height),
-                _widthPixels,
+                0f,
                 _occludeBias));
+            _composite.SetVector(IdWidths, new Vector4(_primaryWidthPixels, _aggroWidthPixels, 0f, 0f));
 
             using var builder = renderGraph.AddRasterRenderPass<CompositePassData>(
                 PassNames.Composite, out CompositePassData data);

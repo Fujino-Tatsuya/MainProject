@@ -178,7 +178,7 @@ public sealed class HoverOutlineTests
         Assert.AreEqual(1, found.Count);
         Assert.AreEqual(3, EnemyOutlineRenderers.SubMeshCount(skin));
 
-        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3, 2);
         Assert.IsTrue(EnemyOutlineDrawList.Add(skin, EnemyOutlineDrawList.PrimaryColorIndex));
         Assert.AreEqual(3, EnemyOutlineDrawList.Get(0).SubMeshCount);
         CollectionAssert.AreEqual(originals, skin.sharedMaterials);
@@ -205,7 +205,7 @@ public sealed class HoverOutlineTests
         var root = Track(new GameObject("Monster"));
         MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
 
-        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3, 2);
         r.enabled = false;
         Assert.IsFalse(EnemyOutlineDrawList.Add(r, EnemyOutlineDrawList.PrimaryColorIndex));
         r.enabled = true;
@@ -224,9 +224,9 @@ public sealed class HoverOutlineTests
         var root = Track(new GameObject("Monster"));
         MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
 
-        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3, 2);
         EnemyOutlineDrawList.Add(r, EnemyOutlineDrawList.PrimaryColorIndex);
-        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3, 2);
         Assert.AreEqual(0, EnemyOutlineDrawList.Count);
         Assert.IsFalse(EnemyOutlineDrawList.Add(null, 0));
     }
@@ -235,14 +235,23 @@ public sealed class HoverOutlineTests
     [TestCase(1, 1)]
     [TestCase(3, 3)]
     [TestCase(99, 8)]
-    public void 굵기는_1에서_8픽셀로_클램프(int raw, int expected)
+    public void 굵기는_색_묶음마다_1에서_8픽셀로_클램프(int raw, int expected)
     {
-        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, raw);
-        Assert.AreEqual(expected, EnemyOutlineDrawList.WidthPixels);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, raw, raw);
+        Assert.AreEqual(expected, EnemyOutlineDrawList.PrimaryWidthPixels);
+        Assert.AreEqual(expected, EnemyOutlineDrawList.AggroWidthPixels);
     }
 
     [Test]
-    public void Player_프리팹_기본값은_1픽셀_나를노림_어두운_회색()
+    public void 굵기는_색_묶음마다_따로()
+    {
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3, 2);
+        Assert.AreEqual(3, EnemyOutlineDrawList.PrimaryWidthPixels);
+        Assert.AreEqual(2, EnemyOutlineDrawList.AggroWidthPixels);
+    }
+
+    [Test]
+    public void Player_프리팹_기본값은_빨강_3픽셀_나를노림_밝은_회색_2픽셀()
     {
         var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/Player/Player.prefab");
         Assert.IsNotNull(prefab);
@@ -250,11 +259,12 @@ public sealed class HoverOutlineTests
         Assert.IsNotNull(outline);
 
         var so = new UnityEditor.SerializedObject(outline);
-        Assert.AreEqual(1, so.FindProperty("outlineWidthPixels").intValue);
+        Assert.AreEqual(3, so.FindProperty("outlineWidthPixels").intValue);
+        Assert.AreEqual(2, so.FindProperty("aggroOutlineWidthPixels").intValue);
         Color aggro = so.FindProperty("aggroOutlineColor").colorValue;
-        Assert.AreEqual(0.22f, aggro.r, 1e-4f);
-        Assert.AreEqual(0.22f, aggro.g, 1e-4f);
-        Assert.AreEqual(0.22f, aggro.b, 1e-4f);
+        Assert.AreEqual(0.75f, aggro.r, 1e-4f);
+        Assert.AreEqual(0.75f, aggro.g, 1e-4f);
+        Assert.AreEqual(0.75f, aggro.b, 1e-4f);
         Assert.AreEqual(1f, aggro.a, 1e-4f);
     }
 
@@ -276,12 +286,27 @@ public sealed class HoverOutlineTests
         Assert.AreEqual(21, DiskTaps(2), "2px 은 모서리 (±2,±2) 만 빠진 원판");
     }
 
+    // 합성 셰이더의 색 묶음별 반경 판정을 그대로 옮긴 것 — 이웃 픽셀은 자기 색 묶음 원판 안일 때만 후보.
+    static bool Reaches(int dx, int dy, int ownWidth) => dx * dx + dy * dy <= ownWidth * ownWidth + ownWidth;
+
+    [Test]
+    public void 합성_원판은_이웃_픽셀의_색_묶음_반경을_쓴다()
+    {
+        // 빨강 3 · 회색 2 — 3칸 떨어진 빨강은 닿고, 3칸 떨어진 회색은 닿지 않는다.
+        Assert.IsTrue(Reaches(3, 0, 3));
+        Assert.IsFalse(Reaches(3, 0, 2));
+        Assert.IsTrue(Reaches(2, 0, 2));
+        Assert.IsTrue(Reaches(2, 1, 2), "회색 2px 원판(반경² 6) 은 (2,1) 포함");
+        Assert.IsFalse(Reaches(2, 2, 2));
+        Assert.AreEqual(37, DiskTaps(3), "3px 원판(반경² 12)");
+    }
+
     [Test]
     public void 대상이_먼저_파괴돼도_목록은_안전()
     {
         var root = new GameObject("Monster");
         MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
-        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3, 2);
         EnemyOutlineDrawList.Add(r, 0);
 
         Object.DestroyImmediate(root);
