@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude+Codex) · **23호 A·B 비교 보스(내일 빌드 플레이테스트)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) ✅ 승인 · ✅ Codex 교차검증 · ✅ 구현(미커밋) · ⏳ 경석 Play
+- A(기본 빌드·에디터 기본) = 70% 기본 송전기 · 30% 간파 릴레이 · 0줄 자폭 / B(레이드 빌드·툴바 '레이드') = 70% 드론 송전기 · 30% **북진 압박**(은희 제안 61) · 0줄 자폭. 공통 = 레이드 규칙. 새 에셋 `No23_A`·`No23_B`(xlsx 열 없음 = SO 값).
+- 버그: 보라색 표시 = 판정 창(23호, 09-28 결정 뒤집음) · 간파 정면 판정 `counterRequiresFront` 분리(앞뒤 표시·백어택은 꺼진 채).
+- 경석 Play 1차(A·B 둘 다 OK · 자폭 OK) 반영: 북진 재차징 때 **보스 발밑 송전탑 제외**(밀린 보스가 탑 자리에 서서 탑이 몸 안에서 솟아 안 보였다 — 3인이면 그 회차 3개) · 어퍼→잡기 예고 0.3→0.6초(4 에셋) · 툴바·빌드 메뉴 A/B 개명 · **취약 중 팔라딘 Q = 밀림 + 경직(남은 취약까지, 취약 풀리면 바로 행동)**. ✅ Play 2차.
+- 🔒 수정: `TwentyThreeBoss.cs`·`.RaidRelay.cs` · `BossDataSO.cs` · `BossElectricFloor.cs`(취소 API) · `MonsterInspectorCatalog.cs` · `BossRaidVariantAuthoring.cs` · `TwentyThree.prefab`·`TwentyThree_Raid.prefab` · 신규 `No23_A`·`No23_B` · `TutorialGuideTexts.asset`
+
 ## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **보스 앞뒤 구분 끄기 · 점프×3 착지 간파 창 · PLAN 정리 · 레이드 새 페이즈(간파 릴레이·연쇄 간파)**, 브랜치 `feature/Boss23`) — ① ② ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · 보스 패턴 10/0 · ⏳ 경석 Play · ③ ✅ 정리(미커밋) · ④ 계획 [PLAN-boss-raid-relay.md](PLAN-boss-raid-relay.md) ✅ 승인 · ✅ 구현(미커밋) · 전투 EditMode 279/0 · ⏳ 경석 Play — `No23_Raid` 20% = 간파 릴레이(자폭은 enum 그대로), 연쇄 간파는 phases 에 `RaidChainCounter` 행 추가로 사용 · 은희 요청서 [handoff-raid-relay-lock.md](Docs/tech/handoff-raid-relay-lock.md)
 - Play 1차(10-20) 반영: 릴레이 방향 = 화면 아래 투영(✅ 경석 확인) · 1인 밀림 ×2 · 점프×3 착지 간파 = 피해 직후 0.8초 창(2차: 자세 정지 없앰 — 착지 클립 이어 재생 → 이동 자세 크로스페이드, 끊긴 클립 루프 이펙트 끔) ✅ 경석 확인. ✅ 연쇄 간파 Play(45% 임시 전환) → **최종: 45% = 구출 유지, 1인은 점프·점프·점프 콤보**(2~3인 잡기). 연쇄 간파는 enum·코드만(배치 안 함). 점프·점프·점프 = 시작 전 차징 1초(콤보 행 `windup`, 단타 점프와 구별 — 경석 의견) ⏳ Play.
 - 🔸 **기획 논의 대기(경석)**: 한 방에 HP 임계를 넘기면 그 페이즈 기믹을 **건너뛸지/그래도 낼지**. 지금 코드는 예약 큐라 **안 건너뛴다**(PLAN-boss-raid W1). 경석 의견 = 넘기면 스킵. 결정 나면 `EvaluatePhase` 예약 큐에서 처리. 릴레이 안전 구역 = 3줄 6칸(위 3칸 추가는 경석 확인 후 되돌림). 디버그 단축키 정리 — 보스 단타 예약 5종 삭제, **F3 = 점프·점프·점프 콤보 예약**([debug-hotkeys.md](Docs/tech/debug-hotkeys.md)). ⏳ 점프×3 Play.
@@ -78,7 +84,7 @@ Update this file when a term becomes important enough that future agents or team
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).
 - 웰즈 드론 회색 = DRONE.fbx 에 머티리얼 없음 → `WellsDrone.prefab`(래퍼) + `DRONE_Mat`(SVN r454, URP Lit 베이스+노멀). 저작 `Tools/Boss/웰즈 드론 — 재질·래퍼 프리팹 만들기`.
-- 레이드 테스트 빌드 메뉴 `Build/Windows64 Player (MainFlow · 레이드 보스)`(BOSS_RAID_BUILD, 출력 `MainProjectBuilds/WindowsRaid`). ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
+- 레이드(=B) 테스트 빌드 메뉴 `Build/Windows64 Player (MainFlow · B 보스)`(10-20 개명)(BOSS_RAID_BUILD, 출력 `MainProjectBuilds/WindowsRaid`). ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
 - ⏸ 보류: Stage1 `Slot_8_Z9_M` 배치 어긋남(은희 보고) — 팀장 나중에 확인. 전투 시스템 개정(제압 칸·간파 성공 넉백+그로기→취약 8초·취약 중 CC 패턴 끊기)은 칸 UI 회의 후, 보스 넉백 ↔ UnitWallImpacts 연결은 은희와 상의.
 
 ## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)

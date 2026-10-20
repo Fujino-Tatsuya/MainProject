@@ -26,7 +26,7 @@ public partial class TwentyThreeBoss
     /// <summary>릴레이 종료(성공·실패·중단 공통) — 남은 잠금 전부 해제.</summary>
     public static event Action RelayEnded;
 
-    enum RaidGimmick { None, Relay, Chain }
+    enum RaidGimmick { None, Relay, Chain, PushNorth }
 
     enum GimmickStep
     {
@@ -35,6 +35,8 @@ public partial class TwentyThreeBoss
         Gather, Ready, Prepare, Push, Reposition, FailDash,
         // 연쇄 간파
         ChainIntro, ChainMark, ChainWindow, ChainDash, ChainStun, ChainInterval,
+        // 북진 압박
+        PnCharge, PnStun, PnPush, PnAfterFail,
     }
 
     RaidGimmick _raidGimmick;
@@ -70,13 +72,14 @@ public partial class TwentyThreeBoss
     bool RaidGimmickActive => _raidGimmick != RaidGimmick.None;
 
     /// <summary>릴레이 중 보스는 피해를 받지 않는다(기획 기믹1 §3-1) — 간파만 처리.</summary>
-    bool RaidGimmickDamageImmune => _raidGimmick == RaidGimmick.Relay;
+    bool RaidGimmickDamageImmune => _raidGimmick == RaidGimmick.Relay || _raidGimmick == RaidGimmick.PushNorth;
 
     /// <summary>[서버] 예약 소비 — 해당 시퀀스면 기믹을 걸고 true.</summary>
     bool TryArmRaidGimmick(BossPhaseSequence pending)
     {
         if (pending == BossPhaseSequence.RaidInterruptRelay) _raidGimmick = RaidGimmick.Relay;
         else if (pending == BossPhaseSequence.RaidChainCounter) _raidGimmick = RaidGimmick.Chain;
+        else if (pending == BossPhaseSequence.RaidPushNorth) _raidGimmick = RaidGimmick.PushNorth;
         else return false;
         _gStep = GimmickStep.None;
         return true;
@@ -91,6 +94,7 @@ public partial class TwentyThreeBoss
 
         EnterPhase(BossAttackPhase.ChargeWait, 9999f);       // 끝은 자체 단계가 정한다
         if (_raidGimmick == RaidGimmick.Relay) StartRelay();
+        else if (_raidGimmick == RaidGimmick.PushNorth) StartPushNorth();
         else StartChain();
     }
 
@@ -103,6 +107,7 @@ public partial class TwentyThreeBoss
 
         if (_raidGimmick == RaidGimmick.Relay) TickRelay();
         else if (_raidGimmick == RaidGimmick.Chain) TickChain();
+        else if (_raidGimmick == RaidGimmick.PushNorth) TickPushNorth();
     }
 
     void SetStep(GimmickStep step, float duration)
@@ -131,6 +136,9 @@ public partial class TwentyThreeBoss
             return a == BossRelayRoster.Accept.Accepted;
         }
 
+        if (_raidGimmick == RaidGimmick.PushNorth)
+            return _gStep == GimmickStep.PnStun && !_pnCounterTaken;   // 무력화 중 1회만
+
         bool ok = _gStep == GimmickStep.ChainWindow && _chainTarget != null && _chainTarget.OwnerClientId == clientId;
         if (!ok && _gStep == GimmickStep.ChainWindow)
             Debug.Log($"[23호/연쇄 간파] client {clientId} 간파 불인정 — 지목 대상 아님", this);
@@ -148,6 +156,7 @@ public partial class TwentyThreeBoss
             CrossFadeStateClientRpc(_boss.hitReactionState);
 
         if (_raidGimmick == RaidGimmick.Relay) OnRelayCounter(id);
+        else if (_raidGimmick == RaidGimmick.PushNorth) OnPushNorthCounter();
         else OnChainCounter();
     }
 
@@ -175,9 +184,11 @@ public partial class TwentyThreeBoss
             if (IsSpawned) NotifyRelayEndedRpc();
         }
         _chainTarget = null;
+        if (g == RaidGimmick.PushNorth) CleanupPushNorthRound();
 
-        FightLog($"{(g == RaidGimmick.Relay ? "간파 릴레이" : "연쇄 간파")} 종료 — {why}");
-        Debug.Log($"[23호/레이드] {(g == RaidGimmick.Relay ? "간파 릴레이" : "연쇄 간파")} 종료 — {why}", this);
+        string gName = g == RaidGimmick.Relay ? "간파 릴레이" : g == RaidGimmick.PushNorth ? "북진 압박" : "연쇄 간파";
+        FightLog($"{gName} 종료 — {why}");
+        Debug.Log($"[23호/레이드] {gName} 종료 — {why}", this);
 
         if (!resume) return;
         if (data != null && !string.IsNullOrEmpty(data.locomotionState))
@@ -701,6 +712,178 @@ public partial class TwentyThreeBoss
         StartVulnerable();
         if (_vulnerableUntil > 0f)
             _vulnerableUntil = Time.time + _boss.chainPartialGroggy + _boss.chainPartialVulnerable;
+    }
+
+    // ─── 북진 압박 (RaidPushNorth — PLAN-boss-ab-test, 은희 제안 61) ───────────────
+    // 중앙 점프(송전기 흐름) → [차징: 송전탑 인원 비례 + 바닥 즉사 예고] → 탑 전부 파괴 = 예고 취소 + 무력화(간파 1회 = 화면 위로 1칸)
+    // → 그 자리에서 다음 차징 … → 위 꼭짓점 도달 = 제압(8초 · ×1.3). 탑이 남은 채 차징이 끝나면 예고 칸 즉사 → 다음 차징.
+    // 🔴 BeginCharge 를 다시 부르지 않는다 — 부르면 중앙으로 돌아간다(Codex 10-20). 탑은 _charge.Begin 을 회차마다 다시 부른다(연속 Begin 허용).
+    int _pnRound;
+    bool _pnCounterTaken;
+    Vector3 _pnGoalPoint;   // 위 꼭짓점 칸 중심
+    float _pnStepLen;       // 간파 1회 밀림(m) — 화면 위로 대각 한 칸
+
+    void StartPushNorth()
+    {
+        if (!ResolveRelayGeometry() || !TryGetTileGrid(out BossTileGrid g))
+        {
+            Debug.LogWarning($"{name}: 북진 압박 — 타일 그리드를 못 찾아 건너뛴다.", this);
+            EndRaidGimmick("타일 그리드 없음(기술적 중단)", resume: true);
+            return;
+        }
+
+        // 목표 = 화면 위로 가장 먼 칸(같으면 가운데). 한 칸 = 중앙 칸에서 화면 위쪽 이웃 칸까지의 화면 세로 거리 최대값
+        // (대각선 카메라 = 타일 대각선, 정면 카메라 = 타일 한 변).
+        int n = BossTileGrid.Size, mid = n / 2;
+        Vector3 north = -_relaySouth;
+        Vector3 right = Vector3.Cross(Vector3.up, _relaySouth);
+        float best = float.MinValue, bestLat = float.MaxValue;
+        for (int r = 0; r < n; r++)
+            for (int c = 0; c < n; c++)
+            {
+                Vector3 d = g.TileCenter(r, c) - _relayCenter; d.y = 0f;
+                float a = Vector3.Dot(d, north), l = Mathf.Abs(Vector3.Dot(d, right));
+                if (a > best + 0.01f || (Mathf.Abs(a - best) <= 0.01f && l < bestLat)) { best = a; bestLat = l; _pnGoalPoint = g.TileCenter(r, c); }
+            }
+        float step = 0f;
+        for (int dr = -1; dr <= 1; dr++)
+            for (int dc = -1; dc <= 1; dc++)
+            {
+                if (dr == 0 && dc == 0) continue;
+                Vector3 d = g.TileCenter(mid + dr, mid + dc) - g.TileCenter(mid, mid); d.y = 0f;
+                step = Mathf.Max(step, Vector3.Dot(d, north));
+            }
+        _pnStepLen = Mathf.Max(0.5f, step * Mathf.Max(0.25f, _boss.pushNorthStepTiles));
+
+        _pnRound = 0;
+        FaceDirection(_relaySouth);
+        ShowRaidSubtitleServer("BOSS_RAID_PushNorthGuide");
+        FightLog("북진 압박 시작");
+        Debug.Log($"[23호/북진] 시작 — 1칸 {_pnStepLen:0.0}m · 위 끝까지 {Vector3.Dot(_pnGoalPoint - transform.position, north):0.0}m", this);
+        BeginPushNorthCharge();
+    }
+
+    float PnRiseGrace => _charge is BossChargeSequence seq ? seq.RiseGrace : 1.5f;
+    const float PushNorthPylonAvoidRadius = 3f;   // 보스 몸(반경 ~0.85) + 탑 몸통 + 여유
+
+    void BeginPushNorthCharge()
+    {
+        _pnRound++;
+        _pnCounterTaken = false;
+        FaceDirection(_relaySouth);
+        EndDashMove();
+
+        BossAttackEntry e = _currentEntry;
+        if (e != null && !string.IsNullOrEmpty(e.animatorStateName))
+            CrossFadeStateClientRpc(e.animatorStateName);   // 차징 자세
+
+        float chargeTime = _pnRound == 1 ? _boss.pushNorthFirstChargeTime : _boss.pushNorthChargeTime;
+        // 🔴 예고 길이 = 탑 제한시간과 **같은 종료 시각**(제한 + 상승 여유) — 따로 돌면 탑을 부숴도 방전이 먼저 터진다(Codex 10-20).
+        float total = chargeTime + PnRiseGrace;
+        int pylons = PylonCountFor(CountAlivePlayers());
+        if (_charge == null) _charge = GetComponentInChildren<IBossChargeSequence>(true);
+        // 밀린 보스가 탑 자리(중앙 둘레 대각선)에 서 있으면 그 탑이 몸 안에서 솟아 안 보인다(경석 Play 10-20) → 발밑 탑은 뺀다.
+        //    3인(탑 4개)이면 그 회차는 3개 — 제안서 답 "3인 기준 3~4개" 범위.
+        if (_charge is BossChargeSequence seq) seq.AvoidNextSelection(transform.position, PushNorthPylonAvoidRadius);
+        _charge?.Begin(pylons, chargeTime, _boss.raidPylonHpMultiplier);
+
+        ulong mask = _pnRound == 1 ? (BossTileGrid.AllMask & ~RelaySafeMask()) : BossTileGrid.AllMask;
+        _electricFloor?.ServerQueueDischarge(mask, total, 0, lethal: true);
+        StartChargeBallClientRpc(transform.position, ChargeZoneRadius);
+
+        Debug.Log($"[23호/북진] {_pnRound}회차 차징 {chargeTime:0.#}초(+상승 {PnRiseGrace:0.#}) · 탑 {pylons}개 · " +
+                  $"예고 {BossTileGrid.Count(mask)}칸{(_pnRound == 1 ? "(안전 구역 제외)" : "(전체)")}", this);
+        SetStep(GimmickStep.PnCharge, total);
+    }
+
+    /// <summary>[서버] 회차 정리 — 바닥 예고 취소 · 구슬 · 탑. 다음 회차·종료·중단 공통.</summary>
+    void CleanupPushNorthRound(bool cancelFloor = true)
+    {
+        if (cancelFloor) _electricFloor?.ServerCancelDischarge();
+        if (IsSpawned) EndChargeBallClientRpc(broken: true);
+        _charge?.Cancel();
+    }
+
+    void TickPushNorth()
+    {
+        switch (_gStep)
+        {
+            case GimmickStep.PnCharge:
+            {
+                // 🔴 보스 Update 가 장판(DefaultExecutionOrder 100)보다 먼저 돈다 — 마지막 틱의 파괴 성공이 발동보다 먼저 확정된다.
+                BossChargeResult res = _charge != null ? _charge.Poll() : BossChargeResult.InProgress;
+                if (res == BossChargeResult.AllPylonsDestroyed)
+                {
+                    CleanupPushNorthRound();
+                    SetCounterWindow(true, _boss.pushNorthStunTime);   // 보라색 = 판정 창(같이 꺼진다)
+                    if (!string.IsNullOrEmpty(_boss.hitReactionState)) CrossFadeStateClientRpc(_boss.hitReactionState);
+                    FightLog($"북진 {_pnRound}회차 — 탑 파괴 → 무력화");
+                    Debug.Log($"[23호/북진] {_pnRound}회차 탑 전부 파괴 — 무력화 {_boss.pushNorthStunTime:0.#}초(간파 1회 = 1칸)", this);
+                    SetStep(GimmickStep.PnStun, _boss.pushNorthStunTime);
+                    break;
+                }
+                if (_gStepTimer > 0f) break;
+                // 실패 — 예고 칸 즉사 방전은 장판이 그대로 낸다. 탑·구슬만 걷고 잠깐 뒤 다음 차징.
+                CleanupPushNorthRound(cancelFloor: false);
+                FightLog($"북진 {_pnRound}회차 실패 — 즉사 방전");
+                Debug.Log($"[23호/북진] {_pnRound}회차 실패 — 탑이 남았다 · 즉사 방전", this);
+                SetStep(GimmickStep.PnAfterFail, 2f);
+                break;
+            }
+
+            case GimmickStep.PnStun:
+                if (_gStepTimer > 0f) break;
+                SetCounterWindow(false);
+                BeginPushNorthCharge();   // 간파 없이 끝 — 그 자리에서 다음 차징
+                break;
+
+            case GimmickStep.PnPush:
+            {
+                float t = _boss.pushNorthPushTime > 0f ? 1f - Mathf.Clamp01(_gStepTimer / _boss.pushNorthPushTime) : 1f;
+                WarpTo(Vector3.Lerp(_relayPushFrom, _relayPushTo, t));
+                if (_gStepTimer <= 0f) EndPushNorthPush();
+                break;
+            }
+
+            case GimmickStep.PnAfterFail:
+                if (_gStepTimer <= 0f) BeginPushNorthCharge();
+                break;
+        }
+    }
+
+    void OnPushNorthCounter()
+    {
+        _pnCounterTaken = true;
+        Vector3 north = -_relaySouth;
+        Vector3 from = transform.position;
+        float remain = Mathf.Max(0f, Vector3.Dot(_pnGoalPoint - from, north));
+        _relayPushFrom = from;
+        // NavMesh.Raycast 로 자르지 않는다 — 내려간 송전탑 자리가 메시 구멍이면 첫 칸에서 막힌다. WarpTo 가 가까운 메시로 붙인다.
+        _relayPushTo = from + north * Mathf.Min(_pnStepLen, remain);
+        FightLog($"북진 {_pnRound}회차 — 간파 → 1칸");
+        Debug.Log($"[23호/북진] 간파 — 위로 {Mathf.Min(_pnStepLen, remain):0.0}m (남은 {remain:0.0}m)", this);
+        SetStep(GimmickStep.PnPush, _boss.pushNorthPushTime);
+    }
+
+    void EndPushNorthPush()
+    {
+        WarpTo(_relayPushTo);
+        Vector3 north = -_relaySouth;
+        float before = Vector3.Dot(_pnGoalPoint - _relayPushFrom, north);
+        float remain = Vector3.Dot(_pnGoalPoint - transform.position, north);
+
+        // 도달 — 또는 한 칸 밀었는데 거의 못 갔다(지형 끝) = 벽에 닿은 것으로 본다(무한 반복 방지, Codex 10-20).
+        bool stuck = before - remain < 0.1f;
+        if (remain <= 0.3f || stuck)
+        {
+            if (stuck) Debug.LogWarning($"[23호/북진] 밀림이 막혔다(남은 {remain:0.0}m) — 도달로 처리한다.", this);
+            ShowRaidSubtitleServer("BOSS_RAID_PushNorthSuccess");
+            EndRaidGimmick($"성공 — {_pnRound}회차", resume: false);
+            _attackPhase = BossAttackPhase.None;
+            EnterSuppressWith("북진 압박 파훼", _boss.pushNorthRewardDuration, _boss.pushNorthRewardDamageMultiplier);
+            return;
+        }
+        BeginPushNorthCharge();
     }
     #endregion
 }

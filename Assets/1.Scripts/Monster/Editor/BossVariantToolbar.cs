@@ -27,9 +27,12 @@ public static class BossVariantToolbar
     static MainToolbarElement CreateDropdown()
     {
         var content = new MainToolbarContent(
-            "보스: " + (BossVariantSelection.UseRaid ? "레이드" : "기존"),
+            "보스: " + (BossVariantSelection.UseRaid ? "B" : "A"),
             null,
-            "보스방에서 스폰할 23호. 기존 = TwentyThree / 레이드 = TwentyThree_Raid(비교용 변형). 빌드는 항상 기존.");
+            "보스방에서 스폰할 23호(PLAN-boss-ab-test, 경석 10-20).\n" +
+            "A = TwentyThree(No23_A): 70% 기본 송전기 · 30% 간파 릴레이 · 0줄 자폭\n" +
+            "B = TwentyThree_Raid(No23_B): 70% 드론 송전기 · 30% 북진 압박 · 0줄 자폭\n" +
+            "빌드: Build 메뉴의 'A 보스' / 'B 보스' 로 따로 뽑는다.");
         return new MainToolbarDropdown(content, ShowDropdown);
     }
 
@@ -43,10 +46,10 @@ public static class BossVariantToolbar
             return;
         }
 
-        menu.AddItem(new GUIContent("기존 (TwentyThree)"), !BossVariantSelection.UseRaid, () => Set(false));
-        menu.AddItem(new GUIContent("레이드 (TwentyThree_Raid)"), BossVariantSelection.UseRaid, () => Set(true));
+        menu.AddItem(new GUIContent("A — 기본 송전기 · 간파 릴레이 · 0줄 자폭"), !BossVariantSelection.UseRaid, () => Set(false));
+        menu.AddItem(new GUIContent("B — 드론 송전기 · 북진 압박 · 0줄 자폭"), BossVariantSelection.UseRaid, () => Set(true));
         menu.AddSeparator(string.Empty);
-        menu.AddItem(new GUIContent("레이드 변형 만들기·맞추기 (멱등)"), false,
+        menu.AddItem(new GUIContent("B 프리팹·자막 맞추기 (멱등)"), false,
             () => EditorApplication.ExecuteMenuItem(BossRaidVariantAuthoring.BuildMenu));
         menu.DropDown(buttonRect);
     }

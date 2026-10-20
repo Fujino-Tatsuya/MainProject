@@ -1057,6 +1057,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 if (seq != NoAttack)
                 {
                     _raidSelfDestruct = true;
+                    if (_zeroGuard == ZeroGuard.Reserved) _zeroGuard = ZeroGuard.Active;   // 0줄 자폭 진행
                     return seq;
                 }
                 Debug.LogError($"{name}: 폐기 처분인데 공격 테이블에 ChargeSequence 행이 없다 — 건너뛴다.", this);
@@ -3112,6 +3113,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             _raidSelfDestruct = false;
             _selfDestructShieldLeft = 0;          // 중단(사망 등) — 체력바 실드 덮개를 거둔다
             _selfDestructShield01.Value = 0f;
+            // 0줄 자폭이 결과 없이 끊겼다 — 보호를 유지한 채 다시 예약한다(안 하면 HP 1 에서 영원히 안 죽는다).
+            if (_zeroGuard == ZeroGuard.Active && State != MonsterState.Dead)
+            {
+                _zeroGuard = ZeroGuard.Reserved;
+                _pendingPhaseSequences.Enqueue(BossPhaseSequence.RaidSelfDestruct);
+            }
         }
         // 간파 릴레이 · 연쇄 간파 — 돌진 이동·히트 윈도우·창·잠금을 걷는다(성공 경로에서는 이미 끝나 no-op).
         EndRaidGimmick("중단", resume: false);
@@ -4789,6 +4796,18 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _selfDestructShield01.Value = 0f;
         _attackPhase = BossAttackPhase.None;
 
+        // 0줄 자폭: 저지 = 처치 / 실패 = 대폭발이 실제로 터질 때까지 보호 → 그 뒤 다음 피해에 사망(경석 10-20).
+        if (_zeroGuard == ZeroGuard.Active)
+        {
+            if (stopped)
+            {
+                KillAfterZeroSelfDestruct();
+                return;
+            }
+            _zeroGuard = ZeroGuard.Exploding;
+            _zeroExplodeUntil = Time.time + _boss.raidSelfDestructBlastWarn + 0.5f;
+        }
+
         if (stopped)
         {
             Debug.Log("[23호/레이드] 폐기 처분 — 실드 파괴 → 제압", this);
@@ -5876,6 +5895,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 점프 체인 중엔 넉백 없이 피해만(IsInJumpChain — 이륙·공중·착지 모두 끊기지 않는다, 팀장 09-29).
         bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence && !IsInJumpChain;
 
+        // 취약 중 팔라딘 Q(진격의 방패) = 밀림 + 경직(경석 Play 10-20). 넉백·경직을 **둘 다** 싣는 플레이어 공격은 지금 Q 하나뿐이다.
+        // 경직은 남은 취약 시간까지만 — 취약이 풀리면 보스가 바로 움직인다(EndVulnerable).
+        bool qPushHit = IsServer && IsVulnerable && !IsInterruptAttack(attackInfo) && IsFromPlayer(hitContext)
+                        && attackInfo.knockbackStrength > 0f && attackInfo.staggerDuration > 0f
+                        && !IsInMandatorySequence && !IsInJumpChain;
+
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
         // 인터럽트 히트에서만 돌므로 조용하다. 취약·제압 중에는 실패가 정상이라 찍지 않는다.
         if (IsInterruptAttack(attackInfo) && !counter && !CounterBlockedByState)
@@ -5927,6 +5952,18 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         else if (vulnerableHit && resolved && State != MonsterState.Dead)
         {
             StartVulnerableKnockback(hitContext, attackInfo);
+        }
+        else if (qPushHit && resolved && State != MonsterState.Dead)
+        {
+            StartVulnerableKnockback(hitContext, attackInfo);
+            float stun = Mathf.Min(attackInfo.staggerDuration, _vulnerableUntil - Time.time);
+            if (stun > 0.05f && State != MonsterState.Groggy)
+            {
+                _groggyKind = BossPauseCondition.CounterGroggy;
+                ForceGroggy(stun);
+                _vulnerableStunGroggy = true;
+                Debug.Log($"[23호] 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초(남은 취약까지)", this);
+            }
         }
 
         return resolved;
@@ -5982,8 +6019,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// </summary>
     protected virtual bool IsCounterFromFront(AttackHitContext hitContext)
     {
-        // 앞뒤 구분 꺼짐(useFacingRules, 경석 10-20 기본) = 방향 무관 인정.
-        if (_boss != null && !_boss.useFacingRules) return true;
+        // 간파 정면 판정은 counterRequiresFront 가 정한다(useFacingRules 와 분리 — 경석 Play 10-20).
+        if (_boss != null && !_boss.counterRequiresFront) return true;
 
         // 🔴 sourcePosition 이 아니라 공격자 **루트**를 우선 쓴다.
         //    BaseAttack.CreateHitContext 는 `transform.position` 을 담는데, 그 transform 은 플레이어
@@ -6106,11 +6143,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             return;
         }
 
-        float duration = Mathf.Max(0.05f, _boss != null ? _boss.breakDuration : 5f);
+        // 북진 압박 파훼 보상처럼 이 제압만 길이·배율이 다른 경우(공용 breakDuration·suppressDamageMultiplier 는 그대로 — Codex 10-20).
+        float duration = _suppressDurationOverride > 0f
+            ? _suppressDurationOverride
+            : Mathf.Max(0.05f, _boss != null ? _boss.breakDuration : 5f);
+        _suppressDurationOverride = -1f;
         _pendingSuppress = false;
         _fightSuppressions++;
         FightLog($"제압 — {reason}");
-        EndVulnerable("제압 진입");   // 취약이면 즉시 종료(기획 §8.2)
+        EndVulnerable("제압 진입", releaseStun: false);   // 취약이면 즉시 종료(기획 §8.2) — Q 경직은 제압 그로기가 이어받는다
         _suppressed = true;
         _groggyKind = BossPauseCondition.Suppress;
         StunForCounter(duration);
@@ -6137,6 +6178,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (!_suppressed || previous != MonsterState.Groggy || next == MonsterState.Groggy) return;
 
         _suppressed = false;
+        _suppressMultiplierOverride = -1f;   // 이번 제압 전용 배율(북진 압박) 끝
         if (next == MonsterState.Dead)
         {
             _pendingSuppress = false;
@@ -6215,8 +6257,20 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         Debug.Log($"[23호] 취약 진입 — {VulnerableDuration:0.#}초(그로기 포함)", this);
     }
 
-    void EndVulnerable(string why)
+    // 취약 중 팔라딘 Q 가 건 경직이 지금 그로기인가 — 취약이 끝나면 함께 풀어 보스가 바로 움직인다(경석 Play 10-20).
+    bool _vulnerableStunGroggy;
+
+    void EndVulnerable(string why, bool releaseStun = true)
     {
+        if (_vulnerableStunGroggy)
+        {
+            _vulnerableStunGroggy = false;
+            if (releaseStun && IsServer && State == MonsterState.Groggy && !_suppressed)
+            {
+                Debug.Log($"[23호] 취약 종료({why}) — 팔라딘 Q 경직도 해제, 바로 행동", this);
+                DecideNextAfterAction();
+            }
+        }
         if (_vulnerableUntil < 0f) return;
         _vulnerableUntil = -1f;
         if (IsServer) _vulnerableVisual.Value = false;
@@ -6469,7 +6523,22 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         return null;
     }
 
-    float SuppressDamageMultiplier => _boss != null ? Mathf.Max(0f, _boss.suppressDamageMultiplier) : 1.2f;
+    float SuppressDamageMultiplier => _suppressMultiplierOverride > 0f
+        ? _suppressMultiplierOverride
+        : (_boss != null ? Mathf.Max(0f, _boss.suppressDamageMultiplier) : 1.2f);
+
+    // 이번 제압 한 번만 다른 길이·배율(북진 압박 파훼 8초 · ×1.3). 길이는 EnterSuppress 가 소비, 배율은 제압이 끝날 때 지운다.
+    float _suppressDurationOverride = -1f;
+    float _suppressMultiplierOverride = -1f;
+
+    /// <summary>[서버] 길이·배율을 지정한 제압(기믹 종료 지점 전용 — 예약 검사 생략).</summary>
+    void EnterSuppressWith(string reason, float duration, float damageMultiplier)
+    {
+        _suppressDurationOverride = Mathf.Max(0.05f, duration);
+        _suppressMultiplierOverride = Mathf.Max(0f, damageMultiplier);
+        EnterSuppress(reason, fromReservation: true);
+        if (!_suppressed) _suppressMultiplierOverride = -1f;   // 사망 등으로 안 들어갔다
+    }
 
     // 🔴 몸 캡슐 1.53 — 데이터 회피 반경 0.3 으로 덮으면 좁은 통로에서 벽·플레이어를 파고든다(09-28 NavMesh 전수조사).
     //    프리팹 에이전트 반경(0.85)을 지킨다. 베이크는 반경 0.5(Humanoid 단일 타입)라 0.85 는 가장자리에 조금 더 보수적이다.
@@ -6486,6 +6555,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (!IsServer) return;
 
         TickSuppressExit(previous, next);
+        if (previous == MonsterState.Groggy && next != MonsterState.Groggy) _vulnerableStunGroggy = false;   // Q 경직이 제 시간에 끝났다
         // 콤보 끊기 — 그로기·피격 경직·넉백·리쉬 복귀·사망(Idle→Idle 은 콜백이 없어 나머지는 각 진입점에서 끊는다).
         if (next == MonsterState.Groggy || next == MonsterState.Hit || next == MonsterState.Knockback ||
             next == MonsterState.Return || next == MonsterState.Dead)
@@ -6631,9 +6701,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         if (!IsServer) return;
 
-        _bossCounterVisualOffAt = open && windowDuration > 0f
-            ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
-            : -1f;
+        // 🔴 경석 Play 10-20: 보라색(표시)과 간파 판정이 **같은 순간**에 꺼져야 한다 — 09-28 "표시만 0.15초 일찍"을 뒤집음.
+        //    표시를 따로 예약해 일찍 끄면 "보라색이 풀렸는데 간파가 된다"가 됐고, 돌진은 애니 준비가 늦으면 판정이 더 늦게 닫혀
+        //    어긋남이 더 컸다(Codex 10-20). 그래서 표시는 판정 창의 개폐만 따라간다. 공용 상수(MonsterBase)는 그대로 — 중간보스 무변경.
+        _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
 
         if (_counterWindow.Value == open) return;
@@ -6677,8 +6748,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// <summary>[서버] 열린 창이 <paramref name="remaining"/> 초 뒤 닫힐 것이 확정됐다 — 표시를 그 0.15초 전에 끄게 예약.</summary>
     void ScheduleCounterVisualOff(float remaining)
     {
+        // 경석 Play 10-20: 표시는 판정 창 개폐만 따라간다(SetCounterWindow 참조) — 조기 소등 예약 안 함.
         if (!IsServer || !_counterWindow.Value) return;
-        _bossCounterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
+        _bossCounterVisualOffAt = -1f;
     }
 
     void TickCounterVisual()
@@ -6756,13 +6828,90 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     #region 페이즈 (HP 임계 전환)
     public override void TakeDamage(AttackInfo attackInfo)
     {
+        // 0줄 자폭(PLAN-boss-ab-test) — 치명 피해는 HP 1 에서 멈추고, 보호 중엔 HP 피해 0. 예약은 페이즈 판정 **뒤에**(아래).
+        bool reserveZero = IsServer && ZeroGuardFilter(ref attackInfo);
+
         base.TakeDamage(attackInfo); // 서버 가드 + 방어/체력 + 사망/그로기/피격경직 판정
 
         if (!IsServer || State == MonsterState.Dead)
             return;
 
         EvaluatePhase();
+
+        // 한 방에 30% 와 0줄을 같이 넘겨도 페이즈 기믹 → 자폭 순서로 정확히 한 번(Codex 10-20).
+        if (reserveZero)
+        {
+            _pendingPhaseSequences.Enqueue(BossPhaseSequence.RaidSelfDestruct);
+            FightLog("0줄 — 자폭 예약(HP 1 보호)");
+            Debug.Log("[23호] 0줄 — 치명 피해를 HP 1 에서 멈추고 자폭을 예약한다", this);
+        }
     }
+
+    #region 0줄 자폭 (selfDestructAtZero, PLAN-boss-ab-test)
+    // Off → (치명 피해) Reserved → (예약 소비) Active → 실드 파괴 = Killing(처치) / 시간 초과 = Exploding(방전 발동까지 보호) → Done(다음 피해에 사망).
+    enum ZeroGuard { Off, Reserved, Active, Exploding, Done, Killing }
+    ZeroGuard _zeroGuard;
+    float _zeroExplodeUntil;
+
+    bool ZeroSelfDestructOn => _boss != null && _boss.selfDestructAtZero && IsRaid;
+
+    bool ZeroGuardProtecting
+    {
+        get
+        {
+            if (_zeroGuard == ZeroGuard.Exploding && Time.time >= _zeroExplodeUntil) _zeroGuard = ZeroGuard.Done;
+            return _zeroGuard == ZeroGuard.Reserved || _zeroGuard == ZeroGuard.Active || _zeroGuard == ZeroGuard.Exploding;
+        }
+    }
+
+    /// <summary>[서버] 이번 피해를 거른다. 반환 = 이번 피해로 자폭을 새로 예약해야 한다.</summary>
+    bool ZeroGuardFilter(ref AttackInfo attackInfo)
+    {
+        if (!ZeroSelfDestructOn || _zeroGuard == ZeroGuard.Killing || _zeroGuard == ZeroGuard.Done) return false;
+
+        if (ZeroGuardProtecting)
+        {
+            attackInfo.damage = 0;   // 예약·자폭·폭발 대기 중 HP 는 1 에서 안 내려간다(실드 넘침 포함)
+            return false;
+        }
+
+        if (attackInfo.damage < CurrentHealth) return false;
+        // 방어 경감 전 값으로 깎는다 — 경감은 피해를 줄이기만 하므로 HP ≥ 1 이 보장된다.
+        attackInfo.damage = Mathf.Max(0, CurrentHealth - 1);
+        _zeroGuard = ZeroGuard.Reserved;
+        return true;
+    }
+
+    // ReceiveAttack 을 거치지 않는 직접·비율 피해도 막는다(Unit.ApplyHealthDamage — Codex 10-20). 보호 중이면 전부, 아니면 치명만.
+    protected override bool CanApplyHealthDamage(int damage)
+    {
+        if (IsServer && ZeroSelfDestructOn && _zeroGuard != ZeroGuard.Killing && _zeroGuard != ZeroGuard.Done)
+        {
+            if (ZeroGuardProtecting && damage > 0) return false;
+            if (damage >= CurrentHealth)
+            {
+                if (_zeroGuard == ZeroGuard.Off)
+                {
+                    _zeroGuard = ZeroGuard.Reserved;
+                    _pendingPhaseSequences.Enqueue(BossPhaseSequence.RaidSelfDestruct);
+                    FightLog("0줄 — 자폭 예약(직접 피해, HP 보호)");
+                }
+                return false;
+            }
+        }
+        return base.CanApplyHealthDamage(damage);
+    }
+
+    /// <summary>[서버] 0줄 자폭 실드 파괴 — 보호를 풀고 정상 사망 경로로 처치한다.</summary>
+    void KillAfterZeroSelfDestruct()
+    {
+        _zeroGuard = ZeroGuard.Killing;
+        _pendingSuppress = false;   // 제압 예약이 남아 있으면 버린다(처치가 우선)
+        FightLog("0줄 자폭 저지 — 처치");
+        BreakShield();
+        TakeDamage(new AttackInfo(999999, AttackType.Default));
+    }
+    #endregion
 
     // 체력 비율이 임계를 넘어설 때마다 페이즈를 1 올린다.
     // 🔴 페이즈는 되돌아가지 않는다 — 회복(리쉬 리셋 등)이 페이즈 연출을 다시 트리거하면 안 된다.

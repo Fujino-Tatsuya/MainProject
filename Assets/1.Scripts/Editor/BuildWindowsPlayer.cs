@@ -39,7 +39,8 @@ public static class BuildWindowsPlayer
 
     private const string DevOutput = "../MainProjectBuilds/WindowsDev/MainProject.exe";
 
-    [MenuItem("Build/Windows64 Player (MainFlow)")]
+    // 경석 10-20: 기본 빌드 = 23호 A 보스(TwentyThree.prefab → No23_A). B 는 아래 'B 보스' 메뉴.
+    [MenuItem("Build/Windows64 Player (MainFlow · A 보스)")]
     public static void BuildWindows64FromMenu()
     {
         Build(ResolveOutputPath(null), BuildOptions.None);
@@ -66,7 +67,8 @@ public static class BuildWindowsPlayer
     /// 튜토리얼 스킵(Alt+1~9)·보스방 워프(F5)는 DEV_HOTKEYS(Standalone 기본 심볼)로 이미 들어간다.
     /// ⚠️ 호스트·클라 모두 이 빌드여야 한다(RPC 테이블·보스 프리팹이 같아야 한다).
     /// </summary>
-    [MenuItem("Build/Windows64 Player (MainFlow · 레이드 보스)")]
+    // 경석 10-20: 이 빌드 = 23호 B 보스(TwentyThree_Raid.prefab → No23_B). 출력 폴더 이름(WindowsRaid)은 그대로.
+    [MenuItem("Build/Windows64 Player (MainFlow · B 보스)")]
     public static void BuildWindows64RaidFromMenu()
     {
         Build(Path.GetFullPath(RaidOutput), BuildOptions.None, new[] { "BOSS_RAID_BUILD" });

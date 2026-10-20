@@ -460,3 +460,11 @@ MonoBehaviour:
     text: "<b>\uc9c0\ubaa9\ub41c \uc0ac\ub78c</b>\uc774 \uc815\uba74\uc5d0\uc11c <b>\uc6b0\ud074\ub9ad</b>\uc73c\ub85c \uac04\ud30c\ud558\uc138\uc694!"
     durationSeconds: 5
     sfx: {fileID: 0}
+  - id: BOSS_RAID_PushNorthGuide
+    text: "<b>\uc1a1\uc804\ud0d1</b>\uc744 \ubd80\uc234 \ucc28\uc9d5\uc744 \ub04a\uace0, \uc4f0\ub7ec\uc9c4 23\ud638\ub97c <b>\uc6b0\ud074\ub9ad</b>\uc73c\ub85c <b>\uc704\ucabd \ub05d</b>\uae4c\uc9c0 \ubc00\uc5b4\ub0b4\uc138\uc694!"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_PushNorthSuccess
+    text: "23\ud638\ub97c \ub05d\uae4c\uc9c0 \ubc00\uc5b4\ub0c8\uc2b5\ub2c8\ub2e4! \uc9c0\uae08 \uacf5\uaca9\ud558\uc138\uc694!"
+    durationSeconds: 4
+    sfx: {fileID: 0}

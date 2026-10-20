@@ -23,7 +23,7 @@ PrefabInstance:
     - target: {fileID: 3496395017441729605, guid: f3f87bba52188544aa5e032c28ce9d60, type: 3}
       propertyPath: data
       value: 
-      objectReference: {fileID: 11400000, guid: 406a1d52f52206f48a62390fe8d0712a, type: 2}
+      objectReference: {fileID: 11400000, guid: fefa4ae44ce24b9bb7b51fea055c70da, type: 2}
     - target: {fileID: 6928635095488946580, guid: f3f87bba52188544aa5e032c28ce9d60, type: 3}
       propertyPath: m_Name
       value: TwentyThree_Raid

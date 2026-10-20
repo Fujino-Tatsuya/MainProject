@@ -195,6 +195,7 @@ public enum BossPhaseSequence
     RaidSelfDestruct = 4, // ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 (W3)
     RaidInterruptRelay = 5, // 간파 릴레이 — 6시 집결 → 돌진 간파로 12시까지 밀기 (PLAN-boss-raid-relay, 10-20)
     RaidChainCounter = 6,   // 연쇄 간파 — 위협 순번 지목 돌진, 지목자만 간파 (PLAN-boss-raid-relay, 10-20)
+    RaidPushNorth = 7,      // 북진 압박 — 회차 차징·송전탑 → 무력화 중 간파로 화면 위로 1칸씩 (PLAN-boss-ab-test, 은희 제안 61)
 }
 
 // 페이즈 1행. hpThreshold 는 **내림차순**으로 저작한다(0.66 → 0.33).
@@ -281,8 +282,9 @@ public class BossDataSO : MonsterDataSO
              "후속 돌진은 준비동작 클립을 건너뛰고 돌진 클립 첫 자세에서 이 시간만큼 멈췄다 나간다.")]
     [DataTableIgnore] [Range(0.1f, 2f)] public float comboDashWindup = 0.7f;
 
-    [Tooltip("즉시 연결 콤보의 후속 잡기 예고(초). 단타 잡기는 행의 telegraphDuration(0.7) 그대로. 돌진 다음 잡기는 아래 칸.")]
-    [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraph = 0.3f;
+    [Tooltip("즉시 연결 콤보의 후속 잡기 예고(초). 단타 잡기는 행의 telegraphDuration(0.7) 그대로. 돌진 다음 잡기는 아래 칸.\n" +
+             "지금 이 값을 쓰는 콤보 = 어퍼 → 잡기. 경석 Play 10-20: 0.3 은 너무 빨라 0.6.")]
+    [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraph = 0.6f;
 
     [Tooltip("즉시 연결 콤보에서 **돌진 다음** 잡기의 예고(초) — 돌진 끝에서 바로 잡히면 피할 수 없다(경석 Play 10-19: 1초 여유).")]
     [DataTableIgnore] [Min(0.05f)] public float comboGrabTelegraphAfterDash = 1f;
@@ -410,6 +412,24 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("끝난 뒤(실패·중단) 일반 전투 재개까지(초).")]
     [DataTableIgnore] [Min(0f)] public float relayResumeDelay = 2f;
 
+    [Header("레이드 북진 압박 (RaidPushNorth) — 차징·송전탑 → 무력화 중 간파로 화면 위로 1칸씩 (PLAN-boss-ab-test)")]
+    [Tooltip("차징 시간(초) — 1회차 / 2회차부터. 끝날 때까지 탑이 남으면 예고 칸 즉사 방전.")]
+    [DataTableIgnore] [Min(1f)] public float pushNorthFirstChargeTime = 12f;
+    [DataTableIgnore] [Min(1f)] public float pushNorthChargeTime = 10f;
+    [Tooltip("탑을 다 부순 뒤 무력화(초) — 이 동안 간파 1회 = 화면 위로 1칸. 없으면 그 자리에서 다음 차징.")]
+    [DataTableIgnore] [Min(0.5f)] public float pushNorthStunTime = 3f;
+    [Tooltip("간파 1회 밀림 = 타일 대각선 몇 칸(마름모 방에서 중앙 → 위 꼭짓점 = 3칸).")]
+    [DataTableIgnore] [Min(0.25f)] public float pushNorthStepTiles = 1f;
+    [DataTableIgnore] [Min(0.05f)] public float pushNorthPushTime = 0.45f;
+    [Tooltip("파훼 보상 — 그로기(초) · 받는 플레이어 피해 배율(제압 경로, 이 기믹 끝에서만).")]
+    [DataTableIgnore] [Min(0.5f)] public float pushNorthRewardDuration = 8f;
+    [DataTableIgnore] [Min(1f)] public float pushNorthRewardDamageMultiplier = 1.3f;
+
+    [Header("0줄 자폭 — HP 0 이 되면 죽지 않고 자폭 단계(PLAN-boss-ab-test)")]
+    [Tooltip("켜면 HP 가 0 이 될 피해를 HP 1 에서 멈추고 자폭(raidSelfDestruct* 값)을 예약한다.\n" +
+             "실드 파괴 = 처치 / 시간 초과 = 대폭발 → 살아남은 사람이 있으면 HP 1 로 남아 다음 피해에 사망.")]
+    [DataTableIgnore] public bool selfDestructAtZero;
+
     [Header("레이드 연쇄 간파 (RaidChainCounter) — 위협 순번 지목 돌진, 지목자만 간파")]
     [Tooltip("지목 표시(초) → 돌진 예고 = 간파 창(초) → 돌진.")]
     [DataTableIgnore] [Min(0.1f)] public float chainMarkTime = 1f;
@@ -428,11 +448,15 @@ public class BossDataSO : MonsterDataSO
 
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("보스 앞뒤 구분(경석 10-20 — 일단 끈다, 지우지 않음). 끄면 아래 세 가지가 함께 꺼진다:\n" +
-             "· 간파 정면 판정(counterFrontAngle) — 어느 방향에서 쳐도 간파 인정\n" +
+             "· (10-20 분리) 간파 정면 판정은 아래 counterRequiresFront 가 따로 정한다\n" +
              "· 위치 백어택(backAttackAngle) — 어쌔신 변신 중 강제 백어택은 그대로\n" +
              "· 바닥 앞뒤 표시(BossDirectionIndicator)\n" +
              "켜면 이전 동작으로 돌아간다.")]
     [DataTableIgnore] public bool useFacingRules;
+
+    [Tooltip("간파는 정면(counterFrontAngle)에서만 인정 — 위 앞뒤 구분과 **따로** 켠다(경석 Play 10-20: 점프×3 착지 간파가 뒤에서도 성공했다).\n" +
+             "앞뒤 구분이 꺼져 있어도 이 칸이 켜져 있으면 간파 정면 판정만 살아 있다(바닥 앞뒤 표시·백어택은 꺼진 채).")]
+    [DataTableIgnore] public bool counterRequiresFront = true;
 
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +
              "헤드어택(은희) 구현 후 그쪽 판정으로 교체될 지점이다.")]

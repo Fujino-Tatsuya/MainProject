@@ -14,7 +14,7 @@ public static class BossVariantSelection
         set => UnityEditor.EditorPrefs.SetBool(PrefKey, value);
     }
 #elif BOSS_RAID_BUILD
-    // 레이드 테스트 빌드(Build/Windows64 Player (MainFlow · 레이드 보스) — 팀장 10-16). 그 메뉴만 이 심볼을 얹는다.
+    // 레이드 테스트 빌드(Build/Windows64 Player (MainFlow · B 보스) — 팀장 10-16, 10-20 A·B 로 개명). 그 메뉴만 이 심볼을 얹는다.
     public static bool UseRaid => true;
 #else
     public static bool UseRaid => false;

@@ -143,13 +143,36 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
         _prepared = false;
     }
 
+    // 다음 Begin 한 번만 — 이 점 반경 안의 탑은 고르지 않는다(북진 압박: 밀린 보스가 탑 자리에 서 있으면 그 탑이 몸 안에서 솟아 안 보였다, 경석 Play 10-20).
+    bool _avoidSet;
+    Vector3 _avoidPoint;
+    float _avoidRadius;
+
+    /// <summary>[서버] 다음 <see cref="Begin"/> 의 탑 선택에서 이 점 반경 안 탑을 뺀다(한 번 쓰고 지워진다). 미리 고른 집합도 버린다.</summary>
+    public void AvoidNextSelection(Vector3 point, float radius)
+    {
+        _avoidSet = true;
+        _avoidPoint = point;
+        _avoidRadius = Mathf.Max(0f, radius);
+        _prepared = false;
+    }
+
     void SelectPylons(int count)
     {
         _engaged.Clear();
 
         List<BossChargingPylon> pool = BossChargingPylon.Active;
         for (int i = 0; i < pool.Count; i++)
-            if (pool[i] != null) _engaged.Add(pool[i]);
+        {
+            if (pool[i] == null) continue;
+            if (_avoidSet)
+            {
+                Vector3 d = pool[i].transform.position - _avoidPoint; d.y = 0f;
+                if (d.sqrMagnitude < _avoidRadius * _avoidRadius) continue;
+            }
+            _engaged.Add(pool[i]);
+        }
+        _avoidSet = false;
 
         if (pickNearest)
         {

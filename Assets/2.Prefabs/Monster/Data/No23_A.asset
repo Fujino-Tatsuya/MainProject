@@ -1,0 +1,504 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d46c5d28b6dbaeb4ca1be5ca83b290c6, type: 3}
+  m_Name: No23_A
+  m_EditorClassIdentifier: Assembly-CSharp::BossDataSO
+  archetype: 3
+  rank: 2
+  attackDamage: 45
+  moveSpeed: 2.5
+  chaseSpeed: 4
+  attackSpeed: 1
+  attackCooldown: 1
+  maxHp: 2880
+  defense: 0
+  maxShield: 1000
+  detectionRadius: 8
+  detectionHeightTolerance: 0
+  attackRange: 3.4
+  leashRadius: 22
+  retargetInterval: 0
+  returnSpeedMultiplier: 5
+  turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 12
+  projectileLifetime: 4
+  minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  rangedStyle: 0
+  skyStrikeTelegraphTime: 1.5
+  skyStrikeFallTime: 0.35
+  skyStrikeFloorTolerance: 1.5
+  skyStrikeLosBlockMask:
+    serializedVersion: 2
+    m_Bits: 1
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
+  attackDuration: 0.9
+  attackWindup: 0.35
+  cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
+  maxGroggyCount: 5
+  groggyDuration: 1.5
+  startsWithSuperArmor: 1
+  hasSuperArmorWhileAttacking: 0
+  hitStunDuration: 0.4
+  despawnDelay: 2
+  animSpeedParam: Speed
+  attackTrigger: 
+  attackFinishTrigger: 
+  hitTrigger: 
+  groggyBool: Groggy
+  deathTrigger: Death
+  locomotionState: Locomotion
+  locomotionClipSpeed: 0
+  locomotionFullBlendSpeed: 0
+  locomotionIdleCycleSeconds: 0
+  locomotionMoveCycleSeconds: 0
+  locomotionFullBlendWhileMoving: 0
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  locomotionPlaybackScale: 1
+  animatorControllerOverride: {fileID: 0}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}
+  attacks:
+  - attackId: 0
+    animatorStateName: LeftHook
+    cooldown: 2.5
+    minDistance: 0
+    maxDistance: 4.42
+    ignoreDistanceWindow: 0
+    attackTargeting: 0
+    weight: 30
+    allowedFromPhase: 0
+    damage: 45
+    opensCounterWindow: 0
+    counterWindowDuration: 0
+    superArmor: 1
+    hitboxAnchorName: Hand_L
+    lungeDistance: 2.5
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 120
+    coneOffsetAngle: -30
+    boxWidth: 4.1
+    boxLength: 6
+    boxLateralOffset: -1.07
+    boxBackOffset: 2
+    telegraphDuration: 0.7
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: LeftHookPrep
+    telegraphPoseNormalized: 0.15
+  - attackId: 1
+    animatorStateName: RightHook
+    cooldown: 2.5
+    minDistance: 0
+    maxDistance: 4.42
+    ignoreDistanceWindow: 0
+    attackTargeting: 0
+    weight: 30
+    allowedFromPhase: 0
+    damage: 45
+    opensCounterWindow: 0
+    counterWindowDuration: 0
+    superArmor: 1
+    hitboxAnchorName: Hand_R
+    lungeDistance: 2.5
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 120
+    coneOffsetAngle: 30
+    boxWidth: 4.1
+    boxLength: 6
+    boxLateralOffset: 1.07
+    boxBackOffset: 2
+    telegraphDuration: 0.7
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: RightHookPrep
+    telegraphPoseNormalized: 0.15
+  - attackId: 2
+    animatorStateName: Uppercut
+    cooldown: 3
+    minDistance: 0
+    maxDistance: 4.08
+    ignoreDistanceWindow: 0
+    attackTargeting: 0
+    weight: 12
+    allowedFromPhase: 0
+    damage: 55
+    opensCounterWindow: 0
+    counterWindowDuration: 0
+    superArmor: 1
+    hitboxAnchorName: Hand_R
+    lungeDistance: 3.75
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 1.8
+    coneRadius: 2.25
+    coneAngle: 360
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0.5
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: UppercutPrep
+    telegraphPoseNormalized: 0.15
+  - attackId: 3
+    animatorStateName: MagneticGrab
+    cooldown: 20
+    minDistance: 0
+    maxDistance: 3.74
+    ignoreDistanceWindow: 0
+    attackTargeting: 0
+    weight: 15
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 1
+    counterWindowDuration: 1.3
+    superArmor: 1
+    hitboxAnchorName: Hand_R
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 8
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0.7
+    telegraphFillInward: 1
+    hitEventFallbackNormalized: 0
+    prepStateName: 
+    telegraphPoseNormalized: 0.15
+  - attackId: 4
+    animatorStateName: Leap
+    cooldown: 10
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 1
+    attackTargeting: 1
+    weight: 15
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    counterWindowDuration: 0
+    superArmor: 1
+    hitboxAnchorName: 
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: 
+    telegraphPoseNormalized: 0.15
+  - attackId: 5
+    animatorStateName: DashAttack
+    cooldown: 5
+    minDistance: 0
+    maxDistance: 20
+    ignoreDistanceWindow: 1
+    attackTargeting: 1
+    weight: 20
+    allowedFromPhase: 0
+    damage: 55
+    opensCounterWindow: 1
+    counterWindowDuration: 1.5
+    superArmor: 1
+    hitboxAnchorName: DashBody
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0.57
+    prepStateName: DashPrep
+    telegraphPoseNormalized: 0.15
+  - attackId: 6
+    animatorStateName: Charging
+    cooldown: 0
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 1
+    attackTargeting: 0
+    weight: 0
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    counterWindowDuration: 0
+    superArmor: 1
+    hitboxAnchorName: 
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: 
+    telegraphPoseNormalized: 0.15
+  - attackId: 7
+    animatorStateName: Rage
+    cooldown: 0
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 1
+    attackTargeting: 0
+    weight: 0
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    counterWindowDuration: 0
+    superArmor: 1
+    hitboxAnchorName: DashBody
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: 
+    telegraphPoseNormalized: 0.15
+  repeatPenalty: 0.3
+  repeatBlockAfter: 2
+  combos:
+  - name: HookHookDash
+    weight: 20
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 0
+      forceFire: 0
+    - attack: 1
+      forceFire: 0
+    - attack: 5
+      forceFire: 0
+    chainOnHit: 1
+  - name: HookUpper
+    weight: 15
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 0
+      forceFire: 0
+    - attack: 2
+      forceFire: 0
+    chainOnHit: 1
+  - name: DashGrab
+    weight: 25
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 5
+      forceFire: 0
+    - attack: 3
+      forceFire: 1
+    chainOnHit: 1
+  - name: JumpDash
+    weight: 25
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 4
+      forceFire: 0
+    - attack: 5
+      forceFire: 0
+    chainOnHit: 1
+  - name: UpperGrab
+    weight: 10
+    allowedFromPhase: 0
+    cooldown: 10
+    steps:
+    - attack: 2
+      forceFire: 0
+    - attack: 3
+      forceFire: 1
+    chainOnHit: 1
+  - name: HookHookHook
+    weight: 15
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 0
+      forceFire: 0
+    - attack: 1
+      forceFire: 0
+    - attack: 0
+      forceFire: 0
+    chainOnHit: 1
+  - name: JumpJumpJump
+    weight: 21
+    allowedFromPhase: 0
+    cooldown: 12
+    steps:
+    - attack: 4
+      forceFire: 0
+    - attack: 4
+      forceFire: 0
+    - attack: 4
+      forceFire: 0
+      landingCounterWindow: 0.8
+    chainOnHit: 1
+    windup: 1
+  openingCombo: 010000000000000005000000
+  comboStepInterval: 0.3
+  comboChaseGrace: 1
+  raidOpeningStepInterval: 1
+  comboDashWindup: 0.7
+  comboGrabTelegraph: 0.6
+  comboGrabTelegraphAfterDash: 1
+  comboHookFollowThrough: 0.3
+  singleHookUpper: 0
+  comboJumpRecovery: 0
+  comboDashRecovery: 0.3
+  hookTelegraphMarkers: 0
+  phases:
+  - hpThreshold: 0.7
+    sequence: 1
+    damageMultiplier: 1.15
+    speedMultiplier: 1.1
+  - hpThreshold: 0.3
+    sequence: 5
+    damageMultiplier: 1.3
+    speedMultiplier: 1.2
+  partyHpMultipliers:
+  - 1
+  - 2.5
+  - 4.55
+  playerHitDamageCapRatio: 0.9
+  raidScript: 1
+  selfDestructAtZero: 1
+  raidChargeTimeLimit: 25
+  raidDroneGuideCooldown: 1.5
+  raidDischargeWarnTime: 2.5
+  raidDischargeDamage: 150
+  raidSelfDestructTime: 30
+  raidSelfDestructGaugeDamage: 750
+  counterFrontAngle: 60
+  backAttackAngle: 60
+  hitReactionState: getowned
+  hitReactionStateRight: getowned_R
+  breakDuration: 5
+  counterGaugeStep: 20
+  environmentGaugeStep: 20
+  suppressDamageMultiplier: 1.2
+  vulnerableDuration: 8
+  vulnerableKnockbackDistance: 3
+  vulnerableKnockbackTime: 0.35
+  wallReboundDistance: 0.5
+  wallReboundTime: 0.3
+  vulnerableTint: {r: 0.45, g: 0.75, b: 1, a: 1}
+  aggroRetargetInterval: 8
+  aggroAvoidsRepeatTarget: 1
+  chargeClearGroggyDuration: 1.5
+  grabRadius: 3.74
+  grabHoldDuration: 1.13
+  grabTickInterval: 0.5
+  grabTickDamage: 8
+  grabThrowDuration: 0.65
+  grabThrowDistance: 6
+  grabThrowDamage: 20
+  grabRecoveryDuration: 0.8
+  grabHoldState: Holding
+  grabThrowState: Throw
+  grabCycleSpeed: 1.4
+  grabPullDuration: 1.65
+  grabCatchDuration: 1.1
+  grabSlamCount: 3
+  grabSlamDamage: 15
+  grabEndDuration: 1.37
+  grabCatchState: Grab
+  grabEndState: GrabEnd
+  grabPullKnockback: 4
+  playerScanRadius: 45
+  jumpHoverTime: 1.2
+  jumpLandingDuration: 1
+  jumpRecoveryDuration: 0.4
+  jumpAoeRadius: 5.25
+  jumpLandingDamage: 65
+  jumpTakeoffState: Leap
+  jumpTakeoffDuration: 0.633
+  jumpHoverState: JumpHover
+  jumpLandingState: JumpLanding
+  silentLandingState: EntranceLanding
+  jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
+  jumpLandSeparation: 1.2
+  jumpKnockbackStrength: 5
+  chargeTimeLimit: 30
+  chargeLoopStartFrame: 62
+  chargeLoopEndFrame: 125
+  chargeZonePrefab: {fileID: 0}
+  chargePylonsSolo: 1
+  chargePylonsDuo: 2
+  chargePylonsTrioPlus: 4
+  rageDashCount: 3
+  rageDashInterval: 0.5
+  rageDashDuration: 0.7
+  rageDashSpeedMultiplier: 6
+  rageDashMaxDistance: 16
+  rageDashDamage: 50
+  dashDuration: 1.5
+  dashSpeedMultiplier: 7.8
+  dashMaxDistance: 30
+  dashDamage: 55
+  dashCarryFrontOffset: 2.2
+  dashStunDuration: 1
+  dashKnockbackStrength: 5
+  bombThrowInterval: 6
+  bombPrefab: {fileID: 7643126938755057433, guid: ede00d4e6aaec7442abf1ed83b4a7234, type: 3}
+  spreadAngle: 15
+  electricFloor: {fileID: 11400000, guid: 3dc6da150d6e4c29a2d414faad7d1234, type: 2}
+  wellsDrone: {fileID: 11400000, guid: 18b9ee564410be04a95d0ef34173cac3, type: 2}
+  globalAttackInterval: 1.5
+  chargeAuraRadius: 5.5
+  chargeAuraInterval: 1
+  chargeAuraDamage: 20
+  chargeAuraKnockbackStrength: 5
+  chargeAuraTelegraphPrefab: {fileID: 0}
