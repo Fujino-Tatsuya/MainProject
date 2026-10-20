@@ -101,6 +101,21 @@ public sealed class QAInputController : MonoBehaviour
         yield return null;
     }
 
+    /// <summary>지금 시전이 막히는 사유(null = 시전 가능). PlayerSkillController.Cast 의 조기 거부 조건과 같은 순서.</summary>
+    public string SkillBlockReason(PlayerSkillSlot slot)
+    {
+        if (_skills == null)
+            return "스킬 컨트롤러 없음";
+        PlayerSkillBase skill = _skills.GetSkill(slot);
+        if (skill == null || skill.Data == null)
+            return "슬롯 비어 있음";
+        if (_skills.IsBusy)
+            return "다른 스킬 실행·요청 중";
+        if (!_skills.IsCooldownReady(slot))
+            return $"쿨다운 {_skills.GetCooldownRemaining(slot):F1}s";
+        return null;
+    }
+
     public bool IsSkillReady(PlayerSkillSlot slot)
     {
         return _skills != null && _skills.IsCooldownReady(slot);

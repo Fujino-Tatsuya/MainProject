@@ -131,6 +131,60 @@ public interface IQADetector
     void OnSessionEnd(QARecorder recorder);
 }
 
+/// <summary>
+/// 판정에서 빼는 발견의 단일 목록(할 일 48.3) — 검증 대상(48)과 무관한 알려진 노이즈.
+/// 매칭된 로그는 Error 가 아니라 Info 로 <see cref="NoiseCategory"/> 에 쌓이고, 리포트의 '무관 노이즈·오탐 제외' 집계에 따로 나온다.
+/// 감지기 오탐 제외는 같은 집계에 <see cref="FalsePositivePrefix"/> 분류로 쌓는다(근거는 각 감지기 주석).
+/// </summary>
+public static class QAKnownNoise
+{
+    public const string NoiseCategory = "Noise";
+    public const string FalsePositivePrefix = "FP-";
+
+    private struct Rule
+    {
+        public string[] All;   // 전부 포함해야 매칭
+        public string Reason;
+    }
+
+    private static readonly Rule[] Rules =
+    {
+        new Rule
+        {
+            All = new[] { "[MCP] Failed to start server" },
+            Reason = "com.community.unity-mcp 서버 포트 충돌(에디터 도구) — 48 무관",
+        },
+        new Rule
+        {
+            All = new[] { "[BridgeGate]", "미저작" },
+            Reason = "절차 맵 다리 열림 위치 미저작(맵 저작 데이터) — 48 무관",
+        },
+    };
+
+    public static bool TryMatch(string message, out string reason)
+    {
+        reason = null;
+        if (string.IsNullOrEmpty(message))
+            return false;
+
+        foreach (Rule rule in Rules)
+        {
+            bool all = true;
+            foreach (string token in rule.All)
+                if (!message.Contains(token)) { all = false; break; }
+            if (all)
+            {
+                reason = rule.Reason;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static bool IsExcluded(QAFinding f) =>
+        f.Category == NoiseCategory || (f.Category != null && f.Category.StartsWith(FalsePositivePrefix, StringComparison.Ordinal));
+}
+
 /// <summary>QA 공용 소도구.</summary>
 public static class QAUtil
 {

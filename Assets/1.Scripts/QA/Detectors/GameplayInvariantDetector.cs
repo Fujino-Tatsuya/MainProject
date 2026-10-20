@@ -309,13 +309,26 @@ public sealed class GameplayInvariantDetector : IQADetector
             verticalDelta > WallClimbVerticalEpsilon &&
             verticalDelta <= WallClimbMaxPlausibleDelta;
 
+        // 오탐 제외(할 일 48.3): 벽 타기는 입력으로 움직이는 Alive 에서만 난다. 48-20261020_143105 의 22건은
+        // 전부 QA 전멸 강제 중 DeadPresentation(입력 없음, state=Idle, y=0.00)에서 났다 — 사망 몸의 위치 보정이지 벽 타기가 아니다.
+        PlayerLifeState life = _playerLifeCycle != null ? _playerLifeCycle.State : PlayerLifeState.Alive;
+        bool notAlive = life != PlayerLifeState.Alive;
+
         Evaluate(
             recorder,
             "P9-PlayerWallClimb",
             _playerId,
-            climbing,
+            climbing && !notAlive,
             QASeverity.Error,
             $"평지 접지 중 이상 상승 감지: +{verticalDelta * 1000f:F1}mm/tick — 벽에 대고 이동 연타로 벽 타기 의심",
+            $"player={Target(player)} state={state} position={position}");
+        Evaluate(
+            recorder,
+            QAKnownNoise.FalsePositivePrefix + "P9-PlayerWallClimb",
+            _playerId,
+            climbing && notAlive,
+            QASeverity.Info,
+            $"P9 오탐 제외: 생명 상태 {life}(Alive 아님) 중 +{verticalDelta * 1000f:F1}mm/tick — 입력 없는 사망·영혼 몸의 위치 보정",
             $"player={Target(player)} state={state} position={position}");
     }
 

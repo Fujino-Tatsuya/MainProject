@@ -156,6 +156,8 @@ public static class QAReportWriter
                 sb.AppendLine("| - | - | (항목 없음) | - | - | - |");
             sb.AppendLine();
 
+            AppendExcluded(sb, ctx.Recorder);
+
             sb.AppendLine("## 탐지기(상시 감시) 집계");
             sb.AppendLine();
             AppendFindings(sb, ctx.Recorder);
@@ -167,6 +169,29 @@ public static class QAReportWriter
         {
             Debug.LogError($"[QA] 시나리오 리포트 저장 실패: {e.Message}");
         }
+    }
+
+    /// <summary>판정에서 뺀 발견(QAKnownNoise — 무관 노이즈·감지기 오탐 제외) 집계. FAIL 사유·에러 건수에 들어가지 않는다.</summary>
+    private static void AppendExcluded(StringBuilder sb, QARecorder recorder)
+    {
+        sb.AppendLine("## 무관 노이즈·오탐 제외 집계 (판정 제외)");
+        sb.AppendLine();
+        sb.AppendLine("| 분류 | 요약 | 처음 | 횟수 |");
+        sb.AppendLine("|---|---|---|---:|");
+        int rows = 0, total = 0;
+        foreach (QAFinding f in recorder.Findings)
+        {
+            if (!QAKnownNoise.IsExcluded(f))
+                continue;
+            rows++;
+            total += f.Count;
+            sb.AppendLine($"| {f.Category} | {Escape(f.Summary)} | {f.Scene} {f.TimeSeconds:F1}s | {f.Count} |");
+        }
+        if (rows == 0)
+            sb.AppendLine("| - | (없음) | - | 0 |");
+        sb.AppendLine();
+        sb.AppendLine($"- 합계 {total}건 — 목록 원본: QAModel.cs `QAKnownNoise`");
+        sb.AppendLine();
     }
 
     private static string StatusLabel(QAItemStatus s)

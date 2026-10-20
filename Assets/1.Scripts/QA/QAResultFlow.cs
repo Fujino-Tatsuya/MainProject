@@ -14,6 +14,15 @@ public enum QAResultPath
     Cleared  // 보스전 강제 개시(BossTeleportManager.ForceStartEncounter) → 보스 격파 → BossEncounterDirector
 }
 
+/// <summary>전멸 강제의 귀결 — <see cref="QAResultFlow.WipeOutcome"/>.</summary>
+public enum QAWipeOutcome
+{
+    Timeout,            // 아무 귀결도 없음(FAIL)
+    Result,             // 결과 확정(결과 화면/로비 결과 패널)
+    Respawned,          // 전멸 리스폰(보스 미격파 — 설계)
+    TutorialAutoRevive, // 튜토리얼 G11 전 — 차감 없는 자동 부활이라 전멸 불가(설계)
+}
+
 /// <summary>
 /// 결과 화면 플레이어별 통계 QA. 게임 코드 무수정 — public 진입점과 정적 이벤트만 쓴다.
 ///
@@ -134,13 +143,38 @@ public sealed class QAResultFlow
         return null;
     }
 
+    /// <summary>직전 <see cref="QAResultPath.Wiped"/> 강제의 귀결. 결과 화면 말고도 설계상 귀결이 둘 있다(party-lives-respawn.md).</summary>
+    public QAWipeOutcome WipeOutcome { get; private set; }
+
+    /// <summary>
+    /// 전멸 강제. 설계상 결과 화면까지 안 가는 경우가 둘이라 그것도 귀결로 인정하고 멈춘다(할 일 48.3 원인 분석):
+    ///  · 튜토리얼 G11(보스방 도착) 전 사망 = 차감 없이 3초 뒤 자동 부활(TutorialDeathRules, ServerDeathKeepsSoul) — 전멸이 날 수 없다.
+    ///    48-20261020_143105 의 '120초 안에 결과 확정 안 됨' 은 이 자동 부활 ↔ QA 재사망이 약 5초 주기로 돈 것(진단 5초 주기와 겹쳐 DeadPresentation 에 멈춘 것처럼 보였다).
+    ///    QA 가 Soul 을 직접 되살리면(TryCompleteReviveOnServer) 차감 없는 구간인데도 공용 목숨이 깎이므로 이 구간에선 직접 부활하지 않는다.
+    ///  · 보스 미격파 전멸 = 결과 화면 대신 전멸 리스폰(PartyWipeRespawner.PartyWipeRespawned).
+    /// </summary>
     private IEnumerator ForceWipe(QARecorder recorder)
     {
         float deadline = Time.time + WipeTimeout;
         float nextDiag = 0f;
         MultiGameRule rule = UnityEngine.Object.FindFirstObjectByType<MultiGameRule>();
+        bool respawned = false;
+        System.Action<IReadOnlyList<ulong>> onRespawn = _ => respawned = true;
+        PartyWipeRespawner.PartyWipeRespawned += onRespawn;
+        var freeDeaths = new HashSet<ulong>();
+        var freeRevived = new HashSet<ulong>();
+        WipeOutcome = QAWipeOutcome.Timeout;
+        try
+        {
         while (Time.time < deadline && !SessionResult.HasValue && !InResultScene)
         {
+            if (respawned)
+            {
+                WipeOutcome = QAWipeOutcome.Respawned;
+                Note("전멸 → 전멸 리스폰(PartyWipeRespawned) — 설계상 결과 화면 대신 리스폰");
+                yield break;
+            }
+
             bool diag = Time.time >= nextDiag;
             var sb = diag ? new StringBuilder("전멸 강제 상태:") : null;
             if (diag)
@@ -161,18 +195,26 @@ public sealed class QAResultFlow
                     rule?.TryGetLifeCount(player.OwnerClientId, out lives);
                     PlayerInvulnerability inv = player.GetComponent<PlayerInvulnerability>();
                     sb.Append($" c{player.OwnerClientId}[{life.State} hp={player.CurrentHealth} life={lives} " +
-                              $"inv={(inv != null && inv.IsServerInvulnerable)}]");
+                              $"inv={(inv != null && inv.IsServerInvulnerable)} {DeathResolutionDiag(life)}]");
                 }
 
+                bool keepsSoul = PlayerLifeCycleController.ServerDeathKeepsSoul != null &&
+                                 PlayerLifeCycleController.ServerDeathKeepsSoul(player.OwnerClientId);
                 if (life.State == PlayerLifeState.Alive && player.CurrentHealth > 0)
                 {
+                    if (freeDeaths.Contains(player.OwnerClientId))
+                        freeRevived.Add(player.OwnerClientId); // 차감 없는 자동 부활로 돌아왔다
                     // 직접 피해(무적 중엔 거부 — 다음 틱 재시도). 추락 피해는 추락 사망 연출로 DeadPresentation 이
                     // 30초 가까이 늘어져(10-08 3차) 쓰지 않는다.
                     player.ApplyDirectHealthDamage(player.CurrentHealth + 100000);
                     if (player.CurrentHealth <= 0)
+                    {
                         Increment(_injectedDeaths, player.OwnerClientId);
+                        if (keepsSoul)
+                            freeDeaths.Add(player.OwnerClientId);
+                    }
                 }
-                else if (life.State == PlayerLifeState.Soul)
+                else if (life.State == PlayerLifeState.Soul && !keepsSoul)
                 {
                     // 목숨이 남은 Soul 은 게임의 부활 경로로 되살려 다시 죽인다(목숨 1 소비).
                     // 🔴 PlayerLifeCycleController.TryCompleteRevive 는 목숨을 안 깎아 무한 루프가 된다(10-08 3차).
@@ -182,12 +224,50 @@ public sealed class QAResultFlow
 
             if (diag)
                 Note(sb.ToString());
+
+            // 전원이 '차감 없는 사망 → 자동 부활' 을 한 번씩 거쳤으면 이 판은 지금 전멸할 수 없다(튜토리얼 G11 전).
+            if (freeRevived.Count > 0 && freeRevived.SetEquals(freeDeaths) && freeDeaths.Count >= CountSpawnedPlayers())
+            {
+                WipeOutcome = QAWipeOutcome.TutorialAutoRevive;
+                Note($"전멸 불가 — 튜토리얼 G11 전 사망은 차감 없이 자동 부활(TutorialDeathRules). 자동 부활 확인 {freeRevived.Count}명, 공용 목숨 {(rule != null && rule.IsSpawned ? rule.PartyLives : -1)}");
+                yield break;
+            }
             yield return new WaitForSeconds(0.25f);
         }
 
-        if (!SessionResult.HasValue && !InResultScene)
-            recorder.Add(QASeverity.Error, "ResultStats", $"전멸 강제 {WipeTimeout:F0}초 안에 결과가 확정되지 않음",
+        if (SessionResult.HasValue || InResultScene)
+            WipeOutcome = QAWipeOutcome.Result;
+        else if (respawned)
+            WipeOutcome = QAWipeOutcome.Respawned;
+        else
+            recorder.Add(QASeverity.Error, "ResultStats", $"전멸 강제 {WipeTimeout:F0}초 안에 결과·리스폰·자동 부활 어느 것도 안 남",
                 _log.ToString());
+        }
+        finally
+        {
+            PartyWipeRespawner.PartyWipeRespawned -= onRespawn;
+        }
+    }
+
+    private static int CountSpawnedPlayers()
+    {
+        int n = 0;
+        foreach (Player p in UnityEngine.Object.FindObjectsByType<Player>(FindObjectsSortMode.None))
+            if (p != null && p.IsSpawned)
+                n++;
+        return n;
+    }
+
+    /// <summary>사망 연출 해소 예약(private) 진단 — DeadPresentation 에 멈춘 원인을 가르기 위한 읽기 전용 리플렉션.</summary>
+    private static string DeathResolutionDiag(PlayerLifeCycleController life)
+    {
+        const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        System.Type t = typeof(PlayerLifeCycleController);
+        object pending = t.GetField("deathResolutionPending", F)?.GetValue(life);
+        object deadline = t.GetField("deathResolutionDeadlineServerTime", F)?.GetValue(life);
+        object deferred = t.GetField("deferredDeathWhileLocked", F)?.GetValue(life);
+        double now = NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : -1;
+        return $"pending={pending} deadline={deadline:0.0} now={now:0.0} deferred={deferred} keepsSoul={PlayerLifeCycleController.ServerDeathKeepsSoul?.Invoke(life.OwnerClientId)}";
     }
 
     private IEnumerator ForceClear(QARecorder recorder)

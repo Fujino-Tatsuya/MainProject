@@ -50,6 +50,14 @@ public sealed class LogErrorDetector : IQADetector
 
         // 동일 메시지 첫 줄로 dedup — 매 프레임 같은 예외가 쏟아져도 1건+카운트로 집계.
         string key = type + "|" + FirstLine(condition);
+
+        // 알려진 무관 노이즈는 판정(Error 집계)에서 빼고 따로 센다.
+        if (QAKnownNoise.TryMatch(condition, out string reason))
+        {
+            _recorder.Add(QASeverity.Info, QAKnownNoise.NoiseCategory, $"{reason} · {FirstLine(condition)}", stackTrace, "noise|" + key);
+            return;
+        }
+
         _recorder.Add(severity, Name, condition, stackTrace, key);
     }
 

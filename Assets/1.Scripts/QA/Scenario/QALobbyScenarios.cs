@@ -102,7 +102,12 @@ public static class QALobbyScenarios
         }
     }
 
-    private static IEnumerator CombatSample(QAScenarioContext ctx, StringBuilder log)
+    /// <summary>
+    /// 이동·대시·평타·스킬 4슬롯 한 번씩. 스킬은 앞 스킬이 끝나고 쿨다운이 돌 때까지(최대 8초) 기다렸다 쓴다 —
+    /// 1차(48-20261020_143105)의 Sub·Interrupt=False 는 Main 실행 중(IsBusy)에 1.2초 간격으로 눌러 Cast 가 조기 거부한 것이었다.
+    /// unexpectedFalse = 막힐 사유가 없는데 false 가 나온 슬롯 수(FAIL 대상). 사유가 있는 거부는 근거로만 남긴다.
+    /// </summary>
+    private static IEnumerator CombatSample(QAScenarioContext ctx, StringBuilder log, QACount unexpectedFalse = null)
     {
         Player p = Player.LocalPlayer;
         if (p == null)
@@ -123,9 +128,18 @@ public static class QALobbyScenarios
             p = Player.LocalPlayer;
             if (p == null)
                 break;
+            input.SetTarget(p);
+            yield return ctx.Wait(() => input.SkillBlockReason(slot) == null, 8f);
+            string reason = input.SkillBlockReason(slot);
+            p = Player.LocalPlayer;
+            if (p == null)
+                break;
             Vector3 aim = p.transform.position + p.transform.forward * 3f;
-            log.Append($"{slot}={input.UseSkillAt(slot, aim)} ");
-            yield return new WaitForSeconds(1.2f);
+            bool used = input.UseSkillAt(slot, aim);
+            log.Append(used ? $"{slot}=True " : $"{slot}=False({reason ?? "사유 없음"}) ");
+            if (!used && reason == null && unexpectedFalse != null)
+                unexpectedFalse.Value++;
+            yield return new WaitForSeconds(0.5f);
         }
     }
 
@@ -169,10 +183,13 @@ public static class QALobbyScenarios
         ctx.Check(probe.Ok, "카메라 추적", probe.Evidence);
 
         var log = new StringBuilder();
+        var unexpected = new QACount();
         QAScenarioContext.ErrorMark combatMark = ctx.MarkErrors();
-        yield return CombatSample(ctx, log);
+        yield return CombatSample(ctx, log, unexpected);
         int combatErrors = ctx.ErrorsSince(combatMark, out string combatSummary);
         ctx.Check(combatErrors == 0, "이동/대시/평타/스킬 예외 0", $"반환값: {log}| 에러 {combatErrors}건: {combatSummary}", ctx.Shot("combat"));
+        ctx.Check(unexpected.Value == 0, "스킬 4슬롯 시전(로비 제한 없음)",
+            $"사유 없는 거부 {unexpected.Value}건. {log}— 로비 스킬 제한은 lobby-demo-flow.md 에 없다(제한 없음이 사양)");
 
         int errors = ctx.ErrorsSince(mark, out string summary);
         ctx.Check(errors == 0, "S1 구간 에러 로그 0", $"{errors}건: {summary}");
@@ -306,6 +323,16 @@ public static class QALobbyScenarios
             {
                 flow.Begin();
                 yield return flow.DriveHost(path, ctx.Recorder);
+                if (path == QAResultPath.Wiped && flow.WipeOutcome != QAWipeOutcome.Result)
+                {
+                    // 전멸이 설계상 결과로 안 간다(party-lives-respawn.md §1 — 보스 미격파 전멸 = 리스폰, 튜토리얼 G11 전 = 차감 없는 자동 부활).
+                    // 귀결을 판정하고 판은 나가기로 끝낸다 — 로비 복귀·결과 패널 단언은 그대로 이어서 본다.
+                    bool designed = flow.WipeOutcome == QAWipeOutcome.Respawned || flow.WipeOutcome == QAWipeOutcome.TutorialAutoRevive;
+                    ctx.Check(designed, $"{tag} 전멸 처리(설계 귀결)",
+                        $"귀결={flow.WipeOutcome} — 결과 화면 대신 {(flow.WipeOutcome == QAWipeOutcome.Respawned ? "전멸 리스폰" : flow.WipeOutcome == QAWipeOutcome.TutorialAutoRevive ? "튜토리얼 자동 부활(전멸 불가)" : "귀결 없음")}. 판 종료는 나가기로 대체",
+                        ctx.Shot($"r{round}_wipe"));
+                    GameManager.GoToResultButton();
+                }
                 yield return ctx.Wait(() => QALobbyFlow.HasLocalLobbyPlayer, 300f);
                 flow.End();
             }
@@ -524,4 +551,9 @@ public static class QALobbyScenarios
 public sealed class QAFlag
 {
     public bool Value;
+}
+
+public sealed class QACount
+{
+    public int Value;
 }
