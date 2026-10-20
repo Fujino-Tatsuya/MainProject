@@ -262,4 +262,33 @@ public sealed class BossElevatorRig : MonoBehaviour
         if (_doorAnimator == null || !_doorAnimator.isActiveAndEnabled) return;
         _doorAnimator.Play(stateHash, 0, normalizedTime);
     }
+
+#if UNITY_EDITOR
+    static readonly Color[] FrontPointGizmoColors = { new Color(1f, 0.3f, 0.3f), new Color(0.3f, 0.6f, 1f), new Color(0.3f, 1f, 0.4f) };
+
+    // 문 앞 지점마다 순간이동 직후 바라볼 방향(y축 회전만 — 텔레포트가 쓰는 규칙과 같다) 화살표. 슬롯 색 P1 빨강·P2 파랑·P3 초록.
+    void OnDrawGizmos()
+    {
+        for (int slot = 0; slot < _frontPoints.Length; slot++)
+        {
+            Transform point = _frontPoints[slot];
+            if (point == null) continue;
+
+            Vector3 forward = point.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.001f) continue;
+            forward.Normalize();
+
+            Vector3 from = point.position + Vector3.up * 0.05f;
+            Vector3 tip = from + forward * 1f;
+            Vector3 side = Vector3.Cross(Vector3.up, forward) * 0.2f;
+
+            Gizmos.color = FrontPointGizmoColors[slot % FrontPointGizmoColors.Length];
+            Gizmos.DrawWireSphere(from, 0.2f);
+            Gizmos.DrawLine(from, tip);
+            Gizmos.DrawLine(tip, tip - forward * 0.3f + side);
+            Gizmos.DrawLine(tip, tip - forward * 0.3f - side);
+        }
+    }
+#endif
 }

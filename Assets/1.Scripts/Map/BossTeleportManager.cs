@@ -615,12 +615,16 @@ public class BossTeleportManager : NetworkBehaviour
         if (playerObject.TryGetComponent(out PlayerStateController stateController))
             stateController.EndDash();
 
+        // 🔴 바라보는 방향은 루트가 아니라 Armature(= Motor 시뮬레이션의 ArmatureRotation)다. 루트 회전은 다음 틱에
+        //    Motor 가 RootRotation 으로 되돌리고 Armature 는 옛 방향 그대로라, 지점의 회전이 화면에 반영되지 않았다(할 일 65).
+        //    RotateImmediately 가 y축만 남겨 Armature·Motor 상태를 함께 맞춘다.
         var motor = playerObject.GetComponent<PlayerMotor>();
         if (motor != null)
         {
             motor.ClearKnockbackVelocity();
             motor.TeleportAuthoritative(destination);
-            playerObject.transform.rotation = rotation;
+            if (playerObject.TryGetComponent(out PlayerMovement movement))
+                movement.RotateImmediately(rotation * Vector3.forward);
         }
         else
         {
