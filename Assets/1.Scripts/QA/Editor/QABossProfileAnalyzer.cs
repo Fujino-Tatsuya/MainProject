@@ -70,7 +70,8 @@ public static class QABossProfileAnalyzer
     private sealed class FrameRow
     {
         public int Seg, Index, Frame = -1, Phase = -1;
-        public float FrameMs, PlayerLoopMs, EditorLoopMs, GcCollectMs, GcAllocKb;
+        public float FrameMs, PlayerLoopMs, EditorLoopMs, GcCollectMs, GcAllocKb, ToolMs;
+        public bool IsTool => Edge || ToolMs >= 1f;
         public string Markers = "";
         public bool Edge;   // 세그먼트 첫·끝 프레임 — 프로파일러를 껐다 켠 측정 도구 비용(분포에서 따로 뺀다)
         public readonly Dictionary<string, float> Diag = new Dictionary<string, float>();   // Diag57.* 진단 마커 ms(+ ".JIT")
@@ -108,14 +109,19 @@ public static class QABossProfileAnalyzer
     private static PropertyInfo _frameCountProp;
 
     [MenuItem(MenuRoot + "Analyze Latest Boss Profile")]
-    public static void AnalyzeLatest()
+    public static void AnalyzeLatest() => AnalyzeNthFromLatest(0);
+
+    [MenuItem(MenuRoot + "Analyze Previous Boss Profile")]
+    public static void AnalyzePrevious() => AnalyzeNthFromLatest(1);
+
+    private static void AnalyzeNthFromLatest(int n)
     {
         string root = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Application.dataPath)), "_lane-artifacts",
                                    Path.GetFileName(Path.GetDirectoryName(Application.dataPath)), "57.2-profile");
-        string dir = Directory.Exists(root) ? Directory.GetDirectories(root, "run-*").OrderBy(d => d).LastOrDefault() : null;
+        string dir = Directory.Exists(root) ? Directory.GetDirectories(root, "run-*").OrderByDescending(d => d).Skip(n).FirstOrDefault() : null;
         if (dir == null)
         {
-            Debug.LogError($"[QA][57.2] {root} 에 run-* 없음");
+            Debug.LogError($"[QA][57.2] {root} 에 run-* 가 {n + 1}개 미만");
             return;
         }
         Analyze(dir);
@@ -273,25 +279,30 @@ public static class QABossProfileAnalyzer
                 return null;
             row.FrameMs = v.frameTimeMs;
             var kids = new List<int>();
-            var stack = new Stack<int>();
+            var stack = new Stack<(int id, bool inLoop)>();
             var markers = new List<string>();
             int root = v.GetRootItemID();
             v.GetItemChildren(root, kids);
-            foreach (int k in kids) stack.Push(k);
-            // 에디터 Play 는 PlayerLoop 가 루트가 아니라 Application.Tick > … > UpdateScene 아래에 있다 — 트리 어디서든 찾는다(바깥 것만).
+            foreach (int k in kids) stack.Push((k, false));
+            // 에디터 Play 는 PlayerLoop 가 루트가 아니라 Application.Tick > … > UpdateScene 아래에 있다 — 트리 어디서든 찾는다.
+            // 한 프레임에 둘이다: 게임 업데이트 + GameView.Paint 안의 게임 카메라 렌더(RenderPlayModeViewCameras). 둘 다 게임 몫이라 더한다.
+            // PlayerLoop 안에 또 PlayerLoop 가 나오면(중첩) 바깥 것만 센다.
             while (stack.Count > 0)
             {
-                int id = stack.Pop();
+                (int id, bool inLoop) = stack.Pop();
                 string name = v.GetItemName(id);
                 float ms = v.GetItemColumnDataAsFloat(id, HierarchyFrameDataView.columnTotalTime);
                 kids.Clear();
                 v.GetItemChildren(id, kids);
-                if (name == "PlayerLoop")
+                bool isLoop = name == "PlayerLoop";
+                if (isLoop && inLoop) { }
+                else if (isLoop)
                 {
                     row.PlayerLoopMs += ms;
                     row.GcAllocKb += v.GetItemColumnDataAsFloat(id, HierarchyFrameDataView.columnGcMemory) / 1024f;
                 }
                 else if (name == "GC.Collect") row.GcCollectMs += ms;
+                else if (name.StartsWith("EditorApplication.update: Unity.AI.MCP") || name == "Gfx.CaptureScreenshot") row.ToolMs += ms;   // 측정 도구(MCP 폴링·QA 스크린샷)
                 else if (name == "QA57.Segment") markers.Add("Segment");
                 else if (name.StartsWith("QA57.")) markers.Add(name.Substring(5));
                 else if (name.StartsWith("Diag57."))
@@ -307,7 +318,7 @@ public static class QABossProfileAnalyzer
                             row.Diag[key + ".JIT"] = j + v.GetItemColumnDataAsFloat(k, HierarchyFrameDataView.columnTotalTime);
                         }
                 }
-                foreach (int k in kids) stack.Push(k);
+                foreach (int k in kids) stack.Push((k, inLoop || isLoop));
             }
             row.EditorLoopMs = Math.Max(0f, row.FrameMs - row.PlayerLoopMs);
             row.Markers = string.Join("|", markers);
@@ -341,7 +352,7 @@ public static class QABossProfileAnalyzer
     }
 
     private static string Header(FrameRow r) =>
-        $"seg {r.Seg} idx {r.Index} · frame {r.Frame} · phase {(QABossProfileProbe.Phase)Math.Max(0, r.Phase)} · 전체 {r.FrameMs:F2} ms · PlayerLoop {r.PlayerLoopMs:F2} ms · 에디터(전체−PlayerLoop) {r.EditorLoopMs:F2} ms · GC.Collect {r.GcCollectMs:F2} ms · GC Alloc {r.GcAllocKb:F1} KB · 마커 [{r.Markers}]{DiagText(r)}{(r.Edge ? " · 🔸세그먼트 경계(측정 도구)" : "")}";
+        $"seg {r.Seg} idx {r.Index} · frame {r.Frame} · phase {(QABossProfileProbe.Phase)Math.Max(0, r.Phase)} · 전체 {r.FrameMs:F2} ms · PlayerLoop {r.PlayerLoopMs:F2} ms · 에디터(전체−PlayerLoop) {r.EditorLoopMs:F2} ms · GC.Collect {r.GcCollectMs:F2} ms · GC Alloc {r.GcAllocKb:F1} KB · 마커 [{r.Markers}]{DiagText(r)}{(r.Edge ? " · 🔸세그먼트 경계(측정 도구)" : "")}{(r.ToolMs >= 1f ? $" · 🔸측정 도구(MCP·스크린샷) {r.ToolMs:F1} ms" : "")}";
 
     private static string DiagText(FrameRow r) =>
         r.Diag.Count == 0 ? "" : " · 진단 " + string.Join(" ", DiagKeys.Where(k => r.Diag.ContainsKey(k)).Select(k => $"{k} {r.DiagMs(k):F3} ms(JIT {r.DiagMs(k + ".JIT"):F3})"));
@@ -386,10 +397,10 @@ public static class QABossProfileAnalyzer
     private static void WriteOutputs()
     {
         var inv = CultureInfo.InvariantCulture;
-        var csv = new StringBuilder("seg,idx,frame,phase,frame_ms,player_loop_ms,editor_ms,gc_collect_ms,gc_alloc_kb,qa_markers,seg_edge,diag_show_ms,diag_show_jit_ms,diag_lock_ms,diag_lock_jit_ms,diag_jump_ms,diag_jump_jit_ms\n");
+        var csv = new StringBuilder("seg,idx,frame,phase,frame_ms,player_loop_ms,editor_ms,gc_collect_ms,gc_alloc_kb,qa_markers,seg_edge,diag_show_ms,diag_show_jit_ms,diag_lock_ms,diag_lock_jit_ms,diag_jump_ms,diag_jump_jit_ms,tool_ms\n");
         foreach (FrameRow r in _rows)
-            csv.AppendLine(string.Format(inv, "{0},{1},{2},{3},{4:F3},{5:F3},{6:F3},{7:F3},{8:F1},{9},{10},{11:F3},{12:F3},{13:F3},{14:F3},{15:F3},{16:F3}", r.Seg, r.Index, r.Frame, r.Phase, r.FrameMs, r.PlayerLoopMs, r.EditorLoopMs, r.GcCollectMs, r.GcAllocKb, r.Markers, r.Edge ? 1 : 0,
-                r.DiagMs("Show"), r.DiagMs("Show.JIT"), r.DiagMs("ClientLock"), r.DiagMs("ClientLock.JIT"), r.DiagMs("CreateJump"), r.DiagMs("CreateJump.JIT")));
+            csv.AppendLine(string.Format(inv, "{0},{1},{2},{3},{4:F3},{5:F3},{6:F3},{7:F3},{8:F1},{9},{10},{11:F3},{12:F3},{13:F3},{14:F3},{15:F3},{16:F3},{17:F3}", r.Seg, r.Index, r.Frame, r.Phase, r.FrameMs, r.PlayerLoopMs, r.EditorLoopMs, r.GcCollectMs, r.GcAllocKb, r.Markers, r.Edge ? 1 : 0,
+                r.DiagMs("Show"), r.DiagMs("Show.JIT"), r.DiagMs("ClientLock"), r.DiagMs("ClientLock.JIT"), r.DiagMs("CreateJump"), r.DiagMs("CreateJump.JIT"), r.ToolMs));
         File.WriteAllText(Path.Combine(_dir, "profile-frames.csv"), csv.ToString(), new UTF8Encoding(false));
 
         // 첫 예고 프레임 덤프
@@ -431,8 +442,9 @@ public static class QABossProfileAnalyzer
             sum.AppendLine($"## {(QABossProfileProbe.Phase)phase} — 프로파일 프레임 {rs.Count}개");
             sum.AppendLine(Stats("전체(frameTimeMs, EditorLoop 포함)", rs.Select(r => r.FrameMs).ToList()));
             sum.AppendLine(Stats("PlayerLoop", rs.Select(r => r.PlayerLoopMs).ToList()));
-            sum.AppendLine(Stats("전체 — 세그먼트 첫·끝 제외", rs.Where(r => !r.Edge).Select(r => r.FrameMs).ToList()));
-            sum.AppendLine(Stats("PlayerLoop — 세그먼트 첫·끝 제외", rs.Where(r => !r.Edge).Select(r => r.PlayerLoopMs).ToList()));
+            sum.AppendLine(Stats("전체 — 측정 도구 프레임(세그먼트 첫·끝, MCP 폴링·스크린샷 ≥1ms) 제외", rs.Where(r => !r.IsTool).Select(r => r.FrameMs).ToList()));
+            sum.AppendLine(Stats("PlayerLoop — 측정 도구 프레임 제외", rs.Where(r => !r.IsTool).Select(r => r.PlayerLoopMs).ToList()));
+            sum.AppendLine($"- 측정 도구 프레임 {rs.Count(r => r.IsTool)}개(세그먼트 경계 {rs.Count(r => r.Edge)} · MCP/스크린샷 {rs.Count(r => r.ToolMs >= 1f)})");
             sum.AppendLine($"- GC.Collect 든 프레임 {rs.Count(r => r.GcCollectMs > 0)}개 · 세그먼트 전환 프레임 {rs.Count(r => r.Markers.Contains("Segment"))}개");
             sum.AppendLine();
         }
