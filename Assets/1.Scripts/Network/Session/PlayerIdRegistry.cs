@@ -5,7 +5,7 @@ using System.Collections.Generic;
 /// 서버 전용 clientId ↔ playerId 매핑 — PLAN-48 Q4(재접속 클라는 새 clientId 와 무관하게 playerId 로 이어 간다).
 /// 승인 때 <see cref="Register"/>, 퇴장 때 <see cref="RemoveClient"/>(clientId 매핑만 지우고 그 playerId 를 봤다는 기록은 남긴다),
 /// 세션 시작·종료 때 <see cref="Clear"/>. 실제 서버 인스턴스는 <see cref="Server"/> 하나이고 NetworkSessionLauncher 가 관리한다.
-/// 캐릭터 선택·증강을 playerId 로 옮기는 건 C8 — 지금은 조회 API 까지만.
+/// 캐릭터 선택은 승인 때 같은 키로 <see cref="ServerCharacterSelectionStore.BindPlayer"/> 에 묶어 재접속에 이어 간다(C8).
 /// </summary>
 public sealed class PlayerIdRegistry
 {

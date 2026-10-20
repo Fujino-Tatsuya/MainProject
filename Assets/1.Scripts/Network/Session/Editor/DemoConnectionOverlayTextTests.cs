@@ -30,6 +30,27 @@ public sealed class DemoConnectionOverlayTextTests
         Assert.That(DemoConnectionOverlayText.ShouldShowStatus(state), Is.EqualTo(expected));
     }
 
+    [TestCase(ReconnectState.Connected, true, false, false, true)]
+    [TestCase(ReconnectState.Connected, true, true, false, false)]   // 내 플레이어가 생기면 닫는다
+    [TestCase(ReconnectState.Connected, true, false, true, false)]   // 이 맵에서 이미 있었다(판 끝 디스폰) — 깜빡이지 않게
+    [TestCase(ReconnectState.Connected, false, false, false, false)] // 맵이 아님(로비·로딩)
+    [TestCase(ReconnectState.Hosting, true, false, false, false)]    // 호스트는 띄우지 않는다
+    [TestCase(ReconnectState.Connecting, true, false, false, false)]
+    public void 판에_합류하는_중은_맵에서_내_플레이어가_아직_없을_때만(
+        ReconnectState state, bool isMapActive, bool hasLocalPlayer, bool hadLocalPlayer, bool expected)
+    {
+        Assert.That(
+            DemoConnectionOverlayText.ShouldShowJoiningMatch(state, isMapActive, hasLocalPlayer, hadLocalPlayer),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void 판에_합류하는_중_문구_키가_목록에_있다()
+    {
+        Assert.That(DemoConnectUiStrings.All, Does.Contain(DemoConnectUiStrings.JoiningMatch));
+        Assert.That(DemoConnectUiStrings.JoiningMatch.Key, Is.EqualTo("UI.DemoConnect.JoiningMatch"));
+    }
+
     [Test]
     public void 설정_파일_없음_안내는_3초만()
     {

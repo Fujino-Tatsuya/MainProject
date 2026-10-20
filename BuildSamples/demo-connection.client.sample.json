@@ -1,0 +1,9 @@
+{
+  "role": "client",
+  "hostAddress": "192.168.0.10",
+  "port": 7777,
+  "playerId": "booth-2",
+  "retryIntervalSeconds": 3,
+  "connectTimeoutSeconds": 5,
+  "disconnectTimeoutSeconds": 10
+}

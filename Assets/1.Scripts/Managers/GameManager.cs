@@ -22,7 +22,6 @@ public class GameManager : MonoBehaviour
     [SerializeField] private string resultSceneName = "ResultScene";
     [SerializeField] private string loadingSceneName = "2.LoadingScene";
     [SerializeField] private string mainGameSceneName = "4.MapScene";
-    [SerializeField] private string sessionConnectPanelName = "Pannel_SessionConnect";
 
     /// <summary>현재 게임 상태. 씬 전환 시점에 갱신된다.</summary>
     public GameState CurrentState { get; private set; } = GameState.Title;
@@ -35,7 +34,6 @@ public class GameManager : MonoBehaviour
 
     public bool IsMainGameReady { get; private set; }
 
-    private bool _hideSessionConnectPanelOnLobbyLoad;
     private bool _suppressStartupSceneLoad;
 
     /// <summary>
@@ -170,8 +168,7 @@ public class GameManager : MonoBehaviour
 
     public void GoToLobby()
     {
-        _hideSessionConnectPanelOnLobbyLoad = IsInNetworkSession();
-        Debug.Log($"[SceneFlow] GameManager.GoToLobby LoadScene lobbySceneName={lobbySceneName} hideSessionPanel={_hideSessionConnectPanelOnLobbyLoad}");
+        Debug.Log($"[SceneFlow] GameManager.GoToLobby LoadScene lobbySceneName={lobbySceneName}");
         SceneManager.LoadScene(lobbySceneName);
     }
 
@@ -275,78 +272,5 @@ public class GameManager : MonoBehaviour
                 NetworkClock.Instance.MarkMainGameStart();
             }
         }
-
-        if (scene.name != lobbySceneName)
-        {
-            return;
-        }
-
-        ApplyLobbySessionConnectPanelState();
-    }
-
-    private void ApplyLobbySessionConnectPanelState()
-    {
-        // 부스 데모 흐름은 설정 파일로 자동 접속하므로 옛 연결 패널을 늘 숨긴다(삭제는 PLAN-48 C9).
-        var shouldHide = _hideSessionConnectPanelOnLobbyLoad || IsInNetworkSession() || DemoSessionDirector.IsDemoFlowActive;
-        _hideSessionConnectPanelOnLobbyLoad = IsInNetworkSession();
-        Debug.Log($"[SceneFlow] GameManager.ApplyLobbySessionConnectPanelState shouldHide={shouldHide} inNetwork={_hideSessionConnectPanelOnLobbyLoad}");
-
-        if (!shouldHide)
-        {
-            return;
-        }
-
-        var sessionConnectPanel = FindInActiveScene(sessionConnectPanelName);
-        if (sessionConnectPanel != null)
-        {
-            sessionConnectPanel.SetActive(false);
-        }
-    }
-
-    private static bool IsInNetworkSession()
-    {
-        var networkManager = NetworkManager.Singleton;
-        return networkManager != null &&
-               networkManager.IsListening &&
-               (networkManager.IsHost ||
-                networkManager.IsServer ||
-                networkManager.IsClient ||
-                networkManager.IsConnectedClient);
-    }
-
-    private static GameObject FindInActiveScene(string objectName)
-    {
-        var activeScene = SceneManager.GetActiveScene();
-        var rootObjects = activeScene.GetRootGameObjects();
-
-        foreach (var rootObject in rootObjects)
-        {
-            var target = FindInChildren(rootObject.transform, objectName);
-            if (target != null)
-            {
-                return target.gameObject;
-            }
-        }
-
-        return null;
-    }
-
-    private static Transform FindInChildren(Transform parent, string objectName)
-    {
-        if (parent.name == objectName)
-        {
-            return parent;
-        }
-
-        for (var i = 0; i < parent.childCount; i++)
-        {
-            var target = FindInChildren(parent.GetChild(i), objectName);
-            if (target != null)
-            {
-                return target;
-            }
-        }
-
-        return null;
     }
 }

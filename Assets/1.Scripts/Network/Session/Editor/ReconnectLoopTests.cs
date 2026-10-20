@@ -118,6 +118,20 @@ public sealed class ReconnectLoopTests
         Assert.AreEqual(DemoJoinRejectReason.None, loop.LastReason, "접속에 성공하면 비운다");
     }
 
+    [Test]
+    public void 재합류_대기_거절도_재시도한다()
+    {
+        // C14 — 명단 안 사람이 씬 전환·옛 연결 정리를 기다리는 거절. 다른 거절과 같이 간격 뒤 다시 붙는다.
+        var loop = ClientInBackoff(DemoJoinRejectReason.RejoinWaiting, 2);
+        Assert.AreEqual(DemoJoinRejectReason.RejoinWaiting, loop.LastReason);
+        Assert.AreEqual(ReconnectCommand.StartClient, loop.Tick(2 + Retry));
+        Assert.AreEqual(DemoJoinRejectReason.RejoinWaiting, loop.LastReason, "다음 시도 중에도 재합류 대기 문구를 보여 준다");
+
+        loop.OnClientConnected(3 + Retry);
+        Assert.AreEqual(ReconnectState.Connected, loop.State);
+        Assert.AreEqual(DemoJoinRejectReason.None, loop.LastReason);
+    }
+
     // ─── 호스트 ────────────────────────────────────────────────────────
 
     [Test]
@@ -277,6 +291,8 @@ public sealed class ReconnectLoopTests
         Assert.AreEqual(string.Empty, DemoJoinRejectReasonText.ToDisplayText(DemoJoinRejectReason.None));
         StringAssert.Contains("판이 끝나면 자동 입장", DemoJoinRejectReasonText.ToDisplayText(DemoJoinRejectReason.GameInProgress));
         StringAssert.Contains("3/3", DemoJoinRejectReasonText.ToDisplayText(DemoJoinRejectReason.LobbyFull));
+        Assert.AreEqual(DemoConnectUiStrings.RejoinWaiting.Text, DemoJoinRejectReasonText.ToDisplayText(DemoJoinRejectReason.RejoinWaiting),
+            "재합류 대기 문구는 Strings 키(UI.DemoConnect.RejoinWaiting)에서 온다");
         foreach (DemoJoinRejectReason r in System.Enum.GetValues(typeof(DemoJoinRejectReason)))
         {
             if (r != DemoJoinRejectReason.None)

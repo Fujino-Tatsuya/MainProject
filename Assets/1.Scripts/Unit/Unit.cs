@@ -380,6 +380,22 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     /// <summary>
+    /// [서버] 현재 체력을 그 값(0~최대 체력)으로 맞춘다 — 판 도중 재합류 생명 복원(할 일 48 C14 R5c) 전용.
+    /// 피해·회복 경로가 아니라 결과 통계·피격 연출 RPC·사망 신호(<see cref="Died"/>)를 내지 않는다.
+    /// 0 이면 사망 래치를 걸어 Soul·PermanentDead 로 복원된 플레이어에게서 Died 가 나지 않게 한다(<see cref="Revive"/> 가 푼다).
+    /// </summary>
+    public void SetCurrentHealthOnServer(int health)
+    {
+        if (!IsServer || _health == null) return;
+        int target = Mathf.Clamp(health, 0, _health.MaxHp);
+        _health.Revive();
+        if (target < _health.MaxHp)
+            _health.TakeHpDamage(_health.MaxHp - target);
+        _currentHp.Value = _health.CurrentHealth;
+        _deathNotified = target <= 0;
+    }
+
+    /// <summary>
     /// increaseAmount만큼 방어력을 증가시키는 함수
     /// </summary>
     /// <param name="increaseAmount">증가시킬 방어력 양</param>

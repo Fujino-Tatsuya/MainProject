@@ -411,6 +411,7 @@ public sealed partial class TutorialDirector : NetworkBehaviour
         _subscribedNm.OnClientConnectedCallback += HandleClientConnected;
         _subscribedNm.OnClientDisconnectCallback += HandleClientDisconnected;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
+        MatchRoster.PlayerRejoined += HandlePlayerRejoinedServer;
         SubscribeBossPath();
 
         // [0, CounterCount) = 값, [CounterCount, 2·CounterCount) = 목표(존2 목표가 장부 수라 클라도 알아야 한다).
@@ -435,6 +436,7 @@ public sealed partial class TutorialDirector : NetworkBehaviour
             _subscribedNm = null;
         }
         PlayerLifeCycleController.ServerLifeStateChanged -= HandleServerLifeStateChanged;
+        MatchRoster.PlayerRejoined -= HandlePlayerRejoinedServer;
         if (_teleport != null)
         {
             _teleport.AlivePlayersArrived -= HandleBossRoomArrived;
@@ -790,6 +792,25 @@ public sealed partial class TutorialDirector : NetworkBehaviour
         if (_model.MarkDisconnected(clientId))
             Edit.Log($"[Tutorial] client {clientId} 이탈 — 남은 참가자 {_model.ParticipantCount}명 기준으로 재판정.", this);
         _areas?.RemovePlayer(clientId);
+        Commit();
+    }
+
+    // 판 도중 재합류(할 일 48 C14 R4c · 설계 메모 R-b) — 새 clientId 가 옛 기록의 개인 체크·완전 사망을 이어 받는다.
+    // 안 하면 새 기록(CheckMask 0)이 개인 게이트를 교착 방지 60초까지 막는다. 재합류자는 첫 스폰 지점에서 다시 출발하므로
+    // 개인 뒤 배리어 마스크는 0 — 앞으로 걸어가며 지나는 배리어가 다시 닫힌다.
+    private void HandlePlayerRejoinedServer(string playerId, ulong oldClientId, ulong newClientId)
+    {
+        if (_model == null || !IsSpawned) return;
+        if (!_model.RebindPlayer(oldClientId, newClientId))
+        {
+            Edit.LogWarning($"[Tutorial] 재합류 {playerId} client {oldClientId}→{newClientId} — 옛 기록이 없어 이어 받지 못했다(새 기록으로 진행).", this);
+            return;
+        }
+
+        _backBarrierMasks.Remove(newClientId);
+        _model.TryGetPlayer(newClientId, out TutorialPlayerProgress p);
+        Edit.Log($"[Tutorial] 재합류 {playerId} client {oldClientId}→{newClientId} — 체크 0x{p.CheckMask:X}·완전 사망 {p.PermanentDead} 이어 받음, " +
+                 $"뒤 배리어 0 (참가자 {_model.ParticipantCount}명).", this);
         Commit();
     }
 

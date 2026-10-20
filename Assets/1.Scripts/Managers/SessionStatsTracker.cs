@@ -46,6 +46,7 @@ public sealed class SessionStatsTracker : MonoBehaviour
         CombatStatsEvents.ServerHealApplied += HandleHealApplied;
         CombatStatsEvents.ServerCounterSucceeded += HandleCounterSucceeded;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
+        MatchRoster.PlayerRejoined += HandlePlayerRejoined;
     }
 
     private void OnDisable()
@@ -55,6 +56,7 @@ public sealed class SessionStatsTracker : MonoBehaviour
         CombatStatsEvents.ServerHealApplied -= HandleHealApplied;
         CombatStatsEvents.ServerCounterSucceeded -= HandleCounterSucceeded;
         PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
+        MatchRoster.PlayerRejoined -= HandlePlayerRejoined;
 
         if (Active == this)
             Active = null;
@@ -139,6 +141,17 @@ public sealed class SessionStatsTracker : MonoBehaviour
 
         RememberPlayer(clientId);
         _aggregator.RecordLifeStateChange(clientId, previous, current);
+    }
+
+    // 판 도중 재합류(할 일 48 C14 R5c) — 옛 clientId 행을 새 clientId 행으로 합친다(같은 사람 1행). 발행 순서와 무관하다.
+    private void HandlePlayerRejoined(string playerId, ulong oldClientId, ulong newClientId)
+    {
+        if (_captured || !IsCountingAuthority())
+            return;
+
+        RememberPlayer(newClientId);
+        if (_aggregator.Rebind(oldClientId, newClientId))
+            Debug.Log($"[Rejoin] 결과 행 합침 playerId={playerId} {oldClientId} → {newClientId} (행 {_aggregator.PlayerCount}개)");
     }
 
     // 행 등록 + 캐릭터 id 캐시. 스토어는 접속이 끊기면 그 clientId 를 지우므로(NetworkSessionLauncher)

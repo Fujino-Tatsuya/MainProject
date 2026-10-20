@@ -24,6 +24,10 @@ public static class BuildWindowsPlayer
     /// EditorBuildSettings 에서도 빠졌다 — 더 이상 출하하지 않으므로 여기서도 요구하지 않는다.
     /// <c>0.BootStrapScene</c> 의 GameManager 인스턴스가 <c>mainGameSceneName</c> 을
     /// <c>4.MapScene</c> 으로 오버라이드한다.
+    /// <para>
+    /// 2026-10-19 PLAN-48 C13: <c>5.ResultScene</c> 은 흐름에서 빠졌다(결과 = 로비 결과 패널) — EditorBuildSettings 에서도 뺐다.
+    /// 씬 파일·<c>ResultSceneManager</c> 는 보관만 한다. 대신 데모 대기 씬 <c>6.DemoConnectScene</c> 이 필수다.
+    /// </para>
     /// </summary>
     private static readonly string[] RequiredScenes =
     {
@@ -32,7 +36,7 @@ public static class BuildWindowsPlayer
         "Assets/0.Scenes/MainFlow/2.LoadingScene.unity",
         "Assets/0.Scenes/MainFlow/3.LobbyScene.unity",
         "Assets/0.Scenes/MainFlow/4.MapScene.unity", // 🔴 정본 — 부트스트랩이 여는 전투 맵
-        "Assets/0.Scenes/MainFlow/5.ResultScene.unity",
+        "Assets/0.Scenes/MainFlow/6.DemoConnectScene.unity", // 부스 데모 접속 대기(DemoSessionDirector)
     };
 
     private const string DefaultOutput = "../MainProjectBuilds/Windows/MainProject.exe";
@@ -131,7 +135,23 @@ public static class BuildWindowsPlayer
         }
 
         Debug.Log($"[Build] SUCCEEDED exe={outputPath}");
+        CopyDemoConnectionSamples(outputPath);
         return true;
+    }
+
+    /// <summary>
+    /// 부스 데모 연결 설정 샘플(호스트·클라)을 exe 폴더에 둔다 — Docs/tech/lobby-demo-flow.md. 세 빌드 메뉴·CLI 가 모두 여기를 지난다.
+    /// 실패해도 빌드 결과는 그대로 성공이다(샘플 없이도 exe 는 호스트로 뜬다). 콘솔 에러로만 알린다.
+    /// </summary>
+    private static void CopyDemoConnectionSamples(string outputPath)
+    {
+        var projectRoot = Path.GetDirectoryName(Application.dataPath);
+        var errors = new List<string>();
+        var copied = DemoConnectionSamples.CopyToBuild(DemoConnectionSamples.ResolveSourceDirectory(projectRoot), outputPath, errors);
+        foreach (var error in errors)
+            Debug.LogError($"[Build] demo-connection {error}");
+        Debug.Log($"[Build] demo-connection samples copied={copied}/{DemoConnectionSamples.SampleFileNames.Count} " +
+                  $"dir={Path.GetDirectoryName(outputPath)} — PC 마다 하나를 {DemoConnectionConfig.FileName} 으로 이름을 바꿔 쓴다");
     }
 
     /// <summary>메인 플로우 씬 누락과 0번 씬 오배치를 잡는다. 부트스트랩이 0번이 아니면 실행 시 타이틀로 못 넘어간다.</summary>

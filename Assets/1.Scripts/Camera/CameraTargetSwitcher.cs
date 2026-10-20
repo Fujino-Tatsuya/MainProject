@@ -206,12 +206,22 @@ public class CameraTargetSwitcher : MonoBehaviour
         for (int i = 0; i < cameraFollowTargets.Count; i++)
         {
             NetworkObject networkObject = cameraFollowTargets[i].GetComponentInParent<NetworkObject>();
-            if (networkObject != null && networkObject.IsOwner)
+            if (networkObject != null && IsOwnerFollowCandidate(networkObject.IsSpawned, networkObject.IsOwner))
             {
                 SetTarget(i);
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// 오너 추적 후보인가 — 스폰돼 있고 내 것. 로비 캐릭터 교체(할 일 48 C12)는 옛 PlayerObject 를 디스폰한 같은 프레임에
+    /// 새 Variant 를 세우므로, 파괴 직전의 옛 오브젝트(IsSpawned=false, IsOwner 는 여전히 참)가 태그 검색에 남는다 — 그걸 건너뛴다.
+    /// 새 오너 플레이어는 <see cref="Player"/>.OnNetworkSpawn → <see cref="FocusOwnerPlayer"/> 로 다시 붙는다.
+    /// </summary>
+    public static bool IsOwnerFollowCandidate(bool isSpawned, bool isOwner)
+    {
+        return isSpawned && isOwner;
     }
 
     private void Update()

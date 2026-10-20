@@ -15,7 +15,7 @@ public enum LobbyResultCloseReason
 public sealed class LobbyResultPanelRules
 {
     /// <summary>기본 자동 닫힘 시간(초). 0 이하면 자동으로 닫지 않는다.</summary>
-    public const float DefaultAutoCloseSeconds = 15f;
+    public const float DefaultAutoCloseSeconds = 180f;
 
     public LobbyResultPanelRules(float autoCloseSeconds = DefaultAutoCloseSeconds)
     {
