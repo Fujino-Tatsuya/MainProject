@@ -236,6 +236,13 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(1f, t.WalkProgressAt(1, t.DoorCloseAt), Eps, "도착 뒤 = 칸 안 고정");
     }
 
+    // 경유 지점 없는 직선 보행 = 점 하나짜리 경로.
+    static Vector3 StepToward(Vector3 toTarget, double timeLeft, float dt)
+    {
+        int index = 0;
+        return BossElevatorTimeline.WalkStepAlongPath(Vector3.zero, new[] { toTarget }, ref index, timeLeft, dt);
+    }
+
     [Test]
     public void WalkStep_RemainingDistanceOverRemainingTime_Horizontal()
     {
@@ -243,15 +250,15 @@ public sealed class BossElevatorTimelineTests
         const float dt = 0.02f;
         var toTarget = new Vector3(3f, 0.47f, 4f); // 수평 5m, 칸 바닥이 0.47m 높다
 
-        Vector3 step = BossElevatorTimeline.WalkStep(toTarget, t.WalkDuration, dt);
+        Vector3 step = StepToward(toTarget, t.WalkDuration, dt);
         Assert.AreEqual(0f, step.y, Eps, "높이는 지면에 맡긴다 — 수직 성분 없음");
         Assert.AreEqual(5f / t.WalkDuration * dt, step.magnitude, Eps, "남은 거리 ÷ 남은 시간 × dt");
         Assert.AreEqual(0.6f, step.x / step.magnitude, Eps, "목표 방향");
 
-        Assert.AreEqual(2f * step.magnitude, BossElevatorTimeline.WalkStep(toTarget, t.WalkDuration * 0.5, dt).magnitude, Eps,
+        Assert.AreEqual(2f * step.magnitude, StepToward(toTarget, t.WalkDuration * 0.5, dt).magnitude, Eps,
             "막혀서 뒤처지면(시간이 절반 남음) 다음 틱 속도가 올라 따라잡는다");
-        Assert.AreEqual(5f, BossElevatorTimeline.WalkStep(toTarget, dt * 0.5, dt).magnitude, Eps, "남은 시간이 한 틱 이하면 남은 거리 전부");
-        Assert.AreEqual(Vector3.zero, BossElevatorTimeline.WalkStep(toTarget, 1.0, 0f), "dt 0 = 이동 없음");
+        Assert.AreEqual(5f, StepToward(toTarget, dt * 0.5, dt).magnitude, Eps, "남은 시간이 한 틱 이하면 남은 거리 전부");
+        Assert.AreEqual(Vector3.zero, StepToward(toTarget, 1.0, 0f), "dt 0 = 이동 없음");
     }
 
     [Test]
@@ -265,13 +272,69 @@ public sealed class BossElevatorTimelineTests
         Vector3 half = Vector3.zero;
         for (double now = start; now < end - 1e-6; now += dt)
         {
-            position += BossElevatorTimeline.WalkStep(target - position, end - now, dt);
+            position += StepToward(target - position, end - now, dt);
             if (half == Vector3.zero && now + dt >= start + t.WalkDuration * 0.5 - 1e-6) half = position;
         }
 
         Assert.AreEqual(0f, (target - position).magnitude, 1e-3f, "도착 시각에 칸 안 지점");
         Assert.AreEqual(0.5f, half.magnitude / target.magnitude, 0.02f, "막힘이 없으면 등속(절반 시간 = 절반 거리)");
         Assert.AreEqual(2f, t.WalkDuration, Eps, "시간표 기대값은 그대로");
+    }
+
+    // ─── 보행 경로(할 일 64 — 경유 지점) ───────────────────────────────────
+
+    [Test]
+    public void PathLength_SumsHorizontalSegments()
+    {
+        var path = new[] { new Vector3(3f, 0.5f, 0f), new Vector3(3f, 0f, 4f) };
+        Assert.AreEqual(7f, BossElevatorTimeline.PathLength(Vector3.zero, path), Eps, "3 + 4, 높이 차는 빼고");
+        Assert.AreEqual(5f, BossElevatorTimeline.PathLength(Vector3.zero, new[] { new Vector3(3f, 2f, 4f) }), Eps, "경유 없음 = 직선");
+        Assert.AreEqual(0f, BossElevatorTimeline.PathLength(Vector3.zero, new Vector3[0]), Eps);
+    }
+
+    [Test]
+    public void WalkStepAlongPath_CrossesCornerAndAdvancesIndex()
+    {
+        var path = new[] { new Vector3(1f, 0f, 0f), new Vector3(1f, 0f, 3f) }; // 총 4m
+        int index = 0;
+        // 남은 4m, 시간 1초 중 0.5초 틱 → 2m: 첫 점(1m)을 지나 꺾여 z 로 1m.
+        Vector3 step = BossElevatorTimeline.WalkStepAlongPath(Vector3.zero, path, ref index, 1.0, 0.5f);
+        Assert.AreEqual(1, index, "꺾이는 점을 지나 다음 점을 향한다");
+        Assert.AreEqual(new Vector3(1f, 0f, 1f), step);
+
+        // 남은 시간이 한 틱 이하 = 끝점까지, 인덱스는 마지막 점에 머문다.
+        Vector3 rest = BossElevatorTimeline.WalkStepAlongPath(step, path, ref index, 0.01, 0.02f);
+        Assert.AreEqual(1, index);
+        Assert.AreEqual(0f, (step + rest - path[1]).magnitude, Eps);
+    }
+
+    [Test]
+    public void WalkStepAlongPath_FollowedEachTick_ConstantSpeedAndArrivesAtWalkEnd()
+    {
+        // 리그가 경로 총길이로 시간표를 짠다 — 경유 지점이 있어도 보행 시간 = 길이 ÷ 속도, 오너는 그 시간 동안 등속.
+        var front = Vector3.zero;
+        var path = new[] { new Vector3(0f, 0f, 2f), new Vector3(2f, 0f, 2f), new Vector3(2f, 0.47f, 4f) }; // 6m
+        float length = BossElevatorTimeline.PathLength(front, path);
+        var t = new BossElevatorTimeline(Settings(), ClipOpen, ClipClose, Walkers, length);
+        Assert.AreEqual(2f, t.WalkDuration, Eps, "6m ÷ 3m/s — 직선 6m 와 같은 시간표");
+
+        const float dt = 0.02f;
+        int index = 0;
+        Vector3 position = front;
+        double start = t.WalkStartAt(0), end = t.WalkEndAt(0);
+        float maxStep = 0f, minStep = float.MaxValue;
+        for (double now = start; now < end - 1e-6; now += dt)
+        {
+            Vector3 step = BossElevatorTimeline.WalkStepAlongPath(position, path, ref index, end - now, dt);
+            position += step;
+            if (now + dt < end - 1e-6) { maxStep = Mathf.Max(maxStep, step.magnitude); minStep = Mathf.Min(minStep, step.magnitude); }
+        }
+
+        Assert.AreEqual(2, index, "마지막 점까지 왔다");
+        Assert.AreEqual(0f, Vector3.ProjectOnPlane(path[2] - position, Vector3.up).magnitude, 1e-3f, "도착 시각에 칸 안 지점");
+        // 모서리를 자르는 틱만 변위가 조금 짧다(직각 꺾임 = 최대 √2 배) — 그 외엔 3m/s × dt.
+        Assert.AreEqual(3f * dt, maxStep, 1e-3f, "등속");
+        Assert.Greater(minStep, 3f * dt / 1.5f, "모서리 틱도 크게 느려지지 않는다");
     }
 
     [Test]
