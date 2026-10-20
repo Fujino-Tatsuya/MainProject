@@ -3,9 +3,10 @@
 /// <summary>
 /// E 수호자의 의지 설계값 — 전방 방어 후 자동 반격.
 /// 반격 피해는 base의 AttackDamageMultiplier/FlatDamageBonus, 반격 대상 레이어는 base의 HittableLayers를 쓴다.
-/// 방어 창·반격 판정·반격 종료는 초 값이 아니라 클립 이벤트다(방어 클립 Custom0·Custom1, 반격 클립 Hit·End —
+/// 방어 창·반격 판정·반격 종료는 초 값이 아니라 클립 이벤트다(방어 시작 Custom0 · 방어 종료 Custom1, 반격 클립 Hit·End —
 /// <see cref="FirstMeleeSubSkill"/>). 초 단위 값은 안전망 maxActiveDuration 하나만 남는다.
-/// 🔴 maxActiveDuration 은 방어 클립 Custom1 + 반격 클립 End 보다 길어야 한다(지금 1.0 + 0.4 &lt; 1.5).
+/// 🔴 maxActiveDuration 은 방어 종료 Custom1 시각 + 반격 클립 End 보다 길어야 한다
+/// (2026-10-20 정식 클립: 시작 1.0 + 유지 0.5 + 종료 Custom1 0.93 ≈ 2.43, + 반격 End 1.1 ≈ 3.53 → 3.6 이상).
 /// 짧으면 반격 중에 안전망이 E 를 끊는다(반격은 OnEnd 보장 반격으로 1회 나간다).
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/Skills/FirstMelee Sub Skill Data (수호자의 의지)")]
