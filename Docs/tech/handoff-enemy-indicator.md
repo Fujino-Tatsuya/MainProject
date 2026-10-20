@@ -247,11 +247,38 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 5. 도메인 리로드 직후 + `EnsureView`(판 3장 생성). 콜드 2회째부터 1.2ms(웰즈)·0.7ms(점프).
 6. 점프 뷰는 매번 새 GameObject 를 만든다(57 이전 VFX 카탈로그 경로도 생성했다) — 그 래퍼 할당. 텍스처·재질은 만들지 않는다(§9.5 결정적 테스트).
 
-**수용 기준(PLAN-57 §6 "첫 호출 각 1ms 미만")**:
-- **콜드 첫 호출 — 미충족.** 23호 돌진 `Show` **42.29 ms** · 웰즈 드론 `ClientLock` **7.87 ms** · 점프 `CreateJump` **2.95 ms**(에디터 도메인 리로드 직후 첫 호출, JIT·정적 생성자·`EnsureBuilt`/`EnsureView` 오브젝트 생성 포함). 정적 캐시만 비운 콜드도 2.4~2.7ms(`Show`)로 1ms 를 넘는다.
-- **예열 후 첫 호출 — 충족**(최대 0.181ms, 합집합 길이 변경 `Show`). 단, 이것은 PLAN 기준(첫 호출)이 아니다.
-- **GPU 첫 드로우는 측정 밖**(위) — 빌드에서 셰이더 변형 첫 사용 비용이 더해질 수 있다.
-- 남은 일 = 스폰/씬 준비 때 `EnsureBuilt`·`EnsureView`·재질·셰이더 워밍을 미리 해 첫 호출을 예열 후 수준으로 내리는 **예열 방안 — 사용자 결정 대기**(아직 코드 없음).
+**로딩 씬 예열(할 일 57 R 예열, 사용자 결정 10-20 "예열을 넣되 로딩 씬에서")** — 위 표의 "예열 후" 열(같은 오브젝트 반복)과 다른 것이다:
+- **진입점** = `EnemyC3Visuals.Prewarm()`(구현 `Monster/EnemyC3Prewarm.cs`). Play 당 1회(플래그는 `ResetForPlay` 가 내린다), 두 번째부터 무동작·false. 예외는 로그만 남기고 삼킨다.
+- **호출 위치** = `NetworkLoadingFlowController.HandleLoadStarted`(타깃 씬 NGO `Load` 이벤트) 한 줄 — 호스트·클라 모두, 로딩 화면이 떠 있는 동안. 보스·몬스터 스폰 코드는 건드리지 않았다. 판 재시작(Alt+0)도 이 경로를 타지만 이미 했으므로 무동작.
+- **하는 일** (a) JSON(`Get`)·판/데칼 재질·판 층 10종 MPB·스매시 09 sprite (b) 셰이더 — 코드로 만든 `ShaderVariantCollection.WarmUp`(에셋·Preloaded Shaders 무변경, 세 셰이더는 이미 Resources 재질로 빌드에 들어간다): `EnemyC3Plate`·`TelegraphQuad`(PassType.Normal) + `SG_EnemyC3Decal` `{_DBUFFER_MRT3 _DECAL_LAYERS}`·`{_DBUFFER_MRT3}`·`{_DECAL_NORMAL_BLEND_LOW _DECAL_LAYERS}`·`{_DECAL_NORMAL_BLEND_LOW}` = `PC_Renderer` 데칼 설정(Automatic→DBuffer · surfaceData AlbedoNormalMAOS · decalLayers 켜짐 · normalBlend Low) (c) 화면 밖(-10000) 숨김 더미로 `NewDecalInstance`·`SetDecalProperties`(부채꼴·띠·대시 띠·합집합)·`SetArcFill`(앞/뒤)·`SetRectFill`·`SetUnionFill`·`SetDiscFill`·프로젝터 켜고 끄기·`PaintPlate/PaintLayer/PaintActive`·`Paint(CodeShape)` 3종·`CreateJump`·`ApplySmash` 를 한 번씩 부르고 **같은 호출 안에서 `DestroyImmediate`**(재질 인스턴스·코드 SVC 포함). 남는 건 게임이 원래 만드는 공유 캐시(`BossPatternVisuals` 판 재질·쿼드)뿐.
+- **보이지 않는 1프레임 드로우를 안 쓴 이유**: 데칼은 불투명 표면 + DBuffer 패스가 있는 카메라에서만 그려져 로딩 씬 카메라·렌더러 구성에 묶이고, 한 프레임 살아 있는 오브젝트(또는 씬 수정)가 필요하다.
+- **로딩 대기** = 완료 조건이 **아니다**. 이벤트 프레임에서 동기 실행(한 프레임 히치, 로딩 화면 중)이고, 최소 표시 시간 타이머(5 s)는 바로 위에서 시작하므로 **타이머와 병렬** — 타깃 로드 + 예열이 5 s 안이면 완료 시각은 그대로. 실측 **46~63 ms**(에디터, data 12 · shaders 1.7 · paths 47 ms — `S5/prewarm.txt`).
+  🔴 에디터는 처음 쓰는 변형을 여기서 **동기 컴파일**한다 — 셰이더 캐시가 빈 첫 회만 0.6~10.3 s(실측). 10 s 면 그 회만 로딩이 5 s 를 넘겨 늘어난다. 빌드는 미리 컴파일돼 있다.
+- **로딩 흐름을 안 거치는 진입**(훅 없음 — 사용자 판단): 에디터에서 `4.MapScene`·`BossScene`·`MonsterScene`·`TrashMobScene`·`VFXScene`·`Debug/*`·`Art/*` 직접 Play(타깃 Load 이벤트 없음 → 예열 없음, 첫 예고가 콜드 비용). `Dev_Boot`(`DevSceneBooter`)는 타깃을 NGO 로 로드해 `HandleLoadStarted` 를 타므로 **예열은 돌지만** 로딩 화면이 없고(표시 시간 0) 부팅이 ~63 ms 늘어난다. `6.DemoConnectScene` 은 로비로 가서 정식 로딩 흐름을 탄다.
+
+예열 후 콜드 첫 호출 — 메뉴 `Tools/Enemy C3/Measure prewarm then first calls`(대조군 `… (control, no prewarm)`), 각각 **도메인 리로드 직후** 첫 실행. 원본 = `S5/prewarm.txt`·`control.txt`·`prewarm-summary.txt`(`perf.txt`·`perf.tsv` 끝에도 붙였다).
+
+| 경로(새 오브젝트 첫 호출) | 대조군(예열 없음) | 예열 후 | 1 ms 미만 |
+|---|---:|---:|:---:|
+| 23호 돌진 `Show`(합집합 02, `EnsureBuilt` 포함) | 43.69 ms | **11.10 ms**(실행별 8.5~11.1) | ❌ |
+| └ 남는 비용: `EnsureBuilt`(프로젝터 6개 + 재질 인스턴스 6개) | — | 2.39 ms(10회 평균 2.31 — 보스 컴포넌트마다 1회) | |
+| └ `EnsureBuilt` 뒤 `Show` | — | 0.34 ms | |
+| └ 나머지 ≈ 8 ms = `BossAttackConeTelegraph` 자체 메서드 JIT(보스 컴포넌트라 예열에서 세우지 않음) | | | |
+| 웰즈 드론 `ClientLock`(판 14, `EnsureView` 포함) | 12.38 ms | **2.87 ms**(2.3~2.9) | ❌ |
+| └ `EnsureView` 0.14 ms · 그 뒤 `ClientLock` 0.12 ms → 나머지 ≈ 2.5 ms = `WellsDroneAttack` 메서드 JIT | | | |
+| 점프 `CreateJump`(→`Begin`) | 1.88 ms | **0.75 ms** | ✅ |
+| 방향 표식 `ApplyDecal`(`SetArcFill`, 프로젝터 준비 후) | 0.12 ms⁷ | **0.22 ms** | ✅ |
+| └ 남는 비용: `BuildRenderers`(프로젝터 2개) | 0.55 ms⁷ | 0.87 ms | |
+| `BossPatternVisuals.Paint(CodeShape)` | 0.34 ms⁷ | **0.14 ms** | ✅ |
+
+7. 대조군에서 첫 행 뒤의 경로는 앞 경로가 JIT 한 공용 코드 위에서 잰 값(순서 효과)이라 순수 콜드가 아니다. 순수 콜드 기준은 위 S5 표(42.29 / 7.87 / 2.95 ms).
+- `RuntimeHelpers.PrepareMethod` 로 보스 컴포넌트 메서드만 JIT 하는 안은 **Mono 에서 무동작**(53개 0.29 ms, `Show` 그대로 — `S5/experiment-preparemethod.txt`, 출하 안 함). 남은 JIT 을 없애려면 보스 컴포넌트를 미리 세우거나(스폰 경로 — 이번 결정 밖) IL2CPP(AOT) 빌드.
+
+**수용 기준(PLAN-57 §6 "첫 호출 각 1ms 미만")** — 예열 후, 경로별:
+- **충족**: 점프 `CreateJump` 0.75 ms · 방향 표식 `ApplyDecal` 0.22 ms · `Paint(CodeShape)` 0.14 ms. C3 칠하기 함수 자체(값 넣기·MPB·sprite)는 전부 1 ms 미만.
+- **미충족**: 23호 돌진 `Show` **11.10 ms**(42.29 → 약 1/4) · 웰즈 드론 `ClientLock` **2.87 ms**(7.87 → 약 1/3). 남는 것은 C3 가 아니라 **보스 컴포넌트 자체 JIT**(≈ 8 ms · 2.5 ms)와 **보스 오브젝트별 생성**(`EnsureBuilt` 2.3 ms · `BuildRenderers` 0.7~0.9 ms · `EnsureView` 0.1 ms — 컴포넌트마다 1회) — 로딩 씬 예열 범위(보스를 세우지 않는다) 밖.
+- **GPU 첫 드로우는 측정 밖** — Windows 빌드 기본 API 는 D3D12 이고, D3D12/Vulkan/Metal 에서 SVC `WarmUp` 은 셰이더 프로그램까지만 준비한다. 파이프라인 상태(PSO: 렌더 상태·RT 포맷)는 첫 그리기에서 만든다(남는 비용). 완전 예열은 빌드에서 `GraphicsStateCollection` 트레이스 → WarmUp 이 필요하다(사용자 결정).
+- **데칼 변형 커버 확인의 한계**: 실제 렌더가 쓴 변형을 에디터에서 추적하지 못했다(`ShaderUtil.SaveCurrentShaderVariantCollection` 은 대화상자 필요, `GraphicsStateCollection` 트레이스는 EditMode 렌더에서 0개). DBuffer 커버는 렌더러 설정 + URP 키워드 규칙 근거이고(테스트 `DecalKeywords_MatchTheProjectRendererDecalSettings` 가 설정이 바뀌면 목록 갱신을 요구), ScreenSpace 대체 경로의 조명 키워드 조합(`_MAIN_LIGHT_SHADOWS*` 등)은 덮지 않는다(데스크톱 기본 경로 아님).
 
 예고 1회당 GC(예열 후) — C3 값 넣기 경로(Rebuild*·`ApplyFill`·`PaintPlate`·`PaintLockCircle`·`ClientLock`·`ApplyDecal`·`Paint(CodeShape)`)는 **0 B**, 0 이 아닌 곳은 위 주 2·4·6(C3 와 무관한 기존 흐름·오브젝트 생성). 예전 CPU 굽기 대비 예열 후 `PaintPlate("14")` 는 약 30만 배, 합집합 외곽선은 약 7만 배 싸다(에디터 기준). 사용자 프로파일 수치(4,237ms Deep / 181ms)는 빌드·Play 환경이라 직접 비교 대상이 아니다 — Play 프로파일 재확인은 §9.11.
 
@@ -261,6 +288,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 |---|---|
 | `EnemyC3RuntimeTextureGuardTests`(6) | `Monster/**`·`Rendering/Telegraph/**` 의 Editor 밖 `.cs` 에서 Texture2D 생성·`SetPixel(s/s32/Data)`·`Sprite.Create` 금지(위반 파일:줄·메서드 출력). **예외 목록 0**(S4c2 확정) — 다시 넣으려면 사용자 결정, `NoRuntimeExceptions` 가 막는다. 할 일 57 R: 작은 렉서로 주석·문자열(일반·verbatim·보간 — 구멍은 코드)·문자 리터럴을 지운 뒤 **파일 전체**를 검사 → `UnityEngine.`/`global::` 정규화 이름·`using` 별칭·Texture2D 로 선언된 변수·필드·프로퍼티·반환의 target-typed `new()`·줄바꿈 생성식·닫힌 블록 주석 뒤 코드·`using static` Sprite 도 잡고, 문자열 속 금지어는 무시(`ScannerCatchesBypasses` 자기검사). 알려진 한계: 의미 분석이 없어 인자 위치의 target-typed `new()`(`Foo(new(1,1))`)는 못 본다(Roslyn 은 에디터 참조 불확실로 미사용) |
 | `EnemyC3TelegraphInstanceTests`(6) | 예열 후 `Show`(합집합·띠·부채꼴·잡기 ×20 + 진행 단계)·`PaintPlate/PaintActive/Paint(CodeShape)` ×20·`CreateJump` ×10(+파괴)·`ApplySmash` ×20 을 되풀이해도 재질·Texture2D·Sprite 인스턴스 수가 늘지 않는다. 타이밍 단언은 넣지 않는다(머신마다 흔들림 — 시간은 §9.4 메뉴로). 할 일 57 R: 공격 예고 6조각이 예고 재질(`MA_TelegraphDecal`, 그리고 `MaterialOverride` 경로)의 renderQueue(+조각 순서)·`_DrawOrder`·Normal_Blend·각도 페이드·메시 바이어스를 물려받는지 |
+| `EnemyC3PrewarmTests`(6) | 할 일 57 R 예열: `Prewarm` 이 런타임 Texture2D 를 만들지 않고, 더미(오브젝트·재질 인스턴스·코드 SVC)가 남지 않으며(새 재질·메시는 `BossPatternVisuals` 공유 캐시 1개씩까지), 두 번째 호출은 무동작(오브젝트·재질·메시·텍스처 수 그대로), `ResetForPlay` 뒤 다시 돈다 · 데이터 캐시(MPB ≥ 10·JSON·스매시 sprite)가 찬다 · 목록의 셰이더 변형 6개가 전부 존재 · 데칼 키워드가 `PC_Renderer` 데칼 설정과 맞다 · 로딩 흐름 `HandleLoadStarted` 에 호출이 정확히 1개. 타이밍 단언 없음 |
 
 ### 9.6 픽셀 비교 테스트 (예전 CPU 그림 vs 셰이더, 384² RT, 기준 = 채널 오차 ≤ 2/255 픽셀 99% 이상)
 
@@ -308,12 +336,15 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | S5 | `2663e6a0` | 성능 측정 메뉴·결정적 테스트·이 절 |
 | R(A·B) | `c037f68a` | 공격 예고 데칼 인스턴스 `NewDecalInstance` 로(데칼 설정 보존), `EnemyC3Aa` 회전 불변(최대 특잇값) |
 | R(C·D) | `1844dd71` | 런타임 텍스처 정적 검사 렉서 기반 강화, 실제 데칼 렌더 비교 `EnemyC3DecalRenderTests` |
-| R(E) | 메시지 `할 일 57 R — 문서` | 이 절의 커밋·되돌리기·수용 기준 정정 |
+| R(E) | `a72f310e` | 이 절의 커밋·되돌리기·수용 기준 정정 |
+| R 예열 | `f0c69867` | 로딩 화면 중 예열 `EnemyC3Visuals.Prewarm`(`EnemyC3Prewarm.cs`) + `NetworkLoadingFlowController.HandleLoadStarted` 한 줄, 예열 후 콜드 첫 호출 측정 메뉴, `EnemyC3PrewarmTests` |
+| R 예열 문서 | 메시지 `할 일 57 R 예열 — 문서` | §9.4 예열·수용 기준, §9.5·§9.9~§9.11, `scene-flow-audit.md` 한 줄 |
 
 ### 9.10 되돌리기
 
 - 🔴 **Unity 를 닫고** 한다(여러 에셋·셰이더 그래프·`.meta` 를 한 번에 다시 쓴다 — `CLAUDE.md` 6번). 끝나면 `.meta` guid 가 그대로인지 확인.
-- **커밋 단위로, 최신부터 역순**: R 문서(`할 일 57 R — 문서`) → `1844dd71` → `c037f68a` → S5 `2663e6a0` → `d83f9817` → `bad1edea` → `298f8991` → `11c0fa1e` → `e7f92c18` → `f01990a7` → `dff34d8b`. 각 단계 뒤 컴파일 0 에러가 정상이다.
+- 예열만 빼려면 R 예열 문서(`할 일 57 R 예열 — 문서`) → `f0c69867` 두 개만 역순 revert 하면 된다(셰이더 경로는 그대로, 첫 예고가 §9.4 S5 표의 콜드 비용으로 돌아간다). 에셋·`.meta` 변경이 없어 Unity 를 켠 채로 해도 된다(`.cs` 만).
+- **커밋 단위로, 최신부터 역순**: R 예열 문서 → `f0c69867` → R 문서 `a72f310e` → `1844dd71` → `c037f68a` → S5 `2663e6a0` → `d83f9817` → `bad1edea` → `298f8991` → `11c0fa1e` → `e7f92c18` → `f01990a7` → `dff34d8b`. 각 단계 뒤 컴파일 0 에러가 정상이다.
   - 가운데 하나만 revert 하면 충돌하거나 컴파일이 깨진다(예: S4b 가 Bake 를 Editor 로 옮겼고 S4a·S4c 테스트가 그 위에 있다).
   - S4c2 까지만 되돌리면 `BossPatternVisuals` 런타임 굽기가 돌아오고 정적 검사 예외 목록도 함께 복원된다(같은 커밋). S4b 를 되돌리면 정적 검사 테스트 자체가 사라진다.
   - S1 까지 다 되돌리면 `637091b9` + `72cbefba` 상태(패키지 CPU 굽기, §9.1 스파이크 재발)다. C3 자체를 빼려면 이어서 §8.4.
@@ -334,3 +365,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - [ ] §9.7 알려진 차이(원 테두리 줄무늬·데칼 알파·원판 가장자리)가 화면에서 보이지 않는지
 - [ ] R 경사·원근 시점에서 판·데칼 외곽선 가장자리 폭이 모양 방향(돌진 방향)에 따라 달라지지 않는지(`EnemyC3Aa` 최대 특잇값)
 - [ ] R 첫 예고 프레임 히치(콜드 첫 호출 §9.4 미충족 + GPU 첫 드로우) — 예열 방안 결정의 근거로
+- [ ] R 예열: 정식 흐름(로비 → 로딩 → 맵)에서 콘솔 `[Enemy C3] Prewarm … ms` 가 호스트·클라(MPPM) **각각 1회**, 로딩 화면 중에 찍히는지 · 로딩 화면 애니메이션 끊김·로딩 완료 시각이 예전과 같은지
+- [ ] R 예열: 판 재시작(Alt+0)·두 번째 판에서 예열 로그가 다시 안 찍히는지(Play 당 1회), Play 재시작 뒤엔 다시 1회
+- [ ] R 예열: 프로파일러로 23호 돌진 첫 예고(남은 ≈ 11 ms — 보스 JIT·`EnsureBuilt`)·웰즈 드론 첫 고정(≈ 3 ms)·점프 첫 예고 프레임 — 대조는 §9.4 예열 표
+- [ ] R 예열(빌드, D3D12): 첫 데칼·판이 그려지는 프레임의 GPU/렌더 스레드 히치(PSO 생성 — SVC 로 못 덮는 부분)
