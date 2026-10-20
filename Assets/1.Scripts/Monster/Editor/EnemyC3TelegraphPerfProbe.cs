@@ -71,6 +71,205 @@ public static class EnemyC3TelegraphPerfProbe
         return txt;
     }
 
+    // ── 할 일 57 R 예열 — 예열 후 콜드 첫 호출 ─────────────────────
+    // 🔴 도메인 리로드 직후, C3 경로를 아무것도 부르지 않은 상태에서 실행해야 '콜드 첫 호출'이다(두 번째 실행은 JIT 이 끝나 있다).
+    //    대조군(예열 없음)도 같은 조건 — 리로드 → control 메뉴. 정적 캐시는 비우지 않는다(게임에서도 예열 뒤 그대로 남는다).
+
+    [MenuItem("Tools/Enemy C3/Measure prewarm then first calls")]
+    static void PrewarmMenu() => UnityEngine.Debug.Log("[Enemy C3] prewarm perf →\n" + RunPrewarm(true, out _));
+
+    [MenuItem("Tools/Enemy C3/Measure first calls (control, no prewarm)")]
+    static void ControlMenu() => UnityEngine.Debug.Log("[Enemy C3] control perf →\n" + RunPrewarm(false, out _));
+
+    /// <summary>예열(선택) → 경로별 첫 호출 → 같은 경로 새 오브젝트 9회 더(JIT 뒤 남는 생성 비용). 산출물 = S5/prewarm.txt·tsv(대조군은 control.*).</summary>
+    public static string RunPrewarm(bool prewarm, out string artifactDir)
+    {
+        bool domainFirst = !_ranThisDomain;
+        _ranThisDomain = true;
+        var rows = new List<Row>();
+        ResetStatics();   // Play 진입 직후처럼(ResetForPlay 가 예열 플래그도 내린다)
+
+        double prewarmMs = 0;
+        string breakdown = "";
+        if (prewarm)
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            long g0 = GC.GetTotalMemory(false);
+            EnemyC3Visuals.Prewarm();
+            prewarmMs = Ms(Stopwatch.GetTimestamp() - t0);
+            long gc = Math.Max(0, GC.GetTotalMemory(false) - g0);
+            rows.Add(new Row { path = "EnemyC3Visuals.Prewarm() (예열 자체)", phase = "prewarm", n = 1, ms = prewarmMs, msMax = prewarmMs, gc = gc });
+            var last = Type.GetType("EnemyC3Prewarm, Assembly-CSharp")?.GetField("Last", Any)?.GetValue(null);
+            if (last != null)
+                breakdown = $"예열 내역: data {Field<double>(last, "data"):F2} ms · shaders {Field<double>(last, "shaders"):F2} ms ({Field<int>(last, "variants")} 변형) · paths {Field<double>(last, "paths"):F2} ms";
+            long t1 = Stopwatch.GetTimestamp();
+            EnemyC3Visuals.Prewarm();
+            double again = Ms(Stopwatch.GetTimestamp() - t1);
+            rows.Add(new Row { path = "EnemyC3Visuals.Prewarm() 두 번째(무동작)", phase = "prewarm", n = 1, ms = again, msMax = again });
+        }
+
+        string phase = prewarm ? "first" : "control";
+        foreach (var p in FirstCallPaths()) MeasureFirst(p, phase, rows);
+        ResetStatics();
+
+        var sb = new StringBuilder();
+        sb.AppendLine(prewarm
+            ? "할 일 57 R 예열 — 예열 후 콜드 첫 호출(에디터 EditMode, Tools/Enemy C3/Measure prewarm then first calls)"
+            : "할 일 57 R 예열 — 대조군: 예열 없이 콜드 첫 호출(Tools/Enemy C3/Measure first calls (control, no prewarm))");
+        sb.AppendLine($"측정 {DateTime.Now:yyyy-MM-dd HH:mm} · Unity {Application.unityVersion} · {SystemInfo.processorType} · {SystemInfo.graphicsDeviceName} · {SystemInfo.graphicsDeviceType}");
+        sb.AppendLine(domainFirst
+            ? "이번 실행 = 도메인 리로드 뒤 첫 실행 → first n=1 = 도메인 첫 호출(예열이 JIT 을 못 덮은 부분 포함)."
+            : "⚠️ 같은 도메인의 두 번째 이후 실행 — JIT 이 이미 끝나 콜드가 아니다. 리로드 뒤 다시 잴 것.");
+        sb.AppendLine("first n=1 = 경로 첫 호출(새 오브젝트) · n=10 = 새 오브젝트로 10회 평균(첫 호출 포함, max 함께) — n=10 이 남는 생성 비용의 눈금.");
+        sb.AppendLine("정적 캐시는 예열 뒤 비우지 않는다(게임과 같음). 셰이더 GPU 준비·첫 그리기(PSO)는 Stopwatch 밖.");
+        if (breakdown != "") sb.AppendLine(breakdown);
+        sb.AppendLine();
+        sb.AppendLine($"{"path",-52} {"phase",-7} {"n",3} {"ms/call",10} {"ms max",10} {"Δheap B",9} {"<1ms",5}");
+        foreach (var r in rows)
+            sb.AppendLine($"{r.path,-52} {r.phase,-7} {r.n,3} {r.ms,10:F4} {r.msMax,10:F4} {r.gc,9} {(r.phase == "prewarm" ? "" : r.n == 1 ? (r.ms < 1 ? "yes" : "NO") : ""),5}");
+        string txt = sb.ToString();
+
+        artifactDir = ArtifactDir();
+        if (artifactDir != null)
+        {
+            Directory.CreateDirectory(artifactDir);
+            string stem = prewarm ? "prewarm" : "control";
+            File.WriteAllText(Path.Combine(artifactDir, stem + ".txt"), txt, new UTF8Encoding(false));
+            var tsv = new StringBuilder("path\tphase\tn\tms_per_call\tms_max\theap_delta_bytes_4KB_granular\tunder_1ms\n");
+            foreach (var r in rows)
+                tsv.Append($"{r.path}\t{r.phase}\t{r.n}\t{r.ms:F4}\t{r.msMax:F4}\t{r.gc}\t{(r.phase != "prewarm" && r.n == 1 ? (r.ms < 1 ? "yes" : "no") : "")}\n");
+            File.WriteAllText(Path.Combine(artifactDir, stem + ".tsv"), tsv.ToString(), new UTF8Encoding(false));
+        }
+        return txt;
+    }
+
+    // 첫 호출 1회(행 n=1) + 새 오브젝트로 9회 더 = 10회 평균(행 n=10). setup/teardown 은 시간 밖.
+    static void MeasureFirst(PathSpec p, string phase, List<Row> rows)
+    {
+        double sum = 0, max = 0; long gcSum = 0;
+        for (int k = 0; k < Repeat; k++)
+        {
+            p.setup?.Invoke();
+            try
+            {
+                var (ms, gc) = Time(p, k);
+                if (k == 0) rows.Add(new Row { path = p.name, phase = phase, n = 1, ms = ms, msMax = ms, gc = gc });
+                sum += ms; max = Math.Max(max, ms); gcSum += gc;
+            }
+            finally { p.teardown?.Invoke(); }
+        }
+        rows.Add(new Row { path = p.name, phase = phase, n = Repeat, ms = sum / Repeat, msMax = max, gc = gcSum / Repeat });
+    }
+
+    // 사용자 must-fix 경로(23호 돌진 Show · 드론 ClientLock · CreateJump) + 방향 표식 · Paint(CodeShape), 그리고 남는 비용 쪼개기.
+    static IEnumerable<PathSpec> FirstCallPaths()
+    {
+        GameObject go = null;
+        BossAttackConeTelegraph t = null;
+        void NewTelegraph() { go = new GameObject("EnemyC3Perf_Telegraph"); t = go.AddComponent<BossAttackConeTelegraph>(); }
+        void DropTelegraph() { DestroyTelegraph(go); go = null; t = null; }
+
+        yield return new PathSpec
+        {
+            name = "23호 돌진 Show(합집합 02, EnsureBuilt 포함)",
+            setup = NewTelegraph, teardown = DropTelegraph,
+            call = i => t.Show(2.5f, 360f, 0f, 18f, 1f, 18f, 1f),
+        };
+        // 남는 비용 쪼개기 — 보스 컴포넌트 첫 생성(프로젝터 6개 + 재질 인스턴스 6개)과 그 뒤 Show.
+        var ensureBuilt = Method<Func<BossAttackConeTelegraph, bool>>(typeof(BossAttackConeTelegraph), "EnsureBuilt");
+        yield return new PathSpec
+        {
+            name = "  └ 남는 비용: EnsureBuilt(프로젝터 6개 생성)",
+            setup = NewTelegraph, teardown = DropTelegraph,
+            call = i => ensureBuilt(t),
+        };
+        yield return new PathSpec
+        {
+            name = "  └ EnsureBuilt 뒤 Show(값 넣기·배치)",
+            setup = () => { NewTelegraph(); ensureBuilt(t); }, teardown = DropTelegraph,
+            call = i => t.Show(2.5f, 360f, 0f, 18f, 1f, 18f, 1f),
+        };
+
+        WellsDroneAttack w = null; ScriptableObject data = null;
+        void NewWells()
+        {
+            go = new GameObject("EnemyC3Perf_Wells");
+            w = go.AddComponent<WellsDroneAttack>();
+            var f = typeof(WellsDroneAttack).GetField("_d", Any);
+            data = ScriptableObject.CreateInstance(f.FieldType);
+            f.SetValue(w, data);
+        }
+        void DropWells()
+        {
+            var root = Field<Transform>(w, "_viewRoot");
+            if (root != null) Object.DestroyImmediate(root.gameObject);
+            Object.DestroyImmediate(go); Object.DestroyImmediate(data);
+            go = null; w = null; data = null;
+        }
+        yield return new PathSpec
+        {
+            name = "웰즈 드론 ClientLock(판 14, EnsureView 포함)",
+            setup = NewWells, teardown = DropWells,
+            call = i => w.ClientLock(new Vector3(i * 0.5f, 0f, 0f), 3f, 2f, true),
+        };
+        var ensureView = Method<Action<WellsDroneAttack>>(typeof(WellsDroneAttack), "EnsureView");
+        yield return new PathSpec
+        {
+            name = "  └ 남는 비용: EnsureView(드론 뷰 생성)",
+            setup = NewWells, teardown = DropWells,
+            call = i => ensureView(w),
+        };
+        yield return new PathSpec
+        {
+            name = "  └ EnsureView 뒤 ClientLock",
+            setup = () => { NewWells(); ensureView(w); }, teardown = DropWells,
+            call = i => w.ClientLock(new Vector3(i * 0.5f, 0f, 0f), 3f, 2f, true),
+        };
+
+        var jumps = new List<GameObject>();
+        yield return new PathSpec
+        {
+            name = "EnemyC3Visuals.CreateJump(→Begin)",
+            teardown = () => { foreach (var j in jumps) if (j != null) Object.DestroyImmediate(j); jumps.Clear(); },
+            call = i => jumps.Add(EnemyC3Visuals.CreateJump(new Vector3(i, 0f, 0f), 4f, 1.2f)),
+        };
+
+        BossDirectionIndicator ind = null; DecalProjector frontDecal = null;
+        var applyDecal = Method<Action<BossDirectionIndicator, DecalProjector, Material, float, bool, float, float, float>>(typeof(BossDirectionIndicator), "ApplyDecal");
+        var buildRenderers = Method<Action<BossDirectionIndicator>>(typeof(BossDirectionIndicator), "BuildRenderers");
+        void NewIndicator()
+        {
+            go = new GameObject("EnemyC3Perf_Direction");
+            ind = go.AddComponent<BossDirectionIndicator>();
+            var source = Resources.Load<Material>("Telegraph/MA_TelegraphDecal");
+            foreach (string f in new[] { "decalMaterial", "frontMaterial", "backMaterial" })
+                typeof(BossDirectionIndicator).GetField(f, Any).SetValue(ind, source);
+        }
+        void DropIndicator() { DestroyTelegraph(go); go = null; ind = null; frontDecal = null; }
+        yield return new PathSpec
+        {
+            name = "방향 표식 ApplyDecal(SetArcFill, 프로젝터 준비 후)",
+            setup = () => { NewIndicator(); buildRenderers(ind); frontDecal = Field<DecalProjector>(ind, "_frontDecal"); },
+            teardown = DropIndicator,
+            call = i => applyDecal(ind, frontDecal, null, 40f, false, 1.6f, 2.6f, 5.2f),
+        };
+        yield return new PathSpec
+        {
+            name = "  └ 남는 비용: BuildRenderers(프로젝터 2개 생성)",
+            setup = NewIndicator, teardown = DropIndicator,
+            call = i => buildRenderers(ind),
+        };
+
+        Transform plateRoot = null; MeshRenderer flat = null;
+        yield return new PathSpec
+        {
+            name = "BossPatternVisuals.Paint(CodeShape)",
+            setup = () => { plateRoot = new GameObject("EnemyC3Perf_Flat").transform; flat = BossPatternVisuals.CreateFlat("Flat", plateRoot); },
+            teardown = () => { Object.DestroyImmediate(plateRoot.gameObject); plateRoot = null; },
+            call = i => BossPatternVisuals.Paint(flat, Color.red, BossPatternVisuals.CodeShape.Disc, 0.08f),
+        };
+    }
+
     // ── 측정 ─────────────────────────────────────────────
     // 🔴 GC.GetAllocatedBytesForCurrentThread 는 Unity Mono 에서 항상 0 이다(S5 실측 — 590KB 를 할당하는 CPU 굽기도 0).
     //    그래서 관리 힙 사용량(GC.GetTotalMemory(false), Boehm 4KB 블록 단위)의 증가로 잰다.

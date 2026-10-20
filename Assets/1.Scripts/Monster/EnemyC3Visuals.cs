@@ -20,7 +20,22 @@ public static class EnemyC3Visuals
     static void ResetForPlay()
     {
         // Reload the selected JSON on each Play, including when domain reload is disabled.
-        plateBlocks.Clear();entries=null;smashSprite=null;
+        plateBlocks.Clear();entries=null;smashSprite=null;prewarmed=false;
+    }
+    static bool prewarmed;
+    /// <summary>
+    /// Loading-screen prewarm (할 일 57 R 예열) — data, materials, plate blocks, smash sprite, C3 shader variants and the
+    /// C3 paint paths on throw-away objects, so the first telegraph in the map does not pay for them. Once per Play
+    /// (reset with the caches above); later calls do nothing and return false. Never throws — a failure only logs.
+    /// Called from NetworkLoadingFlowController when the target scene load starts. Details: EnemyC3Prewarm.
+    /// </summary>
+    public static bool Prewarm()
+    {
+        if(prewarmed)return false;
+        prewarmed=true;
+        try{EnemyC3Prewarm.Run();}
+        catch(Exception e){Debug.LogException(e);}
+        return true;
     }
     public static Entry Get(string id)
     {

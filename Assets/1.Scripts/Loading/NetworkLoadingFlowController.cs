@@ -599,6 +599,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         StartLocalProgressReporting();
         ApplyViewState();
+
+        // 할 일 57 R 예열 — 로딩 화면이 떠 있는 동안(최소 표시 시간 타이머는 위에서 막 시작) 적 예고 C3 의 첫 호출 비용을 치른다.
+        // 호스트·클라 모두 여기 온다. Play 당 1회(두 번째부터 아무것도 안 함). 상세: handoff-enemy-indicator §9.4.
+        EnemyC3Visuals.Prewarm();
     }
 
     private void HandleLoadComplete(SceneEvent sceneEvent)
