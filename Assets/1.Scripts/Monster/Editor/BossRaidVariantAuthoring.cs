@@ -37,6 +37,13 @@ public static class BossRaidVariantAuthoring
         ("BOSS_RAID_OpeningDash",       "돌진이 <b>파랗게</b> 빛나면 <b>정면</b>에서 <b>우클릭</b>으로 간파하세요!", 4f),
         ("BOSS_RAID_ChargeGuide",       "드론 표식을 <b>송전탑 위로</b> 끌고 가서 떨어뜨리세요! 직접 때려도 부서집니다.", 6f),
         ("BOSS_RAID_SelfDestructGuide", "23호가 <b>자폭</b>을 준비합니다! <b>공격</b>해서 <b>실드</b>를 부수세요!", 6f),   // 10-19 실드로 교체
+        // 간파 릴레이 · 연쇄 간파(PLAN-boss-raid-relay, 경석 10-20)
+        ("BOSS_RAID_RelayGather",       "<b>6시 안전 구역</b>으로 모이세요!", 5f),
+        ("BOSS_RAID_RelayGuide",        "돌진이 <b>파랗게</b> 빛나면 <b>우클릭</b>으로 막아 23호를 <b>12시 벽</b>까지 밀어내세요! 막은 사람은 동료 차례를 기다립니다.", 6f),
+        ("BOSS_RAID_RelayRoundReset",   "다시 모두 간파할 수 있습니다!", 3f),
+        ("BOSS_RAID_RelaySuccess",      "23호를 벽까지 밀어냈습니다! 지금 공격하세요!", 4f),
+        ("BOSS_RAID_RelayFail",         "돌진을 피하세요!", 3f),
+        ("BOSS_RAID_ChainGuide",        "<b>지목된 사람</b>이 정면에서 <b>우클릭</b>으로 간파하세요!", 5f),
     };
 
     [MenuItem(BuildMenu)]
@@ -87,7 +94,8 @@ public static class BossRaidVariantAuthoring
         {
             new BossPhaseEntry { hpThreshold = 0.75f, sequence = BossPhaseSequence.RaidDroneCharge,  damageMultiplier = 1.15f, speedMultiplier = 1.1f },
             new BossPhaseEntry { hpThreshold = 0.45f, sequence = BossPhaseSequence.RaidRescue,       damageMultiplier = 1.3f,  speedMultiplier = 1.2f },
-            new BossPhaseEntry { hpThreshold = 0.20f, sequence = BossPhaseSequence.RaidSelfDestruct, damageMultiplier = 1.3f,  speedMultiplier = 1.2f },
+            // 경석 10-20: ④ 자리 = 간파 릴레이(자폭은 enum·코드 그대로 — phases 에서 고르면 다시 쓴다).
+            new BossPhaseEntry { hpThreshold = 0.20f, sequence = BossPhaseSequence.RaidInterruptRelay, damageMultiplier = 1.3f,  speedMultiplier = 1.2f },
         };
         EditorUtility.SetDirty(data);
         log.AppendLine($"  ✓ No23_Raid.asset 생성 — 1인 HP {data.maxHp} × [{string.Join(", ", PartyHpMultipliers)}] · 피해 상한 {HitCapRatio:P0} · 페이즈 3");

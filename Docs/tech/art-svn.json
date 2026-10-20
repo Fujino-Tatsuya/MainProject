@@ -9,13 +9,13 @@
   "url": "https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace",
   "subtree": "4_Resources/Art",
   "junctionPath": "Assets/50.Art",
-  "pinnedRevision": 477,
+  "pinnedRevision": 478,
   "pinnedAt": "2026-10-20",
   "expected": {
     "metaFiles": 3304,
     "ownedGuids": 1105,
     "gitFilesReferencing": 422,
     "guidOccurrencesInGit": 28751,
-    "_comment": "2026-10-20 SVN r476 설정창 UI_Panel(r466)·캐릭터 선택 개편(r458)·서울알림체(UI/Fonts r476·r477) · Strings 일시정지 키(r477) 반영. metaFiles 현재 작업사본 실측; 나머지 참조 통계는 기존 참고값 유지."
+    "_comment": "2026-10-20 SVN r478 은희 P_HumanoidBot.prefab(Missing Script 정리) · r476 설정창 UI_Panel(r466)·캐릭터 선택 개편(r458)·서울알림체(UI/Fonts r476·r477) · Strings 일시정지 키(r477) 반영. metaFiles 현재 작업사본 실측; 나머지 참조 통계는 기존 참고값 유지."
   }
 }

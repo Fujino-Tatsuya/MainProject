@@ -193,6 +193,8 @@ public enum BossPhaseSequence
     RaidDroneCharge = 2,  // ② 전력 공급 — 드론 유도로 송전탑 파괴, 실패 = 방전 (W2)
     RaidRescue = 3,       // ③ 새 가족 — 각본 잡기 구출(1인 = 간파 돌진) (W3)
     RaidSelfDestruct = 4, // ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 (W3)
+    RaidInterruptRelay = 5, // 간파 릴레이 — 6시 집결 → 돌진 간파로 12시까지 밀기 (PLAN-boss-raid-relay, 10-20)
+    RaidChainCounter = 6,   // 연쇄 간파 — 위협 순번 지목 돌진, 지목자만 간파 (PLAN-boss-raid-relay, 10-20)
 }
 
 // 페이즈 1행. hpThreshold 는 **내림차순**으로 저작한다(0.66 → 0.33).
@@ -371,7 +373,70 @@ public class BossDataSO : MonsterDataSO
              "대시 무적 등 피격 무효는 그대로 통한다.")]
     public bool raidSelfDestructBlastLethal = true;
 
+    // ─── 레이드 새 페이즈(PLAN-boss-raid-relay, 경석 10-20) — phases 의 sequence 로 고른다. xlsx 미노출(인스펙터 저작) ───
+    [Header("레이드 간파 릴레이 (RaidInterruptRelay) — 6시 집결 → 돌진 간파로 12시 끝선까지 밀기")]
+    [Tooltip("6시 안전 구역 = **화면 아래** 끝에서 몇 줄(화면 가로로 같은 높이의 칸 묶음). 대각선 카메라에선 마름모 아래 꼭짓점 삼각형\n" +
+             "(3 = 6칸). 그 밖 전부 집결 방전. 보스는 방 중앙(송전탑 안쪽)에서 시작해 화면 위로 밀린다(경석 Play 10-20).")]
+    [DataTableIgnore] [Range(1, 6)] public int relaySafeLines = 3;
+    [Tooltip("안전 구역 꼭대기 칸의 위쪽 이웃 3칸(좌상·우상·바로 위)도 안전으로 — 시작 때 여유(경석 Play 10-20). 3줄이면 6칸 → 9칸.")]
+    [DataTableIgnore] public bool relaySafeExtendApex = true;
+    [Tooltip("중앙 통로 반폭(m) — 방 중앙을 지나는 화면 세로선에서 이만큼 안의 칸. 밖(안전 구역 제외) = 측면 장판. 돌진 예고 띠 반폭도 이 값.")]
+    [DataTableIgnore] [Min(0.5f)] public float relayCorridorHalfWidth = 3.5f;
+    [Tooltip("집결 방전 예고(초) · 피해(일반 방전 경로 — 대시 무적은 통한다, 한 방 상한 적용).")]
+    [DataTableIgnore] [Min(0.5f)] public float relayGatherWarn = 7f;
+    [DataTableIgnore] [Min(0)] public int relayOpeningDamage = 80;
+    [Tooltip("집결 방전 뒤 첫 돌진 준비까지(초).")]
+    [DataTableIgnore] [Min(0f)] public float relayReady = 1f;
+    [Tooltip("돌진 준비 전체(초)와 그중 마지막 간파 창(초).")]
+    [DataTableIgnore] [Min(0.3f)] public float relayPrepare = 1.8f;
+    [DataTableIgnore] [Min(0.1f)] public float relayCounterWindow = 0.9f;
+    [Tooltip("간파 성공 1회 = 12시로 이만큼(m)을 이 시간(초)에 밀린다.")]
+    [DataTableIgnore] [Min(0.1f)] public float relayPushDistance = 2.8f;
+    [DataTableIgnore] [Min(0.05f)] public float relayPushTime = 0.45f;
+    [Tooltip("명단이 1명일 때 밀림 거리 배수(경석 Play 10-20 — 혼자서는 간파를 너무 많이 해야 했다: 2.8m × 6회).")]
+    [DataTableIgnore] [Min(1f)] public float relaySoloPushMultiplier = 2f;
+    [Tooltip("밀린 뒤 다음 돌진 준비까지(초).")]
+    [DataTableIgnore] [Min(0f)] public float relayReposition = 1.2f;
+    [Tooltip("12시 목표선 = 방의 화면 위쪽 끝(마름모 위 꼭짓점)에서 이만큼(m) 안쪽. 보스가 여기 닿으면 성공.\n" +
+             "꼭짓점은 좁아 보스 몸이 못 들어가므로 넉넉히 둔다.")]
+    [DataTableIgnore] [Min(0f)] public float relayGoalInset = 4f;
+    [Tooltip("릴레이 전체 제한(초, 첫 돌진 준비부터). 넘기면 실패 돌진.")]
+    [DataTableIgnore] [Min(5f)] public float relayTimeout = 60f;
+    [Tooltip("실패 돌진 — 6시로 끝까지, 맞은 사람만 1회 피해(일반 피해 경로).")]
+    [DataTableIgnore] [Min(0)] public int relayFailDashDamage = 55;
+    [Tooltip("성공 보상 — 탈진(초). 그로기 클립 재사용, 제압 게이지·취약은 그대로.")]
+    [DataTableIgnore] [Min(0.5f)] public float relaySuccessExhaust = 6f;
+    [Tooltip("측면 장판 — 주기(초) · 예고(초) · 피해.")]
+    [DataTableIgnore] [Min(0.5f)] public float relaySideInterval = 2f;
+    [DataTableIgnore] [Min(0.3f)] public float relaySideWarn = 0.8f;
+    [DataTableIgnore] [Min(0)] public int relaySideDamage = 7;
+    [Tooltip("끝난 뒤(실패·중단) 일반 전투 재개까지(초).")]
+    [DataTableIgnore] [Min(0f)] public float relayResumeDelay = 2f;
+
+    [Header("레이드 연쇄 간파 (RaidChainCounter) — 위협 순번 지목 돌진, 지목자만 간파")]
+    [Tooltip("지목 표시(초) → 돌진 예고 = 간파 창(초) → 돌진.")]
+    [DataTableIgnore] [Min(0.1f)] public float chainMarkTime = 1f;
+    [DataTableIgnore] [Min(0.3f)] public float chainCounterWindow = 1.5f;
+    [Tooltip("간파 성공 경직(초) · 회차 사이(초).")]
+    [DataTableIgnore] [Min(0f)] public float chainHitStun = 1f;
+    [DataTableIgnore] [Min(0f)] public float chainInterval = 1.5f;
+    [Tooltip("간파 실패 = 돌진 끝 + 방 전체 방전(예고 초 · 피해).")]
+    [DataTableIgnore] [Min(0.3f)] public float chainFailWarn = 1f;
+    [DataTableIgnore] [Min(0)] public int chainFailDamage = 70;
+    [Tooltip("돌진 피해(경로 스침, 1인 1회).")]
+    [DataTableIgnore] [Min(0)] public int chainDashDamage = 40;
+    [Tooltip("절반 이상 성공 보상 — 그로기(초) 뒤 취약(초). 전부 성공 = 제압(breakDuration).")]
+    [DataTableIgnore] [Min(0.1f)] public float chainPartialGroggy = 1.5f;
+    [DataTableIgnore] [Min(0f)] public float chainPartialVulnerable = 8f;
+
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
+    [Tooltip("보스 앞뒤 구분(경석 10-20 — 일단 끈다, 지우지 않음). 끄면 아래 세 가지가 함께 꺼진다:\n" +
+             "· 간파 정면 판정(counterFrontAngle) — 어느 방향에서 쳐도 간파 인정\n" +
+             "· 위치 백어택(backAttackAngle) — 어쌔신 변신 중 강제 백어택은 그대로\n" +
+             "· 바닥 앞뒤 표시(BossDirectionIndicator)\n" +
+             "켜면 이전 동작으로 돌아간다.")]
+    [DataTableIgnore] public bool useFacingRules;
+
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +
              "헤드어택(은희) 구현 후 그쪽 판정으로 교체될 지점이다.")]
     [Range(0f, 180f)] public float counterFrontAngle = 60f;

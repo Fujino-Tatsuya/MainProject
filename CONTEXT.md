@@ -8,13 +8,20 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **인게임 ESC 일시정지 메뉴 + 종료 확인**, 브랜치 `feature/Boss23`) — 계획 [PLAN-pause-menu.md](PLAN-pause-menu.md) ✅ 승인 · ✅ 구현 · 데이터 테이블 239/0 · 로컬라이제이션 150/0 · ✅ 경석 Play · ✅ 커밋(git · SVN **r477**, 핀 477)
+## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **보스 앞뒤 구분 끄기 · 점프×3 착지 간파 창 · PLAN 정리 · 레이드 새 페이즈(간파 릴레이·연쇄 간파)**, 브랜치 `feature/Boss23`) — ① ② ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · 보스 패턴 10/0 · ⏳ 경석 Play · ③ ✅ 정리(미커밋) · ④ 계획 [PLAN-boss-raid-relay.md](PLAN-boss-raid-relay.md) ✅ 승인 · ✅ 구현(미커밋) · 전투 EditMode 279/0 · ⏳ 경석 Play — `No23_Raid` 20% = 간파 릴레이(자폭은 enum 그대로), 연쇄 간파는 phases 에 `RaidChainCounter` 행 추가로 사용 · 은희 요청서 [handoff-raid-relay-lock.md](Docs/tech/handoff-raid-relay-lock.md)
+- Play 1차(10-20) 반영: 릴레이 방향 = 화면 아래 투영(✅ 경석 확인) · 1인 밀림 ×2 · 점프×3 착지 간파 = 피해 직후 0.8초 창(2차: 자세 정지 없앰 — 착지 클립 이어 재생 → 이동 자세 크로스페이드, 끊긴 클립 루프 이펙트 끔) ✅ 경석 확인. 릴레이 안전 구역 = 6칸 + 꼭대기 위 3칸(`relaySafeExtendApex`). 디버그 단축키 정리 — 보스 단타 예약 5종 삭제, **F3 = 점프·점프·점프 콤보 예약**([debug-hotkeys.md](Docs/tech/debug-hotkeys.md)). ⏳ 점프×3 Play.
+- ③ 결과: 경석 PLAN 14개 → `Docs/history/PLANS/`(링크 자동 갱신 — CONTEXT·handoff·telegraph-style·raid-23-phases·`PLAN-gunner.md` 링크 1줄). `PLAN-mcp.md` 는 gitignore 개인 노트라 그대로. 남김: boss-raid·flatkit·cleanup-optimization.
+- 확정(경석 10-20): ① `BossDataSO.useFacingRules` 하나(기본 꺼짐) — 간파 정면 판정·위치 백어택·앞뒤 바닥 표시를 함께 끈다(어쌔신 강제 백어택은 유지). ② 점프·점프·점프 3번째 타 = 착지 피해 직후 간파 창 0.5초(콤보 타 데이터) — 성공 = 기존 간파 보상, 실패 = 그대로 전투. ③ 경석 PLAN 완료분 → `Docs/history/PLANS/`, `PLAN-enemy-indicator-c3.md` 삭제(다른 팀원이 진행). ④ 레이드에 간파 릴레이·연쇄 간파 페이즈 2종을 만들어 두고 배치는 경석이 조합 — grill → PLAN 후 구현.
+- SVN 아트 r478(은희 `P_HumanoidBot.prefab`) 받음 · 충돌 0 · ⏳ 핀 477 → 478 은 git 커밋 때.
+- 🔒 수정: `Monster/Boss/TwentyThreeBoss.cs`(+ 신규 partial `TwentyThreeBoss.RaidRelay.cs`) · `BossRelayRoster.cs`(신규) · `BossDataSO.cs` · `BossComboEntry.cs` · `BossDirectionIndicator.cs` · `Monster/MonsterBase.cs` · `Monster/Editor/{MonsterInspectorCatalog,BossEntryDrawers,BossRaidVariantAuthoring,BossRelayRosterTests}.cs` · `Editor/CombatEditModeTestRunner.cs` · `No23.asset`·`No23_Raid.asset` · `TutorialGuideTexts.asset` · 루트 `PLAN-*.md`(경석분 이동)
+
+## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **인게임 ESC 일시정지 메뉴 + 종료 확인**, 브랜치 `feature/Boss23`) — 계획 [PLAN-pause-menu.md](Docs/history/PLANS/PLAN-pause-menu.md) ✅ 승인 · ✅ 구현 · 데이터 테이블 239/0 · 로컬라이제이션 150/0 · ✅ 경석 Play · ✅ 커밋(git · SVN **r477**, 핀 477)
 - 🔸 **은희**: 바탕화면/로비 나가기 처리는 비워 둠 → `PauseMenuView.ExitToDesktopRequested`·`ExitToLobbyRequested` 에 연결. 상세 [handoff-pause-menu.md](Docs/tech/handoff-pause-menu.md). 설정창 나가기 버튼 꺼짐 → 호스트 결과 화면 경로가 UI 에서 빠진 상태.
 - ESC 패널(`OptionPanel`) = 화면 전체 반투명 검정 + 캔버스 정렬 1000(HUD 위). 타이틀 설정창 세로 위치 = `TitleFlowDirector._titleSettingsOffsetY`(+60). 타이틀 메뉴 3단 +170 올림(SETTING = 예전 START 자리, `TitleRigAuthoring` 도 같이).
 - 🔴 **병합 Export 주의**: 하면 Map 시트 엘리베이터 16행에 r470 에서 지운 Elevator 열(D)이 되살아난다. 이번엔 Strings 행만 직접 넣었다.
 - 🔒 수정 파일: `UI/Pause/**` · `Managers/MapSceneManager.cs` · `Localization/UiStrings.cs` · `Settings/Editor/SettingsFontAssetAuthoring.cs`·`SettingsHostSceneAuthoring.cs` · `2.Prefabs/UI/PauseMenu.prefab`·`Textures/PauseSelectRing.png` · `4.MapScene.unity` · `StringTable.asset` · `art-svn.json`
 
-## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **설정창 UI 새 아트(SVN r466 UI_Panel) 교체**, 브랜치 `feature/Boss23`) — 계획 [PLAN-settings-art.md](PLAN-settings-art.md) ✅ 승인 · ✅ 구현 · ✅ 경석 타이틀 Play · 설정 EditMode 26/0 · 플레이어 508/0 · ⏳ ESC(맵) Play · ✅ 커밋(SVN r476 · git)
+## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **설정창 UI 새 아트(SVN r466 UI_Panel) 교체**, 브랜치 `feature/Boss23`) — 계획 [PLAN-settings-art.md](Docs/history/PLANS/PLAN-settings-art.md) ✅ 승인 · ✅ 구현 · ✅ 경석 타이틀 Play · 설정 EditMode 26/0 · 플레이어 508/0 · ⏳ ESC(맵) Play · ✅ 커밋(SVN r476 · git)
 - 🔸 **git 과 SVN 을 같이 받을 것** — SVN **r476**(핀 476) = UI_Panel 스프라이트(r466) + 서울알림체 `UI/Fonts/`(r476). 설정창 프리팹이 둘의 guid 를 참조한다.
 - 다시 만들 때: `Tools/UI/Settings/설정 패널 항목 배치 (멱등)` → 새 아트까지 입힌다. 씬 옛 틀은 `설정창 옛 틀 끄기 — 타이틀·ESC (멱등)`. 폰트는 `설정창 글꼴 에셋 만들기 (서울알림체)`.
 - 서울알림체 = 공공누리 제1유형(출처 표시) — 크레딧에 표기 필요.
@@ -34,13 +41,13 @@ Update this file when a term becomes important enough that future agents or team
   원인: 은희가 SVN **r462** 에 `gunner.fbx.meta` 클립 이벤트를 올렸는데(git `feature/GunnerAnimEvents` 짝) **아트 핀 `art-svn.json` 은 457 그대로** → 핀대로 받은 사본은 이벤트가 없다. → ✅ 10-20 설정창 작업에서 핀 476 으로 올려 해결.
 - SVN: 이 작업은 아트 변경 0. 원격 SVN 최신 r467 · `GameData.xlsx` 는 다른 작업 사본에서 잠김(기획 편집 중으로 보임).
 
-## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude) · **23호 콤보 즉시 연결 + 훅·어퍼 바닥 예고 토글**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-combo-chain.md](PLAN-boss-combo-chain.md) ✅ 승인 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · Verify 필드 없음 0 · ⏳ 경석 Play
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude) · **23호 콤보 즉시 연결 + 훅·어퍼 바닥 예고 토글**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-combo-chain.md](Docs/history/PLANS/PLAN-boss-combo-chain.md) ✅ 승인 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · Verify 필드 없음 0 · ⏳ 경석 Play
 - 수정: `TwentyThreeBoss.cs`(즉시 연결·후속 타 분기·토글) · `BossComboEntry.chainOnHit` · `BossDataSO` 새 칸 5(comboDashWindup 0.7 · comboGrabTelegraph 0.3 · comboJumpRecovery 0 · comboDashRecovery 0.3 · hookTelegraphMarkers) · `BossComboPolicy`(+테스트) · 인스펙터 사전 · 에셋 No23·No23_Raid(콤보 6종 즉시 연결 · 새 HookHookHook w15·cd8 · 바닥 예고 끔). 개전 콤보는 즉시 연결 제외.
 - 같이 미커밋: 앞 단계 콤보 가중치(돌잡·점돌 w25·cd8 · UpperGrab) · PLAN-boss-balance.
 - 2차(경석 Play 후): 점프→돌진 이펙트 잔존 수정(끊긴 클립 루프 끄기 `StopCutClipLoopsClientRpc`) · 단타 훅·어퍼 끔(`singleHookUpper`) · 훅·어퍼 히트 뒤 0.3초(`comboHookFollowThrough`) · 돌진 다음 잡기 예고 1초(`comboGrabTelegraphAfterDash`) · 새 콤보 JumpJumpJump w21·cd12(15 → 1.3배 빈도). 컴파일 0 · EditMode 257/0 · ✅ 커밋 `f976803b` + 가중치 조정 커밋.
 - ⚠️ 이 세션 중 Unity MCP 브리지(node, `mcp-bridge-launcher.js`)가 CPU 루프로 멈춰 PID 종료로 복구 — 메모리 [unity-mcp-bridge-hang] 대처 그대로 통했다.
 
-## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **23호 공격 빈도 밸런스**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-balance.md](PLAN-boss-balance.md) ✅ 승인
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **23호 공격 빈도 밸런스**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-balance.md](Docs/history/PLANS/PLAN-boss-balance.md) ✅ 승인
 - ⚠️ P1(가중치 10·쿨 16/12) → 경석 Play 에서 두 콤보가 한 번도 안 나옴 → **P1' 적용(미커밋)**: `DashGrab`·`JumpDash` 가중치 25·쿨 8 + **신규 `UpperGrab`(어퍼→잡기 무조건) 가중치 10·쿨 10** (No23·No23_Raid). 🔴 콤보 빈도 손잡이는 쿨이 아니라 **가중치**(첫 타 단타 쿨이 실제 제한). 시뮬 1인 근 기존 6.5초 · 레이드 7.7초.
 - ⏳ Play 체감(기존·레이드 1인 근 · 가능하면 원거리 2인) · P2(기존 전역 간격 0.75→1.0)·P3(잡기 예고 0.7→1.0) = 경석이 기획에 전달(xlsx).
 - 핵심: 원거리만 있는 조합이 가장 빡빡(5~6초)한데 숫자로는 거의 안 움직인다(주기 구조) — Play 로 보고 필요하면 규칙 논의. 시뮬 스크립트는 로컬(scratchpad) — 공유 여부 미정.
@@ -53,7 +60,7 @@ Update this file when a term becomes important enough that future agents or team
 - ⏳ 남은 확인: `attackWindup` 선딜 MPPM 2인 · 팀장·기획 인스펙터 눈 확인(★ 목록) · 다중 선택·Undo.
 - 미커밋: `PLAN-monster-data-inspector.md`·`CONTEXT.md`(8칸 표기 정정·이 인수인계) — 다음 커밋에 같이. `Docs/design/boss/raid-23-phases.html` 은 이 작업과 무관(추적 안 함).
 
-## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **몬스터 데이터 인스펙터 + 선딜 연결 + 죽은 칸 삭제**, 브랜치 `feature/Boss23`) — ✅ 커밋(미푸시) · 계획 [PLAN-monster-data-inspector.md](PLAN-monster-data-inspector.md) · [PLAN-attack-windup.md](PLAN-attack-windup.md) · 조사 [monster-data-survey-1019.md](Docs/tech/monster-data-survey-1019.md)(333칸)
+## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **몬스터 데이터 인스펙터 + 선딜 연결 + 죽은 칸 삭제**, 브랜치 `feature/Boss23`) — ✅ 커밋(미푸시) · 계획 [PLAN-monster-data-inspector.md](Docs/history/PLANS/PLAN-monster-data-inspector.md) · [PLAN-attack-windup.md](Docs/history/PLANS/PLAN-attack-windup.md) · 조사 [monster-data-survey-1019.md](Docs/tech/monster-data-survey-1019.md)(333칸)
 - `b54596df` 인스펙터 1차 — `Monster/Editor/` `MonsterInspectorCatalog.cs`(칸 이름·묶음·★ 는 여기 한 곳) · `MonsterDataSOEditor.cs` · `BossEntryDrawers.cs` · `MonsterInspectorGUI.cs` · `DataTableInspectorBadge.TryGetWrite`. 표 값 ≠ SO 값은 맞추지 않는다(xlsx 가 정본 — 경석).
 - `2d9efa34` `attackWindup` = Chomp·Humanoid 예비동작 길이(÷ attackSpeed). 히트는 애니 이벤트 그대로. Humanoid 0.73 → 0.55(경석 결정). 경석 Play 확인.
 - `4f6bd2eb` 죽은 칸 6개 삭제(xlsx r461 행 0). 2차(장판·드론·예고 스타일·중간보스)는 안 한다.
@@ -61,7 +68,7 @@ Update this file when a term becomes important enough that future agents or team
 - ⚠️ `[DataTableSheet]` SO 칸을 지우거나 이름 바꾸기 전에 **지금 xlsx** 를 다시 보고 Verify("필드 없음" 0).
 
 ## ▶▶ 작업 세션 (2026-10-18~19 · 경석(Claude) · 23호 콤보 · 레이드 ④ 실드 · HUD 레이캐스트, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r457(핀 457)
-- 콤보 = [PLAN-boss-combo.md](PLAN-boss-combo.md) — 룰렛 가중치(훅·훅·돌진 20 · 훅·어퍼 15 · 돌진·잡기 15 임시, 팀장이 정함) · 0.3초 · 추격 유예 1초 · 어그로 고정 · 개전 오른훅→왼훅→돌진(기존·레이드, 1인 제외). Codex 교차검증 반영.
+- 콤보 = [PLAN-boss-combo.md](Docs/history/PLANS/PLAN-boss-combo.md) — 룰렛 가중치(훅·훅·돌진 20 · 훅·어퍼 15 · 돌진·잡기 15 임시, 팀장이 정함) · 0.3초 · 추격 유예 1초 · 어그로 고정 · 개전 오른훅→왼훅→돌진(기존·레이드, 1인 제외). Codex 교차검증 반영.
 - 레이드 ④ 자폭 = 체력바 실드(간파 게이지·창·전기 구슬 제거) · ③ 구출 자막 제거. 간파 보너스·창 칸은 xlsx 행 때문에 **미사용으로 남김**(다음 병합 Export 때 정리).
 - HUD: 플레이어 상태·키가이드 Raycast Target 끔(미니맵·보스 체력바·보스 타이머는 원래 끔, 스킬 슬롯은 툴팁용 유지). 23호 `hitVFXCollider` = HurtBox 연결(기존·레이드 — 비어 있어 피격 이펙트가 안 나오고 경고만 찍혔다).
 - 📝 메모(손대지 않음): `4.MapScene` `UI/Canvas/Fade_Image` 가 Raycast Target 켜진 전체 화면 이미지다. 지금은 **꺼진 채 아무도 안 켜서** 무해하지만, 누가 켜면 그 캔버스 UI 클릭을 전부 막는다 — 쓰게 되면 Raycast Target 부터 끌 것.
@@ -83,7 +90,7 @@ Update this file when a term becomes important enough that future agents or team
 - 수정 범위: 신규 바닥 FBX·공유 아틀라스 v006·전용 머티리얼 추가, `Art/lobby.unity` 및 로비 건축/Complete 프리팹의 8개 바닥 참조. 기존 바이너리·GUID·배치·콜라이더 보존.
 - 현재 열린 씬의 저장 전 상태를 별도 백업한 뒤 에디터에서 반영. 검수 기록: `D:/p_MT/lobby/aiworkspace/90_조립검수/v020/validation`.
 - 완료: 시멘트 아틀라스 v006·바닥 v004 추가, 연습장 8개 씬/프리팹 교체 및 저장. 사용자 작업 중 추가한 프랍도 보존. 배치/콜라이더/UV2 검증 통과, Unity Scene View 확인 완료(Play 검증은 미수행).
-## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude) · **23호 위협 어그로 + 일반 몬스터 추적 해제**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-aggro.md](PLAN-boss-aggro.md) ✅ 승인(10-14) · ✅ 구현·커밋 · 컴파일 error CS 0 · 전투 EditMode 176/0(신규 27) · 보스 패턴 10/0 · ✅ 팀장 Play 확인(10-14)
+## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude) · **23호 위협 어그로 + 일반 몬스터 추적 해제**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-aggro.md](Docs/history/PLANS/PLAN-boss-aggro.md) ✅ 승인(10-14) · ✅ 구현·커밋 · 컴파일 error CS 0 · 전투 EditMode 176/0(신규 27) · 보스 패턴 10/0 · ✅ 팀장 Play 확인(10-14)
 - 정정: Gauntlet·Spinner·WallBot 은 중간보스(`rank 1`)라 `loseTargetRadius` 0 — 적용 = 일반 7종.
 - `MonsterDataSO.loseTargetRadius`·`BossDataSO.threat*`·`farPressure*` 는 xlsx 에 행이 없어 SO 값으로 돈다(테이블 반영은 병합 Export 때).
 - `169da399`: 레이드 장판 상시화(①③ 교차 · ②④ A/B · 간격 4.2초) · ④ 자폭 HP 피해 90% 감소 · ② 송전탑 HP ×2. 이어서 ④ 자폭 30초 · 게이지 750(1인, 300 → 750 — 팀장 "너무 빨리 파훼").
@@ -107,7 +114,7 @@ Update this file when a term becomes important enough that future agents or team
 - 📄 **구간별 진행 설명(기획용, 팀장이 「추가할 것」 칸에 덧붙임)** = [raid-23-phases.md](Docs/design/boss/raid-23-phases.md). 10-14 추가 변경: ④ 실패 = 즉사기 · 자막은 규칙 안내 3종만. **기존 23호(`TwentyThree.prefab`·`No23.asset`)는 그대로**, 변형(`TwentyThree_Raid`·`No23_Raid`) 추가 후 비교.
 - 🔴 **수정 예정 — 동시 수정 금지**: `Monster/Boss/TwentyThreeBoss.cs` · `BossDataSO.cs` · `WellsDroneAttack.cs` · `BossChargingPylon.cs` · `BossElectricFloor.cs` · `Map/BossEncounterDirector.cs` · `4.MapScene.unity`(BossEncounterDirector 칸만) · 신규 `TwentyThree_Raid.prefab`·`No23_Raid.asset`.
 
-## ▶▶ 작업 세션 (2026-10-13 · 경석(Claude) · **공격 예고 색·마스크 + 일반 몹 예고(Chomp·Humanoid·Mortar)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-telegraph-style.md](PLAN-telegraph-style.md) · [PLAN-monster-tells.md](PLAN-monster-tells.md) ✅ 완료·팀장 확인 · 커밋·푸시(동시 수정 잠금 해제) · SVN 커밋
+## ▶▶ 작업 세션 (2026-10-13 · 경석(Claude) · **공격 예고 색·마스크 + 일반 몹 예고(Chomp·Humanoid·Mortar)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-telegraph-style.md](Docs/history/PLANS/PLAN-telegraph-style.md) · [PLAN-monster-tells.md](Docs/history/PLANS/PLAN-monster-tells.md) ✅ 완료·팀장 확인 · 커밋·푸시(동시 수정 잠금 해제) · SVN 커밋
 - 아트 전달 = [Docs/tech/telegraph-style.md](Docs/tech/telegraph-style.md). 예고 색·마스크 정본 = `2.Prefabs/Monster/Data/TelegraphStyle_Default.asset`(몬스터 데이터 12개 연결).
 - Mortar = 수직 낙하 포격(`rangedStyle` SkyStrike). 🔴 `skyStrike*` 칸은 xlsx 미반영([DataTableIgnore]) — 테이블로 옮기려면 병합 Export.
 - 10-13 후속 ✅(커밋): 기존 테스트 실패 2건 해결 — "최원거리 타깃은 Jump 전용" 옛 규칙(테스트·런타임 계약·주석)이 09-17 G3(돌진 = 최원거리) 뒤 미갱신 → "최원거리 = 거리창 끈 행만(Jump·Dash)"으로 정정, 전투 EditMode 125/0. 설정 비네트: 방향 반전 수정(`VignetteOpenScale`) · 실드 비네트 연결 · 최소에서도 모서리 유지 · 표시 0~100(50 = 기본). "후처리 (블룸 등)" → "블룸·색수차". 팀장 확인 OK.
@@ -181,7 +188,7 @@ Update this file when a term becomes important enough that future agents or team
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
 - 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
 
-## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **설정창**, 브랜치 `feature/Settings`) — 계획 [PLAN-settings.md](PLAN-settings.md) · 1~3단계 + CRT 가독성 + 그래픽 확장 구현 ✅ · ✅ **10-13 커밋 + `feature/Boss23` 에 병합**(빨리 감기) · 남은 일 = PLAN 「다음 세션」(마우스 감도 보류 등)
+## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **설정창**, 브랜치 `feature/Settings`) — 계획 [PLAN-settings.md](Docs/history/PLANS/PLAN-settings.md) · 1~3단계 + CRT 가독성 + 그래픽 확장 구현 ✅ · ✅ **10-13 커밋 + `feature/Boss23` 에 병합**(빨리 감기) · 남은 일 = PLAN 「다음 세션」(마우스 감도 보류 등)
 - 통합 패널 `Assets/2.Prefabs/UI/SettingsBody.prefab` 을 타이틀·맵 ESC 가 같이 씀. 항목 수정 = `Tools/UI/Settings/설정 패널 항목 배치 (멱등)`(프리팹 원본을 연다).
 - 팀장 Play 확인: 드롭다운·오디오·프레임 제한·키 변경. 해상도·창 모드·그래픽 품질·비네트·Alt+Tab 음소거는 빌드에서 확인 예정.
 - 은희 `feature/DashDirectionOption`(대시 방향 옵션) **흡수함** — 따로 머지하지 말 것. 기본값은 **캐릭터 정면**(팀장 10-12).
@@ -189,7 +196,7 @@ Update this file when a term becomes important enough that future agents or team
 - 🔴 타이틀 CRT 값의 정본이 `MA_TitleMonitorUI.mat` → **`TitleMonitorDisplay` 인스펙터**로 옮겨졌다(머티리얼 값을 고쳐도 화면이 안 바뀐다).
 🔴 **수정 예정 — 동시 수정 금지:** 신규 `GameSettings`·설정 패널 프리팹 · `Managers/DisplayResolutionBoot.cs`·`FrameRateCap.cs`·`TitleOptionsPanel.cs`·`MapSceneManager.cs`(옵션 패널 부분) · `Sound/VolumeSlider.cs` · `Player/UserInputConfig.cs`·`PlayerDashController.cs`(방향) · `InputSystem_Actions.inputactions`(Interact E→F) · `Map/ZoneBridgeGateManager.cs`(입력) · `UI/Interact/*`(키 표기) · `UI/Combat/FloatingDamage/*`(표시 필터) · `Camera/Feedback/CameraFeedback.cs`(배율). 씬(`1.TitleScene`·`4.MapScene`)은 튜토리얼 브랜치 머지 뒤.
 
-## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **송전기 노랑 아웃라인 + 간파 넉백 후 취약 유지**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-1012.md](PLAN-boss-1012.md) ✅ 완료 · 팀장 Play 확인 · 커밋·푸시(동시 수정 잠금 해제)
+## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **송전기 노랑 아웃라인 + 간파 넉백 후 취약 유지**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-1012.md](Docs/history/PLANS/PLAN-boss-1012.md) ✅ 완료 · 팀장 Play 확인 · 커밋·푸시(동시 수정 잠금 해제)
 🔴 **수정 예정 — 동시 수정 금지:** `Monster/Boss/BossChargingPylon.cs` · `Monster/Boss/TwentyThreeBoss.cs`(`FinishVulnerableKnockback`) · `Rendering/Editor/FlatKitSmoothNormalBaker.cs` · 신규 `Rendering/Toon/Shaders/OutlineOnly.shader`·`3.Materials/MA_PylonOutline.mat` · `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab`(송전기 4개 필드).
 
 ## ▶▶ 다음 세션 인수인계 (2026-10-08~12 · 경석(Claude)) — 최신. 여기부터 읽을 것
@@ -209,7 +216,7 @@ Update this file when a term becomes important enough that future agents or team
 - Codex 교차검증: v0.162 에서 샌드박스가 안 떠 실패 → **Codex 데스크톱 앱을 끄면 동작**(10-12 확인, 절차 = 경석 로컬 규칙).
 - ⚠️ 에디터 `Unexpected error in Burst compilation … Library\BurstCache\JIT\*.dll, error code 4551` = **Windows Smart App Control 이 서명 없는 Burst JIT DLL 차단**(코드 무결성 로그 3077, 경석 PC 09-18~ 9개). 코드 문제 아님 — 해당 잡만 Burst 대신 일반 C# 으로 돈다(에디터 성능만 영향). 끄려면 Windows 보안에서 Smart App Control 해제(⚠️ 한 번 끄면 OS 재설치 전엔 다시 못 켬).
 
-**10-12 추가**: 보스 수정 3건 완료·푸시(돌진 예고 파랑 `de2df265` · 송전기 노랑 아웃라인 + 벽 아니면 취약 유지 `4fabedb3`, [PLAN-boss-1012.md](PLAN-boss-1012.md)). 이어서 `origin/development`(`25723503`, 123커밋) 병합 + SVN **r420** · 핀 415 → **420**(dev 코드가 r416 `F_KeyIcon`·r420 `SlowMotion` 시트를 요구 — dev 핀 415 는 부족했다). r410 대시 아이콘 `.meta` 2개 트리 충돌 → 서버 guid. Codex 머지 전 교차검증 "진행해도 됨". 컴파일 error CS 0 · 전투 EditMode 108/2(기존 실패 2).
+**10-12 추가**: 보스 수정 3건 완료·푸시(돌진 예고 파랑 `de2df265` · 송전기 노랑 아웃라인 + 벽 아니면 취약 유지 `4fabedb3`, [PLAN-boss-1012.md](Docs/history/PLANS/PLAN-boss-1012.md)). 이어서 `origin/development`(`25723503`, 123커밋) 병합 + SVN **r420** · 핀 415 → **420**(dev 코드가 r416 `F_KeyIcon`·r420 `SlowMotion` 시트를 요구 — dev 핀 415 는 부족했다). r410 대시 아이콘 `.meta` 2개 트리 충돌 → 서버 guid. Codex 머지 전 교차검증 "진행해도 됨". 컴파일 error CS 0 · 전투 EditMode 108/2(기존 실패 2).
 - ⚠️ dev 데이터로 23호 **취약 4 → 8초**(HP 2,000 → 10,000 · 공격력 10 → 45). 「벽 아니면 취약 유지」와 합쳐져 취약이 최대 8초 — ✅ 팀장 Play 체감 확인(10-12).
 - ⚠️ `TwentyThree_Solo.prefab` `GlobalObjectIdHash` 변경 — 머지 전 빌드와 섞어 멀티 테스트 금지.
 
@@ -451,7 +458,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - **플레이어 Flat Kit Variant**(10-02): 부모 = `FlatKit/Player/FK_Paladin_Toon`(가붕이 몸) · Variant = 검·방패 · `Gunner/FK_Gunner_Body`(4K) · `Gunner/FK_LaserGun`.
   셰이더·외곽선·셀 값은 **부모에서만** 고친다. 재구성 = `Tools/Rendering/Flat Kit/플레이어 Variant 구성 (가붕이 부모)`. 은희 ToonLit Variant(`3.Materials/Toon/`)는 남겨 둠(미사용).
 - 전원 유령(부활 대기)이면 전기 장판 정지 — 드론은 대상 선정에서 원래 멈춤.
-- **전기 장판·자폭 드론** — 계획·진행·피드백 이력 = [PLAN-boss-electric-drone.md](PLAN-boss-electric-drone.md) §6 · 기획 사본 [Docs/design/boss/](Docs/design/boss/).
+- **전기 장판·자폭 드론** — 계획·진행·피드백 이력 = [PLAN-boss-electric-drone.md](Docs/history/PLANS/PLAN-boss-electric-drone.md) §6 · 기획 사본 [Docs/design/boss/](Docs/design/boss/).
   컴포넌트 `BossElectricFloor` · `WellsDroneAttack`(NetworkBehaviour 아님 — 23호가 스폰 때 AddComponent, ClientRpc 중계). 23호 상태는 폴링
   (`IsChargeJumpActive`·`IsChargeGimmickActive`·`ActivePauseConditions`·`IsFightActive`). 정지 조건 = `BossPauseCondition` Flags(SO `pauseOn`).
   수치·연출 전부 SO: `2.Prefabs/Monster/Data/BossElectricFloorData` · `WellsDroneData`(No23·No23_Solo 연결, `Tools/Boss/전기 장판·자폭 드론 데이터 만들기·연결`).
@@ -539,7 +546,7 @@ WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다
 
 - **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
 - 09-29 반영: 취약 넉백(방 회전) · 넉백 종료 시 그로기·취약 종료 · 제압 그로기 루프 · 취약 중 돌진 · 어퍼 예고 0.5 · 차징 점프 착지 범위 공격 · 점프 체인 안 끊김 · 잡기 낚아채는 프레임 부착 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠(실측 1.5m) · Start → 튜토리얼 스테이지([PLAN-tutorial-stage.md](Docs/history/PLANS/PLAN-tutorial-stage.md)) · 차징 오라 데칼 제거 · 진입 연출 디버프만 해제 · Dev 공격 예약 단축키(F3/F4/F6/F9/F11, 대기열 8, Shift+F3 비우기).
-  상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
+  상세: [PLAN-boss-counter-vulnerable.md](Docs/history/PLANS/PLAN-boss-counter-vulnerable.md) §7-2.
 - 🔴 **10-01 — Flat Kit 전환(캐릭터·물) · `feature/Boss23` 에만 푸시(development 미반영)**. 계획·기록 [PLAN-flatkit.md](PLAN-flatkit.md).
   - 캐릭터: 몬스터 8종·23호·Wells·플레이어 → `FlatKit/Stylized Surface`(플레이어는 부드러운 법선 복제 셰이더). 룩 값 한 곳 `Assets/1.Scripts/Rendering/Editor/FlatKitCharacterLook.cs`(외곽선 0.4 = 1080p 1.08px). 메뉴 `Tools/Rendering/Flat Kit/`.
   - 물: 보스방 `Water_BossRoom`(벤트 밑 −0.12) + 존 프리팹 `Water`(**`ZoneWater` = 존별 수면 높이 한 칸**, 기본 −4.3414(10-02 존 0.98 축소, 원래 −4.43), 재실행해도 유지). 존 물은 **뚫린 곳(구덩이·벤트)에만** 깔린다(구덩이 벽 안쪽 면까지). 머티리얼 `FK_Water_Pool09` 은 월드 UV 복제 셰이더 — 인스펙터로 조절(도구가 안 덮어씀). 맵 330m 큰 쿼드는 팀장이 삭제.

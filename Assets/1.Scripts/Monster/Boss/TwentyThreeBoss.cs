@@ -15,7 +15,7 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -297,6 +297,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     bool _chainArmed;             // 훅·어퍼가 맞혔다 — _chainAt 에 다음 타로 넘긴다(comboHookFollowThrough)
     float _chainAt;
     BossAttackId _chainPrevAttack; // 지금 후속 타 바로 앞 타 — 돌진 다음 잡기만 예고를 길게(comboGrabTelegraphAfterDash)
+
+    // ─── 점프 착지 간파 창(경석 10-20 — 점프·점프·점프 3번째) — 서버 전용 ───
+    float _comboLandingCounterNext;      // ConsumeCombo 가 세운 이 타의 창 길이 — 다음 StartAttack 이 소비
+    float _landingCounterWindow;         // 지금 공격(점프)의 착지 피해 직후 창 길이. 0 = 없음 · 한 번 열면 0
+    float _landingCounterCloseAt = -1f;  // 연 창을 닫을 시각(-1 = 없음). Attack 이탈은 PlayStateAnimation 이 닫는다
 
     bool ComboActive => _combo != null;
 
@@ -1043,6 +1048,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                 continue;
             }
 
+            // 간파 릴레이 · 연쇄 간파(PLAN-boss-raid-relay) — ④ 자폭과 같은 송전기 흐름(점프 → ChargeWait 안의 자체 단계).
+            if (IsRaid && TryArmRaidGimmick(pending))
+            {
+                int seq = FindSlot(BossAttackId.ChargeSequence);
+                if (seq != NoAttack) return seq;
+                _raidGimmick = RaidGimmick.None;
+                Debug.LogError($"{name}: {pending} 인데 공격 테이블에 ChargeSequence 행이 없다 — 건너뛴다.", this);
+                continue;
+            }
+
             // 그 밖(레이드가 꺼진 보스에 레이드 시퀀스가 들어간 경우) — 건너뛰고 한 번만 알린다.
             int bit = 1 << (int)pending;
             if ((_warnedRaidSequenceMask & bit) == 0)
@@ -1183,60 +1198,72 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-    /// <summary>[Dev] 예약 대기열 최대 길이. 넘치면 새 예약을 받지 않는다(덮어쓰지 않는다 — 넣은 순서가 곧 재현 순서다).</summary>
-    public const int DevReservationCapacity = 8;
-    readonly Queue<BossAttackId> _devReservations = new Queue<BossAttackId>(DevReservationCapacity);
+    // 🔸 경석 10-20: 단타 5종 대기열 예약(F3·F4·F6·F9·F11)을 걷어 내고 **점프·점프·점프 콤보 1회 예약(F3)** 만 남겼다.
+    //    점프×3 3번째 착지 간파 창(landingCounterWindow)은 콤보 마지막 타에만 있어서 단타 점프 예약으론 확인할 수 없다.
+    bool _devJumpComboReserved;
 
-    /// <summary>[Dev · 서버] 지금 대기 중인 예약 수.</summary>
-    public int DevReservationCount => _devReservations.Count;
+    /// <summary>[Dev · 서버] 점프·점프·점프 콤보 예약이 걸려 있는가.</summary>
+    public bool DevJumpComboReserved => _devJumpComboReserved;
 
-    /// <summary>[Dev · 서버] 다음 공격 예약을 대기열 끝에 넣는다. 가득 차면 false.</summary>
-    public bool DevReserveNextAttack(BossAttackId id)
+    /// <summary>[Dev · 서버] 다음 행동 = 점프·점프·점프 콤보(쿨·가중치 무시). 콤보가 데이터에 없으면 false.</summary>
+    public bool DevReserveJumpCombo()
     {
         if (!IsServer) return false;
-        if (_devReservations.Count >= DevReservationCapacity)
+        if (FindDevJumpCombo() < 0)
         {
-            Debug.LogWarning($"[23호/Dev] 예약 대기열이 가득 찼다({DevReservationCapacity}) — {id} 무시", this);
+            Debug.LogWarning("[23호/Dev] 점프·점프·점프 콤보(모든 타가 Jump)가 combos 에 없다 — 예약 안 함", this);
             return false;
         }
-        _devReservations.Enqueue(id);
-        Debug.Log($"[23호/Dev] 예약 추가 — {id} · 대기 {_devReservations.Count}/{DevReservationCapacity} " +
-                  $"[{string.Join(" → ", _devReservations)}] (상태={State} · 페이즈={_attackPhase})", this);
+        _devJumpComboReserved = true;
+        Debug.Log($"[23호/Dev] 점프·점프·점프 콤보 예약 (상태={State} · 페이즈={_attackPhase})", this);
         return true;
     }
 
-    /// <summary>[Dev · 서버] 대기열을 비운다.</summary>
-    public void DevClearReservations()
+    // 모든 타가 Jump 인 콤보. 착지 간파 창이 있는 것을 먼저 고른다.
+    int FindDevJumpCombo()
     {
-        if (!IsServer) return;
-        _devReservations.Clear();
-        Debug.Log("[23호/Dev] 예약 대기열 비움", this);
+        BossComboEntry[] combos = _boss != null ? _boss.combos : null;
+        if (combos == null) return -1;
+        int fallback = -1;
+        for (int k = 0; k < combos.Length; k++)
+        {
+            BossComboEntry c = combos[k];
+            if (c == null || c.steps == null || c.steps.Length == 0) continue;
+            bool allJump = true, hasWindow = false;
+            foreach (BossComboStep s in c.steps)
+            {
+                if (s.attack != BossAttackId.Jump) { allJump = false; break; }
+                if (s.landingCounterWindow > 0f) hasWindow = true;
+            }
+            if (!allJump) continue;
+            if (hasWindow) return k;
+            if (fallback < 0) fallback = k;
+        }
+        return fallback;
     }
 
-    // 맨 앞 예약만 본다 — 사거리 밖이면 **순서를 지키려고** 뒤 예약으로 건너뛰지 않고 추격한다.
     int ConsumeDevReservation(BossAttackEntry[] rows, float dist)
     {
-        if (_devReservations.Count == 0) return NoAttack;
+        if (!_devJumpComboReserved) return NoAttack;
 
-        BossAttackId next = _devReservations.Peek();
-        int slot = FindSlot(next);
-        if (slot == NoAttack)
+        int k = FindDevJumpCombo();
+        int slot = FindSlot(BossAttackId.Jump);
+        if (k < 0 || slot == NoAttack)
         {
-            _devReservations.Dequeue();
-            Debug.LogWarning($"[23호/Dev] 예약한 {next} 행이 공격 테이블에 없다 — 건너뜀", this);
+            _devJumpComboReserved = false;
+            Debug.LogWarning("[23호/Dev] 점프·점프·점프 콤보 또는 Jump 행이 없다 — 예약 버림", this);
             return NoAttack;
         }
+        if (!InComboWindow(rows[slot], dist)) return NoAttack;   // 예약 유지 — 거리창이 맞으면 발동
 
-        BossAttackEntry e = rows[slot];
-        if (!e.ignoreDistanceWindow)
+        if (_comboLastUsed == null || _comboLastUsed.Length != _boss.combos.Length)
         {
-            float max = BossContactReachPolicy.EffectiveMaxDistance(e, data.attackRange, _inContactReach);
-            if (dist < e.minDistance || dist > max) return NoAttack;   // 예약 유지 — 추격하다 붙으면 발동
+            _comboLastUsed = new float[_boss.combos.Length];
+            for (int i = 0; i < _comboLastUsed.Length; i++) _comboLastUsed[i] = -999f;
         }
-
-        _devReservations.Dequeue();
-        Debug.Log($"[23호/Dev] 예약 공격 발동 — {next} (거리 {dist:0.##}m) · 남은 예약 {_devReservations.Count}", this);
-        return slot;
+        _devJumpComboReserved = false;
+        Debug.Log($"[23호/Dev] 예약 발동 — {_boss.combos[k].name} (거리 {dist:0.##}m)", this);
+        return StartRouletteCombo(k, rows);
     }
 #endif
     #endregion
@@ -1413,6 +1440,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         // forceFire — 시작 순간 어그로 대상 쪽으로 즉시 몸을 돌린다(StartAttack 에서 소비). 돌진 끝엔 벽을 보고 있어서(팀장 10-19).
         _comboFaceAggroOnStart = step.forceFire;
         _chainNextPending = chain;           // 다음 StartAttack 이 후속 타 분기(예고 생략·준비 단축·방향 고정)를 탄다
+        _comboLandingCounterNext = step.attack == BossAttackId.Jump ? step.landingCounterWindow : 0f;
         _chainPrevAttack = started ? steps[_comboIndex - 1].attack : step.attack;
         if (!started) _comboLock = Target;   // 개전 첫 타 — 이 순간 고정
 
@@ -1445,6 +1473,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         _chainNextPending = false;
         _chainFacingValid = false;
         _chainArmed = false;
+        _comboLandingCounterNext = 0f;
         _combo = null;
         _comboIndex = 0;
         _comboIsOpening = false;
@@ -1464,6 +1493,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         _chainedAttack = _chainNextPending;
         _chainNextPending = false;
         _chainArmed = false;   // 앞 공격이 남긴 예약은 이 공격에 해당하지 않는다
+        _landingCounterWindow = _comboLandingCounterNext;   // 콤보 타가 아니면 0(ClearCombo·소비 후 0)
+        _comboLandingCounterNext = 0f;
+        _landingCounterCloseAt = -1f;
 
         // 연속 카운트는 "실제로 쓴 것" 기준으로 센다(SelectAttackSlot 은 NoAttack 을 돌릴 수 있다).
         if (CurrentAttackSlot == _lastSlot)
@@ -1747,6 +1779,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     {
                         _attackPhaseTimer = 0f;
                         StopCutClipLoopsClientRpc();   // 착지 루프(JumpLanding)가 돌진까지 붙어 남던 것(경석 Play 10-19)
+                    }
+                    else
+                    {
+                        OpenLandingCounterWindow();     // 점프·점프·점프 3번째 — 착지 피해 직후 짧은 간파 창(경석 10-20)
                     }
                 }
                 break;
@@ -2449,6 +2485,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         //    (`DecideNextAfterAction` 은 virtual 이 아니라 훅을 걸 수 없고, 종료 경로가 4곳으로 흩어져 있다.)
         _lastAttackTickTime = Time.time;
         TickCounterVisual();   // 간파 창은 공격 중에만 열린다 — 조기 소등 검사는 여기 한 곳이면 된다
+        TickLandingCounterWindow();
 
         // [G1] 전진 공격은 **단계(AttackPhase)를 쓰지 않는다** — 훅·어퍼는 단타 공격이고, 전진은
         // 애니 히트 이벤트가 끝을 알리므로 단계 기계가 필요 없다. 그래서 아래 분기보다 앞에 둔다.
@@ -2580,12 +2617,22 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     break;
                 }
 
+                // 착지 간파 창이 남아 있으면(점프×3 마지막 타) 이동 자세로 자연스럽게 이어 주고, 창이 닫힐 때까지 회복을 늘린다.
+                if (LandingCounterRemaining > 0f)
+                {
+                    if (data != null && !string.IsNullOrEmpty(data.locomotionState))
+                        CrossFadeStateClientRpc(data.locomotionState);
+                    EnterPhase(BossAttackPhase.Recovery, Mathf.Max(JumpRecovery, LandingCounterRemaining));
+                    break;
+                }
+
                 EnterPhase(BossAttackPhase.Recovery, ChainPending ? Mathf.Max(0f, _boss.comboJumpRecovery) : JumpRecovery);
                 break;
 
             // ── 페이즈 시퀀스 ─────────────────────────────────────────
             case BossAttackPhase.ChargeWait:
                 if (_raidSelfDestruct) { TickSelfDestruct(); break; }   // ④ 자폭 — 오라·탑 없음(때려야 하는 기믹)
+                if (RaidGimmickActive) { TickRaidGimmick(dt); break; } // 간파 릴레이 · 연쇄 간파
                 TickChargeAura(dt);   // 접근 차단 오라는 차징 대기 구간에서만 돈다
                 TickCharge();
                 break;
@@ -3019,6 +3066,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             _selfDestructShieldLeft = 0;          // 중단(사망 등) — 체력바 실드 덮개를 거둔다
             _selfDestructShield01.Value = 0f;
         }
+        // 간파 릴레이 · 연쇄 간파 — 돌진 이동·히트 윈도우·창·잠금을 걷는다(성공 경로에서는 이미 끝나 no-op).
+        EndRaidGimmick("중단", resume: false);
 
         if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
 
@@ -4382,7 +4431,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         // 🔴 `out` 을 `&&` 오른쪽에 두면 단축평가로 **대입되지 않는 경로**가 생긴다(컴파일 에러).
         Vector3 pylonCenter = transform.position;
         // ④ 자폭은 탑을 고르지 않는다(고르면 참여 집합이 남아 다음 시퀀스가 재사용한다).
-        bool havePylonCenter = !_raidSelfDestruct && _charge != null && _charge.TryPrepareCenter(_chargePylons, out pylonCenter);
+        bool havePylonCenter = !_raidSelfDestruct && !RaidGimmickActive && _charge != null && _charge.TryPrepareCenter(_chargePylons, out pylonCenter);
 
         Transform landing = FindChargeLandingPoint();
         if (landing != null)
@@ -4445,6 +4494,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (_raidSelfDestruct)
         {
             StartSelfDestructInPlace();
+            return;
+        }
+
+        if (RaidGimmickActive)
+        {
+            StartRaidGimmickInPlace();   // 간파 릴레이 · 연쇄 간파(TwentyThreeBoss.RaidRelay.cs)
             return;
         }
 
@@ -4649,7 +4704,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): 방전/대폭발 처리 중만.</summary>
     // 팀장 10-14: 레이드도 장판을 계속 낸다 — ①·③ = 교차 장판, ②·④ = A/B(둘 다 ChargeSequence 의 ChargeWait 라 장판이 Charge 모드로 읽는다).
     public bool IsRaidFloorHeld =>
-        IsRaid && Time.time < _raidFloorHoldUntil;
+        IsRaid && (Time.time < _raidFloorHoldUntil || RaidGimmickActive);   // 릴레이·연쇄 간파 = 상시 장판 대신 기믹 방전만
 
     /// <summary>[서버] ③ 새 가족 각본이 예약·진행 중 — 상시 장판·드론을 멈춘다(PLAN §2 "각본 중 상시 공격 정지").</summary>
     public bool IsRaidRescueHold => _raidRescueActive || _raidRescueNext.HasValue;
@@ -5762,7 +5817,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                        && _counterWindow.Value
                        && !CounterBlockedByState          // 취약·제압 중 간파 실패(기획 간파 §8)
                        && IsInterruptAttack(attackInfo)
-                       && IsCounterFromFront(hitContext);
+                       && IsCounterFromFront(hitContext)
+                       && RaidGimmickAcceptsCounter(GetAttackerClientId(hitContext));   // 릴레이 잠금 · 연쇄 지목자만
+        _raidCounterClientId = GetAttackerClientId(hitContext);
+
+        // 간파 릴레이 중 보스는 플레이어 피해를 받지 않는다(기획 기믹1 §3-1) — 간파 판정만 남긴다.
+        if (IsServer && RaidGimmickDamageImmune && IsFromPlayer(hitContext))
+            attackInfo.damage = 0;
 
         // 취약 중 간파 스킬 = 방향 무관 넉백(간파 성공 아님 · 게이지·취약시간 불변 — 기획 취약 §4.4). 필수 기믹 중엔 피해만.
         // 점프 체인 중엔 넉백 없이 피해만(IsInJumpChain — 이륙·공중·착지 모두 끊기지 않는다, 팀장 09-29).
@@ -5874,6 +5935,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     /// </summary>
     protected virtual bool IsCounterFromFront(AttackHitContext hitContext)
     {
+        // 앞뒤 구분 꺼짐(useFacingRules, 경석 10-20 기본) = 방향 무관 인정.
+        if (_boss != null && !_boss.useFacingRules) return true;
+
         // 🔴 sourcePosition 이 아니라 공격자 **루트**를 우선 쓴다.
         //    BaseAttack.CreateHitContext 는 `transform.position` 을 담는데, 그 transform 은 플레이어
         //    루트가 아니라 무기/히트박스 자식이다(이미 보스 쪽으로 뻗어 있음). 그 점으로 각도를 재면
@@ -5926,6 +5990,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     {
         if (!IsServer) return;
         CancelCombo("간파 성공");
+
+        // 간파 릴레이 · 연쇄 간파 — 일반 간파 그로기 대신 기믹 처리(밀어내기 / 경직 → 다음 회).
+        if (RaidGimmickActive)
+        {
+            OnRaidGimmickCounter();
+            return;
+        }
 
         // ④ 자폭은 간파 창을 열지 않는다(팀장 10-19 — 실드를 공격으로 부순다). 그래서 여기 올 일이 없다.
 
@@ -6521,6 +6592,40 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (_counterWindow.Value == open) return;
         _counterWindow.Value = open;
     }
+
+    /// <summary>
+    /// [서버] 점프 착지 간파 창(경석 10-20) — 콤보 타의 <c>landingCounterWindow</c> 만큼 착지 피해 **직후** 연다.
+    /// 성공은 일반 간파와 같은 경로(ReceiveAttack → EnterCounterSuccess = 그로기·게이지), 놓치면 그대로 전투.
+    /// 한 공격에 한 번만 — 착지 히트 이벤트가 두 번 와도 다시 열지 않는다.
+    /// </summary>
+    void OpenLandingCounterWindow()
+    {
+        if (!IsServer || _landingCounterWindow <= 0f) return;
+
+        float window = _landingCounterWindow;
+        _landingCounterWindow = 0f;
+        if (CounterBlockedByState) return;   // 취약·제압 중 간파 없음(기획 간파 §8) — 다른 창과 같은 규칙
+
+        // 경석 Play 10-20 (2차): 자세 정지(animator 0)는 "순간 멈춰" 보였고, 클립이 0.21 에 멈춰 착지 루프(JumpLanding)의
+        //    짝 StopEffect(0.23)가 안 와서 레이지 같은 이펙트가 남았다(10-19 즉시 연결 때와 같은 뿌리).
+        //    → 루프는 여기서 끄고, 클립은 **그대로 이어 재생**한다. 착지가 끝나면 이동 자세로 이어지고(case Land),
+        //      창이 닫힐 때까지 회복을 늘려 공격 상태를 유지한다 — Attack 을 벗어나면 창이 닫히기 때문이다.
+        StopCutClipLoopsClientRpc();
+        _stateTimer += window;
+        SetCounterWindow(true, window);
+        _landingCounterCloseAt = Time.time + window;
+        Debug.Log($"[23호] 점프 착지 간파 창 {window:0.##}초", this);
+    }
+
+    void TickLandingCounterWindow()
+    {
+        if (_landingCounterCloseAt < 0f || Time.time < _landingCounterCloseAt) return;
+        _landingCounterCloseAt = -1f;
+        SetCounterWindow(false);
+    }
+
+    /// <summary>착지 간파 창이 아직 열려 있으면 남은 시간(초), 아니면 0.</summary>
+    float LandingCounterRemaining => _landingCounterCloseAt < 0f ? 0f : Mathf.Max(0f, _landingCounterCloseAt - Time.time);
 
     /// <summary>[서버] 열린 창이 <paramref name="remaining"/> 초 뒤 닫힐 것이 확정됐다 — 표시를 그 0.15초 전에 끄게 예약.</summary>
     void ScheduleCounterVisualOff(float remaining)
