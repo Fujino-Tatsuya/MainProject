@@ -26,15 +26,64 @@ public static class QASettings
     /// </summary>
     public static string Scenarios
     {
-        get => EditorPrefs.GetString(ScenariosKey, string.Empty);
-        set => EditorPrefs.SetString(ScenariosKey, value ?? string.Empty);
+        get => TryReadRunFile(out string[] f) ? f[0] : EditorPrefs.GetString(ScenariosKey, string.Empty);
+        set
+        {
+            EditorPrefs.SetString(ScenariosKey, value ?? string.Empty);
+            WriteRunFile();
+        }
     }
 
     /// <summary>결과 화면 경로 순서(쉼표 구분: Aborted,Wiped,Cleared). 비우면 기본 순서.</summary>
     public static string ResultPathOrder
     {
-        get => EditorPrefs.GetString(ResultPathOrderKey, string.Empty);
-        set => EditorPrefs.SetString(ResultPathOrderKey, value ?? string.Empty);
+        get => TryReadRunFile(out string[] f) && f.Length > 2 ? f[2] : EditorPrefs.GetString(ResultPathOrderKey, string.Empty);
+        set
+        {
+            EditorPrefs.SetString(ResultPathOrderKey, value ?? string.Empty);
+            WriteRunFile();
+        }
+    }
+
+    // ── 시나리오 실행 파일(할 일 48.3) ───────────────────────────
+    // MPPM 클론 에디터는 EditorPrefs 를 프로세스 안에 캐시해 메인이 바꾼 시나리오 목록을 못 본다(2차에서 클론이 M2 대신 이전 값 M1,M4 를 돌림).
+    // 그래서 시나리오·인원·경로 순서를 리포트 루트(모든 인스턴스가 같은 절대 경로)의 파일로도 넘긴다. 줄 = ids / 인원 / 경로 순서.
+
+    private static string RunFilePath
+    {
+        get
+        {
+            string root = ReportRoot;
+            return string.IsNullOrWhiteSpace(root) || !System.IO.Path.IsPathRooted(root.Trim())
+                ? null
+                : System.IO.Path.Combine(root.Trim(), ".scenario48.txt");
+        }
+    }
+
+    private static bool TryReadRunFile(out string[] fields)
+    {
+        fields = null;
+        string path = RunFilePath;
+        if (path == null || !System.IO.File.Exists(path))
+            return false;
+        fields = System.IO.File.ReadAllText(path).Replace("\r", string.Empty).Split('\n');
+        return fields.Length > 0;
+    }
+
+    private static void WriteRunFile()
+    {
+        string path = RunFilePath;
+        if (path == null)
+            return;
+        string ids = EditorPrefs.GetString(ScenariosKey, string.Empty);
+        if (string.IsNullOrWhiteSpace(ids))
+        {
+            if (System.IO.File.Exists(path))
+                System.IO.File.Delete(path);
+            return;
+        }
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        System.IO.File.WriteAllText(path, $"{ids}\n{EditorPrefs.GetInt(PlayerCountKey, 3)}\n{EditorPrefs.GetString(ResultPathOrderKey, string.Empty)}");
     }
 
     /// <summary>
@@ -71,8 +120,12 @@ public static class QASettings
     /// <summary>멀티플레이 인원 수(호스트 포함). 3=호스트1+MPPM 가상 플레이어2. 1=단독.</summary>
     public static int PlayerCount
     {
-        get => EditorPrefs.GetInt(PlayerCountKey, 3);
-        set => EditorPrefs.SetInt(PlayerCountKey, value);
+        get => TryReadRunFile(out string[] f) && f.Length > 1 && int.TryParse(f[1], out int n) ? n : EditorPrefs.GetInt(PlayerCountKey, 3);
+        set
+        {
+            EditorPrefs.SetInt(PlayerCountKey, value);
+            WriteRunFile();
+        }
     }
 
     /// <summary>
