@@ -3,6 +3,11 @@
 > 2026-10-13 · 경석 · 계획 [PLAN-telegraph-style.md](../../PLAN-telegraph-style.md)
 > 몬스터 공격 예고(바닥에 깔리는 빨간/파란 범위)의 **색과 무늬(마스크 이미지)** 를 스크립트를 열지 않고
 > **에셋 인스펙터에서 바로** 고칠 수 있다. Play 중에 고쳐도 바로 반영된다.
+>
+> ⚠️ **2026-10-19 할 일 57(적 범위표시 C3) 이후** — 23호 훅·어퍼·잡기·돌진, 건틀렛 펀치·스매시, 스피너 채찍·돌진,
+> 웰즈 드론 착탄 원, 박격포 착탄 원, 전기 장판, 23호 점프 착지 원은 **이 에셋이 아니라 `Resources/Telegraph/EnemyC3Selected.json`** 의
+> 색·기하로 그린다(마스크도 적용 안 됨). 이 에셋 값이 아직 먹는 곳: 원형 장판 `AoeTelegraph`(23호 차징 오라 — 원형 판 채움 색),
+> 예고 재질(`MA_TelegraphDecal`)이 없을 때의 대체 경로 채움 색. 상세 = [handoff-enemy-indicator.md](handoff-enemy-indicator.md) §8.2·§9.
 
 ---
 
@@ -104,15 +109,17 @@
 
 ## 6. 범위 밖 (이 에셋으로 안 바뀌는 것)
 
-- 보스 **방향 표식**(보스 발밑 앞/뒤 호) — 기존 재질 그대로.
-- **점프 착지 예고** — 이펙트(`EffectCatalog` 의 `Drop_Charge_*`)라 이펙트 프리팹에서 고친다.
-- **건틀렛 스매시 원의 모양·페이드** — 아트 VFX. 이 에셋은 인터럽트 **채움 색 RGB 만** 덮는다.
+- 보스 **방향 표식**(보스 발밑 앞/뒤 호) — 색은 전방/후방 재질의 `_BaseColor` 그대로. 모양(호)은 할 일 57 S4c1 부터 C3 데칼 셰이더가 그린다(텍스처 없음).
+- **점프 착지 예고** — 할 일 57 부터 `EnemyC3JumpView`(C3 판 06·07, `EnemyC3Selected.json`). 예전 이펙트(`EffectCatalog` 의 `Drop_Charge_*`)는 쓰이지 않는다.
+- **건틀렛 스매시 원** — 페이드는 아트 VFX 그대로, 그림은 할 일 57 부터 미리 구운 C3 sprite(`Resources/Telegraph/EnemyC3_Smash09.png`). 이 에셋의 인터럽트 색은 더 이상 덮지 않는다.
 - 전기 장판 **발동 색**(전기 깜빡임) — `BossElectricFloorData.electricColor`(예고가 아니라 발동 표시).
 - 원형 장판 컴포넌트(`AoeTelegraph`) — 2026-10-13 기준 쓰는 곳이 없다.
 
 ## 7. 개발 참고
 
 - 셰이더: 데칼 `Assets/3.Materials/SG_TelegraphDecal.shadergraph`(커스텀 함수 1개) · 판 `Monster/TelegraphQuad` — 계산은 둘 다 `Assets/1.Scripts/Rendering/Telegraph/TelegraphMask.hlsl`.
-- 재질: `Assets/Resources/Telegraph/MA_TelegraphDecal.mat` · `MA_TelegraphQuad.mat`(코드가 불러 쓴다 — 지우지 말 것).
+  - `TelegraphQuad` 의 `_CodeShape`(할 일 57 S4c2): 0 = `_MainTex` 텍스처(기본), 1 사각 · 2 원판 · 3 조준 = `BossPatternVisuals` 의 코드 모양을 텍스처 없이 셰이더가 그린다(예전 런타임 64²/128² 굽기 대체, `y` = 테두리 비율).
+  - C3 경로 전용: 데칼 `SG_EnemyC3Decal`(같은 `TelegraphShade` 로 색·마스크 합성) · 판 `Monster/EnemyC3Plate`. 공격 데칼의 **채움**도 할 일 57 S4a 부터 `SG_EnemyC3Decal` 이 그린다(예전 `BuildArcTexture`·`BuildRectTexture`·`BuildUnionTexture` 256² 굽기 없음 — 원본 식은 에디터 전용 `Monster/Editor/LegacyDecalTextureReference`). 구조 = handoff-enemy-indicator.md §9.
+- 재질: `Assets/Resources/Telegraph/MA_TelegraphDecal.mat` · `MA_TelegraphQuad.mat` · `MA_EnemyC3Decal.mat` · `MA_EnemyC3Plate.mat`(코드가 불러 쓴다 — 지우지 말 것). `MA_TelegraphDecal` 은 C3 데칼 인스턴스의 그리기 순서(renderQueue·`_DrawOrder`) 출처로 계속 쓰인다.
 - 준비/검사 메뉴: `Tools/Monster/공격 예고 스타일 준비 (멱등)` · `Tools/Monster/공격 예고 셰이더 검사`.
 - 테스트: `Tools/Tests/전투 EditMode 테스트 실행` 의 `TelegraphStyleTests`(기본값 = 옛 화면 고정).
