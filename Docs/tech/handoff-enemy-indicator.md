@@ -154,7 +154,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 
 ### 8.4 되돌리기
 
-- 🔴 **먼저 §9.10 의 셰이더 재개발 커밋(S5 → S1)을 역순으로 되돌린 뒤**에 아래를 한다 — S1~S5 가 `637091b9` 위에 쌓여 있어 바로 revert 하면 충돌한다.
+- 🔴 **먼저 §9.10 의 셰이더 재개발 커밋(R → S5 → S1)을 역순으로 되돌린 뒤**에 아래를 한다 — S1~S5 가 `637091b9` 위에 쌓여 있어 바로 revert 하면 충돌한다.
 - **이번 적용만 통째로**: `git revert 637091b9` (신규 3개 삭제 + 6개 연결 원복이 한 커밋에 들어 있다).
 - **연결만 끄고 신규 파일은 남기기**: 6개 파일에서 `EnemyC3Visuals.` 호출 hunk 만 되돌린다(`git diff 637091b9~1 637091b9 -- <파일>` 의 반대). 패키지 `rollback/*.cs.txt` 는 `6ed043d8` 기준이라 **23호·건틀렛에는 덮어쓰면 안 된다**(경석 변경이 사라진다). 나머지 4개는 rollback 본과 원래 동일했다.
 - **신규 3개 제거**: 연결 hunk 를 먼저 되돌린 뒤 `EnemyC3Visuals.cs`·`Editor/EnemyC3Validation.cs`·`Resources/Telegraph/EnemyC3Selected.json` 을 meta 와 함께 삭제(순서를 바꾸면 컴파일 에러).
@@ -176,13 +176,13 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - 패키지의 `EnemyC3Visuals.Bake` 는 384×384 텍스처를 **CPU 로 픽셀마다** 계산했고, 예고가 처음 뜨는 RPC 경로에서 돌았다.
   사용자 프로파일(Work1): `WellsDroneAttack.ClientLock → PaintLockCircle` 한 프레임 **4,237ms**(Deep Profile), 일반 프로파일 `MonsterBase.Update(TwentyThree)` **181ms** 스파이크.
 - `Decal()` 캐시 키에 크기(F4)가 들어가 돌진처럼 길이가 바뀌면 매번 다시 굽고, 해제 없이 576KB 씩 쌓였다.
-- 수용 기준: **런타임 텍스처 생성 0**(정적 검사로 못박음), 예열 후 첫 호출 1ms 미만.
+- 수용 기준(PLAN-57 §6): **런타임 텍스처 생성 0**(정적 검사로 못박음), 23호 돌진·드론 고정·점프 **첫 호출** 각 1ms 미만(Stopwatch, 에디터), 예고 1회당 GC 0(가능한 범위). 충족 여부는 §9.4.
 
 ### 9.2 지금 구조
 
 | 무엇 | 파일 (`Assets/` 기준) | 하는 일 |
 |---|---|---|
-| 공용 모양 식 | `1.Scripts/Rendering/Telegraph/EnemyC3Sdf.hlsl` | 예전 `Bake` 픽셀 함수(Box·Segment·Polygon·Fins·CircleFins·부채꼴·합집합 SDF·Over·테두리/채움 합성)를 HLSL 로 옮긴 것. AA = 화면 미분(`fwidth`) |
+| 공용 모양 식 | `1.Scripts/Rendering/Telegraph/EnemyC3Sdf.hlsl` | 예전 `Bake` 픽셀 함수(Box·Segment·Polygon·Fins·CircleFins·부채꼴·합집합 SDF·Over·테두리/채움 합성)를 HLSL 로 옮긴 것. AA = 화면→p 야코비안의 최대 특잇값(`EnemyC3Aa`, 회전 불변 — 할 일 57 R) |
 | 바닥 판 셰이더 | `1.Scripts/Rendering/Telegraph/EnemyC3Plate.shader`(`Monster/EnemyC3Plate`) + `Resources/Telegraph/MA_EnemyC3Plate.mat` | 원·사각 판 12·14·15·16, 점프 06·07. 재질 한 장 공유 + `(id, 사각, 채움)` 별 `MaterialPropertyBlock` 캐시(`EnemyC3Visuals.PaintPlate/PaintLayer/PaintActive`). renderQueue 3100·블렌드는 `TelegraphQuad` 와 같다 |
 | 데칼 셰이더 | `1.Scripts/Rendering/Telegraph/SG_EnemyC3Decal.shadergraph` + `EnemyC3Decal.hlsl` + `Resources/Telegraph/MA_EnemyC3Decal.mat` | `SG_TelegraphDecal` 복제 그래프에서 Sample Texture 대신 Custom Function(`EnemyC3DecalShade`). 색·마스크 합성은 기존 `TelegraphMask.hlsl`(`TelegraphShade`) 그대로. `SG_TelegraphDecal`·`TelegraphMask.hlsl` 은 **무수정** |
 | 판·조준 코드 모양 | `1.Scripts/Rendering/Telegraph/TelegraphQuad.shader` 의 `_CodeShape` | `BossPatternVisuals` 가 예전에 런타임으로 굽던 64²/128² 흰 텍스처(사각·원판·조준)를 셰이더에서 재현. `_CodeShape.x` 0 = 기존 `_MainTex`(기본값 — 재질 에셋 무수정), 1 사각 · 2 원판 · 3 조준, `y` = 테두리 비율(0.005 단위) |
@@ -205,7 +205,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 
 - 모드 3~6 은 예전 256²/128² 텍스처를 **텍셀 중심 식 → 8비트 → 이중선형(Clamp)** 으로 재현한다(겉모습 동일 목표).
 - `BossAttackConeTelegraph`·`BossDirectionIndicator` 는 프로젝터마다 재질 인스턴스 **1개**(예전과 같은 수)를 만들고, 크기·각도·진행이 바뀌면 **값만** 다시 쓴다.
-  방향 표식·`AoeTelegraph` 의 인스턴스는 `EnemyC3Visuals.NewDecalInstance(source, color)` 가 원래 재질의 renderQueue·`_DrawOrder`·데칼 설정(Normal_Blend·각도 페이드·메시 바이어스)을 복사한다.
+  공격 예고(할 일 57 R 부터)·방향 표식·`AoeTelegraph` 의 인스턴스는 `EnemyC3Visuals.NewDecalInstance(source, color)` 가 원래 재질의 renderQueue·`_DrawOrder`·데칼 설정(Normal_Blend·각도 페이드·메시 바이어스)을 복사한다. 공격 예고는 그 위에 조각별 순서(외곽선 renderQueue +1·`_DrawOrder` 1)만 덮는다.
 
 ### 9.3 사용자 결정 10-20 (사실 기록)
 
@@ -221,7 +221,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - **콜드** = 정적 캐시 비움(JSON·MPB·재질 참조) + 새 오브젝트에서 첫 호출. 표의 첫 행 콜드는 **도메인 리로드 직후 첫 호출**(JIT 포함).
 - **예열 후** = 같은 오브젝트에 2회 부른 뒤. GC = 예열 후 200회 연속 호출의 관리 힙 증가 ÷ 200.
   (`GC.GetAllocatedBytesForCurrentThread` 는 Unity Mono 에서 항상 0 이라 쓰지 않았다. 힙 증가는 4KB 블록 단위라 1회 값은 거칠고, 연속 평균이 기준이다.)
-- 셰이더 GPU 컴파일·첫 그리기는 Stopwatch 밖(렌더 스레드)이라 이 표에 없다.
+- 🔴 **GPU 첫 드로우(셰이더 변형 첫 사용·GPU 컴파일)는 측정 밖**이다 — Stopwatch 밖(렌더 스레드)이라 이 표에 없고, 따로 재지 않았다.
 
 | 경로 | 콜드 1회 | 콜드 10회 평균 | 예열 후 1회 | 예열 후 10회 평균 | 예열 후 GC B/회 |
 |---|---:|---:|---:|---:|---:|
@@ -247,14 +247,20 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 5. 도메인 리로드 직후 + `EnsureView`(판 3장 생성). 콜드 2회째부터 1.2ms(웰즈)·0.7ms(점프).
 6. 점프 뷰는 매번 새 GameObject 를 만든다(57 이전 VFX 카탈로그 경로도 생성했다) — 그 래퍼 할당. 텍스처·재질은 만들지 않는다(§9.5 결정적 테스트).
 
-**수용 기준**: 예열 후 첫 호출 1ms 미만 — **충족**(최대 0.181ms, 합집합 길이 변경 `Show`). 예고 1회당 GC(예열 후) — C3 값 넣기 경로(Rebuild*·`ApplyFill`·`PaintPlate`·`PaintLockCircle`·`ClientLock`·`ApplyDecal`·`Paint(CodeShape)`)는 **0 B**, 0 이 아닌 곳은 위 주 2·4·6(C3 와 무관한 기존 흐름·오브젝트 생성). 예전 CPU 굽기 대비 예열 후 `PaintPlate("14")` 는 약 30만 배, 합집합 외곽선은 약 7만 배 싸다(에디터 기준). 사용자 프로파일 수치(4,237ms Deep / 181ms)는 빌드·Play 환경이라 직접 비교 대상이 아니다 — Play 프로파일 재확인은 §9.11.
+**수용 기준(PLAN-57 §6 "첫 호출 각 1ms 미만")**:
+- **콜드 첫 호출 — 미충족.** 23호 돌진 `Show` **42.29 ms** · 웰즈 드론 `ClientLock` **7.87 ms** · 점프 `CreateJump` **2.95 ms**(에디터 도메인 리로드 직후 첫 호출, JIT·정적 생성자·`EnsureBuilt`/`EnsureView` 오브젝트 생성 포함). 정적 캐시만 비운 콜드도 2.4~2.7ms(`Show`)로 1ms 를 넘는다.
+- **예열 후 첫 호출 — 충족**(최대 0.181ms, 합집합 길이 변경 `Show`). 단, 이것은 PLAN 기준(첫 호출)이 아니다.
+- **GPU 첫 드로우는 측정 밖**(위) — 빌드에서 셰이더 변형 첫 사용 비용이 더해질 수 있다.
+- 남은 일 = 스폰/씬 준비 때 `EnsureBuilt`·`EnsureView`·재질·셰이더 워밍을 미리 해 첫 호출을 예열 후 수준으로 내리는 **예열 방안 — 사용자 결정 대기**(아직 코드 없음).
+
+예고 1회당 GC(예열 후) — C3 값 넣기 경로(Rebuild*·`ApplyFill`·`PaintPlate`·`PaintLockCircle`·`ClientLock`·`ApplyDecal`·`Paint(CodeShape)`)는 **0 B**, 0 이 아닌 곳은 위 주 2·4·6(C3 와 무관한 기존 흐름·오브젝트 생성). 예전 CPU 굽기 대비 예열 후 `PaintPlate("14")` 는 약 30만 배, 합집합 외곽선은 약 7만 배 싸다(에디터 기준). 사용자 프로파일 수치(4,237ms Deep / 181ms)는 빌드·Play 환경이라 직접 비교 대상이 아니다 — Play 프로파일 재확인은 §9.11.
 
 ### 9.5 재발 감시·결정적 테스트
 
 | 테스트 (`Monster/Editor/`) | 무엇을 막나 |
 |---|---|
-| `EnemyC3RuntimeTextureGuardTests`(4) | `Monster/**`·`Rendering/Telegraph/**` 의 Editor 밖 `.cs` 에서 `new Texture2D`·`SetPixel(s/s32/Data)`·`Sprite.Create` 금지(주석 제외, 위반 파일:줄 출력). **예외 목록 0**(S4c2 확정) — 다시 넣으려면 사용자 결정, `NoRuntimeExceptions` 가 막는다 |
-| `EnemyC3TelegraphInstanceTests`(4) | 예열 후 `Show`(합집합·띠·부채꼴·잡기 ×20 + 진행 단계)·`PaintPlate/PaintActive/Paint(CodeShape)` ×20·`CreateJump` ×10(+파괴)·`ApplySmash` ×20 을 되풀이해도 재질·Texture2D·Sprite 인스턴스 수가 늘지 않는다. 타이밍 단언은 넣지 않는다(머신마다 흔들림 — 시간은 §9.4 메뉴로) |
+| `EnemyC3RuntimeTextureGuardTests`(6) | `Monster/**`·`Rendering/Telegraph/**` 의 Editor 밖 `.cs` 에서 Texture2D 생성·`SetPixel(s/s32/Data)`·`Sprite.Create` 금지(위반 파일:줄·메서드 출력). **예외 목록 0**(S4c2 확정) — 다시 넣으려면 사용자 결정, `NoRuntimeExceptions` 가 막는다. 할 일 57 R: 작은 렉서로 주석·문자열(일반·verbatim·보간 — 구멍은 코드)·문자 리터럴을 지운 뒤 **파일 전체**를 검사 → `UnityEngine.`/`global::` 정규화 이름·`using` 별칭·Texture2D 로 선언된 변수·필드·프로퍼티·반환의 target-typed `new()`·줄바꿈 생성식·닫힌 블록 주석 뒤 코드·`using static` Sprite 도 잡고, 문자열 속 금지어는 무시(`ScannerCatchesBypasses` 자기검사). 알려진 한계: 의미 분석이 없어 인자 위치의 target-typed `new()`(`Foo(new(1,1))`)는 못 본다(Roslyn 은 에디터 참조 불확실로 미사용) |
+| `EnemyC3TelegraphInstanceTests`(6) | 예열 후 `Show`(합집합·띠·부채꼴·잡기 ×20 + 진행 단계)·`PaintPlate/PaintActive/Paint(CodeShape)` ×20·`CreateJump` ×10(+파괴)·`ApplySmash` ×20 을 되풀이해도 재질·Texture2D·Sprite 인스턴스 수가 늘지 않는다. 타이밍 단언은 넣지 않는다(머신마다 흔들림 — 시간은 §9.4 메뉴로). 할 일 57 R: 공격 예고 6조각이 예고 재질(`MA_TelegraphDecal`, 그리고 `MaterialOverride` 경로)의 renderQueue(+조각 순서)·`_DrawOrder`·Normal_Blend·각도 페이드·메시 바이어스를 물려받는지 |
 
 ### 9.6 픽셀 비교 테스트 (예전 CPU 그림 vs 셰이더, 384² RT, 기준 = 채널 오차 ≤ 2/255 픽셀 99% 이상)
 
@@ -267,7 +273,12 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | `EnemyC3MarkerDiscShaderTests` | S4c1 | 방향 표식 12 + 원판 3 + 재질 전제 1 + 런타임 2 | ≥ 99.67%(표식 최대 4/255, 원판 최대 8/255) |
 | `BossPatternPlateShaderTests` | S4c2 | 원판 5 · 사각 4 · 조준 2 · 마스크 2 = 13 + 기본 경로 3 | 100%(최대 1/255) |
 
-나란히 PNG(예전|셰이더|차이×16)·`results.tsv` = `_lane-artifacts/MainProject-WorkTree/57-shader/<단계>/`(테스트가 그 폴더가 있을 때만 남긴다).
+| `EnemyC3DecalRenderTests` | R | **실제 `SG_EnemyC3Decal` 데칼 렌더**: 외곽선 3(띠·부채꼴·합집합) + 채움 5(부채꼴·고리·띠·합집합·원판) × DBuffer = 8, ScreenSpace 2, 기법 확인 1 | 전부 100%(최대 2/255) |
+
+나란히 PNG(예전|셰이더|차이×16)·`results.tsv` = `_lane-artifacts/MainProject-WorkTree/57-shader/<단계>/`(테스트가 그 폴더가 있을 때만 남긴다). 렌더 비교는 `57-shader/R/render/`(맨바닥|텍스처 데칼|C3 데칼|차이×16).
+
+- 위 S1~S4c2 비교는 비교용 셰이더(`Hidden/EnemyC3DecalCompare`)로 **같은 hlsl 함수**를 부를 뿐이라, 그래프 연결(Custom Function → BaseColor·Alpha·NormalAlpha)·Decal SubTarget·패스 설정은 보지 못한다. 그건 `EnemyC3DecalRenderTests` 가 본다: EditMode 프리뷰 씬에 Lit 바닥 + `DecalProjector` + 정사영 카메라를 두고 프로젝트 렌더러(`PC_Renderer`, Decal 기능)로 RT 에 찍어, 같은 바닥·같은 프로젝터에 **기존 텍스처 데칼**(`MA_TelegraphDecal` + 예전 CPU 텍스처)을 찍은 것과 비교한다. 데칼이 실제로 보이는지(맨바닥과 다른 픽셀 ≥ 1%)도 단언한다.
+- 기법: 프로젝트 설정은 Automatic → Windows 데스크톱 = **DBuffer**(`ProjectUsesDBufferDecals` 가 못박음). ScreenSpace 는 `DecalRendererFeature` 설정을 **메모리에서만** 잠깐 바꿔 찍고 되돌린다(애셋 파일 무변경). GBuffer(디퍼드)는 프로젝트가 Forward+ 라 안 본다.
 
 ### 9.7 알려진 차이 (화면상 무차이로 추정 — Play 확인 필요)
 
@@ -275,6 +286,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - **데칼 알파 1/255 반올림**: 셰이더가 Bake 텍스처처럼 알파를 1/255 단위로 맞춘다 — 반올림 경계에서 1/255 차이.
 - **원판 최대 8/255**(`AoeTelegraph` 코드 원판): 알파 양자화 순서 차이가 투명 sRGB RT 의 저알파 가장자리에서 확대된 값.
 - 실제 화면은 화면 해상도로 그려 CPU 384² 보다 가장자리가 더 매끈할 수 있다(PLAN R2, 허용).
+- **AA 폭(할 일 57 R)**: `EnemyC3Aa` = 화면→p 야코비안의 최대 특잇값. 원근·경사로 비등방이면 거친 축 기준이라 경계가 조금 더 부드럽고(계단 없음 쪽), 모양을 돌려도 폭이 같다. 축 정렬이면 예전 식과 같은 값이라 위 픽셀 비교 결과는 R 전후 동일(`57-shader/R/tsv-compare.txt`). 데칼 쪽 `max(extent)/64` 상한(깊이 불연속 대응)은 그대로.
 
 ### 9.8 프리셋을 바꿀 때
 
@@ -293,12 +305,15 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | S4b | `298f8991` | CPU Bake 를 에디터 전용 `EnemyC3BakeReference` 로 이동, 정적 검사 추가 |
 | S4c1 | `bad1edea` | 방향 표식 데칼·`AoeTelegraph` 코드 원판 셰이더화 |
 | S4c2 | `d83f9817` | `BossPatternVisuals` 판·조준 → `TelegraphQuad` `_CodeShape`, 정적 검사 예외 0 |
-| S5 | 메시지 `할 일 57 S5` | 성능 측정 메뉴·결정적 테스트·이 절 |
+| S5 | `2663e6a0` | 성능 측정 메뉴·결정적 테스트·이 절 |
+| R(A·B) | `c037f68a` | 공격 예고 데칼 인스턴스 `NewDecalInstance` 로(데칼 설정 보존), `EnemyC3Aa` 회전 불변(최대 특잇값) |
+| R(C·D) | `1844dd71` | 런타임 텍스처 정적 검사 렉서 기반 강화, 실제 데칼 렌더 비교 `EnemyC3DecalRenderTests` |
+| R(E) | 메시지 `할 일 57 R — 문서` | 이 절의 커밋·되돌리기·수용 기준 정정 |
 
 ### 9.10 되돌리기
 
 - 🔴 **Unity 를 닫고** 한다(여러 에셋·셰이더 그래프·`.meta` 를 한 번에 다시 쓴다 — `CLAUDE.md` 6번). 끝나면 `.meta` guid 가 그대로인지 확인.
-- **커밋 단위로, 최신부터 역순**: S5 → `d83f9817` → `bad1edea` → `298f8991` → `11c0fa1e` → `e7f92c18` → `f01990a7` → `dff34d8b`. 각 단계 뒤 컴파일 0 에러가 정상이다.
+- **커밋 단위로, 최신부터 역순**: R 문서(`할 일 57 R — 문서`) → `1844dd71` → `c037f68a` → S5 `2663e6a0` → `d83f9817` → `bad1edea` → `298f8991` → `11c0fa1e` → `e7f92c18` → `f01990a7` → `dff34d8b`. 각 단계 뒤 컴파일 0 에러가 정상이다.
   - 가운데 하나만 revert 하면 충돌하거나 컴파일이 깨진다(예: S4b 가 Bake 를 Editor 로 옮겼고 S4a·S4c 테스트가 그 위에 있다).
   - S4c2 까지만 되돌리면 `BossPatternVisuals` 런타임 굽기가 돌아오고 정적 검사 예외 목록도 함께 복원된다(같은 커밋). S4b 를 되돌리면 정적 검사 테스트 자체가 사라진다.
   - S1 까지 다 되돌리면 `637091b9` + `72cbefba` 상태(패키지 CPU 굽기, §9.1 스파이크 재발)다. C3 자체를 빼려면 이어서 §8.4.
@@ -317,3 +332,5 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - [ ] S5 프로파일러: 23호 돌진·웰즈 드론 고정·점프 첫 예고에서 스파이크(예전 181ms·Deep 4,237ms)가 사라졌는지, GC Alloc 열
 - [ ] MPPM 호스트/클라 양쪽 동일, Play 재시작·씬 전환 뒤에도 같은 그림(정적 캐시 초기화)
 - [ ] §9.7 알려진 차이(원 테두리 줄무늬·데칼 알파·원판 가장자리)가 화면에서 보이지 않는지
+- [ ] R 경사·원근 시점에서 판·데칼 외곽선 가장자리 폭이 모양 방향(돌진 방향)에 따라 달라지지 않는지(`EnemyC3Aa` 최대 특잇값)
+- [ ] R 첫 예고 프레임 히치(콜드 첫 호출 §9.4 미충족 + GPU 첫 드로우) — 예열 방안 결정의 근거로
