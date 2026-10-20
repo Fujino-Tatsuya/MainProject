@@ -14,12 +14,18 @@
 #ifndef ENEMY_C3_SDF_INCLUDED
 #define ENEMY_C3_SDF_INCLUDED
 
-// 픽셀 한 칸 = p 의 길이. 화면 축 정렬이면 Bake 의 sampleExtent/n 과 같고, 기울어진 시점에서도 회전 불변이다.
+// 픽셀 한 칸 = p 의 길이 = 화면→p 야코비안 J = [ddx(p) ddy(p)] 의 최대 특잇값(스펙트럴 노름, 할 일 57 R).
+// 특잇값은 p 평면에서 모양을 돌려도·화면에서 돌려도 그대로라, 원근·경사로 비등방일 때도 모양의 방향에 따라 경계 폭이
+// 달라지지 않는다(예전 식 = 열별 길이의 최대값은 비등방에서 회전에 따라 값이 변했다).
+// 축 정렬이면(등방이든 비등방이든) max(|ddx p|, |ddy p|) = Bake 의 max(sampleExtent)/n 과 정확히 같다 — 그래서
+// 비정방 데칼(띠·합집합)을 정방 RT 에 찍는 픽셀 비교도 그대로다. 프로베니우스/√2(제곱평균)는 그 경우 더 날카로워져 Bake 와 갈린다.
 // 🔴 분기 안에서 부르지 말 것 — 미분은 쿼드 단위라 분기 밖, 프래그먼트 맨 앞에서 한 번 구한다.
 float EnemyC3Aa(float2 p)
 {
     float2 dx = ddx(p), dy = ddy(p);
-    return max(max(length(float2(dx.x, dy.x)), length(float2(dx.y, dy.y))), 1e-6);
+    float a = dot(dx, dx), b = dot(dy, dy), c = dot(dx, dy);
+    float h = 0.5 * (a - b);
+    return max(sqrt(0.5 * (a + b) + sqrt(h * h + c * c)), 1e-6);   // √λmax(JᵀJ)
 }
 
 // Bake.Over — 직선 알파 합성(감마 공간).

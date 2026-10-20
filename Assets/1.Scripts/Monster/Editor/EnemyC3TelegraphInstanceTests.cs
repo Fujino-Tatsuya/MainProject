@@ -4,6 +4,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.TestTools;
 
 /// <summary>
 /// 할 일 57 S5 — 예열 후 예고를 되풀이해도 재질·텍스처·스프라이트 인스턴스가 늘지 않는다(결정적 단언만, 타이밍 없음).
@@ -68,6 +69,75 @@ public sealed class EnemyC3TelegraphInstanceTests
             CollectionAssert.AreEqual(materials, projectors.Select(p => p.material).ToArray(), "projector material instances must be reused");
         }
         finally { DestroyTelegraph(go); }
+    }
+
+    // 할 일 57 R(A) — 공격 예고 데칼 인스턴스는 예고 재질(source)의 그리기 순서·데칼 설정을 그대로 물려받고,
+    // 조각별 순서(외곽선 +1)만 덮는다. 데칼 설정 = EnemyC3Visuals.NewDecalInstance 가 복사하는 목록.
+    static readonly string[] DecalSettings = { "Normal_Blend", "_DecalAngleFadeSupported", "_DecalMeshBiasType", "_DecalMeshDepthBias", "_DecalMeshViewBias" };
+
+    static void AssertInheritsSource(GameObject go, Material source, string what)
+    {
+        var projectors = go.GetComponentsInChildren<DecalProjector>(true);
+        Assert.AreEqual(6, projectors.Length, what + ": 6 projectors");
+        foreach (var p in projectors)
+        {
+            var m = p.material;
+            Assert.AreSame(EnemyC3Visuals.DecalMaterial.shader, m.shader, what + "/" + p.name + ": C3 decal shader");
+            int artOrder = p.name.EndsWith("Outline") ? 1 : 0;
+            Assert.AreEqual(source.renderQueue + artOrder, m.renderQueue, what + "/" + p.name + ": renderQueue");
+            Assert.AreEqual(artOrder, m.GetInt("_DrawOrder"), what + "/" + p.name + ": _DrawOrder");
+            foreach (var s in DecalSettings)
+                if (source.HasProperty(s) && m.HasProperty(s))
+                    Assert.AreEqual(source.GetFloat(s), m.GetFloat(s), 1e-6f, what + "/" + p.name + ": " + s);
+        }
+    }
+
+    [Test]
+    public void AttackTelegraph_DecalInstances_InheritSourceDrawOrderAndDecalSettings()
+    {
+        Assume.That(EnemyC3Visuals.DecalMaterial, Is.Not.Null);
+        var source = Resources.Load<Material>("Telegraph/MA_TelegraphDecal");
+        Assume.That(source, Is.Not.Null, "Resources/Telegraph/MA_TelegraphDecal");
+        var go = new GameObject("EnemyC3InstanceTest_Inherit");
+        try
+        {
+            go.AddComponent<BossAttackConeTelegraph>().Show(2.5f, 360f, 0f, 18f, 1f, 18f, 1f);
+            AssertInheritsSource(go, source, "MA_TelegraphDecal");
+        }
+        finally { DestroyTelegraph(go); }
+    }
+
+    [Test]
+    public void AttackTelegraph_MaterialOverride_InheritsOverrideDrawOrderAndDecalSettings()
+    {
+        Assume.That(EnemyC3Visuals.DecalMaterial, Is.Not.Null);
+        var baseSource = Resources.Load<Material>("Telegraph/MA_TelegraphDecal");
+        Assume.That(baseSource, Is.Not.Null);
+        var t = typeof(BossAttackConeTelegraph);
+        var matField = t.GetField("_telegraphMaterial", BindingFlags.Static | BindingFlags.NonPublic);
+        var triedField = t.GetField("_triedLoadMaterial", BindingFlags.Static | BindingFlags.NonPublic);
+        object savedMat = matField.GetValue(null), savedTried = triedField.GetValue(null);
+        // 기본값과 다른 값으로 바꾼 대체 재질 — 복사가 실제로 일어나야 통과한다.
+        var over = new Material(baseSource) { renderQueue = baseSource.renderQueue + 7 };
+        foreach (var s in DecalSettings) if (over.HasProperty(s)) over.SetFloat(s, over.GetFloat(s) == 0f ? 1f : 0f);
+        var go = new GameObject("EnemyC3InstanceTest_Override");
+        try
+        {
+            matField.SetValue(null, null);
+            triedField.SetValue(null, true);   // Resources 예고 재질이 없는 경로 → MaterialOverride
+            var tel = go.AddComponent<BossAttackConeTelegraph>();
+            tel.MaterialOverride = over;
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("예고 재질"));
+            tel.Show(2.5f, 360f, 0f, 18f, 1f, 18f, 1f);
+            AssertInheritsSource(go, over, "MaterialOverride");
+        }
+        finally
+        {
+            matField.SetValue(null, savedMat);
+            triedField.SetValue(null, savedTried);
+            DestroyTelegraph(go);
+            Object.DestroyImmediate(over);
+        }
     }
 
     [Test]

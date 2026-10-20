@@ -523,9 +523,12 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         var decal = go.AddComponent<DecalProjector>();
         int artOrder=childName.EndsWith("Outline") ? 1 : 0;
         // 외곽선·채움 = C3 데칼 셰이더(할 일 57 S2·S4a) — 모양을 텍스처로 굽지 않고 재질 값만 넣는다.
-        // 그리기 순서(renderQueue·_DrawOrder)는 예고 재질(source) 기준 그대로. SG_EnemyC3Decal 은 SG_TelegraphDecal 과 데칼 타깃 설정이 같다.
-        Material shape = EnemyC3Visuals.DecalMaterial != null ? EnemyC3Visuals.DecalMaterial : source;
-        decal.material = new Material(shape);           // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
+        // 그리기 순서·데칼 설정(Normal_Blend·각도 페이드·메시 바이어스)은 예고 재질(source) 기준 그대로 —
+        // NewDecalInstance 가 복사하고(할 일 57 R), 여기선 조각별 순서(artOrder)만 그 위에 덮는다.
+        Material shape = EnemyC3Visuals.DecalMaterial;
+        decal.material = shape != null                  // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
+            ? EnemyC3Visuals.NewDecalInstance(source, shape.HasProperty(BaseColorId) ? shape.GetColor(BaseColorId) : Color.white)
+            : new Material(source);
         DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터·벽에 묻지 않게(표식과 같은 계약)
         if(decal.material.HasProperty("_DrawOrder"))decal.material.SetInt("_DrawOrder",artOrder);
         decal.material.renderQueue = source.renderQueue + artOrder;
