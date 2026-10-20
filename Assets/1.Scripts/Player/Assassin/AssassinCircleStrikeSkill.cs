@@ -14,7 +14,7 @@ using UnityEngine;
 /// 공격 중 이동·대시·다른 스킬 불가(스킬 상태), 변신 만료·R 해제는 FSM 이 Skill 을 벗어난 뒤 AssassinState 가 처리한다(5타 완료 후 종료).
 /// 변신 중이라 스택은 없다. 백어택 배율은 A11.
 /// </summary>
-public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
+public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHitPreview
 {
     private AssassinState assassinState;
     private PlayerInvulnerability invulnerability;
@@ -66,8 +66,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
 
         // 확정 지점은 컨트롤러가 서버 위치 기준으로 재투영해 넘긴다(A4). 없으면 승인 방향 × 중심 거리.
         Vector3 origin = owner.transform.position;
-        areaCenter = HasAimPoint ? AimPoint : origin + direction * data.CenterDistance;
-        areaCenter.y = origin.y;
+        areaCenter = AreaCenter(origin, HasAimPoint ? AimPoint : origin + direction * data.CenterDistance);
 
         sequence.Begin(data.HitCount);
 
@@ -129,18 +128,14 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
         if (data == null || owner == null || hitResults == null)
             return;
 
-        float radius = data.AreaRadius;
-        Vector3 boxCenter = areaCenter + Vector3.up * (data.AreaHeight * 0.5f);
-        Vector3 halfExtents = new Vector3(radius, data.AreaHeight * 0.5f, radius);
-        int count = Physics.OverlapBoxNonAlloc(
-            boxCenter, halfExtents, hitResults, Quaternion.identity,
-            data.HittableLayers, QueryTriggerInteraction.Collide);
+        SkillHitVolume area = HitVolume(areaCenter, data);
+        int count = area.Overlap(hitResults, area.Mask, QueryTriggerInteraction.Collide);
 
         strikeLandedUnits.Clear();
         for (int i = 0; i < count; i++)
         {
             Collider hit = hitResults[i];
-            if (hit == null || !AssassinCircleStrikeRules.OverlapsCircle(areaCenter, radius, hit.bounds))
+            if (hit == null || !area.Accepts(hit.bounds))
                 continue;
 
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
@@ -173,6 +168,33 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
 
         if (strikeLandedUnits.Count > 0)
             owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, strikeLandedUnits, this);
+    }
+
+    /// <summary>[오너 로컬] 조준 지점 원이 떠 있는 동안 — 그 지점에 시전하면 칠 영역. 서버 타격(<see cref="StrikeArea"/>)과 같은 식.</summary>
+    public bool TryGetGroundHitVolume(Vector3 casterPosition, Vector3 aimPoint, out SkillHitVolume volume)
+    {
+        AssassinCircleStrikeSkillData data = StrikeData;
+        if (data == null)
+        {
+            volume = default;
+            return false;
+        }
+
+        volume = HitVolume(AreaCenter(casterPosition, aimPoint), data);
+        return true;
+    }
+
+    /// <summary>원 중심 = 시전 지점의 수평 위치 + 시전자 발 높이(서버 확정·오너 미리보기 공용).</summary>
+    public static Vector3 AreaCenter(Vector3 casterPosition, Vector3 point)
+    {
+        point.y = casterPosition.y;
+        return point;
+    }
+
+    /// <summary>판정 원기둥(서버 타격·오너 미리보기 공용) — 반경 aoeRadius, 높이 areaHeight, 피격 레이어 hittableLayers.</summary>
+    public static SkillHitVolume HitVolume(Vector3 areaCenter, AssassinCircleStrikeSkillData data)
+    {
+        return SkillHitVolume.CircleColumn(areaCenter, data.AreaRadius, data.AreaHeight, data.HittableLayers);
     }
 
     private void RemoveInvulnerability()
