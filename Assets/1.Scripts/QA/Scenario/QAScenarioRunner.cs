@@ -93,6 +93,7 @@ public sealed class QAScenarioRunner : MonoBehaviour
             int before = _ctx.Items.Count;
             bool done = false;
             float limit = QALobbyScenarios.TimeLimit(id);
+            QABlackboard.ExpectDisconnects = QALobbyScenarios.SimulatesDisconnects(id);
             Debug.Log($"[QA] ── 시나리오 {id} 시작(상한 {limit:F0}s) ──");
 
             Coroutine co = StartCoroutine(Guard(QALobbyScenarios.Run(id, _ctx), () => done = true));
@@ -115,6 +116,7 @@ public sealed class QAScenarioRunner : MonoBehaviour
             WriteReport(); // 중간 저장 — 도중에 Play 를 멈춰도 여기까지는 남는다
         }
 
+        QABlackboard.ExpectDisconnects = false;
         _status = "완료";
         Finish();
         Debug.Log($"[QA] 48 시나리오 전부 끝 — 리포트: {_ctx.RunDir}/report.md . Tools/QA/Stop Active Scenario 로 정지할 것.");

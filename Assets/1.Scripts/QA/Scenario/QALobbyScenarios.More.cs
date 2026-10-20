@@ -30,6 +30,10 @@ public static partial class QALobbyScenarios
         }
     }
 
+    /// <summary>끊김·거절을 일부러 내는 시나리오 — 그 동안 네트워크 감지기의 접속 해제는 판정 제외(QABlackboard.ExpectDisconnects).</summary>
+    public static bool SimulatesDisconnects(string id) =>
+        id == "M2" || id == "M4" || id == "M5" || id == "M6" || id == "M7" || id == "M8";
+
     private static IEnumerator RunMore(string id, QAScenarioContext ctx)
     {
         switch (id)

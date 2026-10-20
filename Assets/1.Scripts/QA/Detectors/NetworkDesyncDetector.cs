@@ -42,9 +42,12 @@ public sealed class NetworkDesyncDetector : IQADetector
         }
         else if (_wasListening)
         {
-            // 리슨 중이었는데 꺼짐 — 세션이 죽음.
+            // 리슨 중이었는데 꺼짐 — 세션이 죽음. 시나리오가 끊김을 흉내 내는 구간이면 판정 제외로 센다.
             _wasListening = false;
-            recorder.Add(QASeverity.Critical, Name, "네트워크 세션이 예기치 않게 종료됨(리슨 중단)");
+            if (QABlackboard.ExpectDisconnects)
+                recorder.Add(QASeverity.Info, ExpectedCategory, "네트워크 세션 종료(시나리오가 흉내 낸 끊김·거절)");
+            else
+                recorder.Add(QASeverity.Critical, Name, "네트워크 세션이 예기치 않게 종료됨(리슨 중단)");
         }
     }
 
@@ -68,8 +71,13 @@ public sealed class NetworkDesyncDetector : IQADetector
         string reason = nm != null ? nm.DisconnectReason : null;
         if (!string.IsNullOrEmpty(reason))
         {
-            _recorder.Add(QASeverity.Error, Name,
-                $"클라이언트 {clientId} 비정상 접속 해제: {reason}");
+            if (QABlackboard.ExpectDisconnects)
+                _recorder.Add(QASeverity.Info, ExpectedCategory, $"클라이언트 {clientId} 접속 해제(시나리오가 흉내 낸 끊김·거절): {reason}");
+            else
+                _recorder.Add(QASeverity.Error, Name,
+                    $"클라이언트 {clientId} 비정상 접속 해제: {reason}");
         }
     }
+
+    private static string ExpectedCategory => QAKnownNoise.FalsePositivePrefix + "Network-ExpectedDisconnect";
 }

@@ -114,11 +114,15 @@ public static class QABlackboard
     /// <summary>스크립트(로비 걷기·시나리오)가 이동을 쥐고 있다 — QAAgent 휴리스틱은 행동을 넣지 않는다.</summary>
     public static bool ScriptedControl;
 
+    /// <summary>시나리오가 끊김·접속 거절을 일부러 내는 구간(M2·M4~M8) — 네트워크 감지기가 접속 해제를 판정 제외로 센다. 결과는 시나리오 단언이 본다.</summary>
+    public static bool ExpectDisconnects;
+
     public static void Reset()
     {
         LastMoveIntentTime = -999f;
         Controlling = false;
         ScriptedControl = false;
+        ExpectDisconnects = false;
     }
 }
 
@@ -158,6 +162,18 @@ public static class QAKnownNoise
         {
             All = new[] { "[BridgeGate]", "미저작" },
             Reason = "절차 맵 다리 열림 위치 미저작(맵 저작 데이터) — 48 무관",
+        },
+        new Rule
+        {
+            All = new[] { "connection.state_change" },
+            Reason = "공식 Unity MCP(AI Assistant) relay 프로세스 상태 로그(에디터 도구, 가상 플레이어) — 48 무관",
+        },
+        new Rule
+        {
+            // PlayerAimIndicator.UpdateAimDirection → Camera.ScreenPointToRay(마우스 NaN). 포커스 없는 MPPM 클론에서만 관측(48-20261020_150745 클라 1곳 576건).
+            // 48 밖 플레이어 영역 — 빌드(창 있음)에서 재현되면 NaN 가드 없는 버그로 따로 올린다.
+            All = new[] { "Screen position out of view frustum", "nan" },
+            Reason = "MPPM 가상 플레이어 마우스 좌표 NaN → PlayerAimIndicator ScreenPointToRay(에디터 클론 환경) — 48 무관, 플레이어 영역 버그 후보",
         },
     };
 
