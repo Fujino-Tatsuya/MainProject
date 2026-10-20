@@ -46,14 +46,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   blackImage: {fileID: 0}
   fadeDuration: 0.8
-  ipInputField: {fileID: 0}
-  portInputField: {fileID: 0}
-  setConnectionDataButton: {fileID: 0}
-  startHostButton: {fileID: 0}
-  startClientButton: {fileID: 0}
-  gameStartButton: {fileID: 0}
-  readyButton: {fileID: 0}
-  sessionConnectPanel: {fileID: 0}
-  errorText: {fileID: 0}
-  defaultIp: 127.0.0.1
-  defaultPort: 7777
+  resultPanel: {fileID: 0}
+  showLastResultButton: {fileID: 0}

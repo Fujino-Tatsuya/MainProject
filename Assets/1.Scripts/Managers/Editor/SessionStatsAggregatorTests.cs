@@ -259,4 +259,111 @@ public sealed class SessionStatsAggregatorTests
         Assert.AreEqual(Client1, rows[1].ClientId);
         Assert.AreEqual(Client2, rows[2].ClientId);
     }
+
+    // ─── 판 도중 재합류 행 합치기(할 일 48 C14 R5c) ─────────────────────
+
+    const ulong Rejoined1 = 5;
+    const ulong Rejoined2 = 8;
+
+    [Test]
+    public void 재합류하면_옛_행을_새_clientId_로_합쳐_같은_사람_1행()
+    {
+        var a = new SessionStatsAggregator();
+        a.SetCharacterId(Client1, 2);
+        a.RecordDamage(Client1, true, 100, true);
+        a.RecordLifeStateChange(Client1, PlayerLifeState.Alive, PlayerLifeState.DeadPresentation);
+        a.RecordHealing(Client1, true, 7);
+        a.RecordDamageTaken(Client1, true, 30);
+        a.RecordCounterSuccess(Client1);
+
+        // 재스폰 직후 — 스폰 초기 통지가 새 행을 이미 만들었고 새 행에도 값이 쌓였다
+        a.RecordLifeStateChange(Rejoined1, PlayerLifeState.Alive, PlayerLifeState.Alive);
+        a.RecordDamage(Rejoined1, true, 20, false);
+
+        Assert.IsTrue(a.Rebind(Client1, Rejoined1));
+        Assert.AreEqual(1, a.PlayerCount, "같은 사람은 1행");
+        Assert.IsFalse(a.TryGet(Client1, out _), "옛 행은 없어진다");
+
+        var row = Get(a, Rejoined1);
+        Assert.AreEqual(Rejoined1, row.ClientId);
+        Assert.AreEqual(120, row.Damage);
+        Assert.AreEqual(1, row.Kills);
+        Assert.AreEqual(1, row.Deaths);
+        Assert.AreEqual(7, row.Healing);
+        Assert.AreEqual(30, row.DamageTaken);
+        Assert.AreEqual(1, row.Counters);
+        Assert.AreEqual(2, row.CharacterId, "새 행 캐릭터를 모르면 옛 값");
+    }
+
+    [Test]
+    public void 새_행_캐릭터를_알면_새_값을_쓴다()
+    {
+        var a = new SessionStatsAggregator();
+        a.SetCharacterId(Client1, 1);
+        a.SetCharacterId(Rejoined1, 3);
+
+        Assert.IsTrue(a.Rebind(Client1, Rejoined1));
+        Assert.AreEqual(3, Get(a, Rejoined1).CharacterId);
+    }
+
+    [Test]
+    public void 새_행이_아직_없으면_옛_행을_그대로_옮긴다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RecordDamage(Client1, true, 50, false);
+
+        Assert.IsTrue(a.Rebind(Client1, Rejoined1));
+        Assert.AreEqual(1, a.PlayerCount);
+        Assert.AreEqual(50, Get(a, Rejoined1).Damage);
+    }
+
+    [Test]
+    public void 같은_쌍을_두_번_불러도_행과_값이_늘지_않는다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RecordDamage(Client1, true, 50, false);
+        a.RegisterPlayer(Rejoined1);
+
+        Assert.IsTrue(a.Rebind(Client1, Rejoined1));
+        Assert.IsFalse(a.Rebind(Client1, Rejoined1), "옛 행이 이미 없다");
+        Assert.AreEqual(1, a.PlayerCount);
+        Assert.AreEqual(50, Get(a, Rejoined1).Damage);
+    }
+
+    [Test]
+    public void 옛_행이_없거나_같은_id_면_아무것도_안_한다()
+    {
+        var a = new SessionStatsAggregator();
+        a.RegisterPlayer(Rejoined1);
+
+        Assert.IsFalse(a.Rebind(Client1, Rejoined1));
+        Assert.IsFalse(a.Rebind(Rejoined1, Rejoined1));
+        Assert.IsFalse(a.Rebind(Rejoined1, SessionStatsAggregator.NoAttacker));
+        Assert.AreEqual(1, a.PlayerCount);
+    }
+
+    [Test]
+    public void 합친_행은_옛_자리_순서를_지킨다_두_번_재합류해도()
+    {
+        var a = new SessionStatsAggregator();
+        a.RegisterPlayer(Host);
+        a.RegisterPlayer(Client1);
+        a.RegisterPlayer(Client2);
+
+        a.Rebind(Client1, Rejoined1);
+        a.Rebind(Rejoined1, Rejoined2);
+
+        var rows = new List<PlayerSessionStats>();
+        a.Snapshot(rows);
+        Assert.AreEqual(3, rows.Count);
+        Assert.AreEqual(Host, rows[0].ClientId);
+        Assert.AreEqual(Rejoined2, rows[1].ClientId, "P2 자리 그대로");
+        Assert.AreEqual(Client2, rows[2].ClientId);
+
+        a.Reset();
+        a.RegisterPlayer(Rejoined2);
+        a.RegisterPlayer(Client2);
+        a.Snapshot(rows);
+        Assert.AreEqual(Client2, rows[0].ClientId, "Reset 뒤에는 정렬 키도 비워 clientId 순");
+    }
 }

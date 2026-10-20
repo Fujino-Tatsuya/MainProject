@@ -104,6 +104,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
     public override void OnNetworkDespawn()
     {
+        if (IsServer)
+            NoteLifeForRejoin();
+
         UnsubscribeFromDeathSource();
 
         if (encounterLock != null)
@@ -211,6 +214,69 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         if (lifeState.Value != PlayerLifeState.Alive)
             lifeState.Value = PlayerLifeState.Alive;
         return true;
+    }
+
+    /// <summary>
+    /// [서버, 판 도중 재합류 전용 — 할 일 48 C14 R5c] 퇴장 때 보관한 생명 기록을 막 스폰된 새 PlayerObject 에 적용한다
+    /// (규칙 <see cref="PlayerRejoinLifeRules"/>). 호출자 = <c>NetworkLoadingFlowController</c> 의 재합류 묶기 하나 —
+    /// PlayerRejoined 구독자(특성 효과·튜토리얼 이어 받기)가 끝난 <b>뒤</b> 부른다(영구 상태이상이 사망 상태에서 거부되지 않게).
+    ///  · Alive: 체력 비율만 맞춘다(Q-B). 스킬 쿨다운은 새 오브젝트 그대로(0부터).
+    ///  · Soul: Alive → Soul 로 바로 쓴다(Q-C — 사망 연출·사망 횟수·목숨 소비 없음). 부활은 기존 규칙 그대로.
+    ///  · PermanentDead: Alive → PermanentDead 로 바로 쓴다. 관전은 오너 상태로 자동. 시체는 두지 않는다(죽은 자리가 아니라 스폰 지점이다).
+    /// <see cref="TryRespawnAfterWipeOnServer"/> 처럼 일반 전이표의 예외다. 상태가 그대로면(Alive) 서버 통지를 (s,s) 로 한 번 더 내
+    /// 튜토리얼 완전 사망 표시처럼 옛 clientId 기록을 이어 받은 쪽이 지금 상태로 맞춰지게 한다.
+    /// 연출 잠금 중이면 거부(재합류 스폰 게이트가 연출 중 스폰을 보류하므로 정상 경로에선 없다).
+    /// </summary>
+    public bool RestoreForRejoinServer(PlayerLifeState state, float hpRatio)
+    {
+        if (!CanWriteLifeState)
+            return false;
+
+        ResolveLocalReferences();
+        if (deathSource == null)
+        {
+            Debug.LogError("[SoulAlert] 재합류 생명 복원 — Unit deathSource가 없어 중단합니다.", this);
+            return false;
+        }
+
+        PlayerRejoinLifeRestore restore = PlayerRejoinLifeRules.PlanRestore(state);
+        deathResolutionPending = false;
+        deferredDeathWhileLocked = false;
+        deathSource.SetCurrentHealthOnServer(
+            PlayerRejoinLifeRules.ResolveRestoreHealth(restore, hpRatio, deathSource.MaxHp));
+
+        PlayerLifeState next = restore == PlayerRejoinLifeRestore.Soul ? PlayerLifeState.Soul
+            : restore == PlayerRejoinLifeRestore.PermanentDead ? PlayerLifeState.PermanentDead
+            : PlayerLifeState.Alive;
+        if (next == PlayerLifeState.PermanentDead)
+            LastDeathCause = PlayerDeathCause.Fall; // 시체 없음 경로(PlayerCorpseController) — 스폰 지점에 시체를 두지 않는다
+
+        if (lifeState.Value != next)
+            lifeState.Value = next;
+        else
+            NotifyStateObservers(next, next);
+        return true;
+    }
+
+    // [서버] 디스폰 순간 생명 기록을 재합류 보관소에 메모한다(판 진행 중만). NGO 는 퇴장 콜백보다 먼저 PlayerObject 를 디스폰하므로
+    // 퇴장 콜백(NetworkLoadingFlowController)이 이 메모를 playerId 키로 옮긴다. 사망 연출 중이면 지금 목적지를 확정한다(사망 목적지 판정과 같은 입력).
+    private void NoteLifeForRejoin()
+    {
+        if (!MatchRoster.Server.IsActive)
+            return;
+
+        ResolveLocalReferences();
+        ResolveGameRuleReference();
+        bool keepsSoul = ServerDeathKeepsSoul != null && ServerDeathKeepsSoul(OwnerClientId);
+        // MultiGameRule 이 없으면 사망 목적지 폴백(Soul)과 같게 — 목숨 1 로 본다.
+        int partyLives = gameRule != null ? gameRule.PartyLives : 1;
+        PlayerRejoinLifeRecord record = PlayerRejoinLifeRules.Capture(
+            lifeState.Value,
+            deathSource != null ? deathSource.CurrentHealth : 0,
+            deathSource != null ? deathSource.MaxHp : 0,
+            partyLives,
+            keepsSoul);
+        RejoinMemory.Server.NoteDespawnedLife(OwnerClientId, record);
     }
 
     /// <summary>DeadPresentation 종료 후 최종 사망을 확정한다. 서버에서만 성공한다.</summary>

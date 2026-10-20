@@ -13,6 +13,8 @@
 **구조.** `Player.prefab` = 캐릭터 무관한 **역할 base**. 캐릭터마다 그 **Prefab Variant** 를 두고,
 Variant 가 `Armature`(캐릭터 몸체) · 스킬 · VFX · 무기 · 스탯 · 평타 데이터를 얹는다.
 **캐릭터는 스폰 전에 고른다** — 스폰할 Variant 를 고르는 방식이다(런타임 Armature 교체는 미채택, §1.5).
+**로비 캐릭터 교체도 같은 원칙이다** — 서버가 지금 PlayerObject 를 디스폰하고 같은 위치·회전에 새 Variant 를 `SpawnAsPlayerObject` 한다
+(런타임 Armature 교체 아님, 할 일 48 C12 — `LobbyPlayerSpawner.TrySwapCharacter` → `PlayerSpawnService.SpawnCharacter`).
 
 ```
 Player.prefab (base)            ← 네트워크·입력·이동·생명주기·상태이상·HUD·HurtBox·실루엣 태그·시각 보간
@@ -415,8 +417,8 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 ✅ **2026-10-02 구현** ([PLAN-character-select.md](../../PLAN-character-select.md)). 아래는 결과 요약.
 
 - 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
-- 로비: 클라 → 서버 `Lobby.CharacterRequest`, 서버가 검증(사용 가능·Ready 아님) 후 `Lobby.State` 에 클라별 id 를 실어 방송. 기본 0번, 중복 선택 허용.
-- Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움, 퇴장 시 제거).
+- 로비(2026-10-19 C8): `LobbySession.RequestCharacterServerRpc` → 서버가 `LobbyReadyRules`(Ready·카운트다운 중 거부, 교체 쿨다운) + 로스터로 검증 후 `NetworkList<LobbyPlayerEntry>` 로 복제. 기본 0번, 중복 선택 허용. (옛 `Lobby.CharacterRequest`/`Lobby.State` named message 는 퇴역.)
+- Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움). 퇴장 때는 clientId 쪽만 지우고 playerId 의 마지막 선택은 남겨 재접속 때 되살린다. 로비 재진입 때 `LobbySession` 이 이 저장소로 자리를 시드한다.
 - `NetworkLoadingFlowController.ResolvePlayerPrefabForClient(clientId)` = 캐릭터 id → Variant. **이 함수 하나가 (A) 방식의 유일한 분기점이다.**
   미선택·잘못된 id·비활성 칸 → `defaultPlayerPrefab`(Paladin). Dev Boot 는 로비를 안 거치므로 이 폴백으로 지금처럼 동작.
 - 범위 밖으로 남긴 것: 전투 HUD 초상화(`CombatHUD.prefab` 에 Paladin 고정 — Gunner 도 Paladin 얼굴).

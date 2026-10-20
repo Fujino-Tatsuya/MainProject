@@ -2,7 +2,7 @@
 
 > 5.ResultScene 을 없애고 판 결과를 로비 패널로 보여 준다(PLAN-48 v2 §0-1).
 > 이 문서는 **패널을 로비에 붙이는 쪽(Work3)** 이 볼 것만 적는다.
-> 붙임 = C7b(`feature/LobbyDemo`): 3.LobbyScene 에 프리팹 인스턴스, `LobbySceneManager.Start` 가 `HasResult` 면 Show, 임시 다시 보기 버튼 `Canvas/Button_ShowLastResult`(`UI.Lobby.ShowLastResult`). 결과 비우기는 기존 두 곳(`SessionStatsTracker.Awake`·`DemoSessionDirector.CleanupAfterDrop`)으로 충분하다고 보고 새로 넣지 않았다.
+> 붙임 = C7b(`feature/LobbyDemo`): 3.LobbyScene 에 프리팹 인스턴스, `LobbySceneManager.Start` 가 `HasResult` 면 Show, 임시 다시 보기 버튼 `UI/Canvas/Button_ShowLastResult`(C9 에서 UI 루트로 옮김)(`UI.Lobby.ShowLastResult`). 결과 비우기는 기존 두 곳(`SessionStatsTracker.Awake`·`DemoSessionDirector.CleanupAfterDrop`)으로 충분하다고 보고 새로 넣지 않았다.
 
 ## 파일
 | 무엇 | 경로 |
@@ -38,7 +38,7 @@
 - "나" 강조 기준 = `NetworkManager.LocalClientId`(세션 유지 중이어야 한다).
 
 ## 닫기·모달
-- 닫기 버튼, ESC, **열린 뒤 15초**(`autoCloseSeconds`, `Time.unscaledTime` — 슬로모션 영향 없음, 0 이하면 끔) 중 먼저 오는 것. 피어마다 각자(로컬) 닫는다.
+- 닫기 버튼, ESC, **열린 뒤 180초**(`autoCloseSeconds`, `Time.unscaledTime` — 슬로모션 영향 없음, 0 이하면 끔) 중 먼저 오는 것. 피어마다 각자(로컬) 닫는다.
 - 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력을 막고, 반투명 Dim 이 뒤 클릭을 막는다.
 
 ## ESC
@@ -87,6 +87,6 @@
 
 ## ⏳ 사람 Play 확인
 - 판 끝 → 로비 복귀 때 패널이 뜨고 값이 결과와 같은가(호스트·클라 각각, "나" 강조가 자기 행인가).
-- 닫기 버튼·ESC·15초 자동 닫힘, 열린 동안 이동·공격이 막히고 닫으면 풀리는가. 슬로모션 중에도 15초가 실제 시간인가.
+- 닫기 버튼·ESC·180초 자동 닫힘, 열린 동안 이동·공격이 막히고 닫으면 풀리는가. 슬로모션 중에도 180초가 실제 시간인가.
 - 첫 부팅·재접속 로비에서는 안 뜨는가(호출 측 Clear 확인).
 - 행이 순위 순서인가, 1위만 왕관인가(아무도 피해 0 이면 왕관 없음). 회복량·입은 피해 값이 호스트·클라에서 같은가.

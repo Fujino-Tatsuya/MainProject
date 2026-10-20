@@ -346,6 +346,89 @@ public sealed class TutorialTraitSelectionModel
         }
     }
 
+    // ── 재합류 복원(할 일 48 C14 R4c) ─────────────────────────────────────
+
+    /// <summary>
+    /// 판 도중 재합류 — 퇴장 때 보관한 획득 목록을 새 clientId 에 되돌린다(획득 순서 유지).
+    /// 이미 가진 인덱스·중복·범위 밖·사용 불가는 건너뛴다(같은 목록을 두 번 넣어도 한 번만 — 멱등).
+    /// 제시 번호는 올리지 않는다 — 창이 열리거나 획득 토스트가 뜨지 않는다. 넣은 인덱스는 <paramref name="added"/> 에 덧붙인다(null 가능).
+    /// 효과 적용은 호출자 몫. 넣은 수를 돌려준다.
+    /// </summary>
+    public int RestoreAcquired(ulong clientId, IReadOnlyList<int> traitIndices, List<int> added = null)
+    {
+        if (traitIndices == null || traitIndices.Count == 0)
+            return 0;
+
+        PlayerState state = GetOrCreate(clientId);
+        int count = 0;
+        for (int i = 0; i < traitIndices.Count; i++)
+        {
+            int index = traitIndices[i];
+            if (!IsRestorable(index) || state.Acquired.Contains(index))
+                continue;
+
+            state.Acquired.Add(index);
+            added?.Add(index);
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// 재합류 — 퇴장 전에 지금 복도 라운드에서 이미 골랐던(0장 포함) 사람을 "참가·고름"으로 되돌린다.
+    /// 그래야 문이 열릴 때 미도착자 자동 획득·중간 지점 늦은 도착이 같은 라운드에서 한 장을 더 주지 않는다(<see cref="TutorialTraitJoinResult.AlreadyInRound"/>).
+    /// 라운드가 그새 바뀌었거나 이미 참가 중이면 아무것도 안 하고 false.
+    /// </summary>
+    public bool RestoreRoundDone(ulong clientId, int round)
+    {
+        if (round <= 0 || round != Round)
+            return false;
+
+        PlayerState state = GetOrCreate(clientId);
+        if (state.InRound)
+            return false;
+
+        state.InRound = true;
+        state.Chosen = true;
+        state.Personal = false;
+        state.Offered.Clear();
+        return true;
+    }
+
+    /// <summary>
+    /// 재합류 — 퇴장 때 열려 있던 재선택(개인 라운드) 후보를 그대로 다시 제시한다(할 일 30 재선택 창 복원).
+    /// 이미 획득·범위 밖·사용 불가 후보는 뺀다. 남은 게 없으면 아무것도 안 하고 false(호출자가 다음 재선택 라운드를 연다).
+    /// 새 제시 번호를 받는다 — 그 사람 창만 새로 열린다. 다른 사람의 참가·제시는 건드리지 않는다.
+    /// </summary>
+    public bool RestorePersonalOffer(ulong clientId, IReadOnlyList<int> offered)
+    {
+        if (offered == null || offered.Count == 0)
+            return false;
+
+        PlayerState state = GetOrCreate(clientId);
+        candidateScratch.Clear();
+        for (int i = 0; i < offered.Count; i++)
+        {
+            int index = offered[i];
+            if (IsRestorable(index) && !state.Acquired.Contains(index) && !candidateScratch.Contains(index))
+                candidateScratch.Add(index);
+        }
+
+        if (candidateScratch.Count == 0)
+            return false;
+
+        state.Offered.Clear();
+        state.Offered.AddRange(candidateScratch);
+        state.InRound = true;
+        state.Personal = true;
+        state.Chosen = false;
+        state.OfferSeq = ++lastOfferSeq;
+        return true;
+    }
+
+    private bool IsRestorable(int index) => index >= 0 && index < poolSize && !unusable.Contains(index);
+
     /// <summary>접속 종료 — 라운드 참가에서 빼서 전원 완료 판단을 막지 않게 한다. 획득 목록도 지운다.</summary>
     public void RemovePlayer(ulong clientId)
     {

@@ -45,7 +45,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     }
 
     /// <summary>
-    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. LobbySession(C8)이 생기면 거기서 넣는다. 없으면 false.
+    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. <see cref="LobbySession"/> 이 스폰 때 넣고 디스폰 때 뺀다. 없으면 false.
     /// </summary>
     public static Func<bool> LobbyCountdownActiveProvider { get; set; }
 
@@ -218,6 +218,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     {
         ServerCharacterSelectionStore.Clear();
         PlayerIdRegistry.Server.Clear();
+        NetworkLoadingFlowController.EndMatchRoster("startServer");
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartServer before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartServer.before");
         if (_networkManager.StartServer())
@@ -240,6 +241,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     private void PrepareLocalConnectionData()
     {
         PlayerIdRegistry.Server.Clear();
+        NetworkLoadingFlowController.EndMatchRoster("newSession");
         var payload = PlayerIdConnectionData.Encode(LocalPlayerId);
         _networkManager.NetworkConfig.ConnectionData = payload;
         NetworkDiagnosticsLog.Log(
@@ -265,6 +267,11 @@ public class NetworkSessionLauncher : MonoBehaviour
         var isCountdownActive = LobbyCountdownActiveProvider != null && LobbyCountdownActiveProvider();
         // 같은 프레임에 승인된 클라는 ConnectedClientsIds 에 아직 없다 — 승인 때 넣는 레지스트리 수와 큰 쪽을 쓴다.
         var connectedCount = Math.Max(registry.ConnectedCount, _networkManager.ConnectedClientsIds.Count);
+        // 판 도중 재합류(C14) — 명단은 데모 흐름에서만 활성이다.
+        var roster = MatchRoster.Server;
+        var isMatchActive = roster.IsActive;
+        var isInMatchRoster = hasPlayerId && roster.Contains(playerId);
+        var isSceneTransition = _loadingFlowController != null && _loadingFlowController.IsSceneTransitionInProgress;
 
         var reason = DemoJoinRule.Evaluate(new DemoJoinRequest(
             isHostSelf,
@@ -274,7 +281,10 @@ public class NetworkSessionLauncher : MonoBehaviour
             connectedCount,
             DemoJoinRule.MaxPlayers,
             hasPlayerId,
-            isPlayerIdConnected));
+            isPlayerIdConnected,
+            isMatchActive,
+            isInMatchRoster,
+            isSceneTransition));
 
         response.Approved = reason == DemoJoinRejectReason.None;
         response.Reason = DemoJoinRule.ToApprovalReason(reason);
@@ -289,13 +299,20 @@ public class NetworkSessionLauncher : MonoBehaviour
                 : isPlayerIdConnected ? $"{playerId}#{clientId}"
                 : playerId;
             registry.Register(clientId, registryKey);
+            // 재접속이면 그 playerId 의 마지막 캐릭터를 새 clientId 에 되살린다 — LobbySession 이 이 값으로 자리를 시드한다(Q4).
+            ServerCharacterSelectionStore.BindPlayer(clientId, registryKey);
         }
+
+        // 명단 묶기(MatchRoster.BindClient)와 재키잉 이벤트는 맵 재스폰 직후에 한다(R2c) — 승인만으로는 Map 에 캐릭터가 생기지 않는다.
+        var isRejoin = response.Approved && !isHostSelf && isMatchActive && isInMatchRoster;
+        var lastClientText = isRejoin && roster.TryGetLastClientId(playerId, out var lastClientId) ? lastClientId.ToString() : "-";
 
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.HandleConnectionApproval",
             $"clientId={clientId} host={isHostSelf} demo={DemoSessionDirector.IsDemoFlowActive} playerId='{playerId}' " +
             $"validId={hasPlayerId} duplicate={isPlayerIdConnected} lobby={isInLobby} countdown={isCountdownActive} " +
-            $"connected={connectedCount} approved={response.Approved} reason={reason}");
+            $"connected={connectedCount} match={isMatchActive} inRoster={isInMatchRoster} transition={isSceneTransition} " +
+            $"rejoin={isRejoin} lastClientId={lastClientText} approved={response.Approved} reason={reason}");
     }
 
     /// <summary>호스트의 활성 씬이 로비이고 로딩 흐름(로비 → 맵 등)이 돌고 있지 않다.</summary>
@@ -570,10 +587,14 @@ public class NetworkSessionLauncher : MonoBehaviour
     {
         ServerCharacterSelectionStore.Clear();
         PlayerIdRegistry.Server.Clear();
+        NetworkLoadingFlowController.EndMatchRoster("sessionStopped");
     }
 
     private void HandleClientDisconnected(ulong clientId)
     {
+        // 판 명단 자리는 남기고 clientId 묶임만 푼다 — 같은 playerId 가 다시 오면 재합류로 받는다(C14).
+        MatchRoster.Server.UnbindClient(clientId);
+        // clientId 쪽 선택만 지운다 — playerId 의 마지막 선택은 남아 재접속 승인 때 되살아난다(Q4).
         ServerCharacterSelectionStore.Remove(clientId);
         // clientId 매핑만 지운다 — 재접속하면 새 clientId 로 같은 playerId 를 다시 묶는다(Q4).
         PlayerIdRegistry.Server.RemoveClient(clientId);
