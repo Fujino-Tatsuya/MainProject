@@ -396,11 +396,13 @@ public static partial class QALobbyScenarios
             if (idx < 0 || d > 1.5f || !used.Add(idx))
                 slotsOk = false;
         }
-        // 접속 순서 = clientId 오름차순. 호스트(0) = 0번, 늦은 클라 = 1·2번.
-        for (int i = 0; i < players.Count && slotsOk; i++)
+        // 호스트 = 0번, 늦은 클라 = 1·2번(서로 다름). 클라끼리 순서는 clientId 가 아니라 스폰 순서(LobbyPlayerSpawner.AcquireSlot
+        // = 비어 있는 가장 앞 자리)라 로딩이 늦은 쪽이 2번이 된다(48.3 3차: c1→2·c2→1 실측) — 순서는 판정하지 않는다.
+        foreach (Player pl in players)
         {
-            int idx = QALobbyFlow.NearestSpawnIndex(players[i].transform.position, out _);
-            if (idx != i)
+            int idx = QALobbyFlow.NearestSpawnIndex(pl.transform.position, out _);
+            bool host = pl.OwnerClientId == NetworkManager.ServerClientId;
+            if (host ? idx != 0 : idx < 1 || idx >= expected)
                 slotsOk = false;
         }
         string gatherShot = ctx.Shot("gather");
