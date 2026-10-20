@@ -26,6 +26,9 @@ public static class QAAutoBootstrap
             return;
 
         _spawnedThisSession = true;
+        // 48.3 3차: 에디터 포커스 없이 돌려도 Play 루프가 멈추지 않게 런타임에만 켠다(ProjectSettings 무수정).
+        // MPPM 가상 플레이어도 같은 부트스트랩을 타므로 함께 적용된다. 에디터 스로틀은 QAFocuslessEditorPump 가 맡는다.
+        Application.runInBackground = true;
         CreateHarness();
     }
 

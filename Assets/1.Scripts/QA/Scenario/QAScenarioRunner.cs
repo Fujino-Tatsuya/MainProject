@@ -47,6 +47,7 @@ public sealed class QAScenarioRunner : MonoBehaviour
         _ctx.Recorder = new QARecorder { SessionStartTime = Time.time };
         _ctx.RunDir = QAReportWriter.ScenarioRunDir("48", _ctx.Role == "host" ? null : _ctx.Role);
         _ctx.SceneLog.Add(SceneManager.GetActiveScene().name);
+        _ctx.Stats.Begin();
 
         _detectors.Add(new LogErrorDetector());
         _detectors.Add(new SoftlockDetector());
@@ -69,6 +70,7 @@ public sealed class QAScenarioRunner : MonoBehaviour
     {
         if (!_running)
             return;
+        _ctx.Stats.Tick(_ctx.Input);
         float dt = Time.deltaTime;
         for (int i = 0; i < _detectors.Count; i++)
             _detectors[i].Tick(_ctx.Recorder, dt);

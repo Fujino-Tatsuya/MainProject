@@ -39,6 +39,9 @@ public sealed class QAScenarioContext
     public string Role;
     public int ExpectedPlayers = 1;
 
+    /// <summary>실행 환경 측정(포커스·fps·카운트다운·이동 속도) — 리포트 머리에 남는다.</summary>
+    public readonly QARunStats Stats = new QARunStats();
+
     /// <summary>S5 판 종료 경로 순서(판마다 돌려 쓴다).</summary>
     public QAResultPath[] EndPaths = { QAResultPath.Aborted, QAResultPath.Wiped, QAResultPath.Cleared };
 

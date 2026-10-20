@@ -119,6 +119,7 @@ public static class QAReportWriter
             sb.AppendLine($"- 역할: {ctx.Role} · 인원: {ctx.ExpectedPlayers} · 시나리오: {string.Join(",", scenarioIds)}");
             sb.AppendLine($"- Unity: {Application.unityVersion} · 거친 씬: {string.Join(" → ", ctx.SceneLog)}");
             sb.AppendLine();
+            ctx.Stats.AppendMarkdown(sb);
 
             sb.AppendLine("## 시나리오 요약");
             sb.AppendLine();

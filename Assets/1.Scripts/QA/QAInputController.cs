@@ -29,6 +29,14 @@ public sealed class QAInputController : MonoBehaviour
 
     public bool HasTarget => _player != null;
 
+    /// <summary>지금 이동 입력을 넣고 있는가(실행 환경 측정 — 이동 속도 실측용).</summary>
+    public bool IsMoving => _player != null && _desiredWorldMove != Vector3.zero;
+
+    public Player Target => _player;
+
+    /// <summary>수동 이동과 같은 최대 이동 속도(m/s). 대상이 없으면 0.</summary>
+    public float ExpectedMoveSpeed => _movement != null ? _movement.MaxResolvedMoveSpeed : 0f;
+
     /// <summary>플레이어가 스폰되면 세션 컨트롤러가 대상을 넘긴다. null이면 조작 중단.</summary>
     public void SetTarget(Player player)
     {
