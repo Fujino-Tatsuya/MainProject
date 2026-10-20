@@ -231,6 +231,22 @@
 - 재현되면 받을 것: 경고 전문, Play 전에 한 일(DevBoot 사용 여부·로비/호스트 경로), MPPM 여부,
   같은 PC 에서 다른 에디터가 호스트 중이었는지.
 
+### Play 중 어셈블리 리로드 막기 — Script Changes While Playing (할 일 56.2)
+- NGO 종료 순서: `NetworkManager.OnApplicationQuit` → `OnDestroy` → `ShutdownInternal` —
+  Despawn → `ConnectionManager.Shutdown`(여기서 transport 종료) → `SceneManager.Dispose` → `IsListening=false`.
+- 원인 = Play 중 핫 리로드. Preferences ▸ General ▸ "Script Changes While Playing" 이 기본값
+  **Recompile And Continue Playing** 이면 Play 도중 스크립트 컴파일 뒤 도메인 리로드가 일어나 깨진다. `NetworkSceneManager` 는 `[Serializable]` 이라
+  생성자 없이 복원되고, Dictionary 인 `SceneEventDataStore` 는 직렬화가 안 돼 null 로 남는다 → 정지 때
+  `NetworkSceneManager.Dispose` NRE 로 `ShutdownInternal` 이 중간에 끊기고, 리로드로 UnityTransport 의 네이티브
+  드라이버 핸들도 잃어 UDP 포트가 에디터 프로세스에 남는다(48.3 QA: NRE 난 정지 3회 = 그 Play 중 리로드 3회, 나머지 18회는 NRE·누수 0).
+- 대책 = `Assets/1.Scripts/Dev/Editor/PlayModeReloadGuard.cs`(`[InitializeOnLoad]`)가 사용자별 EditorPrefs
+  `ScriptCompilationDuringPlay` 를 **1 = Recompile After Finished Playing** 으로 맞춘다. 팀원 에디터도 프로젝트를 열면
+  자동 적용된다. 0(키 없음 포함)·범위 밖 값일 때만 바꾸고 콘솔에 `[ReloadGuard] …` 한 줄을 남기며,
+  사용자가 고른 1·**2 = Stop Playing And Recompile** 은 그대로 둔다.
+  값은 `UnityEditor.ScriptChangesDuringPlayOptions`(internal enum: 0 RecompileAndContinuePlaying · 1 RecompileAfterFinishedPlaying · 2 StopPlayingAndRecompile).
+- `LockReloadAssemblies` 로 Play 중 잠그는 방식(849ba9ba)은 버렸다 — Play 중 컴파일이 나면 에디터가 '컴파일 중' 으로
+  고정돼 MCP `Unity_RunCommand` 가 전부 `COMPILATION_IN_PROGRESS` 로 거부되고 Play 정지도 못 했다(에디터 재시작으로만 복구).
+
 ## 패키지 주의
 - NGO/Steamworks 패키지를 추가하면 **반드시 `Packages/manifest.json` + `packages-lock.json` 커밋**
   (현재 미추적 — [../../AGENT.md](../../AGENT.md) §3).
