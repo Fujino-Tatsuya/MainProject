@@ -10,7 +10,25 @@ using UnityEditor;
 [InitializeOnLoad]
 public static class QAFocuslessEditorPump
 {
+    /// <summary>QA 전용 키(사용자 전역 설정 아님) — 펌프 없이 비교 실행할 때만 끈다. 기본 켬.</summary>
+    public const string EnabledKey = "QA.FocuslessPump";
+    private const string MenuPath = "Tools/QA/48/Focusless Play Pump";
+
     private static bool _hooked;
+
+    [MenuItem(MenuPath, priority = 43)]
+    private static void Toggle()
+    {
+        EditorPrefs.SetBool(EnabledKey, !EditorPrefs.GetBool(EnabledKey, true));
+        UnityEngine.Debug.Log($"[QA] 포커스 없는 Play 펌프 설정 = {EditorPrefs.GetBool(EnabledKey, true)}(다음 Play 부터)");
+    }
+
+    [MenuItem(MenuPath, true)]
+    private static bool ToggleValidate()
+    {
+        Menu.SetChecked(MenuPath, EditorPrefs.GetBool(EnabledKey, true));
+        return true;
+    }
 
     static QAFocuslessEditorPump()
     {
@@ -30,7 +48,7 @@ public static class QAFocuslessEditorPump
 
     private static void Sync(bool playing)
     {
-        bool want = playing && !string.IsNullOrWhiteSpace(QASettings.Scenarios);
+        bool want = playing && EditorPrefs.GetBool(EnabledKey, true) && !string.IsNullOrWhiteSpace(QASettings.Scenarios);
         if (want == _hooked)
             return;
         _hooked = want;
