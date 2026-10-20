@@ -6061,7 +6061,6 @@ MonoBehaviour:
   autoNameHints:
   - head
   - hand
-  - foot
   autoPickLimit: 6
   lineMaterial: {fileID: 2100000, guid: e0574a2cb61d4938af39c70e5d1b826f, type: 2}
   lineTime: 0.2
@@ -6115,8 +6114,8 @@ MonoBehaviour:
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: 3b8f06d25a1e49c7ae04f31b96d2057c, type: 2}
   speedLines: {fileID: 807663423485243698}
-  spawnInterval: 0
-  ghostLifetime: 0.2
+  spawnInterval: 0.05
+  ghostLifetime: 0.3
   fadeCurve:
     serializedVersion: 2
     m_Curve:
@@ -6150,7 +6149,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  maxGhosts: 80
+  maxGhosts: 40
   logDiagnostics: 1
   safetyTimeout: 2
 --- !u!114 &6415595436376966411
