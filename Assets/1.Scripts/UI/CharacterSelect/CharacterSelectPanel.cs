@@ -49,6 +49,12 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("다 선 가운데 카드 배율(1 = 확대 없음).")]
     [SerializeField] private float focusScale = 1.08f;
 
+    [Header("Key Repeat (이동 키 길게 누르기, 초 — unscaled, 할 일 60)")]
+    [Tooltip("처음 1칸 뒤 첫 반복까지 기다리는 시간.")]
+    [SerializeField] private float keyRepeatDelaySeconds = 0.25f;
+    [Tooltip("첫 반복 이후 한 칸씩 옮기는 간격(한 프레임 최대 1칸).")]
+    [SerializeField] private float keyRepeatIntervalSeconds = 0.1f;
+
     [Header("Behaviour")]
     [SerializeField] private bool closeWithEscape = true;
     [Tooltip("잠금 중 확정을 누르면 잠금 문구를 강조하는 시간(초, unscaled).")]
@@ -64,6 +70,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     private readonly List<bool> _available = new List<bool>();
     private readonly List<CharacterSelectCardTrack> _tracks = new List<CharacterSelectCardTrack>();
     private readonly CharacterSelectCardMotion _motion = new CharacterSelectCardMotion();
+    private readonly CharacterSelectKeyRepeat _keyRepeat = new CharacterSelectKeyRepeat();
     private CharacterSelectPanelRules _rules;
     private bool _countedOpen;
     private float _lockedPulseUntil = -1f;
@@ -131,7 +138,10 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
         // 결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫혔다 — 키 입력은 그쪽 것.
         if (LobbyResultPanel.IsEscapeClaimed)
+        {
+            _keyRepeat.Reset(); // 반복도 멈춘다 — 눌려 있던 이동 키는 새로 누를 때까지 무시
             return;
+        }
 
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null)
@@ -151,17 +161,17 @@ public sealed class CharacterSelectPanel : MonoBehaviour
                 return;
             }
 
-            if (keyboard.wKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame ||
-                keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame)
+            // 이동 키 — 누른 순간 1칸, 길게 누르면 대기 뒤 간격마다 1칸(CharacterSelectKeyRepeat).
+            bool backHeld = keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ||
+                            keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
+            bool forwardHeld = keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ||
+                               keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
+            _keyRepeat.DelaySeconds = keyRepeatDelaySeconds;
+            _keyRepeat.IntervalSeconds = keyRepeatIntervalSeconds;
+            int step = _keyRepeat.Tick(backHeld, forwardHeld, Time.unscaledTime);
+            if (step != 0)
             {
-                MoveFocus(-1);
-                return;
-            }
-
-            if (keyboard.sKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame ||
-                keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame)
-            {
-                MoveFocus(1);
+                MoveFocus(step);
                 return;
             }
         }
@@ -186,6 +196,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         BuildCards();
         Rules.Open(currentCharacterId, isLocked, _available);
         _lockedPulseUntil = -1f;
+        _keyRepeat.Reset(); // 열 때 이미 눌려 있던 이동 키는 새로 누를 때까지 무시
 
         if (content != null)
             content.SetActive(true);
@@ -480,6 +491,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         if (content != null)
             content.SetActive(false); // UiModalBlocker.OnDisable 가 입력 차단을 푼다
+        _keyRepeat.Reset();
         SetCountedOpen(false);
         Closed?.Invoke(reason);
     }

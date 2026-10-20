@@ -423,6 +423,50 @@ public static class CharacterSelectPanelAuthoring
                   $"샘플 시각 {pos50:F3}s(위치 50%) / {ringOff:F3}s(시간 {ringOff / moveSeconds:P0}·테두리 꺼짐) / {settled:F3}s(정착)");
     }
 
+    /// <summary>
+    /// 이동 키 길게 누르기(할 일 60) — 앞으로 키를 시각 0 부터 누르고 있는 것으로 치고 60fps 프레임마다 반복 규칙을 돌려,
+    /// 연속 미끄러짐 중(첫 반복 0.25s 뒤 0.1s 간격 재목표) 프레임을 찍는다.
+    /// </summary>
+    [MenuItem("Tools/UI/Preview/Character Select Panel 길게 누르기 캡처")]
+    public static void CaptureHoldPreview() => RunPreview(MotionCaptureDir, CaptureHold);
+
+    static void CaptureHold(GameObject instance, Camera camera, RenderTexture rt, CharacterSelectPanel panel)
+    {
+        var so = new SerializedObject(panel);
+        var repeat = new CharacterSelectKeyRepeat
+        {
+            DelaySeconds = so.FindProperty("keyRepeatDelaySeconds").floatValue,
+            IntervalSeconds = so.FindProperty("keyRepeatIntervalSeconds").floatValue
+        };
+        float[] shots = { 0.35f, 0.45f, 0.55f };
+        const float Fps = 60f;
+
+        panel.Show(0, false);
+        var steps = new System.Text.StringBuilder();
+        int next = 0;
+        for (int frame = 0; next < shots.Length; frame++)
+        {
+            float t = frame / Fps;
+            s_previewNow = t; // MoveFocus 가 이 시각으로 재목표한다
+            int step = repeat.Tick(false, true, t);
+            if (step != 0)
+            {
+                panel.MoveFocus(step);
+                steps.Append($"{t:F3}s ");
+            }
+            SampleAt(panel, t);
+
+            if (t + 0.5f / Fps >= shots[next])
+            {
+                Shoot(instance, camera, rt, $"CharacterSelect_hold_{next}_{shots[next]:F2}s.png");
+                next++;
+            }
+        }
+
+        Debug.Log($"{Tag} 길게 누르기 캡처 — 대기 {repeat.DelaySeconds}s · 간격 {repeat.IntervalSeconds}s, 칸 이동 시각 {steps}, " +
+                  $"마지막 포커스 {panel.FocusedCharacterId}");
+    }
+
     static void Shoot(GameObject instance, Camera camera, RenderTexture rt, string file)
     {
         Texture2D shot = Render(instance, camera, rt);

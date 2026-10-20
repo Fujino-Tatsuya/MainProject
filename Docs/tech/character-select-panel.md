@@ -12,6 +12,7 @@
 | 뷰 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanel.cs` · `CharacterSelectCard.cs` |
 | 규칙(순수) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanelRules.cs` — 테스트 `Editor/CharacterSelectPanelRulesTests.cs` |
 | 카드 이동 연출 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectCardMotion.cs` — 같은 테스트 파일 |
+| 이동 키 길게 누르기 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectKeyRepeat.cs` — 같은 테스트 파일 |
 | 배경 흐름 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectBackgroundScroll.cs` |
 | 문구 키 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs` (`UiStrings.All` 에 포함) |
 | 저작·미리보기 | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectPanelAuthoring.cs` |
@@ -88,12 +89,30 @@
 | 입력 | 동작 |
 |---|---|
 | W/S · ↑/↓ · A/D · ←/→ · 마우스 휠 | 이전(위·왼쪽·휠 위)/다음(아래·오른쪽·휠 아래) 카드로 포커스 — 잠금 중에도 구경 가능 |
+| 이동 키 길게 누르기 | 누른 순간 1칸 → 0.25초 뒤부터 0.1초마다 1칸(아래 "길게 누르기"). 휠·카드 클릭은 반복 없음 |
 | Enter · 숫자패드 Enter · Space · 가운데 카드 클릭 | 선택 확정(위 규칙) |
 | 위·아래 카드 클릭 | 그 카드로 포커스 이동 |
 | 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) |
 
 - 키는 `Keyboard.current`·`Mouse.current` 를 직접 읽는다. 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력(이동·공격·F 등)을 막는다.
 - 카드 클릭은 `Button` 이 아니라 `IPointerClickHandler` — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 막는다. 뒤로가기 버튼은 Navigation None.
+
+### 길게 누르기(키 반복, 할 일 60)
+판단 = `CharacterSelectKeyRepeat`(순수). 패널은 매 프레임 "뒤로(W·↑·A·←) / 앞으로(S·↓·D·→) 중 하나라도 눌려 있는가"(`isPressed`)와 `Time.unscaledTime` 을 넘기고, 돌려받은 칸(-1·0·+1)만큼 `MoveFocus` 한다.
+값은 패널 인스펙터 `Key Repeat`(UI 값 — SO·xlsx 아님).
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `keyRepeatDelaySeconds` | 0.25 | 처음 1칸 뒤 첫 반복까지 대기 |
+| `keyRepeatIntervalSeconds` | 0.1 | 첫 반복 이후 1칸 간격 |
+
+- 같은 방향 키 두 개(W 와 ↑ 등)는 하나로 친다 — 하나를 떼도 다른 쪽이 눌려 있으면 반복이 이어진다.
+- 반대 방향을 새로 누르면 **즉시 그쪽 1칸 + 대기부터 다시**. 둘 다 누르고 있으면 **나중에 누른 쪽**이 이긴다. 같은 프레임에 둘 다 누르면 뒤로(기존 키 검사 순서).
+- 이기던 키를 떼고 반대쪽이 아직 눌려 있으면 그 방향으로 **대기부터 다시(즉시 1칸 없음)**. 둘 다 떼면 멈춘다.
+- **한 프레임 최대 1칸** — 프레임이 길어 간격이 여러 번 지나도 1칸만 가고 밀린 칸은 버린다(다음 칸 = 그 프레임 + 간격).
+- 반복 칸마다 카드 이동은 지금처럼 재목표(0.1초 간격 < 이동 0.18초) — 누르고 있는 동안 카드는 계속 미끄러지고 금색 테두리는 꺼진 채, 떼고 마지막 이동이 끝나면 켜진다.
+- `Show`·닫힘(`Hide`·ESC·확정·뒤로가기)·`LobbyResultPanel.IsEscapeClaimed` 인 프레임에는 반복 상태를 비운다. **그때 눌려 있던 이동 키는 뗐다가 새로 누를 때까지 무시**(열자마자 미끄러지지 않게).
+- 잠금 중에도 반복된다(확정만 막힘). Enter·Space·ESC 가 눌린 프레임에는 이동 키를 보지 않는다 — 같은 프레임에 누른 이동 키는 다음 프레임에 1칸으로 들어간다.
 
 ## ESC
 - 🔴 `LobbyResultPanel.IsEscapeClaimed` 가 true 면(결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫힘) 선택 패널은 **ESC 와 키·휠·카드 클릭을 모두 무시**한다 — 같은 키로 둘이 같이 닫히지 않는다.
@@ -118,6 +137,8 @@
 - `Tools/UI/Preview/Character Select Panel 이동 연출 캡처` — 같은 방식으로 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/60-anim/` 에 저장. 지금 0번·포커스 0번에서 `MoveFocus(1)` 후 패널 시계를 직접 넣어 샘플링:
   `CharacterSelect_anim_0_idle.png`(열 때) · `_1_moving_pos50.png`(위치 50% = 시간 ≈ 21%, 테두리 반쯤) · `_2_moving_ring_off.png`(시간 ≈ 56%, 테두리 꺼짐) · `_3_settled.png`(정착 — 테두리 켜짐·확대).
   시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
+- `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
+  `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 연속 미끄러짐)를 저장. 콘솔에 칸 이동 시각.
 - 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests`).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
@@ -127,4 +148,7 @@
 - 준비 중 열기 → 구경은 되고 확정하면 잠금 문구가 강조되는가. 열린 채 준비 해제(`SetLocked(false)`) → 바로 고를 수 있는가.
 - 결과 패널이 위에 열려 있을 때 ESC 한 번에 결과 패널만 닫히는가(선택 패널은 그대로).
 - (할 일 60) 카드가 미끄러지듯 움직이고 연타해도 점프 없이 새 목표로 가는가. 테두리가 이동 중 꺼졌다가 가운데 카드에서 켜지고 살짝 커지는가. 이동 중 Enter 가 새 가운데로 확정되는가.
+- (할 일 60 길게 누르기) 이동 키를 누르고 있으면 0.25초 뒤부터 0.1초마다 넘어가고 떼면 멈추는가. 미끄러짐이 끊겨 보이지 않는가.
+  누른 채 반대 키 → 즉시 반대로 1칸 후 대기·반복, 반대 키만 떼면 대기 뒤 원래 방향으로 이어지는가. W+↑ 같이 눌러도 2칸씩 가지 않는가.
+  키를 누른 채 패널을 열면(F) 미끄러지지 않고, 새로 눌러야 움직이는가. 잠금 중에도 반복되는가. 결과 패널이 위에 있으면 반복이 멈추는가.
 - 배경이 슬로모션과 무관하게 천천히 흐르고 가장자리가 비지 않는가(16:9 외 비율 포함).
