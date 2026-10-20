@@ -116,7 +116,10 @@ public static partial class QALobbyScenarios
         return QALobbyFlow.ReadyCount(out int total) == 0 && total > 0;
     }
 
-    /// <summary>준비를 켜거나 끈다(패드까지 걸어가 F, 키가 안 먹으면 같은 RPC).</summary>
+    /// <summary>
+    /// 준비를 켜거나 끈다(패드까지 걸어가 F, 키가 안 먹으면 같은 RPC). 셋이 같은 패드 중심으로 가면 서로 막혀 반경 밖에 남으므로
+    /// (2차 M2: A 가 준비 못 함) clientId 마다 패드 둘레 다른 자리(반경 절반, 120° 간격)로 간다.
+    /// </summary>
     private static IEnumerator SetReady(QAScenarioContext ctx, bool ready)
     {
         if (!QALobbyFlow.HasLocalLobbyPlayer || QALobbyFlow.IsLocalReady() == ready)
@@ -124,7 +127,9 @@ public static partial class QALobbyScenarios
         LobbyInteractable pad = QALobbyFlow.FindInteractable(LobbyInteractableKind.Ready, Player.LocalPlayer.transform.position);
         if (pad == null)
             yield break;
-        yield return QALobbyFlow.WalkTo(ctx.Input, pad.Position, pad.Radius * 0.5f, 20f);
+        float angle = (LocalId % 3) * 120f * Mathf.Deg2Rad;
+        Vector3 spot = pad.Position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * (pad.Radius * 0.5f);
+        yield return QALobbyFlow.WalkTo(ctx.Input, spot, 0.3f, 20f);
         yield return QALobbyFlow.PressInteract(ctx.Input, () => QALobbyFlow.IsLocalReady() == ready, () => LobbySession.Active?.RequestToggleReady());
         QABlackboard.ScriptedControl = false;
     }
@@ -537,9 +542,12 @@ public static partial class QALobbyScenarios
 
         // B) 준비 → 카운트다운 뜨면 해제
         yield return SetReady(ctx, true);
+        bool readyOn = QALobbyFlow.IsLocalReady();
         yield return ctx.Wait(() => LobbySession.Active != null && LobbySession.Active.IsCountdownActive, 60f);
+        bool sawCountdown = !ctx.TimedOut;
         yield return SetReady(ctx, false);
-        ctx.Check(!QALobbyFlow.IsLocalReady(), "A: 카운트다운 중 준비 해제", $"ready={QALobbyFlow.IsLocalReady()}");
+        ctx.Check(readyOn && sawCountdown && !QALobbyFlow.IsLocalReady(), "A: 카운트다운 중 준비 해제",
+            $"준비 켜짐={readyOn} 카운트다운 관측={sawCountdown} 해제 뒤 ready={QALobbyFlow.IsLocalReady()}");
         yield return ctx.Wait(() => LobbySession.Active != null && !LobbySession.Active.IsCountdownActive, 8f);
 
         // C) 다시 준비(B 가 카운트다운을 보고 나간다)

@@ -201,7 +201,11 @@ public static class QALobbyFlow
             yield break;
         }
 
-        yield return WalkTo(input, pad.Position, pad.Radius * 0.5f, 20f);
+        // MPPM 셋이 같은 중심으로 가면 서로 막힌다 — clientId 마다 패드 둘레 다른 자리(반경 절반, 120° 간격).
+        ulong id = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
+        float angle = (id % 3) * 120f * Mathf.Deg2Rad;
+        Vector3 spot = pad.Position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * (pad.Radius * 0.5f);
+        yield return WalkTo(input, spot, 0.3f, 20f);
         yield return PressInteract(input, IsLocalReady, () => LobbySession.Active?.RequestToggleReady());
         QABlackboard.ScriptedControl = false;
     }
