@@ -7,7 +7,7 @@
 //  쓰는 곳: SG_EnemyC3Decal(Custom Function → EnemyC3DecalShade) · 픽셀 비교 테스트 셰이더(Hidden/EnemyC3DecalCompare).
 //  🔴 이 파일도 속성을 선언하지 않는다 — 그래프 블랙보드(또는 테스트 셰이더)가 선언한다.
 //
-//  _C3Shape   x = 모양(0 부채꼴 · 1 띠 · 2 합집합 / 3~5 = 채움, 아래 EnemyC3FillTexel)  y = unit(디자인 단위 → m)  z = 반각(도)  w = 쐐기 표시(0/1)
+//  _C3Shape   x = 모양(0 부채꼴 · 1 띠 · 2 합집합 / 3~6 = 채움, 아래 EnemyC3FillTexel)  y = unit(디자인 단위 → m)  z = 반각(도)  w = 쐐기 표시(0/1)
 //  _C3Extent  xy = 모양 크기(m, 외곽선 제외)  zw = 데칼 전체 크기(= Bake 의 sampleExtent, 외곽선 포함)
 //  _C3Path    x = 쐐기 폭(띠 = 데칼 폭, 합집합 = 경로 폭)  y = 경로 길이  z = 끝 원 중심  w = 부채꼴·끝 원 반경
 //  _C3Geom    x = 바깥 외곽선 폭  y = 안쪽 선 폭  z = 간격  w = 띠 그라데이션 시작(%)
@@ -60,10 +60,17 @@ float4 EnemyC3DecalGamma(float2 uv)
 //  예전엔 256² 흰 텍스처(알파만)를 CPU 로 구워 SG_TelegraphDecal 이 Base_Map 으로 읽었다.
 //  겉모습을 그대로 두려고 **그 텍스처를 셰이더에서 재현**한다: 텍셀 중심마다 예전 식 → 8비트 → 이중선형(Clamp).
 //  _C3Shape  x = 3 부채꼴(BuildArcTexture, outer 1)  · 4 띠(BuildRectTexture)  · 5 합집합(BuildUnionTexture)
-//            z = 부채꼴 반각(도)  w = 진행 — 부채꼴 = 안쪽 반경(0~1, 잡기 고리), 합집합 = 전선(m, 보스 기준)
+//                · 6 원판(AoeTelegraph.BuildDiscTexture, 128 텍셀 — S4c1)
+//            y = 부채꼴 후방(0/1 — 방향 표식 뒤 호, S4c1)
+//            z = 부채꼴 반각(도) / 원판 채움 세기(fill)  w = 진행 — 부채꼴 = 안쪽 반경(0~1, 잡기 고리·방향 표식 inner/outer),
+//                합집합 = 전선(m, 보스 기준) / 원판 테두리 폭(rim, 정규화 반경)
 //  _C3Extent xy = 합집합 바운딩 박스(폭, 길이 m)
 //  _C3Path   x = 경로 폭  y = 경로 길이  z = 끝 원 중심  w = 끝 원 반경(합집합)
+//  예전 원본 식(픽셀 비교 기준)은 에디터 전용 Monster/Editor/LegacyDecalTextureReference.cs 에 있다.
 #define ENEMY_C3_FILL_TEX 256.0
+#define ENEMY_C3_DISC_TEX 128.0
+
+float EnemyC3FillTexSize() { return _C3Shape.x > 5.5 ? ENEMY_C3_DISC_TEX : ENEMY_C3_FILL_TEX; }
 
 float EnemyC3FillTexel(float2 texel)
 {
@@ -71,13 +78,25 @@ float EnemyC3FillTexel(float2 texel)
     float a;
     if (kind < 3.5)
     {
-        // BossDirectionIndicator.BuildArcTexture(inner = _C3Shape.w, outer 1, isBack false)
+        // BuildArcTexture(inner = _C3Shape.w, outer 1, isBack = _C3Shape.y)
         float2 uv = (texel + 0.5 - ENEMY_C3_FILL_TEX * 0.5) / (ENEMY_C3_FILL_TEX * 0.5);
         float r = sqrt(uv.x * uv.x + uv.y * uv.y);
         float radiusFeather = (2.0 / ENEMY_C3_FILL_TEX) * 2.0;
         a = saturate((r - _C3Shape.w) / radiusFeather) * saturate((1.0 - r) / radiusFeather);
         float angle = abs(degrees(atan2(uv.x, uv.y)));
-        a *= saturate((_C3Shape.z - angle) / 2.0);
+        float edge = _C3Shape.y > 0.5 ? angle - (180.0 - _C3Shape.z) : _C3Shape.z - angle;
+        a *= saturate(edge / 2.0);
+    }
+    else if (kind > 5.5)
+    {
+        // AoeTelegraph.BuildDiscTexture(size 128, fill = _C3Shape.z, rim = _C3Shape.w) — 채움 + 테두리로 올라가는 알파 + 바깥 페더
+        float half = ENEMY_C3_DISC_TEX * 0.5;
+        float2 dxy = texel + 0.5 - half;
+        float d = sqrt(dxy.x * dxy.x + dxy.y * dxy.y) / half;
+        float feather = 1.0 / (ENEMY_C3_DISC_TEX * 0.05);
+        float rimW = clamp(_C3Shape.w, 0.0, 0.5);
+        float rimA = rimW > 0.0 ? saturate((d - (1.0 - rimW)) / rimW) : 0.0;
+        a = max(saturate(_C3Shape.z), rimA) * saturate((1.0 - d) / feather);
     }
     else if (kind < 4.5)
     {
@@ -107,9 +126,10 @@ float EnemyC3FillTexel(float2 texel)
 // 예전 텍스처의 이중선형 샘플(Clamp) — 프로젝터가 커져도 늘어나는 모양까지 같다.
 float EnemyC3FillAlpha(float2 uv)
 {
-    float2 p = uv * ENEMY_C3_FILL_TEX - 0.5;
+    float size = EnemyC3FillTexSize();
+    float2 p = uv * size - 0.5;
     float2 i0 = floor(p), f = p - i0;
-    float2 lo = clamp(i0, 0.0, ENEMY_C3_FILL_TEX - 1.0), hi = clamp(i0 + 1.0, 0.0, ENEMY_C3_FILL_TEX - 1.0);
+    float2 lo = clamp(i0, 0.0, size - 1.0), hi = clamp(i0 + 1.0, 0.0, size - 1.0);
     float a00 = EnemyC3FillTexel(lo), a10 = EnemyC3FillTexel(float2(hi.x, lo.y));
     float a01 = EnemyC3FillTexel(float2(lo.x, hi.y)), a11 = EnemyC3FillTexel(hi);
     return lerp(lerp(a00, a10, f.x), lerp(a01, a11, f.x), f.y);
@@ -121,7 +141,7 @@ void EnemyC3DecalShade_float(float2 UV, float3 WorldPos, out float3 Color, out f
     float4 baseRGBA;
     if (_C3Shape.x > 2.5)
     {
-        // 채움 — 예전 텍스처처럼 흰색 + 모양 알파. 색은 _BaseColor(채움 색)가 입힌다.
+        // 채움 — 예전 텍스처처럼 흰색 + 모양 알파. 색은 _BaseColor(채움 색 · 방향 표식 색 · 장판 색)가 입힌다.
         baseRGBA = float4(1.0, 1.0, 1.0, EnemyC3FillAlpha(UV));
     }
     else

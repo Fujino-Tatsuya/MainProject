@@ -14,7 +14,7 @@ using UnityEngine.Rendering.Universal;
 /// 비교 셰이더는 S2 의 Hidden/EnemyC3DecalCompare 그대로 — pass 0 = 기존 텍스처(_OldTex), pass 1 = EnemyC3DecalShade
 /// (그래프 Custom Function 이 부르는 바로 그 함수, S2 의 GraphUsesSharedDecalFunction 이 연결을 보증). 값은 런타임과 같은
 /// EnemyC3Visuals.SetArcFill/SetRectFill/SetUnionFill 이 넣는다.
-/// 기존 텍스처: 부채꼴·고리 = BossDirectionIndicator.BuildArcTexture(지금도 방향 표식이 쓰는 원본),
+/// 기존 텍스처: 부채꼴·고리 = LegacyDecalTextureReference.BuildArcTexture(S4c1 에서 BossDirectionIndicator 에서 옮긴 원본 그대로),
 /// 띠·합집합 = 아래 OldRect/OldUnion(S4a 에서 지운 BossAttackConeTelegraph.BuildRectTexture/BuildUnionTexture 를 그대로 옮긴 기준).
 /// 기준 = 채널 오차 ≤ 2/255 인 픽셀 99% 이상. 나란히 PNG(기존|셰이더|차이×16)는 _lane-artifacts 가 있을 때만 남긴다.
 /// </summary>
@@ -94,7 +94,7 @@ public sealed class EnemyC3FillShaderTests
             switch (f.kind)
             {
                 case 3:
-                    old = BossDirectionIndicator.BuildArcTexture(Color.white, f.halfAngle, isBack: false, inner: Mathf.Clamp01(f.inner), outer: 1f, size: Tex);
+                    old = LegacyDecalTextureReference.BuildArcTexture(Color.white, f.halfAngle, isBack: false, inner: Mathf.Clamp01(f.inner), outer: 1f, size: Tex);
                     EnemyC3Visuals.SetArcFill(mat, f.halfAngle, f.inner);
                     break;
                 case 4:

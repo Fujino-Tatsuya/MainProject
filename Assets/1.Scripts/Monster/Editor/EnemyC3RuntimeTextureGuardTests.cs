@@ -28,12 +28,9 @@ public sealed class EnemyC3RuntimeTextureGuardTests
     /// </summary>
     static readonly (string file, string[] methods, string reason)[] PendingDecision =
     {
-        ("Assets/1.Scripts/Monster/AoeTelegraph.cs", new[] { "BuildDiscTexture" },
-            "일반 몹 장판 디스크 — 인스턴스당 1회 128² 굽기"),
+        // S4c1 에서 AoeTelegraph.BuildDiscTexture · BossDirectionIndicator.BuildArcTexture 는 셰이더로 옮겨 지웠다(원본 = Editor/LegacyDecalTextureReference).
         ("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", new[] { "BuildSquare", "BuildDisc", "BuildCrosshair", "NewTex" },
             "보스 패턴 판 기본 텍스처 — 정적 지연 캐시 64·128², 테두리 비율별 캐시"),
-        ("Assets/1.Scripts/Monster/Boss/BossDirectionIndicator.cs", new[] { "BuildArcTexture" },
-            "방향 표식 — ApplyDecal 마다 Destroy + new 256²"),
     };
 
     public readonly struct Hit
@@ -159,9 +156,12 @@ public sealed class EnemyC3RuntimeTextureGuardTests
         Assert.IsNull(hits[4].method, "field initializer must not inherit the previous method: " + dump);
 
         // 예외는 메서드 단위 — 예외 파일의 다른 메서드에서 나온 사용은 걸린다.
-        Assert.IsTrue(Allowed("Assets/1.Scripts/Monster/AoeTelegraph.cs", "BuildDiscTexture"));
-        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/AoeTelegraph.cs", "Make"));
-        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/AoeTelegraph.cs", null));
-        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/EnemyC3Visuals.cs", "BuildDiscTexture"));
+        Assert.IsTrue(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "BuildDisc"));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "Make"));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", null));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/EnemyC3Visuals.cs", "BuildDisc"));
+        // S4c1 에서 지운 예외 — 다시 생기면 걸려야 한다.
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/AoeTelegraph.cs", "BuildDiscTexture"));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossDirectionIndicator.cs", "BuildArcTexture"));
     }
 }

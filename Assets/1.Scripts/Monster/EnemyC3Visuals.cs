@@ -128,11 +128,45 @@ public static class EnemyC3Visuals
     }
     // Attack decal fills (BossAttackConeTelegraph, S4a) — the same SG_EnemyC3Decal redraws the old 256² CPU fill textures
     // (BuildArcTexture / BuildRectTexture / BuildUnionTexture) in the shader. Progress changes only rewrite one vector.
-    /// <summary>Sector fill (outer = 1). inner 0 = full sector, 1 → 0 = grab ring closing in.</summary>
-    public static void SetArcFill(Material m,float halfAngle,float inner)
+    // S4c1: the same fill modes also draw the boss direction marker arcs (BossDirectionIndicator) and the AoeTelegraph disc.
+    // The old CPU bakes live in the editor-only LegacyDecalTextureReference (pixel comparison baseline).
+    /// <summary>Sector fill (outer = 1). inner 0 = full sector, 1 → 0 = grab ring closing in.
+    /// isBack = the boss direction marker's rear arc (|angle| ≥ 180 − halfAngle), as the old BuildArcTexture(isBack).</summary>
+    public static void SetArcFill(Material m,float halfAngle,float inner,bool isBack=false)
     {
         if(m==null)return;
-        m.SetVector(ShapeId,new Vector4(3,0,halfAngle,Mathf.Clamp01(inner)));
+        m.SetVector(ShapeId,new Vector4(3,isBack?1:0,halfAngle,Mathf.Clamp01(inner)));
+    }
+    /// <summary>AoeTelegraph disc (S4c1) — the old 128² BuildDiscTexture: fill alpha inside, rising to 1 across the rim band, feathered edge.</summary>
+    public static void SetDiscFill(Material m,float fill,float rim)
+    {
+        if(m==null)return;
+        m.SetVector(ShapeId,new Vector4(6,0,Mathf.Clamp01(fill),Mathf.Clamp(rim,0,.5f)));
+    }
+    static readonly int BaseColorId=Shader.PropertyToID("_BaseColor"),DrawOrderId=Shader.PropertyToID("_DrawOrder"),
+        MaskTexId=Shader.PropertyToID("_MaskTex"),MaskParamsId=Shader.PropertyToID("_MaskParams");
+    static readonly string[] DecalSettings={"Normal_Blend","_DecalAngleFadeSupported","_DecalMeshBiasType","_DecalMeshDepthBias","_DecalMeshViewBias"};
+    /// <summary>
+    /// A C3 decal material instance that replaces a texture-based floor decal material (<paramref name="source"/>, e.g.
+    /// SG_DecalFloorOnly) without changing how it draws: render queue, _DrawOrder and the decal target settings
+    /// (normal blend, angle fade, mesh bias) are copied from the source; the mask is off; _BaseColor = <paramref name="color"/>.
+    /// The caller owns (and destroys) the instance. Null when the C3 decal material is missing.
+    /// </summary>
+    public static Material NewDecalInstance(Material source,Color color)
+    {
+        var shape=DecalMaterial;
+        if(shape==null)return null;
+        var m=new Material(shape){name=shape.name+" (Instance)"};
+        if(source!=null)
+        {
+            m.renderQueue=source.renderQueue;
+            if(source.HasProperty(DrawOrderId))m.SetFloat(DrawOrderId,source.GetFloat(DrawOrderId));
+            foreach(var p in DecalSettings)if(source.HasProperty(p)&&m.HasProperty(p))m.SetFloat(p,source.GetFloat(p));
+        }
+        m.SetTexture(MaskTexId,Texture2D.whiteTexture);
+        m.SetVector(MaskParamsId,new Vector4(0,0,1,0));
+        m.SetColor(BaseColorId,color);
+        return m;
     }
     /// <summary>Path band fill (whole rectangle, 1.5 texel edge feather).</summary>
     public static void SetRectFill(Material m)
