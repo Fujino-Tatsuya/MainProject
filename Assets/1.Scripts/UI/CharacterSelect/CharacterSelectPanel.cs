@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
@@ -49,11 +50,16 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("다 선 가운데 카드 배율(1 = 확대 없음).")]
     [SerializeField] private float focusScale = 1.08f;
 
-    [Header("Key Repeat (이동 키 길게 누르기, 초 — unscaled, 할 일 60)")]
+    [Header("Key Repeat (이동 키 길게 누르기, 초 — unscaled, 할 일 60·60.1)")]
     [Tooltip("처음 1칸 뒤 첫 반복까지 기다리는 시간.")]
     [SerializeField] private float keyRepeatDelaySeconds = 0.25f;
-    [Tooltip("첫 반복 이후 한 칸씩 옮기는 간격(한 프레임 최대 1칸).")]
-    [SerializeField] private float keyRepeatIntervalSeconds = 0.1f;
+    [Tooltip("첫 반복 직후 간격. 홀드 시간에 비례해 최소 간격까지 줄어든다(한 프레임 최대 1칸).")]
+    [SerializeField] private float keyRepeatStartIntervalSeconds = 0.25f;
+    [Tooltip("가장 짧은 반복 간격 — 램프가 끝나면 이 간격을 유지한다.")]
+    [FormerlySerializedAs("keyRepeatIntervalSeconds")]
+    [SerializeField] private float keyRepeatMinIntervalSeconds = 0.1f;
+    [Tooltip("간격이 시작 간격에서 최소 간격까지 줄어드는 시간(첫 반복 시점부터).")]
+    [SerializeField] private float keyRepeatRampSeconds = 0.75f;
 
     [Header("Behaviour")]
     [SerializeField] private bool closeWithEscape = true;
@@ -161,13 +167,15 @@ public sealed class CharacterSelectPanel : MonoBehaviour
                 return;
             }
 
-            // 이동 키 — 누른 순간 1칸, 길게 누르면 대기 뒤 간격마다 1칸(CharacterSelectKeyRepeat).
+            // 이동 키 — 누른 순간 1칸, 길게 누르면 대기 뒤 점점 짧아지는 간격마다 1칸(CharacterSelectKeyRepeat).
             bool backHeld = keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ||
                             keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
             bool forwardHeld = keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ||
                                keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
             _keyRepeat.DelaySeconds = keyRepeatDelaySeconds;
-            _keyRepeat.IntervalSeconds = keyRepeatIntervalSeconds;
+            _keyRepeat.StartIntervalSeconds = keyRepeatStartIntervalSeconds;
+            _keyRepeat.MinIntervalSeconds = keyRepeatMinIntervalSeconds;
+            _keyRepeat.RampSeconds = keyRepeatRampSeconds;
             int step = _keyRepeat.Tick(backHeld, forwardHeld, Time.unscaledTime);
             if (step != 0)
             {

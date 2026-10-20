@@ -425,7 +425,8 @@ public static class CharacterSelectPanelAuthoring
 
     /// <summary>
     /// 이동 키 길게 누르기(할 일 60) — 앞으로 키를 시각 0 부터 누르고 있는 것으로 치고 60fps 프레임마다 반복 규칙을 돌려,
-    /// 연속 미끄러짐 중(첫 반복 0.25s 뒤 0.1s 간격 재목표) 프레임을 찍는다.
+    /// 연속 미끄러짐 중(첫 반복 0.25s 뒤 0.25s → 0.1s 로 줄어드는 간격 재목표, 할 일 60.1) 프레임을 찍는다.
+    /// 로그의 칸 이동 시각은 가속이 끝난 뒤까지(<c>LogUntil</c>) 남긴다.
     /// </summary>
     [MenuItem("Tools/UI/Preview/Character Select Panel 길게 누르기 캡처")]
     public static void CaptureHoldPreview() => RunPreview(MotionCaptureDir, CaptureHold);
@@ -436,15 +437,18 @@ public static class CharacterSelectPanelAuthoring
         var repeat = new CharacterSelectKeyRepeat
         {
             DelaySeconds = so.FindProperty("keyRepeatDelaySeconds").floatValue,
-            IntervalSeconds = so.FindProperty("keyRepeatIntervalSeconds").floatValue
+            StartIntervalSeconds = so.FindProperty("keyRepeatStartIntervalSeconds").floatValue,
+            MinIntervalSeconds = so.FindProperty("keyRepeatMinIntervalSeconds").floatValue,
+            RampSeconds = so.FindProperty("keyRepeatRampSeconds").floatValue
         };
         float[] shots = { 0.35f, 0.45f, 0.55f };
         const float Fps = 60f;
+        const float LogUntil = 1.5f;
 
         panel.Show(0, false);
         var steps = new System.Text.StringBuilder();
         int next = 0;
-        for (int frame = 0; next < shots.Length; frame++)
+        for (int frame = 0; next < shots.Length || frame / Fps <= LogUntil; frame++)
         {
             float t = frame / Fps;
             s_previewNow = t; // MoveFocus 가 이 시각으로 재목표한다
@@ -456,14 +460,15 @@ public static class CharacterSelectPanelAuthoring
             }
             SampleAt(panel, t);
 
-            if (t + 0.5f / Fps >= shots[next])
+            if (next < shots.Length && t + 0.5f / Fps >= shots[next])
             {
                 Shoot(instance, camera, rt, $"CharacterSelect_hold_{next}_{shots[next]:F2}s.png");
                 next++;
             }
         }
 
-        Debug.Log($"{Tag} 길게 누르기 캡처 — 대기 {repeat.DelaySeconds}s · 간격 {repeat.IntervalSeconds}s, 칸 이동 시각 {steps}, " +
+        Debug.Log($"{Tag} 길게 누르기 캡처 — 대기 {repeat.DelaySeconds}s · 간격 {repeat.StartIntervalSeconds}s → {repeat.MinIntervalSeconds}s" +
+                  $"(램프 {repeat.RampSeconds}s), 60fps 칸 이동 시각 {steps}, " +
                   $"마지막 포커스 {panel.FocusedCharacterId}");
     }
 

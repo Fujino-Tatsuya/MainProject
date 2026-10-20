@@ -1087,7 +1087,9 @@ MonoBehaviour:
   focusScaleSeconds: 0.12
   focusScale: 1.08
   keyRepeatDelaySeconds: 0.25
-  keyRepeatIntervalSeconds: 0.1
+  keyRepeatStartIntervalSeconds: 0.25
+  keyRepeatMinIntervalSeconds: 0.1
+  keyRepeatRampSeconds: 0.75
   closeWithEscape: 1
   lockedPulseSeconds: 0.6
   lockedPulseScale: 1.12

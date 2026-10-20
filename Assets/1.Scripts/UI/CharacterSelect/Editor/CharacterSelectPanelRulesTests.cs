@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -451,9 +452,25 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.AreEqual(1, rules.Focus);
     }
 
-    // ── 이동 키 길게 누르기(할 일 60) — 대기 0.25s · 간격 0.1s ──
+    // ── 이동 키 길게 누르기(할 일 60·60.1) — 대기 0.25s · 간격 0.25s → 0.1s(램프 0.75s) ──
 
-    static CharacterSelectKeyRepeat Repeat() => new CharacterSelectKeyRepeat { DelaySeconds = 0.25f, IntervalSeconds = 0.1f };
+    static CharacterSelectKeyRepeat Repeat() => new CharacterSelectKeyRepeat
+    {
+        DelaySeconds = 0.25f, StartIntervalSeconds = 0.25f, MinIntervalSeconds = 0.1f, RampSeconds = 0.75f
+    };
+
+    // 앞으로 키를 0 부터 end 까지 1ms 마다 누르고 있을 때 칸을 낸 시각.
+    static List<float> HoldStepTimes(CharacterSelectKeyRepeat repeat, float end)
+    {
+        var times = new List<float>();
+        for (int ms = 0; ms <= Mathf.RoundToInt(end * 1000f); ms++)
+        {
+            float t = ms / 1000f;
+            if (repeat.Tick(false, true, t) != 0)
+                times.Add(t);
+        }
+        return times;
+    }
 
     [Test]
     public void KeyRepeat_FirstPressMovesOnce_ThenWaitsDelay_ThenEveryInterval()
@@ -463,10 +480,31 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.AreEqual(0, repeat.Tick(false, true, 0.1f));
         Assert.AreEqual(0, repeat.Tick(false, true, 0.24f), "대기 전에는 그대로");
         Assert.AreEqual(1, repeat.Tick(false, true, 0.26f), "첫 반복");
-        Assert.AreEqual(0, repeat.Tick(false, true, 0.30f));
-        Assert.AreEqual(1, repeat.Tick(false, true, 0.36f), "이후 간격마다");
-        Assert.AreEqual(0, repeat.Tick(false, true, 0.40f));
-        Assert.AreEqual(1, repeat.Tick(false, true, 0.46f));
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.36f));
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.49f), "첫 반복 직후 간격 = 시작 간격 0.25s");
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.51f), "이후 간격마다");
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.69f));
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.71f));
+    }
+
+    [Test]
+    public void KeyRepeat_IntervalShrinksLinearly_ReachingMinAtOneSecond()
+    {
+        // 간격 0.25 → 0.20 → 0.16 → 0.128 → 0.1024 → 0.1 …
+        float[] expected = { 0f, 0.25f, 0.50f, 0.70f, 0.86f, 0.988f, 1.0904f, 1.1904f };
+        List<float> times = HoldStepTimes(Repeat(), 1.25f);
+        Assert.AreEqual(expected.Length, times.Count, string.Join(", ", times));
+        for (int i = 0; i < expected.Length; i++)
+            Assert.AreEqual(expected[i], times[i], 0.003f, $"{i}번째 칸 시각 — {string.Join(", ", times)}");
+    }
+
+    [Test]
+    public void KeyRepeat_LongHold_NeverGoesBelowMinInterval()
+    {
+        List<float> times = HoldStepTimes(Repeat(), 5f);
+        for (int i = 1; i < times.Count; i++)
+            Assert.GreaterOrEqual(times[i] - times[i - 1], 0.0985f,$"{times[i - 1]}s → {times[i]}s");
+        Assert.AreEqual(0.1f, times[times.Count - 1] - times[times.Count - 2], 0.0015f, "램프 뒤에는 최소 간격 유지");
     }
 
     [Test]
@@ -480,6 +518,8 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.AreEqual(-1, repeat.Tick(true, false, 0.6f), "다시 누르면 즉시 1칸");
         Assert.AreEqual(0, repeat.Tick(true, false, 0.8f), "대기부터 다시");
         Assert.AreEqual(-1, repeat.Tick(true, false, 0.86f));
+        Assert.AreEqual(0, repeat.Tick(true, false, 1.05f), "가속도 처음부터 — 다음 간격 0.25s");
+        Assert.AreEqual(-1, repeat.Tick(true, false, 1.11f));
     }
 
     [Test]
@@ -491,6 +531,8 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.AreEqual(-1, repeat.Tick(true, true, 0.30f), "나중에 누른 반대 방향이 즉시 1칸");
         Assert.AreEqual(0, repeat.Tick(true, true, 0.50f), "대기부터 다시");
         Assert.AreEqual(-1, repeat.Tick(true, true, 0.56f), "둘 다 눌려 있으면 나중에 누른 쪽으로 반복");
+        Assert.AreEqual(0, repeat.Tick(true, true, 0.79f), "가속도 처음부터 — 다음 간격 0.25s");
+        Assert.AreEqual(-1, repeat.Tick(true, true, 0.81f));
     }
 
     [Test]
@@ -503,6 +545,8 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.AreEqual(1, repeat.Direction);
         Assert.AreEqual(0, repeat.Tick(false, true, 0.44f));
         Assert.AreEqual(1, repeat.Tick(false, true, 0.46f), "대기 뒤 반복");
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.69f), "가속도 처음부터 — 다음 간격 0.25s");
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.71f));
     }
 
     [Test]
