@@ -1,74 +1,33 @@
 using NUnit.Framework;
-using UnityEditor;
 
+// 순수 함수만 검사한다 — 실제 EditorPrefs 는 건드리지 않는다.
 public sealed class PlayModeReloadGuardTests
 {
     [Test]
-    public void EnteredPlayMode_Unlocked_Locks()
+    public void RecompileAndContinuePlaying_ChangesToRecompileAfterFinished()
     {
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.EnteredPlayMode, false),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.Lock));
+        Assert.That(PlayModeReloadGuard.Decide(PlayModeReloadGuard.RecompileAndContinuePlaying),
+            Is.EqualTo(PlayModeReloadGuard.RecompileAfterFinishedPlaying));
     }
 
     [Test]
-    public void EnteredPlayMode_AlreadyLocked_DoesNotLockTwice()
+    public void RecompileAfterFinishedPlaying_Kept()
     {
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.EnteredPlayMode, true),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.None));
+        Assert.That(PlayModeReloadGuard.Decide(PlayModeReloadGuard.RecompileAfterFinishedPlaying),
+            Is.EqualTo(PlayModeReloadGuard.RecompileAfterFinishedPlaying));
     }
 
     [Test]
-    public void ExitingPlayMode_Locked_Unlocks()
+    public void StopPlayingAndRecompile_Kept()
     {
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.ExitingPlayMode, true),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.Unlock));
+        Assert.That(PlayModeReloadGuard.Decide(PlayModeReloadGuard.StopPlayingAndRecompile),
+            Is.EqualTo(PlayModeReloadGuard.StopPlayingAndRecompile));
     }
 
     [Test]
-    public void EnteredEditMode_StillLocked_UnlocksAsSafetyNet()
+    public void OutOfRange_ChangesToRecompileAfterFinished()
     {
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.EnteredEditMode, true),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.Unlock));
-    }
-
-    [Test]
-    public void Unlocked_ExitOrEditMode_DoesNotUnlockTwice()
-    {
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.ExitingPlayMode, false),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.None));
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.EnteredEditMode, false),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.None));
-    }
-
-    [Test]
-    public void ExitingEditMode_NeverChangesLock()
-    {
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.ExitingEditMode, false),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.None));
-        Assert.That(PlayModeReloadGuard.Decide(PlayModeStateChange.ExitingEditMode, true),
-            Is.EqualTo(PlayModeReloadGuard.LockAction.None));
-    }
-
-    [Test]
-    public void FullPlaySession_LocksOnceAndUnlocksOnce()
-    {
-        bool locked = false;
-        int locks = 0, unlocks = 0;
-        foreach (PlayModeStateChange change in new[]
-                 {
-                     PlayModeStateChange.ExitingEditMode, PlayModeStateChange.EnteredPlayMode,
-                     PlayModeStateChange.ExitingPlayMode, PlayModeStateChange.EnteredEditMode,
-                 })
-        {
-            switch (PlayModeReloadGuard.Decide(change, locked))
-            {
-                case PlayModeReloadGuard.LockAction.Lock: locks++; locked = true; break;
-                case PlayModeReloadGuard.LockAction.Unlock: unlocks++; locked = false; break;
-            }
-        }
-
-        Assert.That(locks, Is.EqualTo(1));
-        Assert.That(unlocks, Is.EqualTo(1));
-        Assert.That(locked, Is.False);
+        Assert.That(PlayModeReloadGuard.Decide(-1), Is.EqualTo(PlayModeReloadGuard.RecompileAfterFinishedPlaying));
+        Assert.That(PlayModeReloadGuard.Decide(3), Is.EqualTo(PlayModeReloadGuard.RecompileAfterFinishedPlaying));
     }
 }
