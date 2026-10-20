@@ -55,10 +55,10 @@ public sealed class AssassinEnhanceSkill : PlayerInstantSkill
     }
 
     // 전 피어 — 컨트롤러가 상체 레이어의 Buff 로 CrossFade 한 직후다. 레이어 가중치를 올려 상체에 Buff 를 보인다.
+    // 연출(차지·오라·날 발광)은 강화 상태(AssassinState.IsEnhancedReady)를 보는 AssassinEnhanceReadyView 가 낸다 — 여기서 하지 않는다.
     public override void OnClientPlay(Vector3 direction)
     {
         upperBodyActive = true;
-        AssassinSkillView.Play(owner, v => v.PlayEnhanceCast());
     }
 
     // 전 피어 — 컨트롤러의 종료 CrossFade(Idle)는 0층만 되돌린다. 완료·대시·피격·사망 모두 상체 레이어 가중치를 내려 0층에 돌려준다.

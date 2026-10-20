@@ -2181,8 +2181,8 @@ MonoBehaviour:
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720127, type: 2}
   speedLines: {fileID: 7301928374650192902}
-  spawnInterval: 0
-  ghostLifetime: 0.2
+  spawnInterval: 0.05
+  ghostLifetime: 0.3
   fadeCurve:
     serializedVersion: 2
     m_Curve:
@@ -2216,7 +2216,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  maxGhosts: 80
+  maxGhosts: 40
   logDiagnostics: 1
   safetyTimeout: 2
 --- !u!114 &7301928374650192902

@@ -103,6 +103,30 @@ public class EffectCatalog : ScriptableObject
     // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).
     [field: SerializeField] public EffectEntry Assassin_Q_StormSlash { get; private set; }
 
+    [Header("플레이어 — 어쌔신 좌클릭")]
+    // 일반 1~4타 = Hit 이벤트마다 소켓 원샷(FX_Assassin_LClick_Slash, 4타 공용 — 방향은 소켓 회전),
+    // 적중 성공 = 서버 판정 → RPC 로 같은 타 소켓에 원샷(FX_Assassin_LClick_Success, 일반 슬래쉬와 겹쳐 재생),
+    // 변신 묶음 = 묶음 동안 소켓 루프(FX_Assassin_LClick_Transformed). AssassinSkillView 의 EffectSocketPlayer 가 재생한다(2026-10-19 민경).
+    [field: SerializeField] public EffectEntry Assassin_LClick_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_LClick_Success { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_LClick_Transformed { get; private set; }
+
+    [Header("플레이어 — 어쌔신 우클릭(간파)")]
+    // Attack_Up_01 클립의 EffectAnimEvents 이벤트가 소켓에서 재생한다: 기 모으기 루프(FX_Assassin_RClick_Windup, 끄면 즉시 반납) →
+    // 튀기기 원샷(_Pop, 기 모으기 정지와 같은 프레임) → 올려치기 원샷(_Slash). 간파 성공 = 서버 판정 → RPC → 올려치기가
+    // 재생되는 순간 함께 원샷(_Success, AssassinSkillView). (2026-10-19 민경)
+    [field: SerializeField] public EffectEntry Assassin_RClick_Windup { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Pop { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Success { get; private set; }
+
+    [Header("플레이어 — 어쌔신 일반 E(단검 강화)")]
+    // 강화 준비 동안 양손 단검 소켓(VFX_EnhanceAura)에서 오라 루프(FX_Assassin_E_Aura, 끄면 0.7초에 흩어짐), 준비 순간 차지 원샷(_Charge) —
+    // AssassinEnhanceReadyView 가 AssassinState.IsEnhancedReady 로 켜고 끈다. 강타 슬래쉬(_Slash) = Combo_Attack_02_01 의 PlayEffect 이벤트. (2026-10-20 민경)
+    [field: SerializeField] public EffectEntry Assassin_E_Aura { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_E_Charge { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_E_Slash { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
