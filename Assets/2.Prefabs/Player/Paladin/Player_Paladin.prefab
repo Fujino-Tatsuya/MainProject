@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &286766987322105371
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5487098805794614413}
+  m_Layer: 6
+  m_Name: TopHead
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5487098805794614413
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 286766987322105371}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.142, y: 1.619, z: 0.066}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2162852363296307074}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &369241749512796251
 GameObject:
   m_ObjectHideFlags: 0
@@ -909,6 +940,7 @@ Transform:
   - {fileID: 7065225733054577906}
   - {fileID: 8048451549909016702}
   - {fileID: 5490914321695818411}
+  - {fileID: 2388949476267549546}
   m_Father: {fileID: 836662554432917908}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3442890603742201715
@@ -1587,6 +1619,54 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
+--- !u!1 &7583570667378339134
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2388949476267549546}
+  - component: {fileID: 7668978312619558656}
+  m_Layer: 6
+  m_Name: States
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &7668978312619558656
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7583570667378339134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fee7e730493246bc87e643cf6ad5ac86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StatusEffectVfxPresenter
+  set: {fileID: 11400000, guid: 29fa7e0b9acd423fa7cbc7418d62cf23, type: 2}
+  overhead: {fileID: 5487098805794614413}
+  body: {fileID: 0}
+  feet: {fileID: 0}
+--- !u!4 &2388949476267549546
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7583570667378339134}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 219519478881073421}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7630356137226478081
 GameObject:
   m_ObjectHideFlags: 0
@@ -2354,7 +2434,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 5826707812529849164, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5487098805794614413}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
 --- !u!4 &32826166321045741 stripped
@@ -2387,6 +2470,11 @@ MonoBehaviour:
 --- !u!4 &1992480276934339905 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6159190776356182415, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
+  m_PrefabInstance: {fileID: 5683368051277706446}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &2162852363296307074 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5826707812529849164, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
   m_PrefabInstance: {fileID: 5683368051277706446}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &3395036302714926425 stripped

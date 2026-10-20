@@ -127,6 +127,10 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Assassin_E_Charge { get; private set; }
     [field: SerializeField] public EffectEntry Assassin_E_Slash { get; private set; }
 
+    [Header("플레이어 — 상태이상(공용)")]
+    // 상태 → 이펙트 표는 PlayerStatusEffectVfxSet(SO)가 들고, StatusEffectVfxPresenter 가 루프로 켜고 끈다. 여기는 prewarm 등록만(2026-10-20 민경).
+    [field: SerializeField] public EffectEntry Player_Faint { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]

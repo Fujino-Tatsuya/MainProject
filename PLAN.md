@@ -1,3 +1,27 @@
+# ▶▶▶ 계획 = **플레이어 상태이상 루프 VFX — SO 표(상태 → 이펙트) + Presenter, 첫 항목 기절 → FX_Faint** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 반입·코드·SO·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 상태이상 = `StatusEffectController`(서버 권위 `NetworkList`, 전 피어 복제). 지금 플레이어 기절이 실제로 나는 곳 = **23호 대쉬 벽꽝(1초)** 뿐(착지 보호 기절·AreaZone 은 경로만 있고 데이터상 안 남).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 반입 | MyProject `Export/Common/States/FX_Faint.prefab` → `50.Art/VFX/Common/States/FX_Faint.prefab`(같은 guid) + `FX_Faint_Entry.asset`(루프, outro 0.3초). 의존 신규 2(Klaus `Mat_fx_HCFX_Star_01.mat` → `_Materials/`, `Tex_fx_HCFX_Star_01.tga` → `Textures/`). 카탈로그 `Player_Faint`(prewarm). 🔴 SVN add |
+| 변화 알림(6-a) | `StatusEffectController` 에 **추가만**: `public event Action EffectsChanged` + `OnNetworkSpawn`/`OnNetworkDespawn` 에서 `effects.OnListChanged` 구독·해제 → 전 피어에서 목록 변화(추가·갱신·해제·만료)마다 발화. 기존 함수·동작 무변경. 처음 동기화(늦은 접속)엔 안 나므로 구독자가 켜질 때 직접 읽는다. 은희 영역 → handoff·CONTEXT + 민경이 메시지로 알림 |
+| SO | `1.Scripts/Effects/StatusEffectVfxSet.cs` — 행 = { 상태 종류(플래그 1개) · 엔트리(루프) · 자리(Overhead/Body/Feet) · 오프셋 · 배율 · 우선순위 }. 에셋 `9.ScriptableObject/Effects/PlayerStatusEffectVfxSet.asset` **플레이어 공용 1개**, 첫 행 = 기절 → `FX_Faint_Entry`, 자리 Overhead, 오프셋 (0, 0.5, 0)(지금 소켓 값), 배율 1, 우선순위는 머리 위 상태 글자 순서(잡힘 > 공중 > 기절 > 속박 > 침묵 > 약화 > 둔화) |
+| Presenter | `1.Scripts/Effects/StatusEffectVfxPresenter.cs` — 각 Variant `VFX/States` 에 부착. 필드 = SO · 자리 트랜스폼(Overhead = `TopHead` — 이번 신설, 어쌔신·팔라딘은 Armature 인스턴스 직하 / 거너는 그 아래 `VFX/`, Body·Feet 비움 → Feet 는 플레이어 루트, Body 비면 그 행 건너뜀+경고). `EffectsChanged` + `PlayerLifeCycleController.LifeStateChanged` 구독(켜질 때 한 번 직접 읽음), **살아 있을 때만**, **자리마다 우선순위 최고 1개**(다른 자리끼리는 동시). `EffectManager.PlayLooping`(핸들 직접 보관) → 바뀐 행만 Release, OnDisable/OnDestroy 에서 반납. 추가 네트워크 없음 |
+| `VFX/States`·`TopHead` | 세 Variant 에 상태이상 연출 오브젝트가 원래 없어 **둘 다 신설**(계획 단계의 '기존 Faint 소켓 삭제'는 착오 — HEAD 에 그런 오브젝트가 없다). 거너는 흩어진 추가 오브젝트를 `VFX` 컨테이너로 묶는 정리가 함께 들어감 |
+| 범위 밖 | 몬스터(`MonsterStatusEffect` 별도 — SO 형식은 재사용 가능하게), `GameData.xlsx`(연출 연결이라 제외), 기절 디버그 단축키 |
+
+## 변경 파일
+- 신규: `50.Art/VFX/Common/States/FX_Faint.prefab`·`_Entry` + 의존 2 · `StatusEffectVfxSet.cs` · `StatusEffectVfxPresenter.cs` · `PlayerStatusEffectVfxSet.asset`
+- `StatusEffectController.cs`(이벤트 추가) · `EffectCatalog.cs`·`.asset` · `Player_Assassin`·`Player_Gunner`·`Player_Paladin.prefab`(Presenter 부착, Faint 삭제)
+- 문서: handoff(새 `Docs/tech/handoff-status-effect-vfx.md`) · CONTEXT
+
+## 검증
+- dotnet 빌드 오류 0 · guid·내부 참조 누락 0. ⏳ 민경 Play / MPPM: 23호 대쉬 벽꽝 → 머리 위 별 1초 루프 후 0.3초에 사라짐, 호스트·클라·관전 화면 모두, 기절 중 쓰러지면 즉시 꺼짐, 늦게 들어온 클라도 맞음.
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 대쉬 잔상 — 팔라딘·거너와 같은 DashAfterimage + 속도선 (검붉은 색)** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 프리팹·재질 — 코드 무변경 · ⏳ 민경 Play/MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 대상 = 스페이스바 공용 대쉬(`PlayerDashController` · Dash 상태)만. Q 관통 돌진 제외.
