@@ -341,8 +341,9 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _vStart = Time.time;
         _vDur = Mathf.Max(0.01f, trackTime);
         _crossColor = _d.crosshairStartColor;
-        BossPatternVisuals.Paint(_cross, _crossColor,
-                                 _d.crosshairTexture != null ? _d.crosshairTexture : BossPatternVisuals.CrosshairTexture);
+        // 아트 텍스처가 비면 코드 조준(셰이더 모양 — 할 일 57 S4c2).
+        if (_d.crosshairTexture != null) BossPatternVisuals.Paint(_cross, _crossColor, _d.crosshairTexture);
+        else BossPatternVisuals.Paint(_cross, _crossColor, BossPatternVisuals.CodeShape.Crosshair);
         _cross.enabled = true;
         _cross.gameObject.SetActive(true);
     }
@@ -427,11 +428,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
     // 마스크 기준점 = 착탄 중심(채움 판이 커져도 패턴은 제자리), 축 = 월드(원이라 방향이 없다).
     void PaintLockCircle()
     {
-        TelegraphPlateStyle s = TelegraphStyleSO.For(this).circle;
-        Texture2D disc = BossPatternVisuals.DiscTextureFor(s.rimRatio);
-        var extent = new Vector2(_vRadius * 2f, _vRadius * 2f);
-        BossPatternVisuals.PaintStyled(_outer, s.outline, disc, _vPos, Vector3.right, Vector3.forward, extent);
-        BossPatternVisuals.PaintStyled(_fill, s.fill, disc, _vPos, Vector3.right, Vector3.forward, extent);
+        EnemyC3Visuals.PaintPlate(_outer,_fill,"14");
         _paintedStyleVersion = TelegraphStyleSO.Version;
     }
 
@@ -498,6 +495,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
     {
         Transform t = m.transform;
         t.SetPositionAndRotation(new Vector3(_vPos.x, _vFloorY + lift, _vPos.z), Quaternion.identity);
+        if(m==_outer)radius*=EnemyC3Visuals.OuterScale("14");
         float d = Mathf.Max(0.01f, radius * 2f);
         t.localScale = new Vector3(d, 1f, d);
     }

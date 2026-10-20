@@ -427,14 +427,13 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
         if (smashTelegraph.GetInstances(_smashTelegraphInstances) == 0) return;
 
         // 인터럽트 색 = 이 몬스터 스타일의 인터럽트 **채움** RGB(알파는 VFX 스프라이트 것을 유지 — 모양·페이드는 아트 VFX 담당).
-        Color blue = TelegraphStyleSO.For(this).interrupt.fill.color;
+        // C3 sprite contains the selected colors; keep the VFX-driven alpha.
         _smashTintVersion = TelegraphStyleSO.Version;
         for (int i = 0; i < _smashTelegraphInstances.Count; i++)
         {
             GameObject go = _smashTelegraphInstances[i];
             if (go == null) continue;
-            foreach (SpriteRenderer sr in go.GetComponentsInChildren<SpriteRenderer>(true))
-                sr.color = new Color(blue.r, blue.g, blue.b, sr.color.a);
+            EnemyC3Visuals.ApplySmash(go);
         }
         _smashTelegraphInstances.Clear();   // 풀 소유 — 들고 있지 않는다
         _smashTelegraphTinted = true;

@@ -251,12 +251,17 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     //    띄운 만큼 탑다운에서 밀려 보이고(시차) 아레나 중앙 바닥판(보행면 +6cm)과 파일런에 묻혔다.
     //    데칼은 표면에 투영되므로 시차 0 이고 단차·프롭을 타고 이어진다.
     //
-    // ⚠️ 색은 **여기서도 재질이 출처다** — 텍스처를 만들 때 기존 재질의 `_BaseColor` 를 읽어
-    //    구워 넣는다(내장 데칼 셰이더에 색 프로퍼티가 없어 텍스처가 색을 들고 갈 수밖에 없다).
+    // ⚠️ 색은 **여기서도 재질이 출처다** — 전방/후방 재질의 `_BaseColor` 를 읽어 데칼 색으로 넣는다.
     //    값을 코드에 복제하면 "색은 재질이 정한다"는 규약이 깨진다.
+    //
+    // 🔴 할 일 57 S4c1(2026-10-20): 모양은 **텍스처 없이 셰이더**(SG_EnemyC3Decal 의 부채꼴 채움 모드)가 그린다.
+    //    예전엔 각도·반경이 바뀔 때마다 256² 텍스처를 Destroy + new 로 다시 구웠다. 지금은 프로젝터마다 재질 인스턴스
+    //    하나(EnemyC3Visuals.NewDecalInstance)에 값만 쓴다. 그리기 순서·리시버·데칼 설정은 아래 decalMaterial 에서
+    //    그대로 복사하므로 겉모습과 순서가 같다. 예전 굽기 식은 에디터 전용 LegacyDecalTextureReference(픽셀 비교 기준).
     [Header("데칼 모드 — 재질을 배선하면 메시 대신 데칼로 그린다")]
     [SerializeField]
     [Tooltip("데칼용 재질(Shader Graphs/Decal). 비우면 기존 메시 경로로 그린다 — 되돌리기가 이 한 칸이다.\n" +
+             "모양은 C3 데칼 셰이더가 그리고, 이 재질에서는 그리기 순서(renderQueue·_DrawOrder)·데칼 설정만 가져온다.\n" +
              "🔴 Shader.Find 가 아니라 이 참조로 물려야 빌드에서 셰이더가 스트립되지 않는다.")]
     Material decalMaterial;
 
@@ -273,8 +278,8 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
 
     UnityEngine.Rendering.Universal.DecalProjector _frontDecal;
     UnityEngine.Rendering.Universal.DecalProjector _backDecal;
-    Texture2D _frontTexture;
-    Texture2D _backTexture;
+    Material _frontDecalMaterial;
+    Material _backDecalMaterial;
 
     void BuildRenderers()
     {
@@ -282,6 +287,8 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         {
             _frontDecal = CreateArcDecal("FrontArcDecal");
             _backDecal = CreateArcDecal("BackArcDecal");
+            _frontDecalMaterial = _frontDecal != null ? _frontDecal.material : null;
+            _backDecalMaterial = _backDecal != null ? _backDecal.material : null;
             RebuildMeshesIfNeeded();
             return;
         }
@@ -302,8 +309,17 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         //    부모(이 컴포넌트)는 yaw 만 들고 있으므로 보스가 돌면 호도 함께 돈다.
         go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
+        // 인스턴스 — 애셋 오염 금지. C3 데칼 셰이더에 decalMaterial 의 그리기 순서·데칼 설정을 옮긴 것(할 일 57 S4c1).
+        Material instance = EnemyC3Visuals.NewDecalInstance(decalMaterial, Color.clear);
+        if (instance == null)
+        {
+            Debug.LogError($"{name}: C3 데칼 재질(Resources/Telegraph/MA_EnemyC3Decal)이 없다 — 방향 표식 데칼을 그리지 않는다.", this);
+            Destroy(go);
+            return null;
+        }
+
         var decal = go.AddComponent<UnityEngine.Rendering.Universal.DecalProjector>();
-        decal.material = new Material(decalMaterial);   // 인스턴스 — 애셋 오염 금지
+        decal.material = instance;
         DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터 제외(마스크) + 벽 제외(각도 페이드)
         decal.fadeFactor = 1f;
         return decal;
@@ -382,23 +398,24 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
             mf.sharedMesh = mesh;
     }
 
-    // ─── 데칼: 환형 섹터를 텍스처로 구운다 ───────────────────────────────
+    // ─── 데칼: 환형 섹터는 셰이더가 그린다(할 일 57 S4c1) ───────────────────
     //
     // 메시(BuildArcMesh)와 **같은 각도 규약**을 쓴다 — +V(로컬 +Y) = 보스 정면 0°, 시계방향 +.
     // 그래서 전방은 |각도| <= front, 후방은 |각도| >= 180 - back 이다(메시 판정과 1:1).
+    // 크기·각도가 바뀌어도 재질·텍스처를 새로 만들지 않는다 — 프로젝터 크기와 재질 값만 바꾼다.
     void RebuildDecals(float front, float back, float inner, float outer)
     {
         float size = outer * 2f;   // 프로젝터 발자국 = 외반경 지름
 
-        ApplyDecal(_frontDecal, ref _frontTexture, FrontMaterial, front, isBack: false, inner, outer, size);
-        ApplyDecal(_backDecal, ref _backTexture, BackMaterial, back, isBack: true, inner, outer, size);
+        ApplyDecal(_frontDecal, FrontMaterial, front, isBack: false, inner, outer, size);
+        ApplyDecal(_backDecal, BackMaterial, back, isBack: true, inner, outer, size);
     }
 
-    void ApplyDecal(UnityEngine.Rendering.Universal.DecalProjector decal, ref Texture2D texture,
+    void ApplyDecal(UnityEngine.Rendering.Universal.DecalProjector decal,
                     Material colorSource, float halfAngle, bool isBack,
                     float inner, float outer, float size)
     {
-        if (decal == null) return;
+        if (decal == null || decal.material == null) return;
 
         decal.size = new Vector3(size, size, decalProjectionDepth);
 
@@ -408,117 +425,26 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
             : Color.red;
         color.a = decalAlpha;
 
-        if (texture != null) Destroy(texture);
-        texture = BuildArcTexture(color, halfAngle, isBack, inner, outer, DecalTextureSize);
-
-        if (decal.material != null && decal.material.HasProperty(DecalBaseMapId))
-            decal.material.SetTexture(DecalBaseMapId, texture);
+        // 예전 BuildArcTexture(color, halfAngle, isBack, inner, outer, 256) 와 같은 그림 — 정규화(outer = 1) 안쪽 반경만 넘긴다.
+        decal.material.SetColor(BaseColorId, color);
+        EnemyC3Visuals.SetArcFill(decal.material, halfAngle, inner / outer, isBack);
     }
 
-    const int DecalTextureSize = 256;
-    static readonly int DecalBaseMapId = Shader.PropertyToID("Base_Map");
     static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
     /// <summary>
-    /// 이 보스의 바닥 데칼 재질. <see cref="BossAttackConeTelegraph"/> 가 **같은 재질**로 공격 예고를
-    /// 그리기 위해 읽는다 — 재질을 따로 들면 예고와 표식의 셰이더·리시버 설정이 갈라진다.
+    /// 이 보스의 바닥 데칼 재질. <see cref="BossAttackConeTelegraph"/> 가 예고 재질(Resources/Telegraph/MA_TelegraphDecal)이
+    /// 없을 때 **대체 재질**로 읽는다 — 재질을 따로 들면 예고와 표식의 셰이더·리시버 설정이 갈라진다.
+    /// (할 일 57 S4c1 이후 표식 자신은 이 재질에서 그리기 순서·데칼 설정만 가져오고 모양은 C3 데칼 셰이더로 그린다.)
     /// 🔴 읽는 쪽은 반드시 <c>new Material(...)</c> 로 인스턴스를 떠야 한다(애셋 오염 금지).
     /// </summary>
     public Material DecalMaterial => decalMaterial;
 
-    /// <summary>
-    /// 환형 섹터 알파 마스크. 반경·각도 경계를 몇 픽셀/도 만큼 부드럽게 떨어뜨려 계단을 없앤다.
-    /// 🔴 각도 0 = +V(보스 정면). 메시 경로의 "+Z 기준 yaw(x = sin, z = cos)"와 같은 규약이다.
-    ///
-    /// ⚠️ 공격 예고(<see cref="BossAttackConeTelegraph"/>)도 이 하나를 쓴다 — 두 벌로 나누면
-    ///    예고와 표식의 페더·각도 규약이 조용히 갈라진다.
-    /// </summary>
-    /// <param name="rimWidth">
-    /// 0 보다 크면 <b>윤곽선 모드</b> — 섹터 경계에서 이 거리(월드 단위, <paramref name="outer"/> 와 같은
-    /// 축)만큼만 진하게 그리고 내부는 <paramref name="interiorAlphaScale"/> 배로 흐려진다.
-    /// 0 이면 지금까지처럼 면 전체를 균일하게 칠한다(방향 표식이 쓰는 경로 — 동작 불변).
-    /// </param>
-    /// <param name="interiorAlphaScale">윤곽선 모드에서 내부에 남길 알파 비율(0 = 완전히 빈 내부).</param>
-    /// <param name="reuse">같은 크기의 기존 텍스처가 있으면 새로 만들지 않고 덮어쓴다(공격 예고의 단계 굽기 — 할당 방지).</param>
-    public static Texture2D BuildArcTexture(Color color, float halfAngleDeg, bool isBack,
-                                            float inner, float outer, int size,
-                                            float rimWidth = 0f, float interiorAlphaScale = 0f,
-                                            Texture2D reuse = null)
-    {
-        Texture2D tex = reuse != null && reuse.width == size && reuse.height == size
-            ? reuse
-            : new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                name = isBack ? "BossBackArcDecal" : "BossFrontArcDecal",
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-            };
-
-        float half = size * 0.5f;
-        float radiusFeather = outer * (2f / size) * 2f;   // 약 2픽셀
-        const float AngleFeather = 2f;                    // 도
-
-        Color32[] pixels = PixelBuffer(size);
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float u = ((x + 0.5f) - half) / half;   // 로컬 +X = 보스 오른쪽
-                float v = ((y + 0.5f) - half) / half;   // 로컬 +Y = 보스 정면
-                float r = Mathf.Sqrt(u * u + v * v) * outer;
-
-                float a = color.a;
-
-                // 반경 밴드
-                a *= Mathf.Clamp01((r - inner) / radiusFeather);
-                a *= Mathf.Clamp01((outer - r) / radiusFeather);
-
-                // 각도 섹터 — 정면 0°, 후방 ±180°
-                float angle = Mathf.Abs(Mathf.Atan2(u, v) * Mathf.Rad2Deg);
-                float edge = isBack ? (angle - (180f - halfAngleDeg)) : (halfAngleDeg - angle);
-                a *= Mathf.Clamp01(edge / AngleFeather);
-
-                // 🔴 윤곽선 모드(rimWidth > 0) — 섹터 **경계만** 진하게, 내부는 흐리게 한다.
-                //    로스트아크식 장판 규약: "윤곽선이 먼저 그려지고 내부는 텅 빈 상태"에서
-                //    채움이 차오르는 것이 타이머다. 내부를 처음부터 칠하면 채움이 안 읽힌다.
-                //    rimWidth 0 이면 이 블록이 통째로 꺼져 **기존 동작 그대로**다(방향 표식 경로).
-                if (rimWidth > 0f && a > 0f)
-                {
-                    // 바깥 호까지의 거리 + 두 직선 모서리까지의 거리(호 길이 근사) 중 가까운 쪽.
-                    float toOuterArc = outer - r;
-                    float toAngularEdge = (edge <= 0f ? 0f : edge) * Mathf.Deg2Rad * r;
-                    float toBoundary = Mathf.Min(toOuterArc, toAngularEdge);
-
-                    float rim = Mathf.Clamp01(1f - toBoundary / rimWidth);
-                    a *= Mathf.Max(interiorAlphaScale, rim);
-                }
-
-                pixels[y * size + x] = new Color(color.r, color.g, color.b, Mathf.Clamp01(a));
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply(false, false);
-        return tex;
-    }
-
-    static Color32[] _pixelBuffer;
-
-    /// <summary>
-    /// 절차 텍스처용 픽셀 버퍼(메인 스레드 전용, 공유). 굽기마다 256² 배열을 새로 잡던 할당을 없앤다.
-    /// 🔴 받은 직후 전부 덮어쓰고 SetPixels32 로 넘긴 뒤에는 들고 있지 말 것 — 다음 굽기가 같은 배열을 쓴다.
-    /// </summary>
-    public static Color32[] PixelBuffer(int size)
-    {
-        int n = size * size;
-        if (_pixelBuffer == null || _pixelBuffer.Length != n) _pixelBuffer = new Color32[n];
-        return _pixelBuffer;
-    }
-
+    // 프로젝터 재질은 이 컴포넌트가 만든 인스턴스다 — 같이 정리한다(자식 프로젝터가 먼저 파괴될 수 있어 필드로 든다).
     void OnDestroy()
     {
-        if (_frontTexture != null) Destroy(_frontTexture);
-        if (_backTexture != null) Destroy(_backTexture);
+        if (_frontDecalMaterial != null) Destroy(_frontDecalMaterial);
+        if (_backDecalMaterial != null) Destroy(_backDecalMaterial);
     }
 
     /// <summary>전방 반각(도). 🔴 카운터 판정과 **같은 값**을 쓴다 — 표시가 판정에 대해 거짓말할 수 없다.</summary>

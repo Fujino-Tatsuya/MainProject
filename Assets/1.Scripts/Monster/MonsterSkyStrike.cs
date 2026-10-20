@@ -224,11 +224,7 @@ public sealed class MonsterSkyStrike : MonoBehaviour
 
     void Paint(Visual v)
     {
-        TelegraphPlateStyle s = v.style ?? TelegraphStyleSO.Default.circle;
-        Texture2D disc = BossPatternVisuals.DiscTextureFor(s.rimRatio);
-        var extent = new Vector2(v.radius * 2f, v.radius * 2f);
-        BossPatternVisuals.PaintStyled(v.outer, s.outline, disc, v.point, Vector3.right, Vector3.forward, extent);
-        BossPatternVisuals.PaintStyled(v.fill, s.fill, disc, v.point, Vector3.right, Vector3.forward, extent);
+        EnemyC3Visuals.PaintPlate(v.outer,v.fill,"12");
         v.paintedVersion = TelegraphStyleSO.Version;
     }
 
@@ -236,6 +232,7 @@ public sealed class MonsterSkyStrike : MonoBehaviour
     {
         Transform t = m.transform;
         t.SetPositionAndRotation(point + Vector3.up * (0.06f + lift), Quaternion.identity);   // 바닥 위 살짝 — Z 파이팅 방지
+        if(m.name=="SkyStrikeOuter") radius*=EnemyC3Visuals.OuterScale("12");
         t.localScale = new Vector3(radius * 2f, 1f, radius * 2f);
     }
 
