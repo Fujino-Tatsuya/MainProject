@@ -70,6 +70,27 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         encounterLock = GetComponent<PlayerEncounterLock>();
     }
 
+    /// <summary>
+    /// [전 피어] 상태이상 목록이 바뀔 때마다(추가·갱신·해제·만료) 난다 — 무엇이 바뀌었는지는 <see cref="Has"/>·<see cref="ActiveEffects"/>로 다시 읽는다.
+    /// 처음 동기화(늦은 접속)에는 나지 않으므로 구독하는 쪽이 켜질 때 한 번 직접 읽을 것.
+    /// 연출(상태이상 루프 VFX — StatusEffectVfxPresenter)이 매 프레임 폴링하지 않으려고 연다(2026-10-20 민경, 추가만 — 기존 동작 무변경).
+    /// </summary>
+    public event Action EffectsChanged;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        effects.OnListChanged += HandleEffectsListChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        effects.OnListChanged -= HandleEffectsListChanged;
+        base.OnNetworkDespawn();
+    }
+
+    private void HandleEffectsListChanged(NetworkListEvent<StatusEffectInstance> change) => EffectsChanged?.Invoke();
+
     // NetworkList 쓰기는 스폰된 서버에서만 유효 (오프라인 실행에서는 상태이상이 걸리지 않는다 — Unit 스탯 계열과 동일)
     private bool CanWrite => IsSpawned && IsServer;
 
