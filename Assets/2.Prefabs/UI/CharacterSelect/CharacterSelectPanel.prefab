@@ -1086,6 +1086,8 @@ MonoBehaviour:
   ringFadeSeconds: 0.1
   focusScaleSeconds: 0.12
   focusScale: 1.08
+  keyRepeatDelaySeconds: 0.25
+  keyRepeatIntervalSeconds: 0.1
   closeWithEscape: 1
   lockedPulseSeconds: 0.6
   lockedPulseScale: 1.12

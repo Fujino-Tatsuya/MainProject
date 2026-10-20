@@ -450,4 +450,87 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.AreEqual(CharacterSelectConfirmResult.Chosen, rules.Confirm());
         Assert.AreEqual(1, rules.Focus);
     }
+
+    // ── 이동 키 길게 누르기(할 일 60) — 대기 0.25s · 간격 0.1s ──
+
+    static CharacterSelectKeyRepeat Repeat() => new CharacterSelectKeyRepeat { DelaySeconds = 0.25f, IntervalSeconds = 0.1f };
+
+    [Test]
+    public void KeyRepeat_FirstPressMovesOnce_ThenWaitsDelay_ThenEveryInterval()
+    {
+        var repeat = Repeat();
+        Assert.AreEqual(1, repeat.Tick(false, true, 0f), "누른 순간 1칸");
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.1f));
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.24f), "대기 전에는 그대로");
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.26f), "첫 반복");
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.30f));
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.36f), "이후 간격마다");
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.40f));
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.46f));
+    }
+
+    [Test]
+    public void KeyRepeat_ReleaseStops_RepressStartsOver()
+    {
+        var repeat = Repeat();
+        Assert.AreEqual(-1, repeat.Tick(true, false, 0f));
+        Assert.AreEqual(0, repeat.Tick(false, false, 0.1f), "떼면 멈춤");
+        Assert.AreEqual(0, repeat.Tick(false, false, 0.5f));
+        Assert.AreEqual(0, repeat.Direction);
+        Assert.AreEqual(-1, repeat.Tick(true, false, 0.6f), "다시 누르면 즉시 1칸");
+        Assert.AreEqual(0, repeat.Tick(true, false, 0.8f), "대기부터 다시");
+        Assert.AreEqual(-1, repeat.Tick(true, false, 0.86f));
+    }
+
+    [Test]
+    public void KeyRepeat_OppositePress_MovesImmediately_AndRestartsDelay()
+    {
+        var repeat = Repeat();
+        repeat.Tick(false, true, 0f);
+        repeat.Tick(false, true, 0.26f);
+        Assert.AreEqual(-1, repeat.Tick(true, true, 0.30f), "나중에 누른 반대 방향이 즉시 1칸");
+        Assert.AreEqual(0, repeat.Tick(true, true, 0.50f), "대기부터 다시");
+        Assert.AreEqual(-1, repeat.Tick(true, true, 0.56f), "둘 다 눌려 있으면 나중에 누른 쪽으로 반복");
+    }
+
+    [Test]
+    public void KeyRepeat_ReleasingWinner_FallsBackToStillHeld_WithDelayAndNoImmediateStep()
+    {
+        var repeat = Repeat();
+        repeat.Tick(false, true, 0f);
+        repeat.Tick(true, true, 0.1f); // 뒤로가 이김
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.2f), "이기던 키를 떼면 남은 쪽으로 — 즉시 1칸은 없다");
+        Assert.AreEqual(1, repeat.Direction);
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.44f));
+        Assert.AreEqual(1, repeat.Tick(false, true, 0.46f), "대기 뒤 반복");
+    }
+
+    [Test]
+    public void KeyRepeat_BothPressedSameFrame_BackWins()
+    {
+        Assert.AreEqual(-1, Repeat().Tick(true, true, 0f), "기존 키 검사 순서와 같이 뒤로");
+    }
+
+    [Test]
+    public void KeyRepeat_LongFrame_MovesAtMostOnce_AndDropsBacklog()
+    {
+        var repeat = Repeat();
+        repeat.Tick(false, true, 0f);
+        Assert.AreEqual(1, repeat.Tick(false, true, 1f), "간격 여러 개가 지나도 한 프레임 1칸");
+        Assert.AreEqual(0, repeat.Tick(false, true, 1.01f), "밀린 칸을 다음 프레임에 몰아서 가지 않는다");
+        Assert.AreEqual(1, repeat.Tick(false, true, 1.11f));
+    }
+
+    [Test]
+    public void KeyRepeat_Reset_IgnoresKeysHeldUntilRepressed()
+    {
+        var repeat = Repeat();
+        repeat.Tick(false, true, 0f);
+        repeat.Reset();
+        Assert.AreEqual(0, repeat.Tick(false, true, 0.3f), "리셋 때 눌려 있던 키는 무시");
+        Assert.AreEqual(0, repeat.Tick(false, true, 1f));
+        Assert.AreEqual(-1, repeat.Tick(true, true, 1.1f), "다른 키는 새로 누르면 바로 받는다");
+        Assert.AreEqual(0, repeat.Tick(false, false, 1.2f));
+        Assert.AreEqual(1, repeat.Tick(false, true, 1.3f), "뗐다가 새로 누르면 받는다");
+    }
 }
