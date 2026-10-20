@@ -29,6 +29,9 @@ public static class SettingsUiStrings
     public static readonly UiString TabControls = S("Tab.Controls", "조작", "Controls", Body + "Controls 탭");
     public static readonly UiString TabAudio = S("Tab.Audio", "오디오", "Audio", Body + "Audio 탭");
 
+    // 틀(PLAN-settings-art — 새 아트 패널 제목)
+    public static readonly UiString PanelTitle = S("Title", "설정", "Settings", Body + "Frame_Title 제목");
+
     // 게임플레이
     public static readonly UiString GameplayDamageNumbers = S("Gameplay.DamageNumbers", "데미지 숫자", "Damage Numbers", Body + "DamageNumbers 라벨");
     public static readonly UiString GameplayDamageNumbersAll = S("Gameplay.DamageNumbers.All", "전체", "All", "설정창 — 데미지 숫자 드롭다운(코드)");

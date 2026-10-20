@@ -569,6 +569,9 @@ MonoBehaviour:
   - key: Character.Player_Assassin.Name
     ko: "\uC5B4\uC314\uC2E0"
     en: Assassin
+  - key: UI.StatusEffect.Grabbed
+    ko: "\uBD99\uC7A1\uD798"
+    en: "\uBD99\uC7A1\uD798"
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

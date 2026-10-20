@@ -336,6 +336,14 @@ public class MapSceneManager : NemoSceneManager
             optionButton.onClick.AddListener(OpenOptionPanel);
         }
 
+        // 설정창 틀 안의 닫기 버튼(PLAN-settings-art — 공유 프리팹 SettingsBody 에 들어 있다).
+        SettingsBodyView settingsBody = optionPanel != null ? optionPanel.GetComponentInChildren<SettingsBodyView>(true) : null;
+        if (settingsBody != null && settingsBody.CloseButton != null)
+        {
+            settingsBody.CloseButton.onClick.RemoveListener(CloseOptionPanel);
+            settingsBody.CloseButton.onClick.AddListener(CloseOptionPanel);
+        }
+
         if (warningConfirmButton != null)
         {
             warningConfirmButton.onClick.RemoveListener(ConfirmClientExit);

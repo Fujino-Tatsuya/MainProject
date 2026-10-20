@@ -8,12 +8,25 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **설정창 UI 새 아트(SVN r466 UI_Panel) 교체**, 브랜치 `feature/Boss23`) — 계획 [PLAN-settings-art.md](PLAN-settings-art.md) ✅ 승인 · ✅ 구현 · ✅ 경석 타이틀 Play · 설정 EditMode 26/0 · 플레이어 508/0 · ⏳ ESC(맵) Play · ✅ 커밋(SVN r476 · git)
+- 🔸 **git 과 SVN 을 같이 받을 것** — SVN **r476**(핀 476) = UI_Panel 스프라이트(r466) + 서울알림체 `UI/Fonts/`(r476). 설정창 프리팹이 둘의 guid 를 참조한다.
+- 다시 만들 때: `Tools/UI/Settings/설정 패널 항목 배치 (멱등)` → 새 아트까지 입힌다. 씬 옛 틀은 `설정창 옛 틀 끄기 — 타이틀·ESC (멱등)`. 폰트는 `설정창 글꼴 에셋 만들기 (서울알림체)`.
+- 서울알림체 = 공공누리 제1유형(출처 표시) — 크레딧에 표기 필요.
+- 🔒 수정 파일(동시 수정 주의): `Assets/2.Prefabs/UI/SettingsBody.prefab` · `Assets/1.Scripts/Settings/**`(UI·Editor·`SettingsUiStrings`) · `Managers/TitleOptionsPanel.cs` · `Managers/MapSceneManager.cs`(닫기 연결만) · `UI/Title/TitleFlowDirector.cs`(닫기 연결만) · `0.Scenes/MainFlow/1.TitleScene.unity`·`4.MapScene.unity`(옛 틀 끄기) · `Docs/tech/art-svn.json`(핀 457 → 476) · SVN `Assets/50.Art/UI/Fonts/`(서울알림체 Heavy — 신규)
+- SVN r457 → r476 update·커밋 완료(충돌 0). r462 거너 이벤트도 핀 안에 들어가 `PlayerAnimationEventRequirementTests` 통과(플레이어 EditMode 508/0).
+
 ## ▶▶ 작업 세션 (2026-10-17 · 은희(Claude) · **어쌔신 비주얼 v18 반영 — Flat Kit 재질 + 키 ×1.25**, 브랜치 `feature/AssassinVisual`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) §9 ✅ 승인(기본안) · ✅ V1~V6 — 은희 Play 확인 · SVN **r457**(핀 457) · development 병합·푸시 · EditMode 전체 1793 / 0(건너뜀 20)
 - 🔸 **git 과 SVN 을 같이 받을 것** — SVN r457 = 어쌔신 `Assassin.fbx`(v18g)·`.meta`(임포트 Scale Factor 1.25)·`Textures/Assassin_BaseColor.png`(T3H). git 쪽 단검 배율·머리카락 길이 값·`Run_Loop` 0.8 은 이 아트를 전제한다. 한쪽만 받으면 키·단검·머리카락이 어긋난다.
 - ✅ 동시 수정 잠금 해제(10-17 병합·푸시). 고친 곳: `2.Prefabs/Player/Assassin/Assassin_Armature.prefab` · 신규 `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat` · `4.Animations/Player/Assassin/AssassinAnimatorController.controller` · `1.Scripts/Player/Editor/AssassinHairAuthoring.cs`·`AssassinShellAuthoring.cs`·`AssassinHairPrefabTests.cs`·신규 `AssassinVisualPrefabTests.cs`·`PlayerEditModeTestRunner.cs` · `1.Scripts/Rendering/Editor/FlatKitPlayerVariants.cs` · `Docs/tech/art-svn.json`·`player-prefabs.md`(§7 5-1·§13·§14) · `Docs/design/character/character_assassin.md` · `PLAN-assassin.md` §9.
 - 10-17 에디터 메뉴 실행(MCP): `Tools/Player/Assassin/머리카락 본 연결`(재캡처, 은희 허락) · `Tools/Rendering/Flat Kit/플레이어 Variant 구성`(재실행 안전 확인 — 해시 19개 동일) · 플레이어·튜토리얼 EditMode 러너.
 - ⏸ 후속(범위 밖): 텍스처 남은 항목·v18.2 눈·입 UV 밀도(10/22 Codex 한도 해제 뒤 — PLAN §9 끝) · `Assassin_BaseColor` 4096 무압축(약 85 MiB → 4096 BC7 권장) · 판정 거리를 커진 몸에 맞출지 기획 확인 · 변신 R·Q 일섬 VFX 배율(민경) · 단검 전용 텍스처 · 로비 초상화 · `Run_Start`/`Run_Stop` 속도.
 - `Docs/tech/player-prefabs.md` 를 잠근 「거너 레이저건 정렬」 세션(`fix/GunnerGunAlign`)은 이미 병합됐다(`1d2e4b22`) — 그 잠금은 끝난 것으로 본다.
+
+## ▶▶ 반영 (2026-10-19 · 경석(Claude)) — `feature/Boss23` → `development` 병합·푸시 `6a59ae53`(origin/development 30여 커밋 선병합 `eac7ea01`, 충돌 0)
+- 배치 모드 EditMode 전체 1942 — 통과 1921 / 실패 1 / 건너뜀 20 · error CS 0.
+- 🔴 실패 1 = `PlayerAnimationEventRequirementTests` — 거너 `gunner_skill_RMB_interrupt` 의 Hit·End 이벤트 누락. **이 작업과 무관.**
+  원인: 은희가 SVN **r462** 에 `gunner.fbx.meta` 클립 이벤트를 올렸는데(git `feature/GunnerAnimEvents` 짝) **아트 핀 `art-svn.json` 은 457 그대로** → 핀대로 받은 사본은 이벤트가 없다. → ✅ 10-20 설정창 작업에서 핀 476 으로 올려 해결.
+- SVN: 이 작업은 아트 변경 0. 원격 SVN 최신 r467 · `GameData.xlsx` 는 다른 작업 사본에서 잠김(기획 편집 중으로 보임).
 
 ## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude) · **23호 콤보 즉시 연결 + 훅·어퍼 바닥 예고 토글**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-combo-chain.md](PLAN-boss-combo-chain.md) ✅ 승인 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 257/0 · Verify 필드 없음 0 · ⏳ 경석 Play
 - 수정: `TwentyThreeBoss.cs`(즉시 연결·후속 타 분기·토글) · `BossComboEntry.chainOnHit` · `BossDataSO` 새 칸 5(comboDashWindup 0.7 · comboGrabTelegraph 0.3 · comboJumpRecovery 0 · comboDashRecovery 0.3 · hookTelegraphMarkers) · `BossComboPolicy`(+테스트) · 인스펙터 사전 · 에셋 No23·No23_Raid(콤보 6종 즉시 연결 · 새 HookHookHook w15·cd8 · 바닥 예고 끔). 개전 콤보는 즉시 연결 제외.

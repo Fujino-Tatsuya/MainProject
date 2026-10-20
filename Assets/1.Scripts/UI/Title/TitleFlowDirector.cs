@@ -522,6 +522,13 @@ public sealed class TitleFlowDirector : MonoBehaviour
         Bind(_optionButton, OpenSettings);
         Bind(_exitButton, ExitGame);
         Bind(_settingsCloseButton, CloseSettings);
+
+        // 설정창 틀 안의 닫기 버튼(PLAN-settings-art — 공유 프리팹 SettingsBody 에 들어 있다).
+        if (_settingsRoot != null)
+        {
+            SettingsBodyView body = _settingsRoot.GetComponentInChildren<SettingsBodyView>(true);
+            if (body != null) Bind(body.CloseButton, CloseSettings);
+        }
     }
 
     private static void Bind(Button button, UnityEngine.Events.UnityAction action)
