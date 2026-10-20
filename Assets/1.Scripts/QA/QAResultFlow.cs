@@ -138,7 +138,7 @@ public sealed class QAResultFlow
     {
         float deadline = Time.time + WipeTimeout;
         float nextDiag = 0f;
-        Temp_MultiGameRule rule = UnityEngine.Object.FindFirstObjectByType<Temp_MultiGameRule>();
+        MultiGameRule rule = UnityEngine.Object.FindFirstObjectByType<MultiGameRule>();
         while (Time.time < deadline && !SessionResult.HasValue && !InResultScene)
         {
             bool diag = Time.time >= nextDiag;

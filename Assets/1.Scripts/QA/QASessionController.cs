@@ -337,26 +337,35 @@ public sealed class QASessionController : MonoBehaviour
 
         if (expectedPlayers > 1)
         {
-            Debug.Log($"[QA][Host] 클라이언트 {expectedPlayers - 1}명 접속·ready 대기");
-            yield return WaitOrTimeout(HostReadyToStart, multiplayerTimeout);
-            if (AbortCycle($"클라이언트 접속·ready(기대 {expectedPlayers}인)")) yield break;
+            Debug.Log($"[QA][Host] 클라이언트 {expectedPlayers - 1}명 접속 대기");
+            yield return WaitOrTimeout(AllPlayersConnected, multiplayerTimeout);
+            if (AbortCycle($"클라이언트 접속(기대 {expectedPlayers}인)")) yield break;
         }
 
-        yield return new WaitForSeconds(0.5f);
-        Debug.Log("[QA][Host] → StartGameLoading");
-        launcher.StartGameLoading();
+        // 48(C9): Ready 버튼·호스트 시작 버튼이 없다 — 전원 준비 → LobbySession 카운트다운이 끝나면
+        // 서버가 StartGameLoading 을 스스로 1회 부른다. QA 는 내 준비만 켠다.
+        yield return RequestLocalReady();
     }
 
-    /// <summary>모든 인원 접속 + 전원 ready(호스트는 자동 ready)일 때만 게임 시작 가능.</summary>
-    private bool HostReadyToStart()
+    private bool AllPlayersConnected()
     {
         NetworkManager nm = NetworkManager.Singleton;
-        if (nm == null || !nm.IsServer)
-            return false;
-        if (nm.ConnectedClientsList.Count < expectedPlayers)
-            return false;
-        LobbyUIController lobby = LobbyUIController.Active;
-        return lobby == null || lobby.CanStartGame;
+        return nm != null && nm.IsServer && nm.ConnectedClientsList.Count >= expectedPlayers;
+    }
+
+    /// <summary>LobbySession 이 뜨면 내 자리가 준비 해제일 때만 준비 토글을 요청한다(토글이라 두 번 누르면 꺼진다).</summary>
+    private IEnumerator RequestLocalReady()
+    {
+        yield return WaitOrTimeout(() => LobbySession.Active != null && LobbyUIController.Active != null, phaseTimeout);
+        if (AbortCycle("로비 세션 대기")) yield break;
+
+        // 내 자리(LobbyPlayerEntry)가 복제될 시간.
+        yield return new WaitForSeconds(0.5f);
+        if (!LobbyUIController.Active.IsLocalReady())
+        {
+            Debug.Log("[QA] → 준비 토글 요청");
+            LobbySession.Active.RequestToggleReady();
+        }
     }
 
     /// <summary>클라이언트 역할(MPPM 가상 플레이어): 호스트에 접속 → ready. 스폰은 공통 단계에서 대기.</summary>
@@ -386,11 +395,8 @@ public sealed class QASessionController : MonoBehaviour
         }
 
         Debug.Log("[QA][Client] 접속 완료 → ready");
-        yield return WaitOrTimeout(() => LobbyUIController.Active != null, phaseTimeout);
-        if (AbortCycle("로비 UI 대기")) yield break;
-
-        LobbyUIController.Active.SetLocalReady(true);
-        // 호스트가 StartGameLoading하면 서버가 스폰 → 공통 4)에서 Player.LocalPlayer 대기.
+        yield return RequestLocalReady();
+        // 전원 준비 → 카운트다운 끝에 서버가 맵을 로드·스폰 → 공통 4)에서 Player.LocalPlayer 대기.
     }
 
     /// <summary>MPPM 가상 플레이어(클론)는 --virtual-project-clone 인자를 갖는다. 메인 에디터=호스트.</summary>
