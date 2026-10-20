@@ -1446,9 +1446,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerEnemyHoverOutline
   outlineMaterial: {fileID: 2100000, guid: 01cc5129f6bbff742bccf0992d22d505, type: 2}
-  outlineColor: {r: 1, g: 0.08, b: 0.08, a: 1}
-  outlineWidth: 4
-  outlineMeshScale: 1
+  rimColor: {r: 1, g: 0.08, b: 0.08, a: 1}
+  rimThreshold: 0.25
+  rimSoftness: 0.1
+  rimIntensity: 1
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

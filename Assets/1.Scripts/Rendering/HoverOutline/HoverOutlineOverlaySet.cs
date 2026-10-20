@@ -11,8 +11,8 @@ using UnityEngine.Rendering;
 /// 외곽선이 섞이거나 우리가 그들의 교체를 되돌리게 된다. 겹 렌더러는 그 배열과 무관하다.
 /// 또 덧붙인 슬롯은 마지막 서브메시만 그리지만, 겹은 서브메시마다 외곽선 머티리얼을 둬 전부 덮는다(23호 몸체 6개).
 ///
-/// 외곽선 머티리얼은 "Outline" 패스만 가진 셰이더(Zone/InteractOutline)라 PC_Renderer 의
-/// 「Flat Kit Per Object Outline」 피처만 그린다 — 본체·그림자·깊이는 원래 렌더러 몫이다.
+/// 외곽선 머티리얼은 림 셰이더(Project/Enemy Hover Rim — 투명 큐·알파 블렌드·ZWrite Off·Offset -1)라
+/// 부풀리기 없이 원본 위에 실루엣 가장자리만 덧그린다 — 본체·그림자·깊이는 원래 렌더러 몫이다.
 /// </summary>
 public sealed class HoverOutlineOverlaySet
 {

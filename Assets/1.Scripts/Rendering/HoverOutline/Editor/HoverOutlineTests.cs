@@ -4,7 +4,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// 몬스터 호버 외곽선(할 일 58) — 대상 고르기 규칙, 전환 시 떼기/붙이기, 겹 렌더러가 원본 머티리얼을 안 건드리는지.
+/// 몬스터 호버 외곽선(할 일 58) — 대상 고르기 규칙, 전환 시 떼기/붙이기, 겹 렌더러가 원본 머티리얼을 안 건드리는지,
+/// 림 설정 범위·셰이더 식.
 /// </summary>
 public sealed class HoverOutlineTests
 {
@@ -233,6 +234,69 @@ public sealed class HoverOutlineTests
         r.enabled = true;
         set.SyncVisibility();
         Assert.IsTrue(set.GetOverlay(0).enabled);
+    }
+
+    // ── 림 설정 ──
+
+    [Test]
+    public void 림_설정_범위_밖은_클램프()
+    {
+        var s = new HoverRimSettings(new Color(1f, 0f, 0f, 3f), 1.5f, -0.2f, 99f).Sanitized();
+        Assert.AreEqual(1f, s.Threshold);
+        Assert.AreEqual(0f, s.Softness);
+        Assert.AreEqual(HoverRimSettings.MaxIntensity, s.Intensity);
+        Assert.AreEqual(1f, s.Color.a);
+
+        s = new HoverRimSettings(Color.red, -1f, 5f, -3f).Sanitized();
+        Assert.AreEqual(0f, s.Threshold);
+        Assert.AreEqual(HoverRimSettings.MaxSoftness, s.Softness);
+        Assert.AreEqual(0f, s.Intensity);
+    }
+
+    [Test]
+    public void 림_설정_NaN은_최소값()
+    {
+        var s = new HoverRimSettings(Color.red, float.NaN, float.NaN, float.NaN).Sanitized();
+        Assert.AreEqual(0f, s.Threshold);
+        Assert.AreEqual(0f, s.Softness);
+        Assert.AreEqual(0f, s.Intensity);
+    }
+
+    [Test]
+    public void 림_설정_범위_안은_그대로()
+    {
+        var raw = new HoverRimSettings(Color.red, 0.25f, 0.1f, 1f);
+        Assert.AreEqual(raw, raw.Sanitized());
+    }
+
+    [Test]
+    public void 림은_실루엣에서_1_정면에서_0()
+    {
+        Assert.AreEqual(1f, HoverRimSettings.RimAlpha(0f, 0.25f, 0.1f), 1e-5f);
+        Assert.AreEqual(0f, HoverRimSettings.RimAlpha(1f, 0.25f, 0.1f), 1e-5f);
+        Assert.AreEqual(0.5f, HoverRimSettings.RimAlpha(0.25f, 0.25f, 0.1f), 1e-5f);
+    }
+
+    [Test]
+    public void 림_부드러움_0이면_임계값에서_딱_잘린다()
+    {
+        Assert.AreEqual(1f, HoverRimSettings.RimAlpha(0.249f, 0.25f, 0f), 1e-5f);
+        Assert.AreEqual(0f, HoverRimSettings.RimAlpha(0.251f, 0.25f, 0f), 1e-5f);
+    }
+
+    [Test]
+    public void 림_셰이더는_색_틴트_프로퍼티가_없다()
+    {
+        Shader shader = Shader.Find("Project/Enemy Hover Rim");
+        Assert.IsNotNull(shader);
+        var m = Track(new Material(shader));
+        Assert.IsFalse(m.HasProperty("_BaseColor"));
+        Assert.IsFalse(m.HasProperty("_Color"));
+        Assert.IsTrue(m.HasProperty(HoverRimSettings.ColorId));
+        Assert.IsTrue(m.HasProperty(HoverRimSettings.ThresholdId));
+        Assert.IsTrue(m.HasProperty(HoverRimSettings.SoftnessId));
+        Assert.IsTrue(m.HasProperty(HoverRimSettings.IntensityId));
+        Assert.GreaterOrEqual(m.renderQueue, (int)RenderQueue.Transparent);
     }
 
     [Test]

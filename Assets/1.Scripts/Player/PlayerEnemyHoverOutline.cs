@@ -10,34 +10,37 @@ using UnityEngine.InputSystem;
 /// <see cref="ReportAimedTarget"/> 로 받아 쓰고 이쪽은 쏘지 않는다.
 ///
 /// 외곽선은 대상 렌더러에 겹 렌더러를 얹는 방식(<see cref="HoverOutlineOverlaySet"/>) — 몬스터 머티리얼은 무수정.
-/// 색·두께는 여기 한 곳에서 튜닝한다(런타임 사본 머티리얼에 적용 — 원본 에셋은 안 바뀐다). 문서: Docs/tech/monster-hover-outline.md
+/// 겹은 림(프레넬) 셰이더(<c>Project/Enemy Hover Rim</c>)로 |N·V| 가 작은 실루엣 가장자리만 칠한다.
+/// 색·임계값·부드러움·강도는 여기 한 곳에서 튜닝한다 — 값이 바뀐 프레임에 런타임 사본 머티리얼에 반영되므로
+/// Play 중 인스펙터로 바로 볼 수 있다(원본 에셋은 안 바뀐다). 문서: Docs/tech/monster-hover-outline.md
 /// </summary>
 [RequireComponent(typeof(Player))]
 public class PlayerEnemyHoverOutline : MonoBehaviour
 {
-    static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor");
-    static readonly int OutlineWidthId = Shader.PropertyToID("_OutlineWidth");
-    static readonly int OutlineScaleId = Shader.PropertyToID("_OutlineScale");
-
     [SerializeField]
-    [Tooltip("외곽선 머티리얼(Zone/InteractOutline — 'Outline' 패스만). 런타임 사본에 아래 색·두께를 적용해 쓴다.")]
+    [Tooltip("림 머티리얼(Project/Enemy Hover Rim). 런타임 사본에 아래 값을 적용해 쓴다.")]
     Material outlineMaterial;
 
     [SerializeField]
-    [Tooltip("호버 외곽선 색.")]
-    Color outlineColor = new Color(1f, 0.08f, 0.08f, 1f);
+    [Tooltip("림 색. 알파는 림 전체 불투명도.")]
+    Color rimColor = new Color(1f, 0.08f, 0.08f, 1f);
 
-    [SerializeField, Range(0f, 10f)]
-    [Tooltip("화면 공간 두께. 몬스터의 기존 검정 FlatKit 외곽선보다 두꺼워야 그 바깥에 빨간 테가 보인다.")]
-    float outlineWidth = 4f;
+    [SerializeField, Range(0f, 1f)]
+    [Tooltip("|N·V| 가 이 값보다 작은 곳(실루엣 가장자리)만 칠한다. 클수록 림이 두껍다.")]
+    float rimThreshold = 0.25f;
 
-    [SerializeField, Range(1f, 1.1f)]
-    [Tooltip("메시 자체 부풀림(각진 모서리 틈 메우기). 큰 스키닝 메시는 원점 기준으로 밀려 어긋날 수 있어 기본 1(끔).")]
-    float outlineMeshScale = 1f;
+    [SerializeField, Range(0f, HoverRimSettings.MaxSoftness)]
+    [Tooltip("임계값 경계의 번짐 폭(임계값 ± 이 값/2). 0 이면 딱 잘린다.")]
+    float rimSoftness = 0.1f;
+
+    [SerializeField, Range(0f, HoverRimSettings.MaxIntensity)]
+    [Tooltip("색 밝기 배수. 1 = 색 그대로, 크면 블룸에 걸려 빛난다.")]
+    float rimIntensity = 1f;
 
     Player owner;
     PlayerAimIndicator aimIndicator;
     Material runtimeMaterial;
+    HoverRimSettings appliedSettings;
     readonly HoverOutlineTracker tracker = new HoverOutlineTracker();
     readonly HoverOutlineOverlaySet overlays = new HoverOutlineOverlaySet();
 
@@ -72,6 +75,8 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
         }
 
         overlays.SyncVisibility();
+        if (overlays.Count > 0)
+            ApplySettings();
     }
 
     Unit ResolveHovered()
@@ -98,13 +103,30 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
             return null;
 
         if (runtimeMaterial == null)
+        {
             runtimeMaterial = new Material(outlineMaterial) { name = outlineMaterial.name + " (Hover)" };
+            appliedSettings = CurrentSettings();
+            appliedSettings.ApplyTo(runtimeMaterial);
+        }
 
-        // 붙일 때마다 적용 — Play 중 인스펙터 튜닝이 다음 호버부터 반영된다.
-        runtimeMaterial.SetColor(OutlineColorId, outlineColor);
-        runtimeMaterial.SetFloat(OutlineWidthId, outlineWidth);
-        runtimeMaterial.SetFloat(OutlineScaleId, outlineMeshScale);
         return runtimeMaterial;
+    }
+
+    HoverRimSettings CurrentSettings() =>
+        new HoverRimSettings(rimColor, rimThreshold, rimSoftness, rimIntensity).Sanitized();
+
+    // 값이 바뀐 프레임에만 사본에 쓴다 — Play 중 인스펙터 튜닝이 호버 중인 대상에 바로 보인다.
+    void ApplySettings()
+    {
+        if (runtimeMaterial == null)
+            return;
+
+        HoverRimSettings current = CurrentSettings();
+        if (current.Equals(appliedSettings))
+            return;
+
+        appliedSettings = current;
+        current.ApplyTo(runtimeMaterial);
     }
 
     void OnDisable()
