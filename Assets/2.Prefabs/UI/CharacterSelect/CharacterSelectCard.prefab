@@ -502,7 +502,7 @@ GameObject:
   - component: {fileID: 5699034943757967133}
   - component: {fileID: 8533283523847497120}
   m_Layer: 5
-  m_Name: Marker_Current
+  m_Name: Ring_Focus
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1165,7 +1165,7 @@ MonoBehaviour:
   sideBackground: {fileID: 7981741697866378015}
   sideTopSprite: {fileID: 21300000, guid: b0bbf79af41873345a5c50efcf01bd81, type: 3}
   sideBottomSprite: {fileID: 21300000, guid: 3228d489de5139348b3c324a35160924, type: 3}
-  currentMarker: {fileID: 5103994108708253439}
+  focusRing: {fileID: 5103994108708253439}
   portraitImage: {fileID: 1058035086793036450}
   nameText: {fileID: 3895078497317525261}
   currentTag: {fileID: 5831147525972799979}

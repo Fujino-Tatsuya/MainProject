@@ -1082,6 +1082,10 @@ MonoBehaviour:
   previousSlot: {x: 779, y: 408}
   nextSlot: {x: 255, y: -550}
   sideScale: 0.84
+  moveSeconds: 0.18
+  ringFadeSeconds: 0.1
+  focusScaleSeconds: 0.12
+  focusScale: 1.08
   closeWithEscape: 1
   lockedPulseSeconds: 0.6
   lockedPulseScale: 1.12

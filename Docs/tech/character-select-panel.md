@@ -11,6 +11,7 @@
 | 카드 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectCard.prefab` (런타임에 로스터 수만큼 복제) |
 | 뷰 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanel.cs` · `CharacterSelectCard.cs` |
 | 규칙(순수) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanelRules.cs` — 테스트 `Editor/CharacterSelectPanelRulesTests.cs` |
+| 카드 이동 연출 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectCardMotion.cs` — 같은 테스트 파일 |
 | 배경 흐름 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectBackgroundScroll.cs` |
 | 문구 키 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs` (`UiStrings.All` 에 포함) |
 | 저작·미리보기 | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectPanelAuthoring.cs` |
@@ -50,8 +51,32 @@
 ## 화면
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
   카드가 2장이면 다른 카드는 아래, 4장 이상이면 포커스 ±1 만 보인다. 위·아래 카드는 목업처럼 화면 밖으로 일부 잘린다.
-- 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = 금색 테두리 + "현재" 표식**(포커스 표시인 초록·크기와 따로 보인다).
+- 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = "현재" 알약 표식만**(포커스 표시인 초록·크기와 따로 보인다).
+  **금색 테두리(`card_selected_ring`, 카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
   잠금 중에는 포커스 카드 초록이 바래고, 왼쪽 아래에 "준비를 해제해야 바꿀 수 있습니다".
+
+### 카드 이동·확대 연출(할 일 60)
+값은 모두 패널 인스펙터 `Card Motion`(UI 연출 값 — SO·xlsx 아님). 시간 = `Time.unscaledTime`(슬로모션 무관). 트윈 패키지 없음 — 이징은 `CharacterSelectCardMotion.EaseOutCubic`.
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `moveSeconds` | 0.18 | 포커스가 바뀌면 카드가 지금 자리에서 새 자리(`focusedSlot`/`previousSlot`/`nextSlot`·`sideScale`)로 미끄러짐, EaseOutCubic |
+| `ringFadeSeconds` | 0.1 | 금색 테두리 — 이동 시작에 꺼지고(지금 알파에서 선형), 이동이 끝나면 새 가운데 카드에서 켜짐 |
+| `focusScaleSeconds` | 0.12 | 이동이 끝난 뒤 가운데 카드 확대, EaseOutCubic |
+| `focusScale` | 1.08 | 다 선 가운데 카드 배율. 가운데에서 벗어나는 카드는 이동하면서 옆 크기(`sideScale`)로 돌아간다 |
+
+- 단계 = `Idle → Moving(이동·테두리 페이드 아웃) → Settling(확대·테두리 페이드 인, 둘 중 긴 쪽) → Idle`.
+- **이동 중 새 입력은 큐잉하지 않는다** — 키·휠·옆 카드 클릭·`MoveFocus` 가 오면 모든 카드가 **지금 보이는 자리·크기**에서 새 목표로 다시 출발(연타해도 끊김·점프 없음).
+  테두리는 이어서 꺼지고(정착 중이었다면 켜지던 알파에서), 정착은 마지막 이동이 끝난 뒤 한 번만.
+- 논리 포커스(`FocusedCharacterId`)·이름판·카드 모양(초록/옆 카드)은 입력 즉시 바뀐다. **확정(Enter/Space/가운데 클릭)은 이동 중에도 받고 대상은 논리 가운데**다.
+  가운데 클릭 판정도 index == 논리 포커스(그 카드가 아직 미끄러지는 중이어도).
+- 화면 밖 카드: 자리 offset ±2 = 위·아래 자리에서 같은 간격만큼 더 나간 곳(위 바깥 (1035, 888) · 아래 바깥 (-13, -1028), 둘 다 화면 밖).
+  - 보이지 않던 카드가 보이게 되면 **도착하는 쪽 바깥**(위 자리면 위 바깥, 아래 자리면 아래 바깥)에서 들어온다. 큰 점프로 바로 가운데에 오면 이동 방향 쪽(포커스 앞으로 = 아래 바깥).
+  - 보이던 카드가 화면 밖이 되면 **흘러가는 쪽 바깥**(포커스 앞으로 = 카드가 올라가므로 위 바깥, 뒤로 = 아래 바깥)으로 빠지고 이동이 끝나면 꺼진다.
+    (자리 offset 은 4장일 때 ±2 가 +2 로 정해지므로 offset 부호가 아니라 이동 방향을 쓴다.)
+  - 2·3장 순환에서 위↔아래로 바뀌는 카드는 사라졌다 나타나지 않고 **가운데 카드 뒤로 가로질러** 미끄러진다(가운데 카드가 맨 위에 그려진다).
+- `Show`(열 때)·`SetLocked` 는 애니메이션 없이 바로 정렬 — 테두리 켜짐·확대 상태.
+
 - 왼쪽 아래 이름판 = 포커스된 캐릭터의 원형 초상화·이름. 왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠.
 - 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬를 따라 **오른쪽으로 40px/s**(unscaled) 흐름(방향 = 10-19 결정).
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
@@ -89,6 +114,10 @@
 - `Tools/UI/Authoring/Character Select Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 자리·색은 스크립트 상단 상수와 패널·카드 인스펙터.
 - `Tools/UI/Preview/Character Select Panel 캡처` — 프리뷰 씬에서 1920×1080 PNG 를 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/48.2-char-select/` 에 저장(열린 씬 무수정):
   `CharacterSelect_unlocked.png`(지금 0번·포커스 1번) · `CharacterSelect_locked.png`(지금 1번·포커스 2번·잠금) · `CharacterSelect_vs_mockup.png`(왼쪽 목업) · `CharacterSelect_bg_gamma.png`(배경 _gamma 판 비교용), 콘솔에 배경 밝기 비교.
+  이동 연출은 시계를 넘겨 다 선 상태로 찍는다.
+- `Tools/UI/Preview/Character Select Panel 이동 연출 캡처` — 같은 방식으로 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/60-anim/` 에 저장. 지금 0번·포커스 0번에서 `MoveFocus(1)` 후 패널 시계를 직접 넣어 샘플링:
+  `CharacterSelect_anim_0_idle.png`(열 때) · `_1_moving_pos50.png`(위치 50% = 시간 ≈ 21%, 테두리 반쯤) · `_2_moving_ring_off.png`(시간 ≈ 56%, 테두리 꺼짐) · `_3_settled.png`(정착 — 테두리 켜짐·확대).
+  시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
 - 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests`).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
@@ -97,4 +126,5 @@
 - 다른 캐릭터 확정 → `RequestCharacterServerRpc` 가 한 번 나가고 패널이 닫히는가. 지금 캐릭터 확정 → 요청 없이 닫히는가.
 - 준비 중 열기 → 구경은 되고 확정하면 잠금 문구가 강조되는가. 열린 채 준비 해제(`SetLocked(false)`) → 바로 고를 수 있는가.
 - 결과 패널이 위에 열려 있을 때 ESC 한 번에 결과 패널만 닫히는가(선택 패널은 그대로).
+- (할 일 60) 카드가 미끄러지듯 움직이고 연타해도 점프 없이 새 목표로 가는가. 테두리가 이동 중 꺼졌다가 가운데 카드에서 켜지고 살짝 커지는가. 이동 중 Enter 가 새 가운데로 확정되는가.
 - 배경이 슬로모션과 무관하게 천천히 흐르고 가장자리가 비지 않는가(16:9 외 비율 포함).

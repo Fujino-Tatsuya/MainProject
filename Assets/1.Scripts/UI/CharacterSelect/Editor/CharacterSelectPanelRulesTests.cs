@@ -4,6 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 로비 캐릭터 선택 패널 판단(할 일 48.2) — 첫 포커스·순환 이동·카드 자리·확정(잠금·불가·같은 캐릭터)·ESC·배경 흐름.
+/// 카드 이동 연출(할 일 60) — 이징·단계 전이·이동 중 재목표·테두리 알파·확대·바깥 자리 출입.
 /// </summary>
 public sealed class CharacterSelectPanelRulesTests
 {
@@ -232,5 +233,221 @@ public sealed class CharacterSelectPanelRulesTests
         float dx = Mathf.Repeat(oneSecond.x - zero.x + tile.x * 0.5f, tile.x) - tile.x * 0.5f;
         float dy = Mathf.Repeat(oneSecond.y - zero.y + tile.y * 0.5f, tile.y) - tile.y * 0.5f;
         Assert.AreEqual(40f, new Vector2(dx, dy).magnitude, 1e-2f, "1초에 40px");
+    }
+
+    // ── 카드 이동·확대 연출(할 일 60) ──────────────────────────
+
+    static readonly CharacterSelectSlotLayout Slots =
+        new CharacterSelectSlotLayout(new Vector2(523f, -72f), new Vector2(779f, 408f), new Vector2(255f, -550f), 0.84f);
+
+    const float Eps = 1e-4f;
+
+    static CharacterSelectCardMotion Motion() =>
+        new CharacterSelectCardMotion { MoveSeconds = 0.18f, RingFadeSeconds = 0.1f, ScaleSeconds = 0.12f };
+
+    [Test]
+    public void EaseOutCubic_EndpointsMidpointAndClamp()
+    {
+        Assert.AreEqual(0f, CharacterSelectCardMotion.EaseOutCubic(0f), Eps);
+        Assert.AreEqual(0.875f, CharacterSelectCardMotion.EaseOutCubic(0.5f), Eps);
+        Assert.AreEqual(1f, CharacterSelectCardMotion.EaseOutCubic(1f), Eps);
+        Assert.AreEqual(0f, CharacterSelectCardMotion.EaseOutCubic(-1f), Eps);
+        Assert.AreEqual(1f, CharacterSelectCardMotion.EaseOutCubic(2f), Eps);
+
+        float last = 0f;
+        for (int i = 1; i <= 20; i++)
+        {
+            float v = CharacterSelectCardMotion.EaseOutCubic(i / 20f);
+            Assert.Greater(v, last, "단조 증가");
+            last = v;
+        }
+    }
+
+    [Test]
+    public void Motion_IdleMovingSettlingIdle_RingAndScaleOverTime()
+    {
+        var motion = Motion();
+        motion.Snap();
+        Assert.AreEqual(CharacterSelectMotionPhase.Idle, motion.Phase);
+        Assert.AreEqual(1f, motion.RingAlpha(0f), Eps, "열 때 = 테두리 켜짐");
+        Assert.AreEqual(1.08f, motion.FocusScale(0f, 1.08f), Eps, "열 때 = 확대 상태");
+        Assert.AreEqual(1f, motion.MoveProgress(0f), Eps);
+
+        motion.Retarget(0f);
+        Assert.AreEqual(CharacterSelectMotionPhase.Moving, motion.Tick(0f));
+        Assert.AreEqual(0f, motion.MoveProgress(0f), Eps);
+        Assert.AreEqual(1f, motion.RingAlpha(0f), Eps);
+        Assert.AreEqual(1f, motion.FocusScale(0f, 1.08f), Eps, "이동 중 확대 없음");
+
+        Assert.AreEqual(CharacterSelectMotionPhase.Moving, motion.Tick(0.05f));
+        Assert.AreEqual(0.5f, motion.RingAlpha(0.05f), Eps, "0.1초 페이드 아웃 절반");
+        Assert.AreEqual(0.875f, motion.MoveProgress(0.09f), Eps, "시간 절반 = EaseOutCubic 0.875");
+        Assert.AreEqual(0f, motion.RingAlpha(0.1f), Eps, "0.1초면 꺼짐");
+        Assert.AreEqual(0f, motion.RingAlpha(0.17f), Eps);
+
+        Assert.AreEqual(CharacterSelectMotionPhase.Settling, motion.Tick(0.181f));
+        Assert.AreEqual(1f, motion.MoveProgress(0.181f), Eps, "정착 = 도착");
+        Assert.AreEqual(0.01f, motion.RingAlpha(0.181f), 1e-3f, "정착 시작(0.18)부터 켜진다");
+        Assert.AreEqual(0.5f, motion.RingAlpha(0.23f), Eps, "0.1초 페이드 인 절반");
+        Assert.AreEqual(1f, motion.RingAlpha(0.28f), Eps);
+        Assert.AreEqual(1f + 0.08f * 0.875f, motion.FocusScale(0.24f, 1.08f), Eps, "확대 0.12초 절반 = EaseOutCubic");
+
+        Assert.AreEqual(CharacterSelectMotionPhase.Settling, motion.Tick(0.29f), "정착 = 테두리·확대 중 긴 쪽(0.12초)");
+        Assert.AreEqual(CharacterSelectMotionPhase.Idle, motion.Tick(0.31f));
+        Assert.AreEqual(1f, motion.RingAlpha(0.31f), Eps);
+        Assert.AreEqual(1.08f, motion.FocusScale(0.31f, 1.08f), Eps);
+    }
+
+    [Test]
+    public void Motion_RetargetWhileMoving_RestartsFromNow_NoQueue()
+    {
+        var motion = Motion();
+        motion.Snap();
+        motion.Retarget(0f);
+        motion.Tick(0.05f);
+
+        motion.Retarget(0.05f); // 빠른 연타 — 새 목표로 바로
+        Assert.AreEqual(CharacterSelectMotionPhase.Moving, motion.Phase);
+        Assert.AreEqual(0f, motion.MoveProgress(0.05f), Eps, "지금부터 다시 잰다");
+        Assert.AreEqual(0.5f, motion.RingAlpha(0.05f), Eps, "테두리는 이어서 꺼진다(다시 켜지지 않는다)");
+        Assert.AreEqual(0f, motion.RingAlpha(0.10f), Eps);
+
+        Assert.AreEqual(CharacterSelectMotionPhase.Moving, motion.Tick(0.20f), "첫 출발 기준(0.18)이 아니라 다시 출발한 기준");
+        Assert.AreEqual(CharacterSelectMotionPhase.Settling, motion.Tick(0.24f));
+    }
+
+    [Test]
+    public void Motion_RetargetWhileSettling_FadesOutFromPartialRing()
+    {
+        var motion = Motion();
+        motion.Retarget(0f);
+        Assert.AreEqual(CharacterSelectMotionPhase.Settling, motion.Tick(0.181f));
+        Assert.AreEqual(0.5f, motion.RingAlpha(0.23f), Eps);
+
+        motion.Retarget(0.23f);
+        Assert.AreEqual(CharacterSelectMotionPhase.Moving, motion.Phase);
+        Assert.AreEqual(0.5f, motion.RingAlpha(0.23f), Eps, "켜지던 알파에서 바로 꺼지기 시작");
+        Assert.AreEqual(0f, motion.RingAlpha(0.28f), Eps);
+        Assert.AreEqual(1f, motion.FocusScale(0.23f, 1.08f), Eps);
+    }
+
+    [Test]
+    public void Motion_ZeroDurations_ArriveAndSettleImmediately()
+    {
+        var motion = new CharacterSelectCardMotion { MoveSeconds = 0f, RingFadeSeconds = 0f, ScaleSeconds = 0f };
+        motion.Retarget(1f);
+        Assert.AreEqual(CharacterSelectMotionPhase.Idle, motion.Tick(1f));
+        Assert.AreEqual(1f, motion.RingAlpha(1f), Eps);
+        Assert.AreEqual(1.08f, motion.FocusScale(1f, 1.08f), Eps);
+    }
+
+    [Test]
+    public void SlotLayout_OutsideSlotsExtendTheStack()
+    {
+        Assert.AreEqual(Slots.Focused, Slots.Position(0));
+        Assert.AreEqual(Slots.Previous, Slots.Position(-1));
+        Assert.AreEqual(Slots.Next, Slots.Position(1));
+        Assert.AreEqual(new Vector2(1035f, 888f), Slots.Position(-2), "위 바깥 = 위 자리에서 같은 간격 더");
+        Assert.AreEqual(new Vector2(-13f, -1028f), Slots.Position(2), "아래 바깥");
+        Assert.AreEqual(1f, Slots.Scale(0), Eps);
+        Assert.AreEqual(0.84f, Slots.Scale(-1), Eps);
+        Assert.AreEqual(0.84f, Slots.Scale(2), Eps);
+    }
+
+    [Test]
+    public void Track_VisibleCardSlidesFromCurrentPosition()
+    {
+        // 다음 카드(+1)가 이동 중 어딘가에 있다가 가운데(0)로 새 목표
+        CharacterSelectCardTrack track = CharacterSelectCardMotion.Snap(1, Slots);
+        var midway = new Vector2(400f, -300f);
+        track = CharacterSelectCardMotion.Retarget(track, midway, 0.9f, 0, 1, Slots);
+
+        Assert.IsTrue(track.Active);
+        Assert.IsFalse(track.HideAtEnd);
+        Assert.IsTrue(track.Focused);
+        Assert.AreEqual(midway, track.Position(0f), "점프 없이 지금 자리에서");
+        Assert.AreEqual(Slots.Focused, track.Position(1f));
+        Assert.AreEqual(0.9f, track.Scale(0f, 1f), Eps);
+        Assert.AreEqual(1.08f, track.Scale(1f, 1.08f), Eps, "가운데 도착 카드만 정착 확대");
+    }
+
+    [Test]
+    public void Track_LeavingCenterShrinksBackToSideScale()
+    {
+        CharacterSelectCardTrack track = CharacterSelectCardMotion.Snap(0, Slots);
+        float shown = track.Scale(1f, 1.08f);
+        Assert.AreEqual(1.08f, shown, Eps);
+
+        track = CharacterSelectCardMotion.Retarget(track, track.Position(1f), shown, -1, 1, Slots);
+        Assert.IsFalse(track.Focused);
+        Assert.AreEqual(1.08f, track.Scale(0f, 1.08f), Eps, "확대 상태에서 출발");
+        Assert.AreEqual(0.84f, track.Scale(1f, 1.08f), Eps, "원래(옆) 크기로");
+    }
+
+    [Test]
+    public void Track_HiddenCardEntersFromOutside_LeavingCardExitsThenTurnsOff()
+    {
+        // 4장, 포커스 0 → 1 : 2번(+2, 꺼짐) → +1 은 아래 바깥에서 들어오고, 3번(-1) → -2 는 위 바깥으로 빠진다.
+        CharacterSelectCardTrack entering = CharacterSelectCardMotion.Snap(CharacterSelectPanelRules.SlotOffset(2, 0, 4), Slots);
+        CharacterSelectCardTrack leaving = CharacterSelectCardMotion.Snap(CharacterSelectPanelRules.SlotOffset(3, 0, 4), Slots);
+        Assert.IsFalse(entering.Active);
+        Assert.IsTrue(leaving.Active);
+
+        entering = CharacterSelectCardMotion.Retarget(entering, Vector2.zero, 0f, CharacterSelectPanelRules.SlotOffset(2, 1, 4), 1, Slots);
+        Assert.IsTrue(entering.Active);
+        Assert.AreEqual(Slots.Position(2), entering.Position(0f), "아래 바깥에서 출발");
+        Assert.AreEqual(Slots.Next, entering.Position(1f));
+
+        leaving = CharacterSelectCardMotion.Retarget(leaving, Slots.Previous, 0.84f, CharacterSelectPanelRules.SlotOffset(3, 1, 4), 1, Slots);
+        Assert.IsTrue(leaving.Active, "나가는 동안은 보인다");
+        Assert.IsTrue(leaving.HideAtEnd);
+        Assert.AreEqual(Slots.Position(-2), leaving.Position(1f), "위 바깥으로");
+
+        Assert.IsFalse(CharacterSelectCardMotion.Arrive(leaving).Active, "이동이 끝나면 꺼진다");
+        CharacterSelectCardTrack arrived = CharacterSelectCardMotion.Arrive(entering);
+        Assert.IsTrue(arrived.Active);
+        Assert.AreEqual(Slots.Next, arrived.Position(0f), "도착 자리에 고정");
+
+        // 반대 방향(포커스 1 → 0)이면 꺼져 있던 3번이 위(-1)로, 위 바깥에서 들어온다.
+        CharacterSelectCardTrack fromTop = CharacterSelectCardMotion.Retarget(CharacterSelectCardMotion.Arrive(leaving), Vector2.zero, 0f,
+            CharacterSelectPanelRules.SlotOffset(3, 0, 4), -1, Slots);
+        Assert.AreEqual(Slots.Position(-2), fromTop.Position(0f));
+        Assert.AreEqual(Slots.Previous, fromTop.Position(1f));
+    }
+
+    [Test]
+    public void Track_HiddenStaysHidden_EnterOffsetForBigJumpFollowsDirection()
+    {
+        CharacterSelectCardTrack hidden = CharacterSelectCardMotion.Snap(2, Slots);
+        Assert.IsFalse(CharacterSelectCardMotion.Retarget(hidden, Vector2.zero, 0f, -2, 1, Slots).Active);
+
+        Assert.AreEqual(-2, CharacterSelectCardMotion.EnterOffset(-1, 1));
+        Assert.AreEqual(2, CharacterSelectCardMotion.EnterOffset(1, -1));
+        Assert.AreEqual(2, CharacterSelectCardMotion.EnterOffset(0, 1), "앞으로 가면 카드가 올라가므로 아래에서 온다");
+        Assert.AreEqual(-2, CharacterSelectCardMotion.EnterOffset(0, -1));
+
+        // 4장이면 ±2 가 +2 로 정해지지만, 빠지는 쪽은 카드가 흘러가는 방향이다.
+        Assert.AreEqual(2, CharacterSelectPanelRules.SlotOffset(3, 1, 4));
+        Assert.AreEqual(-2, CharacterSelectCardMotion.ExitOffset(2, 1), "앞으로 가면 위로 빠진다");
+        Assert.AreEqual(2, CharacterSelectCardMotion.ExitOffset(2, -1), "뒤로 가면 아래로 빠진다");
+        CharacterSelectCardTrack down = CharacterSelectCardMotion.Retarget(CharacterSelectCardMotion.Snap(1, Slots), Slots.Next, 0.84f,
+            CharacterSelectPanelRules.SlotOffset(2, 0, 4), -1, Slots); // 4장, 포커스 1 → 0 : 2번(+1) 은 아래 바깥으로
+        Assert.AreEqual(Slots.Position(2), down.Position(1f));
+    }
+
+    [Test]
+    public void LogicalFocus_UpdatesImmediately_ConfirmTargetsNewCenterDuringMove()
+    {
+        // 이동 연출은 논리 포커스를 늦추지 않는다 — MoveFocus 직후 Confirm 대상 = 새 가운데.
+        var rules = Opened(0);
+        var motion = Motion();
+        motion.Snap();
+
+        rules.MoveFocus(1);
+        motion.Retarget(0f);
+        Assert.AreEqual(CharacterSelectMotionPhase.Moving, motion.Tick(0.05f));
+        Assert.AreEqual(1, rules.Focus);
+        Assert.AreEqual(CharacterSelectConfirmResult.Chosen, rules.Confirm());
+        Assert.AreEqual(1, rules.Focus);
     }
 }

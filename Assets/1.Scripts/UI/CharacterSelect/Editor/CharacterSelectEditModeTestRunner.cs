@@ -11,7 +11,7 @@ internal static class CharacterSelectEditModeTestRunner
 {
     static readonly string[] Fixtures =
     {
-        "^CharacterSelectPanelRulesTests" // 포커스·확정·잠금·ESC·배경 흐름
+        "^CharacterSelectPanelRulesTests" // 포커스·확정·잠금·ESC·배경 흐름·카드 이동 연출(할 일 60)
     };
 
     const string Tag = "[CharacterSelectTests]";
