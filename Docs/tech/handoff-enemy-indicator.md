@@ -252,12 +252,17 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - **호출 위치** = `NetworkLoadingFlowController.HandleLoadStarted`(타깃 씬 NGO `Load` 이벤트) 한 줄 — 호스트·클라 모두, 로딩 화면이 떠 있는 동안. 보스·몬스터 스폰 코드는 건드리지 않았다. 판 재시작(Alt+0)도 이 경로를 타지만 이미 했으므로 무동작.
 - **하는 일** (a) JSON(`Get`)·판/데칼 재질·판 층 10종 MPB·스매시 09 sprite (b) 셰이더 — 코드로 만든 `ShaderVariantCollection.WarmUp`(에셋·Preloaded Shaders 무변경, 세 셰이더는 이미 Resources 재질로 빌드에 들어간다): `EnemyC3Plate`·`TelegraphQuad`(PassType.Normal) + `SG_EnemyC3Decal` `{_DBUFFER_MRT3 _DECAL_LAYERS}`·`{_DBUFFER_MRT3}`·`{_DECAL_NORMAL_BLEND_LOW _DECAL_LAYERS}`·`{_DECAL_NORMAL_BLEND_LOW}` = `PC_Renderer` 데칼 설정(Automatic→DBuffer · surfaceData AlbedoNormalMAOS · decalLayers 켜짐 · normalBlend Low) (c) 화면 밖(-10000) 숨김 더미로 `NewDecalInstance`·`SetDecalProperties`(부채꼴·띠·대시 띠·합집합)·`SetArcFill`(앞/뒤)·`SetRectFill`·`SetUnionFill`·`SetDiscFill`·프로젝터 켜고 끄기·`PaintPlate/PaintLayer/PaintActive`·`Paint(CodeShape)` 3종·`CreateJump`·`ApplySmash` 를 한 번씩 부르고 **같은 호출 안에서 `DestroyImmediate`**(재질 인스턴스·코드 SVC 포함). 남는 건 게임이 원래 만드는 공유 캐시(`BossPatternVisuals` 판 재질·쿼드, `TelegraphStyleSO` 코드 기본값)뿐.
   (c-2, **할 일 57.1** — 사용자 "그거 없애자고 예열하는 거잖아, 로딩 때 예열해 두셈") 보스 예고 컴포넌트 두 개는 `NetworkBehaviour` 가 아닌 `MonoBehaviour` 라 같은 숨김 더미에 **임시로 붙여 실제 경로를 그대로** 돌린다(`EnemyC3Prewarm.WarmBossComponents`): `BossAttackConeTelegraph.Show` — 23호가 부르는 분기 합집합 02·부채꼴 03·잡기(바깥→안)·네모 띠(앞·옆 치우침)·간파 04 — 와 `Hide`(`EnsureBuilt` 포함), `WellsDroneAttack.Init(null, 빈 데이터)` → `ClientMark` → `ClientLock`(판 14, `EnsureView` 포함) → `ClientCancel`. 빈 `WellsDroneDataSO` 라 드론 모델 `Instantiate`·카메라 분기는 안 타고, 폭발 `ClientImpact`(EffectManager 재생)는 부르지 않는다. 생성물(프로젝터 6개·재질 인스턴스 6개·드론 뷰 루트·빈 데이터)은 같은 호출에서 지운다 — **풀은 두지 않았다**(아래 판단). 보스 쪽 코드 변경은 `WellsDroneAttack.ViewRoot`(읽기 전용 internal — 뷰 루트가 컴포넌트 자식이 아니라 예열이 지우려고 읽는다) 하나뿐, 판정·RPC·FSM·스폰 경로 무변경.
+- (c-3, **할 일 57.3** — 사용자 "드론 pooling 해야지") 57.1의 빈 데이터를 정본 `WellsDroneData.asset`으로 바꿨다. 원본은 Resources 밖이므로 에셋 이동·GUID 변경 없이 작은 `Resources/Monster/WellsDronePrewarmCatalog.asset`이 참조한다. `ClientMark` → 카메라 없는 `ClientLock` → 고정/낙하 `ClientTick` → `PlayDroneClips`/`TickDroneClips`(DashStart→DashLoop) → 풀 반납을 실제 모델·클립으로 돈다. 모델의 mesh/material/texture를 접근하고 전용 16×16 RT에 `CommandBuffer.DrawRenderer` + `GL.Flush`로 한 번 그려 첫 렌더의 lazy `Loading.ReadObject`를 로딩 프레임으로 앞당긴다. 게임 카메라·씬 렌더에는 노출하지 않는다.
+- **드론 풀** = NGO 풀이 아니다. 드론은 NetworkObject가 아닌 각 피어의 로컬 표현이고 서버 판정·RPC·타이머는 그대로다. `WellsDroneVisualPool`은 `DontDestroyOnLoad` 숨김 루트에 비활성 **1기**만 보관한다(한 보스·한 `WellsDroneAttack`, 새 Lock 전 `ClientCancel`이라 실제 동시 최대 1). Collider off·Rigidbody kinematic/충돌 off·Animator 준비는 생성 때 한 번, DashStart/DashLoop 두 입력의 PlayableGraph도 인스턴스와 함께 재사용한다. 조준/원 뷰는 기존 컴포넌트당 1회 재사용, 폭발은 기존 `EffectManager` 풀이라 변경하지 않았다.
+- **수명**: 로딩 씬→맵·Alt+0·두 번째 판은 영속 루트가 그대로 건너고, 보스 `OnDisable`/`OnDestroy`·사망/취소는 대출 중인 모델을 반납한다. `EnemyC3Visuals.ResetForPlay`가 풀·graph·Resources 인덱스 캐시를 지워 도메인 리로드를 끈 Play 재진입도 이전 참조를 남기지 않는다.
 - **보이지 않는 1프레임 드로우를 안 쓴 이유**: 데칼은 불투명 표면 + DBuffer 패스가 있는 카메라에서만 그려져 로딩 씬 카메라·렌더러 구성에 묶이고, 한 프레임 살아 있는 오브젝트(또는 씬 수정)가 필요하다.
+- 57.3 드론은 데칼과 달리 일반 Renderer라 전용 RT `CommandBuffer`로 즉시 그릴 수 있다. 이 방식은 카메라·씬·다음 프레임을 요구하지 않고 mesh/material/texture 업로드를 강제하지만, 플랫폼별 D3D12 PSO 완전 보장은 Play/빌드 프로파일로 남긴다.
 - **로딩 대기** = 완료 조건이 **아니다**. 이벤트 프레임에서 동기 실행(한 프레임 히치, 로딩 화면 중)이고, 최소 표시 시간 타이머(5 s)는 바로 위에서 시작하므로 **타이머와 병렬** — 타깃 로드 + 예열이 5 s 안이면 완료 시각은 그대로. 실측 **46~63 ms**(57 시점, 에디터, data 12 · shaders 1.7 · paths 47 ms — `S5/prewarm.txt`). **57.1 뒤 37.6~39.8 ms**(같은 세션 3회, data 2.5~3.2 · shaders 1.3~1.7 · paths 32.8~34.4 — 그중 보스 컴포넌트 **7.7~7.9 ms 가 늘어난 몫**, `57.1/prewarm.txt`). 세션마다 절대값은 흔들려(57 원본은 다른 워크트리·다른 시각) 늘어난 양은 `Timing.boss` 로 직접 잰다. 5 s 창 대비 무시할 크기라 완료 시각 영향 없음.
+  **57.3** 도메인 첫 실행은 **46.78 ms**(data 2.50 · shaders 1.23 · paths 42.03, 그중 boss **16.74 ms**) — 실제 모델 로드·graph 준비·전용 RT 첫 그리기를 넣어 기록된 57.1 boss보다 약 **+8.8~9.0 ms** 늘었다. 두 번째 호출은 **0.002 ms**. 로딩 화면의 한 프레임 정지는 사용자 허용이고 5 s 최소 표시보다 작다. Play 57.2에서 관측한 `Loading.LockPersistentManager` 706~772 ms 대기는 별도 기존 이슈라 이 EditMode 수치에는 없다.
   🔴 에디터는 처음 쓰는 변형을 여기서 **동기 컴파일**한다 — 셰이더 캐시가 빈 첫 회만 0.6~10.3 s(실측). 10 s 면 그 회만 로딩이 5 s 를 넘겨 늘어난다. 빌드는 미리 컴파일돼 있다.
 - **로딩 흐름을 안 거치는 진입**(훅 없음 — 사용자 판단): 에디터에서 `4.MapScene`·`BossScene`·`MonsterScene`·`TrashMobScene`·`VFXScene`·`Debug/*`·`Art/*` 직접 Play(타깃 Load 이벤트 없음 → 예열 없음, 첫 예고가 콜드 비용). `Dev_Boot`(`DevSceneBooter`)는 타깃을 NGO 로 로드해 `HandleLoadStarted` 를 타므로 **예열은 돌지만** 로딩 화면이 없고(표시 시간 0) 부팅이 ~63 ms 늘어난다. `6.DemoConnectScene` 은 로비로 가서 정식 로딩 흐름을 탄다.
 
-예열 후 콜드 첫 호출 — 메뉴 `Tools/Enemy C3/Measure prewarm then first calls`(대조군 `… (control, no prewarm)`), 각각 **도메인 리로드 직후** 첫 실행. 57 원본 = `MainProject-WorkTree\57-shader\S5\prewarm.txt`·`control.txt`·`prewarm-summary.txt`. **57.1 원본 = `C:\UnityProject\_lane-artifacts\MainProject-Worktree4\57.1\`**(`prewarm.txt`·`control.txt` = 마지막 실행, `prewarm-run1~3.txt`·`control-run1~2.txt` = 실행별, `perf.txt`·`perf.tsv` = S5 메뉴 재측정, `summary.txt`). 측정 메뉴의 예열·대조군 산출물 폴더는 57.1 부터 `<_lane-artifacts>/<repo 폴더>/57.1/` 이다.
+예열 후 콜드 첫 호출 — 메뉴 `Tools/Enemy C3/Measure prewarm then first calls`(대조군 `… (control, no prewarm)`), 각각 **도메인 리로드 직후** 첫 실행. 57 원본 = `MainProject-WorkTree\57-shader\S5\prewarm.txt`·`control.txt`·`prewarm-summary.txt`. **57.1 원본 = `C:\UnityProject\_lane-artifacts\MainProject-Worktree4\57.1\`**. **57.3 원본 = 같은 레인의 `57.3\`**(`control/prewarm.txt`·`.tsv`, `implementation-report.md`). 57.3 측정 행은 빈 SO가 아니라 Resources 인덱스가 가리키는 실제 모델·클립 데이터다.
 
 | 경로(새 오브젝트 첫 호출) | 대조군(예열 없음) 57 / 57.1 | 57 예열 후 | **57.1 예열 후**(3회) | 1 ms 미만 |
 |---|---:|---:|---:|:---:|
@@ -271,15 +276,26 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | └ `BuildRenderers`(프로젝터 2개) | 0.55 / 0.22 ms⁷ | 0.87 ms | 0.19~0.20 ms | |
 | `BossPatternVisuals.Paint(CodeShape)` | 0.34 / 0.35 ms⁷ | 0.14 ms | 0.04~0.05 ms | ✅ |
 
+57.3 실제 드론 경로(2026-10-20, 각 열 별도 도메인 첫 실행):
+
+| 경로 | 예열 없음 | 57.3 예열 후 | 판정 |
+|---|---:|---:|:---:|
+| `ClientMark`(실제 데이터, `EnsureView`) | 2.3086 ms | **0.0914 ms** | ✅ |
+| `ClientLock`(실제 모델 풀, `EnsureView`) | 8.6267 ms | **0.1221 ms** | ✅ · 예열 뒤 Instantiate 0 |
+| 전체 클라 경로(Mark→Lock→낙하·클립→반납) | 4.3946 ms | **0.4306 ms** | ✅ |
+| 예열 자체 / 두 번째 호출 | — | **46.7752 / 0.0020 ms** | 1회 플래그 ✅ |
+| `Timing.boss` | — | **16.74 ms** | 실제 모델·graph·첫 그리기 포함 |
+
 7. 대조군에서 첫 행 뒤의 경로는 앞 경로가 JIT 한 공용 코드 위에서 잰 값(순서 효과)이라 순수 콜드가 아니다. 순수 콜드 기준은 위 S5 표(42.29 / 7.87 / 2.95 ms).
 - 57 과 57.1 측정은 다른 워크트리·다른 세션이다 — 대조군 `Show` 가 43.7 → 26~28 ms, 대조군 `EnsureBuilt` 가 1.9 → 0.6 ms 로 **머신 상태만으로도** 흔들렸다. 57.1 의 판정은 같은 세션의 대조군·예열 3회 기준이다.
 - `RuntimeHelpers.PrepareMethod` 로 보스 컴포넌트 메서드만 JIT 하는 안은 **Mono 에서 무동작**(53개 0.29 ms, `Show` 그대로 — `S5/experiment-preparemethod.txt`, 출하 안 함). 57.1 은 그래서 **실제 실행**으로 JIT 한다(c-2).
 - **`EnsureBuilt` 풀을 두지 않은 이유**: JIT 이 빠지자 `EnsureBuilt` 는 0.5 ms 안팎(오브젝트·`DecalProjector` 추가 ~0.15 ms + 재질 인스턴스 6개 ~0.3 ms)이고 `Show` 전체가 0.63~0.66 ms 로 기준 안에 들어왔다. 풀은 씬 언로드 생존(로딩 시작 씬 ≠ 타깃 씬)·보스 둘 이상·Alt+0·`ResetForPlay` 수명 관리를 새로 만들어야 해 이득(≈ 0.5 ms) 대비 위험이 크다. 🟧 단, 57 세션처럼 `EnsureBuilt` 가 2 ms 대로 나오는 머신 상태면 `Show` 가 1 ms 를 넘을 수 있다 — 그때의 다음 수단이 풀(또는 재질 인스턴스 공유)이다.
+- **드론 모델은 반대로 풀을 둔다(57.3)**: 57.2 Play에서 고정 다음 프레임에 `WellsDroneAttack.Update` JIT 2.0 ms + 첫 모델 그리기 `Loading.ReadObject` 3.1 ms가 실측됐고, 대조군 실제 모델 `ClientLock`도 8.6267 ms였다. 동시 최대 1·로컬 표현이라 작은 영속 풀 하나로 비용과 수명 위험을 모두 제한할 수 있다. NGO `INetworkPrefabInstanceHandler`를 쓰면 네트워크 오브젝트가 아닌 표현에 잘못된 수명/권한을 얹으므로 사용하지 않는다.
 
 **수용 기준(PLAN-57 §6 "첫 호출 각 1ms 미만")** — 57.1 예열 후, 경로별:
 - **충족(전부)**: 23호 돌진 `Show` 0.63~0.66 ms · 웰즈 드론 `ClientLock` 0.12~0.15 ms · 점프 `CreateJump` 0.40~0.47 ms · 방향 표식 `ApplyDecal` 0.11~0.12 ms · `Paint(CodeShape)` 0.04~0.05 ms.
-- **남는 비용**: 보스 오브젝트별 생성(`EnsureBuilt` ≈ 0.5 ms · `BuildRenderers` ≈ 0.2 ms · `EnsureView` ≈ 0.07 ms — 컴포넌트마다 1회, JIT 아님). 측정 밖: 23호가 첫 예고 때 `AddComponent<BossAttackConeTelegraph>` 하는 비용(`TwentyThreeBoss.AttackCone`), 실제 드론 데이터의 **드론 모델 `Instantiate`·애니 그래프**(첫 `ClientLock`·낙하 시작 — 측정 행은 빈 데이터), 폭발 `ClientImpact`(이펙트 풀), `BossDirectionIndicator` JIT(예열에 안 넣음 — 이미 1 ms 미만).
-- **GPU 첫 드로우는 측정 밖** — Windows 빌드 기본 API 는 D3D12 이고, D3D12/Vulkan/Metal 에서 SVC `WarmUp` 은 셰이더 프로그램까지만 준비한다. 파이프라인 상태(PSO: 렌더 상태·RT 포맷)는 첫 그리기에서 만든다(남는 비용). 완전 예열은 빌드에서 `GraphicsStateCollection` 트레이스 → WarmUp 이 필요하다(사용자 결정).
+- **남는 비용**: 보스 오브젝트별 생성(`EnsureBuilt` ≈ 0.5 ms · `BuildRenderers` ≈ 0.2 ms · `EnsureView` ≈ 0.08 ms — 컴포넌트마다 1회, JIT 아님). 측정 밖: 23호가 첫 예고 때 `AddComponent<BossAttackConeTelegraph>` 하는 비용, 폭발 `ClientImpact`(이미 이펙트 풀), `BossDirectionIndicator` JIT. 드론 모델 Instantiate와 graph 생성은 예열 뒤 첫 사용 0이다.
+- **GPU 첫 드로우** — 드론 mesh/material/texture는 전용 RT 첫 그리기와 `GL.Flush`까지 예열 안에서 수행한다. 다만 실제 GameView RT 포맷의 플랫폼별 D3D12 PSO가 같은지는 빌드 프로파일 확인 대상이다. 데칼은 여전히 SVC가 셰이더 프로그램까지만 준비하며 완전 예열은 빌드 `GraphicsStateCollection` 트레이스가 필요하다.
 - **데칼 변형 커버 확인의 한계**: 실제 렌더가 쓴 변형을 에디터에서 추적하지 못했다(`ShaderUtil.SaveCurrentShaderVariantCollection` 은 대화상자 필요, `GraphicsStateCollection` 트레이스는 EditMode 렌더에서 0개). DBuffer 커버는 렌더러 설정 + URP 키워드 규칙 근거이고(테스트 `DecalKeywords_MatchTheProjectRendererDecalSettings` 가 설정이 바뀌면 목록 갱신을 요구), ScreenSpace 대체 경로의 조명 키워드 조합(`_MAIN_LIGHT_SHADOWS*` 등)은 덮지 않는다(데스크톱 기본 경로 아님).
 
 예고 1회당 GC(예열 후) — C3 값 넣기 경로(Rebuild*·`ApplyFill`·`PaintPlate`·`PaintLockCircle`·`ClientLock`·`ApplyDecal`·`Paint(CodeShape)`)는 **0 B**, 0 이 아닌 곳은 위 주 2·4·6(C3 와 무관한 기존 흐름·오브젝트 생성). 예전 CPU 굽기 대비 예열 후 `PaintPlate("14")` 는 약 30만 배, 합집합 외곽선은 약 7만 배 싸다(에디터 기준). 사용자 프로파일 수치(4,237ms Deep / 181ms)는 빌드·Play 환경이라 직접 비교 대상이 아니다 — Play 프로파일 재확인은 §9.11.
@@ -290,7 +306,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 |---|---|
 | `EnemyC3RuntimeTextureGuardTests`(6) | `Monster/**`·`Rendering/Telegraph/**` 의 Editor 밖 `.cs` 에서 Texture2D 생성·`SetPixel(s/s32/Data)`·`Sprite.Create` 금지(위반 파일:줄·메서드 출력). **예외 목록 0**(S4c2 확정) — 다시 넣으려면 사용자 결정, `NoRuntimeExceptions` 가 막는다. 할 일 57 R: 작은 렉서로 주석·문자열(일반·verbatim·보간 — 구멍은 코드)·문자 리터럴을 지운 뒤 **파일 전체**를 검사 → `UnityEngine.`/`global::` 정규화 이름·`using` 별칭·Texture2D 로 선언된 변수·필드·프로퍼티·반환의 target-typed `new()`·줄바꿈 생성식·닫힌 블록 주석 뒤 코드·`using static` Sprite 도 잡고, 문자열 속 금지어는 무시(`ScannerCatchesBypasses` 자기검사). 알려진 한계: 의미 분석이 없어 인자 위치의 target-typed `new()`(`Foo(new(1,1))`)는 못 본다(Roslyn 은 에디터 참조 불확실로 미사용) |
 | `EnemyC3TelegraphInstanceTests`(6) | 예열 후 `Show`(합집합·띠·부채꼴·잡기 ×20 + 진행 단계)·`PaintPlate/PaintActive/Paint(CodeShape)` ×20·`CreateJump` ×10(+파괴)·`ApplySmash` ×20 을 되풀이해도 재질·Texture2D·Sprite 인스턴스 수가 늘지 않는다. 타이밍 단언은 넣지 않는다(머신마다 흔들림 — 시간은 §9.4 메뉴로). 할 일 57 R: 공격 예고 6조각이 예고 재질(`MA_TelegraphDecal`, 그리고 `MaterialOverride` 경로)의 renderQueue(+조각 순서)·`_DrawOrder`·Normal_Blend·각도 페이드·메시 바이어스를 물려받는지 |
-| `EnemyC3PrewarmTests`(8) | 할 일 57 R 예열: `Prewarm` 이 런타임 Texture2D 를 만들지 않고, 더미(오브젝트·재질 인스턴스·코드 SVC)가 남지 않으며(새 재질·메시는 `BossPatternVisuals` 공유 캐시 1개씩까지), 두 번째 호출은 무동작(오브젝트·재질·메시·텍스처 수 그대로), `ResetForPlay` 뒤 다시 돈다 · 데이터 캐시(MPB ≥ 10·JSON·스매시 sprite)가 찬다 · 목록의 셰이더 변형 6개가 전부 존재 · 데칼 키워드가 `PC_Renderer` 데칼 설정과 맞다 · 로딩 흐름 `HandleLoadStarted` 에 호출이 정확히 1개. 할 일 57.1: `Prewarm_BossComponents_LeaveNothingBehind` — 보스 컴포넌트 단계가 돌았고(`Timing.boss` > 0) 임시 `BossAttackConeTelegraph`·`WellsDroneAttack`·`DecalProjector`·빈 `WellsDroneDataSO`·`WellsDroneView` 루트가 남지 않으며 재무장 뒤에도 프로젝터·재질 수 그대로 · `Prewarm_ThenNewTelegraph_BuildsTheSameProjectorSet` — 예열 뒤 새 예고도 프로젝터 6개·조각별 재질 인스턴스 6개·renderQueue(예고 재질 + 외곽선 1)·`_DrawOrder` 그대로(풀 없음). 타이밍 단언 없음 |
+| `EnemyC3PrewarmTests`(10) | 기존 8건 + 57.3: 실제 데이터 예열 뒤 비활성 풀 1기·live graph 1, 첫 사용 Instantiate 0, 같은 인스턴스/Animator/graph 재사용, 반복 Lock/Cancel/Impact 뒤 수 불변, Collider off·Rigidbody kinematic/충돌 off, 두 번째 호출 무동작, `ResetForPlay`가 이전 풀을 지우고 다시 1기 생성. 임시 `BossAttackConeTelegraph`·`WellsDroneAttack`·`DecalProjector`·`WellsDroneView`는 여전히 0. 타이밍 단언 없음 |
 
 ### 9.6 픽셀 비교 테스트 (예전 CPU 그림 vs 셰이더, 384² RT, 기준 = 채널 오차 ≤ 2/255 픽셀 99% 이상)
 
@@ -343,11 +359,14 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | R 예열 문서 | `d5c17938` | §9.4 예열·수용 기준, §9.5·§9.9~§9.11, `scene-flow-audit.md` 한 줄 |
 | 57.1 | `3ff61ba1` | 보스 예고 컴포넌트(23호 `Show`·드론 `ClientLock`) 로딩 예열(`EnemyC3Prewarm.WarmBossComponents`)·`WellsDroneAttack.ViewRoot`·`Timing.boss`, 측정 산출물 `57.1/`, 테스트 2개 |
 | 57.1 문서 | 메시지 `할 일 57.1 — 문서` | §9.4 예열 표·수용 기준·풀 판단, §9.5·§9.9~§9.11 |
+| 57.3 | `ddc0ee61` | 실제 데이터 Resources 인덱스·로컬 드론 풀(1기)·Animator/PlayableGraph 재사용·전용 RT 첫 그리기·Reset 수명·결정적 테스트 2개·57.3 측정 메뉴 |
+| 57.3 문서 | 이 문서 후속 커밋 | §9.4 실측/풀 판단·§9.5·§9.9~§9.11·외부 `57.3/implementation-report.md` |
 
 ### 9.10 되돌리기
 
 - 🔴 **Unity 를 닫고** 한다(여러 에셋·셰이더 그래프·`.meta` 를 한 번에 다시 쓴다 — `CLAUDE.md` 6번). 끝나면 `.meta` guid 가 그대로인지 확인.
 - 57.1(보스 컴포넌트 예열)만 빼려면 `할 일 57.1 — 문서` → `3ff61ba1` 순으로 revert — 첫 23호 돌진·드론 고정이 위 "57 예열 후" 열로 돌아간다(`.cs`·문서만).
+- 57.3만 빼려면 **57.3 문서 커밋 → `ddc0ee61`** 순으로 revert 한다. 그러면 드론 모델은 다시 공격마다 Instantiate/Destroy되고 57.1의 빈 데이터 보스 예열로 돌아간다. 새 Resources 인덱스·풀 스크립트와 `.meta`도 기능 커밋에서 함께 빠진다. 기존 아트·정본 `WellsDroneData.asset`의 GUID는 건드리지 않는다.
 - 예열만 빼려면 57.1 두 개 → R 예열 문서(`d5c17938`) → `f0c69867` 순으로 revert 하면 된다(셰이더 경로는 그대로, 첫 예고가 §9.4 S5 표의 콜드 비용으로 돌아간다). 에셋·`.meta` 변경이 없어 Unity 를 켠 채로 해도 된다(`.cs` 만).
 - **커밋 단위로, 최신부터 역순**: R 예열 문서 → `f0c69867` → R 문서 `a72f310e` → `1844dd71` → `c037f68a` → S5 `2663e6a0` → `d83f9817` → `bad1edea` → `298f8991` → `11c0fa1e` → `e7f92c18` → `f01990a7` → `dff34d8b`. 각 단계 뒤 컴파일 0 에러가 정상이다.
   - 가운데 하나만 revert 하면 충돌하거나 컴파일이 깨진다(예: S4b 가 Bake 를 Editor 로 옮겼고 S4a·S4c 테스트가 그 위에 있다).
@@ -374,4 +393,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 - [ ] R 예열: 판 재시작(Alt+0)·두 번째 판에서 예열 로그가 다시 안 찍히는지(Play 당 1회), Play 재시작 뒤엔 다시 1회
 - [ ] R 예열(57.1): 프로파일러로 23호 돌진 첫 예고(에디터 측정 0.63~0.66 ms — `EnsureBuilt` 만 남음)·웰즈 드론 첫 고정(0.12~0.15 ms, 단 실제 드론 모델 `Instantiate` 는 측정 밖)·점프 첫 예고 프레임 — 대조는 §9.4 예열 표
 - [ ] 57.1: 예열 로그 `[Enemy C3] Prewarm … boss …` 의 boss 값(에디터 ≈ 8 ms)과 로딩 완료 시각이 예전과 같은지, 로딩 중 하이어라키·콘솔에 `WellsDroneView`·`AttackConeTelegraph` 잔여·경고가 없는지
+- [ ] 57.3: 로딩 로그 boss가 에디터 측정 **≈16.7 ms** 크기인지, 풀 루트에 비활성 `WellsDrone (Pooled)` **1기**만 있고 Collider/물리 참여·`WellsDroneView`/임시 보스 컴포넌트 잔여가 없는지
+- [ ] 57.3: 첫 표식·첫 고정 다음 프레임에서 57.2의 `WellsDroneAttack.Update` JIT 2.0 ms와 `Loading.ReadObject` 3.1 ms가 사라지는지, 공격 반복·보스 사망/디스폰·Alt+0·두 번째 판에서 같은 1기를 재사용하는지
+- [ ] 57.3: Play 종료→재진입(도메인 리로드 끔 포함) 뒤 이전 풀/graph 파괴 참조가 없고 새 로딩에서 다시 1회 예열되는지; MPPM 호스트·클라 각각 자기 로컬 1기인지
 - [ ] R 예열(빌드, D3D12): 첫 데칼·판이 그려지는 프레임의 GPU/렌더 스레드 히치(PSO 생성 — SVC 로 못 덮는 부분)
