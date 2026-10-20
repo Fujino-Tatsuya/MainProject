@@ -103,9 +103,10 @@ public class AoeTelegraph : MonoBehaviour
     }
 
     /// <summary>
-    /// 데칼 모양을 <b>코드로 생성한 텍스처</b>로 넣는다(원형 디스크 + 부드러운 테두리).
+    /// 데칼 모양을 넣는다 — 아트 텍스처(shapeTexture)가 있으면 그것, 없으면 <b>셰이더 원판</b>(원형 디스크 + 부드러운 테두리,
+    /// 할 일 57 S4c1 — 예전엔 코드로 텍스처를 구웠다).
     ///
-    /// 🔴 텍스처를 아트로 받지 않는 이유 — 아크·원은 수식으로 정확히 나오고, 각도·반경이 런타임
+    /// 🔴 원판을 아트로 받지 않는 이유 — 아크·원은 수식으로 정확히 나오고, 각도·반경이 런타임
     ///    값(SO)이라 이미지로 고정하면 저작이 코드와 갈린다. 아트 의존을 만들지 않는 쪽을 골랐다.
     /// ⚠️ 재질은 <b>인스턴스</b>로 복제해서 만진다. `DecalProjector.material` 은 프리팹이 물고 있는
     ///    애셋이므로 그대로 쓰면 애셋이 오염된다(메시 경로의 sharedMaterial 주의와 같은 함정).
@@ -114,36 +115,74 @@ public class AoeTelegraph : MonoBehaviour
     {
         if (_decal == null || _decal.material == null) return;
 
-        // 아트가 준 모양이 있으면 그걸 쓰고, 없으면 예전처럼 코드로 굽는다.
+        // 아트가 준 모양이 없으면 원판을 **셰이더로** 그린다(할 일 57 S4c1 — 예전엔 128² 텍스처를 코드로 구웠다).
         // 🔴 아트 텍스처는 **복제하지 않는다** — 애셋을 그대로 참조하므로 Destroy 대상이 아니다.
-        //    코드 생성분만 인스턴스 소유이고 OnDestroy 에서 지운다(_discTexture 만).
-        Texture2D shape = shapeTexture;
-        if (shape == null)
+        if (shapeTexture == null)
         {
-            if (_discTexture == null) _discTexture = BuildDiscTexture(decalColor, 128, fillAlpha, rimWidth);
-            shape = _discTexture;
+            if (!ApplyDiscShader()) _decal.enabled = false;   // 그릴 모양이 없다 — 빈 Base_Map(흰 사각)을 칠하지 않는다
+            return;
         }
 
         _decal.material = _ownedMaterial = new Material(_decal.material);   // 한 번만(_decalSearched) — OnDestroy 에서 정리
         bool hasBaseMap = _decal.material.HasProperty(BaseMapId);
         if (hasBaseMap)
-            _decal.material.SetTexture(BaseMapId, shape);
+            _decal.material.SetTexture(BaseMapId, shapeTexture);
 
         // 아트 텍스처는 대개 흰 그림이라 색이 안 들어간다 — decalColor 의 **RGB만** 틴트로 얹는다.
         // 🔴 알파는 1 로 고정한다. 투명도는 `SetAlpha` 가 프로젝터의 fadeFactor 로 따로 정하는데
         //    (점프 예고가 두 겹을 0.4 / 0.85 로 쓴다), 여기서 decalColor.a(0.35)까지 곱하면
         //    0.35 × 0.85 ≈ 0.3 으로 눌려 두 겹의 대비가 사라진다.
-        //    코드 생성 경로는 픽셀에 알파가 이미 구워져 있어 이 줄을 타지 않는다.
-        if (shapeTexture != null && _decal.material.HasProperty(BaseColorId))
+        if (_decal.material.HasProperty(BaseColorId))
             _decal.material.SetColor(BaseColorId, new Color(decalColor.r, decalColor.g, decalColor.b, 1f));
+        _styleable = _decal.material.HasProperty(BaseColorId) && _decal.material.HasProperty(MaskTexId);
 
         // 🔴 침묵은 성공이 아니다. 데칼은 안 보일 때 예외도 경고도 없이 그냥 안 그려지므로,
         //    "이 경로가 돌았고 무엇으로 그리는지"를 한 번 남긴다(인스턴스당 1회).
         Debug.Log($"[AoeTelegraph/데칼] {name} 초기화 — 재질 '{_decal.material.shader?.name}' · " +
-                  $"모양 {(shapeTexture != null ? $"아트 '{shapeTexture.name}'" : "코드 생성 원판")} · " +
+                  $"모양 아트 '{shapeTexture.name}' · " +
                   $"Base_Map {(hasBaseMap ? "설정" : "🔴프로퍼티 없음")} · " +
                   $"mask 0x{(uint)_decal.renderingLayerMask:X} · 깊이 {projectionDepth}m", this);
     }
+
+    /// <summary>
+    /// 코드 원판(할 일 57 S4c1) — 예전 <c>BuildDiscTexture(decalColor, 128, fillAlpha, rimWidth)</c> 텍스처를 프리팹 재질의
+    /// Base_Map 에 넣던 것과 같은 그림을 C3 데칼 셰이더(원판 채움 모드)로 그린다. 텍스처를 만들지 않는다.
+    /// 재질은 C3 데칼 인스턴스로 갈아끼우되 그리기 순서·데칼 설정은 프리팹 재질에서 복사한다(<see cref="EnemyC3Visuals.NewDecalInstance"/>).
+    /// 예전엔 색이 텍스처에 구워졌다(decalColor) — 지금은 그 색을 _BaseColor 로 곱한다.
+    /// 프리팹 재질이 이미 예고 셰이더(_BaseColor·_MaskTex)였다면 그 색·마스크가 텍스처 위에 한 번 더 곱해졌으므로 그대로 옮긴다.
+    /// 예전 원본 식은 에디터 전용 LegacyDecalTextureReference.BuildDiscTexture(픽셀 비교 기준).
+    /// </summary>
+    bool ApplyDiscShader()
+    {
+        Material source = _decal.material;
+        _styleable = source.HasProperty(BaseColorId) && source.HasProperty(MaskTexId);
+        Color tint = _styleable ? source.GetColor(BaseColorId) : Color.white;
+
+        Material m = EnemyC3Visuals.NewDecalInstance(source, decalColor * tint);
+        if (m == null)
+        {
+            Debug.LogError($"{name}: C3 데칼 재질(Resources/Telegraph/MA_EnemyC3Decal)이 없다 — 장판 원판을 그릴 수 없다.", this);
+            return false;
+        }
+        if (_styleable)
+        {
+            m.SetTexture(MaskTexId, source.GetTexture(MaskTexId));
+            foreach (int id in new[] { MaskParamsId, MaskOriginId, MaskAxesId, MaskExtentId })
+                if (source.HasProperty(id)) m.SetVector(id, source.GetVector(id));
+        }
+        EnemyC3Visuals.SetDiscFill(m, fillAlpha, rimWidth);
+        _decal.material = _ownedMaterial = m;   // 한 번만(_decalSearched) — OnDestroy 에서 정리
+        _discShader = true;
+
+        Debug.Log($"[AoeTelegraph/데칼] {name} 초기화 — 재질 '{m.shader?.name}' · 모양 셰이더 원판(fill {fillAlpha:0.##} · rim {rimWidth:0.##}) · " +
+                  $"mask 0x{(uint)_decal.renderingLayerMask:X} · 깊이 {projectionDepth}m", this);
+        return true;
+    }
+
+    // 프리팹 재질이 예고 셰이더(_BaseColor·_MaskTex)였는가 — ApplyStyle 이 먹는 조건(재질을 C3 로 갈아끼운 뒤에도 예전과 같게).
+    bool _styleable;
+    // 코드 원판을 C3 셰이더로 그리는 중 — 예전 텍스처에 구워졌던 decalColor 를 스타일 색에 곱해야 한다.
+    bool _discShader;
 
     [SerializeField]
     [Tooltip("데칼 모드에서 생성할 디스크 색(알파 포함). 메시 경로는 재질의 _BaseColor 를 쓴다.\n" +
@@ -161,73 +200,27 @@ public class AoeTelegraph : MonoBehaviour
              "0 이면 예전처럼 균일하게 채운 원판이다.")]
     float rimWidth = 0.12f;
 
-    // 🔴 색은 여기서 **픽셀에 굽는다** — URP 데칼 셰이더는 패키지 소유(`Decal.shadergraph`)이고
-    //    노출 프로퍼티가 `Base Map`·`Normal Map`·`Normal Blend` 3개뿐이라 **색 프로퍼티가 아예 없다.**
-    //    그래서 shapeTexture(아트 그림)를 물리면 그 그림의 색이 그대로 나온다 — 흰 그림은 흰색이다.
-    //    셰이더를 포크해 `_BaseColor` 를 만들면 ApplyDecalShape 가 이미 그걸 세팅하므로 코드 변경 없이
-    //    아트 텍스처도 틴트된다(decisions #11 과 같은 뿌리 — 데칼은 색을 텍스처로 받는다).
+    // 🔴 바닥 전용 데칼 셰이더(`SG_DecalFloorOnly`)는 노출 프로퍼티가 `Base Map`·`Normal Map`·`Normal Blend` 뿐이라
+    //    **색 프로퍼티가 없다.** 그래서 shapeTexture(아트 그림)를 물리면 그 그림의 색이 그대로 나온다 — 흰 그림은 흰색이다.
+    //    `_BaseColor` 가 있는 재질이면 ApplyDecalShape 가 이미 그걸 세팅하므로 코드 변경 없이 아트 텍스처도 틴트된다.
+    //    코드 원판은 할 일 57 S4c1 부터 C3 데칼 셰이더가 그리고 decalColor 를 _BaseColor 로 받는다(ApplyDiscShader).
 
     [SerializeField]
-    [Tooltip("데칼 모양 텍스처(선택). 비우면 지금처럼 코드가 모양을 굽는다.\n" +
+    [Tooltip("데칼 모양 텍스처(선택). 비우면 C3 데칼 셰이더가 원판을 그린다(텍스처를 만들지 않는다).\n" +
              "🔴 넣으면 그 그림이 그대로 장판이 된다 — 링·테두리처럼 수식으로 만들기 번거로운 모양을 " +
              "아트에서 받을 때 쓴다(예: VFX/Textures/ring06.png = GauntletBot 스매시 장판과 같은 그림).\n" +
              "⚠️ 아크(각도) 예고는 각도가 런타임 값이라 이미지로 고정할 수 없다 — 그건 비워 둘 것.")]
     Texture2D shapeTexture;
 
-    Texture2D _discTexture;
     static readonly int BaseMapId = Shader.PropertyToID("Base_Map");
 
-    // 지름이 텍스처 폭에 꽉 차는 디스크. 테두리 1px 은 알파를 부드럽게 떨어뜨려 계단을 없앤다.
-    /// <summary>
-    /// 장판 텍스처를 굽는다 — <b>채워진 면 + 또렷한 테두리</b>.
-    ///
-    /// 🔴 채움이 핵심이다. 외곽선만 그리면 ① 공격 범위로 안 읽히고 ② 점프 예고의 점증 레이어가
-    ///    "면이 차오른다"가 아니라 "테두리가 밖으로 밀려난다"로 보인다(2026-09-09 팀장 판정).
-    /// </summary>
-    static Texture2D BuildDiscTexture(Color color, int size, float fill, float rim)
-    {
-        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
-        {
-            name = "AoeDecalDisc",
-            wrapMode = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Bilinear,
-        };
-
-        // 바깥 경계를 부드럽게 떨어뜨릴 폭(정규화 반경 기준) — 계단 제거용.
-        float feather = 1f / (size * 0.05f);
-        float rimW = Mathf.Clamp(rim, 0f, 0.5f);
-        float fillA = Mathf.Clamp01(fill);
-
-        float half = size * 0.5f;
-        var pixels = new Color32[size * size];
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float dx = (x + 0.5f) - half;
-                float dy = (y + 0.5f) - half;
-                float d = Mathf.Sqrt(dx * dx + dy * dy) / half;   // 0 = 중심, 1 = 테두리
-
-                // 내부는 fillA 로 균일하게 채우고, 테두리 밴드로 갈수록 1 까지 올린다.
-                float rimA = rimW > 0f ? Mathf.Clamp01((d - (1f - rimW)) / rimW) : 0f;
-                float a = Mathf.Max(fillA, rimA);
-
-                // 바깥으로 나가는 순간은 페더로 끊는다.
-                a *= Mathf.Clamp01((1f - d) / feather);
-
-                pixels[y * size + x] = new Color(color.r, color.g, color.b, color.a * a);
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply(false, false);
-        return tex;
-    }
+    // 🔴 원판은 채움이 핵심이다. 외곽선만 그리면 ① 공격 범위로 안 읽히고 ② 점프 예고의 점증 레이어가
+    //    "면이 차오른다"가 아니라 "테두리가 밖으로 밀려난다"로 보인다(2026-09-09 팀장 판정).
+    //    그림 = 채움 fillAlpha + 테두리 rimWidth 밴드에서 1 까지 + 바깥 페더 — EnemyC3Decal.hlsl 원판 모드(6).
 
     // 🔴 복제한 재질도 정리한다(10-13 이전엔 새고 있었다 — Codex 지적).
     void OnDestroy()
     {
-        if (_discTexture != null) Destroy(_discTexture);
         if (_ownedMaterial != null) Destroy(_ownedMaterial);
     }
 
@@ -248,9 +241,10 @@ public class AoeTelegraph : MonoBehaviour
     {
         if (layer == null || !TryDecal(out DecalProjector d) || d.material == null) return;
         Material m = d.material;
-        if (!m.HasProperty(BaseColorId) || !m.HasProperty(MaskTexId)) return;
+        if (!_styleable || !m.HasProperty(BaseColorId) || !m.HasProperty(MaskTexId)) return;
 
-        m.SetColor(BaseColorId, layer.color);
+        // 코드 원판(C3 셰이더)은 예전 텍스처에 구워졌던 decalColor 를 스타일 색에 곱한다 — 예전 "텍스처 × _BaseColor" 와 같은 결과.
+        m.SetColor(BaseColorId, _discShader ? layer.color * decalColor : layer.color);
         TelegraphMask mask = layer.mask;
         bool on = mask != null && mask.Active;
         m.SetTexture(MaskTexId, on ? mask.texture : Texture2D.whiteTexture);
