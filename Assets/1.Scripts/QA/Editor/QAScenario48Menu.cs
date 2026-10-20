@@ -24,6 +24,9 @@ public static class QAScenario48Menu
     [MenuItem(Root + "Run MPPM Batch 2 (M2·M3·M8)", priority = 3)]
     public static void RunMppm2() => Run("M2,M3,M8", 3);
 
+    [MenuItem(Root + "Run MPPM Batch 2b (M3·M8)", priority = 3)]
+    public static void RunMppm2b() => Run("M3,M8", 3);
+
     [MenuItem(Root + "Run MPPM Batch 3 (M5·M6·M7)", priority = 4)]
     public static void RunMppm3() => Run("M5,M6,M7", 3);
 
