@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 
 /// <summary>
-/// "나를 노리는 몬스터" 주황 외곽선(할 일 58 후속 3) — 서버 복제 값 규칙(상태별 대상 id),
+/// "나를 노리는 몬스터" 회색 외곽선(할 일 58 후속 3) — 서버 복제 값 규칙(상태별 대상 id),
 /// 클라 판정(나 · 살아 있음), 고르기(빨강 우선 · 합집합 · 상한 · 가까운 순 · 사망 제외).
 /// </summary>
 public sealed class AggroOutlineTests
@@ -187,9 +187,9 @@ public sealed class AggroOutlineTests
     }
 
     [Test]
-    public void 합집합_빨강과_주황은_겹치지_않는다()
+    public void 합집합_빨강과_나를노림은_겹치지_않는다()
     {
-        // 빨강 세트(호버 h + 범위 r1) ∪ 주황 세트 = 전체, 교집합 없음.
+        // 빨강 세트(호버 h + 범위 r1) ∪ 나를 노림 세트 = 전체, 교집합 없음.
         Target h = new Target("h"), r1 = new Target("r1"), a1 = new Target("a1"), a2 = new Target("a2");
         var primary = new List<Target> { r1 };
         var result = new List<Target>();
@@ -204,7 +204,7 @@ public sealed class AggroOutlineTests
     // ── 스킬 인디케이터 켜짐(할 일 58 후속 4) ──
 
     [Test]
-    public void 인디케이터_켜짐이면_주황_0_빨강은_그대로()
+    public void 인디케이터_켜짐이면_나를노림_0_빨강은_그대로()
     {
         Target h = new Target("h"), r1 = new Target("r1"), a1 = new Target("a1");
         var primary = new List<Target> { r1 };
@@ -218,7 +218,7 @@ public sealed class AggroOutlineTests
     }
 
     [Test]
-    public void 인디케이터_꺼지면_주황_복귀()
+    public void 인디케이터_꺼지면_나를노림_복귀()
     {
         Target a1 = new Target("a1"), a2 = new Target("a2");
         var result = new List<Target>();
@@ -232,7 +232,7 @@ public sealed class AggroOutlineTests
     }
 
     [Test]
-    public void 범위_대상_0이어도_인디케이터_켜짐이면_주황_0()
+    public void 범위_대상_0이어도_인디케이터_켜짐이면_나를노림_0()
     {
         Target a1 = new Target("a1");
         var result = new List<Target>();
@@ -261,6 +261,6 @@ public sealed class AggroOutlineTests
         var stamp = new MonsterAggroTargetRule.FrameStamp();
         stamp.Mark(5);
         stamp.Clear();
-        Assert.IsFalse(stamp.IsSet(5), "시전·취소 프레임에 바로 주황 복귀");
+        Assert.IsFalse(stamp.IsSet(5), "시전·취소 프레임에 바로 나를 노림 복귀");
     }
 }

@@ -1446,8 +1446,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerEnemyHoverOutline
   outlineColor: {r: 1, g: 0.08, b: 0.08, a: 1}
-  aggroOutlineColor: {r: 1, g: 0.55, b: 0.1, a: 1}
-  outlineWidthPixels: 3
+  aggroOutlineColor: {r: 0.22, g: 0.22, b: 0.22, a: 1}
+  outlineWidthPixels: 1
   skillRangeMaxTargets: 16
   aggroMaxTargets: 8
 --- !u!1 &8896633917232358439

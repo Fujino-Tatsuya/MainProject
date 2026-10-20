@@ -13,7 +13,7 @@ using UnityEngine.InputSystem;
 /// <item><b>스킬 범위</b>(빨강) — 범위 표시가 떠 있는 동안 그 스킬이 실제로 맞힐 영역 안의 적. 표시를 그리는 쪽이 매 프레임
 ///   서버 판정과 같은 <see cref="SkillHitVolume"/> 을 <see cref="ReportSkillHitArea"/> 로 넘기고, 여기서 NonAlloc 겹침 1회로 고른다.
 ///   보고가 끊긴 프레임(시전·취소)에 바로 꺼진다. 상한 초과는 가까운 순(<see cref="SkillRangeOutlineSelection"/>).</item>
-/// <item><b>나를 노림</b>(주황) — 서버가 복제한 <see cref="MonsterBase.AggroTargetId"/> 가 내 NetworkObjectId 인 살아 있는 몬스터.
+/// <item><b>나를 노림</b>(어두운 회색) — 서버가 복제한 <see cref="MonsterBase.AggroTargetId"/> 가 내 NetworkObjectId 인 살아 있는 몬스터.
 ///   빨강 세트에 든 몬스터는 빠진다(빨강 우선). 상한 초과는 가까운 순(<see cref="MonsterAggroTargetRule"/>).
 ///   스킬 인디케이터가 떠 있는 동안(<see cref="ReportSkillIndicatorActive"/>)은 전부 꺼진다.</item>
 /// </list>
@@ -33,12 +33,12 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
     Color outlineColor = new Color(1f, 0.08f, 0.08f, 1f);
 
     [SerializeField]
-    [Tooltip("나를 추적·공격 중인 몬스터 외곽선 색(주황). 빨강 대상이면 빨강이 이긴다.")]
-    Color aggroOutlineColor = new Color(1f, 0.55f, 0.1f, 1f);
+    [Tooltip("나를 추적·공격 중인 몬스터 외곽선 색(어두운 회색 — 거의 티 안 나게). 빨강 대상이면 빨강이 이긴다.")]
+    Color aggroOutlineColor = new Color(0.22f, 0.22f, 0.22f, 1f);
 
     [SerializeField, Range(EnemyOutlineDrawList.MinWidthPixels, EnemyOutlineDrawList.MaxWidthPixels)]
     [Tooltip("외곽선 굵기(화면 픽셀). 해상도·거리와 무관하게 같은 픽셀 수.")]
-    int outlineWidthPixels = 3;
+    int outlineWidthPixels = 1;
 
     [Header("스킬 범위 외곽선")]
     [SerializeField, Min(1)]
@@ -88,7 +88,7 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
     /// <summary>지금 스킬 범위 외곽선을 그리는 적들(호버 대상 제외, 가까운 순).</summary>
     public IReadOnlyList<Unit> SkillRangeTargets => rangeTargets;
 
-    /// <summary>지금 "나를 노림" 주황 외곽선을 그리는 몬스터들(빨강 대상 제외, 가까운 순).</summary>
+    /// <summary>지금 "나를 노림" 회색 외곽선을 그리는 몬스터들(빨강 대상 제외, 가까운 순).</summary>
     public IReadOnlyList<Unit> AggroTargets => aggroTargets;
 
     /// <summary>이번 프레임 스킬 인디케이터(범위 표시·조준)가 떠 있다고 보고됐는가.</summary>
@@ -122,11 +122,11 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
 
     /// <summary>
     /// [오너 로컬] 이번 프레임 스킬 인디케이터(범위 표시·조준)가 떠 있다 — 맞을 대상 보고가 없는 조준도 부른다.
-    /// 부른 프레임엔 주황(나를 노림)을 끈다. 안 부른 프레임엔 자동 해제. <see cref="ReportSkillHitArea"/> 는 이것도 겸한다.
+    /// 부른 프레임엔 나를 노림(회색)을 끈다. 안 부른 프레임엔 자동 해제. <see cref="ReportSkillHitArea"/> 는 이것도 겸한다.
     /// </summary>
     public void ReportSkillIndicatorActive() => skillIndicator.Mark(Time.frameCount);
 
-    /// <summary>[오너 로컬] 표시가 이번 프레임에 꺼졌다(시전·취소) — 같은 프레임의 보고도 버린다(주황은 이 프레임에 복귀).</summary>
+    /// <summary>[오너 로컬] 표시가 이번 프레임에 꺼졌다(시전·취소) — 같은 프레임의 보고도 버린다(나를 노림은 이 프레임에 복귀).</summary>
     public void ClearSkillHitArea()
     {
         areaFrame = -1;
@@ -272,7 +272,7 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
                 Acquire(aggroTargets[i], EnemyOutlineDrawList.AggroColorIndex);
     }
 
-    // -1 = 세트 밖. 빨강(호버·범위) > 주황(나를 노림).
+    // -1 = 세트 밖. 빨강(호버·범위) > 회색(나를 노림).
     int DesiredColor(Unit unit, Unit hovered)
     {
         if (unit == null)

@@ -147,7 +147,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         SetCursorState(SkillCursorState.Targeting);
-        // 진입 프레임부터 주황(나를 노림) 외곽선을 끈다 — 조준 Update 가 이 프레임에 이미 지나갔을 수 있다.
+        // 진입 프레임부터 나를 노림(회색) 외곽선을 끈다 — 조준 Update 가 이 프레임에 이미 지나갔을 수 있다.
         hoverOutline?.ReportSkillIndicatorActive();
 
         aimSessionActive = true;
@@ -246,7 +246,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         if (!isTargeting)
             return;
 
-        // 조준 중(모든 조준 모드, 맞을 대상 보고 유무와 무관)엔 주황 외곽선을 끈다. 확정·취소는 ExitStandby 가 같은 프레임에 푼다.
+        // 조준 중(모든 조준 모드, 맞을 대상 보고 유무와 무관)엔 나를 노림(회색) 외곽선을 끈다. 확정·취소는 ExitStandby 가 같은 프레임에 푼다.
         hoverOutline?.ReportSkillIndicatorActive();
 
         // 진입한 프레임의 입력(스킬키 press 등)이 취소/확정으로 오인되지 않도록 한 프레임 건너뛴다

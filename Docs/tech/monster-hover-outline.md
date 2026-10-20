@@ -1,8 +1,8 @@
-# 몬스터 외곽선 — 호버·스킬 범위(빨강) / 나를 노림(주황) (할 일 58)
+# 몬스터 외곽선 — 호버·스킬 범위(빨강) / 나를 노림(어두운 회색) (할 일 58)
 
 내 마우스 커서 아래 적 한 마리와, 스킬 범위 표시가 떠 있는 동안 그 스킬에 맞을 적들(아래 "스킬 범위 외곽선")에 **빨간** 외곽선,
-나(로컬 플레이어)를 추적·공격 중인 몬스터에 **주황** 외곽선을 그린다. **표시만, 오너 로컬 전용** — 판정·서버 권한 변경 없음
-(주황 판정용으로 몬스터 대상 id 복제 값 하나만 추가, 아래 "나를 노리는 몬스터").
+나(로컬 플레이어)를 추적·공격 중인 몬스터에 **어두운 회색**(거의 티 안 나게) 외곽선을 그린다. **표시만, 오너 로컬 전용** — 판정·서버 권한 변경 없음
+(나를 노림 판정용으로 몬스터 대상 id 복제 값 하나만 추가, 아래 "나를 노리는 몬스터").
 외곽선은 **화면 공간 마스크** 방식이다 — 대상 렌더러만 마스크 RT 에 그리고, 마스크를 N px 넓힌 것 − 원래 마스크 = 바깥 윤곽만 칠한다.
 
 ## 구성
@@ -33,7 +33,7 @@
 | 단계 | 내용 |
 |---|---|
 | 데이터 | `PlayerEnemyHoverOutline.LateUpdate` 가 매 프레임 `EnemyOutlineDrawList.Begin(색, 색, 두께)` + 대상 렌더러마다 `Add(렌더러, 색 인덱스)`. 꺼진 렌더러(`enabled=false`·`forceRenderingOff`·비활성)는 넣지 않는다. 목록이 비면 피처는 패스를 아예 넣지 않는다. |
-| 마스크 패스 `EnemyOutline Mask` | 풀해상도 `R16G16B16A16_SFloat` 컬러 + 32bit 전용 깊이(매 프레임 클리어, MSAA 1, Point). 대상 렌더러를 `DrawRenderer(렌더러, 마스크 머티리얼, 서브메시 i)` 로 **서브메시 전부** 다시 그린다. 출력 R=1, G=색 인덱스(0 빨강/1 주황 — 머티리얼 2개), B=eye 깊이(m), ZWrite On·LEqual 로 대상끼리 앞뒤를 가린다. |
+| 마스크 패스 `EnemyOutline Mask` | 풀해상도 `R16G16B16A16_SFloat` 컬러 + 32bit 전용 깊이(매 프레임 클리어, MSAA 1, Point). 대상 렌더러를 `DrawRenderer(렌더러, 마스크 머티리얼, 서브메시 i)` 로 **서브메시 전부** 다시 그린다. 출력 R=1, G=색 인덱스(0 빨강/1 나를 노림 회색 — 머티리얼 2개), B=eye 깊이(m), ZWrite On·LEqual 로 대상끼리 앞뒤를 가린다. |
 | 합성 패스 `EnemyOutline Composite` | `Blitter` 전체 화면. 마스크 R=1(대상 안쪽)이면 버린다 → **안쪽 선 없음**(23호처럼 렌더러·서브메시가 여러 개여도 바깥 윤곽 하나). 반경 N px **원판**(dx²+dy² ≤ N²+N) 안 대상 픽셀 중 가장 앞(B 최소)의 색·깊이를 고른다 → 없으면 버림. 그 픽셀의 씬 깊이(`_CameraDepthTexture`)가 대상 깊이 − 여유보다 앞이면 버림(가림). 카메라 컬러에 `Blend SrcAlpha OneMinusSrcAlpha`. |
 | 주입 | `BeforeRenderingPostProcessing`(550). 같은 550 인 `PlayerSilhouetteFeature` 보다 렌더러 목록에서 뒤라 **실루엣 합성 다음**에 얹힌다(투명·포그(450) 뒤, 포스트프로세스·`RetroCRT`(AfterRenderingPostProcessing) 앞). `MaskBlurFeature`(550)는 비활성. |
 | 카메라 | Preview·Reflection·오버레이·`targetTexture` 카메라(미니맵)에는 걸지 않는다(`PlayerSilhouetteFeature` 와 같은 규칙). 예외: `EnemyOutlineFeature.DevCaptureCamera`(에디터 캡처 전용 정적 필드, 기본 null). |
@@ -42,6 +42,7 @@
   (몬스터 쪽 연출 `MonsterAttackTell`·`DissolveDeath`·`MonsterCollapseDebris`·`BossChargingPylon` 이 배열을 스스로 바꾸고 복원하므로).
 - 🔴 마스크 셰이더에 `_BaseColor`/`_Color` 가 없다 — HitFlash·사망 틴트 MPB 와 무관(EditMode 테스트로 고정).
 - 두께는 **마스크 픽셀 단위**(= 카메라 타깃 해상도의 픽셀) — 해상도·거리와 무관하게 같은 픽셀 수. 원판이라 대각선도 같은 굵기. 범위 1~8 클램프.
+  기본 **1px**(할 일 58 후속 5): N=1 이면 원판(반경² 2)이 대각 (±1,±1) 까지 든 **3x3 전체**(8-이웃 팽창)라 십자로 끊기거나 대각선만 얇아지지 않는다(EditMode 테스트로 고정).
 - 마스크에 그릴 렌더러: `SkinnedMeshRenderer`/`MeshRenderer` 이고 메인 머티리얼이 불투명 큐(≤ GeometryLast), `AoeTelegraph`·`NoHitFlash` 아래가 아님(HitFlash 와 같은 제외 규칙).
   대상이 세트에 들어올 때 한 번 모아 두고, 켜짐은 매 프레임 본다.
 - 알파 클립(컷아웃) 재질은 덮어쓰기 머티리얼이 클립을 하지 않아 메시 전체 모양으로 윤곽이 잡힌다(현재 몬스터 메시는 해당 없음으로 판단 — Play 확인 항목).
@@ -59,12 +60,15 @@
 | 필드 | 범위 | 기본 | 뜻 |
 |---|---|---|---|
 | `outlineColor` | 알파 0~1 | (1, 0.08, 0.08, 1) | 호버·스킬 범위(빨강). 알파 = 불투명도. |
-| `aggroOutlineColor` | 알파 0~1 | (1, 0.55, 0.1, 1) | 나를 노림(주황). |
-| `outlineWidthPixels` | 1~8 | 3 | 외곽선 굵기(화면 픽셀). |
+| `aggroOutlineColor` | 알파 0~1 | (0.22, 0.22, 0.22, 1) | 나를 노림(어두운 회색 — 거의 티 안 나게, 할 일 58 후속 5). |
+| `outlineWidthPixels` | 1~8 | 1 | 외곽선 굵기(화면 픽셀). |
 | `skillRangeMaxTargets` | 1~ | 16 | 스킬 범위 동시 최대 마리(호버 제외). 넘으면 시전자에서 가까운 순. |
 | `aggroMaxTargets` | 0~ | 8 | 나를 노림 동시 최대 마리(빨강 대상 제외). 넘으면 가까운 순. 0 = 끔. |
 
 - 값은 매 프레임 `EnemyOutlineDrawList` 로 넘기므로 Play 중 인스펙터로 바꾸면 바로 보인다.
+- 🔴 색은 셰이더에 **선형 값 그대로** 들어간다(합성 셰이더에 Properties 블록이 없어 `SetColor` 감마→선형 변환이 안 걸림 — `PlayerSilhouetteFeature` 와 같은 방식).
+  그래서 화면에는 인스펙터 견본보다 밝게 보인다: `aggroOutlineColor` 0.22 → 화면 sRGB ≈ 0.51(129/255, 회색 바닥과 거의 같은 밝기).
+  견본처럼 어두운 회색(화면 sRGB 0.22)으로 보이려면 값 ≈ 0.04 — 에디터 캡처 비교 `58-mask/compare-aggro-value-0.04-zoom-chomp.png`. 빨강·주황(이전)도 같은 이유로 연하게 보였다.
 - 피처 쪽(`PC_Renderer` → `EnemyOutlineFeature`): `_occludeBias`(0.2m), `_injectionPoint`(550).
 
 ## 스킬 범위 외곽선 (할 일 58 후속)
@@ -106,7 +110,7 @@
 - 새 지점 지정 스킬은 `ISkillGroundHitPreview` 를 서버 판정과 같은 함수로 구현하면 자동으로 붙는다.
 - 겹침 버퍼는 64(콜라이더 수). 몬스터 하나가 콜라이더 여러 개면 한 마리로 합친다.
 
-## 나를 노리는 몬스터 (할 일 58 후속 3, 주황)
+## 나를 노리는 몬스터 (할 일 58 후속 3, 어두운 회색 — 후속 5 에서 주황 → 회색)
 
 서버의 몬스터 현재 대상(`MonsterBase._target`, Transform)은 원래 **클라에 복제되지 않았다**(서버 전용 필드, 복제 RPC 도 없음). 그래서 표시용 복제 값 하나를 추가했다(경석 영역, 사용자 승인 2026-10-20).
 
@@ -119,17 +123,17 @@
 | 동작 영향 | 없음 — FSM·판정·어그로 규칙은 이 값을 읽지 않는다. |
 
 - 대상: `MonsterBase` 를 상속하는 전부 — 일반 몹·중간보스(GauntletBot·SpinnerBot·WallBot)·**23호(TwentyThreeBoss) 포함**(모두 base `Update` 를 그대로 쓴다).
-  **웰즈(BossWells)는 제외** — `MonoBehaviour` 인 23호 탑승 장식이라 자기 대상이 없다(23호 본체가 주황이 된다).
-- 고르기(`MonsterAggroTargetRule.SelectAggro`): 빨강 세트(호버·스킬 범위)에 든 몬스터는 빼고(**빨강 > 주황**, 한 몬스터는 한 색), 가까운 순, 상한 `aggroMaxTargets`(8).
-- **스킬 인디케이터가 켜져 있는 동안은 주황을 전부 끈다**(할 일 58 후속 4) — 그동안은 빨강(호버·스킬 범위)만 보인다. 대상 유무가 아니라 **표시 유무** 기준(범위 대상 0 이어도 끈다).
+  **웰즈(BossWells)는 제외** — `MonoBehaviour` 인 23호 탑승 장식이라 자기 대상이 없다(23호 본체가 회색이 된다).
+- 고르기(`MonsterAggroTargetRule.SelectAggro`): 빨강 세트(호버·스킬 범위)에 든 몬스터는 빼고(**빨강 > 회색**, 한 몬스터는 한 색), 가까운 순, 상한 `aggroMaxTargets`(8).
+- **스킬 인디케이터가 켜져 있는 동안은 나를 노림(회색)을 전부 끈다**(할 일 58 후속 4) — 그동안은 빨강(호버·스킬 범위)만 보인다. 대상 유무가 아니라 **표시 유무** 기준(범위 대상 0 이어도 끈다).
   - 판단 기준 = 오너 로컬에서 범위 표시·조준이 떠 있는 프레임: `PlayerSkillTargeting` 조준 중(`Begin` 진입 프레임 + `isTargeting` 인 매 `Update`, 단일 대상·지점 지정 등 모든 조준 모드) ·
     `ReportSkillHitArea` 를 부른 프레임(거너 Q 충전 직선, 지점 지정 조준의 판정 영역 보고 — `ReportSkillHitArea` 가 겸한다).
-    **HUD 슬롯 호버 미리보기는 제외**(사용 시 표시가 아니다). 조준 확정 뒤 자동 접근(`isMovingToCast`)은 표시가 꺼져 있어 주황이 돌아온다.
+    **HUD 슬롯 호버 미리보기는 제외**(사용 시 표시가 아니다). 조준 확정 뒤 자동 접근(`isMovingToCast`)은 표시가 꺼져 있어 나를 노림이 돌아온다.
   - 방식: `PlayerEnemyHoverOutline.ReportSkillIndicatorActive()` 프레임 도장(`MonsterAggroTargetRule.FrameStamp`) — 안 부른 프레임엔 자동 해제, 표시가 꺼지는 프레임은 `ClearSkillHitArea` 가 같이 푼다(같은 프레임 복귀).
     `SelectAggro(..., skillIndicatorActive)` 가 결과를 비운다. 몬스터 목록 훑기(0.25초)는 그대로 — 표시 단계에서만 거른다.
 - 켜짐/꺼짐: 몬스터가 나를 물고 Chase/Attack 이면 켜지고, 추적 해제(대상 잃음·리쉬 복귀 Return)·피격 경직(Hit)·그로기·넉백 중·사망(HP 0 → 즉시)·휴면·연출 정지면 꺼진다.
   피격 경직·그로기 동안 잠깐 꺼졌다 다시 켜지는 것은 "추적 또는 공격 중" 정의 그대로다.
-- MPPM: 피어마다 자기 Player 의 id 로 판정한다(같은 몬스터가 A 화면에선 주황, B 화면에선 무색).
+- MPPM: 피어마다 자기 Player 의 id 로 판정한다(같은 몬스터가 A 화면에선 회색, B 화면에선 무색).
 - 네트워크 비용: 몬스터당 ulong 하나, 대상이 바뀔 때만 전송.
 
 ## 연출과의 관계
@@ -137,7 +141,7 @@
 - `HitFlash`·사망 틴트(MPB `_BaseColor`/`_Color`): 마스크는 덮어쓰기 머티리얼로 그리므로 무관. 원본 렌더러 MPB 도 안 건드린다.
 - 23호 체공 숨김·붕괴 사망(`enabled=false`): 매 프레임 렌더러 켜짐을 보고 목록에서 뺀다.
 - 사망 디졸브: HP 0 이 되면 다음 LateUpdate 에 세트에서 빠진다.
-- 그로기: 렌더러·머티리얼을 건드리지 않아 무관(빨강은 살아 있는 동안 계속, 주황은 위 규칙대로 꺼짐).
+- 그로기: 렌더러·머티리얼을 건드리지 않아 무관(빨강은 살아 있는 동안 계속, 나를 노림은 위 규칙대로 꺼짐).
 - **23호 인터럽트 표시(`DissolveOverlay`, Transparent 큐)**: 림 방식에선 투명 정렬에 따라 림이 그 밑에 깔릴 수 있었다.
   지금은 합성이 **투명 패스 뒤(550)** 카메라 컬러에 얹히므로 깔리지 않는다 — 기존 한계 해소. 대신 외곽선은 바깥 윤곽이라 몸 안쪽의 투명 표시와는 겹치지 않는다.
 
@@ -149,7 +153,7 @@
 
 ## 알려진 한계 / 확인 필요
 
-- **Play 확인 필요(사람)**: 3px 균일 두께, 안쪽 선 없음, 23호 하나의 윤곽, 겹친 두 몬스터·벽 가림·발밑 바닥(occludeBias 0.2), 주황 켜짐/꺼짐(어그로 해제·사망), MPPM 각자 기준.
+- **Play 확인 필요(사람)**: 1px 균일 두께(끊김·대각 얇아짐 없음, PixelScanline 아래에서도 보이는지), 안쪽 선 없음, 23호 하나의 윤곽, 겹친 두 몬스터·벽 가림·발밑 바닥(occludeBias 0.2), 나를 노림 회색이 바닥·배경 위에서 너무 안 보이지 않는지, 켜짐/꺼짐(어그로 해제·사망), MPPM 각자 기준.
 - 에디터 캡처(Play 없이, 전/후): `C:/UnityProject/_lane-artifacts/MainProject-Worktree2/58-mask/`.
 - 마우스가 HUD 위에 있어도 레이는 나간다(스킬 조준과 같은 동작).
 - `PixelScanline`(RetroCRT) 포스트가 블록 재샘플을 하므로 실제 화면 굵기는 블록 크기에 따라 달라 보일 수 있다(실루엣 윤곽선과 같은 조건).

@@ -10,7 +10,7 @@ using UnityEngine;
 public static class EnemyOutlineDrawList
 {
     public const int PrimaryColorIndex = 0;   // 호버·스킬 범위(빨강)
-    public const int AggroColorIndex = 1;     // 나를 노리는 몬스터(주황)
+    public const int AggroColorIndex = 1;     // 나를 노리는 몬스터(어두운 회색)
     public const int MinWidthPixels = 1;
     public const int MaxWidthPixels = 8;
 
@@ -27,8 +27,8 @@ public static class EnemyOutlineDrawList
     public static Item Get(int index) => s_items[index];
 
     public static Color PrimaryColor { get; private set; } = Color.red;
-    public static Color AggroColor { get; private set; } = new Color(1f, 0.55f, 0.1f, 1f);
-    public static int WidthPixels { get; private set; } = 3;
+    public static Color AggroColor { get; private set; } = new Color(0.22f, 0.22f, 0.22f, 1f);
+    public static int WidthPixels { get; private set; } = 1;
 
     /// <summary>이번 프레임 목록을 새로 시작한다(이전 프레임 항목은 버린다).</summary>
     public static void Begin(Color primary, Color aggro, int widthPixels)

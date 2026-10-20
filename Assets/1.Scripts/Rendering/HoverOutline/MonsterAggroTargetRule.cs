@@ -3,7 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// "나를 노리는 몬스터" 주황 외곽선(할 일 58)의 규칙 — 순수 함수, 할당 없음.
+/// "나를 노리는 몬스터" 회색 외곽선(할 일 58)의 규칙 — 순수 함수, 할당 없음.
 /// <list type="bullet">
 /// <item><b>서버 쓰기</b>(<see cref="ReplicatedTargetId"/>): <see cref="MonsterBase"/> 가 복제하는 대상 id.
 ///   Chase·Attack 이고 살아 있고 서버 로직이 돌 때(휴면·연출 정지 아님)만 현재 대상의 NetworkObjectId, 그 밖 0.</item>
@@ -35,7 +35,7 @@ public static class MonsterAggroTargetRule
     }
 
     /// <summary>
-    /// 나를 노리는 후보에서 주황 세트를 고른다. <paramref name="hovered"/>·<paramref name="primaryTargets"/>(빨강)에 든 대상은 뺀다.
+    /// 나를 노리는 후보에서 나를 노림 세트를 고른다. <paramref name="hovered"/>·<paramref name="primaryTargets"/>(빨강)에 든 대상은 뺀다.
     /// 후보의 Selectable 은 <see cref="IsTargetingLocal"/> 결과여야 한다.
     /// <paramref name="skillIndicatorActive"/> 면 비운다 — 스킬 인디케이터가 떠 있는 동안은 빨강(호버·범위)만 보인다.
     /// 대상 유무가 아니라 표시 유무 기준이다(범위 대상 0 이어도 끈다).

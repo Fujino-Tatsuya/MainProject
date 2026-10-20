@@ -232,12 +232,48 @@ public sealed class HoverOutlineTests
     }
 
     [TestCase(0, 1)]
+    [TestCase(1, 1)]
     [TestCase(3, 3)]
     [TestCase(99, 8)]
     public void 굵기는_1에서_8픽셀로_클램프(int raw, int expected)
     {
         EnemyOutlineDrawList.Begin(Color.red, Color.yellow, raw);
         Assert.AreEqual(expected, EnemyOutlineDrawList.WidthPixels);
+    }
+
+    [Test]
+    public void Player_프리팹_기본값은_1픽셀_나를노림_어두운_회색()
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/Player/Player.prefab");
+        Assert.IsNotNull(prefab);
+        var outline = prefab.GetComponent<PlayerEnemyHoverOutline>();
+        Assert.IsNotNull(outline);
+
+        var so = new UnityEditor.SerializedObject(outline);
+        Assert.AreEqual(1, so.FindProperty("outlineWidthPixels").intValue);
+        Color aggro = so.FindProperty("aggroOutlineColor").colorValue;
+        Assert.AreEqual(0.22f, aggro.r, 1e-4f);
+        Assert.AreEqual(0.22f, aggro.g, 1e-4f);
+        Assert.AreEqual(0.22f, aggro.b, 1e-4f);
+        Assert.AreEqual(1f, aggro.a, 1e-4f);
+    }
+
+    // EnemyOutlineComposite.shader 의 원판 판정(x²+y² ≤ N²+N)을 그대로 옮긴 것 — 1px 에서 십자로 끊기지 않는지.
+    static int DiskTaps(int n)
+    {
+        int count = 0;
+        for (int y = -n; y <= n; y++)
+            for (int x = -n; x <= n; x++)
+                if (x * x + y * y <= n * n + n)
+                    count++;
+        return count;
+    }
+
+    [Test]
+    public void 합성_원판은_1픽셀이면_대각_포함_3x3()
+    {
+        Assert.AreEqual(9, DiskTaps(1), "대각 이웃까지 든 8-이웃 팽창(십자 5칸이 아님)");
+        Assert.AreEqual(21, DiskTaps(2), "2px 은 모서리 (±2,±2) 만 빠진 원판");
     }
 
     [Test]
