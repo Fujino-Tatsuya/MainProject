@@ -84,7 +84,7 @@ public sealed class EnemyC3PlateShaderTests
 
         // 기존: Bake 텍스처 + BossPatternVisuals.Paint 와 같은 속성(흰색, 마스크 꺼짐).
         var oldBlock = new MaterialPropertyBlock();
-        oldBlock.SetTexture("_MainTex", square ? EnemyC3Visuals.Square(id, fill) : EnemyC3Visuals.Circle(id, fill));
+        oldBlock.SetTexture("_MainTex", square ? EnemyC3BakeReference.Square(id, fill) : EnemyC3BakeReference.Circle(id, fill));
         oldBlock.SetColor("_Color", Color.white);
         oldBlock.SetTexture("_MaskTex", Texture2D.whiteTexture);
         oldBlock.SetVector("_MaskParams", new Vector4(0, 0, 1, 0));

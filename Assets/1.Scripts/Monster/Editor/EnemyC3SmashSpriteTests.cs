@@ -37,7 +37,7 @@ public sealed class EnemyC3SmashSpriteTests
         var sprite = EnemyC3Visuals.SmashSprite;
         Assert.IsNotNull(sprite, "Run Tools/Enemy C3/Bake smash 09 sprite");
         Assert.AreEqual(N, sprite.texture.width);
-        Color32[] expected = ToRT(EnemyC3Visuals.Circle("09")), actual = ToRT(sprite.texture);
+        Color32[] expected = ToRT(EnemyC3BakeReference.Circle("09")), actual = ToRT(sprite.texture);
         int ok = 0, maxDiff = 0;
         var diff = new Color32[N * N];
         for (int i = 0; i < expected.Length; i++)
@@ -68,7 +68,7 @@ public sealed class EnemyC3SmashSpriteTests
             Vector3 scale = sr.transform.localScale;
             float alpha = sr.color.a;
             // 예전 ApplySmash 와 같은 식으로 만든 sprite = 기준.
-            var tex = EnemyC3Visuals.Circle("09");
+            var tex = EnemyC3BakeReference.Circle("09");
             legacy = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(.5f, .5f), tex.width / (old.bounds.size.x * EnemyC3Visuals.OuterScale("09")));
 
             EnemyC3Visuals.ApplySmash(go);

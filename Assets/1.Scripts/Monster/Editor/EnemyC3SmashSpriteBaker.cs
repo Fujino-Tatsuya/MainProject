@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 할 일 57 S3 — 스매시 09 sprite 를 에디터에서 미리 굽는다(런타임 Sprite.Create·Bake 0).
-/// CPU <c>EnemyC3Visuals.Circle("09")</c> 를 PNG 로 저장하고, 임포트 PPU 를 예전 런타임 식
+/// CPU <c>EnemyC3BakeReference.Circle("09")</c> 를 PNG 로 저장하고, 임포트 PPU 를 예전 런타임 식
 /// <c>tex.width / (원본 sprite 폭 × OuterScale("09"))</c> 과 같게 맞춘다 → 화면 크기 그대로.
 /// 프리셋(EnemyC3Selected.json)의 09 값이 바뀌면 이 메뉴를 다시 돌리고 PNG·meta 를 커밋한다
 /// (EnemyC3SmashSpriteTests 가 어긋남을 잡는다).
@@ -29,7 +29,7 @@ public static class EnemyC3SmashSpriteBaker
     [MenuItem("Tools/Enemy C3/Bake smash 09 sprite")]
     public static void Bake()
     {
-        var tex = EnemyC3Visuals.Circle("09");
+        var tex = EnemyC3BakeReference.Circle("09");
         File.WriteAllBytes(Path.GetFullPath(AssetPath), tex.EncodeToPNG());
         AssetDatabase.ImportAsset(AssetPath, ImportAssetOptions.ForceSynchronousImport);
         var ti = (TextureImporter)AssetImporter.GetAtPath(AssetPath);

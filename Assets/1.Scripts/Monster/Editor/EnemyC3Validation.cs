@@ -15,7 +15,7 @@ public static class EnemyC3Validation
             if(EnemyC3Visuals.Get(id).id!=id)throw new Exception("Missing C3 mapping: "+id);
         if(EnemyC3Visuals.Get("01").geometry.linearMarkerSpacing!=67||EnemyC3Visuals.Get("10").geometry.linearMarkerSpacing!=78||EnemyC3Visuals.Get("09").geometry.markerRadiusPercent!=81)
             throw new Exception("Selected per-attack overrides were lost.");
-        var grab=EnemyC3Visuals.Decal("03",new Vector2(16,16),8,0,45,0,0);
+        var grab=EnemyC3BakeReference.Decal("03",new Vector2(16,16),8,0,45,0,0);
         float grabPad=EnemyC3Visuals.DecalPadding("03",new Vector2(16,16),8,0,0);
         float sampleExtent=16+grabPad*2;
         for(int degrees=-180;degrees<=180;degrees+=15)
@@ -29,15 +29,15 @@ public static class EnemyC3Validation
             if(Mathf.Abs(degrees)<=30&&alpha<.5f)throw new Exception("Magnetic grab sector arc was removed.");
         }
         File.WriteAllBytes(Output+"/magnetic-grab-sector-texture.png",grab.EncodeToPNG());
-        var circle=EnemyC3Visuals.Circle("12");
+        var circle=EnemyC3BakeReference.Circle("12");
         if(circle.GetPixel(0,0).a>.01f)throw new Exception("Circle leaks beyond radius.");
         if(circle.GetPixel(192,192).a>.01f)throw new Exception("Boundary layer fills center prematurely.");
-        var fill=EnemyC3Visuals.Circle("12",true);
+        var fill=EnemyC3BakeReference.Circle("12",true);
         if(Mathf.Abs(fill.GetPixel(192,192).a-.232f)>.01f)throw new Exception("Fill alpha mismatch.");
-        var upper=EnemyC3Visuals.Decal("02",new Vector2(250,405),125,280,180,130,175);
-        var dash=EnemyC3Visuals.Decal("04",new Vector2(114,370),0,0,0,114,370);
-        var smash=EnemyC3Visuals.Circle("09");
-        var longerDash=EnemyC3Visuals.Decal("04",new Vector2(114,500),0,0,0,114,500);
+        var upper=EnemyC3BakeReference.Decal("02",new Vector2(250,405),125,280,180,130,175);
+        var dash=EnemyC3BakeReference.Decal("04",new Vector2(114,370),0,0,0,114,370);
+        var smash=EnemyC3BakeReference.Circle("09");
+        var longerDash=EnemyC3BakeReference.Decal("04",new Vector2(114,500),0,0,0,114,500);
         float pinY=EnemyC3Visuals.Get("04").geometry.linearMarkerStart-5;
         float SamplePin(Texture2D texture,float length)
         {

@@ -127,7 +127,7 @@ public sealed class EnemyC3DecalShaderTests
             mat.SetTexture("_MaskTex", Texture2D.whiteTexture);
             mat.SetVector("_MaskParams", new Vector4(0, 0, 1, 0));
             // 기존: Decal() 텍스처. 새것: 같은 인자로 런타임 주입 함수.
-            mat.SetTexture("_OldTex", EnemyC3Visuals.Decal(id, s.extent, s.coneRadius, s.coneCenter, s.halfAngle, s.pathWidth, s.pathLength));
+            mat.SetTexture("_OldTex", EnemyC3BakeReference.Decal(id, s.extent, s.coneRadius, s.coneCenter, s.halfAngle, s.pathWidth, s.pathLength));
             EnemyC3Visuals.SetDecalProperties(mat, id, s.extent, s.coneRadius, s.coneCenter, s.halfAngle, s.pathWidth, s.pathLength);
 
             Color32[] expected = Render(mat, 0), actual = Render(mat, 1);
