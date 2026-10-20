@@ -53,11 +53,8 @@ public static class AssassinShellAuthoring
     // 🔸 임시 VFX — 프로젝트 공용 파티클. 민경 정식 VFX 로 교체 대상(필드가 비어 있을 때만 채우므로 교체값은 재실행에도 유지).
     private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
     private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
-    // 평타·시전 임시 VFX(10-06 은희 요청) — 가붕이 평타 베기·공용 연출 재사용. 민경 교체 대상.
-    // 일반 4타·변신 묶음은 정식 VFX(Player_Assassin/VFX/* 의 EffectSocketPlayer — 민경이 프리팹에서 엔트리·소켓 지정, 2026-10-19)로 바뀌어 여기서 채우지 않는다.
-    private const string PlayerSlashFolder = "Assets/50.Art/VFX/Common/Players/Player1/DefaultAttack/";
-    private const string EnhancedSlashVfxPath = PlayerSlashFolder + "FX_DoubleSlash_O.prefab";
-    private const string EnhanceCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Flash_star.prefab";
+    // 평타·일반 E 시전의 임시 VFX(10-06 은희 요청)는 정식 VFX 로 바뀌어 여기서 채우지 않는다 — 일반 4타·변신 묶음·강타 = Player_Assassin/VFX/* 의
+    // EffectSocketPlayer(민경이 프리팹에서 엔트리·소켓 지정, 2026-10-19·20), 일반 E 차지·오라·날 발광 = Assassin_Armature 의 AssassinEnhanceReadyView.
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -575,9 +572,6 @@ public static class AssassinShellAuthoring
             // 변신 루프는 정식 VFX(EffectCatalog.Assassin_R_BladeVortex)로 바뀌어 여기서 채우지 않는다(2026-10-14 민경).
             SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
             SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
-            SetIfEmpty(so, "enhancedSlashPrefab", EnhancedSlashVfxPath);
-            SetIfEmpty(so, "enhanceCastPrefab", EnhanceCastVfxPath);
-            so.FindProperty("enhancedSlashSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
             so.ApplyModifiedPropertiesWithoutUndo();
 
             PrefabUtility.SaveAsPrefabAsset(root, VariantPath);

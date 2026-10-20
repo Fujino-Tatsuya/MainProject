@@ -76,6 +76,27 @@
 - `EffectAnimEvents`(VFX 코드): `PlayEffect`·`StartEffect` 가 재생 성공 뒤 `Played(id)` 를 낸다. 구독자 없으면 동작 불변.
 - ⚠️ 판정(0.15초 타이머)과 올려치기 프레임(0.2667초)은 여전히 따로다 — 정렬은 은희 결정. 판정을 옮겨도 성공 연출은 위 구조로 따라온다.
 
+## 3-7. 일반 E — 단검 날 발광 · 오라 · 차지 · 강타 슬래쉬 (2026-10-20 추가)
+- 🔸 3-4(10-16) 의 단검 발광·소켓·뷰 배선은 커밋되지 않았고 v18 비주얼(`c5c80d5f`) 뒤 단검 = FK 1슬롯이라 **다시 했다**(방식 동일 — 팔라딘 패시브 오버레이).
+- `Assassin_Armature`:
+  - 양손 단검 렌더러 슬롯 [1] = `50.Art/VFX/_Materials/Dagger_Blade_Glow.mat`(인스턴스 수정 `m_Materials.Array.size 2`). [0] FK 그대로.
+  - 소켓 `Dagger_Weapon_R/L`(FBX Null) `/VFX_EnhanceAura`(로컬 Y 0.33 = 칼날 중간) — 자식 `Aura`·`Charge` 에 `EffectSocketPlayer`(엔트리 `Assassin_E_Aura` 루프 · `Assassin_E_Charge` 원샷, Scale 1.25 = 단검 루트 배율, 오라 Safety Timeout 0). ⚠️ 왼손 FBX Null 배율이 (-1,-1,-1)(거울)이라 왼손 소켓은 Z 180° — 회전만 따르는 소켓 플레이어가 칼날 쪽을 보게.
+  - `VFX/EnhancedReady` 에 `MaterialFadeEffect`(대상 = 두 단검 렌더러, `_ColorFactor` 인 0.5·아웃 0.3초 — 몸 FK 재질은 속성이 없어 건너뜀) + `AssassinEnhanceReadyView`.
+- `AssassinEnhanceReadyView`: 프리팹 Instantiate/Destroy → 소켓 플레이어 `Play`/`Stop`/`PlayOnce` 로 교체(`auras[]`·`charges[]`, `chargePrefab`·`auraPrefab`·`bladeSockets`·`releaseLifetime` 삭제). 켜짐 = `AssassinState.IsEnhancedReady`(차지는 `EnhancedReadyChanged(true)` 순간만). **추가 네트워크 없음.**
+- 강타 슬래쉬: `Player_Assassin/Armature/VFX/EnhancedSlash`(민경 배치)에 `EffectSocketPlayer`(id `Assassin_EnhancedSlash`, 엔트리 `Assassin_E_Slash`) · `Combo_Attack_02_01` 0.2167초(= Hit, 민경이 넣어 둔 빈 이벤트) `PlayEffect("Assassin_EnhancedSlash")`.
+  - `AssassinSkillView`: `enhancedSlashPrefab`·`enhancedSlashSocket`·`PlayAttackSlash` **삭제**(임시 팔라딘 `FX_DoubleSlash_O`). `AssassinBasicAttack.HandleAnimationEvent` 의 Hit → `PlayAttackSlash` 호출 삭제(판정 경로 무변경). `AssassinShellAuthoring` 해당 상수·줄 삭제. 강타 클립은 `StampEventsIfEmpty` 라 메뉴 재실행에도 이벤트 유지.
+- 🔸 테스트 `AssassinVisualPrefabTests.BodyAndDaggerSlotsUseFlatKitBody`: 단검은 [0] = FK, 그 뒤 슬롯은 `Dagger_Blade_Glow` 만 허용(`AssertDaggerSlots`), 기대 슬롯 5 = FK 슬롯만 센다. `FlatKitPlayerVariants` 는 `Assassin_Toon` 이름만 바꾸므로 오버레이는 건드리지 않는다.
+- 에셋 `Players/Player3/NormalE/FX_Assassin_E_Aura`(루프, outro 0.7)·`_Charge`(0.5)·`_Slash`(1.0) + `Models/Dagger_Blade.fbx`(오라 Shape 메시).
+- 🔸 10-20 2차(민경): 오라·차지 소켓 플레이어를 `Player_Assassin/VFX/NormalE/Aura_R·Aura_L/{Aura,Charge}`(Socket = 단검 `VFX_EnhanceAura`), 강타 플레이어를 `VFX/NormalE/EnhancedSlash`(Socket = `Armature/VFX/EnhancedSlash`)로 옮김 → `MaterialFadeEffect`(대상 = Armature 안 양손 단검 렌더러)·`AssassinEnhanceReadyView` 도 **`VFX/NormalE` 로 이동**. `Assassin_Armature` 의 `EnhancedReady` 컴포넌트 2·원래 `Aura`/`Charge` 4 삭제(소켓 `VFX_EnhanceAura` 는 유지), `Player_Assassin` 의 낡은 오버라이드·삭제 기록 정리. 손으로 만든 stripped fileID 4개를 Unity 규칙(인스턴스 ^ 원본)으로 바로잡음.
+- 시전 임시 연출 삭제: `Player_Assassin` 의 `enhanceCastPrefab`(공용 `Burst/Flash_star`)가 아직 채워져 E 시전마다 나오고 있었다 → `AssassinSkillView.enhanceCastPrefab`·`PlayEnhanceCast`·`PlayAttached`(호출자 없어짐), `AssassinEnhanceSkill.OnClientPlay` 의 호출(상체 레이어 처리는 그대로), `AssassinShellAuthoring` 의 `EnhanceCastVfxPath`·`SetIfEmpty` 삭제(메뉴 재실행으로 되살아나지 않게).
+
+## 3-8. 대쉬 잔상 (2026-10-20 추가)
+- `Player_Assassin` 루트(Player.prefab 인스턴스 루트에 추가 컴포넌트)에 **`PlayerSkillVfx`**(최후의 심판 칸은 전부 비움 → 대쉬 잔상 RPC 경로만 동작, 거너와 같은 구성) + `DashAfterimage` + `DashSpeedLines`. **코드 무변경.**
+  - `PlayerSkillVfx` 는 NetworkBehaviour 라 어쌔신 NetworkObject 의 behaviour 목록이 하나 늘어난다(모든 피어가 같은 프리팹이라 문제없음 — 팔라딘·거너 선례).
+  - `DashAfterimage`: modelRoot = `Armature`(몸·머리카락·양손 단검, VFX 제외), 재질 `50.Art/VFX/Common/Players/Dash/FX_AssassinDashAfterimage.mat`, spawnInterval 0 · 수명 0.2 · 최대 80 · safetyTimeout 2(팔라딘·거너 값).
+  - `DashSpeedLines`: searchRoot = `Armature`, 이름 힌트 head·hand·foot, 재질 `FX_AssassinDashSpeedLine.mat`.
+- 대상은 스페이스바 공용 대쉬(Dash 상태)뿐 — Q 관통 돌진은 Skill 상태라 잔상이 안 난다.
+
 ## 4. 확인 부탁
 - Play: R → 0.5초에 소용돌이가 차고 따라다님 / 만료·수동 해제·쓰러짐 → 0.5초에 흩어짐.
 - MPPM: 다른 피어·변신 중 늦게 들어온 클라에서도 보이는지.
@@ -85,3 +106,5 @@
 - 일반 E: 누르면 양손 단검 날만 붉게 + 검붉은 오라, 강화 일격·변신·쓰러짐에 꺼짐. 다른 피어·늦은 접속에서도 같은지. 다른 캐릭터(팔라딘·거너·어쌔신 몸)가 그대로인지.
 - 좌클릭: 일반 4타마다 소켓 방향대로 베기, 맞았을 때만 성공 연출이 겹쳐 나옴(빗나가면 베기만). 변신 묶음 동안 루프가 돌고 묶음 끝·피격 취소·변신 해제에 꺼지는지. 다른 피어에서도 같은지.
 - 우클릭: 기 모으기 → 13프레임에 튀기며 사라지고 16프레임 올려치기. 보스·중간보스 간파 **성공 때만** 성공 연출이 올려치기와 함께(빗나감·일반 적중은 올려치기만). 시전 중 피격되면 기 모으기가 남지 않는지. 다른 피어에서도 같은지.
+- 일반 E(10-20): E → 양손 단검 날만 붉게 + 차지 + 오라(무기를 따라감, 왼손도 칼날 쪽), 강타 시작에 꺼지고 0.2167초에 강타 슬래쉬, 변신·쓰러짐에 꺼짐. 다른 피어·늦은 접속 동일. EditMode `AssassinVisualPrefabTests` 통과.
+- 대쉬 잔상(10-20): 스페이스바 대쉬마다 검붉은 잔상 + 붉은 속도선, 호스트·클라 누가 대쉬해도 양쪽에 보이는지, Q 돌진엔 안 나오는지.

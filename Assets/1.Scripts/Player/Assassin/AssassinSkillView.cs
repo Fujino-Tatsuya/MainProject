@@ -9,7 +9,8 @@ using UnityEngine;
 /// - 변신 중 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
 ///   🔹 정식 VFX — <c>EffectCatalog.Assassin_R_BladeVortex</c> 를 EffectManager 로 재생한다(2026-10-14 민경).
 ///   변신 시작 = PlayLooping(0.5초에 차오름), 종료(만료·수동 해제·쓰러짐 공통) = Release(0.5초에 흩어짐).
-/// - Q 돌진 궤적 · 변신 E 원 · E 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+/// - Q 돌진 궤적 · 변신 E 원: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+///   (일반 E 시전 임시 연출 Flash_star 는 2026-10-20 삭제 — 차지·오라·날 발광은 AssassinEnhanceReadyView.)
 ///   🔹 변신 E 원 = 정식 VFX <c>EffectCatalog.Assassin_E_MultiSlashes</c> 루프(2026-10-15 민경) — 확정 시 원 중심에서
 ///   배율 = 원 반경으로 켜고, 스킬 OnEnd(5타 완료·중단 공통)에서 Release 한다. 확정 순간 1회 <c>circleStrikePrefab</c> 도 그대로 낸다.
 ///   🔹 변신 Q 돌진 = 정식 VFX <c>EffectCatalog.Assassin_Q_StormSlash</c> 루프(2026-10-15 민경) — 플레이어 루트를 따라가며
@@ -21,7 +22,9 @@ using UnityEngine;
 ///   일반 1~4타·변신 묶음은 클립의 <see cref="EffectAnimEvents"/> 이벤트(<c>PlayEffect</c> / <c>StartEffect</c>·<c>StopEffect</c>)가
 ///   직접 재생한다 — 여기서 하지 않는다. 여기 남은 것: 적중 성공 = [서버] <see cref="ServerNormalSlashHit"/> → 전 피어
 ///   <c>normalSlashSuccess[타]</c> 원샷(일반 베기와 겹쳐 재생 — 서버 판정이라 애니 이벤트로 못 낸다),
-///   변신 루프 안전 정지 <see cref="EndTransformedSlash"/>(묶음이 StopEffect 프레임 전에 끊길 때). 강타는 아직 임시 프리팹 경로.
+///   변신 루프 안전 정지 <see cref="EndTransformedSlash"/>(묶음이 StopEffect 프레임 전에 끊길 때).
+///   강타 슬래쉬도 <c>Combo_Attack_02_01</c> 의 <c>PlayEffect("Assassin_EnhancedSlash")</c> 이벤트가 낸다(2026-10-20, 임시 프리팹 경로 삭제).
+///   일반 E 버프(날 발광·오라·차지)는 <see cref="AssassinEnhanceReadyView"/>(Assassin_Armature) 담당.
 /// - 우클릭 간파: 🔹 정식 VFX(2026-10-19 민경) — 기 모으기·튀기기·올려치기는 <c>Attack_Up_01</c> 클립의 <see cref="EffectAnimEvents"/>
 ///   이벤트가 <c>Player_Assassin/VFX/RightClick/*</c> 소켓에서 직접 재생한다. 여기 남은 것: 간파 성공 = [서버]
 ///   <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/> → 전 피어 "성공 대기" → 올려치기 소켓 id 가 재생되는 순간
@@ -61,8 +64,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [SerializeField] private EffectSocketPlayer[] normalSlashSuccess = new EffectSocketPlayer[4];
     [Tooltip("변신 평타 묶음 루프 — 켜고 끄는 건 클립의 StartEffect/StopEffect 이벤트. 여기는 묶음이 끊길 때의 안전 정지에만 쓴다.")]
     [SerializeField] private EffectSocketPlayer transformedSlash;
-    [Tooltip("강타 — 임시 프리팹(Hit 이벤트에 소켓에 붙여 1회).")]
-    [SerializeField] private GameObject enhancedSlashPrefab;
 
     [Header("우클릭 간파 — EffectSocketPlayer(Player_Assassin/VFX/RightClick/*)")]
     [Tooltip("기 모으기 루프 — 켜고 끄는 건 Attack_Up_01 의 StartEffect/StopEffect 이벤트. 여기는 시전이 그 프레임 전에 끊길 때의 안전 정지에만 쓴다.")]
@@ -72,19 +73,12 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [Tooltip("간파 성공 — 서버 판정 → RPC → 올려치기와 함께 원샷. id 비워 둠(코드 전용). 엔트리 = Assassin_RClick_Success.")]
     [SerializeField] private EffectSocketPlayer insightSuccess;
 
-    [Header("시전 1회 — 스킬 OnClientPlay(전 피어)")]
-    [SerializeField] private GameObject enhanceCastPrefab;
-
     [Header("1회·스킬 동안")]
     [Tooltip("변신 E 확정 순간 원 중심에 1회(Multi Slashes 루프와 함께).")]
     [SerializeField] private GameObject circleStrikePrefab;
     [SerializeField] private GameObject backAttackHitPrefab;
     [Tooltip("1회 연출·꺼진 루프가 남은 입자를 흘리고 사라지기까지(초).")]
     [SerializeField, Min(0.1f)] private float releaseLifetime = 2f;
-
-    [Header("소켓 (비우면 플레이어 루트)")]
-    [Tooltip("강타 베기 — Armature/VFX/EnhancedAttack.")]
-    [SerializeField] private Transform enhancedSlashSocket;
 
     private AssassinState state;
     private EffectHandle transformLoop;
@@ -160,16 +154,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     }
 
     /// <summary>
-    /// [전 피어] 평타 Hit 애니 이벤트 — 강타만 임시 프리팹을 소켓에 붙여 1회. 일반 1~4타·변신 묶음은 클립의
-    /// EffectAnimEvents 이벤트가 직접 내므로 여기서는 아무것도 하지 않는다.
-    /// </summary>
-    public void PlayAttackSlash(AssassinBasicAttackMode mode, int stepIndex)
-    {
-        if (mode == AssassinBasicAttackMode.Enhanced)
-            PlayAttached(enhancedSlashPrefab, enhancedSlashSocket);
-    }
-
-    /// <summary>
     /// [전 피어] 변신 묶음 끝·취소·일반 모드 타 시작 — 안전 정지(엔트리 outroDuration 동안 남은 입자가 사라진다). 꺼져 있으면 무시.
     /// 평소엔 클립의 StopEffect 이벤트가 끄지만, 피격·대시·변신 해제로 묶음이 그 프레임 전에 끊기면 이게 끈다.
     /// </summary>
@@ -181,9 +165,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     private static T At<T>(T[] array, int index) where T : Object =>
         array != null && index >= 0 && index < array.Length ? array[index] : null;
-
-    /// <summary>[전 피어] 일반 E 버프 시전.</summary>
-    public void PlayEnhanceCast() => PlayAttached(enhanceCastPrefab);
 
     /// <summary>
     /// [전 피어] 우클릭 간파 시전 — 지난 시전의 성공 대기·올려치기 표시를 지운다. 연출 재생은 클립 이벤트가 한다.
@@ -396,14 +377,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             return;
         instance.transform.position = position;
         Destroy(instance, releaseLifetime);
-    }
-
-    // 1회 연출을 소켓(없으면 플레이어 루트)에 붙인다 — 시전·베기가 캐릭터를 따라가고, 소켓 위치·회전으로 맞춘다.
-    private void PlayAttached(GameObject prefab, Transform socket = null)
-    {
-        GameObject instance = Spawn(prefab, socket != null ? socket : transform);
-        if (instance != null)
-            Destroy(instance, releaseLifetime);
     }
 
     // ── 루프 ──

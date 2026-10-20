@@ -1,3 +1,56 @@
+# ▶▶▶ 계획 = **어쌔신 대쉬 잔상 — 팔라딘·거너와 같은 DashAfterimage + 속도선 (검붉은 색)** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 프리팹·재질 — 코드 무변경 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 대상 = 스페이스바 공용 대쉬(`PlayerDashController` · Dash 상태)만. Q 관통 돌진 제외.
+
+## 사실
+- 잔상 = `50.Art/VFX/Common/Players/Dash/DashAfterimage.cs`(대쉬 중 포즈 BakeMesh 스냅샷·풀링·페이드) + `DashSpeedLines.cs`(본 추종 TrailRenderer). 셰이더 `Player/DashAfterimage`(알파 블렌드, 림). EffectManager·카탈로그 미사용.
+- 켜고 끄기 = `PlayerSkillVfx`(NetworkBehaviour)가 Dash 상태 엣지를 보고 Reliable RPC 로 전 피어에 — 자식의 `DashAfterimage` 를 Awake 에서 자동으로 찾는다. 팔라딘·거너 프리팹에는 있고 **어쌔신엔 없다**(base `Player.prefab` 에도 없음).
+- 색은 캐릭터별 재질(팔라딘 금빛 `FX_PaladinDashAfterimage`(10-20 이름 변경, 구 `FX_DashAfterimage`) · 거너 파랑 `FX_GunnerDashAfterimage`, Solidity 0.15 / 속도선 Solidity 1).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 재질 | 신규 `FX_AssassinDashAfterimage.mat`(거너 재질 복사 → 몸 (0.35,0.03,0.04)·Solidity 0.25 + 붉은 림 HDR (2,0.16,0.1)) · `FX_AssassinDashSpeedLine.mat`(붉은색 (1.6,0.18,0.12)). 같은 폴더 `Players/Dash/`. 🔴 SVN add |
+| 부착 | `Player_Assassin` 루트에 `PlayerSkillVfx`(R 칸 비움 = 잔상만, 거너와 같음) + `DashAfterimage`(modelRoot = `Armature` — 몸·머리카락·양손 단검, VFX 제외 / spawnInterval 0 · 수명 0.2(팔라딘·거너 실제 값 — 0.45 는 스크립트 기본값) · 최대 80 · safetyTimeout 2) + `DashSpeedLines`(searchRoot = `Armature`, 기본 이름 힌트 head·hand·foot, 선 0.2초·폭 0.05→0) |
+| 코드 | 변경 없음(프리팹·재질만). `PlayerSkillVfx` 는 플레이어 공용 → handoff 공유 |
+
+## 검증
+- guid·내부 참조 누락 0 · cmp. ⏳ 민경 Play / MPPM: 스페이스바 대쉬마다 검붉은 잔상 + 붉은 속도선, 호스트·클라 어느 쪽이 대쉬해도 양쪽에 보임, Q 돌진엔 안 나옴.
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 일반 E VFX 반입·배선 — 단검 날 발광(오버레이) · 오라 · 차지 · 강타 슬래쉬 (EffectSocketPlayer)** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹·클립 배선 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM · EditMode)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 기획 §8(E = Buff + 강화 준비, 다음 좌클릭 = 강타 `Combo_Attack_02_01` 1회 후 소모, 변신·쓰러짐·사망에 해제). 10-16 일반 E 계획(아래)의 발광·소켓·뷰 배선은 커밋되지 않았고 v18 비주얼(`c5c80d5f`)로 단검 재질이 Flat Kit 1슬롯이 됨 → **다시 한다**.
+
+## 사실
+- 단검 `Dagger_Weapon_L/R` = 슬롯 1개 `FK_Assassin_Body`, 루트 배율 1.25(v18). 단검 FBX 10-06 이후 무변경 → `Dagger_BladeMask.png`(UV0 칼날) 그대로 유효. `Dagger_Blade_Glow.mat` 있음.
+- `AssassinEnhanceReadyView` 는 코드만 있고 미부착. `Assassin_Armature/VFX/EnhancedReady` 빈 오브젝트 있음, `VFX_EnhanceAura` 소켓 없음.
+- `Player_Assassin` 에 민경이 만든 `Armature/VFX/EnhancedSlash` 트랜스폼. 강타 클립 0.2167초(= Hit)에 빈 이벤트.
+- 🔴 `AssassinVisualPrefabTests.BodyAndDaggerSlotsUseFlatKitBody`(은희) 가 단검 슬롯 = FK 1개만 허용 → 오버레이를 넣으면 실패.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 발광 대상 | **양손** 단검. 각 렌더러 슬롯 [1] = `Dagger_Blade_Glow`(팔라딘 패시브 방식), `EnhancedReady` 의 `MaterialFadeEffect`(`_ColorFactor`, 인 0.5초·아웃 0.3초, 대상 = 두 단검 렌더러) |
+| 반입 | MyProject `Export/Player3/NormalE/BM Assassin_EnhanceAura`·`_EnhanceCharge`·`_EnhanceSlash` → `50.Art/VFX/Common/Players/Player3/NormalE/FX_Assassin_E_Aura`·`_Charge`·`_Slash`(같은 guid, 루트 이름만). 의존 신규 7(`Dagger_Blade.fbx` → `Models/`, Piloto Double 재질 3·Sword_Tex_5 재질·텍스처·Slash_Fire_Repeat → `*/PilotoStudio/`). 엔트리: 오라 루프(outro 0.7초), 차지 0.5초·강타 1.0초 원샷. 카탈로그 `Assassin_E_Aura`·`_Charge`·`_Slash`. 🔴 SVN add |
+| 오라·차지 재생 | 🔸 **붙는 곳 = 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura`(10-16 확정, 칼날 중간 로컬 Y 0.33 — 다시 만듦)**. `EffectSocketPlayer` 4개를 그 소켓의 자식 `Aura`·`Charge` 에 둔다(소켓 비움 = 자기 자신 = 무기를 따라감, 10-20 민경). 배율 1.25(단검 배율), 오라 safetyTimeout 0(버프 무기한). 켜기·끄기는 `AssassinEnhanceReadyView` 가 `AssassinState.IsEnhancedReady` 로(차지는 `EnhancedReadyChanged(true)` 순간만, 늦은 접속은 차지 없이) — 인스턴스 생성 코드 → 소켓 플레이어 `Play`/`Stop`/`PlayOnce` 로 교체. 추가 네트워크 없음 |
+| 강타 슬래쉬 | `Armature/VFX/EnhancedSlash` 에 `EffectSocketPlayer`(id `Assassin_EnhancedSlash`, 엔트리 `Assassin_E_Slash`) · 강타 클립 0.2167초 빈 이벤트 → `PlayEffect("Assassin_EnhancedSlash")`. `AssassinSkillView` 의 `enhancedSlashPrefab`·`enhancedSlashSocket`·`PlayAttackSlash` 경로 삭제(임시 팔라딘 `FX_DoubleSlash_O`), `AssassinBasicAttack` 호출 정리, 저작 도구 해당 줄 삭제. 적중 성공 연출 없음 |
+| 시전 임시 연출 | `enhanceCastPrefab` 는 이미 비어 있음(차지가 대신) — 그대로 |
+| 테스트 | `AssassinVisualPrefabTests`: 단검 슬롯 [0] = FK, 그 뒤 슬롯은 `Dagger_Blade_Glow` 만 허용, 기대 슬롯 수 5 = FK 슬롯만 센다. 은희 영역 → handoff |
+| 담당·공유 | `AssassinSkillView`·`AssassinBasicAttack`·`AssassinShellAuthoring`·`AssassinVisualPrefabTests` = 은희 영역 → `Docs/tech/handoff-assassin-r-vfx.md` §3-7 |
+
+## 변경 파일
+- 신규: `50.Art/VFX/Common/Players/Player3/NormalE/*`(프리팹 3·엔트리 3) + 의존 아트 7
+- `Assassin_Armature.prefab`(단검 슬롯 [1]·소켓 2·EnhancedReady 뷰·페이드·소켓 플레이어 4) · `Player_Assassin.prefab`(EnhancedSlash 플레이어, 뷰 필드 정리) · `Combo_Attack_02_01.anim`(빈 이벤트 채움)
+- `AssassinEnhanceReadyView.cs` · `AssassinSkillView.cs` · `AssassinBasicAttack.cs` · `AssassinShellAuthoring.cs` · `AssassinVisualPrefabTests.cs` · `EffectCatalog.cs`·`.asset`
+- 문서: handoff · CONTEXT
+
+## 검증
+- dotnet 빌드 오류 0 · guid 연결(누락 0) · cmp. ⏳ 민경 Play / MPPM: E → 양손 날 붉게 + 차지 + 오라, 강타 시작에 꺼지고 0.2167초 슬래쉬, 변신·쓰러짐에 꺼짐, 다른 피어·늦은 접속 동일. EditMode `AssassinVisualPrefabTests` 통과.
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 우클릭(간파) VFX 반입·배선 — 기 모으기 · 튀기기 · 올려치기 · 성공 (EffectSocketPlayer)** (2026-10-19 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹·클립 배선 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-19). 소켓 4개 = 민경이 `Player_Assassin/VFX/RightClick/WindUp · Pop · Slash · Slash_Success` 에 EffectSocketPlayer 를 넣어 둠(커밋 `23a389de`, id·effect 비어 있음. Slash·Slash_Success 소켓은 10-19 `InterruptSlash` 트랜스폼으로 옮김). 좌클릭 반입(아래 계획)과 같은 방식.

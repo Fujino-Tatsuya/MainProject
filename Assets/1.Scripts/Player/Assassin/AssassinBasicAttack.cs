@@ -255,11 +255,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (hasPendingClip)
             return;
 
-        // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
-        // 일반 1~4타·변신 묶음 베기는 클립의 EffectAnimEvents 이벤트(PlayEffect / StartEffect·StopEffect)가 직접 낸다 —
-        // 여기로 오는 건 강타(임시 프리팹)뿐이다(2026-10-19 민경).
-        if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
-            view.PlayAttackSlash(currentMode, currentStepIndex);
+        // 베기 연출(일반 1~4타·변신 묶음·강타)은 클립의 EffectAnimEvents 이벤트(PlayEffect / StartEffect·StopEffect)가
+        // 전 피어에서 직접 낸다 — 여기서 하지 않는다(2026-10-19·20 민경). 판정은 아래 서버만.
 
         // 예약 창도 전 피어 — 오너는 자기 예약을, 서버는 승인을 각자 자기 애니 진행으로 거른다(가붕이 isComboWindowOpen 과 같다).
         if (active)

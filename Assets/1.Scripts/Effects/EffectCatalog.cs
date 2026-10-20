@@ -120,6 +120,13 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Assassin_RClick_Slash { get; private set; }
     [field: SerializeField] public EffectEntry Assassin_RClick_Success { get; private set; }
 
+    [Header("플레이어 — 어쌔신 일반 E(단검 강화)")]
+    // 강화 준비 동안 양손 단검 소켓(VFX_EnhanceAura)에서 오라 루프(FX_Assassin_E_Aura, 끄면 0.7초에 흩어짐), 준비 순간 차지 원샷(_Charge) —
+    // AssassinEnhanceReadyView 가 AssassinState.IsEnhancedReady 로 켜고 끈다. 강타 슬래쉬(_Slash) = Combo_Attack_02_01 의 PlayEffect 이벤트. (2026-10-20 민경)
+    [field: SerializeField] public EffectEntry Assassin_E_Aura { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_E_Charge { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_E_Slash { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
