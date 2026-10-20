@@ -205,24 +205,28 @@ MonoBehaviour:
     remainingText: {fileID: 333}
     hover: {fileID: 1978276408305894442}
     keyBackground: {fileID: 5608140777153697656}
+    keyText: {fileID: 313}
   - slot: 1
     icon: {fileID: 6373871036476383152}
     cooldownFill: {fileID: 423}
     remainingText: {fileID: 433}
     hover: {fileID: 9047073778394391620}
     keyBackground: {fileID: 1843538227861066266}
+    keyText: {fileID: 413}
   - slot: 2
     icon: {fileID: 174007606884099533}
     cooldownFill: {fileID: 523}
     remainingText: {fileID: 533}
     hover: {fileID: 4306313036729098530}
     keyBackground: {fileID: 8826426828853587377}
+    keyText: {fileID: 513}
   - slot: 3
     icon: {fileID: 8602286723302483696}
     cooldownFill: {fileID: 623}
     remainingText: {fileID: 633}
     hover: {fileID: 977021372868400882}
     keyBackground: {fileID: 8998427736566006272}
+    keyText: {fileID: 613}
   blockedColor: {r: 0.35, g: 0.35, b: 0.35, a: 0.75}
 --- !u!114 &373025847395609761
 MonoBehaviour:
