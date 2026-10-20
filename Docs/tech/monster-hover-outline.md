@@ -121,6 +121,12 @@
 - 대상: `MonsterBase` 를 상속하는 전부 — 일반 몹·중간보스(GauntletBot·SpinnerBot·WallBot)·**23호(TwentyThreeBoss) 포함**(모두 base `Update` 를 그대로 쓴다).
   **웰즈(BossWells)는 제외** — `MonoBehaviour` 인 23호 탑승 장식이라 자기 대상이 없다(23호 본체가 주황이 된다).
 - 고르기(`MonsterAggroTargetRule.SelectAggro`): 빨강 세트(호버·스킬 범위)에 든 몬스터는 빼고(**빨강 > 주황**, 한 몬스터는 한 색), 가까운 순, 상한 `aggroMaxTargets`(8).
+- **스킬 인디케이터가 켜져 있는 동안은 주황을 전부 끈다**(할 일 58 후속 4) — 그동안은 빨강(호버·스킬 범위)만 보인다. 대상 유무가 아니라 **표시 유무** 기준(범위 대상 0 이어도 끈다).
+  - 판단 기준 = 오너 로컬에서 범위 표시·조준이 떠 있는 프레임: `PlayerSkillTargeting` 조준 중(`Begin` 진입 프레임 + `isTargeting` 인 매 `Update`, 단일 대상·지점 지정 등 모든 조준 모드) ·
+    `ReportSkillHitArea` 를 부른 프레임(거너 Q 충전 직선, 지점 지정 조준의 판정 영역 보고 — `ReportSkillHitArea` 가 겸한다).
+    **HUD 슬롯 호버 미리보기는 제외**(사용 시 표시가 아니다). 조준 확정 뒤 자동 접근(`isMovingToCast`)은 표시가 꺼져 있어 주황이 돌아온다.
+  - 방식: `PlayerEnemyHoverOutline.ReportSkillIndicatorActive()` 프레임 도장(`MonsterAggroTargetRule.FrameStamp`) — 안 부른 프레임엔 자동 해제, 표시가 꺼지는 프레임은 `ClearSkillHitArea` 가 같이 푼다(같은 프레임 복귀).
+    `SelectAggro(..., skillIndicatorActive)` 가 결과를 비운다. 몬스터 목록 훑기(0.25초)는 그대로 — 표시 단계에서만 거른다.
 - 켜짐/꺼짐: 몬스터가 나를 물고 Chase/Attack 이면 켜지고, 추적 해제(대상 잃음·리쉬 복귀 Return)·피격 경직(Hit)·그로기·넉백 중·사망(HP 0 → 즉시)·휴면·연출 정지면 꺼진다.
   피격 경직·그로기 동안 잠깐 꺼졌다 다시 켜지는 것은 "추적 또는 공격 중" 정의 그대로다.
 - MPPM: 피어마다 자기 Player 의 id 로 판정한다(같은 몬스터가 A 화면에선 주황, B 화면에선 무색).

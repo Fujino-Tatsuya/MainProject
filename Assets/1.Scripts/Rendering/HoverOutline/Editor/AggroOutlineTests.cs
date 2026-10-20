@@ -200,4 +200,67 @@ public sealed class AggroOutlineTests
         CollectionAssert.DoesNotContain(result, h);
         CollectionAssert.DoesNotContain(result, r1);
     }
+
+    // ── 스킬 인디케이터 켜짐(할 일 58 후속 4) ──
+
+    [Test]
+    public void 인디케이터_켜짐이면_주황_0_빨강은_그대로()
+    {
+        Target h = new Target("h"), r1 = new Target("r1"), a1 = new Target("a1");
+        var primary = new List<Target> { r1 };
+        var range = new List<Target>(primary);
+        var result = new List<Target> { a1 }; // 지난 프레임 결과가 남아 있어도 비운다
+        MonsterAggroTargetRule.SelectAggro(Candidates((h, 1f, true), (r1, 2f, true), (a1, 3f, true)),
+            h, primary, 8, result, skillIndicatorActive: true);
+
+        Assert.AreEqual(0, result.Count);
+        CollectionAssert.AreEqual(range, primary); // 빨강 세트는 건드리지 않는다
+    }
+
+    [Test]
+    public void 인디케이터_꺼지면_주황_복귀()
+    {
+        Target a1 = new Target("a1"), a2 = new Target("a2");
+        var result = new List<Target>();
+        MonsterAggroTargetRule.SelectAggro(Candidates((a1, 1f, true), (a2, 2f, true)),
+            null, new List<Target>(), 8, result, skillIndicatorActive: true);
+        Assert.AreEqual(0, result.Count);
+
+        MonsterAggroTargetRule.SelectAggro(Candidates((a1, 1f, true), (a2, 2f, true)),
+            null, new List<Target>(), 8, result, skillIndicatorActive: false);
+        CollectionAssert.AreEqual(new[] { a1, a2 }, result);
+    }
+
+    [Test]
+    public void 범위_대상_0이어도_인디케이터_켜짐이면_주황_0()
+    {
+        Target a1 = new Target("a1");
+        var result = new List<Target>();
+        MonsterAggroTargetRule.SelectAggro(Candidates((a1, 1f, true)),
+            null, new List<Target>(), 8, result, skillIndicatorActive: true);
+        Assert.AreEqual(0, result.Count);
+    }
+
+    [Test]
+    public void 도장은_찍은_프레임만_켜짐_보고_끊기면_자동_해제()
+    {
+        var stamp = new MonsterAggroTargetRule.FrameStamp();
+        Assert.IsFalse(stamp.IsSet(0), "기본값은 꺼짐(프레임 0 포함)");
+
+        stamp.Mark(10);
+        Assert.IsTrue(stamp.IsSet(10));
+        Assert.IsFalse(stamp.IsSet(11), "다음 프레임에 보고가 없으면 꺼짐");
+
+        stamp.Mark(11);
+        Assert.IsTrue(stamp.IsSet(11), "매 프레임 보고하면 계속 켜짐");
+    }
+
+    [Test]
+    public void 도장_Clear는_같은_프레임에_해제()
+    {
+        var stamp = new MonsterAggroTargetRule.FrameStamp();
+        stamp.Mark(5);
+        stamp.Clear();
+        Assert.IsFalse(stamp.IsSet(5), "시전·취소 프레임에 바로 주황 복귀");
+    }
 }

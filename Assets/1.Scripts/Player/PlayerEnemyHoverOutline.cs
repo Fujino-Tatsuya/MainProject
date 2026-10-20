@@ -14,7 +14,8 @@ using UnityEngine.InputSystem;
 ///   서버 판정과 같은 <see cref="SkillHitVolume"/> 을 <see cref="ReportSkillHitArea"/> 로 넘기고, 여기서 NonAlloc 겹침 1회로 고른다.
 ///   보고가 끊긴 프레임(시전·취소)에 바로 꺼진다. 상한 초과는 가까운 순(<see cref="SkillRangeOutlineSelection"/>).</item>
 /// <item><b>나를 노림</b>(주황) — 서버가 복제한 <see cref="MonsterBase.AggroTargetId"/> 가 내 NetworkObjectId 인 살아 있는 몬스터.
-///   빨강 세트에 든 몬스터는 빠진다(빨강 우선). 상한 초과는 가까운 순(<see cref="MonsterAggroTargetRule"/>).</item>
+///   빨강 세트에 든 몬스터는 빠진다(빨강 우선). 상한 초과는 가까운 순(<see cref="MonsterAggroTargetRule"/>).
+///   스킬 인디케이터가 떠 있는 동안(<see cref="ReportSkillIndicatorActive"/>)은 전부 꺼진다.</item>
 /// </list>
 /// 그리기는 화면 공간 마스크 외곽선(<see cref="EnemyOutlineFeature"/>) — 여기서는 대상 렌더러 목록을 <see cref="EnemyOutlineDrawList"/> 에 넘기기만 한다.
 /// 몬스터 머티리얼·레이어·계층은 무수정. 색·두께는 여기 한 곳에서 튜닝한다(매 프레임 넘기므로 Play 중 인스펙터로 바로 보인다).
@@ -75,6 +76,8 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
     readonly List<OutlineCandidate<Unit>> candidates = new List<OutlineCandidate<Unit>>(OverlapBufferSize);
     readonly List<Unit> rangeTargets = new List<Unit>(SkillRangeOutlineSelection.DefaultMaxTargets);
 
+    MonsterAggroTargetRule.FrameStamp skillIndicator;
+
     float nextMonsterScan;
     readonly List<MonsterBase> monsters = new List<MonsterBase>(64);
     readonly List<Unit> aggroTargets = new List<Unit>(MonsterAggroTargetRule.DefaultMaxTargets);
@@ -87,6 +90,9 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
 
     /// <summary>지금 "나를 노림" 주황 외곽선을 그리는 몬스터들(빨강 대상 제외, 가까운 순).</summary>
     public IReadOnlyList<Unit> AggroTargets => aggroTargets;
+
+    /// <summary>이번 프레임 스킬 인디케이터(범위 표시·조준)가 떠 있다고 보고됐는가.</summary>
+    public bool SkillIndicatorActive => skillIndicator.IsSet(Time.frameCount);
 
     void Awake()
     {
@@ -111,10 +117,21 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
     {
         areaFrame = Time.frameCount;
         area = volume;
+        ReportSkillIndicatorActive();
     }
 
-    /// <summary>[오너 로컬] 표시가 이번 프레임에 꺼졌다(시전·취소) — 같은 프레임의 보고도 버린다.</summary>
-    public void ClearSkillHitArea() => areaFrame = -1;
+    /// <summary>
+    /// [오너 로컬] 이번 프레임 스킬 인디케이터(범위 표시·조준)가 떠 있다 — 맞을 대상 보고가 없는 조준도 부른다.
+    /// 부른 프레임엔 주황(나를 노림)을 끈다. 안 부른 프레임엔 자동 해제. <see cref="ReportSkillHitArea"/> 는 이것도 겸한다.
+    /// </summary>
+    public void ReportSkillIndicatorActive() => skillIndicator.Mark(Time.frameCount);
+
+    /// <summary>[오너 로컬] 표시가 이번 프레임에 꺼졌다(시전·취소) — 같은 프레임의 보고도 버린다(주황은 이 프레임에 복귀).</summary>
+    public void ClearSkillHitArea()
+    {
+        areaFrame = -1;
+        skillIndicator.Clear();
+    }
 
     // 조준·스킬 틱(Update)이 보고를 마친 뒤 판정한다. 렌더는 LateUpdate 뒤라 이번 프레임 목록이 바로 그려진다.
     void LateUpdate()
@@ -175,6 +192,7 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
     }
 
     // 복제된 대상 id 가 나인 몬스터. 몬스터 목록은 주기적으로만 다시 만든다(스폰된 NetworkObject 순회).
+    // 인디케이터가 떠 있어도 훑기는 계속한다 — 고르기 단계에서만 걸러야 해제 프레임에 바로 돌아온다.
     void ResolveAggroTargets(bool active, Unit hovered)
     {
         aggroTargets.Clear();
@@ -204,7 +222,8 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
             candidates.Add(new OutlineCandidate<Unit>(monster, SqrFlatDistance(monster, origin), targeting));
         }
 
-        MonsterAggroTargetRule.SelectAggro(candidates, hovered, rangeTargets, aggroMaxTargets, aggroTargets);
+        MonsterAggroTargetRule.SelectAggro(candidates, hovered, rangeTargets, aggroMaxTargets, aggroTargets,
+            SkillIndicatorActive);
     }
 
     void ScanMonsters()
@@ -335,6 +354,7 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
         rangeTargets.Clear();
         aggroTargets.Clear();
         areaFrame = -1;
+        skillIndicator.Clear();
         ReleaseAll();
         Publish(false);
     }
