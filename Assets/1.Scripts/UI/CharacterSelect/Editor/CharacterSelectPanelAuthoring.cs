@@ -28,6 +28,8 @@ public static class CharacterSelectPanelAuthoring
     const string ArtDir = "Assets/50.Art/UI/char_select/";
     const string MockupRelative = "50.Art/UI/char_select/legacy/00_mock_up.png";
     const string CaptureDir = "C:/UnityProject/_lane-artifacts/MainProject-Worktree4/48.2-char-select";
+    const string MotionCaptureDir = "C:/UnityProject/_lane-artifacts/MainProject-Worktree4/60-anim";
+    const string FocusRingName = "Ring_Focus"; // 구 이름 Marker_Current(할 일 60 전 — 금색 테두리 = 지금 캐릭터였다)
 
     const int SortingOrder = 190; // LobbyResultPanel(200) 아래 — 결과 패널이 위에 뜬다
 
@@ -146,10 +148,10 @@ public static class CharacterSelectPanelAuthoring
             // 클릭 영역 — 사각형(아트 텍스처가 Read/Write 꺼짐이라 알파 판정 불가). 자리끼리 겹치지 않는다.
             AddImage(root, null, new Color(0f, 0f, 0f, 0f)).raycastTarget = true;
 
-            // 지금 내 캐릭터 — 금색 테두리(카드 실루엣을 조금 크게 뒤에)
-            RectTransform marker = Child("Marker_Current", root.transform, Vector2.zero, CardSize + new Vector2(40f, 32f));
-            AddImage(marker.gameObject, sprites.CardRing, CurrentMarkerColor);
-            marker.gameObject.SetActive(false);
+            // 가운데 자리 강조 — 금색 테두리(카드 실루엣을 조금 크게 뒤에). 알파는 패널 이동 연출이 준다(할 일 60).
+            RectTransform ring = Child(FocusRingName, root.transform, Vector2.zero, CardSize + new Vector2(40f, 32f));
+            AddImage(ring.gameObject, sprites.CardRing, CurrentMarkerColor);
+            ring.gameObject.SetActive(false);
 
             // 위·아래 카드 바탕(card_unselected_top/bottom, 패널이 0.84 배로 줄여 549×436 원래 크기가 된다)
             RectTransform side = Child("Side", root.transform, Vector2.zero, CardSize);
@@ -191,7 +193,7 @@ public static class CharacterSelectPanelAuthoring
             so.FindProperty("sideBackground").objectReferenceValue = sideImage;
             so.FindProperty("sideTopSprite").objectReferenceValue = sprites.CardTop;
             so.FindProperty("sideBottomSprite").objectReferenceValue = sprites.CardBottom;
-            so.FindProperty("currentMarker").objectReferenceValue = marker.gameObject;
+            so.FindProperty("focusRing").objectReferenceValue = ring.gameObject;
             so.FindProperty("portraitImage").objectReferenceValue = portraitImage;
             so.FindProperty("nameText").objectReferenceValue = nameText;
             so.FindProperty("currentTag").objectReferenceValue = currentTag.gameObject;
@@ -383,7 +385,65 @@ public static class CharacterSelectPanelAuthoring
     // ── 미리보기 캡처 ─────────────────────────────────────────
 
     [MenuItem("Tools/UI/Preview/Character Select Panel 캡처")]
-    public static void CapturePreview()
+    public static void CapturePreview() => RunPreview(CaptureDir, CaptureStill);
+
+    /// <summary>
+    /// 카드 이동 연출(할 일 60) — 지금 0번·포커스 0번에서 다음 카드로 MoveFocus(1) 한 뒤, 패널 시계를 직접 넣어 샘플링한다.
+    /// 이동 중(위치 ≈ 50%, 시간 ≈ 50%·테두리 꺼짐)과 정착 뒤(테두리 켜짐·확대)를 찍는다.
+    /// </summary>
+    [MenuItem("Tools/UI/Preview/Character Select Panel 이동 연출 캡처")]
+    public static void CaptureMotionPreview() => RunPreview(MotionCaptureDir, CaptureMotion);
+
+    static void CaptureMotion(GameObject instance, Camera camera, RenderTexture rt, CharacterSelectPanel panel)
+    {
+        var move = new SerializedObject(panel);
+        float moveSeconds = move.FindProperty("moveSeconds").floatValue;
+        float ringFadeSeconds = move.FindProperty("ringFadeSeconds").floatValue;
+        float settleSeconds = Mathf.Max(ringFadeSeconds, move.FindProperty("focusScaleSeconds").floatValue);
+
+        panel.Show(0, false);
+        Shoot(instance, camera, rt, "CharacterSelect_anim_0_idle.png");
+
+        panel.MoveFocus(1); // 시각 0 에 출발
+        // EaseOutCubic 위치 50% = 시간 1 - 0.5^(1/3) ≈ 20.6% — 테두리는 아직 반쯤 남아 있다.
+        float pos50 = moveSeconds * (1f - Mathf.Pow(0.5f, 1f / 3f));
+        SampleAt(panel, pos50);
+        Shoot(instance, camera, rt, "CharacterSelect_anim_1_moving_pos50.png");
+
+        // 시간 ≈ 50% 이면서 테두리 다 꺼짐 — 페이드 0.1초가 이동 0.18초의 절반보다 길어 둘 중 늦은 쪽.
+        float ringOff = Mathf.Max(moveSeconds * 0.5f, ringFadeSeconds);
+        SampleAt(panel, ringOff);
+        Shoot(instance, camera, rt, "CharacterSelect_anim_2_moving_ring_off.png");
+
+        float settled = moveSeconds + settleSeconds + 0.01f;
+        SampleAt(panel, settled); // 이동 끝 → 정착 끝 → 정지
+        Shoot(instance, camera, rt, "CharacterSelect_anim_3_settled.png");
+
+        Debug.Log($"{Tag} 이동 연출 캡처 — 이동 {moveSeconds}s · 테두리 {ringFadeSeconds}s · 정착 {settleSeconds}s, " +
+                  $"샘플 시각 {pos50:F3}s(위치 50%) / {ringOff:F3}s(시간 {ringOff / moveSeconds:P0}·테두리 꺼짐) / {settled:F3}s(정착)");
+    }
+
+    static void Shoot(GameObject instance, Camera camera, RenderTexture rt, string file)
+    {
+        Texture2D shot = Render(instance, camera, rt);
+        Save(shot, file);
+        Object.DestroyImmediate(shot);
+    }
+
+    // 프리뷰 씬은 Update 가 돌지 않는다 — 패널 연출 시계를 이 값으로 바꿔 끼우고 원하는 시각으로 직접 그린다.
+    static float s_previewNow;
+    static string s_captureDir = CaptureDir;
+
+    static void SampleAt(CharacterSelectPanel panel, float time)
+    {
+        s_previewNow = time;
+        panel.SamplePreviewMotion(() => s_previewNow);
+    }
+
+    /// <summary>시계를 1초 넘겨 이동·정착을 끝낸다(정지 상태로 찍기).</summary>
+    static void SettleForCapture(CharacterSelectPanel panel) => SampleAt(panel, s_previewNow + 1f);
+
+    static void RunPreview(string dir, System.Action<GameObject, Camera, RenderTexture, CharacterSelectPanel> capture)
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
@@ -398,7 +458,8 @@ public static class CharacterSelectPanelAuthoring
             return;
         }
 
-        Directory.CreateDirectory(CaptureDir);
+        Directory.CreateDirectory(dir);
+        s_captureDir = dir;
         Scene preview = EditorSceneManager.NewPreviewScene();
         var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32);
         Camera camera = null;
@@ -423,10 +484,31 @@ public static class CharacterSelectPanelAuthoring
             canvas.planeDistance = 10f;
 
             panel = instance.GetComponent<CharacterSelectPanel>();
+            SampleAt(panel, 0f);
+            capture(instance, camera, rt, panel);
+        }
+        finally
+        {
+            if (panel != null)
+            {
+                panel.SamplePreviewMotion(null);
+                panel.Hide(); // 정적 열림 수 되돌리기(IsEscapeClaimed)
+            }
+            if (camera != null) camera.targetTexture = null;
+            RenderTexture.active = null;
+            rt.Release();
+            Object.DestroyImmediate(rt);
+            EditorSceneManager.ClosePreviewScene(preview);
+        }
+    }
 
-            // 1) 잠금 해제 — 지금 = 0번(팔라딘, 위 카드 금색 테두리), 포커스 = 1번(거너)
+    static void CaptureStill(GameObject instance, Camera camera, RenderTexture rt, CharacterSelectPanel panel)
+    {
+        {
+            // 1) 잠금 해제 — 지금 = 0번(팔라딘, 위 카드 "현재" 표식), 포커스 = 1번(거너). 이동 연출은 시계를 넘겨 정지 상태로 찍는다.
             panel.Show(0, false);
             panel.MoveFocus(1);
+            SettleForCapture(panel);
             Texture2D unlocked = Render(instance, camera, rt);
             Save(unlocked, "CharacterSelect_unlocked.png");
 
@@ -454,19 +536,10 @@ public static class CharacterSelectPanelAuthoring
             // 2) 잠금 — 지금 = 1번, 포커스 = 2번(어쌔신), "준비를 해제해야" 문구
             panel.Show(1, true);
             panel.MoveFocus(1);
+            SettleForCapture(panel);
             Texture2D locked = Render(instance, camera, rt);
             Save(locked, "CharacterSelect_locked.png");
             Object.DestroyImmediate(locked);
-        }
-        finally
-        {
-            if (panel != null)
-                panel.Hide(); // 정적 열림 수 되돌리기(IsEscapeClaimed)
-            if (camera != null) camera.targetTexture = null;
-            RenderTexture.active = null;
-            rt.Release();
-            Object.DestroyImmediate(rt);
-            EditorSceneManager.ClosePreviewScene(preview);
         }
     }
 
@@ -482,7 +555,7 @@ public static class CharacterSelectPanelAuthoring
 
     static void Save(Texture2D texture, string file)
     {
-        string path = Path.Combine(CaptureDir, file);
+        string path = Path.Combine(s_captureDir, file);
         File.WriteAllBytes(path, texture.EncodeToPNG());
         Debug.Log($"{Tag} 캡처 저장: {path}");
     }
