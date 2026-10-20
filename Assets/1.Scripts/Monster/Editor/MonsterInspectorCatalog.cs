@@ -210,7 +210,6 @@ public static class MonsterInspectorCatalog
         (Phase, "raidSelfDestructBlastDamage", "④ 대폭발 피해"),
         (Phase, "raidSelfDestructBlastLethal", "④ 대폭발 즉사"),
         (Phase, "relaySafeLines", "릴레이 — 6시(화면 아래) 안전 구역 줄 수"),
-        (Phase, "relaySafeExtendApex", "릴레이 — 안전 구역 꼭대기 위 3칸 추가"),
         (Phase, "relayCorridorHalfWidth", "릴레이 — 중앙 통로 반폭(m)"),
         (Phase, "relayGatherWarn", "릴레이 — 집결 방전 예고"),
         (Phase, "relayOpeningDamage", "릴레이 — 집결 방전 피해"),

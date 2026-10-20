@@ -304,35 +304,6 @@ public partial class TwentyThreeBoss
             if (safe) _relaySafeMask |= 1UL << i;
             else if (Mathf.Abs(lat[i]) > halfWidth + 0.01f) _relaySideMask |= 1UL << i;
         }
-        // 안전 구역 꼭대기 칸(맨 윗줄 중 가운데)의 위쪽 이웃 3칸(좌상·우상·바로 위)도 안전 — 경석 Play 10-20 "시작 때 여유 있게".
-        if (_boss == null || _boss.relaySafeExtendApex)
-        {
-            int apex = -1;
-            float apexAlong = float.MaxValue, apexLat = float.MaxValue;
-            for (int i = 0; i < BossTileGrid.TileCount; i++)
-            {
-                if ((_relaySafeMask & (1UL << i)) == 0) continue;
-                bool higher = along[i] < apexAlong - tol;
-                bool sameRowMoreCentral = Mathf.Abs(along[i] - apexAlong) <= tol && Mathf.Abs(lat[i]) < apexLat;
-                if (higher || sameRowMoreCentral) { apex = i; apexAlong = along[i]; apexLat = Mathf.Abs(lat[i]); }
-            }
-            if (apex >= 0)
-            {
-                int ar = apex / n, ac = apex % n;
-                for (int dr = -1; dr <= 1; dr++)
-                    for (int dc = -1; dc <= 1; dc++)
-                    {
-                        int r = ar + dr, c = ac + dc;
-                        if ((dr == 0 && dc == 0) || r < 0 || r >= n || c < 0 || c >= n) continue;
-                        int i = BossTileGrid.Bit(r, c);
-                        if (along[i] < apexAlong - tol)   // 화면 위쪽 이웃만
-                        {
-                            _relaySafeMask |= 1UL << i;
-                            _relaySideMask &= ~(1UL << i);
-                        }
-                    }
-            }
-        }
 
         _relayHalfWidth = Mathf.Max(0.5f, halfWidth);
 

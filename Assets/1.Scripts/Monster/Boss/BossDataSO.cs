@@ -377,10 +377,7 @@ public class BossDataSO : MonsterDataSO
     [Header("레이드 간파 릴레이 (RaidInterruptRelay) — 6시 집결 → 돌진 간파로 12시 끝선까지 밀기")]
     [Tooltip("6시 안전 구역 = **화면 아래** 끝에서 몇 줄(화면 가로로 같은 높이의 칸 묶음). 대각선 카메라에선 마름모 아래 꼭짓점 삼각형\n" +
              "(3 = 6칸). 그 밖 전부 집결 방전. 보스는 방 중앙(송전탑 안쪽)에서 시작해 화면 위로 밀린다(경석 Play 10-20).")]
-    [DataTableIgnore] [Range(1, 6)] public int relaySafeLines = 3;
-    [Tooltip("안전 구역 꼭대기 칸의 위쪽 이웃 3칸(좌상·우상·바로 위)도 안전으로 — 시작 때 여유(경석 Play 10-20). 3줄이면 6칸 → 9칸.")]
-    [DataTableIgnore] public bool relaySafeExtendApex = true;
-    [Tooltip("중앙 통로 반폭(m) — 방 중앙을 지나는 화면 세로선에서 이만큼 안의 칸. 밖(안전 구역 제외) = 측면 장판. 돌진 예고 띠 반폭도 이 값.")]
+    [DataTableIgnore] [Range(1, 6)] public int relaySafeLines = 3;    [Tooltip("중앙 통로 반폭(m) — 방 중앙을 지나는 화면 세로선에서 이만큼 안의 칸. 밖(안전 구역 제외) = 측면 장판. 돌진 예고 띠 반폭도 이 값.")]
     [DataTableIgnore] [Min(0.5f)] public float relayCorridorHalfWidth = 3.5f;
     [Tooltip("집결 방전 예고(초) · 피해(일반 방전 경로 — 대시 무적은 통한다, 한 방 상한 적용).")]
     [DataTableIgnore] [Min(0.5f)] public float relayGatherWarn = 7f;

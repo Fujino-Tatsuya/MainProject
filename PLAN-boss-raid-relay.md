@@ -4,7 +4,7 @@
 > 구현: `TwentyThreeBoss.RaidRelay.cs`(partial — 두 기믹 전체) · `BossRelayRoster.cs`(명단·잠금·연쇄 규칙) · 본체 연결 9곳. 자막 6줄 = `TutorialGuideTexts.asset`(git — xlsx 아님) + `BossRaidVariantAuthoring` 목록.
 > 🔸 **경석 Play 1차(10-20) 반영**: ① 방향 — 카메라가 요 −45° 대각선이라 방이 화면에서 마름모다. 방 축을 고르던 방식은 두 축이 동점이라 왼쪽 아래 벽이 골라졌다 →
 > **화면 아래로 투영**해 나눈다: 시작 = 방 중앙(송전탑 안쪽), 6시 = 마름모 아래 꼭짓점 쪽 `relaySafeLines`(3줄=6칸), 통로 = 중앙 화면 세로선 반폭 `relayCorridorHalfWidth` 3.5m, 12시 = 위 꼭짓점에서 `relayGoalInset` 4m 안쪽.
-> ② 1인 밀림 ×2(`relaySoloPushMultiplier`). (점프×3 착지 간파 = 착지 피해 직후 **자세 정지 0.8초** 창 → 닫히면 동작 재개.) 컴파일 0 · 전투 279/0 · ⏳ Play 2차.
+> ② 1인 밀림 ×2(`relaySoloPushMultiplier`). (점프×3 착지 간파 = 착지 피해 직후 **자세 정지 0.8초** 창 → 닫히면 동작 재개.) 컴파일 0 · 전투 279/0 · ✅ Play 2차(릴레이 솔로 · 점프×3) · ✅ 연쇄 간파 솔로 Play(45% 임시 전환으로 확인). ⏳ MPPM(릴레이 잠금·연쇄 지목자).
 > ⚠️ 계획과 다른 점: 집결 미도착자 **위치 보정 없음**(서버에서 플레이어를 옮기는 API 가 없다 — 방전 피해만). 연쇄 간파 지목 표시 = 대상 쪽으로 차오르는 파란 띠 + 어그로 전환(머리 위 표식·전기선 VFX 없음).
 > 근거: SVN r475 `2_Documents/20_Design/ReC/Re_C_보스_기믹1_간파릴레이_예외처리_20261020.md`(김태현) ·
 > r474 `Re_C_23호_협동_변형_기획서.md` §8 연쇄 간파. 상위 계획 [PLAN-boss-raid.md](PLAN-boss-raid.md).
@@ -13,7 +13,7 @@
 | 항목 | 결정 |
 |---|---|
 | 만들 것 | `BossPhaseSequence` 새 값 2개 — `RaidInterruptRelay`(간파 릴레이) · `RaidChainCounter`(연쇄 간파). **배치는 경석이 조합**한다 |
-| 기본 배치 | `No23_Raid` ④ 20% 행 = **간파 릴레이**. 자폭(`RaidSelfDestruct`)은 코드·enum 그대로 남김. 연쇄 간파는 phases 에 행만 넣으면 바로 동작 |
+| 기본 배치 | `No23_Raid` ④ 20% 행 = **간파 릴레이**. 자폭(`RaidSelfDestruct`)은 코드·enum 그대로 남김. 연쇄 간파는 phases 에 행만 넣으면 바로 동작. 10-20 경석 Play 후 최종: 45% = ③ 구출 유지(1인 = 점프·점프·점프 콤보, 2~3인 = 잡기), 연쇄 간파는 배치 안 함 |
 | 우클릭 잠금 | **보스 쪽만** — 잠긴 사람의 간파는 보스가 인정하지 않는다(일반 피해만). 쿨 0·잠금 아이콘은 은희에게 요청 → 요청서 [handoff-raid-relay-lock.md](Docs/tech/handoff-raid-relay-lock.md) |
 | 기믹 피해 | 기존 레이드 방전과 **같은 경로**(일반 피해 + 한 방 90% 상한, 대시 무적은 통한다). 값은 최대 HP 비율이 아니라 **고정 피해(SO)** |
 | 연쇄 지목 순번 | 기믹 시작 때 **위협 1위부터** 순번을 정해 순환. 쓰러진 사람은 건너뜀 |

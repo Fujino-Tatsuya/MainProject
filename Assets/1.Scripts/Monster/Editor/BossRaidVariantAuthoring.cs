@@ -93,6 +93,7 @@ public static class BossRaidVariantAuthoring
         data.phases = new[]
         {
             new BossPhaseEntry { hpThreshold = 0.75f, sequence = BossPhaseSequence.RaidDroneCharge,  damageMultiplier = 1.15f, speedMultiplier = 1.1f },
+            // 경석 10-20: ③ 구출 유지 — 1인은 점프·점프·점프 콤보(BossRaidRules.RescueAttackFor). 연쇄 간파는 enum 만 있고 배치 안 함.
             new BossPhaseEntry { hpThreshold = 0.45f, sequence = BossPhaseSequence.RaidRescue,       damageMultiplier = 1.3f,  speedMultiplier = 1.2f },
             // 경석 10-20: ④ 자리 = 간파 릴레이(자폭은 enum·코드 그대로 — phases 에서 고르면 다시 쓴다).
             new BossPhaseEntry { hpThreshold = 0.20f, sequence = BossPhaseSequence.RaidInterruptRelay, damageMultiplier = 1.3f,  speedMultiplier = 1.2f },

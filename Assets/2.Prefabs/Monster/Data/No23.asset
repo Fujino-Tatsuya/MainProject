@@ -379,6 +379,7 @@ MonoBehaviour:
       forceFire: 0
       landingCounterWindow: 0.8
     chainOnHit: 1
+    windup: 1
   openingCombo: 010000000000000005000000
   comboStepInterval: 0.3
   comboChaseGrace: 1

@@ -1,7 +1,7 @@
 # PLAN — 23호 레이드 변형 (지스타 2026-11, 경석)
 
 > 상태: ✅ 승인(10-14) · ✅ W1 `b9be4190` · ✅ W2 `ec1985d8`(팀장 Play OK, 방전 0칸 버그 수정) · ✅ W3 코드(컴파일 0 · 전투 EditMode 149/0) · ⏳ W3 팀장 Play.
-> 🔸 **10-20 경석: ④ 20% 기본 배치 = 간파 릴레이**(자폭은 enum·코드 그대로 남김) · 연쇄 간파 페이즈 추가 — [PLAN-boss-raid-relay.md](PLAN-boss-raid-relay.md).
+> 🔸 **10-20 경석: ④ 20% 기본 배치 = 간파 릴레이**(자폭은 enum·코드 그대로 남김) · 연쇄 간파 페이즈 추가(배치 안 함) · ③ 1인 = 점프·점프·점프 콤보 — [PLAN-boss-raid-relay.md](PLAN-boss-raid-relay.md).
 > 근거 회의(10-14): Claude 안 + Codex 교차 안 비교 → 합본 A+ 채택. 원문 = `Docs/design/boss/raid-rework-meeting-1014.md`.
 
 ## 0. 목표

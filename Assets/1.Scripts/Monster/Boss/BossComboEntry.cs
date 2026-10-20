@@ -31,6 +31,10 @@ public class BossComboEntry
              "· 앞 타가 점프면 착지 히트 순간(후딜 comboJumpRecovery) · 돌진이면 복귀 comboDashRecovery 뒤\n" +
              "끄면 이전 동작(comboStepInterval 간격 + 각 타 예고 그대로).")]
     public bool chainOnHit = true;
+
+    [Tooltip("콤보 시작 전 차징(초) — 첫 타 전에 차징 클립(ChargeSequence 행 애니)을 이만큼 튼다(경석 10-20 — 점프·점프·점프가\n" +
+             "단타 점프와 구별되게). 0 = 없음. ⚠️ 지금은 첫 타가 점프일 때만 동작한다.")]
+    [Min(0f)] public float windup;
 }
 
 [Serializable]

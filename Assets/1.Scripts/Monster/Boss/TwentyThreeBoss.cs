@@ -298,6 +298,21 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     float _chainAt;
     BossAttackId _chainPrevAttack; // 지금 후속 타 바로 앞 타 — 돌진 다음 잡기만 예고를 길게(comboGrabTelegraphAfterDash)
 
+    // ─── 콤보 시작 전 차징(경석 10-20 — 점프·점프·점프) — 서버 전용 ───
+    float _comboWindupNext;   // StartRouletteCombo 가 세운 첫 타 앞 차징 — 다음 StartAttack 이 소비
+    float _comboWindup;       // 지금 공격(점프)이 시작 전에 틀 차징 길이. 0 = 없음
+
+    void BeginComboWindup()
+    {
+        float t = _comboWindup;
+        _comboWindup = 0f;
+        BossAttackEntry charge = AttackEntryOf(BossAttackId.ChargeSequence);
+        if (charge != null && !string.IsNullOrEmpty(charge.animatorStateName))
+            CrossFadeStateClientRpc(charge.animatorStateName);
+        Debug.Log($"[23호/콤보] 시작 전 차징 {t:0.##}초", this);
+        EnterPhase(BossAttackPhase.ComboWindup, t);
+    }
+
     // ─── 점프 착지 간파 창(경석 10-20 — 점프·점프·점프 3번째) — 서버 전용 ───
     float _comboLandingCounterNext;      // ConsumeCombo 가 세운 이 타의 창 길이 — 다음 StartAttack 이 소비
     float _landingCounterWindow;         // 지금 공격(점프)의 착지 피해 직후 창 길이. 0 = 없음 · 한 번 열면 0
@@ -1209,7 +1224,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     public bool DevReserveJumpCombo()
     {
         if (!IsServer) return false;
-        if (FindDevJumpCombo() < 0)
+        if (FindJumpTripleCombo() < 0)
         {
             Debug.LogWarning("[23호/Dev] 점프·점프·점프 콤보(모든 타가 Jump)가 combos 에 없다 — 예약 안 함", this);
             return false;
@@ -1219,34 +1234,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         return true;
     }
 
-    // 모든 타가 Jump 인 콤보. 착지 간파 창이 있는 것을 먼저 고른다.
-    int FindDevJumpCombo()
-    {
-        BossComboEntry[] combos = _boss != null ? _boss.combos : null;
-        if (combos == null) return -1;
-        int fallback = -1;
-        for (int k = 0; k < combos.Length; k++)
-        {
-            BossComboEntry c = combos[k];
-            if (c == null || c.steps == null || c.steps.Length == 0) continue;
-            bool allJump = true, hasWindow = false;
-            foreach (BossComboStep s in c.steps)
-            {
-                if (s.attack != BossAttackId.Jump) { allJump = false; break; }
-                if (s.landingCounterWindow > 0f) hasWindow = true;
-            }
-            if (!allJump) continue;
-            if (hasWindow) return k;
-            if (fallback < 0) fallback = k;
-        }
-        return fallback;
-    }
-
     int ConsumeDevReservation(BossAttackEntry[] rows, float dist)
     {
         if (!_devJumpComboReserved) return NoAttack;
 
-        int k = FindDevJumpCombo();
+        int k = FindJumpTripleCombo();
         int slot = FindSlot(BossAttackId.Jump);
         if (k < 0 || slot == NoAttack)
         {
@@ -1256,11 +1248,6 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
         if (!InComboWindow(rows[slot], dist)) return NoAttack;   // 예약 유지 — 거리창이 맞으면 발동
 
-        if (_comboLastUsed == null || _comboLastUsed.Length != _boss.combos.Length)
-        {
-            _comboLastUsed = new float[_boss.combos.Length];
-            for (int i = 0; i < _comboLastUsed.Length; i++) _comboLastUsed[i] = -999f;
-        }
         _devJumpComboReserved = false;
         Debug.Log($"[23호/Dev] 예약 발동 — {_boss.combos[k].name} (거리 {dist:0.##}m)", this);
         return StartRouletteCombo(k, rows);
@@ -1292,12 +1279,51 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         return ScriptedResult.Fire;
     }
 
+    /// <summary>모든 타가 Jump 인 콤보(점프·점프·점프). 착지 간파 창이 있는 것을 먼저 고른다. 없으면 -1.</summary>
+    int FindJumpTripleCombo()
+    {
+        BossComboEntry[] combos = _boss != null ? _boss.combos : null;
+        if (combos == null) return -1;
+        int fallback = -1;
+        for (int k = 0; k < combos.Length; k++)
+        {
+            BossComboEntry c = combos[k];
+            if (c == null || c.steps == null || c.steps.Length == 0) continue;
+            bool allJump = true, hasWindow = false;
+            foreach (BossComboStep s in c.steps)
+            {
+                if (s.attack != BossAttackId.Jump) { allJump = false; break; }
+                if (s.landingCounterWindow > 0f) hasWindow = true;
+            }
+            if (!allJump) continue;
+            if (hasWindow) return k;
+            if (fallback < 0) fallback = k;
+        }
+        return fallback;
+    }
+
     int ConsumeRaidRescue(BossAttackEntry[] rows, float dist)
     {
         BossAttackId next = _raidRescueNext.Value;
         ScriptedResult r = TryScripted(next, rows, dist, out int slot);
         if (r == ScriptedResult.Missing) { _raidRescueNext = null; return NoAttack; }
         if (r == ScriptedResult.Wait) return NoAttack;
+
+        // 1인 = 점프·점프·점프 콤보(경석 10-20 — 구출 상대가 없으니 그냥 나오기만 한다). 보상은 일반 간파(3번째 착지 창)와 같다.
+        //    구출 표식(_raidRescueActive)은 세우지 않는다 — 콤보 타마다 FinishChain 이 지나가 첫 착지에서 "구출 실패"로 지워진다.
+        if (next == BossAttackId.Jump)
+        {
+            _raidRescueNext = null;
+            int k = FindJumpTripleCombo();
+            if (k < 0)
+            {
+                Debug.LogWarning($"[23호/레이드] 새 가족(1인) — 점프·점프·점프 콤보가 없어 단타 점프로 낸다.", this);
+                return slot;
+            }
+            Debug.Log($"[23호/레이드] 새 가족(1인) — {_boss.combos[k].name} 발동", this);
+            FightLog("③ 새 가족(1인) — 점프·점프·점프");
+            return StartRouletteCombo(k, rows);
+        }
 
         _raidRescueNext = null;
         _raidRescueActive = true;
@@ -1377,11 +1403,19 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         int slot = FindSlot(c.steps[0].attack);
         if (slot == NoAttack) return NoAttack;
 
+        // 룰렛 밖(Dev 예약 · ③ 1인 각본)에서 부르면 후보 계산을 거치지 않아 배열이 아직 없을 수 있다.
+        if (_comboLastUsed == null || _comboLastUsed.Length != _boss.combos.Length)
+        {
+            _comboLastUsed = new float[_boss.combos.Length];
+            for (int i = 0; i < _comboLastUsed.Length; i++) _comboLastUsed[i] = -999f;
+        }
+
         _combo = c;
         _comboIndex = 1;
         _comboIsOpening = false;
         _comboLock = Target;
         _comboLastUsed[k] = Time.time;
+        _comboWindupNext = c.steps[0].attack == BossAttackId.Jump ? Mathf.Max(0f, c.windup) : 0f;   // 첫 타 앞 차징
         _fightCombosStarted++;
         Debug.Log($"[23호/콤보] {c.name} 시작 — {c.steps[0].attack} (대상 {(Target != null ? Target.name : "없음")})", this);
         return slot;
@@ -1474,6 +1508,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _chainFacingValid = false;
         _chainArmed = false;
         _comboLandingCounterNext = 0f;
+        _comboWindupNext = 0f;
         _combo = null;
         _comboIndex = 0;
         _comboIsOpening = false;
@@ -1495,6 +1530,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _chainArmed = false;   // 앞 공격이 남긴 예약은 이 공격에 해당하지 않는다
         _landingCounterWindow = _comboLandingCounterNext;   // 콤보 타가 아니면 0(ClearCombo·소비 후 0)
         _comboLandingCounterNext = 0f;
+        _comboWindup = e != null && e.attackId == BossAttackId.Jump ? _comboWindupNext : 0f;   // 콤보 첫 타 앞 차징
+        _comboWindupNext = 0f;
         _landingCounterCloseAt = -1f;
 
         // 연속 카운트는 "실제로 쓴 것" 기준으로 센다(SelectAttackSlot 은 NoAttack 을 돌릴 수 있다).
@@ -1575,7 +1612,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                     // 🔴 [G4] 이륙 몴을 반드시 더한다 — 빼면 체인 도중 데드락 안전망이 터진다
                     //    (돌진이 선딜 몫을 빼뜨려 매번 타임아웃하던 것과 같은 종류).
                     _stateTimer = JumpTakeoffDuration + JumpHover + JumpLanding + JumpRecovery
-                                + data.attackDuration;
+                                + data.attackDuration + _comboWindup;   // 콤보 앞 차징 몫도(슈퍼아머 길이)
                     break;
                 case BossAttackId.ChargeSequence:
                     // 🔴 **진입 구간을 예산에 넣는다**(2026-08-13). 차징은 자리로 이동한 뒤 시작하므로
@@ -1688,7 +1725,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 StartMagneticPullClientRpc();
                 break;
 
-            case BossAttackId.Jump: BeginJump(); break;
+            case BossAttackId.Jump:
+                if (_comboWindup > 0f) BeginComboWindup();   // 점프·점프·점프 — 차징 클립 뒤 점프(case ComboWindup)
+                else BeginJump();
+                break;
             case BossAttackId.ChargeSequence: BeginCharge(); break;
             // 팔다리 전기는 **선딜부터** 흐른다(그랩 팔 전기와 같은 판단) — BeginDash/BeginRageDash 는
             // 실제 돌진이 시작되는 지점이라 거기서 켜면 선딜 동안 아무 예고가 없다.
@@ -2594,6 +2634,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             // [G4] 이륙 — 올라가는 동안. 다 오르면 체공으로 넘긴다.
             case BossAttackPhase.JumpTakeoff:
                 if (_attackPhaseTimer <= 0f) BeginJumpHover();
+                break;
+
+            // 콤보 시작 전 차징(점프·점프·점프) — 끝나면 원래 점프 시작으로.
+            case BossAttackPhase.ComboWindup:
+                if (_attackPhaseTimer > 0f) break;
+                if (IsSpawned) StopCutClipLoopsClientRpc();   // 차징 클립을 도중에 끊는다 — 루프 이펙트 정리
+                BeginJump();
                 break;
 
             case BossAttackPhase.Leap:
