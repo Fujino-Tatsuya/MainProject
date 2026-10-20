@@ -81,7 +81,10 @@ public static class EnemyC3TelegraphPerfProbe
     [MenuItem("Tools/Enemy C3/Measure first calls (control, no prewarm)")]
     static void ControlMenu() => UnityEngine.Debug.Log("[Enemy C3] control perf →\n" + RunPrewarm(false, out _));
 
-    /// <summary>예열(선택) → 경로별 첫 호출 → 같은 경로 새 오브젝트 9회 더(JIT 뒤 남는 생성 비용). 산출물 = S5/prewarm.txt·tsv(대조군은 control.*).</summary>
+    /// <summary>
+    /// 예열(선택) → 경로별 첫 호출 → 같은 경로 새 오브젝트 9회 더(JIT 뒤 남는 생성 비용). 산출물 = &lt;_lane-artifacts&gt;/&lt;repo 폴더&gt;/57.1/prewarm.txt·tsv
+    /// (대조군은 control.*). 할 일 57.1 부터 예열이 보스 예고 컴포넌트(23호 Show·드론 ClientLock)도 덮는다.
+    /// </summary>
     public static string RunPrewarm(bool prewarm, out string artifactDir)
     {
         bool domainFirst = !_ranThisDomain;
@@ -101,7 +104,7 @@ public static class EnemyC3TelegraphPerfProbe
             rows.Add(new Row { path = "EnemyC3Visuals.Prewarm() (예열 자체)", phase = "prewarm", n = 1, ms = prewarmMs, msMax = prewarmMs, gc = gc });
             var last = Type.GetType("EnemyC3Prewarm, Assembly-CSharp")?.GetField("Last", Any)?.GetValue(null);
             if (last != null)
-                breakdown = $"예열 내역: data {Field<double>(last, "data"):F2} ms · shaders {Field<double>(last, "shaders"):F2} ms ({Field<int>(last, "variants")} 변형) · paths {Field<double>(last, "paths"):F2} ms";
+                breakdown = $"예열 내역: data {Field<double>(last, "data"):F2} ms · shaders {Field<double>(last, "shaders"):F2} ms ({Field<int>(last, "variants")} 변형) · paths {Field<double>(last, "paths"):F2} ms (그중 보스 컴포넌트 {Field<double>(last, "boss"):F2} ms — 57.1)";
             long t1 = Stopwatch.GetTimestamp();
             EnemyC3Visuals.Prewarm();
             double again = Ms(Stopwatch.GetTimestamp() - t1);
@@ -114,8 +117,8 @@ public static class EnemyC3TelegraphPerfProbe
 
         var sb = new StringBuilder();
         sb.AppendLine(prewarm
-            ? "할 일 57 R 예열 — 예열 후 콜드 첫 호출(에디터 EditMode, Tools/Enemy C3/Measure prewarm then first calls)"
-            : "할 일 57 R 예열 — 대조군: 예열 없이 콜드 첫 호출(Tools/Enemy C3/Measure first calls (control, no prewarm))");
+            ? "할 일 57.1 예열(보스 컴포넌트 포함) — 예열 후 콜드 첫 호출(에디터 EditMode, Tools/Enemy C3/Measure prewarm then first calls)"
+            : "할 일 57.1 예열 — 대조군: 예열 없이 콜드 첫 호출(Tools/Enemy C3/Measure first calls (control, no prewarm))");
         sb.AppendLine($"측정 {DateTime.Now:yyyy-MM-dd HH:mm} · Unity {Application.unityVersion} · {SystemInfo.processorType} · {SystemInfo.graphicsDeviceName} · {SystemInfo.graphicsDeviceType}");
         sb.AppendLine(domainFirst
             ? "이번 실행 = 도메인 리로드 뒤 첫 실행 → first n=1 = 도메인 첫 호출(예열이 JIT 을 못 덮은 부분 포함)."
@@ -129,7 +132,7 @@ public static class EnemyC3TelegraphPerfProbe
             sb.AppendLine($"{r.path,-52} {r.phase,-7} {r.n,3} {r.ms,10:F4} {r.msMax,10:F4} {r.gc,9} {(r.phase == "prewarm" ? "" : r.n == 1 ? (r.ms < 1 ? "yes" : "NO") : ""),5}");
         string txt = sb.ToString();
 
-        artifactDir = ArtifactDir();
+        artifactDir = ArtifactDir("57.1");
         if (artifactDir != null)
         {
             Directory.CreateDirectory(artifactDir);
@@ -601,10 +604,12 @@ public static class EnemyC3TelegraphPerfProbe
         return sb.ToString();
     }
 
-    static string ArtifactDir()
+    static string ArtifactDir() => ArtifactDir(Path.Combine("57-shader", "S5"));
+
+    static string ArtifactDir(string sub)
     {
         var project = Directory.GetParent(Application.dataPath);
         var lanes = Path.Combine(project.Parent.FullName, "_lane-artifacts");
-        return Directory.Exists(lanes) ? Path.Combine(lanes, project.Name, "57-shader", "S5") : null;
+        return Directory.Exists(lanes) ? Path.Combine(lanes, project.Name, sub) : null;
     }
 }

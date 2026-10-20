@@ -500,6 +500,12 @@ public sealed class WellsDroneAttack : MonoBehaviour
         t.localScale = new Vector3(d, 1f, d);
     }
 
+    /// <summary>
+    /// 드론 뷰 루트(표식·예고 원) — 이 컴포넌트의 자식이 아닌 별도 오브젝트다. 로딩 예열(EnemyC3Prewarm, 할 일 57.1)이
+    /// 임시 컴포넌트로 ClientMark·ClientLock 을 한 번 돌린 뒤 같은 호출 안에서 즉시 지우려고 읽는다(EditMode 엔 OnDestroy 가 안 돈다).
+    /// </summary>
+    internal Transform ViewRoot => _viewRoot;
+
     void EnsureView()
     {
         if (_viewRoot != null) return;
