@@ -950,7 +950,12 @@ public static partial class QALobbyScenarios
 
         if (role.Value == 0)
         {
-            // 전멸이 결과 대신 리스폰이 되려면 보스방 도착(G11) 뒤여야 한다 — 보스전 강제 개시 후 Combat 까지.
+            // 전멸이 결과 대신 리스폰이 되려면 튜토리얼은 G10(보스 진입·패드)이 열려 있어야 한다(PartyWipeRespawnRules.CanRespawn,
+            // party-lives-respawn.md §3.2). 강제 개시는 패드를 건너뛰어 G10 이 닫힌 채라 2차 1회차에서 결과 화면으로 갔다 — 디버그 경로로 G10 까지 연다.
+            TutorialDirector tutorial = TutorialDirector.Instance;
+            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad))
+                TutorialDebugActions.OpenGatesThrough(tutorial, TutorialGate.G10_BossEnterAndPad);
+            // 그다음 보스전 강제 개시 → Combat(보스방 도착 = G11).
             BossTeleportManager tp = BossTeleportManager.Instance;
             float deadline = Time.realtimeSinceStartup + 30f;
             while (tp != null && Phase != BossEncounterPhase.Combat && !tp.ForceStartEncounter(0f) && Time.realtimeSinceStartup < deadline)
