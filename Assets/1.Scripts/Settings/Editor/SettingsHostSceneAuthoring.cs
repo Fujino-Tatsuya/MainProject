@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -7,18 +6,13 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 설정창 새 아트(PLAN-settings-art) — 설정창을 담는 두 씬의 옛 틀을 끈다. <b>멱등</b>. 삭제하지 않고 끄기만 한다(되돌리기 쉽게).
-/// - 맵 ESC(<c>4.MapScene</c> <c>OptionPanel</c>): 배경은 투명(클릭 차단은 유지) · 옛 제목·"Option" 글자·X 버튼 끔 ·
-///   나가기 버튼을 새 틀 제목줄 오른쪽(닫기 버튼 왼쪽)의 빨간 알약으로(경석 10-20). 버튼 기능·연결은 그대로.
+/// - 맵 ESC(<c>4.MapScene</c> <c>OptionPanel</c>): 배경 = 반투명 검정(클릭 차단 유지) · 옛 제목·"Option" 글자·X 버튼 끔 ·
+///   나가기 버튼 끔(ESC 일시정지 메뉴의 그만두기가 대신 — PLAN-pause-menu).
 /// - 타이틀(<c>1.TitleScene</c>): 옛 Close_Button·Options_Title 끔 · 배경 투명 · 설정창 배율 1.4 → 1.0(새 틀 1475 폭이 모니터 RT 1536 에 맞게).
 /// </summary>
 public static class SettingsHostSceneAuthoring
 {
     const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
-
-    // 새 틀 제목줄 안 나가기 버튼 — 패널 중심 기준. 제목줄 띠(목업 y 115~225) 세로 중앙, 닫기 버튼(목업 x 1496) 왼쪽 20.
-    static readonly Vector2 ExitPos = new Vector2(394.6f, 358f);
-    static readonly Vector2 ExitSize = new Vector2(220f, 76f);
-    const string PillRedGuid = "ba9c4ad2c9534c66b0b003202a73d7dd";
 
     [MenuItem("Tools/UI/Settings/설정창 옛 틀 끄기 — 타이틀·ESC (멱등)")]
     static void Run()
@@ -35,45 +29,14 @@ public static class SettingsHostSceneAuthoring
         if (panel == null) { Debug.LogError("[SettingsHost] 맵 OptionPanel 이 없다."); return false; }
 
         Image bg = panel.GetComponent<Image>();
-        if (bg != null) bg.color = Color.clear;   // 새 틀이 그림 — 바깥 클릭 차단(레이캐스트)은 남긴다
+        if (bg != null) bg.color = PauseMenuAuthoring.DimColor;   // 반투명 검정으로 게임을 덮는다(펴기·정렬은 PauseMenuAuthoring)
         Hide(panel.transform, "Options_Title");
         Hide(panel.transform, "OptionPanel_Text");
         Hide(panel.transform, "OptionPanel_Close");
 
-        Transform exit = panel.transform.Find("ExitButton");
-        if (exit == null) { Debug.LogError("[SettingsHost] 맵 ExitButton 이 없다."); return false; }
-        var r = (RectTransform)exit;
-        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
-        r.pivot = new Vector2(0.5f, 0.5f);
-        r.anchoredPosition = ExitPos;
-        r.sizeDelta = ExitSize;
-        exit.SetAsLastSibling();   // 설정창(SettingsBody) 위에 그려지게 — 경고창은 그 다음
-        Transform warning = panel.transform.Find("WarnningMessage_Panel");
-        if (warning != null) warning.SetAsLastSibling();
-
-        var pill = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath(PillRedGuid));
-        Image img = exit.GetComponent<Image>();
-        if (pill != null && img != null) SettingsArtSkin.SetSliced(img, pill, ExitSize);
-        Button b = exit.GetComponent<Button>();
-        if (b != null)
-        {
-            ColorBlock c = b.colors;
-            c.normalColor = Color.white;
-            c.highlightedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
-            c.selectedColor = Color.white;
-            c.pressedColor = new Color(0.72f, 0.72f, 0.72f, 1f);
-            c.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.5f);
-            b.colors = c;
-        }
-        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(SettingsArtSkin.FontAssetPath);
-        foreach (TMP_Text t in exit.GetComponentsInChildren<TMP_Text>(true))
-        {
-            if (font != null) { t.font = font; t.fontSharedMaterial = font.material; }
-            t.color = Color.white;
-            t.alignment = TextAlignmentOptions.Center;
-            SettingsArtSkin.AutoSize(t, 14f, 30f);
-            SettingsArtSkin.Stretch(t.rectTransform, new Vector2(18f, 0f), new Vector2(-18f, 0f));
-        }
+        // 나가기 버튼은 끈다 — ESC 일시정지 메뉴의 '그만두기'가 대신한다(PLAN-pause-menu, 경석 10-20).
+        //   (10-20 오전엔 제목줄 빨간 알약으로 옮겼으나 일시정지 메뉴 도입으로 뒤집음.)
+        Hide(panel.transform, "ExitButton");
         return true;
     }
 

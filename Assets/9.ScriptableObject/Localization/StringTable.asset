@@ -572,6 +572,36 @@ MonoBehaviour:
   - key: UI.StatusEffect.Grabbed
     ko: "\uBD99\uC7A1\uD798"
     en: "\uBD99\uC7A1\uD798"
+  - key: UI.Pause.Title
+    ko: "\uBA54\uB274"
+    en: Menu
+  - key: UI.Pause.Continue
+    ko: "\uACC4\uC18D\uD558\uAE30"
+    en: Continue
+  - key: UI.Pause.Settings
+    ko: "\uC124\uC815"
+    en: Settings
+  - key: UI.Pause.Quit
+    ko: "\uADF8\uB9CC\uB450\uAE30"
+    en: Quit
+  - key: UI.Pause.PressAnyButton
+    ko: Press Any Button
+    en: Press Any Button
+  - key: UI.Exit.Title
+    ko: "\uAC8C\uC784 \uC885\uB8CC"
+    en: Quit Game
+  - key: UI.Exit.Message
+    ko: "\uC815\uB9D0 \uC885\uB8CC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?"
+    en: Are you sure you want to quit?
+  - key: UI.Exit.Desktop
+    ko: "\uBC14\uD0D5\uD654\uBA74"
+    en: Desktop
+  - key: UI.Exit.Lobby
+    ko: "\uB85C\uBE44"
+    en: Lobby
+  - key: UI.Settings.Title
+    ko: "\uC124\uC815"
+    en: Settings
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

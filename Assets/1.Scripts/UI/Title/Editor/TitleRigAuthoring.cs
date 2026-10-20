@@ -374,7 +374,9 @@ public static class TitleRigAuthoring
             if (b == null) continue;
             var rt = (RectTransform)b.transform;
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = new Vector2(0f, y - 60f); // 화면 중심보다 조금 아래 — 곡면 위쪽 가장자리를 피한다
+            // 화면 중심보다 위로 +110 — SETTING 이 예전 START 자리. 예전 −60(곡면 위쪽 가장자리 회피)은 모니터 안에서
+            // 아래로 쏠려 보였다(경석 10-20 Play: "SETTING 이 START 자리쯤이어야").
+            rt.anchoredPosition = new Vector2(0f, y + 110f);
             rt.sizeDelta = new Vector2(600f, 120f);
             rt.localScale = Vector3.one;
 

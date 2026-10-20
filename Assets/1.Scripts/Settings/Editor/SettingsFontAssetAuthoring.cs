@@ -12,7 +12,7 @@ using UnityEngine.TextCore.LowLevel;
 ///
 /// 🔴 <b>정적(Static)</b> 에셋으로 만든다 — 동적이면 Play 때마다 아틀라스가 바뀌어 SVN 에 쓸데없는 변경이 생긴다.
 ///    설정창 문구(ko·en) + ASCII 를 미리 굽고, 여기 없는 글자(시트에서 바뀐 문구 등)는 NotoSansKR 폴백이 그린다.
-/// 다시 실행하면 같은 경로에 새로 만든다(멱등 — guid 는 유지하려고 기존 에셋을 지우지 않고 덮는다).
+/// 다시 실행하면 기존 에셋에 빠진 글자만 더한다(멱등 — guid·기존 글리프 유지).
 /// </summary>
 public static class SettingsFontAssetAuthoring
 {
@@ -28,21 +28,26 @@ public static class SettingsFontAssetAuthoring
         var font = AssetDatabase.LoadAssetAtPath<Font>(FontPath);
         if (font == null) { Debug.LogError($"[SettingsFont] 서체 파일이 없다: {FontPath}"); return; }
 
-        TMP_FontAsset asset = TMP_FontAsset.CreateFontAsset(font, SamplingSize, Padding, GlyphRenderMode.SDFAA,
-            AtlasSize, AtlasSize, AtlasPopulationMode.Dynamic, enableMultiAtlasSupport: true);
-        if (asset == null) { Debug.LogError("[SettingsFont] TMP 에셋 생성 실패."); return; }
-        asset.name = "SeoulAlrimTTF-Heavy SDF";
-
         string path = SettingsArtSkin.FontAssetPath;
-        var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
-        if (existing != null)
+        var asset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+        if (asset == null)
         {
-            // guid 유지 — 프리팹 참조가 끊기지 않게 내용만 갈아 끼운다.
-            foreach (Object sub in AssetDatabase.LoadAllAssetRepresentationsAtPath(path)) Object.DestroyImmediate(sub, true);
-            EditorUtility.CopySerialized(asset, existing);
-            asset = existing;
+            asset = TMP_FontAsset.CreateFontAsset(font, SamplingSize, Padding, GlyphRenderMode.SDFAA,
+                AtlasSize, AtlasSize, AtlasPopulationMode.Dynamic, enableMultiAtlasSupport: true);
+            if (asset == null) { Debug.LogError("[SettingsFont] TMP 에셋 생성 실패."); return; }
+            asset.name = "SeoulAlrimTTF-Heavy SDF";
+            AssetDatabase.CreateAsset(asset, path);
+            AttachSubAssets(asset);
         }
-        else AssetDatabase.CreateAsset(asset, path);
+        else
+        {
+            // 🔴 이미 있으면 지우지 않고 글자만 더한다 — guid·기존 글리프 유지(프리팹 참조가 안 끊기게).
+            // 정적 에셋은 원본 서체 참조를 비워 둘 수 있다 — 글자를 더하려면 다시 걸어야 한다(setter 가 internal 이라 직렬화로).
+            var so = new SerializedObject(asset);
+            so.FindProperty("m_SourceFontFile").objectReferenceValue = font;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            asset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+        }
 
         string chars = CharacterSet();
         asset.TryAddCharacters(chars, out string missing);
@@ -79,13 +84,13 @@ public static class SettingsFontAssetAuthoring
         }
     }
 
-    /// <summary>ASCII + 설정창 문구 전부(ko·en) + 언어 이름 + 화면에 쓰는 기호.</summary>
+    /// <summary>ASCII + UI 문구 전부(<see cref="UiStrings.All"/> ko — 설정창·일시정지 메뉴 포함) + 설정창 영어 + 언어 이름 + 기호.</summary>
     internal static string CharacterSet()
     {
         var set = new SortedSet<char>();
         for (char c = ' '; c <= '~'; c++) set.Add(c);
         void AddAll(string s) { if (s == null) return; foreach (char c in s) if (!char.IsControl(c)) set.Add(c); }
-        foreach (UiString s in SettingsUiStrings.All) AddAll(s.Ko);
+        foreach (UiString s in UiStrings.All) AddAll(s.Ko);   // SettingsUiStrings 포함(10-20 일시정지 메뉴 추가로 확장)
         foreach (string en in SettingsUiStrings.AuthoredEnglish.Values) AddAll(en);
         AddAll(LocText.NativeName(GameLanguage.Ko));
         AddAll(LocText.NativeName(GameLanguage.En));

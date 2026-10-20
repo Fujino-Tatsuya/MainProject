@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **인게임 ESC 일시정지 메뉴 + 종료 확인**, 브랜치 `feature/Boss23`) — 계획 [PLAN-pause-menu.md](PLAN-pause-menu.md) ✅ 승인 · ✅ 구현 · 데이터 테이블 239/0 · 로컬라이제이션 150/0 · ✅ 경석 Play · ✅ 커밋(git · SVN **r477**, 핀 477)
+- 🔸 **은희**: 바탕화면/로비 나가기 처리는 비워 둠 → `PauseMenuView.ExitToDesktopRequested`·`ExitToLobbyRequested` 에 연결. 상세 [handoff-pause-menu.md](Docs/tech/handoff-pause-menu.md). 설정창 나가기 버튼 꺼짐 → 호스트 결과 화면 경로가 UI 에서 빠진 상태.
+- ESC 패널(`OptionPanel`) = 화면 전체 반투명 검정 + 캔버스 정렬 1000(HUD 위). 타이틀 설정창 세로 위치 = `TitleFlowDirector._titleSettingsOffsetY`(+60). 타이틀 메뉴 3단 +170 올림(SETTING = 예전 START 자리, `TitleRigAuthoring` 도 같이).
+- 🔴 **병합 Export 주의**: 하면 Map 시트 엘리베이터 16행에 r470 에서 지운 Elevator 열(D)이 되살아난다. 이번엔 Strings 행만 직접 넣었다.
+- 🔒 수정 파일: `UI/Pause/**` · `Managers/MapSceneManager.cs` · `Localization/UiStrings.cs` · `Settings/Editor/SettingsFontAssetAuthoring.cs`·`SettingsHostSceneAuthoring.cs` · `2.Prefabs/UI/PauseMenu.prefab`·`Textures/PauseSelectRing.png` · `4.MapScene.unity` · `StringTable.asset` · `art-svn.json`
+
 ## ▶▶ 작업 세션 (2026-10-20 · 경석(Claude) · **설정창 UI 새 아트(SVN r466 UI_Panel) 교체**, 브랜치 `feature/Boss23`) — 계획 [PLAN-settings-art.md](PLAN-settings-art.md) ✅ 승인 · ✅ 구현 · ✅ 경석 타이틀 Play · 설정 EditMode 26/0 · 플레이어 508/0 · ⏳ ESC(맵) Play · ✅ 커밋(SVN r476 · git)
 - 🔸 **git 과 SVN 을 같이 받을 것** — SVN **r476**(핀 476) = UI_Panel 스프라이트(r466) + 서울알림체 `UI/Fonts/`(r476). 설정창 프리팹이 둘의 guid 를 참조한다.
 - 다시 만들 때: `Tools/UI/Settings/설정 패널 항목 배치 (멱등)` → 새 아트까지 입힌다. 씬 옛 틀은 `설정창 옛 틀 끄기 — 타이틀·ESC (멱등)`. 폰트는 `설정창 글꼴 에셋 만들기 (서울알림체)`.

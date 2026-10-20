@@ -76,6 +76,9 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("타이틀에서 연 설정창(탭+내용) 배율. 모니터 RT 에 다시 찍혀 글씨가 작아져 키운다 — 공유 프리팹·ESC 는 그대로.\n" +
              "1.4 = 모니터 캔버스(약 ±858 × ±604)와 Options 제목 안쪽.")]
     [SerializeField, Range(1f, 1.6f)] private float _titleSettingsScale = 1.4f;
+    [Tooltip("타이틀 설정창 세로 위치(캔버스 단위, + = 위). 모니터 화면 안쪽이 아래 베젤 쪽으로 좁아 보여\n" +
+             "가운데에 두면 내려가 보였다(경석 10-20 Play) — 60 만큼 올림. Play 중 바꾸면 바로 반영.")]
+    [SerializeField, Range(-200f, 200f)] private float _titleSettingsOffsetY = 60f;
 
     [Header("UI 루트")]
     [Tooltip("PRESS ANY KEY — 화면 앞 오버레이(모니터 안이 아니다).")]
@@ -296,7 +299,9 @@ public sealed class TitleFlowDirector : MonoBehaviour
     {
         if (_settingsRoot == null) return;
         TitleOptionsPanel body = _settingsRoot.GetComponentInChildren<TitleOptionsPanel>(true);
-        if (body != null) body.transform.localScale = new Vector3(_titleSettingsScale, _titleSettingsScale, 1f);
+        if (body == null) return;
+        body.transform.localScale = new Vector3(_titleSettingsScale, _titleSettingsScale, 1f);
+        if (body.transform is RectTransform rt) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, _titleSettingsOffsetY);
     }
 
     private void OnValidate()
