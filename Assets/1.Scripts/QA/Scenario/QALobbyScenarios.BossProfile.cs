@@ -197,11 +197,7 @@ public sealed class QABossProfileProbe : MonoBehaviour
         Event("phase", p.ToString());
     }
 
-    public void StartProfiler()
-    {
-        Profiler.enableBinaryLog = true;
-        OpenSegment();
-    }
+    public void StartProfiler() => OpenSegment();
 
     public void StopProfiler()
     {
@@ -216,9 +212,10 @@ public sealed class QABossProfileProbe : MonoBehaviour
 
     private void OpenSegment()
     {
-        // 파일을 바꾸려면 껐다 켠다(켠 채 logFile 만 바꾸면 이어 쓰지 않는다는 보장이 없다).
+        // 파일을 바꾸려면 껐다 켠다. 🔴 logFile 을 쓰면 enableBinaryLog 가 꺼진다(57.2 1회차 시험 실행에서 .raw 0개) — 매번 그 뒤에 다시 켠다.
         Profiler.enabled = false;
         Profiler.logFile = Path.Combine(_dir, $"seg-{Segments:000}");
+        Profiler.enableBinaryLog = true;
         Profiler.enabled = true;
         _profiling = true;
         _segFrames = 0;
