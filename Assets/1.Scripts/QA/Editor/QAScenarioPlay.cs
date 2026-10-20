@@ -69,6 +69,7 @@ public static class QAScenarioPlay
     [MenuItem("Tools/QA/Activate Virtual Players (2,3)")]
     public static void ActivateVirtualPlayers()
     {
+        EnsureClientTags();
         Type mppm = FindType("Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode");
         if (mppm == null)
         {
@@ -104,6 +105,62 @@ public static class QAScenarioPlay
 
             object ok = activate.Invoke(player, args);
             Debug.Log($"[QA] {prop}.Activate → {ok} (이전 상태 {state}, error={args[0]})");
+        }
+    }
+
+    /// <summary>
+    /// 가상 플레이어 2·3 에 MPPM 태그 <c>Client</c>(<see cref="DemoConnectionConfig.MppmClientTag"/>)를 붙인다 — 없으면 데모 흐름이 안 켜지고
+    /// 옛 수동 흐름(타이틀)으로 돈다(lobby-demo-flow.md §6). 48.3 2차에서 태그가 비어 클론이 타이틀로 간 것을 확인했다.
+    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — 메뉴 Deactivate 후 Activate.
+    /// </summary>
+    [MenuItem("Tools/QA/Ensure MPPM Client Tags (2,3)")]
+    public static void EnsureClientTags()
+    {
+        string tag = DemoConnectionConfig.MppmClientTag;
+        Type mppm = FindType("Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode"); // internal — 리플렉션
+        object projectTags = mppm?.GetProperty("PlayerTags", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+        if (projectTags == null)
+        {
+            Debug.LogError("[QA] MPPM PlayerTags 를 찾지 못했다.");
+            return;
+        }
+        Type tagsType = projectTags.GetType();
+        bool has = (bool)tagsType.GetMethod("Contains").Invoke(projectTags, new object[] { tag });
+        if (!has)
+        {
+            var args = new object[] { tag, null };
+            bool added = (bool)tagsType.GetMethod("Add").Invoke(projectTags, args);
+            Debug.Log($"[QA] MPPM 프로젝트 태그 '{tag}' 추가 → {added} ({args[1]})");
+        }
+
+        foreach (string prop in new[] { "PlayerTwo", "PlayerThree" })
+        {
+            object player = mppm.GetProperty(prop, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+            if (player == null)
+                continue;
+            var tags = player.GetType().GetProperty("Tags")?.GetValue(player) as string[];
+            if (tags != null && Array.IndexOf(tags, tag) >= 0)
+                continue;
+            var args = new object[] { tag, null };
+            bool ok = (bool)player.GetType().GetMethod("AddTag").Invoke(player, args);
+            Debug.Log($"[QA] {prop} 에 MPPM 태그 '{tag}' 추가 → {ok} ({args[1]})");
+        }
+    }
+
+    /// <summary>가상 플레이어 2·3 을 끈다(태그 반영·정리용). 끝나면 Play 를 먼저 멈출 것.</summary>
+    [MenuItem("Tools/QA/Deactivate Virtual Players (2,3)")]
+    public static void DeactivateVirtualPlayers()
+    {
+        Type mppm = FindType("Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode");
+        foreach (string prop in new[] { "PlayerTwo", "PlayerThree" })
+        {
+            object player = mppm?.GetProperty(prop, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+            MethodInfo deactivate = player?.GetType().GetMethod("Deactivate", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (deactivate == null)
+                continue;
+            var args = new object[deactivate.GetParameters().Length];
+            object ok = deactivate.Invoke(player, args);
+            Debug.Log($"[QA] {prop}.Deactivate → {ok} ({(args.Length > 0 ? args[0] : null)})");
         }
     }
 

@@ -18,6 +18,39 @@ public static class QAScenario48Menu
     [MenuItem(Root + "Run MPPM Batch (M1·M4)", priority = 1)]
     public static void RunMppm() => Run("M1,M4", 3);
 
+    [MenuItem(Root + "Run Solo Batch 2 (S2·S4)", priority = 2)]
+    public static void RunSolo2() => Run("S2,S4", 1);
+
+    [MenuItem(Root + "Run MPPM Batch 2 (M2·M3·M8)", priority = 3)]
+    public static void RunMppm2() => Run("M2,M3,M8", 3);
+
+    [MenuItem(Root + "Run MPPM Batch 3 (M5·M6·M7)", priority = 4)]
+    public static void RunMppm3() => Run("M5,M6,M7", 3);
+
+    [MenuItem(Root + "Single/S2 Fall → Spawn", priority = 30)]
+    public static void RunS2() => Run("S2", 1);
+
+    [MenuItem(Root + "Single/S4 Character Select", priority = 31)]
+    public static void RunS4() => Run("S4", 1);
+
+    [MenuItem(Root + "Single/M2 Ready Reset·Cancel·Reject", priority = 32)]
+    public static void RunM2() => Run("M2", 3);
+
+    [MenuItem(Root + "Single/M3 Swap Sync·Map Spawn", priority = 33)]
+    public static void RunM3() => Run("M3", 3);
+
+    [MenuItem(Root + "Single/M5 Boss Rejoin", priority = 34)]
+    public static void RunM5() => Run("M5", 3);
+
+    [MenuItem(Root + "Single/M6 Rejoin Restore", priority = 35)]
+    public static void RunM6() => Run("M6", 3);
+
+    [MenuItem(Root + "Single/M7 Absent Wipe Respawn", priority = 36)]
+    public static void RunM7() => Run("M7", 3);
+
+    [MenuItem(Root + "Single/M8 Newcomer Reject → Lobby", priority = 37)]
+    public static void RunM8() => Run("M8", 3);
+
     [MenuItem(Root + "Single/S1 Boot·Spawn·Camera·Combat", priority = 20)]
     public static void RunS1() => Run("S1", 1);
 

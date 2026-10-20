@@ -10,9 +10,9 @@ using UnityEngine.SceneManagement;
 /// 각 시나리오 = 준비 → 행동 → 상태 대기형 단언 → 항목 기록. 실패해도 다음 단계로 갈 수 있으면 계속 간다.
 /// MPPM 은 인스턴스마다 같은 시나리오를 돌리고 역할(호스트/클라)에 따라 갈라진다 — 단계 동기화는 관측 가능한 상태로 한다.
 /// </summary>
-public static class QALobbyScenarios
+public static partial class QALobbyScenarios
 {
-    public static readonly string[] Known = { "S1", "S3", "S5", "M1", "M4" };
+    public static readonly string[] Known = { "S1", "S2", "S3", "S4", "S5", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8" };
 
     /// <summary>시나리오 하나의 상한(초) — 러너의 감시 타이머. 넘으면 FAIL 로 끊고 다음으로 간다.</summary>
     public static float TimeLimit(string id)
@@ -24,7 +24,7 @@ public static class QALobbyScenarios
             case "S5": return 1500f;
             case "M1": return 300f;
             case "M4": return 360f;
-            default: return 60f;
+            default: return MoreTimeLimit(id);
         }
     }
 
@@ -37,7 +37,7 @@ public static class QALobbyScenarios
             case "S5": return S5(ctx);
             case "M1": return M1(ctx);
             case "M4": return M4(ctx);
-            default: return Unknown(ctx, id);
+            default: return RunMore(id, ctx) ?? Unknown(ctx, id);
         }
     }
 
