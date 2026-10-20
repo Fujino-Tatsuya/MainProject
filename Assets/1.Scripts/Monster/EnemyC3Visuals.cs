@@ -17,14 +17,12 @@ public static class EnemyC3Visuals
     [Serializable] class Preset { public Entry[] entries; }
     static Dictionary<string,Entry> entries;
     static readonly Dictionary<string,Texture2D> textures=new();
-    static readonly Dictionary<Sprite,Sprite> smashSprites=new();
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetForPlay()
     {
         // Reload the selected JSON on each Play, including when domain reload is disabled.
-        foreach(var sprite in smashSprites.Values) if(sprite!=null) UnityEngine.Object.Destroy(sprite);
         foreach(var texture in textures.Values) if(texture!=null) UnityEngine.Object.Destroy(texture);
-        smashSprites.Clear();textures.Clear();plateBlocks.Clear();entries=null;
+        textures.Clear();plateBlocks.Clear();entries=null;smashSprite=null;
     }
     public static Entry Get(string id)
     {
@@ -162,7 +160,7 @@ public static class EnemyC3Visuals
         return Bake(key,id,extent,unit,Sdf,marker,false,!band&&!union&&halfAngle>=179.9f);
     }
     // Floor plates (12·14·15·16, jump 06·07) are drawn by the EnemyC3Plate shader — no runtime texture.
-    // Circle()/Square() above stay as the CPU reference for the pixel comparison test and smash 09 (S3).
+    // Circle()/Square() above stay as the CPU reference for the pixel comparison test and the editor smash 09 sprite bake.
     static readonly Dictionary<(string,bool,bool),MaterialPropertyBlock> plateBlocks=new();
     static Material plateMaterial;
     static readonly int TintId=Shader.PropertyToID("_Color"),ModeId=Shader.PropertyToID("_C3Mode"),SizeId=Shader.PropertyToID("_C3Size"),
@@ -243,21 +241,20 @@ public static class EnemyC3Visuals
         m.SetVector(OutlineId,e.outline.Value);m.SetVector(InnerLineId,e.innerLine.Value);
         m.SetVector(BandId,e.band.Value);m.SetVector(MarkersId,e.markers.Value);
     }
+    // Smash 09 is a SpriteRenderer (FX_Mob_Smah_Warning/L_circle, FadeInHoldEffect drives sr.color alpha), so it needs a sprite:
+    // Circle("09") pre-baked in the editor (Tools/Enemy C3/Bake smash 09 sprite) — no runtime Sprite.Create.
+    // Its import PPU makes it cover the original sprite × OuterScale("09"), so no transform scaling is needed.
+    public const string SmashSpritePath="Telegraph/EnemyC3_Smash09";
+    static Sprite smashSprite;
+    public static Sprite SmashSprite=>smashSprite!=null?smashSprite:smashSprite=Resources.Load<Sprite>(SmashSpritePath);
     public static void ApplySmash(GameObject go)
     {
+        var sprite=SmashSprite;
+        if(sprite==null){Debug.LogError("[Enemy C3] Missing smash sprite Resources/"+SmashSpritePath);return;}
         foreach(var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
         {
             if(sr.sprite==null)continue;
-            if(!sr.sprite.name.StartsWith("EnemyC3_"))
-            {
-                var old=sr.sprite;
-                if(!smashSprites.TryGetValue(old,out var sprite))
-                {
-                    var tex=Circle("09");sprite=Sprite.Create(tex,new Rect(0,0,tex.width,tex.height),new Vector2(.5f,.5f),tex.width/(old.bounds.size.x*OuterScale("09")));
-                    sprite.name="EnemyC3_Smash";smashSprites[old]=sprite;
-                }
-                sr.sprite=sprite;
-            }
+            if(sr.sprite!=sprite)sr.sprite=sprite;
             sr.color=new Color(1,1,1,sr.color.a);
         }
     }
