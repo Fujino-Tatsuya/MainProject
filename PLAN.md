@@ -1,3 +1,26 @@
+# ▶▶▶ 잠긴 계획 = **할 일 57.3 — 웰즈 드론 로컬 풀 + 로딩 예열** (2026-10-20 · 위임 승인)
+
+> Handoff `54adb49f-b945-46bc-adff-08c1f727e3bc` · 브랜치 `feature/EnemyC3PrewarmBoss` · 선행 `3ff61ba1`/`f378714d`.
+
+## 목표와 결정
+- `WellsDroneAttack`의 클라이언트 로컬 드론 모델을 매 공격 Instantiate/Destroy 하지 않고 피어별 비활성 풀에서 재사용한다. 현재 한 보스·컴포넌트가 새 Lock 전에 Cancel 하므로 보관 상한은 **1기**다.
+- 드론은 NetworkObject가 아니므로 NGO prefab handler는 쓰지 않는다. 서버 타이머·판정·RPC 중계는 바꾸지 않는다.
+- 풀 인스턴스는 `DontDestroyOnLoad` 숨김 루트 아래 살아 로딩 씬→맵, Alt+0, 두 번째 판, 보스 디스폰을 건넌다. `SubsystemRegistration`의 `ResetForPlay`에서 풀·PlayableGraph를 명시 정리해 도메인 리로드 끔 재진입도 처리한다.
+- Collider 비활성·Rigidbody kinematic·Animator 준비는 생성 때 한 번만 한다. DashStart/DashLoop는 한 PlayableGraph의 두 입력으로 미리 만들고 공격마다 시간·가중치만 재설정한다.
+- 정본 `WellsDroneData.asset`은 Resources 밖이다. 에셋 이동/GUID 변경 없이 `Resources/Monster/WellsDronePrewarmCatalog.asset`이 정본 SO를 참조한다. 예열은 실제 모델·클립 데이터로 Mark→Lock→고정/낙하 Tick→클립 시작/루프 전환→반납을 돈다.
+- 첫 그리기의 lazy `Loading.ReadObject`를 앞당기기 위해 모델의 mesh/material/texture를 순회해 접근하고, 전용 작은 RenderTexture에 CommandBuffer로 한 번 그린 뒤 `GL.Flush`한다. 게임 카메라·화면·판정에는 노출하지 않는다.
+- 조준/착탄 뷰 루트는 기존 컴포넌트당 1회 재사용, 폭발은 기존 EffectManager 풀을 그대로 둔다.
+
+## 위험·범위 밖
+- URP/DX12의 PSO 준비 보장은 플랫폼별로 다르므로 빌드 GPU 첫 프레임은 Play 확인 항목으로 남긴다. 이번 결정적 테스트는 인스턴스/Animator/graph 수와 Instantiate 0 계약만 단언하고 시간은 단언하지 않는다.
+- 아트·xlsx·기존 `.meta` GUID·서버 로직·`TwentyThreeBoss` RPC는 수정하지 않는다.
+
+## 수용·검증
+- 동일 인스턴스 재사용, 반복 Lock/Cancel/Impact 후 풀/Animator/PlayableGraph 수 불변, 예열 뒤 첫 Lock 생성 0, 두 번째 예열 무동작, Reset 뒤 재실행을 EditMode로 검증한다.
+- Unity MCP로 Refresh→컴파일 0→전체 EditMode 0 실패→57.3 측정 메뉴 순서. Play 진입은 금지하고 문서 §9.4/9.5/9.9~9.11 및 외부 산출물 `57.3/`을 갱신한다.
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 일반 Q VFX — 관통 일섬(PierceLine + PierceBurst)** (2026-10-16 · grill 확정 · ✅ MyProject 컨펌 · ✅ 반입·배선 — 컴파일 에러 0 · ⏳ Play·MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 변신 Q(Storm Slash — 바닥에 남는 무거운 자국)와 반대로 **허리 높이의 가늘고 날카로운 검붉은 일섬**.
