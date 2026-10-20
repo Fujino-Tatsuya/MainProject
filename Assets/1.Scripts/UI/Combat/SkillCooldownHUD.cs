@@ -17,6 +17,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         public Image cooldownFill;   // Filled 타입 오버레이 — 남은 쿨타임 비율만큼 덮는다
         public TMP_Text remainingText;
         public SkillSlotHover hover = null;
+        public Image keyBackground = null;   // 단축키 글자 배경 — 차단 색 전환에서 제외한다(같은 회색이 되면 글자가 묻힌다)
 
         [System.NonSerialized] public Graphic[] graphics;
         [System.NonSerialized] public Color[] normalColors;
@@ -215,6 +216,8 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                 continue;
 
             widget.graphics = slotRoot.GetComponentsInChildren<Graphic>(true);
+            if (widget.keyBackground != null)
+                widget.graphics = System.Array.FindAll(widget.graphics, g => g != widget.keyBackground);
             widget.normalColors = new Color[widget.graphics.Length];
 
             for (int i = 0; i < widget.graphics.Length; i++)
