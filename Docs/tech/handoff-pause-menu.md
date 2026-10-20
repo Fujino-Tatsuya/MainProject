@@ -1,6 +1,6 @@
 # handoff — 인게임 ESC 일시정지 메뉴 (경석 → 은희, 2026-10-20)
 
-> 계획: [PLAN-pause-menu.md](../../PLAN-pause-menu.md) · 아트 SVN r466 `UI/UI_Panel`(03_PauseMenu · 02_ExitConfirm) · 문구 SVN r477(Strings 시트)
+> 계획: [PLAN-pause-menu.md](../history/PLANS/PLAN-pause-menu.md) · 아트 SVN r466 `UI/UI_Panel`(03_PauseMenu · 02_ExitConfirm) · 문구 SVN r477(Strings 시트)
 
 ## 요약 — 은희가 할 일은 "나가기 두 개 연결"뿐
 ESC 흐름과 UI 는 끝나 있다. **바탕화면 / 로비 의 실제 처리(호스트·클라 예외 포함)는 비워 뒀다** — 만들고 아래 이벤트에 연결하면 된다.

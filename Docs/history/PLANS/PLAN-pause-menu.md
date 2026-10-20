@@ -68,7 +68,7 @@
   - 글자 일부("뉴·속·하")가 가는 폴백으로 나옴 → 서울알림체 에셋이 설정창 글자만 구워져 있었다. 생성 메뉴가 `UiStrings.All` 전체 글자를 굽도록 + 기존 에셋에 **글자만 더하는** 방식으로(guid 유지) → 245 → 288자.
   - 선택 테두리 안 보임 → 어두운 알약을 흰색으로 "칠해" 깔았는데 UI 색은 곱하기라 흰색이 안 된다. 흰 캡슐 테두리 PNG 를 생성(`Textures/PauseSelectRing.png`)해 버튼 위에.
 - 🔴 문구: **병합 Export 결과를 버렸다** — Strings 10행은 맞았지만 Map 시트 엘리베이터 16행에 r470(은희)에서 지운 "중첩 전용 Elevator 열"이 되살아남. xlsx 원본 복원 후 Strings 시트 XML 에 10행(ko·en)만 직접 추가 → 다른 시트 변경 0(행 비교로 확인) → StringTable 갱신(키 167). SVN **r477**(xlsx + 폰트 에셋), 핀 477.
-- 인수인계 [handoff-pause-menu.md](Docs/tech/handoff-pause-menu.md).
+- 인수인계 [handoff-pause-menu.md](../../tech/handoff-pause-menu.md).
 ### 10-20 — 경석 Play 후 수정 ✅ · 컴파일 0 · ⏳ 경석 재확인
 - 경석 Play: 동작 문제 없음. ① 인게임 ESC 가 게임 화면을 덮지 않고 HUD(스킬 아이콘)가 메뉴 위에 그려짐 ② 타이틀 설정창이 모니터 가운데보다 내려가 보임.
 - ① `OptionPanel` 을 화면 전체로 펴고 배경 = 반투명 검정(알파 0.5) + 자체 캔버스 정렬 **1000**(CombatHUD 0 · 튜토리얼 50~60 · 맵 전체 보기 999 위, 드롭다운 목록 30000·성능 표시 아래) + GraphicRaycaster. 원인 = OptionPanel 이 기본 캔버스(정렬 0) 안이라 별도 캔버스 CombatHUD(정렬 0)와 순서가 엉킴.
