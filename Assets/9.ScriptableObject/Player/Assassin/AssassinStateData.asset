@@ -22,7 +22,7 @@ MonoBehaviour:
       \uC774\uC0C1\uC774\uBA74 R\uB85C \uBCC0\uC2E0\uD558\uACE0, \uBCC0\uC2E0 \uC911\uC5D0\uB294
       \uCD08\uB2F9 {transformRageDecayPerSecond}\uC529 \uC904\uC5B4\uB4ED\uB2C8\uB2E4.
       \uBCC0\uC2E0 \uC911\uC5D0\uB294 \uBAA8\uB4E0 \uACF5\uACA9\uC774 \uBC31\uC5B4\uD0DD\uC785\uB2C8\uB2E4."
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 500b5bae15c146196eb8bf3d394a73b8, type: 3}
   maxRage: 100
   minTransformRage: 40
   basicAttackRageGain: 3
