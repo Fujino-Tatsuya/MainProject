@@ -12,6 +12,7 @@ using UnityEngine.Rendering;
 /// DecalProjector 는 RT 로 직접 찍기 어려워 Hidden/EnemyC3DecalCompare 로 데칼 표면 출력(색·알파)을 평면에 그린다.
 /// 그 셰이더의 새 패스는 SG_EnemyC3Decal 의 Custom Function 과 <b>같은 hlsl 함수</b>(EnemyC3DecalShade)를 부르고,
 /// 값은 런타임과 <b>같은 C# 함수</b>(EnemyC3Visuals.SetDecalProperties)가 넣는다 — 그래프가 그 함수를 쓰는지는 따로 확인한다.
+/// 그래프의 출력 연결(BaseColor·Alpha·NormalAlpha)·데칼 패스까지 포함한 실제 렌더 비교는 EnemyC3DecalRenderTests(할 일 57 R).
 /// 기준 = 채널 오차 ≤ 2/255 인 픽셀 99% 이상. 나란히 PNG(기존|셰이더|차이×16)는 _lane-artifacts 가 있을 때만 남긴다.
 /// </summary>
 public sealed class EnemyC3DecalShaderTests

@@ -232,8 +232,8 @@ public sealed class EnemyC3FillShaderTests
     static Texture2D NewTex(string name) => new Texture2D(Tex, Tex, TextureFormat.RGBA32, false)
     { name = name, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, hideFlags = HideFlags.HideAndDontSave };
 
-    // BuildRectTexture(color, 256, rimU 0, rimV 0, interiorAlpha 1)
-    static Texture2D OldRect(Color color)
+    // BuildRectTexture(color, 256, rimU 0, rimV 0, interiorAlpha 1). 실제 데칼 렌더 비교(EnemyC3DecalRenderTests)도 쓴다.
+    internal static Texture2D OldRect(Color color)
     {
         var tex = NewTex("OldBossPathBandDecal");
         float feather = 1.5f / Tex;
@@ -252,7 +252,7 @@ public sealed class EnemyC3FillShaderTests
     }
 
     // BuildUnionTexture(color, extent, rimWorld 0, interiorAlpha 1, front)
-    static Texture2D OldUnion(Color color, Vector2 extent, float pathRadius, float pathLength, float coneCenter, float coneRadius, float front)
+    internal static Texture2D OldUnion(Color color, Vector2 extent, float pathRadius, float pathLength, float coneCenter, float coneRadius, float front)
     {
         var tex = NewTex("OldBossAttackUnionDecal");
         float len = extent.y;
