@@ -214,8 +214,10 @@ public static class EnemyC3Visuals
             sr.color=new Color(1,1,1,sr.color.a);
         }
     }
+    static readonly Unity.Profiling.ProfilerMarker Diag57CreateJump=new Unity.Profiling.ProfilerMarker("Diag57.CreateJump");   // 할 일 57.2 진단 마커(QA 브랜치 전용)
     public static GameObject CreateJump(Vector3 point,float radius,float duration)
     {
+        using var diag57=Diag57CreateJump.Auto();
         var root=new GameObject("EnemyC3_JumpTelegraph");root.transform.position=point;
         var view=root.AddComponent<EnemyC3JumpView>();view.Begin(radius,duration);return root;
     }

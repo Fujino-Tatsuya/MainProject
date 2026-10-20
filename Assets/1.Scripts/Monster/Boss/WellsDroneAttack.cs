@@ -348,8 +348,11 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _cross.gameObject.SetActive(true);
     }
 
+    static readonly Unity.Profiling.ProfilerMarker Diag57ClientLock = new Unity.Profiling.ProfilerMarker("Diag57.ClientLock");   // 할 일 57.2 진단 마커(QA 브랜치 전용)
+
     public void ClientLock(Vector3 pos, float radius, float lockTime, bool fromRight)
     {
+        using var diag57 = Diag57ClientLock.Auto();
         EnsureView();
         ClientCancel();
         _view = View.Lock;

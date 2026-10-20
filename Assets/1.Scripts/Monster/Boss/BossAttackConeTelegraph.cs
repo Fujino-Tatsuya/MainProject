@@ -124,6 +124,8 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     float _pathRadius, _pathLength, _pathForwardOffset, _pathLateralOffset;
     bool _warnedNoMaterial;
 
+    static readonly Unity.Profiling.ProfilerMarker Diag57Show = new Unity.Profiling.ProfilerMarker("Diag57.Show");   // 할 일 57.2 진단 마커(QA 브랜치 전용)
+
     /// <param name="coneRadius">끝점 부채꼴 반경(m). 판정과 **같은 값**이어야 한다. 0 이면 안 그린다.</param>
     /// <param name="coneAngleDeg">전체 각(도). 180 이면 전방 반원, 360 이면 원형.</param>
     /// <param name="coneOffsetAngleDeg">보스 정면에서 좌/우로 치우치는 각(도). + = 오른쪽.</param>
@@ -137,6 +139,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
                      float pathForwardOffset = 0f, float pathLateralOffset = 0f, bool fillInward = false,
                      Palette palette = Palette.Attack)
     {
+        using var diag57 = Diag57Show.Auto();
         if (!EnsureBuilt()) return;
 
         // 모양은 팔레트와 무관하다(색은 아래 ApplyStyle 이 재질에 넣는다). 두께는 팔레트별로 다를 수 있어 아래 키가 잡는다.
