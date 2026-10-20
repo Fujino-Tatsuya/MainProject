@@ -5,6 +5,8 @@ using UnityEngine;
 /// 런타임은 같은 그림을 SG_EnemyC3Decal 의 채움 모드(EnemyC3Decal.hlsl — 3 부채꼴 · 6 원판)로 그리고 텍스처를 만들지 않는다.
 ///  - <see cref="BuildArcTexture"/> = BossDirectionIndicator.BuildArcTexture 그대로(방향 표식 · S4a 공격 예고 채움의 기준)
 ///  - <see cref="BuildDiscTexture"/> = AoeTelegraph.BuildDiscTexture 그대로(장판 원판)
+///  - <see cref="BuildSquare"/>·<see cref="BuildDisc"/>·<see cref="BuildCrosshair"/> = BossPatternVisuals 판·조준 그대로(S4c2,
+///    런타임은 Monster/TelegraphQuad 의 _CodeShape 모드)
 /// 🔴 식을 고치지 말 것 — 고치면 비교 기준이 함께 움직여 테스트가 아무것도 지키지 못한다.
 /// </summary>
 public static class LegacyDecalTextureReference
@@ -121,4 +123,75 @@ public static class LegacyDecalTextureReference
         tex.Apply(false, false);
         return tex;
     }
+
+    // ── BossPatternVisuals 판 텍스처(할 일 57 S4c2) — 런타임은 Monster/TelegraphQuad 의 _CodeShape 1·2·3 으로 그린다.
+    //    런타임은 SquareTexture = BuildSquare(64, 0.1) · DiscTexture = BuildDisc(128, 0.08) · CrosshairTexture = BuildCrosshair(128),
+    //    테두리 비율별 캐시(SquareTextureFor·DiscTextureFor)는 비율을 0.005 단위로 묶어 같은 함수를 불렀다.
+
+    // 채운 면 + 또렷한 테두리(채움이 없으면 범위로 안 읽힌다 — AoeTelegraph 2026-09-09 팀장 판정과 같은 이유).
+    public static Texture2D BuildSquare(int size, float rim)
+    {
+        var tex = NewTex("BossPatternSquare", size);
+        var px = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size, v = (y + 0.5f) / size;
+                float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));   // 0 = 테두리
+                float a = edge < rim ? 1f : 0.55f;
+                px[y * size + x] = new Color(1f, 1f, 1f, a);
+            }
+        tex.SetPixels32(px);
+        tex.Apply(false, false);
+        return tex;
+    }
+
+    public static Texture2D BuildDisc(int size, float rim)
+    {
+        var tex = NewTex("BossPatternDisc", size);
+        var px = new Color32[size * size];
+        float half = size * 0.5f;
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float d = Mathf.Sqrt(Sq(x + 0.5f - half) + Sq(y + 0.5f - half)) / half;
+                float a = d > 1f ? 0f : (d > 1f - rim ? 1f : 0.55f);
+                a *= Mathf.Clamp01((1f - d) * size * 0.5f);   // 바깥 1px 페더
+                px[y * size + x] = new Color(1f, 1f, 1f, a);
+            }
+        tex.SetPixels32(px);
+        tex.Apply(false, false);
+        return tex;
+    }
+
+    // 원 테두리 + 안쪽으로 들어오는 네 눈금.
+    public static Texture2D BuildCrosshair(int size)
+    {
+        var tex = NewTex("BossPatternCrosshair", size);
+        var px = new Color32[size * size];
+        float half = size * 0.5f;
+        float ring = 0.86f, ringW = 0.07f, tickIn = 0.55f, tickW = 0.05f;
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x + 0.5f - half) / half, dy = (y + 0.5f - half) / half;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                bool onRing = Mathf.Abs(d - ring) < ringW;
+                bool onTick = d > tickIn && d < 1f &&
+                              (Mathf.Abs(dx) < tickW || Mathf.Abs(dy) < tickW);
+                px[y * size + x] = new Color(1f, 1f, 1f, onRing || onTick ? 1f : 0f);
+            }
+        tex.SetPixels32(px);
+        tex.Apply(false, false);
+        return tex;
+    }
+
+    static Texture2D NewTex(string name, int size) => new Texture2D(size, size, TextureFormat.RGBA32, false)
+    {
+        name = name,
+        wrapMode = TextureWrapMode.Clamp,
+        filterMode = FilterMode.Bilinear,
+    };
+
+    static float Sq(float v) => v * v;
 }

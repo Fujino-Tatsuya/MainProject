@@ -10,7 +10,7 @@ using UnityEngine;
 /// 범위 = Assets/1.Scripts/Monster/** · Assets/1.Scripts/Rendering/Telegraph/** 의 .cs 중 Editor 폴더 밖.
 /// 금지 = new Texture2D · SetPixel / SetPixels / SetPixels32 / SetPixelData · Sprite.Create. 주석 줄(//, ///, /* */ 안)은 제외.
 /// 위반이 나오면 파일:줄과 그 줄을 메시지에 찍는다. 런타임 예고는 셰이더(EnemyC3Plate·SG_EnemyC3Decal)로 그리고,
-/// CPU 기준 그림은 에디터 전용 EnemyC3BakeReference 에만 둔다.
+/// CPU 기준 그림은 에디터 전용 EnemyC3BakeReference · LegacyDecalTextureReference 에만 둔다. 예외 0(S4c2 확정).
 /// </summary>
 public sealed class EnemyC3RuntimeTextureGuardTests
 {
@@ -22,16 +22,13 @@ public sealed class EnemyC3RuntimeTextureGuardTests
     static readonly Regex MemberDecl = new Regex(@"^ {4}(?![ /\[{}])[^=;(]*?\b(\w+)\s*(<[^>()]*>)?\s*\(");
 
     /// <summary>
-    /// 결정 대기 예외 — 57 이전부터 있던 비-C3 경로. 사용자가 셰이더 전환/유지를 정할 때까지 이 메서드 안의 사용만 허용한다.
-    /// 같은 파일이라도 아래 메서드 밖에 새로 생긴 사용은 실패한다.
-    /// TODO(할 일 57 후속): 결정이 나면 해당 경로를 셰이더로 옮기고 항목을 지운다 — 이 목록은 비어야 한다.
+    /// 메서드 단위 예외(파일 + 메서드 이름) — 그 메서드 안의 사용만 허용하고, 같은 파일이라도 밖에 새로 생긴 사용은 실패한다.
+    /// 🔴 비어 있다 = 런타임 전체 금지 확정(할 일 57 S4c2, 사용자 결정 10-20). 57 이전의 비-C3 경로
+    ///    (AoeTelegraph·BossDirectionIndicator — S4c1, BossPatternVisuals — S4c2)도 셰이더로 옮겼다(원본 = Editor/LegacyDecalTextureReference).
+    ///    항목을 다시 넣으려면 사용자 결정이 필요하다 — <see cref="NoRuntimeExceptions"/> 가 막는다.
     /// </summary>
     static readonly (string file, string[] methods, string reason)[] PendingDecision =
-    {
-        // S4c1 에서 AoeTelegraph.BuildDiscTexture · BossDirectionIndicator.BuildArcTexture 는 셰이더로 옮겨 지웠다(원본 = Editor/LegacyDecalTextureReference).
-        ("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", new[] { "BuildSquare", "BuildDisc", "BuildCrosshair", "NewTex" },
-            "보스 패턴 판 기본 텍스처 — 정적 지연 캐시 64·128², 테두리 비율별 캐시"),
-    };
+        System.Array.Empty<(string file, string[] methods, string reason)>();
 
     public readonly struct Hit
     {
@@ -88,8 +85,17 @@ public sealed class EnemyC3RuntimeTextureGuardTests
         }
     }
 
-    static bool Allowed(string file, string method) =>
-        method != null && PendingDecision.Any(p => p.file == file && p.methods.Contains(method));
+    static bool Allowed(string file, string method) => Allowed(PendingDecision, file, method);
+
+    static bool Allowed((string file, string[] methods, string reason)[] exceptions, string file, string method) =>
+        method != null && exceptions.Any(p => p.file == file && p.methods.Contains(method));
+
+    [Test]
+    public void NoRuntimeExceptions()
+    {
+        // 예외 0 확정 — 실제 예외 목록이 비어 있어야 한다(예외 메커니즘 자체는 ScannerCatchesForbiddenCalls 가 가짜 목록으로 검사).
+        Assert.IsEmpty(PendingDecision, "runtime texture creation is banned without exceptions (할 일 57 S4c2)");
+    }
 
     [Test]
     public void RuntimeCodeDoesNotBuildTextures()
@@ -155,13 +161,18 @@ public sealed class EnemyC3RuntimeTextureGuardTests
         Assert.AreEqual("Other", hits[3].method, dump);
         Assert.IsNull(hits[4].method, "field initializer must not inherit the previous method: " + dump);
 
-        // 예외는 메서드 단위 — 예외 파일의 다른 메서드에서 나온 사용은 걸린다.
-        Assert.IsTrue(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "BuildDisc"));
-        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "Make"));
-        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", null));
-        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/EnemyC3Visuals.cs", "BuildDisc"));
-        // S4c1 에서 지운 예외 — 다시 생기면 걸려야 한다.
+        // 예외 메커니즘 — 가짜 예외 목록으로. 예외는 메서드 단위라 예외 파일의 다른 메서드에서 나온 사용은 걸린다.
+        var fakeExceptions = new[] { ("Assets/1.Scripts/Monster/Fake.cs", new[] { "BuildDiscTexture" }, "self-test") };
+        Assert.IsTrue(Allowed(fakeExceptions, "Assets/1.Scripts/Monster/Fake.cs", "BuildDiscTexture"));
+        Assert.IsFalse(Allowed(fakeExceptions, "Assets/1.Scripts/Monster/Fake.cs", "Make"));
+        Assert.IsFalse(Allowed(fakeExceptions, "Assets/1.Scripts/Monster/Fake.cs", null));
+        Assert.IsFalse(Allowed(fakeExceptions, "Assets/1.Scripts/Monster/EnemyC3Visuals.cs", "BuildDiscTexture"));
+
+        // 실제 예외는 0 — S4c1·S4c2 에서 지운 경로가 다시 생기면 걸려야 한다.
         Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/AoeTelegraph.cs", "BuildDiscTexture"));
         Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossDirectionIndicator.cs", "BuildArcTexture"));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "BuildDisc"));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "BuildSquare"));
+        Assert.IsFalse(Allowed("Assets/1.Scripts/Monster/Boss/BossPatternVisuals.cs", "BuildCrosshair"));
     }
 }
