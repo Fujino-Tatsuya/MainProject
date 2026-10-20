@@ -12,6 +12,8 @@ using UnityEngine;
 ///   · 더미(오브젝트·재질 인스턴스·코드 SVC)가 남지 않는다 — 남는 건 게임이 원래 만드는 공유 캐시(BossPatternVisuals 판 재질·쿼드)뿐.
 ///   · 두 번째 호출은 아무것도 안 한다(false, 오브젝트·재질 수 그대로). Play 진입 리셋(ResetForPlay) 뒤엔 다시 돈다.
 ///   · 로딩 흐름(NetworkLoadingFlowController.HandleLoadStarted)이 부른다.
+///   · 할 일 57.1 — 보스 예고 컴포넌트(BossAttackConeTelegraph·WellsDroneAttack) 예열 뒤에도 임시 컴포넌트·프로젝터·드론 뷰가 남지 않고,
+///     게임이 새로 붙이는 예고는 프로젝터·재질 인스턴스 수와 그리기 순서가 그대로다(풀 없음).
 /// </summary>
 public sealed class EnemyC3PrewarmTests
 {
@@ -82,6 +84,68 @@ public sealed class EnemyC3PrewarmTests
 
     const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     static readonly System.Type PrewarmType = System.Type.GetType("EnemyC3Prewarm, Assembly-CSharp");
+
+    // 할 일 57.1 — 보스 예고 컴포넌트(23호 Show·드론 ClientLock)도 예열한다. 임시 컴포넌트·프로젝터·재질 인스턴스·드론 뷰·빈 드론 데이터가
+    // 같은 호출 안에서 다 지워져야 한다(풀 없음). 두 번째 호출·재무장 뒤에도 수가 늘지 않는다.
+    [Test]
+    public void Prewarm_BossComponents_LeaveNothingBehind()
+    {
+        ResetForPlay();
+        var telBefore = new HashSet<BossAttackConeTelegraph>(Runtime<BossAttackConeTelegraph>());
+        var droneBefore = new HashSet<WellsDroneAttack>(Runtime<WellsDroneAttack>());
+        var decalBefore = new HashSet<UnityEngine.Rendering.Universal.DecalProjector>(Runtime<UnityEngine.Rendering.Universal.DecalProjector>());
+        var dataBefore = new HashSet<WellsDroneDataSO>(Runtime<WellsDroneDataSO>());
+        int viewsBefore = Runtime<GameObject>().Count(g => g.name == "WellsDroneView");
+
+        Assert.IsTrue(EnemyC3Visuals.Prewarm());
+        object last = PrewarmType.GetField("Last", Any).GetValue(null);
+        Assert.That((double)last.GetType().GetField("boss", Any).GetValue(last), Is.GreaterThan(0.0), "boss component stage ran");
+
+        CollectionAssert.IsEmpty(Runtime<BossAttackConeTelegraph>().Where(c => !telBefore.Contains(c)), "temporary telegraph left behind");
+        CollectionAssert.IsEmpty(Runtime<WellsDroneAttack>().Where(c => !droneBefore.Contains(c)), "temporary drone attack left behind");
+        CollectionAssert.IsEmpty(Runtime<UnityEngine.Rendering.Universal.DecalProjector>().Where(d => !decalBefore.Contains(d)), "telegraph projectors left behind");
+        CollectionAssert.IsEmpty(Runtime<WellsDroneDataSO>().Where(d => !dataBefore.Contains(d)), "empty drone data left behind");
+        Assert.AreEqual(viewsBefore, Runtime<GameObject>().Count(g => g.name == "WellsDroneView"), "drone view root left behind");
+
+        int decals = Runtime<UnityEngine.Rendering.Universal.DecalProjector>().Count, mats = Runtime<Material>().Count;
+        ResetForPlay();
+        Assert.IsTrue(EnemyC3Visuals.Prewarm(), "re-armed run");
+        Assert.AreEqual(decals, Runtime<UnityEngine.Rendering.Universal.DecalProjector>().Count, "projectors after the re-armed run");
+        Assert.AreEqual(mats, Runtime<Material>().Count, "materials after the re-armed run (telegraph instances destroyed)");
+    }
+
+    // 예열 뒤 게임이 새로 붙이는 보스 예고도 그대로다 — 프로젝터 6개, 재질 인스턴스 6개(조각마다 따로), 그리기 순서 = 예고 재질 + 외곽선 1.
+    [Test]
+    public void Prewarm_ThenNewTelegraph_BuildsTheSameProjectorSet()
+    {
+        ResetForPlay();
+        EnemyC3Visuals.Prewarm();
+        var go = new GameObject("EnemyC3PrewarmTests_Telegraph");
+        try
+        {
+            go.AddComponent<BossAttackConeTelegraph>().Show(2.5f, 360f, 0f, 18f, 1f, 18f, 1f);
+            var decals = go.GetComponentsInChildren<UnityEngine.Rendering.Universal.DecalProjector>(true);
+            Assert.AreEqual(6, decals.Length, "projectors");
+            Assert.AreEqual(6, decals.Select(d => d.material).Distinct().Count(), "one material instance per piece");
+            int baseQueue = Resources.Load<Material>("Telegraph/MA_TelegraphDecal").renderQueue;
+            foreach (var d in decals)
+            {
+                int order = d.name.EndsWith("Outline") ? 1 : 0;
+                Assert.AreEqual(baseQueue + order, d.material.renderQueue, d.name + " renderQueue");
+                if (d.material.HasProperty("_DrawOrder")) Assert.AreEqual(order, d.material.GetInt("_DrawOrder"), d.name + " _DrawOrder");
+                Assert.IsFalse(EditorUtility.IsPersistent(d.material), d.name + " uses an instance, not the asset");
+            }
+        }
+        finally
+        {
+            foreach (var d in go.GetComponentsInChildren<UnityEngine.Rendering.Universal.DecalProjector>(true))
+            {
+                var m = d.material; d.material = null;
+                if (m != null) Object.DestroyImmediate(m);
+            }
+            Object.DestroyImmediate(go);
+        }
+    }
 
     [Test]
     public void Prewarm_WarmsEveryListedVariant()
