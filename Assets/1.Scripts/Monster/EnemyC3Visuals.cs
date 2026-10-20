@@ -24,7 +24,7 @@ public static class EnemyC3Visuals
         // Reload the selected JSON on each Play, including when domain reload is disabled.
         foreach(var sprite in smashSprites.Values) if(sprite!=null) UnityEngine.Object.Destroy(sprite);
         foreach(var texture in textures.Values) if(texture!=null) UnityEngine.Object.Destroy(texture);
-        smashSprites.Clear();textures.Clear();entries=null;
+        smashSprites.Clear();textures.Clear();plateBlocks.Clear();entries=null;
     }
     public static Entry Get(string id)
     {
@@ -159,14 +159,53 @@ public static class EnemyC3Visuals
         string key=FormattableString.Invariant($"{id}_{extent.x:F4}_{extent.y:F4}_{coneRadius:F4}_{coneCenter:F4}_{halfAngle:F2}_{pathWidth:F4}_{pathLength:F4}");
         return Bake(key,id,extent,unit,Sdf,marker,false,!band&&!union&&halfAngle>=179.9f);
     }
+    // Floor plates (12·14·15·16, jump 06·07) are drawn by the EnemyC3Plate shader — no runtime texture.
+    // Circle()/Square() above stay as the CPU reference for the pixel comparison test and smash 09 (S3).
+    static readonly Dictionary<(string,bool,bool),MaterialPropertyBlock> plateBlocks=new();
+    static Material plateMaterial;
+    static readonly int TintId=Shader.PropertyToID("_Color"),ModeId=Shader.PropertyToID("_C3Mode"),SizeId=Shader.PropertyToID("_C3Size"),
+        GeomId=Shader.PropertyToID("_C3Geom"),OutlineId=Shader.PropertyToID("_C3Outline"),InnerLineId=Shader.PropertyToID("_C3InnerLine"),
+        BandId=Shader.PropertyToID("_C3Band"),FillId=Shader.PropertyToID("_C3Fill"),MarkersId=Shader.PropertyToID("_C3Markers");
+    public static Material PlateMaterial
+    {
+        get
+        {
+            if(plateMaterial!=null)return plateMaterial;
+            // Resources asset keeps the shader in builds; its render queue (3100) matches BossPatternVisuals plates.
+            plateMaterial=Resources.Load<Material>("Telegraph/MA_EnemyC3Plate");
+            if(plateMaterial==null)plateMaterial=new Material(Shader.Find("Monster/EnemyC3Plate")){name="EnemyC3Plate",renderQueue=3100};
+            return plateMaterial;
+        }
+    }
+    /// <summary>Plate layer values for the EnemyC3Plate shader — same inputs as Circle()/Square() Bake. Colors stay gamma (SetVector).</summary>
+    public static void SetPlateProperties(MaterialPropertyBlock block,string id,bool square,bool fill)
+    {
+        var e=Get(id).elements;var g=Get(id).geometry;
+        bool pins=!square&&(id=="09"?g.smashShowMarkers:g.showMarkers);
+        float core=square?150:165;
+        block.SetColor(TintId,Color.white);
+        block.SetVector(ModeId,new Vector4(square?1:0,fill?1:0,id=="09"||id=="16"?1:0,pins?1:0));
+        block.SetVector(SizeId,new Vector4(core,core*2+(fill?0:2*g.outerWidth),g.markerRadiusPercent,0));
+        block.SetVector(GeomId,new Vector4(g.outerWidth,g.innerWidth,g.gap,g.gradientStart));
+        block.SetVector(OutlineId,e.outline.Value);block.SetVector(InnerLineId,e.innerLine.Value);
+        block.SetVector(BandId,e.band.Value);block.SetVector(FillId,e.fill.Value);block.SetVector(MarkersId,e.markers.Value);
+    }
+    internal static void PaintLayer(Renderer r,string id,bool square,bool fill,float alpha=1)
+    {
+        if(r==null)return;
+        var mat=PlateMaterial;if(r.sharedMaterial!=mat)r.sharedMaterial=mat;
+        if(!plateBlocks.TryGetValue((id,square,fill),out var block))
+        { block=new MaterialPropertyBlock();SetPlateProperties(block,id,square,fill);plateBlocks[(id,square,fill)]=block; }
+        block.SetColor(TintId,new Color(1,1,1,Mathf.Clamp01(alpha)));
+        r.SetPropertyBlock(block);
+    }
     public static void PaintPlate(Renderer outer,Renderer fill,string id,bool square=false)
     {
         outer.sortingOrder=1;fill.sortingOrder=0;
-        BossPatternVisuals.Paint(outer,Color.white,square?Square(id):Circle(id));
-        BossPatternVisuals.Paint(fill,Color.white,square?Square(id,true):Circle(id,true));
+        PaintLayer(outer,id,square,false);
+        PaintLayer(fill,id,square,true);
     }
-    public static void PaintActive(Renderer r,float alpha=1)
-    { BossPatternVisuals.Paint(r,new Color(1,1,1,Mathf.Clamp01(alpha)),Square("16")); }
+    public static void PaintActive(Renderer r,float alpha=1)=>PaintLayer(r,"16",true,false,alpha);
     public static void ApplySmash(GameObject go)
     {
         foreach(var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
@@ -200,7 +239,7 @@ public sealed class EnemyC3JumpView : MonoBehaviour
     {
         radius=r;duration=d;outer=BossPatternVisuals.CreateFlat("Boundary",transform);fill=BossPatternVisuals.CreateFlat("Growing",transform);
         EnemyC3Visuals.PaintPlate(outer,fill,"06");
-        BossPatternVisuals.Paint(fill,Color.white,EnemyC3Visuals.Circle("07",true));
+        EnemyC3Visuals.PaintLayer(fill,"07",false,true);
         outer.transform.localPosition=Vector3.up*.07f;fill.transform.localPosition=Vector3.up*.08f;
         float outerDiameter=r*2*EnemyC3Visuals.OuterScale("06");outer.transform.localScale=new Vector3(outerDiameter,1,outerDiameter);outer.gameObject.SetActive(true);fill.gameObject.SetActive(true);UpdateScale();
     }
