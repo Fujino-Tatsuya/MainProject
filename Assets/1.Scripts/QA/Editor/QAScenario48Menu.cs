@@ -54,6 +54,19 @@ public static class QAScenario48Menu
     [MenuItem(Root + "Single/M8 Newcomer Reject → Lobby", priority = 37)]
     public static void RunM8() => Run("M8", 3);
 
+    /// <summary>할 일 57.2 보스전 실측 프로파일(솔로). 분석은 Tools/QA/57.2/Analyze Latest Boss Profile.</summary>
+    [MenuItem(Root + "Single/P572 Boss Profile (57.2)", priority = 38)]
+    public static void RunP572()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogWarning("[QA] 이미 Play 중이다 — Tools/QA/Stop Active Scenario 로 먼저 정지할 것.");
+            return;
+        }
+        QABossProfileAnalyzer.PrepareProfilerForRun();
+        Run("P572", 1);
+    }
+
     [MenuItem(Root + "Single/S1 Boot·Spawn·Camera·Combat", priority = 20)]
     public static void RunS1() => Run("S1", 1);
 

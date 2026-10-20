@@ -26,6 +26,7 @@ public static partial class QALobbyScenarios
             case "M6": return 360f;
             case "M7": return 480f;
             case "M8": return 420f;
+            case "P572": return 720f;
             default: return 60f;
         }
     }
@@ -46,6 +47,7 @@ public static partial class QALobbyScenarios
             case "M6": return M6(ctx);
             case "M7": return M7(ctx);
             case "M8": return M8(ctx);
+            case "P572": return P572(ctx);
             default: return null;
         }
     }
