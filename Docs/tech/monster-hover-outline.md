@@ -66,9 +66,12 @@
 | `aggroMaxTargets` | 0~ | 8 | 나를 노림 동시 최대 마리(빨강 대상 제외). 넘으면 가까운 순. 0 = 끔. |
 
 - 값은 매 프레임 `EnemyOutlineDrawList` 로 넘기므로 Play 중 인스펙터로 바꾸면 바로 보인다.
-- 🔴 색은 셰이더에 **선형 값 그대로** 들어간다(합성 셰이더에 Properties 블록이 없어 `SetColor` 감마→선형 변환이 안 걸림 — `PlayerSilhouetteFeature` 와 같은 방식).
-  그래서 화면에는 인스펙터 견본보다 밝게 보인다: `aggroOutlineColor` 0.22 → 화면 sRGB ≈ 0.51(129/255, 회색 바닥과 거의 같은 밝기).
-  견본처럼 어두운 회색(화면 sRGB 0.22)으로 보이려면 값 ≈ 0.04 — 에디터 캡처 비교 `58-mask/compare-aggro-value-0.04-zoom-chomp.png`. 빨강·주황(이전)도 같은 이유로 연하게 보였다.
+- 🔴 **인스펙터 값 = 화면 sRGB 값**(선형 변환, 할 일 58 후속 6). 합성 셰이더에 Properties 블록이 없어 `SetColor` 가
+  감마→선형 변환을 해 주지 않으므로, `EnemyOutlineFeature.ToShaderColor` 가 프로젝트가 Linear 면 `color.linear` 로 바꿔 넘긴다
+  (Gamma 면 그대로, 알파는 그대로). 그래서 견본 색이 화면에 그대로 보인다 — `aggroOutlineColor` 0.22 → 화면 ≈ 0.22(sRGB 56/255 근처).
+  - 이전(변환 없음)에는 0.22 가 선형 값으로 들어가 화면 sRGB ≈ 0.51(129/255)로 밝게 보였고 빨강도 연했다.
+    변환 후 빨강도 진해진다(사용자 수용). 캡처: `58-mask/after-linear*.png`.
+  - `PlayerSilhouetteFeature`(벽 뒤 플레이어 실루엣)는 같은 방식(Properties 없는 합성 셰이더 + `SetColor`)이라 같은 문제가 있지만 **이번에 고치지 않았다**.
 - 피처 쪽(`PC_Renderer` → `EnemyOutlineFeature`): `_occludeBias`(0.2m), `_injectionPoint`(550).
 
 ## 스킬 범위 외곽선 (할 일 58 후속)

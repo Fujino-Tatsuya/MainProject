@@ -48,6 +48,14 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
     /// </summary>
     public static Camera DevCaptureCamera;
 
+    /// <summary>
+    /// 인스펙터 색 → 합성 셰이더에 넘길 값. 합성 셰이더에 Properties 블록이 없어 SetColor 가 감마→선형 변환을
+    /// 하지 않으므로, Linear 프로젝트면 여기서 직접 바꿔야 인스펙터 값이 화면 sRGB 값으로 그대로 보인다.
+    /// 알파는 그대로. Gamma 프로젝트면 변환 없음.
+    /// </summary>
+    public static Color ToShaderColor(Color inspectorColor, ColorSpace colorSpace) =>
+        colorSpace == ColorSpace.Linear ? inspectorColor.linear : inspectorColor;
+
     private Material _maskPrimaryMaterial;
     private Material _maskAggroMaterial;
     private Material _compositeMaterial;
@@ -97,7 +105,9 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
         if (camData != null && camData.renderType == CameraRenderType.Overlay)
             return;
 
-        _pass.Setup(EnemyOutlineDrawList.PrimaryColor, EnemyOutlineDrawList.AggroColor,
+        ColorSpace colorSpace = QualitySettings.activeColorSpace;
+        _pass.Setup(ToShaderColor(EnemyOutlineDrawList.PrimaryColor, colorSpace),
+            ToShaderColor(EnemyOutlineDrawList.AggroColor, colorSpace),
             EnemyOutlineDrawList.WidthPixels, _occludeBias);
 
         // 합성 셰이더가 _CameraDepthTexture 를 읽는다 — 여기서 요청해야 URP 가 만든다.
