@@ -1,6 +1,6 @@
 # 몬스터 호버 빨간 외곽선 (할 일 58)
 
-내 마우스 커서 아래 적 한 마리에 빨간 외곽선을 그린다. **표시만, 로컬 전용** — 네트워크·서버 권한·판정 변경 없음.
+내 마우스 커서 아래 적 한 마리와, 스킬 범위 표시가 떠 있는 동안 그 스킬에 맞을 적들(아래 "스킬 범위 외곽선")에 빨간 외곽선을 그린다. **표시만, 로컬 전용** — 네트워크·서버 권한·판정 변경 없음.
 외곽선은 **림(프레넬)** 방식이다 — 월드 노멀 N 과 카메라 방향 V 의 `|dot(N, V)|` 가 0 에 가까운 곳(실루엣 가장자리)만 칠한다.
 
 ## 구성
@@ -17,6 +17,8 @@
 
 - 대상 마스크: `GameLayers.EnemyTargetMask` = Enemy + EnemyHurtBox (단일 대상 스킬 데이터의 TargetableLayers 와 같은 조합).
 - 대상: 위 마스크에서 해석된 **살아 있는 Unit** — 일반 몹·중간보스·23호·훈련 허수아비·보스 충전기(Unit 인 기믹) 포함. HP 0(사망 처리 중)·자기 자신 제외.
+  **스킬 조준과 같은 기준이다 — 허수아비·충전기 포함은 사용자 확정(2026-10-20).**
+- **가려진 부분은 그리지 않는다** — `ZTest LEqual` 유지, 벽 뒤 투시 패스는 추가하지 않는다(사용자 확정 (a), 2026-10-20).
 - 레이는 **프레임당 1회.** 단일 대상 조준 중엔 `PlayerSkillTargeting` 이 쏜 레이의 판정을 `ReportAimedTarget` 으로 넘기고 외곽선 쪽은 쏘지 않는다(LateUpdate 에서 판정).
 - 벽은 레이를 막지 않는다(스킬 조준과 같음 — 마스크에 벽이 없다).
 
@@ -43,6 +45,54 @@
 - 값은 `HoverRimSettings.Sanitized()` 로 클램프(NaN → 최소값) 후, **값이 바뀐 프레임에만** 런타임 사본 머티리얼에 쓴다 —
   Play 중 인스펙터로 바꾸면 호버 중인 대상에 바로 보인다. 원본 `.mat` 은 안 바뀐다.
 - 림은 **버텍스 노멀** 기준이라 하드 엣지(면마다 노멀이 갈라진) 메시는 가장자리 면이 넓게/좁게 갈린다 — HumanoidBot 처럼 각진 몹은 임계값을 올려 보며 맞춘다.
+
+## 스킬 범위 외곽선 (할 일 58 후속)
+
+스킬 **범위 표시가 떠 있는 동안** 그 스킬이 **실제로 맞힐 영역** 안의 살아 있는 적에도 같은 림을 켠다. 오너 로컬·네트워크 없음.
+
+- **판정 = 서버 판정과 같은 기하.** 인디케이터 그림이 아니라 스킬의 피격 판정 영역(`SkillHitVolume`)을 쓴다.
+  서버 판정 코드가 같은 팩토리로 영역을 만들어 겹침을 돌리므로 모양·사거리·폭·높이·앵커가 갈라질 곳이 없다.
+  - `SkillHitVolume.Beam` — 거너 Q 관통 상자. `GunnerBeamAttack.OverlapBeamBox`(서버)·`GunnerChargeLaserSkill.FireVolume`(미리보기)이 쓴다.
+  - `SkillHitVolume.CircleColumn` + `Accepts`(= `AssassinCircleStrikeRules.OverlapsCircle`) — 어쌔신 변신 E 원기둥.
+    `AssassinCircleStrikeSkill.StrikeArea`(서버)·`TryGetGroundHitVolume`(미리보기)이 같은 `AreaCenter`/`HitVolume` 을 쓴다.
+- **보고 방식**: 표시를 그리는 쪽이 매 프레임 `PlayerEnemyHoverOutline.ReportSkillHitArea(volume)` 를 부른다(호버의 `ReportAimedTarget` 과 같은 프레임 도장).
+  안 부른 프레임엔 꺼진다. 표시가 꺼지는 프레임(조준 확정·취소 = `ExitStandby`, Q 발사·종료)은 `ClearSkillHitArea` 로 같은 프레임에 끈다.
+  - 거너 Q: `OnOwnerTick` 이 충전 직선(`ShowCharge`)을 그린 직후 보고.
+  - 지점 지정(GroundPoint) 조준: `PlayerSkillTargeting.UpdateGroundPointPreview` 가 지점 원을 그린 직후, 스킬이 `ISkillGroundHitPreview` 면 그 지점(확정 때 넘길 지점 — 고정 거리 투영·Clamp 반영)으로 보고.
+- **고르기**: LateUpdate 에서 NonAlloc 상자 겹침 **1회**(마스크 = 스킬 피격 마스크 ∩ `GameLayers.EnemyTargetMask`) → 원기둥이면 `Accepts` →
+  `CursorUnitPick.ResolveUnit`(Hurtbox 우선) → `IsSelectable`(HP 0·자기 자신 제외) → `SkillRangeOutlineSelection.Select`(중복 제거·가까운 순·상한).
+  상자·플레이어 같은 비적은 마스크에서 빠진다.
+- **합집합 규칙**: 호버 대상 ∪ 범위 대상. 같은 몬스터가 둘 다면 **호버가 이긴다**(호버 강도 하나만, 겹 중복 없음). 상한은 범위 세트에만 센다.
+- **비용**: 겹 붙이기/떼기는 몬스터가 세트에 들어오거나 나갈 때(또는 호버↔범위 전환)만. 버퍼·리스트·겹 묶음은 재사용(프레임 할당 0 지향).
+  런타임 사본 머티리얼은 호버용·범위용 2개.
+- 서버 시점과의 차이: Q 사거리는 오너 충전 시각 기준이라 RTT 만큼 서버보다 앞서거나 뒤질 수 있다(인디케이터와 같은 차이). 위치도 오너 예측 기준.
+
+### 스킬 적용 표
+
+| 캐릭터 | 슬롯 | 스킬 | 범위 표시 | 판정 모양 | 판정 출처 함수 | 적용 |
+|---|---|---|---|---|---|---|
+| 거너 | Q | 충전 레이저 | 충전 중 직선(`ShowCharge`) | 직육면체(관통) | `GunnerBeamAttack.FirePiercing` → `OverlapBeamBox` | ✅ |
+| 거너 | R | 추적 레이저 | 조준(대상 지정) + 대상 주변 원 | 생성 후 스스로 움직이며 재탐색 | `GunnerTrackingLaser` | ❌ 제외 — 경로·틱 대상이 시전 뒤 정해진다. 조준 대상은 호버(`ReportAimedTarget`)로 이미 칠해진다 |
+| 거너 | E | 냉각 백스텝 | 없음(HUD 호버 화살표만) | 피해 없음(이동) | — | ❌ 해당 없음 |
+| 거너 | 우클릭 | 근접 간파 | 없음(HUD 호버 상자만) | 앵커 상자 | `PlayerInterruptSkillBase` | ❌ 사용 시 범위 표시 없음 |
+| 가붕이(팔라딘) | R | 최후의 심판 | 조준(대상 지정) | 단일 대상 | `FirstMeleeUltimateSkill.OnChannelCompleted` | ➖ 단일 대상 — 호버(조준 대상)로 충분 |
+| 가붕이 | Q / E | 메인·서브 | 없음(즉발) | — | `FirstMeleeMainSkill`·`FirstMeleeSubSkill` | ❌ 사용 시 범위 표시 없음 |
+| 가붕이 | 우클릭 | 간파 | 없음(HUD 호버 상자만) | 앵커 상자 | `PlayerInterruptSkillBase` | ❌ 사용 시 범위 표시 없음 |
+| 어쌔신 | E(변신) | 원형 5타 | 조준(고정 거리 지점 원) | 원기둥(AABB-원) | `AssassinCircleStrikeSkill.StrikeArea` | ✅ |
+| 어쌔신 | Q / E / R / 우클릭 | 돌진 베기·강화·변신·간파 | 없음(즉발·이동형) | — | `AssassinDashStrikeSkill` 등 | ❌ 사용 시 범위 표시 없음(돌진은 이동 경로가 판정이라 미리 알 수 없다) |
+
+- **HUD 슬롯 호버 미리보기(`SkillLineIndicator.BeginPreview`·사거리 원 빌려 쓰기)는 넣지 않았다** — "스킬 사용 시" 표시가 아니라 툴팁용이다.
+  넣으려면 `ISkillPreviewSource` 구현 스킬(거너 Q·우클릭, 가붕이 우클릭)이 같은 방식으로 `ReportSkillHitArea` 를 부르면 된다.
+- 새 지점 지정 스킬은 `ISkillGroundHitPreview` 를 서버 판정과 같은 함수로 구현하면 자동으로 붙는다.
+
+### 튜닝 (`PlayerEnemyHoverOutline` 인스펙터 — 스킬 범위)
+
+| 필드 | 범위 | 기본 | 뜻 |
+|---|---|---|---|
+| `skillRangeRimIntensity` | 0~8 | 1 | 범위 대상 림 밝기 배수. 색·임계값·부드러움은 호버와 같다. |
+| `skillRangeMaxTargets` | 1~ | 16 | 동시에 칠할 최대 마리 수(호버 대상 제외). 넘으면 시전자에서 가까운 순. |
+
+- 겹침 버퍼는 64(콜라이더 수). 몬스터 하나가 콜라이더 여러 개면 한 마리로 합친다.
 
 ## 왜 림인가 (1차 구현의 부풀린 외피 대신)
 

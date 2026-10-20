@@ -48,6 +48,8 @@ public class PlayerSkillTargeting : MonoBehaviour
 
     private PlayerSkillSlot currentSlot;
     private PlayerSkillData currentData;
+    // 지점 지정 스킬의 피격 영역 미리보기(스킬 범위 외곽선). 없으면 null.
+    private ISkillGroundHitPreview groundHitPreview;
     private SkillCursorState cursorState = SkillCursorState.Default;
 
     // 조준 미리보기 결과
@@ -127,6 +129,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         beganThisFrame = true;
         currentSlot = slot;
         currentData = skill.Data;
+        groundHitPreview = currentData.TargetingMode == SkillTargetingMode.GroundPoint ? skill as ISkillGroundHitPreview : null;
         hoveredTarget = null;
         hoveredInRange = false;
         hasCandidateGroundPoint = false;
@@ -461,14 +464,17 @@ public class PlayerSkillTargeting : MonoBehaviour
         hasCandidateGroundPoint = true;
 
         // Clamp 는 시전될 경계 지점에, AutoApproach 는 사거리와 무관하게 마우스를 따라 같은 모양으로 그린다.
+        Vector3 markerPoint = currentData.FixedDistance
+            ? point
+            : GroundPointTargeting.PreviewMarkerPoint(
+                owner.transform.position, point, currentData.CastRange, currentData.GroundPointOutOfRange);
         if (rangeIndicator != null)
-        {
-            Vector3 markerPoint = currentData.FixedDistance
-                ? point
-                : GroundPointTargeting.PreviewMarkerPoint(
-                    owner.transform.position, point, currentData.CastRange, currentData.GroundPointOutOfRange);
             rangeIndicator.SetGroundMarker(true, markerPoint, GetGroundMarkerRadius(currentData));
-        }
+
+        // 그 지점에 시전하면 맞을 적에 외곽선(할 일 58) — 스킬의 서버 판정과 같은 영역.
+        if (hoverOutline != null && groundHitPreview != null &&
+            groundHitPreview.TryGetGroundHitVolume(owner.transform.position, markerPoint, out SkillHitVolume volume))
+            hoverOutline.ReportSkillHitArea(volume);
 
         SetCursorState(inRange ? SkillCursorState.ValidTarget : SkillCursorState.OutOfRange);
     }
@@ -712,6 +718,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         beganThisFrame = false;
         hoveredTarget = null;
         hasCandidateGroundPoint = false;
+        groundHitPreview = null;
 
         if (rangeIndicator != null)
         {
@@ -719,6 +726,8 @@ public class PlayerSkillTargeting : MonoBehaviour
             rangeIndicator.gameObject.SetActive(false);
         }
 
+        // 표시가 꺼진 프레임에 범위 외곽선도 끈다(확정·취소 모두 여기를 지난다).
+        hoverOutline?.ClearSkillHitArea();
         SetCursorState(SkillCursorState.Default);
     }
 
