@@ -198,8 +198,12 @@ public sealed class QAResultFlow
                               $"inv={(inv != null && inv.IsServerInvulnerable)} {DeathResolutionDiag(life)}]");
                 }
 
+                // 차감 없는 사망 여부는 사망이 기록된 뒤에야 참이 된다(TutorialDeathRulesModel.IsPenaltyFree) — 죽은 상태에서 본다.
                 bool keepsSoul = PlayerLifeCycleController.ServerDeathKeepsSoul != null &&
                                  PlayerLifeCycleController.ServerDeathKeepsSoul(player.OwnerClientId);
+                if (keepsSoul && (life.State == PlayerLifeState.DeadPresentation || life.State == PlayerLifeState.Soul))
+                    freeDeaths.Add(player.OwnerClientId);
+
                 if (life.State == PlayerLifeState.Alive && player.CurrentHealth > 0)
                 {
                     if (freeDeaths.Contains(player.OwnerClientId))
@@ -208,11 +212,7 @@ public sealed class QAResultFlow
                     // 30초 가까이 늘어져(10-08 3차) 쓰지 않는다.
                     player.ApplyDirectHealthDamage(player.CurrentHealth + 100000);
                     if (player.CurrentHealth <= 0)
-                    {
                         Increment(_injectedDeaths, player.OwnerClientId);
-                        if (keepsSoul)
-                            freeDeaths.Add(player.OwnerClientId);
-                    }
                 }
                 else if (life.State == PlayerLifeState.Soul && !keepsSoul)
                 {
