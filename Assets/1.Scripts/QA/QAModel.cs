@@ -111,10 +111,14 @@ public static class QABlackboard
     /// <summary>플레이어가 스폰되어 QA가 실제 조작 중인지.</summary>
     public static bool Controlling;
 
+    /// <summary>스크립트(로비 걷기·시나리오)가 이동을 쥐고 있다 — QAAgent 휴리스틱은 행동을 넣지 않는다.</summary>
+    public static bool ScriptedControl;
+
     public static void Reset()
     {
         LastMoveIntentTime = -999f;
         Controlling = false;
+        ScriptedControl = false;
     }
 }
 

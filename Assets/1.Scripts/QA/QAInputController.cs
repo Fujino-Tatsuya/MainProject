@@ -1,4 +1,7 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 /// <summary>
 /// QA 에이전트의 행동을 게임 플레이어에 주입한다. 게임 코드 무수정 원칙:
@@ -72,6 +75,30 @@ public sealed class QAInputController : MonoBehaviour
             return false;
 
         return target != null ? _skills.TryUse(slot, target) : _skills.TryUse(slot);
+    }
+
+    /// <summary>조준 확정 경로로 지점 시전 — 조준 모드에 들어가지 않는다(대상 없는 로비·맵 시험용).</summary>
+    public bool UseSkillAt(PlayerSkillSlot slot, Vector3 aimPoint)
+    {
+        return _skills != null && _skills.ExecuteTargetedSkill(slot, null, aimPoint, true);
+    }
+
+    /// <summary>
+    /// 키 한 번 누름을 가상 키보드 상태 이벤트로 넣는다(누름 2프레임 → 뗌). 로비 F 상호작용처럼
+    /// 게임이 Keyboard 를 직접 읽는 경로를 그대로 탄다. 창 포커스·배경 입력 설정에 따라 무시될 수 있어
+    /// 호출 측이 상태 변화로 반영 여부를 확인해야 한다.
+    /// </summary>
+    public IEnumerator PressKey(Key key)
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null)
+            yield break;
+
+        InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+        yield return null;
+        yield return null;
+        InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+        yield return null;
     }
 
     public bool IsSkillReady(PlayerSkillSlot slot)

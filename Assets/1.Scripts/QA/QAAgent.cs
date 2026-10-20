@@ -139,7 +139,7 @@ public sealed class QAAgent : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        if (_input == null || !_input.HasTarget)
+        if (_input == null || !_input.HasTarget || QABlackboard.ScriptedControl)
             return;
 
         var continuous = actions.ContinuousActions;

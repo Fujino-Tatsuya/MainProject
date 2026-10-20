@@ -164,6 +164,64 @@ public sealed class QASessionController : MonoBehaviour
         _cycleSummary = "중단";
         _cycleFailed = false;
 
+        // 48 데모 흐름: 타이틀·IP 버튼이 없다 — 접속은 DemoSessionDirector 가 설정 파일로 한다. QA 는 걷어서 준비만 한다.
+        if (DemoSessionDirector.IsDemoFlowActive)
+        {
+            yield return RunDemoLobby();
+            if (_cycleFailed) yield break;
+        }
+        else
+        {
+            yield return RunLegacyLobby(first);
+            if (_cycleFailed) yield break;
+        }
+
+        // 4) 플레이어 스폰 대기(호스트가 맵 로딩 후 서버가 스폰). 48 로비에도 플레이어가 서므로 맵 씬까지 본다.
+        float spawnWait = expectedPlayers > 1 ? multiplayerTimeout : spawnTimeout;
+        yield return WaitOrTimeout(() => QALobbyFlow.InMapWithPlayer, spawnWait);
+        if (AbortCycle("맵 로딩·플레이어 스폰")) yield break;
+        _input.SetTarget(Player.LocalPlayer);
+
+        if (resultPaths)
+        {
+            yield return RunResultPhase();
+            yield break;
+        }
+
+        // 5) 플레이 세션. 시간 만료 또는 전멸(전원 유령) 10초 경과 중 먼저 오는 쪽으로 끝난다.
+        Debug.Log($"[QA] 전투 씬 도달 — {sessionDuration:F0}초 QA 세션 진행.");
+        float endTime = Time.time + sessionDuration;
+        _cycleSummary = $"정상 종료: {sessionDuration:F0}초 세션 완료";
+        yield return WaitForSessionEnd(endTime);
+    }
+
+    /// <summary>48 데모 흐름: 로비 접속(자동) 대기 → (호스트) 인원 대기 → 준비 패드까지 걸어가 F.</summary>
+    private IEnumerator RunDemoLobby()
+    {
+        yield return WaitOrTimeout(() => QALobbyFlow.IsConnected && QALobbyFlow.HasLocalLobbyPlayer, multiplayerTimeout);
+        if (AbortCycle("데모 자동 접속·로비 입장")) yield break;
+
+        if (IsHostRole() && expectedPlayers > 1)
+        {
+            Debug.Log($"[QA][Host] 클라이언트 {expectedPlayers - 1}명 접속 대기");
+            yield return WaitOrTimeout(AllPlayersConnected, multiplayerTimeout);
+            if (AbortCycle($"클라이언트 접속(기대 {expectedPlayers}인)")) yield break;
+        }
+
+        // 결과 패널이 열려 있으면 입력이 막힌다 — 닫고 준비.
+        LobbyResultPanel panel = FindFirstObjectByType<LobbyResultPanel>();
+        if (panel != null && panel.IsOpen)
+            panel.Hide();
+
+        yield return QALobbyFlow.ReadyUp(_input);
+        if (!QALobbyFlow.IsLocalReady())
+            _recorder.Add(QASeverity.Error, "Flow", "로비 준비 실패(패드 걷기·F·RPC 모두) — 카운트다운이 시작되지 않을 수 있음");
+        // 전원 준비 → 카운트다운 끝에 서버가 맵을 로드·스폰한다.
+    }
+
+    /// <summary>옛 흐름(데모 흐름 꺼짐 — Dev 부팅 등): 타이틀 → 로비 → IP 직접 접속.</summary>
+    private IEnumerator RunLegacyLobby(bool first)
+    {
         // 1) 첫 사이클만 부팅 완료 대기(GameManager 준비 + 타이틀 씬 로드).
         if (first)
         {
@@ -188,24 +246,6 @@ public sealed class QASessionController : MonoBehaviour
             yield return RunHostLobby(launcher);
         else
             yield return RunClientLobby(launcher);
-        if (_cycleFailed) yield break;
-
-        // 4) 플레이어 스폰 대기(호스트가 맵 로딩 후 서버가 스폰).
-        float spawnWait = expectedPlayers > 1 ? multiplayerTimeout : spawnTimeout;
-        yield return WaitOrTimeout(() => Player.LocalPlayer != null, spawnWait);
-        if (AbortCycle("맵 로딩·플레이어 스폰")) yield break;
-
-        if (resultPaths)
-        {
-            yield return RunResultPhase();
-            yield break;
-        }
-
-        // 5) 플레이 세션. 시간 만료 또는 전멸(전원 유령) 10초 경과 중 먼저 오는 쪽으로 끝난다.
-        Debug.Log($"[QA] 전투 씬 도달 — {sessionDuration:F0}초 QA 세션 진행.");
-        float endTime = Time.time + sessionDuration;
-        _cycleSummary = $"정상 종료: {sessionDuration:F0}초 세션 완료";
-        yield return WaitForSessionEnd(endTime);
     }
 
     /// <summary>
@@ -353,19 +393,13 @@ public sealed class QASessionController : MonoBehaviour
         return nm != null && nm.IsServer && nm.ConnectedClientsList.Count >= expectedPlayers;
     }
 
-    /// <summary>LobbySession 이 뜨면 내 자리가 준비 해제일 때만 준비 토글을 요청한다(토글이라 두 번 누르면 꺼진다).</summary>
+    /// <summary>로비에 내 플레이어가 서면 준비 패드까지 걸어가 F(서버가 패드 거리를 다시 본다). 토글이라 이미 준비면 건너뛴다.</summary>
     private IEnumerator RequestLocalReady()
     {
-        yield return WaitOrTimeout(() => LobbySession.Active != null && LobbyUIController.Active != null, phaseTimeout);
+        yield return WaitOrTimeout(() => QALobbyFlow.HasLocalLobbyPlayer, phaseTimeout);
         if (AbortCycle("로비 세션 대기")) yield break;
 
-        // 내 자리(LobbyPlayerEntry)가 복제될 시간.
-        yield return new WaitForSeconds(0.5f);
-        if (!LobbyUIController.Active.IsLocalReady())
-        {
-            Debug.Log("[QA] → 준비 토글 요청");
-            LobbySession.Active.RequestToggleReady();
-        }
+        yield return QALobbyFlow.ReadyUp(_input);
     }
 
     /// <summary>클라이언트 역할(MPPM 가상 플레이어): 호스트에 접속 → ready. 스폰은 공통 단계에서 대기.</summary>
@@ -458,6 +492,19 @@ public sealed class QASessionController : MonoBehaviour
     private IEnumerator ResetBetweenCycles()
     {
         _input?.SetTarget(null);
+
+        // 48 데모 흐름: 네트워크를 끄면 DemoSessionDirector 가 재접속 루프를 탄다 — 연결은 두고 판만 끝내 로비로 돌아간다.
+        if (DemoSessionDirector.IsDemoFlowActive)
+        {
+            if (IsHostRole() && QAUtil.ActiveSceneName() == QALobbyFlow.MapScene)
+            {
+                Debug.Log("[QA] 사이클 재시작 — 판 종료(GoToResultButton) → 로비.");
+                GameManager.GoToResultButton();
+            }
+            yield return WaitOrTimeout(() => QALobbyFlow.HasLocalLobbyPlayer, resultWaitTimeout);
+            yield return new WaitForSeconds(1f);
+            yield break;
+        }
 
         // 결과 화면 경로 모드의 클라: 호스트가 결과 씬에 머무는 동안(hostResultLingerSeconds) 먼저 끊고
         // 재접속하면 끝나가는 세션에 다시 붙는다(10-08 1차 — 사이클 2·3 로비 소프트락). 호스트가 닫을 때까지 기다린다.

@@ -35,6 +35,18 @@ public static class QAAutoBootstrap
         go.SetActive(false);                 // 구성 완료 후 활성화(에이전트 초기화 순서 보장)
         Object.DontDestroyOnLoad(go);
 
+        // 할 일 48 시나리오 모드 — 접속은 DemoSessionDirector 에 맡기고 시나리오 스크립트가 입력을 넣는다(휴리스틱 에이전트 없음).
+        string scenarios = QASettings.Scenarios;
+        if (!string.IsNullOrWhiteSpace(scenarios))
+        {
+            go.AddComponent<QAInputController>();
+            var runner = go.AddComponent<QAScenarioRunner>();
+            runner.Configure(scenarios, QASettings.PlayerCount, QASettings.ResultPathOrder);
+            go.SetActive(true);
+            Debug.Log($"[QA] Harness 생성 완료 — 48 시나리오 모드 {scenarios}, {QASettings.PlayerCount}인.");
+            return;
+        }
+
         var bp = go.AddComponent<BehaviorParameters>();
         bp.BehaviorName = "GameQAAgent";
         bp.BehaviorType = BehaviorType.HeuristicOnly;   // Python 트레이너 없이 Heuristic()으로 동작

@@ -67,6 +67,119 @@ public static class QAReportWriter
         return DateTime.Now.ToString("yyyyMMdd_HHmmss");
     }
 
+    // ── 시나리오 리포트(할 일 48) ─────────────────────────────────
+
+    /// <summary>
+    /// 시나리오 리포트 루트: 설정 경로(절대)가 있으면 그것, 없으면 저장소 옆 C:/UnityProject/QA(= repo 상위/QA).
+    /// 에디터를 다시 켜도 지워지지 않고 git 밖이다.
+    /// </summary>
+    public static string ScenarioRoot()
+    {
+#if UNITY_EDITOR
+        string configured = QASettings.ReportRoot;
+        if (!string.IsNullOrWhiteSpace(configured) && Path.IsPathRooted(configured.Trim()))
+            return configured.Trim();
+        string repoRoot = Directory.GetParent(Application.dataPath).FullName;
+        string parent = Directory.GetParent(repoRoot)?.FullName ?? repoRoot;
+        return Path.Combine(parent, "QA");
+#else
+        return Path.Combine(Application.persistentDataPath, "qa-runs");
+#endif
+    }
+
+    /// <summary>"&lt;prefix&gt;-&lt;시각&gt;[-suffix]" 실행 폴더를 만든다. 실패하면 null.</summary>
+    public static string ScenarioRunDir(string prefix, string suffix)
+    {
+        try
+        {
+            string name = $"{prefix}-{Timestamp()}" + (string.IsNullOrEmpty(suffix) ? string.Empty : "-" + suffix);
+            string dir = Path.Combine(ScenarioRoot(), name);
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[QA] 시나리오 리포트 폴더 생성 실패: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>항목별 PASS/FAIL/눈확인 표 + 탐지기 타임라인을 report.md 로, 에러 원문을 errors.log 로 (덮어)쓴다.</summary>
+    public static void WriteScenarioReport(QAScenarioContext ctx, string[] scenarioIds, string status)
+    {
+        if (string.IsNullOrEmpty(ctx.RunDir))
+            return;
+
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# 할 일 48 로비 데모 QA 시나리오 리포트");
+            sb.AppendLine();
+            sb.AppendLine($"- 생성: {DateTime.Now:yyyy-MM-dd HH:mm:ss} · 상태: {status}");
+            sb.AppendLine($"- 역할: {ctx.Role} · 인원: {ctx.ExpectedPlayers} · 시나리오: {string.Join(",", scenarioIds)}");
+            sb.AppendLine($"- Unity: {Application.unityVersion} · 거친 씬: {string.Join(" → ", ctx.SceneLog)}");
+            sb.AppendLine();
+
+            sb.AppendLine("## 시나리오 요약");
+            sb.AppendLine();
+            sb.AppendLine("| 시나리오 | PASS | FAIL | 눈확인 | 건너뜀 | 판정 |");
+            sb.AppendLine("|---|---:|---:|---:|---:|---|");
+            foreach (string id in scenarioIds)
+            {
+                int pass = 0, fail = 0, eye = 0, skip = 0;
+                foreach (QAScenarioItem it in ctx.Items)
+                {
+                    if (it.Scenario != id) continue;
+                    switch (it.Status)
+                    {
+                        case QAItemStatus.Pass: pass++; break;
+                        case QAItemStatus.Fail: fail++; break;
+                        case QAItemStatus.Eye: eye++; break;
+                        default: skip++; break;
+                    }
+                }
+                string verdict = pass + fail + eye + skip == 0 ? "미실행" : fail > 0 ? "FAIL" : eye > 0 ? "PASS(눈확인 남음)" : "PASS";
+                sb.AppendLine($"| {id} | {pass} | {fail} | {eye} | {skip} | {verdict} |");
+            }
+            sb.AppendLine();
+
+            sb.AppendLine("## 항목");
+            sb.AppendLine();
+            sb.AppendLine("| 시각(s) | 시나리오 | 항목 | 결과 | 근거 | 스크린샷 |");
+            sb.AppendLine("|---:|---|---|---|---|---|");
+            foreach (QAScenarioItem it in ctx.Items)
+            {
+                string shot = string.IsNullOrEmpty(it.Screenshot) ? "" : $"[{Path.GetFileName(it.Screenshot)}]({it.Screenshot})";
+                sb.AppendLine($"| {it.TimeSeconds:F1} | {it.Scenario} | {Escape(it.Name)} | {StatusLabel(it.Status)} | {Escape(it.Evidence)} | {shot} |");
+            }
+            if (ctx.Items.Count == 0)
+                sb.AppendLine("| - | - | (항목 없음) | - | - | - |");
+            sb.AppendLine();
+
+            sb.AppendLine("## 탐지기(상시 감시) 집계");
+            sb.AppendLine();
+            AppendFindings(sb, ctx.Recorder);
+
+            File.WriteAllText(Path.Combine(ctx.RunDir, "report.md"), sb.ToString(), new UTF8Encoding(true));
+            File.WriteAllText(Path.Combine(ctx.RunDir, "errors.log"), BuildErrorLog(ctx.Recorder), new UTF8Encoding(true));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[QA] 시나리오 리포트 저장 실패: {e.Message}");
+        }
+    }
+
+    private static string StatusLabel(QAItemStatus s)
+    {
+        switch (s)
+        {
+            case QAItemStatus.Pass: return "✅ PASS";
+            case QAItemStatus.Fail: return "❌ FAIL";
+            case QAItemStatus.Eye: return "👀 눈확인";
+            default: return "건너뜀";
+        }
+    }
+
     private static string BuildMarkdown(QARecorder recorder, string sessionSummary)
     {
         var sb = new StringBuilder();
@@ -76,6 +189,12 @@ public static class QAReportWriter
         sb.AppendLine($"- Unity: {Application.unityVersion}");
         sb.AppendLine($"- 요약: {sessionSummary}");
         sb.AppendLine();
+        AppendFindings(sb, recorder);
+        return sb.ToString();
+    }
+
+    private static void AppendFindings(StringBuilder sb, QARecorder recorder)
+    {
         sb.AppendLine("## 집계");
         sb.AppendLine();
         sb.AppendLine($"- Critical: {recorder.CountBySeverity(QASeverity.Critical)}");
@@ -103,8 +222,6 @@ public static class QAReportWriter
 
         if (findings.Count == 0)
             sb.AppendLine("| - | - | - | - | (발견 없음) | - |");
-
-        return sb.ToString();
     }
 
     private static string BuildErrorLog(QARecorder recorder)

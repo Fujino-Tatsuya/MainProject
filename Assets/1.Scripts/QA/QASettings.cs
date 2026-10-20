@@ -18,6 +18,17 @@ public static class QASettings
     public const string ReportRootKey = "QA.ReportRoot";
     public const string ResultPathsKey = "QA.ResultPaths";
     public const string ResultPathOrderKey = "QA.ResultPathOrder";
+    public const string ScenariosKey = "QA.Scenarios48";
+
+    /// <summary>
+    /// 할 일 48 시나리오 모드(쉼표 구분 id, 예: "S1,S3,S5"). 비어 있지 않으면 부트스트랩이 QASessionController·QAAgent 대신
+    /// QAScenarioRunner 를 붙인다. MPPM 가상 플레이어도 같은 EditorPrefs 를 읽는다. Tools/QA/48 메뉴가 설정·해제한다.
+    /// </summary>
+    public static string Scenarios
+    {
+        get => EditorPrefs.GetString(ScenariosKey, string.Empty);
+        set => EditorPrefs.SetString(ScenariosKey, value ?? string.Empty);
+    }
 
     /// <summary>결과 화면 경로 순서(쉼표 구분: Aborted,Wiped,Cleared). 비우면 기본 순서.</summary>
     public static string ResultPathOrder
