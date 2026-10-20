@@ -21,8 +21,8 @@ using UnityEngine.Rendering.Universal;
 /// <b>채움</b>(0 → 전체로 자람 = "언제") 두 겹이다. 채움이 가득 차는 순간이 곧 공격이다.
 ///
 /// 🎨 <b>색·마스크 = 몬스터 데이터의 <see cref="TelegraphStyleSO"/></b>(PLAN-telegraph-style, 팀장 10-13).
-///    모양 텍스처는 <b>흰색</b>으로 굽고(모양 알파만), 색·마스크는 셰이더(<c>SG_TelegraphDecal</c>)가 재질 값으로 입힌다 —
-///    그래서 스타일을 바꿔도 다시 굽지 않는다. Play 중 스타일 값을 바꾸면 <see cref="TelegraphStyleSO.Version"/> 을 보고
+///    모양(윤곽선·채움)은 텍스처 없이 셰이더(<c>SG_EnemyC3Decal</c>)가 그리고(할 일 57 S2·S4a), 색·마스크는 같은
+///    셰이더가 재질 값으로 입힌다 — 그래서 스타일·크기·진행이 바뀌어도 재질 값만 바뀐다. Play 중 스타일 값을 바꾸면 <see cref="TelegraphStyleSO.Version"/> 을 보고
 ///    재질 값만 다시 넣는다(<c>Show</c> 를 다시 부르지 않음 — 부르면 채움 진행이 0 으로 돌아간다).
 ///    마스크 좌표 = 각 조각 기준점의 로컬 좌표(<c>TelegraphMask.hlsl</c>) — 채움 프로젝터가 커져도 패턴이 미끄러지지 않고,
 ///    보스가 돌면 패턴도 같이 돈다.
@@ -41,10 +41,8 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
 
     Palette _palette = Palette.Attack;
 
-    const int TextureSize = 256;
     const float ProjectionDepth = 6f;   // 표식과 같은 정도 — 경사면에서도 투영되게 넉넉히
     const float MinFillSize = 0.15f;     // 0 이면 프로젝터가 사라져 깜빡인다
-    static readonly int DecalBaseMapId = Shader.PropertyToID("Base_Map");
 
     // ── 스타일 셰이더 속성(SG_TelegraphDecal · TelegraphMask.hlsl)
     static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -78,37 +76,49 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     }
 
     TelegraphDecalStyle CurrentStyle => Style.Decal(_palette);
+    string C3Id
+    {
+        get
+        {
+            if (_coneRadius > 0 && _pathLength > 0) return "02";
+            if (_coneRadius > 0) return "03";
+            MonsterBase owner=GetComponent<MonsterBase>();
+            string kind=owner!=null?owner.GetType().Name:"";
+            if (kind=="SpinnerBot") return _palette==Palette.Interrupt?"11":"10";
+            if (kind=="GauntletBot") return "08";
+            if (_palette==Palette.Interrupt) return "04";
+            return _growTime<=0?"05":"01";
+        }
+    }
 
-    // 셰이더가 색을 입히는가(예고 재질). 아니면(대체 재질) 예전처럼 색을 텍스처에 굽는다.
+
+    // 예고 재질(_BaseColor·마스크)인가. 아니면(대체 재질) 마스크 없이 채움 색만 재질에 넣는다.
     bool _shaderColor;
-    Color ShapeColor(TelegraphLayer layer) => _shaderColor ? Color.white : layer.color;
     int _appliedVersion = -1;
 
     // 끝점 부채꼴
     Transform _coneRoot;
     DecalProjector _coneOutline, _coneFill;
-    Texture2D _coneOutlineTex, _coneFillTex;
     Vector3 _builtConeKey = new Vector3(-1f, -1f, -1f);   // (반각, 반경, 두께) — 두께 UV 가 반경에 의존한다
+    float _coneHalfAngle = 180f;
 
     // 전진 경로 띠
     Transform _bandRoot;
     DecalProjector _bandOutline, _bandFill;
-    Texture2D _bandOutlineTex, _bandFillTex;
     Vector3 _builtBandKey = new Vector3(-1f, -1f, -1f);   // (반폭, 길이, 두께)
 
     // 합집합(열쇠구멍) — 띠와 끝점이 둘 다 있을 때는 **한 도형**으로 그린다(팀장 확정 2026-09-18).
     Transform _unionRoot;
     DecalProjector _unionOutline, _unionFill;
-    Texture2D _unionOutlineTex, _unionFillTex;
-    float _builtUnionKey = -1f;      // 모양이 바뀜을 때만 외곽선을 다시 굽는다
-    int _builtUnionFillStep = -1;    // 채움은 양자화해서 다시 굽는다(매 프레임은 낭비)
+    float _builtUnionKey = -1f;      // 모양이 바뀜을 때만 외곽선 값을 다시 넣는다
+    int _builtUnionFillStep = -1;    // 채움 전선은 25단계로 끊는다(예전 텍스처 굽기와 같은 겉모습)
     bool _useUnion;
     const int UnionFillSteps = 24;   // 단계 0~24 = 25 상태
 
+    string _builtC3Id;
     bool _active;
     bool _fillInward;              // 바깥 → 보스로 차오르기(잡기)
     int _builtInwardStep = -1;
-    bool _coneFillIsRing;          // 채움 텍스처가 지금 고리(안쪽 비움)인가 — 일반 부채꼴 재사용 방지
     float _elapsed, _growTime;
     float _coneRadius, _coneOffsetAngle, _coneForwardOffset;
     float _pathRadius, _pathLength, _pathForwardOffset, _pathLateralOffset;
@@ -129,23 +139,11 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     {
         if (!EnsureBuilt()) return;
 
-        // 셰이더가 색을 입히면 모양 텍스처는 팔레트와 무관하다(흰색). 두께는 팔레트별로 다를 수 있어 아래 키가 잡는다.
-        // 대체 재질(색을 텍스처에 굽는 경로)이면 예전처럼 색이 바뀔 때 전부 다시 굽는다.
-        if (palette != _palette)
-        {
-            _palette = palette;
-            if (!_shaderColor) InvalidateShapes();
-        }
+        // 모양은 팔레트와 무관하다(색은 아래 ApplyStyle 이 재질에 넣는다). 두께는 팔레트별로 다를 수 있어 아래 키가 잡는다.
+        _palette = palette;
 
         _fillInward = fillInward;
         _builtInwardStep = -1;
-        // 🔴 잡기가 도중에 끊기면 채움 텍스처가 **반쯤 찬 고리**로 남는다 — 같은 각도의 일반 부채꼴이
-        //    그걸 재사용하지 않게 다시 굽게 한다.
-        if (_coneFillIsRing && !fillInward)
-        {
-            _builtConeKey = new Vector3(-1f, -1f, -1f);
-            _coneFillIsRing = false;
-        }
 
         _coneRadius = Mathf.Max(0f, coneRadius);
         _coneOffsetAngle = coneOffsetAngleDeg;
@@ -158,6 +156,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         _elapsed = 0f;
         _active = true;
 
+        if (_builtC3Id != C3Id) { _builtC3Id=C3Id; InvalidateShapes(); }
         float width = CurrentStyle.outlineWidth;
 
         // ── 끝점 부채꼴
@@ -168,10 +167,15 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         var coneKey = new Vector3(halfAngle, _coneRadius, width);
         if (hasCone && coneKey != _builtConeKey)
         {
-            RebuildConeTextures(halfAngle, width);
+            RebuildConeOutline(halfAngle);
             _builtConeKey = coneKey;
         }
-        SetSquareSize(_coneOutline, _coneRadius);
+        // 채움은 가득 찬 부채꼴로 되돌린다 — 잡기가 도중에 끊겨 **반쯤 찬 고리**가 남아 있어도 다음 예고에 새지 않는다.
+        // 잡기면 ApplyFill 이 곧바로 고리 값으로 바꾼다.
+        _coneHalfAngle = halfAngle;
+        if (hasCone) EnemyC3Visuals.SetArcFill(_coneFill.material, halfAngle, 0f);
+        var coneExtent=new Vector2(_coneRadius*2,_coneRadius*2);
+        SetSquareSize(_coneOutline, _coneRadius+(_coneRadius>0?EnemyC3Visuals.DecalPadding(C3Id,coneExtent,_coneRadius,0,0):0));
         _coneOutline.enabled = hasCone;
         _coneFill.enabled = hasCone;
 
@@ -182,10 +186,11 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
             var bandKey = new Vector3(_pathRadius, _pathLength, width);
             if (bandKey != _builtBandKey)
             {
-                RebuildBandTextures(width);
+                RebuildBandOutline();
                 _builtBandKey = bandKey;
             }
-            SetRectSize(_bandOutline, _pathRadius * 2f, _pathLength);
+            float pad=EnemyC3Visuals.DecalPadding(C3Id,new Vector2(_pathRadius*2,_pathLength),0,_pathRadius*2,_pathLength);
+            SetRectSize(_bandOutline, _pathRadius * 2f+pad*2, _pathLength+pad*2);
         }
         _bandOutline.enabled = hasBand;
         _bandFill.enabled = hasBand;
@@ -202,13 +207,14 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
                       + _coneForwardOffset * 1e-3f + width * 1e-5f;
             if (!Mathf.Approximately(key, _builtUnionKey))
             {
-                RebuildUnionOutline(width);
+                RebuildUnionOutline();
                 _builtUnionKey = key;
                 _builtUnionFillStep = -1;   // 모양이 바뀌었으니 채움도 다시
             }
 
             Vector2 u = UnionExtent;
-            SetRectSize(_unionOutline, u.x, u.y);
+            float pad=EnemyC3Visuals.DecalPadding(C3Id,u,_coneRadius,_pathRadius*2,_pathLength);
+            SetRectSize(_unionOutline, u.x+pad*2, u.y+pad*2);
             SetRectSize(_unionFill, u.x, u.y);
         }
         _unionOutline.enabled = _unionFill.enabled = _useUnion;
@@ -236,11 +242,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         if (!_active) return;
 
         // Play 중 스타일 값이 바뀌었다 — 진행(_elapsed)은 그대로 두고 색·마스크만 다시 넣는다.
-        if (_appliedVersion != TelegraphStyleSO.Version)
-        {
-            if (!_shaderColor) { InvalidateShapes(); _builtUnionFillStep = -1; _builtInwardStep = -1; }
-            ApplyStyle();
-        }
+        if (_appliedVersion != TelegraphStyleSO.Version) ApplyStyle();
 
         _elapsed += Time.deltaTime;
         ApplyFill();
@@ -255,7 +257,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         if (_useUnion)
         {
             // 채움은 **전선 하나**가 앞으로 쓸고 간다 — 띠를 지나 끝점으로 자연스럽게 이어진다.
-            // ⚠️ 텍스처를 다시 굽는 방식이라 매 프레임은 낭비다 — 단계로 끊어 굽는다(텍스처·버퍼는 재사용).
+            // 전선은 25단계로 끊는다 — 예전 텍스처 굽기의 겉모습 그대로. 단계가 바뀔 때만 재질 값을 넣는다.
             int step = Mathf.Clamp(Mathf.RoundToInt(FillT * UnionFillSteps), 0, UnionFillSteps);
             if (step != _builtUnionFillStep)
             {
@@ -268,7 +270,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         float t = FillT;
 
         // 끌어당기는 공격(잡기) — 바깥 끝에서 보스 쪽으로 차오른다(2026-09-28 팀장).
-        // 채움 데칼은 전체 반경에 고정하고, 안쪽 반경이 1 → 0 으로 줄어드는 고리를 단계별로 다시 굽는다(합집합과 같은 방식).
+        // 채움 데칼은 전체 반경에 고정하고, 안쪽 반경이 1 → 0 으로 줄어드는 고리를 단계별로 바꾼다(합집합과 같은 25단계).
         bool coneOnly = _coneFill != null && _coneFill.enabled && !(_bandFill != null && _bandFill.enabled);
         if (_fillInward && coneOnly)
         {
@@ -378,9 +380,19 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     void ApplyStyle()
     {
         _appliedVersion = TelegraphStyleSO.Version;
-        if (!_shaderColor) return;   // 대체 재질 — 색은 텍스처에 구워진다
+        if (!_shaderColor)
+        {
+            // 대체 재질 — 예전엔 채움 색을 텍스처에 구웠다. 이제 채움도 셰이더가 그려 색만 넣는다(마스크 없음).
+            Color fill = CurrentStyle.fill.color;
+            SetFillColor(_coneFill, fill); SetFillColor(_bandFill, fill); SetFillColor(_unionFill, fill);
+            return;
+        }
 
-        TelegraphDecalStyle s = CurrentStyle;
+        TelegraphDecalStyle s = new TelegraphDecalStyle
+        {
+            outline = new TelegraphLayer(Color.white),
+            fill = new TelegraphLayer(EnemyC3Visuals.FillColor(C3Id))
+        };
         Vector2 cone = new Vector2(_coneRadius * 2f, _coneRadius * 2f);
         Vector2 band = new Vector2(_pathRadius * 2f, _pathLength);
         Vector2 union = UnionExtent;
@@ -405,6 +417,12 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
             on ? mask.tileSize : 1f,
             on ? mask.rotation * Mathf.Deg2Rad : 0f));
         m.SetVector(MaskExtentId, new Vector4(Mathf.Max(0.01f, extent.x), Mathf.Max(0.01f, extent.y), 0f, 0f));
+    }
+
+    static void SetFillColor(DecalProjector decal, Color color)
+    {
+        if (decal == null || decal.material == null || !decal.material.HasProperty(BaseColorId)) return;
+        decal.material.SetColor(BaseColorId, color);
     }
 
     // 마스크 좌표계 = 조각 기준점(root)의 위치·좌우·정면. 매 프레임(보스가 돌고 움직인다).
@@ -485,6 +503,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         _bandRoot.SetParent(transform, false);
         _bandOutline = CreateDecal(source, _bandRoot, "PathOutline");
         _bandFill = CreateDecal(source, _bandRoot, "PathFill");
+        EnemyC3Visuals.SetRectFill(_bandFill.material);   // 띠 채움은 모양이 하나 — 길이는 프로젝터 크기가 자란다
 
         _unionRoot = new GameObject("AttackUnionTelegraph").transform;
         _unionRoot.SetParent(transform, false);
@@ -502,47 +521,32 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
         var decal = go.AddComponent<DecalProjector>();
-        decal.material = new Material(source);          // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
+        int artOrder=childName.EndsWith("Outline") ? 1 : 0;
+        // 외곽선·채움 = C3 데칼 셰이더(할 일 57 S2·S4a) — 모양을 텍스처로 굽지 않고 재질 값만 넣는다.
+        // 그리기 순서·데칼 설정(Normal_Blend·각도 페이드·메시 바이어스)은 예고 재질(source) 기준 그대로 —
+        // NewDecalInstance 가 복사하고(할 일 57 R), 여기선 조각별 순서(artOrder)만 그 위에 덮는다.
+        Material shape = EnemyC3Visuals.DecalMaterial;
+        decal.material = shape != null                  // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
+            ? EnemyC3Visuals.NewDecalInstance(source, shape.HasProperty(BaseColorId) ? shape.GetColor(BaseColorId) : Color.white)
+            : new Material(source);
         DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터·벽에 묻지 않게(표식과 같은 계약)
+        if(decal.material.HasProperty("_DrawOrder"))decal.material.SetInt("_DrawOrder",artOrder);
+        decal.material.renderQueue = source.renderQueue + artOrder;
         decal.fadeFactor = 1f;                         // 🔴 알파는 셰이더에서 색 알파로 **한 번만** 곱한다
         decal.enabled = false;
         return decal;
     }
 
-    void RebuildConeTextures(float halfAngle, float width)
+    // 🔴 윤곽선은 **경계만** 그리고 내부는 비운다 — 장판 규약이 "윤곽선이 생기고 내부가 텅 빈
+    //    상태에서 차오른다"이기 때문. 내부를 미리 칠하면 채움이 어디까지 찼는지 안 읽힌다.
+    void RebuildConeOutline(float halfAngle)
     {
-        TelegraphDecalStyle s = CurrentStyle;
-
-        // outer 1 = 정규화 → 텍스처가 반경과 무관해진다. 윤곽선 두께만 반경에 의존한다(키에 반경 포함).
-        // 🔴 윤곽선은 **경계만** 그리고 내부는 비운다 — 장판 규약이 "윤곽선이 생기고 내부가 텅 빈
-        //    상태에서 차오른다"이기 때문. 내부를 미리 칠하면 채움이 어디까지 찼는지 안 읽힌다.
-        float rimUv = _coneRadius > 0f ? width / _coneRadius : 0.06f;
-        _coneOutlineTex = BossDirectionIndicator.BuildArcTexture(
-            ShapeColor(s.outline), halfAngle, isBack: false, inner: 0f, outer: 1f, size: TextureSize,
-            rimWidth: rimUv, interiorAlphaScale: 0f, reuse: _coneOutlineTex);
-
-        _coneFillTex = BossDirectionIndicator.BuildArcTexture(
-            ShapeColor(s.fill), halfAngle, isBack: false, inner: 0f, outer: 1f, size: TextureSize,
-            reuse: _coneFillTex);
-
-        AssignTexture(_coneOutline, _coneOutlineTex);
-        AssignTexture(_coneFill, _coneFillTex);
+        EnemyC3Visuals.SetDecalProperties(_coneOutline.material,C3Id,new Vector2(_coneRadius*2f,_coneRadius*2f),_coneRadius,0,halfAngle,0,0);
     }
 
-    void RebuildBandTextures(float width)
+    void RebuildBandOutline()
     {
-        TelegraphDecalStyle s = CurrentStyle;
-
-        // 띠는 직사각이라 UV 가 그대로 사각형에 대응한다 — 비(比)만 맞추면 왜곡이 없다.
-        // 윤곽선 두께를 월드 기준으로 맞추려면 짧은 축·긴 축에 다른 UV 두께를 줘야 한다.
-        float rimU = _pathRadius > 0f ? width / (_pathRadius * 2f) : 0.08f;
-        float rimV = _pathLength > 0f ? width / _pathLength : 0.08f;
-
-        _bandOutlineTex = BuildRectTexture(ShapeColor(s.outline), TextureSize, rimU, rimV, 0f, _bandOutlineTex);
-        _bandFillTex = BuildRectTexture(ShapeColor(s.fill), TextureSize, 0f, 0f, 1f, _bandFillTex);
-
-        AssignTexture(_bandOutline, _bandOutlineTex);
-        AssignTexture(_bandFill, _bandFillTex);
+        EnemyC3Visuals.SetDecalProperties(_bandOutline.material,C3Id,new Vector2(_pathRadius*2f,_pathLength),0,0,0,_pathRadius*2f,_pathLength);
     }
 
     // ─── 합집합(열쇠구멍) — 띠 + 끝점 원을 한 도형으로 ─────────────
@@ -558,164 +562,39 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         }
     }
 
-    void RebuildUnionOutline(float width)
+    void RebuildUnionOutline()
     {
         Vector2 u = UnionExtent;
-        _unionOutlineTex = BuildUnionTexture(ShapeColor(CurrentStyle.outline), u, width, 0f, front: -1f, reuse: _unionOutlineTex);
-        AssignTexture(_unionOutline, _unionOutlineTex);
+        EnemyC3Visuals.SetDecalProperties(_unionOutline.material,C3Id,u,_coneRadius,_coneForwardOffset,180,_pathRadius*2f,_pathLength);
     }
 
     // 안쪽 반경(정규화 0~1)만 비운 부채꼴 고리. inner 1 = 아직 빈 상태, 0 = 가득.
     void RebuildInwardConeFill(float inner)
     {
-        float halfAngle = _builtConeKey.x >= 0f ? _builtConeKey.x : 180f;
-        _coneFillTex = BossDirectionIndicator.BuildArcTexture(
-            ShapeColor(CurrentStyle.fill), halfAngle, isBack: false, inner: Mathf.Clamp01(inner), outer: 1f,
-            size: TextureSize, reuse: _coneFillTex);
-        AssignTexture(_coneFill, _coneFillTex);
-        _coneFillIsRing = true;
-    }
-
-    void RebuildUnionFill(float t)
-    {
-        Vector2 u = UnionExtent;
-        // 채움은 테두리 없이 안을 꽉 채운다. front 까지만 남기고 그 앞은 버린다.
-        _unionFillTex = BuildUnionTexture(ShapeColor(CurrentStyle.fill), u, 0f, 1f, front: u.y * Mathf.Clamp01(t), reuse: _unionFillTex);
-        AssignTexture(_unionFill, _unionFillTex);
+        EnemyC3Visuals.SetArcFill(_coneFill.material, _coneHalfAngle, inner);
     }
 
     /// <summary>
     /// 띠(폭 <c>_pathRadius</c>×2, 길이 <c>_pathLength</c>) 과 끝점 원(<c>_coneRadius</c>, 중심은
-    /// <c>_coneForwardOffset</c>)의 <b>합집합</b>을 한 장에 굽는다.
+    /// <c>_coneForwardOffset</c>)의 <b>합집합</b> 채움을 전선 <paramref name="t"/>(0~1)까지 그린다.
     ///
     /// 🔴 거리함수(SDF)의 <b>최솟값</b>을 쓰므로 두 도형이 만나는 곳에 이음선이 생기지 않는다 —
-    ///    그게 “한 도형으로 보이게” 하는 핵심이다.
+    ///    그게 “한 도형으로 보이게” 하는 핵심이다(셰이더 <c>EnemyC3Decal.hlsl</c> 의 채움 5).
     /// </summary>
-    /// <param name="front">이 거리(보스에서의 전방 m)까지만 그린다. 음수면 전체.</param>
-    /// <param name="reuse">같은 크기면 덮어쓴다 — 단계 굽기마다 텍스처를 새로 만들지 않는다.</param>
-    Texture2D BuildUnionTexture(Color color, Vector2 extent, float rimWorld,
-                                float interiorAlpha, float front, Texture2D reuse)
+    void RebuildUnionFill(float t)
     {
-        int size = TextureSize;
-        Texture2D tex = Reuse(reuse, size, "BossAttackUnionDecal");
-
-        float halfW = extent.x * 0.5f;
-        float len = extent.y;
-        // 1.5px 정도를 월드 단위로 — 긴 축 기준이면 짧은 축에서 너무 뚝뚝해진다.
-        float feather = 1.5f * Mathf.Max(extent.x, len) / size;
-
-        Color32[] pixels = BossDirectionIndicator.PixelBuffer(size);
-        for (int y = 0; y < size; y++)
-        {
-            float along = (y + 0.5f) / size * len;            // 0 = 보스, len = 끝
-            for (int x = 0; x < size; x++)
-            {
-                float lat = ((x + 0.5f) / size - 0.5f) * extent.x;
-
-                // 띠: 축 방향 0~_pathLength, 가로 |lat| <= _pathRadius
-                float dBand = _pathRadius > 0f && _pathLength > 0f
-                    ? Mathf.Max(Mathf.Abs(lat) - _pathRadius,
-                                Mathf.Max(-along, along - _pathLength))
-                    : float.MaxValue;
-
-                // 끝점 원
-                float dz = along - _coneForwardOffset;
-                float dCone = _coneRadius > 0f
-                    ? Mathf.Sqrt(dz * dz + lat * lat) - _coneRadius
-                    : float.MaxValue;
-
-                float d = Mathf.Min(dBand, dCone);   // 음수 = 안쪽
-
-                float a = color.a * Mathf.Clamp01(-d / feather);
-
-                if (rimWorld > 0f)
-                {
-                    float rim = Mathf.Clamp01(1f + d / rimWorld);   // 경계에서 1, 안으로 갈수록 0
-                    a *= Mathf.Max(interiorAlpha, rim);
-                }
-
-                if (front >= 0f && along > front) a = 0f;
-
-                pixels[y * size + x] = new Color(color.r, color.g, color.b, Mathf.Clamp01(a));
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply(false, false);
-        return tex;
+        Vector2 u = UnionExtent;
+        EnemyC3Visuals.SetUnionFill(_unionFill.material, u, _pathRadius, _pathLength, _coneForwardOffset, _coneRadius,
+                                    u.y * Mathf.Clamp01(t));
     }
 
-    /// <summary>
-    /// 직사각 알파 마스크. <paramref name="rimU"/>/<paramref name="rimV"/> 가 0 보다 크면
-    /// 테두리만 진하게 그리고 내부는 <paramref name="interiorAlpha"/> 배로 남긴다.
-    /// 두 축의 두께를 따로 받는 이유는 데칼이 정사각이 아니어서 — 같은 값을 주면 테두리가 찌그러진다.
-    /// </summary>
-    static Texture2D BuildRectTexture(Color color, int size, float rimU, float rimV, float interiorAlpha, Texture2D reuse)
-    {
-        Texture2D tex = Reuse(reuse, size, "BossPathBandDecal");
-
-        float feather = 1.5f / size;
-        Color32[] pixels = BossDirectionIndicator.PixelBuffer(size);
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float u = (x + 0.5f) / size;   // 0~1
-                float v = (y + 0.5f) / size;
-
-                // 가장자리까지의 거리(정규화). 0 = 경계.
-                float du = Mathf.Min(u, 1f - u);
-                float dv = Mathf.Min(v, 1f - v);
-
-                float a = color.a;
-                a *= Mathf.Clamp01(du / feather);
-                a *= Mathf.Clamp01(dv / feather);
-
-                if (rimU > 0f || rimV > 0f)
-                {
-                    float rim = Mathf.Max(
-                        rimU > 0f ? 1f - du / rimU : 0f,
-                        rimV > 0f ? 1f - dv / rimV : 0f);
-                    a *= Mathf.Max(interiorAlpha, Mathf.Clamp01(rim));
-                }
-
-                pixels[y * size + x] = new Color(color.r, color.g, color.b, Mathf.Clamp01(a));
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply(false, false);
-        return tex;
-    }
-
-    static Texture2D Reuse(Texture2D reuse, int size, string texName) =>
-        reuse != null && reuse.width == size && reuse.height == size
-            ? reuse
-            : new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                name = texName,
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-            };
-
-    static void AssignTexture(DecalProjector decal, Texture2D texture)
-    {
-        if (decal == null || decal.material == null) return;
-        if (decal.material.HasProperty(DecalBaseMapId))
-            decal.material.SetTexture(DecalBaseMapId, texture);
-    }
-
-    // 🔴 합집합 텍스처·재질까지 정리한다(10-13 이전엔 부채꼴·띠만 정리해 합집합이 새고 있었다 — Codex 지적).
+    // 🔴 재질 인스턴스를 정리한다(10-13 이전엔 부채꼴·띠만 정리해 합집합이 새고 있었다 — Codex 지적).
     void OnDestroy()
     {
-        DestroyIf(_coneOutlineTex); DestroyIf(_coneFillTex);
-        DestroyIf(_bandOutlineTex); DestroyIf(_bandFillTex);
-        DestroyIf(_unionOutlineTex); DestroyIf(_unionFillTex);
         DestroyMaterial(_coneOutline); DestroyMaterial(_coneFill);
         DestroyMaterial(_bandOutline); DestroyMaterial(_bandFill);
         DestroyMaterial(_unionOutline); DestroyMaterial(_unionFill);
     }
 
-    static void DestroyIf(Texture2D t) { if (t != null) Destroy(t); }
     static void DestroyMaterial(DecalProjector d) { if (d != null && d.material != null) Destroy(d.material); }
 }

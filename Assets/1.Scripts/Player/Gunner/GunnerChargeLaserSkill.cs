@@ -19,6 +19,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private GunnerBeamView view;
     private PlayerMovement movement;
     private SkillLineIndicator lineIndicator;
+    private PlayerEnemyHoverOutline hoverOutline;
     private readonly List<Player> allies = new List<Player>();
 
     // 서버 런타임
@@ -61,6 +62,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         view = owner.GetComponent<GunnerBeamView>();
         movement = owner.GetComponent<PlayerMovement>();
         lineIndicator = owner.GetComponentInChildren<SkillLineIndicator>(true);
+        hoverOutline = owner.GetComponent<PlayerEnemyHoverOutline>();
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => QData != null && beam != null;
@@ -119,6 +121,14 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
         float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
         lineIndicator.ShowCharge(origin, aimDirection, 0f, length, data.BeamWidth);
+        // 지금 쏘면 맞을 적에 외곽선(할 일 58) — 발사(Fire)와 같은 사거리·폭·높이·앵커.
+        hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, data));
+    }
+
+    /// <summary>발사 판정 상자 — <see cref="Fire"/> 의 <see cref="GunnerBeamAttack.FirePiercing"/> 와 같은 인자(오너 미리보기 공용).</summary>
+    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data)
+    {
+        return SkillHitVolume.Beam(origin, direction, length, data.BeamWidth, data.BeamHeight, data.HittableLayers);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -150,6 +160,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     {
         GunnerChargeLaserData data = QData;
         lineIndicator?.HideCharge();
+        hoverOutline?.ClearSkillHitArea();
         State = SkillState.Active;
         fired = true;
 
@@ -224,6 +235,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         if (fired)
             GunnerSkillEventRules.WarnIfFallbackEnded(reason, "Q", "gunner_skill_Q_fire", SkillAnimationEventType.End, this);
         lineIndicator?.HideCharge();
+        hoverOutline?.ClearSkillHitArea();
         // 🔴 **권한 가드 밖이다.** 발사 없이 끝나는 경로(대시 취소·피격·사망)에서도
         //    전 피어가 충전 루프를 꺼야 한다. 안 그러면 그 피어에 총구 연출이 남는다.
         //    (발사로 끝난 경우는 PlayChargeLaser 가 이미 껐고, Stop 은 두 번 불러도 무해하다.)

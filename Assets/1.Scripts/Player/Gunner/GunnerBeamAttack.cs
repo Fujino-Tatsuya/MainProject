@@ -187,12 +187,11 @@ public class GunnerBeamAttack : BaseAttack
         }
     }
 
+    // 상자 기하는 SkillHitVolume.Beam 한 곳 — 오너의 스킬 범위 외곽선(할 일 58)도 같은 값으로 맞을 적을 고른다.
     private int OverlapBeamBox(Vector3 origin, Vector3 direction, float length, float width, float height,
                                LayerMask mask, QueryTriggerInteraction triggers)
     {
-        Vector3 center = origin + direction * (length * 0.5f);
-        var halfExtents = new Vector3(width * 0.5f, height * 0.5f, length * 0.5f);
-        return Physics.OverlapBoxNonAlloc(center, halfExtents, boxHits, Quaternion.LookRotation(direction), mask, triggers);
+        return SkillHitVolume.Beam(origin, direction, length, width, height, mask).Overlap(boxHits, mask, triggers);
     }
 
     private bool TryHit(Collider col, bool triggersOnHit)

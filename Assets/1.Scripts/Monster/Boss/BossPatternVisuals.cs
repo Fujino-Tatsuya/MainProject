@@ -7,21 +7,24 @@ using UnityEngine;
 /// 셰이더는 <c>Sprites/Default</c> — URP 에서 빌트인 Default-Material 은 자홍색으로 깨지고
 /// (이 프로젝트에서 이미 밟은 함정, 예전 존 바닥 링 ZoneInteractRing — 10-06 삭제), 라이팅을 안 받아 어두운 방에서도 색이 그대로다.
 /// 색·텍스처는 <see cref="MaterialPropertyBlock"/> 으로 렌더러별로 덮는다(머티리얼 한 장 공유).
+/// 코드로 그린 기본 모양(사각·원판·조준)은 텍스처 없이 Monster/TelegraphQuad 의 _CodeShape 모드로 그린다(할 일 57 S4c2 —
+/// 예전엔 64²/128² 텍스처를 런타임에 구웠다. 원본 식 = Editor/LegacyDecalTextureReference).
 /// </summary>
 public static class BossPatternVisuals
 {
     static Material _mat;
     static Mesh _quad;
-    static Texture2D _square, _disc, _crosshair;
     static MaterialPropertyBlock _mpb;
 
     static readonly int ColorId = Shader.PropertyToID("_Color");
     static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+    static readonly int CodeShapeId = Shader.PropertyToID("_CodeShape");
 
-    public static Texture2D SquareTexture => _square != null ? _square : (_square = BuildSquare(64, 0.1f));
-    public static Texture2D DiscTexture => _disc != null ? _disc : (_disc = BuildDisc(128, 0.08f));
-    /// <summary>코드로 그린 기본 크로스헤어 — 아트 텍스처는 <see cref="WellsDroneDataSO.crosshairTexture"/> 칸에 넣는다(비면 이것).</summary>
-    public static Texture2D CrosshairTexture => _crosshair != null ? _crosshair : (_crosshair = BuildCrosshair(128));
+    /// <summary>코드로 그린 판 모양 — 값 = TelegraphQuad 의 _CodeShape.x(0 = _MainTex 텍스처).</summary>
+    public enum CodeShape { Square = 1, Disc = 2, Crosshair = 3 }
+
+    /// <summary>기본 테두리 비율(예전 SquareTexture·DiscTexture).</summary>
+    public const float SquareRim = 0.1f, DiscRim = 0.08f;
 
     static Material Mat
     {
@@ -75,16 +78,41 @@ public static class BossPatternVisuals
         return r;
     }
 
+    /// <summary>텍스처 모양으로 칠한다. <paramref name="tex"/> 가 null 이면 모양(텍스처·코드 모양)은 그대로 두고 색만 바꾼다.</summary>
     public static void Paint(Renderer r, Color color, Texture tex)
     {
         if (r == null) return;
         _mpb ??= new MaterialPropertyBlock();
         r.GetPropertyBlock(_mpb);
         _mpb.SetColor(ColorId, color);
-        if (tex != null) _mpb.SetTexture(MainTexId, tex);
+        if (tex != null)
+        {
+            _mpb.SetTexture(MainTexId, tex);
+            _mpb.SetVector(CodeShapeId, Vector4.zero);
+        }
         // 마스크는 끈다 — 같은 판을 예고(마스크 있음) → 발동 표시(마스크 없음)로 재사용할 때 남지 않게. 스타일은 PaintStyled.
         _mpb.SetVector(MaskParamsId, new Vector4(0f, 0f, 1f, 0f));
         r.SetPropertyBlock(_mpb);
+    }
+
+    /// <summary>코드 모양으로 칠한다(텍스처 없음). 테두리 비율은 사각·원판만 — 생략하면 <see cref="SquareRim"/>·<see cref="DiscRim"/>.</summary>
+    public static void Paint(Renderer r, Color color, CodeShape shape, float rimRatio = -1f)
+    {
+        if (r == null) return;
+        _mpb ??= new MaterialPropertyBlock();
+        r.GetPropertyBlock(_mpb);
+        _mpb.SetColor(ColorId, color);
+        _mpb.SetVector(CodeShapeId, new Vector4((float)shape, RimFor(shape, rimRatio), 0f, 0f));
+        _mpb.SetVector(MaskParamsId, new Vector4(0f, 0f, 1f, 0f));
+        r.SetPropertyBlock(_mpb);
+    }
+
+    // 테두리 비율은 0.005 단위로 묶는다 — 예전 비율별 텍스처 캐시(DiscTextureFor·SquareTextureFor)와 같은 값.
+    static float RimFor(CodeShape shape, float rimRatio)
+    {
+        if (shape == CodeShape.Crosshair) return 0f;
+        if (rimRatio < 0f) return shape == CodeShape.Square ? SquareRim : DiscRim;
+        return Mathf.RoundToInt(Mathf.Clamp(rimRatio, 0.005f, 0.5f) * 200f) / 200f;
     }
 
     static readonly int MaskTexId = Shader.PropertyToID("_MaskTex");
@@ -104,7 +132,20 @@ public static class BossPatternVisuals
     {
         if (r == null || layer == null) return;
         Paint(r, layer.color, shape);
-        TelegraphMask mask = layer.mask;
+        ApplyMask(r, layer.mask, origin, right, forward, extent);
+    }
+
+    /// <summary>코드 모양(텍스처 없음) + 스타일 층. 테두리 비율은 <see cref="Paint(Renderer, Color, CodeShape, float)"/>, 마스크 좌표는 위와 같다.</summary>
+    public static void PaintStyled(Renderer r, TelegraphLayer layer, CodeShape shape, float rimRatio,
+                                   Vector3 origin, Vector3 right, Vector3 forward, Vector2 extent)
+    {
+        if (r == null || layer == null) return;
+        Paint(r, layer.color, shape, rimRatio);
+        ApplyMask(r, layer.mask, origin, right, forward, extent);
+    }
+
+    static void ApplyMask(Renderer r, TelegraphMask mask, Vector3 origin, Vector3 right, Vector3 forward, Vector2 extent)
+    {
         bool on = mask != null && mask.Active;
         r.GetPropertyBlock(_mpb);
         _mpb.SetTexture(MaskTexId, on ? mask.texture : Texture2D.whiteTexture);
@@ -115,26 +156,6 @@ public static class BossPatternVisuals
         _mpb.SetVector(MaskAxesId, new Vector4(right.x, right.z, forward.x, forward.z));
         _mpb.SetVector(MaskExtentId, new Vector4(Mathf.Max(0.01f, extent.x), Mathf.Max(0.01f, extent.y), 0f, 0f));
         r.SetPropertyBlock(_mpb);
-    }
-
-    // 테두리 비율별 판 텍스처(스타일 rimRatio). 비율은 0.005 단위로 묶어 캐시한다 — 슬라이더를 끌 때마다 새로 만들지 않게.
-    static readonly System.Collections.Generic.Dictionary<int, Texture2D> _discByRim = new();
-    static readonly System.Collections.Generic.Dictionary<int, Texture2D> _squareByRim = new();
-
-    public static Texture2D DiscTextureFor(float rimRatio)
-    {
-        int key = Mathf.RoundToInt(Mathf.Clamp(rimRatio, 0.005f, 0.5f) * 200f);
-        if (!_discByRim.TryGetValue(key, out Texture2D t) || t == null)
-            _discByRim[key] = t = BuildDisc(128, key / 200f);
-        return t;
-    }
-
-    public static Texture2D SquareTextureFor(float rimRatio)
-    {
-        int key = Mathf.RoundToInt(Mathf.Clamp(rimRatio, 0.005f, 0.5f) * 200f);
-        if (!_squareByRim.TryGetValue(key, out Texture2D t) || t == null)
-            _squareByRim[key] = t = BuildSquare(64, key / 200f);
-        return t;
     }
 
     /// <summary>
@@ -155,73 +176,4 @@ public static class BossPatternVisuals
         }
         return best;
     }
-
-    // ── 절차 텍스처 ─────────────────────────────────────────────
-
-    // 채운 면 + 또렷한 테두리(채움이 없으면 범위로 안 읽힌다 — AoeTelegraph 2026-09-09 팀장 판정과 같은 이유).
-    static Texture2D BuildSquare(int size, float rim)
-    {
-        var tex = NewTex("BossPatternSquare", size);
-        var px = new Color32[size * size];
-        for (int y = 0; y < size; y++)
-            for (int x = 0; x < size; x++)
-            {
-                float u = (x + 0.5f) / size, v = (y + 0.5f) / size;
-                float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));   // 0 = 테두리
-                float a = edge < rim ? 1f : 0.55f;
-                px[y * size + x] = new Color(1f, 1f, 1f, a);
-            }
-        tex.SetPixels32(px);
-        tex.Apply(false, false);
-        return tex;
-    }
-
-    static Texture2D BuildDisc(int size, float rim)
-    {
-        var tex = NewTex("BossPatternDisc", size);
-        var px = new Color32[size * size];
-        float half = size * 0.5f;
-        for (int y = 0; y < size; y++)
-            for (int x = 0; x < size; x++)
-            {
-                float d = Mathf.Sqrt(Sq(x + 0.5f - half) + Sq(y + 0.5f - half)) / half;
-                float a = d > 1f ? 0f : (d > 1f - rim ? 1f : 0.55f);
-                a *= Mathf.Clamp01((1f - d) * size * 0.5f);   // 바깥 1px 페더
-                px[y * size + x] = new Color(1f, 1f, 1f, a);
-            }
-        tex.SetPixels32(px);
-        tex.Apply(false, false);
-        return tex;
-    }
-
-    // 원 테두리 + 안쪽으로 들어오는 네 눈금.
-    static Texture2D BuildCrosshair(int size)
-    {
-        var tex = NewTex("BossPatternCrosshair", size);
-        var px = new Color32[size * size];
-        float half = size * 0.5f;
-        float ring = 0.86f, ringW = 0.07f, tickIn = 0.55f, tickW = 0.05f;
-        for (int y = 0; y < size; y++)
-            for (int x = 0; x < size; x++)
-            {
-                float dx = (x + 0.5f - half) / half, dy = (y + 0.5f - half) / half;
-                float d = Mathf.Sqrt(dx * dx + dy * dy);
-                bool onRing = Mathf.Abs(d - ring) < ringW;
-                bool onTick = d > tickIn && d < 1f &&
-                              (Mathf.Abs(dx) < tickW || Mathf.Abs(dy) < tickW);
-                px[y * size + x] = new Color(1f, 1f, 1f, onRing || onTick ? 1f : 0f);
-            }
-        tex.SetPixels32(px);
-        tex.Apply(false, false);
-        return tex;
-    }
-
-    static Texture2D NewTex(string name, int size) => new Texture2D(size, size, TextureFormat.RGBA32, false)
-    {
-        name = name,
-        wrapMode = TextureWrapMode.Clamp,
-        filterMode = FilterMode.Bilinear,
-    };
-
-    static float Sq(float v) => v * v;
 }
