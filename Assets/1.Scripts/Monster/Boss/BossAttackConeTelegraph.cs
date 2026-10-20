@@ -102,19 +102,19 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     // 끝점 부채꼴
     Transform _coneRoot;
     DecalProjector _coneOutline, _coneFill;
-    Texture2D _coneOutlineTex, _coneFillTex;
+    Texture2D _coneFillTex;
     Vector3 _builtConeKey = new Vector3(-1f, -1f, -1f);   // (반각, 반경, 두께) — 두께 UV 가 반경에 의존한다
 
     // 전진 경로 띠
     Transform _bandRoot;
     DecalProjector _bandOutline, _bandFill;
-    Texture2D _bandOutlineTex, _bandFillTex;
+    Texture2D _bandFillTex;
     Vector3 _builtBandKey = new Vector3(-1f, -1f, -1f);   // (반폭, 길이, 두께)
 
     // 합집합(열쇠구멍) — 띠와 끝점이 둘 다 있을 때는 **한 도형**으로 그린다(팀장 확정 2026-09-18).
     Transform _unionRoot;
     DecalProjector _unionOutline, _unionFill;
-    Texture2D _unionOutlineTex, _unionFillTex;
+    Texture2D _unionFillTex;
     float _builtUnionKey = -1f;      // 모양이 바뀜을 때만 외곽선을 다시 굽는다
     int _builtUnionFillStep = -1;    // 채움은 양자화해서 다시 굽는다(매 프레임은 낭비)
     bool _useUnion;
@@ -526,9 +526,11 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
         var decal = go.AddComponent<DecalProjector>();
-        decal.material = new Material(source);          // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
-        DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터·벽에 묻지 않게(표식과 같은 계약)
         int artOrder=childName.EndsWith("Outline") ? 1 : 0;
+        // 외곽선 = C3 데칼 셰이더(할 일 57 S2) — 모양을 텍스처로 굽지 않고 재질 값만 넣는다. 그리기 순서는 채움 재질 기준 그대로.
+        Material shape = artOrder == 1 && EnemyC3Visuals.DecalMaterial != null ? EnemyC3Visuals.DecalMaterial : source;
+        decal.material = new Material(shape);           // 인스턴스 — 애셋 오염 금지(조각마다 색·마스크가 다르다)
+        DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터·벽에 묻지 않게(표식과 같은 계약)
         if(decal.material.HasProperty("_DrawOrder"))decal.material.SetInt("_DrawOrder",artOrder);
         decal.material.renderQueue = source.renderQueue + artOrder;
         decal.fadeFactor = 1f;                         // 🔴 알파는 셰이더에서 색 알파로 **한 번만** 곱한다
@@ -544,13 +546,12 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         // 🔴 윤곽선은 **경계만** 그리고 내부는 비운다 — 장판 규약이 "윤곽선이 생기고 내부가 텅 빈
         //    상태에서 차오른다"이기 때문. 내부를 미리 칠하면 채움이 어디까지 찼는지 안 읽힌다.
         float rimUv = _coneRadius > 0f ? width / _coneRadius : 0.06f;
-        _coneOutlineTex = EnemyC3Visuals.Decal(C3Id,new Vector2(_coneRadius*2f,_coneRadius*2f),_coneRadius,0,halfAngle,0,0);
+        EnemyC3Visuals.SetDecalProperties(_coneOutline.material,C3Id,new Vector2(_coneRadius*2f,_coneRadius*2f),_coneRadius,0,halfAngle,0,0);
 
         _coneFillTex = BossDirectionIndicator.BuildArcTexture(
             ShapeColor(s.fill), halfAngle, isBack: false, inner: 0f, outer: 1f, size: TextureSize,
             reuse: _coneFillTex);
 
-        AssignTexture(_coneOutline, _coneOutlineTex);
         AssignTexture(_coneFill, _coneFillTex);
     }
 
@@ -563,10 +564,9 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         float rimU = _pathRadius > 0f ? width / (_pathRadius * 2f) : 0.08f;
         float rimV = _pathLength > 0f ? width / _pathLength : 0.08f;
 
-        _bandOutlineTex = EnemyC3Visuals.Decal(C3Id,new Vector2(_pathRadius*2f,_pathLength),0,0,0,_pathRadius*2f,_pathLength);
+        EnemyC3Visuals.SetDecalProperties(_bandOutline.material,C3Id,new Vector2(_pathRadius*2f,_pathLength),0,0,0,_pathRadius*2f,_pathLength);
         _bandFillTex = BuildRectTexture(ShapeColor(s.fill), TextureSize, 0f, 0f, 1f, _bandFillTex);
 
-        AssignTexture(_bandOutline, _bandOutlineTex);
         AssignTexture(_bandFill, _bandFillTex);
     }
 
@@ -586,8 +586,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     void RebuildUnionOutline(float width)
     {
         Vector2 u = UnionExtent;
-        _unionOutlineTex = EnemyC3Visuals.Decal(C3Id,u,_coneRadius,_coneForwardOffset,180,_pathRadius*2f,_pathLength);
-        AssignTexture(_unionOutline, _unionOutlineTex);
+        EnemyC3Visuals.SetDecalProperties(_unionOutline.material,C3Id,u,_coneRadius,_coneForwardOffset,180,_pathRadius*2f,_pathLength);
     }
 
     // 안쪽 반경(정규화 0~1)만 비운 부채꼴 고리. inner 1 = 아직 빈 상태, 0 = 가득.
@@ -733,9 +732,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     // 🔴 합집합 텍스처·재질까지 정리한다(10-13 이전엔 부채꼴·띠만 정리해 합집합이 새고 있었다 — Codex 지적).
     void OnDestroy()
     {
-        DestroyIf(_coneOutlineTex); DestroyIf(_coneFillTex);
-        DestroyIf(_bandOutlineTex); DestroyIf(_bandFillTex);
-        DestroyIf(_unionOutlineTex); DestroyIf(_unionFillTex);
+        DestroyIf(_coneFillTex); DestroyIf(_bandFillTex); DestroyIf(_unionFillTex);
         DestroyMaterial(_coneOutline); DestroyMaterial(_coneFill);
         DestroyMaterial(_bandOutline); DestroyMaterial(_bandFill);
         DestroyMaterial(_unionOutline); DestroyMaterial(_unionFill);

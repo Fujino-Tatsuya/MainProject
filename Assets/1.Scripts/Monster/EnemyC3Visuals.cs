@@ -38,11 +38,13 @@ public static class EnemyC3Visuals
         return entries[id];
     }
     public static float OuterScale(string id,bool square=false)=>1+Get(id).geometry.outerWidth/(square?150f:165f);
-    public static float DecalPadding(string id,Vector2 extent,float coneRadius,float pathWidth,float pathLength)
+    public static float DecalPadding(string id,Vector2 extent,float coneRadius,float pathWidth,float pathLength)=>
+        Get(id).geometry.outerWidth*DecalUnit(id,extent,coneRadius,pathWidth,pathLength);
+    // Design units → metres for a decal shape (same as Decal()).
+    static float DecalUnit(string id,Vector2 extent,float coneRadius,float pathWidth,float pathLength)
     {
         bool union=coneRadius>0&&pathLength>0,band=pathLength>0&&!union;
-        float unit=band?extent.x/(id=="04"||id=="05"||id=="11"?114f:200f):union?pathWidth/130f:coneRadius/165f;
-        return Get(id).geometry.outerWidth*unit;
+        return band?extent.x/(id=="04"||id=="05"||id=="11"?114f:200f):union?pathWidth/130f:coneRadius/165f;
     }
     public static Color FillColor(string id)=>Get(id).elements.fill.Value;
     static Color Over(Color under,Color over,float coverage=1f)
@@ -206,6 +208,41 @@ public static class EnemyC3Visuals
         PaintLayer(fill,id,square,true);
     }
     public static void PaintActive(Renderer r,float alpha=1)=>PaintLayer(r,"16",true,false,alpha);
+    // Attack decal outlines (01~05·08·10·11) are drawn by SG_EnemyC3Decal — no runtime texture.
+    // DecalProjector has no property block, so values go into each projector's own material instance
+    // (BossAttackConeTelegraph already makes one per projector). Size changes only rewrite these vectors.
+    // Decal() above stays as the CPU reference for the pixel comparison test (editor-only move in S4).
+    static Material decalMaterial;
+    static readonly int ShapeId=Shader.PropertyToID("_C3Shape"),ExtentId=Shader.PropertyToID("_C3Extent"),
+        PathId=Shader.PropertyToID("_C3Path"),FinsId=Shader.PropertyToID("_C3Fins");
+    public static Material DecalMaterial
+    {
+        get
+        {
+            if(decalMaterial!=null)return decalMaterial;
+            // Resources asset keeps the shader graph in builds.
+            decalMaterial=Resources.Load<Material>("Telegraph/MA_EnemyC3Decal");
+            if(decalMaterial==null){var shader=Shader.Find("Shader Graphs/SG_EnemyC3Decal");if(shader!=null)decalMaterial=new Material(shader){name="EnemyC3Decal"};}
+            return decalMaterial;
+        }
+    }
+    /// <summary>Decal outline values for SG_EnemyC3Decal — same arguments and result as Decal(). Colors stay gamma (SetVector).</summary>
+    public static void SetDecalProperties(Material m,string id,Vector2 extent,float coneRadius,float coneCenter,float halfAngle,float pathWidth,float pathLength)
+    {
+        if(m==null)return;
+        bool union=coneRadius>0&&pathLength>0,band=pathLength>0&&!union;
+        float unit=DecalUnit(id,extent,coneRadius,pathWidth,pathLength);
+        var e=Get(id).elements;var g=Get(id).geometry;
+        bool show=(band||union)&&(union?g.upperShowMarkers:id=="04"||id=="05"||id=="11"?g.dashShowMarkers:g.showMarkers);
+        Vector2 sample=extent+Vector2.one*(2*g.outerWidth*unit);
+        m.SetVector(ShapeId,new Vector4(band?1:union?2:0,unit,halfAngle,show?1:0));
+        m.SetVector(ExtentId,new Vector4(extent.x,extent.y,sample.x,sample.y));
+        m.SetVector(PathId,new Vector4(band?extent.x:pathWidth,pathLength,coneCenter,coneRadius));
+        m.SetVector(GeomId,new Vector4(g.outerWidth,g.innerWidth,g.gap,g.gradientStart));
+        m.SetVector(FinsId,new Vector4(g.linearMarkerScalePercent,g.linearMarkerSpacing,g.linearMarkerStart,0));
+        m.SetVector(OutlineId,e.outline.Value);m.SetVector(InnerLineId,e.innerLine.Value);
+        m.SetVector(BandId,e.band.Value);m.SetVector(MarkersId,e.markers.Value);
+    }
     public static void ApplySmash(GameObject go)
     {
         foreach(var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
