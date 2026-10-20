@@ -241,6 +241,28 @@ public static class EnemyC3Visuals
         m.SetVector(OutlineId,e.outline.Value);m.SetVector(InnerLineId,e.innerLine.Value);
         m.SetVector(BandId,e.band.Value);m.SetVector(MarkersId,e.markers.Value);
     }
+    // Attack decal fills (BossAttackConeTelegraph, S4a) — the same SG_EnemyC3Decal redraws the old 256² CPU fill textures
+    // (BuildArcTexture / BuildRectTexture / BuildUnionTexture) in the shader. Progress changes only rewrite one vector.
+    /// <summary>Sector fill (outer = 1). inner 0 = full sector, 1 → 0 = grab ring closing in.</summary>
+    public static void SetArcFill(Material m,float halfAngle,float inner)
+    {
+        if(m==null)return;
+        m.SetVector(ShapeId,new Vector4(3,0,halfAngle,Mathf.Clamp01(inner)));
+    }
+    /// <summary>Path band fill (whole rectangle, 1.5 texel edge feather).</summary>
+    public static void SetRectFill(Material m)
+    {
+        if(m==null)return;
+        m.SetVector(ShapeId,new Vector4(4,0,0,0));
+    }
+    /// <summary>Union (band + end circle) fill up to <paramref name="front"/> m from the boss. Negative front = whole shape.</summary>
+    public static void SetUnionFill(Material m,Vector2 extent,float pathRadius,float pathLength,float coneCenter,float coneRadius,float front)
+    {
+        if(m==null)return;
+        m.SetVector(ShapeId,new Vector4(5,0,0,front));
+        m.SetVector(ExtentId,new Vector4(extent.x,extent.y,extent.x,extent.y));
+        m.SetVector(PathId,new Vector4(pathRadius*2,pathLength,coneCenter,coneRadius));
+    }
     // Smash 09 is a SpriteRenderer (FX_Mob_Smah_Warning/L_circle, FadeInHoldEffect drives sr.color alpha), so it needs a sprite:
     // Circle("09") pre-baked in the editor (Tools/Enemy C3/Bake smash 09 sprite) — no runtime Sprite.Create.
     // Its import PPU makes it cover the original sprite × OuterScale("09"), so no transform scaling is needed.
