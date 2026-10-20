@@ -4,8 +4,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// 몬스터 호버 외곽선(할 일 58) — 대상 고르기 규칙, 전환 시 떼기/붙이기, 겹 렌더러가 원본 머티리얼을 안 건드리는지,
-/// 림 설정 범위·셰이더 식.
+/// 몬스터 외곽선(할 일 58) — 대상 고르기 규칙, 전환, 마스크에 그릴 렌더러 고르기(원본 머티리얼 무수정),
+/// 그릴 목록(꺼진 렌더러 제외·색 인덱스·굵기 클램프), 마스크/합성 셰이더.
 /// </summary>
 public sealed class HoverOutlineTests
 {
@@ -18,6 +18,7 @@ public sealed class HoverOutlineTests
             if (_cleanup[i] != null)
                 Object.DestroyImmediate(_cleanup[i]);
         _cleanup.Clear();
+        EnemyOutlineDrawList.Clear();
     }
 
     T Track<T>(T obj) where T : Object
@@ -57,6 +58,13 @@ public sealed class HoverOutlineTests
         for (int i = 0; i < subMeshes; i++)
             mesh.SetTriangles(new[] { 0, 1, 2 }, i);
         return mesh;
+    }
+
+    List<Renderer> Collect(Transform root)
+    {
+        var into = new List<Renderer>();
+        EnemyOutlineRenderers.Collect(root, into, new List<Renderer>());
+        return into;
     }
 
     // ── 대상 고르기 ──
@@ -137,37 +145,27 @@ public sealed class HoverOutlineTests
         Assert.IsFalse(t.Set(null, out _));
     }
 
-    // ── 겹 렌더러 ──
+    // ── 마스크에 그릴 렌더러 ──
 
     [Test]
-    public void 붙이기_원본_머티리얼_배열은_그대로()
+    public void 렌더러_모으기_원본_머티리얼_계층은_그대로()
     {
         Material body = NewMaterial("Body");
-        Material outline = NewMaterial("Outline");
         var root = Track(new GameObject("Monster"));
         MeshRenderer r = NewMeshRenderer(root.transform, "Body", body);
+        int layer = r.gameObject.layer;
 
-        var set = new HoverOutlineOverlaySet();
-        set.Attach(root.transform, outline);
+        List<Renderer> found = Collect(root.transform);
 
-        Assert.AreEqual(1, set.Count);
+        CollectionAssert.AreEqual(new Renderer[] { r }, found);
         CollectionAssert.AreEqual(new[] { body }, r.sharedMaterials);
-        Renderer overlay = set.GetOverlay(0);
-        Assert.AreSame(r.transform, overlay.transform.parent);
-        Assert.AreEqual(HoverOutlineOverlaySet.OverlayName, overlay.name);
-        CollectionAssert.AreEqual(new[] { outline }, overlay.sharedMaterials);
-        Assert.AreEqual(ShadowCastingMode.Off, overlay.shadowCastingMode);
-
-        set.Clear();
-        Assert.AreEqual(0, set.Count);
         Assert.AreEqual(0, r.transform.childCount);
-        CollectionAssert.AreEqual(new[] { body }, r.sharedMaterials);
+        Assert.AreEqual(layer, r.gameObject.layer);
     }
 
     [Test]
-    public void 스키닝_여러_서브메시_전부_덮는다()
+    public void 스키닝_여러_서브메시는_서브메시_수만큼_그린다()
     {
-        Material outline = NewMaterial("Outline");
         var root = Track(new GameObject("Boss"));
         var go = new GameObject("Body");
         go.transform.SetParent(root.transform, false);
@@ -176,140 +174,103 @@ public sealed class HoverOutlineTests
         Material[] originals = { NewMaterial("A"), NewMaterial("B"), NewMaterial("C") };
         skin.sharedMaterials = originals;
 
-        var set = new HoverOutlineOverlaySet();
-        set.Attach(root.transform, outline);
+        List<Renderer> found = Collect(root.transform);
+        Assert.AreEqual(1, found.Count);
+        Assert.AreEqual(3, EnemyOutlineRenderers.SubMeshCount(skin));
 
-        Assert.AreEqual(1, set.Count);
-        var overlay = set.GetOverlay(0) as SkinnedMeshRenderer;
-        Assert.IsNotNull(overlay);
-        Assert.AreSame(skin.sharedMesh, overlay.sharedMesh);
-        CollectionAssert.AreEqual(new[] { outline, outline, outline }, overlay.sharedMaterials);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        Assert.IsTrue(EnemyOutlineDrawList.Add(skin, EnemyOutlineDrawList.PrimaryColorIndex));
+        Assert.AreEqual(3, EnemyOutlineDrawList.Get(0).SubMeshCount);
         CollectionAssert.AreEqual(originals, skin.sharedMaterials);
-    }
-
-    [Test]
-    public void 다시_붙여도_겹이_쌓이지_않는다()
-    {
-        Material outline = NewMaterial("Outline");
-        var root = Track(new GameObject("Monster"));
-        MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
-
-        var set = new HoverOutlineOverlaySet();
-        set.Attach(root.transform, outline);
-        set.Attach(root.transform, outline);
-
-        Assert.AreEqual(1, set.Count);
-        Assert.AreEqual(1, r.transform.childCount);
     }
 
     [Test]
     public void 연출용_반투명_렌더러는_제외()
     {
-        Material outline = NewMaterial("Outline");
         var root = Track(new GameObject("Monster"));
         NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
         MeshRenderer marked = NewMeshRenderer(root.transform, "Arc", NewMaterial("Arc"));
         marked.gameObject.AddComponent<NoHitFlash>();
         NewMeshRenderer(root.transform, "Glass", NewMaterial("Glass", (int)RenderQueue.Transparent));
 
-        var set = new HoverOutlineOverlaySet();
-        set.Attach(root.transform, outline);
+        List<Renderer> found = Collect(root.transform);
 
-        Assert.AreEqual(1, set.Count);
-        Assert.AreEqual("Body", set.GetSource(0).name);
+        Assert.AreEqual(1, found.Count);
+        Assert.AreEqual("Body", found[0].name);
     }
 
     [Test]
-    public void 원본이_꺼지면_겹도_꺼진다()
+    public void 꺼진_렌더러는_그릴_목록에서_빠진다()
     {
         var root = Track(new GameObject("Monster"));
         MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
-        var set = new HoverOutlineOverlaySet();
-        set.Attach(root.transform, NewMaterial("Outline"));
 
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
         r.enabled = false;
-        set.SyncVisibility();
-        Assert.IsFalse(set.GetOverlay(0).enabled);
-
+        Assert.IsFalse(EnemyOutlineDrawList.Add(r, EnemyOutlineDrawList.PrimaryColorIndex));
         r.enabled = true;
-        set.SyncVisibility();
-        Assert.IsTrue(set.GetOverlay(0).enabled);
+        r.forceRenderingOff = true;
+        Assert.IsFalse(EnemyOutlineDrawList.Add(r, EnemyOutlineDrawList.PrimaryColorIndex));
+        r.forceRenderingOff = false;
+        Assert.IsTrue(EnemyOutlineDrawList.Add(r, EnemyOutlineDrawList.AggroColorIndex));
+
+        Assert.AreEqual(1, EnemyOutlineDrawList.Count);
+        Assert.AreEqual(EnemyOutlineDrawList.AggroColorIndex, EnemyOutlineDrawList.Get(0).ColorIndex);
     }
 
-    // ── 림 설정 ──
-
     [Test]
-    public void 림_설정_범위_밖은_클램프()
+    public void 그릴_목록은_프레임마다_새로_시작()
     {
-        var s = new HoverRimSettings(new Color(1f, 0f, 0f, 3f), 1.5f, -0.2f, 99f).Sanitized();
-        Assert.AreEqual(1f, s.Threshold);
-        Assert.AreEqual(0f, s.Softness);
-        Assert.AreEqual(HoverRimSettings.MaxIntensity, s.Intensity);
-        Assert.AreEqual(1f, s.Color.a);
+        var root = Track(new GameObject("Monster"));
+        MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
 
-        s = new HoverRimSettings(Color.red, -1f, 5f, -3f).Sanitized();
-        Assert.AreEqual(0f, s.Threshold);
-        Assert.AreEqual(HoverRimSettings.MaxSoftness, s.Softness);
-        Assert.AreEqual(0f, s.Intensity);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Add(r, EnemyOutlineDrawList.PrimaryColorIndex);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        Assert.AreEqual(0, EnemyOutlineDrawList.Count);
+        Assert.IsFalse(EnemyOutlineDrawList.Add(null, 0));
     }
 
-    [Test]
-    public void 림_설정_NaN은_최소값()
+    [TestCase(0, 1)]
+    [TestCase(3, 3)]
+    [TestCase(99, 8)]
+    public void 굵기는_1에서_8픽셀로_클램프(int raw, int expected)
     {
-        var s = new HoverRimSettings(Color.red, float.NaN, float.NaN, float.NaN).Sanitized();
-        Assert.AreEqual(0f, s.Threshold);
-        Assert.AreEqual(0f, s.Softness);
-        Assert.AreEqual(0f, s.Intensity);
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, raw);
+        Assert.AreEqual(expected, EnemyOutlineDrawList.WidthPixels);
     }
 
     [Test]
-    public void 림_설정_범위_안은_그대로()
-    {
-        var raw = new HoverRimSettings(Color.red, 0.25f, 0.1f, 1f);
-        Assert.AreEqual(raw, raw.Sanitized());
-    }
-
-    [Test]
-    public void 림은_실루엣에서_1_정면에서_0()
-    {
-        Assert.AreEqual(1f, HoverRimSettings.RimAlpha(0f, 0.25f, 0.1f), 1e-5f);
-        Assert.AreEqual(0f, HoverRimSettings.RimAlpha(1f, 0.25f, 0.1f), 1e-5f);
-        Assert.AreEqual(0.5f, HoverRimSettings.RimAlpha(0.25f, 0.25f, 0.1f), 1e-5f);
-    }
-
-    [Test]
-    public void 림_부드러움_0이면_임계값에서_딱_잘린다()
-    {
-        Assert.AreEqual(1f, HoverRimSettings.RimAlpha(0.249f, 0.25f, 0f), 1e-5f);
-        Assert.AreEqual(0f, HoverRimSettings.RimAlpha(0.251f, 0.25f, 0f), 1e-5f);
-    }
-
-    [Test]
-    public void 림_셰이더는_색_틴트_프로퍼티가_없다()
-    {
-        Shader shader = Shader.Find("Project/Enemy Hover Rim");
-        Assert.IsNotNull(shader);
-        var m = Track(new Material(shader));
-        Assert.IsFalse(m.HasProperty("_BaseColor"));
-        Assert.IsFalse(m.HasProperty("_Color"));
-        Assert.IsTrue(m.HasProperty(HoverRimSettings.ColorId));
-        Assert.IsTrue(m.HasProperty(HoverRimSettings.ThresholdId));
-        Assert.IsTrue(m.HasProperty(HoverRimSettings.SoftnessId));
-        Assert.IsTrue(m.HasProperty(HoverRimSettings.IntensityId));
-        Assert.GreaterOrEqual(m.renderQueue, (int)RenderQueue.Transparent);
-    }
-
-    [Test]
-    public void 대상이_먼저_파괴돼도_떼기는_안전()
+    public void 대상이_먼저_파괴돼도_목록은_안전()
     {
         var root = new GameObject("Monster");
-        NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
-        var set = new HoverOutlineOverlaySet();
-        set.Attach(root.transform, NewMaterial("Outline"));
+        MeshRenderer r = NewMeshRenderer(root.transform, "Body", NewMaterial("Body"));
+        EnemyOutlineDrawList.Begin(Color.red, Color.yellow, 3);
+        EnemyOutlineDrawList.Add(r, 0);
 
         Object.DestroyImmediate(root);
-        Assert.DoesNotThrow(() => set.SyncVisibility());
-        Assert.DoesNotThrow(() => set.Clear());
-        Assert.AreEqual(0, set.Count);
+        Assert.IsTrue(EnemyOutlineDrawList.Get(0).Renderer == null);
+        Assert.IsFalse(EnemyOutlineDrawList.Add(r, 0));
+    }
+
+    // ── 셰이더 ──
+
+    [TestCase("Hidden/Rendering/EnemyOutlineMask")]
+    [TestCase("Hidden/Rendering/EnemyOutlineComposite")]
+    public void 외곽선_셰이더가_있고_지원된다(string name)
+    {
+        Shader shader = Shader.Find(name);
+        Assert.IsNotNull(shader, name);
+        Assert.IsTrue(shader.isSupported, name);
+    }
+
+    [Test]
+    public void 마스크_셰이더는_색_틴트_프로퍼티가_없다()
+    {
+        // HitFlash·사망 틴트(MPB _BaseColor/_Color)가 덮어쓰기 머티리얼에 영향을 주지 않는다.
+        var m = Track(new Material(Shader.Find("Hidden/Rendering/EnemyOutlineMask")));
+        Assert.IsFalse(m.HasProperty("_BaseColor"));
+        Assert.IsFalse(m.HasProperty("_Color"));
+        Assert.IsTrue(m.HasProperty("_OutlineColorIndex"));
     }
 }

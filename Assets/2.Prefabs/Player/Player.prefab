@@ -1445,11 +1445,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9a046004aa9145940aaf59dcf447de5a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerEnemyHoverOutline
-  outlineMaterial: {fileID: 2100000, guid: 01cc5129f6bbff742bccf0992d22d505, type: 2}
-  rimColor: {r: 1, g: 0.08, b: 0.08, a: 1}
-  rimThreshold: 0.25
-  rimSoftness: 0.1
-  rimIntensity: 1
+  outlineColor: {r: 1, g: 0.08, b: 0.08, a: 1}
+  aggroOutlineColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+  outlineWidthPixels: 3
+  skillRangeMaxTargets: 16
+  aggroMaxTargets: 8
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
