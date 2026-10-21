@@ -127,6 +127,13 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Assassin_E_Charge { get; private set; }
     [field: SerializeField] public EffectEntry Assassin_E_Slash { get; private set; }
 
+    [Header("플레이어 — 거너 R(추적 레이저)")]
+    // 장판 루프 · 대상별 조준 루프(TelegraphRing) · 맞은 위치마다 위성 레이저 원샷. GunnerTrackingLaserView(레이저 프리팹)가 직접 들고 있다 —
+    // 여기는 prewarm 등록만(2026-10-21 민경).
+    [field: SerializeField] public EffectEntry Gunner_R_Zone { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_R_Lock { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_R_Strike { get; private set; }
+
     [Header("플레이어 — 상태이상(공용)")]
     // 상태 → 이펙트 표는 PlayerStatusEffectVfxSet(SO)가 들고, StatusEffectVfxPresenter 가 루프로 켜고 끈다. 여기는 prewarm 등록만(2026-10-20 민경).
     [field: SerializeField] public EffectEntry Player_Faint { get; private set; }
