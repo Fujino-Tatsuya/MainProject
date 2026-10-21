@@ -26,7 +26,7 @@
 ## 판정
 | 항목 | 피어 | 방법 |
 |---|---|---|
-| S0 환영 | 오너 | `PlayerGroundingSensor.IsGrounded` 가 **연속 1초**(낙하·튕김·사망 중 0) → 자막 `TUT_S0_WELCOME` 1번 |
+| S0 환영 | 오너 | **로딩 화면이 걷힌 뒤**(`GameManager.IsMainGameReady`) `PlayerGroundingSensor.IsGrounded` 가 **연속 1초**(낙하·튕김·사망 중 0) → 자막 `TUT_S0_WELCOME` 1번. 1초 = 디렉터 인스펙터 `welcomeDelaySeconds`(할 일 81 — 전에는 코드 상수, 로딩 화면 뒤에서 세서 자막 대부분이 가려졌다. 타임라인 아래 '시작 대기') |
 | Z1-1 이동 5m | 오너 → 서버 | XZ 누적(한 프레임에 30m/s 넘는 이동 = 순간이동으로 버림, 사망 중 끊음) → `TutorialDirector.ReportLocalMoveDistance(m)` 1초 간격 재시도. 서버 `ReportOwnerMoveServerRpc`: G1 전·PlayerObject·Alive + **상한** = 5m ≤ 보고 ≤ 30 m/s × (튜토리얼 활성 뒤 경과) + 3m |
 | Z1-2 대시 | 서버 | `PlayerDashController.ServerDashApproved` → `ReportCheckServer(Dash)` |
 | Z1-3 기본 공격 | 서버 | **`Player.ServerBasicAttackStarted`**(신규 정적 이벤트) — 기본 공격 1타가 실제로 시작될 때(적중 무관): 가붕이 `DefaultAttackController.StartAttackServer` · 거너 `GunnerBasicAttack.ServerFire`(한 발) · 어쌔신 `AssassinBasicAttack.StartServer`(강타 포함). 거부된 요청·거너 준비 자세만으로는 안 난다. **R 대상 확정 좌클릭은 조준 경로라 기본 공격으로 안 센다** |
@@ -78,6 +78,25 @@
 | `Player.ServerBasicAttackStarted`(static) + `RaiseServerBasicAttackStarted()` | `Player.cs` | 서버만 발행(IsServer 가드). SubsystemRegistration 에서 비움 |
 | 호출 3곳 | `DefaultAttackController.StartAttackServer` · `GunnerBasicAttack.ServerFire` · `AssassinBasicAttack.StartServer` | 한 줄씩 |
 | `GunnerChargeLaserSkill.ServerFired`(static) | 발사 처리(`CommitCooldownServer` 직후) | 대시 취소 커밋 경로에서는 안 남 |
+
+## 시작 대기 (할 일 81, 2026-10-22)
+T0 = `4.MapScene` 로드 시작(호스트), L = 모든 피어 맵 로드 실제 시간(미측정). 클라는 Completed 메시지 지연만큼 늦다.
+
+| # | 대기 | 시간 | 근거 | 값 | 입력 |
+|---|---|---|---|---|---|
+| 1 | 맵 로드 → 플레이어 스폰(10m 위) | L | `NetworkLoadingFlowController` `SpawnAllPlayersOnce`·`spawn_Offset` | `NetworkManager.prefab` y 10 | 스폰 즉시 열림(`Player.OnNetworkSpawn` → `EnableLocalInput`) — **로딩 화면 아래에서도 움직인다** |
+| 2 | 로딩 최소 표시 | max(0, 5 − 경과) | `NetworkLoadingFlowController.cs:1309-1314` | `minimumVisibleSeconds` 5 (prefab) | 화면만 가림 |
+| 3 | 로딩 Ready 문구 | **2.5 → 1.5** | `:1322` | `readyMessageSeconds` (prefab) | 화면만 가림 |
+| 4 | 맵 진입 검은 페이드 | 0.8 | `MapSceneManager.Start` → `NemoSceneManager.PlayEnterFade` | `MapSceneManager.prefab` `fadeDuration` | 씬 로드 직후 시작 → 보통 로딩 화면 뒤에서 끝남 |
+| 5 | 스폰 낙하 10m | ≈1.43(추정, g 9.81) | `PlayerMotor` 중력 | — | 막지 않음 |
+| 6 | 착지 뒤 환영 자막 | 1 (+ 자막 6) | `TutorialZone1Flow.TickLocal` | 디렉터 `welcomeDelaySeconds`(신규) · 문구 SO `durationSeconds` 6 | 막지 않음 |
+
+- 첫 목표(`TUT_Z1_MOVE`)는 대기 없이 디렉터 활성 때 그려진다 — 로딩 화면(sortingOrder 1000)이 걷히는 순간 이미 있다. 카메라 인트로는 없다.
+- **보이는 첫 조작**(L < 5): 전 T0 + 7.5초 → 후 **T0 + 6.5초**(Ready 문구 1초 줄임 — 문구 3개가 0.5초마다 바뀌어 1.5초면 한 바퀴 다 보인다).
+- **환영 자막**: 전 = T0 + L + ≈2.4초에 시작해 대부분 로딩 화면 뒤(L = 1초면 보이는 건 약 1.9초) → 후 = 로딩 화면이 걷힌 뒤 1초(T0 + 7.5초)부터 6초 전부 보인다.
+- 줄이지 않은 후보(연출 의도가 보이는 것 — 결정은 사람): 로딩 최소 5초(팁·이미지 순환 `imageInterval` 5초) · 10m 낙하 연출(지금은 로딩 화면 뒤라 안 보임) · 착지 1초 · 자막 6초 ·
+  맵 진입 페이드 0.8초(로딩 화면 뒤라 효과 없음) · 로딩 화면 아래 입력 열림(이동 5m 체크가 화면이 걷히기 전에 끝날 수 있음 — 입력 잠금은 대기 단축이 아니라 동작 변경이라 손대지 않음).
+- Dev 부팅(`DevSceneBooter.SetEditorDefaults(…, 0, 0)`)은 2·3 이 0 이라 바로 보인다.
 
 ## Play 확인 (사람 — MPPM 호스트+클라)
 → [tutorial-qa.md](tutorial-qa.md) 1부 "존1"·2부 "개인 체크리스트 · 대기 줄".

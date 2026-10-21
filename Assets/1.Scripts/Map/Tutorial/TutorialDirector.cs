@@ -108,6 +108,10 @@ public sealed partial class TutorialDirector : NetworkBehaviour
     [Tooltip("개인 뒤 배리어 — 열린 배리어 앞면에서 이만큼(m, 플레이어 반경 이상) 넘어가 너머 구간 안에 들어가면 '지남'으로 본다.")]
     [SerializeField, Min(0.1f)] private float backBarrierClearance = TutorialBackBarrierRules.DefaultClearance;
 
+    [Header("시작 (S0 — 할 일 81)")]
+    [Tooltip("착지 뒤 환영 자막(TUT_S0_WELCOME)까지(실제 시간 초, 각 피어 로컬). 로딩 화면이 걷힌 뒤(MainGameReady)부터 잰다 — 그 전엔 화면에 안 보인다.")]
+    [SerializeField, Min(0f)] private float welcomeDelaySeconds = TutorialZone1Rules.WelcomeDelaySeconds;
+
     // 🔴 선언 순서 = 같은 틱 안의 클라 반영 순서로 기대한다 — 교착 방지 마스크를 열림 마스크보다 먼저 둬서
     //    클라 GateOpened 가 이유(Timeout)를 읽을 수 있게 한다(보장은 아님 — 이유는 표시 보조용).
     private readonly NetworkVariable<bool> _active = new NetworkVariable<bool>(
@@ -283,6 +287,9 @@ public sealed partial class TutorialDirector : NetworkBehaviour
 
     public float AreaEnterMargin => areaEnterMargin;
     public float AreaExitMargin => areaExitMargin;
+
+    /// <summary>착지 뒤 환영 자막까지(초) — 존1 흐름이 읽는다(할 일 81).</summary>
+    public float WelcomeDelaySeconds => welcomeDelaySeconds;
 
     /// <summary>
     /// [서버] 플레이어의 지금 구간(히스테리시스 적용). 튜토리얼 비활성·모르는 id·살아 있지 않음(영혼·사망 연출·완전 사망) = None.
