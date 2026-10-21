@@ -3,11 +3,8 @@ using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using Unity.Netcode;
 
 /// <summary>
 /// 할 일 48 빌드 시나리오(B1~B3) 준비 — QA 전용 출력 폴더에 빌드하고 인스턴스 폴더 2개(호스트·클라)를 만든다.
@@ -22,9 +19,7 @@ public static class QABuild48
 
     public static string BaseExe => Path.Combine(ArtifactsRoot, "base", "MainProject.exe");
     public static string MismatchBaseExe => Path.Combine(ArtifactsRoot, "mismatch-base", "MainProject.exe");
-
-    /// <summary>빌드 씬 복사본에만 프로토콜 차이를 넣는 플래그. 원본 프리팹·씬은 저장하지 않는다.</summary>
-    internal static bool BuildProtocolMismatch { get; private set; }
+    const string NetworkManagerPrefab = "Assets/2.Prefabs/Network/NetworkManager.prefab";
 
     [MenuItem("Tools/QA/48/Build/Build Demo Player (QA artifacts)", priority = 60)]
     public static void Build()
@@ -61,17 +56,9 @@ public static class QABuild48
 
             Directory.CreateDirectory(Path.GetDirectoryName(MismatchBaseExe));
             options.locationPathName = MismatchBaseExe;
-            try
-            {
-                BuildProtocolMismatch = true;
-                mismatchReport = BuildPipeline.BuildPlayer(options);
-                mismatchSummary = mismatchReport.summary;
-                mismatchBuilt = true;
-            }
-            finally
-            {
-                BuildProtocolMismatch = false;
-            }
+            mismatchReport = BuildProtocolMismatchPlayer(options);
+            mismatchSummary = mismatchReport.summary;
+            mismatchBuilt = true;
         });
         if (!baseBuilt)
         {
@@ -159,29 +146,46 @@ public static class QABuild48
             File.Copy(file, target, true);
         }
     }
-}
 
-/// <summary>
-/// B2 버전 불일치 전용 빌드 가공. BuildPipeline 이 넘긴 씬 복사본의 NGO ProtocolVersion 만 바꾸므로
-/// NetworkManager.prefab 과 0.BootStrapScene 에는 diff·재직렬화가 남지 않는다.
-/// </summary>
-public sealed class QABuild48ProtocolMismatchProcessor : IProcessSceneWithReport
-{
-    public int callbackOrder => int.MaxValue;
-
-    public void OnProcessScene(Scene scene, BuildReport report)
+    /// <summary>
+    /// NetworkManager.prefab 의 ProtocolVersion 한 바이트만 임시로 바꿔 불일치 빌드를 만들고 원본 바이트를 즉시 복원한다.
+    /// YAML 재직렬화 없이 동일 길이 바이트를 교체하므로 finally 뒤 추적 에셋 diff가 남지 않는다.
+    /// </summary>
+    static BuildReport BuildProtocolMismatchPlayer(BuildPlayerOptions options)
     {
-        if (!QABuild48.BuildProtocolMismatch || scene.name != DemoSessionRules.BootstrapSceneName)
-            return;
+        string fullPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Application.dataPath), NetworkManagerPrefab));
+        byte[] original = File.ReadAllBytes(fullPath);
+        byte[] changed = (byte[])original.Clone();
+        byte[] needle = System.Text.Encoding.ASCII.GetBytes("ProtocolVersion: 0");
+        int found = FindBytes(changed, needle);
+        if (found < 0)
+            throw new InvalidOperationException($"[QA][Build] {NetworkManagerPrefab} 에 ProtocolVersion: 0 이 없다.");
+        changed[found + needle.Length - 1] = (byte)'1';
 
-        foreach (GameObject root in scene.GetRootGameObjects())
+        try
         {
-            foreach (NetworkManager manager in root.GetComponentsInChildren<NetworkManager>(true))
-            {
-                manager.NetworkConfig.ProtocolVersion++;
-                Debug.Log($"[QA][Build] mismatch 씬 복사본 ProtocolVersion={manager.NetworkConfig.ProtocolVersion}", manager);
-            }
+            File.WriteAllBytes(fullPath, changed);
+            AssetDatabase.ImportAsset(NetworkManagerPrefab, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+            Debug.Log("[QA][Build] mismatch 빌드용 NetworkManager ProtocolVersion=1 임시 적용");
+            return BuildPipeline.BuildPlayer(options);
         }
+        finally
+        {
+            File.WriteAllBytes(fullPath, original);
+            AssetDatabase.ImportAsset(NetworkManagerPrefab, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+            Debug.Log("[QA][Build] NetworkManager.prefab 원본 바이트 복원");
+        }
+    }
+
+    static int FindBytes(byte[] haystack, byte[] needle)
+    {
+        for (int i = 0; i <= haystack.Length - needle.Length; i++)
+        {
+            int j = 0;
+            for (; j < needle.Length && haystack[i + j] == needle[j]; j++) { }
+            if (j == needle.Length) return i;
+        }
+        return -1;
     }
 }
 #endif
