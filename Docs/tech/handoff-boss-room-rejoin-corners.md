@@ -37,6 +37,16 @@
 다시 만들려면 `Tools/Map/Authoring/Add Boss Room Rejoin Corners`.
 `IsElevatorRunning` getter 를 지우면 `NetworkLoadingFlowController.TickPendingRejoin` 컴파일이 깨진다 — 같이 고쳐야 한다.
 
+## 2026-10-21 QA B-2(M5 `Boundary_ZMax` P8) 조사 — 모서리 스폰은 원인 아님
+할 일 71. 코드·프리팹은 고치지 않았다(가설이 반증돼서).
+- QA 의 "모서리 3(0.0m)" 은 **재합류 위치 ↔ 모서리 마커** 거리다(`QALobbyScenarios.More.cs` `CheckFarthestCorner`). 벽 거리가 아니다.
+  모서리 3 = 방 로컬 (11.366, 0.5, 11.366), `Boundary_ZMax` 안쪽 면 z=13.366 → 벽까지 2m(캡슐 반경 0.38m 밖 여유 1.62m). 저작·폴백 모두 같은 2m 인셋이다.
+- P8 은 **재합류하지 않은 클라**(10-20 `152302-client-mppm951030ef`)에서 났다. 그 판 M5 재합류자는 `mppm2bdbbfaf`(에러 0)다.
+  P8 탐지기는 `Player.LocalPlayer` 만 검사한다(`GameplayInvariantDetector.InspectWallPenetration`).
+- 시각도 다르다: 951030ef P8 = 30.6s, 같은 틱에 P5 순간이동(보스룸 입장 텔레포트) 재발. 재합류자의 끊김 31.2s·재합류 스폰 ≈36s 보다 앞선다.
+  → 남은 후보는 **보스룸 입장 텔레포트 도착 틱의 1회 겹침**이다(도착 지점 `PlayerArrivalPoints` 는 z≈-1.5~-8.5 로 ZMax 와 멀어 지점 자체는 아님). 별도 할 일로 본다.
+- 참고: `development` 의 `bossroom.prefab` 에는 `RejoinCornerPoints` 가 없다(02e130f9 Work4 에디터 일괄 저장에서 빠짐). 런타임 폴백이 같은 좌표를 내므로 동작 차이는 없고 경고 1회만 난다. 되살리려면 위 메뉴.
+
 ## 관련
 - 테스트: `Assets/1.Scripts/Network/Session/Editor/BossRoomRejoinTests.cs`(모서리 선택·폴백·판정 표)
 - 재합류 전체: `Assets/1.Scripts/Network/Session/RejoinSpawnGate.cs`(보류 판정), `Assets/1.Scripts/Network/Session/MatchRoster.cs`(판 명단)
