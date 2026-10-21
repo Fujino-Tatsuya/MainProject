@@ -74,8 +74,9 @@ public class PlayerMovement : MonoBehaviour
             soulController != null &&
             soulController.TryGetFixedMoveSpeed(out fixedMoveSpeed);
 
-        float statusMultiplier = player != null && player.StatusEffects != null
-            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+        // 기본%·전체% 종합 배율(PlayerStats, 할 일 83) — 서버·오너가 같은 값을 낸다
+        float statusMultiplier = player != null && player.Stats != null
+            ? player.Stats.Multiplier(PlayerStatKind.MoveSpeed)
             : 1f;
 
         return new PlayerSimulationInput
@@ -295,8 +296,9 @@ public class PlayerMovement : MonoBehaviour
             return soulMoveSpeed;
         }
 
-        float statusMultiplier = player != null && player.StatusEffects != null
-            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+        // 기본%·전체% 종합 배율(PlayerStats, 할 일 83) — 서버·오너가 같은 값을 낸다
+        float statusMultiplier = player != null && player.Stats != null
+            ? player.Stats.Multiplier(PlayerStatKind.MoveSpeed)
             : 1f;
 
         return baseSpeed * statusMultiplier;

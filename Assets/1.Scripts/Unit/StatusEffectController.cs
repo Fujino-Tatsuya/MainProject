@@ -134,6 +134,19 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         return multiplier;
     }
 
+    /// <summary>플레이어 스탯 단계 타입(XBaseModifier·XModifier·DealtDamageModifier)의 % 합(PlayerStats 용). magnitude 1.2 = +0.2, 스택은 곱이 아니라 더한다. 없으면 0.</summary>
+    public float GetStatPercentSum(StatusEffectType statType)
+    {
+        float sum = 0f;
+        for (int i = 0; i < effects.Count; i++)
+        {
+            if ((effects[i].type & statType) != 0)
+                sum += PlayerStatFormula.PercentOf(effects[i].magnitude, effects[i].stackCount);
+        }
+
+        return sum;
+    }
+
     /// <summary>특정 출처가 건 특정 타입의 현재 스택 수. 없으면 0.</summary>
     public int GetStackCount(StatusEffectType type, ulong sourceId)
     {
