@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5842449110104199389
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1245972112267408864}
+  - component: {fileID: 3078212583230318523}
+  - component: {fileID: 5418834981001723847}
+  - component: {fileID: 1284531838405133848}
+  m_Layer: 0
+  m_Name: ProfilerHUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1245972112267408864
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5842449110104199389}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3078212583230318523
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5842449110104199389}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 759f3e7efbe215ff33c59875ac312d6f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProfilerHUD
+  toggleKey: 101
+  startVisible: 1
+  anchor: 0
+  scale: 1
+  refreshInterval: 0.2
+  targetFps: 200
+  customMarkers:
+  - label: Blur DownH
+    markerName: MaskBlur DownH
+    budgetMs: 0
+  - label: Blur V
+    markerName: MaskBlur V
+    budgetMs: 0
+  - label: Blur Comp
+    markerName: MaskBlur Composite
+    budgetMs: 0
+  - label: Blur Copy
+    markerName: MaskBlur CopyBack
+    budgetMs: 0
+  - label: Silh Mask
+    markerName: PlayerSilhouette Mask
+    budgetMs: 0
+  - label: Silh Comp
+    markerName: PlayerSilhouette Composite
+    budgetMs: 0
+--- !u!114 &5418834981001723847
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5842449110104199389}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8ab627a32dd5804f9a64dbd0eb78dab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RenderCostAB
+  toggleKey: 100
+  startWithSilhouette: 1
+  startWithWallOcclusion: 0
+  autoMeasure: 0
+  warmupFrames: 180
+  sampleFrames: 120
+  alternations: 4
+  switchSettleFrames: 30
+--- !u!114 &1284531838405133848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5842449110104199389}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb505cbfcda162849ac46d85be1974e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZonePerfRecorder
+  budgetFps: 200
+  measureUncapped: 1
+  warmupSeconds: 3
+  showOverlay: 1
