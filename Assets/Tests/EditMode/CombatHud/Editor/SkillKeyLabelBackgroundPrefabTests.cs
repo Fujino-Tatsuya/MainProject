@@ -8,7 +8,7 @@ public sealed class SkillKeyLabelBackgroundPrefabTests
 {
     private const string PrefabPath = "Assets/2.Prefabs/UI/CombatHUD.prefab";
     private const string SkillBarPath = "Layer_Combat/SkillBar";
-    private static readonly string[] SlotNames = { "Slot_P", "Slot_Q", "Slot_E", "Slot_RMB", "Slot_R" };
+    private static readonly string[] SlotNames = { "Slot_Passive", "Slot_Q", "Slot_E", "Slot_RMB", "Slot_R" };
 
     private GameObject root;
 

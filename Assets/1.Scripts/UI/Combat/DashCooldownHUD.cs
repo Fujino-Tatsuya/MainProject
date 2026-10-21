@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 대시(Shift) 재충전 표시. 로컬 플레이어의 <see cref="PlayerDashController"/>를 매 프레임 폴링한다.
+/// 대시(Space) 재충전 표시. 로컬 플레이어의 <see cref="PlayerDashController"/>를 매 프레임 폴링한다.
 /// 표현은 스킬 슬롯과 동일하다 — 남은 비율만큼 Filled 오버레이가 덮고, 남은 초를 텍스트로 쓴다.
 ///
 /// 오너 예측 장부(<c>predictedLedger</c>)를 읽으므로 로컬 플레이어에만 유효하다.
@@ -16,6 +16,9 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
     [Tooltip("남은 재충전(초) 텍스트. 스킬 쿨타임 HUD와 동일 포맷. 선택.")]
     [SerializeField] private TMP_Text remainingText;
+
+    [Tooltip("최대 충전이 2개 이상일 때 현재/최대 충전 수를 표시한다. 선택.")]
+    [SerializeField] private TMP_Text chargeText;
 
     [SerializeField] private Color blockedColor = new Color(0.35f, 0.35f, 0.35f, 0.75f);
 
@@ -68,6 +71,8 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     {
         float remaining = 0f;
         float total = 0f;
+        int charge = 0;
+        int maxCharge = 0;
 
         if (dash != null)
         {
@@ -75,6 +80,8 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             //    NetworkClock인지 Time.timeAsDouble인지는 PlayerDashController만 안다.
             remaining = dash.RemainingRecharge;
             total = dash.RechargeDuration;
+            charge = dash.PredictedCharge;
+            maxCharge = dash.MaxCharge;
         }
 
         if (cooldownFill != null)
@@ -83,11 +90,27 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         if (remainingText != null)
         {
             // 스킬 쿨타임 HUD와 동일 포맷: 1초 미만은 0.1초 단위, 1초 이상은 올림 정수, 0이면 숨김
-            remainingText.text = remaining <= 0f
-                ? string.Empty
-                : remaining < 1f ? remaining.ToString("F1") : Mathf.CeilToInt(remaining).ToString();
+            remainingText.text = FormatRemaining(remaining);
+        }
+
+        if (chargeText != null)
+        {
+            bool showCharge = ShouldShowCharge(maxCharge);
+            if (chargeText.gameObject.activeSelf != showCharge)
+                chargeText.gameObject.SetActive(showCharge);
+
+            chargeText.text = showCharge ? FormatCharge(charge, maxCharge) : string.Empty;
         }
     }
+
+    public static string FormatRemaining(float remaining) => remaining <= 0f
+        ? string.Empty
+        : remaining < 1f ? remaining.ToString("F1") : Mathf.CeilToInt(remaining).ToString();
+
+    public static bool ShouldShowCharge(int maxCharge) => maxCharge > 1;
+
+    public static string FormatCharge(int charge, int maxCharge) =>
+        $"{Mathf.Clamp(charge, 0, Mathf.Max(0, maxCharge))}/{Mathf.Max(0, maxCharge)}";
 
     private void CacheSlotColors()
     {

@@ -15,6 +15,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         public PlayerSkillSlot slot;
         public Image icon = null;
         public Image cooldownFill;   // Filled 타입 오버레이 — 남은 쿨타임 비율만큼 덮는다
+        public Image cooldownIcon = null;   // cooldownFill 마스크 안 아이콘 사본(Icon_mask_CooldownFill/Icon_*) — icon 과 같은 스프라이트로 맞춘다
         public TMP_Text remainingText;
         public SkillSlotHover hover = null;
         public Image keyBackground = null;   // 단축키 글자 배경 — 차단 색 전환에서 제외한다(같은 회색이 되면 글자가 묻힌다)
@@ -101,6 +102,8 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         {
             Sprite skillIcon = source != null ? source.Tooltip.Icon : null;
             widget.icon.sprite = skillIcon != null ? skillIcon : widget.defaultIcon;
+            if (widget.cooldownIcon != null)
+                widget.cooldownIcon.sprite = widget.icon.sprite;
         }
 
         widget.hover?.Bind(

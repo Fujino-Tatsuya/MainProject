@@ -18,6 +18,9 @@ public class PassiveHUD : MonoBehaviour
     [Tooltip("패시브 아이콘. Ready 여부에 따라 색을 바꾼다.")]
     [SerializeField] private Image icon;
 
+    [Tooltip("cooldownFill 마스크 안 아이콘 사본. icon 과 같은 스프라이트로 맞춘다. 선택.")]
+    [SerializeField] private Image cooldownIcon;
+
     [SerializeField] private SkillSlotHover hover;
 
     [Tooltip("남은 쿨다운(초) 텍스트. 스킬 쿨타임 HUD와 동일 포맷. 선택.")]
@@ -40,6 +43,8 @@ public class PassiveHUD : MonoBehaviour
             tooltipSource = player.GetComponentInChildren<IPassiveTooltipProvider>(true)?.PassiveTooltip;
 
         SkillCooldownHUD.SetSlotIcon(icon, tooltipSource);
+        if (cooldownIcon != null && icon != null)
+            cooldownIcon.sprite = icon.sprite;
 
         hover?.Bind(
             player,

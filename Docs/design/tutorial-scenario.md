@@ -437,7 +437,7 @@
 ### 7.1 그대로 쓸 수 있는 것
 | 용도 | 있는 것 |
 |---|---|
-| 패시브 툴팁 | `PassiveHUD` + `SkillSlotHover`(Slot_P, displayKey `Passive`) + `SkillTooltipView`(0.15초 지연, Shift 상세) — 3캐릭터 동작 |
+| 패시브 툴팁 | `PassiveHUD` + `SkillSlotHover`(Slot_Passive, displayKey `Passive`) + `SkillTooltipView`(0.15초 지연, Shift 상세) — 3캐릭터 동작 |
 | 평타·스킬 적중 집계 | `Player.ServerAttackLanded`(서버, AttackType Default/SkillQ/SkillE/SkillR — **적중 시에만**. 어쌔신 강타는 Default) |
 | 대시 감지 | `PlayerDashController` 서버 대시 승인 지점(이벤트는 없음 — 훅 위치) |
 | 몬스터 처치 집계 | `MonsterDeathEvents.ServerMonsterDied` |

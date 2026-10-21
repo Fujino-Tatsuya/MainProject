@@ -117,7 +117,7 @@ public static class SkillTooltipAuthoring
             skillSo.ApplyModifiedPropertiesWithoutUndo();
 
             var passiveSo = new SerializedObject(passiveHud);
-            Transform passiveRoot = FindDeep(root.transform, "Slot_P");
+            Transform passiveRoot = FindDeep(root.transform, "Slot_Passive");
             if (passiveRoot != null)
             {
                 passiveRoot.gameObject.SetActive(true);
@@ -363,7 +363,7 @@ public static class SkillTooltipAuthoring
     }
 
     /// <summary>
-    /// 슬롯 안 마스크 밑 아이콘 Image(프리팹에서 직접 만든 것 — <c>Slot_Q/Icon_mask/Icon_Q</c>, <c>Slot_P/Icon_mask/Icon_Passive</c>)를 찾아 쓴다.
+    /// 슬롯 안 마스크 밑 아이콘 Image(프리팹에서 직접 만든 것 — <c>Slot_Q/Icon_mask/Icon_Q</c>, <c>Slot_Passive/Icon_mask/Icon_Passive</c>)를 찾아 쓴다.
     /// 위치·크기·스프라이트는 건드리지 않는다. 슬롯 루트(프레임 slot_skill)·마스크 Image 는 아이콘으로 쓰지 않는다.
     /// </summary>
     private static Image FindSlotIcon(Transform slotRoot, string iconPath)
