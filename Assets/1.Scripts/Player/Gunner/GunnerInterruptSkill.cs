@@ -9,7 +9,7 @@ using UnityEngine;
 /// 쿨타임은 사용 시점(빗나가도 적용 — §8.6). 과열도와 무관.
 ///
 /// 시점 = gunner_skill_RMB_interrupt 클립 이벤트(PLAN-anim-event-timing P3-2 ①): Hit = 판정(서버)·후폭풍 출발(각 피어 자기 애니메이터),
-/// End = 종료. 이벤트가 안 오면 컨트롤러 MaxActiveDuration 안전망 — 후폭풍도 없다. 시점 튜닝은 클립에서 이벤트를 옮긴다.
+/// End = 종료. 이벤트가 안 오면 컨트롤러 안전망(클립 실제 길이 + padding) — 후폭풍도 없다. 시점 튜닝은 클립에서 이벤트를 옮긴다.
 /// </summary>
 public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
@@ -19,7 +19,8 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSourc
     private Vector3 attackDirection;
     private GunnerRecoilModel recoil;
 
-    protected override bool TimingFromAnimationEvents => true;
+    // 이벤트 방식(Hit·End) — 안전망 = 상태 클립 실제 길이 + padding.
+    public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => HitAndEndEvents;
 
     private GunnerInterruptData IData => Data as GunnerInterruptData;
 

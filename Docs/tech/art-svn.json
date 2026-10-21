@@ -9,13 +9,13 @@
   "url": "https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace",
   "subtree": "4_Resources/Art",
   "junctionPath": "Assets/50.Art",
-  "pinnedRevision": 478,
-  "pinnedAt": "2026-10-20",
+  "pinnedRevision": 487,
+  "pinnedAt": "2026-10-21",
   "expected": {
-    "metaFiles": 3304,
+    "metaFiles": 3297,
     "ownedGuids": 1105,
     "gitFilesReferencing": 422,
     "guidOccurrencesInGit": 28751,
-    "_comment": "2026-10-20 SVN r478 은희 P_HumanoidBot.prefab(Missing Script 정리) · r476 설정창 UI_Panel(r466)·캐릭터 선택 개편(r458)·서울알림체(UI/Fonts r476·r477) · Strings 일시정지 키(r477) 반영. metaFiles 현재 작업사본 실측; 나머지 참조 통계는 기존 참고값 유지."
+    "_comment": "2026-10-21 SVN r487 — r480~487(이지원·김태현·김민경·은희: 팔라딘 E 클립 .meta·floor_metal_trenchcover·암살자 아이콘 .meta 등, development 병합 시 핀 반영). 이전: 2026-10-20 SVN r478 — r478 P_HumanoidBot 끊긴 VisualScripting 컴포넌트 제거(할 일 59)·r471~472 거너/팔라딘 스킬 아이콘·r476~477 경석 아트. 이전: 2026-10-19 SVN r470 — r458 char_select 새 PNG·r468 그 .meta·r467 UI_Panel Mockups~ 정리·r469~470 GameData.xlsx 병합 Export(Elevator 열 제거·팔라딘 E 값). metaFiles = r470 버전 관리 .meta 실측(svn ls -R); 나머지 참조 통계는 기존 참고값 유지."
   }
 }

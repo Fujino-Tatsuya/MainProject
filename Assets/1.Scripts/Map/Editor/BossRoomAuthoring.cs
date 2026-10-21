@@ -799,5 +799,77 @@ public static class BossRoomAuthoring
             SetRootLocalPosition(root, landing.transform, floorCenter);
             Debug.Log($"[BossRoomAuthoring] {BossLandingName} 새로 만듦 — 중심 {floorCenter}, 부모 {landing.transform.parent.name}");
         }
+
+        BuildRejoinCorners(root, arena.min.x, arena.max.x, arena.min.z, arena.max.z, floorTopY);
+    }
+
+    /// <summary>
+    /// 판 도중 재합류 스폰 모서리 4개(C14 R3c, Docs/tech/handoff-boss-room-rejoin-corners.md).
+    /// 🔴 **그룹이 이미 있으면 건드리지 않는다**(경석이 옮긴 지점 보존). 없을 때만 벽 안쪽 면에서 인셋 2m·바닥 높이로 만들고 방 중심을 보게 한다.
+    /// 런타임은 이름(<see cref="BossRoomRejoin.GroupName"/>/Corner1~4)으로 찾고, 없으면 같은 계산을 폴백으로 쓴다.
+    /// </summary>
+    static void BuildRejoinCorners(GameObject root, float minX, float maxX, float minZ, float maxZ, float floorTopY)
+    {
+        if (FindDeep(root.transform, BossRoomRejoin.GroupName) != null)
+            return;
+
+        var group = new GameObject(BossRoomRejoin.GroupName);
+        group.transform.SetParent(root.transform, false);
+
+        var local = new Vector3[BossRoomRejoin.CornerCount];
+        BossRoomRejoin.ComputeLocalCorners(minX, maxX, minZ, maxZ, floorTopY, BossRoomRejoin.Inset, local);
+        var center = new Vector3((minX + maxX) * 0.5f, floorTopY, (minZ + maxZ) * 0.5f);
+        for (int i = 0; i < local.Length; i++)
+        {
+            var corner = new GameObject(BossRoomRejoin.CornerName(i));
+            corner.transform.SetParent(group.transform, false);
+            corner.transform.localPosition = local[i];
+            corner.transform.localRotation = BossRoomRejoin.FaceTowards(local[i], center);
+        }
+
+        Debug.Log($"[BossRoomAuthoring] {BossRoomRejoin.GroupName} 새로 만듦 — 인셋 {BossRoomRejoin.Inset}m, " +
+                  $"모서리 {local[0]} {local[1]} {local[2]} {local[3]}");
+    }
+
+    /// <summary>
+    /// 재합류 모서리만 추가 — 경계·바닥·기준점을 다시 만들지 않는다(전체 Rebuild 의 재직렬화 없이).
+    /// 아레나는 <c>InvisibleBoundaries/Boundary_*</c> 안쪽 면으로 읽는다. 그룹이 있으면 아무것도 하지 않는다.
+    /// </summary>
+    [MenuItem("Tools/Map/Authoring/Add Boss Room Rejoin Corners")]
+    public static void AddRejoinCorners()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(BossRoomPath);
+
+        try
+        {
+            if (FindDeep(root.transform, BossRoomRejoin.GroupName) != null)
+            {
+                Debug.Log($"[BossRoomAuthoring] {BossRoomRejoin.GroupName} 이 이미 있다 — 건드리지 않는다(옮긴 지점 보존). 다시 만들려면 그룹을 지우고 실행.");
+                return;
+            }
+
+            Transform boundaries = FindDeep(root.transform, BoundariesName);
+            // 루트 로컬로 읽는다 — InvisibleBoundaries 는 루트 원점·항등(BuildBoundaries)이지만 가정하지 않는다.
+            if (boundaries == null ||
+                !BossRoomRejoin.TryReadArenaLocal(boundaries, out float minX, out float maxX, out float minZ, out float maxZ, out float floorY))
+            {
+                Debug.LogError($"[BossRoomAuthoring] {BoundariesName}/Boundary_XMin·XMax·ZMin·ZMax 가 다 있지 않다 — 저장하지 않는다.");
+                return;
+            }
+
+            if (boundaries.localPosition != Vector3.zero || boundaries.localRotation != Quaternion.identity || boundaries.localScale != Vector3.one)
+            {
+                Debug.LogError($"[BossRoomAuthoring] {BoundariesName} 가 루트 원점·항등이 아니다 — Rebuild Boss Room Bounds 를 먼저 돌린다.");
+                return;
+            }
+
+            BuildRejoinCorners(root, minX, maxX, minZ, maxZ, floorY);
+            PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath);
+            Debug.Log("[BossRoomAuthoring] 재합류 모서리 추가 후 저장.");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
     }
 }

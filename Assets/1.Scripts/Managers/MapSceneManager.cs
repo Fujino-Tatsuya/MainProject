@@ -86,7 +86,7 @@ public class MapSceneManager : NemoSceneManager
     }
 
     // ExitButton 진입점. TempGameManager.GoToResultButton 브리지가 호출한다.
-    // 호스트/오프라인: 전 클라 ResultScene 전환. 클라: 경고창 표시.
+    // 호스트/오프라인: 결과 확정·페이로드 송신 후 로비로 전환(PLAN-48 C7 — 서버 NGO Single, 결과 패널은 C7b 에서 Work1 LobbyResultPanel 연결 예정). 클라: 경고창 표시.
     public void GoToResult()
     {
         Debug.Log($"[SceneFlow] MapSceneManager.GoToResult transitioning={IsTransitioning} client={IsNetworkClientOnly()}");
@@ -183,7 +183,8 @@ public class MapSceneManager : NemoSceneManager
 #endif
     }
 
-    // 실제 로컬 전환. GameManager.GoToResult가 ResultScene을 단일 모드로 로드 → MapScene 자동 언로드.
+    // 페이드 후 GameManager.GoToResult — 서버는 NGO 로 로비를 Single 로드(동적 객체 디스폰 포함), 오프라인은 로컬 Single 로드,
+    // 클라는 페이드만 하고 서버의 NGO 전환을 기다린다(로컬 씬 로드 없음).
     private void PerformGoToResult()
     {
         if (IsTransitioning || _gameManager == null)
@@ -248,7 +249,7 @@ public class MapSceneManager : NemoSceneManager
         Debug.Log("[SceneFlow] MapSceneManager.UnregisterGoToResultHandler unregistered");
     }
 
-    // 서버(호스트)만 호출. 자기 자신을 제외한 전 클라에게 전환 신호를 보낸다 (BroadcastState 패턴).
+    // 서버(호스트)만 호출. 자기 자신을 제외한 전 클라에게 결과 페이로드를 보낸다 (BroadcastState 패턴). 씬 전환은 NGO 가 한다.
     // 집계는 서버에서만 하므로 확정된 SessionResult를 페이로드로 실어 클라 결과 화면도 같은 값을 보이게 한다.
     // GoToResult 가 이 호출 전에 SessionStatsTracker.Capture 를 끝낸다(전멸·클리어는 그 호출자가 먼저 확정).
     // 페이로드는 플레이어 수에 맞춘 가변 크기다(SessionResultPayload — 상한 초과 시 경고 후 자름).
@@ -279,7 +280,8 @@ public class MapSceneManager : NemoSceneManager
         Debug.Log($"[SceneFlow] MapSceneManager.BroadcastGoToResultToClients clients={_networkManager.ConnectedClientsIds.Count}");
     }
 
-    // 클라 수신: 서버가 보낸 것만 신뢰하고 로컬 전환한다.
+    // 클라 수신: 서버가 보낸 것만 신뢰하고 결과를 확정한 뒤 페이드한다. 씬은 서버의 NGO LoadScene(로비, Single)이 옮긴다 —
+    // 서버는 이 메시지를 보낸 뒤 페이드 + 한 프레임 뒤에 LoadScene 을 부르고, 둘 다 같은 ReliableSequenced 파이프라인이라 이 메시지가 먼저 온다.
     // ⚠️ 이 핸들러는 Awake에서 호스트/클라 구분 없이 등록된다(RegisterGoToResultHandler). 송신자 검증이
     //    없으면 클라가 서버로 같은 이름의 메시지를 보내 호스트를 결과 화면으로 끌고 갈 수 있었다.
     //    LobbyUIController·NetworkLoadingFlowController·NetworkClock이 쓰는 것과 동일한 가드다.

@@ -1,17 +1,13 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using Unity.Collections;
-using Unity.Netcode;
+﻿using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.UI;
 
+/// <summary>
+/// 로비 상단 플레이어 슬롯 3칸(이름·캐릭터·준비)과 <see cref="LobbySession"/> 사이의 얇은 뷰 — PLAN-48 C8·C9.
+/// 상태는 갖지 않는다. 읽기 = LobbySession 의 복제 자리 목록, 쓰기 = LobbySession 의 RPC(준비·캐릭터 요청 진입점 — 상호작용 C10·선택 패널 C12 가 부른다).
+/// 옛 Ready·캐릭터 버튼은 C9 걷는 로비에서 씬째 지웠다.
+/// </summary>
 public class LobbyUIController : MonoBehaviour
 {
-    private const int DefaultCharacterId = 0;
-    private const string ReadyRequestMessageName = "Lobby.ReadyRequest";
-    private const string CharacterRequestMessageName = "Lobby.CharacterRequest";
-    private const string StateMessageName = "Lobby.State";
-
     public static LobbyUIController Active { get; private set; }
 
     public event System.Action StateChanged;
@@ -20,24 +16,6 @@ public class LobbyUIController : MonoBehaviour
 
     [SerializeField] private LobbyPlayerSlotView[] slots;
     [SerializeField] private CharacterRoster characterRoster;
-    [SerializeField] private Image startButtonImage;
-    [SerializeField] private Color startAvailableColor = new Color(0.25f, 0.85f, 0.45f, 1f);
-    [SerializeField] private Color startBlockedColor = new Color(0.35f, 0.35f, 0.35f, 1f);
-    [SerializeField] private bool autoRegisterWhenNetworkStarts = true;
-
-    private readonly Dictionary<ulong, bool> _readyStates = new Dictionary<ulong, bool>();
-    private readonly Dictionary<ulong, int> _characterSelections = new Dictionary<ulong, int>();
-    private readonly List<ulong> _orderedClients = new List<ulong>();
-    private readonly List<ulong> _clientsToRemove = new List<ulong>();
-
-    private NetworkManager _networkManager;
-    private Coroutine _registerRoutine;
-    private bool _callbacksRegistered;
-    private bool _localReady;
-
-    private bool IsServerActive => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
-    public bool AreAllConnectedClientsReady => HasConnectedClients() && AreAllReady();
-    public bool CanStartGame => IsServerActive && AreAllConnectedClientsReady;
 
     private void Awake()
     {
@@ -46,23 +24,13 @@ public class LobbyUIController : MonoBehaviour
 
     private void OnEnable()
     {
+        LobbySession.StateChanged += ApplyUi;
         ApplyUi();
-
-        if (autoRegisterWhenNetworkStarts)
-        {
-            _registerRoutine = StartCoroutine(RegisterWhenNetworkStarts());
-        }
     }
 
     private void OnDisable()
     {
-        if (_registerRoutine != null)
-        {
-            StopCoroutine(_registerRoutine);
-            _registerRoutine = null;
-        }
-
-        UnregisterCallbacks();
+        LobbySession.StateChanged -= ApplyUi;
     }
 
     private void OnDestroy()
@@ -75,370 +43,49 @@ public class LobbyUIController : MonoBehaviour
 
     public void ToggleLocalReady()
     {
-        SetLocalReady(!_localReady);
-    }
-
-    public void SetLocalReady(bool ready)
-    {
-        _localReady = ready;
-        RegisterCallbacks();
-
-        if (_networkManager == null || !_networkManager.IsListening)
+        var session = LobbySession.Active;
+        if (session == null)
         {
-            ApplyUi();
+            Debug.LogWarning("[SceneFlow] LobbyUIController.ToggleLocalReady — 스폰된 LobbySession 이 없다.");
             return;
         }
 
-        if (IsServerActive)
-        {
-            _readyStates[_networkManager.LocalClientId] = ready;
-            BroadcastState();
-            ApplyUi();
-            return;
-        }
-
-        SendReadyRequest(ready);
+        session.RequestToggleReady();
     }
 
     public void RequestLocalCharacterSelection(int characterId)
     {
-        RegisterCallbacks();
-
-        if (_networkManager == null || !_networkManager.IsListening)
-        {
-            return;
-        }
-
-        if (IsServerActive)
-        {
-            ApplyCharacterSelectionRequest(_networkManager.LocalClientId, characterId);
-            return;
-        }
-
-        SendCharacterRequest(characterId);
+        LobbySession.Active?.RequestCharacter(characterId);
     }
 
     public int GetLocalCharacterSelectionId()
     {
-        if (_networkManager != null &&
-            _networkManager.IsListening &&
-            _characterSelections.TryGetValue(_networkManager.LocalClientId, out var characterId))
-        {
-            return characterId;
-        }
-
-        return DefaultCharacterId;
+        return TryGetLocalEntry(out var entry) ? entry.CharacterId : LobbySession.DefaultCharacterId;
     }
 
     public bool IsLocalReady()
     {
-        if (_networkManager != null &&
-            _networkManager.IsListening &&
-            _readyStates.TryGetValue(_networkManager.LocalClientId, out var ready))
-        {
-            return ready;
-        }
-
-        return _localReady;
+        return TryGetLocalEntry(out var entry) && entry.Ready;
     }
 
-    private IEnumerator RegisterWhenNetworkStarts()
+    /// <summary>내 캐릭터 변경이 막혔는가(준비 상태·카운트다운 중) — 서버도 같은 규칙으로 거부한다. 호스트 예외 없음.</summary>
+    public bool IsLocalCharacterSelectionLocked()
     {
-        while (true)
-        {
-            _networkManager = NetworkManager.Singleton;
-            if (_networkManager != null && _networkManager.IsListening)
-            {
-                RegisterCallbacks();
-                yield break;
-            }
-
-            yield return null;
-        }
+        var session = LobbySession.Active;
+        return IsLocalReady() || (session != null && session.IsCountdownActive);
     }
 
-    private void RegisterCallbacks()
+    private static bool TryGetLocalEntry(out LobbyPlayerEntry entry)
     {
-        if (_callbacksRegistered)
+        var session = LobbySession.Active;
+        var networkManager = NetworkManager.Singleton;
+        if (session != null && networkManager != null && networkManager.IsListening)
         {
-            return;
+            return session.TryGetEntry(networkManager.LocalClientId, out entry);
         }
 
-        _networkManager = NetworkManager.Singleton;
-        if (_networkManager == null || !_networkManager.IsListening)
-        {
-            return;
-        }
-
-        _networkManager.OnClientConnectedCallback += HandleClientConnected;
-        _networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
-
-        if (_networkManager.CustomMessagingManager != null)
-        {
-            _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(ReadyRequestMessageName, HandleReadyRequestMessage);
-            _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(CharacterRequestMessageName, HandleCharacterRequestMessage);
-            _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(StateMessageName, HandleStateMessage);
-        }
-
-        _callbacksRegistered = true;
-
-        if (IsServerActive)
-        {
-            SyncConnectedClientsFromServer();
-            BroadcastState();
-        }
-    }
-
-    private void UnregisterCallbacks()
-    {
-        if (!_callbacksRegistered || _networkManager == null)
-        {
-            return;
-        }
-
-        _networkManager.OnClientConnectedCallback -= HandleClientConnected;
-        _networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
-
-        if (_networkManager.CustomMessagingManager != null)
-        {
-            _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(ReadyRequestMessageName);
-            _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(CharacterRequestMessageName);
-            _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(StateMessageName);
-        }
-
-        _callbacksRegistered = false;
-    }
-
-    private void HandleClientConnected(ulong clientId)
-    {
-        if (!IsServerActive)
-        {
-            return;
-        }
-
-        if (!_readyStates.ContainsKey(clientId))
-        {
-            _readyStates.Add(clientId, IsHostClient(clientId));
-        }
-
-        EnsureDefaultCharacterSelection(clientId);
-
-        BroadcastState();
-        ApplyUi();
-    }
-
-    private void HandleClientDisconnected(ulong clientId)
-    {
-        if (!IsServerActive)
-        {
-            return;
-        }
-
-        _readyStates.Remove(clientId);
-        _characterSelections.Remove(clientId);
-        ServerCharacterSelectionStore.Remove(clientId);
-        BroadcastState();
-        ApplyUi();
-    }
-
-    private void HandleCharacterRequestMessage(ulong senderClientId, FastBufferReader reader)
-    {
-        if (!IsServerActive)
-        {
-            return;
-        }
-
-        reader.ReadValueSafe(out int characterId);
-        ApplyCharacterSelectionRequest(senderClientId, characterId);
-    }
-
-    private void ApplyCharacterSelectionRequest(ulong clientId, int characterId)
-    {
-        SyncConnectedClientsFromServer();
-
-        if (!_readyStates.ContainsKey(clientId) ||
-            IsCharacterSelectionLocked(clientId) ||
-            characterRoster == null ||
-            !characterRoster.TryGetAvailableCharacter(characterId, out _))
-        {
-            return;
-        }
-
-        _characterSelections[clientId] = characterId;
-        ServerCharacterSelectionStore.Set(clientId, characterId);
-        BroadcastState();
-    }
-
-    // Host는 Ready 버튼이 없고 항상 준비 상태이므로, Ready 잠금은 토글 가능한 원격 클라이언트에만 적용한다.
-    private bool IsCharacterSelectionLocked(ulong clientId)
-    {
-        return !IsHostClient(clientId) &&
-               _readyStates.TryGetValue(clientId, out var ready) &&
-               ready;
-    }
-
-    private void HandleReadyRequestMessage(ulong senderClientId, FastBufferReader reader)
-    {
-        if (!IsServerActive)
-        {
-            return;
-        }
-
-        reader.ReadValueSafe(out bool ready);
-        _readyStates[senderClientId] = ready;
-        BroadcastState();
-        ApplyUi();
-    }
-
-    private void SendReadyRequest(bool ready)
-    {
-        var messagingManager = _networkManager.CustomMessagingManager;
-        if (messagingManager == null)
-        {
-            return;
-        }
-
-        using (var writer = new FastBufferWriter(sizeof(byte), Allocator.Temp))
-        {
-            writer.WriteValueSafe(ready);
-            messagingManager.SendNamedMessage(ReadyRequestMessageName, NetworkManager.ServerClientId, writer);
-        }
-    }
-
-    private void SendCharacterRequest(int characterId)
-    {
-        var messagingManager = _networkManager.CustomMessagingManager;
-        if (messagingManager == null)
-        {
-            return;
-        }
-
-        using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
-        {
-            writer.WriteValueSafe(characterId);
-            messagingManager.SendNamedMessage(CharacterRequestMessageName, NetworkManager.ServerClientId, writer);
-        }
-    }
-
-    private void BroadcastState()
-    {
-        if (!IsServerActive || _networkManager.CustomMessagingManager == null)
-        {
-            return;
-        }
-
-        SyncConnectedClientsFromServer();
-        ApplyUi();
-
-        foreach (var clientId in _networkManager.ConnectedClientsIds)
-        {
-            if (_networkManager.IsHost && clientId == _networkManager.LocalClientId)
-            {
-                continue;
-            }
-
-            SendState(clientId);
-        }
-    }
-
-    private void SendState(ulong clientId)
-    {
-        var count = _readyStates.Count;
-        var size = sizeof(int) + count * (sizeof(ulong) + sizeof(byte) + sizeof(int));
-
-        using (var writer = new FastBufferWriter(size, Allocator.Temp))
-        {
-            writer.WriteValueSafe(count);
-            foreach (var pair in _readyStates)
-            {
-                writer.WriteValueSafe(pair.Key);
-                writer.WriteValueSafe(pair.Value);
-                writer.WriteValueSafe(GetCharacterSelectionOrDefault(pair.Key));
-            }
-
-            _networkManager.CustomMessagingManager.SendNamedMessage(StateMessageName, clientId, writer);
-        }
-    }
-
-    private void HandleStateMessage(ulong senderClientId, FastBufferReader reader)
-    {
-        if (senderClientId != NetworkManager.ServerClientId)
-        {
-            return;
-        }
-
-        reader.ReadValueSafe(out int count);
-        _readyStates.Clear();
-        _characterSelections.Clear();
-
-        for (var i = 0; i < count; i++)
-        {
-            reader.ReadValueSafe(out ulong clientId);
-            reader.ReadValueSafe(out bool ready);
-            reader.ReadValueSafe(out int characterId);
-            _readyStates[clientId] = ready;
-            _characterSelections[clientId] = characterId;
-        }
-
-        if (_networkManager != null && _networkManager.IsListening)
-        {
-            _localReady = _readyStates.TryGetValue(_networkManager.LocalClientId, out var ready) && ready;
-        }
-
-        ApplyUi();
-    }
-
-    private void SyncConnectedClientsFromServer()
-    {
-        if (_networkManager == null)
-        {
-            return;
-        }
-
-        _orderedClients.Clear();
-        foreach (var clientId in _networkManager.ConnectedClientsIds)
-        {
-            _orderedClients.Add(clientId);
-            if (!_readyStates.ContainsKey(clientId))
-            {
-                _readyStates.Add(clientId, IsHostClient(clientId));
-            }
-
-            EnsureDefaultCharacterSelection(clientId);
-        }
-
-        _clientsToRemove.Clear();
-        foreach (var pair in _readyStates)
-        {
-            if (!_orderedClients.Contains(pair.Key))
-            {
-                _clientsToRemove.Add(pair.Key);
-            }
-        }
-
-        foreach (var clientId in _clientsToRemove)
-        {
-            _readyStates.Remove(clientId);
-            _characterSelections.Remove(clientId);
-            ServerCharacterSelectionStore.Remove(clientId);
-        }
-    }
-
-    private void EnsureDefaultCharacterSelection(ulong clientId)
-    {
-        if (!_characterSelections.ContainsKey(clientId))
-        {
-            _characterSelections.Add(clientId, DefaultCharacterId);
-        }
-
-        ServerCharacterSelectionStore.Set(clientId, _characterSelections[clientId]);
-    }
-
-    private int GetCharacterSelectionOrDefault(ulong clientId)
-    {
-        return _characterSelections.TryGetValue(clientId, out var characterId)
-            ? characterId
-            : DefaultCharacterId;
+        entry = default;
+        return false;
     }
 
     private Sprite GetCharacterPortrait(int characterId)
@@ -448,83 +95,42 @@ public class LobbyUIController : MonoBehaviour
             : null;
     }
 
+    // 이름 = 머리 위 이름과 같은 "P{clientId+1}"(UiStrings.OverheadPlayerLabel), 뒤에 캐릭터 이름.
+    private string BuildSlotLabel(LobbyPlayerEntry entry)
+    {
+        var playerLabel = UiStrings.OverheadPlayerLabel.Format(
+            new System.Collections.Generic.Dictionary<string, string> { ["n"] = (entry.ClientId + 1).ToString() });
+        return characterRoster != null && characterRoster.TryGetAvailableCharacter(entry.CharacterId, out var character)
+            ? $"{playerLabel} · {character.DisplayName}"
+            : playerLabel;
+    }
+
     private void ApplyUi()
     {
-        if (slots == null)
+        if (slots != null)
         {
-            ApplyStartButtonState();
-            return;
+            var session = LobbySession.Active;
+            var count = session != null ? session.EntryCount : 0;
+
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var slot = slots[i];
+                if (slot == null)
+                {
+                    continue;
+                }
+
+                if (i >= count)
+                {
+                    slot.SetState(false, false, null);
+                    continue;
+                }
+
+                var entry = session.GetEntry(i);
+                slot.SetState(true, entry.Ready, GetCharacterPortrait(entry.CharacterId), BuildSlotLabel(entry));
+            }
         }
 
-        BuildOrderedClientList();
-
-        for (var i = 0; i < slots.Length; i++)
-        {
-            var slot = slots[i];
-            if (slot == null)
-            {
-                continue;
-            }
-
-            if (i >= _orderedClients.Count)
-            {
-                slot.SetState(false, false, null);
-                continue;
-            }
-
-            var clientId = _orderedClients[i];
-            var ready = _readyStates.TryGetValue(clientId, out var isReady) && isReady;
-            var characterId = GetCharacterSelectionOrDefault(clientId);
-            slot.SetState(true, ready, GetCharacterPortrait(characterId));
-        }
-
-        ApplyStartButtonState();
         StateChanged?.Invoke();
-    }
-
-    private void BuildOrderedClientList()
-    {
-        _orderedClients.Clear();
-
-        foreach (var pair in _readyStates)
-        {
-            _orderedClients.Add(pair.Key);
-        }
-
-        _orderedClients.Sort();
-    }
-
-    private void ApplyStartButtonState()
-    {
-        if (startButtonImage == null)
-        {
-            return;
-        }
-
-        startButtonImage.color = AreAllConnectedClientsReady ? startAvailableColor : startBlockedColor;
-    }
-
-    // Host는 Ready 버튼 없이 항상 준비 상태로 취급한다. GameStart 활성 조건은 "Host 제외 전원 Ready"가 된다.
-    private bool IsHostClient(ulong clientId)
-    {
-        return _networkManager != null && _networkManager.IsHost && clientId == NetworkManager.ServerClientId;
-    }
-
-    private bool HasConnectedClients()
-    {
-        return _readyStates.Count > 0;
-    }
-
-    private bool AreAllReady()
-    {
-        foreach (var pair in _readyStates)
-        {
-            if (!pair.Value)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

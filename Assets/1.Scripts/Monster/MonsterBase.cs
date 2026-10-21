@@ -69,6 +69,18 @@ public class MonsterBase : Unit
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 지금 쫓거나 때리는 대상의 NetworkObjectId **표시용 복제**(할 일 58 — 나를 노리는 몬스터 주황 외곽선).
+    // 서버만 쓴다(Update). Chase·Attack 이고 서버 로직이 돌 때만 대상 id, 그 밖 0 — 규칙은 MonsterAggroTargetRule.
+    // 판정·FSM 은 이 값을 읽지 않는다(동작 변경 없음). Docs/tech/monster-hover-outline.md "나를 노리는 몬스터".
+    readonly NetworkVariable<ulong> _aggroTargetId = new NetworkVariable<ulong>(
+        MonsterAggroTargetRule.NoTarget,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+    MonsterAggroTargetRule.TargetIdCache _aggroTargetIdCache;
+
+    /// <summary>[모든 피어] 지금 쫓거나 때리는 대상의 NetworkObjectId(없으면 0). 표시 전용.</summary>
+    public ulong AggroTargetId => _aggroTargetId.Value;
+
     /// <summary>
     /// 간파 표시를 판정 창보다 **이만큼 먼저** 끈다(초). 간파 스킬은 서버에서 시작하고 이 시간 뒤에 판정되므로
     /// (<c>FirstMeleeInterruptSkillData.hitDelay</c> 0.15) "보일 때 누르면 성공"이 보장된다 — 팀장 09-28: 유예 없음, 표시만 일찍.
@@ -296,6 +308,15 @@ public class MonsterBase : Unit
         // 애니 재생 속도 — 모든 피어, 이 한 곳에서만 쓴다(자세 홀드 중엔 홀드가 0 을 쥔다).
         if (ManagesAnimatorSpeed && !_animatorHeldLocally && animator != null)
             animator.speed = ManagedAnimatorSpeed() * AnimatorSpeedScale;
+
+        // 표시용 대상 id 복제(직전 틱 결과 — 한 프레임 늦어도 표시엔 무관). 사망·휴면·연출 정지도 여기서 0 으로 내린다.
+        if (IsServer)
+        {
+            ulong aggroId = MonsterAggroTargetRule.ReplicatedTargetId(
+                _state.Value, _isDead, _serverLogicSuspended || _dormant, _aggroTargetIdCache.Resolve(_target));
+            if (_aggroTargetId.Value != aggroId)
+                _aggroTargetId.Value = aggroId;
+        }
 
         if (!IsServer || !_initialized || _isDead)
             return;

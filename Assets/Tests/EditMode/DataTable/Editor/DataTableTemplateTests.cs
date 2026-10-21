@@ -195,4 +195,14 @@ public sealed class DataTableTemplateTests
         Assert.That(writes, Is.Not.Empty);
         return DataTableApplier.Diff(writes);
     }
+
+    [Test]
+    public void CollectTargets_BossElevatorRig_OnlyOuterBossEnterPrefab()
+    {
+        // Elevator.prefab 은 ZoneS_typeBossEnter 안에만 중첩된다 — 바깥 프리팹 행 하나만 남아야 Map 시트에 같은 열이 둘 생기지 않는다.
+        List<(Type, IReadOnlyList<(string id, Object target)>)> tables = DataTableTemplate.CollectTargets(new List<string>());
+
+        IReadOnlyList<(string id, Object target)> rig = tables.Single(t => t.Item1 == typeof(BossElevatorRig)).Item2;
+        Assert.That(rig.Select(t => t.id), Is.EqualTo(new[] { "ZoneS_typeBossEnter" }));
+    }
 }

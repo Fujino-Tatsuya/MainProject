@@ -11,7 +11,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private const string ProgressMessageName = "LoadingScene.Progress";
     private const string StateMessageName = "LoadingScene.State";
     private const int ProgressMessageSize = sizeof(uint) + sizeof(float);
-    private const int StateMessageSize = sizeof(uint) + sizeof(byte) + sizeof(float);
+    // flowId · phase · 평균 진행률 · 소스가 NGO 씬인가(클라가 로컬 언로드를 건너뛸지).
+    private const int StateMessageSize = sizeof(uint) + sizeof(byte) + sizeof(float) + sizeof(byte);
 
     [SerializeField] private string loadingSceneName = "LoadingScene";
     [SerializeField] private string targetSceneName = "MapScene"; // Temp_inGameScene에서 변경.
@@ -51,7 +52,35 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private string _sourceSceneName;
     // 판 재시작(TryRestartTargetScene) — 로딩 씬이 뜬 뒤 소스(로컬) 씬 대신 타깃 씬을 네트워크 언로드한다.
     private bool _restartingTargetScene;
+    // 소스 씬이 NGO 가 로드한 씬인가 — 서버가 StartGameLoading 에서 정해 상태 메시지로 클라에 알린다(SourceSceneUnloadRule).
+    private bool _sourceIsNetworkScene;
+    // [서버] NGO LoadScene 으로 들어와 아직 떠 있는 씬 이름. 서버 자신의 LoadComplete 로 넣고 Unity sceneUnloaded 로 뺀다.
+    // NGO 의 ScenesLoaded 는 internal 이고, StartHost 때 이미 떠 있던 로컬 씬(지금의 로비)까지 담아 판별에 못 쓴다.
+    private readonly HashSet<string> _networkLoadedScenes = new HashSet<string>();
     private readonly List<NetworkObject> _despawnBuffer = new List<NetworkObject>();
+    // [서버] 판 종료 Single 전환(TryLoadSessionSceneSingle) 루틴.
+    private Coroutine _sessionSceneLoadRoutine;
+
+    // [서버] 판 도중 재합류 대기열(C14 R2c) — Map 이 떠 있을 때 SynchronizeComplete 를 마친 명단 안 클라.
+    // 매 프레임 RejoinSpawnGate 로 판정해 Ready 면 첫 스폰 지점에 세운다. 대기 중 퇴장하면 뺀다.
+    private sealed class PendingRejoin
+    {
+        public ulong ClientId;
+        public string PlayerId;
+        public float EnqueuedAt;
+        public bool HasVerdict;
+        public RejoinSpawnVerdict LastVerdict;
+        public bool LongHoldWarned;
+    }
+
+    private const float RejoinLongHoldWarningSeconds = 10f;
+    private readonly List<PendingRejoin> _pendingRejoin = new List<PendingRejoin>();
+    private readonly List<PendingRejoin> _finishedRejoin = new List<PendingRejoin>();
+    private readonly List<Vector3> _rejoinOtherPlayerPositions = new List<Vector3>();
+    private readonly List<Vector3> _rejoinBossRoomCandidates = new List<Vector3>();
+    private readonly List<Vector3> _rejoinBossPositions = new List<Vector3>();
+    private readonly List<Pose> _rejoinBossRoomCorners = new List<Pose>();
+    private PartyWipeWatcher _partyWipeWatcher;
 
     private bool IsServerActive => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
 
@@ -64,6 +93,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
     {
         _networkManager = GetComponent<NetworkManager>();
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.Awake hasNetworkManager={_networkManager != null}");
+
+        // 서버가 켜지자마자 씬 이벤트를 구독한다 — StartHost 직후 NGO 로 로드하는 씬(로비)도 _networkLoadedScenes 에 잡히게.
+        if (_networkManager != null)
+        {
+            _networkManager.OnServerStarted += RegisterNetworkCallbacks;
+        }
+
+        SceneManager.sceneUnloaded += HandleUnitySceneUnloaded;
     }
 
     private void OnDestroy()
@@ -74,7 +111,19 @@ public class NetworkLoadingFlowController : MonoBehaviour
             _registerCallbacksRoutine = null;
         }
 
+        if (_networkManager != null)
+        {
+            _networkManager.OnServerStarted -= RegisterNetworkCallbacks;
+        }
+
+        SceneManager.sceneUnloaded -= HandleUnitySceneUnloaded;
         UnregisterNetworkCallbacks();
+    }
+
+    // NGO 언로드든 로컬 언로드·Single 교체든 씬이 내려가면 "NGO 씬" 기록에서 뺀다.
+    private void HandleUnitySceneUnloaded(Scene scene)
+    {
+        _networkLoadedScenes.Remove(scene.name);
     }
 
     public void RegisterNetworkCallbacks()
@@ -109,11 +158,18 @@ public class NetworkLoadingFlowController : MonoBehaviour
         // 구독한 "대상"을 기억해 둔다 — 아래 IsRegistrationCurrent 가 이걸로 세대를 판별한다.
         _registeredSceneManager = _networkManager.SceneManager;
         _registeredMessagingManager = _networkManager.CustomMessagingManager;
+        _networkLoadedScenes.Clear(); // 새 세션 — 지난 세션의 NGO 씬 기록은 이 SceneManager 와 무관하다
+        _pendingRejoin.Clear();
+        if (!_networkManager.IsServer)
+        {
+            ResetClientFlowForNewSession();
+        }
 
         _registeredSceneManager.OnSceneEvent += HandleSceneEvent;
         _registeredMessagingManager.RegisterNamedMessageHandler(ProgressMessageName, HandleProgressMessage);
         _registeredMessagingManager.RegisterNamedMessageHandler(StateMessageName, HandleStateMessage);
         _networkManager.OnClientConnectedCallback += HandleClientConnected;
+        _networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
         _callbacksRegistered = true;
 
         Debug.Log("[SceneFlow] NetworkLoadingFlowController.RegisterNetworkCallbacks registered");
@@ -194,15 +250,17 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        BeginMatchRoster();
         ResetFlow();
         _flowId++;
         _phase = NetworkLoadingPhase.LoadingScene;
         _minimumTimerStartedAt = Time.unscaledTime;
         _sourceSceneName = SceneManager.GetActiveScene().name;
+        _sourceIsNetworkScene = _networkLoadedScenes.Contains(_sourceSceneName);
 
         Debug.Log(
             $"[SceneFlow] NetworkLoadingFlowController.StartGameLoading loadingScene={loadingSceneName} " +
-            $"targetScene={targetSceneName} sourceScene={_sourceSceneName} flowId={_flowId}");
+            $"targetScene={targetSceneName} sourceScene={_sourceSceneName} sourceIsNetworkScene={_sourceIsNetworkScene} flowId={_flowId}");
         LogDebug($"StartGameLoading flowId={_flowId}, loadingScene={loadingSceneName}, targetScene={targetSceneName}.");
         ApplyViewState();
         BroadcastState();
@@ -277,6 +335,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return false;
         }
 
+        // 판 재시작은 처음 로드한 것처럼 전부 초기화한다 — 부재자 생명 기록도 버린다(돌아오면 Alive·만피). 특성 기록은 특성 디렉터가 새로 스폰될 때 버린다.
+        int clearedLives = RejoinMemory.Server.ClearLives();
+        if (clearedLives > 0)
+        {
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RejoinMemory clear lives context=restart count={clearedLives}");
+        }
+
         reason = null;
         return true;
     }
@@ -346,14 +411,150 @@ public class NetworkLoadingFlowController : MonoBehaviour
         return count;
     }
 
-    private bool CanStartFromLobby()
+    // [서버] 씬 전환 직전 정리(PLAN-48 §4.3·R1) — 동적 NetworkObject(PlayerObject 포함, IsSceneObject=false)를 전부 디스폰하고
+    // 남은 스폰 개수(씬 배치 객체 — 언로드가 정리)를 남긴다. 전환마다 남은 수가 불어나면 누적 누수다.
+    private void DespawnDynamicNetworkObjectsBeforeTransition(string context)
     {
-        var lobby = LobbyUIController.Active;
-        if (lobby == null)
+        int despawned = DespawnDynamicNetworkObjects();
+        int remaining = _networkManager.SpawnManager.SpawnedObjectsList.Count;
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.DespawnBeforeTransition context={context} despawned={despawned} remaining={remaining}");
+    }
+
+    /// <summary>
+    /// [서버] 세션 유지형 Single 전환 — 판이 끝나면 4.MapScene 에서 로비로 바로 간다(PLAN-48 C7, 5.ResultScene 경유 없음).
+    /// 한 프레임 뒤에 동적 NetworkObject·플레이어를 디스폰하고(남은 개수 로그, R1) NGO <c>LoadScene(Single)</c> 을 부른다 — 클라는 NGO 가 따라 옮긴다.
+    /// 한 프레임 미루는 건 호출 전에 보낸 결과 페이로드(MapScene.GoToResult named message)를 씬 이벤트보다 앞선 프레임에 송신하기 위해서다
+    /// (둘 다 UnityTransport 의 같은 ReliableSequenced 파이프라인이라 같은 프레임이어도 순서는 지켜진다).
+    /// 로딩 흐름이 진행 중이면 끝날 때까지 기다렸다 전환한다. 서버가 아니거나 이미 전환 중이면 거부(false + 이유).
+    /// </summary>
+    public bool TryLoadSessionSceneSingle(string sceneName, out string reason)
+    {
+        RegisterNetworkCallbacks();
+
+        if (!IsServerActive)
         {
-            lobby = FindFirstObjectByType<LobbyUIController>();
+            reason = "서버가 아니다";
+            return false;
         }
 
+        if (_sessionSceneLoadRoutine != null)
+        {
+            reason = "이미 Single 전환 중이다";
+            return false;
+        }
+
+        // 판 끝 — 여기부터 명단 안 사람도 재합류가 아니라 로비 입장으로 다시 받는다(C14).
+        EndMatchRoster($"single={sceneName}");
+        _sessionSceneLoadRoutine = StartCoroutine(LoadSessionSceneSingle(sceneName));
+        reason = null;
+        return true;
+    }
+
+    /// <summary>[서버] 씬을 바꾸는 중 — 로딩 흐름(첫 진입·판 재시작) 또는 맵 → 로비 Single 전환 대기·진행. 재합류 승인을 미룬다(C14).</summary>
+    public bool IsSceneTransitionInProgress => IsFlowInProgress || _sessionSceneLoadRoutine != null;
+
+    // [서버] 판 명단 고정(C14) — 로비 → 맵 래치를 통과한 순간 접속해 있던 playerId. 데모 흐름 밖에선 명단 기능 전체를 끈다
+    // (playerId 가 없거나 겹친 client-·# 키가 명단에 들어가지 않게).
+    private void BeginMatchRoster()
+    {
+        var roster = MatchRoster.Server;
+        if (!DemoSessionDirector.IsDemoFlowActive)
+        {
+            EndMatchRoster("begin.notDemo");
+            return;
+        }
+
+        var registry = PlayerIdRegistry.Server;
+        var playerIds = new List<string>();
+        var clientIds = new List<ulong>();
+        foreach (var clientId in _networkManager.ConnectedClientsIds)
+        {
+            if (registry.TryGetPlayerId(clientId, out var playerId))
+            {
+                playerIds.Add(playerId);
+                clientIds.Add(clientId);
+            }
+        }
+
+        // 판 재시작 경로(TryRestartTargetScene)는 이 함수를 거치지 않는다 — 같은 판이라 명단을 그대로 둔다.
+        var previous = roster.IsActive ? roster.Count : 0;
+        ClearRejoinMemory("begin");
+        roster.Begin(playerIds);
+        var players = new List<string>(playerIds.Count);
+        for (var i = 0; i < playerIds.Count; i++)
+        {
+            roster.BindClient(playerIds[i], clientIds[i], out _, out _);
+            players.Add($"{playerIds[i]}:{clientIds[i]}");
+        }
+
+        Debug.Log(
+            $"[SceneFlow] NetworkLoadingFlowController.MatchRoster begin count={roster.Count} bound={roster.BoundCount} " +
+            $"connected={_networkManager.ConnectedClientsIds.Count} previousActive={previous} players=[{string.Join(",", players)}]");
+    }
+
+    /// <summary>[서버] 판 명단을 끝낸다(C14). 활성이었으면 크기를 남긴다 — 판마다 begin/end 가 짝을 이루지 않으면 누적이다(R1).</summary>
+    public static void EndMatchRoster(string context)
+    {
+        // 보관소는 명단이 비활성이어도 비운다 — 판 경계마다 0 으로 돌아가야 누적이 없다(R1).
+        ClearRejoinMemory(context);
+        var roster = MatchRoster.Server;
+        if (!roster.IsActive)
+        {
+            return;
+        }
+
+        int bound = roster.BoundCount;
+        int count = roster.End();
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.MatchRoster end context={context} count={count} bound={bound}");
+    }
+
+    // [서버] 재합류 보관소(RejoinMemory) 비우기 — 판 명단과 같은 경계. 비운 게 있을 때만 크기를 남긴다.
+    private static void ClearRejoinMemory(string context)
+    {
+        int cleared = RejoinMemory.Server.Clear();
+        if (cleared > 0)
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RejoinMemory clear context={context} count={cleared}");
+    }
+
+    private IEnumerator LoadSessionSceneSingle(string sceneName)
+    {
+        yield return null;
+        while (IsServerActive && IsFlowInProgress)
+        {
+            yield return null;
+        }
+
+        if (!IsServerActive)
+        {
+            Debug.LogWarning($"[SceneFlow] NetworkLoadingFlowController.LoadSessionSceneSingle 서버가 멈춰 전환을 취소한다 scene={sceneName}");
+            _sessionSceneLoadRoutine = null;
+            yield break;
+        }
+
+        DespawnDynamicNetworkObjectsBeforeTransition($"single={sceneName}");
+
+        var status = _networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        var retries = 0;
+        while (status == SceneEventProgressStatus.SceneEventInProgress && retries < 30)
+        {
+            retries++;
+            yield return null;
+            status = _networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.LoadSessionSceneSingle LoadScene scene={sceneName} status={status} retries={retries}");
+        if (status != SceneEventProgressStatus.Started)
+        {
+            Debug.LogError($"[Loading] {sceneName} Single 로드 실패({status}) — 판 종료 전환이 멈췄다.");
+        }
+
+        _sessionSceneLoadRoutine = null;
+    }
+
+    // 로비 시작 조건 = LobbySession 카운트다운이 끝나 시작 래치가 걸렸다(PLAN-48 C8). 로비 세션이 없는 경로(Dev 부팅 등)는 막지 않는다.
+    private bool CanStartFromLobby()
+    {
+        var lobby = LobbySession.Active;
         return lobby == null || lobby.CanStartGame;
     }
 
@@ -404,6 +605,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         if (_networkManager != null)
         {
             _networkManager.OnClientConnectedCallback -= HandleClientConnected;
+            _networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
         }
 
         _registeredSceneManager = null;
@@ -426,6 +628,364 @@ public class NetworkLoadingFlowController : MonoBehaviour
         SendState(clientId);
     }
 
+    private void HandleClientDisconnected(ulong clientId)
+    {
+        CommitRejoinLife(clientId);
+
+        for (var i = _pendingRejoin.Count - 1; i >= 0; i--)
+        {
+            var entry = _pendingRejoin[i];
+            if (entry.ClientId != clientId)
+            {
+                continue;
+            }
+
+            _pendingRejoin.RemoveAt(i);
+            Debug.Log(
+                $"[Rejoin] 대기 중 퇴장 — 대기열에서 뺀다 clientId={clientId} playerId={entry.PlayerId} " +
+                $"waited={Time.unscaledTime - entry.EnqueuedAt:F1}s pending={_pendingRejoin.Count}");
+        }
+    }
+
+    // [서버] 퇴장 확정(C14 R5c) — PlayerObject 디스폰 때 남긴 생명 메모를 playerId 키 기록으로 옮긴다(NGO 는 이 콜백보다 디스폰이 먼저다).
+    // 메모가 없으면(스폰 보류 중 다시 나감) 이전 기록을 그대로 둔다.
+    private void CommitRejoinLife(ulong clientId)
+    {
+        if (!IsServerActive || !MatchRoster.Server.IsActive)
+        {
+            return;
+        }
+
+        var memory = RejoinMemory.Server;
+        if (!MatchRoster.Server.TryGetPlayerIdByLastClient(clientId, out var playerId))
+        {
+            return;
+        }
+
+        if (memory.CommitLifeOnDisconnect(clientId, playerId, out var record))
+        {
+            Debug.Log($"[Rejoin] 퇴장 — 재합류용 생명 보관 clientId={clientId} playerId={playerId} life={record} (보관 {memory.Count}건)");
+        }
+        else
+        {
+            Debug.Log($"[Rejoin] 퇴장 — 생명 메모 없음(PlayerObject 없이 나감), 이전 기록 유지 clientId={clientId} playerId={playerId}");
+        }
+    }
+
+    // ── 판 도중 재합류(C14 R2c) ─────────────────────────────────────────────────
+
+    // [서버] 늦게 붙은 클라가 씬 동기화를 마쳤다. 판 진행 중(명단 활성·Map 로드됨)이고 명단 안 사람이면
+    // Completed 상태를 보내(클라 NotifyMainGameReady → BGM·AudioListener) 재합류 대기열에 넣는다.
+    // 로딩 흐름은 Map 이 뜬 뒤 _phase=Completed 로 남아 HandleClientConnected 가 상태를 보내지 않는다 — 그래서 여기서 보낸다.
+    private void HandleClientSynchronized(ulong clientId)
+    {
+        if (!IsServerActive || clientId == _networkManager.LocalClientId)
+        {
+            return;
+        }
+
+        var roster = MatchRoster.Server;
+        if (!roster.IsActive)
+        {
+            return; // 로비·데모 흐름 밖 — 로비 스포너(LobbyPlayerSpawner)나 기존 경로 몫
+        }
+
+        if (!PlayerIdRegistry.Server.TryGetPlayerId(clientId, out var playerId) || !roster.Contains(playerId))
+        {
+            Debug.LogWarning($"[Rejoin] 동기화 완료 클라가 판 명단 밖이다 — 재합류 스폰 안 함 clientId={clientId} playerId='{playerId}'");
+            return;
+        }
+
+        if (!IsTargetSceneLoaded())
+        {
+            Debug.LogWarning($"[Rejoin] 동기화 완료인데 {targetSceneName} 이 떠 있지 않다 — 재합류 스폰 안 함 clientId={clientId} playerId={playerId} phase={_phase}");
+            return;
+        }
+
+        // 판 재시작 흐름 도중이면 그 흐름의 BroadcastState 가 이 클라에게도 간다 — Completed 일 때만 직접 보낸다.
+        var sentState = _phase == NetworkLoadingPhase.Completed;
+        if (sentState)
+        {
+            SendState(clientId);
+        }
+
+        foreach (var existing in _pendingRejoin)
+        {
+            if (existing.ClientId == clientId)
+            {
+                Debug.Log($"[Rejoin] 이미 대기열에 있다 clientId={clientId} playerId={playerId}");
+                return;
+            }
+        }
+
+        _pendingRejoin.Add(new PendingRejoin
+        {
+            ClientId = clientId,
+            PlayerId = playerId,
+            EnqueuedAt = Time.unscaledTime,
+        });
+        var lastClientText = roster.TryGetLastClientId(playerId, out var lastClientId) ? lastClientId.ToString() : "-";
+        Debug.Log(
+            $"[Rejoin] 대기열 추가 clientId={clientId} playerId={playerId} lastClientId={lastClientText} " +
+            $"phase={_phase} flowId={_flowId} sentCompleted={sentState} pending={_pendingRejoin.Count}");
+    }
+
+    private void Update()
+    {
+        if (_pendingRejoin.Count == 0)
+        {
+            return;
+        }
+
+        if (!IsServerActive)
+        {
+            _pendingRejoin.Clear();
+            return;
+        }
+
+        TickPendingRejoin();
+    }
+
+    // [서버] 대기열 앞에서부터 판정한다 — 같은 프레임에 둘이 Ready 면 앞사람이 먼저 서고, 뒷사람의 빈 칸 계산에 앞사람 위치가 들어간다.
+    private void TickPendingRejoin()
+    {
+        var mapReady = _phase == NetworkLoadingPhase.Completed &&
+                       !IsSceneTransitionInProgress &&
+                       IsTargetSceneLoaded() &&
+                       (GameManager.Instance == null || GameManager.Instance.IsMainGameReady);
+
+        var boss = BossEncounterDirector.Instance;
+        var resultReserved = !MatchRoster.Server.IsActive ||
+                             _sessionSceneLoadRoutine != null ||
+                             (boss != null && boss.IsBossDefeatedServer);
+
+        var teleport = BossTeleportManager.Instance;
+        var elevatorOrTeleportBusy = teleport != null &&
+                                     (teleport.IsElevatorRunning || teleport.IsEncounterBusy || teleport.IsCountdownActive);
+
+        var bossCinematic = boss != null && IsBossCinematicPhase(boss.Phase);
+        var slowMotion = GlobalTimeScale.Instance != null && GlobalTimeScale.Instance.IsActive;
+
+        if (_partyWipeWatcher == null)
+        {
+            _partyWipeWatcher = FindFirstObjectByType<PartyWipeWatcher>();
+        }
+
+        var wipePending = _partyWipeWatcher != null && _partyWipeWatcher.IsWipeGracePending;
+
+        _finishedRejoin.Clear();
+        // 스폰이 구독자를 거쳐 대기열을 건드려도 안전하게 복사본을 돈다.
+        var snapshotList = _pendingRejoin.ToArray();
+        foreach (var entry in snapshotList)
+        {
+            var connected = _networkManager.ConnectedClients.TryGetValue(entry.ClientId, out var client);
+            var verdict = RejoinSpawnGate.Evaluate(new RejoinSpawnSnapshot(
+                connected,
+                clientSynchronized: true, // SynchronizeComplete 를 받은 클라만 대기열에 들어온다
+                mapReady,
+                resultReserved,
+                connected && client.PlayerObject != null,
+                elevatorOrTeleportBusy,
+                bossCinematic,
+                slowMotion,
+                wipePending));
+
+            var waited = Time.unscaledTime - entry.EnqueuedAt;
+            if (!entry.HasVerdict || !entry.LastVerdict.Equals(verdict))
+            {
+                Debug.Log(
+                    $"[Rejoin] 판정 clientId={entry.ClientId} playerId={entry.PlayerId} verdict={verdict} " +
+                    $"before={(entry.HasVerdict ? entry.LastVerdict.ToString() : "-")} waited={waited:F1}s");
+                entry.HasVerdict = true;
+                entry.LastVerdict = verdict;
+            }
+
+            switch (verdict.Decision)
+            {
+                case RejoinSpawnDecision.Hold:
+                    if (!entry.LongHoldWarned && waited > RejoinLongHoldWarningSeconds)
+                    {
+                        entry.LongHoldWarned = true;
+                        Debug.LogWarning(
+                            $"[Rejoin] {RejoinLongHoldWarningSeconds:F0}초 넘게 스폰 보류 중 clientId={entry.ClientId} playerId={entry.PlayerId} " +
+                            $"reason={verdict.Reason} waited={waited:F1}s");
+                    }
+
+                    break;
+
+                case RejoinSpawnDecision.Drop:
+                    if (verdict.Reason == RejoinSpawnReason.AlreadyHasPlayerObject)
+                    {
+                        // 판 재시작 스폰 등이 먼저 세웠다 — 스폰은 안 하지만 명단 묶기·재합류 발행은 한다(옛 clientId 키가 남지 않게).
+                        BindRejoinedClient(entry, "existingPlayerObject");
+                    }
+
+                    _finishedRejoin.Add(entry);
+                    break;
+
+                case RejoinSpawnDecision.Ready:
+                    SpawnRejoiner(entry);
+                    _finishedRejoin.Add(entry);
+                    break;
+            }
+        }
+
+        foreach (var entry in _finishedRejoin)
+        {
+            _pendingRejoin.Remove(entry);
+        }
+
+        _finishedRejoin.Clear();
+    }
+
+    // [서버] 맵 첫 스폰 지점(Q-A) — 처음 스폰과 같은 공식(RejoinSpawnPicker.SlotPose)의 빈 칸. 보스 룸이면 모서리 4지점 중 가장 먼 곳(R3c).
+    // 프리팹은 선택 저장소(playerId 로 승인 때 복원).
+    private void SpawnRejoiner(PendingRejoin entry)
+    {
+        var baseSpawnPoint = ResolveBasePlayerSpawnPoint();
+        _rejoinOtherPlayerPositions.Clear();
+        _rejoinBossRoomCandidates.Clear();
+        foreach (var other in _networkManager.ConnectedClientsList)
+        {
+            if (other.ClientId != entry.ClientId && other.PlayerObject != null)
+            {
+                var position = other.PlayerObject.transform.position;
+                _rejoinOtherPlayerPositions.Add(position);
+
+                // 보스 룸 판정은 영구 사망자를 빼고 본다(메모 "생존·Soul" — 사망 연출 중도 아직 아레나 안이라 넣는다).
+                var lifeCycle = other.PlayerObject.GetComponent<PlayerLifeCycleController>();
+                if (lifeCycle == null || lifeCycle.State != PlayerLifeState.PermanentDead)
+                {
+                    _rejoinBossRoomCandidates.Add(position);
+                }
+            }
+        }
+
+        var boss = BossEncounterDirector.Instance;
+        var bossPhase = boss != null ? boss.Phase : BossEncounterPhase.Idle;
+        var inBossRoom = BossRoomRejoin.IsInBossRoom(bossPhase, BossRoomRejoin.AnyInsideBossArea(_rejoinBossRoomCandidates));
+
+        _rejoinBossPositions.Clear();
+        var cornersFromPrefab = false;
+        if (inBossRoom)
+        {
+            BossRoomRejoin.TryCollectCorners(_rejoinBossRoomCorners, out cornersFromPrefab);
+            // 보스 쪽 파일을 고치지 않으려고 Director 의 private 참조 대신 씬에서 찾는다(재합류 순간 1회).
+            foreach (var bossUnit in FindObjectsByType<TwentyThreeBoss>(FindObjectsSortMode.None))
+            {
+                if (bossUnit.isActiveAndEnabled)
+                {
+                    _rejoinBossPositions.Add(bossUnit.transform.position);
+                }
+            }
+        }
+        else
+        {
+            _rejoinBossRoomCorners.Clear();
+        }
+
+        var pick = RejoinSpawnPicker.Pick(new RejoinSpawnContext(
+            inBossRoom,
+            baseSpawnPoint != null,
+            baseSpawnPoint != null ? baseSpawnPoint.position : Vector3.zero,
+            baseSpawnPoint != null ? baseSpawnPoint.rotation : Quaternion.identity,
+            spawn_Offset,
+            _rejoinOtherPlayerPositions,
+            _rejoinBossRoomCorners,
+            _rejoinBossPositions));
+
+        var result = PlayerSpawnService.SpawnForClient(
+            _networkManager, entry.ClientId, characterRoster, defaultPlayerPrefab, pick.Pose,
+            SceneManager.GetSceneByName(targetSceneName));
+        if (!result.Succeeded)
+        {
+            Debug.LogError(
+                $"[Rejoin] 재합류 스폰 실패 clientId={entry.ClientId} playerId={entry.PlayerId} failure={result.Failure} — 대기열에서 뺀다.");
+            return;
+        }
+
+        Debug.Log(
+            $"[Rejoin] 재합류 스폰 clientId={entry.ClientId} playerId={entry.PlayerId} prefab={result.Prefab.name} " +
+            $"slot={pick.SlotIndex} others={_rejoinOtherPlayerPositions.Count} " +
+            $"bossRoom={inBossRoom}(phase={bossPhase}) corner={(pick.IsBossRoomCorner ? (cornersFromPrefab ? "prefab" : "fallback") : "-")} bosses={_rejoinBossPositions.Count} " +
+            $"baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")} " +
+            $"position={pick.Pose.position} waited={Time.unscaledTime - entry.EnqueuedAt:F1}s");
+        BindRejoinedClient(entry, "spawn");
+    }
+
+    // [서버] 스폰 직후 — 명단에 새 clientId 를 묶고, 이 판에서 다른 clientId 를 썼으면 PlayerRejoined 를 발행한다(구독은 R4c·R5c).
+    private static void BindRejoinedClient(PendingRejoin entry, string context)
+    {
+        if (!MatchRoster.Server.BindClient(entry.PlayerId, entry.ClientId, out var rejoined, out var oldClientId))
+        {
+            Debug.LogWarning($"[Rejoin] 명단 묶기 실패(명단 비활성·밖) clientId={entry.ClientId} playerId={entry.PlayerId} context={context}");
+            return;
+        }
+
+        if (!rejoined)
+        {
+            Debug.Log($"[Rejoin] 명단 묶기 — 같은 clientId 라 재합류 발행 없음 clientId={entry.ClientId} playerId={entry.PlayerId} context={context}");
+            return;
+        }
+
+        // 구독자(특성 복원 R4c·튜토리얼 RebindPlayer)가 먼저 돈다. 생명 상태 복원(R5c)은 구독으로 붙이지 말고 이 발행이 끝난 뒤
+        // 여기서 직접 부른다 — 특성 효과(영구 상태이상)가 사망·연출 잠금에서 거부되지 않게 "생명 상태는 마지막에"(설계 메모 §3.3).
+        var subscribers = MatchRoster.RaisePlayerRejoined(entry.PlayerId, oldClientId, entry.ClientId);
+        Debug.Log(
+            $"[Rejoin] PlayerRejoined playerId={entry.PlayerId} oldClientId={oldClientId} newClientId={entry.ClientId} " +
+            $"subscribers={subscribers} bound={MatchRoster.Server.BoundCount}/{MatchRoster.Server.Count} context={context}");
+
+        RestoreRejoinedLife(entry, restore: context == "spawn");
+    }
+
+    // [서버] 생명·체력 복원(C14 R5c) — PlayerRejoined 구독자 뒤. 기록이 없으면 새 PlayerObject 의 Alive·만피 그대로.
+    // 판 재시작 스폰이 먼저 세운 오브젝트(existingPlayerObject)는 "처음 로드한 것처럼" 초기화된 판이라 기록을 버린다.
+    private static void RestoreRejoinedLife(PendingRejoin entry, bool restore)
+    {
+        if (!RejoinMemory.Server.TryTakeLife(entry.PlayerId, out var record))
+        {
+            Debug.Log($"[Rejoin] 생명 기록 없음 — Alive·만피 그대로 clientId={entry.ClientId} playerId={entry.PlayerId}");
+            return;
+        }
+
+        if (!restore)
+        {
+            Debug.Log($"[Rejoin] 생명 기록 버림(판 재시작 스폰) clientId={entry.ClientId} playerId={entry.PlayerId} life={record}");
+            return;
+        }
+
+        var networkManager = NetworkManager.Singleton;
+        var lifeCycle = networkManager != null && networkManager.ConnectedClients.TryGetValue(entry.ClientId, out var client) &&
+                        client.PlayerObject != null
+            ? client.PlayerObject.GetComponent<PlayerLifeCycleController>()
+            : null;
+        if (lifeCycle == null || !lifeCycle.RestoreForRejoinServer(record.State, record.HpRatio))
+        {
+            Debug.LogWarning(
+                $"[Rejoin] 생명 복원 실패(PlayerLifeCycleController 없음·연출 잠금) — Alive·만피 그대로 " +
+                $"clientId={entry.ClientId} playerId={entry.PlayerId} life={record}");
+            return;
+        }
+
+        Debug.Log($"[Rejoin] 생명 복원 clientId={entry.ClientId} playerId={entry.PlayerId} life={record} 보관 {RejoinMemory.Server.Count}건");
+    }
+
+    // BossEncounterDirector.IsCinematicPhase(private)와 같은 값 — 보스 쪽 파일을 고치지 않으려고 공개 Phase 로 판정한다.
+    // (R3c 판단: 사본 유지. Director 에 getter 를 열면 경석 영역 파일 수정이 생기고, 4줄 사본은 enum 이 바뀔 때만 어긋난다.)
+    private static bool IsBossCinematicPhase(BossEncounterPhase phase)
+    {
+        return phase == BossEncounterPhase.Preparing ||
+               phase == BossEncounterPhase.Descending ||
+               phase == BossEncounterPhase.Impact ||
+               phase == BossEncounterPhase.Dialogue;
+    }
+
+    private bool IsTargetSceneLoaded()
+    {
+        var scene = SceneManager.GetSceneByName(targetSceneName);
+        return scene.IsValid() && scene.isLoaded;
+    }
+
     private void HandleSceneEvent(SceneEvent sceneEvent)
     {
         RegisterNetworkCallbacks();
@@ -444,6 +1004,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
                 HandleLoadStarted(sceneEvent);
                 break;
             case SceneEventType.LoadComplete:
+                TrackNetworkLoadedScene(sceneEvent);
                 HandleLoadComplete(sceneEvent);
                 break;
             case SceneEventType.LoadEventCompleted:
@@ -452,7 +1013,22 @@ public class NetworkLoadingFlowController : MonoBehaviour
             case SceneEventType.UnloadEventCompleted:
                 HandleUnloadEventCompleted(sceneEvent);
                 break;
+            case SceneEventType.SynchronizeComplete:
+                HandleClientSynchronized(sceneEvent.ClientId);
+                break;
         }
+    }
+
+    // [서버] 서버 자신의 LoadComplete = 서버가 NGO LoadScene 으로 올린 씬이다(서버는 동기화 로드를 받지 않는다).
+    // 클라 쪽은 기록하지 않는다 — 클라는 접속 동기화 때 이미 떠 있던 로컬 로비에도 LoadComplete 를 받아 구분이 안 된다.
+    private void TrackNetworkLoadedScene(SceneEvent sceneEvent)
+    {
+        if (!IsServerActive || sceneEvent.ClientId != _networkManager.LocalClientId)
+        {
+            return;
+        }
+
+        _networkLoadedScenes.Add(sceneEvent.SceneName);
     }
 
     private void HandleUnloadEventCompleted(SceneEvent sceneEvent)
@@ -484,6 +1060,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         StartLocalProgressReporting();
         ApplyViewState();
+
+        // 할 일 57 R 예열 — 로딩 화면이 떠 있는 동안(최소 표시 시간 타이머는 위에서 막 시작) 적 예고 C3 의 첫 호출 비용을 치른다.
+        // 호스트·클라 모두 여기 온다. Play 당 1회(두 번째부터 아무것도 안 함). 상세: handoff-enemy-indicator §9.4.
+        EnemyC3Visuals.Prewarm();
     }
 
     private void HandleLoadComplete(SceneEvent sceneEvent)
@@ -521,9 +1101,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
             }
             else if (!IsServerActive)
             {
-                // Lobby/Result는 로컬 UI 씬이라 NGO가 언로드하지 않는다.
+                // 로컬 소스(지금의 Lobby/Result)는 NGO가 언로드하지 않는다.
                 // 서버는 StartTargetLoadAfterSceneEvent에서 로컬 소스 씬을 언로드하므로
                 // 클라이언트도 대칭적으로 자기 로컬 소스(Lobby) 씬을 여기서 언로드한다.
+                // NGO 소스면(서버 상태 메시지의 플래그) 서버의 NGO 언로드가 클라까지 내리므로 여기선 건너뛴다(SourceSceneUnloadRule).
                 StartCoroutine(UnloadSourceSceneIfNeeded());
             }
 
@@ -607,50 +1188,21 @@ public class NetworkLoadingFlowController : MonoBehaviour
         SpawnAllPlayers();
     }
 
+    // 위치 계산은 여기, 프리팹 결정·생성·SpawnAsPlayerObject 는 PlayerSpawnService(로비와 공용).
     private void SpawnPlayerForClient(ulong clientId, int spawnIndex, Transform baseSpawnPoint)
     {
-        if (!_networkManager.ConnectedClients.TryGetValue(clientId, out var client))
-        {
-            return;
-        }
-
-        if (client.PlayerObject != null)
-        {
-            // 조용히 넘기면 "왜 이 클라만 엉뚱한 곳에 있나"를 추적할 수 없다.
-            // 이미 PlayerObject 가 있으면 이 스폰은 건너뛰므로, 그 오브젝트가 어디에 있든 그대로 남는다.
-            Edit.LogWarning(
-                $"[Loading] clientId={clientId} 는 이미 PlayerObject 를 갖고 있어 스폰을 건너뜁니다. " +
-                $"기존 위치={client.PlayerObject.transform.position}, " +
-                $"이번에 스폰했을 위치={ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint).position}");
-            return;
-        }
-
-        var prefab = ResolvePlayerPrefabForClient(clientId);
-        if (prefab == null)
-        {
-            Edit.LogWarning($"[Loading] Player prefab is not assigned. clientId={clientId}");
-            return;
-        }
-
-        if (!prefab.TryGetComponent<NetworkObject>(out _))
-        {
-            Edit.LogWarning($"[Loading] Player prefab must have a {nameof(NetworkObject)} component. prefab={prefab.name}");
-            return;
-        }
-
         var spawnPose = ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint);
-        var player = Instantiate(prefab, spawnPose.position, spawnPose.rotation);
-        var targetScene = SceneManager.GetSceneByName(targetSceneName);
-        if (targetScene.IsValid() && targetScene.isLoaded)
+        var result = PlayerSpawnService.SpawnForClient(
+            _networkManager, clientId, characterRoster, defaultPlayerPrefab, spawnPose,
+            SceneManager.GetSceneByName(targetSceneName));
+        if (!result.Succeeded)
         {
-            SceneManager.MoveGameObjectToScene(player, targetScene);
+            return;
         }
-
-        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
 
         // 스폰 좌표는 "이 클라만 엉뚱한 위치" 류 문제의 1차 증거다. debugLogging 설정과 무관하게 남긴다.
         Edit.Log(
-            $"[Loading] Spawned player. clientId={clientId}, prefab={prefab.name}, " +
+            $"[Loading] Spawned player. clientId={clientId}, prefab={result.Prefab.name}, " +
             $"spawnIndex={spawnIndex}, baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")}, " +
             $"position={spawnPose.position}.");
     }
@@ -658,29 +1210,12 @@ public class NetworkLoadingFlowController : MonoBehaviour
     /// <summary>스폰에 쓰는 캐릭터 로스터(튜토리얼 캐릭터 판별이 PrefabIdHash 역조회에 쓴다).</summary>
     public CharacterRoster CharacterRoster => characterRoster;
 
-    private GameObject ResolvePlayerPrefabForClient(ulong clientId)
-    {
-        if (ServerCharacterSelectionStore.TryGet(clientId, out var characterId) &&
-            characterRoster != null &&
-            characterRoster.TryGetAvailableCharacter(characterId, out var entry) &&
-            entry.PlayerPrefab != null)
-        {
-            return entry.PlayerPrefab;
-        }
-
-        return defaultPlayerPrefab;
-    }
-
+    // 판 도중 재합류(SpawnRejoiner)와 같은 칸 공식이다 — RejoinSpawnPicker.SlotPose 하나로 맞춘다.
     private Pose ResolvePlayerSpawnPose(int spawnIndex, Transform baseSpawnPoint)
     {
-        if (baseSpawnPoint != null)
-        {
-            var playerSpacingOffset = Vector3.right * (spawnIndex * 2f);
-            return new Pose(baseSpawnPoint.position + spawn_Offset + playerSpacingOffset, baseSpawnPoint.rotation);
-        }
-
-        var fallbackPosition = new Vector3(spawnIndex * 2f, 5.0f, 0f);
-        return new Pose(fallbackPosition, Quaternion.identity);
+        return baseSpawnPoint != null
+            ? RejoinSpawnPicker.SlotPose(true, baseSpawnPoint.position, baseSpawnPoint.rotation, spawn_Offset, spawnIndex)
+            : RejoinSpawnPicker.SlotPose(false, Vector3.zero, Quaternion.identity, spawn_Offset, spawnIndex);
     }
 
     private Transform ResolveBasePlayerSpawnPoint()
@@ -1001,6 +1536,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
             writer.WriteValueSafe(_flowId);
             writer.WriteValueSafe((byte)_phase);
             writer.WriteValueSafe(_averageProgress);
+            writer.WriteValueSafe(_sourceIsNetworkScene);
             messagingManager.SendNamedMessage(StateMessageName, clientId, writer);
         }
 
@@ -1017,9 +1553,11 @@ public class NetworkLoadingFlowController : MonoBehaviour
         reader.ReadValueSafe(out uint flowId);
         reader.ReadValueSafe(out byte phaseValue);
         reader.ReadValueSafe(out float averageProgress);
+        reader.ReadValueSafe(out bool sourceIsNetworkScene);
 
-        if (flowId < _flowId)
+        if (LoadingStateFlowRule.IsStale(flowId, _flowId))
         {
+            Debug.LogWarning($"[SceneFlow] NetworkLoadingFlowController.HandleStateMessage 지난 흐름 상태를 버린다 messageFlowId={flowId} currentFlowId={_flowId} phase={(NetworkLoadingPhase)phaseValue}");
             return;
         }
 
@@ -1033,6 +1571,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _flowId = flowId;
         _phase = (NetworkLoadingPhase)phaseValue;
         _averageProgress = Mathf.Clamp01(averageProgress);
+        // 서버는 로딩 씬 LoadScene 전에 상태를 먼저 보내므로, 클라가 로딩 씬 LoadEventCompleted 를 받을 땐 이미 와 있다.
+        _sourceIsNetworkScene = sourceIsNetworkScene;
 
         LogDebug($"Received state. sender={senderClientId}, phase={_phase}, average={_averageProgress:P0}, flowId={_flowId}.");
 
@@ -1114,6 +1654,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _targetLoadEventCompleted = false;
         _averageProgress = 0f;
         _sourceSceneName = string.Empty;
+        _sourceIsNetworkScene = false;
         _restartingTargetScene = false;
 
         if (_phase != NetworkLoadingPhase.Completed)
@@ -1121,6 +1662,16 @@ public class NetworkLoadingFlowController : MonoBehaviour
             _phase = NetworkLoadingPhase.Idle;
         }
         LogLoadedScenes("ResetFlow.after");
+    }
+
+    // [클라] 새 세션(StartClient) — 지난 세션의 흐름 번호·단계를 버린다(LoadingStateFlowRule). 서버 번호는 세션마다 1부터일 수 있다
+    // (호스트 exe 재시작). 판 도중 끊겼다 다시 붙은 클라도 Completed 를 "처음 받는" 상태가 된다.
+    private void ResetClientFlowForNewSession()
+    {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.ResetClientFlowForNewSession flowIdBefore={_flowId} phaseBefore={_phase}");
+        _phase = NetworkLoadingPhase.Idle;
+        ResetFlow();
+        _flowId = LoadingStateFlowRule.SessionStartFlowId;
     }
 
     public void SetEditorDefaults(string loadingScene, string targetScene, float minimumSeconds, float readySeconds)
@@ -1133,15 +1684,34 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private IEnumerator UnloadSourceSceneIfNeeded()
     {
-        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadSourceSceneIfNeeded source={_sourceSceneName} loading={loadingSceneName} target={targetSceneName}");
-        if (string.IsNullOrEmpty(_sourceSceneName) ||
-            _sourceSceneName == loadingSceneName ||
-            _sourceSceneName == targetSceneName)
+        var mode = SourceSceneUnloadRule.Decide(
+            _sourceSceneName, loadingSceneName, targetSceneName, _sourceIsNetworkScene, IsServerActive);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadSourceSceneIfNeeded source={_sourceSceneName} loading={loadingSceneName} target={targetSceneName} mode={mode}");
+        switch (mode)
         {
-            yield break;
+            case SourceSceneUnloadMode.Local:
+                yield return UnloadLocalScene(_sourceSceneName);
+                break;
+            case SourceSceneUnloadMode.Network:
+                yield return UnloadNetworkSourceScene(_sourceSceneName);
+                break;
+        }
+    }
+
+    // [서버] NGO 소스 씬(로비·결과) — 동적 객체·플레이어를 먼저 디스폰(DestroyWithScene=false 라 언로드로는 안 사라지고,
+    // 남은 PlayerObject 는 타깃 씬 SpawnAllPlayersOnce 를 막는다) → 활성 씬을 로딩 씬으로 옮기고(R2) → NGO 언로드. 클라는 NGO 가 따라 내린다.
+    private IEnumerator UnloadNetworkSourceScene(string sceneName)
+    {
+        DespawnDynamicNetworkObjectsBeforeTransition($"source={sceneName}");
+
+        var scene = SceneManager.GetSceneByName(sceneName);
+        if (scene.IsValid() && scene.isLoaded)
+        {
+            MoveActiveSceneBeforeLocalUnload(scene);
         }
 
-        yield return UnloadLocalScene(_sourceSceneName);
+        // 로딩 씬 LoadEventCompleted 직후라 NGO 씬 이벤트가 아직 닫히지 않았을 수 있다 — 판 재시작 언로드와 같은 재시도.
+        yield return UnloadNetworkScene(sceneName, inProgressRetries: 30);
     }
 
     private IEnumerator UnloadLoadingScene()
@@ -1150,7 +1720,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
         yield return UnloadNetworkScene(loadingSceneName);
     }
 
-    private IEnumerator UnloadNetworkScene(string sceneName)
+    // inProgressRetries — SceneEventInProgress 로 거절되면 한 프레임씩 이만큼 다시 요청한다(0 = 재시도 없음).
+    private IEnumerator UnloadNetworkScene(string sceneName, int inProgressRetries = 0)
     {
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene begin scene={sceneName} isServer={IsServerActive}");
         if (!IsServerActive)
@@ -1168,7 +1739,15 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         _completedUnloads.Remove(sceneName);
         var status = _networkManager.SceneManager.UnloadScene(scene);
-        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene requested scene={sceneName} status={status}");
+        var retries = 0;
+        while (status == SceneEventProgressStatus.SceneEventInProgress && retries < inProgressRetries)
+        {
+            retries++;
+            yield return null;
+            status = _networkManager.SceneManager.UnloadScene(scene);
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene requested scene={sceneName} status={status} retries={retries}");
         LogDebug($"Requested scene unload. scene={sceneName}, status={status}.");
         if (status != SceneEventProgressStatus.Started)
         {

@@ -23,7 +23,10 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private InputAction skillUltimateAction;
     private InputAction dashAction;
     private bool inputEnabled = true;
-    private bool uiInputSuppressed;
+    // 입력 차단 토큰(할 일 48 C9) — 요청자마다 막고 풀며 하나라도 남으면 이동·대시·전투 입력이 모두 막힌다. 생명주기 정책과 AND.
+    private readonly PlayerInputBlockTokens blockTokens = new PlayerInputBlockTokens();
+    // SetUiInputSuppressed 가 거는 토큰(옛 bool API 호환).
+    private readonly object uiSuppressToken = new object();
     private bool combatInputEnabled = true;
     private bool controlEnabled = true;
     private bool dashPressedLatched;
@@ -73,7 +76,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private bool CanReadCombatInput =>
         EffectiveInputEnabled && combatInputEnabled;
     private bool EffectiveInputEnabled =>
-        inputEnabled && !uiInputSuppressed;
+        inputEnabled && !blockTokens.IsBlocked;
     internal bool DiagnosticEffectiveInputEnabled => EffectiveInputEnabled;
 
     public float InputBufferSeconds => inputBufferSeconds;
@@ -363,9 +366,30 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public void SetUiInputSuppressed(bool suppressed)
     {
-        uiInputSuppressed = suppressed;
-        ApplyInputState();
+        if (suppressed)
+            AcquireInputBlock(uiSuppressToken);
+        else
+            ReleaseInputBlock(uiSuppressToken);
     }
+
+    /// <summary>
+    /// <paramref name="token"/> 이름으로 이 플레이어의 입력(이동·대시·전투)을 막는다. 같은 토큰은 한 번만 센다.
+    /// 다른 요청자의 토큰과 생명주기 정책(<see cref="SetInputEnabled"/>)은 그대로다 — 모두 열려야 입력이 들어온다.
+    /// </summary>
+    public void AcquireInputBlock(object token)
+    {
+        if (blockTokens.Acquire(token))
+            ApplyInputState();
+    }
+
+    /// <summary><see cref="AcquireInputBlock"/> 로 건 토큰을 푼다. 마지막 토큰이 풀릴 때만 입력이 다시 열린다.</summary>
+    public void ReleaseInputBlock(object token)
+    {
+        if (blockTokens.Release(token))
+            ApplyInputState();
+    }
+
+    public bool IsInputBlockedByToken => blockTokens.IsBlocked;
 
     /// <summary>
     /// 이동 입력은 유지하면서 공격/인터럽트/스킬 입력만 허용하거나 차단한다.
@@ -531,7 +555,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
             $"localClientId={localClientId}, edges={edgeCount}, Direction={Direction}, " +
             $"HasMoveInput={HasMoveInput}, sawMove={sawMove}, lastEdgeDirection={lastEdgeDirection}, " +
             $"EffectiveInputEnabled={EffectiveInputEnabled}, inputEnabled={inputEnabled}, " +
-            $"uiSuppressed={uiInputSuppressed}, controlEnabled={controlEnabled}, " +
+            $"blockTokens={blockTokens.Count}, controlEnabled={controlEnabled}, " +
             $"reader.enabled={enabled}, PlayerInput.enabled={playerInput != null && playerInput.enabled}, " +
             $"MoveAction.enabled={moveAction != null && moveAction.enabled}",
             this);

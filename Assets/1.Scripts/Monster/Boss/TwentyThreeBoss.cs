@@ -135,6 +135,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     //
     // ⚠️ 루프 핸들은 버리면 풀 인스턴스가 영원히 돌아오지 않는다. 핸들은 피어마다 자기 EffectManager 에서
     //    발급받으므로 이 필드도 피어 로컬이다 — 재생 전·해제 시·파괴 시 세 곳에서 모두 회수한다.
+    GameObject _c3JumpTelegraph;
     EffectHandle _boundaryHandle = EffectHandle.None;    // 경계 원 — 어디에 떨어지는가(고정 크기)
     EffectHandle _indicatorHandle = EffectHandle.None;   // 차오르는 원 — 언제 떨어지는가(0.1 → AoE 점증)
     bool _warnedNoBoundaryEntry;
@@ -3753,32 +3754,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 이 RPC 로 실어 보내는 런타임 값이다.
         ReleaseJumpTelegraphs();   // 이전 점프의 핸들이 남아 있으면 먼저 회수한다(재진입 방어)
 
-        // TryGet 은 매니저와 **카탈로그**가 둘 다 있을 때만 true 다(둘 다 자체 경고를 남긴다).
-        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
-        EffectCatalog catalog = effects.Catalog;
+        _c3JumpTelegraph=EnemyC3Visuals.CreateJump(point,radius,growTime);
 
-        // 크기는 **판정 반경**이 정한다 — 예고가 판정에 대해 거짓말하지 않게(방향 표시기와 같은 원칙).
-        // 🔴 회전은 identity 다. 경사면 정렬을 하려면 서버가 착지점 노멀을 RPC 에 함께 실어야 한다
-        //    (GroundProbe 는 서버에서만 돌았다). 지금 아레나는 평지라 뒤로 미뤘다.
-        // 경계에는 partDuration 을 넘기지 않는다 — 자라지 않으므로 드라이버에 줄 시간축이 없다.
-        if (catalog.Drop_Charge_Boundary != null)
-        {
-            _boundaryHandle = effects.PlayLooping(
-                catalog.Drop_Charge_Boundary, point + Vector3.up * 0.01f, Quaternion.identity, radius);
-        }
-        else WarnNoBoundaryEntryOnce();
-
-        // 차오르는 원은 경계(+1cm)보다 1cm 위 — 둘의 **상대** 순서만 이 1cm 가 정한다.
-        // ⚠️ 이 2cm 로는 아레나 중앙 바닥판(보행면 +6cm)을 못 넘어 예고가 판에 묻힌다.
-        //    표준 간격까지 올려 봤다가 되돌렸다 — 시차 때문이다(GroundProbe.SurfaceOffset 주석).
-        //    데칼·스텐실 작업에서 함께 0 으로 간다.
-        if (catalog.Drop_Charge_Indicator != null)
-        {
-            _indicatorHandle = effects.PlayLooping(
-                catalog.Drop_Charge_Indicator, point + Vector3.up * 0.02f, Quaternion.identity,
-                radius, growTime);
-        }
-        else WarnNoIndicatorEntryOnce();
     }
 
     [ClientRpc]
@@ -4065,6 +4042,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// </summary>
     void ReleaseJumpTelegraphs()
     {
+        if (_c3JumpTelegraph != null) { _c3JumpTelegraph.SetActive(false); Destroy(_c3JumpTelegraph); _c3JumpTelegraph=null; }
         ReleaseHandle(ref _boundaryHandle);
         ReleaseHandle(ref _indicatorHandle);
     }

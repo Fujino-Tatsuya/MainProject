@@ -50,6 +50,7 @@
   툴바 `데이터: 테이블/인스펙터` 로 Play 출처를 고르고, **빌드는 항상 xlsx 값**. 새 수치를 노출할 땐 `[DataTableSheet]`·`[DataTableIgnore]`.
 - **튜토리얼 특성 선택**: [Docs/tech/tutorial-traits.md](Docs/tech/tutorial-traits.md) — 디렉터 API·S12 배치 순서·placeholder 특성·알려진 제약.
 - **튜토리얼 QA**: [Docs/tech/tutorial-qa.md](Docs/tech/tutorial-qa.md) — 솔로·MPPM·회귀 Play 체크리스트·알려진 한계·병합 전 확인. 단계별 문서 목록은 [tutorial-director.md](Docs/tech/tutorial-director.md) §10.1.
+- **로비 데모 부스 운영**: [Docs/tech/lobby-demo-flow.md](Docs/tech/lobby-demo-flow.md) — 흐름·PC 별 `demo-connection.json`(빌드 폴더 샘플 이름 바꾸기)·같은 빌드 필수·대기 화면 문구·재접속·MPPM `Client` 태그·알려진 한계.
 - **디버그 단축키**: [Docs/tech/debug-hotkeys.md](Docs/tech/debug-hotkeys.md) — 키 목록·겹침, 릴리스 빌드 포함 심볼 `DEV_HOTKEYS`(Standalone). 정식 릴리스 때 심볼만 지운다.
 - **행동 입력 거부 피드백**: [Docs/tech/skill-reject-feedback.md](Docs/tech/skill-reject-feedback.md) — 거부 사유별 선입력 버퍼 처리 표(보관/버림), 오너 전용 이벤트 `CooldownRejected`·`ActionBlockedByEffect`(입력 1회=1회)·사운드 키 지정법(비우면 무음).
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스

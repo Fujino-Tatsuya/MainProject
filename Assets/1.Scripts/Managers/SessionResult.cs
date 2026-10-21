@@ -21,6 +21,8 @@ public struct PlayerSessionStats
     public int Kills;    // 막타 수
     public int Counters; // 간파 성공 수
     public int Deaths;   // Alive→DeadPresentation 전이 수
+    public int Healing;     // 플레이어 대상 실제 회복량 합(오버힐·기본 체력 재생 제외) — 회복 주체에게
+    public int DamageTaken; // 자기 HP 실제 감소량 합(방어 경감분·실드로 막힌 양·막타 초과분 제외, 공격자 무관)
 }
 
 /// <summary>

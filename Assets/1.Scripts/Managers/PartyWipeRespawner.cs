@@ -120,7 +120,11 @@ public static class PartyWipeRespawner
             respawned.Add(po.OwnerClientId);
         }
 
-        Debug.Log($"[PartyWipe] 전멸 리스폰 — {where} {respawned.Count}명, 공용 목숨 {lives}, 보스 처음부터.");
+        // 판 도중 재합류(할 일 48 C14 R5c) — 지금 자리에 없는 사람의 보관 생명 기록도 Alive·만피로(그 자리에 있었으면 살아났을 것).
+        int absentLives = RejoinMemory.Server.OverwriteAbsentLivesAfterWipe();
+
+        Debug.Log($"[PartyWipe] 전멸 리스폰 — {where} {respawned.Count}명, 공용 목숨 {lives}, 보스 처음부터" +
+                  (absentLives > 0 ? $", 부재자 생명 기록 {absentLives}건 Alive·만피로." : "."));
         PartyWipeRespawned?.Invoke(respawned);
         return true;
     }

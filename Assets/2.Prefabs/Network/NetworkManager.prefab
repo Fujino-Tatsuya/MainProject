@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 7043847080119373261}
   - component: {fileID: 1111111111111111111}
   - component: {fileID: 8945878156428303657}
+  - component: {fileID: 2312403450460863167}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -59,7 +60,7 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 28ca89dc34eff6547b550c9200caee32, type: 2}
     TickRate: 30
     ClientConnectionBufferTimeout: 10
-    ConnectionApproval: 0
+    ConnectionApproval: 1
     ConnectionData: 
     EnableTimeResync: 0
     TimeResyncInterval: 30
@@ -175,3 +176,18 @@ MonoBehaviour:
     holdDuration: 0.35
     exitDuration: 0.25
     failExitDuration: 0.1
+--- !u!114 &2312403450460863167
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93f52c3af3c6d0246a942a5b7cf478f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DemoSessionDirector
+  runDemoFlow: 1
+  lobbySceneName: 3.LobbyScene
+  waitSceneName: 6.DemoConnectScene

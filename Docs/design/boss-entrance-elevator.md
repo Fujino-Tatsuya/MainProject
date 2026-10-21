@@ -51,6 +51,7 @@ t = 0 은 카운트다운 끝(연출 시작). 괄호 = 이 수치로 짠 3인 �
 | `_timing.walkInterval` | 앞사람 출발 → 다음 사람 출발 | 초 | 0.6 |
 | `_timing.walkSpeed` | 걷는 속도. 보행 시간 = 가장 먼 경로(현재 5.37m) ÷ 속도 = 1.79초(전원 같은 시간) | m/s | 3 |
 | `_insideSpread`(리그, `보행 경로` 묶음) | 칸 안 도착 지점 간격 배율 — 문 앞 지점 배치를 칸 중앙 기준으로 줄임(0 = 전원 정중앙). 보행 거리·시간도 바뀐다 | 배 | 0.6 |
+| `_walkWaypoints`(리그, `보행 경로` 묶음) | 슬롯(P1~P3, 문 앞 지점과 같은 번호)별 경유 지점 Transform 목록 — 문 앞 → 경유 지점들 → 칸 안 지점을 차례로 걷는다. 비면 직선(할 일 64). 보행 시간 기준 거리 = 가장 긴 경로 총길이(수평) | Transform[] | 비어 있음 |
 | **문 닫힘** | | | |
 | `_timing.closeDelayAfterWalk` | 마지막 사람 도착(+7.85) → 문 닫힘 시작(+8.35) | 초 | 0.5 |
 | `_timing.doorCloseDuration` | 문 닫힘 시작 → 다 닫힘 = 숨김·상승 시작(+10.03). 0 이하 = Close 클립 길이(1.68) | 초 | 0 |
@@ -81,10 +82,13 @@ t = 0 은 카운트다운 끝(연출 시작). 괄호 = 이 수치로 짠 3인 �
 
 - **하강 = 암전 기준**(할 일 46 후속 5). 예전엔 페이드 인 끝 + 0.5 에 출발해 밝아진 화면에 멈춘 칸이 보였다. 이제 문 앞 이동 순간(`TeleportFrontAt`) + `descendDelay` —
   밝아질 때 이미 내려오는 중이다. 문 열림·보행·닫힘·상승은 하강 끝 기준이라 같이 앞당겨진다. 암전 유지·페이드 인은 하강과 겹치므로 단계 enum 에서 뺐다(`FadeAlphaAt` 별도 트랙).
-- **보행 = 오너 권한 연출 이동.** 서버가 페이드 인 끝(`FrontFadeInEndAt`, 하강 중 — 출발은 문 열림 뒤라 지시가 먼저 도착)에 오너에게 `ElevatorWalkOwnerClientRpc(목표, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
-  오너가 `FixedUpdate` 에서 평소 걷기와 같은 Motor 채널 `PlayerMotor.AddGroundedDisplacement` 로 지금 자리 → 칸 안 지점까지 **걸어 들어간다**(할 일 46 후속 9).
+- **보행 경로 편집**(할 일 64): `ZoneS_typeBossEnter.prefab` 을 열고 `[Elevator]` 아래에 빈 GameObject 를 만들어 경유 지점으로 둔 뒤, 리그 `Walk Waypoints` 의 슬롯 칸(Element 0 = P1)에 문 앞에서 가까운 순서로 끌어 넣는다.
+  씬 뷰 기즈모 = 슬롯 색(P1 빨강·P2 파랑·P3 초록) 선이 문 앞 → 경유 지점(작은 공) → 칸 안 지점(네모). 지점을 선택해 이동 핸들로 옮기면 선이 따라간다. 높이는 무시(수평만) — 지면을 탄다.
+- **보행 = 오너 권한 연출 이동.** 서버가 페이드 인 끝(`FrontFadeInEndAt`, 하강 중 — 출발은 문 열림 뒤라 지시가 먼저 도착)에 오너에게 `ElevatorWalkOwnerClientRpc(경로 점들, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
+  오너가 `FixedUpdate` 에서 평소 걷기와 같은 Motor 채널 `PlayerMotor.AddGroundedDisplacement` 로 지금 자리 → 경유 지점들 → 칸 안 지점까지 **걸어 들어간다**(할 일 46 후속 9, 경유 지점 할 일 64).
+  경로 점은 서버가 리그(`BossElevatorRig.GetWalkPath`)에서 읽어 RPC 로 보낸다(점 몇 개) — 오너가 리그를 찾을 필요 없고 서버 시간표와 같은 경로가 보장된다.
   스윕 충돌·`StepOffset`·경사 투영·중력이 그대로 적용돼 칸 프리팹의 경사판(`Slope`)을 타고 칸 바닥(`Floor`)으로 올라간다 — 목표 높이는 고정하지 않고 지면에 맡긴다.
-  속도 = 매 틱 **남은 수평 거리 ÷ 남은 시간**(`BossElevatorTimeline.WalkStep`) — 시간표 도착 시각(`WalkEndAt`)을 지키고, 잠깐 막혀 뒤처지면 다음 틱에 따라잡는다.
+  속도 = 매 틱 **남은 경로 길이(수평) ÷ 남은 시간**(`BossElevatorTimeline.WalkStepAlongPath` — 경유 지점을 지나면 다음 구간으로, 꺾일 때 `RotateImmediately`) — 시간표 도착 시각(`WalkEndAt`)을 지키고, 잠깐 막혀 뒤처지면 다음 틱에 따라잡는다.
   시네마틱 입력 잠금은 조작 입력(`CanMove`)만 막고 이 변위는 막지 않는다. 걷는 동안·붙잡는 동안 `PassThroughUnitsOverride` 를 켜 참가자끼리 막힘·밀어내기를 끈다
   (칸 안 지점 간격 0.72m < 캡슐 지름 0.76m — 줄 서 걷거나 도착할 때 튀지 않게. 벽·칸 콜라이더엔 그대로 막힌다). 보스방 도착 RPC·연출 끝(`StopOwnerWalk`)에 끈다.
   방향은 `PlayerMovement.RotateImmediately`, Walk 애니는 `Player.SetAnimatorMoving`(IsMoving) — 위치는 오너 NetworkTransform, 애니는 NetworkAnimator(오너)로 복제된다

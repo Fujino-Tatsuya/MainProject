@@ -98,6 +98,9 @@ public static class UiStrings
     public static readonly UiString ResultSurvival = new UiString("UI.Result.Survival", "생존 시간  {time}", "5.ResultScene › Text_Survival({time} = mm:ss)");
     public static readonly UiString ResultPlayerSlot = new UiString("UI.Result.PlayerSlot", "P{n}", "ResultPlayerRow.prefab › Text_Slot({n} = 1부터 세는 플레이어 번호)");
 
+    // 로비 — LobbySceneManager. 직전 판 결과 패널 다시 보기(임시 버튼, 걷는 로비 결과 오브젝트는 C9 이후)
+    public static readonly UiString LobbyShowLastResult = new UiString("UI.Lobby.ShowLastResult", "지난 판 결과", "3.LobbyScene › Button_ShowLastResult(코드)");
+
     // 허수아비 체력 — TrainingDummyHealthBar
     public static readonly UiString TrainingDummyHp = new UiString("UI.TrainingDummy.Hp", "{hp} / {max}", "TrainingDummy.prefab — 머리 위 체력({hp} = 현재, {max} = 최대)");
 
@@ -179,6 +182,7 @@ public static class UiStrings
             LoadingPreparing, LoadingLoading, LoadingWaitingForPlayers, LoadingActivating, LoadingStandBy,
             SkillTooltipShiftHint, SkillTooltipError, SkillTooltipPassiveBadge,
             ResultCleared, ResultFailed, ResultAborted, ResultSurvival, ResultPlayerSlot,
+            LobbyShowLastResult,
             TrainingDummyHp,
         };
         all.AddRange(LoadingTips);
@@ -187,6 +191,9 @@ public static class UiStrings
         all.Add(StatusEffectGrabbed);
         all.AddRange(new[] { PauseTitle, PauseContinue, PauseSettings, PauseQuit, PausePressAnyButton, ExitTitle, ExitMessage, ExitDesktop, ExitLobby });
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
+        all.AddRange(DemoConnectUiStrings.All); // 부스 데모 연결 오버레이(UI.DemoConnect.*)
+        all.AddRange(LobbyUiStrings.All);       // 걷는 로비 상호작용·준비·카운트다운(UI.Lobby.*, 할 일 48 C10)
+        all.AddRange(CharacterSelectUiStrings.All); // 로비 캐릭터 선택 패널(UI.CharacterSelect.*)
         return all;
     }
 

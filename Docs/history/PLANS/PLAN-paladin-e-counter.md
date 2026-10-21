@@ -304,7 +304,7 @@ C2~C9 의 세부(테스트 이름·의사코드)는 조사 원본 PLAN 의 같�
   새 열 `guardAngle`(180) · `counterAngle`(120) · `counterRange`(3). `guardDuration`·`counterHitDelay`·`counterDuration` 은 P1-③ 에서 삭제돼 열 없음(타이밍 = 클립 이벤트).
   구 `shieldAmount`·`shieldDuration` 열은 이때 정리한다. GameData.xlsx(SVN) 은 이 브랜치에서 건드리지 않았다.
 - **E·우클릭 타이밍 튜닝 = 클립에서 이벤트를 옮긴다**(§2.1·§10). E 이벤트를 늦게 옮기면 `maxActiveDuration` 도 같이 늘린다(§5 🔴).
-  두 E 클립은 `Garen_Parry` 임시 복제다 — 정식 애니가 오면 클립만 교체하고 이벤트 4종(Custom0·Custom1 / Hit·End)을 다시 단다.
+  ~~두 E 클립은 `Garen_Parry` 임시 복제다~~ → **2026-10-20 정식 클립으로 교체(할 일 66)** — 아래 §12.
 - **후속 1줄 커밋 필요(Work3 병합 뒤)** — Work3(`feature/AnimEventCore`) 의 `PlayerInterruptSkillBase.TimingFromAnimationEvents` 가 들어오면
   `FirstMeleeInterruptSkill` 에서 켠다. 그 전에는 `Garen_Parry` 이벤트를 0.25s 보다 늦게 옮겨도 타이머가 먼저 이긴다.
   같은 때 E(`FirstMeleeSubSkill`)에도 필요한 이벤트 목록(`RequiredAnimationEvents`: Custom0·Custom1·Hit·End) 선언을 붙인다.
@@ -316,3 +316,24 @@ C2~C9 의 세부(테스트 이름·의사코드)는 조사 원본 PLAN 의 같�
 - **HolyShield 정리 미정** — §7 범위 밖 목록 그대로(ShieldType.HolyShield·HolyShieldEffect·System·보호막 색·HealthShieldTests·SO 구 필드).
 - **일반 몹 투사체 방어 불가** — C5(MonsterProjectile 주체 전달, 경석 영역) 제외. PeekABot·TeslaBot 투사체는 정면이라도 '주체 없음 → Pass' 로 피해가 들어간다.
 - Play·MPPM 확인(§6)은 사람이 해야 한다 — 워커는 Play 모드에 들어가지 않았다.
+
+## 12. 정식 클립 교체 (2026-10-20, 할 일 66 — `feature/PaladinEAnimation`)
+
+아트 SVN r481 `4_Resources/Art/Char/paladin/E_Skill/`(작업본 `Assets/50.Art/Char/paladin/E_Skill/`, FBX .meta guid 는 SVN 것 그대로)의
+FBX 4개를 `Assets/4.Animations/Player/Garen/` 에 `.anim` 으로 복제(이벤트는 git 쪽 `.anim` 에 둔다 — 기존 Garen 클립과 같은 방식).
+임시 클립 `Garen_Guard_Placeholder`·`Garen_GuardCounter_Placeholder` 는 삭제.
+
+| 상태(`GarenAnimatorController` Base Layer) | 클립(원본 FBX) | 길이 | 이벤트 | 나가는 전이 |
+|---|---|---|---|---|
+| `SubSkillGuard`(데이터 `animatorStateName`, 시작) | `Garen_E_GuardStart`(Block_Start_1) | 1.0s, **상태 speed 2 → 0.5s**(사용자 Play 조정) | `Custom0` 0.0s 창 열림 | → `SubSkillGuardIdle` exitTime 1 · 0.1s |
+| `SubSkillGuardIdle`(새) | `Garen_E_GuardIdle`(Block_Idle_1, 루프) | 3.5s | 없음 | → `SubSkillGuardEnd` exitTime 0.143(=0.5s) · 0.1s |
+| `SubSkillGuardEnd`(새) | `Garen_E_GuardEnd`(Block_End_1) | 1.0s, **상태 speed 2 → 0.5s** | `Custom1` 0.933s(28f, 실시간 0.467s) 창 닫힘·E 종료 | → `Idle` exitTime 1 · 0.05s(보조) |
+| `SubSkillCounter`(코드 상수) | `Garen_E_GuardCounter`(Block_Parry_3) | 1.167s | `Hit` **0.433s(13f, 사용자 Play 조정**, 처음 0.567s) · `End` 1.1s(33f) | → `Idle` exitTime 1 · 0.05s |
+
+- 방어 성공은 어느 방어 상태(시작·유지·종료)에서든 `SubSkillCounter` 로 CrossFade 한다(기존 `ServerPlayGuardCounterPose`, 상태 해시 그대로).
+- 스킬 종료는 컨트롤러가 `Idle` 로 CrossFade 하므로 **`Custom1` 이 곧 종료 시점**이다 — 종료 클립이 다 보이도록 끝 근처(28f)에 둔다.
+  그래서 방어 창은 종료 클립(방패 내리는 동작) 동안에도 열려 있다. 창을 먼저 닫고 동작만 이어 가려면 모델에 단계를 하나 더 둬야 한다(이번 범위 밖).
+- 요구 이벤트 대조(`CollectAnimationEventRequirements`): `SubSkillGuard` Custom0 · `SubSkillGuardEnd` Custom1 · `SubSkillCounter` Hit·End (4개 그대로).
+- 안전망 `maxActiveDuration`(xlsx Paladin E 1.5 + padding 0.1): 사용자 속도 조정 뒤 방어 실패 경로 ≈ 0.5 + 0.5 + 0.467 = 1.47s 로 들어온다.
+  반격 경로는 늦게 막으면 최대 ≈ 1.47 + 1.1 = 2.57s — 안전망이 반격 End 전에 끊을 수 있다(반격 판정 Hit 0.433s 가 먼저라 피해는 대부분 나가고, 못 나갔으면 OnEnd 보장 반격). 반격 동작을 끝까지 보이려면 xlsx 를 2.7 이상으로.
+- 튜닝 = 클립 이벤트 이동 + 유지 길이는 `SubSkillGuardIdle → SubSkillGuardEnd` 전이 exitTime(0.143 = 0.5s; 1.0 = 3.5s 한 바퀴).

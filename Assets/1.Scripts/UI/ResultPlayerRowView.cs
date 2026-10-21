@@ -19,6 +19,12 @@ public sealed class ResultPlayerRowView : MonoBehaviour
     [SerializeField] private TMP_Text deathsText;    // Text_Deaths
     [SerializeField] private GameObject localMarker; // Marker_Local — 로컬 플레이어("나") 강조
 
+    [Header("Optional (로비 결과 패널 — 없으면 무시)")]
+    [SerializeField] private TMP_Text healingText;     // Text_Healing — 회복량
+    [SerializeField] private TMP_Text damageTakenText; // Text_DamageTaken — 입은 피해
+    [SerializeField] private TMP_Text rankText;        // Text_Rank — 순위 숫자(왕관 행은 숨김)
+    [SerializeField] private Image crownImage;         // Image_Crown — 1위 왕관 배지
+
     [Header("Labels")]
     [SerializeField] private string slotFormat = "P{0}";
     [SerializeField] private string unknownCharacterLabel = "-";
@@ -35,6 +41,9 @@ public sealed class ResultPlayerRowView : MonoBehaviour
         SetText(killsText, stats.Kills);
         SetText(countersText, stats.Counters);
         SetText(deathsText, stats.Deaths);
+        SetText(healingText, stats.Healing);
+        SetText(damageTakenText, stats.DamageTaken);
+        SetRank(0, false); // 순위를 매기는 쪽(로비 패널)만 SetRank 로 다시 채운다
 
         if (portraitImage != null)
         {
@@ -48,7 +57,25 @@ public sealed class ResultPlayerRowView : MonoBehaviour
     }
 
     /// <summary>
-    /// 슬롯 라벨 — <c>UI.Result.PlayerSlot</c>({n}). 시트에 행이 없으면 직렬화 <c>slotFormat</c>(<c>P{0}</c>, string.Format 형식)
+    /// 순위 셀. <paramref name="crowned"/> 면 왕관만, 아니면 순위 숫자만 보인다. rank 0 이하 = 순위 없음(둘 다 숨김).
+    /// 순위 셀이 없는 행(5.ResultScene)은 아무것도 안 한다.
+    /// </summary>
+    public void SetRank(int rank, bool crowned)
+    {
+        ResolveReferences();
+
+        if (crownImage != null)
+            crownImage.enabled = crowned;
+
+        if (rankText != null)
+        {
+            rankText.text = rank > 0 ? rank.ToString(CultureInfo.InvariantCulture) : string.Empty;
+            rankText.enabled = !crowned && rank > 0;
+        }
+    }
+
+    /// <summary>
+    /// 슬롯 라벨 —<c>UI.Result.PlayerSlot</c>({n}). 시트에 행이 없으면 직렬화 <c>slotFormat</c>(<c>P{0}</c>, string.Format 형식)
     /// — 빈 값이면 키의 ko. 자리표시자 이름이 다르다(시트 <c>{n}</c>, 프리팹 <c>{0}</c>).
     /// </summary>
     public static string SlotText(int slotNumber, string serializedFormat)
@@ -74,6 +101,10 @@ public sealed class ResultPlayerRowView : MonoBehaviour
         if (killsText == null) killsText = FindChild<TMP_Text>("Text_Kills");
         if (countersText == null) countersText = FindChild<TMP_Text>("Text_Counters");
         if (deathsText == null) deathsText = FindChild<TMP_Text>("Text_Deaths");
+        if (healingText == null) healingText = FindChild<TMP_Text>("Text_Healing");
+        if (damageTakenText == null) damageTakenText = FindChild<TMP_Text>("Text_DamageTaken");
+        if (rankText == null) rankText = FindChild<TMP_Text>("Text_Rank");
+        if (crownImage == null) crownImage = FindChild<Image>("Image_Crown");
         if (localMarker == null)
         {
             Transform marker = FindChild<Transform>("Marker_Local");

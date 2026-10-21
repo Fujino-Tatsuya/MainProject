@@ -13,12 +13,14 @@
 **구조.** `Player.prefab` = 캐릭터 무관한 **역할 base**. 캐릭터마다 그 **Prefab Variant** 를 두고,
 Variant 가 `Armature`(캐릭터 몸체) · 스킬 · VFX · 무기 · 스탯 · 평타 데이터를 얹는다.
 **캐릭터는 스폰 전에 고른다** — 스폰할 Variant 를 고르는 방식이다(런타임 Armature 교체는 미채택, §1.5).
+**로비 캐릭터 교체도 같은 원칙이다** — 서버가 지금 PlayerObject 를 디스폰하고 같은 위치·회전에 새 Variant 를 `SpawnAsPlayerObject` 한다
+(런타임 Armature 교체 아님, 할 일 48 C12 — `LobbyPlayerSpawner.TrySwapCharacter` → `PlayerSpawnService.SpawnCharacter`).
 
 ```
 Player.prefab (base)            ← 네트워크·입력·이동·생명주기·상태이상·HUD·HurtBox·실루엣 태그·시각 보간
 │                                  🔴 기본 공격 없음(2026-09-30) — 캐릭터가 IPlayerBasicAttack 구현을 얹는다
 ├─ Player_Paladin.prefab (Variant)
-│  ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator·히트박스·VFX 소켓
+│  ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator(4.Animations/Player/Garen/GarenAnimatorController — Idle/Walk = Garen_Idle·Garen_Walk.anim)·히트박스·VFX 소켓
 │  ├─ PlayerWaeponSlot/SM_Wep_Shield_01 · SM_Wep_Sword_03
 │  ├─ VFX  (EffectSocketPlayer 들)
 │  └─ 루트 추가: PlayerDefaultAttack·DefaultAttackController(콤보) · FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
@@ -176,7 +178,7 @@ Variant 가 아니라 **통짜 복제본**을 만들면 §4 의 어긋남이 캐
 | 루트 오브젝트 이름 | `Player` | `Paladin` | `TempPlayer_Armature` |
 | 루트 레이어 / 태그 | 6 (Player) / `Player` | 6 (Player) / `Player` | — |
 | 모델 | `PlayerBaseModel.fbx` (Armature 경유) | `paladin 1.fbx` (평탄화) | `PlayerBaseModel.fbx` |
-| Animator Controller | `4.Animations/Player/PlayerAnimatorController.controller` | **동일** | 동일 |
+| Animator Controller | `4.Animations/Player/PlayerAnimatorController.controller`(당시 경로. 지금 팔라딘은 `4.Animations/Player/Garen/GarenAnimatorController.controller` — guid 유지 이동, §0) | **동일** | 동일 |
 | 최초 커밋 | `d40f6bcb` (2026-06-09) | `36d7f9e6` (2026-07-06, "Add Garen player prefab setup") | — |
 | 전환 커밋 | — | `5e773aea` (2026-07-30, "Paladin migration complete") | — |
 | 네트워크 프리팹 목록 등록 | ✅ | ✅ | — |
@@ -368,7 +370,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 
 현재 **루트에 붙은 스킬 컴포넌트 5종이 전부 가붕이(근거리) 전용**이다 —
 `FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill`("E 수호자의 의지" — 전방 방어 → 자동 반격, [PLAN-paladin-e-counter.md](../history/PLANS/PLAN-paladin-e-counter.md).
-타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(방어 클립 `Custom0` 창 열림 · `Custom1` 닫힘)와
+타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(방어 시작 클립 `Custom0` 창 열림) → `SubSkillGuardIdle`(유지 루프) → `SubSkillGuardEnd`(방어 종료 클립 `Custom1` 닫힘·종료)와
 `SubSkillCounter`(반격 클립 `Hit` 판정 · `End` 종료, 방어 성공 시 서버가 전 피어 CrossFade). 초 값은 안전망 `maxActiveDuration` 만) · `FirstMeleeUltimateSkill` ·
 `FirstMeleeInterruptSkill`("단죄의 방패") · `FirstMeleePassive`.
 징크스(원거리)는 좌클릭 스택·우클릭 스택 발동 등 **다른 스킬 세트**가 필요하다([players.md](../design/players.md)).
@@ -415,8 +417,8 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 ✅ **2026-10-02 구현** ([PLAN-character-select.md](../../PLAN-character-select.md)). 아래는 결과 요약.
 
 - 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
-- 로비: 클라 → 서버 `Lobby.CharacterRequest`, 서버가 검증(사용 가능·Ready 아님) 후 `Lobby.State` 에 클라별 id 를 실어 방송. 기본 0번, 중복 선택 허용.
-- Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움, 퇴장 시 제거).
+- 로비(2026-10-19 C8): `LobbySession.RequestCharacterServerRpc` → 서버가 `LobbyReadyRules`(Ready·카운트다운 중 거부, 교체 쿨다운) + 로스터로 검증 후 `NetworkList<LobbyPlayerEntry>` 로 복제. 기본 0번, 중복 선택 허용. (옛 `Lobby.CharacterRequest`/`Lobby.State` named message 는 퇴역.)
+- Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움). 퇴장 때는 clientId 쪽만 지우고 playerId 의 마지막 선택은 남겨 재접속 때 되살린다. 로비 재진입 때 `LobbySession` 이 이 저장소로 자리를 시드한다.
 - `NetworkLoadingFlowController.ResolvePlayerPrefabForClient(clientId)` = 캐릭터 id → Variant. **이 함수 하나가 (A) 방식의 유일한 분기점이다.**
   미선택·잘못된 id·비활성 칸 → `defaultPlayerPrefab`(Paladin). Dev Boot 는 로비를 안 거치므로 이 폴백으로 지금처럼 동작.
 - 범위 밖으로 남긴 것: 전투 HUD 초상화(`CombatHUD.prefab` 에 Paladin 고정 — Gunner 도 Paladin 얼굴).

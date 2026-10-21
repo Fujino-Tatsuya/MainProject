@@ -372,14 +372,7 @@ public sealed class BossElectricFloor : MonoBehaviour
     // 마스크 기준점 = 칸 중심, 축 = 격자 회전, 늘이기 = 칸 하나에 한 장. 채움 판이 커져도 기준은 칸 중심이라 패턴이 제자리다.
     void PaintWarnTile(int r, int c, int i)
     {
-        TelegraphPlateStyle s = TelegraphStyleSO.For(this).floorTile;
-        Texture2D square = BossPatternVisuals.SquareTextureFor(s.rimRatio);
-        Vector3 center = _viewGrid.TileCenter(r, c);
-        Vector3 right = _viewGrid.Rotation * Vector3.right;
-        Vector3 fwd = _viewGrid.Rotation * Vector3.forward;
-        Vector2 extent = _viewGrid.TileExtent;
-        BossPatternVisuals.PaintStyled(_outer[i], s.outline, square, center, right, fwd, extent);
-        BossPatternVisuals.PaintStyled(_fill[i], s.fill, square, center, right, fwd, extent);
+        EnemyC3Visuals.PaintPlate(_outer[i],_fill[i],"15",true);
     }
 
     public void ClientFire(ulong mask, float vfxTime)
@@ -402,7 +395,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         ForEachTile(mask, (r, c, i) =>
         {
             PlaceTile(_outer[i], r, c, i, FullTile);
-            BossPatternVisuals.Paint(_outer[i], _d.electricColor, BossPatternVisuals.SquareTexture);
+            EnemyC3Visuals.PaintActive(_outer[i]);
             _outer[i].gameObject.SetActive(true);
 
             if (_d.electricVfxPrefab != null)
@@ -443,7 +436,7 @@ public sealed class BossElectricFloor : MonoBehaviour
             {
                 if (!BossTileGrid.Has(_viewMask, r, c)) continue;
                 int i = BossTileGrid.Bit(r, c);
-                if (_viewFiring) BossPatternVisuals.Paint(_outer[i], col, null);
+                if (_viewFiring) EnemyC3Visuals.PaintActive(_outer[i],_d.electricColor.a>0?col.a/_d.electricColor.a:1);
                 else
                 {
                     if (repaint) PaintWarnTile(r, c, i);
@@ -492,6 +485,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         Transform t = m.transform;
         t.SetPositionAndRotation(p, _viewGrid.Rotation);
         Vector2 e = _viewGrid.TileExtent;
+        if(m==_outer[i])scale01*=EnemyC3Visuals.OuterScale(_viewFiring?"16":"15",true);
         t.localScale = new Vector3(e.x * scale01, 1f, e.y * scale01);
     }
 

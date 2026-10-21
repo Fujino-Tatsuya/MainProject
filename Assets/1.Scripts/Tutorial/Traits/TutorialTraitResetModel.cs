@@ -126,6 +126,54 @@ public sealed class TutorialTraitResetModel
     /// <summary>접속 종료 — 대기·재선택 상태를 지운다(패드 잠금이 남지 않게). 지운 게 있으면 true.</summary>
     public bool Remove(ulong clientId) => players.Remove(clientId);
 
+    // ── 재합류 보관·복원(할 일 48 C14 R4c · Q-D b) ─────────────────────────
+
+    /// <summary>
+    /// 퇴장 직전 그 플레이어의 팝업·재선택 상태를 읽는다(<see cref="Remove"/> 전에 부른다). 상태가 없으면 false(값은 0·false).
+    /// <paramref name="promptGeneration"/> = 팝업 대기 세대(0 = 없음), <paramref name="roundsLeft"/> = 재선택 중 남은 라운드(지금 열린 라운드 제외).
+    /// </summary>
+    public bool TryCapture(ulong clientId, out int promptGeneration, out bool reselecting, out int roundsLeft)
+    {
+        if (!players.TryGetValue(clientId, out PlayerState state))
+        {
+            promptGeneration = 0;
+            reselecting = false;
+            roundsLeft = 0;
+            return false;
+        }
+
+        promptGeneration = state.PromptGeneration;
+        reselecting = state.Reselecting;
+        roundsLeft = state.Reselecting ? state.RoundsLeft : 0;
+        return true;
+    }
+
+    /// <summary>재합류 — 그 세대 팝업 대기를 되살린다. 세대가 지금 세대가 아니거나(지난 팝업) 이미 상태가 있으면 false.</summary>
+    public bool RestorePrompt(ulong clientId, int generation)
+    {
+        if (generation <= 0 || generation != Generation || players.ContainsKey(clientId))
+            return false;
+
+        players.Add(clientId, new PlayerState { PromptGeneration = generation });
+        return true;
+    }
+
+    /// <summary>
+    /// 재합류 — 재선택 중 상태를 되살린다(남은 라운드 = 지금 열린 라운드 제외 수). 이미 상태가 있으면 false.
+    /// 열려 있던 라운드의 제시는 호출자가 선택 모델에 되살린다.
+    /// </summary>
+    public bool RestoreReselect(ulong clientId, int roundsLeft)
+    {
+        if (players.ContainsKey(clientId))
+            return false;
+
+        players.Add(clientId, new PlayerState { Reselecting = true, RoundsLeft = Math.Max(0, roundsLeft) });
+        return true;
+    }
+
+    /// <summary>그 플레이어에게 팝업·재선택 상태가 있는가.</summary>
+    public bool Has(ulong clientId) => players.ContainsKey(clientId);
+
     /// <summary>팝업 대기 중인 플레이어 id(복제 행 재작성용).</summary>
     public void GetPrompted(List<ulong> result)
     {
@@ -177,6 +225,18 @@ public sealed class TutorialTraitEffectLedger<THandle>
         }
 
         return count;
+    }
+
+    /// <summary>그 플레이어에게 그 특성의 기록이 있는가(재합류 복원이 효과를 두 번 걸지 않게).</summary>
+    public bool Has(ulong clientId, int traitIndex)
+    {
+        for (int i = 0; i < records.Count; i++)
+        {
+            if (records[i].ClientId == clientId && records[i].TraitIndex == traitIndex)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>그 플레이어의 기록을 장부에서 빼 <paramref name="taken"/> 에 채운다(적용 순서). 뺀 수.</summary>

@@ -6,10 +6,12 @@ using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class NetworkSessionLauncher : MonoBehaviour
 {
     private const string DiagTag = "NetworkSessionLauncher";
+    private const string DefaultLobbySceneName = "3.LobbyScene";
 
     /// <summary>
     /// NGO 의 내부 진단 로그를 Developer 수준까지 연다.
@@ -24,11 +26,28 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     NetworkManager _networkManager;
     NetworkLoadingFlowController _loadingFlowController;
+    // Unity Relay 는 런타임 경로에서 뺐다(PLAN-48 Q6 — 유선 IPv4 만). RelayConnectionProvider.cs·패키지는 남겨 둔다.
     DirectIPv4ConnectionProvider _directIPv4Provider;
-    RelayConnectionProvider _relayProvider;
     UnityTransport _transport;
 
     public SessionConnectionMode Mode { get; set; } = SessionConnectionMode.DirectIPv4;
+
+    string _localPlayerId;
+
+    /// <summary>
+    /// StartHost/StartClient 때 ConnectionData 로 보낼 playerId(PLAN-48 Q4). 기본은 PC 이름(MPPM 가상 플레이어는 인스턴스 접미사),
+    /// 데모 흐름이면 DemoSessionDirector 가 설정 파일 값으로 바꾼다. 지연 초기화라 Awake 순서와 무관하다.
+    /// </summary>
+    public string LocalPlayerId
+    {
+        get => _localPlayerId ??= DemoConnectionConfig.ResolveLocalDefaultPlayerId();
+        set => _localPlayerId = value;
+    }
+
+    /// <summary>
+    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. <see cref="LobbySession"/> 이 스폰 때 넣고 디스폰 때 뺀다. 없으면 false.
+    /// </summary>
+    public static Func<bool> LobbyCountdownActiveProvider { get; set; }
 
     public event Action<SessionStartResult> SessionStartCompleted;
 
@@ -40,6 +59,8 @@ public class NetworkSessionLauncher : MonoBehaviour
             _networkManager.OnServerStopped += HandleSessionStopped;
             _networkManager.OnClientStopped += HandleSessionStopped;
             _networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
+            // 프리팹이 ConnectionApproval 을 켰으므로 콜백이 없으면 모든 접속이 승인 대기로 타임아웃된다 — 경로와 무관하게 여기서 건다.
+            _networkManager.ConnectionApprovalCallback = HandleConnectionApproval;
         }
 
         _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
@@ -52,14 +73,13 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (_transport != null)
         {
             _directIPv4Provider = new DirectIPv4ConnectionProvider(_transport);
-            _relayProvider = new RelayConnectionProvider(_transport);
         }
 
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.Awake hasNetworkManager={_networkManager != null} hasLoadingFlow={_loadingFlowController != null}");
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.Awake",
             $"hasNetworkManager={_networkManager != null} hasTransport={_transport != null} " +
-            $"hasDirectProvider={_directIPv4Provider != null} hasRelayProvider={_relayProvider != null} mode={Mode} " +
+            $"hasDirectProvider={_directIPv4Provider != null} mode={Mode} " +
             $"ngoLogLevel={(_networkManager != null ? _networkManager.LogLevel.ToString() : "(없음)")}");
     }
 
@@ -161,6 +181,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     private bool StartHostCore()
     {
         ServerCharacterSelectionStore.Clear();
+        PrepareLocalConnectionData();
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartHost before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartHost.before");
         if (_networkManager.StartHost())
@@ -178,6 +199,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     private bool StartClientCore()
     {
         ServerCharacterSelectionStore.Clear();
+        PrepareLocalConnectionData();
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartClient before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartClient.before");
         if (_networkManager.StartClient())
@@ -195,6 +217,8 @@ public class NetworkSessionLauncher : MonoBehaviour
     private bool StartServerCore()
     {
         ServerCharacterSelectionStore.Clear();
+        PlayerIdRegistry.Server.Clear();
+        NetworkLoadingFlowController.EndMatchRoster("startServer");
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartServer before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartServer.before");
         if (_networkManager.StartServer())
@@ -207,6 +231,98 @@ public class NetworkSessionLauncher : MonoBehaviour
 
         Debug.Log("[SceneFlow] NetworkSessionLauncher.StartServer failed");
         return false;
+    }
+
+    /// <summary>
+    /// 새 세션 직전 — playerId 레지스트리를 비우고 내 playerId 를 ConnectionData 에 담는다.
+    /// 호스트도 NGO 가 자기 ConnectionData 로 승인 콜백을 부르므로 같은 경로로 레지스트리에 들어간다.
+    /// ConnectionData 는 NetworkConfig 해시 재료가 아니다.
+    /// </summary>
+    private void PrepareLocalConnectionData()
+    {
+        PlayerIdRegistry.Server.Clear();
+        NetworkLoadingFlowController.EndMatchRoster("newSession");
+        var payload = PlayerIdConnectionData.Encode(LocalPlayerId);
+        _networkManager.NetworkConfig.ConnectionData = payload;
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.PrepareLocalConnectionData",
+            $"playerId='{PlayerIdConnectionData.Normalize(LocalPlayerId)}' bytes={payload.Length}");
+    }
+
+    /// <summary>
+    /// [서버] NGO 접속 승인 — PLAN-48 §4.8. 판단은 <see cref="DemoJoinRule.Evaluate"/> 가 한다.
+    /// 데모 흐름이 아니면(Dev 부팅·태그 없는 MPPM·옛 수동 접속) 종전처럼 항상 승인하고 playerId 기록만 한다.
+    /// NetworkConfig 해시가 다른 클라는 NGO 가 이 콜백 전에 사유 없이 끊는다(R6).
+    /// </summary>
+    private void HandleConnectionApproval(
+        NetworkManager.ConnectionApprovalRequest request,
+        NetworkManager.ConnectionApprovalResponse response)
+    {
+        var clientId = request.ClientNetworkId;
+        var isHostSelf = clientId == NetworkManager.ServerClientId;
+        var registry = PlayerIdRegistry.Server;
+        var hasPlayerId = PlayerIdConnectionData.TryDecode(request.Payload, out var playerId);
+        var isPlayerIdConnected = hasPlayerId && registry.IsPlayerConnected(playerId);
+        var isInLobby = IsHostInLobby();
+        var isCountdownActive = LobbyCountdownActiveProvider != null && LobbyCountdownActiveProvider();
+        // 같은 프레임에 승인된 클라는 ConnectedClientsIds 에 아직 없다 — 승인 때 넣는 레지스트리 수와 큰 쪽을 쓴다.
+        var connectedCount = Math.Max(registry.ConnectedCount, _networkManager.ConnectedClientsIds.Count);
+        // 판 도중 재합류(C14) — 명단은 데모 흐름에서만 활성이다.
+        var roster = MatchRoster.Server;
+        var isMatchActive = roster.IsActive;
+        var isInMatchRoster = hasPlayerId && roster.Contains(playerId);
+        var isSceneTransition = _loadingFlowController != null && _loadingFlowController.IsSceneTransitionInProgress;
+
+        var reason = DemoJoinRule.Evaluate(new DemoJoinRequest(
+            isHostSelf,
+            DemoSessionDirector.IsDemoFlowActive,
+            isInLobby,
+            isCountdownActive,
+            connectedCount,
+            DemoJoinRule.MaxPlayers,
+            hasPlayerId,
+            isPlayerIdConnected,
+            isMatchActive,
+            isInMatchRoster,
+            isSceneTransition));
+
+        response.Approved = reason == DemoJoinRejectReason.None;
+        response.Reason = DemoJoinRule.ToApprovalReason(reason);
+        // 콜백이 없던 때와 같게 — NGO 는 PlayerPrefab 이 있을 때만 플레이어 오브젝트를 만들었다(지금 프리팹은 비어 있다).
+        response.CreatePlayerObject = _networkManager.NetworkConfig.PlayerPrefab != null;
+        response.Pending = false;
+
+        if (response.Approved)
+        {
+            // 데모 흐름 밖에선 playerId 가 없거나 겹쳐도 받으므로 clientId 로 구분되는 키를 쓴다.
+            var registryKey = !hasPlayerId ? $"client-{clientId}"
+                : isPlayerIdConnected ? $"{playerId}#{clientId}"
+                : playerId;
+            registry.Register(clientId, registryKey);
+            // 재접속이면 그 playerId 의 마지막 캐릭터를 새 clientId 에 되살린다 — LobbySession 이 이 값으로 자리를 시드한다(Q4).
+            ServerCharacterSelectionStore.BindPlayer(clientId, registryKey);
+        }
+
+        // 명단 묶기(MatchRoster.BindClient)와 재키잉 이벤트는 맵 재스폰 직후에 한다(R2c) — 승인만으로는 Map 에 캐릭터가 생기지 않는다.
+        var isRejoin = response.Approved && !isHostSelf && isMatchActive && isInMatchRoster;
+        var lastClientText = isRejoin && roster.TryGetLastClientId(playerId, out var lastClientId) ? lastClientId.ToString() : "-";
+
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.HandleConnectionApproval",
+            $"clientId={clientId} host={isHostSelf} demo={DemoSessionDirector.IsDemoFlowActive} playerId='{playerId}' " +
+            $"validId={hasPlayerId} duplicate={isPlayerIdConnected} lobby={isInLobby} countdown={isCountdownActive} " +
+            $"connected={connectedCount} match={isMatchActive} inRoster={isInMatchRoster} transition={isSceneTransition} " +
+            $"rejoin={isRejoin} lastClientId={lastClientText} approved={response.Approved} reason={reason}");
+    }
+
+    /// <summary>호스트의 활성 씬이 로비이고 로딩 흐름(로비 → 맵 등)이 돌고 있지 않다.</summary>
+    private bool IsHostInLobby()
+    {
+        var director = GetComponent<DemoSessionDirector>();
+        var lobbySceneName = director != null ? director.LobbySceneName : DefaultLobbySceneName;
+        if (!string.Equals(SceneManager.GetActiveScene().name, lobbySceneName, StringComparison.Ordinal))
+            return false;
+        return _loadingFlowController == null || !_loadingFlowController.IsFlowInProgress;
     }
 
     /// <summary>
@@ -315,12 +431,8 @@ public class NetworkSessionLauncher : MonoBehaviour
         out ISessionConnectionProvider provider,
         out SessionStartResult failureResult)
     {
-        provider = Mode switch
-        {
-            SessionConnectionMode.DirectIPv4 => _directIPv4Provider,
-            SessionConnectionMode.UnityRelay => _relayProvider,
-            _ => null
-        };
+        // DirectIPv4 만 연결한다 — 그 밖의 모드(Relay·Steam)는 "프로바이더 없음" 으로 실패한다.
+        provider = Mode == SessionConnectionMode.DirectIPv4 ? _directIPv4Provider : null;
         if (provider == null)
         {
             failureResult = SessionStartResult.Failed(
@@ -464,16 +576,27 @@ public class NetworkSessionLauncher : MonoBehaviour
             _networkManager.OnServerStopped -= HandleSessionStopped;
             _networkManager.OnClientStopped -= HandleSessionStopped;
             _networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
+            if (_networkManager.ConnectionApprovalCallback == HandleConnectionApproval)
+            {
+                _networkManager.ConnectionApprovalCallback = null;
+            }
         }
     }
 
     private void HandleSessionStopped(bool wasHost)
     {
         ServerCharacterSelectionStore.Clear();
+        PlayerIdRegistry.Server.Clear();
+        NetworkLoadingFlowController.EndMatchRoster("sessionStopped");
     }
 
     private void HandleClientDisconnected(ulong clientId)
     {
+        // 판 명단 자리는 남기고 clientId 묶임만 푼다 — 같은 playerId 가 다시 오면 재합류로 받는다(C14).
+        MatchRoster.Server.UnbindClient(clientId);
+        // clientId 쪽 선택만 지운다 — playerId 의 마지막 선택은 남아 재접속 승인 때 되살아난다(Q4).
         ServerCharacterSelectionStore.Remove(clientId);
+        // clientId 매핑만 지운다 — 재접속하면 새 clientId 로 같은 playerId 를 다시 묶는다(Q4).
+        PlayerIdRegistry.Server.RemoveClient(clientId);
     }
 }

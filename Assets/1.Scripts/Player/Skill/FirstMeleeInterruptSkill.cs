@@ -12,7 +12,7 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
-    protected override bool TimingFromAnimationEvents => true;
+    public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => HitAndEndEvents;
 
     // 🔴 여기는 RPC 가 필요 없다 — OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
     //    시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다

@@ -7,7 +7,59 @@
 - **Server/Host**: every system except player-owned movement, input, and animation is authoritative on the host.
 - Anti-cheat is unnecessary for cooperative PvE, so this split keeps player response fast while keeping the network model simple.
 
-## 연결 흐름
+## Lobby Demo (target, 2026-10-19)
+> Status: **implementation in progress** on `feature/LobbyDemo` (PLAN-48 v2, commits C1~C13). The code may still differ from this section until those commits land.
+> Where this section conflicts with the sections below marked **(old / current code)**, this section is the decision for the booth demo.
+> Scene flow details: [SceneFlow.md](../design/SceneFlow.md#-target-flow--lobby-demo-2026-10-19-implementation-in-progress).
+
+### Flow
+- `Bootstrap → 3.LobbyScene → 4.MapScene → 3.LobbyScene → …` with the session kept alive. No `Shutdown` per game. Title is skipped.
+- `3.LobbyScene` is a walkable **NGO scene**. `5.ResultScene` is removed; results open as a lobby result panel only after returning from 4.MapScene.
+- All transitions are host-driven `NetworkManager.SceneManager.LoadScene`. Clients never load gameplay scenes locally.
+- Map → Lobby: `GoToResult` captures and broadcasts the result payload → `DespawnDynamicNetworkObjects()` (log remaining count) → `LoadScene("3.LobbyScene", Single)`.
+- ✅ Implemented: C7a (Map → Lobby NGO direct) · C7b (lobby result panel — opens on lobby entry when `SessionResult.HasValue`; the payload reaches clients before the lobby scene event on the same reliable pipeline). Panel: [lobby-result-panel.md](lobby-result-panel.md).
+
+### Connection config (`demo-connection.json`)
+- Location: `Path.GetDirectoryName(Application.dataPath)/demo-connection.json` — next to the exe in builds, project root in the Editor.
+- Fields: `role` (`host` / `client`), `hostAddress`, `port`, `playerId` (stable player ID), retry interval / connect timeout / disconnect timeout seconds.
+- Missing file → `host` · `127.0.0.1` · `7777`, and a 3-second notice "설정 파일 없음 — 호스트 모드".
+- The Host starts hosting on boot; Clients connect automatically. No connection buttons.
+- Clients run an **auto-connect / auto-reconnect loop**. While waiting or after a drop they sit in the local scene `6.DemoConnectScene` with the "호스트 대기 중" overlay.
+- **Wired direct IPv4 only.** Unity Relay is excluded: the lobby connection panel, Relay UI, and the `RelayConnectionProvider` runtime path are removed. The Relay package stays (no `Packages/manifest.json` change). Steamworks for release is a separate task.
+
+### Connection approval
+- `ConnectionApproval` is enabled. In the lobby, approve only when the countdown is not running and fewer than 3 players are connected.
+- During a game, only a `playerId` on the **match roster** (players connected when the game started) is approved — a **mid-game rejoin** ([Mid-game rejoin](#mid-game-rejoin-c14)). Everyone else is rejected as "게임 진행 중" and enters automatically once the Host returns to the lobby. **No backfilling** of new people; the 3-player cap holds because the roster is at most 3.
+- A roster player is rejected as `RejoinWaiting` ("판에 다시 합류하는 중") while a scene transition is running (loading flow · Map → Lobby) or while the old connection is still alive (`DuplicatePlayerId` for a roster id). The Client retries and gets in.
+- Full lobby → rejected as full (3/3).
+
+### Reconnect identity
+- A reconnecting Client gets a new `ClientId`. The server store for the last character selection and traits (augments) is keyed by `playerId`, so both are kept across reconnects.
+- ✅ **Character (C8):** on approval `NetworkSessionLauncher` calls `ServerCharacterSelectionStore.BindPlayer(clientId, playerId)`; leaving removes only the `clientId` side, so the same `playerId` gets its last character back (pure core: `CharacterSelectionMemory`). Session stop clears everything.
+- ✅ **Traits (C14 R4c):** kept for a mid-game rejoin — on leave `TutorialTraitDirector` stores the acquired traits (+ current corridor round, reset popup state) in `RejoinMemory` by `playerId` and re-applies them on rejoin. Dropped on every Map unload (a new game starts clean). Details: [tutorial-traits.md](tutorial-traits.md).
+
+### Mid-game rejoin (C14)
+- **Who:** only `playerId`s on the match roster `MatchRoster` (snapshot at `NetworkLoadingFlowController.StartGameLoading`, ended on Map → Lobby and session start/stop). Demo flow only — outside it (Dev boot, untagged MPPM) the roster is off. New people are never backfilled.
+- **Approval → spawn:** approved → NGO late-join sync loads `4.MapScene` → on `SynchronizeComplete` the server sends the Completed loading state (client `MainGameReady`) and queues the client. The client sees "판에 합류하는 중…" (`JoiningMatch`) until its player spawns.
+- **Spawn hold (`RejoinSpawnGate`):** held during elevator / teleport countdown, boss cinematic, slow motion, party-wipe grace; dropped when the result transition is reserved (the Lobby transition takes them) or a PlayerObject already exists.
+- **Spawn point (`RejoinSpawnPicker`):** always the map's first spawn point (`ZoneRole.PlayerSpawn`, free slot). In the boss room: of the four `RejoinCornerPoints` (fallback: computed from the boundaries), the corner farthest from other players and the boss. The last party-wipe respawn point is **not** used.
+- **Kept across the rejoin** (all keyed by `playerId`, server only, `RejoinMemory`, cleared at the roster boundaries):
+  - character (`CharacterSelectionMemory`) · traits + trait reset popup (R4c) · tutorial checks / permanent-dead mark (`TutorialFlowModel.RebindPlayer`, back barrier reset to 0)
+  - **life state + HP ratio (R5c):** recorded when the PlayerObject despawns (NGO despawns it before `OnClientDisconnectCallback`) and committed on disconnect. Leaving during `DeadPresentation` is resolved then (`PartyLivesRules`: Soul / PermanentDead). Restored by `PlayerLifeCycleController.RestoreForRejoinServer` right after the `PlayerRejoined` subscribers: Alive → HP ratio (skill cooldowns start from 0), Soul → Soul (no life consumed; tutorial auto-revive re-armed), PermanentDead → PermanentDead (spectating, no corpse). A party-wipe respawn while absent overwrites the record to Alive · full HP.
+  - result row: `SessionStatsAggregator.Rebind(old, new)` merges the old `clientId` row into the new one (one row per person, keeps the old slot order).
+- Debug map restart (`TryRestartTargetScene`) drops the life records (fresh start).
+- Design memo (out of repo): `_lane-artifacts/MainProject-Worktree3/C14/C14-rejoin-design.md`. Boss room corners: [handoff-boss-room-rejoin-corners.md](handoff-boss-room-rejoin-corners.md).
+
+### Lobby rules
+- All input is allowed in the lobby (movement, attack, skills).
+- Character select object (`F`) → panel → despawn + respawn the new Variant at the same position.
+- Ready object (`F`) → when all connected players (1~3) are Ready, a 5-second server-time countdown → `4.MapScene`.
+- No character change while Ready or during the countdown. A new connection resets all Ready states. No Host "always Ready" exception.
+- ✅ Implemented in C8 by `LobbySession` (server-written `NetworkList` + countdown `NetworkVariable`, `ToggleReadyServerRpc`/`RequestCharacterServerRpc`) and the pure `LobbyReadyRules`. The old `Lobby.ReadyRequest`/`Lobby.CharacterRequest`/`Lobby.State` named messages are gone. Details: [SceneFlow.md](../design/SceneFlow.md#lobby-rules-target).
+
+## 연결 흐름 (old / current code)
+> Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is skipped and Result is a lobby panel.
+
 1. **Title / Lobby / Loading / InGame / Result**
 2. If the Host leaves during InGame, the session ends. The remaining players transition to the Result Scene locally.
 
@@ -18,8 +70,9 @@
 - If the Host leaves the Lobby, no scene transition occurs, and all slots except the local player's character slot become `Empty`.
 - The game can start only when all connected players are Ready.
 - Solo, duo, and trio play are all supported.
-- When entering the Lobby Scene, the `NetworkManager` instance must be inactive or in a local-only state, not running as Host.
-- The Lobby Scene is always treated as a local scene and is not loaded through `NetworkSceneManager`.
+- (old / current code) When entering the Lobby Scene, the `NetworkManager` instance must be inactive or in a local-only state, not running as Host.
+- (old / current code) The Lobby Scene is always treated as a local scene and is not loaded through `NetworkSceneManager`.
+- **Target (lobby demo):** the two rules above are replaced — the Host is already running when the lobby loads, and `3.LobbyScene` is loaded through `NetworkSceneManager`. See [Lobby Demo (target)](#lobby-demo-target-2026-10-19).
 
 ## Lobby Ready / Start
 - The Lobby start button is bound to `Ready()` for both solo and multiplayer.
@@ -33,7 +86,9 @@
 - Clients only send a `RequestReady()` call, and the server validates whether the player can become Ready before changing the Ready state.
 - Lobby player data such as Ready state, character selection, and build selection is stored and synchronized using `NetworkVariable` or `NetworkList`.
 
-## Solo Flow
+## Solo Flow (old / current code)
+> Superseded for the demo: solo = `host` with no config file. The Host is started on boot, so the lobby countdown always uses server time.
+
 - Solo flow: `Ready()` -> 5-second countdown -> `StartHost()` -> Loading Scene -> InGame Scene.
 - In Solo play, the countdown is handled by a local timer because the Host has not started yet.
 - In Solo play, if the player becomes Unready during the countdown, the countdown is canceled and the player remains in the Lobby.
@@ -49,7 +104,9 @@
 - Clients cannot join after the game has already started.
 - The countdown is managed and synchronized by the server.
 
-## Result Scene
+## Result Scene (old / current code)
+> Superseded for the demo: `5.ResultScene` is removed. The same result data (`SessionResult` + payload named message) is shown in the lobby result panel. "Result Scene" below reads as "lobby result panel" for the demo.
+
 - The Result Scene requires network synchronization on normal game completion.
 - On normal game completion, category-based result ratios are calculated by the Host before entering the Result Scene.
 - On normal game completion, all players see the full team result in the Result Scene.
@@ -75,8 +132,9 @@
 - Damage caused by a disconnected Client's remaining projectiles or area effects after disconnection still affects gameplay, but is excluded from Result contribution data.
 - If a Client leaves during InGame, boss difficulty and HP scaling are not recalculated.
 - If only one player remains after a Client leaves during InGame, the session continues.
-- Rejoining is not allowed after a Client leaves during InGame.
+- A Client that leaves during InGame may rejoin the running game if its `playerId` is on the match roster — character, traits, life state and HP ratio are kept ([Mid-game rejoin](#mid-game-rejoin-c14)). Anyone else waits until the Host is back in the Lobby (see [Connection approval](#connection-approval)).
 - Backfilling is not allowed after a Client leaves during InGame.
+- (old / current code) A Client that leaves during InGame returns to the Title Scene. **Target (lobby demo):** it goes to `6.DemoConnectScene` and keeps retrying.
 - When a Client leaves during InGame, the Host finalizes that player's individual contribution snapshot at the moment of leaving.
 - If a Client leaves during InGame, that player's Result data is included up to the point of leaving.
 - For normal game completion, disconnected Clients' Result data is based only on authoritative data stored by the Host up to the point of leaving.
@@ -128,7 +186,7 @@
 - The project does not use a generic individual timer pause system.
 - Special mechanics that stop their own countdown, such as bomb fuse timing while flying, are handled as object-specific state rules instead of generic timer pause.
 - Lobby countdowns are separate from combat `GameTime`.
-- Solo Lobby countdowns use local real time because the Host has not started yet.
+- (old / current code) Solo Lobby countdowns use local real time because the Host has not started yet. **Target (lobby demo):** the Host always runs in the lobby, so every lobby countdown uses server time.
 - Multiplayer Lobby countdowns use server real time.
 - Matchmaking timeouts, connection timeouts, UI fades, loading spinners, and transport/heartbeat timeouts use real time.
 - NGO `NetworkConfig.TickRate` starts at 30 ticks per second and may be changed later.
@@ -157,6 +215,37 @@
 - Multiple players' Ability requests on the same fixed tick are processed in ascending `ClientId` order.
 - If boss HP reaches 0 during a fixed tick, combat ends immediately at that point.
 - The server fixed tick pipeline should be centralized so event ordering can be changed by reordering pipeline steps.
+
+## Play 종료 후 포트 점유 진단 ([PortLeak])
+에디터 전용 진단(`Assets/1.Scripts/Dev/Editor/PlayModePortLeakProbe.cs`). 동작은 바꾸지 않고 로그만 남긴다.
+- `ExitingPlayMode` 에 스냅샷(씬의 NetworkManager 수, Singleton 의 IsListening/IsServer/IsClient/ShutdownInProgress,
+  UnityTransport 별 포트·드라이버 생성 여부, 에디터 pid)을 `SessionState` 에 보관 → `EnteredEditMode` 2프레임 뒤
+  7777 + 종료 시 본 Transport 포트(DevBoot port++ 포함)를 `DevSceneBooter.IsUdpPortInUse` 로 탐침한다.
+- 모두 비어 있으면 **로그 없음**. 하나라도 잡혀 있으면 `[PortLeak] Play 종료 후 포트 N 아직 점유` 경고 1개.
+- 읽는 법:
+  - `소유:` — `netstat -ano -p UDP` 로 찾은 그 포트의 pid. **`이 에디터`면 진짜 누수 후보**,
+    `다른 프로세스`면 다른 에디터(Main·Work 레인)나 빌드가 호스트 중인 것이라 **오탐**. netstat 실패면 `알 수 없음`.
+  - `종료 시 스냅샷` — Play 를 끝내는 순간 상태. IsListening=True·드라이버 생성=예 였는데 지금도 점유면
+    종료 과정에서 소켓이 안 닫힌 것.
+  - `편집 모드 스냅샷` — 편집 모드로 돌아온 뒤 상태. 보통 NetworkManager 0개·Singleton=null 이어야 한다.
+- 재현되면 받을 것: 경고 전문, Play 전에 한 일(DevBoot 사용 여부·로비/호스트 경로), MPPM 여부,
+  같은 PC 에서 다른 에디터가 호스트 중이었는지.
+
+### Play 중 어셈블리 리로드 막기 — Script Changes While Playing (할 일 56.2)
+- NGO 종료 순서: `NetworkManager.OnApplicationQuit` → `OnDestroy` → `ShutdownInternal` —
+  Despawn → `ConnectionManager.Shutdown`(여기서 transport 종료) → `SceneManager.Dispose` → `IsListening=false`.
+- 원인 = Play 중 핫 리로드. Preferences ▸ General ▸ "Script Changes While Playing" 이 기본값
+  **Recompile And Continue Playing** 이면 Play 도중 스크립트 컴파일 뒤 도메인 리로드가 일어나 깨진다. `NetworkSceneManager` 는 `[Serializable]` 이라
+  생성자 없이 복원되고, Dictionary 인 `SceneEventDataStore` 는 직렬화가 안 돼 null 로 남는다 → 정지 때
+  `NetworkSceneManager.Dispose` NRE 로 `ShutdownInternal` 이 중간에 끊기고, 리로드로 UnityTransport 의 네이티브
+  드라이버 핸들도 잃어 UDP 포트가 에디터 프로세스에 남는다(48.3 QA: NRE 난 정지 3회 = 그 Play 중 리로드 3회, 나머지 18회는 NRE·누수 0).
+- 대책 = `Assets/1.Scripts/Dev/Editor/PlayModeReloadGuard.cs`(`[InitializeOnLoad]`)가 사용자별 EditorPrefs
+  `ScriptCompilationDuringPlay` 를 **1 = Recompile After Finished Playing** 으로 맞춘다. 팀원 에디터도 프로젝트를 열면
+  자동 적용된다. 0(키 없음 포함)·범위 밖 값일 때만 바꾸고 콘솔에 `[ReloadGuard] …` 한 줄을 남기며,
+  사용자가 고른 1·**2 = Stop Playing And Recompile** 은 그대로 둔다.
+  값은 `UnityEditor.ScriptChangesDuringPlayOptions`(internal enum: 0 RecompileAndContinuePlaying · 1 RecompileAfterFinishedPlaying · 2 StopPlayingAndRecompile).
+- `LockReloadAssemblies` 로 Play 중 잠그는 방식(849ba9ba)은 버렸다 — Play 중 컴파일이 나면 에디터가 '컴파일 중' 으로
+  고정돼 MCP `Unity_RunCommand` 가 전부 `COMPILATION_IN_PROGRESS` 로 거부되고 Play 정지도 못 했다(에디터 재시작으로만 복구).
 
 ## 패키지 주의
 - NGO/Steamworks 패키지를 추가하면 **반드시 `Packages/manifest.json` + `packages-lock.json` 커밋**

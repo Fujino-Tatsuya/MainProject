@@ -9,7 +9,7 @@ using UnityEngine;
 public class FirstMeleeInterruptSkillData : PlayerSkillData, IPlayerInterruptSkillData
 {
     [Header("판정 타이밍")]
-    // 🔴 지금 안 쓴다 — 판정·종료는 Garen_Parry 의 Hit·End 이벤트가 정한다(FirstMeleeInterruptSkill.TimingFromAnimationEvents,
+    // 🔴 지금 안 쓴다 — 판정·종료는 Garen_Parry 의 Hit·End 이벤트가 정한다(FirstMeleeInterruptSkill.RequiredAnimationEvents,
     //    PLAN-anim-event-timing P1-④). 열 삭제는 Export 정리 때 한다. 시점 튜닝은 클립에서 이벤트를 옮긴다.
     [SerializeField, Min(0f)] private float hitDelay = 0.15f;
     [SerializeField, Min(0.05f)] private float skillDuration = 0.6f;
