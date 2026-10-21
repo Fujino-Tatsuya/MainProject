@@ -54,6 +54,8 @@ MonoBehaviour:
   <Player_Faint>k__BackingField: {fileID: 11400000, guid: 9b8944d0493549069d6e1e57ca0bbc96, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Mob_Bite>k__BackingField: {fileID: 11400000, guid: 711a910e150b32743ba079fc5ff9ed42, type: 2}
+  <Mob_Death_Explosion>k__BackingField: {fileID: 11400000, guid: 34b1366dad16435f912891449e1dc1d2, type: 2}
+  <Mob_Death_Explosion_Elite>k__BackingField: {fileID: 11400000, guid: a11150c990f14220a36c4592852c434a, type: 2}
   <Interrupt_Flash>k__BackingField: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
   <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}

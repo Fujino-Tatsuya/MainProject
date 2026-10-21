@@ -118,6 +118,20 @@ static class MonsterCollapseSetup
         GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
         try
         {
+            // 🔴 폭발 사망(ExplodeDeath)으로 바꾼 몹엔 붕괴를 다시 붙이지 않는다 — IDeathEffect 가 둘이 되면
+            //    어느 쪽이 걸릴지 모른다(2026-10-21). 조각 에셋은 같이 쓰므로 방금 다시 구운 것만 이어 준다.
+            var explode = root.GetComponentInChildren<ExplodeDeath>(true);
+            if (explode != null)
+            {
+                var eo = new SerializedObject(explode);
+                eo.FindProperty("partSet").objectReferenceValue = set;
+                eo.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                Debug.Log($"[부위 붕괴] '{name}' 은 폭발 사망(ExplodeDeath)이라 붕괴로 바꾸지 않았다 — " +
+                          "조각 에셋만 다시 구웠다.", prefabAsset);
+                return;
+            }
+
             // 옛 연출에서 가져올 것들. 둘 다 캐릭터별이 아니라 공용이라 그대로 옮기면 된다.
             Material template = null;
             ParticleSystem particle = null;
