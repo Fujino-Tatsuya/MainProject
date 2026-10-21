@@ -88,6 +88,6 @@ public class GunnerChargeLaserData : PlayerSkillData
         float minScale = DamageMultiplierAt(0f) * StageDamageMultiplier(0);
         float maxScale = DamageMultiplierAt(1f) * StageDamageMultiplier(int.MaxValue);
         return SkillTooltipDamage.FromScaledSnapshot(
-            player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale);
+            player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale, player.DealtDamagePercent);
     }
 }

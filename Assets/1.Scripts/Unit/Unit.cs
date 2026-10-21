@@ -619,7 +619,8 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     public bool HasSuperArmor => StatusFacade != null && StatusFacade.HasSuperArmor;
 
     // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
-    public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
+    // 플레이어는 기본%·전체% 단계를 나눈 PlayerAttackStats 로 덮어쓴다(할 일 83) — 몬스터는 이 식 그대로
+    public virtual int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
     public float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
     public float FinalAttackSpeed => Mathf.Max(0f, _attackSpeed * GetStatMultiplier(StatusEffectType.AttackSpeedModifier));
     // 방어력은 _health가 서버에서만 생성되므로 서버에서만 유효

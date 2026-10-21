@@ -122,6 +122,8 @@ public static class UiStrings
         [StatusEffectType.MaxHpModifier] = "최대 체력 증감",
         [StatusEffectType.PassiveCharge] = "패시브 충전",
         [StatusEffectType.Focus] = "정신 집중",
+        [StatusEffectType.BaseAttackDamageModifier] = "기본 공격력 증감",
+        [StatusEffectType.DealtDamageModifier] = "가하는 피해 증감",
     };
 
     private static readonly Dictionary<StatusEffectType, UiString> StatusEffectNames = BuildStatusEffectNames();

@@ -69,20 +69,22 @@ public readonly struct SkillTooltipDamage
         if (player == null)
             return default;
 
-        return FromLinear(player.FinalAttackDamage, coefficient, flatBonus);
+        return FromLinear(player.FinalAttackDamage, coefficient, flatBonus, player.DealtDamagePercent);
     }
 
-    public static SkillTooltipDamage FromLinear(float finalAttackDamage, float coefficient, int flatBonus)
+    /// <summary>판정 스냅샷과 같은 식(AttackStatFormula.Snapshot). 가하는 피해% 는 결과에만 들어가고 Shift 계산식 항(계수·고정값)엔 표시하지 않는다.</summary>
+    public static SkillTooltipDamage FromLinear(float finalAttackDamage, float coefficient, int flatBonus, float dealtDamagePercent = 0f)
     {
-        int damage = Mathf.Max(0, Mathf.RoundToInt(finalAttackDamage * coefficient) + flatBonus);
+        int damage = AttackStatFormula.Snapshot(Mathf.RoundToInt(finalAttackDamage), coefficient, flatBonus, dealtDamagePercent);
         return new SkillTooltipDamage(damage, damage, coefficient, coefficient, flatBonus, flatBonus);
     }
 
     /// <summary>스킬 컨트롤러의 1차 스냅샷을 만든 뒤 차지·과열 배율을 곱하는 판정식.</summary>
     public static SkillTooltipDamage FromScaledSnapshot(
-        float finalAttackDamage, float baseCoefficient, int flatBonus, float minimumScale, float maximumScale)
+        float finalAttackDamage, float baseCoefficient, int flatBonus, float minimumScale, float maximumScale,
+        float dealtDamagePercent = 0f)
     {
-        int snapshot = Mathf.Max(0, Mathf.RoundToInt(finalAttackDamage * baseCoefficient) + flatBonus);
+        int snapshot = AttackStatFormula.Snapshot(Mathf.RoundToInt(finalAttackDamage), baseCoefficient, flatBonus, dealtDamagePercent);
         int minimum = Mathf.Max(0, Mathf.RoundToInt(snapshot * minimumScale));
         int maximum = Mathf.Max(0, Mathf.RoundToInt(snapshot * maximumScale));
         return new SkillTooltipDamage(

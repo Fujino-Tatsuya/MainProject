@@ -1,3 +1,47 @@
+# ▶▶▶ 계획 = **할 일 83 — 플레이어 공격 스탯 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 구현 — 컴파일 0 · EditMode 2678/0 · ⏳ 은희 Play/MPPM)
+
+> 브랜치 `fix/TooltipValueClient`(기준 origin/development `c7057322`). 담당 은희(코어 = 본인 영역). 증상: 클라 스킬 툴팁 `{dmg}` 가 틀림.
+
+## 사실
+- 원인: `Player.cs:259` `if (IsServer) Initialize(...)` → `Unit._attackDamage` 가 클라에서 0 → `FinalAttackDamage`·툴팁 `{dmg}` 가 0 기준.
+- 데미지 스냅샷은 서버가 `FinalAttackDamage` 로 만든다(`PlayerSkillController:615`·`DefaultAttackController:870`·`GunnerBasicAttack:441`·`AssassinBasicAttack:619`·`FirstMeleePassive:166`·거너 레이저 데이터 3곳). 툴팁은 `SkillTooltipContracts:72`.
+- 기본 공격력 원본 = `Player.attackDamage`(xlsx → 빌드 포함, 모든 피어가 같은 값). 상태이상 배율은 `StatusEffectController` 의 `NetworkList` 로 이미 복제(현재 같은 타입끼리 **곱**, 스택은 거듭제곱).
+- 튜토리얼 공격력 특성 = 영구 상태이상 `AttackDamageModifier`(배율 ≥1, `TutorialTraitDirector:797`).
+- `ChangeAttackDamageValue(Rpc)` 는 호출처 없음.
+
+## 결정 (grill 2026-10-21, 은희)
+1. **실제 데미지 = 서버 값 유지.** 권한 구조 불변. 클라 종합은 표시(툴팁·HUD)와 검증 보고용.
+2. **같은 종합 클래스를 서버·클라가 쓴다** — 서버 판정 값도 이 클래스에서 나온다(공식 한 곳).
+3. 공식(단계 내 더하기):
+   `최종 공격력 = round( 기본 × (1 + Σ기본공격력%) × (1 + Σ전체공격력%) )`, 0 이상
+   `피해 = round( (최종 공격력 × 스킬 계수 + 고정값) × (1 + Σ가하는피해%) )`, 0 이상 — 이후 거너 열 단계 배율 등 기존 후처리는 그대로.
+4. 상태이상 스탯 타입을 3개로: `BaseAttackDamageModifier`(신규 1<<14) · `AttackDamageModifier`(기존 값 유지 = **전체 공격력**) · `DealtDamageModifier`(신규 1<<15). 인스턴스 magnitude 1.2 = +20%, 0.8 = −20%, 스택 = %×스택 수(더하기). → **기존 공격력 배율 스택이 거듭제곱→더하기로 바뀐다**(튜토리얼 특성은 스택 1이라 수치 동일).
+5. 앞으로의 영구 가산(특성·성장)은 **출처 기록만 복제** — 서버는 "무엇을 얻었는지"(id)만 복제, 수치는 각 피어가 같은 SO 에서 읽어 종합. 이번엔 입력 인터페이스(`IAttackStatSource`)만 두고 구현체는 만들지 않는다(현재 특성은 상태이상 경로로 이미 들어옴).
+6. **서버 2차 검증 = 공격/스킬 시작 요청마다.** 오너가 자기 종합 결과(최종 공격력, 가하는 피해%)를 요청 RPC 에 실어 보내면 서버가 자기 값과 비교, 다르면 `Debug.LogWarning`(clientId·양쪽 값·요청 종류). 서버 쪽 입력이 바뀐 뒤 **유예 시간(기본 0.5초, 인스펙터 필드)** 안의 불일치는 복제 지연으로 보고 무시. 값은 서버 것을 쓴다(경고만).
+   대상 RPC: `PlayerSkillController.RequestUseSkillRpc` · `DefaultAttackController.RequestStartAttackRpc`·`RequestQueueNextAttackRpc` · 거너·어쌔신 기본 공격 시작 요청(데미지 스냅샷을 만드는 서버 지점마다).
+7. 커밋 `207c24ce`(기본 공격력 NetworkVariable 복제)는 **되돌린다**(로컬, push 전).
+
+## 구조
+- 신규 `Assets/1.Scripts/Player/Stats/`:
+  - `AttackStatFormula`(순수 static) — 위 공식·상태이상 % 합산·불일치 판정(유예 포함).
+  - `PlayerAttackStats`(Player 프리팹 base 의 컴포넌트, 비네트워크) — 입력: `Player.attackDamage`(로컬) + `IStatusEffectFacade`(복제) + 등록된 `IAttackStatSource`. 출력: `FinalAttackDamage`·`DealtDamageMultiplier`·`ResolveDamage(계수, 고정값)`·서버용 `LastInputChangedTime`.
+  - `IAttackStatSource` — 기본%/전체%/가하는피해% 기여 반환 + 변경 이벤트.
+- `Unit.FinalAttackDamage` 는 `IAttackStatProvider` 가 붙어 있으면 위임(기존 `IStatusEffectFacade` 조회 패턴), 없으면 지금 식(몬스터 무변경).
+- 데미지 스냅샷 지점들 → `ResolveDamage` 로 통일(가하는 피해% 적용 위치를 한 곳으로). 툴팁 `SkillTooltipDamage` 도 같은 식.
+- `StatusEffectController.GetStatMultiplier` 는 이동속도 등 다른 스탯용으로 그대로. 공격 3타입은 새 합산 API.
+- `UiStrings` 상태이상 이름 2개 추가, `StatusEffectType` 스탯 마스크에 신규 2개 추가.
+
+## 위험·범위 밖
+- 공격력 배율 스택 규칙 변경(4번) — 현재 스택 2 이상 쓰는 공격력 효과가 있으면 수치가 달라진다(구현 때 SO 전수 확인해 보고).
+- 몬스터 공격력·이동속도/공격속도/방어력 종합은 범위 밖. `ChangeAttackDamageValue` 는 손대지 않는다.
+- 플레이어 프리팹은 base(`Player.prefab`)에 컴포넌트 추가만. xlsx·SVN 무수정.
+
+## 수용·검증
+- EditMode: 공식(예: 기본 100, 기본 +10%·+20%, 전체 +50% → 195; 가하는 피해 +20%, 계수 1.8 → 421)·스택 더하기·음수 클램프·유예 판정·툴팁 = 서버 스냅샷 식 일치. 기존 툴팁·데이터 테이블·상태이상·플레이어 테스트 0 실패.
+- Unity MCP Refresh → 컴파일 0 → EditMode → 로컬 커밋(push 금지). Play 진입 금지.
+- 🟧 Play/MPPM(사용자): 호스트·클라 툴팁 `{dmg}` 동일 · 특성/버프 뒤 양쪽 갱신 · 정상 플레이 중 검증 경고 0 · 실제 데미지 수정 전과 동일(스택 1 기준).
+- 문서: `Docs/tech/` 공격 스탯 문서 신규(공식·타입·검증), `data-table.md` §9 `{dmg}` 설명 갱신, `CONTEXT.md` 용어(기본/전체 공격력, 가하는 피해).
+
 # ▶▶▶ 잠긴 계획 = **할 일 57.3 — 웰즈 드론 로컬 풀 + 로딩 예열** (2026-10-20 · 위임 승인)
 
 > Handoff `54adb49f-b945-46bc-adff-08c1f727e3bc` · 브랜치 `feature/EnemyC3PrewarmBoss` · 선행 `3ff61ba1`/`f378714d`.

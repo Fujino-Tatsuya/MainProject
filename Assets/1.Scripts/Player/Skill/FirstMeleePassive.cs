@@ -162,8 +162,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
         statusEffects.Remove(StatusEffectType.PassiveCharge, ChargeSourceId);
         readyServerTime.Value = ServerNow + cooldownTime;
 
-        int bonusDamage = Mathf.Max(0,
-            Mathf.RoundToInt(owner.FinalAttackDamage * bonusDamageMultiplier) + bonusFlatDamage);
+        int bonusDamage = owner.ResolveDamage(bonusDamageMultiplier, bonusFlatDamage);
 
         int healAmount = Mathf.RoundToInt(owner.MaxHp * (healPercent / 100f));
         if (healAmount > 0)

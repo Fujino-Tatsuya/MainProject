@@ -44,7 +44,7 @@ public class GunnerHeatData : ScriptableObject, ISkillTooltipSource
         float minScale = StageDamageMultiplier(0);
         float maxScale = StageDamageMultiplier(int.MaxValue);
         return SkillTooltipDamage.FromScaledSnapshot(
-            player.FinalAttackDamage, attack.AttackDamageMultiplier, attack.FlatDamageBonus, minScale, maxScale);
+            player.FinalAttackDamage, attack.AttackDamageMultiplier, attack.FlatDamageBonus, minScale, maxScale, player.DealtDamagePercent);
     }
 
     /// <param name="stage">1~3</param>
