@@ -36,6 +36,27 @@ public sealed class DemoSessionRulesTests
         Assert.That(DemoSessionRules.ShouldRunDemoFlow(true, "0.BootStrapScene", isVirtualPlayer: true, hasClientTag: true), Is.True);
     }
 
+    // ─── 타이틀 START 뒤 (할 일 70) ─────────────────────────────────────
+
+    [Test]
+    public void 데모_흐름이_꺼져_있으면_종전처럼_로비를_로컬로_로드한다()
+    {
+        Assert.That(DemoSessionRules.ResolveTitleStart(false, false), Is.EqualTo(DemoTitleStartRoute.LoadLobbyLocally));
+        Assert.That(DemoSessionRules.ResolveTitleStart(false, true), Is.EqualTo(DemoTitleStartRoute.LoadLobbyLocally));
+    }
+
+    [Test]
+    public void 데모_흐름의_첫_START_는_데모_흐름을_시작한다()
+    {
+        Assert.That(DemoSessionRules.ResolveTitleStart(true, false), Is.EqualTo(DemoTitleStartRoute.BeginDemoFlow));
+    }
+
+    [Test]
+    public void 이미_시작한_데모_흐름에서_START_는_무시한다()
+    {
+        Assert.That(DemoSessionRules.ResolveTitleStart(true, true), Is.EqualTo(DemoTitleStartRoute.Ignore));
+    }
+
     // ─── 끊긴 사유 ─────────────────────────────────────────────────────
 
     [Test]

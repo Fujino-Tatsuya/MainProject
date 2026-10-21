@@ -16,8 +16,19 @@ public readonly struct DemoTransportTimeouts
     public int DisconnectTimeoutMS { get; }
 }
 
+/// <summary>타이틀 START 를 누른 뒤 갈 곳 — 할 일 70(부팅하면 호스트·클라 모두 타이틀을 거친다).</summary>
+public enum DemoTitleStartRoute
+{
+    /// <summary>데모 흐름이 꺼져 있다 — 종전처럼 로비를 로컬로 로드한다(수동 접속 패널).</summary>
+    LoadLobbyLocally,
+    /// <summary>부팅 뒤 첫 START — 데모 흐름(대기 씬 → 호스팅/자동 접속)을 시작한다.</summary>
+    BeginDemoFlow,
+    /// <summary>데모 흐름이 이미 돌고 있다 — 아무것도 안 한다(살아 있는 세션 위에 로비를 로컬 로드하면 안 된다).</summary>
+    Ignore,
+}
+
 /// <summary>
-/// DemoSessionDirector 의 순수 판단 — 켜질지(게이트), 끊긴 사유, 전송 타임아웃. EditMode 테스트 대상.
+/// DemoSessionDirector 의 순수 판단 — 켜질지(게이트), 타이틀 START 뒤 갈 곳, 끊긴 사유, 전송 타임아웃. EditMode 테스트 대상.
 /// </summary>
 public static class DemoSessionRules
 {
@@ -38,6 +49,18 @@ public static class DemoSessionRules
         if (!string.Equals(activeSceneName, BootstrapSceneName, StringComparison.Ordinal))
             return false;
         return !isVirtualPlayer || hasClientTag;
+    }
+
+    /// <summary>
+    /// 타이틀 START(시작 연출 끝) 뒤 갈 곳. 데모 흐름도 부팅 직후엔 타이틀을 거치고, START 를 눌러야 대기 씬 →
+    /// 호스팅/자동 접속을 시작한다(할 일 70). 판 끝 로비 복귀·재접속 대기는 타이틀을 다시 거치지 않으므로
+    /// 시작은 실행당 한 번뿐이다.
+    /// </summary>
+    public static DemoTitleStartRoute ResolveTitleStart(bool isDemoFlowActive, bool hasBegun)
+    {
+        if (!isDemoFlowActive)
+            return DemoTitleStartRoute.LoadLobbyLocally;
+        return hasBegun ? DemoTitleStartRoute.Ignore : DemoTitleStartRoute.BeginDemoFlow;
     }
 
     /// <summary>

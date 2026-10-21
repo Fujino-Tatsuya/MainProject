@@ -12,7 +12,7 @@
 
 ### 0.1 시작 방법
 - [ ] Unity **6000.3.16f1**, 컴파일 에러 0, Play 모드 아님에서 시작.
-- [ ] `Assets/0.Scenes/MainFlow/0.BootStrapScene` 을 열고 Play → 타이틀 → 로비(캐릭터 선택·Ready) → 로딩 → `4.MapScene`.
+- [ ] `Assets/0.Scenes/MainFlow/0.BootStrapScene` 을 열고 Play → 타이틀(아무 키 → START) → 대기 화면 → 로비(호스트 자동 호스팅 — [lobby-demo-flow.md](lobby-demo-flow.md)) → 준비 → 로딩 → `4.MapScene`.
   `4.MapScene` 의 `Stage1` 이 튜토리얼(StageTutorial)이라 **Start = 항상 튜토리얼**이다(절차 맵 `Stage1_Procedural` 은 비활성으로 보관 — 회귀 3부에서만 켠다).
 - [ ] 🔴 네트워크 없이 `4.MapScene` 만 단독 Play 하면 디렉터·타이머가 스폰되지 않아 **아무것도 돌지 않는다**(로그 `[Tutorial] 네트워크 없이 맵이 생성됐다 …`). 반드시 부트스트랩 → 호스트(솔로도 호스트)로.
 - [ ] 툴바 `데이터: 테이블/인스펙터` 는 어느 쪽이든 된다(튜토리얼 문구 SO 는 아직 데이터 테이블에 연결되지 않음 — [data-table.md](data-table.md)). 빌드는 항상 xlsx.
