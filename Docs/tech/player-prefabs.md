@@ -486,18 +486,18 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
 **전투 HUD 대시 슬롯** (2026-10-21, 할 일 84) — `893c4d74`의 HUD 개편에서 `Slot_Dash` 오브젝트만 빠지고
-`DashCooldownHUD`·`CombatHUD` 바인딩은 남아 직렬화 참조가 끊긴 상태였으므로, 머리 위 아이콘은 유지한 채
-`CombatHUD/Layer_Combat/SkillBar/Slot_Dash`를 다시 넣었다. 사용자 편집이 잦은 `CombatHUD.prefab`에는
-`2.Prefabs/UI/DashCooldownSlot.prefab` 중첩 인스턴스와 세 참조만 추가한다.
+(그 슬롯은 `2.Prefabs/UI/Slot_.prefab` 으로 따로 저장됨) `DashCooldownHUD`·`CombatHUD` 바인딩은 남아 직렬화 참조가 끊긴 상태였으므로,
+머리 위 아이콘은 유지한 채 **기존 스킬 슬롯 `Slot_.prefab` 의 중첩 인스턴스**를 `CombatHUD/Layer_Combat/SkillBar/Slot_Dash` 로 다시 넣었다.
+대시 전용 슬롯 프리팹은 만들지 않는다. 사용자 편집이 잦은 `CombatHUD.prefab`에는 인스턴스와 두 참조만 추가한다.
 
 | 항목 | 내용 |
 |------|------|
-| 크기·배치 | 현행 스킬 슬롯 100×100 템플릿의 **75% 스케일**(실표시 75×75), 기존 5개 슬롯은 이동 없이 오른쪽 `x=300`에 추가 |
-| 이미지 | 머리 위 표시와 같은 `Common_DashSlotIcon` 테두리 + `Common_DashIcon`을 재사용 |
-| 쿨타임 | `PlayerDashController.RemainingRecharge/RechargeDuration`을 그대로 사용해 세로 채움과 남은 초를 표시. 별도 시계·재계산 없음 |
-| 충전 수 | `MaxCharge > 1`일 때만 우하단에 `현재/최대` 표시. 현재 `PlayerDashData.asset`은 1충전이라 숨김 |
+| 크기·배치 | `Slot_`(96×99)의 **75% 스케일**(실표시 72×74), 기존 5개 슬롯은 이동 없이 오른쪽 `x=300`에 추가. 인스턴스 오버라이드 = 이름·활성·위치·스케일·아이콘 |
+| 이미지 | `Slot_` 테두리·`Dash` 키 라벨 그대로, `Icon_mask/Icon_Dash` 스프라이트만 `Common_DashIcon` 오버라이드(원본은 비어 있음). `Slot_` 의 `Icon_mask` 가 Y 180° 반전이라 `Icon_Dash` 도 Y 180° 오버라이드로 되돌려 `>>` 방향 유지 |
+| 쿨타임 | `PlayerDashController.RemainingRecharge/RechargeDuration`을 그대로 사용해 `CooldownFill` 세로 채움과 `Cooldown` 남은 초를 표시. 별도 시계·재계산 없음 |
+| 충전 수 | `DashCooldownHUD.chargeText`(선택, `MaxCharge > 1`일 때만 `현재/최대`)는 비워 둠 — `Slot_` 에 칸이 없고 현재 1충전 |
 | 오너 범위 | `CombatHUD`가 `Player.LocalPlayer`로 바인딩하는 기존 경로 그대로라 로컬 플레이어 HUD에만 표시 |
-| 테스트 | `Tests/EditMode/CombatHud/Editor/DashCooldownHudTests` — 프리팹 배선·75%·이미지·채움·초/충전 표기 규칙 |
+| 테스트 | `Tests/EditMode/CombatHud/Editor/DashCooldownHudTests` — `Slot_` 출처·75%·아이콘·채움 배선·기존 슬롯 위치·초/충전 표기 규칙 |
 
 **머리 위 라벨 = 이름 / 상태이상** (2026-10-16, 할 일 50) — `Bar/NameLabel` 은 평소 이름(P1·P2…), CC·붙잡힘 중에는 그 이름 하나로 바뀐다(규칙·우선순위: [status-effects.md](../design/status-effects.md) §머리 위 표시).
 글자는 흰색 고정 + 검정 아웃라인 ≈3px(2026-10-16 후속) — 전역 폰트(TMP Settings·원본 `LiberationSans SDF`·`Resources/NotoSansKR … SDF`)는 그대로 두고 **이름표 전용 폰트 에셋**을 쓴다.
