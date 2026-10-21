@@ -181,7 +181,7 @@
   - Gameplay that reads `GameNow` or scaled `Time.deltaTime` slows together: cooldowns, status effects, the boss time limit (`BossTimerManager`), combat VFX/animation, and combat HUD effects.
   - Clients receive the start event one-way-latency late. `GameNow` is clamped so it never runs backward, so client display may differ from the server briefly. This is accepted.
   - Cutscene locks and scene transitions refuse slow motion or reset it to 1.0 immediately. Session end restores `Time.timeScale` = 1.
-  - Details, values, and the commit plan are in [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md). Tuning values are in the `SlowMotion` sheet of the data table ([data-table.md](data-table.md)).
+  - Details, values, and the commit plan are in [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md). Tuning values are in the `SlowMotion` sheet of the data table ([data-table.md](data-table.md)).
 - NetworkManager time, transport timeouts, connection state, menu UI input, option panel UI, loading spinners, and other non-gameplay UI continue using real time. They are unaffected by both pause and slow motion (use `Time.unscaledDeltaTime` / `ServerTime`).
 - The project does not use a generic individual timer pause system.
 - Special mechanics that stop their own countdown, such as bomb fuse timing while flying, are handled as object-specific state rules instead of generic timer pause.

@@ -1,7 +1,7 @@
 # PLAN — 플레이어블 스킬 툴팁 + 캐릭터별 스킬 아이콘
 
 > 상태: **✅ 은희 승인(2026-10-02) · 구현 = Codex 위임(브랜치 `feature/SkillTooltip`)**. 작성 2026-10-02 은희(Claude).
-> 담당 영역 = 은희(Player·UI). 데이터 테이블 확장 포함 — 사용법 원본은 [Docs/tech/data-table.md](Docs/tech/data-table.md).
+> 담당 영역 = 은희(Player·UI). 데이터 테이블 확장 포함 — 사용법 원본은 [Docs/tech/data-table.md](../../tech/data-table.md).
 
 ## 1. 목표 · 완료 조건
 

@@ -1,12 +1,12 @@
 # PLAN — 플레이어 이동을 Motor 기반으로 재정립 (2026-09-11, 승인 대기)
 
 작성: 은희(Claude) / 대상: `Assets/1.Scripts/Player/**`, `Assets/2.Prefabs/Player/**`
-관련: [AGENTS.md](AGENTS.md) §4 코어 설계 원칙 · [CONTEXT.md](CONTEXT.md) · [AIRULE.md](AIRULE.md)
+관련: [AGENTS.md](../../../AGENTS.md) §4 코어 설계 원칙 · [CONTEXT.md](../../../CONTEXT.md) · [AIRULE.md](../../../AIRULE.md)
 
 > 🔴 **기준 브랜치: `origin/development` (`72392d6`).**
 > 이 조사는 `fix/PlayerSlopeMovement`(development 대비 ahead 4 / **behind 78**)에서 수행했으나,
 > 착수는 **`development`에서 새로 딴 `feature/player-motor`** 에서 한다. 78커밋 뒤쳐진 브랜치에서
-> `Player.prefab`을 건드리면 머지 시 GUID 파손 위험이 있다([AGENTS.md](AGENTS.md) §3).
+> `Player.prefab`을 건드리면 머지 시 GUID 파손 위험이 있다([AGENTS.md](../../../AGENTS.md) §3).
 >
 > development와의 차이 확인 완료 — 플레이어 관련 변경 4파일 중 **이동에 관계된 것은
 > `PlayerMovement.ApplyFlatGroundYLock` 하나**(§2.4). 나머지(`PlayerDefaultAttack`,
@@ -31,11 +31,11 @@
 
 | # | 위치 | 루프 |
 |---|---|---|
-| A-1 | `PlayerMovement.Move()` → `rb.MovePosition` ([:139](Assets/1.Scripts/Player/PlayerMovement.cs:139)) | `Update` |
-| A-2 | `PlayerMovement.MoveRoot()` → `rb.MovePosition` ([:239](Assets/1.Scripts/Player/PlayerMovement.cs:239)) — **호출자 5곳** | `Update` / `OnAnimatorMove` |
-| A-3 | `PlayerMovement.MoveTowardsPoint()` → `rb.MovePosition` ([:326](Assets/1.Scripts/Player/PlayerMovement.cs:326)) | `Update` |
-| A-4 | `PlayerRestrainedState.Tick()` → `MovePosition` + `MoveRotation` ([:792](Assets/1.Scripts/Player/PlayerStateController.cs:792)) | `Update` |
-| A-5 | `PlayerKnockbackState.Enter()` → `AddForce(Impulse)` ([:915](Assets/1.Scripts/Player/PlayerStateController.cs:915)) | `FixedUpdate`(PhysX) |
+| A-1 | `PlayerMovement.Move()` → `rb.MovePosition` ([:139](../../../Assets/1.Scripts/Player/PlayerMovement.cs:139)) | `Update` |
+| A-2 | `PlayerMovement.MoveRoot()` → `rb.MovePosition` ([:239](../../../Assets/1.Scripts/Player/PlayerMovement.cs:239)) — **호출자 5곳** | `Update` / `OnAnimatorMove` |
+| A-3 | `PlayerMovement.MoveTowardsPoint()` → `rb.MovePosition` ([:326](../../../Assets/1.Scripts/Player/PlayerMovement.cs:326)) | `Update` |
+| A-4 | `PlayerRestrainedState.Tick()` → `MovePosition` + `MoveRotation` ([:792](../../../Assets/1.Scripts/Player/PlayerStateController.cs:792)) | `Update` |
+| A-5 | `PlayerKnockbackState.Enter()` → `AddForce(Impulse)` ([:915](../../../Assets/1.Scripts/Player/PlayerStateController.cs:915)) | `FixedUpdate`(PhysX) |
 | A-6 | 텔레포트/리셋 — `PlayerFallRecovery`, `BossTeleportManager`, `DevBossEntranceWarp` | 각기 다름 |
 | A-7 | **중력** — `UseGravity=on` + `IsKinematic=off`이라 PhysX가 매 스텝 위치를 바꾼다 | `FixedUpdate`(PhysX) |
 
@@ -53,24 +53,24 @@ A-7은 코드에 호출부가 없지만 위치를 쓰는 주체다. **`Update`�
 | | 무엇 | 기준 | 쓰는 곳 |
 |---|---|---|---|
 | C-1 | `PlayerMotionSweep.Resolve` | `ObstacleMask`, 등판각 통과, 접선 슬라이드 | 걷기·대시 |
-| C-2 | `PlayerMovement.ClampByStaticGeometry` ([:243](Assets/1.Scripts/Player/PlayerMovement.cs:243)) | 마스크 하드코딩, **등판각 무시**, 벽 앞 정지 | `MoveRoot` 전부 |
-| C-3 | `PlayerMovement.ProjectOntoGround` ([:149](Assets/1.Scripts/Player/PlayerMovement.cs:149)) | 지면 노멀 투영 | 걷기 |
-| C-4 | `PlayerDashState.ResolvePlanarSlopeDirection` ([:1177](Assets/1.Scripts/Player/PlayerStateController.cs:1177)) | C-3의 사본 | 대시 |
+| C-2 | `PlayerMovement.ClampByStaticGeometry` ([:243](../../../Assets/1.Scripts/Player/PlayerMovement.cs:243)) | 마스크 하드코딩, **등판각 무시**, 벽 앞 정지 | `MoveRoot` 전부 |
+| C-3 | `PlayerMovement.ProjectOntoGround` ([:149](../../../Assets/1.Scripts/Player/PlayerMovement.cs:149)) | 지면 노멀 투영 | 걷기 |
+| C-4 | `PlayerDashState.ResolvePlanarSlopeDirection` ([:1177](../../../Assets/1.Scripts/Player/PlayerStateController.cs:1177)) | C-3의 사본 | 대시 |
 
 **C-1 → C-2가 같은 프레임에 연달아 적용된다.** 마스크·등판각 판정이 달라서 C-1이 통과시킨
-경사를 C-2가 다시 막는다. 코드가 이미 알고 있다 ([PlayerMovement.cs:265](Assets/1.Scripts/Player/PlayerMovement.cs:265) 경고 주석).
+경사를 C-2가 다시 막는다. 코드가 이미 알고 있다 ([PlayerMovement.cs:265](../../../Assets/1.Scripts/Player/PlayerMovement.cs:265) 경고 주석).
 
 ### 2.3.1 🔴 장애물 마스크가 경로마다 다르다
 
 | 경로 | 마스크 | 다른 플레이어/몬스터를 |
 |---|---|---|
-| 걷기 스윕 | `Default/Ground/Wall/Env` ([:54](Assets/1.Scripts/Player/PlayerMovement.cs:54)) | 통과한다 |
+| 걷기 스윕 | `Default/Ground/Wall/Env` ([:54](../../../Assets/1.Scripts/Player/PlayerMovement.cs:54)) | 통과한다 |
 | `MoveRoot` 클램프(C-2) | 위와 동일(하드코딩) | 통과한다 |
 | 대시 스윕 | **`~0` (전체 레이어)** | **막힌다** |
 | PhysX 솔버 | Layer Collision Matrix | **밀어낸다**(dynamic이라) |
 
-대시 마스크가 `~0`인 이유: [PlayerDashData.asset](Assets/9.ScriptableObject/Player/PlayerDashData.asset)에 `dashObstacleMask` 키가 **없어서**
-코드 기본값 `= ~0`([PlayerDashData.cs:31](Assets/1.Scripts/Player/Dash/PlayerDashData.cs:31))이 적용된다. 대시는 `Player`·`Enemy`·`Projectile`·
+대시 마스크가 `~0`인 이유: [PlayerDashData.asset](../../../Assets/9.ScriptableObject/Player/PlayerDashData.asset)에 `dashObstacleMask` 키가 **없어서**
+코드 기본값 `= ~0`([PlayerDashData.cs:31](../../../Assets/1.Scripts/Player/Dash/PlayerDashData.cs:31))이 적용된다. 대시는 `Player`·`Enemy`·`Projectile`·
 `HazardArea`·`PlayerHurtbox`·`Corpse`·`Soul`까지 전부 장애물로 본다 — **"대시가 안 나간다"의 또 다른 후보.**
 
 그리고 대시만의 문제가 아니다. **`Player.prefab`의 마스크가 전부 `~0`(`m_Bits: 4294967295`)이다**:
@@ -159,7 +159,7 @@ FixedUpdate ③   PlayerMotor.Tick()             합산 → 경사 투영 → �
   A-4·A-5가 직접 물리를 만질 수 있었다. 남겨두면 같은 일이 반복된다.
 - B-6(`OnAnimatorMove` 루트모션)은 루프가 다르므로 **델타를 래치**했다가 다음 `FixedUpdate`에 제출.
 - 엣지 입력(`DashPressed`) 래치 — 프레임이 물리보다 빠를 때 입력이 씹히는 것을 막는다.
-  (현재도 잠재 문제다: [PlayerStateController.cs:80](Assets/1.Scripts/Player/PlayerStateController.cs:80) 경고 로그가 이 계열)
+  (현재도 잠재 문제다: [PlayerStateController.cs:80](../../../Assets/1.Scripts/Player/PlayerStateController.cs:80) 경고 로그가 이 계열)
 - 물리 플래그는 **이 단계에서 건드리지 않는다.** A-5(넉백)·A-7(중력)은 그대로 남는다.
 
 ### 3단계 — kinematic 전환 + 넉백 재작성
@@ -172,15 +172,15 @@ FixedUpdate ③   PlayerMotor.Tick()             합산 → 경사 투영 → �
   **PhysX 내장 기본값(마찰 0.6)이 넉백 거리를 정하고 있다** — 아무도 튜닝한 적 없는 값이다.
   - **데이터는 `PlayerGameRuleData`에 둔다**(등판각과 같은 단일 소스). 값은 **기존 동작에 준하는
     기본값**으로 착수하고 별도 튜닝은 하지 않는다 — 현행 `minKnockbackTime 0.15` / `maxKnockbackTime 1.5` /
-    `knockbackStopSpeed 0.15`([PlayerStateController.cs:13](Assets/1.Scripts/Player/PlayerStateController.cs:13))를 옮겨온다.
+    `knockbackStopSpeed 0.15`([PlayerStateController.cs:13](../../../Assets/1.Scripts/Player/PlayerStateController.cs:13))를 옮겨온다.
   - 🔴 **벽 충돌 = 그 자리 정지.** 튕기지 않고 **슬라이드도 하지 않는다**(걷기와 다르다).
   - **상태 지속시간은 유지한다** — 이동이 0이 돼도 넉백(경직)은 원래 종료시각까지 간다.
-    대시의 기존 불변식([:1056](Assets/1.Scripts/Player/PlayerStateController.cs:1056))과 같은 규칙.
+    대시의 기존 불변식([:1056](../../../Assets/1.Scripts/Player/PlayerStateController.cs:1056))과 같은 규칙.
     (가) 즉시 종료로 하면 **벽 근처에서 넉백이 무력화된다** — 보스가 벽으로 밀어붙일수록
     경직이 짧아지는 역전이 생긴다.
 - `isKinematic` / `useGravity` 토글 전부 제거:
-  [Player.cs:362·381](Assets/1.Scripts/Player/Player.cs:362), [PlayerStateController.cs:836·851·910](Assets/1.Scripts/Player/PlayerStateController.cs:836),
-  [PlayerSoulController.cs:185](Assets/1.Scripts/Player/Soul/PlayerSoulController.cs:185). Soul 부유는 "중력 채널 off" 한 줄이 된다.
+  [Player.cs:362·381](../../../Assets/1.Scripts/Player/Player.cs:362), [PlayerStateController.cs:836·851·910](../../../Assets/1.Scripts/Player/PlayerStateController.cs:836),
+  [PlayerSoulController.cs:185](../../../Assets/1.Scripts/Player/Soul/PlayerSoulController.cs:185). Soul 부유는 "중력 채널 off" 한 줄이 된다.
 - 🔴 **stepOffset 상당(계단·턱 넘기)을 `PlayerMotionSweep`에 추가.** 이 계획에서 **유일하게
   선례가 없는 신규 알고리즘**이자 최대 리스크. EditMode 테스트로 고정한다.
   맵에 계단 에셋이 아직 없으므로 **0.3m 후보값으로 진행**하고, 에셋이 들어오면 실측해 조정한다.
@@ -211,7 +211,7 @@ PlayerGameRuleData
   스윕 때문이 아니다(걷기 마스크는 이미 Player를 통과시킨다). kinematic이 되면
   **"플레이어끼리 통과"가 기본값**이 되는데, **이번 결정은 그 기본값을 그대로 채택한다**
   (`blockOtherPlayers = false`). 즉 의도된 동작 변경이며, 나중에 막고 싶으면 이 토글 하나만 켠다.
-- **Enemy는 계속 통과한다** — 현행 동작 유지("러시가 몹 사이를 지나는 감각", [PlayerMovement.cs:54](Assets/1.Scripts/Player/PlayerMovement.cs:54)).
+- **Enemy는 계속 통과한다** — 현행 동작 유지("러시가 몹 사이를 지나는 감각", [PlayerMovement.cs:54](../../../Assets/1.Scripts/Player/PlayerMovement.cs:54)).
   필요해지면 `blockMonsters` 형제 토글을 같은 자리에 추가한다(이번 범위 아님).
   ⚠️ **정정 (2026-09-28 경석 · 팀장 결정)**: 보스·중간보스는 **막힌다.** 토글 대신 `PlayerGameRuleData.asset` 의
   `obstacleMask` 에 Enemy(8)를 넣었다(2185 → 2441). 막히는 것은 **몸 콜라이더가 켜진 것만** — 23호(원래 켜짐)·
@@ -227,7 +227,7 @@ PlayerGameRuleData
 
 **규칙: Soul은 Player를 통과하고, Player도 Soul을 통과한다.** GameRule 필드 없이 처리된다 —
 `PlayerSoulController`가 **루트 레이어를 실제로 바꾸기** 때문이다
-(`aliveLayer`(Player) ↔ `soulLayer`(Soul), [:415·433](Assets/1.Scripts/Player/Soul/PlayerSoulController.cs:415)).
+(`aliveLayer`(Player) ↔ `soulLayer`(Soul), [:415·433](../../../Assets/1.Scripts/Player/Soul/PlayerSoulController.cs:415)).
 
 | 방향 | 성립 근거 |
 |---|---|
@@ -253,9 +253,9 @@ CC는 "무엇을 얼마나 움직일지"는 자유롭게 두지만 **"충돌을 
 
 - 등판각이 `PlayerGameRuleData.MaxWalkableSlopeAngle` 단일 소스로 걷기·대시·접지에 공유된다.
   CC의 `slopeLimit`은 `Move()` 내부에만 걸려 이 단일화가 깨진다.
-- 지면 마스크가 상태별로 바뀐다 (`soulGroundMask` vs `aliveGroundMask`, [GroundingSensor:141](Assets/1.Scripts/Player/PlayerGroundingSensor.cs:141)).
+- 지면 마스크가 상태별로 바뀐다 (`soulGroundMask` vs `aliveGroundMask`, [GroundingSensor:141](../../../Assets/1.Scripts/Player/PlayerGroundingSensor.cs:141)).
 - 충돌 대상을 의도적으로 좁혀놨다 — "유닛은 통과, 정적 지오메트리만 막음"
-  ([PlayerMovement.cs:54](Assets/1.Scripts/Player/PlayerMovement.cs:54), 러시가 몹 사이를 지나는 감각 유지).
+  ([PlayerMovement.cs:54](../../../Assets/1.Scripts/Player/PlayerMovement.cs:54), 러시가 몹 사이를 지나는 감각 유지).
 
 여기에 4단계(되감기)가 CC의 내부 상태 + `enabled` 토글 패턴과 상충한다.
 **대가:** 계단 처리를 직접 짜야 한다(3단계 리스크). CC의 검증된 구현을 포기한다.
@@ -293,7 +293,7 @@ CC는 "무엇을 얼마나 움직일지"는 자유롭게 두지만 **"충돌을 
    *우연히* 안 부르는 것이다. Dynamic 구간에는 Motor가 "지금은 물리가 운전한다"를 **알고** 있어야 한다.
 2. **전환 시 속도를 양방향 인계한다.** kinematic→dynamic이면 Motor의 수직 속도를 `linearVelocity`로
    넘기고, 반대 방향이면 되받는다. 지금 코드는 양쪽 다 `linearVelocity = 0`으로 끊는다
-   ([:911](Assets/1.Scripts/Player/PlayerStateController.cs:911), [:958](Assets/1.Scripts/Player/PlayerStateController.cs:958)) — 낙하 중 넉백에서 수직 속도가 사라진다.
+   ([:911](../../../Assets/1.Scripts/Player/PlayerStateController.cs:911), [:958](../../../Assets/1.Scripts/Player/PlayerStateController.cs:958)) — 낙하 중 넉백에서 수직 속도가 사라진다.
 3. **전환을 Motor가 독점한다.** 현재 `isKinematic` 토글이 4곳(`Knockback` / `Restrained`의 `wasKinematic`
    저장·복원 / `Player.ConfigureMovementPhysicsAuthority` / `SoulController`의 `useGravity`)이라
    **그랩 중 넉백이 들어오면 복원 스택이 깨진다.** 위치를 독점하는 것과 같은 이유로 모드도 독점한다.
@@ -309,11 +309,11 @@ Dynamic 모드가 필요해지면 이 패턴이 먼저 검토 대상이다.
 
 ## 5. Multiplayer / networking authority assumptions
 
-- 이동 권한 = **오너(클라)**. 보스·데미지·상태이상·장판 = 서버. ([AGENTS.md](AGENTS.md) §4 불변)
+- 이동 권한 = **오너(클라)**. 보스·데미지·상태이상·장판 = 서버. ([AGENTS.md](../../../AGENTS.md) §4 불변)
 - 비권한 피어는 루트 NetworkTransform으로 복제된다. 현재 `ConfigureMovementPhysicsAuthority`가
   비권한 피어를 `isKinematic=true`로 만들어 물리 경쟁을 막는데, **3단계에서 전 피어가
   kinematic이 되므로 이 분기는 의미를 잃는다** → `PlayerMotor.enabled` 토글로 대체.
-- 캐리 이중 적용 방지 규약([Player.cs:168](Assets/1.Scripts/Player/Player.cs:168))은 그대로 유지.
+- 캐리 이중 적용 방지 규약([Player.cs:168](../../../Assets/1.Scripts/Player/Player.cs:168))은 그대로 유지.
 - 넉백은 현재 "오너가 종료를 서버에 보고 + 서버 타임아웃 안전망(`ServerKnockbackReportGraceTime`)"
   구조인데, 이건 마찰·솔버 반복에 의존하는 **비결정론에 대한 정당한 대응**이었다.
   3단계에서 결정론이 확보되면 이 안전망을 단순화할 수 있다 — 단 **이번 범위에서는 건드리지 않는다**(회귀 위험).

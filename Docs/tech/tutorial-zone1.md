@@ -1,6 +1,6 @@
 # 튜토리얼 존1 흐름 (할 일 15 · S7 → v8 V1)
 
-> 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.0·§3.1·§5(공통·존1) — **v8**(2026-10-12) · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md) S7·§3-1 V1.
+> 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.0·§3.1·§5(공통·존1) — **v8**(2026-10-12) · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md) S7·§3-1 V1.
 > 디렉터 API 전체는 [tutorial-director.md](tutorial-director.md) §10, 훅은 [tutorial-player-hooks.md](tutorial-player-hooks.md), 안내 UI 는 [tutorial-guide-ui.md](tutorial-guide-ui.md).
 > v8 변경: 평타 '허수아비 적중 5회' 제거 → **기본 공격·Q·E·R·우클릭 각각 실제 사용 1회**(적중 불필요) · **G1 은 60초 교착 방지 제외** · 체크리스트 8줄 · 캐릭터별 힌트.
 

@@ -1,7 +1,7 @@
 # PLAN — 캐릭터 선택 화면 (중간 발표용 최소 구현)
 
 > 2026-10-02 · 은희(Claude) · 브랜치 `feature/SelectCharactorUI` · 그릴 13문항 완료 · ✅ 구현(1단계 Codex `09e9cc57` · 2단계 Claude) · 🔴 MPPM Play 확인 대기
-> 배경 사실: [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) §8.3, `LobbyUIController`, `NetworkLoadingFlowController.ResolvePlayerPrefabForClient`
+> 배경 사실: [Docs/tech/player-prefabs.md](../../tech/player-prefabs.md) §8.3, `LobbyUIController`, `NetworkLoadingFlowController.ResolvePlayerPrefabForClient`
 
 ## 목표
 Lobby 씬에서 StartHost/StartClient 로 접속 → 캐릭터 선택 패널에서 3개 버튼 중 고름 →

@@ -1,7 +1,7 @@
 # PLAN — 거너 레이저건 정렬 + 기본 공격 손 이탈 (2026-10-09)
 
 작성: 은희(Claude) / 브랜치: `fix/GunnerGunAlign`(development `778bbb87` 에서 분기)
-관련: [PLAN-gunner.md](PLAN-gunner.md) · [character_gunner.md](Docs/design/character/character_gunner.md) · [player-prefabs.md](Docs/tech/player-prefabs.md)
+관련: [PLAN-gunner.md](PLAN-gunner.md) · [character_gunner.md](../../design/character/character_gunner.md) · [player-prefabs.md](../../tech/player-prefabs.md)
 
 > 담당 = 은희(Player 영역). 보스·몬스터 코드 수정 없음. VFX 에셋(민경)은 건드리지 않는다 — 소켓 위치만 따라 움직인다.
 

@@ -1,6 +1,6 @@
 # Handoff — 결과 화면 통계용 몬스터 훅 (2026-10-07 · 은희 → **경석**)
 
-> 브랜치 `feature/ResultStats`. 계획 원본 = [PLAN-result-stats.md](../../PLAN-result-stats.md).
+> 브랜치 `feature/ResultStats`. 계획 원본 = [PLAN-result-stats.md](../history/PLANS/PLAN-result-stats.md).
 > 이 프로젝트는 PR 을 쓰지 않으므로 경석 영역(몬스터) 변경을 이 문서로 공유한다.
 
 ## 요약

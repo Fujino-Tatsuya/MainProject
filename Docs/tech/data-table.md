@@ -34,7 +34,7 @@ GameData.xlsx (SVN, 잠금)
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
-| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
+| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 

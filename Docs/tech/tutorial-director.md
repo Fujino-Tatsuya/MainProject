@@ -1,6 +1,6 @@
 # 튜토리얼 진행 상태 — TutorialDirector
 
-> 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4(**v8**, 2026-10-12 — 반영 계획 PLAN-tutorial §3-1) · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
+> 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4(**v8**, 2026-10-12 — 반영 계획 PLAN-tutorial §3-1) · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md).
 > v8 에서 바뀐 디렉터 규칙: G1 = 여덟 항목·교착 방지 제외 · G5 = 수동(연계 3회 + 마지막 복귀) · 체크 항목 SkillR·SkillInterrupt·Corridor1CooldownReset 추가 · `AttackHits` 삭제. 목숨 차감 기준 G11 은 그대로(사용자 확정, §11).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.

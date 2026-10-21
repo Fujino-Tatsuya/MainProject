@@ -1,8 +1,8 @@
 # PLAN — 근접 캐릭터 "어쌔신" 구현 (2026-10-06 작성 · ✅ 은희 승인)
 
 작성: 은희(Claude) / 브랜치: `feature/Assassin`(= `development` `e63d0f3b` 에서 분기)
-기획 원본: [character_assassin.md](Docs/design/character/character_assassin.md) — **맨 아래 「구현 결정」 절이 본문보다 우선**
-관련: [player-prefabs.md](Docs/tech/player-prefabs.md) · [PLAN-gunner.md](PLAN-gunner.md)(선례) · [PLAN-flatkit.md](PLAN-flatkit.md) · [data-table.md](Docs/tech/data-table.md)
+기획 원본: [character_assassin.md](../../design/character/character_assassin.md) — **맨 아래 「구현 결정」 절이 본문보다 우선**
+관련: [player-prefabs.md](../../tech/player-prefabs.md) · [PLAN-gunner.md](PLAN-gunner.md)(선례) · [PLAN-flatkit.md](../../../PLAN-flatkit.md) · [data-table.md](../../tech/data-table.md)
 
 > ✅ **담당 = 은희**(Unit·Player·UI 본인 영역). 분담 = **Codex: C# 로직** / **Claude: 아트 임포트·프리팹·SO·Animator·씬 배선·문서·EditMode 실행**.
 > 🔴 **경석 영역(`MonsterBase`·보스) 은 §6 공유 후에만** 건드린다(백어택 A11). VFX 는 임시 파티클까지만 — 정식 연출은 민경.
@@ -240,7 +240,7 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
 ## 9. 비주얼 통일 반영 — v18 최종 (2026-10-17 작성 · 은희 승인 「기본안」 · 영향 점검 뒤 2차 승인 「기본안」)
 
 아트 작업 공간: `D:\p_MT\char\암살자\AIWorkSpace\v18_CastUnity_20261014\` · 납품: `Delivery_final_v18g_T3H\`(FBX·BaseColor·편집용 blend·미리보기·읽어주세요)
-초안·근거: `00_handoff\PLAN_어쎄신_비주얼반영_초안.md` · 단검 스케일 검증: `120_dagger_scale_check\` · 상세 결정 [player-prefabs.md §14](Docs/tech/player-prefabs.md)
+초안·근거: `00_handoff\PLAN_어쎄신_비주얼반영_초안.md` · 단검 스케일 검증: `120_dagger_scale_check\` · 상세 결정 [player-prefabs.md §14](../../tech/player-prefabs.md)
 브랜치: `feature/AssassinVisual`(development `1c734a03` 에서 분기)
 
 **Goal** — 인게임 어쌔신을 v18 최종 비주얼(형상 v18g + 텍스처 T3H)로 바꾸고, 가붕이·거너와 같은 Flat Kit 재질 + 키 ×1.25(1.252→약 1.565m)로 맞춘다.

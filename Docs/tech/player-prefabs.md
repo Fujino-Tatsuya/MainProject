@@ -306,7 +306,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 > 🔴 **권한 값은 브랜치마다 다르다.** 위 표는 `feature/player-motor-owner-auth`(지스타까지의 개발 브랜치)
 > 기준이다. `feature/player-motor-server-auth` 에서는 루트·Armature 가 Server(`0`) 다.
 > 전환 스위치는 `Player.ServerAuthoritativeMovement` + 프리팹 `AuthorityMode` 두 개다
-> ([PLAN-player-motor.md](../../PLAN-player-motor.md) "결정 — 지스타까지는 오너 권위").
+> ([PLAN-player-motor.md](../history/PLANS/PLAN-player-motor.md) "결정 — 지스타까지는 오너 권위").
 > **프리팹을 복제·분리할 때 이 값을 하드코딩된 상수로 취급하지 말 것.**
 
 ---
@@ -339,7 +339,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
    캐릭터·무기마다 그 **Material Variant** 를 두고 **Base Map(·틴트)만** 덮는다: `FK_Paladin_Sword/Shield_Toon` · `Gunner/FK_Gunner_Body` · `Gunner/FK_LaserGun` · `Assassin/FK_Assassin_Body`(머리·몸·단검 L/R 공용, §14).
    새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Rendering/Flat Kit/플레이어 Variant 구성 (가붕이 부모)`(`FlatKitPlayerVariants.cs`, 재실행 안전 — 🔴 Variant 의 Base Map·틴트 외 오버라이드를 전부 되돌린다).
    ToonLit Variant(`3.Materials/Toon/`, 부모 `PlayableCharacter_Toon`)는 되돌리기용으로만 남아 있다(미사용) — 이전 계획 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md) · [PLAN-flatkit.md](../../PLAN-flatkit.md).
-5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../../PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
+5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../history/PLANS/PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
    **`<Char>_Armature/HUD`** 아래에 중첩한다(자체 Canvas, 오너만 표시). 유령 상태에서 Armature 가 꺼지면 함께 숨는다.
    예: 거너 과열 게이지 = `Gunner_Armature/HUD/GunnerHeatGauge`(`Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)`, 재실행 안전).
    P 칸 툴팁 출처는 `IPlayerPassive`(툴팁 구현 시) → 없으면 하위의 `IPassiveTooltipProvider` — `PassiveHUD` 는 캐릭터 타입을 모른다.
@@ -414,7 +414,7 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 
 ### 8.3 선택값을 스폰까지 나르기
 
-✅ **2026-10-02 구현** ([PLAN-character-select.md](../../PLAN-character-select.md)). 아래는 결과 요약.
+✅ **2026-10-02 구현** ([PLAN-character-select.md](../history/PLANS/PLAN-character-select.md)). 아래는 결과 요약.
 
 - 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
 - 로비(2026-10-19 C8): `LobbySession.RequestCharacterServerRpc` → 서버가 `LobbyReadyRules`(Ready·카운트다운 중 거부, 교체 쿨다운) + 로스터로 검증 후 `NetworkList<LobbyPlayerEntry>` 로 복제. 기본 0번, 중복 선택 허용. (옛 `Lobby.CharacterRequest`/`Lobby.State` named message 는 퇴역.)
@@ -611,7 +611,7 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 
 ## 14. 어쌔신 v18 비주얼 — Flat Kit 재질 · 키 ×1.25 (2026-10-17, PLAN-assassin §9)
 
-계획 [PLAN-assassin.md](../../PLAN-assassin.md) §9. 가붕이·거너와 통일감을 맞추려고 형상 v18g + 텍스처 T3H 로 바꾸고 키를 1.252 → 약 1.565m 로 키웠다. **판정·스킬 수치·클립·네트워크는 그대로다.**
+계획 [PLAN-assassin.md](../history/PLANS/PLAN-assassin.md) §9. 가붕이·거너와 통일감을 맞추려고 형상 v18g + 텍스처 T3H 로 바꾸고 키를 1.252 → 약 1.565m 로 키웠다. **판정·스킬 수치·클립·네트워크는 그대로다.**
 
 | 항목 | 내용 |
 |------|------|
@@ -634,4 +634,4 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 - [layer-standard.md](layer-standard.md) — 레이어 번호와 공격 마스크 표준
 - [networking.md](networking.md) · [architecture.md](architecture.md) — 권한 모델
 - [Docs/design/players.md](../design/players.md) — 가붕이/징크스 설계
-- [PLAN-player-motor.md](../../PLAN-player-motor.md) — 이동/NetworkTransform 권한 작업
+- [PLAN-player-motor.md](../history/PLANS/PLAN-player-motor.md) — 이동/NetworkTransform 권한 작업

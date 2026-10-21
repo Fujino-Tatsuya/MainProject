@@ -1,6 +1,6 @@
 # 튜토리얼 존4 흐름 + 보스 진입 안내 — 설정 → 타이머 → 패널·다리·중간보스 (할 일 15 · S10)
 
-> 원본: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.7(Z4-0~Z4-6)·§3.9(B-1·B-2)·§4 G7~G10·D4·D6·D17·D19 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md) S10.
+> 원본: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.7(Z4-0~Z4-6)·§3.9(B-1·B-2)·§4 G7~G10·D4·D6·D17·D19 · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md) S10.
 > 디렉터: [tutorial-director.md](tutorial-director.md)(§8 장부·§9 보스 타이머/보스 길) · 안내 UI: [tutorial-guide-ui.md](tutorial-guide-ui.md) · 존3(같은 구조): [tutorial-zone3.md](tutorial-zone3.md).
 > 테스트: `TutorialZone4RulesTests`(튜토리얼 러너 `Tools/Tests/튜토리얼 EditMode 테스트 실행`).
 
