@@ -3,8 +3,11 @@ using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using Unity.Netcode;
 
 /// <summary>
 /// 할 일 48 빌드 시나리오(B1~B3) 준비 — QA 전용 출력 폴더에 빌드하고 인스턴스 폴더 2개(호스트·클라)를 만든다.
@@ -18,6 +21,10 @@ public static class QABuild48
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Application.dataPath), "..", "_lane-artifacts", "MainProject", "build48"));
 
     public static string BaseExe => Path.Combine(ArtifactsRoot, "base", "MainProject.exe");
+    public static string MismatchBaseExe => Path.Combine(ArtifactsRoot, "mismatch-base", "MainProject.exe");
+
+    /// <summary>빌드 씬 복사본에만 프로토콜 차이를 넣는 플래그. 원본 프리팹·씬은 저장하지 않는다.</summary>
+    internal static bool BuildProtocolMismatch { get; private set; }
 
     [MenuItem("Tools/QA/48/Build/Build Demo Player (QA artifacts)", priority = 60)]
     public static void Build()
@@ -39,7 +46,25 @@ public static class QABuild48
         };
 
         BuildReport report = null;
-        DataTableBuild.WithTableValues(() => report = BuildPipeline.BuildPlayer(options));
+        BuildReport mismatchReport = null;
+        DataTableBuild.WithTableValues(() =>
+        {
+            report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+                return;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(MismatchBaseExe));
+            options.locationPathName = MismatchBaseExe;
+            try
+            {
+                BuildProtocolMismatch = true;
+                mismatchReport = BuildPipeline.BuildPlayer(options);
+            }
+            finally
+            {
+                BuildProtocolMismatch = false;
+            }
+        });
         BuildSummary summary = report.summary;
         string line = $"[QA][Build] result={summary.result} errors={summary.totalErrors} time={summary.totalTime} exe={BaseExe}";
         File.WriteAllText(Path.Combine(ArtifactsRoot, "build-result.txt"), line + Environment.NewLine);
@@ -49,6 +74,17 @@ public static class QABuild48
             return;
         }
         Debug.Log(line);
+
+        BuildSummary mismatchSummary = mismatchReport.summary;
+        string mismatchLine = $"[QA][Build] mismatch result={mismatchSummary.result} errors={mismatchSummary.totalErrors} " +
+                              $"time={mismatchSummary.totalTime} exe={MismatchBaseExe}";
+        File.AppendAllText(Path.Combine(ArtifactsRoot, "build-result.txt"), mismatchLine + Environment.NewLine);
+        if (mismatchSummary.result != BuildResult.Succeeded)
+        {
+            Debug.LogError(mismatchLine);
+            return;
+        }
+        Debug.Log(mismatchLine);
 
         var errors = new System.Collections.Generic.List<string>();
         int copied = DemoConnectionSamples.CopyToBuild(DemoConnectionSamples.ResolveSourceDirectory(Path.GetDirectoryName(Application.dataPath)), BaseExe, errors);
@@ -70,7 +106,7 @@ public static class QABuild48
             return;
         }
 
-        foreach (string name in new[] { "host", "client", "client2" })
+        foreach (string name in new[] { "host", "client", "client2", "client3" })
         {
             string dir = Path.Combine(ArtifactsRoot, name);
             CopyDirectory(baseDir, dir);
@@ -84,7 +120,16 @@ public static class QABuild48
             sample = System.Text.RegularExpressions.Regex.Replace(sample, "\"playerId\"\\s*:\\s*\"[^\"]*\"", $"\"playerId\": \"qa-{name}\"");
             File.WriteAllText(cfg, sample);
         }
-        Debug.Log($"[QA][Build] 인스턴스 폴더 준비: {ArtifactsRoot}/host(설정 없음) · client · client2(127.0.0.1)");
+
+        string mismatchDir = Path.Combine(ArtifactsRoot, "mismatch");
+        if (File.Exists(MismatchBaseExe))
+        {
+            CopyDirectory(Path.GetDirectoryName(MismatchBaseExe), mismatchDir);
+            string cfg = Path.Combine(mismatchDir, DemoConnectionConfig.FileName);
+            if (File.Exists(cfg))
+                File.Delete(cfg);
+        }
+        Debug.Log($"[QA][Build] 인스턴스 폴더 준비: {ArtifactsRoot}/host(설정 없음) · client · client2 · client3 · mismatch");
     }
 
     private static void CopyDirectory(string source, string destination)
@@ -96,6 +141,30 @@ public static class QABuild48
             string target = Path.Combine(destination, rel);
             Directory.CreateDirectory(Path.GetDirectoryName(target));
             File.Copy(file, target, true);
+        }
+    }
+}
+
+/// <summary>
+/// B2 버전 불일치 전용 빌드 가공. BuildPipeline 이 넘긴 씬 복사본의 NGO ProtocolVersion 만 바꾸므로
+/// NetworkManager.prefab 과 0.BootStrapScene 에는 diff·재직렬화가 남지 않는다.
+/// </summary>
+public sealed class QABuild48ProtocolMismatchProcessor : IProcessSceneWithReport
+{
+    public int callbackOrder => int.MaxValue;
+
+    public void OnProcessScene(Scene scene, BuildReport report)
+    {
+        if (!QABuild48.BuildProtocolMismatch || scene.name != DemoSessionRules.BootstrapSceneName)
+            return;
+
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            foreach (NetworkManager manager in root.GetComponentsInChildren<NetworkManager>(true))
+            {
+                manager.NetworkConfig.ProtocolVersion++;
+                Debug.Log($"[QA][Build] mismatch 씬 복사본 ProtocolVersion={manager.NetworkConfig.ProtocolVersion}", manager);
+            }
         }
     }
 }
