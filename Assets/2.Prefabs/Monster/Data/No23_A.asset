@@ -466,7 +466,7 @@ MonoBehaviour:
   jumpAoeRadius: 5.25
   jumpLandingDamage: 65
   jumpTakeoffState: Leap
-  jumpTakeoffDuration: 0.633
+  jumpTakeoffDuration: 0.5275
   jumpHoverState: JumpHover
   jumpLandingState: JumpLanding
   silentLandingState: EntranceLanding
