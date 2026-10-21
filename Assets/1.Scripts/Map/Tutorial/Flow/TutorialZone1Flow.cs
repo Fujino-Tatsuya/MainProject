@@ -62,7 +62,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     // 오너
     private readonly TutorialMoveAccumulator _move = new TutorialMoveAccumulator();
     private readonly TutorialTooltipHold _passiveHold = new TutorialTooltipHold();
-    private TutorialLandingTimer _landing = new TutorialLandingTimer();   // 지연 = 디렉터 인스펙터(OnEnable)
+    private readonly TutorialLandingTimer _landing = new TutorialLandingTimer();
     private float _moveReportedAt = float.NegativeInfinity;
     private bool _passiveInfoPending;
     private bool _dashSubShown, _heatTipShown, _rTipShown;
@@ -106,8 +106,6 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             enabled = false;
             return;
         }
-
-        _landing = new TutorialLandingTimer(_director.WelcomeDelaySeconds);
 
         _isServer = _nm.IsServer;
         if (_isServer)
@@ -313,10 +311,8 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         bool alive = LocalAlive;
 
-        // S0 — 착지 후 1초(낙하·사망 중에는 세지 않는다). 로딩 화면(sortingOrder 1000)이 걷히기 전엔 세지 않는다 —
-        // 스폰 낙하는 보통 로딩 화면 뒤에서 끝나, 전에는 6초 자막 대부분이 가려졌다(할 일 81).
-        bool screenShown = GameManager.Instance == null || GameManager.Instance.IsMainGameReady;
-        if (!_landing.Fired && _landing.Tick(screenShown && alive && _grounding != null && _grounding.IsGrounded, dt))
+        // S0 — 착지 후 1초(낙하·사망 중에는 세지 않는다).
+        if (!_landing.Fired && _landing.Tick(alive && _grounding != null && _grounding.IsGrounded, dt))
             TutorialGuideUI.Instance?.ShowSubtitle(TutorialGuideIds.S0Welcome);
 
         TryGetLocalProgress(out TutorialPlayerProgress p);
