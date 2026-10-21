@@ -23,7 +23,7 @@ public static class TutorialHudTargetPaths
 
     public static string PathOf(TutorialHudTarget target) => target switch
     {
-        TutorialHudTarget.SkillSlotP => "Layer_Combat/SkillBar/Slot_P",
+        TutorialHudTarget.SkillSlotP => "Layer_Combat/SkillBar/Slot_Passive",
         TutorialHudTarget.SkillSlotQ => "Layer_Combat/SkillBar/Slot_Q",
         TutorialHudTarget.SkillSlotE => "Layer_Combat/SkillBar/Slot_E",
         TutorialHudTarget.SkillSlotR => "Layer_Combat/SkillBar/Slot_R",

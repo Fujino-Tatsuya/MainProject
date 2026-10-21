@@ -8,7 +8,6 @@ public sealed class DashCooldownHudTests
 {
     private const string PrefabPath = "Assets/2.Prefabs/UI/CombatHUD.prefab";
     private const string SlotPath = "Layer_Combat/SkillBar/Slot_Dash";
-    private const string SlotPrefabPath = "Assets/2.Prefabs/UI/Slot_.prefab";
 
     [Test]
     public void RemainingAndChargeFormatting_FollowsDashHudRules()
@@ -21,33 +20,19 @@ public sealed class DashCooldownHudTests
         Assert.That(DashCooldownHUD.FormatCharge(3, 2), Is.EqualTo("2/2"));
     }
 
+
+    // 배치·크기·스프라이트는 사용자가 CombatHUD 에서 조정한다 — 여기서는 쿨타임 오버레이 배선만 고정한다.
     [Test]
-    public void Prefab_HasExistingSkillSlotWiredAsDashAtSeventyFivePercent()
+    public void Prefab_DashSlotUsesIconMaskCooldownFill()
     {
         GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
         try
         {
             Transform slot = root.transform.Find(SlotPath);
             Assert.That(slot, Is.Not.Null);
-            Assert.That(((RectTransform)slot).anchoredPosition.x, Is.EqualTo(300f).Within(0.0001f));
-            Assert.That(slot.localScale.x, Is.EqualTo(0.75f).Within(0.0001f));
-            Assert.That(slot.localScale.y, Is.EqualTo(0.75f).Within(0.0001f));
-            Assert.That(slot.localScale.z, Is.EqualTo(0.75f).Within(0.0001f));
 
-            // 새 슬롯을 만들지 않고 기존 스킬 슬롯 프리팹(Slot_)을 그대로 쓴다.
-            GameObject source = PrefabUtility.GetCorrespondingObjectFromSource(slot.gameObject);
-            Assert.That(AssetDatabase.GetAssetPath(source), Is.EqualTo(SlotPrefabPath));
-            Assert.That(slot.gameObject.activeSelf, Is.True);
-
-            Image icon = slot.Find("Icon_mask/Icon_Dash")?.GetComponent<Image>();
-            Image fill = slot.Find("CooldownFill")?.GetComponent<Image>();
+            Image fill = AssertIconMaskCooldownFill(slot, "Icon_mask/Icon_Dash", out _);
             TMP_Text remaining = slot.Find("Cooldown")?.GetComponent<TMP_Text>();
-
-            Assert.That(icon?.sprite?.name, Is.EqualTo("Common_DashIcon"));
-            // Slot_ 의 Icon_mask 는 Y 180° 반전이라 아이콘이 그대로면 «« 로 뒤집혀 보인다.
-            Assert.That(Quaternion.Angle(slot.rotation, icon.transform.rotation), Is.LessThan(0.01f));
-            Assert.That(fill, Is.Not.Null);
-            Assert.That(fill.type, Is.EqualTo(Image.Type.Filled));
             Assert.That(remaining, Is.Not.Null);
 
             DashCooldownHUD hud = root.GetComponentInChildren<DashCooldownHUD>(true);
@@ -58,19 +43,72 @@ public sealed class DashCooldownHudTests
             CombatHUD combatHud = root.GetComponent<CombatHUD>();
             Assert.That(new SerializedObject(combatHud).FindProperty("dashCooldownHUD").objectReferenceValue,
                 Is.SameAs(hud));
-
-            string[] existingSlots = { "Slot_P", "Slot_Q", "Slot_E", "Slot_R", "Slot_RMB" };
-            float[] existingX = { -200f, -100f, 0f, 100f, 200f };
-            for (int i = 0; i < existingSlots.Length; i++)
-            {
-                RectTransform existing = root.transform.Find($"Layer_Combat/SkillBar/{existingSlots[i]}") as RectTransform;
-                Assert.That(existing, Is.Not.Null, existingSlots[i]);
-                Assert.That(existing.anchoredPosition.x, Is.EqualTo(existingX[i]).Within(0.0001f), existingSlots[i]);
-            }
         }
         finally
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    [Test]
+    public void Prefab_SkillAndPassiveSlotsUseIconMaskCooldownFill()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            Transform bar = root.transform.Find("Layer_Combat/SkillBar");
+            SerializedProperty slots = new SerializedObject(bar.GetComponent<SkillCooldownHUD>()).FindProperty("slots");
+            (string slot, string icon)[] skillSlots =
+            {
+                ("Slot_Q", "Icon_mask/Icon_Q"), ("Slot_E", "Icon_mask/Icon_E"),
+                ("Slot_RMB", "Icon_mask/Icon_RMB"), ("Slot_R", "Icon_mask/Icon_Ult"),
+            };
+            Assert.That(slots.arraySize, Is.EqualTo(skillSlots.Length));
+
+            for (int i = 0; i < skillSlots.Length; i++)
+            {
+                Image fill = AssertIconMaskCooldownFill(bar.Find(skillSlots[i].slot), skillSlots[i].icon, out Image overlayIcon);
+                SerializedProperty widget = slots.GetArrayElementAtIndex(i);
+                Assert.That(widget.FindPropertyRelative("cooldownFill").objectReferenceValue, Is.SameAs(fill), skillSlots[i].slot);
+                Assert.That(widget.FindPropertyRelative("cooldownIcon").objectReferenceValue, Is.SameAs(overlayIcon), skillSlots[i].slot);
+            }
+
+            SerializedObject passive = new SerializedObject(bar.GetComponent<PassiveHUD>());
+            Image passiveFill = AssertIconMaskCooldownFill(bar.Find("Slot_Passive"), "Icon_mask/Icon_Passive", out Image passiveIcon);
+            Assert.That(passive.FindProperty("cooldownFill").objectReferenceValue, Is.SameAs(passiveFill));
+            Assert.That(passive.FindProperty("cooldownIcon").objectReferenceValue, Is.SameAs(passiveIcon));
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// Slot_Dash 와 같은 구조: 옛 CooldownFill 대신 Filled 마스크 <c>Icon_mask_CooldownFill</c> 아래 아이콘 사본.
+    /// 사본은 원래 아이콘과 같은 방향·크기여야 겹쳐 보인다(반전 슬롯은 부모·자식 스케일 곱으로 비교).
+    /// </summary>
+    private static Image AssertIconMaskCooldownFill(Transform slot, string iconPath, out Image overlayIcon)
+    {
+        Assert.That(slot, Is.Not.Null);
+        Assert.That(slot.Find("CooldownFill"), Is.Null, $"{slot.name}: 옛 CooldownFill 이 남아 있다");
+
+        Transform overlay = slot.Find("Icon_mask_CooldownFill");
+        Assert.That(overlay, Is.Not.Null, slot.name);
+        Assert.That(overlay.GetComponent<Mask>(), Is.Not.Null, slot.name);
+        Image fill = overlay.GetComponent<Image>();
+        Assert.That(fill.type, Is.EqualTo(Image.Type.Filled), slot.name);
+
+        Transform icon = slot.Find(iconPath);
+        Assert.That(icon, Is.Not.Null, $"{slot.name}/{iconPath}");
+        Assert.That(overlay.childCount, Is.EqualTo(1), slot.name);
+        Transform copy = overlay.GetChild(0);
+        overlayIcon = copy.GetComponent<Image>();
+        Assert.That(overlayIcon, Is.Not.Null, slot.name);
+
+        Assert.That(Vector3.Distance(copy.lossyScale, icon.lossyScale), Is.LessThan(0.0001f), $"{slot.name}: 사본 크기·반전");
+        Assert.That(Quaternion.Angle(copy.rotation, icon.rotation), Is.LessThan(0.01f), $"{slot.name}: 사본 회전");
+        Assert.That(((RectTransform)copy).sizeDelta, Is.EqualTo(((RectTransform)icon).sizeDelta), slot.name);
+        return fill;
     }
 }

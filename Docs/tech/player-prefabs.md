@@ -257,7 +257,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 ├─ AimIndicator · SkillRangeIndicator · HurtBox
 ├─ CombatHUD                  (평탄화됨 — 프리팹 링크 없음)
 │  ├─ BossHealthHUD           <중첩: 2.Prefabs/UI/BossHealthHUD.prefab>
-│  ├─ CombatPanel ── SkillBar(Slot_P/Q/E/RMB/R/Dash) · HpBar · ShieldBar · StatusEffects
+│  ├─ CombatPanel ── SkillBar(Slot_Passive/Q/E/RMB/R/Dash) · HpBar · ShieldBar · StatusEffects
 │  └─ ProfilPanel ── Profile
 ├─ OverheadHealthBar          (평탄화됨 — 프리팹 링크 없음)
 └─ Corpse ── CorpseVisualPlaceholder
@@ -485,19 +485,21 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 인스펙터 | `UnitOverheadHealthBar` 「대시 아이콘」: `dashIconRoot` · `dashIconGraphics`(색을 곱할 Slot·Icon) · `dashReadyColor`(흰색) · `dashNotReadyColor`(0.35 회색, 알파로 흐리게도 가능) |
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
-**전투 HUD 대시 슬롯** (2026-10-21, 할 일 84) — `893c4d74`의 HUD 개편에서 `Slot_Dash` 오브젝트만 빠지고
-(그 슬롯은 `2.Prefabs/UI/Slot_.prefab` 으로 따로 저장됨) `DashCooldownHUD`·`CombatHUD` 바인딩은 남아 직렬화 참조가 끊긴 상태였으므로,
-머리 위 아이콘은 유지한 채 **기존 스킬 슬롯 `Slot_.prefab` 의 중첩 인스턴스**를 `CombatHUD/Layer_Combat/SkillBar/Slot_Dash` 로 다시 넣었다.
-대시 전용 슬롯 프리팹은 만들지 않는다. 사용자 편집이 잦은 `CombatHUD.prefab`에는 인스턴스와 두 참조만 추가한다.
+**전투 HUD 대시 슬롯 · 쿨타임 오버레이** (2026-10-21, 할 일 84) — `893c4d74`의 HUD 개편에서 `Slot_Dash` 오브젝트만 빠지고
+`DashCooldownHUD`·`CombatHUD` 바인딩은 남아 직렬화 참조가 끊긴 상태였으므로, 머리 위 아이콘은 유지한 채
+기존 스킬 슬롯(`2.Prefabs/UI/Slot_.prefab`)으로 `CombatHUD/Layer_Combat/SkillBar/Slot_Dash` 를 다시 넣었다(75% 스케일).
+이후 사용자가 SkillBar 슬롯 배치·크기·아이콘을 직접 조정했고(슬롯은 언팩됨), Slot_Dash 에 만든 **`Icon_mask_CooldownFill`** 구조를
+패시브·Q·E·R·RMB 에도 같게 적용했다.
 
 | 항목 | 내용 |
 |------|------|
-| 크기·배치 | `Slot_`(96×99)의 **75% 스케일**(실표시 72×74), 기존 5개 슬롯은 이동 없이 오른쪽 `x=300`에 추가. 인스턴스 오버라이드 = 이름·활성·위치·스케일·아이콘 |
-| 이미지 | `Slot_` 테두리·`Dash` 키 라벨 그대로, `Icon_mask/Icon_Dash` 스프라이트만 `Common_DashIcon` 오버라이드(원본은 비어 있음). `Slot_` 의 `Icon_mask` 가 Y 180° 반전이라 `Icon_Dash` 도 Y 180° 오버라이드로 되돌려 `>>` 방향 유지 |
-| 쿨타임 | `PlayerDashController.RemainingRecharge/RechargeDuration`을 그대로 사용해 `CooldownFill` 세로 채움과 `Cooldown` 남은 초를 표시. 별도 시계·재계산 없음 |
-| 충전 수 | `DashCooldownHUD.chargeText`(선택, `MaxCharge > 1`일 때만 `현재/최대`)는 비워 둠 — `Slot_` 에 칸이 없고 현재 1충전 |
+| 구조 | 슬롯 루트 아래 `Icon_mask_CooldownFill`(Image = 그 슬롯 `Icon_mask` 모양 스프라이트, **Filled Vertical**, `Mask`) → 자식 = 아이콘 사본(검정 알파 0.78). 옛 `CooldownFill` 은 삭제. 남은 비율만큼 아이콘 모양 어두운 덮개가 아래부터 채워진다 |
+| 아이콘 사본 | 원래 아이콘(`Icon_mask/Icon_*`)과 같은 이름·위치·크기·회전·스케일. Slot_Dash 만 사용자 설정대로 x −1 반전, 다른 슬롯은 반전 없음 |
+| 스프라이트 동기화 | 스킬 아이콘은 런타임에 바뀌므로 `SkillCooldownHUD.SlotWidget.cooldownIcon`·`PassiveHUD.cooldownIcon` 이 원래 아이콘과 같은 스프라이트로 맞춘다. 대시는 고정 스프라이트라 코드 없음 |
+| 쿨타임 | `cooldownFill` = 각 `Icon_mask_CooldownFill`. 대시는 `PlayerDashController.RemainingRecharge/RechargeDuration` 그대로, 별도 시계·재계산 없음 |
+| 충전 수 | `DashCooldownHUD.chargeText`(선택, `MaxCharge > 1`일 때만 `현재/최대`)는 비워 둠 — 현재 1충전 |
 | 오너 범위 | `CombatHUD`가 `Player.LocalPlayer`로 바인딩하는 기존 경로 그대로라 로컬 플레이어 HUD에만 표시 |
-| 테스트 | `Tests/EditMode/CombatHud/Editor/DashCooldownHudTests` — `Slot_` 출처·75%·아이콘·채움 배선·기존 슬롯 위치·초/충전 표기 규칙 |
+| 테스트 | `Tests/EditMode/CombatHud/Editor/DashCooldownHudTests` — 6슬롯 오버레이 구조·사본 방향/크기·HUD 배선·초/충전 표기 규칙(배치·크기는 고정하지 않음) |
 
 **머리 위 라벨 = 이름 / 상태이상** (2026-10-16, 할 일 50) — `Bar/NameLabel` 은 평소 이름(P1·P2…), CC·붙잡힘 중에는 그 이름 하나로 바뀐다(규칙·우선순위: [status-effects.md](../design/status-effects.md) §머리 위 표시).
 글자는 흰색 고정 + 검정 아웃라인 ≈3px(2026-10-16 후속) — 전역 폰트(TMP Settings·원본 `LiberationSans SDF`·`Resources/NotoSansKR … SDF`)는 그대로 두고 **이름표 전용 폰트 에셋**을 쓴다.
