@@ -81,7 +81,10 @@ public static class EnemyC3TelegraphPerfProbe
     [MenuItem("Tools/Enemy C3/Measure first calls (control, no prewarm)")]
     static void ControlMenu() => UnityEngine.Debug.Log("[Enemy C3] control perf →\n" + RunPrewarm(false, out _));
 
-    /// <summary>예열(선택) → 경로별 첫 호출 → 같은 경로 새 오브젝트 9회 더(JIT 뒤 남는 생성 비용). 산출물 = S5/prewarm.txt·tsv(대조군은 control.*).</summary>
+    /// <summary>
+    /// 예열(선택) → 경로별 첫 호출 → 같은 경로 새 오브젝트 9회 더(JIT 뒤 남는 생성 비용). 산출물 = &lt;_lane-artifacts&gt;/&lt;repo 폴더&gt;/57.3/prewarm.txt·tsv
+    /// (대조군은 control.*). 57.3은 실제 드론 데이터로 표식·고정·모델 풀·낙하/클립·전용 RT 첫 그리기까지 예열한다.
+    /// </summary>
     public static string RunPrewarm(bool prewarm, out string artifactDir)
     {
         bool domainFirst = !_ranThisDomain;
@@ -101,7 +104,7 @@ public static class EnemyC3TelegraphPerfProbe
             rows.Add(new Row { path = "EnemyC3Visuals.Prewarm() (예열 자체)", phase = "prewarm", n = 1, ms = prewarmMs, msMax = prewarmMs, gc = gc });
             var last = Type.GetType("EnemyC3Prewarm, Assembly-CSharp")?.GetField("Last", Any)?.GetValue(null);
             if (last != null)
-                breakdown = $"예열 내역: data {Field<double>(last, "data"):F2} ms · shaders {Field<double>(last, "shaders"):F2} ms ({Field<int>(last, "variants")} 변형) · paths {Field<double>(last, "paths"):F2} ms";
+                breakdown = $"예열 내역: data {Field<double>(last, "data"):F2} ms · shaders {Field<double>(last, "shaders"):F2} ms ({Field<int>(last, "variants")} 변형) · paths {Field<double>(last, "paths"):F2} ms (그중 보스 컴포넌트 {Field<double>(last, "boss"):F2} ms — 57.3 실제 드론 포함)";
             long t1 = Stopwatch.GetTimestamp();
             EnemyC3Visuals.Prewarm();
             double again = Ms(Stopwatch.GetTimestamp() - t1);
@@ -114,14 +117,14 @@ public static class EnemyC3TelegraphPerfProbe
 
         var sb = new StringBuilder();
         sb.AppendLine(prewarm
-            ? "할 일 57 R 예열 — 예열 후 콜드 첫 호출(에디터 EditMode, Tools/Enemy C3/Measure prewarm then first calls)"
-            : "할 일 57 R 예열 — 대조군: 예열 없이 콜드 첫 호출(Tools/Enemy C3/Measure first calls (control, no prewarm))");
+            ? "할 일 57.3 예열(실제 드론 모델 풀 포함) — 예열 후 콜드 첫 호출(에디터 EditMode, Tools/Enemy C3/Measure prewarm then first calls)"
+            : "할 일 57.3 예열 — 대조군: 예열 없이 콜드 첫 호출(Tools/Enemy C3/Measure first calls (control, no prewarm))");
         sb.AppendLine($"측정 {DateTime.Now:yyyy-MM-dd HH:mm} · Unity {Application.unityVersion} · {SystemInfo.processorType} · {SystemInfo.graphicsDeviceName} · {SystemInfo.graphicsDeviceType}");
         sb.AppendLine(domainFirst
             ? "이번 실행 = 도메인 리로드 뒤 첫 실행 → first n=1 = 도메인 첫 호출(예열이 JIT 을 못 덮은 부분 포함)."
             : "⚠️ 같은 도메인의 두 번째 이후 실행 — JIT 이 이미 끝나 콜드가 아니다. 리로드 뒤 다시 잴 것.");
         sb.AppendLine("first n=1 = 경로 첫 호출(새 오브젝트) · n=10 = 새 오브젝트로 10회 평균(첫 호출 포함, max 함께) — n=10 이 남는 생성 비용의 눈금.");
-        sb.AppendLine("정적 캐시는 예열 뒤 비우지 않는다(게임과 같음). 셰이더 GPU 준비·첫 그리기(PSO)는 Stopwatch 밖.");
+        sb.AppendLine("정적 캐시와 드론 풀은 예열 뒤 비우지 않는다(게임과 같음). 드론은 전용 RT 첫 그리기+GL.Flush가 예열 Stopwatch 안, 플랫폼별 PSO 보장은 별도 Play 확인.");
         if (breakdown != "") sb.AppendLine(breakdown);
         sb.AppendLine();
         sb.AppendLine($"{"path",-52} {"phase",-7} {"n",3} {"ms/call",10} {"ms max",10} {"Δheap B",9} {"<1ms",5}");
@@ -129,7 +132,7 @@ public static class EnemyC3TelegraphPerfProbe
             sb.AppendLine($"{r.path,-52} {r.phase,-7} {r.n,3} {r.ms,10:F4} {r.msMax,10:F4} {r.gc,9} {(r.phase == "prewarm" ? "" : r.n == 1 ? (r.ms < 1 ? "yes" : "NO") : ""),5}");
         string txt = sb.ToString();
 
-        artifactDir = ArtifactDir();
+        artifactDir = ArtifactDir("57.3");
         if (artifactDir != null)
         {
             Directory.CreateDirectory(artifactDir);
@@ -190,25 +193,30 @@ public static class EnemyC3TelegraphPerfProbe
             call = i => t.Show(2.5f, 360f, 0f, 18f, 1f, 18f, 1f),
         };
 
-        WellsDroneAttack w = null; ScriptableObject data = null;
+        WellsDroneAttack w = null;
         void NewWells()
         {
             go = new GameObject("EnemyC3Perf_Wells");
             w = go.AddComponent<WellsDroneAttack>();
-            var f = typeof(WellsDroneAttack).GetField("_d", Any);
-            data = ScriptableObject.CreateInstance(f.FieldType);
-            f.SetValue(w, data);
+            WellsDronePrewarmCatalog catalog = Resources.Load<WellsDronePrewarmCatalog>("Monster/WellsDronePrewarmCatalog");
+            w.Init(null, catalog.data);
         }
         void DropWells()
         {
             var root = Field<Transform>(w, "_viewRoot");
             if (root != null) Object.DestroyImmediate(root.gameObject);
-            Object.DestroyImmediate(go); Object.DestroyImmediate(data);
-            go = null; w = null; data = null;
+            Object.DestroyImmediate(go);
+            go = null; w = null;
         }
         yield return new PathSpec
         {
-            name = "웰즈 드론 ClientLock(판 14, EnsureView 포함)",
+            name = "웰즈 드론 ClientMark(실제 데이터, EnsureView 포함)",
+            setup = NewWells, teardown = DropWells,
+            call = i => w.ClientMark(go.transform, 1f),
+        };
+        yield return new PathSpec
+        {
+            name = "웰즈 드론 ClientLock(실제 모델 풀, EnsureView 포함)",
             setup = NewWells, teardown = DropWells,
             call = i => w.ClientLock(new Vector3(i * 0.5f, 0f, 0f), 3f, 2f, true),
         };
@@ -221,9 +229,16 @@ public static class EnemyC3TelegraphPerfProbe
         };
         yield return new PathSpec
         {
-            name = "  └ EnsureView 뒤 ClientLock",
+            name = "  └ EnsureView 뒤 ClientLock(실제 모델 풀)",
             setup = () => { NewWells(); ensureView(w); }, teardown = DropWells,
             call = i => w.ClientLock(new Vector3(i * 0.5f, 0f, 0f), 3f, 2f, true),
+        };
+        var prewarmClientPath = Method<Action<WellsDroneAttack, Transform>>(typeof(WellsDroneAttack), "PrewarmClientPath");
+        yield return new PathSpec
+        {
+            name = "  └ 전체 클라 경로(Mark→Lock→낙하·클립→반납)",
+            setup = NewWells, teardown = DropWells,
+            call = i => prewarmClientPath(w, go.transform),
         };
 
         var jumps = new List<GameObject>();
@@ -601,10 +616,12 @@ public static class EnemyC3TelegraphPerfProbe
         return sb.ToString();
     }
 
-    static string ArtifactDir()
+    static string ArtifactDir() => ArtifactDir(Path.Combine("57-shader", "S5"));
+
+    static string ArtifactDir(string sub)
     {
         var project = Directory.GetParent(Application.dataPath);
         var lanes = Path.Combine(project.Parent.FullName, "_lane-artifacts");
-        return Directory.Exists(lanes) ? Path.Combine(lanes, project.Name, "57-shader", "S5") : null;
+        return Directory.Exists(lanes) ? Path.Combine(lanes, project.Name, sub) : null;
     }
 }
