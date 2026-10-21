@@ -275,12 +275,13 @@ public static class TutorialGuideUIAuthoring
 
     private static (CanvasGroup group, TMP_Text text) BuildSubtitle(Transform root, TMP_FontAsset font)
     {
-        // 화면 중앙 위쪽. 스킬바 위 툴팁 자리(430×270)와 우측 하단(타이머·미니맵·키가이드)을 피한다.
-        // 목표 패널이 체크리스트 9줄까지 늘어나도 겹치지 않는 높이.
+        // 목표 패널 아래 — 패널과 같은 상단 앵커라 화면 비율이 넓어져도 간격이 그대로다(할 일 79).
+        // y −350 = 패널 y −24 + 최대 높이 약 314(체크리스트 8줄 + 대기 줄 + 목표 2줄) + 여유 12.
+        // 스킬바 위 툴팁 자리(430×270)와 우측 하단(타이머·미니맵·키가이드)을 피한다. 튜닝은 프리팹 RectTransform 에서.
         RectTransform box = Child(root, "Subtitle");
-        box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
-        box.pivot = new Vector2(0.5f, 0.5f);
-        box.anchoredPosition = new Vector2(0f, 120f);
+        box.anchorMin = box.anchorMax = new Vector2(0.5f, 1f);
+        box.pivot = new Vector2(0.5f, 1f);
+        box.anchoredPosition = new Vector2(0f, -350f);
         box.sizeDelta = new Vector2(1100f, 80f);
         Background(box, new Color(0f, 0f, 0f, 0.6f));
         CanvasGroup group = Group(box, 0f);
