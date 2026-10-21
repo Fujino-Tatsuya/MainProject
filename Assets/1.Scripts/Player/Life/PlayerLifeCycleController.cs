@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -59,6 +60,18 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     /// </summary>
     public static Func<ulong, bool> ServerDeathKeepsSoul;
 
+    private static readonly ActiveRegistry<PlayerLifeCycleController> ActiveList =
+        new ActiveRegistry<PlayerLifeCycleController>();
+
+    /// <summary>
+    /// 켜져 있는 생명주기 컨트롤러 전부(OnEnable 등록·OnDisable 해제 — 스폰 여부와 무관, 비활성 GameObject 제외).
+    /// 전멸 판정(<c>PartyWipeWatcher</c>)이 주기마다 씬을 뒤지지 않고 이 목록을 돈다(할 일 69). 읽기 전용.
+    /// </summary>
+    public static IReadOnlyList<PlayerLifeCycleController> Active => ActiveList.Items;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetActive() => ActiveList.Clear();
+
     private bool CanWriteLifeState => IsSpawned && IsServer && !IsCinematicLocked;
     private bool deathResolutionPending;
     private double deathResolutionDeadlineServerTime;
@@ -80,6 +93,10 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         if (lifeAnimator == null)
             lifeAnimator = GetComponentInChildren<Animator>(true);
     }
+
+    private void OnEnable() => ActiveList.Add(this);
+
+    private void OnDisable() => ActiveList.Remove(this);
 
     public override void OnNetworkSpawn()
     {

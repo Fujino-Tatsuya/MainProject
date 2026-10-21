@@ -37,6 +37,21 @@ public class MultiGameRule : NetworkBehaviour
 
     private bool CanWriteLifeCounts => IsSpawned && IsServer;
 
+    private static readonly ActiveRegistry<MultiGameRule> ActiveList = new ActiveRegistry<MultiGameRule>();
+
+    /// <summary>
+    /// 켜져 있는 규칙(OnEnable 등록·OnDisable 해제 — 스폰 여부와 무관, 없으면 null). 판 도중 네트워크 스폰돼도 켜지는 순간 잡힌다.
+    /// 전멸 판정(<c>PartyWipeWatcher</c>)이 주기마다 씬을 뒤지지 않고 이것을 읽는다(할 일 69). 스폰 여부는 호출자가 <c>IsSpawned</c> 로 본다.
+    /// </summary>
+    public static MultiGameRule Current => ActiveList.Items.Count > 0 ? ActiveList.Items[0] : null;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetActive() => ActiveList.Clear();
+
+    private void OnEnable() => ActiveList.Add(this);
+
+    private void OnDisable() => ActiveList.Remove(this);
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
