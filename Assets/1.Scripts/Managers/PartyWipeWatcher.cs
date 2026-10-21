@@ -91,8 +91,8 @@ public sealed class PartyWipeWatcher : MonoBehaviour
     /// </summary>
     private bool IsPartyWiped()
     {
-        PlayerLifeCycleController[] players = FindObjectsByType<PlayerLifeCycleController>(
-            FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        // 씬 탐색 대신 등록식 목록(할 일 69 — 보스전 중 FindObjectsByType 한 번 8 ms 실측).
+        System.Collections.Generic.IReadOnlyList<PlayerLifeCycleController> players = PlayerLifeCycleController.Active;
 
         if (_gameRule == null)
             _gameRule = FindFirstObjectByType<MultiGameRule>();
@@ -100,8 +100,9 @@ public sealed class PartyWipeWatcher : MonoBehaviour
         int partyLives = _gameRule != null && _gameRule.IsSpawned ? _gameRule.PartyLives : 1;
 
         _members.Clear();
-        foreach (PlayerLifeCycleController player in players)
+        for (int i = 0; i < players.Count; i++)
         {
+            PlayerLifeCycleController player = players[i];
             if (player == null)
                 continue;
 

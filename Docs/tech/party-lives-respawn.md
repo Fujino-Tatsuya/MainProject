@@ -34,6 +34,7 @@
 - **공용 풀의 새 경우 — 갇힌 Soul**: 풀 1 에서 둘이 Soul 이 된 뒤 한 명이 부활하면 0 — 남은 Soul 은 차감 부활을 못 한다.
   예전 클라별 풀에서는 "Soul = 목숨 있음" 이라 없던 경우다. 상태는 그대로 Soul 로 두고(관전 전환 없음), **전멸 판정이 '탈락'으로 센다**:
   `PartyWipeWatcher` 가 `PartyLivesRules.IsPartyWiped(풀, 구성원)` 으로 판정 — 전원 PermanentDead 이거나 풀 0 의 Soul(차감 없는 부활 대기 제외).
+  구성원은 씬 탐색이 아니라 등록식 목록 `PlayerLifeCycleController.Active`(OnEnable 등록·OnDisable 해제, `ActiveRegistry<T>`)를 0.25초마다 순회한다(할 일 69 — `FindObjectsByType` 1회 8 ms 실측).
   `MultiGameRule` 이 없거나 스폰 전이면 예전 규칙(전원 PermanentDead). 2단계 리스폰이 Soul 도 전원 살리므로 갇힌 Soul 은 전멸 리스폰으로 풀린다(D1 유지).
 - 튜토리얼 G11 뒤 자동 부활이 풀 0 으로 거부되면 경고 로그 후 Soul 로 남는다(`TutorialDeathRules.Revive`).
 - 보스 강제 개시 부활(`BossTeleportManager.ReviveSoulsForForcedStart`)은 Soul 마다 공용 풀에서 1개씩 쓴다 — 풀이 모자라면 `ConnectedClientsList` 순회 앞쪽만 산다. 기존 코드 그대로.
