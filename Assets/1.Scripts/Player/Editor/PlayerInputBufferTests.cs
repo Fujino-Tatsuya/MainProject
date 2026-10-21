@@ -357,6 +357,132 @@ public sealed class PlayerInputBufferTests
         return result;
     }
 
+    // ── 우선순위(할 일 77) — PlayerInputReader 기본값: 대시5 > 우클릭4 > R3 > Q·E 2 > 평타1 ──
+
+    private static PlayerInputBuffer CreatePrioritized(float hold = Hold)
+    {
+        var buffer = new PlayerInputBuffer(hold);
+        buffer.SetPriority(PlayerBufferedInput.Dash, 5);
+        buffer.SetPriority(PlayerBufferedInput.SkillInterrupt, 4);
+        buffer.SetPriority(PlayerBufferedInput.SkillUltimate, 3);
+        buffer.SetPriority(PlayerBufferedInput.SkillMain, 2);
+        buffer.SetPriority(PlayerBufferedInput.SkillSub, 2);
+        buffer.SetPriority(PlayerBufferedInput.Attack, 1);
+        return buffer;
+    }
+
+    [TestCase(PlayerBufferedInput.Dash, PlayerBufferedInput.SkillInterrupt)]
+    [TestCase(PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate)]
+    [TestCase(PlayerBufferedInput.SkillUltimate, PlayerBufferedInput.SkillMain)]
+    [TestCase(PlayerBufferedInput.SkillSub, PlayerBufferedInput.Attack)]
+    [TestCase(PlayerBufferedInput.Dash, PlayerBufferedInput.Attack)]
+    public void Priority_HigherHeld_IgnoresLowerInput(PlayerBufferedInput higher, PlayerBufferedInput lower)
+    {
+        var buffer = CreatePrioritized();
+        Assert.That(buffer.Record(higher, 10f), Is.True);
+        Assert.That(buffer.Record(lower, 10.1f), Is.False, "낮은 입력은 기록하지 않는다");
+
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(higher));
+        Assert.That(buffer.Peek(10.21f), Is.EqualTo(PlayerBufferedInput.None), "유지 시간은 높은 입력의 기록 시각 기준 — 무시된 입력이 늘리지 않는다");
+    }
+
+    [TestCase(PlayerBufferedInput.Attack, PlayerBufferedInput.Dash)]
+    [TestCase(PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillUltimate)]
+    [TestCase(PlayerBufferedInput.SkillUltimate, PlayerBufferedInput.SkillInterrupt)]
+    public void Priority_LowerHeld_OverwrittenByHigher(PlayerBufferedInput lower, PlayerBufferedInput higher)
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(lower, 10f);
+
+        Assert.That(buffer.Record(higher, 10.1f), Is.True);
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(higher));
+    }
+
+    [TestCase(PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub)]
+    [TestCase(PlayerBufferedInput.SkillSub, PlayerBufferedInput.SkillMain)]
+    [TestCase(PlayerBufferedInput.Attack, PlayerBufferedInput.Attack)]
+    public void Priority_Equal_LaterWins(PlayerBufferedInput first, PlayerBufferedInput later)
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(first, 10f);
+
+        Assert.That(buffer.Record(later, 10.1f), Is.True);
+        Assert.That(buffer.Peek(10.25f), Is.EqualTo(later), "덮으면 유지 시간도 나중 입력 기준");
+    }
+
+    [Test]
+    public void Priority_SameFrame_OrderDoesNotMatter()
+    {
+        // 같은 프레임 기록 순서와 무관하게 우선순위가 정한다(PlayerInputReader.CaptureBufferedPresses).
+        var dashFirst = CreatePrioritized();
+        dashFirst.Record(PlayerBufferedInput.Dash, 10f);
+        dashFirst.Record(PlayerBufferedInput.Attack, 10f);
+
+        var dashLast = CreatePrioritized();
+        dashLast.Record(PlayerBufferedInput.Attack, 10f);
+        dashLast.Record(PlayerBufferedInput.Dash, 10f);
+
+        Assert.That(dashFirst.Peek(10f), Is.EqualTo(PlayerBufferedInput.Dash));
+        Assert.That(dashLast.Peek(10f), Is.EqualTo(PlayerBufferedInput.Dash));
+    }
+
+    [Test]
+    public void Priority_HigherExpired_LowerIsRecorded()
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+
+        Assert.That(buffer.Record(PlayerBufferedInput.Attack, 10.21f), Is.True, "만료된 입력은 없는 것으로 본다");
+        Assert.That(buffer.Peek(10.21f), Is.EqualTo(PlayerBufferedInput.Attack));
+    }
+
+    [Test]
+    public void Priority_HigherConsumed_LowerIsRecorded()
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.SkillUltimate, 10f);
+        buffer.Resolve(PlayerBufferedInput.SkillUltimate, PlayerActionAttempt.OutOfResource);
+
+        Assert.That(buffer.Record(PlayerBufferedInput.SkillMain, 10.05f), Is.True, "버린 입력은 낮은 입력을 막지 않는다");
+        Assert.That(buffer.Peek(10.05f), Is.EqualTo(PlayerBufferedInput.SkillMain));
+    }
+
+    [Test]
+    public void Priority_BlockedHigherHeld_BlocksLowerUntilExpiry()
+    {
+        // 바쁨·CC 로 보관 중인 높은 입력은 유지 시간 동안 낮은 입력을 막는다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+        buffer.Resolve(PlayerBufferedInput.Dash, PlayerActionAttempt.Blocked);
+
+        Assert.That(buffer.Record(PlayerBufferedInput.SkillMain, 10.15f), Is.False);
+        Assert.That(buffer.Peek(10.15f), Is.EqualTo(PlayerBufferedInput.Dash));
+
+        Assert.That(buffer.Record(PlayerBufferedInput.SkillMain, 10.25f), Is.True, "만료 뒤엔 기록된다");
+        Assert.That(buffer.Peek(10.25f), Is.EqualTo(PlayerBufferedInput.SkillMain));
+    }
+
+    [Test]
+    public void Priority_BufferOff_RecordsNothing()
+    {
+        var buffer = CreatePrioritized(0f);
+
+        Assert.That(buffer.Record(PlayerBufferedInput.Dash, 10f), Is.False);
+        Assert.That(buffer.Record(PlayerBufferedInput.Attack, 10f), Is.False);
+        Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.None));
+    }
+
+    [Test]
+    public void Priority_DefaultAllEqual_LastInputWins()
+    {
+        // 우선순위를 설정하지 않은 버퍼 = 전부 0 — 예전처럼 마지막 입력이 남는다.
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+
+        Assert.That(buffer.Record(PlayerBufferedInput.Attack, 10.1f), Is.True);
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.Attack));
+    }
+
     [Test]
     public void FromSkillSlot_MapsEverySlot()
     {

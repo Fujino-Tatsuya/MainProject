@@ -13,6 +13,20 @@ public class PlayerInputReader : BaseNetworkBehaviour
     [Tooltip("선입력 버퍼 유지 시간(초). 행동 중이라 바로 실행 못 한 평타·대시·스킬 입력을 이만큼 들고 있다가 실행 가능해진 첫 순간에 실행한다. 0 = 버퍼 끔")]
     [SerializeField, Min(0f)] private float inputBufferSeconds = 0.2f;
 
+    // 선입력 버퍼 우선순위(할 일 77) — 버퍼에 살아 있는 입력보다 낮은 입력은 기록하지 않는다. 같으면 나중 입력이 이긴다.
+    [Tooltip("선입력 버퍼 우선순위 — 대시. 클수록 높다. 버퍼에 남은 입력보다 낮은 입력은 무시하고, 같으면 나중 입력이 이긴다")]
+    [SerializeField] private int bufferPriorityDash = 5;
+    [Tooltip("선입력 버퍼 우선순위 — 우클릭(인터럽트 스킬·인터럽트). 클수록 높다")]
+    [SerializeField] private int bufferPriorityInterrupt = 4;
+    [Tooltip("선입력 버퍼 우선순위 — R(궁극기). 클수록 높다")]
+    [SerializeField] private int bufferPriorityUltimate = 3;
+    [Tooltip("선입력 버퍼 우선순위 — Q(주 스킬). 클수록 높다")]
+    [SerializeField] private int bufferPrioritySkillMain = 2;
+    [Tooltip("선입력 버퍼 우선순위 — E(보조 스킬). 클수록 높다")]
+    [SerializeField] private int bufferPrioritySkillSub = 2;
+    [Tooltip("선입력 버퍼 우선순위 — 좌클릭(기본 공격). 클수록 높다")]
+    [SerializeField] private int bufferPriorityAttack = 1;
+
     private PlayerInput playerInput;
     private PlayerMovement movement;
     private InputAction moveAction;
@@ -37,7 +51,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private readonly int[] virtualSkillPressedFrame = { -1, -1, -1, -1 };
 
     // 선입력 버퍼(할 일 44) — 오너 로컬 입력만 기록한다(비오너는 EffectiveInputEnabled 가 꺼져 있다).
-    // 유지 시간은 기록할 때마다 inputBufferSeconds 로 맞춘다(데이터 테이블·인스펙터 값이 Awake 뒤에 바뀌어도 따른다).
+    // 유지 시간·우선순위는 기록할 때마다 직렬화 필드로 맞춘다(데이터 테이블·인스펙터 값이 Awake 뒤에 바뀌어도 따른다).
     private readonly PlayerInputBuffer inputBuffer = new PlayerInputBuffer(0f);
     private int inputBufferCapturedFrame = -1;
 
@@ -109,11 +123,24 @@ public class PlayerInputReader : BaseNetworkBehaviour
         dashPressedLatched = false;
     }
 
-    // 버퍼 기록 + 진단 press. 기록 규칙은 inputBuffer.Record 그대로다.
+    // 버퍼 기록 + 진단 press(또는 낮은 우선순위로 무시). 기록 규칙은 inputBuffer.Record 그대로다.
     private void RecordBufferedPress(PlayerBufferedInput input, float now)
     {
-        inputBuffer.Record(input, now);
-        DiagnoseBufferPress(input, now);
+        PlayerBufferedInput held = inputBuffer.Peek(now);
+        if (inputBuffer.Record(input, now))
+            DiagnoseBufferPress(input, now);
+        else if (input != PlayerBufferedInput.None && held != PlayerBufferedInput.None)
+            DiagnoseBufferIgnored(input, held, now);
+    }
+
+    private void ApplyBufferPriorities()
+    {
+        inputBuffer.SetPriority(PlayerBufferedInput.Dash, bufferPriorityDash);
+        inputBuffer.SetPriority(PlayerBufferedInput.SkillInterrupt, bufferPriorityInterrupt);
+        inputBuffer.SetPriority(PlayerBufferedInput.SkillUltimate, bufferPriorityUltimate);
+        inputBuffer.SetPriority(PlayerBufferedInput.SkillMain, bufferPrioritySkillMain);
+        inputBuffer.SetPriority(PlayerBufferedInput.SkillSub, bufferPrioritySkillSub);
+        inputBuffer.SetPriority(PlayerBufferedInput.Attack, bufferPriorityAttack);
     }
 
     /// <summary>
@@ -197,8 +224,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     // 이번 프레임에 새로 눌린 입력을 버퍼에 남긴다. 프레임당 한 번 — 소비처·상태 머신·Update 중 먼저 부른 쪽이 받는다.
     // 그래서 누가 먼저 돌든 '받아서 지움'이 '뒤늦게 기록'에 덮이지 않는다.
-    // 같은 프레임에 여럿이면 마지막 기록이 남으므로 우선순위 낮은 것부터 적는다(대시 > 공격 > 스킬 > 인터럽트).
-    // HUD 가상 스킬 press 는 SetVirtualSkillInput 에서 바로 기록한다.
+    // 같은 프레임에 여럿이어도 남는 입력은 기록 순서가 아니라 버퍼 우선순위(할 일 77)가 정한다 — 아래 순서는 의미 없다.
+    // HUD 가상 스킬 press 는 SetVirtualSkillInput 에서 바로 기록한다(같은 우선순위 규칙).
     private void CaptureBufferedPresses()
     {
         if (inputBufferCapturedFrame == Time.frameCount)
@@ -206,6 +233,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
         inputBufferCapturedFrame = Time.frameCount;
         inputBuffer.HoldSeconds = inputBufferSeconds;
+        ApplyBufferPriorities();
         if (inputBufferSeconds <= 0f || !EffectiveInputEnabled)
             return;
 
@@ -577,6 +605,14 @@ public class PlayerInputReader : BaseNetworkBehaviour
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         GetInputBufferDiag()?.Press(input, now, Time.frameCount, inputBuffer.HoldSeconds);
+#endif
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferIgnored(PlayerBufferedInput input, PlayerBufferedInput held, float now)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        GetInputBufferDiag()?.IgnoredLowerPriority(input, held, now, Time.frameCount);
 #endif
     }
 

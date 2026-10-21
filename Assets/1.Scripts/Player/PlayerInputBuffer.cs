@@ -43,13 +43,16 @@ public static class PlayerActionRejectPolicy
 
 /// <summary>
 /// 선입력 버퍼(할 일 44) — 지금 바로 실행 못 하는 입력을 잠깐 들고 있다가 실행 가능해진 첫 순간에 넘긴다.
-/// 마지막 1개만 기억한다(새 입력이 이전 것을 덮는다). 유지 시간이 지나면 없는 것으로 본다.
+/// 1개만 기억한다 — 살아 있는 입력보다 우선순위가 낮은 새 입력은 기록하지 않고, 같거나 높으면 덮는다(할 일 77).
+/// 유지 시간이 지나면 없는 것으로 본다(만료된 입력은 새 입력을 막지 않는다).
 /// 시간은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상). 유지 시간 0 이하 = 버퍼 끔.
 /// </summary>
 public sealed class PlayerInputBuffer
 {
     private PlayerBufferedInput kind = PlayerBufferedInput.None;
     private float recordedAt;
+    // 종류별 우선순위(인덱스 = PlayerBufferedInput). 기본 전부 0 = 마지막 입력이 이긴다.
+    private readonly int[] priorities = new int[(int)PlayerBufferedInput.SkillUltimate + 1];
 
     public PlayerInputBuffer(float holdSeconds)
     {
@@ -58,14 +61,34 @@ public sealed class PlayerInputBuffer
 
     public float HoldSeconds { get; set; }
 
-    /// <summary>새로 눌린 입력을 기록한다. 이전 입력은 버린다.</summary>
-    public void Record(PlayerBufferedInput input, float now)
+    public void SetPriority(PlayerBufferedInput input, int priority)
+    {
+        int index = (int)input;
+        if (index > 0 && index < priorities.Length)
+            priorities[index] = priority;
+    }
+
+    public int GetPriority(PlayerBufferedInput input)
+    {
+        int index = (int)input;
+        return index > 0 && index < priorities.Length ? priorities[index] : 0;
+    }
+
+    /// <summary>
+    /// 새로 눌린 입력을 기록한다. 살아 있는 입력의 우선순위가 더 높으면 기록하지 않는다(false), 같거나 낮으면 덮는다.
+    /// </summary>
+    public bool Record(PlayerBufferedInput input, float now)
     {
         if (HoldSeconds <= 0f || input == PlayerBufferedInput.None)
-            return;
+            return false;
+
+        PlayerBufferedInput held = Peek(now);
+        if (held != PlayerBufferedInput.None && GetPriority(held) > GetPriority(input))
+            return false;
 
         kind = input;
         recordedAt = now;
+        return true;
     }
 
     /// <summary>지금 살아 있는 입력. 만료됐으면 None.</summary>

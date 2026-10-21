@@ -23,7 +23,7 @@ public enum InputBufferDiagEvent
     Expired,
     /// <summary>자원 부족·차단 효과·기타 거부·비움으로 버려졌다(사유 포함).</summary>
     Dropped,
-    /// <summary>새 입력에 덮여 버려졌다.</summary>
+    /// <summary>새 입력에 실제로 덮여 버려졌다(같거나 높은 우선순위).</summary>
     Overwritten,
     /// <summary>바빴던 행동이 끝나 Idle/Move 로 돌아왔다 — 직전 만료 입력이 있으면 놓친 간격을 함께 남긴다.</summary>
     Actionable,
@@ -31,7 +31,9 @@ public enum InputBufferDiagEvent
     /// 기본 공격 중 스킬 입력을 공격 뒤로 예약했다(거너 — 현재 발 마무리 후 시전). 그 입력은 버퍼에서 예약으로 옮겨 가
     /// 만료·실행 이벤트가 더 나지 않는다(같은 스킬 연타도 1건씩 남되 실행은 1번).
     /// </summary>
-    SkillReservedAfterAttack
+    SkillReservedAfterAttack,
+    /// <summary>버퍼에 살아 있는 입력보다 우선순위가 낮아 기록되지 않았다(할 일 77). 들고 있던 입력은 그대로다.</summary>
+    IgnoredLowerPriority
 }
 
 /// <summary>진단 이벤트 1건. 시간은 전부 초(Time.time 기준), 없으면 음수.</summary>
@@ -69,8 +71,9 @@ public readonly struct InputBufferDiagRecord
 }
 
 /// <summary>
-/// 버퍼가 들고 있는 입력 1개를 <see cref="PlayerInputBuffer"/> 와 같은 규칙(마지막 1개·유지 시간 초과 = 만료)으로 따라가며
-/// 진단 이벤트를 만든다. 시간·프레임은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상).
+/// 버퍼가 들고 있는 입력 1개를 <see cref="PlayerInputBuffer"/> 와 같은 규칙(1개·유지 시간 초과 = 만료)으로 따라가며
+/// 진단 이벤트를 만든다. 우선순위 판정은 버퍼가 하고, 호출자가 결과대로 Press 또는 IgnoredLowerPriority 를 부른다.
+/// 시간·프레임은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상).
 /// </summary>
 public sealed class PlayerInputBufferDiagTracker
 {
@@ -100,7 +103,22 @@ public sealed class PlayerInputBufferDiagTracker
     public PlayerBufferedInput Pending => pendingKind;
     public bool IsActionable => actionable;
 
-    /// <summary>버퍼에 기록된 press. 살아 있던 이전 입력은 Overwritten.</summary>
+    /// <summary>
+    /// 버퍼보다 낮은 우선순위라 기록되지 않은 press. 들고 있던 입력(<paramref name="held"/>)의 추적은 그대로 둔다.
+    /// elapsed = 들고 있던 입력의 press 부터.
+    /// </summary>
+    public void IgnoredLowerPriority(PlayerBufferedInput input, PlayerBufferedInput held, float now, int frame)
+    {
+        CheckExpiry(now, frame);
+        if (input == PlayerBufferedInput.None)
+            return;
+
+        float elapsed = pendingKind != PlayerBufferedInput.None && pendingKind == held ? now - pendingPressTime : -1f;
+        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.IgnoredLowerPriority, input, now, frame,
+            elapsed: elapsed, detail: $"보관 중 {held}"));
+    }
+
+    /// <summary>버퍼에 기록된 press. 살아 있던 이전 입력은 Overwritten(같거나 낮은 우선순위라 실제로 덮였다).</summary>
     public void Press(PlayerBufferedInput input, float now, int frame, float holdSeconds)
     {
         if (input == PlayerBufferedInput.None || holdSeconds <= 0f)
@@ -324,7 +342,7 @@ public sealed class PlayerInputBufferDiagStats
         sb.Append(PlayerInputBufferDiagnostics.Prefix)
             .Append(" 요약 — 유지 ").Append(Ms(holdSeconds)).Append("ms, 이벤트 ").Append(TotalEvents)
             .Append("건, CSV: ").Append(csvPath ?? "(없음)").AppendLine();
-        sb.AppendLine("입력 | press | 즉시 실행 | 버퍼 실행 | 만료 | 버림 | 덮임 | 평타 뒤 예약");
+        sb.AppendLine("입력 | press | 즉시 실행 | 버퍼 실행 | 만료 | 버림 | 덮임 | 평타 뒤 예약 | 낮은 우선순위 무시");
         foreach (PlayerBufferedInput input in Inputs)
         {
             int consumed = Count(input, InputBufferDiagEvent.Consumed);
@@ -337,6 +355,7 @@ public sealed class PlayerInputBufferDiagStats
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Dropped))
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Overwritten))
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.SkillReservedAfterAttack))
+                .Append(" | ").Append(Count(input, InputBufferDiagEvent.IgnoredLowerPriority))
                 .AppendLine();
         }
 
@@ -518,6 +537,7 @@ public static class PlayerInputBufferDiagnostics
         InputBufferDiagEvent.Overwritten => "overwritten",
         InputBufferDiagEvent.Actionable => "actionable",
         InputBufferDiagEvent.SkillReservedAfterAttack => "skill-reserved-after-attack",
+        InputBufferDiagEvent.IgnoredLowerPriority => "ignored-lower-priority",
         _ => evt.ToString()
     };
 
@@ -532,6 +552,8 @@ public static class PlayerInputBufferDiagnostics
             case InputBufferDiagEvent.Dropped:
             case InputBufferDiagEvent.Overwritten:
                 return $" press→{Ms(record.Elapsed)}ms";
+            case InputBufferDiagEvent.IgnoredLowerPriority:
+                return record.Elapsed >= 0f ? $" 보관 입력 press→{Ms(record.Elapsed)}ms" : "";
             case InputBufferDiagEvent.Actionable:
                 if (record.MissedGap >= 0f)
                     return $" 놓친 간격 {Ms(record.MissedGap)}ms, press→actionable {Ms(record.PressToActionable)}ms";

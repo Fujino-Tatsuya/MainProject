@@ -49,6 +49,19 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 진단 로그: 예약 입력마다 `skill-reserved-after-attack`(요약 표 '평타 뒤 예약' 열, 사유 = 예약/예약 교체/같은 스킬 연타). 그 입력은 버퍼 추적에서 빠져 `expired` 로 세지 않는다.
 - 코드: `PlayerBasicAttackInputRules`·`PlayerSkillReservation`(`IPlayerBasicAttack.cs`), `PlayerStateBase.TryReserveSkillDuringAttack`·`TryStartReservedSkill`·`TryStartAttackOnHold`, `GunnerBasicAttack.FinishWithoutChaining`. 테스트: `PlayerBasicAttackInputRulesTests`.
 
+### 0.2 버퍼 우선순위(할 일 77, 2026-10-22)
+
+버퍼는 입력 1개만 든다. 유지 시간(0.2초) 안에 여러 입력이 오면 **우선순위 높은 것**을 남긴다.
+
+- 규칙: 살아 있는(만료 안 된) 입력보다 새 입력의 우선순위가 **낮으면 기록하지 않는다**, **같거나 높으면 덮는다**(같으면 나중 입력이 이긴다). 만료·소비·버림으로 비었으면 무엇이든 기록한다.
+- 같은 프레임에 여럿 눌려도 기록 순서와 무관하게 이 규칙이 정한다. HUD 가상 스킬(`SetVirtualSkillInput`)도 같다.
+- 기본값(클수록 높음): 대시 5 > 우클릭(`SkillInterrupt`) 4 > R(`SkillUltimate`) 3 > Q(`SkillMain`)·E(`SkillSub`) 2 > 평타(`Attack`) 1.
+- 필드: `PlayerInputReader` › `bufferPriorityDash`·`bufferPriorityInterrupt`·`bufferPriorityUltimate`·`bufferPrioritySkillMain`·`bufferPrioritySkillSub`·`bufferPriorityAttack`(`Player` 시트, `inputBufferSeconds` 와 같은 구역). 매 프레임 버퍼에 넘긴다.
+- §0 의 보관/버림 규칙은 그대로다. 그래서 **바쁨·CC 로 보관 중인 높은 입력은 유지 시간(0.2초) 동안 낮은 입력을 막는다** — 예: 넉백 중 대시를 누른 뒤 0.2초 안에 누른 평타·스킬은 버려진다. 자원 부족·차단 효과로 버린 입력은 더 막지 않는다.
+- 우선순위는 버퍼 기록에만 쓴다. 이번 프레임 눌림을 바로 읽는 경로(Idle/Move 즉시 실행·행동 중 원시 입력 소비)와 거너 평타 뒤 스킬 예약(§0.1, 마지막 스킬 1개)은 바꾸지 않는다.
+- 진단: 낮아서 기록 안 된 입력 = `ignored-lower-priority`(요약 표 '낮은 우선순위 무시' 열, 사유 = 보관 중 입력). `overwritten` 은 실제로 덮인 경우만.
+- 테스트: `PlayerInputBufferTests` `Priority_*`, `PlayerInputBufferDiagnosticsTests.IgnoredLowerPriority_*`.
+
 ## 1. 이벤트
 
 ### 1.1 쿨타임 거부 — `PlayerSkillController.CooldownRejected`
@@ -89,7 +102,7 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 범위: 오너 클라만. `UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS` 일 때만 컴파일된다(훅은 `[Conditional]` — 심볼이 없으면 호출째 사라진다).
 - 토글: `PlayerInputBufferDiagnostics.Enabled`(기본 켜짐). 에디터는 메뉴 `Tools/Debug/선입력 버퍼 진단 로그`(EditorPrefs 에 남음).
 - 출력: 콘솔 `[InputBuf]` 한 줄씩 + CSV. 에디터 = 프로젝트 `Logs/InputBuffer-<시각>.csv`, 빌드 = `Application.persistentDataPath`. Play 종료 때 입력별 개수·분포 요약과 CSV 경로를 콘솔에 남긴다.
-- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`·`actionable`(바쁨 → Idle/Move)·`skill-reserved-after-attack`(거너 평타 중 스킬 입력을 지금 발 마무리 뒤로 예약, §0.1).
+- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`(실제로 덮임)·`ignored-lower-priority`(§0.2)·`actionable`(바쁨 → Idle/Move)·`skill-reserved-after-attack`(거너 평타 중 스킬 입력을 지금 발 마무리 뒤로 예약, §0.1).
 - 핵심 숫자: `actionable` 의 **놓친 간격** = 실행 가능해진 시각 − 만료 시각(press + 유지 시간), **press→actionable** = 그 입력이 살아남으려면 필요했던 유지 시간. 바쁜 동안 만료된 입력만 센다.
 - 알려진 한계: 원격 클라 오너의 근접 평타 콤보 예약 입력은 버퍼에서 지우지 않아(창을 서버만 안다) 콤보 중 누른 LMB 가 `expired` 로 잡힐 수 있다. Idle/Move 안에서 요청 응답만 기다리는 경우(스킬 요청 대기)는 `actionable` 로 보지 않는다.
 - 코드: `PlayerInputBufferDiagnostics.cs`(추적기·집계·세션), 훅은 `PlayerInputReader`(기록·소비·Resolve·비움)·`PlayerStateController.ChangeState`/`SetState`. 테스트: `PlayerInputBufferDiagnosticsTests`.

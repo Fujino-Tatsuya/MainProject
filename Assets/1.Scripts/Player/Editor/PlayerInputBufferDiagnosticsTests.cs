@@ -134,6 +134,25 @@ public sealed class PlayerInputBufferDiagnosticsTests
     }
 
     [Test]
+    public void IgnoredLowerPriority_KeepsPending_NoOverwritten_CountedInSummary()
+    {
+        // 할 일 77 — 보관 중인 높은 입력(대시) 때문에 기록 안 된 평타는 overwritten 이 아니라 ignored-lower-priority.
+        var stats = new PlayerInputBufferDiagStats();
+        var counted = new PlayerInputBufferDiagTracker(r => { records.Add(r); stats.Add(r); });
+        counted.Press(PlayerBufferedInput.Dash, 10f, 100, Hold);
+        counted.IgnoredLowerPriority(PlayerBufferedInput.Attack, PlayerBufferedInput.Dash, 10.05f, 103);
+
+        InputBufferDiagRecord ignored = Last(InputBufferDiagEvent.IgnoredLowerPriority);
+        Assert.That(ignored.Input, Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(ignored.Elapsed, Is.EqualTo(0.05f).Within(1e-4f), "보관 입력 press 부터");
+        Assert.That(ignored.Detail, Does.Contain("Dash"));
+        Assert.That(CountOf(InputBufferDiagEvent.Overwritten), Is.EqualTo(0));
+        Assert.That(counted.Pending, Is.EqualTo(PlayerBufferedInput.Dash));
+        Assert.That(PlayerInputBufferDiagnostics.EventName(InputBufferDiagEvent.IgnoredLowerPriority), Is.EqualTo("ignored-lower-priority"));
+        StringAssert.Contains("LMB | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
+    }
+
+    [Test]
     public void DroppedAndConsumed_MatchKindOnly_OrAnyWhenNone()
     {
         tracker.Press(PlayerBufferedInput.SkillMain, 10f, 100, Hold);

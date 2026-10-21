@@ -23,7 +23,7 @@ GameData.xlsx (SVN, 잠금)
 
 | 시트 | 들어 있는 것 |
 |---|---|
-| `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 |
+| `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 · 선입력 버퍼(`PlayerInputReader` — `inputBufferSeconds`, 우선순위 `bufferPriority*` 6칸, [skill-reject-feedback.md §0.2](skill-reject-feedback.md)) |
 | `Paladin` | 가붕이 기본 공격 · 패시브 · 스킬 SO 4종 |
 | `Gunner` | 거너 기본 공격 · 과열 · 스킬 SO 4종 |
 | `Assassin` | 어쌔신 기본 공격 · 상태 · 스킬 SO |
