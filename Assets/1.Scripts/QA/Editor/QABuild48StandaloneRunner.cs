@@ -294,7 +294,13 @@ public static class QABuild48StandaloneRunner
 
     static void AppendReadable(StringBuilder sb, string path)
     {
-        try { if (File.Exists(path)) sb.AppendLine(File.ReadAllText(path)); }
+        try
+        {
+            if (!File.Exists(path)) return;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, Encoding.UTF8, true))
+                sb.AppendLine(reader.ReadToEnd());
+        }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
