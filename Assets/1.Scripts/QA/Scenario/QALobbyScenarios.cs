@@ -74,6 +74,25 @@ public static partial class QALobbyScenarios
             yield break;
 
         yield return CloseResultPanelIfOpen(ctx, null);
+
+        // MPPM 클론의 로비 씬 동기화가 끝나기 전에 먼저 준비하면 뒤늦은 LobbySession 접속 처리에서
+        // 전원 Ready 초기화가 일어나 호스트만 준비가 풀릴 수 있다. 기대 인원이 2초간 유지된 뒤 준비한다.
+        if (ctx.ExpectedPlayers > 1)
+        {
+            float stable = 0f;
+            yield return ctx.Wait(() =>
+            {
+                bool full = LobbySession.Active != null && LobbySession.Active.EntryCount >= ctx.ExpectedPlayers;
+                stable = full ? stable + Time.unscaledDeltaTime : 0f;
+                return stable >= 2f;
+            }, 60f);
+            if (ctx.TimedOut)
+            {
+                ctx.Fail("로비 기대 인원 집결", $"60초 안에 {ctx.ExpectedPlayers}명 안정 집결 실패 — 현재 {(LobbySession.Active != null ? LobbySession.Active.EntryCount : 0)}명");
+                yield break;
+            }
+        }
+
         yield return QALobbyFlow.ReadyUp(ctx.Input);
         yield return ctx.Wait(() => QALobbyFlow.InMapWithPlayer, 120f);
         ok.Value = !ctx.TimedOut;
