@@ -44,6 +44,7 @@ internal static class SettingsArtSkin
     internal const string FontAssetPath = "Assets/50.Art/UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset";
 
     internal const float Pad = 2f;                                    // 스프라이트 바깥 투명 여백(논리)
+    const float DropdownListPad = 10f;                                // 드롭다운 목록 위아래 여백(경석 10-21)
     static readonly Vector2 PanelCenter = new Vector2(971.39f, 528.11f);   // panel_settings rect 중심(목업 좌표)
 
     // 내용 카드(탭 오른쪽 줄무늬 영역) — 목업 좌표.
@@ -375,6 +376,10 @@ internal static class SettingsArtSkin
         {
             var itemRt = (RectTransform)item.transform;
             itemRt.sizeDelta = new Vector2(itemRt.sizeDelta.x, 44f);
+            // 목록 위아래 여백(경석 10-21: 맨 위 항목이 테두리에 붙었다). TMP 드롭다운은 Content 높이와 항목 높이의 차이를
+            // 위아래 여백으로 쓴다 — Content 를 기본 28 로 두면 44 짜리 항목이 위로 8px 삐져나가 맨 위 글자가 붙는다.
+            if (itemRt.parent is RectTransform listContent)
+                listContent.sizeDelta = new Vector2(listContent.sizeDelta.x, 44f + DropdownListPad * 2f);
             if (item.targetGraphic is Image itemBg)
             {
                 itemBg.sprite = null;
