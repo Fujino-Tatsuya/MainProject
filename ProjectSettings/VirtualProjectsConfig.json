@@ -1,4 +1,6 @@
 {
-  "PlayerTags": [],
+  "PlayerTags": [
+    "Client"
+  ],
   "version": "6000.3.16f1"
 }

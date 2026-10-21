@@ -116,7 +116,9 @@ public class BossTeleportManager : NetworkBehaviour
     {
         public bool Active;
         public double ElevatorStart;  // 어느 연출의 지시인가 — 시작 시각이 다른 값으로 바뀌면 버린다
-        public Vector3 Target;        // 칸 안 지점 — 수평만 쓴다(높이는 지면)
+        public Vector3[] Path;        // 경유 지점들 → 칸 안 지점(마지막) — 수평만 쓴다(높이는 지면)
+        public int PathIndex;         // 지금 향하는 점
+        public Vector3 Target => Path[Path.Length - 1];
         public double StartAt;        // 서버시간
         public float Duration;
         public bool Started;
@@ -412,8 +414,9 @@ public class BossTeleportManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// [포커스 시각] 오너에게 보행 지시 — 슬롯 순서대로 시간표의 시작 시각에 칸 안 지점까지.
+    /// [포커스 시각] 오너에게 보행 지시 — 슬롯 순서대로 시간표의 시작 시각에 경유 지점들을 거쳐 칸 안 지점까지.
     /// 시작 시각·시간을 함께 보내 오너가 서버 시간표에 맞춰 걷는다(출발 자리가 문 앞에서 조금 어긋나 있어도 같은 시각에 도착).
+    /// 경로 점은 서버 리그에서 읽어 RPC 로 보낸다(점 몇 개) — 오너가 자기 리그를 찾지 않아도 되고 서버 시간표와 같은 경로가 보장된다.
     /// </summary>
     private void DirectWalk(List<ulong> participants, BossElevatorRig rig, BossElevatorTimeline timeline, double start)
     {
@@ -423,7 +426,7 @@ public class BossTeleportManager : NetworkBehaviour
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null)
                 continue;
 
-            ElevatorWalkOwnerClientRpc(rig.GetInsidePoint(slot), start, start + timeline.WalkStartAt(slot), timeline.WalkDuration,
+            ElevatorWalkOwnerClientRpc(rig.GetWalkPath(slot).ToArray(), start, start + timeline.WalkStartAt(slot), timeline.WalkDuration,
                 new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } });
         }
     }
@@ -659,20 +662,21 @@ public class BossTeleportManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// [오너] 엘리베이터 보행 지시 — <paramref name="startAt"/>(서버시간)부터 <paramref name="duration"/> 동안 지금 자리 → <paramref name="target"/>
-    /// Motor 걷기 변위로 보행(Walk 애니 = IsMoving, 칸 콜라이더를 타고 오른다). 도착 뒤에도 그 자리를 붙잡아 둔다(숨김·상승 동안 낙하·밀림 없음). 보스룸 도착·연출 끝에 풀린다.
+    /// [오너] 엘리베이터 보행 지시 — <paramref name="startAt"/>(서버시간)부터 <paramref name="duration"/> 동안 지금 자리 → <paramref name="path"/>(경유 지점들 → 칸 안 지점)
+    /// 를 차례로 Motor 걷기 변위로 등속 보행(Walk 애니 = IsMoving, 칸 콜라이더를 타고 오른다). 도착 뒤에도 그 자리를 붙잡아 둔다(숨김·상승 동안 낙하·밀림 없음). 보스룸 도착·연출 끝에 풀린다.
     /// <paramref name="elevatorStart"/> = 어느 연출의 지시인가(복제 시작 시각과 RPC 의 도착 순서가 바뀌어도 맞춰 본다).
     /// </summary>
     [ClientRpc]
     private void ElevatorWalkOwnerClientRpc(
-        Vector3 target, double elevatorStart, double startAt, float duration, ClientRpcParams rpcParams = default)
+        Vector3[] path, double elevatorStart, double startAt, float duration, ClientRpcParams rpcParams = default)
     {
         StopOwnerWalk();
+        if (path == null || path.Length == 0) return;
         _walk = new OwnerWalk
         {
             Active = true,
             ElevatorStart = elevatorStart,
-            Target = target,
+            Path = path,
             StartAt = startAt,
             Duration = Mathf.Max(0f, duration),
         };
@@ -703,7 +707,7 @@ public class BossTeleportManager : NetworkBehaviour
             // 줄 서서 걷는 참가자끼리(칸 안 지점 간격 0.72m < 캡슐 지름 0.76m) 막힘·밀어내기로 튀지 않게 — 보행·붙잡기 동안만. 벽·칸 콜라이더엔 그대로 막힌다.
             motor.PassThroughUnitsOverride = true;
 
-            Vector3 dir = _walk.Target - motor.Position;
+            Vector3 dir = _walk.Path[0] - motor.Position;
             dir.y = 0f;
             if (po.TryGetComponent(out PlayerMovement movement)) movement.RotateImmediately(dir);
         }
@@ -730,7 +734,12 @@ public class BossTeleportManager : NetworkBehaviour
             return;
         }
 
-        motor.AddGroundedDisplacement(BossElevatorTimeline.WalkStep(_walk.Target - position, walkEndAt - now, Time.fixedDeltaTime));
+        int segment = _walk.PathIndex;
+        motor.AddGroundedDisplacement(
+            BossElevatorTimeline.WalkStepAlongPath(position, _walk.Path, ref _walk.PathIndex, walkEndAt - now, Time.fixedDeltaTime));
+        // 경유 지점을 지나 꺾이면 다음 구간을 바라본다.
+        if (_walk.PathIndex != segment && po.TryGetComponent(out PlayerMovement turning))
+            turning.RotateImmediately(_walk.Path[_walk.PathIndex] - _walk.Path[_walk.PathIndex - 1]);
         if (player != null) player.SetAnimatorMoving(true);
     }
 
