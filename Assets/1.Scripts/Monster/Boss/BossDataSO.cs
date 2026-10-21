@@ -664,8 +664,9 @@ public class BossDataSO : MonsterDataSO
     public string jumpTakeoffState = "Leap";
 
     [Tooltip("[G4] 이륙 길이(초). 클립 전체를 이 시간에 맞추어 재생한다 — " +
-             "🔴 재생속도는 클립 길이에서 역산한다(상수로 박지 않는다). 0 이면 이륙 없음.")]
-    [Min(0f)] public float jumpTakeoffDuration = 0.633f;
+             "🔴 재생속도는 클립 길이에서 역산한다(상수로 박지 않는다). 0 이면 이륙 없음.\n" +
+             "경석 10-21: 1.2배속 = 0.633 / 1.2 = 0.5275. 이 시간 동안 모델이 카메라 밖까지 솟는다(TwentyThreeBoss.JumpRise).")]
+    [Min(0f)] public float jumpTakeoffDuration = 0.5275f;
 
     [Tooltip("체공 포즈 애니메이터 상태명. 비우면 도약 클립을 유지한다.")]
     public string jumpHoverState = "";

@@ -4069,6 +4069,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void SetModelVisibleClientRpc(bool visible)
     {
+        StopTakeoffRiseLocal();   // 이륙 상승 원위치 — 숨김(체공 시작)·되살림(착지·중단) 어느 쪽이든
         if (_modelRenderers == null) CacheModelRenderers();
         if (_modelRenderers == null) return;
 
@@ -4165,6 +4166,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (_counterAnimatorHeldLocally) _counterAnimatorResumeSpeed = speed;
         else animator.speed = speed;
+
+        // 이륙 동안 모델을 카메라 밖까지 끌어올린다(경석 10-21 — TwentyThreeBoss.JumpRise.cs). 체공 시작 숨김에서 원위치.
+        BeginTakeoffRiseLocal(dur);
     }
 
     /// <summary>[G4] 이륙 배속을 1 로 되돌린다. 잡기 배수 복원과 같은 규약.</summary>
