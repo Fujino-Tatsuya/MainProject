@@ -56,6 +56,12 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     /// </summary>
     public static System.Func<ulong, Vector3, Vector3?> ReturnPointFallback;
 
+    /// <summary>
+    /// [서버] 복귀 지점 우선 지정(전역). 값을 돌려주면 큐·Ring 탐색 없이 그 지점을 쓴다(인자 = OwnerClientId, 낙하 지점).
+    /// null 을 돌려주거나 없으면 기존 탐색. 튜토리얼 스텝별 고정 안전 지점(<c>TutorialSafePoints</c>, 할 일 80)이 건다.
+    /// </summary>
+    public static System.Func<ulong, Vector3, Vector3?> ReturnPointOverride;
+
     private readonly Queue<Vector3> _safePointQueue = new Queue<Vector3>();
     private readonly List<GameObject> _markerInstances = new List<GameObject>();
     private Vector3 _spawnPoint;
@@ -178,6 +184,12 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     /// 모두 실패하면 최종 fallback으로 스폰 위치를 반환한다.</summary>
     public Vector3 ResolveReturnPoint(Vector3 fallPoint)
     {
+        if (ReturnPointOverride?.Invoke(OwnerClientId, fallPoint) is Vector3 fixedPoint)
+        {
+            Edit.Log($"[Fall/진단] 고정 안전 지점으로 — {fixedPoint}", this);
+            return fixedPoint;
+        }
+
         // 오래된 → 최신 순으로 채워지므로 역순으로 훑는다.
         Vector3[] candidates = _safePointQueue.ToArray();
 
