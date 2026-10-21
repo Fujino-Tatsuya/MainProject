@@ -40,7 +40,7 @@ exe 실행 → (호스트) 바로 호스팅 / (클라) 자동 접속 — 버튼 
 
 - 틀린 값은 기본값으로 바꾸고 계속 돈다(JSON 이 깨졌으면 통째로 호스트). 파서: [DemoConnectionConfig.cs](../../Assets/1.Scripts/Network/Session/DemoConnectionConfig.cs).
 - **R5 끊김 타임아웃:** 랜선이 빠지면 `disconnectTimeoutSeconds`(10초) 안에 대기 화면으로 간다. 너무 짧으면 순간 렉에도 끊기고, 길면 복구가 늦다 — **부스 리허설에서 조정**한다.
-- 에디터는 **프로젝트 루트**의 `demo-connection.json` 을 읽는다. 개인 파일이라 `.gitignore` 에 있다 — 커밋하지 않는다.
+- 에디터는 **프로젝트 루트**의 `demo-connection.json` 을 읽는다. 기본값(host 샘플과 같음)으로 git 에 들어 있다 — 클라로 시험할 때만 로컬에서 고치고 그 변경은 커밋하지 않는다.
 
 ## 3. 같은 빌드 필수 (R6)
 - 접속 승인을 켜서, 빌드가 다르면(NetworkConfig 해시 불일치) 호스트가 사유 없이 끊고 클라는 **"버전 불일치 — 호스트와 같은 빌드인지 확인"** 을 띄우며 재시도한다.
