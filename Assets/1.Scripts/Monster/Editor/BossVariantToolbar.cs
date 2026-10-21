@@ -21,7 +21,7 @@ public static class BossVariantToolbar
     [MainToolbarElement(
         ElementPath,
         defaultDockPosition = MainToolbarDockPosition.Middle,
-        defaultDockIndex = 14,
+        defaultDockIndex = 4,
         menuPriority = 104,
         ussName = UssName)]
     static MainToolbarElement CreateDropdown()
