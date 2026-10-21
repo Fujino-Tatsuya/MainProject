@@ -602,6 +602,80 @@ MonoBehaviour:
   - key: UI.Settings.Title
     ko: "\uC124\uC815"
     en: Settings
+  - key: UI.Lobby.ShowLastResult
+    ko: "\uC9C0\uB09C \uD310 \uACB0\uACFC"
+    en: "\uC9C0\uB09C \uD310 \uACB0\uACFC"
+  - key: UI.DemoConnect.WaitingForHost
+    ko: "\uD638\uC2A4\uD2B8 \uB300\uAE30 \uC911"
+    en: "\uD638\uC2A4\uD2B8 \uB300\uAE30 \uC911"
+  - key: UI.DemoConnect.StartingHost
+    ko: "\uD638\uC2A4\uD2B8 \uC2DC\uC791 \uC911"
+    en: "\uD638\uC2A4\uD2B8 \uC2DC\uC791 \uC911"
+  - key: UI.DemoConnect.Disconnected
+    ko: "\uC5F0\uACB0 \uB04A\uAE40 \u2014 \uC815\uB9AC \uC911"
+    en: "\uC5F0\uACB0 \uB04A\uAE40 \u2014 \uC815\uB9AC \uC911"
+  - key: UI.DemoConnect.Address
+    ko: "\uC8FC\uC18C {address}:{port}"
+    en: "\uC8FC\uC18C {address}:{port}"
+  - key: UI.DemoConnect.Connecting
+    ko: "\uC811\uC18D \uC2DC\uB3C4 \uC911 ({attempt}\uD68C\uC9F8)"
+    en: "\uC811\uC18D \uC2DC\uB3C4 \uC911 ({attempt}\uD68C\uC9F8)"
+  - key: UI.DemoConnect.RetryIn
+    ko: "{time} \uD6C4 \uC7AC\uC2DC\uB3C4 ({attempt}\uD68C\uC9F8)"
+    en: "{time} \uD6C4 \uC7AC\uC2DC\uB3C4 ({attempt}\uD68C\uC9F8)"
+  - key: UI.DemoConnect.ConfigMissing
+    ko: "\uC124\uC815 \uD30C\uC77C \uC5C6\uC74C \u2014 \uD638\uC2A4\uD2B8 \uBAA8\uB4DC"
+    en: "\uC124\uC815 \uD30C\uC77C \uC5C6\uC74C \u2014 \uD638\uC2A4\uD2B8 \uBAA8\uB4DC"
+  - key: UI.DemoConnect.BuildInfo
+    ko: "v{version} \xB7 cfg {hash}"
+    en: "v{version} \xB7 cfg {hash}"
+  - key: UI.DemoConnect.RejoinWaiting
+    ko: "\uD310\uC5D0 \uB2E4\uC2DC \uD569\uB958\uD558\uB294 \uC911 \u2014 \uC7A0\uC2DC
+      \uAE30\uB2E4\uB9AC\uC138\uC694"
+    en: "\uD310\uC5D0 \uB2E4\uC2DC \uD569\uB958\uD558\uB294 \uC911 \u2014 \uC7A0\uC2DC
+      \uAE30\uB2E4\uB9AC\uC138\uC694"
+  - key: UI.DemoConnect.JoiningMatch
+    ko: "\uD310\uC5D0 \uD569\uB958\uD558\uB294 \uC911\u2026"
+    en: "\uD310\uC5D0 \uD569\uB958\uD558\uB294 \uC911\u2026"
+  - key: UI.DemoConnect.AutoHostMatch
+    ko: "\uC790\uB3D9: \uD638\uC2A4\uD2B8 ({address} \uC77C\uCE58)"
+    en: 'Auto: Host ({address} matched)'
+  - key: UI.DemoConnect.AutoHostLoopback
+    ko: "\uC790\uB3D9: \uD638\uC2A4\uD2B8 (hostAddress {address})"
+    en: 'Auto: Host (hostAddress {address})'
+  - key: UI.DemoConnect.AutoClient
+    ko: "\uC790\uB3D9: \uD074\uB77C (\uC774 PC \uC5D0 {address} \uC5C6\uC74C)"
+    en: 'Auto: Client ({address} not on this PC)'
+  - key: UI.Lobby.InteractReady
+    ko: "\uC900\uBE44"
+    en: "\uC900\uBE44"
+  - key: UI.Lobby.InteractUnready
+    ko: "\uC900\uBE44 \uD574\uC81C"
+    en: "\uC900\uBE44 \uD574\uC81C"
+  - key: UI.Lobby.InteractCharacterSelect
+    ko: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
+    en: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
+  - key: UI.Lobby.ReadyCount
+    ko: "\uC900\uBE44 {ready}/{total}"
+    en: "\uC900\uBE44 {ready}/{total}"
+  - key: UI.Lobby.Countdown
+    ko: "{time} \uD6C4 \uCD9C\uBC1C"
+    en: "{time} \uD6C4 \uCD9C\uBC1C"
+  - key: UI.Lobby.CountdownStarting
+    ko: "\uCD9C\uBC1C!"
+    en: "\uCD9C\uBC1C!"
+  - key: UI.CharacterSelect.LockedNotice
+    ko: "\uC900\uBE44\uB97C \uD574\uC81C\uD574\uC57C \uBC14\uAFC0 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+    en: "\uC900\uBE44\uB97C \uD574\uC81C\uD574\uC57C \uBC14\uAFC0 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+  - key: UI.CharacterSelect.CurrentTag
+    ko: "\uD604\uC7AC"
+    en: "\uD604\uC7AC"
+  - key: UI.CharacterSelect.Unavailable
+    ko: "\uC120\uD0DD \uBD88\uAC00"
+    en: "\uC120\uD0DD \uBD88\uAC00"
+  - key: UI.CharacterSelect.Hint
+    ko: "W/S\xB7\uBC29\uD5A5\uD0A4 \uC774\uB3D9   Enter \uC120\uD0DD   Esc \uB4A4\uB85C"
+    en: "W/S\xB7\uBC29\uD5A5\uD0A4 \uC774\uB3D9   Enter \uC120\uD0DD   Esc \uB4A4\uB85C"
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

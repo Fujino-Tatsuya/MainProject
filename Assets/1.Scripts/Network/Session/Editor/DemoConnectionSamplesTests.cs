@@ -4,7 +4,7 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 빌드에 복사하는 연결 설정 샘플(레포 루트 BuildSamples/ — 공용 auto · host · client) — 원본이 <see cref="DemoConnectionConfig.TryParse"/> 로 사유 없이 읽히고,
+/// 빌드에 복사하는 연결 설정 샘플(레포 루트 BuildSamples/ — 모든 PC 공용, role auto — 할 일 72 후속으로 host·client 샘플은 지웠다) — 원본이 <see cref="DemoConnectionConfig.TryParse"/> 로 사유 없이 읽히고,
 /// 복사 대상이 exe 폴더이며 실제 설정 파일명과 겹치지 않는다(PLAN-48 C13).
 /// </summary>
 public sealed class DemoConnectionSamplesTests
@@ -42,29 +42,6 @@ public sealed class DemoConnectionSamplesTests
         Assert.IsTrue(onHost.IsHost);
         Assert.AreEqual(DemoConnectionRole.Client, onOther.Role);
         Assert.AreEqual(address, onOther.HostAddress);
-    }
-
-    [Test]
-    public void 호스트_샘플은_사유_없이_호스트로_읽힌다()
-    {
-        var c = ParseSample(DemoConnectionSamples.HostSampleFileName).Config;
-
-        Assert.IsTrue(c.IsHost);
-        Assert.AreEqual(DemoConnectionConfig.DefaultPort, c.Port);
-        Assert.AreNotEqual("BOOTH-PC", c.PlayerId, "playerId 필드가 샘플에 있어야 한다");
-    }
-
-    [Test]
-    public void 클라_샘플은_사유_없이_클라로_읽히고_playerId_가_호스트와_다르다()
-    {
-        var host = ParseSample(DemoConnectionSamples.HostSampleFileName).Config;
-        var c = ParseSample(DemoConnectionSamples.ClientSampleFileName).Config;
-
-        Assert.AreEqual(DemoConnectionRole.Client, c.Role);
-        Assert.AreNotEqual(DemoConnectionConfig.DefaultHostAddress, c.HostAddress, "호스트 주소 자리표시가 있어야 한다");
-        Assert.AreEqual(host.Port, c.Port);
-        Assert.AreNotEqual("BOOTH-PC", c.PlayerId, "playerId 필드가 샘플에 있어야 한다");
-        Assert.AreNotEqual(host.PlayerId, c.PlayerId, "같은 playerId 면 DuplicatePlayerId 로 거절된다");
     }
 
     [Test]

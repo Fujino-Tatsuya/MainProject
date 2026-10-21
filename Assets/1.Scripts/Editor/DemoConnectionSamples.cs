@@ -17,11 +17,8 @@ public static class DemoConnectionSamples
     public const string SourceFolderName = "BuildSamples";
     /// <summary>모든 PC 공용 — role auto(이 PC IP = hostAddress 면 호스트, 아니면 클라). 운영 기본(할 일 72).</summary>
     public const string AutoSampleFileName = "demo-connection.sample.json";
-    /// <summary>role 명시 샘플 — 자동 판정이 맞지 않을 때만(예: 호스트가 NAT·포트포워딩 뒤라 hostAddress 가 자기 NIC 에 없음).</summary>
-    public const string HostSampleFileName = "demo-connection.host.sample.json";
-    public const string ClientSampleFileName = "demo-connection.client.sample.json";
 
-    public static readonly IReadOnlyList<string> SampleFileNames = new[] { AutoSampleFileName, HostSampleFileName, ClientSampleFileName };
+    public static readonly IReadOnlyList<string> SampleFileNames = new[] { AutoSampleFileName };
 
     /// <summary><c>Path.GetDirectoryName(Application.dataPath)</c>(프로젝트 루트) 아래 샘플 폴더.</summary>
     public static string ResolveSourceDirectory(string projectRoot)
