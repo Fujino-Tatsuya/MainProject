@@ -26,7 +26,6 @@ public sealed class PartyWipeWatcher : MonoBehaviour
     private float _checkTimer;
     private float _wipeElapsed;
     private bool _fired;
-    private MultiGameRule _gameRule;
     private readonly System.Collections.Generic.List<PartyMemberLife> _members =
         new System.Collections.Generic.List<PartyMemberLife>();
 
@@ -94,10 +93,10 @@ public sealed class PartyWipeWatcher : MonoBehaviour
         // 씬 탐색 대신 등록식 목록(할 일 69 — 보스전 중 FindObjectsByType 한 번 8 ms 실측).
         System.Collections.Generic.IReadOnlyList<PlayerLifeCycleController> players = PlayerLifeCycleController.Active;
 
-        if (_gameRule == null)
-            _gameRule = FindFirstObjectByType<MultiGameRule>();
+        // 규칙도 등록식(MultiGameRule.Current) — 규칙 없는 씬에서 주기마다 FindFirstObjectByType 하지 않는다.
         // 규칙이 없으면 Soul 을 '부활 가능'으로 본다 = 예전 규칙(전원 PermanentDead 만 전멸).
-        int partyLives = _gameRule != null && _gameRule.IsSpawned ? _gameRule.PartyLives : 1;
+        MultiGameRule gameRule = MultiGameRule.Current;
+        int partyLives = gameRule != null && gameRule.IsSpawned ? gameRule.PartyLives : 1;
 
         _members.Clear();
         for (int i = 0; i < players.Count; i++)
