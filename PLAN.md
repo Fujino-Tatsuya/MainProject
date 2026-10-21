@@ -1,3 +1,38 @@
+# ▶▶▶ 계획 = **거너 R 추적 레이저 연출 재제작 — 범위 장판 · 대상별 조준(좁혀지는 원) · 대상별 위성 레이저+땅 파문** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1단계 MyProject 제작 · ✅ 2단계 반입·코드·배선(MyProject 저장본 그대로, dotnet 빌드 오류 0) · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-21, Q1~Q12 전부 추천안). **게임플레이 무변경** — 0.5초마다 반경 2m 안 적 전부 즉시 피해(`GunnerTrackingLaser.DamageTick`), 연출을 그 박자에 맞춘다.
+
+## 사실
+- 레이저 = 서버 소유 NetworkObject `2.Prefabs/Player/Gunner/GunnerTrackingLaser.prefab`. 서버가 이동·피해·수명 계산, 복제는 위치(NetworkTransform)·반경(NetworkVariable)뿐. 연출 = 자식 `Visual` 의 `FX_GunnerUltLaser`(반경×2 균일 배율) 하나 — 맞는 적을 모른다.
+- `GunnerTrackingLaser.cs` = 은희 영역(G7). 레이저 프리팹 연출 = 민경(10-06·10-08).
+- 참고: MyProject `Export/Player2/R/Effect_05_Nuke.prefab`(패키지 스크립트 `DelayActive` 등 4종 타임라인 — 초반 = `NukeMarks` 바닥·세로 표식) · `Effect_54_SateliteCannon.prefab`(스크립트 없음, 파티클 6개 원샷).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 박자(Q1-a) | 연출이 실제 피해 박자를 그대로 보여 준다 — 대상별 원이 피해 간격 동안 좁혀져 0 = 피해 순간, 그때 레이저 |
+| 제작(Q2) | MyProject 빌더(`Tools/VFX/Gunner Ult (R 위성 레이저) 빌드`) → 민경 확인 → 반입. 3번 = SateliteCannon 복제 개조, 2번 = NukeMarks 파티클만 떼어 스크립트 없이 재구성 |
+| 색(Q3) | 거너 청록·하늘 + 흰 코어, 예고(2번)만 따뜻한 강조색. 정확한 값은 MyProject 확인 때 |
+| 1 장판(Q4) | 테두리 링 + 옅은 채움 + 테두리 도는 눈금(스캔선 없음). 루프, 레이저 따라 이동, 지름 1유닛 저작(반경×2 배율 그대로) |
+| 2 조준(Q5) | 조여 드는 꺾쇠 4개 + 좁혀지는 원 + 중심 점 깜빡임 + 아주 옅은 하늘 조준선. 루프, 범위 안 적마다 하나·추종 |
+| 3 레이저(Q6) | 수직으로 내리꽂기 — 흰 코어 + 글로우 + 섬광 + 파문 링 + 불꽃(그을음 없음). 원샷, 맞은 위치마다. 레이저+파문 = **한 프리팹·한 엔트리**(Q9) |
+| 퇴장(Q7-b) | 레이저 제거 때 장판이 0.3초 줄어들며 사라짐(디스폰 직전 연출만 떼어 냄) |
+| 동기화(Q8-a) | 서버가 피해 순간마다 **맞은 위치 목록 + 피해 간격**을 전 피어에 RPC → 이펙트 3. 조준 표식은 각 피어가 매 프레임 범위 안 적을 직접 계산(새로 들어온 적도 예고), 원 진행도 = 마지막 신호 이후 시간 ÷ 간격 |
+| 코드(Q9) | 신규 `GunnerTrackingLaserView`(민경) — 장판 루프·대상별 조준 루프·신호 받으면 레이저·퇴장. `EffectManager` 엔트리 3(장판 루프 · 조준 루프 · 레이저 원샷) 카탈로그 등록. 원 진행도는 조준 프리팹 안의 작은 컴포넌트(`SetProgress`)로 — MyProject·MainProject 같은 guid. `GunnerTrackingLaser` 에는 신호 함수·호출만 **추가**(은희 handoff). 오프라인(테스트 씬)도 같은 연출 |
+| 크기(Q10-b) | 조준 표식·원은 대상 몸 크기(콜라이더 반경) 따라, 상·하한. 레이저 굵기 고정 |
+| 정리(Q11-a, Q12-a) | 기존 `FX_GunnerUltLaser` 는 프리팹에서 떼고 파일은 남김. 시전 총구 섬광 `FX_GunnerUltCast` 그대로 |
+
+## 단계
+1. MyProject: 빌더 + 프리팹 3종(`Export/Player2/R/FX_GunnerUlt_Zone`·`_Lock`·`_Strike`) + 미리보기(움직이는 더미 대상 · 0.5초 박자) → ⏳ 민경 확인
+   - ✅ 작성: `1.Scripts/Editor/GunnerUltVfxBuilder.cs`(메뉴 `Tools/VFX/Gunner Ult (R 위성 레이저) 빌드` → 재질 사본 `Export/Player2/R/Materials/M_GUlt_*` · 프리팹 3 · 씬 `Scenes/GunnerUltPreview.unity`) · `1.Scripts/GunnerUltTester.cs`(미리보기 — MainProject View 와 같은 규칙) · `1.Scripts/TelegraphRing.cs`(guid `f4c85f3d33ed4596b0eecde3e202d475` — MainProject 에 같은 guid 로 반입)
+   - 재료: 장판 = Mark_1(링)·Mark_5(톱니)·Ring_2(채움) 청록 / 조준 = Mark_7(꺾쇠)·Mark_1(원) Nuke 주황 + Particle_01(점·하늘선) / 레이저 = SateliteCannon 사본 ×0.6, 루트 한 발 버스트, 청록 재질. 셰이더 `Shader_IntegratedEffect`(MainProject 에 같은 guid 있음)
+2. MainProject(🔴 Unity 끔): 반입(같은 guid) · 엔트리·카탈로그 · `GunnerTrackingLaserView` · `GunnerTrackingLaser` 신호 추가 · 프리팹 배선 · handoff
+   - ✅ 10-21: 프리팹 3 → `Common/Players/Player2/R_TrackingLaser/` + 엔트리 3(Strike 1.2초·prewarm 8 / Lock prewarm 6) · 재질 12 → `_Materials/Player2/` · 팩 텍스처 7·`Cylinder_01.fbx` · `TelegraphRing.cs`(같은 guid) · 카탈로그 `Gunner_R_*` · `GunnerTrackingLaserView`(NetworkBehaviour — NetworkVariable 반경·간격·적 레이어 + Reliable RPC 맞은 위치) · `GunnerTrackingLaser` 호출 2곳 추가 · 레이저 프리팹에서 `FX_GunnerUltLaser` 제거 · `GunnerUltSetup` 가드 · [handoff-gunner-r-vfx](Docs/tech/handoff-gunner-r-vfx.md)
+   - ⚠️ 반입 시점 Lock 프리팹: `Brackets` 가 `Ground` 밖(루트 직하, X 90°)이라 `TelegraphRing` 이 회전을 (0,0,각도)로 덮어써 세로로 선다 — 고칠 방법(원위치 or 스크립트가 저작값 기준으로) 민경 결정 대기
+3. ⏳ 민경 Play/MPPM: 호스트·클라 모두 — 대상별 표식이 범위 출입에 맞게 붙고 떨어짐, 원 0 순간 레이저와 피해 숫자 일치, 6초 뒤 장판 줄어들며 퇴장, 늦게 들어온 클라
+
+---
+
 # ▶▶▶ 잠긴 계획 = **할 일 57.3 — 웰즈 드론 로컬 풀 + 로딩 예열** (2026-10-20 · 위임 승인)
 
 > Handoff `54adb49f-b945-46bc-adff-08c1f727e3bc` · 브랜치 `feature/EnemyC3PrewarmBoss` · 선행 `3ff61ba1`/`f378714d`.
