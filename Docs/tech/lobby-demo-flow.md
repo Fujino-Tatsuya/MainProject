@@ -23,14 +23,13 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 ## 2. 설정 파일 — 모든 PC 에 같은 파일 하나 (호스트 1대 + 클라 최대 2대)
 1. **모든 PC 에 같은 빌드**를 깐다(§3).
 2. 빌드 폴더(exe 옆)에 샘플이 들어 있다 — 빌드 메뉴가 넣는다([BuildWindowsPlayer.cs](../../Assets/1.Scripts/Editor/BuildWindowsPlayer.cs), 원본 [BuildSamples/](../../BuildSamples/)).
-   - **`demo-connection.sample.json` — 공용(기본).** `role` 이 `auto` 다.
-   - `demo-connection.host.sample.json` · `demo-connection.client.sample.json` — role 명시. 자동 판정이 안 맞을 때만(아래 5).
+   - **`demo-connection.sample.json` — 모든 PC 공용 샘플 하나.** `role` 이 `auto` 다(호스트·클라 명시 샘플은 2026-10-21 지웠다 — 필요하면 아래 5 처럼 `role` 만 고친다).
 3. 한 PC 에서 공용 샘플을 `demo-connection.json` 으로 이름을 바꾸고 **`hostAddress` 를 호스트로 쓸 PC 의 IPv4** 로 고친다(호스트 PC 에서 `ipconfig`). 그 **빌드 폴더를 통째로 모든 PC 에 복사**한다 — PC 마다 고칠 것이 없다.
    - 실행하면 이 PC 의 IPv4(켜진 NIC 전부) 중 하나가 `hostAddress` 와 같으면 **호스트**, 아니면 `hostAddress` 로 접속하는 **클라**가 된다. `hostAddress` 가 비었거나 `127.x`·`localhost` 면 호스트.
    - 판정 결과는 부팅 안내(3초)·대기 화면 제목 아래에 한 줄 뜬다 — `자동: 호스트 (100.79.198.77 일치)` / `자동: 클라 (이 PC 에 100.79.198.77 없음)`. 로그(`[DemoSession] role …`)에는 비교한 이 PC 주소 목록도 남는다.
    - **`playerId` 는 쓰지 않는다** — 비우면 PC 이름이라 PC 마다 저절로 다르다. 같은 PC 이름 두 대(복제 이미지)라면 그 PC 만 `playerId` 를 넣는다. 같으면 "같은 플레이어 ID 가 이미 접속 중" 으로 거절된다. 재접속해도 캐릭터를 이어 받는 열쇠라서 **행사 중엔 바꾸지 않는다.**
 4. 파일이 없으면 **호스트**(127.0.0.1 · 7777)로 뜨고 "설정 파일 없음 — 호스트 모드" 가 3초 뜬다. 클라 PC 에서 이 문구가 보이면 파일 이름·위치가 틀린 것이다.
-5. **`role` 에 `host`/`client` 를 쓰면 자동 판정보다 우선한다**(예전 PC 별 파일도 그대로 동작). 호스트 PC 의 IP 가 바뀌어 클라로 뜨면 `hostAddress` 를 고치거나 그 PC 만 `host` 로 둔다.
+5. **`role` 에 `host`/`client` 를 쓰면 자동 판정보다 우선한다**(예전 PC 별 파일도 그대로 동작 — 공용 샘플의 `role` 만 고치면 된다). 호스트 PC 의 IP 가 바뀌어 클라로 뜨면 `hostAddress` 를 고치거나 그 PC 만 `host` 로 둔다.
 
 | 필드 | 뜻 | 공용 샘플 값 |
 |---|---|---|

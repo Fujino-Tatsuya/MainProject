@@ -142,7 +142,7 @@ public static class BuildWindowsPlayer
     }
 
     /// <summary>
-    /// 부스 데모 연결 설정 샘플(공용 auto · 호스트·클라 명시)을 exe 폴더에 둔다 — Docs/tech/lobby-demo-flow.md. 세 빌드 메뉴·CLI 가 모두 여기를 지난다.
+    /// 부스 데모 연결 설정 샘플(모든 PC 공용, role auto)을 exe 폴더에 둔다 — Docs/tech/lobby-demo-flow.md. 세 빌드 메뉴·CLI 가 모두 여기를 지난다.
     /// 실패해도 빌드 결과는 그대로 성공이다(샘플 없이도 exe 는 호스트로 뜬다). 콘솔 에러로만 알린다.
     /// </summary>
     private static void CopyDemoConnectionSamples(string outputPath)
