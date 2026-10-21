@@ -71,7 +71,7 @@ public sealed class SkillTooltipFormatterTests
     [Test]
     public void Damage_IncludesDealtDamagePercent_LikeJudgeSnapshot()
     {
-        // 판정 스냅샷(AttackStatFormula.Snapshot)과 같은 식 — 가하는 피해% 는 1차 스냅샷 뒤, 차지 배율 앞.
+        // 판정 스냅샷(PlayerStatFormula.Snapshot)과 같은 식 — 가하는 피해% 는 1차 스냅샷 뒤, 차지 배율 앞.
         SkillTooltipDamage linear = SkillTooltipDamage.FromLinear(195f, 1.8f, 0, 0.2f);
         SkillTooltipDamage scaled = SkillTooltipDamage.FromScaledSnapshot(130f, 1f, 10, 0.5f, 2.25f, 0.2f);
 

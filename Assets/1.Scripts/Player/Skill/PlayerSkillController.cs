@@ -375,7 +375,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
             targetRef = target.NetworkObject;
 
         isRequestingSkill = true;
-        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateAttackStatReport());
+        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport());
         return true;
     }
 
@@ -836,12 +836,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
     [Rpc(SendTo.Server)]
     private void RequestUseSkillRpc(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, NetworkObjectReference targetRef,
-        Vector3 aimPoint, bool hasAimPoint, AttackStatReport statReport, RpcParams rpcParams = default)
+        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateAttackStatReport(statReport, rpcParams.Receive.SenderClientId, $"스킬 {slot}");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, $"스킬 {slot}");
 
         Unit target = ResolveTarget(targetRef);
         if (!StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint))

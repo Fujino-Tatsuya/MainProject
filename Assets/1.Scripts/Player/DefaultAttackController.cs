@@ -252,7 +252,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
             return false;
 
         isRequestingAttack = true;
-        RequestStartAttackRpc(requestedDirection, turnDelay, player.CreateAttackStatReport());
+        RequestStartAttackRpc(requestedDirection, turnDelay, player.CreateStatReport());
         return true;
     }
 
@@ -573,12 +573,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestStartAttackRpc(Vector3 requestedDirection, float requestedTurnDelay, AttackStatReport statReport, RpcParams rpcParams = default)
+    private void RequestStartAttackRpc(Vector3 requestedDirection, float requestedTurnDelay, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateAttackStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 시작");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 시작");
 
         bool canApprove = CanApproveServerAttack();
         if (!canApprove)
@@ -595,12 +595,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestQueueNextAttackRpc(Vector3 requestedDirection, AttackStatReport statReport, RpcParams rpcParams = default)
+    private void RequestQueueNextAttackRpc(Vector3 requestedDirection, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId || !IsAttacking)
             return;
 
-        player.ValidateAttackStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 다음 타");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 다음 타");
 
         if (!isComboWindowOpen)
             return;
@@ -849,7 +849,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
             return;
         }
 
-        RequestQueueNextAttackRpc(direction, player.CreateAttackStatReport());
+        RequestQueueNextAttackRpc(direction, player.CreateStatReport());
 
         // 창은 서버만 안다(애니 이벤트가 서버 전용). 호스트 오너만 같은 판단으로 지운다 —
         // 원격 클라 오너는 창 여부를 몰라 버퍼를 그대로 둔다(체인이 이어지는 동안 0.2초 안에 만료된다).
@@ -870,7 +870,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     private int CalculateDamageSnapshot(DefaultAttackStep step)
     {
-        // 공격 스탯 종합(기본%·전체%·가하는 피해%) 기준 — 툴팁과 같은 식(AttackStatFormula)
+        // 공격 스탯 종합(기본%·전체%·가하는 피해%) 기준 — 툴팁과 같은 식(PlayerStatFormula)
         return player != null ? player.ResolveDamage(step.AttackDamageMultiplier, step.FlatDamageBonus) : 0;
     }
 

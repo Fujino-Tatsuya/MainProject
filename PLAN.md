@@ -1,6 +1,15 @@
-# ▶▶▶ 계획 = **할 일 83 — 플레이어 공격 스탯 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 구현 — 컴파일 0 · EditMode 2678/0 · ⏳ 은희 Play/MPPM)
+# ▶▶▶ 계획 = **할 일 83 — 플레이어 스탯 5종 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1차 공격력 `fbb29438` · ✅ 2차 5종 — 컴파일 0 · EditMode 2680/0 · ⏳ 은희 Play/MPPM)
 
 > 브랜치 `fix/TooltipValueClient`(기준 origin/development `c7057322`). 담당 은희(코어 = 본인 영역). 증상: 클라 스킬 툴팁 `{dmg}` 가 틀림.
+
+## 2차 확장 (2026-10-21 grill, 은희) — 공격력만이 아니라 **플레이어 스탯 5종 전부**
+- 범위: 공격력·이동속도·공격속도·방어력·최대 체력. 새 스탯은 표(`PlayerStatKind`)에 한 줄 추가로 늘린다.
+- 모든 스탯 = 기본% · 전체% 2단계(단계 내 더하기). 가하는 피해% 는 공격력 전용 3단계로 유지.
+- 상태이상: 기존 `XModifier` = 전체%, 기본% 타입 추가 — `MoveSpeedBaseModifier`(1<<16)·`AttackSpeedBaseModifier`(1<<17)·`DefenseBaseModifier`(1<<18)·`MaxHpBaseModifier`(1<<19). `BaseAttackDamageModifier`(1<<14) 는 그대로.
+- 이름 정리: `PlayerAttackStats`→`PlayerStats`, `AttackStatFormula`→`PlayerStatFormula`, `IAttackStatSource`→`IPlayerStatSource`, `AttackStatReport`→`PlayerStatReport`(5종 + 가하는 피해, 요청 6곳 그대로).
+- 기본값(피어마다 로컬): 공격력 `Player.attackDamage` · 이동속도 `PlayerMovement.BaseMaxSpeed` · 공격속도 `Player.attackSpeed` · 방어력 `Player.defense` · 최대 체력 `Player.maxHp`.
+- 소비처 연결(사용자 무선호 → 추천안): `Unit.Final*` 5개 virtual → Player 가 종합값으로 덮어씀(HUD·회복·추락 피해 등 기존 FinalMaxHp 소비처 자동 반영) · **이동속도**: `PlayerMovement` 의 상태이상 배율 → 종합 배율 · **방어력**: 피해 경감(`Unit.ApplyMitigatedHealthDamage`)이 플레이어는 종합 방어력을 읽음(몬스터 그대로) · **공격속도**: 값만 낸다(플레이어 소비처 없음 → 후속).
+- 동작 변화: 이동속도도 겹치면 곱→더하기(예: 이동 특성 1.2 + 거너 Q 감속 0.5 = 0.6 → 0.7). 방어력 상태이상이 처음으로 판정에 들어간다(현재 거는 곳 없음).
 
 ## 사실
 - 원인: `Player.cs:259` `if (IsServer) Initialize(...)` → `Unit._attackDamage` 가 클라에서 0 → `FinalAttackDamage`·툴팁 `{dmg}` 가 0 기준.

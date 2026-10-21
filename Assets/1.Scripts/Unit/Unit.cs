@@ -182,7 +182,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         shieldDealt = 0;
 
         //// 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
-        remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + _health.CurrentDefense));
+        remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + FinalDefense)); // 플레이어 = 종합 방어력(PlayerStats), 몬스터 = 원본 × 배율(1)
 
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산(만료가 가장 빠른 보호막부터)
         if (_health.HasShield)
@@ -619,13 +619,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     public bool HasSuperArmor => StatusFacade != null && StatusFacade.HasSuperArmor;
 
     // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
-    // 플레이어는 기본%·전체% 단계를 나눈 PlayerAttackStats 로 덮어쓴다(할 일 83) — 몬스터는 이 식 그대로
+    // 플레이어는 기본%·전체% 단계를 나눈 PlayerStats 로 5종 모두 덮어쓴다(할 일 83) — 몬스터는 이 식 그대로
     public virtual int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
-    public float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
-    public float FinalAttackSpeed => Mathf.Max(0f, _attackSpeed * GetStatMultiplier(StatusEffectType.AttackSpeedModifier));
+    public virtual float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
+    public virtual float FinalAttackSpeed => Mathf.Max(0f, _attackSpeed * GetStatMultiplier(StatusEffectType.AttackSpeedModifier));
     // 방어력은 _health가 서버에서만 생성되므로 서버에서만 유효
-    public int FinalDefense => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.CurrentDefense : 0) * GetStatMultiplier(StatusEffectType.DefenseModifier)));
-    public int FinalMaxHp => Mathf.Max(0, Mathf.RoundToInt(MaxHp * GetStatMultiplier(StatusEffectType.MaxHpModifier)));
+    public virtual int FinalDefense => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.CurrentDefense : 0) * GetStatMultiplier(StatusEffectType.DefenseModifier)));
+    public virtual int FinalMaxHp => Mathf.Max(0, Mathf.RoundToInt(MaxHp * GetStatMultiplier(StatusEffectType.MaxHpModifier)));
     #endregion
 
     #region RPC

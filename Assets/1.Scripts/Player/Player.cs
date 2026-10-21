@@ -57,9 +57,9 @@ public class Player : Unit
     [SerializeField] int maxHp;
     [SerializeField] int defense;
 
-    [Header("\n공격 스탯 검증")]
+    [Header("\n스탯 검증")]
     [Tooltip("서버 2차 검증 — 상태이상·특성 입력이 바뀐 뒤 이 시간(초) 안의 불일치는 복제 지연으로 보고 경고하지 않는다.")]
-    [DataTableIgnore] [SerializeField] private float attackStatValidationGrace = 0.5f;
+    [DataTableIgnore] [SerializeField] private float statValidationGrace = 0.5f;
 
     [Header("\n이동 플랫폼 캐리")]
     [Tooltip("발밑 검사 거리(m).")]
@@ -194,30 +194,49 @@ public class Player : Unit
     /// <summary>모든 피어가 읽는 구속(잡기·밀기) 여부 — 표시 전용(머리 위 라벨). 오프라인에서는 항상 false.</summary>
     public bool IsRestrainedReplicated => restrainedReplicated.Value;
 
-    private PlayerAttackStats attackStats;
+    private PlayerStats stats;
+    private PlayerMovement statsMovement;
 
-    /// <summary>공격 스탯 종합(할 일 83) — 모든 피어에서 같은 값. 판정은 서버가, 툴팁·검증 보고는 오너가 읽는다.</summary>
-    public PlayerAttackStats AttackStats => attackStats;
+    /// <summary>플레이어 스탯 종합(할 일 83) — 모든 피어에서 같은 값. 판정은 서버가, 툴팁·HUD·검증 보고는 오너가 읽는다.</summary>
+    public PlayerStats Stats => stats;
 
-    // 기본 = xlsx 값(피어마다 로컬)이라 클라도 서버와 같은 값을 낸다. Unit._attackDamage(서버 전용 Initialize)는 플레이어 판정에 쓰지 않는다.
-    public override int FinalAttackDamage => attackStats != null ? attackStats.FinalAttackDamage : base.FinalAttackDamage;
+    // 기본 = xlsx 값(피어마다 로컬)이라 클라도 서버와 같은 값을 낸다. Unit 의 서버 전용 Initialize 값은 플레이어 스탯에 쓰지 않는다.
+    private float BaseStatValue(PlayerStatKind kind)
+    {
+        switch (kind)
+        {
+            case PlayerStatKind.AttackDamage: return attackDamage;
+            case PlayerStatKind.MoveSpeed: return statsMovement != null ? statsMovement.BaseMaxSpeed : 0f;
+            case PlayerStatKind.AttackSpeed: return attackSpeed;
+            case PlayerStatKind.Defense: return defense;
+            case PlayerStatKind.MaxHp: return maxHp;
+            default: return 0f;
+        }
+    }
+
+    public override int FinalAttackDamage => stats != null ? stats.FinalAttackDamage : base.FinalAttackDamage;
+    public override float FinalMoveSpeed => stats != null ? stats.FinalMoveSpeed : base.FinalMoveSpeed;
+    public override float FinalAttackSpeed => stats != null ? stats.FinalAttackSpeed : base.FinalAttackSpeed;
+    public override int FinalDefense => stats != null ? stats.FinalDefense : base.FinalDefense;
+    public override int FinalMaxHp => stats != null ? stats.FinalMaxHp : base.FinalMaxHp;
 
     /// <summary>판정·툴팁 공용 피해 스냅샷(가하는 피해% 포함).</summary>
     public int ResolveDamage(float coefficient, int flatBonus) =>
-        attackStats != null ? attackStats.ResolveDamage(coefficient, flatBonus) : AttackStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
+        stats != null ? stats.ResolveDamage(coefficient, flatBonus) : PlayerStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
 
-    public float DealtDamagePercent => attackStats != null ? attackStats.DealtDamagePercent : 0f;
+    public float DealtDamagePercent => stats != null ? stats.DealtDamagePercent : 0f;
 
     /// <summary>[오너] 공격·스킬 시작 요청에 싣는 자기 종합 결과.</summary>
-    public AttackStatReport CreateAttackStatReport() => attackStats != null ? attackStats.CreateReport() : default;
+    public PlayerStatReport CreateStatReport() => stats != null ? stats.CreateReport() : default;
 
     /// <summary>[서버] 오너 보고 2차 검증 — 다르면 경고만, 판정은 서버 값.</summary>
-    public void ValidateAttackStatReport(AttackStatReport report, ulong senderClientId, string request) =>
-        attackStats?.ValidateClientReport(report, senderClientId, request, attackStatValidationGrace, this);
+    public void ValidateStatReport(PlayerStatReport report, ulong senderClientId, string request) =>
+        stats?.ValidateClientReport(report, senderClientId, request, statValidationGrace, this);
 
     private void Awake()
     {
-        attackStats = new PlayerAttackStats(() => attackDamage, GetComponent<StatusEffectController>());
+        statsMovement = GetComponent<PlayerMovement>();
+        stats = new PlayerStats(BaseStatValue, GetComponent<StatusEffectController>());
 
         // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         if (GetComponent<StatusEffectController>() == null)
@@ -371,7 +390,7 @@ public class Player : Unit
     public override void OnDestroy()
     {
         // NGO NetworkBehaviour의 OnDestroy가 내부 정리를 수행하므로 반드시 base 호출
-        attackStats?.Dispose();
+        stats?.Dispose();
 
         if (LocalPlayer == this)
             SetLocalPlayer(null);

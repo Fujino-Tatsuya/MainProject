@@ -72,10 +72,10 @@ public readonly struct SkillTooltipDamage
         return FromLinear(player.FinalAttackDamage, coefficient, flatBonus, player.DealtDamagePercent);
     }
 
-    /// <summary>판정 스냅샷과 같은 식(AttackStatFormula.Snapshot). 가하는 피해% 는 결과에만 들어가고 Shift 계산식 항(계수·고정값)엔 표시하지 않는다.</summary>
+    /// <summary>판정 스냅샷과 같은 식(PlayerStatFormula.Snapshot). 가하는 피해% 는 결과에만 들어가고 Shift 계산식 항(계수·고정값)엔 표시하지 않는다.</summary>
     public static SkillTooltipDamage FromLinear(float finalAttackDamage, float coefficient, int flatBonus, float dealtDamagePercent = 0f)
     {
-        int damage = AttackStatFormula.Snapshot(Mathf.RoundToInt(finalAttackDamage), coefficient, flatBonus, dealtDamagePercent);
+        int damage = PlayerStatFormula.Snapshot(Mathf.RoundToInt(finalAttackDamage), coefficient, flatBonus, dealtDamagePercent);
         return new SkillTooltipDamage(damage, damage, coefficient, coefficient, flatBonus, flatBonus);
     }
 
@@ -84,7 +84,7 @@ public readonly struct SkillTooltipDamage
         float finalAttackDamage, float baseCoefficient, int flatBonus, float minimumScale, float maximumScale,
         float dealtDamagePercent = 0f)
     {
-        int snapshot = AttackStatFormula.Snapshot(Mathf.RoundToInt(finalAttackDamage), baseCoefficient, flatBonus, dealtDamagePercent);
+        int snapshot = PlayerStatFormula.Snapshot(Mathf.RoundToInt(finalAttackDamage), baseCoefficient, flatBonus, dealtDamagePercent);
         int minimum = Mathf.Max(0, Mathf.RoundToInt(snapshot * minimumScale));
         int maximum = Mathf.Max(0, Mathf.RoundToInt(snapshot * maximumScale));
         return new SkillTooltipDamage(

@@ -179,7 +179,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return false;
 
         requesting = true;
-        RequestStartRpc(direction, turnDelay, player.CreateAttackStatReport());
+        RequestStartRpc(direction, turnDelay, player.CreateStatReport());
         return true;
     }
 
@@ -353,7 +353,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
         }
 
-        RequestQueueNextAttackRpc(direction, player.CreateAttackStatReport());
+        RequestQueueNextAttackRpc(direction, player.CreateStatReport());
     }
 
     // 홀드 — 눌림이 바뀌면 즉시, 눌린 동안은 HoldSignalInterval 마다 알린다(거너 HoldSignal). 조준도 실어 End 순간 이어질 다음 타 방향이 된다.
@@ -431,12 +431,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(Vector3 direction, float turnDelay, AttackStatReport statReport, RpcParams rpcParams = default)
+    private void RequestStartRpc(Vector3 direction, float turnDelay, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateAttackStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 시작");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 시작");
 
         if (active || stateController == null || !stateController.CanAttack || !CanStartApprovedAttack)
         {
@@ -449,12 +449,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestQueueNextAttackRpc(Vector3 direction, AttackStatReport statReport, RpcParams rpcParams = default)
+    private void RequestQueueNextAttackRpc(Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateAttackStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 다음 타");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 다음 타");
 
         // 창 판정은 서버 자기 애니 진행으로 한다(가붕이 isComboWindowOpen 과 같은 권한). 창 밖이면 오너 예약을 푼다.
         if (!IsInCurrentComboWindow())

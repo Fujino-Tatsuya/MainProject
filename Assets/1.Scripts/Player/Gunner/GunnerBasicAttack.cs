@@ -137,7 +137,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return false;
 
         isRequesting = true;
-        RequestStartRpc(direction, player.CreateAttackStatReport());
+        RequestStartRpc(direction, player.CreateStatReport());
         return true;
     }
 
@@ -303,12 +303,12 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     // ── 서버 ─────────────────────────────────────────────────────────────
 
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(Vector3 direction, AttackStatReport statReport, RpcParams rpcParams = default)
+    private void RequestStartRpc(Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateAttackStatReport(statReport, rpcParams.Receive.SenderClientId, "거너 기본 공격 시작");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "거너 기본 공격 시작");
 
         if (active || stateController == null || !stateController.CanAttack || heat.IsOverheated)
         {

@@ -134,14 +134,14 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         return multiplier;
     }
 
-    /// <summary>공격 단계 타입(BaseAttackDamage·AttackDamage·DealtDamage Modifier)의 % 합. magnitude 1.2 = +0.2, 스택은 곱이 아니라 더한다. 없으면 0.</summary>
+    /// <summary>플레이어 스탯 단계 타입(XBaseModifier·XModifier·DealtDamageModifier)의 % 합(PlayerStats 용). magnitude 1.2 = +0.2, 스택은 곱이 아니라 더한다. 없으면 0.</summary>
     public float GetStatPercentSum(StatusEffectType statType)
     {
         float sum = 0f;
         for (int i = 0; i < effects.Count; i++)
         {
             if ((effects[i].type & statType) != 0)
-                sum += AttackStatFormula.PercentOf(effects[i].magnitude, effects[i].stackCount);
+                sum += PlayerStatFormula.PercentOf(effects[i].magnitude, effects[i].stackCount);
         }
 
         return sum;
