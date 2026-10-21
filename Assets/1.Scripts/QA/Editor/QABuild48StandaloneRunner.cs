@@ -174,11 +174,13 @@ public static class QABuild48StandaloneRunner
         LaunchedPlayer host = Launch("host", dir, "host");
         bool hostReady = await WaitLog(host, t => t.Contains("LobbySceneManager.Awake"), 60f);
         LaunchedPlayer client = Launch("mismatch", dir, "mismatch-client");
-        bool rejected = await WaitLog(client, t => t.Contains("reason=HashMismatch"), 30f);
+        bool rejected = await WaitLog(client, t => t.Contains("reason=HashMismatch") || Count(t, "disconnected by server") >= 2, 30f);
         string all = ReadAll(client);
-        string evidence = $"normal host + ProtocolVersion 차이 client, HashMismatch={rejected}, ClosedByRemote={all.Contains("ClosedByRemote")}";
+        bool classified = all.Contains("reason=HashMismatch");
+        string evidence = $"normal host protocolVersion=0 + mismatch client protocolVersion=1, transport 거절={rejected}, " +
+                          $"재시도 거절 {Count(all, "disconnected by server")}회, HashMismatch 판정={classified}, Unknown={all.Contains("reason=Unknown")}";
         await FinishCase(dir);
-        return new CaseResult("B2-4 버전 불일치", hostReady && rejected, evidence, Relative(root, dir));
+        return new CaseResult("B2-4 버전 불일치", hostReady && rejected && classified, evidence, Relative(root, dir));
     }
 
     static async Task<CaseResult> RunTransportShutdownRejoin(string root)
