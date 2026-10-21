@@ -1,0 +1,8 @@
+{
+  "role": "auto",
+  "hostAddress": "192.168.0.10",
+  "port": 7777,
+  "retryIntervalSeconds": 3,
+  "connectTimeoutSeconds": 5,
+  "disconnectTimeoutSeconds": 10
+}

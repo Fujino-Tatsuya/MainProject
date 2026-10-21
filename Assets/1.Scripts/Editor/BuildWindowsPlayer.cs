@@ -142,7 +142,7 @@ public static class BuildWindowsPlayer
     }
 
     /// <summary>
-    /// 부스 데모 연결 설정 샘플(호스트·클라)을 exe 폴더에 둔다 — Docs/tech/lobby-demo-flow.md. 세 빌드 메뉴·CLI 가 모두 여기를 지난다.
+    /// 부스 데모 연결 설정 샘플(공용 auto · 호스트·클라 명시)을 exe 폴더에 둔다 — Docs/tech/lobby-demo-flow.md. 세 빌드 메뉴·CLI 가 모두 여기를 지난다.
     /// 실패해도 빌드 결과는 그대로 성공이다(샘플 없이도 exe 는 호스트로 뜬다). 콘솔 에러로만 알린다.
     /// </summary>
     private static void CopyDemoConnectionSamples(string outputPath)
@@ -153,7 +153,7 @@ public static class BuildWindowsPlayer
         foreach (var error in errors)
             Debug.LogError($"[Build] demo-connection {error}");
         Debug.Log($"[Build] demo-connection samples copied={copied}/{DemoConnectionSamples.SampleFileNames.Count} " +
-                  $"dir={Path.GetDirectoryName(outputPath)} — PC 마다 하나를 {DemoConnectionConfig.FileName} 으로 이름을 바꿔 쓴다");
+                  $"dir={Path.GetDirectoryName(outputPath)} — {DemoConnectionSamples.AutoSampleFileName} 의 hostAddress 를 고쳐 {DemoConnectionConfig.FileName} 으로 바꾸고 폴더째 모든 PC 에 복사");
     }
 
     /// <summary>메인 플로우 씬 누락과 0번 씬 오배치를 잡는다. 부트스트랩이 0번이 아니면 실행 시 타이틀로 못 넘어간다.</summary>
