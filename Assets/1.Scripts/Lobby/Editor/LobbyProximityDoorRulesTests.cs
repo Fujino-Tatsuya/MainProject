@@ -82,6 +82,68 @@ public sealed class LobbyProximityDoorRulesTests
     }
 
     [Test]
+    public void 플레이어_반대쪽으로_연다()
+    {
+        Assert.That(LobbyProximityDoorRules.SwingSign(0.5f), Is.EqualTo(-1));
+        Assert.That(LobbyProximityDoorRules.SwingSign(-0.5f), Is.EqualTo(1));
+        Assert.That(LobbyProximityDoorRules.SwingSign(0f), Is.EqualTo(-1));
+    }
+
+    [Test]
+    public void 양의_각도는_문짝을_로컬_플러스Z_쪽으로_넘긴다()
+    {
+        // 문짝은 힌지(원점)에서 로컬 -X 로 뻗는다 — SwingSign +1 이 정말 +Z 쪽인지.
+        LobbyProximityDoorRules.LeafPose(Vector3.zero, Quaternion.identity, 90f, Vector3.zero, out var pos, out var rot);
+        var tip = pos + rot * new Vector3(-1.27f, 0f, 0f);
+
+        Assert.That(tip.z, Is.GreaterThan(1.2f));
+    }
+
+    [Test]
+    public void 회전_중심은_제자리에_있다()
+    {
+        var closedPos = new Vector3(3f, 0.5f, -2f);
+        var closedRot = Quaternion.Euler(0f, 270f, 0f);
+        var pivot = new Vector3(0f, 0f, -0.22f);
+
+        foreach (var angle in new[] { 0f, 45f, -90f, 90f })
+        {
+            LobbyProximityDoorRules.LeafPose(closedPos, closedRot, angle, pivot, out var pos, out var rot);
+            var before = closedPos + closedRot * pivot;
+            var after = pos + rot * pivot;
+            Assert.That(Vector3.Distance(before, after), Is.LessThan(1e-4f), $"angle {angle}");
+        }
+    }
+
+    [Test]
+    public void 각도_0이면_닫힌_자세_그대로다()
+    {
+        var closedPos = new Vector3(1f, 2f, 3f);
+        var closedRot = Quaternion.Euler(0f, 30f, 0f);
+        LobbyProximityDoorRules.LeafPose(closedPos, closedRot, 0f, new Vector3(0f, 0f, 0.06f), out var pos, out var rot);
+
+        Assert.That(Vector3.Distance(pos, closedPos), Is.LessThan(1e-5f));
+        Assert.That(Quaternion.Angle(rot, closedRot), Is.LessThan(1e-3f));
+    }
+
+    [Test]
+    public void 넘어가는_쪽_면을_축으로_돌면_문짝이_힌지_밖_문틀로_파고들지_않는다()
+    {
+        // 문짝 두께 Z -0.22~0.06, 힌지 모서리 X=0. 문틀(벽)은 X>0 쪽. 열린 뒤 문짝의 모든 모서리가 X<=0 이어야 한다.
+        foreach (var sign in new[] { 1, -1 })
+        {
+            var pivot = new Vector3(0f, 0f, sign > 0 ? 0.06f : -0.22f);
+            LobbyProximityDoorRules.LeafPose(Vector3.zero, Quaternion.identity, sign * 90f, pivot, out var pos, out var rot);
+            foreach (var x in new[] { 0f, -1.27f })
+            foreach (var z in new[] { -0.22f, 0.06f })
+            {
+                var corner = pos + rot * new Vector3(x, 0f, z);
+                Assert.That(corner.x, Is.LessThanOrEqualTo(1e-4f), $"sign {sign} corner ({x},{z})");
+            }
+        }
+    }
+
+    [Test]
     public void 거리는_평면_거리다()
     {
         Assert.That(LobbyProximityDoorRules.PlanarSqrDistance(new Vector3(3f, 10f, 4f), Vector3.zero), Is.EqualTo(25f).Within(1e-5f));

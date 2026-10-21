@@ -36,6 +36,25 @@ public static class LobbyProximityDoorRules
         return Mathf.MoveTowards(Mathf.Clamp01(progress), target, Mathf.Max(0f, deltaTime) / seconds);
     }
 
+    /// <summary>
+    /// 이번에 열 방향(+1 = 문짝 로컬 +Z 쪽으로 넘어감 = 로컬 Y +각도, -1 = 반대).
+    /// <paramref name="playerSide"/> = 닫힌 문 기준으로 연 플레이어가 로컬 +Z 쪽이면 양수 — 그 반대쪽으로 열어
+    /// 다가온 플레이어를 문짝이 덮지 않는다. 문면 위(0)는 +Z 쪽으로 친다.
+    /// </summary>
+    public static int SwingSign(float playerSide) => playerSide >= 0f ? -1 : 1;
+
+    /// <summary>
+    /// 로컬 Y 로 <paramref name="angle"/> 만큼 돌렸을 때의 문짝 로컬 자세. 회전 중심 = 문짝 로컬 <paramref name="pivot"/>
+    /// (힌지 모서리의, 넘어가는 쪽 면) — 문짝 두께가 문틀로 파고들지 않는다. angle 0 이면 닫힌 자세 그대로.
+    /// </summary>
+    public static void LeafPose(Vector3 closedPosition, Quaternion closedRotation, float angle, Vector3 pivot,
+        out Vector3 position, out Quaternion rotation)
+    {
+        var turn = Quaternion.Euler(0f, angle, 0f);
+        rotation = closedRotation * turn;
+        position = closedPosition + closedRotation * (pivot - turn * pivot);
+    }
+
     /// <summary>두 점 사이의 평면(XZ) 거리 제곱.</summary>
     public static float PlanarSqrDistance(Vector3 a, Vector3 b)
     {
