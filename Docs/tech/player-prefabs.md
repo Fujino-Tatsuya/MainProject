@@ -497,6 +497,7 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 아이콘 사본 | 원래 아이콘(`Icon_mask/Icon_*`)과 같은 이름·위치·크기·회전·스케일. Slot_Dash 만 사용자 설정대로 x −1 반전, 다른 슬롯은 반전 없음 |
 | 스프라이트 동기화 | 스킬 아이콘은 런타임에 바뀌므로 `SkillCooldownHUD.SlotWidget.cooldownIcon`·`PassiveHUD.cooldownIcon` 이 원래 아이콘과 같은 스프라이트로 맞춘다. 대시는 고정 스프라이트라 코드 없음 |
 | 쿨타임 | `cooldownFill` = 각 `Icon_mask_CooldownFill`. 대시는 `PlayerDashController.RemainingRecharge/RechargeDuration` 그대로, 별도 시계·재계산 없음 |
+| 쿨다운 숫자 | 6슬롯 `Cooldown` 텍스트 = `2.Prefabs/UI/LiberationSans SDF - Cooldown Outline.mat`(LiberationSans SDF 아틀라스, `OUTLINE_ON`, 검정 Outline Width **0.3** · Face Dilate **0.3**). 전역 폰트 머티리얼은 그대로 |
 | 충전 수 | `DashCooldownHUD.chargeText`(선택, `MaxCharge > 1`일 때만 `현재/최대`)는 비워 둠 — 현재 1충전 |
 | 오너 범위 | `CombatHUD`가 `Player.LocalPlayer`로 바인딩하는 기존 경로 그대로라 로컬 플레이어 HUD에만 표시 |
 | 테스트 | `Tests/EditMode/CombatHud/Editor/DashCooldownHudTests` — 6슬롯 오버레이 구조·사본 방향/크기·HUD 배선·초/충전 표기 규칙(배치·크기는 고정하지 않음) |

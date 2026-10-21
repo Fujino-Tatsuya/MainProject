@@ -8,6 +8,7 @@ public sealed class DashCooldownHudTests
 {
     private const string PrefabPath = "Assets/2.Prefabs/UI/CombatHUD.prefab";
     private const string SlotPath = "Layer_Combat/SkillBar/Slot_Dash";
+    private const string CooldownOutlineMaterialPath = "Assets/2.Prefabs/UI/LiberationSans SDF - Cooldown Outline.mat";
 
     [Test]
     public void RemainingAndChargeFormatting_FollowsDashHudRules()
@@ -77,6 +78,35 @@ public sealed class DashCooldownHudTests
             Image passiveFill = AssertIconMaskCooldownFill(bar.Find("Slot_Passive"), "Icon_mask/Icon_Passive", out Image passiveIcon);
             Assert.That(passive.FindProperty("cooldownFill").objectReferenceValue, Is.SameAs(passiveFill));
             Assert.That(passive.FindProperty("cooldownIcon").objectReferenceValue, Is.SameAs(passiveIcon));
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void Prefab_CooldownNumbersUseBlackOutlineMaterial()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            Transform bar = root.transform.Find("Layer_Combat/SkillBar");
+            int count = 0;
+            foreach (Transform slot in bar)
+            {
+                TMP_Text text = slot.Find("Cooldown")?.GetComponent<TMP_Text>();
+                if (text == null)
+                    continue;
+
+                Material mat = text.fontSharedMaterial;
+                Assert.That(AssetDatabase.GetAssetPath(mat), Is.EqualTo(CooldownOutlineMaterialPath), slot.name);
+                Assert.That(mat.IsKeywordEnabled("OUTLINE_ON"), Is.True, slot.name);
+                Assert.That(mat.GetColor("_OutlineColor"), Is.EqualTo(Color.black), slot.name);
+                Assert.That(mat.GetTexture("_MainTex"), Is.SameAs(text.font.atlasTexture), slot.name);
+                count++;
+            }
+            Assert.That(count, Is.EqualTo(6));
         }
         finally
         {
