@@ -35,6 +35,10 @@ public class BossComboEntry
     [Tooltip("콤보 시작 전 차징(초) — 첫 타 전에 차징 클립(ChargeSequence 행 애니)을 이만큼 튼다(경석 10-20 — 점프·점프·점프가\n" +
              "단타 점프와 구별되게). 0 = 없음. ⚠️ 지금은 첫 타가 점프일 때만 동작한다.")]
     [Min(0f)] public float windup;
+
+    [Tooltip("위 차징 클립을 **어디서부터** 틀지(0~1 정규화). 0 = 첫 프레임(일어서는 동작부터) — 경석 10-21: 팔을 모으는 중간부터가 맞다.\n" +
+             "Play 하며 이 값만 바꿔 맞춘다(0.1 단위 권장).")]
+    [Range(0f, 0.95f)] public float windupStartNormalized;
 }
 
 [Serializable]
