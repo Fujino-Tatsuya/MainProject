@@ -26,6 +26,9 @@ public class MapSceneManager : NemoSceneManager
     [SerializeField] private Button warningCancelButton;  // CancelButton — 경고창 닫기
 
     private GameManager _gameManager;
+    // ESC 일시정지 메뉴(PLAN-pause-menu) — OptionPanel 안의 PauseMenu·SettingsBody 인스턴스(ResolveSceneReferences 가 찾는다).
+    private PauseMenuView _pauseMenu;
+    private GameObject _settingsBody;
     private NetworkManager _networkManager;
     private bool _messageHandlerRegistered;
 
@@ -46,7 +49,7 @@ public class MapSceneManager : NemoSceneManager
         // 키 변경 중 Esc = 변경 취소(설정창 KeyRebindRow) — 옵션창을 닫지 않는다.
         if (Keyboard.current?.escapeKey.wasPressedThisFrame == true && !KeyRebindRow.IsRebinding)
         {
-            ToggleOptionPanel();
+            HandleEscape();
         }
     }
 
@@ -131,10 +134,44 @@ public class MapSceneManager : NemoSceneManager
         SetOptionPanel(false);
     }
 
-    // ESC / 톱니 토글 — 열려 있으면 닫고, 닫혀 있으면 연다.
+    // 톱니 토글 — 열려 있으면 닫고, 닫혀 있으면 일시정지 메뉴로 연다.
     public void ToggleOptionPanel()
     {
         SetOptionPanel(optionPanel == null || !optionPanel.activeSelf);
+    }
+
+    // ESC = 한 단계 뒤로(PLAN-pause-menu P2): 닫힘 → 메뉴 / 설정·종료 팝업 → 메뉴 / 메뉴 → 닫힘.
+    private void HandleEscape()
+    {
+        if (optionPanel == null || !optionPanel.activeSelf)
+        {
+            SetOptionPanel(true);
+            return;
+        }
+
+        bool settingsOpen = _settingsBody != null && _settingsBody.activeSelf;
+        bool exitOpen = _pauseMenu != null && _pauseMenu.IsExitConfirmOpen;
+        if (_pauseMenu != null && (settingsOpen || exitOpen))
+        {
+            ShowPauseMenu();
+            return;
+        }
+
+        SetOptionPanel(false);
+    }
+
+    // 일시정지 메뉴 화면 — 설정창은 숨긴다. 설정창 X·종료 팝업 ✗ 도 여기로 돌아온다.
+    public void ShowPauseMenu()
+    {
+        if (_settingsBody != null) _settingsBody.SetActive(_pauseMenu == null);   // 메뉴 프리팹이 없으면 예전처럼 설정창만
+        if (_pauseMenu != null) _pauseMenu.ShowMenu();
+    }
+
+    // 메뉴의 '설정' — 메뉴를 숨기고 설정창.
+    private void ShowSettingsFromPause()
+    {
+        if (_pauseMenu != null) _pauseMenu.HideAll();
+        if (_settingsBody != null) _settingsBody.SetActive(true);
     }
 
     private void QuitApplication()
@@ -171,6 +208,7 @@ public class MapSceneManager : NemoSceneManager
     {
         if (optionPanel != null)
         {
+            if (active) ShowPauseMenu();   // 열 때는 항상 메뉴부터
             optionPanel.SetActive(active);
         }
     }
@@ -297,6 +335,13 @@ public class MapSceneManager : NemoSceneManager
             warningPanel = FindInActiveScene("WarningMessage_Panel");
         }
 
+        if (optionPanel != null)
+        {
+            _pauseMenu = optionPanel.GetComponentInChildren<PauseMenuView>(true);
+            SettingsBodyView body = optionPanel.GetComponentInChildren<SettingsBodyView>(true);
+            _settingsBody = body != null ? body.gameObject : null;
+        }
+
         if (resultButton == null)
         {
             WarnMissingReference(nameof(resultButton));
@@ -336,6 +381,23 @@ public class MapSceneManager : NemoSceneManager
         {
             optionButton.onClick.RemoveListener(OpenOptionPanel);
             optionButton.onClick.AddListener(OpenOptionPanel);
+        }
+
+        // 설정창 틀 안의 닫기 버튼(PLAN-settings-art) — 일시정지 메뉴로 돌아간다(PLAN-pause-menu P2).
+        SettingsBodyView settingsBody = _settingsBody != null ? _settingsBody.GetComponent<SettingsBodyView>() : null;
+        if (settingsBody != null && settingsBody.CloseButton != null)
+        {
+            settingsBody.CloseButton.onClick.RemoveListener(ShowPauseMenu);
+            settingsBody.CloseButton.onClick.AddListener(ShowPauseMenu);
+        }
+
+        // 일시정지 메뉴 — 계속하기 = 닫기, 설정 = 설정창. 나가기(바탕화면·로비)는 은희가 PauseMenuView 이벤트에 연결한다.
+        if (_pauseMenu != null)
+        {
+            _pauseMenu.ContinueRequested -= CloseOptionPanel;
+            _pauseMenu.ContinueRequested += CloseOptionPanel;
+            _pauseMenu.SettingsRequested -= ShowSettingsFromPause;
+            _pauseMenu.SettingsRequested += ShowSettingsFromPause;
         }
 
         if (warningConfirmButton != null)

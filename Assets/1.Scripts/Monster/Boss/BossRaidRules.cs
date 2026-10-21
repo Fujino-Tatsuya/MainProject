@@ -57,9 +57,12 @@ public static class BossRaidRules
         return Mathf.Clamp(gauge - 100f * damage / gaugeDamageTotal, 0f, 100f);
     }
 
-    /// <summary>③ 구출 각본 공격 — 2인 이상 = 잡기(동료가 정면 간파로 구출), 1인 = 간파 가능 돌진(로아 싱글: 구출 → 단순 돌진).</summary>
+    /// <summary>
+    /// ③ 구출 각본 공격 — 2인 이상 = 잡기(동료가 정면 간파로 구출), 1인 = 점프(→ 점프·점프·점프 콤보, 경석 10-20).
+    /// 예전 1인 = 간파 가능 돌진(로아 싱글: 구출 → 단순 돌진).
+    /// </summary>
     public static BossAttackId RescueAttackFor(int alivePlayers) =>
-        alivePlayers >= 2 ? BossAttackId.Grab : BossAttackId.Dash;
+        alivePlayers >= 2 ? BossAttackId.Grab : BossAttackId.Jump;
 
     /// <summary>한 번에 받는 피해 상한. ratio ≤ 0 이면 상한 없음.</summary>
     public static int CapHitDamage(int damage, int receiverMaxHp, float ratio)

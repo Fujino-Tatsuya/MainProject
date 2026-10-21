@@ -202,6 +202,10 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         if (_boss != null && _boss.State == MonsterState.Dead)
             return false;
 
+        // 보스 앞뒤 구분 꺼짐(BossDataSO.useFacingRules) — 판정이 없으니 표시도 없다.
+        if (_data != null && !_data.useFacingRules)
+            return false;
+
         Transform boss = _boss != null ? _boss.transform : transform.parent;
         if (boss == null) return false;
 

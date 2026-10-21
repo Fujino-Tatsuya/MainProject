@@ -97,5 +97,5 @@ CPU 굽기 → GPU · 사용처 정정(일반 몹 아님, 드론·전기 장판 
 - `BossAttackConeTelegraph` 재작성: 모양 흰색 굽기 + 재질 색·마스크, 스타일은 붙은 몬스터 데이터에서(`TelegraphStyleSO.For`, 모든 피어), 버전 갱신(진행 유지), 캐시 키에 반경·두께, 텍스처·버퍼 재사용(`BossDirectionIndicator.PixelBuffer`), 합집합 정리 누락 수정. `InterruptRgb` 제거.
 - 드론(`WellsDroneAttack.PaintLockCircle`)·전기 장판(`BossElectricFloor.PaintWarnTile`) = `BossPatternVisuals.PaintStyled`. 옛 색 칸 4개 `[Obsolete]`(값 보존). `Paint` 는 마스크를 끈다(발동 표시 재사용).
 - 건틀렛 스매시 = 스타일 interrupt.fill RGB, 버전 바뀌면 다시 칠함. `AoeTelegraph.ApplyStyle`(호출 쪽이 넘길 때만) + 복제 재질 정리. 23호 차징 오라만 호출(프리팹 칸 비어 있어 실제 표시 없음).
-- 규격 문서 [Docs/tech/telegraph-style.md](Docs/tech/telegraph-style.md).
+- 규격 문서 [Docs/tech/telegraph-style.md](../../tech/telegraph-style.md).
 - Play(에디터, 부분): 보스방 전기 장판 경고 칸이 새 판 셰이더로 정상 렌더링 확인. 공격 예고 데칼 = 팀장 확인 OK(10-13 "데칼 제대로 보임"). 임시 확인 메뉴 삭제.

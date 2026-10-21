@@ -31,6 +31,10 @@ public class BossComboEntry
              "· 앞 타가 점프면 착지 히트 순간(후딜 comboJumpRecovery) · 돌진이면 복귀 comboDashRecovery 뒤\n" +
              "끄면 이전 동작(comboStepInterval 간격 + 각 타 예고 그대로).")]
     public bool chainOnHit = true;
+
+    [Tooltip("콤보 시작 전 차징(초) — 첫 타 전에 차징 클립(ChargeSequence 행 애니)을 이만큼 튼다(경석 10-20 — 점프·점프·점프가\n" +
+             "단타 점프와 구별되게). 0 = 없음. ⚠️ 지금은 첫 타가 점프일 때만 동작한다.")]
+    [Min(0f)] public float windup;
 }
 
 [Serializable]
@@ -41,4 +45,9 @@ public struct BossComboStep
     [Tooltip("사거리와 무관하게 **무조건 시전**하고, 시작 순간 어그로 대상 쪽으로 즉시 몸을 돌린다(팀장 10-19 — 돌진 → 잡기).\n" +
              "돌진이 끝나면 보스가 벽을 보고 있어 그대로 잡으면 위협이 없다. 끄면 다른 타처럼 사거리 밖이면 추격 유예 뒤 버린다.")]
     public bool forceFire;
+
+    [Tooltip("점프 타 전용 — 착지 피해 **직후** 이 시간(초)만큼 간파 창을 연다(경석 10-20 — 점프·점프·점프 3번째).\n" +
+             "성공 = 기존 간파 보상(그로기·게이지) / 놓치면 그대로 전투. 0 = 창 없음(기존 동작).\n" +
+             "다음 타로 즉시 연결되는 타(마지막 타가 아님)에는 쓰지 않는다 — 착지 히트 순간 다음 점프로 넘어가 창이 바로 닫힌다.")]
+    [Min(0f)] public float landingCounterWindow;
 }

@@ -1893,7 +1893,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBoss
   ShowTopMostFoldoutHeaderGroup: 1
-  data: {fileID: 11400000, guid: 5df9704c5a3ee96428a7116594284d22, type: 2}
+  data: {fileID: 11400000, guid: e6c69007a6f4462faebfe139aecff7a1, type: 2}
   agent: {fileID: 4776157784861599908}
   animator: {fileID: 7785889658917140854}
   status: {fileID: 2598989074200388058}

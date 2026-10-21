@@ -11,16 +11,26 @@ using UnityEngine.UI;
 /// 규칙:
 /// - 탭 내용마다 세로 정렬 컨테이너 <c>Rows</c>(제목 아래)를 두고 행을 쌓는다. 기존 행(Hold·대시 토글, 볼륨 3개)은 그 안으로 옮긴다.
 /// - 이 메뉴가 만든 행은 이름이 <c>Settings_</c> 로 시작한다. 다시 실행하면 그 행만 지우고 새로 만든다(기존 행은 유지).
-/// - 글꼴·크기는 Audio 탭 <c>MasterVolumeLabel</c> 을 따른다. 비주얼은 1차 기능용 — CRT 조정 때 손본다(팀장 10-12).
+/// - 겉모습 = SVN r466 UI_Panel 새 아트(PLAN-settings-art) — 행 배치 후 <see cref="SettingsArtSkin"/> 이 틀·탭·컨트롤 그림·글꼴을 입힌다.
 /// 패널 본체를 프리팹으로 뽑아 ESC 메뉴와 공유하는 것은 <see cref="SettingsBodyPrefabAuthoring"/>.
 /// </summary>
 public static class SettingsPanelAuthoring
 {
     internal const string TitleScenePath = "Assets/0.Scenes/MainFlow/1.TitleScene.unity";
     internal const string GeneratedPrefix = "Settings_";
-    const float RowHeight = 30f;   // 그래픽 탭 12줄이 내용 영역(높이 430)에 들어가게(10-12 품질 항목 추가)
-    const float LabelWidth = 250f;
-    const float ControlWidth = 360f;
+    // 새 아트(PLAN-settings-art) — 목업 06_Settings 행 크기. 투명 여백(2px×2)을 포함한 이미지 크기다.
+    // 라벨 캡슐 274×57 · 컨트롤 553×57 · 둘 사이 21 · 행 간격 98(목업 드롭다운→슬라이더) → 이미지 61 + 간격 37.
+    // 그래픽 12줄·조작 10줄은 스크롤로 넣는다(A2) — 예전처럼 줄 높이를 줄여 맞추지 않는다.
+    const float RowHeight = 57f + SettingsArtSkin.Pad * 2;
+    const float RowSpacing = 98f - RowHeight;
+    const float LabelWidth = 274f + SettingsArtSkin.Pad * 2;
+    const float ControlX = 295f;                                  // 라벨 이미지 왼쪽 → 컨트롤 이미지 왼쪽
+    const float ControlWidth = 553f + SettingsArtSkin.Pad * 2;
+    const float SliderX = 12f;                                    // 컨트롤 칸 왼쪽 → 슬라이더 트랙 이미지
+    const float SliderWidth = 432.32f + SettingsArtSkin.Pad * 2;
+    const float SliderHeight = 47f + SettingsArtSkin.Pad * 2;     // 손잡이 높이
+    const float ValueCenterX = 512.7f;                            // 컨트롤 칸 왼쪽 → "100%" 중심
+    static readonly RectOffset RowsPadding = new RectOffset(28, 20, 30, 30);   // 내용 영역(밝은 회색) 안쪽 여백
 
     static TMP_FontAsset _font;
     static float _fontSize = 18f;
@@ -85,8 +95,11 @@ public static class SettingsPanelAuthoring
         TMP_Text fontRef = FindDeep(audio.transform, "MasterVolumeLabel")?.GetComponent<TMP_Text>();
         if (fontRef == null) { Debug.LogError("[SettingsAuthoring] MasterVolumeLabel 을 못 찾았다 — 글꼴 기준이 없다."); return false; }
         _font = fontRef.font;
-        _fontSize = fontRef.fontSize;
-        _fontColor = fontRef.color;
+        _fontSize = 24f;                 // 새 아트 캡슐 높이(57) 기준
+        _fontColor = SettingsArtSkin.TextLight;
+
+        // 새 아트(SVN r466 UI_Panel)가 없으면 아무것도 바꾸지 않는다 — 반쯤 바뀐 패널을 저장하지 않게.
+        if (!SettingsArtSkin.LoadSprites()) return false;
 
         _sliderTemplate = FindDeep(audio.transform, "MasterVolume")?.GetComponent<Slider>();
         BuildGameplay(EnsureRows(gameplay.transform));
@@ -94,14 +107,15 @@ public static class SettingsPanelAuthoring
         BuildControls(EnsureRows(controls.transform), controls.transform);
         BuildAudio(EnsureRows(audio.transform), audio.transform);
 
-        foreach (GameObject content in new[] { gameplay, graphics, controls, audio })
-        {
-            SetLayerRecursively(content.transform, content.layer);
-            SettingsDarkTheme.Apply(content.transform);   // 흰 컨트롤이 CRT 에서 번졌다(팀장 10-13)
-        }
+        var contents = new[] { gameplay, graphics, controls, audio };
+        foreach (GameObject content in contents)
+            SettingsArtSkin.SkinControls(content.transform);   // 예전 SettingsDarkTheme(10-13) 자리 — 새 아트가 대신한다
+        SettingsArtSkin.ApplyFrame(panel.transform, contents);
+        SetLayerRecursively(panel.transform, gameplay.layer);
 
-        // 고정 라벨에 언어 전환 키를 붙인다(탭 이름 포함 — 패널 전체).
+        // 고정 라벨에 언어 전환 키를 붙인다(탭 이름·틀 제목 포함 — 패널 전체).
         SettingsLocalizationLinker.Link(panel.transform);
+        SettingsArtSkin.ApplyFont(panel.transform);
         return true;
     }
 
@@ -181,17 +195,18 @@ public static class SettingsPanelAuthoring
     static void BuildControls(RectTransform rows, Transform content)
     {
         // 기존 토글(Hold·대시)을 맨 위로.
-        AdoptExisting(rows, content, "HoldSkillToggle", RowHeight);
-        AdoptExisting(rows, content, "DashDirectionToggle", RowHeight);
+        AdoptToggleRow(rows, content, "HoldSkillToggle");
+        AdoptToggleRow(rows, content, "DashDirectionToggle");
 
         foreach ((string path, string label) in RebindRows)
         {
             RectTransform row = NewRow(rows, "Rebind_" + path.Substring(path.IndexOf('/') + 1), label, out RectTransform slot);
             Button button = NewButton(slot, "KeyButton", "-", out TMP_Text keyText);
+            LeftAligned((RectTransform)button.transform, LabelWidth);   // 알약 하나 크기(라벨 캡슐과 같은 폭)
             var r = row.gameObject.AddComponent<KeyRebindRow>();
             var rso = new SerializedObject(r);
             rso.FindProperty("actionPath").stringValue = path;
-            rso.FindProperty("actionLabel").objectReferenceValue = row.Find("Label").GetComponent<TMP_Text>();
+            rso.FindProperty("actionLabel").objectReferenceValue = FindDeep(row, "Label").GetComponent<TMP_Text>();
             rso.FindProperty("bindButton").objectReferenceValue = button;
             rso.FindProperty("keyText").objectReferenceValue = keyText;
             rso.ApplyModifiedPropertiesWithoutUndo();
@@ -207,42 +222,23 @@ public static class SettingsPanelAuthoring
 
     static void BuildAudio(RectTransform rows, Transform content)
     {
-        AdoptExisting(rows, content, "MasterVolume", 50f);
-        AdoptExisting(rows, content, "BGMVolume", 50f);
-        AdoptExisting(rows, content, "SFXVolume", 50f);
+        AdoptSliderRow(rows, content, "MasterVolume");
+        AdoptSliderRow(rows, content, "BGMVolume");
+        AdoptSliderRow(rows, content, "SFXVolume");
         Toggle mute = ToggleRow(rows, "MuteInBackground", "Mute When Unfocused");
         if (mute.GetComponent<MuteInBackgroundOption>() == null) mute.gameObject.AddComponent<MuteInBackgroundOption>();
     }
 
     // ─── 컨테이너·행 ───────────────────────────────────────────────────
 
-    /// <summary>탭 내용의 Rows(세로 정렬)를 보장하고, 이전 실행이 만든 Settings_ 행을 지운다.</summary>
+    /// <summary>
+    /// 탭 내용의 Rows(세로 정렬)를 스크롤 영역 안에 보장하고, 이전 실행이 만든 Settings_ 행을 지운다.
+    /// 🔴 Rows 는 부모 정렬을 무시한다(ignoreLayout) — Audio_Content 에는 원래 VerticalLayoutGroup 이 있어 Rows 자체를 끌고 가
+    ///    오디오 탭만 오른쪽 아래로 밀렸다(팀장 10-12 Play). 새 아트에서는 그 정렬 자체를 끈다(<see cref="SettingsArtSkin.ApplyFrame"/>).
+    /// </summary>
     static RectTransform EnsureRows(Transform content)
     {
-        Transform existing = content.Find("Rows");
-        RectTransform rows;
-        if (existing == null)
-        {
-            var go = new GameObject("Rows", typeof(RectTransform), typeof(VerticalLayoutGroup));
-            rows = (RectTransform)go.transform;
-            rows.SetParent(content, false);
-            rows.anchorMin = new Vector2(0f, 0f);
-            rows.anchorMax = new Vector2(1f, 1f);
-            rows.offsetMin = new Vector2(40f, 20f);     // 왼·아래 여백
-            rows.offsetMax = new Vector2(-40f, -90f);   // 오른·위(탭 제목 아래)
-            var v = go.GetComponent<VerticalLayoutGroup>();
-            v.childAlignment = TextAnchor.UpperLeft;
-            v.spacing = 4f;
-            v.childControlWidth = false;
-            v.childControlHeight = false;
-            v.childForceExpandWidth = false;
-            v.childForceExpandHeight = false;
-        }
-        else rows = (RectTransform)existing;
-
-        // 🔴 부모 정렬을 무시한다 — Audio_Content 에는 원래 VerticalLayoutGroup 이 있어 Rows 자체를 끌고 가
-        //    오디오 탭만 오른쪽 아래로 밀렸다(팀장 10-12 Play).
-        GetOrAdd<LayoutElement>(rows.gameObject).ignoreLayout = true;
+        RectTransform rows = SettingsArtSkin.EnsureScroll(content, RowSpacing, RowsPadding);
 
         for (int i = rows.childCount - 1; i >= 0; i--)
         {
@@ -255,34 +251,165 @@ public static class SettingsPanelAuthoring
     // 🔴 기존 행(볼륨 슬라이더·Hold/대시 토글)은 높이를 가진 감싸개 Row_<이름> 에 넣는다. Rows 는 자식 높이를 제어하지
     //    않아(childControlHeight = false) LayoutElement 높이 대신 **자기 rect 높이(슬라이더 20)** 로 쌓여 볼륨 라벨이
     //    겹쳤다(팀장 10-12 Play). 감싸개 이름은 Settings_ 가 아니라 재실행 때 지워지지 않는다(안의 원본을 지키려고).
-    static void AdoptExisting(RectTransform rows, Transform content, string name, float height)
+    static Transform AdoptExisting(RectTransform rows, Transform content, string name, out RectTransform wrap)
     {
         string wrapName = "Row_" + name;
-        Transform wrap = rows.Find(wrapName);
-        Transform t = wrap != null ? wrap.Find(name) : (content.Find(name) ?? rows.Find(name));
-        if (t == null) { Debug.LogWarning($"[SettingsAuthoring] {content.name}/{name} 이 없다 — 건너뜀."); return; }
+        Transform found = rows.Find(wrapName);
+        Transform t = found != null ? found.Find(name) : (content.Find(name) ?? rows.Find(name));
+        wrap = null;
+        if (t == null) { Debug.LogWarning($"[SettingsAuthoring] {content.name}/{name} 이 없다 — 건너뜀."); return null; }
 
-        var tr = (RectTransform)t;
-        if (wrap == null)
+        if (found == null)
         {
             var go = new GameObject(wrapName, typeof(RectTransform), typeof(LayoutElement));
-            wrap = go.transform;
-            wrap.SetParent(rows, false);
+            found = go.transform;
+            found.SetParent(rows, false);
         }
-        var wr = (RectTransform)wrap;
-        wr.sizeDelta = new Vector2(tr.sizeDelta.x, height);
+        wrap = (RectTransform)found;
+        wrap.sizeDelta = new Vector2(ControlX + ControlWidth, RowHeight);
         var le = wrap.GetComponent<LayoutElement>();
-        le.preferredHeight = height;
-        le.preferredWidth = tr.sizeDelta.x;
+        le.preferredHeight = RowHeight;
+        le.preferredWidth = wrap.sizeDelta.x;
         wrap.SetSiblingIndex(rows.childCount - 1);
 
-        // 원본은 감싸개 아래쪽 왼쪽에 붙인다 — 볼륨 라벨(슬라이더 위 +22)이 감싸개 안에 들어오게.
         t.SetParent(wrap, false);
-        tr.anchorMin = tr.anchorMax = Vector2.zero;
-        tr.pivot = Vector2.zero;
-        tr.anchoredPosition = new Vector2(0f, 4f);
         LayoutElement old = t.GetComponent<LayoutElement>();
         if (old != null) Object.DestroyImmediate(old);   // 예전 실행이 붙인 것 — 감싸개가 대신한다
+        return t;
+    }
+
+    // 기존 볼륨 슬라이더 → 새 행 모양(왼쪽 라벨 캡슐 · 오른쪽 슬라이더 + "100%"). 라벨(MasterVolumeLabel 등)은 슬라이더 자식이던 것을
+    // 캡슐 안으로 옮긴다 — LocalizedText 가 붙은 그 오브젝트를 그대로 쓴다. VolumeSlider·TitleScreenSlider 는 손대지 않는다.
+    static void AdoptSliderRow(RectTransform rows, Transform content, string name)
+    {
+        Transform t = AdoptExisting(rows, content, name, out RectTransform wrap);
+        if (t == null) return;
+
+        Transform labelBg = EnsureLabelBg(wrap);
+        TMP_Text label = FirstText(t, "Value") ?? FirstText(labelBg, null);
+        if (label != null) StyleRowLabel(label, labelBg);
+
+        var tr = (RectTransform)t;
+        tr.anchorMin = tr.anchorMax = new Vector2(0f, 0.5f);
+        tr.pivot = new Vector2(0f, 0.5f);
+        tr.anchoredPosition = new Vector2(ControlX + SliderX, 0f);
+        tr.sizeDelta = new Vector2(SliderWidth, SliderHeight);
+
+        Transform valueT = wrap.Find("Value");
+        TMP_Text value = valueT != null ? valueT.GetComponent<TMP_Text>() : NewText(wrap, "Value", "100%", TextAlignmentOptions.Center);
+        PlaceValue(value.rectTransform, ControlX);
+        StyleValue(value);
+
+        var percent = GetOrAdd<SettingsSliderPercent>(wrap.gameObject);
+        var so = new SerializedObject(percent);
+        so.FindProperty("slider").objectReferenceValue = t.GetComponent<Slider>();
+        so.FindProperty("text").objectReferenceValue = value;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // 기존 토글(Hold·대시 — 은희 저작) → 새 행 모양. 토글 루트를 행 전체로 펴고, 라벨은 캡슐 안, 체크 칸은 컨트롤 자리로.
+    static void AdoptToggleRow(RectTransform rows, Transform content, string name)
+    {
+        Transform t = AdoptExisting(rows, content, name, out RectTransform wrap);
+        if (t == null) return;
+        var tr = (RectTransform)t;
+        tr.anchorMin = Vector2.zero;
+        tr.anchorMax = Vector2.one;
+        tr.pivot = new Vector2(0.5f, 0.5f);
+        tr.offsetMin = tr.offsetMax = Vector2.zero;
+
+        Transform labelBg = EnsureLabelBg(t);
+        TMP_Text label = FirstText(t, "LabelBg") ?? FirstText(labelBg, null);
+        if (label != null) StyleRowLabel(label, labelBg);
+
+        Toggle toggle = t.GetComponent<Toggle>();
+        if (toggle != null && toggle.targetGraphic != null)
+        {
+            RectTransform box = toggle.targetGraphic.rectTransform;
+            box.anchorMin = box.anchorMax = new Vector2(0f, 0.5f);
+            box.pivot = new Vector2(0f, 0.5f);
+            box.anchoredPosition = new Vector2(ControlX, 0f);
+            box.sizeDelta = ToggleSize;
+        }
+    }
+
+    /// <summary>행 왼쪽 라벨 캡슐(settings_label_capsule). 이미 있으면 그대로.</summary>
+    static Transform EnsureLabelBg(Transform row)
+    {
+        Transform t = row.Find("LabelBg");
+        if (t == null)
+        {
+            var go = new GameObject("LabelBg", typeof(RectTransform), typeof(Image));
+            t = go.transform;
+            t.SetParent(row, false);
+        }
+        t.SetAsFirstSibling();
+        var r = (RectTransform)t;
+        r.anchorMin = new Vector2(0f, 0.5f);
+        r.anchorMax = new Vector2(0f, 0.5f);
+        r.pivot = new Vector2(0f, 0.5f);
+        r.anchoredPosition = Vector2.zero;
+        r.sizeDelta = new Vector2(LabelWidth, RowHeight);
+        Image img = t.GetComponent<Image>();
+        SettingsArtSkin.SetSliced(img, SettingsArtSkin.LabelCapsule, r.sizeDelta);
+        img.raycastTarget = false;
+        return t;
+    }
+
+    static void StyleRowLabel(TMP_Text label, Transform labelBg)
+    {
+        label.transform.SetParent(labelBg, false);
+        SettingsArtSkin.Stretch(label.rectTransform, new Vector2(18f, 0f), new Vector2(-18f, 0f));
+        label.alignment = TextAlignmentOptions.Center;
+        label.color = SettingsArtSkin.TextLight;
+        label.raycastTarget = false;
+        SettingsArtSkin.AutoSize(label, 14f, 26f);
+    }
+
+    static void PlaceValue(RectTransform r, float slotX)
+    {
+        r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f);
+        r.pivot = new Vector2(0.5f, 0.5f);
+        r.anchoredPosition = new Vector2(slotX + ValueCenterX, 0f);
+        r.sizeDelta = new Vector2(88f, 40f);
+    }
+
+    static void StyleValue(TMP_Text t)
+    {
+        t.alignment = TextAlignmentOptions.Center;
+        t.color = SettingsArtSkin.TextDark;
+        t.fontSize = 25f;
+        t.enableAutoSizing = false;
+        t.raycastTarget = false;
+    }
+
+    static TMP_Text FirstText(Transform root, string skipName)
+    {
+        if (root == null) return null;
+        foreach (TMP_Text t in root.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (skipName != null && (t.name == skipName || HasAncestorNamed(t.transform, root, skipName))) continue;
+            return t;
+        }
+        return null;
+    }
+
+    static bool HasAncestorNamed(Transform t, Transform stop, string name)
+    {
+        for (Transform p = t.parent; p != null && p != stop; p = p.parent)
+            if (p.name == name) return true;
+        return false;
+    }
+
+    static readonly Vector2 ToggleSize = new Vector2(71.86f + SettingsArtSkin.Pad * 2, 47.64f + SettingsArtSkin.Pad * 2);
+
+    static void LeftAligned(RectTransform r, float width)
+    {
+        r.anchorMin = new Vector2(0f, 0f);
+        r.anchorMax = new Vector2(0f, 1f);
+        r.pivot = new Vector2(0f, 0.5f);
+        r.anchoredPosition = Vector2.zero;
+        r.sizeDelta = new Vector2(width, 0f);
     }
 
     // 생성·이동한 오브젝트를 탭 내용과 같은 레이어(UI)로. 🔴 새 GameObject 는 Default 레이어라
@@ -299,21 +426,24 @@ public static class SettingsPanelAuthoring
         var go = new GameObject(GeneratedPrefix + name, typeof(RectTransform), typeof(LayoutElement));
         var row = (RectTransform)go.transform;
         row.SetParent(rows, false);
-        row.sizeDelta = new Vector2(LabelWidth + ControlWidth + 10f, RowHeight);
+        row.sizeDelta = new Vector2(ControlX + ControlWidth, RowHeight);
         var le = go.GetComponent<LayoutElement>();
         le.preferredHeight = RowHeight;
         le.preferredWidth = row.sizeDelta.x;
 
-        TMP_Text text = NewText(row, "Label", label, TextAlignmentOptions.MidlineLeft);
-        var tr = (RectTransform)text.transform;
-        tr.anchorMin = new Vector2(0f, 0f); tr.anchorMax = new Vector2(0f, 1f); tr.pivot = new Vector2(0f, 0.5f);
-        tr.anchoredPosition = Vector2.zero; tr.sizeDelta = new Vector2(LabelWidth, 0f);
+        // 라벨 = 캡슐(settings_label_capsule) 안 가운데 글자. 라벨이 빈 행(적용·초기화 버튼)은 캡슐도 없다.
+        if (!string.IsNullOrEmpty(label))
+        {
+            Transform labelBg = EnsureLabelBg(row);
+            TMP_Text text = NewText(row, "Label", label, TextAlignmentOptions.Center);
+            StyleRowLabel(text, labelBg);
+        }
 
         var slotGo = new GameObject("Control", typeof(RectTransform));
         controlSlot = (RectTransform)slotGo.transform;
         controlSlot.SetParent(row, false);
         controlSlot.anchorMin = new Vector2(0f, 0f); controlSlot.anchorMax = new Vector2(0f, 1f); controlSlot.pivot = new Vector2(0f, 0.5f);
-        controlSlot.anchoredPosition = new Vector2(LabelWidth + 10f, 0f);
+        controlSlot.anchoredPosition = new Vector2(ControlX, 0f);
         controlSlot.sizeDelta = new Vector2(ControlWidth, 0f);
         return row;
     }
@@ -352,7 +482,9 @@ public static class SettingsPanelAuthoring
         var tr = (RectTransform)tg.transform;
         tr.SetParent(slot, false);
         tr.anchorMin = tr.anchorMax = new Vector2(0f, 0.5f); tr.pivot = new Vector2(0f, 0.5f);
-        tr.anchoredPosition = Vector2.zero; tr.sizeDelta = new Vector2(26f, 26f);
+        tr.anchoredPosition = Vector2.zero; tr.sizeDelta = ToggleSize;
+        Transform bg = tg.transform.Find("Background");
+        if (bg != null) SettingsArtSkin.Stretch((RectTransform)bg, Vector2.zero, Vector2.zero);
         Transform defaultLabel = tg.transform.Find("Label");
         if (defaultLabel != null) Object.DestroyImmediate(defaultLabel.gameObject);
         return tg.GetComponent<Toggle>();
@@ -378,13 +510,12 @@ public static class SettingsPanelAuthoring
         sl.name = "Slider";
         var sr = (RectTransform)sl.transform;
         sr.SetParent(slot, false);
-        sr.anchorMin = new Vector2(0f, 0.5f); sr.anchorMax = new Vector2(1f, 0.5f); sr.pivot = new Vector2(0f, 0.5f);
-        sr.offsetMin = new Vector2(0f, -10f); sr.offsetMax = new Vector2(-70f, 10f);
+        sr.anchorMin = sr.anchorMax = new Vector2(0f, 0.5f); sr.pivot = new Vector2(0f, 0.5f);
+        sr.anchoredPosition = new Vector2(SliderX, 0f); sr.sizeDelta = new Vector2(SliderWidth, SliderHeight);
 
-        valueText = NewText(slot, "Value", "100%", TextAlignmentOptions.MidlineRight);
-        var vr = (RectTransform)valueText.transform;
-        vr.anchorMin = new Vector2(1f, 0f); vr.anchorMax = new Vector2(1f, 1f); vr.pivot = new Vector2(1f, 0.5f);
-        vr.anchoredPosition = Vector2.zero; vr.sizeDelta = new Vector2(64f, 0f);
+        valueText = NewText(slot, "Value", "100%", TextAlignmentOptions.Center);
+        PlaceValue(valueText.rectTransform, 0f);
+        StyleValue(valueText);
         return sl.GetComponent<Slider>();
     }
 
@@ -396,14 +527,16 @@ public static class SettingsPanelAuthoring
         var hr = (RectTransform)holder.transform;
         hr.SetParent(slot, false);
         hr.anchorMin = new Vector2(0f, 0f); hr.anchorMax = new Vector2(0f, 1f); hr.pivot = new Vector2(0f, 0.5f);
-        hr.anchoredPosition = Vector2.zero; hr.sizeDelta = new Vector2(200f, 0f);
+        hr.anchoredPosition = Vector2.zero; hr.sizeDelta = new Vector2(LabelWidth, 0f);
         Button b = NewButton(hr, "Button", buttonText, out _);
 
+        // 상태 글자(초기화 알림 등)는 밝은 회색 내용 영역 위라 어두운 색.
         status = NewText(slot, "Status", "", TextAlignmentOptions.MidlineLeft);
         var st = (RectTransform)status.transform;
         st.anchorMin = new Vector2(0f, 0f); st.anchorMax = new Vector2(1f, 1f);
-        st.offsetMin = new Vector2(210f, 0f); st.offsetMax = Vector2.zero;
-        status.fontSize = _fontSize * 0.8f;
+        st.offsetMin = new Vector2(LabelWidth + 12f, 0f); st.offsetMax = Vector2.zero;
+        status.fontSize = 20f;
+        status.color = SettingsArtSkin.TextDark;
         return b;
     }
 
@@ -427,16 +560,18 @@ public static class SettingsPanelAuthoring
         var r = (RectTransform)go.transform;
         r.SetParent(content, false);
         r.anchorMin = new Vector2(0.5f, 0.5f); r.anchorMax = new Vector2(0.5f, 0.5f);
-        r.sizeDelta = new Vector2(460f, 200f);
-        go.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.92f);   // 뒤 클릭 차단
+        r.sizeDelta = new Vector2(640f, 280f);
+        SettingsArtSkin.SkinDialog(go.GetComponent<Image>());   // 펼친 드롭다운과 같은 어두운 판 · 뒤 클릭 차단
 
         text = NewText(r, "Message", "Keep these display settings?", TextAlignmentOptions.Center);
         var tr = (RectTransform)text.transform;
-        tr.anchorMin = new Vector2(0f, 0.45f); tr.anchorMax = new Vector2(1f, 1f);
-        tr.offsetMin = new Vector2(20f, 0f); tr.offsetMax = new Vector2(-20f, -20f);
+        tr.anchorMin = new Vector2(0f, 0.4f); tr.anchorMax = new Vector2(1f, 1f);
+        tr.offsetMin = new Vector2(36f, 0f); tr.offsetMax = new Vector2(-36f, -28f);
+        text.fontSize = 28f;
 
-        keep = DialogButton(r, "Keep", "Keep", new Vector2(-100f, 40f));
-        revert = DialogButton(r, "Revert", "Revert", new Vector2(100f, 40f));
+        // 유지 = 초록 알약 · 되돌리기 = 빨강 알약(SettingsArtSkin.SkinControls 가 부모 이름으로 고른다).
+        keep = DialogButton(r, "Keep", "Keep", new Vector2(-140f, 62f));
+        revert = DialogButton(r, "Revert", "Revert", new Vector2(140f, 62f));
         go.SetActive(false);
         return go;
     }
@@ -447,7 +582,7 @@ public static class SettingsPanelAuthoring
         var hr = (RectTransform)holder.transform;
         hr.SetParent(parent, false);
         hr.anchorMin = hr.anchorMax = new Vector2(0.5f, 0f);
-        hr.anchoredPosition = pos; hr.sizeDelta = new Vector2(160f, 40f);
+        hr.anchoredPosition = pos; hr.sizeDelta = new Vector2(240f, RowHeight);
         return NewButton(hr, "Button", text, out _);
     }
 

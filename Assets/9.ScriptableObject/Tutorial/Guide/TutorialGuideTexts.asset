@@ -436,3 +436,35 @@ MonoBehaviour:
     text: "23\ud638\uac00 <b>\uc790\ud3ed</b>\uc744 \uc900\ube44\ud569\ub2c8\ub2e4! <b>\uacf5\uaca9</b>\ud574\uc11c <b>\uc2e4\ub4dc</b>\ub97c \ubd80\uc218\uc138\uc694!"
     durationSeconds: 6
     sfx: {fileID: 0}
+  - id: BOSS_RAID_RelayGather
+    text: "<b>6\uc2dc \uc548\uc804 \uad6c\uc5ed</b>\uc73c\ub85c \ubaa8\uc774\uc138\uc694!"
+    durationSeconds: 5
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_RelayGuide
+    text: "\ub3cc\uc9c4\uc774 <b>\ud30c\ub797\uac8c</b> \ube5b\ub098\uba74 <b>\uc6b0\ud074\ub9ad</b>\uc73c\ub85c \ub9c9\uc544 23\ud638\ub97c <b>12\uc2dc \ubcbd</b>\uae4c\uc9c0 \ubc00\uc5b4\ub0b4\uc138\uc694! \ub9c9\uc740 \uc0ac\ub78c\uc740 \ub3d9\ub8cc \ucc28\ub840\ub97c \uae30\ub2e4\ub9bd\ub2c8\ub2e4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_RelayRoundReset
+    text: "\ub2e4\uc2dc \ubaa8\ub450 \uac04\ud30c\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4!"
+    durationSeconds: 3
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_RelaySuccess
+    text: "23\ud638\ub97c \ubcbd\uae4c\uc9c0 \ubc00\uc5b4\ub0c8\uc2b5\ub2c8\ub2e4! \uc9c0\uae08 \uacf5\uaca9\ud558\uc138\uc694!"
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_RelayFail
+    text: "\ub3cc\uc9c4\uc744 \ud53c\ud558\uc138\uc694!"
+    durationSeconds: 3
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_ChainGuide
+    text: "<b>\uc9c0\ubaa9\ub41c \uc0ac\ub78c</b>\uc774 \uc815\uba74\uc5d0\uc11c <b>\uc6b0\ud074\ub9ad</b>\uc73c\ub85c \uac04\ud30c\ud558\uc138\uc694!"
+    durationSeconds: 5
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_PushNorthGuide
+    text: "<b>\uc1a1\uc804\ud0d1</b>\uc744 \ubd80\uc234 \ucc28\uc9d5\uc744 \ub04a\uace0, \uc4f0\ub7ec\uc9c4 23\ud638\ub97c <b>\uc6b0\ud074\ub9ad</b>\uc73c\ub85c <b>\uc704\ucabd \ub05d</b>\uae4c\uc9c0 \ubc00\uc5b4\ub0b4\uc138\uc694!"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_PushNorthSuccess
+    text: "23\ud638\ub97c \ub05d\uae4c\uc9c0 \ubc00\uc5b4\ub0c8\uc2b5\ub2c8\ub2e4! \uc9c0\uae08 \uacf5\uaca9\ud558\uc138\uc694!"
+    durationSeconds: 4
+    sfx: {fileID: 0}

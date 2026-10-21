@@ -1535,7 +1535,8 @@ public class MonsterBase : Unit
             return false;
 
         BossDataSO boss = data as BossDataSO;
-        bool behind = boss != null && BackAttackRules.IsBehind(
+        // 보스 앞뒤 구분 꺼짐(useFacingRules) = 위치 백어택 없음. 강제(어쌔신 변신)는 Applies 가 그대로 본다.
+        bool behind = boss != null && boss.useFacingRules && BackAttackRules.IsBehind(
             transform.forward, transform.position,
             BackAttackRules.ResolveAttackerPosition(hitContext), boss.backAttackAngle);
         return BackAttackRules.Applies(attackInfo.backAttackMultiplier, attackInfo.forceBackAttack, boss != null, behind);

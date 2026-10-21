@@ -151,9 +151,9 @@ public sealed class SettingsRulesTests
     }
 
     [Test]
-    public void Strings_57Keys_UnderSettingsPrefix_EnglishUniqueAndFilled()
+    public void Strings_58Keys_UnderSettingsPrefix_EnglishUniqueAndFilled()
     {
-        Assert.AreEqual(57, SettingsUiStrings.All.Count);
+        Assert.AreEqual(58, SettingsUiStrings.All.Count);   // +1 틀 제목(PLAN-settings-art)
         var english = new System.Collections.Generic.HashSet<string>();
         foreach (UiString s in SettingsUiStrings.All)
         {
