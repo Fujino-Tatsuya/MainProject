@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,6 +13,7 @@ public sealed class QABuild48RuntimeProbe : MonoBehaviour
 {
     string _screenshotPath;
     string _initialScreenshotPath;
+    string _commandFile;
     bool _sawLobby;
     bool _captured;
     float _waitSceneEnteredAt = -1f;
@@ -21,7 +23,8 @@ public sealed class QABuild48RuntimeProbe : MonoBehaviour
     {
         string screenshot = ArgumentValue("-qa48-screenshot");
         string initialScreenshot = ArgumentValue("-qa48-initial-screenshot");
-        if (string.IsNullOrWhiteSpace(screenshot) && string.IsNullOrWhiteSpace(initialScreenshot))
+        string commandFile = ArgumentValue("-qa48-command-file");
+        if (string.IsNullOrWhiteSpace(screenshot) && string.IsNullOrWhiteSpace(initialScreenshot) && string.IsNullOrWhiteSpace(commandFile))
             return;
 
         var go = new GameObject("QA48 Runtime Probe");
@@ -30,11 +33,32 @@ public sealed class QABuild48RuntimeProbe : MonoBehaviour
         var probe = go.AddComponent<QABuild48RuntimeProbe>();
         probe._screenshotPath = screenshot;
         probe._initialScreenshotPath = initialScreenshot;
-        Debug.Log($"[QA48-Probe] active screenshot='{screenshot}' initial='{initialScreenshot}'");
+        probe._commandFile = commandFile;
+        Debug.Log($"[QA48-Probe] active screenshot='{screenshot}' initial='{initialScreenshot}' command='{commandFile}'");
     }
 
     void Update()
     {
+        if (!string.IsNullOrWhiteSpace(_commandFile) && File.Exists(_commandFile))
+        {
+            string command = File.ReadAllText(_commandFile).Trim();
+            File.Delete(_commandFile);
+            if (string.Equals(command, "shutdown-transport", StringComparison.OrdinalIgnoreCase))
+            {
+                NetworkManager manager = NetworkManager.Singleton;
+                if (manager != null && manager.IsListening)
+                {
+                    _sawLobby = true;
+                    manager.Shutdown();
+                    Debug.Log("[QA48-Probe] transport shutdown executed");
+                }
+                else
+                {
+                    Debug.LogWarning("[QA48-Probe] transport shutdown ignored — NetworkManager is not listening");
+                }
+            }
+        }
+
         string scene = SceneManager.GetActiveScene().name;
         if (scene == "3.LobbyScene")
             _sawLobby = true;

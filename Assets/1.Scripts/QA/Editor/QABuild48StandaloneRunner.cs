@@ -69,6 +69,50 @@ public static class QABuild48StandaloneRunner
         }
     }
 
+    [MenuItem(MenuRoot + "Run B3 Recovery Suite", priority = 71)]
+    public static async void RunB3Menu()
+    {
+        if (_running)
+        {
+            Debug.LogWarning("[QA][B3] 이미 standalone 스위트가 실행 중이다.");
+            return;
+        }
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogWarning("[QA][B3] Play 중에는 실행하지 않는다.");
+            return;
+        }
+        if (!RequiredBuildsExist(out string missing))
+        {
+            Debug.LogError($"[QA][B3] 빌드가 없다: {missing} — Build Demo Player (QA artifacts) 먼저 실행");
+            return;
+        }
+
+        _running = true;
+        string reportRoot = Path.Combine("C:/UnityProject/QA", $"48-{DateTime.Now:yyyyMMdd_HHmmss}");
+        Directory.CreateDirectory(reportRoot);
+        var results = new List<CaseResult>();
+        try
+        {
+            results.Add(await RunTransportShutdownRejoin(reportRoot));
+            results.Add(await RunHostRestart(reportRoot));
+        }
+        catch (Exception e)
+        {
+            results.Add(new CaseResult("B3-runner", false, $"러너 예외: {e}", string.Empty));
+            Debug.LogException(e);
+        }
+        finally
+        {
+            await StopAll();
+            DeleteTemporaryConfigs();
+            WriteReport(reportRoot, results, "B3");
+            _running = false;
+            AssetDatabase.Refresh();
+            Debug.Log($"[QA][B3] 완료: {reportRoot}/report.md — PASS {results.Count(x => x.Pass)}/{results.Count}");
+        }
+    }
+
     static async Task<CaseResult> RunWrongAddress(string root)
     {
         string dir = CaseDirectory(root, "B2-1-wrong-address");
@@ -137,6 +181,54 @@ public static class QABuild48StandaloneRunner
         return new CaseResult("B2-4 버전 불일치", hostReady && rejected, evidence, Relative(root, dir));
     }
 
+    static async Task<CaseResult> RunTransportShutdownRejoin(string root)
+    {
+        string dir = CaseDirectory(root, "B3-1-transport-shutdown-rejoin");
+        int port = NextAvailablePort();
+        WriteHostConfig(port, "transport-host");
+        WriteClientConfig("client", "127.0.0.1", port, "transport-client");
+        LaunchedPlayer host = Launch("host", dir, "host", false);
+        bool hostReady = await WaitLog(host, t => t.Contains("LobbySceneManager.Awake"), 60f);
+        LaunchedPlayer client = Launch("client", dir, "client", false);
+        bool firstLobby = await WaitLog(client, t => Count(t, "LobbySceneManager.Awake") >= 1, 60f);
+
+        File.WriteAllText(client.CommandFile, "shutdown-transport");
+        bool shutdown = await WaitLog(client, t => t.Contains("[QA48-Probe] transport shutdown executed"), 10f);
+        bool waitScene = await WaitLog(client, t => t.Contains("CleanupAndLoadWaitScene") && t.Contains("대기 씬 로드 완료 state=Dropped"), 30f);
+        bool rejoined = await WaitLog(client, t => Count(t, "LobbySceneManager.Awake") >= 2, 90f);
+        string evidence = $"host/first lobby={hostReady}/{firstLobby}, probe shutdown={shutdown}, wait scene={waitScene}, " +
+                          $"lobby loads={Count(ReadAll(client), "LobbySceneManager.Awake")}, rejoined={rejoined}";
+        await FinishCase(dir);
+        return new CaseResult("B3-1 client transport 종료→대기→재합류", hostReady && firstLobby && shutdown && waitScene && rejoined,
+            evidence, Relative(root, dir));
+    }
+
+    static async Task<CaseResult> RunHostRestart(string root)
+    {
+        string dir = CaseDirectory(root, "B3-2-host-restart");
+        int port = NextAvailablePort();
+        WriteHostConfig(port, "restart-host");
+        WriteClientConfig("client", "127.0.0.1", port, "restart-client", 1f, 3f);
+        LaunchedPlayer hostBefore = Launch("host", dir, "host-before", false);
+        bool hostReady = await WaitLog(hostBefore, t => t.Contains("LobbySceneManager.Awake"), 60f);
+        LaunchedPlayer client = Launch("client", dir, "client", false);
+        bool firstLobby = await WaitLog(client, t => Count(t, "LobbySceneManager.Awake") >= 1, 60f);
+
+        await StopOne(hostBefore);
+        ArchiveNetworkLog(hostBefore, dir);
+        bool waitScene = await WaitLog(client, t => t.Contains("CleanupAndLoadWaitScene") && t.Contains("대기 씬 로드 완료 state=Dropped"), 30f);
+        await Task.Delay(4000);
+        LaunchedPlayer hostAfter = Launch("host", dir, "host-after", false);
+        bool restarted = await WaitLog(hostAfter, t => t.Contains("LobbySceneManager.Awake"), 60f);
+        bool rejoined = await WaitLog(client, t => Count(t, "LobbySceneManager.Awake") >= 2, 90f);
+        bool hostSawClient = await WaitLog(hostAfter, t => t.Contains("[LobbySession] 접속 client"), 30f);
+        string evidence = $"처음 host/client lobby={hostReady}/{firstLobby}, host pid {hostBefore.Process.Id}만 종료, wait scene={waitScene}, " +
+                          $"재시작 host lobby={restarted}, client lobby loads={Count(ReadAll(client), "LobbySceneManager.Awake")}, host 접속 관측={hostSawClient}";
+        await FinishCase(dir);
+        return new CaseResult("B3-2 host exe 재시작 뒤 로딩", hostReady && firstLobby && waitScene && restarted && rejoined && hostSawClient,
+            evidence, Relative(root, dir));
+    }
+
     static bool RequiredBuildsExist(out string missing)
     {
         foreach (string name in new[] { "host", "client", "client2", "client3", "mismatch" })
@@ -155,11 +247,12 @@ public static class QABuild48StandaloneRunner
         return dir;
     }
 
-    static LaunchedPlayer Launch(string instance, string caseDir, string label)
+    static LaunchedPlayer Launch(string instance, string caseDir, string label, bool initialScreenshot = true)
     {
         string exe = Exe(instance);
         string playerLog = Path.Combine(caseDir, label + ".log");
         string screenshot = Path.Combine(caseDir, "shots", label + "-wait.png");
+        string commandFile = Path.Combine(caseDir, label + ".command");
         string networkLog = Path.Combine(Path.GetDirectoryName(exe), "network.log");
         if (File.Exists(playerLog)) File.Delete(playerLog);
         if (File.Exists(networkLog)) File.Delete(networkLog);
@@ -169,9 +262,11 @@ public static class QABuild48StandaloneRunner
             WorkingDirectory = Path.GetDirectoryName(exe),
             UseShellExecute = false,
             Arguments = $"-logFile \"{playerLog}\" -screen-fullscreen 0 -screen-width 640 -screen-height 360 " +
-                        $"-qa48-initial-screenshot \"{screenshot}\"",
+                        $"{(initialScreenshot ? "-qa48-initial-screenshot" : "-qa48-screenshot")} \"{screenshot}\" " +
+                        $"-qa48-command-file \"{commandFile}\"",
         };
-        var launched = new LaunchedPlayer(label, Process.Start(start), playerLog, networkLog);
+        if (File.Exists(commandFile)) File.Delete(commandFile);
+        var launched = new LaunchedPlayer(label, Process.Start(start), playerLog, networkLog, commandFile);
         Started.Add(launched);
         Debug.Log($"[QA][Standalone] 시작 {label} pid={launched.Process.Id} exe={exe}");
         return launched;
@@ -209,14 +304,7 @@ public static class QABuild48StandaloneRunner
         LaunchedPlayer[] players = Started.ToArray();
         await StopAll();
         foreach (LaunchedPlayer p in players)
-        {
-            try
-            {
-                if (File.Exists(p.NetworkLog))
-                    File.Copy(p.NetworkLog, Path.Combine(caseDir, p.Label + "-network.log"), true);
-            }
-            catch (Exception e) { Debug.LogWarning($"[QA][Standalone] network.log 보관 실패 {p.Label}: {e.Message}"); }
-        }
+            ArchiveNetworkLog(p, caseDir);
         DeleteTemporaryConfigs();
         await Task.Delay(1500);
     }
@@ -224,20 +312,34 @@ public static class QABuild48StandaloneRunner
     static async Task StopAll()
     {
         foreach (LaunchedPlayer p in Started.ToArray())
-        {
-            try
-            {
-                if (p.Process == null || p.Process.HasExited) continue;
-                p.Process.CloseMainWindow();
-                await Task.Delay(300);
-                if (!p.Process.HasExited)
-                    p.Process.Kill();
-                p.Process.WaitForExit(3000);
-                Debug.Log($"[QA][Standalone] 종료 {p.Label} pid={p.Process.Id}");
-            }
-            catch (Exception e) { Debug.LogWarning($"[QA][Standalone] 종료 실패 {p.Label}: {e.Message}"); }
-        }
+            await StopOne(p);
         Started.Clear();
+    }
+
+    static async Task StopOne(LaunchedPlayer p)
+    {
+        try
+        {
+            if (p.Process == null || p.Process.HasExited) return;
+            p.Process.CloseMainWindow();
+            await Task.Delay(300);
+            if (!p.Process.HasExited)
+                p.Process.Kill();
+            p.Process.WaitForExit(3000);
+            Debug.Log($"[QA][Standalone] 종료 {p.Label} pid={p.Process.Id}");
+        }
+        catch (Exception e) { Debug.LogWarning($"[QA][Standalone] 종료 실패 {p.Label}: {e.Message}"); }
+        finally { Started.Remove(p); }
+    }
+
+    static void ArchiveNetworkLog(LaunchedPlayer p, string caseDir)
+    {
+        try
+        {
+            if (File.Exists(p.NetworkLog))
+                File.Copy(p.NetworkLog, Path.Combine(caseDir, p.Label + "-network.log"), true);
+        }
+        catch (Exception e) { Debug.LogWarning($"[QA][Standalone] network.log 보관 실패 {p.Label}: {e.Message}"); }
     }
 
     static void WriteHostConfig(int port, string suffix) => WriteConfig("host", "host", "127.0.0.1", port, suffix, 1f, 5f);
@@ -310,12 +412,13 @@ public static class QABuild48StandaloneRunner
 
     sealed class LaunchedPlayer
     {
-        public LaunchedPlayer(string label, Process process, string playerLog, string networkLog)
-        { Label = label; Process = process; PlayerLog = playerLog; NetworkLog = networkLog; }
+        public LaunchedPlayer(string label, Process process, string playerLog, string networkLog, string commandFile)
+        { Label = label; Process = process; PlayerLog = playerLog; NetworkLog = networkLog; CommandFile = commandFile; }
         public string Label { get; }
         public Process Process { get; }
         public string PlayerLog { get; }
         public string NetworkLog { get; }
+        public string CommandFile { get; }
     }
 
     readonly struct CaseResult
