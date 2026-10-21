@@ -21,10 +21,14 @@ public static class DemoConnectUiStrings
     public static readonly UiString RejoinWaiting = new UiString("UI.DemoConnect.RejoinWaiting", "판에 다시 합류하는 중 — 잠시 기다리세요", Where + " · 거절 사유 RejoinWaiting(판 명단 안 사람이 씬 전환·옛 연결 정리를 기다림)");
     public static readonly UiString JoiningMatch = new UiString("UI.DemoConnect.JoiningMatch", "판에 합류하는 중…", Where + " · 판 도중 재합류 — 맵에 들어왔지만 내 캐릭터가 아직 스폰되지 않음(서버 스폰 보류 중)");
 
+    public static readonly UiString AutoHostMatch = new UiString("UI.DemoConnect.AutoHostMatch", "자동: 호스트 ({address} 일치)", Where + " · role 자동 판정 — 이 PC IP 가 hostAddress 와 같음({address} = 일치한 IP)");
+    public static readonly UiString AutoHostLoopback = new UiString("UI.DemoConnect.AutoHostLoopback", "자동: 호스트 (hostAddress {address})", Where + " · role 자동 판정 — hostAddress 가 비었거나 loopback({address} = hostAddress)");
+    public static readonly UiString AutoClient = new UiString("UI.DemoConnect.AutoClient", "자동: 클라 (이 PC 에 {address} 없음)", Where + " · role 자동 판정 — 이 PC 에 hostAddress 가 없어 그 주소로 접속({address} = hostAddress)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         WaitingForHost, StartingHost, Disconnected, Address, Connecting, RetryIn, ConfigMissing, BuildInfo, RejoinWaiting,
-        JoiningMatch,
+        JoiningMatch, AutoHostMatch, AutoHostLoopback, AutoClient,
     };
 }
 
@@ -40,7 +44,8 @@ public readonly struct DemoConnectionOverlayModel
         float secondsUntilRetry,
         DemoJoinRejectReason lastReason,
         string version,
-        string configHash)
+        string configHash,
+        DemoAutoRoleDecision? autoRole = null)
     {
         Role = role;
         State = state;
@@ -51,6 +56,7 @@ public readonly struct DemoConnectionOverlayModel
         LastReason = lastReason;
         Version = version;
         ConfigHash = configHash;
+        AutoRole = autoRole;
     }
 
     public DemoConnectionRole Role { get; }
@@ -63,12 +69,14 @@ public readonly struct DemoConnectionOverlayModel
     public string Version { get; }
     /// <summary>비었으면 "?" 로 표시(아직 한 번도 NetworkManager 를 시작하지 않음).</summary>
     public string ConfigHash { get; }
+    /// <summary>role 을 자동 판정했으면 그 근거(제목 아래 한 줄). 명시 role 이면 null.</summary>
+    public DemoAutoRoleDecision? AutoRole { get; }
 }
 
 /// <summary>DemoConnectionOverlay 의 표시 판단·문구 조립 — 순수 함수(EditMode 테스트 대상).</summary>
 public static class DemoConnectionOverlayText
 {
-    public const float ConfigMissingNoticeSeconds = 3f;
+    public const float BootNoticeSeconds = 3f;
 
     /// <summary>접속·호스팅이 된 상태(Connected·Hosting)에서는 상태 패널을 숨긴다.</summary>
     public static bool ShouldShowStatus(ReconnectState state)
@@ -86,16 +94,19 @@ public static class DemoConnectionOverlayText
         return state == ReconnectState.Connected && isMapActive && !hasLocalPlayer && !hadLocalPlayerInThisMap;
     }
 
-    /// <summary>"설정 파일 없음 — 호스트 모드" 를 부팅 후 3초 동안 띄운다(Q5).</summary>
-    public static bool ShouldShowConfigMissing(bool isFileMissing, float secondsSinceBoot)
+    /// <summary>부팅 안내(<see cref="BootNotice"/> — 설정 파일 없음 Q5 · role 자동 판정 근거)를 3초 동안 띄운다.</summary>
+    public static bool ShouldShowBootNotice(bool hasNotice, float secondsSinceBoot)
     {
-        return isFileMissing && secondsSinceBoot >= 0f && secondsSinceBoot < ConfigMissingNoticeSeconds;
+        return hasNotice && secondsSinceBoot >= 0f && secondsSinceBoot < BootNoticeSeconds;
     }
 
     public static string BuildStatus(in DemoConnectionOverlayModel model)
     {
         var sb = new StringBuilder();
         sb.Append(Title(model));
+
+        if (model.AutoRole.HasValue)
+            sb.Append('\n').Append(AutoRoleText(model.AutoRole.Value));
 
         sb.Append('\n').Append(DemoConnectUiStrings.Address.Format(new Dictionary<string, string>
         {
@@ -113,6 +124,32 @@ public static class DemoConnectionOverlayText
 
         sb.Append('\n').Append(BuildInfo(model.Version, model.ConfigHash));
         return sb.ToString();
+    }
+
+    /// <summary>"자동: 호스트 (100.79.198.77 일치)" 같은 판정 근거 한 줄.</summary>
+    public static string AutoRoleText(in DemoAutoRoleDecision decision)
+    {
+        var key = decision.Basis switch
+        {
+            DemoAutoRoleBasis.LocalAddressMatch => DemoConnectUiStrings.AutoHostMatch,
+            DemoAutoRoleBasis.LoopbackHostAddress => DemoConnectUiStrings.AutoHostLoopback,
+            _ => DemoConnectUiStrings.AutoClient,
+        };
+        return key.Format(new Dictionary<string, string>
+        {
+            ["address"] = string.IsNullOrEmpty(decision.Address) ? "?" : decision.Address,
+        });
+    }
+
+    /// <summary>
+    /// 부팅 직후 3초 안내 문구 — 설정 파일이 없으면 "설정 파일 없음 — 호스트 모드", role 을 자동 판정했으면 그 근거.
+    /// 띄울 게 없으면 빈 문자열. 호스트는 곧 상태 패널이 숨으므로 판정 근거를 여기서 한 번 더 보여 준다.
+    /// </summary>
+    public static string BootNotice(bool isFileMissing, DemoAutoRoleDecision? autoRole)
+    {
+        if (isFileMissing)
+            return DemoConnectUiStrings.ConfigMissing.Text;
+        return autoRole.HasValue ? AutoRoleText(autoRole.Value) : string.Empty;
     }
 
     public static string BuildInfo(string version, string configHash)

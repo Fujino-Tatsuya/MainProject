@@ -132,7 +132,7 @@ public sealed class DemoSessionDirector : MonoBehaviour
     {
         // 첫 시도도 대기 씬에서 한다 — 타이틀 위에서 접속을 기다리지 않는다. 호스트는 곧바로 NGO 로 로비를 Single 로드한다.
         _begun = true;
-        _bootTime = Time.realtimeSinceStartup; // "설정 파일 없음" 3초 안내는 타이틀 뒤부터 센다
+        _bootTime = Time.realtimeSinceStartup; // 부팅 안내(설정 파일 없음·role 자동 판정) 3초는 타이틀 뒤부터 센다
         _waitingForWaitScene = true;
         SceneManager.LoadScene(waitSceneName, LoadSceneMode.Single);
     }
@@ -341,6 +341,13 @@ public sealed class DemoSessionDirector : MonoBehaviour
             $"path={DemoConnectionConfig.ResolvePath(Application.dataPath)} missing={_loadResult.IsFileMissing} " +
             $"role={_config.Role} host={_config.HostAddress}:{_config.Port} playerId={_config.PlayerId} " +
             $"retry={_config.RetryIntervalSeconds}s connect={_config.ConnectTimeoutSeconds}s disconnect={_config.DisconnectTimeoutSeconds}s");
+        if (_config.AutoRole.HasValue)
+        {
+            var auto = _config.AutoRole.Value;
+            var line = $"{DemoConnectionOverlayText.AutoRoleText(auto)} basis={auto.Basis} local=[{string.Join(", ", auto.LocalAddresses)}]";
+            Debug.Log($"[DemoSession] role {line}", this);
+            NetworkDiagnosticsLog.Log($"{DiagTag}.AutoRole", line);
+        }
         foreach (var issue in _loadResult.Issues)
         {
             Debug.LogWarning($"[DemoSession] 설정 파일: {issue}", this);
@@ -367,8 +374,9 @@ public sealed class DemoSessionDirector : MonoBehaviour
         else
             _overlay.SetStatus(showStatus, showStatus ? DemoConnectionOverlayText.BuildStatus(BuildOverlayModel()) : string.Empty);
 
-        var showNotice = DemoConnectionOverlayText.ShouldShowConfigMissing(_loadResult.IsFileMissing, Time.realtimeSinceStartup - _bootTime);
-        _overlay.SetNotice(showNotice, showNotice ? DemoConnectUiStrings.ConfigMissing.Text : string.Empty);
+        var inNoticeWindow = DemoConnectionOverlayText.ShouldShowBootNotice(true, Time.realtimeSinceStartup - _bootTime);
+        var notice = inNoticeWindow ? DemoConnectionOverlayText.BootNotice(_loadResult.IsFileMissing, _config.AutoRole) : string.Empty;
+        _overlay.SetNotice(notice.Length > 0, notice);
     }
 
     private DemoConnectionOverlayModel BuildOverlayModel()
@@ -382,6 +390,7 @@ public sealed class DemoSessionDirector : MonoBehaviour
             _loop.SecondsUntilRetry(Now),
             _loop.LastReason,
             Application.version,
-            _lastConfigHash);
+            _lastConfigHash,
+            _config.AutoRole);
     }
 }

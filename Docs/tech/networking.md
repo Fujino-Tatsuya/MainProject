@@ -21,7 +21,7 @@
 
 ### Connection config (`demo-connection.json`)
 - Location: `Path.GetDirectoryName(Application.dataPath)/demo-connection.json` — next to the exe in builds, project root in the Editor.
-- Fields: `role` (`host` / `client`), `hostAddress`, `port`, `playerId` (stable player ID), retry interval / connect timeout / disconnect timeout seconds.
+- Fields: `role` (`auto` — default when empty/missing — / `host` / `client`; auto = host if one of this PC's IPv4 equals `hostAddress` or it is loopback/empty, else client to `hostAddress`; explicit host/client wins, MPPM `Client` tag still overrides — 할 일 72), `hostAddress`, `port`, `playerId` (stable player ID), retry interval / connect timeout / disconnect timeout seconds.
 - Missing file → `host` · `127.0.0.1` · `7777`, and a 3-second notice "설정 파일 없음 — 호스트 모드".
 - The Host starts hosting on boot; Clients connect automatically. No connection buttons.
 - Clients run an **auto-connect / auto-reconnect loop**. While waiting or after a drop they sit in the local scene `6.DemoConnectScene` with the "호스트 대기 중" overlay.

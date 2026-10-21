@@ -7,17 +7,21 @@ using System.IO;
 /// 원본은 레포 루트 <c>BuildSamples/</c>(Assets 밖 — Unity 가 임포트하지 않는다).
 /// <para>
 /// 실제 파일명(<see cref="DemoConnectionConfig.FileName"/>)으로는 복사하지 않는다. 그 이름이면 빌드의 기본 동작
-/// (파일 없음 → 호스트, Q5)이 바뀐다. 운영자가 PC 마다 샘플 하나를 <c>demo-connection.json</c> 으로 이름을 바꿔 쓴다.
+/// (파일 없음 → 호스트, Q5)이 바뀐다. 운영자가 공용 샘플(<see cref="AutoSampleFileName"/>)의 hostAddress 를 호스트 PC IP 로 고쳐
+/// <c>demo-connection.json</c> 으로 이름을 바꾸고, 그 빌드 폴더를 모든 PC 에 그대로 복사한다.
 /// </para>
 /// </summary>
 public static class DemoConnectionSamples
 {
     /// <summary>레포 루트 기준 샘플 폴더.</summary>
     public const string SourceFolderName = "BuildSamples";
+    /// <summary>모든 PC 공용 — role auto(이 PC IP = hostAddress 면 호스트, 아니면 클라). 운영 기본(할 일 72).</summary>
+    public const string AutoSampleFileName = "demo-connection.sample.json";
+    /// <summary>role 명시 샘플 — 자동 판정이 맞지 않을 때만(예: 호스트가 NAT·포트포워딩 뒤라 hostAddress 가 자기 NIC 에 없음).</summary>
     public const string HostSampleFileName = "demo-connection.host.sample.json";
     public const string ClientSampleFileName = "demo-connection.client.sample.json";
 
-    public static readonly IReadOnlyList<string> SampleFileNames = new[] { HostSampleFileName, ClientSampleFileName };
+    public static readonly IReadOnlyList<string> SampleFileNames = new[] { AutoSampleFileName, HostSampleFileName, ClientSampleFileName };
 
     /// <summary><c>Path.GetDirectoryName(Application.dataPath)</c>(프로젝트 루트) 아래 샘플 폴더.</summary>
     public static string ResolveSourceDirectory(string projectRoot)
