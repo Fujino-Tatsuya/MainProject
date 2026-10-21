@@ -66,7 +66,7 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 | 연결 끊김 — 정리 중 | 접속 중 끊김. 곧 재시도로 넘어간다 |
 | 자동: 호스트 (… 일치) / 자동: 클라 (이 PC 에 … 없음) | `role` auto 판정 근거(§2). 호스트 PC 인데 "클라" 면 `hostAddress` 가 그 PC IP 와 다르다 — `ipconfig` 로 확인 |
 
-- 문구 원본: [DemoConnectionOverlayText.cs](../../Assets/1.Scripts/Network/Session/DemoConnectionOverlayText.cs) · [DemoJoinRejectReason.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRejectReason.cs). 판단: [DemoSessionRules.cs](../../Assets/1.Scripts/Network/Session/DemoSessionRules.cs) · [DemoJoinRule.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRule.cs).
+- 문구 키·원본: §8. 판단: [DemoSessionRules.cs](../../Assets/1.Scripts/Network/Session/DemoSessionRules.cs) · [DemoJoinRule.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRule.cs).
 
 ## 5. 재접속
 - **판 도중 재합류:** 판 시작 때 있던 PC(`playerId`)가 끊기면 대기 화면에서 계속 재시도하다 **그 판으로 다시 들어간다**. 맵 첫 스폰 지점에 나오고, 보스 룸이면 네 모서리 중 다른 플레이어·보스에서 가장 먼 곳에 나온다.
@@ -93,3 +93,21 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 - 해시는 대기 화면에서만 보인다(§3).
 - 무입력 리셋·스태프 키·코스 스킵·전멸 상한·관람객 디버그 키 차단은 범위 밖(별도 작업). 디버그 단축키(`DEV_HOTKEYS`)는 빌드에 들어 있다 — [debug-hotkeys.md](debug-hotkeys.md).
 - Unity Relay 는 쓰지 않는다. **유선 직접 IPv4 만.**
+
+## 8. 화면 문구 키 (Strings)
+> 문구 원본 = `GameData.xlsx`(SVN) **Strings 시트** ko·en. 키·ko 폴백은 아래 코드 파일 한 곳이고 `UiStrings.All` 이 모은다 — 규칙 [localization.md](localization.md) §6·§8.
+> 시트에 행이 없으면 화면은 코드 ko 폴백이다(`#키` 가 안 나온다). 기준 2026-10-22(할 일 48 후속).
+
+| 접두사 | 개수 | 쓰는 곳 | 키 원본 |
+|---|---|---|---|
+| `UI.Lobby.*` | 7 | 로비 상호작용 프롬프트(`InteractReady`·`InteractUnready`·`InteractCharacterSelect`) · 준비 `ReadyCount` · 카운트다운 `Countdown`·`CountdownStarting` · 지난 판 결과 버튼 `ShowLastResult` | [LobbyUiStrings.cs](../../Assets/1.Scripts/Lobby/LobbyUiStrings.cs) · `ShowLastResult` 만 [UiStrings.cs](../../Assets/1.Scripts/Localization/UiStrings.cs) |
+| `UI.CharacterSelect.*` | 4 | 캐릭터 선택 패널 `LockedNotice`·`CurrentTag`·`Unavailable`·`Hint` | [CharacterSelectUiStrings.cs](../../Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs) |
+| `UI.DemoConnect.*` | 20 | 대기 화면(§4) — 제목·주소·진행 9 + 재합류 `RejoinWaiting`·`JoiningMatch` + 자동 판정 3 + **거절 사유 7**(`GameInProgress`·`LobbyFull`·`HashMismatch`·`Timeout`·`DuplicatePlayerId`·`InvalidPlayerId`·`UnknownReason`) | [DemoConnectionOverlayText.cs](../../Assets/1.Scripts/Network/Session/DemoConnectionOverlayText.cs)(`DemoConnectUiStrings`) — 사유 → 키는 [DemoJoinRejectReason.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRejectReason.cs) |
+| `UI.LobbyResult.*` | 10 | 결과 패널 정적 라벨 `Title`·`PlayTimeLabel`·`Close`·`Header.Rank/Player/Damage/Healing/Counters/DamageTaken/Deaths`(프리팹 `LocalizedText`) | [LobbyResultUiStrings.cs](../../Assets/1.Scripts/UI/LobbyResult/LobbyResultUiStrings.cs) |
+| `UI.Result.*` | 10 | 결과 라벨 CLEAR/FAILED/ABORTED 등 — 5.ResultScene 과 공용(이미 ko·en 있음) | [UiStrings.cs](../../Assets/1.Scripts/Localization/UiStrings.cs) |
+
+- 🔸 거절 사유 7키·`UI.LobbyResult.*` 10키는 2026-10-22 새로 뺐다(예전엔 코드·프리팹 하드코딩). `LobbyFull` 은 `{max}` 자리표시자(= 3).
+- 결과 패널 열 제목은 5.ResultScene 열 제목(`UI.Result.Damage` 등)과 문구가 달라(`가한피해`·`간파 성공`) 키를 나눴다.
+- 로비·네트워크 **오류**(`LOBBY_*`·`NET_*`)는 Strings 가 아니라 ErrorCodes 시트 — [localization.md §7](localization.md#7-l4--로비네트워크-오류-코드).
+- 번역하지 않는 것: 설정 파일 경고(`DemoConnectionConfig` issues — 로그 전용), 서버 거부 사유(로그 전용), 키 기호 `F`.
+- en 추천 번역·행 상태표: `C:/UnityProject/_lane-artifacts/MainProject-WorkTree/48-strings/strings-rows-to-add.tsv`(xlsx 반영 전 초안).
