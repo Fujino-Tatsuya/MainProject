@@ -302,15 +302,18 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // ─── 콤보 시작 전 차징(경석 10-20 — 점프·점프·점프) — 서버 전용 ───
     float _comboWindupNext;   // StartRouletteCombo 가 세운 첫 타 앞 차징 — 다음 StartAttack 이 소비
     float _comboWindup;       // 지금 공격(점프)이 시작 전에 틀 차징 길이. 0 = 없음
+    float _comboWindupStartNext;   // 차징 클립 시작 지점(정규화) — 콤보 행 windupStartNormalized
+    float _comboWindupStart;
 
     void BeginComboWindup()
     {
         float t = _comboWindup;
         _comboWindup = 0f;
         BossAttackEntry charge = AttackEntryOf(BossAttackId.ChargeSequence);
+        // 차징 클립을 콤보 행 windupStartNormalized 지점부터(경석 10-21: 첫 프레임이 아니라 팔을 모으는 중간부터).
         if (charge != null && !string.IsNullOrEmpty(charge.animatorStateName))
-            CrossFadeStateClientRpc(charge.animatorStateName);
-        Debug.Log($"[23호/콤보] 시작 전 차징 {t:0.##}초", this);
+            CrossFadeStateAtClientRpc(charge.animatorStateName, _comboWindupStart);
+        Debug.Log($"[23호/콤보] 시작 전 차징 {t:0.##}초 (클립 {_comboWindupStart:0.##} 부터)", this);
         EnterPhase(BossAttackPhase.ComboWindup, t);
     }
 
@@ -1136,6 +1139,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             if (CurrentPhase < e.allowedFromPhase) continue;
             // 단타 훅·어퍼 끔(경석 10-19) — 콤보로만 나온다. 콤보 첫 타 판정(CollectComboCandidates)은 행 가중치를 안 보므로 영향 없다.
             if (!_boss.singleHookUpper && BossComboPolicy.IsHookOrUpper(e.attackId)) continue;
+            // 단타 점프 끔(경석 10-21) — 점프는 콤보로만. 같은 이유로 콤보 첫 타 판정에는 영향 없다.
+            if (!_boss.singleJump && e.attackId == BossAttackId.Jump) continue;
 
             // 🔴 상한은 저작값이 아니라 **개시 상한**이다 — 접촉 공격은 attackRange 안까지 걸어
             //    들어간 뒤에만 시작한다(허공 훅 차단). 붙은 뒤에는 저작값까지 계속 때린다.
@@ -1418,6 +1423,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _comboLock = Target;
         _comboLastUsed[k] = Time.time;
         _comboWindupNext = c.steps[0].attack == BossAttackId.Jump ? Mathf.Max(0f, c.windup) : 0f;   // 첫 타 앞 차징
+        _comboWindupStartNext = Mathf.Clamp01(c.windupStartNormalized);
         _fightCombosStarted++;
         Debug.Log($"[23호/콤보] {c.name} 시작 — {c.steps[0].attack} (대상 {(Target != null ? Target.name : "없음")})", this);
         return slot;
@@ -1511,6 +1517,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _chainArmed = false;
         _comboLandingCounterNext = 0f;
         _comboWindupNext = 0f;
+        _comboWindupStartNext = 0f;
         _combo = null;
         _comboIndex = 0;
         _comboIsOpening = false;
@@ -1533,7 +1540,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _landingCounterWindow = _comboLandingCounterNext;   // 콤보 타가 아니면 0(ClearCombo·소비 후 0)
         _comboLandingCounterNext = 0f;
         _comboWindup = e != null && e.attackId == BossAttackId.Jump ? _comboWindupNext : 0f;   // 콤보 첫 타 앞 차징
+        _comboWindupStart = _comboWindupStartNext;
         _comboWindupNext = 0f;
+        _comboWindupStartNext = 0f;
         _landingCounterCloseAt = -1f;
 
         // 연속 카운트는 "실제로 쓴 것" 기준으로 센다(SelectAttackSlot 은 NoAttack 을 돌릴 수 있다).
@@ -4632,6 +4641,17 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // 임의의 상태명을 전 피어에 CrossFade 한다(관용구 2 — 다지선다 애니는 상태 복제로 못 싣는다).
     [ClientRpc]
     void CrossFadeStateClientRpc(string stateName) => SafeCrossFade(stateName);
+
+    /// <summary>상태를 클립의 <paramref name="normalizedStart"/> 지점부터 CrossFade(0.1초 고정) — 점프×3 앞 차징처럼 중간 자세부터 틀 때.</summary>
+    [ClientRpc]
+    void CrossFadeStateAtClientRpc(string stateName, float normalizedStart)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrEmpty(stateName)) return;
+        int hash = Animator.StringToHash(stateName);
+        if (!animator.HasState(0, hash)) return;
+        // CrossFade 의 4번째 인자는 **정규화** 시작 지점이다(CrossFadeInFixedTime 은 초 단위라 쓰지 않는다).
+        animator.CrossFade(hash, 0.1f, 0, Mathf.Clamp01(normalizedStart));
+    }
 
     void TickCharge()
     {

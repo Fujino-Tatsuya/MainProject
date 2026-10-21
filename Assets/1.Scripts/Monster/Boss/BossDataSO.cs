@@ -296,6 +296,10 @@ public class BossDataSO : MonsterDataSO
              "xlsx 가중치와 무관하게 적용된다(가중치 칸은 xlsx 가 덮어쓴다). 🔴 콤보가 없는 1인 Solo 는 켜 둘 것 — 끄면 근접 공격이 사라진다.")]
     [DataTableIgnore] public bool singleHookUpper = true;
 
+    [Tooltip("점프어택을 **단타로**도 쓰는가. 끄면 룰렛에서 단타 점프가 빠지고 콤보(점프·돌진 · 점프·점프·점프)로만 나온다(경석 10-21).\n" +
+             "xlsx 가중치와 무관. 원거리 압박도 단타 점프는 안 고른다(돌진만). 차징 진입 점프·③ 1인 각본 점프와는 무관.")]
+    [DataTableIgnore] public bool singleJump = true;
+
     [Tooltip("즉시 연결 콤보에서 점프 다음 타가 있을 때 착지 후딜(초). 착지 히트 순간 착지 클립을 끊고 이 시간 뒤 다음 타. 단타 점프는 jumpRecoveryDuration.")]
     [DataTableIgnore] [Min(0f)] public float comboJumpRecovery = 0f;
 

@@ -380,6 +380,7 @@ MonoBehaviour:
       landingCounterWindow: 0.8
     chainOnHit: 1
     windup: 1
+    windupStartNormalized: 0.4
   openingCombo: 010000000000000005000000
   comboStepInterval: 0.3
   comboChaseGrace: 1
@@ -389,6 +390,7 @@ MonoBehaviour:
   comboGrabTelegraphAfterDash: 1
   comboHookFollowThrough: 0.3
   singleHookUpper: 0
+  singleJump: 0
   comboJumpRecovery: 0
   comboDashRecovery: 0.3
   hookTelegraphMarkers: 0

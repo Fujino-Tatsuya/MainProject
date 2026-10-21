@@ -112,6 +112,7 @@ public static class MonsterInspectorCatalog
         (Combos, "comboGrabTelegraphAfterDash", "즉시 연결 — 돌진 다음 잡기 예고"),
         (Combos, "comboHookFollowThrough", "즉시 연결 — 훅·어퍼 히트 뒤 더 재생"),
         (Combos, "singleHookUpper", "훅·어퍼 단타 사용"),
+        (Combos, "singleJump", "점프어택 단타 사용"),
         (Combos, "comboJumpRecovery", "즉시 연결 — 점프 뒤 착지 후딜"),
         (Combos, "comboDashRecovery", "즉시 연결 — 돌진 뒤 복귀"),
         (Combos, "hookTelegraphMarkers", "훅·어퍼 바닥 예고 표시"),
