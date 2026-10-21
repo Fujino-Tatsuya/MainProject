@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4238773910711080463}
   - component: {fileID: 2110411441399445073}
   - component: {fileID: 7335009774728139487}
+  - component: {fileID: 1251342527762222460}
   m_Layer: 7
   m_Name: PF_Room_DoorSingle_01_v003
   m_TagString: Untagged
@@ -113,3 +114,24 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -7299640482258060938, guid: d7fd1ad01c3cbf844bb66935e6bc88f7, type: 3}
+--- !u!114 &1251342527762222460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3394664053403810221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eff6261d96cb157489a74369292819e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyProximityDoor
+  leaf: {fileID: 0}
+  centerOffset: {x: -0.63, y: 0, z: -0.08}
+  frontFaceZ: 0.06
+  backFaceZ: -0.22
+  openRadius: 1.8
+  closeRadius: 2.6
+  openAngle: 90
+  openSeconds: 0.35
+  closeSeconds: 0.5
