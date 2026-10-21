@@ -13,7 +13,7 @@
 > Scene flow details: [SceneFlow.md](../design/SceneFlow.md#-target-flow--lobby-demo-2026-10-19-implementation-in-progress).
 
 ### Flow
-- `Bootstrap → 3.LobbyScene → 4.MapScene → 3.LobbyScene → …` with the session kept alive. No `Shutdown` per game. Title is skipped.
+- `Bootstrap → 1.TitleScene (START) → 6.DemoConnectScene → 3.LobbyScene → 4.MapScene → 3.LobbyScene → …` with the session kept alive. No `Shutdown` per game. Host and client both pass the title once at boot (task 70, 2026-10-21); returning to the lobby and reconnect waits never go back to the title.
 - `3.LobbyScene` is a walkable **NGO scene**. `5.ResultScene` is removed; results open as a lobby result panel only after returning from 4.MapScene.
 - All transitions are host-driven `NetworkManager.SceneManager.LoadScene`. Clients never load gameplay scenes locally.
 - Map → Lobby: `GoToResult` captures and broadcasts the result payload → `DespawnDynamicNetworkObjects()` (log remaining count) → `LoadScene("3.LobbyScene", Single)`.
@@ -58,7 +58,7 @@
 - ✅ Implemented in C8 by `LobbySession` (server-written `NetworkList` + countdown `NetworkVariable`, `ToggleReadyServerRpc`/`RequestCharacterServerRpc`) and the pure `LobbyReadyRules`. The old `Lobby.ReadyRequest`/`Lobby.CharacterRequest`/`Lobby.State` named messages are gone. Details: [SceneFlow.md](../design/SceneFlow.md#lobby-rules-target).
 
 ## 연결 흐름 (old / current code)
-> Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is skipped and Result is a lobby panel.
+> Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is shown once at boot (START starts host/auto-join) and Result is a lobby panel.
 
 1. **Title / Lobby / Loading / InGame / Result**
 2. If the Host leaves during InGame, the session ends. The remaining players transition to the Result Scene locally.
