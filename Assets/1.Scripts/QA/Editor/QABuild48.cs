@@ -47,10 +47,16 @@ public static class QABuild48
 
         BuildReport report = null;
         BuildReport mismatchReport = null;
+        BuildSummary summary = default;
+        BuildSummary mismatchSummary = default;
+        bool baseBuilt = false;
+        bool mismatchBuilt = false;
         DataTableBuild.WithTableValues(() =>
         {
             report = BuildPipeline.BuildPlayer(options);
-            if (report.summary.result != BuildResult.Succeeded)
+            summary = report.summary;
+            baseBuilt = true;
+            if (summary.result != BuildResult.Succeeded)
                 return;
 
             Directory.CreateDirectory(Path.GetDirectoryName(MismatchBaseExe));
@@ -59,13 +65,19 @@ public static class QABuild48
             {
                 BuildProtocolMismatch = true;
                 mismatchReport = BuildPipeline.BuildPlayer(options);
+                mismatchSummary = mismatchReport.summary;
+                mismatchBuilt = true;
             }
             finally
             {
                 BuildProtocolMismatch = false;
             }
         });
-        BuildSummary summary = report.summary;
+        if (!baseBuilt)
+        {
+            Debug.LogError("[QA][Build] base BuildReport 를 받지 못했다.");
+            return;
+        }
         string line = $"[QA][Build] result={summary.result} errors={summary.totalErrors} time={summary.totalTime} exe={BaseExe}";
         File.WriteAllText(Path.Combine(ArtifactsRoot, "build-result.txt"), line + Environment.NewLine);
         if (summary.result != BuildResult.Succeeded)
@@ -75,7 +87,11 @@ public static class QABuild48
         }
         Debug.Log(line);
 
-        BuildSummary mismatchSummary = mismatchReport.summary;
+        if (!mismatchBuilt)
+        {
+            Debug.LogError("[QA][Build] mismatch BuildReport 를 받지 못했다.");
+            return;
+        }
         string mismatchLine = $"[QA][Build] mismatch result={mismatchSummary.result} errors={mismatchSummary.totalErrors} " +
                               $"time={mismatchSummary.totalTime} exe={MismatchBaseExe}";
         File.AppendAllText(Path.Combine(ArtifactsRoot, "build-result.txt"), mismatchLine + Environment.NewLine);
