@@ -338,19 +338,21 @@ MonoBehaviour:
   m_GameObject: {fileID: 2289540308195322763}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 225bd2ebaa0aff641bf79e7b748d7129, type: 3}
+  m_Script: {fileID: 11500000, guid: c7288fb85fe14fac928f3bd2411c488a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CollapseDeath
+  m_EditorClassIdentifier: Assembly-CSharp::ExplodeDeath
   ShowTopMostFoldoutHeaderGroup: 1
   partSet: {fileID: 11400000, guid: 982c1eb764d872e48a093880b12eeea8, type: 2}
+  burstHeight: 0
+  explosionScale: 1
+  outwardSpeed: {x: 1.5, y: 2.5}
+  upwardSpeed: {x: 2, y: 3}
+  spinRange: {x: 180, y: 360}
   exitMode: 0
   stylizedDissolveShader: {fileID: 4800000, guid: 2e0fd796f9611bf4f8bdfccb6ef91d91, type: 3}
   dissolveNoise: {fileID: 2800000, guid: 7006c928f27b40a489aa5208bfe5a43f, type: 3}
   dissolveNoiseTiling: 4
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
-  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
-  scatterSpeed: 0.5
-  spinRange: {x: 40, y: 160}
   settleTime: 1.2
   exitDuration: 0.6
   despawnGrace: 0.3

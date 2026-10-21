@@ -81,6 +81,12 @@ public class MonsterCollapseDebris : MonoBehaviour
         public Shader stylizedDissolve;
         public Texture dissolveNoise;
         public float dissolveNoiseTiling;
+
+        // ── 폭발(ExplodeDeath)용 — 전부 비워 두면 위 붕괴와 똑같이 돈다 ──
+        // 바깥 속도 범위(m/s). y > 0 이면 scatterSpeed 대신 이 범위에서 고른다.
+        public Vector2 scatterSpeedRange;
+        // 위로 튀는 속도 범위(m/s). 0 이면 위로 안 튄다(붕괴).
+        public Vector2 upwardSpeedRange;
     }
 
     /// <summary>녹이는 동안 움직일 값 하나. 경로마다 프로퍼티와 방향이 다르다.</summary>
@@ -157,13 +163,19 @@ public class MonsterCollapseDebris : MonoBehaviour
 
             // 🔴 폭발이 아니다. 중력이 일을 하게 두고, 여기서는 "이음매가 풀렸다"는 정도만 준다.
             //    힘을 세게 주면 로봇이 무너지는 게 아니라 터지는 그림이 된다.
-            if (cfg.scatterSpeed > 0f)
+            //    폭발(ExplodeDeath)은 반대로 범위를 직접 주고 위로도 띄운다 — 그쪽이 의도한 "터지는 그림"이다.
+            float speed = cfg.scatterSpeedRange.y > 0f
+                ? Random.Range(cfg.scatterSpeedRange.x, cfg.scatterSpeedRange.y)
+                : cfg.scatterSpeed * Random.Range(0.5f, 1f);
+            if (speed > 0f)
             {
                 Vector3 outward = piece.transform.position - go.transform.position;
                 outward.y = 0f;
                 Vector3 dir = outward.sqrMagnitude > 1e-4f ? outward.normalized : Random.onUnitSphere;
-                rb.linearVelocity = dir * (cfg.scatterSpeed * Random.Range(0.5f, 1f));
+                rb.linearVelocity = dir * speed;
             }
+            if (cfg.upwardSpeedRange.y > 0f)
+                rb.linearVelocity += Vector3.up * Random.Range(cfg.upwardSpeedRange.x, cfg.upwardSpeedRange.y);
 
             rb.angularVelocity = Random.onUnitSphere
                                  * (Random.Range(cfg.spinRange.x, cfg.spinRange.y) * Mathf.Deg2Rad);

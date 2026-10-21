@@ -18,6 +18,47 @@
 ## 수용·검증
 - 동일 인스턴스 재사용, 반복 Lock/Cancel/Impact 후 풀/Animator/PlayableGraph 수 불변, 예열 뒤 첫 Lock 생성 0, 두 번째 예열 무동작, Reset 뒤 재실행을 EditMode로 검증한다.
 - Unity MCP로 Refresh→컴파일 0→전체 EditMode 0 실패→57.3 측정 메뉴 순서. Play 진입은 금지하고 문서 §9.4/9.5/9.9~9.11 및 외부 산출물 `57.3/`을 갱신한다.
+# ▶▶▶ 계획 = **잡몹 5종 + 엘리트 3종 폭발 사망 — ExplodeDeath(조각이 위·바깥으로 튐) + FX_Death_Explosion_01/02 (디졸브 파티클 없음)** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-21). 대상 = `ChompBot`·`HumanoidBot`·`MortarBot`·`PeekABot`·`TeslaBot`. ~~`GauntletBot`·`SpinnerBot`·`WallBot` 은 지금 붕괴 그대로.~~ → **2차(10-21 민경 요청): 엘리트 3종도 폭발** — 아래 「2차」.
+
+## 사실
+- 지금 사망 = `CollapseDeath`(`1.Scripts/Monster/Collapse/`, 민경 작성 10-06) — `MonsterBase` 가 사망 클립 끝 − `leadBeforeClipEnd`(0.1초)에 서버에서 `IDeathEffect.Play` → Reliable RPC 로 전 피어가 로컬 재생. 몬스터는 `GetComponent<IDeathEffect>()` 로 **하나만** 집는다.
+- 조각 = `MonsterCollapseDebris.Spawn`(본 단위 조각 + Rigidbody). 처음 속도는 **수평 바깥 0.5m/s 뿐**(위로 0), 1.2초 굴러다닌 뒤 0.6초 디졸브 → 조각 루트 `Destroy`.
+- 파티클 `FX_Dissolve_Death`(수명 2초, 엔트리·카탈로그 없음)는 지금 **붕괴 시작 때** 조각 루트의 자식으로 생긴다 → 디졸브 시작 때 같은 방식으로 내면 0.6초 만에 루트와 함께 잘린다.
+- `FX_Death_Explosion_01`(MyProject `Export/Monsters/Death/`) = 파티클 4개, 1초, 루프 아님. 의존: `Mat_fx_HCFX_Circle_01`·`Mat_fx_HCFX_Sharp_01`·`Fbx_fx_Round_01` 은 MainProject 에 있음, **`Mat_fx_HCFX_Dust_02.mat` + `Tex_fx_HCFX_Dust_02.tga` 신규**(셰이더 `HCFX_Particle2ndColor` 는 있음).
+- 5종 프리팹의 `CollapseDeath` 를 덮어쓰는 씬·존 프리팹 오버라이드 없음. `MonsterCollapseSetup`(에디터 도구)은 재실행하면 `CollapseDeath` 를 다시 붙인다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방식(Q1-b) | 새 컴포넌트 `1.Scripts/Monster/Collapse/ExplodeDeath.cs`(NetworkBehaviour, `IDeathEffect`) — `CollapseDeath` 와 같은 RPC·타이밍 구조. 5종은 `CollapseDeath` 를 떼고 `ExplodeDeath` 를 붙인다(공통 칸 값은 그대로 옮김). `CollapseDeath` 코드는 무변경 |
+| 조각 공유(Q7-a) | `MonsterCollapseDebris.Config` 에 **추가만**: 바깥 속도 범위 · 위로 튀는 속도 범위(사라지기 시작 콜백은 3차에서 뺌. 구현 때 "퍼지는 중심 높이"는 뺌 — 바깥 방향이 수평이라 높이와 무관, 높이는 이펙트 위치에만 씀). 기본값 0/null = 지금과 똑같음(붕괴 3종 무영향) |
+| 타이밍(Q2-a) | 지금처럼 사망 클립 끝 0.1초 전(`leadBeforeClipEnd`·`delayAfterClipEnd` 그대로) |
+| 세기(Q3-a, Q11) | 바깥 1.5~2.5m/s · 위로 2~3m/s · 회전 180~360도/초, 사방 고르게(타격 방향 안 실음). 인스펙터 조정 |
+| 폭발 이펙트(Q4-a) | `50.Art/VFX/Common/Monsters/Death/FX_Death_Explosion_01.prefab`(같은 guid) + `_Entry`(원샷) → 카탈로그 `몬스터` 묶음 `Mob_Death_Explosion`. 조각이 터지는 순간 `EffectManager.Play`(전 피어 로컬) |
+| 위치·크기(Q5-a) | 몬스터마다 `burstHeight`(이펙트 위치, 루트 + 위로) · `explosionScale`. **`burstHeight` 0 = 터지는 순간 몸 렌더러 경계 중심(자동)** — 5종 콜라이더가 모두 기본값(2m 캡슐)이라 오프라인 계산 근거가 없어 런타임 자동으로 대체. 배율은 1로 두고 Play 에서 조정 |
+| 디졸브 파티클(Q4·Q8-a·Q9-a) | ❌ **3차(10-21 민경)에서 뺌** — 폭발 때 디졸브 파티클 없음. 엔트리·카탈로그 `Mob_Death_Dissolve`·콜백 삭제. (원래: 조각이 디졸브를 시작할 때 조각들의 평균 위치에서 `FX_Dissolve_Death` 1회. 새 `FX_Dissolve_Death_Entry`(같은 폴더 `Common/Dissolve/`) → 카탈로그 `Mob_Death_Dissolve`, `EffectManager.Play` — 조각 루트와 따로 살아 잘리지 않음. 5종의 `particlePrefab` 직접 생성은 안 씀) |
+| 정리 시간(Q6-a) | 굴러다님 1.2초 · 디졸브 0.6초 그대로 |
+| 도구 가드(Q10) | `MonsterCollapseSetup` 이 `ExplodeDeath` 가 있는 프리팹은 건너뜀 |
+| 신규 아트 | `Mat_fx_HCFX_Dust_02.mat` → `_Materials/`, `Tex_fx_HCFX_Dust_02.tga` → `Textures/`. 🔴 SVN add(프리팹·엔트리 포함) |
+| 공유 | 몬스터 프리팹은 경석 영역 → 짧은 handoff(`Docs/tech/handoff-monster-explode-death.md`) |
+
+## 2차 — 엘리트 3종(GauntletBot·SpinnerBot·WallBot) (10-21 민경 요청 · ✅ 구현 — dotnet 빌드 오류 0 · ⏳ Play)
+| 항목 | 결정 |
+|---|---|
+| 컴포넌트 | 셋 다 `CollapseDeath` → `ExplodeDeath`(같은 자리, 공통 칸 그대로). 이제 `CollapseDeath` 를 쓰는 프리팹은 없다(코드는 남김) |
+| 세기 | **중간**: 바깥 3~5m/s · 위로 3~5m/s · 회전 360~720도/초 |
+| 폭발 이펙트 | MyProject `Export/Monsters/Death/FX_Death_Explosion_02.prefab` → `50.Art/VFX/Common/Monsters/Death/`(같은 guid) + `_Entry`(prewarm 2). 의존 신규 3(`Mat_fx_HCFX_Glow_Long_01_add`·`Mat_fx_HCFX_Impact_01_add` → `_Materials/`, `Tex_fx_HCFX_Glow_Long_01.tga` → `Textures/`). 🔴 SVN add |
+| 고르기 | `ExplodeDeath.explosionEffect`(EffectEntry) 신설 — 비우면 카탈로그 `Mob_Death_Explosion`(잡몹 5종은 비움), 엘리트 3종은 `FX_Death_Explosion_02_Entry`. 카탈로그에 `Mob_Death_Explosion_Elite`(prewarm 등록) |
+| 그대로 | 위치 자동(`burstHeight` 0) · 배율 1 · 정리 시간 · 타이밍 |
+
+## 변경 파일
+- 신규: `ExplodeDeath.cs` · `FX_Death_Explosion_01.prefab`·`_Entry` · Dust_02 재질·텍스처 · handoff
+- `MonsterCollapseDebris.cs`(Config 추가) · `MonsterCollapseSetup.cs`(가드 1줄) · `EffectCatalog.cs`·`.asset` · 5종 몬스터 프리팹 · CONTEXT
+
+## 검증
+- dotnet 빌드 오류 0 · guid·내부 참조 누락 0 · 붕괴 3종 프리팹 무변경. ⏳ 민경 Play/MPPM: 5종 처치 → 휘청 → 조각이 위·바깥으로 튀며 폭발 이펙트 → 1.2초 뒤 디졸브(파티클 없음), 호스트·클라 둘 다 · 붕괴 3종은 기존과 같음.
 
 ---
 
