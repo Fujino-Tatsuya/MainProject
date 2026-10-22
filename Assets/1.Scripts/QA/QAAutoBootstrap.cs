@@ -39,6 +39,8 @@ public static class QAAutoBootstrap
         Object.DontDestroyOnLoad(go);
         // 할 일 88 — 원격 지연 파일(MPPM 클론 루트에만 생김)을 읽어 이 인스턴스 트랜스포트에 지연을 건다. 파일이 없으면 아무것도 안 한다.
         go.AddComponent<QANetSim88>();
+        // 할 일 88 Q4 — 부팅은 항상 타이틀을 거친다(할 일 70). 모든 모드 공통으로 타이틀 START 를 인스턴스당 1회 대신 부른다.
+        go.AddComponent<QATitleStartKick>();
 
         // 할 일 48 시나리오 모드 — 접속은 DemoSessionDirector 에 맡기고 시나리오 스크립트가 입력을 넣는다(휴리스틱 에이전트 없음).
         string scenarios = QASettings.Scenarios;
