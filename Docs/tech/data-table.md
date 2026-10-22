@@ -32,6 +32,7 @@ GameData.xlsx (SVN, 잠금)
 | `Boss` | 23호(`BossDataSO`) |
 | `Sound` | 문자열 키별 사운드(`SoundCatalog`) — 재생 수치 + 엔티티 구성(라이브러리·클립·재생 모드). 구성은 `Tools/Data/사운드 동기화` 로 반영(§6 사운드 키) |
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
+| `SuppressHaste` | 제압 가속 버프(할 일 91, `SuppressHasteData` — `Assets/Resources/Player/`) · 배율 3개(`moveSpeedMultiplier`·`attackSpeedMultiplier`·`cooldownRateMultiplier`) · `durationOverride`(0 = 이번 제압 길이) · 비네팅 페이드 `vignetteFadeIn`/`vignetteFadeOut`. [handoff-suppress-haste.md](handoff-suppress-haste.md) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
 | `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |
