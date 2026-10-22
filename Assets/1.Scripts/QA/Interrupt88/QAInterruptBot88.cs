@@ -60,6 +60,13 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private static readonly FieldInfo CounterVisualField =
         typeof(MonsterBase).GetField("_counterVisual", BindingFlags.Instance | BindingFlags.NonPublic);
 
+    // 넉백 관측(읽기만) — 넉백은 오너에게만 ClientRpc 로 와서 LinearKnockback._isKnockbacking 이 오너 쪽에서 켜진다.
+    private static readonly FieldInfo KnockbackingField =
+        typeof(LinearKnockback).GetField("_isKnockbacking", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    /// <summary>누름 직전 이 시간(초) 안 또는 창이 열린 뒤에 넉백이 시작됐으면 누름 줄 <c>knockedBack=true</c>.</summary>
+    private const double KnockbackRecentSeconds = 1.5;
+
     // 낭떠러지 검사 바닥 — 보행면(Ground)·Default·Env. 클라엔 NavMesh 가 없어(MapNavMeshBaker 는 서버만 굽는다) 직선 접근이 틈에 떨어졌다(스모크 4차).
     private static readonly int GroundMask = LayerMask.GetMask("Default", "Ground", "Env");
 
@@ -95,6 +102,12 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private int _attacksSeen;
     private int _edgeBlocks;
     private bool _edgeBlocked;
+
+    // 넉백 진단 — 오너 쪽 넉백 시작 엣지.
+    private LinearKnockback _myKnockback;
+    private bool _wasKnockbacking;
+    private double _lastKnockbackAt = -1.0;
+    private int _knockbacks;
 
     public bool IsRunning => _active;
     public bool IsDone { get; private set; }
@@ -132,6 +145,10 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         _lastOpenSeenAt = -1.0;
         _attacksSeen = _edgeBlocks = 0;
         _edgeBlocked = false;
+        _myKnockback = null;
+        _wasKnockbacking = false;
+        _lastKnockbackAt = -1.0;
+        _knockbacks = 0;
         _lastAirborneSeenAt = -1.0;
         _windowCounts = false;
         _active = _input != null;
@@ -170,6 +187,7 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Approach(me);
 
         double now = Time.realtimeSinceStartupAsDouble;
+        TrackKnockback(me, now);
         if (_bodyCollider != null && !_bodyCollider.enabled)
             _lastAirborneSeenAt = now;
         bool open = IsWindowOpen();
@@ -203,7 +221,7 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Debug.Log($"{Tag} event=bot_diag kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} target={QAInterruptLag88Plan.LogToken(_target.name)} " +
                   $"observe={observe} open={(open ? "true" : "false")} windows={Windows} lastOpenAgoS={lastOpen} attempts={Attempts} " +
                   $"dist={Fmt(QAPartyPlacement88.HorizontalDistance(mine, boss))} dy={Fmt(mine.y - boss.y)} " +
-                  $"bossState={_target.State} attacksSeen={_attacksSeen} aggroId={_target.AggroTargetId} " +
+                  $"bossState={_target.State} attacksSeen={_attacksSeen} aggroId={_target.AggroTargetId} {TargetDiag(me)} knockbacks={_knockbacks} " +
                   $"edgeBlocked={(_edgeBlocked ? "true" : "false")} edgeBlocks={_edgeBlocks} " +
                   $"myPos={Fmt(mine)} bossPos={Fmt(boss)}");
     }
@@ -380,7 +398,7 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private void Press(double now, bool openNow)
     {
         _pending = false;
-        string aimDiag = AimDiag(_input.Target);   // 시전 전(스냅 회전 전) — 누를 때 바라보던 방향
+        string aimDiag = AimDiag(_input.Target) + " " + TargetDiag(_input.Target) + " " + KnockbackDiag(now);   // 시전 전(스냅 회전 전) — 누를 때 바라보던 방향
         string reason = _input.SkillBlockReason(PlayerSkillSlot.Interrupt);
         bool cast = reason == null && (_cfg.AimAtTarget
             ? _input.UseSkillToward(PlayerSkillSlot.Interrupt, _target)
@@ -465,7 +483,51 @@ public sealed class QAInterruptBot88 : MonoBehaviour
                $"hurtOn={(_hurtCollider != null && _hurtCollider.enabled ? "true" : "false")}";
     }
 
-    private static string Fmt(double v) => double.IsNaN(v) ? "na" : v.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+    /// <summary>
+    /// 봇이 지금 대상의 공격 대상인가 — 서버가 복제하는 <see cref="MonsterBase.AggroTargetId"/>(Chase·Attack 동안만 값, 그 밖 0)와 내 NetworkObjectId 비교.
+    /// 23호 점프×3 은 콤보 시작 순간의 어그로 대상에 고정된다(<c>_comboLock</c>) — 착지 창에서 <c>isTarget=true</c> 면 그 점프의 대상이다.
+    /// </summary>
+    private string TargetDiag(Player me)
+    {
+        if (me == null || _target == null)
+            return "isTarget=na";
+        ulong aggro = _target.AggroTargetId;
+        string isTarget = aggro == MonsterAggroTargetRule.NoTarget ? "na" : aggro == me.NetworkObjectId ? "true" : "false";
+        return $"isTarget={isTarget} myObjId={me.NetworkObjectId}";
+    }
+
+    /// <summary>오너 쪽 넉백 시작 엣지를 센다(<see cref="LinearKnockback"/> 비공개 상태 읽기만).</summary>
+    private void TrackKnockback(Player me, double now)
+    {
+        if (_myKnockback == null)
+            _myKnockback = me.GetComponent<LinearKnockback>();
+        if (_myKnockback == null || KnockbackingField == null)
+            return;
+        bool on = (bool)KnockbackingField.GetValue(_myKnockback);
+        if (on && !_wasKnockbacking)
+        {
+            _knockbacks++;
+            _lastKnockbackAt = now;
+        }
+        _wasKnockbacking = on;
+    }
+
+    /// <summary>
+    /// 누름 직전 넉백 — 이번 창이 열린 뒤 또는 누르기 전 <see cref="KnockbackRecentSeconds"/> 안에 넉백이 시작됐으면 true.
+    /// knockAgoS = 마지막 넉백 시작부터 누름까지(초).
+    /// </summary>
+    private string KnockbackDiag(double now)
+    {
+        if (_myKnockback == null || KnockbackingField == null)
+            return "knockedBack=na knockAgoS=na";
+        if (_lastKnockbackAt < 0.0)
+            return "knockedBack=false knockAgoS=na";
+        double ago = now - _lastKnockbackAt;
+        bool recent = _lastKnockbackAt >= _openAt || ago <= KnockbackRecentSeconds;
+        return $"knockedBack={(recent ? "true" : "false")} knockAgoS={Fmt(ago)}";
+    }
+
+    private static string Fmt(double v) =>double.IsNaN(v) ? "na" : v.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
 
     private static string Fmt(Vector3 v) => $"{Fmt(v.x)}/{Fmt(v.y)}/{Fmt(v.z)}";
 }
