@@ -138,6 +138,10 @@ public class EffectCatalog : ScriptableObject
     // 상태 → 이펙트 표는 PlayerStatusEffectVfxSet(SO)가 들고, StatusEffectVfxPresenter 가 루프로 켜고 끈다. 여기는 prewarm 등록만(2026-10-20 민경).
     [field: SerializeField] public EffectEntry Player_Faint { get; private set; }
 
+    [Header("플레이어 — 증강 획득(공용)")]
+    // 고른 본인 화면에서만, 몸을 따라가는 레벨업 원샷. 각 Variant VFX 의 TraitAcquiredVfxPresenter 가 직접 들고 있다 — 여기는 prewarm 등록만(2026-10-22 민경).
+    [field: SerializeField] public EffectEntry Player_TraitAcquired { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]

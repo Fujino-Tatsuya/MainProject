@@ -1,3 +1,26 @@
+# ▶▶▶ 계획 = **증강 획득 이펙트 — 고른 본인 화면에서 Level_up 원샷(몸 추종)** (2026-10-22 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-22). 증강 = `Tutorial/Traits/TutorialTraitDirector`(은희, 서버 확정·획득 목록 전 피어 복제). 선택 완료에 연출·네트워크 신호 없음.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 보는 사람(Q1-b) | 고른 본인 화면만(플레이어 NetworkObject `IsOwner`) |
+| 시점(Q2-a) | 내 획득 수가 늘어나는 순간 — 직접·자동(출구 열림·보스 타이머·전멸 후 재선택) 모두. 디버그 건너뛰기도 포함 |
+| 위치(Q3-a) | 플레이어 루트 추종 — `PlayLooping` 후 곧바로 `Release`, 엔트리 outro 2초 동안 따라감(프리팹에 루프 시스템 없음) |
+| 감지(Q4-a) | `TraitAcquiredVfxPresenter` 가 `TutorialTraitDirector.ClientStateChanged` + `GetAcquired(OwnerClientId)` 개수 비교. 연결 순간 기준값(늦은 접속·씬 진입 오발 방지), 줄면 기준도 내림. 은희 코드 무수정·네트워크 무추가 |
+| 자리(Q5-a) | 세 Variant 의 `VFX`(= `VFX/States` 부모) |
+| 크기·색(Q6) | 원본 그대로 — 민경이 Play 후 직접 조정(컴포넌트 `scale` 또는 프리팹) |
+
+## 변경
+- 반입: MyProject `Export/Common/States/Level_up.prefab` → `50.Art/VFX/Common/States/`(같은 guid) + `Level_up_Entry`(outro 2·prewarm 1) · 텍스처 4(`Textures/Casual RPG VFX/` circle_boke01·gradient01·ring03·arrow04) · `Models/Cylinder01.fbx`. 재질 `1Add_mat`·`1AB_mat`(레거시 파티클 셰이더)은 이미 있음. 원본의 빈 참조 3(빌보드 렌더러 메시 2·루트 스프라이트 1)은 안 쓰는 칸이라 그대로. 🔴 SVN add
+- 신규 `1.Scripts/Effects/TraitAcquiredVfxPresenter.cs` · 카탈로그 `Player_TraitAcquired`(prewarm 등록) · `Player_Assassin`·`Player_Gunner`·`Player_Paladin.prefab`(VFX 에 부착)
+
+## 검증
+- dotnet 빌드 오류 0 · guid 누락 0(원본 빈 참조 3 제외). ⏳ 민경 Play/MPPM: 복도에서 증강 선택 → 창 닫히는 순간 내 캐릭터 발밑 레벨업(걸어도 따라옴), 다른 플레이어 화면엔 안 보임, 자동 선택 때도, 맵 진입 때 오발 없음.
+
+---
+
 # ▶▶▶ 계획 = **거너 R 추적 레이저 연출 재제작 — 범위 장판 · 대상별 조준(좁혀지는 원) · 대상별 위성 레이저+땅 파문** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1단계 MyProject 제작 · ✅ 2단계 반입·코드·배선(MyProject 저장본 그대로, dotnet 빌드 오류 0) · ⏳ 민경 Play/MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-21, Q1~Q12 전부 추천안). **게임플레이 무변경** — 0.5초마다 반경 2m 안 적 전부 즉시 피해(`GunnerTrackingLaser.DamageTick`), 연출을 그 박자에 맞춘다.

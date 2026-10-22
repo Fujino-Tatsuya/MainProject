@@ -55,6 +55,7 @@ MonoBehaviour:
   <Gunner_R_Lock>k__BackingField: {fileID: 11400000, guid: e271ef022f104452a88fe7e53e7dccc1, type: 2}
   <Gunner_R_Strike>k__BackingField: {fileID: 11400000, guid: cf886c3930344214963ed0f67ae4900d, type: 2}
   <Player_Faint>k__BackingField: {fileID: 11400000, guid: 9b8944d0493549069d6e1e57ca0bbc96, type: 2}
+  <Player_TraitAcquired>k__BackingField: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Mob_Bite>k__BackingField: {fileID: 11400000, guid: 711a910e150b32743ba079fc5ff9ed42, type: 2}
   <Mob_Death_Explosion>k__BackingField: {fileID: 11400000, guid: 34b1366dad16435f912891449e1dc1d2, type: 2}
