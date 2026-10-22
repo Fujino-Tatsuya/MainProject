@@ -12,6 +12,7 @@ public sealed class FirstMeleeGuardAttackSpeedTests
     private const string ControllerPath = "Assets/4.Animations/Player/Garen/GarenAnimatorController.controller";
     private const string GuardStartClipPath = "Assets/4.Animations/Player/Garen/Garen_E_GuardStart.anim";
     private const string GuardEndClipPath = "Assets/4.Animations/Player/Garen/Garen_E_GuardEnd.anim";
+    private const string DataPath = "Assets/9.ScriptableObject/Player/Garen/FirstMeleeSubSkillData.asset";
     private const string GuardState = "SubSkillGuard";
     private const string GuardIdleState = "SubSkillGuardIdle";
     private const string GuardEndState = "SubSkillGuardEnd";
@@ -114,9 +115,53 @@ public sealed class FirstMeleeGuardAttackSpeedTests
     public void BaseStateSpeeds_Kept()
     {
         AnimatorController controller = LoadController(ControllerPath);
-        Assert.That(FindState(controller, GuardState).speed, Is.EqualTo(2f), "준비 상태 Speed 2 유지 — 배율은 그 위에 곱한다");
-        Assert.That(FindState(controller, GuardEndState).speed, Is.EqualTo(2f), "해제 상태 Speed 2 유지");
+        Assert.That(FindState(controller, GuardState).speed, Is.EqualTo(4f), "준비 상태 Speed 4(A6 임시값) — 배율은 그 위에 곱한다");
+        Assert.That(FindState(controller, GuardEndState).speed, Is.EqualTo(4f), "해제 상태 Speed 4(A6 임시값)");
         Assert.That(FindState(controller, GuardIdleState).speed, Is.EqualTo(1f));
+    }
+
+    // 방어중 유지 = exitTime × 루프 클립 길이 ÷ 상태 Speed — A6 임시값 실시간 1.5s(공속 무관).
+    [Test]
+    public void GuardIdle_HoldsAboutOnePointFiveSeconds()
+    {
+        AnimatorState idle = FindState(LoadController(ControllerPath), GuardIdleState);
+        AnimatorStateTransition toEnd = FindTransition(idle, GuardEndState);
+        Assert.That(toEnd.hasExitTime, Is.True, "방어중 → 해제는 exitTime 전이");
+
+        float seconds = toEnd.exitTime * idle.motion.averageDuration / idle.speed;
+        Assert.That(seconds, Is.EqualTo(1.5f).Within(0.01f), "방어중 실시간 유지");
+    }
+
+    // 안전망은 준비 + 방어중 + 해제 Custom1(창 닫힘 직전 방어 성공) + 반격 End 보다 길어야 반격을 끊지 않는다.
+    [Test]
+    public void SafetyNet_LongerThanGuardPlusCounter()
+    {
+        AnimatorController controller = LoadController(ControllerPath);
+        var data = AssetDatabase.LoadAssetAtPath<FirstMeleeSubSkillData>(DataPath);
+        Assert.That(data, Is.Not.Null, DataPath);
+
+        AnimatorState guard = FindState(controller, GuardState);
+        AnimatorState idle = FindState(controller, GuardIdleState);
+        AnimatorState end = FindState(controller, GuardEndState);
+        AnimatorState counter = FindState(controller, CounterState);
+
+        float worst = guard.motion.averageDuration / guard.speed
+            + FindTransition(idle, GuardEndState).exitTime * idle.motion.averageDuration / idle.speed
+            + EventTime(LoadClip(GuardEndClipPath), SkillAnimationEventType.Custom1) / end.speed
+            + EventTime((AnimationClip)counter.motion, SkillAnimationEventType.End) / counter.speed;
+
+        Assert.That(data.MaxActiveDuration, Is.EqualTo(4f), "팔라딘 E 안전망 A6 임시값");
+        Assert.That(data.MaxActiveDuration, Is.GreaterThan(worst), $"방어 + 반격 최장 {worst:0.##}s");
+    }
+
+    private static AnimatorStateTransition FindTransition(AnimatorState from, string toName)
+    {
+        foreach (AnimatorStateTransition transition in from.transitions)
+            if (transition.destinationState != null && transition.destinationState.name == toName)
+                return transition;
+
+        Assert.Fail($"{from.name} → {toName} 전환이 없다");
+        return null;
     }
 
     // 준비 → 방어중, 방어중 → 해제 전환은 초 단위 고정 길이 — 방어 창 실제 길이가 공속과 무관해지는 조건.
@@ -128,19 +173,8 @@ public sealed class FirstMeleeGuardAttackSpeedTests
         AssertFixedTransition(FindState(controller, GuardIdleState), GuardEndState);
     }
 
-    private static void AssertFixedTransition(AnimatorState from, string toName)
-    {
-        foreach (AnimatorStateTransition transition in from.transitions)
-        {
-            if (transition.destinationState != null && transition.destinationState.name == toName)
-            {
-                Assert.That(transition.hasFixedDuration, Is.True, $"{from.name} → {toName} 고정 길이");
-                return;
-            }
-        }
-
-        Assert.Fail($"{from.name} → {toName} 전환이 없다");
-    }
+    private static void AssertFixedTransition(AnimatorState from, string toName) =>
+        Assert.That(FindTransition(from, toName).hasFixedDuration, Is.True, $"{from.name} → {toName} 고정 길이");
 
     // 파라미터 기본값 1 — 쓰기 전(스폰 직후)이나 다른 상태에서 배율이 새지 않는다. 다른 상태는 이 파라미터를 쓰지 않는다.
     [Test]
