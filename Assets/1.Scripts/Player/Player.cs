@@ -1820,6 +1820,24 @@ public class Player : Unit
         }
     }
 
+    // [서버] 체력 하한 — 로비 훈련 보정(할 일 86): LobbyTrainingDirector 가 훈련 단계 동안 훈련 명단에 1, 그 밖엔 0.
+    // 플레이어는 씬마다 새로 스폰되므로 다음 씬(메인)에 이월되지 않는다.
+    private int _serverHealthFloor;
+
+    /// <summary>[서버] 지금 체력 하한(0 = 없음).</summary>
+    public int ServerHealthFloor => _serverHealthFloor;
+
+    /// <summary>[서버] 체력 하한을 정한다(0 = 해제). 서버가 아니면 무시.</summary>
+    public void ServerSetHealthFloor(int floor)
+    {
+        if (!IsServer)
+            return;
+
+        _serverHealthFloor = Mathf.Max(0, floor);
+    }
+
+    protected override int HealthFloor => _serverHealthFloor;
+
     // 재생 리셋 = 체력 피해 > 0 또는 추락 피해. 보호막만 깎인 피격은 재생을 멈추지 않는다(사용자 결정 10-13).
     // 무적으로 막힌 피해·내가 때린 것은 오지 않는다.
     protected override void OnServerHealthDamageApplied(int healthLost, int shieldLost)

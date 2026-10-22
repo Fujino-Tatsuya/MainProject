@@ -18,6 +18,10 @@ using UnityEngine;
 /// 훈련·브리핑 중 접속은 받는다(로비 대기).</item>
 /// <item>캐릭터 잠금: <see cref="CharacterChangeBlockFor"/> — 훈련 명단(복제)·단계·출격 카운트다운으로 서버 RPC 와 클라 패널이 같은 판정을 한다.</item>
 /// <item>판 끝 로비 복귀: 로비 씬이 다시 올라오면 새 진행기 = Lobby 단계부터(새 회차 — 출격 래치·명단도 새로).</item>
+/// <item>훈련 보정(T3, 명세 §6): 훈련 단계(Train01~Train03D) 동안 훈련 명단 플레이어 체력 하한 1(<see cref="Player.ServerSetHealthFloor"/>) —
+/// 단계가 바뀔 때마다 즉시 다시 맞춰 출격·종료 집결·브리핑에선 0, 진행기 디스폰(판 끝 로비 복귀·씬 전환) 때도 0.</item>
+/// <item>훈련 리셋(T3, 공용): <see cref="ServerResetTrainingRoster"/> — 명단 전원 <see cref="TrainingPlayerReset"/> + 진행 중 행동 예약 + 오너 대시 예측 짝(복제 일련번호).</item>
+/// <item>단계 내용 컴포넌트는 <see cref="ServerFlowChanged"/>(서버, 단계·하위 상태 확정 뒤 1회)를 구독한다 — 복제 값 두 개가 따로 도착하는 클라 이벤트와 달리 중간 조합이 없다.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -57,6 +61,12 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     private readonly NetworkList<ulong> trainingRoster = new NetworkList<ulong>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 훈련 리셋 일련번호 — 오너가 바뀌는 것을 보고 대시 예측 충전을 서버 장부와 맞춘다(복도1 쿨 초기화와 같은 방식).
+    private readonly NetworkVariable<int> trainingResetSerial = new NetworkVariable<int>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private const float SupportTickInterval = 0.25f;
+
     private static readonly LobbyGatherPoint[] Points =
     {
         LobbyGatherPoint.Entrance, LobbyGatherPoint.Sortie, LobbyGatherPoint.Train01Start, LobbyGatherPoint.Train02Start,
@@ -68,12 +78,21 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     private bool _zonesDirty;
     private bool _loggedWaitingZones;
     private Func<bool> _joinBlockedProvider;
+    private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
+    private readonly List<ulong> _idBuffer = new List<ulong>();
+    private float _supportTimer;
 
     /// <summary>스폰된 진행기(없으면 null).</summary>
     public static LobbyTrainingDirector Active { get; private set; }
 
     /// <summary>[전 피어] 단계 또는 하위 상태가 바뀌었다(스폰 직후 1회 포함) — 목표 UI·무전(T6)이 붙을 자리.</summary>
     public static event Action<LobbyTrainingStage, LobbyTrainingPhase> StageChanged;
+
+    /// <summary>[서버] 단계·하위 상태가 바뀌었다(전이 확정 뒤 1회, 스폰 직후 1회) — 단계 내용(표적·몹·상대) 시작·정리용.</summary>
+    public event Action ServerFlowChanged;
+
+    /// <summary>[전 피어] 이 사람이 훈련 명단(입구 확정 때 고정)에 있는가 — 복제 명단.</summary>
+    public bool IsInTrainingRoster(ulong clientId) => IsSpawned && trainingRoster.Contains(clientId);
 
     public LobbyTrainingStage Stage => IsSpawned ? stage.Value : LobbyTrainingStage.Lobby;
     public LobbyTrainingPhase Phase => IsSpawned ? phase.Value : LobbyTrainingPhase.Gathering;
@@ -105,6 +124,7 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
         Active = this;
         stage.OnValueChanged += HandleStageChanged;
         phase.OnValueChanged += HandlePhaseChanged;
+        trainingResetSerial.OnValueChanged += HandleTrainingResetSerialChanged;
 
         if (IsServer)
         {
@@ -121,6 +141,7 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
             SyncReplicatedState();
             _zonesDirty = true;
             Debug.Log($"[SceneFlow] {Tag} 서버 스폰 — 새 회차 Lobby, 접속자 {_flow.Connected.Count}명");
+            ServerFlowChanged?.Invoke();
         }
 
         StageChanged?.Invoke(Stage, Phase);
@@ -130,9 +151,14 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     {
         stage.OnValueChanged -= HandleStageChanged;
         phase.OnValueChanged -= HandlePhaseChanged;
+        trainingResetSerial.OnValueChanged -= HandleTrainingResetSerialChanged;
 
         if (IsServer)
         {
+            // 판 끝·씬 전환 — 훈련 보정이 남지 않게 접속자 전원 하한 해제.
+            ClearHealthFloors();
+            _resetReservations.Clear();
+
             if (NetworkManager != null)
             {
                 NetworkManager.OnClientConnectedCallback -= HandleClientConnected;
@@ -184,7 +210,19 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsSpawned || !IsServer || !_zonesDirty)
+        if (!IsSpawned || !IsServer)
+            return;
+
+        _supportTimer -= Time.unscaledDeltaTime;
+        if (_supportTimer <= 0f)
+        {
+            _supportTimer = SupportTickInterval;
+            // 플레이어 오브젝트가 늦게 붙거나 다시 스폰돼도 하한이 맞게 주기적으로도 맞춘다(같은 값이면 아무 일 없음).
+            SyncHealthFloors();
+            TickResetReservations();
+        }
+
+        if (!_zonesDirty)
             return;
 
         // 씬 상주 구역이 이 진행기보다 늦게 스폰될 수 있다 — 전부 스폰된 뒤에 한 번에 넣는다.
@@ -259,6 +297,7 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
 
     private void HandleClientDisconnected(ulong clientId)
     {
+        _resetReservations.Forget(clientId);
         if (_flow == null || !_flow.RemoveClient(clientId))
             return;
 
@@ -271,7 +310,126 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     {
         SyncReplicatedState();
         _zonesDirty = true;
+        // 출격 진입 등 단계가 바뀌는 즉시 하한을 맞춘다(주기 갱신을 기다리지 않는다).
+        SyncHealthFloors();
         LogStageContent();
+        ServerFlowChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// [서버] 훈련 리셋 — 훈련 명단 전원에게 <see cref="TrainingPlayerReset.ServerApply"/>(체력·쿨타임·대시·어쌔신 R 최소 분노 — 옵션).
+    /// 진행 중 행동이 있던 사람은 끝나는 순간 쿨타임을 한 번 더 지운다(예약). 대시를 채웠으면 오너 예측도 맞추게 일련번호를 올린다.
+    /// </summary>
+    public void ServerResetTrainingRoster(TrainingResetOptions options)
+    {
+        if (!IsServer || _flow == null)
+            return;
+
+        foreach (var clientId in _flow.TrainingRoster)
+        {
+            if (!TryGetPlayer(clientId, out var player))
+            {
+                Debug.LogWarning($"{Tag} 훈련 리셋 — client {clientId} 플레이어 오브젝트 없음, 건너뜀.", this);
+                continue;
+            }
+
+            var busy = TrainingPlayerReset.ServerApply(player, options, out var summary);
+            _resetReservations.OnReset(clientId, busy && options.ResetCooldowns);
+            Debug.Log($"[SceneFlow] {Tag} 훈련 리셋 client {clientId} — {summary}");
+        }
+
+        if (options.RefillDash)
+            trainingResetSerial.Value++;
+    }
+
+    private void TickResetReservations()
+    {
+        if (_resetReservations.Count == 0)
+            return;
+
+        _resetReservations.CopyTo(_idBuffer);
+        foreach (var clientId in _idBuffer)
+        {
+            if (!TryGetPlayer(clientId, out var player))
+            {
+                _resetReservations.Forget(clientId);
+                continue;
+            }
+
+            if (!_resetReservations.Tick(clientId, TutorialCooldownReset.IsBusy(player)))
+                continue;
+
+            var n = TrainingPlayerReset.ServerApplyReservedCooldowns(player);
+            Debug.Log($"[SceneFlow] {Tag} 훈련 리셋 예약 실행 client {clientId} — 진행 중 행동 종료, 스킬 쿨 {n}개");
+        }
+    }
+
+    // [서버] 훈련 보정 체력 하한 — 훈련 단계 + 훈련 명단이면 1, 아니면 0(늦은 참가자·출격·브리핑·로비).
+    private void SyncHealthFloors()
+    {
+        if (_flow == null || NetworkManager == null)
+            return;
+
+        foreach (var client in NetworkManager.ConnectedClientsList)
+        {
+            var player = client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
+            if (player == null)
+                continue;
+
+            var floor = LobbyTrainingSupportRules.HealthFloorFor(_flow.Stage, ContainsRoster(client.ClientId));
+            if (player.ServerHealthFloor == floor)
+                continue;
+
+            player.ServerSetHealthFloor(floor);
+            Debug.Log($"[SceneFlow] {Tag} 훈련 보정 체력 하한 client {client.ClientId} → {floor} ({Describe()})");
+        }
+    }
+
+    private void ClearHealthFloors()
+    {
+        if (NetworkManager == null)
+            return;
+
+        foreach (var client in NetworkManager.ConnectedClientsList)
+        {
+            var player = client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
+            if (player != null)
+                player.ServerSetHealthFloor(0);
+        }
+    }
+
+    private bool ContainsRoster(ulong clientId)
+    {
+        var roster = _flow.TrainingRoster;
+        for (var i = 0; i < roster.Count; i++)
+        {
+            if (roster[i] == clientId)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>[서버] 접속자의 플레이어 컴포넌트.</summary>
+    public bool TryGetPlayer(ulong clientId, out Player player)
+    {
+        player = null;
+        if (NetworkManager == null || !NetworkManager.ConnectedClients.TryGetValue(clientId, out var client) || client.PlayerObject == null)
+            return false;
+
+        player = client.PlayerObject.GetComponent<Player>();
+        return player != null;
+    }
+
+    // [오너] 서버가 대시를 가득 채웠다 — 내가 훈련 명단이면 예측 충전도 가득(서버 장부와 짝). 스폰 직후 값(이미 지난 리셋)은 무시.
+    private void HandleTrainingResetSerialChanged(int previous, int current)
+    {
+        if (NetworkManager == null || !IsInTrainingRoster(NetworkManager.LocalClientId))
+            return;
+
+        var local = Player.LocalPlayer;
+        if (local != null)
+            local.GetComponent<PlayerDashController>()?.OwnerResetChargeToFull();
     }
 
     // [서버] 모델 → 구역. 켜기 전에 명단·유지 시간을 넣고, 다시 쓰는 구역(Train03 영역)은 확정 래치를 푼다.
@@ -298,13 +456,13 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
         });
     }
 
-    // 각 단계 내용(표적·몹·상대·무전)은 T3~T6 — 지금은 무엇이 시작될 자리인지만 남긴다.
+    // 각 단계 내용은 ServerFlowChanged 구독자(T3 = LobbyTrainingWeaponCheck, T4~T6 미연결) — 여기선 시작만 남긴다.
     private void LogStageContent()
     {
         if (_flow.Phase != LobbyTrainingPhase.InProgress)
             return;
 
-        Debug.Log($"[SceneFlow] {Tag} {_flow.Stage} 진행 시작 — 내용 미연결(T3~T6), {nameof(ServerReportStageCompleted)}({_flow.Stage}) 로 완료.");
+        Debug.Log($"[SceneFlow] {Tag} {_flow.Stage} 진행 시작 — {nameof(ServerReportStageCompleted)}({_flow.Stage}) 로 완료.");
     }
 
     private void SyncReplicatedState()

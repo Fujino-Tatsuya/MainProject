@@ -18,11 +18,39 @@ public static class LobbyUiStrings
     public static readonly UiString GatherCount = new UiString("UI.Lobby.GatherCount", "집결 {gathered}/{total}", Where + " › 집결 구역 표시({gathered} = 구역 안 + 쓰러짐·사망 아님, {total} = 참여자, 할 일 86)");
     public static readonly UiString GatherCountdown = new UiString("UI.Lobby.GatherCountdown", "{time} 후 이동", Where + " › 집결 카운트다운({time} = UI.Unit.Seconds 로 만든 남은 초, 올림 정수, 할 일 86)");
 
+    public static readonly UiString Train01Title = new UiString("UI.Lobby.Train01Title", "무기 점검", Where + " › TRAIN_01 개인 체크 제목(할 일 86 T3)");
+    public static readonly UiString Train01BasicAttack = new UiString("UI.Lobby.Train01BasicAttack", "기본 공격", Where + " › TRAIN_01 체크 항목 — 기본 공격(할 일 86 T3)");
+    public static readonly UiString Train01SkillQ = new UiString("UI.Lobby.Train01SkillQ", "Q", Where + " › TRAIN_01 체크 항목 — Q 스킬(할 일 86 T3)");
+    public static readonly UiString Train01SkillE = new UiString("UI.Lobby.Train01SkillE", "E", Where + " › TRAIN_01 체크 항목 — E 스킬(할 일 86 T3)");
+    public static readonly UiString Train01SkillR = new UiString("UI.Lobby.Train01SkillR", "R", Where + " › TRAIN_01 체크 항목 — R 스킬(할 일 86 T3)");
+    public static readonly UiString Train01RightClick = new UiString("UI.Lobby.Train01RightClick", "우클릭 스킬", Where + " › TRAIN_01 체크 항목 — 우클릭 스킬(명세 '간파' 대신, 할 일 86 T3)");
+    public static readonly UiString Train01Dash = new UiString("UI.Lobby.Train01Dash", "대시", Where + " › TRAIN_01 체크 항목 — 대시(할 일 86 T3)");
+    public static readonly UiString Train01PartyDone = new UiString("UI.Lobby.Train01PartyDone", "완료 {done}/{total}", Where + " › TRAIN_01 파티 완료 인원({done} = 6항목 모두 마친 사람, {total} = 훈련 명단, 할 일 86 T3)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         InteractReady, InteractUnready, InteractCharacterSelect, ReadyCount, Countdown, CountdownStarting,
         GatherCount, GatherCountdown,
+        Train01Title, Train01BasicAttack, Train01SkillQ, Train01SkillE, Train01SkillR, Train01RightClick, Train01Dash, Train01PartyDone,
     };
+
+    /// <summary>TRAIN_01 체크 항목 이름.</summary>
+    public static UiString Train01Item(LobbyWeaponCheckItem item)
+    {
+        switch (item)
+        {
+            case LobbyWeaponCheckItem.BasicAttack: return Train01BasicAttack;
+            case LobbyWeaponCheckItem.SkillQ: return Train01SkillQ;
+            case LobbyWeaponCheckItem.SkillE: return Train01SkillE;
+            case LobbyWeaponCheckItem.SkillR: return Train01SkillR;
+            case LobbyWeaponCheckItem.RightClick: return Train01RightClick;
+            default: return Train01Dash;
+        }
+    }
+
+    /// <summary>"완료 n/m".</summary>
+    public static string FormatTrain01PartyDone(int done, int total) =>
+        Train01PartyDone.Format(new Dictionary<string, string> { ["done"] = done.ToString(), ["total"] = total.ToString() });
 
     /// <summary>"준비 n/m".</summary>
     public static string FormatReadyCount(int ready, int total) =>
