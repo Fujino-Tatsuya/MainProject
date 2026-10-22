@@ -29,7 +29,7 @@
 두 갈래 선택 상태(`ExitChoice`)·✓ 확인 단계와 인스펙터 UnityEvent(`onExitToDesktop`·`onExitToLobby`)는 지웠다 — 연결된 곳이 없었다.
 
 ### 2-3. 입력 설정 기본값 (`UserInputConfig`)
-처음 실행(저장값 없음) 기본값을 **홀드 스킬 토글 = 켬 · 대시 방향 = 마우스(Cursor)** 로 바꿨다(경석 10-22). 이미 저장된 PC 는 그대로. enum 값은 안 바꿨다(저장 호환).
+처음 실행(저장값 없음) 기본값을 **홀드 스킬 토글 = 켬** 으로 바꿨다(경석 10-22). 대시 방향 기본은 그대로 캐릭터 방향(CharacterFacing). 이미 저장된 PC 는 그대로. enum 값은 안 바꿨다(저장 호환).
 
 ### 2-4. 스킬 조준 ESC (`PlayerSkillTargeting`)
 조준 취소·자동 접근 취소에 쓴 ESC 를 `PlayerSkillTargeting.IsEscapeClaimed`(이 프레임)로 남긴다 — ESC 메뉴가 같은 키로 같이 열리지 않게.

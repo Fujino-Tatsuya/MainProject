@@ -11,7 +11,7 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
 
 ## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
-- 은희 공유: [handoff-game-menu.md](Docs/tech/handoff-game-menu.md) — 그만두기 → 타이틀 의도적 이탈(`DemoSessionDirector.PrepareLeaveToTitle`·`ReconnectLoop.Reset`) · 입력 기본값(홀드 토글·대시 마우스 켬) · 조준 ESC 소비 표시.
+- 은희 공유: [handoff-game-menu.md](Docs/tech/handoff-game-menu.md) — 그만두기 → 타이틀 의도적 이탈(`DemoSessionDirector.PrepareLeaveToTitle`·`ReconnectLoop.Reset`) · 입력 기본값(홀드 토글 켬 · 대시는 캐릭터 방향 그대로) · 조준 ESC 소비 표시.
 - 같이 들어간 것(경석 10-22 Play): 타이틀 버튼 기본 한국어(시작하기·설정·나가기, en = START·SETTING·EXIT — `TextScramble` 이 저장 원문으로 덮던 것 수정) · 그만두기 팝업 = **바탕화면 / 타이틀** 두 버튼, 누르면 바로 실행(✗/✓ 없음, ESC = 메뉴로 · 로비·인게임 같음, 호스트는 경고 문구) · 새 문구 6개 Strings 시트 + 서울알림 Heavy 아틀라스(288 → 342자) · M 키 맵 전체 보기 끔.
 - EditMode: 새 에디터 2717/0. `EnemyC3PrewarmTests` 2건은 **에디터에서 Play 한 뒤에만** 실패(57.3 드론 풀 `HideAndDontSave` 잔존 — 이번 변경 무관). handoff §4.
 - 커밋 제외(Unity 부수효과): `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`(Play 중 동적 글자 추가) · `AddressableAssetSettings.asset`(해시 0 리셋).

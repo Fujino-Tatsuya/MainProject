@@ -11,10 +11,10 @@ public static class UserInputConfig
     private const string HoldSkillAsTogglePrefsKey = "Input.HoldSkillAsToggle";
     private const string DashDirectionModePrefsKey = "Input.DashDirectionMode";
 
-    // 저장값이 없을 때(처음 실행) 쓰는 값 — 경석 10-22: 둘 다 켠 상태(토글 · 마우스 방향)로 시작한다.
+    // 저장값이 없을 때(처음 실행) 쓰는 값 — 경석 10-22: 홀드 스킬 = 토글 켬, 대시 = 캐릭터 방향(마우스 방향 꺼짐).
     // 이미 저장된 PC 는 그 값을 그대로 쓴다. enum 의 0(CharacterFacing)은 저장 호환 때문에 바꾸지 않는다.
     private const bool DefaultHoldSkillAsToggle = true;
-    private const DashDirectionMode DefaultDashDirection = DashDirectionMode.Cursor;
+    private const DashDirectionMode DefaultDashDirection = DashDirectionMode.CharacterFacing;
 
     private static bool isLoaded;
     private static bool holdSkillAsToggle;
@@ -47,7 +47,7 @@ public static class UserInputConfig
     }
 
     /// <summary>
-    /// 대시가 나가는 방향. 기본 = <see cref="DashDirectionMode.Cursor"/>(마우스 방향, 10-22 — 예전 기본은 CharacterFacing).
+    /// 대시가 나가는 방향. 기본 = <see cref="DashDirectionMode.CharacterFacing"/>(이동 입력 → 캐릭터 정면).
     /// 오너만 읽는다 — 방향은 오너가 계산해 대시 요청 RPC 로 보내므로 서버·다른 클라는 이 값을 몰라도 된다.
     /// 선택 규칙 = <see cref="DashDirectionRules"/>.
     /// </summary>
