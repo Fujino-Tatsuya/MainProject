@@ -30,7 +30,7 @@
 |---|---|---|---|---|---|
 | AttackDamage | `Player.attackDamage` | `BaseAttackDamageModifier` | `AttackDamageModifier` | — | 데미지 스냅샷(`Player.ResolveDamage`)·툴팁 |
 | MoveSpeed | `PlayerMovement.BaseMaxSpeed` | `MoveSpeedBaseModifier` | `MoveSpeedModifier` | `MoveSpeedFinalMultiplier` | `PlayerMovement`(서버·오너 이동) — `Stats.Multiplier(MoveSpeed)`(최종 배율 포함) |
-| AttackSpeed | `Player.attackSpeed` | `AttackSpeedBaseModifier` | `AttackSpeedModifier` | `AttackSpeedFinalMultiplier` | 값만 있음 — 플레이어 소비처 없음(할 일 91 T5 에서 애니 속도 연결 예정) |
+| AttackSpeed | `Player.attackSpeed` | `AttackSpeedBaseModifier` | `AttackSpeedModifier` | `AttackSpeedFinalMultiplier` | 평타·스킬 재생 속도 — `Player.AttackSpeedRate` = `Stats.Multiplier(AttackSpeed)`(최종 ÷ 기본, 최종 배율 포함). §3.1 |
 | Defense | `Player.defense` | `DefenseBaseModifier` | `DefenseModifier` | — | 피해 경감 `Unit.ApplyMitigatedHealthDamage`(`FinalDefense`) |
 | MaxHp | `Player.maxHp` | `MaxHpBaseModifier` | `MaxHpModifier` | — | `FinalMaxHp` 소비처(HUD·재생·추락 피해·피격 상한) |
 
@@ -46,6 +46,28 @@
   4. `Player.BaseStatValue` 에 기본값을 연결한다
   5. `PlayerStatReport` 필드를 추가한다
   6. `UiStrings` 이름과 `StatusEffectCategories` 마스크에 추가한다
+
+### 3.1 공격속도 소비 (할 일 91 T5)
+
+규칙 한 곳: `PlayerAttackSpeedRules`(`Assets/1.Scripts/Player/Stats/`). 배율은 복제된 상태이상으로 각 피어가 계산한다 — 서버·오너·관찰자 재생 속도가 같다.
+배율 하한 0.1(감속 디버프가 와도 멈추지 않게).
+
+| 동작 | 연결 | 타이밍 기준 |
+|---|---|---|
+| 가붕이 콤보(`DefaultAttackController`) | 상태 파라미터 `AttackSpeed` = 데이터 공속 × 배율 | 클립 이벤트(Hit·ComboWindow·End). 종료 안전망·전진 속도도 같은 재생 시간을 쓴다 |
+| 어쌔신 평타(`AssassinBasicAttack`) | 공격 중 `Animator.speed` = 배율 | 클립 이벤트. 종료 안전망 = 클립 길이(감속이면 ÷ 배율), 강타 전진 시간 ÷ 배율 |
+| 거너 평타(`GunnerBasicAttack`) | 데이터 시간(준비·발사 간격·후속 동작·입력 창·발 잠금) ÷ 배율 + 공격 중 `Animator.speed` = 배율 | 데이터 시간 값. `FireSpeed` 는 배율 전 간격 기준(두 번 곱하지 않음) |
+| 공속을 타는 스킬 | 실행 중 `Animator.speed` = 배율(`PlayerSkillController`) | 클립 이벤트. 임시 안전망 `maxActiveDuration`(감속이면 ÷ 배율), 클립 안전망은 `Animator.speed` 포함(`PlayerSkillSafetyNet.Probe`) |
+
+- 시작 때 한 번 정하는 서버 시간 안전망은 `SafetyNetDuration` — **감속이면 늘리고 가속이면 줄이지 않는다.** 배율은 도중에 바뀌므로(가속 버프가 스킬 중간에 끝남)
+  줄여 두면 느려진 나머지 재생보다 먼저 끊는다. 가속 중 정상 종료는 클립 이벤트가 먼저 낸다. 가붕이 콤보는 타마다 파라미터를 한 번 정해 그 타 안에서는 안 바뀌므로 재생 시간 그대로다.
+
+- `Animator.speed` 쓰기는 `PlayerAttackSpeedAnimator` 한 곳뿐이다(`Player.Awake` 가 붙인다). 창구 `IPlayerAttackSpeedAnimatorUser` 중 하나라도 참이면 배율, 아니면 1.
+- 스킬이 타는지 = `PlayerSkillBase.ScalesWithAttackSpeed`(virtual) — 기본 이벤트 방식(`EndsOnClipEvent`). 가붕이 E 는 클립 이벤트로만 돌아 참으로, 어쌔신 Q 돌진은 거짓으로 덮는다.
+  - 탄다: 가붕이 E·R·우클릭 간파, 거너 우클릭 간파, 어쌔신 E(원형 베기·강화)·R 변신·우클릭 간파.
+- **타지 않는 것(고정 타이밍):** 대시 지속, 타이머 방식 스킬(가붕이 Q 홀드, 거너 Q 충전·E 백스텝·R 추적 레이저), 채널링·홀드 틱 간격,
+  어쌔신 Q 돌진, 스킬 안의 보호·연출 지속(`maxActiveDuration` 로 거는 슈퍼아머·무적·어쌔신 원형 베기 연출 — 무적·슈퍼아머는 스킬 종료 때 걷힌다).
+- 전진 거리는 배율과 무관하게 같다 — 거리 ÷ 실제 재생 시간으로 속도만 바뀐다(가붕이 ScriptedForwardDistance·루트모션, 어쌔신 강타 전진).
 
 ## 4. 입력
 
@@ -81,3 +103,4 @@
 - 최종 배율 단계 추가: `최종 = (기본 × (1+Σ기본%) × (1+Σ전체%)) × Π최종배율`. 이동속도·공격속도만, 같은 최종 배율끼리는 곱.
   예) 이동 특성 1.2(전체%) + 제압 가속 ×2(최종) → 1.2 × 2 = 2.4.
 - 새 상태이상 3종 `MoveSpeedFinalMultiplier`·`AttackSpeedFinalMultiplier`·`CooldownRateModifier` — 아직 거는 곳이 없어 기존 수치는 그대로다(제압 가속 버프가 T6 에서 건다).
+- T5: 공격속도가 처음으로 평타·스킬 재생 속도에 들어간다(§3.1). 지금 공속을 바꾸는 상태이상·특성이 없어 배율 1 — 기존 동작 그대로다.

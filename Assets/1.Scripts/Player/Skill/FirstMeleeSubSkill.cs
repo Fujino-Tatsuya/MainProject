@@ -54,6 +54,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => GuardEvents;
 
+    // 방어 창·종료·반격이 전부 클립 이벤트(Custom0·Custom1·Hit·End)라 공격속도를 탄다(할 일 91 T5) — 방어 창도 실제 시간으로 짧아진다.
+    // End 를 시작 상태에 선언하지 않아 EndsOnClipEvent 는 거짓이다(안전망 = maxActiveDuration ÷ 배율 + padding).
+    public override bool ScalesWithAttackSpeed => true;
+
     public override void CollectAnimationEventRequirements(List<AnimationEventRequirement> requirements)
     {
         base.CollectAnimationEventRequirements(requirements);

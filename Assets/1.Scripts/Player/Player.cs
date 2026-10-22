@@ -220,6 +220,13 @@ public class Player : Unit
     public override int FinalDefense => stats != null ? stats.FinalDefense : base.FinalDefense;
     public override int FinalMaxHp => stats != null ? stats.FinalMaxHp : base.FinalMaxHp;
 
+    /// <summary>
+    /// 공격속도 배율(할 일 91 T5) = 최종 공격속도 ÷ 기본값(최종 배율 포함). 평타·스킬 재생 속도에 곱한다 — 전 피어 같은 값.
+    /// 소비 규칙: <see cref="PlayerAttackSpeedRules"/>.
+    /// </summary>
+    public float AttackSpeedRate =>
+        PlayerAttackSpeedRules.Rate(stats != null ? stats.Multiplier(PlayerStatKind.AttackSpeed) : 1f);
+
     /// <summary>판정·툴팁 공용 피해 스냅샷(가하는 피해% 포함).</summary>
     public int ResolveDamage(float coefficient, int flatBonus) =>
         stats != null ? stats.ResolveDamage(coefficient, flatBonus) : PlayerStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
@@ -261,6 +268,10 @@ public class Player : Unit
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        // Animator.speed 쓰기 지점(공격속도, 할 일 91 T5) — 프리팹에 없으면 붙인다.
+        if (GetComponent<PlayerAttackSpeedAnimator>() == null)
+            gameObject.AddComponent<PlayerAttackSpeedAnimator>();
 
         int historyCapacity = PlayerTickRingBuffer<PlayerSimulationState>.CapacityForSeconds(
             ReconciliationHistorySeconds,

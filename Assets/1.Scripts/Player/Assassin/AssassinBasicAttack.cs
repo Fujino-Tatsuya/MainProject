@@ -14,7 +14,8 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(AssassinConeAttack))]
-public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IAnimationEventRequirementSource
+public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IAnimationEventRequirementSource,
+    IPlayerAttackSpeedAnimatorUser
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
@@ -181,6 +182,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     public bool IsOutOfResource => false;
 
+    // 공격속도(할 일 91 T5) — 평타 상태에 속도 파라미터가 없어 공격 중(전 피어 — StartRpc~EndRpc) Animator.speed 로 탄다.
+    // 판정·예약 창·End 는 클립 이벤트라 같이 빨라진다. 꼬리(finishingTail)는 1 배속.
+    public bool ScalesAnimatorWithAttackSpeed => active;
+
+    private float AttackSpeedRate => player != null ? player.AttackSpeedRate : 1f;
+
     public bool TryStart()
     {
         if (active || requesting || player == null || !CanStartApprovedAttack)
@@ -220,8 +227,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (!active || hasPendingClip || lungeRemaining <= 0f || motor == null || data == null || !player.IsSimulating)
             return;
 
+        // 판정 프레임이 공격속도만큼 당겨지므로 전진 시간도 배율로 나눈다 — 거리는 같다(할 일 91 T5).
         float step = AssassinLungeRules.StepDistance(
-            lungeRemaining, data.EnhancedLungeDistance, data.EnhancedLungeDuration, Time.fixedDeltaTime);
+            lungeRemaining, data.EnhancedLungeDistance,
+            PlayerAttackSpeedRules.Duration(data.EnhancedLungeDuration, AttackSpeedRate), Time.fixedDeltaTime);
         lungeRemaining -= step;
         motor.AddGroundedDisplacement(attackDirection * step);
     }
@@ -613,7 +622,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         currentMode = mode;
         attackDirection = Flatten(direction);
         serverNextDirection = attackDirection;
-        fallbackEndTime = Time.time + turnDelay + step.ClipLength + data.EndFallbackPadding;
+        // 재생 속도(Animator.speed)는 도중에 바뀔 수 있어 감속만 늘린다(할 일 91 T5, SafetyNetDuration).
+        fallbackEndTime = Time.time + turnDelay + PlayerAttackSpeedRules.SafetyNetDuration(step.ClipLength, AttackSpeedRate) +
+            data.EndFallbackPadding;
 
         StopLunge();
         if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating)

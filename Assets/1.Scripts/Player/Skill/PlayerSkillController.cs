@@ -10,7 +10,7 @@ using UnityEngine;
 /// 흐름은 DefaultAttackController의 승인 패턴을 따른다: 오너 요청 → 서버 검증 → 전 클라 재생.
 /// </summary>
 [RequireComponent(typeof(Player))]
-public class PlayerSkillController : BaseNetworkBehaviour
+public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAnimatorUser
 {
     private static readonly int IdleHash = Animator.StringToHash("Idle");
 
@@ -86,6 +86,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
+    // 전 피어 — 실행 중(관찰자는 PlaySkillClientRpc~EndSkillClientRpc) 스킬이 공격속도를 타면 Animator.speed = 배율(할 일 91 T5).
+    public bool ScalesAnimatorWithAttackSpeed => activeSkill != null && activeSkill.ScalesWithAttackSpeed;
     /// <summary>[오너] 스킬 실행 중이거나 시전 요청 응답을 기다리는 중 — 이때 못 쓴 입력은 선입력 버퍼에 남긴다(할 일 44).</summary>
     public bool IsBusy => IsSkillActive || isRequestingSkill;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
@@ -600,7 +602,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
         isRequestingSkill = false;
         activeSkill = skill;
         // 타이머 방식 안전망. 이벤트 방식은 상태에 들어간 뒤 클립 길이로 바꾼다(ResolveClipFallback) — 그 전까지 이 값이 임시 그물이다.
-        activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(skill.Data.MaxActiveDuration, endFallbackPadding);
+        // 공격속도를 타는 스킬은 이 그물도 배율로 나눈다 — 감속만 늘리고 가속은 줄이지 않는다(할 일 91 T5, SafetyNetDuration).
+        // 클립 길이 그물은 Animator.speed 를 이미 포함한다(Probe).
+        float maxActive = skill.ScalesWithAttackSpeed
+            ? PlayerAttackSpeedRules.SafetyNetDuration(skill.Data.MaxActiveDuration, player.AttackSpeedRate)
+            : skill.Data.MaxActiveDuration;
+        activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(maxActive, endFallbackPadding);
         activeEndsOnClipEvent = skill.EndsOnClipEvent;
         hasClipFallback = false;
         activeStartFrame = Time.frameCount;

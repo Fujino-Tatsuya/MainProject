@@ -116,6 +116,15 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
         }
     }
 
+    /// <summary>
+    /// 공격속도를 타는가(할 일 91 T5). 참이면 실행 중 Animator.speed = 배율이고 서버 임시 안전망도 배율로 나눈다(<see cref="PlayerSkillController"/>).
+    /// 기본 = 이벤트 방식(<see cref="EndsOnClipEvent"/>) — 판정·종료가 클립 이벤트라 클립과 같이 빨라진다.
+    /// 타이머 방식(가붕이 Q 홀드, 거너 Q 충전·E·R)은 판정·종료가 코드 시간이라 애니만 빨라지면 어긋나므로 타지 않는다.
+    /// 예외는 스킬이 덮는다 — 클립 이벤트로만 도는데 End 를 선언하지 않은 스킬(가붕이 E)은 참, 이벤트 방식이어도
+    /// 고정 속도·거리 이동이 동작을 정하는 스킬(어쌔신 Q 돌진)은 거짓.
+    /// </summary>
+    public virtual bool ScalesWithAttackSpeed => EndsOnClipEvent;
+
     // 시작 상태 말고 다른 상태(코드 상수로 CrossFade 하는 상태 등)에도 요구가 있는 스킬은 base 를 부른 뒤 덧붙인다(팔라딘 E 반격 상태).
     public virtual void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
     {
