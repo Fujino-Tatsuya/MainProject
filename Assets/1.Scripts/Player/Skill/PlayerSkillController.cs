@@ -383,7 +383,9 @@ public class PlayerSkillController : BaseNetworkBehaviour
             return false;
 
         isRequestingSkill = true;
-        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport());
+        // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
+        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
+            NetworkManager.ServerTime.Time);
         return true;
     }
 
@@ -862,15 +864,25 @@ public class PlayerSkillController : BaseNetworkBehaviour
     [Rpc(SendTo.Server)]
     private void RequestUseSkillRpc(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, NetworkObjectReference targetRef,
-        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, RpcParams rpcParams = default)
+        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, double pressedServerTime,
+        RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, $"스킬 {slot}");
 
+        // 간파 지연 측정(측정만) — 승인되면 OnServerStart 가 가져가고, 거부되면 아래에서 버린다.
+        PlayerInterruptSkillBase interrupt = GetSkillByIndex(expectedSkillIndex) as PlayerInterruptSkillBase;
+        if (interrupt != null)
+            interrupt.ServerSetLagPress(rpcParams.Receive.SenderClientId, pressedServerTime);
+
         Unit target = ResolveTarget(targetRef);
-        if (!StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint))
+        bool started = StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint);
+        if (interrupt != null)
+            interrupt.ServerClearLagPress();
+
+        if (!started)
             RejectSkillClientRpc(CreateOwnerClientRpcParams());
     }
 

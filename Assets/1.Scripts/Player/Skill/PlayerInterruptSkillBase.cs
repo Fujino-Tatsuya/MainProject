@@ -38,6 +38,25 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private float endTime;
     private bool hasResolvedHit;
 
+    // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
+    [Header("간파 지연 측정")]
+    [SerializeField, Min(0f)]
+    [Tooltip("'누른 시각 기준이면 성공했을 것' 로그의 상한(ms). 판정 시각 − 누른 시각이 이 이하일 때만 true. 측정 전용 — 판정에 영향 없음.")]
+    private float lagCompensationCapMs = InterruptLagJudge.DefaultCapMs;
+
+    private struct LagPress
+    {
+        public bool Valid;
+        public ulong ClientId;
+        public bool IsHost;
+        public double PressServerTime;
+        public double ArriveServerTime;
+        public double RttMs;
+    }
+
+    private LagPress pendingLagPress;
+    private LagPress activeLagPress;
+
     /// <summary>
     /// 이벤트 방식 간파의 요구 이벤트. 클립에 Hit·End 를 심은 캐릭터가 RequiredAnimationEvents 로 이걸 돌려준다(거너·어쌔신).
     /// 선언하지 않으면 HitDelay·SkillDuration 타이머 방식(가붕이 — 클립 이벤트를 심은 뒤 켠다).
@@ -55,6 +74,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         base.OnServerStart(direction, target);
         slowMotion.Begin();
         successCooldown.BeginCast();
+        activeLagPress = pendingLagPress;
+        pendingLagPress = default;
 
         IPlayerInterruptSkillData data = InterruptData;
         if (data == null)
@@ -177,6 +198,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         bool onHitBonusTaken = false;
         bool interruptLanded = false;
         int resolvedCount = 0;
+        LagHit lagHit = default;
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -211,15 +233,20 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             // 슬로우 모션 판별과 간파 성공 쿨 감소(허수아비)가 같은 비교를 쓴다.
             IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
             int successBefore = slowTarget != null ? slowTarget.ServerInterruptSuccessCount : 0;
+            bool openAtHit = slowTarget != null && slowTarget.ServerIsInterruptible; // 측정 전용 읽기
 
             bool resolved = ReceiveListeningForCounter(hurtbox, unit, attackInfo, hitContext);
 
-            if (slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore)
+            bool counterSucceeded = slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore;
+            if (counterSucceeded)
             {
                 successCooldown.NotifySuccess();
                 if (slowMotion.IsPending)
                     interruptLanded = true;
             }
+
+            if (slowTarget != null)
+                lagHit.Observe(unit, openAtHit, counterSucceeded);
 
             if (!resolved)
                 continue;
@@ -232,6 +259,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         FailSlowMotion(slowMotion.Resolve(interruptLanded));
+        ReportLag(lagHit);
         ApplySuccessCooldownReduction();
 
         if (CompleteBeforeAttackLanded)
@@ -242,6 +270,85 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (!CompleteBeforeAttackLanded)
             CompleteResolution(resolvedCount);
+    }
+
+    // ── 간파 지연 측정 (서버, 측정만) ──
+
+    /// <summary>
+    /// [서버] 요청 RPC 가 들고 온 누른 시각을 다음 <see cref="OnServerStart"/> 에 넘긴다. 호스트 자신은 지연 0(누른 시각 = 도착 시각).
+    /// </summary>
+    internal void ServerSetLagPress(ulong senderClientId, double pressedServerTime)
+    {
+        if (!InterruptLagMonitor.TryServerNow(out double now))
+        {
+            pendingLagPress = default;
+            return;
+        }
+
+        bool isHost = senderClientId == Unity.Netcode.NetworkManager.ServerClientId;
+        pendingLagPress = new LagPress
+        {
+            Valid = true,
+            ClientId = senderClientId,
+            IsHost = isHost,
+            PressServerTime = isHost ? now : pressedServerTime,
+            ArriveServerTime = now,
+            RttMs = InterruptLagMonitor.RttMs(senderClientId),
+        };
+    }
+
+    /// <summary>[서버] 승인 여부와 관계없이 요청 처리 뒤 남은 누른 시각을 버린다.</summary>
+    internal void ServerClearLagPress() => pendingLagPress = default;
+
+    // 판정 1회에서 로그에 쓸 카운터 창 소유자 하나 — 성공한 첫 대상, 없으면 처음 만난 대상.
+    private struct LagHit
+    {
+        public Unit Target;
+        public bool OpenAtHit;
+        public bool Success;
+
+        public void Observe(Unit unit, bool openAtHit, bool success)
+        {
+            if (Target != null && (Success || !success))
+                return;
+
+            Target = unit;
+            OpenAtHit = openAtHit;
+            Success = success;
+        }
+    }
+
+    private void ReportLag(in LagHit hit)
+    {
+        LagPress press = activeLagPress;
+        activeLagPress = default;
+        if (!press.Valid || !InterruptLagMonitor.TryServerNow(out double hitServerTime))
+            return;
+
+        InterruptWindowState pressWindow = hit.Target != null
+            ? InterruptLagMonitor.WindowStateAt(hit.Target.gameObject, press.PressServerTime)
+            : InterruptWindowState.Unknown;
+        bool wouldSucceed = hit.Target != null && InterruptLagJudge.WouldSucceedAtPress(
+            pressWindow, press.PressServerTime, hitServerTime, lagCompensationCapMs / 1000.0);
+
+        InterruptLagMonitor.ReportJudgement(new InterruptLagSample
+        {
+            ClientId = press.ClientId,
+            IsHost = press.IsHost,
+            Skill = GetType().Name,
+            Target = hit.Target != null ? hit.Target.name : null,
+            PressServerTime = press.PressServerTime,
+            ArriveServerTime = press.ArriveServerTime,
+            HitServerTime = hitServerTime,
+            RttMs = press.RttMs,
+            PressWindow = pressWindow,
+            HitWindow = hit.Target == null
+                ? InterruptWindowState.Unknown
+                : hit.OpenAtHit ? InterruptWindowState.Open : InterruptWindowState.Closed,
+            Success = hit.Success,
+            WouldSucceed = wouldSucceed,
+            CapMs = lagCompensationCapMs,
+        });
     }
 
     // ── 간파 성공 쿨 감소 (서버, 할 일 26) ──

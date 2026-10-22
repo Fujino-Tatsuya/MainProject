@@ -216,6 +216,61 @@
 - If boss HP reaches 0 during a fixed tick, combat ends immediately at that point.
 - The server fixed tick pipeline should be centralized so event ordering can be changed by reordering pipeline steps.
 
+### Interrupt lag measurement (간파 지연 측정 — 할 일 74 후속, 2026-10-22)
+> **측정만 한다. 보정은 아직 구현하지 않았다** — 위 "client input-time compensation 없음" 규칙이 그대로 유효하다. 판정 결과(성공/실패)는 로그와 무관하다.
+
+**보정을 한다면의 결정 기준(합의, 미구현)**
+- 보정 대상은 **카운터 창 열림 여부만**이다. 사거리·명중(앵커 오버랩)은 서버 현재 기준 그대로.
+- 상한 **100ms**: 판정 시각 − 누른 시각 ≤ 상한이고, 누른 시각에 창이 열려 있었을 때만 "누른 시각 기준이면 성공"으로 본다.
+  상한은 간파 스킬 컴포넌트의 직렬화 필드 `lagCompensationCapMs`(`PlayerInterruptSkillBase`, 기본 100). 데이터 테이블에는 아직 없다.
+- ⚠️ 판정 시각은 클립 Hit 이벤트(또는 `hitDelay` 0.15~0.25s) 뒤라 `hitAfterPressMs` 에 시전 지연이 들어간다. 상한 100ms 로는 대부분 `wouldSucceed=false` 일 수 있으니,
+  판단은 `lagMs`·`pressWindow`·`hitWindow` 원본 값으로도 다시 계산해 본다.
+
+**절차**: 측정(빌드 + LAN/원격, Development 또는 `DEV_HOTKEYS` 릴리스 — [debug-hotkeys.md](debug-hotkeys.md)) → 호스트 `Player.log` 의 `[InterruptLag]` 줄 수집(QA 자동화 `qa/LobbyDemo` 가 파싱) →
+원격 `rescued`(보정했으면 성공인데 실제 실패) 비율과 `rttAvgMs`·`rttMaxMs` 를 호스트 그룹과 비교 → 원격 실패가 지연 때문에 의미 있게 늘어날 때만 보정을 PLAN 으로 올린다.
+
+**구성**: 원격 클라는 `RequestUseSkillRpc` 에 누른 순간의 `NetworkManager.ServerTime.Time`(클라 추정 서버 시각)을 실어 보낸다(간파 외 슬롯은 서버가 무시).
+호스트 자신은 지연 0(누른 시각 = 도착 시각, RTT 0). 카운터 창 소유자(GauntletBot·WallBot·SpinnerBot = `MonsterCounterWindow`, 23호 = `_counterWindow` 변화, 허수아비 = `TrainingDummyInterrupt` 상태)가
+열림/닫힘 서버 시각을 `InterruptLagMonitor` 의 소유자별 링버퍼(16개)에 남긴다. 순수 계산 = `InterruptLagModel.cs`(EditMode `InterruptLagModelTests`).
+로그는 `Debug.Log` 그대로라 Development·`DEV_HOTKEYS` 릴리스 빌드의 `Player.log` 에도 남는다. 서버(호스트)에서만 찍힌다.
+
+**판정 줄** — 간파 판정(Hit) 1회마다 1줄. 공백 구분 `key=value`, 값에 공백 없음.
+```
+[InterruptLag] event=judge clientId=1 host=false skill=GunnerInterruptSkill target=GauntletBot(Clone) pressT=812.402 arriveT=812.431 hitT=812.632 lagMs=29.0 hitAfterPressMs=230.0 rttMs=58 pressWindow=open hitWindow=closed result=fail wouldSucceed=false capMs=100
+```
+| 키 | 의미 |
+|---|---|
+| `clientId` | 요청한 클라 |
+| `host` | 호스트 자신이면 `true`(지연 0 취급) |
+| `skill` | 간파 스킬 타입 이름 |
+| `target` | 판정에 쓴 카운터 창 소유자(성공한 첫 대상, 없으면 앵커에 처음 걸린 소유자). 사거리에 없으면 `none` |
+| `pressT` | 누른 시각(서버 시각 초, 원격 = 클라 추정 `ServerTime`) |
+| `arriveT` | 요청이 서버에 도착한 서버 시각 |
+| `hitT` | 판정(Hit) 서버 시각 |
+| `lagMs` | `arriveT − pressT` |
+| `hitAfterPressMs` | `hitT − pressT` (상한 비교 대상) |
+| `rttMs` | 그 클라의 트랜스포트 RTT(`GetCurrentRtt`, 도착 때 측정). 호스트 0 |
+| `pressWindow` | 누른 시각의 창 상태(링버퍼 기준) `open`/`closed`/`unknown`(기록 없음·밀려남·대상 없음) |
+| `hitWindow` | 판정 시각의 창 상태(판정 직전 `ServerIsInterruptible` — 23호는 상태 차단 포함) |
+| `result` | 실제 결과 `success`/`fail`(카운터 창 소유자의 성공 수 증가 여부) |
+| `wouldSucceed` | 누른 시각 기준이면 성공했을 것: `pressWindow=open` ∧ `hitAfterPressMs ≤ capMs` ∧ 대상 있음 |
+| `capMs` | 상한(ms) |
+
+**요약 줄** — 판 종료 때 그룹마다 1줄(`host`, `remote` 순). 그 뒤 집계·창 기록을 비운다.
+```
+[InterruptLag] event=summary reason=session_end group=remote attempts=12 withTarget=10 success=7 correctedSuccess=8 rescued=1 rttAvgMs=54.3 rttMaxMs=91.0
+```
+| 키 | 의미 |
+|---|---|
+| `reason` | `session_end`(결과 확정 `SessionStatsTracker.Capture` — 클리어·전멸·중도 종료, 0건이어도 찍음) · `scene_end`(`SessionStatsTracker` 비활성 = 씬 언로드·서버 종료) · `quit`(앱 종료). 뒤 두 개는 찍지 않은 시도가 남았을 때만 |
+| `group` | `host`(호스트 자신) / `remote`(원격 클라 전부) |
+| `attempts` | 판정 줄 수 |
+| `withTarget` | 그중 카운터 창 소유자가 사거리에 있던 수 |
+| `success` | 실제 성공 수 |
+| `correctedSuccess` | 보정했으면 성공 수 = `result=success` ∨ `wouldSucceed=true` |
+| `rescued` | `correctedSuccess` 중 실제 실패였던 수 |
+| `rttAvgMs`·`rttMaxMs` | 판정 줄의 `rttMs` 평균·최대 |
+
 ## Play 종료 후 포트 점유 진단 ([PortLeak])
 에디터 전용 진단(`Assets/1.Scripts/Dev/Editor/PlayModePortLeakProbe.cs`). 동작은 바꾸지 않고 로그만 남긴다.
 - `ExitingPlayMode` 에 스냅샷(씬의 NetworkManager 수, Singleton 의 IsListening/IsServer/IsClient/ShutdownInProgress,

@@ -107,6 +107,7 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
             _cycle = new TrainingDummyInterruptCycle(vulnerableDuration, idleDuration);
             _state.Value = _cycle.State;
             ServerRefreshSuperArmor();
+            InterruptLagMonitor.RecordWindow(gameObject, IsInterruptible);   // 간파 지연 측정 — 시작 상태(이후는 OnStateChanged)
         }
 
         _state.OnValueChanged += OnStateChanged;
@@ -168,7 +169,12 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
         }
     }
 
-    void OnStateChanged(TrainingDummyInterruptState previous, TrainingDummyInterruptState current) => ApplyTint(current);
+    void OnStateChanged(TrainingDummyInterruptState previous, TrainingDummyInterruptState current)
+    {
+        ApplyTint(current);
+        // 간파 지연 측정(측정만) — 서버에서만 기록된다(RecordWindow 가 거른다).
+        InterruptLagMonitor.RecordWindow(gameObject, current == TrainingDummyInterruptState.Interruptible);
+    }
 
     // BossCounterTelegraph 와 같은 방식 — 베이스 틴트로 넣어야 피격 플래시가 이 색 위에서 Lerp 하고 끝나도 돌아온다.
     void ApplyTint(TrainingDummyInterruptState state)
