@@ -18,9 +18,8 @@ using UnityEngine.AI;
 ///  · G4 열림 ∧ 존3 파티 첫 진입 → 스피너봇 휴면 해제 → <see cref="TutorialSpinnerPractice.EnterPractice"/> · 단계 Zone3Practice ·
 ///    자막 TUT_Z3_INTRO → TUT_Z3_PRACTICE_NOTE(공통 — 캐릭터별 간파 설명 없음, §2.4).
 ///  · 간파 성공(준비 단계) = <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/>(연습 중 · 시전자 존3 안 — 존3 의 카운터 대상은
-///    스피너봇뿐이고, 간파 창은 연계 준비 단계에서만 열리므로 이 성공 = 연계 시작) → <b>파티 전원 우클릭 쿨 1회 초기화</b>
-///    (<see cref="TutorialCooldownReset"/> — 시전자 쿨 감소(할 일 26)를 적용한 <b>뒤</b> 나는 이벤트라 그 위에 0 으로 덮는다) ·
-///    첫 성공만 TUT_Z3_FIRST_SUCCESS · TUT_Z3_PUSH_INTRO. 간파 횟수는 세지 않는다.
+///    스피너봇뿐이고, 간파 창은 연계 준비 단계에서만 열리므로 이 성공 = 연계 시작) → 첫 성공만 TUT_Z3_FIRST_SUCCESS · TUT_Z3_PUSH_INTRO.
+///    간파 횟수는 세지 않고, 쿨타임도 돌려주지 않는다(할 일 90).
 ///  · 연계 일(<see cref="TutorialSpinnerPractice.ServerComboEvent"/>): 벽 충돌 → Zone3Interrupts +1 · TUT_Z3_WALL_SUCCESS({n}/3) ·
 ///    밀치기 빗나감 → TUT_Z3_PUSH_HINT(5초 간격) · 회복 끝(다시 준비) → TUT_Z3_COUNTER_GOAL ·
 ///    완료(3회째 회복 끝) → <b>G5</b>(<see cref="TutorialDirector.RequestGateServer"/>) → <see cref="TutorialSpinnerPractice.EnterRealMode"/>
@@ -252,26 +251,15 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         _director.ShowSubtitleServer(TutorialGuideIds.ZoneClear);
     }
 
-    // v8 Z3-4 — 간파 성공(준비 단계)마다 파티 전원 우클릭 쿨 1회 초기화. 간파 횟수는 세지 않는다(연계 = 벽 충돌).
-    // 26 이 시전자 우클릭 쿨을 줄인 뒤 나는 이벤트라 여기서 0 으로 덮는다. 연습 모드 없는 스피너봇(Variant 미치환)은 연계가 없어 초기화하지 않는다.
+    // 간파 성공(준비 단계) — 첫 성공 자막 + 밀치기 안내. 간파 횟수는 세지 않는다(연계 = 벽 충돌). 쿨타임은 돌려주지 않는다(할 일 90).
+    // 연습 모드 없는 스피너봇(Variant 미치환)은 연계가 없어 안내하지 않는다.
     private void HandleInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
     {
         if (caster == null) return;
         _succeededCaster = caster;
 
-        ulong attackerClientId = caster.OwnerClientId;
-        if (_practice == null || _director.GetPlayerAreaServer(attackerClientId) != TutorialArea.Zone3) return;
+        if (_practice == null || _director.GetPlayerAreaServer(caster.OwnerClientId) != TutorialArea.Zone3) return;
         if (!_model.NotifyCounterSucceeded(out bool first)) return;
-
-        int players = 0, skills = 0;
-        foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            Player p = client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
-            if (p == null) continue;
-            players++;
-            skills += TutorialCooldownReset.ResetSkillsServer(p, TutorialCooldownResetScope.Zone3CounterIncludes);
-        }
-        Edit.Log($"[Tutorial] 존3 간파 성공(client {attackerClientId}) → 파티 우클릭 쿨 초기화 — {players}명 · 스킬 {skills}개.", this);
 
         if (first) _director.ShowSubtitleServer(TutorialGuideIds.Z3FirstSuccess);
         _director.ShowSubtitleServer(TutorialGuideIds.Z3PushIntro);
