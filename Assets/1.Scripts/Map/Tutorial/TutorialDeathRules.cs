@@ -23,7 +23,8 @@ using UnityEngine;
 ///  · 보스 진입 패드 범위 + 1m 안은 부활·추락 복구 지점에서 뺀다(C3 — <see cref="ServerPadAreas"/>). G10 을 지난 사람의 보스 진입 존 후보가
 ///    전부 빠지면 G10 배리어 바로 앞(보스 진입 존 쪽, 패드 밖)으로. 추락 복구 거름(<see cref="TutorialBarriers.IsReturnPointAllowed"/>)도 같은 범위를 뺀다.
 ///  · 보스방 이동 카운트다운(<see cref="BossTeleportManager.IsCountdownActive"/> — 패드·타이머 만료 강제 이동 공통)이 보이면
-///    대기 부활을 즉시·그 자리로 바꾼다. 튜토리얼 구간 밖(보스방)에 있는 사람도 그 자리에서 되살린다(옛 구간으로 끌고 가지 않음).
+///    대기 부활을 즉시로 바꾼다. 카운트다운 중 부활 자리 = 보스 진입 고정 지점(<see cref="TutorialSafePoints.TryResolveFixedPoint"/>, 할 일 80) —
+///    지점이 없거나 카운트다운이 끝난 뒤(엘리베이터·도착 뒤 — 연출 잠금 보류 후)면 그 자리.
 ///  · 보스방 도착(<see cref="BossTeleportManager.AlivePlayersArrived"/>/<see cref="BossTeleportManager.ArrivalAborted"/>) 또는
 ///    단계 <see cref="TutorialStep.Finished"/> 이후 사망은 일반 규칙(자동 부활 없음). 남은 대기는 그 자리에서 끝낸다.
 ///  · 연출 잠금(<see cref="PlayerEncounterLock.IsCinematicLocked"/>) 중이면 보류하고 경고 1회 — 풀리면 다음 프레임에 부활.
@@ -373,7 +374,14 @@ public sealed class TutorialDeathRules : MonoBehaviour
         bool inPlace = order.InPlace || !IsInsideTutorial(here);
         Vector3 target = here;
         string where = "그 자리";
-        if (!inPlace)
+        // 보스방 이동 카운트다운 중 부활(즉시) = 보스 진입 고정 지점(할 일 80). 지점이 없으면 기존대로 그 자리.
+        if (order.InPlace && _model.IsMoveInProgress && TutorialSafePoints.Active != null
+            && TutorialSafePoints.Active.TryResolveFixedPoint(TutorialArea.BossEnter, clientId, "카운트다운 중 부활", out target))
+        {
+            inPlace = false;
+            where = $"{TutorialArea.BossEnter} 안전 지점(카운트다운 중) {target}";
+        }
+        else if (!inPlace)
         {
             if (TryFindRevivePoint(clientId, here, out target, out bool safe, out TutorialArea area))
                 where = $"{area} {(safe ? "안전 지점" : "안전 지점 없음 → 몬스터에서 가장 먼 지점")} {target}";

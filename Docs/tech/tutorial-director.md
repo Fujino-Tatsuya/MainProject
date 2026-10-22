@@ -4,7 +4,7 @@
 > v8 에서 바뀐 디렉터 규칙: G1 = 여덟 항목·교착 방지 제외 · G5 = 수동(연계 3회 + 마지막 복귀) · 체크 항목 SkillR·SkillInterrupt·Corridor1CooldownReset 추가 · `AttackHits` 삭제. 목숨 차감 기준 G11 은 그대로(사용자 확정, §11).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
-> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11.
+> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11. 스텝별 고정 안전 지점(낙사 복귀, 할 일 80)은 §12.
 > **Play 검증 체크리스트(S0~S12 전 단계·MPPM·회귀·병합 전 확인)**: [tutorial-qa.md](tutorial-qa.md).
 
 ## 1. 판별 — 한 곳
@@ -360,8 +360,9 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - 부활 지점 = **지금 단계 구간**(디렉터 `Step` 의 구간 — 열린 배리어로 들어갈 수 있는 가장 앞 구간을 넘지 않음, 아래 S12 항목)(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
   1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
   안전한 곳이 없으면 몬스터에서 가장 먼 후보, 후보가 없으면 그 자리.
-- 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시·그 자리'(Soul 이 되는 대로). 이동 중 사망도 같다.
-  튜토리얼 구간 밖(보스방)에 있는 Soul 은 늘 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
+- 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시'(Soul 이 되는 대로). 이동 중 사망도 같다.
+  부활 자리 = 카운트다운이 아직 켜져 있으면 **보스 진입 고정 지점**(§12 — `TutorialSafePoints.TryResolveFixedPoint(BossEnter)`, 할 일 80 2026-10-22), 지점이 없거나
+  카운트다운이 끝난 뒤(엘리베이터 연출 잠금 보류 → 도착 뒤)면 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
 - 연출 잠금(`PlayerEncounterLock`) 중이면 보류 + 경고 1회, 풀리면 다음 프레임 부활(사망 연출 해소도 잠금 해제 뒤 진행).
 - 추락 생존 복구는 그대로. 추락 사망은 기존대로 안전지점에 Soul 로 옮겨진 뒤 같은 규칙으로 부활.
 - '지금 단계 구간'(부활 지점의 기준 구간) = **디렉터 `Step` 의 구간**(S12 — `TutorialRevivePointRules.StepArea`·`ResolveStageArea(step, mask)`).
@@ -389,3 +390,70 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   - 리스폰 직후 각자 "특성을 초기화하고 다시 선택할까요?" 팝업(`TutorialTraitDirector` — `PartyWipeRespawned` 구독, 튜토리얼일 때만). 예 = 그 플레이어 특성 효과만 원복 + 혼자 4라운드(3장 중 1장, 고른 것 제외, 선택 중 무적). 아니오 = 유지.
   - 🔴 **팝업·재선택 중인 사람이 있으면 보스 진입 패드가 잠긴다**(`TutorialBossPath.IsBossPadEnabled` — G10 전 잠금과 같은 경로·테두리 숨김). 패드는 한 명만 서도 전원을 끌고 가기 때문(D3).
     끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).
+
+## 12. 스텝별 고정 안전 지점 (할 일 80 — 1안, 2026-10-22)
+> 코드: `TutorialSafePointRules`(순수 — 복귀 구간·지금 스텝 구간·지점 고르기·점유 레이어·주변 링·복귀 높이·기본 위치) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
+> 훅 `PlayerSafePointTracker.ReturnPointOverride`(신규, 기본 null = 기존 동작). 저작: `Tools/Map/Authoring/Tutorial/8. Place Safe Points (열린 씬)`.
+> 테스트: `TutorialSafePointRulesTests`(튜토리얼 러너). 디렉터·흐름 코드는 바꾸지 않았다(디렉터 공개 API 만 부른다).
+
+**데이터** — `4.MapScene` 루트 `TutorialSafePoints`(비네트워크) + 자식 `SafePoint_{구간}` 9개(존1~4·복도1~4·보스 진입). 지점 = 씬 Transform 참조(`points`).
+저작 메뉴가 **빠진 구간만** 기본 위치에 만든다(멱등 — 손으로 옮긴 지점은 그대로). 기본 위치(2026-10-22 배치, Y = 스테이지 0):
+
+| 구간 | 기본 위치(월드 XZ) | 규칙 |
+|---|---|---|
+| 존1 | (29.83, −200.40) | 가운데(스폰 존) |
+| 복도1 | (17.93, −200.40) | 입구 배리어 G1 앞면 + 1.5m — 중간 지점(특성 창) 전 |
+| 존2 | (7.68, −200.40) | 복도1 출구 G2 앞면 + 2.5m |
+| 복도2 | (0.18, −188.50) | G3 앞면 + 1.5m |
+| 존3 | (0.18, −178.05) | G4 앞면 + 2.5m |
+| 복도3 | (0.18, −138.65) | G6 앞면 + 1.5m |
+| 존4 | (0.18, −128.40) | G7 앞면 + 2.5m |
+| 복도4 | (−11.73, −101.11) | G9 앞면 + 1.5m |
+| 보스 진입 | (−21.97, −101.11) | G10 앞면 + 2.5m(패드 위에 두지 말 것 — 런타임이 거르지 않는다) |
+
+튜닝 값(전부 `TutorialSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 복귀 높이 `dropHeight`(기본 3m — 고른 자리 Y + 3 에서 떨어져 착지) ·
+점유 반경 `occupancyRadius`(0.4) · 링 후보 바닥 탐색 `floorSearchHeight`(±1.5) · `maxFlatAngle`(10°).
+
+**언제(서버, 튜토리얼 활성)** — **낙사**: 추락 생존·추락 사망의 복귀 지점(`ResolveReturnPoint`)을 큐·Ring 탐색 대신 아래 구간별 자리로. 연출(낙하 카메라·0.75초 지연·무적·입력 잠금)은 기존 그대로.
+낙사 말고는 되돌리지 않는다 — 처음 구현에 있던 구간 이탈(1.5초)·끼임(2초) 자동 복귀는 요청 범위 밖이라 뺐다(2026-10-22).
+
+**복귀 구간(2026-10-22 사용자 결정 — 순수 `TutorialSafePointRules.ReturnPhase(active, step, countdownActive, encounterBusy)`)**
+
+| 구간 | 코드 경계 | 낙사 | 사망 부활 |
+|---|---|---|---|
+| 스텝 진행 | 단계 Zone1~BossEnter · 카운트다운·이동 연출 아님 | 지금 스텝 구간 고정 지점(아래 선택 순서) | 기존(§8 — 3초 뒤 지금 단계 구간 격자) |
+| 보스방 이동 카운트다운 | `BossTeleportManager.IsCountdownActive`(`_teleportAt > 0` — 설정 `BeginCountdown`, 해제 `CancelCountdown`·엘리베이터 시작·리그 없는 이동·`AbortArrival`) | **보스 진입(`SafePoint_BossEnter`) 고정 지점** — 같은 선택 순서(`FixedPointArea` = BossEnter) | 즉시, **같은 보스 진입 고정 지점**(`TutorialDeathRules.Revive` — 카운트다운이 켜져 있을 때만) |
+| 엘리베이터 연출·도착 ACK 대기 | 카운트다운 끝 뒤 `IsEncounterBusy`(`_pending`(`_elevatorRunning` 구간 포함)·`_awaitingArrival`) | **변경 없음** — override null(기존 큐 → `ReturnPointFallback` → 스폰) · 할 일 89 | 변경 없음(참가자 입력 잠금 = 보류) |
+| 보스방 도착 뒤(보스전) | 단계 `Finished`(`CompleteArrival` → `AlivePlayersArrived` → `TutorialDirector.HandleBossRoomArrived`) | **재합류 모서리 규칙**(`BossRoomRejoin.TryCollectCorners` + `RejoinSpawnPicker.FarthestCorner` — 다른 플레이어·`TwentyThreeBoss` 에서 가장 먼 모서리, [handoff-boss-room-rejoin-corners.md](handoff-boss-room-rejoin-corners.md)) 모서리 Y + `dropHeight` | 일반 규칙(그대로) |
+
+- 카운트다운 중엔 `IsEncounterBusy` 도 true(카운트다운 코루틴) — 카운트다운이 먼저다. 카운트다운이 패드 이탈로 취소되면 다시 스텝 구간.
+- 카운트다운은 타이머 만료 강제 이동이면 G10 전(존4 등)에서도 켜진다 — 그때도 보스 진입 지점(사용자 사양 그대로, 곧 엘리베이터로 끌려간다).
+- 보스전 모서리를 못 찾으면(모서리 그룹·`InvisibleBoundaries` 둘 다 없음) 경고 후 기존 경로. 모서리는 점유·링 검사를 하지 않는다(재합류와 같다).
+- 도착 무효(`ArrivalAborted` — ACK 타임아웃)는 단계가 Finished 가 아니라 '스텝 진행'(보스 진입 지점)으로 본다.
+
+**어느 지점**: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(`TutorialSafePointRules.StepArea` = `TutorialRevivePointRules.ResolveStageArea(step, mask, passed)` —
+단계 구간을 배리어 상한으로 내리고, 그 플레이어의 지나온 최전방 구간보다 뒤면 그 구간으로 올림)의 지점 **하나만** 쓴다(`TryPickStepPoint`).
+- 🔴 **최종 선택 순서(2026-10-22 사용자 정정)** — `TutorialSafePointRules.PickSpot`:
+  1. **점유 검사 = 정적 장애물만**(`BlockingLayers` = Default·Ground·Env·Wall·Barrier, `CheckSphere` 반경 `occupancyRadius`). 몬스터·플레이어·시체 등 유닛은 보지 않는다 —
+     몬스터가 지점 위에 있어도 지점 그대로, 겹치면 유닛 충돌 밀어내기(할 일 11)가 푼다. 지점 자체는 바닥 검사를 하지 않는다(저작 위치를 믿는다).
+  2. 지점이 정적 장애물에 막히면 **주변 링**(`TryFindNearestFree` — 반경 0.75/1.5/2.25/3m × 8방향, 가까운 것부터, 그 구간 사각형 안만)에서
+     아래 평평한 바닥이 있고 정적 장애물에 막히지 않은 첫 빈자리.
+  3. 고른 자리(지점 또는 링 빈자리) XZ 에 **지점 Y + `dropHeight`(3m)** 로 내려놓아 떨어져 착지한다.
+  4. 링도 실패(또는 구간 사각형 없음)하면 **그 지점 + 3m 그대로**(겹침 허용 · 경고 로그) — 기록 지점 큐·`ReturnPointFallback`·스폰 폴백으로 내려가지 않는다.
+  - 격자(`TryFindAreaSpreadPoints`)·다른 구간 대체·최후 수단·`ReturnPointFilter` 는 고정 지점 경로에 없다(격자는 자동 부활·전멸 리스폰이 그대로 쓴다).
+- 기존 추락 복구(큐 → `ReturnPointFallback` → 스폰 폴백)로 넘기는 건 그 구간에 지점이 없을 때·엘리베이터 연출·도착 대기 중(할 일 89)·보스전 모서리 없음뿐(override null).
+- 배경(2026-10-22 진단): 기존 추락 복구의 큐 점유 검사(`PlayerSafePointTracker.IsFreeStanding`/`TryResolveFlatUnoccupied`)는 `Player.prefab` 의 `groundMask` = Everything 이라
+  몬스터·다른 플레이어가 근처에 있으면 기록 지점이 무효가 되고, 큐가 전부 막히면 스폰(씬 시작 지점)으로 폴백한다. 튜토리얼 중에는 고정 지점이 있으면 이 경로에 내려가지 않는다.
+  큐(이동하며 갱신되는 기록 지점)와 일반 스테이지 동작은 의도대로 그대로 둔다.
+
+**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `client n 낙사 → Zone2 안전 지점 주변 빈자리 …` · `[Fall/진단] 고정 안전 지점으로 — …` ·
+경고 `client n 낙사 — Zone2 안전 지점이 장애물에 막히고 주변 빈자리도 없어 지점 위 … 에 그대로 내린다(겹침 허용).` ·
+경고 `client n 낙사 — Zone2 안전 지점이 없다(미배치). 기존 경로로 넘긴다.` ·
+카운트다운 `client n 낙사 → BossEnter 안전 지점 …` · `client n 카운트다운 중 부활 → BossEnter 안전 지점 …` · `[Tutorial] client n 자동 부활 — BossEnter 안전 지점(카운트다운 중) …` ·
+보스전 `client n 보스전 낙사 → 보스 룸 모서리 Corner3(prefab|fallback) …` · 경고 `client n 보스전 낙사 — 보스 룸 모서리를 못 찾아 기존 추락 복구로 넘긴다.`
+
+**알려진 한계 · Play 로 볼 것**
+- 낙사가 '최근 밟은 자리'가 아니라 구간 입구로 돌아간다(1안 사양). 존2 물 구멍처럼 자주 떨어지는 곳은 이동 거리가 늘 수 있다 — 싫으면 `useOnFall` 끔.
+- 지점 Y 는 스테이지 높이(0) — 존 바닥은 런타임 존 프리팹이라 에디터에서 검증하지 못했다. 런타임은 지점 자체의 바닥은 보지 않으므로(링 후보만 본다) 지점 아래에 바닥이 없으면 다시 떨어진다 — 지점을 바닥 위에 둘 것.
+- 지점 바로 위(3m 안)에 천장·소품이 있으면 그 안에 끼일 수 있다 — 지점을 트인 곳에 둔다.
+- 할 일 86(존1·존3 검사 로비 이전) 뒤 구간이 바뀌면 지점만 지우고 메뉴를 다시 돌린다.
