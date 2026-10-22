@@ -6711,6 +6711,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (_counterWindow.Value == open) return;
         _counterWindow.Value = open;
+        InterruptLagMonitor.RecordWindow(gameObject, open);   // 간파 지연 측정(측정만)
     }
 
     /// <summary>

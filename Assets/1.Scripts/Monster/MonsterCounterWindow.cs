@@ -57,14 +57,35 @@ public class MonsterCounterWindow : MonoBehaviour
     public bool IsOpen => _window.IsOpen;
 
     /// <summary>저작된 길이로 창을 연다. 길이가 0 이면 열리지 않는다(카운터 없음).</summary>
-    public void Open() => _window.Open(WindowDuration);
+    public void Open()
+    {
+        bool wasOpen = _window.IsOpen;
+        _window.Open(WindowDuration);
+        if (wasOpen) InterruptLagMonitor.RecordWindow(gameObject, false);   // 다시 열기 = 닫힘 → 열림
+        if (_window.IsOpen) InterruptLagMonitor.RecordWindow(gameObject, true);
+    }
 
     /// <summary>시간을 흘린다. <b>이번 틱에 만료됐으면 true</b> — 호출측이 "실패 확정"을 한 번만 처리한다.</summary>
-    public bool TickAndDetectExpiry(float deltaTime) => _window.TickAndDetectExpiry(deltaTime);
+    public bool TickAndDetectExpiry(float deltaTime)
+    {
+        bool expired = _window.TickAndDetectExpiry(deltaTime);
+        if (expired) InterruptLagMonitor.RecordWindow(gameObject, false);
+        return expired;
+    }
 
     /// <summary>인터럽트를 소비한다(창 하나에 한 번만). true 면 성공 — 창은 즉시 닫힌다.</summary>
-    public bool TryConsumeInterrupt() => _window.TryConsumeInterrupt();
+    public bool TryConsumeInterrupt()
+    {
+        bool consumed = _window.TryConsumeInterrupt();
+        if (consumed) InterruptLagMonitor.RecordWindow(gameObject, false);
+        return consumed;
+    }
 
     /// <summary>창을 비운다. 공격 취소·사망·디스폰에서 부른다. 멱등이다.</summary>
-    public void Close() => _window.Close();
+    public void Close()
+    {
+        bool wasOpen = _window.IsOpen;
+        _window.Close();
+        if (wasOpen) InterruptLagMonitor.RecordWindow(gameObject, false);
+    }
 }

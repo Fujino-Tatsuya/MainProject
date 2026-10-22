@@ -745,7 +745,11 @@ public abstract class PlayerStateBase : IPlayerState
             return true;
         }
 
-        if (Context.Input.InterruptPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.SkillInterrupt))
+        // 인터럽트 상태 경로는 우클릭에 스킬이 없을 때만 쓴다. 스킬이 배정돼 있으면 위 스킬 경로가 이 입력을 이미 판정했다 —
+        // 시전 요청 응답 대기(바쁨)로 남겨 둔 우클릭이 여기서 인터럽트 상태로 새면, 원격 클라는 서버가 승인한 간파를
+        // 스킬 상태로 받지 못해(PlaySkillClientRpc 의 BeginSkill 거부) 간파 모션이 씹힌다(할 일 74).
+        if ((Context.Skills == null || Context.Skills.GetSkill(PlayerSkillSlot.Interrupt) == null) &&
+            (Context.Input.InterruptPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.SkillInterrupt)))
         {
             if (Context.Controller.ChangeState(PlayerActionState.Interrupt))
             {
@@ -753,14 +757,10 @@ public abstract class PlayerStateBase : IPlayerState
                 return true;
             }
 
-            // 우클릭에 스킬이 배정돼 있으면 위 스킬 경로가 이 입력을 이미 판정했다 — 여기서 다시 버리거나 피드백하지 않는다.
-            if (Context.Skills == null || Context.Skills.GetSkill(PlayerSkillSlot.Interrupt) == null)
-            {
-                Context.Input.ResolveBufferedInput(PlayerBufferedInput.SkillInterrupt,
-                    Context.StatusEffects.BlocksInterrupt
-                        ? Context.Controller.RejectByEffect(PlayerBufferedInput.SkillInterrupt)
-                        : PlayerActionAttempt.Rejected);
-            }
+            Context.Input.ResolveBufferedInput(PlayerBufferedInput.SkillInterrupt,
+                Context.StatusEffects.BlocksInterrupt
+                    ? Context.Controller.RejectByEffect(PlayerBufferedInput.SkillInterrupt)
+                    : PlayerActionAttempt.Rejected);
         }
 
         if (TryStartAttackOnHold())
