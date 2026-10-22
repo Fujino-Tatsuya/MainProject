@@ -23,4 +23,5 @@
 - 대상 = 그 순간 Alive 플레이어. 상태이상 3개(`CooldownRateModifier`·`MoveSpeedFinalMultiplier`·`AttackSpeedFinalMultiplier`), 출처 = 보스 `NetworkObjectId`, 스택 1(재진입 = 지속 갱신).
 - 지속 = 시트 `durationOverride` > 0 이면 그 값, 0 이면 제압 길이. 만료는 상태이상 스윕 — 제압 종료 이벤트는 쓰지 않는다.
 - Alive 를 벗어나면(쓰러짐 연출·Soul·사망) 그 출처 3개 제거, 부활해도 다시 안 건다.
+- 버프 전체 요약·비네팅: [suppress-haste.md](suppress-haste.md).
 - 규칙: `SuppressHasteRules`(EditMode `SuppressHasteRulesTests`). 수치: `Assets/Resources/Player/SuppressHasteData.asset` · xlsx `SuppressHaste` 시트.
