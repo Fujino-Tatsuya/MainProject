@@ -43,16 +43,22 @@ public static class PlayerActionRejectPolicy
 
 /// <summary>
 /// 선입력 버퍼(할 일 44) — 지금 바로 실행 못 하는 입력을 잠깐 들고 있다가 실행 가능해진 첫 순간에 넘긴다.
-/// 1개만 기억한다 — 살아 있는 입력보다 우선순위가 낮은 새 입력은 기록하지 않고, 같거나 높으면 덮는다(할 일 77).
-/// 유지 시간이 지나면 없는 것으로 본다(만료된 입력은 새 입력을 막지 않는다).
-/// 시간은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상). 유지 시간 0 이하 = 버퍼 끔.
+/// 종류별로 마지막 누른 시각을 들고 있다(할 일 77) — 살아 있는 입력은 전부 보관하고, 각자 유지 시간이 지나면 따로 만료된다.
+/// 같은 종류를 다시 누르면 시각만 갱신한다. 꺼낼 때(<see cref="Peek"/>)는 살아 있는 것 중 우선순위가 가장 높은 것,
+/// 같으면 나중에 누른 것. 시간은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상). 유지 시간 0 이하 = 버퍼 끔.
 /// </summary>
 public sealed class PlayerInputBuffer
 {
-    private PlayerBufferedInput kind = PlayerBufferedInput.None;
-    private float recordedAt;
-    // 종류별 우선순위(인덱스 = PlayerBufferedInput). 기본 전부 0 = 마지막 입력이 이긴다.
-    private readonly int[] priorities = new int[(int)PlayerBufferedInput.SkillUltimate + 1];
+    private const int KindCount = (int)PlayerBufferedInput.SkillUltimate + 1;
+
+    // 인덱스 = PlayerBufferedInput. alive 가 거짓이면 그 종류는 없다.
+    private readonly bool[] alive = new bool[KindCount];
+    private readonly float[] recordedAt = new float[KindCount];
+    // 누른 순서 — 같은 우선순위에서 나중 입력을 고른다(같은 프레임이면 기록 순서).
+    private readonly int[] recordedOrder = new int[KindCount];
+    private int nextOrder;
+    // 종류별 우선순위. 기본 전부 0 = 마지막 입력이 이긴다.
+    private readonly int[] priorities = new int[KindCount];
 
     public PlayerInputBuffer(float holdSeconds)
     {
@@ -75,55 +81,103 @@ public sealed class PlayerInputBuffer
     }
 
     /// <summary>
-    /// 새로 눌린 입력을 기록한다. 살아 있는 입력의 우선순위가 더 높으면 기록하지 않는다(false), 같거나 낮으면 덮는다.
+    /// 같은 우선순위끼리는 순서를 지키며 <paramref name="kinds"/> 를 우선순위 높은 순으로 정렬한다(제자리, 할당 없음).
+    /// 상태 머신이 후보를 시도하는 순서다.
     /// </summary>
+    public void SortByPriority(PlayerBufferedInput[] kinds)
+    {
+        for (int i = 1; i < kinds.Length; i++)
+        {
+            PlayerBufferedInput current = kinds[i];
+            int priority = GetPriority(current);
+            int j = i - 1;
+            while (j >= 0 && GetPriority(kinds[j]) < priority)
+            {
+                kinds[j + 1] = kinds[j];
+                j--;
+            }
+
+            kinds[j + 1] = current;
+        }
+    }
+
+    /// <summary>새로 눌린 입력을 기록한다 — 다른 종류는 그대로 두고, 같은 종류면 시각만 갱신한다. 버퍼가 꺼져 있으면 false.</summary>
     public bool Record(PlayerBufferedInput input, float now)
     {
-        if (HoldSeconds <= 0f || input == PlayerBufferedInput.None)
+        int index = (int)input;
+        if (HoldSeconds <= 0f || index <= 0 || index >= KindCount)
             return false;
 
-        PlayerBufferedInput held = Peek(now);
-        if (held != PlayerBufferedInput.None && GetPriority(held) > GetPriority(input))
-            return false;
-
-        kind = input;
-        recordedAt = now;
+        alive[index] = true;
+        recordedAt[index] = now;
+        recordedOrder[index] = ++nextOrder;
         return true;
     }
 
-    /// <summary>지금 살아 있는 입력. 만료됐으면 None.</summary>
+    /// <summary>지금 꺼낼 입력 — 살아 있는 것 중 우선순위가 가장 높은 것, 같으면 나중에 누른 것. 없으면 None.</summary>
     public PlayerBufferedInput Peek(float now)
     {
-        if (kind == PlayerBufferedInput.None)
-            return PlayerBufferedInput.None;
-
-        if (HoldSeconds <= 0f || now - recordedAt > HoldSeconds)
+        PlayerBufferedInput best = PlayerBufferedInput.None;
+        for (int i = 1; i < KindCount; i++)
         {
-            kind = PlayerBufferedInput.None;
-            return PlayerBufferedInput.None;
+            if (!IsAlive(i, now))
+                continue;
+
+            if (best == PlayerBufferedInput.None ||
+                priorities[i] > priorities[(int)best] ||
+                (priorities[i] == priorities[(int)best] && recordedOrder[i] > recordedOrder[(int)best]))
+                best = (PlayerBufferedInput)i;
         }
 
-        return kind;
+        return best;
     }
 
+    /// <summary>그 종류가 지금 꺼낼 입력(<see cref="Peek"/>)인가. 살아 있어도 더 높은 입력에 밀려 있으면 false.</summary>
     public bool Has(PlayerBufferedInput input, float now) =>
         input != PlayerBufferedInput.None && Peek(now) == input;
 
-    /// <summary>그 종류가 들어 있으면 지운다. 다른 종류는 그대로 둔다.</summary>
-    public void Consume(PlayerBufferedInput input)
+    /// <summary>그 종류가 순위와 무관하게 살아 있는가.</summary>
+    public bool Contains(PlayerBufferedInput input, float now)
     {
-        if (input != PlayerBufferedInput.None && kind == input)
-            kind = PlayerBufferedInput.None;
+        int index = (int)input;
+        return index > 0 && index < KindCount && IsAlive(index, now);
     }
 
-    public void Clear()
+    /// <summary>살아 있는 입력 수.</summary>
+    public int Count(float now)
     {
-        kind = PlayerBufferedInput.None;
+        int count = 0;
+        for (int i = 1; i < KindCount; i++)
+        {
+            if (IsAlive(i, now))
+                count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>그 종류만 지운다. 다른 종류는 그대로 둔다(거부로 버림·평타 뒤 예약으로 옮김).</summary>
+    public void Remove(PlayerBufferedInput input)
+    {
+        int index = (int)input;
+        if (index > 0 && index < KindCount)
+            alive[index] = false;
     }
 
     /// <summary>
-    /// 그 입력으로 시작을 시도한 결과를 반영한다. 시작 = 전부 비움, 막힘(바쁨·CC) = 그대로 둠,
-    /// 그 밖의 거부(자원 부족·차단 효과·기타) = 그 입력만 버림.
+    /// 행동 하나가 실제로 실행됐다 — 버퍼 전체를 비운다. 함께 들고 있던 오래된 후보가 그 행동 뒤에 연달아 실행되지 않게 한다.
+    /// </summary>
+    public void Consume(PlayerBufferedInput input) => Clear();
+
+    public void Clear()
+    {
+        for (int i = 0; i < KindCount; i++)
+            alive[i] = false;
+    }
+
+    /// <summary>
+    /// 그 입력으로 시작을 시도한 결과를 반영한다. 시작 = 전부 비움, 막힘(바쁨·CC) = 전부 그대로 둠,
+    /// 그 밖의 거부(자원 부족·차단 효과·기타) = 그 입력만 버림 — 남은 것 중 다음 순위가 <see cref="Peek"/> 에 올라온다.
     /// 거부된 입력을 바로 버리므로 같은 입력이 거부(로그·피드백)를 두 번 내지 않는다.
     /// </summary>
     public void Resolve(PlayerBufferedInput input, PlayerActionAttempt attempt)
@@ -136,9 +190,28 @@ public sealed class PlayerInputBuffer
             case PlayerActionAttempt.Blocked:
                 break;
             default:
-                Consume(input);
+                Remove(input);
                 break;
         }
+    }
+
+    /// <summary>그 거부가 입력을 버리는가(다음 후보로 넘어감). 시작·막힘(보관)은 false.</summary>
+    public static bool DropsInput(PlayerActionAttempt attempt) =>
+        attempt != PlayerActionAttempt.Started && attempt != PlayerActionAttempt.Blocked;
+
+    // 유지 시간이 지났으면 그 종류만 지운다(한 번 만료되면 되살아나지 않는다).
+    private bool IsAlive(int index, float now)
+    {
+        if (!alive[index])
+            return false;
+
+        if (HoldSeconds <= 0f || now - recordedAt[index] > HoldSeconds)
+        {
+            alive[index] = false;
+            return false;
+        }
+
+        return true;
     }
 
     public static PlayerBufferedInput FromSkillSlot(PlayerSkillSlot slot) => slot switch

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 
-/// <summary>선입력 버퍼 진단(할 일 44 후속) — 이벤트 추적(즉시·버퍼 실행·만료·덮임·놓친 간격)과 집계(개수·중앙값·90%).</summary>
+/// <summary>선입력 버퍼 진단(할 일 44 후속·77) — 이벤트 추적(즉시·버퍼 실행·만료·재입력·밀림·다음 후보·놓친 간격)과 집계(개수·중앙값·90%).</summary>
 public sealed class PlayerInputBufferDiagnosticsTests
 {
     private const float Hold = 0.2f;
@@ -23,12 +23,13 @@ public sealed class PlayerInputBufferDiagnosticsTests
     public void PressAndStartSameFrame_IsImmediateConsume_NoBuffered()
     {
         tracker.Press(PlayerBufferedInput.Attack, 10f, 100, Hold);
-        tracker.Consumed(PlayerBufferedInput.None, 10f, 100, "행동 시작");
+        tracker.ActionStarted(PlayerBufferedInput.Attack, 10f, 100, "행동 시작");
 
         Assert.That(CountOf(InputBufferDiagEvent.Buffered), Is.EqualTo(0));
         InputBufferDiagRecord consumed = Last(InputBufferDiagEvent.Consumed);
         Assert.That(consumed.Input, Is.EqualTo(PlayerBufferedInput.Attack));
         Assert.That(consumed.Immediate, Is.True);
+        Assert.That(tracker.HasPending, Is.False);
     }
 
     [Test]
@@ -38,7 +39,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         tracker.Press(PlayerBufferedInput.SkillSub, 10f, 100, Hold);
         tracker.SkillReservedAfterAttack(PlayerBufferedInput.SkillSub, 10f, 100, "예약");
 
-        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.None), "예약으로 옮겨 가 버퍼 추적은 끝난다");
+        Assert.That(tracker.IsPending(PlayerBufferedInput.SkillSub), Is.False, "예약으로 옮겨 가 버퍼 추적은 끝난다");
         tracker.BeginFrame(10.5f, 130); // 0.2초가 지나도 만료로 세지 않는다
 
         Assert.That(CountOf(InputBufferDiagEvent.Expired), Is.EqualTo(0));
@@ -51,7 +52,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         var stats = new PlayerInputBufferDiagStats();
         records.ForEach(r => stats.Add(r));
         Assert.That(stats.Count(PlayerBufferedInput.SkillSub, InputBufferDiagEvent.SkillReservedAfterAttack), Is.EqualTo(1));
-        StringAssert.Contains("E | 1 | 0 | 0 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
+        StringAssert.Contains("E | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0", stats.BuildSummary(Hold, "x.csv"));
     }
 
     [Test]
@@ -70,7 +71,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         Assert.That(actionable.MissedGap, Is.LessThan(0f), "놓친 입력 없음");
         Assert.That(actionable.PressToActionable, Is.EqualTo(0.15f).Within(1e-4f), "대기 입력의 press→actionable");
 
-        tracker.Consumed(PlayerBufferedInput.None, 10.15f, 109, "행동 시작");
+        tracker.ActionStarted(PlayerBufferedInput.SkillMain, 10.15f, 109, "행동 시작");
         InputBufferDiagRecord consumed = Last(InputBufferDiagEvent.Consumed);
         Assert.That(consumed.Immediate, Is.False);
         Assert.That(consumed.Elapsed, Is.EqualTo(0.15f).Within(1e-4f));
@@ -84,7 +85,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         tracker.BeginFrame(10.25f, 115);
 
         Assert.That(Last(InputBufferDiagEvent.Expired).Input, Is.EqualTo(PlayerBufferedInput.Dash));
-        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(tracker.HasPending, Is.False);
 
         tracker.StateChanged(true, 10.3f, 118, "→Idle");
         InputBufferDiagRecord actionable = Last(InputBufferDiagEvent.Actionable);
@@ -107,7 +108,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         // 유지 시간과 같으면 아직 살아 있다(PlayerInputBuffer.Peek 와 같음).
         tracker.Press(PlayerBufferedInput.Attack, 0f, 200, Hold);
         tracker.BeginFrame(0.2f, 212);
-        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(tracker.IsPending(PlayerBufferedInput.Attack), Is.True);
     }
 
     [Test]
@@ -122,50 +123,88 @@ public sealed class PlayerInputBufferDiagnosticsTests
     }
 
     [Test]
-    public void NewPress_OverwritesPending()
+    public void DifferentKinds_AreTrackedTogether_ExpireSeparately()
+    {
+        // 할 일 77 — 다른 종류는 덮지 않고 함께 들고, 각자 유지 시간으로 따로 만료된다.
+        tracker.Press(PlayerBufferedInput.Attack, 10f, 100, Hold);
+        tracker.Press(PlayerBufferedInput.SkillUltimate, 10.1f, 106, Hold);
+
+        Assert.That(CountOf(InputBufferDiagEvent.Overwritten), Is.EqualTo(0));
+        Assert.That(tracker.IsPending(PlayerBufferedInput.Attack), Is.True);
+        Assert.That(tracker.IsPending(PlayerBufferedInput.SkillUltimate), Is.True);
+
+        tracker.BeginFrame(10.25f, 115);
+        Assert.That(Last(InputBufferDiagEvent.Expired).Input, Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(tracker.IsPending(PlayerBufferedInput.SkillUltimate), Is.True, "나중 입력은 아직 살아 있다");
+    }
+
+    [Test]
+    public void SameKindRepress_IsOverwritten_RefreshesPressTime()
     {
         tracker.Press(PlayerBufferedInput.Attack, 10f, 100, Hold);
-        tracker.Press(PlayerBufferedInput.SkillUltimate, 10.05f, 103, Hold);
+        tracker.Press(PlayerBufferedInput.Attack, 10.05f, 103, Hold);
 
         InputBufferDiagRecord overwritten = Last(InputBufferDiagEvent.Overwritten);
         Assert.That(overwritten.Input, Is.EqualTo(PlayerBufferedInput.Attack));
         Assert.That(overwritten.Elapsed, Is.EqualTo(0.05f).Within(1e-4f));
-        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.SkillUltimate));
+
+        tracker.BeginFrame(10.22f, 113);
+        Assert.That(tracker.IsPending(PlayerBufferedInput.Attack), Is.True, "유지 시간은 다시 누른 시각 기준");
     }
 
     [Test]
-    public void IgnoredLowerPriority_KeepsPending_NoOverwritten_CountedInSummary()
+    public void ActionStarted_ExecutedConsumed_OthersOutranked_CountedInSummary()
     {
-        // 할 일 77 — 보관 중인 높은 입력(대시) 때문에 기록 안 된 평타는 overwritten 이 아니라 ignored-lower-priority.
         var stats = new PlayerInputBufferDiagStats();
         var counted = new PlayerInputBufferDiagTracker(r => { records.Add(r); stats.Add(r); });
-        counted.Press(PlayerBufferedInput.Dash, 10f, 100, Hold);
-        counted.IgnoredLowerPriority(PlayerBufferedInput.Attack, PlayerBufferedInput.Dash, 10.05f, 103);
+        counted.Press(PlayerBufferedInput.Attack, 10f, 100, Hold);
+        counted.Press(PlayerBufferedInput.Dash, 10.05f, 103, Hold);
+        counted.ActionStarted(PlayerBufferedInput.Dash, 10.1f, 106, "행동 시작");
 
-        InputBufferDiagRecord ignored = Last(InputBufferDiagEvent.IgnoredLowerPriority);
-        Assert.That(ignored.Input, Is.EqualTo(PlayerBufferedInput.Attack));
-        Assert.That(ignored.Elapsed, Is.EqualTo(0.05f).Within(1e-4f), "보관 입력 press 부터");
-        Assert.That(ignored.Detail, Does.Contain("Dash"));
-        Assert.That(CountOf(InputBufferDiagEvent.Overwritten), Is.EqualTo(0));
-        Assert.That(counted.Pending, Is.EqualTo(PlayerBufferedInput.Dash));
-        Assert.That(PlayerInputBufferDiagnostics.EventName(InputBufferDiagEvent.IgnoredLowerPriority), Is.EqualTo("ignored-lower-priority"));
-        StringAssert.Contains("LMB | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
+        Assert.That(Last(InputBufferDiagEvent.Consumed).Input, Is.EqualTo(PlayerBufferedInput.Dash));
+        InputBufferDiagRecord outranked = Last(InputBufferDiagEvent.Outranked);
+        Assert.That(outranked.Input, Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(outranked.Elapsed, Is.EqualTo(0.1f).Within(1e-4f));
+        Assert.That(outranked.Detail, Does.Contain("Dash"));
+        Assert.That(counted.HasPending, Is.False, "실행되면 전부 비운다");
+        Assert.That(PlayerInputBufferDiagnostics.EventName(InputBufferDiagEvent.Outranked), Is.EqualTo("outranked"));
+        StringAssert.Contains("LMB | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0", stats.BuildSummary(Hold, "x.csv"));
     }
 
     [Test]
-    public void DroppedAndConsumed_MatchKindOnly_OrAnyWhenNone()
+    public void Fallback_EmittedForNextCandidate_CountedInSummary()
+    {
+        var stats = new PlayerInputBufferDiagStats();
+        var counted = new PlayerInputBufferDiagTracker(r => { records.Add(r); stats.Add(r); });
+        counted.Press(PlayerBufferedInput.SkillMain, 10f, 100, Hold);
+        counted.Press(PlayerBufferedInput.SkillUltimate, 10.05f, 103, Hold);
+        counted.Dropped(PlayerBufferedInput.SkillUltimate, 10.1f, 106, "자원 부족");
+        counted.Fallback(PlayerBufferedInput.SkillUltimate, PlayerBufferedInput.SkillMain, 10.1f, 106);
+
+        InputBufferDiagRecord fallback = Last(InputBufferDiagEvent.Fallback);
+        Assert.That(fallback.Input, Is.EqualTo(PlayerBufferedInput.SkillMain));
+        Assert.That(fallback.Elapsed, Is.EqualTo(0.1f).Within(1e-4f));
+        Assert.That(fallback.Detail, Does.Contain("SkillUltimate"));
+        Assert.That(counted.IsPending(PlayerBufferedInput.SkillMain), Is.True, "다음 후보는 그대로 추적");
+        Assert.That(PlayerInputBufferDiagnostics.EventName(InputBufferDiagEvent.Fallback), Is.EqualTo("fallback"));
+        StringAssert.Contains("Q | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
+    }
+
+    [Test]
+    public void DroppedMatchesKindOnly_OrAllWhenNone()
     {
         tracker.Press(PlayerBufferedInput.SkillMain, 10f, 100, Hold);
         tracker.Dropped(PlayerBufferedInput.Attack, 10f, 100, "자원 부족");
-        Assert.That(CountOf(InputBufferDiagEvent.Dropped), Is.EqualTo(0), "다른 종류는 무시");
+        Assert.That(CountOf(InputBufferDiagEvent.Dropped), Is.EqualTo(0), "추적하지 않는 종류는 무시");
 
         tracker.Dropped(PlayerBufferedInput.SkillMain, 10f, 100, "자원 부족");
         Assert.That(Last(InputBufferDiagEvent.Dropped).Detail, Is.EqualTo("자원 부족"));
 
         tracker.Press(PlayerBufferedInput.Dash, 11f, 160, Hold);
+        tracker.Press(PlayerBufferedInput.Attack, 11f, 160, Hold);
         tracker.Dropped(PlayerBufferedInput.None, 11.1f, 166, "입력 차단");
-        Assert.That(Last(InputBufferDiagEvent.Dropped).Input, Is.EqualTo(PlayerBufferedInput.Dash));
-        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(CountOf(InputBufferDiagEvent.Dropped), Is.EqualTo(3), "None = 들고 있던 전부");
+        Assert.That(tracker.HasPending, Is.False);
     }
 
     [Test]
@@ -192,7 +231,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         var statsTracker = new PlayerInputBufferDiagTracker(r => stats.Add(r));
 
         statsTracker.Press(PlayerBufferedInput.Attack, 1f, 10, Hold);
-        statsTracker.Consumed(PlayerBufferedInput.None, 1f, 10, "행동 시작"); // 즉시
+        statsTracker.ActionStarted(PlayerBufferedInput.Attack, 1f, 10, "행동 시작"); // 즉시
 
         statsTracker.StateChanged(false, 1f, 10, "→Attack");
         statsTracker.Press(PlayerBufferedInput.Attack, 1.5f, 40, Hold);
@@ -202,7 +241,7 @@ public sealed class PlayerInputBufferDiagnosticsTests
         statsTracker.StateChanged(false, 2f, 70, "→Attack");
         statsTracker.Press(PlayerBufferedInput.Attack, 2.4f, 94, Hold);
         statsTracker.StateChanged(true, 2.5f, 100, "→Idle"); // 대기 입력 press→actionable 0.1
-        statsTracker.Consumed(PlayerBufferedInput.None, 2.5f, 100, "행동 시작");
+        statsTracker.ActionStarted(PlayerBufferedInput.Attack, 2.5f, 100, "행동 시작");
 
         Assert.That(stats.Count(PlayerBufferedInput.Attack, InputBufferDiagEvent.Press), Is.EqualTo(3));
         Assert.That(stats.Count(PlayerBufferedInput.Attack, InputBufferDiagEvent.Consumed), Is.EqualTo(2));

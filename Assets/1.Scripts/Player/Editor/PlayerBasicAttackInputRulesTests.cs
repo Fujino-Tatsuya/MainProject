@@ -88,7 +88,7 @@ public sealed class PlayerBasicAttackInputRulesTests
 
         buffer.Record(PlayerBufferedInput.SkillSub, press);
         reservation.Reserve(PlayerBufferedInput.SkillSub);
-        buffer.Consume(PlayerBufferedInput.SkillSub); // 예약으로 옮겨 간다
+        buffer.Remove(PlayerBufferedInput.SkillSub); // 예약으로 옮겨 간다
 
         Assert.That(buffer.Has(PlayerBufferedInput.SkillSub, press + 0.5f), Is.False, "버퍼는 이미 비었다(0.2초 만료와 무관)");
         Assert.That(reservation.Reserved, Is.EqualTo(PlayerBufferedInput.SkillSub), "평타가 끝날 때까지 들고 있다(만료 없음)");

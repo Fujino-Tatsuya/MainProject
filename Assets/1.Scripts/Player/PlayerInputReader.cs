@@ -13,8 +13,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
     [Tooltip("선입력 버퍼 유지 시간(초). 행동 중이라 바로 실행 못 한 평타·대시·스킬 입력을 이만큼 들고 있다가 실행 가능해진 첫 순간에 실행한다. 0 = 버퍼 끔")]
     [SerializeField, Min(0f)] private float inputBufferSeconds = 0.2f;
 
-    // 선입력 버퍼 우선순위(할 일 77) — 버퍼에 살아 있는 입력보다 낮은 입력은 기록하지 않는다. 같으면 나중 입력이 이긴다.
-    [Tooltip("선입력 버퍼 우선순위 — 대시. 클수록 높다. 버퍼에 남은 입력보다 낮은 입력은 무시하고, 같으면 나중 입력이 이긴다")]
+    // 선입력 버퍼 우선순위(할 일 77) — 살아 있는 입력은 전부 보관하고, 꺼낼 때 가장 높은 것부터 시도한다. 같으면 나중 입력.
+    [Tooltip("선입력 버퍼 우선순위 — 대시. 클수록 높다. 버퍼에 함께 남은 입력 중 높은 것부터 시도하고, 같으면 나중 입력이 먼저다")]
     [SerializeField] private int bufferPriorityDash = 5;
     [Tooltip("선입력 버퍼 우선순위 — 우클릭(인터럽트 스킬·인터럽트). 클수록 높다")]
     [SerializeField] private int bufferPriorityInterrupt = 4;
@@ -123,14 +123,20 @@ public class PlayerInputReader : BaseNetworkBehaviour
         dashPressedLatched = false;
     }
 
-    // 버퍼 기록 + 진단 press(또는 낮은 우선순위로 무시). 기록 규칙은 inputBuffer.Record 그대로다.
+    // 버퍼 기록 + 진단 press. 기록 규칙은 inputBuffer.Record 그대로다.
     private void RecordBufferedPress(PlayerBufferedInput input, float now)
     {
-        PlayerBufferedInput held = inputBuffer.Peek(now);
         if (inputBuffer.Record(input, now))
             DiagnoseBufferPress(input, now);
-        else if (input != PlayerBufferedInput.None && held != PlayerBufferedInput.None)
-            DiagnoseBufferIgnored(input, held, now);
+    }
+
+    /// <summary>
+    /// <paramref name="kinds"/> 를 선입력 버퍼 우선순위 높은 순으로 정렬한다(같으면 원래 순서). 상태 머신이 후보를 시도하는 순서다(할 일 77).
+    /// </summary>
+    public void SortByBufferPriority(PlayerBufferedInput[] kinds)
+    {
+        ApplyBufferPriorities();
+        inputBuffer.SortByPriority(kinds);
     }
 
     private void ApplyBufferPriorities()
@@ -144,8 +150,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
     }
 
     /// <summary>
-    /// 선입력 버퍼에 그 종류가 살아 있는가. 각 행동의 '이번 프레임 눌림'과 OR 해서 쓴다 — 버퍼가 꺼져 있어도
-    /// 눌린 프레임 입력은 그대로 읽힌다.
+    /// 선입력 버퍼에서 지금 꺼낼 입력(살아 있는 것 중 우선순위 최고)이 그 종류인가. 더 높은 입력에 밀려 있으면 false.
+    /// 각 행동의 '이번 프레임 눌림'과 OR 해서 쓴다 — 버퍼가 꺼져 있어도 눌린 프레임 입력은 그대로 읽힌다.
     /// </summary>
     public bool HasBufferedInput(PlayerBufferedInput input)
     {
@@ -153,7 +159,10 @@ public class PlayerInputReader : BaseNetworkBehaviour
         return inputBuffer.Has(input, Time.time);
     }
 
-    /// <summary>행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않게 지운다.</summary>
+    /// <summary>
+    /// 행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 실행됐으니 버퍼 전체를 비운다(할 일 77).
+    /// 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않고, 함께 들고 있던 오래된 후보도 연달아 실행되지 않는다.
+    /// </summary>
     // 호출자 정보는 진단 로그(consumed 사유)에만 쓴다.
     public void ConsumeBufferedInput(
         PlayerBufferedInput input,
@@ -161,7 +170,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         [CallerFilePath] string callerFile = null)
     {
         CaptureBufferedPresses();
-        DiagnoseBufferConsumed(input, callerMember, callerFile);
+        DiagnoseBufferActionStarted(input, callerMember, callerFile);
         inputBuffer.Consume(input);
     }
 
@@ -171,19 +180,26 @@ public class PlayerInputReader : BaseNetworkBehaviour
         [CallerFilePath] string callerFile = null) =>
         ConsumeBufferedInput(PlayerInputBuffer.FromSkillSlot(slot), callerMember, callerFile);
 
-    /// <summary>Idle/Move 에서 그 입력으로 시작을 시도한 결과를 버퍼에 반영한다 — 시작 = 비움, 막힘(바쁨·CC) = 유지, 그 밖의 거부 = 그 입력만 버림.</summary>
+    /// <summary>
+    /// Idle/Move 에서 그 입력으로 시작을 시도한 결과를 버퍼에 반영한다 — 시작 = 비움, 막힘(바쁨·CC) = 전부 유지,
+    /// 그 밖의 거부 = 그 입력만 버림(남은 것 중 다음 순위가 꺼낼 입력으로 올라와 같은 프레임에 시도될 수 있다).
+    /// </summary>
     public void ResolveBufferedInput(PlayerBufferedInput input, PlayerActionAttempt attempt)
     {
         CaptureBufferedPresses();
         DiagnoseBufferResolve(input, attempt);
         inputBuffer.Resolve(input, attempt);
+        if (PlayerInputBuffer.DropsInput(attempt))
+            DiagnoseBufferFallback(input);
     }
 
-    /// <summary>입력으로 새 행동을 시작했을 때 버퍼를 비운다(진단: 들고 있던 입력 = 실행됨).</summary>
-    public void ClearInputBufferOnActionStarted()
+    /// <summary>
+    /// 입력 <paramref name="started"/> 로 새 행동을 시작했을 때 버퍼를 비운다(진단: 그 입력 = 실행됨, 함께 들고 있던 나머지 = 선택에서 밀림).
+    /// </summary>
+    public void ClearInputBufferOnActionStarted(PlayerBufferedInput started)
     {
         CaptureBufferedPresses();
-        DiagnoseBufferConsumed(PlayerBufferedInput.None, "행동 시작", null);
+        DiagnoseBufferActionStarted(started, "행동 시작", null);
         inputBuffer.Clear();
         skillReservation.Clear();
     }
@@ -215,7 +231,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
             !changed ? "같은 스킬 연타(1회로)"
             : previous == PlayerBufferedInput.None ? "예약"
             : $"예약 교체({previous}→{input})");
-        inputBuffer.Consume(input);
+        inputBuffer.Remove(input);
         return changed;
     }
 
@@ -224,8 +240,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     // 이번 프레임에 새로 눌린 입력을 버퍼에 남긴다. 프레임당 한 번 — 소비처·상태 머신·Update 중 먼저 부른 쪽이 받는다.
     // 그래서 누가 먼저 돌든 '받아서 지움'이 '뒤늦게 기록'에 덮이지 않는다.
-    // 같은 프레임에 여럿이어도 남는 입력은 기록 순서가 아니라 버퍼 우선순위(할 일 77)가 정한다 — 아래 순서는 의미 없다.
-    // HUD 가상 스킬 press 는 SetVirtualSkillInput 에서 바로 기록한다(같은 우선순위 규칙).
+    // 같은 프레임에 여럿이면 전부 보관되고 꺼낼 순서는 버퍼 우선순위(할 일 77)가 정한다 — 아래 순서는 같은 우선순위끼리(Q·E)만 가른다.
+    // HUD 가상 스킬 press 는 SetVirtualSkillInput 에서 바로 기록한다(같은 규칙).
     private void CaptureBufferedPresses()
     {
         if (inputBufferCapturedFrame == Time.frameCount)
@@ -608,21 +624,14 @@ public class PlayerInputReader : BaseNetworkBehaviour
 #endif
     }
 
+    // 행동 실행으로 버퍼 전체 비움 — executed = 실행됨, 나머지 = 선택에서 밀림(outranked).
     [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
-    private void DiagnoseBufferIgnored(PlayerBufferedInput input, PlayerBufferedInput held, float now)
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-        GetInputBufferDiag()?.IgnoredLowerPriority(input, held, now, Time.frameCount);
-#endif
-    }
-
-    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
-    private void DiagnoseBufferConsumed(PlayerBufferedInput input, string callerMember, string callerFile)
+    private void DiagnoseBufferActionStarted(PlayerBufferedInput executed, string callerMember, string callerFile)
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
-        if (diag != null && diag.Pending != PlayerBufferedInput.None)
-            diag.Consumed(input, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
+        if (diag != null && diag.HasPending)
+            diag.ActionStarted(executed, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
 #endif
     }
 
@@ -631,8 +640,23 @@ public class PlayerInputReader : BaseNetworkBehaviour
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
-        if (diag != null && diag.Pending != PlayerBufferedInput.None)
+        if (diag != null && diag.HasPending)
             diag.Dropped(input, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
+#endif
+    }
+
+    // 버림 거부 뒤 — 남은 입력 중 다음 순위가 꺼낼 입력으로 올라왔으면 fallback 으로 남긴다.
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferFallback(PlayerBufferedInput dropped)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
+        if (diag == null)
+            return;
+
+        PlayerBufferedInput next = inputBuffer.Peek(Time.time);
+        if (next != PlayerBufferedInput.None)
+            diag.Fallback(dropped, next, Time.time, Time.frameCount);
 #endif
     }
 
@@ -641,7 +665,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
-        if (diag == null || diag.Pending == PlayerBufferedInput.None)
+        if (diag == null || !diag.HasPending)
             return;
 
         float now = Time.time;
@@ -649,7 +673,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         switch (attempt)
         {
             case PlayerActionAttempt.Started:
-                diag.Consumed(PlayerBufferedInput.None, now, frame, $"{input} 시작");
+                diag.ActionStarted(input, now, frame, $"{input} 시작");
                 break;
             case PlayerActionAttempt.Blocked:
                 diag.Blocked(input, now, frame, IsInputBufferDiagIncapacitated() ? "CC" : "바쁨(요청 대기)");
