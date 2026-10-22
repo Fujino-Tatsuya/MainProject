@@ -227,6 +227,13 @@ public class Player : Unit
     public float AttackSpeedRate =>
         PlayerAttackSpeedRules.Rate(stats != null ? stats.Multiplier(PlayerStatKind.AttackSpeed) : 1f);
 
+    /// <summary>
+    /// 쿨 줄어드는 속도 배율(할 일 91 T8) = <see cref="StatusEffectType.CooldownRateModifier"/> 곱(<see cref="StatusEffectController.GetStatMultiplier"/>), 없으면 1.
+    /// 피어마다 복제된 상태이상으로 계산한다 — 쿨 시계(<see cref="PlayerCooldownClock"/>) 동기화는 없다. Awake 에서 쿨 시계 배율 공급원으로 연결한다.
+    /// </summary>
+    public float CooldownRate =>
+        StatusEffects != null ? StatusEffects.GetStatMultiplier(StatusEffectType.CooldownRateModifier) : 1f;
+
     /// <summary>판정·툴팁 공용 피해 스냅샷(가하는 피해% 포함).</summary>
     public int ResolveDamage(float coefficient, int flatBonus) =>
         stats != null ? stats.ResolveDamage(coefficient, flatBonus) : PlayerStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
@@ -272,6 +279,9 @@ public class Player : Unit
         // Animator.speed 쓰기 지점(공격속도, 할 일 91 T5) — 프리팹에 없으면 붙인다.
         if (GetComponent<PlayerAttackSpeedAnimator>() == null)
             gameObject.AddComponent<PlayerAttackSpeedAnimator>();
+
+        // 쿨 시계 배율 연결 지점(할 일 91 T8) — 스킬·대시 두 시계(패시브는 스킬 시계 공유)가 매 프레임 이 값을 읽는다.
+        PlayerCooldownClock.For(this).SetRateSource(() => CooldownRate);
 
         int historyCapacity = PlayerTickRingBuffer<PlayerSimulationState>.CapacityForSeconds(
             ReconciliationHistorySeconds,
