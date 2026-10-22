@@ -19,7 +19,7 @@ using UnityEngine.AI;
 ///    자막 TUT_Z3_INTRO → TUT_Z3_PRACTICE_NOTE(공통 — 캐릭터별 간파 설명 없음, §2.4).
 ///  · 간파 성공(준비 단계) = <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/>(연습 중 · 시전자 존3 안 — 존3 의 카운터 대상은
 ///    스피너봇뿐이고, 간파 창은 연계 준비 단계에서만 열리므로 이 성공 = 연계 시작) → <b>파티 전원 우클릭 쿨 1회 초기화</b>
-///    (<see cref="TutorialCooldownReset"/> — 시전자 쿨 감소(할 일 26)를 적용한 <b>뒤</b> 나는 이벤트라 그 위에 0 으로 덮는다) ·
+///    (<see cref="TutorialCooldownReset"/>) ·
 ///    첫 성공만 TUT_Z3_FIRST_SUCCESS · TUT_Z3_PUSH_INTRO. 간파 횟수는 세지 않는다.
 ///  · 연계 일(<see cref="TutorialSpinnerPractice.ServerComboEvent"/>): 벽 충돌 → Zone3Interrupts +1 · TUT_Z3_WALL_SUCCESS({n}/3) ·
 ///    밀치기 빗나감 → TUT_Z3_PUSH_HINT(5초 간격) · 회복 끝(다시 준비) → TUT_Z3_COUNTER_GOAL ·

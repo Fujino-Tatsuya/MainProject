@@ -74,10 +74,10 @@
 - 본 전투 전환(`EnterRealMode`) 때 `SpinnerComboModel.Finish()` — 정지·슈퍼 아머·취약 유지를 모두 끈다. 본 전투의 간파 성공은 원래 그로기(1초)뿐(우클릭 쿨 초기화 없음).
 
 ## 5. 우클릭 쿨 초기화 — 다른 레인과의 관계
-- 쿨 장부(`PlayerSkillController`)는 **고치지 않았다**. 할 일 26 의 공개 API `ResetCooldownServer(skill)` 로 0 을 만든다(이미 준비된 스킬은 건너뜀, 오너 HUD 미러는 장부가 보냄).
+- 쿨 장부(`PlayerSkillController`)는 **고치지 않았다**. 공개 API `ResetCooldownServer(skill)` 로 0 을 만든다(이미 준비된 스킬은 건너뜀, 오너 HUD 미러는 장부가 보냄).
 - 대상 = 그 플레이어에 등록된 스킬 중 Slot == Interrupt 전부(`GetSkillIndex` ≥ 0 — 기본·대체).
-- **순서**(할 일 26 의존): 같은 판정(`ResolveHit`) 안에서 스피너봇 `ServerCounterSucceeded`(→ 연계 시작 `ServerComboCounterAccepted`) → 26 의 시전자 쿨 감소 → `ServerInterruptSucceeded`(→ 여기서 파티 초기화) → `ServerInterruptResolved`(→ 빗나감·이른 간파 피드백).
-  초기화를 감소 **뒤** 이벤트에서 하므로 시전자도 결과는 0. 이른 간파 판정의 '이번 판정 성공' = 같은 호출 안에서 `ServerInterruptSucceeded` 로 받은 시전자(`ServerInterruptResolved` 에서 소비 — 프레임 비교 없음).
+- **순서**: 같은 판정(`ResolveHit`) 안에서 스피너봇 `ServerCounterSucceeded`(→ 연계 시작 `ServerComboCounterAccepted`) → `ServerInterruptSucceeded`(→ 여기서 파티 초기화) → `ServerInterruptResolved`(→ 빗나감·이른 간파 피드백).
+  간파 성공 시 시전자 쿨 감소(할 일 26)는 할 일 90 에서 제거됐다 — 존3 연습의 이 초기화만 남는다(튜토리얼 전용). 이른 간파 판정의 '이번 판정 성공' = 같은 호출 안에서 `ServerInterruptSucceeded` 로 받은 시전자(`ServerInterruptResolved` 에서 소비 — 프레임 비교 없음).
   `ServerComboCounterAccepted` 는 존3 흐름이 더 구독하지 않는다(감소 전에 나서 초기화 시점으로 맞지 않음).
 - 존3 의 카운터 대상은 스피너봇뿐이고 간파 창은 연계 준비 단계에서만 열리므로, 연습 중 존3 안 시전자의 간파 성공 = 연계 시작으로 본다.
 - 파티 전원 = 접속 중 PlayerObject 가 있는 모두(영혼 포함 — 쿨만 0 이 된다).

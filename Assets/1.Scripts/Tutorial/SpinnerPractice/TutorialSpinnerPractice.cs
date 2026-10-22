@@ -160,7 +160,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
 
     /// <summary>
     /// [서버] 연습 중 간파 성공을 연계 시작으로 받아들였다(준비·간파 단계에서만 — 취약·회복 중 성공은 없다). 인자 = 간파한 clientId.
-    /// 시전자 쿨 감소(할 일 26) <b>전</b>에 난다 — 그래서 존3 흐름의 파티 우클릭 쿨 초기화는 여기가 아니라 <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/> 에서 한다.
+    /// 존3 흐름의 파티 우클릭 쿨 초기화는 여기가 아니라 <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/> 에서 한다.
     /// </summary>
     public event Action<TutorialSpinnerPractice, ulong> ServerComboCounterAccepted;
 
