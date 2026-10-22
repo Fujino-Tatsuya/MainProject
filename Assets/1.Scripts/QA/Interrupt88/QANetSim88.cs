@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Unity.Multiplayer.Tools.NetworkSimulator.Runtime;
 using UnityEngine;
@@ -26,6 +27,53 @@ public sealed class QANetSim88 : MonoBehaviour
     public static string FilePathFor(string projectRoot) => Path.Combine(projectRoot, FileName);
 
     private static string OwnFilePath => FilePathFor(Path.GetDirectoryName(Application.dataPath));
+
+    /// <summary>이 인스턴스 프로젝트 루트(MPPM 클론이면 <c>Library/VP/mppm*</c>).</summary>
+    public static string OwnRoot => Path.GetDirectoryName(Application.dataPath);
+
+    /// <summary>
+    /// 메인 에디터 기준 MPPM 클론 루트 목록(이름순). 클론에서 부르면 비어 있다.
+    /// 에디터 메뉴(<c>QAScenario88Menu</c>)와 Play 중 호스트 스위트(<c>QAInterruptSuite88</c>)가 같이 쓴다.
+    /// </summary>
+    public static List<string> CloneRoots()
+    {
+        var roots = new List<string>();
+        string vp = Path.Combine(OwnRoot, "Library", "VP");
+        if (Directory.Exists(vp))
+            roots.AddRange(Directory.GetDirectories(vp, "mppm*"));
+        roots.Sort(System.StringComparer.Ordinal);
+        return roots;
+    }
+
+    /// <summary>MPPM 클론 전부에 원격 지연(ms, 송수신 각각)을 건다. 0 이하면 원복. 쓴 클론 수.</summary>
+    public static int SetRemoteDelayFiles(int delayMs)
+    {
+        if (delayMs <= 0)
+            return ResetRemoteDelayFiles();
+        delayMs = Mathf.Min(delayMs, QAInterruptLag88Plan.MaxDelayMs);
+        int n = 0;
+        foreach (string root in CloneRoots())
+        {
+            File.WriteAllText(FilePathFor(root), delayMs.ToString());
+            n++;
+        }
+        return n;
+    }
+
+    /// <summary>원격 지연 원복(0) — 클론의 지연 파일을 지운다. 지운 수.</summary>
+    public static int ResetRemoteDelayFiles()
+    {
+        int n = 0;
+        foreach (string root in CloneRoots())
+        {
+            string path = FilePathFor(root);
+            if (!File.Exists(path))
+                continue;
+            File.Delete(path);
+            n++;
+        }
+        return n;
+    }
 
     /// <summary>파일에서 읽을 지연. 파일이 없거나 형식이 틀리면 0.</summary>
     public static int ReadRequestedDelayMs()

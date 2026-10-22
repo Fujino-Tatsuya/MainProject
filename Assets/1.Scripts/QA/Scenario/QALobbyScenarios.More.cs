@@ -27,6 +27,9 @@ public static partial class QALobbyScenarios
             case "M7": return 480f;
             case "M8": return 420f;
             case "P572": return 720f;
+#if UNITY_EDITOR
+            case Interrupt88Id: return QAInterruptSuite88.TimeLimitSeconds();
+#endif
             default: return 60f;
         }
     }
@@ -48,6 +51,9 @@ public static partial class QALobbyScenarios
             case "M7": return M7(ctx);
             case "M8": return M8(ctx);
             case "P572": return P572(ctx);
+#if UNITY_EDITOR
+            case Interrupt88Id: return I88(ctx);
+#endif
             default: return null;
         }
     }

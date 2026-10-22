@@ -160,12 +160,13 @@ public static class QAScenario48Menu
         EditorUtility.RevealInFinder(root);
     }
 
-    private static void Run(string ids, int players)
+    /// <summary>시나리오 실행 공통 경로(포트 돌리기 → 시나리오 모드 → Play Active Scenario). 할 일 88 메뉴도 쓴다. 이미 Play 중이라 안 했으면 false.</summary>
+    internal static bool Run(string ids, int players)
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
             Debug.LogWarning("[QA] 이미 Play 중이다 — Tools/QA/Stop Active Scenario 로 먼저 정지할 것.");
-            return;
+            return false;
         }
 
         WriteQAConnectionConfigs();
@@ -174,6 +175,7 @@ public static class QAScenario48Menu
         QASettings.PlayerCount = players;
         Debug.Log($"[QA] 48 시나리오 {ids} ({players}인) 실행 — 리포트 루트 {QAReportWriter.ScenarioRoot()}");
         QAScenarioPlay.Play();
+        return true;
     }
 }
 #endif
