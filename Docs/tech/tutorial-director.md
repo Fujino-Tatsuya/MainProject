@@ -391,7 +391,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
     끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).
 
 ## 12. 스텝별 고정 안전 지점 (할 일 80 — 1안, 2026-10-22)
-> 코드: `TutorialSafePointRules`(순수 — 감시 조건·구간 순서·기본 위치) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
+> 코드: `TutorialSafePointRules`(순수 — 감시 조건·구간 순서·기본 위치·점유 레이어·주변 빈자리·최후 수단) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
 > 훅 `PlayerSafePointTracker.ReturnPointOverride`(신규, 기본 null = 기존 동작). 저작: `Tools/Map/Authoring/Tutorial/8. Place Safe Points (열린 씬)`.
 > 테스트: `TutorialSafePointRulesTests`(튜토리얼 러너). 디렉터·흐름 코드는 바꾸지 않았다(디렉터 공개 API·`TutorialDeathRules.TryFindAreaSpreadPoints` 만 부른다).
 
@@ -418,9 +418,18 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 **어느 지점**: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(`TutorialRevivePointRules.AreaOrder(step, mask, passed)` — 단계 구간을 배리어 상한으로 내리고,
 그 플레이어의 지나온 최전방 구간 아래로는 안 감)부터 거꾸로 — 지점이 있고, 바닥·점유가 괜찮고, `ReturnPointFilter`(닫힌 배리어·뒤 배리어·지난 배리어 앞면 여유·패드 + 1m) 를 통과하는 첫 구간.
-지점이 막혔으면 같은 구간에서 지점에 가장 가까운 안전 격자점(`TryFindAreaSpreadPoints` — 전멸 리스폰·구간 스킵과 같은 탐색). 하나도 없으면 기존 동작(큐).
+- **점유 = 정적 장애물만**(`TutorialSafePointRules.BlockingLayers` = Default·Ground·Env·Wall·Barrier). 몬스터(Enemy·EnemyHurtBox·래그돌 뼈)·플레이어·시체·Soul 이
+  지점 근처에 있어도 지점은 무효가 아니다 — 겹쳐 내려도 유닛 충돌 밀어내기(할 일 11)가 푼다.
+- 지점이 정적 장애물·배리어 규칙에 막혔으면 ① 같은 구간 사각형 안에서 지점 주변 링(0.75/1.5/2.25/3m × 8방향, 가까운 것부터 — `TryFindNearestFree`)의 첫 빈자리
+  ② 그래도 없으면 지점에 가장 가까운 안전 격자점(`TryFindAreaSpreadPoints` — 전멸 리스폰·구간 스킵과 같은 탐색) ③ 다음(뒤) 구간.
+- 🔴 **어느 구간에서도 못 찾아도 씬 시작 지점으로 보내지 않는다** — 구간 순서의 첫 지점(지금 단계 구간)에 그대로 내린다(겹침 허용 + 경고 `설 자리를 못 찾아 … 그대로 내린다`, `TryPickLastResort`).
+  기존 추락 복구(큐 → 스폰 폴백)로 넘기는 건 지점이 하나도 배치되지 않았을 때·감시 조건 밖(단계 Finished·보스방 이동 중)뿐.
+- 배경(2026-10-22 진단): 기존 추락 복구의 큐 점유 검사(`PlayerSafePointTracker.IsFreeStanding`/`TryResolveFlatUnoccupied`)는 `Player.prefab` 의 `groundMask` = Everything 이라
+  몬스터·다른 플레이어가 근처에 있으면 기록 지점이 무효가 되고, 큐가 전부 막히면 스폰(씬 시작 지점)으로 폴백한다. 튜토리얼 중에는 위 최후 수단으로 이 경로에 내려가지 않게 했고,
+  일반 스테이지의 큐 동작은 바꾸지 않았다.
 
-**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `[Fall/진단] 고정 안전 지점으로 — …`.
+**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `[Fall/진단] 고정 안전 지점으로 — …` ·
+경고 `client n 낙사 — 설 자리를 못 찾아 Zone2 안전 지점 … 에 그대로 내린다(겹침 허용).`
 
 **알려진 한계 · Play 로 볼 것**
 - 낙사가 '최근 밟은 자리'가 아니라 구간 입구로 돌아간다(1안 사양). 존2 물 구멍처럼 자주 떨어지는 곳은 이동 거리가 늘 수 있다 — 싫으면 `useOnFall` 끔.

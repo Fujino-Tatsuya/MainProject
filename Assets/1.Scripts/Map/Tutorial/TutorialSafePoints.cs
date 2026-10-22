@@ -16,8 +16,11 @@ using UnityEngine;
 ///
 /// 어느 지점인가: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(<see cref="TutorialSafePointRules.AreaOrder"/>)부터 거꾸로,
 /// 지점이 있고 설 수 있는(바닥·점유·<see cref="PlayerSafePointTracker.ReturnPointFilter"/> — 닫힌 배리어·뒤 배리어·패드 규칙) 첫 구간.
-/// 지점 자체가 막혔으면 그 구간에서 지점에 가장 가까운 안전 격자점(<see cref="TutorialDeathRules.TryFindAreaSpreadPoints"/>).
-/// 아무것도 없으면 기존 동작(안전지점 큐).
+/// 점유 = 정적 장애물만(<see cref="TutorialSafePointRules.BlockingLayers"/>) — 몬스터·플레이어가 근처에 있어도 지점은 그대로 쓴다.
+/// 지점 자체가 막혔으면 그 구간 안에서 지점 주변 링(<see cref="TutorialSafePointRules.TryFindNearestFree"/>)의 가장 가까운 빈자리,
+/// 그다음 지점에 가장 가까운 안전 격자점(<see cref="TutorialDeathRules.TryFindAreaSpreadPoints"/>).
+/// 아무 구간에서도 못 찾으면 씬 시작 지점으로 보내지 않고 지금 단계 구간 지점에 그대로(겹침 허용 + 경고, <see cref="TutorialSafePointRules.TryPickLastResort"/>).
+/// 지점이 하나도 배치되지 않았을 때만 기존 동작(안전지점 큐).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialSafePoints : MonoBehaviour
@@ -65,7 +68,12 @@ public sealed class TutorialSafePoints : MonoBehaviour
     private void Awake()
     {
         _groundMask = LayerMask.GetMask("Default", "Ground", "Env");
-        _obstacleMask = _groundMask | LayerMask.GetMask("Wall", "Barrier");
+        _obstacleMask = 0;
+        foreach (string name in TutorialSafePointRules.BlockingLayers)
+        {
+            int layer = LayerMask.NameToLayer(name);
+            if (layer >= 0) _obstacleMask |= 1 << layer;
+        }
     }
 
     private void OnDisable() => Unhook();
@@ -117,23 +125,36 @@ public sealed class TutorialSafePoints : MonoBehaviour
     {
         if (!useOnFall || !TryGetServerDirector(out TutorialDirector d)) return null;
         if (!TutorialSafePointRules.ShouldWatch(d.IsTutorialActive, d.Step, BossMoveBusy())) return null;
-        if (!TryResolve(d, clientId, out Vector3 point, out TutorialArea area)) return null;
 
-        Edit.Log($"[Tutorial] client {clientId} 낙사 → {area} 안전 지점 {point}.", this);
-        return point;
+        int mask = 0;
+        for (int g = 0; g < TutorialFlowModel.GateCount; g++)
+            if (d.IsGateOpen((TutorialGate)g)) mask |= 1 << g;
+        List<TutorialArea> order = TutorialSafePointRules.AreaOrder(d.Step, mask, d.GetBackBarrierMaskServer(clientId));
+
+        if (TryResolve(d, clientId, order, out Vector3 point, out TutorialArea area))
+        {
+            Edit.Log($"[Tutorial] client {clientId} 낙사 → {area} 안전 지점 {point}.", this);
+            return point;
+        }
+
+        // 튜토리얼 진행 중에는 씬 시작 지점(추락 복구의 스폰 폴백)으로 보내지 않는다 — 지금 단계 구간 지점에 그대로(겹침 허용).
+        if (TutorialSafePointRules.TryPickLastResort(order, a => TryGetPoint(a, out _), out area) && TryGetPoint(area, out Transform last))
+        {
+            Edit.LogWarning($"[Tutorial] client {clientId} 낙사 — 설 자리를 못 찾아 {area} 안전 지점 {last.position} 에 그대로 내린다(겹침 허용).", this);
+            return last.position;
+        }
+
+        Edit.LogWarning($"[Tutorial] client {clientId} 낙사 — 안전 지점이 하나도 없다(미배치). 기존 추락 복구로 넘긴다.", this);
+        return null;
     }
 
     // ─── 지점 고르기 ─────────────────────────────────────────────────────
 
-    private bool TryResolve(TutorialDirector d, ulong clientId, out Vector3 point, out TutorialArea area)
+    private bool TryResolve(TutorialDirector d, ulong clientId, List<TutorialArea> order, out Vector3 point, out TutorialArea area)
     {
-        int mask = 0;
-        for (int g = 0; g < TutorialFlowModel.GateCount; g++)
-            if (d.IsGateOpen((TutorialGate)g)) mask |= 1 << g;
-        int passed = d.GetBackBarrierMaskServer(clientId);
         var rules = d.GetComponent<TutorialDeathRules>();
 
-        foreach (TutorialArea a in TutorialSafePointRules.AreaOrder(d.Step, mask, passed))
+        foreach (TutorialArea a in order)
         {
             if (!TryGetPoint(a, out Transform t)) continue;
             Vector3 anchor = t.position;
@@ -143,7 +164,21 @@ public sealed class TutorialSafePoints : MonoBehaviour
                 return true;
             }
 
-            // 지점이 막혔다(소품·몬스터 시체가 아닌 고정물·배리어 규칙) — 같은 구간에서 지점에 가장 가까운 안전 격자점(전멸 리스폰·구간 스킵과 같은 탐색).
+            // 지점이 정적 장애물(소품·벽·배리어)이나 배리어 규칙에 막혔다 — 먼저 지점 주변 링에서 가장 가까운 빈자리(같은 구간 안).
+            if (rules != null && rules.TryGetAreaRect(a, out TutorialRect rect))
+            {
+                Vector3 found = default;
+                if (TutorialSafePointRules.TryFindNearestFree(anchor.x, anchor.z, rect, TutorialSafePointRules.DefaultRingRadii,
+                        TutorialSafePointRules.DefaultRingDirections,
+                        (x, z) => TryStandAt(new Vector3(x, anchor.y, z), out found) && IsAllowed(clientId, found), out _, out _))
+                {
+                    point = found;
+                    area = a;
+                    return true;
+                }
+            }
+
+            // 그래도 없으면 같은 구간에서 지점에 가장 가까운 안전 격자점(전멸 리스폰·구간 스킵과 같은 탐색).
             if (rules != null && rules.TryFindAreaSpreadPoints(a, 1, anchor.x, anchor.z, _spread) && IsAllowed(clientId, _spread[0]))
             {
                 point = _spread[0];
@@ -160,7 +195,7 @@ public sealed class TutorialSafePoints : MonoBehaviour
     private static bool IsAllowed(ulong clientId, Vector3 p) =>
         PlayerSafePointTracker.ReturnPointFilter == null || PlayerSafePointTracker.ReturnPointFilter(clientId, p);
 
-    // 지점 아래 평평한 바닥이 있고 서 있을 자리가 비었는가 — 자동 부활 격자점과 같은 검사.
+    // 지점 아래 평평한 바닥이 있고 서 있을 자리가 비었는가(정적 장애물만) — 자동 부활 격자점과 같은 검사.
     private bool TryStandAt(Vector3 anchor, out Vector3 point)
     {
         point = anchor;
