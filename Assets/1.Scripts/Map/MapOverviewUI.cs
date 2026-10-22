@@ -13,6 +13,9 @@ public class MapOverviewUI : MonoBehaviour
     [Header("=== 참조 ===")]
     public MapGenerator Generator;
 
+    [Tooltip("M 키로 열고 닫기. 경석 10-22: 맵 전체 보기는 쓰지 않는다 — 기본 꺼짐(켜면 예전 동작).")]
+    [SerializeField] private bool hotkeyEnabled;
+
     [Header("=== 표시 설정 ===")]
     [Range(0.4f, 0.95f)] public float PanelScreenRatio = 0.8f;
     public Color BackgroundColor = new Color(0f, 0f, 0f, 0.95f);
@@ -37,6 +40,7 @@ public class MapOverviewUI : MonoBehaviour
 
     private void Update()
     {
+        if (!hotkeyEnabled) return;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame) Toggle();
 #else

@@ -8,6 +8,14 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
+- 은희 공유: [handoff-game-menu.md](Docs/tech/handoff-game-menu.md) — 그만두기 → 타이틀 의도적 이탈(`DemoSessionDirector.PrepareLeaveToTitle`·`ReconnectLoop.Reset`) · 입력 기본값(홀드 토글·대시 마우스 켬) · 조준 ESC 소비 표시.
+- 같이 들어간 것(경석 10-22 Play): 타이틀 버튼 기본 한국어(시작하기·설정·나가기, en = START·SETTING·EXIT — `TextScramble` 이 저장 원문으로 덮던 것 수정) · 그만두기 팝업 = **바탕화면 / 타이틀** 두 버튼, 누르면 바로 실행(✗/✓ 없음, ESC = 메뉴로 · 로비·인게임 같음, 호스트는 경고 문구) · 새 문구 6개 Strings 시트 + 서울알림 Heavy 아틀라스(288 → 342자) · M 키 맵 전체 보기 끔.
+- EditMode: 새 에디터 2717/0. `EnemyC3PrewarmTests` 2건은 **에디터에서 Play 한 뒤에만** 실패(57.3 드론 풀 `HideAndDontSave` 잔존 — 이번 변경 무관). handoff §4.
+- 커밋 제외(Unity 부수효과): `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`(Play 중 동적 글자 추가) · `AddressableAssetSettings.asset`(해시 0 리셋).
+- SVN **r500**: `DataTable~/GameData.xlsx`(Strings 6행만 — 다른 시트 바이트 동일 확인) · `UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset`. git 과 같이 받아야 문구·글자가 맞다.
+- 🔴 Play 종료 무한대기 원인 확정 = **Unity 엔진 교착 UUM-152966**(셰이더 파괴 중 비동기 셰이더 컴파일 취소가 잠금 대기, 6000.3.13f1~ 미해결). 우리 코드 아님. 경석 PC 에서만 재현돼 **경석 로컬에서만** Editor 비동기 셰이더 컴파일을 껐다(git 미반영). 같은 증상이 나면 Project Settings › Editor › Asynchronous Shader Compilation 을 로컬에서 끄면 된다.
+
 ## ▶▶ 반영 (2026-10-21 · 경석(Claude)) — `feature/Boss23` → `development` 병합·푸시(origin/development 142커밋 선병합, 충돌 = `art-svn.json` 1건 → development 판). SVN **r487**(핀 478 → 487). 컴파일 0 · 전투 279/0 · 보스 패턴 10/0 · 데이터 테이블 240/0.
 - development 쪽 C3 적 범위표시(할 일 57)가 `TwentyThreeBoss.cs`·`BossElectricFloor.cs` 등에 자동 병합됨 — A·B Play 때 예고 표시 같이 볼 것.
 

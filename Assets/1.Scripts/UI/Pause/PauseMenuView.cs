@@ -5,17 +5,17 @@ using UnityEngine.Events;
 using UnityEngine.UI;
 
 /// <summary>
-/// 인게임 ESC 일시정지 메뉴 + 종료 확인 팝업(PLAN-pause-menu — SVN r466 03_PauseMenu · 02_ExitConfirm 아트).
-/// 화면 전환(메뉴 ↔ 설정 ↔ 팝업)은 <see cref="MapSceneManager"/> 가 정한다 — 이 컴포넌트는 버튼을 신호로 바꾸고 팝업 선택 상태만 가진다.
-///
-/// 🔴 <b>로비로 나가기·게임 종료의 실제 처리는 여기서 하지 않는다</b>(경석 10-20 — 은희가 만들어 연결).
-///    ✓ 를 누르면 <see cref="ExitToDesktopRequested"/> / <see cref="ExitToLobbyRequested"/> 만 낸다(인스펙터 UnityEvent 도 함께).
-///    아무것도 연결 안 됐으면 경고 로그만 남긴다. 연결 방법: <c>Docs/tech/handoff-pause-menu.md</c>.
+/// ESC 메뉴 + 그만두기 확인 팝업(PLAN-pause-menu — SVN r466 03_PauseMenu · 02_ExitConfirm 아트).
+/// 화면 전환(메뉴 ↔ 설정 ↔ 팝업)과 나가기 처리는 <see cref="GameMenuController"/> 가 정한다(PLAN-settings-ddol) —
+/// 이 컴포넌트는 버튼을 신호로 바꾸고 팝업 선택 상태만 가진다.
+/// <para>
+/// 팝업 = <b>바탕화면</b>(게임 종료) / <b>타이틀</b>(타이틀로 돌아가기) 두 버튼 — 누르면 **바로** 실행한다(경석 10-22 Play: 다시 묻지 않음).
+/// 아트의 ✗/✓ 는 숨긴다. 취소는 ESC(→ 메뉴). 로비·인게임 같다.
+/// 프리팹의 오른쪽 버튼은 이름이 <c>Lobby</c> 지만 글자를 "타이틀"로 바꿔 쓴다.
+/// </para>
 /// </summary>
 public sealed class PauseMenuView : MonoBehaviour
 {
-    public enum ExitChoice { None, Desktop, Lobby }
-
     [Header("메뉴")]
     [SerializeField] private GameObject menuRoot;
     [SerializeField] private Button continueButton;
@@ -23,47 +23,43 @@ public sealed class PauseMenuView : MonoBehaviour
     [SerializeField] private Button quitButton;
     [SerializeField] private Button pressAnyButton;   // 아래 "Press Any Button" 캡슐 — 계속하기와 같다
 
-    [Header("종료 확인 팝업")]
+    [Header("그만두기 팝업")]
     [SerializeField] private GameObject exitRoot;
-    [SerializeField] private Button desktopButton;
-    [SerializeField] private Button lobbyButton;
-    [SerializeField] private Button cancelButton;     // ✗ — 메뉴로
-    [SerializeField] private Button confirmButton;    // ✓ — 고른 쪽 신호
-    [SerializeField] private Color choiceTextNormal = new Color(0.75f, 0.77f, 0.77f, 1f);   // 목업 C25 M20 Y20
-    [SerializeField] private Color choiceTextSelected = Color.white;
+    [SerializeField] private Button desktopButton;    // 바탕화면 — 게임 종료
+    [SerializeField] private Button lobbyButton;      // 오른쪽 — "타이틀"
+    [SerializeField] private Button cancelButton;     // ✗ — 숨김(취소 = ESC)
+    [SerializeField] private Button confirmButton;    // ✓ — 숨김(버튼이 바로 실행)
     [SerializeField] private GameObject desktopSelectedRing;
     [SerializeField] private GameObject lobbySelectedRing;
-
-    [Header("나가기 연결(은희) — 코드 이벤트와 같이 불린다")]
-    [SerializeField] private UnityEvent onExitToDesktop = new UnityEvent();
-    [SerializeField] private UnityEvent onExitToLobby = new UnityEvent();
 
     /// <summary>계속하기(또는 아래 캡슐) — 메뉴를 닫아 게임으로.</summary>
     public event Action ContinueRequested;
     /// <summary>설정 — 설정창 열기.</summary>
     public event Action SettingsRequested;
-    /// <summary>바탕화면 + ✓. 처리(게임 종료·호스트/클라 예외)는 연결하는 쪽이 한다.</summary>
+    /// <summary>그만두기 — 확인 팝업을 띄운다(문구는 받는 쪽이 <see cref="ShowExitConfirm"/> 로 정한다).</summary>
+    public event Action QuitRequested;
+    /// <summary>바탕화면 — 게임 종료.</summary>
     public event Action ExitToDesktopRequested;
-    /// <summary>로비 + ✓. 처리(호스트 = 전원 로비 / 클라 = 혼자 세션 구성 화면)는 연결하는 쪽이 한다.</summary>
-    public event Action ExitToLobbyRequested;
+    /// <summary>타이틀 — 세션을 떠나 타이틀로.</summary>
+    public event Action ExitToTitleRequested;
 
-    public UnityEvent OnExitToDesktop => onExitToDesktop;
-    public UnityEvent OnExitToLobby => onExitToLobby;
-
-    public ExitChoice Choice { get; private set; }
     public bool IsExitConfirmOpen => exitRoot != null && exitRoot.activeSelf;
+
+    // 코드가 넣는 팝업 문구(호스트 경고 등) — 언어가 바뀌면 다시 넣는다(LocalizedText 는 키를 비워 손을 떼게 한다).
+    private UiString? _confirmMessage;
 
     private void Awake()
     {
         Bind(continueButton, () => ContinueRequested?.Invoke());
         Bind(pressAnyButton, () => ContinueRequested?.Invoke());
         Bind(settingsButton, () => SettingsRequested?.Invoke());
-        Bind(quitButton, ShowExitConfirm);
-        Bind(desktopButton, () => Select(ExitChoice.Desktop));
-        Bind(lobbyButton, () => Select(ExitChoice.Lobby));
-        Bind(cancelButton, ShowMenu);
-        Bind(confirmButton, Confirm);
+        Bind(quitButton, () => QuitRequested?.Invoke());
+        Bind(desktopButton, () => ExitToDesktopRequested?.Invoke());
+        Bind(lobbyButton, () => ExitToTitleRequested?.Invoke());
     }
+
+    private void OnEnable() => Loc.Changed += ApplyTexts;
+    private void OnDisable() => Loc.Changed -= ApplyTexts;
 
     /// <summary>메뉴 화면(팝업 닫힘). ESC 로 처음 열 때·팝업 ✗·설정창 닫기 뒤.</summary>
     public void ShowMenu()
@@ -79,50 +75,43 @@ public sealed class PauseMenuView : MonoBehaviour
         SetActive(exitRoot, false);
     }
 
-    /// <summary>종료 확인 팝업. 열 때마다 선택을 비운다 — ✓ 는 고르기 전까지 비활성.</summary>
-    public void ShowExitConfirm()
+    /// <summary>그만두기 팝업 — 바탕화면 / 타이틀 두 버튼만(✗/✓·선택 링 숨김). <paramref name="message"/> = 가운데 문구(호스트 경고 등).</summary>
+    public void ShowExitConfirm(UiString message)
     {
+        _confirmMessage = message;
         SetActive(menuRoot, false);
         SetActive(exitRoot, true);
-        Select(ExitChoice.None);
+        SetActive(cancelButton != null ? cancelButton.gameObject : null, false);
+        SetActive(confirmButton != null ? confirmButton.gameObject : null, false);
+        SetActive(desktopSelectedRing, false);
+        SetActive(lobbySelectedRing, false);
+        ApplyTexts();   // 활성화 뒤 — LocalizedText.OnEnable 이 저작 글자로 덮은 다음에 넣는다
     }
 
-    private void Select(ExitChoice choice)
+    private void ApplyTexts()
     {
-        Choice = choice;
-        Paint(desktopButton, desktopSelectedRing, choice == ExitChoice.Desktop);
-        Paint(lobbyButton, lobbySelectedRing, choice == ExitChoice.Lobby);
-        if (confirmButton != null) confirmButton.interactable = choice != ExitChoice.None;
-    }
+        if (lobbyButton != null)
+            SetText(lobbyButton.GetComponentInChildren<TMP_Text>(true), UiStrings.ExitTitleChoice);
 
-    private void Paint(Button button, GameObject ring, bool selected)
-    {
-        SetActive(ring, selected);
-        if (button == null) return;
-        foreach (TMP_Text t in button.GetComponentsInChildren<TMP_Text>(true))
-            t.color = selected ? choiceTextSelected : choiceTextNormal;
-    }
-
-    private void Confirm()
-    {
-        switch (Choice)
+        if (exitRoot == null || !_confirmMessage.HasValue) return;
+        Transform t = exitRoot.transform.Find("Message");
+        TMP_Text message = t != null ? t.GetComponent<TMP_Text>() : null;
+        SetText(message, _confirmMessage.Value);
+        if (message != null)
         {
-            case ExitChoice.Desktop:
-                Raise("바탕화면", ExitToDesktopRequested, onExitToDesktop);
-                break;
-            case ExitChoice.Lobby:
-                Raise("로비", ExitToLobbyRequested, onExitToLobby);
-                break;
+            // 호스트 경고는 "정말 종료하시겠습니까?" 보다 길다 — 칸(700) 안에 줄여 넣는다.
+            message.enableAutoSizing = true;
+            message.fontSizeMax = 60f;
+            message.fontSizeMin = 30f;
         }
     }
 
-    private static void Raise(string label, Action action, UnityEvent unityEvent)
+    private static void SetText(TMP_Text text, UiString value)
     {
-        bool wired = action != null || unityEvent.GetPersistentEventCount() > 0;
-        action?.Invoke();
-        unityEvent.Invoke();
-        if (!wired)
-            Debug.LogWarning($"[PauseMenu] '{label}' 나가기가 아직 연결되지 않았다 — Docs/tech/handoff-pause-menu.md 참고.");
+        if (text == null) return;
+        LocalizedText localized = text.GetComponent<LocalizedText>();
+        if (localized != null && !string.IsNullOrEmpty(localized.Key)) localized.Key = string.Empty;   // 저작 키가 다시 덮지 않게
+        text.text = value.Text;
     }
 
     private static void Bind(Button button, UnityAction action)

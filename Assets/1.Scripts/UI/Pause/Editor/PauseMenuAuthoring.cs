@@ -8,7 +8,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 인게임 ESC 일시정지 메뉴 프리팹(PLAN-pause-menu) — SVN r466 UI_Panel 의 03_PauseMenu · 02_ExitConfirm 배치를 그대로 옮긴다. <b>멱등</b>.
 /// 1) <c>Assets/2.Prefabs/UI/PauseMenu.prefab</c> 을 새로 만든다(매번 처음부터 — 손으로 고칠 곳 없음, 고칠 건 이 파일).
-/// 2) <c>4.MapScene</c> <c>OptionPanel</c> 에 인스턴스를 넣고(없을 때만), 설정창 제목줄의 나가기 버튼(71c8599a)은 끈다 — 그만두기가 대신.
+/// 2) (10-22 폐지) 맵 OptionPanel 배치 — PauseMenu 는 이제 GameMenu.prefab(DDOL) 안에 중첩된다(PLAN-settings-ddol, GameMenuAuthoring).
 /// 좌표 = 매니페스트 rect(1920×1080, 왼쪽 위 원점) → 화면 중심(960, 540) 원점. 이미지는 rect + 투명 여백 4.
 /// </summary>
 public static class PauseMenuAuthoring
@@ -36,7 +36,7 @@ public static class PauseMenuAuthoring
     static TMP_FontAsset _font;
     static int _uiLayer;
 
-    [MenuItem("Tools/UI/Pause/일시정지 메뉴 만들기 + ESC 적용 (멱등)")]
+    [MenuItem("Tools/UI/Pause/일시정지 메뉴 프리팹 만들기 (멱등)")]
     static void Run()
     {
         if (EditorApplication.isPlaying) { Debug.LogError("[PauseMenu] Play 중에는 실행하지 않는다."); return; }
@@ -49,8 +49,7 @@ public static class PauseMenuAuthoring
         PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
         Object.DestroyImmediate(root);
         Debug.Log($"[PauseMenu] {PrefabPath} 저장");
-
-        ApplyToMap();
+        // 맵 OptionPanel 배치(ApplyToMap)는 하지 않는다 — PauseMenu 는 GameMenu.prefab(DDOL) 안에 중첩된다(PLAN-settings-ddol).
     }
 
     // ─── 프리팹 ─────────────────────────────────────────────────────

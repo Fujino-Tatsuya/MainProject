@@ -172,6 +172,57 @@ public class GameManager : MonoBehaviour
         SceneManager.LoadScene(lobbySceneName);
     }
 
+    private bool _leavingToTitle;
+
+    /// <summary>
+    /// ESC 그만두기 → "타이틀"(로비·인게임, PLAN-settings-ddol). 데모 재접속 루프를 먼저 Idle 로 돌리고(끊김으로 처리되지 않게) NGO 를 Shutdown,
+    /// 정리가 끝나면 타이틀을 로컬 Single 로드한다. 호스트가 누르면 클라 전원은 끊김 경로("호스트 대기 중")로 간다.
+    /// 🔴 0.BootStrapScene 은 다시 로드하지 않는다 — NetworkManager 가 둘이 된다.
+    /// </summary>
+    public void LeaveSessionToTitle()
+    {
+        if (_leavingToTitle)
+        {
+            return;
+        }
+
+        StartCoroutine(LeaveSessionToTitleRoutine());
+    }
+
+    private System.Collections.IEnumerator LeaveSessionToTitleRoutine()
+    {
+        _leavingToTitle = true;
+        Debug.Log("[SceneFlow] GameManager.LeaveSessionToTitle");
+        DemoSessionDirector.PrepareLeaveToTitle();
+
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager != null && (networkManager.IsListening || networkManager.ShutdownInProgress))
+        {
+            networkManager.Shutdown();
+            while (networkManager != null && (networkManager.IsListening || networkManager.ShutdownInProgress))
+            {
+                yield return null;
+            }
+        }
+
+        Time.timeScale = 1f;
+        SessionResult.Clear();
+        SetState(GameState.Title);
+        SceneManager.LoadScene(titleSceneName);
+        _leavingToTitle = false;
+    }
+
+    /// <summary>ESC 그만두기 → "바탕화면" — 에디터는 Play 정지, 빌드는 종료. 세션 정리는 각 OnApplicationQuit 가 한다.</summary>
+    public static void QuitGame()
+    {
+        Debug.Log("[SceneFlow] GameManager.QuitGame");
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
     public static void GoToLobbyButton()
     {
         Debug.Log("[SceneFlow] GameManager.GoToLobbyButton");

@@ -146,6 +146,15 @@ public static class UiStrings
     public static readonly UiString ExitMessage = new UiString("UI.Exit.Message", "정말 종료하시겠습니까?", PauseWhere + "종료 확인 팝업 문구");
     public static readonly UiString ExitDesktop = new UiString("UI.Exit.Desktop", "바탕화면", PauseWhere + "종료 확인 — 바탕화면(게임 종료) 선택");
     public static readonly UiString ExitLobby = new UiString("UI.Exit.Lobby", "로비", PauseWhere + "종료 확인 — 로비 선택");
+    // 타이틀 모니터 메뉴(경석 10-22 — 기본 한국어, 영어로 바꾸면 START·SETTING·EXIT).
+    private const string TitleWhere = "1.TitleScene › 모니터 메뉴 › ";
+    public static readonly UiString TitleStart = new UiString("UI.Title.Start", "시작하기", TitleWhere + "시작 버튼");
+    public static readonly UiString TitleSetting = new UiString("UI.Title.Setting", "설정", TitleWhere + "설정 버튼");
+    public static readonly UiString TitleExit = new UiString("UI.Title.Exit", "나가기", TitleWhere + "나가기 버튼");
+    // 그만두기 팝업(PLAN-settings-ddol, 경석 10-22) — 오른쪽 선택 = 타이틀(로비 자리). 호스트는 다른 플레이어도 끊긴다는 경고.
+    public static readonly UiString ExitTitleChoice = new UiString("UI.Exit.ToTitle", "타이틀", PauseWhere + "종료 확인 — 타이틀(타이틀로 돌아가기) 선택");
+    public static readonly UiString ExitHostQuitWarning = new UiString("UI.Exit.HostQuitWarning", "다른 플레이어의 게임도 끝납니다", PauseWhere + "그만두기 확인 문구 — 인게임 호스트에게만");
+    public static readonly UiString ExitHostToTitleWarning = new UiString("UI.Exit.HostToTitleWarning", "다른 플레이어도 연결이 끊깁니다", PauseWhere + "그만두기 확인 문구 — 로비 호스트에게만");
 
     public static readonly UiString StatusEffectGrabbed = new UiString(StatusEffectKeyPrefix + "Grabbed", "붙잡힘", "PlayerOverheadHealthBarRule — 머리 위 붙잡힘(구속)(코드)");
 
@@ -195,7 +204,9 @@ public static class UiStrings
         all.AddRange(LoadingReadyMessages);
         all.AddRange(StatusEffectNames.Values);
         all.Add(StatusEffectGrabbed);
-        all.AddRange(new[] { PauseTitle, PauseContinue, PauseSettings, PauseQuit, PausePressAnyButton, ExitTitle, ExitMessage, ExitDesktop, ExitLobby });
+        all.AddRange(new[] { PauseTitle, PauseContinue, PauseSettings, PauseQuit, PausePressAnyButton, ExitTitle, ExitMessage, ExitDesktop, ExitLobby,
+                                ExitTitleChoice, ExitHostQuitWarning, ExitHostToTitleWarning,
+                                TitleStart, TitleSetting, TitleExit });
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
         all.AddRange(DemoConnectUiStrings.All); // 부스 데모 연결 오버레이(UI.DemoConnect.*)
         all.AddRange(LobbyUiStrings.All);       // 걷는 로비 상호작용·준비·카운트다운(UI.Lobby.*, 할 일 48 C10)

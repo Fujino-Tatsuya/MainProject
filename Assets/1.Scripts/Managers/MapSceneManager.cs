@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class MapSceneManager : NemoSceneManager
@@ -14,21 +13,10 @@ public class MapSceneManager : NemoSceneManager
     private static readonly List<PlayerSessionStats> ReceivedPlayerRows = new List<PlayerSessionStats>();
 
     [Header("Buttons")]
-    [SerializeField] private Button resultButton; // ExitButton — 호스트/오프라인만 GoToResult 개시
-    [SerializeField] private Button optionButton; // Option_Button — 옵션 패널 열기
+    [SerializeField] private Button optionButton; // Option_Button — ESC 메뉴 열기(GameMenuController)
 
-    [Header("Option")]
-    [SerializeField] private GameObject optionPanel;
-
-    [Header("Client Exit Warning")]
-    [SerializeField] private GameObject warningPanel;     // WarningMessage_Panel — 클라 전용 경고창
-    [SerializeField] private Button warningConfirmButton; // ConfirmButton(Yes) — 게임 종료
-    [SerializeField] private Button warningCancelButton;  // CancelButton — 경고창 닫기
-
+    // ESC 메뉴·설정창·종료는 DDOL GameMenuController 가 한다(PLAN-settings-ddol) — 씬의 OptionPanel·클라 경고창·ExitButton 은 지웠다.
     private GameManager _gameManager;
-    // ESC 일시정지 메뉴(PLAN-pause-menu) — OptionPanel 안의 PauseMenu·SettingsBody 인스턴스(ResolveSceneReferences 가 찾는다).
-    private PauseMenuView _pauseMenu;
-    private GameObject _settingsBody;
     private NetworkManager _networkManager;
     private bool _messageHandlerRegistered;
 
@@ -39,24 +27,13 @@ public class MapSceneManager : NemoSceneManager
         _gameManager = GetGameManager();
         _networkManager = NetworkManager.Singleton;
         ResolveSceneReferences();
-        SetOptionPanel(false);
         BindButtons();
         RegisterGoToResultHandler();
-    }
-
-    private void Update()
-    {
-        // 키 변경 중 Esc = 변경 취소(설정창 KeyRebindRow) — 옵션창을 닫지 않는다.
-        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true && !KeyRebindRow.IsRebinding)
-        {
-            HandleEscape();
-        }
     }
 
     private void Start()
     {
         Debug.Log("[SceneFlow] MapSceneManager.Start");
-        SetWarningPanel(false); // 경고창은 기본 숨김 — 클라가 Exit를 누를 때만 표시
         PlayEnterFade();
 
         // 인게임 BGM: 씬 로드 시점이 아니라 "본게임 준비 완료(로딩+플레이어 스폰 동기화)" 시점에 재생.
@@ -85,23 +62,17 @@ public class MapSceneManager : NemoSceneManager
         UnregisterGoToResultHandler();
     }
 
-    // ExitButton 진입점. TempGameManager.GoToResultButton 브리지가 호출한다.
-    // 호스트/오프라인: 결과 확정·페이로드 송신 후 로비로 전환(PLAN-48 C7 — 서버 NGO Single, 결과 패널은 C7b 에서 Work1 LobbyResultPanel 연결 예정). 클라: 경고창 표시.
+    // 판 끝 전환 진입점 — 서버 경로(PartyWipeWatcher 전멸 · BossEncounterDirector 처치)와 GameManager.GoToResultButton 이 호출한다.
+    // 호스트/오프라인: 결과 확정·페이로드 송신 후 로비로 전환(PLAN-48 C7 — 서버 NGO Single). 클라: 무시(서버의 전환을 따라간다).
     public void GoToResult()
     {
         Debug.Log($"[SceneFlow] MapSceneManager.GoToResult transitioning={IsTransitioning} client={IsNetworkClientOnly()}");
-        if (IsTransitioning || _gameManager == null)
+        if (IsTransitioning || _gameManager == null || IsNetworkClientOnly())
         {
             return;
         }
 
-        if (IsNetworkClientOnly())
-        {
-            SetWarningPanel(true);
-            return;
-        }
-
-        // ExitButton(중도 종료)도 누른 시점까지의 집계값으로 확정한다. 전멸·클리어가 먼저 확정했으면
+        // 중도 종료도 누른 시점까지의 집계값으로 확정한다. 전멸·클리어가 먼저 확정했으면
         // 첫 확정이 이기므로 그 결과가 그대로 간다.
         SessionStatsTracker.Active?.Capture(SessionOutcome.Aborted);
 
@@ -109,78 +80,13 @@ public class MapSceneManager : NemoSceneManager
         PerformGoToResult();
     }
 
-    // 클라 경고창 Yes — 게임 종료.
-    public void ConfirmClientExit()
-    {
-        Debug.Log("[SceneFlow] MapSceneManager.ConfirmClientExit quit");
-        SetButtonsInteractable(false, warningConfirmButton, warningCancelButton);
-        QuitApplication();
-    }
-
-    // 클라 경고창 Cancel — 경고창 닫기.
-    public void CancelClientExit()
-    {
-        Debug.Log("[SceneFlow] MapSceneManager.CancelClientExit close warning");
-        SetWarningPanel(false);
-    }
-
+    // 톱니(Option_Button) — ESC 메뉴 열기.
     public void OpenOptionPanel()
     {
-        SetOptionPanel(true);
-    }
-
-    public void CloseOptionPanel()
-    {
-        SetOptionPanel(false);
-    }
-
-    // 톱니 토글 — 열려 있으면 닫고, 닫혀 있으면 일시정지 메뉴로 연다.
-    public void ToggleOptionPanel()
-    {
-        SetOptionPanel(optionPanel == null || !optionPanel.activeSelf);
-    }
-
-    // ESC = 한 단계 뒤로(PLAN-pause-menu P2): 닫힘 → 메뉴 / 설정·종료 팝업 → 메뉴 / 메뉴 → 닫힘.
-    private void HandleEscape()
-    {
-        if (optionPanel == null || !optionPanel.activeSelf)
+        if (GameMenuController.Instance != null)
         {
-            SetOptionPanel(true);
-            return;
+            GameMenuController.Instance.OpenMenu();
         }
-
-        bool settingsOpen = _settingsBody != null && _settingsBody.activeSelf;
-        bool exitOpen = _pauseMenu != null && _pauseMenu.IsExitConfirmOpen;
-        if (_pauseMenu != null && (settingsOpen || exitOpen))
-        {
-            ShowPauseMenu();
-            return;
-        }
-
-        SetOptionPanel(false);
-    }
-
-    // 일시정지 메뉴 화면 — 설정창은 숨긴다. 설정창 X·종료 팝업 ✗ 도 여기로 돌아온다.
-    public void ShowPauseMenu()
-    {
-        if (_settingsBody != null) _settingsBody.SetActive(_pauseMenu == null);   // 메뉴 프리팹이 없으면 예전처럼 설정창만
-        if (_pauseMenu != null) _pauseMenu.ShowMenu();
-    }
-
-    // 메뉴의 '설정' — 메뉴를 숨기고 설정창.
-    private void ShowSettingsFromPause()
-    {
-        if (_pauseMenu != null) _pauseMenu.HideAll();
-        if (_settingsBody != null) _settingsBody.SetActive(true);
-    }
-
-    private void QuitApplication()
-    {
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
     }
 
     // 페이드 후 GameManager.GoToResult — 서버는 NGO 로 로비를 Single 로드(동적 객체 디스폰 포함), 오프라인은 로컬 Single 로드,
@@ -192,25 +98,8 @@ public class MapSceneManager : NemoSceneManager
             return;
         }
 
-        SetButtonsInteractable(false, resultButton);
+        GameMenuController.Instance?.Close();
         StartCoroutine(FadeThenInvoke(_gameManager.GoToResult));
-    }
-
-    private void SetWarningPanel(bool active)
-    {
-        if (warningPanel != null)
-        {
-            warningPanel.SetActive(active);
-        }
-    }
-
-    private void SetOptionPanel(bool active)
-    {
-        if (optionPanel != null)
-        {
-            if (active) ShowPauseMenu();   // 열 때는 항상 메뉴부터
-            optionPanel.SetActive(active);
-        }
     }
 
     private bool IsNetworkClientOnly()
@@ -321,95 +210,19 @@ public class MapSceneManager : NemoSceneManager
 
     private void ResolveSceneReferences()
     {
-        resultButton ??= FindButton("ExitButton");
         optionButton ??= FindButton("Option_Button");
-        warningConfirmButton ??= FindButton("ConfirmButton");
-        warningCancelButton ??= FindButton("CancelButton");
-        if (optionPanel == null)
-        {
-            optionPanel = FindInActiveScene("OptionPanel");
-        }
-
-        if (warningPanel == null)
-        {
-            warningPanel = FindInActiveScene("WarningMessage_Panel");
-        }
-
-        if (optionPanel != null)
-        {
-            _pauseMenu = optionPanel.GetComponentInChildren<PauseMenuView>(true);
-            SettingsBodyView body = optionPanel.GetComponentInChildren<SettingsBodyView>(true);
-            _settingsBody = body != null ? body.gameObject : null;
-        }
-
-        if (resultButton == null)
-        {
-            WarnMissingReference(nameof(resultButton));
-        }
-
         if (optionButton == null)
         {
             WarnMissingReference(nameof(optionButton));
-        }
-
-        if (optionPanel == null)
-        {
-            WarnMissingReference(nameof(optionPanel));
-        }
-
-        if (warningPanel == null)
-        {
-            WarnMissingReference(nameof(warningPanel));
-        }
-
-        if (warningConfirmButton == null)
-        {
-            WarnMissingReference(nameof(warningConfirmButton));
-        }
-
-        if (warningCancelButton == null)
-        {
-            WarnMissingReference(nameof(warningCancelButton));
         }
     }
 
     private void BindButtons()
     {
-        // resultButton(ExitButton)은 씬에서 GameManager.GoToResultButton 퍼시스턴트 이벤트로 이미 연결됨 —
-        // 코드 리스너를 추가하면 이중 호출되므로 여기서는 바인딩하지 않는다. (interactable 제어용으로만 참조 보유)
         if (optionButton != null)
         {
             optionButton.onClick.RemoveListener(OpenOptionPanel);
             optionButton.onClick.AddListener(OpenOptionPanel);
-        }
-
-        // 설정창 틀 안의 닫기 버튼(PLAN-settings-art) — 일시정지 메뉴로 돌아간다(PLAN-pause-menu P2).
-        SettingsBodyView settingsBody = _settingsBody != null ? _settingsBody.GetComponent<SettingsBodyView>() : null;
-        if (settingsBody != null && settingsBody.CloseButton != null)
-        {
-            settingsBody.CloseButton.onClick.RemoveListener(ShowPauseMenu);
-            settingsBody.CloseButton.onClick.AddListener(ShowPauseMenu);
-        }
-
-        // 일시정지 메뉴 — 계속하기 = 닫기, 설정 = 설정창. 나가기(바탕화면·로비)는 은희가 PauseMenuView 이벤트에 연결한다.
-        if (_pauseMenu != null)
-        {
-            _pauseMenu.ContinueRequested -= CloseOptionPanel;
-            _pauseMenu.ContinueRequested += CloseOptionPanel;
-            _pauseMenu.SettingsRequested -= ShowSettingsFromPause;
-            _pauseMenu.SettingsRequested += ShowSettingsFromPause;
-        }
-
-        if (warningConfirmButton != null)
-        {
-            warningConfirmButton.onClick.RemoveListener(ConfirmClientExit);
-            warningConfirmButton.onClick.AddListener(ConfirmClientExit);
-        }
-
-        if (warningCancelButton != null)
-        {
-            warningCancelButton.onClick.RemoveListener(CancelClientExit);
-            warningCancelButton.onClick.AddListener(CancelClientExit);
         }
     }
 }
