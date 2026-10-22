@@ -17,7 +17,7 @@ using UnityEngine.AI;
 /// <item>훈련 보정: A/B 칸 전이 중지·칸 UI 숨김, B 학습용 취약 유지·자발 행동 없음, 처치 방지(체력 하한 1), D 마무리 체력.
 /// 실전 전역 규칙·데이터는 건드리지 않는다.</item>
 /// </list>
-/// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)은 T5c. 이 상대는 서버 C# 이벤트만 낸다.
+/// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)은 <see cref="LobbyTrainingSparring"/>(T5c). 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
 [DataTableSheet("Lobby", Order = 0)]
 public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IOverheadHealthBarRule

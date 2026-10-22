@@ -1,6 +1,6 @@
 # 로비 훈련장 (할 일 86)
 
-> 로비(3.LobbyScene) 훈련실에서 하는 TRAIN_01~03 진행. 이 문서는 T8 에서 흐름·단계별 내용으로 확장한다 — 지금은 TRAIN_01 체크 시점·NavMesh 절만 있다.
+> 로비(3.LobbyScene) 훈련실에서 하는 TRAIN_01~03 진행. 이 문서는 T8 에서 흐름·단계별 내용으로 확장한다 — 지금은 TRAIN_01 체크 시점·TRAIN_03 상대·진행기 연결·NavMesh 절만 있다.
 > 흐름·출격·접속 승인은 [lobby-demo-flow.md](lobby-demo-flow.md) §1.
 
 ## TRAIN_01 무기 점검 — 체크 시점
@@ -21,7 +21,7 @@
 - 승인 = `PlayerSkillController.StartSkillServer` 끝의 `ServerSkillUsed` — 쿨타임을 수동 커밋하는 스킬(암살자 E 등)도 승인 시점에 난다.
 - 발사 신호로 세는 스킬은 `GunnerChargeLaserSkill` 하나뿐이다(`TryGetApprovalItem(countsOnFire)`). 다른 스킬을 발사·효과 시점으로 바꾸려면 이 규칙과 훅을 같이 고친다.
 
-## TRAIN_03 훈련 상대 `TrainingSparringBot` (T5b — 진행기 연결·씬 배치는 T5c)
+## TRAIN_03 훈련 상대 `TrainingSparringBot` (T5b) · 진행기 연결 `LobbyTrainingSparring` (T5c)
 
 - **프리팹**: `Assets/2.Prefabs/Lobby/TrainingSparringBot.prefab` = `SpinnerBot.prefab` 의 **Variant** 에서 `SpinnerBot` 컴포넌트를 지우고 `TrainingSparringBot` 을 얹었다
   (외형·애니메이터·`MonsterCounterWindow` 창 길이·`SpinnerBotData` 는 SpinnerBot 저작값을 따라간다). `DefaultNetworkPrefabs` 등록.
@@ -29,10 +29,35 @@
 - **판정**: 단계 = `TrainingSparringModel`(T5a), 게이지·벽·처치 방지 = `TrainingSparringRules`. 23호 코드(`TwentyThreeBoss`)는 읽고 같은 규칙을 이 상대 안에 다시 썼다 — 23호 규칙이 바뀌면 같이 맞춘다(PLAN-86 R3).
 - **이동 없음**: 배치 위치에서 돌아보고 사거리(`SpinnerBotData.attackRange`) 안이면 간파 창 → 채찍. 넉백으로 밀린 자리에서 계속한다(벽마다 원위치 복귀 없음, 명세 §9.5).
   base 추격·리쉬 복귀(체력 회복)를 쓰지 않아 C 위치와 지정 벽 거리가 설계대로 유지된다.
-- **벽**: 넉백·Q 밀림 틱마다 `UnitWallImpacts.ServerProbe`(넉백 1회 = 1회). 결과 콜라이더가 `designatedWalls` 에 있을 때만 유효 — 씬 배치(T5c)가 `ServerConfigureArena(C 위치, 지정 벽)` 로 넣는다.
+- **벽**: 넉백·Q 밀림 틱마다 `UnitWallImpacts.ServerProbe`(넉백 1회 = 1회). 결과 콜라이더가 `designatedWalls` 에 있을 때만 유효 — 씬 배치(T5c, 아래)가 `ServerConfigureArena(C 위치, 지정 벽)` 로 넣는다.
 - **간파 성공 쿨 감소**: 할 일 90 으로 게임 전체에서 제거 — 훈련 상대 별도 처리 없음.
 - **칸 UI**: 머리 위 중간보스 바(`MonsterHealthBar_MidBoss`)를 이 상대의 `IOverheadHealthBarRule` 로 C·D 에만 켠다. 게이지 칸은 바 이름 자리 `칸 n/m`, D 제압 중엔 `제압된 상대를 공격하세요 n초`(임시 — 문구 `LobbyUiStrings.Train03*`). 바 채움은 체력.
 - **이벤트(서버)**: 간파 성공·CC 적용/종료·지정 벽 유효 충돌·칸 감소·제압 진입/종료·제압 중 피해·사망·단계 완료(`ServerStageCompleted`)·B→C 초기화 완료(`ServerResetExecuted` — 플레이어 쪽 `TrainingResetOptions.PracticeReset` 을 진행기가 이어 건다).
+
+### 진행기 연결 (T5c)
+
+`LobbyTrainingSparring` — `LobbyTrainingDirector` 와 같은 오브젝트(`LobbyTraining/LobbyTrainingDirector`)에 붙어 `ServerFlowChanged` 를 구독한다(T3·T4 와 같은 방식).
+"언제 한 번만"은 순수 `LobbySparringLink`(EditMode `LobbySparringLinkTests`), 단계·CC 판정은 상대 쪽 그대로.
+
+| 시점 | 하는 일 |
+|---|---|
+| 진행기 Train03A 진입(시작 집결 대기 포함) | 상대를 `SpawnAB` 에 스폰(이미 있으면 재사용) → `ServerConfigureArena(PointC, 지정 벽)`. 진행 알림 전엔 Idle 로 서 있기만 한다 |
+| Train03A~D 가 진행 중이 될 때 | `ServerNotifyFlowStageStarted(단계)` 1회(앞으로만). Train03C = 상대 B→C 초기화(C 위치 재배치) |
+| 상대 `ServerResetExecuted` | 훈련 명단 `ServerResetTrainingRoster(PracticeReset)` — 회차당 1회(체력·Q/E/R/우클릭 쿨·대시, 분노 재지급 없음) |
+| 상대 `ServerStageCompleted` | **다음 프레임** `ServerReportStageCompleted(Train03A~D)` 1회 — 진행기가 그 단계를 진행 중일 때만, 어긋남·중복·역순은 경고 후 무시 |
+| Train03 밖(TrainEnd 등)·진행기 디스폰(판 끝 로비 복귀) | 살아 있는 상대 디스폰·회차 끝(다음 회차는 기록을 새로). D 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰 |
+
+- A→B·B→C 전이는 진행기 쪽 영역 안 확인(`Gather_Train03Area`, 0초)을 거친다. C→D 는 제압 시작 순간 바로.
+- **무전 연결 지점(서버 C# 이벤트, `LobbyTrainingSparring.Active` 에서 구독)** — Train03 회차당 1회, 판정 콜백 밖(다음 프레임)에서 낸다.
+  - `ServerFirstCounterSucceeded` — A 첫 간파 성공(명세 §14 `TRAIN_03_COUNTER`). C·D 의 간파는 아니다.
+  - `ServerFirstValidWallImpact` — C 첫 유효 벽 충돌 = 칸 감소를 동반한 지정 벽 충돌(상대 모델 `HasRecordedWall`, `TRAIN_03_WALL`). A/B 의 벽·0칸 접촉·장식 벽은 아니다.
+- **씬 배치(임시 좌표 — 최종 위치는 사용자)**: `LobbyTraining/Train03Arena`(`LobbyTrainingSparringArena`, Gizmo 는 선택 안 해도 보인다 — A/B 노랑·C 하늘색·지정 벽 주황 + 라벨).
+  - `SpawnAB` (-16, 0, 1.5), 방향 +z(시작 집결 구역 쪽) — 동·서 벽에서 4 m.
+  - `PointC` (-17.5, 0, 5), 방향 +x(동쪽 = 플레이어 쪽) — 지정 벽 면까지 2.2 m, 간파 넉백(No23_A `vulnerableKnockbackDistance` 3 m)으로 닿는다. NavMesh 끝 x -19.33 에서 막히면 판정 거리 1.6 m 로 잡힌다.
+  - `DesignatedWall_West` — Wall 레이어 BoxCollider(보이는 메시 없음), 중심 (-19.8, 1.1, 5) 크기 (0.2, 2.2, 5.5). 서쪽 아트 벽(x -20, 두께 0.22) 바로 앞에 겹쳐 스윕이 이 상자를 먼저 맞힌다.
+    아트 벽 콜라이더를 직접 넣지 않은 이유: SVN 아트가 바뀌면 참조가 조용히 끊긴다. 위치를 옮길 땐 상자를 아트 벽 면에 붙여 두고 NavMesh 걷는 면(벽에서 0.5 m 안쪽)을 침범하지 않게 둔다.
+- **남은 것**: 무전 구독 = Work1 T6(위 두 이벤트), 제압 중 쿨타임 가속 = 할 일 91 `GrantServer(sourceId, duration)` 로 연결(지금 보류 플래그 꺼짐, 코드 없음),
+  마무리 체력 = 프리팹 `finishHealth` 임시 60, 명세 §9.4 '변신 해제·강화·잔류 공격 종료'(`PracticeReset` 주석 참고), 명세 §9.7 경계 밖 갇힘 복구(상대는 이동이 없고 넉백은 NavMesh 안에서만 밀린다 — 따로 없음). Play·MPPM 확인은 사용자.
 
 ## NavMesh 사전 베이크
 
