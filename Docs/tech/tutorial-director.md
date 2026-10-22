@@ -4,7 +4,7 @@
 > v8 에서 바뀐 디렉터 규칙: G1 = 여덟 항목·교착 방지 제외 · G5 = 수동(연계 3회 + 마지막 복귀) · 체크 항목 SkillR·SkillInterrupt·Corridor1CooldownReset 추가 · `AttackHits` 삭제. 목숨 차감 기준 G11 은 그대로(사용자 확정, §11).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
-> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11. 스텝별 고정 안전 지점(낙사·구간 이탈·끼임 복귀, 할 일 80)은 §12.
+> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11. 스텝별 고정 안전 지점(낙사 복귀, 할 일 80)은 §12.
 > **Play 검증 체크리스트(S0~S12 전 단계·MPPM·회귀·병합 전 확인)**: [tutorial-qa.md](tutorial-qa.md).
 
 ## 1. 판별 — 한 곳
@@ -391,7 +391,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
     끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).
 
 ## 12. 스텝별 고정 안전 지점 (할 일 80 — 1안, 2026-10-22)
-> 코드: `TutorialSafePointRules`(순수 — 감시 조건·구간 밖·구간 순서·기본 위치) · `TutorialRecoveryTimer`(연속 시간) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
+> 코드: `TutorialSafePointRules`(순수 — 감시 조건·구간 순서·기본 위치) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
 > 훅 `PlayerSafePointTracker.ReturnPointOverride`(신규, 기본 null = 기존 동작). 저작: `Tools/Map/Authoring/Tutorial/8. Place Safe Points (열린 씬)`.
 > 테스트: `TutorialSafePointRulesTests`(튜토리얼 러너). 디렉터·흐름 코드는 바꾸지 않았다(디렉터 공개 API·`TutorialDeathRules.TryFindAreaSpreadPoints` 만 부른다).
 
@@ -410,23 +410,19 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 복도4 | (−11.73, −101.11) | G9 앞면 + 1.5m |
 | 보스 진입 | (−21.97, −101.11) | G10 앞면 + 2.5m(패드 + 1m 안이면 런타임 거름이 다른 점으로) |
 
-튜닝 값(전부 `TutorialSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 구간 이탈 `recoverOutOfArea`/`outOfAreaSeconds` 1.5/`outOfAreaMargin` 1m ·
-끼임 `recoverStuck`/`stuckSeconds` 2/탐침 반경 0.15m·높이 0.5~1.3m · 판정 간격 0.2초 · 바닥 찾기 ±1.5m · 점유 반경 0.4m · 평지 10°.
+튜닝 값(전부 `TutorialSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 바닥 찾기 ±1.5m · 점유 반경 0.4m · 평지 10°.
 
 **언제(서버, 튜토리얼 활성 · 단계 None/Finished 아님 · 보스방 이동(`IsCountdownActive`/`IsEncounterBusy`) 아님)**
 - **낙사**: 추락 생존·추락 사망의 복귀 지점(`ResolveReturnPoint`)을 큐·Ring 탐색 대신 고정 지점으로. 연출(낙하 카메라·0.75초 지연·무적·입력 잠금)은 기존 그대로.
-- **구간 이탈**: Alive + 접지 + 튜토리얼 구간(존1~보스 진입) 사각형 + 1m 밖이 1.5초 이어지면.
-- **끼임**: Alive 인 몸 중심 탐침(반경 0.15m)이 Wall·Barrier 콜라이더 속이 2초 이어지면. 개인 뒤 배리어(`BackBarrier_*`)는 피어마다 달라(서버엔 호스트 것만) 뺀다.
-- 이탈·끼임 이동 = `PlayerFallRecovery.RelocateServer` → `TeleportAuthoritative`(오너 권한이면 오너에게 순간이동 RPC — 자동 부활과 같은 경로). 실패하면 다음 1.5/2초 뒤 다시.
+- 낙사 말고는 되돌리지 않는다 — 처음 구현에 있던 구간 이탈(1.5초)·끼임(2초) 자동 복귀는 요청 범위 밖이라 뺐다(2026-10-22).
 
 **어느 지점**: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(`TutorialRevivePointRules.AreaOrder(step, mask, passed)` — 단계 구간을 배리어 상한으로 내리고,
 그 플레이어의 지나온 최전방 구간 아래로는 안 감)부터 거꾸로 — 지점이 있고, 바닥·점유가 괜찮고, `ReturnPointFilter`(닫힌 배리어·뒤 배리어·지난 배리어 앞면 여유·패드 + 1m) 를 통과하는 첫 구간.
-지점이 막혔으면 같은 구간에서 지점에 가장 가까운 안전 격자점(`TryFindAreaSpreadPoints` — 전멸 리스폰·구간 스킵과 같은 탐색). 하나도 없으면 기존 동작(낙사 = 큐, 이탈·끼임 = 그대로 + 경고).
+지점이 막혔으면 같은 구간에서 지점에 가장 가까운 안전 격자점(`TryFindAreaSpreadPoints` — 전멸 리스폰·구간 스킵과 같은 탐색). 하나도 없으면 기존 동작(큐).
 
-**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · …` · `client n 낙사 → Zone2 안전 지점 …` · `client n 구간 이탈 (…) → … 안전 지점 …` · `client n 끼임 …` · `[Fall/진단] 고정 안전 지점으로 — …`.
+**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `[Fall/진단] 고정 안전 지점으로 — …`.
 
 **알려진 한계 · Play 로 볼 것**
-- 낙사가 '최근 밟은 자리'가 아니라 구간 입구로 돌아간다(1안 사양). 존2 물 구멍처럼 자주 떨어지는 곳은 이동 거리가 늘 수 있다 — 싫으면 `useOnFall` 끔(이탈·끼임만).
-- 끼임 탐침은 Wall·Barrier 만 본다(소품 Default·Env 속 끼임은 못 잡음 — 오탐 방지 우선). 구간 이탈은 접지 상태만(낙하는 기존 추락 판정 몫).
+- 낙사가 '최근 밟은 자리'가 아니라 구간 입구로 돌아간다(1안 사양). 존2 물 구멍처럼 자주 떨어지는 곳은 이동 거리가 늘 수 있다 — 싫으면 `useOnFall` 끔.
 - 지점 Y 는 스테이지 높이(0) — 존 바닥은 런타임 존 프리팹이라 에디터에서 검증하지 못했다. 바닥이 없으면 런타임이 격자 탐색으로 내려간다.
 - 할 일 86(존1·존3 검사 로비 이전) 뒤 구간이 바뀌면 지점만 지우고 메뉴를 다시 돌린다.

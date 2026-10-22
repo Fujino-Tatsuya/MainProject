@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using NUnit.Framework;
 
 /// <summary>
-/// 튜토리얼 스텝별 고정 안전 지점(할 일 80) 순수 규칙(<see cref="TutorialSafePointRules"/>·<see cref="TutorialRecoveryTimer"/>) —
-/// 감시 조건·구간 밖 판정·구간 순서(부활과 같음)·저작 기본 위치·연속 시간 타이머. 문서: Docs/tech/tutorial-director.md §12.
+/// 튜토리얼 스텝별 고정 안전 지점(할 일 80) 순수 규칙(<see cref="TutorialSafePointRules"/>) —
+/// 감시 조건·구간 순서(부활과 같음)·저작 기본 위치. 문서: Docs/tech/tutorial-director.md §12.
 /// </summary>
 public sealed class TutorialSafePointRulesTests
 {
@@ -34,26 +34,6 @@ public sealed class TutorialSafePointRulesTests
         Assert.IsFalse(TutorialSafePointRules.ShouldWatch(true, TutorialStep.None, false), "활성 전");
         Assert.IsFalse(TutorialSafePointRules.ShouldWatch(true, TutorialStep.Finished, false), "보스방 도착 뒤 = 일반 규칙");
         Assert.IsFalse(TutorialSafePointRules.ShouldWatch(true, TutorialStep.BossEnter, true), "보스방 이동(카운트다운·도착 대기) 중");
-    }
-
-    // ─── 구간 밖 ──────────────────────────────────────────────────────────
-
-    [Test]
-    public void IsOutsideAll_InsideAnyAreaOrMargin_IsFalse()
-    {
-        TutorialAreaTracker t = Layout();
-        Assert.IsFalse(TutorialSafePointRules.IsOutsideAll(t, 5f, 0f, 1f), "존1 안");
-        Assert.IsFalse(TutorialSafePointRules.IsOutsideAll(t, 15f, 1.5f, 1f), "복도1 안");
-        Assert.IsFalse(TutorialSafePointRules.IsOutsideAll(t, 15f, 2.8f, 1f), "복도 벽 너머 0.8m — 여유 안");
-        Assert.IsTrue(TutorialSafePointRules.IsOutsideAll(t, 15f, 3.5f, 1f), "복도 옆 1.5m 밖 — 맵 밖");
-        Assert.IsTrue(TutorialSafePointRules.IsOutsideAll(t, -3f, 0f, 1f), "존1 뒤 바깥");
-    }
-
-    [Test]
-    public void IsOutsideAll_NoAreas_NeverJudges()
-    {
-        Assert.IsFalse(TutorialSafePointRules.IsOutsideAll(null, 999f, 999f, 0f), "구간 계산 실패");
-        Assert.IsFalse(TutorialSafePointRules.IsOutsideAll(new TutorialAreaTracker(), 999f, 999f, 0f), "구간 0개");
     }
 
     // ─── 구간 순서 = 자동 부활 ───────────────────────────────────────────
@@ -112,33 +92,5 @@ public sealed class TutorialSafePointRulesTests
         Assert.IsTrue(TutorialSafePointRules.TryDefaultAnchor(TutorialArea.Corridor2, t, specs, 1.5f, out float x, out float z));
         Assert.AreEqual(0f, x, 1e-4);
         Assert.AreEqual(-181.9f, z, 1e-4, "앞면 −180.4 에서 −Z 로 1.5");
-    }
-
-    // ─── 연속 시간 타이머 ────────────────────────────────────────────────
-
-    [Test]
-    public void Timer_FiresAfterContinuousThreshold_ThenRearms()
-    {
-        var timer = new TutorialRecoveryTimer();
-        Assert.IsFalse(timer.Tick(true, 0.0, 1.5f));
-        Assert.IsFalse(timer.Tick(true, 1.0, 1.5f));
-        Assert.IsTrue(timer.Tick(true, 1.5, 1.5f), "1.5초 연속");
-        Assert.IsFalse(timer.Tick(true, 2.0, 1.5f), "알린 뒤 다시 잰다");
-        Assert.IsTrue(timer.Tick(true, 3.0, 1.5f), "복귀 실패로 그대로면 다음 1.5초 뒤 다시");
-    }
-
-    [Test]
-    public void Timer_BreakResets()
-    {
-        var timer = new TutorialRecoveryTimer();
-        timer.Tick(true, 0.0, 1.5f);
-        Assert.IsFalse(timer.Tick(false, 1.0, 1.5f));
-        Assert.IsFalse(timer.IsRunning);
-        Assert.IsFalse(timer.Tick(true, 1.2, 1.5f), "끊긴 뒤 처음부터");
-        Assert.IsFalse(timer.Tick(true, 2.6, 1.5f));
-        Assert.IsTrue(timer.Tick(true, 2.7, 1.5f));
-
-        timer.Reset();
-        Assert.IsFalse(timer.IsRunning);
     }
 }

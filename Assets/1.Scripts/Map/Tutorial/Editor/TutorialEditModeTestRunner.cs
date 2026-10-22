@@ -17,7 +17,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialMonsterLedgerTests$",
         "^TutorialBossPathRulesTests$",
         "^TutorialDeathRulesTests$", // 사망 규칙(S11) + 부활 지점 — 뒤 배리어 예외(C2)·보스 진입 패드 제외·G10 앞 폴백(C3)
-        "^TutorialSafePointRulesTests$", // 할 일 80 스텝별 고정 안전 지점 — 감시 조건·구간 밖·구간 순서·기본 위치·연속 시간
+        "^TutorialSafePointRulesTests$", // 할 일 80 스텝별 고정 안전 지점 — 감시 조건·구간 순서·기본 위치
         "^TutorialBossRetryTests$", // 할 일 30 (2) 전멸 리스폰 — 보스 재도전 되감기(G11 닫기·BossEnter)·뒤 배리어 마스크 재계산(복도4 최전방)
         "^TutorialTraitSelectionModelTests$", // 특성(T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
         "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 내 제시 번호(OfferSeq)로 열림·닫힘·닫힌 제시 재표시 금지·다른 사람 재선택에 안 닫힘·획득 토스트·문구

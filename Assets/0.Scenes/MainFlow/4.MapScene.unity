@@ -2969,15 +2969,6 @@ MonoBehaviour:
   - area: 9
     point: {fileID: 1269426342}
   useOnFall: 1
-  recoverOutOfArea: 1
-  outOfAreaSeconds: 1.5
-  outOfAreaMargin: 1
-  recoverStuck: 1
-  stuckSeconds: 2
-  stuckProbeRadius: 0.15
-  stuckProbeBottom: 0.5
-  stuckProbeTop: 1.3
-  pollInterval: 0.2
   floorSearchHeight: 1.5
   occupancyRadius: 0.4
   maxFlatAngle: 10
