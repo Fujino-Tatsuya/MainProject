@@ -94,7 +94,8 @@ public static class QAScenario48Menu
     // ── QA 실행 포트 돌리기 ───────────────────────────────────────
     // 48.3 2차: Play 정지 때 NGO 종료 NRE(NetworkSceneManager.Dispose) 뒤 에디터가 호스트 UDP 포트를 계속 쥐어
     // 다음 Play 호스트가 'Server failed to bind' 로 무한 재시도했다(7777·7778 두 번). 에디터 재시작 없이 돌리려고
-    // 실행마다 새 포트로 demo-connection.json(gitignore 개인 파일)을 루트·MPPM 클론 루트에 쓴다. 우리가 쓴 파일만 지운다(playerId 'qa' 표식).
+    // 실행마다 새 포트로 demo-connection.json 을 루트·MPPM 클론 루트에 쓴다. 우리가 쓴 파일만 지운다(playerId 'qa' 표식).
+    // 루트가 사람 파일(964fc4ef 부터 git 추적)이면 루트는 두고 클론만 그 포트로 쓴다 — HumanRootPort.
 
     private const string PortPrefKey = "QA.Scenario48.Port";
     private const string QAMarker = "\"playerId\": \"qa";
@@ -122,9 +123,24 @@ public static class QAScenario48Menu
     private static bool IsOurs(string path) =>
         !System.IO.File.Exists(path) || System.IO.File.ReadAllText(path).Contains(QAMarker);
 
+    /// <summary>
+    /// 루트 설정이 사람 파일(git 추적 부스 기본값 등)이면 호스트는 그 포트로 듣고 QA 가 바꿀 수 없다 — 클론도 그 포트로 붙인다.
+    /// 할 일 88 스모크 2차: 호스트 7777(루트 추적 파일)·클론 7799(QA 회전 포트)로 갈려 클론이 접속 타임아웃만 반복했다.
+    /// 값은 게임의 <see cref="DemoConnectionConfig.TryParse"/> 그대로라 비었거나 깨진 파일이면 호스트와 같은 기본 포트가 나온다.
+    /// </summary>
+    internal static ushort HumanRootPort(string rootJson)
+    {
+        DemoConnectionConfig.TryParse(rootJson, "qa", System.Array.Empty<string>(), out DemoConnectionLoadResult parsed);
+        return parsed.Config.Port;
+    }
+
     private static void WriteQAConnectionConfigs()
     {
-        int port = NextPort();
+        string rootPath = System.IO.Path.Combine(ProjectRoot, DemoConnectionConfig.FileName);
+        bool humanRoot = !IsOurs(rootPath);
+        int port = humanRoot ? HumanRootPort(System.IO.File.ReadAllText(rootPath)) : NextPort();
+        if (humanRoot)
+            Debug.LogWarning($"[QA] 루트 설정이 사람 파일이라 포트 회전 없이 그 포트 {port} 로 클론을 붙인다 — 호스트 포트가 묶이면 에디터 재시작 필요.");
         foreach (string path in ConfigPaths())
         {
             if (!IsOurs(path))
