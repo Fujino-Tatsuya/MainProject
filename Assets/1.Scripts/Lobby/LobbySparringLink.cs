@@ -36,6 +36,13 @@ public sealed class LobbySparringLink
     /// </summary>
     public static bool BotPresent(LobbyTrainingStage stage) => IsSparringStage(stage);
 
+    /// <summary>
+    /// [전 피어] 지정 벽 표시(주황 띠, 임시 비주얼)를 켜는가 — 벽 목표가 있는 Train03C·D 동안(하위 상태 무관). A·B·TrainEnd 이후·로비·진행기 없음(Lobby 로 읽힘)은 끈다.
+    /// 클라는 복제 단계(<see cref="LobbyTrainingDirector.Stage"/>)로 판정 — 늦게 붙은 클라도 같다.
+    /// </summary>
+    public static bool WallMarkerVisible(LobbyTrainingStage stage) =>
+        stage == LobbyTrainingStage.Train03C || stage == LobbyTrainingStage.Train03D;
+
     /// <summary>새 회차 — 기록을 비운다. 이미 진행 중이면 false(그대로 — 상대 재사용).</summary>
     public bool BeginRound()
     {

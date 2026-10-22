@@ -56,6 +56,11 @@
   - `PointC` (-17.5, 0, 5), 방향 +x(동쪽 = 플레이어 쪽) — 지정 벽 면까지 2.2 m, 간파 넉백(No23_A `vulnerableKnockbackDistance` 3 m)으로 닿는다. NavMesh 끝 x -19.33 에서 막히면 판정 거리 1.6 m 로 잡힌다.
   - `DesignatedWall_West` — Wall 레이어 BoxCollider(보이는 메시 없음), 중심 (-19.8, 1.1, 5) 크기 (0.2, 2.2, 5.5). 서쪽 아트 벽(x -20, 두께 0.22) 바로 앞에 겹쳐 스윕이 이 상자를 먼저 맞힌다.
     아트 벽 콜라이더를 직접 넣지 않은 이유: SVN 아트가 바뀌면 참조가 조용히 끊긴다. 위치를 옮길 땐 상자를 아트 벽 면에 붙여 두고 NavMesh 걷는 면(벽에서 0.5 m 안쪽)을 침범하지 않게 둔다.
+    2026-10-22 확인(Physics.OverlapBox·바운드 비교): 서쪽 아트 벽 = `PF_Lobby_Architecture_v015` 의 `SB_WallBay_004/005_body`(x -20, z 0.25~7.75, 안쪽 면 x -19.89)·`SB_WallNode_004_I`(z 4)·모서리 `SB_WallNode_005_L`(-19.93, 7.93), 모두 Wall 레이어 MeshCollider.
+    지정 벽 상자(x -19.9~-19.7, z 2.25~7.75)는 아트 벽과 0.01 m 겹치고 안쪽 면이 아트 면보다 0.19 m 앞 → 스윕이 지정 벽을 먼저 맞힌다. 상대(반경 0.5)가 NavMesh 끝(x -19.33)에서 멈추면 몸 가장자리 ↔ 지정 벽 면 0.87 m < 판정 거리 1.6 m. 옮길 필요 없음.
+  - **지정 벽 Game 뷰 표시 `DesignatedWall_West_Marker` = 임시 비주얼, 아트 교체 대상.** Gizmo 는 Scene 뷰 전용이라 Game 뷰엔 주황 반투명 띠(얇은 큐브, 콜라이더 없음, 그림자 cast/receive off)를 지정 벽 면에 붙였다 —
+    중심 (-19.67, 1.05, 5) 크기 (0.06, 2, 5.5), 머티리얼 `Assets/3.Materials/Lobby/MA_Train03DesignatedWall.mat`(URP Unlit Transparent, `MA_AoeTelegraph_Red` 복사본, 주황 α 0.45).
+    **Train03C·D 동안만 켜진다**(하위 상태 무관, `LobbySparringLink.WallMarkerVisible`). A·B·TrainEnd 이후·로비 복귀·진행기 없음은 꺼짐. `LobbyTrainingSparringArena.wallMarkers` 가 전 피어에서 진행기 복제 단계(`LobbyTrainingDirector.Active.Stage`)를 매 프레임 읽어 켜고 끈다 — 새 RPC 없음, 늦게 붙은 클라도 같다. 씬엔 꺼진 채 저장.
 - **남은 것**: 무전 구독 = Work1 T6(위 두 이벤트), 제압 중 쿨타임 가속 = 할 일 91 `GrantServer(sourceId, duration)` 로 연결(지금 보류 플래그 꺼짐, 코드 없음),
   마무리 체력 = 프리팹 `finishHealth` 임시 60, 명세 §9.4 '변신 해제·강화·잔류 공격 종료'(`PracticeReset` 주석 참고), 명세 §9.7 경계 밖 갇힘 복구(상대는 이동이 없고 넉백은 NavMesh 안에서만 밀린다 — 따로 없음). Play·MPPM 확인은 사용자.
 

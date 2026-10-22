@@ -31,6 +31,20 @@ public sealed class LobbySparringLinkTests
     }
 
     [Test]
+    public void WallMarkerVisible_OnlyTrain03CAndD()
+    {
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Lobby), Is.False);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Train02), Is.False);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Train03A), Is.False);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Train03B), Is.False);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Train03C), Is.True);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Train03D), Is.True);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.TrainEnd), Is.False);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Brief), Is.False);
+        Assert.That(LobbySparringLink.WallMarkerVisible(LobbyTrainingStage.Sortie), Is.False);
+    }
+
+    [Test]
     public void BeginRound_Twice_SecondIgnored_EndThenBeginCountsNewRound()
     {
         var link = Started();
