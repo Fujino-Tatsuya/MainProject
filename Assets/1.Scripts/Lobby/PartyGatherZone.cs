@@ -13,7 +13,7 @@ using UnityEngine;
 /// <item>참여자: 기본 = 접속자 전원(접속·퇴장 자동 반영). <see cref="ServerSetParticipants"/> 로 외부(로비 훈련 진행기)가 명단을 넣으면 그 뒤로 접속은 자동 추가하지 않는다.
 /// 연결 종료 확정(OnClientDisconnectCallback)은 어느 쪽이든 명단에서 뺀다.</item>
 /// <item>복제: 활성·집결 n/m·카운트다운 종료 서버 시각·확정 여부. 모두 서버만 쓴다. 표시는 <see cref="PartyGatherStatusView"/>.</item>
-/// <item>카운트다운 중 행동 시작 제한: 지금은 <see cref="IsRestrictingActions"/>·<see cref="AnyRestrictingActions"/> 로 노출만 한다(입력 연결은 T2).</item>
+/// <item>카운트다운 중에도 입력은 막지 않는다(사용자 결정 2026-10-22). 카운트다운 여부는 <see cref="IsCountdownActive"/> — 출격 구역 것을 접속 승인·캐릭터 잠금이 본다.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -56,36 +56,6 @@ public sealed class PartyGatherZone : NetworkBehaviour
     /// <summary>스폰된 집결 구역(활성·비활성 모두).</summary>
     public static IReadOnlyList<PartyGatherZone> Spawned => SpawnedZones;
 
-    /// <summary>[전 피어] 활성이고 확정 전인 첫 구역(없으면 null) — 한 번에 하나만 켜는 것을 전제로 한 UI 기본 대상.</summary>
-    public static PartyGatherZone FirstActive
-    {
-        get
-        {
-            foreach (var zone in SpawnedZones)
-            {
-                if (zone.IsActive && !zone.IsConfirmed)
-                    return zone;
-            }
-
-            return null;
-        }
-    }
-
-    /// <summary>[전 피어] 카운트다운 중인 구역이 하나라도 있다 — 신규 공격·스킬·대시·상호작용 시작 제한 신호(걷기 허용).</summary>
-    public static bool AnyRestrictingActions
-    {
-        get
-        {
-            foreach (var zone in SpawnedZones)
-            {
-                if (zone.IsRestrictingActions)
-                    return true;
-            }
-
-            return false;
-        }
-    }
-
     /// <summary>[서버] 전원 집결을 유지 시간만큼 채워 확정됐다 — 구역마다 1회(<see cref="ServerResetConfirmation"/> 전까지).</summary>
     public event Action<PartyGatherZone> ServerConfirmed;
 
@@ -98,9 +68,6 @@ public sealed class PartyGatherZone : NetworkBehaviour
 
     /// <summary>[전 피어] 카운트다운 중.</summary>
     public bool IsCountdownActive => IsActive && !IsConfirmed && countdownEndServerTime.Value > PartyGatherRules.NoCountdown;
-
-    /// <summary>[전 피어] 이 구역이 행동 시작을 제한 중(= 카운트다운 중).</summary>
-    public bool IsRestrictingActions => IsCountdownActive;
 
     /// <summary>[전 피어] 남은 카운트다운 초(없으면 0).</summary>
     public double CountdownRemainingSeconds => IsSpawned && NetworkManager != null
@@ -271,6 +238,16 @@ public sealed class PartyGatherZone : NetworkBehaviour
         var state = player.CurrentState;
         var busy = state != PlayerActionState.Idle && state != PlayerActionState.Move;
         return new PartyGatherMemberState(ContainsPoint(player.transform.position), incapacitated, busy);
+    }
+
+    /// <summary>박스 중심 월드 좌표 — 표시 대상 고르기(가까운 구역)용.</summary>
+    public Vector3 WorldCenter
+    {
+        get
+        {
+            var box = _box != null ? _box : GetComponent<BoxCollider>();
+            return box.transform.TransformPoint(box.center);
+        }
     }
 
     /// <summary>월드 좌표가 박스(회전 포함) 안인가.</summary>

@@ -31,7 +31,7 @@ public readonly struct PartyGatherMemberState
 /// <item>카운트다운 중 한 명 이탈·쓰러짐 → 즉시 0 초기화. 참여자 추가·제거(인원 변화) → 즉시 0 초기화(남은 전원이 안이면 다음 판정에서 처음부터 다시).</item>
 /// <item>유지 시간을 채우면 확정 1회(래치) — <see cref="Tick"/> 이 한 번만 true. 래치 뒤엔 판정하지 않는다(<see cref="ResetConfirmation"/> 로만 푼다).</item>
 /// <item>비활성이면 판정·카운트 없음(끄는 순간 카운트다운도 0).</item>
-/// <item>카운트다운 중 = 신규 공격·스킬·대시·상호작용 시작 제한 신호(<see cref="IsRestrictingActions"/>, 걷기 허용). 행동이 이미 진행 중이면 시작만 미룬다 — 시작 뒤의 행동은 카운트다운을 끊지 않는다.</item>
+/// <item>행동이 이미 진행 중이면 카운트다운 시작만 미룬다 — 시작 뒤의 행동은 카운트다운을 끊지 않는다. 카운트다운 중 입력 제한은 없다(사용자 결정 2026-10-22).</item>
 /// </list>
 /// 시각은 호출자가 넣는다(PartyGatherZone = NetworkManager.ServerTime.Time). 종료 시각 0 이하 = 카운트다운 없음.
 /// </summary>
@@ -71,9 +71,6 @@ public sealed class PartyGatherRules
     public double CountdownEndTime { get; private set; } = NoCountdown;
 
     public bool IsCountdownActive => CountdownEndTime > NoCountdown;
-
-    /// <summary>신규 공격·스킬·대시·상호작용 시작을 막아야 하는가(= 카운트다운 중). 걷기는 막지 않는다.</summary>
-    public bool IsRestrictingActions => IsActive && !IsConfirmed && IsCountdownActive;
 
     public IReadOnlyList<ulong> Participants => _participants;
 

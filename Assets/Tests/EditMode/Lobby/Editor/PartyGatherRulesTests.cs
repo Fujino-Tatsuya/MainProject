@@ -39,13 +39,11 @@ public sealed class PartyGatherRulesTests
         Assert.That(rules.Tick(10d), Is.False);
         Assert.That(rules.IsCountdownActive, Is.True);
         Assert.That(rules.CountdownEndTime, Is.EqualTo(15d));
-        Assert.That(rules.IsRestrictingActions, Is.True);
         Assert.That(rules.Tick(14.99d), Is.False);
 
         Assert.That(rules.Tick(15d), Is.True);
         Assert.That(rules.IsConfirmed, Is.True);
         Assert.That(rules.IsCountdownActive, Is.False);
-        Assert.That(rules.IsRestrictingActions, Is.False);
     }
 
     [Test]
@@ -99,7 +97,6 @@ public sealed class PartyGatherRulesTests
         rules.SetMemberState(1, Out);
         Assert.That(rules.Tick(4.9d), Is.False);
         Assert.That(rules.IsCountdownActive, Is.False);
-        Assert.That(rules.IsRestrictingActions, Is.False);
 
         // 다시 들어오면 처음부터 5초.
         rules.SetMemberState(1, In);
@@ -207,13 +204,26 @@ public sealed class PartyGatherRulesTests
 
         Assert.That(rules.Tick(0d), Is.False);
         Assert.That(rules.IsCountdownActive, Is.False);
-        Assert.That(rules.IsRestrictingActions, Is.False);
         Assert.That(rules.GatheredCount, Is.EqualTo(2));
 
         // 행동이 끝나면 그때부터 5초.
         rules.SetMemberState(1, In);
         rules.Tick(2d);
         Assert.That(rules.CountdownEndTime, Is.EqualTo(7d));
+    }
+
+    [Test]
+    public void 카운트다운_중_행동을_시작해도_카운트다운은_이어진다()
+    {
+        // 카운트다운 중 입력 제한은 없다(사용자 결정 10-22) — 시작 뒤의 행동은 카운트다운을 끊지 않는다.
+        var rules = CreateActive(0, 1);
+        SetAll(rules, In);
+        rules.Tick(0d);
+
+        rules.SetMemberState(1, InBusy);
+        Assert.That(rules.Tick(3d), Is.False);
+        Assert.That(rules.CountdownEndTime, Is.EqualTo(5d));
+        Assert.That(rules.Tick(5d), Is.True);
     }
 
     [Test]
@@ -226,7 +236,6 @@ public sealed class PartyGatherRulesTests
         Assert.That(rules.Tick(0d), Is.False);
         Assert.That(rules.Tick(100d), Is.False);
         Assert.That(rules.IsCountdownActive, Is.False);
-        Assert.That(rules.IsRestrictingActions, Is.False);
         Assert.That(rules.IsConfirmed, Is.False);
     }
 

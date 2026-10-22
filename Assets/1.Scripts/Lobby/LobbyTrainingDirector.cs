@@ -36,7 +36,7 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     [Tooltip("훈련장 입구(훈련실 문 앞 복도). Lobby 단계에서 출격 구역과 함께 켜진다 — 확정 = 훈련 시작.")]
     [SerializeField] private PartyGatherZone entranceZone;
 
-    [Tooltip("출격(옛 Ready 패드 자리). Lobby 단계(훈련 없이 출격)와 브리핑 완료 뒤에 켜진다.")]
+    [Tooltip("출격(SortieStation 패드 위 — 임시 위치, 최종 배치는 사용자). Lobby 단계(훈련 없이 출격)와 브리핑 완료 뒤에 켜진다.")]
     [SerializeField] private PartyGatherZone sortieZone;
 
     [SerializeField] private PartyGatherZone train01StartZone;
@@ -100,8 +100,8 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     /// <summary>[전 피어] 훈련 시작(입구 확정) 뒤 — 회차 단위 잠금. 사람별 판정은 <see cref="CharacterChangeBlockFor"/>.</summary>
     public bool IsCharacterLocked => Stage != LobbyTrainingStage.Lobby;
 
-    /// <summary>[전 피어] 출격 집결 카운트다운 중(행동 시작 제한 구간).</summary>
-    public bool IsSortieCountdownActive => sortieZone != null && sortieZone.IsRestrictingActions;
+    /// <summary>[전 피어] 출격 집결 카운트다운 중 — 접속 승인·캐릭터 잠금이 본다(입력은 막지 않는다).</summary>
+    public bool IsSortieCountdownActive => sortieZone != null && sortieZone.IsCountdownActive;
 
     /// <summary>[서버] 출격 확정으로 메인 진입을 내보냈다 — NetworkLoadingFlowController 의 로비 시작 조건.</summary>
     public bool ServerHasLaunched => _flow != null && _flow.HasLaunched;
