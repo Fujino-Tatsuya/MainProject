@@ -27,6 +27,7 @@ public sealed class QABossStart88Result
 public static class QABossStart88
 {
     private const string Tag = "[QA88]";
+    private const float ReadyWaitSeconds = 30f;
     private const float SkipWaitSeconds = 60f;
     private const float G8WaitSeconds = 20f;
     private const float CombatWaitSeconds = 150f;
@@ -38,6 +39,26 @@ public static class QABossStart88
 
     private static BossEncounterPhase Phase =>
         BossEncounterDirector.Instance != null ? BossEncounterDirector.Instance.Phase : BossEncounterPhase.Idle;
+
+    /// <summary>로딩 흐름(첫 진입·판 재시작) 진행 중 — 구간 스킵 컨트롤러가 RestartInProgress 판정에 쓰는 것과 같은 원본.</summary>
+    private static bool IsLoadingFlowInProgress
+    {
+        get
+        {
+            NetworkLoadingFlowController flow = NetworkManager.Singleton != null ? NetworkManager.Singleton.GetComponent<NetworkLoadingFlowController>() : null;
+            return flow != null && flow.IsFlowInProgress;
+        }
+    }
+
+    private static bool CanRequestZone4SkipNow(TutorialDirector d) =>
+        CanRequestZone4Skip(d.Step, d.GetComponent<TutorialSkipController>() != null, IsLoadingFlowInProgress);
+
+    /// <summary>
+    /// 존4 구간 스킵을 지금 보내면 받아들여지는가 — 스킵 컨트롤러가 붙었고 <see cref="TutorialSkipPlan.Check"/> 가 Ok.
+    /// 로딩 흐름 진행 중이면 컨트롤러가 RestartInProgress 로 거부하고 다시 시도하지 않는다.
+    /// </summary>
+    public static bool CanRequestZone4Skip(TutorialStep step, bool hasSkipController, bool loadingFlowInProgress) =>
+        hasSkipController && TutorialSkipPlan.Check(step, TutorialSkipTarget.Zone4, loadingFlowInProgress) == TutorialSkipVerdict.Ok;
 
     public static IEnumerator Start(QAInterruptTargetKind kind, QABossStart88Result result) =>
         kind == QAInterruptTargetKind.Midboss ? StartMidboss(result) : StartTwentyThree(result);
@@ -54,7 +75,21 @@ public static class QABossStart88
             yield break;
         }
 
-        // 1) 존4 로 구간 스킵(이미 존4 이상이면 Backward/Finished 로 거부되고 그대로 진행).
+        // 1) 존4 로 구간 스킵(이미 존4 이상이면 보내지 않고 그대로 진행).
+        //    맵 첫 진입 로딩 흐름(로딩 씬 언로드·최소 표시 시간)이 끝나기 전 요청은 RestartInProgress 로 한 번 거부되고 끝난다
+        //    (스모크 3차 88-20261022_143717) — 스킵 컨트롤러가 받아들일 때까지 기다렸다 한 번만 보낸다.
+        if (d.Step < TutorialStep.Zone4Lore)
+        {
+            float readyUntil = Time.realtimeSinceStartup + ReadyWaitSeconds;
+            while (d != null && d.Step < TutorialStep.Zone4Lore && !CanRequestZone4SkipNow(d) && Time.realtimeSinceStartup < readyUntil)
+                yield return null;
+            if (d == null || (d.Step < TutorialStep.Zone4Lore && !CanRequestZone4SkipNow(d)))
+            {
+                result.Detail = $"존4 스킵 {ReadyWaitSeconds:0}초 안에 보낼 수 없음(단계={(d != null ? d.Step.ToString() : "없음")}, " +
+                                $"스킵 컨트롤러={(d != null && d.GetComponent<TutorialSkipController>() != null)}, 로딩 흐름 진행 중={IsLoadingFlowInProgress})";
+                yield break;
+            }
+        }
         if (d.Step < TutorialStep.Zone4Lore)
         {
             d.RequestSkip(TutorialSkipTarget.Zone4);
@@ -106,6 +141,17 @@ public static class QABossStart88
         if (!IsServer)
         {
             result.Detail = "서버 아님";
+            yield break;
+        }
+
+        // 23호 경로(게이트 강제 개방·ForceStartEncounter)엔 로딩 흐름 거부가 없지만, 첫 런이면 맵 진입 로딩 흐름이 아직 끝나지 않았을 수 있다 —
+        // 로딩 씬 언로드 도중 패드 이동이 겹치지 않게 같은 조건으로 기다린다.
+        float readyUntil = Time.realtimeSinceStartup + ReadyWaitSeconds;
+        while (IsLoadingFlowInProgress && Time.realtimeSinceStartup < readyUntil)
+            yield return null;
+        if (IsLoadingFlowInProgress)
+        {
+            result.Detail = $"맵 진입 로딩 흐름이 {ReadyWaitSeconds:0}초 안에 안 끝남";
             yield break;
         }
 

@@ -139,5 +139,23 @@ public sealed class QAInterruptLag88PlanTests
         Assert.IsTrue(l.TryEstimate(out s));
         Assert.AreEqual(0.5, s, 1e-9, "오래된 0.8 은 밀려났다");
     }
+
+    // ─── 중간보스 강제 개시 — 존4 스킵 보낼 시점 ────────────────────────
+
+    [Test]
+    public void 존4_스킵은_로딩_흐름이_끝나고_컨트롤러가_붙은_뒤에만_보낸다()
+    {
+        Assert.IsTrue(QABossStart88.CanRequestZone4Skip(TutorialStep.Zone1, true, false));
+        Assert.IsFalse(QABossStart88.CanRequestZone4Skip(TutorialStep.Zone1, true, true), "첫 진입 로딩 흐름 중 = RestartInProgress 로 거부된다(스모크 3차)");
+        Assert.IsFalse(QABossStart88.CanRequestZone4Skip(TutorialStep.Zone1, false, false), "스킵 컨트롤러가 아직 안 붙었다");
+    }
+
+    [Test]
+    public void 존4_스킵은_존4_뒤에서는_보내지_않는다()
+    {
+        Assert.IsTrue(QABossStart88.CanRequestZone4Skip(TutorialStep.Corridor3, true, false));
+        Assert.IsFalse(QABossStart88.CanRequestZone4Skip(TutorialStep.Corridor4, true, false), "Backward");
+        Assert.IsFalse(QABossStart88.CanRequestZone4Skip(TutorialStep.Finished, true, false), "Finished");
+    }
 }
 #endif
