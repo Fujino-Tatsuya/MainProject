@@ -244,8 +244,55 @@ public static class QABossStart88
     }
 
     /// <summary>
+    /// [서버] 런 전 위치 검사 — 파티 전원(누르는 봇 포함)이 <paramref name="boss"/> 근처(<see cref="QAPartyPlacement88.IsNearTarget"/>)인가.
+    /// <paramref name="detail"/> = 플레이어별 <c>clientId:수평거리/높이차(near|far)</c>, 누르는 쪽은 <c>*</c>. 플레이어가 없으면 false.
+    /// </summary>
+    public static bool IsPartyNear(MonsterBase boss, float radius, long presserClientId, out string detail)
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer || boss == null)
+        {
+            detail = boss == null ? "target=none" : "server=false";
+            return false;
+        }
+        var sb = new System.Text.StringBuilder();
+        Vector3 bp = boss.transform.position;
+        bool all = true;
+        int n = 0;
+        foreach (NetworkClient client in nm.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null)
+                continue;
+            Vector3 p = client.PlayerObject.transform.position;
+            bool near = QAPartyPlacement88.IsNearTarget(p, bp, radius);
+            all &= near;
+            if (n++ > 0)
+                sb.Append(',');
+            sb.Append(client.ClientId).Append(presserClientId >= 0 && client.ClientId == (ulong)presserClientId ? "*" : "").Append(':')
+              .Append(QAPartyPlacement88.HorizontalDistance(p, bp).ToString("F1", System.Globalization.CultureInfo.InvariantCulture)).Append('/')
+              .Append((p.y - bp.y).ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(near ? "(near)" : "(far)");
+        }
+        detail = n == 0 ? "players=none" : "players=" + sb;
+        return n > 0 && all;
+    }
+
+    /// <summary>
+    /// [서버] 런 전 재배치 — 강제 개시 때와 같은 경로(<see cref="MovePartyNear"/>)로 파티를 <paramref name="boss"/> 옆에 다시 놓는다. 옮긴 수.
+    /// 중간보스만 구간 격자로 물러날 수 있다(23호 보스방은 링만).
+    /// </summary>
+    public static int RelocatePartyNear(QAInterruptTargetKind kind, MonsterBase boss, out string method)
+    {
+        method = "none";
+        if (!IsServer || boss == null)
+            return 0;
+        TutorialDirector d = kind == QAInterruptTargetKind.Midboss ? TutorialDirector.Instance : null;
+        return MovePartyNear(d, TutorialArea.Zone4, boss, out method);
+    }
+
+    /// <summary>
     /// [서버] 파티를 <paramref name="boss"/> 옆으로 옮긴다. 우선 <see cref="TryFindBossRingPoints"/>(보스와 같은 NavMesh 섬, 벽·소품 겹침 없음),
-    /// 못 찾으면 예전 구간 격자(<see cref="TutorialDeathRules.TryFindAreaSpreadPoints"/> — 섬 밖일 수 있다)로 물러난다. 옮긴 수.
+    /// 못 찾으면 예전 구간 격자(<see cref="TutorialDeathRules.TryFindAreaSpreadPoints"/> — 섬 밖일 수 있다)로 물러난다(<paramref name="d"/> 가 있을 때만). 옮긴 수.
     /// </summary>
     private static int MovePartyNear(TutorialDirector d, TutorialArea area, MonsterBase boss, out string method)
     {
@@ -272,10 +319,10 @@ public static class QABossStart88
         }
         else
         {
-            TutorialDeathRules rules = d.GetComponent<TutorialDeathRules>();
+            TutorialDeathRules rules = d != null ? d.GetComponent<TutorialDeathRules>() : null;
             if (rules == null || !rules.TryFindAreaSpreadPoints(area, movers.Count, near.x, near.z, Points))
             {
-                Debug.LogWarning($"{Tag} {area} 중간보스 근처 안전 지점 없음 — 파티를 옮기지 않는다(봇이 걸어서 접근).");
+                Debug.LogWarning($"{Tag} {boss.name} 근처 안전 지점 없음 — 파티를 옮기지 않는다(봇이 걸어서 접근).");
                 return 0;
             }
             method = "area";
@@ -503,7 +550,7 @@ public sealed class QA88TwentyThreeAssist
             return;
         }
         _forceOk++;
-        Debug.Log($"{Tag} event=aggro_force ok=true run={_run} n={_forceOk} clientId={_presser.OwnerClientId} aggroId={_boss.AggroTargetId}");
+        Debug.Log($"{Tag} event=aggro_force ok=true run={_run} n={_forceOk} clientId={_presser.OwnerClientId} presserObjId={_presser.NetworkObjectId} aggroId={_boss.AggroTargetId}");
     }
 
     private void FailForce(string reason)
@@ -580,7 +627,9 @@ public sealed class QABossWatch88
                 _windows++;
                 _lastWindowAt = Time.realtimeSinceStartupAsDouble;
             }
-            Debug.Log($"{Tag} event=boss_window state={(open ? "open" : "closed")} n={_windows} {Players()}");
+            // 어그로 3종 — 복제값(aggroId, 클라 isTarget 의 원본)·서버 _target(serverTargetId)·23호 이상 조건(presserIsTarget) — 클라 isTarget 과 창 단위로 대조한다.
+            Debug.Log($"{Tag} event=boss_window state={(open ? "open" : "closed")} n={_windows} bossState={state} aggroId={_target.AggroTargetId} " +
+                      $"serverTargetId={ServerTargetId()} {AssistDiag()} {Players()}");
             _wasOpen = open;
         }
 
@@ -593,6 +642,14 @@ public sealed class QABossWatch88
                   $"onNavMesh={(_agent != null && _agent.isOnNavMesh ? "true" : "false")} pos={QABossStart88.Fmt(_target.transform.position)} " +
                   $"aggroId={_target.AggroTargetId} attacks={_attacks} windows={_windows} lastWindowAgoS={lastWindow} " +
                   $"awakeNormals={AwakeNormals(kind)} {AssistDiag()} {Players()}");
+    }
+
+    /// <summary>서버 쪽 현재 대상(<see cref="MonsterBase.CurrentTarget"/>)의 NetworkObjectId. 없으면 0.</summary>
+    private string ServerTargetId()
+    {
+        Transform t = _target != null ? _target.CurrentTarget : null;
+        NetworkObject no = t != null ? t.GetComponentInParent<NetworkObject>() : null;
+        return no != null && no.IsSpawned ? no.NetworkObjectId.ToString() : "0";
     }
 
     /// <summary>23호 이상 조건 상태(<see cref="QA88TwentyThreeAssist"/>) — 꺼져 있으면(중간보스·런 밖) off.</summary>

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 88 — 파티를 대상 보스 바로 옆에 둘 후보 지점과 간격 선택, 봇 낭떠러지 판정(순수 계산, EditMode <c>QAPartyPlacement88Tests</c>).
+/// 할 일 88 — 파티를 대상 보스 바로 옆에 둘 후보 지점과 간격 선택, 런 전 위치 검사, 봇 낭떠러지 판정(순수 계산, EditMode <c>QAPartyPlacement88Tests</c>).
 /// <para>스모크 4차(88-20261022_145020): 구간 사각형 격자(<c>TutorialDeathRules.TryFindAreaSpreadPoints</c>)는 중간보스 <b>섬</b>
 /// (다리 개통 전 NavMesh 가 끊긴 중앙 섬) 밖 플랫폼을 골랐다 — 보스는 경로가 없어 10분 동안 한 번도 공격하지 않았고(창 0),
 /// 클라 봇은 NavMesh 가 없어(클라는 베이크 안 함) 직선으로 걷다 틈에 떨어졌다. 그래서 후보를 보스 NavMesh 위치 둘레 링으로 만들고
@@ -74,6 +74,20 @@ public static class QAPartyPlacement88
         }
         return into.Count;
     }
+
+    /// <summary>런 전 위치 검사 — 중간보스 근처 반경(m). 링 최대 반경 8m + 보스가 쫓아오며 벌어지는 여유.</summary>
+    public const float MidbossNearMeters = 12f;
+    /// <summary>런 전 위치 검사 — 23호 근처 반경(m). 보스방 안이면 통과(23호는 점프·돌진으로 방 안을 넓게 움직인다).</summary>
+    public const float TwentyThreeNearMeters = 25f;
+    /// <summary>런 전 위치 검사 — 높이 차 상한(m). 섬 아래로 떨어졌거나 다른 층이면 근처가 아니다.</summary>
+    public const float NearMaxDy = 4f;
+
+    public static float NearRadius(QAInterruptTargetKind kind) =>
+        kind == QAInterruptTargetKind.TwentyThree ? TwentyThreeNearMeters : MidbossNearMeters;
+
+    /// <summary>런 전 위치 검사 — 플레이어가 대상 보스 근처인가(수평 반경 안 + 높이 차 <see cref="NearMaxDy"/> 이하).</summary>
+    public static bool IsNearTarget(Vector3 player, Vector3 boss, float radius) =>
+        HorizontalDistance(player, boss) <= radius && Mathf.Abs(player.y - boss.y) <= NearMaxDy;
 
     /// <summary>
     /// 봇이 이 방향으로 걸어도 되는가 — 앞 바닥을 찾았고(<paramref name="groundFound"/>) 그 높이가 발보다 <see cref="EdgeMaxDrop"/> 넘게 낮지 않다.

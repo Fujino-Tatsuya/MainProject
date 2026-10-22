@@ -13,7 +13,8 @@ using UnityEngine;
 /// <para><b>채널 = 파일</b>(Q2 원격 지연과 같은 방식): 호스트 → 클론 = 클론 루트 <see cref="QA88Command.FileName"/>,
 /// 클론 → 호스트 = 각 인스턴스 콘솔 tee(<c>&lt;스위트&gt;/logs/&lt;역할&gt;.log</c>)를 호스트가 따라 읽는다(<see cref="QALogTail88"/>).
 /// 원격 지연 적용 확인 = 클론 tee 의 최신 <c>[QA88] event=netsim delayMs</c>.</para>
-/// <para><b>런 하나</b>: (대상이 바뀌면 강제 개시) → 원격 지연 파일 → 클론 netsim 확인 → 호스트 <c>run_begin</c> → 클론 <c>go</c>(누르는 클론 1명만 봇)
+/// <para><b>스위트 동안</b> 보스 제한시간을 멈춘다(<see cref="QABossTimerHold88"/> — 정리 때 원복).</para>
+/// <para><b>런 하나</b>: (대상이 바뀌면 강제 개시) → 런 전 위치 검사(아니면 재배치, 그래도 아니면 건너뜀) → 원격 지연 파일 → 클론 netsim 확인 → 호스트 <c>run_begin</c> → 클론 <c>go</c>(누르는 클론 1명만 봇)
 /// → 누르는 클론 <c>run_end</c>(N회) 또는 런 상한 → 클론 <c>idle</c> → 2초 유예(늦은 판정) → 호스트 <c>run_end</c> → 집계·리포트 덮어쓰기.
 /// 런 동안 0.5초마다 <see cref="QABossStart88.KeepAliveServer"/>(파티·대상 체력 유지), 23호는 1초마다 점프 콤보 예약, 매 프레임 <see cref="QABossWatch88"/>(보스 공격·창 진단).</para>
 /// <para>정리(정상·중단·예외): 여기서는 클론 <c>end</c>·원격 지연 0·봇 정지까지. Play 정지·가상 플레이어 비활성·시나리오 모드 해제는
@@ -32,6 +33,10 @@ public static class QAInterruptSuite88
     private const float ReserveSeconds = 1f;
     private const float ClientNoCommandSeconds = 900f;
     private const float ClientLimitSeconds = 6f * 3600f;
+    /// <summary>런 전 위치 검사에서 재배치를 몇 번까지 해 보는가.</summary>
+    private const int PlaceAttempts = 2;
+    /// <summary>재배치 뒤 근처가 될 때까지 기다리는 시간(초) — 원격은 오너 권한 이동이라 RPC 왕복(+원격 지연) 뒤 복제된다.</summary>
+    private const float PlaceSettleSeconds = 5f;
 
     /// <summary>호스트 스위트가 시작됐다(이번 Play).</summary>
     public static bool Started { get; private set; }
@@ -214,6 +219,7 @@ public static class QAInterruptSuite88
         private string _status = "준비";
         private bool _closed;
         private float _nextKeepAlive, _nextReserve;
+        private QABossTimerHold88 _timerHold;    // 스위트 동안 보스 제한시간 정지(정리 때 원복)
 
         public HostRun(QAScenarioContext ctx, QA88SuiteConfig cfg, string dir)
         {
@@ -243,11 +249,16 @@ public static class QAInterruptSuite88
                                "봇은 착지 창(체공 직후 열린 창)만 배우고 누른다(개전 돌진 창 등은 건너뜀).");
             _header.Notes.Add("조준: 봇은 대상(중간보스·23호) 모두 누를 때 대상 쪽을 조준한다(`UseSkillToward`, 누름 줄 `aim=target`) — 마우스 위치로 간파 방향이 달라져 측정이 오염되지 않게. 누름 줄 `surf`·`reach`·`inReach`·`faceDeg` 로 사거리·방향을 본다. " +
                                "`isTarget` = 누를 때 보스 복제 어그로 대상이 봇인가(23호 점프×3 은 콤보 시작 때 어그로 대상에 고정), `knockedBack` = 창이 열린 뒤 또는 누르기 1.5초 안에 봇이 넉백됐는가(`knockAgoS`).");
+            _header.Notes.Add("보스 제한시간: 스위트 동안 멈춘다(`QABossTimerHold88` — 만료 시각을 뒤로 미룸, 새로 시작되는 타이머도 매 프레임 다시 미룸, 정리 때 남은 시간 그대로 원복). " +
+                               "풀타임 1차(88-20261022_180739) 런2 에서 존4 스킵 때 시작된 420초가 만료돼 파티가 보스방으로 끌려간 것을 막는다. 로그 `event=boss_timer_hold`·`boss_timer_restore`.");
+            _header.Notes.Add($"런 전 위치 검사: 매 런 시작 전 파티 전원(누르는 봇 `*` 포함)이 대상 근처(중간보스 {QAPartyPlacement88.MidbossNearMeters:0}m · 23호 {QAPartyPlacement88.TwentyThreeNearMeters:0}m, 높이 차 {QAPartyPlacement88.NearMaxDy:0}m)인지 본다(`event=party_check`). " +
+                               $"아니면 강제 개시와 같은 경로로 재배치(`event=party_relocate`, 최대 {PlaceAttempts}회·회당 {PlaceSettleSeconds:0}초 대기)하고, 그래도 아니면 런을 건너뛴다(비고에 사유).");
             _header.Notes.Add("원격 지연 = Multiplayer Tools NetworkSimulator 송신·수신 각각 X ms(RTT 대략 +2X). 호스트는 지연 0. 런 시작 전 클론 콘솔의 `[QA88] event=netsim` 으로 적용을 확인한다.");
             _header.Notes.Add("진단 줄(원본 로그): 호스트 `event=boss_attack`·`boss_window`(엣지)·`boss_diag`(5초 — 상태·휴면·NavMesh·어그로·창·플레이어별 거리·깨어 있는 일반몹), 파티 배치 `party_points`·`party_point`, 누르는 클론 `bot_diag`(5초 — 관측 경로·창 값·마지막 관측·보스 거리·보스 상태·낭떠러지 멈춤).");
             _header.Notes.Add("탐지기: 기존 5종(예외·소프트락·성능·네트워크·불변식)이 모든 인스턴스에서 상시 감시한다. 런 구간에 새로 잡히거나 재발한 Warning 이상(노이즈 제외)은 비고 '탐지기' 로 남긴다. 인스턴스별 전체 집계는 각 `48-*` 리포트.");
             Debug.Log($"{Tag} event=suite_begin runs={_cfg.Runs.Count} attempts={_cfg.Attempts} runTimeoutSec={_cfg.RunTimeoutSec} hostBot={(_cfg.HostBot ? "true" : "false")} dir={QAInterruptLag88Plan.LogToken(_dir)}");
             WriteReport();
+            _timerHold = QABossTimerHold88.Begin();
 
             // 1) 클론 팔로워 준비 — 명령 파일로 스위트 폴더를 알리고 tee 의 follower_ready 를 기다린다.
             QANetSim88.ResetRemoteDelayFiles();
@@ -257,6 +268,7 @@ public static class QAInterruptSuite88
             float until = Time.realtimeSinceStartup + FollowerWaitSeconds;
             while (Time.realtimeSinceStartup < until && !AllReady())
             {
+                _timerHold?.Tick("follower_wait");
                 PollClones();
                 Beat();
                 yield return null;
@@ -298,7 +310,7 @@ public static class QAInterruptSuite88
                     StopHostBot("kind_change");
                     EndAssist("kind_change");
                     var start = new QABossStart88Result();
-                    yield return QABossStart88.Start(spec.Kind, start);
+                    yield return WithTimerHold(QABossStart88.Start(spec.Kind, start), "boss_start");   // 존4 스킵(G8)이 제한시간을 새로 시작한다
                     Beat();
                     startedKind = spec.Kind;
                     startOk = start.Ok;
@@ -315,6 +327,20 @@ public static class QAInterruptSuite88
                     Finish(result);
                     continue;
                 }
+
+                // 런 전 위치 검사 — 대상 근처가 아니면 재배치, 그래도 아니면 건너뛴다(공회전 금지).
+                var place = new PlaceCheck();
+                yield return EnsurePartyNear(spec, ready.Count > 0 ? ready[0].ClientId : -1, place);
+                Beat();
+                if (!place.Ok)
+                {
+                    result.Skipped = true;
+                    result.Notes.Add($"런 전 위치 검사 실패 — {place.Detail}");
+                    Finish(result);
+                    continue;
+                }
+                if (place.Relocations > 0)
+                    result.Notes.Add($"런 전 재배치 {place.Relocations}회 뒤 시작");
 
                 // 원격 지연 → 클론 netsim 확인.
                 QANetSim88.SetRemoteDelayFiles(spec.DelayMs);
@@ -446,6 +472,16 @@ public static class QAInterruptSuite88
             StopHostBot("suite_end");
             try
             {
+                _timerHold?.End("suite_end");
+                _timerHold = null;
+                QABossTimerHold88.ReleaseActive("suite_end");   // 다른 경로로 남은 것까지
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"{Tag} 보스 제한시간 원복 중 오류: {e.Message}");
+            }
+            try
+            {
                 EndAssist("suite_end");
                 QA88TwentyThreeAssist.ReleaseActive("suite_end");   // 다른 경로로 남은 것까지
             }
@@ -493,6 +529,7 @@ public static class QAInterruptSuite88
 
         private void KeepAlive()
         {
+            _timerHold?.Tick("run");
             _watch.Tick(_targetKind);
             float now = Time.realtimeSinceStartup;
             if (now >= _nextKeepAlive)
@@ -513,6 +550,61 @@ public static class QAInterruptSuite88
         {
             _assist?.End(reason);
             _assist = null;
+        }
+
+        /// <summary>안쪽 코루틴을 돌리는 동안 매 프레임 보스 제한시간을 다시 막는다(강제 개시가 새 타이머를 시작해도 바로 미룬다).</summary>
+        private IEnumerator WithTimerHold(IEnumerator inner, string where)
+        {
+            while (true)
+            {
+                _timerHold?.Tick(where);
+                Beat();
+                if (!inner.MoveNext())
+                    break;
+                yield return inner.Current;
+            }
+            _timerHold?.Tick(where);
+        }
+
+        /// <summary>
+        /// 런 전 위치 검사 — 파티 전원(누르는 봇 포함)이 대상 근처인가(<see cref="QABossStart88.IsPartyNear"/>). 아니면 강제 개시와 같은 경로
+        /// (<see cref="QABossStart88.RelocatePartyNear"/>)로 재배치하고 근처가 될 때까지 <see cref="PlaceSettleSeconds"/> 기다린다. 최대 <see cref="PlaceAttempts"/> 회.
+        /// </summary>
+        private IEnumerator EnsurePartyNear(QA88RunSpec spec, int presserClientId, PlaceCheck outcome)
+        {
+            float radius = QAPartyPlacement88.NearRadius(spec.Kind);
+            string kind = QAInterruptLag88Plan.KindToken(spec.Kind);
+            for (int attempt = 0; ; attempt++)
+            {
+                bool near = QABossStart88.IsPartyNear(_target, radius, presserClientId, out string detail);
+                Debug.Log($"{Tag} event=party_check run={spec.Index} kind={kind} attempt={attempt} ok={(near ? "true" : "false")} radius={radius:0} maxDy={QAPartyPlacement88.NearMaxDy:0} " +
+                          $"relocations={outcome.Relocations} target={QAInterruptLag88Plan.LogToken(_target != null ? _target.name : "none")} {detail}");
+                if (near)
+                {
+                    outcome.Ok = true;
+                    yield break;
+                }
+                if (_target == null || attempt >= PlaceAttempts)
+                {
+                    outcome.Detail = _target == null
+                        ? "대상 보스 없음(처치·디스폰 의심)"
+                        : $"재배치 {outcome.Relocations}회 뒤에도 대상 근처 아님(반경 {radius:0}m · 높이 차 {QAPartyPlacement88.NearMaxDy:0}m, {detail})";
+                    Debug.LogWarning($"{Tag} event=party_check_skip run={spec.Index} kind={kind} relocations={outcome.Relocations} {detail}");
+                    yield break;
+                }
+
+                int moved = QABossStart88.RelocatePartyNear(spec.Kind, _target, out string method);
+                outcome.Relocations++;
+                Debug.Log($"{Tag} event=party_relocate run={spec.Index} kind={kind} n={outcome.Relocations} moved={moved} method={method}");
+                float until = Time.realtimeSinceStartup + PlaceSettleSeconds;
+                while (Time.realtimeSinceStartup < until && !QABossStart88.IsPartyNear(_target, radius, presserClientId, out _))
+                {
+                    PollClones();
+                    KeepAlive();
+                    Beat();
+                    yield return null;
+                }
+            }
         }
 
         private void StopHostBot(string reason)
@@ -595,6 +687,14 @@ public static class QAInterruptSuite88
             }
             return lines;
         }
+    }
+
+    /// <summary>런 전 위치 검사 결과(코루틴 밖으로 넘긴다).</summary>
+    private sealed class PlaceCheck
+    {
+        public bool Ok;
+        public int Relocations;
+        public string Detail = "";
     }
 
     /// <summary>호스트가 본 가상 플레이어 하나(명령 파일 위치·tee 따라 읽기 상태).</summary>

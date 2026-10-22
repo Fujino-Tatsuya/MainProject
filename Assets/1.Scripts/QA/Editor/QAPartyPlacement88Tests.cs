@@ -82,6 +82,26 @@ public sealed class QAPartyPlacement88Tests
     }
 
     [Test]
+    public void 런_전_위치_검사는_수평_반경과_높이_차를_본다()
+    {
+        var boss = new Vector3(0f, 10f, 0f);
+        float r = QAPartyPlacement88.NearRadius(QAInterruptTargetKind.Midboss);
+        Assert.AreEqual(QAPartyPlacement88.MidbossNearMeters, r);
+        Assert.AreEqual(QAPartyPlacement88.TwentyThreeNearMeters, QAPartyPlacement88.NearRadius(QAInterruptTargetKind.TwentyThree));
+        Assert.IsTrue(QAPartyPlacement88.IsNearTarget(new Vector3(r - 0.1f, 10f, 0f), boss, r), "반경 안");
+        Assert.IsFalse(QAPartyPlacement88.IsNearTarget(new Vector3(r + 0.1f, 10f, 0f), boss, r), "반경 밖");
+        Assert.IsTrue(QAPartyPlacement88.IsNearTarget(new Vector3(1f, 10f - QAPartyPlacement88.NearMaxDy + 0.1f, 0f), boss, r), "허용 높이 차 안");
+        Assert.IsFalse(QAPartyPlacement88.IsNearTarget(new Vector3(1f, 10f - QAPartyPlacement88.NearMaxDy - 0.1f, 0f), boss, r), "섬 아래로 떨어짐");
+        Assert.IsFalse(QAPartyPlacement88.IsNearTarget(new Vector3(0f, 10f, 80f), boss, QAPartyPlacement88.TwentyThreeNearMeters), "보스방으로 끌려간 중간보스 파티 등");
+    }
+
+    [Test]
+    public void 보스_제한시간_정지_리플렉션_대상이_있다()
+    {
+        Assert.IsTrue(QABossTimerHold88.ReflectionOk, "BossTimerManager._expiresAt(NetworkVariable<double>)·TimerNow(NetworkManager) 이름이 바뀌면 스위트 동안 제한시간을 못 멈춘다");
+    }
+
+    [Test]
     public void 일반몹_재우기는_G8_지연_기상_뒤()
     {
         Assert.Greater(QABossStart88.NormalWakeWaitSeconds, TutorialZone4Model.DefaultWakeDelaySeconds,

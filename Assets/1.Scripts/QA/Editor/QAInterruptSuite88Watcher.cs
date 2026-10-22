@@ -104,7 +104,7 @@ public static class QAInterruptSuite88Watcher
         _stopRequested = true;
         EditorPrefs.SetString(StopReasonKey, reason);
         Debug.Log($"[QA88] 감시자: {reason} → Play 정지");
-        ReleaseTwentyThreeAssist("watcher_stop");   // 23호 넉백 면역(SuperArmor)은 Play 를 멈추기 전에 서버에서 해제
+        ReleaseTwentyThreeAssist("watcher_stop");   // 23호 넉백 면역(SuperArmor)·보스 제한시간 정지는 Play 를 멈추기 전에 서버에서 해제
         QAScenarioPlay.Stop();
     }
 
@@ -113,6 +113,7 @@ public static class QAInterruptSuite88Watcher
         try
         {
             QA88TwentyThreeAssist.ReleaseActive(reason);
+            QABossTimerHold88.ReleaseActive(reason);
         }
         catch (Exception e)
         {
