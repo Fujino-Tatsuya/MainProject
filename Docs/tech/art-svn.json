@@ -9,13 +9,13 @@
   "url": "https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace",
   "subtree": "4_Resources/Art",
   "junctionPath": "Assets/50.Art",
-  "pinnedRevision": 500,
+  "pinnedRevision": 501,
   "pinnedAt": "2026-10-22",
   "expected": {
     "metaFiles": 3309,
     "ownedGuids": 1105,
     "gitFilesReferencing": 422,
     "guidOccurrencesInGit": 28751,
-    "_comment": "2026-10-22 SVN r500 — r500 경석 GameData.xlsx Strings 6행(UI.Exit.ToTitle·HostQuitWarning·HostToTitleWarning·UI.Title.Start/Setting/Exit)·서울알림 Heavy 아틀라스 288→342자(PLAN-settings-ddol, git feature/SettingsDdol 짝)·r499 김민경 VFX(거너 R 존 라인·레벨업 등). metaFiles = 3304 + r497→500 .meta 추가 11 − 삭제 6(svn diff). 이전: 2026-10-22 SVN r497 — r497 GameData.xlsx Strings 로비 데모 키 17개·en 21행(할 일 48 후속, 은희)·r496 김민경 거너 R 추적 레이저 VFX(FX_GunnerUlt_* .meta 6·Cylinder_01.fbx.meta, PR #38 짝). metaFiles = r494 실측 3297 + r496 신규 .meta 7. 이전: 2026-10-21 SVN r494 — r494 GameData.xlsx Strings UI.DemoConnect.Auto* 3키 ko·en(할 일 72 후속, 병합 Export). 이전: 2026-10-21 SVN r487 — r480~487(이지원·김태현·김민경·은희: 팔라딘 E 클립 .meta·floor_metal_trenchcover·암살자 아이콘 .meta 등, development 병합 시 핀 반영). 이전: 2026-10-20 SVN r478 — r478 P_HumanoidBot 끊긴 VisualScripting 컴포넌트 제거(할 일 59)·r471~472 거너/팔라딘 스킬 아이콘·r476~477 경석 아트. 이전: 2026-10-19 SVN r470 — r458 char_select 새 PNG·r468 그 .meta·r467 UI_Panel Mockups~ 정리·r469~470 GameData.xlsx 병합 Export(Elevator 열 제거·팔라딘 E 값). metaFiles = r470 버전 관리 .meta 실측(svn ls -R); 나머지 참조 통계는 기존 참고값 유지."
+    "_comment": "2026-10-22 SVN r501 — r501 경석 GameData.xlsx Boss 시트 counterFrontAngle 60→90(23호 간파 각도). metaFiles 변동 없음. 이전: 2026-10-22 SVN r500 — r500 경석 GameData.xlsx Strings 6행(UI.Exit.ToTitle·HostQuitWarning·HostToTitleWarning·UI.Title.Start/Setting/Exit)·서울알림 Heavy 아틀라스 288→342자(PLAN-settings-ddol, git feature/SettingsDdol 짝)·r499 김민경 VFX(거너 R 존 라인·레벨업 등). metaFiles = 3304 + r497→500 .meta 추가 11 − 삭제 6(svn diff). 이전: 2026-10-22 SVN r497 — r497 GameData.xlsx Strings 로비 데모 키 17개·en 21행(할 일 48 후속, 은희)·r496 김민경 거너 R 추적 레이저 VFX(FX_GunnerUlt_* .meta 6·Cylinder_01.fbx.meta, PR #38 짝). metaFiles = r494 실측 3297 + r496 신규 .meta 7. 이전: 2026-10-21 SVN r494 — r494 GameData.xlsx Strings UI.DemoConnect.Auto* 3키 ko·en(할 일 72 후속, 병합 Export). 이전: 2026-10-21 SVN r487 — r480~487(이지원·김태현·김민경·은희: 팔라딘 E 클립 .meta·floor_metal_trenchcover·암살자 아이콘 .meta 등, development 병합 시 핀 반영). 이전: 2026-10-20 SVN r478 — r478 P_HumanoidBot 끊긴 VisualScripting 컴포넌트 제거(할 일 59)·r471~472 거너/팔라딘 스킬 아이콘·r476~477 경석 아트. 이전: 2026-10-19 SVN r470 — r458 char_select 새 PNG·r468 그 .meta·r467 UI_Panel Mockups~ 정리·r469~470 GameData.xlsx 병합 Export(Elevator 열 제거·팔라딘 E 값). metaFiles = r470 버전 관리 .meta 실측(svn ls -R); 나머지 참조 통계는 기존 참고값 유지."
   }
 }

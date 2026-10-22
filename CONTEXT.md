@@ -8,6 +8,8 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
+
 ## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
 - 은희 공유: [handoff-game-menu.md](Docs/tech/handoff-game-menu.md) — 그만두기 → 타이틀 의도적 이탈(`DemoSessionDirector.PrepareLeaveToTitle`·`ReconnectLoop.Reset`) · 입력 기본값(홀드 토글·대시 마우스 켬) · 조준 ESC 소비 표시.
 - 같이 들어간 것(경석 10-22 Play): 타이틀 버튼 기본 한국어(시작하기·설정·나가기, en = START·SETTING·EXIT — `TextScramble` 이 저장 원문으로 덮던 것 수정) · 그만두기 팝업 = **바탕화면 / 타이틀** 두 버튼, 누르면 바로 실행(✗/✓ 없음, ESC = 메뉴로 · 로비·인게임 같음, 호스트는 경고 문구) · 새 문구 6개 Strings 시트 + 서울알림 Heavy 아틀라스(288 → 342자) · M 키 맵 전체 보기 끔.
@@ -95,7 +97,7 @@ Update this file when a term becomes important enough that future agents or team
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).
 - 웰즈 드론 회색 = DRONE.fbx 에 머티리얼 없음 → `WellsDrone.prefab`(래퍼) + `DRONE_Mat`(SVN r454, URP Lit 베이스+노멀). 저작 `Tools/Boss/웰즈 드론 — 재질·래퍼 프리팹 만들기`.
-- 레이드(=B) 테스트 빌드 메뉴 `Build/Windows64 Player (MainFlow · B 보스)`(10-20 개명)(BOSS_RAID_BUILD, 출력 `MainProjectBuilds/WindowsRaid`). ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
+- (10-22 바뀜) 기본 빌드 = B 보스 `Build/Windows64 Player (MainFlow · B 보스 — 기본)`(출력 `MainProjectBuilds/Windows`) · A 는 `… · A 보스`(BOSS_A_BUILD, 출력 `WindowsA`). 옛 BOSS_RAID_BUILD·WindowsRaid 는 없다. ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
 - ⏸ 보류: Stage1 `Slot_8_Z9_M` 배치 어긋남(은희 보고) — 팀장 나중에 확인. 전투 시스템 개정(제압 칸·간파 성공 넉백+그로기→취약 8초·취약 중 CC 패턴 끊기)은 칸 UI 회의 후, 보스 넉백 ↔ UnitWallImpacts 연결은 은희와 상의.
 
 ## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)

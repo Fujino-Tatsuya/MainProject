@@ -43,8 +43,9 @@ public static class BuildWindowsPlayer
 
     private const string DevOutput = "../MainProjectBuilds/WindowsDev/MainProject.exe";
 
-    // 경석 10-20: 기본 빌드 = 23호 A 보스(TwentyThree.prefab → No23_A). B 는 아래 'B 보스' 메뉴.
-    [MenuItem("Build/Windows64 Player (MainFlow · A 보스)")]
+    // 경석 10-22: 기본 빌드 = 23호 **B 보스**(TwentyThree_Raid.prefab → No23_B) — 심볼 없이 뽑으면 B(BossVariantSelection).
+    //    A 는 아래 'A 보스' 메뉴(BOSS_A_BUILD 심볼). (10-20 까지는 기본 = A 였다.)
+    [MenuItem("Build/Windows64 Player (MainFlow · B 보스 — 기본)")]
     public static void BuildWindows64FromMenu()
     {
         Build(ResolveOutputPath(null), BuildOptions.None);
@@ -63,19 +64,18 @@ public static class BuildWindowsPlayer
         Build(Path.GetFullPath(DevOutput), BuildOptions.Development);
     }
 
-    private const string RaidOutput = "../MainProjectBuilds/WindowsRaid/MainProject.exe";
+    private const string AOutput = "../MainProjectBuilds/WindowsA/MainProject.exe";
 
     /// <summary>
-    /// 23호 **레이드 변형**으로 뽑는 테스트 빌드(팀장 10-16 — 다 같이 보스만 플레이). 이번 빌드에만 <c>BOSS_RAID_BUILD</c> 심볼을 얹어
-    /// <see cref="BossVariantSelection.UseRaid"/> 가 true 가 된다 — ProjectSettings 는 건드리지 않으므로 다른 빌드는 그대로 기존 보스다.
+    /// 23호 **A 보스**(TwentyThree.prefab → No23_A, 기본 송전기·간파 릴레이)로 뽑는 비교 빌드. 이번 빌드에만 <c>BOSS_A_BUILD</c> 심볼을 얹어
+    /// <see cref="BossVariantSelection.UseRaid"/> 가 false 가 된다 — ProjectSettings 는 건드리지 않으므로 다른 빌드는 그대로 B 다(경석 10-22).
     /// 튜토리얼 스킵(Alt+1~9)·보스방 워프(F5)는 DEV_HOTKEYS(Standalone 기본 심볼)로 이미 들어간다.
-    /// ⚠️ 호스트·클라 모두 이 빌드여야 한다(RPC 테이블·보스 프리팹이 같아야 한다).
+    /// ⚠️ 호스트·클라 모두 같은 빌드여야 한다(RPC 테이블·보스 프리팹이 같아야 한다).
     /// </summary>
-    // 경석 10-20: 이 빌드 = 23호 B 보스(TwentyThree_Raid.prefab → No23_B). 출력 폴더 이름(WindowsRaid)은 그대로.
-    [MenuItem("Build/Windows64 Player (MainFlow · B 보스)")]
-    public static void BuildWindows64RaidFromMenu()
+    [MenuItem("Build/Windows64 Player (MainFlow · A 보스)")]
+    public static void BuildWindows64AFromMenu()
     {
-        Build(Path.GetFullPath(RaidOutput), BuildOptions.None, new[] { "BOSS_RAID_BUILD" });
+        Build(Path.GetFullPath(AOutput), BuildOptions.None, new[] { "BOSS_A_BUILD" });
     }
 
     /// <summary>CLI -executeMethod 진입점. 성공 0, 실패 1로 종료한다.</summary>
@@ -116,7 +116,7 @@ public static class BuildWindowsPlayer
             locationPathName = outputPath,
             // 릴리즈 = None. 측정용 = Development 만(script debugging·프로파일러 연결 미포함).
             options = buildOptions,
-            // 이번 빌드에만 얹는 심볼(레이드 빌드 = BOSS_RAID_BUILD). ProjectSettings 의 Standalone 심볼(DEV_HOTKEYS 등)에 더해진다.
+            // 이번 빌드에만 얹는 심볼(A 보스 빌드 = BOSS_A_BUILD — 기본은 B). ProjectSettings 의 Standalone 심볼(DEV_HOTKEYS 등)에 더해진다.
             extraScriptingDefines = extraDefines,
         };
         if (extraDefines != null && extraDefines.Length > 0)
