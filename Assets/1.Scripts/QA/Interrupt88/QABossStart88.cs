@@ -411,8 +411,9 @@ public static class QABossStart88
 /// <summary>
 /// [서버] 할 일 88 23호 런 이상 조건(사용자 결정 ①-a·②-a, 게임 코드 무수정) — <b>23호 런 동안만</b> 켠다. 중간보스엔 쓰지 않는다.
 /// <list type="bullet">
-/// <item>대상 고정: 콤보 예약 틱(1초)마다 콤보 밖이고 누르는 클라1 이 대상이 아니면 비공개 <c>TwentyThreeBoss.AdoptAggro(Transform, string)</c> 를
-///   리플렉션으로 부른다(<see cref="QAInterruptLag88Plan.ShouldForceAggro"/>). 결과는 <c>[QA88] event=aggro_force ok=…</c>. 실패해도 런은 계속.</item>
+/// <item>대상 고정: 콤보 예약 틱(1초)마다 서버 대상이 누르는 클라1 이 아니면 비공개 <c>TwentyThreeBoss.AdoptAggro(Transform, string)</c> 를
+///   리플렉션으로 부르고, 콤보 진행 중이면 고정 대상 <c>_comboLock</c> 도 리플렉션으로 누르는 클라1 로 바꾼다(콤보 여부와 무관 — b안,
+///   <see cref="QAInterruptLag88Plan.ShouldForceAggro"/>). 결과는 <c>[QA88] event=aggro_force ok=…</c>. 실패해도 런은 계속.</item>
 /// <item>넉백 면역: 누르는 클라1 에 QA 출처(<see cref="SourceId"/>) 무기한 <see cref="StatusEffectType.SuperArmor"/> — 넉백 진입점
 ///   <see cref="Unit.Knockback"/> 이 거부한다. 0.5초마다 빠졌으면 다시 건다(<see cref="QAInterruptLag88Plan.ShouldReapplySuperArmor"/>).
 ///   🔴 해제: 런 끝·스위트 정리(Close)·종류 바뀜·에디터 감시자 정지 요청(<see cref="ReleaseActive"/>) 모두. 같은 출처만 지우므로 스킬이 건 슈퍼아머는 건드리지 않는다.</item>
@@ -430,6 +431,8 @@ public sealed class QA88TwentyThreeAssist
         BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(Transform), typeof(string) }, null);
     private static readonly FieldInfo ComboField =
         typeof(TwentyThreeBoss).GetField("_combo", BindingFlags.Instance | BindingFlags.NonPublic);
+    private static readonly FieldInfo ComboLockField =
+        typeof(TwentyThreeBoss).GetField("_comboLock", BindingFlags.Instance | BindingFlags.NonPublic);
 
     /// <summary>지금 켜져 있는 것(감시자가 Play 를 멈추기 전에 해제할 수 있게).</summary>
     public static QA88TwentyThreeAssist Active { get; private set; }
@@ -465,7 +468,8 @@ public sealed class QA88TwentyThreeAssist
         var a = new QA88TwentyThreeAssist(boss, presser, run) { _on = true };
         Active = a;
         Debug.Log($"{Tag} event=assist_begin run={run} presserClientId={(presserKnown ? presserClientId.ToString() : "na")} presser={(presser != null ? "found" : "missing")} " +
-                  $"boss={(boss != null ? "found" : "missing")} adoptAggro={(AdoptAggroMethod != null ? "found" : "missing")} comboField={(ComboField != null ? "found" : "missing")}");
+                  $"boss={(boss != null ? "found" : "missing")} adoptAggro={(AdoptAggroMethod != null ? "found" : "missing")} comboField={(ComboField != null ? "found" : "missing")} " +
+                  $"comboLockField={(ComboLockField != null ? "found" : "missing")}");
         if (presser == null)
             Debug.LogWarning($"{Tag} event=aggro_force ok=false run={run} reason=presser_missing — 대상 고정·넉백 면역 없이 런 계속");
         a.RefreshSuperArmor();
@@ -516,41 +520,78 @@ public sealed class QA88TwentyThreeAssist
         }
     }
 
-    /// <summary>[서버] 콤보 예약 직전(1초 틱) — 콤보 밖이고 누르는 쪽이 대상이 아니면 AdoptAggro 로 승계시킨다.</summary>
+    /// <summary>
+    /// [서버] 콤보 예약 직전(1초 틱) — 서버 대상이 누르는 쪽이 아니면 AdoptAggro 로 승계시키고, 콤보 진행 중이면 고정 대상(<c>_comboLock</c>)도
+    /// 누르는 쪽으로 바꾼다(b안 — AdoptAggro 는 이미 같은 대상이면 아무것도 안 해 고정 대상이 남는다). 콤보 밖이면 고정 대상은 건드리지 않는다.
+    /// </summary>
     public void ForceAggroBeforeReserve()
     {
         if (!_on || _boss == null || _presser == null)
             return;
-        bool comboKnown = ComboField != null;
-        bool comboActive = comboKnown && ComboField.GetValue(_boss) != null;
-        bool alreadyTarget = _boss.CurrentTarget == _presser.transform;
-        if (!QAInterruptLag88Plan.ShouldForceAggro(comboKnown, comboActive, alreadyTarget))
+        if (ComboField == null)
         {
-            if (!comboKnown)
-                FailForce("combo_field_missing");
+            FailForce("combo_field_missing");
             return;
         }
-        if (AdoptAggroMethod == null)
+        if (ComboLockField == null)
         {
-            FailForce("method_missing");
+            FailForce("comboLock_field_missing");
             return;
         }
-        try
-        {
-            AdoptAggroMethod.Invoke(_boss, new object[] { _presser.transform, "QA88" });
-        }
-        catch (System.Exception e)
-        {
-            FailForce("invoke_" + (e.InnerException ?? e).GetType().Name);
+        Transform presser = _presser.transform;
+        bool comboActive = ComboField.GetValue(_boss) != null;
+        var lockBefore = ComboLockField.GetValue(_boss) as Transform;
+        bool targetIsPresser = _boss.CurrentTarget == presser;
+        if (!QAInterruptLag88Plan.ShouldForceAggro(comboActive, targetIsPresser, lockBefore == presser))
             return;
-        }
-        if (_boss.CurrentTarget != _presser.transform)
+
+        bool adopted = false;
+        if (!targetIsPresser)
         {
-            FailForce("not_adopted");   // AdoptTarget 이 거부(대상 무효 등)
-            return;
+            if (AdoptAggroMethod == null)
+            {
+                FailForce("method_missing");
+                return;
+            }
+            try
+            {
+                AdoptAggroMethod.Invoke(_boss, new object[] { presser, "QA88" });
+            }
+            catch (System.Exception e)
+            {
+                FailForce("invoke_" + (e.InnerException ?? e).GetType().Name);
+                return;
+            }
+            if (_boss.CurrentTarget != presser)
+            {
+                FailForce("not_adopted");   // AdoptTarget 이 거부(대상 무효 등)
+                return;
+            }
+            adopted = true;
         }
+
+        // AdoptAggro 가 콤보 중이면 이미 옮겼을 수 있다 — 다시 읽고 남았을 때만 바꾼다.
+        bool lockSwapped = false;
+        if (QAInterruptLag88Plan.ShouldSwapComboLock(comboActive, ComboLockField.GetValue(_boss) as Transform == presser))
+        {
+            ComboLockField.SetValue(_boss, presser);
+            lockSwapped = true;
+        }
+        var lockAfter = ComboLockField.GetValue(_boss) as Transform;
+
         _forceOk++;
-        Debug.Log($"{Tag} event=aggro_force ok=true run={_run} n={_forceOk} clientId={_presser.OwnerClientId} presserObjId={_presser.NetworkObjectId} aggroId={_boss.AggroTargetId}");
+        Debug.Log($"{Tag} event=aggro_force ok=true run={_run} n={_forceOk} clientId={_presser.OwnerClientId} presserObjId={_presser.NetworkObjectId} aggroId={_boss.AggroTargetId} " +
+                  $"adopted={(adopted ? "true" : "false")} comboActive={(comboActive ? "true" : "false")} " +
+                  $"comboLockBefore={ObjId(lockBefore)} comboLockAfter={ObjId(lockAfter)} comboLockSwapped={(lockSwapped ? "true" : "false")}");
+    }
+
+    /// <summary>로그용 — 그 Transform 의 NetworkObjectId, null 이면 none.</summary>
+    private static string ObjId(Transform t)
+    {
+        if (t == null)
+            return "none";
+        NetworkObject no = t.GetComponentInParent<NetworkObject>();
+        return no != null && no.IsSpawned ? no.NetworkObjectId.ToString() : "unspawned";
     }
 
     private void FailForce(string reason)
@@ -562,12 +603,22 @@ public sealed class QA88TwentyThreeAssist
         _lastForceFail = reason;
     }
 
-    /// <summary>boss_diag 용 — <c>aggroForced=ok/fail superArmor=true|false|na</c>.</summary>
+    /// <summary>
+    /// boss_diag·boss_window 용 — <c>aggroForced=ok/fail presserIsTarget=… comboLockIsPresser=true|false|none|na superArmor=true|false|na</c>.
+    /// <c>comboLockIsPresser</c>: none = 고정 대상 없음(콤보 밖·첫 타 전), na = 필드를 못 읽음.
+    /// </summary>
     public string Diag()
     {
         string armor = _presser == null || _presser.StatusEffects == null ? "na"
             : _presser.StatusEffects.GetStackCount(StatusEffectType.SuperArmor, SourceId) > 0 ? "true" : "false";
-        return $"aggroForced={_forceOk}/{_forceFail} presserIsTarget={(_presser != null && _boss != null && _boss.CurrentTarget == _presser.transform ? "true" : "false")} superArmor={armor}";
+        string comboLock = "na";
+        if (ComboLockField != null && _boss != null)
+        {
+            var t = ComboLockField.GetValue(_boss) as Transform;
+            comboLock = t == null ? "none" : _presser != null && t == _presser.transform ? "true" : "false";
+        }
+        return $"aggroForced={_forceOk}/{_forceFail} presserIsTarget={(_presser != null && _boss != null && _boss.CurrentTarget == _presser.transform ? "true" : "false")} " +
+               $"comboLockIsPresser={comboLock} superArmor={armor}";
     }
 }
 

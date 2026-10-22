@@ -76,12 +76,17 @@ public static class QAInterruptLag88Plan
         lastAirborneSeenAt >= 0.0 && openAt >= lastAirborneSeenAt && openAt - lastAirborneSeenAt <= maxGapSec;
 
     /// <summary>
-    /// 23호 대상 고정(사용자 결정 ①-a): 콤보 예약 틱에서 <c>AdoptAggro(누르는 클라1)</c> 를 부를까.
-    /// 콤보 중이면 부르지 않는다(콤보 중 승계는 고정 대상 <c>_comboLock</c> 까지 옮겨 진행 중 콤보를 바꾼다).
-    /// 콤보 여부를 읽지 못했으면(리플렉션 실패) 부르지 않는다. 이미 대상이면 부르지 않는다(게임 쪽도 같은 대상이면 아무것도 안 한다).
+    /// 23호 대상 고정(사용자 결정 ①-a, 후속 b안): 1초 틱마다 다시 걸까 — 서버 대상(<c>CurrentTarget</c>)이 누르는 클라1 이 아니거나,
+    /// 콤보 진행 중인데 고정 대상(<c>_comboLock</c>)이 누르는 클라1 이 아니면 건다. 콤보 여부와 무관하다.
+    /// 스모크 3차: 개전 콤보 완주 프레임에 점프×3 이 이어져 틱마다 콤보 중이라, "콤보 밖일 때만" 규칙으론 한 번도 안 걸렸다.
+    /// 콤보 밖이면 <c>_comboLock</c> 은 보지 않는다 — 다음 첫 타가 그때의 대상(= 누르는 클라1)으로 잡는다.
     /// </summary>
-    public static bool ShouldForceAggro(bool comboKnown, bool comboActive, bool alreadyTarget) =>
-        comboKnown && !comboActive && !alreadyTarget;
+    public static bool ShouldForceAggro(bool comboActive, bool targetIsPresser, bool comboLockIsPresser) =>
+        !targetIsPresser || ShouldSwapComboLock(comboActive, comboLockIsPresser);
+
+    /// <summary>대상 고정에서 <c>_comboLock</c> 도 누르는 클라1 로 바꿀까 — 콤보 진행 중이고 아직 아닐 때만.</summary>
+    public static bool ShouldSwapComboLock(bool comboActive, bool comboLockIsPresser) =>
+        comboActive && !comboLockIsPresser;
 
     /// <summary>23호 넉백 면역(사용자 결정 ②-a): 켜 둔 동안 QA 출처 슈퍼아머 스택이 없으면(연출 일괄 해제·연출 잠금 거부 등) 다시 건다.</summary>
     public static bool ShouldReapplySuperArmor(bool active, int qaStackCount) => active && qaStackCount <= 0;

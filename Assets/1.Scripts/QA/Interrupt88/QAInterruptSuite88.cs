@@ -241,7 +241,7 @@ public static class QAInterruptSuite88
                 if (s.Kind != QAInterruptTargetKind.TwentyThree)
                     continue;
                 _header.Notes.Add("**측정 조건(23호): 대상 고정(AdoptAggro QA88) + 넉백 면역(SuperArmor) — 이상 조건, 실제 플레이와 다름.** " +
-                                   "23호 런 동안 서버가 콤보 밖일 때 누르는 클라1 로 어그로를 승계시키고(`event=aggro_force`), 같은 클라에 QA 출처 무기한 슈퍼아머를 건다(런 끝·정리에서 해제, `event=assist_end`). 중간보스 런엔 적용하지 않는다.");
+                                   "23호 런 동안 서버가 1초마다 누르는 클라1 로 어그로를 승계시키고 콤보 중이면 콤보 고정 대상도 옮기며(`event=aggro_force`), 같은 클라에 QA 출처 무기한 슈퍼아머를 건다(런 끝·정리에서 해제, `event=assist_end`). 중간보스 런엔 적용하지 않는다.");
                 break;
             }
             _header.Notes.Add("판 유지: 런 동안 0.5초마다 `QABossStart88.KeepAliveServer` 가 파티 전원과 **대상 보스(중간보스·23호) 체력**을 최대 체력 70% 아래면 최대로 채운다 — 측정 유지 목적(처치·전멸로 런이 끊기지 않게). 통계·피격 연출·사망 신호 없음.");
@@ -541,7 +541,7 @@ public static class QAInterruptSuite88
             if (now >= _nextReserve && _target is TwentyThreeBoss boss)
             {
                 _nextReserve = now + ReserveSeconds;
-                _assist?.ForceAggroBeforeReserve();   // 콤보 예약 직전 — 콤보 밖일 때만
+                _assist?.ForceAggroBeforeReserve();   // 콤보 예약 직전 — 콤보 중이면 고정 대상까지
                 QABossStart88.ReserveJumpComboIfIdle(boss);
             }
         }

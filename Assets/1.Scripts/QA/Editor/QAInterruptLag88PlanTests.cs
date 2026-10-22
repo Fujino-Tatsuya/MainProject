@@ -177,12 +177,22 @@ public sealed class QAInterruptLag88PlanTests
     // ─── 23호 대상 고정·넉백 면역(사용자 결정 ①-a·②-a) ──────────────────
 
     [Test]
-    public void 대상_고정은_콤보_밖에서_대상이_아닐_때만()
+    public void 대상_고정은_서버_대상이나_콤보_고정_대상이_누르는_클라가_아니면_건다()
     {
-        Assert.IsTrue(QAInterruptLag88Plan.ShouldForceAggro(true, false, false), "콤보 밖 · 다른 대상");
-        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(true, true, false), "콤보 중 = 고정 대상까지 옮겨 진행 중 콤보가 바뀐다");
-        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(true, false, true), "이미 대상");
-        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(false, false, false), "콤보 여부를 못 읽음(리플렉션 실패)");
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldForceAggro(false, false, false), "콤보 밖 · 다른 대상");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(false, true, false), "콤보 밖 · 이미 대상 — 고정 대상은 안 본다");
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldForceAggro(true, false, false), "콤보 중 · 다른 대상(스모크 3차: 틱마다 콤보 중이라 한 번도 안 걸림)");
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldForceAggro(true, false, true), "콤보 중 · 고정은 맞지만 서버 대상이 다름");
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldForceAggro(true, true, false), "콤보 중 · 서버 대상은 맞지만 고정 대상이 다름");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(true, true, true), "콤보 중 · 둘 다 누르는 클라");
+    }
+
+    [Test]
+    public void 콤보_고정_대상은_콤보_중이고_누르는_클라가_아닐_때만_바꾼다()
+    {
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldSwapComboLock(true, false), "콤보 중 · 다른 고정 대상(첫 타 전 null 포함)");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldSwapComboLock(true, true), "이미 누르는 클라");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldSwapComboLock(false, false), "콤보 밖 — 다음 첫 타가 대상으로 잡는다");
     }
 
     [Test]
