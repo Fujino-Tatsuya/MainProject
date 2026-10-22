@@ -28,6 +28,7 @@
    - 재료: 장판 = Mark_1(링)·Mark_5(톱니)·Ring_2(채움) 청록 / 조준 = Mark_7(꺾쇠)·Mark_1(원) Nuke 주황 + Particle_01(점·하늘선) / 레이저 = SateliteCannon 사본 ×0.6, 루트 한 발 버스트, 청록 재질. 셰이더 `Shader_IntegratedEffect`(MainProject 에 같은 guid 있음)
 2. MainProject(🔴 Unity 끔): 반입(같은 guid) · 엔트리·카탈로그 · `GunnerTrackingLaserView` · `GunnerTrackingLaser` 신호 추가 · 프리팹 배선 · handoff
    - ✅ 10-21: 프리팹 3 → `Common/Players/Player2/R_TrackingLaser/` + 엔트리 3(Strike 1.2초·prewarm 8 / Lock prewarm 6) · 재질 12 → `_Materials/Player2/` · 팩 텍스처 7·`Cylinder_01.fbx` · `TelegraphRing.cs`(같은 guid) · 카탈로그 `Gunner_R_*` · `GunnerTrackingLaserView`(NetworkBehaviour — NetworkVariable 반경·간격·적 레이어 + Reliable RPC 맞은 위치) · `GunnerTrackingLaser` 호출 2곳 추가 · 레이저 프리팹에서 `FX_GunnerUltLaser` 제거 · `GunnerUltSetup` 가드 · [handoff-gunner-r-vfx](Docs/tech/handoff-gunner-r-vfx.md)
+   - ✅ 10-22 장판 교체: MyProject 에서 `RipplePortal` 기반으로 다시 만든 `FX_GunnerUlt_Zone2`(민경이 이름만 바꿈 — 같은 guid·루트 ID) → MainProject `FX_GunnerUlt_Zone.prefab` 을 그 내용·이름으로 교체(엔트리·배선 그대로) · 재질 3(`M_GUlt_ZoneRipple`·`ZoneCircle`·`ZoneLine`) 반입(텍스처 ripple·ripple_n·circle 는 이미 있음) · 옛 장판 재질 4(`ZoneFill`·`Gear`·`Edge`·`Flash`)·`Mark_5.png` 제거(양 프로젝트, scratchpad `zone2_removed/` 보관)
    - ⚠️ 반입 시점 Lock 프리팹: `Brackets` 가 `Ground` 밖(루트 직하, X 90°)이라 `TelegraphRing` 이 회전을 (0,0,각도)로 덮어써 세로로 선다 — 고칠 방법(원위치 or 스크립트가 저작값 기준으로) 민경 결정 대기
 3. ⏳ 민경 Play/MPPM: 호스트·클라 모두 — 대상별 표식이 범위 출입에 맞게 붙고 떨어짐, 원 0 순간 레이저와 피해 숫자 일치, 6초 뒤 장판 줄어들며 퇴장, 늦게 들어온 클라
 
