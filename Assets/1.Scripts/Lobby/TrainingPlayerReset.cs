@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>훈련 리셋 범위 — 단계마다 고른다(명세 v0.2 §6: TRAIN_01/02/03 시작 = 전부, B→C 초기화 = 분노 재지급 없음, 실전 초기화 = T6).</summary>
+/// <summary>훈련 리셋 범위 — 단계마다 고른다(명세 v0.2 §6: TRAIN_01 시작 = 전부, TRAIN_02 시작 = 분노 빼고, B→C 초기화 = 분노 재지급 없음, 실전 초기화 = T6).</summary>
 public readonly struct TrainingResetOptions
 {
     public TrainingResetOptions(bool fullHealth, bool resetCooldowns, bool refillDash, bool grantAssassinTransformRage)
@@ -26,6 +26,9 @@ public readonly struct TrainingResetOptions
 
     /// <summary>훈련 단계 시작(TRAIN_01) — 체력·쿨타임·대시 + 어쌔신 R 최소 분노.</summary>
     public static TrainingResetOptions TrainingStart => new TrainingResetOptions(true, true, true, true);
+
+    /// <summary>TRAIN_02 시작 — 체력·쿨타임·대시. 분노 재지급 없음(명세 §6 시작 리셋에 분노가 없고 최소 분노는 §7 TRAIN_01 한정).</summary>
+    public static TrainingResetOptions CombatStart => new TrainingResetOptions(true, true, true, false);
 }
 
 /// <summary>

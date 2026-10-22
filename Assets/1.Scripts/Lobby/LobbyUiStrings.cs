@@ -27,12 +27,20 @@ public static class LobbyUiStrings
     public static readonly UiString Train01Dash = new UiString("UI.Lobby.Train01Dash", "대시", Where + " › TRAIN_01 체크 항목 — 대시(할 일 86 T3)");
     public static readonly UiString Train01PartyDone = new UiString("UI.Lobby.Train01PartyDone", "완료 {done}/{total}", Where + " › TRAIN_01 파티 완료 인원({done} = 6항목 모두 마친 사람, {total} = 훈련 명단, 할 일 86 T3)");
 
+    public static readonly UiString Train02Title = new UiString("UI.Lobby.Train02Title", "일반 전투", Where + " › TRAIN_02 제목(할 일 86 T4)");
+    public static readonly UiString Train02Remaining = new UiString("UI.Lobby.Train02Remaining", "남은 상대 {remaining}/{total}", Where + " › TRAIN_02 남은 상대 수({remaining} = 아직 처치 안 한 상대, {total} = 이번 전투 상대 수 — 끼임 복구는 처치 아님, 할 일 86 T4)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         InteractReady, InteractUnready, InteractCharacterSelect, ReadyCount, Countdown, CountdownStarting,
         GatherCount, GatherCountdown,
         Train01Title, Train01BasicAttack, Train01SkillQ, Train01SkillE, Train01SkillR, Train01RightClick, Train01Dash, Train01PartyDone,
+        Train02Title, Train02Remaining,
     };
+
+    /// <summary>"남은 상대 n/m".</summary>
+    public static string FormatTrain02Remaining(int remaining, int total) =>
+        Train02Remaining.Format(new Dictionary<string, string> { ["remaining"] = remaining.ToString(), ["total"] = total.ToString() });
 
     /// <summary>TRAIN_01 체크 항목 이름.</summary>
     public static UiString Train01Item(LobbyWeaponCheckItem item)
