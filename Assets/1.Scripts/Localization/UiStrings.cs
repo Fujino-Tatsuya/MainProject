@@ -128,6 +128,9 @@ public static class UiStrings
         [StatusEffectType.AttackSpeedBaseModifier] = "기본 공격 속도 증감",
         [StatusEffectType.DefenseBaseModifier] = "기본 방어력 증감",
         [StatusEffectType.MaxHpBaseModifier] = "기본 최대 체력 증감",
+        [StatusEffectType.MoveSpeedFinalMultiplier] = "이동 속도 최종 배율",
+        [StatusEffectType.AttackSpeedFinalMultiplier] = "공격 속도 최종 배율",
+        [StatusEffectType.CooldownRateModifier] = "쿨타임 줄어드는 속도 배율",
     };
 
     private static readonly Dictionary<StatusEffectType, UiString> StatusEffectNames = BuildStatusEffectNames();

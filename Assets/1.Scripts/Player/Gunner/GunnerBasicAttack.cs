@@ -27,7 +27,7 @@ using UnityEngine;
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(GunnerHeat))]
 [RequireComponent(typeof(GunnerBeamAttack))]
-public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
+public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlayerAttackSpeedAnimatorUser
 {
     private static readonly int IdleHash = Animator.StringToHash("Idle");
     private static readonly int EmptyHash = Animator.StringToHash("Empty");
@@ -119,6 +119,21 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     // ── IPlayerBasicAttack ───────────────────────────────────────────────
 
     public bool IsOutOfResource => heat != null && heat.IsOverheated;
+
+    // ── 공격속도(할 일 91 T5) ────────────────────────────────────────────
+    // 거너 평타 타이밍은 클립 이벤트가 아니라 데이터 시간 값이라 그 값들을 배율로 나눈다(준비·발사 간격·후속 동작·입력 창·발 잠금).
+    // 서버·오너가 같은 배율(복제된 상태이상) — 배율이 바뀌는 순간만 복제 지연만큼 어긋나고, 서버 간격 검사(IntervalTolerance)가 받아 준다.
+    // 재생 속도는 공격 중(전 피어 StartRpc~EndRpc) Animator.speed 로 같이 탄다 — FireSpeed 는 배율 전 발사 간격 기준이라 두 번 곱하지 않는다.
+    public bool ScalesAnimatorWithAttackSpeed => active;
+
+    private float AttackSpeedRate => player != null ? player.AttackSpeedRate : 1f;
+    private float WindupDuration => PlayerAttackSpeedRules.Duration(data.WindupDuration, AttackSpeedRate);
+    private float FireInterval => PlayerAttackSpeedRules.Duration(data.FireInterval, AttackSpeedRate);
+    private float ShotRecovery => PlayerAttackSpeedRules.Duration(data.ShotRecovery, AttackSpeedRate);
+    private float ComboWindowOpen => PlayerAttackSpeedRules.Duration(data.ComboWindowOpen, AttackSpeedRate);
+    private float ComboWindowClose => PlayerAttackSpeedRules.Duration(data.ComboWindowClose, AttackSpeedRate);
+    private float ShotLockLead => PlayerAttackSpeedRules.Duration(data.ShotLockLead, AttackSpeedRate);
+    private float ShotLockTail => PlayerAttackSpeedRules.Duration(data.ShotLockTail, AttackSpeedRate);
 
     public bool TryStart()
     {
@@ -214,10 +229,10 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         // 다음 발을 이어 쏠 거면 발사 ShotLockLead 전에 그 순간 몸 방향으로 다시 잠근다. 그 사이는 커서 쪽으로 제한 속도 회전.
         if (ownerPreLocked && !OwnerChainsNextShot)
             ownerPreLocked = false; // 미리 잠근 뒤 손을 뗐다(또는 스킬 예약) — 다음 발이 없으니 잠금도 푼다
-        if (facing.IsShotLocked && firstShotSent && !ownerPreLocked && Time.time >= ownerLastShotTime + data.ShotLockTail)
+        if (facing.IsShotLocked && firstShotSent && !ownerPreLocked && Time.time >= ownerLastShotTime + ShotLockTail)
             facing.EndShot();
         if (firstShotSent && !ownerPreLocked && OwnerChainsNextShot && !heat.IsOverheated
-            && Time.time >= ownerLastShotTime + data.FireInterval - data.ShotLockLead)
+            && Time.time >= ownerLastShotTime + FireInterval - ShotLockLead)
         {
             facing.BeginShot(movement.CurrentFacing);
             ownerPreLocked = true;
@@ -243,12 +258,12 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             // 발사 중 클릭은 여기서 홀드/예약으로 쓴다 — 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
             input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
             holdSent = true;
-            nextHoldSignalTime = Time.time + data.FireInterval * HoldSignalIntervals;
+            nextHoldSignalTime = Time.time + FireInterval * HoldSignalIntervals;
             // 오너도 같은 창으로 자기 예약을 든다 — 서버 예약과 기준(각자의 직전 발사)이 같아 지터만큼만 어긋난다.
             if (firstShotSent && !ownerQueued)
             {
                 float sinceShot = Time.time - ownerLastShotTime;
-                ownerQueued = sinceShot >= data.ComboWindowOpen && sinceShot <= data.ComboWindowClose;
+                ownerQueued = sinceShot >= ComboWindowOpen && sinceShot <= ComboWindowClose;
             }
             if (IsNetworkActive)
                 RequestQueueShotRpc();
@@ -259,7 +274,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         // 첫 발 — 준비가 끝나면 한 번만 요청한다. 방향은 공격 시작 때 잠근 조준이다.
         if (!firstShotSent)
         {
-            if (Time.time < startTime + data.WindupDuration || heat.IsOverheated)
+            if (Time.time < startTime + WindupDuration || heat.IsOverheated)
                 return;
 
             firstShotSent = true;
@@ -270,7 +285,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         // 이어지는 발 — 누르고 있거나 창 안에서 예약했으면 발사 간격이 찰 때 요청한다.
         // 방향 = 발사 ShotLockLead 전에 잠근 몸 방향(덜 돌았으면 덜 돈 방향). 그 사이에 눌러 미리 못 잠갔으면 지금 몸 방향.
         if (OwnerChainsNextShot && !heat.IsOverheated
-            && Time.time >= ownerLastShotTime + data.FireInterval)
+            && Time.time >= ownerLastShotTime + FireInterval)
         {
             ownerQueued = false;
             Vector3 shotDirection = ownerPreLocked ? facing.Direction : facing.BeginShot(movement.CurrentFacing);
@@ -283,7 +298,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         if (!holdSent || Time.time < nextHoldSignalTime)
             return;
 
-        nextHoldSignalTime = Time.time + data.FireInterval * HoldSignalIntervals;
+        nextHoldSignalTime = Time.time + FireInterval * HoldSignalIntervals;
         if (IsNetworkActive)
             HoldSignalRpc();
         else
@@ -293,7 +308,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private void RequestShot(Vector3 direction)
     {
         ownerLastShotTime = Time.time;
-        nextHoldSignalTime = Time.time + data.FireInterval * HoldSignalIntervals;
+        nextHoldSignalTime = Time.time + FireInterval * HoldSignalIntervals;
         if (IsNetworkActive)
             FireShotRpc(direction);
         else
@@ -392,7 +407,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         float sinceShot = Time.time - lastShotTime;
-        if (sinceShot < data.ComboWindowOpen || sinceShot > data.ComboWindowClose)
+        if (sinceShot < ComboWindowOpen || sinceShot > ComboWindowClose)
             return;
 
         hasQueuedShot = true;
@@ -428,9 +443,9 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return false;
 
         float now = Time.time;
-        if (now < startTime + data.WindupDuration * IntervalTolerance)
+        if (now < startTime + WindupDuration * IntervalTolerance)
             return false;
-        if (lastShotTime >= 0f && now - lastShotTime < data.FireInterval * IntervalTolerance)
+        if (lastShotTime >= 0f && now - lastShotTime < FireInterval * IntervalTolerance)
             return false;
         if (heat.IsOverheated)
             return false;
@@ -466,14 +481,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         // 첫 발 대기 — 준비 끝에 과열이면 쏘지 않고 끝내고, 오너 요청이 끊기면 서버가 스스로 끝낸다.
         if (lastShotTime < 0f)
         {
-            float fireAt = startTime + data.WindupDuration;
+            float fireAt = startTime + WindupDuration;
             if (heat.IsOverheated && now >= fireAt)
             {
                 EndServer();
                 return;
             }
 
-            if (now > fireAt + data.FireInterval * StallIntervals)
+            if (now > fireAt + FireInterval * StallIntervals)
             {
                 Edit.LogWarning("[Gunner] 오너 첫 발 요청이 끊겼다 — 기본 공격을 서버에서 끝낸다.", this);
                 EndServer();
@@ -482,14 +497,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         }
 
         // 홀드 중 오너 신호가 끊기면 뗀 것으로 본다 — 아래 마무리로 끝난다.
-        if (held && now > lastHoldSignalTime + data.FireInterval * StallIntervals)
+        if (held && now > lastHoldSignalTime + FireInterval * StallIntervals)
         {
             Edit.LogWarning("[Gunner] 오너 홀드 신호가 끊겼다 — 뗀 것으로 보고 기본 공격을 마무리한다.", this);
             held = false;
         }
 
         // 창 예약을 했는데 오너 발사 요청이 끊기면(창 경계에서 오너는 창 밖으로 본 경우 포함) 버린다 — 아래 마무리로 끝난다.
-        if (hasQueuedShot && now > lastShotTime + data.FireInterval * StallIntervals)
+        if (hasQueuedShot && now > lastShotTime + FireInterval * StallIntervals)
         {
             Edit.LogWarning("[Gunner] 창 예약 뒤 오너 발사 요청이 끊겼다 — 예약을 버리고 기본 공격을 마무리한다.", this);
             hasQueuedShot = false;
@@ -503,7 +518,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
         // 홀드도 예약도 없으면(창 밖·과열 포함) 이번 발의 후속 동작까지 마무리하고 끝낸다(§4.3·§4.4).
         // 🔴 여기가 공격 끝이다 — 공격 잠금(이동 입력 회전 차단)도 여기서(EndLocal → ResetRuntime) 풀린다(할 일 27).
-        if (now >= lastShotTime + data.ShotRecovery)
+        if (now >= lastShotTime + ShotRecovery)
             EndServer();
     }
 
@@ -692,7 +707,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         if (!active || data == null || player.CurrentState != PlayerActionState.AttackReady)
             return;
 
-        if (Time.time >= startTime + data.WindupDuration)
+        if (Time.time >= startTime + WindupDuration)
             player.BeginAttackState();
     }
 

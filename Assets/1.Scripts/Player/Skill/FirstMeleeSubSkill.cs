@@ -6,9 +6,10 @@ using UnityEngine;
 /// E 수호자의 의지 — 전방 방어 대기 → 첫 방어 성공 시 그 피해 흡수 + 반격 단계(피해·넉백 무시) → 종료.
 /// 단계는 <see cref="FirstMeleeGuardCounterModel"/>, 방향 판정은 <see cref="FirstMeleeGuardRules"/> 가 맡고
 /// 이 클래스는 서버 배선만 한다. 피격 가로채기는 <see cref="Player"/>.ReceiveAttack 맨 위의 <see cref="IPlayerIncomingAttackGuard"/> 훅.
-/// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 방어 시작(SubSkillGuard) Custom0 방어 창 열림 →
-/// 방어 유지 루프(SubSkillGuardIdle, 전이 exitTime 으로 길이 조정) → 방어 종료(SubSkillGuardEnd) Custom1 창 닫힘·종료,
+/// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 준비(SubSkillGuard) Custom0 방어 창 열림 →
+/// 방어중 루프(SubSkillGuardIdle, 전이 exitTime 으로 길이 조정) → 해제(SubSkillGuardEnd) Custom1 창 닫힘 · End 종료,
 /// 반격(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트·전이를 옮기면 그대로 반영된다.
+/// 공격속도는 준비·해제·반격 상태의 속도 파라미터(AttackSpeedRate)로만 탄다 — 방어중 길이는 공속과 무관(할 일 91 A5, Docs/tech/suppress-haste.md).
 /// 설계·결정: PLAN-paladin-counter-e (Re:C 변경안).
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
@@ -22,10 +23,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
     private const string CounterStateName = "SubSkillCounter";
     private static readonly int CounterStateHash = Animator.StringToHash(CounterStateName);
-    // 방어 시작 → 유지 → 종료는 애니메이터 exitTime 전이로 이어진다. 창을 닫고 E 를 끝내는 Custom1 은 종료 상태 클립에 있다.
+    // 준비 → 방어중 → 해제는 애니메이터 exitTime 전이로 이어진다. 창을 닫는 Custom1 과 E 를 끝내는 End 는 해제 상태 클립에 있다.
     private const string GuardEndStateName = "SubSkillGuardEnd";
 
-    // 방어 시작 클립(데이터 animatorStateName) = Custom0, 방어 종료 클립(GuardEndStateName) = Custom1, 반격 클립(CounterStateName) = Hit·End.
+    // 준비 클립(데이터 animatorStateName) = Custom0, 해제 클립(GuardEndStateName) = Custom1·End, 반격 클립(CounterStateName) = Hit·End.
     private static readonly SkillAnimationEventType[] GuardEvents = { SkillAnimationEventType.Custom0 };
     private static readonly SkillAnimationEventType[] CounterEvents =
         { SkillAnimationEventType.Hit, SkillAnimationEventType.End };
@@ -54,10 +55,20 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => GuardEvents;
 
+    // 공격속도는 Animator.speed 가 아니라 준비·해제·반격 상태의 속도 파라미터(AttackSpeedRate, PlayerAttackSpeedAnimator 가 씀)로 탄다 —
+    // 방어중(SubSkillGuardIdle) 루프와 그 전이는 배율 없이 같은 실제 시간이다(할 일 91 A5).
+    public override bool ScalesWithAttackSpeed => false;
+
+    // 준비·해제·반격은 감속 시 길어지므로 안전망도 감속만큼 늘린다(가속 시 줄이지 않음). 방어중 길이는 런타임에 알 수 없어
+    // maxActiveDuration 전체를 늘린다 — 정밀 분할보다 길 뿐 먼저 끊지는 않는다.
+    // End 를 시작 상태에 선언하지 않아 EndsOnClipEvent 는 거짓이다(안전망 = maxActiveDuration ÷ min(1, 배율) + padding).
+    public override bool ScalesSafetyNetWithAttackSpeed => true;
+
     public override void CollectAnimationEventRequirements(List<AnimationEventRequirement> requirements)
     {
         base.CollectAnimationEventRequirements(requirements);
         requirements.Add(AnimationEventRequirement.ForSkillState(GuardEndStateName, SkillAnimationEventType.Custom1));
+        requirements.Add(AnimationEventRequirement.ForSkillState(GuardEndStateName, SkillAnimationEventType.End));
         foreach (SkillAnimationEventType eventType in CounterEvents)
             requirements.Add(AnimationEventRequirement.ForSkillState(CounterStateName, eventType));
     }
@@ -86,7 +97,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         // 방향 = Cast 시점 조준(결정 4). 반격 부채꼴도 이 방향을 쓴다. 방어 창은 방어 클립 Custom0 이 연다.
         model.Begin(direction, data.GuardAngle);
-        Edit.Log($"[Skill] 수호자의 의지 — 방어 대기 (각도 {data.GuardAngle}°, 방어 창은 클립 Custom0~Custom1)", this);
+        Edit.Log($"[Skill] 수호자의 의지 — 준비 (각도 {data.GuardAngle}°, 방어 창은 준비 클립 Custom0 ~ 해제 클립 Custom1)", this);
     }
 
     public override void OnClientPlay(Vector3 direction)
@@ -96,7 +107,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     }
 
     // 서버(또는 오프라인)에서만 온다(PlayerSkillController.HandleAnimationEvent). base 의 End → Completed 는 타지 않는다 —
-    // 반격 → 종료 순서는 이 스킬이 정한다. 단계에 맞지 않는 이벤트(CrossFade 중 늦게 온 방어 클립 Custom1,
+    // 반격 → 종료 순서는 이 스킬이 정한다. 단계에 맞지 않는 이벤트(CrossFade 중 늦게 온 해제 클립 Custom1·End,
     // 오너 동기로 반격 상태가 다시 들어가 두 번 온 Hit·End)는 모델이 무시한다.
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {
@@ -106,9 +117,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 model.OnGuardWindowOpened();
                 break;
 
+            // 창만 닫는다 — E 는 해제 모션 끝(End)까지 이어진다.
             case SkillAnimationEventType.Custom1:
-                if (model.OnGuardWindowClosed().HasEnded)
-                    EndSelf(SkillEndReason.Completed);
+                model.OnGuardWindowClosed();
                 break;
 
             case SkillAnimationEventType.Hit:
@@ -116,8 +127,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                     FireCounter();
                 break;
 
+            // 해제 클립 End(방어 실패 종료) 또는 반격 클립 End(반격 종료).
             case SkillAnimationEventType.End:
-                GuardEventResult end = model.OnCounterEnd();
+                GuardEventResult end = model.OnEnd();
                 // 🔴 순서 고정: 반격 → 종료. Hit 없이 End 가 오면 둘 다 참이다 — 종료를 먼저 처리하면 반격이 사라진다(모델 계약).
                 if (end.CounterHitDue)
                     FireCounter();

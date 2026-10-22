@@ -6158,7 +6158,14 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _groggyKind = BossPauseCondition.Suppress;
         StunForCounter(duration);
         Debug.Log($"[23호] 제압 진입 ({reason}) — {duration:0.#}초 · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##}", this);
+        SuppressStarted?.Invoke(this, duration);
     }
+
+    /// <summary>
+    /// [서버] 제압에 **실제로 들어간 직후** 1회(예약만 된 경로는 안 냄 — 소비될 때 냄). 인자 = (보스, 이번 제압 길이 초).
+    /// 구독: 제압 가속 버프 <c>SuppressHaste</c>(할 일 91, Docs/tech/handoff-suppress-haste.md). 구독자가 보스 참조를 들고 있지 않아 정적이다.
+    /// </summary>
+    public static event System.Action<TwentyThreeBoss, float> SuppressStarted;
 
     /// <summary>
     /// [서버] 필수 기믹이 **완전히 끝나는 지점**에서 부른다 — 예약된 제압이 있으면 지금 들어간다.
