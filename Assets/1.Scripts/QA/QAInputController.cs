@@ -85,6 +85,18 @@ public sealed class QAInputController : MonoBehaviour
         return target != null ? _skills.TryUse(slot, target) : _skills.TryUse(slot);
     }
 
+    /// <summary>
+    /// 대상 쪽을 조준해 시전 — 조준 확정 경로에 대상 위치를 지점으로 넣는다(<see cref="UseSkill"/> 는 방향을 마우스 조준에서 읽어
+    /// 포커스 없는 MPPM 클론에선 엉뚱한 쪽을 본다). 시전 방향 = 대상 − 나, SnapRotationOnStart 스킬은 그쪽으로 돈다.
+    /// </summary>
+    public bool UseSkillToward(PlayerSkillSlot slot, Unit target)
+    {
+        if (_skills == null || target == null || !_skills.IsCooldownReady(slot))
+            return false;
+
+        return _skills.ExecuteTargetedSkill(slot, target, target.transform.position, true);
+    }
+
     /// <summary>조준 확정 경로로 지점 시전 — 조준 모드에 들어가지 않는다(대상 없는 로비·맵 시험용).</summary>
     public bool UseSkillAt(PlayerSkillSlot slot, Vector3 aimPoint)
     {

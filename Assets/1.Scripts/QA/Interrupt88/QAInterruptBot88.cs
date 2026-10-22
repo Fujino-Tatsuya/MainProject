@@ -14,7 +14,11 @@ public struct QAInterruptBot88Config
     public double ReactMinMs, ReactMaxMs;
     /// <summary>대상 중심에서 이 거리(m, 대상 반경 더함) 안이면 멈춘다.</summary>
     public float StopDistance;
+    /// <summary>누를 때 대상 쪽을 조준한다(<see cref="QAInputController.UseSkillToward"/>). 끄면 게임 조준(마우스) 그대로.</summary>
+    public bool AimAtTarget;
 
+    // 23호(스모크 5차): 마우스 조준이라 23호를 못 보고 '대상 있음 0' — 조준을 켜고, 간파 박스(전방 1.7m)가 HurtBox(r 1.7)에
+    // 넉넉히 닿게 1.0m 로 붙인다(중심 ≈ 2.5m). 중간보스는 5차 OK 라 그대로 둔다.
     public static QAInterruptBot88Config Default(QAInterruptTargetKind kind, QAInterruptBotMode mode) => new QAInterruptBot88Config
     {
         Mode = mode,
@@ -25,7 +29,8 @@ public struct QAInterruptBot88Config
         SweepMaxMs = QAInterruptLag88Plan.SweepMaxMs,
         ReactMinMs = QAInterruptLag88Plan.ReactMinMs,
         ReactMaxMs = QAInterruptLag88Plan.ReactMaxMs,
-        StopDistance = 1.5f,
+        StopDistance = kind == QAInterruptTargetKind.TwentyThree ? 1.0f : 1.5f,
+        AimAtTarget = kind == QAInterruptTargetKind.TwentyThree,
     };
 }
 
@@ -37,7 +42,8 @@ public struct QAInterruptBot88Config
 /// 읽기 권한 Everyone·서버 쓰기라 원격 클라에도 복제되는 신호다(서버 전용 판정 <see cref="MonsterCounterWindow.IsOpen"/> 은 클라에서 늘 닫힘이라 쓰지 않는다),
 /// 창 길이 = <see cref="MonsterCounterWindow.WindowDuration"/>(저작값 ÷ 공격속도 — 전 피어 동일). 표시는 판정보다 0.15초 먼저 꺼지지만 열림은 같은 순간이다.
 /// 23호 = <see cref="TwentyThreeBoss.CounterWindowOpen"/>(판정 창 복제) 엣지, 창 길이는 복제되지 않아 관측한 열림→닫힘 간격으로 배운다
-/// (<see cref="QAWindowDurationLearner"/>) — A 모드는 길이를 배우기 전 첫 창을 누르지 않고 배우기만 한다.</para>
+/// (<see cref="QAWindowDurationLearner"/>) — A 모드는 길이를 배우기 전 첫 창을 누르지 않고 배우기만 한다.
+/// 23호는 <b>착지 창만</b> 본다(<see cref="QAInterruptLag88Plan.IsLandingWindow"/> — 체공 중 꺼지는 몸 콜라이더로 판별). 개전 돌진 창 등은 배우지도 누르지도 않는다.</para>
 /// <para><b>누를 시각</b>: A = 관측 열림 + 창 길이 + 스윕 오프셋(<see cref="QAInterruptLag88Plan.SweepOffsetMs"/>, 시도 순서대로 고르게),
 /// B = 관측 열림 + 반응(<see cref="QAInterruptLag88Plan.ReactionMs"/>). 창 하나에 1회. 쿨다운·시전 거부면 그 창은 건너뛴다(시도 수에 안 넣음).
 /// 시각은 실시간(timeScale 무관 — 간파 슬로모션 영향 없음), 프레임 단위라 실제 오프셋은 로그 <c>offsetMs</c> 가 원본이다.</para>
@@ -65,6 +71,12 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private MonsterCounterWindow _midbossWindow;
     private NetworkVariable<bool> _midbossVisual;
     private float _nextRetarget;
+    private float _targetRadius;        // 켜진 콜라이더로 본 최대 반경 — 23호 체공 중 꺼진 콜라이더(bounds 0)로 줄지 않게
+    private Collider _bodyCollider;     // 23호 루트 몸 콜라이더 — 꺼져 있으면 체공 중
+    private Collider _hurtCollider;     // 대상 HurtBox — 누름 진단 거리용
+
+    private double _lastAirborneSeenAt = -1.0;   // 23호 체공(몸 콜라이더 꺼짐)을 마지막으로 본 실시간
+    private bool _windowCounts;                  // 이번 창이 측정 대상(23호 = 착지 창)인가 — 닫힐 때 학습 여부
 
     private readonly QAWindowDurationLearner _learner = new QAWindowDurationLearner();
     private bool _wasOpen;
@@ -119,6 +131,8 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         _lastOpenSeenAt = -1.0;
         _attacksSeen = _edgeBlocks = 0;
         _edgeBlocked = false;
+        _lastAirborneSeenAt = -1.0;
+        _windowCounts = false;
         _active = _input != null;
         Debug.Log($"{Tag} event=bot_begin mode={QAInterruptLag88Plan.ModeToken(_cfg.Mode)} kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} " +
                   $"attempts={_cfg.Attempts} seed={_cfg.Seed} input={(_input != null)} netsimMs={QANetSim88.AppliedDelayMs}");
@@ -155,6 +169,8 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Approach(me);
 
         double now = Time.realtimeSinceStartupAsDouble;
+        if (_bodyCollider != null && !_bodyCollider.enabled)
+            _lastAirborneSeenAt = now;
         bool open = IsWindowOpen();
         if (open && !_wasOpen)
             OnOpened(now);
@@ -204,13 +220,20 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         _target = null;
         _midbossWindow = null;
         _midbossVisual = null;
+        _targetRadius = 0f;
+        _bodyCollider = null;
+        _hurtCollider = null;
         _wasOpen = false;
         _pending = false;
         if (_cfg.Kind == QAInterruptTargetKind.TwentyThree)
         {
             TwentyThreeBoss boss = FindAnyObjectByType<TwentyThreeBoss>();
             if (boss != null && boss.CurrentHealth > 0)
+            {
                 _target = boss;
+                foreach (Collider c in boss.GetComponents<Collider>())
+                    if (c != null && !c.isTrigger) { _bodyCollider = c; break; }
+            }
         }
         else
         {
@@ -229,6 +252,8 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         }
         if (_target != null)
         {
+            Hurtbox hurt = _target.GetComponentInChildren<Hurtbox>();
+            _hurtCollider = hurt != null ? hurt.GetComponent<Collider>() : null;
             _lastTargetState = _target.State;
             Debug.Log($"{Tag} event=target kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} target={QAInterruptLag88Plan.LogToken(_target.name)} " +
                       $"observe={(_cfg.Kind == QAInterruptTargetKind.TwentyThree ? "CounterWindowOpen" : _midbossVisual != null ? "_counterVisual" : "missing")} " +
@@ -257,6 +282,13 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Collider c = _target.GetComponentInChildren<Collider>();
         if (c != null)
             radius = Mathf.Max(c.bounds.extents.x, c.bounds.extents.z);
+        if (_cfg.Kind == QAInterruptTargetKind.TwentyThree)
+        {
+            // 체공 중엔 몸 콜라이더가 꺼져 bounds 가 0 — 켜져 있을 때 본 반경을 쓴다.
+            if (c != null && c.enabled)
+                _targetRadius = Mathf.Max(_targetRadius, radius);
+            radius = _targetRadius;
+        }
         if (delta.magnitude <= _cfg.StopDistance + radius)
         {
             _input.SetMove(Vector3.zero);
@@ -290,6 +322,17 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         _planOffsetMs = double.NaN;
         _planReactMs = double.NaN;
 
+        _windowCounts = _cfg.Kind != QAInterruptTargetKind.TwentyThree || QAInterruptLag88Plan.IsLandingWindow(now, _lastAirborneSeenAt);
+        if (!_windowCounts)
+        {
+            _pending = false;
+            _estClose = double.NaN;
+            string airborneAgo = _lastAirborneSeenAt < 0.0 ? "na" : Fmt(now - _lastAirborneSeenAt);
+            Debug.Log($"{Tag} event=window state=open landing=false skip=not_landing kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} " +
+                      $"windows={Windows} airborneAgoS={airborneAgo}");
+            return;
+        }
+
         bool known = TryWindowDuration(out double durSec);
         _estClose = known ? now + durSec : double.NaN;
 
@@ -315,9 +358,10 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private void OnClosed(double now)
     {
         double durMs = (now - _openAt) * 1000.0;
-        if (_cfg.Kind == QAInterruptTargetKind.TwentyThree)
+        if (_cfg.Kind == QAInterruptTargetKind.TwentyThree && _windowCounts)
             _learner.Add(now - _openAt);
-        Debug.Log($"{Tag} event=window state=closed kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} observedMs={Fmt(durMs)} windows={Windows}");
+        Debug.Log($"{Tag} event=window state=closed kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} observedMs={Fmt(durMs)} windows={Windows} " +
+                  $"learned={(_cfg.Kind == QAInterruptTargetKind.TwentyThree && _windowCounts ? "true" : "false")}");
     }
 
     private bool TryWindowDuration(out double seconds)
@@ -335,15 +379,18 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private void Press(double now, bool openNow)
     {
         _pending = false;
+        string aimDiag = AimDiag(_input.Target);   // 시전 전(스냅 회전 전) — 누를 때 바라보던 방향
         string reason = _input.SkillBlockReason(PlayerSkillSlot.Interrupt);
-        bool cast = reason == null && _input.UseSkill(PlayerSkillSlot.Interrupt, _target);
+        bool cast = reason == null && (_cfg.AimAtTarget
+            ? _input.UseSkillToward(PlayerSkillSlot.Interrupt, _target)
+            : _input.UseSkill(PlayerSkillSlot.Interrupt, _target));
         double offsetMs = double.IsNaN(_estClose) ? double.NaN : (now - _estClose) * 1000.0;
         double reactMs = (now - _openAt) * 1000.0;
         if (!cast)
         {
             Skipped++;
             Debug.Log($"{Tag} event=press_skip reason={QAInterruptLag88Plan.LogToken(reason ?? "cast_rejected")} mode={QAInterruptLag88Plan.ModeToken(_cfg.Mode)} " +
-                      $"windows={Windows} attempts={Attempts}");
+                      $"windows={Windows} attempts={Attempts} {aimDiag}");
             return;
         }
 
@@ -356,13 +403,65 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Debug.Log($"{Tag} event=press clientId={clientId} host={(host ? "true" : "false")} mode={QAInterruptLag88Plan.ModeToken(_cfg.Mode)} " +
                   $"kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} target={QAInterruptLag88Plan.LogToken(_target.name)} idx={idx} n={_cfg.Attempts} " +
                   $"planOffsetMs={Fmt(_planOffsetMs)} offsetMs={Fmt(offsetMs)} planReactMs={Fmt(_planReactMs)} reactMs={Fmt(reactMs)} " +
-                  $"openAtPress={(openNow ? "true" : "false")} pressT={pressT.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)} netsimMs={QANetSim88.AppliedDelayMs}");
+                  $"openAtPress={(openNow ? "true" : "false")} pressT={pressT.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)} netsimMs={QANetSim88.AppliedDelayMs} " +
+                  aimDiag);
 
         if (Attempts >= _cfg.Attempts)
         {
             IsDone = true;
             Stop("done");
         }
+    }
+
+    /// <summary>
+    /// 누름 진단(스모크 5차 '대상 있음 0' 대응): 이 인스턴스가 본 봇↔보스 수평 중심 거리, 판정 앵커 피벗↔HurtBox 표면 거리(surf),
+    /// 전방위 사거리(reach — 앵커를 어느 방향으로 돌려도 닿는 최대 수평 거리, HUD 와 같은 <see cref="InterruptOmniRangeModel"/>),
+    /// 사거리 판정(inReach = surf ≤ reach), 앵커 정면 ↔ 보스 방향 각도(faceDeg — 조준 전), 조준 방식(aim=target|game).
+    /// 서버 판정은 서버 위치·스냅 회전 뒤 방향으로 하므로 원격은 지연만큼 다를 수 있다 — 원본 판정은 호스트 `[InterruptLag]` 줄.
+    /// </summary>
+    private string AimDiag(Player me)
+    {
+        string aim = _cfg.AimAtTarget ? "target" : "game";
+        if (me == null || _target == null)
+            return $"aim={aim} dist=na surf=na reach=na inReach=na faceDeg=na";
+
+        Vector3 pivot = me.transform.position;
+        Vector3 toBoss = _target.transform.position - pivot;
+        double dist = QAPartyPlacement88.HorizontalDistance(pivot, _target.transform.position);
+
+        PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
+        ColliderInfo anchor = skills != null ? skills.GetSkill(PlayerSkillSlot.Interrupt)?.HitboxAnchor : null;
+        double reach = double.NaN;
+        if (anchor != null)
+        {
+            switch (anchor.OverlapCollider)
+            {
+                case OverlapCollider.Box:
+                    BoxColliderInfo box = default;
+                    anchor.GetBoxColliderInfo(ref box);
+                    reach = InterruptOmniRangeModel.BoxReach(pivot, box.center, box.halfExtents, box.orientation);
+                    break;
+                case OverlapCollider.Sphere:
+                    SphereColliderInfo sphere = default;
+                    anchor.GetSphereColliderInfo(ref sphere);
+                    reach = InterruptOmniRangeModel.SphereReach(pivot, sphere.center, sphere.radius);
+                    break;
+                case OverlapCollider.Capsule:
+                    CapsuleColliderInfo capsule = default;
+                    anchor.GetCapsuleColliderInfo(ref capsule);
+                    reach = InterruptOmniRangeModel.CapsuleReach(pivot, capsule.point0, capsule.point1, capsule.radius);
+                    break;
+            }
+        }
+
+        double surf = _hurtCollider != null && _hurtCollider.enabled
+            ? InterruptOmniRangeModel.HorizontalDistanceToBounds(pivot, _hurtCollider.bounds)
+            : double.NaN;
+        string inReach = double.IsNaN(surf) || double.IsNaN(reach) ? "na" : surf <= reach ? "true" : "false";
+        Vector3 face = anchor != null ? anchor.transform.forward : me.transform.forward;
+        double faceDeg = QAInterruptLag88Plan.FlatAngleDeg(face.x, face.z, toBoss.x, toBoss.z);
+        return $"aim={aim} dist={Fmt(dist)} surf={Fmt(surf)} reach={Fmt(reach)} inReach={inReach} faceDeg={Fmt(faceDeg)} " +
+               $"hurtOn={(_hurtCollider != null && _hurtCollider.enabled ? "true" : "false")}";
     }
 
     private static string Fmt(double v) => double.IsNaN(v) ? "na" : v.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);

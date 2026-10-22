@@ -64,6 +64,28 @@ public static class QAInterruptLag88Plan
     public static double SweepPressDelayMs(double windowDurationMs, double offsetMs) =>
         Math.Max(0.0, windowDurationMs + offsetMs);
 
+    /// <summary>23호 착지 창 판별 — 체공(몸 콜라이더 꺼짐)을 마지막으로 본 뒤 이 시간(초) 안에 열린 창만 착지 창이다.</summary>
+    public const double LandingWindowMaxGapSec = 1.0;
+
+    /// <summary>
+    /// 23호: 이 창이 점프 착지 간파 창인가. 체공 중엔 전 피어에서 몸 콜라이더가 꺼지고(<c>SetHurtableClientRpc</c>) 착지 직후 창이 열린다.
+    /// 개전 콤보 돌진(1.5s) 같은 다른 창은 체공이 없어 거른다 — 스모크 5차에서 이 창이 길이 학습을 1.5s 로 오염시켜 매번 ~0.7s 늦게 눌렀다.
+    /// <paramref name="lastAirborneSeenAt"/> 음수 = 체공을 본 적 없음.
+    /// </summary>
+    public static bool IsLandingWindow(double openAt, double lastAirborneSeenAt, double maxGapSec = LandingWindowMaxGapSec) =>
+        lastAirborneSeenAt >= 0.0 && openAt >= lastAirborneSeenAt && openAt - lastAirborneSeenAt <= maxGapSec;
+
+    /// <summary>두 수평 벡터(x, z) 사이 각도(도, 0~180). 어느 쪽이든 길이 0 이면 NaN — 누름 진단(바라보는 방향 ↔ 보스 방향).</summary>
+    public static double FlatAngleDeg(double ax, double az, double bx, double bz)
+    {
+        double la = Math.Sqrt(ax * ax + az * az);
+        double lb = Math.Sqrt(bx * bx + bz * bz);
+        if (la < 1e-6 || lb < 1e-6)
+            return double.NaN;
+        double c = (ax * bx + az * bz) / (la * lb);
+        return Math.Acos(Math.Max(-1.0, Math.Min(1.0, c))) * 180.0 / Math.PI;
+    }
+
     /// <summary>원격 지연 파일 내용(정수 ms 한 줄) 파싱. 비었거나 숫자가 아니면 false. 0~<see cref="MaxDelayMs"/> 로 자른다.</summary>
     public static bool TryParseDelayMs(string text, out int delayMs)
     {

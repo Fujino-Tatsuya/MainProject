@@ -140,6 +140,40 @@ public sealed class QAInterruptLag88PlanTests
         Assert.AreEqual(0.5, s, 1e-9, "오래된 0.8 은 밀려났다");
     }
 
+    // ─── 23호 착지 창 판별·누름 진단 각도(스모크 5차) ──────────────────
+
+    [Test]
+    public void 체공을_본_직후_열린_창만_착지_창()
+    {
+        Assert.IsTrue(QAInterruptLag88Plan.IsLandingWindow(10.0, 9.98), "착지 직후(한 프레임 뒤)");
+        Assert.IsTrue(QAInterruptLag88Plan.IsLandingWindow(10.0, 10.0), "같은 프레임");
+        Assert.IsTrue(QAInterruptLag88Plan.IsLandingWindow(10.0, 9.0), "경계 1.0s 포함");
+        Assert.IsFalse(QAInterruptLag88Plan.IsLandingWindow(10.0, 8.5), "체공이 오래전 — 개전 돌진 창 등");
+        Assert.IsFalse(QAInterruptLag88Plan.IsLandingWindow(10.0, -1.0), "체공을 본 적 없음(스모크 5차 첫 창 = 개전 돌진 1.5s)");
+        Assert.IsFalse(QAInterruptLag88Plan.IsLandingWindow(10.0, 10.5), "열린 뒤의 체공은 이 창과 무관");
+    }
+
+    [Test]
+    public void 수평_각도는_0_180_길이0이면_NaN()
+    {
+        Assert.AreEqual(0.0, QAInterruptLag88Plan.FlatAngleDeg(0, 1, 0, 5), 1e-9);
+        Assert.AreEqual(90.0, QAInterruptLag88Plan.FlatAngleDeg(1, 0, 0, 1), 1e-9);
+        Assert.AreEqual(180.0, QAInterruptLag88Plan.FlatAngleDeg(1, 0, -2, 0), 1e-9);
+        Assert.AreEqual(45.0, QAInterruptLag88Plan.FlatAngleDeg(1, 0, 1, 1), 1e-9);
+        Assert.IsNaN(QAInterruptLag88Plan.FlatAngleDeg(0, 0, 1, 0));
+    }
+
+    [Test]
+    public void 봇_기본값은_23호만_조준하고_더_붙는다()
+    {
+        QAInterruptBot88Config tt = QAInterruptBot88Config.Default(QAInterruptTargetKind.TwentyThree, QAInterruptBotMode.Sweep);
+        QAInterruptBot88Config mb = QAInterruptBot88Config.Default(QAInterruptTargetKind.Midboss, QAInterruptBotMode.Sweep);
+        Assert.IsTrue(tt.AimAtTarget, "23호 = 대상 조준(마우스 조준으로 '대상 있음 0')");
+        Assert.AreEqual(1.0f, tt.StopDistance, 1e-6f);
+        Assert.IsFalse(mb.AimAtTarget, "중간보스 = 5차 OK 그대로");
+        Assert.AreEqual(1.5f, mb.StopDistance, 1e-6f);
+    }
+
     // ─── 중간보스 강제 개시 — 존4 스킵 보낼 시점 ────────────────────────
 
     [Test]
