@@ -231,7 +231,8 @@ public static class QAInterruptSuite88
             _header.RunTimeoutSec = _cfg.RunTimeoutSec;
             _header.Notes.Add("판 유지: 런 동안 0.5초마다 `QABossStart88.KeepAliveServer` 가 파티 전원과 **대상 보스(중간보스·23호) 체력**을 최대 체력 70% 아래면 최대로 채운다 — 측정 유지 목적(처치·전멸로 런이 끊기지 않게). 통계·피격 연출·사망 신호 없음.");
             _header.Notes.Add("23호: 1초마다 점프×3 콤보 예약(F3 Dev API, 3번째 착지 간파 창). A 스윕은 23호 창 길이가 복제되지 않아 런의 첫 창을 길이 학습에만 쓴다. " +
-                               "봇은 착지 창(체공 직후 열린 창)만 배우고 누르며(개전 돌진 창 등은 건너뜀), 누를 때 23호 쪽을 조준한다 — 누름 줄 `surf`·`reach`·`inReach`·`faceDeg` 로 사거리·방향을 본다.");
+                               "봇은 착지 창(체공 직후 열린 창)만 배우고 누른다(개전 돌진 창 등은 건너뜀).");
+            _header.Notes.Add("조준: 봇은 대상(중간보스·23호) 모두 누를 때 대상 쪽을 조준한다(`UseSkillToward`, 누름 줄 `aim=target`) — 마우스 위치로 간파 방향이 달라져 측정이 오염되지 않게. 누름 줄 `surf`·`reach`·`inReach`·`faceDeg` 로 사거리·방향을 본다.");
             _header.Notes.Add("원격 지연 = Multiplayer Tools NetworkSimulator 송신·수신 각각 X ms(RTT 대략 +2X). 호스트는 지연 0. 런 시작 전 클론 콘솔의 `[QA88] event=netsim` 으로 적용을 확인한다.");
             _header.Notes.Add("진단 줄(원본 로그): 호스트 `event=boss_attack`·`boss_window`(엣지)·`boss_diag`(5초 — 상태·휴면·NavMesh·어그로·창·플레이어별 거리·깨어 있는 일반몹), 파티 배치 `party_points`·`party_point`, 누르는 클론 `bot_diag`(5초 — 관측 경로·창 값·마지막 관측·보스 거리·보스 상태·낭떠러지 멈춤).");
             _header.Notes.Add("탐지기: 기존 5종(예외·소프트락·성능·네트워크·불변식)이 모든 인스턴스에서 상시 감시한다. 런 구간에 새로 잡히거나 재발한 Warning 이상(노이즈 제외)은 비고 '탐지기' 로 남긴다. 인스턴스별 전체 집계는 각 `48-*` 리포트.");

@@ -164,14 +164,14 @@ public sealed class QAInterruptLag88PlanTests
     }
 
     [Test]
-    public void 봇_기본값은_23호만_조준하고_더_붙는다()
+    public void 봇_기본값은_두_대상_모두_조준하고_23호만_더_붙는다()
     {
         QAInterruptBot88Config tt = QAInterruptBot88Config.Default(QAInterruptTargetKind.TwentyThree, QAInterruptBotMode.Sweep);
         QAInterruptBot88Config mb = QAInterruptBot88Config.Default(QAInterruptTargetKind.Midboss, QAInterruptBotMode.Sweep);
         Assert.IsTrue(tt.AimAtTarget, "23호 = 대상 조준(마우스 조준으로 '대상 있음 0')");
         Assert.AreEqual(1.0f, tt.StopDistance, 1e-6f);
-        Assert.IsFalse(mb.AimAtTarget, "중간보스 = 5차 OK 그대로");
-        Assert.AreEqual(1.5f, mb.StopDistance, 1e-6f);
+        Assert.IsTrue(mb.AimAtTarget, "중간보스도 대상 조준 — 마우스 위치로 측정 오염 방지");
+        Assert.AreEqual(1.5f, mb.StopDistance, 1e-6f, "중간보스 거리 = 5차 OK 그대로");
     }
 
     // ─── 중간보스 강제 개시 — 존4 스킵 보낼 시점 ────────────────────────

@@ -14,11 +14,12 @@ public struct QAInterruptBot88Config
     public double ReactMinMs, ReactMaxMs;
     /// <summary>대상 중심에서 이 거리(m, 대상 반경 더함) 안이면 멈춘다.</summary>
     public float StopDistance;
-    /// <summary>누를 때 대상 쪽을 조준한다(<see cref="QAInputController.UseSkillToward"/>). 끄면 게임 조준(마우스) 그대로.</summary>
+    /// <summary>누를 때 대상 쪽을 조준한다(<see cref="QAInputController.UseSkillToward"/>). 끄면 게임 조준(마우스) 그대로. 기본값은 두 대상 모두 켬.</summary>
     public bool AimAtTarget;
 
-    // 23호(스모크 5차): 마우스 조준이라 23호를 못 보고 '대상 있음 0' — 조준을 켜고, 간파 박스(전방 1.7m)가 HurtBox(r 1.7)에
-    // 넉넉히 닿게 1.0m 로 붙인다(중심 ≈ 2.5m). 중간보스는 5차 OK 라 그대로 둔다.
+    // 조준: 두 대상 모두 대상 쪽(스모크 5차 뒤 통일) — 마우스 위치에 따라 간파 방향이 달라져 측정이 오염되지 않게.
+    // 23호(스모크 5차)는 마우스 조준이라 23호를 못 보고 '대상 있음 0' 이었다.
+    // 거리: 23호만 간파 박스(전방 1.7m)가 HurtBox(r 1.7)에 넉넉히 닿게 1.0m 로 붙인다(중심 ≈ 2.5m). 중간보스는 5차 OK 라 그대로 둔다.
     public static QAInterruptBot88Config Default(QAInterruptTargetKind kind, QAInterruptBotMode mode) => new QAInterruptBot88Config
     {
         Mode = mode,
@@ -30,7 +31,7 @@ public struct QAInterruptBot88Config
         ReactMinMs = QAInterruptLag88Plan.ReactMinMs,
         ReactMaxMs = QAInterruptLag88Plan.ReactMaxMs,
         StopDistance = kind == QAInterruptTargetKind.TwentyThree ? 1.0f : 1.5f,
-        AimAtTarget = kind == QAInterruptTargetKind.TwentyThree,
+        AimAtTarget = true,
     };
 }
 
