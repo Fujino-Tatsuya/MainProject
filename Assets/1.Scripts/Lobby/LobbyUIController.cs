@@ -3,8 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// 로비 상단 플레이어 슬롯 3칸(이름·캐릭터·준비)과 <see cref="LobbySession"/> 사이의 얇은 뷰 — PLAN-48 C8·C9.
-/// 상태는 갖지 않는다. 읽기 = LobbySession 의 복제 자리 목록, 쓰기 = LobbySession 의 RPC(준비·캐릭터 요청 진입점 — 상호작용 C10·선택 패널 C12 가 부른다).
-/// 옛 Ready·캐릭터 버튼은 C9 걷는 로비에서 씬째 지웠다.
+/// 상태는 갖지 않는다. 읽기 = LobbySession 의 복제 자리 목록, 쓰기 = LobbySession 의 캐릭터 요청 RPC(선택 패널 C12 가 부른다).
+/// 옛 Ready·캐릭터 버튼은 C9 걷는 로비에서 씬째 지웠고, 준비 토글 진입점은 할 일 86 T2b 에서 지웠다(출격 집결로 대체).
 /// </summary>
 public class LobbyUIController : MonoBehaviour
 {
@@ -41,18 +41,6 @@ public class LobbyUIController : MonoBehaviour
         }
     }
 
-    public void ToggleLocalReady()
-    {
-        var session = LobbySession.Active;
-        if (session == null)
-        {
-            Debug.LogWarning("[SceneFlow] LobbyUIController.ToggleLocalReady — 스폰된 LobbySession 이 없다.");
-            return;
-        }
-
-        session.RequestToggleReady();
-    }
-
     public void RequestLocalCharacterSelection(int characterId)
     {
         LobbySession.Active?.RequestCharacter(characterId);
@@ -61,18 +49,6 @@ public class LobbyUIController : MonoBehaviour
     public int GetLocalCharacterSelectionId()
     {
         return TryGetLocalEntry(out var entry) ? entry.CharacterId : LobbySession.DefaultCharacterId;
-    }
-
-    public bool IsLocalReady()
-    {
-        return TryGetLocalEntry(out var entry) && entry.Ready;
-    }
-
-    /// <summary>내 캐릭터 변경이 막혔는가(준비 상태·카운트다운 중) — 서버도 같은 규칙으로 거부한다. 호스트 예외 없음.</summary>
-    public bool IsLocalCharacterSelectionLocked()
-    {
-        var session = LobbySession.Active;
-        return IsLocalReady() || (session != null && session.IsCountdownActive);
     }
 
     private static bool TryGetLocalEntry(out LobbyPlayerEntry entry)

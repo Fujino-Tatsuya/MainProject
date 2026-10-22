@@ -6,8 +6,9 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// 로비 상호작용 입력(각 피어 로컬, 3.LobbyScene Management) — PLAN-48 §4.6, C10. 원본 패턴 = <see cref="ZoneBridgeGateManager"/>.
 /// 매 프레임 로컬 PlayerObject 위치로 <see cref="NearestInteractable.Pick"/> → 고른 대상에 <see cref="InteractPrompt"/> 를 띄우고,
-/// 상호작용 키(설정창 <c>Player/Interact</c>, 기본 F)를 누르면 종류별로 실행한다(Ready = <see cref="LobbySession.RequestToggleReady"/>,
-/// CharacterSelect = <see cref="CharacterSelectPanel.Show"/>(내 캐릭터, 준비 중 || 카운트다운 중) → 고르면 <see cref="LobbySession.RequestCharacter"/> — C12).
+/// 상호작용 키(설정창 <c>Player/Interact</c>, 기본 F)를 누르면 종류별로 실행한다
+/// (CharacterSelect = <see cref="CharacterSelectPanel.Show"/>(내 캐릭터, 잠금 = <see cref="LobbyTrainingDirector.CharacterChangeBlockFor"/>) → 고르면 <see cref="LobbySession.RequestCharacter"/> — C12).
+/// Ready 종류는 고르지 않는다 — 준비 패드는 출격 집결 구역으로 바뀌었다(할 일 86 PLAN §7-2, 서 있으면 준비).
 /// 판정 권한은 서버다 — 서버가 거리를 다시 본다. 여기 검사는 RPC·프롬프트용이다.
 /// <list type="bullet">
 /// <item>막힘: UI 모달(결과 패널 등 <see cref="UiInputGateManager"/>) 또는 플레이어 입력 차단 토큰·생명주기(Alive 아님)면 프롬프트를 끄고 F 를 무시한다.
@@ -72,7 +73,7 @@ public sealed class LobbyInteractor : MonoBehaviour
         if (target == null)
             return;
 
-        target.ApplyPromptText(target.GetPromptString(IsLocalReady(session)).Text);
+        target.ApplyPromptText(target.GetPromptString(false).Text);
 
         if (InteractPressedThisFrame())
             Interact(target, session);
@@ -98,12 +99,11 @@ public sealed class LobbyInteractor : MonoBehaviour
     }
 
     // CharacterSelect 는 패널이 연결돼 있을 때만 고른다(눌러도 아무 일 없는 프롬프트를 띄우지 않는다).
+    // Ready 는 출격 집결로 대체돼 고르지 않는다(enum 값은 qa/LobbyDemo 하네스 호환으로 남김).
     private bool IsUsable(LobbyInteractable target, LobbySession session)
     {
         switch (target.Kind)
         {
-            case LobbyInteractableKind.Ready:
-                return session.IsSpawned;
             case LobbyInteractableKind.CharacterSelect:
                 return session.IsSpawned && characterSelectPanel != null;
             default:
@@ -115,11 +115,6 @@ public sealed class LobbyInteractor : MonoBehaviour
     {
         switch (target.Kind)
         {
-            case LobbyInteractableKind.Ready:
-                Debug.Log($"[SceneFlow] {Tag} F: 준비 토글 요청 (ready={IsLocalReady(session)})", this);
-                session.RequestToggleReady();
-                break;
-
             case LobbyInteractableKind.CharacterSelect:
                 var locked = IsCharacterLocked(session);
                 var characterId = GetLocalCharacterId(session);
@@ -129,7 +124,7 @@ public sealed class LobbyInteractor : MonoBehaviour
         }
     }
 
-    // 열린 패널의 잠금(준비·카운트다운)을 따라간다. 로비 세션이 내려가면 닫는다.
+    // 열린 패널의 잠금(훈련 명단·출격 카운트다운·출격 단계)을 따라간다. 로비 세션이 내려가면 닫는다.
     private void SyncCharacterSelectPanel(LobbySession session)
     {
         if (characterSelectPanel == null || !characterSelectPanel.IsOpen)
@@ -152,10 +147,13 @@ public sealed class LobbyInteractor : MonoBehaviour
             session.RequestCharacter(characterId);
     }
 
-    // 서버 규칙(LobbyReadyRules.CanChangeCharacter)의 Ready·카운트다운 거부를 패널 잠금으로 미리 보여 준다.
+    // 서버 RPC 의 진행기 거부(LobbyTrainingDirector.CharacterChangeBlockFor)를 패널 잠금으로 미리 보여 준다. 늦은 참가자는 잠기지 않는다.
     private static bool IsCharacterLocked(LobbySession session)
     {
-        return IsLocalReady(session) || session.IsCountdownActive;
+        var training = LobbyTrainingDirector.Active;
+        var networkManager = NetworkManager.Singleton;
+        return training != null && networkManager != null
+            && training.CharacterChangeBlockFor(networkManager.LocalClientId) != LobbyCharacterChangeReject.None;
     }
 
     private static int GetLocalCharacterId(LobbySession session)
@@ -190,12 +188,6 @@ public sealed class LobbyInteractor : MonoBehaviour
 
         var life = player.GetComponent<PlayerLifeCycleController>();
         return life != null && life.State != PlayerLifeState.Alive;
-    }
-
-    private static bool IsLocalReady(LobbySession session)
-    {
-        var networkManager = NetworkManager.Singleton;
-        return networkManager != null && session.TryGetEntry(networkManager.LocalClientId, out var entry) && entry.Ready;
     }
 
     private static bool TryGetLocalPlayer(out NetworkObject player)

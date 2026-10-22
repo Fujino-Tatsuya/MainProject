@@ -551,11 +551,12 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _sessionSceneLoadRoutine = null;
     }
 
-    // 로비 시작 조건 = LobbySession 카운트다운이 끝나 시작 래치가 걸렸다(PLAN-48 C8). 로비 세션이 없는 경로(Dev 부팅 등)는 막지 않는다.
+    // 로비 시작 조건 = 출격 집결 확정으로 로비 훈련 진행기가 메인 진입 래치를 걸었다(할 일 86 T2b — 옛 LobbySession 준비 카운트다운 대체).
+    // 진행기가 없는 경로(Dev 부팅 등)는 막지 않는다.
     private bool CanStartFromLobby()
     {
-        var lobby = LobbySession.Active;
-        return lobby == null || lobby.CanStartGame;
+        var training = LobbyTrainingDirector.Active;
+        return training == null || training.ServerHasLaunched;
     }
 
     public void RegisterView(NetworkLoadingScreenView view)

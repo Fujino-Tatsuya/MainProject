@@ -15,11 +15,50 @@ public static class LobbyUiStrings
     public static readonly UiString ReadyCount = new UiString("UI.Lobby.ReadyCount", "준비 {ready}/{total}", Where + " › 준비 오브젝트 머리 위({ready} = 준비한 사람, {total} = 접속자)");
     public static readonly UiString Countdown = new UiString("UI.Lobby.Countdown", "{time} 후 출발", Where + " › Slot_Countdown({time} = UI.Unit.Seconds 로 만든 남은 초, 올림 정수)");
     public static readonly UiString CountdownStarting = new UiString("UI.Lobby.CountdownStarting", "출발!", Where + " › Slot_Countdown — 0초(시작 래치 뒤 로딩 전까지)");
+    public static readonly UiString GatherCount = new UiString("UI.Lobby.GatherCount", "집결 {gathered}/{total}", Where + " › 집결 구역 표시({gathered} = 구역 안 + 쓰러짐·사망 아님, {total} = 참여자, 할 일 86)");
+    public static readonly UiString GatherCountdown = new UiString("UI.Lobby.GatherCountdown", "{time} 후 이동", Where + " › 집결 카운트다운({time} = UI.Unit.Seconds 로 만든 남은 초, 올림 정수, 할 일 86)");
+
+    public static readonly UiString Train01Title = new UiString("UI.Lobby.Train01Title", "무기 점검", Where + " › TRAIN_01 개인 체크 제목(할 일 86 T3)");
+    public static readonly UiString Train01BasicAttack = new UiString("UI.Lobby.Train01BasicAttack", "기본 공격", Where + " › TRAIN_01 체크 항목 — 기본 공격(할 일 86 T3)");
+    public static readonly UiString Train01SkillQ = new UiString("UI.Lobby.Train01SkillQ", "Q", Where + " › TRAIN_01 체크 항목 — Q 스킬(할 일 86 T3)");
+    public static readonly UiString Train01SkillE = new UiString("UI.Lobby.Train01SkillE", "E", Where + " › TRAIN_01 체크 항목 — E 스킬(할 일 86 T3)");
+    public static readonly UiString Train01SkillR = new UiString("UI.Lobby.Train01SkillR", "R", Where + " › TRAIN_01 체크 항목 — R 스킬(할 일 86 T3)");
+    public static readonly UiString Train01RightClick = new UiString("UI.Lobby.Train01RightClick", "우클릭 스킬", Where + " › TRAIN_01 체크 항목 — 우클릭 스킬(명세 '간파' 대신, 할 일 86 T3)");
+    public static readonly UiString Train01Dash = new UiString("UI.Lobby.Train01Dash", "대시", Where + " › TRAIN_01 체크 항목 — 대시(할 일 86 T3)");
+    public static readonly UiString Train01PartyDone = new UiString("UI.Lobby.Train01PartyDone", "완료 {done}/{total}", Where + " › TRAIN_01 파티 완료 인원({done} = 6항목 모두 마친 사람, {total} = 훈련 명단, 할 일 86 T3)");
+
+    public static readonly UiString Train02Title = new UiString("UI.Lobby.Train02Title", "일반 전투", Where + " › TRAIN_02 제목(할 일 86 T4)");
+    public static readonly UiString Train02Remaining = new UiString("UI.Lobby.Train02Remaining", "남은 상대 {remaining}/{total}", Where + " › TRAIN_02 남은 상대 수({remaining} = 아직 처치 안 한 상대, {total} = 이번 전투 상대 수 — 끼임 복구는 처치 아님, 할 일 86 T4)");
 
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         InteractReady, InteractUnready, InteractCharacterSelect, ReadyCount, Countdown, CountdownStarting,
+        GatherCount, GatherCountdown,
+        Train01Title, Train01BasicAttack, Train01SkillQ, Train01SkillE, Train01SkillR, Train01RightClick, Train01Dash, Train01PartyDone,
+        Train02Title, Train02Remaining,
     };
+
+    /// <summary>"남은 상대 n/m".</summary>
+    public static string FormatTrain02Remaining(int remaining, int total) =>
+        Train02Remaining.Format(new Dictionary<string, string> { ["remaining"] = remaining.ToString(), ["total"] = total.ToString() });
+
+    /// <summary>TRAIN_01 체크 항목 이름.</summary>
+    public static UiString Train01Item(LobbyWeaponCheckItem item)
+    {
+        switch (item)
+        {
+            case LobbyWeaponCheckItem.BasicAttack: return Train01BasicAttack;
+            case LobbyWeaponCheckItem.SkillQ: return Train01SkillQ;
+            case LobbyWeaponCheckItem.SkillE: return Train01SkillE;
+            case LobbyWeaponCheckItem.SkillR: return Train01SkillR;
+            case LobbyWeaponCheckItem.RightClick: return Train01RightClick;
+            default: return Train01Dash;
+        }
+    }
+
+    /// <summary>"완료 n/m".</summary>
+    public static string FormatTrain01PartyDone(int done, int total) =>
+        Train01PartyDone.Format(new Dictionary<string, string> { ["done"] = done.ToString(), ["total"] = total.ToString() });
 
     /// <summary>"준비 n/m".</summary>
     public static string FormatReadyCount(int ready, int total) =>
@@ -36,5 +75,18 @@ public static class LobbyUiStrings
         return seconds > 0
             ? Countdown.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(seconds, "0") })
             : CountdownStarting.Text;
+    }
+
+    /// <summary>"집결 n/m".</summary>
+    public static string FormatGatherCount(int gathered, int total) =>
+        GatherCount.Format(new Dictionary<string, string> { ["gathered"] = gathered.ToString(), ["total"] = total.ToString() });
+
+    /// <summary>집결 카운트다운 문구. 0초면 빈 문자열(확정 순간 구역 표시가 꺼진다).</summary>
+    public static string FormatGatherCountdown(double remainingSeconds)
+    {
+        var seconds = CountdownDisplaySeconds(remainingSeconds);
+        return seconds > 0
+            ? GatherCountdown.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(seconds, "0") })
+            : string.Empty;
     }
 }

@@ -138,6 +138,11 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
             ApplyMitigatedHealthDamage(damage, out hpDealt, out shieldDealt);
         }
 
+        // 체력 하한(기본 0 = 없음, 로비 훈련 보정 — Player). 피해 표시·피격 반응은 그대로, 체력만 하한에서 멈춘다.
+        int floored = HealthFloorRules.Clamp(previousHealth, _health.CurrentHealth, HealthFloor);
+        if (floored > _health.CurrentHealth)
+            _health.HealHp(floored - _health.CurrentHealth);
+
         _currentHp.Value = _health.CurrentHealth;
 
         // 표시용 피해량은 체력 클램프 전 최종값이다. NetworkVariable 변화량으로는 막타 초과분을
@@ -175,6 +180,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     protected virtual void OnServerHealthDamageApplied(int healthLost, int shieldLost)
     {
     }
+
+    /// <summary>[서버] 피해로 내려갈 수 있는 최저 체력(0 = 없음). 모든 체력 피해 경로(공격·직접·비율·추락)가 따른다.</summary>
+    protected virtual int HealthFloor => 0;
 
     void ApplyMitigatedHealthDamage(int damage, out int hpDealt, out int shieldDealt)
     {
