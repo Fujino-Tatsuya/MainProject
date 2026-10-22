@@ -221,10 +221,11 @@
 
 **보정을 한다면의 결정 기준(합의, 미구현)**
 - 보정 대상은 **카운터 창 열림 여부만**이다. 사거리·명중(앵커 오버랩)은 서버 현재 기준 그대로.
-- 상한 **100ms**: 판정 시각 − 누른 시각 ≤ 상한이고, 누른 시각에 창이 열려 있었을 때만 "누른 시각 기준이면 성공"으로 본다.
-  상한은 간파 스킬 컴포넌트의 직렬화 필드 `lagCompensationCapMs`(`PlayerInterruptSkillBase`, 기본 100). 데이터 테이블에는 아직 없다.
-- ⚠️ 판정 시각은 클립 Hit 이벤트(또는 `hitDelay` 0.15~0.25s) 뒤라 `hitAfterPressMs` 에 시전 지연이 들어간다. 상한 100ms 로는 대부분 `wouldSucceed=false` 일 수 있으니,
-  판단은 `lagMs`·`pressWindow`·`hitWindow` 원본 값으로도 다시 계산해 본다.
+- 지연만큼 판정을 **당긴다**(2026-10-22 사용자 결정, 추천안 B): 상한 적용 지연 = `min(lagMs, capMs)`(음수 지연은 0),
+  보정 판정 시각 = `hitT − 상한 적용 지연`. **그 시각에 창이 열려 있었으면** "보정했으면 성공"(`wouldSucceed`)이다.
+  시전 지연(클립 Hit 이벤트까지)은 그대로 두고 네트워크 지연분만 빼므로, 호스트(지연 0)는 `wouldSucceed` 가 실제 판정 시각의 창 상태와 같다.
+- 상한 **100ms** = 간파 스킬 컴포넌트의 직렬화 필드 `lagCompensationCapMs`(`PlayerInterruptSkillBase`, 기본 100). 데이터 테이블에는 아직 없다.
+- 판정 시각 = 세 캐릭터 모두 상태 클립의 **Hit 이벤트**(`RequiredAnimationEvents` = `HitAndEndEvents` — 가붕이 `Garen_Parry`, 거너, 어쌔신). 시점 튜닝은 클립에서 이벤트를 옮긴다.
 
 **절차**: 측정(빌드 + LAN/원격, Development 또는 `DEV_HOTKEYS` 릴리스 — [debug-hotkeys.md](debug-hotkeys.md)) → 호스트 `Player.log` 의 `[InterruptLag]` 줄 수집(QA 자동화 `qa/LobbyDemo` 가 파싱) →
 원격 `rescued`(보정했으면 성공인데 실제 실패) 비율과 `rttAvgMs`·`rttMaxMs` 를 호스트 그룹과 비교 → 원격 실패가 지연 때문에 의미 있게 늘어날 때만 보정을 PLAN 으로 올린다.
@@ -236,7 +237,7 @@
 
 **판정 줄** — 간파 판정(Hit) 1회마다 1줄. 공백 구분 `key=value`, 값에 공백 없음.
 ```
-[InterruptLag] event=judge clientId=1 host=false skill=GunnerInterruptSkill target=GauntletBot(Clone) pressT=812.402 arriveT=812.431 hitT=812.632 lagMs=29.0 hitAfterPressMs=230.0 rttMs=58 pressWindow=open hitWindow=closed result=fail wouldSucceed=false capMs=100
+[InterruptLag] event=judge clientId=1 host=false skill=GunnerInterruptSkill target=GauntletBot(Clone) pressT=812.402 arriveT=812.431 hitT=812.632 lagMs=29.0 hitAfterPressMs=230.0 rttMs=58 pressWindow=open hitWindow=closed correctedWindow=open result=fail wouldSucceed=true capMs=100
 ```
 | 키 | 의미 |
 |---|---|
@@ -248,12 +249,13 @@
 | `arriveT` | 요청이 서버에 도착한 서버 시각 |
 | `hitT` | 판정(Hit) 서버 시각 |
 | `lagMs` | `arriveT − pressT` |
-| `hitAfterPressMs` | `hitT − pressT` (상한 비교 대상) |
+| `hitAfterPressMs` | `hitT − pressT` (참고용 — 시전 지연 포함, 판정 기준 아님) |
 | `rttMs` | 그 클라의 트랜스포트 RTT(`GetCurrentRtt`, 도착 때 측정). 호스트 0 |
 | `pressWindow` | 누른 시각의 창 상태(링버퍼 기준) `open`/`closed`/`unknown`(기록 없음·밀려남·대상 없음) |
 | `hitWindow` | 판정 시각의 창 상태(판정 직전 `ServerIsInterruptible` — 23호는 상태 차단 포함) |
+| `correctedWindow` | 보정 판정 시각(`hitT − min(lagMs, capMs)`, 음수 지연 0)의 창 상태(링버퍼 기준, 수신 전에 읽음) `open`/`closed`/`unknown` |
 | `result` | 실제 결과 `success`/`fail`(카운터 창 소유자의 성공 수 증가 여부) |
-| `wouldSucceed` | 누른 시각 기준이면 성공했을 것: `pressWindow=open` ∧ `hitAfterPressMs ≤ capMs` ∧ 대상 있음 |
+| `wouldSucceed` | 보정했으면 성공했을 것: `correctedWindow=open` ∧ 대상 있음 |
 | `capMs` | 상한(ms) |
 
 **요약 줄** — 판 종료 때 그룹마다 1줄(`host`, `remote` 순). 그 뒤 집계·창 기록을 비운다.
@@ -268,7 +270,7 @@
 | `withTarget` | 그중 카운터 창 소유자가 사거리에 있던 수 |
 | `success` | 실제 성공 수 |
 | `correctedSuccess` | 보정했으면 성공 수 = `result=success` ∨ `wouldSucceed=true` |
-| `rescued` | `correctedSuccess` 중 실제 실패였던 수 |
+| `rescued` | `result=fail` ∧ `wouldSucceed=true` 인 수 |
 | `rttAvgMs`·`rttMaxMs` | 판정 줄의 `rttMs` 평균·최대 |
 
 ## Play 종료 후 포트 점유 진단 ([PortLeak])

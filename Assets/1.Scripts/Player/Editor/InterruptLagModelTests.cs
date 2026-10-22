@@ -48,55 +48,104 @@ public sealed class InterruptLagModelTests
         Assert.AreEqual(InterruptWindowState.Closed, h.StateAt(4.5));
     }
 
-    // ─── 누른 시각 기준 성공 ──────────────────────────────────────────
+    // ─── 보정 시각 기준 성공 (판정 시각 − min(지연, 상한)) ─────────────
 
     [Test]
-    public void 차이가_정확히_상한이면_true()
-    {
-        Assert.IsTrue(InterruptLagJudge.WouldSucceedAtPress(InterruptWindowState.Open, 1.0, 1.1, Cap),
-            "1.1 − 1.0 의 부동소수 오차로 떨어지면 안 된다");
-    }
-
-    [Test]
-    public void 차이가_상한을_넘으면_false()
-    {
-        Assert.IsFalse(InterruptLagJudge.WouldSucceedAtPress(InterruptWindowState.Open, 1.0, 1.1001, Cap));
-    }
-
-    [Test]
-    public void 누른_시각에_창이_닫혔거나_모르면_false()
-    {
-        Assert.IsFalse(InterruptLagJudge.WouldSucceedAtPress(InterruptWindowState.Closed, 1.0, 1.05, Cap));
-        Assert.IsFalse(InterruptLagJudge.WouldSucceedAtPress(InterruptWindowState.Unknown, 1.0, 1.05, Cap));
-    }
-
-    [Test]
-    public void 창_닫힘_직전에_누르고_직후에_판정되면_보정했으면_성공()
+    public void 호스트_지연_0이면_보정_시각은_판정_시각이라_창_상태가_실제와_같다()
     {
         var h = new InterruptWindowHistory();
         h.Record(10.0, true);
         h.Record(11.0, false);
 
-        double press = 10.95, hit = 11.02;
-        InterruptWindowState pressWindow = h.StateAt(press);
-        Assert.AreEqual(InterruptWindowState.Open, pressWindow);
-        Assert.AreEqual(InterruptWindowState.Closed, h.StateAt(hit));
+        Assert.AreEqual(0.0, InterruptLagJudge.CappedLagSeconds(10.5, 10.5, Cap));
 
-        bool would = InterruptLagJudge.WouldSucceedAtPress(pressWindow, press, hit, Cap);
-        Assert.IsTrue(would);
-        Assert.IsTrue(InterruptLagJudge.CorrectedSuccess(actualSuccess: false, would));
+        double openHit = InterruptLagJudge.CorrectedJudgeTime(10.5, 10.5, 10.7, Cap);
+        Assert.AreEqual(10.7, openHit);
+        Assert.AreEqual(InterruptWindowState.Open, h.StateAt(openHit));
+        Assert.IsTrue(InterruptLagJudge.WouldSucceed(h.StateAt(openHit)), "실제 판정 시각에 열림 → 성공과 같다");
+
+        double closedHit = InterruptLagJudge.CorrectedJudgeTime(10.9, 10.9, 11.2, Cap);
+        Assert.AreEqual(11.2, closedHit);
+        Assert.IsFalse(InterruptLagJudge.WouldSucceed(h.StateAt(closedHit)), "실제 판정 시각에 닫힘 → 실패와 같다");
     }
 
     [Test]
-    public void 창_열림_직전에_누르면_보정해도_실패()
+    public void 지연이_정확히_상한이면_상한만큼_당긴다()
+    {
+        Assert.AreEqual(Cap, InterruptLagJudge.CappedLagSeconds(1.0, 1.1, Cap), 1e-9);
+        Assert.AreEqual(1.2, InterruptLagJudge.CorrectedJudgeTime(1.0, 1.1, 1.3, Cap), 1e-9);
+    }
+
+    [Test]
+    public void 지연이_상한을_넘으면_상한으로_잘린다()
+    {
+        Assert.AreEqual(Cap, InterruptLagJudge.CappedLagSeconds(1.0, 1.5, Cap), 1e-9);
+        Assert.AreEqual(1.6, InterruptLagJudge.CorrectedJudgeTime(1.0, 1.5, 1.7, Cap), 1e-9);
+    }
+
+    [Test]
+    public void 음수_지연은_0으로_본다()
+    {
+        Assert.AreEqual(0.0, InterruptLagJudge.CappedLagSeconds(1.05, 1.0, Cap), "클라 추정 시각이 앞서도 미래로 밀지 않는다");
+        Assert.AreEqual(1.3, InterruptLagJudge.CorrectedJudgeTime(1.05, 1.0, 1.3, Cap));
+    }
+
+    [Test]
+    public void 보정_시각이_닫힘_경계_직전이면_성공_직후면_실패()
+    {
+        var h = new InterruptWindowHistory();
+        h.Record(10.0, true);
+        h.Record(11.0, false);
+
+        // 지연 60ms(상한 안) — 판정 11.05 → 보정 10.99(닫힘 직전)
+        double before = InterruptLagJudge.CorrectedJudgeTime(10.9, 10.96, 11.05, Cap);
+        Assert.AreEqual(InterruptWindowState.Closed, h.StateAt(11.05));
+        Assert.AreEqual(InterruptWindowState.Open, h.StateAt(before));
+        bool would = InterruptLagJudge.WouldSucceed(h.StateAt(before));
+        Assert.IsTrue(would);
+        Assert.IsTrue(InterruptLagJudge.CorrectedSuccess(actualSuccess: false, would));
+
+        // 같은 지연 — 판정 11.07 → 보정 11.01(닫힘 직후)
+        double after = InterruptLagJudge.CorrectedJudgeTime(10.9, 10.96, 11.07, Cap);
+        Assert.AreEqual(InterruptWindowState.Closed, h.StateAt(after));
+        Assert.IsFalse(InterruptLagJudge.WouldSucceed(h.StateAt(after)));
+    }
+
+    [Test]
+    public void 상한에_잘리면_누른_시각에_열려_있어도_보정_시각_기준이다()
+    {
+        var h = new InterruptWindowHistory();
+        h.Record(10.0, true);
+        h.Record(11.0, false);
+
+        // 지연 250ms → 100ms 로 잘림. 판정 11.12 → 보정 11.02(닫힘)
+        double corrected = InterruptLagJudge.CorrectedJudgeTime(10.7, 10.95, 11.12, Cap);
+        Assert.AreEqual(11.02, corrected, 1e-9);
+        Assert.AreEqual(InterruptWindowState.Open, h.StateAt(10.7), "누른 시각엔 열림");
+        Assert.IsFalse(InterruptLagJudge.WouldSucceed(h.StateAt(corrected)));
+    }
+
+    [Test]
+    public void 보정_시각이_열림_경계_직전이면_실패()
     {
         var h = new InterruptWindowHistory();
         h.Record(10.0, false);
         h.Record(11.0, true);
 
-        InterruptWindowState pressWindow = h.StateAt(10.999);
-        Assert.AreEqual(InterruptWindowState.Closed, pressWindow);
-        Assert.IsFalse(InterruptLagJudge.WouldSucceedAtPress(pressWindow, 10.999, 11.05, Cap));
+        // 지연 50ms — 판정 11.03(열림) → 보정 10.98(열림 직전)
+        double corrected = InterruptLagJudge.CorrectedJudgeTime(10.95, 11.0, 11.03, Cap);
+        Assert.AreEqual(InterruptWindowState.Open, h.StateAt(11.03));
+        Assert.AreEqual(InterruptWindowState.Closed, h.StateAt(corrected));
+        Assert.IsFalse(InterruptLagJudge.WouldSucceed(h.StateAt(corrected)));
+    }
+
+    [Test]
+    public void 창_기록이_없으면_보정했으면_성공도_false()
+    {
+        var h = new InterruptWindowHistory();
+        double corrected = InterruptLagJudge.CorrectedJudgeTime(1.0, 1.05, 1.2, Cap);
+        Assert.AreEqual(InterruptWindowState.Unknown, h.StateAt(corrected));
+        Assert.IsFalse(InterruptLagJudge.WouldSucceed(InterruptWindowState.Unknown));
     }
 
     // ─── 요약 집계 ────────────────────────────────────────────────────
@@ -149,7 +198,8 @@ public sealed class InterruptLagModelTests
         StringAssert.StartsWith("[InterruptLag] event=judge clientId=1 host=false", line);
         StringAssert.Contains("target=Gauntlet_Bot", line);
         StringAssert.Contains("pressT=10.000 arriveT=10.040 hitT=10.090 lagMs=40.0 hitAfterPressMs=90.0 rttMs=80", line);
-        StringAssert.Contains("pressWindow=open hitWindow=closed result=fail wouldSucceed=true capMs=100", line);
+        StringAssert.Contains(
+            "pressWindow=open hitWindow=closed correctedWindow=open result=fail wouldSucceed=true capMs=100", line);
         foreach (string token in line.Substring("[InterruptLag] ".Length).Split(' '))
             Assert.AreEqual(1, token.Split('=').Length - 1, token);
     }
@@ -167,6 +217,7 @@ public sealed class InterruptLagModelTests
             RttMs = rtt,
             PressWindow = InterruptWindowState.Open,
             HitWindow = InterruptWindowState.Closed,
+            CorrectedWindow = InterruptWindowState.Open,
             Success = success,
             WouldSucceed = would,
             CapMs = 100f,

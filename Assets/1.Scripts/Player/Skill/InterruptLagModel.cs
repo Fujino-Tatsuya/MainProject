@@ -71,28 +71,35 @@ public sealed class InterruptWindowHistory
     }
 }
 
-/// <summary>간파 지연 판정 계산. 순수 함수 — 실제 판정 결과는 바꾸지 않고 "누른 시각 기준이면" 만 계산한다.</summary>
+/// <summary>간파 지연 판정 계산. 순수 함수 — 실제 판정 결과는 바꾸지 않고 "지연만큼 당겨 판정했으면" 만 계산한다.</summary>
 public static class InterruptLagJudge
 {
-    // 서버 시각 double 뺄셈 오차(예: 1.1 - 1.0 = 0.10000000000000009)로 정확히 상한인 차이가 떨어지지 않게.
-    private const double Epsilon = 1e-6;
-
     public const float DefaultCapMs = 100f;
 
-    /// <summary>
-    /// 누른 시각 기준이면 성공했을까. 누른 시각에 창이 열려 있었고, 판정 시각 − 누른 시각 ≤ 상한일 때만 true.
-    /// 사거리·명중은 여기서 보지 않는다(서버 현재 기준 — 호출측이 대상이 맞았을 때만 부른다).
-    /// </summary>
-    public static bool WouldSucceedAtPress(
-        InterruptWindowState pressWindow, double pressServerTime, double hitServerTime, double capSeconds)
+    /// <summary>상한 적용 지연(초) = min(도착 시각 − 누른 시각, 상한). 음수 지연(클라 시계가 앞섬)은 0.</summary>
+    public static double CappedLagSeconds(double pressServerTime, double arriveServerTime, double capSeconds)
     {
-        return pressWindow == InterruptWindowState.Open &&
-               hitServerTime - pressServerTime <= capSeconds + Epsilon;
+        double lag = arriveServerTime - pressServerTime;
+        if (lag <= 0d)
+            return 0d;
+        return Math.Min(lag, Math.Max(0d, capSeconds));
     }
 
-    /// <summary>보정했으면 성공 = 실제 성공 ∨ 누른 시각 기준 성공.</summary>
-    public static bool CorrectedSuccess(bool actualSuccess, bool wouldSucceedAtPress) =>
-        actualSuccess || wouldSucceedAtPress;
+    /// <summary>보정 판정 시각 = 판정 시각 − 상한 적용 지연. 이 시각의 창 상태가 보정했으면의 결과다.</summary>
+    public static double CorrectedJudgeTime(
+        double pressServerTime, double arriveServerTime, double hitServerTime, double capSeconds) =>
+        hitServerTime - CappedLagSeconds(pressServerTime, arriveServerTime, capSeconds);
+
+    /// <summary>
+    /// 보정했으면 성공했을까 = 보정 판정 시각에 창이 열려 있었는가. 기록이 없으면(Unknown) false.
+    /// 사거리·명중은 여기서 보지 않는다(서버 현재 기준 — 호출측이 대상이 맞았을 때만 부른다).
+    /// </summary>
+    public static bool WouldSucceed(InterruptWindowState correctedWindow) =>
+        correctedWindow == InterruptWindowState.Open;
+
+    /// <summary>보정했으면 성공 = 실제 성공 ∨ 보정 시각 기준 성공.</summary>
+    public static bool CorrectedSuccess(bool actualSuccess, bool wouldSucceed) =>
+        actualSuccess || wouldSucceed;
 
     public static string Format(InterruptWindowState state)
     {
@@ -118,6 +125,7 @@ public struct InterruptLagSample
     public double RttMs;
     public InterruptWindowState PressWindow;
     public InterruptWindowState HitWindow;
+    public InterruptWindowState CorrectedWindow;
     public bool Success;
     public bool WouldSucceed;
     public float CapMs;
@@ -141,6 +149,7 @@ public struct InterruptLagSample
         InterruptLagFormat.Append(sb, "rttMs", RttMs, "0");
         InterruptLagFormat.Append(sb, "pressWindow", InterruptLagJudge.Format(PressWindow));
         InterruptLagFormat.Append(sb, "hitWindow", InterruptLagJudge.Format(HitWindow));
+        InterruptLagFormat.Append(sb, "correctedWindow", InterruptLagJudge.Format(CorrectedWindow));
         InterruptLagFormat.Append(sb, "result", Success ? "success" : "fail");
         InterruptLagFormat.Append(sb, "wouldSucceed", WouldSucceed);
         InterruptLagFormat.Append(sb, "capMs", CapMs, "0");
@@ -157,7 +166,7 @@ public sealed class InterruptLagSummary
         public int WithTarget;
         public int Success;
         public int CorrectedSuccess;
-        public int Rescued;           // 보정했으면 성공 ∧ 실제 실패
+        public int Rescued;           // 실제 실패 ∧ 보정했으면 성공(wouldSucceed)
         public double RttSumMs;
         public double RttMaxMs;
 
@@ -170,10 +179,9 @@ public sealed class InterruptLagSummary
                 WithTarget++;
             if (sample.Success)
                 Success++;
-            bool corrected = InterruptLagJudge.CorrectedSuccess(sample.Success, sample.WouldSucceed);
-            if (corrected)
+            if (InterruptLagJudge.CorrectedSuccess(sample.Success, sample.WouldSucceed))
                 CorrectedSuccess++;
-            if (corrected && !sample.Success)
+            if (!sample.Success && sample.WouldSucceed)
                 Rescued++;
             RttSumMs += sample.RttMs;
             RttMaxMs = Math.Max(RttMaxMs, sample.RttMs);
