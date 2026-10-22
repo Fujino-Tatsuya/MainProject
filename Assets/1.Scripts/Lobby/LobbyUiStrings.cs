@@ -15,10 +15,13 @@ public static class LobbyUiStrings
     public static readonly UiString ReadyCount = new UiString("UI.Lobby.ReadyCount", "준비 {ready}/{total}", Where + " › 준비 오브젝트 머리 위({ready} = 준비한 사람, {total} = 접속자)");
     public static readonly UiString Countdown = new UiString("UI.Lobby.Countdown", "{time} 후 출발", Where + " › Slot_Countdown({time} = UI.Unit.Seconds 로 만든 남은 초, 올림 정수)");
     public static readonly UiString CountdownStarting = new UiString("UI.Lobby.CountdownStarting", "출발!", Where + " › Slot_Countdown — 0초(시작 래치 뒤 로딩 전까지)");
+    public static readonly UiString GatherCount = new UiString("UI.Lobby.GatherCount", "집결 {gathered}/{total}", Where + " › 집결 구역 표시({gathered} = 구역 안 + 쓰러짐·사망 아님, {total} = 참여자, 할 일 86)");
+    public static readonly UiString GatherCountdown = new UiString("UI.Lobby.GatherCountdown", "{time} 후 이동", Where + " › 집결 카운트다운({time} = UI.Unit.Seconds 로 만든 남은 초, 올림 정수, 할 일 86)");
 
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         InteractReady, InteractUnready, InteractCharacterSelect, ReadyCount, Countdown, CountdownStarting,
+        GatherCount, GatherCountdown,
     };
 
     /// <summary>"준비 n/m".</summary>
@@ -36,5 +39,18 @@ public static class LobbyUiStrings
         return seconds > 0
             ? Countdown.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(seconds, "0") })
             : CountdownStarting.Text;
+    }
+
+    /// <summary>"집결 n/m".</summary>
+    public static string FormatGatherCount(int gathered, int total) =>
+        GatherCount.Format(new Dictionary<string, string> { ["gathered"] = gathered.ToString(), ["total"] = total.ToString() });
+
+    /// <summary>집결 카운트다운 문구. 0초면 빈 문자열(확정 순간 구역 표시가 꺼진다).</summary>
+    public static string FormatGatherCountdown(double remainingSeconds)
+    {
+        var seconds = CountdownDisplaySeconds(remainingSeconds);
+        return seconds > 0
+            ? GatherCountdown.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(seconds, "0") })
+            : string.Empty;
     }
 }
