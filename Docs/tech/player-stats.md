@@ -58,13 +58,18 @@
 | 어쌔신 평타(`AssassinBasicAttack`) | 공격 중 `Animator.speed` = 배율 | 클립 이벤트. 종료 안전망 = 클립 길이(감속이면 ÷ 배율), 강타 전진 시간 ÷ 배율 |
 | 거너 평타(`GunnerBasicAttack`) | 데이터 시간(준비·발사 간격·후속 동작·입력 창·발 잠금) ÷ 배율 + 공격 중 `Animator.speed` = 배율 | 데이터 시간 값. `FireSpeed` 는 배율 전 간격 기준(두 번 곱하지 않음) |
 | 공속을 타는 스킬 | 실행 중 `Animator.speed` = 배율(`PlayerSkillController`) | 클립 이벤트. 임시 안전망 `maxActiveDuration`(감속이면 ÷ 배율), 클립 안전망은 `Animator.speed` 포함(`PlayerSkillSafetyNet.Probe`) |
+| 가붕이 E(`FirstMeleeSubSkill`) | `Animator.speed` 아님 — 준비·해제·반격 상태의 속도 파라미터 `AttackSpeedRate` = 배율. **방어중(`SubSkillGuardIdle`) 제외** | 클립 이벤트. 방어중 길이는 공속과 무관. 안전망 `maxActiveDuration`(감속이면 ÷ 배율) — [suppress-haste.md](suppress-haste.md) §3 |
 
 - 시작 때 한 번 정하는 서버 시간 안전망은 `SafetyNetDuration` — **감속이면 늘리고 가속이면 줄이지 않는다.** 배율은 도중에 바뀌므로(가속 버프가 스킬 중간에 끝남)
   줄여 두면 느려진 나머지 재생보다 먼저 끊는다. 가속 중 정상 종료는 클립 이벤트가 먼저 낸다. 가붕이 콤보는 타마다 파라미터를 한 번 정해 그 타 안에서는 안 바뀌므로 재생 시간 그대로다.
 
 - `Animator.speed` 쓰기는 `PlayerAttackSpeedAnimator` 한 곳뿐이다(`Player.Awake` 가 붙인다). 창구 `IPlayerAttackSpeedAnimatorUser` 중 하나라도 참이면 배율, 아니면 1.
-- 스킬이 타는지 = `PlayerSkillBase.ScalesWithAttackSpeed`(virtual) — 기본 이벤트 방식(`EndsOnClipEvent`). 가붕이 E 는 클립 이벤트로만 돌아 참으로, 어쌔신 Q 돌진은 거짓으로 덮는다.
-  - 탄다: 가붕이 E·R·우클릭 간파, 거너 우클릭 간파, 어쌔신 E(원형 베기·강화)·R 변신·우클릭 간파.
+  같은 컴포넌트가 상태 속도 파라미터 `AttackSpeedRate`(float, 기본 1)도 전 피어에서 항상 배율로 쓴다 — 파라미터가 없는 컨트롤러(거너·어쌔신)는 건너뛴다.
+  일부 상태만 공속을 타야 하는 동작은 그 상태의 Speed Multiplier 를 이 파라미터로 켠다(지금은 가붕이 E 준비·해제·반격뿐).
+- 스킬이 `Animator.speed` 로 타는지 = `PlayerSkillBase.ScalesWithAttackSpeed`(virtual) — 기본 이벤트 방식(`EndsOnClipEvent`). 어쌔신 Q 돌진은 거짓으로 덮는다.
+  가붕이 E 는 거짓 — 상태 파라미터로 준비·해제·반격만 탄다(할 일 91 A5). 임시 안전망을 배율로 늘리는지는 `ScalesSafetyNetWithAttackSpeed`(기본 = `ScalesWithAttackSpeed`, 가붕이 E 는 참).
+  - `Animator.speed` 로 탄다: 가붕이 R·우클릭 간파, 거너 우클릭 간파, 어쌔신 E(원형 베기·강화)·R 변신·우클릭 간파.
+  - 상태 파라미터로 탄다: 가붕이 E 준비·해제·반격(방어중 제외).
 - **타지 않는 것(고정 타이밍):** 대시 지속, 타이머 방식 스킬(가붕이 Q 홀드, 거너 Q 충전·E 백스텝·R 추적 레이저), 채널링·홀드 틱 간격,
   어쌔신 Q 돌진, 스킬 안의 보호·연출 지속(`maxActiveDuration` 로 거는 슈퍼아머·무적·어쌔신 원형 베기 연출 — 무적·슈퍼아머는 스킬 종료 때 걷힌다).
 - 전진 거리는 배율과 무관하게 같다 — 거리 ÷ 실제 재생 시간으로 속도만 바뀐다(가붕이 ScriptedForwardDistance·루트모션, 어쌔신 강타 전진).

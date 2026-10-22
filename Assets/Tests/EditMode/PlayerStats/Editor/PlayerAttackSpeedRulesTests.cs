@@ -79,7 +79,8 @@ public sealed class PlayerAttackSpeedRulesTests
     // ── 스킬별 적용/제외 (PlayerSkillBase.ScalesWithAttackSpeed) ──
 
     [Test] public void Paladin_Q_Hold_Excluded() => AssertScales<FirstMeleeMainSkill>(false);
-    [Test] public void Paladin_E_ClipDriven_Scales() => AssertScales<FirstMeleeSubSkill>(true);
+    // 팔라딘 E 는 Animator.speed 가 아니라 상태 파라미터로 준비·해제·반격만 탄다(할 일 91 A5, FirstMeleeGuardAttackSpeedTests).
+    [Test] public void Paladin_E_StateParameter_NotAnimatorSpeed() => AssertScales<FirstMeleeSubSkill>(false);
     [Test] public void Paladin_R_Scales() => AssertScales<FirstMeleeUltimateSkill>(true);
     [Test] public void Paladin_Interrupt_Scales() => AssertScales<FirstMeleeInterruptSkill>(true);
     [Test] public void Gunner_Q_Charge_Excluded() => AssertScales<GunnerChargeLaserSkill>(false);

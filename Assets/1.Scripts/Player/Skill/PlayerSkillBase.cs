@@ -122,8 +122,15 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     /// 타이머 방식(가붕이 Q 홀드, 거너 Q 충전·E·R)은 판정·종료가 코드 시간이라 애니만 빨라지면 어긋나므로 타지 않는다.
     /// 예외는 스킬이 덮는다 — 클립 이벤트로만 도는데 End 를 선언하지 않은 스킬(가붕이 E)은 참, 이벤트 방식이어도
     /// 고정 속도·거리 이동이 동작을 정하는 스킬(어쌔신 Q 돌진)은 거짓.
+    /// 상태별로 나눠 타는 스킬(팔라딘 E — 방어중만 제외)은 거짓으로 두고 애니메이터 상태 속도 파라미터(AttackSpeedRate)로 탄다.
     /// </summary>
     public virtual bool ScalesWithAttackSpeed => EndsOnClipEvent;
+
+    /// <summary>
+    /// 서버 타이머 안전망(maxActiveDuration)을 공격속도로 늘리는가(<see cref="PlayerAttackSpeedRules.SafetyNetDuration"/>, 감속만).
+    /// 기본 = <see cref="ScalesWithAttackSpeed"/>. 상태 파라미터로 일부 상태만 타는 스킬(팔라딘 E)이 따로 켠다.
+    /// </summary>
+    public virtual bool ScalesSafetyNetWithAttackSpeed => ScalesWithAttackSpeed;
 
     // 시작 상태 말고 다른 상태(코드 상수로 CrossFade 하는 상태 등)에도 요구가 있는 스킬은 base 를 부른 뒤 덧붙인다(팔라딘 E 반격 상태).
     public virtual void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)

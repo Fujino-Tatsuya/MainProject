@@ -604,7 +604,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 타이머 방식 안전망. 이벤트 방식은 상태에 들어간 뒤 클립 길이로 바꾼다(ResolveClipFallback) — 그 전까지 이 값이 임시 그물이다.
         // 공격속도를 타는 스킬은 이 그물도 배율로 나눈다 — 감속만 늘리고 가속은 줄이지 않는다(할 일 91 T5, SafetyNetDuration).
         // 클립 길이 그물은 Animator.speed 를 이미 포함한다(Probe).
-        float maxActive = skill.ScalesWithAttackSpeed
+        float maxActive = skill.ScalesSafetyNetWithAttackSpeed
             ? PlayerAttackSpeedRules.SafetyNetDuration(skill.Data.MaxActiveDuration, player.AttackSpeedRate)
             : skill.Data.MaxActiveDuration;
         activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(maxActive, endFallbackPadding);

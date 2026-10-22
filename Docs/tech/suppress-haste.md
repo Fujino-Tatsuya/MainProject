@@ -46,3 +46,29 @@
 1. 가장자리만 불투명한 스프라이트(Texture Type = Sprite, Clamp 권장)를 `Assets/2.Prefabs/UI/Textures/` 또는 아트 경로에 둔다.
 2. `SuppressHasteVignette.prefab` 의 `vignetteSprite` 에 넣는다. 컬러 이미지면 `vignetteColor` 를 흰색으로 둔다.
 3. 임시 PNG 는 참조가 없어진 뒤 지워도 된다.
+
+## 3. 팔라딘 E — 공속 적용 범위 (할 일 91 A5, 2026-10-22 사용자 결정)
+
+A2(T5) 에서는 E 전체가 `Animator.speed` 로 공속을 타 **방어 창도 짧아졌다**. E 를 네 상태로 나누고 방어중만 공속에서 뺀다.
+
+| 상태(`GarenAnimatorController`) | 클립 | 상태 Speed | 공속 | 이벤트 |
+|---|---|---|---|---|
+| 준비 `SubSkillGuard` | `Garen_E_GuardStart` 1.0s | 2 × `AttackSpeedRate` | ✅ | `Custom0` = 방어 창 열림 |
+| 방어중 `SubSkillGuardIdle` | `Garen_E_GuardIdle` 3.5s 루프 | 1 | ❌ | 없음. 길이 = 해제로 가는 전이 exitTime(0.143 ≈ 0.5s) |
+| 해제 `SubSkillGuardEnd` | `Garen_E_GuardEnd` 1.0s | 2 × `AttackSpeedRate` | ✅ | `Custom1` = 창 닫힘(E 계속) · `End` = E 종료 |
+| 반격 `SubSkillCounter` | `Garen_E_GuardCounter` 1.167s | 1 × `AttackSpeedRate` | ✅ | `Hit` 반격 판정 · `End` 종료(기존 그대로) |
+
+- 준비 → 방어중(exitTime 1 · 0.1s), 방어중 → 해제(exitTime 0.143 · 0.1s) 전환은 **초 단위 고정**이라 공속과 무관하다. 방어 창 실제 길이 ≈ 준비 클립 `Custom0` 이후 + 방어중 + 해제 클립 `Custom1` 이전.
+- 파라미터 `AttackSpeedRate`(기본 1)는 `PlayerAttackSpeedAnimator` 가 전 피어에서 `Player.AttackSpeedRate` 로 쓴다 — 호스트·클라 같은 값. 팔라딘 E 는 `Animator.speed` 배율 대상이 아니다(`ScalesWithAttackSpeed = false`). 상세: [player-stats.md](player-stats.md) §3.1.
+- 모델(`FirstMeleeGuardCounterModel`): Guarding →(`Custom1`) **Releasing** →(해제 클립 `End`) Finished. 방어 성공이면 Countering →(반격 클립 `End`) Finished. 단계가 안 맞는 이벤트(반격으로 CrossFade 중 늦게 온 해제 클립 `Custom1`, Guarding 중 `End`)는 무시한다.
+- 서버 임시 안전망 = `maxActiveDuration`(1.5) ÷ min(1, 배율) + padding(`ScalesSafetyNetWithAttackSpeed = true`) — 감속만 늘리고 가속엔 줄이지 않는다.
+  방어중 길이는 애니메이터 전이에만 있어 런타임에 따로 뺄 수 없으므로 **전체**를 늘린다(정밀 분할보다 길 뿐 먼저 끊지 않는다). SO 필드는 늘리지 않았다.
+
+### 3.1 이벤트 위치 — 🟨 사용자 튜닝 대상 임시값
+| 클립 | 이벤트 | 클립 시각 | 실제 시각(배율 1, Speed 2) |
+|---|---|---|---|
+| `Garen_E_GuardStart` | `Custom0` 창 열림 | **0.9** (이전 0) | 0.45s — 준비 모션 동안은 비방어 |
+| `Garen_E_GuardEnd` | `Custom1` 창 닫힘 | **0.1** (이전 0.933) | 해제 시작 0.05s |
+| `Garen_E_GuardEnd` | `End` E 종료(신규) | **0.967** | 0.483s — 해제 모션 끝까지 재생 후 종료 |
+
+- 튜닝은 Animation 창에서 이벤트를 옮기면 된다(코드·SO 변경 없음). EditMode `FirstMeleeGuardAttackSpeedTests` 는 값이 아니라 순서(`Custom1` < `End` < 클립 길이, `Custom0` < 준비 클립 길이)만 지킨다.

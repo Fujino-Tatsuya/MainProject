@@ -2,7 +2,7 @@ using NUnit.Framework;
 using UnityEngine;
 
 // PLAN-paladin-counter-e C3 · PLAN-anim-event-timing P1-③ — 팔라딘 E 단계 상태기계(애니메이션 이벤트 구동):
-// 방어 대기(Custom0 창 열림 ~ Custom1 닫힘) → 첫 성공 → 반격(Hit 판정 · End 종료, 무시·넉백 무시) → 종료.
+// 방어 대기(Custom0 창 열림 ~ Custom1 닫힘) → 해제(해제 클립 End 종료), 또는 첫 성공 → 반격(Hit 판정 · End 종료, 무시·넉백 무시) → 종료.
 public sealed class FirstMeleeGuardCounterModelTests
 {
     const float GuardAngle = 180f;    // guardAngle 기본값 — 좌우 90°
@@ -125,27 +125,59 @@ public sealed class FirstMeleeGuardCounterModelTests
         model.OnGuardWindowClosed();
         Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
         Assert.That(model.HasPendingCounter, Is.False);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing), "해제 중 피격은 반격으로 넘어가지 않는다");
     }
 
     [Test]
-    public void GuardWindowClosed_EndedGuardExpired_NoCounter()
+    public void GuardWindowClosed_OnlyClosesWindow_Releasing()
+    {
+        // 할 일 91 A5 — Custom1 은 창만 닫는다. E 는 해제 모션 끝(End)까지 이어진다.
+        var model = Begun();
+        model.OnGuardWindowClosed();
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.IsGuardWindowOpen, Is.False);
+        Assert.That(model.HasPendingCounter, Is.False);
+        Assert.That(model.BlocksKnockback, Is.False);
+
+        // 두 번째 Custom1·늦은 Custom0 은 무시 — 창이 다시 열리지 않는다.
+        model.OnGuardWindowClosed();
+        model.OnGuardWindowOpened();
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
+    }
+
+    [Test]
+    public void ReleaseEnd_EndedGuardExpired_NoCounter()
     {
         var model = Begun();
-        GuardEventResult closed = model.OnGuardWindowClosed();
-        Assert.That(closed.Ended, Is.EqualTo(GuardEndReason.GuardExpired));
-        Assert.That(closed.CounterHitDue, Is.False);
+        model.OnGuardWindowClosed();
+
+        GuardEventResult end = model.OnEnd();
+        Assert.That(end.Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+        Assert.That(end.CounterHitDue, Is.False);
         Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Finished));
 
-        // 두 번째 Custom1 은 무시.
-        Assert.That(model.OnGuardWindowClosed().HasEnded, Is.False);
+        // 두 번째 End 는 무시.
+        Assert.That(model.OnEnd().HasEnded, Is.False);
     }
 
     [Test]
-    public void GuardWindowClosed_WithoutOpen_StillExpires()
+    public void EndWhileGuarding_Ignored()
     {
-        // Custom0 이 빠진 클립이어도 Custom1 이 E 를 끝낸다(막지는 못한 채).
+        // Custom1 없이 온 End 는 단계가 안 맞아 무시한다(기존 규칙) — 안전망이 끝낸다.
+        var model = Begun();
+        Assert.That(model.OnEnd().HasEnded, Is.False);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
+        Assert.That(model.IsGuardWindowOpen, Is.True);
+    }
+
+    [Test]
+    public void GuardWindowClosed_WithoutOpen_StillReleasesAndEnds()
+    {
+        // Custom0 이 빠진 클립이어도 Custom1 → End 로 E 가 끝난다(막지는 못한 채).
         var model = BegunClosed();
-        Assert.That(model.OnGuardWindowClosed().Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+        model.OnGuardWindowClosed();
+        Assert.That(model.OnEnd().Ended, Is.EqualTo(GuardEndReason.GuardExpired));
     }
 
     // ── 반격 중 ──
@@ -187,7 +219,7 @@ public sealed class FirstMeleeGuardCounterModelTests
     {
         // 무시는 End 이벤트까지 — 그 뒤 피격은 정상 적용.
         var model = Countering();
-        model.OnCounterEnd();
+        model.OnEnd();
         Assert.That(model.Evaluate(Hit(Back)), Is.EqualTo(GuardVerdict.Pass));
         Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
     }
@@ -195,11 +227,9 @@ public sealed class FirstMeleeGuardCounterModelTests
     [Test]
     public void Countering_LateGuardWindowClosed_Ignored()
     {
-        // 반격 상태로 CrossFade 하는 동안 방어 클립의 Custom1 이 뒤늦게 와도 E 가 끝나지 않는다.
+        // 반격 상태로 CrossFade 하는 동안 해제 클립의 Custom1 이 뒤늦게 와도 반격 단계가 유지된다.
         var model = Countering();
-        GuardEventResult late = model.OnGuardWindowClosed();
-        Assert.That(late.HasEnded, Is.False);
-        Assert.That(late.CounterHitDue, Is.False);
+        model.OnGuardWindowClosed();
         Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
         Assert.That(model.BlocksKnockback, Is.True);
         Assert.That(model.HasPendingCounter, Is.True);
@@ -219,16 +249,21 @@ public sealed class FirstMeleeGuardCounterModelTests
     [Test]
     public void GuardingOrIdle_CounterEvents_Ignored()
     {
-        // Hit·End 는 Countering 이 아니면 아무 일도 하지 않는다(방어 실패 중 반격 클립 이벤트가 새어 와도).
+        // Hit 은 Countering 이 아니면, End 는 Releasing·Countering 이 아니면 아무 일도 하지 않는다.
         var model = Begun();
         Assert.That(model.OnCounterHit(), Is.False);
-        Assert.That(model.OnCounterEnd().HasEnded, Is.False);
+        Assert.That(model.OnEnd().HasEnded, Is.False);
         Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
+
+        // 해제 중 반격 Hit 은 무시(반격으로 넘어가지 않았다).
+        model.OnGuardWindowClosed();
+        Assert.That(model.OnCounterHit(), Is.False);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
 
         var idle = new FirstMeleeGuardCounterModel();
         Assert.That(idle.OnCounterHit(), Is.False);
-        Assert.That(idle.OnCounterEnd().HasEnded, Is.False);
-        Assert.That(idle.OnGuardWindowClosed().HasEnded, Is.False);
+        Assert.That(idle.OnEnd().HasEnded, Is.False);
+        idle.OnGuardWindowClosed();
         Assert.That(idle.Phase, Is.EqualTo(FirstMeleeGuardPhase.Idle));
     }
 
@@ -254,10 +289,10 @@ public sealed class FirstMeleeGuardCounterModelTests
         if (model.OnCounterHit()) { fired++; model.MarkCounterFired(); }
         if (model.OnCounterHit()) { fired++; model.MarkCounterFired(); }
 
-        GuardEventResult end1 = model.OnCounterEnd();
+        GuardEventResult end1 = model.OnEnd();
         if (end1.CounterHitDue) fired++;
         if (model.OnCounterHit()) fired++;
-        GuardEventResult end2 = model.OnCounterEnd();
+        GuardEventResult end2 = model.OnEnd();
 
         Assert.That(fired, Is.EqualTo(1));
         Assert.That(end1.Ended, Is.EqualTo(GuardEndReason.CounterFinished));
@@ -271,7 +306,7 @@ public sealed class FirstMeleeGuardCounterModelTests
         Assert.That(model.OnCounterHit(), Is.True);
         model.MarkCounterFired();
 
-        GuardEventResult end = model.OnCounterEnd();
+        GuardEventResult end = model.OnEnd();
         Assert.That(end.Ended, Is.EqualTo(GuardEndReason.CounterFinished));
         Assert.That(end.CounterHitDue, Is.False);
         Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Finished));
@@ -282,7 +317,7 @@ public sealed class FirstMeleeGuardCounterModelTests
     {
         // 클립에서 Hit 이 빠졌거나 End 와 같은 시점(같은 프레임에 End 가 먼저) — 반격과 종료가 같이 온다.
         var model = Countering();
-        GuardEventResult r = model.OnCounterEnd();
+        GuardEventResult r = model.OnEnd();
         Assert.That(r.CounterHitDue, Is.True);
         Assert.That(r.Ended, Is.EqualTo(GuardEndReason.CounterFinished));
         Assert.That(model.HasPendingCounter, Is.True); // 호출측이 반격을 먼저 실행해야 한다
@@ -299,7 +334,7 @@ public sealed class FirstMeleeGuardCounterModelTests
         var model = Countering();
         Assert.That(model.OnCounterHit(), Is.True);
         model.MarkCounterFired();
-        GuardEventResult end = model.OnCounterEnd();
+        GuardEventResult end = model.OnEnd();
         Assert.That(end.CounterHitDue, Is.False);
         Assert.That(end.Ended, Is.EqualTo(GuardEndReason.CounterFinished));
         Assert.That(model.HasPendingCounter, Is.False);
@@ -324,7 +359,8 @@ public sealed class FirstMeleeGuardCounterModelTests
     public void HasPendingCounter_FalseWhenGuardExpired()
     {
         var model = Begun();
-        Assert.That(model.OnGuardWindowClosed().Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+        model.OnGuardWindowClosed();
+        Assert.That(model.OnEnd().Ended, Is.EqualTo(GuardEndReason.GuardExpired));
         Assert.That(model.HasPendingCounter, Is.False);
     }
 
@@ -347,7 +383,7 @@ public sealed class FirstMeleeGuardCounterModelTests
     public void BlocksKnockback_FalseAfterCounterEnd()
     {
         var model = Countering();
-        model.OnCounterEnd();
+        model.OnEnd();
         Assert.That(model.BlocksKnockback, Is.False);
     }
 
@@ -357,7 +393,7 @@ public sealed class FirstMeleeGuardCounterModelTests
     public void Finished_AllPass()
     {
         var model = Countering();
-        model.OnCounterEnd();
+        model.OnEnd();
         Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Finished));
 
         Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
@@ -365,8 +401,9 @@ public sealed class FirstMeleeGuardCounterModelTests
         Assert.That(model.BlocksKnockback, Is.False);
         model.OnGuardWindowOpened();
         Assert.That(model.IsGuardWindowOpen, Is.False);
-        Assert.That(model.OnGuardWindowClosed().HasEnded, Is.False);
-        Assert.That(model.OnCounterEnd().HasEnded, Is.False);
+        model.OnGuardWindowClosed();
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Finished));
+        Assert.That(model.OnEnd().HasEnded, Is.False);
     }
 
     [Test]
@@ -383,6 +420,6 @@ public sealed class FirstMeleeGuardCounterModelTests
         model.OnGuardWindowOpened();
         Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass)); // Idle 에서 Custom0 은 창을 열지 않는다
         Assert.That(model.OnCounterHit(), Is.False);
-        Assert.That(model.OnCounterEnd().HasEnded, Is.False);
+        Assert.That(model.OnEnd().HasEnded, Is.False);
     }
 }
