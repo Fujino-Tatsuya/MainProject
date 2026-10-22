@@ -13,7 +13,7 @@
 > Scene flow details: [SceneFlow.md](../design/SceneFlow.md#-target-flow--lobby-demo-2026-10-19-implementation-in-progress).
 
 ### Flow
-- `Bootstrap → 3.LobbyScene → 4.MapScene → 3.LobbyScene → …` with the session kept alive. No `Shutdown` per game. Title is skipped.
+- `Bootstrap → 1.TitleScene (START) → 6.DemoConnectScene → 3.LobbyScene → 4.MapScene → 3.LobbyScene → …` with the session kept alive. No `Shutdown` per game. Host and client both pass the title once at boot (task 70, 2026-10-21); returning to the lobby and reconnect waits never go back to the title.
 - `3.LobbyScene` is a walkable **NGO scene**. `5.ResultScene` is removed; results open as a lobby result panel only after returning from 4.MapScene.
 - All transitions are host-driven `NetworkManager.SceneManager.LoadScene`. Clients never load gameplay scenes locally.
 - Map → Lobby: `GoToResult` captures and broadcasts the result payload → `DespawnDynamicNetworkObjects()` (log remaining count) → `LoadScene("3.LobbyScene", Single)`.
@@ -21,7 +21,7 @@
 
 ### Connection config (`demo-connection.json`)
 - Location: `Path.GetDirectoryName(Application.dataPath)/demo-connection.json` — next to the exe in builds, project root in the Editor.
-- Fields: `role` (`host` / `client`), `hostAddress`, `port`, `playerId` (stable player ID), retry interval / connect timeout / disconnect timeout seconds.
+- Fields: `role` (`auto` — default when empty/missing — / `host` / `client`; auto = host if one of this PC's IPv4 equals `hostAddress` or it is loopback/empty, else client to `hostAddress`; explicit host/client wins, MPPM `Client` tag still overrides — 할 일 72), `hostAddress`, `port`, `playerId` (stable player ID), retry interval / connect timeout / disconnect timeout seconds.
 - Missing file → `host` · `127.0.0.1` · `7777`, and a 3-second notice "설정 파일 없음 — 호스트 모드".
 - The Host starts hosting on boot; Clients connect automatically. No connection buttons.
 - Clients run an **auto-connect / auto-reconnect loop**. While waiting or after a drop they sit in the local scene `6.DemoConnectScene` with the "호스트 대기 중" overlay.
@@ -58,7 +58,7 @@
 - ✅ Implemented in C8 by `LobbySession` (server-written `NetworkList` + countdown `NetworkVariable`, `ToggleReadyServerRpc`/`RequestCharacterServerRpc`) and the pure `LobbyReadyRules`. The old `Lobby.ReadyRequest`/`Lobby.CharacterRequest`/`Lobby.State` named messages are gone. Details: [SceneFlow.md](../design/SceneFlow.md#lobby-rules-target).
 
 ## 연결 흐름 (old / current code)
-> Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is skipped and Result is a lobby panel.
+> Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is shown once at boot (START starts host/auto-join) and Result is a lobby panel.
 
 1. **Title / Lobby / Loading / InGame / Result**
 2. If the Host leaves during InGame, the session ends. The remaining players transition to the Result Scene locally.
@@ -181,7 +181,7 @@
   - Gameplay that reads `GameNow` or scaled `Time.deltaTime` slows together: cooldowns, status effects, the boss time limit (`BossTimerManager`), combat VFX/animation, and combat HUD effects.
   - Clients receive the start event one-way-latency late. `GameNow` is clamped so it never runs backward, so client display may differ from the server briefly. This is accepted.
   - Cutscene locks and scene transitions refuse slow motion or reset it to 1.0 immediately. Session end restores `Time.timeScale` = 1.
-  - Details, values, and the commit plan are in [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md). Tuning values are in the `SlowMotion` sheet of the data table ([data-table.md](data-table.md)).
+  - Details, values, and the commit plan are in [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md). Tuning values are in the `SlowMotion` sheet of the data table ([data-table.md](data-table.md)).
 - NetworkManager time, transport timeouts, connection state, menu UI input, option panel UI, loading spinners, and other non-gameplay UI continue using real time. They are unaffected by both pause and slow motion (use `Time.unscaledDeltaTime` / `ServerTime`).
 - The project does not use a generic individual timer pause system.
 - Special mechanics that stop their own countdown, such as bomb fuse timing while flying, are handled as object-specific state rules instead of generic timer pause.

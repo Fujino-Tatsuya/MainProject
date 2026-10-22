@@ -6,8 +6,9 @@ using UnityEngine;
 /// E 수호자의 의지 — 전방 방어 대기 → 첫 방어 성공 시 그 피해 흡수 + 반격 단계(피해·넉백 무시) → 종료.
 /// 단계는 <see cref="FirstMeleeGuardCounterModel"/>, 방향 판정은 <see cref="FirstMeleeGuardRules"/> 가 맡고
 /// 이 클래스는 서버 배선만 한다. 피격 가로채기는 <see cref="Player"/>.ReceiveAttack 맨 위의 <see cref="IPlayerIncomingAttackGuard"/> 훅.
-/// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 방어 클립(SubSkillGuard) Custom0 방어 창 열림 · Custom1 닫힘,
-/// 반격 클립(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트를 옮기면 그대로 반영된다.
+/// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 방어 시작(SubSkillGuard) Custom0 방어 창 열림 →
+/// 방어 유지 루프(SubSkillGuardIdle, 전이 exitTime 으로 길이 조정) → 방어 종료(SubSkillGuardEnd) Custom1 창 닫힘·종료,
+/// 반격(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트·전이를 옮기면 그대로 반영된다.
 /// 설계·결정: PLAN-paladin-counter-e (Re:C 변경안).
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
@@ -21,10 +22,11 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
     private const string CounterStateName = "SubSkillCounter";
     private static readonly int CounterStateHash = Animator.StringToHash(CounterStateName);
+    // 방어 시작 → 유지 → 종료는 애니메이터 exitTime 전이로 이어진다. 창을 닫고 E 를 끝내는 Custom1 은 종료 상태 클립에 있다.
+    private const string GuardEndStateName = "SubSkillGuardEnd";
 
-    // 방어 클립(데이터 animatorStateName) = Custom0·Custom1, 반격 클립(CounterStateName) = Hit·End.
-    private static readonly SkillAnimationEventType[] GuardEvents =
-        { SkillAnimationEventType.Custom0, SkillAnimationEventType.Custom1 };
+    // 방어 시작 클립(데이터 animatorStateName) = Custom0, 방어 종료 클립(GuardEndStateName) = Custom1, 반격 클립(CounterStateName) = Hit·End.
+    private static readonly SkillAnimationEventType[] GuardEvents = { SkillAnimationEventType.Custom0 };
     private static readonly SkillAnimationEventType[] CounterEvents =
         { SkillAnimationEventType.Hit, SkillAnimationEventType.End };
     // 시작 상태 CrossFade(PlayerSkillController.PlaySkillPresentation)와 같은 값.
@@ -55,6 +57,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     public override void CollectAnimationEventRequirements(List<AnimationEventRequirement> requirements)
     {
         base.CollectAnimationEventRequirements(requirements);
+        requirements.Add(AnimationEventRequirement.ForSkillState(GuardEndStateName, SkillAnimationEventType.Custom1));
         foreach (SkillAnimationEventType eventType in CounterEvents)
             requirements.Add(AnimationEventRequirement.ForSkillState(CounterStateName, eventType));
     }

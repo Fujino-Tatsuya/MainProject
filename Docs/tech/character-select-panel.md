@@ -12,6 +12,8 @@
 | 카드 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectCard.prefab` (런타임에 로스터 수만큼 복제) |
 | 뷰 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanel.cs` · `CharacterSelectCard.cs` |
 | 규칙(순수) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanelRules.cs` — 테스트 `Editor/CharacterSelectPanelRulesTests.cs` |
+| 카드 이동 연출 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectCardMotion.cs` — 같은 테스트 파일 |
+| 이동 키 길게 누르기 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectKeyRepeat.cs` — 같은 테스트 파일 |
 | 배경 흐름 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectBackgroundScroll.cs` |
 | 문구 키 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs` (`UiStrings.All` 에 포함) |
 | 저작·미리보기 | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectPanelAuthoring.cs` |
@@ -51,8 +53,32 @@
 ## 화면
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
   카드가 2장이면 다른 카드는 아래, 4장 이상이면 포커스 ±1 만 보인다. 위·아래 카드는 목업처럼 화면 밖으로 일부 잘린다.
-- 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = 금색 테두리 + "현재" 표식**(포커스 표시인 초록·크기와 따로 보인다).
+- 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = "현재" 알약 표식만**(포커스 표시인 초록·크기와 따로 보인다).
+  **금색 테두리(`card_selected_ring`, 카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
   잠금 중에는 포커스 카드 초록이 바래고, 왼쪽 아래에 "준비를 해제해야 바꿀 수 있습니다".
+
+### 카드 이동·확대 연출(할 일 60)
+값은 모두 패널 인스펙터 `Card Motion`(UI 연출 값 — SO·xlsx 아님). 시간 = `Time.unscaledTime`(슬로모션 무관). 트윈 패키지 없음 — 이징은 `CharacterSelectCardMotion.EaseOutCubic`.
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `moveSeconds` | 0.18 | 포커스가 바뀌면 카드가 지금 자리에서 새 자리(`focusedSlot`/`previousSlot`/`nextSlot`·`sideScale`)로 미끄러짐, EaseOutCubic |
+| `ringFadeSeconds` | 0.1 | 금색 테두리 — 이동 시작에 꺼지고(지금 알파에서 선형), 이동이 끝나면 새 가운데 카드에서 켜짐 |
+| `focusScaleSeconds` | 0.12 | 이동이 끝난 뒤 가운데 카드 확대, EaseOutCubic |
+| `focusScale` | 1.08 | 다 선 가운데 카드 배율. 가운데에서 벗어나는 카드는 이동하면서 옆 크기(`sideScale`)로 돌아간다 |
+
+- 단계 = `Idle → Moving(이동·테두리 페이드 아웃) → Settling(확대·테두리 페이드 인, 둘 중 긴 쪽) → Idle`.
+- **이동 중 새 입력은 큐잉하지 않는다** — 키·휠·옆 카드 클릭·`MoveFocus` 가 오면 모든 카드가 **지금 보이는 자리·크기**에서 새 목표로 다시 출발(연타해도 끊김·점프 없음).
+  테두리는 이어서 꺼지고(정착 중이었다면 켜지던 알파에서), 정착은 마지막 이동이 끝난 뒤 한 번만.
+- 논리 포커스(`FocusedCharacterId`)·이름판·카드 모양(초록/옆 카드)은 입력 즉시 바뀐다. **확정(Enter/Space/가운데 클릭)은 이동 중에도 받고 대상은 논리 가운데**다.
+  가운데 클릭 판정도 index == 논리 포커스(그 카드가 아직 미끄러지는 중이어도).
+- 화면 밖 카드: 자리 offset ±2 = 위·아래 자리에서 같은 간격만큼 더 나간 곳(위 바깥 (1035, 888) · 아래 바깥 (-13, -1028), 둘 다 화면 밖).
+  - 보이지 않던 카드가 보이게 되면 **도착하는 쪽 바깥**(위 자리면 위 바깥, 아래 자리면 아래 바깥)에서 들어온다. 큰 점프로 바로 가운데에 오면 이동 방향 쪽(포커스 앞으로 = 아래 바깥).
+  - 보이던 카드가 화면 밖이 되면 **흘러가는 쪽 바깥**(포커스 앞으로 = 카드가 올라가므로 위 바깥, 뒤로 = 아래 바깥)으로 빠지고 이동이 끝나면 꺼진다.
+    (자리 offset 은 4장일 때 ±2 가 +2 로 정해지므로 offset 부호가 아니라 이동 방향을 쓴다.)
+  - 2·3장 순환에서 위↔아래로 바뀌는 카드는 사라졌다 나타나지 않고 **가운데 카드 뒤로 가로질러** 미끄러진다(가운데 카드가 맨 위에 그려진다).
+- `Show`(열 때)·`SetLocked` 는 애니메이션 없이 바로 정렬 — 테두리 켜짐·확대 상태.
+
 - 왼쪽 아래 이름판 = 포커스된 캐릭터의 원형 초상화·이름. 왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠.
 - 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬를 따라 **오른쪽으로 40px/s**(unscaled) 흐름(방향 = 10-19 결정).
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
@@ -64,12 +90,35 @@
 | 입력 | 동작 |
 |---|---|
 | W/S · ↑/↓ · A/D · ←/→ · 마우스 휠 | 이전(위·왼쪽·휠 위)/다음(아래·오른쪽·휠 아래) 카드로 포커스 — 잠금 중에도 구경 가능 |
+| 이동 키 길게 누르기 | 누른 순간 1칸 → 0.25초 뒤부터 반복, 간격이 0.25초에서 선형으로 줄어 홀드 1초에 0.1초 도달 후 유지(아래 "길게 누르기"). 휠·카드 클릭은 반복 없음 |
 | Enter · 숫자패드 Enter · Space · 가운데 카드 클릭 | 선택 확정(위 규칙) |
 | 위·아래 카드 클릭 | 그 카드로 포커스 이동 |
 | 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) |
 
 - 키는 `Keyboard.current`·`Mouse.current` 를 직접 읽는다. 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력(이동·공격·F 등)을 막는다.
 - 카드 클릭은 `Button` 이 아니라 `IPointerClickHandler` — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 막는다. 뒤로가기 버튼은 Navigation None.
+
+### 길게 누르기(키 반복, 할 일 60·60.1)
+판단 = `CharacterSelectKeyRepeat`(순수). 패널은 매 프레임 "뒤로(W·↑·A·←) / 앞으로(S·↓·D·→) 중 하나라도 눌려 있는가"(`isPressed`)와 `Time.unscaledTime` 을 넘기고, 돌려받은 칸(-1·0·+1)만큼 `MoveFocus` 한다.
+값은 패널 인스펙터 `Key Repeat`(UI 값 — SO·xlsx 아님).
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `keyRepeatDelaySeconds` | 0.25 | 처음 1칸 뒤 첫 반복까지 대기 |
+| `keyRepeatStartIntervalSeconds` | 0.25 | 첫 반복 직후 간격(가속 시작값) |
+| `keyRepeatMinIntervalSeconds` | 0.1 | 가장 짧은 간격 — 램프가 끝나면 유지(옛 `keyRepeatIntervalSeconds`, `FormerlySerializedAs` 로 값 승계) |
+| `keyRepeatRampSeconds` | 0.75 | 간격이 시작값에서 최소값까지 줄어드는 시간(첫 반복 시점부터) |
+
+- **가속(할 일 60.1)**: 반복 칸을 낸 시점의 홀드 시간 h(그 방향 반복이 시작된 시각 기준)로 다음 간격 = `Lerp(시작 간격, 최소 간격, clamp01((h - 대기) / 램프))`.
+  기본값이면 칸 시각 ≈ 0 · 0.25 · 0.50 · 0.70 · 0.86 · 0.99 · 1.09 · 1.19 … (홀드 1초에 0.1초 도달, 그 뒤 0.1초 유지).
+  칸 시각은 예정 시각 기준이라 프레임 속도와 무관하다(프레임이 밀린 경우만 그 프레임 기준).
+- 같은 방향 키 두 개(W 와 ↑ 등)는 하나로 친다 — 하나를 떼도 다른 쪽이 눌려 있으면 반복이 이어진다.
+- 반대 방향을 새로 누르면 **즉시 그쪽 1칸 + 대기·가속부터 다시**. 둘 다 누르고 있으면 **나중에 누른 쪽**이 이긴다. 같은 프레임에 둘 다 누르면 뒤로(기존 키 검사 순서).
+- 이기던 키를 떼고 반대쪽이 아직 눌려 있으면 그 방향으로 **대기·가속부터 다시(즉시 1칸 없음)**. 둘 다 떼면 멈춘다. 떼고 다시 누를 때도 가속은 처음부터.
+- **한 프레임 최대 1칸** — 프레임이 길어 간격이 여러 번 지나도 1칸만 가고 밀린 칸은 버린다(다음 칸 = 그 프레임 + 그 시점 간격).
+- 반복 칸마다 카드 이동은 지금처럼 재목표 — 처음 몇 칸(0.25·0.2초 간격)은 이동 0.18초보다 길어 칸 사이에 잠깐 멈춰 보일 수 있고, 간격이 0.18초 아래로 줄면 카드는 계속 미끄러진다. 누르고 있는 동안 금색 테두리는 꺼진 채, 떼고 마지막 이동이 끝나면 켜진다.
+- `Show`·닫힘(`Hide`·ESC·확정·뒤로가기)·`LobbyResultPanel.IsEscapeClaimed` 인 프레임에는 반복 상태를 비운다. **그때 눌려 있던 이동 키는 뗐다가 새로 누를 때까지 무시**(열자마자 미끄러지지 않게).
+- 잠금 중에도 반복된다(확정만 막힘). Enter·Space·ESC 가 눌린 프레임에는 이동 키를 보지 않는다 — 같은 프레임에 누른 이동 키는 다음 프레임에 1칸으로 들어간다.
 
 ## ESC
 - 🔴 `LobbyResultPanel.IsEscapeClaimed` 가 true 면(결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫힘) 선택 패널은 **ESC 와 키·휠·카드 클릭을 모두 무시**한다 — 같은 키로 둘이 같이 닫히지 않는다.
@@ -90,6 +139,12 @@
 - `Tools/UI/Authoring/Character Select Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 자리·색은 스크립트 상단 상수와 패널·카드 인스펙터.
 - `Tools/UI/Preview/Character Select Panel 캡처` — 프리뷰 씬에서 1920×1080 PNG 를 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/48.2-char-select/` 에 저장(열린 씬 무수정):
   `CharacterSelect_unlocked.png`(지금 0번·포커스 1번) · `CharacterSelect_locked.png`(지금 1번·포커스 2번·잠금) · `CharacterSelect_vs_mockup.png`(왼쪽 목업) · `CharacterSelect_bg_gamma.png`(배경 _gamma 판 비교용), 콘솔에 배경 밝기 비교.
+  이동 연출은 시계를 넘겨 다 선 상태로 찍는다.
+- `Tools/UI/Preview/Character Select Panel 이동 연출 캡처` — 같은 방식으로 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/60-anim/` 에 저장. 지금 0번·포커스 0번에서 `MoveFocus(1)` 후 패널 시계를 직접 넣어 샘플링:
+  `CharacterSelect_anim_0_idle.png`(열 때) · `_1_moving_pos50.png`(위치 50% = 시간 ≈ 21%, 테두리 반쯤) · `_2_moving_ring_off.png`(시간 ≈ 56%, 테두리 꺼짐) · `_3_settled.png`(정착 — 테두리 켜짐·확대).
+  시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
+- `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
+  `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 미끄러짐)를 저장. 콘솔에 대기·간격·램프 값과 1.5초까지의 칸 이동 시각(가속 확인용).
 - 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests`).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
@@ -98,4 +153,8 @@
 - 다른 캐릭터 확정 → `RequestCharacterServerRpc` 가 한 번 나가고 패널이 닫히는가. 지금 캐릭터 확정 → 요청 없이 닫히는가.
 - 준비 중 열기 → 구경은 되고 확정하면 잠금 문구가 강조되는가. 열린 채 준비 해제(`SetLocked(false)`) → 바로 고를 수 있는가.
 - 결과 패널이 위에 열려 있을 때 ESC 한 번에 결과 패널만 닫히는가(선택 패널은 그대로).
+- (할 일 60) 카드가 미끄러지듯 움직이고 연타해도 점프 없이 새 목표로 가는가. 테두리가 이동 중 꺼졌다가 가운데 카드에서 켜지고 살짝 커지는가. 이동 중 Enter 가 새 가운데로 확정되는가.
+- (할 일 60·60.1 길게 누르기) 이동 키를 누르고 있으면 0.25초 뒤부터 처음엔 천천히(0.25초 간격) 넘어가다 점점 빨라져 1초쯤부터 0.1초마다 넘어가고, 떼면 멈추는가. 가속이 자연스럽고 빨라진 뒤 미끄러짐이 끊겨 보이지 않는가.
+  누른 채 반대 키 → 즉시 반대로 1칸 후 대기·느린 반복부터, 반대 키만 떼면 대기 뒤 원래 방향으로 느린 반복부터 이어지는가. 떼고 다시 누르면 다시 느리게 시작하는가. W+↑ 같이 눌러도 2칸씩 가지 않는가.
+  키를 누른 채 패널을 열면(F) 미끄러지지 않고, 새로 눌러야 움직이는가. 잠금 중에도 반복되는가. 결과 패널이 위에 있으면 반복이 멈추는가.
 - 배경이 슬로모션과 무관하게 천천히 흐르고 가장자리가 비지 않는가(16:9 외 비율 포함).

@@ -34,7 +34,7 @@ GameData.xlsx (SVN, 잠금)
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
-| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
+| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 
@@ -184,7 +184,7 @@ GameData.xlsx (SVN, 잠금)
 | `{필드}` | 숫자를 간결하게 표시 | `{cooldownTime}` → `8` |
 | `{필드:0.0}` | .NET 숫자 형식 적용 | `{shieldDuration:0.0}` → `2.5` |
 | `{필드:%}` | 0~1 비율을 백분율로 표시 | `{healPercent:%}` → `15%` |
-| `{dmg}` | 현재 최종 공격력으로 계산한 피해와 공격력 아이콘 | Shift를 누르면 계산식도 표시 |
+| `{dmg}` | 현재 최종 공격력으로 계산한 피해와 공격력 아이콘 — 판정 스냅샷과 같은 식(기본%·전체%·가하는 피해%, [player-stats.md](player-stats.md)) | Shift를 누르면 계산식(계수·고정값)도 표시 |
 
 - 필드 경로는 A열 표기와 같다. 구조체는 `{charge.speed}`, 배열 원소는 `{stages[0]}`처럼 쓴다.
 - 다른 에셋의 값은 참조할 수 없다. 키 주인(SO·프리팹 컴포넌트) 안 필드만 쓴다.

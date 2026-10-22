@@ -38,6 +38,10 @@ public class TitleOptionsPanel : MonoBehaviour
         SetActive(graphicsPanel, graphicsPanel == activePanel);
         SetActive(controlsPanel, controlsPanel == activePanel);
         SetActive(audioPanel, audioPanel == activePanel);
+
+        // 새 아트 틀(PLAN-settings-art) — 선택 탭 알약 강조를 옮긴다.
+        SettingsBodyView view = GetComponent<SettingsBodyView>();
+        if (view != null) view.Refresh();
     }
 
     private static void SetActive(GameObject target, bool active)

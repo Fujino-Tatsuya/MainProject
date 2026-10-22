@@ -179,7 +179,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return false;
 
         requesting = true;
-        RequestStartRpc(direction, turnDelay);
+        RequestStartRpc(direction, turnDelay, player.CreateStatReport());
         return true;
     }
 
@@ -255,9 +255,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (hasPendingClip)
             return;
 
-        // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
-        if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
-            view.PlayAttackSlash(currentMode, currentStepIndex);
+        // 베기 연출(일반 1~4타·변신 묶음·강타)은 클립의 EffectAnimEvents 이벤트(PlayEffect / StartEffect·StopEffect)가
+        // 전 피어에서 직접 낸다 — 여기서 하지 않는다(2026-10-19·20 민경). 판정은 아래 서버만.
 
         // 예약 창도 전 피어 — 오너는 자기 예약을, 서버는 승인을 각자 자기 애니 진행으로 거른다(가붕이 isComboWindowOpen 과 같다).
         if (active)
@@ -354,7 +353,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
         }
 
-        RequestQueueNextAttackRpc(direction);
+        RequestQueueNextAttackRpc(direction, player.CreateStatReport());
     }
 
     // 홀드 — 눌림이 바뀌면 즉시, 눌린 동안은 HoldSignalInterval 마다 알린다(거너 HoldSignal). 조준도 실어 End 순간 이어질 다음 타 방향이 된다.
@@ -432,10 +431,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(Vector3 direction, float turnDelay, RpcParams rpcParams = default)
+    private void RequestStartRpc(Vector3 direction, float turnDelay, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
+
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 시작");
 
         if (active || stateController == null || !stateController.CanAttack || !CanStartApprovedAttack)
         {
@@ -448,10 +449,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestQueueNextAttackRpc(Vector3 direction, RpcParams rpcParams = default)
+    private void RequestQueueNextAttackRpc(Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
+
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 다음 타");
 
         // 창 판정은 서버 자기 애니 진행으로 한다(가붕이 isComboWindowOpen 과 같은 권한). 창 밖이면 오너 예약을 푼다.
         if (!IsInCurrentComboWindow())
@@ -591,6 +594,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void PlayAttackClip()
     {
+        // 변신 묶음 베기 루프는 클립의 StartEffect/StopEffect 이벤트(EffectAnimEvents)가 켜고 끈다.
+        // 안전망 — 일반·강타 클립이 시작되면 남은 루프를 끈다. 끝·취소(StopEffect 프레임에 못 닿는 경우)는 ResetRuntime 이 끈다.
+        if (view != null && currentMode != AssassinBasicAttackMode.Transformed)
+            view.EndTransformedSlash();
         if (animator != null)
         {
             animator.SetInteger(AttackIndexHash, AnimatorIndexFor(currentMode, currentStepIndex));
@@ -613,16 +620,20 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         hitsFired++;
-        int damage = Mathf.Max(0, Mathf.RoundToInt(player.FinalAttackDamage * step.AttackDamageMultiplier));
+        int damage = player.ResolveDamage(step.AttackDamageMultiplier, 0);
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
-        coneAttack.Fire(
+        bool landed = coneAttack.Fire(
             attackDirection,
             step.Range,
             step.Angle,
             damage,
             data.TriggersOnHit);
+
+        // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
+        if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
+            view.ServerNormalSlashHit(currentStepIndex);
 
         // 일반 1타·강타가 유효 대상(§4.3)을 맞히면 대상 수와 무관하게 1번 충전(§4.2). 변신 묶음은 충전 없음 — 모델도 막는다.
         if (!rageClaimed && currentMode != AssassinBasicAttackMode.Transformed && assassinState != null &&
@@ -687,6 +698,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         fallbackEndTime = 0f;
         hasPendingClip = false;
         StopLunge();
+        if (view != null)
+            view.EndTransformedSlash();   // 묶음 끝·취소·시작 실패 — StopEffect 프레임 전에 끊겨도 변신 베기 루프가 남지 않게
     }
 
     // 벽·적 몸에 막히면 남은 전진을 버린다 — 막힌 자리에서 옆으로 미끄러지지 않게(Q 돌진과 같은 규칙).

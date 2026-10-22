@@ -257,7 +257,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 ├─ AimIndicator · SkillRangeIndicator · HurtBox
 ├─ CombatHUD                  (평탄화됨 — 프리팹 링크 없음)
 │  ├─ BossHealthHUD           <중첩: 2.Prefabs/UI/BossHealthHUD.prefab>
-│  ├─ CombatPanel ── SkillBar(Slot_P/Q/E/RMB/R/Dash) · HpBar · ShieldBar · StatusEffects
+│  ├─ CombatPanel ── SkillBar(Slot_Passive/Q/E/RMB/R/Dash) · HpBar · ShieldBar · StatusEffects
 │  └─ ProfilPanel ── Profile
 ├─ OverheadHealthBar          (평탄화됨 — 프리팹 링크 없음)
 └─ Corpse ── CorpseVisualPlaceholder
@@ -306,7 +306,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 > 🔴 **권한 값은 브랜치마다 다르다.** 위 표는 `feature/player-motor-owner-auth`(지스타까지의 개발 브랜치)
 > 기준이다. `feature/player-motor-server-auth` 에서는 루트·Armature 가 Server(`0`) 다.
 > 전환 스위치는 `Player.ServerAuthoritativeMovement` + 프리팹 `AuthorityMode` 두 개다
-> ([PLAN-player-motor.md](../../PLAN-player-motor.md) "결정 — 지스타까지는 오너 권위").
+> ([PLAN-player-motor.md](../history/PLANS/PLAN-player-motor.md) "결정 — 지스타까지는 오너 권위").
 > **프리팹을 복제·분리할 때 이 값을 하드코딩된 상수로 취급하지 말 것.**
 
 ---
@@ -339,7 +339,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
    캐릭터·무기마다 그 **Material Variant** 를 두고 **Base Map(·틴트)만** 덮는다: `FK_Paladin_Sword/Shield_Toon` · `Gunner/FK_Gunner_Body` · `Gunner/FK_LaserGun` · `Assassin/FK_Assassin_Body`(머리·몸·단검 L/R 공용, §14).
    새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Rendering/Flat Kit/플레이어 Variant 구성 (가붕이 부모)`(`FlatKitPlayerVariants.cs`, 재실행 안전 — 🔴 Variant 의 Base Map·틴트 외 오버라이드를 전부 되돌린다).
    ToonLit Variant(`3.Materials/Toon/`, 부모 `PlayableCharacter_Toon`)는 되돌리기용으로만 남아 있다(미사용) — 이전 계획 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md) · [PLAN-flatkit.md](../../PLAN-flatkit.md).
-5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../../PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
+5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../history/PLANS/PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
    **`<Char>_Armature/HUD`** 아래에 중첩한다(자체 Canvas, 오너만 표시). 유령 상태에서 Armature 가 꺼지면 함께 숨는다.
    예: 거너 과열 게이지 = `Gunner_Armature/HUD/GunnerHeatGauge`(`Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)`, 재실행 안전).
    P 칸 툴팁 출처는 `IPlayerPassive`(툴팁 구현 시) → 없으면 하위의 `IPassiveTooltipProvider` — `PassiveHUD` 는 캐릭터 타입을 모른다.
@@ -370,7 +370,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 
 현재 **루트에 붙은 스킬 컴포넌트 5종이 전부 가붕이(근거리) 전용**이다 —
 `FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill`("E 수호자의 의지" — 전방 방어 → 자동 반격, [PLAN-paladin-e-counter.md](../history/PLANS/PLAN-paladin-e-counter.md).
-타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(방어 클립 `Custom0` 창 열림 · `Custom1` 닫힘)와
+타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(방어 시작 클립 `Custom0` 창 열림) → `SubSkillGuardIdle`(유지 루프) → `SubSkillGuardEnd`(방어 종료 클립 `Custom1` 닫힘·종료)와
 `SubSkillCounter`(반격 클립 `Hit` 판정 · `End` 종료, 방어 성공 시 서버가 전 피어 CrossFade). 초 값은 안전망 `maxActiveDuration` 만) · `FirstMeleeUltimateSkill` ·
 `FirstMeleeInterruptSkill`("단죄의 방패") · `FirstMeleePassive`.
 징크스(원거리)는 좌클릭 스택·우클릭 스택 발동 등 **다른 스킬 세트**가 필요하다([players.md](../design/players.md)).
@@ -414,7 +414,7 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 
 ### 8.3 선택값을 스폰까지 나르기
 
-✅ **2026-10-02 구현** ([PLAN-character-select.md](../../PLAN-character-select.md)). 아래는 결과 요약.
+✅ **2026-10-02 구현** ([PLAN-character-select.md](../history/PLANS/PLAN-character-select.md)). 아래는 결과 요약.
 
 - 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
 - 로비(2026-10-19 C8): `LobbySession.RequestCharacterServerRpc` → 서버가 `LobbyReadyRules`(Ready·카운트다운 중 거부, 교체 쿨다운) + 로스터로 검증 후 `NetworkList<LobbyPlayerEntry>` 로 복제. 기본 0번, 중복 선택 허용. (옛 `Lobby.CharacterRequest`/`Lobby.State` named message 는 퇴역.)
@@ -484,6 +484,23 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 준비 판정 | `PlayerDashController.IsReady`(예측 충전 > 0). 공급자 = `PlayerOverheadHealthBarRule`(`IOverheadDashIndicator`). 공급자가 없는 바(스피너봇 등)는 아이콘을 숨긴다 |
 | 인스펙터 | `UnitOverheadHealthBar` 「대시 아이콘」: `dashIconRoot` · `dashIconGraphics`(색을 곱할 Slot·Icon) · `dashReadyColor`(흰색) · `dashNotReadyColor`(0.35 회색, 알파로 흐리게도 가능) |
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
+
+**전투 HUD 대시 슬롯 · 쿨타임 오버레이** (2026-10-21, 할 일 84) — `893c4d74`의 HUD 개편에서 `Slot_Dash` 오브젝트만 빠지고
+`DashCooldownHUD`·`CombatHUD` 바인딩은 남아 직렬화 참조가 끊긴 상태였으므로, 머리 위 아이콘은 유지한 채
+기존 스킬 슬롯(`2.Prefabs/UI/Slot_.prefab`)으로 `CombatHUD/Layer_Combat/SkillBar/Slot_Dash` 를 다시 넣었다(75% 스케일).
+이후 사용자가 SkillBar 슬롯 배치·크기·아이콘을 직접 조정했고(슬롯은 언팩됨), Slot_Dash 에 만든 **`Icon_mask_CooldownFill`** 구조를
+패시브·Q·E·R·RMB 에도 같게 적용했다.
+
+| 항목 | 내용 |
+|------|------|
+| 구조 | 슬롯 루트 아래 `Icon_mask_CooldownFill`(Image = 그 슬롯 `Icon_mask` 모양 스프라이트, **Filled Vertical**, `Mask`) → 자식 = 아이콘 사본(검정 알파 0.78). 옛 `CooldownFill` 은 삭제. 남은 비율만큼 아이콘 모양 어두운 덮개가 아래부터 채워진다 |
+| 아이콘 사본 | 원래 아이콘(`Icon_mask/Icon_*`)과 같은 이름·위치·크기·회전·스케일. Slot_Dash 만 사용자 설정대로 x −1 반전, 다른 슬롯은 반전 없음 |
+| 스프라이트 동기화 | 스킬 아이콘은 런타임에 바뀌므로 `SkillCooldownHUD.SlotWidget.cooldownIcon`·`PassiveHUD.cooldownIcon` 이 원래 아이콘과 같은 스프라이트로 맞춘다. 대시는 고정 스프라이트라 코드 없음 |
+| 쿨타임 | `cooldownFill` = 각 `Icon_mask_CooldownFill`. 대시는 `PlayerDashController.RemainingRecharge/RechargeDuration` 그대로, 별도 시계·재계산 없음 |
+| 쿨다운 숫자 | 6슬롯 `Cooldown` 텍스트 = `2.Prefabs/UI/LiberationSans SDF - Cooldown Outline.mat`(LiberationSans SDF 아틀라스, `OUTLINE_ON`, 검정 Outline Width **0.3** · Face Dilate **0.3**). 전역 폰트 머티리얼은 그대로 |
+| 충전 수 | `DashCooldownHUD.chargeText`(선택, `MaxCharge > 1`일 때만 `현재/최대`)는 비워 둠 — 현재 1충전 |
+| 오너 범위 | `CombatHUD`가 `Player.LocalPlayer`로 바인딩하는 기존 경로 그대로라 로컬 플레이어 HUD에만 표시 |
+| 테스트 | `Tests/EditMode/CombatHud/Editor/DashCooldownHudTests` — 6슬롯 오버레이 구조·사본 방향/크기·HUD 배선·초/충전 표기 규칙(배치·크기는 고정하지 않음) |
 
 **머리 위 라벨 = 이름 / 상태이상** (2026-10-16, 할 일 50) — `Bar/NameLabel` 은 평소 이름(P1·P2…), CC·붙잡힘 중에는 그 이름 하나로 바뀐다(규칙·우선순위: [status-effects.md](../design/status-effects.md) §머리 위 표시).
 글자는 흰색 고정 + 검정 아웃라인 ≈3px(2026-10-16 후속) — 전역 폰트(TMP Settings·원본 `LiberationSans SDF`·`Resources/NotoSansKR … SDF`)는 그대로 두고 **이름표 전용 폰트 에셋**을 쓴다.
@@ -594,7 +611,7 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 
 ## 14. 어쌔신 v18 비주얼 — Flat Kit 재질 · 키 ×1.25 (2026-10-17, PLAN-assassin §9)
 
-계획 [PLAN-assassin.md](../../PLAN-assassin.md) §9. 가붕이·거너와 통일감을 맞추려고 형상 v18g + 텍스처 T3H 로 바꾸고 키를 1.252 → 약 1.565m 로 키웠다. **판정·스킬 수치·클립·네트워크는 그대로다.**
+계획 [PLAN-assassin.md](../history/PLANS/PLAN-assassin.md) §9. 가붕이·거너와 통일감을 맞추려고 형상 v18g + 텍스처 T3H 로 바꾸고 키를 1.252 → 약 1.565m 로 키웠다. **판정·스킬 수치·클립·네트워크는 그대로다.**
 
 | 항목 | 내용 |
 |------|------|
@@ -617,4 +634,4 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 - [layer-standard.md](layer-standard.md) — 레이어 번호와 공격 마스크 표준
 - [networking.md](networking.md) · [architecture.md](architecture.md) — 권한 모델
 - [Docs/design/players.md](../design/players.md) — 가붕이/징크스 설계
-- [PLAN-player-motor.md](../../PLAN-player-motor.md) — 이동/NetworkTransform 권한 작업
+- [PLAN-player-motor.md](../history/PLANS/PLAN-player-motor.md) — 이동/NetworkTransform 권한 작업

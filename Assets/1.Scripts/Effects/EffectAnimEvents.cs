@@ -125,11 +125,30 @@ public class EffectAnimEvents : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// 클립이 <see cref="PlayEffect"/>·<see cref="StartEffect"/>로 이펙트를 재생한 직후 그 id로 난다(로컬, 전 피어).
+    /// 서버 판정 결과를 "그 동작 프레임에 맞춰" 덧붙일 때 쓴다 — 예: 간파 성공 연출을 올려치기와 함께(<c>AssassinSkillView</c>).
+    /// id를 못 찾은 호출에는 나지 않는다.
+    /// </summary>
+    public event System.Action<string> Played;
+
     /// <summary>[릴레이] 원샷 재생.</summary>
-    public void PlayEffect(string id) => Find(id)?.PlayOnce();
+    public void PlayEffect(string id)
+    {
+        IAnimEventEffect effect = Find(id);
+        if (effect == null) return;
+        effect.PlayOnce();
+        Played?.Invoke(id);
+    }
 
     /// <summary>[릴레이] 루프 시작.</summary>
-    public void StartEffect(string id) => Find(id)?.Play();
+    public void StartEffect(string id)
+    {
+        IAnimEventEffect effect = Find(id);
+        if (effect == null) return;
+        effect.Play();
+        Played?.Invoke(id);
+    }
 
     /// <summary>[릴레이] 루프 종료.</summary>
     public void StopEffect(string id) => Find(id)?.Stop();

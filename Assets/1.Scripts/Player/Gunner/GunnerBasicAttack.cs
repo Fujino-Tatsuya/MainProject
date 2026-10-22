@@ -137,7 +137,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return false;
 
         isRequesting = true;
-        RequestStartRpc(direction);
+        RequestStartRpc(direction, player.CreateStatReport());
         return true;
     }
 
@@ -303,10 +303,12 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     // ── 서버 ─────────────────────────────────────────────────────────────
 
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(Vector3 direction, RpcParams rpcParams = default)
+    private void RequestStartRpc(Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
+
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "거너 기본 공격 시작");
 
         if (active || stateController == null || !stateController.CanAttack || heat.IsOverheated)
         {
@@ -438,7 +440,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
         int stage = heat.CurrentStage;
-        int baseDamage = Mathf.RoundToInt(player.FinalAttackDamage * data.AttackDamageMultiplier) + data.FlatDamageBonus;
+        int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus);
         int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heat.StageDamageMultiplier(stage)));
 
         Vector3 origin = muzzle != null

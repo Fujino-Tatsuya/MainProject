@@ -14,7 +14,7 @@ using UnityEngine;
 ///   <see cref="BossElevatorTimeline.FadeAlphaAt"/> 로 맞춘다.
 /// · 칸 대기 자리 = 프리팹에 놓인 자리(위). 높이 설정이 0 이하면 하강이 그 자리에서 시작한다(<see cref="BuildTimeline"/>).
 /// · <see cref="ResetToIdle"/> = 칸을 프리팹에 놓인 자리로, 문은 대기 포즈(<see cref="IdleDoorOpen"/>).
-/// · 보행 경로(<see cref="GetFrontPose"/> → <see cref="GetInsidePoint"/>)도 여기서 정한다 — 칸 안 지점 = 착지 중앙(이 오브젝트 위치)에서
+/// · 보행 경로(<see cref="GetFrontPose"/> → 슬롯별 경유 지점 → <see cref="GetInsidePoint"/>, <see cref="GetWalkPath"/>)도 여기서 정한다 — 칸 안 지점 = 착지 중앙(이 오브젝트 위치)에서
 ///   문 앞 지점 배치를 <see cref="_insideSpread"/> 배로 줄인 자리. 서버·클라가 같은 프리팹이면 같은 거리·시간표가 나온다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -44,8 +44,18 @@ public sealed class BossElevatorRig : MonoBehaviour
     [SerializeField] Transform[] _frontPoints = Array.Empty<Transform>();
     [Tooltip("칸 안 도착 지점 간격 배율 — 문 앞 지점들의 서로 간 배치를 칸 중앙 기준으로 이 배만큼 줄여 세운다. 0 = 전원 정중앙. 보행 거리(→ 보행 시간)도 따라 바뀐다")]
     [SerializeField, Min(0f)] float _insideSpread = 0.6f;
+    [DataTableIgnore]
+    [Tooltip("문 앞 → 칸 안 사이에 거쳐 갈 지점 — 슬롯(P1, P2, P3) 순서, 문 앞 지점 줄과 같은 번호. 비어 있으면 직선. 보행 시간은 가장 긴 경로 ÷ 걷는 속도")]
+    [SerializeField] WalkWaypoints[] _walkWaypoints = Array.Empty<WalkWaypoints>();
     [Tooltip("연출 시간표 — 단계 순서대로(암전·문 앞 이동 → 하강 → 문 → 보행 → 상승 → 페이드 아웃). 서버·클라가 각자 이 프리팹 값으로 같은 시간표를 짠다")]
     [SerializeField] BossElevatorTimingSettings _timing = BossElevatorTimingSettings.Default;
+
+    /// <summary>슬롯 하나의 경유 지점 — 문 앞에서 가까운 순서. 빈 Transform 을 아무 데나 두고 끌어 넣는다(씬 뷰 이동 핸들로 옮긴다).</summary>
+    [Serializable]
+    public struct WalkWaypoints
+    {
+        public Transform[] points;
+    }
 
     BossElevatorTimeline _timeline;
     Transform _cameraTarget;
@@ -150,16 +160,34 @@ public sealed class BossElevatorRig : MonoBehaviour
         return inside;
     }
 
-    /// <summary>문 앞 지점 → 칸 안 지점 수평 거리 중 가장 먼 것(m) — 시간표의 보행 시간 기준.</summary>
+    /// <summary>
+    /// 슬롯의 보행 경로(월드) — 경유 지점들(<see cref="_walkWaypoints"/>, 빈 칸은 건너뜀) → 칸 안 지점(마지막). 문 앞 지점(출발)은 넣지 않는다.
+    /// 경유 지점이 없으면 칸 안 지점 하나(직선). 슬롯 번호는 <see cref="GetFrontPose"/> 처럼 문 앞 지점 수로 돌려 쓴다.
+    /// </summary>
+    public List<Vector3> GetWalkPath(int slot)
+    {
+        var path = new List<Vector3>();
+        int index = _frontPoints.Length > 0 ? Mathf.Max(0, slot) % _frontPoints.Length : 0;
+        Transform[] waypoints = index < _walkWaypoints.Length ? _walkWaypoints[index].points : null;
+        if (waypoints != null)
+        {
+            foreach (Transform point in waypoints)
+            {
+                if (point != null) path.Add(point.position);
+            }
+        }
+        path.Add(GetInsidePoint(slot));
+        return path;
+    }
+
+    /// <summary>문 앞 지점 → 보행 경로(<see cref="GetWalkPath"/>) 수평 길이 중 가장 긴 것(m) — 시간표의 보행 시간 기준.</summary>
     public float MaxWalkDistance()
     {
         float max = 0f;
         for (int slot = 0; slot < _frontPoints.Length; slot++)
         {
             if (!GetFrontPose(slot, out Vector3 front, out _)) continue;
-            Vector3 d = GetInsidePoint(slot) - front;
-            d.y = 0f;
-            max = Mathf.Max(max, d.magnitude);
+            max = Mathf.Max(max, BossElevatorTimeline.PathLength(front, GetWalkPath(slot)));
         }
         return max;
     }
@@ -262,4 +290,44 @@ public sealed class BossElevatorRig : MonoBehaviour
         if (_doorAnimator == null || !_doorAnimator.isActiveAndEnabled) return;
         _doorAnimator.Play(stateHash, 0, normalizedTime);
     }
+
+#if UNITY_EDITOR
+    static readonly Color[] FrontPointGizmoColors = { new Color(1f, 0.3f, 0.3f), new Color(0.3f, 0.6f, 1f), new Color(0.3f, 1f, 0.4f) };
+
+    // 문 앞 지점마다 순간이동 직후 바라볼 방향(y축 회전만 — 텔레포트가 쓰는 규칙과 같다) 화살표와 보행 경로(문 앞 → 경유 지점 → 칸 안). 슬롯 색 P1 빨강·P2 파랑·P3 초록.
+    void OnDrawGizmos()
+    {
+        for (int slot = 0; slot < _frontPoints.Length; slot++)
+        {
+            Transform point = _frontPoints[slot];
+            if (point == null) continue;
+
+            Gizmos.color = FrontPointGizmoColors[slot % FrontPointGizmoColors.Length];
+            Vector3 lift = Vector3.up * 0.05f;
+            Vector3 previous = point.position;
+            List<Vector3> path = GetWalkPath(slot);
+            for (int i = 0; i < path.Count; i++)
+            {
+                Gizmos.DrawLine(previous + lift, path[i] + lift);
+                if (i < path.Count - 1) Gizmos.DrawSphere(path[i] + lift, 0.08f);
+                else Gizmos.DrawWireCube(path[i] + lift, Vector3.one * 0.2f);
+                previous = path[i];
+            }
+
+            Vector3 forward = point.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.001f) continue;
+            forward.Normalize();
+
+            Vector3 from = point.position + Vector3.up * 0.05f;
+            Vector3 tip = from + forward * 1f;
+            Vector3 side = Vector3.Cross(Vector3.up, forward) * 0.2f;
+
+            Gizmos.DrawWireSphere(from, 0.2f);
+            Gizmos.DrawLine(from, tip);
+            Gizmos.DrawLine(tip, tip - forward * 0.3f + side);
+            Gizmos.DrawLine(tip, tip - forward * 0.3f - side);
+        }
+    }
+#endif
 }

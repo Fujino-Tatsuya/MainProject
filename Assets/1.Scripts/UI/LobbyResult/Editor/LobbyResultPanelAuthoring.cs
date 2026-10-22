@@ -36,20 +36,20 @@ public static class LobbyResultPanelAuthoring
     struct Column
     {
         public string Name;   // Header_<Name> · Cell_<Name> · Text_<Name>
-        public string Header; // 열 제목(직렬화 기본값)
+        public UiString Header; // 열 제목 키(ko = 직렬화 글자)
         public bool Narrow;
     }
 
     // 목업 7열 그대로. 처치(Kills)는 목업에 없어 로비 패널에서는 보이지 않는다(데이터·5.ResultScene 은 그대로).
     static readonly Column[] Columns =
     {
-        new Column { Name = "Rank",        Header = "순위",      Narrow = true },
-        new Column { Name = "Player",      Header = "플레이어" },
-        new Column { Name = "Damage",      Header = "가한피해" },
-        new Column { Name = "Healing",     Header = "회복량" },
-        new Column { Name = "Counters",    Header = "간파 성공" },
-        new Column { Name = "DamageTaken", Header = "입은 피해" },
-        new Column { Name = "Deaths",      Header = "사망",      Narrow = true },
+        new Column { Name = "Rank",        Header = LobbyResultUiStrings.HeaderRank,        Narrow = true },
+        new Column { Name = "Player",      Header = LobbyResultUiStrings.HeaderPlayer },
+        new Column { Name = "Damage",      Header = LobbyResultUiStrings.HeaderDamage },
+        new Column { Name = "Healing",     Header = LobbyResultUiStrings.HeaderHealing },
+        new Column { Name = "Counters",    Header = LobbyResultUiStrings.HeaderCounters },
+        new Column { Name = "DamageTaken", Header = LobbyResultUiStrings.HeaderDamageTaken },
+        new Column { Name = "Deaths",      Header = LobbyResultUiStrings.HeaderDeaths,      Narrow = true },
     };
 
     // 왕관 배지 — icon_top_marker 180px → 90(PNG 픽셀/2), 목업처럼 순위 칸 가운데.
@@ -318,7 +318,7 @@ public static class LobbyResultPanelAuthoring
             // 탭 제목 + 판 결과
             RectTransform title = NewRect("Text_Title", panel);
             PlaceDesign(title, 160f, 128f, 360f, 100f);
-            AddText(title, font, "전투결과", 84f, TextAlignmentOptions.Center, Color.white);
+            AddText(title, font, LobbyResultUiStrings.Title, 84f, TextAlignmentOptions.Center, Color.white);
 
             RectTransform outcome = NewRect("Text_Outcome", panel);
             PlaceDesign(outcome, 540f, 160f, 600f, 76f);
@@ -361,7 +361,7 @@ public static class LobbyResultPanelAuthoring
 
             RectTransform timeLabel = NewRect("Text_PlayTimeLabel", panel);
             PlaceDesign(timeLabel, 187f, 850f, 400f, 100f);
-            AddText(timeLabel, font, "소요시간  :", 72f, TextAlignmentOptions.Left, TextLight);
+            AddText(timeLabel, font, LobbyResultUiStrings.PlayTimeLabel, 72f, TextAlignmentOptions.Left, TextLight);
 
             RectTransform timeValue = NewRect("Text_PlayTime", panel);
             PlaceDesign(timeValue, 600f, 850f, 330f, 100f);
@@ -375,7 +375,7 @@ public static class LobbyResultPanelAuthoring
             closeButton.targetGraphic = closeImage;
             RectTransform closeLabel = NewRect("Label", close);
             StretchWithOffset(closeLabel, -Padding);
-            AddText(closeLabel, font, "닫기", 54f, TextAlignmentOptions.Center, TextLight);
+            AddText(closeLabel, font, LobbyResultUiStrings.Close, 54f, TextAlignmentOptions.Center, TextLight);
 
             // 배선
             ResultStatsView stats = panel.gameObject.AddComponent<ResultStatsView>();
@@ -614,6 +614,15 @@ public static class LobbyResultPanelAuthoring
         text.overflowMode = ellipsis ? TextOverflowModes.Ellipsis : TextOverflowModes.Overflow;
         text.raycastTarget = false;
         text.text = value;
+        return text;
+    }
+
+    /// <summary>정적 라벨 — 글자 = 키 ko(시트에 행이 없을 때 폴백) + <see cref="LocalizedText"/>(키).</summary>
+    static TMP_Text AddText(RectTransform rect, TMP_FontAsset font, UiString label, float size,
+        TextAlignmentOptions align, Color color)
+    {
+        TMP_Text text = AddText(rect, font, label.Ko, size, align, color);
+        UiStringsAuthoring.Apply(rect.gameObject, label.Key);
         return text;
     }
 }

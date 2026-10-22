@@ -16,6 +16,7 @@ public static class UiStringsAuthoring
     private const string ResultScenePath = "Assets/0.Scenes/MainFlow/5.ResultScene.unity";
     private const string AssassinHudPath = "Assets/2.Prefabs/Player/Assassin/AssassinHUD.prefab";
     private const string InteractPromptPath = "Assets/2.Prefabs/UI/InteractPrompt.prefab";
+    private const string LobbyResultPanelPath = "Assets/2.Prefabs/UI/Result/LobbyResultPanel.prefab";
 
     /// <summary>라벨 하나 — <see cref="ObjectPath"/> 는 루트 아래 이름 경로의 끝부분(예 <c>PlayerRowsHeader/Header_Kills</c>).</summary>
     private readonly struct Target
@@ -49,6 +50,21 @@ public static class UiStringsAuthoring
         new Target("InteractText", UiStrings.InteractPrompt),
     };
 
+    // 로비 결과 패널 — 프리팹 저작 메뉴(LobbyResultPanelAuthoring)도 같은 키를 붙인다
+    private static readonly Target[] LobbyResultPanelTargets =
+    {
+        new Target("Text_Title", LobbyResultUiStrings.Title),
+        new Target("Text_PlayTimeLabel", LobbyResultUiStrings.PlayTimeLabel),
+        new Target("Button_Close/Label", LobbyResultUiStrings.Close),
+        new Target("Header_Rank/Label", LobbyResultUiStrings.HeaderRank),
+        new Target("Header_Player/Label", LobbyResultUiStrings.HeaderPlayer),
+        new Target("Header_Damage/Label", LobbyResultUiStrings.HeaderDamage),
+        new Target("Header_Healing/Label", LobbyResultUiStrings.HeaderHealing),
+        new Target("Header_Counters/Label", LobbyResultUiStrings.HeaderCounters),
+        new Target("Header_DamageTaken/Label", LobbyResultUiStrings.HeaderDamageTaken),
+        new Target("Header_Deaths/Label", LobbyResultUiStrings.HeaderDeaths),
+    };
+
     [MenuItem("Tools/Localization/L3 — 씬·프리팹 라벨 키 부착")]
     private static void Author()
     {
@@ -61,6 +77,7 @@ public static class UiStringsAuthoring
         int changed = 0;
         changed += AuthorPrefab(AssassinHudPath, AssassinHudTargets);
         changed += AuthorPrefab(InteractPromptPath, InteractPromptTargets);
+        changed += AuthorPrefab(LobbyResultPanelPath, LobbyResultPanelTargets);
         changed += AuthorScene(ResultScenePath, ResultTargets);
         Debug.Log($"{Tag} 완료 — 바뀐 라벨 {changed}개{(changed == 0 ? "(전부 이미 맞음, 저장 안 함)" : string.Empty)}");
     }

@@ -20,6 +20,7 @@ public static class EnemyC3Visuals
     static void ResetForPlay()
     {
         // Reload the selected JSON on each Play, including when domain reload is disabled.
+        WellsDroneVisualPool.ResetForPlay();
         plateBlocks.Clear();entries=null;smashSprite=null;prewarmed=false;
     }
     static bool prewarmed;

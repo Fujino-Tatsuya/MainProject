@@ -76,7 +76,7 @@
 - 판 결과 라벨은 탭 제목 "전투결과" 오른쪽. 푸터 = "소요시간 :" + mm:ss, 오른쪽 큰 버튼 자리에 닫기 버튼 하나(`button_pill_neutral`). 왼쪽 작은 버튼 자리(다시하기)는 패널 그림의 빈 받침만 남는다.
 - 보이는 행은 3줄(실사용 3인). 4인 이상이면 행이 표 아래로 넘친다.
 - 폰트 = `NotoSansKR-VariableFont_wght SDF`(원본 SeoulAlrimTTF-Heavy 없음) — 목업보다 얇다.
-- 열 제목·버튼 글자는 프리팹 직렬화 값이다(로컬라이징 키 없음).
+- 탭 제목·열 제목·소요시간 라벨·닫기 글자 = `LocalizedText`(`UI.LobbyResult.*`, 목록 [LobbyResultUiStrings.cs](../../Assets/1.Scripts/UI/LobbyResult/LobbyResultUiStrings.cs)). 직렬화 글자 = 키 ko(시트에 행이 없을 때 폴백). 재생성 메뉴도 같은 키를 붙인다. 키 표는 [lobby-demo-flow.md §8](lobby-demo-flow.md#8-화면-문구-키-strings).
 
 ## 다시 만들기·미리보기
 - `Tools/UI/Authoring/Lobby Result Panel` — 없는 프리팹만 만든다(있으면 손대지 않음, 다시 돌려도 바이트 동일).

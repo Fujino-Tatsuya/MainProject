@@ -265,7 +265,7 @@
    HUD 6슬롯·HP·실드·상태이상·보스 체력바 표시 확인.
 3. **MPPM 2인** — 호스트/클라 양쪽에서 위를 반복. 특히 **Armature 회전 동기화**와 애니메이션 재생.
    🔴 Play 는 **사용자가 직접** 실행한다(MCP 로 Play 를 켜면 MPPM 이 깨진다).
-4. **회귀 확인** — [PLAN-player-motor.md](../../../PLAN-player-motor.md) 의 이동 검증 항목이 그대로 통과하는지.
+4. **회귀 확인** — [PLAN-player-motor.md](PLAN-player-motor.md) 의 이동 검증 항목이 그대로 통과하는지.
 
 ---
 

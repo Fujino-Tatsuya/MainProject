@@ -122,6 +122,12 @@ public static class UiStrings
         [StatusEffectType.MaxHpModifier] = "최대 체력 증감",
         [StatusEffectType.PassiveCharge] = "패시브 충전",
         [StatusEffectType.Focus] = "정신 집중",
+        [StatusEffectType.BaseAttackDamageModifier] = "기본 공격력 증감",
+        [StatusEffectType.DealtDamageModifier] = "가하는 피해 증감",
+        [StatusEffectType.MoveSpeedBaseModifier] = "기본 이동 속도 증감",
+        [StatusEffectType.AttackSpeedBaseModifier] = "기본 공격 속도 증감",
+        [StatusEffectType.DefenseBaseModifier] = "기본 방어력 증감",
+        [StatusEffectType.MaxHpBaseModifier] = "기본 최대 체력 증감",
     };
 
     private static readonly Dictionary<StatusEffectType, UiString> StatusEffectNames = BuildStatusEffectNames();
@@ -129,6 +135,18 @@ public static class UiStrings
     public const string StatusEffectKeyPrefix = "UI.StatusEffect.";
 
     // 붙잡힘(구속 — 잡기·돌진 밀기) — 상태이상 enum 이 아니라 따로 둔다. 머리 위 라벨만 쓴다(할 일 50)
+    // 인게임 ESC 일시정지 메뉴·종료 확인(PLAN-pause-menu) — PauseMenu.prefab 라벨(LocalizedText).
+    private const string PauseWhere = "PauseMenu.prefab › ";
+    public static readonly UiString PauseTitle = new UiString("UI.Pause.Title", "메뉴", PauseWhere + "메뉴 제목");
+    public static readonly UiString PauseContinue = new UiString("UI.Pause.Continue", "계속하기", PauseWhere + "계속하기 버튼");
+    public static readonly UiString PauseSettings = new UiString("UI.Pause.Settings", "설정", PauseWhere + "설정 버튼");
+    public static readonly UiString PauseQuit = new UiString("UI.Pause.Quit", "그만두기", PauseWhere + "그만두기 버튼");
+    public static readonly UiString PausePressAnyButton = new UiString("UI.Pause.PressAnyButton", "Press Any Button", PauseWhere + "아래 안내 캡슐(누르면 계속하기)");
+    public static readonly UiString ExitTitle = new UiString("UI.Exit.Title", "게임 종료", PauseWhere + "종료 확인 팝업 제목");
+    public static readonly UiString ExitMessage = new UiString("UI.Exit.Message", "정말 종료하시겠습니까?", PauseWhere + "종료 확인 팝업 문구");
+    public static readonly UiString ExitDesktop = new UiString("UI.Exit.Desktop", "바탕화면", PauseWhere + "종료 확인 — 바탕화면(게임 종료) 선택");
+    public static readonly UiString ExitLobby = new UiString("UI.Exit.Lobby", "로비", PauseWhere + "종료 확인 — 로비 선택");
+
     public static readonly UiString StatusEffectGrabbed = new UiString(StatusEffectKeyPrefix + "Grabbed", "붙잡힘", "PlayerOverheadHealthBarRule — 머리 위 붙잡힘(구속)(코드)");
 
     /// <summary>상태이상 하나의 표시 이름 키. <c>None</c>·조합 값처럼 단일 이름이 아니면 false.</summary>
@@ -177,10 +195,12 @@ public static class UiStrings
         all.AddRange(LoadingReadyMessages);
         all.AddRange(StatusEffectNames.Values);
         all.Add(StatusEffectGrabbed);
+        all.AddRange(new[] { PauseTitle, PauseContinue, PauseSettings, PauseQuit, PausePressAnyButton, ExitTitle, ExitMessage, ExitDesktop, ExitLobby });
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
         all.AddRange(DemoConnectUiStrings.All); // 부스 데모 연결 오버레이(UI.DemoConnect.*)
         all.AddRange(LobbyUiStrings.All);       // 걷는 로비 상호작용·준비·카운트다운(UI.Lobby.*, 할 일 48 C10)
         all.AddRange(CharacterSelectUiStrings.All); // 로비 캐릭터 선택 패널(UI.CharacterSelect.*)
+        all.AddRange(LobbyResultUiStrings.All);     // 로비 결과 패널 정적 라벨(UI.LobbyResult.*)
         return all;
     }
 

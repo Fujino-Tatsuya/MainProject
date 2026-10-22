@@ -78,7 +78,7 @@ public readonly struct GuardEventResult
 ///
 /// 순수 C# 이다(MonoBehaviour 아님 — <see cref="CounterWindow"/> 와 같은 모양). 시간을 재지 않는다 —
 /// 방어 창·반격 판정·반격 종료는 호출측이 넘기는 <b>애니메이션 이벤트</b>로 정해진다.
-/// 방어 클립(SubSkillGuard): Custom0 = 방어 창 열림, Custom1 = 방어 창 닫힘.
+/// 방어 시작 클립(SubSkillGuard): Custom0 = 방어 창 열림 → 유지 루프(SubSkillGuardIdle) → 방어 종료 클립(SubSkillGuardEnd): Custom1 = 방어 창 닫힘.
 /// 반격 클립(SubSkillCounter): Hit = 반격 판정, End = 반격 종료.
 /// 피해·반격 판정·넉백·종료 처리는 이 클래스가 하지 않는다 — FirstMeleeSubSkill 의 몫이다.
 ///

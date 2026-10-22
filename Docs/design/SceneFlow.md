@@ -12,7 +12,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 ### Main loop (session kept alive)
 
 ```text
-0.Bootstrap ─(host) StartHost → NGO LoadScene 3.LobbyScene (Single)
+0.Bootstrap → 1.TitleScene (START) → 6.DemoConnect ─(host) StartHost → NGO LoadScene 3.LobbyScene (Single)
    │(client) StartClient → NGO scene sync enters 3.LobbyScene
    ▼
 3.LobbyScene ─all ready → 5 s countdown → Loading (Additive) → 4.MapScene → spawn
@@ -21,9 +21,9 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
          (result panel opens in the lobby)
 ```
 
-- Main flow = `Bootstrap → Lobby (3.LobbyScene) → Map (4.MapScene) → Lobby → Map → …`.
+- Main flow = `Bootstrap → Title (once) → Lobby (3.LobbyScene) → Map (4.MapScene) → Lobby → Map → …`.
 - The NGO session stays alive across games. **There is no `Shutdown` per game.**
-- **Title is skipped** in the demo build. `1.TitleScene` is not part of the loop.
+- **Title is shown once at boot** (task 70, 2026-10-21): host and client both see `1.TitleScene`; its START runs `DemoSessionDirector.TryHandleTitleStart()` → `6.DemoConnectScene` → host/auto-join. `1.TitleScene` is not part of the loop (lobby return and reconnect never revisit it).
 - **`5.ResultScene` is removed.** Results are shown by a **result panel inside the lobby** (see below). The scene is dropped from Build Settings in C13.
 - `3.LobbyScene` becomes a **walkable NGO scene** (scene-placed `NetworkObject`s, players are spawned in it). It is no longer a local UI scene.
 - `6.DemoConnectScene` is a new **local** scene used only while waiting for / reconnecting to the host ("호스트 대기 중" overlay).
@@ -365,7 +365,7 @@ Use this when a scene manager should fade first, then call a global manager func
 
 ## Current Implementation Notes
 
-- `TitleSceneManager.StartGame()` fades first, then calls `GameManager.GoToLobby()`.
+- `TitleSceneManager.StartGame()` fades first, then calls `GameManager.GoToLobby()` — or, in the booth demo flow, `DemoSessionDirector.TryHandleTitleStart()` (wait scene → host/auto-join) instead.
 - `TitleSceneManager.ExitGame()` fades first, then quits play mode or the application.
 - `MapSceneManager.GoToResult()` fades first, then calls `GameManager.GoToResult()`.
 - `ResultSceneManager.GoToLobby()` fades first, then calls `GameManager.GoToLobby()`.

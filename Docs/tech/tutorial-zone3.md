@@ -1,6 +1,6 @@
 # 튜토리얼 존3 흐름 — 스피너봇 연계 연습 (할 일 15 · S9 → v8 V4)
 
-> 원본: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.5(Z3-1~Z3-10)·§4 G4~G6·D2·D2-1·D25·D26·D18 — **v8**(2026-10-12) · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md) S9·§3-1 V4.
+> 원본: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.5(Z3-1~Z3-10)·§4 G4~G6·D2·D2-1·D25·D26·D18 — **v8**(2026-10-12) · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md) S9·§3-1 V4.
 > 디렉터: [tutorial-director.md](tutorial-director.md) · 스피너봇 쪽(몬스터 훅·연습/연계 본체): [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md) §4-2 · 안내 UI: [tutorial-guide-ui.md](tutorial-guide-ui.md).
 > 테스트: `TutorialZone3RulesTests` · `SpinnerComboModelTests` · `SpinnerPracticeModelTests`(튜토리얼 러너 `Tools/Tests/튜토리얼 EditMode 테스트 실행`).
 > v8 변경: '간파 3회' → **[간파 성공 → 취약 유지 → 우클릭 밀치기 → 유효 벽 충돌 → 회복] 연계 파티 합계 3회**, 3회째 회복 끝 = G5 → 본 전투. 거너 전용 간파 설명 제거.

@@ -1,6 +1,6 @@
 # 결과 화면 플레이어별 통계 — UI 배선 지시서 (2단계용)
 
-> 계획 = [PLAN-result-stats.md](../../PLAN-result-stats.md) 2단계. 1단계(코드)는 `feature/ResultStats` 에 들어가 있다.
+> 계획 = [PLAN-result-stats.md](../history/PLANS/PLAN-result-stats.md) 2단계. 1단계(코드)는 `feature/ResultStats` 에 들어가 있다.
 > 이 문서는 **`5.ResultScene.unity` 와 행 프리팹을 어떻게 만들지**만 적는다. 코드는 이미 이 이름·필드를 기대한다.
 >
 > ✅ **2026-10-07 적용됨** — 저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`

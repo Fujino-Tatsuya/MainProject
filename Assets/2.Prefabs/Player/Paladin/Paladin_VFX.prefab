@@ -4468,7 +4468,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   maxGhosts: 80
-  logDiagnostics: 1
+  logDiagnostics: 0
   safetyTimeout: 2
 --- !u!114 &4369639918006030423
 MonoBehaviour:
@@ -4531,7 +4531,7 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 3
   minVertexDistance: 0.02
-  logDiagnostics: 1
+  logDiagnostics: 0
 --- !u!1 &6097337715216137025
 GameObject:
   m_ObjectHideFlags: 0

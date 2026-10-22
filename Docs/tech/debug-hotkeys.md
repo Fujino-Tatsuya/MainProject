@@ -27,10 +27,8 @@
 |---|---|---|---|---|---|
 | F1 | 피격 이펙트 종류 순환 | `Assets/1.Scripts/Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | |
 | F2 | 타격점 계산 방식 순환 | `Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | |
-| F3 / Shift+F3 | 23호 다음 공격 예약 — 훅(좌↔우) / 예약 대기열 비우기 (호스트) | `Dev/DevBossAttackHotkeys.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
-| F4 | 23호 어퍼컷 예약 (호스트) | `Dev/DevBossAttackHotkeys.cs` | DEV_HOTKEYS | ✗ | |
+| F3 | 23호 다음 행동 = 점프·점프·점프 콤보 예약(호스트) — 3번째 착지 간파 창 확인용 | `Dev/DevBossAttackHotkeys.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F5 | 보스방 진입 패드로 파티 워프 | `Dev/DevBossEntranceWarp.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
-| F6 | 23호 점프어택 예약 (호스트) | `Dev/DevBossAttackHotkeys.cs` | DEV_HOTKEYS | ✗ | |
 | F7 | RetroCRT(Cyanilux CRT) 토글 | `Rendering/RetroCRT/RetroCRTController.cs` (맵 씬) | DEV_HOTKEYS | ✗ | ⚠️ F7 — RenderCostAB |
 | F7 | 실루엣 ON/OFF 수동 토글(측정기) | `Dev/LookAB/RenderCostAB.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F7 — RetroCRTController |
 | F8 | 프로파일러 HUD 토글 | `Dev/Profiler/ProfilerHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F8 — ZonePerfRecorder |
@@ -38,10 +36,8 @@
 | Home | 존별 성능 CSV 저장 + 콘솔 요약 | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
 | End | 프레임 상한 해제 ↔ 원래 상한(누적 초기화) | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
 | Insert | 존별 성능 누적 초기화 | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
-| F9 | 23호 잡기 예약 (호스트) | `Dev/DevBossAttackHotkeys.cs` | DEV_HOTKEYS | ✗ | ⚠️ F9 — DevMonsterKill |
-| F9 / Shift+F9 | 가장 가까운 몬스터 / 전부 즉사 (호스트) | `Utility/DevMonsterKill.cs` (자동 생성) | DEV_HOTKEYS | ✗ | ⚠️ F9 — DevBossAttackHotkeys |
+| F9 / Shift+F9 | 가장 가까운 몬스터 / 전부 즉사 (호스트) | `Utility/DevMonsterKill.cs` (자동 생성) | DEV_HOTKEYS | ✗ |  |
 | F10 | 디버그 부활(로컬 오너, 소울 상태일 때) | `Player/Life/PlayerReviveController.cs` (Player 프리팹) | 없음 | ✓ | |
-| F11 | 23호 돌진 예약 (호스트) | `Dev/DevBossAttackHotkeys.cs` | DEV_HOTKEYS | ✗ | |
 | F12 | 조각 폭발(FragmentExploder 가 붙은 오브젝트 전부) | `fragments/FragmentExploder.cs` | 없음 | ✓ | |
 | Alt+1~9, Alt+0 | 튜토리얼 구간 스킵 / Alt+0 판 재시작 (호스트, 튜토리얼 중) | `Map/Tutorial/TutorialSkipController.cs` (+ `TutorialDirector.Skip.cs`·`TutorialDebugActions.cs`·`Flow/TutorialCorridorFlow.cs`) | DEV_HOTKEYS | ✗ | |
 | M | 맵 오버뷰(디버그 맵) 토글 | `Map/MapOverviewUI.cs` | 없음 | ✓ | |
@@ -50,8 +46,8 @@
 
 파일 경로는 `Assets/1.Scripts/` 기준.
 
-- 23호 예약(F3·F4·F6·F9·F11)은 `TwentyThreeBoss.cs` 의 `DevReserveNextAttack`·`ConsumeDevReservation` 블록(같은 게이트)을 쓴다.
-- **겹침은 표시만 했다** — 코드는 고치지 않았다. F9 는 23호 잡기 예약과 몬스터 즉사가 동시에 일어난다.
+- 23호 예약(F3)은 `TwentyThreeBoss.cs` 의 `DevReserveJumpCombo`·`ConsumeDevReservation` 블록(같은 게이트)을 쓴다. 단타 예약 5종(F3 훅·Shift+F3·F4·F6·F9·F11)은 2026-10-20 경석 요청으로 걷어 냈다 — F4·F6·F11 은 비어 있다.
+- **겹침은 표시만 했다** — 코드는 고치지 않았다.
   F8·F7 은 둘 다 씬에 붙어 있을 때만 겹친다. `[ ]` 는 관전 모드이고 미니맵이 슬롯 밖일 때만 겹친다.
 - 일반 조작 키(ESC·이동·스킬·F 상호작용·Alt+Enter 창 모드 등)는 디버그 단축키가 아니라 제외했다.
 - `LookToggle` 은 게이트 대상이지만 단축키가 없다(F9 룩 토글은 09-29 에 뺐다 — 시작 룩 적용만 한다).

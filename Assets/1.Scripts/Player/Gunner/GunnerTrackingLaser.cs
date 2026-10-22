@@ -44,6 +44,9 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
     private float nextRetargetTime;
     private bool initialized;
 
+    // 연출(민경 — GunnerTrackingLaserView). 없으면 연출만 빠진다.
+    private GunnerTrackingLaserView view;
+
     /// <summary>[서버] 스폰 직후 1회.</summary>
     public void ServerInitialize(Player caster, Unit target, int damagePerTick, GunnerTrackingLaserData data,
                                  AttackType attackType, AttackHitPattern hitPattern)
@@ -77,6 +80,11 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
         {
             ApplyVisualRadius(radius);
         }
+
+        // 연출에 반경·피해 간격·적 레이어를 넘긴다(전 피어 장판·대상별 조준 표식).
+        view = GetComponent<GunnerTrackingLaserView>();
+        if (view != null)
+            view.ServerConfigure(radius, damageInterval, enemyLayers);
     }
 
     public override void OnNetworkSpawn()
@@ -179,6 +187,10 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
 
         if (caster != null && landed.Count > 0)
             caster.RaiseServerAttackLanded(attackType, triggersOnHit, landed, this);
+
+        // 실제로 맞은 적마다 위성 레이저 연출(전 피어 RPC).
+        if (view != null && landed.Count > 0)
+            view.ServerStrike(landed);
     }
 
     private Unit FindNearestEnemy(float range)

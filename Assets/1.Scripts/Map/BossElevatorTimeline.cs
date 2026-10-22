@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using EuniTween;
 using UnityEngine;
 
@@ -227,18 +228,60 @@ public sealed class BossElevatorTimeline
     /// <summary>도착 시각에 칸 안 지점에서 이만큼(수평 m) 안이면 걸어서 도착한 것으로 본다 — 더 멀면 <see cref="WalkNeedsSnap"/>.</summary>
     public const float WalkArriveTolerance = 0.25f;
 
-    /// <summary>
-    /// 오너 보행 한 틱의 수평 변위(m, y = 0) — 남은 수평 거리 ÷ 남은 시간 × <paramref name="deltaTime"/>. 남은 시간이 한 틱 이하면 남은 거리 전부.
-    /// 막혀서 뒤처지면 다음 틱 속도가 올라 따라잡는다. 높이는 지면(Motor 의 경사 투영·계단 오르기·중력)에 맡긴다.
-    /// </summary>
-    /// <param name="toTarget">지금 발 위치 → 칸 안 지점(수직 성분은 버린다).</param>
-    /// <param name="timeLeft">도착 시각까지 남은 시간(초).</param>
-    public static Vector3 WalkStep(Vector3 toTarget, double timeLeft, float deltaTime)
+    /// <summary><paramref name="start"/> → <paramref name="path"/> 의 점들을 차례로 잇는 꺾은선의 수평 길이(m). 점이 없으면 0.</summary>
+    public static float PathLength(Vector3 start, IReadOnlyList<Vector3> path)
     {
-        toTarget.y = 0f;
-        if (deltaTime <= 0f) return Vector3.zero;
-        if (timeLeft <= deltaTime) return toTarget;
-        return toTarget * (float)(deltaTime / timeLeft);
+        float length = 0f;
+        Vector3 from = start;
+        for (int i = 0; i < path.Count; i++)
+        {
+            length += Horizontal(path[i] - from).magnitude;
+            from = path[i];
+        }
+        return length;
+    }
+
+    /// <summary>
+    /// 오너 보행 한 틱의 수평 변위(m, y = 0) — 남은 경로 길이 ÷ 남은 시간 × <paramref name="deltaTime"/> 만큼 경로를 따라간다. 남은 시간이 한 틱 이하면 끝점까지.
+    /// 막혀서 뒤처지면 다음 틱 속도가 올라 따라잡는다. 높이는 지면(Motor 의 경사 투영·계단 오르기·중력)에 맡긴다.
+    /// 꺾이는 점을 지나면 <paramref name="index"/> 가 다음 점으로 넘어간다(한 틱 안에서 꺾이면 그 틱 변위는 모서리를 살짝 자른다).
+    /// </summary>
+    /// <param name="position">지금 발 위치.</param>
+    /// <param name="path">경유 지점들 → 칸 안 지점(마지막). 수직 성분은 버린다.</param>
+    /// <param name="index">지금 향하는 점 — 호출자가 틱마다 들고 다닌다(0 에서 시작).</param>
+    /// <param name="timeLeft">도착 시각까지 남은 시간(초).</param>
+    public static Vector3 WalkStepAlongPath(Vector3 position, IReadOnlyList<Vector3> path, ref int index, double timeLeft, float deltaTime)
+    {
+        if (path.Count == 0 || deltaTime <= 0f) return Vector3.zero;
+        index = Mathf.Clamp(index, 0, path.Count - 1);
+
+        float remaining = Horizontal(path[index] - position).magnitude;
+        for (int i = index + 1; i < path.Count; i++)
+            remaining += Horizontal(path[i] - path[i - 1]).magnitude;
+        float move = timeLeft <= deltaTime ? remaining : remaining * (float)(deltaTime / timeLeft);
+
+        Vector3 cursor = position;
+        while (true)
+        {
+            Vector3 segment = Horizontal(path[index] - cursor);
+            float length = segment.magnitude;
+            bool last = index == path.Count - 1;
+            if (last || move < length)
+            {
+                if (length > 0f) cursor += segment * Mathf.Min(1f, move / length);
+                break;
+            }
+            cursor += segment;
+            move -= length;
+            index++;
+        }
+        return Horizontal(cursor - position);
+    }
+
+    static Vector3 Horizontal(Vector3 v)
+    {
+        v.y = 0f;
+        return v;
     }
 
     /// <summary>

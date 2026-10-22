@@ -52,12 +52,12 @@ public sealed class DemoConnectionOverlayTextTests
     }
 
     [Test]
-    public void 설정_파일_없음_안내는_3초만()
+    public void 부팅_안내는_3초만()
     {
-        Assert.That(DemoConnectionOverlayText.ShouldShowConfigMissing(true, 0f), Is.True);
-        Assert.That(DemoConnectionOverlayText.ShouldShowConfigMissing(true, 2.9f), Is.True);
-        Assert.That(DemoConnectionOverlayText.ShouldShowConfigMissing(true, 3f), Is.False);
-        Assert.That(DemoConnectionOverlayText.ShouldShowConfigMissing(false, 0f), Is.False);
+        Assert.That(DemoConnectionOverlayText.ShouldShowBootNotice(true, 0f), Is.True);
+        Assert.That(DemoConnectionOverlayText.ShouldShowBootNotice(true, 2.9f), Is.True);
+        Assert.That(DemoConnectionOverlayText.ShouldShowBootNotice(true, 3f), Is.False);
+        Assert.That(DemoConnectionOverlayText.ShouldShowBootNotice(false, 0f), Is.False);
     }
 
     [Test]
@@ -99,5 +99,64 @@ public sealed class DemoConnectionOverlayTextTests
         Assert.That(Title(ReconnectState.Connecting, DemoConnectionRole.Client), Is.EqualTo(DemoConnectUiStrings.WaitingForHost.Text));
         Assert.That(Title(ReconnectState.StartingHost, DemoConnectionRole.Host), Is.EqualTo(DemoConnectUiStrings.StartingHost.Text));
         Assert.That(Title(ReconnectState.Dropped, DemoConnectionRole.Client), Is.EqualTo(DemoConnectUiStrings.Disconnected.Text));
+    }
+}
+
+/// <summary>role 자동 판정 근거 표시(할 일 72) — 상태 패널 제목 아래 한 줄 + 부팅 안내 3초.</summary>
+public sealed class DemoConnectionOverlayAutoRoleTests
+{
+    static readonly string[] Local = { "127.0.0.1", "100.79.198.77" };
+
+    static DemoConnectionOverlayModel Model(DemoAutoRoleDecision? autoRole) =>
+        new DemoConnectionOverlayModel(DemoConnectionRole.Client, ReconnectState.Connecting, "192.168.0.10", 7777, 1, 0f,
+            DemoJoinRejectReason.None, "0.1.0", "42", autoRole);
+
+    [Test]
+    public void 일치한_IP_를_호스트_근거로_보여_준다()
+    {
+        var text = DemoConnectionOverlayText.AutoRoleText(DemoConnectionConfig.ResolveAutoRole("100.79.198.77", Local));
+
+        Assert.That(text, Is.EqualTo(DemoConnectUiStrings.AutoHostMatch.Format(
+            new System.Collections.Generic.Dictionary<string, string> { ["address"] = "100.79.198.77" })));
+    }
+
+    [Test]
+    public void 클라와_loopback_은_각자_문구()
+    {
+        var client = DemoConnectionOverlayText.AutoRoleText(DemoConnectionConfig.ResolveAutoRole("10.0.0.9", Local));
+        var loopback = DemoConnectionOverlayText.AutoRoleText(DemoConnectionConfig.ResolveAutoRole("", Local));
+
+        Assert.That(client, Does.Contain("10.0.0.9"));
+        Assert.That(client, Is.Not.EqualTo(loopback));
+        Assert.That(loopback, Does.Contain("?"), "빈 hostAddress 는 ? 로 보인다");
+    }
+
+    [Test]
+    public void 자동_판정이면_제목_아래에_근거_줄이_붙는다()
+    {
+        var decision = DemoConnectionConfig.ResolveAutoRole("192.168.0.10", Local);
+        var lines = DemoConnectionOverlayText.BuildStatus(Model(decision)).Split('\n');
+
+        Assert.That(lines.Length, Is.EqualTo(5), "제목·근거·주소·시도·빌드 정보");
+        Assert.That(lines[1], Is.EqualTo(DemoConnectionOverlayText.AutoRoleText(decision)));
+        Assert.That(DemoConnectionOverlayText.BuildStatus(Model(null)).Split('\n').Length, Is.EqualTo(4));
+    }
+
+    [Test]
+    public void 부팅_안내는_파일_없음이_먼저고_명시_role_이면_비어_있다()
+    {
+        var decision = DemoConnectionConfig.ResolveAutoRole("100.79.198.77", Local);
+
+        Assert.That(DemoConnectionOverlayText.BootNotice(true, null), Is.EqualTo(DemoConnectUiStrings.ConfigMissing.Text));
+        Assert.That(DemoConnectionOverlayText.BootNotice(false, decision), Is.EqualTo(DemoConnectionOverlayText.AutoRoleText(decision)));
+        Assert.That(DemoConnectionOverlayText.BootNotice(false, null), Is.Empty);
+    }
+
+    [Test]
+    public void 근거_문구_키가_목록에_있다()
+    {
+        Assert.That(DemoConnectUiStrings.All, Does.Contain(DemoConnectUiStrings.AutoHostMatch));
+        Assert.That(DemoConnectUiStrings.All, Does.Contain(DemoConnectUiStrings.AutoHostLoopback));
+        Assert.That(DemoConnectUiStrings.All, Does.Contain(DemoConnectUiStrings.AutoClient));
     }
 }

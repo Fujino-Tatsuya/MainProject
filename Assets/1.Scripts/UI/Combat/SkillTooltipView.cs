@@ -37,7 +37,7 @@ public sealed class SkillTooltipView : MonoBehaviour
 
     /// <summary>
     /// [오너 로컬] 툴팁이 지연 뒤 실제로 떴다. 인자 = 그 슬롯의 키 표기(displayKey) —
-    /// Q·E·R·RMB(SkillCooldownHUD), 패시브 칸은 "Passive"(PassiveHUD). 튜토리얼 판정 훅.
+    /// 스킬 칸은 현재 바인딩 표기(기본 Q·E·RMB·R — 리바인드 따라 바뀜, SkillCooldownHUD), 패시브 칸은 "Passive"(PassiveHUD). 튜토리얼 판정 훅.
     /// </summary>
     public static event System.Action<string> TooltipShown;
 

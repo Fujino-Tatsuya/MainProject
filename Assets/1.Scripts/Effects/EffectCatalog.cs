@@ -103,11 +103,51 @@ public class EffectCatalog : ScriptableObject
     // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).
     [field: SerializeField] public EffectEntry Assassin_Q_StormSlash { get; private set; }
 
+    [Header("플레이어 — 어쌔신 좌클릭")]
+    // 일반 1~4타 = Hit 이벤트마다 소켓 원샷(FX_Assassin_LClick_Slash, 4타 공용 — 방향은 소켓 회전),
+    // 적중 성공 = 서버 판정 → RPC 로 같은 타 소켓에 원샷(FX_Assassin_LClick_Success, 일반 슬래쉬와 겹쳐 재생),
+    // 변신 묶음 = 묶음 동안 소켓 루프(FX_Assassin_LClick_Transformed). AssassinSkillView 의 EffectSocketPlayer 가 재생한다(2026-10-19 민경).
+    [field: SerializeField] public EffectEntry Assassin_LClick_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_LClick_Success { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_LClick_Transformed { get; private set; }
+
+    [Header("플레이어 — 어쌔신 우클릭(간파)")]
+    // Attack_Up_01 클립의 EffectAnimEvents 이벤트가 소켓에서 재생한다: 기 모으기 루프(FX_Assassin_RClick_Windup, 끄면 즉시 반납) →
+    // 튀기기 원샷(_Pop, 기 모으기 정지와 같은 프레임) → 올려치기 원샷(_Slash). 간파 성공 = 서버 판정 → RPC → 올려치기가
+    // 재생되는 순간 함께 원샷(_Success, AssassinSkillView). (2026-10-19 민경)
+    [field: SerializeField] public EffectEntry Assassin_RClick_Windup { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Pop { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Success { get; private set; }
+
+    [Header("플레이어 — 어쌔신 일반 E(단검 강화)")]
+    // 강화 준비 동안 양손 단검 소켓(VFX_EnhanceAura)에서 오라 루프(FX_Assassin_E_Aura, 끄면 0.7초에 흩어짐), 준비 순간 차지 원샷(_Charge) —
+    // AssassinEnhanceReadyView 가 AssassinState.IsEnhancedReady 로 켜고 끈다. 강타 슬래쉬(_Slash) = Combo_Attack_02_01 의 PlayEffect 이벤트. (2026-10-20 민경)
+    [field: SerializeField] public EffectEntry Assassin_E_Aura { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_E_Charge { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_E_Slash { get; private set; }
+
+    [Header("플레이어 — 거너 R(추적 레이저)")]
+    // 장판 루프 · 대상별 조준 루프(TelegraphRing) · 맞은 위치마다 위성 레이저 원샷. GunnerTrackingLaserView(레이저 프리팹)가 직접 들고 있다 —
+    // 여기는 prewarm 등록만(2026-10-21 민경).
+    [field: SerializeField] public EffectEntry Gunner_R_Zone { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_R_Lock { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_R_Strike { get; private set; }
+
+    [Header("플레이어 — 상태이상(공용)")]
+    // 상태 → 이펙트 표는 PlayerStatusEffectVfxSet(SO)가 들고, StatusEffectVfxPresenter 가 루프로 켜고 끈다. 여기는 prewarm 등록만(2026-10-20 민경).
+    [field: SerializeField] public EffectEntry Player_Faint { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
     [field: SerializeField] public EffectEntry Mob_Slash { get; private set; }
     [field: SerializeField] public EffectEntry Mob_Bite { get; private set; }
+
+    // 잡몹 폭발 사망(ExplodeDeath) — 조각이 튀는 순간 폭발(2026-10-21 민경).
+    [field: SerializeField] public EffectEntry Mob_Death_Explosion { get; private set; }
+    // 엘리트(건틀릿·스피너·월봇) 폭발. 각 프리팹 ExplodeDeath.explosionEffect 가 직접 집는다 — 여기는 prewarm 등록만.
+    [field: SerializeField] public EffectEntry Mob_Death_Explosion_Elite { get; private set; }
 
     // 인터럽트(카운터) 성공 섬광. 터뜨리는 주체가 플레이어가 아니라 **맞는 쪽**이라 여기 둔다 —
     // 23호 본체와 건틀릿·스피너·월봇이 같은 엔트리를 쓴다(각 프리팹의 interruptFlash 소켓).

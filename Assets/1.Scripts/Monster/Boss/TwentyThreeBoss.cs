@@ -15,7 +15,7 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -298,6 +298,29 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     bool _chainArmed;             // 훅·어퍼가 맞혔다 — _chainAt 에 다음 타로 넘긴다(comboHookFollowThrough)
     float _chainAt;
     BossAttackId _chainPrevAttack; // 지금 후속 타 바로 앞 타 — 돌진 다음 잡기만 예고를 길게(comboGrabTelegraphAfterDash)
+
+    // ─── 콤보 시작 전 차징(경석 10-20 — 점프·점프·점프) — 서버 전용 ───
+    float _comboWindupNext;   // StartRouletteCombo 가 세운 첫 타 앞 차징 — 다음 StartAttack 이 소비
+    float _comboWindup;       // 지금 공격(점프)이 시작 전에 틀 차징 길이. 0 = 없음
+    float _comboWindupStartNext;   // 차징 클립 시작 지점(정규화) — 콤보 행 windupStartNormalized
+    float _comboWindupStart;
+
+    void BeginComboWindup()
+    {
+        float t = _comboWindup;
+        _comboWindup = 0f;
+        BossAttackEntry charge = AttackEntryOf(BossAttackId.ChargeSequence);
+        // 차징 클립을 콤보 행 windupStartNormalized 지점부터(경석 10-21: 첫 프레임이 아니라 팔을 모으는 중간부터).
+        if (charge != null && !string.IsNullOrEmpty(charge.animatorStateName))
+            CrossFadeStateAtClientRpc(charge.animatorStateName, _comboWindupStart);
+        Debug.Log($"[23호/콤보] 시작 전 차징 {t:0.##}초 (클립 {_comboWindupStart:0.##} 부터)", this);
+        EnterPhase(BossAttackPhase.ComboWindup, t);
+    }
+
+    // ─── 점프 착지 간파 창(경석 10-20 — 점프·점프·점프 3번째) — 서버 전용 ───
+    float _comboLandingCounterNext;      // ConsumeCombo 가 세운 이 타의 창 길이 — 다음 StartAttack 이 소비
+    float _landingCounterWindow;         // 지금 공격(점프)의 착지 피해 직후 창 길이. 0 = 없음 · 한 번 열면 0
+    float _landingCounterCloseAt = -1f;  // 연 창을 닫을 시각(-1 = 없음). Attack 이탈은 PlayStateAnimation 이 닫는다
 
     bool ComboActive => _combo != null;
 
@@ -1038,9 +1061,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                 if (seq != NoAttack)
                 {
                     _raidSelfDestruct = true;
+                    if (_zeroGuard == ZeroGuard.Reserved) _zeroGuard = ZeroGuard.Active;   // 0줄 자폭 진행
                     return seq;
                 }
                 Debug.LogError($"{name}: 폐기 처분인데 공격 테이블에 ChargeSequence 행이 없다 — 건너뛴다.", this);
+                continue;
+            }
+
+            // 간파 릴레이 · 연쇄 간파(PLAN-boss-raid-relay) — ④ 자폭과 같은 송전기 흐름(점프 → ChargeWait 안의 자체 단계).
+            if (IsRaid && TryArmRaidGimmick(pending))
+            {
+                int seq = FindSlot(BossAttackId.ChargeSequence);
+                if (seq != NoAttack) return seq;
+                _raidGimmick = RaidGimmick.None;
+                Debug.LogError($"{name}: {pending} 인데 공격 테이블에 ChargeSequence 행이 없다 — 건너뛴다.", this);
                 continue;
             }
 
@@ -1105,6 +1139,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             if (CurrentPhase < e.allowedFromPhase) continue;
             // 단타 훅·어퍼 끔(경석 10-19) — 콤보로만 나온다. 콤보 첫 타 판정(CollectComboCandidates)은 행 가중치를 안 보므로 영향 없다.
             if (!_boss.singleHookUpper && BossComboPolicy.IsHookOrUpper(e.attackId)) continue;
+            // 단타 점프 끔(경석 10-21) — 점프는 콤보로만. 같은 이유로 콤보 첫 타 판정에는 영향 없다.
+            if (!_boss.singleJump && e.attackId == BossAttackId.Jump) continue;
 
             // 🔴 상한은 저작값이 아니라 **개시 상한**이다 — 접촉 공격은 attackRange 안까지 걸어
             //    들어간 뒤에만 시작한다(허공 훅 차단). 붙은 뒤에는 저작값까지 계속 때린다.
@@ -1184,60 +1220,44 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-    /// <summary>[Dev] 예약 대기열 최대 길이. 넘치면 새 예약을 받지 않는다(덮어쓰지 않는다 — 넣은 순서가 곧 재현 순서다).</summary>
-    public const int DevReservationCapacity = 8;
-    readonly Queue<BossAttackId> _devReservations = new Queue<BossAttackId>(DevReservationCapacity);
+    // 🔸 경석 10-20: 단타 5종 대기열 예약(F3·F4·F6·F9·F11)을 걷어 내고 **점프·점프·점프 콤보 1회 예약(F3)** 만 남겼다.
+    //    점프×3 3번째 착지 간파 창(landingCounterWindow)은 콤보 마지막 타에만 있어서 단타 점프 예약으론 확인할 수 없다.
+    bool _devJumpComboReserved;
 
-    /// <summary>[Dev · 서버] 지금 대기 중인 예약 수.</summary>
-    public int DevReservationCount => _devReservations.Count;
+    /// <summary>[Dev · 서버] 점프·점프·점프 콤보 예약이 걸려 있는가.</summary>
+    public bool DevJumpComboReserved => _devJumpComboReserved;
 
-    /// <summary>[Dev · 서버] 다음 공격 예약을 대기열 끝에 넣는다. 가득 차면 false.</summary>
-    public bool DevReserveNextAttack(BossAttackId id)
+    /// <summary>[Dev · 서버] 다음 행동 = 점프·점프·점프 콤보(쿨·가중치 무시). 콤보가 데이터에 없으면 false.</summary>
+    public bool DevReserveJumpCombo()
     {
         if (!IsServer) return false;
-        if (_devReservations.Count >= DevReservationCapacity)
+        if (FindJumpTripleCombo() < 0)
         {
-            Debug.LogWarning($"[23호/Dev] 예약 대기열이 가득 찼다({DevReservationCapacity}) — {id} 무시", this);
+            Debug.LogWarning("[23호/Dev] 점프·점프·점프 콤보(모든 타가 Jump)가 combos 에 없다 — 예약 안 함", this);
             return false;
         }
-        _devReservations.Enqueue(id);
-        Debug.Log($"[23호/Dev] 예약 추가 — {id} · 대기 {_devReservations.Count}/{DevReservationCapacity} " +
-                  $"[{string.Join(" → ", _devReservations)}] (상태={State} · 페이즈={_attackPhase})", this);
+        _devJumpComboReserved = true;
+        Debug.Log($"[23호/Dev] 점프·점프·점프 콤보 예약 (상태={State} · 페이즈={_attackPhase})", this);
         return true;
     }
 
-    /// <summary>[Dev · 서버] 대기열을 비운다.</summary>
-    public void DevClearReservations()
-    {
-        if (!IsServer) return;
-        _devReservations.Clear();
-        Debug.Log("[23호/Dev] 예약 대기열 비움", this);
-    }
-
-    // 맨 앞 예약만 본다 — 사거리 밖이면 **순서를 지키려고** 뒤 예약으로 건너뛰지 않고 추격한다.
     int ConsumeDevReservation(BossAttackEntry[] rows, float dist)
     {
-        if (_devReservations.Count == 0) return NoAttack;
+        if (!_devJumpComboReserved) return NoAttack;
 
-        BossAttackId next = _devReservations.Peek();
-        int slot = FindSlot(next);
-        if (slot == NoAttack)
+        int k = FindJumpTripleCombo();
+        int slot = FindSlot(BossAttackId.Jump);
+        if (k < 0 || slot == NoAttack)
         {
-            _devReservations.Dequeue();
-            Debug.LogWarning($"[23호/Dev] 예약한 {next} 행이 공격 테이블에 없다 — 건너뜀", this);
+            _devJumpComboReserved = false;
+            Debug.LogWarning("[23호/Dev] 점프·점프·점프 콤보 또는 Jump 행이 없다 — 예약 버림", this);
             return NoAttack;
         }
+        if (!InComboWindow(rows[slot], dist)) return NoAttack;   // 예약 유지 — 거리창이 맞으면 발동
 
-        BossAttackEntry e = rows[slot];
-        if (!e.ignoreDistanceWindow)
-        {
-            float max = BossContactReachPolicy.EffectiveMaxDistance(e, data.attackRange, _inContactReach);
-            if (dist < e.minDistance || dist > max) return NoAttack;   // 예약 유지 — 추격하다 붙으면 발동
-        }
-
-        _devReservations.Dequeue();
-        Debug.Log($"[23호/Dev] 예약 공격 발동 — {next} (거리 {dist:0.##}m) · 남은 예약 {_devReservations.Count}", this);
-        return slot;
+        _devJumpComboReserved = false;
+        Debug.Log($"[23호/Dev] 예약 발동 — {_boss.combos[k].name} (거리 {dist:0.##}m)", this);
+        return StartRouletteCombo(k, rows);
     }
 #endif
     #endregion
@@ -1266,12 +1286,51 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         return ScriptedResult.Fire;
     }
 
+    /// <summary>모든 타가 Jump 인 콤보(점프·점프·점프). 착지 간파 창이 있는 것을 먼저 고른다. 없으면 -1.</summary>
+    int FindJumpTripleCombo()
+    {
+        BossComboEntry[] combos = _boss != null ? _boss.combos : null;
+        if (combos == null) return -1;
+        int fallback = -1;
+        for (int k = 0; k < combos.Length; k++)
+        {
+            BossComboEntry c = combos[k];
+            if (c == null || c.steps == null || c.steps.Length == 0) continue;
+            bool allJump = true, hasWindow = false;
+            foreach (BossComboStep s in c.steps)
+            {
+                if (s.attack != BossAttackId.Jump) { allJump = false; break; }
+                if (s.landingCounterWindow > 0f) hasWindow = true;
+            }
+            if (!allJump) continue;
+            if (hasWindow) return k;
+            if (fallback < 0) fallback = k;
+        }
+        return fallback;
+    }
+
     int ConsumeRaidRescue(BossAttackEntry[] rows, float dist)
     {
         BossAttackId next = _raidRescueNext.Value;
         ScriptedResult r = TryScripted(next, rows, dist, out int slot);
         if (r == ScriptedResult.Missing) { _raidRescueNext = null; return NoAttack; }
         if (r == ScriptedResult.Wait) return NoAttack;
+
+        // 1인 = 점프·점프·점프 콤보(경석 10-20 — 구출 상대가 없으니 그냥 나오기만 한다). 보상은 일반 간파(3번째 착지 창)와 같다.
+        //    구출 표식(_raidRescueActive)은 세우지 않는다 — 콤보 타마다 FinishChain 이 지나가 첫 착지에서 "구출 실패"로 지워진다.
+        if (next == BossAttackId.Jump)
+        {
+            _raidRescueNext = null;
+            int k = FindJumpTripleCombo();
+            if (k < 0)
+            {
+                Debug.LogWarning($"[23호/레이드] 새 가족(1인) — 점프·점프·점프 콤보가 없어 단타 점프로 낸다.", this);
+                return slot;
+            }
+            Debug.Log($"[23호/레이드] 새 가족(1인) — {_boss.combos[k].name} 발동", this);
+            FightLog("③ 새 가족(1인) — 점프·점프·점프");
+            return StartRouletteCombo(k, rows);
+        }
 
         _raidRescueNext = null;
         _raidRescueActive = true;
@@ -1351,11 +1410,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         int slot = FindSlot(c.steps[0].attack);
         if (slot == NoAttack) return NoAttack;
 
+        // 룰렛 밖(Dev 예약 · ③ 1인 각본)에서 부르면 후보 계산을 거치지 않아 배열이 아직 없을 수 있다.
+        if (_comboLastUsed == null || _comboLastUsed.Length != _boss.combos.Length)
+        {
+            _comboLastUsed = new float[_boss.combos.Length];
+            for (int i = 0; i < _comboLastUsed.Length; i++) _comboLastUsed[i] = -999f;
+        }
+
         _combo = c;
         _comboIndex = 1;
         _comboIsOpening = false;
         _comboLock = Target;
         _comboLastUsed[k] = Time.time;
+        _comboWindupNext = c.steps[0].attack == BossAttackId.Jump ? Mathf.Max(0f, c.windup) : 0f;   // 첫 타 앞 차징
+        _comboWindupStartNext = Mathf.Clamp01(c.windupStartNormalized);
         _fightCombosStarted++;
         Debug.Log($"[23호/콤보] {c.name} 시작 — {c.steps[0].attack} (대상 {(Target != null ? Target.name : "없음")})", this);
         return slot;
@@ -1414,6 +1482,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         // forceFire — 시작 순간 어그로 대상 쪽으로 즉시 몸을 돌린다(StartAttack 에서 소비). 돌진 끝엔 벽을 보고 있어서(팀장 10-19).
         _comboFaceAggroOnStart = step.forceFire;
         _chainNextPending = chain;           // 다음 StartAttack 이 후속 타 분기(예고 생략·준비 단축·방향 고정)를 탄다
+        _comboLandingCounterNext = step.attack == BossAttackId.Jump ? step.landingCounterWindow : 0f;
         _chainPrevAttack = started ? steps[_comboIndex - 1].attack : step.attack;
         if (!started) _comboLock = Target;   // 개전 첫 타 — 이 순간 고정
 
@@ -1446,6 +1515,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         _chainNextPending = false;
         _chainFacingValid = false;
         _chainArmed = false;
+        _comboLandingCounterNext = 0f;
+        _comboWindupNext = 0f;
+        _comboWindupStartNext = 0f;
         _combo = null;
         _comboIndex = 0;
         _comboIsOpening = false;
@@ -1465,6 +1537,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         _chainedAttack = _chainNextPending;
         _chainNextPending = false;
         _chainArmed = false;   // 앞 공격이 남긴 예약은 이 공격에 해당하지 않는다
+        _landingCounterWindow = _comboLandingCounterNext;   // 콤보 타가 아니면 0(ClearCombo·소비 후 0)
+        _comboLandingCounterNext = 0f;
+        _comboWindup = e != null && e.attackId == BossAttackId.Jump ? _comboWindupNext : 0f;   // 콤보 첫 타 앞 차징
+        _comboWindupStart = _comboWindupStartNext;
+        _comboWindupNext = 0f;
+        _comboWindupStartNext = 0f;
+        _landingCounterCloseAt = -1f;
 
         // 연속 카운트는 "실제로 쓴 것" 기준으로 센다(SelectAttackSlot 은 NoAttack 을 돌릴 수 있다).
         if (CurrentAttackSlot == _lastSlot)
@@ -1544,7 +1623,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     // 🔴 [G4] 이륙 몴을 반드시 더한다 — 빼면 체인 도중 데드락 안전망이 터진다
                     //    (돌진이 선딜 몫을 빼뜨려 매번 타임아웃하던 것과 같은 종류).
                     _stateTimer = JumpTakeoffDuration + JumpHover + JumpLanding + JumpRecovery
-                                + data.attackDuration;
+                                + data.attackDuration + _comboWindup;   // 콤보 앞 차징 몫도(슈퍼아머 길이)
                     break;
                 case BossAttackId.ChargeSequence:
                     // 🔴 **진입 구간을 예산에 넣는다**(2026-08-13). 차징은 자리로 이동한 뒤 시작하므로
@@ -1657,7 +1736,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                 StartMagneticPullClientRpc();
                 break;
 
-            case BossAttackId.Jump: BeginJump(); break;
+            case BossAttackId.Jump:
+                if (_comboWindup > 0f) BeginComboWindup();   // 점프·점프·점프 — 차징 클립 뒤 점프(case ComboWindup)
+                else BeginJump();
+                break;
             case BossAttackId.ChargeSequence: BeginCharge(); break;
             // 팔다리 전기는 **선딜부터** 흐른다(그랩 팔 전기와 같은 판단) — BeginDash/BeginRageDash 는
             // 실제 돌진이 시작되는 지점이라 거기서 켜면 선딜 동안 아무 예고가 없다.
@@ -1748,6 +1830,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     {
                         _attackPhaseTimer = 0f;
                         StopCutClipLoopsClientRpc();   // 착지 루프(JumpLanding)가 돌진까지 붙어 남던 것(경석 Play 10-19)
+                    }
+                    else
+                    {
+                        OpenLandingCounterWindow();     // 점프·점프·점프 3번째 — 착지 피해 직후 짧은 간파 창(경석 10-20)
                     }
                 }
                 break;
@@ -2450,6 +2536,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         //    (`DecideNextAfterAction` 은 virtual 이 아니라 훅을 걸 수 없고, 종료 경로가 4곳으로 흩어져 있다.)
         _lastAttackTickTime = Time.time;
         TickCounterVisual();   // 간파 창은 공격 중에만 열린다 — 조기 소등 검사는 여기 한 곳이면 된다
+        TickLandingCounterWindow();
 
         // [G1] 전진 공격은 **단계(AttackPhase)를 쓰지 않는다** — 훅·어퍼는 단타 공격이고, 전진은
         // 애니 히트 이벤트가 끝을 알리므로 단계 기계가 필요 없다. 그래서 아래 분기보다 앞에 둔다.
@@ -2560,6 +2647,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                 if (_attackPhaseTimer <= 0f) BeginJumpHover();
                 break;
 
+            // 콤보 시작 전 차징(점프·점프·점프) — 끝나면 원래 점프 시작으로.
+            case BossAttackPhase.ComboWindup:
+                if (_attackPhaseTimer > 0f) break;
+                if (IsSpawned) StopCutClipLoopsClientRpc();   // 차징 클립을 도중에 끊는다 — 루프 이펙트 정리
+                BeginJump();
+                break;
+
             case BossAttackPhase.Leap:
                 if (_attackPhaseTimer <= 0f) ArriveJump();
                 break;
@@ -2581,12 +2675,22 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                     break;
                 }
 
+                // 착지 간파 창이 남아 있으면(점프×3 마지막 타) 이동 자세로 자연스럽게 이어 주고, 창이 닫힐 때까지 회복을 늘린다.
+                if (LandingCounterRemaining > 0f)
+                {
+                    if (data != null && !string.IsNullOrEmpty(data.locomotionState))
+                        CrossFadeStateClientRpc(data.locomotionState);
+                    EnterPhase(BossAttackPhase.Recovery, Mathf.Max(JumpRecovery, LandingCounterRemaining));
+                    break;
+                }
+
                 EnterPhase(BossAttackPhase.Recovery, ChainPending ? Mathf.Max(0f, _boss.comboJumpRecovery) : JumpRecovery);
                 break;
 
             // ── 페이즈 시퀀스 ─────────────────────────────────────────
             case BossAttackPhase.ChargeWait:
                 if (_raidSelfDestruct) { TickSelfDestruct(); break; }   // ④ 자폭 — 오라·탑 없음(때려야 하는 기믹)
+                if (RaidGimmickActive) { TickRaidGimmick(dt); break; } // 간파 릴레이 · 연쇄 간파
                 TickChargeAura(dt);   // 접근 차단 오라는 차징 대기 구간에서만 돈다
                 TickCharge();
                 break;
@@ -3019,7 +3123,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             _raidSelfDestruct = false;
             _selfDestructShieldLeft = 0;          // 중단(사망 등) — 체력바 실드 덮개를 거둔다
             _selfDestructShield01.Value = 0f;
+            // 0줄 자폭이 결과 없이 끊겼다 — 보호를 유지한 채 다시 예약한다(안 하면 HP 1 에서 영원히 안 죽는다).
+            if (_zeroGuard == ZeroGuard.Active && State != MonsterState.Dead)
+            {
+                _zeroGuard = ZeroGuard.Reserved;
+                _pendingPhaseSequences.Enqueue(BossPhaseSequence.RaidSelfDestruct);
+            }
         }
+        // 간파 릴레이 · 연쇄 간파 — 돌진 이동·히트 윈도우·창·잠금을 걷는다(성공 경로에서는 이미 끝나 no-op).
+        EndRaidGimmick("중단", resume: false);
 
         if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
 
@@ -3957,6 +4069,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     [ClientRpc]
     void SetModelVisibleClientRpc(bool visible)
     {
+        StopTakeoffRiseLocal();   // 이륙 상승 원위치 — 숨김(체공 시작)·되살림(착지·중단) 어느 쪽이든
         if (_modelRenderers == null) CacheModelRenderers();
         if (_modelRenderers == null) return;
 
@@ -4053,6 +4166,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
 
         if (_counterAnimatorHeldLocally) _counterAnimatorResumeSpeed = speed;
         else animator.speed = speed;
+
+        // 이륙 동안 모델을 카메라 밖까지 끌어올린다(경석 10-21 — TwentyThreeBoss.JumpRise.cs). 체공 시작 숨김에서 원위치.
+        BeginTakeoffRiseLocal(dur);
     }
 
     /// <summary>[G4] 이륙 배속을 1 로 되돌린다. 잡기 배수 복원과 같은 규약.</summary>
@@ -4360,7 +4476,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         // 🔴 `out` 을 `&&` 오른쪽에 두면 단축평가로 **대입되지 않는 경로**가 생긴다(컴파일 에러).
         Vector3 pylonCenter = transform.position;
         // ④ 자폭은 탑을 고르지 않는다(고르면 참여 집합이 남아 다음 시퀀스가 재사용한다).
-        bool havePylonCenter = !_raidSelfDestruct && _charge != null && _charge.TryPrepareCenter(_chargePylons, out pylonCenter);
+        bool havePylonCenter = !_raidSelfDestruct && !RaidGimmickActive && _charge != null && _charge.TryPrepareCenter(_chargePylons, out pylonCenter);
 
         Transform landing = FindChargeLandingPoint();
         if (landing != null)
@@ -4423,6 +4539,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (_raidSelfDestruct)
         {
             StartSelfDestructInPlace();
+            return;
+        }
+
+        if (RaidGimmickActive)
+        {
+            StartRaidGimmickInPlace();   // 간파 릴레이 · 연쇄 간파(TwentyThreeBoss.RaidRelay.cs)
             return;
         }
 
@@ -4523,6 +4645,17 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     // 임의의 상태명을 전 피어에 CrossFade 한다(관용구 2 — 다지선다 애니는 상태 복제로 못 싣는다).
     [ClientRpc]
     void CrossFadeStateClientRpc(string stateName) => SafeCrossFade(stateName);
+
+    /// <summary>상태를 클립의 <paramref name="normalizedStart"/> 지점부터 CrossFade(0.1초 고정) — 점프×3 앞 차징처럼 중간 자세부터 틀 때.</summary>
+    [ClientRpc]
+    void CrossFadeStateAtClientRpc(string stateName, float normalizedStart)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrEmpty(stateName)) return;
+        int hash = Animator.StringToHash(stateName);
+        if (!animator.HasState(0, hash)) return;
+        // CrossFade 의 4번째 인자는 **정규화** 시작 지점이다(CrossFadeInFixedTime 은 초 단위라 쓰지 않는다).
+        animator.CrossFade(hash, 0.1f, 0, Mathf.Clamp01(normalizedStart));
+    }
 
     void TickCharge()
     {
@@ -4627,7 +4760,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): 방전/대폭발 처리 중만.</summary>
     // 팀장 10-14: 레이드도 장판을 계속 낸다 — ①·③ = 교차 장판, ②·④ = A/B(둘 다 ChargeSequence 의 ChargeWait 라 장판이 Charge 모드로 읽는다).
     public bool IsRaidFloorHeld =>
-        IsRaid && Time.time < _raidFloorHoldUntil;
+        IsRaid && (Time.time < _raidFloorHoldUntil || RaidGimmickActive);   // 릴레이·연쇄 간파 = 상시 장판 대신 기믹 방전만
 
     /// <summary>[서버] ③ 새 가족 각본이 예약·진행 중 — 상시 장판·드론을 멈춘다(PLAN §2 "각본 중 상시 공격 정지").</summary>
     public bool IsRaidRescueHold => _raidRescueActive || _raidRescueNext.HasValue;
@@ -4664,6 +4797,18 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         _selfDestructShieldLeft = 0;
         _selfDestructShield01.Value = 0f;
         _attackPhase = BossAttackPhase.None;
+
+        // 0줄 자폭: 저지 = 처치 / 실패 = 대폭발이 실제로 터질 때까지 보호 → 그 뒤 다음 피해에 사망(경석 10-20).
+        if (_zeroGuard == ZeroGuard.Active)
+        {
+            if (stopped)
+            {
+                KillAfterZeroSelfDestruct();
+                return;
+            }
+            _zeroGuard = ZeroGuard.Exploding;
+            _zeroExplodeUntil = Time.time + _boss.raidSelfDestructBlastWarn + 0.5f;
+        }
 
         if (stopped)
         {
@@ -5740,11 +5885,23 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
                        && _counterWindow.Value
                        && !CounterBlockedByState          // 취약·제압 중 간파 실패(기획 간파 §8)
                        && IsInterruptAttack(attackInfo)
-                       && IsCounterFromFront(hitContext);
+                       && IsCounterFromFront(hitContext)
+                       && RaidGimmickAcceptsCounter(GetAttackerClientId(hitContext));   // 릴레이 잠금 · 연쇄 지목자만
+        _raidCounterClientId = GetAttackerClientId(hitContext);
+
+        // 간파 릴레이 중 보스는 플레이어 피해를 받지 않는다(기획 기믹1 §3-1) — 간파 판정만 남긴다.
+        if (IsServer && RaidGimmickDamageImmune && IsFromPlayer(hitContext))
+            attackInfo.damage = 0;
 
         // 취약 중 간파 스킬 = 방향 무관 넉백(간파 성공 아님 · 게이지·취약시간 불변 — 기획 취약 §4.4). 필수 기믹 중엔 피해만.
         // 점프 체인 중엔 넉백 없이 피해만(IsInJumpChain — 이륙·공중·착지 모두 끊기지 않는다, 팀장 09-29).
         bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence && !IsInJumpChain;
+
+        // 취약 중 팔라딘 Q(진격의 방패) = 밀림 + 경직(경석 Play 10-20). 넉백·경직을 **둘 다** 싣는 플레이어 공격은 지금 Q 하나뿐이다.
+        // 경직은 남은 취약 시간까지만 — 취약이 풀리면 보스가 바로 움직인다(EndVulnerable).
+        bool qPushHit = IsServer && IsVulnerable && !IsInterruptAttack(attackInfo) && IsFromPlayer(hitContext)
+                        && attackInfo.knockbackStrength > 0f && attackInfo.staggerDuration > 0f
+                        && !IsInMandatorySequence && !IsInJumpChain;
 
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
         // 인터럽트 히트에서만 돌므로 조용하다. 취약·제압 중에는 실패가 정상이라 찍지 않는다.
@@ -5797,6 +5954,18 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         else if (vulnerableHit && resolved && State != MonsterState.Dead)
         {
             StartVulnerableKnockback(hitContext, attackInfo);
+        }
+        else if (qPushHit && resolved && State != MonsterState.Dead)
+        {
+            StartVulnerableKnockback(hitContext, attackInfo);
+            float stun = Mathf.Min(attackInfo.staggerDuration, _vulnerableUntil - Time.time);
+            if (stun > 0.05f && State != MonsterState.Groggy)
+            {
+                _groggyKind = BossPauseCondition.CounterGroggy;
+                ForceGroggy(stun);
+                _vulnerableStunGroggy = true;
+                Debug.Log($"[23호] 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초(남은 취약까지)", this);
+            }
         }
 
         return resolved;
@@ -5852,6 +6021,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     /// </summary>
     protected virtual bool IsCounterFromFront(AttackHitContext hitContext)
     {
+        // 간파 정면 판정은 counterRequiresFront 가 정한다(useFacingRules 와 분리 — 경석 Play 10-20).
+        if (_boss != null && !_boss.counterRequiresFront) return true;
+
         // 🔴 sourcePosition 이 아니라 공격자 **루트**를 우선 쓴다.
         //    BaseAttack.CreateHitContext 는 `transform.position` 을 담는데, 그 transform 은 플레이어
         //    루트가 아니라 무기/히트박스 자식이다(이미 보스 쪽으로 뻗어 있음). 그 점으로 각도를 재면
@@ -5904,6 +6076,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     {
         if (!IsServer) return;
         CancelCombo("간파 성공");
+
+        // 간파 릴레이 · 연쇄 간파 — 일반 간파 그로기 대신 기믹 처리(밀어내기 / 경직 → 다음 회).
+        if (RaidGimmickActive)
+        {
+            OnRaidGimmickCounter();
+            return;
+        }
 
         // ④ 자폭은 간파 창을 열지 않는다(팀장 10-19 — 실드를 공격으로 부순다). 그래서 여기 올 일이 없다.
 
@@ -5966,11 +6145,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
             return;
         }
 
-        float duration = Mathf.Max(0.05f, _boss != null ? _boss.breakDuration : 5f);
+        // 북진 압박 파훼 보상처럼 이 제압만 길이·배율이 다른 경우(공용 breakDuration·suppressDamageMultiplier 는 그대로 — Codex 10-20).
+        float duration = _suppressDurationOverride > 0f
+            ? _suppressDurationOverride
+            : Mathf.Max(0.05f, _boss != null ? _boss.breakDuration : 5f);
+        _suppressDurationOverride = -1f;
         _pendingSuppress = false;
         _fightSuppressions++;
         FightLog($"제압 — {reason}");
-        EndVulnerable("제압 진입");   // 취약이면 즉시 종료(기획 §8.2)
+        EndVulnerable("제압 진입", releaseStun: false);   // 취약이면 즉시 종료(기획 §8.2) — Q 경직은 제압 그로기가 이어받는다
         _suppressed = true;
         _groggyKind = BossPauseCondition.Suppress;
         StunForCounter(duration);
@@ -5997,6 +6180,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (!_suppressed || previous != MonsterState.Groggy || next == MonsterState.Groggy) return;
 
         _suppressed = false;
+        _suppressMultiplierOverride = -1f;   // 이번 제압 전용 배율(북진 압박) 끝
         if (next == MonsterState.Dead)
         {
             _pendingSuppress = false;
@@ -6075,8 +6259,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         Debug.Log($"[23호] 취약 진입 — {VulnerableDuration:0.#}초(그로기 포함)", this);
     }
 
-    void EndVulnerable(string why)
+    // 취약 중 팔라딘 Q 가 건 경직이 지금 그로기인가 — 취약이 끝나면 함께 풀어 보스가 바로 움직인다(경석 Play 10-20).
+    bool _vulnerableStunGroggy;
+
+    void EndVulnerable(string why, bool releaseStun = true)
     {
+        if (_vulnerableStunGroggy)
+        {
+            _vulnerableStunGroggy = false;
+            if (releaseStun && IsServer && State == MonsterState.Groggy && !_suppressed)
+            {
+                Debug.Log($"[23호] 취약 종료({why}) — 팔라딘 Q 경직도 해제, 바로 행동", this);
+                DecideNextAfterAction();
+            }
+        }
         if (_vulnerableUntil < 0f) return;
         _vulnerableUntil = -1f;
         if (IsServer) _vulnerableVisual.Value = false;
@@ -6329,7 +6525,22 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         return null;
     }
 
-    float SuppressDamageMultiplier => _boss != null ? Mathf.Max(0f, _boss.suppressDamageMultiplier) : 1.2f;
+    float SuppressDamageMultiplier => _suppressMultiplierOverride > 0f
+        ? _suppressMultiplierOverride
+        : (_boss != null ? Mathf.Max(0f, _boss.suppressDamageMultiplier) : 1.2f);
+
+    // 이번 제압 한 번만 다른 길이·배율(북진 압박 파훼 8초 · ×1.3). 길이는 EnterSuppress 가 소비, 배율은 제압이 끝날 때 지운다.
+    float _suppressDurationOverride = -1f;
+    float _suppressMultiplierOverride = -1f;
+
+    /// <summary>[서버] 길이·배율을 지정한 제압(기믹 종료 지점 전용 — 예약 검사 생략).</summary>
+    void EnterSuppressWith(string reason, float duration, float damageMultiplier)
+    {
+        _suppressDurationOverride = Mathf.Max(0.05f, duration);
+        _suppressMultiplierOverride = Mathf.Max(0f, damageMultiplier);
+        EnterSuppress(reason, fromReservation: true);
+        if (!_suppressed) _suppressMultiplierOverride = -1f;   // 사망 등으로 안 들어갔다
+    }
 
     // 🔴 몸 캡슐 1.53 — 데이터 회피 반경 0.3 으로 덮으면 좁은 통로에서 벽·플레이어를 파고든다(09-28 NavMesh 전수조사).
     //    프리팹 에이전트 반경(0.85)을 지킨다. 베이크는 반경 0.5(Humanoid 단일 타입)라 0.85 는 가장자리에 조금 더 보수적이다.
@@ -6346,6 +6557,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
         if (!IsServer) return;
 
         TickSuppressExit(previous, next);
+        if (previous == MonsterState.Groggy && next != MonsterState.Groggy) _vulnerableStunGroggy = false;   // Q 경직이 제 시간에 끝났다
         // 콤보 끊기 — 그로기·피격 경직·넉백·리쉬 복귀·사망(Idle→Idle 은 콜백이 없어 나머지는 각 진입점에서 끊는다).
         if (next == MonsterState.Groggy || next == MonsterState.Hit || next == MonsterState.Knockback ||
             next == MonsterState.Return || next == MonsterState.Dead)
@@ -6491,20 +6703,56 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     {
         if (!IsServer) return;
 
-        _bossCounterVisualOffAt = open && windowDuration > 0f
-            ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
-            : -1f;
+        // 🔴 경석 Play 10-20: 보라색(표시)과 간파 판정이 **같은 순간**에 꺼져야 한다 — 09-28 "표시만 0.15초 일찍"을 뒤집음.
+        //    표시를 따로 예약해 일찍 끄면 "보라색이 풀렸는데 간파가 된다"가 됐고, 돌진은 애니 준비가 늦으면 판정이 더 늦게 닫혀
+        //    어긋남이 더 컸다(Codex 10-20). 그래서 표시는 판정 창의 개폐만 따라간다. 공용 상수(MonsterBase)는 그대로 — 중간보스 무변경.
+        _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
 
         if (_counterWindow.Value == open) return;
         _counterWindow.Value = open;
     }
 
+    /// <summary>
+    /// [서버] 점프 착지 간파 창(경석 10-20) — 콤보 타의 <c>landingCounterWindow</c> 만큼 착지 피해 **직후** 연다.
+    /// 성공은 일반 간파와 같은 경로(ReceiveAttack → EnterCounterSuccess = 그로기·게이지), 놓치면 그대로 전투.
+    /// 한 공격에 한 번만 — 착지 히트 이벤트가 두 번 와도 다시 열지 않는다.
+    /// </summary>
+    void OpenLandingCounterWindow()
+    {
+        if (!IsServer || _landingCounterWindow <= 0f) return;
+
+        float window = _landingCounterWindow;
+        _landingCounterWindow = 0f;
+        if (CounterBlockedByState) return;   // 취약·제압 중 간파 없음(기획 간파 §8) — 다른 창과 같은 규칙
+
+        // 경석 Play 10-20 (2차): 자세 정지(animator 0)는 "순간 멈춰" 보였고, 클립이 0.21 에 멈춰 착지 루프(JumpLanding)의
+        //    짝 StopEffect(0.23)가 안 와서 레이지 같은 이펙트가 남았다(10-19 즉시 연결 때와 같은 뿌리).
+        //    → 루프는 여기서 끄고, 클립은 **그대로 이어 재생**한다. 착지가 끝나면 이동 자세로 이어지고(case Land),
+        //      창이 닫힐 때까지 회복을 늘려 공격 상태를 유지한다 — Attack 을 벗어나면 창이 닫히기 때문이다.
+        StopCutClipLoopsClientRpc();
+        _stateTimer += window;
+        SetCounterWindow(true, window);
+        _landingCounterCloseAt = Time.time + window;
+        Debug.Log($"[23호] 점프 착지 간파 창 {window:0.##}초", this);
+    }
+
+    void TickLandingCounterWindow()
+    {
+        if (_landingCounterCloseAt < 0f || Time.time < _landingCounterCloseAt) return;
+        _landingCounterCloseAt = -1f;
+        SetCounterWindow(false);
+    }
+
+    /// <summary>착지 간파 창이 아직 열려 있으면 남은 시간(초), 아니면 0.</summary>
+    float LandingCounterRemaining => _landingCounterCloseAt < 0f ? 0f : Mathf.Max(0f, _landingCounterCloseAt - Time.time);
+
     /// <summary>[서버] 열린 창이 <paramref name="remaining"/> 초 뒤 닫힐 것이 확정됐다 — 표시를 그 0.15초 전에 끄게 예약.</summary>
     void ScheduleCounterVisualOff(float remaining)
     {
+        // 경석 Play 10-20: 표시는 판정 창 개폐만 따라간다(SetCounterWindow 참조) — 조기 소등 예약 안 함.
         if (!IsServer || !_counterWindow.Value) return;
-        _bossCounterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
+        _bossCounterVisualOffAt = -1f;
     }
 
     void TickCounterVisual()
@@ -6582,13 +6830,90 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSl
     #region 페이즈 (HP 임계 전환)
     public override void TakeDamage(AttackInfo attackInfo)
     {
+        // 0줄 자폭(PLAN-boss-ab-test) — 치명 피해는 HP 1 에서 멈추고, 보호 중엔 HP 피해 0. 예약은 페이즈 판정 **뒤에**(아래).
+        bool reserveZero = IsServer && ZeroGuardFilter(ref attackInfo);
+
         base.TakeDamage(attackInfo); // 서버 가드 + 방어/체력 + 사망/그로기/피격경직 판정
 
         if (!IsServer || State == MonsterState.Dead)
             return;
 
         EvaluatePhase();
+
+        // 한 방에 30% 와 0줄을 같이 넘겨도 페이즈 기믹 → 자폭 순서로 정확히 한 번(Codex 10-20).
+        if (reserveZero)
+        {
+            _pendingPhaseSequences.Enqueue(BossPhaseSequence.RaidSelfDestruct);
+            FightLog("0줄 — 자폭 예약(HP 1 보호)");
+            Debug.Log("[23호] 0줄 — 치명 피해를 HP 1 에서 멈추고 자폭을 예약한다", this);
+        }
     }
+
+    #region 0줄 자폭 (selfDestructAtZero, PLAN-boss-ab-test)
+    // Off → (치명 피해) Reserved → (예약 소비) Active → 실드 파괴 = Killing(처치) / 시간 초과 = Exploding(방전 발동까지 보호) → Done(다음 피해에 사망).
+    enum ZeroGuard { Off, Reserved, Active, Exploding, Done, Killing }
+    ZeroGuard _zeroGuard;
+    float _zeroExplodeUntil;
+
+    bool ZeroSelfDestructOn => _boss != null && _boss.selfDestructAtZero && IsRaid;
+
+    bool ZeroGuardProtecting
+    {
+        get
+        {
+            if (_zeroGuard == ZeroGuard.Exploding && Time.time >= _zeroExplodeUntil) _zeroGuard = ZeroGuard.Done;
+            return _zeroGuard == ZeroGuard.Reserved || _zeroGuard == ZeroGuard.Active || _zeroGuard == ZeroGuard.Exploding;
+        }
+    }
+
+    /// <summary>[서버] 이번 피해를 거른다. 반환 = 이번 피해로 자폭을 새로 예약해야 한다.</summary>
+    bool ZeroGuardFilter(ref AttackInfo attackInfo)
+    {
+        if (!ZeroSelfDestructOn || _zeroGuard == ZeroGuard.Killing || _zeroGuard == ZeroGuard.Done) return false;
+
+        if (ZeroGuardProtecting)
+        {
+            attackInfo.damage = 0;   // 예약·자폭·폭발 대기 중 HP 는 1 에서 안 내려간다(실드 넘침 포함)
+            return false;
+        }
+
+        if (attackInfo.damage < CurrentHealth) return false;
+        // 방어 경감 전 값으로 깎는다 — 경감은 피해를 줄이기만 하므로 HP ≥ 1 이 보장된다.
+        attackInfo.damage = Mathf.Max(0, CurrentHealth - 1);
+        _zeroGuard = ZeroGuard.Reserved;
+        return true;
+    }
+
+    // ReceiveAttack 을 거치지 않는 직접·비율 피해도 막는다(Unit.ApplyHealthDamage — Codex 10-20). 보호 중이면 전부, 아니면 치명만.
+    protected override bool CanApplyHealthDamage(int damage)
+    {
+        if (IsServer && ZeroSelfDestructOn && _zeroGuard != ZeroGuard.Killing && _zeroGuard != ZeroGuard.Done)
+        {
+            if (ZeroGuardProtecting && damage > 0) return false;
+            if (damage >= CurrentHealth)
+            {
+                if (_zeroGuard == ZeroGuard.Off)
+                {
+                    _zeroGuard = ZeroGuard.Reserved;
+                    _pendingPhaseSequences.Enqueue(BossPhaseSequence.RaidSelfDestruct);
+                    FightLog("0줄 — 자폭 예약(직접 피해, HP 보호)");
+                }
+                return false;
+            }
+        }
+        return base.CanApplyHealthDamage(damage);
+    }
+
+    /// <summary>[서버] 0줄 자폭 실드 파괴 — 보호를 풀고 정상 사망 경로로 처치한다.</summary>
+    void KillAfterZeroSelfDestruct()
+    {
+        _zeroGuard = ZeroGuard.Killing;
+        _pendingSuppress = false;   // 제압 예약이 남아 있으면 버린다(처치가 우선)
+        FightLog("0줄 자폭 저지 — 처치");
+        BreakShield();
+        TakeDamage(new AttackInfo(999999, AttackType.Default));
+    }
+    #endregion
 
     // 체력 비율이 임계를 넘어설 때마다 페이즈를 1 올린다.
     // 🔴 페이즈는 되돌아가지 않는다 — 회복(리쉬 리셋 등)이 페이즈 연출을 다시 트리거하면 안 된다.

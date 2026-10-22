@@ -138,6 +138,21 @@ public sealed class BossElectricFloor : MonoBehaviour
         _dischargeDamage = Mathf.Max(0, damage);
     }
 
+    /// <summary>
+    /// [서버] 레이드 방전 **취소** — 대기 중 요청과 진행 중 예고(Warn)를 함께 지우고 전 피어 표시를 걷는다(북진 압박: 탑을 다 부수면 방전 없음).
+    /// 이미 발동(Vfx)한 것은 건드리지 않는다. 🔴 pending 만 지우면 Warn 이 Raid 모드를 붙잡은 채 끝까지 가서 터진다(Codex 10-20).
+    /// </summary>
+    public void ServerCancelDischarge()
+    {
+        _dischargePending = false;
+        if (_mode != Mode.Raid || _step != Step.Warn) return;
+        _step = Step.Wait;
+        _t = 0f;
+        _mask = 0UL;
+        Clear();
+        Debug.Log("[전기장판] 레이드 방전 예고 취소", this);
+    }
+
     void TickRaid(float dt)
     {
         if (_step == Step.Wait)

@@ -375,7 +375,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
             targetRef = target.NetworkObject;
 
         isRequestingSkill = true;
-        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint);
+        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport());
         return true;
     }
 
@@ -611,8 +611,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯)
         // 툴팁 계산식도 같은 계수·고정값을 쓰므로 판정 공식을 바꿀 때 SkillTooltipDamage 계산도 같이 바꿀 것.
-        int damageSnapshot = Mathf.Max(0,
-            Mathf.RoundToInt(player.FinalAttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
+        int damageSnapshot = player.ResolveDamage(skill.Data.AttackDamageMultiplier, skill.Data.FlatDamageBonus);
         skill.SetDamageSnapshot(damageSnapshot);
         // 지점(AimPoint)은 CanApproveSkill 이 CanUse 직전에 이미 넣었다.
 
@@ -837,10 +836,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
     [Rpc(SendTo.Server)]
     private void RequestUseSkillRpc(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, NetworkObjectReference targetRef,
-        Vector3 aimPoint, bool hasAimPoint, RpcParams rpcParams = default)
+        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
+
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, $"스킬 {slot}");
 
         Unit target = ResolveTarget(targetRef);
         if (!StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint))

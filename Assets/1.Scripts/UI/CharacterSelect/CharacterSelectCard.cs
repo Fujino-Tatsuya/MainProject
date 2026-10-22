@@ -2,13 +2,15 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
 /// 캐릭터 선택 카드 하나(할 일 48.2) — 로스터 엔트리 하나의 초상화·이름. <see cref="CharacterSelectPanel"/> 이 로스터 수만큼 복제한다.
-/// 자리(위·가운데·아래)·크기는 패널이 정하고, 여기는 겉모습만 바꾼다.
+/// 자리(위·가운데·아래)·크기·이동은 패널이 정하고, 여기는 겉모습만 바꾼다.
 /// - 가운데(포커스) = 초록 큰 카드(card_selected_gap + fill_tint), 위·아래 = card_unselected_top/bottom.
-/// - 지금 내 캐릭터 = 금색 테두리(card_selected_ring) + "현재" 표식 — 포커스(초록·크기)와 따로 보인다.
+/// - 금색 테두리(card_selected_ring) = "가운데 자리 강조"(할 일 60) — 알파는 패널이 이동 연출에 맞춰 준다(<see cref="SetRingAlpha"/>).
+/// - 지금 내 캐릭터 = "현재" 표식만.
 /// - 고를 수 없음 = 회색 + "선택 불가".
 /// 클릭은 Button 이 아니라 <see cref="IPointerClickHandler"/> — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 피한다.
 /// </summary>
@@ -20,7 +22,9 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Image sideBackground;
     [SerializeField] private Sprite sideTopSprite;
     [SerializeField] private Sprite sideBottomSprite;
-    [SerializeField] private GameObject currentMarker;
+    [Tooltip("가운데 자리 강조 금색 테두리(Image). 켜고 끄기·알파는 SetRingAlpha.")]
+    [FormerlySerializedAs("currentMarker")]
+    [SerializeField] private GameObject focusRing;
     [SerializeField] private Image portraitImage;
     [SerializeField] private TMP_Text nameText;
     [Tooltip("\"현재\" 표식(배경 알약째 켜고 끈다). 글자는 currentText.")]
@@ -39,6 +43,10 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Color focusedNameColor = new Color(0.08f, 0.08f, 0.08f, 1f);
     [SerializeField] private Color sideNameColor = Color.white;
     [SerializeField] private Color unavailablePortraitColor = new Color(0.35f, 0.35f, 0.35f, 1f);
+
+    private Image _ringImage;
+    private float _ringBaseAlpha = 1f;
+    private bool _ringCached;
 
     /// <summary>클릭됐다(카드 index).</summary>
     public event Action<int> Clicked;
@@ -72,7 +80,8 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
 
     /// <summary>
     /// 겉모습. <paramref name="slotOffset"/> = 0 가운데(포커스) · -1 위 · +1 아래(그 밖은 패널이 끈다).
-    /// <paramref name="isCurrent"/> = 지금 내 캐릭터, <paramref name="locked"/> = 준비 중(포커스 카드를 바래게).
+    /// 화면 밖(±2 이상)은 나가는 중인 카드 — 옆 카드 모양. <paramref name="isCurrent"/> = 지금 내 캐릭터("현재" 표식),
+    /// <paramref name="locked"/> = 준비 중(포커스 카드를 바래게). 금색 테두리는 여기서 건드리지 않는다(<see cref="SetRingAlpha"/>).
     /// </summary>
     public void SetState(int slotOffset, bool isCurrent, bool locked)
     {
@@ -92,13 +101,37 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
             sideBackground.color = Available ? sideColor : unavailableSideColor;
         }
 
-        if (currentMarker != null)
-            currentMarker.SetActive(isCurrent);
         if (currentTag != null)
             currentTag.SetActive(isCurrent);
 
         if (nameText != null)
             nameText.color = focused && Available ? focusedNameColor : sideNameColor;
+    }
+
+    /// <summary>가운데 자리 강조 테두리 알파(0 = 끔). 프리팹 Image 의 원래 알파에 곱한다.</summary>
+    public void SetRingAlpha(float alpha)
+    {
+        if (focusRing == null)
+            return;
+
+        bool show = alpha > 0f;
+        if (focusRing.activeSelf != show)
+            focusRing.SetActive(show);
+
+        if (!_ringCached)
+        {
+            _ringCached = true;
+            _ringImage = focusRing.GetComponent<Image>();
+            if (_ringImage != null)
+                _ringBaseAlpha = _ringImage.color.a;
+        }
+
+        if (_ringImage != null)
+        {
+            Color color = _ringImage.color;
+            color.a = _ringBaseAlpha * Mathf.Clamp01(alpha);
+            _ringImage.color = color;
+        }
     }
 
     public void OnPointerClick(PointerEventData eventData)

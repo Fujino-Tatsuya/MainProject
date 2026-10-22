@@ -7,8 +7,9 @@ using UnityEngine.SceneManagement;
 /// 부스 데모 자동 접속·재접속 — PLAN-48 §4.2. NetworkManager.prefab 의 NetworkSessionLauncher 옆에 붙는다(DDOL).
 /// 판단은 <see cref="ReconnectLoop"/>(순수)가 하고, 여기서는 NGO 이벤트를 루프에 넣고 루프의 명령을 실행만 한다.
 /// <para>
-/// 부팅: 설정 파일 로드(<see cref="DemoConnectionConfig.Load"/>, MPPM 태그 포함) → 타이틀 자동 로드 억제 →
-/// UnityTransport 타임아웃 덮어쓰기 → 대기 씬(6.DemoConnectScene) 로컬 로드 → 루프 시작.
+/// 부팅: 설정 파일 로드(<see cref="DemoConnectionConfig.Load"/>, MPPM 태그 포함) → UnityTransport 타임아웃 덮어쓰기 →
+/// GameManager 가 평소처럼 1.TitleScene 을 띄운다 → 타이틀 START(<see cref="TryHandleTitleStart"/>) → 대기 씬(6.DemoConnectScene)
+/// 로컬 로드 → 루프 시작. 호스트·클라 모두 부팅 직후 타이틀을 거친다(할 일 70). 그 뒤의 판 끝 로비 복귀·재접속 대기는 타이틀을 거치지 않는다.
 /// 호스트는 StartHost 성공 시 NGO LoadScene(3.LobbyScene, Single), 클라는 hostAddress:port 로 접속하고 NGO 동기화로 로비에 들어간다.
 /// </para>
 /// 켜지는 조건은 <see cref="DemoSessionRules.ShouldRunDemoFlow"/> — 0.BootStrapScene 에서 시작한 메인 흐름일 때만.
@@ -31,6 +32,8 @@ public sealed class DemoSessionDirector : MonoBehaviour
     /// <summary>접속 승인(<see cref="DemoJoinRule"/>)이 "로비인가" 를 판단할 씬 이름.</summary>
     public string LobbySceneName => lobbySceneName;
 
+    static DemoSessionDirector s_active;
+
     NetworkManager _networkManager;
     NetworkSessionLauncher _launcher;
     DemoConnectionLoadResult _loadResult;
@@ -39,6 +42,8 @@ public sealed class DemoSessionDirector : MonoBehaviour
     DemoConnectionOverlay _overlay;
 
     float _bootTime;
+    // 타이틀 START 로 루프를 시작했는가. 그 전엔 루프·오버레이가 멈춰 있다.
+    bool _begun;
     bool _waitingForWaitScene;
     bool _lobbyLoadPending;
     bool _callbacksRegistered;
@@ -79,13 +84,8 @@ public sealed class DemoSessionDirector : MonoBehaviour
             return;
         }
 
-        // GameManager.Start 의 타이틀 로드보다 앞서야 한다(DevSceneBooter 와 같은 이유로 Find 를 쓴다 — Awake 순서 무관).
-        var gameManager = FindFirstObjectByType<GameManager>();
-        if (gameManager != null)
-            gameManager.SuppressStartupSceneLoad();
-        else
-            Debug.LogWarning("[DemoSession] 씬에 GameManager 가 없다 — 타이틀 억제를 건너뛴다.", this);
-
+        // 타이틀은 억제하지 않는다 — GameManager.Start 가 평소처럼 띄우고, START 에서 TryHandleTitleStart 로 넘어온다(할 일 70).
+        s_active = this;
         _loadResult = DemoConnectionConfig.Load();
         _config = _loadResult.Config;
         LogConfig();
@@ -96,16 +96,44 @@ public sealed class DemoSessionDirector : MonoBehaviour
         _launcher.LocalPlayerId = _config.PlayerId;
         _loop = ReconnectLoop.FromConfig(_config);
         _overlay = DemoConnectionOverlay.Create();
-        _bootTime = Time.realtimeSinceStartup;
     }
 
     private void Start()
     {
-        // 첫 시도도 대기 씬에서 한다 — 부트스트랩 씬엔 카메라·배경이 없다. 호스트는 곧바로 NGO 로 로비를 Single 로드한다.
-        _waitingForWaitScene = true;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         Player.LocalPlayerChanged += HandleLocalPlayerChanged;
         RegisterNetworkCallbacks();
+        NetworkDiagnosticsLog.Log($"{DiagTag}.Start", "타이틀 START 를 기다린다");
+    }
+
+    /// <summary>
+    /// 타이틀 START(시작 연출이 끝난 순간)에서 부른다. true = 데모 흐름이 처리했다 — 호출자는 로비를 로컬로 로드하지 않는다.
+    /// false = 데모 흐름이 꺼져 있다 — 종전처럼 로비로. 판단은 <see cref="DemoSessionRules.ResolveTitleStart"/>.
+    /// 무인 QA 는 타이틀 입력 대신 이걸 직접 불러도 된다.
+    /// </summary>
+    public static bool TryHandleTitleStart()
+    {
+        var director = s_active;
+        var route = DemoSessionRules.ResolveTitleStart(IsDemoFlowActive && director != null, director != null && director._begun);
+        NetworkDiagnosticsLog.Log($"{DiagTag}.TryHandleTitleStart", $"route={route}");
+        switch (route)
+        {
+            case DemoTitleStartRoute.BeginDemoFlow:
+                director.BeginFromTitle();
+                return true;
+            case DemoTitleStartRoute.Ignore:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void BeginFromTitle()
+    {
+        // 첫 시도도 대기 씬에서 한다 — 타이틀 위에서 접속을 기다리지 않는다. 호스트는 곧바로 NGO 로 로비를 Single 로드한다.
+        _begun = true;
+        _bootTime = Time.realtimeSinceStartup; // 부팅 안내(설정 파일 없음·role 자동 판정) 3초는 타이틀 뒤부터 센다
+        _waitingForWaitScene = true;
         SceneManager.LoadScene(waitSceneName, LoadSceneMode.Single);
     }
 
@@ -116,12 +144,15 @@ public sealed class DemoSessionDirector : MonoBehaviour
         UnregisterNetworkCallbacks();
         if (_overlay != null)
             Destroy(_overlay.gameObject);
+        if (s_active == this)
+            s_active = null;
         IsDemoFlowActive = false;
     }
 
     private void Update()
     {
-        if (_loop == null)
+        // 타이틀 동안엔 루프도 오버레이도 멈춘다(Idle 상태 문구가 타이틀 위에 뜨지 않게).
+        if (_loop == null || !_begun)
             return;
 
         if (_networkManager.IsListening && _networkManager.NetworkConfig != null)
@@ -310,6 +341,13 @@ public sealed class DemoSessionDirector : MonoBehaviour
             $"path={DemoConnectionConfig.ResolvePath(Application.dataPath)} missing={_loadResult.IsFileMissing} " +
             $"role={_config.Role} host={_config.HostAddress}:{_config.Port} playerId={_config.PlayerId} " +
             $"retry={_config.RetryIntervalSeconds}s connect={_config.ConnectTimeoutSeconds}s disconnect={_config.DisconnectTimeoutSeconds}s");
+        if (_config.AutoRole.HasValue)
+        {
+            var auto = _config.AutoRole.Value;
+            var line = $"{DemoConnectionOverlayText.AutoRoleText(auto)} basis={auto.Basis} local=[{string.Join(", ", auto.LocalAddresses)}]";
+            Debug.Log($"[DemoSession] role {line}", this);
+            NetworkDiagnosticsLog.Log($"{DiagTag}.AutoRole", line);
+        }
         foreach (var issue in _loadResult.Issues)
         {
             Debug.LogWarning($"[DemoSession] 설정 파일: {issue}", this);
@@ -336,8 +374,9 @@ public sealed class DemoSessionDirector : MonoBehaviour
         else
             _overlay.SetStatus(showStatus, showStatus ? DemoConnectionOverlayText.BuildStatus(BuildOverlayModel()) : string.Empty);
 
-        var showNotice = DemoConnectionOverlayText.ShouldShowConfigMissing(_loadResult.IsFileMissing, Time.realtimeSinceStartup - _bootTime);
-        _overlay.SetNotice(showNotice, showNotice ? DemoConnectUiStrings.ConfigMissing.Text : string.Empty);
+        var inNoticeWindow = DemoConnectionOverlayText.ShouldShowBootNotice(true, Time.realtimeSinceStartup - _bootTime);
+        var notice = inNoticeWindow ? DemoConnectionOverlayText.BootNotice(_loadResult.IsFileMissing, _config.AutoRole) : string.Empty;
+        _overlay.SetNotice(notice.Length > 0, notice);
     }
 
     private DemoConnectionOverlayModel BuildOverlayModel()
@@ -351,6 +390,7 @@ public sealed class DemoSessionDirector : MonoBehaviour
             _loop.SecondsUntilRetry(Now),
             _loop.LastReason,
             Application.version,
-            _lastConfigHash);
+            _lastConfigHash,
+            _config.AutoRole);
     }
 }

@@ -133,12 +133,12 @@ public sealed class BossRaidRulesTests
         Assert.That(BossRaidRules.SelfDestructGaugeAfterDamage(70f, 50, 0), Is.EqualTo(70f));
     }
 
-    /// ③ 로아 싱글처럼 — 혼자면 구출(잡기) 대신 간파 가능 돌진.
-    [TestCase(0, BossAttackId.Dash)]
-    [TestCase(1, BossAttackId.Dash)]
+    /// ③ 혼자면 구출(잡기) 대신 점프(→ 점프·점프·점프 콤보, 경석 10-20). 예전 = 간파 가능 돌진.
+    [TestCase(0, BossAttackId.Jump)]
+    [TestCase(1, BossAttackId.Jump)]
     [TestCase(2, BossAttackId.Grab)]
     [TestCase(3, BossAttackId.Grab)]
-    public void RescueAttack_SoloIsDash_PartyIsGrab(int alive, BossAttackId expected)
+    public void RescueAttack_SoloIsJump_PartyIsGrab(int alive, BossAttackId expected)
     {
         Assert.That(BossRaidRules.RescueAttackFor(alive), Is.EqualTo(expected));
     }

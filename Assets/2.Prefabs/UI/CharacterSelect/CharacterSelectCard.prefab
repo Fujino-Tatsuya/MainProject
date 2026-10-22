@@ -255,8 +255,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: '-'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
-  m_sharedMaterial: {fileID: -7556226730295790334, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  m_sharedMaterial: {fileID: -8943234406925885916, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -502,7 +502,7 @@ GameObject:
   - component: {fileID: 5699034943757967133}
   - component: {fileID: 8533283523847497120}
   m_Layer: 5
-  m_Name: Marker_Current
+  m_Name: Ring_Focus
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -632,8 +632,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uD604\uC7AC"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
-  m_sharedMaterial: {fileID: -7556226730295790334, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  m_sharedMaterial: {fileID: -8943234406925885916, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -920,8 +920,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uC120\uD0DD \uBD88\uAC00"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
-  m_sharedMaterial: {fileID: -7556226730295790334, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  m_sharedMaterial: {fileID: -8943234406925885916, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1165,7 +1165,7 @@ MonoBehaviour:
   sideBackground: {fileID: 7981741697866378015}
   sideTopSprite: {fileID: 21300000, guid: b0bbf79af41873345a5c50efcf01bd81, type: 3}
   sideBottomSprite: {fileID: 21300000, guid: 3228d489de5139348b3c324a35160924, type: 3}
-  currentMarker: {fileID: 5103994108708253439}
+  focusRing: {fileID: 5103994108708253439}
   portraitImage: {fileID: 1058035086793036450}
   nameText: {fileID: 3895078497317525261}
   currentTag: {fileID: 5831147525972799979}

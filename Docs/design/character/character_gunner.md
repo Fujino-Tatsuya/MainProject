@@ -6,7 +6,7 @@
 >
 > **원본**: 「Re:C 원거리 캐릭터 상세 기획서」(2026-09-30 수령). 본문은 원본 그대로 두고, grill(2026-09-30, 은희)로
 > 확정한 **변경·보충은 §0 과 본문의 `🆕 확정` 표시**에 적는다. 충돌 시 §0 이 우선한다.
-> 구현 계획: [PLAN-gunner.md](../../../PLAN-gunner.md). 이 캐릭터가 기존 징크스(스택 폭발) 기획을 대체한다 — [character_jinx.md](character_jinx.md) 는 폐기.
+> 구현 계획: [PLAN-gunner.md](../../history/PLANS/PLAN-gunner.md). 이 캐릭터가 기존 징크스(스택 폭발) 기획을 대체한다 — [character_jinx.md](character_jinx.md) 는 폐기.
 
 | 항목 | 값 |
 |------|----|

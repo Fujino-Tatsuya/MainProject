@@ -302,11 +302,12 @@ public sealed class BossComboEntryDrawer : PropertyDrawer
     }
 }
 
-/// <summary>콤보 한 타 — "1타 [공격] [무조건 시전]" 한 줄.</summary>
+/// <summary>콤보 한 타 — "1타 [공격] [착지 간파 초] [무조건 시전]" 한 줄.</summary>
 [CustomPropertyDrawer(typeof(BossComboStep))]
 public sealed class BossComboStepDrawer : PropertyDrawer
 {
     private const float ToggleWidth = 110f;
+    private const float WindowWidth = 120f;
 
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => EditorGUIUtility.singleLineHeight;
 
@@ -315,13 +316,23 @@ public sealed class BossComboStepDrawer : PropertyDrawer
         int index = MonsterInspectorGUI.ArrayIndex(property);
         SerializedProperty attack = property.FindPropertyRelative("attack");
         SerializedProperty forceFire = property.FindPropertyRelative("forceFire");
+        SerializedProperty landingWindow = property.FindPropertyRelative("landingCounterWindow");
 
-        var popup = new Rect(position.x, position.y, position.width - ToggleWidth - 4f, position.height);
-        var toggle = new Rect(popup.xMax + 4f, position.y, ToggleWidth, position.height);
+        var popup = new Rect(position.x, position.y, position.width - ToggleWidth - WindowWidth - 8f, position.height);
+        var window = new Rect(popup.xMax + 4f, position.y, WindowWidth, position.height);
+        var toggle = new Rect(window.xMax + 4f, position.y, ToggleWidth, position.height);
         MonsterInspectorGUI.AttackIdPopup(popup, new GUIContent(index >= 0 ? $"{index + 1}타" : "타", "변수: attack"), attack);
 
         int indent = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
+
+        // 착지 간파 창(초) — 점프 타 전용. 0 = 없음.
+        float labelWidth = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 62f;
+        EditorGUI.PropertyField(window, landingWindow,
+            new GUIContent("착지 간파", landingWindow.tooltip + "\n\n변수: landingCounterWindow"));
+        EditorGUIUtility.labelWidth = labelWidth;
+
         EditorGUI.BeginProperty(toggle, GUIContent.none, forceFire);
         EditorGUI.BeginChangeCheck();
         bool value = EditorGUI.ToggleLeft(toggle, new GUIContent("무조건 시전", forceFire.tooltip + "\n\n변수: forceFire"), forceFire.boolValue);

@@ -31,7 +31,7 @@ public static class DevBootToolbar
     [MainToolbarElement(
         LaunchElementPath,
         defaultDockPosition = MainToolbarDockPosition.Middle,
-        defaultDockIndex = 10,
+        defaultDockIndex = 2,
         menuPriority = 100,
         ussName = LaunchUssName)]
     private static MainToolbarElement CreateLaunchButton()
@@ -51,7 +51,7 @@ public static class DevBootToolbar
     [MainToolbarElement(
         SceneElementPath,
         defaultDockPosition = MainToolbarDockPosition.Middle,
-        defaultDockIndex = 11,
+        defaultDockIndex = 1,
         menuPriority = 101,
         ussName = SceneUssName)]
     private static MainToolbarElement CreateSceneDropdown()
@@ -114,7 +114,7 @@ public static class DevBootToolbar
     [MainToolbarElement(
         CharacterElementPath,
         defaultDockPosition = MainToolbarDockPosition.Middle,
-        defaultDockIndex = 12,
+        defaultDockIndex = 0,
         menuPriority = 102,
         ussName = CharacterUssName)]
     private static MainToolbarElement CreateCharacterDropdown()

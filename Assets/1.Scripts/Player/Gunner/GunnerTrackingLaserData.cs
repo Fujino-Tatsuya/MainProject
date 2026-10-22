@@ -55,6 +55,6 @@ public class GunnerTrackingLaserData : PlayerSkillData
         float minScale = StageDamageMultiplier(0);
         float maxScale = StageDamageMultiplier(int.MaxValue);
         return SkillTooltipDamage.FromScaledSnapshot(
-            player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale);
+            player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale, player.DealtDamagePercent);
     }
 }

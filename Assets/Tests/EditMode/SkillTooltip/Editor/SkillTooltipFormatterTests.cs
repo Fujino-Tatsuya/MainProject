@@ -67,4 +67,17 @@ public sealed class SkillTooltipFormatterTests
         Assert.That(scaled.Minimum, Is.EqualTo(70));
         Assert.That(scaled.Maximum, Is.EqualTo(315));
     }
+
+    [Test]
+    public void Damage_IncludesDealtDamagePercent_LikeJudgeSnapshot()
+    {
+        // 판정 스냅샷(PlayerStatFormula.Snapshot)과 같은 식 — 가하는 피해% 는 1차 스냅샷 뒤, 차지 배율 앞.
+        SkillTooltipDamage linear = SkillTooltipDamage.FromLinear(195f, 1.8f, 0, 0.2f);
+        SkillTooltipDamage scaled = SkillTooltipDamage.FromScaledSnapshot(130f, 1f, 10, 0.5f, 2.25f, 0.2f);
+
+        Assert.That(linear.Minimum, Is.EqualTo(421));
+        Assert.That(linear.MinimumCoefficient, Is.EqualTo(1.8f));
+        Assert.That(scaled.Minimum, Is.EqualTo(84));   // round(140 × 1.2) = 168 → × 0.5
+        Assert.That(scaled.Maximum, Is.EqualTo(378));  // 168 × 2.25
+    }
 }

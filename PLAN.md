@@ -1,3 +1,483 @@
+# ▶▶▶ 계획 = **할 일 83 — 플레이어 스탯 5종 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1차 공격력 `fbb29438` · ✅ 2차 5종 — 컴파일 0 · EditMode 2680/0 · ⏳ 은희 Play/MPPM)
+
+> 브랜치 `fix/TooltipValueClient`(기준 origin/development `c7057322`). 담당 은희(코어 = 본인 영역). 증상: 클라 스킬 툴팁 `{dmg}` 가 틀림.
+
+## 2차 확장 (2026-10-21 grill, 은희) — 공격력만이 아니라 **플레이어 스탯 5종 전부**
+- 범위: 공격력·이동속도·공격속도·방어력·최대 체력. 새 스탯은 표(`PlayerStatKind`)에 한 줄 추가로 늘린다.
+- 모든 스탯 = 기본% · 전체% 2단계(단계 내 더하기). 가하는 피해% 는 공격력 전용 3단계로 유지.
+- 상태이상: 기존 `XModifier` = 전체%, 기본% 타입 추가 — `MoveSpeedBaseModifier`(1<<16)·`AttackSpeedBaseModifier`(1<<17)·`DefenseBaseModifier`(1<<18)·`MaxHpBaseModifier`(1<<19). `BaseAttackDamageModifier`(1<<14) 는 그대로.
+- 이름 정리: `PlayerAttackStats`→`PlayerStats`, `AttackStatFormula`→`PlayerStatFormula`, `IAttackStatSource`→`IPlayerStatSource`, `AttackStatReport`→`PlayerStatReport`(5종 + 가하는 피해, 요청 6곳 그대로).
+- 기본값(피어마다 로컬): 공격력 `Player.attackDamage` · 이동속도 `PlayerMovement.BaseMaxSpeed` · 공격속도 `Player.attackSpeed` · 방어력 `Player.defense` · 최대 체력 `Player.maxHp`.
+- 소비처 연결(사용자 무선호 → 추천안): `Unit.Final*` 5개 virtual → Player 가 종합값으로 덮어씀(HUD·회복·추락 피해 등 기존 FinalMaxHp 소비처 자동 반영) · **이동속도**: `PlayerMovement` 의 상태이상 배율 → 종합 배율 · **방어력**: 피해 경감(`Unit.ApplyMitigatedHealthDamage`)이 플레이어는 종합 방어력을 읽음(몬스터 그대로) · **공격속도**: 값만 낸다(플레이어 소비처 없음 → 후속).
+- 동작 변화: 이동속도도 겹치면 곱→더하기(예: 이동 특성 1.2 + 거너 Q 감속 0.5 = 0.6 → 0.7). 방어력 상태이상이 처음으로 판정에 들어간다(현재 거는 곳 없음).
+
+## 사실
+- 원인: `Player.cs:259` `if (IsServer) Initialize(...)` → `Unit._attackDamage` 가 클라에서 0 → `FinalAttackDamage`·툴팁 `{dmg}` 가 0 기준.
+- 데미지 스냅샷은 서버가 `FinalAttackDamage` 로 만든다(`PlayerSkillController:615`·`DefaultAttackController:870`·`GunnerBasicAttack:441`·`AssassinBasicAttack:619`·`FirstMeleePassive:166`·거너 레이저 데이터 3곳). 툴팁은 `SkillTooltipContracts:72`.
+- 기본 공격력 원본 = `Player.attackDamage`(xlsx → 빌드 포함, 모든 피어가 같은 값). 상태이상 배율은 `StatusEffectController` 의 `NetworkList` 로 이미 복제(현재 같은 타입끼리 **곱**, 스택은 거듭제곱).
+- 튜토리얼 공격력 특성 = 영구 상태이상 `AttackDamageModifier`(배율 ≥1, `TutorialTraitDirector:797`).
+- `ChangeAttackDamageValue(Rpc)` 는 호출처 없음.
+
+## 결정 (grill 2026-10-21, 은희)
+1. **실제 데미지 = 서버 값 유지.** 권한 구조 불변. 클라 종합은 표시(툴팁·HUD)와 검증 보고용.
+2. **같은 종합 클래스를 서버·클라가 쓴다** — 서버 판정 값도 이 클래스에서 나온다(공식 한 곳).
+3. 공식(단계 내 더하기):
+   `최종 공격력 = round( 기본 × (1 + Σ기본공격력%) × (1 + Σ전체공격력%) )`, 0 이상
+   `피해 = round( (최종 공격력 × 스킬 계수 + 고정값) × (1 + Σ가하는피해%) )`, 0 이상 — 이후 거너 열 단계 배율 등 기존 후처리는 그대로.
+4. 상태이상 스탯 타입을 3개로: `BaseAttackDamageModifier`(신규 1<<14) · `AttackDamageModifier`(기존 값 유지 = **전체 공격력**) · `DealtDamageModifier`(신규 1<<15). 인스턴스 magnitude 1.2 = +20%, 0.8 = −20%, 스택 = %×스택 수(더하기). → **기존 공격력 배율 스택이 거듭제곱→더하기로 바뀐다**(튜토리얼 특성은 스택 1이라 수치 동일).
+5. 앞으로의 영구 가산(특성·성장)은 **출처 기록만 복제** — 서버는 "무엇을 얻었는지"(id)만 복제, 수치는 각 피어가 같은 SO 에서 읽어 종합. 이번엔 입력 인터페이스(`IAttackStatSource`)만 두고 구현체는 만들지 않는다(현재 특성은 상태이상 경로로 이미 들어옴).
+6. **서버 2차 검증 = 공격/스킬 시작 요청마다.** 오너가 자기 종합 결과(최종 공격력, 가하는 피해%)를 요청 RPC 에 실어 보내면 서버가 자기 값과 비교, 다르면 `Debug.LogWarning`(clientId·양쪽 값·요청 종류). 서버 쪽 입력이 바뀐 뒤 **유예 시간(기본 0.5초, 인스펙터 필드)** 안의 불일치는 복제 지연으로 보고 무시. 값은 서버 것을 쓴다(경고만).
+   대상 RPC: `PlayerSkillController.RequestUseSkillRpc` · `DefaultAttackController.RequestStartAttackRpc`·`RequestQueueNextAttackRpc` · 거너·어쌔신 기본 공격 시작 요청(데미지 스냅샷을 만드는 서버 지점마다).
+7. 커밋 `207c24ce`(기본 공격력 NetworkVariable 복제)는 **되돌린다**(로컬, push 전).
+
+## 구조
+- 신규 `Assets/1.Scripts/Player/Stats/`:
+  - `AttackStatFormula`(순수 static) — 위 공식·상태이상 % 합산·불일치 판정(유예 포함).
+  - `PlayerAttackStats`(Player 프리팹 base 의 컴포넌트, 비네트워크) — 입력: `Player.attackDamage`(로컬) + `IStatusEffectFacade`(복제) + 등록된 `IAttackStatSource`. 출력: `FinalAttackDamage`·`DealtDamageMultiplier`·`ResolveDamage(계수, 고정값)`·서버용 `LastInputChangedTime`.
+  - `IAttackStatSource` — 기본%/전체%/가하는피해% 기여 반환 + 변경 이벤트.
+- `Unit.FinalAttackDamage` 는 `IAttackStatProvider` 가 붙어 있으면 위임(기존 `IStatusEffectFacade` 조회 패턴), 없으면 지금 식(몬스터 무변경).
+- 데미지 스냅샷 지점들 → `ResolveDamage` 로 통일(가하는 피해% 적용 위치를 한 곳으로). 툴팁 `SkillTooltipDamage` 도 같은 식.
+- `StatusEffectController.GetStatMultiplier` 는 이동속도 등 다른 스탯용으로 그대로. 공격 3타입은 새 합산 API.
+- `UiStrings` 상태이상 이름 2개 추가, `StatusEffectType` 스탯 마스크에 신규 2개 추가.
+
+## 위험·범위 밖
+- 공격력 배율 스택 규칙 변경(4번) — 현재 스택 2 이상 쓰는 공격력 효과가 있으면 수치가 달라진다(구현 때 SO 전수 확인해 보고).
+- 몬스터 공격력·이동속도/공격속도/방어력 종합은 범위 밖. `ChangeAttackDamageValue` 는 손대지 않는다.
+- 플레이어 프리팹은 base(`Player.prefab`)에 컴포넌트 추가만. xlsx·SVN 무수정.
+
+## 수용·검증
+- EditMode: 공식(예: 기본 100, 기본 +10%·+20%, 전체 +50% → 195; 가하는 피해 +20%, 계수 1.8 → 421)·스택 더하기·음수 클램프·유예 판정·툴팁 = 서버 스냅샷 식 일치. 기존 툴팁·데이터 테이블·상태이상·플레이어 테스트 0 실패.
+- Unity MCP Refresh → 컴파일 0 → EditMode → 로컬 커밋(push 금지). Play 진입 금지.
+- 🟧 Play/MPPM(사용자): 호스트·클라 툴팁 `{dmg}` 동일 · 특성/버프 뒤 양쪽 갱신 · 정상 플레이 중 검증 경고 0 · 실제 데미지 수정 전과 동일(스택 1 기준).
+- 문서: `Docs/tech/` 공격 스탯 문서 신규(공식·타입·검증), `data-table.md` §9 `{dmg}` 설명 갱신, `CONTEXT.md` 용어(기본/전체 공격력, 가하는 피해).
+
+# ▶▶▶ 계획 = **거너 R 추적 레이저 연출 재제작 — 범위 장판 · 대상별 조준(좁혀지는 원) · 대상별 위성 레이저+땅 파문** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1단계 MyProject 제작 · ✅ 2단계 반입·코드·배선(MyProject 저장본 그대로, dotnet 빌드 오류 0) · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-21, Q1~Q12 전부 추천안). **게임플레이 무변경** — 0.5초마다 반경 2m 안 적 전부 즉시 피해(`GunnerTrackingLaser.DamageTick`), 연출을 그 박자에 맞춘다.
+
+## 사실
+- 레이저 = 서버 소유 NetworkObject `2.Prefabs/Player/Gunner/GunnerTrackingLaser.prefab`. 서버가 이동·피해·수명 계산, 복제는 위치(NetworkTransform)·반경(NetworkVariable)뿐. 연출 = 자식 `Visual` 의 `FX_GunnerUltLaser`(반경×2 균일 배율) 하나 — 맞는 적을 모른다.
+- `GunnerTrackingLaser.cs` = 은희 영역(G7). 레이저 프리팹 연출 = 민경(10-06·10-08).
+- 참고: MyProject `Export/Player2/R/Effect_05_Nuke.prefab`(패키지 스크립트 `DelayActive` 등 4종 타임라인 — 초반 = `NukeMarks` 바닥·세로 표식) · `Effect_54_SateliteCannon.prefab`(스크립트 없음, 파티클 6개 원샷).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 박자(Q1-a) | 연출이 실제 피해 박자를 그대로 보여 준다 — 대상별 원이 피해 간격 동안 좁혀져 0 = 피해 순간, 그때 레이저 |
+| 제작(Q2) | MyProject 빌더(`Tools/VFX/Gunner Ult (R 위성 레이저) 빌드`) → 민경 확인 → 반입. 3번 = SateliteCannon 복제 개조, 2번 = NukeMarks 파티클만 떼어 스크립트 없이 재구성 |
+| 색(Q3) | 거너 청록·하늘 + 흰 코어, 예고(2번)만 따뜻한 강조색. 정확한 값은 MyProject 확인 때 |
+| 1 장판(Q4) | 테두리 링 + 옅은 채움 + 테두리 도는 눈금(스캔선 없음). 루프, 레이저 따라 이동, 지름 1유닛 저작(반경×2 배율 그대로) |
+| 2 조준(Q5) | 조여 드는 꺾쇠 4개 + 좁혀지는 원 + 중심 점 깜빡임 + 아주 옅은 하늘 조준선. 루프, 범위 안 적마다 하나·추종 |
+| 3 레이저(Q6) | 수직으로 내리꽂기 — 흰 코어 + 글로우 + 섬광 + 파문 링 + 불꽃(그을음 없음). 원샷, 맞은 위치마다. 레이저+파문 = **한 프리팹·한 엔트리**(Q9) |
+| 퇴장(Q7-b) | 레이저 제거 때 장판이 0.3초 줄어들며 사라짐(디스폰 직전 연출만 떼어 냄) |
+| 동기화(Q8-a) | 서버가 피해 순간마다 **맞은 위치 목록 + 피해 간격**을 전 피어에 RPC → 이펙트 3. 조준 표식은 각 피어가 매 프레임 범위 안 적을 직접 계산(새로 들어온 적도 예고), 원 진행도 = 마지막 신호 이후 시간 ÷ 간격 |
+| 코드(Q9) | 신규 `GunnerTrackingLaserView`(민경) — 장판 루프·대상별 조준 루프·신호 받으면 레이저·퇴장. `EffectManager` 엔트리 3(장판 루프 · 조준 루프 · 레이저 원샷) 카탈로그 등록. 원 진행도는 조준 프리팹 안의 작은 컴포넌트(`SetProgress`)로 — MyProject·MainProject 같은 guid. `GunnerTrackingLaser` 에는 신호 함수·호출만 **추가**(은희 handoff). 오프라인(테스트 씬)도 같은 연출 |
+| 크기(Q10-b) | 조준 표식·원은 대상 몸 크기(콜라이더 반경) 따라, 상·하한. 레이저 굵기 고정 |
+| 정리(Q11-a, Q12-a) | 기존 `FX_GunnerUltLaser` 는 프리팹에서 떼고 파일은 남김. 시전 총구 섬광 `FX_GunnerUltCast` 그대로 |
+
+## 단계
+1. MyProject: 빌더 + 프리팹 3종(`Export/Player2/R/FX_GunnerUlt_Zone`·`_Lock`·`_Strike`) + 미리보기(움직이는 더미 대상 · 0.5초 박자) → ⏳ 민경 확인
+   - ✅ 작성: `1.Scripts/Editor/GunnerUltVfxBuilder.cs`(메뉴 `Tools/VFX/Gunner Ult (R 위성 레이저) 빌드` → 재질 사본 `Export/Player2/R/Materials/M_GUlt_*` · 프리팹 3 · 씬 `Scenes/GunnerUltPreview.unity`) · `1.Scripts/GunnerUltTester.cs`(미리보기 — MainProject View 와 같은 규칙) · `1.Scripts/TelegraphRing.cs`(guid `f4c85f3d33ed4596b0eecde3e202d475` — MainProject 에 같은 guid 로 반입)
+   - 재료: 장판 = Mark_1(링)·Mark_5(톱니)·Ring_2(채움) 청록 / 조준 = Mark_7(꺾쇠)·Mark_1(원) Nuke 주황 + Particle_01(점·하늘선) / 레이저 = SateliteCannon 사본 ×0.6, 루트 한 발 버스트, 청록 재질. 셰이더 `Shader_IntegratedEffect`(MainProject 에 같은 guid 있음)
+2. MainProject(🔴 Unity 끔): 반입(같은 guid) · 엔트리·카탈로그 · `GunnerTrackingLaserView` · `GunnerTrackingLaser` 신호 추가 · 프리팹 배선 · handoff
+   - ✅ 10-21: 프리팹 3 → `Common/Players/Player2/R_TrackingLaser/` + 엔트리 3(Strike 1.2초·prewarm 8 / Lock prewarm 6) · 재질 12 → `_Materials/Player2/` · 팩 텍스처 7·`Cylinder_01.fbx` · `TelegraphRing.cs`(같은 guid) · 카탈로그 `Gunner_R_*` · `GunnerTrackingLaserView`(NetworkBehaviour — NetworkVariable 반경·간격·적 레이어 + Reliable RPC 맞은 위치) · `GunnerTrackingLaser` 호출 2곳 추가 · 레이저 프리팹에서 `FX_GunnerUltLaser` 제거 · `GunnerUltSetup` 가드 · [handoff-gunner-r-vfx](Docs/tech/handoff-gunner-r-vfx.md)
+   - ⚠️ 반입 시점 Lock 프리팹: `Brackets` 가 `Ground` 밖(루트 직하, X 90°)이라 `TelegraphRing` 이 회전을 (0,0,각도)로 덮어써 세로로 선다 — 고칠 방법(원위치 or 스크립트가 저작값 기준으로) 민경 결정 대기
+3. ⏳ 민경 Play/MPPM: 호스트·클라 모두 — 대상별 표식이 범위 출입에 맞게 붙고 떨어짐, 원 0 순간 레이저와 피해 숫자 일치, 6초 뒤 장판 줄어들며 퇴장, 늦게 들어온 클라
+
+---
+
+# ▶▶▶ 잠긴 계획 = **할 일 57.3 — 웰즈 드론 로컬 풀 + 로딩 예열** (2026-10-20 · 위임 승인)
+
+> Handoff `54adb49f-b945-46bc-adff-08c1f727e3bc` · 브랜치 `feature/EnemyC3PrewarmBoss` · 선행 `3ff61ba1`/`f378714d`.
+
+## 목표와 결정
+- `WellsDroneAttack`의 클라이언트 로컬 드론 모델을 매 공격 Instantiate/Destroy 하지 않고 피어별 비활성 풀에서 재사용한다. 현재 한 보스·컴포넌트가 새 Lock 전에 Cancel 하므로 보관 상한은 **1기**다.
+- 드론은 NetworkObject가 아니므로 NGO prefab handler는 쓰지 않는다. 서버 타이머·판정·RPC 중계는 바꾸지 않는다.
+- 풀 인스턴스는 `DontDestroyOnLoad` 숨김 루트 아래 살아 로딩 씬→맵, Alt+0, 두 번째 판, 보스 디스폰을 건넌다. `SubsystemRegistration`의 `ResetForPlay`에서 풀·PlayableGraph를 명시 정리해 도메인 리로드 끔 재진입도 처리한다.
+- Collider 비활성·Rigidbody kinematic·Animator 준비는 생성 때 한 번만 한다. DashStart/DashLoop는 한 PlayableGraph의 두 입력으로 미리 만들고 공격마다 시간·가중치만 재설정한다.
+- 정본 `WellsDroneData.asset`은 Resources 밖이다. 에셋 이동/GUID 변경 없이 `Resources/Monster/WellsDronePrewarmCatalog.asset`이 정본 SO를 참조한다. 예열은 실제 모델·클립 데이터로 Mark→Lock→고정/낙하 Tick→클립 시작/루프 전환→반납을 돈다.
+- 첫 그리기의 lazy `Loading.ReadObject`를 앞당기기 위해 모델의 mesh/material/texture를 순회해 접근하고, 전용 작은 RenderTexture에 CommandBuffer로 한 번 그린 뒤 `GL.Flush`한다. 게임 카메라·화면·판정에는 노출하지 않는다.
+- 조준/착탄 뷰 루트는 기존 컴포넌트당 1회 재사용, 폭발은 기존 EffectManager 풀을 그대로 둔다.
+
+## 위험·범위 밖
+- URP/DX12의 PSO 준비 보장은 플랫폼별로 다르므로 빌드 GPU 첫 프레임은 Play 확인 항목으로 남긴다. 이번 결정적 테스트는 인스턴스/Animator/graph 수와 Instantiate 0 계약만 단언하고 시간은 단언하지 않는다.
+- 아트·xlsx·기존 `.meta` GUID·서버 로직·`TwentyThreeBoss` RPC는 수정하지 않는다.
+
+## 수용·검증
+- 동일 인스턴스 재사용, 반복 Lock/Cancel/Impact 후 풀/Animator/PlayableGraph 수 불변, 예열 뒤 첫 Lock 생성 0, 두 번째 예열 무동작, Reset 뒤 재실행을 EditMode로 검증한다.
+- Unity MCP로 Refresh→컴파일 0→전체 EditMode 0 실패→57.3 측정 메뉴 순서. Play 진입은 금지하고 문서 §9.4/9.5/9.9~9.11 및 외부 산출물 `57.3/`을 갱신한다.
+# ▶▶▶ 계획 = **잡몹 5종 + 엘리트 3종 폭발 사망 — ExplodeDeath(조각이 위·바깥으로 튐) + FX_Death_Explosion_01/02 (디졸브 파티클 없음)** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-21). 대상 = `ChompBot`·`HumanoidBot`·`MortarBot`·`PeekABot`·`TeslaBot`. ~~`GauntletBot`·`SpinnerBot`·`WallBot` 은 지금 붕괴 그대로.~~ → **2차(10-21 민경 요청): 엘리트 3종도 폭발** — 아래 「2차」.
+
+## 사실
+- 지금 사망 = `CollapseDeath`(`1.Scripts/Monster/Collapse/`, 민경 작성 10-06) — `MonsterBase` 가 사망 클립 끝 − `leadBeforeClipEnd`(0.1초)에 서버에서 `IDeathEffect.Play` → Reliable RPC 로 전 피어가 로컬 재생. 몬스터는 `GetComponent<IDeathEffect>()` 로 **하나만** 집는다.
+- 조각 = `MonsterCollapseDebris.Spawn`(본 단위 조각 + Rigidbody). 처음 속도는 **수평 바깥 0.5m/s 뿐**(위로 0), 1.2초 굴러다닌 뒤 0.6초 디졸브 → 조각 루트 `Destroy`.
+- 파티클 `FX_Dissolve_Death`(수명 2초, 엔트리·카탈로그 없음)는 지금 **붕괴 시작 때** 조각 루트의 자식으로 생긴다 → 디졸브 시작 때 같은 방식으로 내면 0.6초 만에 루트와 함께 잘린다.
+- `FX_Death_Explosion_01`(MyProject `Export/Monsters/Death/`) = 파티클 4개, 1초, 루프 아님. 의존: `Mat_fx_HCFX_Circle_01`·`Mat_fx_HCFX_Sharp_01`·`Fbx_fx_Round_01` 은 MainProject 에 있음, **`Mat_fx_HCFX_Dust_02.mat` + `Tex_fx_HCFX_Dust_02.tga` 신규**(셰이더 `HCFX_Particle2ndColor` 는 있음).
+- 5종 프리팹의 `CollapseDeath` 를 덮어쓰는 씬·존 프리팹 오버라이드 없음. `MonsterCollapseSetup`(에디터 도구)은 재실행하면 `CollapseDeath` 를 다시 붙인다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방식(Q1-b) | 새 컴포넌트 `1.Scripts/Monster/Collapse/ExplodeDeath.cs`(NetworkBehaviour, `IDeathEffect`) — `CollapseDeath` 와 같은 RPC·타이밍 구조. 5종은 `CollapseDeath` 를 떼고 `ExplodeDeath` 를 붙인다(공통 칸 값은 그대로 옮김). `CollapseDeath` 코드는 무변경 |
+| 조각 공유(Q7-a) | `MonsterCollapseDebris.Config` 에 **추가만**: 바깥 속도 범위 · 위로 튀는 속도 범위(사라지기 시작 콜백은 3차에서 뺌. 구현 때 "퍼지는 중심 높이"는 뺌 — 바깥 방향이 수평이라 높이와 무관, 높이는 이펙트 위치에만 씀). 기본값 0/null = 지금과 똑같음(붕괴 3종 무영향) |
+| 타이밍(Q2-a) | 지금처럼 사망 클립 끝 0.1초 전(`leadBeforeClipEnd`·`delayAfterClipEnd` 그대로) |
+| 세기(Q3-a, Q11) | 바깥 1.5~2.5m/s · 위로 2~3m/s · 회전 180~360도/초, 사방 고르게(타격 방향 안 실음). 인스펙터 조정 |
+| 폭발 이펙트(Q4-a) | `50.Art/VFX/Common/Monsters/Death/FX_Death_Explosion_01.prefab`(같은 guid) + `_Entry`(원샷) → 카탈로그 `몬스터` 묶음 `Mob_Death_Explosion`. 조각이 터지는 순간 `EffectManager.Play`(전 피어 로컬) |
+| 위치·크기(Q5-a) | 몬스터마다 `burstHeight`(이펙트 위치, 루트 + 위로) · `explosionScale`. **`burstHeight` 0 = 터지는 순간 몸 렌더러 경계 중심(자동)** — 5종 콜라이더가 모두 기본값(2m 캡슐)이라 오프라인 계산 근거가 없어 런타임 자동으로 대체. 배율은 1로 두고 Play 에서 조정 |
+| 디졸브 파티클(Q4·Q8-a·Q9-a) | ❌ **3차(10-21 민경)에서 뺌** — 폭발 때 디졸브 파티클 없음. 엔트리·카탈로그 `Mob_Death_Dissolve`·콜백 삭제. (원래: 조각이 디졸브를 시작할 때 조각들의 평균 위치에서 `FX_Dissolve_Death` 1회. 새 `FX_Dissolve_Death_Entry`(같은 폴더 `Common/Dissolve/`) → 카탈로그 `Mob_Death_Dissolve`, `EffectManager.Play` — 조각 루트와 따로 살아 잘리지 않음. 5종의 `particlePrefab` 직접 생성은 안 씀) |
+| 정리 시간(Q6-a) | 굴러다님 1.2초 · 디졸브 0.6초 그대로 |
+| 도구 가드(Q10) | `MonsterCollapseSetup` 이 `ExplodeDeath` 가 있는 프리팹은 건너뜀 |
+| 신규 아트 | `Mat_fx_HCFX_Dust_02.mat` → `_Materials/`, `Tex_fx_HCFX_Dust_02.tga` → `Textures/`. 🔴 SVN add(프리팹·엔트리 포함) |
+| 공유 | 몬스터 프리팹은 경석 영역 → 짧은 handoff(`Docs/tech/handoff-monster-explode-death.md`) |
+
+## 2차 — 엘리트 3종(GauntletBot·SpinnerBot·WallBot) (10-21 민경 요청 · ✅ 구현 — dotnet 빌드 오류 0 · ⏳ Play)
+| 항목 | 결정 |
+|---|---|
+| 컴포넌트 | 셋 다 `CollapseDeath` → `ExplodeDeath`(같은 자리, 공통 칸 그대로). 이제 `CollapseDeath` 를 쓰는 프리팹은 없다(코드는 남김) |
+| 세기 | **중간**: 바깥 3~5m/s · 위로 3~5m/s · 회전 360~720도/초 |
+| 폭발 이펙트 | MyProject `Export/Monsters/Death/FX_Death_Explosion_02.prefab` → `50.Art/VFX/Common/Monsters/Death/`(같은 guid) + `_Entry`(prewarm 2). 의존 신규 3(`Mat_fx_HCFX_Glow_Long_01_add`·`Mat_fx_HCFX_Impact_01_add` → `_Materials/`, `Tex_fx_HCFX_Glow_Long_01.tga` → `Textures/`). 🔴 SVN add |
+| 고르기 | `ExplodeDeath.explosionEffect`(EffectEntry) 신설 — 비우면 카탈로그 `Mob_Death_Explosion`(잡몹 5종은 비움), 엘리트 3종은 `FX_Death_Explosion_02_Entry`. 카탈로그에 `Mob_Death_Explosion_Elite`(prewarm 등록) |
+| 그대로 | 위치 자동(`burstHeight` 0) · 배율 1 · 정리 시간 · 타이밍 |
+
+## 변경 파일
+- 신규: `ExplodeDeath.cs` · `FX_Death_Explosion_01.prefab`·`_Entry` · Dust_02 재질·텍스처 · handoff
+- `MonsterCollapseDebris.cs`(Config 추가) · `MonsterCollapseSetup.cs`(가드 1줄) · `EffectCatalog.cs`·`.asset` · 5종 몬스터 프리팹 · CONTEXT
+
+## 검증
+- dotnet 빌드 오류 0 · guid·내부 참조 누락 0 · 붕괴 3종 프리팹 무변경. ⏳ 민경 Play/MPPM: 5종 처치 → 휘청 → 조각이 위·바깥으로 튀며 폭발 이펙트 → 1.2초 뒤 디졸브(파티클 없음), 호스트·클라 둘 다 · 붕괴 3종은 기존과 같음.
+
+---
+
+# ▶▶▶ 계획 = **플레이어 상태이상 루프 VFX — SO 표(상태 → 이펙트) + Presenter, 첫 항목 기절 → FX_Faint** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 반입·코드·SO·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 상태이상 = `StatusEffectController`(서버 권위 `NetworkList`, 전 피어 복제). 지금 플레이어 기절이 실제로 나는 곳 = **23호 대쉬 벽꽝(1초)** 뿐(착지 보호 기절·AreaZone 은 경로만 있고 데이터상 안 남).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 반입 | MyProject `Export/Common/States/FX_Faint.prefab` → `50.Art/VFX/Common/States/FX_Faint.prefab`(같은 guid) + `FX_Faint_Entry.asset`(루프, outro 0.3초). 의존 신규 2(Klaus `Mat_fx_HCFX_Star_01.mat` → `_Materials/`, `Tex_fx_HCFX_Star_01.tga` → `Textures/`). 카탈로그 `Player_Faint`(prewarm). 🔴 SVN add |
+| 변화 알림(6-a) | `StatusEffectController` 에 **추가만**: `public event Action EffectsChanged` + `OnNetworkSpawn`/`OnNetworkDespawn` 에서 `effects.OnListChanged` 구독·해제 → 전 피어에서 목록 변화(추가·갱신·해제·만료)마다 발화. 기존 함수·동작 무변경. 처음 동기화(늦은 접속)엔 안 나므로 구독자가 켜질 때 직접 읽는다. 은희 영역 → handoff·CONTEXT + 민경이 메시지로 알림 |
+| SO | `1.Scripts/Effects/StatusEffectVfxSet.cs` — 행 = { 상태 종류(플래그 1개) · 엔트리(루프) · 자리(Overhead/Body/Feet) · 오프셋 · 배율 · 우선순위 }. 에셋 `9.ScriptableObject/Effects/PlayerStatusEffectVfxSet.asset` **플레이어 공용 1개**, 첫 행 = 기절 → `FX_Faint_Entry`, 자리 Overhead, 오프셋 (0, 0.5, 0)(지금 소켓 값), 배율 1, 우선순위는 머리 위 상태 글자 순서(잡힘 > 공중 > 기절 > 속박 > 침묵 > 약화 > 둔화) |
+| Presenter | `1.Scripts/Effects/StatusEffectVfxPresenter.cs` — 각 Variant `VFX/States` 에 부착. 필드 = SO · 자리 트랜스폼(Overhead = `TopHead` — 이번 신설, 어쌔신·팔라딘은 Armature 인스턴스 직하 / 거너는 그 아래 `VFX/`, Body·Feet 비움 → Feet 는 플레이어 루트, Body 비면 그 행 건너뜀+경고). `EffectsChanged` + `PlayerLifeCycleController.LifeStateChanged` 구독(켜질 때 한 번 직접 읽음), **살아 있을 때만**, **자리마다 우선순위 최고 1개**(다른 자리끼리는 동시). `EffectManager.PlayLooping`(핸들 직접 보관) → 바뀐 행만 Release, OnDisable/OnDestroy 에서 반납. 추가 네트워크 없음 |
+| `VFX/States`·`TopHead` | 세 Variant 에 상태이상 연출 오브젝트가 원래 없어 **둘 다 신설**(계획 단계의 '기존 Faint 소켓 삭제'는 착오 — HEAD 에 그런 오브젝트가 없다). 거너는 흩어진 추가 오브젝트를 `VFX` 컨테이너로 묶는 정리가 함께 들어감 |
+| 범위 밖 | 몬스터(`MonsterStatusEffect` 별도 — SO 형식은 재사용 가능하게), `GameData.xlsx`(연출 연결이라 제외), 기절 디버그 단축키 |
+
+## 변경 파일
+- 신규: `50.Art/VFX/Common/States/FX_Faint.prefab`·`_Entry` + 의존 2 · `StatusEffectVfxSet.cs` · `StatusEffectVfxPresenter.cs` · `PlayerStatusEffectVfxSet.asset`
+- `StatusEffectController.cs`(이벤트 추가) · `EffectCatalog.cs`·`.asset` · `Player_Assassin`·`Player_Gunner`·`Player_Paladin.prefab`(Presenter 부착, Faint 삭제)
+- 문서: handoff(새 `Docs/tech/handoff-status-effect-vfx.md`) · CONTEXT
+
+## 검증
+- dotnet 빌드 오류 0 · guid·내부 참조 누락 0. ⏳ 민경 Play / MPPM: 23호 대쉬 벽꽝 → 머리 위 별 1초 루프 후 0.3초에 사라짐, 호스트·클라·관전 화면 모두, 기절 중 쓰러지면 즉시 꺼짐, 늦게 들어온 클라도 맞음.
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 대쉬 잔상 — 팔라딘·거너와 같은 DashAfterimage + 속도선 (검붉은 색)** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 프리팹·재질 — 코드 무변경 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 대상 = 스페이스바 공용 대쉬(`PlayerDashController` · Dash 상태)만. Q 관통 돌진 제외.
+
+## 사실
+- 잔상 = `50.Art/VFX/Common/Players/Dash/DashAfterimage.cs`(대쉬 중 포즈 BakeMesh 스냅샷·풀링·페이드) + `DashSpeedLines.cs`(본 추종 TrailRenderer). 셰이더 `Player/DashAfterimage`(알파 블렌드, 림). EffectManager·카탈로그 미사용.
+- 켜고 끄기 = `PlayerSkillVfx`(NetworkBehaviour)가 Dash 상태 엣지를 보고 Reliable RPC 로 전 피어에 — 자식의 `DashAfterimage` 를 Awake 에서 자동으로 찾는다. 팔라딘·거너 프리팹에는 있고 **어쌔신엔 없다**(base `Player.prefab` 에도 없음).
+- 색은 캐릭터별 재질(팔라딘 금빛 `FX_PaladinDashAfterimage`(10-20 이름 변경, 구 `FX_DashAfterimage`) · 거너 파랑 `FX_GunnerDashAfterimage`, Solidity 0.15 / 속도선 Solidity 1).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 재질 | 신규 `FX_AssassinDashAfterimage.mat`(거너 재질 복사 → 몸 (0.35,0.03,0.04)·Solidity 0.25 + 붉은 림 HDR (2,0.16,0.1)) · `FX_AssassinDashSpeedLine.mat`(붉은색 (1.6,0.18,0.12)). 같은 폴더 `Players/Dash/`. 🔴 SVN add |
+| 부착 | `Player_Assassin` 루트에 `PlayerSkillVfx`(R 칸 비움 = 잔상만, 거너와 같음) + `DashAfterimage`(modelRoot = `Armature` — 몸·머리카락·양손 단검, VFX 제외 / spawnInterval 0 · 수명 0.2(팔라딘·거너 실제 값 — 0.45 는 스크립트 기본값) · 최대 80 · safetyTimeout 2) + `DashSpeedLines`(searchRoot = `Armature`, 기본 이름 힌트 head·hand·foot, 선 0.2초·폭 0.05→0) |
+| 코드 | 변경 없음(프리팹·재질만). `PlayerSkillVfx` 는 플레이어 공용 → handoff 공유 |
+
+## 검증
+- guid·내부 참조 누락 0 · cmp. ⏳ 민경 Play / MPPM: 스페이스바 대쉬마다 검붉은 잔상 + 붉은 속도선, 호스트·클라 어느 쪽이 대쉬해도 양쪽에 보임, Q 돌진엔 안 나옴.
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 일반 E VFX 반입·배선 — 단검 날 발광(오버레이) · 오라 · 차지 · 강타 슬래쉬 (EffectSocketPlayer)** (2026-10-20 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹·클립 배선 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM · EditMode)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-20). 기획 §8(E = Buff + 강화 준비, 다음 좌클릭 = 강타 `Combo_Attack_02_01` 1회 후 소모, 변신·쓰러짐·사망에 해제). 10-16 일반 E 계획(아래)의 발광·소켓·뷰 배선은 커밋되지 않았고 v18 비주얼(`c5c80d5f`)로 단검 재질이 Flat Kit 1슬롯이 됨 → **다시 한다**.
+
+## 사실
+- 단검 `Dagger_Weapon_L/R` = 슬롯 1개 `FK_Assassin_Body`, 루트 배율 1.25(v18). 단검 FBX 10-06 이후 무변경 → `Dagger_BladeMask.png`(UV0 칼날) 그대로 유효. `Dagger_Blade_Glow.mat` 있음.
+- `AssassinEnhanceReadyView` 는 코드만 있고 미부착. `Assassin_Armature/VFX/EnhancedReady` 빈 오브젝트 있음, `VFX_EnhanceAura` 소켓 없음.
+- `Player_Assassin` 에 민경이 만든 `Armature/VFX/EnhancedSlash` 트랜스폼. 강타 클립 0.2167초(= Hit)에 빈 이벤트.
+- 🔴 `AssassinVisualPrefabTests.BodyAndDaggerSlotsUseFlatKitBody`(은희) 가 단검 슬롯 = FK 1개만 허용 → 오버레이를 넣으면 실패.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 발광 대상 | **양손** 단검. 각 렌더러 슬롯 [1] = `Dagger_Blade_Glow`(팔라딘 패시브 방식), `EnhancedReady` 의 `MaterialFadeEffect`(`_ColorFactor`, 인 0.5초·아웃 0.3초, 대상 = 두 단검 렌더러) |
+| 반입 | MyProject `Export/Player3/NormalE/BM Assassin_EnhanceAura`·`_EnhanceCharge`·`_EnhanceSlash` → `50.Art/VFX/Common/Players/Player3/NormalE/FX_Assassin_E_Aura`·`_Charge`·`_Slash`(같은 guid, 루트 이름만). 의존 신규 7(`Dagger_Blade.fbx` → `Models/`, Piloto Double 재질 3·Sword_Tex_5 재질·텍스처·Slash_Fire_Repeat → `*/PilotoStudio/`). 엔트리: 오라 루프(outro 0.7초), 차지 0.5초·강타 1.0초 원샷. 카탈로그 `Assassin_E_Aura`·`_Charge`·`_Slash`. 🔴 SVN add |
+| 오라·차지 재생 | 🔸 **붙는 곳 = 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura`(10-16 확정, 칼날 중간 로컬 Y 0.33 — 다시 만듦)**. `EffectSocketPlayer` 4개를 그 소켓의 자식 `Aura`·`Charge` 에 둔다(소켓 비움 = 자기 자신 = 무기를 따라감, 10-20 민경). 배율 1.25(단검 배율), 오라 safetyTimeout 0(버프 무기한). 켜기·끄기는 `AssassinEnhanceReadyView` 가 `AssassinState.IsEnhancedReady` 로(차지는 `EnhancedReadyChanged(true)` 순간만, 늦은 접속은 차지 없이) — 인스턴스 생성 코드 → 소켓 플레이어 `Play`/`Stop`/`PlayOnce` 로 교체. 추가 네트워크 없음 |
+| 강타 슬래쉬 | `Armature/VFX/EnhancedSlash` 에 `EffectSocketPlayer`(id `Assassin_EnhancedSlash`, 엔트리 `Assassin_E_Slash`) · 강타 클립 0.2167초 빈 이벤트 → `PlayEffect("Assassin_EnhancedSlash")`. `AssassinSkillView` 의 `enhancedSlashPrefab`·`enhancedSlashSocket`·`PlayAttackSlash` 경로 삭제(임시 팔라딘 `FX_DoubleSlash_O`), `AssassinBasicAttack` 호출 정리, 저작 도구 해당 줄 삭제. 적중 성공 연출 없음 |
+| 시전 임시 연출 | `enhanceCastPrefab` 는 이미 비어 있음(차지가 대신) — 그대로 |
+| 테스트 | `AssassinVisualPrefabTests`: 단검 슬롯 [0] = FK, 그 뒤 슬롯은 `Dagger_Blade_Glow` 만 허용, 기대 슬롯 수 5 = FK 슬롯만 센다. 은희 영역 → handoff |
+| 담당·공유 | `AssassinSkillView`·`AssassinBasicAttack`·`AssassinShellAuthoring`·`AssassinVisualPrefabTests` = 은희 영역 → `Docs/tech/handoff-assassin-r-vfx.md` §3-7 |
+
+## 변경 파일
+- 신규: `50.Art/VFX/Common/Players/Player3/NormalE/*`(프리팹 3·엔트리 3) + 의존 아트 7
+- `Assassin_Armature.prefab`(단검 슬롯 [1]·소켓 2·EnhancedReady 뷰·페이드·소켓 플레이어 4) · `Player_Assassin.prefab`(EnhancedSlash 플레이어, 뷰 필드 정리) · `Combo_Attack_02_01.anim`(빈 이벤트 채움)
+- `AssassinEnhanceReadyView.cs` · `AssassinSkillView.cs` · `AssassinBasicAttack.cs` · `AssassinShellAuthoring.cs` · `AssassinVisualPrefabTests.cs` · `EffectCatalog.cs`·`.asset`
+- 문서: handoff · CONTEXT
+
+## 검증
+- dotnet 빌드 오류 0 · guid 연결(누락 0) · cmp. ⏳ 민경 Play / MPPM: E → 양손 날 붉게 + 차지 + 오라, 강타 시작에 꺼지고 0.2167초 슬래쉬, 변신·쓰러짐에 꺼짐, 다른 피어·늦은 접속 동일. EditMode `AssassinVisualPrefabTests` 통과.
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 우클릭(간파) VFX 반입·배선 — 기 모으기 · 튀기기 · 올려치기 · 성공 (EffectSocketPlayer)** (2026-10-19 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹·클립 배선 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-19). 소켓 4개 = 민경이 `Player_Assassin/VFX/RightClick/WindUp · Pop · Slash · Slash_Success` 에 EffectSocketPlayer 를 넣어 둠(커밋 `23a389de`, id·effect 비어 있음. Slash·Slash_Success 소켓은 10-19 `InterruptSlash` 트랜스폼으로 옮김). 좌클릭 반입(아래 계획)과 같은 방식.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 반입 프리팹 | MyProject `Export/Player3/RClick/BM Insight_Windup`·`_Pop`·`_Slash`·`_Success`(+ 중첩 `BM Hit`) → `50.Art/VFX/Common/Players/Player3/RClick/FX_Assassin_RClick_Windup`·`_Pop`·`_Slash`·`_Success`·`_Hit`(같은 guid, 루트 이름만 변경). 엔트리 = 기 모으기 루프(outroDuration 0 → 끄는 즉시 반납), 튀기기 0.4초·올려치기 1.0초·성공 1.0초 원샷. `EffectCatalog` 에 `Assassin_RClick_*` 등록(prewarm) |
+| 의존 | 신규 31개(Piloto 재질·텍스처·모델 → `*/PilotoStudio/`, Matthew Guz `Hit.mat`·텍스처 → `*/MatthewGuz/`, `SR_Success_Spark.mat` → `_Materials/Player3/`). 나머지는 같은 guid 로 이미 있음. 🔴 새 아트 SVN add |
+| 소켓 id | `WindUp`=`Assassin_InsightWindup`, `Pop`=`Assassin_InsightPop`, `Slash`=`Assassin_InsightSlash`, `Slash_Success` = id 없음(코드 전용) |
+| 클립 `Attack_Up_01` 이벤트 | 0초 `StartEffect(Assassin_InsightWindup)` · 13프레임(0.2167초) `StopEffect(Assassin_InsightWindup)` + `PlayEffect(Assassin_InsightPop)` · **16프레임(0.2667초, 민경이 넣어 둔 빈 이벤트) `PlayEffect(Assassin_InsightSlash)`**(10-19 민경 지정). 판정 Hit(0.6초)·End(1.275초)는 그대로. 상태 전이는 exitTime 1 이라 스킬 종료(0.6초)로 애니가 끊기지 않음 |
+| "성공" 기준 | **간파 성공** = 서버 `PlayerInterruptSkillBase.ServerInterruptSucceeded`(쿨 감소와 같은 기준). 단순 적중은 아님 |
+| 🔸 성공 = 올려치기와 **같이** | 서버 성공 알림 → RPC(전 피어) → "성공 대기" 표시. `EffectAnimEvents` 에 재생 알림 이벤트 `Played(string id)` 를 추가하고, `AssassinSkillView` 가 올려치기 소켓 id 가 재생되는 순간 성공 대기면 `Slash_Success.PlayOnce()`. 알림이 올려치기보다 늦게 오면(지연·나중에 판정이 0.6초로 옮겨짐) 받는 즉시 재생. 표시는 다음 시전 시작에 지운다(스킬 종료 0.6초와 올려치기 0.6초가 겹쳐도 안 잃음) |
+| 기 모으기 안전 정지 | 스킬 `OnEnd`(완료·피격·사망 공통, 전 피어)에서 켜져 있으면 끈다 |
+| 임시 연출 제거 | `interruptCastPrefab`(`FX_Interrupt_Flash`)·`PlayInterruptCast` 제거 → `OnClientPlay` 는 성공 대기 초기화만 |
+| 담당·공유 | `AssassinInterruptSkill`·`AssassinSkillView` = 은희 영역 → `Docs/tech/handoff-assassin-r-vfx.md` 에 추가. `EffectAnimEvents` = VFX 영역(이벤트 추가만, 기존 동작 불변) |
+
+## 변경 파일
+- 신규: `50.Art/VFX/Common/Players/Player3/RClick/*`(프리팹 5·엔트리 4) + 의존 아트
+- `1.Scripts/Effects/EffectAnimEvents.cs`(Played 이벤트) · `EffectCatalog.cs`·`.asset`
+- `1.Scripts/Player/Assassin/AssassinSkillView.cs` · `AssassinInterruptSkill.cs`
+- `2.Prefabs/Player/Assassin/Player_Assassin.prefab`(소켓 4개 id·엔트리, 뷰 필드) · `4.Animations/Player/Assassin/Attack_Up_01.anim`(이벤트 4개)
+- 문서: handoff · CONTEXT
+
+## 검증
+- 컴파일 에러 0 · guid 연결(dangling 0) · cmp. ⏳ 민경 Play / MPPM(호스트·클라 모두: 기 모으기 → 0.55초 튀기며 사라짐 → 올려치기, 보스 간파 성공 때만 성공 연출이 올려치기와 함께, 시전 중 피격 시 기 모으기 남지 않음).
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 좌클릭 VFX 반입·배선 — 일반 4타 · 일반 성공 · 변신 루프 (EffectSocketPlayer)** (2026-10-19 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 배선(컴파일은 MainProject Unity 를 켜야 확인) · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-19). 소켓 9개 = 민경이 `Player_Assassin/VFX/NormalSlash_1~4 · NormalSlash_Success_1~4 · TransformedSlash` 에 EffectSocketPlayer 를 넣어 둠(id·effect 비어 있음, 각자 Armature `BasicAttack01~04`·`TransformedAttack` 추종).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 반입 프리팹 | MyProject `LClick/BM Assassin_Slash_Arc200_BM`(원본 Arc200 은 원호 모델용 재질 V 0.625 를 링 200° 메시에 써서 어긋남 → 재질만 바로잡은 `_BM`) · `BM Assassin_Slash_Success_200`(원본, NamuFX 가산 + 그어진 섬광 중첩) · `BM Assassin_TransformedSlash`(원본, 민경 10-19 수정본 — 루프) |
+| 배치 | `50.Art/VFX/Common/Players/Player3/LClick/FX_Assassin_LClick_Slash`·`_Success`·`_Transformed`(+`_Entry`). 일반·성공 = 원샷(지속시간 지정), 변신 = 루프(outroDuration 0.3). `EffectCatalog` 에 `Assassin_LClick_Slash`·`_Success`·`_Transformed` 등록(prewarm) |
+| 의존 | 24개 신규(NamuFX 셰이더·서브그래프·텍스처 → `50.Art/VFX/*/NamuFX/`, Piloto BM 재질·텍스처 → 기존 `*/PilotoStudio/`, 재질 사본·링 200° 메시·그어진 섬광). 19개는 같은 guid 로 이미 있음. 🔴 새 아트 SVN add |
+| 🔸 재생 방식(유지보수) | 애니 이벤트(EffectAnimEvents) 대신 **코드의 기존 Hit 이벤트**에서 — 팔라딘 `DefaultAttackController` 선례. `AssassinSkillView` 가 `EffectSocketPlayer` 배열을 든다: 일반 1~4타 = Hit(전 피어) → `normalSlash[타].PlayOnce()`, 일반 성공 = 서버 `Fire()` 반환값 true → RPC(Unreliable) → `normalSlashSuccess[타].PlayOnce()`, 변신 = 묶음 시작(전 피어) `transformedSlash.Play()` / 묶음 끝·취소·변신 해제 `Stop()`. 이유: 판정·VFX 타이밍이 Hit 이벤트 하나, `hasPendingClip`·취소·모드 필터를 그대로 탐, 변신 루프가 끊겨도 확실히 멈춤 |
+| 4타 프리팹 | 4타 모두 같은 Arc200 엔트리, 방향 = 소켓 회전. 성공 4개도 같은 엔트리 |
+| 코드 정리 | `AssassinSkillView` 의 `normalSlashPrefabs`·`transformedSlashPrefab`·해당 소켓 필드·Instantiate 경로를 소켓 플레이어로 교체. 강화(`enhancedSlashPrefab`) 경로는 그대로 |
+| 재생 속도 | `ShurikenEffectSystem` 이 프리팹의 Simulation Speed 를 처음 본 값으로 기억해 `기본 × 배율` 로 쓰게(지금은 반납 때 1 로 덮어써 두 번째 재생부터 느려짐). 기본 1 인 기존 이펙트 동작 불변 |
+| 담당·공유 | `AssassinBasicAttack`·`AssassinSkillView` = 은희 영역 → `Docs/tech/handoff-assassin-r-vfx.md` 에 추가 |
+
+## 검증
+- 컴파일 에러 0 · 프리팹·카탈로그 guid 연결 확인. ⏳ 민경 Play / MPPM(호스트·클라 모두 4타 슬래쉬 · 맞을 때만 성공 · 변신 루프 시작·정지).
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 좌클릭 = Insight 슬래쉬 · E 강타 · 우클릭 올려치기/성공 재제작 (SlashReference 참고)** (2026-10-17 · grill 확정 · ✅ 승인 · 🛠 1단계 MyProject 제작 완료 → ⏳ 민경 컨펌)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-17). 참고 = MyProject `Export/Player3/SlashReference/`(SpecialSkillsEffectsPack EffectsSet_2 — 보이는 부분은 전부 순수 파티클, `Shader_IntegratedEffect`. 소환 스크립트 `MultipleObjectsMake` 는 MainProject EffectManager 풀링과 안 맞아 **시작 지연·버스트로 구워 순수 파티클 프리팹**으로 만든다).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 좌클릭 | `RClick/BM Insight_Slash` **사본** → `LClick/BM Assassin_Slash_Insight.prefab`. 칼끝 ✦ 3개 제거, 크기 ≈1.7배(판정 1.5~1.7m), Simulation Speed 2. 4타 방향 = 소켓 회전(기준 자세 = 소켓 XZ 면, +Z → +X 진행) |
+| 기존 좌클릭 계열 | `LClick/BM Assassin_Slash`(+Arc90/150 Variant) **참고용으로 남김**, 변신 4타 `BM Assassin_TransformedSlash` 유지(범위 밖) |
+| E 강타 | **25_CriticalSlash 를 참고만** — 교차 초승달 구성만 빌리고 **크기·속도·색은 새로**: 주 초승달 = 판정 방향 수평 베기(소켓 XZ 면, +Z 중심, 바깥 ≈2.0m), 보조 초승달 = 비스듬히 교차(X자). 검정·붉은색. `Export/Player3/BM Assassin_EnhancedSlash.prefab` · Simulation Speed 1.5 |
+| 우클릭 올려치기 | 06_MassiveSlash 의 세로 베기 파트 **1개**(10연타 X)를 검붉게, 소켓 면에서 올려 긋기 → `RClick/BM Insight_Uppercut.prefab` · Speed 1.5 |
+| 우클릭 성공 | 11_IntagibleSlash 의 좌우 대칭 초승달 2개(X자) + 불꽃 타격점을 검붉게, 같은 자리 → `RClick/BM Insight_SuccessBurst.prefab` · Speed 1.0 |
+| 우클릭 범위 | 올려치기·성공만 새로. 기 모으기 `_Windup`·튀기기 `_Pop` 유지, 부착 방식(애니 이벤트 × EffectSocketPlayer, 원점 = 베기 중심) 유지. 기존 `_Slash`·`_Success` 는 컨펌 전까지 남김 |
+| 색 | 팩 재질 **사본**(`Export/Player3/Materials/`)에서 `_TintColor` 붉은 HDR + 같은 메시에 **알파 블렌드 검은 층** 추가 |
+| 테스트 | `EnhanceTester`(강타)·`InsightTester`(우클릭)·`BasicAttackTester`(좌클릭) 프리팹 칸만 교체 |
+| 반입 의존 | `Donut_Mesh.fbx`·팩 텍스처 대부분이 MainProject 에 없음 → 반입 때 같이(SVN add). 셰이더는 같은 guid 로 있음 |
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 강화 기본 공격(E 후 강타) 슬래쉬 — Round Slash 기반 강타판** (2026-10-16 · grill 확정 · ✅ 승인 · 🛠 1단계 MyProject 제작 완료 → ⏳ 민경 컨펌)
+
+> 🔸 **10-16 민경 최종 결정: 강화 슬래쉬 = MyProject `Export/Player3/BM Round Slash .prefab` 원본 그대로**(아래 혼합안으로 만든 `BM Assassin_EnhancedSlash` 는 쓰지 않음). 반입 때 이 프리팹 → `enhancedSlashPrefab`(소켓 `EnhancedAttack`). 의존 = Piloto Double 재질 3종·`BM_Sword_Tex_5_alpha_soft`·Flecks 재질·`Slash_Complete_Circle_64_` 등. ⚠️ Piloto 재질 Soft Particle(1.1~1.3m)이 켜져 있어 바닥 가까이 누우면 연해질 수 있음.
+>
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 앞 세션의 `BM Assassin_EnhancedSlash` 는 MyProject 에서 지워진 상태 → 새로 만든다. 오라·차지·칼날 발광(아래 E 계획)은 그대로.
+
+## 사실
+- 클립 **`Combo_Attack_02_01`**(1.417초) × **2배속** — Hit 실제 **0.283초**, End 0.602초(타격→끝 0.32초). 1타 · ×2.5 · 1.8m · 120°.
+- Hit 애니 이벤트에서 전 피어 `PlayAttackSlash(Enhanced)` → `enhancedSlashPrefab` 를 소켓 `VFX/EnhancedAttack`(1개)에 재생. 지금 임시 = 팔라딘 `FX_DoubleSlash_O`.
+- 기반 `Export/Player3/NormalQ/BM Round Slash .prefab` = Piloto 360° 링 + "Double"(가로 반복 2) 재질 → **몸 둘레 쌍 초승달**. 테두리(밝기 350)·날·채움 2·S자 쌍 초승달 칼자국 빌보드 2장(`BM_Sword_Tex_5`, 5.6/6.2m)·반짝이, 이미 검정·붉은색.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 구성 | **혼합(c)** — 주인공 = 정면 **Arc150 검기**(Round Slash 의 재질·색, Double 재질은 반복 1 + 원호 UV 보정 사본), 배경 = Round Slash **360° 링을 어두운 충격파로 옅게** |
+| 크기 | 바깥 ≈ **2.1m**(Arc150 × 배율 2.9) |
+| 검기 Emissive | 테두리 밝기 **2배(350 → 700)** + 칼날 띠를 따라 **흰빛에 가까운 붉은 심지 층** 추가(블룸) |
+| 임팩트 요소 | ① 디스토션 2장 + 충격파 링 디스토션 ② 원호 앞으로 퍼지는 검붉은 반원 링 ③ 검은 연기 폭발 ④ 붉은 불티 20~30 ⑤ 원호 중앙 붉은 섬광 |
+| 타격 성공 | 일반 좌클릭의 그어진 섬광을 **1.5배**로(같은 RPC 에 공격 종류만, 새 에셋 없음) |
+| 재생 속도 | 모든 파티클 **Simulation Speed 1.5**(검기 ≈0.33초, 연기·링 0.5~0.6초). 🔴 반입 때 `ShurikenEffectSystem` 속도 덮어쓰기 수정(좌클릭 계획과 같음) |
+| 파일 | `Export/Player3/BM Assassin_EnhancedSlash.prefab`(기준 자세 = 좌클릭과 같음, 소켓 `EnhancedAttack` 방향은 민경) |
+| 테스트 | `EnhanceTester` 강타(F·좌클릭) — 실제 타이밍(0.283초 뒤) 슬래쉬 · 슬래쉬 소켓 칸 · 성공 체크 시 1.5배 섬광 |
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 일반 E(단검 강화) VFX — 단검 날 붉은 발광 + 검붉은 오라 루프 + 차지 버스트 + 강화 일격 슬래쉬** (2026-10-16 · grill 확정 · ✅ 승인 · 🛠 MainProject 발광·배선 완료 / MyProject 빌드 스크립트 작성 → ⏳ 민경 실행·컨펌 → 반입)
+
+> 🔸 **10-16 2차 grill(민경) — 아래 "결정" 표의 단검 색·발광·오라 형태 항목보다 우선.** 앞 세션 종료 확인. ✅ 승인 · ✅ 구현(아래 표대로. 발광 색은 셰이더 밝기 기준이 달라 팔라딘과 비슷한 밝기의 빨강 `_TintColor` (40, 2.7, 1.6)) · ⏳ 민경 Play
+>
+> | 항목 | 결정 |
+> |---|---|
+> | 칼날 발광 방식 | **팔라딘 방식으로 교체** — 단검 렌더러에 오버레이 슬롯 [1] `50.Art/VFX/_Materials/Dagger_Blade_Glow.mat`(셰이더 `Shader_IntegratedEffect`, `Sword_Blade_Glow` 사본) + 마스크 `50.Art/VFX/Textures/Dagger_BladeMask.png`(단검 UV0 에서 **칼날 폴리곤만** 칠함 — UV0 칼날·손잡이 섬이 안 겹쳐 MaskUV 메시 불필요). `_TintColor` 빨강 HDR (3,0.2,0.12), `MaterialFadeEffect` **float 모드 `_ColorFactor`** 0.5초 인/0.3초 아웃. 두 단검 같은 메시 = 마스크 하나 |
+> | 앞 세션 변경 정리 | `ToonLit.shader`·`MaterialFadeEffect.cs`(Color 모드) **HEAD 로 되돌림**, `3.Materials/Toon/Assassin_Dagger_Toon.mat` **삭제**·양손 단검 슬롯 [0] = 원래 `Assassin_Toon.mat`. `AssassinEnhanceReadyView`·소켓·배선은 유지(발광 대상만 오버레이로, 주석 갱신) |
+> | 칼날 판정 | 단검 메시 Y > 5cm(FBX 단위, = 0.05m) 폴리곤 = 칼날(손잡이 −14.5~5cm, 칼날 5~49.8cm, 등 톱니 포함) |
+> | 오라 형태 | 칼날만 뽑은 메시 `Dagger_Blade`(MyProject `Export/Player3/Models/`, 반입 시 `50.Art/VFX/Models/` · SVN add)를 오라 4개 시스템의 **Shape = Mesh(표면)** 로. 소켓 `VFX_EnhanceAura`(칼날 중간 Y 0.33m)는 그대로, Shape 위치 **−0.33m 보정** |
+> | MyProject 테스트 | MainProject `Dagger_Weapon_L/R.fbx`·텍스처를 **같은 guid** 로 MyProject `50.Art/Char/assassin/` 에 복사, `EnhanceTester` 가 큐브 대신 실제 단검 사용 |
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 변신 E(Multi Slashes)·변신 상태는 건드리지 않는다. 일반 좌클릭 4타 작업과 **병행**(파일 겹침 없음 — 강화 슬래쉬만 좌클릭 슬래쉬 구조를 이어 씀).
+
+## 사실(조사)
+- 버프 = `AssassinStateSnapshot.enhancedReady` 하나(서버 쓰기 NetworkVariable). **지속시간 없음** — 다음 좌클릭이 수락돼 Enhanced 로 시작하면 소모(맞든 안 맞든), 변신·다운·사망에도 해제. 강화 일격 = ×2.5·1타·120°·1.2m 전진(`AssassinBasicAttackData` Enhanced step, AttackIndex 4).
+- 훅: `AssassinState.EnhancedReadyChanged(bool)` 전 피어 발화·구독자 없음 / 빈 소켓 `Assassin_Armature/VFX/EnhancedReady` / `AssassinSkillView.enhanceCastPrefab`(임시 `Flash_star`)·`enhancedSlashPrefab`(임시 팔라딘 `FX_DoubleSlash_O`, 소켓 `VFX/EnhancedAttack`, Hit 애니 이벤트에서 전 피어 재생).
+- 단검 `Dagger_Weapon_R/L` = 날·손잡이 **단일 메시·슬롯 1개**, 몸통과 같은 `Assassin_Toon.mat`(ToonLit, 발광 속성 없음). 메시 긴 축 = 로컬 Y(손잡이 −Y, 날 +Y).
+- 팔라딘 패시브 = 오버레이 머티리얼 `_ColorFactor` 를 `MaterialFadeEffect` 로 페이드(오라 없음).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 작업 위치 | 파티클 에셋 = MyProject `Export/Player3/BM Assassin_Enhance*` 제작 → 컨펌 → MainProject 반입·배선. **머티리얼·셰이더·스크립트 = MainProject 직접**(MyProject 에 어쌔신 모델·ToonLit 없음) |
+| Key color | Player3 팔레트 — 검정 코어(alpha 0,0,0,0.8~1) · 검붉은 연기(alpha ~0.16~0.22,0.02~0.08) · 붉은 강조(add 0.55~0.88,0~0.13) · 가장자리(1,0.12,0.08) |
+| 단검 색 | **단검 전용 머티리얼 분리**: `Assassin_Toon` 의 Material Variant `Assassin_Dagger_Toon.mat` → `Assassin_Armature.prefab` 양손 단검 `m_Materials[0]` 교체 |
+| 발광 | `ToonLit` 에 `[HDR]_EmissionColor`(기본 검정 = 다른 캐릭터 무변화) + **날 마스크**(오브젝트 로컬 Y 경계·부드러움 속성) 추가. 두 UnityPerMaterial CBUFFER(ForwardLit·Outline)와 다른 패스 블록 일치 유지. 붉은 HDR 발광 → 블룸 |
+| 페이드 스크립트 | `MaterialFadeEffect` 에 **Color 모드** 추가(기본 = 기존 float 동작, 팔라딘 무변화). 페이드 인 0.5 · 아웃 0.3초 |
+| 오라 | **양손 단검** 루프 — 검은 연기 코어(alpha) + 붉은 가장자리 글로우(add) + 붉은 불티 소량, **World 시뮬레이션**(휘두르면 꼬리). R `BladeVortex` 의 연기·글로우·불티 재활용·축소, 형태는 날 축(로컬 Y) 따라. 팀원도 알아볼 강도 |
+| 차지 버스트 | E 입력 순간 검붉은 연기·불티가 양손 단검으로 **빨려 드는 차지(~0.3초)** → 오라 시작. 임시 `Flash_star` 교체 |
+| 강화 일격 슬래쉬 | 좌클릭 슬래쉬(`BM Assassin_Slash`) 구조를 이어 **Arc150 기반 큰 초승달**, 검은 코어 + 붉은 가장자리 + 붉은 글로우, 일반 4타보다 두껍고 밝게 + 잔연기. `enhancedSlashPrefab` 교체 |
+| 적중 섬광 | 이번엔 안 함 — 일반 4타용 적중 RPC 가 생기면 같이 씀 |
+| 켜기·끄기 | `EnhancedReadyChanged`(전 피어) 구독 → true: 날 발광 FadeIn + 오라 `PlayLooping`(단검 추종) / false: FadeOut + `Release`. 차지 버스트는 기존 `OnClientPlay → PlayEnhanceCast`. **추가 네트워크 없음** |
+| 타이밍 | 소모는 강화 일격 **시작** 시점(서버 수락) → 오라·발광이 먼저 꺼지기 시작하고 Hit 이벤트에서 슬래쉬가 터진다(0.3초 페이드라 자연스럽게 이어짐) |
+| 늦게 들어온 피어 | 구독 시점에 `IsEnhancedReady` 가 이미 true 면 바로 켬 |
+
+## 진행(10-16)
+- ✅ MainProject: `ToonLit` 발광·날 마스크 · `MaterialFadeEffect` Color 모드 · `Assassin_Dagger_Toon.mat` · 신규 `AssassinEnhanceReadyView`(Assassin_Armature `VFX/EnhancedReady` — 단검과 같은 프리팹이라 참조 한 겹) · 단검 소켓 `VFX_EnhanceAura` · 임시 `enhanceCastPrefab` 비움. **구현 변경**: 오라·차지는 EffectManager/카탈로그가 아니라 소켓 Instantiate(평타 슬래쉬와 같은 경로) — 루프가 단검 뼈대를 따라야 해서 부모 추종이 단순하다. `AssassinSkillView` 구독 대신 Armature 쪽 새 컴포넌트.
+- ✅ MyProject: 빌드 메뉴 `Tools/VFX/Assassin Enhance (일반 E) 빌드`(`1.Scripts/Editor/AssassinEnhanceVfxBuilder.cs`) → `Export/Player3/BM Assassin_EnhanceAura`·`_EnhanceCharge`·`_EnhancedSlash`(Arc150 Variant) + 씬에 `EnhanceTester`(E·F/좌클릭, 자동 반복). 재료 = `BM Blade Vortex_Fast` 시스템(MainProject 반입 완료 guid) + `BM Assassin_Slash_Arc150`.
+- 🔸 10-16 민경 피드백: 강화 슬래쉬가 좌클릭처럼 약함 → `BM Insight_Slash`(간파)처럼 색·범위가 또렷해야 함. **재제작**: 간파 슬래쉬 사본을 Y −45° 로 눕혀 중심축 +Z(±45° + 칼날 무작위 회전 ≈ 120°)·×1.7, 1.25배속(간파 1·좌클릭 2), 원본 BM 재질·큰 검은 Fuzzball 배경 유지, 간파 칼끝 ✦ 줄기 제거, 좌클릭 디스토션(Arc150) + 원호 붉은 글로우·잔연기·불티. 더 이상 Arc150 Variant 가 아님 → 반입 의존 = 간파 슬래쉬 재질·`Slash_Complete_Circle_64_`·`CaracolSphere` 등(간파 반입과 공유).
+- ⏳ 민경: 빌드 실행 → Play 확인·수치 조정 → 컨펌. 반입 = 오라·차지 → `Players/Player3/E_Enhance/`, `AssassinEnhanceReadyView` 의 두 칸. 강화 슬래쉬는 **좌클릭 슬래쉬 반입 때 같이**(의존 `BM Assassin_Slash`·BM 재질·`Slash_Arc*` guid 재매핑 공유) → `enhancedSlashPrefab`.
+- ⚠️ 날 마스크 0.15 는 메시 Y −0.145~0.498m(단위 변환 가정)에서 고른 값 — 손잡이까지 빛나거나 날 일부가 안 빛나면 `Assassin_Dagger_Toon` 의 `Emission Mask Start` 조정.
+
+## 변경 파일(예정)
+- MainProject 코드: `1.Scripts/Rendering/Toon/Shaders/ToonLit.shader`(공용 — 은희 공유), `1.Scripts/Effects/MaterialFadeEffect.cs`(Color 모드), `1.Scripts/Player/Assassin/AssassinSkillView.cs`(구독·오라·발광 필드), `1.Scripts/Effects/EffectCatalog.cs`(엔트리 키)
+- MainProject 에셋: `3.Materials/Toon/Assassin_Dagger_Toon.mat`(신규), `2.Prefabs/Player/Assassin/Assassin_Armature.prefab`(단검 머티리얼·필드), `Player_Assassin.prefab`(View 필드), `50.Art/VFX/Common/Players/Player3/E_Enhance/`(신규 프리팹·Entry — SVN add)
+- MyProject: `Export/Player3/BM Assassin_EnhanceAura`·`_EnhanceCharge`·`_EnhancedSlash` + 테스터
+
+## 리스크
+- 공용 `ToonLit` 수정 — 기본값 0 이라 시각 무변화여야 함. CBUFFER 불일치 시 SRP Batcher 깨짐 → 수정 후 다른 캐릭터 화면 비교.
+- 날 마스크 경계 값은 메시 bbox(Y −14.5~49.8, FBX 단위) 기반 추정 — 화면 보고 조정.
+- 좌클릭 PLAN 의 🔴 `ShurikenEffectSystem` Simulation Speed 덮어쓰기 문제가 강화 슬래쉬에도 적용.
+- Unity 켠 채로: `.cs`·셰이더·텍스트 에셋 소량은 OK. **Play 모드면 먼저 정지.** 바꾼 프리팹은 `cmp`·guid 확인.
+
+## 완료 기준(MPPM 2인, 호스트·클라 양쪽)
+1. E 입력 → 차지 버스트 → 양손 단검 날 붉은 발광 + 오라 루프
+2. 강화 일격 → 오라·발광 페이드아웃 + 강화 슬래쉬
+3. 버프 중 변신·다운·사망 → 오라·발광 페이드아웃
+4. 팔라딘 패시브·다른 캐릭터 외형 무변화, 컴파일 에러 0
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 변신 좌클릭 VFX — 4타 묶음 슬래쉬(변신판)** (2026-10-16 · grill 확정 · ✅ 승인 · 🛠 1단계 MyProject 제작 완료 → ⏳ 민경 컨펌)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 기준 = 기획서 6장 + `AssassinBasicAttack` 변신 모드. 일반 좌클릭 슬래쉬(아래 계획, ✅ 민경 확인 — 방향 OK)의 변신판.
+
+## 사실
+- `Speed_Attack_Loop`(0.667초) × 1.25 — 입력 1회 = 4타 묶음, 유지 시 반복. Hit 실제 **0.08 / 0.187 / 0.293 / 0.40초**(간격 ≈0.107), End 0.48초. 판정 1.8m · 120°.
+- Hit 이벤트마다 전 피어 `PlayAttackSlash(Transformed, …)` = 묶음당 4번. 소켓 `TransformedAttack` 1개, **몇 번째 타인지 정보 없음**(서버 `hitsFired` 만). 지금 임시 = `FX_Mob_Slash`.
+- 변신 중 백어택 강제(`forceBackAttack`) → 적중마다 적 위치에 백어택 버스트(`Burst_sharp`)가 이미 난다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 재생 단위 | **Hit 이벤트마다 슬래쉬 1개**(묶음당 4번) — 애니와 항상 맞음 |
+| 모양 | 일반 슬래쉬 계열의 **변신판**: Arc120 고정, 바깥 ≈1.8m(배율 2.5). 테두리 더 뜨겁게(밝은 심지·밝기 1.3배), 날 (0.3,0,0)·채움 거의 검정, **검은 연기 꼬리 추가**(원호 따라 0.3초), **디스토션 2장 겹침**(재질 복제 없음), 반짝이·연기 개수 절반 |
+| 4타 방향 | **소켓 4개 `TransformedAttack01~04`**(민경이 애니 보고 잡음) + `AssassinSkillView` 가 묶음 안 Hit 순번을 전 피어에서 직접 셈(묶음 시작에 0) — 반입 때 코드 |
+| 타격 성공 | 그어진 섬광 **없음** — 기존 백어택 버스트만 |
+| 파일 | 독립 프리팹 `Export/Player3/BM Assassin_TransformedSlash.prefab`(Arc120, 일반과 같은 원본·스크립트, Mesh 교체로 각도 구조 유지) |
+| 재생 속도 | **모든 파티클 Simulation Speed 3.0**(검기 ≈0.17초, 다음 타와 0.06초 겹침). 🔴 반입 때 `ShurikenEffectSystem` 속도 덮어쓰기 문제는 아래 일반 계획과 같이 고친다 |
+| 테스터 | `1.Scripts/TransformedAttackTester.cs` — 소켓 4·프리팹 1·실제 타이밍 묶음·유지 반복/자동 반복 |
+| 기준 자세 | 일반과 같음(원점 = 원호 중심, +Z 중심축, -X → +X 진행, 반대 방향은 소켓 Z 180°) |
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 일반 좌클릭 VFX — 원호 슬래쉬(모델 교체로 각도) + 타격 성공 그어진 섬광** (2026-10-16 · grill 확정 · ✅ 승인 · 🛠 1단계 MyProject 제작 완료 → ⏳ 민경 컨펌)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). ~~참고 = BM Flash Slash~~ → **10-16 재지시: 섬광(Impact) 빼고 전부 재제작, 참고 = `Export/Player3/BM Insight_Slash`(검정·붉은색 key color) + 검기를 따라 디스토션 + 빠른 재생**.
+
+### 🔸 재제작(10-16 2차) — 아래 표의 슬래쉬 항목보다 우선
+| 항목 | 결정 |
+|---|---|
+| 기반 | `BM Insight_Slash` 의 Edge(0.95,0.1,0.07)·Blade(0.55,0,0)·Fill 2장(검정)·Flecks·Fuzzball. 간파 전용 칼끝 ✦ 3개는 뺌 |
+| 원호 모델 UV 보정 | `Slash_Arc*` 는 V 배치가 Piloto 링과 다르다(칼날 띠 = v 0.8~1.0, 링은 바깥 가장자리 = v 0.5) — 그래서 BM 텍스처의 밝은 중심선이 원호 안쪽에 그려져 연했다. 재질 사본 `Export/Player3/Materials/BM_AssassinSlash_Edge·_Blade·_Fill` 에서 **MainTex V 반복 0.625**(Fill 0.475)로 링 배치에 맞춤 + Soft Particle 끔 |
+| 디스토션 | 팔라딘 좌클릭 `Slash Distortion` 층을 옮김 — `Slash World.mat`(MyProject·MainProject **guid 동일** `0cc31af9…`), 같은 원호 모델, 지연 0.1·수명 0.3 |
+| 각도 | 그대로 — 기본 Arc120, Variant Arc90·Arc150 이 렌더러 5개(Edge·Blade·Fill 2·Distortion) Mesh 만 덮어씀 |
+| 🔸 재생 속도 | **모든 파티클 시스템의 Main › Simulation Speed** 한 값(지금 2.0 = Insight 시간축 2배). 프리팹에서 시스템 9개를 함께 선택해 바꾼다 |
+| 🔴 반입 때 필수 | MainProject `ShurikenEffectSystem` 은 풀 반납(`ResetForPool`)에 `SetPlayRate(1)` 로 **모든 시스템 Simulation Speed 를 1로 덮어쓰고**, 히트스톱도 절대값으로 쓴다 → 프리팹의 2.0 이 첫 재생 뒤 사라진다. 처음 본 값을 기억해 `기본값 × rate` 로 쓰도록 고쳐야 한다(이펙트 공용 코드) |
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 범위 | **일반 4타**(`Combo_Attack_Wave_01~04`)만. 일반 E 강타·변신 4타 묶음은 같은 구조로 다음 차례 |
+| 슬래쉬 구조 | 검기 Edge·Blade 를 **각 1개·회전 무작위 없음**으로 고정, 두 렌더러가 같은 `Slash_Arc*` 모델을 씀 → **Mesh 칸만 바꾸면 각도가 바뀐다**(모델 6종 UV 가 원호 따라 0→1 로 같음) |
+| 각도 관리 | 기본 프리팹(Arc120) + **Prefab Variant**(Arc90·Arc150 — 두 렌더러 Mesh 만 덮어씀) |
+| 타별 각도 | 1타 Arc90 / 2·3타 Arc120 / 4타 Arc150 (판정 90/100/100/120°보다 살짝 넓게. 100° 모델 없음) |
+| 기준 자세 | 원점 = 원호 중심. 베는 면 = 소켓 XZ 면. **원호 중심축 = 소켓 +Z**, -X 쪽에서 +Z 를 지나 +X 쪽으로 진행(모델이 중심축 대칭이라 각도를 바꾸면 양 끝이 같이 늘고 준다). 반대 방향 타는 소켓을 Z 축 180° 회전(재질 양면) |
+| 휘두르는 방향 | 프리팹은 기준 자세 하나, **타별 방향은 소켓 회전**(`BasicAttack01~04`, 민경이 애니 보고 잡음) |
+| 크기 | 바깥 반경 ≈ 1.5m(모델 0.73m × 기본 배율 2). 이후 소켓 배율로 조절 |
+| 남길 요소 | Edge·Blade 각 1, Flecks(개수 축소), FuzzAlpha(축소). **제거** = Smoke·바닥 데칼 2종·바닥 바람 링 2종 |
+| 색·길이 | 검정·붉은색. 수명 0.75 → **~0.35초**(타격→타 종료 0.19초, 4타 연속에 쌓이지 않게) |
+| 검기 재질(10-16 변경) | Flash Slash 재질은 너무 연함(밝기 55·꼬리 디졸브) → **BM Slash 단일 검기 재질**(Edge 밝기 350·Blade 75, Clamp 텍스처). 입자 스핀 없이 **Custom1.z UV 오프셋 0.95→0.1** 로 검기가 원호를 따라 지나간다 = 원호 각도가 곧 휘두르는 범위. 🔸 같은 날 민경: Flash Slash 참고 **취소**, BM Slash 재질 유지(b) — Soft Particle(1.1~1.3m)이 바닥 가까운 납작 원호를 지워서 **Soft Particle 끈 사본** `Export/Player3/Materials/BM_AssassinSlash_Edge·_Blade` 사용, 테두리 디졸브 고원 1.2 → 0.9 |
+| 타격 성공 | **분리 방식** — 슬래쉬는 지금처럼 Hit 이벤트에서 전 피어 즉시 재생, 서버가 맞았다고 판정했을 때만 RPC 로 **그어진 섬광 원샷**을 따로 재생 |
+| 그어진 섬광 | BM Flash Slash 재질로 **일자 베기 선을 새로**: 베기 선(~1.2m, 0.05초에 그어짐, 붉은 테두리·밝은 심지) + 검은 잔상 선(조금 더 남고 가늘어짐) + 가운데 섬광(0.1초) + 선 수직 붉은 불티. 전체 ~0.3초 |
+| 섬광 위치 | 같은 타 소켓 기준 **원호 중앙(+Z 1.1m)**, 진행 방향(X)과 나란히, 위에서 볼 때 15° 고정 기울임. 여러 명 맞혀도 1회 |
+
+## 코드 변경(MainProject 반입 때 · 은희 영역 → handoff)
+- `AssassinBasicAttack.FireCurrentHit` 에서 `coneAttack.Fire(...)` 반환값(지금 버려짐)을 받아, 맞았으면 `AssassinSkillView` 에 전 피어 RPC(타 번호) 추가 — `BackAttackHitRpc` 와 같은 자리.
+- 지금 임시로 쓰는 팔라딘 슬래쉬(1·3타가 `_O` 라 빗나가도 Impact 가 보임)를 새 슬래쉬로 교체.
+
+| 산출물 | MyProject `Export/Player3/BM Assassin_Slash`(Arc120)·`_Slash_Arc90`·`_Slash_Arc150`(Variant)·`BM Assassin_SlashImpact` + 테스터 `1.Scripts/BasicAttackTester.cs`(소켓 4·타별 프리팹·실제 타이밍 타격 0.167/0.167/0.167/0.2초, 타 길이 0.354/0.354/0.354/0.425초로 1→4 반복·성공 체크 시 섬광) → 컨펌 → MainProject 반입 시 원호 모델은 이미 있는 `50.Art/VFX/Models/Slash_Arc*`(파일·임포트 설정 동일, **guid 만 다름 → 재매핑**) |
+
+---
+
+# ▶▶▶ 계획 = **어쌔신 우클릭(간파) VFX — 기 모으기 · 올려치기 · 성공 강조** (2026-10-16 · grill 확정 · 1단계 MyProject 제작 · 부착 = 민경, 애니 이벤트 × EffectSocketPlayer)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 제작·부착(소켓 + 애니 이벤트)은 민경, **판정 타이밍 정렬·성공 알림 경로는 은희와 합의**.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 연출 단계 | 기 모으기(시전 순간) → 올려치기(판정 순간) → 성공 강조(간파 성공 시에만) |
+| 기 모으기(10-16 변경) | **루프**. 오른쪽 단검 칼날 중간 소켓 `Dagger_Weapon_R/VFX_InsightCharge`(은희가 추가)에 부착, 시전부터 판정까지 재생. Gather_Core 는 1→1.2 배 맥동(0.5초 주기) |
+| 기 모으기 끝 | 올려치기 재생 순간(·OnEnd·안전 타임아웃) **튀기기 원샷 `_Pop` 을 소켓에서 재생 + 루프 즉시 해제**(ReleaseImmediate) — 페이드 없이 튀기기가 덮는다. 판정 타이밍(0.15/0.6)과 무관하게 맞는다 |
+| 올려치기 | 세로 초승달 베기(BM Slash 를 세움, 판정 상자 정면 0.9m·높이 1m 중심, 높이 ~1.8m) + 초승달 위 끝 붉은 ✦ 반짝임(무기 뼈대 추종 안 함) |
+| 성공 강조 | 같은 자리 초승달 재번쩍 + 붉은 섬광 + 방사 불꽃 + 붉은 연기 잔광(~0.4초) |
+| 일반·변신 | 같은 연출 |
+| 🔸 부착 방식(10-16 민경 확정) | **애니메이션 이벤트 + `EffectSocketPlayer`** 로 재생한다(코드 타이머·RPC 로 위치를 정하지 않는다). 소켓 위치는 민경이 직접 잡는다. `Attack_Up_01` 클립에 `EffectAnimEvents` 이벤트를 심고, 각 연출은 Id 를 가진 `EffectSocketPlayer` 하나씩 — 아래 표 |
+| 임시 시전 연출 | `FX_Interrupt_Flash`(interruptCastPrefab) 제거 |
+| 🔴 타이밍 사실 | 판정·결과 = `hitDelay` 0.15초(타이머가 먼저). 애니 Hit 이벤트 0.6초·End 1.275초는 `hasResolvedHit`·스킬 종료(skillDuration 0.6)로 **실제 무시됨**. 정렬은 은희가 결정 |
+| 성공 알림(제안) | 서버 전용 `PlayerInterruptSkillBase.ServerInterruptSucceeded` → `AssassinSkillView` 전 피어 RPC(베이스 무변경) |
+
+### 부착 계획 — 애니메이션 이벤트 × EffectSocketPlayer (10-16)
+| 연출 | EffectSocketPlayer 소켓 | 애니 이벤트(`EffectAnimEvents`) | 비고 |
+|---|---|---|---|
+| 기 모으기 `_Windup`(루프) | `Dagger_Weapon_R/VFX_InsightCharge`(칼날 중간, 민경이 잡음) | 시작 프레임 `StartEffect(id)` | 이펙트 매니저가 위치·회전만 따라감(뼈대 스케일 무시) |
+| 튀기기 `_Pop`(원샷) | 위와 같은 소켓 | 올려치기 프레임 `PlayEffect(id)` | 같은 프레임에 기 모으기 `StopEffect(id)` — 엔트리 `outroDuration` 0(해제 파트 없음)이면 Release 즉시 반납 = "즉시 해제" |
+| 올려치기 `_Slash`(원샷) | 민경이 잡는 올려치기 소켓 | 올려치기 프레임 `PlayEffect(id)` | ✅ 10-16 원점 = 베기 중심으로 옮김. 베기 면 = 소켓 XZ 면, **+Z 에서 시작해 +X 쪽으로 진행**(민경 확인 후 10-16 수정), 칼끝 ✦ = +X 0.85m(`_Success` 도 같은 원점·회전) |
+| 성공 강조 `_Success`(원샷) | 올려치기와 같은 소켓 | (애니 이벤트 아님) 성공 알림을 받은 쪽이 `PlayOnce()` | 성공은 서버 판정이라 애니 이벤트로 못 낸다 — 알림 경로는 은희와 합의 |
+- 애니 이벤트는 그 애니를 재생하는 **모든 피어에서 각자** 발화한다 — 이펙트 쪽에 `IsServer` 가드를 넣지 말 것(`EffectSocketPlayer` 주석).
+- 판정(`hitDelay` 0.15초)과 올려치기 프레임(0.6초) 정렬은 은희 결정 사항 — 이벤트를 올려치기 프레임에 두면 동작과 연출은 늘 맞는다.
+- 안전망: 판정 전 취소(피격·사망)면 `StopEffect` 이벤트가 안 올 수 있다 — `EffectSocketPlayer.safetyTimeout`(기본 5초, 10초 미만)과 OnDisable 회수가 받친다. 코어·빛 입자 수명이 10초라 그보다 짧게 둔다.
+
+| 산출물 | MyProject `Export/Player3/BM Insight_Windup`·`_Pop`·`_Slash`·`_Success` + 테스터 `1.Scripts/InsightTester.cs` → 컨펌 → `Players/Player3/RightClick_Insight/FX_Assassin_Insight_*`, 카탈로그 `Assassin_RC_Insight*` |
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 일반 Q VFX — 관통 일섬(PierceLine + PierceBurst)** (2026-10-16 · grill 확정 · ✅ MyProject 컨펌 · ✅ 반입·배선 — 컴파일 에러 0 · ⏳ Play·MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 변신 Q(Storm Slash — 바닥에 남는 무거운 자국)와 반대로 **허리 높이의 가늘고 날카로운 검붉은 일섬**.
@@ -790,7 +1270,7 @@ FX_GunnerBeam.prefab          LaserCore 머티리얼 교체 · EndGlow 추가
 > 📁 09-22 이전 계획(23호 공격 재작업 G1~G7 · Dev Boot · 벽 투명화 1단계 · 보호막 VFX 등)과 끝난 `PLAN-*.md` 는
 > [Docs/history/PLANS/](Docs/history/PLANS/) 로 옮겼다. 옛 문서의 "PLAN.md §…" 참조는 [PLAN-archive-2026-06_09-22.md](Docs/history/PLANS/PLAN-archive-2026-06_09-22.md) 를 본다.
 
-> 🆕 2026-10-02 은희: **캐릭터 선택 화면** → [PLAN-character-select.md](PLAN-character-select.md) (구현 완료 · Play 확인 대기)
+> 🆕 2026-10-02 은희: **캐릭터 선택 화면** → [PLAN-character-select.md](Docs/history/PLANS/PLAN-character-select.md) (구현 완료 · Play 확인 대기)
 
 # ▶▶▶ 진행 중 = **차징 구슬 외부 전기 유입** (2026-09-30 · 그릴 15문항 완료 · **구현 완료 ✅ · Play 검증 대기**)
 

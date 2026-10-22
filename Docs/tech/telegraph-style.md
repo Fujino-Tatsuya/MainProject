@@ -1,6 +1,6 @@
 # 공격 예고 색·마스크 규격 (아트 전달용)
 
-> 2026-10-13 · 경석 · 계획 [PLAN-telegraph-style.md](../../PLAN-telegraph-style.md)
+> 2026-10-13 · 경석 · 계획 [PLAN-telegraph-style.md](../history/PLANS/PLAN-telegraph-style.md)
 > 몬스터 공격 예고(바닥에 깔리는 빨간/파란 범위)의 **색과 무늬(마스크 이미지)** 를 스크립트를 열지 않고
 > **에셋 인스펙터에서 바로** 고칠 수 있다. Play 중에 고쳐도 바로 반영된다.
 >

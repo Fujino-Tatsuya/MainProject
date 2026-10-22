@@ -20,9 +20,10 @@ using Object = UnityEngine.Object;
 ///       🔴 DX12·Vulkan·Metal 에서 WarmUp 은 셰이더 프로그램까지만 준비한다 — 파이프라인 상태(PSO)는 첫 그리기에서 만든다(남는 비용).
 ///   (c) JIT — 화면 밖 더미에서 C3 칠하기 경로(NewDecalInstance·SetDecalProperties·채움 Set*·PaintPlate/PaintLayer/PaintActive·
 ///       CreateJump/Begin·BossPatternVisuals.Paint(CodeShape)·ApplySmash)를 한 번씩 돌리고 즉시 지운다(재질 인스턴스 포함).
-///       할 일 57.1 — 보스 예고 컴포넌트도 임시 오브젝트에 붙여 실제 경로를 한 번씩 돌린다(WarmBossComponents):
+///       할 일 57.1/57.3 — 보스 예고 컴포넌트도 임시 오브젝트에 붙여 실제 경로를 한 번씩 돌린다(WarmBossComponents):
 ///       BossAttackConeTelegraph.Show(합집합·부채꼴·잡기·띠·간파)·Hide(EnsureBuilt 포함) · WellsDroneAttack.ClientMark·ClientLock·ClientCancel
-///       (빈 데이터 — 드론 모델 Instantiate·카메라 분기는 안 탄다). 생성물(프로젝터·재질 인스턴스·드론 뷰)은 같은 호출에서 지운다 — 풀은 두지 않는다.
+///       (57.3: Resources 인덱스가 가리키는 실제 데이터 — 모델 풀 대출·카메라 없는 분기·낙하 Tick·재사용 PlayableGraph·전용 RT 첫 그리기 포함).
+///       임시 생성물(프로젝터·재질 인스턴스·드론 뷰)은 같은 호출에서 지우고, 예열한 비활성 드론 1기만 DontDestroyOnLoad 풀에 남긴다.
 ///       게임 쪽 보스 컴포넌트의 EnsureBuilt(프로젝터 6개 생성)는 JIT 이 끝난 뒤의 생성 비용만 남는다(§9.4).
 ///       BossDirectionIndicator 는 세우지 않는다(BuildRenderers 는 예열 없이도 1 ms 미만).
 /// 런타임 텍스처를 만들지 않는다(EnemyC3RuntimeTextureGuardTests). 결과 시간은 <see cref="Last"/> 와 로그 한 줄.
@@ -122,7 +123,6 @@ static class EnemyC3Prewarm
         GameObject jump = null;
         Material decalInstance = null;
         WellsDroneAttack drone = null;
-        WellsDroneDataSO droneData = null;
         try
         {
             // 데칼 — 인스턴스 생성 + 외곽선(부채꼴·띠·대시 띠·합집합) + 채움(부채꼴·띠·합집합·원판) 값 넣기 + 프로젝터 켜고 끄기.
@@ -182,7 +182,7 @@ static class EnemyC3Prewarm
             if (sr.sprite != null) EnemyC3Visuals.ApplySmash(smash);
 
             var bossSw = Stopwatch.StartNew();
-            WarmBossComponents(root.transform, ref drone, ref droneData);
+            WarmBossComponents(root.transform, ref drone);
             bossMs = bossSw.Elapsed.TotalMilliseconds;
         }
         finally
@@ -198,14 +198,13 @@ static class EnemyC3Prewarm
             }
             if (drone != null && drone.ViewRoot != null) Object.DestroyImmediate(drone.ViewRoot.gameObject);   // 루트 밖 별도 오브젝트
             Object.DestroyImmediate(root);
-            if (droneData != null) Object.DestroyImmediate(droneData);
             if (decalInstance != null) Object.DestroyImmediate(decalInstance);
         }
     }
 
     // (c-2) 할 일 57.1 — 보스 예고 컴포넌트의 첫 호출(메서드 JIT)을 로딩 중에 치른다. 둘 다 MonoBehaviour(NetworkBehaviour 아님)라
     //   임시 오브젝트에 붙여 실제 경로를 그대로 부를 수 있다. 판정·RPC·FSM 과 무관한 그리기 경로만 돈다.
-    static void WarmBossComponents(Transform root, ref WellsDroneAttack drone, ref WellsDroneDataSO droneData)
+    static void WarmBossComponents(Transform root, ref WellsDroneAttack drone)
     {
         // 23호 공격 예고 — TwentyThreeBoss 가 실제로 부르는 분기: 합집합 02(돌진) · 부채꼴 03 · 잡기(바깥→안) · 네모 띠(치우침) · 간파 04, 그리고 Hide.
         //   EnsureBuilt(프로젝터 6개·재질 인스턴스 6개)도 여기서 한 번 돈다 — 생성물은 위 finally 가 지운다.
@@ -219,17 +218,17 @@ static class EnemyC3Prewarm
         telegraph.Show(0f, 0f, 0f, 0f, 1.2f, 8f, 1f, palette: BossAttackConeTelegraph.Palette.Interrupt);
         telegraph.Hide();
 
-        // 웰즈 드론 — 표식 → 위치 고정(판 14) → 취소. 데이터는 빈 기본값(드론 모델 없음 → 모델 Instantiate·카메라 분기는 안 탄다).
-        //   보스 참조 없이 Init(null) — Update 는 보스가 없으면 아무것도 안 한다. 폭발(ClientImpact)은 EffectManager 재생이라 부르지 않는다.
+        // 웰즈 드론 — Resources 의 작은 인덱스가 정본 WellsDroneData.asset 을 가리킨다(원본 이동·복제 없음).
+        //   보스 참조 없이 Init(null) — Update 는 보스가 없으면 아무것도 안 한다. 표식→고정→카메라 없는 출발점→낙하→클립 전환→
+        //   전용 RT 첫 그리기→풀 반납까지 실제 클라 경로를 돈다. 폭발은 이미 EffectManager 풀이라 예열 대상에서 제외한다.
         var droneGo = new GameObject("Drone") { hideFlags = HideFlags.HideAndDontSave };
         droneGo.transform.SetParent(root, false);
-        droneData = ScriptableObject.CreateInstance<WellsDroneDataSO>();
-        droneData.hideFlags = HideFlags.HideAndDontSave;
+        WellsDroneDataSO droneData = WellsDroneVisualPool.PrewarmData;
+        if (droneData == null)
+            throw new InvalidOperationException("Resources/Monster/WellsDronePrewarmCatalog.asset 의 data 참조가 비었습니다.");
         drone = droneGo.AddComponent<WellsDroneAttack>();
         drone.Init(null, droneData);
-        drone.ClientMark(root, 1f);
+        drone.PrewarmClientPath(root);
         if (drone.ViewRoot != null) drone.ViewRoot.gameObject.hideFlags = HideFlags.HideAndDontSave;
-        drone.ClientLock(root.position, 3f, 1f, true);
-        drone.ClientCancel();
     }
 }

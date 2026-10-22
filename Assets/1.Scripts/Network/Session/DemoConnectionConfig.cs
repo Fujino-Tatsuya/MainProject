@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
 
@@ -11,9 +12,39 @@ public enum DemoConnectionRole
     Client,
 }
 
+/// <summary>role 자동 판정(할 일 72)의 근거.</summary>
+public enum DemoAutoRoleBasis
+{
+    /// <summary>hostAddress 가 비었거나 loopback(127.x·localhost) — 이 PC 가 호스트.</summary>
+    LoopbackHostAddress,
+    /// <summary>이 PC 의 IPv4 중 하나가 hostAddress 와 같다 — 호스트.</summary>
+    LocalAddressMatch,
+    /// <summary>이 PC 에 hostAddress 가 없다 — 그 주소로 접속하는 클라.</summary>
+    NoLocalMatch,
+}
+
+/// <summary>role 이 비었거나 auto 일 때의 판정 결과. 로그·오버레이에 근거를 보여 준다.</summary>
+public readonly struct DemoAutoRoleDecision
+{
+    public DemoAutoRoleDecision(DemoConnectionRole role, DemoAutoRoleBasis basis, string address, IReadOnlyList<string> localAddresses)
+    {
+        Role = role;
+        Basis = basis;
+        Address = address ?? string.Empty;
+        LocalAddresses = localAddresses ?? Array.Empty<string>();
+    }
+
+    public DemoConnectionRole Role { get; }
+    public DemoAutoRoleBasis Basis { get; }
+    /// <summary>LocalAddressMatch 면 일치한 이 PC 주소, 그 밖엔 hostAddress.</summary>
+    public string Address { get; }
+    /// <summary>비교한 이 PC 의 주소 목록(로그용).</summary>
+    public IReadOnlyList<string> LocalAddresses { get; }
+}
+
 /// <summary>
 /// 부스 데모 연결 설정(<c>demo-connection.json</c>) — Docs/tech/networking.md "Lobby Demo" 절.
-/// 파싱·검증·MPPM 태그 덮어쓰기는 순수 함수다(EditMode 테스트 대상). 디스크·PC 이름·MPPM 태그를 읽는 건
+/// 파싱·검증·role 자동 판정·MPPM 태그 덮어쓰기는 순수 함수다(EditMode 테스트 대상). 디스크·PC 이름·NIC 주소·MPPM 태그를 읽는 건
 /// <see cref="Load"/> 하나뿐이다. 연결 시작은 DemoSessionDirector(C5)가 이 값으로 한다.
 /// </summary>
 public sealed class DemoConnectionConfig
@@ -43,6 +74,8 @@ public sealed class DemoConnectionConfig
     public float RetryIntervalSeconds { get; }
     public float ConnectTimeoutSeconds { get; }
     public float DisconnectTimeoutSeconds { get; }
+    /// <summary>role 을 자동 판정했으면 그 근거. host/client 명시·파일 없음·MPPM 태그 덮어쓰기면 null.</summary>
+    public DemoAutoRoleDecision? AutoRole { get; }
 
     public bool IsHost => Role == DemoConnectionRole.Host;
     /// <summary>호스트는 0.0.0.0 에서 듣는다. 클라는 listen 하지 않으므로 빈 문자열.</summary>
@@ -55,7 +88,8 @@ public sealed class DemoConnectionConfig
         string playerId,
         float retryIntervalSeconds,
         float connectTimeoutSeconds,
-        float disconnectTimeoutSeconds)
+        float disconnectTimeoutSeconds,
+        DemoAutoRoleDecision? autoRole = null)
     {
         Role = role;
         HostAddress = hostAddress;
@@ -64,6 +98,7 @@ public sealed class DemoConnectionConfig
         RetryIntervalSeconds = retryIntervalSeconds;
         ConnectTimeoutSeconds = connectTimeoutSeconds;
         DisconnectTimeoutSeconds = disconnectTimeoutSeconds;
+        AutoRole = autoRole;
     }
 
     /// <summary>파일이 없을 때의 값 — host · 127.0.0.1 · 7777 (Q5).</summary>
@@ -95,7 +130,8 @@ public sealed class DemoConnectionConfig
     /// JSON 자체가 비었거나 깨졌으면 false 와 전부 기본값(host)을 돌려준다.
     /// </summary>
     /// <param name="fallbackPlayerId">playerId 가 없거나 비었을 때 쓸 값(보통 PC 이름). 테스트에서 주입한다.</param>
-    public static bool TryParse(string json, string fallbackPlayerId, out DemoConnectionLoadResult result)
+    /// <param name="localAddresses">이 PC 의 IPv4 주소(<see cref="GetLocalIPv4Addresses"/>). role 이 비었거나 auto 일 때 판정에 쓴다. 테스트에서 주입한다.</param>
+    public static bool TryParse(string json, string fallbackPlayerId, IReadOnlyList<string> localAddresses, out DemoConnectionLoadResult result)
     {
         var issues = new List<string>();
         var fallback = ResolveFallbackPlayerId(fallbackPlayerId);
@@ -119,17 +155,70 @@ public sealed class DemoConnectionConfig
             return false;
         }
 
-        var role = ParseRole(dto.role, issues);
+        var explicitRole = ParseRole(dto.role, issues);
         var hostAddress = ParseHostAddress(dto.hostAddress, issues);
+        DemoAutoRoleDecision? autoRole = null;
+        if (!explicitRole.HasValue)
+            autoRole = ResolveAutoRole(hostAddress, localAddresses);
+        var role = explicitRole ?? autoRole.Value.Role;
         var port = ParsePort(dto.port, issues);
         var playerId = ParsePlayerId(dto.playerId, fallback, issues);
         var retry = ParseSeconds("retryIntervalSeconds", dto.retryIntervalSeconds, DefaultRetryIntervalSeconds, MaxRetryIntervalSeconds, issues);
         var connect = ParseSeconds("connectTimeoutSeconds", dto.connectTimeoutSeconds, DefaultConnectTimeoutSeconds, MaxConnectTimeoutSeconds, issues);
         var disconnect = ParseSeconds("disconnectTimeoutSeconds", dto.disconnectTimeoutSeconds, DefaultDisconnectTimeoutSeconds, MaxDisconnectTimeoutSeconds, issues);
 
-        var config = new DemoConnectionConfig(role, hostAddress, port, playerId, retry, connect, disconnect);
+        var config = new DemoConnectionConfig(role, hostAddress, port, playerId, retry, connect, disconnect, autoRole);
         result = new DemoConnectionLoadResult(config, isFileMissing: false, issues);
         return true;
+    }
+
+    /// <summary>
+    /// role 자동 판정(할 일 72) — 모든 PC 에 같은 설정 파일을 두기 위한 규칙.
+    /// hostAddress 가 비었거나 loopback 이면 호스트, 이 PC 의 IPv4 중 하나와 같으면 호스트, 아니면 그 주소로 접속하는 클라.
+    /// <paramref name="localAddresses"/> 의 IPv6·형식이 틀린 값은 무시한다.
+    /// </summary>
+    public static DemoAutoRoleDecision ResolveAutoRole(string hostAddress, IReadOnlyList<string> localAddresses)
+    {
+        var trimmed = hostAddress?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0 || string.Equals(trimmed, "localhost", StringComparison.OrdinalIgnoreCase))
+            return new DemoAutoRoleDecision(DemoConnectionRole.Host, DemoAutoRoleBasis.LoopbackHostAddress, trimmed, localAddresses);
+
+        if (IsIPv4(trimmed) && IPAddress.TryParse(trimmed, out var host))
+        {
+            if (IPAddress.IsLoopback(host))
+                return new DemoAutoRoleDecision(DemoConnectionRole.Host, DemoAutoRoleBasis.LoopbackHostAddress, trimmed, localAddresses);
+
+            if (localAddresses != null)
+            {
+                foreach (var local in localAddresses)
+                {
+                    var candidate = local?.Trim();
+                    if (IsIPv4(candidate) && IPAddress.TryParse(candidate, out var address) && address.Equals(host))
+                        return new DemoAutoRoleDecision(DemoConnectionRole.Host, DemoAutoRoleBasis.LocalAddressMatch, candidate, localAddresses);
+                }
+            }
+        }
+
+        return new DemoAutoRoleDecision(DemoConnectionRole.Client, DemoAutoRoleBasis.NoLocalMatch, trimmed, localAddresses);
+    }
+
+    /// <summary>켜진 NIC 의 유니캐스트 IPv4 주소. loopback 도 들어 있지만 판정에는 영향이 없다(hostAddress loopback 은 따로 호스트).</summary>
+    public static IReadOnlyList<string> GetLocalIPv4Addresses()
+    {
+        var addresses = new List<string>();
+        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (nic.OperationalStatus != OperationalStatus.Up)
+                continue;
+
+            foreach (var unicast in nic.GetIPProperties().UnicastAddresses)
+            {
+                if (unicast.Address.AddressFamily == AddressFamily.InterNetwork)
+                    addresses.Add(unicast.Address.ToString());
+            }
+        }
+
+        return addresses;
     }
 
     /// <summary>
@@ -195,7 +284,21 @@ public sealed class DemoConnectionConfig
         {
             try
             {
-                TryParse(File.ReadAllText(path), fallbackPlayerId, out result);
+                IReadOnlyList<string> localAddresses;
+                string addressIssue = null;
+                try
+                {
+                    localAddresses = GetLocalIPv4Addresses();
+                }
+                catch (Exception e)
+                {
+                    localAddresses = Array.Empty<string>();
+                    addressIssue = $"이 PC 의 IP 목록을 읽지 못함 — 자동 판정은 loopback 이 아니면 클라: {e.Message}";
+                }
+
+                TryParse(File.ReadAllText(path), fallbackPlayerId, localAddresses, out result);
+                if (addressIssue != null && result.Config.AutoRole.HasValue)
+                    result = new DemoConnectionLoadResult(result.Config, result.IsFileMissing, new List<string>(result.Issues) { addressIssue });
             }
             catch (Exception e)
             {
@@ -245,14 +348,15 @@ public sealed class DemoConnectionConfig
         return string.IsNullOrWhiteSpace(fallbackPlayerId) ? LastResortPlayerId : fallbackPlayerId.Trim();
     }
 
-    private static DemoConnectionRole ParseRole(string value, List<string> issues)
+    /// <summary>host/client 명시면 그 값, 비었거나 없거나 auto 면 null(자동 판정). 모르는 값도 사유를 남기고 자동 판정한다.</summary>
+    private static DemoConnectionRole? ParseRole(string value, List<string> issues)
     {
-        if (value == null)
+        var trimmed = value?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0 || string.Equals(trimmed, "auto", StringComparison.OrdinalIgnoreCase))
         {
-            return DemoConnectionRole.Host;
+            return null;
         }
 
-        var trimmed = value.Trim();
         if (string.Equals(trimmed, "host", StringComparison.OrdinalIgnoreCase))
         {
             return DemoConnectionRole.Host;
@@ -263,8 +367,8 @@ public sealed class DemoConnectionConfig
             return DemoConnectionRole.Client;
         }
 
-        issues.Add($"role '{value}' 은 host/client 가 아님 — host 로 동작");
-        return DemoConnectionRole.Host;
+        issues.Add($"role '{value}' 은 auto/host/client 가 아님 — 자동 판정으로 동작");
+        return null;
     }
 
     private static string ParseHostAddress(string value, List<string> issues)

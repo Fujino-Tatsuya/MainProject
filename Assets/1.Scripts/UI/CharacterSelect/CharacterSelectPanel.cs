@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
@@ -39,6 +40,27 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("위·아래 카드 배율(card_unselected 549 / card_selected 654).")]
     [SerializeField] private float sideScale = 0.84f;
 
+    [Header("Card Motion (UI 연출, 초 — unscaled, 할 일 60)")]
+    [Tooltip("포커스가 바뀌면 카드가 새 자리로 미끄러지는 시간(EaseOutCubic).")]
+    [SerializeField] private float moveSeconds = 0.18f;
+    [Tooltip("가운데 자리 금색 테두리가 이동 시작 때 꺼지고, 이동이 끝나면 켜지는 페이드 시간.")]
+    [SerializeField] private float ringFadeSeconds = 0.1f;
+    [Tooltip("이동이 끝난 뒤 가운데 카드가 커지는 시간(EaseOutCubic).")]
+    [SerializeField] private float focusScaleSeconds = 0.12f;
+    [Tooltip("다 선 가운데 카드 배율(1 = 확대 없음).")]
+    [SerializeField] private float focusScale = 1.08f;
+
+    [Header("Key Repeat (이동 키 길게 누르기, 초 — unscaled, 할 일 60·60.1)")]
+    [Tooltip("처음 1칸 뒤 첫 반복까지 기다리는 시간.")]
+    [SerializeField] private float keyRepeatDelaySeconds = 0.25f;
+    [Tooltip("첫 반복 직후 간격. 홀드 시간에 비례해 최소 간격까지 줄어든다(한 프레임 최대 1칸).")]
+    [SerializeField] private float keyRepeatStartIntervalSeconds = 0.25f;
+    [Tooltip("가장 짧은 반복 간격 — 램프가 끝나면 이 간격을 유지한다.")]
+    [FormerlySerializedAs("keyRepeatIntervalSeconds")]
+    [SerializeField] private float keyRepeatMinIntervalSeconds = 0.1f;
+    [Tooltip("간격이 시작 간격에서 최소 간격까지 줄어드는 시간(첫 반복 시점부터).")]
+    [SerializeField] private float keyRepeatRampSeconds = 0.75f;
+
     [Header("Behaviour")]
     [SerializeField] private bool closeWithEscape = true;
     [Tooltip("잠금 중 확정을 누르면 잠금 문구를 강조하는 시간(초, unscaled).")]
@@ -52,9 +74,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
     private readonly List<CharacterSelectCard> _cards = new List<CharacterSelectCard>();
     private readonly List<bool> _available = new List<bool>();
+    private readonly List<CharacterSelectCardTrack> _tracks = new List<CharacterSelectCardTrack>();
+    private readonly CharacterSelectCardMotion _motion = new CharacterSelectCardMotion();
+    private readonly CharacterSelectKeyRepeat _keyRepeat = new CharacterSelectKeyRepeat();
     private CharacterSelectPanelRules _rules;
     private bool _countedOpen;
     private float _lockedPulseUntil = -1f;
+    private int _ringCard = -1; // 테두리를 보여 주는 카드 — 이동 중엔 꺼지는 옛 가운데, 정착하면 새 가운데
+    private Func<float> _previewClock;
 
     /// <summary>다른 캐릭터를 골랐다(캐릭터 id = 로스터 index). 곧이어 <see cref="Closed"/>(<see cref="CharacterSelectCloseReason.Chosen"/>).</summary>
     public event Action<int> CharacterChosen;
@@ -76,6 +103,10 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     public static bool IsEscapeClaimed => s_openCount > 0 || s_escapeClaimedFrame == Time.frameCount;
 
     private CharacterSelectPanelRules Rules => _rules ??= new CharacterSelectPanelRules();
+
+    private float Now => _previewClock?.Invoke() ?? Time.unscaledTime;
+
+    private CharacterSelectSlotLayout Layout => new CharacterSelectSlotLayout(focusedSlot, previousSlot, nextSlot, sideScale);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -109,10 +140,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             return;
 
         UpdateLockedPulse();
+        UpdateMotion();
 
         // 결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫혔다 — 키 입력은 그쪽 것.
         if (LobbyResultPanel.IsEscapeClaimed)
+        {
+            _keyRepeat.Reset(); // 반복도 멈춘다 — 눌려 있던 이동 키는 새로 누를 때까지 무시
             return;
+        }
 
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null)
@@ -132,17 +167,19 @@ public sealed class CharacterSelectPanel : MonoBehaviour
                 return;
             }
 
-            if (keyboard.wKey.wasPressedThisFrame || keyboard.upArrowKey.wasPressedThisFrame ||
-                keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame)
+            // 이동 키 — 누른 순간 1칸, 길게 누르면 대기 뒤 점점 짧아지는 간격마다 1칸(CharacterSelectKeyRepeat).
+            bool backHeld = keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ||
+                            keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
+            bool forwardHeld = keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ||
+                               keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
+            _keyRepeat.DelaySeconds = keyRepeatDelaySeconds;
+            _keyRepeat.StartIntervalSeconds = keyRepeatStartIntervalSeconds;
+            _keyRepeat.MinIntervalSeconds = keyRepeatMinIntervalSeconds;
+            _keyRepeat.RampSeconds = keyRepeatRampSeconds;
+            int step = _keyRepeat.Tick(backHeld, forwardHeld, Time.unscaledTime);
+            if (step != 0)
             {
-                MoveFocus(-1);
-                return;
-            }
-
-            if (keyboard.sKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame ||
-                keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame)
-            {
-                MoveFocus(1);
+                MoveFocus(step);
                 return;
             }
         }
@@ -167,12 +204,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         BuildCards();
         Rules.Open(currentCharacterId, isLocked, _available);
         _lockedPulseUntil = -1f;
+        _keyRepeat.Reset(); // 열 때 이미 눌려 있던 이동 키는 새로 누를 때까지 무시
 
         if (content != null)
             content.SetActive(true);
         if (hintText != null)
             hintText.text = CharacterSelectUiStrings.Hint.TextOr(hintText.text);
         Redraw();
+        SnapLayout();
         SetCountedOpen(true);
     }
 
@@ -192,17 +231,22 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         {
             _lockedPulseUntil = -1f;
             Redraw();
+            SnapLayout();
         }
     }
 
-    /// <summary>포커스를 옮긴다(끝에서 순환). 키·휠과 같은 길.</summary>
+    /// <summary>포커스를 옮긴다(끝에서 순환). 키·휠과 같은 길. 카드는 지금 보이는 자리에서 새 자리로 미끄러진다(이동 중이면 바로 새 목표로).</summary>
     public void MoveFocus(int delta)
     {
+        int previous = Rules.Focus;
         if (Rules.MoveFocus(delta))
+        {
             Redraw();
+            AnimateLayout(previous);
+        }
     }
 
-    /// <summary>포커스된 카드로 확정(Enter·Space·가운데 카드 클릭과 같은 길).</summary>
+    /// <summary>포커스된 카드로 확정(Enter·Space·가운데 카드 클릭과 같은 길). 이동 중에도 받는다 — 대상은 논리상 가운데(<see cref="FocusedCharacterId"/>).</summary>
     public CharacterSelectConfirmResult Confirm()
     {
         CharacterSelectConfirmResult result = Rules.Confirm();
@@ -266,25 +310,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
     }
 
+    /// <summary>겉모습(카드 모양·이름판·잠금 문구)을 논리 포커스에 맞춘다. 자리·크기·테두리는 SnapLayout/AnimateLayout.</summary>
     private void Redraw()
     {
         int count = _cards.Count;
         int focus = Rules.Focus;
 
         for (int i = 0; i < count; i++)
-        {
-            CharacterSelectCard card = _cards[i];
-            int offset = CharacterSelectPanelRules.SlotOffset(i, focus, count);
-            bool visible = offset >= -1 && offset <= 1;
-            card.gameObject.SetActive(visible);
-            if (!visible)
-                continue;
-
-            var rect = (RectTransform)card.transform;
-            rect.anchoredPosition = offset == 0 ? focusedSlot : offset < 0 ? previousSlot : nextSlot;
-            rect.localScale = Vector3.one * (offset == 0 ? 1f : sideScale);
-            card.SetState(offset, i == Rules.CurrentId, Rules.IsLocked);
-        }
+            _cards[i].SetState(CharacterSelectPanelRules.SlotOffset(i, focus, count), i == Rules.CurrentId, Rules.IsLocked);
 
         // 그리기 순서 — 포커스 카드를 맨 위로.
         if (focus >= 0 && focus < count)
@@ -327,16 +360,133 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         lockedText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, lockedPulseScale, t);
     }
 
+    // ── 카드 이동·확대 연출(할 일 60) — 시간 규칙은 CharacterSelectCardMotion ──
+
+    private void ConfigureMotion()
+    {
+        _motion.MoveSeconds = moveSeconds;
+        _motion.RingFadeSeconds = ringFadeSeconds;
+        _motion.ScaleSeconds = focusScaleSeconds;
+    }
+
+    /// <summary>애니메이션 없이 다 선 상태로(테두리 켜짐·확대). 열 때·잠금 변경.</summary>
+    private void SnapLayout()
+    {
+        ConfigureMotion();
+        _motion.Snap();
+        _ringCard = Rules.Focus;
+
+        CharacterSelectSlotLayout layout = Layout;
+        _tracks.Clear();
+        for (int i = 0; i < _cards.Count; i++)
+            _tracks.Add(CharacterSelectCardMotion.Snap(CharacterSelectPanelRules.SlotOffset(i, Rules.Focus, _cards.Count), layout));
+
+        ApplyLayout(Now);
+    }
+
+    /// <summary>포커스가 <paramref name="previousFocus"/> 에서 바뀌었다 — 지금 보이는 자리에서 새 자리로 다시 출발(큐잉 없음).</summary>
+    private void AnimateLayout(int previousFocus)
+    {
+        int count = _cards.Count;
+        if (_tracks.Count != count)
+        {
+            SnapLayout();
+            return;
+        }
+
+        ConfigureMotion();
+        float now = Now;
+        TickMotion(now);
+
+        float progress = _motion.MoveProgress(now);
+        float scale = _motion.FocusScale(now, focusScale);
+        int focus = Rules.Focus;
+        int direction = Math.Sign(CharacterSelectPanelRules.SlotOffset(focus, previousFocus, count));
+        CharacterSelectSlotLayout layout = Layout;
+
+        for (int i = 0; i < count; i++)
+        {
+            CharacterSelectCardTrack track = _tracks[i];
+            _tracks[i] = CharacterSelectCardMotion.Retarget(track, track.Position(progress), track.Scale(progress, scale),
+                CharacterSelectPanelRules.SlotOffset(i, focus, count), direction, layout);
+        }
+
+        _motion.Retarget(now); // 테두리는 지금 보여 주는 카드(_ringCard)에서 꺼진다
+        ApplyLayout(now);
+    }
+
+    private void UpdateMotion()
+    {
+        if (_motion.Phase == CharacterSelectMotionPhase.Idle)
+            return;
+
+        float now = Now;
+        TickMotion(now);
+        ApplyLayout(now);
+    }
+
+    /// <summary>시간을 흘린다. 이동이 막 끝났으면 카드를 도착 자리에 고정(나가던 카드 끔)하고 테두리를 새 가운데로 옮긴다.</summary>
+    private void TickMotion(float now)
+    {
+        CharacterSelectMotionPhase before = _motion.Phase;
+        if (before == _motion.Tick(now) || before != CharacterSelectMotionPhase.Moving)
+            return;
+
+        for (int i = 0; i < _tracks.Count; i++)
+            _tracks[i] = CharacterSelectCardMotion.Arrive(_tracks[i]);
+        _ringCard = Rules.Focus;
+    }
+
+    private void ApplyLayout(float now)
+    {
+        float progress = _motion.MoveProgress(now);
+        float scale = _motion.FocusScale(now, focusScale);
+        float ring = _motion.RingAlpha(now);
+
+        for (int i = 0; i < _cards.Count && i < _tracks.Count; i++)
+        {
+            CharacterSelectCard card = _cards[i];
+            CharacterSelectCardTrack track = _tracks[i];
+            if (card.gameObject.activeSelf != track.Active)
+                card.gameObject.SetActive(track.Active);
+            if (!track.Active)
+                continue;
+
+            var rect = (RectTransform)card.transform;
+            rect.anchoredPosition = track.Position(progress);
+            rect.localScale = Vector3.one * track.Scale(progress, scale);
+            card.SetRingAlpha(i == _ringCard ? ring : 0f);
+        }
+    }
+
+#if UNITY_EDITOR
+    /// <summary>에디터 캡처 전용 — 연출 시계를 바꿔 끼우고(null = unscaledTime) 그 시각으로 한 번 그린다. 프리뷰 씬은 Update 가 돌지 않는다.</summary>
+    public void SamplePreviewMotion(Func<float> clock)
+    {
+        _previewClock = clock;
+        if (Rules.IsOpen && clock != null)
+        {
+            float now = Now;
+            TickMotion(now);
+            ApplyLayout(now);
+        }
+    }
+#endif
+
     private void OnCardClicked(int index)
     {
         if (!Rules.IsOpen || LobbyResultPanel.IsEscapeClaimed)
             return;
 
         // 가운데(포커스) 카드 = 확정, 위·아래 카드 = 그 카드로 포커스 이동.
-        if (index == Rules.Focus)
+        int previous = Rules.Focus;
+        if (index == previous)
             Confirm();
         else if (Rules.FocusCard(index))
+        {
             Redraw();
+            AnimateLayout(previous);
+        }
     }
 
     private void OnBackButton()
@@ -349,6 +499,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         if (content != null)
             content.SetActive(false); // UiModalBlocker.OnDisable 가 입력 차단을 푼다
+        _keyRepeat.Reset();
         SetCountedOpen(false);
         Closed?.Invoke(reason);
     }

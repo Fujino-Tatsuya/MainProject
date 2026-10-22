@@ -1,7 +1,7 @@
 # handoff — 설정창 언어 → 로컬라이징(Loc) 통합 (할 일 38)
 
 > 대상: 경석(설정창 담당). 작업: 은희 승인, 2026-10-13. 브랜치 `feature/SettingsLocalization`(기준 `feature/Boss23` 633c0c20 + `feature/LocalizationContent` 병합).
-> 상세 규칙은 [localization.md §9](localization.md#9-설정창-통합). 설정창 설계는 [PLAN-settings.md](../../PLAN-settings.md) S15·S16.
+> 상세 규칙은 [localization.md §9](localization.md#9-설정창-통합). 설정창 설계는 [PLAN-settings.md](../history/PLANS/PLAN-settings.md) S15·S16.
 
 ## 1. 왜
 

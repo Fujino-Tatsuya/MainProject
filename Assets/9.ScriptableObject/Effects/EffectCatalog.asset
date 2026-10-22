@@ -41,8 +41,24 @@ MonoBehaviour:
   <Assassin_Q_StormSlash>k__BackingField: {fileID: 11400000, guid: 1091d72097064b11812b86a97e520d97, type: 2}
   <Assassin_E_MultiSlashes>k__BackingField: {fileID: 11400000, guid: 2f4f9adcbad34c538e23cd1b03faf201, type: 2}
   <Assassin_R_BladeVortex>k__BackingField: {fileID: 11400000, guid: 431b57f705084510a2c34ee8a4c2c887, type: 2}
+  <Assassin_LClick_Slash>k__BackingField: {fileID: 11400000, guid: 53fefa5a6dca4c40bfe6ef5215a839cc, type: 2}
+  <Assassin_LClick_Success>k__BackingField: {fileID: 11400000, guid: 2e7e68d5d7104a2db7930ed1a59fbda6, type: 2}
+  <Assassin_LClick_Transformed>k__BackingField: {fileID: 11400000, guid: 75b7e091f7db4d638ea9e732dfbbd6bb, type: 2}
+  <Assassin_RClick_Windup>k__BackingField: {fileID: 11400000, guid: 2df2a20b8f5040258bb649122ff98b8f, type: 2}
+  <Assassin_RClick_Pop>k__BackingField: {fileID: 11400000, guid: 2aa86f8708d344c2bdfdf0eb39b8a4d1, type: 2}
+  <Assassin_RClick_Slash>k__BackingField: {fileID: 11400000, guid: 114db434195a49519b775c192571905a, type: 2}
+  <Assassin_RClick_Success>k__BackingField: {fileID: 11400000, guid: 5e8ad15d315143f48f2e0b91da6f8d1d, type: 2}
+  <Assassin_E_Aura>k__BackingField: {fileID: 11400000, guid: 4e2342e86f4640b7a58b38a37e56082a, type: 2}
+  <Assassin_E_Charge>k__BackingField: {fileID: 11400000, guid: d9915d2cc4244e7da5e0e27195f06daa, type: 2}
+  <Assassin_E_Slash>k__BackingField: {fileID: 11400000, guid: e2748f5aab1c431fa34e41c469923bbd, type: 2}
+  <Gunner_R_Zone>k__BackingField: {fileID: 11400000, guid: 60e49b7edb0b496495a0742bdb1a8414, type: 2}
+  <Gunner_R_Lock>k__BackingField: {fileID: 11400000, guid: e271ef022f104452a88fe7e53e7dccc1, type: 2}
+  <Gunner_R_Strike>k__BackingField: {fileID: 11400000, guid: cf886c3930344214963ed0f67ae4900d, type: 2}
+  <Player_Faint>k__BackingField: {fileID: 11400000, guid: 9b8944d0493549069d6e1e57ca0bbc96, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Mob_Bite>k__BackingField: {fileID: 11400000, guid: 711a910e150b32743ba079fc5ff9ed42, type: 2}
+  <Mob_Death_Explosion>k__BackingField: {fileID: 11400000, guid: 34b1366dad16435f912891449e1dc1d2, type: 2}
+  <Mob_Death_Explosion_Elite>k__BackingField: {fileID: 11400000, guid: a11150c990f14220a36c4592852c434a, type: 2}
   <Interrupt_Flash>k__BackingField: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
   <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}

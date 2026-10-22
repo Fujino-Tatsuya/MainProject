@@ -15,8 +15,11 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         public PlayerSkillSlot slot;
         public Image icon = null;
         public Image cooldownFill;   // Filled 타입 오버레이 — 남은 쿨타임 비율만큼 덮는다
+        public Image cooldownIcon = null;   // cooldownFill 마스크 안 아이콘 사본(Icon_mask_CooldownFill/Icon_*) — icon 과 같은 스프라이트로 맞춘다
         public TMP_Text remainingText;
         public SkillSlotHover hover = null;
+        public Image keyBackground = null;   // 단축키 글자 배경 — 차단 색 전환에서 제외한다(같은 회색이 되면 글자가 묻힌다)
+        public TMP_Text keyText = null;      // 단축키 글자 — 키 리바인드(KeyBindingConfig) 표기로 채운다
 
         [System.NonSerialized] public Graphic[] graphics;
         [System.NonSerialized] public Color[] normalColors;
@@ -51,6 +54,20 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         Refresh();
     }
 
+    // 설정창에서 키를 바꾸면(Save·ResetAll) 슬롯 글자와 툴팁 키 표기를 다시 채운다.
+    private void OnEnable()
+    {
+        KeyBindingConfig.Changed += HandleKeyBindingsChanged;
+        HandleKeyBindingsChanged();
+    }
+
+    private void OnDisable()
+    {
+        KeyBindingConfig.Changed -= HandleKeyBindingsChanged;
+    }
+
+    private void HandleKeyBindingsChanged() => BindTooltipSlots(boundPlayer);
+
     private void OnDestroy()
     {
         if (skillController != null)
@@ -77,10 +94,16 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         ISkillTooltipSource source = data;
         CacheDefaultIcon(widget);
 
+        string keyLabel = KeyLabel(widget.slot);
+        if (widget.keyText != null)
+            widget.keyText.text = keyLabel;
+
         if (widget.icon != null)
         {
             Sprite skillIcon = source != null ? source.Tooltip.Icon : null;
             widget.icon.sprite = skillIcon != null ? skillIcon : widget.defaultIcon;
+            if (widget.cooldownIcon != null)
+                widget.cooldownIcon.sprite = widget.icon.sprite;
         }
 
         widget.hover?.Bind(
@@ -88,7 +111,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             source,
             widget.slot,
             acceptsLeftClick: true,
-            displayKey: KeyLabel(widget.slot),
+            displayKey: keyLabel,
             cooldownSeconds: data != null ? data.CooldownTime : (float?)null,
             fallbackIcon: widget.icon != null ? widget.icon.sprite : null);
     }
@@ -116,14 +139,18 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             icon.sprite = sprite;
     }
 
-    private static string KeyLabel(PlayerSkillSlot slot) => slot switch
+    /// <summary>슬롯을 쏘는 입력 액션(<see cref="KeyBindingConfig.RebindableActions"/> 경로).</summary>
+    public static string ActionPath(PlayerSkillSlot slot) => slot switch
     {
-        PlayerSkillSlot.Main => "Q",
-        PlayerSkillSlot.Sub => "E",
-        PlayerSkillSlot.Interrupt => "RMB",
-        PlayerSkillSlot.Ultimate => "R",
-        _ => string.Empty,
+        PlayerSkillSlot.Main => "Player/SkillMain",
+        PlayerSkillSlot.Sub => "Player/SkillSub",
+        PlayerSkillSlot.Interrupt => "Player/Interrupt",
+        PlayerSkillSlot.Ultimate => "Player/SkillUltimate",
+        _ => throw new System.ArgumentOutOfRangeException(nameof(slot), slot, null),
     };
+
+    /// <summary>슬롯 글자·툴팁 키 표기 — 설정창(KeyRebindRow)과 같은 표기.</summary>
+    public static string KeyLabel(PlayerSkillSlot slot) => KeyBindingConfig.DisplayName(ActionPath(slot));
 
     /// <summary>
     /// 사용 불가 색상만 전환한다. Refresh는 계속 실행되므로 Cooldown Fill은 멈추지 않는다.
@@ -215,6 +242,8 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                 continue;
 
             widget.graphics = slotRoot.GetComponentsInChildren<Graphic>(true);
+            if (widget.keyBackground != null)
+                widget.graphics = System.Array.FindAll(widget.graphics, g => g != widget.keyBackground);
             widget.normalColors = new Color[widget.graphics.Length];
 
             for (int i = 0; i < widget.graphics.Length; i++)

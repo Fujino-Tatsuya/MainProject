@@ -50,6 +50,23 @@ public sealed class MonsterOverheadHealthBarDelayedTests
         Assert.That(fill.fillOrigin, Is.EqualTo(hp.fillOrigin));
     }
 
+    // 할 일 76 — HpFill 위 형제에 참조 없는 가득 찬 Image(옛 Bar/Mask)가 있으면 맞아도 바가 안 닳아 보인다.
+    [TestCase(NormalPath)]
+    [TestCase(MidBossPath)]
+    public void MonsterBarPrefab_NoImageDrawnOverHpFill(string path)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.That(prefab, Is.Not.Null, path);
+        var so = new SerializedObject(prefab.GetComponent<UnitOverheadHealthBar>());
+        var hp = (Image)so.FindProperty("hpFill").objectReferenceValue;
+        Transform parent = hp.transform.parent;
+        for (int i = hp.transform.GetSiblingIndex() + 1; i < parent.childCount; i++)
+        {
+            Transform sibling = parent.GetChild(i);
+            Assert.That(sibling.GetComponentsInChildren<Image>(true), Is.Empty, $"HpFill 위 {sibling.name}");
+        }
+    }
+
     [TestCase(NormalPath)]
     [TestCase(MidBossPath)]
     public void MonsterBarPrefab_MatchesBossHudDelayedValuesAndColor(string path)

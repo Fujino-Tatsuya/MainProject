@@ -37,6 +37,7 @@ internal static class PlayerEditModeTestRunner
         "^InterruptSuccessCooldownModelTests$", // 할 일 26 — 간파 성공 쿨 감소(전체 쿨 × 비율·0 클램프·시전당 1회)
         "^PartyLivesRulesTests$", // 할 일 30 (1) — 파티 공용 목숨: 사망 목적지·공용 차감·재충전·공용 0 Soul 전멸 판정
         "^PartyWipeRespawnRulesTests$", // 할 일 30 (2) — 전멸 → 리스폰 분기(결과 화면 아님)·리스폰 조건·지점 선택(패드 제외·간격·폴백)·목숨 5
+        "^ActiveRegistryTests$", // 할 일 69 — 전멸 판정 등록식 목록: 켜짐 등록·꺼짐 해제·중복 무시·초기화
         "^PlayerHealthRegenModelTests$", // 할 일 31 — 기본 체력 재생: 지연·틱·상한·피격 리셋·누적기·사망 차단
         "^AimIndicatorPlacementTests$", // 할 일 33 — 에임 인디케이터 3D 쿼드: yaw·수평 회전·발밑 높이·전방 오프셋·스케일
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
@@ -61,6 +62,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerInputBlockTokensTests$", // 할 일 48 C9 — 입력 차단 토큰: 요청자별 걸기·풀기, 마지막 토큰이 풀릴 때만 열림, 중복·null 무시
         "^NearestInteractableTests$", // 할 일 48 C10 — 로비 상호작용 대상(반경·사용 불가·동률 앞 인덱스·평면 거리)·서버 거리 재검증(반경+여유)·카운트다운 올림 초
         "^CameraOwnerFollowCandidateTests$", // 할 일 48 C12 — 캐릭터 교체 뒤 카메라 오너 후보: 디스폰 중인 옛 PlayerObject 건너뜀(IsSpawned 필터)
+        "^LobbyProximityDoorRulesTests$", // 할 일 78 — 로비 근접 문: 열림<닫힘 반경 히스테리시스·여닫는 시간 따로·평면 거리
         "^PlayerRejoinLifeRulesTests$", // 할 일 48 C14 R5c — 재합류 생명: 퇴장 기록(사망 연출 목적지·체력 비율)·복원 판정·복원 체력·전멸 덮어쓰기 값
     };
 

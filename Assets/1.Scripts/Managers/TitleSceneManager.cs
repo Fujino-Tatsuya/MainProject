@@ -80,7 +80,7 @@ public class TitleSceneManager : NemoSceneManager
         }
 
         SetTitleButtonsInteractable(false);
-        StartCoroutine(FadeThenInvoke(_gameManager.GoToLobby));
+        StartCoroutine(FadeThenInvoke(GoToLobbyOrBeginDemo));
     }
 
     /// <summary>
@@ -96,6 +96,20 @@ public class TitleSceneManager : NemoSceneManager
         }
 
         SetTitleButtonsInteractable(false);
+        GoToLobbyOrBeginDemo();
+    }
+
+    /// <summary>
+    /// 부스 데모 흐름이면 여기서 대기 씬 → 호스팅/자동 접속을 시작하고(할 일 70 — 부팅하면 호스트·클라 모두 타이틀을 거친다),
+    /// 아니면 종전처럼 로비로.
+    /// </summary>
+    private void GoToLobbyOrBeginDemo()
+    {
+        if (DemoSessionDirector.TryHandleTitleStart())
+        {
+            return;
+        }
+
         _gameManager.GoToLobby();
     }
 

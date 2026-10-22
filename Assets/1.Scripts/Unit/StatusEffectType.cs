@@ -17,8 +17,9 @@ public enum StatusEffectType
     SuperArmor = 1 << 6,     // 넉백·밀기·잡기·차단류 CC 무시(플레이어/몬스터 공통)
 
     // 스탯 modifier — 인스턴스의 magnitude(배율)가 곱으로 집계된다 (버프 > 1, 디버프 < 1)
+    // 플레이어는 PlayerStats 가 magnitude−1 을 %로 보고 같은 단계끼리 더한다 — 아래 XModifier = 전체%, XBaseModifier = 기본%(PlayerStatFormula).
     MoveSpeedModifier = 1 << 7,
-    AttackDamageModifier = 1 << 8,
+    AttackDamageModifier = 1 << 8,   // 전체 공격력 % (나머지 XModifier 도 전체 %)
     AttackSpeedModifier = 1 << 9,
     DefenseModifier = 1 << 10,
     MaxHpModifier = 1 << 11,
@@ -29,6 +30,14 @@ public enum StatusEffectType
 
     // 정신 집중 — 거너 Q 충전 중 표식(D5, HUD 아이콘). 차단·스탯 테이블에 넣지 않는다(감속은 MoveSpeedModifier 로 따로 건다).
     Focus = 1 << 13,
+
+    // 플레이어 스탯 단계(할 일 83) — 기본% 와 가하는 피해%. 공식은 PlayerStatFormula.
+    BaseAttackDamageModifier = 1 << 14,   // 기본 공격력 %
+    DealtDamageModifier = 1 << 15,        // 가하는 피해 %
+    MoveSpeedBaseModifier = 1 << 16,      // 기본 이동속도 %
+    AttackSpeedBaseModifier = 1 << 17,    // 기본 공격속도 %
+    DefenseBaseModifier = 1 << 18,        // 기본 방어력 %
+    MaxHpBaseModifier = 1 << 19,          // 기본 최대 체력 %
 }
 
 /// <summary>SuperArmor가 신규 상태효과 적용을 거부하는 공통 판정.</summary>
@@ -57,7 +66,10 @@ public static class StatusEffectCategories
     // 스탯 modifier 는 같은 타입이 버프도 디버프도 된다(가속 1.2 / 감속 0.5) — magnitude 로 가른다.
     private const StatusEffectType StatModifiers =
         StatusEffectType.MoveSpeedModifier | StatusEffectType.AttackDamageModifier |
-        StatusEffectType.AttackSpeedModifier | StatusEffectType.DefenseModifier | StatusEffectType.MaxHpModifier;
+        StatusEffectType.AttackSpeedModifier | StatusEffectType.DefenseModifier | StatusEffectType.MaxHpModifier |
+        StatusEffectType.BaseAttackDamageModifier | StatusEffectType.DealtDamageModifier |
+        StatusEffectType.MoveSpeedBaseModifier | StatusEffectType.AttackSpeedBaseModifier |
+        StatusEffectType.DefenseBaseModifier | StatusEffectType.MaxHpBaseModifier;
 
     private const StatusEffectType Buffs =
         StatusEffectType.SuperArmor | StatusEffectType.PassiveCharge | StatusEffectType.Focus;
