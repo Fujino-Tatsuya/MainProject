@@ -12,9 +12,13 @@ using UnityEngine;
 /// 입구·출격 = 접속자 전원(자동), 훈련 내부·종료·브리핑 = 입구 확정 때 고정한 훈련 명단. 유지 시간 = <see cref="LobbyRules.GatherHoldSeconds"/>,
 /// Train03 A→B·B→C 영역 안 확인만 0초.</item>
 /// <item>단계 완료: 훈련 내용(T3 표적·T4 일반 몹·T5 훈련 상대·T6 브리핑)이 <see cref="ServerReportStageCompleted"/> 로 알린다. 현재 단계가 아니면 무시.</item>
-/// <item>판 끝 로비 복귀: 로비 씬이 다시 올라오면 새 진행기 = Lobby 단계부터(새 회차).</item>
+/// <item>출격 확정 = 메인 진입(옛 Ready 패드·LobbySession 카운트다운 대체, PLAN §7-2): Sortie 진입 때 래치(<see cref="LobbyTrainingFlow.TryConsumeLaunch"/>)를 걸고
+/// <see cref="NetworkSessionLauncher.StartGameLoading"/> 을 정확히 1회 부른다. 로딩 흐름의 로비 시작 조건은 <see cref="ServerHasLaunched"/>.</item>
+/// <item>접속 승인: <see cref="NetworkSessionLauncher.LobbyCountdownActiveProvider"/> = 출격 집결 카운트다운 중 또는 출격 단계(<see cref="LobbyTrainingFlow.BlocksNewJoins"/>).
+/// 훈련·브리핑 중 접속은 받는다(로비 대기).</item>
+/// <item>캐릭터 잠금: <see cref="CharacterChangeBlockFor"/> — 훈련 명단(복제)·단계·출격 카운트다운으로 서버 RPC 와 클라 패널이 같은 판정을 한다.</item>
+/// <item>판 끝 로비 복귀: 로비 씬이 다시 올라오면 새 진행기 = Lobby 단계부터(새 회차 — 출격 래치·명단도 새로).</item>
 /// </list>
-/// T2a 범위: 출격 확정은 Sortie 단계로 넘기고 로그만 — <see cref="NetworkSessionLauncher.StartGameLoading"/> 연결·Ready 패드 대체·캐릭터 잠금 적용은 T2b.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbyTrainingDirector : NetworkBehaviour
@@ -49,6 +53,10 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     private readonly NetworkVariable<LobbyTrainingPhase> phase = new NetworkVariable<LobbyTrainingPhase>(
         LobbyTrainingPhase.Gathering, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 훈련 명단 복제 — 클라가 자기 캐릭터 잠금(명단 안 = 잠김, 늦은 참가자 = 허용)을 미리 보여 주려고.
+    private readonly NetworkList<ulong> trainingRoster = new NetworkList<ulong>(
+        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private static readonly LobbyGatherPoint[] Points =
     {
         LobbyGatherPoint.Entrance, LobbyGatherPoint.Sortie, LobbyGatherPoint.Train01Start, LobbyGatherPoint.Train02Start,
@@ -59,6 +67,7 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     private LobbyTrainingFlow _flow;
     private bool _zonesDirty;
     private bool _loggedWaitingZones;
+    private Func<bool> _joinBlockedProvider;
 
     /// <summary>스폰된 진행기(없으면 null).</summary>
     public static LobbyTrainingDirector Active { get; private set; }
@@ -69,8 +78,20 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
     public LobbyTrainingStage Stage => IsSpawned ? stage.Value : LobbyTrainingStage.Lobby;
     public LobbyTrainingPhase Phase => IsSpawned ? phase.Value : LobbyTrainingPhase.Gathering;
 
-    /// <summary>[전 피어] 캐릭터 변경 잠금(입구 확정 뒤 — 적용은 T2b).</summary>
+    /// <summary>[전 피어] 훈련 시작(입구 확정) 뒤 — 회차 단위 잠금. 사람별 판정은 <see cref="CharacterChangeBlockFor"/>.</summary>
     public bool IsCharacterLocked => Stage != LobbyTrainingStage.Lobby;
+
+    /// <summary>[전 피어] 출격 집결 카운트다운 중(행동 시작 제한 구간).</summary>
+    public bool IsSortieCountdownActive => sortieZone != null && sortieZone.IsRestrictingActions;
+
+    /// <summary>[서버] 출격 확정으로 메인 진입을 내보냈다 — NetworkLoadingFlowController 의 로비 시작 조건.</summary>
+    public bool ServerHasLaunched => _flow != null && _flow.HasLaunched;
+
+    /// <summary>[전 피어] 이 사람의 캐릭터 변경을 막는 진행기 사유(없으면 None) — 서버 RPC 검증·클라 패널 잠금 공용.</summary>
+    public LobbyCharacterChangeReject CharacterChangeBlockFor(ulong clientId)
+    {
+        return LobbyTrainingFlow.CharacterChangeBlock(Stage, IsSpawned && trainingRoster.Contains(clientId), IsSortieCountdownActive);
+    }
 
     /// <summary>[서버] 훈련 참여 명단(입구 확정 때 고정). 서버가 아니면 빈 목록.</summary>
     public IReadOnlyList<ulong> ServerTrainingRoster => _flow != null ? _flow.TrainingRoster : Array.Empty<ulong>();
@@ -94,6 +115,8 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
             NetworkManager.OnClientConnectedCallback += HandleClientConnected;
             NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
             ForEachZone((point, zone) => zone.ServerConfirmed += HandleZoneConfirmed);
+            _joinBlockedProvider = () => _flow != null && LobbyTrainingFlow.BlocksNewJoins(_flow.Stage, IsSortieCountdownActive);
+            NetworkSessionLauncher.LobbyCountdownActiveProvider = _joinBlockedProvider;
             WarnMissingZones();
             SyncReplicatedState();
             _zonesDirty = true;
@@ -117,6 +140,9 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
             }
 
             ForEachZone((point, zone) => zone.ServerConfirmed -= HandleZoneConfirmed);
+            if (NetworkSessionLauncher.LobbyCountdownActiveProvider == _joinBlockedProvider)
+                NetworkSessionLauncher.LobbyCountdownActiveProvider = null;
+            _joinBlockedProvider = null;
             _flow = null;
         }
 
@@ -195,10 +221,30 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
         Debug.Log($"[SceneFlow] {Tag} {point} 집결 확정 — {before} → {Describe()}");
         if (point == LobbyGatherPoint.Entrance)
             Debug.Log($"[SceneFlow] {Tag} 훈련 시작 — 참여 명단 고정 {_flow.TrainingRoster.Count}명 [{string.Join(",", _flow.TrainingRoster)}]");
-        if (point == LobbyGatherPoint.Sortie)
-            Debug.Log($"[SceneFlow] {Tag} 출격 집결 확정({(_flow.HasStartedTraining ? "훈련 뒤" : "훈련 없이")}) — 메인 진입 연결은 T2b(지금은 로그만).");
-
         OnFlowChanged();
+
+        if (point == LobbyGatherPoint.Sortie)
+            LaunchMainOnce();
+    }
+
+    // 출격 확정 → 메인 진입. 래치를 먼저 걸어 로딩 흐름의 로비 시작 조건(ServerHasLaunched)을 통과시키고, 재확정·중복은 무시한다.
+    private void LaunchMainOnce()
+    {
+        if (!_flow.TryConsumeLaunch())
+        {
+            Debug.LogWarning($"{Tag} 메인 진입 중복 요청 무시 — 이미 내보냄({Describe()}).", this);
+            return;
+        }
+
+        var launcher = NetworkManager.GetComponent<NetworkSessionLauncher>();
+        Debug.Log($"[SceneFlow] {Tag} 출격 집결 확정({(_flow.HasStartedTraining ? "훈련 뒤" : "훈련 없이")}) — 메인 진입 1회 hasLauncher={launcher != null}");
+        if (launcher == null)
+        {
+            Debug.LogError($"{Tag} NetworkSessionLauncher 가 없어 메인 진입을 시작하지 못했다.", this);
+            return;
+        }
+
+        launcher.StartGameLoading();
     }
 
     private void HandleClientConnected(ulong clientId)
@@ -216,7 +262,8 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
         if (_flow == null || !_flow.RemoveClient(clientId))
             return;
 
-        // 구역은 각자 연결 종료를 명단에서 뺀다 — 여기선 모델 명단만 맞춘다.
+        // 구역은 각자 연결 종료를 명단에서 뺀다 — 여기선 모델 명단(+ 복제 명단)만 맞춘다.
+        SyncReplicatedState();
         Debug.Log($"[SceneFlow] {Tag} 퇴장 client {clientId} — 접속자 {_flow.Connected.Count}명, 훈련 명단 {_flow.TrainingRoster.Count}명");
     }
 
@@ -266,6 +313,18 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
             stage.Value = _flow.Stage;
         if (phase.Value != _flow.Phase)
             phase.Value = _flow.Phase;
+
+        // 명단은 입구 확정 때 한 번 정해지고 퇴장으로만 준다 — 다르면 통째로 다시 쓴다.
+        var roster = _flow.TrainingRoster;
+        var same = trainingRoster.Count == roster.Count;
+        for (var i = 0; same && i < roster.Count; i++)
+            same = trainingRoster[i] == roster[i];
+        if (same)
+            return;
+
+        trainingRoster.Clear();
+        foreach (var clientId in roster)
+            trainingRoster.Add(clientId);
     }
 
     private void HandleStageChanged(LobbyTrainingStage previous, LobbyTrainingStage current) => StageChanged?.Invoke(current, Phase);

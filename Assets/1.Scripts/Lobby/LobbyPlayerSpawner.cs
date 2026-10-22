@@ -82,8 +82,8 @@ public sealed class LobbyPlayerSpawner : MonoBehaviour
 
     private bool IsServer => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
 
-    // 카운트다운이 끝나 시작 래치가 걸렸으면 로비는 내려가는 중이다 — 새로 세우지 않는다.
-    private static bool IsLobbyClosing => LobbySession.Active != null && LobbySession.Active.CanStartGame;
+    // 출격 확정으로 메인 진입 래치가 걸렸으면 로비는 내려가는 중이다 — 새로 세우지 않는다.
+    private static bool IsLobbyClosing => LobbyTrainingDirector.Active != null && LobbyTrainingDirector.Active.ServerHasLaunched;
 
     private void HandleSceneEvent(SceneEvent sceneEvent)
     {

@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// "집결 n/m" + 카운트다운 남은 초 표시(할 일 86 PLAN §3.1). <see cref="PartyGatherZone"/> 의 NetworkVariable 만 읽으므로 모든 피어가 같은 값을 본다.
-/// 대상 구역이 활성이고 확정 전일 때만 <see cref="root"/> 를 켠다(비활성 구역은 표시 없음). 남은 초는 서버 시각 기준 매 프레임 계산(<see cref="LobbyCountdownView"/> 패턴).
+/// 대상 구역이 활성이고 확정 전일 때만 <see cref="root"/> 를 켠다(비활성 구역은 표시 없음). 남은 초는 서버 시각 기준 매 프레임 계산(옛 LobbyCountdownView 패턴).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class PartyGatherStatusView : MonoBehaviour

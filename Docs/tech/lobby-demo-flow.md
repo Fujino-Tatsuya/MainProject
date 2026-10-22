@@ -8,17 +8,18 @@
 ```text
 exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → START
   → (호스트) 바로 호스팅 / (클라) 자동 접속 — 접속 버튼 없음
-  → 걷는 로비(3.LobbyScene) → (원하면 캐릭터 선택 오브젝트 앞에서 F → 패널에서 교체) → 준비 오브젝트 앞에서 F
-  → 접속자 1~3명 전원 준비 → 5초 카운트다운 → 4.MapScene
+  → 걷는 로비(3.LobbyScene) → (원하면 캐릭터 선택 오브젝트 앞에서 F → 패널에서 교체) → (원하면 훈련장 입구 집결 → 훈련 → 브리핑)
+  → 접속자 1~3명 전원 출격 집결 구역(옛 준비 패드 자리) 안에 5초 → 4.MapScene
   → 판 끝(클리어·전멸·나가기) → 로비 복귀 + 결과 패널(180초 뒤 자동 닫힘, 닫기·ESC)
-  → 다시 준비 → … (exe 재실행 없이 반복)
+  → 다시 출격 집결 → … (exe 재실행 없이 반복)
 ```
+- **준비 F·준비 n/m·로비 카운트다운 표시는 없다**(할 일 86 T2b, 2026-10-22) — 출격 집결 구역에 서 있으면 준비다. 구역 위 `집결 n/m` + 남은 초가 뜨고, 한 명이 나가거나 인원이 바뀌면 0초부터 다시. 메인 진입은 `LobbyTrainingDirector` 가 출격 확정 때 1회. 훈련 흐름 상세는 T8 문서(`Docs/tech/lobby-training.md`, 작성 예정) — 지금은 PLAN `_lane-artifacts/common/86-lobby-training/PLAN-86-lobby-training.md` §3.2·§7.
+- 훈련은 선택이다. 훈련·브리핑 중에도 새 사람은 접속해 로비에서 기다리고 출격 인원에 들어간다. **출격 집결 카운트다운 중·메인 로딩 시작 뒤에는 접속을 거절**한다(아래 "게임 진행 중").
 - **호스트·클라 모두 부팅 직후 타이틀을 한 번 거친다**(할 일 70, 2026-10-21). 타이틀 UI·입력은 평소 그대로(SETTING·EXIT 도 그대로)이고, **START 의 시작 연출이 끝나면** 수동 로비 대신 대기 화면 → 호스팅/자동 접속으로 간다. START 를 누르기 전엔 접속을 시도하지 않는다 — 클라 PC 도 **각자 START 를 눌러야** 붙는다.
 - 판 끝 로비 복귀·끊김 뒤 재접속 대기(6.DemoConnectScene)는 **타이틀을 다시 거치지 않는다**(세션 유지·판 도중 재합류를 지키려고). 타이틀은 exe 실행당 한 번뿐이다.
 - 5.ResultScene 은 없다(Build Settings 에서도 뺐다 — 결과는 로비 패널).
-- 판이 끝나도 연결과 고른 캐릭터는 그대로, **준비 상태만 풀린다**.
-- 새 사람이 들어오면 전원의 준비가 풀린다. 한 명이라도 준비를 풀거나 나가면 카운트다운이 취소된다.
-- 수치(카운트다운 5초·상호작용 반경 2m) = `Assets/9.ScriptableObject/Lobby/LobbyRules.asset`.
+- 판이 끝나도 연결과 고른 캐릭터는 그대로, 로비 훈련 진행은 **처음(Lobby 단계)부터**.
+- 수치(집결 유지 5초 `gatherHoldSeconds`·상호작용 반경 2m) = `Assets/9.ScriptableObject/Lobby/LobbyRules.asset`.
 
 ## 2. 설정 파일 — 모든 PC 에 같은 파일 하나 (호스트 1대 + 클라 최대 2대)
 1. **모든 PC 에 같은 빌드**를 깐다(§3).
@@ -56,7 +57,7 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 | 호스트 대기 중 / 접속 시도 중 (n회째) | 클라가 붙는 중. 호스트가 켜지면 자동 입장 |
 | n초 후 재시도 (n회째) | 직전 시도 실패. 그 아래 줄이 사유 |
 | 응답 없음 — 호스트를 기다리는 중 | 호스트가 꺼졌거나 `hostAddress`·`port`·방화벽이 틀림 |
-| 게임 진행 중 — 판이 끝나면 자동 입장 | 호스트가 판 진행 중이거나 카운트다운 중이고, 이 PC 는 그 판 시작 때 없었다. **기다리면 된다**(판 도중 새 사람은 못 들어간다) |
+| 게임 진행 중 — 판이 끝나면 자동 입장 | 호스트가 판 진행 중이거나 출격 집결 카운트다운 중이고, 이 PC 는 그 판 시작 때 없었다. **기다리면 된다**(판 도중 새 사람은 못 들어간다) |
 | 판에 다시 합류하는 중 — 잠시 기다리세요 | 이 판에 있던 PC 가 다시 붙는 중인데 호스트가 씬을 바꾸는 중이거나 이전 연결을 아직 정리 중(최대 `disconnectTimeoutSeconds`). **기다리면 들어간다** |
 | 판에 합류하는 중… | 맵에 들어왔지만 내 캐릭터가 아직 안 나왔다 — 엘리베이터·보스 등장 연출·슬로모션·전멸 유예가 끝나면 나온다 |
 | 인원 가득 (3/3) | 이미 3명. 4번째 PC 는 들어갈 수 없다 |
@@ -86,7 +87,7 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 
 ## 7. 알려진 한계 (2026-10-19)
 - **캐릭터 선택(C12)** — 로비의 캐릭터 선택 오브젝트(`Environment/LobbyInteractables/CharacterSelectStation`, 스폰 지점 왼쪽) 앞에서 F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
-  - **준비 중·카운트다운 중에는 바꿀 수 없다**(패널은 열리지만 잠금 문구). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
+  - **훈련 시작(입구 집결 확정) 뒤 판 끝까지는 훈련한 사람은 바꿀 수 없다** — 훈련·브리핑 중 늦게 들어온 사람은 바꿀 수 있다. **출격 집결 카운트다운 중·메인 진입 뒤에는 누구도 못 바꾼다**(패널은 열리지만 잠금 문구, 서버 거부 사유 `TrainingLocked`·`CountdownActive`·`GameStarting`). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
   - 고른 캐릭터는 다음 판 스폰·판 사이·재접속(`playerId`)에 유지된다. 코드: [LobbyInteractor.cs](../../Assets/1.Scripts/Lobby/LobbyInteractor.cs)(패널 연결) · [LobbySession.cs](../../Assets/1.Scripts/Lobby/LobbySession.cs)(`RequestCharacterServerRpc` 검증) · [LobbyPlayerSpawner.cs](../../Assets/1.Scripts/Lobby/LobbyPlayerSpawner.cs)(`TrySwapCharacter`).
 - **증강(특성)은 판 도중 재합류에만 유지된다**(C14). 판 사이(로비로 돌아갔다 다음 판)에는 새로 시작한다. [networking.md "Mid-game rejoin"](networking.md#mid-game-rejoin-c14).
 - **판 도중 재합류(C14)는 사람이 MPPM·빌드 2대로 아직 확인하지 않았다** — 영혼으로 돌아온 사람은 튜토리얼 밖에서는 기존 부활 규칙(현재 사실상 보스 강제 개시 부활·전멸 리스폰)까지 영혼이다.
@@ -100,7 +101,7 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 
 | 접두사 | 개수 | 쓰는 곳 | 키 원본 |
 |---|---|---|---|
-| `UI.Lobby.*` | 7 | 로비 상호작용 프롬프트(`InteractReady`·`InteractUnready`·`InteractCharacterSelect`) · 준비 `ReadyCount` · 카운트다운 `Countdown`·`CountdownStarting` · 지난 판 결과 버튼 `ShowLastResult` | [LobbyUiStrings.cs](../../Assets/1.Scripts/Lobby/LobbyUiStrings.cs) · `ShowLastResult` 만 [UiStrings.cs](../../Assets/1.Scripts/Localization/UiStrings.cs) |
+| `UI.Lobby.*` | 7 | 로비 상호작용 프롬프트(`InteractReady`·`InteractUnready`·`InteractCharacterSelect`) · 준비 `ReadyCount` · 카운트다운 `Countdown`·`CountdownStarting`(`InteractReady`·`InteractUnready` 포함 이 다섯은 할 일 86 T2b 뒤 화면에 안 쓰임 — 키만 남김) · 지난 판 결과 버튼 `ShowLastResult` | [LobbyUiStrings.cs](../../Assets/1.Scripts/Lobby/LobbyUiStrings.cs) · `ShowLastResult` 만 [UiStrings.cs](../../Assets/1.Scripts/Localization/UiStrings.cs) |
 | `UI.CharacterSelect.*` | 4 | 캐릭터 선택 패널 `LockedNotice`·`CurrentTag`·`Unavailable`·`Hint` | [CharacterSelectUiStrings.cs](../../Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs) |
 | `UI.DemoConnect.*` | 20 | 대기 화면(§4) — 제목·주소·진행 9 + 재합류 `RejoinWaiting`·`JoiningMatch` + 자동 판정 3 + **거절 사유 7**(`GameInProgress`·`LobbyFull`·`HashMismatch`·`Timeout`·`DuplicatePlayerId`·`InvalidPlayerId`·`UnknownReason`) | [DemoConnectionOverlayText.cs](../../Assets/1.Scripts/Network/Session/DemoConnectionOverlayText.cs)(`DemoConnectUiStrings`) — 사유 → 키는 [DemoJoinRejectReason.cs](../../Assets/1.Scripts/Network/Session/DemoJoinRejectReason.cs) |
 | `UI.LobbyResult.*` | 10 | 결과 패널 정적 라벨 `Title`·`PlayTimeLabel`·`Close`·`Header.Rank/Player/Damage/Healing/Counters/DamageTaken/Deaths`(프리팹 `LocalizedText`) | [LobbyResultUiStrings.cs](../../Assets/1.Scripts/UI/LobbyResult/LobbyResultUiStrings.cs) |

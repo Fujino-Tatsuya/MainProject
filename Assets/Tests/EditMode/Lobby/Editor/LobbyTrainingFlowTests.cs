@@ -338,6 +338,154 @@ public sealed class LobbyTrainingFlowTests
         Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.Entrance), Is.True);
     }
 
+    // ── T2b: 출격 = 메인 진입 1회 · 캐릭터 잠금 · 접속 승인 ──
+
+    [Test]
+    public void 출격_확정_전에는_메인_진입_래치가_안_걸린다()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.TryConsumeLaunch(), Is.False);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        Assert.That(flow.TryConsumeLaunch(), Is.False, "훈련 시작은 메인 진입이 아니다");
+        Assert.That(flow.HasLaunched, Is.False);
+    }
+
+    [Test]
+    public void 훈련_없이_출격_확정_메인_진입은_정확히_1회()
+    {
+        var flow = Create(0, 1);
+
+        Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.Sortie), Is.True);
+        Assert.That(flow.TryConsumeLaunch(), Is.True);
+        Assert.That(flow.HasLaunched, Is.True);
+
+        Assert.That(flow.TryConsumeLaunch(), Is.False, "중복 호출");
+        Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.Sortie), Is.False, "재확정");
+        Assert.That(flow.TryConsumeLaunch(), Is.False, "재확정 뒤");
+    }
+
+    [Test]
+    public void 훈련_뒤_출격_확정_메인_진입은_정확히_1회()
+    {
+        var flow = Create(0);
+        RunTrainingToBriefCompleted(flow);
+        Assert.That(flow.TryConsumeLaunch(), Is.False, "브리핑 완료만으로는 진입하지 않는다");
+
+        flow.OnGatherConfirmed(LobbyGatherPoint.Sortie);
+
+        Assert.That(flow.TryConsumeLaunch(), Is.True);
+        Assert.That(flow.TryConsumeLaunch(), Is.False);
+    }
+
+    [Test]
+    public void 새_회차는_메인_진입_래치도_푼다()
+    {
+        var flow = Create(0);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Sortie);
+        flow.TryConsumeLaunch();
+
+        flow.Reset();
+
+        Assert.That(flow.HasLaunched, Is.False);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Sortie);
+        Assert.That(flow.TryConsumeLaunch(), Is.True);
+    }
+
+    [Test]
+    public void 캐릭터_변경은_Lobby_에서_허용_훈련_명단은_입구_확정_뒤_잠김()
+    {
+        var flow = Create(0, 1);
+        Assert.That(flow.CharacterChangeBlockFor(0, false), Is.EqualTo(LobbyCharacterChangeReject.None));
+
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+
+        Assert.That(flow.CharacterChangeBlockFor(0, false), Is.EqualTo(LobbyCharacterChangeReject.TrainingLocked));
+        Assert.That(flow.CharacterChangeBlockFor(1, false), Is.EqualTo(LobbyCharacterChangeReject.TrainingLocked));
+        RunRestToBrief(flow);
+        Assert.That(flow.CharacterChangeBlockFor(0, false), Is.EqualTo(LobbyCharacterChangeReject.TrainingLocked), "브리핑 뒤에도 잠김");
+    }
+
+    [Test]
+    public void 늦은_참가자는_훈련_중_캐릭터를_바꿀_수_있다()
+    {
+        var flow = Create(0);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.AddClient(5);
+
+        Assert.That(flow.IsWaitingLateJoiner(5), Is.True);
+        Assert.That(flow.CharacterChangeBlockFor(5, false), Is.EqualTo(LobbyCharacterChangeReject.None));
+    }
+
+    [Test]
+    public void 재접속은_새_clientId_라_늦은_참가자로_잠기지_않는다()
+    {
+        var flow = Create(0, 1);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.RemoveClient(1);
+        flow.AddClient(2);   // 같은 사람이 새 clientId 로 — 동일 플레이어 매칭 없음
+
+        Assert.That(flow.CharacterChangeBlockFor(2, false), Is.EqualTo(LobbyCharacterChangeReject.None));
+        Assert.That(flow.CharacterChangeBlockFor(0, false), Is.EqualTo(LobbyCharacterChangeReject.TrainingLocked));
+    }
+
+    [Test]
+    public void 출격_카운트다운_중과_출격_단계는_누구나_캐릭터_변경_거부()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.CharacterChangeBlockFor(0, true), Is.EqualTo(LobbyCharacterChangeReject.CountdownActive));
+        flow.OnGatherConfirmed(LobbyGatherPoint.Sortie);
+        Assert.That(flow.CharacterChangeBlockFor(0, false), Is.EqualTo(LobbyCharacterChangeReject.GameStarting));
+        Assert.That(flow.CharacterChangeBlockFor(7, false), Is.EqualTo(LobbyCharacterChangeReject.GameStarting), "명단 밖도");
+    }
+
+    [Test]
+    public void 접속_차단은_출격_카운트다운_중과_출격_단계만()
+    {
+        Assert.That(LobbyTrainingFlow.BlocksNewJoins(LobbyTrainingStage.Lobby, false), Is.False);
+        Assert.That(LobbyTrainingFlow.BlocksNewJoins(LobbyTrainingStage.Lobby, true), Is.True);
+        Assert.That(LobbyTrainingFlow.BlocksNewJoins(LobbyTrainingStage.Train02, false), Is.False, "훈련 중 = 로비 대기로 받는다");
+        Assert.That(LobbyTrainingFlow.BlocksNewJoins(LobbyTrainingStage.Brief, false), Is.False, "브리핑 중");
+        Assert.That(LobbyTrainingFlow.BlocksNewJoins(LobbyTrainingStage.Brief, true), Is.True, "브리핑 뒤 출격 카운트다운");
+        Assert.That(LobbyTrainingFlow.BlocksNewJoins(LobbyTrainingStage.Sortie, false), Is.True, "메인 진입 시작 뒤");
+    }
+
+    [TestCase(LobbyTrainingStage.Lobby, false, DemoJoinRejectReason.None)]
+    [TestCase(LobbyTrainingStage.Train01, false, DemoJoinRejectReason.None)]
+    [TestCase(LobbyTrainingStage.Brief, false, DemoJoinRejectReason.None)]
+    [TestCase(LobbyTrainingStage.Lobby, true, DemoJoinRejectReason.GameInProgress)]
+    [TestCase(LobbyTrainingStage.Brief, true, DemoJoinRejectReason.GameInProgress)]
+    [TestCase(LobbyTrainingStage.Sortie, false, DemoJoinRejectReason.GameInProgress)]
+    public void 접속_승인_데모_규칙과_합치면(LobbyTrainingStage stage, bool sortieCountdown, DemoJoinRejectReason expected)
+    {
+        var request = new DemoJoinRequest(
+            isHostSelf: false, isDemoFlow: true, isInLobby: true,
+            isCountdownActive: LobbyTrainingFlow.BlocksNewJoins(stage, sortieCountdown),
+            connectedCount: 1, maxPlayers: DemoJoinRule.MaxPlayers, isPlayerIdValid: true, isPlayerIdConnected: false);
+
+        Assert.That(DemoJoinRule.Evaluate(request), Is.EqualTo(expected));
+    }
+
+    // 입구 확정 뒤 상태에서 브리핑 완료까지.
+    static void RunRestToBrief(LobbyTrainingFlow flow)
+    {
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train01Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train01);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train02Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train02);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03A);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03B);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03C);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03D);
+        flow.OnGatherConfirmed(LobbyGatherPoint.TrainEnd);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Brief);
+        Assert.That(flow.ReportStageCompleted(LobbyTrainingStage.Brief), Is.True);
+    }
+
     [Test]
     public void None_구역_확정은_무시()
     {
