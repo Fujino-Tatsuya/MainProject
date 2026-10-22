@@ -118,9 +118,11 @@ public static class QABuild48
                 File.Delete(cfg);
             if (name == "host")
                 continue;
-            string sample = File.ReadAllText(Path.Combine(dir, DemoConnectionSamples.ClientSampleFileName));
+            // 할 일 72 뒤 샘플은 공용 auto 하나(playerId 없음)다 — 127.0.0.1 은 auto 판정이 애매하니 클라는 role 을 못박고 playerId 를 넣는다.
+            string sample = File.ReadAllText(Path.Combine(dir, DemoConnectionSamples.AutoSampleFileName));
+            sample = System.Text.RegularExpressions.Regex.Replace(sample, "\"role\"\\s*:\\s*\"[^\"]*\"", "\"role\": \"client\"");
             sample = System.Text.RegularExpressions.Regex.Replace(sample, "\"hostAddress\"\\s*:\\s*\"[^\"]*\"", "\"hostAddress\": \"127.0.0.1\"");
-            sample = System.Text.RegularExpressions.Regex.Replace(sample, "\"playerId\"\\s*:\\s*\"[^\"]*\"", $"\"playerId\": \"qa-{name}\"");
+            sample = System.Text.RegularExpressions.Regex.Replace(sample, "\\{", $"{{\n  \"playerId\": \"qa-{name}\",", System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan.FromSeconds(1));
             File.WriteAllText(cfg, sample);
         }
 
