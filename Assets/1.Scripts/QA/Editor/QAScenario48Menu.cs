@@ -87,6 +87,7 @@ public static class QAScenario48Menu
     {
         QASettings.Scenarios = string.Empty;
         DeleteQAConnectionConfigs();
+        QAScenario88Menu.ResetRemoteDelay();
         Debug.Log("[QA] 48 시나리오 모드 해제 — 이후 Play 는 기존 QA 세션(설정 창 기준)으로 돈다.");
     }
 

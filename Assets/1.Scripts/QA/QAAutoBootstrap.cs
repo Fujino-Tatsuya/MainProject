@@ -37,6 +37,8 @@ public static class QAAutoBootstrap
         var go = new GameObject("[QA] Harness");
         go.SetActive(false);                 // 구성 완료 후 활성화(에이전트 초기화 순서 보장)
         Object.DontDestroyOnLoad(go);
+        // 할 일 88 — 원격 지연 파일(MPPM 클론 루트에만 생김)을 읽어 이 인스턴스 트랜스포트에 지연을 건다. 파일이 없으면 아무것도 안 한다.
+        go.AddComponent<QANetSim88>();
 
         // 할 일 48 시나리오 모드 — 접속은 DemoSessionDirector 에 맡기고 시나리오 스크립트가 입력을 넣는다(휴리스틱 에이전트 없음).
         string scenarios = QASettings.Scenarios;
