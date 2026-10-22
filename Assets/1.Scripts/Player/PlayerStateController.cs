@@ -945,12 +945,14 @@ public abstract class PlayerStateBase : IPlayerState
         if (!Context.Input.InterruptPressed && !Context.Input.HasBufferedInput(PlayerBufferedInput.SkillInterrupt))
             return PlayerActionAttempt.Rejected;
 
-        if (Context.Controller.ChangeState(PlayerActionState.Interrupt))
-            return PlayerActionAttempt.Started;
-
-        // 우클릭에 스킬이 배정돼 있으면 위 스킬 경로가 이 입력을 이미 판정했다 — 여기서 다시 버리거나 피드백하지 않는다.
+        // 인터럽트 상태 경로는 우클릭에 스킬이 없을 때만 쓴다. 스킬이 배정돼 있으면 위 스킬 경로가 이 입력을 이미 판정했다 —
+        // 여기서 인터럽트 상태로 새면 원격 클라는 서버가 승인한 간파를 스킬 상태로 받지 못해
+        // (PlaySkillClientRpc 의 BeginSkill 거부) 간파 모션이 씹힌다(할 일 74). 다시 버리거나 피드백하지도 않는다.
         if (Context.Skills != null && Context.Skills.GetSkill(PlayerSkillSlot.Interrupt) != null)
             return PlayerActionAttempt.Rejected;
+
+        if (Context.Controller.ChangeState(PlayerActionState.Interrupt))
+            return PlayerActionAttempt.Started;
 
         PlayerActionAttempt attempt = Context.StatusEffects.BlocksInterrupt
             ? Context.Controller.RejectByEffect(PlayerBufferedInput.SkillInterrupt)
