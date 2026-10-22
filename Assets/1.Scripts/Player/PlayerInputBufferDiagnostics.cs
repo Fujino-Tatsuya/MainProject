@@ -23,7 +23,7 @@ public enum InputBufferDiagEvent
     Expired,
     /// <summary>자원 부족·차단 효과·기타 거부·비움으로 버려졌다(사유 포함).</summary>
     Dropped,
-    /// <summary>새 입력에 덮여 버려졌다.</summary>
+    /// <summary>같은 종류를 다시 눌러 이전 press 가 새 시각으로 갱신됐다(할 일 77 — 종류별 1개).</summary>
     Overwritten,
     /// <summary>바빴던 행동이 끝나 Idle/Move 로 돌아왔다 — 직전 만료 입력이 있으면 놓친 간격을 함께 남긴다.</summary>
     Actionable,
@@ -31,7 +31,11 @@ public enum InputBufferDiagEvent
     /// 기본 공격 중 스킬 입력을 공격 뒤로 예약했다(거너 — 현재 발 마무리 후 시전). 그 입력은 버퍼에서 예약으로 옮겨 가
     /// 만료·실행 이벤트가 더 나지 않는다(같은 스킬 연타도 1건씩 남되 실행은 1번).
     /// </summary>
-    SkillReservedAfterAttack
+    SkillReservedAfterAttack,
+    /// <summary>함께 보관 중이던 다른 입력(보통 더 높은 순위)이 실행돼 버퍼 전체가 비면서 버려졌다(할 일 77).</summary>
+    Outranked,
+    /// <summary>위 순위 입력이 거부로 버려져 이 입력이 다음 후보로 올라왔다(할 일 77) — 같은 프레임에 시도된다.</summary>
+    Fallback
 }
 
 /// <summary>진단 이벤트 1건. 시간은 전부 초(Time.time 기준), 없으면 음수.</summary>
@@ -57,7 +61,7 @@ public readonly struct InputBufferDiagRecord
     public PlayerBufferedInput Input { get; }
     public float Time { get; }
     public int Frame { get; }
-    /// <summary>press 로부터 이 이벤트까지(Consumed·Expired·Dropped·Overwritten).</summary>
+    /// <summary>press 로부터 이 이벤트까지(Consumed·Expired·Dropped·Overwritten·Outranked·Fallback).</summary>
     public float Elapsed { get; }
     /// <summary>Actionable — 직전 만료 시각(press + 유지 시간)부터 실행 가능해질 때까지. 놓친 입력이 없으면 음수.</summary>
     public float MissedGap { get; }
@@ -69,19 +73,28 @@ public readonly struct InputBufferDiagRecord
 }
 
 /// <summary>
-/// 버퍼가 들고 있는 입력 1개를 <see cref="PlayerInputBuffer"/> 와 같은 규칙(마지막 1개·유지 시간 초과 = 만료)으로 따라가며
-/// 진단 이벤트를 만든다. 시간·프레임은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상).
+/// 버퍼가 들고 있는 입력을 <see cref="PlayerInputBuffer"/> 와 같은 규칙(종류별 1개·각자 유지 시간 초과 = 만료)으로 따라가며
+/// 진단 이벤트를 만든다(할 일 77). 우선순위 판정은 버퍼가 하고, 호출자가 결과대로 ActionStarted·Fallback 등을 부른다.
+/// 시간·프레임은 호출자가 넘긴다(MonoBehaviour 아님 — EditMode 테스트 대상).
 /// </summary>
 public sealed class PlayerInputBufferDiagTracker
 {
+    private const int KindCount = (int)PlayerBufferedInput.SkillUltimate + 1;
+
+    private struct PendingEntry
+    {
+        public bool Active;
+        public float PressTime;
+        public float Hold;
+        public int PressFrame;
+        public bool Buffered;
+    }
+
     private readonly Action<InputBufferDiagRecord> sink;
     private readonly Func<string> describeWait;
 
-    private PlayerBufferedInput pendingKind = PlayerBufferedInput.None;
-    private float pendingPressTime;
-    private float pendingHold;
-    private int pendingPressFrame;
-    private bool pendingBuffered;
+    // 인덱스 = PlayerBufferedInput.
+    private readonly PendingEntry[] pending = new PendingEntry[KindCount];
 
     // 바쁜 동안(Idle/Move 아님) 만료된 마지막 입력 — 다음 Actionable 에서 놓친 간격으로 쓴다.
     private bool actionable = true;
@@ -97,27 +110,41 @@ public sealed class PlayerInputBufferDiagTracker
         this.describeWait = describeWait;
     }
 
-    public PlayerBufferedInput Pending => pendingKind;
+    /// <summary>추적 중인 입력이 하나라도 있는가(만료 확인 전 값).</summary>
+    public bool HasPending
+    {
+        get
+        {
+            for (int i = 1; i < KindCount; i++)
+            {
+                if (pending[i].Active)
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>그 종류를 추적 중인가(만료 확인 전 값).</summary>
+    public bool IsPending(PlayerBufferedInput input) => IsValid(input) && pending[(int)input].Active;
+
     public bool IsActionable => actionable;
 
-    /// <summary>버퍼에 기록된 press. 살아 있던 이전 입력은 Overwritten.</summary>
+    /// <summary>버퍼에 기록된 press. 같은 종류가 살아 있었으면 Overwritten(시각 갱신) 뒤 새로 추적한다. 다른 종류는 그대로다.</summary>
     public void Press(PlayerBufferedInput input, float now, int frame, float holdSeconds)
     {
-        if (input == PlayerBufferedInput.None || holdSeconds <= 0f)
+        if (!IsValid(input) || holdSeconds <= 0f)
             return;
 
         CheckExpiry(now, frame);
-        if (pendingKind != PlayerBufferedInput.None)
+        ref PendingEntry entry = ref pending[(int)input];
+        if (entry.Active)
         {
-            Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Overwritten, pendingKind, now, frame,
-                elapsed: now - pendingPressTime, detail: $"새 입력 {input}"));
+            Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Overwritten, input, now, frame,
+                elapsed: now - entry.PressTime, detail: "같은 입력 재입력(시각 갱신)"));
         }
 
-        pendingKind = input;
-        pendingPressTime = now;
-        pendingHold = holdSeconds;
-        pendingPressFrame = frame;
-        pendingBuffered = false;
+        entry = new PendingEntry { Active = true, PressTime = now, Hold = holdSeconds, PressFrame = frame };
         Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Press, input, now, frame));
     }
 
@@ -125,46 +152,84 @@ public sealed class PlayerInputBufferDiagTracker
     public void BeginFrame(float now, int frame)
     {
         CheckExpiry(now, frame);
-        if (pendingKind != PlayerBufferedInput.None && !pendingBuffered && frame > pendingPressFrame)
-            MarkBuffered(now, frame, describeWait?.Invoke());
+        for (int i = 1; i < KindCount; i++)
+        {
+            if (pending[i].Active && !pending[i].Buffered && frame > pending[i].PressFrame)
+                MarkBuffered((PlayerBufferedInput)i, now, frame, describeWait?.Invoke());
+        }
     }
 
     /// <summary>시작을 시도했지만 막혀(바쁨·CC) 남겨 둔다 — 처음 한 번만 Buffered.</summary>
     public void Blocked(PlayerBufferedInput input, float now, int frame, string reason)
     {
         CheckExpiry(now, frame);
-        if (input != PlayerBufferedInput.None && pendingKind == input && !pendingBuffered)
-            MarkBuffered(now, frame, reason);
+        if (IsPending(input) && !pending[(int)input].Buffered)
+            MarkBuffered(input, now, frame, reason);
     }
 
-    /// <summary>실행됐다. input = None 이면 종류와 무관하게 들고 있던 입력을 실행된 것으로 본다(행동 시작으로 버퍼 전체 비움).</summary>
+    /// <summary>
+    /// 행동이 실행돼 버퍼 전체가 비었다. <paramref name="executed"/> 는 Consumed, 함께 들고 있던 나머지는 Outranked.
+    /// executed = None(무엇이 실행됐는지 모름)이면 전부 Outranked.
+    /// </summary>
+    public void ActionStarted(PlayerBufferedInput executed, float now, int frame, string detail)
+    {
+        Consumed(executed, now, frame, detail);
+
+        string outrankedBy = executed != PlayerBufferedInput.None ? $"{executed} 실행" : detail;
+        for (int i = 1; i < KindCount; i++)
+        {
+            if (!pending[i].Active)
+                continue;
+
+            Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Outranked, (PlayerBufferedInput)i, now, frame,
+                elapsed: now - pending[i].PressTime, detail: outrankedBy));
+            pending[i].Active = false;
+        }
+    }
+
+    /// <summary>그 입력만 실행(소비)됐다 — 행동 중 소비처(콤보 예약 등). 다른 종류는 계속 추적한다.</summary>
     public void Consumed(PlayerBufferedInput input, float now, int frame, string detail)
     {
         CheckExpiry(now, frame);
-        if (!Matches(input))
+        if (!IsPending(input))
             return;
 
-        bool immediate = !pendingBuffered && frame == pendingPressFrame;
-        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Consumed, pendingKind, now, frame,
-            elapsed: now - pendingPressTime, immediate: immediate, detail: detail));
-        pendingKind = PlayerBufferedInput.None;
+        ref PendingEntry entry = ref pending[(int)input];
+        bool immediate = !entry.Buffered && frame == entry.PressFrame;
+        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Consumed, input, now, frame,
+            elapsed: now - entry.PressTime, immediate: immediate, detail: detail));
+        entry.Active = false;
     }
 
-    /// <summary>실행되지 않고 버려졌다. input = None 이면 종류 무관(버퍼 전체 비움).</summary>
+    /// <summary>실행되지 않고 버려졌다. input = None 이면 들고 있던 전부(버퍼 전체 비움).</summary>
     public void Dropped(PlayerBufferedInput input, float now, int frame, string reason)
     {
         CheckExpiry(now, frame);
-        if (!Matches(input))
+        for (int i = 1; i < KindCount; i++)
+        {
+            if (!pending[i].Active || (input != PlayerBufferedInput.None && (int)input != i))
+                continue;
+
+            Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Dropped, (PlayerBufferedInput)i, now, frame,
+                elapsed: now - pending[i].PressTime, detail: reason));
+            pending[i].Active = false;
+        }
+    }
+
+    /// <summary><paramref name="dropped"/> 가 거부로 버려져 <paramref name="next"/> 가 다음 후보로 올라왔다.</summary>
+    public void Fallback(PlayerBufferedInput dropped, PlayerBufferedInput next, float now, int frame)
+    {
+        CheckExpiry(now, frame);
+        if (!IsPending(next))
             return;
 
-        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Dropped, pendingKind, now, frame,
-            elapsed: now - pendingPressTime, detail: reason));
-        pendingKind = PlayerBufferedInput.None;
+        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Fallback, next, now, frame,
+            elapsed: now - pending[(int)next].PressTime, detail: $"{dropped} 버림 → 다음 후보"));
     }
 
     /// <summary>
     /// 행동 상태가 바뀔 때 부른다. 바쁨 → 실행 가능으로 바뀌면 Actionable — 바쁜 동안 만료된 입력이 있으면
-    /// 놓친 간격(지금 - 만료 시각)과 press→지금을, 아직 대기 중인 입력이 있으면 press→지금을 싣는다.
+    /// 놓친 간격(지금 - 만료 시각)과 press→지금을, 아직 대기 중인 입력이 있으면 가장 먼저 누른 것의 press→지금을 싣는다.
     /// </summary>
     public void StateChanged(bool nowActionable, float now, int frame, string detail)
     {
@@ -188,10 +253,16 @@ public sealed class PlayerInputBufferDiagTracker
             missedGap = now - missedExpiredAt;
             pressToActionable = now - missedPressTime;
         }
-        else if (pendingKind != PlayerBufferedInput.None)
+        else
         {
-            kind = pendingKind;
-            pressToActionable = now - pendingPressTime;
+            for (int i = 1; i < KindCount; i++)
+            {
+                if (pending[i].Active && (kind == PlayerBufferedInput.None || pending[i].PressTime < pending[(int)kind].PressTime))
+                    kind = (PlayerBufferedInput)i;
+            }
+
+            if (kind != PlayerBufferedInput.None)
+                pressToActionable = now - pending[(int)kind].PressTime;
         }
 
         missedKind = PlayerBufferedInput.None;
@@ -203,42 +274,45 @@ public sealed class PlayerInputBufferDiagTracker
     public void SkillReservedAfterAttack(PlayerBufferedInput input, float now, int frame, string detail)
     {
         CheckExpiry(now, frame);
-        if (input == PlayerBufferedInput.None)
+        if (!IsValid(input))
             return;
 
-        float elapsed = pendingKind == input ? now - pendingPressTime : -1f;
+        float elapsed = pending[(int)input].Active ? now - pending[(int)input].PressTime : -1f;
         Emit(new InputBufferDiagRecord(InputBufferDiagEvent.SkillReservedAfterAttack, input, now, frame,
             elapsed: elapsed, detail: detail));
-        if (pendingKind == input)
-            pendingKind = PlayerBufferedInput.None;
+        pending[(int)input].Active = false;
     }
 
-    private bool Matches(PlayerBufferedInput input) =>
-        pendingKind != PlayerBufferedInput.None && (input == PlayerBufferedInput.None || input == pendingKind);
+    private static bool IsValid(PlayerBufferedInput input) =>
+        input > PlayerBufferedInput.None && (int)input < KindCount;
 
-    private void MarkBuffered(float now, int frame, string reason)
+    private void MarkBuffered(PlayerBufferedInput input, float now, int frame, string reason)
     {
-        pendingBuffered = true;
-        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Buffered, pendingKind, now, frame,
-            elapsed: now - pendingPressTime, detail: reason));
+        pending[(int)input].Buffered = true;
+        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Buffered, input, now, frame,
+            elapsed: now - pending[(int)input].PressTime, detail: reason));
     }
 
-    // PlayerInputBuffer.Peek 와 같은 조건(now - recordedAt > hold).
+    // PlayerInputBuffer 와 같은 조건(now - recordedAt > hold), 종류마다 따로.
     private void CheckExpiry(float now, int frame)
     {
-        if (pendingKind == PlayerBufferedInput.None || now - pendingPressTime <= pendingHold)
-            return;
-
-        if (!actionable)
+        for (int i = 1; i < KindCount; i++)
         {
-            missedKind = pendingKind;
-            missedPressTime = pendingPressTime;
-            missedExpiredAt = pendingPressTime + pendingHold;
-        }
+            ref PendingEntry entry = ref pending[i];
+            if (!entry.Active || now - entry.PressTime <= entry.Hold)
+                continue;
 
-        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Expired, pendingKind, now, frame,
-            elapsed: now - pendingPressTime, detail: actionable ? "실행 가능 상태에서 만료" : "행동 중 만료"));
-        pendingKind = PlayerBufferedInput.None;
+            if (!actionable)
+            {
+                missedKind = (PlayerBufferedInput)i;
+                missedPressTime = entry.PressTime;
+                missedExpiredAt = entry.PressTime + entry.Hold;
+            }
+
+            Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Expired, (PlayerBufferedInput)i, now, frame,
+                elapsed: now - entry.PressTime, detail: actionable ? "실행 가능 상태에서 만료" : "행동 중 만료"));
+            entry.Active = false;
+        }
     }
 
     private void Emit(in InputBufferDiagRecord record) => sink?.Invoke(record);
@@ -324,7 +398,7 @@ public sealed class PlayerInputBufferDiagStats
         sb.Append(PlayerInputBufferDiagnostics.Prefix)
             .Append(" 요약 — 유지 ").Append(Ms(holdSeconds)).Append("ms, 이벤트 ").Append(TotalEvents)
             .Append("건, CSV: ").Append(csvPath ?? "(없음)").AppendLine();
-        sb.AppendLine("입력 | press | 즉시 실행 | 버퍼 실행 | 만료 | 버림 | 덮임 | 평타 뒤 예약");
+        sb.AppendLine("입력 | press | 즉시 실행 | 버퍼 실행 | 만료 | 버림 | 재입력 갱신 | 평타 뒤 예약 | 선택에서 밀림 | 다음 후보로");
         foreach (PlayerBufferedInput input in Inputs)
         {
             int consumed = Count(input, InputBufferDiagEvent.Consumed);
@@ -337,6 +411,8 @@ public sealed class PlayerInputBufferDiagStats
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Dropped))
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Overwritten))
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.SkillReservedAfterAttack))
+                .Append(" | ").Append(Count(input, InputBufferDiagEvent.Outranked))
+                .Append(" | ").Append(Count(input, InputBufferDiagEvent.Fallback))
                 .AppendLine();
         }
 
@@ -518,6 +594,8 @@ public static class PlayerInputBufferDiagnostics
         InputBufferDiagEvent.Overwritten => "overwritten",
         InputBufferDiagEvent.Actionable => "actionable",
         InputBufferDiagEvent.SkillReservedAfterAttack => "skill-reserved-after-attack",
+        InputBufferDiagEvent.Outranked => "outranked",
+        InputBufferDiagEvent.Fallback => "fallback",
         _ => evt.ToString()
     };
 
@@ -531,6 +609,8 @@ public static class PlayerInputBufferDiagnostics
             case InputBufferDiagEvent.Expired:
             case InputBufferDiagEvent.Dropped:
             case InputBufferDiagEvent.Overwritten:
+            case InputBufferDiagEvent.Outranked:
+            case InputBufferDiagEvent.Fallback:
                 return $" press→{Ms(record.Elapsed)}ms";
             case InputBufferDiagEvent.Actionable:
                 if (record.MissedGap >= 0f)

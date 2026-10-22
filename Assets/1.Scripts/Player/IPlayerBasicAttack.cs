@@ -31,13 +31,15 @@ public interface IPlayerBasicAttack
     /// <summary>
     /// 공격 중(AttackReady·Attack) 스킬 입력을 '공격 뒤 스킬'로 예약하고 이 공격을 지금 발에서 마무리하는가 — 거너 = 예(할 일 44).
     /// 공격은 끊지 않는다: 현재 발은 끝까지 가고 다음 발만 잇지 않는다(<see cref="FinishWithoutChaining"/>), 정상 종료 뒤
-    /// Idle/Move 첫 틱에 예약한 스킬을 기존 경로로 요청한다. 가붕이·어쌔신 = 아니오(공격 중 스킬 입력은 0.2초 선입력 버퍼 그대로).
+    /// Idle/Move 첫 틱에 예약한 스킬을 기존 경로로 요청한다. 가붕이·어쌔신 = 아니오 — 공격 중 스킬 입력은 0.2초 선입력 버퍼 그대로이고,
+    /// 버퍼에 평타보다 높은 스킬 입력이 살아 있으면 <see cref="FinishWithoutChaining"/> 으로 다음 타만 잇지 않는다(할 일 77 후속).
     /// </summary>
     bool ReservesSkillAfterAttack { get; }
 
     /// <summary>
-    /// [오너] 다음 발을 잇지 않고 지금 발로 공격을 마무리한다 — 누르고 있음·창 예약을 무시(버튼을 뗀 것처럼).
-    /// 끝은 기존 정상 종료 경로(거너: 발사 + ShotRecovery 뒤 서버 EndRpc)다. 예약 캐릭터가 아니면 아무것도 안 한다.
+    /// [오너] 다음 발(타)을 잇지 않고 지금 발로 공격을 마무리한다 — 누르고 있음·창 예약을 무시(버튼을 뗀 것처럼).
+    /// 끝은 기존 정상 종료 경로(거너: 발사 + ShotRecovery 뒤 서버 EndRpc / 가붕이·어쌔신: 이 타 End 이벤트 뒤 서버 종료)다.
+    /// 오너와 서버가 같은 래치를 들고 공격이 끝나면(정상 종료·취소) 풀린다.
     /// </summary>
     void FinishWithoutChaining();
 
@@ -143,4 +145,20 @@ public static class PlayerBasicAttackInputRules
     /// </summary>
     public static bool ShouldChainNextShot(bool attackHeld, bool windowQueued, bool skillReserved) =>
         !skillReserved && (attackHeld || windowQueued);
+
+    /// <summary>
+    /// 예약하지 않는 캐릭터(가붕이·어쌔신)가 공격 중 버퍼의 스킬 입력 때문에 다음 타를 잇지 않고 지금 타로 마무리하는가(할 일 77 후속).
+    /// 평타보다 우선순위가 높은 스킬 입력이 살아 있고, 지금 쓸 수 있어 보일 때만(배정됨·차단 효과 아님·쿨타임 아님) —
+    /// 쓸 수 없는 입력은 체인을 끊지 않고 버퍼 규칙(만료·Idle 에서 거부 피드백)에 맡긴다.
+    /// </summary>
+    public static bool ShouldFinishChainForBufferedSkill(
+        bool reservesSkillAfterAttack, bool skillAboveAttackAlive, bool assigned, bool blockedByEffect, bool blockedByCooldown) =>
+        !reservesSkillAfterAttack && skillAboveAttackAlive && assigned && !blockedByEffect && !blockedByCooldown;
+
+    /// <summary>
+    /// 근접 콤보(가붕이)가 이번 틱 다음 타 예약을 요청하는가 — 누르고 있거나 누른 프레임, 단 스킬 때문에 마무리 중이면 안 한다.
+    /// 창(ComboWindowOpen~Close) 판정은 따로(오프라인 = 로컬, 네트워크 = 서버)다.
+    /// </summary>
+    public static bool ShouldRequestNextMeleeAttack(bool attackHeld, bool attackPressed, bool finishingChain) =>
+        !finishingChain && (attackHeld || attackPressed);
 }
