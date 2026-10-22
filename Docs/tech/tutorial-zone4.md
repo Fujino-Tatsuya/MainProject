@@ -43,6 +43,8 @@ S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패�
 - `ServerPanelActivated(int slotId, int panelIndex, int activated, int panelCount)` — 서버 RPC 가 패널을 새로 켠 직후(중복 요청은 안 냄).
 - `ServerBridgeOpened(int slotId)` — `TickOpening` 에서 진행도 1 도달, 슬롯마다 1번(NavMesh 재베이크 호출 직전).
 - 타이머 만료·패드 카운트다운은 이벤트 없이 복제 상태(`State`·`IsCountdownActive`)를 서버에서 폴링 — `BossTimerManager`·`BossTeleportManager` 무수정.
+  할 일 89 뒤 패드 카운트다운 = **전원 발판 집결 5초** 카운트다운([boss-entrance-elevator.md §0](../design/boss-entrance-elevator.md)) — `IsCountdownActive` 의미(집결·강제 공통)는 그대로라 이 폴링은 바뀌지 않는다.
+  카운트 중 한 명이 나가거나 쓰러지면 취소되고 다시 모이면 5초부터라 PAD_COUNT 가 다시 시작될 수 있다(8초 안 중복 억제는 그대로).
 - 슬롯 필터 없음: 튜토리얼에서 다리 게이트는 존4(`ZoneL_typeB`) 하나뿐이라 모든 패널을 존4 패널로 센다.
 
 ## 5. 강조 대상 찾기 (클라)
@@ -71,6 +73,6 @@ S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패�
 - 10초 뒤 게이지 차오름(420초) · START → PANEL_INTRO · 목표 0/4 · 3초 뒤 일반 몹 기상(중간보스는 그대로).
 - 패널 F → 목표 1/4…(누가 켜도) · 첫 패널만 PANEL_FIRST · 4/4 → 목표 MIDBOSS · 1.5초 뒤 BRIDGE + 중간보스 기상 · 계단(가까운 것)·중간보스 강조 · 호스트 끊김 체감.
 - 중간보스 첫 노란빛 → COUNTER_REMIND 1번 · 처치 → CLEAR → GO_BOSS · 목표 GO_BOSS · 미니맵 보스 아이콘 펄스 · G9 개방.
-- 패드 카운트다운 → PAD_COUNT(들락거려도 8초 안엔 1번) · 도착 → 목표·강조·자막 사라짐 → 1초 뒤 23호 정면 팁.
+- 전원 발판 집결 → 5초 카운트다운 → PAD_COUNT(들락거려도 8초 안엔 1번) · 한 명 이탈/사망 → 취소, 다시 모이면 5부터 · 도착 → 목표·강조·자막 사라짐 → 1초 뒤 23호 정면 팁.
 - 타이머 만료(디렉터 `bossTimerLimitSeconds` 짧게) → TIMER_EXPIRED 1번 · 강제 이동 카운트다운에 PAD_COUNT 안 뜸.
 - 늦게 붙은 클라도 목표·강조가 같다.
