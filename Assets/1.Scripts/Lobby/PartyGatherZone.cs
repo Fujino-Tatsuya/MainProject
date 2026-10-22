@@ -177,6 +177,16 @@ public sealed class PartyGatherZone : NetworkBehaviour
         Debug.Log($"[SceneFlow] {Tag} {name} active={active}");
     }
 
+    /// <summary>[서버] 유지 시간을 바꾼다(로비 훈련 진행기가 LobbyRules 값·영역 안 확인 0초를 넣는다). 이미 시작한 카운트다운 종료 시각은 그대로.</summary>
+    public void ServerSetHoldSeconds(float seconds)
+    {
+        if (!RequireServer(nameof(ServerSetHoldSeconds)))
+            return;
+
+        holdSeconds = Mathf.Max(0f, seconds);
+        _rules.HoldSeconds = holdSeconds;
+    }
+
     /// <summary>[서버] 참여자 명단을 외부에서 정한다(로비 훈련 진행기). 이후 새 접속은 자동 추가하지 않는다. 구성이 바뀌면 카운트다운 0.</summary>
     public void ServerSetParticipants(IEnumerable<ulong> clientIds)
     {
