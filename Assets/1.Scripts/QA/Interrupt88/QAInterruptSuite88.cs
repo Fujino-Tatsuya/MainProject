@@ -15,7 +15,7 @@ using UnityEngine;
 /// 원격 지연 적용 확인 = 클론 tee 의 최신 <c>[QA88] event=netsim delayMs</c>.</para>
 /// <para><b>런 하나</b>: (대상이 바뀌면 강제 개시) → 원격 지연 파일 → 클론 netsim 확인 → 호스트 <c>run_begin</c> → 클론 <c>go</c>(누르는 클론 1명만 봇)
 /// → 누르는 클론 <c>run_end</c>(N회) 또는 런 상한 → 클론 <c>idle</c> → 2초 유예(늦은 판정) → 호스트 <c>run_end</c> → 집계·리포트 덮어쓰기.
-/// 런 동안 0.5초마다 <see cref="QABossStart88.KeepAliveServer"/>(파티·대상 체력 유지), 23호는 1초마다 점프 콤보 예약.</para>
+/// 런 동안 0.5초마다 <see cref="QABossStart88.KeepAliveServer"/>(파티·대상 체력 유지), 23호는 1초마다 점프 콤보 예약, 매 프레임 <see cref="QABossWatch88"/>(보스 공격·창 진단).</para>
 /// <para>정리(정상·중단·예외): 여기서는 클론 <c>end</c>·원격 지연 0·봇 정지까지. Play 정지·가상 플레이어 비활성·시나리오 모드 해제는
 /// 에디터 감시자(<c>QAInterruptSuite88Watcher</c>)가 <see cref="Finished"/>·<see cref="LastBeat"/> 를 보고 한다.</para>
 /// </summary>
@@ -207,6 +207,8 @@ public static class QAInterruptSuite88
         private QALogTee88 _tee;
         private QAInterruptBot88 _hostBot;
         private MonsterBase _target;
+        private QAInterruptTargetKind _targetKind;
+        private readonly QABossWatch88 _watch = new QABossWatch88();
         private int _seq;
         private string _status = "준비";
         private bool _closed;
@@ -230,6 +232,7 @@ public static class QAInterruptSuite88
             _header.Notes.Add("판 유지: 런 동안 0.5초마다 `QABossStart88.KeepAliveServer` 가 파티 전원과 **대상 보스(중간보스·23호) 체력**을 최대 체력 70% 아래면 최대로 채운다 — 측정 유지 목적(처치·전멸로 런이 끊기지 않게). 통계·피격 연출·사망 신호 없음.");
             _header.Notes.Add("23호: 1초마다 점프×3 콤보 예약(F3 Dev API, 3번째 착지 간파 창). A 스윕은 23호 창 길이가 복제되지 않아 런의 첫 창을 길이 학습에만 쓴다.");
             _header.Notes.Add("원격 지연 = Multiplayer Tools NetworkSimulator 송신·수신 각각 X ms(RTT 대략 +2X). 호스트는 지연 0. 런 시작 전 클론 콘솔의 `[QA88] event=netsim` 으로 적용을 확인한다.");
+            _header.Notes.Add("진단 줄(원본 로그): 호스트 `event=boss_attack`·`boss_window`(엣지)·`boss_diag`(5초 — 상태·휴면·NavMesh·어그로·창·플레이어별 거리·깨어 있는 일반몹), 파티 배치 `party_points`·`party_point`, 누르는 클론 `bot_diag`(5초 — 관측 경로·창 값·마지막 관측·보스 거리·보스 상태·낭떠러지 멈춤).");
             _header.Notes.Add("탐지기: 기존 5종(예외·소프트락·성능·네트워크·불변식)이 모든 인스턴스에서 상시 감시한다. 런 구간에 새로 잡히거나 재발한 Warning 이상(노이즈 제외)은 비고 '탐지기' 로 남긴다. 인스턴스별 전체 집계는 각 `48-*` 리포트.");
             Debug.Log($"{Tag} event=suite_begin runs={_cfg.Runs.Count} attempts={_cfg.Attempts} runTimeoutSec={_cfg.RunTimeoutSec} hostBot={(_cfg.HostBot ? "true" : "false")} dir={QAInterruptLag88Plan.LogToken(_dir)}");
             WriteReport();
@@ -288,6 +291,8 @@ public static class QAInterruptSuite88
                     startOk = start.Ok;
                     startDetail = start.Detail;
                     _target = start.Target;
+                    _targetKind = spec.Kind;
+                    _watch.Bind(_target);
                     Debug.Log($"{Tag} event=boss_start kind={QAInterruptLag88Plan.KindToken(spec.Kind)} ok={(start.Ok ? "true" : "false")} detail={QAInterruptLag88Plan.LogToken(start.Detail)}");
                 }
                 if (!startOk)
@@ -460,6 +465,7 @@ public static class QAInterruptSuite88
 
         private void KeepAlive()
         {
+            _watch.Tick(_targetKind);
             float now = Time.realtimeSinceStartup;
             if (now >= _nextKeepAlive)
             {

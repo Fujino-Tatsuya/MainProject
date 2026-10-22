@@ -33,7 +33,8 @@ public struct QAInterruptBot88Config
 /// 할 일 88 간파 봇(QA 전용, 게임 코드 무수정) — 이 인스턴스의 로컬 플레이어로 대상 카운터 창을 보고 간파(<see cref="PlayerSkillSlot.Interrupt"/>)를 누른다.
 /// 호스트·원격 어느 인스턴스에서도 돈다(원격 = 지연 그룹, 호스트 = 기준 그룹). 입력은 <see cref="QAInputController"/>(같은 하네스).
 /// <para><b>창 관측</b>(이 인스턴스가 보는 것 그대로):
-/// 중간보스 = <c>MonsterBase._counterVisual</c>(비공개 NetworkVariable, P572 프로브처럼 리플렉션으로 읽기만) 열림 엣지,
+/// 중간보스 = <c>MonsterBase._counterVisual</c>(비공개 NetworkVariable, P572 프로브처럼 리플렉션으로 읽기만) 열림 엣지 —
+/// 읽기 권한 Everyone·서버 쓰기라 원격 클라에도 복제되는 신호다(서버 전용 판정 <see cref="MonsterCounterWindow.IsOpen"/> 은 클라에서 늘 닫힘이라 쓰지 않는다),
 /// 창 길이 = <see cref="MonsterCounterWindow.WindowDuration"/>(저작값 ÷ 공격속도 — 전 피어 동일). 표시는 판정보다 0.15초 먼저 꺼지지만 열림은 같은 순간이다.
 /// 23호 = <see cref="TwentyThreeBoss.CounterWindowOpen"/>(판정 창 복제) 엣지, 창 길이는 복제되지 않아 관측한 열림→닫힘 간격으로 배운다
 /// (<see cref="QAWindowDurationLearner"/>) — A 모드는 길이를 배우기 전 첫 창을 누르지 않고 배우기만 한다.</para>
@@ -47,9 +48,13 @@ public sealed class QAInterruptBot88 : MonoBehaviour
 {
     private const string Tag = "[QA88]";
     private const float RetargetSeconds = 1f;
+    private const float DiagSeconds = 5f;
 
     private static readonly FieldInfo CounterVisualField =
         typeof(MonsterBase).GetField("_counterVisual", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    // 낭떠러지 검사 바닥 — 보행면(Ground)·Default·Env. 클라엔 NavMesh 가 없어(MapNavMeshBaker 는 서버만 굽는다) 직선 접근이 틈에 떨어졌다(스모크 4차).
+    private static readonly int GroundMask = LayerMask.GetMask("Default", "Ground", "Env");
 
     private QAInputController _input;
     private QAInterruptBot88Config _cfg;
@@ -69,6 +74,14 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     private double _estClose;        // 관측 열림 + 창 길이(모르면 NaN)
     private double _planOffsetMs;    // A = 계획 오프셋, B = NaN
     private double _planReactMs;     // B = 계획 반응, A = NaN
+
+    // 진단(bot_diag) — 다음 실패 때 "창이 안 열렸나 / 못 봤나 / 못 갔나" 를 가른다.
+    private float _nextDiag;
+    private double _lastOpenSeenAt = -1.0;
+    private MonsterState _lastTargetState;
+    private int _attacksSeen;
+    private int _edgeBlocks;
+    private bool _edgeBlocked;
 
     public bool IsRunning => _active;
     public bool IsDone { get; private set; }
@@ -102,6 +115,10 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         _wasOpen = false;
         _target = null;
         _nextRetarget = 0f;
+        _nextDiag = 0f;
+        _lastOpenSeenAt = -1.0;
+        _attacksSeen = _edgeBlocks = 0;
+        _edgeBlocked = false;
         _active = _input != null;
         Debug.Log($"{Tag} event=bot_begin mode={QAInterruptLag88Plan.ModeToken(_cfg.Mode)} kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} " +
                   $"attempts={_cfg.Attempts} seed={_cfg.Seed} input={(_input != null)} netsimMs={QANetSim88.AppliedDelayMs}");
@@ -145,8 +162,33 @@ public sealed class QAInterruptBot88 : MonoBehaviour
             OnClosed(now);
         _wasOpen = open;
 
+        MonsterState targetState = _target.State;   // 복제값 — 이 인스턴스가 본 보스 공격
+        if (targetState != _lastTargetState && targetState == MonsterState.Attack)
+            _attacksSeen++;
+        _lastTargetState = targetState;
+
         if (_pending && now >= _pressAt)
             Press(now, open);
+
+        if (_active && Time.realtimeSinceStartup >= _nextDiag)
+        {
+            _nextDiag = Time.realtimeSinceStartup + DiagSeconds;
+            LogDiag(me, open, now);
+        }
+    }
+
+    private void LogDiag(Player me, bool open, double now)
+    {
+        Vector3 mine = me.transform.position;
+        Vector3 boss = _target.transform.position;
+        string observe = _cfg.Kind == QAInterruptTargetKind.TwentyThree ? "CounterWindowOpen" : _midbossVisual != null ? "_counterVisual" : "missing";
+        string lastOpen = _lastOpenSeenAt < 0.0 ? "na" : Fmt(now - _lastOpenSeenAt);
+        Debug.Log($"{Tag} event=bot_diag kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} target={QAInterruptLag88Plan.LogToken(_target.name)} " +
+                  $"observe={observe} open={(open ? "true" : "false")} windows={Windows} lastOpenAgoS={lastOpen} attempts={Attempts} " +
+                  $"dist={Fmt(QAPartyPlacement88.HorizontalDistance(mine, boss))} dy={Fmt(mine.y - boss.y)} " +
+                  $"bossState={_target.State} attacksSeen={_attacksSeen} aggroId={_target.AggroTargetId} " +
+                  $"edgeBlocked={(_edgeBlocked ? "true" : "false")} edgeBlocks={_edgeBlocks} " +
+                  $"myPos={Fmt(mine)} bossPos={Fmt(boss)}");
     }
 
     // ── 대상 ───────────────────────────────────────────────────
@@ -186,8 +228,12 @@ public sealed class QAInterruptBot88 : MonoBehaviour
                 _midbossVisual = CounterVisualField.GetValue(_target) as NetworkVariable<bool>;
         }
         if (_target != null)
+        {
+            _lastTargetState = _target.State;
             Debug.Log($"{Tag} event=target kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} target={QAInterruptLag88Plan.LogToken(_target.name)} " +
-                      $"observe={(_cfg.Kind == QAInterruptTargetKind.TwentyThree ? "CounterWindowOpen" : _midbossVisual != null ? "_counterVisual" : "missing")}");
+                      $"observe={(_cfg.Kind == QAInterruptTargetKind.TwentyThree ? "CounterWindowOpen" : _midbossVisual != null ? "_counterVisual" : "missing")} " +
+                      $"dist={Fmt(QAPartyPlacement88.HorizontalDistance(_input.Target.transform.position, _target.transform.position))}");
+        }
         return _target != null;
     }
 
@@ -198,6 +244,11 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         return _midbossVisual != null && _midbossVisual.Value;
     }
 
+    /// <summary>
+    /// 대상 쪽으로 직선 이동 — 앞 바닥이 없으면(틈·낭떠러지) 멈춘다. 클라엔 NavMesh 가 없어 길찾기를 못 하므로
+    /// 파티는 서버가 보스 옆(같은 섬)에 놓고(<c>QABossStart88.TryFindBossRingPoints</c>), 그 뒤엔 보스가 쫓아온다.
+    /// 스모크 4차: 이 검사 없이 섬 밖에서 걷다 두 번 떨어지고 부활 지점(80m 밖)에서 벽에 붙어 10분을 보냈다.
+    /// </summary>
     private void Approach(Player me)
     {
         Vector3 delta = _target.transform.position - me.transform.position;
@@ -206,7 +257,27 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Collider c = _target.GetComponentInChildren<Collider>();
         if (c != null)
             radius = Mathf.Max(c.bounds.extents.x, c.bounds.extents.z);
-        _input.SetMove(delta.magnitude > _cfg.StopDistance + radius ? delta : Vector3.zero);
+        if (delta.magnitude <= _cfg.StopDistance + radius)
+        {
+            _input.SetMove(Vector3.zero);
+            return;
+        }
+
+        bool safe = IsSafeStep(me.transform.position, delta.normalized);
+        if (!safe && !_edgeBlocked)
+        {
+            _edgeBlocks++;
+            Debug.Log($"{Tag} event=bot_edge_block n={_edgeBlocks} dist={Fmt(delta.magnitude)} myPos={Fmt(me.transform.position)} bossPos={Fmt(_target.transform.position)}");
+        }
+        _edgeBlocked = !safe;
+        _input.SetMove(safe ? delta : Vector3.zero);
+    }
+
+    private static bool IsSafeStep(Vector3 foot, Vector3 dir)
+    {
+        Vector3 probe = foot + dir * QAPartyPlacement88.EdgeProbeAhead + Vector3.up;
+        bool found = Physics.Raycast(probe, Vector3.down, out RaycastHit hit, 1f + QAPartyPlacement88.EdgeMaxDrop + 0.5f, GroundMask, QueryTriggerInteraction.Ignore);
+        return QAPartyPlacement88.IsSafeStep(found, foot.y, found ? hit.point.y : 0f);
     }
 
     // ── 창 엣지 ────────────────────────────────────────────────
@@ -215,6 +286,7 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     {
         Windows++;
         _openAt = now;
+        _lastOpenSeenAt = now;
         _planOffsetMs = double.NaN;
         _planReactMs = double.NaN;
 
@@ -294,4 +366,6 @@ public sealed class QAInterruptBot88 : MonoBehaviour
     }
 
     private static string Fmt(double v) => double.IsNaN(v) ? "na" : v.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Fmt(Vector3 v) => $"{Fmt(v.x)}/{Fmt(v.y)}/{Fmt(v.z)}";
 }
