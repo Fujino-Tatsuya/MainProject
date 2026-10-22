@@ -604,39 +604,38 @@ MonoBehaviour:
     en: Settings
   - key: UI.Lobby.ShowLastResult
     ko: "\uC9C0\uB09C \uD310 \uACB0\uACFC"
-    en: "\uC9C0\uB09C \uD310 \uACB0\uACFC"
+    en: Last Match Results
   - key: UI.DemoConnect.WaitingForHost
     ko: "\uD638\uC2A4\uD2B8 \uB300\uAE30 \uC911"
-    en: "\uD638\uC2A4\uD2B8 \uB300\uAE30 \uC911"
+    en: Waiting for host
   - key: UI.DemoConnect.StartingHost
     ko: "\uD638\uC2A4\uD2B8 \uC2DC\uC791 \uC911"
-    en: "\uD638\uC2A4\uD2B8 \uC2DC\uC791 \uC911"
+    en: Starting host
   - key: UI.DemoConnect.Disconnected
     ko: "\uC5F0\uACB0 \uB04A\uAE40 \u2014 \uC815\uB9AC \uC911"
-    en: "\uC5F0\uACB0 \uB04A\uAE40 \u2014 \uC815\uB9AC \uC911"
+    en: "Disconnected \u2014 cleaning up"
   - key: UI.DemoConnect.Address
     ko: "\uC8FC\uC18C {address}:{port}"
-    en: "\uC8FC\uC18C {address}:{port}"
+    en: Address {address}:{port}
   - key: UI.DemoConnect.Connecting
     ko: "\uC811\uC18D \uC2DC\uB3C4 \uC911 ({attempt}\uD68C\uC9F8)"
-    en: "\uC811\uC18D \uC2DC\uB3C4 \uC911 ({attempt}\uD68C\uC9F8)"
+    en: Connecting (attempt {attempt})
   - key: UI.DemoConnect.RetryIn
     ko: "{time} \uD6C4 \uC7AC\uC2DC\uB3C4 ({attempt}\uD68C\uC9F8)"
-    en: "{time} \uD6C4 \uC7AC\uC2DC\uB3C4 ({attempt}\uD68C\uC9F8)"
+    en: Retrying in {time} (attempt {attempt})
   - key: UI.DemoConnect.ConfigMissing
     ko: "\uC124\uC815 \uD30C\uC77C \uC5C6\uC74C \u2014 \uD638\uC2A4\uD2B8 \uBAA8\uB4DC"
-    en: "\uC124\uC815 \uD30C\uC77C \uC5C6\uC74C \u2014 \uD638\uC2A4\uD2B8 \uBAA8\uB4DC"
+    en: "No config file \u2014 host mode"
   - key: UI.DemoConnect.BuildInfo
     ko: "v{version} \xB7 cfg {hash}"
     en: "v{version} \xB7 cfg {hash}"
   - key: UI.DemoConnect.RejoinWaiting
     ko: "\uD310\uC5D0 \uB2E4\uC2DC \uD569\uB958\uD558\uB294 \uC911 \u2014 \uC7A0\uC2DC
       \uAE30\uB2E4\uB9AC\uC138\uC694"
-    en: "\uD310\uC5D0 \uB2E4\uC2DC \uD569\uB958\uD558\uB294 \uC911 \u2014 \uC7A0\uC2DC
-      \uAE30\uB2E4\uB9AC\uC138\uC694"
+    en: "Rejoining the match \u2014 please wait"
   - key: UI.DemoConnect.JoiningMatch
     ko: "\uD310\uC5D0 \uD569\uB958\uD558\uB294 \uC911\u2026"
-    en: "\uD310\uC5D0 \uD569\uB958\uD558\uB294 \uC911\u2026"
+    en: "Joining the match\u2026"
   - key: UI.DemoConnect.AutoHostMatch
     ko: "\uC790\uB3D9: \uD638\uC2A4\uD2B8 ({address} \uC77C\uCE58)"
     en: 'Auto: Host ({address} matched)'
@@ -648,34 +647,109 @@ MonoBehaviour:
     en: 'Auto: Client ({address} not on this PC)'
   - key: UI.Lobby.InteractReady
     ko: "\uC900\uBE44"
-    en: "\uC900\uBE44"
+    en: Ready
   - key: UI.Lobby.InteractUnready
     ko: "\uC900\uBE44 \uD574\uC81C"
-    en: "\uC900\uBE44 \uD574\uC81C"
+    en: Cancel Ready
   - key: UI.Lobby.InteractCharacterSelect
     ko: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
-    en: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
+    en: Select Character
   - key: UI.Lobby.ReadyCount
     ko: "\uC900\uBE44 {ready}/{total}"
-    en: "\uC900\uBE44 {ready}/{total}"
+    en: Ready {ready}/{total}
   - key: UI.Lobby.Countdown
     ko: "{time} \uD6C4 \uCD9C\uBC1C"
-    en: "{time} \uD6C4 \uCD9C\uBC1C"
+    en: Starting in {time}
   - key: UI.Lobby.CountdownStarting
     ko: "\uCD9C\uBC1C!"
-    en: "\uCD9C\uBC1C!"
+    en: Go!
   - key: UI.CharacterSelect.LockedNotice
     ko: "\uC900\uBE44\uB97C \uD574\uC81C\uD574\uC57C \uBC14\uAFC0 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
-    en: "\uC900\uBE44\uB97C \uD574\uC81C\uD574\uC57C \uBC14\uAFC0 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+    en: Cancel Ready to change your character
   - key: UI.CharacterSelect.CurrentTag
     ko: "\uD604\uC7AC"
-    en: "\uD604\uC7AC"
+    en: Current
   - key: UI.CharacterSelect.Unavailable
     ko: "\uC120\uD0DD \uBD88\uAC00"
-    en: "\uC120\uD0DD \uBD88\uAC00"
+    en: Unavailable
   - key: UI.CharacterSelect.Hint
     ko: "W/S\xB7\uBC29\uD5A5\uD0A4 \uC774\uB3D9   Enter \uC120\uD0DD   Esc \uB4A4\uB85C"
-    en: "W/S\xB7\uBC29\uD5A5\uD0A4 \uC774\uB3D9   Enter \uC120\uD0DD   Esc \uB4A4\uB85C"
+    en: "W/S\xB7Arrow Keys Move   Enter Select   Esc Back"
+  - key: UI.DemoConnect.GameInProgress
+    ko: "\uAC8C\uC784 \uC9C4\uD589 \uC911 \u2014 \uD310\uC774 \uB05D\uB098\uBA74
+      \uC790\uB3D9 \uC785\uC7A5"
+    en: "Game in progress \u2014 you will join when the match ends"
+  - key: UI.DemoConnect.LobbyFull
+    ko: "\uC778\uC6D0 \uAC00\uB4DD ({max}/{max})"
+    en: Lobby full ({max}/{max})
+  - key: UI.DemoConnect.HashMismatch
+    ko: "\uBC84\uC804 \uBD88\uC77C\uCE58 \u2014 \uD638\uC2A4\uD2B8\uC640 \uAC19\uC740
+      \uBE4C\uB4DC\uC778\uC9C0 \uD655\uC778"
+    en: "Version mismatch \u2014 make sure you have the same build as the host"
+  - key: UI.DemoConnect.Timeout
+    ko: "\uC751\uB2F5 \uC5C6\uC74C \u2014 \uD638\uC2A4\uD2B8\uB97C \uAE30\uB2E4\uB9AC\uB294
+      \uC911"
+    en: "No response \u2014 waiting for host"
+  - key: UI.DemoConnect.DuplicatePlayerId
+    ko: "\uAC19\uC740 \uD50C\uB808\uC774\uC5B4 ID \uAC00 \uC774\uBBF8 \uC811\uC18D
+      \uC911 \u2014 \uC124\uC815 \uD30C\uC77C\uC758 playerId \uD655\uC778"
+    en: "This player ID is already connected \u2014 check playerId in the config
+      file"
+  - key: UI.DemoConnect.InvalidPlayerId
+    ko: "\uD50C\uB808\uC774\uC5B4 ID \uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC74C
+      \u2014 \uC124\uC815 \uD30C\uC77C\uC758 playerId \uD655\uC778"
+    en: "Invalid player ID \u2014 check playerId in the config file"
+  - key: UI.DemoConnect.UnknownReason
+    ko: "\uC54C \uC218 \uC5C6\uB294 \uC774\uC720\uB85C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC74C"
+    en: Not connected (unknown reason)
+  - key: UI.LobbyResult.Title
+    ko: "\uC804\uD22C\uACB0\uACFC"
+    en: Battle Results
+  - key: UI.LobbyResult.PlayTimeLabel
+    ko: "\uC18C\uC694\uC2DC\uAC04  :"
+    en: 'Play Time  :'
+  - key: UI.LobbyResult.Close
+    ko: "\uB2EB\uAE30"
+    en: Close
+  - key: UI.LobbyResult.Header.Rank
+    ko: "\uC21C\uC704"
+    en: Rank
+  - key: UI.LobbyResult.Header.Player
+    ko: "\uD50C\uB808\uC774\uC5B4"
+    en: Player
+  - key: UI.LobbyResult.Header.Damage
+    ko: "\uAC00\uD55C\uD53C\uD574"
+    en: Damage Dealt
+  - key: UI.LobbyResult.Header.Healing
+    ko: "\uD68C\uBCF5\uB7C9"
+    en: Healing
+  - key: UI.LobbyResult.Header.Counters
+    ko: "\uAC04\uD30C \uC131\uACF5"
+    en: Interrupts
+  - key: UI.LobbyResult.Header.DamageTaken
+    ko: "\uC785\uC740 \uD53C\uD574"
+    en: Damage Taken
+  - key: UI.LobbyResult.Header.Deaths
+    ko: "\uC0AC\uB9DD"
+    en: Deaths
+  - key: UI.Exit.ToTitle
+    ko: "\uD0C0\uC774\uD2C0"
+    en: Title
+  - key: UI.Exit.HostQuitWarning
+    ko: "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uC758 \uAC8C\uC784\uB3C4 \uB05D\uB0A9\uB2C8\uB2E4"
+    en: Other players' games will end too
+  - key: UI.Exit.HostToTitleWarning
+    ko: "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uB3C4 \uC5F0\uACB0\uC774 \uB04A\uAE41\uB2C8\uB2E4"
+    en: Other players will be disconnected too
+  - key: UI.Title.Start
+    ko: "\uC2DC\uC791\uD558\uAE30"
+    en: START
+  - key: UI.Title.Setting
+    ko: "\uC124\uC815"
+    en: SETTING
+  - key: UI.Title.Exit
+    ko: "\uB098\uAC00\uAE30"
+    en: EXIT
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

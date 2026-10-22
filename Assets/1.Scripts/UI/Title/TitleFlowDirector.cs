@@ -84,7 +84,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("PRESS ANY KEY — 화면 앞 오버레이(모니터 안이 아니다).")]
     [SerializeField] private GameObject _pressAnyKeyRoot;
     [SerializeField] private GameObject _menuRoot;
-    [SerializeField] private GameObject _settingsRoot;
+    // 설정창은 씬에 없다 — DDOL GameMenuController 가 모니터 RT 에 띄운다(PLAN-settings-ddol).
 
     [Header("오버레이 (전체화면)")]
     [Tooltip("우측 하단 'ESC 로 건너뛰기' 안내. 접근 구간에만 켠다.")]
@@ -168,10 +168,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
                 break;
 
             case TitleFlowState.Settings:
-                if (CancelPressed())
+                // 드롭다운이 펼쳐져 있었으면 그 ESC 는 목록 닫기 몫 — 설정창은 그대로(검토 10-22).
+                if (CancelPressed() && !(GameMenuController.Instance != null && GameMenuController.Instance.DropdownClaimsEscape))
                     CloseSettings();
                 else
-                    RestoreSelectionIfNavigating(_settingsCloseButton);
+                    RestoreSelectionIfNavigating(SettingsCloseButton);
                 break;
         }
     }
@@ -185,7 +186,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         SetActive(_pressAnyKeyRoot, true);
         SetActive(_menuRoot, false);
-        SetActive(_settingsRoot, false);
+        HideSettings();
         SetActive(_skipHintRoot, false);
 
         if (_monitorDisplay != null)
@@ -204,7 +205,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         // 🔴 캔버스를 통째로 끈다. GraphicRaycaster 까지 죽어야 연출 중 클릭이 확실히 무시된다.
         SetActive(_pressAnyKeyRoot, false);
         SetActive(_menuRoot, false);
-        SetActive(_settingsRoot, false);
+        HideSettings();
         SetActive(_skipHintRoot, true);
 
         Burst(_approachBurst);
@@ -253,7 +254,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
             _sustainFx.Stop();
 
         SetActive(_skipHintRoot, false);
-        SetActive(_settingsRoot, false);
+        HideSettings();
         SetActive(_menuRoot, true);
         if (_monitorDisplay != null)
         {
@@ -295,18 +296,21 @@ public sealed class TitleFlowDirector : MonoBehaviour
     //    공유 프리팹(SettingsBody — ESC 도 씀)은 그대로 두고 타이틀에서만 통째로 키운다(팀장 10-13).
     //    1.4배 = 탭+내용 묶음 ±722 × (+328~-428) — 모니터 캔버스(약 ±858 × ±604)와 Options 제목(위 +408~) 안쪽.
     //    배율 = 인스펙터 _titleSettingsScale(Play 중 바꾸면 OnValidate 로 바로 반영).
-    private void ScaleSettingsBody()
-    {
-        if (_settingsRoot == null) return;
-        TitleOptionsPanel body = _settingsRoot.GetComponentInChildren<TitleOptionsPanel>(true);
-        if (body == null) return;
-        body.transform.localScale = new Vector3(_titleSettingsScale, _titleSettingsScale, 1f);
-        if (body.transform is RectTransform rt) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, _titleSettingsOffsetY);
-    }
-
+    //    설정창 자체는 DDOL GameMenuController(PLAN-settings-ddol) — 타이틀을 떠나면 그쪽이 원래 크기로 되돌린다.
     private void OnValidate()
     {
-        if (Application.isPlaying && _state == TitleFlowState.Settings) ScaleSettingsBody();
+        if (Application.isPlaying && _state == TitleFlowState.Settings && GameMenuController.Instance != null)
+            GameMenuController.Instance.ApplyTitleSettingsLayout(_titleSettingsScale, _titleSettingsOffsetY);
+    }
+
+    private Button SettingsCloseButton =>
+        GameMenuController.Instance != null ? GameMenuController.Instance.SettingsCloseButton : _settingsCloseButton;
+
+    private static void HideSettings()
+    {
+        GameMenuController menu = GameMenuController.Instance;
+        if (menu != null && menu.Mode == GameMenuMode.Title && menu.IsOpen)
+            menu.CloseTitleSettings();
     }
 
     public void OpenSettings()
@@ -314,11 +318,17 @@ public sealed class TitleFlowDirector : MonoBehaviour
         if (InputLocked || _state == TitleFlowState.Settings)
             return;
 
+        GameMenuController menu = GameMenuController.Instance;
+        if (menu == null)
+        {
+            Debug.LogWarning("[TitleFlow] GameMenuController 가 없다 — 0.BootStrapScene 을 거치지 않은 Play 에서는 설정창이 열리지 않는다.", this);
+            return;
+        }
+
         _state = TitleFlowState.Settings;
 
         SetActive(_menuRoot, false);
-        SetActive(_settingsRoot, true);
-        ScaleSettingsBody();
+        menu.OpenTitleSettings(_titleSettingsScale, _titleSettingsOffsetY, CloseSettings);
         // 설정창은 글이 작아 CRT 에 묻힌다 — 열린 동안 CRT 효과 95% 감소(팀장 10-12 70% → 10-13 95%). 닫으면 EnterMenu 가 되돌린다.
         if (_monitorDisplay != null)
             _monitorDisplay.SetSettingsReadable(true);
@@ -326,7 +336,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         // 🔴 줌하지 않는다(팀장 09-23) — 메뉴가 보이던 Near 뷰 그대로 모니터 내용만 설정창으로 바뀐다.
         //    예전엔 VCam_Closeup 으로 한 번 더 들어가 설정창이 화면 밖으로 잘렸다. Closeup vcam 은 남겨 두되 안 쓴다.
 
-        Select(_settingsCloseButton);
+        Select(SettingsCloseButton);
 
         Debug.Log("[TitleFlow] Settings");
     }
@@ -527,13 +537,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         Bind(_optionButton, OpenSettings);
         Bind(_exitButton, ExitGame);
         Bind(_settingsCloseButton, CloseSettings);
-
-        // 설정창 틀 안의 닫기 버튼(PLAN-settings-art — 공유 프리팹 SettingsBody 에 들어 있다).
-        if (_settingsRoot != null)
-        {
-            SettingsBodyView body = _settingsRoot.GetComponentInChildren<SettingsBodyView>(true);
-            if (body != null) Bind(body.CloseButton, CloseSettings);
-        }
+        // 설정창 틀 안의 닫기 버튼은 GameMenuController 가 OpenTitleSettings 의 onClose(= CloseSettings)로 잇는다.
     }
 
     private static void Bind(Button button, UnityEngine.Events.UnityAction action)

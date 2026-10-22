@@ -7,11 +7,10 @@
 - **좌클릭 = 평타(기본 공격).** 두 캐릭터 공통. (보스의 폭탄도 이 평타로만 상호작용 — [boss 문서](boss-wells-and-no23.md) §폭탄)
 - **우클릭 = 캐릭터별 고유 액션** (근거리 = 패링 / 원거리 = 근접 간파).
 - **대쉬 시 무적** (무적 윈도우 동안 피격 무효 — 서버가 판정).
-- **간파 성공 = 우클릭 쿨 감소** (할 일 26): 열린 카운터 창(23호·중간보스 3종·허수아비, 튜토리얼 스피너봇 포함)을 맞혀
-  소비하면 그 간파 스킬의 남은 쿨에서 **전체 쿨 × 0.8** 을 뺀다(0 미만은 0). 한 번의 시전에서 여러 대상이 성공해도 1회.
-  빗나감·창 안 열린 대상 적중은 해당 없음. **일반 몹은 간파 창이 없어 대상 아님(사용자 결정 10-12)** — 그로기 누적식이라 창 성공 신호가 없다. 대체 슬롯(어쌔신 변신 우클릭)도 같은 규칙.
-  비율 = `PlayerGameRuleData.interruptSuccessCooldownReduction`. 구현: `PlayerInterruptSkillBase`(서버 판정) →
-  `PlayerSkillController.ReduceCooldownServer` → 오너 HUD 미러. 훅: [tutorial-player-hooks.md](../tech/tutorial-player-hooks.md) `ServerInterruptSucceeded`.
+- **간파 성공해도 우클릭 쿨은 그대로** — 할 일 26 의 '성공 시 쿨 80% 감소'는 할 일 90(사용자 결정 10-22, 기획 명세 Re_C v02 §6)에서 제거.
+  간파 성공 = 열린 카운터 창(23호·중간보스 3종·허수아비, 튜토리얼 스피너봇 포함)을 맞혀 소비한 경우(시전당 1회, 일반 몹은 창이 없어 해당 없음).
+  성공 신호는 서버 `PlayerInterruptSkillBase.ServerInterruptSucceeded` 로 계속 나며 연출·튜토리얼이 쓴다 — 훅: [tutorial-player-hooks.md](../tech/tutorial-player-hooks.md).
+  튜토리얼 존3 연습도 예외가 아니다 — 간파 성공 시 파티 우클릭 쿨 초기화를 할 일 90 에서 함께 제거([tutorial-zone3.md](../tech/tutorial-zone3.md) §5).
 
 ## 상태이상 (피격 시 받을 수 있음)
 - 공중에 뜸 / 기절 / 둔화 / 속박 / 침묵(스킬 봉인) / 허약(= 대쉬 불가 + 둔화)

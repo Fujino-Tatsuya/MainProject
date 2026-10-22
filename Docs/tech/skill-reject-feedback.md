@@ -51,6 +51,25 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 진단 로그: 예약 입력마다 `skill-reserved-after-attack`(요약 표 '평타 뒤 예약' 열, 사유 = 예약/예약 교체/같은 스킬 연타). 그 입력은 버퍼 추적에서 빠져 `expired` 로 세지 않는다.
 - 코드: `PlayerBasicAttackInputRules`·`PlayerSkillReservation`(`IPlayerBasicAttack.cs`), `PlayerStateBase.TryReserveSkillDuringAttack`·`TryStartReservedSkill`·`TryStartAttackOnHold`, `GunnerBasicAttack.FinishWithoutChaining`. 테스트: `PlayerBasicAttackInputRulesTests`.
 
+### 0.2 버퍼 우선순위(할 일 77, 2026-10-22)
+
+버퍼는 **입력 종류 → 마지막 누른 시각**을 든다(절충안 c, 2026-10-22 개정). 살아 있는 입력은 종류별로 전부 보관하고, 꺼낼 때 **우선순위 높은 것**부터 시도한다.
+
+- 보관: 다른 종류는 서로 덮지 않는다. 같은 종류를 다시 누르면 시각만 갱신한다. 각 입력은 자기 시각부터 유지 시간(0.2초)이 지나면 따로 만료된다.
+- 꺼내기(`Peek`·`HasBufferedInput`): 살아 있는 것 중 우선순위 최고, 같으면 나중에 누른 것(같은 프레임이면 기록 순서). 더 높은 입력에 밀려 있는 입력은 살아 있어도 꺼낼 입력이 아니다.
+- 기본값(클수록 높음): 대시 5 > 우클릭(`SkillInterrupt`) 4 > R(`SkillUltimate`) 3 > Q(`SkillMain`)·E(`SkillSub`) 2 > 평타(`Attack`) 1.
+- 필드: `PlayerInputReader` › `bufferPriorityDash`·`bufferPriorityInterrupt`·`bufferPriorityUltimate`·`bufferPrioritySkillMain`·`bufferPrioritySkillSub`·`bufferPriorityAttack`(`Player` 시트, `inputBufferSeconds` 와 같은 구역). 매 프레임 버퍼에 넘긴다.
+- Idle/Move 시도 순서(`PlayerStateBase.TryConsumeActionInput`): 대시(고정 맨 앞, PLAN §7) → 거너 평타 뒤 예약(§0.1) → 우클릭·R·Q·E·평타를 **우선순위 높은 순**(같으면 이 순서) → 거너 홀드 시작.
+- 거부 시(§0 표는 그대로):
+  - **버림** 사유(자원 부족·차단 효과·그 밖) — 그 입력만 지우고 다음 순위 후보가 올라와 **같은 프레임에** 이어서 시도된다.
+  - **보관** 사유(바쁨·행동 불능 CC) — 전부 그대로 두고 **이번 프레임 시도를 멈춘다**(낮은 후보가 앞지르지 않음). 보관된 높은 입력이 먼저 만료되면 남은 낮은 입력이 그다음 프레임에 시도된다.
+- 실행: 행동 하나가 실제로 시작되면(Idle/Move 시작·대시 끊기) **버퍼 전체를 비운다** — 함께 들고 있던 오래된 후보가 연달아 실행되지 않는다. 거너 평타 뒤 예약으로 옮긴 입력은 그 종류만 뺀다.
+- 행동 중 원시 입력 소비(`ConsumeBufferedInput` — 콤보 예약·조준 취소 재입력·홀드 종료)는 **그 종류만** 지운다. 평타를 누른 채 콤보를 잇는 동안 콤보 예약이 매 프레임 부르므로, 전체를 비우면 공격 중 누른 스킬이 사라진다(f02ad9d2 버그 — 공격 뒤 스킬이 안 나감).
+- 거너 평타 뒤 스킬 예약(§0.1, 마지막 스킬 1개)은 따로 든다 — 바뀌지 않았다.
+- **근접 평타(가붕이·어쌔신) 중 스킬 입력**(할 일 77 후속): 버퍼에 평타보다 우선순위가 높은 스킬 입력(우클릭·R·Q·E)이 살아 있고 쓸 수 있어 보이면(배정됨·차단 효과/쿨타임 아님) `PlayerStateBase.TryFinishAttackForBufferedSkill` 이 `FinishWithoutChaining` 을 불러 **다음 타를 잇지 않는다** — 홀드·창 예약을 무시하고 이 타는 End 이벤트까지 간 뒤 정상 종료, Idle/Move 첫 틱에 버퍼 우선순위대로 스킬이 나간다. 오너는 예약 요청을 멈추고 서버에 마무리 RPC(받은 예약 지움 + 공격 끝까지 새 예약 거절)를 보낸다. 입력은 버퍼(0.2초)에 그대로라 이 타 남은 시간이 더 길면 만료될 수 있다(체인은 끝난다). 이전엔 홀드 중 콤보 창마다 다음 타가 예약돼 스킬이 끝내 안 나갔다(77 이전부터 있던 동작). 테스트: `PlayerBasicAttackInputRulesTests` `MeleeHold_*`·`ShouldFinishChainForBufferedSkill_*`·`ContainsAbove_*`.
+- 진단: 실행으로 함께 버려진 나머지 = `outranked`(요약 표 '선택에서 밀림' 열, 사유 = 실행된 입력), 위 순위 버림 뒤 올라온 다음 후보 = `fallback`('다음 후보로' 열). `overwritten`('재입력 갱신' 열) = 같은 종류 재입력.
+- 테스트: `PlayerInputBufferTests` `Multi_*`·`Peek_*`·`Resolve_DropReason_*`·`Resolve_Blocked_KeepsAll_*`·`Consume_RemovesOnlyThatKind`·`HoldZero_*`·`SortByPriority_*`·`Dispatch_*`, `PlayerInputBufferDiagnosticsTests` `ActionStarted_*`·`Fallback_*`·`DifferentKinds_*`·`SameKindRepress_*`.
+
 ## 1. 이벤트
 
 ### 1.1 쿨타임 거부 — `PlayerSkillController.CooldownRejected`
@@ -91,7 +110,7 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 범위: 오너 클라만. `UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS` 일 때만 컴파일된다(훅은 `[Conditional]` — 심볼이 없으면 호출째 사라진다).
 - 토글: `PlayerInputBufferDiagnostics.Enabled`(기본 켜짐). 에디터는 메뉴 `Tools/Debug/선입력 버퍼 진단 로그`(EditorPrefs 에 남음).
 - 출력: 콘솔 `[InputBuf]` 한 줄씩 + CSV. 에디터 = 프로젝트 `Logs/InputBuffer-<시각>.csv`, 빌드 = `Application.persistentDataPath`. Play 종료 때 입력별 개수·분포 요약과 CSV 경로를 콘솔에 남긴다.
-- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`·`actionable`(바쁨 → Idle/Move)·`skill-reserved-after-attack`(거너 평타 중 스킬 입력을 지금 발 마무리 뒤로 예약, §0.1).
+- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`(같은 종류 재입력)·`outranked`·`fallback`(§0.2)·`actionable`(바쁨 → Idle/Move)·`skill-reserved-after-attack`(거너 평타 중 스킬 입력을 지금 발 마무리 뒤로 예약, §0.1).
 - 핵심 숫자: `actionable` 의 **놓친 간격** = 실행 가능해진 시각 − 만료 시각(press + 유지 시간), **press→actionable** = 그 입력이 살아남으려면 필요했던 유지 시간. 바쁜 동안 만료된 입력만 센다.
 - 알려진 한계: 원격 클라 오너의 근접 평타 콤보 예약 입력은 버퍼에서 지우지 않아(창을 서버만 안다) 콤보 중 누른 LMB 가 `expired` 로 잡힐 수 있다. Idle/Move 안에서 요청 응답만 기다리는 경우(스킬 요청 대기)는 `actionable` 로 보지 않는다.
 - 코드: `PlayerInputBufferDiagnostics.cs`(추적기·집계·세션), 훅은 `PlayerInputReader`(기록·소비·Resolve·비움)·`PlayerStateController.ChangeState`/`SetState`. 테스트: `PlayerInputBufferDiagnosticsTests`.

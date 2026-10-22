@@ -119,11 +119,13 @@ public static class TitleRigAuthoring
         Reparent(exit, menuRoot);
         LayoutMonitorMenu(start, option, exit);
 
-        GameObject settingsRoot = EnsureChild(monitorCanvas.gameObject, "Settings_Root");
-        StretchFull(settingsRoot);
+        // 설정창은 씬에 두지 않는다 — DDOL GameMenu.prefab 이 모니터 RT 에 띄운다(PLAN-settings-ddol 10-22).
+        //    옛 Option_Panel 이 남아 있는 씬에서만 아래 이관이 돈다(지금 씬에는 없다).
         GameObject optionPanel = FindInScene("Option_Panel");
+        GameObject settingsRoot = optionPanel != null ? EnsureChild(monitorCanvas.gameObject, "Settings_Root") : null;
         if (optionPanel != null)
         {
+            StretchFull(settingsRoot);
             optionPanel.transform.SetParent(settingsRoot.transform, false);
             // 모니터 RT 는 세로 1080 기준 폭 1536(화면 비율 1.42). 예전엔 1920×1080 을 0.78배 균일 축소해
             // 위아래 11% 씩 검은 띠가 남았다(팀장 09-28). 안쪽 내용물은 가운데 앵커로 폭 ~1025 라 1536 에
@@ -293,7 +295,6 @@ public static class TitleRigAuthoring
         Set(so, "_vcamCloseup", closeup);
         Set(so, "_pressAnyKeyRoot", pressAnyKey);
         Set(so, "_menuRoot", menuRoot);
-        Set(so, "_settingsRoot", settingsRoot);
         Set(so, "_monitorDisplay", monitorDisplay);
         Set(so, "_crtFx", crtFx);
         Set(so, "_powerOff", powerOff);

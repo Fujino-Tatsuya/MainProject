@@ -233,9 +233,6 @@ public class TitleSceneManager : NemoSceneManager
             WarnMissingReference(nameof(exitButton));
         }
 
-        if (optionPanel == null)
-        {
-            WarnMissingReference(nameof(optionPanel));
-        }
+        // optionPanel 은 디렉터가 없는 옛 타이틀용 — 지금 설정창은 DDOL GameMenuController(PLAN-settings-ddol)라 씬에 없다. 경고하지 않는다.
     }
 }

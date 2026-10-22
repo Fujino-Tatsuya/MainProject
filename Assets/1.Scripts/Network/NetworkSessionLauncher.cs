@@ -45,7 +45,8 @@ public class NetworkSessionLauncher : MonoBehaviour
     }
 
     /// <summary>
-    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. <see cref="LobbySession"/> 이 스폰 때 넣고 디스폰 때 뺀다. 없으면 false.
+    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. <see cref="LobbyTrainingDirector"/> 가 스폰 때 넣고 디스폰 때 뺀다
+    /// (출격 집결 카운트다운 중 또는 메인 진입 시작 뒤 = true, 훈련·브리핑 중 = false). 없으면 false.
     /// </summary>
     public static Func<bool> LobbyCountdownActiveProvider { get; set; }
 

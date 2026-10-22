@@ -146,6 +146,17 @@ public sealed class ReconnectLoop
         return ReconnectCommand.Shutdown;
     }
 
+    /// <summary>
+    /// 의도적 이탈(ESC 그만두기 → 타이틀, PLAN-settings-ddol) — 처음 상태(Idle)로 돌린다. 명령은 내지 않는다(Shutdown 은 호출자가 한다).
+    /// Idle 에서는 <see cref="OnStopped"/> 가 None 을 돌려주므로, 이어지는 서버/클라 정지가 끊김(재호스팅·대기 씬)으로 처리되지 않는다.
+    /// </summary>
+    public void Reset()
+    {
+        State = ReconnectState.Idle;
+        AttemptCount = 0;
+        LastReason = DemoJoinRejectReason.None;
+    }
+
     /// <summary>StartHost 결과. 실패면 바로 Backoff.</summary>
     public ReconnectCommand OnHostStartResult(bool succeeded, double now)
     {

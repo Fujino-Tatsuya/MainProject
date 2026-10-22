@@ -25,10 +25,21 @@ public static class DemoConnectUiStrings
     public static readonly UiString AutoHostLoopback = new UiString("UI.DemoConnect.AutoHostLoopback", "자동: 호스트 (hostAddress {address})", Where + " · role 자동 판정 — hostAddress 가 비었거나 loopback({address} = hostAddress)");
     public static readonly UiString AutoClient = new UiString("UI.DemoConnect.AutoClient", "자동: 클라 (이 PC 에 {address} 없음)", Where + " · role 자동 판정 — 이 PC 에 hostAddress 가 없어 그 주소로 접속({address} = hostAddress)");
 
+    // 접속 안 된 마지막 사유 — DemoJoinRejectReasonText.ToDisplayText(RejoinWaiting 은 위 키)
+    private const string ReasonWhere = Where + " · 거절 사유 ";
+    public static readonly UiString GameInProgress = new UiString("UI.DemoConnect.GameInProgress", "게임 진행 중 — 판이 끝나면 자동 입장", ReasonWhere + "GameInProgress(판 진행·카운트다운 중, 이 PC 는 판 명단 밖)");
+    public static readonly UiString LobbyFull = new UiString("UI.DemoConnect.LobbyFull", "인원 가득 ({max}/{max})", ReasonWhere + "LobbyFull({max} = 최대 인원)");
+    public static readonly UiString HashMismatch = new UiString("UI.DemoConnect.HashMismatch", "버전 불일치 — 호스트와 같은 빌드인지 확인", ReasonWhere + "HashMismatch(NetworkConfig 해시 다름)");
+    public static readonly UiString Timeout = new UiString("UI.DemoConnect.Timeout", "응답 없음 — 호스트를 기다리는 중", ReasonWhere + "Timeout(호스트 꺼짐·주소 틀림)");
+    public static readonly UiString DuplicatePlayerId = new UiString("UI.DemoConnect.DuplicatePlayerId", "같은 플레이어 ID 가 이미 접속 중 — 설정 파일의 playerId 확인", ReasonWhere + "DuplicatePlayerId");
+    public static readonly UiString InvalidPlayerId = new UiString("UI.DemoConnect.InvalidPlayerId", "플레이어 ID 가 올바르지 않음 — 설정 파일의 playerId 확인", ReasonWhere + "InvalidPlayerId");
+    public static readonly UiString UnknownReason = new UiString("UI.DemoConnect.UnknownReason", "알 수 없는 이유로 연결되지 않음", ReasonWhere + "Unknown");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         WaitingForHost, StartingHost, Disconnected, Address, Connecting, RetryIn, ConfigMissing, BuildInfo, RejoinWaiting,
         JoiningMatch, AutoHostMatch, AutoHostLoopback, AutoClient,
+        GameInProgress, LobbyFull, HashMismatch, Timeout, DuplicatePlayerId, InvalidPlayerId, UnknownReason,
     };
 }
 

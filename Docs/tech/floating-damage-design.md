@@ -39,7 +39,7 @@
   서버 정적 이벤트 `CombatStatsEvents.ServerDamageApplied(대상, 공격자 clientId, HP+실드 실제 감소량, 체력 0 도달)` 를 낸다.
   실제 감소량은 체력 클램프 **후** 값이라 막타 초과분이 빠진다(표시용 `ClientDamageDealtClientRpc` 는 클램프 전 값 — 둘은 다르다).
   읽기 전용 발행이라 판정 무수정 원칙은 그대로다. 구독자가 없으면 null 검사 한 번(할당 0). 소비자 = `SessionStatsTracker`.
-  상세: [PLAN-result-stats.md](../../PLAN-result-stats.md), [handoff-result-stats-monster-hooks.md](handoff-result-stats-monster-hooks.md).
+  상세: [PLAN-result-stats.md](../history/PLANS/PLAN-result-stats.md), [handoff-result-stats-monster-hooks.md](handoff-result-stats-monster-hooks.md).
 
 **함의:** 클라이언트가 `AttackInfo.damage`로 숫자를 추정하면 방어력·실드 때문에 실제와 어긋난다. 숫자는 서버 결과에서 와야 한다.
 

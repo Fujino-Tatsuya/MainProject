@@ -84,8 +84,5 @@ public sealed class TutorialCooldownResetModelTests
         Assert.IsTrue(TutorialCooldownResetScope.Corridor1Includes(PlayerSkillSlot.Sub));
         Assert.IsTrue(TutorialCooldownResetScope.Corridor1Includes(PlayerSkillSlot.Ultimate));
         Assert.IsTrue(TutorialCooldownResetScope.Corridor1Includes(PlayerSkillSlot.Interrupt));
-        Assert.IsTrue(TutorialCooldownResetScope.Zone3CounterIncludes(PlayerSkillSlot.Interrupt));
-        Assert.IsFalse(TutorialCooldownResetScope.Zone3CounterIncludes(PlayerSkillSlot.Main), "존3 은 우클릭만");
-        Assert.IsFalse(TutorialCooldownResetScope.Zone3CounterIncludes(PlayerSkillSlot.Ultimate));
     }
 }

@@ -1697,7 +1697,7 @@ NavMesh 를 읽는 소비자가 에이전트이므로, 고정 터렛 2종은 자
 **상태.** 4단계까지 완료. **오너 권위 브랜치 전 항목 Play 검증 통과(2026-09-16).**
 4b3 은 **코드 완료 + EditMode 112/112 통과, Play 검증 대기.**
 입력 지연은 해소 확인됐고, 루트모션 스냅 수정(b3-3) 후 재검증이 남았다.
-상세는 [PLAN-player-motor.md](../../PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
+상세는 [PLAN-player-motor.md](PLANS/PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
 
 ### 🔴 개발 브랜치 = 오너 권위 (지스타까지)
 
@@ -1705,7 +1705,7 @@ NavMesh 를 읽는 소비자가 에이전트이므로, 고정 터렛 2종은 자
 서버 권위 구현은
 `feature/player-motor-server-auth` 에 완성된 채로 보존돼 있고, 스위치 하나
 (`Player.ServerAuthoritativeMovement`) + 프리팹 `AuthorityMode` 로 되살린다.
-근거와 복귀 시 체크리스트는 [PLAN-player-motor.md](../../PLAN-player-motor.md)
+근거와 복귀 시 체크리스트는 [PLAN-player-motor.md](PLANS/PLAN-player-motor.md)
 "결정 — 지스타(1차 커트라인)까지는 오너 권위" 절.
 
 **아래 불변식 중 1번은 서버 권위 브랜치에만 해당한다.** 나머지 셋은 양쪽 공통이며,
@@ -1745,7 +1745,7 @@ Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateControlle
 **이 파일들 동시 수정 금지.**
 
 **상태.** 1~3단계 · stepOffset · 4a · 4b1 전부 은희 Play 검증 통과. 지금은 4b2.
-상세 설계는 [PLAN-player-motor.md](../../PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
+상세 설계는 [PLAN-player-motor.md](PLANS/PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
 
 ### 🔴 이번에 드러난 사실 — 서버 권위 NetworkTransform 이 클라 이동을 지운다
 
@@ -1794,11 +1794,11 @@ P1 착수할 때 `development` 에서 다시 딴다. 수정 예정 파일:
 
 ### 후순위 미해결
 이동 플랫폼·컨베이어 위 상하 떨림(2026-09-15 은희 발견). 원인 미조사, b2/b3 와 독립.
-[PLAN-player-motor.md](../../PLAN-player-motor.md) "미해결 (후순위)" 절 참조.
+[PLAN-player-motor.md](PLANS/PLAN-player-motor.md) "미해결 (후순위)" 절 참조.
 
 ## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 3단계, 브랜치 `feature/player-motor`)
 
-작업 세션: **은희(Claude → Codex 위임)**. 승인 계획은 [PLAN-player-motor.md](../../PLAN-player-motor.md).
+작업 세션: **은희(Claude → Codex 위임)**. 승인 계획은 [PLAN-player-motor.md](PLANS/PLAN-player-motor.md).
 
 **✅ 1~3단계 승인 완료 (2026-09-11)** — `b9bd537` + `5f8e014`(막힘 판정 수정).
 남은 것: **stepOffset(계단)** → **4단계**(결정론/예측·재조정, 8월 이후).
@@ -1835,7 +1835,7 @@ P1 착수할 때 `development` 에서 다시 딴다. 수정 예정 파일:
 ## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 2단계-b, 브랜치 `feature/player-motor`)
 
 작업 세션: **은희(Claude → Codex 위임)**. 브랜치 `feature/player-motor` (base `origin/development` `72392d6`).
-계획·근거·완료조건은 [PLAN-player-motor.md](../../PLAN-player-motor.md) — 여기에 중복 기술하지 않는다.
+계획·근거·완료조건은 [PLAN-player-motor.md](PLANS/PLAN-player-motor.md) — 여기에 중복 기술하지 않는다.
 
 **2단계-b 코드 완료, Play 검증 대기** — 커밋 `96c8350`.
 

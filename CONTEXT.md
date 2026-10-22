@@ -8,6 +8,16 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
+
+## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
+- 은희 공유: [handoff-game-menu.md](Docs/tech/handoff-game-menu.md) — 그만두기 → 타이틀 의도적 이탈(`DemoSessionDirector.PrepareLeaveToTitle`·`ReconnectLoop.Reset`) · 입력 기본값(홀드 토글 켬 · 대시는 캐릭터 방향 그대로) · 조준 ESC 소비 표시.
+- 같이 들어간 것(경석 10-22 Play): 타이틀 버튼 기본 한국어(시작하기·설정·나가기, en = START·SETTING·EXIT — `TextScramble` 이 저장 원문으로 덮던 것 수정) · 그만두기 팝업 = **바탕화면 / 타이틀** 두 버튼, 누르면 바로 실행(✗/✓ 없음, ESC = 메뉴로 · 로비·인게임 같음, 호스트는 경고 문구) · 새 문구 6개 Strings 시트 + 서울알림 Heavy 아틀라스(288 → 342자) · M 키 맵 전체 보기 끔.
+- EditMode: 새 에디터 2717/0. `EnemyC3PrewarmTests` 2건은 **에디터에서 Play 한 뒤에만** 실패(57.3 드론 풀 `HideAndDontSave` 잔존 — 이번 변경 무관). handoff §4.
+- 커밋 제외(Unity 부수효과): `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`(Play 중 동적 글자 추가) · `AddressableAssetSettings.asset`(해시 0 리셋).
+- SVN **r500**: `DataTable~/GameData.xlsx`(Strings 6행만 — 다른 시트 바이트 동일 확인) · `UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset`. git 과 같이 받아야 문구·글자가 맞다.
+- 🔴 Play 종료 무한대기 원인 확정 = **Unity 엔진 교착 UUM-152966**(셰이더 파괴 중 비동기 셰이더 컴파일 취소가 잠금 대기, 6000.3.13f1~ 미해결). 우리 코드 아님. 경석 PC 에서만 재현돼 **경석 로컬에서만** Editor 비동기 셰이더 컴파일을 껐다(git 미반영). 같은 증상이 나면 Project Settings › Editor › Asynchronous Shader Compilation 을 로컬에서 끄면 된다.
+
 ## ▶▶ 반영 (2026-10-21 · 경석(Claude)) — `feature/Boss23` → `development` 병합·푸시(origin/development 142커밋 선병합, 충돌 = `art-svn.json` 1건 → development 판). SVN **r487**(핀 478 → 487). 컴파일 0 · 전투 279/0 · 보스 패턴 10/0 · 데이터 테이블 240/0.
 - development 쪽 C3 적 범위표시(할 일 57)가 `TwentyThreeBoss.cs`·`BossElectricFloor.cs` 등에 자동 병합됨 — A·B Play 때 예고 표시 같이 볼 것.
 
@@ -38,7 +48,7 @@ Update this file when a term becomes important enough that future agents or team
 - 🔒 수정 파일(동시 수정 주의): `Assets/2.Prefabs/UI/SettingsBody.prefab` · `Assets/1.Scripts/Settings/**`(UI·Editor·`SettingsUiStrings`) · `Managers/TitleOptionsPanel.cs` · `Managers/MapSceneManager.cs`(닫기 연결만) · `UI/Title/TitleFlowDirector.cs`(닫기 연결만) · `0.Scenes/MainFlow/1.TitleScene.unity`·`4.MapScene.unity`(옛 틀 끄기) · `Docs/tech/art-svn.json`(핀 457 → 476) · SVN `Assets/50.Art/UI/Fonts/`(서울알림체 Heavy — 신규)
 - SVN r457 → r476 update·커밋 완료(충돌 0). r462 거너 이벤트도 핀 안에 들어가 `PlayerAnimationEventRequirementTests` 통과(플레이어 EditMode 508/0).
 
-## ▶▶ 작업 세션 (2026-10-17 · 은희(Claude) · **어쌔신 비주얼 v18 반영 — Flat Kit 재질 + 키 ×1.25**, 브랜치 `feature/AssassinVisual`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) §9 ✅ 승인(기본안) · ✅ V1~V6 — 은희 Play 확인 · SVN **r457**(핀 457) · development 병합·푸시 · EditMode 전체 1793 / 0(건너뜀 20)
+## ▶▶ 작업 세션 (2026-10-17 · 은희(Claude) · **어쌔신 비주얼 v18 반영 — Flat Kit 재질 + 키 ×1.25**, 브랜치 `feature/AssassinVisual`) — 계획 [PLAN-assassin.md](Docs/history/PLANS/PLAN-assassin.md) §9 ✅ 승인(기본안) · ✅ V1~V6 — 은희 Play 확인 · SVN **r457**(핀 457) · development 병합·푸시 · EditMode 전체 1793 / 0(건너뜀 20)
 - 🔸 **git 과 SVN 을 같이 받을 것** — SVN r457 = 어쌔신 `Assassin.fbx`(v18g)·`.meta`(임포트 Scale Factor 1.25)·`Textures/Assassin_BaseColor.png`(T3H). git 쪽 단검 배율·머리카락 길이 값·`Run_Loop` 0.8 은 이 아트를 전제한다. 한쪽만 받으면 키·단검·머리카락이 어긋난다.
 - ✅ 동시 수정 잠금 해제(10-17 병합·푸시). 고친 곳: `2.Prefabs/Player/Assassin/Assassin_Armature.prefab` · 신규 `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat` · `4.Animations/Player/Assassin/AssassinAnimatorController.controller` · `1.Scripts/Player/Editor/AssassinHairAuthoring.cs`·`AssassinShellAuthoring.cs`·`AssassinHairPrefabTests.cs`·신규 `AssassinVisualPrefabTests.cs`·`PlayerEditModeTestRunner.cs` · `1.Scripts/Rendering/Editor/FlatKitPlayerVariants.cs` · `Docs/tech/art-svn.json`·`player-prefabs.md`(§7 5-1·§13·§14) · `Docs/design/character/character_assassin.md` · `PLAN-assassin.md` §9.
 - 10-17 에디터 메뉴 실행(MCP): `Tools/Player/Assassin/머리카락 본 연결`(재캡처, 은희 허락) · `Tools/Rendering/Flat Kit/플레이어 Variant 구성`(재실행 안전 확인 — 해시 19개 동일) · 플레이어·튜토리얼 EditMode 러너.
@@ -87,7 +97,7 @@ Update this file when a term becomes important enough that future agents or team
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).
 - 웰즈 드론 회색 = DRONE.fbx 에 머티리얼 없음 → `WellsDrone.prefab`(래퍼) + `DRONE_Mat`(SVN r454, URP Lit 베이스+노멀). 저작 `Tools/Boss/웰즈 드론 — 재질·래퍼 프리팹 만들기`.
-- 레이드(=B) 테스트 빌드 메뉴 `Build/Windows64 Player (MainFlow · B 보스)`(10-20 개명)(BOSS_RAID_BUILD, 출력 `MainProjectBuilds/WindowsRaid`). ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
+- (10-22 바뀜) 기본 빌드 = B 보스 `Build/Windows64 Player (MainFlow · B 보스 — 기본)`(출력 `MainProjectBuilds/Windows`) · A 는 `… · A 보스`(BOSS_A_BUILD, 출력 `WindowsA`). 옛 BOSS_RAID_BUILD·WindowsRaid 는 없다. ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
 - ⏸ 보류: Stage1 `Slot_8_Z9_M` 배치 어긋남(은희 보고) — 팀장 나중에 확인. 전투 시스템 개정(제압 칸·간파 성공 넉백+그로기→취약 8초·취약 중 CC 패턴 끊기)은 칸 UI 회의 후, 보스 넉백 ↔ UnitWallImpacts 연결은 은희와 상의.
 
 ## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)
@@ -141,7 +151,7 @@ Update this file when a term becomes important enough that future agents or team
 - 🔴 **수정 예정 — 동시 수정 금지**: `1.Scripts/Sound/SoundCatalog.cs`(10-14 이동) · `51.Audio/Data/SoundCatalog.asset`·`51.Audio/Data/SoundLibrary/`(10-14 SVN 으로 이동) · `BroAudio/Editor/Resources/BroEditorSetting.asset`(출력 경로) · `1.Scripts/Sound/AudioManager.cs` · `1.Scripts/Sound/Editor/SoundSync*.cs`(신규) · `Managers/Title·Lobby·MapSceneManager.cs`(BGM 호출) · `DataTable/Editor/DataSourcePlayMode.cs`·`DataTableMenu.cs`(동기화 필요 경고 한 줄) · `Docs/tech/data-table.md`.
 - 인수인계 = [handoff-sound-sync.md](Docs/tech/handoff-sound-sync.md). ✅ 10-14 **Play(테이블 모드)·빌드 자동 동기화(결정 C)** — 결과가 `51.Audio/Data` 에 남으니 SVN 커밋. ✅ xlsx `Sound` 시트 새 구성으로 교체(로컬 · Sound 시트만 이식, 다른 시트 바이트 동일) — 🔴 **SVN 커밋 필요**. BGM 호출은 `PlayBGM("BGM_Title"|"BGM_Lobby"|"BGM_InGame")`, `SoundCatalog` 고정 필드 삭제.
 
-## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
+## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](Docs/history/PLANS/PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
 - 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.
 - 🔴 **수정 예정 — 동시 수정 금지**: `Gunner/Gunner_Armature.prefab` · `GunnerAnimatorController.controller` · `Player/Gunner/GunnerBasicAttack.cs`·`GunnerBasicAttackData.cs` · `GunnerBeamView.cs` · `Player/Editor/GunnerShellAuthoring.cs` · `Docs/tech/player-prefabs.md`.
 
@@ -155,7 +165,7 @@ Update this file when a term becomes important enough that future agents or team
 - `AudioManager` 를 `0.BootStrapScene` 에 복구(catalog=SoundCatalog). 8월 씬 정리 때 빠지고 10-06 정리에서 고아 프리팹으로 삭제돼 메인 플로우에 없었다.
 - BGM 3종 엔티티 클립 재연결(Title=`Title_Scene_BGM_03 (2)`, Lobby=`Bureau Lobby`, InGame=`BGM_Factory_Stage_01`) + 그 .meta 를 **SVN r413** 에 등록. 🔴 `51.Audio` 의 .meta 대부분이 SVN 미등록이라 PC 마다 guid 가 달라 BroAudio 클립 참조가 끊긴다 — 새 사운드는 .meta 를 반드시 SVN 에 같이 커밋. 다른 PC 는 update 전 같은 이름 로컬 .meta 삭제. `Slash_01` 은 클립 파일이 없어 미연결.
 - 새 키 추가 = SO 인스펙터(배열 크기), 수치 = xlsx `Sound` 시트.
-## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) · ✅ MPPM 3인 ML-Agent QA(10-08, `MainProject-MLAgent` 의 `qa/ResultStats`): 중도 종료·전멸·클리어 모두 3피어 값 동일·화면 행·"나" 일치·서버 독립 집계 일치. 간파(카운터)만 미검증 · 미푸시
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](Docs/history/PLANS/PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) · ✅ MPPM 3인 ML-Agent QA(10-08, `MainProject-MLAgent` 의 `qa/ResultStats`): 중도 종료·전멸·클리어 모두 3피어 값 동일·화면 행·"나" 일치·서버 독립 집계 일치. 간파(카운터)만 미검증 · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Player/Life/PlayerLifeCycleController.cs`(서버 정적 통지)·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = [handoff](Docs/tech/handoff-result-stats-monster-hooks.md))·`5.ResultScene.unity`(2단계). `MonsterBase.cs`·`PartyWipeWatcher.cs` 는 결국 안 바뀜(getter 는 `Unit`).
 - 신규: `Unit/CombatStatsEvents.cs`·`Managers/SessionStatsAggregator.cs`·`SessionResultPayload.cs`·`UI/ResultPlayerRowView.cs`·테스트 `Managers/Editor/*` + 러너 `Tools/Tests/결과 통계 EditMode 테스트 실행`.
 - 팀 규칙 변경(10-07 은희): **PR 없음** — 본인이 `development` 직접 병합, 타 영역 변경은 `Docs/tech/handoff-*.md` 로 공유([workflow.md](Docs/tech/workflow.md)).
@@ -172,14 +182,14 @@ Update this file when a term becomes important enough that future agents or team
 - 같이 커밋: `99d99119` preloadedAssets 죽은 guid 제거 · `ba24ac2e` link.xml 부산물 제거.
 - ✅ 10-07 스모크 테스트(MainProject 레인, 읽기 전용): Codex(서버명 `unity_mcp`)·claude-alt(`unity`, 지연 로드 → ToolSearch) 둘 다 MainProject 에디터에 정확히 붙음 · Refresh·컴파일 상태·콘솔 OK. ⏳ 도메인 리로드 후 재연결은 미검증(변경 없어 리로드 안 일어남) — 첫 `.cs` 위임 때 확인.
 
-## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](Docs/history/PLANS/PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
 
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex) · **데미지 플로팅 멀티 공유**, 브랜치 `feature/FloatingDamageShare`(development `3217a052` 기준, WorkTree2)) — ✅ 구현 `b2bdb73f`(Codex) · EditMode 23/23 · ✅ MPPM 2인 Play 확인(은희 10-07) · ✅ development 반영(10-08)
 - `FloatingDamageSettings.asset` 표시 필터 = `AllWithOwnEmphasis`: 전원 숫자 표시, **내 것 = 1.0배·알파 255 / 팀원 것 = 0.75배·알파 200**(SO `teammateScaleMultiplier`·`teammateAlpha`, `[DataTableIgnore]`). 판정 = 순수 `FloatingDamageDisplayPolicy`(일반·허수아비 경로 공용). RPC·권한·누적 키 변경 없음. 상세 = [floating-damage-design.md](Docs/tech/floating-damage-design.md).
 - Play 확인 항목(✅ 통과): 호스트·클라 각자 내 숫자 크고 진함 / 팀원 숫자 작고 반투명, 끝에 1.0배로 안 튐 / 공격자별 누적 안 섞임 / 내가 맞은 숫자 계속 미표시.
 
-## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude+Codex) · **3번째 캐릭터 어쌔신**, 브랜치 `feature/Assassin`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) ✅ 승인 · ✅ A0~A10·A12(`0294cb47`, 진행 = PLAN §8) · ⏸ A11 백어택(경석 OK 대기) · ⏳ A13 xlsx · SVN **r403** 같이 받을 것(단검·GameData.xlsx Assassin 시트) · A7~ 은 claude-alt(다른 계정 Claude) 위임 · ⏳ 은희 Play 회귀(A1~A5) + 어쌔신 전 키트
+## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude+Codex) · **3번째 캐릭터 어쌔신**, 브랜치 `feature/Assassin`) — 계획 [PLAN-assassin.md](Docs/history/PLANS/PLAN-assassin.md) ✅ 승인 · ✅ A0~A10·A12(`0294cb47`, 진행 = PLAN §8) · ⏸ A11 백어택(경석 OK 대기) · ⏳ A13 xlsx · SVN **r403** 같이 받을 것(단검·GameData.xlsx Assassin 시트) · A7~ 은 claude-alt(다른 계정 Claude) 위임 · ⏳ 은희 Play 회귀(A1~A5) + 어쌔신 전 키트
 - 기획 사본 = [character_assassin.md](Docs/design/character/character_assassin.md)(맨 아래 「구현 결정」 우선). 아트 = SVN `50.Art/Char/assassin/` v16 · 클립은 git `4.Animations/Player/Assassin/` 로 이전.
 - 🔴 코어 변경 포함: 플레이어 **SuperArmor = 몬스터와 같은 의미**(CC·잡기 거부) · 스킬 쿨 장부 스킬 단위 + 슬롯 교체 · 간파 베이스 추출 · 캐릭터 HUD = `<Char>_Armature/HUD`(거너 과열 게이지 이동).
 - 🔴 백어택은 **경석 공유 후**(PLAN §6 초안). 🔴 **수정 예정 — 동시 수정 금지**: `Player/Skill/*`(Controller·Base·Data·Targeting·Interrupt)·`Unit/StatusEffectController.cs`·`PlayerStateController.cs`·`UI/Combat/PassiveHUD.cs`·`SkillCooldownHUD.cs`·`Player/Gunner/*` HUD·`Player_Gunner`/`Gunner_Armature` 프리팹·`CharacterRoster.asset`.
@@ -333,7 +343,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 ## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
 계획 = [PLAN-title-monitor.md](Docs/history/PLANS/PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
 
-## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](Docs/history/PLANS/PLAN-character-select.md) 승인됨
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
@@ -500,7 +510,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 스킬 툴팁 + 캐릭터별 아이콘**) — ✅ 구현(Codex `a9fe968c` + Claude `3dbf7f13`) · EditMode 82/82 · Verify 0 · xlsx SVN r366(툴팁 30행 TODO 문구) · 🔴 Play·MPPM 남음 · 브랜치 `feature/SkillTooltip`
 
-계획·결정·남은 질문 = [PLAN-skill-tooltip.md](PLAN-skill-tooltip.md).
+계획·결정·남은 질문 = [PLAN-skill-tooltip.md](Docs/history/PLANS/PLAN-skill-tooltip.md).
 - 확정: 문구 = 스킬 SO·패시브 컴포넌트의 `displayName`·`description` → 기존 `Paladin`/`Gunner` 시트 행 · 거너 패시브 = 과열(`GunnerHeat`) → `Slot_P` · 자리표시자 `{필드}`·`{필드:%}`·`{dmg}` · 피해 = **계수 + 실제 수치** · 아이콘 = 스폰된 캐릭터 Variant 데이터에서(캐릭터마다 다름).
 - 다음: 은희 Play·MPPM → 기획이 TODO 문구 교체(SVN 잠금). 🔴 xlsx r366 과 이 브랜치 코드는 같이 나가야 한다. 툴팁 칸(`tooltip.*`)만 빈 칸 = 빈 문자열(그 외 빈 칸 = 오류, 판정은 Applier 로 이동). 저작 메뉴 = `Tools/UI/스킬 툴팁 구성`(재실행 가능). 스킬 아이콘 = 각 출처 `tooltip.icon`(지금 전부 비어 있음 — 아트 대기) → 슬롯 프레임(`slot_skill`) 안 자식 `Slot_*/Icon`(은희 제작) 에만 들어간다. 프레임은 덮지 않는다. 저작 메뉴는 `Icon` 을 찾아 연결만 한다(만들거나 배치를 바꾸지 않음). 칸 클릭 = 스킬 키(D18). 피해 = 계수+실제, 차지·과열은 최소~최대 범위 · Shift = 계산식 · 키워드 = TMP `<style>` 태그. 🔴 **수정 예정 — 동시 수정 금지(구현 시작 시)**: `Assets/1.Scripts/UI/Combat/*`·`CombatHUD.prefab`·`PlayerSkillData` 계열·`FirstMeleePassive`·`GunnerHeat`·`Assets/1.Scripts/DataTable/Editor/DataTableTemplate.cs`·`GameData.xlsx`(SVN 잠금).
 
@@ -576,7 +586,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
 
-기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md)(§0 확정 변경 D1~D15) · 계획·진행 [PLAN-gunner.md](PLAN-gunner.md) §7 · 프리팹 구조 [player-prefabs.md](Docs/tech/player-prefabs.md) §0.
+기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md)(§0 확정 변경 D1~D15) · 계획·진행 [PLAN-gunner.md](Docs/history/PLANS/PLAN-gunner.md) §7 · 프리팹 구조 [player-prefabs.md](Docs/tech/player-prefabs.md) §0.
 **징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`, SVN 핀 **346**).
 - 🔴 **전 캐릭터 공통 코어 변경**(가붕이 Play 확인함): 보호막 = 종류·출처별 인스턴스(`ShieldType`, 사망 시 전부 제거, HUD = 남은 합/부여 합) ·
   기본 공격 = `IPlayerBasicAttack`(base 에서 빠지고 Variant 가 얹음) · `PlayerActionState` 끝에 **`AttackReady`·`Focus`** ·
@@ -632,7 +642,7 @@ WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다
 ## ▶▶ 🔴 은희에게 — 플레이어 겹침 해소 요청 (2026-09-28 경석, `feature/Boss23`)
 
 - 보스·중간보스가 **플레이어를 막게** 했다: `PlayerGameRuleData.asset` obstacleMask 에 Enemy 추가(2185 → 2441),
-  GauntletBot·SpinnerBot 몸 캡슐 `m_Enabled: 1`. 상세·근거는 [PLAN-player-motor.md](PLAN-player-motor.md) Enemy 항목의 ⚠️ 정정.
+  GauntletBot·SpinnerBot 몸 캡슐 `m_Enabled: 1`. 상세·근거는 [PLAN-player-motor.md](Docs/history/PLANS/PLAN-player-motor.md) Enemy 항목의 ⚠️ 정정.
 - **요청**: 이미 겹친 상태를 풀어 주는 처리. 서버가 움직이는 보스가 플레이어를 파고들면(추격·돌진·잡기 해제)
   `PlayerMotionSweep` 의 CapsuleCast 가 시작 겹침을 거리 0 · 법선 = −이동방향으로 돌려줘 **전 방향이 막힌다**(끼임).
   제안: 스윕 전에 `OverlapCapsule(obstacleMask 중 Enemy 비트)` → `Physics.ComputePenetration` 로 **수평만** 밀어내고,
@@ -659,7 +669,7 @@ WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다
 > 새 인수인계는 위에 쌓고, 끝난 것은 아카이브로 옮긴다. 이 파일은 300줄 안팎을 유지한다.
 
 - **이펙트 파사드·Skill ID 테이블은 지스타(2026-11 중순) 이후.** 그 전엔 이펙트 발동 하드코딩. 다시 제안하지 말 것. (「이펙트 구조 개선은」)
-- **개발 브랜치 = 오너 권위 이동**(지스타까지). 서버 권위는 `feature/player-motor-server-auth` 에 보존. 예측 재생은 "그 틱의 모든 의도" 재현, 입력 RPC 는 raw 두 필드뿐. (「개발 브랜치 = 오너 권위」·「이번에 확정된 불변식」) 원본 [PLAN-player-motor.md](PLAN-player-motor.md)
+- **개발 브랜치 = 오너 권위 이동**(지스타까지). 서버 권위는 `feature/player-motor-server-auth` 에 보존. 예측 재생은 "그 틱의 모든 의도" 재현, 입력 RPC 는 raw 두 필드뿐. (「개발 브랜치 = 오너 권위」·「이번에 확정된 불변식」) 원본 [PLAN-player-motor.md](Docs/history/PLANS/PLAN-player-motor.md)
 - **공격속도 = 스탯 추가 안 함, 클립 길이 일반화.** 평타 타이밍은 애니 이벤트가 결정, `MotionDuration` 배율은 효과 없음. (「공격속도」)
 - **존 프리팹에 `NetworkBehaviour` 금지** — `ZoneMonsterSpawnSet`(MonoBehaviour) + 씬 상주 매니저·`SlotID`. (「존 프리팹에 `NetworkBehaviour`」)
 - **`PlayerSkillBase` 는 MonoBehaviour** — 서버 전용 연출 on/off 는 별도 NetworkBehaviour(`PlayerShieldVfx` 선례). (「`PlayerSkillBase` 는 MonoBehaviour」)

@@ -40,7 +40,7 @@
 | F10 | 디버그 부활(로컬 오너, 소울 상태일 때) | `Player/Life/PlayerReviveController.cs` (Player 프리팹) | 없음 | ✓ | |
 | F12 | 조각 폭발(FragmentExploder 가 붙은 오브젝트 전부) | `fragments/FragmentExploder.cs` | 없음 | ✓ | |
 | Alt+1~9, Alt+0 | 튜토리얼 구간 스킵 / Alt+0 판 재시작 (호스트, 튜토리얼 중) | `Map/Tutorial/TutorialSkipController.cs` (+ `TutorialDirector.Skip.cs`·`TutorialDebugActions.cs`·`Flow/TutorialCorridorFlow.cs`) | DEV_HOTKEYS | ✗ | |
-| M | 맵 오버뷰(디버그 맵) 토글 | `Map/MapOverviewUI.cs` | 없음 | ✓ | |
+| ~~M~~ | 맵 오버뷰(디버그 맵) 토글 — **꺼짐**(경석 10-22, 쓰지 않음). 인스펙터 `hotkeyEnabled` 로 다시 켠다 | `Map/MapOverviewUI.cs` | 없음 | — | |
 | `[` `]` | 미니맵 크기 프리셋 이전/다음 (슬롯 미부착일 때) | `Map/Minimap/MinimapController.cs` | 없음 | ✓ | ⚠️ `[ ]` — CameraTargetSwitcher |
 | `[` `]` | 관전 대상 이전/다음 (관전 모드일 때) | `Camera/CameraTargetSwitcher.cs` | 없음 | ✓ | ⚠️ `[ ]` — MinimapController |
 

@@ -23,7 +23,7 @@ GameData.xlsx (SVN, 잠금)
 
 | 시트 | 들어 있는 것 |
 |---|---|
-| `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 |
+| `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 · 선입력 버퍼(`PlayerInputReader` — `inputBufferSeconds`, 우선순위 `bufferPriority*` 6칸, [skill-reject-feedback.md §0.2](skill-reject-feedback.md)) |
 | `Paladin` | 가붕이 기본 공격 · 패시브 · 스킬 SO 4종 |
 | `Gunner` | 거너 기본 공격 · 과열 · 스킬 SO 4종 |
 | `Assassin` | 어쌔신 기본 공격 · 상태 · 스킬 SO |
@@ -34,7 +34,7 @@ GameData.xlsx (SVN, 잠금)
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
-| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
+| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 

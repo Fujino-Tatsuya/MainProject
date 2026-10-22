@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 
-// 복도1 첫 진입 쿨타임 초기화(v8 C1-0)와 존3 간파 성공 우클릭 쿨 초기화(v8 Z3-4)의 순수 규칙 — Unity·NGO 비의존(EditMode 테스트 대상).
-// 원본: Docs/design/tutorial-scenario.md §3.2(C1-0·쿨타임 초기화 범위·추가 구현 검토)·§3.5 · PLAN-tutorial.md V2·V4.
-// 배선(서버 — 쿨 장부 공개 API 호출)은 TutorialCorridor1CooldownFlow · TutorialZone3Flow, 공용 실행은 TutorialCooldownReset.
+// 복도1 첫 진입 쿨타임 초기화(v8 C1-0)의 순수 규칙 — Unity·NGO 비의존(EditMode 테스트 대상).
+// 원본: Docs/design/tutorial-scenario.md §3.2(C1-0·쿨타임 초기화 범위·추가 구현 검토) · PLAN-tutorial.md V2·V4.
+// 배선(서버 — 쿨 장부 공개 API 호출)은 TutorialCorridor1CooldownFlow, 공용 실행은 TutorialCooldownReset.
 
 /// <summary>
 /// 복도1 첫 진입 쿨타임 초기화 — 플레이어별 1회 + 진행 중 행동 종료까지 <b>초기화 예약</b>.
@@ -60,7 +60,4 @@ public static class TutorialCooldownResetScope
     public static bool Corridor1Includes(PlayerSkillSlot slot) =>
         slot == PlayerSkillSlot.Main || slot == PlayerSkillSlot.Sub
         || slot == PlayerSkillSlot.Ultimate || slot == PlayerSkillSlot.Interrupt;
-
-    /// <summary>존3 간파 성공: 우클릭(기본·대체)만. 대시는 아니다.</summary>
-    public static bool Zone3CounterIncludes(PlayerSkillSlot slot) => slot == PlayerSkillSlot.Interrupt;
 }
