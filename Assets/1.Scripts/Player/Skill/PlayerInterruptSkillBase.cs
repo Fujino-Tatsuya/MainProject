@@ -216,7 +216,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
             if (slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore)
             {
-                successCooldown.NotifySuccess();
+                successCooldown.NotifySuccess(GrantsSuccessCooldown(unit));
                 if (slowMotion.IsPending)
                     interruptLanded = true;
             }
@@ -264,7 +264,14 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
     }
 
-    private void HandleCounterSucceeded(Unit target, ulong attackerClientId) => successCooldown.NotifySuccess();
+    private void HandleCounterSucceeded(Unit target, ulong attackerClientId) =>
+        successCooldown.NotifySuccess(GrantsSuccessCooldown(target));
+
+    // 훈련 상대(IInterruptSuccessCooldownTarget = false)는 성공만 남기고 쿨 감소는 주지 않는다 — 성공 이벤트(ServerInterruptSucceeded)는 그대로 난다.
+    // 구현하지 않은 대상(23호·중간보스·허수아비)은 지금처럼 감소한다. 판정 규칙은 InterruptSuccessCooldownModel.GrantsCooldown.
+    private static bool GrantsSuccessCooldown(Unit target) =>
+        target == null || !target.TryGetComponent(out IInterruptSuccessCooldownTarget opt)
+        || InterruptSuccessCooldownModel.GrantsCooldown(opt);
 
     // 판정 1회 = 시전 1회라 여러 대상이 성공해도 감소는 한 번이다. 대체 슬롯이면 그 대체 스킬 인스턴스의 장부가 준다.
     private void ApplySuccessCooldownReduction()

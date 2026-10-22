@@ -71,6 +71,49 @@ public sealed class InterruptSuccessCooldownModelTests
         Assert.That(model.HasSucceeded, Is.True, "비율 0 이어도 성공 자체는 남는다(성공 이벤트는 난다)");
     }
 
+    // 할 일 86 T5b — 훈련 상대처럼 감소를 주지 않는 대상(IInterruptSuccessCooldownTarget = false).
+    sealed class OptOutTarget : IInterruptSuccessCooldownTarget
+    {
+        public bool ServerGrantsInterruptSuccessCooldown { get; set; }
+    }
+
+    [Test]
+    public void OptOutTargetSuccess_KeepsSuccess_ButNoReduction()
+    {
+        var model = new InterruptSuccessCooldownModel();
+        model.BeginCast();
+        model.NotifySuccess(grantsCooldown: false);
+
+        Assert.That(model.HasSucceeded, Is.True, "성공 이벤트(ServerInterruptSucceeded)는 그대로 난다");
+        Assert.That(model.TryClaimReduction(10f, 0.8f, out float seconds), Is.False);
+        Assert.That(seconds, Is.Zero);
+    }
+
+    [Test]
+    public void MixedTargetsInOneCast_ReduceOnce()
+    {
+        var model = new InterruptSuccessCooldownModel();
+        model.BeginCast();
+        model.NotifySuccess(grantsCooldown: false);
+        model.NotifySuccess(grantsCooldown: true);
+
+        Assert.That(model.TryClaimReduction(10f, 0.8f, out float seconds), Is.True, "감소를 주는 대상의 성공이 하나라도 있으면 감소");
+        Assert.That(seconds, Is.EqualTo(8f).Within(1e-5f));
+
+        model.BeginCast();
+        model.NotifySuccess(grantsCooldown: false);
+        Assert.That(model.TryClaimReduction(10f, 0.8f, out _), Is.False, "새 시전은 감소 허용을 이어받지 않는다");
+    }
+
+    [Test]
+    public void GrantsCooldown_OnlyOptOutTargetDenies()
+    {
+        Assert.That(InterruptSuccessCooldownModel.GrantsCooldown(new object()), Is.True, "구현 안 한 대상(23호·중간보스·허수아비) = 지금처럼 감소");
+        Assert.That(InterruptSuccessCooldownModel.GrantsCooldown(null), Is.True);
+        Assert.That(InterruptSuccessCooldownModel.GrantsCooldown(new OptOutTarget { ServerGrantsInterruptSuccessCooldown = false }), Is.False);
+        Assert.That(InterruptSuccessCooldownModel.GrantsCooldown(new OptOutTarget { ServerGrantsInterruptSuccessCooldown = true }), Is.True);
+    }
+
     [Test]
     public void LedgerApply_SubtractsFromRemaining_AndClampsAtZero()
     {
