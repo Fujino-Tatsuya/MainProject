@@ -1,6 +1,7 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -361,6 +362,169 @@ public static class QABossStart88
 }
 
 /// <summary>
+/// [서버] 할 일 88 23호 런 이상 조건(사용자 결정 ①-a·②-a, 게임 코드 무수정) — <b>23호 런 동안만</b> 켠다. 중간보스엔 쓰지 않는다.
+/// <list type="bullet">
+/// <item>대상 고정: 콤보 예약 틱(1초)마다 콤보 밖이고 누르는 클라1 이 대상이 아니면 비공개 <c>TwentyThreeBoss.AdoptAggro(Transform, string)</c> 를
+///   리플렉션으로 부른다(<see cref="QAInterruptLag88Plan.ShouldForceAggro"/>). 결과는 <c>[QA88] event=aggro_force ok=…</c>. 실패해도 런은 계속.</item>
+/// <item>넉백 면역: 누르는 클라1 에 QA 출처(<see cref="SourceId"/>) 무기한 <see cref="StatusEffectType.SuperArmor"/> — 넉백 진입점
+///   <see cref="Unit.Knockback"/> 이 거부한다. 0.5초마다 빠졌으면 다시 건다(<see cref="QAInterruptLag88Plan.ShouldReapplySuperArmor"/>).
+///   🔴 해제: 런 끝·스위트 정리(Close)·종류 바뀜·에디터 감시자 정지 요청(<see cref="ReleaseActive"/>) 모두. 같은 출처만 지우므로 스킬이 건 슈퍼아머는 건드리지 않는다.</item>
+/// </list>
+/// 간파 영향 확인(2026-10-22): SuperArmor 를 읽는 곳은 넉백 가드·Push/Carry 구속 거부·차단류 CC 적용 거부(<see cref="StatusEffectImmunityPolicy"/>)·
+/// 표시(머리 위 상태·상태이상 VFX)뿐 — 간파 판정·간파 슬로모션·<c>[InterruptLag]</c>·간파 시전 조건(<c>PlayerStateController.CanInterrupt</c> = 상태 + BlocksInterrupt)은 읽지 않는다.
+/// </summary>
+public sealed class QA88TwentyThreeAssist
+{
+    private const string Tag = "[QA88]";
+    /// <summary>QA 슈퍼아머 출처 — 플레이어 NetworkObjectId·스킬 출처와 겹치지 않는 값.</summary>
+    public const ulong SourceId = 0x5141_3838_0000_0001UL;
+
+    private static readonly MethodInfo AdoptAggroMethod = typeof(TwentyThreeBoss).GetMethod("AdoptAggro",
+        BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(Transform), typeof(string) }, null);
+    private static readonly FieldInfo ComboField =
+        typeof(TwentyThreeBoss).GetField("_combo", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    /// <summary>지금 켜져 있는 것(감시자가 Play 를 멈추기 전에 해제할 수 있게).</summary>
+    public static QA88TwentyThreeAssist Active { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => Active = null;
+
+    private readonly TwentyThreeBoss _boss;
+    private readonly Player _presser;
+    private readonly int _run;
+    private bool _on;
+    private int _forceOk, _forceFail, _armorApplies;
+    private string _lastForceFail = "";
+
+    public int ForceOk => _forceOk;
+    public int ForceFail => _forceFail;
+
+    private QA88TwentyThreeAssist(TwentyThreeBoss boss, Player presser, int run)
+    {
+        _boss = boss;
+        _presser = presser;
+        _run = run;
+    }
+
+    /// <summary>[서버] 켠다. 이전 것이 남아 있으면 먼저 해제한다. 누르는 쪽을 못 찾아도 객체는 돌려준다(진단 표시·경고만).</summary>
+    public static QA88TwentyThreeAssist Begin(TwentyThreeBoss boss, ulong presserClientId, bool presserKnown, int run)
+    {
+        ReleaseActive("replaced");
+        Player presser = null;
+        NetworkManager nm = NetworkManager.Singleton;
+        if (presserKnown && nm != null && nm.IsServer && nm.ConnectedClients.TryGetValue(presserClientId, out NetworkClient client) && client.PlayerObject != null)
+            presser = client.PlayerObject.GetComponent<Player>();
+        var a = new QA88TwentyThreeAssist(boss, presser, run) { _on = true };
+        Active = a;
+        Debug.Log($"{Tag} event=assist_begin run={run} presserClientId={(presserKnown ? presserClientId.ToString() : "na")} presser={(presser != null ? "found" : "missing")} " +
+                  $"boss={(boss != null ? "found" : "missing")} adoptAggro={(AdoptAggroMethod != null ? "found" : "missing")} comboField={(ComboField != null ? "found" : "missing")}");
+        if (presser == null)
+            Debug.LogWarning($"{Tag} event=aggro_force ok=false run={run} reason=presser_missing — 대상 고정·넉백 면역 없이 런 계속");
+        a.RefreshSuperArmor();
+        return a;
+    }
+
+    /// <summary>켜져 있는 것을 해제한다(없으면 무시). 에디터 감시자·스위트 정리에서 부른다.</summary>
+    public static void ReleaseActive(string reason)
+    {
+        QA88TwentyThreeAssist a = Active;
+        Active = null;
+        a?.End(reason);
+    }
+
+    /// <summary>[서버] 해제 — QA 출처 슈퍼아머를 지운다. 여러 번 불러도 된다.</summary>
+    public void End(string reason)
+    {
+        if (!_on)
+            return;
+        _on = false;
+        if (Active == this)
+            Active = null;
+        bool removed = false;
+        try
+        {
+            StatusEffectController status = _presser != null ? _presser.StatusEffects : null;
+            removed = status != null && status.Remove(StatusEffectType.SuperArmor, SourceId);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"{Tag} 슈퍼아머 해제 중 오류: {e.Message}");
+        }
+        Debug.Log($"{Tag} event=assist_end run={_run} reason={QAInterruptLag88Plan.LogToken(reason)} superArmorRemoved={(removed ? "true" : "false")} " +
+                  $"aggroForceOk={_forceOk} aggroForceFail={_forceFail} armorApplies={_armorApplies}");
+    }
+
+    /// <summary>[서버] 0.5초마다 — QA 슈퍼아머가 빠졌으면 다시 건다.</summary>
+    public void RefreshSuperArmor()
+    {
+        StatusEffectController status = _presser != null ? _presser.StatusEffects : null;
+        if (status == null || !QAInterruptLag88Plan.ShouldReapplySuperArmor(_on, status.GetStackCount(StatusEffectType.SuperArmor, SourceId)))
+            return;
+        status.Apply(StatusEffectType.SuperArmor, 0f, SourceId);
+        if (status.GetStackCount(StatusEffectType.SuperArmor, SourceId) > 0)
+        {
+            _armorApplies++;
+            Debug.Log($"{Tag} event=superarmor_apply run={_run} n={_armorApplies} clientId={_presser.OwnerClientId}");
+        }
+    }
+
+    /// <summary>[서버] 콤보 예약 직전(1초 틱) — 콤보 밖이고 누르는 쪽이 대상이 아니면 AdoptAggro 로 승계시킨다.</summary>
+    public void ForceAggroBeforeReserve()
+    {
+        if (!_on || _boss == null || _presser == null)
+            return;
+        bool comboKnown = ComboField != null;
+        bool comboActive = comboKnown && ComboField.GetValue(_boss) != null;
+        bool alreadyTarget = _boss.CurrentTarget == _presser.transform;
+        if (!QAInterruptLag88Plan.ShouldForceAggro(comboKnown, comboActive, alreadyTarget))
+        {
+            if (!comboKnown)
+                FailForce("combo_field_missing");
+            return;
+        }
+        if (AdoptAggroMethod == null)
+        {
+            FailForce("method_missing");
+            return;
+        }
+        try
+        {
+            AdoptAggroMethod.Invoke(_boss, new object[] { _presser.transform, "QA88" });
+        }
+        catch (System.Exception e)
+        {
+            FailForce("invoke_" + (e.InnerException ?? e).GetType().Name);
+            return;
+        }
+        if (_boss.CurrentTarget != _presser.transform)
+        {
+            FailForce("not_adopted");   // AdoptTarget 이 거부(대상 무효 등)
+            return;
+        }
+        _forceOk++;
+        Debug.Log($"{Tag} event=aggro_force ok=true run={_run} n={_forceOk} clientId={_presser.OwnerClientId} aggroId={_boss.AggroTargetId}");
+    }
+
+    private void FailForce(string reason)
+    {
+        _forceFail++;
+        // 같은 사유가 1초마다 반복되면 첫 번과 10번째마다만 남긴다.
+        if (reason != _lastForceFail || _forceFail % 10 == 0)
+            Debug.LogWarning($"{Tag} event=aggro_force ok=false run={_run} reason={reason} fails={_forceFail}");
+        _lastForceFail = reason;
+    }
+
+    /// <summary>boss_diag 용 — <c>aggroForced=ok/fail superArmor=true|false|na</c>.</summary>
+    public string Diag()
+    {
+        string armor = _presser == null || _presser.StatusEffects == null ? "na"
+            : _presser.StatusEffects.GetStackCount(StatusEffectType.SuperArmor, SourceId) > 0 ? "true" : "false";
+        return $"aggroForced={_forceOk}/{_forceFail} presserIsTarget={(_presser != null && _boss != null && _boss.CurrentTarget == _presser.transform ? "true" : "false")} superArmor={armor}";
+    }
+}
+
+/// <summary>
 /// [서버] 할 일 88 런 진단 — 대상 보스의 공격 진입·간파 창 열림/닫힘 엣지(매 호출)와 <see cref="SummarySeconds"/> 마다 요약을 <c>[QA88]</c> 줄로 남긴다.
 /// 스모크 4차는 "창 0" 만 남아 보스가 안 때린 건지 클라가 못 본 건지 가를 수 없었다 — 호스트 <c>boss_window</c> 와 클론 <c>bot_diag</c> 를 나란히 보면 갈린다.
 /// </summary>
@@ -428,8 +592,12 @@ public sealed class QABossWatch88
                   $"dormant={(_target.IsDormant ? "true" : "false")} hp={_target.CurrentHealth}/{_target.MaxHp} " +
                   $"onNavMesh={(_agent != null && _agent.isOnNavMesh ? "true" : "false")} pos={QABossStart88.Fmt(_target.transform.position)} " +
                   $"aggroId={_target.AggroTargetId} attacks={_attacks} windows={_windows} lastWindowAgoS={lastWindow} " +
-                  $"awakeNormals={AwakeNormals(kind)} {Players()}");
+                  $"awakeNormals={AwakeNormals(kind)} {AssistDiag()} {Players()}");
     }
+
+    /// <summary>23호 이상 조건 상태(<see cref="QA88TwentyThreeAssist"/>) — 꺼져 있으면(중간보스·런 밖) off.</summary>
+    private static string AssistDiag() =>
+        QA88TwentyThreeAssist.Active != null ? QA88TwentyThreeAssist.Active.Diag() : "aggroForced=off superArmor=off";
 
     /// <summary>존4 일반몹 중 깨어 있는 수(중간보스 런만, 아니면 na) — 휴면이 풀려 측정에 끼어드는지 본다.</summary>
     private static string AwakeNormals(QAInterruptTargetKind kind)

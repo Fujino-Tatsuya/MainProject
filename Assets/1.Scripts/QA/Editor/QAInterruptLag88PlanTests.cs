@@ -174,6 +174,25 @@ public sealed class QAInterruptLag88PlanTests
         Assert.AreEqual(1.5f, mb.StopDistance, 1e-6f, "중간보스 거리 = 5차 OK 그대로");
     }
 
+    // ─── 23호 대상 고정·넉백 면역(사용자 결정 ①-a·②-a) ──────────────────
+
+    [Test]
+    public void 대상_고정은_콤보_밖에서_대상이_아닐_때만()
+    {
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldForceAggro(true, false, false), "콤보 밖 · 다른 대상");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(true, true, false), "콤보 중 = 고정 대상까지 옮겨 진행 중 콤보가 바뀐다");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(true, false, true), "이미 대상");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldForceAggro(false, false, false), "콤보 여부를 못 읽음(리플렉션 실패)");
+    }
+
+    [Test]
+    public void 슈퍼아머는_켜_둔_동안_QA_스택이_없을_때만_다시_건다()
+    {
+        Assert.IsTrue(QAInterruptLag88Plan.ShouldReapplySuperArmor(true, 0), "연출 일괄 해제 등으로 빠짐");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldReapplySuperArmor(true, 1), "이미 걸림");
+        Assert.IsFalse(QAInterruptLag88Plan.ShouldReapplySuperArmor(false, 0), "해제 뒤엔 다시 걸지 않는다");
+    }
+
     // ─── 중간보스 강제 개시 — 존4 스킵 보낼 시점 ────────────────────────
 
     [Test]

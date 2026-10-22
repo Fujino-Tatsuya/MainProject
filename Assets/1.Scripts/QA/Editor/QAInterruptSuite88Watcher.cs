@@ -104,12 +104,26 @@ public static class QAInterruptSuite88Watcher
         _stopRequested = true;
         EditorPrefs.SetString(StopReasonKey, reason);
         Debug.Log($"[QA88] 감시자: {reason} → Play 정지");
+        ReleaseTwentyThreeAssist("watcher_stop");   // 23호 넉백 면역(SuperArmor)은 Play 를 멈추기 전에 서버에서 해제
         QAScenarioPlay.Stop();
+    }
+
+    private static void ReleaseTwentyThreeAssist(string reason)
+    {
+        try
+        {
+            QA88TwentyThreeAssist.ReleaseActive(reason);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[QA88] 감시자 23호 이상 조건 해제 실패: {e.Message}");
+        }
     }
 
     private static void Cleanup(string reason)
     {
         Disarm();
+        ReleaseTwentyThreeAssist("watcher_cleanup");   // Play 밖이면 네트워크가 없어 참조만 끊는다
         try
         {
             QANetSim88.ResetRemoteDelayFiles();

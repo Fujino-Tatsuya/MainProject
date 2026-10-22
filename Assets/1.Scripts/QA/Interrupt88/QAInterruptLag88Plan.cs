@@ -75,6 +75,17 @@ public static class QAInterruptLag88Plan
     public static bool IsLandingWindow(double openAt, double lastAirborneSeenAt, double maxGapSec = LandingWindowMaxGapSec) =>
         lastAirborneSeenAt >= 0.0 && openAt >= lastAirborneSeenAt && openAt - lastAirborneSeenAt <= maxGapSec;
 
+    /// <summary>
+    /// 23호 대상 고정(사용자 결정 ①-a): 콤보 예약 틱에서 <c>AdoptAggro(누르는 클라1)</c> 를 부를까.
+    /// 콤보 중이면 부르지 않는다(콤보 중 승계는 고정 대상 <c>_comboLock</c> 까지 옮겨 진행 중 콤보를 바꾼다).
+    /// 콤보 여부를 읽지 못했으면(리플렉션 실패) 부르지 않는다. 이미 대상이면 부르지 않는다(게임 쪽도 같은 대상이면 아무것도 안 한다).
+    /// </summary>
+    public static bool ShouldForceAggro(bool comboKnown, bool comboActive, bool alreadyTarget) =>
+        comboKnown && !comboActive && !alreadyTarget;
+
+    /// <summary>23호 넉백 면역(사용자 결정 ②-a): 켜 둔 동안 QA 출처 슈퍼아머 스택이 없으면(연출 일괄 해제·연출 잠금 거부 등) 다시 건다.</summary>
+    public static bool ShouldReapplySuperArmor(bool active, int qaStackCount) => active && qaStackCount <= 0;
+
     /// <summary>두 수평 벡터(x, z) 사이 각도(도, 0~180). 어느 쪽이든 길이 0 이면 NaN — 누름 진단(바라보는 방향 ↔ 보스 방향).</summary>
     public static double FlatAngleDeg(double ax, double az, double bx, double bz)
     {

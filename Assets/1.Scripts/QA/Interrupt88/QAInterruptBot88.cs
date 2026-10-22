@@ -221,7 +221,7 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         Debug.Log($"{Tag} event=bot_diag kind={QAInterruptLag88Plan.KindToken(_cfg.Kind)} target={QAInterruptLag88Plan.LogToken(_target.name)} " +
                   $"observe={observe} open={(open ? "true" : "false")} windows={Windows} lastOpenAgoS={lastOpen} attempts={Attempts} " +
                   $"dist={Fmt(QAPartyPlacement88.HorizontalDistance(mine, boss))} dy={Fmt(mine.y - boss.y)} " +
-                  $"bossState={_target.State} attacksSeen={_attacksSeen} aggroId={_target.AggroTargetId} {TargetDiag(me)} knockbacks={_knockbacks} " +
+                  $"bossState={_target.State} attacksSeen={_attacksSeen} aggroId={_target.AggroTargetId} {TargetDiag(me)} {AssistDiag(me)} knockbacks={_knockbacks} " +
                   $"edgeBlocked={(_edgeBlocked ? "true" : "false")} edgeBlocks={_edgeBlocks} " +
                   $"myPos={Fmt(mine)} bossPos={Fmt(boss)}");
     }
@@ -494,6 +494,17 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         ulong aggro = _target.AggroTargetId;
         string isTarget = aggro == MonsterAggroTargetRule.NoTarget ? "na" : aggro == me.NetworkObjectId ? "true" : "false";
         return $"isTarget={isTarget} myObjId={me.NetworkObjectId}";
+    }
+
+    /// <summary>
+    /// 23호 이상 조건 표시 — <c>aggroForced</c> = 이 런에서 호스트가 대상 고정을 거는가(23호 = host, 중간보스 = off; 실제 승계 결과는 호스트 <c>event=aggro_force</c>),
+    /// <c>superArmor</c> = 내 플레이어에 슈퍼아머가 걸려 있나(복제된 상태이상 — 출처 무관).
+    /// </summary>
+    private string AssistDiag(Player me)
+    {
+        string forced = _cfg.Kind == QAInterruptTargetKind.TwentyThree ? "host" : "off";
+        string armor = me == null || me.StatusEffects == null ? "na" : me.StatusEffects.HasSuperArmor ? "true" : "false";
+        return $"aggroForced={forced} superArmor={armor}";
     }
 
     /// <summary>오너 쪽 넉백 시작 엣지를 센다(<see cref="LinearKnockback"/> 비공개 상태 읽기만).</summary>

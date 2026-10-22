@@ -206,6 +206,7 @@ public static class QAInterruptSuite88
         private readonly List<CloneState> _clones = new List<CloneState>();
         private QALogTee88 _tee;
         private QAInterruptBot88 _hostBot;
+        private QA88TwentyThreeAssist _assist;   // 23호 런 동안만(대상 고정 + 넉백 면역)
         private MonsterBase _target;
         private QAInterruptTargetKind _targetKind;
         private readonly QABossWatch88 _watch = new QABossWatch88();
@@ -229,6 +230,14 @@ public static class QAInterruptSuite88
             _header.UnityVersion = Application.unityVersion;
             _header.Attempts = _cfg.Attempts;
             _header.RunTimeoutSec = _cfg.RunTimeoutSec;
+            foreach (QA88RunSpec s in _cfg.Runs)
+            {
+                if (s.Kind != QAInterruptTargetKind.TwentyThree)
+                    continue;
+                _header.Notes.Add("**측정 조건(23호): 대상 고정(AdoptAggro QA88) + 넉백 면역(SuperArmor) — 이상 조건, 실제 플레이와 다름.** " +
+                                   "23호 런 동안 서버가 콤보 밖일 때 누르는 클라1 로 어그로를 승계시키고(`event=aggro_force`), 같은 클라에 QA 출처 무기한 슈퍼아머를 건다(런 끝·정리에서 해제, `event=assist_end`). 중간보스 런엔 적용하지 않는다.");
+                break;
+            }
             _header.Notes.Add("판 유지: 런 동안 0.5초마다 `QABossStart88.KeepAliveServer` 가 파티 전원과 **대상 보스(중간보스·23호) 체력**을 최대 체력 70% 아래면 최대로 채운다 — 측정 유지 목적(처치·전멸로 런이 끊기지 않게). 통계·피격 연출·사망 신호 없음.");
             _header.Notes.Add("23호: 1초마다 점프×3 콤보 예약(F3 Dev API, 3번째 착지 간파 창). A 스윕은 23호 창 길이가 복제되지 않아 런의 첫 창을 길이 학습에만 쓴다. " +
                                "봇은 착지 창(체공 직후 열린 창)만 배우고 누른다(개전 돌진 창 등은 건너뜀).");
@@ -287,6 +296,7 @@ public static class QAInterruptSuite88
                 if (startedKind != spec.Kind)
                 {
                     StopHostBot("kind_change");
+                    EndAssist("kind_change");
                     var start = new QABossStart88Result();
                     yield return QABossStart88.Start(spec.Kind, start);
                     Beat();
@@ -341,6 +351,11 @@ public static class QAInterruptSuite88
                     bc.Seed = seed;
                     _hostBot = QAInterruptBot88.Begin(_ctx.Input.gameObject, bc);
                 }
+                if (spec.Kind == QAInterruptTargetKind.TwentyThree && _target is TwentyThreeBoss ttBoss)
+                {
+                    CloneState p = ready.Count > 0 ? ready[0] : null;
+                    _assist = QA88TwentyThreeAssist.Begin(ttBoss, p != null && p.ClientId >= 0 ? (ulong)p.ClientId : 0UL, p != null && p.ClientId >= 0, spec.Index);
+                }
 
                 CloneState presser = ready.Count > 0 ? ready[0] : null;
                 float runUntil = Time.realtimeSinceStartup + _cfg.RunTimeoutSec;
@@ -362,6 +377,7 @@ public static class QAInterruptSuite88
                     yield return null;
                 }
                 StopHostBot("run_end");
+                EndAssist("run_end");
 
                 // 클론 런 정지(대기 클론 포함) → run_end 수신.
                 foreach (CloneState c in ready)
@@ -430,6 +446,15 @@ public static class QAInterruptSuite88
             StopHostBot("suite_end");
             try
             {
+                EndAssist("suite_end");
+                QA88TwentyThreeAssist.ReleaseActive("suite_end");   // 다른 경로로 남은 것까지
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"{Tag} 23호 이상 조건 해제 중 오류: {e.Message}");
+            }
+            try
+            {
                 SendAll("end", null);
                 QANetSim88.ResetRemoteDelayFiles();
             }
@@ -474,12 +499,20 @@ public static class QAInterruptSuite88
             {
                 _nextKeepAlive = now + KeepAliveSeconds;
                 QABossStart88.KeepAliveServer(_target);
+                _assist?.RefreshSuperArmor();
             }
             if (now >= _nextReserve && _target is TwentyThreeBoss boss)
             {
                 _nextReserve = now + ReserveSeconds;
+                _assist?.ForceAggroBeforeReserve();   // 콤보 예약 직전 — 콤보 밖일 때만
                 QABossStart88.ReserveJumpComboIfIdle(boss);
             }
+        }
+
+        private void EndAssist(string reason)
+        {
+            _assist?.End(reason);
+            _assist = null;
         }
 
         private void StopHostBot(string reason)
@@ -573,6 +606,8 @@ public static class QAInterruptSuite88
         public bool Ready;
         public bool Presser;
         public int NetsimMs = -1;
+        /// <summary>클론의 NetworkManager.LocalClientId(<c>follower_ready</c> 줄). 없으면 -1 — 23호 이상 조건을 걸 대상.</summary>
+        public int ClientId = -1;
         public bool NetsimAvailable = true;
         public readonly Dictionary<int, QA88LogLine> RunEnds = new Dictionary<int, QA88LogLine>();
         private readonly QALogTail88 _tail;
@@ -595,6 +630,7 @@ public static class QAInterruptSuite88
                 {
                     case "follower_ready":
                         Ready = true;
+                        ClientId = l.GetInt("clientId", -1);
                         break;
                     case "netsim":
                         NetsimMs = l.GetInt("delayMs");
@@ -665,7 +701,9 @@ public static class QAInterruptSuite88
                     if (have && tee == null && !string.IsNullOrEmpty(cmd.SuiteDir))
                     {
                         tee = QALogTee88.Open(Path.Combine(cmd.SuiteDir, "logs", role + ".log"));
-                        Debug.Log($"{Tag} event=follower_ready role={QAInterruptLag88Plan.LogToken(role)}");
+                        Unity.Netcode.NetworkManager nm = Unity.Netcode.NetworkManager.Singleton;
+                        string clientId = nm != null && nm.IsListening ? nm.LocalClientId.ToString() : "na";
+                        Debug.Log($"{Tag} event=follower_ready role={QAInterruptLag88Plan.LogToken(role)} clientId={clientId}");
                         Debug.Log($"{Tag} event=follower_netsim delayMs={QANetSim88.AppliedDelayMs}");
                     }
                     if (have && cmd.Seq != lastSeq)
