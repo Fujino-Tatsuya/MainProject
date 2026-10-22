@@ -810,6 +810,42 @@ public abstract class PlayerStateBase : IPlayerState
     }
 
     /// <summary>
+    /// 예약하지 않는 기본 공격(가붕이·어쌔신) 중 버퍼에 평타보다 우선순위가 높은 스킬 입력(우클릭·R·Q·E)이 살아 있으면
+    /// 다음 타를 잇지 않고 지금 타로 마무리시킨다(<see cref="IPlayerBasicAttack.FinishWithoutChaining"/>, 할 일 77 후속).
+    /// 평타를 누르고 있으면 콤보 창마다 다음 타가 예약돼 체인이 끝나지 않고, 그동안 스킬 입력이 0.2초 만에 만료됐다.
+    /// 입력은 버퍼에 그대로 두고 — 현재 타가 끝나 Idle/Move 로 돌아온 첫 틱에 기존 우선순위 순서로 시도된다.
+    /// 쓸 수 없어 보이는 입력(빈 슬롯·차단 효과·쿨타임)은 체인을 끊지 않는다 — 거부 처리는 Idle/Move 의 기존 규칙 그대로.
+    /// </summary>
+    protected void TryFinishAttackForBufferedSkill()
+    {
+        IPlayerBasicAttack attack = Context.DefaultAttack;
+        PlayerSkillController skills = Context.Skills;
+        if (attack == null || attack.ReservesSkillAfterAttack || Context.Input == null ||
+            !Context.Player.IsInputSource || (skills != null && skills.IsChoosingTarget))
+            return;
+
+        for (int i = 0; i < SkillSlotOrder.Length; i++)
+        {
+            PlayerSkillSlot slot = SkillSlotOrder[i];
+            PlayerBufferedInput kind = PlayerInputBuffer.FromSkillSlot(slot);
+            PlayerSkillBase skill = skills != null ? skills.GetSkill(slot) : null;
+            // 우클릭에 스킬이 없으면 인터럽트 상태 경로가 같은 입력을 쓴다 — 그 차단 판정으로 본다.
+            bool interruptState = skill == null && slot == PlayerSkillSlot.Interrupt;
+            bool finish = PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(
+                attack.ReservesSkillAfterAttack,
+                Context.Input.HasBufferedInputAbove(kind, PlayerBufferedInput.Attack),
+                skill != null || interruptState,
+                interruptState ? Context.StatusEffects.BlocksInterrupt : Context.StatusEffects.BlocksSkill,
+                skill != null && skills.IsBlockedByCooldown(slot));
+            if (!finish)
+                continue;
+
+            attack.FinishWithoutChaining();
+            return;
+        }
+    }
+
+    /// <summary>
     /// 기본 공격 뒤로 예약한 스킬을 Idle/Move 에서 쓴다(할 일 44). 판정은 버퍼 입력과 같다 — 바쁨(요청 응답 대기)이면 들고 기다리고(Blocked),
     /// 차단 효과·쿨타임·사용 조건 거부는 예약을 버리고 피드백 규칙도 같다. 행동 불능 CC 면 예약을 버린다(만료 없는 예약을 CC 너머로 끌고 가지 않는다).
     /// 예약이 없거나 버렸으면 Rejected — 호출자는 다음 입력으로 넘어간다.
@@ -1055,6 +1091,8 @@ public sealed class PlayerAttackState : PlayerStateBase
     {
         // 공격 뒤로 스킬을 예약하는 공격(거너)이면 스킬 입력을 먼저 본다 — 예약되면 이번 틱부터 다음 발을 잇지 않는다(할 일 44).
         TryReserveSkillDuringAttack();
+        // 예약하지 않는 공격(가붕이·어쌔신)은 버퍼에 평타보다 높은 스킬 입력이 있으면 다음 타를 잇지 않는다(할 일 77 후속).
+        TryFinishAttackForBufferedSkill();
 
         Context.Player.SetAnimatorMoving(false);
         Context.DefaultAttack?.Tick();

@@ -160,6 +160,16 @@ public class PlayerInputReader : BaseNetworkBehaviour
     }
 
     /// <summary>
+    /// 그 입력이 버퍼에 살아 있고 <paramref name="than"/> 보다 우선순위가 높은가 — 꺼낼 입력인지와 무관(더 높은 입력에 밀려 있어도 참).
+    /// 평타 중 스킬 입력이 다음 타를 막을지 볼 때 쓴다(할 일 77 후속).
+    /// </summary>
+    public bool HasBufferedInputAbove(PlayerBufferedInput input, PlayerBufferedInput than)
+    {
+        CaptureBufferedPresses();
+        return inputBuffer.ContainsAbove(input, than, Time.time);
+    }
+
+    /// <summary>
     /// 행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않게 그 종류만 지운다.
     /// 다른 종류는 남긴다 — 콤보 예약은 평타를 누르고 있는 동안 매 프레임 부르므로, 비우면 공격 중 누른 스킬이 사라진다(할 일 77).
     /// </summary>

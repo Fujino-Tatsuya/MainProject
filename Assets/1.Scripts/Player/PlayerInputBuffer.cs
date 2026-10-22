@@ -143,6 +143,13 @@ public sealed class PlayerInputBuffer
         return index > 0 && index < KindCount && IsAlive(index, now);
     }
 
+    /// <summary>
+    /// 그 종류가 살아 있고 <paramref name="than"/> 보다 우선순위가 높은가 — 더 높은 다른 입력(대시 등)에 밀려 있어도 참.
+    /// 평타 콤보를 이을지 볼 때 쓴다(할 일 77 후속): 평타보다 높은 스킬 입력이 살아 있으면 다음 타를 잇지 않는다.
+    /// </summary>
+    public bool ContainsAbove(PlayerBufferedInput input, PlayerBufferedInput than, float now) =>
+        Contains(input, now) && GetPriority(input) > GetPriority(than);
+
     /// <summary>살아 있는 입력 수.</summary>
     public int Count(float now)
     {
