@@ -268,10 +268,9 @@ public sealed class QABossProfileProbe : MonoBehaviour
         if (boss == null)
             return;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-        if (FirstDash < 0)
-            Event("reserve", $"Dash={boss.DevReserveNextAttack(BossAttackId.Dash)}");
+        // 23호 단일 공격 Dev 예약(DevReserveNextAttack)은 development f0b014b7 에서 빠졌다 — 점프 콤보 예약만 남음. 돌진은 자연 발생을 기다린다.
         if (FirstJump < 0)
-            Event("reserve", $"Jump={boss.DevReserveNextAttack(BossAttackId.Jump)}");
+            Event("reserve", $"JumpCombo={boss.DevReserveJumpCombo()}");
 #endif
     }
 
