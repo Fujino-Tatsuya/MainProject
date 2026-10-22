@@ -11,11 +11,14 @@
 ## 2. 공식
 
 ```
-최종 스탯   = 기본 × (1 + Σ기본%) × (1 + Σ전체%)          (공격력·방어력·최대 체력은 반올림), ≥ 0
+최종 스탯   = (기본 × (1 + Σ기본%) × (1 + Σ전체%)) × Π최종배율   (공격력·방어력·최대 체력은 반올림), ≥ 0
 피해 스냅샷 = round( (round(최종 공격력 × 계수) + 고정값) × (1 + Σ가하는피해%) ), ≥ 0
 ```
 
 - 같은 단계 안의 % 는 **더한다**. 단계끼리는 곱한다.
+- **최종 배율**(할 일 91)은 % 단계 **뒤**에 곱하고, 같은 최종 배율끼리도 **곱한다**(2.0 × 1.5 = 3.0). 이동속도·공격속도만 갖는다.
+  집계는 `StatusEffectController.GetStatMultiplier`(스택 = magnitude^스택), 없으면 1 — 기존 값은 그대로다.
+  예) 이동속도 5, 기본 +10%, 전체 +20%, 최종 ×2 → 5 × 1.1 × 1.2 × 2 = 13.2.
 - 차지·과열 단계 배율 같은 기존 후처리는 스냅샷 **뒤**에 곱한다(거너 Q·R·기본 공격).
 - 가하는 피해% 가 0 이면 이전 판정식 `max(0, round(공격력 × 계수) + 고정값)` 과 같다.
 
@@ -23,15 +26,17 @@
 
 ## 3. 스탯 표
 
-| `PlayerStatKind` | 기본값(피어마다 로컬) | 기본% 상태이상 | 전체% 상태이상 | 쓰는 곳 |
-|---|---|---|---|---|
-| AttackDamage | `Player.attackDamage` | `BaseAttackDamageModifier` | `AttackDamageModifier` | 데미지 스냅샷(`Player.ResolveDamage`)·툴팁 |
-| MoveSpeed | `PlayerMovement.BaseMaxSpeed` | `MoveSpeedBaseModifier` | `MoveSpeedModifier` | `PlayerMovement`(서버·오너 이동) — `Stats.Multiplier(MoveSpeed)` |
-| AttackSpeed | `Player.attackSpeed` | `AttackSpeedBaseModifier` | `AttackSpeedModifier` | 값만 있음 — 플레이어 소비처 없음(후속) |
-| Defense | `Player.defense` | `DefenseBaseModifier` | `DefenseModifier` | 피해 경감 `Unit.ApplyMitigatedHealthDamage`(`FinalDefense`) |
-| MaxHp | `Player.maxHp` | `MaxHpBaseModifier` | `MaxHpModifier` | `FinalMaxHp` 소비처(HUD·재생·추락 피해·피격 상한) |
+| `PlayerStatKind` | 기본값(피어마다 로컬) | 기본% 상태이상 | 전체% 상태이상 | 최종 배율 상태이상 | 쓰는 곳 |
+|---|---|---|---|---|---|
+| AttackDamage | `Player.attackDamage` | `BaseAttackDamageModifier` | `AttackDamageModifier` | — | 데미지 스냅샷(`Player.ResolveDamage`)·툴팁 |
+| MoveSpeed | `PlayerMovement.BaseMaxSpeed` | `MoveSpeedBaseModifier` | `MoveSpeedModifier` | `MoveSpeedFinalMultiplier` | `PlayerMovement`(서버·오너 이동) — `Stats.Multiplier(MoveSpeed)`(최종 배율 포함) |
+| AttackSpeed | `Player.attackSpeed` | `AttackSpeedBaseModifier` | `AttackSpeedModifier` | `AttackSpeedFinalMultiplier` | 값만 있음 — 플레이어 소비처 없음(할 일 91 T5 에서 애니 속도 연결 예정) |
+| Defense | `Player.defense` | `DefenseBaseModifier` | `DefenseModifier` | — | 피해 경감 `Unit.ApplyMitigatedHealthDamage`(`FinalDefense`) |
+| MaxHp | `Player.maxHp` | `MaxHpBaseModifier` | `MaxHpModifier` | — | `FinalMaxHp` 소비처(HUD·재생·추락 피해·피격 상한) |
 
 - 가하는 피해%: `DealtDamageModifier`(공격력 전용 3단계).
+- 최종 배율 매핑은 `PlayerStatFormula.FinalMultiplierType`. 셋 다(`CooldownRateModifier` 포함) `StatusEffectCategories` 스탯 마스크라 배율 ≥ 1 = 버프 → 연출 일괄 해제(`ClearDebuffsServer`)가 지우지 않는다.
+- `CooldownRateModifier`(쿨타임 줄어드는 속도 배율)는 스탯이 아니다 — 타입·분류만 있고 소비처(쿨 시계)는 할 일 91 T2~T4.
 - 기본값은 xlsx Player 시트 값이고 빌드에 들어간다. 같은 빌드면 모든 피어가 같은 값을 갖는다.
 - `Unit.Final*` 5개는 virtual 이고, `Player` 가 이 종합값으로 덮어쓴다. 몬스터는 기존 식(원본 × 곱 배율)을 그대로 쓴다.
 - **새 스탯 추가 절차:**
@@ -59,7 +64,7 @@
   - 이동은 원래 오너 권한이다. 이동속도는 서버와 오너가 같은 종합 배율을 쓴다.
 - 툴팁은 같은 식 `SkillTooltipDamage.FromLinear / FromScaledSnapshot(…, dealtDamagePercent)` 를 쓴다.
   Shift 계산식에는 계수·고정값만 보이고, 가하는 피해% 는 결과 숫자에만 들어간다.
-- **서버 2차 검증.** 오너가 공격·스킬 시작 요청에 `PlayerStatReport` 를 싣는다. 내용은 5종 최종값과 가하는 피해%이고, 실수 값은 천분율이다. 서버는 자기 값과 비교한다.
+- **서버 2차 검증.** 오너가 공격·스킬 시작 요청에 `PlayerStatReport` 를 싣는다. 내용은 5종 최종값(최종 배율까지 곱한 값)과 가하는 피해%이고, 실수 값은 천분율이다. 서버는 자기 값과 비교한다.
   - 대상: `RequestUseSkillRpc`, Default `RequestStartAttackRpc`·`RequestQueueNextAttackRpc`, Assassin `RequestStartRpc`·`RequestQueueNextAttackRpc`, Gunner `RequestStartRpc`.
   - 다르면 `[PlayerStats] … 불일치` 경고만 남긴다. 판정은 서버 값이고 요청은 거절하지 않는다.
   - 서버 쪽 입력(상태이상 목록·출처)이 바뀐 뒤 `Player.statValidationGrace`(기본 0.5초) 안의 불일치는 복제 지연으로 보고 무시한다.
@@ -70,3 +75,9 @@
 - 같은 스탯의 상태이상이 겹치면 곱이 아니라 % 를 더한다.
   예) 이동 특성 1.2 + 거너 Q 감속 0.5 → 이전 0.6 → 이제 0.7.
 - 방어력 상태이상이 처음으로 피해 경감에 들어간다. 지금은 거는 곳이 없다.
+
+## 7. 바뀐 동작 (2026-10-22, 할 일 91)
+
+- 최종 배율 단계 추가: `최종 = (기본 × (1+Σ기본%) × (1+Σ전체%)) × Π최종배율`. 이동속도·공격속도만, 같은 최종 배율끼리는 곱.
+  예) 이동 특성 1.2(전체%) + 제압 가속 ×2(최종) → 1.2 × 2 = 2.4.
+- 새 상태이상 3종 `MoveSpeedFinalMultiplier`·`AttackSpeedFinalMultiplier`·`CooldownRateModifier` — 아직 거는 곳이 없어 기존 수치는 그대로다(제압 가속 버프가 T6 에서 건다).

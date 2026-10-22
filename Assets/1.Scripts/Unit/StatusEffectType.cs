@@ -38,6 +38,11 @@ public enum StatusEffectType
     AttackSpeedBaseModifier = 1 << 17,    // 기본 공격속도 %
     DefenseBaseModifier = 1 << 18,        // 기본 방어력 %
     MaxHpBaseModifier = 1 << 19,          // 기본 최대 체력 %
+
+    // 최종 배율(할 일 91) — % 단계 뒤에 곱한다. magnitude = 배율(2.0 = ×2), 같은 단계끼리 곱(GetStatMultiplier).
+    MoveSpeedFinalMultiplier = 1 << 20,   // 이동속도 최종 배율
+    AttackSpeedFinalMultiplier = 1 << 21, // 공격속도 최종 배율
+    CooldownRateModifier = 1 << 22,       // 쿨타임 줄어드는 속도 배율(쿨 시계 — PLAN-91 §3.3)
 }
 
 /// <summary>SuperArmor가 신규 상태효과 적용을 거부하는 공통 판정.</summary>
@@ -69,7 +74,9 @@ public static class StatusEffectCategories
         StatusEffectType.AttackSpeedModifier | StatusEffectType.DefenseModifier | StatusEffectType.MaxHpModifier |
         StatusEffectType.BaseAttackDamageModifier | StatusEffectType.DealtDamageModifier |
         StatusEffectType.MoveSpeedBaseModifier | StatusEffectType.AttackSpeedBaseModifier |
-        StatusEffectType.DefenseBaseModifier | StatusEffectType.MaxHpBaseModifier;
+        StatusEffectType.DefenseBaseModifier | StatusEffectType.MaxHpBaseModifier |
+        StatusEffectType.MoveSpeedFinalMultiplier | StatusEffectType.AttackSpeedFinalMultiplier |
+        StatusEffectType.CooldownRateModifier;
 
     private const StatusEffectType Buffs =
         StatusEffectType.SuperArmor | StatusEffectType.PassiveCharge | StatusEffectType.Focus;
