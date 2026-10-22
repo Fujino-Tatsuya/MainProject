@@ -34,14 +34,17 @@ public interface ITutorialGuideTextSource
 }
 
 /// <summary>
-/// 튜토리얼 안내 문구 테이블(ID → 문구). 에셋: <c>Assets/9.ScriptableObject/Tutorial/Guide/TutorialGuideTexts.asset</c>.
-/// ⚠️ 데이터 테이블([DataTableText]) 연결은 일부러 하지 않았다(할 일 15 S6). xlsx Export 는 병합 뒤 메인이 하고,
-///    기존 스킬 툴팁 검사가 낯선 <c>{…}</c> 자리표시자를 오류로 보므로 옮길 때 표기 변경이 필요하다
-///    (특성 레인 선례). 자세한 건 Docs/tech/tutorial-guide-ui.md.
+/// 튜토리얼 안내 문구 테이블(ID → 문구·지속시간·효과음). 에셋: <see cref="AssetPath"/>.
+/// 화면 문구는 Strings 시트 일반 키 <c>Tutorial.Guide.&lt;id&gt;</c> 가 우선이고, 이 SO 문구는 시트에 행이 없을 때의
+/// 폴백 + Export Template 의 ko 원문이다(할 일 86 T6a — <see cref="TutorialGuideTextSource"/>, Editor <c>TutorialGuideStringKeys</c>).
+/// 지속시간·효과음은 이 SO 가 원본이다. 일반 키라 <c>{Q}</c>·<c>{mm:ss}</c> 표기를 바꿀 필요가 없다.
+/// 자세한 건 Docs/tech/tutorial-guide-ui.md.
 /// </summary>
 [CreateAssetMenu(menuName = "Tutorial/Guide Text Table")]
 public sealed class TutorialGuideTextTable : ScriptableObject, ITutorialGuideTextSource
 {
+    public const string AssetPath = "Assets/9.ScriptableObject/Tutorial/Guide/TutorialGuideTexts.asset";
+
     [SerializeField] private List<TutorialGuideTextRow> rows = new List<TutorialGuideTextRow>();
 
     [NonSerialized] private Dictionary<string, TutorialGuideTextRow> lookup;

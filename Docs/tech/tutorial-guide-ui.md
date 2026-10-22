@@ -11,14 +11,15 @@
 | 파사드(MonoBehaviour) | `Assets/1.Scripts/Tutorial/Guide/TutorialGuideUI.cs` |
 | 순수 로직 | `TutorialGuideText.cs`(변형·치환·mm:ss) · `TutorialSubtitleQueue.cs` · `TutorialGuideModel.cs`(상태·RebuildFromState) |
 | 문구 테이블 타입 / ID 상수 | `TutorialGuideTextTable.cs` / `TutorialGuideIds.cs` |
+| 문구 출처(SO + Strings) / Export 키 등록 | `TutorialGuideTextSource.cs` / `Editor/TutorialGuideStringKeys.cs` — [아래](#문구-출처--strings-시트-우선-so-폴백-할-일-86-t6a) |
 | 로컬 플레이어 읽기 | `TutorialLocalPlayerInfo.cs`(캐릭터 식별 · {Q}{E}{P}) · `TutorialCharacterLookup.cs`(로스터 역조회 순수 판정) |
 | HUD 강조 대상 | `TutorialHudTarget.cs`(enum + CombatHUD 경로) · `TutorialHighlightMarker.cs` |
 | 저작 메뉴 | `Editor/TutorialGuideUIAuthoring.cs` — **Tools/UI/튜토리얼 안내 UI 구성** (멱등) |
-| 테스트 | `Editor/TutorialGuideTextTests.cs` · `Editor/TutorialGuideModelTests.cs` · `Editor/TutorialCharacterLookupTests.cs` |
+| 테스트 | `Editor/TutorialGuideTextTests.cs` · `Editor/TutorialGuideTextSourceTests.cs` · `Editor/TutorialGuideModelTests.cs` · `Editor/TutorialCharacterLookupTests.cs` |
 | 프리팹 | `Assets/2.Prefabs/UI/Tutorial/TutorialGuideUI.prefab` |
 | 문구 SO | `Assets/9.ScriptableObject/Tutorial/Guide/TutorialGuideTexts.asset` |
 
-테스트는 `TutorialEditModeTestRunner`(`Tools/Tests/튜토리얼 EditMode 테스트 실행`)의 `Fixtures` 에 있다(`^TutorialGuide(Text|SubtitleQueue|Model)Tests$`, I0 에서 플레이어 러너에서 이동).
+테스트는 `TutorialEditModeTestRunner`(`Tools/Tests/튜토리얼 EditMode 테스트 실행`)의 `Fixtures` 에 있다(`^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$`, I0 에서 플레이어 러너에서 이동).
 
 ## 접근 방식
 
@@ -87,8 +88,15 @@ DontDestroyOnLoad 하지 않는다 — 튜토리얼 씬에 속한다. 부르는 
 3. ✅ 테스트 픽스처를 튜토리얼 러너로 옮긴다 — I0.
 4. 프리팹 구조를 바꾸려면 `TutorialGuideUIAuthoring` 을 고치고 메뉴를 다시 돌린다(프리팹은 통째로 다시 만든다, 문구 SO 는 빠진 행만 추가).
 
-## ⚠️ 데이터 테이블([DataTableText]) 이관 주의
+## 문구 출처 — Strings 시트 우선, SO 폴백 (할 일 86 T6a)
 
-문구 SO 는 아직 `[DataTableText]`/`[DataTableSheet]` 에 연결하지 않았다(클래스 주석에 이유).
-- xlsx Export 는 병합 뒤 메인이 한다.
-- 기존 스킬 툴팁 검사가 낯선 `{…}` 를 오류로 보므로, 옮길 때 자리표시자 표기 변경(또는 검사 예외)이 필요하다 — 특성 레인 선례.
+화면 문구(자막·목표·대기 줄·체크리스트 id)는 `TutorialGuideTextSource` = **SO + Strings(`Loc`)** 하나에서 읽는다. 23호 레이드 `BOSS_RAID_*` 자막도 같은 길이다(호출 id 그대로).
+- 키 = **`Tutorial.Guide.<행 id>`** 일반 키(예: `Tutorial.Guide.TUT_Z1_Q`, `Tutorial.Guide.TUT_Z1_Q_GUNNER`, `Tutorial.Guide.BOSS_RAID_…`). 툴팁 자동 키(`주인ID/필드경로`)가 아니라서
+  검증기는 ko·en 자리표시자 집합이 같은지만 본다 — `{Q}`·`{E}`·`{P}`·`{mm:ss}`·`{n}/{total}` 표기를 바꿀 필요가 없다.
+- 시트에 키가 있으면 그 문구(현재 언어), 없으면 **SO 문구**(`#키` 를 내지 않는다). 지금 xlsx 에 행이 없으므로 화면은 그대로 SO 문구다.
+- 지속시간·효과음은 계속 **SO** 가 원본이다. SO 에 없고 시트에만 있는 id 도 찾는다(지속시간 0 = 큐 기본값, 효과음 없음) — 새 로비 대사(T6b)가 쓸 수 있다.
+  시트에만 있는 캐릭터 변형(`id_GUNNER` 등)은 SO 기본 id 행의 지속시간·효과음을 물려받는다.
+- 변형 선택: 변형 행이 SO·시트 어느 쪽에 있든 문구가 비어 있지 않으면 변형을 쓴다(SO 변형이 빈 칸이어도 시트 변형이 있으면 그것).
+- 언어가 바뀌면(`Loc.Changed`) 목표 패널·대기 줄은 다시 그린다. 이미 뜬 자막은 그대로, 다음 줄부터 새 언어.
+- Export Template: `Editor/TutorialGuideStringKeys.cs` 가 SO 의 문구 있는 행 전부를 Strings 키로 등록한다(ko = SO 문구, `#설명` = `TutorialGuideTexts · 튜토리얼 안내` / `· 23호 레이드 자막`, en 빈 칸). 빈 문구 행은 뺀다.
+  Export 는 병합 뒤 메인이 한다. 시트 행이 생긴 뒤 문구를 고칠 곳은 xlsx 다(SO 문구는 폴백·새 행 ko 원문으로만 남는다).

@@ -3,6 +3,11 @@
 > 로비(3.LobbyScene) 훈련실에서 하는 TRAIN_01~03 진행. 이 문서는 T8 에서 흐름·단계별 내용으로 확장한다 — 지금은 TRAIN_01 체크 시점·NavMesh 절만 있다.
 > 흐름·출격·접속 승인은 [lobby-demo-flow.md](lobby-demo-flow.md) §1.
 
+## 대사 문구 출처 (T6a)
+
+튜토리얼·23호 레이드 자막 문구는 Strings 일반 키 **`Tutorial.Guide.<id>`** 로 조회하고, 시트에 행이 없으면 `TutorialGuideTexts` SO 문구를 쓴다(지속시간·효과음은 SO) —
+[tutorial-guide-ui.md](tutorial-guide-ui.md#문구-출처--strings-시트-우선-so-폴백-할-일-86-t6a). 로비 무전(T6b)·브리핑(T6c)의 새 대사도 같은 키 접두로 시트에만 넣어도 `TutorialGuideTextSource` 가 찾는다(SO 행이 없으면 지속시간 = 큐 기본값).
+
 ## TRAIN_01 무기 점검 — 체크 시점
 
 개인 6항목은 존1 서버 훅을 그대로 재사용해 센다(`LobbyTrainingWeaponCheck` 구독 → `LobbyWeaponCheckRules`/`LobbyWeaponCheckModel` 판정).

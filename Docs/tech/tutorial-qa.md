@@ -15,7 +15,7 @@
 - [ ] `Assets/0.Scenes/MainFlow/0.BootStrapScene` 을 열고 Play → 타이틀(아무 키 → START) → 대기 화면 → 로비(호스트 자동 호스팅 — [lobby-demo-flow.md](lobby-demo-flow.md)) → 준비 → 로딩 → `4.MapScene`.
   `4.MapScene` 의 `Stage1` 이 튜토리얼(StageTutorial)이라 **Start = 항상 튜토리얼**이다(절차 맵 `Stage1_Procedural` 은 비활성으로 보관 — 회귀 3부에서만 켠다).
 - [ ] 🔴 네트워크 없이 `4.MapScene` 만 단독 Play 하면 디렉터·타이머가 스폰되지 않아 **아무것도 돌지 않는다**(로그 `[Tutorial] 네트워크 없이 맵이 생성됐다 …`). 반드시 부트스트랩 → 호스트(솔로도 호스트)로.
-- [ ] 툴바 `데이터: 테이블/인스펙터` 는 어느 쪽이든 된다(튜토리얼 문구 SO 는 아직 데이터 테이블에 연결되지 않음 — [data-table.md](data-table.md)). 빌드는 항상 xlsx.
+- [ ] 툴바 `데이터: 테이블/인스펙터` 는 어느 쪽이든 된다(튜토리얼 문구는 Strings 키 `Tutorial.Guide.<id>` 가 있으면 그 문구, 없으면 SO 문구 — [tutorial-guide-ui.md](tutorial-guide-ui.md#문구-출처--strings-시트-우선-so-폴백-할-일-86-t6a). Strings 는 툴바와 무관하게 늘 xlsx 가 원본). 빌드는 항상 xlsx.
 - [ ] 캐릭터: 1부는 **팔라딘·거너·어쌔신 각 1회**(시나리오 §9 "솔로 × 3캐릭터"). 캐릭터별 문구가 다르다.
 
 ### 0.2 MPPM (2부)
@@ -335,7 +335,7 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 | 특성 | 6종 **placeholder**(`(임시)` 이름·값) · 특성 기획서(D8) 대기 · 공격속도·방어·최대체력 배율은 소비처 없음 · 틱 공격은 틱마다 쿨감 · 추락 피해는 선택 중 무적 우회 · 끊긴 플레이어 획득 기록 삭제 | 기획 — [tutorial-traits.md](tutorial-traits.md) §4·§6 |
 | 문구 | 전부 **초안** — 기획 확정 필요(특히 새 id `TUT_C_PICK/WAIT/NEXT`·`TUT_C4_GO_PAD`, `TUT_Z4_MIDBOSS` 이름 없음, `TUT_Z4_ULT*` 미표시) · 시나리오 §5 id 와 변형 충돌(`TUT_Z1_ATTACK_HEAT`·`TUT_Z1_PASSIVE_INFO_*` 로 우회) · D20 게이지 이름·D21 원흉 | 기획 |
 | xlsx | 팔라딘 패시브 툴팁 "피격 시" 수정(D22) · 어쌔신 시트 R 스택 잔재 → 분노 게이지 | 기획/데이터(SVN) — 시나리오 §7.3 |
-| xlsx Export | 튜토리얼 문구·특성 SO 는 `[DataTableText]` 미연결 — **development 병합 뒤 Main 에서** Export(자리표시자 `{…}` 표기 변경 필요) | [data-table.md](data-table.md) §8 |
+| xlsx Export | **development 병합 뒤 Main 에서** Export. 튜토리얼 안내 문구 = **해결됨(일반 키)** — Strings `Tutorial.Guide.<id>` 로 등록돼 `{Q}`·`{mm:ss}` 표기 변경 불필요(할 일 86 T6a). 특성 SO 는 아직 `[DataTableText]` 미연결(`{location}` 표기 변경 필요) | [tutorial-guide-ui.md](tutorial-guide-ui.md#문구-출처--strings-시트-우선-so-폴백-할-일-86-t6a) · [data-table.md](data-table.md) §8 |
 | G8 시점 | 설정 자막 10초는 고정값 — 존4 진입 때 다른 자막이 큐에 남아 있으면 화면상 설정 자막이 G8 보다 늦게 끝난다 | [tutorial-zone4.md](tutorial-zone4.md) §3 |
 | 존3 이른 간파 | 추정 판정(존3 수신자 = 스피너봇뿐 전제 — 상자가 생기면 오판) | [tutorial-zone3.md](tutorial-zone3.md) §6 |
 | 존3 연계 튜닝(D26) | 유효 벽(존3 긴 변 — 실제 벽 면이 슬롯 경계에서 안쪽이면 '막힘 접촉 1.6m' 로 인정) · 연습 위치(벽 4m·끝 8m) · 밀치기 3m/0.35초 · 회복 0.6초 · 다음 창 4초 — 전부 인스펙터. 벽 앞 장애물·NavMesh 모양에 따라 Play 로 조정. 원위치 복귀 없음(사용자 변경) → 2·3회째는 벽에 붙은 채 시작해 쉬울 수 있음(벽 판정 방식 논의 중) | [tutorial-zone3.md](tutorial-zone3.md) §4 |
@@ -358,7 +358,8 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 - [ ] `AddressableAssetSettings.asset` 해시 변경(에디터 노이즈)은 커밋하지 않는다.
 - [ ] 공용 존 프리팹(`Zones/*`)·원본 `SpinnerBot.prefab`·`TrainingDummy.prefab`·xlsx·SVN 아트 무수정.
 - [ ] **xlsx 열 목록 보고** — 이 브랜치는 xlsx 열을 **하나도 추가하지 않았다**(`[DataTableSheet/Text]` 0). 병합 뒤 Main 에서 Export 할 후보:
-  - 안내 문구 `TutorialGuideTextTable.rows[]` — `id` · `text`(`[DataTableText]`) · `durationSeconds`(`sfx` 는 에셋 참조라 인스펙터 유지).
+  - 안내 문구 `TutorialGuideTextTable.rows[]` — **해결됨(일반 키, 할 일 86 T6a)**: `text` 는 Export Template 이 Strings 키 `Tutorial.Guide.<id>`(ko = SO 문구)로 붙인다 — 자리표시자 표기 변경 없음.
+    `durationSeconds`·`sfx` 는 SO(인스펙터) 유지.
   - 특성 문구 `TutorialTraitTextTable.entries[]` — `id` · `text`(`[DataTableText]`, `{location}` 표기 변경 필요).
   - 특성 `TutorialTraitDefinition` — `id`·`displayName`·`description`(`[DataTableText]`)·`value`(+ enum `effectKind`·`triggerAttackType`·`cooldownSlot` 은 int 열 또는 인스펙터 유지 결정).
   - 특성 풀 `TutorialTraitPool.offerCount`.
