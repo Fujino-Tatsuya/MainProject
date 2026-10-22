@@ -1,6 +1,9 @@
 using NUnit.Framework;
 
-/// <summary>선입력 버퍼(할 일 44) — 기록·만료·덮어쓰기·소비·비우기·끔, 거부 사유별 보관/버림·입력 1회 = 피드백 1회.</summary>
+/// <summary>
+/// 선입력 버퍼(할 일 44·77) — 기록·종류별 보관과 개별 만료·우선순위 꺼내기·시작(전체 비움)·행동 중 소비(그 종류만)·끔,
+/// 거부 사유별 보관/버림(버림 = 다음 후보, 보관 = 중단)·입력 1회 = 피드백 1회.
+/// </summary>
 public sealed class PlayerInputBufferTests
 {
     private const float Hold = 0.2f;
@@ -31,27 +34,27 @@ public sealed class PlayerInputBufferTests
     }
 
     [Test]
-    public void Record_Overwrites_KeepsOnlyLast()
+    public void Record_SameKind_RefreshesTimeOnly()
     {
         var buffer = new PlayerInputBuffer(Hold);
         buffer.Record(PlayerBufferedInput.Attack, 10f);
-        buffer.Record(PlayerBufferedInput.SkillMain, 10.1f);
+        buffer.Record(PlayerBufferedInput.Attack, 10.1f);
 
-        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.SkillMain));
-        Assert.That(buffer.Has(PlayerBufferedInput.Attack, 10.1f), Is.False);
-        Assert.That(buffer.Peek(10.29f), Is.EqualTo(PlayerBufferedInput.SkillMain), "유지 시간은 마지막 입력 기준");
+        Assert.That(buffer.Count(10.1f), Is.EqualTo(1), "같은 종류는 하나");
+        Assert.That(buffer.Peek(10.29f), Is.EqualTo(PlayerBufferedInput.Attack), "유지 시간은 다시 누른 시각 기준");
+        Assert.That(buffer.Peek(10.31f), Is.EqualTo(PlayerBufferedInput.None));
     }
 
     [Test]
-    public void Consume_RemovesOnlyMatchingKind()
+    public void Remove_RemovesOnlyMatchingKind()
     {
         var buffer = new PlayerInputBuffer(Hold);
         buffer.Record(PlayerBufferedInput.SkillSub, 10f);
 
-        buffer.Consume(PlayerBufferedInput.Attack);
-        Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.SkillSub), "다른 종류 소비는 무시");
+        buffer.Remove(PlayerBufferedInput.Attack);
+        Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.SkillSub), "다른 종류 지우기는 무시");
 
-        buffer.Consume(PlayerBufferedInput.SkillSub);
+        buffer.Remove(PlayerBufferedInput.SkillSub);
         Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.None));
     }
 
@@ -355,6 +358,333 @@ public sealed class PlayerInputBufferTests
         }
 
         return result;
+    }
+
+    // ── 우선순위(할 일 77) — PlayerInputReader 기본값: 대시5 > 우클릭4 > R3 > Q·E 2 > 평타1 ──
+
+    private static PlayerInputBuffer CreatePrioritized(float hold = Hold)
+    {
+        var buffer = new PlayerInputBuffer(hold);
+        buffer.SetPriority(PlayerBufferedInput.Dash, 5);
+        buffer.SetPriority(PlayerBufferedInput.SkillInterrupt, 4);
+        buffer.SetPriority(PlayerBufferedInput.SkillUltimate, 3);
+        buffer.SetPriority(PlayerBufferedInput.SkillMain, 2);
+        buffer.SetPriority(PlayerBufferedInput.SkillSub, 2);
+        buffer.SetPriority(PlayerBufferedInput.Attack, 1);
+        return buffer;
+    }
+
+    [Test]
+    public void Multi_DifferentKinds_AllKept()
+    {
+        // 할 일 77 — 다른 종류는 덮지 않고 전부 보관한다(낮은 입력도 기록된다).
+        var buffer = CreatePrioritized();
+        Assert.That(buffer.Record(PlayerBufferedInput.Dash, 10f), Is.True);
+        Assert.That(buffer.Record(PlayerBufferedInput.Attack, 10.05f), Is.True);
+        Assert.That(buffer.Record(PlayerBufferedInput.SkillMain, 10.1f), Is.True);
+
+        Assert.That(buffer.Count(10.1f), Is.EqualTo(3));
+        Assert.That(buffer.Contains(PlayerBufferedInput.Attack, 10.1f), Is.True);
+        Assert.That(buffer.Contains(PlayerBufferedInput.SkillMain, 10.1f), Is.True);
+        Assert.That(buffer.Has(PlayerBufferedInput.Attack, 10.1f), Is.False, "살아 있어도 더 높은 입력에 밀려 있으면 꺼낼 입력이 아니다");
+    }
+
+    [Test]
+    public void Multi_ExpireSeparately()
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+        buffer.Record(PlayerBufferedInput.Attack, 10.15f);
+
+        Assert.That(buffer.Peek(10.2f), Is.EqualTo(PlayerBufferedInput.Dash));
+        Assert.That(buffer.Peek(10.21f), Is.EqualTo(PlayerBufferedInput.Attack), "대시만 만료 — 평타는 자기 시각 기준으로 살아 있다");
+        Assert.That(buffer.Peek(10.36f), Is.EqualTo(PlayerBufferedInput.None));
+    }
+
+    [TestCase(PlayerBufferedInput.Dash, PlayerBufferedInput.SkillInterrupt)]
+    [TestCase(PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate)]
+    [TestCase(PlayerBufferedInput.SkillUltimate, PlayerBufferedInput.SkillMain)]
+    [TestCase(PlayerBufferedInput.SkillSub, PlayerBufferedInput.Attack)]
+    [TestCase(PlayerBufferedInput.Dash, PlayerBufferedInput.Attack)]
+    public void Peek_HighestPriority_RegardlessOfOrder(PlayerBufferedInput higher, PlayerBufferedInput lower)
+    {
+        var higherFirst = CreatePrioritized();
+        higherFirst.Record(higher, 10f);
+        higherFirst.Record(lower, 10.1f);
+
+        var lowerFirst = CreatePrioritized();
+        lowerFirst.Record(lower, 10f);
+        lowerFirst.Record(higher, 10.1f);
+
+        Assert.That(higherFirst.Peek(10.1f), Is.EqualTo(higher), "나중에 누른 낮은 입력보다 높은 입력");
+        Assert.That(lowerFirst.Peek(10.1f), Is.EqualTo(higher));
+        Assert.That(higherFirst.Has(higher, 10.1f), Is.True);
+        Assert.That(higherFirst.Has(lower, 10.1f), Is.False);
+    }
+
+    [TestCase(PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub)]
+    [TestCase(PlayerBufferedInput.SkillSub, PlayerBufferedInput.SkillMain)]
+    public void Peek_EqualPriority_LaterPressWins(PlayerBufferedInput first, PlayerBufferedInput later)
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(first, 10f);
+        buffer.Record(later, 10.1f);
+
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(later));
+
+        // 같은 프레임(같은 시각)이면 기록 순서로 나중 것.
+        var sameFrame = CreatePrioritized();
+        sameFrame.Record(first, 10f);
+        sameFrame.Record(later, 10f);
+        Assert.That(sameFrame.Peek(10f), Is.EqualTo(later));
+    }
+
+    [Test]
+    public void Peek_EqualPriority_RepressMovesToFront()
+    {
+        // 같은 종류를 다시 누르면 시각이 갱신돼 동순위 중 '나중 입력'이 된다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        buffer.Record(PlayerBufferedInput.SkillSub, 10.05f);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10.1f);
+
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.SkillMain));
+    }
+
+    [Test]
+    public void Peek_DefaultAllEqual_LastInputWins()
+    {
+        // 우선순위를 설정하지 않은 버퍼 = 전부 0 — 마지막 입력이 먼저다(앞 입력도 보관은 된다).
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+        buffer.Record(PlayerBufferedInput.Attack, 10.1f);
+
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(buffer.Contains(PlayerBufferedInput.Dash, 10.1f), Is.True);
+    }
+
+    [TestCase(PlayerActionAttempt.OutOfResource)]
+    [TestCase(PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(PlayerActionAttempt.Rejected)]
+    public void Resolve_DropReason_NextCandidateSurfaces(PlayerActionAttempt attempt)
+    {
+        // 버림 사유 — 그 입력만 지우고 남은 것 중 다음 순위가 꺼낼 입력으로 올라온다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Attack, 10f);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10.02f);
+        buffer.Record(PlayerBufferedInput.SkillUltimate, 10.04f);
+
+        buffer.Resolve(PlayerBufferedInput.SkillUltimate, attempt);
+        Assert.That(buffer.Peek(10.05f), Is.EqualTo(PlayerBufferedInput.SkillMain));
+
+        buffer.Resolve(PlayerBufferedInput.SkillMain, attempt);
+        Assert.That(buffer.Peek(10.05f), Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(PlayerInputBuffer.DropsInput(attempt), Is.True);
+    }
+
+    [Test]
+    public void Resolve_Blocked_KeepsAll_TopUnchanged()
+    {
+        // 보관 사유(바쁨·CC) — 아무것도 지우지 않는다. 꺼낼 입력도 그대로라 낮은 후보가 앞지르지 않는다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Attack, 10f);
+        buffer.Record(PlayerBufferedInput.Dash, 10.02f);
+
+        buffer.Resolve(PlayerBufferedInput.Dash, PlayerActionAttempt.Blocked);
+
+        Assert.That(buffer.Peek(10.05f), Is.EqualTo(PlayerBufferedInput.Dash));
+        Assert.That(buffer.Count(10.05f), Is.EqualTo(2));
+        Assert.That(PlayerInputBuffer.DropsInput(PlayerActionAttempt.Blocked), Is.False);
+        Assert.That(PlayerInputBuffer.DropsInput(PlayerActionAttempt.Started), Is.False);
+    }
+
+    [Test]
+    public void Consume_RemovesOnlyThatKind()
+    {
+        // 행동 중 소비처(콤보 예약 등)는 그 입력만 받아들인다 — 함께 들고 있던 다른 입력은 남는다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        buffer.Record(PlayerBufferedInput.Attack, 10.05f);
+
+        buffer.Consume(PlayerBufferedInput.Attack);
+
+        Assert.That(buffer.Contains(PlayerBufferedInput.Attack, 10.1f), Is.False);
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.SkillMain));
+    }
+
+    [Test]
+    public void Resolve_Started_ClearsAllKinds()
+    {
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.SkillSub, 10f);
+        buffer.Record(PlayerBufferedInput.Dash, 10.05f);
+
+        buffer.Resolve(PlayerBufferedInput.Dash, PlayerActionAttempt.Started);
+
+        Assert.That(buffer.Count(10.05f), Is.EqualTo(0), "대시가 실행되면 함께 들고 있던 E 도 버린다");
+    }
+
+    [Test]
+    public void HoldZero_RecordsNothing_AndDropsHeldWhenSwitchedOff()
+    {
+        var off = CreatePrioritized(0f);
+        Assert.That(off.Record(PlayerBufferedInput.Dash, 10f), Is.False);
+        Assert.That(off.Record(PlayerBufferedInput.Attack, 10f), Is.False);
+        Assert.That(off.Peek(10f), Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(off.Count(10f), Is.EqualTo(0));
+
+        // 들고 있던 중에 유지 시간이 0 이 되면(데이터 테이블·인스펙터) 전부 없는 것으로 본다.
+        var switched = CreatePrioritized();
+        switched.Record(PlayerBufferedInput.SkillMain, 10f);
+        switched.Record(PlayerBufferedInput.Attack, 10f);
+        switched.HoldSeconds = 0f;
+        Assert.That(switched.Peek(10f), Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(switched.Count(10f), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void SortByPriority_DefaultOrder_StableForTies()
+    {
+        var buffer = CreatePrioritized();
+        PlayerBufferedInput[] kinds =
+        {
+            PlayerBufferedInput.Attack, PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub,
+            PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate, PlayerBufferedInput.Dash
+        };
+
+        buffer.SortByPriority(kinds);
+
+        Assert.That(kinds, Is.EqualTo(new[]
+        {
+            PlayerBufferedInput.Dash, PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate,
+            PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub, PlayerBufferedInput.Attack
+        }), "대시 > 우클릭 > R > Q = E(원래 순서) > 평타");
+    }
+
+    // ── Idle/Move 후보 순회(PlayerStateBase.TryConsumeActionInput 과 같은 규칙) ──
+    // 우선순위 높은 순으로 '꺼낼 입력'인 후보만 시도 → 시작 = 전부 비움, 버림 = 그 입력만 지우고 같은 프레임에 다음 후보, 보관 = 중단.
+
+    private static PlayerBufferedInput Dispatch(
+        PlayerInputBuffer buffer, float now, System.Func<PlayerBufferedInput, PlayerActionAttempt> tryStart,
+        System.Collections.Generic.List<PlayerBufferedInput> attempted)
+    {
+        PlayerBufferedInput[] kinds =
+        {
+            PlayerBufferedInput.Dash, PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate,
+            PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub, PlayerBufferedInput.Attack
+        };
+        buffer.SortByPriority(kinds);
+        foreach (PlayerBufferedInput kind in kinds)
+        {
+            if (!buffer.Has(kind, now))
+                continue;
+
+            attempted.Add(kind);
+            PlayerActionAttempt attempt = tryStart(kind);
+            buffer.Resolve(kind, attempt);
+            if (attempt == PlayerActionAttempt.Started)
+                return kind;
+            if (attempt == PlayerActionAttempt.Blocked)
+                return PlayerBufferedInput.None;
+        }
+
+        return PlayerBufferedInput.None;
+    }
+
+    [Test]
+    public void Dispatch_DropRejection_TriesNextCandidateSameFrame()
+    {
+        // R 쿨타임(버림) → 같은 프레임에 Q → Q 도 봉인(버림) → 평타 시작.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Attack, 10f);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10.02f);
+        buffer.Record(PlayerBufferedInput.SkillUltimate, 10.04f);
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+
+        PlayerBufferedInput started = Dispatch(buffer, 10.05f, kind => kind switch
+        {
+            PlayerBufferedInput.SkillUltimate => PlayerActionAttempt.OutOfResource,
+            PlayerBufferedInput.SkillMain => PlayerActionAttempt.BlockedByEffect,
+            _ => PlayerActionAttempt.Started
+        }, attempted);
+
+        Assert.That(started, Is.EqualTo(PlayerBufferedInput.Attack));
+        Assert.That(attempted, Is.EqualTo(new[]
+        {
+            PlayerBufferedInput.SkillUltimate, PlayerBufferedInput.SkillMain, PlayerBufferedInput.Attack
+        }));
+        Assert.That(buffer.Count(10.05f), Is.EqualTo(0), "시작하면 전부 비운다");
+    }
+
+    [Test]
+    public void Dispatch_KeepRejection_StopsThisFrame_KeepsAll()
+    {
+        // 기절(보관) 중 대시 — 아래 Q·평타로 넘어가지 않고 이번 프레임은 멈춘다. 전부 남는다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Attack, 10f);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10.02f);
+        buffer.Record(PlayerBufferedInput.Dash, 10.04f);
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+
+        PlayerBufferedInput started = Dispatch(buffer, 10.05f,
+            kind => kind == PlayerBufferedInput.Dash ? PlayerActionAttempt.Blocked : PlayerActionAttempt.Started, attempted);
+
+        Assert.That(started, Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(attempted, Is.EqualTo(new[] { PlayerBufferedInput.Dash }));
+        Assert.That(buffer.Count(10.05f), Is.EqualTo(3));
+        Assert.That(buffer.Peek(10.05f), Is.EqualTo(PlayerBufferedInput.Dash));
+    }
+
+    [Test]
+    public void Dispatch_KeptHigherExpires_LowerRunsAfterwards()
+    {
+        // 기절로 보관한 대시가 먼저 만료되면, 아직 살아 있는 Q 가 그다음 프레임에 실행된다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10.1f);
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+
+        Assert.That(Dispatch(buffer, 10.15f, _ => PlayerActionAttempt.Blocked, attempted), Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(Dispatch(buffer, 10.25f, _ => PlayerActionAttempt.Started, attempted), Is.EqualTo(PlayerBufferedInput.SkillMain));
+    }
+
+    [Test]
+    public void Dispatch_OnlyQPressed_InterruptUnassigned_StartsQ()
+    {
+        // Q 만 누른 프레임 — 우클릭(미배정이면 Rejected)이 앞 순위여도 시도조차 되지 않고 Q 가 시작된다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+
+        PlayerBufferedInput started = Dispatch(buffer, 10f,
+            kind => kind == PlayerBufferedInput.SkillInterrupt ? PlayerActionAttempt.Rejected : PlayerActionAttempt.Started,
+            attempted);
+
+        Assert.That(started, Is.EqualTo(PlayerBufferedInput.SkillMain));
+        Assert.That(attempted, Is.EqualTo(new[] { PlayerBufferedInput.SkillMain }));
+    }
+
+    [Test]
+    public void Dispatch_SkillPressedDuringHeldAttackCombo_StartsAfterAttack()
+    {
+        // 회귀(할 일 77): 스킬 1회 → 평타를 누른 채 콤보 → 공격 중 E. 콤보 예약이 매 프레임 평타를 소비해도
+        // E 는 남아 공격이 끝난 첫 틱에 시작된다(예전엔 소비가 버퍼 전체를 비워 E 가 사라졌다).
+        var buffer = CreatePrioritized();
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        Assert.That(Dispatch(buffer, 10f, _ => PlayerActionAttempt.Started, attempted), Is.EqualTo(PlayerBufferedInput.SkillMain));
+
+        buffer.Record(PlayerBufferedInput.Attack, 11f);
+        Assert.That(Dispatch(buffer, 11f, _ => PlayerActionAttempt.Started, attempted), Is.EqualTo(PlayerBufferedInput.Attack));
+
+        buffer.Record(PlayerBufferedInput.SkillSub, 11.1f);
+        buffer.Record(PlayerBufferedInput.Attack, 11.12f);
+        for (float t = 11.12f; t < 11.2f; t += 0.02f)
+            buffer.Consume(PlayerBufferedInput.Attack); // DefaultAttackController.TryQueueNextAttackFromInput — 홀드 중 매 프레임
+
+        PlayerBufferedInput started = Dispatch(buffer, 11.2f, _ => PlayerActionAttempt.Started, attempted);
+
+        Assert.That(started, Is.EqualTo(PlayerBufferedInput.SkillSub));
     }
 
     [Test]

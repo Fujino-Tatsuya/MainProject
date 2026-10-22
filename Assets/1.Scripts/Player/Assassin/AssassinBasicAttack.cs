@@ -57,6 +57,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // [서버] 오너가 알린 눌림과 마지막 신호 시각 — End 순간 이 값(신선할 때만)이 다음 타 여부에 들어간다.
     private bool serverHeld;
     private float lastHoldSignalTime;
+    // 스킬 입력으로 지금 타에서 마무리 중(할 일 77 후속) — 오너·서버가 각자 들고 공격이 끝나면(ResetRuntime) 풀린다.
+    private bool finishingChain;
     // 이번 타(일반 1타·강타 1회)의 분노 게이지 충전을 이미 받았는가 — 타 하나에 1번(§4.2).
     private bool rageClaimed;
     private int hitsFired;
@@ -82,7 +84,22 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // 누른 프레임으로만 시작하고, 공격 중 스킬 입력은 선입력 버퍼(0.2초) 그대로다(할 일 44 — 거너만 다름).
     public bool StartsOnHold => false;
     public bool ReservesSkillAfterAttack => false;
-    public void FinishWithoutChaining() { }
+
+    // 버퍼의 스킬 입력 때문에 다음 타를 잇지 않는다(할 일 77 후속) — 뗀 것처럼: 오너는 눌림·창 예약을 더 보내지 않고,
+    // 서버는 눌림·예약을 지우고 이 공격이 끝날 때까지 새 눌림·예약을 받지 않는다. 이 타는 End 에서 기존 정상 종료로 끝난다.
+    public void FinishWithoutChaining()
+    {
+        if (!active || finishingChain || !IsInputSource)
+            return;
+
+        finishingChain = true;
+        ownerQueued = true; // 남은 창에서 다시 예약하지 않게(서버 거절로 풀리지도 않는다 — 아래 서버 래치)
+        holdSent = false;
+        if (IsNetworkActive)
+            FinishChainRpc();
+        else
+            ServerFinishChain();
+    }
     public AssassinBasicAttackData Data => data;
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
@@ -334,6 +351,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void TickInputSource()
     {
+        // 스킬 입력으로 마무리 중이면 눌림·예약을 더 보내지 않는다(FinishWithoutChaining).
+        if (finishingChain)
+            return;
+
         TickHoldSignal();
 
         // 창 안에서 누른 프레임은 예약한다 — 홀드와 별개로, End 전에 손을 떼도 이 예약으로 이어진다. 오너도 자기 재생 기준 창으로 거른다.
@@ -402,7 +423,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // 눌림 변경 — 누름이면 홀드를 (다시) 켠다. 뗐다 다시 눌러도 End 순간 눌려 있으면 잇는다.
     private void ServerSetHold(bool held, Vector3 direction)
     {
-        if (!active)
+        if (!active || finishingChain)
             return;
 
         serverHeld = held;
@@ -456,6 +477,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "어쌔신 기본 공격 다음 타");
 
+        // 스킬 입력으로 마무리 중이면 받지 않는다(오너도 이미 멈췄다 — 도착 순서가 바뀐 요청만 여기 걸린다).
+        if (finishingChain)
+            return;
+
         // 창 판정은 서버 자기 애니 진행으로 한다(가붕이 isComboWindowOpen 과 같은 권한). 창 밖이면 오너 예약을 푼다.
         if (!IsInCurrentComboWindow())
         {
@@ -465,6 +490,25 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         hasQueuedNextAttack = true;
         serverNextDirection = Flatten(direction);
+    }
+
+    [Rpc(SendTo.Server)]
+    private void FinishChainRpc(RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+        ServerFinishChain();
+    }
+
+    // 뗀 것처럼 — 받은 눌림·예약을 지우고 이 공격이 끝날 때까지 새것을 받지 않는다. 서버가 이미 다음 타를 시작했으면 그 타에서 마무리된다.
+    private void ServerFinishChain()
+    {
+        if (!active)
+            return;
+
+        finishingChain = true;
+        serverHeld = false;
+        hasQueuedNextAttack = false;
     }
 
     private bool StartServer(int stepIndex, Vector3 direction, AssassinBasicAttackMode mode, float turnDelay)
@@ -694,6 +738,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         comboWindowOpen = false;
         holdSent = false;
         serverHeld = false;
+        finishingChain = false;
         hitsFired = 0;
         fallbackEndTime = 0f;
         hasPendingClip = false;

@@ -285,6 +285,49 @@ public sealed class ReconnectLoopTests
 
     // ─── 사유 문구 ─────────────────────────────────────────────────────
 
+    // ─── 의도적 이탈(ESC 그만두기 → 타이틀, PLAN-settings-ddol) ──────────────
+
+    [Test]
+    public void 이탈_Reset_뒤_호스트_정지는_재호스팅하지_않는다()
+    {
+        var loop = Host();
+        loop.Start(0);
+        loop.OnHostStartResult(true, 0);
+        Assert.AreEqual(ReconnectState.Hosting, loop.State);
+
+        loop.Reset();
+        Assert.AreEqual(ReconnectState.Idle, loop.State);
+        Assert.AreEqual(ReconnectCommand.None, loop.OnStopped(DemoJoinRejectReason.Unknown, 1), "Shutdown 이 낸 서버 정지가 Shutdown 을 또 내면 안 된다");
+        Assert.AreEqual(ReconnectCommand.None, loop.Tick(100), "Idle 은 시간이 지나도 재시도하지 않는다");
+        Assert.AreEqual(ReconnectState.Idle, loop.State);
+    }
+
+    [Test]
+    public void 이탈_Reset_뒤_클라_정지는_대기_씬으로_가지_않는다()
+    {
+        var loop = Client();
+        loop.Start(0);
+        loop.OnClientConnected(1);
+
+        loop.Reset();
+        Assert.AreEqual(ReconnectCommand.None, loop.OnStopped(DemoJoinRejectReason.Unknown, 2));
+        Assert.AreEqual(ReconnectState.Idle, loop.State);
+        Assert.AreEqual(0, loop.AttemptCount);
+        Assert.AreEqual(DemoJoinRejectReason.None, loop.LastReason);
+    }
+
+    [Test]
+    public void 이탈_뒤_다시_시작하면_첫_시도부터()
+    {
+        var loop = Client();
+        loop.Start(0);
+        loop.OnStopped(DemoJoinRejectReason.Timeout, 1);   // Connecting 실패 → ShuttingDown
+        loop.Reset();
+
+        Assert.AreEqual(ReconnectCommand.StartClient, loop.Start(5), "타이틀 START 로 다시 시작하면 Idle 에서 새 시도");
+        Assert.AreEqual(1, loop.AttemptCount);
+    }
+
     [Test]
     public void 사유마다_문구가_있고_None_은_빈_문자열()
     {

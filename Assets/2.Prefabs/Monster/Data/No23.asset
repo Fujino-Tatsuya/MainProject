@@ -403,7 +403,7 @@ MonoBehaviour:
     sequence: 1
     damageMultiplier: 1
     speedMultiplier: 1
-  counterFrontAngle: 60
+  counterFrontAngle: 90
   backAttackAngle: 60
   hitReactionState: getowned
   hitReactionStateRight: getowned_R

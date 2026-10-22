@@ -14,6 +14,7 @@ public static class UiStringsAuthoring
 {
     private const string Tag = "[UiStringsAuthoring]";
     private const string ResultScenePath = "Assets/0.Scenes/MainFlow/5.ResultScene.unity";
+    private const string TitleScenePath = "Assets/0.Scenes/MainFlow/1.TitleScene.unity";
     private const string AssassinHudPath = "Assets/2.Prefabs/Player/Assassin/AssassinHUD.prefab";
     private const string InteractPromptPath = "Assets/2.Prefabs/UI/InteractPrompt.prefab";
     private const string LobbyResultPanelPath = "Assets/2.Prefabs/UI/Result/LobbyResultPanel.prefab";
@@ -21,15 +22,26 @@ public static class UiStringsAuthoring
     /// <summary>라벨 하나 — <see cref="ObjectPath"/> 는 루트 아래 이름 경로의 끝부분(예 <c>PlayerRowsHeader/Header_Kills</c>).</summary>
     private readonly struct Target
     {
-        public Target(string objectPath, UiString text)
+        public Target(string objectPath, UiString text, bool authorKo = false)
         {
             ObjectPath = objectPath;
             Text = text;
+            AuthorKo = authorKo;
         }
 
         public string ObjectPath { get; }
         public UiString Text { get; }
+        /// <summary>저작 글자도 ko 로 맞춘다 — 시트에 행이 없을 때 영어 원문 대신 한국어가 보이게(타이틀 메뉴, 10-22).</summary>
+        public bool AuthorKo { get; }
     }
+
+    // 타이틀 모니터 메뉴 — 기본 한국어(경석 10-22). 영어는 시트 en(START·SETTING·EXIT).
+    private static readonly Target[] TitleTargets =
+    {
+        new Target("Start_Button/Text (TMP)", UiStrings.TitleStart, authorKo: true),
+        new Target("Option_Button/Text (TMP)", UiStrings.TitleSetting, authorKo: true),
+        new Target("Exit_Button/Text (TMP)", UiStrings.TitleExit, authorKo: true),
+    };
 
     private static readonly Target[] ResultTargets =
     {
@@ -79,6 +91,7 @@ public static class UiStringsAuthoring
         changed += AuthorPrefab(InteractPromptPath, InteractPromptTargets);
         changed += AuthorPrefab(LobbyResultPanelPath, LobbyResultPanelTargets);
         changed += AuthorScene(ResultScenePath, ResultTargets);
+        changed += AuthorScene(TitleScenePath, TitleTargets);
         Debug.Log($"{Tag} 완료 — 바뀐 라벨 {changed}개{(changed == 0 ? "(전부 이미 맞음, 저장 안 함)" : string.Empty)}");
     }
 
@@ -199,10 +212,23 @@ public static class UiStringsAuthoring
             return 0;
         }
 
+        bool authored = false;
         if (text.text != target.Text.Ko)
-            Debug.LogWarning($"{Tag} {where} › {target.ObjectPath} 글자 '{text.text}' ≠ 키 ko '{target.Text.Ko}' — 시트 행이 없으면 저작 글자가 보인다.");
+        {
+            if (target.AuthorKo)
+            {
+                var textSo = new SerializedObject(text);
+                textSo.FindProperty("m_text").stringValue = target.Text.Ko;
+                textSo.ApplyModifiedPropertiesWithoutUndo();
+                authored = true;
+            }
+            else
+            {
+                Debug.LogWarning($"{Tag} {where} › {target.ObjectPath} 글자 '{text.text}' ≠ 키 ko '{target.Text.Ko}' — 시트 행이 없으면 저작 글자가 보인다.");
+            }
+        }
 
-        return Apply(found.gameObject, target.Text.Key) ? 1 : 0;
+        return Apply(found.gameObject, target.Text.Key) || authored ? 1 : 0;
     }
 
     /// <summary><paramref name="root"/>(포함) 아래에서 이름 경로가 <paramref name="path"/> 로 끝나는 첫 오브젝트(비활성 포함).</summary>

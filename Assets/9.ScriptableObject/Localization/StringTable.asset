@@ -732,6 +732,24 @@ MonoBehaviour:
   - key: UI.LobbyResult.Header.Deaths
     ko: "\uC0AC\uB9DD"
     en: Deaths
+  - key: UI.Exit.ToTitle
+    ko: "\uD0C0\uC774\uD2C0"
+    en: Title
+  - key: UI.Exit.HostQuitWarning
+    ko: "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uC758 \uAC8C\uC784\uB3C4 \uB05D\uB0A9\uB2C8\uB2E4"
+    en: Other players' games will end too
+  - key: UI.Exit.HostToTitleWarning
+    ko: "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uB3C4 \uC5F0\uACB0\uC774 \uB04A\uAE41\uB2C8\uB2E4"
+    en: Other players will be disconnected too
+  - key: UI.Title.Start
+    ko: "\uC2DC\uC791\uD558\uAE30"
+    en: START
+  - key: UI.Title.Setting
+    ko: "\uC124\uC815"
+    en: SETTING
+  - key: UI.Title.Exit
+    ko: "\uB098\uAC00\uAE30"
+    en: EXIT
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

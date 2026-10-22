@@ -29,8 +29,9 @@ public static class SettingsBodyPrefabAuthoring
     [MenuItem("Tools/UI/Settings/설정 패널 프리팹화 + ESC 메뉴 적용 (멱등)")]
     static void Run()
     {
-        if (!BuildTitle()) return;
-        ApplyToMap();
+        // 🔴 PLAN-settings-ddol(10-22) 이후 타이틀·맵 씬에 설정창이 없다 — 설정창은 GameMenu.prefab(DDOL) 하나다.
+        //    이 일회성 이관을 다시 돌리면 옛 구조를 찾다 실패하거나 씬에 되살린다. 항목 배치는 SettingsPanelAuthoring(프리팹 원본).
+        Debug.LogError("[SettingsBody] 쓰지 않는 도구 — 설정창은 GameMenu.prefab 으로 옮겼다(PLAN-settings-ddol). 항목은 '설정 패널 항목 배치'.");
     }
 
     static bool BuildTitle()

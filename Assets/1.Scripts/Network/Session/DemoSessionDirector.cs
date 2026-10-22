@@ -128,6 +128,34 @@ public sealed class DemoSessionDirector : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// ESC 그만두기 → "타이틀"(로비·인게임, PLAN-settings-ddol) — <b>Shutdown 전에</b> 부른다. 루프를 Idle 로 돌리고 "타이틀 START 전" 상태로 되돌려,
+    /// 뒤따르는 NGO 정지가 끊김(호스트 재호스팅·클라 대기 씬)으로 처리되지 않게 하고 다음 START 가 데모 흐름을 다시 시작하게 한다.
+    /// Shutdown·타이틀 로드는 호출자(<see cref="GameManager.LeaveSessionToTitle"/>)가 한다. 데모 흐름이 꺼져 있으면 아무것도 안 한다.
+    /// </summary>
+    public static void PrepareLeaveToTitle()
+    {
+        var director = s_active;
+        if (!IsDemoFlowActive || director == null)
+            return;
+        director.ResetToBeforeTitleStart();
+    }
+
+    private void ResetToBeforeTitleStart()
+    {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.PrepareLeaveToTitle", $"state={_loop.State} — 의도적 이탈, 루프 Idle");
+        _loop.Reset();
+        _begun = false;
+        _waitingForWaitScene = false;
+        _lobbyLoadPending = false;
+        _hadLocalPlayerInMap = false;
+        if (_overlay != null)
+        {
+            _overlay.SetStatus(false, string.Empty);
+            _overlay.SetNotice(false, string.Empty);
+        }
+    }
+
     private void BeginFromTitle()
     {
         // 첫 시도도 대기 씬에서 한다 — 타이틀 위에서 접속을 기다리지 않는다. 호스트는 곧바로 NGO 로 로비를 Single 로드한다.

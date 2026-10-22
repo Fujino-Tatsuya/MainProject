@@ -17,10 +17,8 @@ public static class SettingsHostSceneAuthoring
     [MenuItem("Tools/UI/Settings/설정창 옛 틀 끄기 — 타이틀·ESC (멱등)")]
     static void Run()
     {
-        if (EditorApplication.isPlaying) { Debug.LogError("[SettingsHost] Play 중에는 실행하지 않는다 — 정지 후 다시."); return; }
-        bool map = WithScene(MapScenePath, ApplyMap);
-        bool title = WithScene(SettingsPanelAuthoring.TitleScenePath, ApplyTitle);
-        Debug.Log($"[SettingsHost] 맵 {(map ? "저장" : "실패")} · 타이틀 {(title ? "저장" : "실패")}");
+        // 🔴 PLAN-settings-ddol(10-22) 이후 맵 OptionPanel·타이틀 Settings_Root 는 지웠다 — 설정창은 GameMenu.prefab(DDOL).
+        Debug.LogError("[SettingsHost] 쓰지 않는 도구 — 설정창을 담던 씬 틀은 지웠다(PLAN-settings-ddol).");
     }
 
     static bool ApplyMap(Scene scene)
