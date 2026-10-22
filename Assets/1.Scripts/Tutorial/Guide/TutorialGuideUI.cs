@@ -118,6 +118,16 @@ public sealed class TutorialGuideUI : MonoBehaviour
             StartSubtitle();
     }
 
+    /// <summary>아직 안 뜬 자막만 버린다. 지금 뜬 줄은 끝까지 보인다(로비 무전 단계 전환 — LobbyRadio).</summary>
+    public void ClearPendingSubtitles() => model.Subtitles.ClearPending();
+
+    /// <summary>자막만 즉시 끈다(지금 뜬 줄 + 대기 줄). 목표·대기 줄·강조는 그대로(브리핑·강제 연출 시작 — LobbyRadio.ServerClear).</summary>
+    public void ClearSubtitles()
+    {
+        model.Subtitles.Clear();
+        RenderSubtitle();
+    }
+
     /// <summary>지금 할 일 1줄 + 체크리스트 + 진행도. 목표 id 가 바뀌면 단계 전환 효과음을 낸다.</summary>
     public void SetObjective(
         string id,

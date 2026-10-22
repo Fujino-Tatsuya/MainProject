@@ -39,6 +39,7 @@ DontDestroyOnLoad 하지 않는다 — 튜토리얼 씬에 속한다. 부르는 
 | `RebuildFromState(TutorialGuideState)` | 늦게 로드된 클라 — 목표·체크리스트·진행도·대기 줄·강조만 복원. **자막은 비운다**(지나간 자막 생략, 효과음 없음). |
 | `CaptureState()` | 현재 상태 스냅샷(복원 대조용). |
 | `Clear()` | 보스방 도착 시 전부 정리. |
+| `ClearPendingSubtitles()` / `ClearSubtitles()` | 자막 대기 줄만 버림(지금 뜬 줄은 끝까지) / 자막만 즉시 전부 끔(목표·대기 줄·강조 유지). 로비 무전(할 일 86 T6b — `3.LobbyScene` 에도 이 프리팹 1개, [lobby-training.md](lobby-training.md#로비-무전-t6b)). |
 
 `args` = `IReadOnlyDictionary<string, string>`. 체크리스트 `Label` 은 테이블 id 면 그 문구, 아니면 글자 그대로(같은 args 로 치환).
 `style` = `Pulse`(테두리 맥동) · `Arrow`(위쪽 ▼) · `PulseAndArrow`(기본).

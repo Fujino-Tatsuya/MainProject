@@ -32,7 +32,9 @@ internal static class TutorialGuideStringKeys
 
             string where = row.Id.StartsWith(RaidPrefix, System.StringComparison.Ordinal)
                 ? "TutorialGuideTexts · 23호 레이드 자막"
-                : "TutorialGuideTexts · 튜토리얼 안내";
+                : LobbyRadioIds.IsLobbyRadio(row.Id)
+                    ? "TutorialGuideTexts · 로비 무전"
+                    : "TutorialGuideTexts · 튜토리얼 안내";
             keys.Add(new StringKeyInfo(TutorialGuideTextSource.KeyOf(row.Id), where, row.Text));
         }
 

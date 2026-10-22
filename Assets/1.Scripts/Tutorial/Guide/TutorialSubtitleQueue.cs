@@ -76,6 +76,12 @@ public sealed class TutorialSubtitleQueue
         return changed;
     }
 
+    /// <summary>아직 안 뜬 대기 줄만 버린다 — 지금 뜬 줄은 끝까지 보인다(로비 무전: 다음 단계 시작 시 이전 단계 미재생 폐기).</summary>
+    public void ClearPending()
+    {
+        pending.Clear();
+    }
+
     public void Clear()
     {
         pending.Clear();
