@@ -35,6 +35,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialZone3RulesTests$", // 존3 흐름(S9) — 시작 조건·간파 집계·빗나감/이른 간파/힌트·목표·연습 반경
         "^TutorialZone4RulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁·목표/강조
         "^LobbyRadioTests$", // 로비 무전(할 일 86 T6b) — 단계 → 대사 표·회차당 1회·단계 바뀜 = 대기 줄 폐기·늦은 클라·자막 큐 ClearPending·문구 행
+        "^LobbyBriefingTests$", // 로비 브리핑(할 일 86 T6c) — 대사 순서·서버 시간·완료 1회·중복 시작 무시·중단 해제 신호·잠금 장부·목표 표시·문구 행
         "^TutorialSkipPlanTests$", // 구간 스킵 Alt+1~0(할 일 34) — 단축키 매핑·뒤로 거부(Alt+0 처음부터 예외)·재시작 재진입 거부·목적 구간 → 게이트·체크·처치·자동 획득 계획
     };
 

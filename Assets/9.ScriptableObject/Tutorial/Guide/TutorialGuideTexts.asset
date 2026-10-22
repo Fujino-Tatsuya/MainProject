@@ -566,3 +566,11 @@ MonoBehaviour:
     text: "\uD63C\uC790 \uC55E\uC11C\uAC00\uC9C0 \uB9D0\uACE0 \uD568\uAED8 \uC6C0\uC9C1\uC5EC."
     durationSeconds: 4
     sfx: {fileID: 0}
+  - id: LOBBY_OBJ_BRIEFING
+    text: "\uC791\uC804 \uC124\uBA85 \uC911"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_SORTIE
+    text: "\uCD9C\uACA9 \uC9C0\uC810\uC5D0 \uC9D1\uACB0"
+    durationSeconds: 0
+    sfx: {fileID: 0}

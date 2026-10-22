@@ -34,7 +34,9 @@ internal static class TutorialGuideStringKeys
                 ? "TutorialGuideTexts · 23호 레이드 자막"
                 : LobbyRadioIds.IsLobbyRadio(row.Id)
                     ? "TutorialGuideTexts · 로비 무전"
-                    : "TutorialGuideTexts · 튜토리얼 안내";
+                    : LobbyObjectiveIds.IsLobbyObjective(row.Id)
+                        ? "TutorialGuideTexts · 로비 목표"
+                        : "TutorialGuideTexts · 튜토리얼 안내";
             keys.Add(new StringKeyInfo(TutorialGuideTextSource.KeyOf(row.Id), where, row.Text));
         }
 

@@ -11,7 +11,7 @@ using UnityEngine.InputSystem;
 /// Ready 종류는 고르지 않는다 — 준비 패드는 출격 집결 구역으로 바뀌었다(할 일 86 PLAN §7-2, 서 있으면 준비).
 /// 판정 권한은 서버다 — 서버가 거리를 다시 본다. 여기 검사는 RPC·프롬프트용이다.
 /// <list type="bullet">
-/// <item>막힘: UI 모달(결과 패널 등 <see cref="UiInputGateManager"/>) 또는 플레이어 입력 차단 토큰·생명주기(Alive 아님)면 프롬프트를 끄고 F 를 무시한다.
+/// <item>막힘: UI 모달(결과 패널 등 <see cref="UiInputGateManager"/>) 또는 플레이어 입력 차단 토큰·연출 잠금(브리핑 — <see cref="PlayerEncounterLock"/>)·생명주기(Alive 아님)면 프롬프트를 끄고 F 를 무시한다.
 /// ESC 는 쓰지 않는다 — 결과 패널 > 선택 패널 순서의 ESC 소유(각 패널의 IsEscapeClaimed)와 겹치지 않는다.</item>
 /// <item>교체 뒤에도 <c>LocalClient.PlayerObject</c> 를 매 프레임 다시 읽으므로 새 오브젝트를 따라간다(옛 오브젝트 참조를 들고 있지 않는다).</item>
 /// <item>플레이어 프리팹을 고치지 않으려고 씬에 둔다. 플레이어는 <c>NetworkManager.LocalClient.PlayerObject</c> 로 찾는다.</item>
@@ -184,6 +184,12 @@ public sealed class LobbyInteractor : MonoBehaviour
 
         var reader = player.GetComponent<PlayerInputReader>();
         if (reader != null && reader.IsInputBlockedByToken)
+            return true;
+
+        // 연출 잠금(브리핑 — LobbyBriefing)은 토큰이 아니라 입력 정책이 끈다 — 같은 판정을 여기서도 본다.
+        var encounterLock = player.GetComponent<PlayerEncounterLock>();
+        if (encounterLock != null && PlayerLifeInputPolicy.BlocksForCinematic(
+                encounterLock.IsCinematicLocked, encounterLock.IsCinematicInputLocked, encounterLock.IsCinematicHidden))
             return true;
 
         var life = player.GetComponent<PlayerLifeCycleController>();

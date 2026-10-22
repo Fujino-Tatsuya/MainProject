@@ -100,6 +100,13 @@ public static class TutorialGuideUIAuthoring
         (LobbyRadioIds.Brief04, "혼자 앞서가지 말고 함께 움직여.", 4f),
     };
 
+    // 로비 목표 패널(할 일 86 T6c 브리핑) — 명세 v0.2 §10 '출격 지점에 집결'. 목표 줄이라 지속시간은 쓰지 않는다(0).
+    internal static readonly (string id, string text, float seconds)[] LobbyObjectiveTexts =
+    {
+        (LobbyObjectiveIds.Briefing, "작전 설명 중", 0f),
+        (LobbyObjectiveIds.Sortie, "출격 지점에 집결", 0f),
+    };
+
     [MenuItem("Tools/UI/로비 무전 문구 추가")]
     public static void AddLobbyRadioTexts()
     {
@@ -111,12 +118,18 @@ public static class TutorialGuideUIAuthoring
                 added++;
         }
 
+        foreach ((string id, string text, float seconds) in LobbyObjectiveTexts)
+        {
+            if (table.AddRowIfMissing(id, text, seconds))
+                added++;
+        }
+
         if (added > 0)
         {
             EditorUtility.SetDirty(table);
             AssetDatabase.SaveAssets();
         }
-        Debug.Log($"[TutorialGuide] 로비 무전 문구 — {added}행 추가(전체 {LobbyRadioTexts.Length}행).");
+        Debug.Log($"[TutorialGuide] 로비 무전·목표 문구 — {added}행 추가(전체 {LobbyRadioTexts.Length + LobbyObjectiveTexts.Length}행).");
     }
 
     [MenuItem("Tools/UI/튜토리얼 안내 문구 v8 적용")]

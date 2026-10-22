@@ -3192,6 +3192,7 @@ GameObject:
   - component: {fileID: 1218973570}
   - component: {fileID: 1218973571}
   - component: {fileID: 1218973572}
+  - component: {fileID: 1218973573}
   m_Layer: 0
   m_Name: LobbyTrainingDirector
   m_TagString: Untagged
@@ -3303,6 +3304,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyRadio
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &1218973573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1218973566}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99f6549e9df9d5c49becb73fbe1b8abe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyBriefing
+  ShowTopMostFoldoutHeaderGroup: 1
+  textTable: {fileID: 11400000, guid: d7687a8e06602774caf926fc613dd8de, type: 2}
+  leadSeconds: 0.5
+  tailSeconds: 1
+  cameraFocus: {fileID: 1316362332}
 --- !u!1 &1250323957
 GameObject:
   m_ObjectHideFlags: 0
