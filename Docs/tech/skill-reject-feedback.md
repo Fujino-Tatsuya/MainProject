@@ -61,10 +61,11 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 거부 시(§0 표는 그대로):
   - **버림** 사유(자원 부족·차단 효과·그 밖) — 그 입력만 지우고 다음 순위 후보가 올라와 **같은 프레임에** 이어서 시도된다.
   - **보관** 사유(바쁨·행동 불능 CC) — 전부 그대로 두고 **이번 프레임 시도를 멈춘다**(낮은 후보가 앞지르지 않음). 보관된 높은 입력이 먼저 만료되면 남은 낮은 입력이 그다음 프레임에 시도된다.
-- 실행: 행동 하나가 실제로 시작되면(Idle/Move 시작·대시 끊기·행동 중 원시 입력 소비 `ConsumeBufferedInput`) **버퍼 전체를 비운다** — 함께 들고 있던 오래된 후보가 연달아 실행되지 않는다. 거너 평타 뒤 예약으로 옮긴 입력은 그 종류만 뺀다.
+- 실행: 행동 하나가 실제로 시작되면(Idle/Move 시작·대시 끊기) **버퍼 전체를 비운다** — 함께 들고 있던 오래된 후보가 연달아 실행되지 않는다. 거너 평타 뒤 예약으로 옮긴 입력은 그 종류만 뺀다.
+- 행동 중 원시 입력 소비(`ConsumeBufferedInput` — 콤보 예약·조준 취소 재입력·홀드 종료)는 **그 종류만** 지운다. 평타를 누른 채 콤보를 잇는 동안 콤보 예약이 매 프레임 부르므로, 전체를 비우면 공격 중 누른 스킬이 사라진다(f02ad9d2 버그 — 공격 뒤 스킬이 안 나감).
 - 거너 평타 뒤 스킬 예약(§0.1, 마지막 스킬 1개)은 따로 든다 — 바뀌지 않았다.
 - 진단: 실행으로 함께 버려진 나머지 = `outranked`(요약 표 '선택에서 밀림' 열, 사유 = 실행된 입력), 위 순위 버림 뒤 올라온 다음 후보 = `fallback`('다음 후보로' 열). `overwritten`('재입력 갱신' 열) = 같은 종류 재입력.
-- 테스트: `PlayerInputBufferTests` `Multi_*`·`Peek_*`·`Resolve_DropReason_*`·`Resolve_Blocked_KeepsAll_*`·`Consume_ClearsEverything`·`HoldZero_*`·`SortByPriority_*`·`Dispatch_*`, `PlayerInputBufferDiagnosticsTests` `ActionStarted_*`·`Fallback_*`·`DifferentKinds_*`·`SameKindRepress_*`.
+- 테스트: `PlayerInputBufferTests` `Multi_*`·`Peek_*`·`Resolve_DropReason_*`·`Resolve_Blocked_KeepsAll_*`·`Consume_RemovesOnlyThatKind`·`HoldZero_*`·`SortByPriority_*`·`Dispatch_*`, `PlayerInputBufferDiagnosticsTests` `ActionStarted_*`·`Fallback_*`·`DifferentKinds_*`·`SameKindRepress_*`.
 
 ## 1. 이벤트
 

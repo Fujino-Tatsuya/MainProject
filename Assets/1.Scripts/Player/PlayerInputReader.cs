@@ -160,8 +160,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
     }
 
     /// <summary>
-    /// 행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 실행됐으니 버퍼 전체를 비운다(할 일 77).
-    /// 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않고, 함께 들고 있던 오래된 후보도 연달아 실행되지 않는다.
+    /// 행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않게 그 종류만 지운다.
+    /// 다른 종류는 남긴다 — 콤보 예약은 평타를 누르고 있는 동안 매 프레임 부르므로, 비우면 공격 중 누른 스킬이 사라진다(할 일 77).
     /// </summary>
     // 호출자 정보는 진단 로그(consumed 사유)에만 쓴다.
     public void ConsumeBufferedInput(
@@ -170,7 +170,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         [CallerFilePath] string callerFile = null)
     {
         CaptureBufferedPresses();
-        DiagnoseBufferActionStarted(input, callerMember, callerFile);
+        DiagnoseBufferConsumed(input, callerMember, callerFile);
         inputBuffer.Consume(input);
     }
 
@@ -632,6 +632,17 @@ public class PlayerInputReader : BaseNetworkBehaviour
         PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
         if (diag != null && diag.HasPending)
             diag.ActionStarted(executed, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
+#endif
+    }
+
+    // 행동 중 소비처가 그 입력만 받아들임 — 나머지는 계속 추적한다.
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferConsumed(PlayerBufferedInput input, string callerMember, string callerFile)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
+        if (diag != null && diag.IsPending(input))
+            diag.Consumed(input, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
 #endif
     }
 

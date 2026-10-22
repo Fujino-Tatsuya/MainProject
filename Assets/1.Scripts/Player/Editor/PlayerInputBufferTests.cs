@@ -1,7 +1,7 @@
 using NUnit.Framework;
 
 /// <summary>
-/// 선입력 버퍼(할 일 44·77) — 기록·종류별 보관과 개별 만료·우선순위 꺼내기·소비(전체 비움)·끔,
+/// 선입력 버퍼(할 일 44·77) — 기록·종류별 보관과 개별 만료·우선순위 꺼내기·시작(전체 비움)·행동 중 소비(그 종류만)·끔,
 /// 거부 사유별 보관/버림(버림 = 다음 후보, 보관 = 중단)·입력 1회 = 피드백 1회.
 /// </summary>
 public sealed class PlayerInputBufferTests
@@ -499,18 +499,17 @@ public sealed class PlayerInputBufferTests
     }
 
     [Test]
-    public void Consume_ClearsEverything()
+    public void Consume_RemovesOnlyThatKind()
     {
-        // 행동 하나가 실제로 실행되면 버퍼 전체를 비운다 — 오래된 후보가 연달아 실행되지 않게.
+        // 행동 중 소비처(콤보 예약 등)는 그 입력만 받아들인다 — 함께 들고 있던 다른 입력은 남는다.
         var buffer = CreatePrioritized();
         buffer.Record(PlayerBufferedInput.SkillMain, 10f);
         buffer.Record(PlayerBufferedInput.Attack, 10.05f);
-        buffer.Record(PlayerBufferedInput.Dash, 10.1f);
 
         buffer.Consume(PlayerBufferedInput.Attack);
 
-        Assert.That(buffer.Count(10.1f), Is.EqualTo(0));
-        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.None));
+        Assert.That(buffer.Contains(PlayerBufferedInput.Attack, 10.1f), Is.False);
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.SkillMain));
     }
 
     [Test]
@@ -647,6 +646,45 @@ public sealed class PlayerInputBufferTests
 
         Assert.That(Dispatch(buffer, 10.15f, _ => PlayerActionAttempt.Blocked, attempted), Is.EqualTo(PlayerBufferedInput.None));
         Assert.That(Dispatch(buffer, 10.25f, _ => PlayerActionAttempt.Started, attempted), Is.EqualTo(PlayerBufferedInput.SkillMain));
+    }
+
+    [Test]
+    public void Dispatch_OnlyQPressed_InterruptUnassigned_StartsQ()
+    {
+        // Q 만 누른 프레임 — 우클릭(미배정이면 Rejected)이 앞 순위여도 시도조차 되지 않고 Q 가 시작된다.
+        var buffer = CreatePrioritized();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+
+        PlayerBufferedInput started = Dispatch(buffer, 10f,
+            kind => kind == PlayerBufferedInput.SkillInterrupt ? PlayerActionAttempt.Rejected : PlayerActionAttempt.Started,
+            attempted);
+
+        Assert.That(started, Is.EqualTo(PlayerBufferedInput.SkillMain));
+        Assert.That(attempted, Is.EqualTo(new[] { PlayerBufferedInput.SkillMain }));
+    }
+
+    [Test]
+    public void Dispatch_SkillPressedDuringHeldAttackCombo_StartsAfterAttack()
+    {
+        // 회귀(할 일 77): 스킬 1회 → 평타를 누른 채 콤보 → 공격 중 E. 콤보 예약이 매 프레임 평타를 소비해도
+        // E 는 남아 공격이 끝난 첫 틱에 시작된다(예전엔 소비가 버퍼 전체를 비워 E 가 사라졌다).
+        var buffer = CreatePrioritized();
+        var attempted = new System.Collections.Generic.List<PlayerBufferedInput>();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        Assert.That(Dispatch(buffer, 10f, _ => PlayerActionAttempt.Started, attempted), Is.EqualTo(PlayerBufferedInput.SkillMain));
+
+        buffer.Record(PlayerBufferedInput.Attack, 11f);
+        Assert.That(Dispatch(buffer, 11f, _ => PlayerActionAttempt.Started, attempted), Is.EqualTo(PlayerBufferedInput.Attack));
+
+        buffer.Record(PlayerBufferedInput.SkillSub, 11.1f);
+        buffer.Record(PlayerBufferedInput.Attack, 11.12f);
+        for (float t = 11.12f; t < 11.2f; t += 0.02f)
+            buffer.Consume(PlayerBufferedInput.Attack); // DefaultAttackController.TryQueueNextAttackFromInput — 홀드 중 매 프레임
+
+        PlayerBufferedInput started = Dispatch(buffer, 11.2f, _ => PlayerActionAttempt.Started, attempted);
+
+        Assert.That(started, Is.EqualTo(PlayerBufferedInput.SkillSub));
     }
 
     [Test]

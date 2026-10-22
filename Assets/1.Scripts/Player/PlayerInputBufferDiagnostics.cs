@@ -173,15 +173,7 @@ public sealed class PlayerInputBufferDiagTracker
     /// </summary>
     public void ActionStarted(PlayerBufferedInput executed, float now, int frame, string detail)
     {
-        CheckExpiry(now, frame);
-        if (IsPending(executed))
-        {
-            ref PendingEntry entry = ref pending[(int)executed];
-            bool immediate = !entry.Buffered && frame == entry.PressFrame;
-            Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Consumed, executed, now, frame,
-                elapsed: now - entry.PressTime, immediate: immediate, detail: detail));
-            entry.Active = false;
-        }
+        Consumed(executed, now, frame, detail);
 
         string outrankedBy = executed != PlayerBufferedInput.None ? $"{executed} 실행" : detail;
         for (int i = 1; i < KindCount; i++)
@@ -193,6 +185,20 @@ public sealed class PlayerInputBufferDiagTracker
                 elapsed: now - pending[i].PressTime, detail: outrankedBy));
             pending[i].Active = false;
         }
+    }
+
+    /// <summary>그 입력만 실행(소비)됐다 — 행동 중 소비처(콤보 예약 등). 다른 종류는 계속 추적한다.</summary>
+    public void Consumed(PlayerBufferedInput input, float now, int frame, string detail)
+    {
+        CheckExpiry(now, frame);
+        if (!IsPending(input))
+            return;
+
+        ref PendingEntry entry = ref pending[(int)input];
+        bool immediate = !entry.Buffered && frame == entry.PressFrame;
+        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.Consumed, input, now, frame,
+            elapsed: now - entry.PressTime, immediate: immediate, detail: detail));
+        entry.Active = false;
     }
 
     /// <summary>실행되지 않고 버려졌다. input = None 이면 들고 있던 전부(버퍼 전체 비움).</summary>

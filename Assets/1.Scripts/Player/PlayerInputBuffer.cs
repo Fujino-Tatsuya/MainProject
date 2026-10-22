@@ -165,9 +165,11 @@ public sealed class PlayerInputBuffer
     }
 
     /// <summary>
-    /// 행동 하나가 실제로 실행됐다 — 버퍼 전체를 비운다. 함께 들고 있던 오래된 후보가 그 행동 뒤에 연달아 실행되지 않게 한다.
+    /// 행동 중 소비처(콤보 예약·조준 취소 재입력 등)가 그 입력을 받아들였다 — 그 종류만 지운다.
+    /// 전체를 비우면 평타를 누르고 있는 동안 콤보 예약이 매 프레임 부르며 공격 중 누른 스킬 입력까지 지운다(할 일 77 버그).
+    /// Idle/Move 에서 새 행동을 시작할 때의 전체 비움은 <see cref="Resolve"/>(Started)·<see cref="Clear"/> 가 맡는다.
     /// </summary>
-    public void Consume(PlayerBufferedInput input) => Clear();
+    public void Consume(PlayerBufferedInput input) => Remove(input);
 
     public void Clear()
     {
