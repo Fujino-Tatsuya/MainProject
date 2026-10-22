@@ -391,7 +391,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
     끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).
 
 ## 12. 스텝별 고정 안전 지점 (할 일 80 — 1안, 2026-10-22)
-> 코드: `TutorialSafePointRules`(순수 — 감시 조건·지금 스텝 구간·지점 고르기·복귀 높이·기본 위치) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
+> 코드: `TutorialSafePointRules`(순수 — 감시 조건·지금 스텝 구간·지점 고르기·점유 레이어·주변 링·복귀 높이·기본 위치) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
 > 훅 `PlayerSafePointTracker.ReturnPointOverride`(신규, 기본 null = 기존 동작). 저작: `Tools/Map/Authoring/Tutorial/8. Place Safe Points (열린 씬)`.
 > 테스트: `TutorialSafePointRulesTests`(튜토리얼 러너). 디렉터·흐름 코드는 바꾸지 않았다(디렉터 공개 API 만 부른다).
 
@@ -410,7 +410,8 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 복도4 | (−11.73, −101.11) | G9 앞면 + 1.5m |
 | 보스 진입 | (−21.97, −101.11) | G10 앞면 + 2.5m(패드 위에 두지 말 것 — 런타임이 거르지 않는다) |
 
-튜닝 값(전부 `TutorialSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 복귀 높이 `dropHeight`(기본 3m — 지점 Y + 3 에서 떨어져 착지).
+튜닝 값(전부 `TutorialSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 복귀 높이 `dropHeight`(기본 3m — 고른 자리 Y + 3 에서 떨어져 착지) ·
+점유 반경 `occupancyRadius`(0.4) · 링 후보 바닥 탐색 `floorSearchHeight`(±1.5) · `maxFlatAngle`(10°).
 
 **언제(서버, 튜토리얼 활성 · 단계 None/Finished 아님 · 보스방 이동(`IsCountdownActive`/`IsEncounterBusy`) 아님)**
 - **낙사**: 추락 생존·추락 사망의 복귀 지점(`ResolveReturnPoint`)을 큐·Ring 탐색 대신 고정 지점으로. 연출(낙하 카메라·0.75초 지연·무적·입력 잠금)은 기존 그대로.
@@ -418,18 +419,25 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 **어느 지점**: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(`TutorialSafePointRules.StepArea` = `TutorialRevivePointRules.ResolveStageArea(step, mask, passed)` —
 단계 구간을 배리어 상한으로 내리고, 그 플레이어의 지나온 최전방 구간보다 뒤면 그 구간으로 올림)의 지점 **하나만** 쓴다(`TryPickStepPoint`).
-- 🔴 **주변을 검사하지 않는다(2026-10-22 사용자 결정)** — 점유(적·플레이어·소품)·바닥/평지·`ReturnPointFilter`·주변 링·격자·다른 구간 대체·최후 수단 없이,
-  지점 Transform 위치에서 **Y + `dropHeight`(3m)** 에 내려놓아 떨어져 착지한다. 몬스터가 지점 위에 있어도 그대로 — 겹치면 유닛 충돌 밀어내기(할 일 11)가 푼다.
-- 기존 추락 복구(큐 → `ReturnPointFallback` → 스폰 폴백)로 넘기는 건 그 구간에 지점이 없을 때·감시 조건 밖(단계 Finished·보스방 이동 중)뿐(override null).
+- 🔴 **최종 선택 순서(2026-10-22 사용자 정정)** — `TutorialSafePointRules.PickSpot`:
+  1. **점유 검사 = 정적 장애물만**(`BlockingLayers` = Default·Ground·Env·Wall·Barrier, `CheckSphere` 반경 `occupancyRadius`). 몬스터·플레이어·시체 등 유닛은 보지 않는다 —
+     몬스터가 지점 위에 있어도 지점 그대로, 겹치면 유닛 충돌 밀어내기(할 일 11)가 푼다. 지점 자체는 바닥 검사를 하지 않는다(저작 위치를 믿는다).
+  2. 지점이 정적 장애물에 막히면 **주변 링**(`TryFindNearestFree` — 반경 0.75/1.5/2.25/3m × 8방향, 가까운 것부터, 그 구간 사각형 안만)에서
+     아래 평평한 바닥이 있고 정적 장애물에 막히지 않은 첫 빈자리.
+  3. 고른 자리(지점 또는 링 빈자리) XZ 에 **지점 Y + `dropHeight`(3m)** 로 내려놓아 떨어져 착지한다.
+  4. 링도 실패(또는 구간 사각형 없음)하면 **그 지점 + 3m 그대로**(겹침 허용 · 경고 로그) — 기록 지점 큐·`ReturnPointFallback`·스폰 폴백으로 내려가지 않는다.
+  - 격자(`TryFindAreaSpreadPoints`)·다른 구간 대체·최후 수단·`ReturnPointFilter` 는 고정 지점 경로에 없다(격자는 자동 부활·전멸 리스폰이 그대로 쓴다).
+- 기존 추락 복구(큐 → `ReturnPointFallback` → 스폰 폴백)로 넘기는 건 그 구간에 지점이 없을 때·감시 조건 밖(단계 Finished·보스방 이동 중)뿐(override null) — 이 경로는 사용자 결정 대기.
 - 배경(2026-10-22 진단): 기존 추락 복구의 큐 점유 검사(`PlayerSafePointTracker.IsFreeStanding`/`TryResolveFlatUnoccupied`)는 `Player.prefab` 의 `groundMask` = Everything 이라
   몬스터·다른 플레이어가 근처에 있으면 기록 지점이 무효가 되고, 큐가 전부 막히면 스폰(씬 시작 지점)으로 폴백한다. 튜토리얼 중에는 고정 지점이 있으면 이 경로에 내려가지 않는다.
   큐(이동하며 갱신되는 기록 지점)와 일반 스테이지 동작은 의도대로 그대로 둔다.
 
-**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `[Fall/진단] 고정 안전 지점으로 — …` ·
+**로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `client n 낙사 → Zone2 안전 지점 주변 빈자리 …` · `[Fall/진단] 고정 안전 지점으로 — …` ·
+경고 `client n 낙사 — Zone2 안전 지점이 장애물에 막히고 주변 빈자리도 없어 지점 위 … 에 그대로 내린다(겹침 허용).` ·
 경고 `client n 낙사 — Zone2 안전 지점이 없다(미배치). 기존 추락 복구로 넘긴다.`
 
 **알려진 한계 · Play 로 볼 것**
 - 낙사가 '최근 밟은 자리'가 아니라 구간 입구로 돌아간다(1안 사양). 존2 물 구멍처럼 자주 떨어지는 곳은 이동 거리가 늘 수 있다 — 싫으면 `useOnFall` 끔.
-- 지점 Y 는 스테이지 높이(0) — 존 바닥은 런타임 존 프리팹이라 에디터에서 검증하지 못했다. 런타임은 바닥을 보지 않으므로 지점 아래에 바닥이 없으면 다시 떨어진다 — 지점을 바닥 위에 둘 것.
+- 지점 Y 는 스테이지 높이(0) — 존 바닥은 런타임 존 프리팹이라 에디터에서 검증하지 못했다. 런타임은 지점 자체의 바닥은 보지 않으므로(링 후보만 본다) 지점 아래에 바닥이 없으면 다시 떨어진다 — 지점을 바닥 위에 둘 것.
 - 지점 바로 위(3m 안)에 천장·소품이 있으면 그 안에 끼일 수 있다 — 지점을 트인 곳에 둔다.
 - 할 일 86(존1·존3 검사 로비 이전) 뒤 구간이 바뀌면 지점만 지우고 메뉴를 다시 돌린다.

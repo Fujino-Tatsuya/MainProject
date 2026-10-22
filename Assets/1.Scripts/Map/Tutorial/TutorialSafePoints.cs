@@ -15,7 +15,9 @@ using UnityEngine;
 ///    추락 생존·추락 사망 모두. 연출(낙하 카메라·무적·입력 잠금)은 기존 그대로, 지점만 바뀐다.
 ///
 /// 어느 지점인가: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(<see cref="TutorialSafePointRules.StepArea"/>)의 지점 하나.
-/// 주변 적·장애물·바닥은 보지 않는다 — 지점 Transform 위 <see cref="dropHeight"/>(기본 3m)에 내려놓아 떨어져 착지한다.
+/// 점유 = 정적 장애물만(<see cref="TutorialSafePointRules.BlockingLayers"/>) — 몬스터·플레이어가 지점 위에 있어도 지점은 그대로 쓴다.
+/// 지점이 정적 장애물에 막혔으면 그 구간 안 지점 주변 링(<see cref="TutorialSafePointRules.TryFindNearestFree"/>, 가까운 것부터)의 빈자리.
+/// 고른 자리 높이 = 지점 Y + <see cref="dropHeight"/>(기본 3m) — 떨어져 착지한다. 링도 실패하면 지점 위 그대로(겹침 허용 + 경고).
 /// 그 구간에 지점이 없을 때만 기존 동작(안전지점 큐 → 스폰 폴백). 다른 구간 지점으로 대체하지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -35,10 +37,18 @@ public sealed class TutorialSafePoints : MonoBehaviour
     [Tooltip("추락 생존·추락 사망 복귀를 기존 안전지점 큐(최근 밟은 자리) 대신 이 지점으로.")]
     [SerializeField] private bool useOnFall = true;
 
-    [Tooltip("지점 Transform 위로 이만큼(m) 띄워 내려놓는다 — 떨어져 착지. 주변 적·장애물은 보지 않는다.")]
+    [Tooltip("고른 자리(지점 또는 주변 링 빈자리) 위로 이만큼(m) 띄워 내려놓는다 — 떨어져 착지.")]
     [SerializeField, Min(0f)] private float dropHeight = TutorialSafePointRules.DefaultDropHeight;
 
+    [Header("판정")]
+    [Tooltip("정적 장애물 점유 검사 반경(m). 적·플레이어는 보지 않는다.")]
+    [SerializeField, Min(0.05f)] private float occupancyRadius = 0.4f;
+    [Tooltip("링 빈자리 아래 바닥을 찾는 범위(지점 Y ± m).")]
+    [SerializeField, Min(0.1f)] private float floorSearchHeight = 1.5f;
+    [SerializeField, Range(0f, 30f)] private float maxFlatAngle = 10f;
+
     private Func<ulong, Vector3, Vector3?> _fallOverride;
+    private int _groundMask, _obstacleMask;
 
     public IReadOnlyList<Entry> Points => points;
 
@@ -55,6 +65,17 @@ public sealed class TutorialSafePoints : MonoBehaviour
     }
 
     // ─── 생명주기(서버) ──────────────────────────────────────────────────
+
+    private void Awake()
+    {
+        _groundMask = LayerMask.GetMask("Default", "Ground", "Env");
+        _obstacleMask = 0;
+        foreach (string name in TutorialSafePointRules.BlockingLayers)
+        {
+            int layer = LayerMask.NameToLayer(name);
+            if (layer >= 0) _obstacleMask |= 1 << layer;
+        }
+    }
 
     private void OnDisable() => Unhook();
 
@@ -119,9 +140,33 @@ public sealed class TutorialSafePoints : MonoBehaviour
         }
 
         Vector3 p = t.position;
-        var point = new Vector3(p.x, TutorialSafePointRules.DropY(p.y, dropHeight), p.z);
-        Edit.Log($"[Tutorial] client {clientId} 낙사 → {area} 안전 지점 {point}.", this);
+        TutorialRect? bounds = null;
+        var rules = d.GetComponent<TutorialDeathRules>();
+        if (rules != null && rules.TryGetAreaRect(area, out TutorialRect rect)) bounds = rect;
+
+        TutorialSafeSpotKind kind = TutorialSafePointRules.PickSpot(p.x, p.z, IsBlocked(p), bounds,
+            (x, z) => IsFreeRingSpot(new Vector3(x, p.y, z)), out float sx, out float sz);
+        var point = new Vector3(sx, TutorialSafePointRules.DropY(p.y, dropHeight), sz);
+
+        if (kind == TutorialSafeSpotKind.PointOverlap)
+            Edit.LogWarning($"[Tutorial] client {clientId} 낙사 — {area} 안전 지점이 장애물에 막히고 주변 빈자리도 없어 지점 위 {point} 에 그대로 내린다(겹침 허용).", this);
+        else
+            Edit.Log($"[Tutorial] client {clientId} 낙사 → {area} 안전 지점{(kind == TutorialSafeSpotKind.Ring ? " 주변 빈자리" : "")} {point}.", this);
         return point;
+    }
+
+    // 정적 장애물(소품·벽·배리어)만 — 적·플레이어는 보지 않는다.
+    private bool IsBlocked(Vector3 floor) =>
+        Physics.CheckSphere(floor + Vector3.up * (occupancyRadius + 0.05f), occupancyRadius, _obstacleMask, QueryTriggerInteraction.Ignore);
+
+    // 링 후보 — 아래 평평한 바닥이 있고 정적 장애물에 막히지 않았는가(자동 부활 격자점과 같은 검사).
+    private bool IsFreeRingSpot(Vector3 anchor)
+    {
+        var origin = anchor + Vector3.up * floorSearchHeight;
+        if (!Physics.Raycast(origin, Vector3.down, out RaycastHit hit, floorSearchHeight * 2f, _groundMask, QueryTriggerInteraction.Ignore))
+            return false;
+        if (Vector3.Angle(hit.normal, Vector3.up) > maxFlatAngle) return false;
+        return !IsBlocked(hit.point);
     }
 
 #if UNITY_EDITOR
