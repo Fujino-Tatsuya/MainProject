@@ -7,6 +7,7 @@
 > **할 일 32(2026-10-13): 벽 충돌 = 실제 Wall 레이어 콜라이더** — 가상 벽(존 사각형 긴 변) 거리 판정(`SpinnerComboGeometry`)을 지우고, 밀치기 중 스피너봇의 공용 벽 충돌 이벤트(`UnitWallImpact`, [wall-concept.md](wall-concept.md))로 연계 성공을 판정한다.
 > 🔴 **세팅 필요**: 존3(StageTutorial) 벽에 Wall 태그+레이어가 없으면 연계가 성공하지 않는다 — 활성 때 `[Tutorial] 존3 Wall 레이어 콜라이더 0개` 경고.
 > **사용자 변경(2026-10-13): 원위치 복귀 없음** — 회복이 끝나면 스피너봇은 **그 자리(벽 앞)**에서 다음 준비·간파. 복귀 단계(`Returning`)·복귀 무적/관통·5초 Warp·`TUT_Z3_RETURN` 호출을 지웠다(SO 행은 남김).
+> **할 일 90(2026-10-22): 간파 성공 파티 우클릭 쿨 초기화 제거** — 로비·훈련 명세 v0.2. 연습 중에도 정상 쿨(§5).
 
 ## 1. 파일
 | 무엇 | 경로 | 피어 |
@@ -15,7 +16,6 @@
 | 순수 규칙(연계) | `Tutorial/SpinnerPractice/SpinnerComboModel.cs` — `SpinnerComboModel`(단계·밀치기·벽 충돌 보고·회복). 벽 판정 자체는 공용 `UnitWallImpactJudge`(할 일 32) | — |
 | 흐름 | `Map/Tutorial/Flow/TutorialZone3Flow.cs`(+ `TutorialZone3WallFinder` — 안내 화살표용 가장 가까운 Wall 콜라이더 면) | 서버 |
 | 표시 | `Map/Tutorial/Flow/TutorialZone3Guide.cs` | 모든 피어 |
-| 쿨 초기화 실행 | `Map/Tutorial/Flow/TutorialCooldownReset.cs`(복도1 과 공용) | 서버 |
 | 튜토리얼 스피너봇 | `Assets/2.Prefabs/Monster/Tutorial/SpinnerBot_Tutorial.prefab`(SpinnerBot.prefab Variant) · `Tutorial/SpinnerPractice/TutorialSpinnerPractice.cs`(연습 + 연계) · `TutorialSpinnerSpawnOverride.cs` · `TutorialSpinnerHealthBarRule.cs` | 서버 스폰 → 복제 |
 
 부착: `TutorialZone3Flow`(서버)·`TutorialZone3Guide`(각 피어)는 `TutorialDirector.StateChanged` 에서 `IsTutorialActive` 일 때 디렉터 GameObject 에 런타임 `AddComponent`(씬 무수정).
@@ -32,7 +32,7 @@
 | Z3-1 | G4 열림 ∧ `AreaFirstEntered(Zone3)`(순서 무관) | 휴면 해제 → `EnterPractice()` · `SetStepServer(Zone3Practice)` | 자막 INTRO → PRACTICE_NOTE(공통만) |
 | Z3-2 | 준비·간파(`ComboPhase.Ready`) | 원래 연습 루프(창 9초 간격·스핀만·돌진 피해 0) | 목표 `TUT_Z3_COUNTER_GOAL` + 진행도 n/3 · 강조 스피너봇 + 우클릭 칸 |
 | Z3-3 | 준비 단계 간파 판정 | — | 빗나감 `TUT_Z3_MISS` · 이른 간파 `TUT_Z3_EARLY`(시전자만) · 연속 놓침 4·8… `TUT_Z3_HINT` |
-| Z3-4 | 간파 성공(준비 단계) = `PlayerInterruptSkillBase.ServerInterruptSucceeded`(연습 중 · 시전자 존3 안 · 스피너봇 연습 컴포넌트 있음) | **파티 전원 우클릭 쿨 1회 초기화**(등록된 기본·대체 우클릭 스킬, `TutorialCooldownReset`) · 스피너봇 = 원래 그로기(기절) → **취약 유지** | 첫 성공만 `TUT_Z3_FIRST_SUCCESS` · `TUT_Z3_PUSH_INTRO` · 목표 `TUT_Z3_PUSH_GOAL` · 강조 **유효 벽(화살표)** + 스피너봇 + 우클릭 칸 |
+| Z3-4 | 간파 성공(준비 단계) = `PlayerInterruptSkillBase.ServerInterruptSucceeded`(연습 중 · 시전자 존3 안 · 스피너봇 연습 컴포넌트 있음) | 쿨타임 그대로(할 일 90 — 초기화 없음) · 스피너봇 = 원래 그로기(기절) → **취약 유지** | 첫 성공만 `TUT_Z3_FIRST_SUCCESS` · `TUT_Z3_PUSH_INTRO` · 목표 `TUT_Z3_PUSH_GOAL` · 강조 **유효 벽(화살표)** + 스피너봇 + 우클릭 칸 |
 | Z3-5 | 밀치기가 벽에 안 닿고 끝남(`PushEndedNoWall`) | 취약 유지 | `TUT_Z3_PUSH_HINT`(5초에 1번까지) |
 | Z3-6 | 취약 중 우클릭 밀치기로 벽 충돌(`WallHit` = 스피너봇 `UnitWallImpact`) | `AddCounterServer(Zone3Interrupts)` · 취약 종료 → 회복(0.6초) | `TUT_Z3_WALL_SUCCESS` ({n}/{total}) |
 | Z3-7 | 회복 중(`Recovering`) | 정지 · 밀치기·간파 무시 · **원위치 복귀 없음**(사용자 변경) | 목표 `TUT_Z3_GOAL`(연계 n/3) · 강조 없음 · 자막 없음(`TUT_Z3_RETURN` 호출 제거) |
@@ -71,16 +71,14 @@
 - 다음 간파 창 = 원래 간격(창 열림 + 9초)과 회복 끝 + `comboReadyDelay`(4초) 중 늦은 쪽 — 밀치기에 쓴 우클릭이 준비될 틈.
 - ⚠️ 알려진 문제(메모만 — 대응 안 함, 할 일 32 에서도 그대로): 원위치 복귀가 없어 2·3회째 연계는 스피너봇이 **벽에 붙은 채** 시작한다 → 간파 뒤 벽 쪽으로 한 번만 밀면(첫 틱에 판정 거리 0.4m 안이라) 바로 충돌로 세져 너무 쉬울 수 있다.
   후보(사용자 결정 필요): 최소 밀린 거리 조건 · 회복 끝에 벽에서 떨어뜨리기 · 다른 벽만 인정.
-- 본 전투 전환(`EnterRealMode`) 때 `SpinnerComboModel.Finish()` — 정지·슈퍼 아머·취약 유지를 모두 끈다. 본 전투의 간파 성공은 원래 그로기(1초)뿐(우클릭 쿨 초기화 없음).
+- 본 전투 전환(`EnterRealMode`) 때 `SpinnerComboModel.Finish()` — 정지·슈퍼 아머·취약 유지를 모두 끈다. 본 전투의 간파 성공은 원래 그로기(1초)뿐.
 
-## 5. 우클릭 쿨 초기화 — 다른 레인과의 관계
-- 쿨 장부(`PlayerSkillController`)는 **고치지 않았다**. 공개 API `ResetCooldownServer(skill)` 로 0 을 만든다(이미 준비된 스킬은 건너뜀, 오너 HUD 미러는 장부가 보냄).
-- 대상 = 그 플레이어에 등록된 스킬 중 Slot == Interrupt 전부(`GetSkillIndex` ≥ 0 — 기본·대체).
-- **순서**: 같은 판정(`ResolveHit`) 안에서 스피너봇 `ServerCounterSucceeded`(→ 연계 시작 `ServerComboCounterAccepted`) → `ServerInterruptSucceeded`(→ 여기서 파티 초기화) → `ServerInterruptResolved`(→ 빗나감·이른 간파 피드백).
-  간파 성공 시 시전자 쿨 감소(할 일 26)는 할 일 90 에서 제거됐다 — 존3 연습의 이 초기화만 남는다(튜토리얼 전용). 이른 간파 판정의 '이번 판정 성공' = 같은 호출 안에서 `ServerInterruptSucceeded` 로 받은 시전자(`ServerInterruptResolved` 에서 소비 — 프레임 비교 없음).
-  `ServerComboCounterAccepted` 는 존3 흐름이 더 구독하지 않는다(감소 전에 나서 초기화 시점으로 맞지 않음).
+## 5. 간파 성공 신호 — 다른 레인과의 관계
+- **쿨타임은 돌려주지 않는다**(할 일 90, 2026-10-22 — 로비·훈련 명세 v0.2 '구형 훈련 보정 제거'). 간파 성공 시 시전자 쿨 감소(할 일 26)와 존3 연습의 파티 우클릭 쿨 초기화 둘 다 지웠다 — 연습 중에도 정상 우클릭 쿨을 기다린다.
+- **순서**: 같은 판정(`ResolveHit`) 안에서 스피너봇 `ServerCounterSucceeded`(→ 연계 시작 `ServerComboCounterAccepted`) → `ServerInterruptSucceeded`(→ 첫 성공 자막·밀치기 안내) → `ServerInterruptResolved`(→ 빗나감·이른 간파 피드백).
+  이른 간파 판정의 '이번 판정 성공' = 같은 호출 안에서 `ServerInterruptSucceeded` 로 받은 시전자(`ServerInterruptResolved` 에서 소비 — 프레임 비교 없음).
+  `ServerComboCounterAccepted` 는 존3 흐름이 구독하지 않는다.
 - 존3 의 카운터 대상은 스피너봇뿐이고 간파 창은 연계 준비 단계에서만 열리므로, 연습 중 존3 안 시전자의 간파 성공 = 연계 시작으로 본다.
-- 파티 전원 = 접속 중 PlayerObject 가 있는 모두(영혼 포함 — 쿨만 0 이 된다).
 
 ## 6. 추가한 API
 | 쪽 | 시그니처 |
