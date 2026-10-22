@@ -123,6 +123,9 @@ public sealed class TrainingSparringModel
     /// <summary>칸 UI(중간보스 체력바 재사용) 표시 — 초기화 뒤 C·D.</summary>
     public bool ShowsSegmentUi => Stage == TrainingSparringStage.WallAndSuppress || Stage == TrainingSparringStage.Finisher;
 
+    /// <summary>D 마무리 중 — 제압 피해 확인 + 제압 종료 뒤 사망 전까지. 바 이름이 칸 대신 '마무리하세요'(할 일 86 T5c 후속).</summary>
+    public bool IsFinishing => Stage == TrainingSparringStage.Finisher && _finishing;
+
     /// <summary>자발 공격·이동 허용 — A(간파 가능한 직접 공격 반복)·C·D. B·초기화 중·시작 전·완료는 없음.</summary>
     public bool AllowsSelfAction => Stage == TrainingSparringStage.CounterIntro
         || Stage == TrainingSparringStage.WallAndSuppress

@@ -351,6 +351,27 @@ public sealed class TrainingSparringModelTests
     }
 
     [Test]
+    public void D_마무리_표시는_제압_피해_뒤_제압_종료부터_사망_전까지만()
+    {
+        var model = AtD();
+        Assert.That(model.IsFinishing, Is.False);                // 제압 중
+        Assert.That(model.OnSuppressEnded(), Is.True);           // 피해 없이 종료 — 칸 표시 그대로
+        Assert.That(model.IsFinishing, Is.False);
+
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.OnSuppressDamage(), Is.True);
+        Assert.That(model.IsFinishing, Is.False);                // 피해만으론 아직 — 제압 종료가 마무리
+        Assert.That(model.OnSuppressEnded(), Is.True);
+        Assert.That(model.IsFinishing, Is.True);
+        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
+        Assert.That(model.IsFinishing, Is.True);                 // 체력 요청을 꺼내도 사망 전까진 유지
+
+        Assert.That(model.OnDied(), Is.True);
+        Assert.That(model.IsFinishing, Is.False);
+        Assert.That(Create().IsFinishing, Is.False);             // 새로 스폰한 상대
+    }
+
+    [Test]
     public void D_중복_제압_시작과_종료는_무시하고_마무리_뒤_제압도_무시()
     {
         var model = AtD();

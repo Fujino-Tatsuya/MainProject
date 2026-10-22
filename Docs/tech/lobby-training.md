@@ -32,6 +32,9 @@
 - **벽**: 넉백·Q 밀림 틱마다 `UnitWallImpacts.ServerProbe`(넉백 1회 = 1회). 결과 콜라이더가 `designatedWalls` 에 있을 때만 유효 — 씬 배치(T5c, 아래)가 `ServerConfigureArena(C 위치, 지정 벽)` 로 넣는다.
 - **간파 성공 쿨 감소**: 할 일 90 으로 게임 전체에서 제거 — 훈련 상대 별도 처리 없음.
 - **칸 UI**: 머리 위 중간보스 바(`MonsterHealthBar_MidBoss`)를 이 상대의 `IOverheadHealthBarRule` 로 C·D 에만 켠다. 게이지 칸은 바 이름 자리 `칸 n/m`, D 제압 중엔 `제압된 상대를 공격하세요 n초`(임시 — 문구 `LobbyUiStrings.Train03*`). 바 채움은 체력.
+  - **D 마무리**: 제압 중 유효 피해가 있었고 제압이 끝나 마무리로 넘어가면(마무리 체력 60 적용·처치 방지 해제) 바 이름이 `마무리하세요`(`UI.Lobby.Train03Finish`)로 바뀌고 칸 n/m 은 숨긴다 — 체력 바(60→0)는 그대로. 게이지는 23호 규칙대로 제압 종료 때 가득 복원(표시만 숨김).
+    판단 = `TrainingSparringModel.IsFinishing`(D ∧ 마무리, 사망 전까지), 표시 = 서버 쓰기 복제 bool `_finishPrompt` = `IsFinishing ∧ 제압 아님`(늦은 참가 동일, RPC 없음). 스폰·B→C 초기화·사망은 모델에서 자동 false, 마무리 중 다시 제압되면 제압 안내가 우선.
+    피해 없이 끝난 제압은 지금처럼 칸 5/5 로 다시 시작.
 - **이벤트(서버)**: 간파 성공·CC 적용/종료·지정 벽 유효 충돌·칸 감소·제압 진입/종료·제압 중 피해·사망·단계 완료(`ServerStageCompleted`)·B→C 초기화 완료(`ServerResetExecuted` — 플레이어 쪽 `TrainingResetOptions.PracticeReset` 을 진행기가 이어 건다).
 
 ### 진행기 연결 (T5c)

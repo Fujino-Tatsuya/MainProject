@@ -61,6 +61,9 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     // 제압이 끝나는 서버 시각(NetworkManager.ServerTime) — D 남은 시간 표시. 제압 아니면 0.
     readonly NetworkVariable<double> _suppressEndsAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // D 마무리 안내 — 모델 IsFinishing ∧ 제압 아님. 스폰·초기화·사망·제압 중엔 false(SyncModel 이 모델에서 다시 만든다).
+    readonly NetworkVariable<bool> _finishPrompt = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // ── 서버 런타임 ──
     TrainingSparringModel _model;
@@ -113,6 +116,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public bool ShowsSegmentUi => _segmentUi.Value;
     public bool IsVulnerableVisual => _vulnerableVisual.Value;
     public bool IsSuppressedVisual => _suppressedVisual.Value;
+    /// <summary>[모든 피어] D 마무리 안내 표시(복제) — 바 이름이 칸 대신 '마무리하세요'.</summary>
+    public bool ShowsFinishPrompt => _finishPrompt.Value;
     /// <summary>[모든 피어] 총 칸(23호 데이터 — 게이지 최대 / counterGaugeStep).</summary>
     public int TotalSegments => TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, CounterStep).TotalSegments;
     /// <summary>[모든 피어] 남은 칸.</summary>
@@ -761,6 +766,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
 
         if (_stage.Value != _model.Stage) _stage.Value = _model.Stage;
         if (_segmentUi.Value != _model.ShowsSegmentUi) _segmentUi.Value = _model.ShowsSegmentUi;
+        bool finishPrompt = _model.IsFinishing && !_suppressed;
+        if (_finishPrompt.Value != finishPrompt) _finishPrompt.Value = finishPrompt;
     }
     #endregion
 
@@ -800,20 +807,24 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     bool IOverheadHealthBarRule.ShouldShow => _segmentUi.Value && CurrentHealth > 0;
     Color IOverheadHealthBarRule.FillColor => barFillColor;
 
-    // 바 이름 자리 = 칸 "n/m", D 제압 중엔 '제압된 상대를 공격하세요' + 남은 초(임시 — 명세 §9.6). 바뀔 때만 다시 만든다.
+    // 캐시 키: 칸 = 0 이상, 제압 안내 = -1 - 남은 초(-1 이하), 마무리 = 아래 고정값(초기값 int.MinValue 와도 다름).
+    const int FinishLabelKey = int.MinValue + 1;
+
+    // 바 이름 자리 = 칸 "n/m", D 제압 중엔 '제압된 상대를 공격하세요' + 남은 초, D 마무리 중엔 '마무리하세요'(칸 없음 — 임시, 명세 §9.6). 바뀔 때만 다시 만든다.
     string IOverheadHealthBarRule.Label
     {
         get
         {
             bool finisherSuppress = _stage.Value == TrainingSparringStage.Finisher && _suppressedVisual.Value;
-            int key = finisherSuppress
-                ? -1 - LobbyUiStrings.CountdownDisplaySeconds(SuppressRemainingSeconds)
+            bool finishing = !finisherSuppress && _finishPrompt.Value;
+            int key = finisherSuppress ? -1 - LobbyUiStrings.CountdownDisplaySeconds(SuppressRemainingSeconds)
+                : finishing ? FinishLabelKey
                 : RemainingSegments * 1000 + TotalSegments;
             if (key != _labelKey || _label == null)
             {
                 _labelKey = key;
-                _label = finisherSuppress
-                    ? LobbyUiStrings.FormatTrain03SuppressAttack(SuppressRemainingSeconds)
+                _label = finisherSuppress ? LobbyUiStrings.FormatTrain03SuppressAttack(SuppressRemainingSeconds)
+                    : finishing ? LobbyUiStrings.Train03Finish.Text
                     : LobbyUiStrings.FormatTrain03Segments(RemainingSegments, TotalSegments);
             }
             return _label;
