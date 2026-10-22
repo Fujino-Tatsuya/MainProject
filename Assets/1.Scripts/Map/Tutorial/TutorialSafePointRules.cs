@@ -11,74 +11,28 @@ public static class TutorialSafePointRules
     /// <summary>복도는 짧다(약 9.6m) — 중간 지점(뒤쪽 절반)에 닿지 않게 입구 가까이.</summary>
     public const float DefaultCorridorEntryInset = 1.5f;
 
-    /// <summary>지점이 막혔을 때 둘러보는 링 반경(m, 가까운 것부터)·방향 수.</summary>
-    public static readonly IReadOnlyList<float> DefaultRingRadii = new[] { 0.75f, 1.5f, 2.25f, 3f };
-    public const int DefaultRingDirections = 8;
-
-    static readonly string[] BlockingLayerNames = { "Default", "Ground", "Env", "Wall", "Barrier" };
+    /// <summary>복귀 높이 기본값 — 지점 Transform 위로 이만큼(m) 띄워 내려놓고 떨어져 착지한다.</summary>
+    public const float DefaultDropHeight = 3f;
 
     /// <summary>
-    /// 지점을 막는(점유 검사) 레이어 = 정적 장애물만 — 바닥 레이어 위 소품(Default·Ground·Env)·벽(Wall)·배리어(Barrier).
-    /// 몬스터(Enemy·EnemyHurtBox·이름 없는 래그돌 뼈 레이어)·플레이어·시체·Soul·무기처럼 움직이는 것은 넣지 않는다 —
-    /// 겹쳐 내려도 유닛 충돌 밀어내기(할 일 11)가 푼다. 자동 부활 격자(<c>TutorialDeathRules</c>)와 같은 조합.
+    /// 지금 스텝 구간 = 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'
+    /// (<see cref="TutorialRevivePointRules.ResolveStageArea(TutorialStep, int, int)"/>). 보스 진입은 G10 을 지난 사람만.
     /// </summary>
-    public static IReadOnlyList<string> BlockingLayers => BlockingLayerNames;
-
-    public static bool IsBlockingLayer(string layerName) => Array.IndexOf(BlockingLayerNames, layerName) >= 0;
+    public static TutorialArea StepArea(TutorialStep step, int openedGateMask, int passedMask) =>
+        TutorialRevivePointRules.ResolveStageArea(step, openedGateMask, passedMask);
 
     /// <summary>
-    /// 고정 지점(<paramref name="x"/>, <paramref name="z"/>)이 정적 장애물에 막혔을 때 그 주변 빈자리 — 반경 <paramref name="radii"/>(앞에서부터 = 가까운 것부터)마다
-    /// <paramref name="directions"/> 방향(+X 부터 반시계)을 보고, 구간 사각형 <paramref name="bounds"/> 안이면서 <paramref name="isFree"/> 인 첫 점.
-    /// 구간 밖(벽 너머 다른 구간·맵 밖)은 보지 않는다. 없으면 false.
+    /// 복귀 지점 고르기 — 지금 스텝 구간(<paramref name="stepArea"/>)에 지점이 있으면 항상 그것만. 점유·바닥 검사·다른 구간 대체 없음.
+    /// 없으면 false(기존 추락 복구 경로).
     /// </summary>
-    public static bool TryFindNearestFree(float x, float z, TutorialRect bounds, IReadOnlyList<float> radii, int directions,
-                                          Func<float, float, bool> isFree, out float freeX, out float freeZ)
+    public static bool TryPickStepPoint(TutorialArea stepArea, Func<TutorialArea, bool> hasPoint, out TutorialArea area)
     {
-        freeX = x;
-        freeZ = z;
-        if (radii == null || isFree == null || directions <= 0) return false;
-
-        for (int r = 0; r < radii.Count; r++)
-        {
-            for (int d = 0; d < directions; d++)
-            {
-                double angle = 2.0 * Math.PI * d / directions;
-                float cx = x + (float)Math.Cos(angle) * radii[r];
-                float cz = z + (float)Math.Sin(angle) * radii[r];
-                if (!bounds.Contains(cx, cz) || !isFree(cx, cz)) continue;
-                freeX = cx;
-                freeZ = cz;
-                return true;
-            }
-        }
-        return false;
+        area = stepArea != TutorialArea.None && hasPoint != null && hasPoint(stepArea) ? stepArea : TutorialArea.None;
+        return area != TutorialArea.None;
     }
 
-    /// <summary>
-    /// 구간 순서 어디에서도 설 자리를 못 찾았을 때 — 튜토리얼 진행 중에는 씬 시작 지점(추락 복구의 스폰 폴백)으로 보내지 않고
-    /// 순서의 첫 '지점이 있는' 구간(보통 지금 단계 구간)을 고른다. 그 지점에 그대로(겹침 허용) 내린다. 지점이 하나도 없으면 false(기존 동작).
-    /// </summary>
-    public static bool TryPickLastResort(IReadOnlyList<TutorialArea> order, Func<TutorialArea, bool> hasPoint, out TutorialArea area)
-    {
-        if (order != null && hasPoint != null)
-        {
-            for (int i = 0; i < order.Count; i++)
-            {
-                if (!hasPoint(order[i])) continue;
-                area = order[i];
-                return true;
-            }
-        }
-        area = TutorialArea.None;
-        return false;
-    }
-
-    /// <summary>
-    /// 찾는 구간 순서 = 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'부터 지나온 최전방 구간까지 거꾸로
-    /// (<see cref="TutorialRevivePointRules.AreaOrder(TutorialStep, int, int)"/>). 보스 진입은 G10 을 지난 사람만.
-    /// </summary>
-    public static List<TutorialArea> AreaOrder(TutorialStep step, int openedGateMask, int passedMask) =>
-        TutorialRevivePointRules.AreaOrder(step, openedGateMask, passedMask);
+    /// <summary>복귀 높이 — 지점 Y + <paramref name="dropHeight"/>(음수는 0).</summary>
+    public static float DropY(float pointY, float dropHeight) => pointY + Math.Max(0f, dropHeight);
 
     /// <summary>감시하는가 — 튜토리얼 진행 중(단계 None·Finished 아님)이고 보스방 이동(카운트다운·도착 대기) 중이 아님.</summary>
     public static bool ShouldWatch(bool tutorialActive, TutorialStep step, bool bossMoveBusy) =>

@@ -2969,9 +2969,7 @@ MonoBehaviour:
   - area: 9
     point: {fileID: 1269426342}
   useOnFall: 1
-  floorSearchHeight: 1.5
-  occupancyRadius: 0.4
-  maxFlatAngle: 10
+  dropHeight: 3
 --- !u!4 &1019541882
 Transform:
   m_ObjectHideFlags: 0
