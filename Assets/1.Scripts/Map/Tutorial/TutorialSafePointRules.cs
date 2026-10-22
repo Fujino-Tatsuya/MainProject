@@ -7,6 +7,12 @@ using System.Collections.Generic;
 /// <summary>고른 복귀 자리 — 지점 그대로 · 막혀서 주변 링 빈자리 · 링도 실패해 지점 그대로(겹침 허용).</summary>
 public enum TutorialSafeSpotKind { Point, Ring, PointOverlap }
 
+/// <summary>
+/// 튜토리얼 복귀 구간 — None = 기존 경로(override null) · Step = 지금 스텝 고정 지점 · BossCountdown = 보스방 이동 카운트다운(보스 진입 고정 지점) ·
+/// BossFight = 보스방 도착 뒤(재합류 모서리).
+/// </summary>
+public enum TutorialReturnPhase { None, Step, BossCountdown, BossFight }
+
 public static class TutorialSafePointRules
 {
     /// <summary>기본 지점 — 들어오는 배리어 앞면에서 구간 안쪽으로(m). 존1 은 가운데.</summary>
@@ -98,9 +104,31 @@ public static class TutorialSafePointRules
     /// <summary>복귀 높이 — 고른 자리(지점 또는 링 빈자리, 높이는 지점 Y) + <paramref name="dropHeight"/>(음수는 0).</summary>
     public static float DropY(float pointY, float dropHeight) => pointY + Math.Max(0f, dropHeight);
 
-    /// <summary>감시하는가 — 튜토리얼 진행 중(단계 None·Finished 아님)이고 보스방 이동(카운트다운·도착 대기) 중이 아님.</summary>
-    public static bool ShouldWatch(bool tutorialActive, TutorialStep step, bool bossMoveBusy) =>
-        tutorialActive && step != TutorialStep.None && step != TutorialStep.Finished && !bossMoveBusy;
+    /// <summary>
+    /// 지금 복귀 구간 — 튜토리얼 밖·활성 전 = <see cref="TutorialReturnPhase.None"/>.
+    /// 단계 Finished(보스방 도착 뒤 = 보스전) = <see cref="TutorialReturnPhase.BossFight"/>.
+    /// 보스방 이동 카운트다운(<paramref name="countdownActive"/> — 패드·타이머 만료 강제 공통) = <see cref="TutorialReturnPhase.BossCountdown"/>.
+    /// 카운트다운이 끝난 뒤 엘리베이터 연출·도착 대기(<paramref name="encounterBusy"/>)는 None — 기존 경로 그대로(할 일 89).
+    /// 그 밖 = <see cref="TutorialReturnPhase.Step"/>(지금 스텝 고정 지점).
+    /// </summary>
+    public static TutorialReturnPhase ReturnPhase(bool tutorialActive, TutorialStep step, bool countdownActive, bool encounterBusy)
+    {
+        if (!tutorialActive || step == TutorialStep.None) return TutorialReturnPhase.None;
+        if (step == TutorialStep.Finished) return encounterBusy ? TutorialReturnPhase.None : TutorialReturnPhase.BossFight;
+        if (countdownActive) return TutorialReturnPhase.BossCountdown;
+        return encounterBusy ? TutorialReturnPhase.None : TutorialReturnPhase.Step;
+    }
+
+    /// <summary>
+    /// 복귀 구간별 고정 지점 구간 — 스텝 = <paramref name="stepArea"/>, 보스방 이동 카운트다운 = 보스 진입 구간.
+    /// 보스전(모서리)·None 은 구간 지점을 쓰지 않는다(None).
+    /// </summary>
+    public static TutorialArea FixedPointArea(TutorialReturnPhase phase, TutorialArea stepArea) => phase switch
+    {
+        TutorialReturnPhase.Step => stepArea,
+        TutorialReturnPhase.BossCountdown => TutorialArea.BossEnter,
+        _ => TutorialArea.None,
+    };
 
     /// <summary>
     /// 저작 메뉴가 처음 놓는 기본 위치(월드 XZ) — 존1 = 가운데, 그 밖 = 그 구간으로 들어오는 배리어(너머 구간 = area)의

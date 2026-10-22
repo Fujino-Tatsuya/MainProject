@@ -10,11 +10,14 @@ using UnityEngine;
 /// 지점 = 이 컴포넌트의 <see cref="points"/>(구간 → 씬 Transform). 저작 메뉴 <c>Tools/Map/Authoring/Tutorial/8. Place Safe Points</c> 가
 /// 빠진 구간만 기본 위치(들어오는 배리어 안쪽)에 만든다 — 옮긴 지점은 다시 돌려도 그대로다.
 ///
-/// 언제 되돌리나(튜토리얼 진행 중 · 단계 Finished 전 · 보스방 이동 중 아님):
-///  · 낙사 — 기존 추락 복구(<see cref="PlayerFallRecovery"/>)가 복귀 지점을 물을 때(<see cref="PlayerSafePointTracker.ReturnPointOverride"/>).
-///    추락 생존·추락 사망 모두. 연출(낙하 카메라·무적·입력 잠금)은 기존 그대로, 지점만 바뀐다.
+/// 언제 되돌리나 — 낙사: 기존 추락 복구(<see cref="PlayerFallRecovery"/>)가 복귀 지점을 물을 때(<see cref="PlayerSafePointTracker.ReturnPointOverride"/>).
+///    추락 생존·추락 사망 모두. 연출(낙하 카메라·무적·입력 잠금)은 기존 그대로, 지점만 바뀐다. 구간(<see cref="TutorialSafePointRules.ReturnPhase"/>):
+///  · 스텝 진행 중 — 지금 스텝 구간 고정 지점.
+///  · 보스방 이동 카운트다운 중 — 보스 진입(BossEnter) 고정 지점(같은 규칙). 이 동안 자동 부활도 이 지점(<see cref="TryResolveFixedPoint"/>).
+///  · 카운트다운 뒤 엘리베이터 연출·도착 대기 — 기존 경로(override null, 할 일 89).
+///  · 보스방 도착 뒤(단계 Finished = 보스전) — 재합류 모서리 규칙(<see cref="BossRoomFallPoint"/>) + <see cref="dropHeight"/>.
 ///
-/// 어느 지점인가: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(<see cref="TutorialSafePointRules.StepArea"/>)의 지점 하나.
+/// 스텝 지점: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(<see cref="TutorialSafePointRules.StepArea"/>)의 지점 하나.
 /// 점유 = 정적 장애물만(<see cref="TutorialSafePointRules.BlockingLayers"/>) — 몬스터·플레이어가 지점 위에 있어도 지점은 그대로 쓴다.
 /// 지점이 정적 장애물에 막혔으면 그 구간 안 지점 주변 링(<see cref="TutorialSafePointRules.TryFindNearestFree"/>, 가까운 것부터)의 빈자리.
 /// 고른 자리 높이 = 지점 Y + <see cref="dropHeight"/>(기본 3m) — 떨어져 착지한다. 링도 실패하면 지점 위 그대로(겹침 허용 + 경고).
@@ -77,7 +80,16 @@ public sealed class TutorialSafePoints : MonoBehaviour
         }
     }
 
-    private void OnDisable() => Unhook();
+    /// <summary>씬의 활성 인스턴스(없으면 null) — 보스방 이동 카운트다운 중 자동 부활(<see cref="TutorialDeathRules"/>)이 읽는다.</summary>
+    public static TutorialSafePoints Active { get; private set; }
+
+    private void OnEnable() => Active = this;
+
+    private void OnDisable()
+    {
+        if (Active == this) Active = null;
+        Unhook();
+    }
 
     private void Update()
     {
@@ -114,10 +126,13 @@ public sealed class TutorialSafePoints : MonoBehaviour
         _fallOverride = null;
     }
 
-    private static bool BossMoveBusy()
+    // 보스방 이동 상태 — 카운트다운 = IsCountdownActive, 그 뒤 엘리베이터 연출·도착 대기 = IsEncounterBusy(카운트다운 중에도 true).
+    private static TutorialReturnPhase CurrentPhase(TutorialDirector d)
     {
         BossTeleportManager t = BossTeleportManager.Instance;
-        return t != null && t.IsSpawned && (t.IsCountdownActive || t.IsEncounterBusy);
+        bool spawned = t != null && t.IsSpawned;
+        return TutorialSafePointRules.ReturnPhase(d.IsTutorialActive, d.Step,
+            spawned && t.IsCountdownActive, spawned && t.IsEncounterBusy);
     }
 
     // ─── 낙사 ────────────────────────────────────────────────────────────
@@ -125,34 +140,95 @@ public sealed class TutorialSafePoints : MonoBehaviour
     private Vector3? ResolveFallPoint(ulong clientId, Vector3 fallPoint)
     {
         if (!useOnFall || !TryGetServerDirector(out TutorialDirector d)) return null;
-        if (!TutorialSafePointRules.ShouldWatch(d.IsTutorialActive, d.Step, BossMoveBusy())) return null;
 
-        int mask = 0;
-        for (int g = 0; g < TutorialFlowModel.GateCount; g++)
-            if (d.IsGateOpen((TutorialGate)g)) mask |= 1 << g;
-        TutorialArea stepArea = TutorialSafePointRules.StepArea(d.Step, mask, d.GetBackBarrierMaskServer(clientId));
+        TutorialReturnPhase phase = CurrentPhase(d);
+        if (phase == TutorialReturnPhase.None) return null;
+        if (phase == TutorialReturnPhase.BossFight) return ResolveBossRoomCorner(clientId);
 
-        if (!TutorialSafePointRules.TryPickStepPoint(stepArea, a => TryGetPoint(a, out _), out TutorialArea area)
-            || !TryGetPoint(area, out Transform t))
+        TutorialArea stepArea = TutorialArea.None;
+        if (phase == TutorialReturnPhase.Step)
         {
-            Edit.LogWarning($"[Tutorial] client {clientId} 낙사 — {stepArea} 안전 지점이 없다(미배치). 기존 추락 복구로 넘긴다.", this);
-            return null;
+            int mask = 0;
+            for (int g = 0; g < TutorialFlowModel.GateCount; g++)
+                if (d.IsGateOpen((TutorialGate)g)) mask |= 1 << g;
+            stepArea = TutorialSafePointRules.StepArea(d.Step, mask, d.GetBackBarrierMaskServer(clientId));
+        }
+
+        TutorialArea wanted = TutorialSafePointRules.FixedPointArea(phase, stepArea);
+        return TryResolveFixedPoint(wanted, clientId, "낙사", out Vector3 point) ? point : null;
+    }
+
+    /// <summary>
+    /// [서버] 구간 <paramref name="area"/> 고정 지점에서 내릴 자리 — 정적 장애물에 막혔으면 구간 안 주변 링 빈자리, 링도 실패하면 지점 그대로(겹침 허용),
+    /// 높이 = 지점 Y + <see cref="dropHeight"/>. 그 구간에 지점이 없으면 false(호출자는 기존 경로). 보스방 이동 카운트다운 중 자동 부활도 쓴다.
+    /// </summary>
+    public bool TryResolveFixedPoint(TutorialArea area, ulong clientId, string why, out Vector3 point)
+    {
+        point = default;
+        if (!TutorialSafePointRules.TryPickStepPoint(area, a => TryGetPoint(a, out _), out TutorialArea picked)
+            || !TryGetPoint(picked, out Transform t))
+        {
+            Edit.LogWarning($"[Tutorial] client {clientId} {why} — {area} 안전 지점이 없다(미배치). 기존 경로로 넘긴다.", this);
+            return false;
         }
 
         Vector3 p = t.position;
         TutorialRect? bounds = null;
-        var rules = d.GetComponent<TutorialDeathRules>();
-        if (rules != null && rules.TryGetAreaRect(area, out TutorialRect rect)) bounds = rect;
+        TutorialDirector d = TutorialDirector.Instance;
+        var rules = d != null ? d.GetComponent<TutorialDeathRules>() : null;
+        if (rules != null && rules.TryGetAreaRect(picked, out TutorialRect rect)) bounds = rect;
 
         TutorialSafeSpotKind kind = TutorialSafePointRules.PickSpot(p.x, p.z, IsBlocked(p), bounds,
             (x, z) => IsFreeRingSpot(new Vector3(x, p.y, z)), out float sx, out float sz);
-        var point = new Vector3(sx, TutorialSafePointRules.DropY(p.y, dropHeight), sz);
+        point = new Vector3(sx, TutorialSafePointRules.DropY(p.y, dropHeight), sz);
 
         if (kind == TutorialSafeSpotKind.PointOverlap)
-            Edit.LogWarning($"[Tutorial] client {clientId} 낙사 — {area} 안전 지점이 장애물에 막히고 주변 빈자리도 없어 지점 위 {point} 에 그대로 내린다(겹침 허용).", this);
+            Edit.LogWarning($"[Tutorial] client {clientId} {why} — {picked} 안전 지점이 장애물에 막히고 주변 빈자리도 없어 지점 위 {point} 에 그대로 내린다(겹침 허용).", this);
         else
-            Edit.Log($"[Tutorial] client {clientId} 낙사 → {area} 안전 지점{(kind == TutorialSafeSpotKind.Ring ? " 주변 빈자리" : "")} {point}.", this);
+            Edit.Log($"[Tutorial] client {clientId} {why} → {picked} 안전 지점{(kind == TutorialSafeSpotKind.Ring ? " 주변 빈자리" : "")} {point}.", this);
+        return true;
+    }
+
+    // ─── 보스전 낙사 — 재합류 모서리 ─────────────────────────────────────
+
+    private readonly List<Pose> _corners = new List<Pose>();
+    private readonly List<Vector3> _others = new List<Vector3>();
+    private readonly List<Vector3> _bosses = new List<Vector3>();
+
+    // 판 도중 재합류(할 일 48 R3c — NetworkLoadingFlowController.SpawnRejoiner)와 같은 입력: 다른 플레이어 전원·활성 TwentyThreeBoss.
+    private Vector3? ResolveBossRoomCorner(ulong clientId)
+    {
+        if (!BossRoomRejoin.TryCollectCorners(_corners, out bool fromPrefab))
+        {
+            Edit.LogWarning($"[Tutorial] client {clientId} 보스전 낙사 — 보스 룸 모서리를 못 찾아 기존 추락 복구로 넘긴다.", this);
+            return null;
+        }
+
+        _others.Clear();
+        foreach (NetworkClient other in NetworkManager.Singleton.ConnectedClientsList)
+            if (other.ClientId != clientId && other.PlayerObject != null)
+                _others.Add(other.PlayerObject.transform.position);
+
+        _bosses.Clear();
+        foreach (TwentyThreeBoss boss in FindObjectsByType<TwentyThreeBoss>(FindObjectsSortMode.None))
+            if (boss.isActiveAndEnabled) _bosses.Add(boss.transform.position);
+
+        Vector3 point = BossRoomFallPoint(_corners, _others, _bosses, dropHeight, out int corner);
+        Edit.Log($"[Tutorial] client {clientId} 보스전 낙사 → 보스 룸 모서리 {BossRoomRejoin.CornerName(corner)}" +
+                 $"({(fromPrefab ? "prefab" : "fallback")}) {point}.", this);
         return point;
+    }
+
+    /// <summary>
+    /// 보스전 낙사 복귀 자리 — 재합류 모서리 규칙(<see cref="RejoinSpawnPicker.FarthestCorner"/> — 다른 플레이어·보스에서 가장 먼 모서리) 그대로,
+    /// 높이만 모서리 Y + <paramref name="dropHeight"/>(<see cref="TutorialSafePointRules.DropY"/>). <paramref name="corners"/> 는 비어 있으면 안 된다.
+    /// </summary>
+    public static Vector3 BossRoomFallPoint(IReadOnlyList<Pose> corners, IReadOnlyList<Vector3> others, IReadOnlyList<Vector3> bosses,
+                                            float dropHeight, out int corner)
+    {
+        corner = RejoinSpawnPicker.FarthestCorner(corners, others, bosses);
+        Vector3 p = corners[corner].position;
+        return new Vector3(p.x, TutorialSafePointRules.DropY(p.y, dropHeight), p.z);
     }
 
     // 정적 장애물(소품·벽·배리어)만 — 적·플레이어는 보지 않는다.

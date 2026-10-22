@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 /// <summary>
 /// 튜토리얼 스텝별 고정 안전 지점(할 일 80) 순수 규칙(<see cref="TutorialSafePointRules"/>) —
-/// 감시 조건·지금 스텝 구간(부활과 같음)·저작 기본 위치·항상 지금 스텝 지점(대체 없음)·점유 = 정적 장애물만·막히면 주변 링·링 실패 시 지점 그대로·복귀 높이. 문서: Docs/tech/tutorial-director.md §12.
+/// 복귀 구간(스텝·보스방 이동 카운트다운 = 보스 진입 지점·엘리베이터 대기 = 기존·보스전 = 재합류 모서리 + 오프셋)·지금 스텝 구간(부활과 같음)·저작 기본 위치·항상 지금 스텝 지점(대체 없음)·점유 = 정적 장애물만·막히면 주변 링·링 실패 시 지점 그대로·복귀 높이. 문서: Docs/tech/tutorial-director.md §12.
 /// </summary>
 public sealed class TutorialSafePointRulesTests
 {
@@ -27,13 +27,53 @@ public sealed class TutorialSafePointRulesTests
     // ─── 감시 조건 ────────────────────────────────────────────────────────
 
     [Test]
-    public void ShouldWatch_OnlyWhileTutorialRuns()
+    public void ReturnPhase_StepCountdownElevatorBossFight()
     {
-        Assert.IsTrue(TutorialSafePointRules.ShouldWatch(true, TutorialStep.Zone2, false));
-        Assert.IsFalse(TutorialSafePointRules.ShouldWatch(false, TutorialStep.Zone2, false), "튜토리얼 아님");
-        Assert.IsFalse(TutorialSafePointRules.ShouldWatch(true, TutorialStep.None, false), "활성 전");
-        Assert.IsFalse(TutorialSafePointRules.ShouldWatch(true, TutorialStep.Finished, false), "보스방 도착 뒤 = 일반 규칙");
-        Assert.IsFalse(TutorialSafePointRules.ShouldWatch(true, TutorialStep.BossEnter, true), "보스방 이동(카운트다운·도착 대기) 중");
+        Assert.AreEqual(TutorialReturnPhase.Step, TutorialSafePointRules.ReturnPhase(true, TutorialStep.Zone2, false, false));
+        Assert.AreEqual(TutorialReturnPhase.None, TutorialSafePointRules.ReturnPhase(false, TutorialStep.Zone2, false, false), "튜토리얼 아님");
+        Assert.AreEqual(TutorialReturnPhase.None, TutorialSafePointRules.ReturnPhase(true, TutorialStep.None, false, false), "활성 전");
+
+        // 카운트다운 중엔 IsEncounterBusy 도 true(코루틴 대기) — 카운트다운이 우선.
+        Assert.AreEqual(TutorialReturnPhase.BossCountdown, TutorialSafePointRules.ReturnPhase(true, TutorialStep.BossEnter, true, true), "패드 카운트다운");
+        Assert.AreEqual(TutorialReturnPhase.BossCountdown, TutorialSafePointRules.ReturnPhase(true, TutorialStep.Zone4Combat, true, true), "타이머 만료 강제 이동 카운트다운");
+
+        // 카운트다운 끝 → 엘리베이터 연출·도착 대기 = 기존 경로 그대로(할 일 89).
+        Assert.AreEqual(TutorialReturnPhase.None, TutorialSafePointRules.ReturnPhase(true, TutorialStep.BossEnter, false, true), "엘리베이터 대기는 변경 없음");
+
+        Assert.AreEqual(TutorialReturnPhase.BossFight, TutorialSafePointRules.ReturnPhase(true, TutorialStep.Finished, false, false), "보스방 도착 뒤 = 보스전");
+        Assert.AreEqual(TutorialReturnPhase.None, TutorialSafePointRules.ReturnPhase(true, TutorialStep.Finished, false, true), "Finished 여도 이동 연출 중이면 기존 경로");
+    }
+
+    [Test]
+    public void FixedPointArea_CountdownIsBossEnter_StepIsStepArea()
+    {
+        Assert.AreEqual(TutorialArea.Zone2, TutorialSafePointRules.FixedPointArea(TutorialReturnPhase.Step, TutorialArea.Zone2));
+        Assert.AreEqual(TutorialArea.BossEnter, TutorialSafePointRules.FixedPointArea(TutorialReturnPhase.BossCountdown, TutorialArea.Corridor4),
+            "카운트다운 중엔 스텝 구간과 무관하게 보스 진입 지점");
+        Assert.AreEqual(TutorialArea.None, TutorialSafePointRules.FixedPointArea(TutorialReturnPhase.BossFight, TutorialArea.Corridor4), "보스전 = 모서리");
+        Assert.AreEqual(TutorialArea.None, TutorialSafePointRules.FixedPointArea(TutorialReturnPhase.None, TutorialArea.Corridor4), "엘리베이터 대기 = 기존 경로");
+    }
+
+    [Test]
+    public void BossRoomFallPoint_IsFarthestRejoinCorner_PlusDropHeight()
+    {
+        var corners = new List<UnityEngine.Pose>
+        {
+            new UnityEngine.Pose(new UnityEngine.Vector3(-10f, 0.5f, -10f), UnityEngine.Quaternion.identity),
+            new UnityEngine.Pose(new UnityEngine.Vector3(10f, 0.5f, -10f), UnityEngine.Quaternion.identity),
+            new UnityEngine.Pose(new UnityEngine.Vector3(10f, 0.5f, 10f), UnityEngine.Quaternion.identity),
+            new UnityEngine.Pose(new UnityEngine.Vector3(-10f, 0.5f, 10f), UnityEngine.Quaternion.identity),
+        };
+        var others = new List<UnityEngine.Vector3> { new UnityEngine.Vector3(-9f, 0f, -9f) };
+        var bosses = new List<UnityEngine.Vector3> { new UnityEngine.Vector3(0f, 0f, -9f) };
+
+        UnityEngine.Vector3 p = TutorialSafePoints.BossRoomFallPoint(corners, others, bosses, 3f, out int corner);
+
+        Assert.AreEqual(RejoinSpawnPicker.FarthestCorner(corners, others, bosses), corner, "재합류 모서리 선택 그대로");
+        Assert.AreEqual(2, corner, "다른 플레이어·보스에서 가장 먼 모서리");
+        Assert.AreEqual(10f, p.x, 1e-4f);
+        Assert.AreEqual(10f, p.z, 1e-4f);
+        Assert.AreEqual(3.5f, p.y, 1e-4f, "모서리 Y + 오프셋 3");
     }
 
     // ─── 지금 스텝 구간 = 자동 부활 ──────────────────────────────────────
