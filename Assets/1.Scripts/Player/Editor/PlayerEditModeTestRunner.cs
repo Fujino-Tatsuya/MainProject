@@ -56,6 +56,7 @@ internal static class PlayerEditModeTestRunner
         "^AssassinVisualPrefabTests$", // PLAN-assassin §9 — v18 비주얼: Flat Kit 슬롯 5개·부모·BaseMap, 단검 루트 = 임포트 배율, Armature 루트·판정 박스 배율 1
         "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침)·반격 부채꼴(표면 거리·평면 각도)
         "^FirstMeleeGuardCounterModelTests$", // PLAN-paladin-counter-e C3 — 팔라딘 E 단계: 방어 불가 Pass·대기 경계·반격 중 무시(now < counterEndAt)·반격 1회·같은 틱 둘 다·Clamp·반격 보장·넉백
+        "^FirstMeleeGuardAttackSpeedTests$", // 할 일 91 A5 — 팔라딘 E 준비·해제·반격만 공속(AttackSpeedRate), 방어중 제외·고정 전환·이벤트 순서
         "^LobbyReadyRulesTests$", // 할 일 48 C8 — 로비 전원 준비 → 카운트다운·취소·새 접속 Ready 초기화·캐릭터 변경 거부·시작 1회 래치(호스트 예외 없음)
         "^CharacterSelectionMemoryTests$", // 할 일 48 C8 — 캐릭터 선택 저장소: 퇴장 뒤 같은 playerId 재접속에 마지막 선택 되살림
         "^PlayerInputBlockTokensTests$", // 할 일 48 C9 — 입력 차단 토큰: 요청자별 걸기·풀기, 마지막 토큰이 풀릴 때만 열림, 중복·null 무시

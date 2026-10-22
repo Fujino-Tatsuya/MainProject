@@ -1,12 +1,14 @@
 using UnityEngine;
 
-/// <summary>팔라딘 E 단계. Idle → Guarding → (방어 성공) Countering → Finished.</summary>
+/// <summary>팔라딘 E 단계. Idle → Guarding → (창 닫힘) Releasing → Finished, 또는 Guarding → (방어 성공) Countering → Finished.</summary>
 public enum FirstMeleeGuardPhase
 {
     Idle,
     Guarding,
     Countering,
     Finished,
+    /// <summary>방어 창이 닫히고 해제 모션(SubSkillGuardEnd)이 끝나기를 기다린다 — 그 클립 End 가 E 를 끝낸다.</summary>
+    Releasing,
 }
 
 /// <summary>들어온 피격 하나에 대한 판정.</summary>
@@ -24,7 +26,7 @@ public enum GuardVerdict
 public enum GuardEndReason
 {
     None,
-    /// <summary>방어 창이 닫힐 때까지 성공하지 못했다 — 반격 없음.</summary>
+    /// <summary>방어 창이 닫힐 때까지 성공하지 못했고 해제 모션이 끝났다 — 반격 없음.</summary>
     GuardExpired,
     /// <summary>반격 단계가 끝났다.</summary>
     CounterFinished,
@@ -57,7 +59,7 @@ public readonly struct GuardIncoming
     public bool IsUnblockable => !hasAttacker || forcedUnblockable || damage <= 0f;
 }
 
-/// <summary>애니메이션 이벤트 하나를 넣은 결과(<see cref="FirstMeleeGuardCounterModel.OnGuardWindowClosed"/> 등).</summary>
+/// <summary>애니메이션 이벤트 하나를 넣은 결과(<see cref="FirstMeleeGuardCounterModel.OnEnd"/>).</summary>
 public readonly struct GuardEventResult
 {
     /// <summary>반격을 지금 실행해야 한다. 방어 성공 한 번당 한 번만 true.</summary>
@@ -78,8 +80,8 @@ public readonly struct GuardEventResult
 ///
 /// 순수 C# 이다(MonoBehaviour 아님 — <see cref="CounterWindow"/> 와 같은 모양). 시간을 재지 않는다 —
 /// 방어 창·반격 판정·반격 종료는 호출측이 넘기는 <b>애니메이션 이벤트</b>로 정해진다.
-/// 방어 시작 클립(SubSkillGuard): Custom0 = 방어 창 열림 → 유지 루프(SubSkillGuardIdle) → 방어 종료 클립(SubSkillGuardEnd): Custom1 = 방어 창 닫힘.
-/// 반격 클립(SubSkillCounter): Hit = 반격 판정, End = 반격 종료.
+/// 준비 클립(SubSkillGuard): Custom0 = 방어 창 열림 → 방어중 루프(SubSkillGuardIdle) → 해제 클립(SubSkillGuardEnd): Custom1 = 방어 창 닫힘,
+/// End = E 종료. 반격 클립(SubSkillCounter): Hit = 반격 판정, End = 반격 종료.
 /// 피해·반격 판정·넉백·종료 처리는 이 클래스가 하지 않는다 — FirstMeleeSubSkill 의 몫이다.
 ///
 /// 🔴 확정한 규칙(2026-10-16 결정 1~25 권장안):
@@ -89,8 +91,9 @@ public readonly struct GuardEventResult
 ///       (<see cref="FirstMeleeGuardRules.IsInsideGuardArc"/>) 안일 때뿐이다. 성공 즉시 Countering 으로 바뀐다.</item>
 /// <item><b>반격 중 무시</b>는 Countering 인 동안(End 이벤트 전까지), 방향 무관이다.</item>
 /// <item><b>추가 성공은 없다.</b> 반격 중 들어온 피격은 반격을 다시 걸지 않는다.</item>
-/// <item><b>단계에 맞지 않는 이벤트는 무시한다.</b> 반격 상태로 CrossFade 하는 동안 방어 클립의 Custom1 이
-///       뒤늦게 오거나, 원격 오너 동기로 반격 상태가 다시 들어가 Hit·End 가 두 번 올 수 있다.</item>
+/// <item><b>단계에 맞지 않는 이벤트는 무시한다.</b> 반격 상태로 CrossFade 하는 동안 해제 클립의 Custom1 이
+///       뒤늦게 오거나, 원격 오너 동기로 반격 상태가 다시 들어가 Hit·End 가 두 번 올 수 있다.
+///       End 는 Releasing(해제 클립 End)·Countering(반격 클립 End) 에서만 끝낸다 — Guarding 에서 온 End 는 무시한다.</item>
 /// </list>
 /// </summary>
 public sealed class FirstMeleeGuardCounterModel
@@ -143,17 +146,16 @@ public sealed class FirstMeleeGuardCounterModel
     }
 
     /// <summary>
-    /// [Custom1] 방어 창을 닫는다. Guarding 일 때만 <see cref="GuardEndReason.GuardExpired"/> 로 끝난다 —
-    /// 반격 중 뒤늦게 온 Custom1 은 무시한다.
+    /// [Custom1] 방어 창을 닫고 Releasing 으로 넘어간다 — E 는 아직 끝나지 않는다(해제 클립 End 가 끝낸다).
+    /// Guarding 일 때만 — 반격 중 뒤늦게 온 Custom1 은 무시한다.
     /// </summary>
-    public GuardEventResult OnGuardWindowClosed()
+    public void OnGuardWindowClosed()
     {
         if (Phase != FirstMeleeGuardPhase.Guarding)
-            return default;
+            return;
 
         _guardWindowOpen = false;
-        Phase = FirstMeleeGuardPhase.Finished;
-        return new GuardEventResult(false, GuardEndReason.GuardExpired);
+        Phase = FirstMeleeGuardPhase.Releasing;
     }
 
     /// <summary>
@@ -200,20 +202,29 @@ public sealed class FirstMeleeGuardCounterModel
     }
 
     /// <summary>
-    /// [End] 반격 종료. Countering 일 때만 <see cref="GuardEndReason.CounterFinished"/> 로 끝난다.
+    /// [End] 해제 클립 End = Releasing 에서 <see cref="GuardEndReason.GuardExpired"/>,
+    /// 반격 클립 End = Countering 에서 <see cref="GuardEndReason.CounterFinished"/> 로 끝난다. 그 밖의 단계는 무시한다.
     ///
-    /// 🔴 계약: Hit 이 아직 안 왔으면(클립에서 Hit 이 End 뒤로 밀렸거나 빠짐) <see cref="GuardEventResult.CounterHitDue"/>
+    /// 🔴 계약(반격): Hit 이 아직 안 왔으면(클립에서 Hit 이 End 뒤로 밀렸거나 빠짐) <see cref="GuardEventResult.CounterHitDue"/>
     /// 도 같이 true 다. 호출측은 반드시 <b>CounterHitDue 를 먼저</b> 처리(반격 실행 → <see cref="MarkCounterFired"/>)하고
     /// 그다음 종료를 처리한다. 순서를 바꾸면 반격이 사라진다.
     /// </summary>
-    public GuardEventResult OnCounterEnd()
+    public GuardEventResult OnEnd()
     {
-        if (Phase != FirstMeleeGuardPhase.Countering)
-            return default;
+        switch (Phase)
+        {
+            case FirstMeleeGuardPhase.Releasing:
+                Phase = FirstMeleeGuardPhase.Finished;
+                return new GuardEventResult(false, GuardEndReason.GuardExpired);
 
-        bool hitDue = OnCounterHit();
-        Phase = FirstMeleeGuardPhase.Finished;
-        return new GuardEventResult(hitDue, GuardEndReason.CounterFinished);
+            case FirstMeleeGuardPhase.Countering:
+                bool hitDue = OnCounterHit();
+                Phase = FirstMeleeGuardPhase.Finished;
+                return new GuardEventResult(hitDue, GuardEndReason.CounterFinished);
+
+            default:
+                return default;
+        }
     }
 
     /// <summary>호출측이 반격(즉시 또는 취소 후 보장 실행)을 실행했다. 이후 HasPendingCounter 는 false.</summary>
