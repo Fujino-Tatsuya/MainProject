@@ -167,7 +167,6 @@ public sealed class TrainingSparringBotTests
         Assert.That(go.GetComponents<MonsterBase>().Length, Is.EqualTo(1));
         Assert.That(go.GetComponent<NetworkObject>(), Is.Not.Null);
         Assert.That(go.GetComponent<MonsterCounterWindow>(), Is.Not.Null, "간파 창 = SpinnerBot 저작값");
-        Assert.That(go.GetComponent<IInterruptSuccessCooldownTarget>(), Is.Not.Null);
         Assert.That(go.GetComponent<IInterruptSlowMotionTarget>(), Is.Not.Null);
         Assert.That(go.GetComponent<IOverheadHealthBarRule>(), Is.Not.Null, "칸 UI 규칙(머리 위 중간보스 바)");
         Assert.That(go.GetComponentInChildren<MonsterMeleeAttack>(true), Is.Not.Null);

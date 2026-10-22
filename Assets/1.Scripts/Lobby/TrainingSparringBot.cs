@@ -14,13 +14,13 @@ using UnityEngine.AI;
 /// <item>보스처럼 자동 피격 반응 없음(<see cref="AutoHitReactions"/> = false) — 일반 몬스터 경직·그로기 누적·넉백을 쓰지 않는다.</item>
 /// <item>벽: 넉백·밀림 틱마다 <see cref="UnitWallImpacts.ServerProbe"/>(넉백 1회 = 에피소드 1개) — 결과 콜라이더가 <see cref="designatedWalls"/> 에 있을 때만 유효.</item>
 /// <item>공격: 간파 창(<see cref="MonsterCounterWindow"/> 저작값) 동안 파란 예고 → 채찍(클립 OnAttackHit 이 판정). 이동 없이 제자리에서 돌아본다(앵커 = 배치 위치).</item>
-/// <item>훈련 보정: A/B 칸 전이 중지·칸 UI 숨김, B 학습용 취약 유지·자발 행동 없음, 처치 방지(체력 하한 1), D 마무리 체력, 간파 성공 쿨 반환 없음
-/// (<see cref="IInterruptSuccessCooldownTarget"/>). 실전 전역 규칙·데이터는 건드리지 않는다.</item>
+/// <item>훈련 보정: A/B 칸 전이 중지·칸 UI 숨김, B 학습용 취약 유지·자발 행동 없음, 처치 방지(체력 하한 1), D 마무리 체력.
+/// 실전 전역 규칙·데이터는 건드리지 않는다.</item>
 /// </list>
 /// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)은 T5c. 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
 [DataTableSheet("Lobby", Order = 0)]
-public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptSuccessCooldownTarget, IOverheadHealthBarRule
+public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IOverheadHealthBarRule
 {
     const string Tag = "[TrainingSparring]";
 
@@ -392,7 +392,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         {
             _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 ReceiveAttack 안에서 올린다(플레이어가 전후 비교)
             ulong attacker = GetAttackerClientId(hitContext);
-            CombatStatsEvents.RaiseServerCounterSucceeded(this, attacker);   // 결과 화면 통계 + 플레이어 성공 장부(쿨 감소는 이 상대가 거절)
+            CombatStatsEvents.RaiseServerCounterSucceeded(this, attacker);   // 결과 화면 통계 + 플레이어 성공 장부
             EnterCounterSuccess(attacker);
             PlayInterruptFlashRpc();
         }
@@ -764,15 +764,12 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     }
     #endregion
 
-    #region 간파 슬로우·쿨 반환·연출
+    #region 간파 슬로우·연출
     // 실전 규칙 유지 — 중간보스·23호처럼 간파 슬로우를 건다(창 열림 ∧ 취약·제압 아님).
     bool IInterruptSlowMotionTarget.ServerIsInterruptible =>
         IsServer && _windupLeft > 0f && Counter != null && Counter.IsOpen && !CounterBlockedByState;
 
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
-
-    // 명세 §6·§9.2 — 훈련 간파 성공은 쿨 반환 없음(모델 출력, 항상 false).
-    bool IInterruptSuccessCooldownTarget.ServerGrantsInterruptSuccessCooldown => _model != null && _model.GrantsCounterCooldownRefund;
 
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayInterruptFlashRpc()

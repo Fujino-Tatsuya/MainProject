@@ -128,12 +128,6 @@ public sealed class TrainingSparringModel
         || Stage == TrainingSparringStage.WallAndSuppress
         || Stage == TrainingSparringStage.Finisher;
 
-    /// <summary>
-    /// 이 상대에게 간파 성공 시 우클릭 쿨 반환을 줄지 — 훈련 상대는 항상 false(명세 §6·§9.2 "쿨타임 반환 없음").
-    /// 플레이어 쪽 연결은 <see cref="IInterruptSuccessCooldownTarget"/>(T5b) — 전역 GameRule 을 0 으로 덮지 않는다.
-    /// </summary>
-    public bool GrantsCounterCooldownRefund => false;
-
     /// <summary>제압 중 쿨타임 가속을 적용할지 — 🔴 보류 플래그. 생성자에서 켠 경우에만 C·D 제압 중 true.</summary>
     public bool AppliesSuppressAcceleration => _suppressAccelerationEnabled && _suppressActive && AllowsGaugeTransition;
 

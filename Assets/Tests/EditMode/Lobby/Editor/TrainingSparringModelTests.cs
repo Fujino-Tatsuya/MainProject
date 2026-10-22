@@ -129,17 +129,6 @@ public sealed class TrainingSparringModelTests
     }
 
     [Test]
-    public void 간파_쿨_반환은_어느_단계에서도_없다()
-    {
-        var model = Create();
-        Assert.That(model.GrantsCounterCooldownRefund, Is.False);
-        model = AtB();
-        Assert.That(model.GrantsCounterCooldownRefund, Is.False);
-        model = AtD();
-        Assert.That(model.GrantsCounterCooldownRefund, Is.False);
-    }
-
-    [Test]
     public void 제압_가속은_보류_플래그가_켜진_경우에만_C_D_제압_중_true()
     {
         var off = AtD();
