@@ -116,6 +116,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private bool isRequestingAttack;
     private bool isComboWindowOpen;
     private bool hasQueuedNextAttack;
+    // 스킬 입력 때문에 지금 타로 마무리 중(할 일 77 후속) — 오너·서버가 각자 들고, 공격이 끝나면(ResetAttackRuntime) 풀린다.
+    private bool isFinishingChain;
     private bool hasStartedAttack;
     // End에서 콤보로 안 이어질 때, 입력은 바로 풀어주되(EndAttackState) 화면에 남은
     // 이 스텝의 클립은 억지로 끊지 않고 자연 재생되게 둔다. 그동안에도 루트모션은
@@ -145,7 +147,20 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     // 콤보는 누른 프레임으로만 시작하고, 공격 중 스킬 입력은 선입력 버퍼(0.2초) 그대로다(할 일 44 — 거너만 다름).
     public bool StartsOnHold => false;
     public bool ReservesSkillAfterAttack => false;
-    public void FinishWithoutChaining() { }
+
+    // 버퍼의 스킬 입력 때문에 다음 타를 잇지 않는다(할 일 77 후속) — 오너가 예약 요청을 멈추고, 서버는 이미 받은 예약을
+    // 지우고 이후 예약을 거절한다. 이 타는 End 이벤트에서 기존 정상 종료(EndAttackServer)로 끝난다.
+    public void FinishWithoutChaining()
+    {
+        if (!IsAttacking || isFinishingChain || (IsNetworkActive && !IsOwner))
+            return;
+
+        isFinishingChain = true;
+        hasQueuedNextAttack = false;
+        // 호스트 오너·오프라인은 같은 인스턴스가 서버라 위 두 줄로 끝난다.
+        if (IsNetworkActive && !IsServer)
+            RequestFinishChainRpc();
+    }
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -602,11 +617,23 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 다음 타");
 
-        if (!isComboWindowOpen)
+        if (!isComboWindowOpen || isFinishingChain)
             return;
 
         hasQueuedNextAttack = true;
         queuedAttackDirection = ResolveAttackDirection(requestedDirection);
+    }
+
+    // 오너가 스킬 입력으로 마무리를 정했다 — 받은 예약을 지우고 이 공격이 끝날 때까지 새 예약을 거절한다.
+    // 서버가 이미 다음 타를 시작했으면(도착 전 End) 그 타에서 마무리된다 — 오너 래치도 그 타 끝까지 남아 둘이 같다.
+    [Rpc(SendTo.Server)]
+    private void RequestFinishChainRpc(RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId || !IsAttacking)
+            return;
+
+        isFinishingChain = true;
+        hasQueuedNextAttack = false;
     }
 
     [ClientRpc]
@@ -832,7 +859,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     {
         // 콤보 윈도우 안에서 한 순간이라도 눌려 있었으면 예약되는 래치.
         // 윈도우 밖 입력은 아래 가드(오프라인)와 서버 RPC 가드에서 걸러진다.
-        if (!inputReader.AttackHeld && !inputReader.AttackPressed)
+        // 스킬 입력으로 마무리 중이면 누르고 있어도 잇지 않는다(할 일 77 후속, FinishWithoutChaining).
+        if (!PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(
+                inputReader.AttackHeld, inputReader.AttackPressed, isFinishingChain))
             return;
 
         Vector3 direction = GetCurrentAimDirection();
@@ -902,6 +931,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         attackEndFallbackTime = 0f;
         currentAttackIndex = 0;
         hasQueuedNextAttack = false;
+        isFinishingChain = false;
         isComboWindowOpen = false;
         hasStartedAttack = false;
         isRequestingAttack = false;

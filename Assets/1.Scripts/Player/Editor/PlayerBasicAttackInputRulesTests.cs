@@ -88,7 +88,7 @@ public sealed class PlayerBasicAttackInputRulesTests
 
         buffer.Record(PlayerBufferedInput.SkillSub, press);
         reservation.Reserve(PlayerBufferedInput.SkillSub);
-        buffer.Consume(PlayerBufferedInput.SkillSub); // 예약으로 옮겨 간다
+        buffer.Remove(PlayerBufferedInput.SkillSub); // 예약으로 옮겨 간다
 
         Assert.That(buffer.Has(PlayerBufferedInput.SkillSub, press + 0.5f), Is.False, "버퍼는 이미 비었다(0.2초 만료와 무관)");
         Assert.That(reservation.Reserved, Is.EqualTo(PlayerBufferedInput.SkillSub), "평타가 끝날 때까지 들고 있다(만료 없음)");
@@ -109,6 +109,130 @@ public sealed class PlayerBasicAttackInputRulesTests
         Assert.That(reservation.HasReservation, Is.False);
         Assert.That(buffer.Has(PlayerBufferedInput.SkillSub, 60f), Is.False, "버림");
         Assert.That(PlayerBasicAttackInputRules.ShouldChainNextShot(true, false, reservation.HasReservation), Is.True);
+    }
+
+    // ── 근접 평타 홀드 중 스킬(할 일 77 후속) ─────────────────────────────
+
+    // PlayerInputReader 기본 우선순위와 같게 맞춘 버퍼.
+    private static PlayerInputBuffer CreatePrioritizedBuffer()
+    {
+        var buffer = new PlayerInputBuffer(0.2f);
+        buffer.SetPriority(PlayerBufferedInput.Dash, 5);
+        buffer.SetPriority(PlayerBufferedInput.SkillInterrupt, 4);
+        buffer.SetPriority(PlayerBufferedInput.SkillUltimate, 3);
+        buffer.SetPriority(PlayerBufferedInput.SkillMain, 2);
+        buffer.SetPriority(PlayerBufferedInput.SkillSub, 2);
+        buffer.SetPriority(PlayerBufferedInput.Attack, 1);
+        return buffer;
+    }
+
+    /// <summary>
+    /// 가붕이 콤보 한 타를 프레임 단위로 돈다 — 오너 틱(스킬 버퍼 → 마무리 래치, 홀드 → 창 안 예약)을 상태 머신·DefaultAttackController 와 같은 규칙으로.
+    /// 창 = [windowOpen, windowClose], End = stepEnd. 다음 타로 이어지면 true.
+    /// </summary>
+    private static bool SimulateMeleeStep(
+        PlayerInputBuffer buffer, float stepStart, float windowOpen, float windowClose, float stepEnd,
+        bool attackHeld, ref bool finishingChain, float skillPressAt = -1f,
+        PlayerBufferedInput skill = PlayerBufferedInput.None)
+    {
+        const float frame = 1f / 60f;
+        bool queued = false;
+        for (float t = stepStart; t < stepEnd; t += frame)
+        {
+            if (skillPressAt >= 0f && t >= skillPressAt && t < skillPressAt + frame)
+                buffer.Record(skill, t);
+
+            bool skillAlive = false;
+            foreach (PlayerBufferedInput kind in new[] {
+                         PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub,
+                         PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate })
+                skillAlive |= buffer.ContainsAbove(kind, PlayerBufferedInput.Attack, t);
+
+            if (PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, skillAlive, true, false, false))
+            {
+                finishingChain = true;
+                queued = false; // 서버가 받은 예약도 지운다(RequestFinishChainRpc)
+            }
+
+            bool inWindow = t >= windowOpen && t <= windowClose;
+            if (inWindow && PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(attackHeld, false, finishingChain))
+                queued = true;
+        }
+
+        return queued;
+    }
+
+    [Test]
+    public void MeleeHold_NoSkillInput_KeepsChaining()
+    {
+        var buffer = CreatePrioritizedBuffer();
+        bool finishing = false;
+        // 창 0.30~0.45, End 0.55 — 스킬 입력이 없으면 홀드로 매 타 이어진다.
+        for (int step = 0; step < 6; step++)
+        {
+            float s = step * 0.55f;
+            Assert.That(SimulateMeleeStep(buffer, s, s + 0.30f, s + 0.45f, s + 0.55f, true, ref finishing), Is.True,
+                $"{step}타 — 홀드 연타 유지");
+        }
+
+        Assert.That(finishing, Is.False);
+    }
+
+    [Test]
+    public void MeleeHold_SkillPressedInWindow_EndsChain_SkillStartsAtEnd()
+    {
+        var buffer = CreatePrioritizedBuffer();
+        bool finishing = false;
+
+        // 1타는 이어진다.
+        Assert.That(SimulateMeleeStep(buffer, 0f, 0.30f, 0.45f, 0.55f, true, ref finishing), Is.True);
+
+        // 2타 창이 열린 뒤(이미 홀드로 예약됨) Q — 받은 예약도 지우고 이 타로 마무리.
+        bool chained = SimulateMeleeStep(buffer, 0.55f, 0.85f, 1.00f, 1.10f, true, ref finishing,
+            skillPressAt: 0.95f, skill: PlayerBufferedInput.SkillMain);
+        Assert.That(chained, Is.False, "체인 종료");
+        Assert.That(finishing, Is.True);
+
+        // 이 타가 끝난 첫 틱(Idle) — 꺼낼 입력은 Q.
+        Assert.That(buffer.Peek(1.10f), Is.EqualTo(PlayerBufferedInput.SkillMain), "현재 타가 끝난 첫 틱에 Q 시작");
+    }
+
+    [Test]
+    public void MeleeHold_SkillAlive_StopsRequestEvenAfterWindowReopens()
+    {
+        // 마무리 래치는 공격이 끝날 때까지 — 스킬 입력이 0.2초 만료된 뒤에도 홀드가 다시 예약하지 않는다.
+        Assert.That(PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(true, false, true), Is.False);
+        Assert.That(PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(false, true, true), Is.False);
+        Assert.That(PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(true, false, false), Is.True);
+        Assert.That(PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(false, true, false), Is.True);
+        Assert.That(PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(false, false, false), Is.False);
+    }
+
+    [Test]
+    public void ShouldFinishChainForBufferedSkill_OnlyUsableSkillOnNonReservingCharacter()
+    {
+        Assert.That(PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, true, true, false, false), Is.True);
+        Assert.That(PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(true, true, true, false, false), Is.False,
+            "거너는 공격 뒤 예약 경로(§0.1)");
+        Assert.That(PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, false, true, false, false), Is.False,
+            "스킬 입력 없음 = 홀드 연타 그대로");
+        Assert.That(PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, true, false, false, false), Is.False, "빈 슬롯");
+        Assert.That(PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, true, true, true, false), Is.False, "차단 효과(침묵)");
+        Assert.That(PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, true, true, false, true), Is.False, "쿨타임");
+    }
+
+    [Test]
+    public void ContainsAbove_SkillAboveAttack_EvenWhenOutrankedByDash()
+    {
+        var buffer = CreatePrioritizedBuffer();
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+
+        Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.Dash));
+        Assert.That(buffer.ContainsAbove(PlayerBufferedInput.SkillMain, PlayerBufferedInput.Attack, 10f), Is.True,
+            "대시에 밀려 있어도 살아 있으면 참");
+        Assert.That(buffer.ContainsAbove(PlayerBufferedInput.Attack, PlayerBufferedInput.Attack, 10f), Is.False, "같은 우선순위는 아님");
+        Assert.That(buffer.ContainsAbove(PlayerBufferedInput.SkillMain, PlayerBufferedInput.Attack, 10.3f), Is.False, "만료");
     }
 
     [Test]
