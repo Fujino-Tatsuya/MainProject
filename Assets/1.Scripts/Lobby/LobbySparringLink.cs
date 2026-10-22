@@ -2,7 +2,7 @@
 /// [서버] TRAIN_03 진행기 ↔ 훈련 상대 연결 규칙(할 일 86 T5c, PLAN-86 §3.5, 명세 v0.2 §9). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
 /// 실행은 <see cref="LobbyTrainingSparring"/> — 여기는 "언제 한 번만 하나"만 정한다.
 /// <list type="bullet">
-/// <item>회차: 진행기가 Train03A~D 에 있는 동안 상대 1개(<see cref="BotPresent"/>). 회차 시작(<see cref="BeginRound"/>)마다 기록을 비운다 — 판 끝 로비 복귀·Train03 이탈이 회차 끝.</item>
+/// <item>회차: 진행기가 Train03A 진행(집결 확정) ~ D 에 있는 동안 상대 1개(<see cref="BotPresent"/>). 회차 시작(<see cref="BeginRound"/>)마다 기록을 비운다 — 판 끝 로비 복귀·Train03 이탈이 회차 끝.</item>
 /// <item>단계 알림: 진행기 Train03A~D 가 진행 중이 되면 상대에게 1회(<see cref="TryTakeFlowNotice"/>). 앞으로만 — 같은 단계 재알림·역순은 없음.</item>
 /// <item>완료 보고: 상대 모델의 단계 완료를 진행기에 1회(<see cref="TryAcceptReport"/>). 진행기의 지금 단계(진행 중)와 같을 때만 — 어긋남·중복·역순은 무시.</item>
 /// <item>B→C 초기화(플레이어 쪽 <see cref="TrainingResetOptions.PracticeReset"/>): 회차당 1회(<see cref="TryConsumePracticeReset"/>).</item>
@@ -31,10 +31,11 @@ public sealed class LobbySparringLink
         stage >= LobbyTrainingStage.Train03A && stage <= LobbyTrainingStage.Train03D;
 
     /// <summary>
-    /// 훈련 상대가 있어야 하는가 — Train03A~D 전체(Train03A 시작 집결 대기 포함: 상대는 Idle 로 서 있기만 하고 진행 알림 뒤 움직인다).
-    /// 그 밖(TrainEnd·브리핑·출격·로비)은 정리.
+    /// 훈련 상대가 있어야 하는가 — Train03A 진행(시작 집결 확정) 순간부터 Train03D 까지(사용자 10-22: 집결 대기 중엔 없다).
+    /// Train03A 시작 집결 대기(Gathering)·그 밖(TrainEnd·브리핑·출격·로비)은 없음. A→B·B→C 영역 확인 대기(Completed)는 그대로 둔다.
     /// </summary>
-    public static bool BotPresent(LobbyTrainingStage stage) => IsSparringStage(stage);
+    public static bool BotPresent(LobbyTrainingStage stage, LobbyTrainingPhase phase) =>
+        IsSparringStage(stage) && !(stage == LobbyTrainingStage.Train03A && phase == LobbyTrainingPhase.Gathering);
 
     /// <summary>
     /// [전 피어] 지정 벽 표시(주황 띠, 임시 비주얼)를 켜는가 — 벽 목표가 있는 Train03C·D 동안(하위 상태 무관). A·B·TrainEnd 이후·로비·진행기 없음(Lobby 로 읽힘)은 끈다.

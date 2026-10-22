@@ -44,7 +44,7 @@
 
 | 시점 | 하는 일 |
 |---|---|
-| 진행기 Train03A 진입(시작 집결 대기 포함) | 상대를 `SpawnAB` 에 스폰(이미 있으면 재사용) → `ServerConfigureArena(PointC, 지정 벽)`. 진행 알림 전엔 Idle 로 서 있기만 한다 |
+| 진행기 Train03A 진행(시작 집결 확정 — 집결 대기 중엔 상대 없음, 사용자 10-22) | 상대를 `SpawnAB` 에 스폰(이미 있으면 재사용) → `ServerConfigureArena(PointC, 지정 벽)` → 같은 평가에서 Train03A 진행 알림. 판단 = `LobbySparringLink.BotPresent(단계, 하위 상태)` |
 | Train03A~D 가 진행 중이 될 때 | `ServerNotifyFlowStageStarted(단계)` 1회(앞으로만). Train03C = 상대 B→C 초기화(C 위치 재배치) |
 | 상대 `ServerResetExecuted` | 훈련 명단 `ServerResetTrainingRoster(PracticeReset)` — 회차당 1회(체력·Q/E/R/우클릭 쿨·대시, 분노 재지급 없음) |
 | 상대 `ServerStageCompleted` | **다음 프레임** `ServerReportStageCompleted(Train03A~D)` 1회 — 진행기가 그 단계를 진행 중일 때만, 어긋남·중복·역순은 경고 후 무시 |
@@ -56,6 +56,8 @@
   - `ServerFirstValidWallImpact` — C 첫 유효 벽 충돌 = 칸 감소를 동반한 지정 벽 충돌(상대 모델 `HasRecordedWall`, `TRAIN_03_WALL`). A/B 의 벽·0칸 접촉·장식 벽은 아니다.
 - **씬 배치(임시 좌표 — 최종 위치는 사용자)**: `LobbyTraining/Train03Arena`(`LobbyTrainingSparringArena`, Gizmo 는 선택 안 해도 보인다 — A/B 노랑·C 하늘색·지정 벽 주황 + 라벨).
   - `SpawnAB` (-16, 0, 1.5), 방향 +z(시작 집결 구역 쪽) — 동·서 벽에서 4 m.
+    ⚠ 시작 집결 구역 `Gather_Train03Area`(중심 (-16, 5), 7×5 → z 2.5~7.5) **밖 1 m** 이고 상대는 이동이 없으며 사거리는 `SpinnerBotData.attackRange` 2 m 다 —
+    구역 가운데 선 플레이어(3.5 m)에겐 A 에서 돌아보기만 하고 공격·간파 창이 없다(2026-10-22 Play 피드백 '시작 직후 멀뚱멀뚱'의 원인). 다가가야 시작된다. 위치·접근 방식 결정은 사용자.
   - `PointC` (-17.5, 0, 5), 방향 +x(동쪽 = 플레이어 쪽) — 지정 벽 면까지 2.2 m, 간파 넉백(No23_A `vulnerableKnockbackDistance` 3 m)으로 닿는다. NavMesh 끝 x -19.33 에서 막히면 판정 거리 1.6 m 로 잡힌다.
   - `DesignatedWall_West` — Wall 레이어 BoxCollider(보이는 메시 없음), 중심 (-19.8, 1.1, 5) 크기 (0.2, 2.2, 5.5). 서쪽 아트 벽(x -20, 두께 0.22) 바로 앞에 겹쳐 스윕이 이 상자를 먼저 맞힌다.
     아트 벽 콜라이더를 직접 넣지 않은 이유: SVN 아트가 바뀌면 참조가 조용히 끊긴다. 위치를 옮길 땐 상자를 아트 벽 면에 붙여 두고 NavMesh 걷는 면(벽에서 0.5 m 안쪽)을 침범하지 않게 둔다.

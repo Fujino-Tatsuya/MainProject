@@ -23,11 +23,21 @@ public sealed class LobbySparringLinkTests
     [Test]
     public void BotPresent_OnlyTrain03AToD()
     {
-        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train02), Is.False);
-        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03A), Is.True);
-        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03D), Is.True);
-        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.TrainEnd), Is.False);
-        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Lobby), Is.False);
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train02, InProgress), Is.False);
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03A, InProgress), Is.True);
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03D, InProgress), Is.True);
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.TrainEnd, Gathering), Is.False);
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Lobby, Gathering), Is.False);
+    }
+
+    [Test]
+    public void BotPresent_NotDuringTrain03AStartGathering_KeptThroughAreaChecks()
+    {
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03A, Gathering), Is.False, "시작 집결 대기 중엔 스폰하지 않는다");
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03A, InProgress), Is.True, "집결 확정 = 스폰");
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03A, Completed), Is.True, "A→B 영역 확인 대기 — 유지");
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03B, Completed), Is.True, "B→C 영역 확인 대기 — 유지");
+        Assert.That(LobbySparringLink.BotPresent(LobbyTrainingStage.Train03C, InProgress), Is.True);
     }
 
     [Test]
@@ -219,13 +229,12 @@ public sealed class LobbySparringLinkTests
         var wallEvents = 0;
         var resets = 0;
 
-        Assert.That(LobbySparringLink.BotPresent(flow.Stage), Is.True, "Train03A 집결 대기 중에 상대 스폰");
-        link.BeginRound();
-        Notify(link, flow, model);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Idle), "집결 전엔 알리지 않는다");
+        Assert.That(LobbySparringLink.BotPresent(flow.Stage, flow.Phase), Is.False, "Train03A 집결 대기 중엔 상대 없음");
 
-        // A: 시작 집결 → 간파 성공 → 그로기 종료
+        // A: 시작 집결 확정 = 스폰 + 같은 평가에서 진행 알림 → 간파 성공 → 그로기 종료
         Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area), Is.True);
+        Assert.That(LobbySparringLink.BotPresent(flow.Stage, flow.Phase), Is.True, "Train03A 진행 = 스폰");
+        link.BeginRound();
         Notify(link, flow, model);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CounterIntro));
         model.OnCounterSucceeded();
@@ -275,7 +284,7 @@ public sealed class LobbySparringLinkTests
         Assert.That(model.OnDied(), Is.True);
         Assert.That(Pump(link, flow, model), Is.EqualTo(new[] { LobbyTrainingStage.Train03D }));
         Assert.That(flow.Stage, Is.EqualTo(LobbyTrainingStage.TrainEnd));
-        Assert.That(LobbySparringLink.BotPresent(flow.Stage), Is.False, "종료 집결 = 정리");
+        Assert.That(LobbySparringLink.BotPresent(flow.Stage, flow.Phase), Is.False, "종료 집결 = 정리");
         Assert.That(link.EndRound(), Is.True);
 
         Assert.That(counterEvents, Is.EqualTo(1));

@@ -8,8 +8,8 @@ using UnityEngine.SceneManagement;
 /// TRAIN_03 간파·CC·벽·제압(할 일 86 T5c — PLAN §3.5, 명세 v0.2 §9) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
 /// 연결 규칙은 <see cref="LobbySparringLink"/>, 단계·CC 판정은 훈련 상대(<see cref="TrainingSparringBot"/>·<see cref="TrainingSparringModel"/>). 여기는 스폰·구독·보고만 한다.
 /// <list type="bullet">
-/// <item>시작 = 진행기가 Train03A 에 들어오는 순간(시작 집결 대기 포함): 상대를 <see cref="LobbyTrainingSparringArena.SpawnPoint"/>(A/B)에 스폰하고
-/// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣는다. 이미 있으면 재사용. 진행 알림 전엔 상대가 서 있기만 한다(Idle).</item>
+/// <item>시작 = 진행기 Train03A 가 진행 중이 되는 순간(시작 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대를 <see cref="LobbyTrainingSparringArena.SpawnPoint"/>(A/B)에 스폰하고
+/// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 Train03A 진행 알림까지 준다. 이미 있으면 재사용.</item>
 /// <item>진행 알림: Train03A~D 가 진행 중이 될 때마다 <see cref="TrainingSparringBot.ServerNotifyFlowStageStarted"/> 1회(앞으로만).
 /// Train03C 알림 = 상대 B→C 초기화(C 위치 재배치) → <see cref="TrainingSparringBot.ServerResetExecuted"/> → 플레이어 리셋(<see cref="TrainingResetOptions.PracticeReset"/>) 회차당 1회.</item>
 /// <item>완료 보고: 상대 <see cref="TrainingSparringBot.ServerStageCompleted"/> → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportStageCompleted"/>(Train03A~D) 1회 —
@@ -135,7 +135,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
             return;
 
         var stage = _director.Stage;
-        if (LobbySparringLink.BotPresent(stage))
+        if (LobbySparringLink.BotPresent(stage, _director.Phase))
         {
             if (!_link.IsRoundActive)
                 BeginServer();
