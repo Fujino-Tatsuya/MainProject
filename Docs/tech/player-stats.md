@@ -36,7 +36,9 @@
 
 - 가하는 피해%: `DealtDamageModifier`(공격력 전용 3단계).
 - 최종 배율 매핑은 `PlayerStatFormula.FinalMultiplierType`. 셋 다(`CooldownRateModifier` 포함) `StatusEffectCategories` 스탯 마스크라 배율 ≥ 1 = 버프 → 연출 일괄 해제(`ClearDebuffsServer`)가 지우지 않는다.
-- `CooldownRateModifier`(쿨타임 줄어드는 속도 배율)는 스탯이 아니다 — 타입·분류만 있고 소비처(쿨 시계)는 할 일 91 T2~T4.
+- `CooldownRateModifier`(쿨타임 줄어드는 속도 배율)는 스탯이 아니다(`PlayerStatKind`·`PlayerStatReport` 에 없음). 소비처 = 쿨 시계(할 일 91 T8):
+  `Player.CooldownRate` = `StatusEffectController.GetStatMultiplier(CooldownRateModifier)`(최종 배율과 같은 곱 집계, 없으면 1) → `Player.Awake` 가 `PlayerCooldownClock.SetRateSource` 에 연결.
+  스킬 쿨(우클릭·Q·E·궁극기)·대시 충전·가붕이 패시브 내부 쿨이 이 배율로 줄어든다. 피어마다 복제본으로 계산하고 시계는 동기화하지 않는다 — [suppress-haste.md](suppress-haste.md) §1.1.
 - 기본값은 xlsx Player 시트 값이고 빌드에 들어간다. 같은 빌드면 모든 피어가 같은 값을 갖는다.
 - `Unit.Final*` 5개는 virtual 이고, `Player` 가 이 종합값으로 덮어쓴다. 몬스터는 기존 식(원본 × 곱 배율)을 그대로 쓴다.
 - **새 스탯 추가 절차:**
@@ -109,4 +111,5 @@
   예) 이동 특성 1.2(전체%) + 제압 가속 ×2(최종) → 1.2 × 2 = 2.4.
 - 새 상태이상 3종 `MoveSpeedFinalMultiplier`·`AttackSpeedFinalMultiplier`·`CooldownRateModifier` — 아직 거는 곳이 없어 기존 수치는 그대로다(제압 가속 버프가 T6 에서 건다).
 - T5: 공격속도가 처음으로 평타·스킬 재생 속도에 들어간다(§3.1). 지금 공속을 바꾸는 상태이상·특성이 없어 배율 1 — 기존 동작 그대로다.
+- T2~T4·T8: 쿨 속도 배율 소비처 = 쿨 시계(스킬·대시·가붕이 패시브). 배율 1 이면 기존 쿨과 같다 — [suppress-haste.md](suppress-haste.md) §1.1.
 - 이 배율·타입을 거는 제압 가속 버프 전체(발동·대상·지속·데이터·비네팅)는 [suppress-haste.md](suppress-haste.md).
