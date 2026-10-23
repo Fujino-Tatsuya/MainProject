@@ -11,20 +11,24 @@ namespace BeaverLobby.Player.Dash
         public readonly double RemainingServerDuration;
         public readonly bool WasInterruptedByServerState;
         public readonly int AuthoritativeChargeCount;
-        public readonly double NextChargeReadyServerTime;
+        /// <summary>
+        /// 다음 충전까지 남은 초(서버 쿨 시계 기준). 만충이면 0.
+        /// 절대시각이 아니다 — 피어마다 쿨 시계 원점이 달라 오너는 받은 남은 초를 자기 시계에 더한다(할 일 91 T3).
+        /// </summary>
+        public readonly double NextChargeRemaining;
         public readonly uint ChargeEpoch;
         public readonly uint ChargeRevision;
 
         public DashServerResponse(
             bool approved, DashRejectReason reason, double remaining, bool interrupted,
-            int chargeCount, double nextReady, uint epoch, uint revision)
+            int chargeCount, double nextChargeRemaining, uint epoch, uint revision)
         {
             IsApproved = approved;
             Reason = reason;
             RemainingServerDuration = remaining;
             WasInterruptedByServerState = interrupted;
             AuthoritativeChargeCount = chargeCount;
-            NextChargeReadyServerTime = nextReady;
+            NextChargeRemaining = nextChargeRemaining;
             ChargeEpoch = epoch;
             ChargeRevision = revision;
         }
@@ -35,6 +39,9 @@ namespace BeaverLobby.Player.Dash
     /// MainGame 기준 씬에 정확히 하나 배치하는 일반 MonoBehaviour. NetworkObject 아님. 파일 I/O 없음.
     /// Player별 Snapshot 이력·서버 권한 충전 장부·멱등 캐시를 유지한다.
     /// RTT/serverNow/현재상태는 호출자(PlayerDashController)가 주입한다(NGO 비의존).
+    ///
+    /// 시간축이 둘이다(할 일 91 T3): 스냅샷·요청시각 검증은 <c>serverNow</c>(NetworkClock.GameNow),
+    /// 충전 장부는 <c>chargeNow</c>(그 플레이어의 서버 쿨 시계 — 쿨 속도 배율 반영). 둘을 섞지 않는다.
     /// </summary>
     public sealed class PlayerDashValidationManager : MonoBehaviour
     {
@@ -90,7 +97,8 @@ namespace BeaverLobby.Player.Dash
             }
         }
 
-        public void RegisterPlayer(ulong networkObjectId, ulong ownerClientId, in DashRuntimeConfig config, double now)
+        /// <param name="chargeNow">충전 장부 시각(서버 쿨 시계).</param>
+        public void RegisterPlayer(ulong networkObjectId, ulong ownerClientId, in DashRuntimeConfig config, double chargeNow)
         {
             if (_players.ContainsKey(networkObjectId))
             {
@@ -103,14 +111,14 @@ namespace BeaverLobby.Player.Dash
             DashLog.Log(
                 $"[Dash/서버] 등록: NetworkObjectId={networkObjectId} owner={ownerClientId} " +
                 $"활성={config.DashEnabled} 지속={config.DashDuration:F3}s 충전={config.MaxCharge} " +
-                $"재충전={config.RechargeDuration:F2}s 스냅샷허용={config.SnapshotFreshnessTolerance:F3}s serverNow={now:F3}", this);
+                $"재충전={config.RechargeDuration:F2}s 스냅샷허용={config.SnapshotFreshnessTolerance:F3}s 쿨시계={chargeNow:F3}", this);
 
             _players[networkObjectId] = new PlayerEntry
             {
                 OwnerClientId = ownerClientId,
                 Config = config,
                 History = new DashSnapshotHistory(Mathf.Max(1, config.SnapshotCapacity)),
-                Ledger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, now),
+                Ledger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, chargeNow),
                 HasLastRequest = false,
                 LastRequestId = 0u,
                 LastResponse = default,
@@ -125,14 +133,14 @@ namespace BeaverLobby.Player.Dash
         }
 
         /// <summary>생존 복귀/부활 시 서버 권한 충전을 강제 초기화한다(Epoch 증가). (PLAN §10)</summary>
-        public void ForceReset(ulong networkObjectId, int count, double now)
+        public void ForceReset(ulong networkObjectId, int count, double chargeNow)
         {
             if (_players.TryGetValue(networkObjectId, out PlayerEntry entry))
             {
                 DashLog.Log(
                     $"[Dash/서버] 충전 강제 초기화: NetworkObjectId={networkObjectId} " +
-                    $"{entry.Ledger.Count}→{count} (Epoch {entry.Ledger.Epoch}→{entry.Ledger.Epoch + 1u}) serverNow={now:F3}", this);
-                entry.Ledger.ForceReset(count, now);
+                    $"{entry.Ledger.Count}→{count} (Epoch {entry.Ledger.Epoch}→{entry.Ledger.Epoch + 1u}) 쿨시계={chargeNow:F3}", this);
+                entry.Ledger.ForceReset(count, chargeNow);
             }
             else
             {
@@ -142,7 +150,7 @@ namespace BeaverLobby.Player.Dash
 
         /// <summary>서버 tick마다 충전 장부를 진행시키고 현재 상태 스냅샷을 저장한다.</summary>
         public void CaptureSnapshot(
-            ulong networkObjectId, double serverTime,
+            ulong networkObjectId, double serverTime, double chargeNow,
             bool grounded, bool dead, bool soul, bool crowdControlled, bool landingProtected)
         {
             if (!_players.TryGetValue(networkObjectId, out PlayerEntry e))
@@ -176,7 +184,7 @@ namespace BeaverLobby.Player.Dash
                 e.LastLandingProtected = landingProtected;
             }
 
-            e.Ledger.Advance(serverTime);
+            e.Ledger.Advance(chargeNow);
             bool pushed = e.History.Push(new DashStateSnapshot(
                 serverTime, grounded, dead, soul, crowdControlled, landingProtected,
                 e.Ledger.Count, e.Ledger.NextReadyTime, e.Ledger.Epoch, e.Ledger.Revision));
@@ -191,20 +199,21 @@ namespace BeaverLobby.Player.Dash
         }
 
         /// <summary>충전만 조회(거부/최신 동기화 응답에 사용).</summary>
-        private static DashServerResponse ChargeOnly(bool approved, DashRejectReason reason, PlayerEntry e)
+        private static DashServerResponse ChargeOnly(bool approved, DashRejectReason reason, PlayerEntry e, double chargeNow)
         {
             return new DashServerResponse(
                 approved, reason, 0.0, false,
-                e.Ledger.Count, e.Ledger.NextReadyTime, e.Ledger.Epoch, e.Ledger.Revision);
+                e.Ledger.Count, e.Ledger.RemainingToReady(chargeNow), e.Ledger.Epoch, e.Ledger.Revision);
         }
 
         /// <summary>
         /// 대시 요청을 검증하고(멱등), 승인 시 서버 권한 충전을 소비한 뒤 응답을 만든다. (PLAN §9)
+        /// <paramref name="serverNow"/> = 검증 시간축(GameNow), <paramref name="chargeNow"/> = 충전 장부 시간축(서버 쿨 시계).
         /// </summary>
         public DashServerResponse ValidateRequest(
             ulong networkObjectId, ulong senderClientId, uint requestId,
             double clientLocalTime, double directionX, double directionZ,
-            double serverNow, double serverRtt, bool rttAvailable,
+            double serverNow, double chargeNow, double serverRtt, bool rttAvailable,
             bool currentDead, bool currentSoul, bool currentCrowdControlled)
         {
             // ⚠️ 아래 4개 조기 반환은 전부 사유가 ConfigDisabled로 뭉개져 나간다. 오너 로그만 보면
@@ -224,7 +233,7 @@ namespace BeaverLobby.Player.Dash
                 DashLog.LogWarning(
                     $"[Dash/서버] 거부(사유표기 ConfigDisabled): 요청자≠오너 — sender={senderClientId}, owner={e.OwnerClientId}. " +
                     "소유권 이전 직후 등록 정보가 갱신되지 않은 경우입니다(RegisterPlayer는 스폰 시 1회만 기록).", this);
-                return ChargeOnly(false, DashRejectReason.ConfigDisabled, e);
+                return ChargeOnly(false, DashRejectReason.ConfigDisabled, e, chargeNow);
             }
 
             // 멱등: 같은 RequestId면 소비/상태를 다시 적용하지 않고 기존 결과 재전송.
@@ -242,10 +251,10 @@ namespace BeaverLobby.Player.Dash
                 DashLog.LogWarning(
                     $"[Dash/서버] 거부(사유표기 ConfigDisabled): 순서 지난 요청 requestId={requestId} < 최근처리 {e.LastRequestId}. " +
                     "RPC 순서 역전 또는 오너 재스폰으로 requestId가 1부터 다시 시작된 경우입니다.", this);
-                return ChargeOnly(false, DashRejectReason.ConfigDisabled, e);
+                return ChargeOnly(false, DashRejectReason.ConfigDisabled, e, chargeNow);
             }
 
-            e.Ledger.Advance(serverNow);
+            e.Ledger.Advance(chargeNow);
 
             // 추정 입력시각(서버 도메인). DashValidationPolicy와 같은 식을 쓴다.
             double oneWayDelay = rttAvailable && serverRtt > 0.0 ? serverRtt * 0.5 : 0.0;
@@ -268,19 +277,20 @@ namespace BeaverLobby.Player.Dash
             // ⚠️ 소비 시각은 RPC 도착시각(serverNow)이 아니라 추정 입력시각이다. 도착시각으로 잡으면
             // 서버 회복 완료가 오너보다 항상 편도지연만큼 늦어진다 → 오너가 "이제 찼다"고 믿고 누른
             // 입력이 서버에선 아직 0인 구간이 매 주기 생기고, 그 입력이 거부된다(원격 클라에서 심함).
+            // 장부는 쿨 시계 축이라 같은 편도지연만큼 쿨 시각에서 당긴다(배율 ≠ 1 구간의 오차는 지연 × (배율−1) 수준).
             bool consumed = result.IsApproved && e.Ledger.HasCharge;
             if (consumed)
             {
-                e.Ledger.TryConsume(estimatedStart);
+                e.Ledger.TryConsume(chargeNow - oneWayDelay);
             }
 
             DashServerResponse response = new DashServerResponse(
                 result.IsApproved, result.Reason, result.RemainingServerDuration, result.WasInterruptedByServerState,
-                e.Ledger.Count, e.Ledger.NextReadyTime, e.Ledger.Epoch, e.Ledger.Revision);
+                e.Ledger.Count, e.Ledger.RemainingToReady(chargeNow), e.Ledger.Epoch, e.Ledger.Revision);
 
             LogValidationOutcome(
                 networkObjectId, requestId, result, consumed, estimatedStart, oneWayDelay,
-                serverNow, serverRtt, rttAvailable, e, currentDead, currentSoul, currentCrowdControlled);
+                serverNow, chargeNow, serverRtt, rttAvailable, e, currentDead, currentSoul, currentCrowdControlled);
 
             e.HasLastRequest = true;
             e.LastRequestId = requestId;
@@ -296,7 +306,7 @@ namespace BeaverLobby.Player.Dash
         /// </summary>
         private void LogValidationOutcome(
             ulong networkObjectId, uint requestId, in DashValidationResult result, bool consumed,
-            double estimatedStart, double oneWayDelay, double serverNow, double serverRtt, bool rttAvailable,
+            double estimatedStart, double oneWayDelay, double serverNow, double chargeNow, double serverRtt, bool rttAvailable,
             PlayerEntry e, bool currentDead, bool currentSoul, bool currentCrowdControlled)
         {
             string common =
@@ -304,7 +314,7 @@ namespace BeaverLobby.Player.Dash
                 $"serverNow={serverNow:F3} RTT={(rttAvailable ? $"{serverRtt * 1000.0:F1}ms" : "사용불가")} " +
                 $"편도={oneWayDelay:F3}s 추정입력시각={estimatedStart:F3} | " +
                 $"{DescribeSnapshot(e, estimatedStart)} | " +
-                $"서버충전={e.Ledger.Count}/{e.Ledger.MaxCharge} 다음충전까지={DescribeNextReady(e, serverNow)} | " +
+                $"서버충전={e.Ledger.Count}/{e.Ledger.MaxCharge} 다음충전까지={DescribeNextReady(e, chargeNow)} | " +
                 $"현재 사망={currentDead} 소울={currentSoul} CC={currentCrowdControlled}";
 
             if (!result.IsApproved)
@@ -375,15 +385,9 @@ namespace BeaverLobby.Player.Dash
             return $"채택 스냅샷 없음(보관 {e.History.Count}/{e.History.Capacity}, 허용 {e.Config.SnapshotFreshnessTolerance:F3}s)";
         }
 
-        private static string DescribeNextReady(PlayerEntry e, double serverNow)
+        private static string DescribeNextReady(PlayerEntry e, double chargeNow)
         {
-            double next = e.Ledger.NextReadyTime;
-            if (double.IsInfinity(next) || double.IsNaN(next))
-            {
-                return "만충";
-            }
-
-            return $"{System.Math.Max(0.0, next - serverNow):F2}s";
+            return e.Ledger.IsFull ? "만충" : $"{e.Ledger.RemainingToReady(chargeNow):F2}s";
         }
 
         // uint 순환 비교: a가 b보다 과거이면 true.

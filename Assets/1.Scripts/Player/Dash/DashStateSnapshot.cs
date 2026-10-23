@@ -15,6 +15,7 @@ namespace BeaverLobby.Player.Dash
         public readonly bool LandingProtected;
 
         public readonly int ChargeCount;
+        // 충전 장부 시간축(서버 쿨 시계) 기준 — ServerTime 과 원점이 다르다(할 일 91 T3). 진단용.
         public readonly double NextChargeReadyTime;
         public readonly uint ChargeEpoch;
         public readonly uint ChargeRevision;
