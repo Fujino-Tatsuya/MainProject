@@ -8,14 +8,16 @@ using UnityEngine;
 // 보스룸 이동 관리자 (PLAN §6 개정). 씬 상주 NetworkObject — 이 오브젝트의 위치가 텔레포트 지점이다.
 //
 // 흐름(서버 권한):
-//  1) BossEnterTrigger가 존 점유(생존 플레이어 유무)를 통지 — 점유 시작 → 카운트다운,
-//     전원 이탈/전멸 → 취소·리셋(로아식, 재진입 시 재시작).
-//  2) 만료 시각(서버시간)을 NetworkVariable로 복제 → 전 피어가 동일한 3·2·1 표시.
-//  3) 만료 시 보스 엘리베이터 연출(할 일 39·46 — Docs/design/boss-entrance-elevator.md). 시작 시각(서버시간)과 참가자 순서(슬롯 = clientId
+//  1) 파티 집결(할 일 89) — 서버 Update 가 참가자(접속 중 + PermanentDead 아님)마다 발판(BossEnterTrigger) 안·생명·행동 상태를 읽어
+//     BossElevatorGather(= 할 일 86 PartyGatherRules)로 판정한다. 전원이 살아서 발판에 모이면 유지 시간(BossElevatorRig 데이터, 기본 5초) 카운트,
+//     한 명이라도 나가거나 쓰러지거나 인원이 바뀌면 0 — 다시 모이면 처음부터. 발판 잠김(튜토리얼)·강제 카운트다운·연출·도착 대기 중엔 판정하지 않는다.
+//     제한시간 만료 강제 이동(ForceStartEncounter)은 따로 — 집결 상태로 취소되지 않는다.
+//  2) 만료 시각(서버시간)·집결 n/m 을 NetworkVariable로 복제 → 전 피어가 같은 숫자 표시.
+//  3) 집결 확정(대기 없이 — 입력 잠금 같은 프레임) 또는 강제 카운트다운 만료 시 보스 엘리베이터 연출(할 일 39·46 — Docs/design/boss-entrance-elevator.md). 시작 시각(서버시간)과 참가자 순서(슬롯 = clientId
 //     오름차순, 플레이어 NetworkObjectId 목록)를 복제해 전 피어가 같은 시간표로 BossElevatorRig·화면 페이드·실루엣을 그린다(늦은 합류도 같은 그림).
 //     서버는 시간표대로: 시작(카운트다운 끝) = 입력 잠금 → 페이드 아웃 끝(암전) = 참가자를 FrontPoints 로 순간이동(같은 순간 각 피어의
 //     참가자 카메라가 엘리베이터로) → 페이드 인 끝 = 오너에게 보행 지시(목표·시작 시각·시간) → (하강·문 열림·슬롯 순서 보행은 각 피어/오너가
-//     시간표로) → 상승 시작(문 닫힘 끝) = 숨김 → Blackout(완전 암전) = 4). 시작 뒤엔 취소가 없다 — 패드 이탈은 카운트다운만 취소한다. 리그가 없는 구성이면 곧바로 4).
+//     시간표로) → 상승 시작(문 닫힘 끝) = 숨김 → Blackout(완전 암전) = 4). 시작 뒤엔 취소가 없다 — 발판 이탈은 집결 카운트다운만 취소한다. 리그가 없는 구성이면 곧바로 4).
 //  4) 서버가 참가자 전원을 PlayerArrivalPoints 로 텔레포트 → 도착 ACK → AlivePlayersArrived → 입력 잠금·숨김 해제.
 //     리그 없는 구성에서 이동하는 본인 화면은 이동 직전 암전 → 이동 → 밝아짐(로컬 연출). 엘리베이터면 상승 중 카메라가 칸을 따라가고
 //     화면이 시간표대로 검게 페이드 아웃, 도착 RPC 까지 암전을 유지한 뒤 기존 페이드 인으로 이어진다.
@@ -26,8 +28,7 @@ using UnityEngine;
 [RequireComponent(typeof(NetworkObject))]
 public class BossTeleportManager : NetworkBehaviour
 {
-    [Header("카운트다운/산개")]
-    [SerializeField, Min(0.5f)] private float countdownSeconds = 3f;
+    [Header("산개")]
     [Tooltip("도착 지점을 못 찾았을 때만 쓰는 폴백 산개 반경.")]
     [SerializeField, Min(0f)] private float scatterRadius = 2f;
 
@@ -60,9 +61,15 @@ public class BossTeleportManager : NetworkBehaviour
     private readonly NetworkVariable<double> _teleportAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // 존 점유 여부(범위 표시 색 전환용 복제). 서버 write / 모두 read.
+    // 존 점유 여부(범위 표시 색 전환용 복제 — 발판 위 집결 인정 1명 이상). 서버 write / 모두 read.
     private readonly NetworkVariable<bool> _occupied = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // 집결 n/m(할 일 89). 판정이 꺼져 있으면 0/0. 서버 write / 모두 read.
+    private readonly NetworkVariable<int> _gatheredCount = new NetworkVariable<int>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<int> _gatherTotal = new NetworkVariable<int>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // 보스 엘리베이터 연출 시작 시각(서버시간). 0 = 연출 없음. 서버 write / 모두 read — 각 피어가 이 시각으로 리그를 재생한다.
     // 도착 완료·도착 무효·재도전 리셋에서 0 으로 돌아간다.
@@ -78,12 +85,18 @@ public class BossTeleportManager : NetworkBehaviour
         NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : 0d;
     private static readonly Func<double> ServerClock = () => ServerNow;
 
-    /// <summary>카운트다운을 누가 시작했나. 패드 이탈은 <see cref="CountdownCause.Pad"/> 만 취소한다.</summary>
-    private enum CountdownCause { None, Pad, Forced }
+    /// <summary>카운트다운을 누가 시작했나. 집결이 깨지면 <see cref="CountdownCause.Gather"/> 만 취소된다.</summary>
+    private enum CountdownCause { None, Gather, Forced }
 
     private CountdownCause _countdownCause;
+    // 강제 카운트다운 대기(TeleportAfter) 또는 엘리베이터 시간표(ElevatorSequence) 코루틴. 집결 카운트다운은 코루틴이 없다(Update 판정).
     private Coroutine _pending;
     private GUIStyle _countdownStyle;
+    private GUIStyle _gatherStyle;
+
+    // 파티 집결 판정(서버 전용, 할 일 89).
+    private readonly BossElevatorGather _gather = new BossElevatorGather();
+    private readonly List<BossElevatorGatherMember> _gatherMembers = new List<BossElevatorGatherMember>();
 
     // 로컬 페이드 상태(이동하는 본인 화면 전용 연출).
     private float _fadeAlpha;
@@ -135,14 +148,20 @@ public class BossTeleportManager : NetworkBehaviour
 
     public static BossTeleportManager Instance { get; private set; }
 
-    /// <summary>카운트다운 또는 도착 대기가 진행 중인지 — 재진입 카운트다운을 막는 데 쓴다.</summary>
+    /// <summary>[서버] 강제 카운트다운·엘리베이터 연출 또는 도착 대기가 진행 중인지 — 재진입을 막는 데 쓴다. 집결 카운트다운은 <see cref="IsCountdownActive"/> 로만 보인다.</summary>
     public bool IsEncounterBusy => _pending != null || _awaitingArrival.Count > 0;
 
-    /// <summary>존 안에 생존 플레이어가 있는지 (모든 피어에서 유효 — 범위 표시가 읽는다).</summary>
+    /// <summary>발판 위에 살아 있는 참가자가 있는지 (모든 피어에서 유효 — 범위 표시 색만 읽는다).</summary>
     public bool IsOccupied => _occupied.Value;
 
-    /// <summary>카운트다운 진행 중인지 (모든 피어에서 유효).</summary>
+    /// <summary>카운트다운 진행 중인지 — 집결·강제 공통 (모든 피어에서 유효).</summary>
     public bool IsCountdownActive => _teleportAt.Value > 0d;
+
+    /// <summary>집결 n/m 의 n — 발판 위 + 쓰러짐 아님. 판정이 꺼져 있으면 0 (모든 피어에서 유효).</summary>
+    public int GatheredCount => _gatheredCount.Value;
+
+    /// <summary>집결 n/m 의 m — 참가자 수. 판정이 꺼져 있으면 0 (모든 피어에서 유효).</summary>
+    public int GatherTotal => _gatherTotal.Value;
 
     /// <summary>[서버 전용] 엘리베이터 연출이 진행 중인지(읽기 전용) — 판 도중 재합류 스폰 보류(C14 RejoinSpawnGate)가 읽는다.</summary>
     public bool IsElevatorRunning => _elevatorRunning;
@@ -218,43 +237,93 @@ public class BossTeleportManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 존 점유 상태 통지(서버 전용). BossEnterTrigger가 호출한다.
-    /// 점유 시작 → 카운트다운 시작 / 전원 이탈 → 카운트다운 취소(로아식, 팀장 확정).
+    /// 발판 점유 표시(서버 전용) — 범위 표시 색 전환용 복제값만 쓴다. 카운트다운은 시작하지 않는다(집결 판정은 <see cref="UpdateGatherServer"/>).
     /// </summary>
     public void SetOccupied(bool occupied)
     {
         if (!IsServer || _occupied.Value == occupied) return;
         _occupied.Value = occupied;
-
-        if (occupied)
-        {
-            // 연출/도착 대기 중에는 재진입 카운트다운을 만들지 않는다.
-            if (IsEncounterBusy) return;
-            BeginCountdown(countdownSeconds, CountdownCause.Pad);
-            Edit.Log($"[BossTeleport] 카운트다운 시작 — {countdownSeconds:0}초 후 참가자 전원 보스룸 이동.", this);
-        }
-        else if (_pending != null)
-        {
-            // 엘리베이터 연출이 시작된 뒤엔 취소가 없다 — 참가자가 문 앞으로 옮겨지면서 패드를 떠나는 게 정상이다.
-            if (_elevatorRunning) return;
-
-            // 🔴 강제 이동(제한시간 만료)은 패드 이탈로 취소되지 않는다.
-            //    예전에는 `_pending` 하나를 두 경로가 공유해서, 강제 경고 중에 누가 패드에
-            //    들어왔다 나가기만 해도 강제 이동이 조용히 사라졌다 — 제한시간이 통째로 우회됐다.
-            if (_countdownCause == CountdownCause.Forced)
-            {
-                Edit.Log("[BossTeleport] 존 이탈 — 그러나 강제 이동 중이라 취소하지 않는다.", this);
-                return;
-            }
-
-            CancelCountdown();
-            Edit.Log("[BossTeleport] 존 이탈 — 카운트다운 취소.", this);
-        }
     }
 
-    private void BeginCountdown(float seconds, CountdownCause cause)
+    /// <summary>
+    /// [서버, 매 프레임] 파티 집결 판정(할 일 89) — 참가자마다 발판 안·생명·행동 상태를 넣고 <see cref="BossElevatorGather"/> 로 판정한다.
+    /// 집결 카운트다운은 <see cref="_teleportAt"/> 에 그대로 싣는다(강제 카운트다운·연출 중엔 판정이 꺼져 있어 건드리지 않는다).
+    /// 확정되면 대기 없이 엘리베이터 연출을 시작한다(입력 잠금 같은 프레임).
+    /// </summary>
+    private void UpdateGatherServer()
     {
-        _countdownCause = cause;
+        BossElevatorRig rig = _rig != null ? _rig : _rig = BossElevatorRig.FindActive();
+        _gather.HoldSeconds = rig != null ? rig.GatherHoldSeconds : PartyGatherRules.DefaultHoldSeconds;
+
+        _gatherMembers.Clear();
+        foreach (NetworkClient client in NetworkManager.ConnectedClientsList)
+        {
+            NetworkObject playerObject = client.PlayerObject;
+            if (playerObject == null) continue; // 스폰 전·교체 중 — 참가자 아님(CollectParticipants 와 같은 기준)
+            _gatherMembers.Add(ReadGatherMember(client.ClientId, playerObject));
+        }
+
+        bool padEnabled = TutorialBossPath.IsBossPadEnabled;
+        var conditions = new BossElevatorGatherConditions(
+            padEnabled,
+            _countdownCause == CountdownCause.Forced,
+            _pending != null || _elevatorRunning,
+            _awaitingArrival.Count > 0);
+
+        bool wasCounting = _gather.IsCountdownActive;
+        bool confirmed = _gather.Tick(ServerNow, conditions, _gatherMembers);
+
+        bool judging = _gather.IsActive && !_gather.IsConfirmed;
+        SetGatherCounts(judging ? _gather.GatheredCount : 0, judging ? _gather.ParticipantCount : 0);
+        SetOccupied(padEnabled && _gather.GatheredCount > 0);
+
+        // 강제 카운트다운·연출이 표시를 쥐고 있지 않을 때만 집결 카운트다운을 복제값에 싣는다.
+        if (_countdownCause != CountdownCause.Forced && _pending == null)
+        {
+            double end = _gather.CountdownEndTime;
+            if (_teleportAt.Value != end) _teleportAt.Value = end;
+            _countdownCause = _gather.IsCountdownActive ? CountdownCause.Gather : CountdownCause.None;
+
+            if (!wasCounting && _gather.IsCountdownActive)
+                Edit.Log($"[BossTeleport] 집결 카운트다운 시작 — 참가자 {_gather.ParticipantCount}명 전원 발판, {_gather.HoldSeconds:0.#}초 뒤 보스 엘리베이터.", this);
+            else if (wasCounting && !_gather.IsCountdownActive && !confirmed)
+                Edit.Log($"[BossTeleport] 집결 카운트다운 취소 — 집결 {_gather.GatheredCount}/{_gather.ParticipantCount}" +
+                         (_gather.IsActive ? "" : " (판정 비활성)") + ".", this);
+        }
+
+        if (!confirmed) return;
+
+        Edit.Log($"[BossTeleport] 집결 확정 — 참가자 {_gather.ParticipantCount}명, 보스 엘리베이터 시작.", this);
+        _countdownCause = CountdownCause.None;
+        StartElevatorSequence();
+    }
+
+    /// <summary>[서버] 참가자 한 명의 집결 입력. 생명주기 컴포넌트가 없는 구성은 체력으로 Alive/PermanentDead(<see cref="IsTeleportParticipant"/> 와 같은 기준).</summary>
+    private static BossElevatorGatherMember ReadGatherMember(ulong clientId, NetworkObject playerObject)
+    {
+        Player player = playerObject.GetComponent<Player>();
+        Unit unit = player != null ? player : playerObject.GetComponent<Unit>();
+        float health = unit != null ? unit.CurrentHealth : 0f;
+
+        var lifeCycle = playerObject.GetComponent<PlayerLifeCycleController>();
+        PlayerLifeState lifeState = lifeCycle != null
+            ? lifeCycle.State
+            : (health > 0f ? PlayerLifeState.Alive : PlayerLifeState.PermanentDead);
+
+        bool onPad = BossEnterTrigger.AnyContains(playerObject.transform.position);
+        bool busy = player != null && BossElevatorGather.IsBusy(player.CurrentState);
+        return new BossElevatorGatherMember(clientId, true, lifeState, health, onPad, busy);
+    }
+
+    private void SetGatherCounts(int gathered, int total)
+    {
+        if (_gatheredCount.Value != gathered) _gatheredCount.Value = gathered;
+        if (_gatherTotal.Value != total) _gatherTotal.Value = total;
+    }
+
+    private void BeginForcedCountdown(float seconds)
+    {
+        _countdownCause = CountdownCause.Forced;
         _teleportAt.Value = NetworkManager.ServerTime.Time + seconds;
         _pending = StartCoroutine(TeleportAfter(_teleportAt.Value));
     }
@@ -274,12 +343,13 @@ public class BossTeleportManager : NetworkBehaviour
     /// <summary>
     /// 제한시간 만료로 보스전을 강제 개시한다(서버 전용). <see cref="BossTimerManager"/> 가 부른다.
     ///
-    /// 🔴 패드 진입과 **같은 경로**로 합류한다 — 산개 좌표·도착 ACK·페이드·연출 진입이 전부
-    ///    그 안에 있어서, 따로 구현하면 두 경로가 갈린다.
+    /// 🔴 집결 확정과 **같은 경로**(<see cref="StartElevatorSequence"/>)로 합류한다 — 산개 좌표·도착 ACK·페이드·연출 진입이 전부
+    ///    그 안에 있어서, 따로 구현하면 두 경로가 갈린다. 강제 카운트다운은 집결 상태(이탈·사망)로 취소되지 않고,
+    ///    진행 중엔 집결 판정이 꺼진다.
     ///
-    /// 이미 진행 중(패드 카운트다운·연출·도착 대기)이면 <c>false</c> 를 돌려준다.
+    /// 이미 진행 중(집결 카운트다운·연출·도착 대기)이면 <c>false</c> 를 돌려준다.
     /// 🔴 호출자는 그때 **만료 사실을 버리지 말고 유지**했다가, 그 진행이 취소되면 다시 불러야 한다.
-    ///    안 그러면 "만료 직전에 패드를 밟았다 나가면 제한시간이 사라지는" 구멍이 생긴다.
+    ///    안 그러면 "만료 직전에 집결했다 흩어지면 제한시간이 사라지는" 구멍이 생긴다.
     /// </summary>
     public bool ForceStartEncounter(float warnSeconds)
     {
@@ -291,11 +361,12 @@ public class BossTeleportManager : NetworkBehaviour
         if (IsEncounterBusy || IsCountdownActive)
             return false;
 
-        BeginCountdown(Mathf.Max(0f, warnSeconds), CountdownCause.Forced);
+        BeginForcedCountdown(Mathf.Max(0f, warnSeconds));
         Edit.Log($"[BossTeleport] 🔴 제한시간 만료 — {warnSeconds:0.#}초 후 강제 이동.", this);
         return true;
     }
 
+    /// <summary>강제 카운트다운 대기 → 엘리베이터 연출. 재도전 리셋(<see cref="CancelCountdown"/>)만 멈춘다.</summary>
     private IEnumerator TeleportAfter(double teleportAt)
     {
         // 표시(_teleportAt · ServerTime)와 같은 시계로 기다린다 — WaitForSeconds 는 timeScale(간파 슬로우 등)에 늘어나
@@ -303,14 +374,22 @@ public class BossTeleportManager : NetworkBehaviour
         while (NetworkManager != null && NetworkManager.ServerTime.Time < teleportAt)
             yield return null;
 
-        // 강제 이동이면 목숨이 남은 Soul 을 먼저 되살린다(팀장 확정 2026-09-20) —
-        // Soul 만 도착하면 Director 가 참가자를 못 잡아 보스가 아예 안 뜬다.
-        bool forced = _countdownCause == CountdownCause.Forced;
-
+        _pending = null;
         _countdownCause = CountdownCause.None;
 
-        if (forced) ReviveSoulsForForcedStart();
+        // 강제 이동이면 목숨이 남은 Soul 을 먼저 되살린다(팀장 확정 2026-09-20) —
+        // Soul 만 도착하면 Director 가 참가자를 못 잡아 보스가 아예 안 뜬다.
+        ReviveSoulsForForcedStart();
 
+        StartElevatorSequence();
+    }
+
+    /// <summary>
+    /// [서버] 보스 엘리베이터 연출 시작 — 집결 확정·강제 카운트다운 만료 공통. 참가자 기록·시작 시각 복제·입력 잠금은 이 호출 안(같은 프레임)에서 끝내고,
+    /// 시간표 대기는 <see cref="ElevatorSequence"/> 코루틴이 한다. 리그가 없는 구성이면 곧바로 보스룸 이동.
+    /// </summary>
+    private void StartElevatorSequence()
+    {
         BossElevatorRig rig = BossElevatorRig.FindActive();
         List<ulong> participants = CollectParticipants();
         if (rig == null || rig.FrontPoints.Count == 0 || participants.Count == 0)
@@ -318,13 +397,12 @@ public class BossTeleportManager : NetworkBehaviour
             // 리그가 없는 구성(테스트 씬 등)·참가자 없음은 예전처럼 곧바로 보스룸 이동(참가자 없음은 그 안에서 취소된다).
             if (participants.Count > 0)
                 Edit.LogWarning("[BossTeleport] 보스 엘리베이터(BossElevatorRig·FrontPoints)가 없어 연출 없이 보스룸으로 이동한다.", this);
-            _pending = null;
             TeleportAlivePlayers();
             _teleportAt.Value = 0d; // 표시 종료
-            yield break;
+            return;
         }
 
-        // 🔴 여기부터 취소 없음 — 패드 이탈은 카운트다운만 취소한다(SetOccupied). 재도전 리셋만 이 코루틴을 멈춘다.
+        // 🔴 여기부터 취소 없음 — 발판 이탈·사망은 집결 카운트다운만 취소한다. 재도전 리셋만 이 시퀀스를 멈춘다.
         _elevatorRunning = true;
         BossElevatorTimeline timeline = rig.BuildTimeline(participants.Count);
         double start = NetworkManager.ServerTime.Time;
@@ -344,6 +422,13 @@ public class BossTeleportManager : NetworkBehaviour
                  $"페이드 인 끝 +{timeline.FrontFadeInEndAt:0.##}s, 하강 +{timeline.DescendStartAt:0.##}s, 보행 +{timeline.WalkStartAt(0):0.##}s(간격 {timeline.WalkInterval:0.##}·{timeline.WalkDuration:0.##}s), " +
                  $"상승 +{timeline.AscendStartAt:0.##}s, 암전 +{timeline.BlackoutAt:0.##}s", this);
 
+        // 시간표가 0 초짜리라 코루틴이 동기로 끝나면(끝에서 _pending 을 비우고 _elevatorRunning 을 내린다) 핸들을 남기지 않는다.
+        Coroutine sequence = StartCoroutine(ElevatorSequence(participants, rig, timeline, start));
+        if (_elevatorRunning) _pending = sequence;
+    }
+
+    private IEnumerator ElevatorSequence(List<ulong> participants, BossElevatorRig rig, BossElevatorTimeline timeline, double start)
+    {
         // 페이드 아웃 끝(완전 암전) — 문 앞으로.
         while (NetworkManager.ServerTime.Time < start + timeline.TeleportFrontAt)
             yield return null;
@@ -842,8 +927,8 @@ public class BossTeleportManager : NetworkBehaviour
 
     /// <summary>
     /// [서버] 전멸 리스폰(할 일 30 (2) — Docs/tech/handoff-boss-encounter-reset.md)용 처음 상태 복귀. <b>이 메서드를 부를 때만</b> 동작한다.
-    /// 카운트다운(패드·강제)·엘리베이터 연출·도착 ACK 대기를 취소하고 시퀀스를 올려 늦게 온 ACK 를 버린다. 점유는 비움으로 둔다 —
-    /// 다음에 패드(<see cref="BossEnterTrigger"/>)에 들어오는 순간 다시 통지돼 카운트다운이 시작된다.
+    /// 카운트다운(집결·강제)·엘리베이터 연출·도착 ACK 대기를 취소하고 시퀀스를 올려 늦게 온 ACK 를 버린다. 집결 확정 래치도 푼다 —
+    /// 다음에 전원이 발판(<see cref="BossEnterTrigger"/>)에 모이면 다시 집결 카운트다운이 시작된다.
     /// 이벤트(<see cref="AlivePlayersArrived"/>·<see cref="ArrivalAborted"/>)는 내지 않는다.
     /// </summary>
     public void ResetForRetryServer()
@@ -863,9 +948,11 @@ public class BossTeleportManager : NetworkBehaviour
         _arrivedClientIds.Clear();
         _encounterSequence++;
         _occupied.Value = false;
+        _gather.ResetConfirmation();
+        SetGatherCounts(0, 0);
         EndElevatorServer("재도전 리셋"); // 연출 중이었으면 숨김 해제·전 피어 리그 대기 복귀(CancelCountdown 이 시퀀스 코루틴도 멈췄다)
 
-        Edit.Log("[BossTeleport] 재도전 리셋 — 카운트다운·엘리베이터 연출·도착 대기 취소, 패드 다시 사용 가능.", this);
+        Edit.Log("[BossTeleport] 재도전 리셋 — 카운트다운·엘리베이터 연출·도착 대기 취소, 집결 래치 해제(발판 다시 사용 가능).", this);
     }
 
     /// <summary>대기 중 이탈 처리. 남은 대기자가 0이면 도착한 사람으로 진행하고, 아무도 없으면 취소한다.</summary>
@@ -912,6 +999,8 @@ public class BossTeleportManager : NetworkBehaviour
     // 엘리베이터 연출 참가자인 본인은 시간표대로(문 앞 이동 페이드, 상승 뒤 암전) 그리고, 보스룸 도착 RPC 까지 암전을 유지한다.
     private void Update()
     {
+        if (IsServer && IsSpawned) UpdateGatherServer();
+
         UpdateElevatorLocal();
 
         float elevatorAlpha = ElevatorFadeAlpha();
@@ -1076,7 +1165,7 @@ public class BossTeleportManager : NetworkBehaviour
         return unit != null && unit.CurrentHealth > 0;
     }
 
-    // 임시 표시(전 피어): 페이드 오버레이 + 카운트다운 숫자 — UI 시스템 합류 시 교체 전제.
+    // 임시 표시(전 피어): 페이드 오버레이 + 집결 n/m + 카운트다운 숫자 — UI 시스템 합류 시 교체 전제.
     private void OnGUI()
     {
         if (_fadeAlpha > 0f)
@@ -1088,11 +1177,14 @@ public class BossTeleportManager : NetworkBehaviour
             GUI.color = Color.white;
         }
 
+        DrawGatherCount();
+
         double teleportAt = _teleportAt.Value;
         if (teleportAt <= 0d || NetworkManager.Singleton == null) return;
 
+        // 상한 없음 — 집결 5초·강제 경고(warnSeconds)도 처음 숫자부터 보인다.
         double remain = teleportAt - NetworkManager.Singleton.ServerTime.Time;
-        if (remain <= 0d || remain > countdownSeconds + 0.5d) return;
+        if (remain <= 0d) return;
 
         _countdownStyle ??= new GUIStyle(GUI.skin.label)
         {
@@ -1105,5 +1197,24 @@ public class BossTeleportManager : NetworkBehaviour
         int display = Mathf.CeilToInt((float)remain);
         Rect rect = new Rect(0f, Screen.height * 0.25f, Screen.width, 120f);
         GUI.Label(rect, display.ToString(), _countdownStyle);
+    }
+
+    // 집결 n/m 한 줄 — 판정 중이고 발판에 누가 있을 때만(맵 내내 0/m 이 떠 있지 않게). 카운트다운 숫자 바로 아래.
+    private void DrawGatherCount()
+    {
+        int total = _gatherTotal.Value;
+        int gathered = _gatheredCount.Value;
+        if (total <= 0 || (gathered <= 0 && !IsCountdownActive)) return;
+
+        _gatherStyle ??= new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 32,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+        };
+        _gatherStyle.normal.textColor = Color.white;
+
+        Rect rect = new Rect(0f, Screen.height * 0.25f + 120f, Screen.width, 48f);
+        GUI.Label(rect, LobbyUiStrings.FormatGatherCount(gathered, total), _gatherStyle);
     }
 }

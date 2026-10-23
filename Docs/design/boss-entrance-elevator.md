@@ -4,9 +4,29 @@
 > `BossTeleportManager.cs`(서버 시퀀스·페이드·카메라·실루엣·오너 보행). 프리팹 `ZoneS_typeBossEnter.prefab` 의 `[Elevator]`(BossElevatorRig).
 > 테스트 `Assets/1.Scripts/Map/Editor/BossElevatorTimelineTests.cs`.
 
+## 0. 진입 조건 — 파티 집결(할 일 89, 2026-10-22)
+
+옛 규칙("1명이 발판에 들어가면 3초 카운트 후 전원 이동", 튜토리얼 D17)은 폐기. **참가자 전원이 발판에 모여 5초를 버텨야** 연출이 시작된다.
+코드: 순수 규칙 `Assets/1.Scripts/Map/BossElevatorGather.cs`(할 일 86 `PartyGatherRules` 재사용) · 서버 판정 `BossTeleportManager.UpdateGatherServer` ·
+발판 박스 `BossEnterTrigger.ContainsPoint`. 테스트 `Assets/Tests/EditMode/Map/Editor/BossElevatorGatherTests.cs`.
+
+- **참가자** = 접속 중 + PermanentDead 아님(이동 대상과 같은 기준). 인원이 바뀌면(접속·이탈·완전 사망) 카운트 0.
+- **집결 인정** = 본체 위치가 발판 박스 안 + 쓰러짐 아님(Alive 이고 HP>0). **Soul 은 인정하지 않는다** — 되살아날 때까지 기다린다.
+- 카운트 중 한 명이라도 **나가거나 쓰러지면 즉시 취소**, 다시 모이면 **5초부터 다시**.
+- 행동 중(Idle/Move 아님)인 사람이 있으면 카운트 **시작만** 미룬다. 시작 뒤 행동은 끊지 않는다(86 규칙 그대로).
+- 판정 끔: 튜토리얼 발판 잠김(`TutorialBossPath.IsBossPadEnabled` false) · 제한시간 만료/구간 스킵 **강제 카운트다운 중** · 엘리베이터 연출 중 · 도착 대기 중.
+- 유지 시간 = `BossElevatorRig._gatherHoldSeconds`(데이터 테이블 `Map` 시트, 기본 5초 — 리그가 없으면 `PartyGatherRules.DefaultHoldSeconds`).
+- 확정 → **대기 없이** 연출 시작(입력 잠금이 같은 프레임). 확정은 1회 래치 — 재도전 리셋(`ResetForRetryServer`)만 푼다.
+- **연출이 시작된 뒤엔 취소가 없다.** 입력 잠금·숨김 동안 `CinematicHidden` 무적 토큰이 피해를 막고, 추락 판정(`PlayerFallController`)도 멈춘다(추락 피해는 무적을 우회하므로).
+- 강제 카운트다운(`ForceStartEncounter` — `BossTimerManager`·`TutorialSkipController`)은 예전 경로 그대로: 집결 상태(이탈·사망)로 취소되지 않고,
+  집결 카운트다운 중이면 `false`(호출자가 만료를 쥐고 재시도).
+- 복제·표시: 카운트다운 종료 시각은 기존 `_teleportAt`(`IsCountdownActive` 의미 그대로 — 집결·강제 공통), 집결 n/m 은 `GatheredCount`/`GatherTotal`.
+  임시 OnGUI 가 숫자(상한 없이 5부터) + "집결 n/m"(`LobbyUiStrings.FormatGatherCount`, 키 `UI.Lobby.GatherCount`) 한 줄 — 판정 중이고 발판에 누가 있을 때만.
+- `IsOccupied`(발판 위 살아 있는 사람 ≥ 1)는 범위 표시 색 전용 — 카운트다운을 시작하지 않는다.
+
 ## 1. 흐름
 
-발판 → 카운트다운 → **입력 잠금 · 페이드 아웃** → (암전 중 문 앞 FrontPoints 로 이동 + **카메라가 엘리베이터 칸 안 지점으로 컷** + **하강 시작**, 이후 도착까지 그 지점을 화면 중앙에 두고 따라감) →
+발판(전원 집결 5초, §0) → **입력 잠금 · 페이드 아웃** → (암전 중 문 앞 FrontPoints 로 이동 + **카메라가 엘리베이터 칸 안 지점으로 컷** + **하강 시작**, 이후 도착까지 그 지점을 화면 중앙에 두고 따라감) →
 **페이드 인**(이미 엘리베이터가 내려오는 중) → 착지 → **문 열림** → **P1 → P2 → P3 순서로 걸어 들어감**(Walk 애니, 걷는 동안 실루엣 꺼짐) → **문 닫힘** → **상승**(숨김, 카메라는 칸을 따라감) →
 페이드 아웃 → 완전 암전 → 보스방 도착(도착 ACK → 보스 등장 연출, 기존 그대로).
 
@@ -106,7 +126,7 @@ t = 0 은 카운트다운 끝(연출 시작). 괄호 = 이 수치로 짠 3인 �
 - **입력 잠금 = `PlayerEncounterLock.SetCinematicInputLockServer`**(새 복제 값). 숨김·보스 등장 잠금(`BeginCinematicServer`)과 독립 —
   FSM 을 Cinematic 으로 바꾸지 않아 보행 애니를 막지 않고, 도착 뒤 보스 등장 잠금이 겹쳐 걸려도 서로 풀지 않는다. 무적 토큰 `CinematicHidden` 은 입력 잠금·숨김 중 하나라도 켜진 동안.
 - **입력 잠금 구간 = 카운트다운이 끝난 순간(연출 시작, `FrontFadeOut` t=0) ~ 보스방 도착 뒤 보스 등장 잠금으로 넘길 때**(사용자 결정 2026-10-16).
-  페이드 아웃·문 앞 이동·페이드 인 동안에도 이동·공격·스킬·대시가 막힌다. 걸기 = `TeleportAfter` 가 시작 시각을 복제한 직후 `LockParticipants`,
+  페이드 아웃·문 앞 이동·페이드 인 동안에도 이동·공격·스킬·대시가 막힌다. 걸기 = `StartElevatorSequence`(집결 확정·강제 만료 공통)가 시작 시각을 복제한 직후 `LockParticipants`,
   풀기 = `EndElevatorServer` 한 곳(도착 완료는 `AlivePlayersArrived` → 보스 등장 잠금이 걸린 **뒤** 부르므로 풀렸다 다시 걸리는 틈이 없다).
   리그가 없어 곧바로 이동하는 경로는 잠그지 않는다.
   잠금 동안 머리 위 체력바(이름표·특성 줄·대시 아이콘 포함) 숨김(전 피어, 보스 등장 잠금 끝까지) — `PlayerOverheadHealthBarRule.IsVisibleDuringEncounter`(할 일 46 후속 10).
