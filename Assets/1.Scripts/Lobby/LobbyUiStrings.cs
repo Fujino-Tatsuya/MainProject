@@ -30,12 +30,17 @@ public static class LobbyUiStrings
     public static readonly UiString Train02Title = new UiString("UI.Lobby.Train02Title", "일반 전투", Where + " › TRAIN_02 제목(할 일 86 T4)");
     public static readonly UiString Train02Remaining = new UiString("UI.Lobby.Train02Remaining", "남은 상대 {remaining}/{total}", Where + " › TRAIN_02 남은 상대 수({remaining} = 아직 처치 안 한 상대, {total} = 이번 전투 상대 수 — 끼임 복구는 처치 아님, 할 일 86 T4)");
 
+    public static readonly UiString Train03Segments = new UiString("UI.Lobby.Train03Segments", "칸 {current}/{total}", Where + " › TRAIN_03 훈련 상대 머리 위 바 이름 자리 — C·D 간파 게이지 칸({current} = 남은 칸, {total} = 전투 데이터 총 칸, 할 일 86 T5b 임시)");
+    public static readonly UiString Train03SuppressAttack = new UiString("UI.Lobby.Train03SuppressAttack", "제압된 상대를 공격하세요 {time}", Where + " › TRAIN_03 D 제압 중 훈련 상대 머리 위 바 이름 자리({time} = UI.Unit.Seconds 로 만든 남은 제압 초, 올림 정수, 할 일 86 T5b 임시)");
+    public static readonly UiString Train03Finish = new UiString("UI.Lobby.Train03Finish", "마무리하세요", Where + " › TRAIN_03 D 제압 중 피해 뒤 제압이 끝나 마무리로 넘어간 훈련 상대 머리 위 바 이름 자리 — 칸 대신 표시(할 일 86 T5c 후속 임시)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         InteractReady, InteractUnready, InteractCharacterSelect, ReadyCount, Countdown, CountdownStarting,
         GatherCount, GatherCountdown,
         Train01Title, Train01BasicAttack, Train01SkillQ, Train01SkillE, Train01SkillR, Train01RightClick, Train01Dash, Train01PartyDone,
         Train02Title, Train02Remaining,
+        Train03Segments, Train03SuppressAttack, Train03Finish,
     };
 
     /// <summary>"남은 상대 n/m".</summary>
@@ -88,5 +93,16 @@ public static class LobbyUiStrings
         return seconds > 0
             ? GatherCountdown.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(seconds, "0") })
             : string.Empty;
+    }
+
+    /// <summary>"칸 n/m".</summary>
+    public static string FormatTrain03Segments(int current, int total) =>
+        Train03Segments.Format(new Dictionary<string, string> { ["current"] = current.ToString(), ["total"] = total.ToString() });
+
+    /// <summary>D 제압 안내 + 남은 초(올림 정수). 0초면 안내만(제압 종료 직전 한 프레임).</summary>
+    public static string FormatTrain03SuppressAttack(double remainingSeconds)
+    {
+        var seconds = CountdownDisplaySeconds(remainingSeconds);
+        return Train03SuppressAttack.Format(new Dictionary<string, string> { ["time"] = seconds > 0 ? UiStrings.Seconds(seconds, "0") : string.Empty }).TrimEnd();
     }
 }
