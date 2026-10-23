@@ -1,14 +1,14 @@
 # handoff — 23호 송전기(차징) 연출 교체 (전류·심지 발광 · 타격 스파크 · 방전 · 전기줄)
 
 > 2026-10-22 · 민경(Claude) · 브랜치 `feature/VFX` · 계획 [PLAN.md](../../PLAN.md) 「23호 송전기(차징) 연출 교체」
-> **경석 님 영역은 프리팹 2개에 컴포넌트만 더했다 — 스크립트 diff 0.** 송전기 HP·상승·판정·Rage/레이드 방전 진입 타이밍 그대로. §1 만 확인하면 된다.
+> **경석 님 영역은 프리팹 2개에 컴포넌트 추가 + 스크립트 1곳(경고 1줄 삭제)뿐이다.** 송전기 HP·상승·판정·Rage/레이드 방전 진입 타이밍 그대로. §1 만 확인하면 된다.
 
 ## 1. 경석 영역 변경 (프리팹만, 추가만)
 - `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab` — `TwentyThreeCharger/Env_Mv_bosscharger_upper` 4개에 **`PylonChargeView`(NetworkBehaviour)** 추가.
   - `BossChargingPylon` 의 서버 전용 상태(`State`·`WasDestroyed`)를 **읽기만** 해서 `NetworkVariable<byte>` 하나(숨김·상승·Live·부서짐·내려감)로 복제한다 — 클라도 "부서져서 내려감"과 "시간 초과로 내려감"을 가를 수 있게.
   - 같은 NetworkObject 에 NetworkBehaviour 가 하나 늘었다(호스트·클라 같은 빌드면 문제없음).
   - **노랑 아웃라인 끔(10-22 민경 요청)** — 4개 모두 `BossChargingPylon.outlineMaterial` 을 비웠다. 아웃라인 전용 렌더러(`PylonOutline`)가 몸 연출(심지·코일 겹침)을 덮어 안 보였다. "Live = 때릴 수 있음" 표시는 이제 몸 연출(Live 때 밝아짐·전기줄 연결)이 맡는다.
-    코드는 그대로라 Awake 때 `outlineMaterial 이 비어 있어…` 경고가 송전기마다 한 번 찍힌다 — 끄려면 경고를 지우거나 "의도적으로 끔" 옵션을 두는 건 경석 님 판단. 클라 콜라이더 토글(`ApplyOutline`)은 아웃라인 렌더러와 무관하게 그대로 돈다.
+    🔴 **10-23: `BossChargingPylon.BuildOutlineRenderers` 의 `outlineMaterial 이 비어 있어…` 경고를 지웠다**(민경 요청 — 경석 영역 스크립트 변경은 이 한 건뿐이다). 비움은 원래 필드 Tooltip 에 "비우면 아웃라인 없이 동작" 이라고 적힌 지원되는 설정이라, 경고가 자기 툴팁과 모순이었다. 동작 변경 0 — 비었을 때 바로 반환하는 흐름은 그대로고, 재질을 다시 넣으면 아웃라인도 예전처럼 돌아온다. 클라 콜라이더 토글(`ApplyOutline`)은 아웃라인 렌더러와 무관하게 그대로 돈다.
 - `2.Prefabs/Monster/Boss/TwentyThree.prefab` — `VFX` 에 **`BossChargeTetherView`**(MonoBehaviour, 네트워크 없음) 추가, `chargeBall` = 기존 `VFX/ChargeBall`(EffectStagePlayer). 레이드(`TwentyThree_Raid`)는 Variant 라 같이 적용.
   - 가슴 점: 뼈 `spine_02.x` 를 이름으로 찾아 보스 기준 앞(+Z) 0.4m. `chest` 에 Transform 을 넣으면 그게 우선(프리팹에 소켓을 만들고 싶으면 여기).
 - 시간 초과 신호는 보스가 이미 보내는 `EndChargeBallClientRpc(broken: false)` → `chargeBall.Stop()` 을 듣는다(시간 초과일 때만 Stop, 그 밖은 Abort). **이 규약(시간 초과 = Stop)을 바꾸면 과충전 연출이 엉뚱하게 나온다** — 바꿀 일이 있으면 알려 주세요.
