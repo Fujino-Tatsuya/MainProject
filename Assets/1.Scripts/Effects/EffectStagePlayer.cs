@@ -76,6 +76,12 @@ public class EffectStagePlayer : MonoBehaviour, IAnimEventEffect
     /// <summary>지금 단계가 진행 중인가. (종료 원샷은 포함되지 않는다 — 회수 책임이 없다)</summary>
     public bool IsPlaying => _running;
 
+    /// <summary>
+    /// 단계가 끝난 순간 — 인자 = 끊긴 종료(<see cref="Abort"/>)였나. 조용한 정리(비활성화 등)에서는 오지 않는다.
+    /// 예: 송전기 전기줄(<see cref="BossChargeTetherView"/>)이 차징 구슬의 Stop(시간 초과)을 듣고 과충전을 낸다.
+    /// </summary>
+    public event System.Action<bool> Finished;
+
     /// <summary>[애니메이션 이벤트] 인스펙터 설정대로 시작한다.</summary>
     public void Play() => Begin(follow != null ? follow : transform, default, scale);
 
@@ -197,6 +203,8 @@ public class EffectStagePlayer : MonoBehaviour, IAnimEventEffect
         }
 
         ReleaseLoops();
+
+        if (!silent) Finished?.Invoke(aborted);
     }
 
     void ReleaseLoops()

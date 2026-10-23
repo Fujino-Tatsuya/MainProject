@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 머리 위 특성 게이지 — 가붕이 패시브(불굴의 의지) 쿨타임 진행률. 충전 상태면 가득 찬 노랑, 차는 중 흰색.
-/// 충전 여부(상태이상 PassiveCharge)와 쿨타임 끝 시각(readyServerTime)은 둘 다 전 피어에서 읽힌다.
+/// 충전 여부(상태이상 PassiveCharge)와 남은 쿨(복제값을 피어 쿨 시계로 환산 — 할 일 91 T4)은 둘 다 전 피어에서 읽힌다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class FirstMeleePassiveOverheadTraitGauge : MonoBehaviour, IOverheadTraitGauge

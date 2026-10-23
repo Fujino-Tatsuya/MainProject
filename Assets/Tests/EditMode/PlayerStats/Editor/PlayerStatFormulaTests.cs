@@ -65,6 +65,70 @@ public sealed class PlayerStatFormulaTests
         }
     }
 
+    // 할 일 91 — 최종 배율 단계: (기본 × (1+Σ기본%) × (1+Σ전체%)) × Π최종배율
+
+    [Test]
+    public void FinalMultiplier_Default_KeepsPreviousValues()
+    {
+        Assert.That(PlayerStatFormula.Final(5f, 0.1f, -0.3f, 1f), Is.EqualTo(PlayerStatFormula.Final(5f, 0.1f, -0.3f)).Within(1e-5f));
+        Assert.That(PlayerStatFormula.FinalInt(100, 0.3f, 0.5f, 1f), Is.EqualTo(195));
+        Assert.That(PlayerStatFormula.Multiplier(0.1f, 0.2f), Is.EqualTo(1.1f * 1.2f).Within(1e-5f));
+    }
+
+    [Test]
+    public void FinalMultiplier_Two_DoublesAfterPercentStages()
+    {
+        // 이동속도 5, 기본 +10%, 전체 +20% → 6.6, 최종 ×2 → 13.2
+        Assert.That(PlayerStatFormula.Final(5f, 0.1f, 0.2f, 2f), Is.EqualTo(13.2f).Within(1e-4f));
+        Assert.That(PlayerStatFormula.Multiplier(0.1f, 0.2f, 2f), Is.EqualTo(2.64f).Within(1e-4f));
+    }
+
+    [Test]
+    public void FinalMultiplier_TwoSources_Multiply()
+    {
+        // 같은 최종 배율끼리는 곱 — StatusEffectController.GetStatMultiplier 가 넘겨주는 값(2 × 1.5 = 3)
+        Assert.That(PlayerStatFormula.Final(5f, 0f, 0f, 2f * 1.5f), Is.EqualTo(15f).Within(1e-4f));
+        // % 단계였다면 1 + 1.0 + 0.5 = 2.5 로 더해졌을 것 — 곱과 다르다
+        Assert.That(PlayerStatFormula.Final(5f, 0f, 0f, 2f * 1.5f), Is.Not.EqualTo(PlayerStatFormula.Final(5f, 0f, 1.5f)).Within(1e-4f));
+    }
+
+    [Test]
+    public void FinalMultiplierType_OnlyMoveSpeedAndAttackSpeed()
+    {
+        foreach (PlayerStatKind kind in Enum.GetValues(typeof(PlayerStatKind)))
+        {
+            StatusEffectType type = PlayerStatFormula.FinalMultiplierType(kind);
+            bool expected = kind == PlayerStatKind.MoveSpeed || kind == PlayerStatKind.AttackSpeed;
+            Assert.That(type != StatusEffectType.None, Is.EqualTo(expected), kind.ToString());
+            if (!expected)
+                continue;
+
+            PlayerStatFormula.StatusTypes(kind, out StatusEffectType basePercent, out StatusEffectType totalPercent);
+            Assert.That(type & (basePercent | totalPercent), Is.EqualTo(StatusEffectType.None), $"{kind} 최종 배율이 % 단계 타입과 겹침");
+        }
+    }
+
+    [TestCase(StatusEffectType.MoveSpeedFinalMultiplier)]
+    [TestCase(StatusEffectType.AttackSpeedFinalMultiplier)]
+    [TestCase(StatusEffectType.CooldownRateModifier)]
+    public void FinalMultiplierTypes_AreStatModifiers_BuffAtOrAboveOne(StatusEffectType type)
+    {
+        // 배율 ≥ 1 = 버프 → 보스방 연출 ClearDebuffsServer 가 지우지 않는다
+        Assert.That(StatusEffectCategories.Of(type, 2f), Is.EqualTo(StatusEffectCategory.Buff));
+        Assert.That(StatusEffectCategories.Of(type, 1f), Is.EqualTo(StatusEffectCategory.Buff));
+        Assert.That(StatusEffectCategories.Of(type, 0.5f), Is.EqualTo(StatusEffectCategory.Debuff));
+    }
+
+    [Test]
+    public void PlayerStats_WithoutStatusEffects_FinalMultiplierIsOne()
+    {
+        var stats = new PlayerStats(kind => kind == PlayerStatKind.MoveSpeed ? 5f : 100f, null);
+        foreach (PlayerStatKind kind in Enum.GetValues(typeof(PlayerStatKind)))
+            Assert.That(stats.FinalMultiplier(kind), Is.EqualTo(1f), kind.ToString());
+        Assert.That(stats.FinalMoveSpeed, Is.EqualTo(5f).Within(1e-5f));
+        stats.Dispose();
+    }
+
     [Test]
     public void ShouldWarn_SameReport_Never()
     {

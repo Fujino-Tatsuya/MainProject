@@ -94,7 +94,7 @@ public sealed class SpinnerComboModel
     /// <summary>스폰 반경 클램프를 거는가 — 준비·간파 단계만(밀치기는 벽까지 움직여야 한다).</summary>
     public bool ClampsToPracticeRadius => Phase == SpinnerComboPhase.Ready;
 
-    /// <summary>간파 성공(이 스피너봇). 준비 단계면 기절로 가고 true — 호출자는 파티 우클릭 쿨을 1회 초기화한다.</summary>
+    /// <summary>간파 성공(이 스피너봇). 준비 단계면 기절로 가고 true.</summary>
     public bool NotifyCounterSucceeded()
     {
         if (Phase != SpinnerComboPhase.Ready) return false;

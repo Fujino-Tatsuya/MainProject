@@ -6,7 +6,8 @@
 /// 방어 창·반격 판정·반격 종료는 초 값이 아니라 클립 이벤트다(방어 시작 Custom0 · 방어 종료 Custom1, 반격 클립 Hit·End —
 /// <see cref="FirstMeleeSubSkill"/>). 초 단위 값은 안전망 maxActiveDuration 하나만 남는다.
 /// 🔴 maxActiveDuration 은 방어 종료 Custom1 시각 + 반격 클립 End 보다 길어야 한다
-/// (2026-10-20 정식 클립·사용자 속도 조정: 시작 0.5 + 유지 0.5 + 종료 Custom1 0.47 ≈ 1.47, + 반격 End 1.1 ≈ 2.57 → 반격 끝까지 보려면 2.7 이상).
+/// (할 일 91 A6 임시값, 공속 1: 준비 1.0s÷Speed 4 = 0.25 + 방어중 1.5 + 해제 0.25 ≈ 2.0 — 해제 Custom1 은 ≈ 1.78,
+/// 창 닫히기 직전 방어 성공 시 + 반격 End 1.1 ≈ 2.9 → 안전망 4.0).
 /// 짧으면 반격 중에 안전망이 E 를 끊는다(반격은 OnEnd 보장 반격으로 1회 나간다).
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/Skills/FirstMelee Sub Skill Data (수호자의 의지)")]

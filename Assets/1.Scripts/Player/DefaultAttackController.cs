@@ -971,9 +971,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private float CurrentStepDuration => HasAttackStep(0) ? attackSteps[0].MotionDuration : 0f;
 
     // 테이블 모드 Play 는 시작 때 SO 값을 덮어쓰므로 캐싱하지 않고 매번 읽는다.
-    private float AttackSpeed => attackData != null ? Mathf.Max(attackData.AttackSpeed, 0.1f) : 1f;
+    // 스탯 공격속도 배율(할 일 91 T5)을 곱한다 — 각 피어가 복제된 상태이상으로 같은 값을 낸다. 판정·창·End 는 클립 이벤트라 같이 빨라진다.
+    private float AttackSpeed =>
+        (attackData != null ? Mathf.Max(attackData.AttackSpeed, 0.1f) : 1f) * (player != null ? player.AttackSpeedRate : 1f);
 
     // MotionDuration 은 클립 타임라인 기준이라 실제 재생 시간은 공격속도로 나눈다.
+    // 종료 안전망(attackEndFallbackTime)과 ScriptedForwardDistance 전진 속도(거리 ÷ 재생 시간 — 거리는 배율과 무관하게 같다)가 이 값을 쓴다.
     private float GetPlaybackDuration(DefaultAttackStep step) => step.MotionDuration / AttackSpeed;
 }
 

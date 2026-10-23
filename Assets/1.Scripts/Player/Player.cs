@@ -220,6 +220,20 @@ public class Player : Unit
     public override int FinalDefense => stats != null ? stats.FinalDefense : base.FinalDefense;
     public override int FinalMaxHp => stats != null ? stats.FinalMaxHp : base.FinalMaxHp;
 
+    /// <summary>
+    /// 공격속도 배율(할 일 91 T5) = 최종 공격속도 ÷ 기본값(최종 배율 포함). 평타·스킬 재생 속도에 곱한다 — 전 피어 같은 값.
+    /// 소비 규칙: <see cref="PlayerAttackSpeedRules"/>.
+    /// </summary>
+    public float AttackSpeedRate =>
+        PlayerAttackSpeedRules.Rate(stats != null ? stats.Multiplier(PlayerStatKind.AttackSpeed) : 1f);
+
+    /// <summary>
+    /// 쿨 줄어드는 속도 배율(할 일 91 T8) = <see cref="StatusEffectType.CooldownRateModifier"/> 곱(<see cref="StatusEffectController.GetStatMultiplier"/>), 없으면 1.
+    /// 피어마다 복제된 상태이상으로 계산한다 — 쿨 시계(<see cref="PlayerCooldownClock"/>) 동기화는 없다. Awake 에서 쿨 시계 배율 공급원으로 연결한다.
+    /// </summary>
+    public float CooldownRate =>
+        StatusEffects != null ? StatusEffects.GetStatMultiplier(StatusEffectType.CooldownRateModifier) : 1f;
+
     /// <summary>판정·툴팁 공용 피해 스냅샷(가하는 피해% 포함).</summary>
     public int ResolveDamage(float coefficient, int flatBonus) =>
         stats != null ? stats.ResolveDamage(coefficient, flatBonus) : PlayerStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
@@ -261,6 +275,13 @@ public class Player : Unit
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        // Animator.speed 쓰기 지점(공격속도, 할 일 91 T5) — 프리팹에 없으면 붙인다.
+        if (GetComponent<PlayerAttackSpeedAnimator>() == null)
+            gameObject.AddComponent<PlayerAttackSpeedAnimator>();
+
+        // 쿨 시계 배율 연결 지점(할 일 91 T8) — 스킬·대시 두 시계(패시브는 스킬 시계 공유)가 매 프레임 이 값을 읽는다.
+        PlayerCooldownClock.For(this).SetRateSource(() => CooldownRate);
 
         int historyCapacity = PlayerTickRingBuffer<PlayerSimulationState>.CapacityForSeconds(
             ReconciliationHistorySeconds,
@@ -1822,6 +1843,24 @@ public class Player : Unit
             _fallDamageBypass = false;
         }
     }
+
+    // [서버] 체력 하한 — 로비 훈련 보정(할 일 86): LobbyTrainingDirector 가 훈련 단계 동안 훈련 명단에 1, 그 밖엔 0.
+    // 플레이어는 씬마다 새로 스폰되므로 다음 씬(메인)에 이월되지 않는다.
+    private int _serverHealthFloor;
+
+    /// <summary>[서버] 지금 체력 하한(0 = 없음).</summary>
+    public int ServerHealthFloor => _serverHealthFloor;
+
+    /// <summary>[서버] 체력 하한을 정한다(0 = 해제). 서버가 아니면 무시.</summary>
+    public void ServerSetHealthFloor(int floor)
+    {
+        if (!IsServer)
+            return;
+
+        _serverHealthFloor = Mathf.Max(0, floor);
+    }
+
+    protected override int HealthFloor => _serverHealthFloor;
 
     // 재생 리셋 = 체력 피해 > 0 또는 추락 피해. 보호막만 깎인 피격은 재생을 멈추지 않는다(사용자 결정 10-13).
     // 무적으로 막힌 피해·내가 때린 것은 오지 않는다.

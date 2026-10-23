@@ -50,6 +50,7 @@ public class StatusEffectHUD : MonoBehaviour
             return;
 
         int activeCount = effectController != null ? effectController.ActiveCount : 0;
+        int effectIndex = NextVisible(0, activeCount);
 
         for (int i = 0; i < widgets.Length; i++)
         {
@@ -57,14 +58,16 @@ public class StatusEffectHUD : MonoBehaviour
             if (widget == null || widget.root == null)
                 continue;
 
-            bool used = i < activeCount;
+            bool used = effectIndex < activeCount;
             if (widget.root.activeSelf != used)
                 widget.root.SetActive(used);
 
             if (!used)
                 continue;
 
-            StatusEffectInstance instance = effectController.GetActive(i);
+            int effect = effectIndex;
+            effectIndex = NextVisible(effectIndex + 1, activeCount);
+            StatusEffectInstance instance = effectController.GetActive(effect);
 
             if (widget.icon != null)
             {
@@ -74,8 +77,17 @@ public class StatusEffectHUD : MonoBehaviour
             }
 
             if (widget.text != null)
-                widget.text.text = BuildLabel(instance, effectController.GetRemainingTime(i));
+                widget.text.text = BuildLabel(instance, effectController.GetRemainingTime(effect));
         }
+    }
+
+    // 제압 가속처럼 한 버프가 타입 여럿으로 걸리면 대표 1개만 보인다(SuppressHasteRules.IsHudHidden).
+    private int NextVisible(int from, int activeCount)
+    {
+        int index = from;
+        while (index < activeCount && SuppressHasteRules.IsHudHidden(effectController.GetActive(index).type))
+            index++;
+        return index;
     }
 
     private Sprite IconFor(StatusEffectType type)

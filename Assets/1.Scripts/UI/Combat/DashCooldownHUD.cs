@@ -76,8 +76,8 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
         if (dash != null)
         {
-            // ⚠️ PredictedNextReadyTime에서 직접 빼지 않는다 — 그 값은 절대시각이고 시간 원점이
-            //    NetworkClock인지 Time.timeAsDouble인지는 PlayerDashController만 안다.
+            // ⚠️ PredictedNextReadyTime에서 직접 빼지 않는다 — 그 값은 이 피어 쿨 시계(PlayerCooldownClock.DashNow)
+            //    기준 시각이라 다른 시계로 빼면 엉킨다. 남은 초·분모 둘 다 쿨 시계 초라 비율은 배율과 무관하게 맞다.
             remaining = dash.RemainingRecharge;
             total = dash.RechargeDuration;
             charge = dash.PredictedCharge;
