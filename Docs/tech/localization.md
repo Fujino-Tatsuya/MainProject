@@ -88,7 +88,7 @@ Strings·ErrorCodes 두 시트에 똑같이 적용한다(시트마다 따로 검
 - `Tools/Data/Export Template` 은 `Strings`·`ErrorCodes` 시트를 **항상** 만든다 — 키가 하나도 없어도 머리글만 있는 시트가 생긴다.
 - 기존 행(메모 행·`#` 메모 열 포함)은 **병합·덮어쓰기 어느 쪽이든 그대로** 옮긴다. 코드가 등록한 키 중 시트에 없는 것만 뒤에 붙는다(en 은 빈 칸).
   머리글에 없는 열은 Export 때 사라진다(원본은 Export 백업).
-- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3·L4b UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)·[§8](#8-l4b--코드에-박힌-ui-문구)). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
+- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3·L4b UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)·[§8](#8-l4b--코드에-박힌-ui-문구)) + 튜토리얼·23호 레이드 자막(`Tutorial.Guide.<id>`, 아래 키 규칙). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
 - ErrorCodes 코드 = `ErrorCatalog.All`([§7](#7-l4--로비네트워크-오류-코드)). 새 코드는 `ko`·`#분류`·`#원인`·`#조치` 가 채워진 채 붙는다(en 빈 칸).
   **시트에만 있고 `ErrorCatalog` 에 없는 행은 경고**(오류 아님, 행은 남긴다) — 안 쓰는 코드면 지우거나 `#` 를 붙인다.
 - 🔴 Export 는 xlsx 를 새로 쓴다(서식·열 너비 사라짐) — [data-table.md §4](data-table.md#4-메뉴-toolsdata).
@@ -127,6 +127,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 - `영역.화면.이름` 점 구분 PascalCase — `UI.Lobby.Ready`, `UI.Settings.Graphics.Resolution`, `Tutorial.S3.Dash`, `Skill.Paladin.Q.Name`.
 - 한 번 쓴 키의 의미를 바꾸지 않는다 — 문구가 크게 바뀌면 새 키를 만든다(번역이 조용히 어긋나지 않게).
 - 같은 단어라도 화면이 다르면 키를 나눈다(언어마다 길이·어순이 달라진다).
+- 튜토리얼 안내·23호 레이드 자막 = **`Tutorial.Guide.<행 id>`**(`TutorialGuideTextSource.KeyPrefix`, 할 일 86 T6a). 출처 = 시트 행 → 없으면 `TutorialGuideTexts` SO 문구(지속시간·효과음은 SO) — [tutorial-guide-ui.md](tutorial-guide-ui.md#문구-출처--strings-시트-우선-so-폴백-할-일-86-t6a). 일반 키라 `{Q}`·`{mm:ss}` 는 ko·en 집합만 같으면 된다.
 
 ### 컴포넌트
 
@@ -161,6 +162,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Settings/SettingsUiStrings.cs` · `Settings/Editor/SettingsLocalizationLinker.cs` | 설정창 문구 키(`UI.Settings.*`) · 설정 라벨 키 연결 메뉴 — [§9](#9-설정창-통합) |
 | `Assets/1.Scripts/Localization/UiStrings.cs` | L3·L4b UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) · 초 단위 `UiStrings.Seconds` · 상태이상 이름 키 |
 | `Assets/1.Scripts/Localization/Editor/UiStringKeys.cs` | Export 때 `UiStrings.All` 을 Strings 키로 등록(`StringKeyRegistry`) |
+| `Assets/1.Scripts/Tutorial/Guide/TutorialGuideTextSource.cs` · `Tutorial/Guide/Editor/TutorialGuideStringKeys.cs` | 튜토리얼 문구 출처(SO + Strings) · Export 때 SO 행을 `Tutorial.Guide.<id>` 로 등록 |
 | `Assets/1.Scripts/Localization/Editor/UiStringsAuthoring.cs` | L3 저작 메뉴 `Tools/Localization/L3 — 씬·프리팹 라벨 키 부착` |
 | `Assets/1.Scripts/Localization/ErrorCatalog.cs` | L4 오류 코드 목록(`ErrorCode` = 코드 + 분류·원인·조치 + ko) · 화면 표기(`ErrorDisplay`) |
 | `Assets/1.Scripts/Localization/Editor/ErrorCodeKeys.cs` | Export 때 `ErrorCatalog.All` 을 ErrorCodes 시트로 등록(`StringKeyRegistry.RegisterErrorCodes`) |
@@ -430,3 +432,23 @@ en: Hold {key:Detail} for details
 - 버튼 한 번 = 다음 언어(`LocText.Next` — 한국어 ↔ English), `Loc.Current` 로 바꾼다(`Loc.Changed` → 라벨·컨트롤러가 다시 그림).
 
 - 테스트: `SettingsRulesTests`(언어 기본·전환·이름 비번역, 57키·영어 원문 중복·자리표시자, 라벨 역조회, 액션 이름) · `UiStringsFormatTests`(확인 창 초 단위·액션 이름 언어 전환) · `UiStringsAuthoringTests`(Linker 멱등·ko 폴백) · `UserLanguageConfigTests`(정수 저장값 이관).
+
+## 10. 글꼴 — 서울알림체 Static 아틀라스
+
+기본 UI 글꼴(`TMP Settings` 기본) = `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`. **Static** 이다(2026-10-23 결정 a) —
+Dynamic 이면 Play 중 새 글자마다 에셋이 바뀌어 모든 워크트리에 병합 불가 충돌이 생긴다. 공유 요약은 [handoff-seoulalrim-static.md](handoff-seoulalrim-static.md).
+
+- 아틀라스에 없는 글자는 폴백 `Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset`(Static, 한글 11172자 전부)이 그린다. 둘 다 없으면 □.
+- 채우는 메뉴: **`Tools/UI/Fonts/Refill SeoulAlrim (Static)`**(`SeoulAlrimStaticRefill`). 같은 에셋에 빠진 글자만 더하고 Static 으로 저장한다(guid·기존 글리프 유지, 더할 게 없으면 바이트 그대로).
+  글자 집합 = ASCII · KS X 1001 한글 2350자 · `GameData.xlsx` Strings·ErrorCodes 시트 ko·en(SVN 원본, `StringTable.asset` 아님) ·
+  런타임 `.cs` 문자열 리터럴의 비ASCII 글자(`Editor`·`Tests` 폴더 제외) · `9.ScriptableObject` 의 `.asset` 텍스트 · `0.Scenes`·`2.Prefabs` 의 TMP `m_text` · 기호 목록.
+  콘솔에 출처별 글자 수, 글자 수 전→후, 아틀라스 장수, 파일 크기, **채우지 못한 글자**(서체에 없는 글자)를 남긴다.
+
+### 새 문구를 넣었을 때
+
+1. 시트(ko·en)나 코드·SO·라벨 문구를 고친다. **KS X 1001 밖 한글**(예: 똠·햏)·새 기호·새 영문 기호가 들어갔는지 본다 — 흔한 한글·ASCII 는 이미 들어 있다.
+2. SVN `GameData.xlsx` 를 최신으로 받은 워크트리에서 **`Tools/UI/Fonts/Refill SeoulAlrim (Static)`** 실행(Play 중이면 먼저 정지).
+3. 콘솔의 `[SeoulAlrimStatic]` 줄을 확인 — 글자 수가 늘었으면 **폰트 에셋(`SeoulAlrimTTF-Medium SDF.asset`) 한 파일만 커밋**한다. 안 늘었으면 git 변경도 없다.
+   "채우지 못한 글자" 경고는 서울알림체에 글리프가 없는 글자다 — NotoSansKR 폴백에 있으면 그대로 두고, 없으면 문구를 바꾸거나 폴백 결정을 받는다.
+- 🔴 Inspector 에서 `Atlas Population Mode` 를 Dynamic 으로 바꾸거나 Font Asset Creator 로 다시 만들지 말 것 — guid 가 바뀌거나 다시 노이즈가 생긴다.
+- Play 중 TMP 가 아틀라스 밖 글자를 만나도 Static 이라 에셋은 바뀌지 않는다(폴백으로 그리거나 □).

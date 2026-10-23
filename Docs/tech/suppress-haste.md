@@ -16,7 +16,24 @@
 | 데이터 | xlsx `SuppressHaste` 시트 → `Assets/Resources/Player/SuppressHasteData.asset` | [data-table.md](data-table.md) 시트 표 |
 | 다른 출처 | `SuppressHaste.GrantServer(sourceId, suppressDuration)` — 보스 종류 무관 서버 API | handoff §2 |
 
-- 쿨 속도 배율의 소비처(쿨 시계 — 스킬·궁극기·대시 충전·패시브 내부 쿨)는 B 레인(PLAN T2~T4)이다. 그 전까진 상태이상만 걸리고 쿨은 그대로다.
+- 쿨 속도 배율은 쿨 시계(§1.1)가 소비한다 — 스킬(우클릭·Q·E·궁극기)·대시 충전·가붕이 패시브 내부 쿨.
+
+### 1.1 쿨 시계 (할 일 91 T2~T4·T8)
+| 항목 | 내용 |
+|---|---|
+| 코드 | `Assets/1.Scripts/Player/Cooldown/` — `CooldownClock`(순수 적분 `Now += Δ원천 × 배율`) · `PlayerCooldownClock`(플레이어마다 1개, 쓰는 쪽이 `For` 로 공유) |
+| 시계 2개 | **스킬** `SkillNow` — 원천 `Time.timeAsDouble` 증분(= `Time.deltaTime` 합, 슬로우 모션 반영). 스킬 쿨 장부·**가붕이 패시브 내부 쿨**이 쓴다<br>**대시** `DashNow` — 원천 `NetworkClock.GameNow` 증분(일시정지·슬로우 반영). 세션이 안 돌면 `Time` 증분, 원천이 바뀌는 프레임은 기준점만 옮긴다. 두 시각은 원점이 달라 서로 빼지 않는다 |
+| 배율 연결 | `Player.Awake` 한 곳: `PlayerCooldownClock.SetRateSource(() => Player.CooldownRate)`. 두 시계가 같은 배율을 쓴다 |
+| 배율 계산 | `Player.CooldownRate` = `StatusEffectController.GetStatMultiplier(CooldownRateModifier)` — 이동·공속 최종 배율(`PlayerStats.FinalMultiplier`)과 같은 집계. 같은 타입 여러 개 = 곱, 스택 = magnitude^스택, 없으면 1. 순수 식 `StatusEffectController.StatMultiplierOf` |
+| 피어별 | 서버·오너·원격 모두 **자기 복제본**으로 계산해 자기 시계에 쌓는다 — **시계 동기화 없음**. 상태이상이 만료·제거되면 목록이 바뀐 다음 프레임 구간부터 1 |
+| 서버↔오너 | "남은 초"만 주고받는다. 스킬 = `CommitCooldownClientRpc`(남은 초) · 대시 = 응답 `DashServerResponse.NextChargeRemaining`(남은 초 — 이전 절대시각 `NextChargeReadyServerTime` 폐기) · 패시브 = 복제 `PassiveCooldownStamp`(남은 초 + 서버 시각, 늦은 참가는 흐른 시간 × 배율을 뺀다) |
+| 판정 | 서버 장부(기존 그대로). 오너 장부는 HUD·예측용 |
+
+- 🔴 **같은 빌드 필수** — 대시 응답 형식(절대시각 → 남은 초)·패시브 복제 형식이 바뀌어 이전 빌드와 섞이면 대시 충전·패시브 쿨 표시가 깨진다(데모 부스 규칙과 같음).
+- **알려진 오차**: 배율이 바뀌는 순간 서버↔오너 시계 차 = 상태이상 복제 지연만큼(버프 시작·만료 각각 RTT/2 안팎 × (배율 − 1)). HUD 표시용 허용 범위이고 판정은 서버라 결과는 서버를 따른다.
+  패시브 늦은 참가 환산은 현재 배율 하나로 흐른 시간을 곱한다 — 도장 이후 배율이 바뀌었으면 그만큼 어긋난다.
+- **결정(2026-10-22 메인)**: 가붕이 패시브 내부 쿨은 스킬 쿨과 같은 스킬 시계를 써 **슬로우 모션을 반영**한다(이전 = 복제된 절대 서버시각 `readyServerTime` 기준이라 슬로우와 무관했다).
+- 테스트: EditMode `CooldownClockTests`·`DashCooldownClockSyncTests`·`PassiveCooldownSyncTests`·`CooldownRateWiringTests`(배율 2 스킬·대시·패시브 절반, 중간 해제 2→1, 곱 계산).
 
 ## 2. 화면 연출 — 비네팅 (PLAN T7)
 | 무엇 | 위치 |

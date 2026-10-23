@@ -15,6 +15,17 @@ Update this file when a term becomes important enough that future agents or team
 - 로비 형광등 36개 = `_Fluorescent (n)` 묶음(복제 배치) × **포인트 라이트 1개 + 바닥 빛 줄기**(막대 메시 없음 — 탑다운이라 천장 요소 불필요). `형광등 — 씬 전체 다시 조립`·`라이트 수`·`바닥 빛 줄기 사용` 메뉴. PC Forward+ 라 라이트 수 여유(한도 256).
 - 커밋 제외: `StringTable.asset`(자동 추가 키 63개) · `MainProject-git.slnx` · `Assets/_Recovery/` · `PLAN-lobby-stage.md`·`PLAN-title-camera.md`. 서울알림 Medium SDF 로컬 변경(Play 동적 글자)은 버리고 원격 Static 판 사용. SVN 변경 없음.
 
+## ▶▶ 작업 세션 (2026-10-23 · 경석(Claude+Codex) · **보스 등장 시네마틱 + 다인 Space 홀드 스킵**, 브랜치 `feature/SettingsDdol` 작업 트리) — 계획 [PLAN-boss-encounter-cutscene.md](PLAN-boss-encounter-cutscene.md) ✅ 승인(10-23, Codex 아이디어 회의·레퍼런스 영상 실측 반영) · ✅ 구현 · 컴파일 0 · 전투 EditMode 295/0 · ✅ 경석 Play(1인·MPPM 3인 — 카메라 구도·HP바 차오름·HUD 끄기·Space 키캡 스킵·스킵 뒤 카메라 복귀·지시 0.8초 대기 반영) · ✅ development 병합(10-23) · ⚠️ 알려진 문제: 엘리베이터 직전 재합류자가 워크인 중 안 보임(원인 미확정, PLAN "알려진 문제")
+- 워크인(엘리베이터 보행 재사용, 가로 일자·3인 삼각형 동시 출발) → 강하 → 착지 밀림·흔들림 → 웰즈 `Boss_welz_throwing` 지시·독백 → 전투. 스킵 = Space 1초(표 유지)·전원 동의. 레터박스 4%·비네팅 0.35 시작값. 씬·프리팹 무수정(런타임 생성).
+- 다른 영역 파일 추가분은 [handoff-boss-intro-cinematic.md](Docs/tech/handoff-boss-intro-cinematic.md) — 보스 HP바·튜토리얼 정면 팁 노출 시점이 바뀐다.
+
+## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **튜토리얼·23호 전수조사 → 보스방·몬스터 결함 수정**, 브랜치 `feature/SettingsDdol` 작업 트리) — ✅ 구현 · 컴파일 error CS 0(배치) · `TutorialZone4RulesTests` 23/0 · ✅ development 병합(10-23, 보스 등장 연출과 함께)
+- 23호: 0줄 자폭 HP 1 보호가 HP−1 피해까지 막던 것 · 폭발 뒤 첫 치명타가 자폭 재예약하던 것(`TwentyThreeBoss.cs` ZeroGuard) · 잡힌 대상 쓰러지면 놓고 복귀(빈 손 간파 방지) · B 북진 첫 칸 막힘 = 보상 없이 기술적 중단 · 연쇄 간파 창 도중 쓰러짐 = 회차 미소모.
+- 보스방: 이동 카운트다운 대기를 `ServerTime` 으로 · 튜토리얼 G11 전 강제 개시 부활 목숨 차감 없음.
+- 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
+- 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
+- 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+
 ## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
 
 ## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)

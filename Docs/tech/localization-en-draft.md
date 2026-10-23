@@ -273,3 +273,9 @@
 | ErrorCodes | `UGS_NOT_INITIALIZED` | `Unity Services가 초기화되지 않았습니다.` | `Unity Services is not initialized.` |  |
 | ErrorCodes | `UGS_INITIALIZING` | `Unity Services 초기화 중입니다. 잠시 후 다시 시도하세요.` | `Unity Services is initializing. Please try again shortly.` |  |
 | ErrorCodes | `UGS_NOT_SIGNED_IN` | `Unity Services 익명 로그인이 완료되지 않았습니다.` | `Unity Services anonymous sign-in has not completed.` |  |
+
+## 보스 등장 연출 (2026-10-23 · 경석(Claude)) — ⏳ 다음 Export 때 시트에 행이 생기면 en 칸에 넣는다
+
+| 시트 | key | ko | en | 메모 |
+|---|---|---|---|---|
+| Strings | `UI.BossIntro.Skip` | `건너뛰기` | `Skip` | 보스 등장 연출 스킵 버튼(Space 1초 홀드) — `UiStrings.BossIntroSkip`. 시트에 행이 없는 동안은 ko 원문이 나온다 |

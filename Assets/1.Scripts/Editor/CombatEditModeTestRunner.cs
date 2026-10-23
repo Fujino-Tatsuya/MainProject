@@ -34,6 +34,8 @@ internal static class CombatEditModeTestRunner
         "^BossCombo",    // BossComboPolicyTests — 콤보 후보·다음 타(PLAN-boss-combo)
         "^BossRelayRoster", // BossRelayRosterTests — 레이드 간파 릴레이 명단·잠금(PLAN-boss-raid-relay)
         "^BossChainCounter", // BossChainCounterRulesTests — 레이드 연쇄 간파 회차·순번·결과
+        "^BossIntroRules", // BossIntroRulesTests — 등장 시네마틱 대열·스킵 투표·홀드(PLAN-boss-encounter-cutscene)
+        "^BossHealthIntroFill", // BossHealthIntroFillTests — 보스 HP바 등장 차오름(1/4 → 최대)
         "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
         "^MonsterSkyStrike", // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
         "^MonsterOverheadHealthBar", // MonsterOverheadHealthBarVisibilityTests — 몬스터 발밑 체력바 표시·부착 판단

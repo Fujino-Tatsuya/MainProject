@@ -154,6 +154,9 @@ public static class UiStrings
     public static readonly UiString TitleStart = new UiString("UI.Title.Start", "시작하기", TitleWhere + "시작 버튼");
     public static readonly UiString TitleSetting = new UiString("UI.Title.Setting", "설정", TitleWhere + "설정 버튼");
     public static readonly UiString TitleExit = new UiString("UI.Title.Exit", "나가기", TitleWhere + "나가기 버튼");
+
+    // 보스 등장 시네마틱(PLAN-boss-encounter-cutscene) — 스킵 버튼. en 초안 = Skip(localization-en-draft.md).
+    public static readonly UiString BossIntroSkip = new UiString("UI.BossIntro.Skip", "건너뛰기", "보스 등장 연출 — 스킵 버튼 문구(Space 1초 홀드, BossIntroPresentation)");
     // 그만두기 팝업(PLAN-settings-ddol, 경석 10-22) — 오른쪽 선택 = 타이틀(로비 자리). 호스트는 다른 플레이어도 끊긴다는 경고.
     public static readonly UiString ExitTitleChoice = new UiString("UI.Exit.ToTitle", "타이틀", PauseWhere + "종료 확인 — 타이틀(타이틀로 돌아가기) 선택");
     public static readonly UiString ExitHostQuitWarning = new UiString("UI.Exit.HostQuitWarning", "다른 플레이어의 게임도 끝납니다", PauseWhere + "그만두기 확인 문구 — 인게임 호스트에게만");
@@ -210,6 +213,7 @@ public static class UiStrings
         all.AddRange(new[] { PauseTitle, PauseContinue, PauseSettings, PauseQuit, PausePressAnyButton, ExitTitle, ExitMessage, ExitDesktop, ExitLobby,
                                 ExitTitleChoice, ExitHostQuitWarning, ExitHostToTitleWarning,
                                 TitleStart, TitleSetting, TitleExit });
+        all.Add(BossIntroSkip);
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
         all.AddRange(DemoConnectUiStrings.All); // 부스 데모 연결 오버레이(UI.DemoConnect.*)
         all.AddRange(LobbyUiStrings.All);       // 걷는 로비 상호작용·준비·카운트다운(UI.Lobby.*, 할 일 48 C10)

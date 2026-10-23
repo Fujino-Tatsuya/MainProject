@@ -29,6 +29,12 @@ public readonly struct TrainingResetOptions
 
     /// <summary>TRAIN_02 시작 — 체력·쿨타임·대시. 분노 재지급 없음(명세 §6 시작 리셋에 분노가 없고 최소 분노는 §7 TRAIN_01 한정).</summary>
     public static TrainingResetOptions CombatStart => new TrainingResetOptions(true, true, true, false);
+
+    /// <summary>
+    /// TRAIN_03 B→C 명시 연습 초기화(명세 §9.4, 할 일 86 T5b — 호출은 T5c 진행기) — 체력·Q/E/R/우클릭·대시 1회. 최초 R 분노 보조는 반복하지 않는다.
+    /// ⚠️ 명세의 '변신 해제·강화·잔류 공격 종료'는 아직 없다 — 어쌔신 변신을 강제로 끝내는 서버 API 가 없다(실전 초기화 T6 와 같이 연결).
+    /// </summary>
+    public static TrainingResetOptions PracticeReset => new TrainingResetOptions(true, true, true, false);
 }
 
 /// <summary>

@@ -161,9 +161,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     //    (2026-09-28 실제로 겪었다). <c>StartAttack</c> 의 attackId switch 는 그 결합이 없다.
     //    덤으로 재생이 바닥 예고와 같은 순간이 된다 — 이유는 그 자리 주석.
     //    종료는 반대다 — 끌어당김이 끝나는 프레임은 클립이 가장 잘 안다.
-    // 🔴 그래서 **비상 정지가 따로 필요하다**. 잡기는 counterWindowDuration(1.3)이
-    //    telegraphDuration(0.7)보다 길어 카운터 창이 끌어당김 구간으로 0.6초 넘어온다.
-    //    거기서 끊기면 클립이 getowned 로 잘려 종료 이벤트를 못 지나간다
+    // 🔴 그래서 **비상 정지가 따로 필요하다**. 끌어당김 도중 그로기·사망·중단으로
+    //    끊기면 클립이 getowned 로 잘려 종료 이벤트를 못 지나간다
+    //    (⚠️ 정정 2026-10-22: 예전엔 잡기 카운터 창이 StartAttack 부터 counterWindowDuration 만큼 열려 끌어당김으로 넘어왔다.
+    //     지금 잡기 창은 붙잡은 뒤(AttachGrabbed)~3타 직전이고, 잡기 행의 counterWindowDuration 은 읽히지 않는다.)
     //    — 자기장이 safetyTimeout(5초)까지 남는다. 그로기·사망도 같다 → AbortAttackChain.
     [Header("VFX — Grab 끌어당김 자기장")]
     [Tooltip("끌어당김 자기장의 id. 클립 이벤트 문자열(Boss_23_magneticgrab 의 StopEffect data)과 " +
@@ -1692,7 +1693,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 관용구 2: 다지선다 애니는 상태 복제로 실을 수 없다 → ClientRpc 로 CrossFade.
         // 문자열이 아니라 슬롯 번호를 보낸다(각 피어가 같은 SO 에서 상태명을 조회한다 — GauntletBot 선례).
-        PlayAttackAnimClientRpc(CurrentAttackSlot);
+        // 🔴 차징 시퀀스는 여기서 자기 상태(Charging)를 틀지 않는다 — 바로 뒤 BeginCharge 가 중앙으로 **점프**(이륙 = Leap)하는데,
+        //    같은 프레임에 Charging 을 먼저 틀면 이륙 크로스페이드가 Charging 에서 출발해 "팔 뻗은 차징 자세로 그대로 떠오르는" 그림이 된다
+        //    (경석 Play 10-23). Charging 은 실제 차징 시작(StartChargingInPlace)이 다시 튼다.
+        if (e == null || e.attackId != BossAttackId.ChargeSequence)
+            PlayAttackAnimClientRpc(CurrentAttackSlot);
 
         // 애니가 나간 **뒤에** 각 체인의 진입 처리를 한다(클립이 먼저 보여야 한다).
         if (e == null) return;
@@ -2925,6 +2930,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     void TickGrabHold(float dt)
     {
         // 잡힌 대상이 사라지면(사망·디스폰) 체인을 정리하고 복귀한다.
+        DropGrabbedIfDown();
         if (!IsGrabbedValid())
         {
             StopGrabPulseClientRpc();
@@ -2968,6 +2974,16 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // 한 타가 끝났다 — 남았으면 **쉼 없이** 다음 타, 마지막이었으면 놓아준다.
     void AdvanceGrabSlam()
     {
+        if (DropGrabbedIfDown())
+        {
+            // 내려치기 사이에 쓰러졌다 — 남은 타·간파 창 없이 복귀(빈 손 간파 = 공짜 그로기 방지).
+            StopGrabPulseClientRpc();
+            StopGrabbedElectricClientRpc();
+            SetCounterWindow(false);
+            EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
+            return;
+        }
+
         _grabSlamsLeft--;
 
         // 🔴 [G6] **마지막 타부터는 못 끊는다**(팀장 확정: "3번째 직전까지가 인터럽트 가능").
@@ -3196,6 +3212,19 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     }
 
     bool IsGrabbedValid() => _grabbed != null && _grabbed.gameObject.activeInHierarchy;
+
+    /// <summary>
+    /// 잡힌 대상이 쓰러졌으면(유령은 같은 오브젝트라 <see cref="IsGrabbedValid"/> 로 못 거른다) 구속을 풀고 손을 비운다. 놓았으면 true.
+    /// 안 놓으면 빈 손에 간파 창이 3타 직전까지 열려 있어 공짜 간파(그로기+취약)가 나온다.
+    /// </summary>
+    bool DropGrabbedIfDown()
+    {
+        if (!IsGrabbedValid() || BossPatternTargets.IsAlive(_grabbed)) return false;
+        _grabbed.EndGrabbedByInstigator();
+        _grabbed = null;
+        FightLog("잡힌 대상 쓰러짐 — 놓고 복귀");
+        return true;
+    }
 
     // 🔴 **공격 중에는 회전하지 않는다**(팀장 확정 2026-08-13). base 의 매 틱 회전도 함께 끈다.
     //
@@ -3519,6 +3548,62 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         if (!IsServer || !IsSpawned) return;
         CrossFadeJumpStateClientRpc(landing: true, silentLanding: true);
+    }
+
+    /// <summary>착지 뒤 지시 — 웰즈 <c>Boss_welz_throwing</c>(손폭탄 표시 없이). 웰즈는 네트워크가 없어 23호 RPC 로 모든 피어에 내린다.</summary>
+    public void PlayEntranceCommandServer()
+    {
+        if (!IsServer || !IsSpawned) return;
+        PlayWellsEntranceCommandClientRpc();
+    }
+
+    /// <summary>등장 착지 순간 — 돌진 팔다리 전기 펄스를 <paramref name="seconds"/> 동안(경석 10-23). 끄는 건 각 피어가 시간으로 한다.</summary>
+    public void PlayEntranceImpactServer(float seconds)
+    {
+        if (!IsServer || !IsSpawned || seconds <= 0f) return;
+        PlayEntranceElectricClientRpc(seconds);
+    }
+
+    [ClientRpc]
+    void PlayEntranceElectricClientRpc(float seconds)
+    {
+        if (limbPulses == null || limbPulses.Length == 0) { WarnNoLimbPulsesOnce(); return; }
+        for (int i = 0; i < limbPulses.Length; i++)
+        {
+            if (limbPulses[i] == null) continue;
+            limbPulses[i].SetScale(DashLimbElectricScale);
+            limbPulses[i].Play();
+        }
+        if (_entranceElectricStop != null) StopCoroutine(_entranceElectricStop);
+        _entranceElectricStop = StartCoroutine(StopEntranceElectricAfter(seconds));
+    }
+
+    Coroutine _entranceElectricStop;
+
+    System.Collections.IEnumerator StopEntranceElectricAfter(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        _entranceElectricStop = null;
+        if (limbPulses == null) yield break;
+        for (int i = 0; i < limbPulses.Length; i++)
+            if (limbPulses[i] != null) limbPulses[i].Stop();
+    }
+
+    /// <summary>웰즈 지시 클립(<c>Boss_welz_throwing</c>) 길이 — 애니메이터 컨트롤러에서 읽는다(웰즈가 없으면 0).</summary>
+    public float EntranceCommandSeconds
+    {
+        get
+        {
+            if (_wells == null) _wells = GetComponentInChildren<BossWells>(true);
+            return _wells != null ? _wells.CommandGestureLength : 0f;
+        }
+    }
+
+    [ClientRpc]
+    void PlayWellsEntranceCommandClientRpc()
+    {
+        if (_wells == null) _wells = GetComponentInChildren<BossWells>(true);
+        _wells?.PlayCommandGesture();
     }
 
     /// <summary>연출 종료 — 로코모션 복귀. FSM 을 깨우기 <b>직전</b>에 불린다.</summary>
@@ -4160,7 +4245,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         SafeCrossFade(state);
         animator.Update(0f);   // 상태 정보가 이번 프레임에 즉시 갱신되게
 
-        float len = animator.GetCurrentAnimatorStateInfo(0).length;
+        // 크로스페이드 중이면 '현재' 는 아직 이전 상태다 — 배속은 이륙 상태(다음 상태) 길이로 잡는다(Charging 길이로 잡히던 문제, 10-23).
+        float len = animator.IsInTransition(0)
+            ? animator.GetNextAnimatorStateInfo(0).length
+            : animator.GetCurrentAnimatorStateInfo(0).length;
         float dur = Mathf.Max(0.01f, _boss.jumpTakeoffDuration);
         float speed = len > 0.01f ? len / dur : 1f;
 
@@ -5961,7 +6049,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             float stun = Mathf.Min(attackInfo.staggerDuration, _vulnerableUntil - Time.time);
             if (stun > 0.05f && State != MonsterState.Groggy)
             {
-                _groggyKind = BossPauseCondition.CounterGroggy;
+                // 🔴 Q 경직은 간파 그로기가 아니다(경석 10-23) — 정지 조건 없음 = 장판·드론은 계속 돈다.
+                _groggyKind = BossPauseCondition.None;
                 ForceGroggy(stun);
                 _vulnerableStunGroggy = true;
                 Debug.Log($"[23호] 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초(남은 취약까지)", this);
@@ -6587,6 +6676,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     WellsDroneAttack _drone;
     bool _fightActive;   // 입장 연출 착지 뒤 true(OnServerLogicResumed) — 서버 전용 의미
     // 지금 그로기가 어느 경로로 들어왔나. 진입 3곳(간파 성공 · 송전기 전멸 · 제압)이 StunForCounter 직전에 세운다.
+    // 취약 중 팔라딘 Q 경직은 None(정지 조건 없음)으로 세운다 — 간파 그로기가 아니다.
     // 그로기가 아닐 때는 읽지 않는다(ActivePauseConditions) — 그래서 이탈 때 지우지 않아도 된다.
     BossPauseCondition _groggyKind;
 
@@ -6843,6 +6933,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         base.TakeDamage(attackInfo); // 서버 가드 + 방어/체력 + 사망/그로기/피격경직 판정
 
+        // 🔴 보호 상태는 HP−1 피해가 들어간 **뒤에** 세운다 — 먼저 세우면 CanApplyHealthDamage 가 그 피해까지 막아 HP 가 1 로 안 내려간다.
+        if (reserveZero) _zeroGuard = ZeroGuard.Reserved;
+
         if (!IsServer || State == MonsterState.Dead)
             return;
 
@@ -6874,12 +6967,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
     }
 
-    /// <summary>[서버] 이번 피해를 거른다. 반환 = 이번 피해로 자폭을 새로 예약해야 한다.</summary>
+    /// <summary>[서버] 이번 피해를 거른다. 반환 = 이번 피해로 자폭을 새로 예약해야 한다(Reserved 는 호출부가 피해 적용 뒤에 세운다).</summary>
     bool ZeroGuardFilter(ref AttackInfo attackInfo)
     {
-        if (!ZeroSelfDestructOn || _zeroGuard == ZeroGuard.Killing || _zeroGuard == ZeroGuard.Done) return false;
+        if (!ZeroSelfDestructOn) return false;
+        // 🔴 getter 를 Done 검사보다 먼저 — 폭발 대기 만료(Exploding → Done)를 여기서 넘긴다. 뒤에 두면 만료 뒤 첫 치명타가 자폭을 다시 예약한다.
+        bool protecting = ZeroGuardProtecting;
+        if (_zeroGuard == ZeroGuard.Killing || _zeroGuard == ZeroGuard.Done) return false;
 
-        if (ZeroGuardProtecting)
+        if (protecting)
         {
             attackInfo.damage = 0;   // 예약·자폭·폭발 대기 중 HP 는 1 에서 안 내려간다(실드 넘침 포함)
             return false;
@@ -6888,16 +6984,17 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (attackInfo.damage < CurrentHealth) return false;
         // 방어 경감 전 값으로 깎는다 — 경감은 피해를 줄이기만 하므로 HP ≥ 1 이 보장된다.
         attackInfo.damage = Mathf.Max(0, CurrentHealth - 1);
-        _zeroGuard = ZeroGuard.Reserved;
         return true;
     }
 
     // ReceiveAttack 을 거치지 않는 직접·비율 피해도 막는다(Unit.ApplyHealthDamage — Codex 10-20). 보호 중이면 전부, 아니면 치명만.
     protected override bool CanApplyHealthDamage(int damage)
     {
+        // getter 를 먼저 — 폭발 대기 만료를 Done 으로 넘겨야 그 뒤 직접 치명 피해가 "막힘"이 아니라 사망이 된다.
+        bool protecting = IsServer && ZeroSelfDestructOn && ZeroGuardProtecting;
         if (IsServer && ZeroSelfDestructOn && _zeroGuard != ZeroGuard.Killing && _zeroGuard != ZeroGuard.Done)
         {
-            if (ZeroGuardProtecting && damage > 0) return false;
+            if (protecting && damage > 0) return false;
             if (damage >= CurrentHealth)
             {
                 if (_zeroGuard == ZeroGuard.Off)

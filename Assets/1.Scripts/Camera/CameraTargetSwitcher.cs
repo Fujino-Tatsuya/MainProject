@@ -125,6 +125,60 @@ public class CameraTargetSwitcher : MonoBehaviour
         IsInFallView = false;
     }
 
+    // ── 연출 카메라(보스 등장 시네마틱 — PLAN-boss-encounter-cutscene) ───────────────
+    // 연출 쪽이 만든 vcam 의 Priority 를 플레이어·낙하 vcam(100) 위로 올렸다 내린다 — 브레인이 블렌드한다.
+    // 이 컴포넌트가 전환마다 DefaultBlend 시간을 덮어쓰므로(ApplyBlendDuration) 진입·복귀 블렌드 시간은 여기서 넣는다.
+    private const int CinematicCameraPriority = 200;
+    private CinemachineCamera cinematicCamera;
+
+    /// <summary>연출 카메라 중인가(로컬).</summary>
+    public bool IsInCinematic => cinematicCamera != null;
+
+    /// <summary>
+    /// 게임플레이 카메라의 <b>고정</b> 회전(팔로우 오프셋 기준, 요 −45°·피치 ≈60°). 렌더 카메라 transform 은 연출·낙하 vcam 이 움직이므로
+    /// "화면 방향"이 필요한 연출은 이 값을 쓴다(보스 등장 시네마틱 — 연출 카메라가 자기 자신을 기준으로 삼아 요가 틀어지던 문제, 경석 10-23 Play).
+    /// 리그가 없으면 false.
+    /// </summary>
+    public bool TryGetGameplayViewRotation(out Quaternion rotation)
+    {
+        EnsureCameraRig();
+        CacheFixedCameraRotation();
+        rotation = fixedCameraRotation;
+        return hasFixedCameraRotation;
+    }
+
+    /// <summary>연출 vcam 으로 전환한다. <paramref name="blendSeconds"/> 0 = 컷(암전 직후 등).</summary>
+    public void EnterCinematic(CinemachineCamera camera, float blendSeconds)
+    {
+        if (camera == null)
+        {
+            return;
+        }
+
+        EnsureCameraRig();
+        ApplyBlendDuration(blendSeconds);
+        if (cinematicCamera != null && cinematicCamera != camera)
+        {
+            cinematicCamera.Priority = InactiveCameraPriority;
+        }
+
+        cinematicCamera = camera;
+        camera.Priority = CinematicCameraPriority;
+    }
+
+    /// <summary>연출 vcam 에서 지금 플레이어(또는 낙하·관전) vcam 으로 돌아온다. 그 vcam 이 아니면 무시. 멱등.</summary>
+    public void ExitCinematic(CinemachineCamera camera, float blendSeconds)
+    {
+        if (camera == null || cinematicCamera != camera)
+        {
+            return;
+        }
+
+        ApplyBlendDuration(blendSeconds);
+        camera.Priority = InactiveCameraPriority;
+        cinematicCamera = null;
+    }
+
     private void EnsureCameraRig()
     {
         if (playerCamera != null && floatCamera != null && gameplayCamera != null)

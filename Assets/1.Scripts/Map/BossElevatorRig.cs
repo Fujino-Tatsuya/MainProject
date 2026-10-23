@@ -49,6 +49,9 @@ public sealed class BossElevatorRig : MonoBehaviour
     [SerializeField] WalkWaypoints[] _walkWaypoints = Array.Empty<WalkWaypoints>();
     [Tooltip("연출 시간표 — 단계 순서대로(암전·문 앞 이동 → 하강 → 문 → 보행 → 상승 → 페이드 아웃). 서버·클라가 각자 이 프리팹 값으로 같은 시간표를 짠다")]
     [SerializeField] BossElevatorTimingSettings _timing = BossElevatorTimingSettings.Default;
+    [Header("파티 집결")]
+    [Tooltip("참가자 전원이 발판에 모인 채 이 시간(초)을 버티면 엘리베이터 연출이 시작된다. 한 명이라도 나가거나 쓰러지면 0 부터 다시")]
+    [SerializeField, Min(0f)] float _gatherHoldSeconds = (float)PartyGatherRules.DefaultHoldSeconds;
 
     /// <summary>슬롯 하나의 경유 지점 — 문 앞에서 가까운 순서. 빈 Transform 을 아무 데나 두고 끌어 넣는다(씬 뷰 이동 핸들로 옮긴다).</summary>
     [Serializable]
@@ -77,6 +80,8 @@ public sealed class BossElevatorRig : MonoBehaviour
     public event Action OnBlackout;
 
     public IReadOnlyList<Transform> FrontPoints => _frontPoints;
+    /// <summary>파티 집결 유지 시간(초) — 서버 <see cref="BossTeleportManager"/> 가 읽는다.</summary>
+    public float GatherHoldSeconds => _gatherHoldSeconds;
     public bool IsPlaying => _playing;
     public BossElevatorTimeline Timeline => _timeline;
     /// <summary>움직이는 칸(높이를 바꾸는 대상).</summary>

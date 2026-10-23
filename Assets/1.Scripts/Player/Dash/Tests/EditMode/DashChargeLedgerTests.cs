@@ -145,5 +145,17 @@ namespace BeaverLobby.Player.Dash.EditModeTests
             Assert.AreEqual(1, ledger.Count);
             Assert.IsTrue(ledger.IsFull);
         }
+
+        [Test]
+        public void RemainingToReady_IsZeroWhenFull_AndCountsDownOtherwise()
+        {
+            var ledger = new DashChargeLedger(2, 2.0, 2, 0.0);
+            Assert.AreEqual(0.0, ledger.RemainingToReady(0.0), "만충 = 0(+Inf 를 보내지 않는다)");
+
+            ledger.TryConsume(10.0);
+            Assert.AreEqual(2.0, ledger.RemainingToReady(10.0), 1e-9);
+            Assert.AreEqual(0.5, ledger.RemainingToReady(11.5), 1e-9);
+            Assert.AreEqual(0.0, ledger.RemainingToReady(50.0), "지난 완료시각은 0 으로 자른다");
+        }
     }
 }

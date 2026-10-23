@@ -29,6 +29,8 @@ public class PlayerDashController : NetworkBehaviour
     private PlayerInvulnerability invulnerability;
     private PlayerEncounterLock encounterLock;
     private PlayerLifeCycleController lifeCycle;
+    // 충전 장부의 시간축. 피어마다 자기 시계 — 서버↔오너는 남은 초만 주고받는다(할 일 91 T3 · PLAN-91 §3.3).
+    private PlayerCooldownClock cooldownClock;
 
     private DashRuntimeConfig config;
     private DashChargeLedger predictedLedger;
@@ -67,8 +69,8 @@ public class PlayerDashController : NetworkBehaviour
     /// 다음 충전 완료까지 남은 시간(초). 만충이면 0.
     ///
     /// ⚠️ HUD가 <see cref="PredictedNextReadyTime"/>에서 직접 빼면 안 되기 때문에 존재한다 —
-    /// 그 값은 절대시각이고, 시간 원점이 NetworkClock인지 <see cref="Time.timeAsDouble"/>인지는
-    /// <see cref="OwnerNow"/>만 안다. 도메인을 밖에서 다시 고르면 두 시계가 어긋나 남은 시간이 엉킨다.
+    /// 그 값은 이 피어 쿨 시계(<see cref="PlayerCooldownClock.DashNow"/>) 기준 시각이라 다른 시계와 원점이 다르다.
+    /// 반환값은 쿨 시계 초다(쿨 속도 배율이 2 면 실제로는 절반 시간에 찬다 — 스킬 HUD 와 같은 규칙).
     /// </summary>
     public float RemainingRecharge
     {
@@ -77,11 +79,7 @@ public class PlayerDashController : NetworkBehaviour
             if (predictedLedger == null)
                 return 0f;
 
-            double next = predictedLedger.NextReadyTime;
-            if (double.IsInfinity(next))
-                return 0f; // 만충 — 회복 타이머가 없다.
-
-            return Mathf.Max(0f, (float)(next - OwnerNow()));
+            return (float)predictedLedger.RemainingToReady(ChargeNow()); // 만충이면 0
         }
     }
 
@@ -98,6 +96,7 @@ public class PlayerDashController : NetworkBehaviour
         lifeCycle = GetComponent<PlayerLifeCycleController>();
         if (groundingSensor == null)
             groundingSensor = GetComponent<PlayerGroundingSensor>();
+        cooldownClock = PlayerCooldownClock.For(this);
 
         BuildRuntime();
     }
@@ -107,14 +106,14 @@ public class PlayerDashController : NetworkBehaviour
         if (dashData == null)
         {
             config = DashRuntimeConfig.Create(0.0, 0.0, 1, 0.0, 1, 0.0); // DashEnabled=false
-            predictedLedger = new DashChargeLedger(1, 0.0, 0, OwnerNow());
+            predictedLedger = new DashChargeLedger(1, 0.0, 0, ChargeNow());
             ready = true;
             Debug.LogWarning("[DashAlert] PlayerDashData가 할당되지 않아 대시를 비활성화합니다.", this);
             return;
         }
 
         config = dashData.CreateValidatedConfig();
-        predictedLedger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, OwnerNow());
+        predictedLedger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, ChargeNow());
         ready = true;
 
         if (!config.DashEnabled)
@@ -129,7 +128,7 @@ public class PlayerDashController : NetworkBehaviour
         {
             if (PlayerDashValidationManager.Instance != null)
             {
-                PlayerDashValidationManager.Instance.RegisterPlayer(NetworkObjectId, OwnerClientId, config, ServerNow());
+                PlayerDashValidationManager.Instance.RegisterPlayer(NetworkObjectId, OwnerClientId, config, ChargeNow());
             }
             else if (!_serverSnapshotWarned)
             {
@@ -148,7 +147,7 @@ public class PlayerDashController : NetworkBehaviour
         if (IsOwner)
         {
             // 예측 장부를 네트워크 시간 기준으로 재시작(만충).
-            predictedLedger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, OwnerNow());
+            predictedLedger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, ChargeNow());
 
             Edit.Log(
                 $"[Dash] 오너 초기화 — 활성={DashEnabled} 속도={config.DashSpeed:F1} 지속={config.DashDuration:F3}s " +
@@ -173,7 +172,9 @@ public class PlayerDashController : NetworkBehaviour
     // "멈춘 시계"로 Advance()가 돌아 충전이 영구히 회복되지 않았다(대시 1회만 되는 증상).
     private static bool ClockRunning => NetworkClock.Instance != null && NetworkClock.Instance.IsRunning;
 
-    private double OwnerNow() => ClockRunning ? NetworkClock.Instance.GameLocalNow : Time.timeAsDouble;
+    // 충전 장부(서버 권한·오너 예측 둘 다) 시각 = 이 피어의 쿨 시계. 원천 선택(NetworkClock/Time 폴백)은 시계가 한다.
+    private double ChargeNow() => cooldownClock != null ? cooldownClock.DashNow : Time.timeAsDouble;
+    // 스냅샷·요청시각 검증 시간축. 충전 장부와 섞지 않는다.
     private double ServerNow() => ClockRunning ? NetworkClock.Instance.GameNow : Time.timeAsDouble;
     private double LocalTimeForRequest() => ClockRunning ? NetworkClock.Instance.LocalNow : Time.timeAsDouble;
 
@@ -196,7 +197,7 @@ public class PlayerDashController : NetworkBehaviour
 
         // 오너 예측 충전 회복.
         if (ready && predictedLedger != null)
-            predictedLedger.Advance(OwnerNow());
+            predictedLedger.Advance(ChargeNow());
 
         // 예측 무적을 대시 상태에 맞춘다(오너 로컬 Hurtbox 즉시 반영). 서버 무적은 승인 토큰이 확정.
         if (invulnerability != null && stateController != null)
@@ -216,6 +217,7 @@ public class PlayerDashController : NetworkBehaviour
         PlayerDashValidationManager.Instance.CaptureSnapshot(
             NetworkObjectId,
             ServerNow(),
+            ChargeNow(),
             grounded: groundingSensor == null || groundingSensor.IsGrounded,
             dead: IsDeadForDash,
             soul: IsSoulForDash,
@@ -234,7 +236,7 @@ public class PlayerDashController : NetworkBehaviour
             if (!ready || predictedLedger == null)
                 return false;
 
-            predictedLedger.Advance(OwnerNow());
+            predictedLedger.Advance(ChargeNow());
             return !predictedLedger.HasCharge;
         }
     }
@@ -274,7 +276,7 @@ public class PlayerDashController : NetworkBehaviour
             return false;
         }
 
-        double now = OwnerNow();
+        double now = ChargeNow();
         if (!predictedLedger.TryConsume(now))
         {
             // 가장 흔한 정상 거절 — 충전 1개/재충전 2초 설계라 연속 입력은 여기서 막힌다.
@@ -361,7 +363,7 @@ public class PlayerDashController : NetworkBehaviour
         DashServerResponse response = PlayerDashValidationManager.Instance.ValidateRequest(
             NetworkObjectId, senderClientId, requestId,
             clientLocalTime, directionX, directionZ,
-            ServerNow(), rttSeconds, rttAvailable,
+            ServerNow(), ChargeNow(), rttSeconds, rttAvailable,
             currentDead: IsDeadForDash,
             currentSoul: IsSoulForDash,
             currentCrowdControlled:
@@ -399,14 +401,14 @@ public class PlayerDashController : NetworkBehaviour
 
         RespondDashClientRpc(
             requestId, response.IsApproved, (int)response.Reason, response.RemainingServerDuration,
-            response.WasInterruptedByServerState, response.AuthoritativeChargeCount, response.NextChargeReadyServerTime,
+            response.WasInterruptedByServerState, response.AuthoritativeChargeCount, response.NextChargeRemaining,
             response.ChargeEpoch, response.ChargeRevision, OwnerClientRpcParams());
     }
 
     [ClientRpc]
     private void RespondDashClientRpc(
         uint requestId, bool approved, int reason, double remainingServerDuration, bool interrupted,
-        int authoritativeChargeCount, double nextChargeReadyServerTime, uint chargeEpoch, uint chargeRevision,
+        int authoritativeChargeCount, double nextChargeRemaining, uint chargeEpoch, uint chargeRevision,
         ClientRpcParams rpcParams = default)
     {
         if (!IsOwner || predictedLedger == null)
@@ -428,14 +430,14 @@ public class PlayerDashController : NetworkBehaviour
             // 거부 = 우리 예측 소비가 무효였다는 뜻. Revision 가드를 우회해 권한값으로 되돌린다.
             // ⚠️ SyncToAuthoritative로는 이 경로가 항상 무시된다(오너 Revision이 더 높음) →
             // 오너만 충전 1개와 재충전 시간을 잃어 "쿨타임이 안 도는" 것처럼 보였다.
+            // 서버가 보낸 건 남은 초(서버 쿨 시계 기준)다 — 오너 쿨 시계 지금에 그대로 더한다(할 일 91 T3).
             predictedLedger.ForceAdoptAuthoritative(
-                authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow(),
-                RemainingToReadyInOwnerDomain(nextChargeReadyServerTime));
+                authoritativeChargeCount, chargeEpoch, chargeRevision, ChargeNow(), nextChargeRemaining);
         }
         else
         {
             // 권한 충전으로 예측 정합(더 최신 Epoch/Revision만 채택).
-            predictedLedger.SyncToAuthoritative(authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow());
+            predictedLedger.SyncToAuthoritative(authoritativeChargeCount, chargeEpoch, chargeRevision, ChargeNow());
         }
 
         if (isPendingResponse)
@@ -474,19 +476,6 @@ public class PlayerDashController : NetworkBehaviour
                     $"(Epoch={chargeEpoch} Revision={chargeRevision})", this);
             }
         }
-    }
-
-    /// <summary>
-    /// 서버 도메인 "다음 충전 완료시각"을 오너 도메인 잔여시간으로 환산한다.
-    /// 두 시계(GameNow / GameLocalNow)는 도메인만 다르고 진행 속도는 같으므로 차이만 옮긴다.
-    /// 만충(+Inf)/비정상 값은 0.
-    /// </summary>
-    private double RemainingToReadyInOwnerDomain(double nextChargeReadyServerTime)
-    {
-        if (double.IsNaN(nextChargeReadyServerTime) || double.IsInfinity(nextChargeReadyServerTime))
-            return 0.0;
-
-        return System.Math.Max(0.0, nextChargeReadyServerTime - ServerNow());
     }
 
     private ClientRpcParams OwnerClientRpcParams()
@@ -528,14 +517,14 @@ public class PlayerDashController : NetworkBehaviour
     public void ServerResetChargeToOne()
     {
         if (IsServer && PlayerDashValidationManager.Instance != null)
-            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, 1, ServerNow());
+            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, 1, ChargeNow());
     }
 
     /// <summary>오너 예측 충전을 1개로 강제 초기화. 다음 충전 진행도는 0부터.</summary>
     public void OwnerResetChargeToOne()
     {
         if (player != null && player.IsInputSource && predictedLedger != null)
-            predictedLedger.ForceReset(1, OwnerNow());
+            predictedLedger.ForceReset(1, ChargeNow());
     }
 
     /// <summary>
@@ -545,14 +534,14 @@ public class PlayerDashController : NetworkBehaviour
     public void ServerResetChargeToFull()
     {
         if (IsServer && PlayerDashValidationManager.Instance != null)
-            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, int.MaxValue, ServerNow());
+            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, int.MaxValue, ChargeNow());
     }
 
     /// <summary>오너 예측 충전을 가득 채운다(<see cref="ServerResetChargeToFull"/> 의 오너 짝).</summary>
     public void OwnerResetChargeToFull()
     {
         if (player != null && player.IsInputSource && predictedLedger != null)
-            predictedLedger.ForceReset(int.MaxValue, OwnerNow());
+            predictedLedger.ForceReset(int.MaxValue, ChargeNow());
     }
 
     // 대시 방향은 옵션(UserInputConfig.DashDirection, 기본 = 캐릭터 정면)을 따른다(모든 캐릭터 공통,

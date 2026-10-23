@@ -50,6 +50,20 @@ namespace BeaverLobby.Player.Dash
         public bool IsFull => _count >= _maxCharge;
         public bool HasCharge => _count > 0;
 
+        /// <summary>
+        /// 다음 충전까지 남은 시간(이 장부 시간축의 초). 만충·비정상이면 0.
+        /// 서버↔오너는 절대시각이 아니라 이 값을 주고받는다 — 피어마다 쿨 시계 원점이 달라서다(할 일 91 T3).
+        /// </summary>
+        public double RemainingToReady(double now)
+        {
+            if (_count >= _maxCharge || double.IsNaN(_nextReadyTime) || double.IsInfinity(_nextReadyTime))
+            {
+                return 0.0;
+            }
+
+            return Math.Max(0.0, _nextReadyTime - now);
+        }
+
         /// <summary>경과한 완료시각만큼 충전을 채운다(catch-up). 변화가 있으면 Revision 증가.</summary>
         public void Advance(double now)
         {

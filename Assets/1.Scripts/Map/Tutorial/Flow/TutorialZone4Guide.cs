@@ -91,6 +91,8 @@ public sealed class TutorialZone4Guide : MonoBehaviour
             Edit.Log("[Tutorial] 보스방 도착 — 안내 정리.", this);
             return;
         }
+        // 전멸 재도전 되감기(Finished → BossEnter) — 다음 도착 때 다시 정리하게 푼다(안 풀면 "보스방으로"·미니맵 펄스가 보스전 내내 남는다).
+        _finishedCleared = false;
 
         TutorialStep step = _director.Step;
         int panels = _director.GetCounter(TutorialCounter.Zone4Panels);

@@ -37,7 +37,11 @@
   구성원은 씬 탐색이 아니라 등록식 목록 `PlayerLifeCycleController.Active`(OnEnable 등록·OnDisable 해제, `ActiveRegistry<T>`)를 0.25초마다 순회하고, 규칙도 `MultiGameRule.Current`(같은 등록 방식)로 읽는다(할 일 69 — `FindObjectsByType` 1회 8 ms 실측).
   `MultiGameRule` 이 없거나 스폰 전이면 예전 규칙(전원 PermanentDead). 2단계 리스폰이 Soul 도 전원 살리므로 갇힌 Soul 은 전멸 리스폰으로 풀린다(D1 유지).
 - 튜토리얼 G11 뒤 자동 부활이 풀 0 으로 거부되면 경고 로그 후 Soul 로 남는다(`TutorialDeathRules.Revive`).
-- 보스 강제 개시 부활(`BossTeleportManager.ReviveSoulsForForcedStart`)은 Soul 마다 공용 풀에서 1개씩 쓴다 — 풀이 모자라면 `ConnectedClientsList` 순회 앞쪽만 산다. 기존 코드 그대로.
+- **보스 강제 개시 부활**(`BossTeleportManager.ReviveSoulsForForcedStart`) — 제한시간 만료 → 경고 카운트다운 → **보스방으로 강제 이동하기 직전**에, 그 순간 Soul 인 사람을 전부 되살린다(팀장 확정 2026-09-20).
+  이유: Soul 만 보스방에 도착하면 디렉터가 참가자를 못 잡아 보스가 아예 안 뜬다. 패드로 들어가는 정상 이동에는 없다(만료 강제 이동만).
+  - 차감: Soul 마다 공용 풀에서 1개씩 쓴다 — 풀이 모자라면 `ConnectedClientsList` 순회 앞쪽만 산다(못 산 사람은 Soul 그대로 이동).
+  - **예외(2026-10-22)**: 튜토리얼에서 보스방 도착(G11) **전**이면 차감 없이 살린다(`consumeLife: false`) — "G11 전 사망은 차감 없음"(S11) 규칙과 맞춘 것. 튜토리얼 밖·G11 뒤는 위 차감 그대로.
+  - 카운트다운 대기는 표시와 같은 `ServerTime` 기준이다(간파 슬로우 등 `timeScale` 에 안 늘어난다, 2026-10-22).
 - **데이터 테이블(xlsx Export 안 함 — 기획·병합 Export 때)**: Player 시트 · `#■ MultiGameRule` 구역 · 대상 열 `GameRule` 에 **`partyLifeCount` 행(5)** 추가.
   행이 없는 동안은 프리팹 값 5 를 쓴다(테이블 규칙 — 행 없음 = 인스펙터 값). 옛 `defaultLifeCount` 행은 코드 필드를 남겨 두었다(지우면 `필드 'X' 가 없다` 오류로 테이블 적용 전체가 멈춘다) —
   병합 Export 로 행이 정리된 뒤 필드를 지운다.
