@@ -6,7 +6,7 @@
 /// <item>단계 알림: 진행기 Train03A~D 가 진행 중이 되면 상대에게 1회(<see cref="TryTakeFlowNotice"/>). 앞으로만 — 같은 단계 재알림·역순은 없음.</item>
 /// <item>완료 보고: 상대 모델의 단계 완료를 진행기에 1회(<see cref="TryAcceptReport"/>). 진행기의 지금 단계(진행 중)와 같을 때만 — 어긋남·중복·역순은 무시.</item>
 /// <item>B→C 초기화(플레이어 쪽 <see cref="TrainingResetOptions.PracticeReset"/>): 회차당 1회(<see cref="TryConsumePracticeReset"/>).</item>
-/// <item>무전 연결 이벤트(Work1 T6 이 구독): A 첫 간파 성공(TRAIN_03_COUNTER)·C 첫 유효 벽 충돌(TRAIN_03_WALL) — 각각 회차당 1회.</item>
+/// <item>무전 이벤트: A 첫 간파 성공(TRAIN_03_COUNTER)·C 첫 유효 벽 충돌(TRAIN_03_WALL)·D 첫 마무리 진입(TRAIN_03_COMBAT) — 각각 회차당 1회.</item>
 /// </list>
 /// </summary>
 public sealed class LobbySparringLink
@@ -16,6 +16,7 @@ public sealed class LobbySparringLink
     bool _practiceResetDone;
     bool _counterRaised;
     bool _wallRaised;
+    bool _finishRaised;
 
     /// <summary>회차 진행 중(상대를 스폰한 뒤 ~ 정리 전).</summary>
     public bool IsRoundActive { get; private set; }
@@ -57,6 +58,7 @@ public sealed class LobbySparringLink
         _practiceResetDone = false;
         _counterRaised = false;
         _wallRaised = false;
+        _finishRaised = false;
         return true;
     }
 
@@ -132,6 +134,19 @@ public sealed class LobbySparringLink
             return false;
 
         _wallRaised = true;
+        return true;
+    }
+
+    /// <summary>
+    /// 첫 마무리 진입 이벤트(TRAIN_03_COMBAT — "D 제압 중 유효 피해 경험 + 제압 종료")를 낼 차례인가. 상대 모델이 마무리 중이면(<see cref="TrainingSparringModel.IsFinishing"/> —
+    /// 제압 피해 확인 + 제압 종료, 마무리 체력 설정 직후) 회차당 1회. 피해 없이 끝난 제압은 마무리가 아니므로 여기 오지 않는다.
+    /// </summary>
+    public bool TryRaiseFirstFinish(bool finishing)
+    {
+        if (!IsRoundActive || _finishRaised || !finishing)
+            return false;
+
+        _finishRaised = true;
         return true;
     }
 }

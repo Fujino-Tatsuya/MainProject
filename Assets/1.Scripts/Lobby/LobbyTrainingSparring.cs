@@ -14,7 +14,8 @@ using UnityEngine.SceneManagement;
 /// Train03C 알림 = 상대 B→C 초기화(C 위치 재배치) → <see cref="TrainingSparringBot.ServerResetExecuted"/> → 플레이어 리셋(<see cref="TrainingResetOptions.PracticeReset"/>) 회차당 1회.</item>
 /// <item>완료 보고: 상대 <see cref="TrainingSparringBot.ServerStageCompleted"/> → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportStageCompleted"/>(Train03A~D) 1회 —
 /// 피해·사망 판정 도중 단계를 넘기지 않는다. 진행기 단계와 어긋난 보고·중복은 무시(경고).</item>
-/// <item>무전 연결 지점(Work1 T6 이 구독만 하면 된다): <see cref="ServerFirstCounterSucceeded"/>(TRAIN_03_COUNTER)·<see cref="ServerFirstValidWallImpact"/>(TRAIN_03_WALL) — 회차당 1회.</item>
+/// <item>무전: <see cref="ServerFirstCounterSucceeded"/>(TRAIN_03_COUNTER)·<see cref="ServerFirstValidWallImpact"/>(TRAIN_03_WALL)·<see cref="ServerFinishStarted"/>(TRAIN_03_COMBAT) — 회차당 1회.
+/// 이벤트를 낼 때 여기서 바로 <see cref="LobbyRadio.ServerPlay"/>(LobbyRadioIds) 를 부른다. 단계 진입 대사(START/CC/RESET·WALL_GUIDE/SUPPRESS)는 <see cref="LobbyRadio"/> 쪽.</item>
 /// <item>정리: Train03 이 아닌 단계로 넘어가거나(TrainEnd 등) 진행기 디스폰(판 끝 로비 복귀·씬 전환) 때 살아 있는 상대 디스폰·회차 끝.
 /// D 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰한다(마지막 처치 연출을 끊지 않는다).</item>
 /// </list>
@@ -37,8 +38,9 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     private readonly Queue<LobbyTrainingStage> _pendingReports = new Queue<LobbyTrainingStage>();
     private TrainingSparringBot _bot;
     private bool _pendingFirstCounter;
+    private bool _warnedNoRadio;
 
-    /// <summary>스폰된 TRAIN_03 연결(없으면 null) — 무전(T6)이 이벤트를 구독할 곳.</summary>
+    /// <summary>스폰된 TRAIN_03 연결(없으면 null) — 서버 이벤트를 구독할 곳.</summary>
     public static LobbyTrainingSparring Active { get; private set; }
 
     /// <summary>[서버] A 에서 첫 간파 성공 — TRAIN_03_COUNTER 무전용. Train03 회차당 1회, 판정 콜백 밖(다음 프레임)에서 낸다.</summary>
@@ -46,6 +48,9 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
 
     /// <summary>[서버] C 에서 첫 유효 벽 충돌(칸 감소를 동반한 지정 벽 충돌 = 벽 목표 기록) — TRAIN_03_WALL 무전용. Train03 회차당 1회, 판정 콜백 밖에서 낸다.</summary>
     public event Action ServerFirstValidWallImpact;
+
+    /// <summary>[서버] D 에서 첫 마무리 진입(제압 중 유효 피해 + 제압 종료 = 마무리 체력 설정 직후, 상대 모델 IsFinishing) — TRAIN_03_COMBAT 무전용. Train03 회차당 1회, 판정 콜백 밖에서 낸다.</summary>
+    public event Action ServerFinishStarted;
 
     /// <summary>[서버] 지금 회차의 훈련 상대(없으면 null).</summary>
     public TrainingSparringBot ServerBot => _bot;
@@ -112,6 +117,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         {
             _pendingFirstCounter = false;
             Debug.Log($"[SceneFlow] {Tag} 첫 간파 성공(회차 {_link.Round}) — {nameof(ServerFirstCounterSucceeded)}");
+            PlayRadioServer(LobbyRadioIds.Train03Counter);
             ServerFirstCounterSucceeded?.Invoke();
         }
 
@@ -119,12 +125,38 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         if (model != null && _link.TryRaiseFirstWall(model.HasRecordedWall))
         {
             Debug.Log($"[SceneFlow] {Tag} 첫 유효 벽 충돌(회차 {_link.Round}) — {nameof(ServerFirstValidWallImpact)}");
+            PlayRadioServer(LobbyRadioIds.Train03Wall);
             ServerFirstValidWallImpact?.Invoke();
+        }
+
+        // 피해 없이 끝난 제압은 마무리가 아니다(IsFinishing false) — 무전 없음.
+        if (model != null && _link.TryRaiseFirstFinish(model.IsFinishing))
+        {
+            Debug.Log($"[SceneFlow] {Tag} 첫 마무리 진입(회차 {_link.Round}) — {nameof(ServerFinishStarted)}");
+            PlayRadioServer(LobbyRadioIds.Train03Combat);
+            ServerFinishStarted?.Invoke();
         }
 
         // 피해·사망 콜백 안에서 단계를 넘기지 않는다 — 다음 프레임에 보고한다(보고가 Train03 이탈이면 이 안에서 정리될 수 있다).
         while (_link.IsRoundActive && _pendingReports.Count > 0)
             ReportServer(_pendingReports.Dequeue());
+    }
+
+    // 단계 안 사건 무전 — 회차당 1회는 무전 쪽(oncePerRound 기본값)도 막는다. 무전이 없으면(씬 배치 누락) 경고 한 번만.
+    private void PlayRadioServer(string id)
+    {
+        var radio = LobbyRadio.Active;
+        if (radio == null)
+        {
+            if (!_warnedNoRadio)
+            {
+                _warnedNoRadio = true;
+                Debug.LogWarning($"{Tag} LobbyRadio 가 없다 — {id} 등 TRAIN_03 무전을 건너뛴다.", this);
+            }
+            return;
+        }
+
+        radio.ServerPlay(id);
     }
 
     // ─── 서버: 시작·알림·정리 ────────────────────────────────────────────

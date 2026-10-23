@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 
 /// <summary>
-/// 할 일 86 T5c — TRAIN_03 진행기 ↔ 훈련 상대 연결 규칙(<see cref="LobbySparringLink"/>): 보고 1회·어긋남 무시·초기화 1회·무전 이벤트 1회.
+/// 할 일 86 T5c — TRAIN_03 진행기 ↔ 훈련 상대 연결 규칙(<see cref="LobbySparringLink"/>): 보고 1회·어긋남 무시·초기화 1회·무전 이벤트(간파·벽·마무리) 1회.
 /// 끝의 전 경로 테스트는 실제 <see cref="LobbyTrainingFlow"/>·<see cref="TrainingSparringModel"/> 을 이 규칙으로 이어 A→D 를 돈다(컴포넌트가 하는 일과 같은 순서).
 /// </summary>
 public sealed class LobbySparringLinkTests
@@ -179,6 +179,21 @@ public sealed class LobbySparringLinkTests
         Assert.That(link.TryRaiseFirstWall(true), Is.False, "회차 밖");
     }
 
+    [Test]
+    public void FirstFinish_OnlyWhenFinishing_OncePerRound_NewRoundAllowsAgain()
+    {
+        var link = Started();
+        Assert.That(link.TryRaiseFirstFinish(false), Is.False, "피해 없이 끝난 제압 — 마무리 아님");
+        Assert.That(link.TryRaiseFirstFinish(true), Is.True);
+        Assert.That(link.TryRaiseFirstFinish(true), Is.False, "마무리 중 매 프레임 — 다시 내지 않는다");
+
+        link.EndRound();
+        Assert.That(link.TryRaiseFirstFinish(true), Is.False, "회차 밖");
+        link.BeginRound();
+        Assert.That(link.TryRaiseFirstFinish(true), Is.True, "새 회차(판 끝 로비 복귀 뒤)");
+        Assert.That(link.TryRaiseFirstFinish(true), Is.False);
+    }
+
     // ─── 전 경로: 진행기 + 상대 모델 ─────────────────────────────────
 
     static LobbyTrainingFlow FlowAtTrain03AGathering()
@@ -227,6 +242,7 @@ public sealed class LobbySparringLinkTests
         var model = new TrainingSparringModel(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, 20f));
         var counterEvents = 0;
         var wallEvents = 0;
+        var finishEvents = 0;
         var resets = 0;
 
         Assert.That(LobbySparringLink.BotPresent(flow.Stage, flow.Phase), Is.False, "Train03A 집결 대기 중엔 상대 없음");
@@ -277,10 +293,16 @@ public sealed class LobbySparringLinkTests
         Assert.That(flow.Stage, Is.EqualTo(LobbyTrainingStage.Train03D));
         Assert.That(flow.Phase, Is.EqualTo(InProgress), "제압 시작 순간 D — 집결 재검사 없음");
 
-        // D: 제압 피해 → 제압 종료 → 마무리 → 처치
+        // D: 진입 제압이 피해 없이 끝남 = 마무리 아님(COMBAT 없음) → 다음 제압 피해 → 제압 종료 → 마무리(COMBAT 1회) → 처치
+        Assert.That(model.OnSuppressEnded(), Is.True);
+        Assert.That(model.IsFinishing, Is.False);
+        if (link.TryRaiseFirstFinish(model.IsFinishing)) finishEvents++;
+        Assert.That(model.OnSuppressStarted(), Is.True);
         model.OnSuppressDamage();
         model.OnSuppressEnded();
         Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
+        if (link.TryRaiseFirstFinish(model.IsFinishing)) finishEvents++;
+        if (link.TryRaiseFirstFinish(model.IsFinishing)) finishEvents++;
         Assert.That(model.OnDied(), Is.True);
         Assert.That(Pump(link, flow, model), Is.EqualTo(new[] { LobbyTrainingStage.Train03D }));
         Assert.That(flow.Stage, Is.EqualTo(LobbyTrainingStage.TrainEnd));
@@ -289,6 +311,7 @@ public sealed class LobbySparringLinkTests
 
         Assert.That(counterEvents, Is.EqualTo(1));
         Assert.That(wallEvents, Is.EqualTo(1));
+        Assert.That(finishEvents, Is.EqualTo(1));
         Assert.That(resets, Is.EqualTo(1));
     }
 }
