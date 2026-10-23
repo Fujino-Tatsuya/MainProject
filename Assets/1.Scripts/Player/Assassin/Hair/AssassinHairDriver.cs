@@ -30,6 +30,12 @@ public sealed class AssassinHairDriver : MonoBehaviour
     [Tooltip("팔 밀어내기가 마디 하나를 더 꺾는 최대 각도(도). 크면 팔은 덜 비치지만 가닥이 팔 위에서 갈라지듯 꺾인다.")]
     [SerializeField, Range(0f, 90f)] private float armClearanceMaxDegrees = 45f;
 
+    [Tooltip("달리기(Start·Loop·Stop) 보정이 몸 방향을 따라가는 지연(초). 0 이면 몸과 똑같이 돈다. 크면 방향을 틀 때 머리카락이 늦게 따라온다.")]
+    [SerializeField, Range(0f, 0.5f)] private float runFacingFollowSeconds = 0.08f;
+
+    [Tooltip("보정 모양이 바뀌는 순간(Stop→Start·공격 취소→달리기·회피 앞뒤 등) 직전 모양에서 새 모양으로 넘어가는 시간(초). 0 이면 바로 바뀐다(그 순간 머리카락이 튈 수 있다).")]
+    [SerializeField, Range(0f, 0.5f)] private float overlayBlendSeconds = 0.2f;
+
     private readonly AssassinHairClipTracker tracker = new();
     private readonly List<AnimatorClipInfo> clipInfos = new();
 
@@ -39,9 +45,15 @@ public sealed class AssassinHairDriver : MonoBehaviour
     private AssassinDiveHairAnimation diveHair;
     private bool overlaysReady;
     private Vector3 trailingDirection;
+    private bool wasFollowingFacing;
     private AnimationClip cachedClip;
     private string cachedClipName;
     private AssassinHairArmClearance.Buffers armClearance;
+
+    // 보정 전환 이어주기(관성 전환) — 마디마다 월드 회전. base = v13 결과, overlay = 보정 결과, applied = 실제로 얹은 보정 회전.
+    private Quaternion[] baseWorld, overlayWorld, appliedDelta, carryOffset;
+    private float carryElapsed = float.PositiveInfinity;
+    private bool carryReady;
 
     private void Awake()
     {
@@ -60,6 +72,14 @@ public sealed class AssassinHairDriver : MonoBehaviour
 
             actionHair.Capture(hair, transform);
             diveHair.Capture(hair, transform);
+
+            int boneCount = 0;
+            foreach (AssassinHairMotion.Chain chain in hair.chains)
+                boneCount += chain.bones.Length;
+            baseWorld = new Quaternion[boneCount];
+            overlayWorld = new Quaternion[boneCount];
+            appliedDelta = new Quaternion[boneCount];
+            carryOffset = new Quaternion[boneCount];
             overlaysReady = true;
         }
         catch (Exception error)
@@ -74,6 +94,9 @@ public sealed class AssassinHairDriver : MonoBehaviour
         if (hair != null)
             hair.externalDrive = true;
         tracker.Invalidate();
+        wasFollowingFacing = false;
+        carryReady = false;
+        carryElapsed = float.PositiveInfinity;
     }
 
     private void OnDisable()
@@ -100,15 +123,19 @@ public sealed class AssassinHairDriver : MonoBehaviour
             return;
 
         hair.Advance(Time.deltaTime);
-        ApplyOverlays();
+        if (overlaysReady)
+            ReadHairRotations(baseWorld);
+        ApplyOverlays(Time.deltaTime, out bool evaluated, out bool overlayChanged, out bool restarted);
+        CarryOverlayChange(evaluated, overlayChanged, restarted, Time.deltaTime);
 
         // 마지막 덧쓰기 — 다음 프레임 v13 Advance 가 바인드 회전부터 다시 쓰므로 시뮬레이션 상태에 들어가지 않는다.
         if (armClearanceEnabled && hair.motionEnabled && hair.weight > 0f)
             AssassinHairArmClearance.Apply(hair, armClearance, armClearanceMaxDegrees);
     }
 
-    private void ApplyOverlays()
+    private void ApplyOverlays(float deltaTime, out bool evaluated, out bool overlayChanged, out bool restarted)
     {
+        evaluated = overlayChanged = restarted = false;
         if (!overlaysReady)
             return;
 
@@ -117,6 +144,7 @@ public sealed class AssassinHairDriver : MonoBehaviour
         {
             ClearOverlays();
             tracker.Invalidate();
+            wasFollowingFacing = false;
             return;
         }
 
@@ -126,11 +154,19 @@ public sealed class AssassinHairDriver : MonoBehaviour
             cachedClipName = clip.name;
         }
 
-        if (tracker.Observe(state.fullPathHash, cachedClipName, state.normalizedTime, clip.isLooping, hair.resetCount))
-        {
+        bool relaunch = tracker.Observe(state.fullPathHash, cachedClipName, state.normalizedTime, clip.isLooping, hair.resetCount);
+        if (relaunch)
             ClearOverlays();
-            trailingDirection = Vector3.ProjectOnPlane(-(transform.rotation * Vector3.forward), Vector3.up);
-        }
+        evaluated = true;
+        restarted = tracker.Restarted;
+        // 같은 클립 루프 한 바퀴는 모양이 이어지고, 리셋은 v13 자체가 새로 시작하므로 이어주지 않는다.
+        overlayChanged = relaunch && !tracker.LoopOnly && !tracker.Restarted;
+
+        // 달리기 계열은 루프 한 바퀴·Start→Loop→Stop 에서 다시 잡지 않고 몸 방향을 따라간다(루프 경계 튐 방지).
+        bool followingFacing = AssassinHairClipRules.FollowsFacing(cachedClipName);
+        trailingDirection = AssassinHairClipRules.NextTrailing(trailingDirection, -(transform.rotation * Vector3.forward),
+            relaunch, tracker.Restarted, followingFacing, wasFollowingFacing, deltaTime, runFacingFollowSeconds);
+        wasFollowingFacing = followingFacing;
 
         float clipTime = AssassinHairClipRules.ClipTime(state.normalizedTime, clip.length, clip.isLooping);
         switch (AssassinHairClipRules.Select(cachedClipName))
@@ -147,6 +183,66 @@ public sealed class AssassinHairDriver : MonoBehaviour
                 ClearOverlays();
                 break;
         }
+    }
+
+    /// <summary>
+    /// 10-22 — 보정 모양이 바뀌는 순간의 튐을 없앤다(관성 전환). 클립이 바뀌면 보정 모양이 한 프레임에 바뀐다
+    /// (예: Stop→Start 재진입 때 달리기 보정 세기 0.72 → 0, 공격 취소→Run_Loop 때 0 → 0.76).
+    /// 전환 순간 지난 프레임에 얹었던 보정과 새 보정의 차이를 기억해 <see cref="overlayBlendSeconds"/> 동안 0 으로 줄인다.
+    /// 전환이 없는 프레임은 뼈를 건드리지 않는다(보정 결과 그대로). v13 결과(base)는 손대지 않고, 회전만 쓴다.
+    /// </summary>
+    private void CarryOverlayChange(bool evaluated, bool overlayChanged, bool restarted, float deltaTime)
+    {
+        if (!overlaysReady)
+            return;
+
+        if (!evaluated || !(overlayBlendSeconds > 0f))
+        {
+            carryReady = false;
+            carryElapsed = float.PositiveInfinity;
+            return;
+        }
+
+        if (restarted)
+            carryElapsed = float.PositiveInfinity;
+
+        ReadHairRotations(overlayWorld);
+        bool start = overlayChanged && carryReady;
+        if (start)
+            carryElapsed = 0f;
+        float weight = AssassinHairClipRules.CarryWeight(carryElapsed, overlayBlendSeconds);
+
+        AssassinHairMotion.Chain[] chains = hair.chains;
+        int i = 0;
+        for (int c = 0; c < chains.Length; c++)
+        {
+            Transform[] bones = chains[c].bones;
+            for (int b = 0; b < bones.Length; b++, i++)
+            {
+                Quaternion delta = overlayWorld[i] * Quaternion.Inverse(baseWorld[i]);
+                if (start)
+                    carryOffset[i] = AssassinHairClipRules.CarryOffset(appliedDelta[i], delta);
+                if (weight > 0f)
+                {
+                    delta = AssassinHairClipRules.ApplyCarry(carryOffset[i], weight, delta);
+                    // 뿌리 마디부터 월드 회전을 차례로 정하므로 자식 마디도 정확히 이 값이 된다.
+                    bones[b].rotation = delta * baseWorld[i];
+                }
+                appliedDelta[i] = delta;
+            }
+        }
+
+        carryReady = true;
+        if (!float.IsInfinity(carryElapsed))
+            carryElapsed += Mathf.Max(0f, deltaTime);
+    }
+
+    private void ReadHairRotations(Quaternion[] into)
+    {
+        int i = 0;
+        foreach (AssassinHairMotion.Chain chain in hair.chains)
+            foreach (Transform bone in chain.bones)
+                into[i++] = bone.rotation;
     }
 
     /// <summary>Base Layer 현재 상태의 가장 무거운 클립. 상·하체가 섞여도 UpperBody 레이어는 보지 않는다(사용자 결정).</summary>
