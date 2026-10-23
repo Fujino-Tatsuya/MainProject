@@ -1,3 +1,23 @@
+# ▶▶▶ 계획 = **거너 좌클릭 연출 보정 — 착탄 이펙트 벽면 회전 · 빔 끝 둥글게** (2026-10-23 · grill 확정 · ✅ 진행 지시 · ✅ 구현(dotnet 빌드 오류 0, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23, Q1~Q5 전부 추천안). 게임플레이·네트워크 무변경.
+
+## 사실
+- 착탄 `FX_LaserEnd`(공통)·`FX_LaserHit`(몬스터 피해 시 한 겹 더)는 `GunnerBeamView.ShowBasicShot` 에서 `LookRotation(-빔 방향)` 으로만 재생 — 벽면을 모른다. 서버 SphereCast 의 normal 은 `ShotRpc`(시작·끝·적중)에 안 실린다(`GunnerBasicAttack` = 은희). 끝점 = 닿은 순간의 구 중심(벽에서 최대 반경만큼 앞).
+- 빔 몸통 2겹: `LaserCore`(Stretched Billboard, `FX_LaserCore.png` — 두께 방향만 부드럽고 **길이 방향 양끝 페이드 없음** → 네모) · `Beam ray`(원통 메시). 길이 = `startSizeY` = 거리(1 = 1m) → 캡슐 메시는 끝이 길이만큼 늘어나 무효. 끝점 옮기기는 기존 `BeamEndAnchor` 가 한다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방향(Q1-a) | 착탄 이펙트 +Z = 벽면 normal — `FromToRotation(-빔 방향, normal) × 기존 방향` |
+| normal(Q2-a) | 각 화면이 끝점 바로 앞에서 짧은 레이캐스트(지형 레이어 = `GunnerBasicAttackData.blockingLayers` 와 같은 값). 못 맞히면 지금처럼 |
+| 대상(Q3-a) | 지형에 맞았을 때만. 몬스터 피해 시 `FX_LaserEnd`·`FX_LaserHit` 둘 다 지금처럼 쏜 사람 쪽 |
+| 빔 끝(Q4-b+a) | `LaserCore` 텍스처 양끝 짧은 페이드(새 텍스처 `FX_LaserCore_Capped.png`, `FX_LaserCore.mat` 이 가리키게) + 끝점에 둥근 글로우 `EndCap`(LaserCore 복제 → 빌보드·`Glow1cg`·`BeamEndAnchor`). 시작은 `StartFlare`·`Glow` 가 덮음 |
+| 제작(Q5-a) | MainProject 직접 — `GunnerBeamView.cs` · `FX_GunnerBeam.prefab` · `FX_LaserCore.mat` · 새 텍스처(🔴 SVN add) |
+| 날아가는 빔(10-23 추가) | ~~속도 비례(100m/s)~~ → 같은 날 **지정 시간** `beamTravelDuration` = 0.06초(거리 무관, 0 이하 = 예전 즉시). 몸통(size3D) 길이 = 거리 × min(1, 경과÷도달 시간)을 매 프레임 입자에 직접, 날아가는 동안 입자 나이를 0 에 묶어 두께·색 유지 → 닿은 뒤 원래 0.1초 동안 사라짐(길이 성장 커브 Y 는 1 로). 닿는 순간 `EndSparks`(BeamEndAnchor) 버스트 + 착탄 `FX_LaserEnd`·`FX_LaserHit`. 피해 숫자는 그대로(도달 시간만큼 먼저). `EndCap` 은 민경이 비활성 — 무시. Q 빔 무변경 |
+
+---
+
 # ▶▶▶ 계획 = **할 일 83 — 플레이어 스탯 5종 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1차 공격력 `fbb29438` · ✅ 2차 5종 — 컴파일 0 · EditMode 2680/0 · ⏳ 은희 Play/MPPM)
 
 > 브랜치 `fix/TooltipValueClient`(기준 origin/development `c7057322`). 담당 은희(코어 = 본인 영역). 증상: 클라 스킬 툴팁 `{dmg}` 가 틀림.
