@@ -34,6 +34,15 @@ public class PlayerDashController : NetworkBehaviour
     // 대시 애니(Dodge) — 컨트롤러 Base 레이어에 dashData 의 상태가 있을 때만 쓴다(할 일 92-3).
     private Animator animator;
     private int dodgeStateHash;
+    // Dodge 구간 재생 속도(할 일 92-5) — 컨트롤러에 float DodgeSpeed 가 있을 때만(Dodge 상태 Speed Multiplier).
+    public const string DodgeSpeedParameter = "DodgeSpeed";
+    private static readonly int DodgeSpeedHash = Animator.StringToHash(DodgeSpeedParameter);
+    private RuntimeAnimatorController dodgeSpeedCheckedFor;
+    private bool hasDodgeSpeedParameter;
+    private DodgePhaseTiming dodgeTiming;
+    private float dodgeClock;          // Dodge 재생 경과(초) — 프레임마다 Time.deltaTime 만큼, Animator 가 상태 시간을 쌓는 방식과 같다
+    private int dodgeClockFrame = -1;  // 같은 프레임 두 번(Enter 직후 Tick) 쌓지 않게
+    private bool dodgeSpeedDriving;
 
     private DashRuntimeConfig config;
     private DashChargeLedger predictedLedger;
@@ -110,7 +119,9 @@ public class PlayerDashController : NetworkBehaviour
 
     // ── 대시 애니(할 일 92-3) ──
     // 입력 주체(오너·오프라인)만 CrossFade 한다. 오너 권한 NetworkAnimator 가 서버·관찰자에게 그대로 복제하므로
-    // 서버(원격 오너의 대시 상태도 돈다)가 따로 틀면 같은 CrossFade 가 두 번 들어간다. 재생 속도는 컨트롤러 상태 Speed 가 정한다.
+    // 서버(원격 오너의 대시 상태도 돈다)가 따로 틀면 같은 CrossFade 가 두 번 들어간다.
+    // 재생 속도(할 일 92-5): 입력 주체가 대시 중 매 프레임 DodgeSpeed 를 쓴다 — float 파라미터라 오너 권한 NetworkAnimator 가
+    // 바뀔 때마다 서버·관찰자에 복제한다(구간 안에서는 값이 같아 경계에서만 보낸다).
 
     /// <summary>컨트롤러 Base 레이어에 Dodge 상태가 있다(어쌔신). 없으면(팔라딘·거너) 대시 애니 처리를 전부 건너뛴다.</summary>
     public bool HasDodgeAnimation =>
@@ -140,18 +151,87 @@ public class PlayerDashController : NetworkBehaviour
         }
     }
 
-    /// <summary>[입력 주체] 대시 상태 진입 — Base 레이어 Dodge 로 CrossFade.</summary>
-    internal void PlayDodgeStart()
+    /// <summary>[입력 주체] 대시 상태 진입 — Base 레이어 Dodge 로 CrossFade. DodgeSpeed 가 있으면 구간 속도를 쓰기 시작한다.</summary>
+    /// <param name="dashDuration">이 대시의 지속(초) — 대시 상태 타이머와 같은 값.</param>
+    internal void PlayDodgeStart(float dashDuration)
     {
         if (player == null || !player.IsInputSource || !HasDodgeAnimation)
             return;
 
+        dodgeSpeedDriving = HasDodgeSpeedParameter;
+        if (dodgeSpeedDriving)
+        {
+            dodgeTiming = new DodgePhaseTiming(
+                dashData.DodgeCrouchEndFrame, dashData.DodgeAirEndFrame, dashData.DodgeEndFrame,
+                dashData.DodgeClipFps, dashData.DodgeAirborneRatio, dashDuration);
+            dodgeClock = 0f;
+            dodgeClockFrame = -1;
+            TickDodgeSpeed();
+        }
+
         animator.CrossFadeInFixedTime(dodgeStateHash, dashData.DodgeStartBlend, PlayerActionPoseRules.BaseLayer);
+    }
+
+    /// <summary>
+    /// [입력 주체] 대시 중 매 프레임 — 이번 프레임 Animator 가 Dodge 를 진행시킬 구간 속도를 쓴다(프레임당 한 번).
+    /// Animator 는 Update 뒤에 상태 시간을 deltaTime × 속도만큼 쌓는다 — 같은 시계로 [경과, 경과+dt] 구간 속도를 준다.
+    /// </summary>
+    internal void TickDodgeSpeed()
+    {
+        if (!dodgeSpeedDriving || animator == null || dodgeClockFrame == Time.frameCount)
+            return;
+
+        dodgeClockFrame = Time.frameCount;
+        float dt = Time.deltaTime;
+        float speed = dodgeTiming.IsValid ? dodgeTiming.FrameSpeed(dodgeClock, dodgeClock + dt) : 1f;
+        dodgeClock += dt;
+        animator.SetFloat(DodgeSpeedHash, speed);
+    }
+
+    // 대시를 떠나면 기본값 1 — 다른 경로의 Dodge(보스 연출 리액션 등)는 원래 속도로 재생한다.
+    private void StopDodgeSpeed()
+    {
+        if (!dodgeSpeedDriving)
+            return;
+
+        dodgeSpeedDriving = false;
+        if (animator != null)
+            animator.SetFloat(DodgeSpeedHash, 1f);
+    }
+
+    private bool HasDodgeSpeedParameter
+    {
+        get
+        {
+            if (animator == null || !animator.isInitialized)
+                return false;
+
+            RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+            if (controller != dodgeSpeedCheckedFor)
+            {
+                dodgeSpeedCheckedFor = controller;
+                hasDodgeSpeedParameter = false;
+                if (controller != null)
+                {
+                    foreach (AnimatorControllerParameter parameter in animator.parameters)
+                    {
+                        if (parameter.nameHash == DodgeSpeedHash && parameter.type == AnimatorControllerParameterType.Float)
+                        {
+                            hasDodgeSpeedParameter = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return hasDodgeSpeedParameter;
+        }
     }
 
     /// <summary>[입력 주체] 대시 상태 이탈 — 이동으로 나가면 Run_Loop, 아니면 Idle. 다시 대시·사망이면 건드리지 않는다.</summary>
     internal void PlayDodgeEnd(PlayerActionState nextState)
     {
+        StopDodgeSpeed();
         if (player == null || !player.IsInputSource || !HasDodgeAnimation)
             return;
 

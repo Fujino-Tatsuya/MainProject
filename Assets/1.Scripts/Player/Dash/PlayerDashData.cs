@@ -25,7 +25,7 @@ namespace BeaverLobby.Player.Dash
         [SerializeField, Min(1), DataTableIgnore] private int snapshotCapacity = 32;                // 서버 과거 상태 Ring Buffer
         [SerializeField, Min(0f), DataTableIgnore] private float snapshotFreshnessTolerance = 0.1f; // 요청시각과 Snapshot 최대 간격(초)
 
-        // 연출 정렬 값이라 테이블에 올리지 않는다. 재생 속도는 컨트롤러 상태의 Speed 로 조절한다(코드에서 건드리지 않음).
+        // 연출 정렬 값이라 테이블에 올리지 않는다. 재생 속도는 컨트롤러에 DodgeSpeed 파라미터가 있을 때 구간 비율로 코드가 정한다(할 일 92-5).
         [Header("애니메이션 (컨트롤러 Base 레이어에 이 상태가 있을 때만 — 어쌔신)")]
         [Tooltip("대시 시작 때 Base 레이어에서 CrossFade 할 상태 이름. 컨트롤러에 없으면(팔라딘·거너) 대시 애니를 틀지 않는다.")]
         [SerializeField, DataTableIgnore] private string dodgeStateName = "Dodge";
@@ -33,6 +33,16 @@ namespace BeaverLobby.Player.Dash
         [SerializeField, Min(0f), DataTableIgnore] private float dodgeStartBlend = 0.05f;
         [Tooltip("대시 끝 → Run_Loop(이동 입력 중) / Idle 블렌드 시간(초).")]
         [SerializeField, Min(0f), DataTableIgnore] private float dodgeEndBlend = 0.1f;
+        [Tooltip("Dodge 클립 웅크리기 구간 끝 프레임(0 ~ 이 프레임).")]
+        [SerializeField, Min(0), DataTableIgnore] private int dodgeCrouchEndFrame = 10;
+        [Tooltip("Dodge 클립 공중 구간 끝 프레임(웅크리기 끝 ~ 이 프레임). 그 뒤 ~ 끝 프레임이 착지.")]
+        [SerializeField, Min(0), DataTableIgnore] private int dodgeAirEndFrame = 34;
+        [Tooltip("Dodge 클립에서 대시 끝에 도달할 프레임.")]
+        [SerializeField, Min(0), DataTableIgnore] private int dodgeEndFrame = 62;
+        [Tooltip("Dodge 클립 프레임레이트.")]
+        [SerializeField, Min(1f), DataTableIgnore] private float dodgeClipFps = 60f;
+        [Tooltip("대시 지속 중 공중 구간이 차지하는 비율. 나머지를 웅크리기:착지 프레임 길이 비로 나눈다.")]
+        [SerializeField, Range(0f, 1f), DataTableIgnore] private float dodgeAirborneRatio = 0.95f;
 
         public float DashSpeed => dashSpeed;
         public float DashDuration => dashDuration;
@@ -43,6 +53,11 @@ namespace BeaverLobby.Player.Dash
         public string DodgeStateName => dodgeStateName;
         public float DodgeStartBlend => dodgeStartBlend;
         public float DodgeEndBlend => dodgeEndBlend;
+        public int DodgeCrouchEndFrame => dodgeCrouchEndFrame;
+        public int DodgeAirEndFrame => dodgeAirEndFrame;
+        public int DodgeEndFrame => dodgeEndFrame;
+        public float DodgeClipFps => dodgeClipFps;
+        public float DodgeAirborneRatio => dodgeAirborneRatio;
 
         /// <summary>검증된 불변 런타임 설정을 만든다. 값이 비정상이면 DashEnabled=false로 반환한다.</summary>
         public DashRuntimeConfig CreateValidatedConfig()

@@ -1466,7 +1466,7 @@ public sealed class PlayerDashState : PlayerStateBase
         Context.Player.SetAnimatorMoving(false);
         Context.Movement.RotateImmediately(direction);
         // 나가는 상태(공격·스킬)의 정리는 Dodge 가 있으면 0층을 건드리지 않았다 — 여기서 튼 Dodge 가 최종으로 남는다.
-        Context.Dash?.PlayDodgeStart();
+        Context.Dash?.PlayDodgeStart(duration);
 
         startPosition = CurrentPosition;
         PlayerGroundingSensor sensor = Context.GroundingSensor;
@@ -1496,6 +1496,8 @@ public sealed class PlayerDashState : PlayerStateBase
 
     public override void Tick()
     {
+        // 구간 속도(할 일 92-5) — 끝나는 프레임에도 먼저 쓰고, 이어지는 Exit 가 기본값 1 로 되돌린다.
+        Context.Dash?.TickDodgeSpeed();
         if (Time.time < endTime)
             return;
 
