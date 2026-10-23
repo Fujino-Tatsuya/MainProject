@@ -204,6 +204,12 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry ChargeBall_FadeOut { get; private set; }
     [field: SerializeField] public EffectEntry ChargeBall_Break { get; private set; }
 
+    [Header("보스 — 송전기(차징)")]
+    // 송전기 몸 연출(FX_PylonCharge)·전기줄(FX_PylonTether)은 스크립트가 직접 만드는 오브젝트라 엔트리가 없다(PylonChargeView·BossChargeTetherView).
+    [field: SerializeField] public EffectEntry Pylon_HitSpark { get; private set; }
+    [field: SerializeField] public EffectEntry Pylon_Discharge { get; private set; }
+    [field: SerializeField] public EffectEntry Pylon_Overcharge { get; private set; }
+
     [Header("보스 — 돌진 전기")]
     // 23호가 일반 돌진·레이지 돌진을 할 때 몸통에서 손발로 흐르는 전기(EffectPathPlayer 4갈래).
     // 그랩 팔 전기와 **파트 프리팹은 같고 엔트리만 다르다** — 그쪽은 1갈래, 이쪽은 4갈래라

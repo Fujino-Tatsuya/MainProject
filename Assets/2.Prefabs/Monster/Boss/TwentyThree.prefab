@@ -2152,6 +2152,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7474057274361013860}
+  - component: {fileID: 4403756093096900204}
   m_Layer: 8
   m_Name: VFX
   m_TagString: Untagged
@@ -2159,6 +2160,26 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &4403756093096900204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7872058075082925992}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 623866bdb9da40cdbb513b19f965b993, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossChargeTetherView
+  tetherPrefab: {fileID: 5615621351101353752, guid: 7f10dae38e41ca94ea4ebf8889ed9024, type: 3}
+  overcharge: {fileID: 11400000, guid: 204564a4ffd14d61a5e8a4b84e7cf347, type: 2}
+  overchargeScale: 1
+  chargeBall: {fileID: 1106473793353871622}
+  fadeGrace: 0.2
+  chest: {fileID: 0}
+  chestBone: spine_02.x
+  chestOffset: {x: 0, y: 0, z: 0.4}
 --- !u!4 &7474057274361013860
 Transform:
   m_ObjectHideFlags: 0

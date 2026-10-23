@@ -78,6 +78,9 @@ MonoBehaviour:
   <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
   <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
   <ChargeBall_Break>k__BackingField: {fileID: 11400000, guid: 3c3031593b194504a7a6a779cf151ce4, type: 2}
+  <Pylon_HitSpark>k__BackingField: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  <Pylon_Discharge>k__BackingField: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  <Pylon_Overcharge>k__BackingField: {fileID: 11400000, guid: 204564a4ffd14d61a5e8a4b84e7cf347, type: 2}
   <Dash_LimbElectric>k__BackingField: {fileID: 11400000, guid: 450273ae057d428b84b164f61c4680b4, type: 2}
   <Rage_Shield>k__BackingField: {fileID: 11400000, guid: c201e9a39f93a3c46a80851faf12f0c6, type: 2}
   <Explosion_Basic>k__BackingField: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}

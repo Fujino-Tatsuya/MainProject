@@ -1,3 +1,62 @@
+# ▶▶▶ 계획 = **23호 송전기(차징) 연출 교체 — 송전기 전류·심지 발광 · 피격 스파크 · 파괴 방전 · 보스 공급 전기줄(끊김·과충전)** (2026-10-22 · grill 확정 · ✅ 승인 · ✅ 1~2단계 · ✅ 3단계 반입·코드·배선(민경 수정본 그대로, dotnet 빌드 오류 0) · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-22, Q3 = B 외 전부 추천안). **게임플레이 무변경** — 송전기 HP·상승·판정·Rage/방전 진입 타이밍 그대로, 연출만 얹는다.
+
+## 사실
+- 송전기 = 아레나 `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab` 의 `TwentyThreeCharger/Env_Mv_bosscharger_upper` ×4(FBX 프리팹 인스턴스 + 추가 컴포넌트 NetworkObject·NetworkTransform(로컬)·BoxCollider·`BossChargingPylon`). riseHeight 0.5·moveSpeed 1 → 상승 0.5초. 크기 ≈ 0.9×0.7×1m.
+- 메시 1개(`Env_Mv_bosscharger_upper.fbx` / `Plane.014`) · 재질 1개(`Generic_01_A` — 맵 프리팹 107개 공유, **수정 금지**). 심지 = 별도 메시·서브메시 아님.
+- `BossChargingPylon`(경석) 상태는 서버 전용, 클라 복제는 `_outlined`(Live 여부) 하나 — 클라는 "부서져서 내려감"과 "시간 초과로 내려감"을 못 가른다. `Unit` 파생이라 피격 VFX RPC 없음. 전 피어 이벤트 `Unit.ClientDamagedAttributed`(공격자 clientId 포함, 위치 없음)는 있다.
+- 보스: `TwentyThree_Raid` = `TwentyThree.prefab` Variant(연출 공유). 송전기는 일반 23호도 같이 쓴다. 가슴 뼈 `spine_02.x`, 가슴 소켓 없음.
+- 결과 신호는 이미 클라로 간다: `EndChargeBallClientRpc(broken)` — 시간 초과 = `chargeBall.Stop()`, 전부 파괴·카운터·사망 끊김 = `Abort()`. 시간 초과 직후 일반 = Rage, 레이드 ② = 바닥 방전(`StartRaidDischarge`), 둘 다 **즉시**.
+- 팔라딘 검 발광 = 검 렌더러에 재질 한 장 더(`Sword_Blade_Glow`, `Shader_IntegratedEffect` IS_RIMLIGHT, `_MainTex` = 칼날 마스크) + `MaterialFadeEffect`(`_ColorFactor` 0.5초 페이드).
+- 전기줄용 기존 스크립트 없음.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| ChargeBall(Q1-c·Q18-a) | 유지. 끝나는 시점은 이미 맞음(전부 파괴 = 깨짐, 시간 초과 = 사그라듦), 시작도 그대로(차징 시작 → 0.5초 뒤 줄 연결) |
+| 방전 단위(Q2-a) | 송전기 **하나**가 부서질 때마다 그 송전기에서 방전 + 그 줄 끊김 |
+| 시간 초과(Q3-b·Q14-a) | **과충전**: 남은 줄을 따라 빛 덩어리가 0.4초 안에 보스 가슴으로 몰려듦 → 가슴 큰 섬광 → 줄 소멸·심지 꺼짐. 로직 무변경 — Rage/레이드 방전 진입 순간에 겹쳐 재생 |
+| 시작(Q4-c) | 상승 시작부터 전류·심지 약하게 → Live(노랑 아웃라인) 순간 확 밝아짐 + 줄이 보스로 뻗음 |
+| 색(Q5-a) | 시안·하늘 전기 + 흰 코어(노랑 아웃라인과 구분) |
+| 스파크 빈도(Q6-b) | 송전기당 최소 간격 0.08초 |
+| 제작(Q7) | MyProject 빌더로 프리팹 제작 → 민경 확인 → 반입(같은 guid). 코드는 MainProject |
+| 네트워크(Q8-b) | 경석 로직 파일 diff 0 — 송전기마다 연출 전용 NetworkBehaviour 를 새로 붙여 서버가 상태를 읽어 복제 |
+| 심지(Q9) | 심지 영역 마스크 텍스처 + 재질 겹치기(팔라딘 방식). **먼저 Blender 로 UV 확인** — 아틀라스 같은 칸을 다른 면이 같이 쓰면 심지 위치 빛 기둥·글로우 파티클로 대체 |
+| 전류(Q10-c) | 겹친 재질의 전기 무늬 위로 스크롤 + 메시 표면 방출 파티클(짧은 전기 줄기·스파크) |
+| 줄 도착점(Q11-a) | `spine_02.x` 아래 새 소켓(`TwentyThree.prefab` 에 빈 Transform 하나 — handoff) |
+| 줄 모양(Q12-a) | 지그재그 번개 LineRenderer(초당 ~20회 재생성, 굵은 빛 + 가는 심선 2겹) + 송전기→보스로 흐르는 빛 덩어리 |
+| 끊김(Q13-a) | 가운데서 끊겨 두 토막이 양끝으로 0.25초 말려 들어감 + 끊긴 지점 스파크 + 가슴 작은 섬광 |
+| 피격 스파크(Q15-a①) | 송전기 표면 중 때린 플레이어에 가장 가까운 점(공격자 없음 = 드론 등 → 무작위 점). 팩(Hovl `Sparks blue` 등) 바탕 소형 신규 |
+| 방전(Q16-a) | MyProject `Export/Boss/Charge/Effect_38_ElectricExplosion` 바탕, 송전기 크기에 맞춤 |
+| 적용 범위(Q17-a) | 일반 23호·레이드 둘 다 |
+
+## 구조(코드)
+- **신규 `PylonChargeView`**(NetworkBehaviour, 송전기 4개 각각에 추가 컴포넌트) — 서버가 매 프레임 `BossChargingPylon.State`·`WasDestroyed` 를 읽어 `NetworkVariable<byte>` {숨김·상승·Live·파괴·내려감} 로 복제. 전 피어: 상태에 따라 겹친 재질 페이드(`MaterialFadeEffect` 재사용)·표면 파티클 세기, 파괴 전이에서 방전 원샷, `Unit.ClientDamagedAttributed` → 스파크(간격 0.08초). 클라 정적 목록에 자기 등록.
+- **신규 `BossChargeTetherView`**(MonoBehaviour, `TwentyThree.prefab` 의 `VFX` 아래) — 가슴 소켓과 목록의 송전기들 사이에 줄: Live 진입 시 뻗음, 파괴 시 끊김, `chargeBall` 의 종료 이벤트가 **Stop(=시간 초과)** 이면 과충전.
+- **`EffectStagePlayer`(민경 파일)에 종료 이벤트 추가**(`Finished(bool aborted)`) — 추가만.
+- 카탈로그: 피격 스파크·방전·과충전 섬광 등 원샷 엔트리 등록.
+- 경석 영역 수정 = `bossroom.prefab`(송전기에 컴포넌트 추가)·`TwentyThree.prefab`(소켓·View 추가) 프리팹만, 스크립트 0 → `Docs/tech/handoff-boss-pylon-vfx.md`.
+
+## 단계
+1. Blender 로 송전기 UV 확인 → 심지 마스크 가능 여부 결정(PLAN 에 기록)
+   - ✅ 10-22: 메시 = 캡(위, y 0.54~0.76m) + **심지 원통**(32면 열린 원통 r 0.33m, y 0.03~0.57m, 아틀라스 UV u 0.0786~0.0811 · v 0.297~0.308) + **코일 링 6개**(768면, r 0.375~0.40m, y 0.09~0.505m, UV 한 점 u 0.3964~0.3966 · v 0.0687~0.0739). 심지·코일 UV 칸이 캡과 **안 겹친다** → 마스크 대신 더 확실한 방법: 빌더가 원본 메시에서 그 UV 칸의 삼각형만 뽑아 **겹침 전용 메시 2개**(심지·코일)를 만들고 원통 UV 를 새로 준다(전기 무늬 스크롤·코일 따라 도는 흐름이 가능). 렌더러는 송전기 자식으로 붙고 원본 재질·메시는 안 건드린다(아웃라인과 같은 방식)
+2. MyProject: 빌더 + 프리팹(송전기 겹침 재질·표면 전류 / 피격 스파크 / 방전 / 줄 재질·끊김 스파크·과충전 섬광) + 미리보기 씬(송전기 4 + 보스 대역, 상승→Live→타격→파괴/시간초과 재생) → ⏳ 민경 확인
+   - ✅ 10-22: `1.Scripts/Editor/PylonChargeVfxBuilder.cs`(메뉴 `Tools/VFX/Pylon Charge (23호 송전기) 빌드`) → `Export/Boss/Charge/Pylon/` 프리팹 5(`FX_PylonCharge`·`HitSpark`·`Discharge`·`Tether`·`Overcharge`) · 겹침 메시 2(`Meshes/Pylon_Core`·`Pylon_Coil`) · 재질 `Materials/M_Pylon_*`(IntegratedEffect, 가산) · 생성 텍스처 3(`Textures/T_PylonCoreElectric`·`FlowDash`·`TetherGlow`) · 씬 `Scenes/PylonChargePreview.unity`(`PylonChargeTester` — 1 시작 · H/Space 타격 · D 부수기 · T 시간 초과 · R 초기화). 공유 스크립트(MainProject 에 같은 guid 로): `1.Scripts/PylonChargeVisual.cs`·`ElectricTether.cs`. 송전기 FBX 2개는 MainProject 와 같은 guid 로 복사(미리보기용). 배치 모드 빌드·정지 화면 확인(겹침 정렬 OK, 줄 시작점이 캡에 잘리던 것 → 꼭대기 +0.15m·양끝 가늘게)
+3. MainProject(🔴 Unity 끔): 반입(같은 guid) · 엔트리·카탈로그 · 코드 3 · 프리팹 배선 · handoff · dotnet 빌드
+   - ✅ 10-22: 에셋 34(같은 guid — 프리팹 5 → `Common/Boss/Pylon/` · 재질 17 → `_Materials/Boss/` · 텍스처 8 · 겹침 메시 2 → `Models/` · 공유 스크립트 2) + 엔트리 3(`FX_PylonHitSpark`·`Discharge`·`Overcharge_Entry`, prewarm 8·4·1) · 카탈로그 `Pylon_*` · 코드 `PylonChargeView`·`BossChargeTetherView`(신규)·`PylonChargeVisual`·`ElectricTether`(같은 guid)·`EffectStagePlayer.Finished`(추가) · `bossroom.prefab` 송전기 4 + `PylonChargeView` · `TwentyThree.prefab` `VFX` + `BossChargeTetherView`(chargeBall 연결) · [handoff-boss-pylon-vfx](Docs/tech/handoff-boss-pylon-vfx.md). guid 누락 0(패키지 제외)·중복 0
+   - ⚠️ 가슴 소켓(Q11)은 프리팹 자식 대신 **실행 중 뼈 `spine_02.x` 를 이름으로 찾아 보스 앞 0.4m**(FBX 뼈의 내부 ID 를 Unity 없이 알 수 없음). `chestOffset` 으로 조정, `chest` 에 Transform 을 넣으면 우선
+   - 10-23 타격 스파크 재설계(grill — Q8 만 B, 나머지 추천): 맞은 방향 무관 — `PylonChargeView` 위치 계산(공격자 기준점·ClosestPoint·방향) 삭제 → 심지 가운데(`PylonChargeVisual.SparkOrigin`)에서 회전 없이 재생 + 몸 번쩍 `Pulse()`(전체 림만 ×2.5, 0.12초, 같은 0.08초 간격, Live 만). `FX_PylonHitSpark` 는 **MainProject 에서 직접** 수정(MyProject 원본과 갈라짐): `Flash`·`Arc` 제거, `Sparks` 20개 · 속도 3~6 · 크기 0.05~0.09 · 수명 0.3~0.5 · 반구(위, 세로 0.35 납작) · 반경 0.05. 공유 스크립트 `PylonChargeVisual` 은 MyProject 에도 같은 내용으로 맞춤
+   - 10-22 Play 피드백: 몸 연출이 안 보임 = `PylonOutline`(노랑 아웃라인 전용 렌더러)이 덮음 → 민경 요청으로 `bossroom` 송전기 4 의 `outlineMaterial` 비움(경석 코드 무수정, 경고 1회씩). 게임 카메라(7·17·−7, FOV 34)에선 캡이 코일·심지를 덮어 → MyProject `Tools/VFX/Pylon Charge — 몸 위에서 보이게(덧붙이기)`: 송전기 전체 림 겹침(`Pylon_Shell`·`M_Pylon_ShellRim`) · 후광 캡 위 · `ShellArcs` · 심지·코일 색 ×2 → ✅ 민경 확인 · ✅ 재반입(교체 `FX_PylonCharge`·`M_Pylon_CoreGlow`·`CoilFlow` — guid 그대로, 추가 `Pylon_Shell`·`M_Pylon_ShellRim`·`T_PylonShellRim`)
+4. ⏳ 민경 Play/MPPM: 호스트·클라 — 상승 때 약하게→Live 때 밝아짐·줄 연결, 타격마다 스파크(때린 쪽), 파괴 = 방전+줄 끊김, 전부 파괴 = 구슬 깨짐, 시간 초과 = 과충전 → Rage(일반)/바닥 방전(레이드), 늦게 들어온 클라도 현재 상태대로
+
+## 위험
+- 아틀라스 UV 공유로 심지 마스크 불가 가능성(→ 대체안 확정).
+- 송전기 4개 × (겹친 재질 + 파티클) + 줄 4개 — 파티클 수 상한 두고 미리보기에서 확인.
+- 프리팹 YAML 직접 편집(bossroom = FBX 인스턴스 추가 컴포넌트) — guid·fileID 검사.
+
+---
+
 # ▶▶▶ 계획 = **증강 획득 이펙트 — 고른 본인 화면에서 Level_up 원샷(몸 추종)** (2026-10-22 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-22). 증강 = `Tutorial/Traits/TutorialTraitDirector`(은희, 서버 확정·획득 목록 전 피어 복제). 선택 완료에 연출·네트워크 신호 없음.
