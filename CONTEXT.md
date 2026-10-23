@@ -8,6 +8,13 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-10-23 · Claude(로비 라이팅 세션)) — **맵·로비 라이팅 + 존 조명 벽 회피 + 로비 바깥 검정 바닥 + 로비 형광등**, 브랜치 `feature/LobbyLighting` → `development` · 상세 [map-lighting.md](Docs/tech/map-lighting.md)
+- 맵(4.MapScene): Toon 볼륨 `VP_CombatLevel_Toon`(Neutral·노출 +0.25) · 환경광 그라데이션 · 주광 0.75. 로비(3.LobbyScene): 별도 `VP_Lobby_Toon`(노출 −0.15·**블룸 0.8**) — 두 씬의 노출·블룸을 따로 조정한다.
+- 존 프리팹 9개: 벽(Stage1 `Level_wall_hallway`)에 붙은 스포트라이트를 슬롯 배치 기준으로 안쪽 이동 — `Tools/Map/Authoring/벽에 붙은 조명 안쪽으로`(4.MapScene 열고 실행).
+- 로비 `Env_Black_Outside`: 로비 건축 외곽선과 오차 0(테두리 428곳 실측)으로 구멍 뚫린 검정 판, **y 2.165(벽 윗면 바로 아래)** — 레이아웃 바뀌면 `로비 바깥 검정 바닥 만들기` 다시.
+- 로비 형광등 36개 = `_Fluorescent (n)` 묶음(복제 배치) × **포인트 라이트 1개 + 바닥 빛 줄기**(막대 메시 없음 — 탑다운이라 천장 요소 불필요). `형광등 — 씬 전체 다시 조립`·`라이트 수`·`바닥 빛 줄기 사용` 메뉴. PC Forward+ 라 라이트 수 여유(한도 256).
+- 커밋 제외: `StringTable.asset`(자동 추가 키 63개) · `MainProject-git.slnx` · `Assets/_Recovery/` · `PLAN-lobby-stage.md`·`PLAN-title-camera.md`. 서울알림 Medium SDF 로컬 변경(Play 동적 글자)은 버리고 원격 Static 판 사용. SVN 변경 없음.
+
 ## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
 
 ## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
