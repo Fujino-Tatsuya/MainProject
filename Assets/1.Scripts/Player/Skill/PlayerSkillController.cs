@@ -57,6 +57,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
     private PlayerSkillTargeting targeting;
+    private PlayerDashController dash;
 
     // 기본 4슬롯 뒤 대체 4슬롯을 같은 슬롯 순서로 등록한다. null은 건너뛰며 모든 피어에서 순서가 같다.
     private readonly List<PlayerSkillBase> registeredSkills = new List<PlayerSkillBase>(SlotCount * 2);
@@ -137,6 +138,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         movement = GetComponent<PlayerMovement>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
         targeting = GetComponent<PlayerSkillTargeting>();
+        dash = GetComponent<PlayerDashController>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -1127,7 +1129,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                          inputReader != null && inputReader.HasMoveInput && player.CanMove;
         PlayerActionExitPose pose = PlayerActionPoseRules.ResolveExit(
             IsUpperBodyOnly(skill),
-            PlayerActionPoseRules.EndsIntoOwnAnimation(reason),
+            PlayerActionPoseRules.EndsIntoOwnAnimation(reason, dash != null && dash.HasDodgeAnimation),
             returnsToLocomotion,
             wantsMove,
             animator.HasState(PlayerActionPoseRules.BaseLayer, PlayerActionPoseRules.RunLoopHash));

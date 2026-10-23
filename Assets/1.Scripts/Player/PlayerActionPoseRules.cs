@@ -53,9 +53,30 @@ public static class PlayerActionPoseRules
 
     /// <summary>
     /// 이 종료 사유의 다음 상태가 0층에 자기 애니를 트는가. 사망은 잔여 클립을 그대로 둔다(기존 동작).
+    /// 대시 취소는 컨트롤러에 Dodge 가 있을 때만(어쌔신) — 없으면(팔라딘·거너) Idle 로 되돌린다.
     /// </summary>
-    public static bool EndsIntoOwnAnimation(SkillEndReason reason) =>
-        reason == SkillEndReason.CasterDied;
+    public static bool EndsIntoOwnAnimation(SkillEndReason reason, bool dashPlaysDodge) =>
+        reason == SkillEndReason.CasterDied ||
+        (reason == SkillEndReason.DashCancelled && dashPlaysDodge);
+
+    /// <summary>
+    /// 대시(Dodge 재생 중)가 끝날 때 0층 포즈. 이동으로 나가면 Run_Loop, Idle·넉백 등이면 Idle,
+    /// 다시 대시(새 Dodge)·사망이면 건드리지 않는다. Dodge 가 없는 컨트롤러는 호출부가 아예 부르지 않는다.
+    /// </summary>
+    public static PlayerActionExitPose ResolveDashExit(PlayerActionState nextState, bool hasRunLoop) =>
+        ResolveExit(
+            upperBodyOnly: false,
+            nextPlaysOwnAnimation: nextState == PlayerActionState.Dash || nextState == PlayerActionState.Dead,
+            returnsToLocomotion: nextState == PlayerActionState.Idle || nextState == PlayerActionState.Move,
+            wantsMove: nextState == PlayerActionState.Move,
+            hasRunLoop: hasRunLoop);
+
+    /// <summary>
+    /// 대시가 끝날 때 들어갈 상태. 이동 입력 중이면 Idle 을 거치지 않고 Move 로 바로 간다 —
+    /// Idle 진입이 IsMoving 을 끄면 Run_Loop 가 곧장 Run_Stop 으로 빠지기 때문이다.
+    /// </summary>
+    public static PlayerActionState DashEndState(bool hasMoveInput, bool movementBlocked) =>
+        hasMoveInput && !movementBlocked ? PlayerActionState.Move : PlayerActionState.Idle;
 
     /// <summary>
     /// 스킬 시작 때 IsMoving 값. 0층 스킬은 끈다(기존). 상체 전용이면서 이동 허용 스킬은 이동 입력 중이면 켠 채로 둔다 — 하체 Run_Loop 유지.

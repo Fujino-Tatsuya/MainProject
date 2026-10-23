@@ -84,7 +84,36 @@ public sealed class PlayerActionPoseRulesTests
     [Test]
     public void Death_KeepsBaseLayer()
     {
-        Assert.That(PlayerActionPoseRules.EndsIntoOwnAnimation(SkillEndReason.CasterDied), Is.True);
-        Assert.That(PlayerActionPoseRules.EndsIntoOwnAnimation(SkillEndReason.Cancelled), Is.False);
+        Assert.That(PlayerActionPoseRules.EndsIntoOwnAnimation(SkillEndReason.CasterDied, false), Is.True);
+        Assert.That(PlayerActionPoseRules.EndsIntoOwnAnimation(SkillEndReason.Cancelled, true), Is.False);
+    }
+
+    [Test]
+    public void DashCancel_LeavesDodge_OnlyWhenControllerHasIt()
+    {
+        Assert.That(PlayerActionPoseRules.EndsIntoOwnAnimation(SkillEndReason.DashCancelled, true), Is.True,
+            "어쌔신 — 스킬 중 대시는 Dodge 가 최종으로 남는다");
+        Assert.That(PlayerActionPoseRules.EndsIntoOwnAnimation(SkillEndReason.DashCancelled, false), Is.False,
+            "팔라딘·거너 — Dodge 가 없으니 Idle 로 되돌린다");
+    }
+
+    [TestCase(PlayerActionState.Move, true, PlayerActionExitPose.RunLoop)]
+    [TestCase(PlayerActionState.Move, false, PlayerActionExitPose.Idle)]
+    [TestCase(PlayerActionState.Idle, true, PlayerActionExitPose.Idle)]
+    [TestCase(PlayerActionState.Knockback, true, PlayerActionExitPose.Idle)]
+    [TestCase(PlayerActionState.Restrained, true, PlayerActionExitPose.Idle)]
+    [TestCase(PlayerActionState.Dash, true, PlayerActionExitPose.None)]
+    [TestCase(PlayerActionState.Dead, true, PlayerActionExitPose.None)]
+    public void DashExit_PicksPoseByNextState(PlayerActionState next, bool hasRunLoop, PlayerActionExitPose expected)
+    {
+        Assert.That(PlayerActionPoseRules.ResolveDashExit(next, hasRunLoop), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, false, PlayerActionState.Move)]
+    [TestCase(false, false, PlayerActionState.Idle)]
+    [TestCase(true, true, PlayerActionState.Idle)]
+    public void DashEndState_GoesStraightToMoveWhileMoving(bool hasMoveInput, bool blocked, PlayerActionState expected)
+    {
+        Assert.That(PlayerActionPoseRules.DashEndState(hasMoveInput, blocked), Is.EqualTo(expected));
     }
 }

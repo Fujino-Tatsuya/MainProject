@@ -74,6 +74,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
     private float lungeRemaining;
     private PlayerMotor motor;
+    private PlayerDashController dash;
     // 다 돈 뒤 공격(할 일 43): 크게 꺾으면 TurnToward 가 도는 동안 클립 시작·강타 전진을 늦춘다.
     // 판정·End 는 클립 이벤트라 같이 늦춰진다. 지연은 서버가 정해 StartRpc 로 싣는다 — 첫 타는 오너가 잰 값.
     private bool hasPendingClip;
@@ -118,6 +119,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         assassinState = GetComponent<AssassinState>();
         view = GetComponent<AssassinSkillView>();
         motor = GetComponent<PlayerMotor>();
+        dash = GetComponent<PlayerDashController>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -806,8 +808,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
     }
 
+    // 대시로 끊긴 공격은 Idle 로 돌리지 않는다 — 오너는 같은 프레임에 대시 상태가 Dodge 를 틀고, 관찰자는 CancelRpc 보다
+    // NetworkAnimator 의 Dodge 가 먼저 올 수 있다. 어느 순서든 Dodge 가 최종으로 남는다(PlayerDashController.HoldsBasePose).
     private void ReturnToIdlePose()
     {
+        if (dash != null && dash.HoldsBasePose)
+            return;
+
         if (animator != null && animator.runtimeAnimatorController != null && animator.HasState(0, IdleHash))
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
     }
