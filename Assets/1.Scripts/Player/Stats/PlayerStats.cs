@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 플레이어 스탯 종합(할 일 83) — 서버·클라 모든 피어에서 같은 입력으로 같은 값을 낸다.
-/// 입력: 기본값(xlsx → 빌드 포함, 피어마다 로컬) + 상태이상 기본%·전체%(NetworkList 복제) + 등록된 <see cref="IPlayerStatSource"/>.
+/// 입력: 기본값(xlsx → 빌드 포함, 피어마다 로컬) + 상태이상 기본%·전체%·최종 배율(NetworkList 복제) + 등록된 <see cref="IPlayerStatSource"/>.
 /// 판정은 서버가 이 값으로 하고(권한 불변), 오너는 같은 값을 툴팁·HUD 에 쓰고 공격 요청에 실어 서버 2차 검증을 받는다.
 /// </summary>
 public sealed class PlayerStats
@@ -58,13 +58,22 @@ public sealed class PlayerStats
         }
     }
 
-    /// <summary>기본에 곱할 배율 — 기본값을 따로 갖는 소비처(PlayerMovement)용.</summary>
-    public float Multiplier(PlayerStatKind kind) => PlayerStatFormula.Multiplier(BasePercent(kind), TotalPercent(kind));
+    /// <summary>최종 배율 상태이상의 곱(할 일 91). 최종 배율이 없는 스탯·상태이상 없음 = 1.</summary>
+    public float FinalMultiplier(PlayerStatKind kind)
+    {
+        StatusEffectType type = PlayerStatFormula.FinalMultiplierType(kind);
+        return type != StatusEffectType.None && statusEffects != null ? statusEffects.GetStatMultiplier(type) : 1f;
+    }
 
-    public float Final(PlayerStatKind kind) => PlayerStatFormula.Final(baseValue(kind), BasePercent(kind), TotalPercent(kind));
+    /// <summary>기본에 곱할 배율(최종 배율 포함) — 기본값을 따로 갖는 소비처(PlayerMovement)용.</summary>
+    public float Multiplier(PlayerStatKind kind) =>
+        PlayerStatFormula.Multiplier(BasePercent(kind), TotalPercent(kind), FinalMultiplier(kind));
+
+    public float Final(PlayerStatKind kind) =>
+        PlayerStatFormula.Final(baseValue(kind), BasePercent(kind), TotalPercent(kind), FinalMultiplier(kind));
 
     public int FinalInt(PlayerStatKind kind) =>
-        PlayerStatFormula.FinalInt(Mathf.RoundToInt(baseValue(kind)), BasePercent(kind), TotalPercent(kind));
+        PlayerStatFormula.FinalInt(Mathf.RoundToInt(baseValue(kind)), BasePercent(kind), TotalPercent(kind), FinalMultiplier(kind));
 
     public int FinalAttackDamage => FinalInt(PlayerStatKind.AttackDamage);
     public float FinalMoveSpeed => Final(PlayerStatKind.MoveSpeed);

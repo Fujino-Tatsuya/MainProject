@@ -10,7 +10,7 @@ using UnityEngine;
 /// 흐름은 DefaultAttackController의 승인 패턴을 따른다: 오너 요청 → 서버 검증 → 전 클라 재생.
 /// </summary>
 [RequireComponent(typeof(Player))]
-public class PlayerSkillController : BaseNetworkBehaviour
+public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAnimatorUser
 {
     private static readonly int IdleHash = Animator.StringToHash("Idle");
 
@@ -86,6 +86,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
+    // 전 피어 — 실행 중(관찰자는 PlaySkillClientRpc~EndSkillClientRpc) 스킬이 공격속도를 타면 Animator.speed = 배율(할 일 91 T5).
+    public bool ScalesAnimatorWithAttackSpeed => activeSkill != null && activeSkill.ScalesWithAttackSpeed;
     /// <summary>[오너] 스킬 실행 중이거나 시전 요청 응답을 기다리는 중 — 이때 못 쓴 입력은 선입력 버퍼에 남긴다(할 일 44).</summary>
     public bool IsBusy => IsSkillActive || isRequestingSkill;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
@@ -371,11 +373,21 @@ public class PlayerSkillController : BaseNetworkBehaviour
             return false;
 
         NetworkObjectReference targetRef = default;
+        Unit sentTarget = null; // 서버가 받는 대상 — 스폰 안 된 대상은 null 로 간다
         if (target != null && target.NetworkObject != null && target.NetworkObject.IsSpawned)
+        {
             targetRef = target.NetworkObject;
+            sentTarget = target;
+        }
+
+        // 원격 오너만 — 호스트는 같은 프레임에 서버 승인이 바로 돈다(왕복 없음).
+        if (!IsServer && !PassesOwnerPrecheck(slot, skillIndex, direction, sentTarget, aimPoint, hasAimPoint))
+            return false;
 
         isRequestingSkill = true;
-        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport());
+        // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
+        RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
+            NetworkManager.ServerTime.Time);
         return true;
     }
 
@@ -573,16 +585,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
     private bool StartSkillServer(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint)
     {
-        PlayerSkillBase requestedSkill = GetSkill(slot);
-        if (hasAimPoint &&
-            requestedSkill != null && requestedSkill.Data != null &&
-            requestedSkill.Data.TargetingMode == SkillTargetingMode.GroundPoint &&
-            requestedSkill.Data.FixedDistance)
-        {
-            aimPoint = PlayerGroundPointProjection.ReprojectServerFixedDistance(
-                transform.position, aimPoint, requestedSkill.Data.CastRange, transform.forward);
-            direction = aimPoint - transform.position;
-        }
+        ReprojectFixedDistanceAim(slot, hasAimPoint, ref direction, ref aimPoint);
 
         if (!CanApproveSkill(
                 slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint,
@@ -600,7 +603,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
         isRequestingSkill = false;
         activeSkill = skill;
         // 타이머 방식 안전망. 이벤트 방식은 상태에 들어간 뒤 클립 길이로 바꾼다(ResolveClipFallback) — 그 전까지 이 값이 임시 그물이다.
-        activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(skill.Data.MaxActiveDuration, endFallbackPadding);
+        // 공격속도를 타는 스킬은 이 그물도 배율로 나눈다 — 감속만 늘리고 가속은 줄이지 않는다(할 일 91 T5, SafetyNetDuration).
+        // 클립 길이 그물은 Animator.speed 를 이미 포함한다(Probe).
+        float maxActive = skill.ScalesSafetyNetWithAttackSpeed
+            ? PlayerAttackSpeedRules.SafetyNetDuration(skill.Data.MaxActiveDuration, player.AttackSpeedRate)
+            : skill.Data.MaxActiveDuration;
+        activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(maxActive, endFallbackPadding);
         activeEndsOnClipEvent = skill.EndsOnClipEvent;
         hasClipFallback = false;
         activeStartFrame = Time.frameCount;
@@ -627,6 +635,34 @@ public class PlayerSkillController : BaseNetworkBehaviour
         return true;
     }
 
+    // 고정 거리 지점 스킬은 서버가 자기 위치·전방 기준으로 지점을 다시 투영한 뒤 승인한다. 원격 오너의 1차 검증도 같은 투영을 쓴다.
+    private void ReprojectFixedDistanceAim(PlayerSkillSlot slot, bool hasAimPoint, ref Vector3 direction, ref Vector3 aimPoint)
+    {
+        PlayerSkillBase requestedSkill = GetSkill(slot);
+        if (hasAimPoint &&
+            requestedSkill != null && requestedSkill.Data != null &&
+            requestedSkill.Data.TargetingMode == SkillTargetingMode.GroundPoint &&
+            requestedSkill.Data.FixedDistance)
+        {
+            aimPoint = PlayerGroundPointProjection.ReprojectServerFixedDistance(
+                transform.position, aimPoint, requestedSkill.Data.CastRange, transform.forward);
+            direction = aimPoint - transform.position;
+        }
+    }
+
+    /// <summary>
+    /// [원격 오너] 시전 요청 RPC 를 보내기 전 1차 검증(할 일 75) — 서버 승인과 같은 <see cref="CanApproveSkill"/> 를 이 피어의 상태로 돌린다.
+    /// 쿨타임 = 서버가 미러한 HUD 장부, 상태·차단 효과 = 자기 FSM·복제된 상태이상, CanUse = 복제된 상태. 걸리면 요청을 보내지 않는다.
+    /// 최종 판정은 그대로 서버다 — 통과해도 서버가 거부할 수 있다(그때는 기존처럼 RejectSkillClientRpc).
+    /// </summary>
+    private bool PassesOwnerPrecheck(
+        PlayerSkillSlot slot, int skillIndex, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint)
+    {
+        ReprojectFixedDistanceAim(slot, hasAimPoint, ref direction, ref aimPoint);
+        return CanApproveSkill(
+            slot, skillIndex, direction, target, aimPoint, hasAimPoint, out _, out _);
+    }
+
     private bool CanApproveSkill(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target,
         Vector3 aimPoint, bool hasAimPoint,
@@ -634,58 +670,57 @@ public class PlayerSkillController : BaseNetworkBehaviour
     {
         skill = GetSkill(slot);
         isDead = stateController != null && stateController.CurrentState == PlayerActionState.Dead;
+        bool assigned = skill != null && skill.Data != null && stateController != null;
+        int skillIndex = assigned ? GetSkillIndex(skill) : InvalidSkillIndex;
 
-        if (skill == null || skill.Data == null || stateController == null)
+        PlayerSkillApproval approval = PlayerSkillApprovalRules.EvaluatePreconditions(
+            assigned,
+            skillIndex == expectedSkillIndex,
+            IsSkillActive,
+            assigned && IsCooldownReady(skill),
+            isDead,
+            assigned && skill.Data.UsableWhileDead,
+            stateController != null && stateController.CanUseSkill);
+
+        if (approval == PlayerSkillApproval.Approved)
         {
-            Edit.Log($"[Skill] {slot} 거부 — 스킬/데이터 미배정", this);
-            return false;
+            // 지점 기반 CanUse(거너 R 지점 지정 등)가 이번 요청의 지점을 보도록 CanUse 직전에 넣는다.
+            // 실행 중 스킬은 위에서 이미 거부됐으므로 진행 중인 스킬의 지점을 덮어쓰지 않는다.
+            // SingleTarget/None 은 hasAimPoint=false 라 HasAimPoint 도 false — 기존 판정 그대로.
+            skill.SetAimPoint(aimPoint, hasAimPoint);
+
+            if (!skill.CanUse(direction, target))
+                approval = PlayerSkillApproval.CanUseFailed;
         }
 
-        int serverSkillIndex = GetSkillIndex(skill);
-        if (serverSkillIndex != expectedSkillIndex)
+        switch (approval)
         {
-            Edit.Log($"[Skill] {slot} 거부 — 슬롯 교체 경합(요청 {expectedSkillIndex}, 서버 {serverSkillIndex})", this);
-            return false;
-        }
-
-        if (IsSkillActive)
-        {
-            Edit.Log($"[Skill] {slot} 거부 — {activeSkill.Slot} 실행 중", this);
-            return false;
-        }
-
-        if (!IsCooldownReady(skill))
-        {
-            Edit.Log($"[Skill] {slot} 거부 — 쿨타임 {GetCooldownRemaining(skill):F1}s 남음", this);
-            return false;
-        }
-
-        if (isDead)
-        {
-            if (!skill.Data.UsableWhileDead)
-            {
+            case PlayerSkillApproval.Approved:
+                return true;
+            case PlayerSkillApproval.Unassigned:
+                Edit.Log($"[Skill] {slot} 거부 — 스킬/데이터 미배정", this);
+                break;
+            case PlayerSkillApproval.SlotRace:
+                Edit.Log($"[Skill] {slot} 거부 — 슬롯 교체 경합(요청 {expectedSkillIndex}, 현재 {skillIndex})", this);
+                break;
+            case PlayerSkillApproval.SkillActive:
+                Edit.Log($"[Skill] {slot} 거부 — {activeSkill.Slot} 실행 중", this);
+                break;
+            case PlayerSkillApproval.Cooldown:
+                Edit.Log($"[Skill] {slot} 거부 — 쿨타임 {GetCooldownRemaining(skill):F1}s 남음", this);
+                break;
+            case PlayerSkillApproval.Dead:
                 Edit.Log($"[Skill] {slot} 거부 — 사망 상태", this);
-                return false;
-            }
-        }
-        else if (!stateController.CanUseSkill)
-        {
-            Edit.Log($"[Skill] {slot} 거부 — 상태 {stateController.CurrentState} 또는 차단 효과", this);
-            return false;
-        }
-
-        // 지점 기반 CanUse(거너 R 지점 지정 등)가 이번 요청의 지점을 보도록 CanUse 직전에 넣는다.
-        // 실행 중 스킬은 위에서 이미 거부됐으므로 진행 중인 스킬의 지점을 덮어쓰지 않는다.
-        // SingleTarget/None 은 hasAimPoint=false 라 HasAimPoint 도 false — 기존 판정 그대로.
-        skill.SetAimPoint(aimPoint, hasAimPoint);
-
-        if (!skill.CanUse(direction, target))
-        {
-            Edit.Log($"[Skill] {slot} 거부 — 스킬 자체 조건(CanUse) 불충족", this);
-            return false;
+                break;
+            case PlayerSkillApproval.StateOrEffect:
+                Edit.Log($"[Skill] {slot} 거부 — 상태 {stateController.CurrentState} 또는 차단 효과", this);
+                break;
+            case PlayerSkillApproval.CanUseFailed:
+                Edit.Log($"[Skill] {slot} 거부 — 스킬 자체 조건(CanUse) 불충족", this);
+                break;
         }
 
-        return true;
+        return false;
     }
 
     private void TickServer()
@@ -836,15 +871,25 @@ public class PlayerSkillController : BaseNetworkBehaviour
     [Rpc(SendTo.Server)]
     private void RequestUseSkillRpc(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, NetworkObjectReference targetRef,
-        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, RpcParams rpcParams = default)
+        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, double pressedServerTime,
+        RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, $"스킬 {slot}");
 
+        // 간파 지연 측정(측정만) — 승인되면 OnServerStart 가 가져가고, 거부되면 아래에서 버린다.
+        PlayerInterruptSkillBase interrupt = GetSkillByIndex(expectedSkillIndex) as PlayerInterruptSkillBase;
+        if (interrupt != null)
+            interrupt.ServerSetLagPress(rpcParams.Receive.SenderClientId, pressedServerTime);
+
         Unit target = ResolveTarget(targetRef);
-        if (!StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint))
+        bool started = StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint);
+        if (interrupt != null)
+            interrupt.ServerClearLagPress();
+
+        if (!started)
             RejectSkillClientRpc(CreateOwnerClientRpcParams());
     }
 
@@ -1097,6 +1142,43 @@ public class PlayerSkillController : BaseNetworkBehaviour
                 TargetClientIds = new[] { OwnerClientId }
             }
         };
+    }
+}
+
+/// <summary>스킬 시전 승인 판정 결과. 위에서 아래 순서로 먼저 걸린 사유 하나.</summary>
+public enum PlayerSkillApproval
+{
+    Approved,
+    Unassigned,     // 스킬·데이터 미배정
+    SlotRace,       // 요청한 스킬 인덱스와 지금 슬롯 바인딩이 다르다
+    SkillActive,    // 다른 스킬 실행 중
+    Cooldown,
+    Dead,           // 사망 중 + 사망 중 허용 스킬 아님
+    StateOrEffect,  // Idle/Move 아님 또는 스킬 차단 효과
+    CanUseFailed    // 스킬 자체 조건(CanUse)
+}
+
+/// <summary>
+/// 스킬 시전 승인의 사전 조건 순서 — 서버 최종 승인과 원격 오너 1차 검증(할 일 75)이 같은 이 판정을 쓴다.
+/// 스킬 자체 조건(CanUse)은 사전 조건이 모두 통과했을 때만 호출자가 본다.
+/// </summary>
+public static class PlayerSkillApprovalRules
+{
+    public static PlayerSkillApproval EvaluatePreconditions(
+        bool assigned, bool skillIndexMatches, bool skillActive, bool cooldownReady,
+        bool isDead, bool usableWhileDead, bool canUseSkillState)
+    {
+        if (!assigned)
+            return PlayerSkillApproval.Unassigned;
+        if (!skillIndexMatches)
+            return PlayerSkillApproval.SlotRace;
+        if (skillActive)
+            return PlayerSkillApproval.SkillActive;
+        if (!cooldownReady)
+            return PlayerSkillApproval.Cooldown;
+        if (isDead)
+            return usableWhileDead ? PlayerSkillApproval.Approved : PlayerSkillApproval.Dead;
+        return canUseSkillState ? PlayerSkillApproval.Approved : PlayerSkillApproval.StateOrEffect;
     }
 }
 

@@ -109,7 +109,7 @@ MonsterBase · TwentyThreeBoss · MonsterCounterWindow · 데이터는 무수정
   밀치기 이동 = `NavMeshAgent.Move`(NavMesh·배리어 카브 밖으로 못 나감, 플레이어 콜라이더 무시). 본 전투(`EnterRealMode`) 때 모두 해제.
   새 복제 변수 3개(`_comboPhase`·`_wallPoint`·`_hasWall` — Variant NetworkBehaviour, hash 무관). 새 서버 이벤트 `ServerComboCounterAccepted`·`ServerComboEvent`. 새 서버 API `SetPracticeWall`·`RelocateAnchor`.
 - 유효 벽·연습 위치는 존3 흐름이 존3 슬롯 사각형의 긴 변에서 정한다(`TutorialZone3Geometry.ChoosePracticeLayout` — 벽 면에서 몸 가장자리 4m, 존 끝에서 8m 안쪽). 튜닝은 인스펙터(D26).
-- 간파 성공마다 파티 우클릭 쿨 초기화는 플레이어 쿨 장부 **공개 API**(`ReduceCooldownServer`·`GetCooldownRemaining`)만 쓴다 — 다른 레인의 '간파 성공 시 우클릭 쿨 80% 감소'와 겹쳐도 결과는 0.
+- 간파 성공으로 쿨타임을 돌려주는 보정은 없다 — 게임 전체의 '간파 성공 시 우클릭 쿨 80% 감소'와 존3 연습의 '파티 우클릭 쿨 초기화' 둘 다 할 일 90 에서 제거. 연습 중에도 정상 우클릭 쿨.
 
 ## 5. 검증
 

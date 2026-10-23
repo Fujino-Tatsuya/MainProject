@@ -327,7 +327,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             success.PlayOnce();
     }
 
-    // [서버] 간파 성공(쿨 감소와 같은 기준) — 전 피어에 성공 대기를 알린다. 1회성 판정 결과라 Reliable.
+    // [서버] 간파 성공 — 전 피어에 성공 대기를 알린다. 1회성 판정 결과라 Reliable.
     private void HandleServerInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
     {
         if (caster == null || caster != player)

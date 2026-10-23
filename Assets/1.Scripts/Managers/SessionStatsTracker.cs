@@ -60,6 +60,8 @@ public sealed class SessionStatsTracker : MonoBehaviour
 
         if (Active == this)
             Active = null;
+
+        InterruptLagMonitor.FlushSummary(InterruptLagMonitor.ReasonSceneEnd);
     }
 
     private void Update()
@@ -98,6 +100,8 @@ public sealed class SessionStatsTracker : MonoBehaviour
         SessionResult.Capture(outcome, ElapsedSeconds, _snapshot);
         _running = false;
         _captured = true;
+
+        InterruptLagMonitor.FlushSummary(InterruptLagMonitor.ReasonSessionEnd);
     }
 
     private void HandleDamageApplied(Unit target, ulong attackerClientId, int amount, bool lethal)

@@ -31,16 +31,35 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
     private readonly List<Unit> landedUnits = new List<Unit>();
     private readonly InterruptSlowMotionTracker slowMotion = new InterruptSlowMotionTracker();
-    private readonly InterruptSuccessCooldownModel successCooldown = new InterruptSuccessCooldownModel();
     private System.Action<Unit, ulong> counterSucceededHandler;
 
     private float hitTime;
     private float endTime;
     private bool hasResolvedHit;
+    private bool interruptSucceeded; // 이번 판정에서 카운터 창 소비 성공이 한 건이라도 있었는가
+
+    // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
+    [Header("간파 지연 측정")]
+    [SerializeField, Min(0f)]
+    [Tooltip("'보정했으면 성공했을 것' 로그의 지연 상한(ms). 판정 시각 − min(지연, 상한) 시점의 창 상태로 계산한다. 측정 전용 — 판정에 영향 없음.")]
+    private float lagCompensationCapMs = InterruptLagJudge.DefaultCapMs;
+
+    private struct LagPress
+    {
+        public bool Valid;
+        public ulong ClientId;
+        public bool IsHost;
+        public double PressServerTime;
+        public double ArriveServerTime;
+        public double RttMs;
+    }
+
+    private LagPress pendingLagPress;
+    private LagPress activeLagPress;
 
     /// <summary>
-    /// 이벤트 방식 간파의 요구 이벤트. 클립에 Hit·End 를 심은 캐릭터가 RequiredAnimationEvents 로 이걸 돌려준다(거너·어쌔신).
-    /// 선언하지 않으면 HitDelay·SkillDuration 타이머 방식(가붕이 — 클립 이벤트를 심은 뒤 켠다).
+    /// 이벤트 방식 간파의 요구 이벤트. 클립에 Hit·End 를 심은 캐릭터가 RequiredAnimationEvents 로 이걸 돌려준다(가붕이·거너·어쌔신 전부).
+    /// 선언하지 않으면 HitDelay·SkillDuration 타이머 방식.
     /// </summary>
     protected static readonly SkillAnimationEventType[] HitAndEndEvents =
         { SkillAnimationEventType.Hit, SkillAnimationEventType.End };
@@ -54,7 +73,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     {
         base.OnServerStart(direction, target);
         slowMotion.Begin();
-        successCooldown.BeginCast();
+        activeLagPress = pendingLagPress;
+        pendingLagPress = default;
 
         IPlayerInterruptSkillData data = InterruptData;
         if (data == null)
@@ -137,8 +157,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// <summary>
     /// [서버] 간파 시전 하나가 열린 카운터 창을 맞혀 소비했다(23호·중간보스 <see cref="CombatStatsEvents.ServerCounterSucceeded"/>,
     /// 허수아비 인터럽트 성공). 여러 대상이 성공해도 시전당 1회. 인자 = 시전자, 그 간파 스킬 인스턴스(대체 슬롯 포함).
-    /// 시전자 본인의 쿨 감소(<see cref="PlayerGameRuleData.InterruptSuccessCooldownReduction"/>)를 적용한 뒤,
-    /// <see cref="ServerInterruptResolved"/> 보다 먼저 난다.
+    /// 같은 판정 안에서 <see cref="ServerInterruptResolved"/> 보다 먼저 난다. 시전자 쿨 감소는 없다(할 일 90 에서 제거).
     /// </summary>
     public static event System.Action<Player, PlayerInterruptSkillBase> ServerInterruptSucceeded;
 
@@ -163,6 +182,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         hasResolvedHit = true;
+        interruptSucceeded = false;
 
         if (HitboxAnchor == null || owner == null)
         {
@@ -177,6 +197,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         bool onHitBonusTaken = false;
         bool interruptLanded = false;
         int resolvedCount = 0;
+        LagHit lagHit = BeginLagHit();
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -208,18 +229,26 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
             // 성공 수를 이 수신 호출 하나의 전후로 비교한다 — 다른 공격의 성공이 섞이지 않는다.
-            // 슬로우 모션 판별과 간파 성공 쿨 감소(허수아비)가 같은 비교를 쓴다.
+            // 슬로우 모션 판별과 간파 성공 판정(허수아비)이 같은 비교를 쓴다.
             IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
             int successBefore = slowTarget != null ? slowTarget.ServerInterruptSuccessCount : 0;
+            bool openAtHit = slowTarget != null && slowTarget.ServerIsInterruptible; // 측정 전용 읽기
+            // 보정 시각 창 상태도 수신 전에 읽는다 — 성공하면 수신 안에서 창이 소비돼 같은 서버 시각에 닫힘이 기록된다(지연 0 이면 보정 시각 = 판정 시각).
+            InterruptWindowState correctedWindow =
+                slowTarget != null ? lagHit.CorrectedWindowOf(unit) : InterruptWindowState.Unknown;
 
             bool resolved = ReceiveListeningForCounter(hurtbox, unit, attackInfo, hitContext);
 
-            if (slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore)
+            bool counterSucceeded = slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore;
+            if (counterSucceeded)
             {
-                successCooldown.NotifySuccess();
+                interruptSucceeded = true;
                 if (slowMotion.IsPending)
                     interruptLanded = true;
             }
+
+            if (slowTarget != null)
+                lagHit.Observe(unit, openAtHit, correctedWindow, counterSucceeded);
 
             if (!resolved)
                 continue;
@@ -232,7 +261,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         FailSlowMotion(slowMotion.Resolve(interruptLanded));
-        ApplySuccessCooldownReduction();
+        ReportLag(lagHit);
+
+        // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
+        if (interruptSucceeded)
+            ServerInterruptSucceeded?.Invoke(owner, this);
 
         if (CompleteBeforeAttackLanded)
             CompleteResolution(resolvedCount);
@@ -244,7 +277,111 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             CompleteResolution(resolvedCount);
     }
 
-    // ── 간파 성공 쿨 감소 (서버, 할 일 26) ──
+    // ── 간파 지연 측정 (서버, 측정만) ──
+
+    /// <summary>
+    /// [서버] 요청 RPC 가 들고 온 누른 시각을 다음 <see cref="OnServerStart"/> 에 넘긴다. 호스트 자신은 지연 0(누른 시각 = 도착 시각).
+    /// </summary>
+    internal void ServerSetLagPress(ulong senderClientId, double pressedServerTime)
+    {
+        if (!InterruptLagMonitor.TryServerNow(out double now))
+        {
+            pendingLagPress = default;
+            return;
+        }
+
+        bool isHost = senderClientId == Unity.Netcode.NetworkManager.ServerClientId;
+        pendingLagPress = new LagPress
+        {
+            Valid = true,
+            ClientId = senderClientId,
+            IsHost = isHost,
+            PressServerTime = isHost ? now : pressedServerTime,
+            ArriveServerTime = now,
+            RttMs = InterruptLagMonitor.RttMs(senderClientId),
+        };
+    }
+
+    /// <summary>[서버] 승인 여부와 관계없이 요청 처리 뒤 남은 누른 시각을 버린다.</summary>
+    internal void ServerClearLagPress() => pendingLagPress = default;
+
+    // 판정 1회에서 로그에 쓸 카운터 창 소유자 하나 — 성공한 첫 대상, 없으면 처음 만난 대상.
+    private struct LagHit
+    {
+        public bool Measuring;               // 누른 시각이 있고 서버라 기록할 판정인가
+        public double HitServerTime;
+        public double CorrectedServerTime;   // 판정 시각 − 상한 적용 지연
+        public Unit Target;
+        public bool OpenAtHit;
+        public InterruptWindowState CorrectedWindow;
+        public bool Success;
+
+        public InterruptWindowState CorrectedWindowOf(Unit unit) =>
+            Measuring ? InterruptLagMonitor.WindowStateAt(unit.gameObject, CorrectedServerTime) : InterruptWindowState.Unknown;
+
+        public void Observe(Unit unit, bool openAtHit, InterruptWindowState correctedWindow, bool success)
+        {
+            if (Target != null && (Success || !success))
+                return;
+
+            Target = unit;
+            OpenAtHit = openAtHit;
+            CorrectedWindow = correctedWindow;
+            Success = success;
+        }
+    }
+
+    private LagHit BeginLagHit()
+    {
+        LagPress press = activeLagPress;
+        if (!press.Valid || !InterruptLagMonitor.TryServerNow(out double hitServerTime))
+            return default;
+
+        return new LagHit
+        {
+            Measuring = true,
+            HitServerTime = hitServerTime,
+            CorrectedServerTime = InterruptLagJudge.CorrectedJudgeTime(
+                press.PressServerTime, press.ArriveServerTime, hitServerTime, lagCompensationCapMs / 1000.0),
+        };
+    }
+
+    private void ReportLag(in LagHit hit)
+    {
+        LagPress press = activeLagPress;
+        activeLagPress = default;
+        if (!press.Valid || !hit.Measuring)
+            return;
+
+        double hitServerTime = hit.HitServerTime;
+        InterruptWindowState pressWindow = hit.Target != null
+            ? InterruptLagMonitor.WindowStateAt(hit.Target.gameObject, press.PressServerTime)
+            : InterruptWindowState.Unknown;
+        InterruptWindowState correctedWindow = hit.Target != null ? hit.CorrectedWindow : InterruptWindowState.Unknown;
+        bool wouldSucceed = hit.Target != null && InterruptLagJudge.WouldSucceed(correctedWindow);
+
+        InterruptLagMonitor.ReportJudgement(new InterruptLagSample
+        {
+            ClientId = press.ClientId,
+            IsHost = press.IsHost,
+            Skill = GetType().Name,
+            Target = hit.Target != null ? hit.Target.name : null,
+            PressServerTime = press.PressServerTime,
+            ArriveServerTime = press.ArriveServerTime,
+            HitServerTime = hitServerTime,
+            RttMs = press.RttMs,
+            PressWindow = pressWindow,
+            HitWindow = hit.Target == null
+                ? InterruptWindowState.Unknown
+                : hit.OpenAtHit ? InterruptWindowState.Open : InterruptWindowState.Closed,
+            CorrectedWindow = correctedWindow,
+            Success = hit.Success,
+            WouldSucceed = wouldSucceed,
+            CapMs = lagCompensationCapMs,
+        });
+    }
+
+    // ── 간파 성공 판정 (서버) ──
 
     // 23호·중간보스는 카운터 창 소비 성공을 피격 처리(ReceiveAttack) 안에서 동기로 발행한다.
     // 이 수신 호출 동안만 들으면 들어온 성공은 전부 이 타격의 것이라 공격자 clientId → 시전자 매핑이 필요 없다(호스트·오프라인 동일).
@@ -264,27 +401,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
     }
 
-    private void HandleCounterSucceeded(Unit target, ulong attackerClientId) => successCooldown.NotifySuccess();
-
-    // 판정 1회 = 시전 1회라 여러 대상이 성공해도 감소는 한 번이다. 대체 슬롯이면 그 대체 스킬 인스턴스의 장부가 준다.
-    private void ApplySuccessCooldownReduction()
-    {
-        if (!successCooldown.HasSucceeded)
-            return;
-
-        float ratio = owner.TryGetComponent(out PlayerMotor motor) && motor.GameRule != null
-            ? motor.GameRule.InterruptSuccessCooldownReduction
-            : InterruptSuccessCooldownModel.DefaultReductionRatio;
-        float fullCooldown = Data != null ? Data.CooldownTime : 0f;
-
-        if (successCooldown.TryClaimReduction(fullCooldown, ratio, out float seconds) && controller != null)
-        {
-            controller.ReduceCooldownServer(this, seconds);
-            Edit.Log($"[Skill] 간파 성공 — 쿨 {seconds:0.##}s 감소(전체 {fullCooldown:0.##}s × {ratio:0.##})", this);
-        }
-
-        ServerInterruptSucceeded?.Invoke(owner, this);
-    }
+    private void HandleCounterSucceeded(Unit target, ulong attackerClientId) => interruptSucceeded = true;
 
     // ── 인터럽트 슬로우 모션 (서버) ──
 

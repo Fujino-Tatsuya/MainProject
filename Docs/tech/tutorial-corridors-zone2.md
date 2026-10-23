@@ -9,7 +9,7 @@
 |---|---|
 | 복도 흐름(런타임, 모든 피어) | `Assets/1.Scripts/Map/Tutorial/Flow/TutorialCorridorFlow.cs` (+ 공용 `TutorialGuideFlowUtil.IsGuideEmpty`) |
 | 복도 순수 규칙 | `Flow/TutorialCorridorModel.cs` — `TutorialCorridorRules`(게이트·체크·단계·창 표시 매핑, 진행 중 복도) · `TutorialCorridorRounds`(복도당 라운드 1번, 라운드→복도) · `TutorialCorridorProgress`(목표 장면) |
-| 복도1 쿨 초기화(v8, 모든 피어) | `Flow/TutorialCorridor1CooldownFlow.cs` · 순수 `Flow/TutorialCooldownResetModel.cs`(`TutorialCooldownResetModel`·`TutorialCooldownResetScope`) · 실행 `Flow/TutorialCooldownReset.cs`(존3 과 공용) |
+| 복도1 쿨 초기화(v8, 모든 피어) | `Flow/TutorialCorridor1CooldownFlow.cs` · 순수 `Flow/TutorialCooldownResetModel.cs`(`TutorialCooldownResetModel`·`TutorialCooldownResetScope`) · 실행 `Flow/TutorialCooldownReset.cs` |
 | 존2 흐름 | `Flow/TutorialZone2Flow.cs` |
 | 존2 순수 규칙 | `Flow/TutorialZone2Model.cs` — `TutorialZone2Rules`(기상 4초) · `TutorialZone2Goal`(목표 줄 — 처치 n/total) |
 | 테스트 | `Map/Tutorial/Editor/TutorialCorridorModelTests.cs` · `TutorialZone2ModelTests.cs` · `TutorialCooldownResetModelTests.cs`(튜토리얼 러너) |
