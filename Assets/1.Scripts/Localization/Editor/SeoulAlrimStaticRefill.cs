@@ -12,7 +12,7 @@ using UnityEngine;
 /// 기본 UI 글꼴 <b>서울알림체 Medium</b> TMP 에셋을 <b>정적(Static)</b>으로 다시 채운다(10-23 결정 a).
 /// 동적이면 Play 중 새 글자마다 에셋이 바뀌어 모든 워크트리에 병합 불가 충돌이 생긴다 — 쓸 글자를 미리 굽고 Static 으로 잠근다.
 /// 같은 에셋에 더한다(guid·기존 글리프 유지). 새 문구를 넣으면 이 메뉴를 다시 돌리고 폰트 에셋을 커밋한다(Docs/tech/localization.md §10).
-/// 글자 집합 = ASCII + KS X 1001 한글 2350자 + GameData.xlsx Strings·ErrorCodes ko·en + 코드 문구 리터럴 + 문구 SO + 씬·프리팹 라벨 + 기호.
+/// 글자 집합 = ASCII + KS X 1001 한글 2350자 + GameData.xlsx Strings·ErrorCodes ko·en + 코드 문구 리터럴 + 문구 SO + 씬·프리팹 라벨 + 기호 + 현재 에셋 글자.
 /// </summary>
 public static class SeoulAlrimStaticRefill
 {
@@ -114,8 +114,15 @@ public static class SeoulAlrimStaticRefill
         Add("문구 SO", YamlText(ScriptableObjectFolder, "*.asset", null));
         Add("씬·프리팹 라벨", LabelFolders.SelectMany(f => YamlText(f, "*.prefab", "m_text:").Concat(YamlText(f, "*.unity", "m_text:"))));
         Add("기호", Symbols);
+        // 10-23 48d79acc 처럼 Dynamic 판이 덮어써도 그 판이 Play 중 모은 글자를 잃지 않게 지금 에셋 글자도 다시 굽는다.
+        var current = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath);
+        Add("현재 에셋 글자", current != null ? ExistingCharacters(current.characterTable) : Enumerable.Empty<char>());
         return new string(set.ToArray());
     }
+
+    /// <summary>글자 표에 이미 있는 글자. <c>char</c> 하나로 못 담는 BMP 밖 글자는 뺀다.</summary>
+    public static IEnumerable<char> ExistingCharacters(IEnumerable<TMP_Character> table) =>
+        table.Where(c => c != null && c.unicode <= 0xFFFF).Select(c => (char)c.unicode);
 
     // 서로게이트(이모지 등)·제어 문자·사용자 정의 영역·이체 선택자(⚠️ 의 U+FE0F)·폭 없는 문자는 굽지 않는다.
     static bool Bakeable(char c) =>

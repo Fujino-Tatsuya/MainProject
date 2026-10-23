@@ -28,6 +28,14 @@ Play 중 아틀라스에 없는 글자가 화면에 나올 때마다 TMP 가 에
 3. 콘솔 `[SeoulAlrimStatic]` 줄에서 글자 수가 늘었으면 `SeoulAlrimTTF-Medium SDF.asset` **한 파일만** 커밋. 안 늘었으면 변경 없음.
 4. 다른 사람이 같은 에셋을 커밋했다면 병합 대신 **최신 development 를 받은 뒤 메뉴를 다시 돌려** 만든다(아틀라스는 손으로 병합하지 않는다).
 
+### 3.1 경석 공유 — Dynamic 판을 커밋하지 말 것 (10-23 재고정)
+
+- **`m_AtlasPopulationMode: 1`(Dynamic) 인 `SeoulAlrimTTF-Medium SDF.asset` 을 커밋하지 않는다.** 새 글자는 위 메뉴로 굽고, Static(`m_AtlasPopulationMode: 0`) 에셋을 커밋한다.
+  커밋 전 `grep m_AtlasPopulationMode "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset"` 가 `0` 인지 본다.
+- 경위: 48d79acc(경석, 로컬 폰트 → 서울 폰트 기준판)가 이 에셋을 Dynamic 판(2453자)으로 덮어 Static 고정(95065a4e, 2498자)이 풀렸다. 그 판에만 있던 글자는 없었다(2453자 ⊂ 2498자).
+- 브랜치 `chore/SeoulAlrimStaticRefix` 에서 메뉴로 다시 채워 **Static, 2498자, 아틀라스 1장**으로 잠갔다(guid 그대로, 재실행 바이트 동일, Static 상태에서 집합 밖 글자 추가 거부 확인).
+- 메뉴 글자 집합에 **`현재 에셋 글자`** 출처를 더했다 — 지금 에셋 글자 표(characterTable)의 글자도 다시 굽는다. 다음에 Dynamic 판이 또 들어와도 그 판이 Play 중 모은 글자를 메뉴 한 번으로 잃지 않고 Static 으로 되돌릴 수 있다.
+
 ## 4. 폴백 상태 (바꾸지 않았다)
 
 - 서울알림체의 폴백 = `Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset` 하나. `TMP Settings` 전역 폴백도 같은 에셋.
