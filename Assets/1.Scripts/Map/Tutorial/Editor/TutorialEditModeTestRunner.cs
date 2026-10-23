@@ -24,7 +24,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialTraitDeadlineModelTests$", // 특성 창 교착 방지 게이지(15 후속) — 비율·10초 강조·로컬 감소·재동기화
         "^TutorialTraitResetModelTests$", // 할 일 30 (3) 전멸 리스폰 뒤 특성 초기화 — 팝업 응답 검증·원복 장부·4라운드 재선택·재전멸·이탈
         "^TutorialTraitRejoinTests$", // 할 일 48 C14 R4c 판 도중 재합류 — 획득 복원(순서·중복·멱등)·라운드 참가·팝업/재선택 보관·복원
-        "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
+        "^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState · 86 T6a SO+Strings 출처
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
         "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프
         "^SpinnerComboModelTests$", // 스피너봇 연계 연습(v8 §3.5) — 간파→취약 유지→밀치기→벽 충돌→회복(그 자리) ×3·중복 방지
@@ -34,6 +34,8 @@ internal static class TutorialEditModeTestRunner
         "^TutorialZone2ModelTests$", // 존2(S8) — 기상 지연·E 안내·Q/E 넛지·목표 줄
         "^TutorialZone3RulesTests$", // 존3 흐름(S9) — 시작 조건·간파 집계·빗나감/이른 간파/힌트·목표·연습 반경
         "^TutorialZone4RulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁·목표/강조
+        "^LobbyRadioTests$", // 로비 무전(할 일 86 T6b) — 단계 → 대사 표·회차당 1회·단계 바뀜 = 대기 줄 폐기·늦은 클라·자막 큐 ClearPending·문구 행
+        "^LobbyBriefingTests$", // 로비 브리핑(할 일 86 T6c) — 대사 순서·서버 시간·완료 1회·중복 시작 무시·중단 해제 신호·잠금 장부·목표 표시·문구 행
         "^TutorialSkipPlanTests$", // 구간 스킵 Alt+1~0(할 일 34) — 단축키 매핑·뒤로 거부(Alt+0 처음부터 예외)·재시작 재진입 거부·목적 구간 → 게이트·체크·처치·자동 획득 계획
     };
 

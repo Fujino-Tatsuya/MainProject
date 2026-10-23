@@ -88,7 +88,7 @@ Strings·ErrorCodes 두 시트에 똑같이 적용한다(시트마다 따로 검
 - `Tools/Data/Export Template` 은 `Strings`·`ErrorCodes` 시트를 **항상** 만든다 — 키가 하나도 없어도 머리글만 있는 시트가 생긴다.
 - 기존 행(메모 행·`#` 메모 열 포함)은 **병합·덮어쓰기 어느 쪽이든 그대로** 옮긴다. 코드가 등록한 키 중 시트에 없는 것만 뒤에 붙는다(en 은 빈 칸).
   머리글에 없는 열은 Export 때 사라진다(원본은 Export 백업).
-- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3·L4b UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)·[§8](#8-l4b--코드에-박힌-ui-문구)). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
+- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3·L4b UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)·[§8](#8-l4b--코드에-박힌-ui-문구)) + 튜토리얼·23호 레이드 자막(`Tutorial.Guide.<id>`, 아래 키 규칙). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
 - ErrorCodes 코드 = `ErrorCatalog.All`([§7](#7-l4--로비네트워크-오류-코드)). 새 코드는 `ko`·`#분류`·`#원인`·`#조치` 가 채워진 채 붙는다(en 빈 칸).
   **시트에만 있고 `ErrorCatalog` 에 없는 행은 경고**(오류 아님, 행은 남긴다) — 안 쓰는 코드면 지우거나 `#` 를 붙인다.
 - 🔴 Export 는 xlsx 를 새로 쓴다(서식·열 너비 사라짐) — [data-table.md §4](data-table.md#4-메뉴-toolsdata).
@@ -127,6 +127,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 - `영역.화면.이름` 점 구분 PascalCase — `UI.Lobby.Ready`, `UI.Settings.Graphics.Resolution`, `Tutorial.S3.Dash`, `Skill.Paladin.Q.Name`.
 - 한 번 쓴 키의 의미를 바꾸지 않는다 — 문구가 크게 바뀌면 새 키를 만든다(번역이 조용히 어긋나지 않게).
 - 같은 단어라도 화면이 다르면 키를 나눈다(언어마다 길이·어순이 달라진다).
+- 튜토리얼 안내·23호 레이드 자막 = **`Tutorial.Guide.<행 id>`**(`TutorialGuideTextSource.KeyPrefix`, 할 일 86 T6a). 출처 = 시트 행 → 없으면 `TutorialGuideTexts` SO 문구(지속시간·효과음은 SO) — [tutorial-guide-ui.md](tutorial-guide-ui.md#문구-출처--strings-시트-우선-so-폴백-할-일-86-t6a). 일반 키라 `{Q}`·`{mm:ss}` 는 ko·en 집합만 같으면 된다.
 
 ### 컴포넌트
 
@@ -161,6 +162,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Settings/SettingsUiStrings.cs` · `Settings/Editor/SettingsLocalizationLinker.cs` | 설정창 문구 키(`UI.Settings.*`) · 설정 라벨 키 연결 메뉴 — [§9](#9-설정창-통합) |
 | `Assets/1.Scripts/Localization/UiStrings.cs` | L3·L4b UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) · 초 단위 `UiStrings.Seconds` · 상태이상 이름 키 |
 | `Assets/1.Scripts/Localization/Editor/UiStringKeys.cs` | Export 때 `UiStrings.All` 을 Strings 키로 등록(`StringKeyRegistry`) |
+| `Assets/1.Scripts/Tutorial/Guide/TutorialGuideTextSource.cs` · `Tutorial/Guide/Editor/TutorialGuideStringKeys.cs` | 튜토리얼 문구 출처(SO + Strings) · Export 때 SO 행을 `Tutorial.Guide.<id>` 로 등록 |
 | `Assets/1.Scripts/Localization/Editor/UiStringsAuthoring.cs` | L3 저작 메뉴 `Tools/Localization/L3 — 씬·프리팹 라벨 키 부착` |
 | `Assets/1.Scripts/Localization/ErrorCatalog.cs` | L4 오류 코드 목록(`ErrorCode` = 코드 + 분류·원인·조치 + ko) · 화면 표기(`ErrorDisplay`) |
 | `Assets/1.Scripts/Localization/Editor/ErrorCodeKeys.cs` | Export 때 `ErrorCatalog.All` 을 ErrorCodes 시트로 등록(`StringKeyRegistry.RegisterErrorCodes`) |
