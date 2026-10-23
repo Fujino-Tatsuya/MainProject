@@ -429,7 +429,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         SkillEndReason reason = PlayerActionPoseRules.ForcedExitReason(nextState);
         skill.OnEnd(reason);
         // 강제 종료도 정상 종료처럼 0층을 되돌린다 — 안 하면 스킬 클립(간파 1.5초 등)이 넉백·그랩 중에 끝까지 돈다.
-        ReturnBasePoseAfterSkill(reason);
+        ReturnBasePoseAfterSkill(skill, reason);
 
         if (IsNetworkActive && IsServer)
             EndSkillClientRpc(GetSkillIndex(skill), reason);
@@ -454,7 +454,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
 
-        ReturnBasePoseAfterSkill(reason);
+        ReturnBasePoseAfterSkill(skill, reason);
 
         if (IsNetworkActive)
             EndSkillClientRpc(GetSkillIndex(skill), reason);
@@ -1028,7 +1028,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 이 피어가 이미 스킬을 떠났으면(오너가 넉백·대시로 먼저 끊음) 0층을 다시 건드리지 않는다 —
         // 늦게 온 이 RPC 가 그사이 들어간 상태의 애니(대시 등)를 Idle 로 덮으면 NetworkAnimator 가 그대로 퍼뜨린다.
         if (endedHere || leftSkillState)
-            ReturnBasePoseAfterSkill(reason);
+            ReturnBasePoseAfterSkill(endedSkill, reason);
     }
 
     [ClientRpc]
@@ -1097,7 +1097,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (skill.Data.SnapRotationOnStart && movement != null)
             movement.RotateImmediately(direction);
 
-        player.SetAnimatorMoving(false);
+        // 상체 전용 스킬(어쌔신 E Buff)은 하체를 0층 Idle/Run 에 그대로 둔다 — 걷는 중이면 Move 상태 Exit 가 막 끈 IsMoving 을
+        // 같은 프레임에 되살린다(안 그러면 하체가 Run_Loop → Run_Stop → Run_Start 로 한 번 끊긴다). 그 밖의 스킬은 기존대로 끈다.
+        bool wantsMove = player.IsInputSource && inputReader != null && inputReader.HasMoveInput && player.CanMove;
+        player.SetAnimatorMoving(PlayerActionPoseRules.MovingOnSkillStart(
+            IsUpperBodyOnly(skill), skill.CanMoveWhileActive, wantsMove));
 
         if (animator != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
             animator.CrossFadeInFixedTime(Animator.StringToHash(skill.Data.AnimatorStateName), 0.05f);
@@ -1105,9 +1109,15 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         skill.OnClientPlay(direction);
     }
 
+    // 상체 전용 = 스킬 SO 의 상태가 컨트롤러 0층에 없고 상체 레이어에만 있다(PlayerActionPoseRules.IsUpperBodyOnlyState).
+    private bool IsUpperBodyOnly(PlayerSkillBase skill) =>
+        skill != null && skill.Data != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName) &&
+        PlayerActionPoseRules.IsUpperBodyOnlyState(animator, Animator.StringToHash(skill.Data.AnimatorStateName));
+
     // 스킬이 끝난 피어마다 0층을 되돌린다(정상·강제 종료, 서버·오너·관찰자 공통). 오너 애니가 NetworkAnimator 로 최종 복제된다.
     // 정상 종료에서 이동 입력 중이면 Run_Loop 로 바로 잇는다 — 입력은 입력 주체만 알아서 다른 피어는 Idle 로 두고 오너 복제를 따른다.
-    private void ReturnBasePoseAfterSkill(SkillEndReason reason)
+    // 상체 전용 스킬은 0층을 건드리지 않는다(상체 레이어 가중치는 스킬 OnEnd 가 내린다). 이동 중이면 IsMoving 만 되살려 하체 Run_Loop 를 잇는다.
+    private void ReturnBasePoseAfterSkill(PlayerSkillBase skill, SkillEndReason reason)
     {
         if (animator == null || animator.runtimeAnimatorController == null)
             return;
@@ -1116,6 +1126,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         bool wantsMove = returnsToLocomotion && player.IsInputSource &&
                          inputReader != null && inputReader.HasMoveInput && player.CanMove;
         PlayerActionExitPose pose = PlayerActionPoseRules.ResolveExit(
+            IsUpperBodyOnly(skill),
             PlayerActionPoseRules.EndsIntoOwnAnimation(reason),
             returnsToLocomotion,
             wantsMove,
@@ -1123,6 +1134,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         switch (pose)
         {
+            case PlayerActionExitPose.KeepMoving:
+                // 스킬 상태 Exit·Idle 진입이 끈 IsMoving 을 같은 프레임에 되살린다 — 하체 Run_Loop 가 Run_Stop 으로 빠지지 않는다.
+                player.SetAnimatorMoving(true);
+                break;
             case PlayerActionExitPose.RunLoop:
                 // Run_Loop 은 IsMoving 이 꺼지면 바로 Run_Stop 으로 빠진다 — Idle 진입이 끈 값을 다시 켠다.
                 player.SetAnimatorMoving(true);
