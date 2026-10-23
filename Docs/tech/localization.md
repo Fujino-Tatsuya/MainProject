@@ -430,3 +430,23 @@ en: Hold {key:Detail} for details
 - 버튼 한 번 = 다음 언어(`LocText.Next` — 한국어 ↔ English), `Loc.Current` 로 바꾼다(`Loc.Changed` → 라벨·컨트롤러가 다시 그림).
 
 - 테스트: `SettingsRulesTests`(언어 기본·전환·이름 비번역, 57키·영어 원문 중복·자리표시자, 라벨 역조회, 액션 이름) · `UiStringsFormatTests`(확인 창 초 단위·액션 이름 언어 전환) · `UiStringsAuthoringTests`(Linker 멱등·ko 폴백) · `UserLanguageConfigTests`(정수 저장값 이관).
+
+## 10. 글꼴 — 서울알림체 Static 아틀라스
+
+기본 UI 글꼴(`TMP Settings` 기본) = `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`. **Static** 이다(2026-10-23 결정 a) —
+Dynamic 이면 Play 중 새 글자마다 에셋이 바뀌어 모든 워크트리에 병합 불가 충돌이 생긴다. 공유 요약은 [handoff-seoulalrim-static.md](handoff-seoulalrim-static.md).
+
+- 아틀라스에 없는 글자는 폴백 `Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset`(Static, 한글 11172자 전부)이 그린다. 둘 다 없으면 □.
+- 채우는 메뉴: **`Tools/UI/Fonts/Refill SeoulAlrim (Static)`**(`SeoulAlrimStaticRefill`). 같은 에셋에 빠진 글자만 더하고 Static 으로 저장한다(guid·기존 글리프 유지, 더할 게 없으면 바이트 그대로).
+  글자 집합 = ASCII · KS X 1001 한글 2350자 · `GameData.xlsx` Strings·ErrorCodes 시트 ko·en(SVN 원본, `StringTable.asset` 아님) ·
+  런타임 `.cs` 문자열 리터럴의 비ASCII 글자(`Editor`·`Tests` 폴더 제외) · `9.ScriptableObject` 의 `.asset` 텍스트 · `0.Scenes`·`2.Prefabs` 의 TMP `m_text` · 기호 목록.
+  콘솔에 출처별 글자 수, 글자 수 전→후, 아틀라스 장수, 파일 크기, **채우지 못한 글자**(서체에 없는 글자)를 남긴다.
+
+### 새 문구를 넣었을 때
+
+1. 시트(ko·en)나 코드·SO·라벨 문구를 고친다. **KS X 1001 밖 한글**(예: 똠·햏)·새 기호·새 영문 기호가 들어갔는지 본다 — 흔한 한글·ASCII 는 이미 들어 있다.
+2. SVN `GameData.xlsx` 를 최신으로 받은 워크트리에서 **`Tools/UI/Fonts/Refill SeoulAlrim (Static)`** 실행(Play 중이면 먼저 정지).
+3. 콘솔의 `[SeoulAlrimStatic]` 줄을 확인 — 글자 수가 늘었으면 **폰트 에셋(`SeoulAlrimTTF-Medium SDF.asset`) 한 파일만 커밋**한다. 안 늘었으면 git 변경도 없다.
+   "채우지 못한 글자" 경고는 서울알림체에 글리프가 없는 글자다 — NotoSansKR 폴백에 있으면 그대로 두고, 없으면 문구를 바꾸거나 폴백 결정을 받는다.
+- 🔴 Inspector 에서 `Atlas Population Mode` 를 Dynamic 으로 바꾸거나 Font Asset Creator 로 다시 만들지 말 것 — guid 가 바뀌거나 다시 노이즈가 생긴다.
+- Play 중 TMP 가 아틀라스 밖 글자를 만나도 Static 이라 에셋은 바뀌지 않는다(폴백으로 그리거나 □).
