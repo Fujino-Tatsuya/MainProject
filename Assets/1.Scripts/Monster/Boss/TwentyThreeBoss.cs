@@ -1693,7 +1693,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 관용구 2: 다지선다 애니는 상태 복제로 실을 수 없다 → ClientRpc 로 CrossFade.
         // 문자열이 아니라 슬롯 번호를 보낸다(각 피어가 같은 SO 에서 상태명을 조회한다 — GauntletBot 선례).
-        PlayAttackAnimClientRpc(CurrentAttackSlot);
+        // 🔴 차징 시퀀스는 여기서 자기 상태(Charging)를 틀지 않는다 — 바로 뒤 BeginCharge 가 중앙으로 **점프**(이륙 = Leap)하는데,
+        //    같은 프레임에 Charging 을 먼저 틀면 이륙 크로스페이드가 Charging 에서 출발해 "팔 뻗은 차징 자세로 그대로 떠오르는" 그림이 된다
+        //    (경석 Play 10-23). Charging 은 실제 차징 시작(StartChargingInPlace)이 다시 튼다.
+        if (e == null || e.attackId != BossAttackId.ChargeSequence)
+            PlayAttackAnimClientRpc(CurrentAttackSlot);
 
         // 애니가 나간 **뒤에** 각 체인의 진입 처리를 한다(클립이 먼저 보여야 한다).
         if (e == null) return;
@@ -3553,6 +3557,38 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         PlayWellsEntranceCommandClientRpc();
     }
 
+    /// <summary>등장 착지 순간 — 돌진 팔다리 전기 펄스를 <paramref name="seconds"/> 동안(경석 10-23). 끄는 건 각 피어가 시간으로 한다.</summary>
+    public void PlayEntranceImpactServer(float seconds)
+    {
+        if (!IsServer || !IsSpawned || seconds <= 0f) return;
+        PlayEntranceElectricClientRpc(seconds);
+    }
+
+    [ClientRpc]
+    void PlayEntranceElectricClientRpc(float seconds)
+    {
+        if (limbPulses == null || limbPulses.Length == 0) { WarnNoLimbPulsesOnce(); return; }
+        for (int i = 0; i < limbPulses.Length; i++)
+        {
+            if (limbPulses[i] == null) continue;
+            limbPulses[i].SetScale(DashLimbElectricScale);
+            limbPulses[i].Play();
+        }
+        if (_entranceElectricStop != null) StopCoroutine(_entranceElectricStop);
+        _entranceElectricStop = StartCoroutine(StopEntranceElectricAfter(seconds));
+    }
+
+    Coroutine _entranceElectricStop;
+
+    System.Collections.IEnumerator StopEntranceElectricAfter(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        _entranceElectricStop = null;
+        if (limbPulses == null) yield break;
+        for (int i = 0; i < limbPulses.Length; i++)
+            if (limbPulses[i] != null) limbPulses[i].Stop();
+    }
+
     /// <summary>웰즈 지시 클립(<c>Boss_welz_throwing</c>) 길이 — 애니메이터 컨트롤러에서 읽는다(웰즈가 없으면 0).</summary>
     public float EntranceCommandSeconds
     {
@@ -4209,7 +4245,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         SafeCrossFade(state);
         animator.Update(0f);   // 상태 정보가 이번 프레임에 즉시 갱신되게
 
-        float len = animator.GetCurrentAnimatorStateInfo(0).length;
+        // 크로스페이드 중이면 '현재' 는 아직 이전 상태다 — 배속은 이륙 상태(다음 상태) 길이로 잡는다(Charging 길이로 잡히던 문제, 10-23).
+        float len = animator.IsInTransition(0)
+            ? animator.GetNextAnimatorStateInfo(0).length
+            : animator.GetCurrentAnimatorStateInfo(0).length;
         float dur = Mathf.Max(0.01f, _boss.jumpTakeoffDuration);
         float speed = len > 0.01f ? len / dur : 1f;
 

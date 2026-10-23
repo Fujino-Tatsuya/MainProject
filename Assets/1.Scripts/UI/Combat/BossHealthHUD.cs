@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -22,13 +23,32 @@ public class BossHealthHUD : MonoBehaviour
     [Tooltip("실드 바 색. Awake 에서 shieldFill 에 적용한다(색 원본은 이 필드).")]
     [SerializeField] private Color shieldColor = new Color(0.55f, 0.85f, 1f, 0.65f);
 
-    [Header("등장 차오름(경석 10-23)")]
-    [Tooltip("바가 처음 보일 때 이 비율에서 실제 HP 까지 빠르게 채운다. 끄면 처음부터 실제 값.")]
+    [Header("HP 색(경석 Play 6차 — 빨강→주황 그라데이션)")]
+    [Tooltip("켜면 HP_Fill 을 바 모양 마스크로만 쓰고 그 안에 아래 그라데이션을 런타임 생성해 그린다(스프라이트 원래 색 대신).\n" +
+             "스프라이트가 이미 색이 칠해진 그라데이션이라 Image.color(곱하기)로는 주황을 못 만든다. 끄면 스프라이트 색 그대로.")]
+    [SerializeField] private bool hpGradientEnabled = true;
+    [Tooltip("왼쪽(0) → 오른쪽(1) HP 색. 바 전체 길이 기준이라 HP 가 줄면 앞쪽 주황부터 사라진다.")]
+    [SerializeField] private Gradient hpGradient = DefaultHpGradient();
+
+    [Header("등장 차오름(경석 10-23 — Shape of Dreams 식: 흰 발광 덩어리가 앞서 달리고 빨강이 뒤따른다)")]
+    [Tooltip("바가 처음 보일 때 이 비율에서 실제 HP 까지 채운다. 끄면 처음부터 실제 값.")]
     [SerializeField] private bool introFillEnabled = true;
-    [Tooltip("차오르기 시작 비율(0~1). 1/4 = 0.25.")]
-    [SerializeField, Range(0f, 1f)] private float introFillStart = 0.25f;
-    [Tooltip("차오르는 시간(초).")]
-    [SerializeField, Min(0.05f)] private float introFillSeconds = 0.8f;
+    [Tooltip("빨강이 차오르기 시작하는 비율(0~1). 멈춤 없이 바로 달린다(경석 Play 6차 — 반에서 끊겼다 차오르는 게 거슬렸다).")]
+    [SerializeField, Range(0f, 1f)] private float introFillStart = 0.45f;
+    [Tooltip("흰 구간이 빨강보다 앞서 출발하는 비율 — 바가 보이는 첫 프레임부터 이미 흰 덩어리가 앞서 있게.")]
+    [SerializeField, Range(0f, 0.5f)] private float introLeadStartGap = 0.08f;
+    [Tooltip("흰 구간이 끝까지 달려가는 시간(초) — 빨강보다 짧게.")]
+    [SerializeField, Min(0.05f)] private float introLeadSeconds = 0.55f;
+    [Tooltip("빨간 바가 끝까지 차오르는 시간(초).")]
+    [SerializeField, Min(0.05f)] private float introFillSeconds = 1.15f;
+    [Tooltip("빨강이 다 찬 뒤 흰 구간·발광이 사그라드는 시간(초).")]
+    [SerializeField, Min(0f)] private float introFadeSeconds = 0.4f;
+    [Tooltip("흰 구간 색 — 바 안쪽 흰 띠 전체가 이 색으로 고르게 빛난다.")]
+    [SerializeField] private Color introLeadColor = Color.white;
+    [Tooltip("흰 구간에서 번지는 빛 색 — 바 모양 안에서만 보인다(빨강 끝·빈 칸 쪽으로 퍼진다).")]
+    [SerializeField] private Color introGlowColor = new Color(1f, 0.96f, 0.9f, 0.7f);
+    [Tooltip("흰 구간 밖으로 빛이 번지는 폭(px). 바 높이 28 기준.")]
+    [SerializeField, Min(1f)] private float introGlowSpread = 14f;
 
     private readonly BossHealthIntroFill introFill = new BossHealthIntroFill();
     private Unit introPlayedFor;              // 이 보스로 차오름을 한 번 했다(재도전 = 새 보스 인스턴스라 다시 한다)
@@ -43,6 +63,20 @@ public class BossHealthHUD : MonoBehaviour
             shieldFill.color = shieldColor;
         else
             Debug.LogWarning($"[BossHealthHUD] shieldFill 이 비어 있어 자폭 실드를 표시하지 않는다: {name}", this);
+
+        if (hpGradientEnabled)
+            BuildHpGradient();
+    }
+
+    private void OnDestroy()
+    {
+        for (int i = 0; i < generatedSprites.Count; i++)
+        {
+            if (generatedSprites[i] == null) continue;
+            Destroy(generatedSprites[i].texture);
+            Destroy(generatedSprites[i]);
+        }
+        generatedSprites.Clear();
     }
 
     private void Update()
@@ -62,27 +96,31 @@ public class BossHealthHUD : MonoBehaviour
         {
             wasShown = false;
             introFill.Cancel();
+            SetIntroLead(false, 0f, 0f, 0f);
             return;
         }
 
-        // 처음 보이는 순간(등장 연출이 끝나 바가 뜰 때) 한 번 — 1/4 에서 최대까지 빠르게 차오른다.
+        // 처음 보이는 순간(등장 연출이 끝나 바가 뜰 때) 한 번 — 멈춤 없이 흰 발광이 앞서 달리고 빨강이 뒤따라 최대까지.
         if (!wasShown && introFillEnabled && introPlayedFor != boss)
         {
             introPlayedFor = boss;
             introFill.Begin();
+            Edit.Log($"[BossHealthHUD] 등장 차오름 시작 — 빨강 {introFillStart:0.##}·흰 구간 +{introLeadStartGap:0.##} 에서 바로 출발, 흰 구간 {introLeadSeconds:0.##}초·빨강 {introFillSeconds:0.##}초.", this);
         }
         wasShown = true;
 
         int maxHp = boss.FinalMaxHp;
         float actual01 = maxHp > 0 ? Mathf.Clamp01((float)boss.CurrentHealth / maxHp) : 0f;
-        float shown01 = introFill.Evaluate(actual01, Time.unscaledDeltaTime, introFillStart, introFillSeconds);
+        BossHealthIntroFill.Frame intro = introFill.Evaluate(actual01, Time.unscaledDeltaTime,
+            introFillStart, introLeadSeconds, introFillSeconds, introFadeSeconds, introLeadStartGap);
         if (hpFill != null)
-            hpFill.fillAmount = shown01;
+            hpFill.fillAmount = intro.Red;
 
         delayed.Tick(Time.deltaTime, boss.CurrentHealth, maxHp);
-        // 차오르는 동안 잔상 바는 앞 바와 같이 간다(잔상이 먼저 가득 차 있으면 피해 흔적처럼 보인다).
-        if (introFill.Active)
-            delayed.ForceFill(shown01);
+        // 차오르는 동안: 흰 구간(오버레이) = 빨강 뒤에서 앞서 달린다 · 잔상 바는 빨강 뒤에 숨긴다(회색이 흰색 너머로 비치지 않게).
+        if (intro.Active)
+            delayed.ForceFill(intro.Red);
+        SetIntroLead(intro.Active, intro.Red, intro.White, intro.WhiteAlpha);
 
         if (counterGaugeFill != null)
         {
@@ -106,6 +144,228 @@ public class BossHealthHUD : MonoBehaviour
     private void OnDisable()
     {
         BindBoss(null);
+    }
+
+    // ── HP 그라데이션 ──────────────────────────────────────────────────────
+    // HP_Fill 스프라이트는 색이 칠해진 그라데이션이라 Image.color(곱하기)로 주황을 못 만든다 → HP_Fill 자체를 Mask 로 쓰고(채움 모양 그대로,
+    // 그리지는 않음) 그 안에 바 전체 크기의 그라데이션 Image 를 깐다. fillAmount 는 지금처럼 HP_Fill 에 넣으면 마스크가 같이 줄어든다.
+    // Mask 는 스프라이트 알파로 자른다(uGUI StencilMaterial 이 UNITY_UI_ALPHACLIP 을 켠다) — 둥근 끝 모양이 유지된다. 런타임 생성(프리팹 무수정).
+    private readonly List<Sprite> generatedSprites = new List<Sprite>();
+
+    private void BuildHpGradient()
+    {
+        if (hpFill == null || hpGradient == null) return;
+
+        Mask mask = hpFill.GetComponent<Mask>();
+        if (mask == null) mask = hpFill.gameObject.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        var go = new GameObject("HP_Gradient", typeof(RectTransform), typeof(Image));
+        var rect = (RectTransform)go.transform;
+        rect.SetParent(hpFill.rectTransform, false);
+        Stretch(rect);
+        var image = go.GetComponent<Image>();
+        image.raycastTarget = false;
+        image.type = Image.Type.Simple;
+        image.sprite = MakeSprite(256, 32, (u, v) =>
+        {
+            Color c = hpGradient.Evaluate(u);
+            // 위가 밝고 아래가 어두운 입체감 + 위쪽 얇은 하이라이트 줄.
+            float shade = Mathf.Lerp(0.68f, 1f, Mathf.SmoothStep(0f, 1f, v / 0.65f));
+            float d = (v - 0.78f) / 0.09f;
+            float highlight = Mathf.Exp(-d * d) * 0.22f;
+            Color shaded = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
+            return Color.Lerp(shaded, Color.white, highlight);
+        });
+    }
+
+    private static Gradient DefaultHpGradient()
+    {
+        var g = new Gradient();
+        g.SetKeys(
+            new[]
+            {
+                new GradientColorKey(new Color(0.55f, 0.04f, 0.05f), 0f),
+                new GradientColorKey(new Color(0.86f, 0.12f, 0.07f), 0.5f),
+                new GradientColorKey(new Color(1f, 0.52f, 0.14f), 1f),
+            },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
+        return g;
+    }
+
+    // ── 등장 차오름 흰 발광 ────────────────────────────────────────────────
+    // 🔴 잔상 바 색을 흰색으로 바꾸는 방식은 안 된다 — HP_Fill·HP_DelayedFill 이 같은 빨간 그라데이션 스프라이트라 Image.color(곱하기)를
+    //    흰색으로 둬도 스프라이트 원래 색(빨강)이 나온다(경석 Play 10-23: 흰색이 안 보였다). → 런타임 생성(프리팹 무수정) 두 겹:
+    //    ① 바 안 흰 띠(IntroLeadMask — 바 모양 Mask, HP_Fill 바로 뒤): 빨강 끝 ~ 흰 구간 끝, 전체가 고른 흰색.
+    //    ② 흰 띠 발광(IntroGlow — HP_Fill 바로 앞, 바 모양 Mask): 흰 띠에서 번지는 빛(9-슬라이스 소프트 사각형), 바 모양 밖은 잘린다.
+    //    🔴 경석 Play 6차 정정: "흰 구간 **자체**가 빛나야 한다" — 오른쪽 끝 반짝임·머리 글로우는 뺐다(끝에만 빛이 몰리면 안 된다).
+    private RectTransform introLeadMaskRect;
+    private RectTransform introLeadRect;
+    private Image introLeadImage;
+    private RectTransform introGlowRect;
+    private Image introGlowImage;
+    private bool introLeadBuilt;
+
+    private void SetIntroLead(bool active, float red01, float white01, float alpha)
+    {
+        if (!active)
+        {
+            if (introLeadMaskRect != null && introLeadMaskRect.gameObject.activeSelf)
+                introLeadMaskRect.gameObject.SetActive(false);
+            if (introGlowRect != null && introGlowRect.gameObject.activeSelf)
+                introGlowRect.gameObject.SetActive(false);
+            return;
+        }
+
+        if (!introLeadBuilt) BuildIntroLead();
+        if (introLeadImage == null) return;
+
+        if (!introLeadMaskRect.gameObject.activeSelf) introLeadMaskRect.gameObject.SetActive(true);
+        if (!introGlowRect.gameObject.activeSelf) introGlowRect.gameObject.SetActive(true);
+
+        float red = Mathf.Clamp01(red01);
+        float white = Mathf.Max(red, Mathf.Clamp01(white01));
+        float a = Mathf.Clamp01(alpha);
+
+        // ① 바 안 흰 띠 — 빨강 끝부터 흰 구간 끝까지(빨강 뒤에 깔리지만 빨강이 덮는 부분은 어차피 안 보인다).
+        introLeadRect.anchorMin = new Vector2(red, 0f);
+        introLeadRect.anchorMax = new Vector2(white, 1f);
+        introLeadImage.color = WithAlpha(introLeadColor, introLeadColor.a * a);
+
+        // ② 발광 = 흰 띠와 같은 구간을 번짐 폭만큼 사방으로 넓힌 사각형. 가운데는 고르고 가장자리에서 부드럽게 꺼진다.
+        float spread = Mathf.Max(1f, introGlowSpread);
+        introGlowRect.anchorMin = new Vector2(red, 0f);
+        introGlowRect.anchorMax = new Vector2(white, 1f);
+        introGlowRect.offsetMin = new Vector2(-spread, -spread);
+        introGlowRect.offsetMax = new Vector2(spread, spread);
+        introGlowImage.pixelsPerUnitMultiplier = GlowBorderTexels / spread;   // 슬라이스 테두리(번짐) = spread px
+        introGlowImage.color = WithAlpha(introGlowColor, introGlowColor.a * a);
+    }
+
+    const int GlowBorderTexels = 32;
+
+    private void BuildIntroLead()
+    {
+        introLeadBuilt = true;
+        Image shape = delayed.FillImage != null ? delayed.FillImage : hpFill;
+        if (shape == null || hpFill == null)
+        {
+            Debug.LogWarning($"[BossHealthHUD] 등장 차오름 흰 구간을 만들 바 이미지가 없다 — 흰 구간 없이 빨강만 차오른다: {name}", this);
+            return;
+        }
+
+        // ① 마스크 = 바 모양(같은 스프라이트, 가득 찬 모양). 자리·크기는 잔상 바와 같게, 순서는 HP_Fill 바로 뒤.
+        var maskGo = new GameObject("IntroLeadMask", typeof(RectTransform), typeof(Image), typeof(Mask));
+        introLeadMaskRect = (RectTransform)maskGo.transform;
+        introLeadMaskRect.SetParent(hpFill.rectTransform.parent, false);
+        CopyRect(shape.rectTransform, introLeadMaskRect);
+        introLeadMaskRect.SetSiblingIndex(hpFill.rectTransform.GetSiblingIndex());   // HP_Fill 을 한 칸 뒤로 밀고 그 앞(아래)에 선다
+        var maskImage = maskGo.GetComponent<Image>();
+        maskImage.sprite = shape.sprite;
+        maskImage.type = Image.Type.Simple;
+        maskImage.raycastTarget = false;
+        maskGo.GetComponent<Mask>().showMaskGraphic = false;
+
+        introLeadImage = NewImage("IntroLead", introLeadMaskRect, null);   // 스프라이트 없음 = 단색 흰 띠
+        introLeadRect = introLeadImage.rectTransform;
+
+        // ② 발광 루트 = 바와 같은 자리(앵커 비율 = 바 위 위치), 순서는 HP_Fill 바로 앞(빨강 끝 위로도 살짝 번진다).
+        //    🔴 이것도 바 모양 Mask 다(경석 Play 10-23: 마스크 없이 두니 번짐 사각형이 바 밖으로 삐져나왔다) —
+        //       빛은 바 모양 안에서만 보이고, 위아래는 바 테두리에서 잘려 앞뒤(빨강 끝·빈 칸 쪽)로만 부드럽게 번진다.
+        var rootGo = new GameObject("IntroGlow", typeof(RectTransform), typeof(Image), typeof(Mask));
+        var root = (RectTransform)rootGo.transform;
+        root.SetParent(hpFill.rectTransform.parent, false);
+        CopyRect(shape.rectTransform, root);
+        root.SetSiblingIndex(hpFill.rectTransform.GetSiblingIndex() + 1);
+        var rootImage = rootGo.GetComponent<Image>();
+        rootImage.sprite = shape.sprite;
+        rootImage.type = Image.Type.Simple;
+        rootImage.raycastTarget = false;
+        rootGo.GetComponent<Mask>().showMaskGraphic = false;
+
+        // 9-슬라이스 소프트 사각형: 테두리(번짐) 32텍셀 · 가운데 2텍셀(고르게 늘어난다). 가장자리 쪽으로 (1-d)² 로 꺼지고 모서리는 둥글다.
+        const int size = GlowBorderTexels * 2 + 2;
+        Sprite glow = MakeSprite(size, size, (u, v) =>
+        {
+            float x = Mathf.Max(0f, Mathf.Abs(u * (size - 1) - (size - 1) * 0.5f) - 0.5f) / GlowBorderTexels;
+            float y = Mathf.Max(0f, Mathf.Abs(v * (size - 1) - (size - 1) * 0.5f) - 0.5f) / GlowBorderTexels;
+            float d = Mathf.Clamp01(Mathf.Sqrt(x * x + y * y));
+            float k = 1f - d;
+            return new Color(1f, 1f, 1f, k * k);
+        }, new Vector4(GlowBorderTexels, GlowBorderTexels, GlowBorderTexels, GlowBorderTexels));
+        introGlowImage = NewImage("IntroGlowBand", root, glow);
+        introGlowImage.type = Image.Type.Sliced;
+        introGlowImage.fillCenter = true;
+        introGlowRect = introGlowImage.rectTransform;
+
+        introLeadMaskRect.gameObject.SetActive(false);
+        introGlowRect.gameObject.SetActive(false);
+    }
+
+    private static Image NewImage(string goName, RectTransform parent, Sprite sprite)
+    {
+        var go = new GameObject(goName, typeof(RectTransform), typeof(Image));
+        var rect = (RectTransform)go.transform;
+        rect.SetParent(parent, false);
+        Stretch(rect);
+        var image = go.GetComponent<Image>();
+        image.raycastTarget = false;
+        image.type = Image.Type.Simple;
+        image.sprite = sprite;
+        return image;
+    }
+
+    /// <summary>(u, v) ∈ [0,1]² → 색 함수로 텍스처를 구워 스프라이트로. OnDestroy 에서 정리한다.</summary>
+    private Sprite MakeSprite(int width, int height, System.Func<float, float, Color> pixel, Vector4 border = default)
+    {
+        var tex = new Texture2D(width, height, TextureFormat.RGBA32, false)
+        {
+            name = $"{name}_Generated",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+            hideFlags = HideFlags.DontSave,
+        };
+        var pixels = new Color32[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            float v = height > 1 ? (float)y / (height - 1) : 0.5f;
+            for (int x = 0; x < width; x++)
+            {
+                float u = width > 1 ? (float)x / (width - 1) : 0.5f;
+                pixels[y * width + x] = pixel(u, v);
+            }
+        }
+        tex.SetPixels32(pixels);
+        tex.Apply(false, true);
+        Sprite sprite = Sprite.Create(tex, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, border);
+        sprite.hideFlags = HideFlags.DontSave;
+        generatedSprites.Add(sprite);
+        return sprite;
+    }
+
+    private static void Stretch(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
+    private static Color WithAlpha(Color c, float a)
+    {
+        c.a = Mathf.Clamp01(a);
+        return c;
+    }
+
+    private static void CopyRect(RectTransform from, RectTransform to)
+    {
+        to.anchorMin = from.anchorMin;
+        to.anchorMax = from.anchorMax;
+        to.pivot = from.pivot;
+        to.anchoredPosition = from.anchoredPosition;
+        to.sizeDelta = from.sizeDelta;
+        to.localRotation = from.localRotation;
+        to.localScale = from.localScale;
     }
 
     private void BindBoss(Unit boss)

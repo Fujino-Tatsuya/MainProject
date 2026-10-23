@@ -156,6 +156,16 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     [Tooltip("스킵 버튼 배경(button_pill_neutral, 9-슬라이스). 비우면 배경 없이 외곽선만.")]
     [SerializeField] private Sprite skipButtonSprite;
 
+    [Header("등장 시네마틱 — 착지 연출(경석 10-23 프로토타입: 먼지 흩날림 · 몸 전기 · 전기 잔여물. 풍압은 넣지 않는다)")]
+    [Tooltip("착지 먼지 머티리얼(M_FX_Alpha_Smoke — URP Particles Unlit). 비우면 먼지 없음 — 경석 10-23 Play: 과하다 → 프리팹에서 비워 둠.")]
+    [SerializeField] private Material introDustMaterial;
+
+    [Tooltip("전기 잔여물 머티리얼(M_Pylon_Spark — 송전탑 VFX). 비우면 잔여물 없음.")]
+    [SerializeField] private Material introSparkMaterial;
+
+    [Tooltip("착지 순간 23호 몸에 전기가 흐르는 시간(초) — 돌진 팔다리 전기 펄스 재사용. 0 이면 끔. 전기 잔여물이 피어나는 시간도 이 값.")]
+    [SerializeField, Min(0f)] private float impactElectricSeconds = 2.5f;
+
     [Header("클리어 판정")]
     [Tooltip("보스 격파 시 결과 화면으로 전환한다. 비어 있으면 씬에서 찾는다.")]
     [SerializeField] private MapSceneManager mapSceneManager;
@@ -230,6 +240,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     public float OverlayFadeSeconds => overlayFadeSeconds;
     public TMPro.TMP_FontAsset IntroFont => introFont;
     public Sprite SkipButtonSprite => skipButtonSprite;
+    public Material IntroDustMaterial => introDustMaterial;
+    public Material IntroSparkMaterial => introSparkMaterial;
+    public float ImpactElectricSeconds => impactElectricSeconds;
 
     /// <summary>[전 피어] 착지점(못 찾았으면 null). 연출 카메라 구도의 기준.</summary>
     public Transform LandingPoint
@@ -740,6 +753,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         for (int i = 0; i < _eligibleClientIds.Count; i++)
             IntroSkidOwnerClientRpc(introSequence.Value, south, impactSkidDistance, startAt, impactSkidDuration, OwnerParams(_eligibleClientIds[i]));
         IntroImpactShakeClientRpc(impactShakeAmplitude, impactShakeDuration);
+        if (impactElectricSeconds > 0f) _bossEntranceAnim?.PlayEntranceImpactServer(impactElectricSeconds);
     }
 
     /// <summary>[서버] 웰즈 지시 구간 — <c>Boss_welz_throwing</c>(폭탄 표시 없이)·독백·HP바 노출. 끝나면 전투.</summary>

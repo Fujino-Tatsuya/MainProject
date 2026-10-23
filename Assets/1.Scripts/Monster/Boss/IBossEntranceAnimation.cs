@@ -33,6 +33,9 @@ public interface IBossEntranceAnimation
     /// <remarks>FSM 은 아직 멈춰 있다(<c>SetServerLogicSuspended(true)</c>) — 데미지·투사체 없음. 구현이 없으면 아무것도 안 한다.</remarks>
     void PlayEntranceCommandServer();
 
+    /// <summary>착지 충격 순간 연출(등장 시네마틱 전용) — 23호는 몸에 <paramref name="seconds"/> 동안 전기가 흐른다. 데미지 없음.</summary>
+    void PlayEntranceImpactServer(float seconds);
+
     /// <summary>지시 동작 길이(초). 0 이하면 디렉터가 인스펙터 대체값을 쓴다. 디렉터는 이게 끝난 뒤 대기 → 카메라 복귀 → 전투 순으로 간다.</summary>
     float EntranceCommandSeconds { get; }
 

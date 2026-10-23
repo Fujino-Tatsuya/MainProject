@@ -68,6 +68,8 @@ public sealed class BossIntroPresentation : MonoBehaviour
     private float _hudRescanAt;
     private const float HudRescanSeconds = 0.5f;   // 연출 도중 새로 뜬 캔버스도 잡는다
 
+    private int _impactFxSequence = -1;
+
     private float _overlayWeight;
     private float _monologueAlpha;
     private readonly BossIntroSkipHold _hold = new BossIntroSkipHold();
@@ -114,6 +116,13 @@ public sealed class BossIntroPresentation : MonoBehaviour
             ExitCamera(_director.CameraReturnSeconds);
         if (_cameraActive) PlaceCamera();
 
+        // 착지 연출(로컬 파티클) — 회차마다 Impact 에 들어서는 순간 한 번.
+        if (active && phase == BossEncounterPhase.Impact && _impactFxSequence != _director.IntroSequence)
+        {
+            _impactFxSequence = _director.IntroSequence;
+            SpawnImpactParticles();
+        }
+
         bool showMonologue = active && phase == BossEncounterPhase.Dialogue && _director.ShowMonologue;
         // HUD — 연출 내내 끄고, 끝나는 순간(전투 시작·스킵·중단) 다시 켠다. 보스 HP바는 그때 1/4 에서 차오른다(BossHealthHUD).
         if (active) HideHud();
@@ -144,6 +153,156 @@ public sealed class BossIntroPresentation : MonoBehaviour
 
         if (_hold.Tick(pressed, Time.unscaledDeltaTime, _director.SkipHoldSeconds))
             _director.RequestSkipVote(sequence);
+    }
+
+    // ── 착지 파티클(프로토타입 — 경석 10-23) ─────────────────────────────────
+    // 정식 VFX 는 VFX 담당(김민경)이 만든다 — 이건 "어떤 느낌인지" 보려는 코드 파티클이다. 풍압은 넣지 않는다(경석 결정).
+    // ① 먼지: 착지점 둘레에서 바닥을 따라 천천히 퍼지며 흩날리는 옅은 먼지(레퍼런스 1 — 낮게 깔린 안개).
+    // ② 전기 잔여물: 착지점 주위를 떠다니다 사라지는 작은 푸른 불티(레퍼런스 2). 몸 전기는 23호 RPC(팔다리 펄스 1초).
+
+    private void SpawnImpactParticles()
+    {
+        Transform landing = _director.LandingPoint;
+        if (landing == null) return;
+        Vector3 at = landing.position;
+
+        if (_director.IntroDustMaterial != null)
+            SpawnDust(at, _director.IntroDustMaterial);
+        if (_director.IntroSparkMaterial != null)
+            SpawnElectricMotes(at, _director.IntroSparkMaterial, Mathf.Max(0.1f, _director.ImpactElectricSeconds));
+    }
+
+    private static ParticleSystem NewSystem(string name, Vector3 position, Material material, int maxParticles)
+    {
+        var go = new GameObject(name);
+        go.transform.position = position;
+        var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        ParticleSystem.MainModule main = ps.main;
+        main.loop = false;
+        main.playOnAwake = false;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = maxParticles;
+        main.stopAction = ParticleSystemStopAction.Destroy;   // 다 끝나면 오브젝트째 정리
+
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        renderer.sharedMaterial = material;
+        renderer.renderMode = ParticleSystemRenderMode.Billboard;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        return ps;
+    }
+
+    private static void SpawnDust(Vector3 at, Material material)
+    {
+        ParticleSystem ps = NewSystem("BossIntroDust", at + Vector3.up * 0.3f, material, 60);
+
+        ParticleSystem.MainModule main = ps.main;
+        main.duration = 3f;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(2.4f, 3.8f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.6f, 3.6f);
+        main.startSize = new ParticleSystem.MinMaxCurve(2.2f, 4.2f);
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        main.startColor = new Color(0.62f, 0.6f, 0.58f, 0.45f);
+        main.gravityModifier = 0f;
+
+        ParticleSystem.EmissionModule emission = ps.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 36), new ParticleSystem.Burst(0.15f, 14) });
+
+        // 바닥 평면 고리에서 바깥으로(원형 셰이프는 XY 평면이라 눕힌다).
+        ParticleSystem.ShapeModule shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Circle;
+        shape.radius = 2.2f;
+        shape.radiusThickness = 0.4f;
+        shape.rotation = new Vector3(90f, 0f, 0f);
+
+        ParticleSystem.LimitVelocityOverLifetimeModule limit = ps.limitVelocityOverLifetime;
+        limit.enabled = true;
+        limit.limit = 0.6f;
+        limit.dampen = 0.08f;   // 처음 퍼지고 곧 느려져 떠다닌다
+
+        ParticleSystem.VelocityOverLifetimeModule vel = ps.velocityOverLifetime;
+        vel.enabled = true;
+        vel.space = ParticleSystemSimulationSpace.World;
+        // 세 축이 같은 곡선 모드여야 한다(하나만 TwoConstants 면 Unity 가 거부한다).
+        vel.x = new ParticleSystem.MinMaxCurve(0f, 0f);
+        vel.y = new ParticleSystem.MinMaxCurve(0.05f, 0.35f);
+        vel.z = new ParticleSystem.MinMaxCurve(0f, 0f);
+
+        ParticleSystem.NoiseModule noise = ps.noise;
+        noise.enabled = true;
+        noise.strength = 0.35f;
+        noise.frequency = 0.4f;
+
+        ParticleSystem.RotationOverLifetimeModule rot = ps.rotationOverLifetime;
+        rot.enabled = true;
+        rot.z = new ParticleSystem.MinMaxCurve(-0.4f, 0.4f);
+
+        ParticleSystem.SizeOverLifetimeModule size = ps.sizeOverLifetime;
+        size.enabled = true;
+        size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.7f, 1f, 1.6f));
+
+        ParticleSystem.ColorOverLifetimeModule color = ps.colorOverLifetime;
+        color.enabled = true;
+        color.color = FadeGradient(Color.white, 0.12f, 0.75f);
+
+        ps.Play();
+    }
+
+    // emitSeconds = 몸 전기와 같은 시간(디렉터 impactElectricSeconds, 경석 10-23: 1.5초) 동안 피어나고, 남은 불티는 수명대로 사라진다.
+    private static void SpawnElectricMotes(Vector3 at, Material material, float emitSeconds)
+    {
+        // 양·범위 = 처음 프로토타입의 2배(경석 10-23 Play: 반경 3.2 → 6.4m, 초당 22 → 44 · 첫 분출 18 → 36).
+        ParticleSystem ps = NewSystem("BossIntroElectricMotes", at + Vector3.up * 1.2f, material, 260);
+
+        ParticleSystem.MainModule main = ps.main;
+        main.duration = emitSeconds;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.4f, 2.8f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.15f, 0.8f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.22f);
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.45f, 0.75f, 1f, 1f), new Color(0.75f, 0.95f, 1f, 1f));
+        main.gravityModifier = -0.03f;   // 아주 천천히 떠오른다
+
+        ParticleSystem.EmissionModule emission = ps.emission;
+        emission.rateOverTime = 44f;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 36) });
+
+        ParticleSystem.ShapeModule shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 6.4f;
+        shape.radiusThickness = 0.8f;
+
+        ParticleSystem.NoiseModule noise = ps.noise;
+        noise.enabled = true;
+        noise.strength = 0.7f;
+        noise.frequency = 1.1f;
+        noise.scrollSpeed = 0.6f;
+
+        // 깜빡임 — 크기가 빠르게 들쑥날쑥(전기 불티 느낌).
+        ParticleSystem.SizeOverLifetimeModule size = ps.sizeOverLifetime;
+        size.enabled = true;
+        var flicker = new AnimationCurve(
+            new Keyframe(0f, 0.3f), new Keyframe(0.12f, 1f), new Keyframe(0.25f, 0.55f), new Keyframe(0.4f, 1f),
+            new Keyframe(0.6f, 0.6f), new Keyframe(0.8f, 0.9f), new Keyframe(1f, 0f));
+        size.size = new ParticleSystem.MinMaxCurve(1f, flicker);
+
+        ParticleSystem.ColorOverLifetimeModule color = ps.colorOverLifetime;
+        color.enabled = true;
+        color.color = FadeGradient(Color.white, 0.08f, 0.7f);
+
+        ps.Play();
+    }
+
+    // 알파만 0 → 1 → 0(나타나는 구간·사라지기 시작하는 지점).
+    private static Gradient FadeGradient(Color tint, float fadeIn, float fadeOutStart)
+    {
+        var g = new Gradient();
+        g.SetKeys(
+            new[] { new GradientColorKey(tint, 0f), new GradientColorKey(tint, 1f) },
+            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, fadeIn), new GradientAlphaKey(1f, fadeOutStart), new GradientAlphaKey(0f, 1f) });
+        return g;
     }
 
     // ── HUD 숨김 ────────────────────────────────────────────────────────────
