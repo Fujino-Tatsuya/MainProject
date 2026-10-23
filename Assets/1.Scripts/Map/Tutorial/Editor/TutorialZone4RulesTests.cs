@@ -194,6 +194,20 @@ public class TutorialZone4RulesTests
     }
 
     [Test]
+    public void BossRetry_ReleasesArrival_PadAndTipAgain()
+    {
+        var m = new TutorialZone4Model(padCountCooldownSeconds: 0f, bossTipDelaySeconds: 1f);
+        Assert.IsFalse(m.NotifyBossRetry());
+        m.NotifyBossArrived(10d);
+        Assert.IsTrue(m.NotifyBossRetry());
+        Assert.IsFalse(m.NotifyBossRetry());
+        Assert.IsFalse(m.ShouldShowBossTip(20d));
+        Assert.IsTrue(m.NotifyPadCountdown(true, false, 30d));
+        Assert.IsTrue(m.NotifyBossArrived(40d));
+        Assert.IsTrue(m.ShouldShowBossTip(41d));
+    }
+
+    [Test]
     public void BossArrived_DuringLore_CancelsTimerAndWake()
     {
         var m = InLore(0d);

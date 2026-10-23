@@ -13,6 +13,10 @@ internal static class PlayerEditModeTestRunner
     {
         "^StatusEffectImmunityTests$", // PLAN-assassin A1 — SuperArmor 의미 통일
         "^PlayerSkillCooldownLedgerTests$", // PLAN-assassin A2 — 스킬 단위 쿨 장부·슬롯 교체
+        "^CooldownClockTests$", // 할 일 91 T2 — 쿨 시계 적분: 배율 1·중간 변경·0·슬로우·원천 역행·교체
+        "^CooldownRateWiringTests$", // 할 일 91 T8 — 쿨 배율 = CooldownRateModifier 곱(없음 1·곱·스택), 배율 2 스킬·대시·패시브 절반, 중간 해제 2→1
+        "^PassiveCooldownSyncTests$", // 할 일 91 T4 — 가붕이 패시브 내부 쿨: 남은 초 도장·피어 환산·늦은 참가·배율 2·피격 감소
+        "^DashCooldownClockSyncTests$", // 할 일 91 T3 — 대시 응답 = 남은 초, 오너 자기 쿨 시계 환산·서버/오너 남은 시간 일치·강제 초기화
         "^PlayerGroundPointProjectionTests$", // PLAN-assassin A4 — 고정 거리 조준·서버 재투영
         "^AssassinComboModelTests$", // PLAN-assassin A6 — 평타 순서·0.8초 유예·스킬 리셋
         "^AssassinComboWindowRulesTests$", // 할 일 47 연장 — 평타 다음 타 예약 창(정규화 시간·경계·단별 기본값)

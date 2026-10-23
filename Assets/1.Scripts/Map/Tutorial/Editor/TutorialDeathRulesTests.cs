@@ -127,6 +127,27 @@ public sealed class TutorialDeathRulesTests
     // ─── 보스방 이동 ─────────────────────────────────────────────────────
 
     [Test]
+    public void 집결_카운트다운_중_사망은_카운트가_취소돼도_보스진입_고정지점_부활()
+    {
+        // 할 일 89 — 사망 순간 집결이 깨져 카운트다운이 취소되고(EndMove) 그 뒤에 Soul 이 된다.
+        var m = new TutorialDeathRulesModel();
+        m.BeginMove();
+        m.RecordDeath(A, 0d, bossRoomReached: false);
+        m.EndMove();
+
+        Assert.That(m.IsMoveInProgress, Is.False);
+        Assert.That(Eval(m, A, 0.5d, PlayerLifeState.Soul, false, out TutorialReviveOrder o), Is.EqualTo(TutorialReviveVerdict.Revive));
+        Assert.That(o.InPlace, Is.True);
+        Assert.That(TutorialDeathRulesModel.RevivesAtBossEnterPoint(o, finished: false), Is.True, "보스방 도착 전 즉시 주문 = 보스 진입 고정 지점");
+        Assert.That(TutorialDeathRulesModel.RevivesAtBossEnterPoint(o, finished: true), Is.False, "도착 뒤 = 그 자리(기존)");
+
+        // 이동과 무관한 3초 대기 부활은 고정 지점이 아니다(지금 단계 구간의 안전 지점).
+        m.RecordDeath(B, 1d, bossRoomReached: false);
+        Assert.That(Eval(m, B, 4d, PlayerLifeState.Soul, false, out TutorialReviveOrder b), Is.EqualTo(TutorialReviveVerdict.Revive));
+        Assert.That(TutorialDeathRulesModel.RevivesAtBossEnterPoint(b, finished: false), Is.False);
+    }
+
+    [Test]
     public void 이동_시작하면_대기부활을_취소하고_즉시_그자리_부활()
     {
         var m = new TutorialDeathRulesModel();

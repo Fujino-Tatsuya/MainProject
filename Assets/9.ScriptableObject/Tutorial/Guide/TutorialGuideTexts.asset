@@ -574,3 +574,7 @@ MonoBehaviour:
     text: "\uCD9C\uACA9 \uC9C0\uC810\uC5D0 \uC9D1\uACB0"
     durationSeconds: 0
     sfx: {fileID: 0}
+  - id: BOSS_INTRO_WellsCommand
+    text: "23\ud638. \ubd84\uc1c4\ud574\ub77c."
+    durationSeconds: 0
+    sfx: {fileID: 0}

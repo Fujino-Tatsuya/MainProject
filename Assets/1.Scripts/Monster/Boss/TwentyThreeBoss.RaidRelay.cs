@@ -619,6 +619,13 @@ public partial class TwentyThreeBoss
                 break;
 
             case GimmickStep.ChainWindow:
+                if (_chainTarget == null || !BossPatternTargets.IsAlive(_chainTarget))
+                {
+                    SetCounterWindow(false);
+                    HideAttackConeClientRpc();
+                    BeginChainMark();   // 창 도중 쓰러짐 — 지목 중과 같이 회차를 쓰지 않고 다음 사람(빈 자리에 방전 금지)
+                    break;
+                }
                 if (_gStepTimer > 0f) break;
                 SetCounterWindow(false);
                 HideAttackConeClientRpc();
@@ -874,6 +881,13 @@ public partial class TwentyThreeBoss
 
         // 도달 — 또는 한 칸 밀었는데 거의 못 갔다(지형 끝) = 벽에 닿은 것으로 본다(무한 반복 방지, Codex 10-20).
         bool stuck = before - remain < 0.1f;
+        // 🔴 첫 칸부터 막혔으면 벽이 아니라 출발점이 막힌 것(송전탑 자리 NavMesh 구멍 등) — 보상 없이 기술적 중단(릴레이와 같은 처리).
+        if (stuck && _pnRound <= 1 && remain > 0.3f)
+        {
+            Debug.LogWarning($"[23호/북진] 첫 칸부터 밀림이 막혔다(남은 {remain:0.0}m) — 기술적 중단. 출발점 NavMesh·북진 목표 지점을 볼 것.", this);
+            EndRaidGimmick("밀림 막힘(기술적 중단)", resume: true);
+            return;
+        }
         if (remain <= 0.3f || stuck)
         {
             if (stuck) Debug.LogWarning($"[23호/북진] 밀림이 막혔다(남은 {remain:0.0}m) — 도달로 처리한다.", this);

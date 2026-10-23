@@ -456,7 +456,7 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
         });
     }
 
-    // 각 단계 내용은 ServerFlowChanged 구독자(T3 = LobbyTrainingWeaponCheck, T4 = LobbyTrainingCombat, T5~T6 미연결) — 여기선 시작만 남긴다.
+    // 각 단계 내용은 ServerFlowChanged 구독자(T3 = LobbyTrainingWeaponCheck, T4 = LobbyTrainingCombat, T5 = LobbyTrainingSparring, T6 미연결) — 여기선 시작만 남긴다.
     private void LogStageContent()
     {
         if (_flow.Phase != LobbyTrainingPhase.InProgress)

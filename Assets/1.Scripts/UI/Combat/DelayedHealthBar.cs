@@ -62,6 +62,13 @@ public sealed class DelayedHealthBar
             heldTotal -= held.Dequeue();
     }
 
+    /// <summary>잔상 Image 를 이 비율로 덮어 그린다(내부 값은 그대로) — 보스 HP바 등장 차오름 동안만.</summary>
+    public void ForceFill(float amount01)
+    {
+        if (delayedFill != null)
+            delayedFill.fillAmount = Mathf.Clamp01(amount01);
+    }
+
     public void Tick(float deltaTime, int hp, int maxHp)
     {
         if (held.Count > 0)

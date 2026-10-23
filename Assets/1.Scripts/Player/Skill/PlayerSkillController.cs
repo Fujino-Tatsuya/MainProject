@@ -64,6 +64,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private readonly List<PlayerSkillBase> registeredSkills = new List<PlayerSkillBase>(SlotCount * 2);
     private readonly Dictionary<PlayerSkillBase, int> skillIndices = new Dictionary<PlayerSkillBase, int>();
     private PlayerSkillCooldownLedger cooldownLedger;
+    // 쿨 장부의 시간축. 피어마다 자기 시계 — 서버↔오너는 남은 초만 주고받는다(할 일 91 · PLAN-91 §3.3).
+    private PlayerCooldownClock cooldownClock;
     private PlayerSkillSlotBindingModel slotBindings;
     private byte locallyAppliedOverrideMask;
     private PlayerSkillBase activeSkill;
@@ -126,6 +128,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // [오너] 조준 모드 취소 — 시전하지 않았으므로 쿨타임 없음.
     public void CancelTargeting() => targeting?.Cancel();
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
+    // 쿨 장부 전용 시각. 시계가 없으면(Awake 전) 실시간으로 대신한다.
+    private float CooldownNow => cooldownClock != null ? cooldownClock.SkillNow : Time.time;
 
     private void Awake()
     {
@@ -155,6 +159,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         }
 
         cooldownLedger = new PlayerSkillCooldownLedger(registeredSkills.Count);
+        cooldownClock = PlayerCooldownClock.For(this);
         slotBindings = new PlayerSkillSlotBindingModel(alternateMask);
     }
 
@@ -206,7 +211,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         for (int i = 0; i < registeredSkills.Count; i++)
         {
             PlayerSkillBase skill = registeredSkills[i];
-            if (skill != null && skill != activeSkill && cooldownLedger.IsReady(i, Time.time))
+            if (skill != null && skill != activeSkill && cooldownLedger.IsReady(i, CooldownNow))
                 skill.ResetToReady();
         }
     }
@@ -237,7 +242,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     public bool IsCooldownReady(PlayerSkillBase skill)
     {
         int skillIndex = GetSkillIndex(skill);
-        return cooldownLedger != null && cooldownLedger.IsReady(skillIndex, Time.time);
+        return cooldownLedger != null && cooldownLedger.IsReady(skillIndex, CooldownNow);
     }
 
     public float GetCooldownRemaining(PlayerSkillSlot slot)
@@ -248,7 +253,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     public float GetCooldownRemaining(PlayerSkillBase skill)
     {
         int skillIndex = GetSkillIndex(skill);
-        return cooldownLedger != null ? cooldownLedger.GetRemaining(skillIndex, Time.time) : 0f;
+        return cooldownLedger != null ? cooldownLedger.GetRemaining(skillIndex, CooldownNow) : 0f;
     }
 
     public int GetSkillIndex(PlayerSkillBase skill) =>
@@ -500,12 +505,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         int skillIndex = GetSkillIndex(skill);
         if (!HasGameplayAuthority || skillIndex == InvalidSkillIndex || skill.Data == null ||
-            !cooldownLedger.IsReady(skillIndex, Time.time))
+            !cooldownLedger.IsReady(skillIndex, CooldownNow))
         {
             return;
         }
 
-        cooldownLedger.Start(skillIndex, Time.time, skill.Data.CooldownTime);
+        cooldownLedger.Start(skillIndex, CooldownNow, skill.Data.CooldownTime);
         Edit.Log($"[Skill] {skill.Slot} 쿨타임 시작 {skill.Data.CooldownTime}s", this);
 
         MirrorCooldownToOwner(skillIndex);
@@ -518,9 +523,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (!HasGameplayAuthority || skillIndex == InvalidSkillIndex || seconds <= 0f)
             return;
 
-        float before = cooldownLedger.GetRemaining(skillIndex, Time.time);
-        cooldownLedger.Reduce(skillIndex, Time.time, seconds);
-        if (cooldownLedger.GetRemaining(skillIndex, Time.time) >= before)
+        float now = CooldownNow;
+        float before = cooldownLedger.GetRemaining(skillIndex, now);
+        cooldownLedger.Reduce(skillIndex, now, seconds);
+        if (cooldownLedger.GetRemaining(skillIndex, now) >= before)
             return;
 
         MirrorCooldownToOwner(skillIndex);
@@ -535,12 +541,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         int skillIndex = GetSkillIndex(skill);
         if (!HasGameplayAuthority || skillIndex == InvalidSkillIndex ||
-            cooldownLedger.IsReady(skillIndex, Time.time))
+            cooldownLedger.IsReady(skillIndex, CooldownNow))
         {
             return;
         }
 
-        cooldownLedger.SetRemaining(skillIndex, Time.time, 0f);
+        cooldownLedger.SetRemaining(skillIndex, CooldownNow, 0f);
         MirrorCooldownToOwner(skillIndex);
     }
 
@@ -615,7 +621,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         // 쿨타임은 승인 즉시 시작, 환불 없음 — 단 수동 커밋 스킬은 발동 시점에 스스로 시작한다(CommitCooldownServer)
         if (!skill.Data.CommitCooldownManually)
-            cooldownLedger.Start(expectedSkillIndex, Time.time, skill.Data.CooldownTime);
+            cooldownLedger.Start(expectedSkillIndex, CooldownNow, skill.Data.CooldownTime);
 
         // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯)
         // 툴팁 계산식도 같은 계수·고정값을 쓰므로 판정 공식을 바꿀 때 SkillTooltipDamage 계산도 같이 바꿀 것.
@@ -970,7 +976,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         int skillIndex, float remaining, ClientRpcParams clientRpcParams = default)
     {
         if (IsOwner && cooldownLedger != null)
-            cooldownLedger.SetRemaining(skillIndex, Time.time, remaining);
+            cooldownLedger.SetRemaining(skillIndex, CooldownNow, remaining);
     }
 
     [ClientRpc]
@@ -991,7 +997,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 서버 시점과의 오차(전송 지연)는 HUD 표시용으로 허용, 검증은 여전히 서버 장부가 담당 (그릴 합의)
         // 수동 커밋 스킬은 CommitCooldownClientRpc 가 따로 미러한다.
         if (IsOwner && skill.Data != null && !skill.Data.CommitCooldownManually)
-            cooldownLedger.Start(skillIndex, Time.time, skill.Data.CooldownTime);
+            cooldownLedger.Start(skillIndex, CooldownNow, skill.Data.CooldownTime);
 
         if (stateController != null &&
             !stateController.IsInSkillState &&
@@ -1077,7 +1083,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (!IsNetworkActive || IsOwner)
             return;
 
-        float remaining = cooldownLedger.GetRemaining(skillIndex, Time.time);
+        float remaining = cooldownLedger.GetRemaining(skillIndex, CooldownNow);
         CommitCooldownClientRpc(skillIndex, remaining, CreateOwnerClientRpcParams());
     }
 

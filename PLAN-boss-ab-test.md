@@ -18,6 +18,8 @@
 | 자폭 실패 뒤 생존자 | 보스 HP 1 로 남고 **다음 피해에 사망** |
 | 버그① 보라색 ≠ 판정 | 표시가 판정보다 0.15초 먼저 꺼진다(09-28 설계 `CounterVisualLeadSeconds`). → **같은 순간에 꺼지게**(선행 0). 09-28 결정 뒤집음 |
 | 버그② 뒤에서 간파 성공 | 원인 = 오늘 앞뒤 구분 끔(`useFacingRules`). → **간파만 정면 필요**: 새 칸 `counterRequiresFront`(기본 켬)로 분리, 백어택·바닥 앞뒤 표시는 계속 꺼짐 |
+| ✅ 확정(경석 10-23) 정면 표시기 | 간파는 정면(반각 `counterFrontAngle` 90 = 앞쪽 반원)만 되지만 **바닥 정면 표시기(`BossDirectionIndicator`)는 꺼 둔 채로 간다**(`useFacingRules` = false). 판정 범위는 보스 모델 방향으로 읽는다 — 버그 아님 |
+| ✅ 확정(경석 10-23) 팔라딘 Q 경직 | 취약 중 Q 경직은 **간파 그로기가 아니다** — 정지 조건 없음(`BossPauseCondition.None`), 장판·드론은 멈추지 않는다 |
 
 ## 1. 보스 A·B 에셋과 빌드
 - **B** = 기존 `TwentyThree_Raid.prefab` + `No23_Raid.asset` — phases 만 바꾼다: 0.70 `RaidDroneCharge` · 0.30 `RaidPushNorth`(신규). 45% 구출·20% 릴레이 행 삭제.
