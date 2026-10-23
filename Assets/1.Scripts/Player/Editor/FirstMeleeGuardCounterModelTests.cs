@@ -387,6 +387,113 @@ public sealed class FirstMeleeGuardCounterModelTests
         Assert.That(model.BlocksKnockback, Is.False);
     }
 
+    // ── E 재입력 해제(할 일 94) ──
+    // inGuardHold = 서버 애니메이터가 방어중(SubSkillGuardIdle) 상태이고 전이 중이 아님.
+
+    [Test]
+    public void RePress_DuringPrepare_Ignored()
+    {
+        // 준비 클립 재생 중(Custom0 전후 모두) — 애니메이터가 아직 방어중이 아니다.
+        var model = BegunClosed();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: false), Is.False);
+        model.OnGuardWindowOpened();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: false), Is.False);
+        Assert.That(model.ReleaseRequested, Is.False);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
+    }
+
+    [Test]
+    public void RePress_DuringHold_Accepted_PhaseUnchanged_WindowStillOpen()
+    {
+        // 받아도 단계·창은 그대로 — 창은 해제 클립 Custom1 이, 종료는 End 가 기존 경로로 처리한다.
+        var model = Begun();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
+        Assert.That(model.ReleaseRequested, Is.True);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
+        Assert.That(model.IsGuardWindowOpen, Is.True);
+
+        model.OnGuardWindowClosed();
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        GuardEventResult end = model.OnEnd();
+        Assert.That(end.Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+        Assert.That(end.CounterHitDue, Is.False);
+    }
+
+    [Test]
+    public void RePress_Twice_SecondIgnored()
+    {
+        // 해제 CrossFade 중(Custom1 전) 연타 — 애니메이터가 아직 방어중으로 읽혀도 다시 받지 않는다.
+        var model = Begun();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.False);
+    }
+
+    [Test]
+    public void RePress_WhileReleasing_Ignored()
+    {
+        // 방어중 시간이 다 돼 해제로 넘어간 뒤(Custom1) — 원격 오너가 늦게 보낸 재입력도 무시.
+        var model = Begun();
+        model.OnGuardWindowClosed();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.False);
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: false), Is.False);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+    }
+
+    [Test]
+    public void RePress_WhileTransitioningToRelease_Ignored()
+    {
+        // 방어중 → 해제 exitTime 전이 중(Custom1 전) — 애니메이터 판정이 거짓이라 무시.
+        var model = Begun();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: false), Is.False);
+        Assert.That(model.ReleaseRequested, Is.False);
+    }
+
+    [Test]
+    public void RePress_WhileCountering_Ignored()
+    {
+        var model = Countering();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.False);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
+        Assert.That(model.HasPendingCounter, Is.True);
+    }
+
+    [Test]
+    public void RePress_IdleOrFinished_Ignored()
+    {
+        var model = new FirstMeleeGuardCounterModel();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.False);
+
+        var finished = Countering();
+        finished.OnEnd();
+        Assert.That(finished.TryRequestRelease(animatorInGuardHold: true), Is.False);
+    }
+
+    [Test]
+    public void BlockAfterReleaseRequested_BeforeCustom1_StillCounters()
+    {
+        // 해제 CrossFade 가 Custom1 에 닿기 전까지 창은 열려 있다 — 그 사이 방어 성공은 그대로 반격.
+        var model = Begun();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.BlockAndCounter));
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
+
+        model.OnGuardWindowClosed(); // 반격 중 늦게 온 Custom1 은 무시
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
+    }
+
+    [Test]
+    public void ReleaseRequested_ClearedByResetAndBegin()
+    {
+        var model = Begun();
+        model.TryRequestRelease(animatorInGuardHold: true);
+        model.Reset();
+        Assert.That(model.ReleaseRequested, Is.False);
+
+        model.Begin(Vector3.forward, GuardAngle);
+        model.OnGuardWindowOpened();
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
+    }
+
     // ── 종료 후 ──
 
     [Test]

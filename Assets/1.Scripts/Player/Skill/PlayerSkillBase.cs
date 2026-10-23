@@ -87,6 +87,10 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 실행 중 좌클릭을 이 스킬이 받는가(거너 Q: 좌클릭 = 발사). true 면 컨트롤러가 오너의 좌클릭을 OnPrimaryPressed 로 넘긴다.
     public virtual bool ConsumesPrimaryInput => false;
 
+    // 실행 중 같은 슬롯 재입력을 이 스킬이 받는가(팔라딘 E: 방어중 재입력 = 해제, 할 일 94). true 면 컨트롤러가 오너의 재입력을
+    // 선입력 버퍼에서 지우고 OnSkillRePressed 로 넘긴다 — 받을지 말지는 스킬이 서버에서 정한다(안 받으면 그 입력은 그냥 사라진다).
+    public virtual bool ConsumesSkillRePress => false;
+
     // 실행 중 오너 조준을 서버로 주기 전송할지. 기본은 홀드 스킬만(기존 동작).
     public virtual bool WantsAimUpdates => data != null && data.InputType == PlayerSkillInputType.Hold;
 
@@ -204,6 +208,9 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
 
     // 서버 전용: 실행 중 좌클릭(ConsumesPrimaryInput 일 때만). direction = 누른 순간의 조준.
     public virtual void OnPrimaryPressed(Vector3 direction) { }
+
+    // 서버 전용: 실행 중 같은 슬롯 재입력(ConsumesSkillRePress 일 때만). 원격 오너면 RPC 지연만큼 늦게 온다 — 지금 서버 상태로 판정한다.
+    public virtual void OnSkillRePressed() { }
 
     // 서버 전용: 오너 권위 결과 보고(PlayerSkillController.ReportOwnerSkillResult). 값 검증은 스킬 몫이다(어쌔신 Q: 실제 이동 거리).
     public virtual void OnOwnerResultReported(float value) { }

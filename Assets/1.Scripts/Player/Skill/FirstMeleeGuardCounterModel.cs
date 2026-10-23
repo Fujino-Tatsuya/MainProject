@@ -94,6 +94,8 @@ public readonly struct GuardEventResult
 /// <item><b>단계에 맞지 않는 이벤트는 무시한다.</b> 반격 상태로 CrossFade 하는 동안 해제 클립의 Custom1 이
 ///       뒤늦게 오거나, 원격 오너 동기로 반격 상태가 다시 들어가 Hit·End 가 두 번 올 수 있다.
 ///       End 는 Releasing(해제 클립 End)·Countering(반격 클립 End) 에서만 끝낸다 — Guarding 에서 온 End 는 무시한다.</item>
+/// <item><b>E 재입력 해제</b>(할 일 94)는 방어중(Guarding + 서버 애니메이터 SubSkillGuardIdle)에서 한 번만 받는다
+///       (<see cref="TryRequestRelease"/>). 해제 CrossFade 가 Custom1 에 닿기 전까지 창은 열려 있어 그 사이 방어 성공도 그대로 받는다.</item>
 /// </list>
 /// </summary>
 public sealed class FirstMeleeGuardCounterModel
@@ -103,6 +105,7 @@ public sealed class FirstMeleeGuardCounterModel
     bool _guardWindowOpen;
     bool _blocked;
     bool _counterHitRaised;
+    bool _releaseRequested;
 
     public FirstMeleeGuardPhase Phase { get; private set; } = FirstMeleeGuardPhase.Idle;
 
@@ -157,6 +160,26 @@ public sealed class FirstMeleeGuardCounterModel
         _guardWindowOpen = false;
         Phase = FirstMeleeGuardPhase.Releasing;
     }
+
+    /// <summary>
+    /// [E 재입력] 방어중 해제 요청을 받는가(할 일 94). 참이면 호출측(서버)이 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다 —
+    /// 이 모델은 단계를 바꾸지 않는다. 창 닫힘·종료는 그 해제 클립의 Custom1·End 가 기존 경로로 처리한다.
+    /// 받는 때는 Guarding 이고 서버 애니메이터가 방어중 상태(SubSkillGuardIdle, 전이 중 아님)일 때뿐이다 —
+    /// 준비(SubSkillGuard)·해제(Releasing 또는 이미 해제로 넘어가는 중)·반격(Countering) 중 재입력은 거짓(무시)이다.
+    /// 한 시전에 한 번만 참이다 — 해제 CrossFade 중(Custom1 전)의 연타가 CrossFade 를 다시 걸지 않게 한다.
+    /// </summary>
+    /// <param name="animatorInGuardHold">서버 애니메이터가 방어중 상태에 있고 다른 상태로 전이 중이 아니다.</param>
+    public bool TryRequestRelease(bool animatorInGuardHold)
+    {
+        if (Phase != FirstMeleeGuardPhase.Guarding || _releaseRequested || !animatorInGuardHold)
+            return false;
+
+        _releaseRequested = true;
+        return true;
+    }
+
+    /// <summary>이번 시전에서 E 재입력 해제를 받았다(<see cref="TryRequestRelease"/>). Reset 전까지 유지된다.</summary>
+    public bool ReleaseRequested => _releaseRequested;
 
     /// <summary>
     /// 피격 하나를 판정한다. <see cref="GuardVerdict.BlockAndCounter"/> 면 Countering 으로 바뀐다.
@@ -242,6 +265,7 @@ public sealed class FirstMeleeGuardCounterModel
         _guardWindowOpen = false;
         _blocked = false;
         _counterHitRaised = false;
+        _releaseRequested = false;
         CounterFired = false;
     }
 }

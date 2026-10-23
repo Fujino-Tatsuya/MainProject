@@ -316,6 +316,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
 
     /// <summary>
     /// [서버] 수호자의 의지(E) 방어 성공 — 반격 자세 상태로 <b>전 피어(오너 포함)</b>에서 CrossFade 한다.
+    /// 방어중 E 재입력 해제(해제 상태 SubSkillGuardEnd, 할 일 94)도 같은 창구를 쓴다.
     ///
     /// <b>왜 서버만 하면 안 되나.</b> 반격 판정·종료는 반격 클립의 Hit·End 이벤트로 정해지는데,
     /// 스킬 이벤트는 서버 애니메이터에서만 처리된다. 플레이어에는 오너 권한 NetworkAnimator 가 있어

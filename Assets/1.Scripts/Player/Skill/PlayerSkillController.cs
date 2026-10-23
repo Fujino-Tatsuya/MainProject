@@ -828,6 +828,18 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             else
                 NotifySkillPrimaryRpc(aim);
         }
+
+        // 같은 슬롯 재입력(팔라딘 E 방어중 해제, 할 일 94). 받을지(방어중인가)는 서버가 정한다 — 오너는 상태를 먼저 바꾸지 않는다.
+        // 단계와 무관하게 버퍼에서 지운다 — 준비·해제·반격 중 누른 E 가 E 가 끝난 뒤 새 시전(또는 쿨타임 거부)으로 이어지지 않게.
+        // 쿨타임 거부(UseSkillSlot)는 Idle/Move 후보 경로에서만 나므로, 스킬 상태에서 도는 이 경로가 E 실행 중 입력을 먼저 가져간다.
+        if (activeSkill.ConsumesSkillRePress && inputReader != null && inputReader.GetSkillPressed(activeSkill.Slot))
+        {
+            inputReader.ConsumeBufferedSkillInput(activeSkill.Slot);
+            if (!IsNetworkActive)
+                activeSkill.OnSkillRePressed();
+            else
+                NotifySkillRePressedRpc(GetSkillIndex(activeSkill));
+        }
     }
 
     private void TickOwnerHoldInput()
@@ -956,6 +968,18 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         if (activeSkill != null && activeSkill.ConsumesPrimaryInput)
             activeSkill.OnPrimaryPressed(ResolveDirection(direction));
+    }
+
+    // 인덱스를 같이 보낸다 — 늦게 도착한 재입력이 그사이 바뀐 다른 스킬에 닿지 않게 한다.
+    [Rpc(SendTo.Server)]
+    private void NotifySkillRePressedRpc(int skillIndex, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        PlayerSkillBase skill = GetSkillByIndex(skillIndex);
+        if (skill != null && skill == activeSkill && skill.ConsumesSkillRePress)
+            skill.OnSkillRePressed();
     }
 
     [Rpc(SendTo.Server)]

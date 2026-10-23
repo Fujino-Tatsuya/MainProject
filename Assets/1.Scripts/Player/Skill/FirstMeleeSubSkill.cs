@@ -9,6 +9,7 @@ using UnityEngine;
 /// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 준비(SubSkillGuard) Custom0 방어 창 열림 →
 /// 방어중 루프(SubSkillGuardIdle, 전이 exitTime 으로 길이 조정) → 해제(SubSkillGuardEnd) Custom1 창 닫힘 · End 종료,
 /// 반격(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트·전이를 옮기면 그대로 반영된다.
+/// 방어중에 E 를 다시 누르면 서버가 해제 상태로 바로 넘긴다(할 일 94, <see cref="OnSkillRePressed"/>).
 /// 공격속도는 준비·해제·반격 상태의 속도 파라미터(AttackSpeedRate)로만 탄다 — 방어중 길이는 공속과 무관(할 일 91 A5, Docs/tech/suppress-haste.md).
 /// 설계·결정: PLAN-paladin-counter-e (Re:C 변경안).
 /// </summary>
@@ -25,6 +26,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     private static readonly int CounterStateHash = Animator.StringToHash(CounterStateName);
     // 준비 → 방어중 → 해제는 애니메이터 exitTime 전이로 이어진다. 창을 닫는 Custom1 과 E 를 끝내는 End 는 해제 상태 클립에 있다.
     private const string GuardEndStateName = "SubSkillGuardEnd";
+    private static readonly int GuardEndStateHash = Animator.StringToHash(GuardEndStateName);
+    // 방어중 루프 상태 — E 재입력 해제(할 일 94)는 서버 애니메이터가 이 상태에 있을 때만 받는다.
+    private static readonly int GuardHoldStateHash = Animator.StringToHash("SubSkillGuardIdle");
+    private const int BaseLayer = 0;
 
     // 준비 클립(데이터 animatorStateName) = Custom0, 해제 클립(GuardEndStateName) = Custom1·End, 반격 클립(CounterStateName) = Hit·End.
     private static readonly SkillAnimationEventType[] GuardEvents = { SkillAnimationEventType.Custom0 };
@@ -35,6 +40,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     private readonly FirstMeleeGuardCounterModel model = new FirstMeleeGuardCounterModel();
     private PlayerInputReader inputReader;
+    private Animator animator;
 
     // 방어 성공 뒤 반격 전에 E 가 끊겼을 때(구속·기타 Cancelled) 다음 프레임에 실행할 반격 1회(결정 2).
     // 모델은 OnEnd 에서 Reset 되므로 방향은 따로 들고 있는다.
@@ -82,7 +88,41 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     {
         base.Initialize(owner, controller);
         inputReader = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
+        // PlayerSkillController·PlayerShieldVfx 와 같은 해석(자식의 첫 Animator).
+        animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
     }
+
+    // 방어중 E 재입력 = 즉시 해제(할 일 94). 준비·해제·반격 중 재입력은 무시한다(버퍼에서는 컨트롤러가 이미 지웠다).
+    public override bool ConsumesSkillRePress => true;
+
+    /// <summary>
+    /// [서버] E 재입력. 지금 서버 애니메이터가 방어중(SubSkillGuardIdle, 전이 중 아님)이면 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다.
+    /// 원격 오너가 방어중으로 보고 눌렀어도 서버가 아직 준비 중이거나 이미 해제로 넘어가는 중이면 조용히 무시한다(서버 판정이 기준).
+    /// 그 뒤 창 닫힘(Custom1)·E 종료(End)는 해제 클립 이벤트가 기존 경로로 처리한다 — 타이머를 따로 두지 않는다.
+    /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PlayerShieldVfx.ServerPlayGuardCounterPose"/>).
+    /// </summary>
+    public override void OnSkillRePressed()
+    {
+        if (!IsServerPeer)
+            return;
+
+        if (shieldVfx == null)
+        {
+            Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 E 재입력 해제를 전 피어로 보낼 수 없습니다. 무시합니다.", this);
+            return;
+        }
+
+        if (!model.TryRequestRelease(IsAnimatorInGuardHold()))
+            return;
+
+        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
+        Edit.Log("[Skill] 수호자의 의지 — E 재입력: 방어중 → 해제", this);
+    }
+
+    private bool IsAnimatorInGuardHold() =>
+        animator != null &&
+        !animator.IsInTransition(BaseLayer) &&
+        animator.GetCurrentAnimatorStateInfo(BaseLayer).shortNameHash == GuardHoldStateHash;
 
     public override void OnServerStart(Vector3 direction, Unit target)
     {
