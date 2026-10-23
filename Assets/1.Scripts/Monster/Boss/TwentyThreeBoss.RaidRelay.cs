@@ -152,6 +152,7 @@ public partial class TwentyThreeBoss
         SetCounterWindow(false);
         HideAttackConeClientRpc();
         StopCutClipLoopsClientRpc();   // 돌진 준비 클립을 끊는다 — 짝 StopEffect 가 안 와 루프(레이지 같은 이펙트)가 남지 않게
+        if (_raidGimmick == RaidGimmick.PushNorth) ReleasePushNorthDownPose();   // 얼린 채면 피격 리액션이 안 넘어간다
         if (_boss != null && !string.IsNullOrEmpty(_boss.hitReactionState))
             CrossFadeStateClientRpc(_boss.hitReactionState);
 
@@ -184,7 +185,11 @@ public partial class TwentyThreeBoss
             if (IsSpawned) NotifyRelayEndedRpc();
         }
         _chainTarget = null;
-        if (g == RaidGimmick.PushNorth) CleanupPushNorthRound();
+        if (g == RaidGimmick.PushNorth)
+        {
+            CleanupPushNorthRound();
+            ReleasePushNorthDownPose();
+        }
 
         string gName = g == RaidGimmick.Relay ? "간파 릴레이" : g == RaidGimmick.PushNorth ? "북진 압박" : "연쇄 간파";
         FightLog($"{gName} 종료 — {why}");
@@ -823,7 +828,8 @@ public partial class TwentyThreeBoss
                 {
                     CleanupPushNorthRound();
                     SetCounterWindow(true, _boss.pushNorthStunTime);   // 보라색 = 판정 창(같이 꺼진다)
-                    if (!string.IsNullOrEmpty(_boss.hitReactionState)) CrossFadeStateClientRpc(_boss.hitReactionState);
+                    // 무력화 = 그로기 클립(Boss_23_.groggy) 끝의 **쓰러진 자세로 멈춰** 간파를 기다린다(경석 10-23).
+                    PlayPushNorthDownPoseClientRpc();
                     FightLog($"북진 {_pnRound}회차 — 탑 파괴 → 무력화");
                     Debug.Log($"[23호/북진] {_pnRound}회차 탑 전부 파괴 — 무력화 {_boss.pushNorthStunTime:0.#}초(간파 1회 = 1칸)", this);
                     SetStep(GimmickStep.PnStun, _boss.pushNorthStunTime);
@@ -841,6 +847,7 @@ public partial class TwentyThreeBoss
             case GimmickStep.PnStun:
                 if (_gStepTimer > 0f) break;
                 SetCounterWindow(false);
+                ReleasePushNorthDownPose();
                 BeginPushNorthCharge();   // 간파 없이 끝 — 그 자리에서 다음 차징
                 break;
 
@@ -856,6 +863,67 @@ public partial class TwentyThreeBoss
                 if (_gStepTimer <= 0f) BeginPushNorthCharge();
                 break;
         }
+    }
+
+    // ─── 북진 무력화 자세 — 그로기 클립 끝(쓰러진 자세)에서 멈춰 둔다(경석 10-23) ───
+    // 기믹 중 상태는 Attack 이라 Groggy bool 이 꺼져 있다 → 그냥 두면 GroggyStart 끝(exitTime 0.95)에서 Groggy 를 거쳐
+    // GroggyEnd(일어남) → Locomotion 으로 **다시 선다**. 그래서 exitTime 직전에서 자세 홀드 래치(animator.speed 0)로 얼린다.
+    // 🔴 래치는 카운터 선딜 홀드와 **공용**이다 — 사망·중단은 AbortAttackChain → ResetCounterWindup 이 같이 푼다.
+    //    간파 성공·3초 경과·기믹 종료는 ReleasePushNorthDownPose 가 푼다(안 풀면 보스가 쓰러진 채 굳는다).
+    // ⚠️ 0.94 이후의 클립 이벤트는 안 온다(얼렸으므로). 그로기 클립 끝에 짝 StopEffect 를 넣으면 루프 이펙트가 남는다.
+    const float PushNorthDownPoseAt = 0.94f;   // No23Controller GroggyStart→Groggy exitTime 0.95 바로 앞
+    Coroutine _pnDownPoseRoutine;
+
+    [ClientRpc]
+    void PlayPushNorthDownPoseClientRpc()
+    {
+        if (animator == null) return;
+        if (_pnDownPoseRoutine != null) StopCoroutine(_pnDownPoseRoutine);
+        SafeCrossFade(GroggyStartState);
+        _pnDownPoseRoutine = StartCoroutine(HoldPushNorthDownPose());
+    }
+
+    System.Collections.IEnumerator HoldPushNorthDownPose()
+    {
+        int hash = Animator.StringToHash(GroggyStartState);
+        while (animator != null)
+        {
+            yield return null;   // Update 뒤·애니 평가 앞 — 이번 프레임에 exitTime 을 넘길지 미리 본다
+            AnimatorStateInfo st = animator.GetCurrentAnimatorStateInfo(0);
+            if (st.shortNameHash != hash)
+            {
+                // 아직 GroggyStart 로 넘어가는 중이면 기다리고, 다른 상태가 가져갔으면(간파 리액션·차징·사망) 그만둔다.
+                if (animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).shortNameHash == hash) continue;
+                break;
+            }
+            if (animator.IsInTransition(0)) continue;
+
+            float step = st.length > 0.0001f ? Time.deltaTime * animator.speed / st.length : 1f;
+            if (st.normalizedTime + step < PushNorthDownPoseAt) continue;
+
+            animator.Play(hash, 0, PushNorthDownPoseAt);
+            animator.Update(0f);   // 즉시 평가 — HoldAttackPoseClientRpc 와 같은 이유
+            HoldCounterPoseLocal();
+            break;
+        }
+        _pnDownPoseRoutine = null;
+    }
+
+    [ClientRpc]
+    void ReleasePushNorthDownPoseClientRpc()
+    {
+        if (_pnDownPoseRoutine != null)
+        {
+            StopCoroutine(_pnDownPoseRoutine);
+            _pnDownPoseRoutine = null;
+        }
+        RestoreCounterPose();
+    }
+
+    /// <summary>[서버] 무력화 자세 홀드를 푼다(멱등).</summary>
+    void ReleasePushNorthDownPose()
+    {
+        if (IsSpawned) ReleasePushNorthDownPoseClientRpc();
     }
 
     void OnPushNorthCounter()
