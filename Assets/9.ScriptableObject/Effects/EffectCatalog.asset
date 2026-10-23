@@ -55,6 +55,7 @@ MonoBehaviour:
   <Gunner_R_Lock>k__BackingField: {fileID: 11400000, guid: e271ef022f104452a88fe7e53e7dccc1, type: 2}
   <Gunner_R_Strike>k__BackingField: {fileID: 11400000, guid: cf886c3930344214963ed0f67ae4900d, type: 2}
   <Player_Faint>k__BackingField: {fileID: 11400000, guid: 9b8944d0493549069d6e1e57ca0bbc96, type: 2}
+  <Player_TraitAcquired>k__BackingField: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Mob_Bite>k__BackingField: {fileID: 11400000, guid: 711a910e150b32743ba079fc5ff9ed42, type: 2}
   <Mob_Death_Explosion>k__BackingField: {fileID: 11400000, guid: 34b1366dad16435f912891449e1dc1d2, type: 2}
@@ -77,6 +78,9 @@ MonoBehaviour:
   <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
   <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
   <ChargeBall_Break>k__BackingField: {fileID: 11400000, guid: 3c3031593b194504a7a6a779cf151ce4, type: 2}
+  <Pylon_HitSpark>k__BackingField: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  <Pylon_Discharge>k__BackingField: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  <Pylon_Overcharge>k__BackingField: {fileID: 11400000, guid: 204564a4ffd14d61a5e8a4b84e7cf347, type: 2}
   <Dash_LimbElectric>k__BackingField: {fileID: 11400000, guid: 450273ae057d428b84b164f61c4680b4, type: 2}
   <Rage_Shield>k__BackingField: {fileID: 11400000, guid: c201e9a39f93a3c46a80851faf12f0c6, type: 2}
   <Explosion_Basic>k__BackingField: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}

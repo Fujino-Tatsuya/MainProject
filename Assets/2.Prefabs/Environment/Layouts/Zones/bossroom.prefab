@@ -3134,6 +3134,9 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 313944383911697089}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 6541630275479559151}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
@@ -3150,6 +3153,25 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
   m_PrefabInstance: {fileID: 730792832644184112}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &313944383911697089
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 496844997193450849}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &6541630275479559151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3259,7 +3281,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 0.5
   moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  outlineMaterial: {fileID: 0}
 --- !u!4 &985995061862146011 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -3599,6 +3621,9 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 225264209247820285}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 8212091248684035610}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
@@ -3615,6 +3640,25 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
   m_PrefabInstance: {fileID: 847494091531024338}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &225264209247820285
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 505404483568650883}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &8212091248684035610
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3724,7 +3768,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 0.5
   moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  outlineMaterial: {fileID: 0}
 --- !u!4 &885060816906195001 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -9148,6 +9192,9 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 7984853288632569731}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 3099638776200115007}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
@@ -9164,6 +9211,25 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
   m_PrefabInstance: {fileID: 5538223265212959385}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7984853288632569731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4619234605682112456}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &3099638776200115007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9273,7 +9339,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 0.5
   moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  outlineMaterial: {fileID: 0}
 --- !u!4 &5427120997204487538 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -12062,6 +12128,9 @@ PrefabInstance:
       addedObject: {fileID: 4627039947633231218}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 5752398698857424512}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 7947843130189058856}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
@@ -12105,6 +12174,25 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
+--- !u!114 &5752398698857424512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7590406370858292409}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &7947843130189058856
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12189,7 +12277,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 0.5
   moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  outlineMaterial: {fileID: 0}
 --- !u!1001 &7343172837201687197
 PrefabInstance:
   m_ObjectHideFlags: 0

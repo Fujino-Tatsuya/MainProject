@@ -59,7 +59,6 @@ public class BossChargingPylon : Unit
     // 상태(_state)는 서버 전용이라 클라는 Live 를 모른다 → 표시 여부만 복제한다.
     readonly NetworkVariable<bool> _outlined = new NetworkVariable<bool>(false);
     readonly List<Renderer> _outlineRenderers = new List<Renderer>();
-    bool _warnedNoOutlineMaterial;
 
     Collider _collider;
     Vector3 _hiddenLocal;
@@ -201,16 +200,10 @@ public class BossChargingPylon : Unit
 
     void BuildOutlineRenderers()
     {
-        if (outlineMaterial == null)
-        {
-            if (!_warnedNoOutlineMaterial)
-            {
-                _warnedNoOutlineMaterial = true;
-                Debug.LogWarning($"{name}: outlineMaterial 이 비어 있어 송전기 아웃라인이 안 보인다 — " +
-                                 "bossroom.prefab 의 BossChargingPylon 에 MA_PylonOutline 을 지정할 것.", this);
-            }
-            return;
-        }
+        // 비움 = 아웃라인 없이 동작(필드 Tooltip 그대로). 2026-10-22 부터 bossroom 의 송전기 4개가
+        // 모두 비어 있다 — Live 표시를 몸 연출(PylonChargeVisual)이 맡고, 아웃라인 렌더러가 그 위를
+        // 덮어 안 보였기 때문이다. 콜라이더 토글(ApplyOutline)은 여기와 무관하게 그대로 돈다.
+        if (outlineMaterial == null) return;
 
         var sources = GetComponentsInChildren<MeshRenderer>(true);
         for (int i = 0; i < sources.Length; i++)

@@ -44,6 +44,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3024030988266647831}
+  - component: {fileID: 3380059220795825168}
   m_Layer: 6
   m_Name: VFX
   m_TagString: Untagged
@@ -51,6 +52,20 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &3380059220795825168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 291120902584957618}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
+  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
+  scale: 1
 --- !u!4 &3024030988266647831
 Transform:
   m_ObjectHideFlags: 0
