@@ -12,8 +12,6 @@ using UnityEngine;
 [RequireComponent(typeof(Player))]
 public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAnimatorUser
 {
-    private static readonly int IdleHash = Animator.StringToHash("Idle");
-
     // 홀드 조향 오너→서버 전송 주기 (~10Hz). 서버는 마지막 값만 유지한다.
     private const float AimSendInterval = 0.1f;
     private const int SlotCount = 4;
@@ -428,13 +426,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         activeSkill = null;
         activeEndFallbackTime = 0f;
 
-        SkillEndReason reason = nextState switch
-        {
-            PlayerActionState.Dead => SkillEndReason.CasterDied,
-            PlayerActionState.Dash => SkillEndReason.DashCancelled,
-            _ => SkillEndReason.Cancelled,
-        };
+        SkillEndReason reason = PlayerActionPoseRules.ForcedExitReason(nextState);
         skill.OnEnd(reason);
+        // 강제 종료도 정상 종료처럼 0층을 되돌린다 — 안 하면 스킬 클립(간파 1.5초 등)이 넉백·그랩 중에 끝까지 돈다.
+        ReturnBasePoseAfterSkill(reason);
 
         if (IsNetworkActive && IsServer)
             EndSkillClientRpc(GetSkillIndex(skill), reason);
@@ -459,8 +454,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
 
-        if (animator != null)
-            animator.CrossFadeInFixedTime(IdleHash, 0.05f);
+        ReturnBasePoseAfterSkill(reason);
 
         if (IsNetworkActive)
             EndSkillClientRpc(GetSkillIndex(skill), reason);
@@ -1016,9 +1010,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (IsServer)
             return;
 
-        // 로컬(오너)에서 이미 정리된 경우(넉백 선반영 등) 이중 처리 방지
+        // 로컬(오너)에서 이미 정리된 경우(넉백·대시 선반영 등) 이중 처리 방지
         PlayerSkillBase endedSkill = GetSkillByIndex(skillIndex);
-        if (activeSkill != null && activeSkill == endedSkill)
+        bool endedHere = activeSkill != null && activeSkill == endedSkill;
+        if (endedHere)
         {
             PlayerSkillBase skill = activeSkill;
             activeSkill = null;
@@ -1026,11 +1021,14 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             skill.OnEnd(reason);
         }
 
-        if (stateController != null && stateController.IsInSkillState)
+        bool leftSkillState = stateController != null && stateController.IsInSkillState;
+        if (leftSkillState)
             stateController.EndSkill();
 
-        if (animator != null)
-            animator.CrossFadeInFixedTime(IdleHash, 0.05f);
+        // 이 피어가 이미 스킬을 떠났으면(오너가 넉백·대시로 먼저 끊음) 0층을 다시 건드리지 않는다 —
+        // 늦게 온 이 RPC 가 그사이 들어간 상태의 애니(대시 등)를 Idle 로 덮으면 NetworkAnimator 가 그대로 퍼뜨린다.
+        if (endedHere || leftSkillState)
+            ReturnBasePoseAfterSkill(reason);
     }
 
     [ClientRpc]
@@ -1105,6 +1103,38 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             animator.CrossFadeInFixedTime(Animator.StringToHash(skill.Data.AnimatorStateName), 0.05f);
 
         skill.OnClientPlay(direction);
+    }
+
+    // 스킬이 끝난 피어마다 0층을 되돌린다(정상·강제 종료, 서버·오너·관찰자 공통). 오너 애니가 NetworkAnimator 로 최종 복제된다.
+    // 정상 종료에서 이동 입력 중이면 Run_Loop 로 바로 잇는다 — 입력은 입력 주체만 알아서 다른 피어는 Idle 로 두고 오너 복제를 따른다.
+    private void ReturnBasePoseAfterSkill(SkillEndReason reason)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null)
+            return;
+
+        bool returnsToLocomotion = PlayerActionPoseRules.ReturnsToLocomotion(reason);
+        bool wantsMove = returnsToLocomotion && player.IsInputSource &&
+                         inputReader != null && inputReader.HasMoveInput && player.CanMove;
+        PlayerActionExitPose pose = PlayerActionPoseRules.ResolveExit(
+            PlayerActionPoseRules.EndsIntoOwnAnimation(reason),
+            returnsToLocomotion,
+            wantsMove,
+            animator.HasState(PlayerActionPoseRules.BaseLayer, PlayerActionPoseRules.RunLoopHash));
+
+        switch (pose)
+        {
+            case PlayerActionExitPose.RunLoop:
+                // Run_Loop 은 IsMoving 이 꺼지면 바로 Run_Stop 으로 빠진다 — Idle 진입이 끈 값을 다시 켠다.
+                player.SetAnimatorMoving(true);
+                animator.CrossFadeInFixedTime(
+                    PlayerActionPoseRules.RunLoopHash, PlayerActionPoseRules.ExitBlendSeconds, PlayerActionPoseRules.BaseLayer);
+                break;
+            case PlayerActionExitPose.Idle:
+                if (animator.HasState(PlayerActionPoseRules.BaseLayer, PlayerActionPoseRules.IdleHash))
+                    animator.CrossFadeInFixedTime(
+                        PlayerActionPoseRules.IdleHash, PlayerActionPoseRules.ExitBlendSeconds, PlayerActionPoseRules.BaseLayer);
+                break;
+        }
     }
 
     private static Unit ResolveTarget(NetworkObjectReference targetRef)
