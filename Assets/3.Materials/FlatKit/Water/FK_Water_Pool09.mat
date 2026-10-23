@@ -114,7 +114,7 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _LightContribution: 0.927
+    - _LightContribution: 0.657
     - _Metallic: 0
     - _NoiseSource: 1
     - _OcclusionStrength: 1
@@ -127,7 +127,7 @@ Material:
     - _RefractionScale: -1.4
     - _RefractionSpeed: 0.5
     - _RefractionStrength: 0.01
-    - _ShadowStrength: 1
+    - _ShadowStrength: 0.188
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -138,7 +138,7 @@ Material:
     - _Surface: 0
     - _UvFadeX: 0.1
     - _UvFadeY: 0.1
-    - _WaterClearness: 0.557
+    - _WaterClearness: 0.318
     - _WaterDepth: 9.28
     - _WaveAmplitude: 0.05
     - _WaveDirection: 0
@@ -154,7 +154,7 @@ Material:
     - _ColorDeep: {r: 0.63529414, g: 1, b: 0.9421882, a: 1}
     - _ColorShallow: {r: 0.5729352, g: 0.9098238, b: 0.9716981, a: 1}
     - _ColorTop: {r: 1, g: 1, b: 1, a: 0.34117648}
-    - _CrestColor: {r: 1, g: 1, b: 1, a: 0.9}
+    - _CrestColor: {r: 0.39110893, g: 0.4433962, b: 0.4296364, a: 0.9}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _FoamColor: {r: 0.12348701, g: 0.3490566, b: 0.34481347, a: 0.24705882}
     - _FoamStretch: {r: 1, g: 1, b: 1, a: 1}
