@@ -20,11 +20,11 @@ RenderSettings:
   m_FogDensity: 0.01
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.47058824, g: 0.6039216, b: 0.70980394, a: 1}
-  m_AmbientEquatorColor: {r: 0.3137255, g: 0.41960785, b: 0.5137255, a: 1}
-  m_AmbientGroundColor: {r: 0.14901961, g: 0.21568628, b: 0.27450982, a: 1}
-  m_AmbientIntensity: 1.15
-  m_AmbientMode: 0
+  m_AmbientSkyColor: {r: 0.45, g: 0.52, b: 0.7, a: 1}
+  m_AmbientEquatorColor: {r: 0.28, g: 0.31, b: 0.42, a: 1}
+  m_AmbientGroundColor: {r: 0.13, g: 0.13, b: 0.18, a: 1}
+  m_AmbientIntensity: 1
+  m_AmbientMode: 1
   m_SubtractiveShadowColor: {r: 1, g: 1, b: 1, a: 1}
   m_SkyboxMaterial: {fileID: 2100000, guid: 35ddad7d97b7ea345bc2f9b19789956b, type: 2}
   m_HaloStrength: 0.5
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 512
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 0.6
+  m_ReflectionIntensity: 0.4
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
   m_UseRadianceAmbientProbe: 0
@@ -556,8 +556,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
-  m_Color: {r: 0.990566, g: 0.88543516, b: 0.7803044, a: 1}
-  m_Intensity: 0.3
+  m_Color: {r: 1, g: 0.86, b: 0.68, a: 1}
+  m_Intensity: 0.75
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -566,7 +566,7 @@ Light:
     m_Type: 1
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.65
     m_Bias: 0.035
     m_NormalBias: 0.28
     m_NearPlane: 0.1
@@ -619,7 +619,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 529259874}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.1491917, y: -0.78930134, z: 0.5567909, w: 0.21149269}
+  m_LocalRotation: {x: -0.10938169, y: 0.8754261, z: -0.4082179, w: -0.23456974}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1698,7 +1698,7 @@ MonoBehaviour:
   priority: 0
   blendDistance: 0
   weight: 1
-  sharedProfile: {fileID: 11400000, guid: aa2aa29de75be474f8c81eb8ba0aaf8c, type: 2}
+  sharedProfile: {fileID: 11400000, guid: b95e63b9a2050cd4c88d3dfe33f26389, type: 2}
 --- !u!4 &973540932
 Transform:
   m_ObjectHideFlags: 0
@@ -1764,6 +1764,9 @@ MonoBehaviour:
     point: {fileID: 1269426342}
   useOnFall: 1
   dropHeight: 3
+  occupancyRadius: 0.4
+  floorSearchHeight: 1.5
+  maxFlatAngle: 10
 --- !u!4 &1019541882
 Transform:
   m_ObjectHideFlags: 0
