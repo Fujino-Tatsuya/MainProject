@@ -63,13 +63,14 @@ LobbyRadio.Active.ServerClear()                                           // [�
 
 #### Work2 T5c 연결 대상 (레인 B `feature/LobbyTrainingSparring`)
 
-훈련 상대(`TrainingSparringBot`) 서버 이벤트에서 아래처럼 부른다. id 상수는 `LobbyRadioIds`. 문구·지속시간 행은 이미 `TutorialGuideTexts` 에 있다.
+**연결 완료** — `LobbyTrainingSparring` 이 아래 시점의 서버 이벤트(`ServerFirstCounterSucceeded`·`ServerFirstValidWallImpact`·`ServerFinishStarted`)를 낼 때 같은 자리에서 `LobbyRadio.Active.ServerPlay(id)` 를 직접 부른다
+(무전이 없으면 경고 한 번 뒤 건너뜀). id 상수는 `LobbyRadioIds`. 문구·지속시간 행은 이미 `TutorialGuideTexts` 에 있다. 세 줄은 `LobbyRadioRules` 단계 진입 표에 넣지 않는다(중복 금지).
 
 | id | 상수 | 호출 시점(서버) | 메모 |
 |---|---|---|---|
 | `TRAIN_03_COUNTER` | `LobbyRadioIds.Train03Counter` | A(`Train03A/InProgress`)에서 **첫 간파 성공**이 확정된 순간 — 단계 완료 보고(`ServerReportStageCompleted(Train03A)`) **전에** 부른다 | 완료 보고 뒤엔 같은 단계(A/Completed)라 폐기되지 않지만, B 진입이 바로 이어지면 대기 줄이 버려질 수 있다 — 먼저 부르면 지금 뜬 줄이 된다 |
 | `TRAIN_03_WALL` | `LobbyRadioIds.Train03Wall` | C(`Train03C/InProgress`)에서 **첫 유효 벽 충돌**(칸 감소 동반, 명세 §9.5)이 기록된 순간 | 같은 넉백이 마지막 칸 감소 → 제압이면 벽 기록 → `ServerPlay` → C 완료 보고 순서(D 진입 때 폐기돼도 `TRAIN_03_SUPPRESS` 가 이어진다) |
-| `TRAIN_03_COMBAT` | `LobbyRadioIds.Train03Combat` | D(`Train03D/InProgress`)에서 **제압 중 유효 피해 경험 + 제압 종료**(마무리 체력 설정 직후) | 진행기에 D 제압 종료 시점이 없어 단계 진입 대사로 두지 않았다 |
+| `TRAIN_03_COMBAT` | `LobbyRadioIds.Train03Combat` | D(`Train03D/InProgress`)에서 **제압 중 유효 피해 경험 + 제압 종료**(마무리 체력 설정 직후) | 진행기에 D 제압 종료 시점이 없어 단계 진입 대사로 두지 않았다. 판정 = 상대 모델 `IsFinishing` 이 처음 true 가 된 다음 프레임(`ServerFinishStarted`). 피해 없이 끝난 제압은 무전 없음 |
 
 세 줄 모두 `oncePerRound` 기본값(true)으로 부르면 재시도·중복 이벤트에도 회차당 1번만 나온다.
 
@@ -182,9 +183,11 @@ LobbyRadio.Active.ServerClear()                                           // [�
 | Train03 밖(TrainEnd 등)·진행기 디스폰(판 끝 로비 복귀) | 살아 있는 상대 디스폰·회차 끝(다음 회차는 기록을 새로). D 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰 |
 
 - A→B·B→C 전이는 진행기 쪽 영역 안 확인(`Gather_Train03Area`, 0초)을 거친다. C→D 는 제압 시작 순간 바로.
-- **무전 연결 지점(서버 C# 이벤트, `LobbyTrainingSparring.Active` 에서 구독)** — Train03 회차당 1회, 판정 콜백 밖(다음 프레임)에서 낸다.
+- **무전 연결(서버 C# 이벤트, `LobbyTrainingSparring.Active` 에서 구독 가능)** — Train03 회차당 1회, 판정 콜백 밖(다음 프레임)에서 낸다. 낼 때 `LobbyRadio.ServerPlay` 로 해당 무전을 바로 튼다(연결 완료).
+  `Update` 순서 = 간파 → 벽 → 마무리 무전 → 대기 중인 단계 완료 보고.
   - `ServerFirstCounterSucceeded` — A 첫 간파 성공(명세 §14 `TRAIN_03_COUNTER`). C·D 의 간파는 아니다.
   - `ServerFirstValidWallImpact` — C 첫 유효 벽 충돌 = 칸 감소를 동반한 지정 벽 충돌(상대 모델 `HasRecordedWall`, `TRAIN_03_WALL`). A/B 의 벽·0칸 접촉·장식 벽은 아니다.
+  - `ServerFinishStarted` — D 첫 마무리 진입 = 제압 중 유효 피해 + 제압 종료(마무리 체력 설정 직후, 상대 모델 `IsFinishing`, `TRAIN_03_COMBAT`). 규칙 = `LobbySparringLink.TryRaiseFirstFinish`. 피해 없이 끝난 제압은 아니다.
 - **씬 배치(임시 좌표 — 최종 위치는 사용자)**: `LobbyTraining/Train03Arena`(`LobbyTrainingSparringArena`, Gizmo 는 선택 안 해도 보인다 — A/B 노랑·C 하늘색·지정 벽 주황 + 라벨).
   - `SpawnAB` (-16, 0, 4), 방향 +z(집결 구역 중심 쪽) — 시작 집결 구역 `Gather_Train03Area`(중심 (-16, 5), 7×5 → x -19.5~-12.5, z 2.5~7.5) **안쪽**, 중심에서 1 m.
     상대는 이동이 없고 사거리는 `SpinnerBotData.attackRange` 2 m 라 처음엔 구역 밖 z 1.5 였을 때 가운데 선 플레이어(3.5 m)에게 공격·간파 창이 없었다
@@ -199,7 +202,7 @@ LobbyRadio.Active.ServerClear()                                           // [�
   - **지정 벽 Game 뷰 표시 `DesignatedWall_West_Marker` = 임시 비주얼, 아트 교체 대상.** Gizmo 는 Scene 뷰 전용이라 Game 뷰엔 주황 반투명 띠(얇은 큐브, 콜라이더 없음, 그림자 cast/receive off)를 지정 벽 면에 붙였다 —
     중심 (-19.67, 1.05, 5) 크기 (0.06, 2, 5.5), 머티리얼 `Assets/3.Materials/Lobby/MA_Train03DesignatedWall.mat`(URP Unlit Transparent, `MA_AoeTelegraph_Red` 복사본, 주황 α 0.45).
     **Train03C·D 동안만 켜진다**(하위 상태 무관, `LobbySparringLink.WallMarkerVisible`). A·B·TrainEnd 이후·로비 복귀·진행기 없음은 꺼짐. `LobbyTrainingSparringArena.wallMarkers` 가 전 피어에서 진행기 복제 단계(`LobbyTrainingDirector.Active.Stage`)를 매 프레임 읽어 켜고 끈다 — 새 RPC 없음, 늦게 붙은 클라도 같다. 씬엔 꺼진 채 저장.
-- **남은 것**: 무전 구독 = Work1 T6(위 두 이벤트), 제압 중 쿨타임 가속 = 할 일 91 `GrantServer(sourceId, duration)` 로 연결(지금 보류 플래그 꺼짐, 코드 없음),
+- **남은 것**: (무전 COUNTER·WALL·COMBAT 연결은 완료 — 위), 제압 중 쿨타임 가속 = 할 일 91 `GrantServer(sourceId, duration)` 로 연결(지금 보류 플래그 꺼짐, 코드 없음),
   마무리 체력 = 프리팹 `finishHealth` 임시 60, 명세 §9.4 '변신 해제·강화·잔류 공격 종료'(`PracticeReset` 주석 참고), 명세 §9.7 경계 밖 갇힘 복구(상대는 이동이 없고 넉백은 NavMesh 안에서만 밀린다 — 따로 없음). Play·MPPM 확인은 사용자.
 
 ## NavMesh 사전 베이크
