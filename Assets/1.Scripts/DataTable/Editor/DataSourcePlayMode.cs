@@ -22,14 +22,13 @@ public enum DataSource
 /// </para>
 /// <para>
 /// 테이블에 오류가 있으면 Play 진입을 막는다. xlsx 가 하나도 없으면(아직 SVN 에 없음 등) 막지 않고 SO 값으로 돈다 —
-/// 표시가 "TABLE (xlsx 없음)" 으로 바뀐다.
+/// 경고 로그만 남긴다.
 /// </para>
 /// </summary>
 [InitializeOnLoad]
 public static class DataSourcePlayMode
 {
     private const string SnapshotSessionKey = "MainProject.DataTable.PlaySnapshot";
-    private const string BadgeSessionKey = "MainProject.DataTable.PlayBadge";
     private const string GuardedPathsSessionKey = "MainProject.DataTable.PlayGuardedPaths";
     private const string LogPrefix = "[DataTable] ";
 
@@ -72,9 +71,6 @@ public static class DataSourcePlayMode
                 RestorePending(); // 이전 Play 의 찌꺼기가 있으면 먼저 정리
                 PrepareTablePlay();
                 break;
-            case PlayModeStateChange.EnteredPlayMode:
-                ShowBadge();
-                break;
             case PlayModeStateChange.EnteredEditMode:
                 RestorePending();
                 break;
@@ -85,7 +81,6 @@ public static class DataSourcePlayMode
     {
         if (Current != DataSource.Table)
         {
-            SessionState.SetString(BadgeSessionKey, "DATA: INSPECTOR");
             StringTableBuild.RefreshForInspectorPlay(); // 문구는 xlsx 가 유일한 원본 — 수치 모드와 무관하게 갱신
             return;
         }
@@ -102,7 +97,6 @@ public static class DataSourcePlayMode
         if (result.FileCount == 0)
         {
             Debug.LogWarning($"{LogPrefix}데이터 출처 = 테이블인데 xlsx 가 없다({DataTableSource.Folder}) — SO 값으로 돈다. SVN 업데이트 확인.");
-            SessionState.SetString(BadgeSessionKey, "DATA: TABLE (xlsx 없음)");
             return;
         }
 
@@ -118,19 +112,9 @@ public static class DataSourcePlayMode
         SessionState.SetString(SnapshotSessionKey, JsonUtility.ToJson(snapshot));
         // 복구 전까지 이 에셋들의 저장을 막는다(DataTableSaveGuard) — 메모리의 테이블 값이 디스크로 새는 걸 막는다.
         SetGuardedPaths(result.Writes.Select(w => AssetDatabase.GetAssetPath(w.Target)));
-        SessionState.SetString(BadgeSessionKey, "DATA: TABLE");
         snapshotTargets = null;
         warnedTargets.Clear();
         Debug.Log($"{LogPrefix}테이블 Play — xlsx {result.FileCount}개, 필드 {result.Writes.Count}개를 메모리에 적용(디스크 변경 없음).");
-    }
-
-    private static void ShowBadge()
-    {
-        string text = SessionState.GetString(BadgeSessionKey, string.Empty);
-        if (text.Length > 0)
-        {
-            DataSourceBadge.Show(text, text.StartsWith("DATA: TABLE") ? TableColor : InspectorColor);
-        }
     }
 
     private static void RestorePending()
