@@ -163,7 +163,6 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     // GetComponentsInChildren(List<T>) 오버로드는 할당하지 않는다 — 매 프레임 도는 경로다.
     private static readonly List<ParticleSystem> BeamSystems = new List<ParticleSystem>();
-    private static readonly List<BeamEndAnchor> BeamAnchors = new List<BeamEndAnchor>();
     private float beamStopAt = -1f;
     private float beamSizeMultiplier = -1f;
     private float beamLength = -1f;
@@ -177,8 +176,6 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private bool impactDamagedUnit;
     private Vector3 impactDelta;
     private float impactWidth;
-    private bool endSystemsHeld;
-    private static readonly List<ParticleSystem> HeldEndSystems = new List<ParticleSystem>();
     private static ParticleSystem.Particle[] TravelParticles = new ParticleSystem.Particle[16];
     // 몸통의 원래 길이 성장 커브(Size over Lifetime Y). 날아가는 동안은 코드가 길이를 정하므로 1 로 바꿔 두고, 즉시 모드면 되돌린다.
     private static readonly Dictionary<ParticleSystem, ParticleSystem.MinMaxCurve> AuthoredGrowth =
@@ -616,16 +613,13 @@ public class GunnerBeamView : BaseNetworkBehaviour
             return;
         }
 
-        // 끝점 불꽃(BeamEndAnchor)은 닿을 때까지 붙잡아 둔다 — 쏘는 순간 끝점에서 먼저 튀지 않게.
-        HoldEndSystems();
         pendingImpact = true;
     }
 
-    // [로컬] 레이저가 끝점에 닿은 순간 — 끝점 불꽃을 풀고 착탄 연출을 낸다.
+    // [로컬] 레이저가 끝점에 닿은 순간 — 착탄 연출을 낸다.
     private void ArriveBeam()
     {
         pendingImpact = false;
-        ReleaseEndSystems();
         PlayImpact();
     }
 
@@ -662,33 +656,6 @@ public class GunnerBeamView : BaseNetworkBehaviour
             return facing;
 
         return Quaternion.FromToRotation(-dir, hit.normal) * facing;
-    }
-
-    // 끝점 불꽃(BeamEndAnchor 가 붙은 시스템)을 버스트 전에 멈춰 둔다. Play() 와 같은 프레임이라 아직 안 튀었다.
-    private void HoldEndSystems()
-    {
-        HeldEndSystems.Clear();
-        int count = basicBeamPlayer.GetInstances(BeamInstances);
-        for (int i = 0; i < count; i++)
-        {
-            BeamInstances[i].GetComponentsInChildren(true, BeamAnchors);
-            for (int k = 0; k < BeamAnchors.Count; k++)
-            {
-                if (!BeamAnchors[k].TryGetComponent(out ParticleSystem ps)) continue;
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                HeldEndSystems.Add(ps);
-            }
-        }
-        endSystemsHeld = HeldEndSystems.Count > 0;
-    }
-
-    private void ReleaseEndSystems()
-    {
-        if (!endSystemsHeld) return;
-        endSystemsHeld = false;
-        for (int i = 0; i < HeldEndSystems.Count; i++)
-            if (HeldEndSystems[i] != null) HeldEndSystems[i].Play(true);
-        HeldEndSystems.Clear();
     }
 
     /// <summary>
@@ -891,7 +858,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
                 //    ⚠️ 값으로 걸러낼 수 없다: Constant 모드에서
                 //    startSpeedMultiplier 는 startSpeed.constant 와 **같은 값**이라,
                 //    한 번 곱하고 나면 "원래 속도"를 읽을 방법이 없다.
-                //    그래서 BeamEndAnchor 와 같은 방식으로 프리팹에 표시한다.
+                //    그래서 BeamTravelScale 컴포넌트로 프리팹에 표시한다.
                 if (!BeamSystems[k].TryGetComponent(out BeamTravelScale _))
                     continue;
 
@@ -906,19 +873,6 @@ public class GunnerBeamView : BaseNetworkBehaviour
                 float travelSpeed = life > 0.001f ? length / life : length;
                 if (!Mathf.Approximately(main.startSpeedMultiplier, travelSpeed))
                     main.startSpeedMultiplier = travelSpeed;
-            }
-
-            // 🔴 끝점 연출(BeamEndAnchor)은 늘이는 게 아니라 **옮기는** 것이다.
-            //    프리팹 루트의 +Z 가 빔 진행 방향이라, 거기서 거리만큼 민다.
-            //    TransformPoint 대신 position + forward 를 쓰는 이유: 루트 배율이 섞여도 거리가 안 틀어진다.
-            instance.GetComponentsInChildren(true, BeamAnchors);
-            if (BeamAnchors.Count == 0) continue;
-
-            Transform rootT = instance.transform;
-            for (int k = 0; k < BeamAnchors.Count; k++)
-            {
-                float along = length + BeamAnchors[k].OffsetAlongBeam;
-                BeamAnchors[k].transform.position = rootT.position + rootT.forward * along;
             }
         }
     }
