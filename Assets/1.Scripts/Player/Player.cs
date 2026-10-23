@@ -1672,6 +1672,9 @@ public class Player : Unit
         stateController.EndKnockback();
     }
 
+    /// <summary>캐릭터 Animator(읽기 전용) — 보스 등장 연출의 밀림 리액션이 상태를 고른다(BossEncounterDirector).</summary>
+    public Animator CharacterAnimator => animator;
+
     public void SetAnimatorMoving(bool isMoving)
     {
         if (animator != null)

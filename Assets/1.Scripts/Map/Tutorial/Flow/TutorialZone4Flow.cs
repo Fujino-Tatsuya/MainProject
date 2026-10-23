@@ -124,10 +124,17 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         // 보스방 도착(Finished) 뒤엔 23호 팁만 남긴다 — 설정 자막→G8·기상 시계·만료/패드 자막은 돌리지 않는다(S12 정리, 휴면 몬스터는 휴면 그대로).
         if (_director.IsFinished)
         {
+            // 보스 등장 시네마틱(웰즈 독백)과 겹치지 않게 — 연출이 끝난 뒤에 낸다(팁 예약은 그때까지 남아 있다).
+            BossEncounterDirector encounter = BossEncounterDirector.Instance;
+            if (encounter != null && encounter.IsSpawned && encounter.IsIntroCinematicActive) return;
             if (_model.ShouldShowBossTip(now))
                 _director.ShowSubtitleServer(TutorialGuideIds.BBossFrontTip);
             return;
         }
+
+        // 전멸 재도전 되감기로 Finished 를 벗어났다 — 도착 래치를 풀어 패드 자막·재도착 처리를 다시 돌린다.
+        if (_model.NotifyBossRetry())
+            Edit.Log("[Tutorial] 존4: 보스 재도전 — 도착 래치 해제.", this);
 
         if (_model.ShouldStartTimer(now))
         {

@@ -104,3 +104,5 @@ MonoBehaviour:
   mapSceneManager: {fileID: 0}
   resultDelayAfterVanishSeconds: 0
   defeatResultTimeoutSeconds: 12
+  introFont: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  skipButtonSprite: {fileID: 21300000, guid: 28aaba80a0054613b29a08d4926849c1, type: 3}

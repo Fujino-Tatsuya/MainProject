@@ -158,6 +158,33 @@ public class BossWells : MonoBehaviour
     // 레거시에서 들고 있던 폭탄을 정리하던 이벤트. 비주얼 정리만 한다(실물 폭탄은 자기 수명이 있다).
     public void BombDestroyEvent() => ShowHeldBomb(false);
 
+    /// <summary>
+    /// [모든 피어] 등장 연출의 공격 지시 — <c>Boss_welz_throwing</c> 클립만 튼다(경석 10-23). <see cref="PlayState"/>(Throw) 와 달리
+    /// <b>손폭탄 표시를 켜지 않는다.</b> 클립 이벤트 <see cref="ThrowBombEvent"/> 는 구독자가 없어 투사체가 안 나간다. 끝나면 컨트롤러가 Idle 로 돌아간다.
+    /// </summary>
+    const string CommandClipName = "Boss_welz_throwing";
+
+    /// <summary>지시 클립(<c>Boss_welz_throwing</c>) 길이(초, 컨트롤러 기준). 못 찾으면 0 — 등장 연출이 이 길이만큼 기다린 뒤 카메라를 돌린다.</summary>
+    public float CommandGestureLength
+    {
+        get
+        {
+            if (animator == null) animator = GetComponentInChildren<Animator>(true);
+            RuntimeAnimatorController controller = animator != null ? animator.runtimeAnimatorController : null;
+            if (controller == null) return 0f;
+            foreach (AnimationClip clip in controller.animationClips)
+                if (clip != null && clip.name == CommandClipName) return clip.length;
+            return 0f;
+        }
+    }
+
+    public void PlayCommandGesture()
+    {
+        if (animator == null || animator.runtimeAnimatorController == null) return;
+        ShowHeldBomb(false);
+        SafeTrigger(throwTrigger);
+    }
+
     void ShowHeldBomb(bool visible)
     {
         if (heldBombVisual != null && heldBombVisual.activeSelf != visible)

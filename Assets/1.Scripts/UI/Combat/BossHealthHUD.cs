@@ -22,6 +22,18 @@ public class BossHealthHUD : MonoBehaviour
     [Tooltip("실드 바 색. Awake 에서 shieldFill 에 적용한다(색 원본은 이 필드).")]
     [SerializeField] private Color shieldColor = new Color(0.55f, 0.85f, 1f, 0.65f);
 
+    [Header("등장 차오름(경석 10-23)")]
+    [Tooltip("바가 처음 보일 때 이 비율에서 실제 HP 까지 빠르게 채운다. 끄면 처음부터 실제 값.")]
+    [SerializeField] private bool introFillEnabled = true;
+    [Tooltip("차오르기 시작 비율(0~1). 1/4 = 0.25.")]
+    [SerializeField, Range(0f, 1f)] private float introFillStart = 0.25f;
+    [Tooltip("차오르는 시간(초).")]
+    [SerializeField, Min(0.05f)] private float introFillSeconds = 0.8f;
+
+    private readonly BossHealthIntroFill introFill = new BossHealthIntroFill();
+    private Unit introPlayedFor;              // 이 보스로 차오름을 한 번 했다(재도전 = 새 보스 인스턴스라 다시 한다)
+    private bool wasShown;
+
     private Unit boundBoss;
     private TwentyThreeBoss boundGaugeBoss;   // 간파 게이지를 가진 보스(23호)일 때만
 
@@ -39,18 +51,38 @@ public class BossHealthHUD : MonoBehaviour
         if (boss != boundBoss)
             BindBoss(boss);
 
-        bool shouldShow = boss != null && boss.CurrentHealth > 0;
+        // 등장 시네마틱 워크인·강하·착지 동안은 숨긴다 — 웰즈 지시 구간부터 보인다(PLAN-boss-encounter-cutscene 정정 8).
+        BossEncounterDirector director = BossEncounterDirector.Instance;
+        bool introHides = director != null && director.IsSpawned && director.HidesBossHud;
+        bool shouldShow = boss != null && boss.CurrentHealth > 0 && !introHides;
         if (barRoot != null && barRoot.activeSelf != shouldShow)
             barRoot.SetActive(shouldShow);
 
         if (!shouldShow)
+        {
+            wasShown = false;
+            introFill.Cancel();
             return;
+        }
+
+        // 처음 보이는 순간(등장 연출이 끝나 바가 뜰 때) 한 번 — 1/4 에서 최대까지 빠르게 차오른다.
+        if (!wasShown && introFillEnabled && introPlayedFor != boss)
+        {
+            introPlayedFor = boss;
+            introFill.Begin();
+        }
+        wasShown = true;
 
         int maxHp = boss.FinalMaxHp;
+        float actual01 = maxHp > 0 ? Mathf.Clamp01((float)boss.CurrentHealth / maxHp) : 0f;
+        float shown01 = introFill.Evaluate(actual01, Time.unscaledDeltaTime, introFillStart, introFillSeconds);
         if (hpFill != null)
-            hpFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)boss.CurrentHealth / maxHp) : 0f;
+            hpFill.fillAmount = shown01;
 
         delayed.Tick(Time.deltaTime, boss.CurrentHealth, maxHp);
+        // 차오르는 동안 잔상 바는 앞 바와 같이 간다(잔상이 먼저 가득 차 있으면 피해 흔적처럼 보인다).
+        if (introFill.Active)
+            delayed.ForceFill(shown01);
 
         if (counterGaugeFill != null)
         {

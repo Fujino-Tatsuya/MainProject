@@ -1,5 +1,10 @@
 # 23호 레이드 — 체력 구간별 진행 (2026-10-14 기준)
 
+> ⚠️ **정정 2026-10-22** — 이 문서는 `No23_Raid`(75/45/20) 기준이고 **지금 빌드에 나가는 보스가 아니다.**
+> 기본 빌드·에디터 기본 = **23호 B**(`TwentyThree_Raid.prefab` → `No23_B.asset`, 커밋 19af69c2). A = `TwentyThree.prefab` → `No23_A.asset`(`BOSS_A_BUILD` 빌드).
+> A·B 는 70%/30% 두 구간이고 기믹만 다르다: **A = 70% 송전탑 차징(ChargeSequence) · 30% 간파 릴레이** / **B = 70% 드론 송전기(RaidDroneCharge) · 30% 북진 압박(RaidPushNorth)**. 둘 다 0줄 자폭(`selfDestructAtZero`).
+> 나머지 수치는 A=B 이고 xlsx `Boss` 시트 D·E 열 = 에셋(10-22 대조, 차이 0). 릴레이·북진·연쇄 간파 칸은 `[DataTableIgnore]` 라 xlsx 로 못 바꾼다(코드 기본값). 아래 "빌드는 아직 항상 기존"·"③ 1인 = 간파 돌진"·"xlsx 에 행이 없는 칸"은 낡은 서술이다.
+
 > 기존 23호와 **별개의 변형 보스**다(`TwentyThree_Raid.prefab` + `No23_Raid.asset`). 에디터 툴바 **"보스: 기존/레이드"** 로 바꿔 비교한다(빌드는 아직 항상 기존).
 > 설계 배경 = [PLAN-boss-raid.md](../../../PLAN-boss-raid.md) · 회의 = [raid-rework-meeting-1014.md](raid-rework-meeting-1014.md).
 > 수치는 `No23_Raid.asset` 칸이다. 아래 `필드명` 은 그 칸 이름이다.

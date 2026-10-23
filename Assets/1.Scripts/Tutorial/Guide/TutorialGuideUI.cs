@@ -95,6 +95,19 @@ public sealed class TutorialGuideUI : MonoBehaviour
 
     // ---------------- API ----------------
 
+    /// <summary>자막 글꼴(한글 글리프 보장) — 보스 등장 독백·스킵 안내가 같은 글꼴을 쓴다(BossIntroPresentation).</summary>
+    public TMP_FontAsset SubtitleFont => subtitleText != null ? subtitleText.font : null;
+
+    /// <summary>문구 표에서 <paramref name="id"/> 를 지금 캐릭터 기준으로 찾는다(자막을 띄우지 않고 글만). 없으면 false.</summary>
+    public bool TryResolveText(string id, out string text)
+    {
+        text = null;
+        if (TutorialGuideText.Resolve(textTable, id, LocalCharacter(), out TutorialGuideTextRow row) != TutorialGuideTextStatus.Found
+            || row == null || string.IsNullOrEmpty(row.Text)) return false;
+        text = row.Text;
+        return true;
+    }
+
     /// <summary>
     /// 자막 한 줄을 큐에 넣는다. 캐릭터 변형·{Q}{E}{P} 는 로컬 플레이어로, 그 밖 자리표시자는 args 로 채운다.
     /// 행이 없거나 문구가 비었으면 아무것도 띄우지 않고 경고만 남긴다.

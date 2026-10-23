@@ -256,7 +256,7 @@ public class BossTeleportManager : NetworkBehaviour
     {
         _countdownCause = cause;
         _teleportAt.Value = NetworkManager.ServerTime.Time + seconds;
-        _pending = StartCoroutine(TeleportAfter(seconds));
+        _pending = StartCoroutine(TeleportAfter(_teleportAt.Value));
     }
 
     private void CancelCountdown()
@@ -296,9 +296,12 @@ public class BossTeleportManager : NetworkBehaviour
         return true;
     }
 
-    private IEnumerator TeleportAfter(float seconds)
+    private IEnumerator TeleportAfter(double teleportAt)
     {
-        yield return new WaitForSeconds(seconds);
+        // 표시(_teleportAt · ServerTime)와 같은 시계로 기다린다 — WaitForSeconds 는 timeScale(간파 슬로우 등)에 늘어나
+        // 숫자가 0 이 된 뒤에도 안 떠나고, 그동안 BossCountdown 구간(낙사·부활 = 보스 진입 지점)도 길어진다.
+        while (NetworkManager != null && NetworkManager.ServerTime.Time < teleportAt)
+            yield return null;
 
         // 강제 이동이면 목숨이 남은 Soul 을 먼저 되살린다(팀장 확정 2026-09-20) —
         // Soul 만 도착하면 Director 가 참가자를 못 잡아 보스가 아예 안 뜬다.
@@ -501,7 +504,10 @@ public class BossTeleportManager : NetworkBehaviour
             if (lifeCycle == null || lifeCycle.State != PlayerLifeState.Soul) continue;
 
             var revive = playerObject.GetComponent<PlayerReviveController>();
-            bool ok = revive != null && revive.TryCompleteReviveOnServer();
+            // 튜토리얼 보스방 도착(G11) 전 사망은 목숨 차감 없음(tutorial-director.md S11) — 사망 규칙과 같은 프레임에 겹쳐도 차감하지 않게.
+            TutorialDirector tutorial = TutorialDirector.Instance;
+            bool free = tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G11_BossRoom);
+            bool ok = revive != null && revive.TryCompleteReviveOnServer(consumeLife: !free);
 
             Edit.Log($"[BossTeleport] 강제 개시 부활 — clientId={client.ClientId} 결과={(ok ? "성공" : "실패(목숨 없음)")}", this);
         }
@@ -552,6 +558,13 @@ public class BossTeleportManager : NetworkBehaviour
         {
             ulong clientId = alive[slot];
             GetArrivalPose(slot, out Vector3 destination, out Quaternion rotation);
+            // 보스 등장 시네마틱 — 도착 자리 = 워크인 출발 대열(가로 일자·3인 삼각형, PLAN-boss-encounter-cutscene). 높이는 원래 도착 지점 그대로.
+            BossEncounterDirector director = BossEncounterDirector.Instance;
+            if (director != null && director.TryGetIntroStartPose(slot, alive.Count, destination.y, out Vector3 introPos, out Quaternion introRot))
+            {
+                destination = introPos;
+                rotation = introRot;
+            }
             TeleportParticipant(clientId, destination, rotation, isArrival: true);
             Edit.Log($"[BossTeleport] 슬롯 {slot} 배정 — clientId={clientId}, seq={_encounterSequence}", this);
         }
