@@ -340,11 +340,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 885060816906195001, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.669
       objectReference: {fileID: 0}
     - target: {fileID: 985995061862146011, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.669
+      objectReference: {fileID: 0}
+    - target: {fileID: 1032678739827477454, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.67
       objectReference: {fileID: 0}
     - target: {fileID: 3099638776200115007, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: GlobalObjectIdHash
@@ -370,9 +374,13 @@ PrefabInstance:
       propertyPath: SceneMigrationSynchronization
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4984204819302039578, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.67
+      objectReference: {fileID: 0}
     - target: {fileID: 5427120997204487538, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.669
       objectReference: {fileID: 0}
     - target: {fileID: 5795541321776209706, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.x
@@ -414,6 +422,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5844271226541974829, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.67
+      objectReference: {fileID: 0}
+    - target: {fileID: 6258091361856820721, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.67
+      objectReference: {fileID: 0}
     - target: {fileID: 6541630275479559151, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 1449384102
@@ -424,7 +440,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7069906824164445699, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.669
       objectReference: {fileID: 0}
     - target: {fileID: 7590406370858292409, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_Layer

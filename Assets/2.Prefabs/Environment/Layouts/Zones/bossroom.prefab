@@ -3030,6 +3030,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(4)
@@ -3120,6 +3124,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -3166,9 +3174,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
   ShowTopMostFoldoutHeaderGroup: 1
-  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
   hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
-  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
   hitSparkInterval: 0.08
   hitSparkScale: 1
   dischargeScale: 1
@@ -3262,8 +3270,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &6562377548359998151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3279,8 +3287,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
   outlineMaterial: {fileID: 0}
 --- !u!4 &985995061862146011 stripped
 Transform:
@@ -3607,6 +3615,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -3653,9 +3665,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
   ShowTopMostFoldoutHeaderGroup: 1
-  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
   hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
-  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
   hitSparkInterval: 0.08
   hitSparkScale: 1
   dischargeScale: 1
@@ -3749,8 +3761,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &5085897276421390087
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3766,8 +3778,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
   outlineMaterial: {fileID: 0}
 --- !u!4 &885060816906195001 stripped
 Transform:
@@ -8090,6 +8102,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(2)
@@ -9178,6 +9194,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -9224,9 +9244,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
   ShowTopMostFoldoutHeaderGroup: 1
-  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
   hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
-  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
   hitSparkInterval: 0.08
   hitSparkScale: 1
   dischargeScale: 1
@@ -9320,8 +9340,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &7190623343084418001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9337,8 +9357,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
   outlineMaterial: {fileID: 0}
 --- !u!4 &5427120997204487538 stripped
 Transform:
@@ -9627,6 +9647,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(1)
@@ -10373,6 +10397,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(3)
@@ -12111,6 +12139,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -12187,9 +12219,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
   ShowTopMostFoldoutHeaderGroup: 1
-  chargePrefab: {fileID: 4360387743528230286, guid: e94c8131aa0cae24b889c1a584bdbf9d, type: 3}
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
   hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
-  discharge: {fileID: 11400000, guid: 333c87e4b7e440bf943128ec567092e8, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
   hitSparkInterval: 0.08
   hitSparkScale: 1
   dischargeScale: 1
@@ -12258,8 +12290,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &3221511134861534754
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12275,8 +12307,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
   outlineMaterial: {fileID: 0}
 --- !u!1001 &7343172837201687197
 PrefabInstance:
