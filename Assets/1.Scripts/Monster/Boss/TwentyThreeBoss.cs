@@ -6750,12 +6750,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     // 🔴 연출은 반드시 RPC 로 — 서버에서 직접 그리면 호스트에서만 보인다(이 레포가 여러 번 겪은 버그).
     internal void SendFloorWarn(ulong mask, float warnTime) => FloorWarnClientRpc(mask, warnTime);
-    internal void SendFloorFire(ulong mask, float vfxTime) => FloorFireClientRpc(mask, vfxTime);
+    internal void SendFloorFire(ulong mask, float vfxTime, bool lethal) => FloorFireClientRpc(mask, vfxTime, lethal);
     internal void SendFloorClear() => FloorClearClientRpc();
 
     // (`?.` 대신 `!= null` — 파괴된 컴포넌트는 Unity 의 == 만 null 로 본다)
     [ClientRpc] void FloorWarnClientRpc(ulong mask, float warnTime) { if (_electricFloor != null) _electricFloor.ClientShowWarn(mask, warnTime); }
-    [ClientRpc] void FloorFireClientRpc(ulong mask, float vfxTime) { if (_electricFloor != null) _electricFloor.ClientFire(mask, vfxTime); }
+    // lethal = 즉사 방전 연출용(10-23 민경 — handoff-boss-electric-floor-vfx). 판정과 무관.
+    [ClientRpc] void FloorFireClientRpc(ulong mask, float vfxTime, bool lethal) { if (_electricFloor != null) _electricFloor.ClientFire(mask, vfxTime, lethal); }
     [ClientRpc] void FloorClearClientRpc() { if (_electricFloor != null) _electricFloor.ClientClear(); }
 
     internal void SendDroneMark(NetworkObject target, float trackTime) => DroneMarkClientRpc(target, trackTime);
