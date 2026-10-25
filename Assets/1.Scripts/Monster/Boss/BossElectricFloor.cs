@@ -291,7 +291,7 @@ public sealed class BossElectricFloor : MonoBehaviour
     {
         _step = Step.Vfx;
         _t = _d.vfxDuration;
-        _boss.SendFloorFire(mask, _d.vfxDuration);
+        _boss.SendFloorFire(mask, _d.vfxDuration, _fireLethal);   // 즉사 여부는 연출용(즉사 방전 연출) — 판정은 아래 그대로
 
         if (!_boss.TryGetTileGrid(out BossTileGrid grid))
         {
@@ -347,9 +347,19 @@ public sealed class BossElectricFloor : MonoBehaviour
     float _viewStart, _viewDur;
     bool _viewFiring;
 
+    // 연출 신호(전 피어, 2026-10-23 민경 — Docs/tech/handoff-boss-electric-floor-vfx.md). 보스 VFX 의 BossElectricFloorVfx 가 듣는다.
+    // 알리기만 한다 — 판정·표시는 그대로.
+    /// <summary>[전 피어] 예고 시작(칸 마스크, 예고 시간).</summary>
+    public event Action<ulong, float> ClientWarnShown;
+    /// <summary>[전 피어] 발동(칸 마스크, 연출 시간, 즉사 여부).</summary>
+    public event Action<ulong, float, bool> ClientFired;
+    /// <summary>[전 피어] 예고·연출 즉시 제거(모드 전환·제압·기믹 종료·사망).</summary>
+    public event Action ClientCleared;
+
     public void ClientShowWarn(ulong mask, float warnTime)
     {
         if (!EnsureView()) return;
+        ClientWarnShown?.Invoke(mask, warnTime);
         HideAllTiles();
         _viewMask = mask;
         _viewStart = Time.time;
@@ -375,9 +385,10 @@ public sealed class BossElectricFloor : MonoBehaviour
         EnemyC3Visuals.PaintPlate(_outer[i],_fill[i],"15",true);
     }
 
-    public void ClientFire(ulong mask, float vfxTime)
+    public void ClientFire(ulong mask, float vfxTime, bool lethal = false)
     {
         if (!EnsureView()) return;
+        ClientFired?.Invoke(mask, vfxTime, lethal);
         HideAllTiles();
         _viewMask = mask;
         _viewStart = Time.time;
@@ -412,7 +423,11 @@ public sealed class BossElectricFloor : MonoBehaviour
         });
     }
 
-    public void ClientClear() => HideAllTiles();
+    public void ClientClear()
+    {
+        HideAllTiles();
+        ClientCleared?.Invoke();
+    }
 
     void ClientTick()
     {

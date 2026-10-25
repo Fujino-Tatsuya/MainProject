@@ -1,3 +1,66 @@
+# ▶▶▶ 계획 = **23호 전기 장판 VFX — 예고 스파크 · 발동 천둥 번개 · 잔광 · 피격 감전 원샷 · 즉사(번개 모양만 다르게)** (2026-10-23 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23 — Q4 = B·C 둘 다 제작 후 Play 로 선택, Q11 = MyProject 미리보기만, 나머지 추천안).
+> 장판 피해·판정·타이밍 무변경. 경석 영역은 **추가만**(클라 이벤트 3개 + 발동 RPC 인자 1개) → handoff.
+
+## 사실
+- `BossElectricFloor`(경석): 서버가 칸(8×8 마스크)·타이밍을 정하고 23호 ClientRpc 3개(`FloorWarn`·`FloorFire`·`FloorClear`)로 전 피어에 알린다. 클라는 `BossElectricFloorView`(씬 루트) 밑 칸마다 판 2장(`_Outer`·`_Fill`, 공용 예고 스타일 `EnemyC3Visuals` "15"/"16")을 켜고 끈다.
+- 예고 1.2초(일반) / 2초(송전기 기믹) / 레이드 방전은 요청마다 다름 · 발동 연출 0.4초(`vfxDuration`) · 한 번에 최대 64칸 · 기믹 B 는 1단계 직후 2단계 예고.
+- 기존 VFX 훅 = 발동용 `electricVfxPrefab` 하나(두 데이터 에셋 모두 비어 있음). 0.4초 끝에 `HideAllTiles` 가 꺼서 잔광을 못 붙인다.
+- 즉사 여부(`_fireLethal`)는 서버만 안다 — `FloorFireClientRpc(mask, vfxTime)` 에 없다. 즉사 방전 = ④ 폐기 처분 저지 실패 대폭발(`raidSelfDestructBlastLethal`) · 북진 압박 송전기 시간 초과 방전(항상).
+- 감전 상태이상 없음(`StatusEffectType`), 기획 §6.3 = 장판은 상태이상을 걸지 않는다. 피해는 전 피어 `Unit.ClientDamagedAttributed` 로 알려지지만 "장판 피해" 표시는 없다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 타이밍(Q1) | ① 예고 + (a) 발동 직전 0.25초 · ② 발동 0.4초 + (b) 잔광 0.25초 · ③ 피격. 23호·송전기→바닥 아크 없음 |
+| ① 예고(Q3) | 붉은 예고 판 그대로, 그 위에 칸마다 시안 스파크 — 빈도 0→최대(예고 시간 비례), 칸당 동시 ~6 |
+| (a) 발동 직전 | 예고 시간과 무관하게 마지막 0.25초 스파크 몰아침 + 바닥 살짝 밝아짐 |
+| ② 발동 | ~~흐르는 전기 무늬 판~~(물처럼 보임 — 10-23 민경) → **천둥 번개**(레퍼런스 `전기장판 번개 레퍼런스.mp4` 의 3~4배 빠르기): 바닥 번쩍 + 칸 가운데 근처 한 점에서 갈라지는 번개(`ElectricFloorBolts`, 코드로 짠 메시 2겹)가 0.1초에 칸 끝까지 뻗고 0.07초마다 모양을 바꿔 다시 침(밝기 들쭉날쭉). 변 위 끝점은 이웃 칸과 같은 자리 → 판 전체가 한 그물. 수많은 칸이 동시에 켜져도 부담 없게 단순·은은하게(변 닿을 확률 0.5 · 곁가지 0.15 · 지그재그 0.16). + 바닥 번개 조각 1~2 · 불티. 장판의 발동 표시 판("16")은 그대로 켜진다 |
+| (b) 잔광 | 0.4초 뒤 0.25초 동안 무늬 판이 꺼짐. 지우기(사망·제압·기믹 종료 = `FloorClear`) 오면 즉시 끔 |
+| ③ 피격(Q2 B) | 상태이상 없는 원샷 신규 제작. 맞은 플레이어 몸 가운데를 따라다니며 0.5초 — 몸 주위 작은 번개 + 스파크. 나중에 진짜 감전이 생기면 그 연출로 옮길 수 있게 |
+| ③ 판정(Q9 C) | 발동 신호 직후 0.3초 안에 실제 피해 이벤트가 온 플레이어 중 발이 터진 칸 안인 사람만. 네트워크 추가 없음. 보호막에 막혀 이벤트가 안 오면 연출 없음 |
+| 즉사(Q4) | ~~B 강화·C 전용 둘 다 제작 + 선택 칸~~ → **10-23 민경 미리보기 후 확정: 추가 연출 없이 번개 모양 수치만 다르게**(변 닿을 확률 0.709 · 칸 안 줄기 0~10 · 지그재그 0.5 · 곁가지 0.4 — `ElectricFloorBolts` 의 즉사 모양). 선택 칸·전용 판 연출 삭제 |
+| 즉사 전달(Q13 A) | `FloorFireClientRpc` 에 `bool lethal` 추가(경석 2줄). 피해·판정 무변경 |
+| 색(Q5) | 전기 = 송전기와 같은 시안·흰색. 붉은 판이 위험 표시 |
+| 구조(Q6·Q8 B) | 칸마다 프리팹 1개, 64칸 재사용 풀. 연출은 신규 `1.Scripts/Effects/BossElectricFloorVfx.cs`(민경)가 23호 `VFX` 밑에서 전담. `BossElectricFloor` 에는 클라 이벤트 3개(예고 시작(칸·시간)·발동(칸·시간·즉사)·지우기) + 칸 중심/높이 조회만 추가. `electricVfxPrefab` 은 비운 채 |
+| 범위 | `TwentyThree.prefab` 에 붙이면 레이드 Variant 도 같이 |
+| 가장자리 전류(10-23 추가) | 발동 동안 칸 테두리 위 떨리는 선 + 빛 줄기(약 8m/s) — `ElectricFloorEdges`. 공유 변은 한 칸만(위·왼쪽 늘, 아래·오른쪽은 이웃이 안 터질 때) |
+| 제작(Q7 A) | MyProject — 8×8 판 미리보기 씬(일반 교차·기믹 A·B·레이드·즉사 키 재생)에서 제작 → MainProject import |
+| 테스트(Q11 B) | 즉사 B/C 비교는 MyProject 미리보기에서. MainProject 디버그 키 추가 없음 |
+
+## 작업 순서
+1. MyProject `Tools/VFX/Electric Floor (23호 전기 장판) 빌드`: 프리팹 `FX_ElectricFloorTile`(칸 — 예고·발동·잔광, 즉사는 번개 모양만)·`FX_ElectricFloorHit`(피격) · 공용 스크립트 `ElectricFloorTileFx`·`ElectricFloorBolts`·`ElectricFloorFxPool`(같은 guid) · 미리보기 씬 `ElectricFloorPreview`·테스터 → 민경 확인.
+2. MainProject: `BossElectricFloor`·`TwentyThreeBoss` 추가분 → `BossElectricFloorVfx` 배선(`TwentyThree.prefab` `VFX`) · ③ 은 `EffectCatalog` 엔트리 · 에셋 import(`50.Art/VFX/Common/Boss/ElectricFloor/`).
+3. 빌드 오류 0 · handoff `Docs/tech/handoff-boss-electric-floor-vfx.md` · 민경 Play(호스트·클라).
+
+## 리스크
+- 64칸 동시 — 칸당 파티클 상한·무늬 판 1장으로 관리, 즉사 C 의 칸 사이 번개는 칸 수가 아니라 판 단위로 몇 줄만.
+- 발동 RPC 인자 변경 = 호스트·클라 같은 빌드 필요(현재 운영 방식 그대로).
+- ③ 은 원격 플레이어 위치가 살짝 늦게 보여 경계 칸에서 빠질 수 있음(실제 피해 이벤트가 같이 있어야 하므로 엉뚱한 사람에게는 안 나옴).
+
+---
+
+# ▶▶▶ 계획 = **거너 좌클릭 연출 보정 — 착탄 이펙트 벽면 회전 · 빔 끝 둥글게** (2026-10-23 · grill 확정 · ✅ 진행 지시 · ✅ 구현(dotnet 빌드 오류 0, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23, Q1~Q5 전부 추천안). 게임플레이·네트워크 무변경.
+
+## 사실
+- 착탄 `FX_LaserEnd`(공통)·`FX_LaserHit`(몬스터 피해 시 한 겹 더)는 `GunnerBeamView.ShowBasicShot` 에서 `LookRotation(-빔 방향)` 으로만 재생 — 벽면을 모른다. 서버 SphereCast 의 normal 은 `ShotRpc`(시작·끝·적중)에 안 실린다(`GunnerBasicAttack` = 은희). 끝점 = 닿은 순간의 구 중심(벽에서 최대 반경만큼 앞).
+- 빔 몸통 2겹: `LaserCore`(Stretched Billboard, `FX_LaserCore.png` — 두께 방향만 부드럽고 **길이 방향 양끝 페이드 없음** → 네모) · `Beam ray`(원통 메시). 길이 = `startSizeY` = 거리(1 = 1m) → 캡슐 메시는 끝이 길이만큼 늘어나 무효. 끝점 옮기기는 기존 `BeamEndAnchor` 가 한다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방향(Q1-a) | 착탄 이펙트 +Z = 벽면 normal — `FromToRotation(-빔 방향, normal) × 기존 방향` |
+| normal(Q2-a) | 각 화면이 끝점 바로 앞에서 짧은 레이캐스트(지형 레이어 = `GunnerBasicAttackData.blockingLayers` 와 같은 값). 못 맞히면 지금처럼 |
+| 대상(Q3-a) | 지형에 맞았을 때만. 몬스터 피해 시 `FX_LaserEnd`·`FX_LaserHit` 둘 다 지금처럼 쏜 사람 쪽 |
+| 빔 끝(Q4-b+a) | `LaserCore` 텍스처 양끝 짧은 페이드(새 텍스처 `FX_LaserCore_Capped.png`, `FX_LaserCore.mat` 이 가리키게) + 끝점에 둥근 글로우 `EndCap`(LaserCore 복제 → 빌보드·`Glow1cg`·`BeamEndAnchor`). 시작은 `StartFlare`·`Glow` 가 덮음 |
+| 제작(Q5-a) | MainProject 직접 — `GunnerBeamView.cs` · `FX_GunnerBeam.prefab` · `FX_LaserCore.mat` · 새 텍스처(🔴 SVN add) |
+| 날아가는 빔(10-23 추가) | ~~속도 비례(100m/s)~~ → 같은 날 **지정 시간** `beamTravelDuration` = 0.06초(거리 무관, 0 이하 = 예전 즉시). 몸통(size3D) 길이 = 거리 × min(1, 경과÷도달 시간)을 매 프레임 입자에 직접, 날아가는 동안 입자 나이를 0 에 묶어 두께·색 유지 → 닿은 뒤 원래 0.1초 동안 사라짐(길이 성장 커브 Y 는 1 로). 닿는 순간 `EndSparks`(BeamEndAnchor) 버스트 + 착탄 `FX_LaserEnd`·`FX_LaserHit`. 피해 숫자는 그대로(도달 시간만큼 먼저). `EndCap` 은 민경이 비활성 — 무시. Q 빔 무변경 |
+
+---
+
 # ▶▶▶ 계획 = **할 일 83 — 플레이어 스탯 5종 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1차 공격력 `fbb29438` · ✅ 2차 5종 — 컴파일 0 · EditMode 2680/0 · ⏳ 은희 Play/MPPM)
 
 > 브랜치 `fix/TooltipValueClient`(기준 origin/development `c7057322`). 담당 은희(코어 = 본인 영역). 증상: 클라 스킬 툴팁 `{dmg}` 가 틀림.

@@ -39,6 +39,11 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [Tooltip("몬스터에 피해를 준 발에만 추가로 재생할 연출. 아직 없으면 비워 둘 것")]
     [SerializeField] private EffectSocketPlayer monsterHitPlayer;
 
+    // 🔴 착탄 면 맞춤(2026-10-23 민경 grill). 서버 SphereCast 의 normal 은 ShotRpc 에 안 실리므로
+    //    각 피어가 끝점 바로 앞에서 짧게 다시 쏴서 벽·바닥 면을 찾는다(지형은 안 움직여 서버와 같다).
+    [Tooltip("착탄 이펙트를 벽·바닥 면에 맞출 때 찾는 지형 레이어. GunnerBasicAttackData.blockingLayers 와 같게 둘 것")]
+    [SerializeField] private LayerMask impactSurfaceLayers = 1050753;
+
     // 🔴 우클릭(간파) 총구 연출. 소켓은 **총구 자식의 전용 빈 오브젝트**다 —
     //    BeamMuzzle 자체를 쓰면 안 된다. 좌클릭 빔이 매 프레임 그 회전을 다시 잡으므로
     //    여기서 돌려 놓으면 서로 덮어쓴다.
@@ -54,6 +59,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     [Tooltip("한 발의 빔을 켜 두는 시간(초). 프리팹 자체가 0.35초짜리라 그보다 길 이유가 없다")]
     [SerializeField] private float beamHoldDuration = 0.35f;
+
+    // 🔴 좌클릭 레이저가 뻗어 가서 닿는다(2026-10-23 민경). 거리와 상관없이 **이 시간 안에** 끝점에 닿고,
+    //    닿는 순간 끝점 불꽃·착탄 연출이 난다(처음엔 속도 비례였다가 같은 날 지정 시간으로 바꿨다).
+    //    판정·피해 숫자는 서버가 쏘는 순간 그대로 한다 — 숫자가 이 시간만큼 먼저 뜬다(감수).
+    [Tooltip("좌클릭 레이저가 끝점에 닿기까지의 시간(초). 거리와 무관. 0 이하면 예전처럼 쏘는 순간 끝까지(착탄도 즉시)")]
+    [SerializeField] private float beamTravelDuration = 0.06f;
 
     // ── Q 충전 레이저 VFX ────────────────────────────────────────────────
     // 🔴 소켓은 전부 **총구 자식의 전용 빈 오브젝트**다. BeamMuzzle 자체를 쓰면 안 된다 —
@@ -152,11 +163,23 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     // GetComponentsInChildren(List<T>) 오버로드는 할당하지 않는다 — 매 프레임 도는 경로다.
     private static readonly List<ParticleSystem> BeamSystems = new List<ParticleSystem>();
-    private static readonly List<BeamEndAnchor> BeamAnchors = new List<BeamEndAnchor>();
     private float beamStopAt = -1f;
     private float beamSizeMultiplier = -1f;
     private float beamLength = -1f;
     private Vector3 beamEnd;
+
+    // 날아가는 빔 — 쏜 시각·이동 시간과, 닿는 순간 낼 착탄(아직 안 냈으면 pendingImpact).
+    private float beamFireTime;
+    private float beamTravelTime;
+    private bool pendingImpact;
+    private bool impactStopped;
+    private bool impactDamagedUnit;
+    private Vector3 impactDelta;
+    private float impactWidth;
+    private static ParticleSystem.Particle[] TravelParticles = new ParticleSystem.Particle[16];
+    // 몸통의 원래 길이 성장 커브(Size over Lifetime Y). 날아가는 동안은 코드가 길이를 정하므로 1 로 바꿔 두고, 즉시 모드면 되돌린다.
+    private static readonly Dictionary<ParticleSystem, ParticleSystem.MinMaxCurve> AuthoredGrowth =
+        new Dictionary<ParticleSystem, ParticleSystem.MinMaxCurve>();
 
     // Q — 발사 빔과 집중 루프. 전 피어가 각자 돌린다(아래 BeginCharge 주석 참조).
     private float chargeBeamStopAt = -1f;
@@ -564,9 +587,14 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         // 🔴 **위치는 건드리지 않는다.** 소켓이 총구 본의 자식이면 위치는 애니메이션 소유다.
         //    조준(회전)과 길이는 아래 UpdateBeam 이 **매 프레임** 다시 잡는다.
+        // 앞 발이 아직 안 닿았으면(속도를 아주 낮춘 경우) 그 착탄을 지금 낸다 — 덮어써서 잃지 않게.
+        if (pendingImpact) ArriveBeam();
+
         beamEnd = end;
+        beamFireTime = Time.time;
+        beamTravelTime = Mathf.Max(0f, beamTravelDuration);
         basicBeamPlayer.Play();            // Play()가 먼저 Stop() 한다 — 매 발 처음부터
-        beamStopAt = Time.time + beamHoldDuration;
+        beamStopAt = Time.time + beamTravelTime + beamHoldDuration;
         UpdateBeam();
 
         if (logBeamLength)
@@ -574,13 +602,131 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         // 🔴 stopped = **빔이 뭔가에 멈췄는가**(유닛이든 벽이든). 호출자가 판단한다 —
         //    GunnerBasicAttack.ShowBeam 의 주석 참조. "피해를 줬나"로 묶으면 벽에서 안 뜬다.
-        if (!stopped)
+        impactStopped = stopped;
+        impactDamagedUnit = damagedUnit;
+        impactDelta = delta;
+        impactWidth = width;
+
+        if (beamTravelTime <= 0f)
+        {
+            PlayImpact();
+            return;
+        }
+
+        pendingImpact = true;
+    }
+
+    // [로컬] 레이저가 끝점에 닿은 순간 — 착탄 연출을 낸다.
+    private void ArriveBeam()
+    {
+        pendingImpact = false;
+        PlayImpact();
+    }
+
+    private void PlayImpact()
+    {
+        if (!impactStopped)
             return;
 
+        Vector3 end = beamEnd;
+        Vector3 delta = impactDelta;
+        bool damagedUnit = impactDamagedUnit;
+        float width = impactWidth;
+
         // 프리팹의 +Z 가 빔 진행 방향이다. 뒤집어 물려야 파편이 쏜 사람 쪽으로 튄다.
+        // 지형에 멈췄으면 +Z 를 벽면 normal 로 돌린다 — 비스듬히 쏘면 쏜 사람 쪽 방향이 벽 속을 향해 파묻혔다.
+        // 몬스터에 피해를 줬으면 지금처럼 쏜 사람 쪽(캡슐이라 normal 이 거의 같고, 연출이 그 방향 기준이다).
         Quaternion facing = Quaternion.LookRotation(-delta);
-        PlayAt(basicHitPlayer, end, facing);
+        Quaternion impactFacing = damagedUnit ? facing : SurfaceFacing(end, delta, width, facing);
+        PlayAt(basicHitPlayer, end, impactFacing);
         if (damagedUnit) PlayAt(monsterHitPlayer, end, facing);
+    }
+
+    /// <summary>
+    /// 끝점 바로 앞에서 빔 방향으로 짧게 쏴 지형 면을 찾고, 쏜 사람 쪽(-빔 방향)을 그 면의 normal 로 돌리는
+    /// 회전 차만큼 <paramref name="facing"/> 을 돌린다. 못 찾으면 그대로.
+    /// 끝점은 SphereCast 가 닿은 순간의 구 중심이라 면이 최대 반경(width/2)만큼 앞에 있다 — 그만큼 더 쏜다.
+    /// </summary>
+    private Quaternion SurfaceFacing(Vector3 end, Vector3 delta, float width, Quaternion facing)
+    {
+        Vector3 dir = delta.normalized;
+        float probe = Mathf.Max(0.05f, width) + 0.3f;
+        if (!Physics.Raycast(end - dir * 0.05f, dir, out RaycastHit hit, probe, impactSurfaceLayers,
+                             QueryTriggerInteraction.Ignore))
+            return facing;
+
+        return Quaternion.FromToRotation(-dir, hit.normal) * facing;
+    }
+
+    /// <summary>
+    /// 날아가는 빔 — 몸통(size3D) 입자의 길이를 <c>거리 × min(1, 경과 ÷ 도달 시간)</c> 으로 매 프레임 직접 정한다.
+    ///
+    /// 🔴 <b>날아가는 동안은 입자 나이를 0 에 묶는다.</b> 몸통의 두께 감소(Size over Lifetime X·Z)와 색 변화는
+    /// 수명 기준이라, 그대로 두면 멀리 쏠수록 빔 머리가 가늘고 희미해진 채로 닿는다. 나이를 0 에 두면
+    /// 닿을 때까지 처음 모습 그대로이고, 닿은 뒤부터 원래 0.1초 동안 가늘어지며 사라진다.
+    /// 그래서 원래의 길이 성장 커브(Size over Lifetime Y — 0 에서 1 로 자람)는 1 로 바꿔 둔다 — 나이 0 이면 길이 0 이 되기 때문.
+    /// 도달 시간이 0 이하(즉시 모드)면 커브를 되돌리고 아무것도 안 한다.
+    /// </summary>
+    private void ApplyTravel(float distance)
+    {
+        if (basicBeamPlayer == null || distance <= 0f)
+            return;
+
+        bool travelling = beamTravelDuration > 0f;
+        float elapsed = Time.time - beamFireTime;
+        bool beforeArrival = travelling && elapsed < beamTravelTime;
+        float length = travelling && beamTravelTime > 0f ? distance * Mathf.Clamp01(elapsed / beamTravelTime) : distance;
+        float sizeY = beamUnitLength > 0.01f ? length / beamUnitLength : length;
+
+        int count = basicBeamPlayer.GetInstances(BeamInstances);
+        for (int i = 0; i < count; i++)
+        {
+            BeamInstances[i].GetComponentsInChildren(true, BeamSystems);
+            for (int k = 0; k < BeamSystems.Count; k++)
+            {
+                ParticleSystem ps = BeamSystems[k];
+                if (!ps.main.startSize3D) continue;          // 몸통이 아니다 — 불꽃·섬광
+
+                SetGrowthCurve(ps, travelling);
+                if (!travelling) continue;
+
+                // 쏜 프레임에는 아직 입자가 없다 — 곧 나올 버스트도 지금 길이로 나오게(StretchBeam 이 넣은 전체 길이를 덮는다).
+                ParticleSystem.MainModule main = ps.main;
+                main.startSizeYMultiplier = Mathf.Max(0.0001f, sizeY);
+
+                int n = ps.particleCount;
+                if (n == 0) continue;
+                if (TravelParticles.Length < n) TravelParticles = new ParticleSystem.Particle[Mathf.NextPowerOfTwo(n)];
+                n = ps.GetParticles(TravelParticles, n);
+                for (int p = 0; p < n; p++)
+                {
+                    Vector3 size = TravelParticles[p].startSize3D;
+                    size.y = sizeY;
+                    TravelParticles[p].startSize3D = size;
+                    if (beforeArrival) TravelParticles[p].remainingLifetime = TravelParticles[p].startLifetime;
+                }
+                ps.SetParticles(TravelParticles, n);
+            }
+        }
+    }
+
+    // 날아가는 모드 = 길이 성장 커브를 1 로, 즉시 모드 = 저작 커브로. 풀 인스턴스라 한 번 바꾸면 남는다.
+    private static void SetGrowthCurve(ParticleSystem ps, bool travelling)
+    {
+        ParticleSystem.SizeOverLifetimeModule size = ps.sizeOverLifetime;
+        if (!size.enabled || !size.separateAxes) return;
+
+        bool changed = AuthoredGrowth.TryGetValue(ps, out ParticleSystem.MinMaxCurve authored);
+        if (travelling && !changed)
+        {
+            AuthoredGrowth[ps] = size.y;
+            size.y = new ParticleSystem.MinMaxCurve(1f);
+        }
+        else if (!travelling && changed)
+        {
+            size.y = authored;
+            AuthoredGrowth.Remove(ps);
+        }
     }
 
     // 소켓을 그 자리에 찍고 원샷. 비어 있으면 조용한 no-op 이다 —
@@ -653,6 +799,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         beamLength = AimAndStretch(basicBeamPlayer, beamEnd, beamUnitLength);
         beamSizeMultiplier = beamUnitLength > 0.01f && beamLength > 0f ? beamLength / beamUnitLength : -1f;
+        ApplyTravel(beamLength);
     }
 
     /// <summary>
@@ -711,7 +858,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
                 //    ⚠️ 값으로 걸러낼 수 없다: Constant 모드에서
                 //    startSpeedMultiplier 는 startSpeed.constant 와 **같은 값**이라,
                 //    한 번 곱하고 나면 "원래 속도"를 읽을 방법이 없다.
-                //    그래서 BeamEndAnchor 와 같은 방식으로 프리팹에 표시한다.
+                //    그래서 BeamTravelScale 컴포넌트로 프리팹에 표시한다.
                 if (!BeamSystems[k].TryGetComponent(out BeamTravelScale _))
                     continue;
 
@@ -726,19 +873,6 @@ public class GunnerBeamView : BaseNetworkBehaviour
                 float travelSpeed = life > 0.001f ? length / life : length;
                 if (!Mathf.Approximately(main.startSpeedMultiplier, travelSpeed))
                     main.startSpeedMultiplier = travelSpeed;
-            }
-
-            // 🔴 끝점 연출(BeamEndAnchor)은 늘이는 게 아니라 **옮기는** 것이다.
-            //    프리팹 루트의 +Z 가 빔 진행 방향이라, 거기서 거리만큼 민다.
-            //    TransformPoint 대신 position + forward 를 쓰는 이유: 루트 배율이 섞여도 거리가 안 틀어진다.
-            instance.GetComponentsInChildren(true, BeamAnchors);
-            if (BeamAnchors.Count == 0) continue;
-
-            Transform rootT = instance.transform;
-            for (int k = 0; k < BeamAnchors.Count; k++)
-            {
-                float along = length + BeamAnchors[k].OffsetAlongBeam;
-                BeamAnchors[k].transform.position = rootT.position + rootT.forward * along;
             }
         }
     }
@@ -787,9 +921,11 @@ public class GunnerBeamView : BaseNetworkBehaviour
             if (Time.time < beamStopAt)
             {
                 UpdateBeam();
+                if (pendingImpact && Time.time - beamFireTime >= beamTravelTime) ArriveBeam();
             }
             else
             {
+                if (pendingImpact) ArriveBeam();
                 beamStopAt = -1f;
                 beamSizeMultiplier = -1f;
                 beamLength = -1f;

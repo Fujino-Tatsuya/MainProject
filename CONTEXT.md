@@ -30,6 +30,9 @@ Update this file when a term becomes important enough that future agents or team
 - 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
 - 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
 - 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+## ▶▶ 작업 세션 (2026-10-23 · 민경(Claude) · **23호 전기 장판 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현·배선(미커밋) · ⏳ 민경 Play
+- 경석 영역 추가만: `BossElectricFloor` 클라 이벤트 3개 · `FloorFireClientRpc` 에 `bool lethal`(연출용 — 호스트·클라 같은 빌드) · `TwentyThree.prefab` `VFX` 에 `BossElectricFloorVfx`. 공유 → [handoff-boss-electric-floor-vfx.md](Docs/tech/handoff-boss-electric-floor-vfx.md)
+- 에셋 SVN add 필요: `50.Art/VFX/Common/Boss/ElectricFloor/` · `_Materials/Boss/M_Floor_*` 8 · `Textures/T_Floor*` 4
 
 ## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
 
