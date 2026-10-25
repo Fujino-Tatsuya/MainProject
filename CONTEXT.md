@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-23 · 민경(Claude) · **23호 전기 장판 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현·배선(미커밋) · ⏳ 민경 Play
+- 경석 영역 추가만: `BossElectricFloor` 클라 이벤트 3개 · `FloorFireClientRpc` 에 `bool lethal`(연출용 — 호스트·클라 같은 빌드) · `TwentyThree.prefab` `VFX` 에 `BossElectricFloorVfx`. 공유 → [handoff-boss-electric-floor-vfx.md](Docs/tech/handoff-boss-electric-floor-vfx.md)
+- 에셋 SVN add 필요: `50.Art/VFX/Common/Boss/ElectricFloor/` · `_Materials/Boss/M_Floor_*` 8 · `Textures/T_Floor*` 4
+
 ## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
 
 ## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
