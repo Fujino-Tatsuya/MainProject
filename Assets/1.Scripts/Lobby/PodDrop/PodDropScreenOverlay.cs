@@ -13,7 +13,6 @@ using UnityEngine.UI;
 public sealed class PodDropScreenOverlay : MonoBehaviour
 {
     private const int CanvasSortingOrder = 500;
-    private const float HudRescanSeconds = 0.5f;   // 연출 도중 새로 뜬 캔버스도 잡는다
 
     private Canvas _canvas;
     private RectTransform _topBar;
@@ -24,10 +23,9 @@ public sealed class PodDropScreenOverlay : MonoBehaviour
     private float _hudRescanAt;
 
     /// <summary>
-    /// 새로 뜬 화면 UI 를 다시 찾는 간격(초, 기본 0.5). 0 = 매 프레임 — 맵 포드 착지(<see cref="MapPodArrival"/>)는 로딩 화면이 걷히는 프레임에
-    /// HUD 가 한 프레임도 보이면 안 돼서 0 으로 둔다(연출 몇 초 동안만).
+    /// 새로 뜬 화면 UI 를 다시 찾는 간격(초). 0 = 매 프레임. 호출자가 <see cref="PodDropSettings"/>(로비·맵 단계 hudRescanSeconds) 값을 넣는다.
     /// </summary>
-    public float HudRescanInterval { get; set; } = HudRescanSeconds;
+    public float HudRescanInterval { get; set; }
 
     /// <summary>
     /// 이번 프레임 화면. <paramref name="letterbox"/> = 위·아래 띠 각각의 화면 높이 비율, <paramref name="fade"/> = 검은 화면 알파.

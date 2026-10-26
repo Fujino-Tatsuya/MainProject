@@ -24,10 +24,6 @@ public sealed class MapPodArrival : NetworkBehaviour
 {
     private const string Tag = "[MapPod]";
 
-    // 연출을 켠 뒤 로딩 걷힘(시작)을 기다리는 최대 시간(초, 실시간). 넘으면 잠금·숨김에 갇히지 않게 연출 없이 해제한다.
-    // 로딩 최소 표시(5s) + Ready(2.5s) + 느린 클라 로드보다 넉넉한 안전장치라 데이터로 빼지 않는다.
-    private const float StartWatchdogSeconds = 120f;
-
     [Tooltip("포드 강하 수치(맵 단계 시간표·좌석 오프셋). 비우면 연출 없음(지금처럼 낙하 스폰).")]
     [SerializeField] private PodDropSettings settings;
 
@@ -41,10 +37,6 @@ public sealed class MapPodArrival : NetworkBehaviour
     [Header("착지")]
     [Tooltip("착지 순간 땅 갈라짐 이펙트(23호 등장 착지 FX_Ground_Crash_Entry). 비우면 이펙트 없음.")]
     [SerializeField] private EffectEntry impactEffect;
-
-    [Header("화면")]
-    [Tooltip("레터박스 위·아래 각각 화면 높이 비율(로비 포드 연출과 같은 값).")]
-    [SerializeField, Range(0f, 0.2f)] private float letterboxHeight = 0.04f;
 
     // 이번 진입에 연출이 켜졌는가. 서버 write / 모두 read.
     private readonly NetworkVariable<bool> _armed = new NetworkVariable<bool>(
@@ -252,9 +244,10 @@ public sealed class MapPodArrival : NetworkBehaviour
         double start = _startAt.Value;
         if (start <= 0d)
         {
-            if (Time.realtimeSinceStartup - _armedAtRealtime > StartWatchdogSeconds)
+            float timeout = settings.Map.startTimeoutSeconds;
+            if (Time.realtimeSinceStartup - _armedAtRealtime > timeout)
             {
-                AbortServer($"로딩 걷힘(시작)이 {StartWatchdogSeconds:0}초 안에 오지 않았다");
+                AbortServer($"로딩 걷힘(시작)이 {timeout:0}초 안에 오지 않았다");
                 return;
             }
 
@@ -361,13 +354,10 @@ public sealed class MapPodArrival : NetworkBehaviour
 
     private void UpdateOverlay(PodDropMapTimeline timeline, double elapsed)
     {
-        if (_overlay == null)
-        {
-            _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
-            _overlay.HudRescanInterval = 0f; // 로딩이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게 매 프레임 찾는다(연출 몇 초 동안만)
-        }
-
-        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed) * letterboxHeight, 0f, true);
+        if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
+        // 기본 0 = 매 프레임 — 로딩이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게(연출 몇 초 동안만).
+        _overlay.HudRescanInterval = settings.Map.hudRescanSeconds;
+        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, 0f, true);
     }
 
     private void UpdateCamera(PodDropMapTimeline timeline, double elapsed)

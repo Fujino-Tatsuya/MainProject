@@ -10,18 +10,18 @@ using UnityEngine.Serialization;
 /// 로비 포드 탑승·강하 연출(할 일 100 C2, 3.LobbyScene — <see cref="LobbyTrainingDirector"/> 와 같은 씬 상주 NetworkObject 에 붙는다).
 /// 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 맵 로딩 대신 <see cref="TryBeginServer"/> 에 넘긴다 → 시간표 끝(완전 암전)에 그 콜백으로 로딩.
 /// <list type="bullet">
-/// <item>복제: 시작 시각(서버시간)과 참가 명단(플레이어 NetworkObjectId, 보행 슬롯 순서)만. 모든 피어가 같은 명단 인원으로
-/// <see cref="PodDropLobbyTimeline"/> 을 만들어 같은 시각으로 재생한다(보스 엘리베이터 89 와 같은 방식). RPC 없음.</item>
+/// <item>복제: 시작 시각(서버시간), 참가 명단(플레이어 NetworkObjectId, 보행 슬롯 순서), 슬롯별 보행 시간(서버가 경로 길이 ÷ 걷는 속도로 계산).
+/// 모든 피어가 그 보행 시간으로 <see cref="PodDropLobbyTimeline"/> 을 만들어 같은 시각으로 재생한다(보스 엘리베이터 89 와 같은 방식). RPC 없음.</item>
 /// <item>서버: 시작 순간 참가자 연출 잠금(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단),
 /// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), <see cref="PodDropLobbyTimeline.LoadAt"/> 에 콜백.
 /// 연출 중 끊긴 사람은 건너뛰고 계속한다(명단은 그대로 둔다 — 인원이 바뀌면 시간표가 바뀐다). 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
 /// <item>오너: 시작 직후 짧은 암전이 가장 깊을 때(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
 /// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 공용 경로점(walkPath, 리스트 순서)을
-/// 평소 걷기 변위(Walk 애니)로 걷고, 문턱 → 좌석은 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
+/// 평소 걷기 변위(Walk 애니)로 걷고 → 문턱까지 같은 속도로, 문턱 → 좌석은 미끄러짐 시간 동안 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
 /// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(순간이동 암전 + 끝 페이드, <see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
 /// 포드 하강(런타임 transform 만), 연출 동안 포드 콜라이더 끔.</item>
 /// </list>
-/// 수치는 <see cref="PodDropSettings"/>, 위치는 씬 Transform(LobbyTraining/PodLaunch) 이 원본이다.
+/// 수치(레터박스 높이·걷는 속도 포함)는 <see cref="PodDropSettings"/>, 위치는 씬 Transform(LobbyTraining/PodLaunch) 이 원본이다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbyPodLaunch : NetworkBehaviour
@@ -53,16 +53,17 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
     [Tooltip("내려갈 포드 루트(PF_DropPod_v015). 연출 동안 런타임 위치만 바꾸고(씬 저장 없음) 아래 콜라이더를 끈다. 비우면 하강 없음.")]
     [SerializeField] private Transform pod;
 
-    [Header("화면")]
-    [Tooltip("레터박스 위·아래 각각 화면 높이 비율(보스 등장 연출 기본 0.04 와 같은 단위).")]
-    [SerializeField, Range(0f, 0.2f)] private float letterboxHeight = 0.04f;
-
     // 연출 시작 시각(서버시간). 0 = 연출 없음. 서버 write / 모두 read.
     private readonly NetworkVariable<double> _startAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // 참가자 플레이어 NetworkObjectId — 보행 슬롯 순서. 시작 시각보다 먼저 쓴다. 서버 write / 모두 read.
     private readonly NetworkList<ulong> _walkers = new NetworkList<ulong>(
+        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // 슬롯별 보행 시간(초, 걷기 시작 지점 → 문턱) — 서버가 경로 길이 ÷ 걷는 속도로 계산한 값. 명단과 같은 순서·같은 때(시작 시각보다 먼저) 쓴다.
+    // 피어가 각자 경로를 재지 않고 이 값으로 시간표를 만든다 — 서버 숨김 시각과 오너 도착 시각이 늘 같다. 서버 write / 모두 read.
+    private readonly NetworkList<float> _walkSeconds = new NetworkList<float>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private static double ServerNow =>
@@ -93,12 +94,16 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         public bool Started;
         public Vector3[] Ground;      // 충돌을 켠 채 걷는 경유 지점(수평만 쓴다 — 높이는 지면)
         public int GroundIndex;
-        public Vector3[] Interior;    // 충돌 없이 보간 — 문턱 … 좌석(마지막)
+        public Vector3[] Approach;     // 충돌 없이 걷는 마지막 구간 — 문턱(없으면 비었다)
+        public Vector3 Seat;
         public double WalkStartAt;    // 서버시간
-        public double GroundEndAt;    // 출발 때 길이 비율로 정한다
-        public double WalkEndAt;
-        public bool InInterior;
-        public Vector3 InteriorFrom;
+        public double GroundEndAt;    // 보행 시간을 길이 비율로 나눈 앞 구간 끝
+        public double ArriveAt;       // 문턱 도착 — 여기부터 좌석으로 미끄러진다
+        public double WalkEndAt;      // 좌석 도착
+        public bool InApproach;
+        public Vector3 ApproachFrom;
+        public bool InSlide;
+        public Vector3 SlideFrom;
         public bool Arrived;
     }
 
@@ -152,20 +157,25 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             return false;
         }
 
-        PodDropLobbyTimeline timeline = settings.CreateLobbyTimeline(participants.Count);
+        float[] walkSeconds = WalkSecondsPerSlot(participants.Count, settings);
+        PodDropLobbyTimeline timeline = settings.CreateLobbyTimeline(walkSeconds);
         double start = NetworkManager.ServerTime.Time;
 
-        // 명단을 시작 시각보다 먼저 쓴다 — 피어가 시작 시각을 보는 순간 인원(시간표)도 맞아 있게.
+        // 명단·보행 시간을 시작 시각보다 먼저 쓴다 — 피어가 시작 시각을 보는 순간 시간표도 맞아 있게.
         _walkers.Clear();
         foreach (ulong clientId in participants)
             _walkers.Add(NetworkManager.ConnectedClients[clientId].PlayerObject.NetworkObjectId);
+        _walkSeconds.Clear();
+        foreach (float seconds in walkSeconds)
+            _walkSeconds.Add(seconds);
         _startAt.Value = start;
         _loadIssued = false;
         LockParticipants(participants);
 
         Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
-                  $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.TeleportBlackoutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}·{timeline.WalkSeconds:0.##}s), 강하 +{timeline.DescendAt:0.##}s, " +
-                  $"페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
+                  $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.TeleportBlackoutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}s, " +
+                  $"속도 {settings.Lobby.walkSpeed:0.##}m/s, 각자 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s + 미끄러짐 {timeline.SeatSlideSeconds:0.##}s), " +
+                  $"강하 +{timeline.DescendAt:0.##}s, 페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
 
         _sequence = StartCoroutine(Sequence(participants, timeline, start, onDone));
         return true;
@@ -173,12 +183,21 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
 
     private IEnumerator Sequence(List<ulong> participants, PodDropLobbyTimeline timeline, double start, Action onDone)
     {
-        // 슬롯 순서 = 도착 순서 — 포드 안에 도착한 사람부터 숨긴다.
-        for (int slot = 0; slot < participants.Count; slot++)
+        // 좌석에 도착한 사람부터 숨긴다 — 경로 길이가 달라 슬롯 순서와 도착 순서가 다를 수 있다.
+        var hidden = new bool[participants.Count];
+        int remaining = participants.Count;
+        while (remaining > 0)
         {
-            while (NetworkManager.ServerTime.Time < start + timeline.WalkEndAt(slot))
-                yield return null;
-            HideParticipant(participants[slot]);
+            double elapsed = NetworkManager.ServerTime.Time - start;
+            for (int slot = 0; slot < participants.Count; slot++)
+            {
+                if (hidden[slot] || elapsed < timeline.WalkEndAt(slot)) continue;
+                hidden[slot] = true;
+                remaining--;
+                HideParticipant(participants[slot]);
+            }
+
+            if (remaining > 0) yield return null;
         }
 
         while (NetworkManager.ServerTime.Time < start + timeline.LoadAt)
@@ -281,17 +300,18 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         if (settings == null)
             return;
 
-        // 명단이 시작 시각보다 늦게 왔으면 인원에 맞춰 다시 짠다(같은 시각부터 이어 그린다).
-        if (_timeline == null || _timeline.WalkerCount != _walkers.Count)
-            _timeline = settings.CreateLobbyTimeline(_walkers.Count);
+        // 보행 시간 목록이 시작 시각보다 늦게 왔으면 그에 맞춰 다시 짠다(같은 시각부터 이어 그린다).
+        if (_timeline == null || _timeline.WalkerCount != _walkSeconds.Count)
+            _timeline = settings.CreateLobbyTimeline(ReplicatedWalkSeconds());
 
         double elapsed = ServerNow - start;
         UpdatePod(elapsed);
         UpdateCamera(elapsed);
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
+        _overlay.HudRescanInterval = settings.Lobby.hudRescanSeconds;
         // 레터박스는 완전 암전(LoadAt) 뒤 0 — 검은 화면 아래에서 걷힌다. UI 는 암전 전까지 새로 뜬 것도 끄고, 그 뒤엔 끈 것만 유지(로딩 씬 캔버스는 건드리지 않는다).
-        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * letterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed), elapsed < _timeline.LoadAt);
+        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed), elapsed < _timeline.LoadAt);
     }
 
     private void UpdatePod(double elapsed)
@@ -382,27 +402,36 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         {
             StopOwnerWalk();
             int slot = _walkers.IndexOf(po.NetworkObjectId); // 복제 명단 순서 = 보행 슬롯
-            if (slot < 0)
-                return; // 참가자가 아니다
+            if (slot < 0 || slot >= _timeline.WalkerCount)
+                return; // 참가자가 아니다(또는 보행 시간 목록이 아직 안 왔다 — 다음 틱에 다시)
 
             Transform seat = seats.Length > 0 ? seats[PodLaunchRules.PointIndex(slot, seats.Length)] : null;
             Vector3[] starts = Positions(walkStarts);
             if (seat == null || starts.Length == 0)
                 return;
 
-            PodLaunchRules.WalkRoute route = BuildRoute(seat);
+            PodLaunchRules.WalkRoute route = BuildRoute(seat.position);
             if (route.SkippedCount > 0)
                 Debug.LogWarning($"{Tag} 걷기 경로(walkPath)에 빈 칸 {route.SkippedCount}개 — 건너뛰고 걷는다.", this);
+
+            // 서버가 정한 보행 시간(복제)을 길이 비율로 앞(충돌 켬)·뒤(→ 문턱, 충돌 끔) 구간에 나눈다 — 걷는 속도가 일정하게.
+            Vector3 walkStart = starts[PodLaunchRules.PointIndex(slot, starts.Length)];
+            float groundLength = PodLaunchRules.GroundLength(walkStart, route);
+            float share = PodLaunchRules.GroundShare(groundLength, PodLaunchRules.WalkLength(walkStart, route) - groundLength);
+            double walkStartAt = start + _timeline.WalkStartAt(slot);
 
             _walk = new OwnerWalk
             {
                 Active = true,
                 Start = start,
-                WalkStart = starts[PodLaunchRules.PointIndex(slot, starts.Length)],
+                WalkStart = walkStart,
                 TeleportAt = start + _timeline.TeleportAt,
                 Ground = route.Ground,
-                Interior = route.Interior,
-                WalkStartAt = start + _timeline.WalkStartAt(slot),
+                Approach = route.HasThreshold ? new[] { route.Interior[0] } : Array.Empty<Vector3>(),
+                Seat = route.Interior[route.Interior.Length - 1],
+                WalkStartAt = walkStartAt,
+                GroundEndAt = walkStartAt + _timeline.WalkSecondsOf(slot) * share,
+                ArriveAt = start + _timeline.WalkArriveAt(slot),
                 WalkEndAt = start + _timeline.WalkEndAt(slot),
             };
         }
@@ -416,12 +445,11 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             _walk.Teleported = true;
             // 한 줄로 걷는 참가자끼리 밀어내기로 튀지 않게(걷기 시작 지점을 돌려 쓰면 겹쳐 선다) — 순간이동부터 보행·붙잡기 동안만. 벽·계단엔 그대로 막힌다.
             motor.PassThroughUnitsOverride = true;
-            Vector3 firstTarget = _walk.Ground.Length > 0 ? _walk.Ground[0] : _walk.Interior[0];
+            Vector3 firstTarget = _walk.Ground.Length > 0 ? _walk.Ground[0] : _walk.Approach.Length > 0 ? _walk.Approach[0] : _walk.Seat;
             TeleportOwner(po, motor, _walk.WalkStart, firstTarget - _walk.WalkStart);
         }
 
-        double walkStartAt = _walk.WalkStartAt;
-        if (now < walkStartAt)
+        if (now < _walk.WalkStartAt)
             return;
 
         Player player = po.GetComponent<Player>();
@@ -429,15 +457,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         if (!_walk.Started)
         {
             _walk.Started = true;
-
-            // 걷는 속도가 일정하게 — 걷기 시작 지점에서 잰 길이 비율로 보행 시간을 앞(충돌)·뒤(보간) 구간에 나눈다.
-            Vector3 groundEnd = _walk.Ground.Length > 0 ? _walk.Ground[_walk.Ground.Length - 1] : position;
-            float share = PodLaunchRules.GroundShare(
-                BossElevatorTimeline.PathLength(position, _walk.Ground),
-                PodLaunchRules.PathLength3D(groundEnd, _walk.Interior));
-            _walk.GroundEndAt = walkStartAt + (_walk.WalkEndAt - walkStartAt) * share;
-
-            Face(po, (_walk.Ground.Length > 0 ? _walk.Ground[0] : _walk.Interior[0]) - position);
+            Face(po, (_walk.Ground.Length > 0 ? _walk.Ground[0] : _walk.Approach.Length > 0 ? _walk.Approach[0] : _walk.Seat) - position);
         }
 
         if (now < _walk.GroundEndAt && _walk.Ground.Length > 0)
@@ -452,21 +472,37 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             return;
         }
 
-        if (now < _walk.WalkEndAt)
+        // 마지막 경로점 → 문턱 — 충돌 없이 같은 속도로 보간(문턱이 없으면 길이 0 이라 건너뛴다).
+        if (now < _walk.ArriveAt && _walk.Approach.Length > 0)
         {
-            if (!_walk.InInterior)
+            if (!_walk.InApproach)
             {
-                _walk.InInterior = true;
-                _walk.InteriorFrom = position;
-                Vector3 toEntrance = _walk.Interior[0] - position;
+                _walk.InApproach = true;
+                _walk.ApproachFrom = position;
                 if (_walk.Ground.Length > 0 && BossElevatorTimeline.WalkNeedsSnap(now, _walk.GroundEndAt, _walk.Ground[_walk.Ground.Length - 1] - position))
                     Debug.LogWarning($"{Tag} 보행이 입구에 못 닿았다(남은 수평 {Vector3.ProjectOnPlane(_walk.Ground[_walk.Ground.Length - 1] - position, Vector3.up).magnitude:0.##}m) — " +
                                      $"{position} 에서 충돌 없이 포드 안으로 보간한다.", this);
-                Face(po, toEntrance);
+                Face(po, _walk.Approach[0] - position);
             }
 
-            float t = (float)((now - _walk.GroundEndAt) / Math.Max(1e-4, _walk.WalkEndAt - _walk.GroundEndAt));
-            motor.SetPoseTarget(PodLaunchRules.PointAlong(_walk.InteriorFrom, _walk.Interior, t), po.transform.rotation);
+            float t = (float)((now - _walk.GroundEndAt) / Math.Max(1e-4, _walk.ArriveAt - _walk.GroundEndAt));
+            motor.SetPoseTarget(PodLaunchRules.PointAlong(_walk.ApproachFrom, _walk.Approach, t), po.transform.rotation);
+            if (player != null) player.SetAnimatorMoving(true);
+            return;
+        }
+
+        // 문턱 → 좌석 — 정해진 미끄러짐 시간 동안 충돌 없이 보간.
+        if (now < _walk.WalkEndAt)
+        {
+            if (!_walk.InSlide)
+            {
+                _walk.InSlide = true;
+                _walk.SlideFrom = position;
+                Face(po, _walk.Seat - position);
+            }
+
+            float t = (float)((now - _walk.ArriveAt) / Math.Max(1e-4, _walk.WalkEndAt - _walk.ArriveAt));
+            motor.SetPoseTarget(Vector3.Lerp(_walk.SlideFrom, _walk.Seat, Mathf.Clamp01(t)), po.transform.rotation);
             if (player != null) player.SetAnimatorMoving(true);
             return;
         }
@@ -477,7 +513,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             if (player != null) player.SetAnimatorMoving(false);
         }
 
-        motor.SetPoseTarget(_walk.Interior[_walk.Interior.Length - 1], po.transform.rotation);
+        motor.SetPoseTarget(_walk.Seat, po.transform.rotation);
     }
 
     /// <summary>오너 보행을 멈춘다(순간이동한 뒤였으면 Walk 애니·유닛 통과도 끈다). 멱등.</summary>
@@ -520,13 +556,38 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
     }
 
     // 공용 경로점(리스트 순서) → 문턱 → 이 좌석. 이름·개수와 무관하다.
-    private PodLaunchRules.WalkRoute BuildRoute(Transform seat)
+    private PodLaunchRules.WalkRoute BuildRoute(Vector3 seat)
     {
         var path = new List<Vector3?>(walkPath.Count);
         foreach (Transform point in walkPath)
             path.Add(point != null ? point.position : (Vector3?)null);
 
-        return PodLaunchRules.BuildRoute(path, threshold != null ? threshold.position : (Vector3?)null, seat.position);
+        return PodLaunchRules.BuildRoute(path, threshold != null ? threshold.position : (Vector3?)null, seat);
+    }
+
+    /// <summary>
+    /// 슬롯별 보행 시간(초) = 자기 걷기 시작 지점 → 공용 경로점 → 문턱 길이 ÷ 걷는 속도. 서버가 시작 때 한 번 계산해 복제한다(좌석은 길이에 들지 않는다).
+    /// 걷기 시작 지점이 없으면 전원 0.
+    /// </summary>
+    private float[] WalkSecondsPerSlot(int count, PodDropSettings source)
+    {
+        var result = new float[Mathf.Max(0, count)];
+        Vector3[] starts = Positions(walkStarts);
+        if (starts.Length == 0 || source == null)
+            return result;
+
+        PodLaunchRules.WalkRoute route = BuildRoute(Vector3.zero);
+        for (int slot = 0; slot < result.Length; slot++)
+            result[slot] = source.WalkSecondsFor(PodLaunchRules.WalkLength(starts[PodLaunchRules.PointIndex(slot, starts.Length)], route));
+        return result;
+    }
+
+    private float[] ReplicatedWalkSeconds()
+    {
+        var result = new float[_walkSeconds.Count];
+        for (int i = 0; i < result.Length; i++)
+            result[i] = _walkSeconds[i];
+        return result;
     }
 
     // 비어 있는 슬롯은 건너뛴다.
@@ -548,8 +609,12 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
     public Transform EditorThreshold => threshold;
     public IReadOnlyList<Transform> EditorSeats => seats;
     public Transform EditorPod => pod;
+    public PodDropSettings EditorSettings => settings;
 
-    public PodLaunchRules.WalkRoute EditorBuildRoute(Transform seat) => BuildRoute(seat);
+    public PodLaunchRules.WalkRoute EditorBuildRoute(Transform seat) => BuildRoute(seat.position);
+
+    /// <summary>시각표 표시용 — 서버가 연출 시작 때 복제하는 것과 같은 계산(<paramref name="source"/> 의 걷는 속도로).</summary>
+    public float[] EditorWalkSecondsPerSlot(int count, PodDropSettings source) => WalkSecondsPerSlot(count, source);
 #endif
 
     private static int CountAssigned(Transform[] points)

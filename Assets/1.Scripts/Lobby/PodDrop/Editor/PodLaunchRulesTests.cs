@@ -3,7 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 로비 포드 탑승 연출 순수 규칙(<see cref="PodLaunchRules"/>, 할 일 100 C2) — 참가 명단 순서·좌석 돌려 쓰기·폴백 판단·보행 시간 나누기·충돌 없는 보간.
+/// 로비 포드 탑승 연출 순수 규칙(<see cref="PodLaunchRules"/>, 할 일 100 C2) — 참가 명단 순서·좌석 돌려 쓰기·폴백 판단·걸어가는 길이·보행 시간 나누기·충돌 없는 보간.
 /// </summary>
 public sealed class PodLaunchRulesTests
 {
@@ -93,6 +93,42 @@ public sealed class PodLaunchRulesTests
     {
         PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { A }, null, Seat);
         CollectionAssert.AreEqual(new[] { Seat }, route.Interior, "문턱 없음 → 마지막 경로점에서 곧바로 좌석");
+    }
+
+    // ─── 걸어가는 길이 (C2d — 보행 시간 = 이 길이 ÷ 걷는 속도) ──────────────
+
+    [Test]
+    public void WalkLength_StartThroughPathToThreshold_ExcludesSeat()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { A, B, C }, Door, Seat);
+        float expected = Vector3.Distance(Vector3.zero, A) + Vector3.Distance(A, B) + Vector3.Distance(B, C) + Vector3.Distance(C, Door);
+        Assert.AreEqual(expected, PodLaunchRules.WalkLength(Vector3.zero, route), Eps, "걷기 시작 → 경로점 → 문턱(3차원), 좌석 제외");
+        Assert.AreEqual(expected - Vector3.Distance(C, Door), PodLaunchRules.GroundLength(Vector3.zero, route), Eps, "앞 구간 = 마지막 경로점까지");
+        Assert.IsTrue(route.HasThreshold);
+    }
+
+    [Test]
+    public void WalkLength_DiffersPerWalkStart()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { A }, Door, Seat);
+        float near = PodLaunchRules.WalkLength(new Vector3(0f, 0f, 0f), route);
+        float far = PodLaunchRules.WalkLength(new Vector3(-3f, 0f, 0f), route);
+        Assert.AreEqual(3f, far - near, Eps, "걷기 시작 지점만 다르면 첫 합류 구간만큼 차이");
+    }
+
+    [Test]
+    public void WalkLength_NoThresholdOrPath()
+    {
+        PodLaunchRules.WalkRoute noDoor = PodLaunchRules.BuildRoute(new Vector3?[] { A }, null, Seat);
+        Assert.AreEqual(1f, PodLaunchRules.WalkLength(Vector3.zero, noDoor), Eps, "문턱 없음 → 마지막 경로점까지");
+        Assert.IsFalse(noDoor.HasThreshold);
+
+        PodLaunchRules.WalkRoute noPath = PodLaunchRules.BuildRoute(new Vector3?[0], Door, Seat);
+        Assert.AreEqual(Vector3.Distance(Vector3.zero, Door), PodLaunchRules.WalkLength(Vector3.zero, noPath), Eps, "경로점 없음 → 곧바로 문턱");
+        Assert.AreEqual(0f, PodLaunchRules.GroundLength(Vector3.zero, noPath), Eps);
+
+        PodLaunchRules.WalkRoute nothing = PodLaunchRules.BuildRoute(new Vector3?[0], null, Seat);
+        Assert.AreEqual(0f, PodLaunchRules.WalkLength(Vector3.zero, nothing), Eps, "둘 다 없음 → 0(미끄러짐만)");
     }
 
     // ─── 보행 시간 나누기 ────────────────────────────────────────────────

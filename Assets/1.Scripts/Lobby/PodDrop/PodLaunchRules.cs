@@ -40,6 +40,9 @@ public static class PodLaunchRules
         /// <summary>공용 경로에서 건너뛴 빈 칸(null) 수 — 0 보다 크면 호출자가 경고한다.</summary>
         public readonly int SkippedCount;
 
+        /// <summary>문턱이 있는가 — 있으면 <see cref="Interior"/>[0] 이 문턱이다.</summary>
+        public bool HasThreshold => Interior.Length > 1;
+
         public WalkRoute(Vector3[] ground, Vector3[] interior, int skippedCount)
         {
             Ground = ground;
@@ -69,9 +72,24 @@ public static class PodLaunchRules
         return new WalkRoute(ground.ToArray(), interior, skipped);
     }
 
+    /// <summary>충돌을 켠 채 걷는 앞 구간 길이(m) — 걷기 시작 지점 → 공용 경로점 끝.</summary>
+    public static float GroundLength(Vector3 walkStart, WalkRoute route) => PathLength3D(walkStart, route.Ground);
+
+    /// <summary>
+    /// 걸어가는 길이(m) — 걷기 시작 지점 → 공용 경로점 → 문턱(3차원, 계단 높이 포함). 이 길이 ÷ 걷는 속도 = 그 사람 보행 시간.
+    /// 문턱 → 좌석 미끄러짐은 들지 않는다(따로 정한 시간).
+    /// </summary>
+    public static float WalkLength(Vector3 walkStart, WalkRoute route)
+    {
+        float length = GroundLength(walkStart, route);
+        if (route.HasThreshold)
+            length += Vector3.Distance(route.Ground.Length > 0 ? route.Ground[route.Ground.Length - 1] : walkStart, route.Interior[0]);
+        return length;
+    }
+
     /// <summary>
     /// 한 사람 보행 시간 중 충돌을 켠 채 걷는 앞 구간(웨이포인트까지)의 비율(0~1). 걷는 속도가 일정하도록 길이 비율로 나눈다.
-    /// 뒤 구간(문턱 → 좌석)은 충돌 없이 보간한다. 둘 다 0 이면 1(앞 구간에 다 준다 — 보간할 거리가 없다).
+    /// 뒤 구간(마지막 경로점 → 문턱)은 충돌 없이 보간한다. 둘 다 0 이면 1(앞 구간에 다 준다 — 보간할 거리가 없다).
     /// </summary>
     public static float GroundShare(float groundLength, float interiorLength)
     {

@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98339ed7562774644bd6cc1dee2e3b28, type: 3}
   m_Name: PodDropSettings
   m_EditorClassIdentifier: Assembly-CSharp::PodDropSettings
+  letterboxHeight: 0.04
   lobby:
     letterboxInSeconds: 0.5
     teleportBlackoutSeconds: 0.4
@@ -19,13 +20,15 @@ MonoBehaviour:
     cameraEndDistance: 1.15
     cameraZoomSeconds: 6
     cameraZoomEase: 3
-    walkSeconds: 3
+    walkSpeed: 4.5
     walkInterval: 0.4
+    seatSlideSeconds: 0.4
     hatchCloseSeconds: 0
     descendSeconds: 2
     descendDepth: 10
     descendEase: 7
     fadeOutSeconds: 0.6
+    hudRescanSeconds: 0.5
   map:
     holdSeconds: 0.3
     cameraStartDistance: 1.8
@@ -41,6 +44,8 @@ MonoBehaviour:
     settleSeconds: 0.4
     dissolveSeconds: 1
     letterboxOutSeconds: 0.5
+    hudRescanSeconds: 0
+    startTimeoutSeconds: 120
     podLandingOffset: {x: 0, y: 0, z: 0}
     seatOffsets:
     - {x: -0.6, y: 0, z: 0.45}

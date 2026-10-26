@@ -10,6 +10,7 @@ using UnityEngine;
 /// <item>Gizmo(선택 여부와 무관): 걷기 시작 지점 → 공용 경로점(walkPath, 리스트 순서) → 문턱 → 좌석을 잇고 번호·높이를 붙인다. 점마다 바닥까지 수직선.</item>
 /// <item>인스펙터: walkPath 를 끌어서 순서 변경, 경로점 추가(선택한 줄 뒤 또는 끝)·삭제·바닥에 붙이기(Undo), 선택한 줄은 씬 뷰에서 이동 핸들.</item>
 /// <item>경로 점검: 구간마다 플레이어 캡슐(Player.prefab 의 CapsuleCollider·GameRule 스텝 높이)로 훑어 막히는 구간을 콘솔 경고 + Gizmo 주황.</item>
+/// <item>단계 시각표: 이 경로 길이와 연결된 <see cref="PodDropSettings"/> 수치로 계산(<see cref="PodDropScheduleView"/>).</item>
 /// </list>
 /// 경로점 이름은 표시용이다 — 동작은 리스트 순서만 본다.
 /// </summary>
@@ -126,6 +127,9 @@ public sealed class LobbyPodLaunchEditor : Editor
 
         if (LastSummary.TryGetValue(Launch.GetInstanceID(), out string summary))
             EditorGUILayout.HelpBox(summary, summary.StartsWith("막힘 없음") ? MessageType.Info : MessageType.Warning);
+
+        // 이 경로 + 연결된 설정 수치로 계산한 시각표(설정 에셋 인스펙터와 같은 표).
+        PodDropScheduleView.Draw(Launch.EditorSettings, Launch);
     }
 
     // 리스트에서 고른 경로점 — 씬 뷰에서 바로 옮긴다(인스펙터를 떠나지 않게).
