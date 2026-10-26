@@ -7,7 +7,8 @@ using UnityEngine;
 /// 기본 수치(로비): 레터박스 인 0.5(같이 순간이동 암전 0.4, 한가운데 0.2 에 순간이동), 간격 0.4, 문턱 → 좌석 미끄러짐 0.4, 페이드 0.6, 줌 1.8 → 1.15 / 6초.
 /// 발사대 애니(C2i): 해치 클립 0 → 1.4 (순간이동부터, 겹침), 발사 클립 1.5 → 6.8 ×2 = 2.65초(포드 하강은 클립 안).
 /// 보행 시간은 슬롯마다 받는다(C2d — 경로 길이 ÷ 걷는 속도). 여기선 대부분 3인 각 3초 → 합계 7.95초.
-/// 기본 수치(맵): 대기 0.3, 낙하 0.6·높이 12, 여운 0.4, 디졸브 1, 레터박스 아웃 0.5, 줌 1.8 → 1 / 2.6초. 합계 2.8초.
+/// 기본 수치(맵): 대기 0.3, 낙하 0.6·높이 12, 여운 최소 0.4, 착지 애니(C2i, 2배속) 다리 0/2.33 · 날개 0.3/1.5 · 해치 1.4/0.87 → 착지 뒤 2.33초에 디졸브,
+/// 디졸브 1, 레터박스 아웃 0.5, 줌 1.8 → 1 / 2.6초. 합계 4.73초(착지 애니를 다 끄면 C2i 이전 2.8초).
 /// </summary>
 public sealed class PodDropTimelineTests
 {
@@ -297,7 +298,7 @@ public sealed class PodDropTimelineTests
     }
 
     [Test]
-    public void Settings_Asset_LobbyPodAnimFields_TakeDefaults()
+    public void Settings_Asset_PodAnimFields_TakeDefaults()
     {
         // C2i — 에셋에 아직 없는 새 칸은 코드 기본값(SO 필드 초기값)으로 읽힌다(에셋을 다시 쓰지 않는다 — 사용자 튜닝 값 보존).
         var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<PodDropSettings>("Assets/9.ScriptableObject/Lobby/PodDropSettings.asset");
@@ -310,6 +311,14 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(d.launchClipStartSeconds, lobby.launchClipStartSeconds, Eps);
         Assert.AreEqual(d.launchClipEndSeconds, lobby.launchClipEndSeconds, Eps);
         Assert.AreEqual(d.launchSpeed, lobby.launchSpeed, Eps);
+
+        PodDropMapTimings map = asset.Map;
+        PodDropMapTimings m = PodDropMapTimings.Default;
+        Assert.AreEqual(m.landingGear.state, map.landingGear.state);
+        Assert.AreEqual(m.landingGear.seconds, map.landingGear.seconds, Eps);
+        Assert.AreEqual(m.wingDeploy.delaySeconds, map.wingDeploy.delaySeconds, Eps);
+        Assert.AreEqual(m.stageHatch.state, map.stageHatch.state);
+        Assert.AreEqual(m.stageHatch.delaySeconds, map.stageHatch.delaySeconds, Eps);
     }
 
     // ─── 로비: 발사대 애니 (C2i — 해치 열림 · 발사 클립) ──────────────────
@@ -568,11 +577,95 @@ public sealed class PodDropTimelineTests
         PodDropMapTimeline t = Map();
         Assert.AreEqual(0.3f, t.FallAt, Eps);
         Assert.AreEqual(0.9f, t.ImpactAt, Eps);
-        Assert.AreEqual(1.3f, t.DissolveAt, Eps);
+        Assert.AreEqual(0.9f + LandingAnims, t.LandingAnimsEndAt, Eps, "가장 늦게 끝나는 착지 애니 = 다리(2.33)");
+        Assert.AreEqual(t.LandingAnimsEndAt, t.DissolveAt, Eps, "착지 애니가 여운(0.4)보다 길다 → 다 끝난 뒤 디졸브");
         Assert.AreEqual(t.DissolveAt, t.PlayersVisibleAt, Eps, "디졸브 시작 = 플레이어 보임");
-        Assert.AreEqual(2.3f, t.LetterboxOutAt, Eps);
-        Assert.AreEqual(2.8f, t.ReleaseAt, Eps, "맵 합계 2.8초");
-        Assert.LessOrEqual(t.ReleaseAt, 4f, "D4 — 맵 3~4초 이내");
+        Assert.AreEqual(t.DissolveAt + 1f, t.LetterboxOutAt, Eps);
+        Assert.AreEqual(0.9f + LandingAnims + 1.5f, t.ReleaseAt, Eps, "맵 합계 4.73초");
+        // D4 '맵 3~4초' 는 착지 애니 없을 때 기준 — 애니(C2i)를 넣으며 늘었다(사용자 튜닝 대상).
+        Assert.LessOrEqual(new PodDropMapTimeline(NoLandingAnims()).ReleaseAt, 4f, "D4 — 착지 애니를 끄면 3~4초 이내");
+    }
+
+    const float LandingAnims = 4.666667f / 2f; // 다리(DP_GearDeploy) 2배속 — 기본에서 가장 늦게 끝난다
+
+    static PodDropMapTimings NoLandingAnims()
+    {
+        PodDropMapTimings s = PodDropMapTimings.Default;
+        s.landingGear.seconds = 0f;
+        s.wingDeploy.seconds = 0f;
+        s.stageHatch.seconds = 0f;
+        return s;
+    }
+
+    // ─── 맵: 착지 애니 (C2i) ─────────────────────────────────────────────
+
+    [Test]
+    public void Map_LandingCues_Default()
+    {
+        PodDropMapTimings d = PodDropMapTimings.Default;
+        Assert.AreEqual("DP_GearDeploy", d.landingGear.state);
+        Assert.AreEqual("DP_WingDeploy", d.wingDeploy.state);
+        Assert.AreEqual("DP_HatchStageOpen", d.stageHatch.state);
+
+        PodDropMapTimeline t = Map();
+        Assert.AreEqual(3, t.LandingCues.Count);
+        Assert.AreEqual(t.ImpactAt, t.LandingCueStartAt(0), Eps, "다리 = 착지 순간");
+        Assert.AreEqual(t.ImpactAt + 0.3f, t.LandingCueStartAt(1), Eps, "날개 = 착지 +0.3");
+        Assert.AreEqual(t.ImpactAt + 1.4f, t.LandingCueStartAt(2), Eps, "해치 = 착지 +1.4");
+
+        for (int i = 0; i < 3; i++)
+        {
+            Assert.AreEqual(0f, t.LandingCueProgressAt(i, -1d), Eps, $"#{i} 시작 전 0 — 시작 자세로 떨어진다");
+            Assert.AreEqual(0f, t.LandingCueProgressAt(i, t.FallAt + 0.1d), Eps, $"#{i} 낙하 중 0");
+            Assert.AreEqual(0f, t.LandingCueProgressAt(i, t.LandingCueStartAt(i)), Eps);
+            Assert.AreEqual(0.5f, t.LandingCueProgressAt(i, t.LandingCueStartAt(i) + t.LandingCues[i].seconds * 0.5d), Eps, $"#{i} 선형");
+            Assert.AreEqual(1f, t.LandingCueProgressAt(i, t.DissolveAt), Eps, $"#{i} 디졸브 전에 다 끝남");
+            Assert.AreEqual(1f, t.LandingCueProgressAt(i, t.ReleaseAt + 1d), Eps, $"#{i} 끝 자세 유지");
+        }
+    }
+
+    [Test]
+    public void Map_LandingCuesOff_SameAsBefore()
+    {
+        var t = new PodDropMapTimeline(NoLandingAnims());
+        Assert.AreEqual(t.ImpactAt, t.LandingAnimsEndAt, Eps);
+        Assert.AreEqual(1.3f, t.DissolveAt, Eps, "착지 + 여운 0.4 (C2i 이전)");
+        Assert.AreEqual(2.8f, t.ReleaseAt, Eps, "C2i 이전 합계 2.8초");
+        for (int i = 0; i < 3; i++)
+            Assert.AreEqual(0f, t.LandingCueProgressAt(i, t.ReleaseAt), Eps, $"#{i} 생략 = 늘 시작 자세");
+
+        PodDropMapTimings noState = PodDropMapTimings.Default;
+        noState.landingGear.state = "";
+        Assert.IsFalse(new PodDropMapTimeline(noState).LandingCues[0].Plays, "상태 이름이 비면 생략");
+        Assert.AreEqual(0f, new PodDropMapTimeline(noState).LandingCueProgressAt(0, 100d), Eps);
+    }
+
+    [Test]
+    public void Map_SettleLongerThanLandingAnims_SettleWins()
+    {
+        PodDropMapTimings s = PodDropMapTimings.Default;
+        s.settleSeconds = 5f;
+        var t = new PodDropMapTimeline(s);
+        Assert.AreEqual(t.ImpactAt + 5f, t.DissolveAt, Eps, "여운이 더 길면 여운 끝에 디졸브");
+
+        s = PodDropMapTimings.Default;
+        s.stageHatch.delaySeconds = 3f; // 3 + 0.87 > 다리 2.33
+        var later = new PodDropMapTimeline(s);
+        Assert.AreEqual(later.ImpactAt + 3f + 1.733333f / 2f, later.DissolveAt, Eps, "가장 늦게 끝나는 애니(해치) 기준");
+        Assert.AreEqual(Map().ReleaseAt + (later.DissolveAt - Map().DissolveAt), later.ReleaseAt, Eps, "뒤 경계만 밀린다");
+    }
+
+    [Test]
+    public void Map_LandingCues_NegativeClamped()
+    {
+        PodDropMapTimings s = PodDropMapTimings.Default;
+        s.landingGear.delaySeconds = -2f;
+        s.landingGear.seconds = -1f;
+        var t = new PodDropMapTimeline(s);
+        Assert.AreEqual(0f, t.LandingCues[0].delaySeconds, Eps);
+        Assert.AreEqual(0f, t.LandingCues[0].seconds, Eps);
+        Assert.IsFalse(t.LandingCues[0].Plays, "음수 길이 → 0 → 생략");
+        Assert.AreEqual(t.LandingCueStartAt(2) + t.LandingCues[2].seconds, t.LandingAnimsEndAt, Eps, "남은 애니 중 가장 늦은 것(해치)");
     }
 
     [Test]
@@ -675,7 +768,7 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Map_ZeroLengthPhases_Skipped()
     {
-        PodDropMapTimings s = PodDropMapTimings.Default;
+        PodDropMapTimings s = NoLandingAnims();
         s.holdSeconds = 0f;
         s.settleSeconds = 0f;
         var t = new PodDropMapTimeline(s);

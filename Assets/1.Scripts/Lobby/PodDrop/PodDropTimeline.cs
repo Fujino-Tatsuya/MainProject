@@ -142,6 +142,21 @@ public struct PodDropLobbyTimings
     };
 }
 
+/// <summary>포드 애니 한 토막(C2i) — Animator 상태 이름 · 시작 오프셋 · 재생 길이(클립 처음 → 끝을 이 길이에 맞춰 늘이거나 줄인다).</summary>
+[Serializable]
+public struct PodAnimCue
+{
+    [Tooltip("Animator 상태 이름(= 클립 이름). 비우면 이 애니 없음")]
+    public string state;
+    [Tooltip("기준 순간 → 재생 시작(초)")]
+    [Min(0f)] public float delaySeconds;
+    [Tooltip("클립 처음 → 끝을 재생하는 시간(초). 클립 길이와 같으면 1배속. 0 = 이 애니 생략(시작 자세로 둔다)")]
+    [Min(0f)] public float seconds;
+
+    /// <summary>재생하는가 — 상태 이름이 있고 길이가 0 보다 크다.</summary>
+    public bool Plays => !string.IsNullOrEmpty(state) && seconds > 0f;
+}
+
 /// <summary>
 /// 맵 단계 수치 — 인스펙터에서 단계 순서대로 묶는다(t = 0 은 로딩 화면이 걷힌 순간). 길이는 초, 거리는 m.
 /// 이펙트 크기·흔들림은 시간표가 쓰지 않는다 — 착지 시각(<see cref="PodDropMapTimeline.ImpactAt"/>)에 맵 연출이 읽는다.
@@ -181,8 +196,16 @@ public struct PodDropMapTimings
     [Min(0f)] public float shakeAmplitude;
     [Tooltip("착지 카메라 흔들림 시간(초)")]
     [Min(0f)] public float shakeDuration;
-    [Tooltip("착지 → 디졸브 시작(초)")]
+    [Tooltip("착지 → 디졸브 시작 최소(초). 착지 애니가 더 길면 가장 늦게 끝나는 애니까지 기다린다")]
     [Min(0f)] public float settleSeconds;
+
+    [Header("착지 애니 (Animator 상태 — 착지 순간 기준. 마스크 레이어라 겹쳐 돈다, 다 끝나면 디졸브)")]
+    [Tooltip("착지 다리 펴기(DP_GearDeploy, Gear 레이어)")]
+    public PodAnimCue landingGear;
+    [Tooltip("날개 펴기(DP_WingDeploy, Wings 레이어)")]
+    public PodAnimCue wingDeploy;
+    [Tooltip("해치 열기(DP_HatchStageOpen, Hatches 레이어) — 열리면 디졸브로 플레이어가 보인다")]
+    public PodAnimCue stageHatch;
 
     [Header("디졸브 → 레터박스 아웃 → 해제")]
     [Tooltip("포드가 디졸브로 사라지는 시간(초). 시작 순간 플레이어가 보인다")]
@@ -225,6 +248,10 @@ public struct PodDropMapTimings
         shakeAmplitude = 0.6f,
         shakeDuration = 0.35f,
         settleSeconds = 0.4f,
+        // 클립 2배속(로비 발사와 같다 — D4 '짧게'): 다리 4.67→2.33, 날개 3→1.5, 해치 1.73→0.87. 다리·날개를 겹치고 해치는 다리 끝 무렵 → 착지 뒤 2.33초에 디졸브.
+        landingGear = new PodAnimCue { state = "DP_GearDeploy", delaySeconds = 0f, seconds = 4.666667f / 2f },
+        wingDeploy = new PodAnimCue { state = "DP_WingDeploy", delaySeconds = 0.3f, seconds = 1.5f },
+        stageHatch = new PodAnimCue { state = "DP_HatchStageOpen", delaySeconds = 1.4f, seconds = 1.733333f / 2f },
         dissolveSeconds = 1f,
         letterboxOutSeconds = 0.5f,
         letterboxOutEase = Ease.Linear,
@@ -430,7 +457,7 @@ public sealed class PodDropLobbyTimeline
 }
 
 /// <summary>
-/// 맵 포드 착지 연출의 순수 시간표 — 단계 시각, 경과 시간 → 단계·진행률·레터박스 알파·카메라 거리·포드 높이·디졸브 값.
+/// 맵 포드 착지 연출의 순수 시간표 — 단계 시각, 경과 시간 → 단계·진행률·레터박스 알파·카메라 거리·포드 높이·착지 애니 진행률·디졸브 값.
 /// 경과 시간은 로딩 화면이 걷힌 시각 기준(음수 = 시작 전, 첫 단계로 취급 — 레터박스는 덮여 있다).
 /// 해제(<see cref="ReleaseAt"/>)는 항상 레터박스 아웃이 끝난 뒤다. 마지막 단계 <see cref="PodDropMapPhase.Released"/> 는 끝이 없다.
 /// </summary>
@@ -453,9 +480,15 @@ public sealed class PodDropMapTimeline
     public float LetterboxOutSeconds { get; }
     public Ease LetterboxOutEase { get; }
 
+    /// <summary>착지 애니(다리 · 날개 · 해치 순서, 음수 길이·오프셋은 0) — 시작 = 착지 + 오프셋.</summary>
+    public IReadOnlyList<PodAnimCue> LandingCues => _landingCues;
+    private readonly PodAnimCue[] _landingCues;
+
     public float FallAt { get; }
     /// <summary>착지 시각 — 땅 갈라짐 이펙트·카메라 흔들림.</summary>
     public float ImpactAt { get; }
+    /// <summary>재생하는 착지 애니가 다 끝나는 시각. 하나도 없으면 착지 시각.</summary>
+    public float LandingAnimsEndAt { get; }
     /// <summary>디졸브 시작 = 플레이어가 보이는 시각.</summary>
     public float DissolveAt { get; }
     public float PlayersVisibleAt => DissolveAt;
@@ -480,10 +513,18 @@ public sealed class PodDropMapTimeline
         DissolveSeconds = Mathf.Max(0f, timings.dissolveSeconds);
         LetterboxOutSeconds = Mathf.Max(0f, timings.letterboxOutSeconds);
         LetterboxOutEase = timings.letterboxOutEase;
+        _landingCues = new[] { Clamp(timings.landingGear), Clamp(timings.wingDeploy), Clamp(timings.stageHatch) };
 
         FallAt = HoldSeconds;
         ImpactAt = FallAt + FallSeconds;
-        DissolveAt = ImpactAt + SettleSeconds;
+        LandingAnimsEndAt = ImpactAt;
+        foreach (PodAnimCue cue in _landingCues)
+        {
+            if (cue.Plays) LandingAnimsEndAt = Mathf.Max(LandingAnimsEndAt, ImpactAt + cue.delaySeconds + cue.seconds);
+        }
+
+        // 여운은 최소 대기 — 착지 애니가 더 길면 다 끝난 뒤 디졸브(애니가 없으면 C2i 이전과 같다).
+        DissolveAt = Mathf.Max(ImpactAt + SettleSeconds, LandingAnimsEndAt);
         LetterboxOutAt = DissolveAt + DissolveSeconds;
         ReleaseAt = LetterboxOutAt + LetterboxOutSeconds;
     }
@@ -552,6 +593,26 @@ public sealed class PodDropMapTimeline
 
     /// <summary>디졸브 진행률(0 = 포드 온전, 1 = 다 사라짐). 선형. 셰이더 값 변환(예: DissolveFx `_Cutoff` = 1 − 이 값)은 호출자가 한다.</summary>
     public float DissolveProgressAt(double elapsed) => PodDropTimeline.Progress(elapsed, DissolveAt, DissolveSeconds);
+
+    /// <summary>착지 애니 시작 시각 = 착지 + 오프셋.</summary>
+    public float LandingCueStartAt(int index) => ImpactAt + _landingCues[index].delaySeconds;
+
+    /// <summary>
+    /// 착지 애니 진행률(0 = 클립 처음, 1 = 끝 — Animator normalizedTime). 시작 전(낙하 중 포함) 0 — 시작 자세로 떨어진다. 끝난 뒤 1 유지.
+    /// 생략(길이 0·상태 없음)이면 늘 0.
+    /// </summary>
+    public float LandingCueProgressAt(int index, double elapsed)
+    {
+        PodAnimCue cue = _landingCues[index];
+        return cue.Plays ? PodDropTimeline.Progress(elapsed, LandingCueStartAt(index), cue.seconds) : 0f;
+    }
+
+    private static PodAnimCue Clamp(PodAnimCue cue) => new PodAnimCue
+    {
+        state = cue.state,
+        delaySeconds = Mathf.Max(0f, cue.delaySeconds),
+        seconds = Mathf.Max(0f, cue.seconds),
+    };
 }
 
 /// <summary>로비·맵 포드 시간표가 같이 쓰는 계산.</summary>

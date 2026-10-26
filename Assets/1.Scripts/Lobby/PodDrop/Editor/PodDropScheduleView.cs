@@ -130,7 +130,15 @@ public static class PodDropScheduleView
             : "\n  도착 페이드인     없음 (로딩 화면이 걷히자마자 맵이 보인다)");
         sb.Append($"\n  대기              0 ~ {t.FallAt:0.##}s");
         sb.Append($"\n  포드 낙하         {t.FallAt:0.##} ~ {t.ImpactAt:0.##}s ({t.FallHeight:0.##}m, {t.FallEase})");
-        sb.Append($"\n  착지 여운         {t.ImpactAt:0.##} ~ {t.DissolveAt:0.##}s (착지 순간 이펙트·흔들림)");
+        sb.Append($"\n  착지 여운         {t.ImpactAt:0.##} ~ {t.DissolveAt:0.##}s (착지 순간 이펙트·흔들림, 최소 {t.SettleSeconds:0.##}s · 착지 애니가 길면 그 끝까지)");
+        string[] cueNames = { "다리", "날개", "해치" };
+        for (int i = 0; i < t.LandingCues.Count; i++)
+        {
+            PodAnimCue cue = t.LandingCues[i];
+            sb.Append(cue.Plays
+                ? $"\n    착지 애니 {cueNames[i]}   {t.LandingCueStartAt(i):0.##} ~ {t.LandingCueStartAt(i) + cue.seconds:0.##}s ({cue.state}, 착지 +{cue.delaySeconds:0.##}s)"
+                : $"\n    착지 애니 {cueNames[i]}   생략");
+        }
         sb.Append($"\n  디졸브            {t.DissolveAt:0.##} ~ {t.LetterboxOutAt:0.##}s (시작 순간 플레이어 보임)");
         sb.Append($"\n  레터박스 걷힘     {t.LetterboxOutAt:0.##} ~ {t.ReleaseAt:0.##}s ({t.LetterboxOutEase})");
         sb.Append($"\n  해제              {t.ReleaseAt:0.##}s (UI·조작·튜토리얼 S0 — S0 환영 자막은 그 뒤 착지 1초, 튜토리얼 값)");

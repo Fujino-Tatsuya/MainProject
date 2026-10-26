@@ -14,7 +14,8 @@ using UnityEngine.SceneManagement;
 /// (<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단) + 숨김 → 디졸브 시작에 보이기 → 해제 시각에 잠금 해제.
 /// 연출 중 끊긴 사람은 건너뛰고 남은 인원으로 계속. 착지점을 못 찾거나 시작 시각이 오지 않으면 즉시 해제(폴백, 경고 로그).</item>
 /// <item>전 피어(로컬 표시): 레터박스(로딩이 걷힐 때 이미 덮임)·UI 숨김(<see cref="PodDropScreenOverlay"/>, 매 프레임 다시 찾음),
-/// 카메라 거리 배율 줌인, 포드(<c>PF_DropPod_v015</c> 런타임 생성, 콜라이더 끔) 낙하 → 착지 이펙트·흔들림 → 디졸브(<see cref="PodDissolve"/>) → 포드 제거.</item>
+/// 카메라 거리 배율 줌인, 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 낙하 → 착지 이펙트·흔들림
+/// → 착지 애니(다리·날개·해치, C2i — 시간표 시각으로 Animator 를 세운다, <see cref="PodAnimatorDriver"/>) → 디졸브(<see cref="PodDissolve"/>) → 포드 제거.</item>
 /// <item>튜토리얼: <see cref="IsArrivalDoneLocal"/> 이 참이 된 뒤에 존1 S0(착지 타이머·자막·목표)이 시작한다(<see cref="TutorialZone1Flow"/>).</item>
 /// </list>
 /// 수치·좌석 오프셋은 <see cref="PodDropSettings"/>(맵 단계) 가 원본이다 — 착지점은 플레이어 스폰 슬롯(<see cref="MapGenerator.GetRoleSlot"/>) 기준.
@@ -28,7 +29,7 @@ public sealed class MapPodArrival : NetworkBehaviour
     [SerializeField] private PodDropSettings settings;
 
     [Header("포드")]
-    [Tooltip("착지할 포드 원본(PF_DropPod_v015). 피어마다 로컬로 만들고 연출 끝에 지운다. 비우면 연출 없음.")]
+    [Tooltip("착지할 포드 원본(PF_DropPod_PodOnly_Combined_v001 — 루트 Animator). 피어마다 로컬로 만들고 연출 끝에 지운다. 비우면 연출 없음.")]
     [SerializeField] private GameObject podPrefab;
 
     [Tooltip("디졸브 머티리얼 템플릿(M_Dissolve_Template — DissolveFx, _Cutoff). 비우면 디졸브 대신 포드를 숨긴다.")]
@@ -85,6 +86,7 @@ public sealed class MapPodArrival : NetworkBehaviour
     private GameObject _pod;
     private bool _podGone;
     private PodDissolve _dissolve;
+    private PodAnimatorDriver _podAnimator;
     private bool _impactPlayed;
 
     private bool ArrivalDoneLocal
@@ -159,6 +161,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         TryResolveLandingServer(null);
 
         Debug.Log($"[SceneFlow] {Tag} 연출 켜짐(진입 {entryKind}) — 로딩이 걷히면 시작. 낙하 +{_serverTimeline.FallAt:0.##}s, 착지 +{_serverTimeline.ImpactAt:0.##}s, " +
+                  $"착지 애니 끝 +{_serverTimeline.LandingAnimsEndAt:0.##}s, " +
                   $"보이기·디졸브 +{_serverTimeline.DissolveAt:0.##}s, 해제 +{_serverTimeline.ReleaseAt:0.##}s");
     }
 
@@ -381,6 +384,7 @@ public sealed class MapPodArrival : NetworkBehaviour
             SpawnPod(landing);
 
         _pod.transform.SetPositionAndRotation(landing + Vector3.up * timeline.PodHeightAt(elapsed), _landingRotation.Value);
+        UpdatePodAnimation(timeline, elapsed);
         if (!started)
             return;
 
@@ -405,8 +409,17 @@ public sealed class MapPodArrival : NetworkBehaviour
             Destroy(_pod);
             _pod = null;
             _dissolve = null;
+            _podAnimator = null;
             _podGone = true;
         }
+    }
+
+    // 착지 애니는 상태마다 자기 마스크 레이어(Gear·Wings·Hatches)에 세운다 — 겹쳐 돌아도 서로 덮지 않는다. 시작 전(낙하 중)엔 클립 처음 자세.
+    private void UpdatePodAnimation(PodDropMapTimeline timeline, double elapsed)
+    {
+        _podAnimator ??= new PodAnimatorDriver(_pod.GetComponent<Animator>());
+        for (int i = 0; i < timeline.LandingCues.Count; i++)
+            _podAnimator.PoseNormalized(timeline.LandingCues[i].state, -1, timeline.LandingCueProgressAt(i, elapsed));
     }
 
     private void SpawnPod(Vector3 landing)
@@ -448,5 +461,6 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
 
         _dissolve = null;
+        _podAnimator = null;
     }
 }
