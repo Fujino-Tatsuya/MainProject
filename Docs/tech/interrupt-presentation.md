@@ -1,5 +1,7 @@
 # 간파 성공 연출 — 슬로우·히트스톱·암순응·성공 이펙트 칸·오너 줌
 
+> 🔹 할 일 104: 슬로우를 뺀 연출은 지금 **전부 꺼져 있다** — 칸마다 켜는 스위치는 [§6](#6-연출-스위치--interruptpresentationtoggles-할-일-104).
+>
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파 성공에 얹은 연출**만 다룬다.
 > 수치 원본은 `GameData.xlsx` `SlowMotion` 시트([data-table.md](data-table.md)).
@@ -134,7 +136,36 @@
 - 사람이 MPPM 으로 확인할 것: 본인/타인 강도 차이, 원형 중심이 `revealCenter` 대로(기본 = 맞은 대상) 잡히는지,
   `casterFx`·`targetFx` 를 넣은 뒤 전 화면에서 각각 시전자·대상 위치에 재생되는지.
 
-## 6. 이후 확장
+## 6. 연출 스위치 — `InterruptPresentationToggles` (할 일 104)
+
+슬로우만 남기고 그 위의 연출을 칸마다 끄고 켠다. 연출 코드·에셋은 지우지 않았고 재생 지점에서 스위치를 확인만 한다.
+`NetworkManager.prefab` 루트(`InterruptDarkAdaptation` 옆)에 붙어 있다. **기본 전부 꺼짐.**
+
+| 칸 | 필드 | 무엇이 언제 | 막는 곳 |
+|---|---|---|---|
+| A1 | `hitStop` | 성공 슬로우 맨 앞 정지 | `GlobalTimeScale.ServerStart` — 이벤트의 `hitStopDuration` 을 0 으로 싣는다 |
+| A2 | `darkAdaptation` | 성공 때 화면 암순응 | `InterruptDarkAdaptation.HandleStarted` 입구 |
+| A3 | `ownerZoom` | 내가 일으킨 슬로우 동안 카메라 줌 | `CameraTargetSwitcher.UpdateSlowMotionZoom` — 꺼지면 줌 배율 1 |
+| A4 | `successFxSlot` | 공용 성공 이펙트 칸(§2.4) | `InterruptSuccessFx.HandleStarted` 입구 |
+| B1 | `paladinShieldGlow` | 팔라딘 간파 시도 방패 발광·루프 | `FirstMeleeInterruptSkill.OnClientPlay` — `OnEnd` 의 끄기·회수는 늘 돈다 |
+| B2 | `paladinShieldCharge` | 팔라딘 방패 기 모으기(클립 `Garen_Parry` 의 `ShieldCharge`) | `EffectAnimEvents.PlayEffect`·`StartEffect` |
+| B3 | `paladinWave` | 팔라딘 성공 충격파 | `PlayerShieldVfx` 의 `interruptWave` 재생(RPC·오프라인 둘 다) |
+| C1 | `assassinInsightAttempt` | 어쌔신 기 모으기·튀기기·올려치기(클립 `Attack_Up_01`) | `EffectAnimEvents.PlayEffect`·`StartEffect` |
+| C2 | `assassinInsightSuccess` | 어쌔신 간파 성공 이펙트 | `AssassinSkillView.TryPlayInsightSuccess` |
+| E1 | `targetFlash` | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` |
+
+- **피어별.** 각 피어가 자기 `NetworkManager` 인스턴스 값을 읽는다(동기화 없음). 인스턴스가 없으면(EditMode·NetworkManager 없는 씬) 전부 꺼짐.
+- **히트스톱만 서버 값.** 서버가 Start 이벤트를 만들 때(`GlobalTimeScale.CreateStartEvent`) 스위치를 보고 히트스톱 길이만 0 으로 싣는다 —
+  전 피어 같은 타임라인이 유지된다. 배율·진입·유지·복귀는 그대로. 클라 쪽 `hitStop` 값은 쓰이지 않는다.
+- **클립 이벤트 이펙트(B2·C1)** 는 id 로 가린다 — 간파 id(`ShieldCharge`, `Assassin_InsightWindup`/`Pop`/`Slash`)는 `InterruptPresentationToggles` 상수 한 곳에만 있다.
+  다른 id 는 영향 없음. `StopEffect` 는 막지 않는다. 재생을 막아도 `EffectAnimEvents.Played` 알림은 난다 —
+  `AssassinSkillView` 가 올려치기 알림을 C2 기준 프레임으로 쓰므로 **C1 을 꺼도 C2 를 켜면 성공 이펙트가 같은 프레임에 나온다.**
+- 섬광(E1)은 연출만 막는다 — 판정·그로기·통계, 보스의 '섬광 칸 비어 있음' 경고는 그대로.
+- 대상 아님: 슬로우 자체, 거너 폭발선(`GunnerBeamView.InterruptBlastRpc`), `InterruptHighlightHUD`, `CameraFeedback` 공통 흔들림.
+- bool 이라 데이터 테이블 열이 아니다([data-table.md §8](data-table.md)) — `NetworkManager.prefab` 인스펙터에서 켠다.
+- 테스트: `Tools/Tests/슬로우 모션 EditMode 테스트 실행`(`InterruptPresentationTogglesTests`).
+
+## 7. 이후 확장
 
 - 암순응 셰이더에 흑백 실루엣·반전 모드를 얹을 수 있음(미구현, 이펙트 확정 후 결정).
 - 레퍼런스 의도 — 주변 입자가 한 점으로 모이는 효과 + 피격 대상에서 날카로운 선 수십 개가 한쪽으로 쏠려 터지는 충격파(번개 제외), targetFx 칸에 넣을 예정.

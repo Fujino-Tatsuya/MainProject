@@ -78,6 +78,8 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
     {
         if (purpose != SlowMotionPurpose.Success || _networkManager == null)
             return;
+        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.DarkAdaptation))
+            return;
 
         bool triggeredByMe = triggerClientId == _networkManager.LocalClientId;
         float peak = InterruptDarkAdaptationModel.SelectIntensity(triggeredByMe, selfIntensity, othersIntensity);

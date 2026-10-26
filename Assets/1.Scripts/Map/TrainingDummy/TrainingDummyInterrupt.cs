@@ -198,6 +198,7 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayInterruptFlashRpc()
     {
+        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
         if (interruptFlash != null)
             interruptFlash.PlayOnce();
     }

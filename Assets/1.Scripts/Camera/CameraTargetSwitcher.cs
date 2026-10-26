@@ -327,7 +327,8 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
         slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);
-        float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth, slowMotionZoomFactor);
+        float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth,
+            InterruptPresentationToggles.IsOn(InterruptPresentationKind.OwnerZoom) ? slowMotionZoomFactor : 1f); // 할 일 104 A3
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
         if (multiplier == appliedZoomMultiplier)

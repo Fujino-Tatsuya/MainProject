@@ -188,8 +188,21 @@ public sealed class GlobalTimeScale : MonoBehaviour
             triggerId = ++_lastIssuedTriggerId; // uint 한 바퀴 — 0 은 "없음"이라 건너뛴다
         }
 
-        ServerPublish(SlowMotionEvent.CreateStart(triggerId, Now, triggerClientId, profile, purpose, targetPosition));
+        ServerPublish(CreateStartEvent(triggerId, Now, triggerClientId, profile, purpose, targetPosition,
+            InterruptPresentationToggles.IsOn(InterruptPresentationKind.HitStop)));
         return triggerId;
+    }
+
+    /// <summary>
+    /// 서버가 배포할 Start 이벤트. 히트스톱 스위치(할 일 104 A1)가 꺼져 있으면 히트스톱 길이만 0 으로 싣는다 —
+    /// 서버 값 하나가 전 피어에 가서 같은 타임라인이 유지된다. 배율·진입·유지·복귀는 그대로.
+    /// </summary>
+    public static SlowMotionEvent CreateStartEvent(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
+                                                   SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn)
+    {
+        var e = SlowMotionEvent.CreateStart(triggerId, time, triggerClientId, profile, purpose, targetPosition);
+        e.HitStopDuration = InterruptPresentationToggles.SelectHitStopDuration(hitStopOn, e.HitStopDuration);
+        return e;
     }
 
     /// <summary>
