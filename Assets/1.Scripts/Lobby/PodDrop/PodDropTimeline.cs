@@ -9,7 +9,7 @@ using UnityEngine;
 /// </summary>
 public enum PodDropLobbyPhase
 {
-    LetterboxIn,    // t=0 — 서버가 입력 잠금. 위·아래 레터박스가 들어오고 UI 가 같이 숨는다. 카메라는 멀리서 줌인 시작. 같이 짧은 암전 — 가장 깊을 때 각자 걷기 시작 지점으로 순간이동
+    LetterboxIn,    // t=0 — 서버가 입력 잠금. 위·아래 레터박스가 들어오고 UI 가 같이 숨는다. 카메라는 멀리서 줌인 시작. 같이 짧은 암전(검게·유지·밝게) — 유지 구간 한가운데 각자 걷기 시작 지점으로 순간이동
     Walk,           // 걷기 시작 지점 → 계단 → 문턱까지 일정 속도로 자동 보행(슬롯 순서대로 간격을 두고 출발) → 좌석으로 미끄러짐. 레터박스·암전이 둘 다 끝난 뒤. 가장 늦게 앉는 사람 기준
     HatchClose,     // 해치 닫힘(선택 — 길이 0 이면 건너뛴다, 기본 0)
     Descend,        // 포드가 갱도 아래로 내려간다
@@ -40,13 +40,21 @@ public struct PodDropLobbyTimings
     [Header("레터박스 · 카메라")]
     [Tooltip("t=0(출격 확정) → 위·아래 레터박스가 다 들어옴(초). UI 는 레터박스와 같이 숨는다. 이것과 암전이 둘 다 끝나는 순간 첫 사람이 걷기 시작")]
     [Min(0f)] public float letterboxInSeconds;
-    [Tooltip("t=0 부터 짧은 암전 전체 길이(초) — 1/3 검게, 1/3 유지, 1/3 밝게. 한가운데(가장 깊을 때) 각자 걷기 시작 지점(WalkStart)으로 순간이동. 0 = 암전 없이 t=0 에 순간이동")]
-    [Min(0f)] public float teleportBlackoutSeconds;
-    [Tooltip("줌 시작(t=0) 카메라 거리 — 평소 거리 배율(1 = 평소). 클수록 멀리서 시작")]
+    [Tooltip("레터박스 들어오기 이징(진행도 → 덮인 비율). 기본 Linear = 일정한 속도")]
+    public Ease letterboxInEase;
+    [Tooltip("시작 암전 — t=0 부터 화면이 다 검어지기까지(초). 0 = 곧바로 검게(유지가 있으면)")]
+    [Min(0f)] public float blackoutFadeInSeconds;
+    [Tooltip("시작 암전 — 다 검은 채 유지(초). 이 구간 한가운데 각자 걷기 시작 지점(WalkStart)으로 순간이동. 세 구간이 모두 0 = 암전 없이 t=0 에 순간이동")]
+    [Min(0f)] public float blackoutHoldSeconds;
+    [Tooltip("시작 암전 — 유지가 끝난 뒤 다 밝아지기까지(초)")]
+    [Min(0f)] public float blackoutFadeOutSeconds;
+    [Tooltip("줌 시작 카메라 거리 — 평소 거리 배율(1 = 평소). 클수록 멀리서 시작. 줌 시작 지연 동안 이 거리로 멈춰 있다")]
     [Min(0.1f)] public float cameraStartDistance;
     [Tooltip("줌 끝 카메라 거리 — 평소 거리 배율(1 = 평소)")]
     [Min(0.1f)] public float cameraEndDistance;
-    [Tooltip("t=0 → 줌 끝(초). 끝난 뒤로는 끝 거리 유지. 0 = 처음부터 끝 거리")]
+    [Tooltip("t=0 → 줌 시작(초). 그동안 시작 거리로 멈춰 있다. 0 = t=0 에 바로 줌")]
+    [Min(0f)] public float cameraZoomDelaySeconds;
+    [Tooltip("줌 시작 → 줌 끝(초). 끝난 뒤로는 끝 거리 유지. 0 = 줌 시작 순간 끝 거리")]
     [Min(0f)] public float cameraZoomSeconds;
     [Tooltip("줌 이징(진행도 → 시작→끝 거리 비율)")]
     public Ease cameraZoomEase;
@@ -72,6 +80,8 @@ public struct PodDropLobbyTimings
     [Header("페이드 아웃 → 맵 로딩")]
     [Tooltip("강하가 끝난 순간 → 화면이 완전히 검게 됨(초). 끝나는 순간 맵 로딩 시작")]
     [Min(0f)] public float fadeOutSeconds;
+    [Tooltip("끝 암전 이징(진행도 → 검은 비율). 기본 Linear = 일정한 속도")]
+    public Ease fadeOutEase;
 
     [Header("화면 UI")]
     [Tooltip("연출 도중 새로 뜬 화면 UI 를 다시 찾아 숨기는 간격(초). 0 = 매 프레임")]
@@ -80,9 +90,14 @@ public struct PodDropLobbyTimings
     public static PodDropLobbyTimings Default => new PodDropLobbyTimings
     {
         letterboxInSeconds = 0.5f,
-        teleportBlackoutSeconds = 0.4f,
+        letterboxInEase = Ease.Linear,
+        // 짧은 암전 0.4초를 셋으로(C2 까지의 1/3 고정 비율과 같다).
+        blackoutFadeInSeconds = 0.4f / 3f,
+        blackoutHoldSeconds = 0.4f / 3f,
+        blackoutFadeOutSeconds = 0.4f / 3f,
         cameraStartDistance = 1.8f,
         cameraEndDistance = 1.15f,
+        cameraZoomDelaySeconds = 0f,
         cameraZoomSeconds = 6f,
         cameraZoomEase = Ease.InOutSine,
         walkSpeed = 4.5f,
@@ -93,6 +108,7 @@ public struct PodDropLobbyTimings
         descendDepth = 10f,
         descendEase = Ease.InCubic,
         fadeOutSeconds = 0.6f,
+        fadeOutEase = Ease.Linear,
         hudRescanSeconds = 0.5f,
     };
 }
@@ -107,11 +123,18 @@ public struct PodDropMapTimings
     [Header("대기 · 카메라 (레터박스는 덮인 채 시작)")]
     [Tooltip("로딩 화면이 걷힌 순간 → 포드 낙하 시작(초)")]
     [Min(0f)] public float holdSeconds;
-    [Tooltip("줌 시작(t=0) 카메라 거리 — 평소 거리 배율(1 = 평소). 클수록 멀리서 시작")]
+    [Tooltip("로딩 화면이 걷힌 순간 검은 화면에서 밝아지기까지(초). 다른 단계와 겹쳐 흐른다(시각을 밀지 않는다). " +
+             "0 = 검은 화면 없이 곧바로 맵이 보인다(로딩 화면 자체는 페이드 없이 한 번에 사라진다)")]
+    [Min(0f)] public float fadeInSeconds;
+    [Tooltip("도착 페이드인 이징(진행도 → 밝아진 비율). 기본 Linear = 일정한 속도")]
+    public Ease fadeInEase;
+    [Tooltip("줌 시작 카메라 거리 — 평소 거리 배율(1 = 평소). 클수록 멀리서 시작. 줌 시작 지연 동안 이 거리로 멈춰 있다")]
     [Min(0.1f)] public float cameraStartDistance;
     [Tooltip("줌 끝 카메라 거리 — 평소 거리 배율. 1 이면 해제 때 평소 카메라와 이어진다")]
     [Min(0.1f)] public float cameraEndDistance;
-    [Tooltip("t=0 → 줌 끝(초). 해제 시각보다 짧게 두면 해제 때 카메라가 튀지 않는다")]
+    [Tooltip("t=0 → 줌 시작(초). 그동안 시작 거리로 멈춰 있다. 0 = t=0 에 바로 줌")]
+    [Min(0f)] public float cameraZoomDelaySeconds;
+    [Tooltip("줌 시작 → 줌 끝(초). 지연 + 이 값을 해제 시각보다 짧게 두면 해제 때 카메라가 튀지 않는다")]
     [Min(0f)] public float cameraZoomSeconds;
     [Tooltip("줌 이징(진행도 → 시작→끝 거리 비율)")]
     public Ease cameraZoomEase;
@@ -137,6 +160,8 @@ public struct PodDropMapTimings
     [Min(0f)] public float dissolveSeconds;
     [Tooltip("디졸브가 끝난 순간 → 레터박스가 다 걷힘(초). 끝나는 순간 UI·조작·튜토리얼(S0) 해제")]
     [Min(0f)] public float letterboxOutSeconds;
+    [Tooltip("레터박스 걷히기 이징(진행도 → 걷힌 비율). 기본 Linear = 일정한 속도")]
+    public Ease letterboxOutEase;
 
     [Header("화면 UI · 안전장치")]
     [Tooltip("연출 도중 새로 뜬 화면 UI 를 다시 찾아 숨기는 간격(초). 0 = 매 프레임 — 로딩 화면이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게(연출 몇 초 동안만)")]
@@ -157,8 +182,11 @@ public struct PodDropMapTimings
     public static PodDropMapTimings Default => new PodDropMapTimings
     {
         holdSeconds = 0.3f,
+        fadeInSeconds = 0f,
+        fadeInEase = Ease.Linear,
         cameraStartDistance = 1.8f,
         cameraEndDistance = 1f,
+        cameraZoomDelaySeconds = 0f,
         cameraZoomSeconds = 2.6f,
         cameraZoomEase = Ease.InOutSine,
         fallHeight = 12f,
@@ -170,6 +198,7 @@ public struct PodDropMapTimings
         settleSeconds = 0.4f,
         dissolveSeconds = 1f,
         letterboxOutSeconds = 0.5f,
+        letterboxOutEase = Ease.Linear,
         hudRescanSeconds = 0f,
         startTimeoutSeconds = 120f,
         podLandingOffset = Vector3.zero,
@@ -188,10 +217,16 @@ public struct PodDropMapTimings
 public sealed class PodDropLobbyTimeline
 {
     public float LetterboxInSeconds { get; }
-    /// <summary>순간이동 암전 전체 길이(초, t=0 시작) — 검게 · 유지 · 밝게가 1/3 씩.</summary>
-    public float TeleportBlackoutSeconds { get; }
+    public Ease LetterboxInEase { get; }
+    /// <summary>시작 암전 — 검어지기 · 유지 · 밝아지기(초, t=0 부터 이 순서).</summary>
+    public float BlackoutFadeInSeconds { get; }
+    public float BlackoutHoldSeconds { get; }
+    public float BlackoutFadeOutSeconds { get; }
+    /// <summary>시작 암전 전체 길이(초) = 세 구간 합.</summary>
+    public float BlackoutSeconds => BlackoutFadeInSeconds + BlackoutHoldSeconds + BlackoutFadeOutSeconds;
     public float CameraStartDistance { get; }
     public float CameraEndDistance { get; }
+    public float CameraZoomDelaySeconds { get; }
     public float CameraZoomSeconds { get; }
     public Ease CameraZoomEase { get; }
     public float HatchCloseSeconds { get; }
@@ -199,6 +234,7 @@ public sealed class PodDropLobbyTimeline
     public float DescendDepth { get; }
     public Ease DescendEase { get; }
     public float FadeOutSeconds { get; }
+    public Ease FadeOutEase { get; }
 
     /// <summary>걸어 들어가는 사람 수(0 = 아무도 안 걷고 보행 단계 길이 0).</summary>
     public int WalkerCount => _walkSeconds.Length;
@@ -210,8 +246,8 @@ public sealed class PodDropLobbyTimeline
     // 슬롯별 보행 시간(초, 걷기 시작 지점 → 문턱) — 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
     private readonly float[] _walkSeconds;
 
-    /// <summary>암전이 가장 깊은 시각(암전 한가운데) — 각 오너가 자기 걷기 시작 지점으로 순간이동한다. 암전 길이 0 이면 0.</summary>
-    public float TeleportAt => TeleportBlackoutSeconds * 0.5f;
+    /// <summary>순간이동 시각 = 암전 유지 구간 한가운데 — 각 오너가 자기 걷기 시작 지점으로 순간이동한다. 암전이 없으면 0.</summary>
+    public float TeleportAt => BlackoutFadeInSeconds + BlackoutHoldSeconds * 0.5f;
     /// <summary>레터박스가 다 들어오고 암전도 다 걷힌 시각 = 보행 단계 시작(첫 사람 출발).</summary>
     public float WalkAt { get; }
     /// <summary>가장 늦게 좌석에 도착한 사람의 도착 시각 = 해치 닫힘 시작.</summary>
@@ -225,9 +261,13 @@ public sealed class PodDropLobbyTimeline
     public PodDropLobbyTimeline(PodDropLobbyTimings timings, IReadOnlyList<float> walkSeconds)
     {
         LetterboxInSeconds = Mathf.Max(0f, timings.letterboxInSeconds);
-        TeleportBlackoutSeconds = Mathf.Max(0f, timings.teleportBlackoutSeconds);
+        LetterboxInEase = timings.letterboxInEase;
+        BlackoutFadeInSeconds = Mathf.Max(0f, timings.blackoutFadeInSeconds);
+        BlackoutHoldSeconds = Mathf.Max(0f, timings.blackoutHoldSeconds);
+        BlackoutFadeOutSeconds = Mathf.Max(0f, timings.blackoutFadeOutSeconds);
         CameraStartDistance = timings.cameraStartDistance;
         CameraEndDistance = timings.cameraEndDistance;
+        CameraZoomDelaySeconds = Mathf.Max(0f, timings.cameraZoomDelaySeconds);
         CameraZoomSeconds = Mathf.Max(0f, timings.cameraZoomSeconds);
         CameraZoomEase = timings.cameraZoomEase;
         HatchCloseSeconds = Mathf.Max(0f, timings.hatchCloseSeconds);
@@ -235,6 +275,7 @@ public sealed class PodDropLobbyTimeline
         DescendDepth = Mathf.Max(0f, timings.descendDepth);
         DescendEase = timings.descendEase;
         FadeOutSeconds = Mathf.Max(0f, timings.fadeOutSeconds);
+        FadeOutEase = timings.fadeOutEase;
 
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
         SeatSlideSeconds = Mathf.Max(0f, timings.seatSlideSeconds);
@@ -243,7 +284,7 @@ public sealed class PodDropLobbyTimeline
             _walkSeconds[i] = walkSeconds[i] > 0f ? walkSeconds[i] : 0f; // NaN 도 0
 
         // 암전이 레터박스보다 길면 밝아진 뒤에 걷는다 — 걷는 모습이 검은 화면에 묻히지 않게.
-        WalkAt = Mathf.Max(LetterboxInSeconds, TeleportBlackoutSeconds);
+        WalkAt = Mathf.Max(LetterboxInSeconds, BlackoutSeconds);
         // 가장 늦게 도착하는 사람 기준. 아무도 안 걸으면 보행 시간 없이 바로 해치 닫힘.
         HatchCloseAt = WalkAt;
         for (int slot = 0; slot < WalkerCount; slot++)
@@ -310,18 +351,18 @@ public sealed class PodDropLobbyTimeline
     }
 
     /// <summary>
-    /// 레터박스 알파(0 = 없음, 1 = 다 덮임). 들어오는 구간은 선형, 그 뒤 1 유지.
+    /// 레터박스 알파(0 = 없음, 1 = 다 덮임). 들어오는 구간은 <see cref="LetterboxInEase"/>(기본 선형), 그 뒤 1 유지.
     /// <see cref="LoadAt"/>(완전 암전)부터 0 — 검은 화면 아래에서 걷혀 로딩 화면을 가리지 않는다. UI 숨김도 같은 값으로 본다(&gt; 0 이면 숨김).
     /// </summary>
     public float LetterboxAlphaAt(double elapsed)
     {
         if (elapsed < 0d || elapsed >= LoadAt) return 0f;
-        return PodDropTimeline.Progress(elapsed, 0f, LetterboxInSeconds);
+        return Easing.Evaluate(LetterboxInEase, PodDropTimeline.Progress(elapsed, 0f, LetterboxInSeconds));
     }
 
-    /// <summary>카메라 거리(평소 거리 배율). t=0 시작 거리 → 줌 끝 끝 거리, 그 뒤 유지.</summary>
+    /// <summary>카메라 거리(평소 거리 배율). 줌 시작 지연까지 시작 거리 → 줌 끝 끝 거리, 그 뒤 유지.</summary>
     public float CameraDistanceAt(double elapsed) =>
-        PodDropTimeline.CameraDistance(elapsed, CameraStartDistance, CameraEndDistance, CameraZoomSeconds, CameraZoomEase);
+        PodDropTimeline.CameraDistance(elapsed, CameraStartDistance, CameraEndDistance, CameraZoomDelaySeconds, CameraZoomSeconds, CameraZoomEase);
 
     /// <summary>해치 닫힘 진행률(0 = 열림, 1 = 닫힘). 해치 연출이 없으면(길이 0) 닫힘 시각부터 1 — 호출자가 해치를 쓰지 않으면 무시한다.</summary>
     public float HatchCloseProgressAt(double elapsed) => PodDropTimeline.Progress(elapsed, HatchCloseAt, HatchCloseSeconds);
@@ -330,17 +371,18 @@ public sealed class PodDropLobbyTimeline
     public float PodOffsetAt(double elapsed) =>
         -DescendDepth * Easing.Evaluate(DescendEase, PodDropTimeline.Progress(elapsed, DescendAt, DescendSeconds));
 
-    /// <summary>검은 화면 알파(0 = 투명, 1 = 완전 암전). 페이드 구간은 선형, <see cref="LoadAt"/> 부터 1.</summary>
-    public float FadeAlphaAt(double elapsed) => PodDropTimeline.Progress(elapsed, FadeOutAt, FadeOutSeconds);
+    /// <summary>검은 화면 알파(0 = 투명, 1 = 완전 암전). 페이드 구간은 <see cref="FadeOutEase"/>(기본 선형), <see cref="LoadAt"/> 부터 1.</summary>
+    public float FadeAlphaAt(double elapsed) =>
+        Easing.Evaluate(FadeOutEase, PodDropTimeline.Progress(elapsed, FadeOutAt, FadeOutSeconds));
 
     /// <summary>
-    /// 순간이동 암전 알파 — t=0 부터 1/3 동안 0 → 1, 1/3 동안 1 유지(<see cref="TeleportAt"/> 가 이 안), 1/3 동안 1 → 0, 그 뒤 0. 길이 0 이면 늘 0.
+    /// 시작 암전 알파 — t=0 부터 검어지기 동안 0 → 1, 유지 동안 1(<see cref="TeleportAt"/> 가 이 한가운데), 밝아지기 동안 1 → 0, 그 뒤 0(선형).
+    /// 세 구간이 모두 0 이면 늘 0.
     /// </summary>
     public float BlackoutAlphaAt(double elapsed)
     {
-        float third = TeleportBlackoutSeconds / 3f;
-        float fadeIn = PodDropTimeline.Progress(elapsed, 0f, third);
-        float fadeOut = 1f - PodDropTimeline.Progress(elapsed, third * 2f, third);
+        float fadeIn = PodDropTimeline.Progress(elapsed, 0f, BlackoutFadeInSeconds);
+        float fadeOut = 1f - PodDropTimeline.Progress(elapsed, BlackoutFadeInSeconds + BlackoutHoldSeconds, BlackoutFadeOutSeconds);
         return Mathf.Min(fadeIn, fadeOut);
     }
 
@@ -356,8 +398,12 @@ public sealed class PodDropLobbyTimeline
 public sealed class PodDropMapTimeline
 {
     public float HoldSeconds { get; }
+    /// <summary>도착 페이드인 길이(초, t=0 시작) — 다른 단계와 겹쳐 흐른다. 0 = 검은 화면 없음.</summary>
+    public float FadeInSeconds { get; }
+    public Ease FadeInEase { get; }
     public float CameraStartDistance { get; }
     public float CameraEndDistance { get; }
+    public float CameraZoomDelaySeconds { get; }
     public float CameraZoomSeconds { get; }
     public Ease CameraZoomEase { get; }
     public float FallHeight { get; }
@@ -366,6 +412,7 @@ public sealed class PodDropMapTimeline
     public float SettleSeconds { get; }
     public float DissolveSeconds { get; }
     public float LetterboxOutSeconds { get; }
+    public Ease LetterboxOutEase { get; }
 
     public float FallAt { get; }
     /// <summary>착지 시각 — 땅 갈라짐 이펙트·카메라 흔들림.</summary>
@@ -380,8 +427,11 @@ public sealed class PodDropMapTimeline
     public PodDropMapTimeline(PodDropMapTimings timings)
     {
         HoldSeconds = Mathf.Max(0f, timings.holdSeconds);
+        FadeInSeconds = Mathf.Max(0f, timings.fadeInSeconds);
+        FadeInEase = timings.fadeInEase;
         CameraStartDistance = timings.cameraStartDistance;
         CameraEndDistance = timings.cameraEndDistance;
+        CameraZoomDelaySeconds = Mathf.Max(0f, timings.cameraZoomDelaySeconds);
         CameraZoomSeconds = Mathf.Max(0f, timings.cameraZoomSeconds);
         CameraZoomEase = timings.cameraZoomEase;
         FallHeight = Mathf.Max(0f, timings.fallHeight);
@@ -390,6 +440,7 @@ public sealed class PodDropMapTimeline
         SettleSeconds = Mathf.Max(0f, timings.settleSeconds);
         DissolveSeconds = Mathf.Max(0f, timings.dissolveSeconds);
         LetterboxOutSeconds = Mathf.Max(0f, timings.letterboxOutSeconds);
+        LetterboxOutEase = timings.letterboxOutEase;
 
         FallAt = HoldSeconds;
         ImpactAt = FallAt + FallSeconds;
@@ -438,12 +489,23 @@ public sealed class PodDropMapTimeline
     /// <summary>해제됐는가 — UI·조작·튜토리얼(S0) 시작. 레터박스가 다 걷힌 뒤에만 true.</summary>
     public bool IsReleasedAt(double elapsed) => elapsed >= ReleaseAt;
 
-    /// <summary>레터박스 알파(0 = 없음, 1 = 다 덮임). 레터박스 아웃 전 1(로딩이 걷힐 때 이미 덮임), 아웃 구간 선형 1 → 0, 그 뒤 0. UI 숨김도 같은 값으로 본다.</summary>
-    public float LetterboxAlphaAt(double elapsed) => 1f - PodDropTimeline.Progress(elapsed, LetterboxOutAt, LetterboxOutSeconds);
+    /// <summary>
+    /// 레터박스 알파(0 = 없음, 1 = 다 덮임). 레터박스 아웃 전 1(로딩이 걷힐 때 이미 덮임), 아웃 구간 1 → 0(<see cref="LetterboxOutEase"/>, 기본 선형), 그 뒤 0.
+    /// UI 숨김도 같은 값으로 본다.
+    /// </summary>
+    public float LetterboxAlphaAt(double elapsed) =>
+        1f - Easing.Evaluate(LetterboxOutEase, PodDropTimeline.Progress(elapsed, LetterboxOutAt, LetterboxOutSeconds));
 
-    /// <summary>카메라 거리(평소 거리 배율). t=0 시작 거리 → 줌 끝 끝 거리, 그 뒤 유지.</summary>
+    /// <summary>
+    /// 도착 페이드인 검은 화면 알파(1 = 완전 암전, 0 = 투명). t=0 전 1(로딩 화면 아래), 페이드인 구간 1 → 0(<see cref="FadeInEase"/>), 그 뒤 0.
+    /// 길이 0 이면 늘 0 — 검은 화면 없이 로딩 화면이 걷히자마자 맵이 보인다(C2h 이전과 같다).
+    /// </summary>
+    public float FadeAlphaAt(double elapsed) =>
+        FadeInSeconds > 0f ? 1f - Easing.Evaluate(FadeInEase, PodDropTimeline.Progress(elapsed, 0f, FadeInSeconds)) : 0f;
+
+    /// <summary>카메라 거리(평소 거리 배율). 줌 시작 지연까지 시작 거리 → 줌 끝 끝 거리, 그 뒤 유지.</summary>
     public float CameraDistanceAt(double elapsed) =>
-        PodDropTimeline.CameraDistance(elapsed, CameraStartDistance, CameraEndDistance, CameraZoomSeconds, CameraZoomEase);
+        PodDropTimeline.CameraDistance(elapsed, CameraStartDistance, CameraEndDistance, CameraZoomDelaySeconds, CameraZoomSeconds, CameraZoomEase);
 
     /// <summary>포드 높이(착지점 기준 오프셋, m). 낙하 전 <see cref="FallHeight"/>, 낙하 중 → 0, 착지 뒤 0.</summary>
     public float PodHeightAt(double elapsed) =>
@@ -463,7 +525,7 @@ public static class PodDropTimeline
         return Mathf.Clamp01((float)((elapsed - start) / duration));
     }
 
-    /// <summary>t=0 에서 <paramref name="from"/> → <paramref name="seconds"/> 뒤 <paramref name="to"/>(이징), 그 뒤 유지.</summary>
-    public static float CameraDistance(double elapsed, float from, float to, float seconds, Ease ease) =>
-        Mathf.LerpUnclamped(from, to, Easing.Evaluate(ease, Progress(elapsed, 0f, seconds)));
+    /// <summary><paramref name="delay"/> 까지 <paramref name="from"/> 유지 → 그로부터 <paramref name="seconds"/> 뒤 <paramref name="to"/>(이징), 그 뒤 유지.</summary>
+    public static float CameraDistance(double elapsed, float from, float to, float delay, float seconds, Ease ease) =>
+        Mathf.LerpUnclamped(from, to, Easing.Evaluate(ease, Progress(elapsed, delay, seconds)));
 }

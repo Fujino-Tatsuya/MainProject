@@ -357,7 +357,8 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         // 기본 0 = 매 프레임 — 로딩이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게(연출 몇 초 동안만).
         _overlay.HudRescanInterval = settings.Map.hudRescanSeconds;
-        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, 0f, true);
+        // 검은 화면 = 도착 페이드인(기본 0 = 없음). 시작 전엔 로딩 화면(정렬 1000) 아래에 깔려 있다가 걷히는 순간부터 밝아진다.
+        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, timeline.FadeAlphaAt(elapsed), true);
     }
 
     private void UpdateCamera(PodDropMapTimeline timeline, double elapsed)

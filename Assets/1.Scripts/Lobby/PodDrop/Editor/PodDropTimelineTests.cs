@@ -83,7 +83,11 @@ public sealed class PodDropTimelineTests
     public void Lobby_Blackout_Default_InsideLetterboxIn()
     {
         PodDropLobbyTimeline t = Lobby();
-        Assert.AreEqual(0.4f, PodDropLobbyTimings.Default.teleportBlackoutSeconds, Eps, "기본 = 짧은 암전 0.4초");
+        PodDropLobbyTimings d = PodDropLobbyTimings.Default;
+        Assert.AreEqual(0.4f, t.BlackoutSeconds, Eps, "기본 = 짧은 암전 0.4초");
+        Assert.AreEqual(0.4f / 3f, d.blackoutFadeInSeconds, Eps, "검게·유지·밝게 1/3 씩(C2h 이전 고정 비율과 같다)");
+        Assert.AreEqual(0.4f / 3f, d.blackoutHoldSeconds, Eps);
+        Assert.AreEqual(0.4f / 3f, d.blackoutFadeOutSeconds, Eps);
         Assert.AreEqual(0.2f, t.TeleportAt, Eps, "순간이동 = 암전 한가운데");
         Assert.AreEqual(0.5f, t.WalkAt, Eps, "암전(0.4)이 레터박스 인(0.5) 안 → 보행 시작 그대로");
         Assert.AreEqual(7.3f, t.LoadAt, Eps, "합계 그대로");
@@ -121,8 +125,7 @@ public sealed class PodDropTimelineTests
     public void Lobby_BlackoutLongerThanLetterbox_WalkWaitsForLight()
     {
         PodDropLobbyTimeline zero = Lobby();
-        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
-        s.teleportBlackoutSeconds = 1.2f;
+        PodDropLobbyTimings s = Blackout(0.4f, 0.4f, 0.4f);
         var t = Lobby(s);
 
         Assert.AreEqual(0.6f, t.TeleportAt, Eps);
@@ -136,8 +139,7 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Lobby_BlackoutZero_TeleportAtStartNoBlack()
     {
-        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
-        s.teleportBlackoutSeconds = 0f;
+        PodDropLobbyTimings s = Blackout(0f, 0f, 0f);
         var t = Lobby(s);
 
         Assert.AreEqual(0f, t.TeleportAt, Eps, "암전 없음 → t=0 에 순간이동");
@@ -145,8 +147,149 @@ public sealed class PodDropTimelineTests
         for (double e = -0.5d; e <= t.FadeOutAt - 0.01d; e += 0.01d)
             Assert.AreEqual(0f, t.BlackoutAlphaAt(e), Eps, $"t={e:F2} 암전이 없어야 한다");
 
-        s.teleportBlackoutSeconds = -1f;
-        Assert.AreEqual(0f, Lobby(s).TeleportBlackoutSeconds, Eps, "음수 → 0");
+        var negative = Lobby(Blackout(-1f, -1f, -1f));
+        Assert.AreEqual(0f, negative.BlackoutSeconds, Eps, "음수 → 0");
+        Assert.AreEqual(0f, negative.TeleportAt, Eps);
+    }
+
+    static PodDropLobbyTimings Blackout(float fadeIn, float hold, float fadeOut)
+    {
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.blackoutFadeInSeconds = fadeIn;
+        s.blackoutHoldSeconds = hold;
+        s.blackoutFadeOutSeconds = fadeOut;
+        return s;
+    }
+
+    // ─── C2h: 조절 항목 (기본값 = C2h 이전과 같은 화면) ─────────────────────
+
+    [Test]
+    public void Lobby_NewKnobs_DefaultsMatchPreviousCurves()
+    {
+        PodDropLobbyTimings d = PodDropLobbyTimings.Default;
+        Assert.AreEqual(Ease.Linear, d.letterboxInEase, "레터박스 들어오기 기본 = 선형");
+        Assert.AreEqual(Ease.Linear, d.fadeOutEase, "끝 암전 기본 = 선형");
+        Assert.AreEqual(0f, d.cameraZoomDelaySeconds, Eps, "줌 지연 기본 0");
+
+        // C2h 이전 공식(선형 레터박스·선형 끝 페이드·1/3 고정 암전·t=0 줌)과 촘촘히 비교.
+        PodDropLobbyTimeline t = Lobby();
+        float third = 0.4f / 3f;
+        for (double e = -0.5d; e <= t.LoadAt + 0.5d; e += 0.01d)
+        {
+            float letterbox = e < 0d || e >= t.LoadAt ? 0f : PodDropTimeline.Progress(e, 0f, 0.5f);
+            float blackout = Mathf.Min(PodDropTimeline.Progress(e, 0f, third), 1f - PodDropTimeline.Progress(e, third * 2f, third));
+            float fade = PodDropTimeline.Progress(e, t.FadeOutAt, 0.6f);
+            float zoom = Mathf.LerpUnclamped(1.8f, 1.15f, Easing.Evaluate(Ease.InOutSine, PodDropTimeline.Progress(e, 0f, 6f)));
+            Assert.AreEqual(letterbox, t.LetterboxAlphaAt(e), Eps, $"레터박스 t={e:F2}");
+            Assert.AreEqual(blackout, t.BlackoutAlphaAt(e), Eps, $"시작 암전 t={e:F2}");
+            Assert.AreEqual(fade, t.FadeAlphaAt(e), Eps, $"끝 암전 t={e:F2}");
+            Assert.AreEqual(zoom, t.CameraDistanceAt(e), Eps, $"줌 t={e:F2}");
+        }
+    }
+
+    [Test]
+    public void Map_NewKnobs_DefaultsMatchPreviousCurves()
+    {
+        PodDropMapTimings d = PodDropMapTimings.Default;
+        Assert.AreEqual(Ease.Linear, d.letterboxOutEase, "레터박스 걷히기 기본 = 선형");
+        Assert.AreEqual(0f, d.fadeInSeconds, Eps, "도착 페이드인 기본 없음");
+        Assert.AreEqual(0f, d.cameraZoomDelaySeconds, Eps, "줌 지연 기본 0");
+
+        PodDropMapTimeline t = Map();
+        for (double e = -0.5d; e <= t.ReleaseAt + 0.5d; e += 0.01d)
+        {
+            float letterbox = 1f - PodDropTimeline.Progress(e, t.LetterboxOutAt, 0.5f);
+            float zoom = Mathf.LerpUnclamped(1.8f, 1f, Easing.Evaluate(Ease.InOutSine, PodDropTimeline.Progress(e, 0f, 2.6f)));
+            Assert.AreEqual(letterbox, t.LetterboxAlphaAt(e), Eps, $"레터박스 t={e:F2}");
+            Assert.AreEqual(0f, t.FadeAlphaAt(e), Eps, $"검은 화면 없음 t={e:F2}");
+            Assert.AreEqual(zoom, t.CameraDistanceAt(e), Eps, $"줌 t={e:F2}");
+        }
+    }
+
+    [Test]
+    public void Lobby_Blackout_UnevenSections_TeleportInMiddleOfHold()
+    {
+        var t = Lobby(Blackout(0.2f, 0.6f, 0.4f));
+        Assert.AreEqual(1.2f, t.BlackoutSeconds, Eps);
+        Assert.AreEqual(0.5f, t.TeleportAt, Eps, "검게 0.2 + 유지 0.6 의 절반");
+        Assert.AreEqual(0.5f, t.BlackoutAlphaAt(0.1d), Eps, "검게 — 선형");
+        Assert.AreEqual(1f, t.BlackoutAlphaAt(0.2d), Eps, "다 검어짐");
+        Assert.AreEqual(1f, t.BlackoutAlphaAt(0.8d), Eps, "유지 끝");
+        Assert.AreEqual(0.5f, t.BlackoutAlphaAt(1.0d), Eps, "밝게 — 선형");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(1.2d), Eps);
+        Assert.AreEqual(1.2f, t.WalkAt, Eps, "보행 = 암전이 다 걷힌 뒤");
+
+        var instant = Lobby(Blackout(0f, 0.3f, 0.3f));
+        Assert.AreEqual(1f, instant.BlackoutAlphaAt(0d), Eps, "검게 0 = t=0 부터 바로 검다");
+        Assert.AreEqual(0.15f, instant.TeleportAt, Eps);
+    }
+
+    [Test]
+    public void Lobby_Eases_Applied()
+    {
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.letterboxInEase = Ease.OutQuad;
+        s.fadeOutEase = Ease.InCubic;
+        var t = Lobby(s);
+        Assert.AreEqual(Easing.Evaluate(Ease.OutQuad, 0.5f), t.LetterboxAlphaAt(0.25d), Eps, "레터박스 들어오기 이징");
+        Assert.AreEqual(1f, t.LetterboxAlphaAt(t.WalkAt), Eps);
+        Assert.AreEqual(Easing.Evaluate(Ease.InCubic, 0.5f), t.FadeAlphaAt(t.FadeOutAt + 0.3d), Eps, "끝 암전 이징");
+        Assert.AreEqual(1f, t.FadeAlphaAt(t.LoadAt), Eps);
+        Assert.AreEqual(Lobby().LoadAt, t.LoadAt, Eps, "이징은 시각을 바꾸지 않는다");
+    }
+
+    [Test]
+    public void Lobby_CameraZoomDelay_HoldsStartThenZooms()
+    {
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.cameraZoomDelaySeconds = 1f;
+        var t = Lobby(s);
+        Assert.AreEqual(1.8f, t.CameraDistanceAt(0.5d), Eps, "지연 동안 시작 거리");
+        Assert.AreEqual(1.8f, t.CameraDistanceAt(1d), Eps);
+        Assert.AreEqual((1.8f + 1.15f) * 0.5f, t.CameraDistanceAt(4d), Eps, "지연 + 3초 = InOutSine 중간");
+        Assert.AreEqual(1.15f, t.CameraDistanceAt(7d), Eps);
+        Assert.AreEqual(Lobby().LoadAt, t.LoadAt, Eps, "줌은 시각표를 밀지 않는다");
+    }
+
+    [Test]
+    public void Map_LetterboxOutEase_FadeIn_ZoomDelay()
+    {
+        PodDropMapTimings s = PodDropMapTimings.Default;
+        s.letterboxOutEase = Ease.InQuad;
+        s.fadeInSeconds = 0.8f;
+        s.fadeInEase = Ease.Linear;
+        s.cameraZoomDelaySeconds = 0.5f;
+        var t = new PodDropMapTimeline(s);
+
+        Assert.AreEqual(1f - Easing.Evaluate(Ease.InQuad, 0.5f), t.LetterboxAlphaAt(t.LetterboxOutAt + 0.25d), Eps, "레터박스 걷히기 이징");
+        Assert.AreEqual(0f, t.LetterboxAlphaAt(t.ReleaseAt), Eps);
+
+        Assert.AreEqual(1f, t.FadeAlphaAt(-1d), Eps, "시작 전(로딩 화면 아래) 검다");
+        Assert.AreEqual(1f, t.FadeAlphaAt(0d), Eps);
+        Assert.AreEqual(0.5f, t.FadeAlphaAt(0.4d), Eps, "페이드인 — 선형");
+        Assert.AreEqual(0f, t.FadeAlphaAt(0.8d), Eps);
+        Assert.AreEqual(Map().ReleaseAt, t.ReleaseAt, Eps, "페이드인은 다른 단계와 겹친다(시각 불변)");
+
+        Assert.AreEqual(1.8f, t.CameraDistanceAt(0.5d), Eps, "지연 동안 시작 거리");
+        Assert.AreEqual(1f, t.CameraDistanceAt(0.5d + 2.6d), Eps);
+    }
+
+    [Test]
+    public void Settings_Asset_BlackoutMigratedToThreeSections()
+    {
+        // C2h — 옛 teleportBlackoutSeconds(0.4) 를 새 세 칸에 직접 옮겨 적었다(FormerlySerializedAs 로는 하나를 셋으로 못 나눈다).
+        var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<PodDropSettings>("Assets/9.ScriptableObject/Lobby/PodDropSettings.asset");
+        Assert.IsNotNull(asset, "PodDropSettings.asset 이 없다");
+        PodDropLobbyTimings lobby = asset.Lobby;
+        Assert.AreEqual(0.4f / 3f, lobby.blackoutFadeInSeconds, Eps);
+        Assert.AreEqual(0.4f / 3f, lobby.blackoutHoldSeconds, Eps);
+        Assert.AreEqual(0.4f / 3f, lobby.blackoutFadeOutSeconds, Eps);
+        Assert.AreEqual(Ease.Linear, lobby.letterboxInEase);
+        Assert.AreEqual(Ease.Linear, lobby.fadeOutEase);
+        Assert.AreEqual(0f, lobby.cameraZoomDelaySeconds, Eps);
+        Assert.AreEqual(Ease.Linear, asset.Map.letterboxOutEase);
+        Assert.AreEqual(0f, asset.Map.fadeInSeconds, Eps);
+        Assert.AreEqual(0f, asset.Map.cameraZoomDelaySeconds, Eps);
     }
 
     // ─── 로비: 해치 (D13 — 길이 0 이면 건너뜀) ────────────────────────────

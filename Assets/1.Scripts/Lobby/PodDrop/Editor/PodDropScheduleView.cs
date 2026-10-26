@@ -53,10 +53,18 @@ public static class PodDropScheduleView
 
         sb.Append($"로비 — t=0 = 출격 집결 확정, {DisplayWalkers}인 기준");
         sb.Append(known ? $" (경로: {sceneName})" : "");
-        sb.Append($"\n  레터박스 들어옴   0 ~ {t.LetterboxInSeconds:0.##}s");
-        sb.Append(t.TeleportBlackoutSeconds > 0f
-            ? $"\n  순간이동 암전     0 ~ {t.TeleportBlackoutSeconds:0.##}s (가장 깊을 때 {t.TeleportAt:0.##}s 에 걷기 시작 지점으로)"
-            : "\n  순간이동 암전     없음 (t=0 에 순간이동)");
+        sb.Append($"\n  레터박스 들어옴   0 ~ {t.LetterboxInSeconds:0.##}s ({t.LetterboxInEase})");
+        if (t.BlackoutSeconds > 0f)
+        {
+            float holdAt = t.BlackoutFadeInSeconds;
+            float lightAt = holdAt + t.BlackoutHoldSeconds;
+            sb.Append($"\n  시작 암전         검게 0 ~ {holdAt:0.##}s · 유지 ~ {lightAt:0.##}s · 밝게 ~ {t.BlackoutSeconds:0.##}s");
+            sb.Append($"\n                    (유지 한가운데 {t.TeleportAt:0.##}s 에 걷기 시작 지점으로 순간이동)");
+        }
+        else
+        {
+            sb.Append("\n  시작 암전         없음 (t=0 에 순간이동)");
+        }
 
         if (!known)
         {
@@ -64,7 +72,8 @@ public static class PodDropScheduleView
             sb.Append($"\n                    (속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 문턱 → 좌석 미끄러짐 {t.SeatSlideSeconds:0.##}s)");
             sb.Append(HatchLine(t, relative: true));
             sb.Append($"\n  포드 하강         +{t.DescendSeconds:0.##}s ({t.DescendDepth:0.##}m, {t.DescendEase})");
-            sb.Append($"\n  끝 암전(페이드)   +{t.FadeOutSeconds:0.##}s");
+            sb.Append($"\n  끝 암전(페이드)   +{t.FadeOutSeconds:0.##}s ({t.FadeOutEase})");
+            sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
             sb.Append($"\n  총 = 가장 늦게 앉는 사람 + {t.HatchCloseSeconds + t.DescendSeconds + t.FadeOutSeconds:0.##}s → 맵 로딩");
             return sb.ToString();
         }
@@ -78,10 +87,17 @@ public static class PodDropScheduleView
         sb.Append($"\n                    (속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 미끄러짐 {t.SeatSlideSeconds:0.##}s, 가장 늦게 앉는 사람 {t.HatchCloseAt:0.##}s)");
         sb.Append(HatchLine(t, relative: false));
         sb.Append($"\n  포드 하강         {t.DescendAt:0.##} ~ {t.FadeOutAt:0.##}s ({t.DescendDepth:0.##}m, {t.DescendEase})");
-        sb.Append($"\n  끝 암전(페이드)   {t.FadeOutAt:0.##} ~ {t.LoadAt:0.##}s");
-        sb.Append($"\n  카메라 줌         0 ~ {t.CameraZoomSeconds:0.##}s ({t.CameraStartDistance:0.##} → {t.CameraEndDistance:0.##}배, {t.CameraZoomEase})");
+        sb.Append($"\n  끝 암전(페이드)   {t.FadeOutAt:0.##} ~ {t.LoadAt:0.##}s ({t.FadeOutEase})");
+        sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
         sb.Append($"\n  총 {t.LoadAt:0.##}초 → 맵 로딩");
         return sb.ToString();
+    }
+
+    // 줌 시작 지연이 있으면 그동안 시작 거리로 멈춰 있다.
+    private static string CameraLine(float delay, float seconds, float from, float to, EuniTween.Ease ease)
+    {
+        string hold = delay > 0f ? $" — 0 ~ {delay:0.##}s 는 시작 거리로 멈춤" : "";
+        return $"\n  카메라 줌         {delay:0.##} ~ {delay + seconds:0.##}s ({from:0.##} → {to:0.##}배, {ease}){hold}";
     }
 
     private static string HatchLine(PodDropLobbyTimeline t, bool relative)
@@ -96,13 +112,16 @@ public static class PodDropScheduleView
     {
         PodDropMapTimeline t = settings.CreateMapTimeline();
         var sb = new StringBuilder("맵 — t=0 = 로딩 화면이 걷힌 순간 (레터박스는 덮인 채 시작)");
+        sb.Append(t.FadeInSeconds > 0f
+            ? $"\n  도착 페이드인     0 ~ {t.FadeInSeconds:0.##}s (검은 화면 → 밝게, {t.FadeInEase}, 다른 단계와 겹침)"
+            : "\n  도착 페이드인     없음 (로딩 화면이 걷히자마자 맵이 보인다)");
         sb.Append($"\n  대기              0 ~ {t.FallAt:0.##}s");
         sb.Append($"\n  포드 낙하         {t.FallAt:0.##} ~ {t.ImpactAt:0.##}s ({t.FallHeight:0.##}m, {t.FallEase})");
         sb.Append($"\n  착지 여운         {t.ImpactAt:0.##} ~ {t.DissolveAt:0.##}s (착지 순간 이펙트·흔들림)");
         sb.Append($"\n  디졸브            {t.DissolveAt:0.##} ~ {t.LetterboxOutAt:0.##}s (시작 순간 플레이어 보임)");
-        sb.Append($"\n  레터박스 걷힘     {t.LetterboxOutAt:0.##} ~ {t.ReleaseAt:0.##}s");
+        sb.Append($"\n  레터박스 걷힘     {t.LetterboxOutAt:0.##} ~ {t.ReleaseAt:0.##}s ({t.LetterboxOutEase})");
         sb.Append($"\n  해제              {t.ReleaseAt:0.##}s (UI·조작·튜토리얼 S0 — S0 환영 자막은 그 뒤 착지 1초, 튜토리얼 값)");
-        sb.Append($"\n  카메라 줌         0 ~ {t.CameraZoomSeconds:0.##}s ({t.CameraStartDistance:0.##} → {t.CameraEndDistance:0.##}배, {t.CameraZoomEase})");
+        sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
         sb.Append($"\n  총 {t.ReleaseAt:0.##}초");
         return sb.ToString();
     }

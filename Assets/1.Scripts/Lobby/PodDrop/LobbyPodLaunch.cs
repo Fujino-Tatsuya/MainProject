@@ -15,7 +15,7 @@ using UnityEngine.Serialization;
 /// <item>서버: 시작 순간 참가자 연출 잠금(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단),
 /// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), <see cref="PodDropLobbyTimeline.LoadAt"/> 에 콜백.
 /// 연출 중 끊긴 사람은 건너뛰고 계속한다(명단은 그대로 둔다 — 인원이 바뀌면 시간표가 바뀐다). 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
-/// <item>오너: 시작 직후 짧은 암전이 가장 깊을 때(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
+/// <item>오너: 시작 직후 짧은 암전의 유지 구간 한가운데(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
 /// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 개인 경로점(슬롯 entryPath) → 공용 경로점(walkPath, 슬롯 합류 번호부터 리스트 순서)을
 /// 평소 걷기 변위(Walk 애니)로 걷고 → 문턱까지 같은 속도로, 문턱 → 좌석은 미끄러짐 시간 동안 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
 /// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(순간이동 암전 + 끝 페이드, <see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
@@ -108,7 +108,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         public bool Active;
         public double Start;          // 어느 연출의 보행인가 — 시작 시각이 바뀌면 버린다
         public Vector3 WalkStart;     // 걷기 시작 지점(순간이동 목적지)
-        public double TeleportAt;     // 서버시간 — 암전이 가장 깊을 때
+        public double TeleportAt;     // 서버시간 — 암전 유지 구간 한가운데
         public bool Teleported;
         public bool Started;
         public Vector3[] Ground;      // 충돌을 켠 채 걷는 경유 지점(수평만 쓴다 — 높이는 지면)
@@ -214,7 +214,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         LockParticipants(participants);
 
         Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
-                  $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.TeleportBlackoutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}s, " +
+                  $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.BlackoutFadeInSeconds:0.##}/{timeline.BlackoutHoldSeconds:0.##}/{timeline.BlackoutFadeOutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}s, " +
                   $"속도 {settings.Lobby.walkSpeed:0.##}m/s, 각자 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s + 미끄러짐 {timeline.SeatSlideSeconds:0.##}s), " +
                   $"강하 +{timeline.DescendAt:0.##}s, 페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
 

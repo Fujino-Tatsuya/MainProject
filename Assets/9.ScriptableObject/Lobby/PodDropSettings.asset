@@ -15,7 +15,9 @@ MonoBehaviour:
   letterboxHeight: 0.04
   lobby:
     letterboxInSeconds: 0.5
-    teleportBlackoutSeconds: 0.4
+    blackoutFadeInSeconds: 0.13333334
+    blackoutHoldSeconds: 0.13333334
+    blackoutFadeOutSeconds: 0.13333334
     cameraStartDistance: 1.8
     cameraEndDistance: 1.15
     cameraZoomSeconds: 6
