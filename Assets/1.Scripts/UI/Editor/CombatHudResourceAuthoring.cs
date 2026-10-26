@@ -349,6 +349,8 @@ public static class CombatHudResourceAuthoring
     // 레벨 숫자 = XP 바 왼쪽 둥근 자리(미리보기 실측, 프레임 좌상단 기준). XP 채움 위에 겹친다.
     static readonly Vector2 LevelTopLeft = new Vector2(182f, 51f);
     static readonly Vector2 LevelSize = new Vector2(36f, 38f);
+    // 레벨 숫자 색 = 미리보기 그림 기준 검정(주황 XP 바 위). 글꼴·크기는 HpText 그대로.
+    static readonly Color LevelTextColor = Color.black;
 
     static readonly (string name, PlayerSkillSlot slot)[] SkillSlots =
     {
@@ -404,7 +406,7 @@ public static class CombatHudResourceAuthoring
         return true;
     }
 
-    /// <summary>HpText 의 글꼴·머티리얼·크기·색을 그대로 쓰는 숫자 칸. XP 바 바로 위(형제 순서)에 그린다.</summary>
+    /// <summary>HpText 의 글꼴·머티리얼·크기를 그대로 쓰고 색만 <see cref="LevelTextColor"/> 인 숫자 칸. XP 바 바로 위(형제 순서)에 그린다.</summary>
     static TMP_Text BuildLevelText(RectTransform status, RectTransform ex, TMP_Text style)
     {
         RectTransform rt = EnsureChild(status, LevelTextName);
@@ -421,11 +423,17 @@ public static class CombatHudResourceAuthoring
         text.fontSize = style.fontSize;
         text.enableAutoSizing = false;
         text.fontStyle = style.fontStyle;
-        text.color = style.color;
+        text.color = LevelTextColor;
         text.alignment = TextAlignmentOptions.Center;
         text.textWrappingMode = TextWrappingModes.NoWrap;
         text.raycastTarget = false;
         text.text = "1";
+
+        // color 세터는 m_fontColor 만 바꾸고 m_fontColor32 는 메시를 다시 만들 때 따라간다.
+        // LoadPrefabContents 안에서는 메시가 안 만들어져 흰색 32비트 값이 남으므로 직접 맞춘다.
+        var so = new SerializedObject(text);
+        so.FindProperty("m_fontColor32").colorValue = LevelTextColor;
+        so.ApplyModifiedPropertiesWithoutUndo();
         return text;
     }
 
