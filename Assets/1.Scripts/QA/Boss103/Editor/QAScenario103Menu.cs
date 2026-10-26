@@ -20,8 +20,21 @@ public static class QAScenario103Menu
     private const string SeedKey = "QA.103.Seed";
     private const string RunKey = "QA.103.Run";
 
+    private const string TierKey = "QA.103.Tier"; // -1 = 자동(판 번호), 그 밖 = QABoss103BotTier
+
     private static int Seed => EditorPrefs.GetInt(SeedKey, QABoss103Config.DefaultSeed);
     private static int Run => Mathf.Max(1, EditorPrefs.GetInt(RunKey, 1));
+
+    private static QABoss103BotTier? Tier
+    {
+        get
+        {
+            int v = EditorPrefs.GetInt(TierKey, -1);
+            return System.Enum.IsDefined(typeof(QABoss103BotTier), v) ? (QABoss103BotTier)v : (QABoss103BotTier?)null;
+        }
+    }
+
+    private static QABoss103Config Current => new QABoss103Config { Seed = Seed, Run = Run, Tier = Tier };
 
     [MenuItem(Root + "Run 1 Match (Boss 3P)", priority = 0)]
     public static void RunOne()
@@ -38,17 +51,56 @@ public static class QAScenario103Menu
             return;
         }
 
-        var cfg = new QABoss103Config { Seed = Seed, Run = Run };
+        QABoss103Config cfg = Current;
         int written = WriteConfig(cfg);
-        Debug.Log($"{QABoss103Plan.Tag} event=menu_run seed={cfg.Seed} run={cfg.Run} runSeed={cfg.RunSeed} configs={written}");
+        Debug.Log($"{QABoss103Plan.Tag} event=menu_run seed={cfg.Seed} run={cfg.Run} runSeed={cfg.RunSeed} botTier={cfg.BotTier} tierSource={(cfg.Tier.HasValue ? "manual" : "run")} configs={written}");
         QAScenario48Menu.Run(QALobbyScenarios.Boss103Id, 3);
     }
 
     [MenuItem(Root + "Status", priority = 1)]
     public static void Status()
     {
-        var cfg = new QABoss103Config { Seed = Seed, Run = Run };
-        Debug.Log($"{QABoss103Plan.Tag} 설정 — 기준 시드 {cfg.Seed} · 판 {cfg.Run} · 판 시드 {cfg.RunSeed} · 클론 {QANetSim88.CloneRoots().Count}개");
+        QABoss103Config cfg = Current;
+        Debug.Log($"{QABoss103Plan.Tag} 설정 — 기준 시드 {cfg.Seed} · 판 {cfg.Run} · 판 시드 {cfg.RunSeed} · " +
+                  $"봇 단계 {cfg.BotTier}({(cfg.Tier.HasValue ? "수동" : "판 번호 mod 3")}) [{QABoss103BotProfile.For(cfg.BotTier).Describe()}] · 클론 {QANetSim88.CloneRoots().Count}개");
+    }
+
+    // ── 봇 단계 ──────────────────────────────────────────────
+
+    [MenuItem(Root + "Settings/Bot Tier - Auto (run mod 3)", priority = 60)]
+    public static void TierAuto() => SetTier(-1);
+
+    [MenuItem(Root + "Settings/Bot Tier - Beginner", priority = 61)]
+    public static void TierBeginner() => SetTier((int)QABoss103BotTier.Beginner);
+
+    [MenuItem(Root + "Settings/Bot Tier - Normal", priority = 62)]
+    public static void TierNormal() => SetTier((int)QABoss103BotTier.Normal);
+
+    [MenuItem(Root + "Settings/Bot Tier - Skilled", priority = 63)]
+    public static void TierSkilled() => SetTier((int)QABoss103BotTier.Skilled);
+
+    [MenuItem(Root + "Settings/Bot Tier - Auto (run mod 3)", true)]
+    public static bool TierAutoCheck() => CheckTier("Settings/Bot Tier - Auto (run mod 3)", -1);
+
+    [MenuItem(Root + "Settings/Bot Tier - Beginner", true)]
+    public static bool TierBeginnerCheck() => CheckTier("Settings/Bot Tier - Beginner", (int)QABoss103BotTier.Beginner);
+
+    [MenuItem(Root + "Settings/Bot Tier - Normal", true)]
+    public static bool TierNormalCheck() => CheckTier("Settings/Bot Tier - Normal", (int)QABoss103BotTier.Normal);
+
+    [MenuItem(Root + "Settings/Bot Tier - Skilled", true)]
+    public static bool TierSkilledCheck() => CheckTier("Settings/Bot Tier - Skilled", (int)QABoss103BotTier.Skilled);
+
+    private static void SetTier(int v)
+    {
+        EditorPrefs.SetInt(TierKey, v);
+        Status();
+    }
+
+    private static bool CheckTier(string item, int v)
+    {
+        Menu.SetChecked(Root + item, (Tier.HasValue ? (int)Tier.Value : -1) == v);
+        return true;
     }
 
     [MenuItem(Root + "Open Report Folder", priority = 2)]

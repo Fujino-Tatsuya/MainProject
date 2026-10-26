@@ -79,7 +79,7 @@ public static class QABoss103Match
     }
 
     private static QABoss103RunRecord NewRecord(QABoss103Config cfg) =>
-        new QABoss103RunRecord { Run = cfg.Run, BaseSeed = cfg.Seed, RunSeed = cfg.RunSeed };
+        new QABoss103RunRecord { Run = cfg.Run, BaseSeed = cfg.Seed, RunSeed = cfg.RunSeed, BotTier = cfg.BotTier };
 
     private static void Finish(QAScenarioContext ctx, QABoss103RunRecord rec)
     {
@@ -101,6 +101,7 @@ public static class QABoss103Match
         QABossTimerHold88.ReleaseActive("b103_start");
 
         QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.RunSeed, localCharacter);
+        QABoss103CombatBot fighter = CreateFighter(ctx, cfg, localCharacter);
         var characters = new Dictionary<ulong, QABoss103Character>();
         Action<TutorialTraitChosen> onChosen = c =>
         {
@@ -128,7 +129,7 @@ public static class QABoss103Match
                 characters[p.OwnerClientId] = ch;
                 party.Add($"{p.OwnerClientId}:{ch}:{QALobbyFlow.CleanName(p)}");
             }
-            Debug.Log($"{Tag} event=run_start run={rec.Run} seed={rec.BaseSeed} runSeed={rec.RunSeed} party={QABoss103Plan.Token(string.Join(",", party))}");
+            Debug.Log($"{Tag} event=run_start run={rec.Run} seed={rec.BaseSeed} runSeed={rec.RunSeed} botTier={rec.BotTier} party={QABoss103Plan.Token(string.Join(",", party))}");
             ctx.Eye("103 파티", string.Join(", ", party));
 
             // 1) 특성 4라운드.
@@ -252,7 +253,18 @@ public static class QABoss103Match
             Finish(ctx, rec);
             if (bot != null)
                 UnityEngine.Object.Destroy(bot.gameObject);
+            if (fighter != null)
+                UnityEngine.Object.Destroy(fighter.gameObject);
         }
+    }
+
+    /// <summary>C2 전투 봇 — 이 판 단계(<see cref="QABoss103Config.BotTier"/>)의 프로필을 리포트에 그대로 남긴다.</summary>
+    private static QABoss103CombatBot CreateFighter(QAScenarioContext ctx, QABoss103Config cfg, QABoss103Character character)
+    {
+        QABoss103CombatBot fighter = QABoss103CombatBot.Create(cfg.RunSeed, character, cfg.BotTier);
+        string source = cfg.Tier.HasValue ? "수동 지정" : $"판 {cfg.Run} mod 3";
+        ctx.Eye($"103 봇 프로필({character})", $"{fighter.Profile.Describe()} · 단계 출처 {source}");
+        return fighter;
     }
 
     // ── 가상 플레이어 ────────────────────────────────────────
@@ -264,6 +276,7 @@ public static class QABoss103Match
     public static IEnumerator RunClient(QAScenarioContext ctx, QABoss103Config cfg, QABoss103Character localCharacter)
     {
         QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.RunSeed, localCharacter);
+        QABoss103CombatBot fighter = CreateFighter(ctx, cfg, localCharacter);
         try
         {
             string mapScene = SceneManager.GetActiveScene().name;
@@ -297,6 +310,8 @@ public static class QABoss103Match
         {
             if (bot != null)
                 UnityEngine.Object.Destroy(bot.gameObject);
+            if (fighter != null)
+                UnityEngine.Object.Destroy(fighter.gameObject);
         }
     }
 
