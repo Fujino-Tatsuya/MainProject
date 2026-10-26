@@ -138,3 +138,39 @@ public sealed class QABoss103StallWatch
         return now - _since >= StallSeconds;
     }
 }
+
+/// <summary>
+/// 할 일 103 C7g — 조기 시간초과(순수, EditMode <c>QABoss103BatchTests</c>). 공용 목숨 0 이고 보스 HP 가 <see cref="NoProgressSeconds"/> 동안
+/// 그대로면 판을 Timeout(note <see cref="Note"/>)으로 끝낸다 — 30분까지 가도 결과가 같은 Timeout 인 북진 교착에서 시간만 아낀다.
+/// 목숨이 0 이 아니거나(모름 포함) 보스 HP 를 모르거나 HP 가 바뀌면 그 순간부터 다시 센다. 30분 상한·90초 정체(<see cref="QABoss103StallWatch"/>)는 그대로.
+/// </summary>
+public sealed class QABoss103EarlyTimeout
+{
+    public const double NoProgressSeconds = 300.0;
+    public const string Note = "early_no_progress";
+
+    private bool _started;
+    private double _since;
+    private int _bossHp;
+
+    /// <summary>목숨 0·보스 HP 불변이 이어진 초. 세는 중이 아니면 0.</summary>
+    public double FlatSeconds(double now) => _started ? now - _since : 0.0;
+
+    /// <summary>매 틱. <paramref name="lives"/> = 공용 목숨(모르면 음수), <paramref name="bossHp"/> = 보스 HP(모르면 <see cref="int.MinValue"/>). 조기 시간초과면 true.</summary>
+    public bool Tick(double now, int lives, int bossHp)
+    {
+        if (lives != 0 || bossHp == int.MinValue)
+        {
+            _started = false;
+            return false;
+        }
+        if (!_started || bossHp != _bossHp)
+        {
+            _started = true;
+            _since = now;
+            _bossHp = bossHp;
+            return false;
+        }
+        return now - _since >= NoProgressSeconds;
+    }
+}

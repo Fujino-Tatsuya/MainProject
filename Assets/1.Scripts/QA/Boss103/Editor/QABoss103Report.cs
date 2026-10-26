@@ -383,6 +383,7 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
         Row2(sb, "측정 규칙", "QA 끼임 복구 — 이동하려는데 목표에 못 다가간 채 2초 옆걸음 → 6초 뒤·옆 대시 → 20초 보스 둘레 링 지점으로 재배치(run_chars qa_relocates) · " +
                              "Combat 중 90초 동안 전투 활동(보스·탑 피해, 피격, 사망·부활, 공용 목숨, 기믹 진행, 보스 HP 변화)이 없으면 정체(stall) 오류 판");
+        Row2(sb, "측정 규칙", "조기 시간초과: 공용 목숨 0 이고 보스 HP 5분 불변이면 Timeout 으로 처리(통계는 시간초과와 같이 집계 · 판 목록 note early_no_progress)");
         Row2(sb, "시작 / 최근", $"{H(Val(batch, "started_at", Dash))} / {H(last.Length > 0 ? last : Dash)}");
         Row2(sb, "루프 상태", H(input.LoopState.Length > 0 ? input.LoopState : Dash));
         sb.Append("</tbody></table>\n");

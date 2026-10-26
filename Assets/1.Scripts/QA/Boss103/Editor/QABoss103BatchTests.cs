@@ -261,6 +261,32 @@ public sealed class QABoss103BatchTests
     }
 
     [Test]
+    public void 조기_시간초과_목숨_0_보스_HP_5분_불변이면_true()
+    {
+        var e = new QABoss103EarlyTimeout();
+        Assert.IsFalse(e.Tick(0.0, 0, 5000));
+        Assert.IsFalse(e.Tick(299.9, 0, 5000));
+        Assert.IsTrue(e.Tick(300.0, 0, 5000));
+        Assert.AreEqual("early_no_progress", QABoss103EarlyTimeout.Note);
+    }
+
+    [Test]
+    public void 조기_시간초과_목숨이_남거나_HP가_바뀌거나_모르면_다시_센다()
+    {
+        var e = new QABoss103EarlyTimeout();
+        Assert.IsFalse(e.Tick(0.0, 2, 5000));
+        Assert.IsFalse(e.Tick(400.0, 1, 5000));   // 목숨 남음 — 안 센다
+        Assert.IsFalse(e.Tick(400.0, 0, 5000));   // 목숨 0 — 여기부터
+        Assert.IsFalse(e.Tick(650.0, 0, 4990));   // 보스 HP 변화 — 다시
+        Assert.AreEqual(0.0, e.FlatSeconds(650.0));
+        Assert.IsFalse(e.Tick(949.9, 0, 4990));
+        Assert.IsFalse(e.Tick(950.0, 0, int.MinValue));   // HP 모름 — 끊김
+        Assert.IsFalse(e.Tick(951.0, -1, 4990));          // 목숨 모름 — 끊김
+        Assert.IsFalse(e.Tick(952.0, 0, 4990));
+        Assert.IsTrue(e.Tick(1252.0, 0, 4990));
+    }
+
+    [Test]
     public void 정체_오류_사유는_stall_재실행_대상()
     {
         string detail = $"{QABoss103Batch.ReasonStall} — Combat 중 90초 동안 보스에 준 피해·받은 피해 0";

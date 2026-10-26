@@ -18,7 +18,8 @@ using UnityEngine.SceneManagement;
 ///   일렬로 옮긴다(<see cref="PlayerFallRecovery.RelocateServer"/>). 봇은 움직이지 않는다 → 게임의 집결 판정(전원 발판 5초)이 엘리베이터를 연다.</item>
 /// <item>엘리베이터 → 23호 등장 연출(연출 잠금) → 각 인스턴스 봇이 Space 홀드 스킵 → <see cref="BossEncounterPhase.Combat"/> 진입 시각 기록.</item>
 /// <item>[서버] 판 종료 판정(<see cref="QABoss103Plan.Judge"/>): 보스 처치 = 클리어 / 공용 목숨 0 전멸(<see cref="PartyWipeRespawner.PartyWipeRespawned"/>,
-///   리스폰 대상이 아니라 결과 화면으로 가면 씬 이탈) = 실패 / Combat 부터 30분 = 시간초과. 판 기록 → <see cref="LastRecord"/> + 로그 1줄.
+///   리스폰 대상이 아니라 결과 화면으로 가면 씬 이탈) = 실패 / Combat 부터 30분 = 시간초과(C7g — 목숨 0·보스 HP 5분 불변이면 조기 시간초과,
+///   <see cref="QABoss103EarlyTimeout"/>). 판 기록 → <see cref="LastRecord"/> + 로그 1줄.
 ///   판 동안 QA 자동 부활(<see cref="QABoss103AutoRevive"/>, C7b) — Soul 3초 뒤 정식 부활(목숨 1 차감), 목숨 0 이면 Soul 그대로 → 전멸.</item>
 /// </list>
 /// 88 의 체력 채우기·어그로 강제·보스 타이머 정지·QA 슈퍼아머는 켜지 않는다(혹시 남아 있으면 시작 때 해제).
@@ -238,6 +239,7 @@ public static class QABoss103Match
             string mapScene = SceneManager.GetActiveScene().name;
             BossEncounterDirector director = BossEncounterDirector.Instance;
             var stall = new QABoss103StallWatch();
+            var early = new QABoss103EarlyTimeout();
             while (true)
             {
                 double elapsed = Time.realtimeSinceStartupAsDouble - combatStart;
@@ -253,6 +255,16 @@ public static class QABoss103Match
                     Debug.LogWarning($"{Tag} event=stall combatS={elapsed:F1} quietS={stall.QuietSeconds(elapsed):F1} lastActivity={recorder.Activity.LastKind} " +
                                      $"activity={recorder.Activity.Count} dealt={recorder.Stats.DamageDealtTotal()} " +
                                      $"taken={recorder.Stats.TakenActivity()} relocates={QABoss103Relocator.Relocates} {BossDiag()}");
+                    break;
+                }
+                if (outcome == QABoss103Outcome.None && early.Tick(elapsed, recorder.Stats.LivesNow, recorder.BossHp))
+                {
+                    // C7g — 목숨 0 + 보스 HP 5분 불변(북진 교착) → 30분까지 가도 같은 Timeout. 통계는 일반 Timeout 과 같이, note 로 구분.
+                    rec.Outcome = QABoss103Outcome.Timeout;
+                    rec.CombatSeconds = elapsed;
+                    rec.Detail = QABoss103EarlyTimeout.Note;
+                    Debug.LogWarning($"{Tag} event=early_timeout combatS={elapsed:F1} flatS={early.FlatSeconds(elapsed):F1} lives={recorder.Stats.LivesNow} " +
+                                     $"bossHp={recorder.BossHp} lastActivity={recorder.Activity.LastKind} {BossDiag()}");
                     break;
                 }
                 if (outcome != QABoss103Outcome.None)

@@ -56,6 +56,9 @@ public sealed class QABoss103Recorder : MonoBehaviour
 
     public bool CurrentEntryReadable => CurrentEntryField != null;
 
+    /// <summary>C7g — 마지막으로 본 보스 HP(모르면 <see cref="int.MinValue"/>).</summary>
+    public int BossHp => _lastBossHp;
+
     /// <summary>호스트 — Combat 진입 순간 만든다. <paramref name="characters"/> = clientId → 캐릭터(자리).</summary>
     public static QABoss103Recorder Begin(IReadOnlyDictionary<ulong, QABoss103Character> characters)
     {

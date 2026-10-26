@@ -141,6 +141,9 @@ public sealed class QABoss103RunStats
     public readonly List<QABoss103GimmickEvent> Gimmicks = new List<QABoss103GimmickEvent>();
 
     private int _lives = -1;
+
+    /// <summary>C7g — 마지막으로 본 공용 목숨(모르면 -1).</summary>
+    public int LivesNow => _lives;
     private bool _suppressed;
 
     public double Duration => double.IsNaN(CombatStart) || double.IsNaN(CombatEnd) ? double.NaN : Math.Max(0.0, CombatEnd - CombatStart);
