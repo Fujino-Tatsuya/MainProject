@@ -14,10 +14,25 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 {
-    // 반격 순간 연출 자리값(PlayerShieldVfx.ServerInterruptWave 재사용, 결정 25). 반격 판정마다 대상 유무와 무관하게 1회.
+    // 반격 자세 전환 창구(PlayerShieldVfx.ServerPlayGuardCounterPose). 예전 임시 반격 충격파(ServerInterruptWave)는
+    // 2026-10-26 민경 연출(handoff-paladin-guardian-will-vfx)로 바꾸면서 뺐다 — 우클릭 충격파는 그대로다.
     [Header("연출")]
-    [Tooltip("연출 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
+    [Tooltip("반격 자세 전환 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 반격 자세로 못 넘어가 안전망이 E 를 끝낸다")]
     [SerializeField] private PlayerShieldVfx shieldVfx;
+
+    // 상태 클립별 연출(점화·결계·해제·막아냄·오라·기 모으기·반격)은 Garen_E_* 클립 이벤트가 전 피어에서 켜고 끈다.
+    // 여기는 방패 문양 발광과, 클립 Stop 이벤트가 안 오는 끊김(경직·사망·안전망)의 루프 회수만 한다. 비워두면 그 부분만 빠진다.
+    [Tooltip("방패 메쉬 문양 발광(머티리얼 페이드) — 우클릭과 같은 방패의 MaterialFadeEffect 를 물린다. E 내내 켠다")]
+    [SerializeField] private MaterialFadeEffect shieldGlow;
+
+    [Tooltip("방어 결계 루프(소켓 이펙트, Id 'GuardianBarrier') — 'VFX/GuardianWill/Barrier'. 끊겼을 때 끄기만 한다")]
+    [SerializeField] private EffectSocketPlayer barrierLoop;
+
+    [Tooltip("반격 금빛 오라 루프(소켓 이펙트, Id 'GuardianAura') — 'VFX/GuardianWill/Aura'. 끊겼을 때 끄기만 한다")]
+    [SerializeField] private EffectSocketPlayer auraLoop;
+
+    [Tooltip("반격 전 검 기 모으기 루프(소켓 이펙트, Id 'GuardianCharge') — 'VFX/GuardianWill/Charge'. 끊겼을 때 끄기만 한다")]
+    [SerializeField] private EffectSocketPlayer chargeLoop;
 
     // 방어 성공 시 CrossFade 할 반격 자세 상태(PlayerAnimatorController Base Layer). 시작 상태(SubSkillGuard)는 데이터의
     // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
@@ -103,7 +118,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     public override void OnClientPlay(Vector3 direction)
     {
         // 방어 자세 애니(SubSkillGuard)는 컨트롤러가 시작 상태로 전 피어에서 재생한다. 반격 자세는 방어 성공 때
-        // PlayerShieldVfx.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
+        // PlayerShieldVfx.ServerPlayGuardCounterPose 가 전 피어로 퍼뜨린다. 단계별 연출은 클립 이벤트 몫 — 여기는 방패 발광만.
+        shieldGlow?.FadeIn();
     }
 
     // 서버(또는 오프라인)에서만 온다(PlayerSkillController.HandleAnimationEvent). base 의 End → Completed 는 타지 않는다 —
@@ -168,6 +184,13 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         model.Reset();
 
+        // 🔴 종료 사유를 가리지 않는다 — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).
+        //    소켓 safetyTimeout 은 이 경로가 실패했을 때의 그물이다.
+        shieldGlow?.FadeOut();
+        barrierLoop?.Stop();
+        auraLoop?.Stop();
+        chargeLoop?.Stop();
+
         // 입력 예약 없음(결정 22): 방어·반격 중 누른 입력은 E 가 끝나도 재생하지 않는다.
         // 순서 확인(PlayerSkillController): 서버 EndActiveSkillServer·클라 EndSkillClientRpc 모두
         // skill.OnEnd 를 stateController.EndSkill()(Idle 복귀)보다 먼저 부르고, 선입력 재생은 Idle/Move 상태의
@@ -198,7 +221,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     /// <summary>
     /// [서버] 반격 1회 — 고정 방어 방향 기준 전방 counterAngle·counterRange 안의 대상에게 대상당 1회 피해.
     /// 흐름은 <see cref="FirstMeleeMainSkill"/>.OnHoldTick 과 같다. 방어 성공과 별개라
-    /// 막은 공격자가 범위 밖이면 피해가 없다. 연출은 대상이 없어도 1회 낸다.
+    /// 막은 공격자가 범위 밖이면 피해가 없다. 반격 연출은 반격 클립 Hit 이벤트(GuardianCounter)가 전 피어에서 낸다.
     /// </summary>
     private void ResolveCounterHit(Vector3 origin, Vector3 forward)
     {
@@ -261,9 +284,6 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         }
 
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, counterLandedUnits, this);
-
-        if (shieldVfx != null)
-            shieldVfx.ServerInterruptWave();
     }
 
     // ── IPlayerIncomingAttackGuard (서버) ──
