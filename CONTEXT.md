@@ -8,10 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-26 · 경석(Claude) · **중간보스 평상시 경직 면역 · 취약 중 팔라딘 Q 밀림 · 사거리 안 어그로 전환**, 브랜치 `feature/SettingsDdol` 작업 트리) — 계획 [PLAN-midboss-hitreact-aggro.md](PLAN-midboss-hitreact-aggro.md) ✅ 승인(10-26) · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 321/0 · ⏳ 경석 MPPM Play · 규칙 정본 [monster-aggro-hitreact.md](Docs/tech/monster-aggro-hitreact.md)
+## ▶▶ 반영 (2026-10-26 · 경석(Claude) · **중간보스 평상시 경직 면역 · 취약 중 팔라딘 Q 밀림 · 사거리 안 어그로 전환**, 브랜치 `feature/SettingsDdol` 작업 트리) — 계획 [PLAN-midboss-hitreact-aggro.md](PLAN-midboss-hitreact-aggro.md) ✅ 승인(10-26) · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 321/0 · ⏳ 경석 MPPM Play · 규칙 정본 [monster-aggro-hitreact.md](Docs/tech/monster-aggro-hitreact.md)
 - 수정: `MonsterBase.cs` · `MonsterHitReactionPolicy.cs` · `MonsterEngagePolicy.cs` · `GauntletBot.cs` · 테스트 `MonsterHitReactionPolicyTests.cs`·`MonsterEngagePolicyTests.cs`. 23호 파일은 안 건드렸다.
 - Play 확인: 거너가 멀리서 어그로 + 근접이 옆에서 평타 → 중간보스가 근접에게 돌아서 공격 · 간파 성공 뒤 팔라딘 Q → 밀림·경직 후 다시 취약 · 포탑·Mortar 사거리 안 전환이 어색하지 않은지.
-- 2차(10-26 경석 Play 후): 중간보스 취약 색(23호와 같은 하늘색) · 펀치·채찍 바닥 예고 제거 + 대기 0.125초(`GauntletBot`·`SpinnerBot` 코드·프리팹) · 23호 차징 오라 원 복구(`No23*.asset` 5개 `chargeAuraTelegraphPrefab` = `AoeDecalTelegraph`, 코드 무수정). 컴파일 0 · 전투 321/0. ⏳ **xlsx MidBoss 시트 `punchTelegraphDuration`·`whipTelegraphDuration` 0.5 → 0.125**(SVN 잠금 필요 — 안 바꾸면 테이블 Play·빌드는 0.5 대기).
+- 2차(10-26 경석 Play 후): 중간보스 취약 색(23호와 같은 하늘색) · 펀치·채찍 바닥 예고 제거 + 대기 0.125초(`GauntletBot`·`SpinnerBot` 코드·프리팹) · 23호 차징 오라 원 복구(`No23*.asset` 5개 `chargeAuraTelegraphPrefab` = `AoeDecalTelegraph`, 코드 무수정). 컴파일 0 · 전투 321/0. ✅ 경석 Play · ✅ git `b85f4461` · ✅ xlsx MidBoss 시트 `punchTelegraphDuration`(C16)·`whipTelegraphDuration`(C30·D30) 0.5 → 0.125 SVN **r516**(핀 516, check-environment 통과).
 
 ## ▶▶ 반영 (2026-10-25 · 아트(Claude+Codex)) — **타이틀 카메라 구도·라이팅·반사 프로브·심도**, 브랜치 `feature/Title-look` → `development` · 상세 [handoff-title-look.md](Docs/tech/handoff-title-look.md)
 - 1.TitleScene: VCam_Far·VCam_Near 구도, TitleOffice 라이트 3개·반사 프로브 세기 0.3(씬 오버라이드), 재베이크. `GlobalVolumeProfile` DoF 20 m·F4·65 mm(아트 씬과 공유).
