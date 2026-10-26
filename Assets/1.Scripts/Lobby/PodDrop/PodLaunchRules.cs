@@ -28,55 +28,96 @@ public static class PodLaunchRules
         return null;
     }
 
-    /// <summary>한 사람 보행 경로 — 충돌을 켠 채 걷는 앞 구간과 충돌 없이 보간하는 뒤 구간(문턱 … 좌석).</summary>
+    /// <summary>한 사람 보행 경로 — 충돌을 켠 채 걷는 앞 구간(개인 경로 → 공용 경로 합류 이후)과 충돌 없이 보간하는 뒤 구간(문턱 … 좌석).</summary>
     public readonly struct WalkRoute
     {
-        /// <summary>충돌을 켠 채 걷는 공용 경로점(순서 그대로, 빈 칸 뺌). 비면 걷기 시작 지점에서 곧바로 문턱으로 보간한다.</summary>
+        /// <summary>
+        /// 충돌을 켠 채 걷는 점(순서 그대로, 빈 칸 뺌) — 개인 경로점 <see cref="EntryCount"/>개 다음에 공용 경로점(합류 번호부터).
+        /// 비면 걷기 시작 지점에서 곧바로 문턱으로 보간한다.
+        /// </summary>
         public readonly Vector3[] Ground;
+
+        /// <summary>
+        /// <see cref="Ground"/> 각 점의 출처 — 0 이상 = 공용 경로점 리스트 칸 번호(0부터), 음수 = 개인 경로점(−1 = 개인 첫 점, −2 = 둘째 …). 표시·점검 라벨용.
+        /// </summary>
+        public readonly int[] Source;
 
         /// <summary>충돌 없이 보간 — 문턱(있으면) → 좌석(마지막). 항상 1개 이상.</summary>
         public readonly Vector3[] Interior;
 
-        /// <summary>공용 경로에서 건너뛴 빈 칸(null) 수 — 0 보다 크면 호출자가 경고한다.</summary>
+        /// <summary>개인·공용 경로에서 건너뛴 빈 칸(null) 수(공용은 합류 번호 이후만 센다) — 0 보다 크면 호출자가 경고한다.</summary>
         public readonly int SkippedCount;
+
+        /// <summary><see cref="Ground"/> 앞쪽의 개인 경로점 수 — <see cref="Ground"/>[EntryCount] 가 공용 경로 합류점이다(있으면).</summary>
+        public readonly int EntryCount;
+
+        /// <summary>실제로 쓴 합류 번호(범위 안으로 맞춘 값, 0 ~ 공용 경로점 칸 수). 칸 수와 같으면 공용 경로 없이 문턱으로.</summary>
+        public readonly int JoinIndex;
+
+        /// <summary>요청한 합류 번호가 범위 밖이라 맞췄는가 — true 면 호출자가 경고한다.</summary>
+        public readonly bool JoinClamped;
 
         /// <summary>문턱이 있는가 — 있으면 <see cref="Interior"/>[0] 이 문턱이다.</summary>
         public bool HasThreshold => Interior.Length > 1;
 
-        public WalkRoute(Vector3[] ground, Vector3[] interior, int skippedCount)
+        public WalkRoute(Vector3[] ground, int[] source, Vector3[] interior, int skippedCount, int entryCount, int joinIndex, bool joinClamped)
         {
             Ground = ground;
+            Source = source;
             Interior = interior;
             SkippedCount = skippedCount;
+            EntryCount = entryCount;
+            JoinIndex = joinIndex;
+            JoinClamped = joinClamped;
         }
     }
 
     /// <summary>
-    /// 공용 경로점(<paramref name="walkPath"/>, 리스트 순서 = 걷는 순서, null = 빈 칸 → 건너뜀)·문턱·좌석으로 보행 경로를 만든다.
-    /// 경로점 이름·개수와 무관하다. 사람마다 다른 건 걷기 시작 지점(첫 경로점으로 합류)과 좌석뿐이다.
+    /// 공용 경로점(<paramref name="walkPath"/>, 리스트 순서 = 걷는 순서, null = 빈 칸 → 건너뜀)·문턱·좌석으로 보행 경로를 만든다(개인 경로 없음, 첫 칸부터 합류).
     /// </summary>
-    public static WalkRoute BuildRoute(IReadOnlyList<Vector3?> walkPath, Vector3? threshold, Vector3 seat)
+    public static WalkRoute BuildRoute(IReadOnlyList<Vector3?> walkPath, Vector3? threshold, Vector3 seat) =>
+        BuildRoute(null, walkPath, 0, threshold, seat);
+
+    /// <summary>
+    /// 한 사람 보행 경로 = 걷기 시작 지점 → 개인 경로점(<paramref name="entryPath"/>, 순서 그대로) → 공용 경로점 <paramref name="walkPath"/>[<paramref name="joinIndex"/>..] → 문턱 → 좌석.
+    /// 빈 칸(null)은 건너뛴다. <paramref name="joinIndex"/> 는 공용 경로점 리스트 칸 번호(0부터, 빈 칸 포함) — 0 = 처음부터(개인 경로가 비면 C2d 까지와 같다),
+    /// 칸 수 = 공용 경로 없이 문턱으로. 범위 밖이면 맞추고 <see cref="WalkRoute.JoinClamped"/> 를 켠다. 경로점 이름·개수와 무관하다.
+    /// </summary>
+    public static WalkRoute BuildRoute(IReadOnlyList<Vector3?> entryPath, IReadOnlyList<Vector3?> walkPath, int joinIndex, Vector3? threshold, Vector3 seat)
     {
-        var ground = new List<Vector3>(walkPath != null ? walkPath.Count : 0);
+        int pathCount = walkPath != null ? walkPath.Count : 0;
+        int join = Mathf.Clamp(joinIndex, 0, pathCount);
+        var ground = new List<Vector3>();
+        var source = new List<int>();
         int skipped = 0;
-        if (walkPath != null)
+
+        if (entryPath != null)
         {
-            foreach (Vector3? point in walkPath)
+            for (int i = 0; i < entryPath.Count; i++)
             {
-                if (point.HasValue) ground.Add(point.Value);
-                else skipped++;
+                if (!entryPath[i].HasValue) { skipped++; continue; }
+                ground.Add(entryPath[i].Value);
+                source.Add(-(i + 1));
             }
         }
 
+        int entryCount = ground.Count;
+        for (int i = join; i < pathCount; i++)
+        {
+            if (!walkPath[i].HasValue) { skipped++; continue; }
+            ground.Add(walkPath[i].Value);
+            source.Add(i);
+        }
+
         Vector3[] interior = threshold.HasValue ? new[] { threshold.Value, seat } : new[] { seat };
-        return new WalkRoute(ground.ToArray(), interior, skipped);
+        return new WalkRoute(ground.ToArray(), source.ToArray(), interior, skipped, entryCount, join, join != joinIndex);
     }
 
-    /// <summary>충돌을 켠 채 걷는 앞 구간 길이(m) — 걷기 시작 지점 → 공용 경로점 끝.</summary>
+    /// <summary>충돌을 켠 채 걷는 앞 구간 길이(m) — 걷기 시작 지점 → 개인 경로점 → 공용 경로점 끝.</summary>
     public static float GroundLength(Vector3 walkStart, WalkRoute route) => PathLength3D(walkStart, route.Ground);
 
     /// <summary>
-    /// 걸어가는 길이(m) — 걷기 시작 지점 → 공용 경로점 → 문턱(3차원, 계단 높이 포함). 이 길이 ÷ 걷는 속도 = 그 사람 보행 시간.
+    /// 걸어가는 길이(m) — 걷기 시작 지점 → 개인 경로점 → 공용 경로점 → 문턱(3차원, 계단 높이 포함). 이 길이 ÷ 걷는 속도 = 그 사람 보행 시간.
     /// 문턱 → 좌석 미끄러짐은 들지 않는다(따로 정한 시간).
     /// </summary>
     public static float WalkLength(Vector3 walkStart, WalkRoute route)

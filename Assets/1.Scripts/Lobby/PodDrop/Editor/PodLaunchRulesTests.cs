@@ -95,6 +95,89 @@ public sealed class PodLaunchRulesTests
         CollectionAssert.AreEqual(new[] { Seat }, route.Interior, "문턱 없음 → 마지막 경로점에서 곧바로 좌석");
     }
 
+    // ─── 개인 경로 + 합류 번호 (C2e) ─────────────────────────────────────
+
+    static readonly Vector3 E1 = new Vector3(9f, 0f, 0f);
+    static readonly Vector3 E2 = new Vector3(9f, 0f, 2f);
+
+    [Test]
+    public void BuildRoute_NoEntryJoinZero_SameAsSharedOnly()
+    {
+        var shared = new Vector3?[] { A, B, C };
+        PodLaunchRules.WalkRoute legacy = PodLaunchRules.BuildRoute(shared, Door, Seat);
+        PodLaunchRules.WalkRoute personal = PodLaunchRules.BuildRoute(new Vector3?[0], shared, 0, Door, Seat);
+        CollectionAssert.AreEqual(legacy.Ground, personal.Ground, "개인 경로 비고 합류 0 = C2d 까지와 같다");
+        CollectionAssert.AreEqual(new[] { 0, 1, 2 }, personal.Source);
+        Assert.AreEqual(0, personal.EntryCount);
+        Assert.AreEqual(0, personal.JoinIndex);
+        Assert.IsFalse(personal.JoinClamped);
+        Assert.AreEqual(legacy.Ground.Length, PodLaunchRules.BuildRoute(null, shared, 0, Door, Seat).Ground.Length, "개인 경로 리스트가 없어도 같다");
+    }
+
+    [Test]
+    public void BuildRoute_EntryThenJoinMiddle()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { E1, E2 }, new Vector3?[] { A, B, C }, 1, Door, Seat);
+        CollectionAssert.AreEqual(new[] { E1, E2, B, C }, route.Ground, "개인 경로 → 공용 [1..]");
+        CollectionAssert.AreEqual(new[] { -1, -2, 1, 2 }, route.Source, "출처: 개인 −1·−2, 공용 칸 번호");
+        Assert.AreEqual(2, route.EntryCount, "Ground[EntryCount] = 합류점");
+        Assert.AreEqual(B, route.Ground[route.EntryCount]);
+        CollectionAssert.AreEqual(new[] { Door, Seat }, route.Interior);
+    }
+
+    [Test]
+    public void BuildRoute_JoinAtEnd_SkipsSharedAndGoesToThreshold()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { E1 }, new Vector3?[] { A, B, C }, 3, Door, Seat);
+        CollectionAssert.AreEqual(new[] { E1 }, route.Ground, "합류 = 칸 수 → 공용 경로 없이 문턱으로");
+        Assert.AreEqual(3, route.JoinIndex);
+        Assert.IsFalse(route.JoinClamped, "칸 수는 범위 안");
+        Assert.AreEqual(Vector3.Distance(Vector3.zero, E1) + Vector3.Distance(E1, Door), PodLaunchRules.WalkLength(Vector3.zero, route), Eps);
+    }
+
+    [Test]
+    public void BuildRoute_JoinOutOfRange_ClampsAndFlags()
+    {
+        var shared = new Vector3?[] { A, B, C };
+        PodLaunchRules.WalkRoute over = PodLaunchRules.BuildRoute(null, shared, 7, Door, Seat);
+        Assert.AreEqual(3, over.JoinIndex, "넘치면 칸 수(= 공용 없이 문턱)");
+        Assert.IsTrue(over.JoinClamped);
+        Assert.AreEqual(0, over.Ground.Length);
+
+        PodLaunchRules.WalkRoute under = PodLaunchRules.BuildRoute(null, shared, -2, Door, Seat);
+        Assert.AreEqual(0, under.JoinIndex, "음수면 0(처음부터)");
+        Assert.IsTrue(under.JoinClamped);
+        CollectionAssert.AreEqual(new[] { A, B, C }, under.Ground);
+
+        PodLaunchRules.WalkRoute empty = PodLaunchRules.BuildRoute(null, null, 1, Door, Seat);
+        Assert.AreEqual(0, empty.JoinIndex, "공용 경로가 없으면 0 이 칸 수");
+        Assert.IsTrue(empty.JoinClamped);
+    }
+
+    [Test]
+    public void BuildRoute_NullEntriesSkippedAndCounted_OnlyUsedSharedCounted()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { null, E1, null }, new Vector3?[] { null, A, null, B }, 2, Door, Seat);
+        CollectionAssert.AreEqual(new[] { E1, B }, route.Ground);
+        CollectionAssert.AreEqual(new[] { -2, 3 }, route.Source, "개인 출처 번호는 빈 칸 포함 칸 번호(#2)");
+        Assert.AreEqual(1, route.EntryCount);
+        Assert.AreEqual(3, route.SkippedCount, "개인 빈 칸 2 + 합류 이후 공용 빈 칸 1(합류 앞 빈 칸은 안 센다)");
+
+        PodLaunchRules.WalkRoute joinOnNull = PodLaunchRules.BuildRoute(null, new Vector3?[] { A, null, B }, 1, Door, Seat);
+        CollectionAssert.AreEqual(new[] { B }, joinOnNull.Ground, "합류 칸이 비면 다음 점으로 합류");
+    }
+
+    [Test]
+    public void WalkLength_FollowsPersonalRoute()
+    {
+        var shared = new Vector3?[] { A, B };
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { E1 }, shared, 1, Door, Seat);
+        Vector3 start = new Vector3(10f, 0f, 0f);
+        float expected = Vector3.Distance(start, E1) + Vector3.Distance(E1, B) + Vector3.Distance(B, Door);
+        Assert.AreEqual(expected, PodLaunchRules.WalkLength(start, route), Eps, "시작 → 개인 → 공용[합류..] → 문턱");
+        Assert.AreEqual(expected - Vector3.Distance(B, Door), PodLaunchRules.GroundLength(start, route), Eps);
+    }
+
     // ─── 걸어가는 길이 (C2d — 보행 시간 = 이 길이 ÷ 걷는 속도) ──────────────
 
     [Test]

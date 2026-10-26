@@ -7,10 +7,13 @@ using UnityEngine;
 /// <summary>
 /// 로비 포드 걷기 경로 씬 뷰 편집 도구(할 일 100 C2c, <see cref="LobbyPodLaunch"/>).
 /// <list type="bullet">
-/// <item>Gizmo(선택 여부와 무관): 걷기 시작 지점 → 공용 경로점(walkPath, 리스트 순서) → 문턱 → 좌석을 잇고 번호·높이를 붙인다. 점마다 바닥까지 수직선.</item>
-/// <item>인스펙터: walkPath 를 끌어서 순서 변경, 경로점 추가(선택한 줄 뒤 또는 끝)·삭제·바닥에 붙이기(Undo), 선택한 줄은 씬 뷰에서 이동 핸들.</item>
-/// <item>경로 점검: 구간마다 플레이어 캡슐(Player.prefab 의 CapsuleCollider·GameRule 스텝 높이)로 훑어 막히는 구간을 콘솔 경고 + Gizmo 주황.</item>
-/// <item>단계 시각표: 이 경로 길이와 연결된 <see cref="PodDropSettings"/> 수치로 계산(<see cref="PodDropScheduleView"/>).</item>
+/// <item>Gizmo(선택 여부와 무관): 사람마다 다른 색으로 걷기 시작 지점 → 개인 경로점(entryPath) → 합류점(고리)을, 노랑으로 공용 경로점(walkPath, 리스트 순서),
+/// 연보라로 → 문턱 → 좌석을 잇고 번호·높이를 붙인다. 점마다 바닥까지 수직선. 라벨은 화면에서 조금씩 어긋나게 그려 겹치지 않게 한다.</item>
+/// <item>인스펙터: walkPath 를 끌어서 순서 변경, 경로점 추가(선택한 줄 뒤 또는 끝)·삭제·바닥에 붙이기(Undo), 선택한 줄은 씬 뷰에서 이동 핸들.
+/// 슬롯마다 개인 경로점 추가(그 걷기 시작 지점 자식으로)·마지막 개인 경로점 삭제(Undo).</item>
+/// <item>경로 점검: 사람마다 전체 경로(시작 → 개인 → 공용 합류 이후 → 문턱)를 구간별로 플레이어 캡슐(Player.prefab 의 CapsuleCollider·GameRule 스텝 높이)로 훑어
+/// 막히는 구간을 콘솔 경고 + Gizmo 주황.</item>
+/// <item>단계 시각표: 사람별 경로 길이와 연결된 <see cref="PodDropSettings"/> 수치로 계산(<see cref="PodDropScheduleView"/>).</item>
 /// </list>
 /// 경로점 이름은 표시용이다 — 동작은 리스트 순서만 본다.
 /// </summary>
@@ -27,7 +30,14 @@ public sealed class LobbyPodLaunchEditor : Editor
     private const float GroundProbeUp = 1.5f;
     private const float GroundProbeDistance = 20f;
 
-    private static readonly Color JoinColor = new Color(0.35f, 0.8f, 1f);      // 하늘 — 사람마다 합류
+    // 사람마다(보행 슬롯 순서) — 하늘·민트·연분홍, 더 많으면 돌려 쓴다. 빨강·주황(막힘)과 겹치지 않게.
+    private static readonly Color[] SlotColors =
+    {
+        new Color(0.35f, 0.8f, 1f),
+        new Color(0.4f, 1f, 0.7f),
+        new Color(1f, 0.6f, 0.85f),
+    };
+
     private static readonly Color PathColor = new Color(1f, 0.9f, 0.2f);       // 노랑 — 공용 경로(충돌 켬)
     private static readonly Color InteriorColor = new Color(0.8f, 0.6f, 1f);   // 연보라 — 충돌 끔 보간(→ 문턱 → 좌석)
     private static readonly Color BlockedColor = new Color(1f, 0.55f, 0f);     // 주황 — 점검에서 막힌 구간
@@ -107,7 +117,7 @@ public sealed class LobbyPodLaunchEditor : Editor
         EditorGUILayout.LabelField("걷기 경로 편집", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "리스트에서 줄을 고르면 씬 뷰에 이동 핸들이 뜬다. '경로점 추가'는 고른 줄 뒤(없으면 끝)에 넣는다.\n" +
-            "선: 하늘 = 각자 걷기 시작 지점 → 첫 경로점, 노랑 = 공용 경로(충돌 켬), 연보라 = 충돌 끔 보간(→ 문턱 → 좌석), 주황 = 점검에서 막힘.",
+            "선: 하늘·민트·연분홍 = 사람별 시작 → 개인 경로 → 합류점(고리), 노랑 = 공용 경로(충돌 켬), 연보라 = 충돌 끔 보간(→ 문턱 → 좌석), 주황 = 점검에서 막힘.",
             MessageType.None);
 
         using (new EditorGUILayout.HorizontalScope())
@@ -125,11 +135,53 @@ public sealed class LobbyPodLaunchEditor : Editor
             if (GUILayout.Button("경로 점검")) CheckPath(Launch);
         }
 
+        DrawSlotTools();
+
         if (LastSummary.TryGetValue(Launch.GetInstanceID(), out string summary))
             EditorGUILayout.HelpBox(summary, summary.StartsWith("막힘 없음") ? MessageType.Info : MessageType.Warning);
 
         // 이 경로 + 연결된 설정 수치로 계산한 시각표(설정 에셋 인스펙터와 같은 표).
         PodDropScheduleView.Draw(Launch.EditorSettings, Launch);
+    }
+
+    // 사람별(슬롯) 개인 경로 요약 + 개인 경로점 추가·삭제. 합류 번호·순서는 위 walkSlots 칸에서 고친다.
+    private void DrawSlotTools()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("사람별 개인 경로 (walkSlots)", EditorStyles.boldLabel);
+
+        IReadOnlyList<LobbyPodLaunch.WalkSlot> slots = Launch.EditorWalkSlots;
+        int number = 0;
+        for (int raw = 0; raw < slots.Count; raw++)
+        {
+            LobbyPodLaunch.WalkSlot slot = slots[raw];
+            if (slot == null || slot.start == null)
+            {
+                EditorGUILayout.LabelField($"슬롯 칸 {raw}: 걷기 시작 지점 없음 — 보행 슬롯에서 빠진다");
+                continue;
+            }
+
+            PodLaunchRules.WalkRoute route = Launch.EditorBuildRoute(slot, SeatPlaceholder(Launch, slot));
+            float length = PodLaunchRules.WalkLength(slot.start.position, route);
+            string join = route.JoinIndex >= Launch.EditorWalkPath.Count ? "공용 경로 없이 문턱" : $"공용 #{route.JoinIndex + 1} 합류";
+            string warn = (route.JoinClamped ? $" ⚠ 합류 번호 {slot.joinIndex} 범위 밖 → {route.JoinIndex}" : "") +
+                          (route.SkippedCount > 0 ? $" ⚠ 빈 칸 {route.SkippedCount}" : "");
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUI.color = SlotColor(number);
+                EditorGUILayout.LabelField($"시작 {number} '{slot.start.name}' — 개인 {route.EntryCount}점, {join}, {length:0.0}m{warn}",
+                    GUILayout.MinWidth(120f));
+                GUI.color = Color.white;
+                if (GUILayout.Button("개인 경로점 추가", GUILayout.Width(110f))) AddEntryPoint(Launch, raw);
+                using (new EditorGUI.DisabledScope(slot.entryPath == null || slot.entryPath.Count == 0))
+                {
+                    if (GUILayout.Button("마지막 삭제", GUILayout.Width(80f))) DeleteLastEntryPoint(Launch, raw);
+                }
+            }
+
+            number++;
+        }
     }
 
     // 리스트에서 고른 경로점 — 씬 뷰에서 바로 옮긴다(인스펙터를 떠나지 않게).
@@ -244,14 +296,84 @@ public sealed class LobbyPodLaunchEditor : Editor
         return path.arraySize;
     }
 
+    /// <summary>
+    /// <paramref name="slotIndex"/> 칸(walkSlots) 개인 경로 끝에 새 개인 경로점을 만든다 — 그 걷기 시작 지점 자식으로, 마지막 개인 경로점(없으면 시작 지점)과
+    /// 합류점(없으면 문턱) 가운데. Undo 한 번에 되돌린다. 만든 점을 돌려준다(시작 지점이 없으면 null).
+    /// </summary>
+    public static Transform AddEntryPoint(LobbyPodLaunch launch, int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= launch.EditorWalkSlots.Count) return null;
+        LobbyPodLaunch.WalkSlot slot = launch.EditorWalkSlots[slotIndex];
+        if (slot == null || slot.start == null) return null;
+
+        PodLaunchRules.WalkRoute route = launch.EditorBuildRoute(slot, SeatPlaceholder(launch, slot));
+        Vector3 previous = route.EntryCount > 0 ? route.Ground[route.EntryCount - 1] : slot.start.position;
+        Vector3? next = route.EntryCount < route.Ground.Length ? route.Ground[route.EntryCount]
+            : launch.EditorThreshold != null ? launch.EditorThreshold.position : (Vector3?)null;
+        Vector3 position = next.HasValue ? Vector3.Lerp(previous, next.Value, 0.5f) : previous + Vector3.forward;
+
+        int group = Undo.GetCurrentGroup();
+        var go = new GameObject(GameObjectUtility.GetUniqueNameForSibling(slot.start, $"{slot.start.name}_E"));
+        go.transform.SetParent(slot.start, false);
+        go.transform.position = position;
+        Undo.RegisterCreatedObjectUndo(go, "개인 경로점 추가");
+
+        var serializedObject = new SerializedObject(launch);
+        SerializedProperty entry = serializedObject.FindProperty("walkSlots").GetArrayElementAtIndex(slotIndex).FindPropertyRelative("entryPath");
+        entry.InsertArrayElementAtIndex(entry.arraySize);
+        entry.GetArrayElementAtIndex(entry.arraySize - 1).objectReferenceValue = go.transform;
+        serializedObject.ApplyModifiedProperties();
+
+        Undo.SetCurrentGroupName("개인 경로점 추가");
+        Undo.CollapseUndoOperations(group);
+        Debug.Log($"{Tag} '{slot.start.name}' 개인 경로점 #{entry.arraySize} 추가 — '{go.name}' {position:F2}", go);
+        SceneView.RepaintAll();
+        return go.transform;
+    }
+
+    /// <summary><paramref name="slotIndex"/> 칸 개인 경로의 마지막 점을 빼고 오브젝트를 지운다(다른 칸이 같이 쓰면 리스트에서만). Undo 한 번에 되돌린다.</summary>
+    public static void DeleteLastEntryPoint(LobbyPodLaunch launch, int slotIndex)
+    {
+        var serializedObject = new SerializedObject(launch);
+        SerializedProperty slots = serializedObject.FindProperty("walkSlots");
+        if (slotIndex < 0 || slotIndex >= slots.arraySize) return;
+        SerializedProperty entry = slots.GetArrayElementAtIndex(slotIndex).FindPropertyRelative("entryPath");
+        if (entry.arraySize == 0) return;
+
+        int last = entry.arraySize - 1;
+        Transform point = entry.GetArrayElementAtIndex(last).objectReferenceValue as Transform;
+
+        int group = Undo.GetCurrentGroup();
+        entry.GetArrayElementAtIndex(last).objectReferenceValue = null;
+        entry.DeleteArrayElementAtIndex(last);
+        serializedObject.ApplyModifiedProperties();
+
+        if (point != null && !IsReferencedElsewhere(launch, point))
+            Undo.DestroyObjectImmediate(point.gameObject);
+
+        Undo.SetCurrentGroupName("개인 경로점 삭제");
+        Undo.CollapseUndoOperations(group);
+        Debug.Log($"{Tag} 슬롯 칸 {slotIndex} 개인 경로점 #{last + 1} 삭제{(point != null ? $" — '{point.name}'" : " (빈 칸)")}", launch);
+        SceneView.RepaintAll();
+    }
+
+    // 좌석은 걷는 길이에 들지 않는다 — 표시·점검용 경로의 좌석 자리 표시.
+    private static Vector3 SeatPlaceholder(LobbyPodLaunch launch, LobbyPodLaunch.WalkSlot slot) =>
+        launch.EditorThreshold != null ? launch.EditorThreshold.position : slot.start.position;
+
     private void SnapToGround() => SnapToGround(Launch);
 
-    /// <summary>걷기 시작 지점·공용 경로점을 지면 높이로(문턱·좌석은 포드 안 높이라 건드리지 않는다). Undo 한 번에 되돌린다.</summary>
+    /// <summary>걷기 시작 지점·개인 경로점·공용 경로점을 지면 높이로(문턱·좌석은 포드 안 높이라 건드리지 않는다). Undo 한 번에 되돌린다.</summary>
     public static void SnapToGround(LobbyPodLaunch launch)
     {
         PlayerCapsule capsule = GetCapsule();
         var points = new List<Transform>();
-        foreach (Transform t in launch.EditorWalkStarts) if (t != null && !points.Contains(t)) points.Add(t);
+        foreach (LobbyPodLaunch.WalkSlot slot in launch.EditorActiveSlots())
+        {
+            if (!points.Contains(slot.start)) points.Add(slot.start);
+            if (slot.entryPath == null) continue;
+            foreach (Transform t in slot.entryPath) if (t != null && !points.Contains(t)) points.Add(t);
+        }
         foreach (Transform t in launch.EditorWalkPath) if (t != null && !points.Contains(t)) points.Add(t);
 
         int group = Undo.GetCurrentGroup();
@@ -281,7 +403,7 @@ public sealed class LobbyPodLaunchEditor : Editor
     {
         for (int i = insertAt - 1; i >= 0; i--)
             if (i < launch.EditorWalkPath.Count && launch.EditorWalkPath[i] != null) return launch.EditorWalkPath[i];
-        foreach (Transform t in launch.EditorWalkStarts) if (t != null) return t;
+        foreach (LobbyPodLaunch.WalkSlot slot in launch.EditorActiveSlots()) return slot.start;
         return null;
     }
 
@@ -297,14 +419,19 @@ public sealed class LobbyPodLaunchEditor : Editor
     {
         foreach (Transform t in launch.EditorWalkPath) if (t != null) return t.parent;
         if (launch.EditorThreshold != null) return launch.EditorThreshold.parent;
-        foreach (Transform t in launch.EditorWalkStarts) if (t != null) return t.parent;
+        foreach (LobbyPodLaunch.WalkSlot slot in launch.EditorActiveSlots()) return slot.start.parent;
         return launch.transform;
     }
 
     private static bool IsReferencedElsewhere(LobbyPodLaunch launch, Transform point)
     {
         if (launch.EditorThreshold == point) return true;
-        foreach (Transform t in launch.EditorWalkStarts) if (t == point) return true;
+        foreach (LobbyPodLaunch.WalkSlot slot in launch.EditorWalkSlots)
+        {
+            if (slot == null) continue;
+            if (slot.start == point) return true;
+            if (slot.entryPath != null) foreach (Transform t in slot.entryPath) if (t == point) return true;
+        }
         foreach (Transform t in launch.EditorSeats) if (t == point) return true;
         foreach (Transform t in launch.EditorWalkPath) if (t == point) return true;
         return false;
@@ -312,18 +439,35 @@ public sealed class LobbyPodLaunchEditor : Editor
 
     // ---------------- 경로 점검 ----------------
 
-    /// <summary>구간마다 플레이어 캡슐로 훑어 막히는 곳을 찾는다. 결과는 콘솔 + Gizmo 주황. 막힌 구간 수를 돌려준다.</summary>
+    /// <summary>
+    /// 사람마다 전체 경로(시작 → 개인 → 공용 합류 이후 → 문턱)를 구간별로 플레이어 캡슐로 훑어 막히는 곳을 찾는다. 결과는 콘솔 + Gizmo 주황.
+    /// 막힌 구간 수(사람별 합 — 공용 구간은 지나는 사람마다 센다)를 돌려준다.
+    /// </summary>
     public static int CheckPath(LobbyPodLaunch launch)
     {
         _capsule = null; // 프리팹·GameRule 을 다시 읽는다
         PlayerCapsule capsule = GetCapsule();
         var blocked = new List<BlockedSegment>();
         var log = new StringBuilder();
+        var perPerson = new StringBuilder();
         int segments = 0;
+        int blockedCount = 0;
+        int person = -1;
+        int personSegments = 0;
+        int personBlocked = 0;
 
         foreach (Segment segment in Segments(launch))
         {
+            if (segment.Person != person)
+            {
+                if (person >= 0) perPerson.Append($"\n시작 {person}: 구간 {personSegments}개, 막힘 {personBlocked}");
+                person = segment.Person;
+                personSegments = 0;
+                personBlocked = 0;
+            }
+
             segments++;
+            personSegments++;
             Vector3 from = Grounded(launch, segment.From, capsule.Mask);
             Vector3 to = Grounded(launch, segment.To, capsule.Mask);
             List<RaycastHit> hits = SweepCapsule(launch, capsule, from, to);
@@ -339,70 +483,71 @@ public sealed class LobbyPodLaunchEditor : Editor
             }
 
             Vector3 hitPoint = hits[0].distance > 0f ? hits[0].point : from;
-            blocked.Add(new BlockedSegment { From = segment.From, To = segment.To, HitPoint = hitPoint });
+            blockedCount++;
+            personBlocked++;
+            if (!blocked.Exists(b => b.From == segment.From && b.To == segment.To))
+                blocked.Add(new BlockedSegment { From = segment.From, To = segment.To, HitPoint = hitPoint });
             log.Append($"\n  막힘: {segment.Label}{(segment.CollisionOff ? " [충돌 끔 보간 — 막히진 않지만 벽을 뚫고 지나가 보인다]" : "")}");
             foreach (string name in names) log.Append($"\n    - {name}");
         }
 
+        if (person >= 0) perPerson.Append($"\n시작 {person}: 구간 {personSegments}개, 막힘 {personBlocked}");
+
         int id = launch.GetInstanceID();
         LastBlocked[id] = blocked;
-        string head = blocked.Count == 0
-            ? $"막힘 없음 — 구간 {segments}개"
-            : $"막힌 구간 {blocked.Count}/{segments}개 (Gizmo 주황)";
-        LastSummary[id] = $"{head}\n캡슐 반지름 {capsule.Radius:0.00}·높이 {capsule.Height:0.00}·스텝 {capsule.StepOffset:0.00} ({capsule.Source})";
+        string head = blockedCount == 0
+            ? $"막힘 없음 — 사람별 구간 합 {segments}개"
+            : $"막힌 구간 {blockedCount}/{segments}개 (사람별 합, Gizmo 주황)";
+        LastSummary[id] = $"{head}{perPerson}\n캡슐 반지름 {capsule.Radius:0.00}·높이 {capsule.Height:0.00}·스텝 {capsule.StepOffset:0.00} ({capsule.Source})";
 
-        string message = $"{Tag} 경로 점검 — {head}. 캡슐 반지름 {capsule.Radius:0.00}m·높이 {capsule.Height:0.00}m·스텝 {capsule.StepOffset:0.00}m ({capsule.Source}){log}";
-        if (blocked.Count == 0) Debug.Log(message, launch);
+        string message = $"{Tag} 경로 점검 — {head}. 캡슐 반지름 {capsule.Radius:0.00}m·높이 {capsule.Height:0.00}m·스텝 {capsule.StepOffset:0.00}m ({capsule.Source}){perPerson}{log}";
+        if (blockedCount == 0) Debug.Log(message, launch);
         else Debug.LogWarning(message, launch);
 
         SceneView.RepaintAll();
-        return blocked.Count;
+        return blockedCount;
     }
 
     private struct Segment
     {
+        public int Person;
         public Vector3 From;
         public Vector3 To;
         public string Label;
         public bool CollisionOff;
     }
 
-    // 실제 보행과 같은 경로 — 슬롯마다 걷기 시작 → 첫 점(합류), 공용 경로, → 문턱(충돌 끔), 문턱 → 좌석은 포드 안이라 점검하지 않는다.
+    // 실제 보행과 같은 경로 — 사람(보행 슬롯)마다 걷기 시작 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱(충돌 끔). 문턱 → 좌석은 포드 안이라 점검하지 않는다.
     private static IEnumerable<Segment> Segments(LobbyPodLaunch launch)
     {
-        PodLaunchRules.WalkRoute route = SharedRoute(launch);
-        List<Vector3> starts = Compact(launch.EditorWalkStarts);
+        List<LobbyPodLaunch.WalkSlot> slots = launch.EditorActiveSlots();
         Vector3? threshold = launch.EditorThreshold != null ? launch.EditorThreshold.position : (Vector3?)null;
-        Vector3? first = route.Ground.Length > 0 ? route.Ground[0] : threshold;
 
-        if (first.HasValue)
+        for (int person = 0; person < slots.Count; person++)
         {
-            for (int slot = 0; slot < starts.Count; slot++)
+            LobbyPodLaunch.WalkSlot slot = slots[person];
+            PodLaunchRules.WalkRoute route = launch.EditorBuildRoute(slot, SeatPlaceholder(launch, slot));
+            Vector3 from = slot.start.position;
+            string fromName = "시작";
+            for (int i = 0; i < route.Ground.Length; i++)
+            {
+                string toName = PointName(route.Source[i]) + (i == route.EntryCount ? "(합류)" : "");
+                yield return new Segment { Person = person, From = from, To = route.Ground[i], Label = $"시작 {person}: {fromName} → {toName}" };
+                from = route.Ground[i];
+                fromName = PointName(route.Source[i]);
+            }
+
+            if (threshold.HasValue)
                 yield return new Segment
                 {
-                    From = starts[slot], To = first.Value,
-                    Label = $"걷기 시작 {slot} → {(route.Ground.Length > 0 ? "경로점 #1" : "문턱")}",
-                    CollisionOff = route.Ground.Length == 0,
+                    Person = person, From = from, To = threshold.Value,
+                    Label = $"시작 {person}: {fromName} → 문턱", CollisionOff = true,
                 };
         }
-
-        for (int i = 1; i < route.Ground.Length; i++)
-            yield return new Segment { From = route.Ground[i - 1], To = route.Ground[i], Label = $"경로점 #{i} → #{i + 1}" };
-
-        if (route.Ground.Length > 0 && threshold.HasValue)
-            yield return new Segment
-            {
-                From = route.Ground[route.Ground.Length - 1], To = threshold.Value,
-                Label = $"경로점 #{route.Ground.Length} → 문턱", CollisionOff = true,
-            };
     }
 
-    // 실제 보행 경로의 공용 부분(좌석만 사람마다 다르다 — 여기선 문턱 위치를 자리 표시로 쓴다).
-    private static PodLaunchRules.WalkRoute SharedRoute(LobbyPodLaunch launch)
-    {
-        Transform seat = launch.EditorThreshold != null ? launch.EditorThreshold : launch.transform;
-        return launch.EditorBuildRoute(seat);
-    }
+    // WalkRoute.Source → 표시 이름(공용 = 리스트 칸 번호 #N, 개인 = 개인 #N).
+    private static string PointName(int source) => source >= 0 ? $"공용 #{source + 1}" : $"개인 #{-source}";
 
     // 발 위치에서 스텝 높이만큼 띄운 캡슐(계단 턱은 넘는다 — 평소 걷기와 같다)로 from → to 를 훑는다. 포드 콜라이더(연출 중 꺼진다)·트리거는 뺀다.
     private static List<RaycastHit> SweepCapsule(LobbyPodLaunch launch, PlayerCapsule capsule, Vector3 from, Vector3 to)
@@ -488,13 +633,6 @@ public sealed class LobbyPodLaunchEditor : Editor
     private static bool IsPodCollider(LobbyPodLaunch launch, Collider collider) =>
         launch.EditorPod != null && collider.transform.IsChildOf(launch.EditorPod);
 
-    private static List<Vector3> Compact(IReadOnlyList<Transform> points)
-    {
-        var list = new List<Vector3>();
-        foreach (Transform t in points) if (t != null) list.Add(t.position);
-        return list;
-    }
-
     private static string HierarchyPath(Transform t)
     {
         string path = t.name;
@@ -511,40 +649,68 @@ public sealed class LobbyPodLaunchEditor : Editor
             return; // 런타임엔 포드가 움직인다 — 편집용 표시만
 
         PlayerCapsule capsule = GetCapsule();
-        PodLaunchRules.WalkRoute route = SharedRoute(launch);
         Transform threshold = launch.EditorThreshold;
-        Vector3? first = route.Ground.Length > 0 ? route.Ground[0] : threshold != null ? threshold.position : (Vector3?)null;
         GUIStyle style = LabelStyle();
 
-        // 걷기 시작 → 첫 점(사람마다 합류)
-        List<Vector3> starts = Compact(launch.EditorWalkStarts);
-        for (int slot = 0; slot < starts.Count; slot++)
+        // 공용 경로(충돌 켬) — 리스트 칸 번호(#N = 합류 번호 N−1)로 표시, 끝 → 문턱(충돌 끔).
+        var shared = new List<Vector3?>();
+        foreach (Transform t in launch.EditorWalkPath) shared.Add(t != null ? t.position : (Vector3?)null);
+        PodLaunchRules.WalkRoute sharedRoute = PodLaunchRules.BuildRoute(shared, null, Vector3.zero);
+        for (int i = 0; i < sharedRoute.Ground.Length; i++)
         {
-            if (first.HasValue) DrawLine(starts[slot], first.Value, route.Ground.Length > 0 ? JoinColor : InteriorColor, 3f);
-            DrawPoint(launch, starts[slot], JoinColor, $"시작 {slot}", capsule.Mask, style);
+            if (i > 0) DrawLine(sharedRoute.Ground[i - 1], sharedRoute.Ground[i], PathColor, 4f);
+            DrawPoint(launch, sharedRoute.Ground[i], PathColor, $"#{sharedRoute.Source[i] + 1}", capsule.Mask, style, LabelAbove);
         }
 
-        // 공용 경로(충돌 켬)
-        for (int i = 0; i < route.Ground.Length; i++)
-        {
-            if (i > 0) DrawLine(route.Ground[i - 1], route.Ground[i], PathColor, 4f);
-            DrawPoint(launch, route.Ground[i], PathColor, $"#{i + 1}", capsule.Mask, style);
-        }
-
-        // → 문턱 → 좌석(충돌 끔 보간)
         if (threshold != null)
         {
-            if (route.Ground.Length > 0) DrawLine(route.Ground[route.Ground.Length - 1], threshold.position, InteriorColor, 3f);
-            DrawPoint(launch, threshold.position, InteriorColor, "문턱", capsule.Mask, style);
+            if (sharedRoute.Ground.Length > 0) DrawLine(sharedRoute.Ground[sharedRoute.Ground.Length - 1], threshold.position, InteriorColor, 3f);
+            DrawPoint(launch, threshold.position, InteriorColor, "문턱", capsule.Mask, style, LabelAbove);
         }
 
+        // 사람마다(색 다름): 시작 → 개인 경로점 → 합류점(고리). 개인 경로가 끝에서 곧바로 문턱으로 가면(합류 = 칸 수) 그 구간은 연보라.
+        List<LobbyPodLaunch.WalkSlot> slots = launch.EditorActiveSlots();
+        for (int person = 0; person < slots.Count; person++)
+        {
+            LobbyPodLaunch.WalkSlot slot = slots[person];
+            Color color = SlotColor(person);
+            PodLaunchRules.WalkRoute route = launch.EditorBuildRoute(slot, SeatPlaceholder(launch, slot));
+            Vector3 from = slot.start.position;
+            for (int i = 0; i < route.EntryCount; i++)
+            {
+                DrawLine(from, route.Ground[i], color, 3f);
+                DrawPoint(launch, route.Ground[i], color, $"{person}-개인 #{-route.Source[i]}", capsule.Mask, style, SlotLabelOffset(person));
+                from = route.Ground[i];
+            }
+
+            string join;
+            if (route.EntryCount < route.Ground.Length)
+            {
+                Vector3 joinPoint = route.Ground[route.EntryCount];
+                DrawLine(from, joinPoint, color, 3f);
+                Handles.color = color;
+                Handles.DrawWireDisc(joinPoint, Vector3.up, 0.25f + 0.1f * person, 3f); // 사람마다 고리 크기를 달리해 같은 점에 합류해도 보인다
+                join = $"→ 합류 #{route.Source[route.EntryCount] + 1}";
+            }
+            else
+            {
+                if (threshold != null) DrawLine(from, threshold.position, InteriorColor, 3f);
+                join = "→ 문턱(공용 없음)";
+            }
+
+            DrawPoint(launch, slot.start.position, color,
+                $"시작 {person} {join}{(route.JoinClamped ? " ⚠범위 밖" : "")}", capsule.Mask, style, SlotLabelOffset(person));
+        }
+
+        // → 좌석(충돌 끔 보간) — 문턱 라벨과 겹치지 않게 아래쪽으로 어긋나게.
         IReadOnlyList<Transform> seats = launch.EditorSeats;
+        Vector3? lastShared = sharedRoute.Ground.Length > 0 ? sharedRoute.Ground[sharedRoute.Ground.Length - 1] : (Vector3?)null;
         for (int i = 0; i < seats.Count; i++)
         {
             if (seats[i] == null) continue;
-            Vector3 from = threshold != null ? threshold.position : route.Ground.Length > 0 ? route.Ground[route.Ground.Length - 1] : seats[i].position;
+            Vector3 from = threshold != null ? threshold.position : lastShared ?? seats[i].position;
             DrawLine(from, seats[i].position, InteriorColor, 2f);
-            DrawPoint(launch, seats[i].position, InteriorColor, $"좌석 {i}", capsule.Mask, style);
+            DrawPoint(launch, seats[i].position, InteriorColor, $"좌석 {i}", capsule.Mask, style, SeatLabelOffset(i));
         }
 
         // 마지막 점검에서 막힌 구간
@@ -565,8 +731,15 @@ public sealed class LobbyPodLaunchEditor : Editor
         Handles.DrawAAPolyLine(width, from, to);
     }
 
-    // 점 + 번호·높이 라벨 + 바닥까지 수직선(높이 변화가 보이게).
-    private static void DrawPoint(LobbyPodLaunch launch, Vector3 position, Color color, string label, int mask, GUIStyle style)
+    private static Color SlotColor(int person) => SlotColors[Mathf.Max(0, person) % SlotColors.Length];
+
+    // 라벨 화면 오프셋(픽셀, +y = 아래) — 가까이 모인 점(시작 0·2, 문턱·좌석 0·1·2)의 라벨이 겹치지 않게 조금씩 어긋나게 둔다.
+    private static readonly Vector2 LabelAbove = new Vector2(0f, -10f);
+    private static Vector2 SlotLabelOffset(int person) => new Vector2((person % 3 - 1) * 80f, -10f - person / 3 * 30f);
+    private static Vector2 SeatLabelOffset(int seat) => new Vector2((seat % 3 - 1) * 80f, 44f + seat / 3 * 30f);
+
+    // 점 + 번호·높이 라벨 + 바닥까지 수직선(높이 변화가 보이게). 라벨은 점의 화면 위치에서 offset 픽셀만큼 옮겨 그린다.
+    private static void DrawPoint(LobbyPodLaunch launch, Vector3 position, Color color, string label, int mask, GUIStyle style, Vector2 offset)
     {
         Gizmos.color = color;
         Gizmos.DrawSphere(position, 0.12f);
@@ -584,8 +757,24 @@ public sealed class LobbyPodLaunchEditor : Editor
             }
         }
 
+        Camera camera = Camera.current;
+        if (camera == null || camera.WorldToViewportPoint(position).z <= 0f)
+            return; // 카메라 뒤
+
         style.normal.textColor = color;
-        Handles.Label(position + Vector3.up * 0.35f, $"{label}\n{height}", style);
+        var content = new GUIContent($"{label}\n{height}");
+        Vector2 size = style.CalcSize(content);
+        Vector2 anchor = HandleUtility.WorldToGUIPoint(position) + offset;
+        if (offset.sqrMagnitude > 400f)
+        {
+            // 많이 옮긴 라벨은 점까지 가는 가는 선으로 잇는다.
+            Handles.color = new Color(color.r, color.g, color.b, 0.5f);
+            Handles.DrawLine(position, HandleUtility.GUIPointToWorldRay(anchor).GetPoint(Vector3.Distance(camera.transform.position, position)));
+        }
+
+        Handles.BeginGUI();
+        GUI.Label(new Rect(anchor.x - size.x * 0.5f, anchor.y - size.y, size.x, size.y), content, style);
+        Handles.EndGUI();
     }
 
     private static GUIStyle _style;

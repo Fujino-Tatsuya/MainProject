@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 포드 강하 단계 시각표(읽기 전용, 할 일 100 C2d) — <see cref="PodDropSettings"/>·<see cref="LobbyPodLaunch"/> 인스펙터가 같이 그린다.
-/// 로비 보행 시간은 열린 씬의 <see cref="LobbyPodLaunch"/> 경로(걷기 시작 지점 → 공용 경로점 → 문턱) 길이 ÷ 걷는 속도 — 서버가 연출 시작 때 복제하는 값과 같은 계산.
+/// 로비 보행 시간은 열린 씬의 <see cref="LobbyPodLaunch"/> 사람별 경로(걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱) 길이 ÷ 걷는 속도 — 서버가 연출 시작 때 복제하는 값과 같은 계산.
 /// 씬이 안 열려 있으면 보행 부분은 '경로 길이 미지'로 둔다.
 /// </summary>
 public static class PodDropScheduleView

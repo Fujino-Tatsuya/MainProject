@@ -15971,7 +15971,9 @@ Transform:
   m_LocalPosition: {x: 7.01, y: 0, z: 5.95}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 859989653}
+  - {fileID: 111324855}
   m_Father: {fileID: 1656201363}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1486448066
@@ -16035,6 +16037,68 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1656201363}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &111324854
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 111324855}
+  m_Layer: 0
+  m_Name: WalkStart_1_E2_StairRTop
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &111324855
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 111324854}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -4.26, y: 1.94, z: -0.01999998}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 862102745}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &859989652
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 859989653}
+  m_Layer: 0
+  m_Name: WalkStart_1_E1_StairRBottom
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &859989653
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 859989652}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.21, y: 0, z: -0.01999998}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 862102745}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
@@ -16600,10 +16664,19 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   settings: {fileID: 11400000, guid: af0dfc99a6e059f4c92446f9f24c568f, type: 2}
   cameraFocus: {fileID: 1370602752}
-  walkStarts:
-  - {fileID: 1486448067}
-  - {fileID: 862102745}
-  - {fileID: 1974033137}
+  walkSlots:
+  - start: {fileID: 1486448067}
+    entryPath: []
+    joinIndex: 0
+  - start: {fileID: 862102745}
+    entryPath:
+    - {fileID: 859989653}
+    - {fileID: 111324855}
+    joinIndex: 2
+  - start: {fileID: 1974033137}
+    entryPath: []
+    joinIndex: 0
+  legacyWalkStarts: []
   walkPath:
   - {fileID: 1153451029}
   - {fileID: 1085174633}
@@ -16617,7 +16690,6 @@ MonoBehaviour:
   - {fileID: 1281245962}
   - {fileID: 1973002961}
   pod: {fileID: 173094101}
-  letterboxHeight: 0.04
 --- !u!1 &1281245961
 GameObject:
   m_ObjectHideFlags: 0
