@@ -14,6 +14,9 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     [Tooltip("남은 재충전 비율만큼 덮는 Filled 타입 오버레이 (스킬 쿨타임 HUD와 동일).")]
     [SerializeField] private Image cooldownFill;
 
+    [Tooltip("덮개 마스크 본체 구간(1x px) — 남은 비율을 이 구간에 맞춘다.")]
+    [SerializeField] private CooldownCoverBody cooldownBody = CooldownCoverBody.SideBody;
+
     [Tooltip("남은 재충전(초) 텍스트. 스킬 쿨타임 HUD와 동일 포맷. 선택.")]
     [SerializeField] private TMP_Text remainingText;
 
@@ -84,8 +87,7 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             maxCharge = dash.MaxCharge;
         }
 
-        if (cooldownFill != null)
-            cooldownFill.fillAmount = total > 0f ? Mathf.Clamp01(remaining / total) : 0f;
+        cooldownBody.Apply(cooldownFill, total > 0f ? remaining / total : 0f);
 
         if (remainingText != null)
         {

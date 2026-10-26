@@ -15,6 +15,9 @@ public class PassiveHUD : MonoBehaviour
     [Tooltip("남은 쿨다운 비율만큼 덮는 Filled 타입 오버레이 (스킬 쿨타임 HUD와 동일).")]
     [SerializeField] private Image cooldownFill;
 
+    [Tooltip("덮개 마스크 본체 구간(1x px) — 남은 비율을 이 구간에 맞춘다.")]
+    [SerializeField] private CooldownCoverBody cooldownBody = CooldownCoverBody.SideBody;
+
     [Tooltip("패시브 아이콘. Ready 여부에 따라 색을 바꾼다.")]
     [SerializeField] private Image icon;
 
@@ -75,8 +78,7 @@ public class PassiveHUD : MonoBehaviour
             ready = passive.IsReady;
         }
 
-        if (cooldownFill != null)
-            cooldownFill.fillAmount = total > 0f ? Mathf.Clamp01(remaining / total) : 0f;
+        cooldownBody.Apply(cooldownFill, total > 0f ? remaining / total : 0f);
 
         if (icon != null)
             icon.color = passive == null && tooltipSource != null

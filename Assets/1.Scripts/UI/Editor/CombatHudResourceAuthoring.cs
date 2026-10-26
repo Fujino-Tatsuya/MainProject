@@ -178,11 +178,12 @@ public static class CombatHudResourceAuthoring
     static readonly Rect PassiveBodyPx = Rect.MinMaxRect(10f, 7.5f, 90f, 95f);
     static readonly Rect UltBodyPx = Rect.MinMaxRect(8f, 7.5f, 88f, 95f);
 
-    // slot_skill_1 상단 4칸 내부(프레임 px, 좌상단 기준 [min, max)) — 높이 13 은 칸 마스크(22×13)와 같다.
+    // slot_skill_1 상단 4칸 내부(프레임 px, 좌상단 기준 [min, max)) — 실측 폭 20·22·21·21, 높이 13.
     static readonly float[] HeaderCellXMinPx = { 3f, 25f, 49f, 72f };
     static readonly float[] HeaderCellXMaxPx = { 23f, 47f, 70f, 93f };
     static readonly Vector2 HeaderCellYPx = new Vector2(4f, 17f);
-    static readonly Vector2 HeaderCellPx = new Vector2(22f, 13f);
+    // 칸 = 내부를 사방 1px 줄인 크기. 예전엔 22×13 고정이라 폭 20 인 첫 칸이 테두리를 1px 덮었다.
+    const float HeaderCellInsetPx = 1f;
     // 🟨 임시 색 — 디자인 확정 전까지 XP 바 계열 주황.
     static readonly Color HeaderCellColor = new Color(1f, 0.6f, 0.1f, 1f);
 
@@ -216,7 +217,48 @@ public static class CombatHudResourceAuthoring
 
             BuildUpgradeCells(slot, headerCell);
         }
+        return AssignCooldownBodies(root);
+    }
+
+    /// <summary>
+    /// 쿨다운 덮개 본체 구간(C5)을 슬롯마다 적는다 — 가운데 4칸 = mask_skill_body, 패시브·대시 = 좌우 마스크.
+    /// 컴포넌트 기본값과 같지만, 기존 프리팹 배열 원소는 기본값이 안 들어갈 수 있어 명시한다.
+    /// </summary>
+    static bool AssignCooldownBodies(Transform root)
+    {
+        RectTransform bar = Find(root, SkillBarPath.TrimEnd('/'));
+        if (bar == null)
+            return false;
+
+        var skill = bar.GetComponentInChildren<SkillCooldownHUD>(true);
+        var dash = bar.GetComponentInChildren<DashCooldownHUD>(true);
+        var passive = bar.GetComponentInChildren<PassiveHUD>(true);
+        if (skill == null || dash == null || passive == null)
+        {
+            Debug.LogError("[CombatHudResource] SkillBar 에서 SkillCooldownHUD·DashCooldownHUD·PassiveHUD 를 못 찾았다.");
+            return false;
+        }
+
+        var skillSo = new SerializedObject(skill);
+        SerializedProperty slots = skillSo.FindProperty("slots");
+        for (int i = 0; i < slots.arraySize; i++)
+            WriteBody(slots.GetArrayElementAtIndex(i).FindPropertyRelative("cooldownBody"), CooldownCoverBody.SkillBody);
+        skillSo.ApplyModifiedPropertiesWithoutUndo();
+
+        foreach (Object side in new Object[] { dash, passive })
+        {
+            var so = new SerializedObject(side);
+            WriteBody(so.FindProperty("cooldownBody"), CooldownCoverBody.SideBody);
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
         return true;
+    }
+
+    static void WriteBody(SerializedProperty prop, CooldownCoverBody body)
+    {
+        prop.FindPropertyRelative("canvasHeightPx").floatValue = body.canvasHeightPx;
+        prop.FindPropertyRelative("bodyTopPx").floatValue = body.bodyTopPx;
+        prop.FindPropertyRelative("bodyBottomPx").floatValue = body.bodyBottomPx;
     }
 
     static bool ApplySideSlot(Transform root, string slotName, Sprite frame, Sprite mask, Rect bodyPx)
@@ -276,7 +318,9 @@ public static class CombatHudResourceAuthoring
             RectTransform cell = EnsureChild(group, "Cell" + i);
             cell.anchorMin = cell.anchorMax = cell.pivot = new Vector2(0.5f, 0.5f);
             cell.localScale = Vector3.one;
-            cell.sizeDelta = Vector2.Scale(HeaderCellPx, px);
+            cell.sizeDelta = Vector2.Scale(new Vector2(
+                HeaderCellXMaxPx[i] - HeaderCellXMinPx[i] - HeaderCellInsetPx * 2f,
+                HeaderCellYPx.y - HeaderCellYPx.x - HeaderCellInsetPx * 2f), px);
             cell.anchoredPosition = new Vector2(
                 (HeaderCellXMinPx[i] + HeaderCellXMaxPx[i]) * 0.5f * px.x - SlotRootSize.x * 0.5f,
                 SlotRootSize.y * 0.5f - (HeaderCellYPx.x + HeaderCellYPx.y) * 0.5f * px.y);
