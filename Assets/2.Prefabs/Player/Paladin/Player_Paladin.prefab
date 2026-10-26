@@ -1742,7 +1742,7 @@ MonoBehaviour:
   socket: {fileID: 2457413198031000931}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
-  safetyTimeout: 2
+  safetyTimeout: 5
 --- !u!1 &6847070989216762705
 GameObject:
   m_ObjectHideFlags: 0
