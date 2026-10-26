@@ -54,6 +54,16 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 이번 그로기가 **일반 간파 성공**인가 — 그렇다면 쓰러지는 그로기 대신 간파 피격 클립(getowned/_R = Boss_23_ParryHit_InPlace)을 튼다(경석 10-26).
+    // 제압·송전기·릴레이 탈진·연쇄 간파·Q 경직은 false = 지금처럼 쓰러지는 그로기.
+    // 🔴 상태(MonsterBase._state)와 같은 틱에 바뀐다. NGO 2.x ILPP 는 파생 클래스 변수를 기반 클래스보다 **먼저** 등록·적용하므로
+    //    클라의 PlayStateAnimation(Groggy) 시점엔 이미 새 값이다(_hitReactionRight 와 같은 전제).
+    readonly NetworkVariable<bool> _parryHitGroggy = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+    bool _parryHitPlaying;   // [로컬] 피격 클립으로 그로기를 시작했다 — 그로기를 벗어날 때 이동 자세로 되돌린다(클립에 나가는 전이가 없다)
+
     /// <summary>지금 카운터로 끊을 수 있는가(표현·디버그용 읽기 전용).</summary>
     public bool CounterWindowOpen => _counterWindow.Value;
 
@@ -2316,6 +2326,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (IsServer)
             PushWellsState(s);
 
+        // 간파 피격 클립(getowned/_R)엔 나가는 전이가 없다 — 그로기를 벗어나면 이동 자세로 직접 되돌린다.
+        // 공격·사망은 각자 클립을 트므로 건드리지 않는다.
+        if (_parryHitPlaying && s != MonsterState.Groggy)
+        {
+            _parryHitPlaying = false;
+            if (s != MonsterState.Attack && s != MonsterState.Dead && data != null && !string.IsNullOrEmpty(data.locomotionState))
+                SafeCrossFade(data.locomotionState);
+        }
+
         if (s == MonsterState.Attack) return;
 
         // Hit = 카운터 성공 전용. base 의 hitTrigger 대신 지정된 리액션 상태(getowned)로 CrossFade 한다.
@@ -2341,7 +2360,30 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         //    bool 이 켜진 동안 GroggyStart→Groggy 로 넘어가는 순간 AnyState 가 다시 GroggyStart 로 되돌려
         //    제압 5초 내내 진입 클립이 반복됐다(09-29). 종료는 그대로 Groggy→GroggyEnd(bool 꺼짐)가 맡는다.
         if (s == MonsterState.Groggy)
-            SafeCrossFade(GroggyStartState);
+        {
+            // 일반 간파 성공 = 쓰러지지 않는 간파 피격 클립(1.42초 ≈ 간파 그로기 1.5초, 선 자세로 끝난다 — 경석 10-26).
+            // Groggy bool 은 켜져 있지만 AnyState→GroggyStart 는 Mute 라 이 상태를 빼앗지 않는다.
+            string parry = ParryHitStateName();
+            if (_parryHitGroggy.Value && parry != null)
+            {
+                SafeCrossFade(parry);
+                _parryHitPlaying = true;
+            }
+            else
+            {
+                SafeCrossFade(GroggyStartState);
+            }
+        }
+    }
+
+    // 간파 피격 상태 — 방향은 서버가 정해 복제한 값(_hitReactionRight). 오른쪽이 비면 왼쪽.
+    string ParryHitStateName()
+    {
+        if (_boss == null) return null;
+        string s = _hitReactionRight.Value && !string.IsNullOrEmpty(_boss.hitReactionStateRight)
+            ? _boss.hitReactionStateRight
+            : _boss.hitReactionState;
+        return string.IsNullOrEmpty(s) ? null : s;
     }
 
     const string GroggyStartState = "GroggyStart";
@@ -6051,6 +6093,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             {
                 // 🔴 Q 경직은 간파 그로기가 아니다(경석 10-23) — 정지 조건 없음 = 장판·드론은 계속 돈다.
                 _groggyKind = BossPauseCondition.None;
+                _parryHitGroggy.Value = false;   // 쓰러지는 그로기(직전 간파의 값이 남지 않게)
                 ForceGroggy(stun);
                 _vulnerableStunGroggy = true;
                 Debug.Log($"[23호] 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초(남은 취약까지)", this);
@@ -6199,7 +6242,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
 
         _groggyKind = BossPauseCondition.CounterGroggy;
-        StunForCounter(outcome.Duration);
+        StunForCounter(outcome.Duration, parryHit: true);   // 일반 간파 = 간파 피격 클립(쓰러지지 않음)
         Debug.Log($"[23호] 간파 성공 — 게이지 {outcome.NextGauge:0}% → 그로기 {outcome.Duration:0.#}초", this);
         StartVulnerable();   // 그로기 시작 시점부터 4초(D1)
     }
@@ -6780,8 +6823,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     public float CounterGauge01 => Mathf.Clamp01(_counterGauge.Value / BossCounterProgress.GaugeMax);
 
     // 간파 성공·송전기·제압이 공유하는 "쓰러뜨리기". 체인 정리 + 그로기.
-    void StunForCounter(float duration)
+    /// <param name="parryHit">true = 일반 간파 성공 — 쓰러지는 그로기 대신 간파 피격 클립(<see cref="_parryHitGroggy"/>).</param>
+    void StunForCounter(float duration, bool parryHit = false)
     {
+        _parryHitGroggy.Value = parryHit;   // 🔴 ForceGroggy(상태 변경)보다 먼저 — 같은 틱에 상태보다 먼저 적용된다
         // 🔴 [G6] 리액션 방향을 **체인 정리보다 먼저** 확정한다 — AbortAttackChain 이 진행 중 공격을
         //    비우고 나면 "무엇을 끊었는지"를 알 수 없다.
         _hitReactionRight.Value = ResolveHitReactionRight(_currentEntry);
