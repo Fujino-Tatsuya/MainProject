@@ -378,6 +378,7 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "git 커밋", $"{H(Val(batch, "git_commit", "na"))} ({H(Val(batch, "git_branch", "na"))}) · 판 기록 {H(commits.Count > 0 ? string.Join(", ", commits) : Dash)}");
         Row2(sb, "Unity", H(Val(batch, "unity_version", "na")));
         Row2(sb, "기준 시드", H(Val(batch, "seed", "na")) + " · 판 시드 = 기준 시드 × 판 번호(재실행도 같은 시드)");
+        Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
         Row2(sb, "시작 / 최근", $"{H(Val(batch, "started_at", Dash))} / {H(last.Length > 0 ? last : Dash)}");
         Row2(sb, "루프 상태", H(input.LoopState.Length > 0 ? input.LoopState : Dash));
         sb.Append("</tbody></table>\n");

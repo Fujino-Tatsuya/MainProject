@@ -18,7 +18,8 @@ using UnityEngine.SceneManagement;
 ///   일렬로 옮긴다(<see cref="PlayerFallRecovery.RelocateServer"/>). 봇은 움직이지 않는다 → 게임의 집결 판정(전원 발판 5초)이 엘리베이터를 연다.</item>
 /// <item>엘리베이터 → 23호 등장 연출(연출 잠금) → 각 인스턴스 봇이 Space 홀드 스킵 → <see cref="BossEncounterPhase.Combat"/> 진입 시각 기록.</item>
 /// <item>[서버] 판 종료 판정(<see cref="QABoss103Plan.Judge"/>): 보스 처치 = 클리어 / 공용 목숨 0 전멸(<see cref="PartyWipeRespawner.PartyWipeRespawned"/>,
-///   리스폰 대상이 아니라 결과 화면으로 가면 씬 이탈) = 실패 / Combat 부터 30분 = 시간초과. 판 기록 → <see cref="LastRecord"/> + 로그 1줄.</item>
+///   리스폰 대상이 아니라 결과 화면으로 가면 씬 이탈) = 실패 / Combat 부터 30분 = 시간초과. 판 기록 → <see cref="LastRecord"/> + 로그 1줄.
+///   판 동안 QA 자동 부활(<see cref="QABoss103AutoRevive"/>, C7b) — Soul 3초 뒤 정식 부활(목숨 1 차감), 목숨 0 이면 Soul 그대로 → 전멸.</item>
 /// </list>
 /// 88 의 체력 채우기·어그로 강제·보스 타이머 정지·QA 슈퍼아머는 켜지 않는다(혹시 남아 있으면 시작 때 해제).
 /// </summary>
@@ -124,6 +125,7 @@ public static class QABoss103Match
         Action<IReadOnlyList<ulong>> onWipe = _ => wiped = true;
         TutorialTraitDirector traits = null;
         QABoss103Recorder recorder = null;
+        QABoss103AutoRevive autoRevive = null;
         double bossHpPct = double.NaN;
         try
         {
@@ -224,6 +226,7 @@ public static class QABoss103Match
             double combatStart = Time.realtimeSinceStartupAsDouble;
             QABoss103Heartbeat.MarkCombat();
             recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터
+            autoRevive = QABoss103AutoRevive.Begin(characters, recorder.Stats);   // C7b — 보스전엔 게임 부활 수단이 없다
             string combatWall = DateTime.Now.ToString("HH:mm:ss.fff");
             Debug.Log($"{Tag} event=combat_start at={combatWall} introS={Time.realtimeSinceStartup - introAt:F1} skip={SkipVotes()} hostSkipPath={bot.SkipPath} hostSawLock={bot.SawCinematicLock}");
             ctx.Check(bot.SawCinematicLock, "103 연출 중 연출 잠금", $"호스트 플레이어 PlayerEncounterLock.IsCinematicLocked 관측={bot.SawCinematicLock}");
@@ -250,6 +253,7 @@ public static class QABoss103Match
                 }
                 yield return null;
             }
+            autoRevive.Stop();
             bossHpPct = recorder.Stop();
             QABoss103Heartbeat.SetPhase("end");
 
@@ -285,6 +289,11 @@ public static class QABoss103Match
             {
                 rec.Outcome = QABoss103Outcome.Aborted;
                 rec.Detail = "중단(시나리오 상한·예외·정지)";
+            }
+            if (autoRevive != null)
+            {
+                autoRevive.Stop();
+                UnityEngine.Object.Destroy(autoRevive.gameObject);
             }
             if (recorder != null && double.IsNaN(bossHpPct))
                 bossHpPct = recorder.Stop();

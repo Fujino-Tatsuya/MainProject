@@ -82,6 +82,8 @@ public sealed class QABoss103CharStats
     public int HitsTaken;
     /// <summary>굴림 없는 피격(감지 못한 위험). 판 파일이 없으면 -1.</summary>
     public int HitsUnrolled = -1;
+    /// <summary>C7b — QA 자동 부활 성공(<c>QABoss103AutoRevive</c>, 공용 목숨 1 차감).</summary>
+    public int QaRevives;
 
     internal bool Transformed;
     internal double TransformSince;
@@ -290,6 +292,28 @@ public sealed class QABoss103RunStats
     }
 
     public void Wipe() => Wipes++;
+
+    /// <summary>C7b — 부활 무적을 못 준 QA 자동 부활이 있었다(runs.csv note <c>qa_revive_no_invuln</c>).</summary>
+    public bool QaReviveNoInvuln;
+
+    /// <summary>C7b — QA 자동 부활 성공 1회. <paramref name="invuln"/> = 부활 무적을 줬나.</summary>
+    public void QaRevive(int slot, bool invuln)
+    {
+        QABoss103CharStats c = C(slot);
+        if (c == null)
+            return;
+        c.QaRevives++;
+        if (!invuln)
+            QaReviveNoInvuln = true;
+    }
+
+    public int QaRevivesTotal()
+    {
+        int n = 0;
+        foreach (QABoss103CharStats c in Chars)
+            n += c.QaRevives;
+        return n;
+    }
 
     /// <summary>[서버] 보스 공격 시작(<c>_currentEntry.attackId</c>) — 클라 봇 굴림을 공격 id 로 잇는 시간표.</summary>
     public void AttackStart(double t, string attackId)
@@ -613,6 +637,7 @@ public static class QABoss103Metrics
             "assassin_transform_count", "transform_sec_total", "transform_uptime", "dmg_normal", "dmg_transformed", "dps_normal", "dps_transformed",
             "paladin_guard_success", "paladin_guard_counter", "paladin_guard_ignore", "counter_tries", "counter_success", "dmg_during_suppress",
             "evade_dodge", "evade_take", "evade_no_charge", "evade_blocked", "evade_expired", "hits_taken", "hits_unrolled",
+            "qa_revives",
         });
         return h.ToArray();
     }
@@ -662,6 +687,8 @@ public static class QABoss103CsvRows
         string parts = started ? s.PartsNote() : "";
         if (parts.Length > 0)
             note = note.Length > 0 ? note + " " + parts : parts;
+        if (started && s.QaReviveNoInvuln)
+            note = note.Length > 0 ? note + " " + QABoss103AutoRevive.NoInvulnNote : QABoss103AutoRevive.NoInvulnNote;
         var r = new List<string>(m.Key())
         {
             I(m.RunSeed),
@@ -734,6 +761,7 @@ public static class QABoss103CsvRows
             r.Add(c.PartPresent ? I(c.EvadeExpired) : "");
             r.Add(I(c.HitsTaken));
             r.Add(c.HitsUnrolled >= 0 ? I(c.HitsUnrolled) : "");
+            r.Add(I(c.QaRevives));
             rows.Add(r.ToArray());
         }
         return rows;
