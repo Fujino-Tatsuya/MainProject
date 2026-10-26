@@ -7,7 +7,8 @@ using UnityEngine;
 /// - 프리팹에 붙이지 않는다 — <see cref="MonsterBase"/> 스폰 때 <see cref="TryInstall"/> 가 런타임에 붙인다(체력바와 같은 방식).
 ///   표는 <c>Resources/MonsterStatusEffectVfxSet</c> 하나 — 플레이어 표와 따로 둬서 몬스터 쪽 자리·배율을 따로 맞춘다.
 /// - 켜고 끄기 = <see cref="MonsterStatusEffect.EffectsChanged"/>(복제된 활성 상태 변화)·상태 전이(사망) — 전 피어에서 나므로 <b>추가 네트워크 없음</b>.
-/// - 머리 위 자리는 몸 콜라이더 꼭대기에 자식으로 만든다. 몸·발밑 자리는 아직 쓰지 않아 몸통 중심·루트로 둔다.
+/// - 머리 위 자리는 루트 자식으로 만들고, 머리 뼈("Head")가 있으면 매 프레임 그 위로 따라간다(없으면 몸 콜라이더 꼭대기 고정).
+///   몸·발밑 자리는 아직 쓰지 않아 몸통 중심·루트로 둔다.
 /// - 자리마다 우선순위 최고 1개, 다른 자리끼리는 동시(플레이어판과 같은 규칙).
 ///
 /// 🔴 몬스터에 기절(Stunned)을 거는 곳은 지금 팔라딘 Q 밀림·경직(<c>MonsterBase.TryEnterKnockback/ExitKnockback</c>)과
@@ -22,6 +23,8 @@ public sealed class MonsterStatusEffectVfxPresenter : MonoBehaviour
 
     const int AnchorCount = 3;
     const float FallbackHeadHeight = 2f;   // 콜라이더·렌더러가 없을 때 머리 높이(m)
+    const string HeadBoneName = "Head";
+    const float HeadTopPad = 0.4f;         // 머리 뼈(대개 머리 중심) → 머리 꼭대기 근사(m). 그 위에 표의 offset 이 더해진다
 
     static bool _warnedMissingSet;
 
@@ -30,6 +33,8 @@ public sealed class MonsterStatusEffectVfxPresenter : MonoBehaviour
     StatusEffectVfxSet _set;
     Transform _overhead;
     Transform _body;
+    Transform _headBone;      // 있으면 머리 위 자리가 매 프레임 따라간다
+    float _minHeadHeight;     // 루트 기준 최소 머리 위 높이(스폰 때 잰 콜라이더 꼭대기)
     readonly StatusEffectVfxSet.Row[] _shownRows = new StatusEffectVfxSet.Row[AnchorCount];
     readonly EffectHandle[] _handles = new EffectHandle[AnchorCount];
 
@@ -65,19 +70,47 @@ public sealed class MonsterStatusEffectVfxPresenter : MonoBehaviour
         var presenter = monster.gameObject.AddComponent<MonsterStatusEffectVfxPresenter>();
         presenter.Bind(monster, status, set,
             CreateAnchor(monster.transform, "StatusVfx_Overhead", headY),
-            CreateAnchor(monster.transform, "StatusVfx_Body", (monster.transform.position.y + headY) * 0.5f));
+            CreateAnchor(monster.transform, "StatusVfx_Body", (monster.transform.position.y + headY) * 0.5f),
+            FindHeadBone(monster.transform), headY - monster.transform.position.y);
         return presenter;
     }
 
-    void Bind(MonsterBase monster, MonsterStatusEffect status, StatusEffectVfxSet set, Transform overhead, Transform body)
+    void Bind(MonsterBase monster, MonsterStatusEffect status, StatusEffectVfxSet set, Transform overhead, Transform body,
+              Transform headBone, float minHeadHeight)
     {
         _monster = monster;
         _status = status;
         _set = set;
         _overhead = overhead;
         _body = body;
+        _headBone = headBone;
+        _minHeadHeight = minHeadHeight;
+        FollowHead();
         _status.EffectsChanged += Refresh;
         Refresh();
+    }
+
+    // 머리 뼈(이름 "Head" — 로봇 팩 공통: GauntletBot·SpinnerBot·WallBot 등). 없으면 null → 고정 높이 자리를 쓴다.
+    // 🔴 왜 뼈를 따라가나(경석 10-26 Play): 몸 콜라이더는 몹마다 2m 캡슐 그대로인데 GauntletBot 은 골반만 1.7m 인 큰 모델이라
+    //    콜라이더 꼭대기 자리는 가슴 속이었다 — 별이 몸에 묻혀 중간보스에서만 안 보였다.
+    static Transform FindHeadBone(Transform root)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (string.Equals(t.name, HeadBoneName, System.StringComparison.OrdinalIgnoreCase))
+                return t;
+        return null;
+    }
+
+    void LateUpdate() => FollowHead();
+
+    // 머리 위 자리를 머리 뼈 위(HeadTopPad)로 옮긴다. 애니메이션이 뼈를 움직인 뒤(LateUpdate)라 숙이거나 밀려도 따라간다.
+    // 높이는 스폰 때 잰 콜라이더 꼭대기 밑으로는 내리지 않는다 — 머리가 작은 몹에서 별이 몸에 겹치지 않게.
+    void FollowHead()
+    {
+        if (_headBone == null || _overhead == null) return;
+        Vector3 head = _headBone.position;
+        float y = Mathf.Max(head.y + HeadTopPad, transform.position.y + _minHeadHeight);
+        _overhead.position = new Vector3(head.x, y, head.z);
     }
 
     // 몸 콜라이더 꼭대기(월드 y). 스폰 직후 콜라이더가 꺼져 있으면 bounds 가 0 이라 렌더러로 넘어간다.

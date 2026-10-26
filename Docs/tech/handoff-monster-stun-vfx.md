@@ -38,7 +38,9 @@ Gauntlet·Spinner·WallBot 의 공격 슈퍼아머 부여 4곳이 이 값을 본
 
 - 프리팹에 붙이지 않는다. `MonsterBase.OnNetworkSpawn` 이 `MonsterStatusEffectVfxPresenter.TryInstall` 로 런타임에 붙인다(체력바와 같은 방식). 23호(`rank: Boss`)는 제외.
 - 표는 플레이어 표와 **따로**다(`Resources/MonsterStatusEffectVfxSet`) — 몬스터는 머리 위 기준점이 달라서 오프셋·배율을 따로 맞춘다. 엔트리는 같은 `FX_Faint_Entry` 를 가리킨다.
-- 머리 위 자리 = 몸 콜라이더 꼭대기에 런타임 자식 `StatusVfx_Overhead`. 콜라이더가 꺼져 있으면 렌더러 bounds, 둘 다 없으면 루트 +2m. 몸 자리 = 그 중간, 발밑 = 루트.
+- 머리 위 자리 = 런타임 자식 `StatusVfx_Overhead`. **머리 뼈(`Head`)가 있으면 매 프레임 그 위 0.4m 로 따라간다**(최소 높이 = 몸 콜라이더 꼭대기).
+  뼈가 없으면 몸 콜라이더 꼭대기 고정, 콜라이더가 꺼져 있으면 렌더러 bounds, 둘 다 없으면 루트 +2m. 몸 자리 = 그 중간, 발밑 = 루트.
+  - 🔴 3차(경석 10-26 Play): 처음엔 콜라이더 꼭대기 고정이었는데, 몸 콜라이더는 몹마다 2m 캡슐 그대로라 **GauntletBot(골반만 1.7m)에서 별이 가슴 속에 묻혀** 중간보스만 안 보였다. 중간보스 3종 모두 `Head` 뼈가 있다.
 - 켜고 끄기: `MonsterStatusEffect.EffectsChanged` + 상태 전이(사망이면 끔). **추가 네트워크 없음**.
 - 🔴 몬스터에 기절을 거는 곳은 지금 **팔라딘 Q 밀림·경직**과 **고정 터렛 경직**뿐이다. 평타 경직(Hit 0.4초)은 상태이상을 안 건다 → 평타마다 별이 뜨지 않는다.
 - **중간보스 간파 성공 그로기**는 상태이상이 아니라 FSM 상태(Groggy)라서, Presenter 가 `rank: MidBoss` ∧ `Groggy` 이면 기절 줄을 켠 것으로 본다.
