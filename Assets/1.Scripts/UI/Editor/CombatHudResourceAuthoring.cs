@@ -39,14 +39,21 @@ public static class CombatHudResourceAuthoring
 
         try
         {
-            if (!ApplyHealthBar(root.transform) || !AssignRosterHpFills())
+            if (!ApplyHealthBar(root.transform) || !ApplySkillSlots(root.transform))
             {
                 Debug.LogError("[CombatHudResource] 적용 실패 — 저장하지 않았다. 위 오류를 확인할 것.");
                 return;
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, HudPath);
-            Debug.Log($"[CombatHudResource] 적용 완료 — {HudPath}");
+
+            if (!AssignRosterHpFills())
+            {
+                Debug.LogError("[CombatHudResource] 로스터 체력 채움 지정 실패 — 위 오류를 확인할 것.");
+                return;
+            }
+
+            Debug.Log($"[CombatHudResource] 적용 완료 — {HudPath}, {RosterPath}");
         }
         finally
         {
@@ -144,6 +151,167 @@ public static class CombatHudResourceAuthoring
             case TutorialCharacter.Assassin: return "hp_fill_assassin.png";
             default: return null;
         }
+    }
+
+    // ── C3: 스킬 바 프레임·마스크·상단 칸 ───────────────────────────────────
+
+    const string SlotArtDir = "Assets/50.Art/UI/HUD/Slots/";
+    const string SkillBarPath = "Layer_Combat/SkillBar/";
+    const string UpgradeCellsName = "UpgradeCells";
+
+    // 기존 프레임 조각(slot_skill_N, 96×99 px)은 100×100 슬롯 루트에 늘려 그려진다. 새 그림도 같은 배율로 보이게 한다.
+    // 새 그림은 99×101 캔버스(논리 1x px, 2x 파일은 PPU 200)이고 슬롯·마스크가 같은 캔버스를 쓴다.
+    static readonly Vector2 SlotRootSize = new Vector2(100f, 100f);
+    static readonly Vector2 OldFramePx = new Vector2(96f, 99f);
+    static readonly Vector2 CanvasPx = new Vector2(99f, 101f);
+    static Vector2 PxToUi => new Vector2(SlotRootSize.x / OldFramePx.x, SlotRootSize.y / OldFramePx.y);
+    static Vector2 CanvasUiSize => Vector2.Scale(CanvasPx, PxToUi);
+
+    // 실측(2026-10-26, 알파 맞춤): mask_skill_body 캔버스에서 기존 slot_skill_1 은 (1,0) 에 놓인다
+    // (본체 내부 x8..87·y21..94 ↔ 마스크 x9..88·y21..94). 새 좌·우 프레임은 기존 조각 대비 (1,1) 이라
+    // 슬롯 루트를 캔버스 크기로 키우고 중심은 그대로 둔다(0.5px 미만 차이).
+    static readonly Vector2 SkillFrameInCanvasPx = new Vector2(1f, 0f);
+
+    // 마스크 본체 알파 영역(캔버스 px, 좌상단 기준 [min, max)) — 아이콘 중심을 본체 중심에 맞춘다.
+    static readonly Rect SkillBodyPx = Rect.MinMaxRect(9f, 21f, 89f, 95f);
+    static readonly Rect PassiveBodyPx = Rect.MinMaxRect(10f, 7.5f, 90f, 95f);
+    static readonly Rect UltBodyPx = Rect.MinMaxRect(8f, 7.5f, 88f, 95f);
+
+    // slot_skill_1 상단 4칸 내부(프레임 px, 좌상단 기준 [min, max)) — 높이 13 은 칸 마스크(22×13)와 같다.
+    static readonly float[] HeaderCellXMinPx = { 3f, 25f, 49f, 72f };
+    static readonly float[] HeaderCellXMaxPx = { 23f, 47f, 70f, 93f };
+    static readonly Vector2 HeaderCellYPx = new Vector2(4f, 17f);
+    static readonly Vector2 HeaderCellPx = new Vector2(22f, 13f);
+    // 🟨 임시 색 — 디자인 확정 전까지 XP 바 계열 주황.
+    static readonly Color HeaderCellColor = new Color(1f, 0.6f, 0.1f, 1f);
+
+    static bool ApplySkillSlots(Transform root)
+    {
+        Sprite passiveFrame = LoadSprite(SlotArtDir + "slot_passive_no_tabs_2x.png");
+        Sprite ultFrame = LoadSprite(SlotArtDir + "slot_ult_no_tabs_2x.png");
+        Sprite passiveMask = LoadSprite(SlotArtDir + "mask_passive_body_no_tabs_2x.png");
+        Sprite ultMask = LoadSprite(SlotArtDir + "mask_ult_body_no_tabs_2x.png");
+        Sprite skillMask = LoadSprite(SlotArtDir + "mask_skill_body_2x.png");
+        Sprite headerCell = LoadSprite(SlotArtDir + "mask_skill_header_cell_2x.png");
+        if (passiveFrame == null || ultFrame == null || passiveMask == null || ultMask == null ||
+            skillMask == null || headerCell == null)
+            return false;
+
+        // 좌·우: 새 프레임 = 마스크와 같은 캔버스 → 슬롯 루트를 캔버스 크기로 키우고 마스크는 루트와 겹친다.
+        if (!ApplySideSlot(root, "Slot_Passive", passiveFrame, passiveMask, PassiveBodyPx) ||
+            !ApplySideSlot(root, "Slot_Dash", ultFrame, ultMask, UltBodyPx))
+            return false;
+
+        // 가운데 4칸: 프레임(slot_skill_1)은 그대로, 마스크 캔버스를 프레임 위치에 맞춰 얹고 상단 칸을 둔다.
+        Vector2 px = PxToUi;
+        Vector2 canvasCenter = new Vector2(
+            -SlotRootSize.x * 0.5f - SkillFrameInCanvasPx.x * px.x + CanvasUiSize.x * 0.5f,
+            SlotRootSize.y * 0.5f + SkillFrameInCanvasPx.y * px.y - CanvasUiSize.y * 0.5f);
+        foreach (string slotName in new[] { "Slot_Q", "Slot_E", "Slot_R", "Slot_RMB" })
+        {
+            RectTransform slot = Find(root, SkillBarPath + slotName);
+            if (slot == null || !ApplyMasks(slot, skillMask, canvasCenter, SkillBodyPx))
+                return false;
+
+            BuildUpgradeCells(slot, headerCell);
+        }
+        return true;
+    }
+
+    static bool ApplySideSlot(Transform root, string slotName, Sprite frame, Sprite mask, Rect bodyPx)
+    {
+        RectTransform slot = Find(root, SkillBarPath + slotName);
+        if (slot == null)
+            return false;
+
+        // 중심(anchoredPosition)은 그대로 — 아이콘·키 배지·쿨다운 글자는 중앙 앵커라 움직이지 않는다.
+        slot.sizeDelta = CanvasUiSize;
+        slot.GetComponent<Image>().sprite = frame;
+        return ApplyMasks(slot, mask, Vector2.zero, bodyPx);
+    }
+
+    /// <summary>
+    /// Icon_mask·Icon_mask_CooldownFill 을 마스크 캔버스 크기·위치로 맞춘다. 부모(슬롯 루트)·Filled·색은 그대로.
+    /// 마스크 안 아이콘(사본 포함)은 크기는 두고 중심만 본체 중심에 맞춘다 — 마스크를 옮긴 만큼 아이콘이 따라 움직이지 않게.
+    /// </summary>
+    static bool ApplyMasks(RectTransform slot, Sprite mask, Vector2 canvasCenter, Rect bodyPx)
+    {
+        Vector2 px = PxToUi;
+        Vector2 bodyCenter = canvasCenter + new Vector2(
+            (bodyPx.center.x - CanvasPx.x * 0.5f) * px.x,
+            -(bodyPx.center.y - CanvasPx.y * 0.5f) * px.y);
+
+        foreach (string maskName in new[] { "Icon_mask", "Icon_mask_CooldownFill" })
+        {
+            RectTransform rt = Find(slot, maskName);
+            if (rt == null)
+                return false;
+
+            rt.sizeDelta = CanvasUiSize;
+            rt.anchoredPosition = canvasCenter;
+            rt.GetComponent<Image>().sprite = mask;
+
+            foreach (RectTransform icon in rt)
+                icon.anchoredPosition = bodyCenter - canvasCenter;
+        }
+        return true;
+    }
+
+    /// <summary>slot_skill_1 그림의 상단 4칸 자리에 칸 Image 를 둔다. 기본은 전부 꺼짐(0단계).</summary>
+    static void BuildUpgradeCells(RectTransform slot, Sprite cellSprite)
+    {
+        RectTransform group = EnsureChild(slot, UpgradeCellsName);
+        group.anchorMin = group.anchorMax = group.pivot = new Vector2(0.5f, 0.5f);
+        group.anchoredPosition = Vector2.zero;
+        group.sizeDelta = SlotRootSize;
+        group.localScale = Vector3.one;
+        // 프레임(루트) 위, 아이콘 마스크 다음 — 키 배지·쿨다운 글자보다 아래.
+        group.SetSiblingIndex(slot.Find("Icon_mask_CooldownFill").GetSiblingIndex() + 1);
+
+        Vector2 px = PxToUi;
+        var cells = new GameObject[HeaderCellXMinPx.Length];
+        for (int i = 0; i < cells.Length; i++)
+        {
+            RectTransform cell = EnsureChild(group, "Cell" + i);
+            cell.anchorMin = cell.anchorMax = cell.pivot = new Vector2(0.5f, 0.5f);
+            cell.localScale = Vector3.one;
+            cell.sizeDelta = Vector2.Scale(HeaderCellPx, px);
+            cell.anchoredPosition = new Vector2(
+                (HeaderCellXMinPx[i] + HeaderCellXMaxPx[i]) * 0.5f * px.x - SlotRootSize.x * 0.5f,
+                SlotRootSize.y * 0.5f - (HeaderCellYPx.x + HeaderCellYPx.y) * 0.5f * px.y);
+
+            Image image = EnsureComponent<Image>(cell.gameObject);
+            image.sprite = cellSprite;
+            image.color = HeaderCellColor;
+            image.raycastTarget = false;
+            cell.gameObject.SetActive(false);
+            cells[i] = cell.gameObject;
+        }
+
+        SkillUpgradeCellsView view = EnsureComponent<SkillUpgradeCellsView>(group.gameObject);
+        var so = new SerializedObject(view);
+        SerializedProperty list = so.FindProperty("cells");
+        list.arraySize = cells.Length;
+        for (int i = 0; i < cells.Length; i++)
+            list.GetArrayElementAtIndex(i).objectReferenceValue = cells[i];
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    static RectTransform EnsureChild(Transform parent, string name)
+    {
+        var existing = parent.Find(name) as RectTransform;
+        if (existing != null)
+            return existing;
+
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return (RectTransform)go.transform;
+    }
+
+    static T EnsureComponent<T>(GameObject go) where T : Component
+    {
+        T c = go.GetComponent<T>();
+        return c != null ? c : go.AddComponent<T>();
     }
 
     /// <summary>HpBar(중앙 0,0) 안에서의 위치·크기·스프라이트만 바꾼다. 색·Filled 설정은 기존 값을 유지한다.</summary>
