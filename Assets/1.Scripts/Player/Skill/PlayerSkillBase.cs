@@ -91,6 +91,14 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 선입력 버퍼에서 지우고 OnSkillRePressed 로 넘긴다 — 받을지 말지는 스킬이 서버에서 정한다(안 받으면 그 입력은 그냥 사라진다).
     public virtual bool ConsumesSkillRePress => false;
 
+    // [오너] 실행 중 같은 슬롯 키의 누름/뗌을 서버로 보고하는가(팔라딘 E 홀드 방식, 할 일 95). true 면 컨트롤러가 시작 첫 틱과
+    // 바뀔 때마다 OnSkillHeldChanged 로 넘긴다. 오너 설정으로 정해지므로 오너에서만 의미가 있다(서버는 받은 통보로 판단한다).
+    // Hold 입력 타입 스킬(OnReleased)과 별개다 — 이 스킬은 Press 로 시작하고 해제 여부는 스킬이 서버에서 정한다.
+    public virtual bool ReportsHeldInput => false;
+
+    // [서버] 타이머 안전망(maxActiveDuration)에 더할 초. 실행 길이가 조작에 따라 늘어나는 스킬(팔라딘 E 홀드)이 쓴다. 공격속도와 무관하게 더한다.
+    public virtual float SafetyNetExtraSeconds => 0f;
+
     // 실행 중 오너 조준을 서버로 주기 전송할지. 기본은 홀드 스킬만(기존 동작).
     public virtual bool WantsAimUpdates => data != null && data.InputType == PlayerSkillInputType.Hold;
 
@@ -211,6 +219,9 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
 
     // 서버 전용: 실행 중 같은 슬롯 재입력(ConsumesSkillRePress 일 때만). 원격 오너면 RPC 지연만큼 늦게 온다 — 지금 서버 상태로 판정한다.
     public virtual void OnSkillRePressed() { }
+
+    // 서버 전용: 실행 중 같은 슬롯 키 누름/뗌(오너가 ReportsHeldInput 일 때만 보낸다). 첫 통보는 시작 직후, 그 뒤는 바뀔 때마다.
+    public virtual void OnSkillHeldChanged(bool held) { }
 
     // 서버 전용: 오너 권위 결과 보고(PlayerSkillController.ReportOwnerSkillResult). 값 검증은 스킬 몫이다(어쌔신 Q: 실제 이동 거리).
     public virtual void OnOwnerResultReported(float value) { }

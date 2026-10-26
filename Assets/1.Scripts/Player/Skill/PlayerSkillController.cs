@@ -85,6 +85,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private bool activeHoldUsesToggle;
     // 토글 종료 입력 수용 여부. 시전한 그 입력이 떨어지기 전까지는 false다.
     private bool isToggleEndArmed;
+    // [오너] ReportsHeldInput 스킬에 마지막으로 보낸 누름 상태. 시전마다 첫 틱에 한 번은 보낸다(hasReportedHeld).
+    private bool hasReportedHeld;
+    private bool lastReportedHeld;
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
@@ -614,6 +617,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         float maxActive = skill.ScalesSafetyNetWithAttackSpeed
             ? PlayerAttackSpeedRules.SafetyNetDuration(skill.Data.MaxActiveDuration, player.AttackSpeedRate)
             : skill.Data.MaxActiveDuration;
+        maxActive += Mathf.Max(0f, skill.SafetyNetExtraSeconds);
         activeEndFallbackTime = Time.time + PlayerSkillSafetyNet.TimerSeconds(maxActive, endFallbackPadding);
         activeEndsOnClipEvent = skill.EndsOnClipEvent;
         hasClipFallback = false;
@@ -840,6 +844,22 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             else
                 NotifySkillRePressedRpc(GetSkillIndex(activeSkill));
         }
+
+        // 같은 슬롯 키 누름/뗌 보고(팔라딘 E 홀드 방식, 할 일 95). 첫 틱에 지금 상태를 한 번 보내고(준비 중에 이미 뗐으면 false),
+        // 그 뒤 바뀔 때만 보낸다. 해제·최대 시간 판정과 전이는 서버가 한다 — 오너는 상태를 먼저 바꾸지 않는다.
+        if (activeSkill != null && activeSkill.ReportsHeldInput && inputReader != null)
+        {
+            bool held = inputReader.GetSkillHeld(activeSkill.Slot);
+            if (!hasReportedHeld || held != lastReportedHeld)
+            {
+                hasReportedHeld = true;
+                lastReportedHeld = held;
+                if (!IsNetworkActive)
+                    activeSkill.OnSkillHeldChanged(held);
+                else
+                    NotifySkillHeldRpc(GetSkillIndex(activeSkill), held);
+            }
+        }
     }
 
     private void TickOwnerHoldInput()
@@ -982,6 +1002,18 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             skill.OnSkillRePressed();
     }
 
+    // 인덱스를 같이 보낸다 — 늦게 도착한 뗌이 그사이 바뀐 다른 스킬에 닿지 않게 한다. ReportsHeldInput 은 오너 설정이라 서버에서 다시 보지 않는다.
+    [Rpc(SendTo.Server)]
+    private void NotifySkillHeldRpc(int skillIndex, bool held, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        PlayerSkillBase skill = GetSkillByIndex(skillIndex);
+        if (skill != null && skill == activeSkill)
+            skill.OnSkillHeldChanged(held);
+    }
+
     [Rpc(SendTo.Server)]
     private void NotifySkillOwnerResultRpc(int skillIndex, float value, RpcParams rpcParams = default)
     {
@@ -1119,6 +1151,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         activeHoldUsesToggle = skill.Data.InputType == PlayerSkillInputType.Hold &&
             UserInputConfig.HoldSkillAsToggle;
         isToggleEndArmed = false;
+        hasReportedHeld = false;
 
         if (skill.Data.SnapRotationOnStart && movement != null)
             movement.RotateImmediately(direction);

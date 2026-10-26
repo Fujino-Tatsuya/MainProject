@@ -494,6 +494,160 @@ public sealed class FirstMeleeGuardCounterModelTests
         Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
     }
 
+    // ── E 홀드(할 일 95) ──
+    // TickHold(animatorInGuardHold, now, max) — 서버 매 틱. 최대 유지 시간은 방어중에 처음 들어온 틱부터 잰다.
+
+    const float HoldMax = 3f;
+
+    [Test]
+    public void Hold_TapMode_NoHoldNotice_NeverReleases()
+    {
+        // 탭 방식은 누름/뗌 통보가 없다 — 방어중 길이는 애니메이터 전이(1.5초)가 정한다.
+        var model = Begun();
+        Assert.That(model.HoldMode, Is.False);
+        Assert.That(model.TickHold(true, 0f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.TickHold(true, 100f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.ReleaseRequested, Is.False);
+    }
+
+    [Test]
+    public void Hold_WhileHeld_KeepsGuarding()
+    {
+        var model = Begun();
+        model.OnHoldInput(held: true);
+        Assert.That(model.HoldMode, Is.True);
+        Assert.That(model.TickHold(true, 10f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.TickHold(true, 12.9f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
+        Assert.That(model.IsGuardWindowOpen, Is.True);
+    }
+
+    [Test]
+    public void Hold_ReleaseKey_DuringGuardHold_ReleasesOnce_PhaseUnchanged()
+    {
+        var model = Begun();
+        model.OnHoldInput(true);
+        model.TickHold(true, 10f, HoldMax);
+        model.OnHoldInput(false);
+
+        Assert.That(model.TickHold(true, 10.5f, HoldMax), Is.EqualTo(GuardHoldRelease.KeyReleased));
+        Assert.That(model.ReleaseRequested, Is.True);
+        // 단계·창은 그대로 — 해제 클립 Custom1·End 가 기존 경로로 닫고 끝낸다.
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
+        Assert.That(model.IsGuardWindowOpen, Is.True);
+        // 해제 CrossFade 중(Custom1 전)에는 다시 내지 않는다.
+        Assert.That(model.TickHold(true, 10.6f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+
+        model.OnGuardWindowClosed();
+        GuardEventResult end = model.OnEnd();
+        Assert.That(end.Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+        Assert.That(end.CounterHitDue, Is.False);
+    }
+
+    [Test]
+    public void Hold_MaxDuration_MeasuredFromGuardHoldEntry()
+    {
+        var model = BegunClosed();
+        model.OnHoldInput(true);
+        // 준비 중(애니메이터가 아직 방어중 아님)은 시간을 재지 않는다.
+        Assert.That(model.TickHold(false, 0f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        model.OnGuardWindowOpened();
+        Assert.That(model.TickHold(false, 0.25f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+
+        Assert.That(model.TickHold(true, 0.5f, HoldMax), Is.EqualTo(GuardHoldRelease.None)); // 방어중 진입 = 0.5
+        Assert.That(model.TickHold(true, 3.25f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.TickHold(true, 3.5f, HoldMax), Is.EqualTo(GuardHoldRelease.MaxDuration));
+        Assert.That(model.ReleaseRequested, Is.True);
+    }
+
+    [Test]
+    public void Hold_ReleasedDuringPrepare_ReleasesOnFirstGuardHoldTick()
+    {
+        // 준비 중에 이미 뗐다 — 방어중에 들어온 첫 틱에 해제(최소 한 프레임 방어중). 준비 중에는 해제하지 않는다.
+        var model = BegunClosed();
+        model.OnHoldInput(true);
+        model.OnHoldInput(false);
+        Assert.That(model.TickHold(false, 0.1f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        model.OnGuardWindowOpened();
+        Assert.That(model.TickHold(false, 0.2f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.IsGuardWindowOpen, Is.True); // 준비 중 Custom0 뒤 방어 창은 열려 있다
+
+        Assert.That(model.TickHold(true, 0.35f, HoldMax), Is.EqualTo(GuardHoldRelease.KeyReleased));
+    }
+
+    [Test]
+    public void Hold_FirstNoticeAlreadyReleased_CountsAsHoldMode()
+    {
+        // 원격 오너가 시작 RPC 를 받기 전에 뗐다 — 첫 통보가 false 여도 홀드 방식이고 방어중 첫 틱에 해제한다.
+        var model = BegunClosed();
+        model.OnHoldInput(false);
+        Assert.That(model.HoldMode, Is.True);
+        model.OnGuardWindowOpened();
+        Assert.That(model.TickHold(true, 0.35f, HoldMax), Is.EqualTo(GuardHoldRelease.KeyReleased));
+    }
+
+    [Test]
+    public void Hold_RePressAfterRelease_DoesNotResumeHold()
+    {
+        var model = BegunClosed();
+        model.OnHoldInput(true);
+        model.OnHoldInput(false);
+        model.OnHoldInput(true);
+        model.OnGuardWindowOpened();
+        Assert.That(model.TickHold(true, 0.35f, HoldMax), Is.EqualTo(GuardHoldRelease.KeyReleased));
+    }
+
+    [Test]
+    public void Hold_BlockWhileHeld_Counters_NoRelease()
+    {
+        var model = Begun();
+        model.OnHoldInput(true);
+        model.TickHold(true, 0f, HoldMax);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.BlockAndCounter));
+
+        model.OnHoldInput(false);
+        Assert.That(model.TickHold(true, 0.5f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.TickHold(true, 10f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
+    }
+
+    [Test]
+    public void Hold_AndRePress_ShareOneRelease()
+    {
+        // E 재입력 해제(할 일 94)와 홀드 해제는 같은 한 번짜리 요청이다 — 겹쳐도 CrossFade 는 한 번.
+        var model = Begun();
+        model.OnHoldInput(true);
+        Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
+        model.OnHoldInput(false);
+        Assert.That(model.TickHold(true, 1f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+    }
+
+    [Test]
+    public void Hold_ZeroMax_ReleasesOnFirstGuardHoldTick()
+    {
+        var model = Begun();
+        model.OnHoldInput(true);
+        Assert.That(model.TickHold(true, 5f, 0f), Is.EqualTo(GuardHoldRelease.MaxDuration));
+    }
+
+    [Test]
+    public void Hold_NoticeBeforeBeginOrAfterEnd_Ignored_ResetClears()
+    {
+        var idle = new FirstMeleeGuardCounterModel();
+        idle.OnHoldInput(true);
+        Assert.That(idle.HoldMode, Is.False);
+
+        var model = Begun();
+        model.OnHoldInput(true);
+        model.Reset();
+        Assert.That(model.HoldMode, Is.False);
+
+        model.Begin(Vector3.forward, GuardAngle);
+        model.OnGuardWindowOpened();
+        Assert.That(model.HoldMode, Is.False);
+        Assert.That(model.TickHold(true, 0f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+    }
+
     // ── 종료 후 ──
 
     [Test]

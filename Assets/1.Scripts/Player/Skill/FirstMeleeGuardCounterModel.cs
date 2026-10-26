@@ -59,6 +59,16 @@ public readonly struct GuardIncoming
     public bool IsUnblockable => !hasAttacker || forcedUnblockable || damage <= 0f;
 }
 
+/// <summary>홀드 방식 방어중을 이번 틱에 해제해야 하는 이유(<see cref="FirstMeleeGuardCounterModel.TickHold"/>). None = 유지.</summary>
+public enum GuardHoldRelease
+{
+    None,
+    /// <summary>E 를 뗐다(준비 중에 뗐으면 방어중에 들어온 첫 틱).</summary>
+    KeyReleased,
+    /// <summary>방어중 최대 유지 시간을 넘겼다.</summary>
+    MaxDuration,
+}
+
 /// <summary>애니메이션 이벤트 하나를 넣은 결과(<see cref="FirstMeleeGuardCounterModel.OnEnd"/>).</summary>
 public readonly struct GuardEventResult
 {
@@ -96,6 +106,9 @@ public readonly struct GuardEventResult
 ///       End 는 Releasing(해제 클립 End)·Countering(반격 클립 End) 에서만 끝낸다 — Guarding 에서 온 End 는 무시한다.</item>
 /// <item><b>E 재입력 해제</b>(할 일 94)는 방어중(Guarding + 서버 애니메이터 SubSkillGuardIdle)에서 한 번만 받는다
 ///       (<see cref="TryRequestRelease"/>). 해제 CrossFade 가 Custom1 에 닿기 전까지 창은 열려 있어 그 사이 방어 성공도 그대로 받는다.</item>
+/// <item><b>홀드 방식</b>(할 일 95)은 오너의 누름/뗌 통보(<see cref="OnHoldInput"/>)가 처음 온 시전에서만 켜진다. 방어중에 들어온 뒤
+///       뗐거나(준비 중에 뗐으면 방어중 첫 틱) 방어중 최대 유지 시간을 넘기면 해제를 한 번 낸다(<see cref="TickHold"/>).
+///       해제 요청은 E 재입력 해제와 같은 한 번짜리라 둘이 겹쳐도 CrossFade 는 한 번이다.</item>
 /// </list>
 /// </summary>
 public sealed class FirstMeleeGuardCounterModel
@@ -106,6 +119,10 @@ public sealed class FirstMeleeGuardCounterModel
     bool _blocked;
     bool _counterHitRaised;
     bool _releaseRequested;
+    bool _holdMode;
+    bool _holdKeyReleased;
+    bool _holdEntered;
+    float _holdEnteredAt;
 
     public FirstMeleeGuardPhase Phase { get; private set; } = FirstMeleeGuardPhase.Idle;
 
@@ -180,6 +197,54 @@ public sealed class FirstMeleeGuardCounterModel
 
     /// <summary>이번 시전에서 E 재입력 해제를 받았다(<see cref="TryRequestRelease"/>). Reset 전까지 유지된다.</summary>
     public bool ReleaseRequested => _releaseRequested;
+
+    /// <summary>이번 시전이 홀드 방식이다(오너 누름/뗌 통보를 받았다). Reset 전까지 유지된다.</summary>
+    public bool HoldMode => _holdMode;
+
+    /// <summary>
+    /// [홀드] 오너의 E 누름/뗌 통보(할 일 95). 첫 통보가 이 시전을 홀드 방식으로 만든다 — 탭 방식이면 통보가 오지 않는다.
+    /// 한 번 뗀 뒤 다시 눌러도 유지로 돌아가지 않는다. E 가 진행 중(Guarding·Releasing·Countering)일 때만 받는다.
+    /// </summary>
+    public void OnHoldInput(bool held)
+    {
+        if (Phase == FirstMeleeGuardPhase.Idle || Phase == FirstMeleeGuardPhase.Finished)
+            return;
+
+        _holdMode = true;
+        if (!held)
+            _holdKeyReleased = true;
+    }
+
+    /// <summary>
+    /// [홀드, 서버 매 틱] 방어중을 지금 해제해야 하는가. None 이 아니면 해제 요청을 받은 것이고(<see cref="ReleaseRequested"/>),
+    /// 호출측이 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다 — 단계는 바꾸지 않는다(창 닫힘·종료는 해제 클립 이벤트).
+    /// 홀드 방식이고 Guarding 이고 서버 애니메이터가 방어중(전이 중 아님)일 때만 본다. 최대 유지 시간은 방어중에 처음 들어온
+    /// 틱부터 잰다. 준비 중에 이미 뗐으면 방어중 첫 틱에 KeyReleased(최소 한 프레임 방어중).
+    /// </summary>
+    /// <param name="animatorInGuardHold">서버 애니메이터가 방어중 상태에 있고 다른 상태로 전이 중이 아니다.</param>
+    /// <param name="now">시각(초).</param>
+    /// <param name="maxHoldSeconds">방어중 최대 유지 시간(초). 0 이하면 방어중 첫 틱에 해제한다.</param>
+    public GuardHoldRelease TickHold(bool animatorInGuardHold, float now, float maxHoldSeconds)
+    {
+        if (!_holdMode || Phase != FirstMeleeGuardPhase.Guarding || _releaseRequested || !animatorInGuardHold)
+            return GuardHoldRelease.None;
+
+        if (!_holdEntered)
+        {
+            _holdEntered = true;
+            _holdEnteredAt = now;
+        }
+
+        GuardHoldRelease release = _holdKeyReleased
+            ? GuardHoldRelease.KeyReleased
+            : now - _holdEnteredAt >= maxHoldSeconds
+                ? GuardHoldRelease.MaxDuration
+                : GuardHoldRelease.None;
+
+        if (release != GuardHoldRelease.None)
+            _releaseRequested = true;
+        return release;
+    }
 
     /// <summary>
     /// 피격 하나를 판정한다. <see cref="GuardVerdict.BlockAndCounter"/> 면 Countering 으로 바뀐다.
@@ -266,6 +331,10 @@ public sealed class FirstMeleeGuardCounterModel
         _blocked = false;
         _counterHitRaised = false;
         _releaseRequested = false;
+        _holdMode = false;
+        _holdKeyReleased = false;
+        _holdEntered = false;
+        _holdEnteredAt = 0f;
         CounterFired = false;
     }
 }
