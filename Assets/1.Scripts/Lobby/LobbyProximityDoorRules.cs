@@ -37,6 +37,21 @@ public static class LobbyProximityDoorRules
     }
 
     /// <summary>
+    /// 이번 프레임에 쓸 진행도(할 일 99). 다음 자세(<paramref name="candidate"/>)의 문짝이 대상 플레이어 몸과 겹치면
+    /// 지금 진행도 그대로 멈춘다 — 문짝이 캡슐 위로 돌면 모터 스윕이 시작 겹침으로 전 방향을 막아 영구히 끼인다.
+    /// 여는 중·닫는 중·닫히다 다시 열리는 중 모두 같다. 비키면 다음 프레임부터 다시 움직인다.
+    /// </summary>
+    public static float ResolveProgress(float progress, float candidate, bool nextPoseBlocked) =>
+        nextPoseBlocked ? progress : candidate;
+
+    /// <summary>
+    /// 문 판정 대상인가 — 열림 판정과 문짝 겹침 판정이 같이 쓴다. 스폰된 <see cref="PlayerLifeState.Alive"/> 만.
+    /// 죽은 플레이어는 문을 열지도, 막지도 않는다.
+    /// </summary>
+    public static bool IsDoorTarget(bool isSpawned, PlayerLifeState state) =>
+        isSpawned && state == PlayerLifeState.Alive;
+
+    /// <summary>
     /// 이번에 열 방향(+1 = 문짝 로컬 +Z 쪽으로 넘어감 = 로컬 Y +각도, -1 = 반대).
     /// <paramref name="playerSide"/> = 닫힌 문 기준으로 연 플레이어가 로컬 +Z 쪽이면 양수 — 그 반대쪽으로 열어
     /// 다가온 플레이어를 문짝이 덮지 않는다. 문면 위(0)는 +Z 쪽으로 친다.
@@ -53,6 +68,27 @@ public static class LobbyProximityDoorRules
         var turn = Quaternion.Euler(0f, angle, 0f);
         rotation = closedRotation * turn;
         position = closedPosition + closedRotation * (pivot - turn * pivot);
+    }
+
+    /// <summary>
+    /// 문짝 상자(<paramref name="leafBox"/> — 문짝 회전 기준, 월드 단위)가 월드 자세 (<paramref name="leafPosition"/>,
+    /// <paramref name="leafRotation"/>)일 때 직립(Y 축) 몸 캡슐과 겹치는가(할 일 99). 문짝은 Y 축으로만 돈다고 보고
+    /// 문짝 기준 XZ 에서 원(반경) 대 사각형, Y 는 캡슐 높이 구간으로 본다. 닿기만 한 경계는 겹침이 아니다.
+    /// </summary>
+    public static bool LeafBoxOverlapsUprightCapsule(Bounds leafBox, Vector3 leafPosition, Quaternion leafRotation,
+        Vector3 capsuleCenter, float capsuleHeight, float capsuleRadius)
+    {
+        if (capsuleRadius <= 0f)
+            return false;
+
+        var local = Quaternion.Inverse(leafRotation) * (capsuleCenter - leafPosition);
+        var halfHeight = Mathf.Max(capsuleHeight * 0.5f, capsuleRadius);
+        if (local.y + halfHeight <= leafBox.min.y || local.y - halfHeight >= leafBox.max.y)
+            return false;
+
+        var dx = Mathf.Max(leafBox.min.x - local.x, 0f, local.x - leafBox.max.x);
+        var dz = Mathf.Max(leafBox.min.z - local.z, 0f, local.z - leafBox.max.z);
+        return dx * dx + dz * dz < capsuleRadius * capsuleRadius;
     }
 
     /// <summary>두 점 사이의 평면(XZ) 거리 제곱.</summary>

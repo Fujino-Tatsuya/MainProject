@@ -67,6 +67,7 @@ internal static class PlayerEditModeTestRunner
         "^NearestInteractableTests$", // 할 일 48 C10 — 로비 상호작용 대상(반경·사용 불가·동률 앞 인덱스·평면 거리)·서버 거리 재검증(반경+여유)·카운트다운 올림 초
         "^CameraOwnerFollowCandidateTests$", // 할 일 48 C12 — 캐릭터 교체 뒤 카메라 오너 후보: 디스폰 중인 옛 PlayerObject 건너뜀(IsSpawned 필터)
         "^LobbyProximityDoorRulesTests$", // 할 일 78 — 로비 근접 문: 열림<닫힘 반경 히스테리시스·여닫는 시간 따로·평면 거리
+        "^LobbyProximityDoorPenetrationTests$", // 할 일 99 — 로비 문짝 다음 자세 × 몸 캡슐 겹침(실제 Box·비볼록 MeshCollider → 문짝 상자, 돌아 있는 문)
         "^PlayerRejoinLifeRulesTests$", // 할 일 48 C14 R5c — 재합류 생명: 퇴장 기록(사망 연출 목적지·체력 비율)·복원 판정·복원 체력·전멸 덮어쓰기 값
     };
 
