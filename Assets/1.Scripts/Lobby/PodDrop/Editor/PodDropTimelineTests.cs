@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 포드 강하 순수 시간표(<see cref="PodDropLobbyTimeline"/>·<see cref="PodDropMapTimeline"/>, 할 일 100 C1) — 단계 경계·합계 길이·0 길이 단계·보간 끝값·해제 ≥ 레터박스 아웃.
-/// 기본 수치(로비): 레터박스 인 0.5, 보행 3·간격 0.4(3인), 해치 0, 강하 2·깊이 10, 페이드 0.6, 줌 1.8 → 1.15 / 6초. 합계 6.9초.
+/// 기본 수치(로비): 레터박스 인 0.5(같이 순간이동 암전 0.4, 한가운데 0.2 에 순간이동), 보행 3·간격 0.4(3인), 해치 0, 강하 2·깊이 10, 페이드 0.6, 줌 1.8 → 1.15 / 6초. 합계 6.9초.
 /// 기본 수치(맵): 대기 0.3, 낙하 0.6·높이 12, 여운 0.4, 디졸브 1, 레터박스 아웃 0.5, 줌 1.8 → 1 / 2.6초. 합계 2.8초.
 /// </summary>
 public sealed class PodDropTimelineTests
@@ -64,6 +64,78 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(t.LoadAt, sum, Eps);
         Assert.AreEqual(t.LoadAt, t.StartOf(PodDropLobbyPhase.Done), Eps);
         Assert.AreEqual(0f, t.DurationOf(PodDropLobbyPhase.Done), Eps);
+    }
+
+    // ─── 로비: 순간이동 암전 (C2b) ──────────────────────────────────────
+
+    [Test]
+    public void Lobby_Blackout_Default_InsideLetterboxIn()
+    {
+        PodDropLobbyTimeline t = Lobby();
+        Assert.AreEqual(0.4f, PodDropLobbyTimings.Default.teleportBlackoutSeconds, Eps, "기본 = 짧은 암전 0.4초");
+        Assert.AreEqual(0.2f, t.TeleportAt, Eps, "순간이동 = 암전 한가운데");
+        Assert.AreEqual(0.5f, t.WalkAt, Eps, "암전(0.4)이 레터박스 인(0.5) 안 → 보행 시작 그대로");
+        Assert.AreEqual(6.9f, t.LoadAt, Eps, "합계 그대로");
+        Assert.Less(t.TeleportAt, t.WalkStartAt(0), "순간이동이 첫 출발보다 먼저");
+    }
+
+    [Test]
+    public void Lobby_BlackoutAlpha_InHoldOut()
+    {
+        PodDropLobbyTimeline t = Lobby();
+        float third = 0.4f / 3f;
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(-0.1d), Eps, "시작 전 없음");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(0d), Eps);
+        Assert.AreEqual(0.5f, t.BlackoutAlphaAt(third * 0.5f), Eps, "검게 — 선형");
+        Assert.AreEqual(1f, t.BlackoutAlphaAt(third), Eps, "다 검어짐");
+        Assert.AreEqual(1f, t.BlackoutAlphaAt(t.TeleportAt), Eps, "순간이동 순간 = 완전 암전");
+        Assert.AreEqual(1f, t.BlackoutAlphaAt(third * 2f), Eps, "유지 끝");
+        Assert.AreEqual(0.5f, t.BlackoutAlphaAt(third * 2.5f), Eps, "밝게 — 선형");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(0.4d), Eps, "다 밝아짐");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(t.WalkAt), Eps, "걸을 땐 밝다");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(t.FadeOutAt + 0.3d), Eps, "끝 페이드와 무관");
+    }
+
+    [Test]
+    public void Lobby_ScreenFadeAlpha_MaxOfBlackoutAndFadeOut()
+    {
+        PodDropLobbyTimeline t = Lobby();
+        Assert.AreEqual(1f, t.ScreenFadeAlphaAt(t.TeleportAt), Eps, "앞 = 순간이동 암전");
+        Assert.AreEqual(0f, t.ScreenFadeAlphaAt(t.WalkAt + 1d), Eps, "보행 중 밝음");
+        Assert.AreEqual(0.5f, t.ScreenFadeAlphaAt(t.FadeOutAt + 0.3d), Eps, "뒤 = 끝 페이드");
+        Assert.AreEqual(1f, t.ScreenFadeAlphaAt(t.LoadAt), Eps);
+    }
+
+    [Test]
+    public void Lobby_BlackoutLongerThanLetterbox_WalkWaitsForLight()
+    {
+        PodDropLobbyTimeline zero = Lobby();
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.teleportBlackoutSeconds = 1.2f;
+        var t = new PodDropLobbyTimeline(s, Walkers);
+
+        Assert.AreEqual(0.6f, t.TeleportAt, Eps);
+        Assert.AreEqual(1.2f, t.WalkAt, Eps, "보행 시작 = 암전 끝(레터박스 0.5 보다 늦음)");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(t.WalkAt), Eps);
+        Assert.AreEqual(zero.LoadAt + 0.7f, t.LoadAt, Eps, "뒤 경계는 늘어난 만큼(1.2 − 0.5) 밀린다");
+        Assert.AreEqual(PodDropLobbyPhase.LetterboxIn, t.PhaseAt(1.1d), "암전 중은 아직 레터박스 인 단계");
+        Assert.AreEqual(PodDropLobbyPhase.Walk, t.PhaseAt(t.WalkAt));
+    }
+
+    [Test]
+    public void Lobby_BlackoutZero_TeleportAtStartNoBlack()
+    {
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.teleportBlackoutSeconds = 0f;
+        var t = new PodDropLobbyTimeline(s, Walkers);
+
+        Assert.AreEqual(0f, t.TeleportAt, Eps, "암전 없음 → t=0 에 순간이동");
+        Assert.AreEqual(0.5f, t.WalkAt, Eps, "보행은 레터박스 끝");
+        for (double e = -0.5d; e <= t.FadeOutAt - 0.01d; e += 0.01d)
+            Assert.AreEqual(0f, t.BlackoutAlphaAt(e), Eps, $"t={e:F2} 암전이 없어야 한다");
+
+        s.teleportBlackoutSeconds = -1f;
+        Assert.AreEqual(0f, new PodDropLobbyTimeline(s, Walkers).TeleportBlackoutSeconds, Eps, "음수 → 0");
     }
 
     // ─── 로비: 해치 (D13 — 길이 0 이면 건너뜀) ────────────────────────────

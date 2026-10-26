@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 로비 포드 탑승 연출(<see cref="LobbyPodLaunch"/>, 할 일 100 C2)의 순수 규칙 — 참가 명단 순서·좌석·폴백 판단·보행 경로 나누기.
+/// 로비 포드 탑승 연출(<see cref="LobbyPodLaunch"/>, 할 일 100 C2)의 순수 규칙 — 참가 명단 순서·좌석·걷기 시작 지점·폴백 판단·보행 경로 나누기.
 /// 네트워크·씬을 모른다. 서버와 모든 피어가 같은 복제 명단으로 같은 답을 얻는다.
 /// </summary>
 public static class PodLaunchRules
@@ -10,17 +10,20 @@ public static class PodLaunchRules
     /// <summary>참가자 순서(= 보행 슬롯 순서) — clientId 오름차순. 슬롯 배정이 결정적이어야 재현·디버깅이 된다(엘리베이터 89 와 같다).</summary>
     public static void OrderParticipants(List<ulong> clientIds) => clientIds.Sort();
 
-    /// <summary>슬롯의 좌석 — 좌석보다 사람이 많으면 돌려 쓴다(숨김 지점이라 겹쳐도 된다). 좌석이 없으면 −1.</summary>
-    public static int SeatIndex(int slot, int seatCount) => seatCount > 0 ? Mathf.Max(0, slot) % seatCount : -1;
+    /// <summary>
+    /// 슬롯의 지점(좌석·걷기 시작 지점) — 지점보다 사람이 많으면 돌려 쓴다(좌석은 숨김 지점, 걷기 시작 지점은 출발 간격이 있어 겹쳐도 된다). 지점이 없으면 −1.
+    /// </summary>
+    public static int PointIndex(int slot, int pointCount) => pointCount > 0 ? Mathf.Max(0, slot) % pointCount : -1;
 
     /// <summary>
     /// 연출을 못 하는 이유(없으면 null) — 있으면 호출자는 연출 없이 곧바로 맵 로딩으로 넘어간다(지금까지와 같은 폴백).
-    /// 카메라 지점·포드·웨이포인트는 없어도 연출은 돈다(그 부분만 빠진다).
+    /// 카메라 지점·포드·웨이포인트는 없어도 연출은 돈다(그 부분만 빠진다). 걷기 시작 지점은 보행 출발점이라 없으면 못 한다.
     /// </summary>
-    public static string MissingSetup(bool hasSettings, int seatCount, int participantCount)
+    public static string MissingSetup(bool hasSettings, int seatCount, int walkStartCount, int participantCount)
     {
         if (!hasSettings) return "PodDropSettings 가 비었다";
         if (seatCount <= 0) return "포드 안 좌석(Seat) 지점이 없다";
+        if (walkStartCount <= 0) return "걷기 시작 지점(WalkStart)이 없다";
         if (participantCount <= 0) return "참가자가 없다";
         return null;
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 
 /// <summary>
@@ -13,9 +14,10 @@ using UnityEngine;
 /// <item>서버: 시작 순간 참가자 연출 잠금(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단),
 /// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), <see cref="PodDropLobbyTimeline.LoadAt"/> 에 콜백.
 /// 연출 중 끊긴 사람은 건너뛰고 계속한다(명단은 그대로 둔다 — 인원이 바뀌면 시간표가 바뀐다). 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
-/// <item>오너: 자기 슬롯 보행 구간 동안 지금 자리 → 공통 웨이포인트(계단 아래 … 입구)를 평소 걷기 변위(Walk 애니)로 걷고,
-/// 문턱 → 좌석은 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
-/// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(<see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
+/// <item>오너: 시작 직후 짧은 암전이 가장 깊을 때(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
+/// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 공통 웨이포인트(계단 아래 … 입구)를
+/// 평소 걷기 변위(Walk 애니)로 걷고, 문턱 → 좌석은 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
+/// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(순간이동 암전 + 끝 페이드, <see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
 /// 포드 하강(런타임 transform 만), 연출 동안 포드 콜라이더 끔.</item>
 /// </list>
 /// 수치는 <see cref="PodDropSettings"/>, 위치는 씬 Transform(LobbyTraining/PodLaunch) 이 원본이다.
@@ -32,7 +34,10 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
     [Tooltip("연출 동안 카메라가 따라가는 지점(포드 쪽). 비우면 카메라는 플레이어를 따라간 채 줌만 한다.")]
     [SerializeField] private Transform cameraFocus;
 
-    [Tooltip("충돌을 켠 채 걷는 공통 경로 — 계단 아래 → 계단 위 → … → 입구(다리 위 문 앞). 첫 지점은 각자 지금 위치라 집결 구역이 옮겨져도 된다.")]
+    [Tooltip("걷기 시작 지점 — 슬롯 순서(P1, P2, P3). 시작 암전 한가운데 각자 여기로 순간이동한 뒤 걷는다. 사람이 더 많으면 돌려 쓴다. 비우면 연출 없이 곧바로 맵 로딩.")]
+    [SerializeField] private Transform[] walkStarts = Array.Empty<Transform>();
+
+    [Tooltip("충돌을 켠 채 걷는 공통 경로 — 계단 아래 → 계단 위 → … → 입구(다리 위 문 앞). 걷기 시작 지점에서 첫 지점으로 걸어간다.")]
     [SerializeField] private Transform[] walkWaypoints = Array.Empty<Transform>();
 
     [Tooltip("충돌 없이 보간하는 구간 — 문턱부터(포드 실내 높이 1.42m 라 캡슐이 막힌다). 마지막에 자기 좌석이 붙는다.")]
@@ -79,6 +84,9 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
     {
         public bool Active;
         public double Start;          // 어느 연출의 보행인가 — 시작 시각이 바뀌면 버린다
+        public Vector3 WalkStart;     // 걷기 시작 지점(순간이동 목적지)
+        public double TeleportAt;     // 서버시간 — 암전이 가장 깊을 때
+        public bool Teleported;
         public bool Started;
         public Vector3[] Ground;      // 충돌을 켠 채 걷는 경유 지점(수평만 쓴다 — 높이는 지면)
         public int GroundIndex;
@@ -134,7 +142,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         }
 
         List<ulong> participants = CollectParticipants();
-        string missing = PodLaunchRules.MissingSetup(settings != null, CountAssigned(seats), participants.Count);
+        string missing = PodLaunchRules.MissingSetup(settings != null, CountAssigned(seats), CountAssigned(walkStarts), participants.Count);
         if (missing != null)
         {
             Debug.LogWarning($"{Tag} {missing} — 포드 연출 없이 곧바로 맵 로딩.", this);
@@ -153,7 +161,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         LockParticipants(participants);
 
         Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
-                  $"보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}·{timeline.WalkSeconds:0.##}s), 강하 +{timeline.DescendAt:0.##}s, " +
+                  $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.TeleportBlackoutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}·{timeline.WalkSeconds:0.##}s), 강하 +{timeline.DescendAt:0.##}s, " +
                   $"페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
 
         _sequence = StartCoroutine(Sequence(participants, timeline, start, onDone));
@@ -201,6 +209,9 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             PlayerEncounterLock encounterLock = FindLock(clientId);
             if (encounterLock == null || !encounterLock.BeginCinematicServer())
                 continue;
+
+            // 🔴 걸려 있던 낙하 복구(안전지점으로 되돌리는 지연 코루틴)를 끊는다 — 안 끊으면 걷기 시작 지점으로 옮긴 뒤 옛 안전지점으로 끌려간다(엘리베이터와 같다).
+            encounterLock.GetComponent<PlayerFallRecovery>()?.CancelRecoveryServer();
 
             _lockedClientIds.Add(clientId);
         }
@@ -277,7 +288,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         // 레터박스는 완전 암전(LoadAt) 뒤 0 — 검은 화면 아래에서 걷힌다. UI 는 암전 전까지 새로 뜬 것도 끄고, 그 뒤엔 끈 것만 유지(로딩 씬 캔버스는 건드리지 않는다).
-        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * letterboxHeight, _timeline.FadeAlphaAt(elapsed), elapsed < _timeline.LoadAt);
+        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * letterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed), elapsed < _timeline.LoadAt);
     }
 
     private void UpdatePod(double elapsed)
@@ -371,14 +382,17 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             if (slot < 0)
                 return; // 참가자가 아니다
 
-            Transform seat = seats.Length > 0 ? seats[PodLaunchRules.SeatIndex(slot, seats.Length)] : null;
-            if (seat == null)
+            Transform seat = seats.Length > 0 ? seats[PodLaunchRules.PointIndex(slot, seats.Length)] : null;
+            Vector3[] starts = Positions(walkStarts, null);
+            if (seat == null || starts.Length == 0)
                 return;
 
             _walk = new OwnerWalk
             {
                 Active = true,
                 Start = start,
+                WalkStart = starts[PodLaunchRules.PointIndex(slot, starts.Length)],
+                TeleportAt = start + _timeline.TeleportAt,
                 Ground = Positions(walkWaypoints, null),
                 Interior = Positions(interiorWaypoints, seat),
                 WalkStartAt = start + _timeline.WalkStartAt(slot),
@@ -387,6 +401,18 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         }
 
         double now = ServerNow;
+        if (now < _walk.TeleportAt)
+            return;
+
+        if (!_walk.Teleported)
+        {
+            _walk.Teleported = true;
+            // 한 줄로 걷는 참가자끼리 밀어내기로 튀지 않게(걷기 시작 지점을 돌려 쓰면 겹쳐 선다) — 순간이동부터 보행·붙잡기 동안만. 벽·계단엔 그대로 막힌다.
+            motor.PassThroughUnitsOverride = true;
+            Vector3 firstTarget = _walk.Ground.Length > 0 ? _walk.Ground[0] : _walk.Interior[0];
+            TeleportOwner(po, motor, _walk.WalkStart, firstTarget - _walk.WalkStart);
+        }
+
         double walkStartAt = _walk.WalkStartAt;
         if (now < walkStartAt)
             return;
@@ -396,13 +422,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         if (!_walk.Started)
         {
             _walk.Started = true;
-            if (po.TryGetComponent(out PlayerStateController stateController) && stateController.CurrentState == PlayerActionState.Dash)
-                stateController.EndDash();
-            motor.ClearKnockbackVelocity();
-            // 한 줄로 걷는 참가자끼리 밀어내기로 튀지 않게 — 보행·붙잡기 동안만. 벽·계단엔 그대로 막힌다.
-            motor.PassThroughUnitsOverride = true;
 
-            // 걷는 속도가 일정하게 — 지금 자리에서 잰 길이 비율로 보행 시간을 앞(충돌)·뒤(보간) 구간에 나눈다.
+            // 걷는 속도가 일정하게 — 걷기 시작 지점에서 잰 길이 비율로 보행 시간을 앞(충돌)·뒤(보간) 구간에 나눈다.
             Vector3 groundEnd = _walk.Ground.Length > 0 ? _walk.Ground[_walk.Ground.Length - 1] : position;
             float share = PodLaunchRules.GroundShare(
                 BossElevatorTimeline.PathLength(position, _walk.Ground),
@@ -452,10 +473,10 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         motor.SetPoseTarget(_walk.Interior[_walk.Interior.Length - 1], po.transform.rotation);
     }
 
-    /// <summary>오너 보행을 멈춘다(걷는 중이었으면 Walk 애니·유닛 통과도 끈다). 멱등.</summary>
+    /// <summary>오너 보행을 멈춘다(순간이동한 뒤였으면 Walk 애니·유닛 통과도 끈다). 멱등.</summary>
     private void StopOwnerWalk()
     {
-        if (_walk.Active && _walk.Started)
+        if (_walk.Active && _walk.Teleported)
         {
             NetworkManager nm = NetworkManager.Singleton;
             NetworkObject po = nm != null ? nm.LocalClient?.PlayerObject : null;
@@ -467,6 +488,21 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
         }
 
         _walk = default;
+    }
+
+    // 보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서 — 대시 상태 종료 → 넉백 제거 → Motor 순간이동(다음 시뮬레이션 기준점까지)
+    // → Armature 방향 → 오너 NetworkTransform 순간이동(다른 피어가 보간으로 미끄러지지 않게). 이유는 그쪽 주석 참고.
+    private static void TeleportOwner(NetworkObject po, PlayerMotor motor, Vector3 destination, Vector3 facing)
+    {
+        if (po.TryGetComponent(out PlayerStateController stateController))
+            stateController.EndDash();
+
+        motor.ClearKnockbackVelocity();
+        motor.TeleportAuthoritative(destination);
+        Face(po, facing);
+
+        if (po.TryGetComponent(out NetworkTransform netTransform))
+            netTransform.Teleport(destination, po.transform.rotation, po.transform.localScale);
     }
 
     private static void Face(NetworkObject po, Vector3 direction)

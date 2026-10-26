@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PodDropSettings
   lobby:
     letterboxInSeconds: 0.5
+    teleportBlackoutSeconds: 0.4
     cameraStartDistance: 1.8
     cameraEndDistance: 1.15
     cameraZoomSeconds: 6

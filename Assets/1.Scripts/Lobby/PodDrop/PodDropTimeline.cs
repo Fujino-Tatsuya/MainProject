@@ -8,8 +8,8 @@ using UnityEngine;
 /// </summary>
 public enum PodDropLobbyPhase
 {
-    LetterboxIn,    // t=0 — 서버가 입력 잠금. 위·아래 레터박스가 들어오고 UI 가 같이 숨는다. 카메라는 멀리서 줌인 시작
-    Walk,           // 탑승 시작점 → 계단 → 포드 안까지 웨이포인트 자동 보행(슬롯 순서대로 간격을 두고 출발)
+    LetterboxIn,    // t=0 — 서버가 입력 잠금. 위·아래 레터박스가 들어오고 UI 가 같이 숨는다. 카메라는 멀리서 줌인 시작. 같이 짧은 암전 — 가장 깊을 때 각자 걷기 시작 지점으로 순간이동
+    Walk,           // 걷기 시작 지점 → 계단 → 포드 안까지 웨이포인트 자동 보행(슬롯 순서대로 간격을 두고 출발). 레터박스·암전이 둘 다 끝난 뒤
     HatchClose,     // 해치 닫힘(선택 — 길이 0 이면 건너뛴다, 기본 0)
     Descend,        // 포드가 갱도 아래로 내려간다
     FadeOut,        // 화면이 검게 페이드 아웃
@@ -37,8 +37,10 @@ public enum PodDropMapPhase
 public struct PodDropLobbyTimings
 {
     [Header("레터박스 · 카메라")]
-    [Tooltip("t=0(출격 확정) → 위·아래 레터박스가 다 들어옴(초). UI 는 레터박스와 같이 숨는다. 끝나는 순간 첫 사람이 걷기 시작")]
+    [Tooltip("t=0(출격 확정) → 위·아래 레터박스가 다 들어옴(초). UI 는 레터박스와 같이 숨는다. 이것과 암전이 둘 다 끝나는 순간 첫 사람이 걷기 시작")]
     [Min(0f)] public float letterboxInSeconds;
+    [Tooltip("t=0 부터 짧은 암전 전체 길이(초) — 1/3 검게, 1/3 유지, 1/3 밝게. 한가운데(가장 깊을 때) 각자 걷기 시작 지점(WalkStart)으로 순간이동. 0 = 암전 없이 t=0 에 순간이동")]
+    [Min(0f)] public float teleportBlackoutSeconds;
     [Tooltip("줌 시작(t=0) 카메라 거리 — 평소 거리 배율(1 = 평소). 클수록 멀리서 시작")]
     [Min(0.1f)] public float cameraStartDistance;
     [Tooltip("줌 끝 카메라 거리 — 평소 거리 배율(1 = 평소)")]
@@ -48,8 +50,8 @@ public struct PodDropLobbyTimings
     [Tooltip("줌 이징(진행도 → 시작→끝 거리 비율)")]
     public Ease cameraZoomEase;
 
-    [Header("보행 (탑승 시작점 → 포드 안)")]
-    [Tooltip("한 사람이 탑승 시작점에서 포드 안 지점까지 걷는 시간(초) — 전원 같은 시간. 걷는 속도 = 경로 길이 ÷ 이 값(경로 약 7~9m)")]
+    [Header("보행 (걷기 시작 지점 → 포드 안)")]
+    [Tooltip("한 사람이 걷기 시작 지점에서 포드 안 지점까지 걷는 시간(초) — 전원 같은 시간. 걷는 속도 = 경로 길이 ÷ 이 값(경로 약 7~9m)")]
     [Min(0f)] public float walkSeconds;
     [Tooltip("앞사람이 걷기 시작한 순간 → 다음 사람이 걷기 시작(초). 탑승 다리 폭이 0.8m 라 한 줄로 들어간다")]
     [Min(0f)] public float walkInterval;
@@ -71,6 +73,7 @@ public struct PodDropLobbyTimings
     public static PodDropLobbyTimings Default => new PodDropLobbyTimings
     {
         letterboxInSeconds = 0.5f,
+        teleportBlackoutSeconds = 0.4f,
         cameraStartDistance = 1.8f,
         cameraEndDistance = 1.15f,
         cameraZoomSeconds = 6f,
@@ -167,6 +170,8 @@ public struct PodDropMapTimings
 public sealed class PodDropLobbyTimeline
 {
     public float LetterboxInSeconds { get; }
+    /// <summary>순간이동 암전 전체 길이(초, t=0 시작) — 검게 · 유지 · 밝게가 1/3 씩.</summary>
+    public float TeleportBlackoutSeconds { get; }
     public float CameraStartDistance { get; }
     public float CameraEndDistance { get; }
     public float CameraZoomSeconds { get; }
@@ -184,7 +189,9 @@ public sealed class PodDropLobbyTimeline
     /// <summary>다음 사람이 걷기 시작하는 간격(초).</summary>
     public float WalkInterval { get; }
 
-    /// <summary>레터박스가 다 들어온 시각 = 보행 단계 시작(첫 사람 출발).</summary>
+    /// <summary>암전이 가장 깊은 시각(암전 한가운데) — 각 오너가 자기 걷기 시작 지점으로 순간이동한다. 암전 길이 0 이면 0.</summary>
+    public float TeleportAt => TeleportBlackoutSeconds * 0.5f;
+    /// <summary>레터박스가 다 들어오고 암전도 다 걷힌 시각 = 보행 단계 시작(첫 사람 출발).</summary>
     public float WalkAt { get; }
     /// <summary>마지막 사람이 포드 안에 도착한 시각 = 해치 닫힘 시작.</summary>
     public float HatchCloseAt { get; }
@@ -196,6 +203,7 @@ public sealed class PodDropLobbyTimeline
     public PodDropLobbyTimeline(PodDropLobbyTimings timings, int walkerCount)
     {
         LetterboxInSeconds = Mathf.Max(0f, timings.letterboxInSeconds);
+        TeleportBlackoutSeconds = Mathf.Max(0f, timings.teleportBlackoutSeconds);
         CameraStartDistance = timings.cameraStartDistance;
         CameraEndDistance = timings.cameraEndDistance;
         CameraZoomSeconds = Mathf.Max(0f, timings.cameraZoomSeconds);
@@ -210,7 +218,8 @@ public sealed class PodDropLobbyTimeline
         WalkSeconds = Mathf.Max(0f, timings.walkSeconds);
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
 
-        WalkAt = LetterboxInSeconds;
+        // 암전이 레터박스보다 길면 밝아진 뒤에 걷는다 — 걷는 모습이 검은 화면에 묻히지 않게.
+        WalkAt = Mathf.Max(LetterboxInSeconds, TeleportBlackoutSeconds);
         // 아무도 안 걸으면 보행 시간 없이 바로 해치 닫힘.
         HatchCloseAt = WalkerCount > 0 ? WalkEndAt(WalkerCount - 1) : WalkAt;
         DescendAt = HatchCloseAt + HatchCloseSeconds;
@@ -224,7 +233,7 @@ public sealed class PodDropLobbyTimeline
     /// <summary>슬롯이 포드 안 지점에 도착하는 경과 시각(초) — 이 순간 숨긴다.</summary>
     public float WalkEndAt(int slot) => WalkStartAt(slot) + WalkSeconds;
 
-    /// <summary>슬롯의 보행 진행률(0 = 탑승 시작점, 1 = 포드 안). 선형 — 걷는 속도가 일정하다.</summary>
+    /// <summary>슬롯의 보행 진행률(0 = 걷기 시작 지점, 1 = 포드 안). 선형 — 걷는 속도가 일정하다.</summary>
     public float WalkProgressAt(int slot, double elapsed) => PodDropTimeline.Progress(elapsed, WalkStartAt(slot), WalkSeconds);
 
     /// <summary>단계가 시작되는 경과 시각(초).</summary>
@@ -287,6 +296,20 @@ public sealed class PodDropLobbyTimeline
 
     /// <summary>검은 화면 알파(0 = 투명, 1 = 완전 암전). 페이드 구간은 선형, <see cref="LoadAt"/> 부터 1.</summary>
     public float FadeAlphaAt(double elapsed) => PodDropTimeline.Progress(elapsed, FadeOutAt, FadeOutSeconds);
+
+    /// <summary>
+    /// 순간이동 암전 알파 — t=0 부터 1/3 동안 0 → 1, 1/3 동안 1 유지(<see cref="TeleportAt"/> 가 이 안), 1/3 동안 1 → 0, 그 뒤 0. 길이 0 이면 늘 0.
+    /// </summary>
+    public float BlackoutAlphaAt(double elapsed)
+    {
+        float third = TeleportBlackoutSeconds / 3f;
+        float fadeIn = PodDropTimeline.Progress(elapsed, 0f, third);
+        float fadeOut = 1f - PodDropTimeline.Progress(elapsed, third * 2f, third);
+        return Mathf.Min(fadeIn, fadeOut);
+    }
+
+    /// <summary>화면에 그릴 검은 알파 — 순간이동 암전과 끝 페이드 중 큰 값.</summary>
+    public float ScreenFadeAlphaAt(double elapsed) => Mathf.Max(BlackoutAlphaAt(elapsed), FadeAlphaAt(elapsed));
 }
 
 /// <summary>

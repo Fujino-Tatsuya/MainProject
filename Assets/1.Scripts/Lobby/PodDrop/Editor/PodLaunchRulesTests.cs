@@ -20,12 +20,15 @@ public sealed class PodLaunchRulesTests
     }
 
     [Test]
-    public void SeatIndex_WrapsWhenMorePlayersThanSeats()
+    public void PointIndex_WrapsWhenMorePlayersThanPoints()
     {
-        Assert.AreEqual(0, PodLaunchRules.SeatIndex(0, 3));
-        Assert.AreEqual(2, PodLaunchRules.SeatIndex(2, 3));
-        Assert.AreEqual(0, PodLaunchRules.SeatIndex(3, 3), "4번째 사람은 첫 좌석을 같이 쓴다(숨김 지점)");
-        Assert.AreEqual(-1, PodLaunchRules.SeatIndex(0, 0), "좌석 없음");
+        Assert.AreEqual(0, PodLaunchRules.PointIndex(0, 3));
+        Assert.AreEqual(2, PodLaunchRules.PointIndex(2, 3));
+        Assert.AreEqual(0, PodLaunchRules.PointIndex(3, 3), "4번째 사람은 첫 지점을 같이 쓴다(좌석 = 숨김 지점, 걷기 시작 = 출발 간격)");
+        Assert.AreEqual(1, PodLaunchRules.PointIndex(3, 2), "걷기 시작 지점 2개에 4번째 = 둘째");
+        Assert.AreEqual(0, PodLaunchRules.PointIndex(2, 1), "지점 1개 = 전원 같은 지점");
+        Assert.AreEqual(0, PodLaunchRules.PointIndex(-1, 3), "음수 슬롯 = 첫 지점");
+        Assert.AreEqual(-1, PodLaunchRules.PointIndex(0, 0), "지점 없음");
     }
 
     // ─── 폴백 ───────────────────────────────────────────────────────────
@@ -33,15 +36,17 @@ public sealed class PodLaunchRulesTests
     [Test]
     public void MissingSetup_NullWhenReady()
     {
-        Assert.IsNull(PodLaunchRules.MissingSetup(hasSettings: true, seatCount: 3, participantCount: 1));
+        Assert.IsNull(PodLaunchRules.MissingSetup(hasSettings: true, seatCount: 3, walkStartCount: 3, participantCount: 1));
+        Assert.IsNull(PodLaunchRules.MissingSetup(true, 3, 1, 3), "걷기 시작 지점이 사람보다 적어도 돌려 쓴다");
     }
 
     [Test]
-    public void MissingSetup_FallsBackWithoutSettingsSeatsOrPlayers()
+    public void MissingSetup_FallsBackWithoutSettingsSeatsWalkStartsOrPlayers()
     {
-        Assert.IsNotNull(PodLaunchRules.MissingSetup(false, 3, 2), "설정 없음 → 곧바로 로딩");
-        Assert.IsNotNull(PodLaunchRules.MissingSetup(true, 0, 2), "좌석 없음 → 곧바로 로딩");
-        Assert.IsNotNull(PodLaunchRules.MissingSetup(true, 3, 0), "참가자 없음 → 곧바로 로딩");
+        Assert.IsNotNull(PodLaunchRules.MissingSetup(false, 3, 3, 2), "설정 없음 → 곧바로 로딩");
+        Assert.IsNotNull(PodLaunchRules.MissingSetup(true, 0, 3, 2), "좌석 없음 → 곧바로 로딩");
+        Assert.IsNotNull(PodLaunchRules.MissingSetup(true, 3, 0, 2), "걷기 시작 지점 없음 → 곧바로 로딩(지금 자리 출발 폴백 없음)");
+        Assert.IsNotNull(PodLaunchRules.MissingSetup(true, 3, 3, 0), "참가자 없음 → 곧바로 로딩");
     }
 
     // ─── 보행 시간 나누기 ────────────────────────────────────────────────
