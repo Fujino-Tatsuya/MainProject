@@ -1,4 +1,5 @@
 using Unity.Netcode;
+using UnityEngine;
 
 /// <summary>서버가 전 피어에 알리는 슬로우 모션 이벤트 종류.</summary>
 public enum SlowMotionEventKind : byte
@@ -25,9 +26,9 @@ public enum SlowMotionPurpose : byte
 /// </summary>
 public struct SlowMotionEvent
 {
-    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 7×4.</summary>
+    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 7×4 + 대상 위치 3×4.</summary>
     public const int SerializedSize =
-        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 7;
+        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 7 + sizeof(float) * 3;
 
     public SlowMotionEventKind Kind;
     /// <summary>슬로우 목적. Start 에서만 의미가 있고 Fail·Reset 은 <see cref="SlowMotionPurpose.Attempt"/> 고정.</summary>
@@ -47,8 +48,15 @@ public struct SlowMotionEvent
     public float HitStopDuration;
     public float HitStopScale;
 
+    /// <summary>
+    /// 연출 기준 월드 위치(할 일 87 C5) — 간파 성공이면 카운터 창을 소비한 첫 대상, 못 찾으면 시전자.
+    /// Start 에서만 의미가 있고 Fail·Reset 은 0.
+    /// </summary>
+    public Vector3 TargetPosition;
+
     public static SlowMotionEvent CreateStart(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
-                                              SlowMotionPurpose purpose = SlowMotionPurpose.Attempt) =>
+                                              SlowMotionPurpose purpose = SlowMotionPurpose.Attempt,
+                                              Vector3 targetPosition = default) =>
         new SlowMotionEvent
         {
             Kind = SlowMotionEventKind.Start,
@@ -56,6 +64,7 @@ public struct SlowMotionEvent
             TriggerId = triggerId,
             Time = time,
             TriggerClientId = triggerClientId,
+            TargetPosition = targetPosition,
             Scale = profile.scale,
             EnterDuration = profile.enterDuration,
             HoldDuration = profile.holdDuration,
@@ -98,6 +107,9 @@ public struct SlowMotionEvent
         writer.WriteValueSafe(FailExitDuration);
         writer.WriteValueSafe(HitStopDuration);
         writer.WriteValueSafe(HitStopScale);
+        writer.WriteValueSafe(TargetPosition.x);
+        writer.WriteValueSafe(TargetPosition.y);
+        writer.WriteValueSafe(TargetPosition.z);
     }
 
     public static SlowMotionEvent Read(FastBufferReader reader)
@@ -114,6 +126,9 @@ public struct SlowMotionEvent
         reader.ReadValueSafe(out float failExit);
         reader.ReadValueSafe(out float hitStop);
         reader.ReadValueSafe(out float hitStopScale);
+        reader.ReadValueSafe(out float targetX);
+        reader.ReadValueSafe(out float targetY);
+        reader.ReadValueSafe(out float targetZ);
 
         return new SlowMotionEvent
         {
@@ -122,6 +137,7 @@ public struct SlowMotionEvent
             TriggerId = triggerId,
             Time = time,
             TriggerClientId = triggerClientId,
+            TargetPosition = new Vector3(targetX, targetY, targetZ),
             Scale = scale,
             EnterDuration = enter,
             HoldDuration = hold,

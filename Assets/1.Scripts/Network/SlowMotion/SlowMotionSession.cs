@@ -1,3 +1,5 @@
+using UnityEngine;
+
 /// <summary><see cref="SlowMotionSession.Apply"/> 결과. 로컬 이벤트(Started/Failed/Reset)는 앞의 셋에서만 쏜다.</summary>
 public enum SlowMotionApplyResult
 {
@@ -45,6 +47,9 @@ public sealed class SlowMotionSession
     /// <summary>마지막으로 시작된 슬로우의 프로필 유지 배율(정리된 값). 아직 없으면 1. 끝난 뒤에도 값은 남는다.</summary>
     public float CurrentProfileScale { get; private set; } = 1f;
 
+    /// <summary>마지막으로 시작된 슬로우의 연출 기준 월드 위치(<see cref="SlowMotionEvent.TargetPosition"/>). 아직 없으면 0. 끝난 뒤에도 값은 남는다.</summary>
+    public Vector3 CurrentTargetPosition { get; private set; }
+
     public SlowMotionApplyResult Apply(in SlowMotionEvent e)
     {
         if (double.IsNaN(e.Time) || e.Time < _lastEventTime)
@@ -60,6 +65,7 @@ public sealed class SlowMotionSession
                 Accept(e);
                 CurrentTriggerClientId = e.TriggerClientId;
                 CurrentPurpose = e.Purpose;
+                CurrentTargetPosition = e.TargetPosition;
                 var profile = e.ToProfile();
                 CurrentProfileScale = profile.ClampedScale;
                 _timeline.Start(e.Time, profile);
@@ -101,6 +107,7 @@ public sealed class SlowMotionSession
         CurrentTriggerClientId = 0;
         CurrentPurpose = SlowMotionPurpose.Attempt;
         CurrentProfileScale = 1f;
+        CurrentTargetPosition = Vector3.zero;
     }
 
     public float ScaleAt(double t) => _timeline.ScaleAt(t);

@@ -9,7 +9,8 @@ using UnityEngine;
 /// <item>발동자 본인 화면은 <see cref="selfIntensity"/>, 다른 사람 화면은 <see cref="othersIntensity"/>.</item>
 /// <item>곡선은 실시간(unscaled) — 슬로우 배율과 무관하게 같은 길이로 보인다.</item>
 /// <item>강제 리셋·세션 종료·비활성화면 즉시 0.</item>
-/// <item>원형 중심은 매 프레임 발동자 플레이어 위치를 메인 카메라 뷰포트로 바꾼다. 못 찾거나 카메라 뒤면 원형 끔.</item>
+/// <item>원형 중심 = <see cref="revealCenter"/>(기본 Target = 신호의 대상 위치, Caster = 발동자 추적, Midpoint = 중간).
+///       매 프레임 메인 카메라 뷰포트로 바꾼다. 못 찾거나 카메라 뒤면 원형 끔.</item>
 /// </list>
 /// </summary>
 [RequireComponent(typeof(GlobalTimeScale))]
@@ -32,7 +33,9 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
     [SerializeField, Min(0f)] private float thresholdSoftness = 0.3f;
     [Tooltip("강도 1 에서 어두운 픽셀을 낮추는 최대 비율 [0, 1]")]
     [SerializeField, Range(0f, 1f)] private float maxDarken = 0.85f;
-    [Tooltip("시전자 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔")]
+    [Tooltip("살리는 원의 중심 — Target = 카운터 창을 소비한 대상 위치, Caster = 발동자 플레이어 추적, Midpoint = 둘의 중간(시전자 못 찾으면 대상)")]
+    [SerializeField] private RevealCenterMode revealCenter = RevealCenterMode.Target;
+    [Tooltip("중심 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔")]
     [SerializeField, Min(0f)] private float revealRadius = 0.18f;
     [Tooltip("원 가장자리 부드러움(화면 높이 비율)")]
     [SerializeField, Min(0f)] private float revealSoftness = 0.1f;
@@ -43,6 +46,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
     private NetworkManager _networkManager;
     private ulong _triggerClientId;
     private Transform _triggerPlayer;
+    private Vector3 _targetPosition;
 
     private void Awake()
     {
@@ -70,7 +74,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
         StopEffect();
     }
 
-    private void HandleStarted(uint triggerId, ulong triggerClientId, SlowMotionPurpose purpose)
+    private void HandleStarted(uint triggerId, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
     {
         if (purpose != SlowMotionPurpose.Success || _networkManager == null)
             return;
@@ -82,6 +86,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
         if (_triggerClientId != triggerClientId)
             _triggerPlayer = null;
         _triggerClientId = triggerClientId;
+        _targetPosition = targetPosition;
 
         PushState();
     }
@@ -112,7 +117,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
         DarkAdaptationState.RevealSoftness = InterruptDarkAdaptationModel.SanitizeDuration(revealSoftness);
 
         float radius = InterruptDarkAdaptationModel.SanitizeRadius(revealRadius);
-        if (radius > 0f && TryGetTriggerViewport(out Vector2 viewport))
+        if (radius > 0f && TryGetRevealViewport(out Vector2 viewport))
         {
             DarkAdaptationState.RevealCenter = viewport;
             DarkAdaptationState.RevealRadius = radius;
@@ -123,16 +128,22 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
         }
     }
 
-    private bool TryGetTriggerViewport(out Vector2 viewport)
+    private bool TryGetRevealViewport(out Vector2 viewport)
     {
         viewport = default;
 
         Camera camera = Camera.main;
-        Transform player = FindTriggerPlayer();
-        if (camera == null || player == null)
+        if (camera == null)
             return false;
 
-        Vector3 point = camera.WorldToViewportPoint(player.position);
+        // Target 모드는 시전자를 찾지 않는다.
+        Transform player = revealCenter != RevealCenterMode.Target ? FindTriggerPlayer() : null;
+        bool hasCaster = player != null;
+        if (!InterruptDarkAdaptationModel.TrySelectRevealCenter(revealCenter, _targetPosition, hasCaster,
+                hasCaster ? player.position : default, out Vector3 center))
+            return false;
+
+        Vector3 point = camera.WorldToViewportPoint(center);
         if (point.z <= 0f || float.IsNaN(point.x) || float.IsNaN(point.y))
             return false;
 

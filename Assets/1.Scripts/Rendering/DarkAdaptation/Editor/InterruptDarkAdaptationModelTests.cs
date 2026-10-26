@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEngine;
 
 /// <summary>
 /// 간파 성공 암순응 곡선(<see cref="InterruptDarkAdaptationModel"/>) — 곡선 경계, 본인/타인 강도, 재시작, 정리 규칙.
@@ -152,5 +153,48 @@ public sealed class InterruptDarkAdaptationModelTests
         Assert.AreEqual(1f, model.Value, Eps, "fadeIn NaN = 0 → 바로 최대");
         Assert.AreEqual(0f, model.Tick(Hold), Eps, "fadeOut 음수 = 0 → 유지 끝에 바로 끝");
         Assert.IsFalse(model.IsPlaying);
+    }
+
+    // ---- 원형 중심 선택(C5) ----
+
+    static readonly Vector3 TargetPos = new Vector3(4f, 0f, 2f);
+    static readonly Vector3 CasterPos = new Vector3(0f, 1f, -2f);
+
+    [Test]
+    public void RevealCenter_Target_UsesSignalPosition()
+    {
+        Assert.IsTrue(InterruptDarkAdaptationModel.TrySelectRevealCenter(RevealCenterMode.Target, TargetPos, true, CasterPos, out Vector3 c));
+        Assert.AreEqual(TargetPos, c);
+
+        Assert.IsTrue(InterruptDarkAdaptationModel.TrySelectRevealCenter(RevealCenterMode.Target, TargetPos, false, default, out c),
+            "시전자 없이도 켜진다");
+        Assert.AreEqual(TargetPos, c);
+    }
+
+    [Test]
+    public void RevealCenter_Caster_FollowsCasterOrOff()
+    {
+        Assert.IsTrue(InterruptDarkAdaptationModel.TrySelectRevealCenter(RevealCenterMode.Caster, TargetPos, true, CasterPos, out Vector3 c));
+        Assert.AreEqual(CasterPos, c);
+
+        Assert.IsFalse(InterruptDarkAdaptationModel.TrySelectRevealCenter(RevealCenterMode.Caster, TargetPos, false, default, out _),
+            "시전자를 못 찾으면 원형 끔(기존 동작)");
+    }
+
+    [Test]
+    public void RevealCenter_Midpoint_HalfwayOrFallsBackToTarget()
+    {
+        Assert.IsTrue(InterruptDarkAdaptationModel.TrySelectRevealCenter(RevealCenterMode.Midpoint, TargetPos, true, CasterPos, out Vector3 c));
+        Assert.AreEqual(new Vector3(2f, 0.5f, 0f), c);
+
+        Assert.IsTrue(InterruptDarkAdaptationModel.TrySelectRevealCenter(RevealCenterMode.Midpoint, TargetPos, false, default, out c));
+        Assert.AreEqual(TargetPos, c, "시전자 못 찾으면 대상");
+    }
+
+    [Test]
+    public void RevealCenter_UnknownMode_TreatedAsTarget()
+    {
+        Assert.IsTrue(InterruptDarkAdaptationModel.TrySelectRevealCenter((RevealCenterMode)99, TargetPos, true, CasterPos, out Vector3 c));
+        Assert.AreEqual(TargetPos, c);
     }
 }

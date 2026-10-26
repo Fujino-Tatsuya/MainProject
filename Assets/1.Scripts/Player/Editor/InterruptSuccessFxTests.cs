@@ -34,8 +34,41 @@ public sealed class InterruptSuccessFxTests
         Assert.IsFalse(InterruptSuccessFx.ShouldPlay(SlowMotionPurpose.Success, 0, false, 0));
     }
 
+    // ─── 칸 선택(C5) ───
+
     [Test]
-    public void Player_base_루트에_있고_성공_이펙트_칸은_비어_있다()
+    public void 칸_둘_다_있으면_둘_다_재생()
+    {
+        Assert.AreEqual(InterruptSuccessFx.Slots.Caster | InterruptSuccessFx.Slots.Target,
+            InterruptSuccessFx.SelectSlots(true, true, true));
+    }
+
+    [Test]
+    public void 시전자_칸만_있으면_시전자만()
+    {
+        Assert.AreEqual(InterruptSuccessFx.Slots.Caster, InterruptSuccessFx.SelectSlots(true, true, false));
+    }
+
+    [Test]
+    public void 대상_칸만_있으면_대상만()
+    {
+        Assert.AreEqual(InterruptSuccessFx.Slots.Target, InterruptSuccessFx.SelectSlots(true, false, true));
+    }
+
+    [Test]
+    public void 칸_둘_다_비면_아무것도_안_함()
+    {
+        Assert.AreEqual(InterruptSuccessFx.Slots.None, InterruptSuccessFx.SelectSlots(true, false, false));
+    }
+
+    [Test]
+    public void 재생_조건이_아니면_칸이_있어도_안_함()
+    {
+        Assert.AreEqual(InterruptSuccessFx.Slots.None, InterruptSuccessFx.SelectSlots(false, true, true));
+    }
+
+    [Test]
+    public void Player_base_루트에_있고_성공_이펙트_칸_둘_다_비어_있다()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
         Assert.IsNotNull(prefab, PlayerPrefabPath);
@@ -44,8 +77,11 @@ public sealed class InterruptSuccessFxTests
         Assert.IsNotNull(fx, "Player.prefab 루트에 InterruptSuccessFx 가 없다");
 
         var so = new SerializedObject(fx);
-        SerializedProperty slot = so.FindProperty("successEffect");
-        Assert.IsNotNull(slot, "successEffect 필드 이름이 바뀌었다");
-        Assert.IsNull(slot.objectReferenceValue, "base 의 칸은 비워 두고 캐릭터 Variant 가 덮어쓴다");
+        foreach (string field in new[] { "casterFx", "targetFx" })
+        {
+            SerializedProperty slot = so.FindProperty(field);
+            Assert.IsNotNull(slot, $"{field} 필드 이름이 바뀌었다");
+            Assert.IsNull(slot.objectReferenceValue, $"base 의 {field} 칸은 비워 두고 캐릭터 Variant 가 덮어쓴다");
+        }
     }
 }

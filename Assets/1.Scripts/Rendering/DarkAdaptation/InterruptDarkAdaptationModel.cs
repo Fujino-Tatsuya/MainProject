@@ -1,5 +1,16 @@
 using UnityEngine;
 
+/// <summary>암순응 원형 중심 기준(할 일 87 C5).</summary>
+public enum RevealCenterMode
+{
+    /// <summary>간파 성공 신호의 대상 위치(고정 월드 좌표).</summary>
+    Target = 0,
+    /// <summary>발동자 플레이어 오브젝트(매 프레임 추적).</summary>
+    Caster = 1,
+    /// <summary>대상과 시전자의 중간. 시전자를 못 찾으면 대상.</summary>
+    Midpoint = 2,
+}
+
 /// <summary>
 /// 간파 성공 암순응 곡선 — 순수 계산(MonoBehaviour·Unity 시간 없음). 할 일 87 C3.
 ///
@@ -101,6 +112,27 @@ public sealed class InterruptDarkAdaptationModel
     /// <summary>발동자가 나면 본인 강도, 아니면 타인 강도(정리된 값).</summary>
     public static float SelectIntensity(bool triggeredByMe, float selfIntensity, float othersIntensity) =>
         SanitizeIntensity(triggeredByMe ? selfIntensity : othersIntensity);
+
+    /// <summary>
+    /// 원형 중심 월드 위치(할 일 87 C5). Target = 신호의 대상 위치, Caster = 시전자(못 찾으면 원형 끔 → false),
+    /// Midpoint = 둘의 중간(시전자 못 찾으면 대상). 알 수 없는 값은 Target 으로 본다.
+    /// </summary>
+    public static bool TrySelectRevealCenter(RevealCenterMode mode, Vector3 target, bool hasCaster, Vector3 caster,
+                                             out Vector3 center)
+    {
+        switch (mode)
+        {
+            case RevealCenterMode.Caster:
+                center = hasCaster ? caster : default;
+                return hasCaster;
+            case RevealCenterMode.Midpoint:
+                center = hasCaster ? (target + caster) * 0.5f : target;
+                return true;
+            default:
+                center = target;
+                return true;
+        }
+    }
 
     /// <summary>원형 반경(화면 높이 비율). 0 이하·NaN 이면 0 = 원형 끔.</summary>
     public static float SanitizeRadius(float radius) =>

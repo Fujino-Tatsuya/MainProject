@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
+using UnityEngine;
 
 /// <summary>
 /// 전역 시간 레이어의 순수 규칙 — 발동 번호 문지기(<see cref="SlowMotionSession"/>), 이벤트 직렬화(<see cref="SlowMotionEvent"/>),
@@ -285,9 +286,44 @@ public sealed class SlowMotionSessionTests
     // ─── 직렬화 ───────────────────────────────────────────────────────
 
     [Test]
-    public void 이벤트_크기는_목적_칸과_히트스톱_칸을_포함한다()
+    public void 이벤트_크기는_목적_칸과_히트스톱_칸과_대상_위치를_포함한다()
     {
-        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7, SlowMotionEvent.SerializedSize);
+        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7 + 4 * 3, SlowMotionEvent.SerializedSize);
+    }
+
+    [Test]
+    public void Start_이벤트_대상_위치_직렬화_왕복()
+    {
+        var position = new Vector3(1.5f, -0.25f, 1234.125f);
+        var r = RoundTrip(SlowMotionEvent.CreateStart(1, 1.0, 3, P(0.25f), SlowMotionPurpose.Success, position));
+        Assert.AreEqual(position, r.TargetPosition);
+
+        Assert.AreEqual(Vector3.zero, RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P())).TargetPosition, "기본 = 0");
+        Assert.AreEqual(Vector3.zero, RoundTrip(SlowMotionEvent.CreateFail(1, 1.0)).TargetPosition, "Fail = 0");
+        Assert.AreEqual(Vector3.zero, RoundTrip(SlowMotionEvent.CreateReset(1, 1.0)).TargetPosition, "Reset = 0");
+    }
+
+    [Test]
+    public void 세션은_마지막_Start_의_대상_위치를_기억한다()
+    {
+        var s = new SlowMotionSession();
+        Assert.AreEqual(Vector3.zero, s.CurrentTargetPosition);
+
+        var first = new Vector3(1f, 0f, 2f);
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, P(), SlowMotionPurpose.Success, first));
+        Assert.AreEqual(first, s.CurrentTargetPosition);
+
+        // 버린 Start·Fail 은 기억을 바꾸지 않는다.
+        s.Apply(SlowMotionEvent.CreateStart(1, T0 + 0.25, 1, P(), SlowMotionPurpose.Success, new Vector3(9f, 9f, 9f)));
+        s.Apply(SlowMotionEvent.CreateFail(1, T0 + 0.25));
+        Assert.AreEqual(first, s.CurrentTargetPosition);
+
+        var second = new Vector3(-3f, 0.5f, 4f);
+        s.Apply(SlowMotionEvent.CreateStart(2, T0 + 0.5, 1, P(), SlowMotionPurpose.Success, second));
+        Assert.AreEqual(second, s.CurrentTargetPosition, "마지막 것이 이긴다");
+
+        s.Clear();
+        Assert.AreEqual(Vector3.zero, s.CurrentTargetPosition);
     }
 
     [Test]

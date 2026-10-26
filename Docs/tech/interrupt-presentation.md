@@ -1,6 +1,6 @@
 # 간파 성공 연출 — 슬로우·히트스톱·암순응·성공 이펙트 칸·오너 줌
 
-> 할 일 87(C1~C4)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
+> 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파 성공에 얹은 연출**만 다룬다.
 > 수치 원본은 `GameData.xlsx` `SlowMotion` 시트([data-table.md](data-table.md)).
 
@@ -10,21 +10,25 @@
 간파 입력(오너) ─▶ 서버 PlayerInterruptSkillBase
   ① 예측 적중이면 시도 슬로우   GlobalTimeScale.ServerStart(interruptProfile, 시전자, Attempt)
   ② 판정 — 대상 수신 전후 성공 수 비교 / CombatStatsEvents.ServerCounterSucceeded 수신
+       카운터 창을 소비한 첫 대상의 transform.position 을 기록만 한다(C5 — 판정 불변)
   ③ 시도 슬로우 정리            빗나가면 ServerFail(시도 번호)
-  ④ 성공(카운터 창 소비)이면     ServerStart(interruptSuccessProfile, 시전자, Success)
+  ④ 성공(카운터 창 소비)이면     ServerStart(interruptSuccessProfile, 시전자, Success, 대상 위치 — 없으면 시전자 위치)
                                  → last-wins: 시도 슬로우의 지금 배율을 덮고 맨 앞 히트스톱부터 다시 시작
                                  → 예측이 빗나가 시도 슬로우가 없었어도 건다
-  ⑤ named message 로 전 피어 배포(SlowMotionEvent — 목적 칸 Purpose 포함)
+  ⑤ named message 로 전 피어 배포(SlowMotionEvent — 목적 칸 Purpose·대상 위치 TargetPosition 포함, 54B)
         │
-        ▼ 각 피어에서 GlobalTimeScale.Started(id, 발동자 clientId, purpose)
+        ▼ 각 피어에서 GlobalTimeScale.Started(id, 발동자 clientId, purpose, 대상 위치)  — 같은 값 = CurrentTargetPosition
   ├─ 시간 배율: 히트스톱 → 진입 → 유지 → 복귀(전 피어 같은 타임라인)
-  ├─ InterruptDarkAdaptation (NetworkManager)   purpose==Success → 암순응 곡선, 본인/타인 강도
-  ├─ InterruptSuccessFx (각 Player)              purpose==Success && 발동자 == 이 플레이어 Owner → successEffect.PlayOnce()
+  ├─ InterruptDarkAdaptation (NetworkManager)   purpose==Success → 암순응 곡선, 본인/타인 강도, 원형 중심 = revealCenter
+  ├─ InterruptSuccessFx (각 Player)              purpose==Success && 발동자 == 이 플레이어 Owner →
+  │                                               casterFx.PlayOnce()(시전자 소켓) + targetFx 를 대상 위치에서 원샷
   └─ CameraTargetSwitcher (오너 카메라)          발동자가 나면 줌, 깊이 기준 = 지금 재생 중인 프로필 배율(CurrentProfileScale)
 ```
 
 - **공용 성공 신호 = 슬로우 이벤트의 목적 칸**(`SlowMotionPurpose.Success`). 연출용 RPC 를 따로 두지 않는다 —
-  성공 연출을 더할 땐 `GlobalTimeScale.Started` 를 구독하고 `purpose` 를 본다.
+  성공 연출을 더할 땐 `GlobalTimeScale.Started` 를 구독하고 `purpose` 를 본다. 위치 기준이 필요하면 넷째 인자(대상 위치)를 쓴다.
+- **대상 위치** = 카운터 창을 소비한 첫 대상(수신 전후 성공 수가 처음 바뀐 Unit, 또는 `CombatStatsEvents` 로만 온 성공의 target).
+  서버 판정 시점 위치를 고정 월드 좌표로 싣는다 — 대상을 따라가지 않는다. 시도 슬로우·Fail·Reset 은 0.
 - 연출 훅일 뿐 판정·피해·카운터 창에는 관여하지 않는다.
 - 컷신·씬 전환·세션 종료로 `ForcedReset` 이 오면 암순응은 즉시 0. 원샷 성공 이펙트는 끊지 않는다.
 
@@ -64,19 +68,31 @@
 | `luminanceThreshold` | 0.8 | 이 HDR 휘도보다 어두운 픽셀만 낮춘다(빛 이펙트·발광은 남는다) |
 | `thresholdSoftness` | 0.3 | 임계 아래로 부드럽게 섞는 휘도 폭 |
 | `maxDarken` | 0.85 | 강도 1 에서 어두운 픽셀을 낮추는 최대 비율 [0, 1] |
-| `revealRadius` | 0.18 | 시전자 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔 |
+| `revealCenter` | Target | 원 중심 기준(열거 — **데이터 테이블 열 아님**, 인스펙터·`NetworkManager.prefab` 에서 고른다). Target = 대상 위치 · Caster = 발동자 추적 · Midpoint = 둘의 중간 |
+| `revealRadius` | 0.18 | 중심 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔 |
 | `revealSoftness` | 0.1 | 원 가장자리 부드러움(화면 높이 비율) |
 
 **본인/타인.** `Started` 의 발동자 clientId 가 이 피어의 `LocalClientId` 면 `selfIntensity`, 아니면 `othersIntensity`.
-원형 중심은 매 프레임 발동자 플레이어 위치를 메인 카메라 뷰포트로 바꾼다(못 찾거나 카메라 뒤면 원형 끔).
+
+**원형 중심**(`InterruptDarkAdaptationModel.TrySelectRevealCenter`) — 매 프레임 메인 카메라 뷰포트로 바꾼다(카메라 뒤면 원형 끔).
+
+| `revealCenter` | 중심 | 시전자를 못 찾으면 |
+|---|---|---|
+| `Target`(기본) | 신호의 대상 위치(고정 월드 좌표) | 상관없음 |
+| `Caster` | 발동자 플레이어 오브젝트(매 프레임 추적, C3 동작) | 원형 끔 |
+| `Midpoint` | 대상과 시전자의 중간 | 대상 |
+
+> 데이터 테이블은 enum 을 템플릿에 넣지 않는다([data-table.md §8](data-table.md)) — `revealCenter` 는 xlsx 열이 없다.
 
 ### 2.4 성공 이펙트 칸 — `InterruptSuccessFx` (Player.prefab base 루트)
 
 | 필드 | base 기본 | 의미 |
 |---|---|---|
-| `successEffect` | 비어 있음 | 간파 성공 시 이 플레이어 쪽 원샷(`EffectSocketPlayer.PlayOnce`). 비어 있으면 아무것도 안 함(경고 없음) |
+| `casterFx` | 비어 있음 | 간파 성공 시 **시전자 소켓 위치**에서 원샷(`EffectSocketPlayer.PlayOnce`). C4 의 `successEffect` 를 이름만 바꾼 칸(`FormerlySerializedAs`) |
+| `targetFx` | 비어 있음 | 간파 성공 시 **신호의 대상 위치**에서 원샷 — 충격파는 여기. 소켓을 그 위치로 잠깐 옮겨 `PlayOnce` 하고 같은 호출 안에서 되돌린다(회전은 소켓 회전, `offset` 은 더해진다) |
 
-- 전 피어가 각자 재생한다 — 판단은 `ShouldPlay(purpose, 발동자, 스폰 여부, OwnerClientId)`.
+- 칸마다 따로 — 비어 있는 칸은 아무것도 안 한다. 둘 다 비면 아무것도 안 함(경고 없음).
+- 전 피어가 각자 재생한다 — 판단은 `ShouldPlay(purpose, 발동자, 스폰 여부, OwnerClientId)` → `SelectSlots(재생 여부, casterFx 있음, targetFx 있음)`.
 - `GlobalTimeScale` 이 플레이어보다 늦게 생겨도 `Update` 에서 다시 찾아 구독한다.
 - 데이터 테이블 대상이 아니다(오브젝트 참조만 있다).
 
@@ -96,8 +112,10 @@
    ([player-prefabs.md](player-prefabs.md) — 캐릭터 고유 = Variant).
 2. Variant 안에 소켓 오브젝트를 만들고 `EffectSocketPlayer` 를 붙인다 — `effect` 에 EffectEntry, 필요하면 `socket`·`offset`·`scale`.
    `id` 는 애니메이션 이벤트로 부르지 않으니 비워도 된다.
-3. Variant 루트의 `InterruptSuccessFx.successEffect` 칸에 그 소켓을 끌어 넣는다(base 값에 대한 Variant 오버라이드로 저장된다).
-4. Play — 간파 성공 시 모든 화면에서 발동자 쪽에 한 번 재생된다. 원샷이라 소켓을 따라가지 않고 재생 순간 위치에 찍힌다.
+3. Variant 루트의 `InterruptSuccessFx` 칸에 그 소켓을 끌어 넣는다(base 값에 대한 Variant 오버라이드로 저장된다).
+   - **충격파처럼 맞은 대상에서 터져야 하는 것은 `targetFx`**, 시전자 몸에서 나는 것은 `casterFx`.
+   - `targetFx` 소켓은 루트가 아닌 **빈 자식 오브젝트**에 둔다 — 재생 순간 그 트랜스폼을 대상 위치로 잠깐 옮겼다 되돌린다.
+4. Play — 간파 성공 시 모든 화면에서 한 번 재생된다. 원샷이라 소켓·대상을 따라가지 않고 재생 순간 위치에 찍힌다.
 
 캐릭터별 기존 성공 연출(가붕이 `PlayerShieldVfx` 충격파, 어쌔신 `AssassinSkillView` 성공 소켓, 거너 쪽)은 그대로다 — 이 칸은 그것과 별개로 추가되는 공용 칸이다.
 겹쳐 보이면 둘 중 하나를 비운다.
@@ -112,8 +130,11 @@
   화면상 차이는 없지만 `Failed` 이벤트가 성공 직전에 한 번 난다 — `Failed` 구독자는 이를 감안할 것.
 - **임계값은 톤매핑 전 HDR 기준.** `luminanceThreshold` 는 화면에 보이는 최종 밝기가 아니라 후처리 전 HDR 휘도다.
   노출·톤매핑 설정을 바꾸면 같은 값이 다르게 보인다.
-- 사람이 MPPM 으로 확인할 것: 본인/타인 강도 차이, 원형 중심이 발동자를 따라가는지, 성공 이펙트를 넣은 뒤 전 화면 재생.
+- **대상 위치는 판정 순간 값.** 클라 화면의 대상은 보간 지연만큼 뒤에 있을 수 있어 `targetFx`·Target 원형이 살짝 어긋나 보일 수 있다.
+- 사람이 MPPM 으로 확인할 것: 본인/타인 강도 차이, 원형 중심이 `revealCenter` 대로(기본 = 맞은 대상) 잡히는지,
+  `casterFx`·`targetFx` 를 넣은 뒤 전 화면에서 각각 시전자·대상 위치에 재생되는지.
 
 ## 6. 이후 확장
 
 - 암순응 셰이더에 흑백 실루엣·반전 모드를 얹을 수 있음(미구현, 이펙트 확정 후 결정).
+- 레퍼런스 의도 — 주변 입자가 한 점으로 모이는 효과 + 피격 대상에서 날카로운 선 수십 개가 한쪽으로 쏠려 터지는 충격파(번개 제외), targetFx 칸에 넣을 예정.

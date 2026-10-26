@@ -1476,7 +1476,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7134a7ab37e1c8f4f9309f088651f54d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptSuccessFx
-  successEffect: {fileID: 0}
+  casterFx: {fileID: 0}
+  targetFx: {fileID: 0}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
