@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -39,7 +40,7 @@ public static class CombatHudResourceAuthoring
 
         try
         {
-            if (!ApplyHealthBar(root.transform) || !ApplySkillSlots(root.transform))
+            if (!ApplyHealthBar(root.transform) || !ApplySkillSlots(root.transform) || !ApplyTraitProgress(root.transform))
             {
                 Debug.LogError("[CombatHudResource] 적용 실패 — 저장하지 않았다. 위 오류를 확인할 것.");
                 return;
@@ -66,7 +67,7 @@ public static class CombatHudResourceAuthoring
     /// <summary>
     /// PlayerStatus 틀 → hp_empty_frame, HP 채움 3장 → 435×74, ExBar → xp_fill.
     /// 🔴 HpBar 자체는 제자리(0,0)에 두고 채움만 옮긴다 — HpBar 를 옮기면 자식 HpText·Portrait 가 따라 움직인다.
-    /// ExBar 는 켜지 않는다(값 연결과 함께 별도 단계).
+    /// ExBar 를 켜고 값을 잇는 건 C4(<see cref="ApplyTraitProgress"/>).
     /// </summary>
     static bool ApplyHealthBar(Transform root)
     {
@@ -295,6 +296,93 @@ public static class CombatHudResourceAuthoring
         for (int i = 0; i < cells.Length; i++)
             list.GetArrayElementAtIndex(i).objectReferenceValue = cells[i];
         so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // ── C4: 특성 진행도(XP 바·레벨 숫자·상단 칸 연결) ──────────────────────
+
+    const string LevelTextName = "LevelText";
+
+    // 레벨 숫자 = XP 바 왼쪽 둥근 자리(미리보기 실측, 프레임 좌상단 기준). XP 채움 위에 겹친다.
+    static readonly Vector2 LevelTopLeft = new Vector2(182f, 51f);
+    static readonly Vector2 LevelSize = new Vector2(36f, 38f);
+
+    static readonly (string name, PlayerSkillSlot slot)[] SkillSlots =
+    {
+        ("Slot_Q", PlayerSkillSlot.Main),
+        ("Slot_E", PlayerSkillSlot.Sub),
+        ("Slot_R", PlayerSkillSlot.Ultimate),
+        ("Slot_RMB", PlayerSkillSlot.Interrupt),
+    };
+
+    /// <summary>
+    /// ExBar 를 켜고(Filled Horizontal Left) 레벨 숫자 TMP 를 둔 뒤, <see cref="TraitProgressHUD"/> 를 PlayerStatus 에 붙여
+    /// XP 바·레벨·상단 칸 4개를 잇고 <see cref="CombatHUD"/> 의 필드에 꽂는다.
+    /// </summary>
+    static bool ApplyTraitProgress(Transform root)
+    {
+        RectTransform status = Find(root, "Layer_Combat/PlayerStatus");
+        RectTransform ex = Find(status, "ExBar");
+        RectTransform hpText = Find(status, "HpBar/HpText");
+        if (status == null || ex == null || hpText == null)
+            return false;
+
+        var exImage = ex.GetComponent<Image>();
+        exImage.type = Image.Type.Filled;
+        exImage.fillMethod = Image.FillMethod.Horizontal;
+        exImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        exImage.fillAmount = 0f;
+        ex.gameObject.SetActive(true);
+
+        TMP_Text level = BuildLevelText(status, ex, hpText.GetComponent<TMP_Text>());
+
+        var view = EnsureComponent<TraitProgressHUD>(status.gameObject);
+        var so = new SerializedObject(view);
+        so.FindProperty("xpFill").objectReferenceValue = exImage;
+        so.FindProperty("levelText").objectReferenceValue = level;
+        SerializedProperty list = so.FindProperty("slotCells");
+        list.arraySize = SkillSlots.Length;
+        for (int i = 0; i < SkillSlots.Length; i++)
+        {
+            RectTransform cells = Find(root, SkillBarPath + SkillSlots[i].name + "/" + UpgradeCellsName);
+            if (cells == null)
+                return false;
+
+            SerializedProperty element = list.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("slot").enumValueIndex = (int)SkillSlots[i].slot;
+            element.FindPropertyRelative("view").objectReferenceValue = cells.GetComponent<SkillUpgradeCellsView>();
+        }
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        var hud = root.GetComponent<CombatHUD>();
+        var hudSo = new SerializedObject(hud);
+        hudSo.FindProperty("traitProgressHUD").objectReferenceValue = view;
+        hudSo.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
+
+    /// <summary>HpText 의 글꼴·머티리얼·크기·색을 그대로 쓰는 숫자 칸. XP 바 바로 위(형제 순서)에 그린다.</summary>
+    static TMP_Text BuildLevelText(RectTransform status, RectTransform ex, TMP_Text style)
+    {
+        RectTransform rt = EnsureChild(status, LevelTextName);
+        rt.gameObject.layer = status.gameObject.layer;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.localScale = Vector3.one;
+        rt.sizeDelta = LevelSize;
+        rt.anchoredPosition = CenterOffset(LevelTopLeft, LevelSize);
+        rt.SetSiblingIndex(ex.GetSiblingIndex() + 1);
+
+        var text = EnsureComponent<TextMeshProUGUI>(rt.gameObject);
+        text.font = style.font;
+        text.fontSharedMaterial = style.fontSharedMaterial;
+        text.fontSize = style.fontSize;
+        text.enableAutoSizing = false;
+        text.fontStyle = style.fontStyle;
+        text.color = style.color;
+        text.alignment = TextAlignmentOptions.Center;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.raycastTarget = false;
+        text.text = "1";
+        return text;
     }
 
     static RectTransform EnsureChild(Transform parent, string name)

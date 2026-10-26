@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 일반 스킬 슬롯(Q·E·R·RMB) 상단 칸 — 그 스킬에 붙은 특성(증강) 강화 단계 수만큼 앞에서부터 칸을 켠다.
-/// 단계 데이터 연결은 아직 없다(특성↔스킬 연결 확정 후). 지금은 프리팹 기본값대로 항상 0칸.
+/// 단계 수는 <see cref="TraitProgressHUD"/> 가 넣는다(그 슬롯의 쿨 감소 특성 수). 프리팹 기본값은 0칸.
 /// 칸 on/off 는 GameObject 로 한다 — SkillCooldownHUD 의 차단 색은 꺼진 칸까지 포함해 캐시하므로 색은 건드리지 않는다.
 /// </summary>
 public class SkillUpgradeCellsView : MonoBehaviour
