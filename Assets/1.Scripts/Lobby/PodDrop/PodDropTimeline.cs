@@ -126,6 +126,15 @@ public struct PodDropMapTimings
     [Tooltip("디졸브가 끝난 순간 → 레터박스가 다 걷힘(초). 끝나는 순간 UI·조작·튜토리얼(S0) 해제")]
     [Min(0f)] public float letterboxOutSeconds;
 
+    // 위치는 시간표가 쓰지 않는다 — 맵 연출(MapPodArrival)이 플레이어 스폰 슬롯(MapGenerator PlayerSpawn) 기준으로 읽는다.
+    [Header("착지점 · 좌석 (플레이어 스폰 슬롯 기준 로컬, m)")]
+    [Tooltip("포드 착지점 = 스폰 슬롯 + 이 오프셋(슬롯 회전 기준 로컬). 플레이어 좌석은 이 착지점 기준이다")]
+    public Vector3 podLandingOffset;
+    [Tooltip("플레이어 좌석(숨긴 채 스폰되는 자리) — 포드 착지점 기준 로컬 오프셋, 스폰 순서(P1, P2, P3). 사람이 더 많으면 돌려 쓴다. 비우면 전원 착지점")]
+    public Vector3[] seatOffsets;
+    [Tooltip("착지점 지면 찾기 — 착지점 위 이 높이(m)에서 아래로 같은 길이만큼 레이를 쏴 맞은 높이를 지면으로 쓴다. 0 = 슬롯 높이 그대로")]
+    [Min(0f)] public float groundProbeHeight;
+
     public static PodDropMapTimings Default => new PodDropMapTimings
     {
         holdSeconds = 0.3f,
@@ -142,6 +151,10 @@ public struct PodDropMapTimings
         settleSeconds = 0.4f,
         dissolveSeconds = 1f,
         letterboxOutSeconds = 0.5f,
+        podLandingOffset = Vector3.zero,
+        // 포드 바닥 약 2.35 × 2.69m 안 — 디졸브로 포드가 걷히면 그 자리에 서 있다.
+        seatOffsets = new[] { new Vector3(-0.6f, 0f, 0.45f), new Vector3(0.6f, 0f, 0.45f), new Vector3(0f, 0f, -0.55f) },
+        groundProbeHeight = 2f,
     };
 }
 

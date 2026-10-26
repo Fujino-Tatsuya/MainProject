@@ -40,3 +40,9 @@ MonoBehaviour:
     settleSeconds: 0.4
     dissolveSeconds: 1
     letterboxOutSeconds: 0.5
+    podLandingOffset: {x: 0, y: 0, z: 0}
+    seatOffsets:
+    - {x: -0.6, y: 0, z: 0.45}
+    - {x: 0.6, y: 0, z: 0.45}
+    - {x: 0, y: 0, z: -0.55}
+    groundProbeHeight: 2

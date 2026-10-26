@@ -24,6 +24,12 @@ public sealed class PodDropScreenOverlay : MonoBehaviour
     private float _hudRescanAt;
 
     /// <summary>
+    /// 새로 뜬 화면 UI 를 다시 찾는 간격(초, 기본 0.5). 0 = 매 프레임 — 맵 포드 착지(<see cref="MapPodArrival"/>)는 로딩 화면이 걷히는 프레임에
+    /// HUD 가 한 프레임도 보이면 안 돼서 0 으로 둔다(연출 몇 초 동안만).
+    /// </summary>
+    public float HudRescanInterval { get; set; } = HudRescanSeconds;
+
+    /// <summary>
     /// 이번 프레임 화면. <paramref name="letterbox"/> = 위·아래 띠 각각의 화면 높이 비율, <paramref name="fade"/> = 검은 화면 알파.
     /// <paramref name="scanHud"/> = 새로 뜬 화면 UI 도 찾아 끈다(false 면 이미 끈 것만 꺼 둔다 — 암전 뒤 로딩 씬 캔버스를 건드리지 않게).
     /// </summary>
@@ -58,8 +64,8 @@ public sealed class PodDropScreenOverlay : MonoBehaviour
 
     private void HideHud()
     {
-        if (Time.unscaledTime < _hudRescanAt) return;
-        _hudRescanAt = Time.unscaledTime + HudRescanSeconds;
+        if (HudRescanInterval > 0f && Time.unscaledTime < _hudRescanAt) return;
+        _hudRescanAt = Time.unscaledTime + HudRescanInterval;
 
         Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < canvases.Length; i++)

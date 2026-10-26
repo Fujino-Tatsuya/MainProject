@@ -284,7 +284,8 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
 
         // 포드 탑승·강하 연출(할 일 100) 뒤 완전 암전에 로딩. 연출 컴포넌트·설정이 없으면 지금처럼 곧바로 로딩(폴백).
         var podLaunch = GetComponent<LobbyPodLaunch>();
-        if (podLaunch != null && podLaunch.TryBeginServer(launcher.StartGameLoading))
+        // 연출을 탄 경우만 진입 종류 Lobby — 맵에서 포드 착지 연출로 이어진다. 폴백(곧바로 로딩)은 Direct 라 맵도 지금처럼 낙하 스폰.
+        if (podLaunch != null && podLaunch.TryBeginServer(launcher.StartGameLoadingFromLobbyPod))
             return;
 
         launcher.StartGameLoading();
