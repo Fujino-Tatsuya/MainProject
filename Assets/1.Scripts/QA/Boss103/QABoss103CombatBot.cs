@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// 할 일 103 C2 — 인스턴스마다(호스트·가상 플레이어) 자기 로컬 플레이어로 23호와 싸우는 전투 봇(공격 쪽만). 플레이어 이동·스킬은 오너 권한이라 오너 클라에서 돈다.
 /// <list type="bullet">
-/// <item>대상 = <see cref="TwentyThreeBoss"/>(웰즈·드론은 피격 대상이 아니다). 보스가 Combat 이 아니거나, 내가 연출 잠금·사망·영혼이면 아무것도 안 한다.</item>
+/// <item>대상 = <see cref="TwentyThreeBoss"/>(웰즈·드론은 피격 대상이 아니다). 송전탑·드론 유도·자폭 실드 기믹 중엔 C3b(<c>QABoss103CombatBot.Gimmick.cs</c>)가 대상을 탑으로 바꾼다. 보스가 Combat 이 아니거나, 내가 연출 잠금·사망·영혼이면 아무것도 안 한다.</item>
 /// <item>거리 유지(<see cref="QABoss103Bot.DecideMove"/>, 보스 HurtBox 표면까지 수평 거리): 근접 = 2m 넘으면 1m 까지 붙음, 거너 = 6~9m(벗어나면 7.5m 로).
 ///   멈춰 있을 때만 평타(누르고 있음 — <see cref="QABoss103InputDriver.HoldBasic"/>)와 스킬을 쓴다.</item>
 /// <item>이동: 클라엔 NavMesh 가 없어 직선 이동 + 앞 바닥 레이캐스트(88 Approach 와 같은 낭떠러지 검사). 이동 중 2초 동안 0.3m 미만이면 옆걸음 0.8초(<see cref="QABoss103StuckDetector"/>).
@@ -157,6 +157,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         _driver.ReleaseBasic();
         StopHold();
         FlushEvasion(reason);
+        FlushGimmick(reason);
         _move = QABoss103Bot.Move.Hold;
     }
 
@@ -201,6 +202,8 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         double now = Time.realtimeSinceStartupAsDouble;
         TickEvasion(me, myPos, surface, now);
         TickCounter(me, myPos, surface, now);
+        // C3b — 기믹(실드·드론 유도·송전탑)이 공격 대상을 고른다. 대시·방어 중에도 배정·로그는 돈다.
+        AttackTarget tgt = TickGimmick(me, myPos, bossPos, surface, hittable, now);
         if (EvasionHoldsBot(now))
         {
             _input.SetMove(Vector3.zero);
@@ -215,24 +218,29 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
 
         PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
-        bool inSkill = TickActiveSkill(skills, bossPos);
+        bool inSkill = TickActiveSkill(skills, tgt.Pos);
 
-        // 이동(스킬이 이동을 잠그는 동안은 넣지 않는다 — 거너 Q 집중은 이동 가능).
-        _move = QABoss103Bot.DecideMove(surface, _band, _move);
+        // 이동(스킬이 이동을 잠그는 동안은 넣지 않는다 — 거너 Q 집중은 이동 가능). 드론 유도는 거리 띠 대신 유도 자리로.
+        if (tgt.HasSpot)
+            _move = QAPartyPlacement88.HorizontalDistance(myPos, tgt.Spot) > QABoss103Gimmick.GuideTolerance ? QABoss103Bot.Move.Approach : QABoss103Bot.Move.Hold;
+        else
+            _move = QABoss103Bot.DecideMove(tgt.Surface, _band, _move);
         bool canMoveInSkill = !inSkill || (skills != null && skills.ActiveSkill != null && skills.ActiveSkill.CanMoveWhileActive);
+        if (tgt.HasSpot && _move == QABoss103Bot.Move.Approach)
+            _driver.ReleaseBasic();   // 유도 자리로 가야 한다 — 이어치기를 끊고 이번 타로 마무리
         bool attackBusy = _driver.IsBasicActive;
         Vector3 moveDir = Vector3.zero;
         // 회피한 위험이 끝날 때까지는 다시 들어가지 않는다(물러나기는 그대로).
         bool avoid = _move == QABoss103Bot.Move.Approach && AvoidingApproach(now);
         if (_move != QABoss103Bot.Move.Hold && canMoveInSkill && !attackBusy && !avoid)
         {
-            Vector3 toBoss = bossPos - myPos;
-            toBoss.y = 0f;
-            moveDir = _move == QABoss103Bot.Move.Approach ? toBoss.normalized : -toBoss.normalized;
+            Vector3 toward = (tgt.HasSpot ? tgt.Spot : tgt.Pos) - myPos;
+            toward.y = 0f;
+            moveDir = _move == QABoss103Bot.Move.Approach ? toward.normalized : -toward.normalized;
         }
         Steer(myPos, moveDir);
 
-        if (inSkill || !hittable)
+        if (inSkill || !tgt.Hittable)
         {
             _driver.ReleaseBasic();
             return;
@@ -246,28 +254,38 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
             return;
         }
 
-        _driver.SetAim(bossPos + _aimOffset);
+        _driver.SetAim(tgt.Pos + _aimOffset);
 
         // 스킬 장전이 있으면 평타를 놓아 이번 타로 마무리하고, 끝나면 시전한다.
+        // 탑 대상이면 대상 지정 R(팔라딘·거너)은 굴리지도 않는다 — 장전 상태는 보스로 돌아올 때까지 그대로.
         bool wantQ = _gateQ.Tick(ReadyQ(skills), Time.timeAsDouble, _skillRng, _profile.SkillUseChance);
-        bool wantR = _gateR.Tick(ReadyR(skills), Time.timeAsDouble, _skillRng, _profile.SkillUseChance);
+        bool wantR = AllowRFor(skills, tgt) && _gateR.Tick(ReadyR(skills), Time.timeAsDouble, _skillRng, _profile.SkillUseChance);
         if (wantQ || wantR)
         {
             _driver.ReleaseBasic();
             if (!attackBusy && !skills.IsBusy && Time.time >= _nextCastAttempt)
             {
                 _nextCastAttempt = Time.time + CastRetrySeconds;
-                if (wantR && TryCastR(skills, bossPos))
+                if (wantR && TryCastR(skills, tgt))
+                {
+                    NoteAttack(tgt, "R");
                     return;
-                if (wantQ && TryCastQ(skills, bossPos))
+                }
+                if (wantQ && TryCastQ(skills, tgt))
+                {
+                    NoteAttack(tgt, "Q");
                     return;
+                }
             }
             if (attackBusy)
                 return;
         }
 
         if (!skills.IsBusy && _driver.HoldBasic())
+        {
             _attackStarts++;
+            NoteAttack(tgt, "basic");
+        }
     }
 
     private bool ReadyQ(PlayerSkillController skills) =>
@@ -287,9 +305,9 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         return true;
     }
 
-    private bool TryCastQ(PlayerSkillController skills, Vector3 bossPos)
+    private bool TryCastQ(PlayerSkillController skills, in AttackTarget tgt)
     {
-        Vector3 point = bossPos + SampleOffset();
+        Vector3 point = tgt.Pos + SampleOffset();
         _driver.SetAim(point);
         bool hold = skills.GetSkill(PlayerSkillSlot.Main).Data.InputType == PlayerSkillInputType.Hold;
         if (hold)
@@ -313,17 +331,18 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         _chargeSeenAt = -1f;
         _chargeFired = false;
         Debug.Log($"{Tag} event=bot_cast character={_character} slot=Q skill={skills.GetSkill(PlayerSkillSlot.Main).GetType().Name} hold={(hold ? "true" : "false")} " +
-                  $"aimErrM={F(Flat(point - bossPos))} rolls={_gateQ.Rolls} fails={_gateQ.Fails}");
+                  $"target={tgt.Token} aimErrM={F(Flat(point - tgt.Pos))} rolls={_gateQ.Rolls} fails={_gateQ.Fails}");
         return true;
     }
 
-    private bool TryCastR(PlayerSkillController skills, Vector3 bossPos)
+    private bool TryCastR(PlayerSkillController skills, in AttackTarget tgt)
     {
-        Vector3 point = bossPos + SampleOffset();
+        Vector3 point = tgt.Pos + SampleOffset();
         _driver.SetAim(point);
         PlayerSkillBase r = skills.GetSkill(PlayerSkillSlot.Ultimate);
         bool targeted = r.Data.TargetingMode == SkillTargetingMode.SingleTarget;
-        bool ok = skills.ExecuteTargetedSkill(PlayerSkillSlot.Ultimate, targeted ? _boss : null, point, true);
+        // 대상 지정 R 은 보스 대상일 때만 온다(AllowRFor).
+        bool ok = skills.ExecuteTargetedSkill(PlayerSkillSlot.Ultimate, targeted && tgt.IsBoss ? _boss : null, point, true);
         if (!ok)
         {
             _castRejects++;
@@ -333,13 +352,13 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         _castsR++;
         if (r is AssassinTransformSkill)
             _transforms++;
-        Debug.Log($"{Tag} event=bot_cast character={_character} slot=R skill={r.GetType().Name} target={(targeted ? "boss" : "point")} " +
-                  $"aimErrM={F(Flat(point - bossPos))} rolls={_gateR.Rolls} fails={_gateR.Fails}");
+        Debug.Log($"{Tag} event=bot_cast character={_character} slot=R skill={r.GetType().Name} target={(targeted ? "boss" : "point")} on={tgt.Token} " +
+                  $"aimErrM={F(Flat(point - tgt.Pos))} rolls={_gateR.Rolls} fails={_gateR.Fails}");
         return true;
     }
 
     /// <summary>진행 중 스킬 돌보기(팔라딘 Q 홀드 놓기·거너 Q 발사). 스킬 실행·요청 중이면 true.</summary>
-    private bool TickActiveSkill(PlayerSkillController skills, Vector3 bossPos)
+    private bool TickActiveSkill(PlayerSkillController skills, Vector3 aimPos)
     {
         if (skills == null)
             return false;
@@ -354,14 +373,14 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
             if (ended || timeout || (!skills.IsBusy && Time.time - _holdStartedAt > 1f))
                 StopHold();
             else
-                _driver.SetAim(bossPos + _aimOffset); // 홀드 동안 보스 쪽으로 조향
+                _driver.SetAim(aimPos + _aimOffset); // 홀드 동안 대상(보스·탑) 쪽으로 조향
         }
 
         if (active is GunnerChargeLaserSkill charge && !_chargeFired)
         {
             if (_chargeSeenAt < 0f)
                 _chargeSeenAt = Time.time;
-            _driver.SetAim(bossPos + _aimOffset);
+            _driver.SetAim(aimPos + _aimOffset);
             float maxCharge = charge.Data is GunnerChargeLaserData data ? data.MaxChargeTime : 1f;
             if (Time.time - _chargeSeenAt >= maxCharge + ChargeFireSlack && _driver.SkillPrimary())
             {
@@ -372,7 +391,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
         else if (active is GunnerChargeLaserSkill)
         {
-            _driver.SetAim(bossPos + _aimOffset);
+            _driver.SetAim(aimPos + _aimOffset);
         }
 
         return skills.IsBusy;
@@ -450,7 +469,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
                   $"surfM={F(SurfaceDistance(myPos, bossPos))} hittable={(_bossBody == null || _bossBody.enabled ? "true" : "false")} " +
                   $"attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} rejects={_castRejects} gunnerFires={_gunnerFires} " +
                   $"rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks} " +
-                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()}");
+                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()} {GimmickDiag()}");
     }
 
     private void OnDestroy()
@@ -467,7 +486,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
         Debug.Log($"{Tag} event=bot_combat_done character={_character} tier={_profile.Tier} attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} " +
                   $"transforms={_transforms} rejects={_castRejects} gunnerFires={_gunnerFires} rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} " +
-                  $"stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks} {EvasionDiag()}");
+                  $"stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks} {EvasionDiag()} {GimmickDiag()}");
     }
 
     private static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;

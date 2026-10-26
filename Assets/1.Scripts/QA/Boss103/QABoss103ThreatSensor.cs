@@ -86,7 +86,8 @@ public sealed class QABoss103ThreatSensor
     /// <summary>끝난 위험을 목록에서 지우기 전 보관(초).</summary>
     private const double KeepSeconds = 3.0;
 
-    private const int DroneLock = 2;   // WellsDroneAttack.View: None 0 · Mark 1 · Lock 2
+    private const int DroneMark = 1;   // WellsDroneAttack.View: None 0 · Mark 1 · Lock 2
+    private const int DroneLock = 2;
 
     private TwentyThreeBoss _boss;
     private BossAttackConeTelegraph _cone;
@@ -117,6 +118,13 @@ public sealed class QABoss103ThreatSensor
 
     public IReadOnlyList<QABoss103Threat> Threats => _threats;
     public TwentyThreeBoss Boss => _boss;
+
+    /// <summary>C3b — 드론 표식(추적) 단계이고 대상이 나다(이번 프레임).</summary>
+    public bool DroneMarkingMe => _droneViewWas == DroneMark && _droneMarkedMe;
+    /// <summary>C3b — 드론 고정 원이 떠 있다(착탄 전).</summary>
+    public bool DroneLocked => _droneViewWas == DroneLock;
+    /// <summary>C3b — 마지막 드론 고정 원(고정 중이 아니면 직전 것, 없으면 null).</summary>
+    public QABoss103Threat DroneThreat => _droneThreat;
 
     public QABoss103ThreatSensor()
     {
@@ -266,7 +274,7 @@ public sealed class QABoss103ThreatSensor
         if (_drone == null || DroneView == null)
             return;
         int view = Convert.ToInt32(DroneView.GetValue(_drone));
-        if (view == 1 && DroneCross != null)
+        if (view == DroneMark && DroneCross != null)
         {
             Transform cross = DroneCross.GetValue(_drone) as Transform;
             _droneMarkedMe = me != null && cross != null && cross.root == me.transform.root;
