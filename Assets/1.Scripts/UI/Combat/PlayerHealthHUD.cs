@@ -18,6 +18,8 @@ public class PlayerHealthHUD : MonoBehaviour
 
     private Player player;
     private bool displayOverrideZero;
+    private Sprite defaultHpFillSprite;
+    private bool defaultHpFillCaptured;
 
     public void Bind(Player boundPlayer)
     {
@@ -29,8 +31,30 @@ public class PlayerHealthHUD : MonoBehaviour
         if (player != null)
             player.ClientHpChanged += delayed.OnHpChanged;
 
+        ApplyCharacterHpFill();
         delayed.Bind(player != null ? player.CurrentHealth : 0);
         Refresh();
+    }
+
+    /// <summary>
+    /// 체력 채움 그림을 캐릭터별 포트레잇 합성본으로 고른다(로스터 칸 <see cref="CharacterRoster.Entry.HudHpFill"/>).
+    /// 조회 실패·칸이 비어 있으면 프리팹에 직렬화된 기본(거너) 그림. 잔상·실드 바는 공통 마스크라 바꾸지 않는다.
+    /// </summary>
+    private void ApplyCharacterHpFill()
+    {
+        if (hpFill == null)
+            return;
+
+        if (!defaultHpFillCaptured)
+        {
+            defaultHpFillSprite = hpFill.sprite;
+            defaultHpFillCaptured = true;
+        }
+
+        Sprite characterSprite = SpawnedCharacterRoster.TryGetEntry(player, out CharacterRoster.Entry entry)
+            ? entry.HudHpFill
+            : null;
+        hpFill.sprite = characterSprite != null ? characterSprite : defaultHpFillSprite;
     }
 
     /// <summary>

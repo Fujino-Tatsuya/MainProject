@@ -11,7 +11,7 @@ using UnityEngine;
 /// <item><see cref="Fire"/> — ② 발동(천둥 번개). 바닥 번쩍 + 갈라지는 번개(<see cref="ElectricFloorBolts"/>)가 시작점에서 <see cref="growTime"/> 초에
 ///   칸 끝까지 뻗고, <see cref="restrikeInterval"/> 초마다 모양을 바꿔 다시 친다(밝기가 들쭉날쭉 — 번쩍임). 지정 시간 뒤 (b) 잔광 <see cref="afterglow"/> 초에 꺼진다.
 ///   칸 가장자리를 따라 전류가 흐른다(<see cref="ElectricFloorEdges"/> — 떨리는 선 위로 빛 줄기가 빠르게 미끄러짐, 번개와 같은 박자로 떨림이 바뀜).
-///   즉사 방전은 번개 모양 수치만 다르다(<see cref="ElectricFloorBolts"/> 의 즉사 모양) — 추가 연출 없음(10-23 민경)</item>
+///   즉사 방전은 번개 모양 수치(<see cref="ElectricFloorBolts"/> 의 즉사 모양)와 밝기(<see cref="lethalBoost"/>)만 다르다 — 추가 연출 없음(10-23·26 민경)</item>
 /// <item><see cref="Clear"/> — 즉시 끔(보스 사망·제압·기믹 종료)</item>
 /// </list>
 /// 예고와 발동은 따로 돈다 — 기믹 B 처럼 발동 잔광이 남은 칸에 바로 다음 예고가 와도 둘 다 보인다.
@@ -59,6 +59,10 @@ public class ElectricFloorTileFx : MonoBehaviour
     [Tooltip("가장자리 전류 밝기 — 방전 밝기를 이만큼만 따라 출렁인다(0 = 일정)")]
     [SerializeField, Min(0f)] float edgeLevel = 0.9f;
     [SerializeField, Range(0f, 1f)] float edgeFollow = 0.3f;
+
+    [Header("즉사 방전")]
+    [Tooltip("즉사 방전 밝기 배율 — 번개·가장자리 전류·바닥 번쩍에 곱한다. 셰이더가 밝기를 알파에도 넣어(제곱) 체감은 이보다 크다")]
+    [SerializeField, Min(1f)] float lethalBoost = 1.5f;
 
     static readonly int ColorFactorId = Shader.PropertyToID("_ColorFactor");
 
@@ -223,6 +227,7 @@ public class ElectricFloorTileFx : MonoBehaviour
         if (_firing)
         {
             float f = now - _fireStart;
+            float boost = _lethal ? lethalBoost : 1f;
             if (f < _fireTime)
             {
                 // 다시 치기 — 칠 때마다 새 모양 · 들쭉날쭉한 밝기(첫 방전은 최대).
@@ -236,10 +241,10 @@ public class ElectricFloorTileFx : MonoBehaviour
                 }
                 float inStrike = (f - Mathf.Max(0, _strike) * restrikeInterval) / restrikeInterval;
                 boltLevel = _strikeLevel * (1f - strikeDecay * inStrike);
+                edge = edgeLevel * (1f - edgeFollow + edgeFollow * boltLevel);
                 if (bolts != null)
                     bolts.SetReveal(_strike == 0 ? bolts.MaxDistance * Mathf.Clamp01(f / growTime) + 0.4f : float.PositiveInfinity);
-                glowLevel = Mathf.Max(glowLevel, fireGlow * (1f - Mathf.Clamp01(f / fireGlowTime)));
-                edge = edgeLevel * (1f - edgeFollow + edgeFollow * boltLevel);
+                glowLevel = Mathf.Max(glowLevel, fireGlow * boost * (1f - Mathf.Clamp01(f / fireGlowTime)));
             }
             else if (afterglow > 0f && f < _fireTime + afterglow)
             {
@@ -249,6 +254,9 @@ public class ElectricFloorTileFx : MonoBehaviour
             }
             else
                 _firing = false;
+
+            boltLevel *= boost;
+            edge *= boost;
 
             if (arcs != null && arcTimes != null)
                 while (_arcIndex < arcTimes.Length && f >= arcTimes[_arcIndex] && arcTimes[_arcIndex] < _fireTime)

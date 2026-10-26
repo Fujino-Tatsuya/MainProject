@@ -61,7 +61,8 @@ public sealed class AssassinEnhanceSkill : PlayerInstantSkill
         upperBodyActive = true;
     }
 
-    // 전 피어 — 컨트롤러의 종료 CrossFade(Idle)는 0층만 되돌린다. 완료·대시·피격·사망 모두 상체 레이어 가중치를 내려 0층에 돌려준다.
+    // 전 피어 — Buff 상태가 상체 레이어에만 있어 컨트롤러는 시작·종료 때 0층(하체)을 건드리지 않는다(PlayerActionPoseRules 상체 전용).
+    // 완료·대시·피격·사망 모두 여기서 상체 레이어 가중치를 내려 0층에 돌려준다.
     public override void OnEnd(SkillEndReason reason)
     {
         upperBodyActive = false;
