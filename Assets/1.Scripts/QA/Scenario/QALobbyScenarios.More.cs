@@ -29,6 +29,7 @@ public static partial class QALobbyScenarios
             case "P572": return 720f;
 #if UNITY_EDITOR
             case Interrupt88Id: return QAInterruptSuite88.TimeLimitSeconds();
+            case Boss103Id: return Boss103TimeLimitSeconds;
 #endif
             default: return 60f;
         }
@@ -53,6 +54,7 @@ public static partial class QALobbyScenarios
             case "P572": return P572(ctx);
 #if UNITY_EDITOR
             case Interrupt88Id: return I88(ctx);
+            case Boss103Id: return B103(ctx);
 #endif
             default: return null;
         }

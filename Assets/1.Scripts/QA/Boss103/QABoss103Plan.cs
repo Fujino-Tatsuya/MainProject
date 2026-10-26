@@ -1,0 +1,266 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+
+/// <summary>할 일 103 판 결과.</summary>
+public enum QABoss103Outcome
+{
+    /// <summary>아직 진행 중.</summary>
+    None = 0,
+    /// <summary>보스 처치.</summary>
+    Clear = 1,
+    /// <summary>공용 목숨 0 에서 전멸(게임은 리스폰하지만 QA 는 여기서 판 종료).</summary>
+    Wipe = 2,
+    /// <summary>Combat 진입부터 30분.</summary>
+    Timeout = 3,
+    /// <summary>시작 경로 실패(맵·집결·연출·Combat 중 어디서 멈춤) — 밸런스 통계에서 뺀다.</summary>
+    Aborted = 4,
+}
+
+/// <summary>할 일 103 파티 고정 캐릭터 — 한 판 = 팔라딘·어쌔신·거너 1명씩.</summary>
+public enum QABoss103Character
+{
+    Paladin = 0,
+    Assassin = 1,
+    Gunner = 2,
+}
+
+/// <summary>
+/// 할 일 103 3인 보스전 밸런싱 QA 의 순수 규칙(EditMode <c>QABoss103PlanTests</c>) — 판 종료 판정·30분 상한·시드 → 특성 선택·
+/// 파티 자리 → 캐릭터·판 기록 한 줄. Unity·네트워크 의존 없음.
+/// 사양: <c>_lane-artifacts/common/103/103-결정.md</c>.
+/// </summary>
+public static class QABoss103Plan
+{
+    public const string Tag = "[QA103]";
+
+    /// <summary>시간초과 상한(초) — Combat 진입부터.</summary>
+    public const double CombatLimitSeconds = 30 * 60;
+
+    /// <summary>
+    /// 보스 전에 고르는 특성 수 = 튜토리얼 복도 1~4 라운드(<c>TutorialCorridorFlow</c> — 복도마다 1장, 출구 G2/G4/G7/G10).
+    /// 전멸 뒤 재선택 라운드 수(<c>TutorialTraitResetModel.ReselectRounds</c> = 4)와 같다.
+    /// </summary>
+    public const int TraitRounds = 4;
+
+    /// <summary>파티 자리(접속 clientId 오름차순 순위) → 캐릭터. 자리 0 = 호스트.</summary>
+    public static readonly QABoss103Character[] PartyOrder =
+        { QABoss103Character.Paladin, QABoss103Character.Assassin, QABoss103Character.Gunner };
+
+    /// <summary>자리 → 캐릭터. 범위 밖은 자리를 3으로 돌린다(4인 이상은 이 QA 범위 밖).</summary>
+    public static QABoss103Character CharacterForSlot(int slot)
+    {
+        int n = PartyOrder.Length;
+        return PartyOrder[((slot % n) + n) % n];
+    }
+
+    /// <summary><paramref name="clientId"/> 의 자리 = 접속자(정렬 무관) 중 더 작은 id 의 수. 목록에 없으면 -1.</summary>
+    public static int SlotOf(ulong clientId, IEnumerable<ulong> connected)
+    {
+        bool found = false;
+        int smaller = 0;
+        foreach (ulong id in connected)
+        {
+            if (id == clientId)
+                found = true;
+            else if (id < clientId)
+                smaller++;
+        }
+        return found ? smaller : -1;
+    }
+
+    // ── 발판 배치 ────────────────────────────────────────────────
+
+    /// <summary>발판 안 일렬 배치 간격 기본값(m) — 서로 겹치지 않을 만큼.</summary>
+    public const float PadSpacing = 1.4f;
+
+    /// <summary>
+    /// 발판(반폭 <paramref name="half"/>) 가운데를 지나는 일렬 배치의 <paramref name="index"/> 번째 오프셋(m, 가운데 0).
+    /// 간격은 <paramref name="spacing"/> 이되 양끝이 발판 폭의 80% 안에 들게 줄인다. count 가 1 이하면 0.
+    /// </summary>
+    public static float PadLineOffset(int index, int count, float half, float spacing = PadSpacing)
+    {
+        if (count <= 1)
+            return 0f;
+        float usable = Math.Max(0f, half) * 0.8f;
+        float step = Math.Min(Math.Max(0f, spacing), 2f * usable / (count - 1));
+        return (index - (count - 1) * 0.5f) * step;
+    }
+
+    // ── 판 종료 판정 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// [서버] 판 종료 판정. 같은 틱에 겹치면 클리어 &gt; 전멸 &gt; 시간초과(보스를 잡은 판을 실패로 세지 않는다).
+    /// <paramref name="partyWiped"/> = 공용 목숨 0 에서 전멸 판정이 났다(<c>PartyWipeRespawned</c>·<c>PartyWipeWatcher</c>).
+    /// <paramref name="combatElapsedSeconds"/> = Combat 진입부터(음수 = 아직 Combat 전 → 시간초과 없음).
+    /// </summary>
+    public static QABoss103Outcome Judge(bool bossDead, bool partyWiped, double combatElapsedSeconds, double limitSeconds = CombatLimitSeconds)
+    {
+        if (bossDead)
+            return QABoss103Outcome.Clear;
+        if (partyWiped)
+            return QABoss103Outcome.Wipe;
+        if (IsTimedOut(combatElapsedSeconds, limitSeconds))
+            return QABoss103Outcome.Timeout;
+        return QABoss103Outcome.None;
+    }
+
+    /// <summary>Combat 진입부터 <paramref name="limitSeconds"/> 이상 지났나. Combat 전(음수)은 false.</summary>
+    public static bool IsTimedOut(double combatElapsedSeconds, double limitSeconds = CombatLimitSeconds) =>
+        combatElapsedSeconds >= 0.0 && combatElapsedSeconds >= limitSeconds;
+
+    /// <summary>
+    /// 전멸 판정이 "공용 목숨 0 에서"인가 — 게임은 목숨이 남으면 개인 부활, 0 이면 전멸 리스폰을 한다.
+    /// <paramref name="sharedLivesLeft"/> 가 0 이하이고 살아 있는 플레이어가 0 이면 true.
+    /// </summary>
+    public static bool IsFinalWipe(int sharedLivesLeft, int alivePlayers) => sharedLivesLeft <= 0 && alivePlayers <= 0;
+
+    // ── 시드 ─────────────────────────────────────────────────────
+
+    /// <summary>판 시드 = 기준 시드와 판 번호를 섞은 값(같은 기준 시드·같은 판 = 같은 값).</summary>
+    public static int RunSeed(int baseSeed, int run) => Mix(baseSeed, run, 0x103, 0);
+
+    /// <summary>특성 디렉터 후보 뽑기에 넣을 시드(서버 <c>System.Random</c>).</summary>
+    public static int DirectorSeed(int runSeed) => Mix(runSeed, 0x7A17, 0, 0);
+
+    /// <summary>
+    /// 그 캐릭터의 <paramref name="nth"/>(1부터 — 이미 얻은 수 + 1) 번째 선택에서 제시받은 <paramref name="offers"/> 중 고를 특성 인덱스.
+    /// 같은 (판 시드·순번·캐릭터·제시 목록) = 같은 결과. 제시가 비면 -1.
+    /// </summary>
+    public static int PickOffer(int runSeed, int nth, QABoss103Character character, IReadOnlyList<int> offers)
+    {
+        if (offers == null || offers.Count == 0)
+            return -1;
+        uint h = (uint)Mix(runSeed, nth, (int)character + 1, 0x51C7);
+        return offers[(int)(h % (uint)offers.Count)];
+    }
+
+    /// <summary>정수 4개를 섞는 해시(SplitMix 계열) — 런타임·플랫폼과 무관하게 같은 값.</summary>
+    public static int Mix(int a, int b, int c, int d)
+    {
+        ulong x = 0x9E3779B97F4A7C15UL;
+        x = Step(x ^ (uint)a);
+        x = Step(x ^ ((ulong)(uint)b << 1));
+        x = Step(x ^ ((ulong)(uint)c << 2));
+        x = Step(x ^ ((ulong)(uint)d << 3));
+        return (int)(x ^ (x >> 32));
+    }
+
+    private static ulong Step(ulong z)
+    {
+        z += 0x9E3779B97F4A7C15UL;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+        return z ^ (z >> 31);
+    }
+
+    /// <summary>값을 로그 토큰으로 — 공백·'='·'|'·',' 를 '_' 로(한 줄 key=value 파싱이 깨지지 않게). 비면 na.</summary>
+    public static string Token(string s)
+    {
+        if (string.IsNullOrEmpty(s))
+            return "na";
+        var sb = new StringBuilder(s.Length);
+        foreach (char ch in s)
+            sb.Append(char.IsWhiteSpace(ch) || ch == '=' || ch == '|' || ch == ',' ? '_' : ch);
+        return sb.ToString();
+    }
+}
+
+/// <summary>할 일 103 판 기록 — 결과·전투 시간·시드·캐릭터별 특성. C4(계측·CSV)가 여기에 열을 더한다.</summary>
+public sealed class QABoss103RunRecord
+{
+    public int Run;
+    public int BaseSeed;
+    public int RunSeed;
+    public QABoss103Outcome Outcome = QABoss103Outcome.None;
+    /// <summary>Combat 진입부터 판 종료까지(초). Combat 전에 끝났으면 -1.</summary>
+    public double CombatSeconds = -1.0;
+    /// <summary>판 종료 사유 상세(실패 단계·전멸 판정 출처 등).</summary>
+    public string Detail = "";
+    /// <summary>캐릭터 → 고른 특성 id(획득 순서).</summary>
+    public readonly SortedDictionary<QABoss103Character, List<string>> Traits = new SortedDictionary<QABoss103Character, List<string>>();
+
+    public void AddTrait(QABoss103Character character, string traitId)
+    {
+        if (!Traits.TryGetValue(character, out List<string> list))
+            Traits[character] = list = new List<string>();
+        list.Add(traitId);
+    }
+
+    public int TraitCount(QABoss103Character character) =>
+        Traits.TryGetValue(character, out List<string> list) ? list.Count : 0;
+
+    /// <summary><c>Paladin:a+b+c+d;Assassin:…</c> — 캐릭터 순서 고정.</summary>
+    public string TraitsToken()
+    {
+        var sb = new StringBuilder();
+        foreach (KeyValuePair<QABoss103Character, List<string>> kv in Traits)
+        {
+            if (sb.Length > 0)
+                sb.Append(';');
+            sb.Append(kv.Key).Append(':');
+            for (int i = 0; i < kv.Value.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append('+');
+                sb.Append(QABoss103Plan.Token(kv.Value[i]));
+            }
+        }
+        return sb.Length > 0 ? sb.ToString() : "none";
+    }
+
+    /// <summary>로그 1줄 — <c>[QA103] event=run_end run=… outcome=… combatS=… seed=… runSeed=… traits=… detail=…</c>.</summary>
+    public string ToLogLine()
+    {
+        string combat = CombatSeconds < 0.0 ? "na" : CombatSeconds.ToString("F1", CultureInfo.InvariantCulture);
+        return $"{QABoss103Plan.Tag} event=run_end run={Run} outcome={Outcome} combatS={combat} seed={BaseSeed} runSeed={RunSeed} " +
+               $"traits={TraitsToken()} detail={QABoss103Plan.Token(Detail)}";
+    }
+}
+
+/// <summary>
+/// 할 일 103 실행 설정 — 메뉴(<c>Tools/QA/103</c>)가 호스트·MPPM 클론 루트마다 같은 파일을 쓰고, 각 인스턴스가 자기 루트에서 읽는다.
+/// 형식 = 한 줄에 <c>key=value</c>(<c>seed</c>·<c>run</c>). 모르는 키는 무시.
+/// </summary>
+public sealed class QABoss103Config
+{
+    public const string FileName = "qa103.txt";
+    public const int DefaultSeed = 103;
+
+    public int Seed = DefaultSeed;
+    public int Run = 1;
+
+    public int RunSeed => QABoss103Plan.RunSeed(Seed, Run);
+
+    public string Format() => $"seed={Seed}\nrun={Run}\n";
+
+    public static bool TryParse(string text, out QABoss103Config cfg)
+    {
+        cfg = new QABoss103Config();
+        if (string.IsNullOrEmpty(text))
+            return false;
+        bool any = false;
+        foreach (string raw in text.Split('\n'))
+        {
+            string line = raw.Trim();
+            int eq = line.IndexOf('=');
+            if (eq <= 0)
+                continue;
+            string key = line.Substring(0, eq).Trim();
+            if (!int.TryParse(line.Substring(eq + 1).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int v))
+                continue;
+            if (key == "seed")
+            {
+                cfg.Seed = v;
+                any = true;
+            }
+            else if (key == "run")
+            {
+                cfg.Run = Math.Max(1, v);
+                any = true;
+            }
+        }
+        return any;
+    }
+}
