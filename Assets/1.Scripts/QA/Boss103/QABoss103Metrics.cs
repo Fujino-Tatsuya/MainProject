@@ -489,21 +489,31 @@ public sealed class QABoss103RunStats
         foreach (QABoss103CounterPress p in CounterPresses)
         {
             QABoss103CharStats c = C(p.Slot);
-            if (c == null || !p.HitRoll)
+            if (c == null || !p.HitRoll || double.IsNaN(p.ServerT))
                 continue;
-            c.CounterHitRolls++;
-            for (int i = 0; i < CounterSuccesses.Count; i++)
+            // 창 하나는 한 명만 가져간다(성공 = 그로기로 창 닫힘). 다른 봇이 그 창(누름 앞 창 길이 ~ 뒤 판정 몫)에서 성공했으면 내 누름은 셈에서 뺀다.
+            bool taken = false;
+            foreach (QABoss103Hit s in CounterSuccesses)
+                if (s.Slot != p.Slot && !double.IsNaN(s.T) &&
+                    s.T >= p.ServerT - QABoss103Metrics.CounterWindowBackSeconds && s.T <= p.ServerT + QABoss103Metrics.CounterMatchSeconds)
+                    taken = true;
+            bool mine = false;
+            for (int i = 0; i < CounterSuccesses.Count && !mine; i++)
             {
                 QABoss103Hit s = CounterSuccesses[i];
-                if (used[i] || s.Slot != p.Slot || double.IsNaN(s.T) || double.IsNaN(p.ServerT))
+                if (used[i] || s.Slot != p.Slot || double.IsNaN(s.T))
                     continue;
                 if (s.T >= p.ServerT - QABoss103Metrics.RollLookaheadSeconds && s.T <= p.ServerT + QABoss103Metrics.CounterMatchSeconds)
                 {
                     used[i] = true;
-                    c.CounterHitSuccess++;
-                    break;
+                    mine = true;
                 }
             }
+            if (taken && !mine)
+                continue;
+            c.CounterHitRolls++;
+            if (mine)
+                c.CounterHitSuccess++;
         }
     }
 
@@ -621,6 +631,8 @@ public static class QABoss103Metrics
     public const double FidelityTailSeconds = 1.0;
     /// <summary>C7e 충실도 — 간파 성공 굴림 누름 뒤 이 안(초)의 서버 간파 성공을 그 누름의 결과로 본다(시전 선딜·RPC 왕복).</summary>
     public const double CounterMatchSeconds = 1.0;
+    /// <summary>C7e 충실도 — 내 누름 이만큼(초) 앞까지의 다른 봇 간파 성공은 같은 창(돌진 창 ≈ 1.5초)을 먼저 가져간 것이다.</summary>
+    public const double CounterWindowBackSeconds = 1.6;
 
     /// <summary>C7e — 굴림 감지부터 '그 위험'으로 보는 피격 창(초) = 예상 피격(모르면 기본값) + 꼬리.</summary>
     public static double FidelityWindow(double hitDelaySeconds) =>

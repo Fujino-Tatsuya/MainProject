@@ -216,9 +216,12 @@ public sealed partial class QABoss103CombatBot
             return true;
         }
 
-        double actAt = r.GuardPlan ? QABoss103HitTiming.GuardStartAt(r.DeadlineAt, r.ActAt) : QABoss103HitTiming.DashStartAt(r.DeadlineAt, r.ActAt);
-        if (now < actAt)
+        // 방어 계획이면 방어 시각부터, 아니면 대시 시각부터 마감 직전까지 매 틱 시도한다(Q·R 이 끝나 대시·방어가 열리는 순간을 잡는다).
+        double dashAt = QABoss103HitTiming.DashStartAt(r.DeadlineAt, r.ActAt);
+        double firstAt = r.GuardPlan ? QABoss103HitTiming.GuardStartAt(r.DeadlineAt, r.ActAt) : dashAt;
+        if (now < firstAt)
             return false;
+        bool final = now >= System.Math.Max(dashAt, r.DeadlineAt - FinalTrySeconds);
 
         if (!_sensor.Contains(t, myPos, surface, true))
         {
@@ -227,10 +230,27 @@ public sealed partial class QABoss103CombatBot
             Report(r, QABoss103DodgeAction.Walk, "true", "outside", now);
             return true;
         }
-        QABoss103DodgeAction action = Dodge(me, r, now, out bool done, out string note);
+        QABoss103DodgeAction action = Dodge(me, r, now, now >= dashAt, out bool done, out string note);
+        if (!done && !final)
+            return false;
+        CountAction(action, done);
         string ok = action == QABoss103DodgeAction.Dash || action == QABoss103DodgeAction.Guard ? (done ? "true" : "false") : "na";
         Report(r, action, ok, note, now);
         return true;
+    }
+
+    /// <summary>C7e — 마지막 시도 = 마감 이만큼(초) 전. 대시 무적(0.25)이 마감을 덮을 마지막 틈.</summary>
+    private const double FinalTrySeconds = 0.03;
+
+    private void CountAction(QABoss103DodgeAction action, bool done)
+    {
+        switch (action)
+        {
+            case QABoss103DodgeAction.Guard: if (done) _guards++; else _guardRejects++; break;
+            case QABoss103DodgeAction.Dash: if (done) _dashes++; else _dashRejects++; break;
+            case QABoss103DodgeAction.NoCharge: _noCharges++; break;
+            case QABoss103DodgeAction.Blocked: _blocks++; break;
+        }
     }
 
     private void Report(PendingReaction r, QABoss103DodgeAction action, string ok, string note, double now)
@@ -248,8 +268,11 @@ public sealed partial class QABoss103CombatBot
         PartThreat(t, r.Dodge, action, ok, note, hitMs);
     }
 
-    /// <summary>회피 실행(마감 직전, 아직 범위 안). 방어 계획이면 방어, 거부되면 대시로 넘어간다.</summary>
-    private QABoss103DodgeAction Dodge(Player me, PendingReaction r, double now, out bool done, out string note)
+    /// <summary>
+    /// 회피 시도 1회(아직 범위 안). 방어 계획이면 방어, 안 되면(<paramref name="allowDash"/> = 대시 시각이 지났을 때만) 대시.
+    /// 실패해도 집계는 하지 않는다 — 호출자가 성공 또는 마지막 시도에서 <see cref="CountAction"/>.
+    /// </summary>
+    private QABoss103DodgeAction Dodge(Player me, PendingReaction r, double now, bool allowDash, out bool done, out string note)
     {
         QABoss103Threat t = r.Threat;
         done = false;
@@ -268,12 +291,10 @@ public sealed partial class QABoss103CombatBot
         {
             if (TryGuard(me, skills, t, System.Math.Max(r.HitAt, r.DeadlineAt), now))
             {
-                _guards++;
                 done = true;
                 _avoidUntil = System.Math.Max(_avoidUntil, System.Math.Max(t.EndsAt, r.HitAt) + AvoidTailSeconds);
                 return action;
             }
-            _guardRejects++;
             note = "guard_rejected";
             action = QABoss103Evasion.ChooseAction(true, false, hasCharge, dashAllowed);
         }
@@ -281,6 +302,8 @@ public sealed partial class QABoss103CombatBot
         {
             note = "guard_unready";
         }
+        if (!allowDash)
+            return action;   // 방어 시각 ~ 대시 시각 사이 — 방어만 노린다
 
         switch (action)
         {
@@ -295,26 +318,19 @@ public sealed partial class QABoss103CombatBot
                 done = dash.TryBeginPredictedDash(cancelsAction: !idleMove);
                 if (done)
                 {
-                    _dashes++;
                     _dashLockUntil = now + DashLockSeconds;
                     _avoidUntil = System.Math.Max(_avoidUntil, System.Math.Max(t.EndsAt, r.HitAt) + AvoidTailSeconds);
-                }
-                else
-                {
-                    _dashRejects++;
                 }
                 if (note == "none")
                     note = $"dir={F2(dir.x)}/{F2(dir.z)} state={me.CurrentState}";
                 break;
             case QABoss103DodgeAction.NoCharge:
-                _noCharges++;
                 if (note == "none" && dash != null)
                     note = $"charges={dash.PredictedCharge}/{dash.MaxCharge}";
                 break;
             case QABoss103DodgeAction.Blocked:
-                _blocks++;
-                if (note == "none")
-                    note = "state_" + me.CurrentState;
+                if (note == "none" || note == "guard_unready")
+                    note = (note == "guard_unready" ? "guard_unready_" : "") + "state_" + me.CurrentState;
                 break;
         }
         return action;
@@ -381,9 +397,9 @@ public sealed partial class QABoss103CombatBot
             noStart = true;
             if (r.GuardPlan)
             {
+                // 방어 계획도 걷는다(밖으로 나가면 방어 없이 walk) — 조준만 출처에 둬 방어 방향을 잡는다.
                 hold = true;
                 _driver.SetAim(_sensor.Source(r.Threat));
-                continue;
             }
             if (inside && (lead == null || r.DeadlineAt < lead.DeadlineAt))
                 lead = r;

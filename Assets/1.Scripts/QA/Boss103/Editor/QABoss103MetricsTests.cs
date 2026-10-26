@@ -391,7 +391,15 @@ public sealed class QABoss103MetricsTests
             "counter slot=0 window=3 roll=miss cast=true serverT=59.9",
             "done slot=0",
         });
+        s.AddPart(Asn, new[]
+        {
+            "counter slot=1 window=1 roll=hit cast=true serverT=40.3",   // 같은 창을 팔라딘이 40.4 에 가져갔다 — 뺀다
+            "counter slot=1 window=4 roll=hit cast=true serverT=70.0",   // 아무도 성공 못 함 — 실패로 센다
+            "done slot=1",
+        });
         s.Finish();
+        Assert.AreEqual(1, s.Chars[Asn].CounterHitRolls, "다른 봇이 먼저 가져간 창의 누름은 셈에서 뺀다");
+        Assert.AreEqual(0, s.Chars[Asn].CounterHitSuccess);
         QABoss103CharStats c = s.Chars[Pal];
         Assert.AreEqual(2, c.DodgeRolls, "idle_ 굴림은 행동 못 함 — 뺀다");
         Assert.AreEqual(1, c.DodgeSuccess);
