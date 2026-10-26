@@ -39,7 +39,7 @@ public static class CombatHudResourceAuthoring
 
         try
         {
-            if (!ApplyHealthBar(root.transform))
+            if (!ApplyHealthBar(root.transform) || !AssignRosterHpFills())
             {
                 Debug.LogError("[CombatHudResource] 적용 실패 — 저장하지 않았다. 위 오류를 확인할 것.");
                 return;
@@ -95,6 +95,55 @@ public static class CombatHudResourceAuthoring
         ex.anchoredPosition = CenterOffset(XpTopLeft, XpSize);
         ex.GetComponent<Image>().sprite = xpFill;
         return true;
+    }
+
+    // ── C2: 캐릭터별 체력 채움 ───────────────────────────────────────────
+
+    const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
+
+    /// <summary>
+    /// 로스터 칸마다 <c>hudHpFill</c> 을 넣는다. 칸 순서가 아니라 칸의 캐릭터(<see cref="TutorialCharacter"/>)로 고른다 —
+    /// 칸을 옮겨도 그림이 따라간다. 값이 같으면 건드리지 않는다(에셋을 dirty 로 만들지 않는다).
+    /// </summary>
+    static bool AssignRosterHpFills()
+    {
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
+        if (roster == null)
+        {
+            Debug.LogError($"[CombatHudResource] 로스터를 못 찾았다: {RosterPath}");
+            return false;
+        }
+
+        var so = new SerializedObject(roster);
+        SerializedProperty entries = so.FindProperty("entries");
+        for (int i = 0; i < entries.arraySize; i++)
+        {
+            SerializedProperty entry = entries.GetArrayElementAtIndex(i);
+            string file = HpFillFileFor((TutorialCharacter)entry.FindPropertyRelative("tutorialCharacter").intValue);
+            if (file == null)
+                continue;
+
+            Sprite sprite = LoadSprite(HealthArtDir + file);
+            if (sprite == null)
+                return false;
+
+            entry.FindPropertyRelative("hudHpFill").objectReferenceValue = sprite;
+        }
+
+        if (so.ApplyModifiedPropertiesWithoutUndo())
+            AssetDatabase.SaveAssetIfDirty(roster);
+        return true;
+    }
+
+    static string HpFillFileFor(TutorialCharacter character)
+    {
+        switch (character)
+        {
+            case TutorialCharacter.Paladin: return "hp_fill_paladin.png";
+            case TutorialCharacter.Gunner: return "hp_fill_gunner.png";
+            case TutorialCharacter.Assassin: return "hp_fill_assassin.png";
+            default: return null;
+        }
     }
 
     /// <summary>HpBar(중앙 0,0) 안에서의 위치·크기·스프라이트만 바꾼다. 색·Filled 설정은 기존 값을 유지한다.</summary>
