@@ -4,6 +4,9 @@ using UnityEngine;
 /// 거너 평타 레이저의 위·아래 기울기 규칙(할 일 93). 순수 클래스 — <see cref="GunnerBasicAttack"/> 가 쓴다.
 ///
 /// · 수평 방향은 잠근 몸 방향 그대로다(할 일 27, <see cref="GunnerAttackFacingModel"/>). 여기서는 기울기만 붙인다.
+/// · 지면점은 거너 평타 전용 마우스 레이(Default·Ground·Env, 트리거 무시)로 방향을 잠그는 순간 잡는다 — 조준 화살표의
+///   Ground 전용 레이가 아니다(맵 바닥 floor_stone 계열이 Default 레이어). 레이가 아무것도 못 맞히면 기울기 0.
+/// · 기울기 계산은 그 발을 요청하는 순간의 총구 기준이다(첫 발은 준비가 끝난 발사 자세 총구).
 /// · 마우스 지면점과 발 높이의 차가 levelTolerance 이내면 기울기 0 — 평지는 예전과 똑같이 수평이다.
 /// · 넘으면 조준점 = 지면점 + 위로 aimHeightAboveGround. 기울기 = (조준점.y − 총구.y) / 총구에서 조준점까지 수평 거리.
 /// · 위·아래 각도는 <see cref="MaxPitchDegrees"/> 에서 자른다. 서버도 받은 방향을 <see cref="ClampPitch"/> 로 한 번 더 자른다.
@@ -15,6 +18,18 @@ public static class GunnerLaserPitchRules
 
     // 이보다 가까운 조준점은 기울기를 잴 수 없다고 보고 수평으로 쏜다(m).
     public const float MinHorizontalDistance = 0.01f;
+
+    /// <summary>
+    /// 지면 레이가 못 맞혔을 수도 있는 경우 — <paramref name="hasGroundPoint"/> 가 false 면 수평(평면 방향 그대로).
+    /// </summary>
+    public static Vector3 AimDirection(Vector3 flatDirection, Vector3 origin, float footY, bool hasGroundPoint,
+                                       Vector3 groundPoint, float aimHeightAboveGround, float levelTolerance)
+    {
+        if (!hasGroundPoint)
+            return GunnerAttackFacingModel.Flatten(flatDirection, Vector3.forward);
+
+        return AimDirection(flatDirection, origin, footY, groundPoint, aimHeightAboveGround, levelTolerance);
+    }
 
     /// <summary>
     /// 잠근 평면 방향 <paramref name="flatDirection"/> 에 지면 높이에 따른 기울기를 붙인 3D 방향(정규화).

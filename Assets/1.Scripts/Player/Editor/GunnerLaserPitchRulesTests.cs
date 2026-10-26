@@ -87,6 +87,19 @@ public sealed class GunnerLaserPitchRulesTests
     }
 
     [Test]
+    public void GroundRayMiss_IsHorizontal()
+    {
+        // 레이가 못 맞혔으면 지면점 값(쓰레기여도)과 상관없이 수평 — 수평 성분은 몸 방향.
+        Vector3 body = new Vector3(1f, 0.4f, 1f);
+        Vector3 d = GunnerLaserPitchRules.AimDirection(body, Origin, 0f, false, new Vector3(0f, 5f, 6f), AimHeight, Tolerance);
+
+        Assert.That(d.y, Is.EqualTo(0f).Within(Eps));
+        Assert.That(Vector3.Distance(d, new Vector3(1f, 0f, 1f).normalized), Is.LessThan(Eps));
+        Assert.That(GunnerLaserPitchRules.AimDirection(Vector3.forward, Origin, 0f, true, new Vector3(0f, 5f, 6f), AimHeight, Tolerance).y,
+            Is.GreaterThan(0f), "맞혔으면 기존 규칙대로 기운다");
+    }
+
+    [Test]
     public void ClampPitch_ZeroVector_FallsBackToFlatFacing()
     {
         Vector3 d = GunnerLaserPitchRules.ClampPitch(Vector3.zero, new Vector3(0f, 0.5f, -2f));
