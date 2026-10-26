@@ -13,7 +13,7 @@ using UnityEngine;
 /// Train03 A→B·B→C 영역 안 확인만 0초.</item>
 /// <item>단계 완료: 훈련 내용(T3 표적·T4 일반 몹·T5 훈련 상대·T6 브리핑)이 <see cref="ServerReportStageCompleted"/> 로 알린다. 현재 단계가 아니면 무시.</item>
 /// <item>출격 확정 = 메인 진입(옛 Ready 패드·LobbySession 카운트다운 대체, PLAN §7-2): Sortie 진입 때 래치(<see cref="LobbyTrainingFlow.TryConsumeLaunch"/>)를 걸고
-/// <see cref="NetworkSessionLauncher.StartGameLoading"/> 을 정확히 1회 부른다. 로딩 흐름의 로비 시작 조건은 <see cref="ServerHasLaunched"/>.</item>
+/// <see cref="NetworkSessionLauncher.StartGameLoading"/> 을 정확히 1회 부른다 — 같은 오브젝트에 <see cref="LobbyPodLaunch"/> 가 있으면 포드 연출 끝(완전 암전)에. 로딩 흐름의 로비 시작 조건은 <see cref="ServerHasLaunched"/>.</item>
 /// <item>접속 승인: <see cref="NetworkSessionLauncher.LobbyCountdownActiveProvider"/> = 출격 집결 카운트다운 중 또는 출격 단계(<see cref="LobbyTrainingFlow.BlocksNewJoins"/>).
 /// 훈련·브리핑 중 접속은 받는다(로비 대기).</item>
 /// <item>캐릭터 잠금: <see cref="CharacterChangeBlockFor"/> — 훈련 명단(복제)·단계·출격 카운트다운으로 서버 RPC 와 클라 패널이 같은 판정을 한다.</item>
@@ -281,6 +281,11 @@ public sealed class LobbyTrainingDirector : NetworkBehaviour
             Debug.LogError($"{Tag} NetworkSessionLauncher 가 없어 메인 진입을 시작하지 못했다.", this);
             return;
         }
+
+        // 포드 탑승·강하 연출(할 일 100) 뒤 완전 암전에 로딩. 연출 컴포넌트·설정이 없으면 지금처럼 곧바로 로딩(폴백).
+        var podLaunch = GetComponent<LobbyPodLaunch>();
+        if (podLaunch != null && podLaunch.TryBeginServer(launcher.StartGameLoading))
+            return;
 
         launcher.StartGameLoading();
     }
