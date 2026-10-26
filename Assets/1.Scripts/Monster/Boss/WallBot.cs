@@ -167,7 +167,7 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget
         //    3.9초짜리 시퀀스의 t=1.6 이후(돌진 후반 + 충격파 전체)가 무방비였다 — 거기서 스킬을
         //    맞으면 EnterHit 으로 Attack 을 벗어나며 시퀀스가 정리 없이 얼어붙었다.
         //    인터럽트는 카운터 창으로만 통해야 한다는 설계 의도와도 이쪽이 맞다.
-        if (data != null && data.hasSuperArmorWhileAttacking && status != null)
+        if (UsesAttackSuperArmor && status != null)   // 중간보스 취약 중엔 안 건다(팀장 10-26)
             status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
 
         ServerSetCounterWindow(true, Counter.WindowDuration);   // 표시는 0.15초 먼저 꺼진다
@@ -363,6 +363,7 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget
         ClearSequenceRuntime();
 
         Log($"카운터 성공 — 그로기 {groggy:0.##}s");
+        ServerBeginCounterVulnerable();   // 취약 8초(그로기 포함) — 팀장 10-26
         ForceGroggy(groggy);
 
         PlayInterruptFlashRpc();

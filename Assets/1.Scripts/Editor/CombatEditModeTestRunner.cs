@@ -39,7 +39,8 @@ internal static class CombatEditModeTestRunner
         "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
         "^MonsterSkyStrike", // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
         "^MonsterOverheadHealthBar", // MonsterOverheadHealthBarVisibilityTests — 몬스터 발밑 체력바 표시·부착 판단
-        "^MonsterInspectorCatalog" // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
+        "^MonsterInspectorCatalog", // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
+        "^MonsterStatusEffectVfx" // MonsterStatusEffectVfxSetTests — 몬스터 머리 위 기절 이펙트 표(팔라딘 Q 경직)
     };
 
     const string Tag = "[CombatTests]";

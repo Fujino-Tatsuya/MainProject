@@ -32,6 +32,11 @@ public class MonsterCounterWindow : MonoBehaviour
     [Tooltip("카운터 성공 시 그로기 시간(초). 기본 0.5, 길어도 1 을 넘기지 않는다(팀장 확정).")]
     float groggyDuration = 0.5f;
 
+    [SerializeField, Min(0f)]
+    [Tooltip("중간보스 취약 시간(초) — 카운터 성공 순간부터 센다(그로기 시간 포함). 이 동안 몸이 하늘색이고 팔라딘 Q 에 밀림·경직된다\n" +
+             "(공격 중 슈퍼아머도 뚫는다). 그로기가 끝난 뒤에는 평소처럼 움직이고 공격한다. 기본 8(팀장 10-26). 23호·일반 몹에는 쓰지 않는다.")]
+    float vulnerableDuration = 8f;
+
     readonly CounterWindow _window = new CounterWindow();
 
     /// <summary>
@@ -52,6 +57,9 @@ public class MonsterCounterWindow : MonoBehaviour
 
     /// <summary>카운터 성공 시 그로기 길이(초).</summary>
     public float GroggyDuration => groggyDuration;
+
+    /// <summary>중간보스 취약 길이(초) — 카운터 성공부터. <c>MonsterBase.ServerBeginCounterVulnerable</c> 이 읽는다.</summary>
+    public float VulnerableDuration => vulnerableDuration;
 
     /// <summary>창이 열려 있는가.</summary>
     public bool IsOpen => _window.IsOpen;

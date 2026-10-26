@@ -186,7 +186,7 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
                 float telegraph = AttackTime(whipTelegraphDuration);
                 _whipTelegraphTimer = telegraph;
                 _stateTimer += telegraph;
-                if (data != null && data.hasSuperArmorWhileAttacking && status != null)
+                if (UsesAttackSuperArmor && status != null)   // 중간보스 취약 중엔 안 건다(팀장 10-26)
                     status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration) + telegraph);
                 return;
             }
@@ -206,7 +206,7 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
         _stateTimer = WindupDuration + DashSeconds;
 
         // 준비+돌진 동안만 슈퍼아머(있으면). 종료 시 해제한다.
-        if (data != null && data.hasSuperArmorWhileAttacking && status != null)
+        if (UsesAttackSuperArmor && status != null)   // 중간보스 취약 중엔 안 건다(팀장 10-26)
             status.ApplyStatus(StatusEffectType.SuperArmor, WindupDuration + DashSeconds);
 
         PlaySpinStartClientRpc(WindupDuration);   // 준비 동작을 예고 시간에 맞춰 늘인다 — 다 찬 순간 회전 시작
@@ -374,6 +374,7 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
         status?.RemoveStatus(StatusEffectType.SuperArmor);
 
         _phase = SpinPhase.None;
+        ServerBeginCounterVulnerable();   // 취약 8초(그로기 포함) — 팀장 10-26
         ForceGroggy(Counter.GroggyDuration);
 
         PlayInterruptFlashRpc();

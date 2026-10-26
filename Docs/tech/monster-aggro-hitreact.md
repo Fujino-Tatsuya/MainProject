@@ -19,15 +19,30 @@
 | | 일반 몹 | 중간보스(`rank: MidBoss`) |
 |---|---|---|
 | 평상시 피격 | 0.4초 경직(갱신형). 공격 중 평타는 면제 | **경직 없음 · 밀림 없음**(피해만) |
-| 팔라딘 Q(밀림·경직 값을 싣는 유일한 플레이어 공격) | 밀림 → 경직 | 평상시 **면역** / **취약 중 밀림 → 경직** |
-| 취약(간파 성공 → 그로기) 중 평타·간파 스킬 | — | **피해만** |
-| 취약 중 밀림이 끝나면 | — | **남은 그로기로 복귀**(그로기 시간은 밀림·경직 동안에도 흐른다 — 취약 창 길이 고정) |
-| 슈퍼아머 | 경직·밀림 전부 막음 | 같음(튜토리얼 스피너 연습이 이걸로 Q 밀림을 막는다) |
+| 팔라딘 Q(밀림·경직 값을 싣는 유일한 플레이어 공격) | 밀림 → 경직 | 평상시 **면역** / **취약 중 밀림 → 경직**(공격 중이어도) |
+| 취약 중 평타·간파 스킬 | — | **피해만** |
+| 슈퍼아머 | 경직·밀림 전부 막음 | 같음. 단 **취약 중에는 공격 중 슈퍼아머를 걸지 않는다**(`UsesAttackSuperArmor`). 튜토리얼 스피너 연습의 무한 슈퍼아머는 그대로 막는다 |
 
-- **취약 색**: 중간보스는 Groggy·Knockback·Hit(= 취약과 그 밀림·경직) 동안 몸을 23호와 같은 하늘색(0.45, 0.75, 1)으로 칠한다 —
-  `MonsterBase.RefreshVulnerableTint`, 복제 상태만 보고 전 피어가 칠한다. 간파 창 색과 같은 베이스 틴트 칸이라 창이 켜져 있으면 비킨다.
+### 2.0 중간보스 간파 성공 → 그로기 1초 · 취약 8초 (팀장 10-26)
+
+| | 길이 | 동작 | 보이는 것 |
+|---|---|---|---|
+| **그로기** | `MonsterCounterWindow.groggyDuration` = 1초(xlsx) | 멈춰 있다(공격·이동 없음) | 하늘색 + **머리 위 기절 별** |
+| **취약** | `MonsterCounterWindow.vulnerableDuration` = 8초, **카운터 성공부터**(그로기 포함) | 그로기가 끝나면 평소처럼 움직이고 **공격한다** — 공격을 쉬는 상태가 아니라 **CC 에 약한** 상태다 | **하늘색만**(별 없음) |
+| 취약 중 팔라딘 Q | 밀림 0.25 + 경직 0.2초 | 공격 중이면 공격이 끊긴다. 그로기 중에 밀렸으면 끝난 뒤 **남은 그로기로 복귀**(그로기 시간은 밀림 동안에도 흐른다) | 기절 별(Q 경직의 `Stunned`) |
+
+- 취약은 FSM 상태가 아니라 **복제 플래그**(`MonsterBase._vulnerable` → `IsMidBossVulnerable`)다. 서버가 `ServerBeginCounterVulnerable`(카운터 성공 3곳 —
+  Gauntlet·Spinner·WallBot `CounterSucceeded`)로 열고, 시간 만료·사망·리쉬 복귀·스폰에서 닫는다. 취약 중 다시 간파하면 8초를 처음부터 센다.
+- ⚠️ `vulnerableDuration` 은 아직 `GameData.xlsx` 에 행이 없다 → SO·프리팹 값(기본 8)으로 돈다(Play·빌드 공통). 테이블에서 튜닝하려면
+  Monster 시트 `MonsterCounterWindow` 블록에 행을 추가한다(SVN).
+- **취약 색**: 취약 동안 몸을 23호와 같은 하늘색(0.45, 0.75, 1)으로 칠한다 — `MonsterBase.RefreshVulnerableTint`, 복제 플래그만 보고 전 피어가 칠한다.
+  간파 창 색과 같은 베이스 틴트 칸이라 창이 켜져 있으면 비킨다(취약 중 다음 공격이 창을 열 수 있다 — 닫히면 다시 칠한다).
 - 피격 클립: WallBot 만 있다(`A_WallBot_Hit`). Gauntlet·Spinner 는 없고, 에셋 구매품이라 추가하지 않는다.
-- Gauntlet 은 그로기를 "대기 자세 정지"로 보여 주므로 취약 밀림 뒤 복귀할 때 다시 건다(`OnVulnerableGroggyResumed`).
+- **경직 자세 고정(10-26)**: 피격 상태가 없는 몹(HumanoidBot·GauntletBot·SpinnerBot)은 Hit·Knockback 동안 **대기 자세로 멈춰 선다**
+  (`MonsterHitReactionPolicy.ShouldFreezeForHitReaction` — 터렛·23호 제외). Gauntlet 은 취약 중 Q 로 밀려도 그로기 자세(대기 정지)와 이어져
+  취약이 끊겨 보이지 않는다. Spinner 는 그로기로 돌아올 때 정지를 풀어 Dizzy 클립을 보인다. 팔라딘 Q 밀림·경직 동안은 `Stunned` 가 걸려
+  **머리 위 기절 이펙트**가 뜬다(평타 경직은 안 뜬다). 상세: [handoff-monster-stun-vfx.md](handoff-monster-stun-vfx.md)
+- Gauntlet 은 그로기를 "대기 자세 정지"로 보여 주므로 밀림 뒤 그로기로 복귀할 때 다시 건다(`OnVulnerableGroggyResumed`).
 
 ## 2.1 바닥 예고(데칼) — 간파 가능한 공격만 (팀장 10-26)
 
@@ -47,4 +62,4 @@
 
 ## 4. 테스트
 
-`Tools/Tests/전투 EditMode 테스트 실행` — `MonsterHitReactionPolicyTests`(등급별 경직·밀림 표) · `MonsterEngagePolicyTests`(사거리 전환 히스테리시스).
+`Tools/Tests/전투 EditMode 테스트 실행` — `MonsterHitReactionPolicyTests`(등급별 경직·밀림 표 · 경직 자세 고정) · `MonsterEngagePolicyTests`(사거리 전환 히스테리시스) · `MonsterStatusEffectVfxSetTests`(몬스터 기절 이펙트 표).

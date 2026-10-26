@@ -154,7 +154,7 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
                 float telegraph = AttackTime(punchTelegraphDuration);
                 _punchTelegraphTimer = telegraph;
                 _stateTimer += telegraph;
-                if (data != null && data.hasSuperArmorWhileAttacking && status != null)
+                if (UsesAttackSuperArmor && status != null)   // 중간보스 취약 중엔 안 건다(팀장 10-26)
                     status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration) + telegraph);
                 return;
             }
@@ -270,6 +270,7 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
         meleeAttack?.EndHitWindow();
         status?.RemoveStatus(StatusEffectType.SuperArmor);
 
+        ServerBeginCounterVulnerable();   // 취약 8초(그로기 포함) — 팀장 10-26
         ForceGroggy(Counter.GroggyDuration);
         ServerFreezeAtLocomotion();   // ForceGroggy 뒤에 불러야 한다 — 상태 전이가 자세를 덮지 않게
 

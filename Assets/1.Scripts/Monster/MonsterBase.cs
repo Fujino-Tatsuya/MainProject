@@ -69,6 +69,14 @@ public class MonsterBase : Unit
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 중간보스 취약(카운터 성공부터 vulnerableDuration 초 — 팀장 10-26) 복제. Q 관통 판정·하늘색이 전부 이 값을 본다.
+    // 서버만 쓴다(ServerBeginCounterVulnerable / ServerEndVulnerable). 그로기(1초)와는 따로 간다 — 그로기가 끝나도 취약은 남는다.
+    readonly NetworkVariable<bool> _vulnerable = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+    float _vulnerableUntil = -1f;   // 서버 전용 종료 시각. -1 = 취약 아님
+
     // 지금 쫓거나 때리는 대상의 NetworkObjectId **표시용 복제**(할 일 58 — 나를 노리는 몬스터 주황 외곽선).
     // 서버만 쓴다(Update). Chase·Attack 이고 서버 로직이 돌 때만 대상 id, 그 밖 0 — 규칙은 MonsterAggroTargetRule.
     // 판정·FSM 은 이 값을 읽지 않는다(동작 변경 없음). Docs/tech/monster-hover-outline.md "나를 노리는 몬스터".
@@ -207,10 +215,12 @@ public class MonsterBase : Unit
 
         _state.OnValueChanged += OnStateChanged;
         _counterVisual.OnValueChanged += OnCounterVisualChanged;
+        _vulnerable.OnValueChanged += OnVulnerableChanged;
         ApplyCounterWindowVisual(_counterVisual.Value);   // 늦게 합류한 클라도 지금 값으로
 
         if (IsServer)
         {
+            ServerEndVulnerable();   // 풀 재사용 — 이전 생애의 취약을 남기지 않는다
             ServerInitialize();
         }
         else
@@ -229,13 +239,49 @@ public class MonsterBase : Unit
 
         // 머리 위 체력바 런타임 부착(모든 피어, 표시 전용 — FSM 과 무관). Docs/tech/handoff-monster-healthbar.md
         MonsterOverheadHealthBarRule.TryInstall(this);
+
+        // 상태이상 머리 위 이펙트(기절 = 팔라딘 Q 밀림·경직) 런타임 부착. Docs/tech/handoff-monster-stun-vfx.md
+        _statusVfx = MonsterStatusEffectVfxPresenter.TryInstall(this, status, bodyCollider);
     }
+
+    MonsterStatusEffectVfxPresenter _statusVfx;
 
     public override void OnNetworkDespawn()
     {
         _state.OnValueChanged -= OnStateChanged;
         _counterVisual.OnValueChanged -= OnCounterVisualChanged;
+        _vulnerable.OnValueChanged -= OnVulnerableChanged;
         base.OnNetworkDespawn();
+    }
+
+    void OnVulnerableChanged(bool previous, bool next) => RefreshVulnerableTint();
+
+    /// <summary>
+    /// [서버] 중간보스 취약을 연다 — 카운터 성공 순간에 부른다(팀장 10-26). 길이 = <c>MonsterCounterWindow.VulnerableDuration</c>(기본 8초),
+    /// 그로기(1초)를 포함해 카운터 성공부터 센다. 취약 중 다시 카운터에 성공하면 처음부터 다시 센다.
+    /// 중간보스가 아니면 아무것도 안 한다.
+    /// </summary>
+    protected void ServerBeginCounterVulnerable()
+    {
+        if (!IsServer || _isDead || Rank != MonsterRank.MidBoss) return;
+
+        MonsterCounterWindow counter = GetComponent<MonsterCounterWindow>();
+        float duration = counter != null ? counter.VulnerableDuration : 8f;
+        if (duration <= 0f) return;
+
+        _vulnerableUntil = Time.time + duration;
+        _vulnerable.Value = true;
+        Edit.Log($"[Monster] {name} 취약 시작 — {duration:0.##}s", this);
+    }
+
+    /// <summary>[서버] 취약을 끝낸다(만료·사망·리쉬 복귀·스폰). 멱등.</summary>
+    void ServerEndVulnerable()
+    {
+        if (!IsServer) return;
+        bool was = _vulnerable.Value;
+        _vulnerableUntil = -1f;
+        _vulnerable.Value = false;
+        if (was) Edit.Log($"[Monster] {name} 취약 끝", this);
     }
 
     void ServerInitialize()
@@ -355,6 +401,10 @@ public class MonsterBase : Unit
 
     void TickServer(float dt)
     {
+        // 취약 만료 — 상태와 무관하게 시간으로만 끝난다(그로기·밀림·공격 중이어도). PreTick 앞이라 파생이 틱을 가로채도 돈다.
+        if (_vulnerableUntil >= 0f && Time.time >= _vulnerableUntil)
+            ServerEndVulnerable();
+
         if (OnServerPreTick(dt)) return;
 
         // 이동 봉쇄 상태이상(에어본/기절/속박)이면 에이전트 정지.
@@ -1088,6 +1138,14 @@ public class MonsterBase : Unit
         if (_lastRetargetTime >= 0f) _lastRetargetTime = Time.time;   // 주기 재선정이 곧바로 되돌리지 않게 시계를 다시 센다
     }
 
+    /// <summary>
+    /// 공격 중 슈퍼아머를 거는가 = 데이터 <c>hasSuperArmorWhileAttacking</c> ∧ <b>중간보스 취약이 아님</b>.
+    /// 🔴 취약은 "CC 에 약한" 상태다(팀장 10-26) — 공격 중이어도 팔라딘 Q 에 밀리고 경직된다. 슈퍼아머를 걸고 판정에서 무시하는
+    ///    대신 아예 걸지 않는다: 그래야 튜토리얼 스피너 연습처럼 <b>다른 곳이 건</b> 슈퍼아머는 취약이어도 그대로 막는다.
+    ///    공격 중 슈퍼아머를 거는 곳(이 클래스·GauntletBot·SpinnerBot·WallBot)은 전부 이 값을 볼 것.
+    /// </summary>
+    protected bool UsesAttackSuperArmor => data != null && data.hasSuperArmorWhileAttacking && !IsMidBossVulnerable;
+
     protected virtual void StartAttack()
     {
         // 쿨은 "지금 쓰는 슬롯"에 기록한다. 파생이 CurrentAttackSlot 을 안 건드리면 항상 0 —
@@ -1102,8 +1160,8 @@ public class MonsterBase : Unit
         StopAgent();
         FaceTarget();
 
-        // 공격 중 슈퍼아머(경직 무시) 옵션.
-        if (data.hasSuperArmorWhileAttacking && status != null)
+        // 공격 중 슈퍼아머(경직 무시) 옵션. 중간보스 취약 중에는 걸지 않는다(UsesAttackSuperArmor).
+        if (UsesAttackSuperArmor && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration));
 
         SetState(MonsterState.Attack);
@@ -1470,6 +1528,7 @@ public class MonsterBase : Unit
         _loseOutsideSince = -1f;
         _groggyCount = 0;
         status?.ClearAll();   // 버프/디버프 전부 제거
+        ServerEndVulnerable();
         Revive();             // 즉시 최대 체력 회복
         SetState(MonsterState.Return);
     }
@@ -1609,15 +1668,16 @@ public class MonsterBase : Unit
 
     // 넉백 진입/갱신. 슈퍼아머·사망·그로기·복귀 중에는 무시(기존 CC 무시 규칙 일관).
     // 이미 넉백 중이면 방향·속도·시간을 갱신한다(Q 홀드처럼 매 틱 재적용되는 지속 견인 대응).
-    // 🔴 중간보스는 반대로 **취약(그로기) 중에만** 밀린다(팀장 10-26) — 판정은 MonsterHitReactionPolicy.
+    // 🔴 중간보스는 반대로 **취약(카운터 성공부터 8초) 중에만** 밀린다(팀장 10-26) — 판정은 MonsterHitReactionPolicy.
+    //    그로기 중에 밀리면 끝난 뒤 남은 그로기로 돌아가고(TryResumeVulnerableGroggy), 그로기 밖이면 평소대로 재평가한다.
     void TryEnterKnockback(Vector3 dir, AttackInfo attackInfo)
     {
         if (_isDead) return;
         MonsterState s = _state.Value;
         bool armor = status != null && status.BlocksInterrupt;
-        if (!MonsterHitReactionPolicy.CanEnterKnockback(s, armor, Rank, _vulnerableGroggyEndsAt >= 0f)) return;
+        if (!MonsterHitReactionPolicy.CanEnterKnockback(s, armor, Rank, IsMidBossVulnerable)) return;
 
-        // 취약 중 밀림 — 밀림·경직이 끝나면 남은 그로기로 돌아간다. 시간은 그동안에도 흐른다(취약 창 길이 고정).
+        // 그로기 중 밀림 — 밀림·경직이 끝나면 남은 그로기로 돌아간다. 시간은 그동안에도 흐른다(그로기 길이 고정).
         if (s == MonsterState.Groggy)
             _vulnerableGroggyEndsAt = Time.time + Mathf.Max(0f, _stateTimer);
 
@@ -1642,6 +1702,11 @@ public class MonsterBase : Unit
             }
             return;
         }
+
+        // 기절(Stunned)을 밀림 시작부터 건다 — 머리 위 기절 이펙트가 밀림+경직 내내 보이게(팀장 10-26).
+        // 밀림 중 이동은 HandleKnockback 이 직접 하므로 이동 봉쇄와 싸우지 않는다. 끝나면 ExitKnockback 이 경직 길이로 다시 건다.
+        if (attackInfo.staggerDuration > 0f)
+            status?.ApplyStatus(StatusEffectType.Stunned, attackInfo.knockbackDuration + attackInfo.staggerDuration);
 
         _knockbackDir = dir;
         _knockbackSpeed = attackInfo.knockbackStrength;
@@ -1853,6 +1918,7 @@ public class MonsterBase : Unit
     {
         if (_isDead) return;
         _isDead = true;
+        ServerEndVulnerable();
 
         StopAgent();
         if (agent != null) agent.enabled = false;
@@ -2280,6 +2346,13 @@ public class MonsterBase : Unit
         if (next != MonsterState.Groggy)
             ApplyReleaseActionPose();
 
+        // 밀림·경직 자세 정지(아래 ShouldFreezeForHitReaction)에서 남은 그로기로 돌아올 때 — 그로기 클립이 있는 몹(SpinnerBot IsDizzy)은
+        // 정지를 풀어 그 클립이 보이게 한다. 🔴 클립이 없는 몹(GauntletBot)은 풀지 않는다: 자기 그로기 표현(대기 정지)을 RPC 로 다시 거는데
+        // 원격 피어에서는 그 RPC 가 이 상태 콜백보다 **먼저** 도착할 수 있어, 여기서 풀면 그 정지를 지워 버린다.
+        if (next == MonsterState.Groggy && _hitReactionFrozen && data != null && HasParameter(animator, data.groggyBool))
+            ApplyReleaseActionPose();
+        _hitReactionFrozen = false;
+
         // 공격 슈퍼아머는 공격이 끝나면 푼다(팀장 10-14 P1). StartAttack 이 attackDuration(+예고)만큼 시간으로 걸어
         // 펀치·채찍이 1초 안에 끝나도 2~3초 남았고, 쿨이 짧아 다음 공격이 다시 걸어 근접 교전 중 사실상 상시 경직·넉백 면역이었다.
         // ⚠️ 상태이상은 종류당 하나라 Remove 는 통째로 지운다 — 스폰부터 무한 슈퍼아머(startsWithSuperArmor)인 몹은 건드리지 않는다.
@@ -2312,7 +2385,27 @@ public class MonsterBase : Unit
         PlayStateAnimation(next);
         RefreshVulnerableTint();
 
+        // 피격 클립이 없는 일반 몹은 경직·밀림 동안 대기 자세로 멈춰 선다(팀장 10-26 — 판정은 MonsterHitReactionPolicy).
+        // 해제는 위 ApplyReleaseActionPose 가 상태 이탈마다 하므로 Knockback → Hit 은 풀었다 다시 잡는다.
+        if (data != null && MonsterHitReactionPolicy.ShouldFreezeForHitReaction(next, Rank, data.archetype, HasHitAnimatorState()))
+        {
+            ApplyLocomotionFreeze();
+            _hitReactionFrozen = true;
+        }
+
+        _statusVfx?.Refresh();   // 사망하면 기절 이펙트도 바로 끈다
+
         OnMonsterStateChanged(previous, next);
+    }
+
+    bool _hitReactionFrozen;   // 이 피어에서 밀림·경직 자세 정지를 걸어 둔 상태인가(피어 로컬)
+
+    // 피격 상태는 hitTrigger 와 같은 이름으로 둔다(ChompBot·MortarBot "Hit"). HumanoidBot 은 파라미터만 있고 상태가 없다.
+    bool HasHitAnimatorState()
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrEmpty(data.hitTrigger))
+            return false;
+        return animator.HasState(0, Animator.StringToHash(data.hitTrigger));
     }
 
     /// <summary>
@@ -2400,6 +2493,14 @@ public class MonsterBase : Unit
         RefreshVulnerableTint();
     }
 
+    /// <summary>
+    /// [전 피어] 중간보스가 취약인가 — 카운터 성공부터 <c>MonsterCounterWindow.VulnerableDuration</c>(8초, 팀장 10-26). 복제값만 본다.
+    /// 그로기(1초)가 끝나 다시 움직이고 공격해도 취약은 남는다. 취약 색(<see cref="RefreshVulnerableTint"/>)·팔라딘 Q 관통
+    /// (<see cref="MonsterHitReactionPolicy.CanEnterKnockback"/>)·공격 중 슈퍼아머 해제(<see cref="UsesAttackSuperArmor"/>)가 이 값을 쓴다.
+    /// 머리 위 기절 이펙트는 이 값이 아니라 그로기·Q 경직 때만이다(<c>MonsterStatusEffectVfxPresenter</c>).
+    /// </summary>
+    public bool IsMidBossVulnerable => Rank == MonsterRank.MidBoss && _vulnerable.Value;
+
     // 중간보스 취약 색 — 23호 BossDataSO.vulnerableTint 기본값과 같은 색(팀장 10-26: 보스처럼 취약이 보여야 한다).
     static readonly Color MidBossVulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);
     bool _vulnerableTintApplied;
@@ -2407,18 +2508,16 @@ public class MonsterBase : Unit
     /// <summary>
     /// [전 피어] 중간보스가 취약이면 몸을 취약 색으로 칠한다. 복제된 상태만 보고 정한다.
     ///
-    /// 🔴 중간보스의 그로기는 간파 성공뿐이고(누적 그로기 끔), 밀림·경직은 취약 중 팔라딘 Q 에서만 온다
-    ///    (MonsterHitReactionPolicy) — 그래서 Groggy·Knockback·Hit 를 통째로 "취약"으로 본다. 밀리는 동안 색이 꺼졌다
-    ///    켜지지 않는다. 간파 창 색(BossCounterTelegraph)과 같은 베이스 틴트 칸을 쓰므로 창이 켜져 있으면 비킨다.
+    /// 🔴 취약은 상태(Groggy 등)가 아니라 복제 플래그 <see cref="IsMidBossVulnerable"/>(카운터 성공부터 8초)로 본다(팀장 10-26) —
+    ///    그로기가 끝나 공격·이동 중이어도 색이 남는다. 간파 창 색(BossCounterTelegraph)과 같은 베이스 틴트 칸을 쓰므로 창이 켜져 있으면 비킨다
+    ///    (취약 중 다음 공격이 창을 열 수 있다 — 창이 닫히면 OnCounterVisualChanged 가 다시 칠한다).
     /// </summary>
     void RefreshVulnerableTint()
     {
         HitFlash flash = GetComponent<HitFlash>();
         if (flash == null) return;
 
-        MonsterState s = _state.Value;
-        bool on = Rank == MonsterRank.MidBoss && !_counterVisual.Value
-                  && (s == MonsterState.Groggy || s == MonsterState.Knockback || s == MonsterState.Hit);
+        bool on = IsMidBossVulnerable && !_counterVisual.Value;
         if (on)
         {
             flash.SetBaseTint(MidBossVulnerableTint);
