@@ -15,6 +15,20 @@ MonoBehaviour:
   m_Active: 0
   _shader: {fileID: 4800000, guid: 361f8b51716b94b42ba09f8c105bdd2e, type: 3}
   _injectionPoint: 550
+--- !u!114 &-4498099282036757642
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8f3670d45dec2b47921bf5a21ee2cb0, type: 3}
+  m_Name: DarkAdaptation
+  m_EditorClassIdentifier: Assembly-CSharp::DarkAdaptationFeature
+  m_Active: 1
+  _shader: {fileID: 4800000, guid: 1c0bfbbe5a92c294db94e8025f88ccc4, type: 3}
 --- !u!114 &-2294799603617760137
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -69,7 +83,8 @@ MonoBehaviour:
   - {fileID: 785780402380302125}
   - {fileID: 2594988839221908459}
   - {fileID: 8362648963378373390}
-  m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a03853b20f9ab56d2795a2d6757db1ca7e70a0ee374cbec180e74
+  - {fileID: -4498099282036757642}
+  m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a03853b20f9ab56d2795a2d6757db1ca7e70a0ee374cbec180e74766bc2f1888a93c1
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}

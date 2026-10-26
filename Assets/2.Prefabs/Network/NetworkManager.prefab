@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 1111111111111111111}
   - component: {fileID: 8945878156428303657}
   - component: {fileID: 2312403450460863167}
+  - component: {fileID: 127159849850635136}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -201,3 +202,25 @@ MonoBehaviour:
   runDemoFlow: 1
   lobbySceneName: 3.LobbyScene
   waitSceneName: 6.DemoConnectScene
+--- !u!114 &127159849850635136
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74c5523d63f8bb0429aedc6a2df3dae8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptDarkAdaptation
+  selfIntensity: 1
+  othersIntensity: 0.35
+  fadeInDuration: 0.08
+  holdDuration: 0.6
+  fadeOutDuration: 0.5
+  luminanceThreshold: 0.8
+  thresholdSoftness: 0.3
+  maxDarken: 0.85
+  revealRadius: 0.18
+  revealSoftness: 0.1
