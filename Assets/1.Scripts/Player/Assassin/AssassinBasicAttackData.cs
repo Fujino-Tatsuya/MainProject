@@ -72,6 +72,15 @@ public sealed class AssassinBasicAttackData : ScriptableObject
         new AssassinBasicAttackStepData(1.3f, 1.7f, 120f, 2.5f, 1, 0.05f, 0.25f),
     };
 
+    [Header("일반 타 전진 (할 일 96 — 4타 공용)")]
+    [Tooltip("일반 1~4타가 시작될 때 전진하는 거리(m). 이동 입력이 있으면 그 방향, 없으면 조준 방향. " +
+             "벽·몸 콜라이더 있는 적에 막힌다. 0 = 전진 없음. 변신 묶음은 전진하지 않고 강타는 강타 전진을 쓴다.")]
+    [SerializeField, Min(0f)] private float normalLungeDistance = 0.5f;
+
+    [Tooltip("일반 타 전진에 쓰는 시간(초, 공격속도 1 기준 — 실제는 ÷ 공격속도 배율). " +
+             "판정 프레임(1.2배속 기준 약 0.1초) 안에 끝나게 둔다.")]
+    [SerializeField, Min(0f)] private float normalLungeDuration = 0.1f;
+
     [Header("일반 E 강타 (Combo_Attack_02_01)")]
     [SerializeField] private AssassinBasicAttackStepData enhancedStep =
         new AssassinBasicAttackStepData(2.5f, 1.8f, 120f, 2f);
@@ -106,6 +115,8 @@ public sealed class AssassinBasicAttackData : ScriptableObject
     public AssassinBasicAttackStepData[] NormalSteps => normalSteps;
     public AssassinBasicAttackStepData EnhancedStep => enhancedStep;
     public AssassinBasicAttackStepData TransformedStep => transformedStep;
+    public float NormalLungeDistance => normalLungeDistance;
+    public float NormalLungeDuration => normalLungeDuration;
     public float EnhancedLungeDistance => enhancedLungeDistance;
     public float EnhancedLungeDuration => enhancedLungeDuration;
     public float ComboContinuationSeconds => comboContinuationSeconds;
