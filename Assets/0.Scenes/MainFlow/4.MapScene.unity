@@ -4141,8 +4141,34 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1023950729632622104, guid: d2bca64fce0450f48bd70383e32f4daf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 9062640586550778215}
   m_SourcePrefab: {fileID: 100100000, guid: d2bca64fce0450f48bd70383e32f4daf, type: 3}
+--- !u!1 &9062640586550778214 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1023950729632622104, guid: d2bca64fce0450f48bd70383e32f4daf, type: 3}
+  m_PrefabInstance: {fileID: 9062640586550778213}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &9062640586550778215
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9062640586550778214}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fc267c22961cbc4e82eb6d9370a412e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapPodArrival
+  ShowTopMostFoldoutHeaderGroup: 1
+  settings: {fileID: 11400000, guid: af0dfc99a6e059f4c92446f9f24c568f, type: 2}
+  podPrefab: {fileID: 8335899443148297213, guid: 3397a00ead9467f48aa7c8836f35bac8, type: 3}
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  impactEffect: {fileID: 11400000, guid: 3078e051ba344584a9906b584983709b, type: 2}
+  letterboxHeight: 0.04
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
