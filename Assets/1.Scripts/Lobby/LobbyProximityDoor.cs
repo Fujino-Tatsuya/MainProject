@@ -15,6 +15,8 @@ using UnityEditor;
 /// 넘어가는 쪽 면(<see cref="frontFaceZ"/>/<see cref="backFaceZ"/>)이라 문짝 두께가 문틀로 파고들지 않는다.
 /// <c>PF_Room_DoorSingle_01_v003</c> 은 메쉬 피벗이 힌지 모서리(문짝은 로컬 -X 쪽 약 1.27m, 두께 Z -0.22~0.06)라 루트를 그대로 돌린다.
 /// 같은 오브젝트의 MeshCollider 도 함께 돌아 열린 문 사이로 지나갈 수 있다.</item>
+/// <item>끼임 방지(할 일 99): 다음 자세의 문짝 상자(<see cref="LeafBox"/>)가 판정 대상 플레이어(열림 판정과 같은
+/// <see cref="LobbyProximityDoorRules.IsDoorTarget"/>)의 몸 캡슐과 겹치면 그 프레임은 진행도·자세를 그대로 둔다 — 비키면 다시 돈다.</item>
 /// <item>판정 중심: <see cref="centerOffset"/>(leaf 로컬, 닫힌 문 가운데)을 Awake 때 월드 좌표로 굳힌다 — 문이 돌아도 중심은 그대로.</item>
 /// </list>
 /// </summary>
@@ -47,6 +49,8 @@ public sealed class LobbyProximityDoor : MonoBehaviour
     private bool _isOpen;
     private int _swingSign = 1;
     private float _progress;
+    private Bounds _leafBox;
+    private bool _hasLeafBox;
 
     public bool IsOpen => _isOpen;
 
@@ -55,6 +59,7 @@ public sealed class LobbyProximityDoor : MonoBehaviour
     private void Awake()
     {
         var t = Leaf;
+        _hasLeafBox = LeafBox(t, t.GetComponentsInChildren<Collider>(true), out _leafBox);
         _closedLocalPosition = t.localPosition;
         _closedLocalRotation = t.localRotation;
         _center = t.TransformPoint(centerOffset);
@@ -75,12 +80,100 @@ public sealed class LobbyProximityDoor : MonoBehaviour
         if (Mathf.Approximately(next, _progress))
             return;
 
-        _progress = next;
-        var angle = _swingSign * openAngle * Mathf.SmoothStep(0f, 1f, _progress);
+        var angle = _swingSign * openAngle * Mathf.SmoothStep(0f, 1f, next);
         var pivot = new Vector3(0f, 0f, _swingSign > 0 ? frontFaceZ : backFaceZ);
         LobbyProximityDoorRules.LeafPose(_closedLocalPosition, _closedLocalRotation, angle, pivot,
             out var position, out var rotation);
+
+        next = LobbyProximityDoorRules.ResolveProgress(_progress, next, NextPoseBlocked(position, rotation));
+        if (Mathf.Approximately(next, _progress))
+            return;
+
+        _progress = next;
         Leaf.SetLocalPositionAndRotation(position, rotation);
+    }
+
+    /// <summary>다음 로컬 자세의 문짝 상자가 판정 대상 플레이어의 몸 캡슐과 하나라도 겹치는가.</summary>
+    private bool NextPoseBlocked(Vector3 localPosition, Quaternion localRotation)
+    {
+        if (!_hasLeafBox)
+            return false;
+
+        var parent = Leaf.parent;
+        var worldPosition = parent != null ? parent.TransformPoint(localPosition) : localPosition;
+        var worldRotation = parent != null ? parent.rotation * localRotation : localRotation;
+
+        var players = PlayerLifeCycleController.Active;
+        for (var i = 0; i < players.Count; i++)
+        {
+            var player = players[i];
+            if (player == null || !LobbyProximityDoorRules.IsDoorTarget(player.IsSpawned, player.State))
+                continue;
+            if (!player.TryGetComponent(out PlayerMotor motor) || !motor.TryGetComponent(out CapsuleCollider body))
+                continue;
+
+            if (BodyOverlapsLeafBox(_leafBox, worldPosition, worldRotation, body))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 문짝 콜라이더(트리거 제외 Box·Mesh)를 감싸는 상자 — 문짝 회전 기준, 월드 단위
+    /// (점 w 는 <c>Inverse(leaf.rotation) * (w - leaf.position)</c>). 문짝이 어느 자세에 있든 같은 값이 나온다.
+    /// 비볼록 MeshCollider 는 <c>Physics.ComputePenetration</c> 이 몸 캡슐이 얇은 문짝을 관통한 경우(반경 0.38 &gt; 두께 0.28)
+    /// 양면 관통이 상쇄돼 겹침을 놓치므로 상자로 판정한다.
+    /// </summary>
+    public static bool LeafBox(Transform leafTransform, Collider[] colliders, out Bounds box)
+    {
+        box = default;
+        var found = false;
+        var toLeaf = Quaternion.Inverse(leafTransform.rotation);
+        for (var i = 0; i < colliders.Length; i++)
+        {
+            var collider = colliders[i];
+            if (collider == null || collider.isTrigger)
+                continue;
+
+            Bounds local;
+            if (collider is BoxCollider boxCollider)
+                local = new Bounds(boxCollider.center, boxCollider.size);
+            else if (collider is MeshCollider meshCollider && meshCollider.sharedMesh != null)
+                local = meshCollider.sharedMesh.bounds;
+            else
+                continue;
+
+            var colliderTransform = collider.transform;
+            for (var corner = 0; corner < 8; corner++)
+            {
+                var point = new Vector3(
+                    (corner & 1) == 0 ? local.min.x : local.max.x,
+                    (corner & 2) == 0 ? local.min.y : local.max.y,
+                    (corner & 4) == 0 ? local.min.z : local.max.z);
+                var leafPoint = toLeaf * (colliderTransform.TransformPoint(point) - leafTransform.position);
+                if (found)
+                    box.Encapsulate(leafPoint);
+                else
+                    box = new Bounds(leafPoint, Vector3.zero);
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>문짝이 월드 자세 (<paramref name="leafPosition"/>, <paramref name="leafRotation"/>)일 때 <see cref="LeafBox"/> 가 몸 캡슐(Y 축)과 겹치는가.</summary>
+    public static bool BodyOverlapsLeafBox(Bounds leafBox, Vector3 leafPosition, Quaternion leafRotation, CapsuleCollider body)
+    {
+        if (body == null || !body.enabled)
+            return false;
+
+        var bodyTransform = body.transform;
+        var scale = bodyTransform.lossyScale;
+        return LobbyProximityDoorRules.LeafBoxOverlapsUprightCapsule(leafBox, leafPosition, leafRotation,
+            bodyTransform.TransformPoint(body.center), body.height * Mathf.Abs(scale.y),
+            body.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z)));
     }
 
     private float NearestAlivePlayer(out Vector3 position)
@@ -91,7 +184,7 @@ public sealed class LobbyProximityDoor : MonoBehaviour
         for (var i = 0; i < players.Count; i++)
         {
             var player = players[i];
-            if (player == null || !player.IsSpawned || player.State != PlayerLifeState.Alive)
+            if (player == null || !LobbyProximityDoorRules.IsDoorTarget(player.IsSpawned, player.State))
                 continue;
 
             var playerPosition = player.transform.position;
