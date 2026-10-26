@@ -21,6 +21,16 @@ public static partial class QALobbyScenarios
         QABoss103Config cfg = QABoss103Match.ReadConfig(out string cfgNote);
         ctx.Eye("103 설정", $"{cfgNote} · 기준 시드 {cfg.Seed} · 판 {cfg.Run} · 판 시드 {cfg.RunSeed}");
 
+        // C6 — 심장박동(에디터 루프가 읽는다) + 런타임 데이터 출처. 연속 루프 판은 호스트가 테이블이 아니면 바로 Error.
+        QABoss103Heartbeat.Begin(cfg, ctx.Role);
+        string source = QABoss103Heartbeat.RuntimeDataSource();
+        ctx.Eye("103 데이터 출처(런타임)", $"{source} · 연속 루프 판={(cfg.Batch != 0 ? "예" : "아니오")}");
+        if (cfg.Batch != 0 && ctx.Role == "host" && !QABoss103Batch.IsTable(source))
+        {
+            QABoss103Match.AbortBeforeMap(ctx, cfg, $"{QABoss103Batch.ReasonDataSource} host={source}", QABoss103Outcome.Error);
+            yield break;
+        }
+
         var lobby = new QAFlag();
         yield return EnsureLobbyPlayer(ctx, 120f, lobby);
         if (!lobby.Value)
@@ -65,6 +75,18 @@ public static partial class QALobbyScenarios
         {
             QABoss103Match.AbortBeforeMap(ctx, cfg, "맵 진입 실패");
             yield break;
+        }
+        QABoss103Heartbeat.SetPhase("map");
+
+        // C6 — 클론도 테이블 값으로 도는지(클론 심장박동의 출처). 모르는 클론(na)은 막지 않는다.
+        if (cfg.Batch != 0 && QALobbyFlow.IsServer)
+        {
+            string combined = QABoss103Heartbeat.CombinedDataSource(cfg);
+            if (!QABoss103Batch.IsTable(combined))
+            {
+                QABoss103Match.AbortBeforeMap(ctx, cfg, $"{QABoss103Batch.ReasonDataSource} {combined}", QABoss103Outcome.Error);
+                yield break;
+            }
         }
 
         if (QALobbyFlow.IsServer)

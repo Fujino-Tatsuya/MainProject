@@ -24,6 +24,9 @@ public static class QAScenario103Menu
     private const string TierKey = "QA.103.Tier"; // -1 = 자동(판 번호), 그 밖 = QABoss103BotTier
 
     private static int Seed => EditorPrefs.GetInt(SeedKey, QABoss103Config.DefaultSeed);
+
+    /// <summary>기준 시드(Settings 메뉴) — C6 연속 루프가 배치 시작 때 한 번 읽어 배치 파일에 고정한다.</summary>
+    internal static int BaseSeed => Seed;
     private static int Run => Mathf.Max(1, EditorPrefs.GetInt(RunKey, 1));
 
     private static QABoss103BotTier? Tier

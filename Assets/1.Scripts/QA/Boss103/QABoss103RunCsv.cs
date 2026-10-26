@@ -109,13 +109,36 @@ public static class QABoss103RunCsv
         }
     }
 
+    /// <summary>
+    /// [에디터 루프] 판이 판정 없이 끊겼을 때(심장박동·단계 상한·Play 시작 실패 등) runs.csv 에 Error 행 1줄. 다른 CSV 는 쓰지 않는다(통계 제외 판).
+    /// <paramref name="dataSource"/> = 마지막 심장박동에서 본 출처(모르면 na). 쓴 행 수.
+    /// </summary>
+    public static int WriteLoopError(QABoss103Config cfg, string reason, string note, string dataSource, DateTime startedAt)
+    {
+        if (!cfg.HasOut)
+            return 0;
+        var rec = new QABoss103RunRecord { Run = cfg.Run, BaseSeed = cfg.Seed, RunSeed = cfg.RunSeed, BotTier = cfg.BotTier, Outcome = QABoss103Outcome.Error, Detail = reason };
+        QABoss103RunMeta meta = Meta(cfg, rec, double.NaN, startedAt, string.IsNullOrEmpty(dataSource) ? "na" : dataSource);
+        meta.Note = note ?? "";
+        int rows = QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss103Csv.RunsFile), QABoss103Metrics.RunsHeader, new[] { QABoss103CsvRows.Run(meta, null) });
+        Debug.Log($"{Tag} event=run_csv path={QABoss103Plan.Token(cfg.OutDir)} rows={rows} run={cfg.Run} retry={cfg.Retry} outcome=Error source=loop reason={QABoss103Plan.Token(reason)}");
+        return rows;
+    }
+
+    /// <summary>xlsx 원본(SVN) 마지막 변경 리비전. 실패 = na.</summary>
+    public static string XlsxRevision() =>
+        Shell("svn", $"info --non-interactive --show-item last-changed-revision \"{Path.Combine(QANetSim88.OwnRoot, XlsxRelative)}\"");
+
+    /// <summary>git 짧은 커밋. 실패 = na.</summary>
+    public static string GitCommit() => Shell("git", "rev-parse --short HEAD");
+
     private static List<string> SafeRead(string path)
     {
         try { return QABoss103PartFile.ReadShared(path); }
         catch { return null; }
     }
 
-    private static QABoss103RunMeta Meta(QABoss103Config cfg, QABoss103RunRecord rec, double bossHpPct, DateTime startedAt)
+    private static QABoss103RunMeta Meta(QABoss103Config cfg, QABoss103RunRecord rec, double bossHpPct, DateTime startedAt, string dataSource = null)
     {
         var m = new QABoss103RunMeta
         {
@@ -131,9 +154,9 @@ public static class QABoss103RunCsv
             TraitsAssassin = Traits(rec, QABoss103Character.Assassin),
             TraitsGunner = Traits(rec, QABoss103Character.Gunner),
             BossHpEndPct = rec.Outcome == QABoss103Outcome.Clear ? 0.0 : bossHpPct,
-            DataSource = DataSource(),
-            XlsxSvnRev = Run("svn", $"info --non-interactive --show-item last-changed-revision \"{Path.Combine(QANetSim88.OwnRoot, XlsxRelative)}\""),
-            GitCommit = Run("git", "rev-parse --short HEAD"),
+            DataSource = dataSource ?? QABoss103Heartbeat.CombinedDataSource(cfg),
+            XlsxSvnRev = XlsxRevision(),
+            GitCommit = GitCommit(),
             StartedAt = startedAt.ToString("yyyy-MM-dd HH:mm:ss"),
             EndedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             UnityVersion = Application.unityVersion,
@@ -146,15 +169,8 @@ public static class QABoss103RunCsv
     private static string Traits(QABoss103RunRecord rec, QABoss103Character c) =>
         rec.Traits.TryGetValue(c, out List<string> list) ? string.Join(";", list) : "";
 
-    /// <summary>툴바 데이터 출처(<c>DataSourcePlayMode</c> 의 EditorPrefs — 에디터 어셈블리라 키만 같이 읽는다). 읽기만, 강제는 C6.</summary>
-    private static string DataSource()
-    {
-        try { return UnityEditor.EditorPrefs.GetInt(DevBootTarget.ScopedKey("DataSource"), 0) == 1 ? "inspector" : "table"; }
-        catch { return "na"; }
-    }
-
     /// <summary>프로젝트 루트에서 명령 1개(상한 5초). 실패 = na.</summary>
-    private static string Run(string exe, string args)
+    public static string Shell(string exe, string args)
     {
         try
         {

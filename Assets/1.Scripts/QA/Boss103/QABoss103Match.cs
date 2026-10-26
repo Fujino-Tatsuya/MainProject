@@ -74,13 +74,16 @@ public static class QABoss103Match
         return new QABoss103Config();
     }
 
-    /// <summary>맵 전에 끊긴 판 — 판 기록(Aborted)과 로그 1줄만 남긴다(호스트만 기록).</summary>
-    public static void AbortBeforeMap(QAScenarioContext ctx, QABoss103Config cfg, string why)
+    /// <summary>
+    /// 판 시작 전에 끊긴 판 — 판 기록(기본 Aborted)과 로그 1줄만 남긴다(호스트만 기록).
+    /// C6 데이터 출처 불일치는 <paramref name="outcome"/> = Error(<see cref="QABoss103Batch.ReasonDataSource"/>).
+    /// </summary>
+    public static void AbortBeforeMap(QAScenarioContext ctx, QABoss103Config cfg, string why, QABoss103Outcome outcome = QABoss103Outcome.Aborted)
     {
         if (ctx.Role != "host")
             return;
         var rec = NewRecord(cfg);
-        rec.Outcome = QABoss103Outcome.Aborted;
+        rec.Outcome = outcome;
         rec.Detail = why;
         Finish(ctx, cfg, rec, null, double.NaN);
     }
@@ -91,10 +94,11 @@ public static class QABoss103Match
     private static void Finish(QAScenarioContext ctx, QABoss103Config cfg, QABoss103RunRecord rec, QABoss103Recorder recorder, double bossHpPct)
     {
         LastRecord = rec;
+        QABoss103Heartbeat.SetPhase("end");
         Debug.Log(rec.ToLogLine());
         QABoss103RunCsv.Write(cfg, rec, recorder, bossHpPct, _startedAt);
         string evidence = $"결과 {rec.Outcome} · 전투 {(rec.CombatSeconds < 0 ? "na" : rec.CombatSeconds.ToString("F1") + "s")} · 시드 {rec.BaseSeed}/판 {rec.Run}/판 시드 {rec.RunSeed} · 특성 {rec.TraitsToken()} · {rec.Detail}";
-        if (rec.Outcome == QABoss103Outcome.Aborted)
+        if (rec.Outcome == QABoss103Outcome.Aborted || rec.Outcome == QABoss103Outcome.Error)
             ctx.Fail("103 판 기록", evidence, ctx.Shot("b103_abort"));
         else
             ctx.Pass("103 판 기록", evidence, ctx.Shot("b103_end"));
@@ -143,6 +147,7 @@ public static class QABoss103Match
             ctx.Eye("103 파티", string.Join(", ", party));
 
             // 1) 특성 4라운드.
+            QABoss103Heartbeat.SetPhase("traits");
             traits = TutorialTraitDirector.Instance;
             if (traits == null || !traits.IsSpawned)
             {
@@ -188,6 +193,7 @@ public static class QABoss103Match
             Debug.Log($"{Tag} event=pad_place moved={moved}/{ids.Count} {placeDetail}");
 
             // 3) 집결(전원 발판 유지) → 엘리베이터 → 등장 연출 → Combat.
+            QABoss103Heartbeat.SetPhase("gather");
             BossTeleportManager tp = BossTeleportManager.Instance;
             float gatherAt = Time.realtimeSinceStartup;
             yield return ctx.Wait(() => tp != null && (tp.IsCountdownActive || tp.IsElevatorRunning || Phase != BossEncounterPhase.Idle), GatherWaitSeconds);
@@ -206,6 +212,7 @@ public static class QABoss103Match
                 rec.Detail = $"엘리베이터 → 연출 안 됨(단계={Phase}, 엘리베이터={tp.IsElevatorRunning})";
                 yield break;
             }
+            QABoss103Heartbeat.SetPhase("intro");
             float introAt = Time.realtimeSinceStartup;
             yield return ctx.Wait(() => Phase == BossEncounterPhase.Combat || Phase == BossEncounterPhase.FailedSafe, CombatWaitSeconds);
             if (Phase != BossEncounterPhase.Combat)
@@ -215,6 +222,7 @@ public static class QABoss103Match
                 yield break;
             }
             double combatStart = Time.realtimeSinceStartupAsDouble;
+            QABoss103Heartbeat.MarkCombat();
             recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터
             string combatWall = DateTime.Now.ToString("HH:mm:ss.fff");
             Debug.Log($"{Tag} event=combat_start at={combatWall} introS={Time.realtimeSinceStartup - introAt:F1} skip={SkipVotes()} hostSkipPath={bot.SkipPath} hostSawLock={bot.SawCinematicLock}");
@@ -243,6 +251,7 @@ public static class QABoss103Match
                 yield return null;
             }
             bossHpPct = recorder.Stop();
+            QABoss103Heartbeat.SetPhase("end");
 
             // 전멸 리스폰 뒤 특성 초기화 팝업 — 호스트 봇도 '아니오' 를 보낼 시간을 준다.
             if (rec.Outcome == QABoss103Outcome.Wipe && wiped)
@@ -323,6 +332,7 @@ public static class QABoss103Match
                 if (combatStart < 0.0 && d != null && d.Phase == BossEncounterPhase.Combat)
                 {
                     combatStart = Time.realtimeSinceStartupAsDouble;
+                    QABoss103Heartbeat.MarkCombat();
                     Debug.Log($"{Tag} event=combat_seen character={localCharacter} skipPath={bot.SkipPath} sawLock={bot.SawCinematicLock}");
                 }
                 if (answeredAt < 0f && bot.ResetAnswers > 0)
