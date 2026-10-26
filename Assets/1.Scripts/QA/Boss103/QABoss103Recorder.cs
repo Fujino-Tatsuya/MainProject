@@ -26,6 +26,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
 {
     private const string Tag = QABoss103Plan.Tag;
     private const string FightLogPrefix = "[23호/전투기록]";
+    private const string BossLogPrefix = "[23호/";
     private const float SnapshotSeconds = 5f;
     private const float RescanSeconds = 1f;
     private const BindingFlags AnyInst = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -34,6 +35,8 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private static readonly FieldInfo FightLogField = typeof(TwentyThreeBoss).GetField("_fightLog", AnyInst);
 
     public readonly QABoss103RunStats Stats = new QABoss103RunStats();
+    /// <summary>C7f — 정체 감시용 활동 누계(<see cref="QABoss103StallWatch"/>).</summary>
+    public readonly QABoss103Activity Activity = new QABoss103Activity();
 
     private readonly Dictionary<ulong, int> _slotOf = new Dictionary<ulong, int>();
     private readonly Dictionary<Player, Action<PlayerAttackLanded>> _landed = new Dictionary<Player, Action<PlayerAttackLanded>>();
@@ -49,6 +52,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private bool _wasAttack;
     private string _fightLogCaptured, _fightLogSnapshot;
     private double _combatServerT;
+    private int _lastBossHp = int.MinValue, _lastFightLogLength = -1;
 
     public bool CurrentEntryReadable => CurrentEntryField != null;
 
@@ -163,22 +167,34 @@ public sealed class QABoss103Recorder : MonoBehaviour
         if (target is TwentyThreeBoss boss)
         {
             Stats.DamageDealt(SlotOf(attacker), amount, boss.IsSuppressed);
+            Activity.Note("boss_damage");
             return;
         }
         if (target is Player p)
+        {
             Stats.PlayerHit(SlotOf(p.OwnerClientId), Now, ClassifyHit());
+            Activity.Note("player_hit");
+            return;
+        }
+        Activity.Note("other_damage");   // 송전탑 등 보스 외 유닛
     }
 
     private void OnHealthLost(Unit target, int amount)
     {
         if (!_stopped && target is Player p)
+        {
             Stats.HealthLost(SlotOf(p.OwnerClientId), amount);
+            Activity.Note("health_lost");
+        }
     }
 
     private void OnCounterSucceeded(Unit target, ulong attacker)
     {
         if (!_stopped)
+        {
             Stats.CounterSuccess(SlotOf(attacker), Now);
+            Activity.Note("counter");
+        }
     }
 
     private void OnSkillUsed(Player p, PlayerSkillSlot slot)
@@ -206,20 +222,30 @@ public sealed class QABoss103Recorder : MonoBehaviour
 
     private void OnLifeChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
     {
-        if (!_stopped && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+        if (_stopped)
+            return;
+        if (previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
             Stats.Death(SlotOf(clientId), Now);
+        if (previous != current)
+            Activity.Note("life_" + current);
     }
 
     private void OnLives(int lives)
     {
         if (!_stopped)
+        {
             Stats.Lives(lives);
+            Activity.Note("lives");
+        }
     }
 
     private void OnWipe(IReadOnlyList<ulong> _)
     {
         if (!_stopped)
+        {
             Stats.Wipe();
+            Activity.Note("wipe");
+        }
     }
 
     private void OnGuardAbsorbed(Player p, GuardVerdict verdict)
@@ -231,13 +257,18 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private void OnGimmickResult(TwentyThreeBoss boss, string gimmick, string result, int value)
     {
         if (!_stopped)
+        {
             _eventGimmicks.Add(QABoss103GimmickNotify.FromEvent(gimmick, result, value, Now, _combatServerT));
+            Activity.Note("gimmick");
+        }
     }
 
     private void OnLog(string condition, string stackTrace, LogType type)
     {
         if (condition != null && condition.StartsWith(FightLogPrefix, StringComparison.Ordinal))
             _fightLogCaptured = condition;
+        else if (!_stopped && condition != null && condition.StartsWith(BossLogPrefix, StringComparison.Ordinal))
+            Activity.Note("boss_log");   // C7f — [23호/북진] 회차 차징·실패 등 기믹 진행
     }
 
     /// <summary>평타 = Default, 우클릭 = 슬롯 밖 Skill(<c>PlayerSkillBase.DamageAttackType</c>), 미지정은 평타로 본다.</summary>
@@ -297,6 +328,16 @@ public sealed class QABoss103Recorder : MonoBehaviour
                 Stats.AttackStart(now, entry.attackId.ToString());
             _wasAttack = attack;
             _lastEntry = attack ? entry : null;
+
+            // C7f — 보스 HP 변화 · 전투 기록 줄 추가(북진 회차·릴레이 진행)도 정체 감시 활동.
+            int hp = _boss.CurrentHealth;
+            if (_lastBossHp != int.MinValue && hp != _lastBossHp)
+                Activity.Note("boss_hp");
+            _lastBossHp = hp;
+            int logLength = FightLogField != null && FightLogField.GetValue(_boss) is StringBuilder log ? log.Length : -1;
+            if (_lastFightLogLength >= 0 && logLength >= 0 && logLength != _lastFightLogLength)
+                Activity.Note("fight_log");
+            _lastFightLogLength = logLength;
 
             if (Time.realtimeSinceStartup >= _nextSnapshot)
             {

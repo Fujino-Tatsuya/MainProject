@@ -244,13 +244,14 @@ public static class QABoss103Match
                 bool bossDead = director != null && director.IsBossDefeatedServer;
                 bool leftMap = SceneManager.GetActiveScene().name != mapScene || director == null;
                 QABoss103Outcome outcome = QABoss103Plan.Judge(bossDead, wiped || (leftMap && !bossDead), elapsed);
-                if (outcome == QABoss103Outcome.None && stall.Tick(elapsed, recorder.Stats.DamageDealtTotal(), recorder.Stats.TakenActivity()))
+                if (outcome == QABoss103Outcome.None && stall.Tick(elapsed, recorder.Activity.Count))
                 {
-                    // C7d — 피해가 한쪽도 오가지 않는 교착(끼임·보스 대상 없음). 통계 제외 → 끝에서 1회 재실행.
+                    // C7d·C7f — 피해·사망/부활·목숨·기믹 진행·보스 HP 어느 것도 없는 교착(끼임·보스 대상 없음). 통계 제외 → 끝에서 1회 재실행.
                     rec.Outcome = QABoss103Outcome.Error;
                     rec.CombatSeconds = elapsed;
-                    rec.Detail = $"{QABoss103Batch.ReasonStall} — Combat 중 {QABoss103StallWatch.StallSeconds:0}초 동안 보스에 준 피해·받은 피해 0";
-                    Debug.LogWarning($"{Tag} event=stall combatS={elapsed:F1} quietS={stall.QuietSeconds(elapsed):F1} dealt={recorder.Stats.DamageDealtTotal()} " +
+                    rec.Detail = $"{QABoss103Batch.ReasonStall} — Combat 중 {QABoss103StallWatch.StallSeconds:0}초 동안 전투 활동 0(마지막 {recorder.Activity.LastKind})";
+                    Debug.LogWarning($"{Tag} event=stall combatS={elapsed:F1} quietS={stall.QuietSeconds(elapsed):F1} lastActivity={recorder.Activity.LastKind} " +
+                                     $"activity={recorder.Activity.Count} dealt={recorder.Stats.DamageDealtTotal()} " +
                                      $"taken={recorder.Stats.TakenActivity()} relocates={QABoss103Relocator.Relocates} {BossDiag()}");
                     break;
                 }

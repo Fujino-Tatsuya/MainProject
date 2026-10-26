@@ -71,7 +71,7 @@ public static class QABoss103Batch
     public const string ReasonDataSource = "data_source";
     /// <summary>C7d — 클라 접속 거절(NGO <c>NetworkConfig mismatch</c>) — 집결 상한까지 기다리지 않고 바로 끝낸다.</summary>
     public const string ReasonNetConfigMismatch = "net_config_mismatch";
-    /// <summary>C7d — Combat 중 <see cref="QABoss103StallWatch.StallSeconds"/> 동안 준 피해·받은 피해 모두 0(호스트 판정, 판 기록 Error).</summary>
+    /// <summary>C7d — Combat 중 <see cref="QABoss103StallWatch.StallSeconds"/> 동안 전투 활동(<see cref="QABoss103Activity"/>) 0(호스트 판정, 판 기록 Error).</summary>
     public const string ReasonStall = "stall";
 
     /// <summary>C7d — NGO 접속 거절 로그인가(서버 쪽 <c>NetworkConfig mismatch. The configuration between the server and client does not match</c>).</summary>

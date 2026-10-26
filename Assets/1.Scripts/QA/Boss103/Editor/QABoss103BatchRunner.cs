@@ -278,7 +278,11 @@ public static class QABoss103BatchRunner
         if (!Running)
             return;
         double t = EditorApplication.timeSinceStartup;
-        if (t < _nextTick || EditorApplication.isCompiling || EditorApplication.isUpdating)
+        if (t < _nextTick)
+            return;
+        // C7f — Play 중 스크립트가 바뀌면 컴파일이 정지 뒤로 미뤄져 isCompiling 이 계속 true 다.
+        // 그때도 판 끝 기록·상한 초과 판정과 Play 정지는 처리한다(멈춰야 컴파일이 돈다). 다른 단계는 컴파일 뒤.
+        if ((EditorApplication.isCompiling || EditorApplication.isUpdating) && !(EditorApplication.isPlaying && LoadState() && IsPlayStopState(Get("state"))))
             return;
         _nextTick = t + TickSeconds;
         try
@@ -293,6 +297,10 @@ public static class QABoss103BatchRunner
             Debug.LogError($"{Tag} 루프 예외(5초 뒤 다시): {e.GetType().Name}: {e.Message}\n{e.StackTrace}");
         }
     }
+
+    /// <summary>컴파일 대기 중에도 돌리는 단계 — 판 감시(기록·상한 판정 → 정지 요청)와 정지 재시도뿐. Play 를 새로 켜는 단계는 빠진다.</summary>
+    private static bool IsPlayStopState(string state) =>
+        state == "running" || state == "ending" || state == "stopping" || state == "finishing";
 
     private static void Step()
     {

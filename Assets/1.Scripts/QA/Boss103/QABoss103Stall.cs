@@ -91,8 +91,28 @@ public sealed class QABoss103StuckEscalation
 }
 
 /// <summary>
-/// 할 일 103 C7d — 정체 감시(순수, EditMode <c>QABoss103BatchTests</c>). Combat 중 파티가 보스에 준 피해 누계와 플레이어가 받은 피해 누계가
-/// <see cref="StallSeconds"/> 동안 둘 다 그대로면 정체(판 Error, <see cref="QABoss103Batch.ReasonStall"/>). 어느 쪽이든 늘면 그 순간부터 다시 센다.
+/// 할 일 103 C7f — 전투 활동 누계(순수). 계측기(<c>QABoss103Recorder</c>)가 활동마다 <see cref="Note"/> — 보스·보스 외 유닛(송전탑 등)에 준 피해,
+/// 피격·체력 손실, 생명 상태 변화(사망·영혼·부활·PermanentDead), 공용 목숨 변화, 전멸, 간파, 기믹 알림(<c>QA103GimmickResult</c>),
+/// 보스 전투 기록·<c>[23호/</c> 로그(북진 회차·릴레이 진행), 보스 HP 변화. <see cref="LastKind"/> 는 stall 로그용.
+/// </summary>
+public sealed class QABoss103Activity
+{
+    public const string None = "none";
+
+    public long Count { get; private set; }
+    public string LastKind { get; private set; } = None;
+
+    public void Note(string kind)
+    {
+        Count++;
+        LastKind = string.IsNullOrEmpty(kind) ? None : kind;
+    }
+}
+
+/// <summary>
+/// 할 일 103 C7d·C7f — 정체 감시(순수, EditMode <c>QABoss103BatchTests</c>). Combat 중 활동 누계(<see cref="QABoss103Activity.Count"/>)가
+/// <see cref="StallSeconds"/> 동안 그대로면 정체(판 Error, <see cref="QABoss103Batch.ReasonStall"/>). 늘면 그 순간부터 다시 센다.
+/// C7d 는 보스에 준 피해·받은 피해만 봐서 북진 압박(보스 무적 · 탑 공격 · 즉사 방전 → QA 부활 반복)을 정체로 오판했다.
 /// </summary>
 public sealed class QABoss103StallWatch
 {
@@ -100,20 +120,19 @@ public sealed class QABoss103StallWatch
 
     private bool _started;
     private double _since;
-    private long _dealt, _taken;
+    private long _activity;
 
-    /// <summary>마지막으로 피해가 오간 뒤 지난 초. 시작 전이면 0.</summary>
+    /// <summary>마지막 활동 뒤 지난 초. 시작 전이면 0.</summary>
     public double QuietSeconds(double now) => _started ? now - _since : 0.0;
 
-    /// <summary>매 틱. <paramref name="dealt"/>·<paramref name="taken"/> = 누계. 정체면 true.</summary>
-    public bool Tick(double now, long dealt, long taken)
+    /// <summary>매 틱. <paramref name="activity"/> = 활동 누계. 정체면 true.</summary>
+    public bool Tick(double now, long activity)
     {
-        if (!_started || dealt != _dealt || taken != _taken)
+        if (!_started || activity != _activity)
         {
             _started = true;
             _since = now;
-            _dealt = dealt;
-            _taken = taken;
+            _activity = activity;
             return false;
         }
         return now - _since >= StallSeconds;

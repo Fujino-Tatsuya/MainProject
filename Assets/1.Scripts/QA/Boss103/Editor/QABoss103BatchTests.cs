@@ -217,25 +217,47 @@ public sealed class QABoss103BatchTests
     }
 
     [Test]
-    public void 정체_90초_동안_피해_0_이면_정체()
+    public void 정체_90초_동안_활동_0_이면_정체()
     {
         var w = new QABoss103StallWatch();
-        Assert.IsFalse(w.Tick(0.0, 0, 0));
-        Assert.IsFalse(w.Tick(89.9, 0, 0));
-        Assert.IsTrue(w.Tick(90.0, 0, 0));
+        Assert.IsFalse(w.Tick(0.0, 0));
+        Assert.IsFalse(w.Tick(89.9, 0));
+        Assert.IsTrue(w.Tick(90.0, 0));
     }
 
     [Test]
-    public void 정체_어느_쪽이든_피해가_오가면_다시_센다()
+    public void 정체_활동이_늘면_다시_센다()
     {
         var w = new QABoss103StallWatch();
-        w.Tick(0.0, 0, 0);
-        Assert.IsFalse(w.Tick(80.0, 100, 0), "보스에 준 피해");
-        Assert.IsFalse(w.Tick(169.9, 100, 0));
-        Assert.IsFalse(w.Tick(150.0, 100, 1), "받은 피해");
+        w.Tick(0.0, 0);
+        Assert.IsFalse(w.Tick(80.0, 1));
+        Assert.IsFalse(w.Tick(169.9, 1));
+        Assert.IsFalse(w.Tick(150.0, 2));
         Assert.AreEqual(0.0, w.QuietSeconds(150.0));
-        Assert.IsFalse(w.Tick(239.9, 100, 1));
-        Assert.IsTrue(w.Tick(240.0, 100, 1));
+        Assert.IsFalse(w.Tick(239.9, 2));
+        Assert.IsTrue(w.Tick(240.0, 2));
+    }
+
+    [Test]
+    public void 정체_북진_압박처럼_보스_피해_없이_탑_피해_사망_부활만_있어도_정체_아님()
+    {
+        // C7f 오탐 — 보스 무적 중 탑 공격 · 즉사 방전 · QA 부활 · 목숨 차감 · 기믹 알림만 오간다.
+        var a = new QABoss103Activity();
+        var w = new QABoss103StallWatch();
+        Assert.AreEqual(QABoss103Activity.None, a.LastKind);
+        w.Tick(0.0, a.Count);
+        string[] kinds = { "other_damage", "gimmick", "life_DeadPresentation", "lives", "life_Alive", "boss_log", "fight_log", "boss_hp" };
+        double t = 0.0;
+        foreach (string k in kinds)
+        {
+            t += 80.0;
+            a.Note(k);
+            Assert.IsFalse(w.Tick(t, a.Count), k);
+            Assert.AreEqual(k, a.LastKind);
+        }
+        Assert.IsFalse(w.Tick(t + 89.9, a.Count));
+        Assert.IsTrue(w.Tick(t + 90.0, a.Count));
+        Assert.AreEqual("boss_hp", a.LastKind);
     }
 
     [Test]
