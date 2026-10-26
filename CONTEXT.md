@@ -8,6 +8,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## 작업 세션 (2026-10-26 · 무기 베이스컬러)
+- 팔라딘 검·방패 v02와 어쎄신 좌우 단검 v01을 실제 스폰 프리팹에 연결. 기존 소켓·Transform 보존, 발광은 UV1 복사본, 프리팹/재질 검사 11개 통과. 아트 SVN r527 · [전달 문서](Docs/tech/handoff-weapon-basecolors-20261026.md).
+
 ## ▶▶ 반영 (2026-10-25 · 아트(Claude+Codex)) — **타이틀 카메라 구도·라이팅·반사 프로브·심도**, 브랜치 `feature/Title-look` → `development` · 상세 [handoff-title-look.md](Docs/tech/handoff-title-look.md)
 - 1.TitleScene: VCam_Far·VCam_Near 구도, TitleOffice 라이트 3개·반사 프로브 세기 0.3(씬 오버라이드), 재베이크. `GlobalVolumeProfile` DoF 20 m·F4·65 mm(아트 씬과 공유).
 - 🔴 알려진 문제 2건(프로그래머): Play 뒤 저장하면 타이틀 카메라 3대 AA 가 SMAA 로 바뀜(`GraphicsQualityConfig` 훅) · 모니터 화면이 깊이 텍스처에 없음(DoF 20 m 는 이 상태 기준).
