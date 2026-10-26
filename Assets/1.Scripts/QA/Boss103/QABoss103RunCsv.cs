@@ -91,6 +91,9 @@ public static class QABoss103RunCsv
                         stats.AddPart(s, lines);
                 }
                 stats.Finish();
+                foreach (QABoss103CharStats c in stats.Chars)
+                    Debug.Log($"{Tag} event=bot_fidelity run={cfg.Run} retry={cfg.Retry} character={c.Character} part={(c.PartPresent ? "true" : "false")} " +
+                              $"dodgeRolls={c.DodgeRolls} dodgeSuccess={c.DodgeSuccess} counterHitRolls={c.CounterHitRolls} counterHitSuccess={c.CounterHitSuccess}");
             }
 
             QABoss103RunMeta meta = Meta(cfg, rec, bossHpPct, startedAt);

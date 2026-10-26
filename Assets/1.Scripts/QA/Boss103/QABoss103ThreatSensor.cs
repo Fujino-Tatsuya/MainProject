@@ -18,9 +18,15 @@ public sealed class QABoss103Threat
     public double ServerT;
     /// <summary>감지 순간 남은 예고(초) — 반응 지연보다 짧으면 늦은 회피다. 모르면 NaN.</summary>
     public double LeadSeconds = double.NaN;
+    /// <summary>C7e — 부채꼴·띠 예고 전체 길이(초, <c>_growTime</c>). 돌진 출발 시각 추정에 쓴다. 그 밖 0.</summary>
+    public double GrowSeconds;
+    /// <summary>C7e — 예고 없는 공격인데 앞 공격 감지 직후(<see cref="QABoss103HitTiming.GenericChainGapSeconds"/>) — 이어치기 타.</summary>
+    public bool Chained;
     /// <summary>위험이 끝날 것으로 보는 실시간(초) — 예고가 떠 있는 동안 계속 늘어난다.</summary>
     public double EndsAt;
     public bool Active = true;
+    /// <summary>C7e — 예고 없는 공격으로 먼저 잡았는데 곧 예고 모양(점프 원 등)이 떴다 — 같은 공격이라 이 위험은 버린다(대시 충전을 아낀다).</summary>
+    public bool Superseded;
 
     // 원·칸 위험
     public Vector3 Center;
@@ -77,10 +83,15 @@ public sealed class QABoss103ThreatSensor
 
     private static readonly FieldInfo CurrentEntry = typeof(TwentyThreeBoss).GetField("_currentEntry", Inst);
 
+    private static readonly PropertyInfo DirIndicatorProp = typeof(TwentyThreeBoss).GetProperty("DirectionIndicator", Inst);
+    private static readonly FieldInfo IndicatorSuppressed = typeof(BossDirectionIndicator).GetField("_suppressed", Inst);
+
     /// <summary>공격 상태 진입 뒤 이 시간(초) 안에 예고가 없으면 '예고 없는 공격'으로 본다(RPC·복제 도착 순서 차이 흡수).</summary>
     public const double GenericDelaySeconds = 0.2;
     /// <summary>예고 없는 공격의 위험 시간(초).</summary>
     public const double GenericSeconds = 1.0;
+    /// <summary>C7e — 예고 없는 공격으로 잡은 뒤 이 안(초)에 부채꼴·점프 예고가 뜨면 같은 공격이다(점프는 공격 진입 ~1.3초 뒤 원이 뜬다).</summary>
+    public const double SupersedeSeconds = 1.8;
     /// <summary>예고가 다 찬 뒤 판정이 나가는 꼬리(초).</summary>
     private const double TailSeconds = 0.3;
     /// <summary>끝난 위험을 목록에서 지우기 전 보관(초).</summary>
@@ -97,7 +108,8 @@ public sealed class QABoss103ThreatSensor
     private readonly List<QABoss103Threat> _threats = new List<QABoss103Threat>();
     private readonly Dictionary<QABoss103ThreatKind, int> _counts = new Dictionary<QABoss103ThreatKind, int>();
 
-    private QABoss103Threat _coneThreat, _jumpThreat, _droneThreat, _floorThreat;
+    private QABoss103Threat _coneThreat, _jumpThreat, _droneThreat, _floorThreat, _auraThreat;
+    private double _lastGenericAt = -1.0;
     private bool _coneWas;
     private float _coneLastElapsed;
     private GameObject _jumpWas;
@@ -134,6 +146,7 @@ public sealed class QABoss103ThreatSensor
             miss.Add("cone");
         if (JumpTelegraph == null || JumpRadius == null || JumpDuration == null || JumpElapsed == null) miss.Add("jump");
         if (DroneView == null || DronePos == null || DroneRadius == null || DroneDur == null || DroneStart == null || DroneCross == null) miss.Add("drone");
+        if (DirIndicatorProp == null || IndicatorSuppressed == null) miss.Add("aura");
         Missing = miss.Count > 0 ? string.Join("+", miss) : "none";
     }
 
@@ -161,7 +174,8 @@ public sealed class QABoss103ThreatSensor
         _cone = null;
         _drone = null;
         _threats.Clear();
-        _coneThreat = _jumpThreat = _droneThreat = _floorThreat = null;
+        _coneThreat = _jumpThreat = _droneThreat = _floorThreat = _auraThreat = null;
+        _lastGenericAt = -1.0;
         _coneWas = false;
         _jumpWas = null;
         _droneViewWas = 0;
@@ -191,6 +205,7 @@ public sealed class QABoss103ThreatSensor
         TickDrone(me, now);
         TickFloor(now);
         TickGeneric(now);
+        TickAura(now);
 
         for (int i = _threats.Count - 1; i >= 0; i--)
         {
@@ -222,6 +237,7 @@ public sealed class QABoss103ThreatSensor
             bool inward = ConeInward != null && (bool)ConeInward.GetValue(_cone);
             QABoss103ThreatKind kind = QABoss103Evasion.ClassifyTelegraph(interrupt, inward, F(ConeRadius), F(PathRadius), F(PathLength), grow);
             _coneThreat = Add(kind, now, Math.Max(0.0, grow - elapsed));
+            _coneThreat.GrowSeconds = grow;
             _lastShapeAt = now;
         }
         if (_coneThreat != null && _coneThreat.Active)
@@ -325,9 +341,43 @@ public sealed class QABoss103ThreatSensor
         // 공격 상태 진입 앞뒤로 예고가 떴으면 그 예고가 이 공격이다.
         if (_lastShapeAt >= edge - 0.3)
             return;
+        bool chained = _lastGenericAt >= 0.0 && now - _lastGenericAt <= QABoss103HitTiming.GenericChainGapSeconds;
+        _lastGenericAt = now;
         QABoss103Threat t = Add(QABoss103ThreatKind.Generic, now, 0.0);
         t.Center = _boss.transform.position;
         t.EndsAt = now + GenericSeconds;
+        t.Chained = chained;
+    }
+
+    /// <summary>
+    /// C7e 차징 오라 — 서버 전용 판정이라 클라 신호로 본다: 방향 표시기 억제(<c>ShowChargeAuraClientRpc</c>)인데 점프 예고가 없다
+    /// (점프 체공도 표시기를 억제하지만 그땐 점프 원이 떠 있다). 반경 = 데이터 <c>chargeAuraRadius</c>. 켜진 동안 1건, 꺼지면 끝.
+    /// </summary>
+    private void TickAura(double now)
+    {
+        bool on = false;
+        if (DirIndicatorProp != null && IndicatorSuppressed != null && JumpTelegraph != null && JumpTelegraph.GetValue(_boss) as GameObject == null)
+        {
+            object ind = DirIndicatorProp.GetValue(_boss);
+            on = ind != null && (bool)IndicatorSuppressed.GetValue(ind);
+        }
+        if (on && (_auraThreat == null || !_auraThreat.Active))
+        {
+            _auraThreat = Add(QABoss103ThreatKind.Aura, now, 0.0);
+            _auraThreat.Radius = _boss.Data != null ? _boss.Data.chargeAuraRadius : 5.5f;
+        }
+        if (_auraThreat != null && _auraThreat.Active)
+        {
+            if (on)
+            {
+                _auraThreat.Center = _boss.transform.position;
+                _auraThreat.EndsAt = now + 1.0;
+            }
+            else
+            {
+                End(_auraThreat, now);
+            }
+        }
     }
 
     private QABoss103Threat Add(QABoss103ThreatKind kind, double now, double leadSeconds)
@@ -346,6 +396,13 @@ public sealed class QABoss103ThreatSensor
             LeadSeconds = leadSeconds,
             EndsAt = now + leadSeconds + TailSeconds,
         };
+        if (IsConeKind(kind) || kind == QABoss103ThreatKind.Jump)
+            foreach (QABoss103Threat g in _threats)
+                if (g.Kind == QABoss103ThreatKind.Generic && g.Active && now - g.DetectedAt <= SupersedeSeconds)
+                {
+                    g.Superseded = true;
+                    End(g, now);
+                }
         _threats.Add(t);
         return t;
     }
@@ -384,7 +441,10 @@ public sealed class QABoss103ThreatSensor
     /// 내가 이 위험 범위 안인가(대략). 부채꼴 계열 = 지금 보스 위치·정면 기준 띠/부채꼴, 점프·드론 = 원, 장판 = 예고 칸(±0.4m),
     /// 예고 없는 공격 = 보스 표면 3.5m 안·보스 앞. 드론은 표식 대상이었으면 원 밖이어도 위험으로 본다(나를 노린 공격).
     /// </summary>
-    public bool Contains(QABoss103Threat t, Vector3 pos, float surfaceDistance)
+    public bool Contains(QABoss103Threat t, Vector3 pos, float surfaceDistance) => Contains(t, pos, surfaceDistance, false);
+
+    /// <summary><paramref name="shapeOnly"/> = 드론 '나를 노림'을 빼고 고정 원만 본다(C7e — 걸어서 원 밖으로 나갔나).</summary>
+    public bool Contains(QABoss103Threat t, Vector3 pos, float surfaceDistance, bool shapeOnly)
     {
         if (_boss == null)
             return false;
@@ -404,9 +464,11 @@ public sealed class QABoss103ThreatSensor
             case QABoss103ThreatKind.Jump:
                 return QABoss103Evasion.InCircle(pos.x - t.Center.x, pos.z - t.Center.z, t.Radius);
             case QABoss103ThreatKind.Drone:
-                return t.TargetedMe || QABoss103Evasion.InCircle(pos.x - t.Center.x, pos.z - t.Center.z, t.Radius);
+                return (t.TargetedMe && !shapeOnly) || QABoss103Evasion.InCircle(pos.x - t.Center.x, pos.z - t.Center.z, t.Radius);
             case QABoss103ThreatKind.Floor:
                 return InFloor(t.Mask, pos);
+            case QABoss103ThreatKind.Aura:
+                return QABoss103Evasion.InCircle(pos.x - t.Center.x, pos.z - t.Center.z, t.Radius);
             default:
                 return QABoss103Evasion.InGeneric(f, surfaceDistance);
         }
@@ -442,6 +504,7 @@ public sealed class QABoss103ThreatSensor
         {
             case QABoss103ThreatKind.Jump:
             case QABoss103ThreatKind.Drone:
+            case QABoss103ThreatKind.Aura:
                 QABoss103Evasion.Away(pos.x - t.Center.x, pos.z - t.Center.z, pos.x - bossPos.x, pos.z - bossPos.z, out x, out z);
                 return new Vector3(x, 0f, z);
             case QABoss103ThreatKind.Floor:
@@ -478,10 +541,12 @@ public sealed class QABoss103ThreatSensor
         return bestSq < float.MaxValue;
     }
 
-    /// <summary>방어(E)를 향할 출처 — 부채꼴·예고 없는 공격 = 보스, 점프·드론 = 원 중심.</summary>
+    /// <summary>
+    /// 방어(E)를 향할 출처 — 방어는 공격자 루트 위치로 판정한다. 점프 = 착지 원 중심(보스가 거기 내린다), 그 밖(장판·드론 포함 — 공격자 = 보스) = 보스.
+    /// </summary>
     public Vector3 Source(QABoss103Threat t)
     {
-        if (t.Kind == QABoss103ThreatKind.Jump || t.Kind == QABoss103ThreatKind.Drone)
+        if (t.Kind == QABoss103ThreatKind.Jump)
             return t.Center;
         return _boss != null ? _boss.transform.position : t.Center;
     }

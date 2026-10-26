@@ -159,10 +159,50 @@ public sealed class QABoss103EvasionTests
     }
 
     [Test]
-    public void 장판만_방어_불가()
+    public void 잡기_오라만_방어_불가()
     {
+        // C7e — 장판·드론 공격자 = 보스라 보스를 향한 방어로 막는다. 잡기(끌어당김)·오라(계속 도는 원)는 걷기·대시만.
         foreach (QABoss103ThreatKind k in Enum.GetValues(typeof(QABoss103ThreatKind)))
-            Assert.AreEqual(k != QABoss103ThreatKind.Floor, QABoss103Evasion.IsGuardable(k), k.ToString());
+            Assert.AreEqual(k != QABoss103ThreatKind.Grab && k != QABoss103ThreatKind.Aura, QABoss103Evasion.IsGuardable(k), k.ToString());
+    }
+
+    // ── C7e 피격 시각·회피 시각 ───────────────────────────────
+
+    [Test]
+    public void 위험별_첫_피해_추정()
+    {
+        const double e = 1e-9;
+        Assert.AreEqual(1.2 + 0.39, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Jump, 1.2, 0, 5, false), e, "점프 = 원 + 착지 타격 0.39");
+        Assert.AreEqual(1.2, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Floor, 1.2, 0, 5, false), e, "장판 = 예고 끝 1회");
+        Assert.AreEqual(1.0, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Drone, 1.0, 0, 5, false), e, "드론 = 고정 + 1초");
+        Assert.AreEqual(0.7 + 0.233, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Cone, 0.7, 0.7, 2, false), e, "부채꼴 = 예고 끝 + 0.233");
+        Assert.AreEqual(0.62, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Generic, 0, 0, 2, false), e, "예고 없는 첫 타");
+        Assert.AreEqual(0.03, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Generic, 0, 0, 2, true), e, "이어치기 타는 감지 때 이미 늦다");
+        Assert.AreEqual(0.68 + 1.96, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Grab, 0.68, 0.7, 3, false), e, "잡기 첫 피해");
+        Assert.AreEqual(0.68, QABoss103HitTiming.DeadlineDelay(QABoss103ThreatKind.Grab, 0.68, 0.7, 3, false), e, "잡기 마감 = 예고 끝(끌어당김 판정)");
+    }
+
+    [Test]
+    public void 돌진은_공격_진입_1_5초_뒤_출발하고_나까지_달려온다()
+    {
+        const double e = 1e-9;
+        Assert.AreEqual(1.48, QABoss103HitTiming.DashLaunchDelay(1.48, 1.5), e, "보통 돌진 = 띠 끝");
+        Assert.AreEqual(1.48, QABoss103HitTiming.DashLaunchDelay(0.68, 0.7), e, "이어치기 돌진 띠 0.7초라도 출발은 진입 1.5초");
+        Assert.AreEqual(1.48 + (12.2 - 2.2) / 19.5, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Dash, 1.48, 1.5, 12.2, false), e);
+        Assert.AreEqual(1.48, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.Dash, 1.48, 1.5, 1.0, false), e, "몸 판정 안이면 출발 순간");
+        Assert.AreEqual(10.0 / 15.0, QABoss103HitTiming.HitDelay(QABoss103ThreatKind.RageDash, 0, 0, 12.2, false), e, "레이지 = 띠와 동시 출발");
+    }
+
+    [Test]
+    public void 대시와_방어_시작_시각()
+    {
+        const double e = 1e-9;
+        Assert.AreEqual(1.475, QABoss103HitTiming.DashStartAt(1.6, 0.3), e, "마감 − 무적 0.25 의 절반");
+        Assert.AreEqual(0.45, QABoss103HitTiming.DashStartAt(0.5, 0.45), e, "반응 지연이 늦으면 지연 끝에 바로");
+        Assert.AreEqual(1.6 - 0.325, QABoss103HitTiming.GuardStartAt(1.6, 0.3), e, "방어 창 = 시전 0.225 뒤 — 0.1초 일찍 연다");
+        Assert.IsFalse(QABoss103HitTiming.Missed(0.45, 0.62));
+        Assert.IsTrue(QABoss103HitTiming.Missed(0.45, 0.03), "이어치기 타 — 반응이 마감보다 늦다");
+        Assert.AreEqual(1.5 - 0.333 - 0.07, QABoss103HitTiming.CounterPressDeadline(1.5), e, "간파 판정 0.333초 뒤에도 창이 열려 있어야");
     }
 
     [Test]

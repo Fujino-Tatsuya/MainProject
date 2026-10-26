@@ -46,6 +46,8 @@ public static class QABoss103Report
     private sealed class Group
     {
         public string Label;
+        /// <summary>단계 묶음이면 그 단계(봇 충실도 표의 입력값), 전체면 null.</summary>
+        public QABoss103BotTier? Tier;
         public readonly List<string[]> Runs = new List<string[]>();
         public readonly List<string[]> CharRows = new List<string[]>();
         public readonly List<string[]> PatternRows = new List<string[]>();
@@ -82,7 +84,7 @@ public static class QABoss103Report
         var byTier = new Dictionary<QABoss103BotTier, Group>();
         foreach (QABoss103BotTier t in QABoss103Batch.TierOrder)
         {
-            var g = new Group { Label = QABoss103Batch.TierLabel(t) };
+            var g = new Group { Label = QABoss103Batch.TierLabel(t), Tier = t };
             byTier[t] = g;
             c.Tiers.Add(g);
         }
@@ -531,7 +533,20 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
 
         Sec(sb, "14. 보스 기믹 — 기믹별 표는 아래", cols);
         Line(sb, "기믹 기록 수/판", c, g => Num(Div(g.GimmickRows.Count, g.Runs.Count), 1));
-        sb.Append("</tbody></table></div>\n<div class=\"muted\">8번 칸 = 사용/판 · 적중률(적중 판정/사용) · 피해 비중(그 캐릭터 행동별 피해 합 중). 행동별 피해는 클램프 전 값. " +
+
+        Sec(sb, "15. 봇 충실도(입력 vs 달성) — C7e", cols);
+        Line(sb, "입력 회피율 / 입력 간파 성공률", c, g => g.Tier.HasValue
+            ? $"{Pct(1.0 - QABoss103BotProfile.For(g.Tier.Value).PatternHitChance, 0)} / {Pct(QABoss103BotProfile.For(g.Tier.Value).InterruptSuccessChance, 0)}"
+            : Dash);
+        foreach (QABoss103Character ch in Chars)
+        {
+            Line(sb, $"{CharLabel(ch)} 회피 달성(피함 굴림 → 피격 0)", c, g =>
+                $"{Pct(Div(SumChars(c, g, ch, "dodge_success"), SumChars(c, g, ch, "dodge_rolls")), 0)} ({Num(SumChars(c, g, ch, "dodge_rolls"), 0)})");
+            Line(sb, $"{CharLabel(ch)} 간파 달성(성공 굴림 → 서버 성공)", c, g =>
+                $"{Pct(Div(SumChars(c, g, ch, "counter_roll_success"), SumChars(c, g, ch, "counter_hit_rolls")), 0)} ({Num(SumChars(c, g, ch, "counter_hit_rolls"), 0)})");
+        }
+        sb.Append("</tbody></table></div>\n<div class=\"muted\">15번 칸 = 달성률(굴림 수). 회피 달성 = '피함' 굴림 중 그 위험(감지 + 예상 피격 + 1초 안 같은 패턴)에 피격이 없던 비율, " +
+                  "간파 달성 = 성공 굴림 누름 뒤 1초 안 서버 간파 성공 비율. C7e 전 판은 열이 비어 —.</div>\n<div class=\"muted\">8번 칸 = 사용/판 · 적중률(적중 판정/사용) · 피해 비중(그 캐릭터 행동별 피해 합 중). 행동별 피해는 클램프 전 값. " +
                   "실제 피격률 = 굴림이 있었던 위험에서 실제로 맞은 건수 / 굴림 수(같은 패턴 0.3초 안 다단은 1건). 굴림 없는 피격은 따로 센다.</div>\n");
     }
 

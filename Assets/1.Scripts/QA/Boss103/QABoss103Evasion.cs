@@ -24,6 +24,8 @@ public enum QABoss103ThreatKind
     Drone = 8,
     /// <summary>예고 모양 없는 보스 공격 시작(복제 상태 Attack 엣지).</summary>
     Generic = 9,
+    /// <summary>C7e — 차징 오라(보스 둘레 원, 1초마다 피해·넉백). 클라 신호 = 방향 표시기 억제 + 점프 예고 없음.</summary>
+    Aura = 10,
 }
 
 /// <summary>회피 결정 — 로그 <c>action=</c> 토큰(소문자).</summary>
@@ -38,6 +40,8 @@ public enum QABoss103DodgeAction
     NoCharge = 3,
     /// <summary>회피 굴림이었지만 지금 행동이 대시로 끊기지 않는다(CC·끊을 수 없는 스킬).</summary>
     Blocked = 4,
+    /// <summary>C7e — 피격 시각 전에 걸어서 범위 밖으로 나갔다(대시 충전을 쓰지 않음).</summary>
+    Walk = 5,
 }
 
 /// <summary>
@@ -95,6 +99,7 @@ public static class QABoss103Evasion
             case QABoss103ThreatKind.Jump: return "jump";
             case QABoss103ThreatKind.Floor: return "floor";
             case QABoss103ThreatKind.Drone: return "drone";
+            case QABoss103ThreatKind.Aura: return "aura";
             default: return "generic";
         }
     }
@@ -107,6 +112,7 @@ public static class QABoss103Evasion
             case QABoss103DodgeAction.Guard: return "guard";
             case QABoss103DodgeAction.NoCharge: return "no_charge";
             case QABoss103DodgeAction.Blocked: return "blocked";
+            case QABoss103DodgeAction.Walk: return "walk";
             default: return "none";
         }
     }
@@ -229,8 +235,11 @@ public static class QABoss103Evasion
 
     // ── 행동 선택 ──────────────────────────────────────────────
 
-    /// <summary>방어(팔라딘 E)로 막을 수 있는 위험인가 — 장판은 발밑 칸에서 맞아(출처 = 발 위치) 방향 방어가 성립하지 않아 대시만.</summary>
-    public static bool IsGuardable(QABoss103ThreatKind kind) => kind != QABoss103ThreatKind.Floor;
+    /// <summary>
+    /// 방어(팔라딘 E)로 막을 수 있는 위험인가. C7e — 방어는 공격자 루트 위치로 판정하고 장판·드론의 공격자는 보스라(<c>BossPatternTargets</c>)
+    /// 보스를 향하면 장판도 막는다. 잡기는 피해가 아니라 끌어당김 판정(예고 끝 순간 부채꼴 안)이라, 오라는 계속 도는 원이라 방어로 못 버틴다 — 걷기·대시만.
+    /// </summary>
+    public static bool IsGuardable(QABoss103ThreatKind kind) => kind != QABoss103ThreatKind.Grab && kind != QABoss103ThreatKind.Aura;
 
     /// <summary>
     /// 반응 지연 뒤 행동. 피격 굴림 = 없음. 회피 굴림이면 방어 가능(팔라딘·막을 수 있는 위험·E 쿨·바쁘지 않음) → 방어,
@@ -262,6 +271,104 @@ public static class QABoss103Evasion
         if (deg < -180.0) deg += 360.0;
         return deg;
     }
+}
+
+/// <summary>
+/// 할 일 103 C7e — 위험별 피격 시각 추정과 회피 시각 계산(순수, EditMode <c>QABoss103EvasionTests</c>). 시각은 모두 '감지부터 초'.
+/// 값은 dev No23_B 코드·데이터 조사(2026-10-27) — 클립 60fps 가정, 클라는 한 방향 지연만큼 실제가 빠르다.
+/// <list type="bullet">
+/// <item>부채꼴·띠(훅 예고 켠 보스 등): 예고 끝 = 출발, 타격 이벤트 0.233초 뒤.</item>
+/// <item>돌진(파랑 띠): 공격 진입 1.5초 뒤 출발(이어치기 돌진은 띠가 0.7초라도 출발은 1.5초) → 19.5m/s 로 나까지. 레이지 돌진 = 띠와 동시 출발, 15m/s.</item>
+/// <item>잡기: 예고 끝 순간 부채꼴 안이면 끌려간다(이게 회피 마감). 첫 피해는 그 1.96초 뒤.</item>
+/// <item>점프: 원(1.2초)이 다 찬 뒤 착지 클립 타격 0.39초. 장판: 예고 시간 끝 1회. 드론: 고정 + 1.0초 1회.</item>
+/// <item>예고 없는 공격(훅·어퍼 — No23 은 <c>hookTelegraphMarkers</c> 꺼짐): 공격 진입 → 첫 타 훅 0.93·어퍼 0.73초, 감지는 진입 + 0.2초.
+///   이어치기 타(앞 공격 진입 0.9초 안)는 진입 0.23초 뒤라 감지 때 이미 늦다.</item>
+/// </list>
+/// 대시 무적 = 서버 0.25초(<c>DashValidationPolicy</c>) → 대시 시작 = 마감 − 무적 절반(반응 지연 뒤). 방어 창은 시전 0.225초 뒤 열린다.
+/// 간파는 시전 0.333초 뒤 판정(<c>Garen_Parry</c> 이벤트)이라 그때도 창이 열려 있어야 한다.
+/// </summary>
+public static class QABoss103HitTiming
+{
+    public const double DashInvulnSeconds = 0.25;
+    public const double ConeReleaseHitSeconds = 0.233;
+    public const double DashLaunchSeconds = 1.5;
+    public const double DashTravelSpeed = 19.5;
+    public const double RageDashSpeed = 15.0;
+    /// <summary>돌진 몸 판정 앞쪽 몫(m) — 보스 중심부터 이만큼은 출발 순간 이미 닿는다.</summary>
+    public const double DashBodyReach = 2.2;
+    public const double GrabFirstDamageSeconds = 1.96;
+    public const double JumpLandingHitSeconds = 0.39;
+    /// <summary>예고 없는 공격 첫 타(감지부터) — 훅 0.73·어퍼 0.53 의 가운데(대시 무적 0.25초가 둘 다 덮는다).</summary>
+    public const double GenericFirstHitSeconds = 0.62;
+    /// <summary>예고 없는 이어치기 타(감지부터) — 진입 0.233초 − 감지 지연 0.2초.</summary>
+    public const double GenericChainHitSeconds = 0.03;
+    /// <summary>앞 예고 없는 공격 감지부터 이 안(초)의 새 공격 = 이어치기(타 간격 ≈ 0.53초).</summary>
+    public const double GenericChainGapSeconds = 0.9;
+    public const double GuardStartupSeconds = 0.225;
+    /// <summary>방어 창이 피격보다 이만큼(초) 먼저 열리게 시전한다.</summary>
+    public const double GuardLeadSeconds = 0.1;
+    public const double ParryHitSeconds = 0.333;
+    /// <summary>간파 판정 순간이 추정 닫힘보다 이만큼(초) 앞이어야 한다(RPC·프레임 여유).</summary>
+    public const double ParryCloseMarginSeconds = 0.07;
+    /// <summary>반응이 마감보다 이만큼(초) 넘게 늦으면 놓친 것(expired).</summary>
+    public const double LateSlackSeconds = 0.05;
+
+    /// <summary>
+    /// 감지 → 첫 피해(초). <paramref name="lead"/> = 감지 때 남은 예고, <paramref name="grow"/> = 예고 전체 길이(부채꼴·띠),
+    /// <paramref name="distance"/> = 보스 중심 → 나(m, 돌진류), <paramref name="chained"/> = 예고 없는 이어치기 타.
+    /// </summary>
+    public static double HitDelay(QABoss103ThreatKind kind, double lead, double grow, double distance, bool chained)
+    {
+        lead = Math.Max(0.0, double.IsNaN(lead) ? 0.0 : lead);
+        switch (kind)
+        {
+            case QABoss103ThreatKind.Dash:
+                return DashLaunchDelay(lead, grow) + Travel(distance, DashTravelSpeed);
+            case QABoss103ThreatKind.RageDash:
+                return lead + Travel(distance, RageDashSpeed);
+            case QABoss103ThreatKind.Grab:
+                return lead + GrabFirstDamageSeconds;
+            case QABoss103ThreatKind.Jump:
+                return lead + JumpLandingHitSeconds;
+            case QABoss103ThreatKind.Floor:
+            case QABoss103ThreatKind.Drone:
+                return lead;
+            case QABoss103ThreatKind.Generic:
+                return chained ? GenericChainHitSeconds : GenericFirstHitSeconds;
+            case QABoss103ThreatKind.Aura:
+                return 0.0;
+            default:
+                return lead + ConeReleaseHitSeconds;
+        }
+    }
+
+    /// <summary>회피 마감(감지부터 초) — 이때 무적이거나 범위 밖이어야 한다. 잡기만 피해가 아니라 예고 끝(끌어당김 판정)이다.</summary>
+    public static double DeadlineDelay(QABoss103ThreatKind kind, double lead, double grow, double distance, bool chained) =>
+        kind == QABoss103ThreatKind.Grab ? Math.Max(0.0, double.IsNaN(lead) ? 0.0 : lead) : HitDelay(kind, lead, grow, distance, chained);
+
+    /// <summary>돌진 출발(감지부터) — 공격 진입 1.5초 뒤. 감지 때 예고 경과 = grow − lead 라 1.5 − 경과, 예고 끝보다 이르지 않다.</summary>
+    public static double DashLaunchDelay(double lead, double grow)
+    {
+        double elapsed = Math.Max(0.0, grow - lead);
+        return Math.Max(lead, DashLaunchSeconds - elapsed);
+    }
+
+    private static double Travel(double distance, double speed) =>
+        double.IsNaN(distance) ? 0.0 : Math.Max(0.0, distance - DashBodyReach) / speed;
+
+    /// <summary>대시 시작 시각 = 마감 − 무적 절반, 단 반응 지연 끝(<paramref name="readyAt"/>)보다 이르지 않다.</summary>
+    public static double DashStartAt(double deadlineAt, double readyAt, double invulnSeconds = DashInvulnSeconds) =>
+        Math.Max(readyAt, deadlineAt - invulnSeconds * 0.5);
+
+    /// <summary>방어 시전 시각 = 마감 − 선딜 − 여유(창이 마감 전에 열린다), 단 반응 지연 끝보다 이르지 않다.</summary>
+    public static double GuardStartAt(double deadlineAt, double readyAt) =>
+        Math.Max(readyAt, deadlineAt - GuardStartupSeconds - GuardLeadSeconds);
+
+    /// <summary>반응 지연이 마감을 넘겨 끝났다 — 굴림은 '피함'이었지만 늦었다.</summary>
+    public static bool Missed(double readyAt, double deadlineAt) => readyAt > deadlineAt + LateSlackSeconds;
+
+    /// <summary>간파 마지막 누름 시각 = 추정 닫힘 − 판정 선딜 − 여유.</summary>
+    public static double CounterPressDeadline(double closeAt) => closeAt - ParryHitSeconds - ParryCloseMarginSeconds;
 }
 
 /// <summary>

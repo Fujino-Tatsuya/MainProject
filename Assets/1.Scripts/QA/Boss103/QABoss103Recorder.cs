@@ -178,7 +178,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private void OnCounterSucceeded(Unit target, ulong attacker)
     {
         if (!_stopped)
-            Stats.CounterSuccess(SlotOf(attacker));
+            Stats.CounterSuccess(SlotOf(attacker), Now);
     }
 
     private void OnSkillUsed(Player p, PlayerSkillSlot slot)

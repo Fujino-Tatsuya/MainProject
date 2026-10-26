@@ -34,8 +34,20 @@ public sealed class QABoss103Roll
     public string Action = "none";
     public string Ok = "na";
     public string Note = "none";
+    /// <summary>C7e — 감지부터 예상 피격까지(초, 판 파일 <c>hitMs</c>). 모르면 NaN — 충실도 매칭은 <see cref="QABoss103Metrics.FidelityDefaultHitSeconds"/>.</summary>
+    public double HitDelay = double.NaN;
     /// <summary>판 끝에 정해지는 패턴 키(<see cref="QABoss103Metrics.PatternOfRoll"/>).</summary>
     public string Pattern;
+}
+
+/// <summary>C7e — 봇 간파 누름 1회(판 파일 <c>counter</c> 줄).</summary>
+public sealed class QABoss103CounterPress
+{
+    public int Slot;
+    public double ServerT;
+    /// <summary>성공 굴림(roll=hit).</summary>
+    public bool HitRoll;
+    public bool Cast;
 }
 
 /// <summary>보스 기믹 발생 1건(run_gimmicks.csv 한 줄).</summary>
@@ -87,6 +99,11 @@ public sealed class QABoss103CharStats
     /// <summary>C7d — QA 끼임 재배치 성공(<c>QABoss103Relocator</c>, 20초 이상 진척 없음 → 보스 둘레 링 지점).</summary>
     public int QaRelocates;
 
+    /// <summary>C7e 봇 충실도 — 회피 굴림 수 / 그중 그 위험에 피격 0(<see cref="QABoss103RunStats.Finish"/>). 판 파일이 없으면 열 비움.</summary>
+    public int DodgeRolls, DodgeSuccess;
+    /// <summary>C7e 봇 충실도 — 간파 성공 굴림 누름 수 / 그중 서버 간파 성공이 이어진 것.</summary>
+    public int CounterHitRolls, CounterHitSuccess;
+
     internal bool Transformed;
     internal double TransformSince;
 
@@ -118,6 +135,9 @@ public sealed class QABoss103RunStats
     public readonly List<QABoss103Hit> Deaths = new List<QABoss103Hit>();
     public readonly List<KeyValuePair<double, string>> AttackStarts = new List<KeyValuePair<double, string>>();
     public readonly List<QABoss103Roll> Rolls = new List<QABoss103Roll>();
+    /// <summary>C7e — 봇 간파 누름(판 파일)과 서버 간파 성공(캐릭터, 시각).</summary>
+    public readonly List<QABoss103CounterPress> CounterPresses = new List<QABoss103CounterPress>();
+    public readonly List<QABoss103Hit> CounterSuccesses = new List<QABoss103Hit>();
     public readonly List<QABoss103GimmickEvent> Gimmicks = new List<QABoss103GimmickEvent>();
 
     private int _lives = -1;
@@ -231,11 +251,13 @@ public sealed class QABoss103RunStats
         Deaths.Add(new QABoss103Hit { Slot = slot, T = t, Pattern = pattern });
     }
 
-    public void CounterSuccess(int slot)
+    public void CounterSuccess(int slot, double t = double.NaN)
     {
         QABoss103CharStats c = C(slot);
-        if (c != null)
-            c.CounterSuccess++;
+        if (c == null)
+            return;
+        c.CounterSuccess++;
+        CounterSuccesses.Add(new QABoss103Hit { Slot = slot, T = t });
     }
 
     /// <summary>C5 — 방어 알림을 받을 수 있다(구독함). 팔라딘 방어 열을 빈칸 대신 0 부터 센다.</summary>
@@ -367,6 +389,7 @@ public sealed class QABoss103RunStats
                         Action = Get(kv, "action", "none"),
                         Ok = Get(kv, "ok", "na"),
                         Note = Get(kv, "note", "none"),
+                        HitDelay = ParseD(Get(kv, "hitMs", "")) / 1000.0,
                     };
                     Rolls.Add(r);
                     if (!r.Dodge)
@@ -382,8 +405,16 @@ public sealed class QABoss103RunStats
                     break;
                 case "counter":
                     // 게임이 시전을 거부한 누름(쿨·상태)은 시도가 아니다.
-                    if (Get(kv, "cast", "true") != "false")
+                    bool cast = Get(kv, "cast", "true") != "false";
+                    if (cast)
                         c.CounterTries++;
+                    CounterPresses.Add(new QABoss103CounterPress
+                    {
+                        Slot = slot,
+                        ServerT = ParseD(Get(kv, "serverT", "")),
+                        HitRoll = Get(kv, "roll", "miss") == "hit",
+                        Cast = cast,
+                    });
                     break;
                 case "done":
                     c.PartDone = true;
@@ -418,6 +449,61 @@ public sealed class QABoss103RunStats
                 if (h.Slot == s && !QABoss103Metrics.HasRollFor(h, Rolls))
                     n++;
             c.HitsUnrolled = n;
+        }
+        Fidelity();
+    }
+
+    /// <summary>
+    /// C7e 봇 충실도(<see cref="QABoss103CharStats.DodgeRolls"/> 등). 피격 1건은 같은 캐릭터·같은 패턴 굴림 중 그 피격 직전(<see cref="QABoss103Metrics.RollLookaheadSeconds"/> 여유)
+    /// 마지막 것에 귀속하고, 그 굴림 감지 + 예상 피격 + <see cref="QABoss103Metrics.FidelityTailSeconds"/> 안이면 '그 위험에 맞음'이다.
+    /// 회피 성공 = 회피 굴림(사망·연출로 행동 못 한 idle_ 제외) 중 귀속 피격 0. 간파 = 성공 굴림 누름 뒤 <see cref="QABoss103Metrics.CounterMatchSeconds"/> 안 서버 간파 성공.
+    /// </summary>
+    private void Fidelity()
+    {
+        var hitRolls = new HashSet<QABoss103Roll>();
+        foreach (QABoss103Hit h in Hits)
+        {
+            QABoss103Roll owner = null;
+            foreach (QABoss103Roll r in Rolls)
+            {
+                if (r.Slot != h.Slot || r.Pattern != h.Pattern || r.Note == "superseded" || double.IsNaN(r.ServerT) || r.ServerT > h.T + QABoss103Metrics.RollLookaheadSeconds)
+                    continue;
+                if (owner == null || r.ServerT > owner.ServerT)
+                    owner = r;
+            }
+            if (owner != null && h.T <= owner.ServerT + QABoss103Metrics.FidelityWindow(owner.HitDelay))
+                hitRolls.Add(owner);
+        }
+        foreach (QABoss103CharStats c in Chars)
+            c.DodgeRolls = c.DodgeSuccess = c.CounterHitRolls = c.CounterHitSuccess = 0;
+        foreach (QABoss103Roll r in Rolls)
+        {
+            QABoss103CharStats c = C(r.Slot);
+            if (c == null || !r.Dodge || r.Note == "superseded" || (r.Note != null && r.Note.StartsWith("idle_", StringComparison.Ordinal)))
+                continue;
+            c.DodgeRolls++;
+            if (!hitRolls.Contains(r))
+                c.DodgeSuccess++;
+        }
+        var used = new bool[CounterSuccesses.Count];
+        foreach (QABoss103CounterPress p in CounterPresses)
+        {
+            QABoss103CharStats c = C(p.Slot);
+            if (c == null || !p.HitRoll)
+                continue;
+            c.CounterHitRolls++;
+            for (int i = 0; i < CounterSuccesses.Count; i++)
+            {
+                QABoss103Hit s = CounterSuccesses[i];
+                if (used[i] || s.Slot != p.Slot || double.IsNaN(s.T) || double.IsNaN(p.ServerT))
+                    continue;
+                if (s.T >= p.ServerT - QABoss103Metrics.RollLookaheadSeconds && s.T <= p.ServerT + QABoss103Metrics.CounterMatchSeconds)
+                {
+                    used[i] = true;
+                    c.CounterHitSuccess++;
+                    break;
+                }
+            }
         }
     }
 
@@ -529,6 +615,16 @@ public static class QABoss103Metrics
     public const double AttackLeadSlack = 0.25;
     /// <summary>굴림 시각 → 공격 시간표: 공격 시작부터 이보다 지난 굴림은 그 공격이 아니다.</summary>
     public const double AttackMaxAge = 6.0;
+    /// <summary>C7e 충실도 — 예상 피격 시각을 모르는 굴림(옛 판 파일)의 감지→피격 가정(초).</summary>
+    public const double FidelityDefaultHitSeconds = 1.5;
+    /// <summary>C7e 충실도 — 예상 피격 뒤 이만큼(초)까지의 같은 패턴 피격은 그 위험에 맞은 것(돌진 이동·장판 틱·판정 지연 흡수).</summary>
+    public const double FidelityTailSeconds = 1.0;
+    /// <summary>C7e 충실도 — 간파 성공 굴림 누름 뒤 이 안(초)의 서버 간파 성공을 그 누름의 결과로 본다(시전 선딜·RPC 왕복).</summary>
+    public const double CounterMatchSeconds = 1.0;
+
+    /// <summary>C7e — 굴림 감지부터 '그 위험'으로 보는 피격 창(초) = 예상 피격(모르면 기본값) + 꼬리.</summary>
+    public static double FidelityWindow(double hitDelaySeconds) =>
+        (double.IsNaN(hitDelaySeconds) || hitDelaySeconds < 0.0 ? FidelityDefaultHitSeconds : hitDelaySeconds) + FidelityTailSeconds;
 
     public static readonly string[] ActionPrefix = { "basic", "q", "e", "r", "rclick" };
 
@@ -586,6 +682,7 @@ public static class QABoss103Metrics
             case "rage_dash": return "RageDash";
             case "grab": return "Grab";
             case "jump": return "Jump";
+            case "aura": return "ChargeSequence";
         }
         if (!double.IsNaN(serverT) && attackStarts != null)
         {
@@ -657,6 +754,7 @@ public static class QABoss103Metrics
             "paladin_guard_success", "paladin_guard_counter", "paladin_guard_ignore", "counter_tries", "counter_success", "dmg_during_suppress",
             "evade_dodge", "evade_take", "evade_no_charge", "evade_blocked", "evade_expired", "hits_taken", "hits_unrolled",
             "qa_revives", "qa_relocates",
+            "dodge_rolls", "dodge_success", "counter_hit_rolls", "counter_roll_success",
         });
         return h.ToArray();
     }
@@ -782,6 +880,10 @@ public static class QABoss103CsvRows
             r.Add(c.HitsUnrolled >= 0 ? I(c.HitsUnrolled) : "");
             r.Add(I(c.QaRevives));
             r.Add(I(c.QaRelocates));
+            r.Add(c.PartPresent ? I(c.DodgeRolls) : "");
+            r.Add(c.PartPresent ? I(c.DodgeSuccess) : "");
+            r.Add(c.PartPresent ? I(c.CounterHitRolls) : "");
+            r.Add(c.PartPresent ? I(c.CounterHitSuccess) : "");
             rows.Add(r.ToArray());
         }
         return rows;

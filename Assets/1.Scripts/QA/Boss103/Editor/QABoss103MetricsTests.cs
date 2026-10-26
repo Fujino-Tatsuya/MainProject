@@ -371,6 +371,41 @@ public sealed class QABoss103MetricsTests
     }
 
     [Test]
+    public void 봇_충실도_피함_굴림은_그_위험_피격이_없어야_성공()
+    {
+        var s = new QABoss103RunStats();
+        s.Begin(0);
+        s.PlayerHit(Pal, 11.3, "Jump");     // jump#1(10.0, 예상 1.2초) 창 안 → 회피 실패
+        s.PlayerHit(Pal, 25.0, "floor");    // floor#2(20.0, 예상 1.2초) 창 2.2초 밖 → 그 위험 아님
+        s.PlayerHit(Pal, 31.4, "floor");    // floor#3 은 맞기 굴림 — 회피 지표와 무관
+        s.CounterSuccess(Pal, 40.4);
+        s.CounterSuccess(Pal, 60.0);        // 누름 50.0 뒤 10초 — 다른 누름의 결과 아님
+        s.AddPart(Pal, new[]
+        {
+            "threat slot=0 pattern=jump attack=Jump serverT=10.0 roll=dodge action=dash ok=true hitMs=1200",
+            "threat slot=0 pattern=floor serverT=20.0 roll=dodge action=dash ok=true hitMs=1200",
+            "threat slot=0 pattern=floor serverT=30.0 roll=take hitMs=1200",
+            "threat slot=0 pattern=drone serverT=33.0 roll=dodge action=none note=idle_life_Dead",
+            "counter slot=0 window=1 roll=hit cast=true serverT=40.2",
+            "counter slot=0 window=2 roll=hit cast=false serverT=50.0",
+            "counter slot=0 window=3 roll=miss cast=true serverT=59.9",
+            "done slot=0",
+        });
+        s.Finish();
+        QABoss103CharStats c = s.Chars[Pal];
+        Assert.AreEqual(2, c.DodgeRolls, "idle_ 굴림은 행동 못 함 — 뺀다");
+        Assert.AreEqual(1, c.DodgeSuccess);
+        Assert.AreEqual(2, c.CounterHitRolls, "성공 굴림만(시전 거부 포함)");
+        Assert.AreEqual(1, c.CounterHitSuccess);
+        string[] h = QABoss103Metrics.CharsHeader;
+        List<string[]> rows = QABoss103CsvRows.Chars(Meta(), s);
+        Assert.AreEqual("1", Col(h, rows[Pal], "dodge_success"));
+        Assert.AreEqual("1", Col(h, rows[Pal], "counter_roll_success"));
+        Assert.AreEqual("", Col(h, rows[Gun], "dodge_success"), "판 파일 없음");
+        Assert.AreEqual(2.5, QABoss103Metrics.FidelityWindow(double.NaN), 1e-9, "예상 피격 모름 = 1.5 + 1");
+    }
+
+    [Test]
     public void 기믹_전투기록_파싱()
     {
         const string log =

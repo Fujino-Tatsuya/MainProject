@@ -214,6 +214,10 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
             _driver.ReleaseBasic();
             return;
         }
+        // C7e — '피함' 위험 진행 중(범위 밖으로 걷기·서서 방어 대기)·간파 성공 굴림 대기 중엔 새 평타·스킬을 시작하지 않는다.
+        EvadeMove(myPos, surface, now, out bool evadeHold, out bool noStart);
+        if (evadeHold || CounterHoldsBot(me, myPos, now))
+            return;
 
         if (Time.time >= _nextAimResample)
         {
@@ -260,7 +264,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
 
         // 공격은 거리 띠 안에서 멈춰 있을 때(또는 이미 공격 중).
         bool engaged = _move == QABoss103Bot.Move.Hold || attackBusy;
-        if (!engaged)
+        if (!engaged || noStart)
         {
             _driver.ReleaseBasic();
             return;

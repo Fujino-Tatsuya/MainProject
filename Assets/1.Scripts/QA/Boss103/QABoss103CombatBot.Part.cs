@@ -42,7 +42,8 @@ public sealed partial class QABoss103CombatBot
         catch (Exception e) { Debug.LogWarning($"{Tag} event=bot_part character={_character} state=close_fail error={QABoss103Plan.Token(e.Message)}"); }
     }
 
-    private void PartThreat(QABoss103Threat t, bool dodge, QABoss103DodgeAction action, string ok, string note)
+    /// <summary><paramref name="hitMs"/> = C7e 감지 → 예상 첫 피해(ms) — 호스트 충실도 매칭 창(<see cref="QABoss103Metrics.FidelityWindow"/>).</summary>
+    private void PartThreat(QABoss103Threat t, bool dodge, QABoss103DodgeAction action, string ok, string note, double hitMs)
     {
         PartWrite(QABoss103PartFile.Format("threat",
             "slot", _slot.ToString(CultureInfo.InvariantCulture),
@@ -53,6 +54,7 @@ public sealed partial class QABoss103CombatBot
             "roll", dodge ? "dodge" : "take",
             "action", QABoss103Evasion.Token(action),
             "ok", ok,
+            "hitMs", double.IsNaN(hitMs) ? "na" : hitMs.ToString("F0", CultureInfo.InvariantCulture),
             "note", note));
     }
 
