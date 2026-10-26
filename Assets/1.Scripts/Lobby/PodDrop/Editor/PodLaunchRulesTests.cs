@@ -49,6 +49,52 @@ public sealed class PodLaunchRulesTests
         Assert.IsNotNull(PodLaunchRules.MissingSetup(true, 3, 3, 0), "참가자 없음 → 곧바로 로딩");
     }
 
+    // ─── 보행 경로(공용 경로점 리스트 · 문턱 · 좌석) ─────────────────────────
+
+    static readonly Vector3 A = new Vector3(1f, 0f, 0f);
+    static readonly Vector3 B = new Vector3(2f, 0.5f, 0f);
+    static readonly Vector3 C = new Vector3(2f, 1f, 3f);
+    static readonly Vector3 Door = new Vector3(5f, 1f, 3f);
+    static readonly Vector3 Seat = new Vector3(6f, 1.2f, 3f);
+
+    [Test]
+    public void BuildRoute_KeepsListOrderThenThresholdThenSeat()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { C, A, B }, Door, Seat);
+        CollectionAssert.AreEqual(new[] { C, A, B }, route.Ground, "리스트 순서 그대로 — 이름·좌표 순서와 무관");
+        CollectionAssert.AreEqual(new[] { Door, Seat }, route.Interior, "문턱 → 좌석은 충돌 없이 보간");
+        Assert.AreEqual(0, route.SkippedCount);
+    }
+
+    [Test]
+    public void BuildRoute_SkipsNullEntriesAndCountsThem()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { null, A, null, B }, Door, Seat);
+        CollectionAssert.AreEqual(new[] { A, B }, route.Ground);
+        Assert.AreEqual(2, route.SkippedCount, "빈 칸 수 = 경고에 쓴다");
+    }
+
+    [Test]
+    public void BuildRoute_EmptyPathGoesStraightToThreshold()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[0], Door, Seat);
+        Assert.AreEqual(0, route.Ground.Length, "공용 경로 없음 → 걷기 시작 지점에서 곧바로 문턱");
+        CollectionAssert.AreEqual(new[] { Door, Seat }, route.Interior);
+
+        PodLaunchRules.WalkRoute allNull = PodLaunchRules.BuildRoute(new Vector3?[] { null }, Door, Seat);
+        Assert.AreEqual(0, allNull.Ground.Length);
+        Assert.AreEqual(1, allNull.SkippedCount);
+
+        Assert.AreEqual(0, PodLaunchRules.BuildRoute(null, Door, Seat).Ground.Length, "리스트 자체가 없어도 같다");
+    }
+
+    [Test]
+    public void BuildRoute_NoThresholdEndsAtSeat()
+    {
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { A }, null, Seat);
+        CollectionAssert.AreEqual(new[] { Seat }, route.Interior, "문턱 없음 → 마지막 경로점에서 곧바로 좌석");
+    }
+
     // ─── 보행 시간 나누기 ────────────────────────────────────────────────
 
     [Test]

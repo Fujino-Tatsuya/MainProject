@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// 로비 포드 탑승·강하 연출(할 일 100 C2, 3.LobbyScene — <see cref="LobbyTrainingDirector"/> 와 같은 씬 상주 NetworkObject 에 붙는다).
@@ -15,7 +16,7 @@ using UnityEngine;
 /// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), <see cref="PodDropLobbyTimeline.LoadAt"/> 에 콜백.
 /// 연출 중 끊긴 사람은 건너뛰고 계속한다(명단은 그대로 둔다 — 인원이 바뀌면 시간표가 바뀐다). 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
 /// <item>오너: 시작 직후 짧은 암전이 가장 깊을 때(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
-/// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 공통 웨이포인트(계단 아래 … 입구)를
+/// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 공용 경로점(walkPath, 리스트 순서)을
 /// 평소 걷기 변위(Walk 애니)로 걷고, 문턱 → 좌석은 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
 /// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(순간이동 암전 + 끝 페이드, <see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
 /// 포드 하강(런타임 transform 만), 연출 동안 포드 콜라이더 끔.</item>
@@ -37,11 +38,13 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
     [Tooltip("걷기 시작 지점 — 슬롯 순서(P1, P2, P3). 시작 암전 한가운데 각자 여기로 순간이동한 뒤 걷는다. 사람이 더 많으면 돌려 쓴다. 비우면 연출 없이 곧바로 맵 로딩.")]
     [SerializeField] private Transform[] walkStarts = Array.Empty<Transform>();
 
-    [Tooltip("충돌을 켠 채 걷는 공통 경로 — 계단 아래 → 계단 위 → … → 입구(다리 위 문 앞). 걷기 시작 지점에서 첫 지점으로 걸어간다.")]
-    [SerializeField] private Transform[] walkWaypoints = Array.Empty<Transform>();
+    [Tooltip("충돌을 켠 채 걷는 공용 경로점 — 리스트 순서대로 걷는다(이름은 표시용). 각자 걷기 시작 지점에서 첫 점으로 합류한다. " +
+             "빈 칸은 건너뛴다. 비면 걷기 시작 지점에서 곧바로 문턱으로 보간한다. 씬 뷰 편집은 이 컴포넌트 인스펙터의 버튼으로.")]
+    [FormerlySerializedAs("walkWaypoints")]
+    [SerializeField] private List<Transform> walkPath = new List<Transform>();
 
-    [Tooltip("충돌 없이 보간하는 구간 — 문턱부터(포드 실내 높이 1.42m 라 캡슐이 막힌다). 마지막에 자기 좌석이 붙는다.")]
-    [SerializeField] private Transform[] interiorWaypoints = Array.Empty<Transform>();
+    [Tooltip("문턱 — 마지막 경로점부터 여기를 거쳐 좌석까지 충돌 없이 보간한다(포드 실내 높이 1.42m 라 캡슐이 막힌다). 비우면 마지막 경로점에서 곧바로 좌석으로.")]
+    [SerializeField] private Transform threshold;
 
     [Tooltip("포드 안 좌석(숨김 지점) — 슬롯 순서(P1, P2, P3). 사람이 더 많으면 돌려 쓴다.")]
     [SerializeField] private Transform[] seats = Array.Empty<Transform>();
@@ -383,9 +386,13 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
                 return; // 참가자가 아니다
 
             Transform seat = seats.Length > 0 ? seats[PodLaunchRules.PointIndex(slot, seats.Length)] : null;
-            Vector3[] starts = Positions(walkStarts, null);
+            Vector3[] starts = Positions(walkStarts);
             if (seat == null || starts.Length == 0)
                 return;
+
+            PodLaunchRules.WalkRoute route = BuildRoute(seat);
+            if (route.SkippedCount > 0)
+                Debug.LogWarning($"{Tag} 걷기 경로(walkPath)에 빈 칸 {route.SkippedCount}개 — 건너뛰고 걷는다.", this);
 
             _walk = new OwnerWalk
             {
@@ -393,8 +400,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
                 Start = start,
                 WalkStart = starts[PodLaunchRules.PointIndex(slot, starts.Length)],
                 TeleportAt = start + _timeline.TeleportAt,
-                Ground = Positions(walkWaypoints, null),
-                Interior = Positions(interiorWaypoints, seat),
+                Ground = route.Ground,
+                Interior = route.Interior,
                 WalkStartAt = start + _timeline.WalkStartAt(slot),
                 WalkEndAt = start + _timeline.WalkEndAt(slot),
             };
@@ -512,18 +519,38 @@ public sealed class LobbyPodLaunch : NetworkBehaviour
             movement.RotateImmediately(direction);
     }
 
-    // 비어 있는 슬롯은 건너뛴다. last 가 있으면 끝에 붙인다(좌석).
-    private static Vector3[] Positions(Transform[] points, Transform last)
+    // 공용 경로점(리스트 순서) → 문턱 → 이 좌석. 이름·개수와 무관하다.
+    private PodLaunchRules.WalkRoute BuildRoute(Transform seat)
     {
-        var list = new List<Vector3>(points.Length + 1);
+        var path = new List<Vector3?>(walkPath.Count);
+        foreach (Transform point in walkPath)
+            path.Add(point != null ? point.position : (Vector3?)null);
+
+        return PodLaunchRules.BuildRoute(path, threshold != null ? threshold.position : (Vector3?)null, seat.position);
+    }
+
+    // 비어 있는 슬롯은 건너뛴다.
+    private static Vector3[] Positions(Transform[] points)
+    {
+        var list = new List<Vector3>(points.Length);
         foreach (Transform point in points)
         {
             if (point != null) list.Add(point.position);
         }
 
-        if (last != null) list.Add(last.position);
         return list.ToArray();
     }
+
+#if UNITY_EDITOR
+    // 씬 뷰 경로 편집 도구(LobbyPodLaunchEditor) 읽기 전용 — 쓰기는 SerializedObject 로(Undo).
+    public IReadOnlyList<Transform> EditorWalkStarts => walkStarts;
+    public IReadOnlyList<Transform> EditorWalkPath => walkPath;
+    public Transform EditorThreshold => threshold;
+    public IReadOnlyList<Transform> EditorSeats => seats;
+    public Transform EditorPod => pod;
+
+    public PodLaunchRules.WalkRoute EditorBuildRoute(Transform seat) => BuildRoute(seat);
+#endif
 
     private static int CountAssigned(Transform[] points)
     {

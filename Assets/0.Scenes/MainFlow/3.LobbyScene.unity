@@ -16604,15 +16604,14 @@ MonoBehaviour:
   - {fileID: 1486448067}
   - {fileID: 862102745}
   - {fileID: 1974033137}
-  walkWaypoints:
+  walkPath:
   - {fileID: 1153451029}
   - {fileID: 1085174633}
   - {fileID: 1697694790}
   - {fileID: 1510317677}
   - {fileID: 432256317}
   - {fileID: 1602181260}
-  interiorWaypoints:
-  - {fileID: 531334598}
+  threshold: {fileID: 531334598}
   seats:
   - {fileID: 964224327}
   - {fileID: 1281245962}

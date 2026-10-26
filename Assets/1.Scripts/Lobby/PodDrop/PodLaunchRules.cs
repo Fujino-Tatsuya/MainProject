@@ -28,6 +28,47 @@ public static class PodLaunchRules
         return null;
     }
 
+    /// <summary>한 사람 보행 경로 — 충돌을 켠 채 걷는 앞 구간과 충돌 없이 보간하는 뒤 구간(문턱 … 좌석).</summary>
+    public readonly struct WalkRoute
+    {
+        /// <summary>충돌을 켠 채 걷는 공용 경로점(순서 그대로, 빈 칸 뺌). 비면 걷기 시작 지점에서 곧바로 문턱으로 보간한다.</summary>
+        public readonly Vector3[] Ground;
+
+        /// <summary>충돌 없이 보간 — 문턱(있으면) → 좌석(마지막). 항상 1개 이상.</summary>
+        public readonly Vector3[] Interior;
+
+        /// <summary>공용 경로에서 건너뛴 빈 칸(null) 수 — 0 보다 크면 호출자가 경고한다.</summary>
+        public readonly int SkippedCount;
+
+        public WalkRoute(Vector3[] ground, Vector3[] interior, int skippedCount)
+        {
+            Ground = ground;
+            Interior = interior;
+            SkippedCount = skippedCount;
+        }
+    }
+
+    /// <summary>
+    /// 공용 경로점(<paramref name="walkPath"/>, 리스트 순서 = 걷는 순서, null = 빈 칸 → 건너뜀)·문턱·좌석으로 보행 경로를 만든다.
+    /// 경로점 이름·개수와 무관하다. 사람마다 다른 건 걷기 시작 지점(첫 경로점으로 합류)과 좌석뿐이다.
+    /// </summary>
+    public static WalkRoute BuildRoute(IReadOnlyList<Vector3?> walkPath, Vector3? threshold, Vector3 seat)
+    {
+        var ground = new List<Vector3>(walkPath != null ? walkPath.Count : 0);
+        int skipped = 0;
+        if (walkPath != null)
+        {
+            foreach (Vector3? point in walkPath)
+            {
+                if (point.HasValue) ground.Add(point.Value);
+                else skipped++;
+            }
+        }
+
+        Vector3[] interior = threshold.HasValue ? new[] { threshold.Value, seat } : new[] { seat };
+        return new WalkRoute(ground.ToArray(), interior, skipped);
+    }
+
     /// <summary>
     /// 한 사람 보행 시간 중 충돌을 켠 채 걷는 앞 구간(웨이포인트까지)의 비율(0~1). 걷는 속도가 일정하도록 길이 비율로 나눈다.
     /// 뒤 구간(문턱 → 좌석)은 충돌 없이 보간한다. 둘 다 0 이면 1(앞 구간에 다 준다 — 보간할 거리가 없다).
