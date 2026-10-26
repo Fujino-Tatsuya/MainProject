@@ -149,7 +149,7 @@ MonoBehaviour:
   socket: {fileID: 6168609868067889603}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
-  safetyTimeout: 1
+  safetyTimeout: 5
 --- !u!1 &1156962283159754769
 GameObject:
   m_ObjectHideFlags: 0
@@ -731,7 +731,7 @@ MonoBehaviour:
   socket: {fileID: 2457413198031000931}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
-  safetyTimeout: 3
+  safetyTimeout: 5
 --- !u!1 &2904392726364030715
 GameObject:
   m_ObjectHideFlags: 0
@@ -1742,7 +1742,7 @@ MonoBehaviour:
   socket: {fileID: 2457413198031000931}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
-  safetyTimeout: 2
+  safetyTimeout: 5
 --- !u!1 &6847070989216762705
 GameObject:
   m_ObjectHideFlags: 0
