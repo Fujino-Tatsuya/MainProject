@@ -170,13 +170,116 @@ public sealed class QABoss103MetricsTests
     }
 
     [Test]
-    public void 팔라딘_방어_성공은_C5_전까지_빈칸()
+    public void 팔라딘_방어_성공은_알림_구독_전엔_빈칸()
     {
         QABoss103RunStats s = Scenario();
         string[] h = QABoss103Metrics.CharsHeader;
         Assert.AreEqual("", Col(h, QABoss103CsvRows.Chars(Meta(), s)[Pal], "paladin_guard_success"));
+        Assert.AreEqual("", Col(h, QABoss103CsvRows.Chars(Meta(), s)[Pal], "paladin_guard_counter"));
         s.Chars[Pal].GuardSuccess = 3;
         Assert.AreEqual("3", Col(h, QABoss103CsvRows.Chars(Meta(), s)[Pal], "paladin_guard_success"));
+    }
+
+    // ── C5 게임 코드 알림 ────────────────────────────────────
+
+    [Test]
+    public void 팔라딘_방어_알림_구독하면_0부터_종류별로_센다()
+    {
+        QABoss103RunStats s = Scenario();
+        s.GuardNotifyOn();
+        string[] h = QABoss103Metrics.CharsHeader;
+        List<string[]> rows = QABoss103CsvRows.Chars(Meta(), s);
+        Assert.AreEqual("0", Col(h, rows[Pal], "paladin_guard_success"), "구독했는데 0회 = 0(빈칸 아님)");
+        Assert.AreEqual("0", Col(h, rows[Pal], "paladin_guard_counter"));
+        Assert.AreEqual("0", Col(h, rows[Pal], "paladin_guard_ignore"));
+
+        s.GuardAbsorbed(Pal, counter: true);
+        s.GuardAbsorbed(Pal, counter: false);
+        s.GuardAbsorbed(Pal, counter: false);
+        s.GuardAbsorbed(-1, counter: true);   // 모르는 자리 — 무시
+        rows = QABoss103CsvRows.Chars(Meta(), s);
+        Assert.AreEqual("3", Col(h, rows[Pal], "paladin_guard_success"), "흡수 전부(방어 성공 + 반격 중 무시)");
+        Assert.AreEqual("1", Col(h, rows[Pal], "paladin_guard_counter"));
+        Assert.AreEqual("2", Col(h, rows[Pal], "paladin_guard_ignore"));
+        Assert.AreEqual("", Col(h, rows[Gun], "paladin_guard_success"), "팔라딘 열은 팔라딘만");
+    }
+
+    [Test]
+    public void 기믹_알림_행_결과_정규화와_note()
+    {
+        QABoss103GimmickEvent e = QABoss103GimmickNotify.FromEvent("연쇄 간파", "Partial", 3, 230.0, 100.0);
+        Assert.AreEqual("연쇄 간파", e.Gimmick);
+        Assert.AreEqual("partial", e.Result);
+        Assert.AreEqual("event", e.Source);
+        Assert.AreEqual(130.0, e.FightT, 1e-9);
+        Assert.AreEqual(230.0, e.ServerT, 1e-9);
+        Assert.AreEqual("successes=3", e.Note);
+
+        Assert.AreEqual("success", QABoss103GimmickNotify.NormalizeResult("Full"));
+        Assert.AreEqual("fail", QABoss103GimmickNotify.NormalizeResult("None"));
+        Assert.AreEqual("timeout", QABoss103GimmickNotify.NormalizeResult("timeout"));
+        Assert.AreEqual("pushes=4", QABoss103GimmickNotify.NoteOf("간파 릴레이", 4));
+        Assert.AreEqual("destroyed_tiles=2", QABoss103GimmickNotify.NoteOf("전력 공급", 2));
+        Assert.AreEqual("", QABoss103GimmickNotify.NoteOf("전력 공급", 0));
+        Assert.AreEqual("counter", QABoss103GimmickNotify.NoteOf("새 가족", 1));
+        Assert.AreEqual("", QABoss103GimmickNotify.NoteOf("북진 2회차", 2), "회차는 이름에 있다");
+        Assert.IsTrue(double.IsNaN(QABoss103GimmickNotify.FromEvent("송전기", "success", 0, 5.0, double.NaN).FightT));
+    }
+
+    [Test]
+    public void 기믹_알림이_우선이고_같은_로그_행은_지운다()
+    {
+        var logs = new List<QABoss103GimmickEvent>
+        {
+            new QABoss103GimmickEvent { Gimmick = "송전기", Result = "success", FightT = 30.0 },
+            new QABoss103GimmickEvent { Gimmick = "송전기", Result = "success", FightT = 90.0 },
+            new QABoss103GimmickEvent { Gimmick = "간파 릴레이", Result = "ended", FightT = 150.0, Note = "보스 사망" },
+            new QABoss103GimmickEvent { Gimmick = "연쇄 간파", Result = "partial", FightT = 130.0, Note = "3/4" },
+            new QABoss103GimmickEvent { Gimmick = "북진 1회차", Result = "fail", FightT = 100.0 },
+        };
+        var events = new List<QABoss103GimmickEvent>
+        {
+            QABoss103GimmickNotify.FromEvent("송전기", "success", 0, 130.4, 100.0),
+            QABoss103GimmickNotify.FromEvent("연쇄 간파", "Partial", 3, 230.1, 100.0),
+            QABoss103GimmickNotify.FromEvent("북진 1회차", "success", 1, 199.0, 100.0),   // 로그는 fail — 결과가 다르면 둘 다 남긴다
+        };
+        List<QABoss103GimmickEvent> m = QABoss103GimmickNotify.Merge(events, logs);
+        var got = new List<string>();
+        foreach (QABoss103GimmickEvent g in m)
+            got.Add($"{g.Gimmick}|{g.Result}|{g.Source}");
+        CollectionAssert.AreEqual(new[]
+        {
+            "송전기|success|event",     // 30.4
+            "송전기|success|log",       // 90 — 알림 1건은 로그 1건만 지운다
+            "북진 1회차|success|event", // 99
+            "북진 1회차|fail|log",      // 100
+            "연쇄 간파|partial|event",  // 130.1
+            "간파 릴레이|ended|log",    // 150 — 결과 없는 끝은 로그만 안다
+        }, got);
+    }
+
+    [Test]
+    public void 기믹_알림이_없으면_로그_그대로()
+    {
+        List<QABoss103GimmickEvent> logs = QABoss103FightLog.Parse("  [  30.5s] 송전기 성공\n  [  40.0s] ② 전력 공급 실패 → 방전\n", out _);
+        List<QABoss103GimmickEvent> m = QABoss103GimmickNotify.Merge(new List<QABoss103GimmickEvent>(), logs);
+        Assert.AreEqual(2, m.Count);
+        Assert.AreEqual("log", m[0].Source);
+        Assert.AreEqual(0, QABoss103GimmickNotify.Merge(null, null).Count);
+    }
+
+    [Test]
+    public void 기믹_알림_행_CSV_source_event()
+    {
+        QABoss103RunStats s = Scenario();
+        s.Gimmicks.AddRange(QABoss103GimmickNotify.Merge(
+            new List<QABoss103GimmickEvent> { QABoss103GimmickNotify.FromEvent("간파 릴레이", "success", 4, 130.5, 100.0) }, null));
+        List<string[]> rows = QABoss103CsvRows.Gimmicks(Meta(), s);
+        string[] h = QABoss103Metrics.GimmicksHeader;
+        Assert.AreEqual("event", Col(h, rows[0], "source"));
+        Assert.AreEqual("30.5", Col(h, rows[0], "fight_t"));
+        Assert.AreEqual("130.500", Col(h, rows[0], "serverT"));
+        Assert.AreEqual("pushes=4", Col(h, rows[0], "note"));
     }
 
     [Test]

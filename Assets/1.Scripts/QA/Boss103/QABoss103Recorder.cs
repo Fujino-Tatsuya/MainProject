@@ -18,6 +18,8 @@ using Debug = UnityEngine.Debug;
 /// <item>간파 성공(<see cref="CombatStatsEvents.ServerCounterSucceeded"/>) · 제압(<see cref="TwentyThreeBoss.IsSuppressed"/> 상승 엣지) · 변신(<see cref="AssassinState.IsTransformed"/> 폴링)
 ///   · 공용 목숨(<see cref="MultiGameRule.PartyLivesChanged"/>) · 전멸(<see cref="PartyWipeRespawner.PartyWipeRespawned"/>)</item>
 /// <item>공격 시간표(보스 상태 Attack 진입·공격 행 교체) — 클라 봇 굴림을 공격 id 로 잇는다. 전투 기록(<c>[23호/전투기록]</c> 로그, 없으면 보스 <c>_fightLog</c>)은 기믹 파싱용.</item>
+/// <item>C5 qa 브랜치 전용 게임 알림: 팔라딘 방어(<see cref="FirstMeleeSubSkill.QA103GuardAbsorbed"/>) · 23호 기믹 결과(<see cref="TwentyThreeBoss.QA103GimmickResult"/>, source=event —
+///   전투 기록 파싱 행과 중복 제거, <see cref="QABoss103GimmickNotify.Merge"/>). 상세 Docs/tech/handoff-qa103-notify.md.</item>
 /// </list>
 /// </summary>
 public sealed class QABoss103Recorder : MonoBehaviour
@@ -37,6 +39,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private readonly Dictionary<Player, Action<PlayerAttackLanded>> _landed = new Dictionary<Player, Action<PlayerAttackLanded>>();
     private readonly AssassinState[] _assassin = new AssassinState[3];
     private readonly List<string> _frames = new List<string>(32);
+    private readonly List<QABoss103GimmickEvent> _eventGimmicks = new List<QABoss103GimmickEvent>();
 
     private TwentyThreeBoss _boss;
     private MultiGameRule _rule;
@@ -59,6 +62,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
             r._slotOf[kv.Key] = (int)kv.Value;
         r._combatServerT = Now;
         r.Stats.Begin(r._combatServerT);
+        r.Stats.GuardNotifyOn();
         r.Subscribe();
         r.Rescan();
         Debug.Log($"{Tag} event=recorder_start players={r._slotOf.Count} currentEntry={(CurrentEntryField != null ? "ok" : "missing")} fightLog={(FightLogField != null ? "ok" : "missing")}");
@@ -88,6 +92,8 @@ public sealed class QABoss103Recorder : MonoBehaviour
         PlayerLifeCycleController.ServerLifeStateChanged += OnLifeChanged;
         PartyWipeRespawner.PartyWipeRespawned += OnWipe;
         Application.logMessageReceived += OnLog;
+        FirstMeleeSubSkill.QA103GuardAbsorbed += OnGuardAbsorbed;
+        TwentyThreeBoss.QA103GimmickResult += OnGimmickResult;
     }
 
     private void Unsubscribe()
@@ -100,6 +106,8 @@ public sealed class QABoss103Recorder : MonoBehaviour
         PlayerLifeCycleController.ServerLifeStateChanged -= OnLifeChanged;
         PartyWipeRespawner.PartyWipeRespawned -= OnWipe;
         Application.logMessageReceived -= OnLog;
+        FirstMeleeSubSkill.QA103GuardAbsorbed -= OnGuardAbsorbed;
+        TwentyThreeBoss.QA103GimmickResult -= OnGimmickResult;
         foreach (KeyValuePair<Player, Action<PlayerAttackLanded>> kv in _landed)
             if (kv.Key != null)
                 kv.Key.ServerAttackLanded -= kv.Value;
@@ -214,6 +222,18 @@ public sealed class QABoss103Recorder : MonoBehaviour
             Stats.Wipe();
     }
 
+    private void OnGuardAbsorbed(Player p, GuardVerdict verdict)
+    {
+        if (!_stopped && p != null)
+            Stats.GuardAbsorbed(SlotOf(p.OwnerClientId), verdict == GuardVerdict.BlockAndCounter);
+    }
+
+    private void OnGimmickResult(TwentyThreeBoss boss, string gimmick, string result, int value)
+    {
+        if (!_stopped)
+            _eventGimmicks.Add(QABoss103GimmickNotify.FromEvent(gimmick, result, value, Now, _combatServerT));
+    }
+
     private void OnLog(string condition, string stackTrace, LogType type)
     {
         if (condition != null && condition.StartsWith(FightLogPrefix, StringComparison.Ordinal))
@@ -325,8 +345,10 @@ public sealed class QABoss103Recorder : MonoBehaviour
         foreach (QABoss103GimmickEvent g in gimmicks)
             if (!double.IsNaN(g.FightT))
                 g.ServerT = _combatServerT + g.FightT;   // 근사 — 전투 기록 개전 ≈ Combat 진입
-        Stats.Gimmicks.AddRange(gimmicks);
-        Debug.Log($"{Tag} event=recorder_stop fightLog={(string.IsNullOrEmpty(text) ? "none" : source)} gimmicks={gimmicks.Count} suppress={Stats.SuppressCount} logSuppress={logSuppress} " +
+        List<QABoss103GimmickEvent> merged = QABoss103GimmickNotify.Merge(_eventGimmicks, gimmicks);
+        Stats.Gimmicks.AddRange(merged);
+        Debug.Log($"{Tag} event=recorder_stop fightLog={(string.IsNullOrEmpty(text) ? "none" : source)} gimmicks={merged.Count} gimmickEvents={_eventGimmicks.Count} gimmickLogs={gimmicks.Count} " +
+                  $"guard={Stats.Chars[(int)QABoss103Character.Paladin].GuardSuccess} suppress={Stats.SuppressCount} logSuppress={logSuppress} " +
                   $"hits={Stats.Hits.Count} deaths={Stats.DeathsTotal()} attackStarts={Stats.AttackStarts.Count} dealt={Stats.DamageDealtTotal()}");
         return BossHpPct();
     }

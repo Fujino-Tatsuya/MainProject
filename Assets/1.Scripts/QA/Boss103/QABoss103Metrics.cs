@@ -68,8 +68,10 @@ public sealed class QABoss103CharStats
     public long DamageNormal, DamageTransformed;
     public int CounterSuccess;
     public long DamageDuringSuppress;
-    /// <summary>C5 — 팔라딘 방어 성공(게임 코드 알림). null = 아직 출처 없음(빈칸).</summary>
+    /// <summary>C5 — 팔라딘 방어 성공(게임 코드 알림 <c>FirstMeleeSubSkill.QA103GuardAbsorbed</c>, 흡수한 피격 수). null = 출처 없음(빈칸).</summary>
     public int? GuardSuccess;
+    /// <summary>C5 — 그중 첫 방어 성공(BlockAndCounter, 반격 진입) / 반격 단계 중 흡수(Ignore).</summary>
+    public int GuardCounter, GuardIgnore;
 
     // 봇 판 파일(없으면 PartPresent=false → 열 비움)
     public bool PartPresent;
@@ -230,6 +232,27 @@ public sealed class QABoss103RunStats
         QABoss103CharStats c = C(slot);
         if (c != null)
             c.CounterSuccess++;
+    }
+
+    /// <summary>C5 — 방어 알림을 받을 수 있다(구독함). 팔라딘 방어 열을 빈칸 대신 0 부터 센다.</summary>
+    public void GuardNotifyOn()
+    {
+        foreach (QABoss103CharStats c in Chars)
+            if (c.GuardSuccess == null)
+                c.GuardSuccess = 0;
+    }
+
+    /// <summary>C5 — 팔라딘 E 가 피격 1건을 흡수했다(<paramref name="counter"/> = 첫 방어 성공 BlockAndCounter, 아니면 반격 중 Ignore).</summary>
+    public void GuardAbsorbed(int slot, bool counter)
+    {
+        QABoss103CharStats c = C(slot);
+        if (c == null)
+            return;
+        c.GuardSuccess = (c.GuardSuccess ?? 0) + 1;
+        if (counter)
+            c.GuardCounter++;
+        else
+            c.GuardIgnore++;
     }
 
     /// <summary>보스 제압 상태 폴링 — 상승 엣지마다 1회.</summary>
@@ -588,7 +611,7 @@ public static class QABoss103Metrics
         h.AddRange(new[]
         {
             "assassin_transform_count", "transform_sec_total", "transform_uptime", "dmg_normal", "dmg_transformed", "dps_normal", "dps_transformed",
-            "paladin_guard_success", "counter_tries", "counter_success", "dmg_during_suppress",
+            "paladin_guard_success", "paladin_guard_counter", "paladin_guard_ignore", "counter_tries", "counter_success", "dmg_during_suppress",
             "evade_dodge", "evade_take", "evade_no_charge", "evade_blocked", "evade_expired", "hits_taken", "hits_unrolled",
         });
         return h.ToArray();
@@ -697,7 +720,10 @@ public static class QABoss103CsvRows
             r.Add(assassin ? L(c.DamageTransformed) : "");
             r.Add(assassin ? D(PerSecond(c.DamageNormal, normalSec), 1) : "");
             r.Add(assassin ? D(PerSecond(c.DamageTransformed, c.TransformSeconds), 1) : "");
-            r.Add(c.Character == QABoss103Character.Paladin && c.GuardSuccess.HasValue ? I(c.GuardSuccess.Value) : "");
+            bool guard = c.Character == QABoss103Character.Paladin && c.GuardSuccess.HasValue;
+            r.Add(guard ? I(c.GuardSuccess.Value) : "");
+            r.Add(guard ? I(c.GuardCounter) : "");
+            r.Add(guard ? I(c.GuardIgnore) : "");
             r.Add(c.PartPresent ? I(c.CounterTries) : "");
             r.Add(I(c.CounterSuccess));
             r.Add(L(c.DamageDuringSuppress));
@@ -907,7 +933,99 @@ public sealed class QABoss103PartWriter : IDisposable
 }
 
 /// <summary>
-/// 23호 전투 기록(<c>[23호/전투기록]</c> 로그 또는 보스 <c>_fightLog</c>) → 기믹 발생·결과(C4 임시 출처 source=log, C5 에서 게임 알림으로 교체).
+/// 할 일 103 C5 — 23호 게임 코드 알림(<c>TwentyThreeBoss.QA103GimmickResult</c>, qa 브랜치 전용) → run_gimmicks 행(source=event)과,
+/// 전투 기록 파싱 행(source=log)과의 중복 제거. 기믹 이름은 <see cref="QABoss103FightLog"/> 와 같은 말을 쓴다(전력 공급·송전기·간파 릴레이·
+/// 연쇄 간파 N회·연쇄 간파·북진 N회차·북진 N회차 간파·새 가족·자폭 저지·0줄 자폭).
+/// </summary>
+public static class QABoss103GimmickNotify
+{
+    public const string Source = "event";
+
+    /// <summary>알림 1건 → 행. <paramref name="combatStart"/> = Combat 진입 서버 시각(전투 기록 개전 ≈ 같은 순간) — fight_t 근사.</summary>
+    public static QABoss103GimmickEvent FromEvent(string gimmick, string result, int value, double serverT, double combatStart)
+    {
+        string g = gimmick ?? "";
+        return new QABoss103GimmickEvent
+        {
+            Gimmick = g,
+            Result = NormalizeResult(result),
+            ServerT = serverT,
+            FightT = double.IsNaN(serverT) || double.IsNaN(combatStart) ? double.NaN : Math.Max(0.0, serverT - combatStart),
+            Source = Source,
+            Note = NoteOf(g, value),
+        };
+    }
+
+    /// <summary>게임 결과 문자열 → CSV 결과. 연쇄 간파 Outcome(Full/Partial/None)은 로그 파싱과 같은 success/partial/fail.</summary>
+    public static string NormalizeResult(string result)
+    {
+        switch (result)
+        {
+            case "Full": return "success";
+            case "Partial": return "partial";
+            case "None": return "fail";
+            case null: return "";
+            default: return result;
+        }
+    }
+
+    /// <summary>부가 값 → note. 회차가 이름에 들어 있는 기믹(연쇄 간파 N회·북진 N회차)은 비운다.</summary>
+    public static string NoteOf(string gimmick, int value)
+    {
+        switch (gimmick)
+        {
+            case QABoss103FightLog.Relay: return $"pushes={value.ToString(CultureInfo.InvariantCulture)}";
+            case QABoss103FightLog.Chain: return $"successes={value.ToString(CultureInfo.InvariantCulture)}";
+            case "전력 공급": return value > 0 ? $"destroyed_tiles={value.ToString(CultureInfo.InvariantCulture)}" : "";
+            case "새 가족": return value == 1 ? "counter" : "";
+            default: return "";
+        }
+    }
+
+    /// <summary>
+    /// 알림 행 + 로그 행. 알림 1건마다 같은 기믹·같은 결과의 로그 행 1건(앞에서부터)을 지운다 — 알림이 우선, 로그는 알림이 없는 것만 남는다
+    /// (결과 없이 끝난 ended·판 종료 timeout 등). 순서 = fight_t 오름차순(같으면 알림 → 로그, 입력 순서 유지), 모름(NaN)은 끝.
+    /// </summary>
+    public static List<QABoss103GimmickEvent> Merge(IReadOnlyList<QABoss103GimmickEvent> events, IReadOnlyList<QABoss103GimmickEvent> logs)
+    {
+        var all = new List<QABoss103GimmickEvent>();
+        if (events != null)
+            all.AddRange(events);
+        if (logs != null)
+        {
+            var used = new bool[logs.Count];
+            if (events != null)
+                foreach (QABoss103GimmickEvent e in events)
+                    for (int i = 0; i < logs.Count; i++)
+                        if (!used[i] && logs[i].Gimmick == e.Gimmick && logs[i].Result == e.Result)
+                        {
+                            used[i] = true;
+                            break;
+                        }
+            for (int i = 0; i < logs.Count; i++)
+                if (!used[i])
+                    all.Add(logs[i]);
+        }
+        // 안정 정렬(List.Sort 는 불안정) — 원래 자리를 두 번째 키로.
+        var keyed = new List<KeyValuePair<int, QABoss103GimmickEvent>>(all.Count);
+        for (int i = 0; i < all.Count; i++)
+            keyed.Add(new KeyValuePair<int, QABoss103GimmickEvent>(i, all[i]));
+        keyed.Sort((a, b) =>
+        {
+            double ta = a.Value.FightT, tb = b.Value.FightT;
+            bool na = double.IsNaN(ta), nb = double.IsNaN(tb);
+            int c = na == nb ? (na ? 0 : ta.CompareTo(tb)) : (na ? 1 : -1);
+            return c != 0 ? c : a.Key.CompareTo(b.Key);
+        });
+        var result = new List<QABoss103GimmickEvent>(keyed.Count);
+        foreach (KeyValuePair<int, QABoss103GimmickEvent> kv in keyed)
+            result.Add(kv.Value);
+        return result;
+    }
+}
+
+/// <summary>
+/// 23호 전투 기록(<c>[23호/전투기록]</c> 로그 또는 보스 <c>_fightLog</c>) → 기믹 발생·결과(source=log). C5 부터는 게임 알림(<see cref="QABoss103GimmickNotify"/>)이 우선이고 이건 보조.
 /// 줄 = <c>  [  12.3s] 메시지</c>. 시작만 있고 결과가 없으면 종료 줄로 ended, 기록 끝까지 없으면 timeout(판이 먼저 끝남).
 /// </summary>
 public static class QABoss103FightLog

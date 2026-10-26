@@ -468,8 +468,12 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             Edit.Log($"[Skill] 수호자의 의지 — 방어 성공: {attacker.name} (각도 {angle:0.#}°, 피해 {attackInfo.damage} 흡수)", this);
         }
 
+        if (verdict != GuardVerdict.Pass) QA103GuardAbsorbed?.Invoke(owner, verdict);   // QA103 (qa 브랜치 전용 알림)
         return verdict != GuardVerdict.Pass;
     }
+
+    /// <summary>[서버] 공격 흡수(방어 성공 BlockAndCounter · 반격 중 무시 Ignore) — QA 계측기(QABoss103Recorder) 전용. 구독자 없으면 아무 일도 안 한다.</summary>
+    public static event System.Action<Player, GuardVerdict> QA103GuardAbsorbed;   // QA103 (qa 브랜치 전용 알림)
 
     public bool ServerBlocksKnockback => model.BlocksKnockback;
 }

@@ -448,6 +448,7 @@ public partial class TwentyThreeBoss
         {
             _relayTimedOut = true;
             FightLog("간파 릴레이 — 제한 시간 초과");
+            QA103GimmickResult?.Invoke(this, "간파 릴레이", "timeout", _relayPushes);   // QA103 (qa 브랜치 전용 알림)
         }
         _relayAttemptTaken = false;
         FaceDirection(_relaySouth);
@@ -502,6 +503,7 @@ public partial class TwentyThreeBoss
         {
             ShowRaidSubtitleServer("BOSS_RAID_RelaySuccess");
             FightLog($"간파 릴레이 성공 — {_relayPushes}회");
+            QA103GimmickResult?.Invoke(this, "간파 릴레이", "success", _relayPushes);   // QA103 (qa 브랜치 전용 알림)
             EndRaidGimmick("성공 — 12시 도달", resume: false);
             _groggyKind = BossPauseCondition.CounterGroggy;   // 장판·드론 정지 조건(그로기 종류)
             StunForCounter(_boss.relaySuccessExhaust);        // 탈진 = 그로기 클립 재사용. 게이지·취약은 건드리지 않는다
@@ -526,6 +528,7 @@ public partial class TwentyThreeBoss
     {
         ShowRaidSubtitleServer("BOSS_RAID_RelayFail");
         FightLog("간파 릴레이 실패 — 돌진");
+        QA103GimmickResult?.Invoke(this, "간파 릴레이", "fail", _relayPushes);   // QA103 (qa 브랜치 전용 알림)
         BeginGimmickDash(_relaySouth, _boss.relayFailDashDamage, RelayReachSouth(), GimmickStep.FailDash);
     }
 
@@ -646,6 +649,7 @@ public partial class TwentyThreeBoss
                 // 실패 = 돌진 끝 + 방 전체 방전(기존 레이드 방전 경로).
                 _electricFloor?.ServerQueueDischarge(BossTileGrid.AllMask, _boss.chainFailWarn, _boss.chainFailDamage);
                 FightLog($"연쇄 간파 {_chainRound}회 실패 → 방전");
+                QA103GimmickResult?.Invoke(this, $"연쇄 간파 {_chainRound}회", "fail", _chainRound);   // QA103 (qa 브랜치 전용 알림)
                 Debug.Log($"[23호/연쇄 간파] {_chainRound}/{_chainTotal} 실패 — 방전", this);
                 BossAttackEntry e = _currentEntry;
                 if (e != null && !string.IsNullOrEmpty(e.animatorStateName)) CrossFadeStateClientRpc(e.animatorStateName);
@@ -693,6 +697,7 @@ public partial class TwentyThreeBoss
         _chainSuccesses++;
         _chainRound++;
         FightLog($"연쇄 간파 {_chainRound}회 성공");
+        QA103GimmickResult?.Invoke(this, $"연쇄 간파 {_chainRound}회", "success", _chainRound);   // QA103 (qa 브랜치 전용 알림)
         Debug.Log($"[23호/연쇄 간파] {_chainRound}/{_chainTotal} 성공 (누적 {_chainSuccesses})", this);
         SetStep(GimmickStep.ChainStun, _boss.chainHitStun);
     }
@@ -702,6 +707,7 @@ public partial class TwentyThreeBoss
         int total = Mathf.Max(_chainRound, 1);
         BossChainCounterRules.Outcome o = BossChainCounterRules.Resolve(_chainSuccesses, total);
         FightLog($"연쇄 간파 결과 {_chainSuccesses}/{total} → {o}");
+        QA103GimmickResult?.Invoke(this, "연쇄 간파", o.ToString(), _chainSuccesses);   // QA103 (qa 브랜치 전용 알림) — 결과 Full/Partial/None, 값 = 성공 수
 
         if (o == BossChainCounterRules.Outcome.None)
         {
@@ -831,6 +837,7 @@ public partial class TwentyThreeBoss
                     // 무력화 = 그로기 클립(Boss_23_.groggy) 끝의 **쓰러진 자세로 멈춰** 간파를 기다린다(경석 10-23).
                     PlayPushNorthDownPoseClientRpc();
                     FightLog($"북진 {_pnRound}회차 — 탑 파괴 → 무력화");
+                    QA103GimmickResult?.Invoke(this, $"북진 {_pnRound}회차", "success", _pnRound);   // QA103 (qa 브랜치 전용 알림)
                     Debug.Log($"[23호/북진] {_pnRound}회차 탑 전부 파괴 — 무력화 {_boss.pushNorthStunTime:0.#}초(간파 1회 = 1칸)", this);
                     SetStep(GimmickStep.PnStun, _boss.pushNorthStunTime);
                     break;
@@ -839,6 +846,7 @@ public partial class TwentyThreeBoss
                 // 실패 — 예고 칸 즉사 방전은 장판이 그대로 낸다. 탑·구슬만 걷고 잠깐 뒤 다음 차징.
                 CleanupPushNorthRound(cancelFloor: false);
                 FightLog($"북진 {_pnRound}회차 실패 — 즉사 방전");
+                QA103GimmickResult?.Invoke(this, $"북진 {_pnRound}회차", "fail", _pnRound);   // QA103 (qa 브랜치 전용 알림)
                 Debug.Log($"[23호/북진] {_pnRound}회차 실패 — 탑이 남았다 · 즉사 방전", this);
                 SetStep(GimmickStep.PnAfterFail, 2f);
                 break;
@@ -936,6 +944,7 @@ public partial class TwentyThreeBoss
         // NavMesh.Raycast 로 자르지 않는다 — 내려간 송전탑 자리가 메시 구멍이면 첫 칸에서 막힌다. WarpTo 가 가까운 메시로 붙인다.
         _relayPushTo = from + north * Mathf.Min(_pnStepLen, remain);
         FightLog($"북진 {_pnRound}회차 — 간파 → 1칸");
+        QA103GimmickResult?.Invoke(this, $"북진 {_pnRound}회차 간파", "success", _pnRound);   // QA103 (qa 브랜치 전용 알림)
         Debug.Log($"[23호/북진] 간파 — 위로 {Mathf.Min(_pnStepLen, remain):0.0}m (남은 {remain:0.0}m)", this);
         SetStep(GimmickStep.PnPush, _boss.pushNorthPushTime);
     }
