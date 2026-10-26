@@ -14,12 +14,6 @@ public static class FirstMeleeGuardRules
     const float AngleToleranceDeg = 0.001f;
 
     /// <summary>
-    /// 공용 대시가 E 를 끊을 수 있는가(할 일 95) — E 가 도는 스킬 상태(Skill)면 준비·방어중·해제·반격 어느 단계든 예.
-    /// 단계(모델)를 보지 않는다 — 오너 FSM 이 묻는 값이고 모델은 서버에서만 돈다. 끊기면 OnEnd(DashCancelled)이고 쿨타임은 그대로다.
-    /// </summary>
-    public static bool AllowsDashCancel(PlayerActionState phase) => phase == PlayerActionState.Skill;
-
-    /// <summary>
     /// 공격 주체가 고정 방어 방향의 전방 방어 범위 안에 있는가(바닥 평면).
     /// 방어 방향과 (공격자 − 플레이어) 사이 각도 ≤ <paramref name="guardAngle"/> × 0.5 — 경계 포함.
     ///

@@ -77,7 +77,6 @@ public static class SettingsUiStrings
     // 조작 — Controls.<입력 액션 이름> 은 KeyRebindRow 가 맞바꿈 알림에도 쓴다(ActionLabel)
     public static readonly UiString ControlsHoldSkillToggle = S("Controls.HoldSkillToggle", "홀드 스킬: 토글 방식", "Hold Skill: Toggle", Body + "HoldSkillToggle 라벨");
     public static readonly UiString ControlsDashMouse = S("Controls.DashMouse", "대시: 마우스 방향", "Dash: Mouse Direction", Body + "DashDirectionToggle 라벨");
-    public static readonly UiString ControlsGuardSkillHold = S("Controls.GuardSkillHold", "방어 스킬: 누르는 동안 유지", "Guard Skill: Hold", Body + "GuardSkillHoldToggle 라벨(팔라딘 E — 끄면 탭 방식)");
     public static readonly UiString ControlsAttack = S("Controls.Attack", "기본 공격", "Attack", Body + "Rebind_Attack 라벨 · 맞바꿈 알림");
     public static readonly UiString ControlsInterrupt = S("Controls.Interrupt", "간파", "Interrupt", Body + "Rebind_Interrupt 라벨 · 맞바꿈 알림");
     public static readonly UiString ControlsSkillMain = S("Controls.SkillMain", "스킬 1 (메인)", "Skill 1 (Main)", Body + "Rebind_SkillMain 라벨 · 맞바꿈 알림");

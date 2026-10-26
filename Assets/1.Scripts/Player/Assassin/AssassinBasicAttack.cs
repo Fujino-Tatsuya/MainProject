@@ -8,7 +8,6 @@ using UnityEngine;
 /// 입력과 방향은 오너가 보내며(눌림은 바뀔 때 즉시 + 눌린 동안 주기 신호) 시작/예약 승인(서버 자기 애니 진행 기준),
 /// 연결 판단, 판정, 피해는 서버가 담당한다.
 /// 모드는 <see cref="AssassinState"/> 로 고른다 — 변신 중 = Speed_Attack_Loop 4타 묶음, 일반 E 강화 준비 = 강타 1회, 그 외 = 일반 4타.
-/// 일반 타는 매 타 시작 때 짧게 전진한다(할 일 96) — 이동 입력이 있으면 그 방향, 없으면 조준. 몸·판정·전진이 같은 방향이다.
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
@@ -66,21 +65,15 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private int hitsFired;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
-    // 이 타의 방향 — 몸 회전·판정·전진이 모두 이 값이다(일반 타는 이동 입력 우선, AssassinAttackDirectionRules).
     private Vector3 attackDirection;
-    // [서버] 다음 타 재료 — 조준과 이동 입력(없으면 0)을 따로 들고, 다음 타 모드가 정해진 뒤 방향을 고른다.
-    private Vector3 serverNextAim;
-    private Vector3 serverNextMove;
+    private Vector3 serverNextDirection;
     private float fallbackEndTime;
     // 예약 창 — 이 타 클립의 ComboWindowOpen~Close(또는 End) 사이. 피어마다 자기 애니메이터 이벤트로 연다(오너 = 예약 거르기, 서버 = 승인).
     private bool comboWindowOpen;
     private PlayerActionState observedState;
-    // 전진(일반 타 매 타·강타) — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
+    // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
     private float lungeRemaining;
-    private float lungeDistance;
-    private float lungeDuration;
     private PlayerMotor motor;
-    private PlayerDashController dash;
     // 다 돈 뒤 공격(할 일 43): 크게 꺾으면 TurnToward 가 도는 동안 클립 시작·강타 전진을 늦춘다.
     // 판정·End 는 클립 이벤트라 같이 늦춰진다. 지연은 서버가 정해 StartRpc 로 싣는다 — 첫 타는 오너가 잰 값.
     private bool hasPendingClip;
@@ -125,7 +118,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         assassinState = GetComponent<AssassinState>();
         view = GetComponent<AssassinSkillView>();
         motor = GetComponent<PlayerMotor>();
-        dash = GetComponent<PlayerDashController>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -201,21 +193,17 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (active || requesting || player == null || !CanStartApprovedAttack)
             return false;
 
-        Vector3 aimDirection = CurrentAimDirection();
-        Vector3 moveDirection = CurrentMoveDirection();
+        Vector3 direction = CurrentAimDirection();
         // 첫 타의 회전 지연은 오너의 몸 방향으로 잰다 — 서버 쪽 몸 방향은 NT 로 받은 늦은 값이다.
-        // 모드는 서버가 정하므로 복제된 어쌔신 상태로 같은 선택을 해 그 타의 방향으로 잰다(드문 엇갈림은 서버 상한 자르기에 맡긴다).
-        TrySelectAttackMode(out AssassinBasicAttackMode predictedMode);
-        float turnDelay = movement.GetAttackTurnDelay(
-            Flatten(AssassinAttackDirectionRules.Resolve(predictedMode, moveDirection, aimDirection)));
+        float turnDelay = movement.GetAttackTurnDelay(direction);
         if (!IsNetworkActive)
-            return StartServerAttack(aimDirection, moveDirection, turnDelay);
+            return StartServerAttack(direction, turnDelay);
 
         if (!IsOwner)
             return false;
 
         requesting = true;
-        RequestStartRpc(aimDirection, moveDirection, turnDelay, player.CreateStatReport());
+        RequestStartRpc(direction, turnDelay, player.CreateStatReport());
         return true;
     }
 
@@ -233,7 +221,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             CompleteCurrentStep();
     }
 
-    // 전진 — 일반 타 매 타(할 일 96)·강타(§8.2) 모두 승인 방향으로 판정 프레임 전까지 나눠 낸다. 적 통과 없음(벽·몸 콜라이더 켜진 적에 막힘).
+    // 강타 전진(§8.2) — 승인 방향으로 판정 프레임 전까지 나눠 낸다. 적 통과 없음(벽·몸 콜라이더 켜진 적에 막힘).
     public void FixedTickMovement()
     {
         if (!active || hasPendingClip || lungeRemaining <= 0f || motor == null || data == null || !player.IsSimulating)
@@ -241,8 +229,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         // 판정 프레임이 공격속도만큼 당겨지므로 전진 시간도 배율로 나눈다 — 거리는 같다(할 일 91 T5).
         float step = AssassinLungeRules.StepDistance(
-            lungeRemaining, lungeDistance,
-            PlayerAttackSpeedRules.Duration(lungeDuration, AttackSpeedRate), Time.fixedDeltaTime);
+            lungeRemaining, data.EnhancedLungeDistance,
+            PlayerAttackSpeedRules.Duration(data.EnhancedLungeDuration, AttackSpeedRate), Time.fixedDeltaTime);
         lungeRemaining -= step;
         motor.AddGroundedDisplacement(attackDirection * step);
     }
@@ -265,8 +253,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             CancelRpc();
     }
 
-    // 꼬리(finishingTail)는 EndLocal 에서만 켜진다 — 예약·홀드로 다음 타가 이어지면 공격 상태가 계속돼 Move 로 들어오지 않으므로,
-    // 이동 입력이 있어도 콤보 도중엔 여기 오지 않는다(할 일 96 확인). 예약·홀드 없이 끝난 꼬리만 Run 으로 끊는다.
     public void CancelFinishingTailForMovement()
     {
         if (!finishingTail)
@@ -358,12 +344,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         return true;
     }
 
-    /// <summary>
-    /// [서버] 모드를 골라 첫 타(또는 다음 타·다음 묶음)를 시작한다. 실패하면 오너 요청을 거절한다.
-    /// 방향은 모드가 정해진 뒤 고른다 — 일반 타는 이동 입력 우선, 강타·변신 묶음은 조준(AssassinAttackDirectionRules).
-    /// <paramref name="turnDelay"/> 가 없으면 고른 방향으로 서버가 잰다(다음 타).
-    /// </summary>
-    private bool StartServerAttack(Vector3 aimDirection, Vector3 moveDirection, float? turnDelay)
+    /// <summary>[서버] 모드를 골라 첫 타(또는 다음 타·다음 묶음)를 시작한다. 실패하면 오너 요청을 거절한다.</summary>
+    private bool StartServerAttack(Vector3 direction, float turnDelay)
     {
         if (!TrySelectAttackMode(out AssassinBasicAttackMode mode))
         {
@@ -371,12 +353,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return false;
         }
 
-        Vector3 direction = Flatten(AssassinAttackDirectionRules.Resolve(mode, moveDirection, aimDirection));
-        float delay = turnDelay ?? movement.GetAttackTurnDelay(direction);
-
         // 강타·변신 묶음은 일반 4타 순서와 별개다.
         int stepIndex = mode == AssassinBasicAttackMode.Normal ? combo.Begin(Time.time) : 0;
-        return StartServer(stepIndex, direction, mode, delay);
+        return StartServer(stepIndex, direction, mode, turnDelay);
     }
 
     private void TickInputSource()
@@ -395,21 +374,19 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 창 밖 입력은 남긴다: 홀드로 End 까지 들고 있으면 이어가기에 쓰이고(그동안 0.2초 만료), 떼면 공격 종료 뒤 새 평타가 된다.
         input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
         ownerQueued = true;
-        Vector3 aimDirection = CurrentAimDirection();
-        Vector3 moveDirection = CurrentMoveDirection();
+        Vector3 direction = CurrentAimDirection();
 
         if (!IsNetworkActive)
         {
             hasQueuedNextAttack = true;
-            SetServerNextDirection(aimDirection, moveDirection);
+            serverNextDirection = direction;
             return;
         }
 
-        RequestQueueNextAttackRpc(aimDirection, moveDirection, player.CreateStatReport());
+        RequestQueueNextAttackRpc(direction, player.CreateStatReport());
     }
 
-    // 홀드 — 눌림이 바뀌면 즉시, 눌린 동안은 HoldSignalInterval 마다 알린다(거너 HoldSignal).
-    // 조준·이동 입력도 실어 End 순간 이어질 다음 타 방향이 된다.
+    // 홀드 — 눌림이 바뀌면 즉시, 눌린 동안은 HoldSignalInterval 마다 알린다(거너 HoldSignal). 조준도 실어 End 순간 이어질 다음 타 방향이 된다.
     private void TickHoldSignal()
     {
         bool held = input.AttackHeld;
@@ -419,42 +396,41 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         holdSent = held;
         nextHoldSignalTime = Time.time + HoldSignalInterval;
-        Vector3 aimDirection = CurrentAimDirection();
-        Vector3 moveDirection = CurrentMoveDirection();
+        Vector3 direction = CurrentAimDirection();
 
         if (!IsNetworkActive)
         {
             if (changed)
-                ServerSetHold(held, aimDirection, moveDirection);
+                ServerSetHold(held, direction);
             else
-                ServerHoldSignal(aimDirection, moveDirection);
+                ServerHoldSignal(direction);
             return;
         }
 
         if (changed)
-            SetHoldRpc(held, aimDirection, moveDirection);
+            SetHoldRpc(held, direction);
         else
-            HoldSignalRpc(aimDirection, moveDirection);
+            HoldSignalRpc(direction);
     }
 
     [Rpc(SendTo.Server)]
-    private void SetHoldRpc(bool held, Vector3 aimDirection, Vector3 moveDirection, RpcParams rpcParams = default)
+    private void SetHoldRpc(bool held, Vector3 direction, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
-        ServerSetHold(held, aimDirection, moveDirection);
+        ServerSetHold(held, direction);
     }
 
     [Rpc(SendTo.Server)]
-    private void HoldSignalRpc(Vector3 aimDirection, Vector3 moveDirection, RpcParams rpcParams = default)
+    private void HoldSignalRpc(Vector3 direction, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
-        ServerHoldSignal(aimDirection, moveDirection);
+        ServerHoldSignal(direction);
     }
 
     // 눌림 변경 — 누름이면 홀드를 (다시) 켠다. 뗐다 다시 눌러도 End 순간 눌려 있으면 잇는다.
-    private void ServerSetHold(bool held, Vector3 aimDirection, Vector3 moveDirection)
+    private void ServerSetHold(bool held, Vector3 direction)
     {
         if (!active || finishingChain)
             return;
@@ -462,24 +438,17 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         serverHeld = held;
         lastHoldSignalTime = Time.time;
         if (held)
-            SetServerNextDirection(aimDirection, moveDirection);
+            serverNextDirection = Flatten(direction);
     }
 
-    // 주기 신호는 시각·방향만 갱신한다 — 홀드를 켜지는 않는다(뗀 뒤 늦게 온 신호가 홀드를 되살리지 않게, 거너와 같음).
-    private void ServerHoldSignal(Vector3 aimDirection, Vector3 moveDirection)
+    // 주기 신호는 시각·조준만 갱신한다 — 홀드를 켜지는 않는다(뗀 뒤 늦게 온 신호가 홀드를 되살리지 않게, 거너와 같음).
+    private void ServerHoldSignal(Vector3 direction)
     {
         if (!active || !serverHeld)
             return;
 
         lastHoldSignalTime = Time.time;
-        SetServerNextDirection(aimDirection, moveDirection);
-    }
-
-    // 이동 입력은 펴지 않고 그대로 둔다 — 0 이면 "입력 없음"이라 조준으로 간다(Flatten 은 0 을 몸 정면으로 바꾼다).
-    private void SetServerNextDirection(Vector3 aimDirection, Vector3 moveDirection)
-    {
-        serverNextAim = Flatten(aimDirection);
-        serverNextMove = moveDirection;
+        serverNextDirection = Flatten(direction);
     }
 
     private bool IsServerHoldFresh() =>
@@ -492,8 +461,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(
-        Vector3 aimDirection, Vector3 moveDirection, float turnDelay, PlayerStatReport statReport, RpcParams rpcParams = default)
+    private void RequestStartRpc(Vector3 direction, float turnDelay, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
@@ -507,12 +475,11 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
 
         // 각은 다시 재지 않고 상한만 자른다 — 지연이 길면 보낸 쪽만 손해다.
-        StartServerAttack(aimDirection, moveDirection, movement.ClampAttackTurnDelay(turnDelay));
+        StartServerAttack(direction, movement.ClampAttackTurnDelay(turnDelay));
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestQueueNextAttackRpc(
-        Vector3 aimDirection, Vector3 moveDirection, PlayerStatReport statReport, RpcParams rpcParams = default)
+    private void RequestQueueNextAttackRpc(Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
@@ -531,7 +498,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
 
         hasQueuedNextAttack = true;
-        SetServerNextDirection(aimDirection, moveDirection);
+        serverNextDirection = Flatten(direction);
     }
 
     [Rpc(SendTo.Server)]
@@ -654,19 +621,15 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         currentStepIndex = stepIndex;
         currentMode = mode;
         attackDirection = Flatten(direction);
-        serverNextAim = attackDirection;
-        serverNextMove = Vector3.zero;
+        serverNextDirection = attackDirection;
         // 재생 속도(Animator.speed)는 도중에 바뀔 수 있어 감속만 늘린다(할 일 91 T5, SafetyNetDuration).
         fallbackEndTime = Time.time + turnDelay + PlayerAttackSpeedRules.SafetyNetDuration(step.ClipLength, AttackSpeedRate) +
             data.EndFallbackPadding;
 
-        // 전진 — 일반 타 = 매 타 전진(할 일 96), 강타 = 강타 전진(§8.2), 변신 묶음 = 없음. 방향은 attackDirection(몸·판정과 같다).
         StopLunge();
-        lungeDistance = AssassinLungeRules.Distance(mode, data.NormalLungeDistance, data.EnhancedLungeDistance);
-        lungeDuration = AssassinLungeRules.Duration(mode, data.NormalLungeDuration, data.EnhancedLungeDuration);
-        if (lungeDistance > 0f && motor != null && player.IsSimulating)
+        if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating)
         {
-            lungeRemaining = lungeDistance;
+            lungeRemaining = data.EnhancedLungeDistance;
             motor.MovementResolved += HandleLungeMovementResolved;
         }
 
@@ -749,7 +712,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 창 안에서 예약됐거나 지금 눌려 있으면 다음 타·다음 묶음(4타 뒤 1타 포함). 변신 종료 대기면 시작하지 못하고 여기서 끝난다.
         // 다음 타의 회전 지연은 서버가 잰다 — 이 타 내내 몸이 이 타 방향에 고정돼 있어 NT 값도 이미 따라와 있다.
         if (AssassinComboWindowRules.ShouldContinueAtEnd(hasQueuedNextAttack, IsServerHoldFresh()) &&
-            StartServerAttack(serverNextAim, serverNextMove, null))
+            StartServerAttack(serverNextDirection, movement.GetAttackTurnDelay(serverNextDirection)))
             return;
 
         EndServer();
@@ -843,13 +806,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
     }
 
-    // 대시로 끊긴 공격은 Idle 로 돌리지 않는다 — 오너는 같은 프레임에 대시 상태가 Dodge 를 틀고, 관찰자는 CancelRpc 보다
-    // NetworkAnimator 의 Dodge 가 먼저 올 수 있다. 어느 순서든 Dodge 가 최종으로 남는다(PlayerDashController.HoldsBasePose).
     private void ReturnToIdlePose()
     {
-        if (dash != null && dash.HoldsBasePose)
-            return;
-
         if (animator != null && animator.runtimeAnimatorController != null && animator.HasState(0, IdleHash))
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
     }
@@ -857,12 +815,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private Vector3 CurrentAimDirection()
     {
         return Flatten(aim != null ? aim.AimDirection : transform.forward);
-    }
-
-    // 이동 입력의 월드 방향 — 이동과 같은 입력→월드 변환(PlayerMovement.GetInputWorldDirection). 입력이 없으면 0.
-    private Vector3 CurrentMoveDirection()
-    {
-        return movement != null ? movement.GetInputWorldDirection() : Vector3.zero;
     }
 
     private Vector3 Flatten(Vector3 direction)

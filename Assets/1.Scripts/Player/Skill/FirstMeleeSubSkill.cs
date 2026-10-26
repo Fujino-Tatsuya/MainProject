@@ -9,10 +9,6 @@ using UnityEngine;
 /// 타이밍은 클립 이벤트다(PLAN-anim-event-timing P1-③): 준비(SubSkillGuard) Custom0 방어 창 열림 →
 /// 방어중 루프(SubSkillGuardIdle, 전이 exitTime 으로 길이 조정) → 해제(SubSkillGuardEnd) Custom1 창 닫힘 · End 종료,
 /// 반격(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트·전이를 옮기면 그대로 반영된다.
-/// 방어중에 E 를 다시 누르면 서버가 해제 상태로 바로 넘긴다(할 일 94, <see cref="OnSkillRePressed"/>).
-/// 방어중 → 해제로 넘어가는 순간 방어 창은 바로 닫힌다 — Custom1 을 기다리지 않는다(할 일 95, Custom1 은 그 뒤 무시).
-/// 홀드 방식(설정 기본, 할 일 95)은 E 를 누르는 동안 방어중을 유지하고 떼거나 최대 유지 시간이 지나면 서버가 해제로 넘긴다
-/// (<see cref="OnSkillHeldChanged"/>·<see cref="OnTick"/>). 방어중 자동 해제 전이는 애니메이터 Bool GuardHold 로 막는다.
 /// 공격속도는 준비·해제·반격 상태의 속도 파라미터(AttackSpeedRate)로만 탄다 — 방어중 길이는 공속과 무관(할 일 91 A5, Docs/tech/suppress-haste.md).
 /// 설계·결정: PLAN-paladin-counter-e (Re:C 변경안).
 /// </summary>
@@ -44,14 +40,6 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     private static readonly int CounterStateHash = Animator.StringToHash(CounterStateName);
     // 준비 → 방어중 → 해제는 애니메이터 exitTime 전이로 이어진다. 창을 닫는 Custom1 과 E 를 끝내는 End 는 해제 상태 클립에 있다.
     private const string GuardEndStateName = "SubSkillGuardEnd";
-    private static readonly int GuardEndStateHash = Animator.StringToHash(GuardEndStateName);
-    // 방어중 루프 상태 — E 재입력 해제(할 일 94)는 서버 애니메이터가 이 상태에 있을 때만 받는다.
-    private static readonly int GuardHoldStateHash = Animator.StringToHash("SubSkillGuardIdle");
-    private const int BaseLayer = 0;
-    // 홀드 방식(할 일 95) — 참이면 방어중 → 해제 exitTime 전이(탭 방식 1.5초)를 막는다(Garen 컨트롤러 전이 조건 GuardHold = false).
-    // 오너가 쓰고 오너 권한 NetworkAnimator 가 서버·관찰자에 복제한다(IsMoving 과 같은 길). 해제 전이는 서버 CrossFade 가 한다.
-    private const string GuardHoldParamName = "GuardHold";
-    private static readonly int GuardHoldParamHash = Animator.StringToHash(GuardHoldParamName);
 
     // 준비 클립(데이터 animatorStateName) = Custom0, 해제 클립(GuardEndStateName) = Custom1·End, 반격 클립(CounterStateName) = Hit·End.
     private static readonly SkillAnimationEventType[] GuardEvents = { SkillAnimationEventType.Custom0 };
@@ -62,10 +50,6 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     private readonly FirstMeleeGuardCounterModel model = new FirstMeleeGuardCounterModel();
     private PlayerInputReader inputReader;
-    private Animator animator;
-    private bool? animatorHasGuardHoldParam;
-    // [오너] 이번 시전을 홀드 방식으로 시작했다(시작 때 UserInputConfig.GuardSkillHold 를 확정 — 진행 중 옵션이 바뀌어도 흔들리지 않는다).
-    private bool ownerHoldMode;
 
     // 방어 성공 뒤 반격 전에 E 가 끊겼을 때(구속·기타 Cancelled) 다음 프레임에 실행할 반격 1회(결정 2).
     // 모델은 OnEnd 에서 Reset 되므로 방향은 따로 들고 있는다.
@@ -81,12 +65,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
 
-    // 방어 대기·반격 중 이동·회전 불가(결정 3). 평타·다른 스킬은 Skill 상태 규칙으로 이미 막힌다.
+    // 방어 대기·반격 중 이동·회전 불가(결정 3). 평타·다른 스킬·대시는 Skill 상태 규칙으로 이미 막힌다(CanBeCanceledByDash 기본 false).
     public override bool CanMoveWhileActive => false;
-
-    // 대시는 어느 단계든 E 를 끊는다(할 일 95) — 오너 FSM 의 대시 우선 경로(PlayerStateController.Tick)가 묻는다.
-    // 끊기면 서버도 대시 승인 때 상태가 바뀌어 OnEnd(DashCancelled)이고 쿨타임은 그대로다. 반격 판정 전이면 보장 반격(CounterDueOnCancel).
-    public override bool CanBeCanceledByDash(PlayerActionState phase) => FirstMeleeGuardRules.AllowsDashCancel(phase);
 
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => GuardEvents;
 
@@ -117,124 +97,6 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     {
         base.Initialize(owner, controller);
         inputReader = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
-        // PlayerSkillController·PlayerShieldVfx 와 같은 해석(자식의 첫 Animator).
-        animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
-    }
-
-    // 방어중 E 재입력 = 즉시 해제(할 일 94). 준비·해제·반격 중 재입력은 무시한다(버퍼에서는 컨트롤러가 이미 지웠다).
-    public override bool ConsumesSkillRePress => true;
-
-    /// <summary>
-    /// [서버] E 재입력. 지금 서버 애니메이터가 방어중(SubSkillGuardIdle, 전이 중 아님)이면 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다.
-    /// 원격 오너가 방어중으로 보고 눌렀어도 서버가 아직 준비 중이거나 이미 해제로 넘어가는 중이면 조용히 무시한다(서버 판정이 기준).
-    /// 받는 즉시 방어 창이 닫힌다(할 일 95 — 모델이 Releasing 으로 넘어가 Custom1 은 무시). E 종료는 해제 클립 End 가 한다 — 타이머를 따로 두지 않는다.
-    /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PlayerShieldVfx.ServerPlayGuardCounterPose"/>).
-    /// </summary>
-    public override void OnSkillRePressed()
-    {
-        if (!IsServerPeer)
-            return;
-
-        if (shieldVfx == null)
-        {
-            Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 E 재입력 해제를 전 피어로 보낼 수 없습니다. 무시합니다.", this);
-            return;
-        }
-
-        if (!model.TryRequestRelease(IsAnimatorInGuardHold()))
-            return;
-
-        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
-        Edit.Log("[Skill] 수호자의 의지 — E 재입력: 방어중 → 해제", this);
-    }
-
-    private bool IsAnimatorInGuardHold() =>
-        animator != null &&
-        !animator.IsInTransition(BaseLayer) &&
-        animator.GetCurrentAnimatorStateInfo(BaseLayer).shortNameHash == GuardHoldStateHash;
-
-    // 방어중 → 해제 전이 중이다. '이미 해제 상태'는 보지 않는다 — 새 시전 시작 CrossFade 전 프레임에 지난 시전의 해제 상태가 남아
-    // 있을 수 있어서다. 전이를 한 프레임에 건너뛴 드문 경우는 해제 클립 Custom1 이 그대로 닫는다.
-    private bool IsAnimatorEnteringGuardEnd() =>
-        animator != null &&
-        animator.IsInTransition(BaseLayer) &&
-        animator.GetCurrentAnimatorStateInfo(BaseLayer).shortNameHash == GuardHoldStateHash &&
-        animator.GetNextAnimatorStateInfo(BaseLayer).shortNameHash == GuardEndStateHash;
-
-    // ── 홀드 방식(할 일 95) ──
-
-    // 오너가 홀드 방식으로 시작했을 때만 누름/뗌을 서버로 보낸다(컨트롤러 TickOwnerSkillInput). 탭 방식이면 아무것도 안 보낸다.
-    public override bool ReportsHeldInput => ownerHoldMode;
-
-    // 홀드 방식이면 방어중이 guardHoldMaxDuration 까지 길어진다 — 안전망이 반격·해제 도중 E 를 먼저 끊지 않게 그만큼 더한다.
-    // 서버는 시작 시점에 조작 방식을 모르므로 탭 방식에도 더한다(길어질 뿐 먼저 끊지 않는다 — 정상 종료는 클립 End).
-    public override float SafetyNetExtraSeconds => SubSkillData != null ? SubSkillData.GuardHoldMaxDuration : 0f;
-
-    /// <summary>
-    /// [서버] 오너의 E 누름/뗌(홀드 방식). 첫 통보로 이 시전이 홀드 방식이 된다. 실제 해제는 <see cref="OnTick"/> 이
-    /// 서버 애니메이터가 방어중일 때 낸다 — 준비 중에 뗐으면 방어중에 들어온 첫 틱에 해제한다.
-    /// </summary>
-    public override void OnSkillHeldChanged(bool held)
-    {
-        if (!IsServerPeer)
-            return;
-
-        model.OnHoldInput(held);
-        // 서버 애니메이터도 바로 막는다 — 오너 값이 NetworkAnimator 로 오기 전에 1.5초 전이가 나지 않게(같은 값이 뒤에 온다).
-        if (model.HoldMode)
-            SetGuardHoldParam(true);
-    }
-
-    public override void OnTick()
-    {
-        base.OnTick();
-
-        if (!IsServerPeer)
-            return;
-
-        // 탭 방식 방어중 exitTime 전이(요청 없이 애니메이터가 해제로 넘어감)도 해제 진입 순간 창을 닫는다(할 일 95).
-        // 요청 경로(재입력·홀드)는 모델이 이미 Releasing 이라 여기서는 아무 일도 없다.
-        if (model.Phase == FirstMeleeGuardPhase.Guarding && IsAnimatorEnteringGuardEnd())
-            model.OnReleaseEntered();
-
-        FirstMeleeSubSkillData data = SubSkillData;
-        if (data == null || shieldVfx == null || !model.HoldMode)
-            return;
-
-        GuardHoldRelease release = model.TickHold(IsAnimatorInGuardHold(), Time.time, data.GuardHoldMaxDuration);
-        if (release == GuardHoldRelease.None)
-            return;
-
-        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
-        Edit.Log(release == GuardHoldRelease.KeyReleased
-            ? "[Skill] 수호자의 의지 — 홀드: E 뗌 → 해제"
-            : $"[Skill] 수호자의 의지 — 홀드: 최대 유지 {data.GuardHoldMaxDuration:0.##}s → 해제", this);
-    }
-
-    private void SetGuardHoldParam(bool value)
-    {
-        if (animator == null)
-            return;
-
-        if (animatorHasGuardHoldParam == null)
-        {
-            bool found = false;
-            foreach (AnimatorControllerParameter parameter in animator.parameters)
-            {
-                if (parameter.nameHash == GuardHoldParamHash && parameter.type == AnimatorControllerParameterType.Bool)
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            animatorHasGuardHoldParam = found;
-            if (!found && value)
-                Debug.LogWarning($"[Skill] 수호자의 의지 — 애니메이터에 Bool '{GuardHoldParamName}' 이 없어 홀드 중에도 방어중이 전이 시간에 풀립니다.", this);
-        }
-
-        if (animatorHasGuardHoldParam == true)
-            animator.SetBool(GuardHoldParamHash, value);
     }
 
     public override void OnServerStart(Vector3 direction, Unit target)
@@ -258,12 +120,6 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         // 방어 자세 애니(SubSkillGuard)는 컨트롤러가 시작 상태로 전 피어에서 재생한다. 반격 자세는 방어 성공 때
         // PlayerShieldVfx.ServerPlayGuardCounterPose 가 전 피어로 퍼뜨린다. 단계별 연출은 클립 이벤트 몫 — 여기는 방패 발광만.
         shieldGlow?.FadeIn();
-        // PlayerShieldVfx.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
-
-        // 조작 방식은 오너 설정이다 — 오너(호스트·오프라인 포함)만 정하고, 홀드면 방어중 자동 해제 전이를 막는다.
-        ownerHoldMode = owner != null && owner.IsInputSource && UserInputConfig.GuardSkillHold;
-        if (ownerHoldMode)
-            SetGuardHoldParam(true);
     }
 
     // 서버(또는 오프라인)에서만 온다(PlayerSkillController.HandleAnimationEvent). base 의 End → Completed 는 타지 않는다 —
@@ -277,7 +133,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 model.OnGuardWindowOpened();
                 break;
 
-            // 창만 닫는다 — E 는 해제 모션 끝(End)까지 이어진다. 해제 진입 때 이미 닫혔으면(할 일 95) 모델이 무시한다.
+            // 창만 닫는다 — E 는 해제 모션 끝(End)까지 이어진다.
             case SkillAnimationEventType.Custom1:
                 model.OnGuardWindowClosed();
                 break;
@@ -315,8 +171,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         // 🔴 동기로 실행하지 않는다 — OnEnd 는 TwentyThreeBoss.TryCarryDashTarget 루프 안(돌진 스침 → 캐리 구속 →
         // HandleSkillStateExit)에서 불릴 수 있어, 여기서 보스 ReceiveAttack 을 부르면 보스 재진입이 된다
         // (보스가 죽은 뒤에도 _dashCarried·StartDashMove 가 이어질 수 있다).
-        // 대시 취소(할 일 95)도 여기로 온다 — 반격 판정 전 대시면 반격 피해는 다음 프레임에 지금 위치(대시 첫 프레임)에서 1회 나간다.
-        if (IsServerPeer && model.CounterDueOnCancel(reason))
+        if (IsServerPeer && reason != SkillEndReason.CasterDied && model.HasPendingCounter)
         {
             model.MarkCounterFired();
             pendingDeferredCounter = true;
@@ -335,10 +190,6 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         barrierLoop?.Stop();
         auraLoop?.Stop();
         chargeLoop?.Stop();
-        // 홀드 방식 정리 — 다음 시전(탭 방식일 수 있다)의 방어중 자동 해제를 막지 않게 오너·서버에서 내린다(관찰자는 동기로 따라온다).
-        if (ownerHoldMode || IsServerPeer)
-            SetGuardHoldParam(false);
-        ownerHoldMode = false;
 
         // 입력 예약 없음(결정 22): 방어·반격 중 누른 입력은 E 가 끝나도 재생하지 않는다.
         // 순서 확인(PlayerSkillController): 서버 EndActiveSkillServer·클라 EndSkillClientRpc 모두

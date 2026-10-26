@@ -77,9 +77,9 @@ A2(T5) 에서는 E 전체가 `Animator.speed` 로 공속을 타 **방어 창도 
 
 - 🟨 Speed 4·방어중 1.5s·안전망 4.0 은 할 일 91 A6(2026-10-22) **임시값** — 사용자가 튜닝한다(이전 A5: Speed 2·방어중 0.5s·안전망 1.5).
   배율 1 기준 E 전체 ≈ 0.25 + 1.5 + 0.25 = 2.0s. 창 닫히기 직전 방어 성공 시 최장 ≈ 1.78 + 반격 `End` 1.1 ≈ 2.9s.
-- 준비 → 방어중(exitTime 1 · 0.1s), 방어중 → 해제(exitTime 0.4286 · 0.1s) 전환은 **초 단위 고정**이라 공속과 무관하다. 방어 창 실제 길이 ≈ 준비 클립 `Custom0` 이후 + 방어중 — 방어중 → 해제로 넘어가는 순간 서버가 창을 바로 닫는다(할 일 95, `Custom1` 은 늦은 보조 — 이미 닫혔으면 무시).
+- 준비 → 방어중(exitTime 1 · 0.1s), 방어중 → 해제(exitTime 0.4286 · 0.1s) 전환은 **초 단위 고정**이라 공속과 무관하다. 방어 창 실제 길이 ≈ 준비 클립 `Custom0` 이후 + 방어중 + 해제 클립 `Custom1` 이전.
 - 파라미터 `AttackSpeedRate`(기본 1)는 `PlayerAttackSpeedAnimator` 가 전 피어에서 `Player.AttackSpeedRate` 로 쓴다 — 호스트·클라 같은 값. 팔라딘 E 는 `Animator.speed` 배율 대상이 아니다(`ScalesWithAttackSpeed = false`). 상세: [player-stats.md](player-stats.md) §3.1.
-- 모델(`FirstMeleeGuardCounterModel`): Guarding →(해제 진입 — E 재입력·홀드 뗌·최대 유지 시간·탭 exitTime 전이, 또는 `Custom1`) **Releasing** →(해제 클립 `End`) Finished. 방어 성공이면 Countering →(반격 클립 `End`) Finished. 단계가 안 맞는 이벤트(반격으로 CrossFade 중 늦게 온 해제 클립 `Custom1`, Guarding 중 `End`)는 무시한다.
+- 모델(`FirstMeleeGuardCounterModel`): Guarding →(`Custom1`) **Releasing** →(해제 클립 `End`) Finished. 방어 성공이면 Countering →(반격 클립 `End`) Finished. 단계가 안 맞는 이벤트(반격으로 CrossFade 중 늦게 온 해제 클립 `Custom1`, Guarding 중 `End`)는 무시한다.
 - 서버 임시 안전망 = `maxActiveDuration`(SO 4.0 — xlsx 반영은 메인) ÷ min(1, 배율) + padding(`ScalesSafetyNetWithAttackSpeed = true`) — 감속만 늘리고 가속엔 줄이지 않는다.
   방어중 길이는 애니메이터 전이에만 있어 런타임에 따로 뺄 수 없으므로 **전체**를 늘린다(정밀 분할보다 길 뿐 먼저 끊지 않는다). SO 필드는 늘리지 않았다.
 

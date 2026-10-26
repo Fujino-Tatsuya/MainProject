@@ -11,7 +11,7 @@ public interface IPlayerAttackSpeedAnimatorUser
 
 /// <summary>
 /// [전 피어] 플레이어 Animator 의 공격속도 쓰기 지점(할 일 91 T5·A5) — 두 가지를 쓴다.
-///   · Animator.speed: 창구 중 하나라도 공격속도를 타면 배율, 아니면 1. 대시가 0층(Dodge)을 쥔 동안은 1.
+///   · Animator.speed: 창구 중 하나라도 공격속도를 타면 배율, 아니면 1.
 ///   · 상태 속도 파라미터 <see cref="RateParameter"/>: 항상 배율. 일부 상태만 공속을 타는 동작(팔라딘 E 준비·해제·반격 — 방어중 제외)이
 ///     애니메이터 상태의 Speed Multiplier 로 이 파라미터를 켠다. 파라미터가 없는 컨트롤러는 건너뛴다(기본값 1).
 /// 배율은 복제된 상태이상으로 각 피어가 계산하므로 서버·오너·관찰자 재생 속도가 같다. 바뀔 때만 쓴다.
@@ -29,7 +29,6 @@ public sealed class PlayerAttackSpeedAnimator : MonoBehaviour
     private Player player;
     private PlayableCharacterVisual visual;
     private IPlayerAttackSpeedAnimatorUser[] users;
-    private PlayerDashController dash;
     private Animator animator;
     private float appliedSpeed = float.NaN;
     // 파라미터 유무는 컨트롤러마다 한 번만 본다(animator.parameters 는 매번 배열을 만든다).
@@ -40,7 +39,6 @@ public sealed class PlayerAttackSpeedAnimator : MonoBehaviour
     {
         player = GetComponent<Player>();
         users = GetComponents<IPlayerAttackSpeedAnimatorUser>();
-        dash = GetComponent<PlayerDashController>();
         visual = GetComponent<PlayableCharacterVisual>();
         if (visual != null)
             visual.CharacterApplied += HandleCharacterApplied;
@@ -63,11 +61,8 @@ public sealed class PlayerAttackSpeedAnimator : MonoBehaviour
         float rate = player != null ? player.AttackSpeedRate : 1f;
         WriteRateParameter(PlayerAttackSpeedRules.Rate(rate));
 
-        // 대시(Dodge)가 0층을 쥔 동안은 공속을 풀어 1 — Dodge 는 DodgeSpeed 로 대시 시간에 맞추므로 Animator.speed 가 곱해지면 어긋난다(할 일 92-5).
-        // 관찰자도 Dodge 재생 여부로 같은 판정을 한다(늦게 오는 평타 CancelRpc 와 무관).
-        bool dodging = dash != null && dash.HoldsBasePose;
         bool scales = false;
-        for (int i = 0; i < users.Length && !dodging; i++)
+        for (int i = 0; i < users.Length; i++)
         {
             if (users[i] != null && users[i].ScalesAnimatorWithAttackSpeed)
             {
