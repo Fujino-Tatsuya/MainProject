@@ -11,7 +11,9 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 반영 (2026-10-26 · 경석(Claude) · **몬스터 Q 경직 표현 · 중간보스 취약 8초**, 브랜치 `feature/SettingsDdol`) — ✅ 구현 · 컴파일 0 · 전투 EditMode 337/0 · ⏳ 경석 Play · 규칙 정본 [monster-aggro-hitreact.md](Docs/tech/monster-aggro-hitreact.md) §2.0 · 핸드오프 [handoff-monster-stun-vfx.md](Docs/tech/handoff-monster-stun-vfx.md)(민경 확인용 + Play 체크리스트)
 - 일반 몹: Q 판정은 원래 공격을 끊고 있었다 — 피격 상태 없는 HumanoidBot 이 공격 클립을 계속 돌려 안 끊겨 보였다 → 피격 상태 없는 몹은 Hit·Knockback 동안 대기 자세 정지. Q 밀림+경직 동안 머리 위 기절 별(`MonsterStatusEffectVfxPresenter`, 표 `Resources/MonsterStatusEffectVfxSet`).
 - 중간보스: 간파 성공 = 그로기 1초(별 + 하늘색) + **취약 8초**(카운터 성공부터, 하늘색만, 움직이고 공격함, 공격 중이어도 Q 밀림+경직 — 공격 슈퍼아머를 안 건다). `MonsterCounterWindow.vulnerableDuration` 은 xlsx 행 없음(기본 8).
-- 23호(`TwentyThreeBoss.cs`·`No23Controller`) 미커밋 변경은 다른 세션 작업이라 이 커밋에 없다.
+- 3차(경석 Play): 중간보스만 별이 안 보임 = 몸 콜라이더(2m) 꼭대기가 GauntletBot(골반 1.7m) 가슴 속 → 머리 뼈 `Head` 를 따라가게(최소 = 콜라이더 꼭대기).
+- 23호 일반 간파 성공 = 쓰러지는 그로기 대신 간파 피격 클립(`Boss_23_ParryHit_InPlace`, `_parryHitGroggy`). 그 .anim 의 .meta 가 SVN 에 없어 PC 마다 GUID 가 달랐다 → SVN r521 에 .meta 추가 · 핀 516 → 521.
+- `0.BootStrapScene` GameMenu 인스턴스 삭제 = 경석 의도(GameMenu 는 로비에서 생성, DDOL).
 
 ## ▶▶ 작업 세션 (2026-10-26 · 경석(Claude) · **타이틀 시작 연출 단순화(Press 캡슐만 → 접근 → 모니터 꺼짐 → 로비) · ESC 메뉴 Press 캡슐 삭제 · 설정 탭 4개 모양**, 브랜치 `feature/SettingsDdol` 작업 트리) — 계획 [PLAN-title-start-settings-tabs.md](PLAN-title-start-settings-tabs.md) ✅ 승인(10-26) · ✅ 구현 · ✅ 커밋 34ba95f4(경석 GameMenu 글자 크기 수정 포함) · 컴파일 0 · EditMode 전체 3159/4(실패 4 = `EnemyC3DecalRenderTests` 데칼 픽셀 비교 — 이번 변경과 의존 없음, 변경 전 대조 못 함) · Play(MCP): 대기 → Space → 접근 → 꺼짐 → 페이드 → 로비 로그 정상 · ⏳ 경석 Play(캡슐 모양·깜빡임·ESC 건너뛰기·로비 ESC 메뉴·탭)
 - 타이틀 = Press 캡슐(ESC 메뉴에서 옮긴 알약 + "Press Any Button", 화면 앞 하단 CRT 오버레이, 지직거림 + 깜빡임 `_Pulse` 0.55)만 → 아무 키 → 3초 접근 → 모니터 CRT 꺼짐 1.1초 → 검정 페이드 → 로비. 접근 중 ESC = 바로 페이드. 타이틀 시작·설정·나가기 메뉴 없음.
