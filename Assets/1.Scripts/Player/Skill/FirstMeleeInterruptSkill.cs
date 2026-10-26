@@ -27,6 +27,12 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
              "비워두면 연출만 빠진다")]
     [SerializeField] private EffectSocketPlayer glowLoop;
 
+    // 판정 전 방패 기 모으기(2026-10-26 민경 — handoff-paladin-interrupt-vfx). 켜고 끄는 것은 Garen_Parry 클립 이벤트
+    // (0초 StartEffect · Hit 시각 StopEffect "ShieldCharge")가 전 피어에서 한다. 여기는 판정 전에 끊긴 경우의 회수만.
+    [Tooltip("판정 전 방패 기 모으기(소켓 이펙트, Id 'ShieldCharge'). 프리팹의 'VFX/ShieldInterrupt/ShieldCharge' 를 물린다.\n" +
+             "켜고 끄기는 클립 이벤트가 하고, 여기서는 스킬이 판정 전에 끝났을 때 끄기만 한다. 비워두면 회수만 빠진다")]
+    [SerializeField] private EffectSocketPlayer chargeLoop;
+
     // 🔴 적중 충격파만 창구가 다르다. ResolveHit 은 서버에서만 도는데(OnTick=TickServer,
     //    애니 이벤트=HandleAnimationEvent 의 IsServer 게이트) 이 클래스는 MonoBehaviour 라 RPC 를 못 단다.
     [Tooltip("적중 충격파 전파 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
@@ -52,6 +58,9 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
         // 🔴 루프는 반드시 회수한다 — 핸들을 버리면 풀 인스턴스가 영영 안 돌아온다.
         //    소켓의 safetyTimeout(5s)은 이 경로가 실패했을 때를 위한 그물이지 정상 경로가 아니다.
         glowLoop?.Stop();
+
+        // 판정 전에 끊기면(경직·사망·취소) 클립의 Stop 이벤트가 안 온다. 이미 꺼져 있으면 조용한 no-op 이다.
+        chargeLoop?.Stop();
     }
 
     protected override void OnMissingInterruptData()

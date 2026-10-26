@@ -922,20 +922,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &5437724345990262166
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3244756538833987195}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
-  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
-  scale: 1
 --- !u!4 &219519478881073421
 Transform:
   m_ObjectHideFlags: 0
@@ -958,6 +944,20 @@ Transform:
   - {fileID: 2388949476267549546}
   m_Father: {fileID: 836662554432917908}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5437724345990262166
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3244756538833987195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
+  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
+  scale: 1
 --- !u!1 &3442890603742201715
 GameObject:
   m_ObjectHideFlags: 0
@@ -1089,6 +1089,7 @@ Transform:
   m_Children:
   - {fileID: 5056350328124848846}
   - {fileID: 7732167317155855258}
+  - {fileID: 6468210811633694479}
   m_Father: {fileID: 219519478881073421}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3856474240318230573
@@ -1141,6 +1142,56 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 0.5
   safetyTimeout: 15
+--- !u!1 &7255934146055115567
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6468210811633694479}
+  - component: {fileID: 4103582282502557237}
+  m_Layer: 6
+  m_Name: ShieldCharge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6468210811633694479
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7255934146055115567}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7065225733054577906}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4103582282502557237
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7255934146055115567}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: ShieldCharge
+  effect: {fileID: 11400000, guid: 19aefaf2bde6456491b41aee631dac56, type: 2}
+  socket: {fileID: 4933595309215177818}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 1
 --- !u!1 &4106565856894826488
 GameObject:
   m_ObjectHideFlags: 0
@@ -1651,6 +1702,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!4 &2388949476267549546
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7583570667378339134}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 219519478881073421}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7668978312619558656
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1667,21 +1733,6 @@ MonoBehaviour:
   overhead: {fileID: 5487098805794614413}
   body: {fileID: 0}
   feet: {fileID: 0}
---- !u!4 &2388949476267549546
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7583570667378339134}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 219519478881073421}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7630356137226478081
 GameObject:
   m_ObjectHideFlags: 0
@@ -2205,8 +2256,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
   data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
   hitboxAnchor: {fileID: 6786142914605788478}
+  lagCompensationCapMs: 100
   shieldGlow: {fileID: 1486249918430601143}
   glowLoop: {fileID: 3678982283790920023}
+  chargeLoop: {fileID: 4103582282502557237}
   shieldVfx: {fileID: 1140297743786010553}
 --- !u!114 &1140297743786010553
 MonoBehaviour:

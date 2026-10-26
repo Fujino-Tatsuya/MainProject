@@ -1,3 +1,39 @@
+# ▶▶▶ 계획 = **팔라딘 우클릭(단죄의 방패) 연출 — 충격파는 간파 성공 때만 · 판정 전 방패 기 모으기** (2026-10-26 · grill 확정 · ✅ 승인 · ✅ MyProject 제작 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-26, Q1~Q7 전부 추천안). 판정·피해·네트워크 무변경. 은희 영역(Player) 스크립트·클립은 **연출 배선만** → handoff.
+
+## 사실
+- 충격파 `FX_ShieldWave_Entry` = `Player_Paladin.prefab` `VFX/ShieldInterrupt/ShieldWave`(EffectSocketPlayer) ← `PlayerShieldVfx.ServerInterruptWave()`(서버 → 전 피어 RPC) ← `FirstMeleeInterruptSkill.OnInterruptResolutionCompleted` 에서 **적중 1건 이상이면**(`resolvedCount > 0`) 재생 — 간파 창 없는 대상·상자도 포함.
+- 간파 성공 판정은 이미 있다: `PlayerInterruptSkillBase.ResolveHit` 가 카운터 창 소비(23호·중간보스·허수아비 `ServerInterruptSuccessCount` 증가)를 세고, 성공 시 정적 이벤트 `ServerInterruptSucceeded(owner, skill)` 를 **판정 1회에 한 번** 쏜다(`OnInterruptResolutionCompleted` 보다 먼저, 같은 프레임).
+- `ServerInterruptWave` 는 E(`FirstMeleeSubSkill`) 반격도 쓴다.
+- `Garen_Parry.anim`(git, 팔라딘 전용 컨트롤러만 사용): 0초 시작 · **0.333초 Hit(판정)** · 0.6초 End · 길이 1.17초. (커밋본 `5ecc21df` 는 Hit 0.25 — 0.333 은 작업 전부터 있던 로컬 변경, 10-26 민경 판단으로 유지·같이 커밋) 판정은 서버 전용이라 클라 코드는 판정 순간을 모른다. 클립 이벤트(`EffectAnimEvents` 의 `StartEffect`/`StopEffect`)는 전 피어에서 각자 울린다 — 어쌔신 클립 선례.
+- 기존 우클릭 연출: 방패 문양 발광 + 금색 `FX_ShieldGlow` 루프(스킬 내내, 소켓 `4933595309215177818`).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 간파 성공(Q1-A) | 카운터 창을 실제로 소비한 경우만(= `ServerInterruptSucceeded`). 여러 대상 성공해도 1회 |
+| 실패·적중만(Q2-A) | 추가 연출 없음 — 모으던 기만 사라짐 |
+| E 반격(Q3-A) | 그대로(반격 판정마다 충격파) |
+| 배선 ① 충격파 | `FirstMeleeInterruptSkill` 이 `ServerInterruptSucceeded` 를 구독해 **자기 시전일 때만** `shieldVfx.ServerInterruptWave()`. 기존 `resolvedCount > 0` 호출 삭제. 부모 클래스(`PlayerInterruptSkillBase`)는 무변경 |
+| 배선 ② 기 모으기(Q4-A) | `Garen_Parry.anim` 에 이벤트 2개 추가 — 0초 `StartEffect("ShieldCharge")` · 0.333초(Hit 와 같은 시각) `StopEffect("ShieldCharge")`. 공격 속도·클립 수정에 자동으로 따라감 |
+| 취소 안전 | 판정 전에 끊기면(경직·사망·취소) Stop 이벤트가 안 온다 → `FirstMeleeInterruptSkill.OnEnd` 에서도 끈다(새 칸 `chargeLoop`) + 소켓 safetyTimeout 1초 |
+| ShieldGlow(Q5-A) | 그대로(스킬 끝까지). 기 모으기는 판정 전까지 위에 겹침 |
+| 모양·색(Q6-A) | 방패 주변 금색 빛 입자가 방패 중심으로 빨려 들어가고 중심 빛이 점점 커짐(약 0.33초). 기존 우클릭 금색 |
+| 위치 | 새 `VFX/ShieldInterrupt/ShieldCharge`(EffectSocketPlayer, Id `ShieldCharge`) — 소켓은 ShieldGlow 와 같은 방패 소켓 |
+| 제작(Q7-B) | MyProject 에서 방패 대역 미리보기와 함께 → MainProject import(`50.Art/VFX/Common/Players/Player1/RightClickSkill/FX_ShieldCharge`·Entry) |
+
+## 작업 순서
+1. MyProject: `FX_ShieldCharge` 프리팹 + 미리보기(방패 대역, 키로 0.33초 재생·반복) → 민경 확인.
+2. MainProject(🔴 Unity 닫고): 에셋 import · `Player_Paladin.prefab` 에 `ShieldCharge` 소켓 + 스킬 `chargeLoop` 연결 · `Garen_Parry.anim` 이벤트 2개 · `FirstMeleeInterruptSkill` 충격파 조건 변경.
+3. 컴파일 0 · handoff `Docs/tech/handoff-paladin-interrupt-vfx.md`(은희) · 민경 Play(허수아비 간파 성공/실패, 일반 몹, 공격 속도 버프).
+
+## 리스크
+- 정적 이벤트 구독은 시전자 비교(`skill == this`)를 빠뜨리면 다른 팔라딘의 성공에도 터진다 — 반드시 비교.
+- 클립 이벤트는 같은 클립을 쓰는 다른 프리팹에서 Id 를 못 찾으면 조용히 무시된다(현재 팔라딘 컨트롤러만 사용).
+
+---
+
 # ▶▶▶ 계획 = **23호 전기 장판 VFX — 예고 스파크 · 발동 천둥 번개 · 잔광 · 피격 감전 원샷 · 즉사(번개 모양만 다르게)** (2026-10-23 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23 — Q4 = B·C 둘 다 제작 후 Play 로 선택, Q11 = MyProject 미리보기만, 나머지 추천안).
