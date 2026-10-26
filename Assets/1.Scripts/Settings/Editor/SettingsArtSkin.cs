@@ -123,7 +123,7 @@ internal static class SettingsArtSkin
         cross.raycastTarget = false;
         Place(cross.rectTransform, new Vector2(3.75f, 0f), NativeSize(cross.sprite));
 
-        // 탭 4개 — 그림 위 칸 자리에 버튼을 맞추고, 선택된 탭만 알약을 보인다(SettingsBodyView).
+        // 탭 4개 — 그림 위 칸 자리에 버튼을 맞추고, 넷 다 알약을 보인다. 선택 탭만 어둡게(SettingsBodyView).
         var tabBgs = new Image[4];
         var tabLabels = new TMP_Text[4];
         for (int i = 0; i < TabNames.Length; i++)
@@ -386,8 +386,9 @@ internal static class SettingsArtSkin
                 itemBg.color = Color.white;
                 ColorBlock c = item.colors;
                 c.normalColor = new Color(1f, 1f, 1f, 0f);
+                // 올린 항목이 곧 선택된다(TMP) — 둘을 같게. 예전 selected 0.08 이 이겨서 띠가 0.08 로 보였다(Codex 10-26).
                 c.highlightedColor = new Color(1f, 1f, 1f, 0.14f);
-                c.selectedColor = new Color(1f, 1f, 1f, 0.08f);
+                c.selectedColor = new Color(1f, 1f, 1f, 0.14f);
                 c.pressedColor = new Color(1f, 1f, 1f, 0.24f);
                 c.disabledColor = new Color(1f, 1f, 1f, 0f);
                 c.colorMultiplier = 1f;
@@ -608,17 +609,18 @@ internal static class SettingsArtSkin
         img.color = Color.white;
     }
 
-    // 그림 자체가 색을 가진다 — 기본 흰색, 올리면 살짝 밝게(그림은 1 이 최대라 대신 누르면 어둡게), 비활성 반투명.
+    // 그림 자체가 색을 가진다 — 기본 흰색, 고름(올림·선택) ×0.55 · 누름 ×0.45 · 비활성 반투명(경석 10-26 6차 — ESC 메뉴와 같은 규칙).
+    // 글자·아이콘은 런타임 UiFeedbackStyle 이 맞춘다.
     static void Tint(Selectable s)
     {
         s.transition = Selectable.Transition.ColorTint;
         if (s.targetGraphic != null) s.targetGraphic.color = s.targetGraphic.color.a <= 0f ? s.targetGraphic.color : Color.white;
         ColorBlock c = s.colors;
         c.normalColor = Color.white;
-        c.highlightedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
-        c.selectedColor = Color.white;
-        c.pressedColor = new Color(0.72f, 0.72f, 0.72f, 1f);
-        c.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.5f);
+        c.highlightedColor = ButtonLabelStateColor.ChosenTint;
+        c.selectedColor = ButtonLabelStateColor.ChosenTint;
+        c.pressedColor = ButtonLabelStateColor.PressedTint;
+        c.disabledColor = ButtonLabelStateColor.DisabledTint;
         c.colorMultiplier = 1f;
         c.fadeDuration = 0.08f;
         s.colors = c;

@@ -32,7 +32,8 @@ public static class PauseMenuAuthoring
     /// <summary>ESC 패널 캔버스 정렬 — CombatHUD 0 · 튜토리얼 50~60 · 맵 전체 보기 999 위, 드롭다운 목록 30000·성능 표시 아래.</summary>
     const int OptionPanelSortingOrder = 1000;
 
-    static readonly Color ButtonText = new Color(0.75f, 0.77f, 0.77f, 1f);   // 목업 C25 M20 Y20
+    // 누를 수 있는 버튼 글자 = 순백 — 설정창 탭(SettingsBodyView)과 같은 규칙(경석 10-26). 목업 원래 색은 연회색(C25 M20 Y20).
+    static readonly Color ButtonText = Color.white;
     static TMP_FontAsset _font;
     static int _uiLayer;
 
@@ -77,7 +78,7 @@ public static class PauseMenuAuthoring
         Button cont = PillButton(menu, "Continue", pill, new Rect(827.9f, 336.7f, 274.8f, 133f), UiStrings.PauseContinue, 54f, ButtonText);
         Button settings = PillButton(menu, "Settings", pill, new Rect(827.9f, 501.5f, 274.8f, 133f), UiStrings.PauseSettings, 54f, ButtonText);
         Button quit = PillButton(menu, "Quit", pill, new Rect(827.9f, 666.2f, 274.8f, 133f), UiStrings.PauseQuit, 54f, ButtonText);
-        Button pressAny = PillButton(menu, "PressAnyButton", pill, new Rect(728.6f, 897.5f, 473.4f, 133f), UiStrings.PausePressAnyButton, 46f, Color.white);
+        // 목업 아래 "Press Any Button" 캡슐은 ESC 메뉴에서 빼고 타이틀로 옮겼다(경석 10-26 — PLAN-title-start-settings-tabs).
 
         // 종료 확인(02_ExitConfirm)
         RectTransform exit = Group(rr, "ExitConfirm");
@@ -99,7 +100,6 @@ public static class PauseMenuAuthoring
         so.FindProperty("continueButton").objectReferenceValue = cont;
         so.FindProperty("settingsButton").objectReferenceValue = settings;
         so.FindProperty("quitButton").objectReferenceValue = quit;
-        so.FindProperty("pressAnyButton").objectReferenceValue = pressAny;
         so.FindProperty("exitRoot").objectReferenceValue = exit.gameObject;
         so.FindProperty("desktopButton").objectReferenceValue = desktop;
         so.FindProperty("lobbyButton").objectReferenceValue = lobby;
@@ -150,6 +150,10 @@ public static class PauseMenuAuthoring
         Tint(b);
         TMP_Text label = Label(img.rectTransform, "Text", text, Rect.zero, size, color);
         SettingsArtSkin.Stretch(label.rectTransform, new Vector2(24f, 0f), new Vector2(-24f, 0f));
+        var state = img.gameObject.AddComponent<ButtonLabelStateColor>();
+        var sso = new SerializedObject(state);
+        sso.FindProperty("label").objectReferenceValue = label;
+        sso.ApplyModifiedPropertiesWithoutUndo();
         return b;
     }
 
@@ -243,13 +247,16 @@ public static class PauseMenuAuthoring
         return t;
     }
 
+    internal static readonly Color ChosenTint = ButtonLabelStateColor.ChosenTint;   // 공통 반응 규칙(UiFeedbackStyle)과 같은 값
+
     static void Tint(Selectable s)
     {
         ColorBlock c = s.colors;
         c.normalColor = Color.white;
-        c.highlightedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
-        c.selectedColor = Color.white;
-        c.pressedColor = new Color(0.72f, 0.72f, 0.72f, 1f);
+        // 고름(마우스 올림·키보드 선택) = 설정 탭 선택과 같은 0.55 로 어둡게 — 글자는 ButtonLabelStateColor(경석 10-26).
+        c.highlightedColor = ChosenTint;
+        c.selectedColor = ChosenTint;
+        c.pressedColor = new Color(0.45f, 0.45f, 0.45f, 1f);
         c.disabledColor = new Color(0.55f, 0.55f, 0.55f, 0.6f);
         c.colorMultiplier = 1f;
         c.fadeDuration = 0.08f;

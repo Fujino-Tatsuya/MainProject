@@ -10,7 +10,7 @@ using UnityEngine.UI;
 /// 설정창 + ESC 메뉴 — 타이틀부터 끝까지 하나만 산다(DDOL, PLAN-settings-ddol). <c>GameMenu.prefab</c> 루트에 붙는다.
 /// <para>
 /// 루트는 항상 켜져 있고(ESC 를 받아야 한다) <see cref="content"/> 만 켜고 끈다. 씬 모드(<see cref="GameMenuRules.ResolveMode"/>):
-/// 타이틀 = 옵션 버튼 → 설정창만, 모니터 RT 안에 그린다(<see cref="OpenTitleSettings"/>) ·
+/// 타이틀 = 열지 않음(10-26 타이틀 설정·나가기 삭제 — 설정·종료는 로비 ESC 메뉴) ·
 /// 로비·인게임 = 계속·설정·그만두기(팝업의 바탕화면 / 타이틀을 누르면 바로 실행, ESC = 메뉴로) · 그 밖(로딩·데모 연결 대기) = 열지 않음.
 /// </para>
 /// 🔴 서버·씬 전환은 여기서 하지 않는다 — 타이틀로 = <see cref="GameManager.LeaveSessionToTitle"/>, 게임 종료 = <see cref="GameManager.QuitGame"/>.
@@ -24,14 +24,8 @@ public sealed class GameMenuController : MonoBehaviour
 
     [SerializeField] private Canvas canvas;
     [SerializeField] private CanvasScaler scaler;
-    [Tooltip("로비·인게임(Overlay) 클릭.")]
-    [SerializeField] private GraphicRaycaster screenRaycaster;
-    [Tooltip("타이틀(모니터 RT) 클릭 — 화면 좌표를 모니터 RT 좌표로 바꾼다.")]
-    [SerializeField] private TitleScreenRaycaster titleRaycaster;
     [Tooltip("켜고 끄는 대상 — 반투명 검정 + UiModalBlocker(로컬 플레이어 입력 차단).")]
     [SerializeField] private GameObject content;
-    [Tooltip("게임 화면을 덮는 반투명 검정. 타이틀(모니터 안)에서는 끈다.")]
-    [SerializeField] private Image dim;
     [SerializeField] private PauseMenuView pauseMenu;
     [SerializeField] private SettingsBodyView settingsBody;
     [Tooltip("Overlay 정렬 — 캐릭터 선택 190 · 로비 결과 200 · CombatHUD 0 위, 로딩 1000 · 연결 안내 30000 아래.")]
@@ -42,17 +36,11 @@ public sealed class GameMenuController : MonoBehaviour
     public bool IsOpen => Screen != GameMenuScreen.Closed;
     public Button SettingsCloseButton => settingsBody != null ? settingsBody.CloseButton : null;
 
-    private RectTransform _settingsRect;
-    private Vector3 _settingsBaseScale = Vector3.one;
-    private Vector2 _settingsBasePos;
-    private Action _titleClose;
-    private bool _titleCanvasBound;
     private TMP_Dropdown[] _dropdowns = Array.Empty<TMP_Dropdown>();
     private bool _dropdownOpenAtFrameStart;
 
     /// <summary>
     /// 이 프레임 시작 때 설정창 드롭다운 목록이 펼쳐져 있었다 — 이 프레임 ESC 는 목록 닫기 몫이다(TMP_Dropdown 이 EventSystem 에서 닫는다).
-    /// 타이틀 디렉터도 이걸 보고 설정창을 닫지 않는다.
     /// </summary>
     public bool DropdownClaimsEscape => _dropdownOpenAtFrameStart;
 
@@ -72,12 +60,7 @@ public sealed class GameMenuController : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         if (settingsBody != null)
-        {
             _dropdowns = settingsBody.GetComponentsInChildren<TMP_Dropdown>(true);
-            _settingsRect = settingsBody.transform as RectTransform;
-            _settingsBaseScale = settingsBody.transform.localScale;
-            if (_settingsRect != null) _settingsBasePos = _settingsRect.anchoredPosition;
-        }
 
         if (pauseMenu != null)
         {
@@ -88,9 +71,12 @@ public sealed class GameMenuController : MonoBehaviour
             pauseMenu.ExitToDesktopRequested += GameManager.QuitGame;
         }
 
-        if (SettingsCloseButton != null) SettingsCloseButton.onClick.AddListener(HandleSettingsClose);
+        if (SettingsCloseButton != null) SettingsCloseButton.onClick.AddListener(ShowMenu);
 
-        UnbindTitleCanvas();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = overlaySortingOrder;
+        // 메뉴·설정창 모든 누를 수 있는 것에 같은 반응·클릭 소리(경석 10-26 6차 — PLAN-title-start-settings-tabs).
+        if (content != null) UiFeedbackStyle.Apply(content.transform);
         SetContent(false);
         SceneManager.activeSceneChanged += HandleActiveSceneChanged;
         ApplyMode(GameMenuRules.ResolveMode(SceneManager.GetActiveScene().name));
@@ -165,14 +151,6 @@ public sealed class GameMenuController : MonoBehaviour
         Screen = GameMenuScreen.Settings;
     }
 
-    private void HandleSettingsClose()
-    {
-        if (Mode == GameMenuMode.Title)
-            _titleClose?.Invoke();   // TitleFlowDirector.CloseSettings → CloseTitleSettings
-        else
-            ShowMenu();
-    }
-
     // 그만두기 → 팝업(바탕화면 / 타이틀 — 누르면 바로). 호스트에게는 다른 플레이어도 끊긴다는 경고 문구.
     private void HandleQuit()
     {
@@ -203,110 +181,16 @@ public sealed class GameMenuController : MonoBehaviour
         return nm != null && nm.IsListening && nm.IsServer;
     }
 
-    // ── 타이틀(모니터 안) ───────────────────────────────────────────────
-
-    /// <summary>타이틀 옵션 버튼. 설정창만 모니터 RT 에 <paramref name="scale"/>·<paramref name="offsetY"/> 로 띄운다. 닫기 버튼 → <paramref name="onClose"/>.</summary>
-    public void OpenTitleSettings(float scale, float offsetY, Action onClose)
-    {
-        _titleClose = onClose;
-        BindTitleCanvas();
-        SetContent(true);
-        if (pauseMenu != null) pauseMenu.HideAll();
-        SetSettings(true);
-        ApplyTitleSettingsLayout(scale, offsetY);
-        Screen = GameMenuScreen.Settings;
-    }
-
-    /// <summary>타이틀 설정창 닫기(TitleFlowDirector 가 부른다).</summary>
-    public void CloseTitleSettings()
-    {
-        _titleClose = null;
-        Close();
-        RestoreSettingsLayout();
-    }
-
-    /// <summary>타이틀에서만 키운다(모니터 RT 에 다시 찍혀 글씨가 작아진다). 다른 모드로 가면 되돌린다.</summary>
-    public void ApplyTitleSettingsLayout(float scale, float offsetY)
-    {
-        if (settingsBody == null) return;
-        settingsBody.transform.localScale = new Vector3(scale, scale, 1f);
-        if (_settingsRect != null) _settingsRect.anchoredPosition = new Vector2(_settingsBasePos.x, offsetY);
-    }
-
-    private void RestoreSettingsLayout()
-    {
-        if (settingsBody == null) return;
-        settingsBody.transform.localScale = _settingsBaseScale;
-        if (_settingsRect != null) _settingsRect.anchoredPosition = _settingsBasePos;
-    }
-
-    private void BindTitleCanvas()
-    {
-        TitleMonitorDisplay display = TitleMonitorDisplay.Active;
-        if (display == null || display.UICamera == null)
-        {
-            Debug.LogWarning("[GameMenu] 타이틀 모니터가 없다 — 설정창을 화면 위(Overlay)에 띄운다.", this);
-            UnbindTitleCanvas();
-            return;
-        }
-
-        // 모니터 캔버스(Monitor_UI_Canvas)와 같은 카메라·거리, 그 위 순서로 RT 에 찍는다.
-        Canvas monitor = null;
-        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-        {
-            if (c != canvas && c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceCamera && c.worldCamera == display.UICamera)
-            {
-                monitor = c;
-                break;
-            }
-        }
-
-        canvas.renderMode = RenderMode.ScreenSpaceCamera;
-        canvas.worldCamera = display.UICamera;
-        if (monitor != null)
-        {
-            canvas.planeDistance = monitor.planeDistance;
-            canvas.sortingLayerID = monitor.sortingLayerID;
-            canvas.sortingOrder = monitor.sortingOrder + 10;
-        }
-
-        SetRaycasters(title: true);
-        if (dim != null) dim.enabled = false;
-        _titleCanvasBound = true;
-    }
-
-    private void UnbindTitleCanvas()
-    {
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.worldCamera = null;
-        canvas.sortingOrder = overlaySortingOrder;
-        SetRaycasters(title: false);
-        if (dim != null) dim.enabled = true;
-        _titleCanvasBound = false;
-    }
-
-    private void SetRaycasters(bool title)
-    {
-        if (screenRaycaster != null) screenRaycaster.enabled = !title;
-        if (titleRaycaster != null) titleRaycaster.enabled = title;
-    }
-
     // ── 씬 전환 ─────────────────────────────────────────────────────────
 
     private void HandleActiveSceneChanged(Scene previous, Scene next)
     {
         // 🔴 Content 를 실제로 끈다 — 해상도 확인 되돌림·키 변경 취소가 설정 컨트롤러의 OnDisable 에서 돈다.
-        _titleClose = null;
         Close();
-        RestoreSettingsLayout();
         ApplyMode(GameMenuRules.ResolveMode(next.name));
     }
 
-    private void ApplyMode(GameMenuMode mode)
-    {
-        Mode = mode;
-        if (mode != GameMenuMode.Title && _titleCanvasBound) UnbindTitleCanvas();
-    }
+    private void ApplyMode(GameMenuMode mode) => Mode = mode;
 
     private void SetContent(bool active)
     {

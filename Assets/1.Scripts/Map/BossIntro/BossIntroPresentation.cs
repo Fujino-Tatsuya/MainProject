@@ -21,25 +21,26 @@ using UnityEngine.UI;
 public sealed class BossIntroPresentation : MonoBehaviour
 {
     private const string MonologueId = "BOSS_INTRO_WellsCommand";
-    private const float SkipPillWidth = 300f;
-    private const float SkipPillHeight = 72f;
+    // 스킵 위젯 모양은 타이틀 ESC 건너뛰기(TitleSkipHint)도 같이 쓴다 — internal(경석 10-26).
+    internal const float SkipPillWidth = 300f;
+    internal const float SkipPillHeight = 72f;
     private const int CanvasSortingOrder = 450;
     private const float VolumePriority = 110f;
     private const float CameraEnterBlendLate = 0.35f;   // 늦게 붙은 클라 — 암전이 아니므로 짧게 블렌드
     private const float MonologueFadeSeconds = 0.25f;
 
     // 어두운 알약(button_pill_neutral ≈ #1C1B19, 테두리 회색) 위에서 읽히는 색 — 크림 글자 · 금색 키 · 금색 채움 · 완료는 초록.
-    private static readonly Color SkipIdleColor = new Color(1f, 1f, 1f, 0.12f);
+    internal static readonly Color SkipIdleColor = new Color(1f, 1f, 1f, 0.12f);
     private static readonly Color SkipFillColor = new Color(1f, 0.82f, 0.36f, 1f);
     private static readonly Color SkipDoneColor = new Color(0.55f, 0.95f, 0.6f, 1f);
-    private static readonly Color SkipTextColor = new Color(0.96f, 0.93f, 0.86f, 1f);
+    internal static readonly Color SkipTextColor = new Color(0.96f, 0.93f, 0.86f, 1f);
     // 키캡 — keyguide.png 의 Space 키 색(밝은 회색 몸통 · 아랫단 조금 어둡게 · 진한 회색 테두리·글씨).
     private static readonly Color32 KeycapFace = new Color32(222, 222, 222, 255);
     private static readonly Color32 KeycapBottom = new Color32(184, 184, 184, 255);
     private static readonly Color32 KeycapBorder = new Color32(48, 48, 48, 255);
-    private static readonly Color KeycapTextColor = new Color32(38, 38, 38, 255);
-    private const float SkipKeycapWidth = 104f;
-    private const float SkipKeycapHeight = 40f;
+    internal static readonly Color KeycapTextColor = new Color32(38, 38, 38, 255);
+    internal const float SkipKeycapWidth = 104f;
+    internal const float SkipKeycapHeight = 40f;
 
     private BossEncounterDirector _director;
 
@@ -659,7 +660,7 @@ public sealed class BossIntroPresentation : MonoBehaviour
     }
 
     // 키캡 — 둥근 사각형 몸통(아랫단 25% 어둡게 = 입체감) + 진한 테두리 3px, 안티에일리어싱.
-    private static Sprite KeycapSprite(int width, int height)
+    internal static Sprite KeycapSprite(int width, int height)
     {
         const float radius = 9f;
         const float border = 3f;
@@ -688,7 +689,7 @@ public sealed class BossIntroPresentation : MonoBehaviour
     }
 
     // 키 아이콘 외곽선 — 둥근 사각형 테두리(안티에일리어싱). 런타임 생성이라 아트 에셋이 필요 없다.
-    private static Sprite RoundedOutlineSprite(int width, int height, float radius, float thickness)
+    internal static Sprite RoundedOutlineSprite(int width, int height, float radius, float thickness)
     {
         var tex = new Texture2D(width, height, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
         var pixels = new Color32[width * height];

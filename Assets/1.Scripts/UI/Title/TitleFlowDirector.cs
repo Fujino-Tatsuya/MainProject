@@ -1,26 +1,23 @@
+using System.Collections;
 using Unity.Cinemachine;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 public enum TitleFlowState
 {
     Idle,
     Approaching,
-    Menu,
-    Settings,
     Starting,
-    Exiting,
 }
 
 /// <summary>
-/// 타이틀 연출의 단일 진입점. PRESS ANY KEY → 카메라 인 → 모니터 안 메뉴 → 설정/시작/종료.
+/// 타이틀 연출의 단일 진입점. Press 캡슐 → 아무 키 → 카메라가 모니터로 다가감 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비.
+/// 다가가는 중 ESC = 꺼짐 없이 바로 검정 페이드 → 로비.
 /// </summary>
 /// <remarks>
-/// 🔴 <b>모든 입력과 버튼은 여기를 거친다.</b> <see cref="TitleSceneManager"/> 의 ESC 처리와
-/// 씬에 박힌 영구 UnityEvent 를 그대로 두면 상태 검사를 우회해 연출 중에 옵션창이 열린다.
-/// 씬의 버튼 콜백은 이 컴포넌트의 메서드로 재지정할 것.
+/// 10-26(경석 — PLAN-title-start-settings-tabs) 모니터 안 메뉴(시작·설정·나가기)와 타이틀 설정창을 지웠다.
+/// 설정·종료는 로비 ESC 메뉴(<see cref="GameMenuController"/>)에서 한다.
+/// 🔴 모든 입력은 여기를 거친다 — <see cref="TitleSceneManager"/> 는 씬 전환·페이드만 한다.
 /// </remarks>
 [DisallowMultipleComponent]
 public sealed class TitleFlowDirector : MonoBehaviour
@@ -29,7 +26,6 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [SerializeField] private CinemachineBrain _brain;
     [SerializeField] private CinemachineCamera _vcamFar;
     [SerializeField] private CinemachineCamera _vcamNear;
-    [SerializeField] private CinemachineCamera _vcamCloseup;
 
     [Tooltip("활성 vcam 에 줄 우선순위.")]
     [SerializeField] private int _activePriority = 30;
@@ -40,61 +36,32 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("Far→Near 이동 시간(초). 🔴 이 값이 유일한 원본 — 시작할 때 Brain 의 Default Blend 시간을 이 값으로 덮는다.")]
     [SerializeField, Min(0.1f)] private float _approachDuration = 3f;
 
-    [Tooltip("도착하면 CinemachineBrain 을 끈다. Play 중에 Main Camera 를 직접 옮겨 보며 구도를 잡을 수 있다.\n" +
-             "(맞춘 값은 Play 종료 전에 Main Camera Transform 을 Copy → VCam_Near 에 Paste)")]
-    [SerializeField] private bool _releaseCameraOnArrive = true;
-
     [Header("중앙 모니터")]
-    [Tooltip("중앙 CRT 화면 표시(로고 ↔ UI 렌더텍스처). 비면 화면 전환 없이 기존처럼 동작.")]
+    [Tooltip("중앙 CRT 화면 표시(로고 · 꺼짐). 비면 꺼짐 없이 바로 페이드.")]
     [SerializeField] private TitleMonitorDisplay _monitorDisplay;
+
+    [Tooltip("도착한 뒤 모니터 화면이 CRT 처럼 꺼지는 시간(초). 끝나면 검정 페이드 → 로비.")]
+    [SerializeField, Min(0.05f)] private float _powerOffDuration = 1.1f;
 
     [Header("CRT 연출 (계획서 §0 · Codex 연출 검토 09-23)")]
     [Tooltip("상시 CRT 시간·찢김·글리치 버스트 구동.")]
     [SerializeField] private TitleCrtFx _crtFx;
 
-    [Tooltip("Exit 의 전체 화면 CRT 꺼짐. Start 는 시작 연출(TitleStartDive)이 실패할 때만 쓴다.")]
-    [SerializeField] private TitlePowerOff _powerOff;
-
-    [Tooltip("게임 시작 연출(모니터 꺼짐 → 검은 화면 속으로 → 페이드 → 로비). 비우면 이 오브젝트에 기본값으로 붙인다.")]
-    [SerializeField] private TitleStartDive _startDive;
-
     // 화면 전환 순간의 지직거림(팀장 10-13 — 인스펙터에서 조절). x = 세기(0~1), y = 길이(초).
     // 상시 지직거림·찢김은 TitleCrtFx, CRT 화면 효과는 TitleMonitorDisplay 인스펙터.
     [Header("전환 지직거림 (x = 세기 0~1, y = 길이 초)")]
-    [Tooltip("PRESS ANY KEY 뒤 모니터로 다가갈 때.")]
+    [Tooltip("Press 뒤 모니터로 다가갈 때.")]
     [SerializeField] private Vector2 _approachBurst = new(0.8f, 0.25f);
-    [Tooltip("메뉴가 뜰 때(로고 → 메뉴 화면 전환).")]
-    [SerializeField] private Vector2 _menuBurst = new(0.9f, 0.28f);
-    [Tooltip("설정창을 열 때.")]
-    [SerializeField] private Vector2 _settingsBurst = new(0.5f, 0.16f);
-    [Tooltip("게임 시작을 누를 때.")]
+    [Tooltip("도착해 모니터가 꺼지기 시작할 때.")]
     [SerializeField] private Vector2 _startBurst = new(0.35f, 0.1f);
-    [Tooltip("종료를 누를 때.")]
-    [SerializeField] private Vector2 _exitBurst = new(0.35f, 0.1f);
-
-    [Header("설정창")]
-    [Tooltip("타이틀에서 연 설정창(탭+내용) 배율. 모니터 RT 에 다시 찍혀 글씨가 작아져 키운다 — 공유 프리팹·ESC 는 그대로.\n" +
-             "1.4 = 모니터 캔버스(약 ±858 × ±604)와 Options 제목 안쪽.")]
-    [SerializeField, Range(1f, 1.6f)] private float _titleSettingsScale = 1.4f;
-    [Tooltip("타이틀 설정창 세로 위치(캔버스 단위, + = 위). 모니터 화면 안쪽이 아래 베젤 쪽으로 좁아 보여\n" +
-             "가운데에 두면 내려가 보였다(경석 10-20 Play) — 60 만큼 올림. Play 중 바꾸면 바로 반영.")]
-    [SerializeField, Range(-200f, 200f)] private float _titleSettingsOffsetY = 60f;
 
     [Header("UI 루트")]
-    [Tooltip("PRESS ANY KEY — 화면 앞 오버레이(모니터 안이 아니다).")]
+    [Tooltip("Press 캡슐 — 화면 앞 오버레이(모니터 안이 아니다).")]
     [SerializeField] private GameObject _pressAnyKeyRoot;
-    [SerializeField] private GameObject _menuRoot;
-    // 설정창은 씬에 없다 — DDOL GameMenuController 가 모니터 RT 에 띄운다(PLAN-settings-ddol).
 
     [Header("오버레이 (전체화면)")]
-    [Tooltip("우측 하단 'ESC 로 건너뛰기' 안내. 접근 구간에만 켠다.")]
+    [Tooltip("우측 하단 'Esc 건너뛰기' 안내(TitleSkipHint — 보스 스킵 위젯 모양, 누르면 바로). 접근 구간에만 켠다.")]
     [SerializeField] private GameObject _skipHintRoot;
-
-    [Header("버튼")]
-    [SerializeField] private Button _startButton;
-    [SerializeField] private Button _optionButton;
-    [SerializeField] private Button _exitButton;
-    [SerializeField] private Button _settingsCloseButton;
 
     [Header("연동")]
     [SerializeField] private TitleSceneManager _sceneManager;
@@ -108,18 +75,13 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [SerializeField] private string _enterBurstId = "glitch";
     [SerializeField] private string _approachSustainId = "approach";
 
-    // 블렌드가 Brain 에 등록되기 전(첫 프레임)의 ESC 는 무시한다. 그 전에 끊으면 스냅이 안 된다.
-    private const float SkipGuardSeconds = 0.05f;
+    // 블렌드가 Brain 에 등록되기 전(첫 프레임)에는 "블렌드 끝"으로 보지 않는다.
+    private const float BlendGuardSeconds = 0.05f;
 
     private TitleFlowState _state = TitleFlowState.Idle;
     private float _approachElapsed;
-    private GameObject _lastSelected;
 
     public TitleFlowState State => _state;
-
-    /// <summary>연출·전환 중이라 UI 입력을 받으면 안 되는 구간.</summary>
-    public bool InputLocked =>
-        _state is TitleFlowState.Approaching or TitleFlowState.Starting or TitleFlowState.Exiting;
 
     private void Awake()
     {
@@ -135,8 +97,6 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         if (_sceneManager == null)
             _sceneManager = FindAnyObjectByType<TitleSceneManager>();
-
-        BindButtons();
     }
 
     private void Start()
@@ -144,9 +104,8 @@ public sealed class TitleFlowDirector : MonoBehaviour
         EnterIdle();
     }
 
-    // 🔴 렌즈(FOV 등)의 원본은 VCam_Far/Near/Closeup 의 **Lens** 다. Main Camera 의 FOV 칸은 CinemachineBrain 이
+    // 🔴 렌즈(FOV 등)의 원본은 VCam_Far/Near 의 **Lens** 다. Main Camera 의 FOV 칸은 CinemachineBrain 이
     //    에디트 모드에서도([ExecuteAlways]) 활성 vcam 값으로 덮어써서 바꿔도 안 먹는다 — 정상 동작.
-    //    (10-06 "시작 시 Main Camera → vcam 복사"를 넣었다가 되돌렸다: Main Camera 값이 이미 Far 라 Near·Closeup 을 덮었다.)
     //    심도(F값·초점 거리·초점 길이)는 카메라가 아니라 볼륨의 Depth Of Field 가 정한다(URP 규칙).
 
     private void Update()
@@ -161,19 +120,6 @@ public sealed class TitleFlowDirector : MonoBehaviour
             case TitleFlowState.Approaching:
                 TickApproaching();
                 break;
-
-            case TitleFlowState.Menu:
-                ReleaseSelectionOnMouseMove();
-                RestoreSelectionIfNavigating(_startButton);
-                break;
-
-            case TitleFlowState.Settings:
-                // 드롭다운이 펼쳐져 있었으면 그 ESC 는 목록 닫기 몫 — 설정창은 그대로(검토 10-22).
-                if (CancelPressed() && !(GameMenuController.Instance != null && GameMenuController.Instance.DropdownClaimsEscape))
-                    CloseSettings();
-                else
-                    RestoreSelectionIfNavigating(SettingsCloseButton);
-                break;
         }
     }
 
@@ -185,14 +131,12 @@ public sealed class TitleFlowDirector : MonoBehaviour
         ActivateCamera(_vcamFar);
 
         SetActive(_pressAnyKeyRoot, true);
-        SetActive(_menuRoot, false);
-        HideSettings();
         SetActive(_skipHintRoot, false);
 
         if (_monitorDisplay != null)
             _monitorDisplay.ShowLogo();
         if (_crtFx != null)
-            _crtFx.AmbientBursts = true; // 로고가 지직거린다
+            _crtFx.AmbientBursts = true; // 로고·Press 캡슐이 지직거린다
 
         Debug.Log("[TitleFlow] Idle");
     }
@@ -202,17 +146,13 @@ public sealed class TitleFlowDirector : MonoBehaviour
         _state = TitleFlowState.Approaching;
         _approachElapsed = 0f;
 
-        // 🔴 캔버스를 통째로 끈다. GraphicRaycaster 까지 죽어야 연출 중 클릭이 확실히 무시된다.
+        // 🔴 캔버스를 통째로 끈다 — 연출 중 Press 캡슐이 남지 않게.
         SetActive(_pressAnyKeyRoot, false);
-        SetActive(_menuRoot, false);
-        HideSettings();
         SetActive(_skipHintRoot, true);
 
         Burst(_approachBurst);
+        // 접근하는 동안엔 로고가 계속 지직거리고, 도착하면 꺼진다(EnterStarting).
 
-        // 접근하는 동안엔 로고가 계속 지직거리고, 도착하는 순간 메뉴로 바뀐다(팀장 09-23 — EnterMenu 에서 ShowUI).
-
-        ClearSelection();
         ActivateCamera(_vcamNear);
 
         if (_burstFx != null)
@@ -228,170 +168,54 @@ public sealed class TitleFlowDirector : MonoBehaviour
         if (_sustainFx != null)
             _sustainFx.DriveSustain(_approachSustainId, Mathf.Clamp01(_approachElapsed / _approachDuration));
 
-        // 첫 프레임에는 Brain 이 아직 블렌드를 만들지 않았다. 그 구간의 ESC 는 보류한다.
-        if (_approachElapsed >= SkipGuardSeconds && CancelPressed())
+        // ESC = 꺼짐 없이 바로 검정 페이드 → 로비(경석 10-26). 카메라는 페이드 아래에서 계속 다가간다.
+        if (CancelPressed())
         {
-            // 진행 중 블렌드를 즉시 완료시킨다. DefaultBlend 를 바꾸는 것은 소급 적용되지 않는다.
-            if (_brain != null)
-                _brain.ActiveBlend = null;
-
-            Debug.Log("[TitleFlow] 접근 스킵");
+            Debug.Log("[TitleFlow] 접근 스킵 → 바로 페이드");
+            EnterStarting(powerOff: false);
+            return;
         }
 
-        bool blendFinished = _approachElapsed >= SkipGuardSeconds &&
+        bool blendFinished = _approachElapsed >= BlendGuardSeconds &&
                              (_brain == null || _brain.ActiveBlend == null);
         bool timedOut = _approachElapsed >= _approachDuration + 0.5f;
 
         if (blendFinished || timedOut)
-            EnterMenu();
+            EnterStarting(powerOff: true);
     }
 
-    private void EnterMenu()
+    private void EnterStarting(bool powerOff)
     {
-        _state = TitleFlowState.Menu;
+        _state = TitleFlowState.Starting;
 
         if (_sustainFx != null)
             _sustainFx.Stop();
-
         SetActive(_skipHintRoot, false);
-        HideSettings();
-        SetActive(_menuRoot, true);
-        if (_monitorDisplay != null)
+
+        Debug.Log($"[TitleFlow] Starting (모니터 꺼짐 {powerOff})");
+
+        if (_sceneManager == null)
         {
-            _monitorDisplay.ShowUI(); // 도착 — 로고 → START / SETTING / EXIT
-            _monitorDisplay.SetSettingsReadable(false);   // 설정창에서 돌아오면 CRT 원래 세기
-        }
-        if (_crtFx != null)
-            _crtFx.AmbientBursts = false; // 메뉴에선 끈다 — 클릭 판정이 흔들리지 않게
-        Burst(_menuBurst); // 화면 전환은 강한 버스트 한 번으로
-
-        // 🔴 처음부터 START 를 선택하면 Selected 색이 hover 처럼 보여 혼자 밝다(팀장 09-28).
-        // 셋 다 같은 색으로 시작하고, 키보드·패드 첫 입력 때 START 부터 잡히게 기억만 해 둔다.
-        ClearSelection();
-        _lastSelected = _startButton != null ? _startButton.gameObject : null;
-
-        if (_releaseCameraOnArrive && _brain != null && _brain.enabled)
-            StartCoroutine(ReleaseCameraNextFrame());
-
-        Debug.Log("[TitleFlow] Menu");
-    }
-
-    /// <summary>
-    /// 🔴 한 프레임 미룬다 — ESC 스킵은 <c>ActiveBlend = null</c> 직후 같은 프레임에 여기로 오는데,
-    /// 카메라를 Near 로 옮기는 건 Brain 의 LateUpdate 다. 바로 끄면 카메라가 중간에 멈춘다.
-    /// </summary>
-    private System.Collections.IEnumerator ReleaseCameraNextFrame()
-    {
-        yield return null;
-        if (_brain != null && _state is TitleFlowState.Menu or TitleFlowState.Settings)
-        {
-            _brain.enabled = false;
-            Debug.Log("[TitleFlow] 카메라 해제 — 이제 Main Camera 를 직접 옮길 수 있다");
-        }
-    }
-
-    // ── 버튼 진입점 (씬의 UnityEvent 는 이쪽으로 재지정한다) ──────────────
-
-    // 🔴 타이틀 설정창은 RT(1536×1080)에 그려져 3D 모니터에 다시 찍히므로 글자가 화면에서 작아진다(18 → 약 12px).
-    //    공유 프리팹(SettingsBody — ESC 도 씀)은 그대로 두고 타이틀에서만 통째로 키운다(팀장 10-13).
-    //    1.4배 = 탭+내용 묶음 ±722 × (+328~-428) — 모니터 캔버스(약 ±858 × ±604)와 Options 제목(위 +408~) 안쪽.
-    //    배율 = 인스펙터 _titleSettingsScale(Play 중 바꾸면 OnValidate 로 바로 반영).
-    //    설정창 자체는 DDOL GameMenuController(PLAN-settings-ddol) — 타이틀을 떠나면 그쪽이 원래 크기로 되돌린다.
-    private void OnValidate()
-    {
-        if (Application.isPlaying && _state == TitleFlowState.Settings && GameMenuController.Instance != null)
-            GameMenuController.Instance.ApplyTitleSettingsLayout(_titleSettingsScale, _titleSettingsOffsetY);
-    }
-
-    private Button SettingsCloseButton =>
-        GameMenuController.Instance != null ? GameMenuController.Instance.SettingsCloseButton : _settingsCloseButton;
-
-    private static void HideSettings()
-    {
-        GameMenuController menu = GameMenuController.Instance;
-        if (menu != null && menu.Mode == GameMenuMode.Title && menu.IsOpen)
-            menu.CloseTitleSettings();
-    }
-
-    public void OpenSettings()
-    {
-        if (InputLocked || _state == TitleFlowState.Settings)
-            return;
-
-        GameMenuController menu = GameMenuController.Instance;
-        if (menu == null)
-        {
-            Debug.LogWarning("[TitleFlow] GameMenuController 가 없다 — 0.BootStrapScene 을 거치지 않은 Play 에서는 설정창이 열리지 않는다.", this);
+            Debug.LogError("[TitleFlow] TitleSceneManager 가 없다 — 로비로 갈 수 없다.", this);
             return;
         }
 
-        _state = TitleFlowState.Settings;
-
-        SetActive(_menuRoot, false);
-        menu.OpenTitleSettings(_titleSettingsScale, _titleSettingsOffsetY, CloseSettings);
-        // 설정창은 글이 작아 CRT 에 묻힌다 — 열린 동안 CRT 효과 95% 감소(팀장 10-12 70% → 10-13 95%). 닫으면 EnterMenu 가 되돌린다.
-        if (_monitorDisplay != null)
-            _monitorDisplay.SetSettingsReadable(true);
-        Burst(_settingsBurst);
-        // 🔴 줌하지 않는다(팀장 09-23) — 메뉴가 보이던 Near 뷰 그대로 모니터 내용만 설정창으로 바뀐다.
-        //    예전엔 VCam_Closeup 으로 한 번 더 들어가 설정창이 화면 밖으로 잘렸다. Closeup vcam 은 남겨 두되 안 쓴다.
-
-        Select(SettingsCloseButton);
-
-        Debug.Log("[TitleFlow] Settings");
-    }
-
-    public void CloseSettings()
-    {
-        if (_state != TitleFlowState.Settings)
-            return;
-
-        EnterMenu(); // 카메라는 이미 Near — 건드리지 않는다
-    }
-
-    public void StartGame()
-    {
-        if (InputLocked || _sceneManager == null)
-            return;
-
-        _state = TitleFlowState.Starting;
-        ClearSelection();
-        if (_crtFx != null)
-            _crtFx.AmbientBursts = true; // 메뉴에서 끈 지직거림을 시작 연출 동안 되살린다 — 입력은 이미 잠겼다
-        Burst(_startBurst);
-        Debug.Log("[TitleFlow] Starting");
-
-        // Start: 중앙 모니터가 월드에서 꺼지고 → 카메라가 그 검은 화면으로 천천히 들어가며 → 검정 페이드 → 로비(팀장 10-03).
-        // ⚠️ 09-23 "딱 꺼지게(페이드 없음)" 를 바꿨다. 시작 연출을 못 하면(참조 누락) 예전 전체 화면 꺼짐으로 간다.
-        if (_startDive == null) _startDive = GetComponent<TitleStartDive>();
-        if (_startDive == null) _startDive = gameObject.AddComponent<TitleStartDive>();   // ?? 금지 — 에디터의 가짜 null 을 못 거른다
-        if (!_startDive.TryPlay(_monitorDisplay, _brain, _sceneManager))
-            PowerOffThenLobby();
-    }
-
-    public void ExitGame()
-    {
-        if (InputLocked || _sceneManager == null)
-            return;
-
-        _state = TitleFlowState.Exiting;
-        ClearSelection();
-        Burst(_exitBurst);
-        Debug.Log("[TitleFlow] Exiting");
-
-        // Exit 도 같은 꺼짐(팀장 09-23).
-        if (_powerOff != null)
-            _powerOff.Play(_sceneManager.ExitGameImmediate);
+        if (powerOff && _monitorDisplay != null && _monitorDisplay.isActiveAndEnabled)
+        {
+            Burst(_startBurst);
+            StartCoroutine(PowerOffThenLobby());
+        }
         else
-            _sceneManager.ExitGame();
-    }
-
-    private void PowerOffThenLobby()
-    {
-        if (_powerOff != null)
-            _powerOff.Play(_sceneManager.StartGameImmediate);
-        else
+        {
             _sceneManager.StartGame();
+        }
+    }
+
+    // 🔴 로비 전환은 TitleSceneManager.StartGame 하나로 — 그게 검정 페이드 완료 후 로비로 간다(로비는 진입 시 페이드 인).
+    private IEnumerator PowerOffThenLobby()
+    {
+        yield return _monitorDisplay.PowerOff(_powerOffDuration);
+        _sceneManager.StartGame();
     }
 
     // x = 세기, y = 길이(초) — 인스펙터 「전환 지직거림」.
@@ -419,101 +243,14 @@ public sealed class TitleFlowDirector : MonoBehaviour
         return false;
     }
 
-    /// <summary>ESC 또는 패드 B. 🔴 uGUI Button 은 ICancelHandler 를 구현하지 않아 직접 읽어야 한다.</summary>
+    /// <summary>ESC 또는 패드 B.</summary>
     private static bool CancelPressed()
     {
-        // 키 변경 중 Esc = 변경 취소(설정창 KeyRebindRow) — 설정 화면을 닫지 않는다.
-        if (KeyRebindRow.IsRebinding)
-            return false;
-
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             return true;
 
         Gamepad pad = Gamepad.current;
         return pad != null && pad.buttonEast.wasPressedThisFrame;
-    }
-
-    private static bool NavigationPressed()
-    {
-        Keyboard kb = Keyboard.current;
-        if (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame ||
-                           kb.leftArrowKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame))
-        {
-            return true;
-        }
-
-        Gamepad pad = Gamepad.current;
-        if (pad == null)
-            return false;
-
-        return pad.dpad.up.wasPressedThisFrame || pad.dpad.down.wasPressedThisFrame ||
-               pad.dpad.left.wasPressedThisFrame || pad.dpad.right.wasPressedThisFrame ||
-               pad.leftStick.up.wasPressedThisFrame || pad.leftStick.down.wasPressedThisFrame;
-    }
-
-    // ── 선택 관리 ──────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// 🔴 BootStrap 의 EventSystem 이 <c>m_DeselectOnBackgroundClick: 1</c> 이라
-    /// 빈 곳을 클릭하면 선택이 풀리고 그 뒤 방향키·패드가 먹통이 된다.
-    /// 마우스 사용자를 방해하지 않도록 <b>네비게이션 입력이 들어온 순간에만</b> 복구한다.
-    /// </summary>
-    private void RestoreSelectionIfNavigating(Button fallback)
-    {
-        EventSystem es = EventSystem.current;
-        if (es == null)
-            return;
-
-        if (es.currentSelectedGameObject != null)
-        {
-            _lastSelected = es.currentSelectedGameObject;
-            return;
-        }
-
-        if (!NavigationPressed())
-            return;
-
-        if (_lastSelected != null && _lastSelected.activeInHierarchy)
-            es.SetSelectedGameObject(_lastSelected);
-        else
-            Select(fallback);
-    }
-
-    /// <summary>
-    /// 마우스를 움직이면 키보드로 잡은 선택을 푼다 — 안 풀면 커서가 떠난 버튼이 Selected 색으로 남아
-    /// "hover 가 아니면 원래 색" 이 깨진다. 다음 키 입력 때 <see cref="_lastSelected"/> 로 복원된다.
-    /// </summary>
-    private void ReleaseSelectionOnMouseMove()
-    {
-        Mouse mouse = Mouse.current;
-        EventSystem es = EventSystem.current;
-        if (mouse == null || es == null || es.currentSelectedGameObject == null)
-            return;
-
-        if (mouse.delta.ReadValue().sqrMagnitude > 0f)
-        {
-            _lastSelected = es.currentSelectedGameObject;
-            es.SetSelectedGameObject(null);
-        }
-    }
-
-    private void Select(Button button)
-    {
-        EventSystem es = EventSystem.current;
-        if (es == null || button == null)
-            return;
-
-        es.SetSelectedGameObject(button.gameObject);
-        _lastSelected = button.gameObject;
-    }
-
-    private void ClearSelection()
-    {
-        EventSystem es = EventSystem.current;
-        if (es != null)
-            es.SetSelectedGameObject(null);
-
-        _lastSelected = null;
     }
 
     // ── 유틸 ───────────────────────────────────────────────────────────────
@@ -522,31 +259,12 @@ public sealed class TitleFlowDirector : MonoBehaviour
     {
         SetPriority(_vcamFar, target == _vcamFar);
         SetPriority(_vcamNear, target == _vcamNear);
-        SetPriority(_vcamCloseup, target == _vcamCloseup);
     }
 
     private void SetPriority(CinemachineCamera vcam, bool active)
     {
         if (vcam != null)
             vcam.Priority = active ? _activePriority : _idlePriority;
-    }
-
-    private void BindButtons()
-    {
-        Bind(_startButton, StartGame);
-        Bind(_optionButton, OpenSettings);
-        Bind(_exitButton, ExitGame);
-        Bind(_settingsCloseButton, CloseSettings);
-        // 설정창 틀 안의 닫기 버튼은 GameMenuController 가 OpenTitleSettings 의 onClose(= CloseSettings)로 잇는다.
-    }
-
-    private static void Bind(Button button, UnityEngine.Events.UnityAction action)
-    {
-        if (button == null)
-            return;
-
-        button.onClick.RemoveListener(action);
-        button.onClick.AddListener(action);
     }
 
     private static void SetActive(GameObject target, bool active)

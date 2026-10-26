@@ -78,17 +78,6 @@ public sealed class TitleCrtFx : MonoBehaviour
 
     public void Unregister(Material m) => _targets.Remove(m);
 
-    // 머티리얼별 찢김·글리치 배율(없으면 1). 설정창이 열린 동안 중앙 모니터만 줄인다 — 벽 모니터는 그대로(팀장 10-12).
-    private readonly Dictionary<Material, float> _effectScale = new();
-
-    /// <summary>이 머티리얼의 찢김 폭·글리치 세기 배율(1 = 원래). <see cref="TitleMonitorDisplay.SetSettingsReadable"/> 가 쓴다.</summary>
-    public void SetEffectScale(Material m, float scale)
-    {
-        if (m == null) return;
-        if (Mathf.Approximately(scale, 1f)) _effectScale.Remove(m);
-        else _effectScale[m] = Mathf.Clamp01(scale);
-    }
-
     /// <summary>글리치 버스트. 즉시 피크 → 감쇠. 진행 중인 버스트보다 약하면 무시된다.</summary>
     public void Burst(float strength, float duration)
     {
@@ -133,9 +122,8 @@ public sealed class TitleCrtFx : MonoBehaviour
             Material m = _targets[i];
             if (m == null) { _targets.RemoveAt(i); continue; }
             m.SetFloat(IdTime, _time);
-            float k = _effectScale.TryGetValue(m, out float s) ? s : 1f;
-            m.SetFloat(IdGlitch, glitch * k);
-            m.SetVector(IdTear, k < 1f ? new Vector4(_tear.x, _tear.y, _tear.z * k, _tear.w) : _tear);   // z = 가로 밀림 폭
+            m.SetFloat(IdGlitch, glitch);
+            m.SetVector(IdTear, _tear);   // z = 가로 밀림 폭
         }
     }
 
