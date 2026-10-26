@@ -26,7 +26,9 @@ MonoBehaviour:
     m_Bits: 17664
   blockingLayers:
     serializedVersion: 2
-    m_Bits: 1050753
+    m_Bits: 1050761
+  aimHeightAboveGround: 1
+  levelTolerance: 0.3
   triggersOnHit: 1
   windupStateName: Gunner_Attack_Start
   fireStateName: Gunner_Attack_Fire

@@ -30,6 +30,7 @@ internal static class PlayerEditModeTestRunner
         "^GunnerAnimEventAuthoringTests$", // PLAN-anim-event-timing P3 — 거너 클립 이벤트 저작: 상태 속도 환산·정규화·병합(사용자 위치 보존)
         "^GunnerSkillEventRulesTests$", // PLAN-anim-event-timing P3 — 거너 R 레이저 Custom0 생성 위치·대상(대상 사망 시 시전 위치·재탐색), 우클릭 Hit·End 요구·후폭풍 Hit 출발(P3-2 ①)
         "^GunnerAttackFacingModelTests$", // 할 일 27 — 원인별 회전 잠금 토큰·평타 발 단위 잠금·발 사이 제한 회전
+        "^GunnerLaserPitchRulesTests$", // 할 일 93 — 거너 평타 지면 조준: 평지 수평·높은 단 올려/낮은 곳 내려 쏘기·허용치 경계·상한 60°·수평 거리 0
         "^AttackTurnTimingTests$", // 할 일 43 — 근접 평타 다 돈 뒤 공격: 각 → 회전 지연·스냅 각·오너 지연 상한
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게(맥동·플래시 끔)
         "^ShieldVignetteModelTests$", // 로컬 실드 비네팅 — 표시 여부·고정 알파 페이드 인/아웃

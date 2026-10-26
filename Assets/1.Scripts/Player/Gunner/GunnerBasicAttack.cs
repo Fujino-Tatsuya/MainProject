@@ -23,6 +23,8 @@ using UnityEngine;
 /// <see cref="GunnerBasicAttackData.BetweenShotTurnSpeed"/> 로 돈다. 발 잠금 = 첫 발은 공격 시작 ~ 발사 + ShotLockTail,
 /// 이어지는 발은 발사 − ShotLockLead ~ 발사 + ShotLockTail(잠근 순간의 몸 방향). 🔴 잠금은 오너 시계만으로 돈다 —
 /// 오너가 방향을 발사 요청에 실어 보내고 서버는 그대로 쏘기만 한다(서버는 몸을 돌리거나 잠금을 검증하지 않는다, 2026-10-13).
+/// 기울기(할 일 93, <see cref="GunnerLaserPitchRules"/>): 몸은 늘 수평이고, 방향을 잠그는 순간 마우스 지면 높이가 발과 다르면
+/// 레이저만 지면 + aimHeightAboveGround 를 향해 위·아래로 기운다(평지 수평, 상한 60°). 발사 요청의 방향에 y 로 실린다.
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(GunnerHeat))]
@@ -76,6 +78,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private bool ownerQueued;              // 오너 쪽 입력 창 예약 — 서버 예약과 같은 규칙
     private bool ownerPreLocked;           // 다음 발을 위해 발사 전에 미리 잠갔는가(오너 시계)
     private bool ownerFinishing;           // 스킬 예약 — 지금 발로 마무리(누름·창 예약 무시, 할 일 44)
+    private Vector3 ownerShotDirection;    // 잠근 발의 3D 방향(기울기 포함, 할 일 93) — 첫 발은 공격 시작, 이어지는 발은 미리 잠근 순간
 
     // 서버
     private bool hasQueuedShot;
@@ -141,6 +144,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
             return false;
 
         Vector3 direction = CurrentAim();
+        // 첫 발 기울기는 몸 방향을 잠그는 이 순간에 정해 들고 있다가 첫 발 요청에 싣는다. 시작 RPC 는 평면 방향만.
+        ownerShotDirection = PitchedShot(direction);
 
         if (!IsNetworkActive)
         {
@@ -234,7 +239,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         if (firstShotSent && !ownerPreLocked && OwnerChainsNextShot && !heat.IsOverheated
             && Time.time >= ownerLastShotTime + FireInterval - ShotLockLead)
         {
-            facing.BeginShot(movement.CurrentFacing);
+            ownerShotDirection = PitchedShot(facing.BeginShot(movement.CurrentFacing));
             ownerPreLocked = true;
         }
         if (!facing.IsShotLocked)
@@ -271,14 +276,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
                 ServerQueueShot();
         }
 
-        // 첫 발 — 준비가 끝나면 한 번만 요청한다. 방향은 공격 시작 때 잠근 조준이다.
+        // 첫 발 — 준비가 끝나면 한 번만 요청한다. 방향은 공격 시작 때 잠근 조준(+ 그때 정한 기울기)이다.
         if (!firstShotSent)
         {
             if (Time.time < startTime + WindupDuration || heat.IsOverheated)
                 return;
 
             firstShotSent = true;
-            RequestShot(facing.Direction);
+            RequestShot(ownerShotDirection);
             return;
         }
 
@@ -288,7 +293,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
             && Time.time >= ownerLastShotTime + FireInterval)
         {
             ownerQueued = false;
-            Vector3 shotDirection = ownerPreLocked ? facing.Direction : facing.BeginShot(movement.CurrentFacing);
+            Vector3 shotDirection = ownerPreLocked ? ownerShotDirection : PitchedShot(facing.BeginShot(movement.CurrentFacing));
             ownerPreLocked = false;
             RequestShot(shotDirection);
             return;
@@ -450,17 +455,16 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         if (heat.IsOverheated)
             return false;
 
-        // 오너가 잠근 방향으로 쏘기만 한다(할 일 27). 몸 회전·잠금은 오너 권한 — 서버는 돌리거나 검증하지 않는다(2026-10-13).
-        Vector3 direction = GunnerAttackFacingModel.Flatten(requested, movement.CurrentFacing);
+        // 오너가 잠근 방향(기울기 포함)으로 쏘기만 한다(할 일 27·93). 몸 회전·잠금은 오너 권한 — 서버는 돌리거나 검증하지 않는다(2026-10-13).
+        // 위·아래 상한만 같은 규칙으로 한 번 더 자른다.
+        Vector3 direction = GunnerLaserPitchRules.ClampPitch(requested, movement.CurrentFacing);
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
         int stage = heat.CurrentStage;
         int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus);
         int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heat.StageDamageMultiplier(stage)));
 
-        Vector3 origin = muzzle != null
-            ? muzzle.position
-            : transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 origin = MuzzleOrigin();
         bool hit = beam.Fire(origin, direction, data.Range, data.BeamWidth * 0.5f,
                              data.HittableLayers, data.BlockingLayers, damage, data.TriggersOnHit, out Vector3 end);
 
@@ -712,6 +716,20 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     }
 
     private Vector3 CurrentAim() => Flatten(aim != null ? aim.AimDirection : transform.forward);
+
+    // 판정선 출발점 — 서버 발사와 오너 기울기 계산이 같은 점을 쓴다.
+    private Vector3 MuzzleOrigin() =>
+        muzzle != null ? muzzle.position : transform.position + Vector3.up * data.MuzzleHeight;
+
+    // 잠근 평면 방향에 마우스 지면 높이에 따른 기울기를 붙인다(오너). 지면점이 없으면 수평 그대로.
+    private Vector3 PitchedShot(Vector3 flatDirection)
+    {
+        if (aim == null || !aim.HasAimGroundPoint)
+            return flatDirection;
+
+        return GunnerLaserPitchRules.AimDirection(flatDirection, MuzzleOrigin(), transform.position.y,
+            aim.AimGroundPoint, data.AimHeightAboveGround, data.LevelTolerance);
+    }
 
     private Vector3 Flatten(Vector3 direction)
     {

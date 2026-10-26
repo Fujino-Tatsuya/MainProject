@@ -51,8 +51,14 @@ public class GunnerBasicAttackData : ScriptableObject
     [Tooltip("대상 마스크 — 기본값 = Enemy·Projectile·EnemyHurtBox(가붕이 평타와 같음).")]
     [SerializeField] private LayerMask hittableLayers = 17664;
 
-    [Tooltip("지형 마스크 — 여기에 먼저 닿으면 그 지점에서 판정 종료. 기본값 = Default·Wall·Env·Barrier(할 일 32).")]
-    [SerializeField] private LayerMask blockingLayers = 1050753;
+    [Tooltip("지형 마스크 — 여기에 먼저 닿으면 그 지점에서 판정 종료. 기본값 = Default·Ground·Wall·Env·Barrier(할 일 32·93).")]
+    [SerializeField] private LayerMask blockingLayers = 1050761;
+
+    [Tooltip("높이가 다른 지면을 겨눌 때 조준점이 지면에서 얼마나 위인가(m). 레이저는 그 점을 향해 위·아래로 기운다(할 일 93).")]
+    [SerializeField, Min(0f)] private float aimHeightAboveGround = 1.0f;
+
+    [Tooltip("이 이내의 지면 높이 차는 같은 높이로 보고 수평으로 쏜다(m).")]
+    [SerializeField, Min(0f)] private float levelTolerance = 0.3f;
 
     [Tooltip("적중 시 적중 전 보너스(패시브·빌드)를 받을지.")]
     [SerializeField] private bool triggersOnHit = true;
@@ -80,6 +86,8 @@ public class GunnerBasicAttackData : ScriptableObject
     public float HeatPerShot => heatPerShot;
     public LayerMask HittableLayers => hittableLayers;
     public LayerMask BlockingLayers => blockingLayers;
+    public float AimHeightAboveGround => aimHeightAboveGround;
+    public float LevelTolerance => levelTolerance;
     public bool TriggersOnHit => triggersOnHit;
     public string WindupStateName => windupStateName;
     public string FireStateName => fireStateName;
