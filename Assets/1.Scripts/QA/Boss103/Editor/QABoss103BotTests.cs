@@ -36,21 +36,21 @@ public sealed class QABoss103BotTests
     // ── 단계 선택 ────────────────────────────────────────────
 
     [Test]
-    public void 판_번호_mod_3_은_보통_숙련_초보()
+    public void 판_번호_빼기_1_mod_3_은_보통_숙련_초보()
     {
-        Assert.AreEqual(QABoss103BotTier.Skilled, QABoss103Bot.TierForRun(1));
-        Assert.AreEqual(QABoss103BotTier.Beginner, QABoss103Bot.TierForRun(2));
-        Assert.AreEqual(QABoss103BotTier.Normal, QABoss103Bot.TierForRun(3));
-        Assert.AreEqual(QABoss103BotTier.Skilled, QABoss103Bot.TierForRun(4));
-        Assert.AreEqual(QABoss103BotTier.Normal, QABoss103Bot.TierForRun(0));
-        Assert.AreEqual(QABoss103BotTier.Beginner, QABoss103Bot.TierForRun(-1), "음수도 0~2 로 접는다");
+        Assert.AreEqual(QABoss103BotTier.Normal, QABoss103Bot.TierForRun(1), "판 1 = 보통");
+        Assert.AreEqual(QABoss103BotTier.Skilled, QABoss103Bot.TierForRun(2));
+        Assert.AreEqual(QABoss103BotTier.Beginner, QABoss103Bot.TierForRun(3));
+        Assert.AreEqual(QABoss103BotTier.Normal, QABoss103Bot.TierForRun(4));
+        Assert.AreEqual(QABoss103BotTier.Beginner, QABoss103Bot.TierForRun(0));
+        Assert.AreEqual(QABoss103BotTier.Skilled, QABoss103Bot.TierForRun(-1), "음수도 0~2 로 접는다");
     }
 
     [Test]
     public void 수동_단계가_판_번호보다_우선()
     {
         Assert.AreEqual(QABoss103BotTier.Beginner, QABoss103Bot.ResolveTier(1, QABoss103BotTier.Beginner));
-        Assert.AreEqual(QABoss103BotTier.Skilled, QABoss103Bot.ResolveTier(1, null));
+        Assert.AreEqual(QABoss103BotTier.Normal, QABoss103Bot.ResolveTier(1, null));
     }
 
     [Test]
@@ -64,13 +64,13 @@ public sealed class QABoss103BotTests
         var auto = new QABoss103Config { Seed = 7, Run = 2 };
         Assert.IsTrue(QABoss103Config.TryParse(auto.Format(), out QABoss103Config autoBack));
         Assert.IsNull(autoBack.Tier);
-        Assert.AreEqual(QABoss103BotTier.Beginner, autoBack.BotTier, "판 2 = 초보");
+        Assert.AreEqual(QABoss103BotTier.Skilled, autoBack.BotTier, "판 2 = 숙련");
 
         Assert.IsTrue(QABoss103Config.TryParse("run=3\ntier=beginner", out QABoss103Config lower));
         Assert.AreEqual(QABoss103BotTier.Beginner, lower.Tier, "대소문자 무관");
         Assert.IsTrue(QABoss103Config.TryParse("run=3\ntier=7", out QABoss103Config junk));
         Assert.IsNull(junk.Tier, "숫자·모르는 값은 자동");
-        Assert.AreEqual(QABoss103BotTier.Normal, junk.BotTier);
+        Assert.AreEqual(QABoss103BotTier.Beginner, junk.BotTier, "판 3 = 초보");
     }
 
     // ── 시드·조준 ────────────────────────────────────────────

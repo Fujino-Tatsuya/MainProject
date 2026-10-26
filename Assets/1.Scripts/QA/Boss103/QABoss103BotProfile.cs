@@ -11,12 +11,12 @@ public enum QABoss103BotTier
 
 /// <summary>
 /// 할 일 103 봇 프로필(단계별 변수 한 벌). 값은 사용자 확정 표 그대로(<see cref="For"/>) — 리포트에도 <see cref="Describe"/> 로 그대로 찍는다.
-/// C2 는 조준 오차·스킬 빈도만 쓰고, 패턴 피격 확률·반응 지연·간파 성공률은 C3(회피·간파·방어)가 쓰도록 보관만 한다.
+/// C2 전투 봇이 조준 오차·스킬 빈도를, C3(<c>QABoss103CombatBot.Evasion</c>)가 패턴 피격 확률·반응 지연·간파 성공률을 쓴다.
 /// </summary>
 public readonly struct QABoss103BotProfile
 {
     public readonly QABoss103BotTier Tier;
-    /// <summary>패턴 피격 확률(0~1) — C3 예고 회피가 쓴다.</summary>
+    /// <summary>패턴 피격 확률(0~1) — C3 예고 회피: 위험 1건마다 이 확률로 회피하지 않는다.</summary>
     public readonly double PatternHitChance;
     /// <summary>반응 지연(ms) — C3 가 쓴다.</summary>
     public readonly double ReactionMs;
@@ -61,12 +61,12 @@ public readonly struct QABoss103BotProfile
 public static class QABoss103Bot
 {
     /// <summary>
-    /// 판 번호 → 단계(C6 연속 루프가 이 순서로 번갈아 돈다): 판 번호 mod 3 → 0 보통 · 1 숙련 · 2 초보.
-    /// 판 1 = 숙련, 판 2 = 초보, 판 3 = 보통.
+    /// 판 번호 → 단계(C6 연속 루프가 이 순서로 번갈아 돈다): 판 번호가 1부터라 (판 번호 − 1) mod 3 → 0 보통 · 1 숙련 · 2 초보.
+    /// 판 1 = 보통, 판 2 = 숙련, 판 3 = 초보(사용자 확정 순서 보통 → 숙련 → 초보).
     /// </summary>
     public static QABoss103BotTier TierForRun(int run)
     {
-        switch (((run % 3) + 3) % 3)
+        switch ((((run - 1) % 3) + 3) % 3)
         {
             case 1: return QABoss103BotTier.Skilled;
             case 2: return QABoss103BotTier.Beginner;
@@ -83,6 +83,10 @@ public static class QABoss103Bot
         Aim = 1,
         Skill = 2,
         Move = 3,
+        /// <summary>C3 예고 회피 굴림(위험 1건 1회).</summary>
+        Dodge = 4,
+        /// <summary>C3 간파 성공/실패 굴림(창 1개 1회).</summary>
+        Counter = 5,
     }
 
     /// <summary>봇 RNG 시드 = 판 시드 × 자리(0 팔라딘·1 어쌔신·2 거너) × 용도. 같은 값 = 같은 굴림 순서.</summary>

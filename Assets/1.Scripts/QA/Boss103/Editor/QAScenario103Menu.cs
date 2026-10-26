@@ -62,7 +62,7 @@ public static class QAScenario103Menu
     {
         QABoss103Config cfg = Current;
         Debug.Log($"{QABoss103Plan.Tag} 설정 — 기준 시드 {cfg.Seed} · 판 {cfg.Run} · 판 시드 {cfg.RunSeed} · " +
-                  $"봇 단계 {cfg.BotTier}({(cfg.Tier.HasValue ? "수동" : "판 번호 mod 3")}) [{QABoss103BotProfile.For(cfg.BotTier).Describe()}] · 클론 {QANetSim88.CloneRoots().Count}개");
+                  $"봇 단계 {cfg.BotTier}({(cfg.Tier.HasValue ? "수동" : "(판 번호 − 1) mod 3")}) [{QABoss103BotProfile.For(cfg.BotTier).Describe()}] · 클론 {QANetSim88.CloneRoots().Count}개");
     }
 
     // ── 봇 단계 ──────────────────────────────────────────────

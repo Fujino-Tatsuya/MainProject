@@ -10,8 +10,8 @@ using UnityEngine;
 /// <item>거리 유지(<see cref="QABoss103Bot.DecideMove"/>, 보스 HurtBox 표면까지 수평 거리): 근접 = 2m 넘으면 1m 까지 붙음, 거너 = 6~9m(벗어나면 7.5m 로).
 ///   멈춰 있을 때만 평타(누르고 있음 — <see cref="QABoss103InputDriver.HoldBasic"/>)와 스킬을 쓴다.</item>
 /// <item>이동: 클라엔 NavMesh 가 없어 직선 이동 + 앞 바닥 레이캐스트(88 Approach 와 같은 낭떠러지 검사). 이동 중 2초 동안 0.3m 미만이면 옆걸음 0.8초(<see cref="QABoss103StuckDetector"/>).
-///   대시는 쓰지 않는다(C3 회피용 충전 보존).</item>
-/// <item>스킬 = Q(Main)·R(Ultimate)만 — 팔라딘 E·우클릭 간파·회피는 C3. 쿨이 돌면 프로필 확률로 굴리고 실패면 1초 뒤 다시(<see cref="QABoss103SkillGate"/>).
+///   대시는 이동에 쓰지 않는다 — 회피 전용(C3, <c>QABoss103CombatBot.Evasion.cs</c>).</item>
+/// <item>스킬 = Q(Main)·R(Ultimate). 팔라딘 E(방어)·우클릭 간파·대시 회피는 C3 파일. 쿨이 돌면 프로필 확률로 굴리고 실패면 1초 뒤 다시(<see cref="QABoss103SkillGate"/>).
 ///   팔라딘 Q = 홀드(스킬이 끝날 때까지, 상한 <see cref="HoldCapSeconds"/>), 거너 Q = 정신 집중 → 최대 충전(<c>MaxChargeTime</c>) 뒤 좌클릭 발사,
 ///   R(팔라딘·거너 = 대상 지정) = 23호 지정, 어쌔신 R = 변신(변신 중엔 R 을 다시 누르지 않는다 — Q·평타는 게임이 변신 판으로 바꾼다).</item>
 /// <item>조준 오차: 보스 위치(또는 스킬 목표점)에 프로필 반경 원판 균일 오프셋(<see cref="QABoss103Bot.AimOffset"/>) — 평타는 <see cref="AimResampleSeconds"/> 마다,
@@ -19,7 +19,7 @@ using UnityEngine;
 /// </list>
 /// 로그: 시작 <c>[QA103] event=bot_profile</c>, 주기 <c>event=bot_diag</c>, 끝 <c>event=bot_combat_done</c>.
 /// </summary>
-public sealed class QABoss103CombatBot : MonoBehaviour
+public sealed partial class QABoss103CombatBot : MonoBehaviour
 {
     private const string Tag = QABoss103Plan.Tag;
     private const float DiagSeconds = 10f;
@@ -90,6 +90,7 @@ public sealed class QABoss103CombatBot : MonoBehaviour
         bot._skillRng = new System.Random(QABoss103Bot.Seed(runSeed, bot._slot, QABoss103Bot.Stream.Skill));
         Debug.Log($"{Tag} event=bot_profile character={character} slot={bot._slot} runSeed={runSeed} {bot._profile.Describe()} " +
                   $"band={F(bot._band.Min)}/{F(bot._band.Settle)}/{F(bot._band.Max)} reflectMissing={bot._driver.Missing}");
+        bot.InitEvasion(runSeed);
         return bot;
     }
 
@@ -155,6 +156,7 @@ public sealed class QABoss103CombatBot : MonoBehaviour
         _input.SetMove(Vector3.zero);
         _driver.ReleaseBasic();
         StopHold();
+        FlushEvasion(reason);
         _move = QABoss103Bot.Move.Hold;
     }
 
@@ -195,6 +197,17 @@ public sealed class QABoss103CombatBot : MonoBehaviour
         // 체공(몸 콜라이더 꺼짐) 중엔 맞지 않는다 — 치지 않고 자리만 잡는다.
         bool hittable = _bossBody == null || _bossBody.enabled;
 
+        // C3 — 위험 감지·회피·간파가 먼저. 대시 중·방어 유지 중엔 공격 쪽 입력을 넣지 않는다.
+        double now = Time.realtimeSinceStartupAsDouble;
+        TickEvasion(me, myPos, surface, now);
+        TickCounter(me, myPos, surface, now);
+        if (EvasionHoldsBot(now))
+        {
+            _input.SetMove(Vector3.zero);
+            _driver.ReleaseBasic();
+            return;
+        }
+
         if (Time.time >= _nextAimResample)
         {
             _nextAimResample = Time.time + AimResampleSeconds;
@@ -209,7 +222,9 @@ public sealed class QABoss103CombatBot : MonoBehaviour
         bool canMoveInSkill = !inSkill || (skills != null && skills.ActiveSkill != null && skills.ActiveSkill.CanMoveWhileActive);
         bool attackBusy = _driver.IsBasicActive;
         Vector3 moveDir = Vector3.zero;
-        if (_move != QABoss103Bot.Move.Hold && canMoveInSkill && !attackBusy)
+        // 회피한 위험이 끝날 때까지는 다시 들어가지 않는다(물러나기는 그대로).
+        bool avoid = _move == QABoss103Bot.Move.Approach && AvoidingApproach(now);
+        if (_move != QABoss103Bot.Move.Hold && canMoveInSkill && !attackBusy && !avoid)
         {
             Vector3 toBoss = bossPos - myPos;
             toBoss.y = 0f;
@@ -435,12 +450,15 @@ public sealed class QABoss103CombatBot : MonoBehaviour
                   $"surfM={F(SurfaceDistance(myPos, bossPos))} hittable={(_bossBody == null || _bossBody.enabled ? "true" : "false")} " +
                   $"attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} rejects={_castRejects} gunnerFires={_gunnerFires} " +
                   $"rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks} " +
-                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth}");
+                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()}");
     }
 
     private void OnDestroy()
     {
         StopHold();
+        ReleaseGuard();
+        _sensor.Unbind();
+        RestoreDashMode();
         _driver.Release();
         if (_input != null)
         {
@@ -449,7 +467,7 @@ public sealed class QABoss103CombatBot : MonoBehaviour
         }
         Debug.Log($"{Tag} event=bot_combat_done character={_character} tier={_profile.Tier} attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} " +
                   $"transforms={_transforms} rejects={_castRejects} gunnerFires={_gunnerFires} rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} " +
-                  $"stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks}");
+                  $"stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks} {EvasionDiag()}");
     }
 
     private static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;

@@ -262,7 +262,7 @@ public static class QABoss103Match
     private static QABoss103CombatBot CreateFighter(QAScenarioContext ctx, QABoss103Config cfg, QABoss103Character character)
     {
         QABoss103CombatBot fighter = QABoss103CombatBot.Create(cfg.RunSeed, character, cfg.BotTier);
-        string source = cfg.Tier.HasValue ? "수동 지정" : $"판 {cfg.Run} mod 3";
+        string source = cfg.Tier.HasValue ? "수동 지정" : $"(판 {cfg.Run} − 1) mod 3";
         ctx.Eye($"103 봇 프로필({character})", $"{fighter.Profile.Describe()} · 단계 출처 {source}");
         return fighter;
     }
