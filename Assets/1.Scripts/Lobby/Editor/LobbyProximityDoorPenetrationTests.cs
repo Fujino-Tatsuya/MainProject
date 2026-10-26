@@ -102,12 +102,95 @@ public sealed class LobbyProximityDoorPenetrationTests
         Assert.That(LobbyProximityDoor.LeafBox(leaf, leaf.GetComponentsInChildren<Collider>(true), out _), Is.False);
     }
 
-    private static bool Overlaps(Transform leaf, CapsuleCollider body, float angle)
+    [Test]
+    public void BodyPoseArgument_WinsOverLaggingTransform()
+    {
+        // 보간 중인 transform 은 물리보다 뒤처진다 — 판정은 넘겨받은 루트 자세(Rigidbody.position)로 한다.
+        Transform leaf = CreateLeaf(Quaternion.identity);
+        BoxCollider box = leaf.gameObject.AddComponent<BoxCollider>();
+        box.center = LeafCenter;
+        box.size = LeafSize;
+        CapsuleCollider body = CreateBody(leaf.TransformPoint(new Vector3(-0.6f, 0.9f, 2.2f)));
+        Vector3 physicsPosition = leaf.TransformPoint(BodyInSwing);
+
+        Assert.That(Overlaps(leaf, body, 90f), Is.False, "transform 자리");
+        Assert.That(Overlaps(leaf, body, 90f, physicsPosition), Is.True, "물리 자리");
+    }
+
+    [Test]
+    public void PlayerPose_PrefersRigidbodyOverTransform()
+    {
+        GameObject player = new GameObject("Player");
+        createdObjects.Add(player);
+        player.transform.position = new Vector3(0f, TestY, 0f);
+        Rigidbody rigidbody = player.AddComponent<Rigidbody>();
+        rigidbody.isKinematic = true;
+        Physics.SyncTransforms();
+        Vector3 physicsPosition = new Vector3(0.4f, TestY, 0f);
+        rigidbody.position = physicsPosition;
+
+        LobbyProximityDoor.PlayerPose(player.transform, out Vector3 position, out _);
+
+        Assert.That(Vector3.Distance(position, physicsPosition), Is.LessThan(1e-4f));
+    }
+
+    [Test]
+    public void PlayerPose_WithoutRigidbody_UsesTransform()
+    {
+        GameObject player = new GameObject("Player");
+        createdObjects.Add(player);
+        player.transform.SetPositionAndRotation(new Vector3(1f, TestY, 2f), Quaternion.Euler(0f, 30f, 0f));
+
+        LobbyProximityDoor.PlayerPose(player.transform, out Vector3 position, out Quaternion rotation);
+
+        Assert.That(position, Is.EqualTo(player.transform.position));
+        Assert.That(Quaternion.Angle(rotation, player.transform.rotation), Is.LessThan(1e-3f));
+    }
+
+    [Test]
+    public void EnsureKinematicBody_NonConvexMesh_AddsKinematicBodyWithoutError()
+    {
+        Transform leaf = CreateLeaf(Quaternion.identity);
+        GameObject mesh = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.DestroyImmediate(mesh.GetComponent<BoxCollider>());
+        mesh.transform.SetParent(leaf, false);
+        MeshCollider meshCollider = mesh.AddComponent<MeshCollider>();
+        meshCollider.convex = false;
+        meshCollider.sharedMesh = mesh.GetComponent<MeshFilter>().sharedMesh;
+        Collider[] colliders = leaf.GetComponentsInChildren<Collider>(true);
+
+        Rigidbody body = LobbyProximityDoor.EnsureKinematicBody(leaf, colliders);
+
+        UnityEngine.TestTools.LogAssert.NoUnexpectedReceived();
+        Assert.That(body.gameObject, Is.SameAs(leaf.gameObject));
+        Assert.That(body.isKinematic, Is.True);
+        Assert.That(body.useGravity, Is.False);
+        Assert.That(body.interpolation, Is.EqualTo(RigidbodyInterpolation.None));
+        Assert.That(meshCollider.enabled, Is.True, "콜라이더 원복");
+        Assert.That(LobbyProximityDoor.EnsureKinematicBody(leaf, colliders), Is.SameAs(body), "이미 있으면 재사용");
+    }
+
+    [Test]
+    public void ExecutionOrder_RunsBeforePlayerMotor()
+    {
+        var order = (DefaultExecutionOrder)System.Attribute.GetCustomAttribute(typeof(LobbyProximityDoor), typeof(DefaultExecutionOrder));
+
+        Assert.That(order, Is.Not.Null);
+        Assert.That(order.order, Is.LessThan(0));
+        Assert.That(System.Attribute.GetCustomAttribute(typeof(PlayerMotor), typeof(DefaultExecutionOrder)), Is.Null,
+            "PlayerMotor 는 기본 순서(0)");
+    }
+
+    private static bool Overlaps(Transform leaf, CapsuleCollider body, float angle) =>
+        Overlaps(leaf, body, angle, body.transform.position);
+
+    private static bool Overlaps(Transform leaf, CapsuleCollider body, float angle, Vector3 bodyRootPosition)
     {
         Assert.That(LobbyProximityDoor.LeafBox(leaf, leaf.GetComponentsInChildren<Collider>(true), out Bounds leafBox), Is.True);
         LobbyProximityDoorRules.LeafPose(leaf.position, leaf.rotation, angle, new Vector3(0f, 0f, FrontFaceZ),
             out Vector3 position, out Quaternion rotation);
-        return LobbyProximityDoor.BodyOverlapsLeafBox(leafBox, position, rotation, body);
+        return LobbyProximityDoor.BodyOverlapsLeafBox(leafBox, position, rotation, body,
+            body.transform, bodyRootPosition, body.transform.rotation);
     }
 
     private Transform CreateLeaf(Quaternion rotation)
