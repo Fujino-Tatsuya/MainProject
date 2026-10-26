@@ -19,14 +19,17 @@ using UnityEngine;
 /// <item>데이터 출처: 판마다 시작 전에 툴바 출처를 테이블로 맞추고, 판 안에서 호스트가 런타임 적용 경로로 확인한다(<c>QABoss103Heartbeat.RuntimeDataSource</c>).</item>
 /// </list>
 /// 순수 규칙은 <see cref="QABoss103Batch"/>, 리포트는 <see cref="QABoss103Report"/>.
+/// <para>EditorPrefs 는 레지스트리 하나를 모든 에디터 프로세스가 같이 쓴다(쓰기는 즉시, 읽기는 프로세스 캐시). MPPM 가상 플레이어(클론)는
+/// SessionState 가 빈 새 에디터라 정적 생성자의 '에디터 재시작' 검사가 Running 을 꺼 버렸다(C7a — 판 1 오류 뒤 재활성에서 루프 정지).
+/// 그래서 클론에서는 아무것도 하지 않고, 키는 워크트리 범위(<see cref="DevBootTarget.ScopedKey"/>)로 둔다.</para>
 /// </summary>
 [InitializeOnLoad]
 public static class QABoss103BatchRunner
 {
     private const string Tag = "[QA103/Batch]";
     private const string Root = "Tools/QA/103/Batch/";
-    private const string DirKey = "QA.103.Batch.Dir";
-    private const string RunningKey = "QA.103.Batch.Running";
+    private static readonly string DirKey = DevBootTarget.ScopedKey("QA.103.Batch.Dir");
+    private static readonly string RunningKey = DevBootTarget.ScopedKey("QA.103.Batch.Running");
     private const string LiveSessionKey = "QA.103.Batch.Live";
     private const double TickSeconds = 0.5;
     private const double RunningCheckSeconds = 2.0;
@@ -42,6 +45,8 @@ public static class QABoss103BatchRunner
 
     static QABoss103BatchRunner()
     {
+        if (IsVirtualPlayer)
+            return;
         EditorApplication.update -= Tick;
         EditorApplication.update += Tick;
         if (Running && SessionState.GetString(LiveSessionKey, "") != "1")
@@ -51,6 +56,9 @@ public static class QABoss103BatchRunner
             Debug.LogWarning($"{Tag} 에디터를 다시 켜서 연속 루프를 멈춰 두었다 — 이어 하려면 {Root}Resume Last ({Dir}).");
         }
     }
+
+    /// <summary>MPPM 가상 플레이어 에디터(클론) — 루프는 메인 에디터만 돈다.</summary>
+    private static bool IsVirtualPlayer => !Unity.Multiplayer.PlayMode.CurrentPlayer.IsMainEditor;
 
     private static bool Running => EditorPrefs.GetBool(RunningKey, false);
     private static string Dir => EditorPrefs.GetString(DirKey, "");
@@ -117,13 +125,39 @@ public static class QABoss103BatchRunner
     [MenuItem(Root + "Stop After Current Run", priority = 103)]
     public static void StopAfterCurrent()
     {
-        if (!Running || !LoadState())
+        string dir = ActiveBatchDir();
+        if (dir == null)
         {
-            Debug.Log($"{Tag} 연속 루프가 돌고 있지 않다.");
+            Debug.Log($"{Tag} 연속 루프가 돌고 있지 않고 끝나지 않은 배치도 없다.");
             return;
         }
+        if (!Running)
+        {
+            // 루프가 꺼진 채 남은 배치 — 표시만 남긴다(Resume Last 가 stopAfter 를 0 으로 되돌리고 이어 간다).
+            _stateDir = null;
+            LoadState(dir);
+            Set("stopAfter", "1");
+            Log($"루프가 꺼져 있다(상태 {Get("state")}, 판 {Get("run")}) — 멈춤 표시만 남김. 이어 하려면 {Root}Resume Last.");
+            return;
+        }
+        LoadState();
         Set("stopAfter", "1");
         Log($"지금 판(판 {Get("run")}·재실행 {Get("retry")}, 상태 {Get("state")})이 끝나면 멈춘다.");
+    }
+
+    /// <summary>돌고 있는 배치 폴더, 아니면 progress state 가 끝나지 않은(<see cref="QABoss103Batch.IsActiveState"/>) 최근 배치. 없으면 null.</summary>
+    private static string ActiveBatchDir()
+    {
+        string dir = !string.IsNullOrEmpty(Dir) && Directory.Exists(Dir) ? Dir : LatestBatchDir();
+        if (dir == null)
+            return null;
+        if (Running)
+            return dir;
+        string path = Path.Combine(dir, QABoss103Batch.StateFile);
+        if (!File.Exists(path))
+            return null;
+        Dictionary<string, string> kv = QABoss103Batch.ParseKeyValues(File.ReadAllText(path));
+        return QABoss103Batch.IsActiveState(kv.TryGetValue("state", out string s) ? s : "") ? dir : null;
     }
 
     [MenuItem(Root + "Open Report", priority = 104)]
@@ -165,7 +199,7 @@ public static class QABoss103BatchRunner
     private static bool CanStartCheck() => !Running;
 
     [MenuItem(Root + "Stop After Current Run", true)]
-    private static bool StopCheck() => Running;
+    private static bool StopCheck() => ActiveBatchDir() != null;
 
     private static bool CanStart()
     {

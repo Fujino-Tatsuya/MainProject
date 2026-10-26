@@ -319,6 +319,24 @@ public static class QABoss103Batch
     public const string LogFolder = "logs";
     public const string LogFile = "loop.log";
 
+    /// <summary>
+    /// progress.txt 의 state 가 아직 끝나지 않은 배치인가(Stop After Current Run 활성 판정). 비었거나 끝 상태(stopped·done·idle)면 false.
+    /// 루프(Running)가 꺼져 있어도 이 상태면 멈춘 배치 — Resume Last 로 이어 간다.
+    /// </summary>
+    public static bool IsActiveState(string state)
+    {
+        switch ((state ?? "").Trim())
+        {
+            case "":
+            case "idle":
+            case "stopped":
+            case "done":
+                return false;
+            default:
+                return true;
+        }
+    }
+
     /// <summary>배치 폴더 이름 = <c>103-yyyyMMdd_HHmm</c>.</summary>
     public static string BatchFolderName(DateTime at) => "103-" + at.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture);
 

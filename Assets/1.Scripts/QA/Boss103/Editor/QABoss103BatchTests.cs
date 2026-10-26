@@ -195,5 +195,14 @@ public sealed class QABoss103BatchTests
         Assert.IsTrue(QABoss103Config.TryParse(new QABoss103Config().Format(), out QABoss103Config plain));
         Assert.AreEqual(0, plain.Batch, "1판 메뉴는 batch 아님");
     }
+
+    [Test]
+    public void 끝나지_않은_배치_상태만_멈춤_대상()
+    {
+        foreach (string s in new[] { "prepare", "activating", "starting", "running", "ending", "stopping", "finishing" })
+            Assert.IsTrue(QABoss103Batch.IsActiveState(s), s);
+        foreach (string s in new[] { null, "", " ", "idle", "stopped", "done" })
+            Assert.IsFalse(QABoss103Batch.IsActiveState(s), s ?? "null");
+    }
 }
 #endif

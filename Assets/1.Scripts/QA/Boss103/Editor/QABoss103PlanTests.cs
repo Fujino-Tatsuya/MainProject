@@ -148,6 +148,40 @@ public sealed class QABoss103PlanTests
         Assert.AreEqual(0.8f, QABoss103Plan.PadLineOffset(2, 3, 1f), 1e-5f);
     }
 
+    [Test]
+    public void 출격_구역_3인_자리는_서로_1m_이상_떨어지고_구역_안()
+    {
+        // Gather_Sortie 3m×2m — 긴 축 반폭 1.5m, 간격 1.1m.
+        float a = QABoss103Plan.PadLineOffset(0, 3, 1.5f, 1.1f);
+        float b = QABoss103Plan.PadLineOffset(1, 3, 1.5f, 1.1f);
+        float c = QABoss103Plan.PadLineOffset(2, 3, 1.5f, 1.1f);
+        Assert.GreaterOrEqual(b - a, 1f);
+        Assert.GreaterOrEqual(c - b, 1f);
+        Assert.LessOrEqual(System.Math.Abs(a), 1.5f - 0.3f, "걷기 도착 여유 0.3m 를 빼도 구역 안");
+        Assert.LessOrEqual(System.Math.Abs(c), 1.5f - 0.3f);
+    }
+
+    [Test]
+    public void 선택대_둘레_자리_각도는_가운데_대칭으로_펼친다()
+    {
+        Assert.AreEqual(0f, QABoss103Plan.ArcAngle(0, 1));
+        Assert.AreEqual(-50f, QABoss103Plan.ArcAngle(0, 3), 1e-4f);
+        Assert.AreEqual(0f, QABoss103Plan.ArcAngle(1, 3), 1e-4f);
+        Assert.AreEqual(50f, QABoss103Plan.ArcAngle(2, 3), 1e-4f);
+        Assert.AreEqual(-30f, QABoss103Plan.ArcAngle(0, 2, 60f), 1e-4f);
+        Assert.AreEqual(30f, QABoss103Plan.ArcAngle(1, 2, 60f), 1e-4f);
+    }
+
+    [Test]
+    public void 선택대_반경_70퍼센트_호_자리는_서로_겹치지_않는다()
+    {
+        // 반경 2m × 0.7 = 1.4m, 50° 간격 → 현 길이 2·1.4·sin(25°) ≈ 1.18m(플레이어 캡슐 지름보다 넉넉).
+        double r = 2.0 * 0.7;
+        double gap = QABoss103Plan.ArcAngle(1, 3) - QABoss103Plan.ArcAngle(0, 3);
+        double chord = 2 * r * System.Math.Sin(gap * System.Math.PI / 360.0);
+        Assert.Greater(chord, 1.0);
+    }
+
     // ── 설정·기록 ───────────────────────────────────────────
 
     [Test]

@@ -90,6 +90,20 @@ public static class QABoss103Plan
         return (index - (count - 1) * 0.5f) * step;
     }
 
+    /// <summary>로비 캐릭터 선택대 둘레 자리를 펼치는 전체 각도(도) 기본값.</summary>
+    public const float SelectArcDegrees = 100f;
+
+    /// <summary>
+    /// 선택대 둘레 호 위 <paramref name="index"/> 번째 자리의 각도(도, 가운데 0 — 접근 방향 기준 좌우). 전체 폭 <paramref name="spreadDegrees"/> 를 고르게 나눈다.
+    /// count 가 1 이하면 0. 범위 밖 index 도 같은 간격으로 이어진다(호출자가 자리 수 안에서 쓴다).
+    /// </summary>
+    public static float ArcAngle(int index, int count, float spreadDegrees = SelectArcDegrees)
+    {
+        if (count <= 1)
+            return 0f;
+        return (index - (count - 1) * 0.5f) * (spreadDegrees / (count - 1));
+    }
+
     // ── 판 종료 판정 ─────────────────────────────────────────────
 
     /// <summary>
