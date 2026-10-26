@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// [서버] 튜토리얼 쿨타임 초기화 실행 — 복도1 첫 진입(v8 C1-0)·존3 간파 성공(v8 Z3-4) 공용.
+/// [서버] 튜토리얼 쿨타임 초기화 실행 — 복도1 첫 진입(v8 C1-0) 등이 쓴다.
 /// 🔴 플레이어 쿨 장부는 <b>공개 API 만</b> 쓴다(<see cref="PlayerSkillController.ResetCooldownServer(PlayerSkillBase)"/>·<see cref="PlayerSkillController.GetCooldownRemaining(PlayerSkillBase)"/>·
-///    <see cref="PlayerSkillController.GetSkillIndex"/>) — 장부 내부를 고치지 않아 '간파 성공 시 우클릭 쿨 감소'(할 일 26)와 충돌하지 않고 그 위에 덮는다.
+///    <see cref="PlayerSkillController.GetSkillIndex"/>) — 장부 내부는 고치지 않는다.
 /// 대상 = 컨트롤러에 등록된 스킬 전부(기본 4 + 대체 4 — 어쌔신 변신 Q/E 처럼 일반/변신 쿨을 따로 갖는 것도 모두). 남은 시간을 0 으로 만든다.
 /// 오너 HUD 미러는 장부 API 가 보낸다.
 /// </summary>

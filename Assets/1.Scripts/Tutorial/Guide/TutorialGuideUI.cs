@@ -20,6 +20,7 @@ public sealed class TutorialGuideUI : MonoBehaviour
     public static TutorialGuideUI Instance { get; private set; }
 
     [Header("문구")]
+    [Tooltip("지속시간·효과음 원본 + 문구 폴백. 화면 문구는 Strings 키 Tutorial.Guide.<id> 가 있으면 그쪽(TutorialGuideTextSource).")]
     [SerializeField] private TutorialGuideTextTable textTable;
 
     [Header("목표 패널 (상단 중앙)")]
@@ -58,6 +59,8 @@ public sealed class TutorialGuideUI : MonoBehaviour
     private readonly StringBuilder builder = new StringBuilder();
 
     private int shownWaitSeconds = -1;
+    private TutorialGuideTextSource source;
+    private TutorialGuideTextTable sourceTable;
 
     /// <summary>읽기 전용 스냅샷 — S7~S10 이 늦은 클라 복원 상태를 맞춰 볼 때 쓴다.</summary>
     public TutorialGuideState CaptureState() => model.Capture();
@@ -86,14 +89,29 @@ public sealed class TutorialGuideUI : MonoBehaviour
     private void OnEnable()
     {
         Player.LocalPlayerChanged += HandleLocalPlayerChanged;
+        Loc.Changed += HandleLanguageChanged;
     }
 
     private void OnDisable()
     {
         Player.LocalPlayerChanged -= HandleLocalPlayerChanged;
+        Loc.Changed -= HandleLanguageChanged;
     }
 
     // ---------------- API ----------------
+
+    /// <summary>자막 글꼴(한글 글리프 보장) — 보스 등장 독백·스킵 안내가 같은 글꼴을 쓴다(BossIntroPresentation).</summary>
+    public TMP_FontAsset SubtitleFont => subtitleText != null ? subtitleText.font : null;
+
+    /// <summary>문구 표에서 <paramref name="id"/> 를 지금 캐릭터 기준으로 찾는다(자막을 띄우지 않고 글만). 없으면 false.</summary>
+    public bool TryResolveText(string id, out string text)
+    {
+        text = null;
+        if (TutorialGuideText.Resolve(textTable, id, LocalCharacter(), out TutorialGuideTextRow row) != TutorialGuideTextStatus.Found
+            || row == null || string.IsNullOrEmpty(row.Text)) return false;
+        text = row.Text;
+        return true;
+    }
 
     /// <summary>
     /// 자막 한 줄을 큐에 넣는다. 캐릭터 변형·{Q}{E}{P} 는 로컬 플레이어로, 그 밖 자리표시자는 args 로 채운다.
@@ -101,7 +119,7 @@ public sealed class TutorialGuideUI : MonoBehaviour
     /// </summary>
     public void ShowSubtitle(string id, IReadOnlyDictionary<string, string> args = null)
     {
-        TutorialGuideTextStatus status = TutorialGuideText.Resolve(textTable, id, LocalCharacter(), out TutorialGuideTextRow row);
+        TutorialGuideTextStatus status = TutorialGuideText.Resolve(Source, id, LocalCharacter(), out TutorialGuideTextRow row);
         if (status != TutorialGuideTextStatus.Found)
         {
             Debug.LogWarning($"{Tag} 자막 생략 — {id} 문구가 {(status == TutorialGuideTextStatus.Empty ? "비어 있다" : "테이블에 없다")}.", this);
@@ -111,6 +129,16 @@ public sealed class TutorialGuideUI : MonoBehaviour
         var subtitle = new TutorialSubtitle(id, TutorialGuideText.Fill(row.Text, BuildArgs(args)), row.DurationSeconds, row.Sfx);
         if (model.Subtitles.Enqueue(subtitle))
             StartSubtitle();
+    }
+
+    /// <summary>아직 안 뜬 자막만 버린다. 지금 뜬 줄은 끝까지 보인다(로비 무전 단계 전환 — LobbyRadio).</summary>
+    public void ClearPendingSubtitles() => model.Subtitles.ClearPending();
+
+    /// <summary>자막만 즉시 끈다(지금 뜬 줄 + 대기 줄). 목표·대기 줄·강조는 그대로(브리핑·강제 연출 시작 — LobbyRadio.ServerClear).</summary>
+    public void ClearSubtitles()
+    {
+        model.Subtitles.Clear();
+        RenderSubtitle();
     }
 
     /// <summary>지금 할 일 1줄 + 체크리스트 + 진행도. 목표 id 가 바뀌면 단계 전환 효과음을 낸다.</summary>
@@ -218,6 +246,13 @@ public sealed class TutorialGuideUI : MonoBehaviour
         // 캐릭터가 바뀌면 변형 문구·{Q}{E}{P} 가 달라지고, CombatHUD 도 새 Player 의 자식이다.
         hudTargets.Clear();
         hudRetryAt.Clear();
+        RenderObjective();
+        RenderWait();
+    }
+
+    // 목표·대기 줄만 다시 그린다. 이미 뜬 자막은 그대로 두고 다음 줄부터 새 언어.
+    private void HandleLanguageChanged()
+    {
         RenderObjective();
         RenderWait();
     }
@@ -492,6 +527,21 @@ public sealed class TutorialGuideUI : MonoBehaviour
 
     // ---------------- 문구 ----------------
 
+    /// <summary>SO + Strings 를 합친 출처. 인스펙터에서 SO 를 바꾸면 다시 만든다(빈 SO 칸은 Strings 만 본다).</summary>
+    private TutorialGuideTextSource Source
+    {
+        get
+        {
+            if (source == null || sourceTable != textTable)
+            {
+                sourceTable = textTable;
+                source = new TutorialGuideTextSource(textTable != null ? textTable : null);
+            }
+
+            return source;
+        }
+    }
+
     private static TutorialCharacter LocalCharacter() => TutorialLocalPlayerInfo.ResolveCharacter(Player.LocalPlayer);
 
     /// <summary>{Q}{E}{P} 를 먼저 넣고 호출자 args 로 덮는다.</summary>
@@ -511,7 +561,7 @@ public sealed class TutorialGuideUI : MonoBehaviour
     /// <summary>목표·대기 줄 문구. 비었거나 없으면 빈 줄 + id 당 한 번 경고.</summary>
     private string ResolveLine(string id, IReadOnlyDictionary<string, string> args)
     {
-        TutorialGuideTextStatus status = TutorialGuideText.Resolve(textTable, id, LocalCharacter(), out TutorialGuideTextRow row);
+        TutorialGuideTextStatus status = TutorialGuideText.Resolve(Source, id, LocalCharacter(), out TutorialGuideTextRow row);
         if (status == TutorialGuideTextStatus.Found)
             return TutorialGuideText.Fill(row.Text, BuildArgs(args));
 
@@ -527,7 +577,7 @@ public sealed class TutorialGuideUI : MonoBehaviour
         if (string.IsNullOrEmpty(label))
             return string.Empty;
 
-        TutorialGuideTextStatus status = TutorialGuideText.Resolve(textTable, label, LocalCharacter(), out _);
+        TutorialGuideTextStatus status = TutorialGuideText.Resolve(Source, label, LocalCharacter(), out _);
         return status == TutorialGuideTextStatus.Missing
             ? TutorialGuideText.Fill(label, BuildArgs(args))
             : ResolveLine(label, args);

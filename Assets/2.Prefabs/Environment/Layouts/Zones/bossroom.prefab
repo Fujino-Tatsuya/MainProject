@@ -974,6 +974,7 @@ Transform:
   - {fileID: 8892658741249228417}
   - {fileID: 4787737736145707969}
   - {fileID: 3703808712729068010}
+  - {fileID: 4156657747420723043}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3702341270029252445
@@ -1014,6 +1015,37 @@ Transform:
   - {fileID: 1574426276055689094}
   - {fileID: 1058290540313187616}
   - {fileID: 2186541793213763907}
+  m_Father: {fileID: 5795541321776209706}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &3942132751231848485
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4156657747420723043}
+  m_Layer: 0
+  m_Name: '[Dev] BossWarpPoint'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4156657747420723043
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3942132751231848485}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.5, z: -4}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
   m_Father: {fileID: 5795541321776209706}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4158902950235679733
@@ -3030,6 +3062,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(4)
@@ -3120,6 +3156,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -3132,6 +3172,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 313944383911697089}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6541630275479559151}
@@ -3150,6 +3193,25 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
   m_PrefabInstance: {fileID: 730792832644184112}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &313944383911697089
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 496844997193450849}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &6541630275479559151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3240,8 +3302,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &6562377548359998151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3257,9 +3319,9 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
+  outlineMaterial: {fileID: 0}
 --- !u!4 &985995061862146011 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -3585,6 +3647,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -3597,6 +3663,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 225264209247820285}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8212091248684035610}
@@ -3615,6 +3684,25 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
   m_PrefabInstance: {fileID: 847494091531024338}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &225264209247820285
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 505404483568650883}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &8212091248684035610
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3705,8 +3793,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &5085897276421390087
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3722,9 +3810,9 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
+  outlineMaterial: {fileID: 0}
 --- !u!4 &885060816906195001 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -8046,6 +8134,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(2)
@@ -9134,6 +9226,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -9146,6 +9242,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7984853288632569731}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3099638776200115007}
@@ -9164,6 +9263,25 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
   m_PrefabInstance: {fileID: 5538223265212959385}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7984853288632569731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4619234605682112456}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &3099638776200115007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9254,8 +9372,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &7190623343084418001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9271,9 +9389,9 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
+  outlineMaterial: {fileID: 0}
 --- !u!4 &5427120997204487538 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -9561,6 +9679,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(1)
@@ -10307,6 +10429,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: e380aabb57e185f4795db821389e4427, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 615534416033457246, guid: 4d3d1ff628b14a288eb329ed0a40978b, type: 3}
     - target: {fileID: 919132149155446097, guid: e380aabb57e185f4795db821389e4427, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_Socket(3)
@@ -12045,6 +12171,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+    - target: {fileID: -5754084199372789682, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: -7584467910536349326, guid: 1aa96d0b9b1e43b2bebf93c2b1b3d367, type: 3}
     - target: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       propertyPath: m_Name
       value: Env_Mv_bosscharger_upper
@@ -12060,6 +12190,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4627039947633231218}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5752398698857424512}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7947843130189058856}
@@ -12105,6 +12238,25 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
+--- !u!114 &5752398698857424512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7590406370858292409}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ea8c2fdefaf4f3a9ddc6ff75dfe45d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PylonChargeView
+  ShowTopMostFoldoutHeaderGroup: 1
+  chargePrefab: {fileID: 1293689804359696049, guid: 0463be8c43399274c99a8ad6db742993, type: 3}
+  hitSpark: {fileID: 11400000, guid: 01300aa42136405dbcc2011ca920b6fe, type: 2}
+  discharge: {fileID: 11400000, guid: 9cbc5f5b46abde24e986c5528a6c80d7, type: 2}
+  hitSparkInterval: 0.08
+  hitSparkScale: 1
+  dischargeScale: 1
 --- !u!114 &7947843130189058856
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12170,8 +12322,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.69, z: 0.96}
-  m_Center: {x: -0.0000044107437, y: 0.42, z: 0}
+  m_Size: {x: 1.470000, y: 2.019426, z: 1.470000}
+  m_Center: {x: 0.000000, y: -1.009713, z: 0.000000}
 --- !u!114 &3221511134861534754
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12187,9 +12339,9 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 0.5
-  moveSpeed: 1
-  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
+  riseHeight: 2.020426
+  moveSpeed: 4.040852
+  outlineMaterial: {fileID: 0}
 --- !u!1001 &7343172837201687197
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -75,6 +75,63 @@ public static class TutorialGuideUIAuthoring
         (TutorialGuideIds.Z3Real, "연습 끝. 이제 진짜입니다! 노란빛이 보이면 언제든 간파하세요.", 6f),
     };
 
+    // 로비 무전(할 일 86 T6b) — 명세 v0.2 §14 대사 초안 그대로. 메뉴 "로비 무전 문구 추가" 가 빠진 행만 덧붙인다(고친 문구는 안 건드림).
+    // 지속시간 = 기존 행 기준(짧은 한 문장 4초 · 30자 안팎 5초 · 두세 문장 6초 · 45자 넘는 긴 줄 7초 — TUT_Z3_* · BOSS_RAID_* 와 같은 폭).
+    internal static readonly (string id, string text, float seconds)[] LobbyRadioTexts =
+    {
+        (LobbyRadioIds.LobbyTrainRoute, "전원 확인. 표적 앞으로 이동해. 먼저 각자의 무기를 점검하겠다.", 6f),
+        (LobbyRadioIds.Train01Start, "먼저 무기부터 점검하겠다. 표적을 상대로 기본 공격과 모든 스킬을 사용해 봐.", 6f),
+        (LobbyRadioIds.Train01End, "무기 점검 완료. 다음 위치로 이동해. 이번에는 움직이는 상대다.", 6f),
+        (LobbyRadioIds.Train02Start, "이번에는 움직이는 상대다. 주변을 살피면서 함께 처리해.", 5f),
+        (LobbyRadioIds.Train02End, "좋아. 다음은 상대의 공격을 끊고, 그 기회를 이어가는 훈련이다.", 6f),
+        (LobbyRadioIds.Train03Start, "공격에 집중하는 순간에는 상대도 빈틈을 드러낸다. 그 순간을 끊어 봐.", 6f),
+        (LobbyRadioIds.Train03Counter, "공격을 끊었다. 지금처럼 빈틈을 잡는 게 간파다.", 5f),
+        (LobbyRadioIds.Train03Cc, "균형이 무너진 상대는 밀거나 잠깐 묶을 수 있다. 이번에는 그 기회를 이어가 봐.", 7f),
+        (LobbyRadioIds.Train03Reset, "좋아. 이제 벽을 활용해 상대를 제압해 보겠다.", 5f),
+        (LobbyRadioIds.Train03WallGuide, "상대를 벽으로 몰아붙여. 간파와 벽 충돌로 제압 칸을 줄일 수 있다.", 6f),
+        (LobbyRadioIds.Train03Wall, "잘했다. 벽을 이용하면 더 빠르게 제압할 수 있다.", 5f),
+        (LobbyRadioIds.Train03Suppress, "제압 성공. 지금 공격을 몰아넣어!", 4f),
+        (LobbyRadioIds.Train03Combat, "좋아. 남은 상대를 처리하면 훈련은 끝이다.", 5f),
+        (LobbyRadioIds.TrainEnd, "훈련 종료. 이제 첫 임무를 설명하겠다. 출구에 집결해.", 6f),
+        (LobbyRadioIds.BriefRoute, "작전 설명 장소로 이동해. 전원이 모이면 시작하겠다.", 5f),
+        (LobbyRadioIds.Brief01, "첫 임무는 웰즈의 연구 시설이다. 이곳의 연구가 대규모 기계 반란으로 이어질 것으로 예측됐다.", 7f),
+        (LobbyRadioIds.Brief02, "우리는 그 일이 벌어지기 전의 시점에 개입한다.", 5f),
+        (LobbyRadioIds.Brief03, "목표는 의체 두뇌의 파괴와 도면 회수. 마지막 모델의 생산을 저지해야 한다.", 6f),
+        (LobbyRadioIds.Brief04, "혼자 앞서가지 말고 함께 움직여.", 4f),
+    };
+
+    // 로비 목표 패널(할 일 86 T6c 브리핑) — 명세 v0.2 §10 '출격 지점에 집결'. 목표 줄이라 지속시간은 쓰지 않는다(0).
+    internal static readonly (string id, string text, float seconds)[] LobbyObjectiveTexts =
+    {
+        (LobbyObjectiveIds.Briefing, "작전 설명 중", 0f),
+        (LobbyObjectiveIds.Sortie, "출격 지점에 집결", 0f),
+    };
+
+    [MenuItem("Tools/UI/로비 무전 문구 추가")]
+    public static void AddLobbyRadioTexts()
+    {
+        TutorialGuideTextTable table = EnsureTextTable();
+        int added = 0;
+        foreach ((string id, string text, float seconds) in LobbyRadioTexts)
+        {
+            if (table.AddRowIfMissing(id, text, seconds))
+                added++;
+        }
+
+        foreach ((string id, string text, float seconds) in LobbyObjectiveTexts)
+        {
+            if (table.AddRowIfMissing(id, text, seconds))
+                added++;
+        }
+
+        if (added > 0)
+        {
+            EditorUtility.SetDirty(table);
+            AssetDatabase.SaveAssets();
+        }
+        Debug.Log($"[TutorialGuide] 로비 무전·목표 문구 — {added}행 추가(전체 {LobbyRadioTexts.Length + LobbyObjectiveTexts.Length}행).");
+    }
+
     [MenuItem("Tools/UI/튜토리얼 안내 문구 v8 적용")]
     public static void ApplyV8Texts()
     {
@@ -275,12 +332,13 @@ public static class TutorialGuideUIAuthoring
 
     private static (CanvasGroup group, TMP_Text text) BuildSubtitle(Transform root, TMP_FontAsset font)
     {
-        // 화면 중앙 위쪽. 스킬바 위 툴팁 자리(430×270)와 우측 하단(타이머·미니맵·키가이드)을 피한다.
-        // 목표 패널이 체크리스트 9줄까지 늘어나도 겹치지 않는 높이.
+        // 목표 패널 아래 — 패널과 같은 상단 앵커라 화면 비율이 넓어져도 간격이 그대로다(할 일 79).
+        // y −350 = 패널 y −24 + 최대 높이 약 314(체크리스트 8줄 + 대기 줄 + 목표 2줄) + 여유 12.
+        // 스킬바 위 툴팁 자리(430×270)와 우측 하단(타이머·미니맵·키가이드)을 피한다. 튜닝은 프리팹 RectTransform 에서.
         RectTransform box = Child(root, "Subtitle");
-        box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
-        box.pivot = new Vector2(0.5f, 0.5f);
-        box.anchoredPosition = new Vector2(0f, 120f);
+        box.anchorMin = box.anchorMax = new Vector2(0.5f, 1f);
+        box.pivot = new Vector2(0.5f, 1f);
+        box.anchoredPosition = new Vector2(0f, -350f);
         box.sizeDelta = new Vector2(1100f, 80f);
         Background(box, new Color(0f, 0f, 0f, 0.6f));
         CanvasGroup group = Group(box, 0f);

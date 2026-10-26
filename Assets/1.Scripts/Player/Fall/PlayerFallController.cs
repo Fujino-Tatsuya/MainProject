@@ -42,7 +42,9 @@ public sealed class PlayerFallController : NetworkBehaviour
 
         // 연출 잠금(보스룸 이동·등장) 중에는 추락 판정을 멈춘다. 보스룸은 생성맵 밖 좌표라
         // 이동 중 경계 아래로 스쳐도 추락 피해·안전지점 복귀가 걸리면 도착 계약이 깨진다.
-        if (encounterLock != null && encounterLock.IsCinematicLocked)
+        // 엘리베이터 연출(입력 잠금·숨김 — 할 일 89)도 같다: 추락 피해는 무적을 우회하므로 CinematicHidden 무적 토큰으로는 못 막는다.
+        if (encounterLock != null
+            && (encounterLock.IsCinematicLocked || encounterLock.IsCinematicInputLocked || encounterLock.IsCinematicHidden))
             return;
 
         FallBoundarySettings boundary = FallBoundarySettings.Instance;

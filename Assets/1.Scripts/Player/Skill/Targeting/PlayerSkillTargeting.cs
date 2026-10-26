@@ -36,6 +36,13 @@ public class PlayerSkillTargeting : MonoBehaviour
     private PlayerInputReader input;
     private PlayerEnemyHoverOutline hoverOutline;
 
+    // 이 프레임 ESC 를 조준 취소·자동 접근 취소가 썼다 — ESC 메뉴(GameMenuController)가 LateUpdate 에서 보고 열지 않는다(PLAN-settings-ddol).
+    private static int s_escapeClaimedFrame = -1;
+    public static bool IsEscapeClaimed => s_escapeClaimedFrame == Time.frameCount;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_escapeClaimedFrame = -1;
+
     private bool isTargeting;      // 조준 대기 모드(인디케이터 표시)
     private bool isMovingToCast;   // 사거리 확보 자동 이동 중
     private bool beganThisFrame;
@@ -372,6 +379,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         // Esc / 우클릭 / 같은 스킬키 재입력으로 조준 취소.
         // 조준 중엔 FSM이 우클릭(단죄의 방패)을 억제하므로 우클릭을 취소로 재활용한다.
         bool escPressed = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+        if (escPressed) s_escapeClaimedFrame = Time.frameCount;
         bool rightClick = Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame;
         return escPressed || rightClick || (controller != null && controller.WasSkillRePressed(currentSlot));
     }
@@ -656,7 +664,10 @@ public class PlayerSkillTargeting : MonoBehaviour
     private bool ShouldCancelAutoMove()
     {
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            s_escapeClaimedFrame = Time.frameCount;
             return true;
+        }
 
         if (input == null)
             return false;

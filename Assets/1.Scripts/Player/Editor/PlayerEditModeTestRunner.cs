@@ -13,6 +13,10 @@ internal static class PlayerEditModeTestRunner
     {
         "^StatusEffectImmunityTests$", // PLAN-assassin A1 — SuperArmor 의미 통일
         "^PlayerSkillCooldownLedgerTests$", // PLAN-assassin A2 — 스킬 단위 쿨 장부·슬롯 교체
+        "^CooldownClockTests$", // 할 일 91 T2 — 쿨 시계 적분: 배율 1·중간 변경·0·슬로우·원천 역행·교체
+        "^CooldownRateWiringTests$", // 할 일 91 T8 — 쿨 배율 = CooldownRateModifier 곱(없음 1·곱·스택), 배율 2 스킬·대시·패시브 절반, 중간 해제 2→1
+        "^PassiveCooldownSyncTests$", // 할 일 91 T4 — 가붕이 패시브 내부 쿨: 남은 초 도장·피어 환산·늦은 참가·배율 2·피격 감소
+        "^DashCooldownClockSyncTests$", // 할 일 91 T3 — 대시 응답 = 남은 초, 오너 자기 쿨 시계 환산·서버/오너 남은 시간 일치·강제 초기화
         "^PlayerGroundPointProjectionTests$", // PLAN-assassin A4 — 고정 거리 조준·서버 재투영
         "^AssassinComboModelTests$", // PLAN-assassin A6 — 평타 순서·0.8초 유예·스킬 리셋
         "^AssassinComboWindowRulesTests$", // 할 일 47 연장 — 평타 다음 타 예약 창(정규화 시간·경계·단별 기본값)
@@ -34,7 +38,6 @@ internal static class PlayerEditModeTestRunner
         "^InterruptOmniRangeModelTests$", // 인터럽트 강조 사거리 — 방향 무관 판정 형상 도달 거리 × 대상 콜라이더 표면 거리
         "^OverheadDashIconRulesTests$", // 할 일 29 — 머리 위 대시 아이콘 표시(로컬·생존)·준비 색, 에임 대시 틴트 토글(기본 꺼짐)
         "^OverheadStatusLabelRulesTests$", // 할 일 50 — 머리 위 이름 → 상태이상 이름: 붙잡힘·CC 6종 우선순위·버프 무시·사망/Soul 은 이름·BlockedCrowdControl 집합 일치
-        "^InterruptSuccessCooldownModelTests$", // 할 일 26 — 간파 성공 쿨 감소(전체 쿨 × 비율·0 클램프·시전당 1회)
         "^PartyLivesRulesTests$", // 할 일 30 (1) — 파티 공용 목숨: 사망 목적지·공용 차감·재충전·공용 0 Soul 전멸 판정
         "^PartyWipeRespawnRulesTests$", // 할 일 30 (2) — 전멸 → 리스폰 분기(결과 화면 아님)·리스폰 조건·지점 선택(패드 제외·간격·폴백)·목숨 5
         "^ActiveRegistryTests$", // 할 일 69 — 전멸 판정 등록식 목록: 켜짐 등록·꺼짐 해제·중복 무시·초기화
@@ -57,12 +60,14 @@ internal static class PlayerEditModeTestRunner
         "^AssassinVisualPrefabTests$", // PLAN-assassin §9 — v18 비주얼: Flat Kit 슬롯 5개·부모·BaseMap, 단검 루트 = 임포트 배율, Armature 루트·판정 박스 배율 1
         "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침)·반격 부채꼴(표면 거리·평면 각도)
         "^FirstMeleeGuardCounterModelTests$", // PLAN-paladin-counter-e C3 — 팔라딘 E 단계: 방어 불가 Pass·대기 경계·반격 중 무시(now < counterEndAt)·반격 1회·같은 틱 둘 다·Clamp·반격 보장·넉백
+        "^FirstMeleeGuardAttackSpeedTests$", // 할 일 91 A5 — 팔라딘 E 준비·해제·반격만 공속(AttackSpeedRate), 방어중 제외·고정 전환·이벤트 순서
         "^LobbyReadyRulesTests$", // 할 일 48 C8 — 로비 전원 준비 → 카운트다운·취소·새 접속 Ready 초기화·캐릭터 변경 거부·시작 1회 래치(호스트 예외 없음)
         "^CharacterSelectionMemoryTests$", // 할 일 48 C8 — 캐릭터 선택 저장소: 퇴장 뒤 같은 playerId 재접속에 마지막 선택 되살림
         "^PlayerInputBlockTokensTests$", // 할 일 48 C9 — 입력 차단 토큰: 요청자별 걸기·풀기, 마지막 토큰이 풀릴 때만 열림, 중복·null 무시
         "^NearestInteractableTests$", // 할 일 48 C10 — 로비 상호작용 대상(반경·사용 불가·동률 앞 인덱스·평면 거리)·서버 거리 재검증(반경+여유)·카운트다운 올림 초
         "^CameraOwnerFollowCandidateTests$", // 할 일 48 C12 — 캐릭터 교체 뒤 카메라 오너 후보: 디스폰 중인 옛 PlayerObject 건너뜀(IsSpawned 필터)
         "^LobbyProximityDoorRulesTests$", // 할 일 78 — 로비 근접 문: 열림<닫힘 반경 히스테리시스·여닫는 시간 따로·평면 거리
+        "^LobbyProximityDoorPenetrationTests$", // 할 일 99 — 로비 문짝 다음 자세 × 몸 캡슐 겹침(실제 Box·비볼록 MeshCollider → 문짝 상자, 돌아 있는 문)
         "^PlayerRejoinLifeRulesTests$", // 할 일 48 C14 R5c — 재합류 생명: 퇴장 기록(사망 연출 목적지·체력 비율)·복원 판정·복원 체력·전멸 덮어쓰기 값
     };
 

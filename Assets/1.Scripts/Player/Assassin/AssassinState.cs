@@ -159,6 +159,26 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
         return true;
     }
 
+    /// <summary>
+    /// [서버] 분노를 <paramref name="amount"/> 까지 올린다(최대 분노로 자름) — 로비 훈련 보정(할 일 86, R 최소 분노 지급) 전용.
+    /// 변신 중·이미 그 이상이면 무시(깎지 않는다). 적중 충전이 아니라 통계·충전 규칙을 타지 않는다.
+    /// </summary>
+    public bool ServerRaiseRageTo(float amount)
+    {
+        if (!HasStateAuthority)
+            return false;
+
+        AssassinStateSnapshot next = State;
+        float target = Mathf.Min(Rules.MaxRage, amount);
+        if (next.transformed || next.rage >= target)
+            return false;
+
+        next.rage = target;
+        Write(next);
+        Edit.Log($"[Assassin] 분노 게이지 → {target:0.#}/{Rules.MaxRage:0.#} (훈련 보정)", this);
+        return true;
+    }
+
     /// <summary>[서버] 일반 E — 강화 준비. 쿨타임은 시작하지 않는다(§8.1).</summary>
     public bool ServerTryPrepareEnhancement()
     {

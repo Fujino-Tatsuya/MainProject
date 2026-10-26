@@ -34,8 +34,14 @@ public sealed class TextScramble : MonoBehaviour
 
     private TMP_Text _text;
     private string _original; // 🔴 도중에 꺼졌다 켜지면 _text.text 는 뒤섞인 문장이다 — 목표는 이걸로
+    private LocalizedText _localized;
     private Coroutine _routine;
     private StringBuilder _builder;
+
+    // 목표 문장. 같은 오브젝트에 LocalizedText 가 있으면 **지금 언어** 문구(시트에 없으면 저작 원문) —
+    // 🔴 저장해 둔 원문만 쓰면 언어를 영어로 바꿔도 켜질 때마다 한국어로 덮어썼다(경석 10-22 Play: 타이틀 시작하기·설정·나가기).
+    private string Target =>
+        _localized != null && !string.IsNullOrEmpty(_localized.Key) ? LocalizedText.Text(_localized.Key, _original) : _original;
 
     /// <summary>수렴이 끝났을 때 한 번 불린다.</summary>
     public event Action Completed;
@@ -47,24 +53,34 @@ public sealed class TextScramble : MonoBehaviour
         _text = GetComponent<TMP_Text>();
         _builder = new StringBuilder();
         _original = _text != null ? _text.text : null;
+        _localized = GetComponent<LocalizedText>();
     }
 
     private void OnEnable()
     {
+        Loc.Changed += HandleLanguageChanged;
         if (_playOnEnable && _text != null)
-            Play(_original);
+            Play(Target);
     }
 
     private void OnDisable()
     {
+        Loc.Changed -= HandleLanguageChanged;
         StopRoutine();
+    }
+
+    // 연출 도중 언어가 바뀌면 새 문구로 다시 — 안 그러면 코루틴이 옛 문구로 끝을 덮는다(LocalizedText 가 먼저 바꿔 둬도).
+    private void HandleLanguageChanged()
+    {
+        if (IsPlaying)
+            Play(Target);
     }
 
     /// <summary>현재 표시 중인 문장으로 다시 재생한다.</summary>
     public void Replay()
     {
         if (_text != null)
-            Play(_original);
+            Play(Target);
     }
 
     /// <summary>목표 문장으로 디코드 연출을 재생한다.</summary>

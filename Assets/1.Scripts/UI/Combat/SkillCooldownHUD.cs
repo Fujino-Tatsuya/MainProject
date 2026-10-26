@@ -15,6 +15,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         public PlayerSkillSlot slot;
         public Image icon = null;
         public Image cooldownFill;   // Filled 타입 오버레이 — 남은 쿨타임 비율만큼 덮는다
+        public CooldownCoverBody cooldownBody = CooldownCoverBody.SkillBody;   // 덮개 마스크 본체 구간 — 남은 비율을 이 구간에 맞춘다
         public Image cooldownIcon = null;   // cooldownFill 마스크 안 아이콘 사본(Icon_mask_CooldownFill/Icon_*) — icon 과 같은 스프라이트로 맞춘다
         public TMP_Text remainingText;
         public SkillSlotHover hover = null;
@@ -209,8 +210,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                 }
             }
 
-            if (widget.cooldownFill != null)
-                widget.cooldownFill.fillAmount = total > 0f ? Mathf.Clamp01(remaining / total) : 0f;
+            widget.cooldownBody.Apply(widget.cooldownFill, total > 0f ? remaining / total : 0f);
 
             if (widget.remainingText != null)
             {

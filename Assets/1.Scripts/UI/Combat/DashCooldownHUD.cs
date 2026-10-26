@@ -14,6 +14,9 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     [Tooltip("남은 재충전 비율만큼 덮는 Filled 타입 오버레이 (스킬 쿨타임 HUD와 동일).")]
     [SerializeField] private Image cooldownFill;
 
+    [Tooltip("덮개 마스크 본체 구간(1x px) — 남은 비율을 이 구간에 맞춘다.")]
+    [SerializeField] private CooldownCoverBody cooldownBody = CooldownCoverBody.SideBody;
+
     [Tooltip("남은 재충전(초) 텍스트. 스킬 쿨타임 HUD와 동일 포맷. 선택.")]
     [SerializeField] private TMP_Text remainingText;
 
@@ -76,16 +79,15 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
         if (dash != null)
         {
-            // ⚠️ PredictedNextReadyTime에서 직접 빼지 않는다 — 그 값은 절대시각이고 시간 원점이
-            //    NetworkClock인지 Time.timeAsDouble인지는 PlayerDashController만 안다.
+            // ⚠️ PredictedNextReadyTime에서 직접 빼지 않는다 — 그 값은 이 피어 쿨 시계(PlayerCooldownClock.DashNow)
+            //    기준 시각이라 다른 시계로 빼면 엉킨다. 남은 초·분모 둘 다 쿨 시계 초라 비율은 배율과 무관하게 맞다.
             remaining = dash.RemainingRecharge;
             total = dash.RechargeDuration;
             charge = dash.PredictedCharge;
             maxCharge = dash.MaxCharge;
         }
 
-        if (cooldownFill != null)
-            cooldownFill.fillAmount = total > 0f ? Mathf.Clamp01(remaining / total) : 0f;
+        cooldownBody.Apply(cooldownFill, total > 0f ? remaining / total : 0f);
 
         if (remainingText != null)
         {

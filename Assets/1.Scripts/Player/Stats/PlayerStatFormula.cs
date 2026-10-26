@@ -13,12 +13,23 @@ public enum PlayerStatKind
 
 /// <summary>
 /// 플레이어 스탯 공식(할 일 83) — 서버 판정·클라 표시(툴팁·HUD)·서버 2차 검증이 전부 이 한 곳을 쓴다.
-///   최종 스탯   = 기본 × (1 + Σ기본%) × (1 + Σ전체%)   (정수 스탯은 반올림), 0 이상
+///   최종 스탯   = 기본 × (1 + Σ기본%) × (1 + Σ전체%) × Π최종배율   (정수 스탯은 반올림), 0 이상
 ///   피해 스냅샷 = round( (round(최종 공격력 × 계수) + 고정값) × (1 + Σ가하는피해%) ), 0 이상
-/// 같은 단계 안의 % 는 더한다. 상세: Docs/tech/player-stats.md
+/// 같은 단계 안의 % 는 더하고, 최종 배율(할 일 91 — 이동속도·공격속도만)끼리는 곱한다. 상세: Docs/tech/player-stats.md
 /// </summary>
 public static class PlayerStatFormula
 {
+    /// <summary>스탯 → 최종 배율 상태이상. 최종 배율이 없는 스탯은 None.</summary>
+    public static StatusEffectType FinalMultiplierType(PlayerStatKind kind)
+    {
+        switch (kind)
+        {
+            case PlayerStatKind.MoveSpeed: return StatusEffectType.MoveSpeedFinalMultiplier;
+            case PlayerStatKind.AttackSpeed: return StatusEffectType.AttackSpeedFinalMultiplier;
+            default: return StatusEffectType.None;
+        }
+    }
+
     /// <summary>스탯 → (기본% 상태이상, 전체% 상태이상).</summary>
     public static void StatusTypes(PlayerStatKind kind, out StatusEffectType basePercent, out StatusEffectType totalPercent)
     {
@@ -45,20 +56,20 @@ public static class PlayerStatFormula
         return (Mathf.Max(0f, magnitude) - 1f) * Mathf.Max(1, stackCount);
     }
 
-    /// <summary>기본에 곱할 배율 (1 + Σ기본%) × (1 + Σ전체%), 0 이상.</summary>
-    public static float Multiplier(float basePercent, float totalPercent)
+    /// <summary>기본에 곱할 배율 (1 + Σ기본%) × (1 + Σ전체%) × Π최종배율, 0 이상. 최종 배율 없음 = 1.</summary>
+    public static float Multiplier(float basePercent, float totalPercent, float finalMultiplier = 1f)
     {
-        return Mathf.Max(0f, 1f + basePercent) * Mathf.Max(0f, 1f + totalPercent);
+        return Mathf.Max(0f, 1f + basePercent) * Mathf.Max(0f, 1f + totalPercent) * Mathf.Max(0f, finalMultiplier);
     }
 
-    public static float Final(float baseValue, float basePercent, float totalPercent)
+    public static float Final(float baseValue, float basePercent, float totalPercent, float finalMultiplier = 1f)
     {
-        return Mathf.Max(0f, baseValue * Multiplier(basePercent, totalPercent));
+        return Mathf.Max(0f, baseValue * Multiplier(basePercent, totalPercent, finalMultiplier));
     }
 
-    public static int FinalInt(int baseValue, float basePercent, float totalPercent)
+    public static int FinalInt(int baseValue, float basePercent, float totalPercent, float finalMultiplier = 1f)
     {
-        return Mathf.Max(0, Mathf.RoundToInt(baseValue * Multiplier(basePercent, totalPercent)));
+        return Mathf.Max(0, Mathf.RoundToInt(baseValue * Multiplier(basePercent, totalPercent, finalMultiplier)));
     }
 
     /// <summary>가하는 피해% 를 뺀 1차 스냅샷 — 기존 판정식 round(공격력 × 계수) + 고정값.</summary>
@@ -90,7 +101,7 @@ public static class PlayerStatFormula
     }
 }
 
-/// <summary>오너가 공격·스킬 시작 요청에 싣는 자기 종합 결과. 서버는 비교만 하고 판정엔 자기 값을 쓴다. 실수 스탯은 천분율.</summary>
+/// <summary>오너가 공격·스킬 시작 요청에 싣는 자기 종합 결과. 서버는 비교만 하고 판정엔 자기 값을 쓴다. 실수 스탯은 천분율(최종 배율까지 곱한 값).</summary>
 public struct PlayerStatReport : INetworkSerializable, System.IEquatable<PlayerStatReport>
 {
     public int attackDamage;

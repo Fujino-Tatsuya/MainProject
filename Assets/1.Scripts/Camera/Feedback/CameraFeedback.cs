@@ -97,6 +97,28 @@ public sealed class CameraFeedback : MonoBehaviour
             ref _lastDealtDamageTime);
     }
 
+    /// <summary>
+    /// 연출용 한 번 흔들림(보스 등장 착지 등) — 세로 위주. 설정창 화면 흔들림 배율이 함께 적용된다.
+    /// 간격 제한 없음(호출자가 한 번만 부른다).
+    /// </summary>
+    public void PlayImpactShake(float amplitude, float duration)
+    {
+        if (_receivedHitImpulse == null)
+            return;
+        if (_impactImpulse == null)
+        {
+            _impactImpulse = gameObject.AddComponent<CinemachineImpulseSource>();
+            ConfigureImpulseSource(_impactImpulse, duration);
+        }
+        _impactImpulse.ImpulseDefinition.ImpulseDuration = Mathf.Max(0.01f, duration);
+        amplitude *= GameplayConfig.ScreenShake;
+        if (!isActiveAndEnabled || amplitude <= 0f)
+            return;
+        _impactImpulse.GenerateImpulseWithVelocity(new Vector3(0.15f, -1f, 0f).normalized * amplitude);
+    }
+
+    CinemachineImpulseSource _impactImpulse;
+
     void InitializeImpulse()
     {
         // ⚠️ 조용히 빠지면 안 된다 — 붙일 GameObject를 잘못 고르면 쉐이크가 영구히 안 나는데

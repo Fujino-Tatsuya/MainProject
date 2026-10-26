@@ -8,6 +8,50 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-10-25 · 아트(Claude+Codex)) — **타이틀 카메라 구도·라이팅·반사 프로브·심도**, 브랜치 `feature/Title-look` → `development` · 상세 [handoff-title-look.md](Docs/tech/handoff-title-look.md)
+- 1.TitleScene: VCam_Far·VCam_Near 구도, TitleOffice 라이트 3개·반사 프로브 세기 0.3(씬 오버라이드), 재베이크. `GlobalVolumeProfile` DoF 20 m·F4·65 mm(아트 씬과 공유).
+- 🔴 알려진 문제 2건(프로그래머): Play 뒤 저장하면 타이틀 카메라 3대 AA 가 SMAA 로 바뀜(`GraphicsQualityConfig` 훅) · 모니터 화면이 깊이 텍스처에 없음(DoF 20 m 는 이 상태 기준).
+- 커밋 제외: `MainProject-git.slnx` · `Assets/_Recovery/` · `PLAN-lobby-stage.md`·`PLAN-title-camera.md`.
+
+## ▶▶ 반영 (2026-10-23 · Claude(로비 라이팅 세션)) — **맵·로비 라이팅 + 존 조명 벽 회피 + 로비 바깥 검정 바닥 + 로비 형광등**, 브랜치 `feature/LobbyLighting` → `development` · 상세 [map-lighting.md](Docs/tech/map-lighting.md)
+- 맵(4.MapScene): Toon 볼륨 `VP_CombatLevel_Toon`(Neutral·노출 +0.25) · 환경광 그라데이션 · 주광 0.75. 로비(3.LobbyScene): 별도 `VP_Lobby_Toon`(노출 −0.15·**블룸 0.8**) — 두 씬의 노출·블룸을 따로 조정한다.
+- 존 프리팹 9개: 벽(Stage1 `Level_wall_hallway`)에 붙은 스포트라이트를 슬롯 배치 기준으로 안쪽 이동 — `Tools/Map/Authoring/벽에 붙은 조명 안쪽으로`(4.MapScene 열고 실행).
+- 로비 `Env_Black_Outside`: 로비 건축 외곽선과 오차 0(테두리 428곳 실측)으로 구멍 뚫린 검정 판, **y 2.165(벽 윗면 바로 아래)** — 레이아웃 바뀌면 `로비 바깥 검정 바닥 만들기` 다시.
+- 로비 형광등 36개 = `_Fluorescent (n)` 묶음(복제 배치) × **포인트 라이트 1개 + 바닥 빛 줄기**(막대 메시 없음 — 탑다운이라 천장 요소 불필요). `형광등 — 씬 전체 다시 조립`·`라이트 수`·`바닥 빛 줄기 사용` 메뉴. PC Forward+ 라 라이트 수 여유(한도 256).
+- 커밋 제외: `StringTable.asset`(자동 추가 키 63개) · `MainProject-git.slnx` · `Assets/_Recovery/` · `PLAN-lobby-stage.md`·`PLAN-title-camera.md`. 서울알림 Medium SDF 로컬 변경(Play 동적 글자)은 버리고 원격 Static 판 사용. SVN 변경 없음.
+
+## ▶▶ 작업 세션 (2026-10-23 · 경석(Claude+Codex) · **보스 등장 시네마틱 + 다인 Space 홀드 스킵**, 브랜치 `feature/SettingsDdol` 작업 트리) — 계획 [PLAN-boss-encounter-cutscene.md](PLAN-boss-encounter-cutscene.md) ✅ 승인(10-23, Codex 아이디어 회의·레퍼런스 영상 실측 반영) · ✅ 구현 · 컴파일 0 · 전투 EditMode 295/0 · ✅ 경석 Play(1인·MPPM 3인 — 카메라 구도·HP바 차오름·HUD 끄기·Space 키캡 스킵·스킵 뒤 카메라 복귀·지시 0.8초 대기 반영) · ✅ development 병합(10-23) · ⚠️ 알려진 문제: 엘리베이터 직전 재합류자가 워크인 중 안 보임(원인 미확정, PLAN "알려진 문제")
+- 워크인(엘리베이터 보행 재사용, 가로 일자·3인 삼각형 동시 출발) → 강하 → 착지 밀림·흔들림 → 웰즈 `Boss_welz_throwing` 지시·독백 → 전투. 스킵 = Space 1초(표 유지)·전원 동의. 레터박스 4%·비네팅 0.35 시작값. 씬·프리팹 무수정(런타임 생성).
+- 다른 영역 파일 추가분은 [handoff-boss-intro-cinematic.md](Docs/tech/handoff-boss-intro-cinematic.md) — 보스 HP바·튜토리얼 정면 팁 노출 시점이 바뀐다.
+
+## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **튜토리얼·23호 전수조사 → 보스방·몬스터 결함 수정**, 브랜치 `feature/SettingsDdol` 작업 트리) — ✅ 구현 · 컴파일 error CS 0(배치) · `TutorialZone4RulesTests` 23/0 · ✅ development 병합(10-23, 보스 등장 연출과 함께)
+- 23호: 0줄 자폭 HP 1 보호가 HP−1 피해까지 막던 것 · 폭발 뒤 첫 치명타가 자폭 재예약하던 것(`TwentyThreeBoss.cs` ZeroGuard) · 잡힌 대상 쓰러지면 놓고 복귀(빈 손 간파 방지) · B 북진 첫 칸 막힘 = 보상 없이 기술적 중단 · 연쇄 간파 창 도중 쓰러짐 = 회차 미소모.
+- 보스방: 이동 카운트다운 대기를 `ServerTime` 으로 · 튜토리얼 G11 전 강제 개시 부활 목숨 차감 없음.
+- 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
+- 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
+- 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+## ▶▶ 작업 세션 (2026-10-26 · 민경(Claude) · **팔라딘 E(수호자의 의지) 연출 — 상태 클립별 VFX 7종**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject import·배선(배치 컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play
+- 은희 영역 연출 배선만: `FirstMeleeSubSkill`(임시 반격 충격파 `ServerInterruptWave` 삭제 · `shieldGlow`·`barrierLoop`·`auraLoop`·`chargeLoop` · OnClientPlay/OnEnd) · `Garen_E_GuardStart`·`GuardEnd`·`GuardCounter.anim` 이벤트 · `Player_Paladin.prefab` `VFX/GuardianWill` 소켓 7. 공유 → [handoff-paladin-guardian-will-vfx.md](Docs/tech/handoff-paladin-guardian-will-vfx.md)
+- 에셋 SVN add 필요: `ESkill/FX_GuardianWill_*` 7 + `_Entry` 7 · 새 폴더 `_Materials/Player1`(23) · `Textures/Player1`(11) · `Models/Player1`(6)
+
+## ▶▶ 작업 세션 (2026-10-26 · 민경(Claude) · **팔라딘 우클릭 연출 — 충격파 간파 성공 때만 · 방패 기 모으기**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현·배선(미커밋) · ⏳ 민경 Play
+- 은희 영역 연출 배선만: `FirstMeleeInterruptSkill`(충격파 = `ServerInterruptSucceeded` 자기 시전만 · `chargeLoop`) · `Garen_Parry.anim` 이벤트 2개 · `Player_Paladin.prefab` `ShieldCharge` 소켓. 공유 → [handoff-paladin-interrupt-vfx.md](Docs/tech/handoff-paladin-interrupt-vfx.md)
+- 에셋 SVN add 필요: `RightClickSkill/FX_ShieldCharge`·`_Entry` · `_Materials/M_ShieldCharge_*` 3
+
+## ▶▶ 작업 세션 (2026-10-23 · 민경(Claude) · **23호 전기 장판 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현·배선(미커밋) · ⏳ 민경 Play
+- 경석 영역 추가만: `BossElectricFloor` 클라 이벤트 3개 · `FloorFireClientRpc` 에 `bool lethal`(연출용 — 호스트·클라 같은 빌드) · `TwentyThree.prefab` `VFX` 에 `BossElectricFloorVfx`. 공유 → [handoff-boss-electric-floor-vfx.md](Docs/tech/handoff-boss-electric-floor-vfx.md)
+- 에셋 SVN add 필요: `50.Art/VFX/Common/Boss/ElectricFloor/` · `_Materials/Boss/M_Floor_*` 8 · `Textures/T_Floor*` 4
+
+## ▶▶ 반영 (2026-10-22 · 경석(Claude)) — 23호 **B 보스가 기본**(에디터 툴바 처음 값·심볼 없는 빌드 모두 B, A = `BOSS_A_BUILD` 메뉴) · 간파 정면 각도 60 → **90**(No23·A·B·Raid·Solo 에셋 + xlsx Boss 252행, SVN **r501** · 핀 501)
+
+## ▶▶ 작업 세션 (2026-10-22 · 경석(Claude) · **설정창·ESC 메뉴 DDOL 단일 프리팹(로비 설정창 안 열림)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-settings-ddol.md](PLAN-settings-ddol.md) ✅ 승인 · ✅ 구현 · 컴파일 0 · EditMode 2717/0 · ✅ 4관점 검토 워크플로(확인 결함 4건 수정) · ✅ 경석 Play · ✅ 커밋 · development 병합 · SVN **r500**(핀 500)
+- 은희 공유: [handoff-game-menu.md](Docs/tech/handoff-game-menu.md) — 그만두기 → 타이틀 의도적 이탈(`DemoSessionDirector.PrepareLeaveToTitle`·`ReconnectLoop.Reset`) · 입력 기본값(홀드 토글 켬 · 대시는 캐릭터 방향 그대로) · 조준 ESC 소비 표시.
+- 같이 들어간 것(경석 10-22 Play): 타이틀 버튼 기본 한국어(시작하기·설정·나가기, en = START·SETTING·EXIT — `TextScramble` 이 저장 원문으로 덮던 것 수정) · 그만두기 팝업 = **바탕화면 / 타이틀** 두 버튼, 누르면 바로 실행(✗/✓ 없음, ESC = 메뉴로 · 로비·인게임 같음, 호스트는 경고 문구) · 새 문구 6개 Strings 시트 + 서울알림 Heavy 아틀라스(288 → 342자) · M 키 맵 전체 보기 끔.
+- EditMode: 새 에디터 2717/0. `EnemyC3PrewarmTests` 2건은 **에디터에서 Play 한 뒤에만** 실패(57.3 드론 풀 `HideAndDontSave` 잔존 — 이번 변경 무관). handoff §4.
+- 커밋 제외(Unity 부수효과): `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`(Play 중 동적 글자 추가) · `AddressableAssetSettings.asset`(해시 0 리셋).
+- SVN **r500**: `DataTable~/GameData.xlsx`(Strings 6행만 — 다른 시트 바이트 동일 확인) · `UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset`. git 과 같이 받아야 문구·글자가 맞다.
+- 🔴 Play 종료 무한대기 원인 확정 = **Unity 엔진 교착 UUM-152966**(셰이더 파괴 중 비동기 셰이더 컴파일 취소가 잠금 대기, 6000.3.13f1~ 미해결). 우리 코드 아님. 경석 PC 에서만 재현돼 **경석 로컬에서만** Editor 비동기 셰이더 컴파일을 껐다(git 미반영). 같은 증상이 나면 Project Settings › Editor › Asynchronous Shader Compilation 을 로컬에서 끄면 된다.
+
 ## ▶▶ 반영 (2026-10-21 · 경석(Claude)) — `feature/Boss23` → `development` 병합·푸시(origin/development 142커밋 선병합, 충돌 = `art-svn.json` 1건 → development 판). SVN **r487**(핀 478 → 487). 컴파일 0 · 전투 279/0 · 보스 패턴 10/0 · 데이터 테이블 240/0.
 - development 쪽 C3 적 범위표시(할 일 57)가 `TwentyThreeBoss.cs`·`BossElectricFloor.cs` 등에 자동 병합됨 — A·B Play 때 예고 표시 같이 볼 것.
 
@@ -87,7 +131,7 @@ Update this file when a term becomes important enough that future agents or team
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).
 - 웰즈 드론 회색 = DRONE.fbx 에 머티리얼 없음 → `WellsDrone.prefab`(래퍼) + `DRONE_Mat`(SVN r454, URP Lit 베이스+노멀). 저작 `Tools/Boss/웰즈 드론 — 재질·래퍼 프리팹 만들기`.
-- 레이드(=B) 테스트 빌드 메뉴 `Build/Windows64 Player (MainFlow · B 보스)`(10-20 개명)(BOSS_RAID_BUILD, 출력 `MainProjectBuilds/WindowsRaid`). ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
+- (10-22 바뀜) 기본 빌드 = B 보스 `Build/Windows64 Player (MainFlow · B 보스 — 기본)`(출력 `MainProjectBuilds/Windows`) · A 는 `… · A 보스`(BOSS_A_BUILD, 출력 `WindowsA`). 옛 BOSS_RAID_BUILD·WindowsRaid 는 없다. ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
 - ⏸ 보류: Stage1 `Slot_8_Z9_M` 배치 어긋남(은희 보고) — 팀장 나중에 확인. 전투 시스템 개정(제압 칸·간파 성공 넉백+그로기→취약 8초·취약 중 CC 패턴 끊기)은 칸 UI 회의 후, 보스 넉백 ↔ UnitWallImpacts 연결은 은희와 상의.
 
 ## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)
@@ -340,6 +384,10 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 ## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 일반 E(단검 강화) VFX — 날 붉은 발광 + 검붉은 오라 + 차지 + 강화 일격 슬래쉬**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · 🛠 MainProject 발광·배선(진행 = PLAN 「진행」) · MyProject 빌드 메뉴 `Tools/VFX/Assassin Enhance (일반 E) 빌드` → ⏳ 민경 실행·컨펌 → 반입 · 🔴 은희 공유 handoff-assassin-r-vfx §3-4(공용 ToonLit)
 - 수정: 신규 `AssassinEnhanceReadyView.cs` · `Assassin_Armature.prefab`(단검 머티리얼·소켓·컴포넌트) · `Player_Assassin.prefab`(임시 시전 연출 비움). 반입 때 `Player3/E_Enhance/`.
 - 🔸 10-16 2차(민경 grill): 칼날 발광을 **팔라딘 방식**으로 교체 — `ToonLit.shader`·`MaterialFadeEffect.cs` **HEAD 로 되돌림**, `Assassin_Dagger_Toon.mat` 삭제(단검 [0] = `Assassin_Toon`), 단검 [1] 오버레이 신규 `50.Art/VFX/_Materials/Dagger_Blade_Glow.mat` + `50.Art/VFX/Textures/Dagger_BladeMask.png`(🔴 SVN add). 오라는 칼날 메시 `Dagger_Blade.fbx`(MyProject `Export/Player3/Models/`, 반입 시 `50.Art/VFX/Models/` · SVN add)의 표면에서 방출(Shape 위치 −0.33 보정). MyProject 에 단검 FBX·텍스처·발광 재질·마스크를 **같은 guid** 로 복사, `EnhanceTester` 실제 단검 사용. 은희 공유는 ToonLit 되돌림으로 불필요.
+## ▶▶ 작업 세션 (2026-10-22 · 민경(Claude) · **23호 송전기(차징) 연출 교체**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 반입·코드·배선(dotnet 빌드 오류 0, 미커밋) · ⏳ Play/MPPM · 🔴 SVN add([handoff](Docs/tech/handoff-boss-pylon-vfx.md) §2) · 수정(MainProject): 신규 `1.Scripts/Effects/PylonChargeView.cs`·`BossChargeTetherView.cs`·`PylonChargeVisual.cs`·`ElectricTether.cs`, `EffectStagePlayer.cs`(종료 이벤트 추가), `EffectCatalog`, `bossroom.prefab`·`TwentyThree.prefab`(경석 — 프리팹만, handoff)
+
+## ▶▶ 작업 세션 (2026-10-22 · 민경(Claude) · **증강 획득 이펙트 Level_up(본인 화면·몸 추종)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(dotnet 빌드 오류 0) · ⏳ Play · 🔴 SVN add(Level_up·엔트리·텍스처 4·Cylinder01)
+- `TraitAcquiredVfxPresenter`(세 Variant `VFX`) — `TutorialTraitDirector` 획득 수 증가를 읽기만 함(은희 코드 무수정). 카탈로그 `Player_TraitAcquired`.
 ## ▶▶ 작업 세션 (2026-10-21 · 민경(Claude) · **거너 R 추적 레이저 연출 재제작 — 장판·대상별 조준·위성 레이저**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 1단계 MyProject · ✅ 2단계 반입·코드(dotnet 빌드 오류 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유 [handoff-gunner-r-vfx](Docs/tech/handoff-gunner-r-vfx.md) §1 · ⚠️ Lock 꺾쇠 세로 서는 문제 미해결
 - 수정: `2.Prefabs/Player/Gunner/GunnerTrackingLaser.prefab` · 신규 `GunnerTrackingLaserView.cs`·`TelegraphRing.cs` · `GunnerTrackingLaser.cs`(추가만) · `EffectCatalog`.
 ## ▶▶ 작업 세션 (2026-10-21 · 민경(Claude) · **잡몹 8종 폭발 사망 — ExplodeDeath + FX_Death_Explosion_01(잡몹)/02(엘리트)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(dotnet 빌드 오류 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 경석 공유 [handoff-monster-explode-death](Docs/tech/handoff-monster-explode-death.md) §1

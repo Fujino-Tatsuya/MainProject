@@ -136,6 +136,13 @@ public sealed class TutorialDeathRulesModel
         return n;
     }
 
+    /// <summary>
+    /// 즉시 부활 주문을 보스 진입 고정 지점(할 일 80)에 세우는가 — 보스방 도착 전(<paramref name="finished"/> false)의 즉시(InPlace) 주문 전부.
+    /// 할 일 89 집결 규칙에선 카운트다운 중 사망이 그 순간 카운트다운을 취소해(<see cref="EndMove"/>) 이동 중 여부로는 못 가린다 —
+    /// 주문이 즉시로 바뀐 것 자체가 "보스방 이동이 시작됐었다" 는 뜻이다. 도착 뒤(<paramref name="finished"/>) 주문은 그 자리.
+    /// </summary>
+    public static bool RevivesAtBossEnterPoint(TutorialReviveOrder order, bool finished) => order.InPlace && !finished;
+
     /// <summary>기록을 지운다(이탈 등). 있었으면 true.</summary>
     public bool Forget(ulong clientId) => _pending.Remove(clientId);
 

@@ -732,6 +732,568 @@ MonoBehaviour:
   - key: UI.LobbyResult.Header.Deaths
     ko: "\uC0AC\uB9DD"
     en: Deaths
+  - key: UI.Exit.ToTitle
+    ko: "\uD0C0\uC774\uD2C0"
+    en: Title
+  - key: UI.Exit.HostQuitWarning
+    ko: "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uC758 \uAC8C\uC784\uB3C4 \uB05D\uB0A9\uB2C8\uB2E4"
+    en: Other players' games will end too
+  - key: UI.Exit.HostToTitleWarning
+    ko: "\uB2E4\uB978 \uD50C\uB808\uC774\uC5B4\uB3C4 \uC5F0\uACB0\uC774 \uB04A\uAE41\uB2C8\uB2E4"
+    en: Other players will be disconnected too
+  - key: UI.Title.Start
+    ko: "\uC2DC\uC791\uD558\uAE30"
+    en: START
+  - key: UI.Title.Setting
+    ko: "\uC124\uC815"
+    en: SETTING
+  - key: UI.Title.Exit
+    ko: "\uB098\uAC00\uAE30"
+    en: EXIT
+  - key: UI.StatusEffect.BaseAttackDamageModifier
+    ko: BaseAttackDamage
+    en: BaseAttackDamage
+  - key: UI.StatusEffect.DealtDamageModifier
+    ko: DealtDamage
+    en: DealtDamage
+  - key: UI.StatusEffect.MoveSpeedBaseModifier
+    ko: MoveSpeedBase
+    en: MoveSpeedBase
+  - key: UI.StatusEffect.AttackSpeedBaseModifier
+    ko: AttackSpeedBase
+    en: AttackSpeedBase
+  - key: UI.StatusEffect.DefenseBaseModifier
+    ko: DefenseBase
+    en: DefenseBase
+  - key: UI.StatusEffect.MaxHpBaseModifier
+    ko: MaxHpBase
+    en: MaxHpBase
+  - key: UI.StatusEffect.MoveSpeedFinalMultiplier
+    ko: MoveSpeedFinalMultiplier
+    en: MoveSpeedFinalMultiplier
+  - key: UI.StatusEffect.AttackSpeedFinalMultiplier
+    ko: AttackSpeedFinalMultiplier
+    en: AttackSpeedFinalMultiplier
+  - key: UI.StatusEffect.CooldownRateModifier
+    ko: "\uC81C\uC555 \uAC00\uC18D"
+    en: Suppress Haste
+  - key: UI.Lobby.GatherCount
+    ko: "\uC9D1\uACB0 {gathered}/{total}"
+    en: "\uC9D1\uACB0 {gathered}/{total}"
+  - key: UI.Lobby.GatherCountdown
+    ko: "{time} \uD6C4 \uC774\uB3D9"
+    en: "{time} \uD6C4 \uC774\uB3D9"
+  - key: UI.Lobby.Train01Title
+    ko: "\uBB34\uAE30 \uC810\uAC80"
+    en: "\uBB34\uAE30 \uC810\uAC80"
+  - key: UI.Lobby.Train01BasicAttack
+    ko: "\uAE30\uBCF8 \uACF5\uACA9"
+    en: "\uAE30\uBCF8 \uACF5\uACA9"
+  - key: UI.Lobby.Train01SkillQ
+    ko: Q
+    en: Q
+  - key: UI.Lobby.Train01SkillE
+    ko: E
+    en: E
+  - key: UI.Lobby.Train01SkillR
+    ko: R
+    en: R
+  - key: UI.Lobby.Train01RightClick
+    ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    en: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+  - key: UI.Lobby.Train01Dash
+    ko: "\uB300\uC2DC"
+    en: "\uB300\uC2DC"
+  - key: UI.Lobby.Train01PartyDone
+    ko: "\uC644\uB8CC {done}/{total}"
+    en: "\uC644\uB8CC {done}/{total}"
+  - key: UI.Lobby.Train02Title
+    ko: "\uC77C\uBC18 \uC804\uD22C"
+    en: "\uC77C\uBC18 \uC804\uD22C"
+  - key: UI.Lobby.Train02Remaining
+    ko: "\uB0A8\uC740 \uC0C1\uB300 {remaining}/{total}"
+    en: "\uB0A8\uC740 \uC0C1\uB300 {remaining}/{total}"
+  - key: Tutorial.Guide.TUT_S0_WELCOME
+    ko: "\uC791\uC804 \uAD6C\uC5ED\uC5D0 \uC9C4\uC785\uD588\uC2B5\uB2C8\uB2E4. \uAE30\uBCF8
+      \uC870\uC791\uBD80\uD130 \uC810\uAC80\uD569\uB2C8\uB2E4."
+    en: You have entered the operation zone. Let's check the basic controls first.
+  - key: Tutorial.Guide.TUT_ZONE_CLEAR
+    ko: "\uAD6C\uC5ED \uD655\uBCF4. \uB2E4\uC74C \uBCF5\uB3C4\uAC00 \uC5F4\uB838\uC2B5\uB2C8\uB2E4."
+    en: Zone secured. The next corridor is open.
+  - key: Tutorial.Guide.TUT_TIP_R_CANCEL
+    ko: "R(\uAD81\uADF9\uAE30)\uC740 \uB300\uC0C1\uC744 \uC9C0\uC815\uD558\uB294
+      \uB3D9\uC548 \uC88C\uD074\uB9AD\uC73C\uB85C \uD655\uC815\uD569\uB2C8\uB2E4.
+      \uCDE8\uC18C\uB294 R \uC744 \uB2E4\uC2DC \uB204\uB974\uAC70\uB098 \uC6B0\uD074\uB9AD."
+    en: While aiming R (Ultimate), left-click to confirm. Press R again or right-click
+      to cancel.
+  - key: Tutorial.Guide.TUT_TIMER_EXPIRED
+    ko: "\uC2DC\uAC04\uC774 \uB2E4 \uB418\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uC6D0\uD749\uC774
+      \uAE30\uB2E4\uB9BD\uB2C8\uB2E4."
+    en: "Time's up \u2014 the culprit is waiting."
+  - key: Tutorial.Guide.TUT_WAIT_PARTY
+    ko: "\uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911 ({n}/{total}) \xB7 {mm:ss}
+      \uD6C4 \uC790\uB3D9 \uC9C4\uD589"
+    en: "Waiting for teammates ({n}/{total}) \xB7 Auto-continue in {mm:ss}"
+  - key: Tutorial.Guide.TUT_Z1_MOVE
+    ko: "<b>WASD</b> \uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    en: Move with <b>WASD</b>
+  - key: Tutorial.Guide.TUT_Z1_DASH
+    ko: "<b>Space</b> \uB85C \uB300\uC2DC\uD558\uC138\uC694"
+    en: Dash with <b>Space</b>
+  - key: Tutorial.Guide.TUT_Z1_DASH_SUB
+    ko: "\uB300\uC2DC\uD558\uB294 \uC21C\uAC04\uC5D0\uB294 \uD53C\uD574\uB97C \uBC1B\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    en: You take no damage at the moment you dash.
+  - key: Tutorial.Guide.TUT_Z1_ATTACK
+    ko: "<b>\uC88C\uD074\uB9AD</b>\uC73C\uB85C \uAE30\uBCF8 \uACF5\uACA9\uC744 \uC0AC\uC6A9\uD558\uC138\uC694
+      ({n}/1)"
+    en: Use a basic attack with <b>Left Click</b> ({n}/1)
+  - key: Tutorial.Guide.TUT_Z1_PASSIVE
+    ko: "\uD654\uBA74 \uC544\uB798 \uC2A4\uD0AC\uBC14 <b>\uB9E8 \uC67C\uCABD \uC544\uC774\uCF58(P)</b>
+      \uC5D0 \uB9C8\uC6B0\uC2A4\uB97C \uC62C\uB824 \uD328\uC2DC\uBE0C\uB97C \uD655\uC778\uD558\uC138\uC694"
+    en: Hover over the <b>leftmost icon (P)</b> on the skill bar to check your passive
+  - key: Tutorial.Guide.TUT_Z1_GO
+    ko: "\uBCF5\uB3C4\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    en: Move to the corridor
+  - key: Tutorial.Guide.TUT_Z2_INTRO
+    ko: "\uC801\uC774 \uAE68\uC5B4\uB0A9\uB2C8\uB2E4! \uBAA8\uB4E0 \uC801\uC744 \uCC98\uCE58\uD558\uC138\uC694."
+    en: Enemies are waking up! Defeat them all.
+  - key: Tutorial.Guide.TUT_Z2_GOAL
+    ko: "\uC801 \uCC98\uCE58 {n}/{total}"
+    en: Enemies defeated {n}/{total}
+  - key: Tutorial.Guide.TUT_Z2_NUDGE
+    ko: "<b>{\uD0A4}</b> \uB97C \uC544\uC9C1 \uC4F0\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4
+      \u2014 [{\uC2A4\uD0AC\uBA85}]"
+    en: "You haven't used <b>{\uD0A4}</b> yet \u2014 [{\uC2A4\uD0AC\uBA85}]"
+  - key: Tutorial.Guide.TUT_Z2_Q
+    ko: "<b>Q</b> [{Q}] \uC2A4\uD0AC\uC744 \uC368 \uBCF4\uC138\uC694."
+    en: Try the <b>Q</b> [{Q}] skill.
+  - key: Tutorial.Guide.TUT_Z2_Q_PALADIN
+    ko: "<b>Q</b> [{Q}] \uB204\uB974\uACE0 \uC788\uB294 \uB3D9\uC548 \uBC29\uD328\uB97C
+      \uB4E4\uACE0 \uC804\uC9C4\uD569\uB2C8\uB2E4. \uB9C8\uC6B0\uC2A4\uB85C \uBC29\uD5A5\uC744
+      \uBC14\uAFC9\uB2C8\uB2E4. (\uD640\uB4DC \uD1A0\uAE00 \uC635\uC158\uC744 \uCF30\uB2E4\uBA74
+      \uD55C \uBC88 \uB20C\uB7EC \uCF1C\uACE0, \uB2E4\uC2DC \uB20C\uB7EC \uB055\uB2C8\uB2E4)"
+    en: <b>Q</b> [{Q}] Advance with your shield raised while held. Steer with the
+      mouse. (With hold-toggle on, press once to start and again to stop.)
+  - key: Tutorial.Guide.TUT_Z2_Q_GUNNER
+    ko: "<b>Q</b> [{Q}] \uC815\uC2E0\uC744 \uC9D1\uC911\uD558\uACE0 \uC88C\uD074\uB9AD\uC73C\uB85C
+      \uBC1C\uC0AC\uD569\uB2C8\uB2E4. \uC624\uB798 \uC9D1\uC911\uD560\uC218\uB85D
+      \uBA40\uB9AC, \uAC15\uD558\uAC8C."
+    en: <b>Q</b> [{Q}] Focus, then left-click to fire. The longer you focus, the
+      farther and harder it hits.
+  - key: Tutorial.Guide.TUT_Z2_Q_ASSASSIN
+    ko: "<b>Q</b> [{Q}] \uC801\uC744 \uAFF0\uB6AB\uC73C\uBA70 \uB3CC\uC9C4\uD569\uB2C8\uB2E4."
+    en: <b>Q</b> [{Q}] Dash through enemies.
+  - key: Tutorial.Guide.TUT_Z2_E
+    ko: "<b>E</b> [{E}] \uC2A4\uD0AC\uB3C4 \uC368 \uBCF4\uC138\uC694."
+    en: Try the <b>E</b> [{E}] skill too.
+  - key: Tutorial.Guide.TUT_Z2_E_PALADIN
+    ko: "<b>E</b> [{E}] \uC790\uC2E0\uC5D0\uAC8C \uBCF4\uD638\uB9C9\uC744 \uC50C\uC6C1\uB2C8\uB2E4."
+    en: <b>E</b> [{E}] Put a protective shield on yourself.
+  - key: Tutorial.Guide.TUT_Z2_E_GUNNER
+    ko: "<b>E</b> [{E}] \uB4A4\uB85C \uBB3C\uB7EC\uB098\uBA70 \uACFC\uC5F4\uC744
+      \uBAA8\uB450 \uC2DD\uD799\uB2C8\uB2E4."
+    en: <b>E</b> [{E}] Leap back and vent all heat.
+  - key: Tutorial.Guide.TUT_Z2_E_ASSASSIN
+    ko: "<b>E</b> [{E}] \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC774 \uAC15\uD0C0\uAC00
+      \uB429\uB2C8\uB2E4."
+    en: <b>E</b> [{E}] Your next basic attack becomes a heavy strike.
+  - key: Tutorial.Guide.TUT_Z3_INTRO
+    ko: "\uACF5\uACA9\uC744 <b>\uAC04\uD30C</b>\uD574 \uAE30\uD68C\uB97C \uB9CC\uB4E4\uACE0,
+      \uCDE8\uC57D\uD55C \uC801\uC744 <b>\uBCBD\uC73C\uB85C \uBC00\uC5B4\uB0B4\uC138\uC694</b>.
+      \uB3D9\uB8CC\uB3C4 \uC774\uC5B4\uC11C \uBC00 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    en: <b>Interrupt</b> attacks to create openings, then <b>push vulnerable enemies
+      into walls</b>. Teammates can keep the push going.
+  - key: Tutorial.Guide.TUT_Z3_PRACTICE_NOTE
+    ko: "\uC5F0\uACC4\uB97C \uC138 \uBC88 \uC131\uACF5\uD560 \uB54C\uAE4C\uC9C0 \uC2A4\uD53C\uB108\uBD07\uC740
+      \uC4F0\uB7EC\uC9C0\uC9C0 \uC54A\uACE0 \uACF5\uACA9\uB3C4 \uD53C\uD574\uB97C
+      \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Until you land the combo three times, the Spinner Bot won't go down and its
+      attacks deal no damage.
+  - key: Tutorial.Guide.TUT_Z3_GOAL
+    ko: "\uAC04\uD30C \u2192 \uBC00\uCE58\uAE30 \u2192 \uBCBD \uCDA9\uB3CC \uC5F0\uACC4
+      ({n}/{total})"
+    en: "Interrupt \u2192 Push \u2192 Wall impact combo ({n}/{total})"
+  - key: Tutorial.Guide.TUT_Z3_GUNNER
+    ko: "\uAC70\uB108\uC758 \uAC04\uD30C\uB294 \uCD1D\uAD6C\uB85C \uCC0C\uB974\uB294
+      \uADFC\uC811\uAE30\uC785\uB2C8\uB2E4. \uC4F0\uACE0 \uB098\uBA74 \uC0B4\uC9DD
+      \uBC00\uB824\uB098\uB2C8 \uB2E4\uC2DC \uBD99\uC73C\uC138\uC694."
+    en: The Gunner's interrupt is a close-range muzzle jab. It knocks you back slightly,
+      so close in again.
+  - key: Tutorial.Guide.TUT_Z3_MISS
+    ko: "\uBE57\uB098\uAC14\uC2B5\uB2C8\uB2E4 \u2014 \uB354 \uAC00\uAE4C\uC774, \uC2A4\uD53C\uB108\uBD07\uC744
+      \uD5A5\uD574."
+    en: "Missed \u2014 get closer and face the Spinner Bot."
+  - key: Tutorial.Guide.TUT_Z3_EARLY
+    ko: "\uC544\uC9C1\uC785\uB2C8\uB2E4 \u2014 \uB178\uB797\uAC8C \uBE5B\uB0A0 \uB54C\uB9CC
+      \uAC04\uD30C\uB429\uB2C8\uB2E4."
+    en: "Not yet \u2014 you can only interrupt while it glows yellow."
+  - key: Tutorial.Guide.TUT_Z3_FIRST_SUCCESS
+    ko: "\uAC04\uD30C \uC131\uACF5! \uACF5\uACA9\uC774 \uB04A\uAE30\uACE0 \uC801\uC774
+      \uCDE8\uC57D\uD574\uC9D1\uB2C8\uB2E4."
+    en: Interrupted! The attack is cut off and the enemy is vulnerable.
+  - key: Tutorial.Guide.TUT_Z3_HINT
+    ko: "\uC694\uB839: \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uBC14\uB85C \uBD99\uC5B4\uC11C
+      \uC6B0\uD074\uB9AD. \uAC04\uD30C\uB294 \uB2E4\uC2DC \uC4F0\uAE30\uAE4C\uC9C0
+      \uBA87 \uCD08 \uAC78\uB9BD\uB2C8\uB2E4."
+    en: 'Tip: when you see the yellow glow, get close and right-click. Interrupt
+      takes a few seconds to recharge.'
+  - key: Tutorial.Guide.TUT_Z3_REAL
+    ko: "\uC5F0\uC2B5 \uB05D. \uC774\uC81C \uC9C4\uC9DC\uC785\uB2C8\uB2E4! \uB178\uB780\uBE5B\uC774
+      \uBCF4\uC774\uBA74 \uC5B8\uC81C\uB4E0 \uAC04\uD30C\uD558\uC138\uC694."
+    en: Practice over. This is the real thing! Interrupt whenever you see the yellow
+      glow.
+  - key: Tutorial.Guide.TUT_Z3_BOSS
+    ko: "[\uC2A4\uD53C\uB108\uBD07] \uC744 \uCC98\uCE58\uD558\uC138\uC694"
+    en: 'Defeat [Spinner Bot]'
+  - key: Tutorial.Guide.TUT_Z4_LORE
+    ko: "[\uACBD\uACE0] \uC624\uB978\uCABD \uC544\uB798 \uAC8C\uC774\uC9C0\uAC00
+      \uAC00\uB4DD \uCC28\uBA74, \uC784\uBB34\uC758 \uC131\uD328\uC640 \uAD00\uACC4\uC5C6\uC774
+      <b>\uC138\uACC4\uC120\uC744 \uC5C9\uB9DD\uC73C\uB85C \uB9CC\uB4E0 \uC6D0\uD749</b>\uACFC
+      \uC2F8\uC6B0\uAC8C \uB429\uB2C8\uB2E4."
+    en: '[Warning] When the gauge at the bottom right fills up, you will face <b>the
+      culprit who wrecked the world line</b>, whether the mission succeeded or not.'
+  - key: Tutorial.Guide.TUT_Z4_TIMER_HINT
+    ko: "\uAC8C\uC774\uC9C0\uAC00 \uB2E4 \uCC28\uAE30 \uC804\uC5D0 \uBCF4\uC2A4\uBC29
+      \uC5D8\uB9AC\uBCA0\uC774\uD130\uC5D0 \uC624\uB974\uBA74 \uAC8C\uC774\uC9C0\uAC00
+      \uBA48\uCDA5\uB2C8\uB2E4. \uBCF4\uC2A4\uBC29\uC73C\uB85C \uAC00\uB294 \uAE38\uC740
+      \uC911\uAC04\uBCF4\uC2A4\uB97C \uC4F0\uB7EC\uB728\uB9AC\uBA74 \uC5F4\uB9BD\uB2C8\uB2E4."
+    en: Board the boss room elevator before the gauge fills to stop it. The path
+      to the boss room opens when you defeat the mid-boss.
+  - key: Tutorial.Guide.TUT_Z4_START
+    ko: "\uAC8C\uC774\uC9C0\uAC00 \uCC28\uC624\uB974\uAE30 \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4."
+    en: The gauge has started filling.
+  - key: Tutorial.Guide.TUT_Z4_PANEL_INTRO
+    ko: "\uAD6C\uC5ED <b>\uB124 \uADC0\uD241\uC774\uC758 \uC81C\uC5B4 \uD328\uB110</b>\uC744
+      \uAC00\uB3D9(<b>F</b>)\uD558\uBA74 \uC911\uC559 \uC12C\uC73C\uB85C \uAC00\uB294
+      \uB2E4\uB9AC\uAC00 \uC5F4\uB9BD\uB2C8\uB2E4."
+    en: Activate (<b>F</b>) the <b>control panels in the four corners</b> to open
+      the bridge to the central island.
+  - key: Tutorial.Guide.TUT_Z4_PANEL_GOAL
+    ko: "\uC81C\uC5B4 \uD328\uB110 \uAC00\uB3D9 ({n}/{total})"
+    en: Control panels activated ({n}/{total})
+  - key: Tutorial.Guide.TUT_Z4_PANEL_FIRST
+    ko: "\uD328\uB110 \uAC00\uB3D9! \uD328\uB110\uC740 \uB3D9\uB8CC\uC640 \uACF5\uC720\uB429\uB2C8\uB2E4."
+    en: Panel activated! Panels are shared with your teammates.
+  - key: Tutorial.Guide.TUT_Z4_BRIDGE
+    ko: "\uB2E4\uB9AC\uAC00 \uC5F4\uB838\uC2B5\uB2C8\uB2E4. <b>\uACC4\uB2E8\uC73C\uB85C
+      2\uCE35\uC5D0 \uC62C\uB77C</b> \uB2E4\uB9AC\uB97C \uAC74\uB108 \uC911\uC559
+      \uC12C\uC73C\uB85C \uAC00\uC138\uC694."
+    en: The bridge is open. <b>Take the stairs to the 2nd floor</b> and cross to
+      the central island.
+  - key: Tutorial.Guide.TUT_Z4_MIDBOSS
+    ko: "\uC911\uC559 \uC12C\uC758 \uC911\uAC04\uBCF4\uC2A4\uB97C \uCC98\uCE58\uD558\uC138\uC694"
+    en: Defeat the mid-boss on the central island
+  - key: Tutorial.Guide.TUT_Z4_COUNTER_REMIND
+    ko: "\uB178\uB797\uAC8C \uBE5B\uB098\uBA74 \uAC04\uD30C \uAE30\uD68C\uC785\uB2C8\uB2E4."
+    en: A yellow glow means a chance to interrupt.
+  - key: Tutorial.Guide.TUT_Z4_ULT
+    ko: "<b>R</b> \u2014 \uAD81\uADF9\uAE30\uB97C \uC368 \uBCF4\uC138\uC694."
+    en: "<b>R</b> \u2014 Try your Ultimate."
+  - key: Tutorial.Guide.TUT_Z4_ULT_ASSASSIN
+    ko: "\uBD84\uB178\uAC00 \uCDA9\uBD84\uD788 \uCC3C\uB2E4\uBA74 <b>R</b> \uB85C
+      \uBCC0\uC2E0\uD574 \uBCF4\uC138\uC694."
+    en: If your Rage is full enough, transform with <b>R</b>.
+  - key: Tutorial.Guide.TUT_Z4_CLEAR
+    ko: "\uAE38\uC774 \uC5F4\uB838\uC2B5\uB2C8\uB2E4."
+    en: The way is open.
+  - key: Tutorial.Guide.TUT_Z4_GO_BOSS
+    ko: "\uBCF5\uB3C4\uC5D0\uC11C \uB9C8\uC9C0\uB9C9 \uD2B9\uC131\uC744 \uACE0\uB978
+      \uB4A4 \uBCF4\uC2A4\uBC29 \uC5D8\uB9AC\uBCA0\uC774\uD130\uB85C \uC774\uB3D9\uD558\uC138\uC694
+      (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
+    en: Pick your last trait in the corridor, then head to the boss room elevator
+      (boss icon on the minimap)
+  - key: Tutorial.Guide.TUT_B_PAD_WARN
+    ko: "<b>\uD30C\uD2F0 \uC804\uC6D0</b>\uC774 \uC5D8\uB9AC\uBCA0\uC774\uD130 \uBC1C\uD310\uC5D0
+      \uBAA8\uC774\uBA74 5\uCD08 \uB4A4 \uBCF4\uC2A4\uBC29\uC73C\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4."
+    en: When <b>the whole party</b> gathers on the elevator pad, you move to the
+      boss room after 5 seconds.
+  - key: Tutorial.Guide.TUT_B_PAD_COUNT
+    ko: "\uBCF4\uC2A4\uBC29\uC73C\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4 \u2014 \uBC1C\uD310\uC744
+      \uBC97\uC5B4\uB098\uAC70\uB098 \uC4F0\uB7EC\uC9C0\uBA74 \uCDE8\uC18C\uB429\uB2C8\uB2E4."
+    en: "Moving to the boss room \u2014 leaving the pad or going down cancels it."
+  - key: Tutorial.Guide.TUT_B_BOSS_FRONT_TIP
+    ko: "\uC6D0\uD749(23\uD638)\uC740 <b>\uC815\uBA74</b>\uC5D0\uC11C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4
+      \u2014 \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uC55E\uC73C\uB85C \uB3CC\uC544\uAC00
+      \uC6B0\uD074\uB9AD\uD558\uC138\uC694."
+    en: "The culprit (No.23) can only be interrupted from the <b>front</b> \u2014
+      when you see the yellow glow, get in front and right-click."
+  - key: Tutorial.Guide.TUT_Z1_ATTACK_HEAT
+    ko: "\uACC4\uC18D \uC3D8\uBA74 \uACFC\uC5F4\uC774 \uC313\uC785\uB2C8\uB2E4. \uAC00\uB4DD
+      \uCC28\uBA74 \uC7A0\uC2DC \uACF5\uACA9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    en: Firing continuously builds heat. When it's full, you can't attack for a moment.
+  - key: Tutorial.Guide.TUT_Z1_PASSIVE_INFO_PALADIN
+    ko: "\uBC29\uAE08 \uCCAB \uACF5\uACA9\uC774 \uB354 \uAC15\uD558\uAC8C \uB4E4\uC5B4\uAC04
+      \uAC83\uC774 \uD328\uC2DC\uBE0C [{P}] \uC785\uB2C8\uB2E4. \uC801\uC5D0\uAC8C
+      \uB9DE\uC744\uC218\uB85D \uB354 \uBE68\uB9AC \uB2E4\uC2DC \uC900\uBE44\uB429\uB2C8\uB2E4."
+    en: That stronger first hit was your passive [{P}]. The more you get hit, the
+      faster it's ready again.
+  - key: Tutorial.Guide.TUT_Z1_PASSIVE_INFO_GUNNER
+    ko: "[{P}] \uC3E0\uC218\uB85D \uACFC\uC5F4 \uB2E8\uACC4\uAC00 \uC624\uB974\uACE0
+      \uACF5\uACA9\uC774 \uAC15\uD574\uC9C0\uC9C0\uB9CC, \uAC00\uB4DD \uCC28\uBA74
+      \uACF5\uACA9\uC774 \uC7A0\uAE41\uB2C8\uB2E4."
+    en: '[{P}] Firing raises your heat level and your attacks get stronger, but at
+      full heat your attacks lock.'
+  - key: Tutorial.Guide.TUT_Z1_PASSIVE_INFO_ASSASSIN
+    ko: "[{P}] \uACF5\uACA9\uC744 \uB9DE\uD790\uC218\uB85D \uBD84\uB178\uAC00 \uCC28\uACE0,
+      \uCDA9\uBD84\uD788 \uCC28\uBA74 <b>R</b> \uB85C \uBCC0\uC2E0\uD569\uB2C8\uB2E4.
+      \uBCF4\uC2A4\uB294 \uB4F1 \uB4A4\uB97C \uCE58\uBA74 \uB354 \uC544\uD515\uB2C8\uB2E4."
+    en: '[{P}] Landing hits fills Rage; when it''s full enough, transform with <b>R</b>.
+      Bosses take more damage from behind.'
+  - key: Tutorial.Guide.TUT_Z1_CHECK_MOVE
+    ko: "\uC774\uB3D9"
+    en: Move
+  - key: Tutorial.Guide.TUT_Z1_CHECK_DASH
+    ko: "\uB300\uC2DC"
+    en: Dash
+  - key: Tutorial.Guide.TUT_Z1_CHECK_ATTACK
+    ko: "\uAE30\uBCF8 \uACF5\uACA9"
+    en: Basic attack
+  - key: Tutorial.Guide.TUT_Z1_CHECK_PASSIVE
+    ko: "\uD328\uC2DC\uBE0C \uD655\uC778"
+    en: Check passive
+  - key: Tutorial.Guide.TUT_C_PICK
+    ko: "\uD2B9\uC131\uC744 \uD558\uB098 \uACE0\uB974\uC138\uC694"
+    en: Pick one trait
+  - key: Tutorial.Guide.TUT_C_WAIT
+    ko: "\uD2B9\uC131 \uC120\uD0DD \uC644\uB8CC \u2014 \uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9BD\uB2C8\uB2E4"
+    en: "Trait selected \u2014 waiting for teammates"
+  - key: Tutorial.Guide.TUT_C_NEXT
+    ko: "\uB2E4\uC74C \uAD6C\uC5ED\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    en: Move to the next zone
+  - key: Tutorial.Guide.TUT_C4_GO_PAD
+    ko: "\uBCF4\uC2A4\uBC29 \uC5D8\uB9AC\uBCA0\uC774\uD130 \uBC1C\uD310\uC73C\uB85C
+      \uC774\uB3D9\uD558\uC138\uC694 (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
+    en: Move to the boss room elevator pad (boss icon on the minimap)
+  - key: Tutorial.Guide.TUT_WAIT_PARTY_NOAUTO
+    ko: "\uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911 ({n}/{total})"
+    en: Waiting for teammates ({n}/{total})
+  - key: Tutorial.Guide.TUT_Z1_Q
+    ko: "<b>Q</b> \uC2A4\uD0AC [{Q}]\uC744 \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
+    en: Use the <b>Q</b> skill [{Q}] ({n}/1)
+  - key: Tutorial.Guide.TUT_Z1_Q_GUNNER
+    ko: "<b>Q</b>\uB85C \uCDA9\uC804\uC744 \uC2DC\uC791\uD558\uACE0 <b>\uC88C\uD074\uB9AD</b>\uC73C\uB85C
+      \uBC1C\uC0AC\uD558\uC138\uC694."
+    en: Start charging with <b>Q</b>, then fire with <b>Left Click</b>.
+  - key: Tutorial.Guide.TUT_Z1_E
+    ko: "<b>E</b> \uC2A4\uD0AC [{E}]\uC744 \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
+    en: Use the <b>E</b> skill [{E}] ({n}/1)
+  - key: Tutorial.Guide.TUT_Z1_E_PALADIN
+    ko: "<b>E</b>\uB85C \uBC29\uC5B4 \uC790\uC138\uB97C \uCDE8\uD558\uC138\uC694.
+      \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uBC18\uACA9\uD569\uB2C8\uB2E4."
+    en: Take a guard stance with <b>E</b>. Block an attack to counter.
+  - key: Tutorial.Guide.TUT_Z1_E_GUNNER
+    ko: "<b>E</b>\uB85C \uB4A4\uB85C \uBB3C\uB7EC\uB098\uBA70 \uACFC\uC5F4\uC744
+      \uC2DD\uD600 \uBCF4\uC138\uC694."
+    en: Leap back with <b>E</b> to vent your heat.
+  - key: Tutorial.Guide.TUT_Z1_E_ASSASSIN
+    ko: "<b>E</b>\uB85C \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC744 \uAC15\uD654\uD558\uC138\uC694."
+    en: Empower your next basic attack with <b>E</b>.
+  - key: Tutorial.Guide.TUT_Z1_RMB
+    ko: "<b>\uC6B0\uD074\uB9AD</b> \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694
+      ({n}/1)"
+    en: Use your <b>Right Click</b> skill ({n}/1)
+  - key: Tutorial.Guide.TUT_Z1_R
+    ko: "<b>R</b> \uAD81\uADF9\uAE30\uB97C \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
+    en: Use your <b>R</b> Ultimate ({n}/1)
+  - key: Tutorial.Guide.TUT_Z1_R_ASSASSIN
+    ko: "\uD5C8\uC218\uC544\uBE44\uB97C \uACF5\uACA9\uD574 \uBD84\uB178\uB97C \uBAA8\uC740
+      \uB4A4 <b>R</b>\uB85C \uBCC0\uC2E0\uD558\uC138\uC694."
+    en: Attack the dummy to build Rage, then transform with <b>R</b>.
+  - key: Tutorial.Guide.TUT_Z1_CHECK_Q
+    ko: "Q \uC2A4\uD0AC"
+    en: Q skill
+  - key: Tutorial.Guide.TUT_Z1_CHECK_E
+    ko: "E \uC2A4\uD0AC"
+    en: E skill
+  - key: Tutorial.Guide.TUT_Z1_CHECK_RMB
+    ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    en: Right-click skill
+  - key: Tutorial.Guide.TUT_Z1_CHECK_R
+    ko: "R \uAD81\uADF9\uAE30"
+    en: R Ultimate
+  - key: Tutorial.Guide.TUT_C1_COOLDOWN_RESET
+    ko: "\uBAA8\uB4E0 \uC2A4\uD0AC\uC758 \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774
+      \uCD08\uAE30\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
+    en: All skill cooldowns have been reset.
+  - key: Tutorial.Guide.TUT_Z3_COUNTER_GOAL
+    ko: "\uB178\uB797\uAC8C \uBE5B\uB0A0 \uB54C \uAC00\uAE4C\uC774\uC5D0\uC11C \uC801\uC744
+      \uD5A5\uD574 <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C \uAC04\uD30C\uD558\uC138\uC694."
+    en: When it glows yellow, get close, face the enemy and <b>Right Click</b> to
+      interrupt.
+  - key: Tutorial.Guide.TUT_Z3_PUSH_INTRO
+    ko: "\uC6B0\uD074\uB9AD\uC774 \uB2E4\uC2DC \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.
+      <b>\uBCBD \uBC18\uB300\uD3B8</b>\uC5D0\uC11C \uC801\uC744 \uD5A5\uD574 \uC6B0\uD074\uB9AD\uD558\uBA74
+      \uBCBD\uC73C\uB85C \uBC00\uC5B4\uB0BC \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    en: Right Click is ready again. Right-click toward the enemy from <b>the side
+      opposite the wall</b> to push it into the wall.
+  - key: Tutorial.Guide.TUT_Z3_PUSH_GOAL
+    ko: "\uCDE8\uC57D\uD55C \uC2A4\uD53C\uB108\uBD07\uC744 <b>\uC6B0\uD074\uB9AD\uC73C\uB85C
+      \uBCBD\uC5D0 \uBD80\uB52A\uD788\uAC8C</b> \uD558\uC138\uC694."
+    en: <b>Right-click</b> the vulnerable Spinner Bot <b>into a wall</b>.
+  - key: Tutorial.Guide.TUT_Z3_PUSH_HINT
+    ko: "\uC544\uC9C1 \uBCBD\uC5D0 \uB2FF\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uC704\uCE58\uB97C
+      \uC7A1\uACE0 \uB2E4\uC2DC \uBC00\uC5B4\uB0B4\uC138\uC694. \uB3D9\uB8CC\uB3C4
+      \uC774\uC5B4\uC11C \uBC00 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    en: It hasn't hit the wall yet. Reposition and push again. Teammates can keep
+      the push going.
+  - key: Tutorial.Guide.TUT_Z3_WALL_SUCCESS
+    ko: "\uBCBD \uCDA9\uB3CC! \uC5F0\uACC4 \uC131\uACF5 ({n}/{total})"
+    en: Wall impact! Combo landed ({n}/{total})
+  - key: Tutorial.Guide.TUT_Z3_RETURN
+    ko: "\uB2E4\uC74C \uC5F0\uC2B5\uC744 \uC900\uBE44\uD569\uB2C8\uB2E4."
+    en: Preparing the next drill.
+  - key: Tutorial.Guide.BOSS_RAID_OpeningDash
+    ko: "\uB3CC\uC9C4\uC774 <b>\uD30C\uB797\uAC8C</b> \uBE5B\uB098\uBA74 <b>\uC815\uBA74</b>\uC5D0\uC11C
+      <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C \uAC04\uD30C\uD558\uC138\uC694!"
+    en: When the charge glows <b>blue</b>, interrupt it from the <b>front</b> with
+      <b>Right Click</b>!
+  - key: Tutorial.Guide.BOSS_RAID_ChargeGuide
+    ko: "\uB4DC\uB860 \uD45C\uC2DD\uC744 <b>\uC1A1\uC804\uD0D1 \uC704\uB85C</b> \uB04C\uACE0
+      \uAC00\uC11C \uB5A8\uC5B4\uB728\uB9AC\uC138\uC694! \uC9C1\uC811 \uB54C\uB824\uB3C4
+      \uBD80\uC11C\uC9D1\uB2C8\uB2E4."
+    en: Drag the drone marker <b>onto the transmission tower</b> and drop it! You
+      can also break it by hitting it.
+  - key: Tutorial.Guide.BOSS_RAID_SelfDestructGuide
+    ko: "23\uD638\uAC00 <b>\uC790\uD3ED</b>\uC744 \uC900\uBE44\uD569\uB2C8\uB2E4!
+      <b>\uACF5\uACA9</b>\uD574\uC11C <b>\uC2E4\uB4DC</b>\uB97C \uBD80\uC218\uC138\uC694!"
+    en: No.23 is preparing to <b>self-destruct</b>! <b>Attack</b> to break its <b>shield</b>!
+  - key: Tutorial.Guide.BOSS_RAID_RelayGather
+    ko: "<b>6\uC2DC \uC548\uC804 \uAD6C\uC5ED</b>\uC73C\uB85C \uBAA8\uC774\uC138\uC694!"
+    en: Gather in the <b>6 o'clock safe zone</b>!
+  - key: Tutorial.Guide.BOSS_RAID_RelayGuide
+    ko: "\uB3CC\uC9C4\uC774 <b>\uD30C\uB797\uAC8C</b> \uBE5B\uB098\uBA74 <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C
+      \uB9C9\uC544 23\uD638\uB97C <b>12\uC2DC \uBCBD</b>\uAE4C\uC9C0 \uBC00\uC5B4\uB0B4\uC138\uC694!
+      \uB9C9\uC740 \uC0AC\uB78C\uC740 \uB3D9\uB8CC \uCC28\uB840\uB97C \uAE30\uB2E4\uB9BD\uB2C8\uB2E4."
+    en: When the charge glows <b>blue</b>, block it with <b>Right Click</b> to push
+      No.23 to the <b>12 o'clock wall</b>! Whoever blocked waits for teammates' turns.
+  - key: Tutorial.Guide.BOSS_RAID_RelayRoundReset
+    ko: "\uB2E4\uC2DC \uBAA8\uB450 \uAC04\uD30C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4!"
+    en: Everyone can interrupt again!
+  - key: Tutorial.Guide.BOSS_RAID_RelaySuccess
+    ko: "23\uD638\uB97C \uBCBD\uAE4C\uC9C0 \uBC00\uC5B4\uB0C8\uC2B5\uB2C8\uB2E4!
+      \uC9C0\uAE08 \uACF5\uACA9\uD558\uC138\uC694!"
+    en: No.23 pushed into the wall! Attack now!
+  - key: Tutorial.Guide.BOSS_RAID_RelayFail
+    ko: "\uB3CC\uC9C4\uC744 \uD53C\uD558\uC138\uC694!"
+    en: Dodge the charge!
+  - key: Tutorial.Guide.BOSS_RAID_ChainGuide
+    ko: "<b>\uC9C0\uBAA9\uB41C \uC0AC\uB78C</b>\uC774 \uC815\uBA74\uC5D0\uC11C <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C
+      \uAC04\uD30C\uD558\uC138\uC694!"
+    en: <b>The marked player</b> must interrupt from the front with <b>Right Click</b>!
+  - key: Tutorial.Guide.BOSS_RAID_PushNorthGuide
+    ko: "<b>\uC1A1\uC804\uD0D1</b>\uC744 \uBD80\uC234 \uCC28\uC9D5\uC744 \uB04A\uACE0,
+      \uC4F0\uB7EC\uC9C4 23\uD638\uB97C <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C <b>\uC704\uCABD
+      \uB05D</b>\uAE4C\uC9C0 \uBC00\uC5B4\uB0B4\uC138\uC694!"
+    en: Break the <b>transmission tower</b> to stop the charge, then <b>Right Click</b>
+      the downed No.23 all the way to the <b>top edge</b>!
+  - key: Tutorial.Guide.BOSS_RAID_PushNorthSuccess
+    ko: "23\uD638\uB97C \uB05D\uAE4C\uC9C0 \uBC00\uC5B4\uB0C8\uC2B5\uB2C8\uB2E4!
+      \uC9C0\uAE08 \uACF5\uACA9\uD558\uC138\uC694!"
+    en: No.23 pushed all the way! Attack now!
+  - key: Tutorial.Guide.LOBBY_TRAIN_ROUTE
+    ko: "\uC804\uC6D0 \uD655\uC778. \uD45C\uC801 \uC55E\uC73C\uB85C \uC774\uB3D9\uD574.
+      \uBA3C\uC800 \uAC01\uC790\uC758 \uBB34\uAE30\uB97C \uC810\uAC80\uD558\uACA0\uB2E4."
+    en: Everyone's here. Move up to the targets. First, we'll check your weapons.
+  - key: Tutorial.Guide.TRAIN_01_START
+    ko: "\uBA3C\uC800 \uBB34\uAE30\uBD80\uD130 \uC810\uAC80\uD558\uACA0\uB2E4. \uD45C\uC801\uC744
+      \uC0C1\uB300\uB85C \uAE30\uBCF8 \uACF5\uACA9\uACFC \uBAA8\uB4E0 \uC2A4\uD0AC\uC744
+      \uC0AC\uC6A9\uD574 \uBD10."
+    en: Weapons check first. Use your basic attack and every skill on the targets.
+  - key: Tutorial.Guide.TRAIN_01_END
+    ko: "\uBB34\uAE30 \uC810\uAC80 \uC644\uB8CC. \uB2E4\uC74C \uC704\uCE58\uB85C
+      \uC774\uB3D9\uD574. \uC774\uBC88\uC5D0\uB294 \uC6C0\uC9C1\uC774\uB294 \uC0C1\uB300\uB2E4."
+    en: Weapons check complete. Move to the next position. This time the targets
+      move.
+  - key: Tutorial.Guide.TRAIN_02_START
+    ko: "\uC774\uBC88\uC5D0\uB294 \uC6C0\uC9C1\uC774\uB294 \uC0C1\uB300\uB2E4. \uC8FC\uBCC0\uC744
+      \uC0B4\uD53C\uBA74\uC11C \uD568\uAED8 \uCC98\uB9AC\uD574."
+    en: This time the targets move. Watch your surroundings and take them out together.
+  - key: Tutorial.Guide.TRAIN_02_END
+    ko: "\uC88B\uC544. \uB2E4\uC74C\uC740 \uC0C1\uB300\uC758 \uACF5\uACA9\uC744 \uB04A\uACE0,
+      \uADF8 \uAE30\uD68C\uB97C \uC774\uC5B4\uAC00\uB294 \uD6C8\uB828\uC774\uB2E4."
+    en: Good. Next, we'll drill cutting off an attack and following up on the opening.
+  - key: Tutorial.Guide.TRAIN_03_START
+    ko: "\uACF5\uACA9\uC5D0 \uC9D1\uC911\uD558\uB294 \uC21C\uAC04\uC5D0\uB294 \uC0C1\uB300\uB3C4
+      \uBE48\uD2C8\uC744 \uB4DC\uB7EC\uB0B8\uB2E4. \uADF8 \uC21C\uAC04\uC744 \uB04A\uC5B4
+      \uBD10."
+    en: When an opponent commits to an attack, it leaves an opening. Cut it off at
+      that moment.
+  - key: Tutorial.Guide.TRAIN_03_COUNTER
+    ko: "\uACF5\uACA9\uC744 \uB04A\uC5C8\uB2E4. \uC9C0\uAE08\uCC98\uB7FC \uBE48\uD2C8\uC744
+      \uC7A1\uB294 \uAC8C \uAC04\uD30C\uB2E4."
+    en: You cut off the attack. Catching openings like that is an interrupt.
+  - key: Tutorial.Guide.TRAIN_03_CC
+    ko: "\uADE0\uD615\uC774 \uBB34\uB108\uC9C4 \uC0C1\uB300\uB294 \uBC00\uAC70\uB098
+      \uC7A0\uAE50 \uBB36\uC744 \uC218 \uC788\uB2E4. \uC774\uBC88\uC5D0\uB294 \uADF8
+      \uAE30\uD68C\uB97C \uC774\uC5B4\uAC00 \uBD10."
+    en: An off-balance opponent can be pushed or briefly pinned. This time, follow
+      up on that chance.
+  - key: Tutorial.Guide.TRAIN_03_RESET
+    ko: "\uC88B\uC544. \uC774\uC81C \uBCBD\uC744 \uD65C\uC6A9\uD574 \uC0C1\uB300\uB97C
+      \uC81C\uC555\uD574 \uBCF4\uACA0\uB2E4."
+    en: Good. Now let's use the wall to suppress the opponent.
+  - key: Tutorial.Guide.TRAIN_03_WALL_GUIDE
+    ko: "\uC0C1\uB300\uB97C \uBCBD\uC73C\uB85C \uBAB0\uC544\uBD99\uC5EC. \uAC04\uD30C\uC640
+      \uBCBD \uCDA9\uB3CC\uB85C \uC81C\uC555 \uCE78\uC744 \uC904\uC77C \uC218 \uC788\uB2E4."
+    en: Drive the opponent into the wall. Interrupts and wall impacts wear down its
+      suppression gauge.
+  - key: Tutorial.Guide.TRAIN_03_WALL
+    ko: "\uC798\uD588\uB2E4. \uBCBD\uC744 \uC774\uC6A9\uD558\uBA74 \uB354 \uBE60\uB974\uAC8C
+      \uC81C\uC555\uD560 \uC218 \uC788\uB2E4."
+    en: Well done. Using the wall suppresses it faster.
+  - key: Tutorial.Guide.TRAIN_03_SUPPRESS
+    ko: "\uC81C\uC555 \uC131\uACF5. \uC9C0\uAE08 \uACF5\uACA9\uC744 \uBAB0\uC544\uB123\uC5B4!"
+    en: Suppressed. Pour on the attacks now!
+  - key: Tutorial.Guide.TRAIN_03_COMBAT
+    ko: "\uC88B\uC544. \uB0A8\uC740 \uC0C1\uB300\uB97C \uCC98\uB9AC\uD558\uBA74 \uD6C8\uB828\uC740
+      \uB05D\uC774\uB2E4."
+    en: Good. Finish off the opponent and training is over.
+  - key: Tutorial.Guide.TRAIN_END
+    ko: "\uD6C8\uB828 \uC885\uB8CC. \uC774\uC81C \uCCAB \uC784\uBB34\uB97C \uC124\uBA85\uD558\uACA0\uB2E4.
+      \uCD9C\uAD6C\uC5D0 \uC9D1\uACB0\uD574."
+    en: Training complete. Now for your first mission briefing. Gather at the exit.
+  - key: Tutorial.Guide.BRIEF_ROUTE
+    ko: "\uC791\uC804 \uC124\uBA85 \uC7A5\uC18C\uB85C \uC774\uB3D9\uD574. \uC804\uC6D0\uC774
+      \uBAA8\uC774\uBA74 \uC2DC\uC791\uD558\uACA0\uB2E4."
+    en: Move to the briefing area. We'll start once everyone's here.
+  - key: Tutorial.Guide.BRIEF_01
+    ko: "\uCCAB \uC784\uBB34\uB294 \uC6F0\uC988\uC758 \uC5F0\uAD6C \uC2DC\uC124\uC774\uB2E4.
+      \uC774\uACF3\uC758 \uC5F0\uAD6C\uAC00 \uB300\uADDC\uBAA8 \uAE30\uACC4 \uBC18\uB780\uC73C\uB85C
+      \uC774\uC5B4\uC9C8 \uAC83\uC73C\uB85C \uC608\uCE21\uB410\uB2E4."
+    en: Your first mission is Wells's research facility. Its research is predicted
+      to lead to a large-scale machine uprising.
+  - key: Tutorial.Guide.BRIEF_02
+    ko: "\uC6B0\uB9AC\uB294 \uADF8 \uC77C\uC774 \uBC8C\uC5B4\uC9C0\uAE30 \uC804\uC758
+      \uC2DC\uC810\uC5D0 \uAC1C\uC785\uD55C\uB2E4."
+    en: We intervene at a point before that happens.
+  - key: Tutorial.Guide.BRIEF_03
+    ko: "\uBAA9\uD45C\uB294 \uC758\uCCB4 \uB450\uB1CC\uC758 \uD30C\uAD34\uC640 \uB3C4\uBA74
+      \uD68C\uC218. \uB9C8\uC9C0\uB9C9 \uBAA8\uB378\uC758 \uC0DD\uC0B0\uC744 \uC800\uC9C0\uD574\uC57C
+      \uD55C\uB2E4."
+    en: 'Objective: destroy the cybernetic brain and recover the blueprints. We must
+      stop production of the final model.'
+  - key: Tutorial.Guide.BRIEF_04
+    ko: "\uD63C\uC790 \uC55E\uC11C\uAC00\uC9C0 \uB9D0\uACE0 \uD568\uAED8 \uC6C0\uC9C1\uC5EC."
+    en: Don't run ahead alone. Move together.
+  - key: Tutorial.Guide.LOBBY_OBJ_BRIEFING
+    ko: "\uC791\uC804 \uC124\uBA85 \uC911"
+    en: Mission briefing
+  - key: Tutorial.Guide.LOBBY_OBJ_SORTIE
+    ko: "\uCD9C\uACA9 \uC9C0\uC810\uC5D0 \uC9D1\uACB0"
+    en: Gather at the sortie point
+  - key: UI.BossIntro.Skip
+    ko: "\uAC74\uB108\uB6F0\uAE30"
+    en: Skip
+  - key: UI.Lobby.Train03Segments
+    ko: "\uCE78 {current}/{total}"
+    en: Segments {current}/{total}
+  - key: UI.Lobby.Train03SuppressAttack
+    ko: "\uC81C\uC555\uB41C \uC0C1\uB300\uB97C \uACF5\uACA9\uD558\uC138\uC694 {time}"
+    en: Attack the suppressed opponent {time}
+  - key: UI.Lobby.Train03Finish
+    ko: "\uB9C8\uBB34\uB9AC\uD558\uC138\uC694"
+    en: Finish it!
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

@@ -1,22 +1,24 @@
 /// <summary>
-/// 보스 비교 전환(PLAN-boss-raid.md §3) — 에디터 툴바 "보스: 기존/레이드" 가 쓰고 <see cref="BossEncounterDirector"/> 가 읽는다.
-/// 🔴 에디터 전용 설정이다. 빌드는 항상 기존 보스(W4 비교 후 기본값을 정한다 — 팀장 10-14 "툴바 토글이면 충분").
+/// 보스 A/B 전환(PLAN-boss-raid.md §3) — 에디터 툴바 "보스: A/B" 가 쓰고 <see cref="BossEncounterDirector"/> 가 읽는다.
+/// 🔴 기본 = **B(레이드, TwentyThree_Raid → No23_B)** — 경석 10-22. 에디터 툴바 처음 값·심볼 없는 빌드(기본 메뉴·Build Profiles·CLI) 모두 B.
+/// A 는 툴바에서 고르거나 "Build/Windows64 Player (MainFlow · A 보스)" 메뉴(BOSS_A_BUILD 심볼)로 뽑는다.
 /// 키는 워크트리 범위(DevBootTarget.ScopedKey)라 MPPM 클론도 메인과 같은 값을 읽는다.
 /// </summary>
 public static class BossVariantSelection
 {
 #if UNITY_EDITOR
-    static string PrefKey => DevBootTarget.ScopedKey("BossVariant.Raid");
+    // 키를 바꿨다(10-22) — 예전 키엔 "A 를 고른 적 없음 = false" 가 저장돼 있을 수 있어 새 기본 B 가 안 먹는다.
+    static string PrefKey => DevBootTarget.ScopedKey("BossVariant.RaidDefaultB");
 
     public static bool UseRaid
     {
-        get => UnityEditor.EditorPrefs.GetBool(PrefKey, false);
+        get => UnityEditor.EditorPrefs.GetBool(PrefKey, true);
         set => UnityEditor.EditorPrefs.SetBool(PrefKey, value);
     }
-#elif BOSS_RAID_BUILD
-    // 레이드 테스트 빌드(Build/Windows64 Player (MainFlow · B 보스) — 팀장 10-16, 10-20 A·B 로 개명). 그 메뉴만 이 심볼을 얹는다.
-    public static bool UseRaid => true;
-#else
+#elif BOSS_A_BUILD
+    // A 보스 빌드(Build/Windows64 Player (MainFlow · A 보스)) — 그 메뉴만 이 심볼을 얹는다.
     public static bool UseRaid => false;
+#else
+    public static bool UseRaid => true;
 #endif
 }

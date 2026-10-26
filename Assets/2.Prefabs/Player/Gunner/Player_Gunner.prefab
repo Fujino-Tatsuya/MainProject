@@ -159,7 +159,7 @@ Transform:
   m_GameObject: {fileID: 875638587521706581}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.5976059, z: 0.003401}
+  m_LocalPosition: {x: -0.0136, y: 0.5789, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -442,6 +442,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!4 &3875643611873376656
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4396835014023420626}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7556259359222862764}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &4897057866995958984
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -458,21 +473,6 @@ MonoBehaviour:
   overhead: {fileID: 2464597730469195352}
   body: {fileID: 0}
   feet: {fileID: 0}
---- !u!4 &3875643611873376656
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4396835014023420626}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 7556259359222862764}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4792439027021553161
 GameObject:
   m_ObjectHideFlags: 0
@@ -768,6 +768,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7556259359222862764}
+  - component: {fileID: 8979058855560388526}
   m_Layer: 6
   m_Name: VFX
   m_TagString: Untagged
@@ -797,6 +798,20 @@ Transform:
   - {fileID: 3875643611873376656}
   m_Father: {fileID: 7722051468864962236}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8979058855560388526
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5593468510048074174}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
+  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
+  scale: 1
 --- !u!1 &6154974025966435614
 GameObject:
   m_ObjectHideFlags: 0
@@ -6078,9 +6093,13 @@ MonoBehaviour:
   basicBeamPlayer: {fileID: 1287483510423607417}
   basicHitPlayer: {fileID: 5849005421721908754}
   monsterHitPlayer: {fileID: 8239599393321802557}
+  impactSurfaceLayers:
+    serializedVersion: 2
+    m_Bits: 1050753
   interruptPlayer: {fileID: 3756621278813905702}
   beamUnitLength: 1
   beamHoldDuration: 0.35
+  beamTravelDuration: 0.06
   chargeBeamPlayer: {fileID: 7124217344394968187}
   chargeLoopPlayer: {fileID: 3360371237505566830}
   chargeFullPlayer: {fileID: 577918771167618275}
@@ -6139,6 +6158,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerInterruptSkill
   data: {fileID: 11400000, guid: e60875766cf84e644a1f0b7dae235261, type: 2}
   hitboxAnchor: {fileID: 3988724667065146670}
+  lagCompensationCapMs: 100
 --- !u!114 &3214493021041571807
 MonoBehaviour:
   m_ObjectHideFlags: 0

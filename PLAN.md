@@ -1,3 +1,161 @@
+# ▶▶▶ 계획 = **팔라딘 E(수호자의 의지) 연출 — 상태 클립별 VFX(점화 · 결계 · 해제 · 막아냄 · 오라 · 반격)** (2026-10-26 · grill 확정 · ✅ 승인 · ✅ MyProject 제작(미리보기 `Scenes/GuardianWillPreview`) · ✅ 민경 확인(레이어 A·B·C 유지 · B 방패 투영 곡면) · ✅ MainProject import·배선(배치 컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-26 — Q6 = E 연결만 끊기, Q9 = 레퍼런스 없음, Q10 = 결계 A+B+C 다 만들고 보고 덜어냄, 나머지 추천안).
+> 판정·피해·네트워크 무변경. 은희 영역(Player) 스크립트·클립은 **연출 배선만** → handoff.
+
+## 사실
+- 입력 E → `SkillSub` → `PlayerSkillController.Cast` → 서버 `StartSkillServer`(쿨 7초 · 피해 ×2.5 · 안전망 4초) → `OnServerStart`(방어 방향 = 시전 조준 고정, 이동·회전 불가) → 전 피어 `SubSkillGuard` 재생.
+- 단계 = `FirstMeleeGuardCounterModel`, 이벤트는 서버만 처리. 클립(공속 1): `Garen_E_GuardStart`(속도 4 → 0.25초, Custom0 @0.9 = 방어 창 열림) → `Garen_E_GuardIdle`(exitTime 전이 1.5초, 공속 무관) → `Garen_E_GuardEnd`(속도 4 → 0.25초, Custom1 @0.1 창 닫힘 · End @0.967 종료). 방어 성공 시 `PlayerShieldVfx.ServerPlayGuardCounterPose` 가 전 피어 `SubSkillCounter` 로 CrossFade — `Garen_E_GuardCounter`(1.17초, Hit @0.433 반격 · End @1.1).
+- 방어 = 정면 180° · 반격 = 고정 방향 120° · 반경 3m · 반격 중 전 방향 피해·넉백 무시.
+- 현재 E 연출 = 반격 때 `shieldVfx.ServerInterruptWave()`(우클릭 충격파 `FX_ShieldWave` 재사용) 하나뿐. `shieldVfx` 칸은 반격 자세 전환에도 쓰여 끊을 수 없다.
+- 클립 4개에 연출 이벤트 없음(`HandleSkillEvent` 만). 클립은 Humanoid, 모델 `2.Prefabs/Player/Paladin/paladin 1.fbx`.
+- 우클릭의 방패 문양 발광 `MaterialFadeEffect`(`shieldGlow`, `1486249918430601143`)가 있다. E·우클릭은 동시에 돌 수 없다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 색(Q1-C) | 방어 단계 = 흰빛·옅은 금빛 / 반격 단계 = 진한 금빛 |
+| SubSkillGuard(Q2) | `_Ignite` 방패 점화 + 발밑 빛 고리(원샷) · 방어 창 열림(Custom0 시각)에 결계 켬 |
+| SubSkillGuardIdle | `_Barrier` 루프 유지(이벤트 없음) |
+| SubSkillGuardEnd | `_Release` 결계가 빛 조각으로 흩어지며 조용히 사라짐(방어 실패) |
+| SubSkillCounter | 0초 `_Block` 방패 앞 섬광 + 결계 깨짐 · `_Aura` 몸 금빛 오라 루프(피해 무시 표시, Q11-A) · 0~Hit 진한 금빛 기 모으기 `_Charge`(루프, Hit 에서 끔 — 공속 자동) · Hit `_Counter` 바닥 120° 3m 부채꼴 충격파 + 무기 궤적 금빛 베기 호(Q12-A, 궤적은 실제 모델로 재생해 맞춤) |
+| 결계 모양(Q10) | **10-26 민경 확인: 셋 다 유지 · B 는 세로 중심선이 앞으로 나온 곡면(양옆 0.14m 휨).** A+B+C 각각 켜고 끌 수 있는 자식 레이어로 전부 제작 → 결과 보고 덜어냄. A 반원 빛 벽(높이 1.6m · 반지름 1.2m · 180° · 위로 투명 · 성문 흐름) / B 큰 방패 투영 / C 바닥 반원 문양 + 테두리선 |
+| 범위 일치(Q3-A) | 결계 180°, 반격 부채꼴 120° · 3m |
+| 막아냄 위치(Q4-A) | 방패 소켓 기준. 공격자 방향 RPC 없음 |
+| 배선(Q5) | E 클립 4개에 `EffectAnimEvents` 이벤트(전 피어) + `Player_Paladin.prefab` `VFX` 밑 `EffectSocketPlayer` 들 |
+| 기존 연출 제거(Q6) | `FirstMeleeSubSkill.ResolveCounterHit` 의 `shieldVfx.ServerInterruptWave()` 한 줄만 삭제. `shieldVfx` 칸·우클릭 충격파는 그대로 |
+| 추가 피격 불꽃(Q7) | 이번엔 없음(네트워크 필요) |
+| 미리보기(Q8-A) | `paladin 1.fbx` + E 클립 4개를 MyProject 로 복사해 실제 애니 위에서 제작 |
+| 방패 문양 발광(Q13) | `shieldGlow` 재사용 — `FirstMeleeSubSkill` `OnClientPlay` 에서 FadeIn, `OnEnd` 에서 FadeOut |
+| 공속(Q14) | 루프는 이벤트로 자동 · 원샷은 고정 길이(배율 코드 없음) |
+| 파일(Q15) | MainProject `50.Art/VFX/Common/Players/Player1/ESkill/FX_GuardianWill_{Ignite,Barrier,Release,Block,Aura,Charge,Counter}` + Entry · 재질 `_Materials/Player1/` · 텍스처 `Textures/Player1/` · 메시 `Models/Player1/` · MyProject `Export/Player1/ESkill/`. 옛 HolyShield 파일 무변경 |
+| 동료 화면(Q16-A) | 모두 같은 강도(결계를 옅게) |
+
+## 클립 이벤트(예정)
+| 클립 | 시각(정규화 아님, 클립 초) | 이벤트 |
+|---|---|---|
+| `Garen_E_GuardStart` | 0 | `PlayEffect` GuardianIgnite |
+| | 0.9(Custom0 과 같은) | `StartEffect` GuardianBarrier |
+| `Garen_E_GuardEnd` | 0.1(Custom1 과 같은) | `StopEffect` GuardianBarrier · `PlayEffect` GuardianRelease |
+| `Garen_E_GuardCounter` | 0 | `StopEffect` GuardianBarrier · `PlayEffect` GuardianBlock · `StartEffect` GuardianAura · `StartEffect` GuardianCharge |
+| | 0.433(Hit 와 같은) | `StopEffect` GuardianCharge · `PlayEffect` GuardianCounter |
+| | 1.1(End 와 같은) | `StopEffect` GuardianAura |
+
+## 취소 안전
+- 끊김(경직·사망·안전망·CrossFade 중 이탈)엔 Stop 이벤트가 안 온다 → `FirstMeleeSubSkill.OnEnd`(전 피어)에서 Barrier·Aura·Charge 소켓 `Stop()` + `shieldGlow.FadeOut()`. 소켓 safetyTimeout = Barrier 3초 · Aura 2초 · Charge 1초(그물).
+
+## 작업 순서
+1. MyProject(🔴 배치 빌드 때 닫기 요청): 모델·클립 복사 · `Tools/VFX/Guardian Will (팔라딘 E) 빌드` → 프리팹 7종 + 재질·텍스처 · 미리보기 씬 `GuardianWillPreview`(실제 애니 재생 · 방어 성공/실패 · 공속 1/1.3/0.7 · 결계 레이어 A/B/C 켜고 끄기) → 민경 확인 · 레이어 덜어내기 → **승인**.
+2. MainProject(🔴 Unity 닫고): 에셋 import(guid 유지) · Entry · `Player_Paladin.prefab` 소켓 · 클립 이벤트 · `FirstMeleeSubSkill`(충격파 1줄 삭제 · 칸 4개 `barrierLoop`·`auraLoop`·`chargeLoop`·`shieldGlow` · OnClientPlay/OnEnd).
+3. 컴파일 0 · 배선 검사 · handoff `Docs/tech/handoff-paladin-guardian-will-vfx.md`(은희) · `CONTEXT.md` · 민경 Play(방어 성공/실패 · 반격 중 피격 · 끊김 · MPPM 클라).
+
+## 리스크
+- 반격 상태 CrossFade(0.05초) 때 해제·준비 클립 이벤트가 뒤늦게 울릴 수 있다 — `StopEffect` 는 꺼져 있으면 no-op 이라 무해, 단 GuardEnd 의 `PlayEffect` Release 가 막아냄과 겹칠 수 있음(제작 때 확인, 필요하면 Release 를 Block 에 묻힘).
+- 원격 오너는 NetworkAnimator 동기로 반격 상태가 다시 들어가 Counter 클립 이벤트가 두 번 울릴 수 있다(모델 주석) — 원샷 2번 가능성, MPPM 에서 확인.
+- 결계 3레이어 겹침은 화면을 가릴 수 있다 — 기본은 옅게, 덜어내기 전제.
+- 클립 이벤트는 같은 클립을 쓰는 다른 프리팹에선 Id 가 없으면 조용히 무시(현재 팔라딘 컨트롤러만).
+
+---
+
+# ▶▶▶ 계획 = **팔라딘 우클릭(단죄의 방패) 연출 — 충격파는 간파 성공 때만 · 판정 전 방패 기 모으기** (2026-10-26 · grill 확정 · ✅ 승인 · ✅ MyProject 제작 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-26, Q1~Q7 전부 추천안). 판정·피해·네트워크 무변경. 은희 영역(Player) 스크립트·클립은 **연출 배선만** → handoff.
+
+## 사실
+- 충격파 `FX_ShieldWave_Entry` = `Player_Paladin.prefab` `VFX/ShieldInterrupt/ShieldWave`(EffectSocketPlayer) ← `PlayerShieldVfx.ServerInterruptWave()`(서버 → 전 피어 RPC) ← `FirstMeleeInterruptSkill.OnInterruptResolutionCompleted` 에서 **적중 1건 이상이면**(`resolvedCount > 0`) 재생 — 간파 창 없는 대상·상자도 포함.
+- 간파 성공 판정은 이미 있다: `PlayerInterruptSkillBase.ResolveHit` 가 카운터 창 소비(23호·중간보스·허수아비 `ServerInterruptSuccessCount` 증가)를 세고, 성공 시 정적 이벤트 `ServerInterruptSucceeded(owner, skill)` 를 **판정 1회에 한 번** 쏜다(`OnInterruptResolutionCompleted` 보다 먼저, 같은 프레임).
+- `ServerInterruptWave` 는 E(`FirstMeleeSubSkill`) 반격도 쓴다.
+- `Garen_Parry.anim`(git, 팔라딘 전용 컨트롤러만 사용): 0초 시작 · **0.333초 Hit(판정)** · 0.6초 End · 길이 1.17초. (커밋본 `5ecc21df` 는 Hit 0.25 — 0.333 은 작업 전부터 있던 로컬 변경, 10-26 민경 판단으로 유지·같이 커밋) 판정은 서버 전용이라 클라 코드는 판정 순간을 모른다. 클립 이벤트(`EffectAnimEvents` 의 `StartEffect`/`StopEffect`)는 전 피어에서 각자 울린다 — 어쌔신 클립 선례.
+- 기존 우클릭 연출: 방패 문양 발광 + 금색 `FX_ShieldGlow` 루프(스킬 내내, 소켓 `4933595309215177818`).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 간파 성공(Q1-A) | 카운터 창을 실제로 소비한 경우만(= `ServerInterruptSucceeded`). 여러 대상 성공해도 1회 |
+| 실패·적중만(Q2-A) | 추가 연출 없음 — 모으던 기만 사라짐 |
+| E 반격(Q3-A) | 그대로(반격 판정마다 충격파) |
+| 배선 ① 충격파 | `FirstMeleeInterruptSkill` 이 `ServerInterruptSucceeded` 를 구독해 **자기 시전일 때만** `shieldVfx.ServerInterruptWave()`. 기존 `resolvedCount > 0` 호출 삭제. 부모 클래스(`PlayerInterruptSkillBase`)는 무변경 |
+| 배선 ② 기 모으기(Q4-A) | `Garen_Parry.anim` 에 이벤트 2개 추가 — 0초 `StartEffect("ShieldCharge")` · 0.333초(Hit 와 같은 시각) `StopEffect("ShieldCharge")`. 공격 속도·클립 수정에 자동으로 따라감 |
+| 취소 안전 | 판정 전에 끊기면(경직·사망·취소) Stop 이벤트가 안 온다 → `FirstMeleeInterruptSkill.OnEnd` 에서도 끈다(새 칸 `chargeLoop`) + 소켓 safetyTimeout 1초 |
+| ShieldGlow(Q5-A) | 그대로(스킬 끝까지). 기 모으기는 판정 전까지 위에 겹침 |
+| 모양·색(Q6-A) | 방패 주변 금색 빛 입자가 방패 중심으로 빨려 들어가고 중심 빛이 점점 커짐(약 0.33초). 기존 우클릭 금색 |
+| 위치 | 새 `VFX/ShieldInterrupt/ShieldCharge`(EffectSocketPlayer, Id `ShieldCharge`) — 소켓은 ShieldGlow 와 같은 방패 소켓 |
+| 제작(Q7-B) | MyProject 에서 방패 대역 미리보기와 함께 → MainProject import(`50.Art/VFX/Common/Players/Player1/RightClickSkill/FX_ShieldCharge`·Entry) |
+
+## 작업 순서
+1. MyProject: `FX_ShieldCharge` 프리팹 + 미리보기(방패 대역, 키로 0.33초 재생·반복) → 민경 확인.
+2. MainProject(🔴 Unity 닫고): 에셋 import · `Player_Paladin.prefab` 에 `ShieldCharge` 소켓 + 스킬 `chargeLoop` 연결 · `Garen_Parry.anim` 이벤트 2개 · `FirstMeleeInterruptSkill` 충격파 조건 변경.
+3. 컴파일 0 · handoff `Docs/tech/handoff-paladin-interrupt-vfx.md`(은희) · 민경 Play(허수아비 간파 성공/실패, 일반 몹, 공격 속도 버프).
+
+## 리스크
+- 정적 이벤트 구독은 시전자 비교(`skill == this`)를 빠뜨리면 다른 팔라딘의 성공에도 터진다 — 반드시 비교.
+- 클립 이벤트는 같은 클립을 쓰는 다른 프리팹에서 Id 를 못 찾으면 조용히 무시된다(현재 팔라딘 컨트롤러만 사용).
+
+---
+
+# ▶▶▶ 계획 = **23호 전기 장판 VFX — 예고 스파크 · 발동 천둥 번개 · 잔광 · 피격 감전 원샷 · 즉사(번개 모양만 다르게)** (2026-10-23 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23 — Q4 = B·C 둘 다 제작 후 Play 로 선택, Q11 = MyProject 미리보기만, 나머지 추천안).
+> 장판 피해·판정·타이밍 무변경. 경석 영역은 **추가만**(클라 이벤트 3개 + 발동 RPC 인자 1개) → handoff.
+
+## 사실
+- `BossElectricFloor`(경석): 서버가 칸(8×8 마스크)·타이밍을 정하고 23호 ClientRpc 3개(`FloorWarn`·`FloorFire`·`FloorClear`)로 전 피어에 알린다. 클라는 `BossElectricFloorView`(씬 루트) 밑 칸마다 판 2장(`_Outer`·`_Fill`, 공용 예고 스타일 `EnemyC3Visuals` "15"/"16")을 켜고 끈다.
+- 예고 1.2초(일반) / 2초(송전기 기믹) / 레이드 방전은 요청마다 다름 · 발동 연출 0.4초(`vfxDuration`) · 한 번에 최대 64칸 · 기믹 B 는 1단계 직후 2단계 예고.
+- 기존 VFX 훅 = 발동용 `electricVfxPrefab` 하나(두 데이터 에셋 모두 비어 있음). 0.4초 끝에 `HideAllTiles` 가 꺼서 잔광을 못 붙인다.
+- 즉사 여부(`_fireLethal`)는 서버만 안다 — `FloorFireClientRpc(mask, vfxTime)` 에 없다. 즉사 방전 = ④ 폐기 처분 저지 실패 대폭발(`raidSelfDestructBlastLethal`) · 북진 압박 송전기 시간 초과 방전(항상).
+- 감전 상태이상 없음(`StatusEffectType`), 기획 §6.3 = 장판은 상태이상을 걸지 않는다. 피해는 전 피어 `Unit.ClientDamagedAttributed` 로 알려지지만 "장판 피해" 표시는 없다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 타이밍(Q1) | ① 예고 + (a) 발동 직전 0.25초 · ② 발동 0.4초 + (b) 잔광 0.25초 · ③ 피격. 23호·송전기→바닥 아크 없음 |
+| ① 예고(Q3) | 붉은 예고 판 그대로, 그 위에 칸마다 시안 스파크 — 빈도 0→최대(예고 시간 비례), 칸당 동시 ~6 |
+| (a) 발동 직전 | 예고 시간과 무관하게 마지막 0.25초 스파크 몰아침 + 바닥 살짝 밝아짐 |
+| ② 발동 | ~~흐르는 전기 무늬 판~~(물처럼 보임 — 10-23 민경) → **천둥 번개**(레퍼런스 `전기장판 번개 레퍼런스.mp4` 의 3~4배 빠르기): 바닥 번쩍 + 칸 가운데 근처 한 점에서 갈라지는 번개(`ElectricFloorBolts`, 코드로 짠 메시 2겹)가 0.1초에 칸 끝까지 뻗고 0.07초마다 모양을 바꿔 다시 침(밝기 들쭉날쭉). 변 위 끝점은 이웃 칸과 같은 자리 → 판 전체가 한 그물. 수많은 칸이 동시에 켜져도 부담 없게 단순·은은하게(변 닿을 확률 0.5 · 곁가지 0.15 · 지그재그 0.16). + 바닥 번개 조각 1~2 · 불티. 장판의 발동 표시 판("16")은 그대로 켜진다 |
+| (b) 잔광 | 0.4초 뒤 0.25초 동안 무늬 판이 꺼짐. 지우기(사망·제압·기믹 종료 = `FloorClear`) 오면 즉시 끔 |
+| ③ 피격(Q2 B) | 상태이상 없는 원샷 신규 제작. 맞은 플레이어 몸 가운데를 따라다니며 0.5초 — 몸 주위 작은 번개 + 스파크. 나중에 진짜 감전이 생기면 그 연출로 옮길 수 있게 |
+| ③ 판정(Q9 C) | 발동 신호 직후 0.3초 안에 실제 피해 이벤트가 온 플레이어 중 발이 터진 칸 안인 사람만. 네트워크 추가 없음. 보호막에 막혀 이벤트가 안 오면 연출 없음 |
+| 즉사(Q4) | ~~B 강화·C 전용 둘 다 제작 + 선택 칸~~ → **10-23 민경 미리보기 후 확정: 추가 연출 없이 번개 모양 수치만 다르게**(변 닿을 확률 0.709 · 칸 안 줄기 0~10 · 지그재그 0.5 · 곁가지 0.4 — `ElectricFloorBolts` 의 즉사 모양). 선택 칸·전용 판 연출 삭제 · **10-26: 밝기도 다시 올림** — `ElectricFloorTileFx.lethalBoost` 1.5배(번개·가장자리 전류·바닥 번쩍) |
+| 즉사 전달(Q13 A) | `FloorFireClientRpc` 에 `bool lethal` 추가(경석 2줄). 피해·판정 무변경 |
+| 색(Q5) | 전기 = 송전기와 같은 시안·흰색. 붉은 판이 위험 표시 |
+| 구조(Q6·Q8 B) | 칸마다 프리팹 1개, 64칸 재사용 풀. 연출은 신규 `1.Scripts/Effects/BossElectricFloorVfx.cs`(민경)가 23호 `VFX` 밑에서 전담. `BossElectricFloor` 에는 클라 이벤트 3개(예고 시작(칸·시간)·발동(칸·시간·즉사)·지우기) + 칸 중심/높이 조회만 추가. `electricVfxPrefab` 은 비운 채 |
+| 범위 | `TwentyThree.prefab` 에 붙이면 레이드 Variant 도 같이 |
+| 가장자리 전류(10-23 추가) | 발동 동안 칸 테두리 위 떨리는 선 + 빛 줄기(약 8m/s) — `ElectricFloorEdges`. 공유 변은 한 칸만(위·왼쪽 늘, 아래·오른쪽은 이웃이 안 터질 때) |
+| 제작(Q7 A) | MyProject — 8×8 판 미리보기 씬(일반 교차·기믹 A·B·레이드·즉사 키 재생)에서 제작 → MainProject import |
+| 테스트(Q11 B) | 즉사 B/C 비교는 MyProject 미리보기에서. MainProject 디버그 키 추가 없음 |
+
+## 작업 순서
+1. MyProject `Tools/VFX/Electric Floor (23호 전기 장판) 빌드`: 프리팹 `FX_ElectricFloorTile`(칸 — 예고·발동·잔광, 즉사는 번개 모양만)·`FX_ElectricFloorHit`(피격) · 공용 스크립트 `ElectricFloorTileFx`·`ElectricFloorBolts`·`ElectricFloorFxPool`(같은 guid) · 미리보기 씬 `ElectricFloorPreview`·테스터 → 민경 확인.
+2. MainProject: `BossElectricFloor`·`TwentyThreeBoss` 추가분 → `BossElectricFloorVfx` 배선(`TwentyThree.prefab` `VFX`) · ③ 은 `EffectCatalog` 엔트리 · 에셋 import(`50.Art/VFX/Common/Boss/ElectricFloor/`).
+3. 빌드 오류 0 · handoff `Docs/tech/handoff-boss-electric-floor-vfx.md` · 민경 Play(호스트·클라).
+
+## 리스크
+- 64칸 동시 — 칸당 파티클 상한·무늬 판 1장으로 관리, 즉사 C 의 칸 사이 번개는 칸 수가 아니라 판 단위로 몇 줄만.
+- 발동 RPC 인자 변경 = 호스트·클라 같은 빌드 필요(현재 운영 방식 그대로).
+- ③ 은 원격 플레이어 위치가 살짝 늦게 보여 경계 칸에서 빠질 수 있음(실제 피해 이벤트가 같이 있어야 하므로 엉뚱한 사람에게는 안 나옴).
+
+---
+
+# ▶▶▶ 계획 = **거너 좌클릭 연출 보정 — 착탄 이펙트 벽면 회전 · 빔 끝 둥글게** (2026-10-23 · grill 확정 · ✅ 진행 지시 · ✅ 구현(dotnet 빌드 오류 0, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23, Q1~Q5 전부 추천안). 게임플레이·네트워크 무변경.
+
+## 사실
+- 착탄 `FX_LaserEnd`(공통)·`FX_LaserHit`(몬스터 피해 시 한 겹 더)는 `GunnerBeamView.ShowBasicShot` 에서 `LookRotation(-빔 방향)` 으로만 재생 — 벽면을 모른다. 서버 SphereCast 의 normal 은 `ShotRpc`(시작·끝·적중)에 안 실린다(`GunnerBasicAttack` = 은희). 끝점 = 닿은 순간의 구 중심(벽에서 최대 반경만큼 앞).
+- 빔 몸통 2겹: `LaserCore`(Stretched Billboard, `FX_LaserCore.png` — 두께 방향만 부드럽고 **길이 방향 양끝 페이드 없음** → 네모) · `Beam ray`(원통 메시). 길이 = `startSizeY` = 거리(1 = 1m) → 캡슐 메시는 끝이 길이만큼 늘어나 무효. 끝점 옮기기는 기존 `BeamEndAnchor` 가 한다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방향(Q1-a) | 착탄 이펙트 +Z = 벽면 normal — `FromToRotation(-빔 방향, normal) × 기존 방향` |
+| normal(Q2-a) | 각 화면이 끝점 바로 앞에서 짧은 레이캐스트(지형 레이어 = `GunnerBasicAttackData.blockingLayers` 와 같은 값). 못 맞히면 지금처럼 |
+| 대상(Q3-a) | 지형에 맞았을 때만. 몬스터 피해 시 `FX_LaserEnd`·`FX_LaserHit` 둘 다 지금처럼 쏜 사람 쪽 |
+| 빔 끝(Q4-b+a) | `LaserCore` 텍스처 양끝 짧은 페이드(새 텍스처 `FX_LaserCore_Capped.png`, `FX_LaserCore.mat` 이 가리키게) + 끝점에 둥근 글로우 `EndCap`(LaserCore 복제 → 빌보드·`Glow1cg`·`BeamEndAnchor`). 시작은 `StartFlare`·`Glow` 가 덮음 |
+| 제작(Q5-a) | MainProject 직접 — `GunnerBeamView.cs` · `FX_GunnerBeam.prefab` · `FX_LaserCore.mat` · 새 텍스처(🔴 SVN add) |
+| 날아가는 빔(10-23 추가) | ~~속도 비례(100m/s)~~ → 같은 날 **지정 시간** `beamTravelDuration` = 0.06초(거리 무관, 0 이하 = 예전 즉시). 몸통(size3D) 길이 = 거리 × min(1, 경과÷도달 시간)을 매 프레임 입자에 직접, 날아가는 동안 입자 나이를 0 에 묶어 두께·색 유지 → 닿은 뒤 원래 0.1초 동안 사라짐(길이 성장 커브 Y 는 1 로). 닿는 순간 `EndSparks`(BeamEndAnchor) 버스트 + 착탄 `FX_LaserEnd`·`FX_LaserHit`. 피해 숫자는 그대로(도달 시간만큼 먼저). `EndCap` 은 민경이 비활성 — 무시. Q 빔 무변경 |
+
+---
+
 # ▶▶▶ 계획 = **할 일 83 — 플레이어 스탯 5종 종합(클라·서버 같은 계산) + 서버 2차 검증** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1차 공격력 `fbb29438` · ✅ 2차 5종 — 컴파일 0 · EditMode 2680/0 · ⏳ 은희 Play/MPPM)
 
 > 브랜치 `fix/TooltipValueClient`(기준 origin/development `c7057322`). 담당 은희(코어 = 본인 영역). 증상: 클라 스킬 툴팁 `{dmg}` 가 틀림.
@@ -50,6 +208,87 @@
 - Unity MCP Refresh → 컴파일 0 → EditMode → 로컬 커밋(push 금지). Play 진입 금지.
 - 🟧 Play/MPPM(사용자): 호스트·클라 툴팁 `{dmg}` 동일 · 특성/버프 뒤 양쪽 갱신 · 정상 플레이 중 검증 경고 0 · 실제 데미지 수정 전과 동일(스택 1 기준).
 - 문서: `Docs/tech/` 공격 스탯 문서 신규(공식·타입·검증), `data-table.md` §9 `{dmg}` 설명 갱신, `CONTEXT.md` 용어(기본/전체 공격력, 가하는 피해).
+# ▶▶▶ 계획 = **23호 송전기(차징) 연출 교체 — 송전기 전류·심지 발광 · 피격 스파크 · 파괴 방전 · 보스 공급 전기줄(끊김·과충전)** (2026-10-22 · grill 확정 · ✅ 승인 · ✅ 1~2단계 · ✅ 3단계 반입·코드·배선(민경 수정본 그대로, dotnet 빌드 오류 0) · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-22, Q3 = B 외 전부 추천안). **게임플레이 무변경** — 송전기 HP·상승·판정·Rage/방전 진입 타이밍 그대로, 연출만 얹는다.
+
+## 사실
+- 송전기 = 아레나 `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab` 의 `TwentyThreeCharger/Env_Mv_bosscharger_upper` ×4(FBX 프리팹 인스턴스 + 추가 컴포넌트 NetworkObject·NetworkTransform(로컬)·BoxCollider·`BossChargingPylon`). riseHeight 0.5·moveSpeed 1 → 상승 0.5초. 크기 ≈ 0.9×0.7×1m.
+- 메시 1개(`Env_Mv_bosscharger_upper.fbx` / `Plane.014`) · 재질 1개(`Generic_01_A` — 맵 프리팹 107개 공유, **수정 금지**). 심지 = 별도 메시·서브메시 아님.
+- `BossChargingPylon`(경석) 상태는 서버 전용, 클라 복제는 `_outlined`(Live 여부) 하나 — 클라는 "부서져서 내려감"과 "시간 초과로 내려감"을 못 가른다. `Unit` 파생이라 피격 VFX RPC 없음. 전 피어 이벤트 `Unit.ClientDamagedAttributed`(공격자 clientId 포함, 위치 없음)는 있다.
+- 보스: `TwentyThree_Raid` = `TwentyThree.prefab` Variant(연출 공유). 송전기는 일반 23호도 같이 쓴다. 가슴 뼈 `spine_02.x`, 가슴 소켓 없음.
+- 결과 신호는 이미 클라로 간다: `EndChargeBallClientRpc(broken)` — 시간 초과 = `chargeBall.Stop()`, 전부 파괴·카운터·사망 끊김 = `Abort()`. 시간 초과 직후 일반 = Rage, 레이드 ② = 바닥 방전(`StartRaidDischarge`), 둘 다 **즉시**.
+- 팔라딘 검 발광 = 검 렌더러에 재질 한 장 더(`Sword_Blade_Glow`, `Shader_IntegratedEffect` IS_RIMLIGHT, `_MainTex` = 칼날 마스크) + `MaterialFadeEffect`(`_ColorFactor` 0.5초 페이드).
+- 전기줄용 기존 스크립트 없음.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| ChargeBall(Q1-c·Q18-a) | 유지. 끝나는 시점은 이미 맞음(전부 파괴 = 깨짐, 시간 초과 = 사그라듦), 시작도 그대로(차징 시작 → 0.5초 뒤 줄 연결) |
+| 방전 단위(Q2-a) | 송전기 **하나**가 부서질 때마다 그 송전기에서 방전 + 그 줄 끊김 |
+| 시간 초과(Q3-b·Q14-a) | **과충전**: 남은 줄을 따라 빛 덩어리가 0.4초 안에 보스 가슴으로 몰려듦 → 가슴 큰 섬광 → 줄 소멸·심지 꺼짐. 로직 무변경 — Rage/레이드 방전 진입 순간에 겹쳐 재생 |
+| 시작(Q4-c) | 상승 시작부터 전류·심지 약하게 → Live(노랑 아웃라인) 순간 확 밝아짐 + 줄이 보스로 뻗음 |
+| 색(Q5-a) | 시안·하늘 전기 + 흰 코어(노랑 아웃라인과 구분) |
+| 스파크 빈도(Q6-b) | 송전기당 최소 간격 0.08초 |
+| 제작(Q7) | MyProject 빌더로 프리팹 제작 → 민경 확인 → 반입(같은 guid). 코드는 MainProject |
+| 네트워크(Q8-b) | 경석 로직 파일 diff 0 — 송전기마다 연출 전용 NetworkBehaviour 를 새로 붙여 서버가 상태를 읽어 복제 |
+| 심지(Q9) | 심지 영역 마스크 텍스처 + 재질 겹치기(팔라딘 방식). **먼저 Blender 로 UV 확인** — 아틀라스 같은 칸을 다른 면이 같이 쓰면 심지 위치 빛 기둥·글로우 파티클로 대체 |
+| 전류(Q10-c) | 겹친 재질의 전기 무늬 위로 스크롤 + 메시 표면 방출 파티클(짧은 전기 줄기·스파크) |
+| 줄 도착점(Q11-a) | `spine_02.x` 아래 새 소켓(`TwentyThree.prefab` 에 빈 Transform 하나 — handoff) |
+| 줄 모양(Q12-a) | 지그재그 번개 LineRenderer(초당 ~20회 재생성, 굵은 빛 + 가는 심선 2겹) + 송전기→보스로 흐르는 빛 덩어리 |
+| 끊김(Q13-a) | 가운데서 끊겨 두 토막이 양끝으로 0.25초 말려 들어감 + 끊긴 지점 스파크 + 가슴 작은 섬광 |
+| 피격 스파크(Q15-a①) | 송전기 표면 중 때린 플레이어에 가장 가까운 점(공격자 없음 = 드론 등 → 무작위 점). 팩(Hovl `Sparks blue` 등) 바탕 소형 신규 |
+| 방전(Q16-a) | MyProject `Export/Boss/Charge/Effect_38_ElectricExplosion` 바탕, 송전기 크기에 맞춤 |
+| 적용 범위(Q17-a) | 일반 23호·레이드 둘 다 |
+
+## 구조(코드)
+- **신규 `PylonChargeView`**(NetworkBehaviour, 송전기 4개 각각에 추가 컴포넌트) — 서버가 매 프레임 `BossChargingPylon.State`·`WasDestroyed` 를 읽어 `NetworkVariable<byte>` {숨김·상승·Live·파괴·내려감} 로 복제. 전 피어: 상태에 따라 겹친 재질 페이드(`MaterialFadeEffect` 재사용)·표면 파티클 세기, 파괴 전이에서 방전 원샷, `Unit.ClientDamagedAttributed` → 스파크(간격 0.08초). 클라 정적 목록에 자기 등록.
+- **신규 `BossChargeTetherView`**(MonoBehaviour, `TwentyThree.prefab` 의 `VFX` 아래) — 가슴 소켓과 목록의 송전기들 사이에 줄: Live 진입 시 뻗음, 파괴 시 끊김, `chargeBall` 의 종료 이벤트가 **Stop(=시간 초과)** 이면 과충전.
+- **`EffectStagePlayer`(민경 파일)에 종료 이벤트 추가**(`Finished(bool aborted)`) — 추가만.
+- 카탈로그: 피격 스파크·방전·과충전 섬광 등 원샷 엔트리 등록.
+- 경석 영역 수정 = `bossroom.prefab`(송전기에 컴포넌트 추가)·`TwentyThree.prefab`(소켓·View 추가) 프리팹만, 스크립트 0 → `Docs/tech/handoff-boss-pylon-vfx.md`.
+
+## 단계
+1. Blender 로 송전기 UV 확인 → 심지 마스크 가능 여부 결정(PLAN 에 기록)
+   - ✅ 10-22: 메시 = 캡(위, y 0.54~0.76m) + **심지 원통**(32면 열린 원통 r 0.33m, y 0.03~0.57m, 아틀라스 UV u 0.0786~0.0811 · v 0.297~0.308) + **코일 링 6개**(768면, r 0.375~0.40m, y 0.09~0.505m, UV 한 점 u 0.3964~0.3966 · v 0.0687~0.0739). 심지·코일 UV 칸이 캡과 **안 겹친다** → 마스크 대신 더 확실한 방법: 빌더가 원본 메시에서 그 UV 칸의 삼각형만 뽑아 **겹침 전용 메시 2개**(심지·코일)를 만들고 원통 UV 를 새로 준다(전기 무늬 스크롤·코일 따라 도는 흐름이 가능). 렌더러는 송전기 자식으로 붙고 원본 재질·메시는 안 건드린다(아웃라인과 같은 방식)
+2. MyProject: 빌더 + 프리팹(송전기 겹침 재질·표면 전류 / 피격 스파크 / 방전 / 줄 재질·끊김 스파크·과충전 섬광) + 미리보기 씬(송전기 4 + 보스 대역, 상승→Live→타격→파괴/시간초과 재생) → ⏳ 민경 확인
+   - ✅ 10-22: `1.Scripts/Editor/PylonChargeVfxBuilder.cs`(메뉴 `Tools/VFX/Pylon Charge (23호 송전기) 빌드`) → `Export/Boss/Charge/Pylon/` 프리팹 5(`FX_PylonCharge`·`HitSpark`·`Discharge`·`Tether`·`Overcharge`) · 겹침 메시 2(`Meshes/Pylon_Core`·`Pylon_Coil`) · 재질 `Materials/M_Pylon_*`(IntegratedEffect, 가산) · 생성 텍스처 3(`Textures/T_PylonCoreElectric`·`FlowDash`·`TetherGlow`) · 씬 `Scenes/PylonChargePreview.unity`(`PylonChargeTester` — 1 시작 · H/Space 타격 · D 부수기 · T 시간 초과 · R 초기화). 공유 스크립트(MainProject 에 같은 guid 로): `1.Scripts/PylonChargeVisual.cs`·`ElectricTether.cs`. 송전기 FBX 2개는 MainProject 와 같은 guid 로 복사(미리보기용). 배치 모드 빌드·정지 화면 확인(겹침 정렬 OK, 줄 시작점이 캡에 잘리던 것 → 꼭대기 +0.15m·양끝 가늘게)
+3. MainProject(🔴 Unity 끔): 반입(같은 guid) · 엔트리·카탈로그 · 코드 3 · 프리팹 배선 · handoff · dotnet 빌드
+   - ✅ 10-22: 에셋 34(같은 guid — 프리팹 5 → `Common/Boss/Pylon/` · 재질 17 → `_Materials/Boss/` · 텍스처 8 · 겹침 메시 2 → `Models/` · 공유 스크립트 2) + 엔트리 3(`FX_PylonHitSpark`·`Discharge`·`Overcharge_Entry`, prewarm 8·4·1) · 카탈로그 `Pylon_*` · 코드 `PylonChargeView`·`BossChargeTetherView`(신규)·`PylonChargeVisual`·`ElectricTether`(같은 guid)·`EffectStagePlayer.Finished`(추가) · `bossroom.prefab` 송전기 4 + `PylonChargeView` · `TwentyThree.prefab` `VFX` + `BossChargeTetherView`(chargeBall 연결) · [handoff-boss-pylon-vfx](Docs/tech/handoff-boss-pylon-vfx.md). guid 누락 0(패키지 제외)·중복 0
+   - ⚠️ 가슴 소켓(Q11)은 프리팹 자식 대신 **실행 중 뼈 `spine_02.x` 를 이름으로 찾아 보스 앞 0.4m**(FBX 뼈의 내부 ID 를 Unity 없이 알 수 없음). `chestOffset` 으로 조정, `chest` 에 Transform 을 넣으면 우선
+   - 10-23 타격 스파크 재설계(grill — Q8 만 B, 나머지 추천): 맞은 방향 무관 — `PylonChargeView` 위치 계산(공격자 기준점·ClosestPoint·방향) 삭제 → 심지 가운데(`PylonChargeVisual.SparkOrigin`)에서 회전 없이 재생 + 몸 번쩍 `Pulse()`(전체 림만 ×2.5, 0.12초, 같은 0.08초 간격, Live 만). `FX_PylonHitSpark` 는 **MainProject 에서 직접** 수정(MyProject 원본과 갈라짐): `Flash`·`Arc` 제거, `Sparks` 20개 · 속도 3~6 · 크기 0.05~0.09 · 수명 0.3~0.5 · 반구(위, 세로 0.35 납작) · 반경 0.05. 공유 스크립트 `PylonChargeVisual` 은 MyProject 에도 같은 내용으로 맞춤
+   - 10-22 Play 피드백: 몸 연출이 안 보임 = `PylonOutline`(노랑 아웃라인 전용 렌더러)이 덮음 → 민경 요청으로 `bossroom` 송전기 4 의 `outlineMaterial` 비움(경석 코드 무수정, 경고 1회씩). 게임 카메라(7·17·−7, FOV 34)에선 캡이 코일·심지를 덮어 → MyProject `Tools/VFX/Pylon Charge — 몸 위에서 보이게(덧붙이기)`: 송전기 전체 림 겹침(`Pylon_Shell`·`M_Pylon_ShellRim`) · 후광 캡 위 · `ShellArcs` · 심지·코일 색 ×2 → ✅ 민경 확인 · ✅ 재반입(교체 `FX_PylonCharge`·`M_Pylon_CoreGlow`·`CoilFlow` — guid 그대로, 추가 `Pylon_Shell`·`M_Pylon_ShellRim`·`T_PylonShellRim`)
+4. ⏳ 민경 Play/MPPM: 호스트·클라 — 상승 때 약하게→Live 때 밝아짐·줄 연결, 타격마다 스파크(때린 쪽), 파괴 = 방전+줄 끊김, 전부 파괴 = 구슬 깨짐, 시간 초과 = 과충전 → Rage(일반)/바닥 방전(레이드), 늦게 들어온 클라도 현재 상태대로
+
+## 위험
+- 아틀라스 UV 공유로 심지 마스크 불가 가능성(→ 대체안 확정).
+- 송전기 4개 × (겹친 재질 + 파티클) + 줄 4개 — 파티클 수 상한 두고 미리보기에서 확인.
+- 프리팹 YAML 직접 편집(bossroom = FBX 인스턴스 추가 컴포넌트) — guid·fileID 검사.
+
+---
+
+# ▶▶▶ 계획 = **증강 획득 이펙트 — 고른 본인 화면에서 Level_up 원샷(몸 추종)** (2026-10-22 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 — dotnet 빌드 오류 0 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-22). 증강 = `Tutorial/Traits/TutorialTraitDirector`(은희, 서버 확정·획득 목록 전 피어 복제). 선택 완료에 연출·네트워크 신호 없음.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 보는 사람(Q1-b) | 고른 본인 화면만(플레이어 NetworkObject `IsOwner`) |
+| 시점(Q2-a) | 내 획득 수가 늘어나는 순간 — 직접·자동(출구 열림·보스 타이머·전멸 후 재선택) 모두. 디버그 건너뛰기도 포함 |
+| 위치(Q3-a) | 플레이어 루트 추종 — `PlayLooping` 후 곧바로 `Release`, 엔트리 outro 2초 동안 따라감(프리팹에 루프 시스템 없음) |
+| 감지(Q4-a) | `TraitAcquiredVfxPresenter` 가 `TutorialTraitDirector.ClientStateChanged` + `GetAcquired(OwnerClientId)` 개수 비교. 연결 순간 기준값(늦은 접속·씬 진입 오발 방지), 줄면 기준도 내림. 은희 코드 무수정·네트워크 무추가 |
+| 자리(Q5-a) | 세 Variant 의 `VFX`(= `VFX/States` 부모) |
+| 크기·색(Q6) | 원본 그대로 — 민경이 Play 후 직접 조정(컴포넌트 `scale` 또는 프리팹) |
+
+## 변경
+- 반입: MyProject `Export/Common/States/Level_up.prefab` → `50.Art/VFX/Common/States/`(같은 guid) + `Level_up_Entry`(outro 2·prewarm 1) · 텍스처 4(`Textures/Casual RPG VFX/` circle_boke01·gradient01·ring03·arrow04) · `Models/Cylinder01.fbx`. 재질 `1Add_mat`·`1AB_mat`(레거시 파티클 셰이더)은 이미 있음. 원본의 빈 참조 3(빌보드 렌더러 메시 2·루트 스프라이트 1)은 안 쓰는 칸이라 그대로. 🔴 SVN add
+- 신규 `1.Scripts/Effects/TraitAcquiredVfxPresenter.cs` · 카탈로그 `Player_TraitAcquired`(prewarm 등록) · `Player_Assassin`·`Player_Gunner`·`Player_Paladin.prefab`(VFX 에 부착)
+
+## 검증
+- dotnet 빌드 오류 0 · guid 누락 0(원본 빈 참조 3 제외). ⏳ 민경 Play/MPPM: 복도에서 증강 선택 → 창 닫히는 순간 내 캐릭터 발밑 레벨업(걸어도 따라옴), 다른 플레이어 화면엔 안 보임, 자동 선택 때도, 맵 진입 때 오발 없음.
+
+---
 
 # ▶▶▶ 계획 = **거너 R 추적 레이저 연출 재제작 — 범위 장판 · 대상별 조준(좁혀지는 원) · 대상별 위성 레이저+땅 파문** (2026-10-21 · grill 확정 · ✅ 승인 · ✅ 1단계 MyProject 제작 · ✅ 2단계 반입·코드·배선(MyProject 저장본 그대로, dotnet 빌드 오류 0) · ⏳ 민경 Play/MPPM)
 
@@ -81,6 +320,7 @@
    - 재료: 장판 = Mark_1(링)·Mark_5(톱니)·Ring_2(채움) 청록 / 조준 = Mark_7(꺾쇠)·Mark_1(원) Nuke 주황 + Particle_01(점·하늘선) / 레이저 = SateliteCannon 사본 ×0.6, 루트 한 발 버스트, 청록 재질. 셰이더 `Shader_IntegratedEffect`(MainProject 에 같은 guid 있음)
 2. MainProject(🔴 Unity 끔): 반입(같은 guid) · 엔트리·카탈로그 · `GunnerTrackingLaserView` · `GunnerTrackingLaser` 신호 추가 · 프리팹 배선 · handoff
    - ✅ 10-21: 프리팹 3 → `Common/Players/Player2/R_TrackingLaser/` + 엔트리 3(Strike 1.2초·prewarm 8 / Lock prewarm 6) · 재질 12 → `_Materials/Player2/` · 팩 텍스처 7·`Cylinder_01.fbx` · `TelegraphRing.cs`(같은 guid) · 카탈로그 `Gunner_R_*` · `GunnerTrackingLaserView`(NetworkBehaviour — NetworkVariable 반경·간격·적 레이어 + Reliable RPC 맞은 위치) · `GunnerTrackingLaser` 호출 2곳 추가 · 레이저 프리팹에서 `FX_GunnerUltLaser` 제거 · `GunnerUltSetup` 가드 · [handoff-gunner-r-vfx](Docs/tech/handoff-gunner-r-vfx.md)
+   - ✅ 10-22 장판 교체: MyProject 에서 `RipplePortal` 기반으로 다시 만든 `FX_GunnerUlt_Zone2`(민경이 이름만 바꿈 — 같은 guid·루트 ID) → MainProject `FX_GunnerUlt_Zone.prefab` 을 그 내용·이름으로 교체(엔트리·배선 그대로) · 재질 3(`M_GUlt_ZoneRipple`·`ZoneCircle`·`ZoneLine`) 반입(텍스처 ripple·ripple_n·circle 는 이미 있음) · 옛 장판 재질 4(`ZoneFill`·`Gear`·`Edge`·`Flash`)·`Mark_5.png` 제거(양 프로젝트, scratchpad `zone2_removed/` 보관)
    - ⚠️ 반입 시점 Lock 프리팹: `Brackets` 가 `Ground` 밖(루트 직하, X 90°)이라 `TelegraphRing` 이 회전을 (0,0,각도)로 덮어써 세로로 선다 — 고칠 방법(원위치 or 스크립트가 저작값 기준으로) 민경 결정 대기
 3. ⏳ 민경 Play/MPPM: 호스트·클라 모두 — 대상별 표식이 범위 출입에 맞게 붙고 떨어짐, 원 0 순간 레이저와 피해 숫자 일치, 6초 뒤 장판 줄어들며 퇴장, 늦게 들어온 클라
 

@@ -5,7 +5,10 @@ using UnityEngine;
 /// <summary>로비 상호작용 오브젝트 종류 — PLAN-48 §4.6.</summary>
 public enum LobbyInteractableKind
 {
-    /// <summary>F = 내 준비 토글(<see cref="LobbySession.RequestToggleReady"/>). 서버가 거리를 다시 본다.</summary>
+    /// <summary>
+    /// [퇴역] 옛 준비 패드 — 할 일 86 T2b 에서 출격 집결 구역으로 바뀌어 씬에 없고 <see cref="LobbyInteractor"/> 도 고르지 않는다.
+    /// qa/LobbyDemo 하네스가 이 값을 참조해 남겼다(직렬화 값 0 유지).
+    /// </summary>
     Ready = 0,
 
     /// <summary>F = 캐릭터 선택 패널(<see cref="CharacterSelectPanel"/>, C12). 고르면 서버가 거리를 다시 보고 디스폰 → 같은 자리 새 Variant 로 교체한다.</summary>

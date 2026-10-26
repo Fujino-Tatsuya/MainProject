@@ -188,6 +188,18 @@ public sealed class TutorialZone4Model
         return true;
     }
 
+    /// <summary>
+    /// 전멸 재도전 되감기(단계 Finished → BossEnter). 도착 래치를 풀어 패드 카운트다운 자막·도착 처리·23호 팁이 다시 돈다.
+    /// 도착 전이면 false(할 일 없음). 설정 자막·타이머·기상 시계는 되살리지 않는다.
+    /// </summary>
+    public bool NotifyBossRetry()
+    {
+        if (!BossArrived) return false;
+        BossArrived = false;
+        _bossTipAt = -1d;
+        return true;
+    }
+
     /// <summary>도착 + 지연이 지났다 → <c>TUT_B_BOSS_FRONT_TIP</c>(D19) 때면 true(한 번).</summary>
     public bool ShouldShowBossTip(double now)
     {

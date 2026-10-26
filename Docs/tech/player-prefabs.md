@@ -370,7 +370,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 
 현재 **루트에 붙은 스킬 컴포넌트 5종이 전부 가붕이(근거리) 전용**이다 —
 `FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill`("E 수호자의 의지" — 전방 방어 → 자동 반격, [PLAN-paladin-e-counter.md](../history/PLANS/PLAN-paladin-e-counter.md).
-타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(방어 시작 클립 `Custom0` 창 열림) → `SubSkillGuardIdle`(유지 루프) → `SubSkillGuardEnd`(방어 종료 클립 `Custom1` 닫힘·종료)와
+타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(준비 클립 `Custom0` 창 열림) → `SubSkillGuardIdle`(방어중 루프) → `SubSkillGuardEnd`(해제 진입 즉시 창 닫힘 — `Custom1` 은 보조 · `End` 종료)와
 `SubSkillCounter`(반격 클립 `Hit` 판정 · `End` 종료, 방어 성공 시 서버가 전 피어 CrossFade). 초 값은 안전망 `maxActiveDuration` 만) · `FirstMeleeUltimateSkill` ·
 `FirstMeleeInterruptSkill`("단죄의 방패") · `FirstMeleePassive`.
 징크스(원거리)는 좌클릭 스택·우클릭 스택 발동 등 **다른 스킬 세트**가 필요하다([players.md](../design/players.md)).

@@ -89,7 +89,7 @@ public sealed class PlayerAnimationEventRequirementTests
         }
     }
 
-    // 팔라딘 우클릭(Garen_Parry Hit·End)·E(방어 Custom0·Custom1 + 반격 SubSkillCounter Hit·End)가 실제로 대조되는가(PLAN-anim-event-timing P1-③·④).
+    // 팔라딘 우클릭(Garen_Parry Hit·End)·E(준비 Custom0 · 해제 Custom1·End + 반격 SubSkillCounter Hit·End)가 실제로 대조되는가(PLAN-anim-event-timing P1-③·④).
     [Test]
     public void PaladinInterruptAndSub_DeclareAndHaveEventTimingEvents()
     {
@@ -102,7 +102,7 @@ public sealed class PlayerAnimationEventRequirementTests
 
         AssertRequirements(prefab.GetComponentInChildren<FirstMeleeInterruptSkill>(true), controller, 2,
             nameof(FirstMeleeInterruptSkill));
-        AssertRequirements(prefab.GetComponentInChildren<FirstMeleeSubSkill>(true), controller, 4,
+        AssertRequirements(prefab.GetComponentInChildren<FirstMeleeSubSkill>(true), controller, 5,
             nameof(FirstMeleeSubSkill));
     }
 

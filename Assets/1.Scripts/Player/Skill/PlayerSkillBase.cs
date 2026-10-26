@@ -87,6 +87,18 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 실행 중 좌클릭을 이 스킬이 받는가(거너 Q: 좌클릭 = 발사). true 면 컨트롤러가 오너의 좌클릭을 OnPrimaryPressed 로 넘긴다.
     public virtual bool ConsumesPrimaryInput => false;
 
+    // 실행 중 같은 슬롯 재입력을 이 스킬이 받는가(팔라딘 E: 방어중 재입력 = 해제, 할 일 94). true 면 컨트롤러가 오너의 재입력을
+    // 선입력 버퍼에서 지우고 OnSkillRePressed 로 넘긴다 — 받을지 말지는 스킬이 서버에서 정한다(안 받으면 그 입력은 그냥 사라진다).
+    public virtual bool ConsumesSkillRePress => false;
+
+    // [오너] 실행 중 같은 슬롯 키의 누름/뗌을 서버로 보고하는가(팔라딘 E 홀드 방식, 할 일 95). true 면 컨트롤러가 시작 첫 틱과
+    // 바뀔 때마다 OnSkillHeldChanged 로 넘긴다. 오너 설정으로 정해지므로 오너에서만 의미가 있다(서버는 받은 통보로 판단한다).
+    // Hold 입력 타입 스킬(OnReleased)과 별개다 — 이 스킬은 Press 로 시작하고 해제 여부는 스킬이 서버에서 정한다.
+    public virtual bool ReportsHeldInput => false;
+
+    // [서버] 타이머 안전망(maxActiveDuration)에 더할 초. 실행 길이가 조작에 따라 늘어나는 스킬(팔라딘 E 홀드)이 쓴다. 공격속도와 무관하게 더한다.
+    public virtual float SafetyNetExtraSeconds => 0f;
+
     // 실행 중 오너 조준을 서버로 주기 전송할지. 기본은 홀드 스킬만(기존 동작).
     public virtual bool WantsAimUpdates => data != null && data.InputType == PlayerSkillInputType.Hold;
 
@@ -115,6 +127,22 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
             return false;
         }
     }
+
+    /// <summary>
+    /// 공격속도를 타는가(할 일 91 T5). 참이면 실행 중 Animator.speed = 배율이고 서버 임시 안전망도 배율로 나눈다(<see cref="PlayerSkillController"/>).
+    /// 기본 = 이벤트 방식(<see cref="EndsOnClipEvent"/>) — 판정·종료가 클립 이벤트라 클립과 같이 빨라진다.
+    /// 타이머 방식(가붕이 Q 홀드, 거너 Q 충전·E·R)은 판정·종료가 코드 시간이라 애니만 빨라지면 어긋나므로 타지 않는다.
+    /// 예외는 스킬이 덮는다 — 클립 이벤트로만 도는데 End 를 선언하지 않은 스킬(가붕이 E)은 참, 이벤트 방식이어도
+    /// 고정 속도·거리 이동이 동작을 정하는 스킬(어쌔신 Q 돌진)은 거짓.
+    /// 상태별로 나눠 타는 스킬(팔라딘 E — 방어중만 제외)은 거짓으로 두고 애니메이터 상태 속도 파라미터(AttackSpeedRate)로 탄다.
+    /// </summary>
+    public virtual bool ScalesWithAttackSpeed => EndsOnClipEvent;
+
+    /// <summary>
+    /// 서버 타이머 안전망(maxActiveDuration)을 공격속도로 늘리는가(<see cref="PlayerAttackSpeedRules.SafetyNetDuration"/>, 감속만).
+    /// 기본 = <see cref="ScalesWithAttackSpeed"/>. 상태 파라미터로 일부 상태만 타는 스킬(팔라딘 E)이 따로 켠다.
+    /// </summary>
+    public virtual bool ScalesSafetyNetWithAttackSpeed => ScalesWithAttackSpeed;
 
     // 시작 상태 말고 다른 상태(코드 상수로 CrossFade 하는 상태 등)에도 요구가 있는 스킬은 base 를 부른 뒤 덧붙인다(팔라딘 E 반격 상태).
     public virtual void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
@@ -188,6 +216,12 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
 
     // 서버 전용: 실행 중 좌클릭(ConsumesPrimaryInput 일 때만). direction = 누른 순간의 조준.
     public virtual void OnPrimaryPressed(Vector3 direction) { }
+
+    // 서버 전용: 실행 중 같은 슬롯 재입력(ConsumesSkillRePress 일 때만). 원격 오너면 RPC 지연만큼 늦게 온다 — 지금 서버 상태로 판정한다.
+    public virtual void OnSkillRePressed() { }
+
+    // 서버 전용: 실행 중 같은 슬롯 키 누름/뗌(오너가 ReportsHeldInput 일 때만 보낸다). 첫 통보는 시작 직후, 그 뒤는 바뀔 때마다.
+    public virtual void OnSkillHeldChanged(bool held) { }
 
     // 서버 전용: 오너 권위 결과 보고(PlayerSkillController.ReportOwnerSkillResult). 값 검증은 스킬 몫이다(어쌔신 Q: 실제 이동 거리).
     public virtual void OnOwnerResultReported(float value) { }

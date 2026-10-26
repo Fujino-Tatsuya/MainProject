@@ -15,7 +15,7 @@ GameData.xlsx (SVN, 잠금)
 
 - 파일: **`Assets/50.Art/DataTable~/GameData.xlsx`** (SVN). 폴더 이름 끝 `~` = Unity 가 임포트하지 않는다.
 - 고치기 전에 **SVN 잠금(Get Lock)**, 커밋하면 잠금 해제. xlsx 는 두 사람이 동시에 고치면 합칠 수 없다.
-- 툴바 `[ 데이터: 테이블 ▾ ]` 로 모드를 고른다(개인 설정). Play 중 화면 오른쪽 위에 `DATA: TABLE` / `DATA: INSPECTOR` 가 항상 보인다.
+- 툴바 `[ 데이터: 테이블 ▾ ]` 로 모드를 고른다(개인 설정). 현재 모드는 툴바 색(테이블 피치 · 인스펙터 연두)으로 본다(10-23 Play 화면 배지 제거).
 
 ## 2. 시트 형식
 
@@ -23,7 +23,7 @@ GameData.xlsx (SVN, 잠금)
 
 | 시트 | 들어 있는 것 |
 |---|---|
-| `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 |
+| `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 · 선입력 버퍼(`PlayerInputReader` — `inputBufferSeconds`, 우선순위 `bufferPriority*` 6칸, [skill-reject-feedback.md §0.2](skill-reject-feedback.md)) |
 | `Paladin` | 가붕이 기본 공격 · 패시브 · 스킬 SO 4종 |
 | `Gunner` | 거너 기본 공격 · 과열 · 스킬 SO 4종 |
 | `Assassin` | 어쌔신 기본 공격 · 상태 · 스킬 SO |
@@ -32,6 +32,7 @@ GameData.xlsx (SVN, 잠금)
 | `Boss` | 23호(`BossDataSO`) |
 | `Sound` | 문자열 키별 사운드(`SoundCatalog`) — 재생 수치 + 엔티티 구성(라이브러리·클립·재생 모드). 구성은 `Tools/Data/사운드 동기화` 로 반영(§6 사운드 키) |
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
+| `SuppressHaste` | 제압 가속 버프(할 일 91, `SuppressHasteData` — `Assets/Resources/Player/`) · 배율 3개(`moveSpeedMultiplier`·`attackSpeedMultiplier`·`cooldownRateMultiplier`) · `durationOverride`(0 = 이번 제압 길이) · 비네팅 페이드 `vignetteFadeIn`/`vignetteFadeOut`. [handoff-suppress-haste.md](handoff-suppress-haste.md) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
 | `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |

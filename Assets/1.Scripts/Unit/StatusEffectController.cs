@@ -118,16 +118,27 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
     public bool HasSuperArmor => Has(StatusEffectType.SuperArmor);
 
     /// <summary>활성 인스턴스 중 statType에 해당하는 배율의 곱. 스택은 magnitude^stackCount로 누적. 없으면 1.</summary>
-    public float GetStatMultiplier(StatusEffectType statType)
+    public float GetStatMultiplier(StatusEffectType statType) =>
+        StatMultiplierOf(effects.Count, effectAt ??= i => effects[i], statType);
+
+    // GetStatMultiplier 가 매 호출 새 델리게이트를 만들지 않게 한 번만 만든다(쿨 시계가 매 프레임 읽는다).
+    private Func<int, StatusEffectInstance> effectAt;
+
+    /// <summary>
+    /// <see cref="GetStatMultiplier"/> 의 순수 계산 — 목록(<paramref name="count"/>개, <paramref name="effectAt"/>)에서 statType 인스턴스 배율의 곱.
+    /// 스택은 magnitude^stackCount, 음수 magnitude 는 0. 없으면 1. EditMode 테스트가 NetworkList 없이 같은 식을 쓴다.
+    /// </summary>
+    public static float StatMultiplierOf(int count, Func<int, StatusEffectInstance> effectAt, StatusEffectType statType)
     {
         float multiplier = 1f;
-        for (int i = 0; i < effects.Count; i++)
+        for (int i = 0; i < count; i++)
         {
-            if ((effects[i].type & statType) == 0)
+            StatusEffectInstance effect = effectAt(i);
+            if ((effect.type & statType) == 0)
                 continue;
 
-            float magnitude = Mathf.Max(0f, effects[i].magnitude);
-            int stacks = Mathf.Max(1, effects[i].stackCount);
+            float magnitude = Mathf.Max(0f, effect.magnitude);
+            int stacks = Mathf.Max(1, effect.stackCount);
             multiplier *= stacks == 1 ? magnitude : Mathf.Pow(magnitude, stacks);
         }
 

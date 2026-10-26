@@ -13,7 +13,9 @@ using UnityEngine.Serialization;
 /// ③ 소모되면 쿨타임(기본 30초)이 시작된다. 쿨타임 중 피격당할 때마다 고정 감소(데미지량 무관).
 ///
 /// 버프는 <see cref="StatusEffectController"/> 가 들고 전 피어에 복제한다 — 칼날 발광은 이걸 본다.
-/// 쿨타임은 "끝나는 서버 시각(readyServerTime)" 하나로 표현하고 전 피어가 읽는다(오너 HUD fill·머리 위 특성 게이지).
+/// 쿨타임은 플레이어 쿨 시계(<see cref="PlayerCooldownClock"/> — 쿨 속도 배율 반영) 위의 끝 시각(readyAt)이다.
+/// 피어마다 시계 원점이 달라 서버는 "남은 초 + 적은 서버 시각"(<see cref="PassiveCooldownStamp"/>)을 복제하고,
+/// 각 피어가 자기 시계의 끝 시각으로 바꿔 읽는다(오너 HUD fill·머리 위 특성 게이지). 할 일 91 T4.
 ///
 /// 🔴 버프 부여는 서버 Update 가 "쿨타임 끝 + 버프 없음" 을 볼 때마다 한다. 이 한 줄이 스폰 직후 부여와,
 ///    보스 연출이 상태이상을 걷어낸 뒤(연출 중엔 Apply 거부) 다시 붙는 것까지 같이 처리한다.
@@ -57,20 +59,25 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
     [SerializeField] private Vector3 additionalHitFallbackOffset = new Vector3(0f, 1f, 0f);
 
-    // 쿨타임이 끝나는 서버 시각(ServerTime). 서버만 쓰고 전 피어가 읽는다 — 원격 플레이어의 머리 위 특성 게이지도 그린다.
-    // 버프 보유 중에는 과거 시각이다. 클라도 같은 NetworkManager.ServerTime 으로 남은 시간을 계산한다.
-    private readonly NetworkVariable<double> readyServerTime = new NetworkVariable<double>(
-        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // 쿨 복제값(남은 초 + 적은 서버 시각). 서버만 쓰고 전 피어가 읽는다 — 원격 플레이어의 머리 위 특성 게이지도 그린다.
+    // 서버가 끝 시각을 바꿀 때(소모·피격 감소·스폰)만 다시 적는다.
+    private readonly NetworkVariable<PassiveCooldownStamp> cooldownStamp = new NetworkVariable<PassiveCooldownStamp>(
+        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private Player owner;
     private StatusEffectController statusEffects;
+    private PlayerCooldownClock cooldownClock;
+    // 쿨이 끝나는 이 피어 쿨 시계 시각. 서버 = 원본, 다른 피어 = 복제값을 환산한 값. 버프 보유 중에는 과거 시각이다.
+    private double readyAt;
     // 칼날 발광에 마지막으로 반영한 버프 상태. null = 아직 한 번도 반영 안 함(늦게 접속한 클라 포함 첫 프레임에 맞춘다).
     private bool? appliedGlow;
 
     private bool HasGameplayAuthority => IsNetworkActive && IsServer;
+    // 복제값 도장용 서버 시각. 쿨 판정은 이 값이 아니라 쿨 시계(ClockNow)로 한다.
     private double ServerNow => IsNetworkActive && NetworkManager != null
         ? NetworkManager.ServerTime.Time
         : Time.timeAsDouble;
+    private double ClockNow => cooldownClock != null ? cooldownClock.SkillNow : Time.timeAsDouble;
     private ulong ChargeSourceId => NetworkObjectId;
 
     /// <summary>버프 보유 여부. 상태이상 목록이 복제되므로 전 피어에서 유효.</summary>
@@ -81,7 +88,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     public float CooldownTime => cooldownTime;
     public bool IsReady => HasCharge;
     public float RemainingCooldown =>
-        !HasCharge ? Mathf.Max(0f, (float)(readyServerTime.Value - ServerNow)) : 0f;
+        !HasCharge ? PassiveCooldownSync.Remaining(readyAt, ClockNow) : 0f;
     public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public UnityEngine.Object TooltipValueSource => this;
 
@@ -92,6 +99,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     {
         owner = GetComponent<Player>();
         statusEffects = GetComponent<StatusEffectController>();
+        cooldownClock = PlayerCooldownClock.For(this);
     }
 
     private void OnEnable()
@@ -114,11 +122,41 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     {
         base.OnNetworkSpawn();
 
+        cooldownStamp.OnValueChanged += HandleCooldownStampChanged;
+
         // 버프 보유로 시작 — 쿨타임을 "이미 끝남" 으로 두면 아래 Update 가 첫 틱에 버프를 건다.
         if (HasGameplayAuthority)
-            readyServerTime.Value = ServerNow;
+            SetReadyAtServer(ClockNow);
+        else
+            AdoptCooldownStamp(cooldownStamp.Value);
 
         appliedGlow = null;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        cooldownStamp.OnValueChanged -= HandleCooldownStampChanged;
+        base.OnNetworkDespawn();
+    }
+
+    // [서버] 끝 시각을 바꾸고 복제값을 다시 적는다.
+    private void SetReadyAtServer(double value)
+    {
+        readyAt = value;
+        cooldownStamp.Value = PassiveCooldownSync.Stamp(readyAt, ClockNow, ServerNow);
+    }
+
+    private void HandleCooldownStampChanged(PassiveCooldownStamp previous, PassiveCooldownStamp current)
+    {
+        if (!HasGameplayAuthority)
+            AdoptCooldownStamp(current);
+    }
+
+    // [서버 외 피어] 복제값을 이 피어 쿨 시계의 끝 시각으로 바꾼다.
+    private void AdoptCooldownStamp(PassiveCooldownStamp stamp)
+    {
+        float rate = cooldownClock != null ? cooldownClock.Rate : 1f;
+        readyAt = PassiveCooldownSync.LocalReadyAt(stamp, ClockNow, ServerNow, rate);
     }
 
     private void Update()
@@ -127,7 +165,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
             return;
 
         // [서버] 쿨타임이 끝났는데 버프가 없으면 건다. 연출 잠금 중이면 Apply 가 거부되고, 잠금이 풀린 뒤 다시 들어온다.
-        if (HasGameplayAuthority && !HasCharge && ServerNow >= readyServerTime.Value)
+        if (HasGameplayAuthority && !HasCharge && ClockNow >= readyAt)
             statusEffects.Apply(StatusEffectType.PassiveCharge, 1f, 0f, ChargeSourceId);
 
         // [전 피어] 칼날 발광 = 버프 보유. 버프가 복제되니 따로 동기화하지 않는다.
@@ -160,7 +198,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
 
         // 소모 → 쿨타임 시작을 먼저 확정한다. 실제 피해 적용은 이 메서드가 반환한 뒤 이어진다.
         statusEffects.Remove(StatusEffectType.PassiveCharge, ChargeSourceId);
-        readyServerTime.Value = ServerNow + cooldownTime;
+        SetReadyAtServer(ClockNow + cooldownTime);
 
         int bonusDamage = owner.ResolveDamage(bonusDamageMultiplier, bonusFlatDamage);
 
@@ -180,9 +218,9 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
         if (!HasGameplayAuthority)
             return;
 
-        double now = ServerNow;
-        if (readyServerTime.Value > now)
-            readyServerTime.Value = Math.Max(now, readyServerTime.Value - hitCooldownReduction);
+        double now = ClockNow;
+        if (readyAt > now)
+            SetReadyAtServer(PassiveCooldownSync.Reduce(readyAt, now, hitCooldownReduction));
     }
 
     // ── 발동 연출 ───────────────────────────────────────────────────
