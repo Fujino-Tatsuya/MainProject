@@ -91072,6 +91072,20 @@ AnimationClip:
     floatParameter: 0
     intParameter: 3
     messageOptions: 0
+  - time: 0.1
+    functionName: StopEffect
+    data: GuardianBarrier
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0
+  - time: 0.1
+    functionName: PlayEffect
+    data: GuardianRelease
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0
   - time: 0.9666667
     functionName: HandleSkillEvent
     data: 
