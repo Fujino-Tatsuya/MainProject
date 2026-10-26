@@ -105,7 +105,10 @@ public readonly struct GuardEventResult
 ///       뒤늦게 오거나, 원격 오너 동기로 반격 상태가 다시 들어가 Hit·End 가 두 번 올 수 있다.
 ///       End 는 Releasing(해제 클립 End)·Countering(반격 클립 End) 에서만 끝낸다 — Guarding 에서 온 End 는 무시한다.</item>
 /// <item><b>E 재입력 해제</b>(할 일 94)는 방어중(Guarding + 서버 애니메이터 SubSkillGuardIdle)에서 한 번만 받는다
-///       (<see cref="TryRequestRelease"/>). 해제 CrossFade 가 Custom1 에 닿기 전까지 창은 열려 있어 그 사이 방어 성공도 그대로 받는다.</item>
+///       (<see cref="TryRequestRelease"/>).</item>
+/// <item><b>해제 진입 = 창 닫힘</b>(할 일 95). 방어중 → 해제로 넘어가는 순간(E 재입력·홀드 뗌·최대 유지 시간·탭 방식 exitTime 전이)
+///       Custom1 을 기다리지 않고 방어 창을 닫고 Releasing 이 된다 — 해제 동작 초반 피격은 반격하지 않는다. 뒤에 온 Custom1 은 무시한다.
+///       대시 취소는 OnEnd → <see cref="Reset"/> 이 같은 순간 창을 닫는다.</item>
 /// <item><b>홀드 방식</b>(할 일 95)은 오너의 누름/뗌 통보(<see cref="OnHoldInput"/>)가 처음 온 시전에서만 켜진다. 방어중에 들어온 뒤
 ///       뗐거나(준비 중에 뗐으면 방어중 첫 틱) 방어중 최대 유지 시간을 넘기면 해제를 한 번 낸다(<see cref="TickHold"/>).
 ///       해제 요청은 E 재입력 해제와 같은 한 번짜리라 둘이 겹쳐도 CrossFade 는 한 번이다.</item>
@@ -173,9 +176,18 @@ public sealed class FirstMeleeGuardCounterModel
 
     /// <summary>
     /// [Custom1] 방어 창을 닫고 Releasing 으로 넘어간다 — E 는 아직 끝나지 않는다(해제 클립 End 가 끝낸다).
-    /// Guarding 일 때만 — 반격 중 뒤늦게 온 Custom1 은 무시한다.
+    /// Guarding 일 때만 — 반격 중 뒤늦게 온 Custom1, 해제 진입 때 이미 닫혀 Releasing 인 뒤 온 Custom1 은 무시한다.
     /// </summary>
-    public void OnGuardWindowClosed()
+    public void OnGuardWindowClosed() => EnterReleasing();
+
+    /// <summary>
+    /// [서버] 방어중 → 해제(SubSkillGuardEnd) 진입 순간 — Custom1 을 기다리지 않고 방어 창을 바로 닫고 Releasing 으로 넘어간다(할 일 95).
+    /// 해제 요청(<see cref="TryRequestRelease"/>·<see cref="TickHold"/>)은 스스로 부르므로, 호출측은 요청 없이 애니메이터가 해제로
+    /// 넘어간 경우(탭 방식 방어중 exitTime 전이)에만 부른다. Guarding 이 아니면 무시한다 — 멱등이다.
+    /// </summary>
+    public void OnReleaseEntered() => EnterReleasing();
+
+    void EnterReleasing()
     {
         if (Phase != FirstMeleeGuardPhase.Guarding)
             return;
@@ -186,7 +198,7 @@ public sealed class FirstMeleeGuardCounterModel
 
     /// <summary>
     /// [E 재입력] 방어중 해제 요청을 받는가(할 일 94). 참이면 호출측(서버)이 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다 —
-    /// 이 모델은 단계를 바꾸지 않는다. 창 닫힘·종료는 그 해제 클립의 Custom1·End 가 기존 경로로 처리한다.
+    /// 받는 즉시 방어 창을 닫고 Releasing 으로 넘어간다(할 일 95, <see cref="OnReleaseEntered"/>). 해제 클립 Custom1 은 그 뒤 무시되고 End 가 끝낸다.
     /// 받는 때는 Guarding 이고 서버 애니메이터가 방어중 상태(SubSkillGuardIdle, 전이 중 아님)일 때뿐이다 —
     /// 준비(SubSkillGuard)·해제(Releasing 또는 이미 해제로 넘어가는 중)·반격(Countering) 중 재입력은 거짓(무시)이다.
     /// 한 시전에 한 번만 참이다 — 해제 CrossFade 중(Custom1 전)의 연타가 CrossFade 를 다시 걸지 않게 한다.
@@ -198,6 +210,7 @@ public sealed class FirstMeleeGuardCounterModel
             return false;
 
         _releaseRequested = true;
+        EnterReleasing();
         return true;
     }
 
@@ -223,7 +236,7 @@ public sealed class FirstMeleeGuardCounterModel
 
     /// <summary>
     /// [홀드, 서버 매 틱] 방어중을 지금 해제해야 하는가. None 이 아니면 해제 요청을 받은 것이고(<see cref="ReleaseRequested"/>),
-    /// 호출측이 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다 — 단계는 바꾸지 않는다(창 닫힘·종료는 해제 클립 이벤트).
+    /// 호출측이 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다 — 방어 창은 바로 닫고 Releasing 으로 넘어간다(종료는 해제 클립 End).
     /// 홀드 방식이고 Guarding 이고 서버 애니메이터가 방어중(전이 중 아님)일 때만 본다. 최대 유지 시간은 방어중에 처음 들어온
     /// 틱부터 잰다. 준비 중에 이미 뗐으면 방어중 첫 틱에 KeyReleased(최소 한 프레임 방어중).
     /// </summary>
@@ -248,7 +261,10 @@ public sealed class FirstMeleeGuardCounterModel
                 : GuardHoldRelease.None;
 
         if (release != GuardHoldRelease.None)
+        {
             _releaseRequested = true;
+            EnterReleasing();
+        }
         return release;
     }
 

@@ -10,6 +10,7 @@ using UnityEngine;
 /// 방어중 루프(SubSkillGuardIdle, 전이 exitTime 으로 길이 조정) → 해제(SubSkillGuardEnd) Custom1 창 닫힘 · End 종료,
 /// 반격(SubSkillCounter) Hit 반격 판정 · End 종료. 이벤트·전이를 옮기면 그대로 반영된다.
 /// 방어중에 E 를 다시 누르면 서버가 해제 상태로 바로 넘긴다(할 일 94, <see cref="OnSkillRePressed"/>).
+/// 방어중 → 해제로 넘어가는 순간 방어 창은 바로 닫힌다 — Custom1 을 기다리지 않는다(할 일 95, Custom1 은 그 뒤 무시).
 /// 홀드 방식(설정 기본, 할 일 95)은 E 를 누르는 동안 방어중을 유지하고 떼거나 최대 유지 시간이 지나면 서버가 해제로 넘긴다
 /// (<see cref="OnSkillHeldChanged"/>·<see cref="OnTick"/>). 방어중 자동 해제 전이는 애니메이터 Bool GuardHold 로 막는다.
 /// 공격속도는 준비·해제·반격 상태의 속도 파라미터(AttackSpeedRate)로만 탄다 — 방어중 길이는 공속과 무관(할 일 91 A5, Docs/tech/suppress-haste.md).
@@ -111,7 +112,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     /// <summary>
     /// [서버] E 재입력. 지금 서버 애니메이터가 방어중(SubSkillGuardIdle, 전이 중 아님)이면 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다.
     /// 원격 오너가 방어중으로 보고 눌렀어도 서버가 아직 준비 중이거나 이미 해제로 넘어가는 중이면 조용히 무시한다(서버 판정이 기준).
-    /// 그 뒤 창 닫힘(Custom1)·E 종료(End)는 해제 클립 이벤트가 기존 경로로 처리한다 — 타이머를 따로 두지 않는다.
+    /// 받는 즉시 방어 창이 닫힌다(할 일 95 — 모델이 Releasing 으로 넘어가 Custom1 은 무시). E 종료는 해제 클립 End 가 한다 — 타이머를 따로 두지 않는다.
     /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PlayerShieldVfx.ServerPlayGuardCounterPose"/>).
     /// </summary>
     public override void OnSkillRePressed()
@@ -136,6 +137,14 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         animator != null &&
         !animator.IsInTransition(BaseLayer) &&
         animator.GetCurrentAnimatorStateInfo(BaseLayer).shortNameHash == GuardHoldStateHash;
+
+    // 방어중 → 해제 전이 중이다. '이미 해제 상태'는 보지 않는다 — 새 시전 시작 CrossFade 전 프레임에 지난 시전의 해제 상태가 남아
+    // 있을 수 있어서다. 전이를 한 프레임에 건너뛴 드문 경우는 해제 클립 Custom1 이 그대로 닫는다.
+    private bool IsAnimatorEnteringGuardEnd() =>
+        animator != null &&
+        animator.IsInTransition(BaseLayer) &&
+        animator.GetCurrentAnimatorStateInfo(BaseLayer).shortNameHash == GuardHoldStateHash &&
+        animator.GetNextAnimatorStateInfo(BaseLayer).shortNameHash == GuardEndStateHash;
 
     // ── 홀드 방식(할 일 95) ──
 
@@ -165,8 +174,16 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     {
         base.OnTick();
 
+        if (!IsServerPeer)
+            return;
+
+        // 탭 방식 방어중 exitTime 전이(요청 없이 애니메이터가 해제로 넘어감)도 해제 진입 순간 창을 닫는다(할 일 95).
+        // 요청 경로(재입력·홀드)는 모델이 이미 Releasing 이라 여기서는 아무 일도 없다.
+        if (model.Phase == FirstMeleeGuardPhase.Guarding && IsAnimatorEnteringGuardEnd())
+            model.OnReleaseEntered();
+
         FirstMeleeSubSkillData data = SubSkillData;
-        if (!IsServerPeer || data == null || shieldVfx == null || !model.HoldMode)
+        if (data == null || shieldVfx == null || !model.HoldMode)
             return;
 
         GuardHoldRelease release = model.TickHold(IsAnimatorInGuardHold(), Time.time, data.GuardHoldMaxDuration);
@@ -243,7 +260,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 model.OnGuardWindowOpened();
                 break;
 
-            // 창만 닫는다 — E 는 해제 모션 끝(End)까지 이어진다.
+            // 창만 닫는다 — E 는 해제 모션 끝(End)까지 이어진다. 해제 진입 때 이미 닫혔으면(할 일 95) 모델이 무시한다.
             case SkillAnimationEventType.Custom1:
                 model.OnGuardWindowClosed();
                 break;

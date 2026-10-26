@@ -403,14 +403,15 @@ public sealed class FirstMeleeGuardCounterModelTests
     }
 
     [Test]
-    public void RePress_DuringHold_Accepted_PhaseUnchanged_WindowStillOpen()
+    public void RePress_DuringHold_Accepted_WindowClosedImmediately()
     {
-        // 받아도 단계·창은 그대로 — 창은 해제 클립 Custom1 이, 종료는 End 가 기존 경로로 처리한다.
+        // 할 일 95 — 받는 즉시 창이 닫히고 Releasing. 해제 클립 Custom1 은 무시되고 End 가 끝낸다.
         var model = Begun();
         Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
         Assert.That(model.ReleaseRequested, Is.True);
-        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
-        Assert.That(model.IsGuardWindowOpen, Is.True);
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.IsGuardWindowOpen, Is.False);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
 
         model.OnGuardWindowClosed();
         Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
@@ -469,16 +470,15 @@ public sealed class FirstMeleeGuardCounterModelTests
     }
 
     [Test]
-    public void BlockAfterReleaseRequested_BeforeCustom1_StillCounters()
+    public void AttackAfterReleaseRequested_BeforeCustom1_NoCounter()
     {
-        // 해제 CrossFade 가 Custom1 에 닿기 전까지 창은 열려 있다 — 그 사이 방어 성공은 그대로 반격.
+        // 할 일 95 — 해제 동작 초반(Custom1 전) 정면 피격도 반격하지 않는다.
         var model = Begun();
         Assert.That(model.TryRequestRelease(animatorInGuardHold: true), Is.True);
-        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.BlockAndCounter));
-        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
-
-        model.OnGuardWindowClosed(); // 반격 중 늦게 온 Custom1 은 무시
-        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.HasPendingCounter, Is.False);
+        Assert.That(model.BlocksKnockback, Is.False);
     }
 
     [Test]
@@ -523,7 +523,7 @@ public sealed class FirstMeleeGuardCounterModelTests
     }
 
     [Test]
-    public void Hold_ReleaseKey_DuringGuardHold_ReleasesOnce_PhaseUnchanged()
+    public void Hold_ReleaseKey_DuringGuardHold_ReleasesOnce_WindowClosedImmediately()
     {
         var model = Begun();
         model.OnHoldInput(true);
@@ -532,9 +532,10 @@ public sealed class FirstMeleeGuardCounterModelTests
 
         Assert.That(model.TickHold(true, 10.5f, HoldMax), Is.EqualTo(GuardHoldRelease.KeyReleased));
         Assert.That(model.ReleaseRequested, Is.True);
-        // 단계·창은 그대로 — 해제 클립 Custom1·End 가 기존 경로로 닫고 끝낸다.
-        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Guarding));
-        Assert.That(model.IsGuardWindowOpen, Is.True);
+        // 할 일 95 — 창은 바로 닫히고 Releasing. 해제 클립 Custom1 은 무시되고 End 가 끝낸다.
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.IsGuardWindowOpen, Is.False);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
         // 해제 CrossFade 중(Custom1 전)에는 다시 내지 않는다.
         Assert.That(model.TickHold(true, 10.6f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
 
@@ -646,6 +647,96 @@ public sealed class FirstMeleeGuardCounterModelTests
         model.OnGuardWindowOpened();
         Assert.That(model.HoldMode, Is.False);
         Assert.That(model.TickHold(true, 0f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+    }
+
+    // ── 해제 진입 즉시 창 닫힘(할 일 95) ──
+    // 방어중 → 해제로 넘어가는 순간 Custom1 을 기다리지 않는다. Custom1 이 뒤에 오면 무시한다.
+
+    [Test]
+    public void ReleaseEntry_HoldMaxDuration_WindowClosedImmediately()
+    {
+        var model = Begun();
+        model.OnHoldInput(true);
+        Assert.That(model.TickHold(true, 0f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
+        Assert.That(model.TickHold(true, HoldMax, HoldMax), Is.EqualTo(GuardHoldRelease.MaxDuration));
+
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.IsGuardWindowOpen, Is.False);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
+        Assert.That(model.HasPendingCounter, Is.False);
+    }
+
+    [Test]
+    public void ReleaseEntry_TapExitTime_WindowClosedImmediately()
+    {
+        // 탭 방식 방어중 exitTime 전이 — 요청 없이 애니메이터가 해제로 넘어간 순간(서버 OnTick 감지).
+        var model = Begun();
+        model.OnReleaseEntered();
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+        Assert.That(model.IsGuardWindowOpen, Is.False);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
+        Assert.That(model.OnEnd().Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+    }
+
+    [Test]
+    public void ReleaseEntry_DashCancel_WindowClosedImmediately()
+    {
+        // 대시 취소 = 서버 OnEnd(DashCancelled) → Reset — 그 순간 창이 닫혀 이후 피격은 Pass, 늦은 Custom1·End 도 무시.
+        var model = Begun();
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.DashCancelled), Is.False);
+        model.Reset();
+
+        Assert.That(model.IsGuardWindowOpen, Is.False);
+        Assert.That(model.Evaluate(Hit(Front)), Is.EqualTo(GuardVerdict.Pass));
+        model.OnGuardWindowClosed();
+        Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Idle));
+        Assert.That(model.OnEnd().HasEnded, Is.False);
+    }
+
+    [Test]
+    public void Custom1_AfterReleaseEntry_IgnoredNoDoubleClose()
+    {
+        // 네 경로 모두 — Custom1 이 이미 닫힌 창에 오면 아무 일도 없다(단계 그대로, End 는 한 번만 끝낸다).
+        var rePress = Begun();
+        rePress.TryRequestRelease(animatorInGuardHold: true);
+
+        var holdReleased = Begun();
+        holdReleased.OnHoldInput(true);
+        holdReleased.OnHoldInput(false);
+        holdReleased.TickHold(true, 0f, HoldMax);
+
+        var holdMax = Begun();
+        holdMax.OnHoldInput(true);
+        holdMax.TickHold(true, 0f, 0f);
+
+        var tap = Begun();
+        tap.OnReleaseEntered();
+
+        foreach (FirstMeleeGuardCounterModel model in new[] { rePress, holdReleased, holdMax, tap })
+        {
+            Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+            Assert.DoesNotThrow(() => model.OnGuardWindowClosed());
+            model.OnReleaseEntered();
+            Assert.That(model.Phase, Is.EqualTo(FirstMeleeGuardPhase.Releasing));
+            Assert.That(model.IsGuardWindowOpen, Is.False);
+
+            Assert.That(model.OnEnd().Ended, Is.EqualTo(GuardEndReason.GuardExpired));
+            Assert.That(model.OnEnd().HasEnded, Is.False);
+        }
+    }
+
+    [Test]
+    public void ReleaseEntered_NotGuarding_Ignored()
+    {
+        // 반격 중·준비 전(Idle) 해제 진입 신호는 무시 — 반격 단계가 유지된다.
+        var countering = Countering();
+        countering.OnReleaseEntered();
+        Assert.That(countering.Phase, Is.EqualTo(FirstMeleeGuardPhase.Countering));
+        Assert.That(countering.HasPendingCounter, Is.True);
+
+        var idle = new FirstMeleeGuardCounterModel();
+        idle.OnReleaseEntered();
+        Assert.That(idle.Phase, Is.EqualTo(FirstMeleeGuardPhase.Idle));
     }
 
     // ── 대시 취소(할 일 95) ──
