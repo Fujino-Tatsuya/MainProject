@@ -9852,8 +9852,6 @@ MonoBehaviour:
   - {fileID: 1085174633}
   - {fileID: 1697694790}
   - {fileID: 1510317677}
-  - {fileID: 0}
-  - {fileID: 0}
   threshold: {fileID: 531334598}
   seats:
   - {fileID: 964224327}
