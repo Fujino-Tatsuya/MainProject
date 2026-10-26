@@ -487,6 +487,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         Debug.Log($"{Tag} event=bot_combat_done character={_character} tier={_profile.Tier} attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} " +
                   $"transforms={_transforms} rejects={_castRejects} gunnerFires={_gunnerFires} rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} " +
                   $"stuck={_stuck.Escapes} edgeBlocks={_edgeBlocks} {EvasionDiag()} {GimmickDiag()}");
+        ClosePart("destroy");
     }
 
     private static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;

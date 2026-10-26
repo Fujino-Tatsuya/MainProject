@@ -41,6 +41,12 @@ public static class QABoss103Match
     /// <summary>마지막으로 끝난 판 기록(호스트). C4 계측·C6 루프가 읽는다.</summary>
     public static QABoss103RunRecord LastRecord { get; private set; }
 
+    /// <summary>판 끝에 클론 봇 판 파일(<c>done</c>)을 기다리는 상한(초) — 못 받으면 그 열을 비우고 runs.csv note 에 남긴다.</summary>
+    private const float PartsWaitSeconds = 10f;
+
+    /// <summary>시나리오가 설정을 읽은 시각 = 판 시작(runs.csv started_at).</summary>
+    private static DateTime _startedAt = DateTime.Now;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics() => LastRecord = null;
 
@@ -51,6 +57,7 @@ public static class QABoss103Match
     /// <summary>자기 루트의 설정 파일. 없거나 깨졌으면 기본값(시드 103·판 1) + 사유.</summary>
     public static QABoss103Config ReadConfig(out string note)
     {
+        _startedAt = DateTime.Now;
         try
         {
             if (File.Exists(ConfigPath) && QABoss103Config.TryParse(File.ReadAllText(ConfigPath), out QABoss103Config cfg))
@@ -75,16 +82,17 @@ public static class QABoss103Match
         var rec = NewRecord(cfg);
         rec.Outcome = QABoss103Outcome.Aborted;
         rec.Detail = why;
-        Finish(ctx, rec);
+        Finish(ctx, cfg, rec, null, double.NaN);
     }
 
     private static QABoss103RunRecord NewRecord(QABoss103Config cfg) =>
         new QABoss103RunRecord { Run = cfg.Run, BaseSeed = cfg.Seed, RunSeed = cfg.RunSeed, BotTier = cfg.BotTier };
 
-    private static void Finish(QAScenarioContext ctx, QABoss103RunRecord rec)
+    private static void Finish(QAScenarioContext ctx, QABoss103Config cfg, QABoss103RunRecord rec, QABoss103Recorder recorder, double bossHpPct)
     {
         LastRecord = rec;
         Debug.Log(rec.ToLogLine());
+        QABoss103RunCsv.Write(cfg, rec, recorder, bossHpPct, _startedAt);
         string evidence = $"결과 {rec.Outcome} · 전투 {(rec.CombatSeconds < 0 ? "na" : rec.CombatSeconds.ToString("F1") + "s")} · 시드 {rec.BaseSeed}/판 {rec.Run}/판 시드 {rec.RunSeed} · 특성 {rec.TraitsToken()} · {rec.Detail}";
         if (rec.Outcome == QABoss103Outcome.Aborted)
             ctx.Fail("103 판 기록", evidence, ctx.Shot("b103_abort"));
@@ -111,6 +119,8 @@ public static class QABoss103Match
         bool wiped = false;
         Action<IReadOnlyList<ulong>> onWipe = _ => wiped = true;
         TutorialTraitDirector traits = null;
+        QABoss103Recorder recorder = null;
+        double bossHpPct = double.NaN;
         try
         {
             // 0) 맵 로딩 흐름이 끝나고 파티 전원이 맵에 설 때까지.
@@ -205,6 +215,7 @@ public static class QABoss103Match
                 yield break;
             }
             double combatStart = Time.realtimeSinceStartupAsDouble;
+            recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터
             string combatWall = DateTime.Now.ToString("HH:mm:ss.fff");
             Debug.Log($"{Tag} event=combat_start at={combatWall} introS={Time.realtimeSinceStartup - introAt:F1} skip={SkipVotes()} hostSkipPath={bot.SkipPath} hostSawLock={bot.SawCinematicLock}");
             ctx.Check(bot.SawCinematicLock, "103 연출 중 연출 잠금", $"호스트 플레이어 PlayerEncounterLock.IsCinematicLocked 관측={bot.SawCinematicLock}");
@@ -231,6 +242,7 @@ public static class QABoss103Match
                 }
                 yield return null;
             }
+            bossHpPct = recorder.Stop();
 
             // 전멸 리스폰 뒤 특성 초기화 팝업 — 호스트 봇도 '아니오' 를 보낼 시간을 준다.
             if (rec.Outcome == QABoss103Outcome.Wipe && wiped)
@@ -238,6 +250,21 @@ public static class QABoss103Match
                 int before = bot.ResetAnswers;
                 yield return ctx.Wait(() => bot == null || bot.ResetAnswers > before, ResetPromptWaitSeconds);
                 Debug.Log($"{Tag} event=reset_prompt host_answered={(bot != null && bot.ResetAnswers > before ? "true" : "false")}");
+            }
+
+            // 5) C4 — 봇 판 파일: 호스트 봇을 닫고, 끝 신호를 쓰고, 클론 봇의 끝 표시를 상한까지 기다린다.
+            if (cfg.HasOut)
+            {
+                if (fighter != null)
+                    fighter.ClosePart("host_end");
+                QABoss103RunCsv.SignalEnd(cfg);
+                var others = new List<int>();
+                foreach (QABoss103Character ch in characters.Values)
+                    if (ch != localCharacter)
+                        others.Add((int)ch);
+                float partsAt = Time.realtimeSinceStartup;
+                yield return ctx.Wait(() => QABoss103RunCsv.PendingParts(cfg, others) == 0, PartsWaitSeconds);
+                Debug.Log($"{Tag} event=parts_wait ok={(!ctx.TimedOut ? "true" : "false")} waitS={Time.realtimeSinceStartup - partsAt:F1} pending={QABoss103RunCsv.PendingParts(cfg, others)}/{others.Count}");
             }
         }
         finally
@@ -250,7 +277,11 @@ public static class QABoss103Match
                 rec.Outcome = QABoss103Outcome.Aborted;
                 rec.Detail = "중단(시나리오 상한·예외·정지)";
             }
-            Finish(ctx, rec);
+            if (recorder != null && double.IsNaN(bossHpPct))
+                bossHpPct = recorder.Stop();
+            Finish(ctx, cfg, rec, recorder, bossHpPct);
+            if (recorder != null)
+                UnityEngine.Object.Destroy(recorder.gameObject);
             if (bot != null)
                 UnityEngine.Object.Destroy(bot.gameObject);
             if (fighter != null)
@@ -264,6 +295,7 @@ public static class QABoss103Match
         QABoss103CombatBot fighter = QABoss103CombatBot.Create(cfg.RunSeed, character, cfg.BotTier);
         string source = cfg.Tier.HasValue ? "수동 지정" : $"(판 {cfg.Run} − 1) mod 3";
         ctx.Eye($"103 봇 프로필({character})", $"{fighter.Profile.Describe()} · 단계 출처 {source}");
+        fighter.AttachPart(cfg);
         return fighter;
     }
 
@@ -280,8 +312,10 @@ public static class QABoss103Match
         try
         {
             string mapScene = SceneManager.GetActiveScene().name;
+            DateTime startedUtc = DateTime.UtcNow;
             double combatStart = -1.0;
             float answeredAt = -1f;
+            float nextEndCheck = 0f;
             string end = "";
             while (end.Length == 0)
             {
@@ -302,6 +336,13 @@ public static class QABoss103Match
                     end = "전멸 → 초기화 팝업 '아니오'";
                 else if (combatStart >= 0.0 && QABoss103Plan.IsTimedOut(Time.realtimeSinceStartupAsDouble - combatStart, QABoss103Plan.CombatLimitSeconds + 30.0))
                     end = "Combat 부터 30분";
+                else if (Time.realtimeSinceStartup >= nextEndCheck)
+                {
+                    // C4 — 호스트 판정 끝 신호(파일) → 봇을 닫아 판 파일 끝 표시(done)를 남긴다.
+                    nextEndCheck = Time.realtimeSinceStartup + 0.5f;
+                    if (QABoss103RunCsv.EndSignaled(cfg, startedUtc))
+                        end = "호스트 판 끝 신호";
+                }
                 yield return null;
             }
             ctx.Eye("103 가상 플레이어 입력", $"{localCharacter} · 끝={end} · 특성 {string.Join("+", bot.Picks)} · 스킵 경로 {bot.SkipPath} · 연출 잠금 관측 {bot.SawCinematicLock} · 팝업 '아니오' {bot.ResetAnswers}회");

@@ -16,6 +16,8 @@ public enum QABoss103Outcome
     Timeout = 3,
     /// <summary>시작 경로 실패(맵·집결·연출·Combat 중 어디서 멈춤) — 밸런스 통계에서 뺀다.</summary>
     Aborted = 4,
+    /// <summary>실행 오류(C6 루프가 정한다 — 데이터 출처 불일치·예외 등). 끝에서 1회 재실행.</summary>
+    Error = 5,
 }
 
 /// <summary>할 일 103 파티 고정 캐릭터 — 한 판 = 팔라딘·어쌔신·거너 1명씩.</summary>
@@ -225,6 +227,7 @@ public sealed class QABoss103RunRecord
 /// 할 일 103 실행 설정 — 메뉴(<c>Tools/QA/103</c>)가 호스트·MPPM 클론 루트마다 같은 파일을 쓰고, 각 인스턴스가 자기 루트에서 읽는다.
 /// 형식 = 한 줄에 <c>key=value</c>(<c>seed</c>·<c>run</c>·<c>tier</c>). 모르는 키는 무시.
 /// <c>tier</c> = 봇 단계 수동 지정(<c>Beginner</c>·<c>Normal</c>·<c>Skilled</c>, 대소문자 무관) — 없거나 <c>auto</c> 면 판 번호로 정한다(<see cref="QABoss103Bot.TierForRun"/>).
+/// <c>out</c> = CSV·봇 판 파일 폴더(절대 경로 — 호스트·클론이 같은 폴더에 쓴다, C4). <c>retry</c> = 재실행 판이면 1(C6).
 /// </summary>
 public sealed class QABoss103Config
 {
@@ -235,13 +238,20 @@ public sealed class QABoss103Config
     public int Run = 1;
     /// <summary>봇 단계 수동 지정. null = 자동(판 번호).</summary>
     public QABoss103BotTier? Tier;
+    /// <summary>CSV 출력 폴더(절대 경로). 비면 CSV·판 파일을 쓰지 않는다.</summary>
+    public string OutDir = "";
+    /// <summary>재실행 판(0/1).</summary>
+    public int Retry;
 
     public int RunSeed => QABoss103Plan.RunSeed(Seed, Run);
 
     /// <summary>이 판의 봇 단계(수동 지정 우선).</summary>
     public QABoss103BotTier BotTier => QABoss103Bot.ResolveTier(Run, Tier);
 
-    public string Format() => $"seed={Seed}\nrun={Run}\ntier={(Tier.HasValue ? Tier.Value.ToString() : "auto")}\n";
+    public bool HasOut => !string.IsNullOrEmpty(OutDir);
+
+    public string Format() =>
+        $"seed={Seed}\nrun={Run}\ntier={(Tier.HasValue ? Tier.Value.ToString() : "auto")}\nretry={Retry}\n" + (HasOut ? $"out={OutDir}\n" : "");
 
     public static bool TryParse(string text, out QABoss103Config cfg)
     {
@@ -256,6 +266,12 @@ public sealed class QABoss103Config
             if (eq <= 0)
                 continue;
             string key = line.Substring(0, eq).Trim();
+            if (key == "out")
+            {
+                cfg.OutDir = line.Substring(eq + 1).Trim();
+                any = true;
+                continue;
+            }
             if (key == "tier")
             {
                 string value = line.Substring(eq + 1).Trim();
@@ -282,6 +298,11 @@ public sealed class QABoss103Config
             else if (key == "run")
             {
                 cfg.Run = Math.Max(1, v);
+                any = true;
+            }
+            else if (key == "retry")
+            {
+                cfg.Retry = v != 0 ? 1 : 0;
                 any = true;
             }
         }

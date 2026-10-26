@@ -163,6 +163,7 @@ public sealed partial class QABoss103CombatBot
                   $"tier={_profile.Tier} roll={(r.Dodge ? "dodge" : "take")} action={QABoss103Evasion.Token(action)} ok={ok} " +
                   $"reactMs={F0(_profile.ReactionMs)} actMs={F0(lagMs)} leadMs={(double.IsNaN(t.LeadSeconds) ? "na" : F0(t.LeadSeconds * 1000.0))} " +
                   $"targetedMe={(t.TargetedMe ? "true" : "false")} serverT={F3(t.ServerT)} note={note}");
+        PartThreat(t, r.Dodge, action, ok, note);
     }
 
     /// <summary>회피 실행. 방어가 거부되면 대시로 넘어간다.</summary>
@@ -284,10 +285,13 @@ public sealed partial class QABoss103CombatBot
     {
         ReleaseGuard();
         foreach (PendingReaction r in _reactions)
+        {
+            PartThreat(r.Threat, r.Dodge, QABoss103DodgeAction.None, "na", "idle_" + reason);
             Debug.Log($"{Tag} event=threat pattern={QABoss103Evasion.Token(r.Threat.Kind)} id={r.Threat.Id} attack={QABoss103Plan.Token(r.Threat.Attack)} bot={_character} slot={_slot} " +
                       $"tier={_profile.Tier} roll={(r.Dodge ? "dodge" : "take")} action=none ok=na reactMs={F0(_profile.ReactionMs)} actMs=na " +
                       $"leadMs={(double.IsNaN(r.Threat.LeadSeconds) ? "na" : F0(r.Threat.LeadSeconds * 1000.0))} targetedMe={(r.Threat.TargetedMe ? "true" : "false")} " +
                       $"serverT={F3(r.Threat.ServerT)} note=idle_{QABoss103Plan.Token(reason)}");
+        }
         _reactions.Clear();
         if (_counterPending)
         {
@@ -410,6 +414,7 @@ public sealed partial class QABoss103CombatBot
                   $"pressMs={F0((now - _windowOpenAt) * 1000.0)} planMs={F0(_counterPlanMs)} reactMs={F0(_profile.ReactionMs)} windowEstMs={F0(_counterEstMs)} " +
                   $"windowSamples={_window.Count} openAtPress={(openNow ? "true" : "false")} front={(front ? "true" : "false")} frontDeg={F0(frontDeg)} frontLimit={F0(limit)} " +
                   $"surfM={F2(surface)} reachM={F2(reach)} inRange={(surface <= reach ? "true" : "false")} cast={(ok ? "true" : "false")} serverT={F3(serverT)}");
+        PartCounter(_counterHit, ok, serverT);
     }
 
     /// <summary>

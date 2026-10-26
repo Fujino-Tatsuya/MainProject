@@ -11,6 +11,7 @@ using UnityEngine;
 ///   시나리오 <see cref="QALobbyScenarios.Boss103Id"/> 를 3인 MPPM 으로 시작한다(<c>QAScenario48Menu.Run</c> 경로 — isPlaying 직접 토글 없음).
 ///   🔴 먼저 <c>Tools/QA/Activate Virtual Players (2,3)</c>. 끝나면 <c>Tools/QA/Stop Active Scenario</c> → 가상 플레이어 비활성 → <c>Tools/QA/48/Clear Scenario Mode</c>.</item>
 /// <item>판 기록 = 호스트 콘솔 <c>[QA103] event=run_end …</c> 1줄 + 48 리포트(<c>C:/UnityProject/QA/48-*/report.md</c>) 항목.</item>
+/// <item>판별 CSV(C4) = <c>C:/UnityProject/QA/103-single-&lt;시각&gt;/</c> runs·run_chars·run_patterns·run_gimmicks.csv + parts/(봇 판 파일).</item>
 /// </list>
 /// 같은 기준 시드·같은 판 번호 = 같은 특성(<see cref="QABoss103Plan.RunSeed"/>).
 /// </summary>
@@ -52,8 +53,9 @@ public static class QAScenario103Menu
         }
 
         QABoss103Config cfg = Current;
+        cfg.OutDir = SingleOutDir();
         int written = WriteConfig(cfg);
-        Debug.Log($"{QABoss103Plan.Tag} event=menu_run seed={cfg.Seed} run={cfg.Run} runSeed={cfg.RunSeed} botTier={cfg.BotTier} tierSource={(cfg.Tier.HasValue ? "manual" : "run")} configs={written}");
+        Debug.Log($"{QABoss103Plan.Tag} event=menu_run seed={cfg.Seed} run={cfg.Run} runSeed={cfg.RunSeed} botTier={cfg.BotTier} tierSource={(cfg.Tier.HasValue ? "manual" : "run")} configs={written} out={QABoss103Plan.Token(cfg.OutDir)}");
         QAScenario48Menu.Run(QALobbyScenarios.Boss103Id, 3);
     }
 
@@ -142,6 +144,12 @@ public static class QAScenario103Menu
         EditorPrefs.SetInt(SeedKey, new System.Random().Next(1, int.MaxValue));
         Status();
     }
+
+    /// <summary>QA 리포트 루트(48·88 과 같은 곳).</summary>
+    internal const string QARoot = "C:/UnityProject/QA";
+
+    /// <summary>메뉴 1판 실행의 CSV 폴더 — <c>C:/UnityProject/QA/103-single-&lt;시각&gt;</c>(C4). 연속 실행(C6)은 <c>103-&lt;배치&gt;</c> 를 직접 넘긴다.</summary>
+    internal static string SingleOutDir() => $"{QARoot}/103-single-{System.DateTime.Now:yyyyMMdd_HHmmss}";
 
     /// <summary>호스트·클론 루트마다 설정 파일을 쓴다. 쓴 수.</summary>
     internal static int WriteConfig(QABoss103Config cfg)
