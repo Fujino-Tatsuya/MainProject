@@ -85,10 +85,18 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
 
     protected override bool CompleteBeforeAttackLanded => true;
 
-    protected override void OnInterruptResolutionCompleted(int resolvedCount)
+    // 충격파 = 간파 성공(카운터 창 소비) 때만(2026-10-26 민경). 예전엔 적중 1건 이상이면 터졌다.
+    // 성공은 부모의 정적 이벤트 ServerInterruptSucceeded 가 판정 1회에 한 번(여러 대상이 성공해도) 알린다 — 서버에서만 난다.
+    private void OnEnable() => ServerInterruptSucceeded += OnServerInterruptSucceeded;
+
+    private void OnDisable() => ServerInterruptSucceeded -= OnServerInterruptSucceeded;
+
+    private void OnServerInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
     {
-        // 하나라도 맞았을 때만, 대상 수와 관계없이 충격파를 한 번 재생한다.
-        if (resolvedCount > 0)
-            shieldVfx?.ServerInterruptWave();
+        // 🔴 정적 이벤트라 모든 팔라딘의 성공이 다 들어온다 — 자기 시전만.
+        if (skill != this)
+            return;
+
+        shieldVfx?.ServerInterruptWave();
     }
 }
