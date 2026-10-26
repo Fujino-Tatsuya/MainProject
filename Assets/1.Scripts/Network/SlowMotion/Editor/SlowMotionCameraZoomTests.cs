@@ -72,6 +72,25 @@ public sealed class SlowMotionCameraZoomTests
         Assert.AreEqual(1f, Depth(session, 8.25 + 0.5), Eps, "성공 유지 = 최대 깊이");
     }
 
+    [Test]
+    public void HitStopBelowProfileScale_DepthPinnedToOne()
+    {
+        // 할 일 87 C2: 히트스톱 배율(0.125)이 프로필 배율(0.25)보다 낮으면 줌 규칙은 그대로 두고 깊이 1 로 고정된다.
+        var session = new SlowMotionSession();
+        var success = new SlowMotionProfile
+        {
+            scale = 0.25f, hitStopDuration = 0.0625f, hitStopScale = 0.125f,
+            enterDuration = 0.125f, holdDuration = 1f, exitDuration = 0.5f,
+        };
+        session.Apply(SlowMotionEvent.CreateStart(1, 8.0, 1, success, SlowMotionPurpose.Success));
+
+        Assert.AreEqual(SlowMotionPhase.HitStop, session.PhaseAt(8.03125));
+        Assert.AreEqual(1f, Depth(session, 8.0), Eps, "히트스톱 시작");
+        Assert.AreEqual(1f, Depth(session, 8.03125), Eps, "히트스톱 중");
+        Assert.AreEqual(1f, Depth(session, 8.0625 + 0.0625), Eps, "히트스톱 배율 → 프로필 배율 진입 중에도 1");
+        Assert.AreEqual(1f, Depth(session, 8.0625 + 0.5), Eps, "유지");
+    }
+
     static float Depth(SlowMotionSession session, double t) =>
         SlowMotionCameraZoom.TargetDepth(true, true, true, session.ScaleAt(t), session.CurrentProfileScale);
 

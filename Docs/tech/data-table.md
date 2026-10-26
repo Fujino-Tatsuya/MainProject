@@ -35,7 +35,7 @@ GameData.xlsx (SVN, 잠금)
 | `SuppressHaste` | 제압 가속 버프(할 일 91, `SuppressHasteData` — `Assets/Resources/Player/`) · 배율 3개(`moveSpeedMultiplier`·`attackSpeedMultiplier`·`cooldownRateMultiplier`) · `durationOverride`(0 = 이번 제압 길이) · 비네팅 페이드 `vignetteFadeIn`/`vignetteFadeOut`. [handoff-suppress-haste.md](handoff-suppress-haste.md) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
-| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 간파 성공 슬로우 `interruptSuccessProfile.*`(같은 5칸, 할 일 87) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |
+| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 간파 성공 슬로우 `interruptSuccessProfile.*`(같은 5칸, 할 일 87) · 맨 앞 히트스톱 `*.hitStopDuration`(실시간 초, 0 = 없음)·`*.hitStopScale`(히트스톱 배율, 두 프로필 공통 칸 — 기본 성공 0.05초·0.02, 시도 0) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 

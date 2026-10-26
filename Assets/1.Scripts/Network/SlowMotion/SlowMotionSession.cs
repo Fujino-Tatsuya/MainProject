@@ -73,7 +73,7 @@ public sealed class SlowMotionSession
                 var before = _timeline.PhaseAt(e.Time);
                 Accept(e);
                 _timeline.Fail(e.Time);
-                return before == SlowMotionPhase.Enter || before == SlowMotionPhase.Hold || before == SlowMotionPhase.Exit
+                return SlowMotionTimeline.IsRunningPhase(before)
                     ? SlowMotionApplyResult.Failed
                     : SlowMotionApplyResult.NoEffect;
             }

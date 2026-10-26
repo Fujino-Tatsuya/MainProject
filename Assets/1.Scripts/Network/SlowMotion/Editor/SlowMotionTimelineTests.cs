@@ -14,7 +14,7 @@ public sealed class SlowMotionTimelineTests
 
     // 배율 0.5, 진입 0.125, 유지 0.25, 복귀 0.25, 실패 복귀 0.125 → 정상 종료 = 0.625s.
     static SlowMotionProfile P(float scale = 0.5f, float enter = 0.125f, float hold = 0.25f, float exit = 0.25f,
-                               float failExit = 0.125f) =>
+                               float failExit = 0.125f, float hitStop = 0f, float hitStopScale = 0.02f) =>
         new SlowMotionProfile
         {
             scale = scale,
@@ -22,7 +22,14 @@ public sealed class SlowMotionTimelineTests
             holdDuration = hold,
             exitDuration = exit,
             failExitDuration = failExit,
+            hitStopDuration = hitStop,
+            hitStopScale = hitStopScale,
         };
+
+    // P() 앞에 히트스톱 0.0625s·배율 0.125 → 정상 종료 = 0.6875s.
+    const double HitStop = 0.0625;
+    const float HitStopScale = 0.125f;
+    static SlowMotionProfile PH(float scale = 0.5f) => P(scale: scale, hitStop: (float)HitStop, hitStopScale: HitStopScale);
 
     // P() 한 번이 끝까지 갔을 때의 손실: 진입 ∫(1−linear) + 유지 + 복귀 ∫(1−easeOut).
     const double FullLostOfP = 0.125 * 0.5 / 2.0 + 0.25 * 0.5 + 0.5 * 0.25 / 3.0;
@@ -418,6 +425,165 @@ public sealed class SlowMotionTimelineTests
 
         var tl = Started(p);
         Assert.AreEqual(expected, tl.ScaleAt(T0 + 0.1875), Eps);
+    }
+
+    // ─── 히트스톱(할 일 87 C2) ─────────────────────────────────────────
+
+    [Test]
+    public void 히트스톱_0이면_기존과_같은_곡선()
+    {
+        var plain = new SlowMotionTimeline();
+        var zero = new SlowMotionTimeline();
+        foreach (var tl in new[] { plain, zero })
+        {
+            bool z = tl == zero;
+            tl.Start(T0, z ? P(hitStop: 0f, hitStopScale: HitStopScale) : P());
+            tl.Start(T0 + 0.25, z ? P(scale: 0.25f, hitStop: -1f, hitStopScale: HitStopScale) : P(scale: 0.25f));
+            tl.Fail(T0 + 0.5);
+            tl.Start(T0 + 1.0, z ? P(hitStop: float.NaN) : P());
+        }
+
+        for (int i = 0; i <= 2000; i++)
+        {
+            double t = T0 - 0.1 + i * 1e-3;
+            Assert.AreEqual(plain.PhaseAt(t), zero.PhaseAt(t), $"t={t}");
+            Assert.AreEqual(plain.ScaleAt(t), zero.ScaleAt(t), $"t={t}");
+            Assert.AreEqual(plain.LostTimeUntil(t), zero.LostTimeUntil(t), $"t={t}");
+        }
+    }
+
+    [Test]
+    public void 히트스톱_구간은_히트스톱_배율_고정_뒤_진입은_그_배율에서()
+    {
+        var tl = Started(PH());
+
+        Assert.AreEqual(SlowMotionPhase.HitStop, tl.PhaseAt(T0));
+        Assert.IsTrue(tl.IsActiveAt(T0));
+        Assert.AreEqual(HitStopScale, tl.ScaleAt(T0), Eps, "유휴에서도 바로 히트스톱 배율");
+        Assert.AreEqual(SlowMotionPhase.HitStop, tl.PhaseAt(T0 + 0.03125));
+        Assert.AreEqual(HitStopScale, tl.ScaleAt(T0 + 0.03125), Eps);
+
+        double enter = T0 + HitStop;
+        Assert.AreEqual(SlowMotionPhase.Enter, tl.PhaseAt(enter));
+        Assert.AreEqual(HitStopScale, tl.ScaleAt(enter), Eps, "진입은 히트스톱 배율에서 출발");
+        Assert.AreEqual(0.3125f, tl.ScaleAt(enter + 0.0625), Eps, "진입 절반 = 0.125 → 0.5 의 중간");
+        Assert.AreEqual(SlowMotionPhase.Hold, tl.PhaseAt(enter + 0.125));
+        Assert.AreEqual(0.5f, tl.ScaleAt(enter + 0.125), Eps);
+        Assert.AreEqual(SlowMotionPhase.Exit, tl.PhaseAt(enter + 0.375));
+        Assert.AreEqual(SlowMotionPhase.None, tl.PhaseAt(enter + 0.625), "히트스톱 길이만큼 늦게 끝난다");
+    }
+
+    [Test]
+    public void 히트스톱_손실은_닫힌_식이고_수치_적분과_일치()
+    {
+        var tl = Started(PH());
+        Assert.AreEqual((1.0 - HitStopScale) * HitStop, tl.LostTimeUntil(T0 + HitStop), 1e-12, "히트스톱 끝 = (1 − 배율) × 길이");
+        Assert.AreEqual((1.0 - HitStopScale) * 0.03125, tl.LostTimeUntil(T0 + 0.03125), 1e-12);
+
+        foreach (double d in new[] { 0.01, 0.0625, 0.1, 0.19, 0.3, 0.45, 0.6, 0.7, 1.0 })
+            Assert.AreEqual(NumericLost(tl, T0, T0 + d), tl.LostTimeUntil(T0 + d), 1e-5, $"t=T0+{d}"); // 시작 순간 배율이 튀므로 격자를 T0 에 맞춘다
+    }
+
+    [Test]
+    public void 히트스톱_포함_손실은_단조_비감소()
+    {
+        var tl = new SlowMotionTimeline();
+        tl.Start(T0, PH());
+        tl.Start(T0 + 0.03, P(scale: 0.9f));          // 히트스톱 중 히트스톱 없는 재시작
+        tl.Start(T0 + 0.2, PH(scale: 0.25f));         // 진입·유지 중 히트스톱 재시작
+        tl.Fail(T0 + 0.23);                           // 히트스톱 중 실패
+        tl.Start(T0 + 0.4, PH());
+        tl.ForceReset(T0 + 0.43);                     // 히트스톱 중 리셋
+        tl.Start(T0 + 0.7, PH());
+
+        double prev = tl.LostTimeUntil(T0 - 1.0);
+        for (int i = 0; i <= 3000; i++)
+        {
+            double t = T0 - 1.0 + i * 1e-3;
+            double cur = tl.LostTimeUntil(t);
+            Assert.GreaterOrEqual(cur, prev, $"t={t}");
+            prev = cur;
+        }
+
+        foreach (double d in new[] { 0.02, 0.1, 0.21, 0.3, 0.42, 0.5, 0.75, 1.5 })
+            Assert.AreEqual(NumericLost(tl, T0, T0 + d), tl.LostTimeUntil(T0 + d), 1e-5, $"t=T0+{d}");
+    }
+
+    [Test]
+    public void 히트스톱_중_Fail_은_히트스톱_배율에서_실패_복귀()
+    {
+        var tl = Started(PH());
+        double t = T0 + 0.03125;
+        Assert.AreEqual(SlowMotionPhase.HitStop, tl.PhaseAt(t));
+
+        tl.Fail(t);
+
+        Assert.AreEqual(SlowMotionPhase.FailExit, tl.PhaseAt(t));
+        Assert.AreEqual(HitStopScale, tl.ScaleAt(t), Eps, "배율이 튀지 않는다");
+        Assert.AreEqual((float)(HitStopScale + (1.0 - HitStopScale) * EaseOut(0.5)), tl.ScaleAt(t + 0.0625), Eps);
+        Assert.AreEqual(SlowMotionPhase.None, tl.PhaseAt(t + 0.125));
+    }
+
+    [Test]
+    public void 히트스톱_중_ForceReset_은_즉시_1_누적_보존()
+    {
+        var tl = Started(PH());
+        double t = T0 + 0.03125;
+
+        tl.ForceReset(t);
+
+        Assert.AreEqual(SlowMotionPhase.None, tl.PhaseAt(t));
+        Assert.AreEqual(1f, tl.ScaleAt(t));
+        Assert.AreEqual((1.0 - HitStopScale) * 0.03125, tl.LostTimeUntil(t + 3.0), 1e-12);
+    }
+
+    [Test]
+    public void 진행_중_시도_슬로우_위에_히트스톱_Start_는_last_wins()
+    {
+        var tl = Started();
+        double t = T0 + 0.25;
+        Assert.AreEqual(SlowMotionPhase.Hold, tl.PhaseAt(t));
+        double lostBefore = tl.LostTimeUntil(t);
+
+        tl.Start(t, PH(scale: 0.25f));
+
+        Assert.AreEqual(lostBefore, tl.LostTimeUntil(t), 1e-12, "재시작 시각의 손실은 이어진다");
+        Assert.AreEqual(SlowMotionPhase.HitStop, tl.PhaseAt(t));
+        Assert.AreEqual(HitStopScale, tl.ScaleAt(t), Eps, "히트스톱은 현재 배율과 상관없이 히트스톱 배율");
+        Assert.AreEqual(SlowMotionPhase.Enter, tl.PhaseAt(t + HitStop));
+        Assert.AreEqual(HitStopScale, tl.ScaleAt(t + HitStop), Eps);
+        Assert.AreEqual(0.25f, tl.ScaleAt(t + HitStop + 0.125), Eps, "새 프로필 배율로 간다");
+        Assert.AreEqual(0.5f, tl.ScaleAt(T0 + 0.1875), Eps, "재시작 이전 시각 조회는 그대로");
+    }
+
+    [Test]
+    public void 히트스톱만_있는_프로필은_히트스톱_뒤_바로_1()
+    {
+        var tl = Started(P(enter: 0f, hold: 0f, exit: 0f, hitStop: (float)HitStop, hitStopScale: HitStopScale));
+        Assert.AreEqual(SlowMotionPhase.HitStop, tl.PhaseAt(T0));
+        Assert.AreEqual(SlowMotionPhase.None, tl.PhaseAt(T0 + HitStop));
+        Assert.AreEqual(1f, tl.ScaleAt(T0 + HitStop));
+    }
+
+    [TestCase(-1f, 0f)]
+    [TestCase(float.NaN, 0f)]
+    [TestCase(float.PositiveInfinity, 0f)]
+    [TestCase(0.0625f, 0.0625f)]
+    public void 히트스톱_길이_정리(float authored, float expected)
+    {
+        Assert.AreEqual(expected, P(hitStop: authored).ClampedHitStopDuration);
+    }
+
+    [TestCase(0f, SlowMotionProfile.MinScale)]
+    [TestCase(-3f, SlowMotionProfile.MinScale)]
+    [TestCase(2f, 1f)]
+    [TestCase(float.NaN, 1f)]
+    [TestCase(0.125f, 0.125f)]
+    public void 히트스톱_배율_정리(float authored, float expected)
+    {
+        var p = P(hitStop: (float)HitStop, hitStopScale: authored);
+        Assert.AreEqual(expected, p.ClampedHitStopScale, Eps);
+        Assert.AreEqual(expected, Started(p).ScaleAt(T0 + 0.03125), Eps);
     }
 
     [Test]

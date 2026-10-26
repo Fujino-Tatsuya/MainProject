@@ -285,9 +285,54 @@ public sealed class SlowMotionSessionTests
     // ─── 직렬화 ───────────────────────────────────────────────────────
 
     [Test]
-    public void 이벤트_크기는_목적_칸을_포함한다()
+    public void 이벤트_크기는_목적_칸과_히트스톱_칸을_포함한다()
     {
-        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 5, SlowMotionEvent.SerializedSize);
+        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7, SlowMotionEvent.SerializedSize);
+    }
+
+    [Test]
+    public void Start_이벤트_히트스톱_직렬화_왕복()
+    {
+        var profile = new SlowMotionProfile { scale = 0.25f, hitStopDuration = 0.05f, hitStopScale = 0.02f };
+        var r = RoundTrip(SlowMotionEvent.CreateStart(1, 1.0, 3, profile, SlowMotionPurpose.Success));
+
+        Assert.AreEqual(0.05f, r.HitStopDuration);
+        Assert.AreEqual(0.02f, r.HitStopScale);
+        var back = r.ToProfile();
+        Assert.AreEqual(0.05f, back.hitStopDuration);
+        Assert.AreEqual(0.02f, back.hitStopScale);
+
+        var none = RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P()));
+        Assert.AreEqual(0f, none.HitStopDuration, "기본 프로필 = 히트스톱 없음");
+    }
+
+    [Test]
+    public void 히트스톱_중_Fail_은_Failed()
+    {
+        var s = new SlowMotionSession();
+        var profile = P();
+        profile.hitStopDuration = 0.0625f;
+        profile.hitStopScale = 0.125f;
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, profile, SlowMotionPurpose.Success));
+        Assert.AreEqual(SlowMotionPhase.HitStop, s.PhaseAt(T0 + 0.03125));
+        Assert.IsTrue(s.IsActiveAt(T0 + 0.03125));
+
+        Assert.AreEqual(SlowMotionApplyResult.Failed, s.Apply(SlowMotionEvent.CreateFail(1, T0 + 0.03125)));
+        Assert.AreEqual(SlowMotionPhase.FailExit, s.PhaseAt(T0 + 0.03125));
+        Assert.AreEqual(0.125f, s.ScaleAt(T0 + 0.03125), Eps);
+    }
+
+    [Test]
+    public void 히트스톱_중_Reset_은_Reset()
+    {
+        var s = new SlowMotionSession();
+        var profile = P();
+        profile.hitStopDuration = 0.0625f;
+        profile.hitStopScale = 0.125f;
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, profile));
+
+        Assert.AreEqual(SlowMotionApplyResult.Reset, s.Apply(SlowMotionEvent.CreateReset(1, T0 + 0.03125)));
+        Assert.AreEqual(1f, s.ScaleAt(T0 + 0.03125));
     }
 
     [Test]

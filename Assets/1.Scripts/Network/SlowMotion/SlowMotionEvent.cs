@@ -25,9 +25,9 @@ public enum SlowMotionPurpose : byte
 /// </summary>
 public struct SlowMotionEvent
 {
-    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 5×4.</summary>
+    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 7×4.</summary>
     public const int SerializedSize =
-        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 5;
+        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 7;
 
     public SlowMotionEventKind Kind;
     /// <summary>슬로우 목적. Start 에서만 의미가 있고 Fail·Reset 은 <see cref="SlowMotionPurpose.Attempt"/> 고정.</summary>
@@ -44,6 +44,8 @@ public struct SlowMotionEvent
     public float HoldDuration;
     public float ExitDuration;
     public float FailExitDuration;
+    public float HitStopDuration;
+    public float HitStopScale;
 
     public static SlowMotionEvent CreateStart(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
                                               SlowMotionPurpose purpose = SlowMotionPurpose.Attempt) =>
@@ -59,6 +61,8 @@ public struct SlowMotionEvent
             HoldDuration = profile.holdDuration,
             ExitDuration = profile.exitDuration,
             FailExitDuration = profile.failExitDuration,
+            HitStopDuration = profile.hitStopDuration,
+            HitStopScale = profile.hitStopScale,
         };
 
     public static SlowMotionEvent CreateFail(uint triggerId, double time) =>
@@ -76,6 +80,8 @@ public struct SlowMotionEvent
             holdDuration = HoldDuration,
             exitDuration = ExitDuration,
             failExitDuration = FailExitDuration,
+            hitStopDuration = HitStopDuration,
+            hitStopScale = HitStopScale,
         };
 
     public void Write(FastBufferWriter writer)
@@ -90,6 +96,8 @@ public struct SlowMotionEvent
         writer.WriteValueSafe(HoldDuration);
         writer.WriteValueSafe(ExitDuration);
         writer.WriteValueSafe(FailExitDuration);
+        writer.WriteValueSafe(HitStopDuration);
+        writer.WriteValueSafe(HitStopScale);
     }
 
     public static SlowMotionEvent Read(FastBufferReader reader)
@@ -104,6 +112,8 @@ public struct SlowMotionEvent
         reader.ReadValueSafe(out float hold);
         reader.ReadValueSafe(out float exit);
         reader.ReadValueSafe(out float failExit);
+        reader.ReadValueSafe(out float hitStop);
+        reader.ReadValueSafe(out float hitStopScale);
 
         return new SlowMotionEvent
         {
@@ -117,6 +127,8 @@ public struct SlowMotionEvent
             HoldDuration = hold,
             ExitDuration = exit,
             FailExitDuration = failExit,
+            HitStopDuration = hitStop,
+            HitStopScale = hitStopScale,
         };
     }
 }

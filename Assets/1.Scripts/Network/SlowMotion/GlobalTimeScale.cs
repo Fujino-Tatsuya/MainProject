@@ -30,10 +30,12 @@ public sealed class GlobalTimeScale : MonoBehaviour
     [Tooltip("인터럽트 유효타 슬로우 모양. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
     [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile();
 
-    [Tooltip("간파 성공(카운터 창 소비) 시 다시 거는 슬로우 모양. 진행 중인 시도 슬로우의 현재 배율에서 이어진다(할 일 87)")]
+    [Tooltip("간파 성공(카운터 창 소비) 시 다시 거는 슬로우 모양. 맨 앞 히트스톱 뒤 그 배율에서 진입한다(할 일 87)")]
     [SerializeField] private SlowMotionProfile interruptSuccessProfile = new SlowMotionProfile
     {
         scale = 0.25f,
+        hitStopDuration = 0.05f,
+        hitStopScale = 0.02f,
         enterDuration = 0.05f,
         holdDuration = 1.2f,
         exitDuration = 0.4f,

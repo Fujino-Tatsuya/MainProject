@@ -172,12 +172,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GlobalTimeScale
   interruptProfile:
     scale: 0.3
+    hitStopDuration: 0
+    hitStopScale: 0.02
     enterDuration: 0.05
     holdDuration: 0.35
     exitDuration: 0.25
     failExitDuration: 0.1
   interruptSuccessProfile:
     scale: 0.25
+    hitStopDuration: 0.05
+    hitStopScale: 0.02
     enterDuration: 0.05
     holdDuration: 1.2
     exitDuration: 0.4
