@@ -323,7 +323,7 @@ public class CameraTargetSwitcher : MonoBehaviour
             slowActive && timeScale.CurrentTriggerClientId == networkManager.LocalClientId,
             sessionRunning && !IsInFallView && !IsSpectatorMode,
             slowActive ? timeScale.CurrentScale : 1f,
-            slowActive ? timeScale.InterruptProfile.ClampedScale : 1f);
+            slowActive ? timeScale.CurrentProfileScale : 1f); // 지금 재생 중인 프로필(시도·성공) 기준
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
         slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);

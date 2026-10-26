@@ -176,6 +176,12 @@ MonoBehaviour:
     holdDuration: 0.35
     exitDuration: 0.25
     failExitDuration: 0.1
+  interruptSuccessProfile:
+    scale: 0.25
+    enterDuration: 0.05
+    holdDuration: 1.2
+    exitDuration: 0.4
+    failExitDuration: 0.1
 --- !u!114 &2312403450460863167
 MonoBehaviour:
   m_ObjectHideFlags: 0

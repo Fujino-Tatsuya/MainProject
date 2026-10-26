@@ -8,6 +8,15 @@ public enum SlowMotionEventKind : byte
     Reset = 3,
 }
 
+/// <summary>슬로우를 왜 걸었는가(할 일 87). 연출 쪽이 시도·성공을 가른다.</summary>
+public enum SlowMotionPurpose : byte
+{
+    /// <summary>간파 시도 — 승인 시 예측으로 건 슬로우. Fail·Reset 도 이 값이다.</summary>
+    Attempt = 0,
+    /// <summary>간파 성공 — 판정에서 카운터 창을 소비했을 때 다시 건 슬로우.</summary>
+    Success = 1,
+}
+
 /// <summary>
 /// 서버 → 전원 슬로우 모션 이벤트 한 건(<see cref="GlobalTimeScale"/> 의 named message 본문).
 ///
@@ -16,10 +25,13 @@ public enum SlowMotionEventKind : byte
 /// </summary>
 public struct SlowMotionEvent
 {
-    /// <summary>직렬화 크기(바이트). kind 1 + id 4 + t 8 + clientId 8 + 프로필 5×4.</summary>
-    public const int SerializedSize = sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 5;
+    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 5×4.</summary>
+    public const int SerializedSize =
+        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 5;
 
     public SlowMotionEventKind Kind;
+    /// <summary>슬로우 목적. Start 에서만 의미가 있고 Fail·Reset 은 <see cref="SlowMotionPurpose.Attempt"/> 고정.</summary>
+    public SlowMotionPurpose Purpose;
     /// <summary>서버 발동 번호(1 부터 증가). 0 = 없음.</summary>
     public uint TriggerId;
     /// <summary>이벤트 시각 — 슬로우 보정 전 게임시간(<see cref="NetworkClock.UnslowedGameNow"/> 도메인).</summary>
@@ -33,10 +45,12 @@ public struct SlowMotionEvent
     public float ExitDuration;
     public float FailExitDuration;
 
-    public static SlowMotionEvent CreateStart(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile) =>
+    public static SlowMotionEvent CreateStart(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
+                                              SlowMotionPurpose purpose = SlowMotionPurpose.Attempt) =>
         new SlowMotionEvent
         {
             Kind = SlowMotionEventKind.Start,
+            Purpose = purpose,
             TriggerId = triggerId,
             Time = time,
             TriggerClientId = triggerClientId,
@@ -67,6 +81,7 @@ public struct SlowMotionEvent
     public void Write(FastBufferWriter writer)
     {
         writer.WriteValueSafe((byte)Kind);
+        writer.WriteValueSafe((byte)Purpose);
         writer.WriteValueSafe(TriggerId);
         writer.WriteValueSafe(Time);
         writer.WriteValueSafe(TriggerClientId);
@@ -80,6 +95,7 @@ public struct SlowMotionEvent
     public static SlowMotionEvent Read(FastBufferReader reader)
     {
         reader.ReadValueSafe(out byte kind);
+        reader.ReadValueSafe(out byte purpose);
         reader.ReadValueSafe(out uint triggerId);
         reader.ReadValueSafe(out double time);
         reader.ReadValueSafe(out ulong triggerClientId);
@@ -92,6 +108,7 @@ public struct SlowMotionEvent
         return new SlowMotionEvent
         {
             Kind = (SlowMotionEventKind)kind,
+            Purpose = (SlowMotionPurpose)purpose,
             TriggerId = triggerId,
             Time = time,
             TriggerClientId = triggerClientId,

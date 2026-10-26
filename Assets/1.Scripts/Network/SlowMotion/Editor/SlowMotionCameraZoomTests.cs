@@ -56,6 +56,25 @@ public sealed class SlowMotionCameraZoomTests
         Assert.AreEqual(0f, SlowMotionCameraZoom.TargetDepth(true, true, true, ProfileScale, float.NaN), Eps);
     }
 
+    [Test]
+    public void SuccessSlow_DepthUsesCurrentProfileScale()
+    {
+        // 할 일 87: 시도(0.5) 유지 중 성공(0.25)으로 다시 걸면, 줌 깊이는 지금 재생 중인 프로필(0.25) 기준이다.
+        var session = new SlowMotionSession();
+        var attempt = new SlowMotionProfile { scale = 0.5f, enterDuration = 0.125f, holdDuration = 0.25f, exitDuration = 0.25f };
+        var success = new SlowMotionProfile { scale = 0.25f, enterDuration = 0.125f, holdDuration = 1f, exitDuration = 0.5f };
+        session.Apply(SlowMotionEvent.CreateStart(1, 8.0, 1, attempt));
+        Assert.AreEqual(1f, Depth(session, 8.25), Eps, "시도 유지 = 시도 프로필 기준 최대 깊이");
+
+        session.Apply(SlowMotionEvent.CreateStart(2, 8.25, 1, success, SlowMotionPurpose.Success));
+        Assert.AreEqual(0.25f, session.CurrentProfileScale, Eps);
+        Assert.AreEqual(0.5f / 0.75f, Depth(session, 8.25), Eps, "성공 진입 시작 — 성공 프로필 기준으로 다시 깊어진다");
+        Assert.AreEqual(1f, Depth(session, 8.25 + 0.5), Eps, "성공 유지 = 최대 깊이");
+    }
+
+    static float Depth(SlowMotionSession session, double t) =>
+        SlowMotionCameraZoom.TargetDepth(true, true, true, session.ScaleAt(t), session.CurrentProfileScale);
+
     // ---- 오프셋 배율 ----
 
     [Test]

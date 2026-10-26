@@ -228,7 +228,85 @@ public sealed class SlowMotionSessionTests
         }
     }
 
+    // ─── 목적·프로필 배율 기억(할 일 87) ──────────────────────────────
+
+    [Test]
+    public void 세션은_마지막_Start_의_목적과_프로필_배율을_기억한다()
+    {
+        var s = new SlowMotionSession();
+        Assert.AreEqual(SlowMotionPurpose.Attempt, s.CurrentPurpose);
+        Assert.AreEqual(1f, s.CurrentProfileScale, "아직 슬로우가 없으면 1");
+
+        s.Apply(Start(1, T0));
+        Assert.AreEqual(SlowMotionPurpose.Attempt, s.CurrentPurpose);
+        Assert.AreEqual(0.5f, s.CurrentProfileScale, Eps);
+
+        s.Apply(SlowMotionEvent.CreateStart(2, T0 + 0.25, 1, P(0.25f), SlowMotionPurpose.Success));
+        Assert.AreEqual(SlowMotionPurpose.Success, s.CurrentPurpose);
+        Assert.AreEqual(0.25f, s.CurrentProfileScale, Eps);
+
+        // 버린 Start·Fail 은 기억을 바꾸지 않는다.
+        s.Apply(Start(1, T0 + 0.3125, scale: 0.75f));
+        s.Apply(SlowMotionEvent.CreateFail(2, T0 + 0.375));
+        Assert.AreEqual(SlowMotionPurpose.Success, s.CurrentPurpose);
+        Assert.AreEqual(0.25f, s.CurrentProfileScale, Eps);
+
+        s.Clear();
+        Assert.AreEqual(SlowMotionPurpose.Attempt, s.CurrentPurpose);
+        Assert.AreEqual(1f, s.CurrentProfileScale);
+    }
+
+    [Test]
+    public void 프로필_배율은_정리된_값으로_기억한다()
+    {
+        var s = new SlowMotionSession();
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, new SlowMotionProfile { scale = -2f }));
+
+        Assert.AreEqual(SlowMotionProfile.MinScale, s.CurrentProfileScale, Eps);
+    }
+
+    [Test]
+    public void 진행_중_Success_Start_는_지금_배율에서_이어진다()
+    {
+        // 시도 슬로우(0.5) 유지 중에 성공 슬로우(0.25)를 다시 걸면 1.0 으로 튀지 않고 0.5 에서 진입한다.
+        var s = new SlowMotionSession();
+        s.Apply(Start(1, T0));
+        double t = T0 + 0.25;
+        Assert.AreEqual(0.5f, s.ScaleAt(t), Eps);
+
+        Assert.AreEqual(SlowMotionApplyResult.Started,
+            s.Apply(SlowMotionEvent.CreateStart(2, t, 1, P(0.25f), SlowMotionPurpose.Success)));
+        Assert.AreEqual(0.5f, s.ScaleAt(t), Eps, "진입 시작 = 직전 배율");
+        Assert.AreEqual(0.375f, s.ScaleAt(t + 0.0625), Eps, "진입 절반 = 0.5 → 0.25 의 중간");
+        Assert.AreEqual(0.25f, s.ScaleAt(t + 0.125), Eps);
+        Assert.AreEqual(SlowMotionPhase.Hold, s.PhaseAt(t + 0.25));
+    }
+
     // ─── 직렬화 ───────────────────────────────────────────────────────
+
+    [Test]
+    public void 이벤트_크기는_목적_칸을_포함한다()
+    {
+        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 5, SlowMotionEvent.SerializedSize);
+    }
+
+    [Test]
+    public void Start_이벤트_목적_직렬화_왕복()
+    {
+        var success = RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P(0.25f), SlowMotionPurpose.Success));
+        Assert.AreEqual(SlowMotionPurpose.Success, success.Purpose);
+        Assert.AreEqual(0.25f, success.Scale);
+
+        var attempt = RoundTrip(SlowMotionEvent.CreateStart(1, 0.5, 3, P()));
+        Assert.AreEqual(SlowMotionPurpose.Attempt, attempt.Purpose, "기본 목적 = 시도");
+    }
+
+    [Test]
+    public void Fail_Reset_의_목적은_시도_고정()
+    {
+        Assert.AreEqual(SlowMotionPurpose.Attempt, RoundTrip(SlowMotionEvent.CreateFail(1, 1.0)).Purpose);
+        Assert.AreEqual(SlowMotionPurpose.Attempt, RoundTrip(SlowMotionEvent.CreateReset(1, 1.0)).Purpose);
+    }
 
     static SlowMotionEvent RoundTrip(in SlowMotionEvent e)
     {

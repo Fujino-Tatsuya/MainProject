@@ -261,6 +261,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         FailSlowMotion(slowMotion.Resolve(interruptLanded));
+        if (interruptSucceeded)
+            StartSuccessSlowMotion();
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -414,6 +416,17 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
+    }
+
+    // 간파 성공(할 일 87): 판정 끝에 성공 프로필로 다시 건다. 마지막 것이 이기므로 시도 슬로우의 지금 배율에서 이어지고,
+    // 예측이 빗나가 시도 슬로우가 없었어도 건다. 연출 훅일 뿐 판정·피해·카운터 창에는 관여하지 않는다.
+    private void StartSuccessSlowMotion()
+    {
+        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
+        if (timeScale == null)
+            return;
+
+        timeScale.ServerStart(timeScale.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success);
     }
 
     private bool PredictsInterruptHit()
