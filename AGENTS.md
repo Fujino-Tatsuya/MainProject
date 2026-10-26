@@ -54,6 +54,7 @@
 - **디버그 단축키**: [Docs/tech/debug-hotkeys.md](Docs/tech/debug-hotkeys.md) — 키 목록·겹침, 릴리스 빌드 포함 심볼 `DEV_HOTKEYS`(Standalone). 정식 릴리스 때 심볼만 지운다.
 - **플레이어 스탯**: [Docs/tech/player-stats.md](Docs/tech/player-stats.md) — 공격력·이동속도·공격속도·방어력·최대 체력 5종 기본%·전체%(+공격력 가하는 피해%) 공식, 서버·클라 같은 종합(`PlayerStats`), 판정은 서버 값, 공격 요청마다 서버 2차 검증(경고만). 새 스탯 추가 절차 §3.
 - **행동 입력 거부 피드백**: [Docs/tech/skill-reject-feedback.md](Docs/tech/skill-reject-feedback.md) — 거부 사유별 선입력 버퍼 처리 표(보관/버림), 오너 전용 이벤트 `CooldownRejected`·`ActionBlockedByEffect`(입력 1회=1회)·사운드 키 지정법(비우면 무음).
+- **간파 성공 연출**: [Docs/tech/interrupt-presentation.md](Docs/tech/interrupt-presentation.md) — 시도 슬로우 → 성공 슬로우 재발동·히트스톱 → 슬로우 이벤트 목적 칸(공용 성공 신호) → 암순응 패스·`InterruptSuccessFx` 성공 이펙트 칸(Variant 가 소켓 연결)·오너 줌, 수치·렌더러 순서·알려진 제약.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조
