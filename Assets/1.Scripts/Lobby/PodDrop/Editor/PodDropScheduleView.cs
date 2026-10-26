@@ -70,11 +70,11 @@ public static class PodDropScheduleView
         {
             sb.Append($"\n  걷기              {t.WalkAt:0.##}s ~ ?  — 경로 길이 미지, 로비 씬(3.LobbyScene)을 열면 계산");
             sb.Append($"\n                    (속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 문턱 → 좌석 미끄러짐 {t.SeatSlideSeconds:0.##}s)");
-            sb.Append(HatchLine(t, relative: true));
-            sb.Append($"\n  포드 하강         +{t.DescendSeconds:0.##}s ({t.DescendDepth:0.##}m, {t.DescendEase})");
-            sb.Append($"\n  끝 암전(페이드)   +{t.FadeOutSeconds:0.##}s ({t.FadeOutEase})");
+            sb.Append(HatchLine(t, lobby));
+            sb.Append($"\n  발사 애니         +{t.LaunchSeconds:0.##}s{LaunchDetail(t, lobby)}");
+            sb.Append($"\n  끝 암전(페이드)   +{t.FadeOutSeconds:0.##}s ({t.FadeOutEase}, 발사 클립은 계속 돈다)");
             sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
-            sb.Append($"\n  총 = 가장 늦게 앉는 사람 + {t.HatchCloseSeconds + t.DescendSeconds + t.FadeOutSeconds:0.##}s → 맵 로딩");
+            sb.Append($"\n  총 = 가장 늦게 앉는 사람 + {t.LaunchSeconds + t.FadeOutSeconds:0.##}s → 맵 로딩");
             return sb.ToString();
         }
 
@@ -84,10 +84,18 @@ public static class PodDropScheduleView
             sb.Append($"\n  걷기 P{slot + 1}           {t.WalkStartAt(slot):0.##} ~ {t.WalkArriveAt(slot):0.##}s ({length:0.##}m) → 미끄러짐 ~ {t.WalkEndAt(slot):0.##}s");
         }
 
-        sb.Append($"\n                    (속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 미끄러짐 {t.SeatSlideSeconds:0.##}s, 가장 늦게 앉는 사람 {t.HatchCloseAt:0.##}s)");
-        sb.Append(HatchLine(t, relative: false));
-        sb.Append($"\n  포드 하강         {t.DescendAt:0.##} ~ {t.FadeOutAt:0.##}s ({t.DescendDepth:0.##}m, {t.DescendEase})");
-        sb.Append($"\n  끝 암전(페이드)   {t.FadeOutAt:0.##} ~ {t.LoadAt:0.##}s ({t.FadeOutEase})");
+        sb.Append($"\n                    (속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 미끄러짐 {t.SeatSlideSeconds:0.##}s, 가장 늦게 앉는 사람 {t.LaunchAt:0.##}s)");
+        sb.Append(HatchLine(t, lobby));
+        if (t.HatchOpenSeconds > 0f && t.WalkerCount > 0)
+        {
+            float firstArrive = float.MaxValue;
+            for (int slot = 0; slot < t.WalkerCount; slot++)
+                firstArrive = Mathf.Min(firstArrive, t.WalkArriveAt(slot));
+            if (firstArrive < t.HatchOpenEndAt)
+                sb.Append($"\n  ⚠ 첫 사람이 문턱에 {firstArrive:0.##}s 에 닿는데 해치는 {t.HatchOpenEndAt:0.##}s 에 다 열린다 — 해치 열림을 줄이거나 보행을 늦출 것");
+        }
+        sb.Append($"\n  발사 애니         {t.LaunchAt:0.##} ~ {t.FadeOutAt:0.##}s{LaunchDetail(t, lobby)}");
+        sb.Append($"\n  끝 암전(페이드)   {t.FadeOutAt:0.##} ~ {t.LoadAt:0.##}s ({t.FadeOutEase}, 발사 클립은 계속 돈다)");
         sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
         sb.Append($"\n  총 {t.LoadAt:0.##}초 → 맵 로딩");
         return sb.ToString();
@@ -100,12 +108,17 @@ public static class PodDropScheduleView
         return $"\n  카메라 줌         {delay:0.##} ~ {delay + seconds:0.##}s ({from:0.##} → {to:0.##}배, {ease}){hold}";
     }
 
-    private static string HatchLine(PodDropLobbyTimeline t, bool relative)
+    // 해치 열림은 다른 단계와 겹친다(순간이동 순간 시작) — 시각을 밀지 않는다.
+    private static string HatchLine(PodDropLobbyTimeline t, PodDropLobbyTimings lobby)
     {
-        if (t.HatchCloseSeconds <= 0f) return "\n  해치 닫힘         0 (생략)";
-        return relative
-            ? $"\n  해치 닫힘         +{t.HatchCloseSeconds:0.##}s"
-            : $"\n  해치 닫힘         {t.HatchCloseAt:0.##} ~ {t.DescendAt:0.##}s";
+        if (t.HatchOpenSeconds <= 0f || string.IsNullOrEmpty(lobby.hatchState)) return "\n  해치 열림         없음 (대기 자세 그대로)";
+        return $"\n  해치 열림         {t.TeleportAt:0.##} ~ {t.HatchOpenEndAt:0.##}s ({lobby.hatchState} 0 ~ {t.HatchOpenSeconds:0.##}s 뒤 멈춤, 다른 단계와 겹침)";
+    }
+
+    private static string LaunchDetail(PodDropLobbyTimeline t, PodDropLobbyTimings lobby)
+    {
+        if (string.IsNullOrEmpty(lobby.launchState)) return " (발사 상태 없음 — 애니 없이 시간만)";
+        return $" ({lobby.launchState} 클립 {t.LaunchClipStartSeconds:0.##} → {t.LaunchClipEndSeconds:0.##}s, ×{t.LaunchSpeed:0.##} — 해치 닫힘·갱도 문·포드 하강)";
     }
 
     public static string MapText(PodDropSettings settings)

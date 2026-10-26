@@ -19,7 +19,7 @@ using UnityEngine.Serialization;
 /// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 개인 경로점(슬롯 entryPath) → 공용 경로점(walkPath, 슬롯 합류 번호부터 리스트 순서)을
 /// 평소 걷기 변위(Walk 애니)로 걷고 → 문턱까지 같은 속도로, 문턱 → 좌석은 미끄러짐 시간 동안 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
 /// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(순간이동 암전 + 끝 페이드, <see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
-/// 포드 하강(런타임 transform 만), 연출 동안 포드 콜라이더 끔.</item>
+/// 발사대 Animator(C2i — 해치 열림 → 발사 클립: 해치 닫힘·갱도 문·포드 하강)를 시간표 시각으로 세운다(<see cref="PodDropLobbyTimeline.PodClipAt"/>, <see cref="PodAnimatorDriver"/>).</item>
 /// </list>
 /// 수치(레터박스 높이·걷는 속도 포함)는 <see cref="PodDropSettings"/>, 위치는 씬 Transform(LobbyTraining/PodLaunch) 이 원본이다.
 /// </summary>
@@ -68,9 +68,9 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     [Tooltip("포드 안 좌석(숨김 지점) — 슬롯 순서(P1, P2, P3). 사람이 더 많으면 돌려 쓴다.")]
     [SerializeField] private Transform[] seats = Array.Empty<Transform>();
 
-    [Header("포드")]
-    [Tooltip("내려갈 포드 루트(PF_DropPod_v015). 연출 동안 런타임 위치만 바꾸고(씬 저장 없음) 아래 콜라이더를 끈다. 비우면 하강 없음.")]
-    [SerializeField] private Transform pod;
+    [Header("발사대")]
+    [Tooltip("발사대 Animator(PF_DropPod_LaunchStation_Combined_v001 루트). 연출 동안 해치·발사 클립을 시간표 시각으로 세운다(포드 하강도 클립이 한다). 비우면 애니 없음.")]
+    [SerializeField] private Animator launcher;
 
     // 연출 시작 시각(서버시간). 0 = 연출 없음. 서버 write / 모두 read.
     private readonly NetworkVariable<double> _startAt = new NetworkVariable<double>(
@@ -98,9 +98,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private PodDropLobbyTimeline _timeline;
     private PodDropScreenOverlay _overlay;
     private CameraTargetSwitcher _heldCamera;
-    private Vector3 _podOrigin;
-    private bool _podMoved;
-    private readonly List<Collider> _disabledColliders = new List<Collider>();
+    private PodAnimatorDriver _launcherDriver;
 
     // 오너 보행
     private struct OwnerWalk
@@ -216,7 +214,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
                   $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.BlackoutFadeInSeconds:0.##}/{timeline.BlackoutHoldSeconds:0.##}/{timeline.BlackoutFadeOutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}s, " +
                   $"속도 {settings.Lobby.walkSpeed:0.##}m/s, 각자 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s + 미끄러짐 {timeline.SeatSlideSeconds:0.##}s), " +
-                  $"강하 +{timeline.DescendAt:0.##}s, 페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
+                  $"해치 열림 ~+{timeline.HatchOpenEndAt:0.##}s, 발사 +{timeline.LaunchAt:0.##}s(클립 {timeline.LaunchClipStartSeconds:0.##}~{timeline.LaunchClipEndSeconds:0.##}s ×{timeline.LaunchSpeed:0.##}), " +
+                  $"페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
 
         _sequence = StartCoroutine(Sequence(participants, timeline, start, onDone));
         return true;
@@ -346,7 +345,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             _timeline = settings.CreateLobbyTimeline(ReplicatedWalkSeconds());
 
         double elapsed = ServerNow - start;
-        UpdatePod(elapsed);
+        UpdateLauncher(elapsed);
         UpdateCamera(elapsed);
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
@@ -355,25 +354,20 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed), elapsed < _timeline.LoadAt);
     }
 
-    private void UpdatePod(double elapsed)
+    // Base Layer(0) 에 전신 클립을 이어 세운다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.
+    // 발사대 프리팹엔 콜라이더가 없다(바닥은 로비 레이아웃 PodLaunch_FloorCollider — 걷는 길이라 끄지 않는다).
+    private void UpdateLauncher(double elapsed)
     {
-        if (pod == null)
+        if (launcher == null)
             return;
 
-        if (!_podMoved)
-        {
-            _podMoved = true;
-            _podOrigin = pod.position;
-            // 연출 동안 포드 콜라이더를 끈다 — 내려가는 몸체에 플레이어(숨김)가 걸리지 않게, 문틀·천장에 막히지 않게.
-            foreach (Collider c in pod.GetComponentsInChildren<Collider>())
-            {
-                if (!c.enabled) continue;
-                c.enabled = false;
-                _disabledColliders.Add(c);
-            }
-        }
+        PodLobbyClipPose pose = _timeline.PodClipAt(elapsed);
+        if (pose.Clip == PodLobbyClip.None)
+            return;
 
-        pod.position = _podOrigin + Vector3.up * _timeline.PodOffsetAt(elapsed);
+        _launcherDriver ??= new PodAnimatorDriver(launcher);
+        PodDropLobbyTimings lobby = settings.Lobby;
+        _launcherDriver.PoseSeconds(pose.Clip == PodLobbyClip.Hatch ? lobby.hatchState : lobby.launchState, 0, pose.Seconds);
     }
 
     private void UpdateCamera(double elapsed)
@@ -407,17 +401,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             _heldCamera = null;
         }
 
-        if (_podMoved)
-        {
-            _podMoved = false;
-            if (pod != null) pod.position = _podOrigin;
-        }
-
-        foreach (Collider c in _disabledColliders)
-        {
-            if (c != null) c.enabled = true;
-        }
-        _disabledColliders.Clear();
+        _launcherDriver?.Release();
     }
 
     // ---------------- 오너 보행 ----------------
@@ -669,7 +653,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     public IReadOnlyList<Transform> EditorWalkPath => walkPath;
     public Transform EditorThreshold => threshold;
     public IReadOnlyList<Transform> EditorSeats => seats;
-    public Transform EditorPod => pod;
+    public Transform EditorLauncher => launcher != null ? launcher.transform : null;
     public PodDropSettings EditorSettings => settings;
 
     public PodLaunchRules.WalkRoute EditorBuildRoute(WalkSlot slot, Vector3 seat) => BuildRoute(slot, seat);

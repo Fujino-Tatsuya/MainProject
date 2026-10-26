@@ -1619,9 +1619,9 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7736860437642046915, guid: 1dad33733ac03a141a8c4ad1fcc529bd, type: 3}
   m_PrefabInstance: {fileID: 173094099}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &173094101 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2082597557250308896, guid: 1dad33733ac03a141a8c4ad1fcc529bd, type: 3}
+--- !u!95 &173094101 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 3098624086309537099, guid: 1dad33733ac03a141a8c4ad1fcc529bd, type: 3}
   m_PrefabInstance: {fileID: 173094099}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &175464451
@@ -9857,7 +9857,7 @@ MonoBehaviour:
   - {fileID: 964224327}
   - {fileID: 1281245962}
   - {fileID: 1973002961}
-  pod: {fileID: 173094101}
+  launcher: {fileID: 173094101}
 --- !u!1 &1250323957
 GameObject:
   m_ObjectHideFlags: 0

@@ -11,10 +11,30 @@ public enum PodDropLobbyPhase
 {
     LetterboxIn,    // t=0 — 서버가 입력 잠금. 위·아래 레터박스가 들어오고 UI 가 같이 숨는다. 카메라는 멀리서 줌인 시작. 같이 짧은 암전(검게·유지·밝게) — 유지 구간 한가운데 각자 걷기 시작 지점으로 순간이동
     Walk,           // 걷기 시작 지점 → 계단 → 문턱까지 일정 속도로 자동 보행(슬롯 순서대로 간격을 두고 출발) → 좌석으로 미끄러짐. 레터박스·암전이 둘 다 끝난 뒤. 가장 늦게 앉는 사람 기준
-    HatchClose,     // 해치 닫힘(선택 — 길이 0 이면 건너뛴다, 기본 0)
-    Descend,        // 포드가 갱도 아래로 내려간다
+    Launch,         // 발사 클립(DP_LaunchCycle) — 해치 닫힘 → 갱도 문 열림 → 포드 하강이 클립 안에 다 들어 있다(C2i). 끝 암전 동안에도 클립은 계속 돈다
     FadeOut,        // 화면이 검게 페이드 아웃
     Done,           // 완전 암전 — 서버가 맵 로딩을 시작한다. 레터박스는 검은 화면 아래에서 걷힌다
+}
+
+/// <summary>로비 발사대 Animator 가 지금 세울 클립(C2i, <see cref="PodDropLobbyTimeline.PodClipAt"/>).</summary>
+public enum PodLobbyClip
+{
+    None,       // 손대지 않음 — 컨트롤러 기본 상태(DP_Idle) 그대로
+    Hatch,      // 해치 열기(DP_HatchLobbyOpenClose 앞부분)
+    Launch,     // 발사(DP_LaunchCycle — 해치 닫힘 · 갱도 문 · 포드 하강)
+}
+
+/// <summary>로비 발사대 자세 — 어느 클립의 몇 초(클립 시각).</summary>
+public readonly struct PodLobbyClipPose
+{
+    public readonly PodLobbyClip Clip;
+    public readonly float Seconds;
+
+    public PodLobbyClipPose(PodLobbyClip clip, float seconds)
+    {
+        Clip = clip;
+        Seconds = seconds;
+    }
 }
 
 /// <summary>
@@ -24,7 +44,7 @@ public enum PodDropMapPhase
 {
     Hold,           // 로딩이 걷힌 뒤 대기. 포드는 위에 떠 있고 플레이어는 착지점에 숨김·잠금
     Fall,           // 포드 낙하
-    Settle,         // 착지 순간(땅 갈라짐 이펙트·카메라 흔들림) → 디졸브 전 여운
+    Settle,         // 착지 순간(땅 갈라짐 이펙트·카메라 흔들림) → 착지 애니(다리·날개·해치, C2i) → 디졸브 전 여운
     Dissolve,       // 포드 디졸브 — 시작 순간 플레이어가 보인다
     LetterboxOut,   // 레터박스가 걷힌다
     Released,       // 해제 — UI·조작·튜토리얼(S0) 시작. 끝이 없다
@@ -67,18 +87,24 @@ public struct PodDropLobbyTimings
     [Tooltip("문턱에 닿은 순간 → 좌석까지 미끄러져 들어가 숨는 시간(초). 포드 실내가 낮아 충돌 없이 보간한다. 문턱이 없으면 마지막 경로점 → 좌석")]
     [Min(0f)] public float seatSlideSeconds;
 
-    [Header("해치 · 강하")]
-    [Tooltip("마지막 사람이 포드 안에 도착한 순간 → 해치가 다 닫힘(초). 0 = 해치 연출 없음(단계 건너뜀)")]
-    [Min(0f)] public float hatchCloseSeconds;
-    [Tooltip("포드가 갱도 아래로 내려가는 시간(초)")]
-    [Min(0f)] public float descendSeconds;
-    [Tooltip("포드가 내려가는 깊이(m) — 발사대 기준 아래로")]
-    [Min(0f)] public float descendDepth;
-    [Tooltip("강하 이징(진행도 → 내려간 비율). 기본 InCubic = 처음 천천히, 점점 빠르게")]
-    public Ease descendEase;
+    [Header("발사대 애니 (Animator 상태 이름 · 클립 시각, 초)")]
+    [Tooltip("해치 열고 닫기 상태 이름(컨트롤러 Base Layer). 비우면 해치 애니 없음")]
+    public string hatchState;
+    [Tooltip("시작 암전 한가운데(순간이동 순간)부터 해치 클립을 1배속으로 이 클립 시각(초)까지 재생하고 그 자세로 멈춘다. " +
+             "DP_HatchLobbyOpenClose 는 열기·닫기가 한 클립이라 기본 = 다 열린 시각 1.4 — 닫힘은 발사 클립 앞부분이 한다. 0 = 해치 애니 없음(대기 자세 그대로)")]
+    [Min(0f)] public float hatchOpenSeconds;
+    [Tooltip("발사 상태 이름(컨트롤러 Base Layer) — 해치 닫힘·갱도 문 열림·포드 하강이 한 클립. 비우면 발사 애니 없음(시각표는 그대로)")]
+    public string launchState;
+    [Tooltip("가장 늦게 앉는 순간 발사 클립을 이 클립 시각(초)부터 재생. DP_LaunchCycle 은 0~1.5 가 정지, 1.5 부터 해치 닫힘(앞부분 건너뛰기)")]
+    [Min(0f)] public float launchClipStartSeconds;
+    [Tooltip("발사 클립이 이 클립 시각(초)에 닿으면 끝 암전 시작. DP_LaunchCycle 은 3.7 갱도 문 열림, 5.0 부터 포드 하강(6.8 ≈ 6m 아래). " +
+             "끝 암전 동안에도 클립은 계속 돈다. 시작보다 작으면 발사 단계 0")]
+    [Min(0f)] public float launchClipEndSeconds;
+    [Tooltip("발사 클립 재생 속도(1 = 원래 속도, 클립 전체 12초). 발사 단계 길이 = (끝 − 시작) ÷ 속도")]
+    [Min(0.01f)] public float launchSpeed;
 
     [Header("페이드 아웃 → 맵 로딩")]
-    [Tooltip("강하가 끝난 순간 → 화면이 완전히 검게 됨(초). 끝나는 순간 맵 로딩 시작")]
+    [Tooltip("발사 단계가 끝난 순간 → 화면이 완전히 검게 됨(초). 끝나는 순간 맵 로딩 시작")]
     [Min(0f)] public float fadeOutSeconds;
     [Tooltip("끝 암전 이징(진행도 → 검은 비율). 기본 Linear = 일정한 속도")]
     public Ease fadeOutEase;
@@ -103,10 +129,13 @@ public struct PodDropLobbyTimings
         walkSpeed = 4.5f,
         walkInterval = 0.4f,
         seatSlideSeconds = 0.4f,
-        hatchCloseSeconds = 0f,
-        descendSeconds = 2f,
-        descendDepth = 10f,
-        descendEase = Ease.InCubic,
+        hatchState = "DP_HatchLobbyOpenClose",
+        hatchOpenSeconds = 1.4f,
+        launchState = "DP_LaunchCycle",
+        // 정지 구간(0~1.5)을 건너뛰고 포드가 6m 쯤 내려간 6.8 에서 끝 암전, 2배속 — 2.65초(D4 '전체를 짧게': 클립 그대로면 12초).
+        launchClipStartSeconds = 1.5f,
+        launchClipEndSeconds = 6.8f,
+        launchSpeed = 2f,
         fadeOutSeconds = 0.6f,
         fadeOutEase = Ease.Linear,
         hudRescanSeconds = 0.5f,
@@ -209,7 +238,7 @@ public struct PodDropMapTimings
 }
 
 /// <summary>
-/// 로비 포드 연출의 순수 시간표 — 단계 시각, 경과 시간 → 단계·진행률·레터박스 알파·카메라 거리·슬롯별 보행·해치·포드 하강·페이드 알파.
+/// 로비 포드 연출의 순수 시간표 — 단계 시각, 경과 시간 → 단계·진행률·레터박스 알파·카메라 거리·슬롯별 보행·발사대 클립 자세·페이드 알파.
 /// 네트워크·씬을 모른다. 경과 시간은 시작 시각(출격 확정) 기준이라 늦게 본 피어도 같은 값을 얻는다(음수 = 시작 전, 첫 단계로 취급).
 /// 보행 시간은 슬롯마다 다르다(경로 길이 ÷ 걷는 속도 — 호출자가 계산해 넣는다). 웨이포인트를 따라가는 실제 이동은 호출자 몫이다(<see cref="BossElevatorTimeline.WalkStepAlongPath"/> 처럼 남은 시간에 맞춰 걷는다).
 /// 마지막 단계 <see cref="PodDropLobbyPhase.Done"/> 은 끝이 없다 — 그 뒤 처리(맵 로딩)는 호출자가 한다.
@@ -229,10 +258,14 @@ public sealed class PodDropLobbyTimeline
     public float CameraZoomDelaySeconds { get; }
     public float CameraZoomSeconds { get; }
     public Ease CameraZoomEase { get; }
-    public float HatchCloseSeconds { get; }
-    public float DescendSeconds { get; }
-    public float DescendDepth { get; }
-    public Ease DescendEase { get; }
+    /// <summary>해치 클립을 멈출 클립 시각(초, 1배속 — 재생 시간과 같다). 0 = 해치 애니 없음.</summary>
+    public float HatchOpenSeconds { get; }
+    public float LaunchClipStartSeconds { get; }
+    /// <summary>발사 클립의 끝 암전 시작 클립 시각(초) — 시작보다 작지 않다.</summary>
+    public float LaunchClipEndSeconds { get; }
+    public float LaunchSpeed { get; }
+    /// <summary>발사 단계 길이(초) = (끝 − 시작) ÷ 속도.</summary>
+    public float LaunchSeconds { get; }
     public float FadeOutSeconds { get; }
     public Ease FadeOutEase { get; }
 
@@ -250,9 +283,10 @@ public sealed class PodDropLobbyTimeline
     public float TeleportAt => BlackoutFadeInSeconds + BlackoutHoldSeconds * 0.5f;
     /// <summary>레터박스가 다 들어오고 암전도 다 걷힌 시각 = 보행 단계 시작(첫 사람 출발).</summary>
     public float WalkAt { get; }
-    /// <summary>가장 늦게 좌석에 도착한 사람의 도착 시각 = 해치 닫힘 시작.</summary>
-    public float HatchCloseAt { get; }
-    public float DescendAt { get; }
+    /// <summary>해치가 다 열린 시각 = 순간이동 + <see cref="HatchOpenSeconds"/>. 해치 애니가 없으면 순간이동 시각.</summary>
+    public float HatchOpenEndAt => TeleportAt + HatchOpenSeconds;
+    /// <summary>가장 늦게 좌석에 도착한 사람의 도착 시각 = 발사 클립 시작.</summary>
+    public float LaunchAt { get; }
     public float FadeOutAt { get; }
     /// <summary>완전 암전 시각 — 서버가 맵 로딩을 시작한다. 로비 연출 전체 길이.</summary>
     public float LoadAt { get; }
@@ -270,10 +304,11 @@ public sealed class PodDropLobbyTimeline
         CameraZoomDelaySeconds = Mathf.Max(0f, timings.cameraZoomDelaySeconds);
         CameraZoomSeconds = Mathf.Max(0f, timings.cameraZoomSeconds);
         CameraZoomEase = timings.cameraZoomEase;
-        HatchCloseSeconds = Mathf.Max(0f, timings.hatchCloseSeconds);
-        DescendSeconds = Mathf.Max(0f, timings.descendSeconds);
-        DescendDepth = Mathf.Max(0f, timings.descendDepth);
-        DescendEase = timings.descendEase;
+        HatchOpenSeconds = Mathf.Max(0f, timings.hatchOpenSeconds);
+        LaunchClipStartSeconds = Mathf.Max(0f, timings.launchClipStartSeconds);
+        LaunchClipEndSeconds = Mathf.Max(LaunchClipStartSeconds, timings.launchClipEndSeconds);
+        LaunchSpeed = Mathf.Max(0.01f, timings.launchSpeed);
+        LaunchSeconds = (LaunchClipEndSeconds - LaunchClipStartSeconds) / LaunchSpeed;
         FadeOutSeconds = Mathf.Max(0f, timings.fadeOutSeconds);
         FadeOutEase = timings.fadeOutEase;
 
@@ -285,12 +320,11 @@ public sealed class PodDropLobbyTimeline
 
         // 암전이 레터박스보다 길면 밝아진 뒤에 걷는다 — 걷는 모습이 검은 화면에 묻히지 않게.
         WalkAt = Mathf.Max(LetterboxInSeconds, BlackoutSeconds);
-        // 가장 늦게 도착하는 사람 기준. 아무도 안 걸으면 보행 시간 없이 바로 해치 닫힘.
-        HatchCloseAt = WalkAt;
+        // 가장 늦게 도착하는 사람 기준. 아무도 안 걸으면 보행 시간 없이 바로 발사.
+        LaunchAt = WalkAt;
         for (int slot = 0; slot < WalkerCount; slot++)
-            HatchCloseAt = Mathf.Max(HatchCloseAt, WalkEndAt(slot));
-        DescendAt = HatchCloseAt + HatchCloseSeconds;
-        FadeOutAt = DescendAt + DescendSeconds;
+            LaunchAt = Mathf.Max(LaunchAt, WalkEndAt(slot));
+        FadeOutAt = LaunchAt + LaunchSeconds;
         LoadAt = FadeOutAt + FadeOutSeconds;
     }
 
@@ -320,8 +354,7 @@ public sealed class PodDropLobbyTimeline
         {
             case PodDropLobbyPhase.LetterboxIn: return 0f;
             case PodDropLobbyPhase.Walk: return WalkAt;
-            case PodDropLobbyPhase.HatchClose: return HatchCloseAt;
-            case PodDropLobbyPhase.Descend: return DescendAt;
+            case PodDropLobbyPhase.Launch: return LaunchAt;
             case PodDropLobbyPhase.FadeOut: return FadeOutAt;
             default: return LoadAt;
         }
@@ -336,8 +369,7 @@ public sealed class PodDropLobbyTimeline
     {
         if (elapsed >= LoadAt) return PodDropLobbyPhase.Done;
         if (elapsed >= FadeOutAt) return PodDropLobbyPhase.FadeOut;
-        if (elapsed >= DescendAt) return PodDropLobbyPhase.Descend;
-        if (elapsed >= HatchCloseAt) return PodDropLobbyPhase.HatchClose;
+        if (elapsed >= LaunchAt) return PodDropLobbyPhase.Launch;
         if (elapsed >= WalkAt) return PodDropLobbyPhase.Walk;
         return PodDropLobbyPhase.LetterboxIn;
     }
@@ -364,12 +396,19 @@ public sealed class PodDropLobbyTimeline
     public float CameraDistanceAt(double elapsed) =>
         PodDropTimeline.CameraDistance(elapsed, CameraStartDistance, CameraEndDistance, CameraZoomDelaySeconds, CameraZoomSeconds, CameraZoomEase);
 
-    /// <summary>해치 닫힘 진행률(0 = 열림, 1 = 닫힘). 해치 연출이 없으면(길이 0) 닫힘 시각부터 1 — 호출자가 해치를 쓰지 않으면 무시한다.</summary>
-    public float HatchCloseProgressAt(double elapsed) => PodDropTimeline.Progress(elapsed, HatchCloseAt, HatchCloseSeconds);
-
-    /// <summary>포드 높이 오프셋(m, 발사대 기준). 강하 전 0, 강하 중 0 → −<see cref="DescendDepth"/>, 그 뒤 유지.</summary>
-    public float PodOffsetAt(double elapsed) =>
-        -DescendDepth * Easing.Evaluate(DescendEase, PodDropTimeline.Progress(elapsed, DescendAt, DescendSeconds));
+    /// <summary>
+    /// 발사대 Animator 자세(Base Layer 한 상태 + 클립 시각) — 모든 피어가 같은 경과 시간이면 같은 자세다.
+    /// 순간이동 전 = 손대지 않음(대기 상태 그대로), 순간이동 ~ 발사 = 해치 클립 0 → <see cref="HatchOpenSeconds"/>(1배속) 뒤 멈춤,
+    /// 발사부터 = 발사 클립 <see cref="LaunchClipStartSeconds"/> + 경과 × 속도(클립 끝을 넘는 값은 호출자가 끝에 맞춘다). 포드 하강은 이 클립이 한다.
+    /// </summary>
+    public PodLobbyClipPose PodClipAt(double elapsed)
+    {
+        if (elapsed >= LaunchAt)
+            return new PodLobbyClipPose(PodLobbyClip.Launch, LaunchClipStartSeconds + (float)(elapsed - LaunchAt) * LaunchSpeed);
+        if (HatchOpenSeconds > 0f && elapsed >= TeleportAt)
+            return new PodLobbyClipPose(PodLobbyClip.Hatch, Mathf.Min((float)(elapsed - TeleportAt), HatchOpenSeconds));
+        return new PodLobbyClipPose(PodLobbyClip.None, 0f);
+    }
 
     /// <summary>검은 화면 알파(0 = 투명, 1 = 완전 암전). 페이드 구간은 <see cref="FadeOutEase"/>(기본 선형), <see cref="LoadAt"/> 부터 1.</summary>
     public float FadeAlphaAt(double elapsed) =>

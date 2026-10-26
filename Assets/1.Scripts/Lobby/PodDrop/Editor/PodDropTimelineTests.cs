@@ -4,8 +4,9 @@ using UnityEngine;
 
 /// <summary>
 /// 포드 강하 순수 시간표(<see cref="PodDropLobbyTimeline"/>·<see cref="PodDropMapTimeline"/>, 할 일 100 C1) — 단계 경계·합계 길이·0 길이 단계·보간 끝값·해제 ≥ 레터박스 아웃.
-/// 기본 수치(로비): 레터박스 인 0.5(같이 순간이동 암전 0.4, 한가운데 0.2 에 순간이동), 간격 0.4, 문턱 → 좌석 미끄러짐 0.4, 해치 0, 강하 2·깊이 10, 페이드 0.6, 줌 1.8 → 1.15 / 6초.
-/// 보행 시간은 슬롯마다 받는다(C2d — 경로 길이 ÷ 걷는 속도). 여기선 대부분 3인 각 3초 → 합계 7.3초.
+/// 기본 수치(로비): 레터박스 인 0.5(같이 순간이동 암전 0.4, 한가운데 0.2 에 순간이동), 간격 0.4, 문턱 → 좌석 미끄러짐 0.4, 페이드 0.6, 줌 1.8 → 1.15 / 6초.
+/// 발사대 애니(C2i): 해치 클립 0 → 1.4 (순간이동부터, 겹침), 발사 클립 1.5 → 6.8 ×2 = 2.65초(포드 하강은 클립 안).
+/// 보행 시간은 슬롯마다 받는다(C2d — 경로 길이 ÷ 걷는 속도). 여기선 대부분 3인 각 3초 → 합계 7.95초.
 /// 기본 수치(맵): 대기 0.3, 낙하 0.6·높이 12, 여운 0.4, 디졸브 1, 레터박스 아웃 0.5, 줌 1.8 → 1 / 2.6초. 합계 2.8초.
 /// </summary>
 public sealed class PodDropTimelineTests
@@ -14,6 +15,8 @@ public sealed class PodDropTimelineTests
     const int Walkers = 3;
     const float Walk = 3f;
     const float Slide = 0.4f;
+    const float Launch = (6.8f - 1.5f) / 2f; // 발사 클립 1.5 → 6.8, 2배속
+    const float LoadDefault = 0.5f + 0.8f + Walk + Slide + Launch + 0.6f; // 7.95
 
     static float[] Same(int walkers, float seconds)
     {
@@ -33,10 +36,10 @@ public sealed class PodDropTimelineTests
     {
         PodDropLobbyTimeline t = Lobby();
         Assert.AreEqual(0.5f, t.WalkAt, Eps, "레터박스 인 끝 = 첫 사람 출발");
-        Assert.AreEqual(0.5f + 0.8f + Walk + Slide, t.HatchCloseAt, Eps, "마지막(P3) 출발 0.5+0.4×2, 문턱 +3, 좌석 +0.4");
-        Assert.AreEqual(t.HatchCloseAt, t.DescendAt, Eps, "해치 기본 0 → 강하가 바로");
-        Assert.AreEqual(t.DescendAt + 2f, t.FadeOutAt, Eps);
-        Assert.AreEqual(7.3f, t.LoadAt, Eps, "로비 합계 7.3초(3인 각 3초)");
+        Assert.AreEqual(0.5f + 0.8f + Walk + Slide, t.LaunchAt, Eps, "마지막(P3) 출발 0.5+0.4×2, 문턱 +3, 좌석 +0.4 = 발사");
+        Assert.AreEqual(2.65f, t.LaunchSeconds, Eps, "발사 클립 1.5 → 6.8 을 2배속");
+        Assert.AreEqual(t.LaunchAt + Launch, t.FadeOutAt, Eps);
+        Assert.AreEqual(LoadDefault, t.LoadAt, Eps, "로비 합계 7.95초(3인 각 3초)");
     }
 
     [Test]
@@ -55,8 +58,9 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(PodDropLobbyPhase.LetterboxIn, t.PhaseAt(0d));
         Assert.AreEqual(PodDropLobbyPhase.LetterboxIn, t.PhaseAt(t.WalkAt - 0.01d));
         Assert.AreEqual(PodDropLobbyPhase.Walk, t.PhaseAt(t.WalkAt));
-        Assert.AreEqual(PodDropLobbyPhase.Walk, t.PhaseAt(t.HatchCloseAt - 0.01d));
-        Assert.AreEqual(PodDropLobbyPhase.Descend, t.PhaseAt(t.DescendAt));
+        Assert.AreEqual(PodDropLobbyPhase.Walk, t.PhaseAt(t.LaunchAt - 0.01d));
+        Assert.AreEqual(PodDropLobbyPhase.Launch, t.PhaseAt(t.LaunchAt));
+        Assert.AreEqual(PodDropLobbyPhase.Launch, t.PhaseAt(t.FadeOutAt - 0.01d));
         Assert.AreEqual(PodDropLobbyPhase.FadeOut, t.PhaseAt(t.FadeOutAt));
         Assert.AreEqual(PodDropLobbyPhase.Done, t.PhaseAt(t.LoadAt));
         Assert.AreEqual(PodDropLobbyPhase.Done, t.PhaseAt(t.LoadAt + 100d), "끝이 없다");
@@ -90,7 +94,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(0.4f / 3f, d.blackoutFadeOutSeconds, Eps);
         Assert.AreEqual(0.2f, t.TeleportAt, Eps, "순간이동 = 암전 한가운데");
         Assert.AreEqual(0.5f, t.WalkAt, Eps, "암전(0.4)이 레터박스 인(0.5) 안 → 보행 시작 그대로");
-        Assert.AreEqual(7.3f, t.LoadAt, Eps, "합계 그대로");
+        Assert.AreEqual(LoadDefault, t.LoadAt, Eps, "합계 그대로");
         Assert.Less(t.TeleportAt, t.WalkStartAt(0), "순간이동이 첫 출발보다 먼저");
     }
 
@@ -292,36 +296,78 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(0f, asset.Map.cameraZoomDelaySeconds, Eps);
     }
 
-    // ─── 로비: 해치 (D13 — 길이 0 이면 건너뜀) ────────────────────────────
+    [Test]
+    public void Settings_Asset_LobbyPodAnimFields_TakeDefaults()
+    {
+        // C2i — 에셋에 아직 없는 새 칸은 코드 기본값(SO 필드 초기값)으로 읽힌다(에셋을 다시 쓰지 않는다 — 사용자 튜닝 값 보존).
+        var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<PodDropSettings>("Assets/9.ScriptableObject/Lobby/PodDropSettings.asset");
+        Assert.IsNotNull(asset, "PodDropSettings.asset 이 없다");
+        PodDropLobbyTimings lobby = asset.Lobby;
+        PodDropLobbyTimings d = PodDropLobbyTimings.Default;
+        Assert.AreEqual(d.hatchState, lobby.hatchState);
+        Assert.AreEqual(d.hatchOpenSeconds, lobby.hatchOpenSeconds, Eps);
+        Assert.AreEqual(d.launchState, lobby.launchState);
+        Assert.AreEqual(d.launchClipStartSeconds, lobby.launchClipStartSeconds, Eps);
+        Assert.AreEqual(d.launchClipEndSeconds, lobby.launchClipEndSeconds, Eps);
+        Assert.AreEqual(d.launchSpeed, lobby.launchSpeed, Eps);
+    }
+
+    // ─── 로비: 발사대 애니 (C2i — 해치 열림 · 발사 클립) ──────────────────
 
     [Test]
-    public void Lobby_HatchZero_PhaseNeverAppears()
+    public void Lobby_PodClip_Default_HatchThenLaunch()
     {
         PodDropLobbyTimeline t = Lobby();
-        Assert.AreEqual(0f, PodDropLobbyTimings.Default.hatchCloseSeconds, Eps, "기본 = 해치 연출 없음");
-        Assert.AreEqual(0f, t.DurationOf(PodDropLobbyPhase.HatchClose), Eps);
-        for (double e = -0.5d; e <= t.LoadAt + 0.5d; e += 0.01d)
-            Assert.AreNotEqual(PodDropLobbyPhase.HatchClose, t.PhaseAt(e), $"t={e:F2}");
-        Assert.AreEqual(PodDropLobbyPhase.Descend, t.PhaseAt(t.HatchCloseAt), "보행 끝 = 바로 강하");
+        PodDropLobbyTimings d = PodDropLobbyTimings.Default;
+        Assert.AreEqual("DP_HatchLobbyOpenClose", d.hatchState);
+        Assert.AreEqual("DP_LaunchCycle", d.launchState);
+        Assert.AreEqual(1.4f, t.HatchOpenSeconds, Eps, "해치 클립 다 열린 시각");
+        Assert.AreEqual(t.TeleportAt + 1.4f, t.HatchOpenEndAt, Eps);
+
+        AssertPose(PodLobbyClip.None, 0f, t.PodClipAt(-1d), "시작 전 = 대기 상태 그대로");
+        AssertPose(PodLobbyClip.None, 0f, t.PodClipAt(t.TeleportAt - 0.01d), "순간이동 전 = 손대지 않음");
+        AssertPose(PodLobbyClip.Hatch, 0f, t.PodClipAt(t.TeleportAt), "순간이동 순간(완전 암전) 해치 클립 처음");
+        AssertPose(PodLobbyClip.Hatch, 0.7f, t.PodClipAt(t.TeleportAt + 0.7d), "1배속");
+        AssertPose(PodLobbyClip.Hatch, 1.4f, t.PodClipAt(t.HatchOpenEndAt + 1d), "다 열린 자세로 멈춤");
+        AssertPose(PodLobbyClip.Hatch, 1.4f, t.PodClipAt(t.LaunchAt - 0.01d), "보행 끝까지 열린 채");
+        AssertPose(PodLobbyClip.Launch, 1.5f, t.PodClipAt(t.LaunchAt), "발사 = 클립 1.5 부터");
+        AssertPose(PodLobbyClip.Launch, 3.5f, t.PodClipAt(t.LaunchAt + 1d), "2배속");
+        AssertPose(PodLobbyClip.Launch, 6.8f, t.PodClipAt(t.FadeOutAt), "끝 암전 시작 = 클립 6.8");
+        AssertPose(PodLobbyClip.Launch, 8f, t.PodClipAt(t.LoadAt), "끝 암전 동안에도 클립은 계속");
+        Assert.Less(t.HatchOpenEndAt, t.WalkArriveAt(0), "기본 — 첫 사람이 문턱에 닿기 전에 다 열린다");
     }
 
     [Test]
-    public void Lobby_HatchNonZero_OnlyShiftsLaterBoundaries()
+    public void Lobby_HatchOpenZero_NoHatchClip()
     {
-        PodDropLobbyTimeline zero = Lobby();
         PodDropLobbyTimings s = PodDropLobbyTimings.Default;
-        s.hatchCloseSeconds = 0.7f;
+        s.hatchOpenSeconds = 0f;
+        var t = Lobby(s);
+        for (double e = -0.5d; e < t.LaunchAt; e += 0.01d)
+            Assert.AreEqual(PodLobbyClip.None, t.PodClipAt(e).Clip, $"t={e:F2} 해치 애니 없음");
+        Assert.AreEqual(PodLobbyClip.Launch, t.PodClipAt(t.LaunchAt).Clip);
+        Assert.AreEqual(Lobby().LoadAt, t.LoadAt, Eps, "해치 열림은 다른 단계와 겹친다(시각 불변)");
+    }
+
+    [Test]
+    public void Lobby_LaunchKnobs_OnlyShiftLaterBoundaries()
+    {
+        PodDropLobbyTimeline baseline = Lobby();
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.launchSpeed = 1f;
         var t = Lobby(s);
 
-        Assert.AreEqual(zero.WalkAt, t.WalkAt, Eps, "앞 경계는 그대로");
-        Assert.AreEqual(zero.HatchCloseAt, t.HatchCloseAt, Eps);
-        Assert.AreEqual(zero.DescendAt + 0.7f, t.DescendAt, Eps, "뒤 경계는 해치 길이만큼 밀린다");
-        Assert.AreEqual(zero.FadeOutAt + 0.7f, t.FadeOutAt, Eps);
-        Assert.AreEqual(zero.LoadAt + 0.7f, t.LoadAt, Eps);
-        Assert.AreEqual(PodDropLobbyPhase.HatchClose, t.PhaseAt(t.HatchCloseAt));
-        Assert.AreEqual(0f, t.HatchCloseProgressAt(t.HatchCloseAt), Eps);
-        Assert.AreEqual(0.5f, t.HatchCloseProgressAt(t.HatchCloseAt + 0.35d), Eps);
-        Assert.AreEqual(1f, t.HatchCloseProgressAt(t.DescendAt), Eps);
+        Assert.AreEqual(baseline.LaunchAt, t.LaunchAt, Eps, "앞 경계는 그대로");
+        Assert.AreEqual(5.3f, t.LaunchSeconds, Eps, "1배속 = 클립 구간 그대로(6.8 − 1.5)");
+        Assert.AreEqual(baseline.LoadAt + 2.65f, t.LoadAt, Eps, "뒤 경계는 늘어난 만큼 밀린다");
+        AssertPose(PodLobbyClip.Launch, 2.5f, t.PodClipAt(t.LaunchAt + 1d), "1배속");
+
+        s.launchClipEndSeconds = 1f; // 시작(1.5)보다 작다
+        var none = Lobby(s);
+        Assert.AreEqual(0f, none.LaunchSeconds, Eps, "끝 < 시작 → 발사 단계 0");
+        Assert.AreEqual(0f, none.DurationOf(PodDropLobbyPhase.Launch), Eps);
+        Assert.AreEqual(PodDropLobbyPhase.FadeOut, none.PhaseAt(none.LaunchAt), "발사 0 → 바로 끝 암전");
+        Assert.AreEqual(1.5f, none.LaunchClipEndSeconds, Eps, "끝은 시작으로 맞춘다");
     }
 
     [Test]
@@ -331,17 +377,30 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(0f, t.LoadAt, Eps);
         Assert.AreEqual(PodDropLobbyPhase.Done, t.PhaseAt(0d));
         Assert.AreEqual(1f, t.FadeAlphaAt(0d), Eps, "0 길이 페이드 = 바로 암전");
+        Assert.AreEqual(0.01f, t.LaunchSpeed, Eps, "속도 0 → 최소 0.01(0 나눗셈 없음)");
     }
 
     [Test]
     public void Lobby_NegativeDurations_ClampedToZero()
     {
         PodDropLobbyTimings s = PodDropLobbyTimings.Default;
-        s.hatchCloseSeconds = -3f;
+        s.hatchOpenSeconds = -3f;
+        s.launchClipStartSeconds = -2f;
+        s.launchClipEndSeconds = -1f;
+        s.launchSpeed = -1f;
         s.walkInterval = -1f;
         var t = Lobby(s);
-        Assert.AreEqual(t.HatchCloseAt, t.DescendAt, Eps);
-        Assert.AreEqual(t.WalkAt + Walk + Slide, t.HatchCloseAt, Eps, "간격 0 → 전원 동시 출발");
+        Assert.AreEqual(0f, t.HatchOpenSeconds, Eps);
+        Assert.AreEqual(0f, t.LaunchClipStartSeconds, Eps);
+        Assert.AreEqual(0f, t.LaunchSeconds, Eps);
+        Assert.AreEqual(t.LaunchAt, t.FadeOutAt, Eps);
+        Assert.AreEqual(t.WalkAt + Walk + Slide, t.LaunchAt, Eps, "간격 0 → 전원 동시 출발");
+    }
+
+    static void AssertPose(PodLobbyClip clip, float seconds, PodLobbyClipPose pose, string message)
+    {
+        Assert.AreEqual(clip, pose.Clip, message);
+        Assert.AreEqual(seconds, pose.Seconds, Eps, message);
     }
 
     // ─── 로비: 보행 ──────────────────────────────────────────────────────
@@ -355,7 +414,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(1.3f, t.WalkStartAt(2), Eps);
         Assert.AreEqual(4.3f, t.WalkArriveAt(2), Eps, "문턱 도착 = 출발 + 보행 시간");
         Assert.AreEqual(4.7f, t.WalkEndAt(2), Eps, "좌석 도착 = 문턱 + 미끄러짐 = 보행 단계 끝");
-        Assert.AreEqual(t.HatchCloseAt, t.WalkEndAt(Walkers - 1), Eps);
+        Assert.AreEqual(t.LaunchAt, t.WalkEndAt(Walkers - 1), Eps);
 
         Assert.AreEqual(0f, t.WalkProgressAt(1, 0d), Eps, "출발 전 0");
         Assert.AreEqual(0f, t.WalkProgressAt(1, t.WalkStartAt(1)), Eps);
@@ -368,12 +427,12 @@ public sealed class PodDropTimelineTests
     public void Lobby_WalkerCount_ChangesOnlyWalkLength()
     {
         PodDropLobbyTimeline one = Lobby(1);
-        Assert.AreEqual(one.WalkAt + Walk + Slide, one.HatchCloseAt, Eps, "1인 = 간격 없음");
+        Assert.AreEqual(one.WalkAt + Walk + Slide, one.LaunchAt, Eps, "1인 = 간격 없음");
         Assert.AreEqual(Lobby().LoadAt - 0.8f, one.LoadAt, Eps);
 
         PodDropLobbyTimeline none = Lobby(0);
         Assert.AreEqual(0f, none.DurationOf(PodDropLobbyPhase.Walk), Eps, "0인 = 보행 단계 길이 0");
-        Assert.AreEqual(PodDropLobbyPhase.Descend, none.PhaseAt(none.WalkAt));
+        Assert.AreEqual(PodDropLobbyPhase.Launch, none.PhaseAt(none.WalkAt));
         Assert.AreEqual(0, new PodDropLobbyTimeline(PodDropLobbyTimings.Default, null).WalkerCount, "목록 없음 = 0인");
     }
 
@@ -400,13 +459,13 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(2.9f, t.WalkEndAt(0), Eps);
         Assert.AreEqual(2.3f, t.WalkEndAt(1), Eps, "P2 가 P1 보다 먼저 앉는다");
         Assert.AreEqual(4.7f, t.WalkEndAt(2), Eps);
-        Assert.AreEqual(4.7f, t.HatchCloseAt, Eps);
+        Assert.AreEqual(4.7f, t.LaunchAt, Eps);
 
         // 첫 사람 경로가 가장 길면 마지막 슬롯이 아니라 그 사람 기준.
         var first = new PodDropLobbyTimeline(s, new[] { 4f, 1f, 1f });
         Assert.AreEqual(0.5f + 4f + Slide, first.WalkEndAt(0), Eps);
-        Assert.AreEqual(first.WalkEndAt(0), first.HatchCloseAt, Eps, "가장 늦게 앉는 사람(P1) 기준");
-        Assert.Less(first.WalkEndAt(2), first.HatchCloseAt);
+        Assert.AreEqual(first.WalkEndAt(0), first.LaunchAt, Eps, "가장 늦게 앉는 사람(P1) 기준");
+        Assert.Less(first.WalkEndAt(2), first.LaunchAt);
         Assert.AreEqual(PodDropLobbyPhase.Walk, first.PhaseAt(first.WalkEndAt(2) + 0.1d), "P3 가 앉아도 P1 이 걷는 동안 보행 단계");
     }
 
@@ -415,7 +474,7 @@ public sealed class PodDropTimelineTests
     {
         var t = new PodDropLobbyTimeline(PodDropLobbyTimings.Default, Same(Walkers, 0f));
         Assert.AreEqual(t.WalkStartAt(0), t.WalkArriveAt(0), Eps, "길이 0 = 걷지 않고 곧바로 미끄러짐");
-        Assert.AreEqual(1.3f + Slide, t.HatchCloseAt, Eps, "마지막 출발 + 미끄러짐");
+        Assert.AreEqual(1.3f + Slide, t.LaunchAt, Eps, "마지막 출발 + 미끄러짐");
         Assert.AreEqual(1f, t.WalkProgressAt(0, t.WalkStartAt(0)), Eps, "길이 0 진행률은 출발 순간 1");
     }
 
@@ -426,7 +485,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(0f, t.WalkSecondsOf(0), Eps, "음수 → 0");
         Assert.AreEqual(0f, t.WalkSecondsOf(1), Eps, "NaN → 0");
         Assert.AreEqual(0f, t.WalkSecondsOf(7), Eps, "명단 밖 슬롯 → 0");
-        Assert.AreEqual(1.3f + 3f + Slide, t.HatchCloseAt, Eps);
+        Assert.AreEqual(1.3f + 3f + Slide, t.LaunchAt, Eps);
         Assert.IsFalse(float.IsNaN(t.LoadAt));
     }
 
@@ -481,17 +540,6 @@ public sealed class PodDropTimelineTests
     }
 
     [Test]
-    public void Lobby_PodOffset_EndValues()
-    {
-        PodDropLobbyTimeline t = Lobby();
-        Assert.AreEqual(0f, t.PodOffsetAt(0d), Eps, "강하 전 제자리");
-        Assert.AreEqual(0f, t.PodOffsetAt(t.DescendAt), Eps);
-        Assert.AreEqual(-10f * Easing.Evaluate(Ease.InCubic, 0.5f), t.PodOffsetAt(t.DescendAt + 1d), Eps, "InCubic 중간");
-        Assert.AreEqual(-10f, t.PodOffsetAt(t.FadeOutAt), Eps);
-        Assert.AreEqual(-10f, t.PodOffsetAt(t.LoadAt + 1d), Eps, "끝 깊이 유지");
-    }
-
-    [Test]
     public void Lobby_FadeAlpha()
     {
         PodDropLobbyTimeline t = Lobby();
@@ -506,8 +554,8 @@ public sealed class PodDropTimelineTests
     public void Lobby_PhaseProgress()
     {
         PodDropLobbyTimeline t = Lobby();
-        Assert.AreEqual(0f, t.PhaseProgressAt(t.DescendAt), Eps);
-        Assert.AreEqual(0.5f, t.PhaseProgressAt(t.DescendAt + 1d), Eps);
+        Assert.AreEqual(0f, t.PhaseProgressAt(t.LaunchAt), Eps);
+        Assert.AreEqual(0.5f, t.PhaseProgressAt(t.LaunchAt + Launch * 0.5d), Eps);
         Assert.AreEqual(0.5f, t.PhaseProgressAt(t.FadeOutAt + 0.3d), Eps);
         Assert.AreEqual(1f, t.PhaseProgressAt(t.LoadAt), Eps, "Done = 1");
     }

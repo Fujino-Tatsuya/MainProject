@@ -630,8 +630,9 @@ public sealed class LobbyPodLaunchEditor : Editor
     private static Vector3 Grounded(LobbyPodLaunch launch, Vector3 point, int mask) =>
         TryGround(launch, point, mask, out RaycastHit hit) ? hit.point : point;
 
+    // 움직이는 발사대 아래 콜라이더는 보행 바닥으로 치지 않는다(지금 프리팹엔 없다 — 바닥은 로비 레이아웃 PodLaunch_FloorCollider).
     private static bool IsPodCollider(LobbyPodLaunch launch, Collider collider) =>
-        launch.EditorPod != null && collider.transform.IsChildOf(launch.EditorPod);
+        launch.EditorLauncher != null && collider.transform.IsChildOf(launch.EditorLauncher);
 
     private static string HierarchyPath(Transform t)
     {
