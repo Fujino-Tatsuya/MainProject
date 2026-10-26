@@ -65,8 +65,12 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
 
-    // 방어 대기·반격 중 이동·회전 불가(결정 3). 평타·다른 스킬·대시는 Skill 상태 규칙으로 이미 막힌다(CanBeCanceledByDash 기본 false).
+    // 방어 대기·반격 중 이동·회전 불가(결정 3). 평타·다른 스킬은 Skill 상태 규칙으로 이미 막힌다.
     public override bool CanMoveWhileActive => false;
+
+    // 대시는 어느 단계든 E 를 끊는다(할 일 95) — 오너 FSM 의 대시 우선 경로(PlayerStateController.Tick)가 묻는다.
+    // 끊기면 서버도 대시 승인 때 상태가 바뀌어 OnEnd(DashCancelled)이고 쿨타임은 그대로다. 반격 판정 전이면 보장 반격(CounterDueOnCancel).
+    public override bool CanBeCanceledByDash(PlayerActionState phase) => FirstMeleeGuardRules.AllowsDashCancel(phase);
 
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => GuardEvents;
 
@@ -277,7 +281,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         // 🔴 동기로 실행하지 않는다 — OnEnd 는 TwentyThreeBoss.TryCarryDashTarget 루프 안(돌진 스침 → 캐리 구속 →
         // HandleSkillStateExit)에서 불릴 수 있어, 여기서 보스 ReceiveAttack 을 부르면 보스 재진입이 된다
         // (보스가 죽은 뒤에도 _dashCarried·StartDashMove 가 이어질 수 있다).
-        if (IsServerPeer && reason != SkillEndReason.CasterDied && model.HasPendingCounter)
+        // 대시 취소(할 일 95)도 여기로 온다 — 반격 판정 전 대시면 반격 피해는 다음 프레임에 지금 위치(대시 첫 프레임)에서 1회 나간다.
+        if (IsServerPeer && model.CounterDueOnCancel(reason))
         {
             model.MarkCounterFired();
             pendingDeferredCounter = true;

@@ -648,6 +648,56 @@ public sealed class FirstMeleeGuardCounterModelTests
         Assert.That(model.TickHold(true, 0f, HoldMax), Is.EqualTo(GuardHoldRelease.None));
     }
 
+    // ── 대시 취소(할 일 95) ──
+
+    [Test]
+    public void DashCancel_AllowedInSkillState_Only()
+    {
+        // 준비·방어중·해제·반격은 모두 Skill 상태다 — 단계와 무관하게 끊는다.
+        Assert.That(FirstMeleeGuardRules.AllowsDashCancel(PlayerActionState.Skill), Is.True);
+        Assert.That(FirstMeleeGuardRules.AllowsDashCancel(PlayerActionState.Focus), Is.False);
+        Assert.That(FirstMeleeGuardRules.AllowsDashCancel(PlayerActionState.Idle), Is.False);
+    }
+
+    [Test]
+    public void DashCancel_DuringPrepareGuardOrRelease_NoCounter()
+    {
+        Assert.That(BegunClosed().CounterDueOnCancel(SkillEndReason.DashCancelled), Is.False); // 준비(Custom0 전)
+        Assert.That(Begun().CounterDueOnCancel(SkillEndReason.DashCancelled), Is.False);       // 방어중
+
+        var releasing = Begun();
+        releasing.OnGuardWindowClosed();
+        Assert.That(releasing.CounterDueOnCancel(SkillEndReason.DashCancelled), Is.False);     // 해제
+    }
+
+    [Test]
+    public void DashCancel_DuringCounter_BeforeHit_CounterStillDue()
+    {
+        // 방어 성공 뒤 반격 판정(Hit) 전 대시 — 반격 피해는 보장 반격으로 1회 나간다(결정 2 그대로).
+        var model = Countering();
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.DashCancelled), Is.True);
+        model.MarkCounterFired();
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.DashCancelled), Is.False); // 보장 반격은 한 번
+    }
+
+    [Test]
+    public void DashCancel_DuringCounter_AfterHit_NoSecondCounter()
+    {
+        var model = Countering();
+        Assert.That(model.OnCounterHit(), Is.True);
+        model.MarkCounterFired();
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.DashCancelled), Is.False);
+    }
+
+    [Test]
+    public void Cancel_CasterDied_NoCounter_OtherReasonsSameAsDash()
+    {
+        var model = Countering();
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.CasterDied), Is.False);
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.Cancelled), Is.True);
+        Assert.That(model.CounterDueOnCancel(SkillEndReason.MaxDurationReached), Is.True);
+    }
+
     // ── 종료 후 ──
 
     [Test]

@@ -145,6 +145,12 @@ public sealed class FirstMeleeGuardCounterModel
     public bool HasPendingCounter => _blocked && !CounterFired;
 
     /// <summary>
+    /// E 가 이 이유로 끊길 때(OnEnd) 보장 반격을 내야 하는가(결정 2). 방어 성공 뒤 반격 판정(Hit) 전이고 시전자 사망이 아니면 예 —
+    /// 대시 취소(할 일 95)·구속·넉백 모두 같다. 준비·방어중·해제 중 취소, 반격 판정이 이미 난 뒤 취소는 아니오.
+    /// </summary>
+    public bool CounterDueOnCancel(SkillEndReason reason) => HasPendingCounter && reason != SkillEndReason.CasterDied;
+
+    /// <summary>
     /// 방어 대기를 시작한다 — 방어 창은 닫힌 채다(Custom0 이 열어 준다). 이전 상태는 모두 지운다.
     /// </summary>
     /// <param name="guardForward">고정 방어 방향(Cast 시점 조준).</param>

@@ -80,6 +80,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
 
     private Unit _unit;
     private Animator _animator;
+    private PlayerStateController _stateController;
     private Barrier _shown;
     private bool _subscribed;
 
@@ -336,8 +337,19 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     }
 
     // 상태 전환이라 Reliable 이다 — 유실되면 그 피어 화면이 방어 자세에 남는다(오너면 동기로 서버까지 되돌린다).
+    // 이 피어가 이미 E 를 떠났으면(오너가 대시로 먼저 끊음, 할 일 95) 늦게 온 자세를 틀지 않는다 — 대시·이동 중에 반격·해제 자세가
+    // 다시 켜지면 오너 권한 NetworkAnimator 가 그대로 전 피어로 퍼뜨린다. 관찰자도 PlaySkillClientRpc~EndSkillClientRpc 동안 스킬 상태다.
     [Rpc(SendTo.NotServer, Delivery = RpcDelivery.Reliable)]
-    private void GuardCounterPoseRpc(int stateHash, float fadeSeconds) => PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
+    private void GuardCounterPoseRpc(int stateHash, float fadeSeconds)
+    {
+        if (_stateController == null)
+            _stateController = GetComponent<PlayerStateController>();
+
+        if (_stateController != null && !_stateController.IsInSkillState)
+            return;
+
+        PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
+    }
 
     private void PlayGuardCounterPoseLocal(int stateHash, float fadeSeconds)
     {
