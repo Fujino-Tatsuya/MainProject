@@ -84,6 +84,8 @@ public sealed class QABoss103CharStats
     public int HitsUnrolled = -1;
     /// <summary>C7b — QA 자동 부활 성공(<c>QABoss103AutoRevive</c>, 공용 목숨 1 차감).</summary>
     public int QaRevives;
+    /// <summary>C7d — QA 끼임 재배치 성공(<c>QABoss103Relocator</c>, 20초 이상 진척 없음 → 보스 둘레 링 지점).</summary>
+    public int QaRelocates;
 
     internal bool Transformed;
     internal double TransformSince;
@@ -305,6 +307,23 @@ public sealed class QABoss103RunStats
         c.QaRevives++;
         if (!invuln)
             QaReviveNoInvuln = true;
+    }
+
+    /// <summary>C7d — QA 끼임 재배치 성공 1회.</summary>
+    public void QaRelocate(int slot)
+    {
+        QABoss103CharStats c = C(slot);
+        if (c != null)
+            c.QaRelocates++;
+    }
+
+    /// <summary>C7d — 정체 감시용 받은 피해 누계(체력 손실 + 피격 건수 — 실드로 막힌 피격도 '오간 피해'로 본다).</summary>
+    public long TakenActivity()
+    {
+        long n = Hits.Count;
+        foreach (QABoss103CharStats c in Chars)
+            n += c.DamageTaken;
+        return n;
     }
 
     public int QaRevivesTotal()
@@ -637,7 +656,7 @@ public static class QABoss103Metrics
             "assassin_transform_count", "transform_sec_total", "transform_uptime", "dmg_normal", "dmg_transformed", "dps_normal", "dps_transformed",
             "paladin_guard_success", "paladin_guard_counter", "paladin_guard_ignore", "counter_tries", "counter_success", "dmg_during_suppress",
             "evade_dodge", "evade_take", "evade_no_charge", "evade_blocked", "evade_expired", "hits_taken", "hits_unrolled",
-            "qa_revives",
+            "qa_revives", "qa_relocates",
         });
         return h.ToArray();
     }
@@ -762,6 +781,7 @@ public static class QABoss103CsvRows
             r.Add(I(c.HitsTaken));
             r.Add(c.HitsUnrolled >= 0 ? I(c.HitsUnrolled) : "");
             r.Add(I(c.QaRevives));
+            r.Add(I(c.QaRelocates));
             rows.Add(r.ToArray());
         }
         return rows;
@@ -842,6 +862,8 @@ public static class QABoss103Csv
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
         bool isNew = !File.Exists(path) || new FileInfo(path).Length == 0;
+        if (!isNew)
+            ExtendHeader(path, header);
         var sb = new StringBuilder();
         if (isNew)
             sb.Append(Line(header)).Append("\r\n");
@@ -859,6 +881,25 @@ public static class QABoss103Csv
             fs.Flush(true);
         }
         return rows.Count;
+    }
+
+    /// <summary>
+    /// 배치 중간에 열이 뒤에 붙었으면(C7d qa_relocates 등) 파일 머리만 새 머리로 바꾼다 — 옛 행은 짧은 채 두고(읽기는 빈칸), 새 행이 열 이름과 맞게.
+    /// 옛 머리가 새 머리의 앞부분일 때만 바꾼다(열 순서가 다르면 건드리지 않는다).
+    /// </summary>
+    public static bool ExtendHeader(string path, IReadOnlyList<string> header)
+    {
+        string text = File.ReadAllText(path, Encoding.UTF8);
+        if (text.Length > 0 && text[0] == '﻿')
+            text = text.Substring(1);
+        int eol = text.IndexOf('\n');
+        string first = (eol >= 0 ? text.Substring(0, eol) : text).TrimEnd('\r');
+        string want = Line(header);
+        if (first == want || !want.StartsWith(first + ",", StringComparison.Ordinal))
+            return false;
+        string rest = eol >= 0 ? text.Substring(eol + 1) : "";
+        File.WriteAllText(path, want + "\r\n" + rest, new UTF8Encoding(true));
+        return true;
     }
 }
 

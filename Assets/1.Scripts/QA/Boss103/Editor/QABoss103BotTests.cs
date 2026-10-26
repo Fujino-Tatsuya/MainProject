@@ -258,5 +258,66 @@ public sealed class QABoss103BotTests
         Assert.AreEqual(1f, rx);
         Assert.AreEqual(0f, rz, 1e-6f);
     }
+
+    // ── C7d 끼임 단계 ────────────────────────────────────────
+
+    [Test]
+    public void 진척_없이_6초면_대시_3초마다_20초면_재배치()
+    {
+        var e = new QABoss103StuckEscalation();
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(0.0, 10.0, true));
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(5.9, 9.8, true), "0.5m 못 줄었으면 진척 아님");
+        Assert.AreEqual(QABoss103StuckStep.Dash, e.Tick(6.0, 9.8, true));
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(8.9, 10.2, true), "옆걸음으로 멀어져도 진척 아님 — 대시는 3초 간격");
+        Assert.AreEqual(QABoss103StuckStep.Dash, e.Tick(9.0, 10.0, true));
+        Assert.AreEqual(2, e.Dashes, "6·9초 대시 2회");
+        Assert.AreEqual(QABoss103StuckStep.Dash, e.Tick(18.0, 10.0, true));
+        Assert.AreEqual(QABoss103StuckStep.Relocate, e.Tick(20.0, 10.0, true), "20초 — 재배치가 대시보다 먼저");
+        Assert.AreEqual(20.0, e.StuckSeconds(20.0), 1e-9);
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(20.5, 10.0, true));
+        Assert.AreEqual(QABoss103StuckStep.Relocate, e.Tick(35.0, 10.0, true), "재배치 실패면 15초 뒤 다시");
+        Assert.AreEqual(2, e.Relocates);
+    }
+
+    [Test]
+    public void 다가가거나_멈추면_단계_초기화()
+    {
+        var e = new QABoss103StuckEscalation();
+        e.Tick(0.0, 10.0, true);
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(5.0, 9.4, true), "0.5m 넘게 다가감 — 다시 센다");
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(10.9, 9.4, true));
+        Assert.AreEqual(QABoss103StuckStep.Dash, e.Tick(11.0, 9.4, true));
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(12.0, 9.4, false), "멈춤(공격·거리 안) = 끼임 아님");
+        Assert.AreEqual(0.0, e.StuckSeconds(12.0));
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(12.1, 9.4, true));
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(18.0, 9.4, true));
+        e.Reset();
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(19.0, 3.0, true), "목표가 바뀌면 처음부터");
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(24.9, 3.0, true));
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(30.0, double.NaN, true), "지표 없음 = 이동 아님");
+        Assert.AreEqual(0, e.Relocates);
+    }
+
+    [Test]
+    public void 물러나기는_음수_거리로_진척()
+    {
+        var e = new QABoss103StuckEscalation();
+        e.Tick(0.0, -4.0, true);
+        Assert.AreEqual(QABoss103StuckStep.None, e.Tick(5.0, -4.6, true), "멀어짐 = 진척");
+        Assert.AreEqual(QABoss103StuckStep.Dash, e.Tick(11.0, -4.6, true));
+    }
+
+    [Test]
+    public void 대시_탈출_방향_차례와_충전_남기기()
+    {
+        Assert.AreEqual(180f, QABoss103StuckEscalation.DashTurnDegrees(1));
+        Assert.AreEqual(90f, QABoss103StuckEscalation.DashTurnDegrees(2));
+        Assert.AreEqual(-90f, QABoss103StuckEscalation.DashTurnDegrees(3));
+        Assert.AreEqual(180f, QABoss103StuckEscalation.DashTurnDegrees(4));
+        Assert.IsTrue(QABoss103StuckEscalation.CanSpendDash(2, 2));
+        Assert.IsFalse(QABoss103StuckEscalation.CanSpendDash(1, 2), "최대 2개면 회피용 1개 남김");
+        Assert.IsTrue(QABoss103StuckEscalation.CanSpendDash(1, 1), "최대 1개면 그 1개를 쓴다");
+        Assert.IsFalse(QABoss103StuckEscalation.CanSpendDash(0, 1));
+    }
 }
 #endif

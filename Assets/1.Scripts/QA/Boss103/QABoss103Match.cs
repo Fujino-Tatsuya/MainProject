@@ -227,6 +227,7 @@ public static class QABoss103Match
             QABoss103Heartbeat.MarkCombat();
             recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터
             autoRevive = QABoss103AutoRevive.Begin(characters, recorder.Stats);   // C7b — 보스전엔 게임 부활 수단이 없다
+            QABoss103Relocator.Begin(characters, recorder.Stats);   // C7d — 20초 끼임 → 보스 둘레 링 지점
             string combatWall = DateTime.Now.ToString("HH:mm:ss.fff");
             Debug.Log($"{Tag} event=combat_start at={combatWall} introS={Time.realtimeSinceStartup - introAt:F1} skip={SkipVotes()} hostSkipPath={bot.SkipPath} hostSawLock={bot.SawCinematicLock}");
             ctx.Check(bot.SawCinematicLock, "103 연출 중 연출 잠금", $"호스트 플레이어 PlayerEncounterLock.IsCinematicLocked 관측={bot.SawCinematicLock}");
@@ -236,12 +237,23 @@ public static class QABoss103Match
             PartyWipeRespawner.PartyWipeRespawned += onWipe;
             string mapScene = SceneManager.GetActiveScene().name;
             BossEncounterDirector director = BossEncounterDirector.Instance;
+            var stall = new QABoss103StallWatch();
             while (true)
             {
                 double elapsed = Time.realtimeSinceStartupAsDouble - combatStart;
                 bool bossDead = director != null && director.IsBossDefeatedServer;
                 bool leftMap = SceneManager.GetActiveScene().name != mapScene || director == null;
                 QABoss103Outcome outcome = QABoss103Plan.Judge(bossDead, wiped || (leftMap && !bossDead), elapsed);
+                if (outcome == QABoss103Outcome.None && stall.Tick(elapsed, recorder.Stats.DamageDealtTotal(), recorder.Stats.TakenActivity()))
+                {
+                    // C7d — 피해가 한쪽도 오가지 않는 교착(끼임·보스 대상 없음). 통계 제외 → 끝에서 1회 재실행.
+                    rec.Outcome = QABoss103Outcome.Error;
+                    rec.CombatSeconds = elapsed;
+                    rec.Detail = $"{QABoss103Batch.ReasonStall} — Combat 중 {QABoss103StallWatch.StallSeconds:0}초 동안 보스에 준 피해·받은 피해 0";
+                    Debug.LogWarning($"{Tag} event=stall combatS={elapsed:F1} quietS={stall.QuietSeconds(elapsed):F1} dealt={recorder.Stats.DamageDealtTotal()} " +
+                                     $"taken={recorder.Stats.TakenActivity()} relocates={QABoss103Relocator.Relocates} {BossDiag()}");
+                    break;
+                }
                 if (outcome != QABoss103Outcome.None)
                 {
                     rec.Outcome = outcome;
@@ -254,6 +266,7 @@ public static class QABoss103Match
                 yield return null;
             }
             autoRevive.Stop();
+            QABoss103Relocator.Stop();
             bossHpPct = recorder.Stop();
             QABoss103Heartbeat.SetPhase("end");
 
@@ -295,6 +308,7 @@ public static class QABoss103Match
                 autoRevive.Stop();
                 UnityEngine.Object.Destroy(autoRevive.gameObject);
             }
+            QABoss103Relocator.Stop();
             if (recorder != null && double.IsNaN(bossHpPct))
                 bossHpPct = recorder.Stop();
             Finish(ctx, cfg, rec, recorder, bossHpPct);
@@ -397,6 +411,13 @@ public static class QABoss103Match
             NetworkLoadingFlowController flow = NetworkManager.Singleton != null ? NetworkManager.Singleton.GetComponent<NetworkLoadingFlowController>() : null;
             return flow != null && flow.IsFlowInProgress;
         }
+    }
+
+    /// <summary>C7d 정체 로그용 — 보스 상태·어그로 대상·체력.</summary>
+    private static string BossDiag()
+    {
+        TwentyThreeBoss boss = UnityEngine.Object.FindAnyObjectByType<TwentyThreeBoss>();
+        return boss == null ? "boss=none" : $"bossState={boss.State} aggroId={boss.AggroTargetId} bossHp={boss.CurrentHealth}";
     }
 
     private static bool BossDeadSeen()

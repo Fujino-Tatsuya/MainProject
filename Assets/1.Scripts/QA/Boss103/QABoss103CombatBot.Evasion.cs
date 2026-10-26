@@ -264,6 +264,52 @@ public sealed partial class QABoss103CombatBot
         _driver.SetSkillHeld(PlayerSkillSlot.Sub, false);
     }
 
+    /// <summary>
+    /// C7d 끼임 6초 단계 — 진행 방향 기준 뒤 → 왼쪽 → 오른쪽 차례(<see cref="QABoss103StuckEscalation.DashTurnDegrees"/>)로 대시해 빠져나온다.
+    /// 충전이 최대 2개 이상이면 회피용 1개는 남긴다(<see cref="QABoss103StuckEscalation.CanSpendDash"/>). 대시했으면 true.
+    /// </summary>
+    private bool TryStuckDash(Player me, Vector3 myPos, Vector3 moveDir, double realNow)
+    {
+        PlayerDashController dash = me.GetComponent<PlayerDashController>();
+        PlayerStateController sc = me.GetComponent<PlayerStateController>();
+        bool idleMove = me.CurrentState == PlayerActionState.Idle || me.CurrentState == PlayerActionState.Move;
+        bool allowed = idleMove || (sc != null && sc.CurrentActionAllowsDashCancel);
+        string skip = dash == null ? "no_dash"
+            : !QABoss103StuckEscalation.CanSpendDash(dash.PredictedCharge, dash.MaxCharge) ? "charge"
+            : !allowed ? "state_" + me.CurrentState
+            : null;
+        int n = _stuckDashes + _stuckDashSkips + 1;
+        Vector3 dir = Vector3.zero;
+        bool done = false;
+        if (skip == null)
+        {
+            Vector3 fwd = moveDir.sqrMagnitude > 1e-4f ? moveDir.normalized : me.transform.forward;
+            fwd.y = 0f;
+            dir = SafeEscape(myPos, Quaternion.AngleAxis(-QABoss103StuckEscalation.DashTurnDegrees(n), Vector3.up) * fwd);
+            StopHold();
+            _driver.ReleaseBasic();
+            _driver.SetAim(myPos + dir * 3f);
+            PlayerMovement movement = me.GetComponent<PlayerMovement>();
+            if (movement != null)
+                movement.RotateToward(dir, 1000f);
+            done = dash.TryBeginPredictedDash(cancelsAction: !idleMove);
+            if (done)
+                _dashLockUntil = realNow + DashLockSeconds;
+            else
+                skip = "rejected";
+        }
+        if (done)
+            _stuckDashes++;
+        else
+            _stuckDashSkips++;
+        Debug.Log($"{Tag} event=bot_stuck_dash character={_character} n={n} ok={(done ? "true" : "false")}" + (skip != null ? $" reason={skip}" : "") +
+                  $" dir={F2(dir.x)}/{F2(dir.z)} charges={(dash != null ? dash.PredictedCharge : 0)}/{(dash != null ? dash.MaxCharge : 0)} " +
+                  $"stuckS={F2(_escalation.StuckSeconds(Time.timeAsDouble))} pos={Fmt(myPos)}");
+        return done;
+    }
+
+    private string StuckDiag() => $"stuckDashes={_stuckDashes} stuckDashSkips={_stuckDashSkips} relocateRequests={_escalation.Relocates}";
+
     /// <summary>회피 방향의 앞 바닥이 없으면(낭떠러지·틈) 돌려 본다. 다 막히면 원래 방향.</summary>
     private static Vector3 SafeEscape(Vector3 foot, Vector3 dir)
     {

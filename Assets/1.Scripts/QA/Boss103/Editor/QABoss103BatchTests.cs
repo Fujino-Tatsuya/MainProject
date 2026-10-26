@@ -204,5 +204,89 @@ public sealed class QABoss103BatchTests
         foreach (string s in new[] { null, "", " ", "idle", "stopped", "done" })
             Assert.IsFalse(QABoss103Batch.IsActiveState(s), s ?? "null");
     }
+
+    // ── C7d ──────────────────────────────────────────────────
+
+    [Test]
+    public void 접속_거절_로그_판별()
+    {
+        Assert.IsTrue(QABoss103Batch.IsNetConfigMismatchLog("[Netcode] NetworkConfig mismatch. The configuration between the server and client does not match"));
+        Assert.IsTrue(QABoss103Batch.IsNetConfigMismatchLog("[Netcode] Incomplete connection request message given config - possible NetworkConfig mismatch."));
+        Assert.IsFalse(QABoss103Batch.IsNetConfigMismatchLog("[Netcode] Client connected"));
+        Assert.IsFalse(QABoss103Batch.IsNetConfigMismatchLog(null));
+    }
+
+    [Test]
+    public void 정체_90초_동안_피해_0_이면_정체()
+    {
+        var w = new QABoss103StallWatch();
+        Assert.IsFalse(w.Tick(0.0, 0, 0));
+        Assert.IsFalse(w.Tick(89.9, 0, 0));
+        Assert.IsTrue(w.Tick(90.0, 0, 0));
+    }
+
+    [Test]
+    public void 정체_어느_쪽이든_피해가_오가면_다시_센다()
+    {
+        var w = new QABoss103StallWatch();
+        w.Tick(0.0, 0, 0);
+        Assert.IsFalse(w.Tick(80.0, 100, 0), "보스에 준 피해");
+        Assert.IsFalse(w.Tick(169.9, 100, 0));
+        Assert.IsFalse(w.Tick(150.0, 100, 1), "받은 피해");
+        Assert.AreEqual(0.0, w.QuietSeconds(150.0));
+        Assert.IsFalse(w.Tick(239.9, 100, 1));
+        Assert.IsTrue(w.Tick(240.0, 100, 1));
+    }
+
+    [Test]
+    public void 정체_오류_사유는_stall_재실행_대상()
+    {
+        string detail = $"{QABoss103Batch.ReasonStall} — Combat 중 90초 동안 보스에 준 피해·받은 피해 0";
+        List<QABoss103Attempt> a = QABoss103Batch.ReadAttempts(QABoss103CsvTable.Parse(RunsCsv((1, 0, "Error", "table", detail))));
+        Assert.IsTrue(a[0].IsError);
+        Assert.AreEqual("stall", QABoss103Batch.ReasonOf(a[0]));
+        Assert.AreEqual(new List<int> { 1 }, QABoss103Batch.RetryList(a, 1));
+    }
+
+    [Test]
+    public void 재배치_qa_relocates_열()
+    {
+        var s = new QABoss103RunStats();
+        s.Begin(0.0);
+        s.QaRelocate(0);
+        s.QaRelocate(0);
+        s.QaRelocate(9);   // 자리 밖은 무시
+        s.End(60.0);
+        var meta = new QABoss103RunMeta { Outcome = QABoss103Outcome.Wipe, CombatSeconds = 60.0 };
+        int col = Array.IndexOf(QABoss103Metrics.CharsHeader, "qa_relocates");
+        Assert.AreEqual(QABoss103Metrics.CharsHeader.Length - 1, col, "끝 열(배치 중간 머리 확장)");
+        List<string[]> rows = QABoss103CsvRows.Chars(meta, s);
+        Assert.AreEqual("2", rows[0][col]);
+        Assert.AreEqual("0", rows[1][col]);
+    }
+
+    [Test]
+    public void 배치_중간에_붙은_열은_머리만_바꾸고_옛_행은_그대로()
+    {
+        string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"qa103_hdr_{Guid.NewGuid():N}.csv");
+        try
+        {
+            string[] oldHeader = { "run", "a" };
+            string[] newHeader = { "run", "a", "b" };
+            QABoss103Csv.Append(path, oldHeader, new List<string[]> { new[] { "1", "x" } });
+            QABoss103Csv.Append(path, newHeader, new List<string[]> { new[] { "2", "y", "z" } });
+            QABoss103CsvTable t = QABoss103CsvTable.Parse(System.IO.File.ReadAllText(path));
+            CollectionAssert.AreEqual(newHeader, t.Header);
+            Assert.AreEqual(2, t.Rows.Count);
+            Assert.AreEqual("", t.Get(t.Rows[0], "b"));
+            Assert.AreEqual("z", t.Get(t.Rows[1], "b"));
+            Assert.IsFalse(QABoss103Csv.ExtendHeader(path, new[] { "a", "run", "b" }), "순서가 다르면 건드리지 않는다");
+        }
+        finally
+        {
+            if (System.IO.File.Exists(path))
+                System.IO.File.Delete(path);
+        }
+    }
 }
 #endif

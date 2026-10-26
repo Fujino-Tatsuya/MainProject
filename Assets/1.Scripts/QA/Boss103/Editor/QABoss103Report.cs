@@ -379,6 +379,8 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "Unity", H(Val(batch, "unity_version", "na")));
         Row2(sb, "기준 시드", H(Val(batch, "seed", "na")) + " · 판 시드 = 기준 시드 × 판 번호(재실행도 같은 시드)");
         Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
+        Row2(sb, "측정 규칙", "QA 끼임 복구 — 이동하려는데 목표에 못 다가간 채 2초 옆걸음 → 6초 뒤·옆 대시 → 20초 보스 둘레 링 지점으로 재배치(run_chars qa_relocates) · " +
+                             "Combat 중 90초 동안 보스에 준 피해·받은 피해가 모두 0 이면 정체(stall) 오류 판");
         Row2(sb, "시작 / 최근", $"{H(Val(batch, "started_at", Dash))} / {H(last.Length > 0 ? last : Dash)}");
         Row2(sb, "루프 상태", H(input.LoopState.Length > 0 ? input.LoopState : Dash));
         sb.Append("</tbody></table>\n");

@@ -15,7 +15,8 @@ using UnityEngine;
 /// <item>상태는 progress.txt 라 Play 진입·정지 도메인 리로드를 넘는다. 에디터를 다시 켜면 자동으로 이어 가지 않는다 — <c>Resume Last</c>.</item>
 /// <item>다음 판 = runs.csv 로 정한다(<see cref="QABoss103Batch.TryNext"/>) — 끝난 판은 건너뛰고, 90판 뒤 오류 판만 1회 재실행.</item>
 /// <item>판 오류(<see cref="QABoss103Batch.Judge"/> — 심장박동 120초·Combat 전 8분·Combat 30+3분, Play 시작 실패·판 기록 전 정지)는 runs.csv 에 Error 행을 쓰고
-///   정리 → 가상 플레이어 비활성·재활성 → 10초(연속 3판마다 60초) 뒤 다음 판.</item>
+///   정리 → 10초(연속 3판마다 60초) 뒤 다음 판. C7d: 판 Play 중 클라 접속 거절(<c>NetworkConfig mismatch</c>) 로그를 보면 바로 Error(net_config_mismatch).</item>
+/// <item>C7d — 정상 판 뒤에도 판마다 가상 플레이어 비활성 → 재활성 → Launched 확인 뒤 다음 판(접속 거절 예방).</item>
 /// <item>데이터 출처: 판마다 시작 전에 툴바 출처를 테이블로 맞추고, 판 안에서 호스트가 런타임 적용 경로로 확인한다(<c>QABoss103Heartbeat.RuntimeDataSource</c>).</item>
 /// </list>
 /// 순수 규칙은 <see cref="QABoss103Batch"/>, 리포트는 <see cref="QABoss103Report"/>.
@@ -49,12 +50,23 @@ public static class QABoss103BatchRunner
             return;
         EditorApplication.update -= Tick;
         EditorApplication.update += Tick;
+        Application.logMessageReceived -= OnLog;
+        Application.logMessageReceived += OnLog;
         if (Running && SessionState.GetString(LiveSessionKey, "") != "1")
         {
             // 에디터 재시작(SessionState 비어 있음) — 사람 없이 저절로 Play 를 시작하지 않는다.
             EditorPrefs.SetBool(RunningKey, false);
             Debug.LogWarning($"{Tag} 에디터를 다시 켜서 연속 루프를 멈춰 두었다 — 이어 하려면 {Root}Resume Last ({Dir}).");
         }
+    }
+
+    /// <summary>C7d — 이번 판 Play 중 본 접속 거절 로그(호스트 = 메인 에디터가 NGO 경고를 낸다). null = 없음. 판 시작마다 지운다.</summary>
+    private static string _netMismatch;
+
+    private static void OnLog(string condition, string stackTrace, LogType type)
+    {
+        if (_netMismatch == null && Running && EditorApplication.isPlaying && QABoss103Batch.IsNetConfigMismatchLog(condition))
+            _netMismatch = condition.Length > 160 ? condition.Substring(0, 160) : condition;
     }
 
     /// <summary>MPPM 가상 플레이어 에디터(클론) — 루프는 메인 에디터만 돈다.</summary>
@@ -330,7 +342,7 @@ public static class QABoss103BatchRunner
         }
         if (Get("recycle") == "1")
         {
-            Log("오류 뒤 가상 플레이어 비활성 → 재활성.");
+            Log("판 사이 가상 플레이어 비활성 → 재활성(C7d — 판마다, 접속 거절 예방).");
             QAScenarioPlay.DeactivateVirtualPlayers();
             Set("recycle", "0");
             Set("vp", "off");
@@ -401,6 +413,7 @@ public static class QABoss103BatchRunner
         Set("playAt", "0");
         Set("endAt", "0");
         Set("state", "starting");
+        _netMismatch = null;
         Log($"판 {run}{(retry > 0 ? " 재실행" : "")} 시작 — 단계 {QABoss103Batch.TierLabel(cfg.BotTier)} · 판 시드 {cfg.RunSeed} · 설정 {written}곳");
         if (!QAScenario48Menu.Run(QALobbyScenarios.Boss103Id, 3))
             Log("Play 시작 요청이 거절됐다(이미 Play 중) — 시작 상한까지 기다린다.");
@@ -438,6 +451,13 @@ public static class QABoss103BatchRunner
         {
             SetTime("endAt", Now);
             Set("state", "ending");
+            return;
+        }
+        if (_netMismatch != null)
+        {
+            // C7d — 클라 접속 거절. 집결 상한(로비 92초)까지 기다리지 않고 바로 끝낸다(다음 판 전 가상 플레이어 재시작).
+            Fail(QABoss103Batch.ReasonNetConfigMismatch, $"클라 접속 거절 로그 — {_netMismatch}", HostSource(run, retry), true);
+            _netMismatch = null;
             return;
         }
         QABoss103Watch w = Watch(run, retry, out string phase, out string detail);
@@ -493,8 +513,8 @@ public static class QABoss103BatchRunner
         bool error = a == null || a.IsError;
         int streak = error ? GetInt("errStreak") + 1 : 0;
         Set("errStreak", streak.ToString(CultureInfo.InvariantCulture));
-        if (error)
-            Set("recycle", "1");
+        // C7d — 정상 판 뒤에도 가상 플레이어를 재시작한다(판 2 NetworkConfig mismatch 예방).
+        Set("recycle", "1");
         int cooldown = QABoss103Batch.CooldownSeconds(error, streak);
         if (error && QABoss103Batch.IsStreakPause(streak))
         {
