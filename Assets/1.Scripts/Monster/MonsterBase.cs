@@ -225,6 +225,7 @@ public class MonsterBase : Unit
 
         // 스폰 시점의 상태를 즉시 애니메이션에 반영(뒤늦게 접속한 클라 포함).
         PlayStateAnimation(_state.Value);
+        RefreshVulnerableTint();   // 취약 중에 합류한 클라도 색을 받는다
 
         // 머리 위 체력바 런타임 부착(모든 피어, 표시 전용 — FSM 과 무관). Docs/tech/handoff-monster-healthbar.md
         MonsterOverheadHealthBarRule.TryInstall(this);
@@ -599,6 +600,8 @@ public class MonsterBase : Unit
             //    빈손 탐색(FindNearestTarget)이 매 틱 돈다.
             _lastRetargetTime = Time.time;
         }
+
+        TrySwitchToInRangeTarget();
 
         if (_target == null)
         {
@@ -1055,6 +1058,36 @@ public class MonsterBase : Unit
     /// </summary>
     protected virtual bool RetargetAvoidsCurrentTarget => false;
 
+    float _nextInRangeSwitchCheck;
+
+    /// <summary>
+    /// 사거리 안 어그로 전환(팀장 10-26) — 대상이 사거리 밖이고 다른 플레이어가 사거리 안이면 그 사람(최근접)으로 바꾼다.
+    /// 전 몹 공통이고 주기 재선정(<see cref="ShouldReacquireTarget"/>)과는 별개다.
+    ///
+    /// 🔴 23호(<c>rank: Boss</c>)는 제외 — 위협표·점프/돌진 승계로 자기 어그로를 따로 돌린다.
+    ///    Idle/Chase 에서만 불린다(HandleSeekAndCombat) — 공격 중 대상이 바뀌어 조준이 흔들리지 않는다.
+    /// </summary>
+    void TrySwitchToInRangeTarget()
+    {
+        if (_target == null || data == null || Rank == MonsterRank.Boss) return;
+        if (Time.time < _nextInRangeSwitchCheck) return;
+        // 사거리 밖 추격 중 매 틱 OverlapSphere 를 돌리지 않게 빈손 탐색과 같은 간격(+지터)을 둔다.
+        _nextInRangeSwitchCheck = Time.time + AcquireRetryInterval + Random.Range(0f, AcquireRetryJitter);
+
+        float dist = Vector3.Distance(transform.position, _target.position);
+        if (!MonsterEngagePolicy.ShouldLookForInRangeTarget(dist, data.attackRange, AttackRangeExitMargin)) return;
+
+        Transform candidate = FindNearestTarget(exclude: _target, radius: data.attackRange);
+        // 콜라이더가 반경에 걸려도 몸 중심은 사거리 밖일 수 있다 — 사거리 판정과 같은 기준(중심 거리)으로 한 번 더 본다.
+        if (candidate == null || Vector3.Distance(transform.position, candidate.position) > data.attackRange) return;
+
+        Edit.Log($"[Monster] {name} 사거리 안 전환 — {_target.name}({dist:0.0}m) → {candidate.name}", this);
+        _target = candidate;
+        _loseOutsideSince = -1f;
+        _heightLostSince = -1f;
+        if (_lastRetargetTime >= 0f) _lastRetargetTime = Time.time;   // 주기 재선정이 곧바로 되돌리지 않게 시계를 다시 센다
+    }
+
     protected virtual void StartAttack()
     {
         // 쿨은 "지금 쓰는 슬롯"에 기록한다. 파생이 CurrentAttackSlot 을 안 건드리면 항상 0 —
@@ -1414,6 +1447,8 @@ public class MonsterBase : Unit
             return;
         }
 
+        if (TryResumeVulnerableGroggy()) return;
+
         DecideNextAfterAction();
     }
 
@@ -1574,12 +1609,17 @@ public class MonsterBase : Unit
 
     // 넉백 진입/갱신. 슈퍼아머·사망·그로기·복귀 중에는 무시(기존 CC 무시 규칙 일관).
     // 이미 넉백 중이면 방향·속도·시간을 갱신한다(Q 홀드처럼 매 틱 재적용되는 지속 견인 대응).
+    // 🔴 중간보스는 반대로 **취약(그로기) 중에만** 밀린다(팀장 10-26) — 판정은 MonsterHitReactionPolicy.
     void TryEnterKnockback(Vector3 dir, AttackInfo attackInfo)
     {
         if (_isDead) return;
-        if (status != null && status.BlocksInterrupt) return; // 슈퍼아머
         MonsterState s = _state.Value;
-        if (s == MonsterState.Groggy || s == MonsterState.Return || s == MonsterState.Dead) return;
+        bool armor = status != null && status.BlocksInterrupt;
+        if (!MonsterHitReactionPolicy.CanEnterKnockback(s, armor, Rank, _vulnerableGroggyEndsAt >= 0f)) return;
+
+        // 취약 중 밀림 — 밀림·경직이 끝나면 남은 그로기로 돌아간다. 시간은 그동안에도 흐른다(취약 창 길이 고정).
+        if (s == MonsterState.Groggy)
+            _vulnerableGroggyEndsAt = Time.time + Mathf.Max(0f, _stateTimer);
 
         // 고정 포탑(RangedTurret)은 자리를 지킨다 — 밀림 무효, 경직(Stunned)만 적용(팀장 확정).
         // 매 히트 갱신 = 지속 타격 중 스턴락 허용(일반 피격경직 hitStun도 갱신형이라 일관).
@@ -1678,11 +1718,39 @@ public class MonsterBase : Unit
             _stateTimer = _staggerAfterKnockback;
             SetState(MonsterState.Hit); // HandleTimedResume이 만료 후 DecideNextAfterAction 호출
         }
-        else
+        else if (!TryResumeVulnerableGroggy())
         {
             DecideNextAfterAction();
         }
     }
+
+    // 취약 중 밀림으로 시작한 밀림·경직의 그로기 종료 시각. -1 = 그런 연쇄가 없다.
+    // 🔴 지우는 곳은 SetState 한 곳이다 — 밀림·경직(Knockback/Hit) 밖으로 나가는 순간 연쇄가 끝난 것이다.
+    float _vulnerableGroggyEndsAt = -1f;
+
+    /// <summary>
+    /// 취약 중 밀림·경직이 끝났을 때 <b>남은 그로기로 돌아간다</b>(팀장 10-26 — 밀림이 끝났다고 취약이 풀리지 않는다).
+    /// 다 썼으면 false — 호출부가 평소대로 재평가한다.
+    /// </summary>
+    bool TryResumeVulnerableGroggy()
+    {
+        if (_vulnerableGroggyEndsAt < 0f) return false;
+
+        float remaining = _vulnerableGroggyEndsAt - Time.time;
+        _vulnerableGroggyEndsAt = -1f;
+        if (remaining <= 0f) return false;
+
+        ForceGroggy(remaining);
+        OnVulnerableGroggyResumed();
+        Edit.Log($"[Monster] {name} 취약 밀림 끝 — 남은 그로기 {remaining:0.##}s 로 복귀", this);
+        return true;
+    }
+
+    /// <summary>
+    /// 취약 밀림 뒤 그로기로 <b>돌아온</b> 직후(서버). 그로기 자세를 직접 거는 파생이 다시 건다 —
+    /// 그로기를 벗어나는 순간 자세 정지가 풀리기 때문이다(<see cref="OnStateChanged"/>).
+    /// </summary>
+    protected virtual void OnVulnerableGroggyResumed() { }
     #endregion
 
     #region 피격 / 사망 (서버 경로)
@@ -1723,9 +1791,10 @@ public class MonsterBase : Unit
         // 🔴 공격 커밋(2026-09-02): 공격 중 들어온 **평타**는 경직시키지 않는다. 평타 한 대마다
         //    EnterHit 이 걸려 일반 몬스터가 공격을 끝내지 못하던 문제. 판정은 전부
         //    MonsterHitReactionPolicy 에 있다(EditMode 로 전 조합 고정) — 조건을 여기서 늘리지 말 것.
+        // 🔴 중간보스는 자동 경직이 없다(팀장 10-26) — 등급까지 넘겨 정책이 가른다.
         bool superArmor = status != null && status.BlocksInterrupt;
         if (MonsterHitReactionPolicy.ShouldEnterAutomaticHit(
-                _state.Value, attackInfo.attackType, superArmor))
+                _state.Value, attackInfo.attackType, superArmor, Rank))
             EnterHit();
     }
 
@@ -1973,12 +2042,14 @@ public class MonsterBase : Unit
     /// 후보에서 제외할 대상(보통 지금 물고 있는 타깃). null 이면 제외 없음.
     /// 주기 어그로 재선정에서 "같은 사람을 다시 고르는 것"을 막는 데 쓴다.
     /// </param>
-    Transform FindNearestTarget(Transform exclude = null)
+    /// <param name="radius">탐색 반경. 0 이하면 <c>detectionRadius</c>(사거리 안 전환은 <c>attackRange</c> 를 넘긴다).</param>
+    Transform FindNearestTarget(Transform exclude = null, float radius = 0f)
     {
         if (_detectBuffer == null) return null;
 
         int count = Physics.OverlapSphereNonAlloc(
-            transform.position, data.detectionRadius, _detectBuffer, playerMask, QueryTriggerInteraction.Collide);
+            transform.position, radius > 0f ? radius : data.detectionRadius, _detectBuffer, playerMask,
+            QueryTriggerInteraction.Collide);
 
         Transform nearest = null;
         float best = float.MaxValue;
@@ -2182,6 +2253,10 @@ public class MonsterBase : Unit
             && _attackingSlot >= 0 && _attackingSlot < _lastUsedByAttack.Length)
             _lastUsedByAttack[_attackingSlot] = Time.time;
 
+        // 취약 밀림 연쇄는 밀림·경직 안에서만 산다(TryResumeVulnerableGroggy).
+        if (next != MonsterState.Knockback && next != MonsterState.Hit)
+            _vulnerableGroggyEndsAt = -1f;
+
         _state.Value = next; // 같은 값이면 NGO가 콜백을 발생시키지 않음.
     }
 
@@ -2235,6 +2310,7 @@ public class MonsterBase : Unit
             _attackTelegraph.Hide();
 
         PlayStateAnimation(next);
+        RefreshVulnerableTint();
 
         OnMonsterStateChanged(previous, next);
     }
@@ -2316,7 +2392,44 @@ public class MonsterBase : Unit
         }
     }
 
-    void OnCounterVisualChanged(bool previous, bool next) => ApplyCounterWindowVisual(next);
+    void OnCounterVisualChanged(bool previous, bool next)
+    {
+        ApplyCounterWindowVisual(next);
+        // 창이 닫히며 지운 베이스 틴트를 취약 색으로 다시 칠한다 — 간파 성공은 창 닫힘·그로기가 같은 틱에 오고
+        // 두 복제 콜백의 순서는 정해져 있지 않다.
+        RefreshVulnerableTint();
+    }
+
+    // 중간보스 취약 색 — 23호 BossDataSO.vulnerableTint 기본값과 같은 색(팀장 10-26: 보스처럼 취약이 보여야 한다).
+    static readonly Color MidBossVulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);
+    bool _vulnerableTintApplied;
+
+    /// <summary>
+    /// [전 피어] 중간보스가 취약이면 몸을 취약 색으로 칠한다. 복제된 상태만 보고 정한다.
+    ///
+    /// 🔴 중간보스의 그로기는 간파 성공뿐이고(누적 그로기 끔), 밀림·경직은 취약 중 팔라딘 Q 에서만 온다
+    ///    (MonsterHitReactionPolicy) — 그래서 Groggy·Knockback·Hit 를 통째로 "취약"으로 본다. 밀리는 동안 색이 꺼졌다
+    ///    켜지지 않는다. 간파 창 색(BossCounterTelegraph)과 같은 베이스 틴트 칸을 쓰므로 창이 켜져 있으면 비킨다.
+    /// </summary>
+    void RefreshVulnerableTint()
+    {
+        HitFlash flash = GetComponent<HitFlash>();
+        if (flash == null) return;
+
+        MonsterState s = _state.Value;
+        bool on = Rank == MonsterRank.MidBoss && !_counterVisual.Value
+                  && (s == MonsterState.Groggy || s == MonsterState.Knockback || s == MonsterState.Hit);
+        if (on)
+        {
+            flash.SetBaseTint(MidBossVulnerableTint);
+            _vulnerableTintApplied = true;
+        }
+        else if (_vulnerableTintApplied)
+        {
+            _vulnerableTintApplied = false;
+            if (!_counterVisual.Value) flash.ClearBaseTint();
+        }
+    }
 
     /// <summary>
     /// 로코모션 첫 프레임 자세로 갈아탄 뒤 정지한다 — <b>그로기 클립이 없는 몹</b>의 그로기 표현.

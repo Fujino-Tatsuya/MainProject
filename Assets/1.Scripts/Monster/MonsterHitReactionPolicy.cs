@@ -35,4 +35,38 @@ public static class MonsterHitReactionPolicy
         //    attackType 이 1(Default)인지 확인할 것.
         return state != MonsterState.Attack || type != AttackType.Default;
     }
+
+    /// <summary>
+    /// 등급까지 본 자동 경직 판정. 🔴 <b>중간보스는 자동 경직이 없다</b>(팀장 10-26).
+    ///
+    /// 왜 — 10-14 P1(공격이 끝나면 슈퍼아머 해제) 뒤로 중간보스가 추격 중 피격마다 0.4초 경직(갱신형)을
+    /// 받았다. 분산 교전에서 멀리 있는 대상을 쫓는 동안 옆 사람이 때리면 경직이 끊기지 않아 제자리에 섰다
+    /// (Gauntlet 은 피격 클립이 없어 그냥 서 있는 것으로 보였다). 취약 중에도 평타·간파 스킬은 피해만이고,
+    /// 경직은 밀림과 함께 오는 것뿐이다 — 그 경로는 <see cref="CanEnterKnockback"/> 이 정한다.
+    /// </summary>
+    public static bool ShouldEnterAutomaticHit(MonsterState state, AttackType type, bool armor, MonsterRank rank)
+    {
+        if (rank == MonsterRank.MidBoss) return false;
+        return ShouldEnterAutomaticHit(state, type, armor);
+    }
+
+    /// <summary>
+    /// 밀림(넉백)에 들어가는가. 밀림 값이 있는 공격만 여기 온다 — 플레이어 쪽은 팔라딘 Q 하나뿐이다.
+    ///
+    /// 일반 몹: 슈퍼아머·그로기·복귀·사망이면 거절(기존 규칙 그대로).
+    /// 🔴 중간보스: <b>취약(그로기) 중에만</b> 밀린다(팀장 10-26). 그 밀림·경직이 이어지는 동안
+    ///    (<paramref name="inVulnerableChain"/> — 밀림 또는 그 뒤 경직)에 다시 맞아도 밀린다.
+    ///    평상시에는 완전 면역이다.
+    /// </summary>
+    /// <param name="inVulnerableChain">취약 중 밀림으로 시작한 밀림·경직이 아직 이어지는 중인가.</param>
+    public static bool CanEnterKnockback(MonsterState state, bool armor, MonsterRank rank, bool inVulnerableChain)
+    {
+        if (armor || state == MonsterState.Return || state == MonsterState.Dead) return false;
+
+        if (rank == MonsterRank.MidBoss)
+            return state == MonsterState.Groggy
+                || (inVulnerableChain && (state == MonsterState.Knockback || state == MonsterState.Hit));
+
+        return state != MonsterState.Groggy;
+    }
 }

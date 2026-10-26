@@ -20,6 +20,7 @@ public sealed class MonsterHitReactionPolicyTests
     [TestCase(MonsterState.Knockback, AttackType.Default, false, false)]
 
     // 🔴 중간보스가 이 변경의 영향을 받지 않는 근거를 코드로 고정한다.
+    //    (10-26 부터 중간보스는 등급 판정으로 자동 경직 자체가 없다 — 아래 MidBoss_NeverEntersAutomaticHit.)
     //    GauntletBot·SpinnerBot·WallBot 은 데이터(hasSuperArmorWhileAttacking: 1)로 공격 중 슈퍼아머가
     //    걸려 있어, 이 정책이 그들에겐 no-op 이다. 정책은 MonsterBase 공용 경로에 있으므로
     //    안전의 근거가 코드가 아니라 **데이터**라는 뜻이다 — 그 플래그를 끄면 공격 커밋도 딸려온다.
@@ -33,6 +34,47 @@ public sealed class MonsterHitReactionPolicyTests
         MonsterState state, AttackType attackType, bool armor, bool expected)
     {
         Assert.That(MonsterHitReactionPolicy.ShouldEnterAutomaticHit(state, attackType, armor),
+            Is.EqualTo(expected));
+    }
+
+    // 🔴 중간보스는 자동 경직이 없다(팀장 10-26) — 평상시·취약(그로기) 모두, 평타·스킬·간파 모두 피해만.
+    [TestCase(MonsterState.Chase,  AttackType.Default)]
+    [TestCase(MonsterState.Idle,   AttackType.Skill)]
+    [TestCase(MonsterState.Hit,    AttackType.SkillQ)]
+    [TestCase(MonsterState.Groggy, AttackType.Default)]
+    [TestCase(MonsterState.Groggy, AttackType.Skill)]
+    public void MidBoss_NeverEntersAutomaticHit(MonsterState state, AttackType attackType)
+    {
+        Assert.That(MonsterHitReactionPolicy.ShouldEnterAutomaticHit(state, attackType, false, MonsterRank.MidBoss),
+            Is.False);
+    }
+
+    // 일반 몹은 등급 인자를 넘겨도 기존 판정 그대로.
+    [TestCase(MonsterState.Chase,  AttackType.Default, true)]
+    [TestCase(MonsterState.Attack, AttackType.Default, false)]
+    public void Normal_RankOverload_MatchesLegacy(MonsterState state, AttackType attackType, bool expected)
+    {
+        Assert.That(MonsterHitReactionPolicy.ShouldEnterAutomaticHit(state, attackType, false, MonsterRank.Normal),
+            Is.EqualTo(expected));
+    }
+
+    // 인자 순서: 상태 / 슈퍼아머 / 등급 / 취약 밀림 연쇄 중 / 기대값(밀리는가)
+    [TestCase(MonsterState.Chase,     false, MonsterRank.MidBoss, false, false)] // 평상시 중간보스 = 완전 면역
+    [TestCase(MonsterState.Idle,      false, MonsterRank.MidBoss, false, false)]
+    [TestCase(MonsterState.Groggy,    false, MonsterRank.MidBoss, false, true)]  // 취약 중 팔라딘 Q = 밀림
+    [TestCase(MonsterState.Knockback, false, MonsterRank.MidBoss, true,  true)]  // 취약 밀림 중 다시 맞으면 갱신
+    [TestCase(MonsterState.Hit,       false, MonsterRank.MidBoss, true,  true)]  // 취약 밀림 뒤 경직 중
+    [TestCase(MonsterState.Hit,       false, MonsterRank.MidBoss, false, false)] // 취약 연쇄가 아닌 Hit(간파 성공 직후 등)
+    [TestCase(MonsterState.Groggy,    true,  MonsterRank.MidBoss, false, false)] // 슈퍼아머는 언제나 막는다
+    [TestCase(MonsterState.Dead,      false, MonsterRank.MidBoss, true,  false)]
+    [TestCase(MonsterState.Chase,     false, MonsterRank.Normal,  false, true)]  // 일반 몹 — 기존 규칙 그대로
+    [TestCase(MonsterState.Groggy,    false, MonsterRank.Normal,  false, false)]
+    [TestCase(MonsterState.Return,    false, MonsterRank.Normal,  false, false)]
+    [TestCase(MonsterState.Chase,     true,  MonsterRank.Normal,  false, false)]
+    public void KnockbackDecision_MatchesRankRule(
+        MonsterState state, bool armor, MonsterRank rank, bool inVulnerableChain, bool expected)
+    {
+        Assert.That(MonsterHitReactionPolicy.CanEnterKnockback(state, armor, rank, inVulnerableChain),
             Is.EqualTo(expected));
     }
 }

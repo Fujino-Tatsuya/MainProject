@@ -82,11 +82,11 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
              "크기는 매 발동마다 smashRadius로 덮어쓰므로 인스펙터의 scale 값은 무시된다")]
     EffectSocketPlayer smashTelegraph;
 
-    [Header("펀치 예고 (2026-09-28 팀장: 범위를 보여 준 뒤 공격)")]
+    [Header("펀치 전 대기 (2026-10-26 팀장: 바닥 예고는 간파 가능한 스매시만)")]
     [SerializeField, Min(0f)]
-    [Tooltip("펀치를 고른 뒤 판정 박스를 바닥에 채우는 시간(초). 다 차면 펀치 모션이 나간다. 0 = 예고 없음(예전).\n" +
-             "스매시는 기존 원형 예고(클립 이벤트)를 그대로 쓴다. 재질은 MonsterBase 의 공격 예고 칸.")]
-    float punchTelegraphDuration = 0.5f;
+    [Tooltip("펀치를 고른 뒤 휘두르기 전 대기(초). 0 = 대기 없음.\n" +
+             "바닥 예고는 그리지 않는다. 스매시는 기존 원형 예고(클립 이벤트)를 그대로 쓴다.")]
+    float punchTelegraphDuration = 0.125f;
 
     [SerializeField, Min(0f)]
     [Tooltip("좌/우 펀치의 판정·예고를 몸 기준 옆으로 미는 거리(m). 왼손 = 왼쪽, 오른손 = 오른쪽.\n" +
@@ -146,16 +146,16 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
 
         if (_currentAttack != GauntletAttackId.Smash)
         {
-            if (HasAttackTelegraph && punchTelegraphDuration > 0f && meleeAttack != null)
+            // 🔴 펀치는 바닥 예고를 그리지 않는다(팀장 10-26 — 예고는 간파 가능한 스매시만). 짧은 대기만 남긴다 —
+            //    대기까지 빼면 너무 빠르다. 안전망 타이머·슈퍼아머도 대기만큼 늘린다(안 늘리면 펀치 전에 Attack 이 끝난다).
+            //    대기·안전망·슈퍼아머 모두 공격속도로 나눈다(AttackTime) — 펀치 클립이 그 배율로 재생된다.
+            if (punchTelegraphDuration > 0f)
             {
-                // 예고 동안 모션을 보류한다. 안전망 타이머·슈퍼아머도 예고만큼 늘린다(안 늘리면 펀치 전에 Attack 이 끝난다).
-                // 예고·안전망·슈퍼아머 모두 공격속도로 나눈다(AttackTime) — 펀치 클립이 그 배율로 재생된다.
                 float telegraph = AttackTime(punchTelegraphDuration);
                 _punchTelegraphTimer = telegraph;
                 _stateTimer += telegraph;
                 if (data != null && data.hasSuperArmorWhileAttacking && status != null)
                     status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration) + telegraph);
-                ShowHitboxTelegraph(meleeAttack.ColliderInfo, telegraph, 0f, SideShift(_currentAttack));
                 return;
             }
 
@@ -206,16 +206,13 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
     // 창 시간을 흘린다. 만료 = **인터럽트 실패 확정** — 예고를 끄고 스매시가 그대로 진행된다.
     protected override void HandleAttack(float dt)
     {
-        // 펀치 예고 — 다 차는 순간 끄고 모션을 낸다. 히트는 여전히 클립의 OnAttackHit 이 낸다.
+        // 펀치 전 대기 — 끝나는 순간 모션을 낸다. 히트는 여전히 클립의 OnAttackHit 이 낸다.
         if (_punchTelegraphTimer > 0f)
         {
             _punchTelegraphTimer -= dt;
             _stateTimer -= dt;
             if (_punchTelegraphTimer <= 0f)
-            {
-                HideAttackTelegraph();
                 PlayAttackAnimClientRpc(_currentAttack);
-            }
             return;
         }
 
@@ -278,6 +275,9 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
 
         PlayInterruptFlashRpc();
     }
+
+    // 취약 중 팔라딘 Q 로 밀렸다가 남은 그로기로 돌아왔다 — 그로기를 벗어날 때 풀린 대기 자세 정지를 다시 건다.
+    protected override void OnVulnerableGroggyResumed() => ServerFreezeAtLocomotion();
 
     /// <summary>
     /// [전 피어] 카운터 성공 섬광.

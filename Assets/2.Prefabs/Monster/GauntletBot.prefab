@@ -792,7 +792,7 @@ MonoBehaviour:
   smashDamageMultiplier: 1.5
   smashMaxHitCount: 8
   smashTelegraph: {fileID: 2123847881958745088}
-  punchTelegraphDuration: 0.5
+  punchTelegraphDuration: 0.125
   sideLateralOffset: 0.95
   smashAnticipationState: Smash Anticipation
   punch01LState: Gauntlet_Punch01_L

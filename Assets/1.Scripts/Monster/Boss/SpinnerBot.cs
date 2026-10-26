@@ -54,9 +54,9 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
     [DataTableIgnore] float dashHalfWidth = 3.1f;   // 아트 형상에 묶인 값 — 밸런스 시트에 안 올린다(sideLateralOffset 과 같은 판단)
     [Header("예고 (2026-09-28 팀장: 범위를 보여 준 뒤 공격)")]
     [SerializeField, Min(0f)]
-    [Tooltip("채찍을 고른 뒤 판정 박스를 바닥에 채우는 시간(초). 다 차면 채찍이 나간다. 0 = 예고 없음(예전).\n" +
-             "스핀은 따로 없다 — 준비(카운터 창) 구간 전체 동안 돌진 경로를 채운다. 재질은 MonsterBase 의 공격 예고 칸.")]
-    float whipTelegraphDuration = 0.5f;
+    [Tooltip("채찍을 고른 뒤 휘두르기 전 대기(초). 0 = 대기 없음.\n" +
+             "바닥 예고는 그리지 않는다(10-26 — 예고는 간파 가능한 공격만). 스핀은 준비(카운터 창) 구간 전체 동안 돌진 경로를 채운다.")]
+    float whipTelegraphDuration = 0.125f;
 
     [SerializeField, Min(0f)]
     [Tooltip("좌/우 채찍의 판정·예고를 몸 기준 옆으로 미는 거리(m). L = 왼쪽, R = 오른쪽. 스핀은 정면 그대로.\n" +
@@ -179,15 +179,15 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
             _phase = SpinPhase.None;
             _whipUseR = !_whipUseR;         // 좌우 번갈아
             _whipTelegraphTimer = 0f;
-            if (HasAttackTelegraph && whipTelegraphDuration > 0f && meleeAttack != null)
+            // 🔴 채찍은 바닥 예고를 그리지 않는다(팀장 10-26 — 예고는 간파 가능한 공격만). 짧은 대기만 남긴다 —
+            //    대기까지 빼면 너무 빠르다. 안전망 타이머·슈퍼아머도 대기만큼 늘린다.
+            if (whipTelegraphDuration > 0f)
             {
-                // 예고 동안 모션을 보류한다. 안전망 타이머·슈퍼아머도 예고만큼 늘린다.
                 float telegraph = AttackTime(whipTelegraphDuration);
                 _whipTelegraphTimer = telegraph;
                 _stateTimer += telegraph;
                 if (data != null && data.hasSuperArmorWhileAttacking && status != null)
                     status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration) + telegraph);
-                ShowHitboxTelegraph(meleeAttack.ColliderInfo, telegraph, 0f, WhipSideShift);
                 return;
             }
             PlayWhipClientRpc(_whipUseR);   // 기본 Whip 애니(데미지는 base.HandleAttack가 처리)
@@ -243,16 +243,13 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
     {
         if (_phase == SpinPhase.None)
         {
-            // 채찍 예고 — 다 차는 순간 끄고 모션을 낸다. 히트는 여전히 클립의 OnAttackHit 이 낸다.
+            // 채찍 전 대기 — 끝나는 순간 모션을 낸다. 히트는 여전히 클립의 OnAttackHit 이 낸다.
             if (_whipTelegraphTimer > 0f)
             {
                 _whipTelegraphTimer -= dt;
                 _stateTimer -= dt;
                 if (_whipTelegraphTimer <= 0f)
-                {
-                    HideAttackTelegraph();
                     PlayWhipClientRpc(_whipUseR);
-                }
                 return;
             }
 
