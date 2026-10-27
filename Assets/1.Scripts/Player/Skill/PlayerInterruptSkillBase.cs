@@ -119,10 +119,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         base.OnAnimationEvent(eventType);
     }
 
-    // 모든 피어에서 불리지만 발동 기록은 서버에만 있다. 판정 전 종료(완료·취소·사망)면 실패 복귀.
+    // 모든 피어에서 불리지만 발동 기록은 서버에만 있다. 판정 전 종료(완료·취소·사망)면 실패 사건 → 디렉터가 실패 복귀.
     public override void OnEnd(SkillEndReason reason)
     {
-        FailSlowMotion(slowMotion.Abort());
+        InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
+            InterruptFailReason.EndedBeforeResolve, slowMotion.Abort()));
         base.OnEnd(reason);
     }
 
@@ -190,7 +191,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (HitboxAnchor == null || owner == null)
         {
-            FailSlowMotion(slowMotion.Resolve(false));
+            InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
+                InterruptFailReason.NoHitboxAnchor, slowMotion.Resolve(false)));
             OnMissingHitboxAnchor();
             return;
         }
@@ -265,9 +267,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             OnInterruptTargetResolved(target, attackInfo);
         }
 
-        FailSlowMotion(slowMotion.Resolve(interruptLanded));
+        // 간파 연출 사건(할 일 118) — 판정 → 성공 순서로 디렉터에 알린다(빗나감 실패 복귀 → 성공 슬로우 재시작).
+        InterruptProductionDirector.ServerResolve(InterruptProductionEvent.Resolve(owner, this,
+            slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount));
         if (interruptSucceeded)
-            StartSuccessSlowMotion();
+            InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
+                hasSuccessTargetPosition, successTargetPosition));
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -428,27 +433,14 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     // 승인 시점 예측(D1·D2): 판정과 같은 앵커 오버랩을 한 번 돌려, 지금 인터럽트 가능한 예측 대상이 있으면 발동한다.
     // 각도 검사는 따로 하지 않는다 — 앵커 형태가 곧 판정 범위다. 시간 레이어가 없는 씬(오프라인 테스트)은 건너뛴다.
+    // 예측(게임 질의)만 여기서 하고, 슬로우를 걸지는 디렉터 시도 단계가 정한다(할 일 118).
     private void TryStartSlowMotion()
     {
-        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale == null || HitboxAnchor == null || owner == null || !PredictsInterruptHit())
+        if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || HitboxAnchor == null || owner == null)
             return;
 
-        slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
-    }
-
-    // 간파 성공(할 일 87): 판정 끝에 성공 프로필로 다시 건다. 마지막 것이 이기므로 시도 슬로우의 지금 배율에서 이어지고,
-    // 예측이 빗나가 시도 슬로우가 없었어도 건다. 연출 훅일 뿐 판정·피해·카운터 창에는 관여하지 않는다.
-    // 연출 기준 위치 = 카운터 창을 소비한 첫 대상, 없으면 시전자(C5).
-    private void StartSuccessSlowMotion()
-    {
-        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale == null)
-            return;
-
-        Vector3 targetPosition = hasSuccessTargetPosition ? successTargetPosition : owner.transform.position;
-        timeScale.ServerStart(timeScale.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success,
-            targetPosition);
+        slowMotion.Started(InterruptProductionDirector.ServerAttempt(
+            InterruptProductionEvent.Attempt(owner, this, PredictsInterruptHit())));
     }
 
     private bool PredictsInterruptHit()
@@ -554,15 +546,4 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     private static IInterruptSlowMotionTarget FindSlowMotionTarget(Unit unit) =>
         unit != null && unit.TryGetComponent(out IInterruptSlowMotionTarget slowTarget) ? slowTarget : null;
-
-    // ServerFail 은 현재 발동 번호일 때만 먹으므로 늦게 와도 남의 슬로우를 끊지 않는다.
-    private static void FailSlowMotion(uint triggerId)
-    {
-        if (triggerId == 0)
-            return;
-
-        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale != null)
-            timeScale.ServerFail(triggerId);
-    }
 }
