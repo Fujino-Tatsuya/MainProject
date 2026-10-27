@@ -78,9 +78,11 @@ setx QA_OBS_BITRATE_KBPS 2500
 (로컬 설정 파일이면 `videoWidth`·`videoHeight`·`videoFps`·`videoBitrateKbps`.)
 - 해상도·fps = `SetVideoSettings`(출력(스케일) 해상도만 바꾸고 기본 캔버스는 그대로). **녹화·리플레이 버퍼가 켜져 있으면 건너뛰고 경고**한다 — OBS 를 켠 뒤 손으로 녹화를 시작해 두지 말 것.
 - 비트레이트 = `SetProfileParameter`. OBS 출력 모드를 먼저 묻는다(`Output/Mode`):
-  - **단순(Simple)**: `SimpleOutput/VBitrate` 에 쓴다. 🔶 [확인 필요] 단순 모드의 녹화 품질이 "스트림과 같음"일 때만 녹화가 이 값을 쓴다 — 아래 수동 설정에서 그렇게 맞춘다.
+  - **단순(Simple)**: `SimpleOutput/VBitrate` 에 쓴다. ✅(2026-10-27, OBS 32.0.1) 녹화 품질이 "스트림과 같음"일 때 녹화가 이 값을 쓴다 — 2500 으로 10초 녹화 = 약 2.6Mbps(오디오 포함). "작은 파일 크기" 등 다른 품질이면 이 값은 무시된다.
   - **고급(Advanced)**: 녹화 인코더 비트레이트는 프로필 ini 가 아니라 인코더 설정 파일에 있어 **못 바꾼다 → 경고만**. 손으로 맞추거나, 키를 안다면 `QA_OBS_BITRATE_PARAM=<카테고리>/<키>`(파일 `obsBitrateParam`)로 직접 지정.
-  - 🔶 [확인 필요] 프로필 파라미터를 바꾼 값이 다음 `StartRecord` 에 바로 먹는지. 첫 밤 아침에 영상 속성(해상도·비트레이트)을 확인한다.
+  - ✅(2026-10-27) **녹화 품질(`SimpleOutput/RecQuality`)은 OBS 가 켜진 채로 바꾸면 안 된다** — 바꾼 직후 녹화 인코더를 못 만들어 `StartRecord` 가 응답만 성공하고 녹화가 시작되지 않는다(로그 `Cannot apply a new video_t object after the encoder has been initialized`). OBS 재시작으로 풀린다. 그래서 QA 코드는 품질을 건드리지 않고, 사람이 설정 창에서 한 번 맞춘다.
+  - ✅(2026-10-27) **OBS 설정 창이 열려 있으면** `StartRecord`·`StartReplayBuffer` 가 응답만 성공하고 출력이 켜지지 않는다. 밤 배치 전에 설정 창을 닫아 둘 것.
+  - 🔶 [확인 필요] `VBitrate` 만 바꾼 값이 다음 `StartRecord` 에 바로 먹는지(이번 확인은 재시작 뒤 값). 첫 밤 아침에 영상 비트레이트를 확인한다.
 - **손으로 OBS 프로필 만들기(권장 — 확실한 방법)**: OBS → 프로필 → 새로 만들기 `QA-Nightly` →
   설정 → 출력 → 출력 모드 **단순** → 녹화 품질 **"스트림과 같음"**, 녹화 형식 mkv, 인코더 하드웨어, 방송 비트레이트 **2500 Kbps** →
   설정 → 비디오 → 출력(스케일) 해상도 **1280x720**, FPS **24**. 이 프로필을 켜 둔 채 밤을 돌리면 위 환경변수는 비워도 된다.
@@ -97,7 +99,7 @@ setx QA_NIGHTLY_CLIP_EVENTS ""
 (파일이면 `replayOnly`·`replaySeconds`·`replayAfterSeconds`·`replayCooldownSeconds`·`clipEvents`. `QA_NIGHTLY_OBS=1` 도 켜져 있어야 한다.)
 - 되돌리기(1단계로): `setx QA_NIGHTLY_REPLAY 0`. 모드는 **배치 시작 때 고정**(batch.txt `record=obs|replay|off`) — 돌던 밤 중간에는 안 바뀐다.
 - **OBS 쪽 준비(손으로 한 번)**: 설정 → 출력 → **리플레이 버퍼 사용** 체크, 최대 리플레이 시간 = N초(예 60). 메모리 한도는 기본값.
-  `QA_OBS_REPLAY_SECONDS` 를 넣으면 배치 시작에 `…/RecRB=true`·`…/RecRBTime=N` 을 프로필 파라미터로 써 본다(단순 `SimpleOutput`, 고급 `AdvOut`) — 🔶 [확인 필요] 키 이름·즉시 반영. 안 먹으면 손 설정이 정답이다.
+  `QA_OBS_REPLAY_SECONDS` 를 넣으면 배치 시작에 `…/RecRB=true`·`…/RecRBTime=N` 을 프로필 파라미터로 써 본다(단순 `SimpleOutput`, 고급 `AdvOut`) — ✅(2026-10-27) 키 이름은 맞다. 단 **즉시 반영되지 않는다** — `RecRB=true` 를 웹소켓으로 쓴 뒤 `StartReplayBuffer` 는 604(사용할 수 없음), OBS 재시작 뒤 시작·저장·정지 정상. 그래서 리플레이 버퍼 사용 체크는 손으로 해 두는 게 정답이다.
 - 이벤트(이벤트 표 — `Assets/1.Scripts/QA/Nightly/Editor/QANightlyEvents.cs` 의 `Table` 한 곳): `error`(에러·예외 로그, QA 발견 Error/Critical, 판 Error, 루프 판 오류) · `stuck`(20초 끼임 재배치, 벽 관통·벽 타기·Softlock 발견) · `stall`(정체 감시 90초) · `death`(사망) · `wipe`(전멸) · `timeout`(30분·조기 시간초과).
   일부만 클립으로: `QA_NIGHTLY_CLIP_EVENTS=stall,wipe`(비움 = 전부). 시각표에는 늘 전부 남는다. 새 이벤트는 `Table` 에 한 줄 더한다.
 - 합치기: 저장 대기(M초) 중에 오는 이벤트, 지난 저장 뒤 쿨다운 안에 오는 이벤트는 **새 클립을 만들지 않고 다음 클립 하나에 모은다**(이름에 `stall+death` 처럼). 쿨다운 안 이벤트의 저장 시각 = max(이벤트 + M, 지난 저장 + 쿨다운).
