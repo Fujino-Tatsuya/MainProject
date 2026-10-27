@@ -10,19 +10,19 @@ public static class TraitProgressRules
 
     // 복도 N 에 도착하기까지 지나는 게이트 — 복도1 = G1, 복도2 = G2·G3, 복도3 = G4·G5·G6, 복도4 = G7·G8·G9.
     // 특성은 복도마다 1장이라 '획득 특성 수' 번째 구간이 지금 채우는 구간이다.
-    static readonly TutorialGate[][] Segments =
+    static readonly MapSceneGate[][] Segments =
     {
-        new[] { TutorialGate.G1_Corridor1Entry },
-        new[] { TutorialGate.G2_Zone2Entry, TutorialGate.G3_Corridor2Entry },
-        new[] { TutorialGate.G4_Zone3Entry, TutorialGate.G5_SpinnerRealMode, TutorialGate.G6_Corridor3Entry },
-        new[] { TutorialGate.G7_Zone4Entry, TutorialGate.G8_TimerStart, TutorialGate.G9_Corridor4Entry },
+        new[] { MapSceneGate.G1_Corridor1Entry },
+        new[] { MapSceneGate.G2_Zone2Entry, MapSceneGate.G3_Corridor2Entry },
+        new[] { MapSceneGate.G4_Zone3Entry, MapSceneGate.G5_SpinnerRealMode, MapSceneGate.G6_Corridor3Entry },
+        new[] { MapSceneGate.G7_Zone4Entry, MapSceneGate.G8_TimerStart, MapSceneGate.G9_Corridor4Entry },
     };
 
     public static int SegmentCount => Segments.Length;
 
     public static int Level(bool inTutorial, int acquiredCount) => inTutorial ? ClampNonNegative(acquiredCount) + 1 : 1;
 
-    /// <param name="openedGateMask">bit = <see cref="TutorialGate"/> 값(<c>TutorialDirector.IsGateOpen</c> 과 같은 배치).</param>
+    /// <param name="openedGateMask">bit = <see cref="MapSceneGate"/> 값(<c>MapSceneDirector.IsGateOpen</c> 과 같은 배치).</param>
     public static float XpFill(bool inTutorial, int acquiredCount, int openedGateMask)
     {
         if (!inTutorial)
@@ -32,9 +32,9 @@ public static class TraitProgressRules
         if (segment >= Segments.Length)
             return 1f;
 
-        TutorialGate[] gates = Segments[segment];
+        MapSceneGate[] gates = Segments[segment];
         int opened = 0;
-        foreach (TutorialGate gate in gates)
+        foreach (MapSceneGate gate in gates)
         {
             if ((openedGateMask & (1 << (int)gate)) != 0)
                 opened++;

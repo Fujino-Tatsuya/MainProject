@@ -1808,19 +1808,19 @@ public class Player : Unit
         return result;
     }
 
-    // 추락 피해는 방어력·쉴드·일반 무적을 무시한다(서버 전용 Bypass Context). (PLAN §11, §13 / W10)
+    // 추락 피해 중인가 — 체력 재생 리셋 구분(OnServerHealthDamageApplied)에만 쓴다.
+    // 무적 게이트 통과는 PlayerInvulnerabilityBypass 하나로 한다(추락 · 보스 즉사 방전 공통). (PLAN §11, §13 / W10, 할 일 105)
     private bool _fallDamageBypass;
 
-    // 무적(대시 등) 동안 일반 피해를 차단한다. 단 추락 Bypass 중에는 통과시킨다. (PLAN §11 / W5·W10)
+    // 무적(대시 등) 동안 일반 피해를 차단한다. 단 무적 무시 중(추락 · 보스 즉사 방전 — PlayerInvulnerabilityBypass)에는 통과시킨다. (PLAN §11 / W5·W10, 할 일 105)
     protected override bool CanApplyHealthDamage(int damage)
     {
-        if (_fallDamageBypass)
-            return true;
-
-        if (invulnerability != null && invulnerability.IsServerInvulnerable)
+        bool bypass = PlayerInvulnerabilityBypass.Active;
+        bool invulnerable = invulnerability != null && invulnerability.IsServerInvulnerable;
+        if (!PlayerInvulnerabilityBypass.AllowsHealthDamage(invulnerable, bypass))
             return false;
 
-        return base.CanApplyHealthDamage(damage);
+        return bypass || base.CanApplyHealthDamage(damage);
     }
 
     /// <summary>
@@ -1832,6 +1832,8 @@ public class Player : Unit
         if (!IsServer)
             return;
 
+        // 추락 피해는 방어력·쉴드·무적을 무시한다(서버 전용 무적 무시 컨텍스트).
+        bool bypassBefore = PlayerInvulnerabilityBypass.Begin();
         _fallDamageBypass = true;
         try
         {
@@ -1841,6 +1843,7 @@ public class Player : Unit
         finally
         {
             _fallDamageBypass = false;
+            PlayerInvulnerabilityBypass.End(bypassBefore);
         }
     }
 

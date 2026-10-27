@@ -1,5 +1,18 @@
 # 튜토리얼 QA 체크리스트 — Play·MPPM 검증 순서표 (할 일 15 · S12-3)
 
+> **🟪 할 일 107 (2026-10-27) — 맵씬 정리 뒤 먼저 이 절부터.** 존1 체크리스트·존2 안내·존3 스피너 연습·복도1 쿨 초기화·존4 교육 문구는 Legacy 로 빠졌다(→ [tutorial-director.md](tutorial-director.md) 맨 위).
+> 아래 1부의 존1·존2 안내·존3 연습·존4 패널 안내 항목은 **더 이상 나오지 않는 것이 정상**이다. 로그 태그 `[Tutorial]` 은 그대로다. 메뉴는 `Tools/MapScene/Debug/*`·`Tools/Tests/맵씬 EditMode 테스트 실행`.
+>
+> **107 Play 확인(사람)** — 부트스트랩 → 로비 → 출격 → `4.MapScene`, 솔로 호스트 + MPPM 2인:
+> - [ ] 착지 직후 존1 → 복도1 배리어가 **바로 열려** 있다(로그 `존1 검사 없음 — G1 바로 열림` · `단계 Zone1 → Corridor1`). 존1 목표·체크리스트·허수아비 없음.
+> - [ ] 복도1 중간 → 특성 창 → 고르면 G2(교착 방지 60초 포함) — 복도1~4 특성 라운드 모두 예전처럼(`MapSceneTraitCorridorFlow`).
+> - [ ] 존2 첫 진입 → 4초 뒤 몬스터 기상 → 전멸 → G3. 존2 자막·"적 처치 n/9" 목표 없음, 복도1 "다음 구역으로" 목표는 존2 에서 지워진다.
+> - [ ] 존3: 원래 스피너봇(연습 모드·회색 잠금 체력바 없음)이 G4 + 진입 때 깨어나 바로 싸운다 → 처치 → G6. 로그 `존3 시작 — 핵심 1마리 기상 · G5(연습 없음)`.
+> - [ ] 존4: **4구역 소개 연출**(조작기 4개 → 다리 → 복귀) 그대로 → 타이머 시작(G8)·일반 몬스터 기상 → 패널 → 다리 → TUT_Z4_BRIDGE·중간보스 → 처치 → TUT_Z4_CLEAR·GO_BOSS → G9.
+> - [ ] 보스 진입: G9 뒤 "보스방으로" 목표·미니맵 펄스 · 복도4 특성 → G10 → 패드 카운트다운(TUT_B_PAD_COUNT) → 보스방 도착 → 안내 정리 → 23호 정면 팁. 타이머 만료 강제 이동·TUT_TIMER_EXPIRED 도.
+> - [ ] 사망/리스폰: 보스방 전 사망 = 자동 부활(목숨 차감 없음) · 보스방 도착(G11) 뒤 목숨 차감 · 전멸 리스폰(보스 재도전 되감기) · 낙사 복귀(스텝별 안전 지점 `MapSceneSafePoints`).
+> - [ ] 구간 스킵 Alt+1~0(QA)·`Tools/MapScene/Debug/*` 메뉴가 그대로 동작. MPPM 클라에서도 배리어·목표·특성 창이 호스트와 같다.
+
 > 사람이 **위에서부터 순서대로** 따라 하며 체크한다. 각 항목 = **할 행동 → 기대 결과(화면·로그)**.
 > 원본: 시나리오 [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §9 완료 기준 전부 + 단계 문서의 Play 확인 항목 전부(중복은 합침).
 > 단계 문서·handoff 목록: [tutorial-director.md](tutorial-director.md) §10.1. 각 항목 끝 `(→ 문서)` 는 실패했을 때 볼 곳.
@@ -35,11 +48,11 @@
 | `[TutorialSkip]` | 구간 스킵 Alt+1~0 | `시작 → X — 할 일 …` · `→ 구간 X (열린 게이트 …)` · 거부(뒤로·Finished·진행 중) |
 | `[BridgeGate]` | 다리(경석) | 고정 조각 에러 1줄(알려진 거짓 경보 — §4) |
 
-### 0.4 디버그 메뉴 (Play 중 호스트, `Tools/Tutorial/Debug/`)
+### 0.4 디버그 메뉴 (Play 중 호스트, `Tools/MapScene/Debug/`)
 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 · 존2 전멸(깨워서 처치) · 존3 핵심 처치(스피너봇) · 존4 핵심 처치(중간보스) ·
 보스 길 상태 로그 · 타이머 HUD 표시 · 타이머 시작(G8 — 앞 게이트 강제) · G9 열기(앞 게이트 강제) · G10 열기(앞 게이트 강제 — 패드·엘리베이터 문) · G11 열기(앞 게이트 강제 — 목숨 차감 기준만, 이동·Finished 없음).
 - F9(`DevMonsterKill`)는 휴면 몬스터를 못 죽인다(무적) — 먼저 깨울 것. F10 = 영혼 디버그 부활.
-- 타이머 만료를 보려면 Play 중 `4.MapScene` 루트 `TutorialDirector` 인스펙터 `bossTimerLimitSeconds` 를 **G8 전에** 짧게(예: 30) — Play 종료 시 되돌아간다.
+- 타이머 만료를 보려면 Play 중 `4.MapScene` 루트 `MapSceneDirector` 인스펙터 `bossTimerLimitSeconds` 를 **G8 전에** 짧게(예: 30) — Play 종료 시 되돌아간다.
 
 **구간 스킵 단축키 (할 일 34 — 호스트만 · 에디터·Development Build 만)** — 상세 [tutorial-director.md §10.5](tutorial-director.md#105-구간-스킵-alt10-할-일-34--qa테스트용).
 Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10개(지금 구간 ▶ · 뒤 구간 비활성 · 마지막 '처음부터' 는 늘 활성). 로그 `[TutorialSkip] → 구간 X (열린 게이트 …)`.
@@ -195,7 +208,7 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 
 ### 스텝별 고정 안전 지점 — 할 일 80 (→ tutorial-director §12)
 - [ ] 맵 로드 뒤 호스트 로그 `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.`
-- [ ] 씬 뷰(Play 중 Gizmos)에서 초록 원 `Safe Zone1`~`Safe BossEnter` 9개가 각 구간 입구 바닥 위에 있다(벽·소품·패드 위가 아님). 이상하면 4.MapScene `TutorialSafePoints/SafePoint_*` 를 옮긴다.
+- [ ] 씬 뷰(Play 중 Gizmos)에서 초록 원 `Safe Zone1`~`Safe BossEnter` 9개가 각 구간 입구 바닥 위에 있다(벽·소품·패드 위가 아님). 이상하면 4.MapScene `MapSceneSafePoints/SafePoint_*` 를 옮긴다.
 - [ ] 존2 물 구멍 추락(생존) → 낙하 연출 뒤 **존2 안전 지점 3m 위**에 나타나 떨어져 착지 · 로그 `낙사 → Zone2 안전 지점 (…, 지점Y+3, …)` · `[Fall/진단] 고정 안전 지점으로`.
 - [ ] 복도 진행 중 추락 → 그 복도 입구 지점(중간 지점 전이라 특성 창이 다시 뜨지 않음). 뒤 배리어를 지난 사람은 뒤 구간으로 안 돌아간다.
 - [ ] 몬스터가 안전 지점 **바로 위**에 있을 때 낙사 → 그래도 **그 지점 3m 위**에서 떨어져 복귀(옆 빈자리·다른 구간·씬 시작 지점 아님 — 적은 점유로 안 본다). 몬스터와 겹치면 밀어내기로 풀린다.
@@ -209,7 +222,7 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 - [ ] 엘리베이터 연출·도착 대기 중 낙사·사망은 이번 변경 없음(할 일 89) — 동작이 이전과 같은지만 본다.
 - [ ] 보스방 도착 뒤(보스전) 낙사 → 보스 룸 **네 모서리 중 다른 플레이어·보스에서 가장 먼 곳 3m 위**에서 떨어져 착지 · 로그 `보스전 낙사 → 보스 룸 모서리 Corner…` · 씬 시작 지점 아님.
 - [ ] MPPM: 클라 플레이어도 낙사 뒤 같은 지점으로 옮겨진다(오너 권한 순간이동 — 클라 화면에서 튐 없이).
-- [ ] 문제가 있으면 `TutorialSafePoints` 인스펙터 `useOnFall` 을 꺼서 기존 추락 복구(큐)와 비교한다.
+- [ ] 문제가 있으면 `MapSceneSafePoints` 인스펙터 `useOnFall` 을 꺼서 기존 추락 복구(큐)와 비교한다.
 
 ---
 
@@ -258,7 +271,7 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 - [ ] 부활 지점은 단계 구간 기준(복도 출구만 열린 동안 죽은 클라가 다음 존에서 부활해 첫 진입·기상을 앞당기지 않는다).
 
 ### 개인 뒤 배리어 (15 후속 C1·C2·C3 → tutorial-director §7·§11)
-> 로그: 서버 `[TutorialBarrier] 뒤 배리어 G* 닫힘 — client n` · `[Tutorial] client n 자동 부활 — …` · `[Fall/진단] …`. 마스크 확인: `Tools/Tutorial/Debug/뒤 배리어 마스크 로그 (클라별)`.
+> 로그: 서버 `[TutorialBarrier] 뒤 배리어 G* 닫힘 — client n` · `[Tutorial] client n 자동 부활 — …` · `[Fall/진단] …`. 마스크 확인: `Tools/MapScene/Debug/뒤 배리어 마스크 로그 (클라별)`.
 - [ ] 한 명(예: 클라)만 열린 배리어를 지나 앞으로 가면 그 사람에게만 뒤 배리어가 생긴다 — **뒤에 남은 동료(호스트)는 여전히 같은 배리어를 지나 전진 가능**.
 - [ ] 앞으로 간 사람은 되돌아가기가 막힌다 — **복도 입구(G1/G3/G6/G9)·출구(G2/G4/G7/G10) 둘 다**. 걷기·대시·이동 스킬·넉백 모두. 호스트·클라 각각 해 본다.
 - [ ] 늦게 로드된 클라도 같은 결과(스폰 직후 자기 마스크대로 뒤 배리어가 켜짐 · 남의 마스크로 켜지지 않음).
@@ -306,7 +319,7 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 
 ### 3.1 절차(일반) 맵
 > `4.MapScene` 에서 `Stage1`(튜토리얼)을 끄고 `Stage1_Procedural` 을 켠 뒤 Play — **씬 저장하지 말 것**(끝나면 되돌림 / 변경 버리기).
-- [ ] 로그 `[Tutorial] 맵 생성 — 튜토리얼 스테이지가 아니다(TutorialStageMarker 없음)` · 디렉터 비활성 · 배리어·허수아비·흐름·사망 규칙 부착 없음.
+- [ ] 로그 `[Tutorial] 맵 생성 — 튜토리얼 스테이지가 아니다(MapSceneStageMarker 없음)` · 디렉터 비활성 · 배리어·허수아비·흐름·사망 규칙 부착 없음.
 - [ ] 타이머가 **맵 생성 직후 자동 시작**(씬 600초) · Idle 에도 HUD 빈 틀(기존) · 보스 패드 처음부터 활성 · 엘리베이터 문 Closed(손대지 않음).
 - [ ] 몬스터가 처음부터 활성(휴면 없음 — `_dormant` 기본 false) · 피해·넉백 정상 · F9 처치 정상.
 - [ ] 스피너봇이 원래 `SpinnerBot`(치환 로그 없음·머리 위 체력바 없음·원래 패턴).
@@ -341,7 +354,7 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 | 존3 연계 튜닝(D26) | 유효 벽(존3 긴 변 — 실제 벽 면이 슬롯 경계에서 안쪽이면 '막힘 접촉 1.6m' 로 인정) · 연습 위치(벽 4m·끝 8m) · 밀치기 3m/0.35초 · 회복 0.6초 · 다음 창 4초 — 전부 인스펙터. 벽 앞 장애물·NavMesh 모양에 따라 Play 로 조정. 원위치 복귀 없음(사용자 변경) → 2·3회째는 벽에 붙은 채 시작해 쉬울 수 있음(벽 판정 방식 논의 중) | [tutorial-zone3.md](tutorial-zone3.md) §4 |
 | 존3 취약 표시 | 취약 유지 중 스피너봇 자체의 '취약' 색·연출은 없다(23호 틴트 같은 것) — 안내 UI 목표·유효 벽 화살표로만 구분. 그로기 끝나면 Idle 자세 | 아트/연출 결정 |
 | 복도1 대시 | 서버·오너 대시 충전을 따로 가득 채운다(추락 복구 ResetChargeToOne 과 같은 방식) — 복제 지연 동안 오너 예측이 잠깐 어긋날 수 있다 | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) |
-| 디렉터 낡은 주석 | `TutorialDirector` 의 `TODO(S6)`×2·`TODO(S8/S12)`·`TODO(S12)` 주석 — 동작은 흐름 컴포넌트에 있음. 코드 정리 때 삭제 | [tutorial-director.md](tutorial-director.md) §10.2 |
+| 디렉터 낡은 주석 | `MapSceneDirector` 의 `TODO(S6)`×2·`TODO(S8/S12)`·`TODO(S12)` 주석 — 동작은 흐름 컴포넌트에 있음. 코드 정리 때 삭제 | [tutorial-director.md](tutorial-director.md) §10.2 |
 | 효과음 | `TutorialGuideUI.stepChangeClip` 비어 있음 | 사운드 결정 |
 | 존3 프리팹 | `ZoneM_typeC` 반영 확인 — 저작 메뉴 `3. Swap MapScene` 재실행 시 존3 이 PeekABot 존으로 돌아가지 않는지 | 시나리오 §1.3 |
 | 범위 밖 | 튜토리얼 스킵·2회차(D23) · 재접속 | — |
@@ -350,9 +363,9 @@ Alt 를 누르고 있으면 호스트 화면 오른쪽 위에 같은 버튼 10�
 
 ## 5. 병합 전 확인 (development 병합 담당이 Play 와 별개로)
 - [ ] 컴파일 에러 0(경고 무관).
-- [ ] 러너 통과 — `Tools/Tests/튜토리얼 EditMode 테스트 실행` · `플레이어 EditMode 테스트 실행` · `데이터 테이블 EditMode 테스트 실행`(실패 0, 통과 0건 아님).
-- [ ] `4.MapScene.unity` diff = **추가만**(삭제 줄 0) — `TutorialDirector`·`TutorialTraitDirector`·`TutorialGuideUI`·`TutorialTraitUI`·Stage1 교체.
-- [ ] `4.MapScene` 의 `TutorialDirector` NetworkObject **`GlobalObjectIdHash 114710176`**, `TutorialTraitDirector` **3847683974** — 0·중복이면 스폰이 깨진다. 씬 머지 뒤 다시 확인.
+- [ ] 러너 통과 — `Tools/Tests/맵씬 EditMode 테스트 실행` · `플레이어 EditMode 테스트 실행` · `데이터 테이블 EditMode 테스트 실행`(실패 0, 통과 0건 아님).
+- [ ] `4.MapScene.unity` diff = **추가만**(삭제 줄 0) — `MapSceneDirector`·`TutorialTraitDirector`·`TutorialGuideUI`·`TutorialTraitUI`·Stage1 교체.
+- [ ] `4.MapScene` 의 `MapSceneDirector` NetworkObject **`GlobalObjectIdHash 114710176`**, `TutorialTraitDirector` **3847683974** — 0·중복이면 스폰이 깨진다. 씬 머지 뒤 다시 확인.
 - [ ] `Assets/DefaultNetworkPrefabs.asset` — 추가 2줄(`TrainingDummy_Tutorial`·`SpinnerBot_Tutorial`)뿐, 같은 프리팹 **중복 항목 없음**. `SpinnerBot_Tutorial` hash 1723163300(원본 2973007222 와 다름).
 - [ ] `Player_Gunner.prefab`·`Player_Paladin.prefab` 등 플레이어 프리팹에 **노이즈 diff 없음**.
 - [ ] `AddressableAssetSettings.asset` 해시 변경(에디터 노이즈)은 커밋하지 않는다.

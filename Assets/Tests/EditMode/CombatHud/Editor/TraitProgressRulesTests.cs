@@ -2,15 +2,15 @@ using NUnit.Framework;
 
 public sealed class TraitProgressRulesTests
 {
-    static int Mask(params TutorialGate[] gates)
+    static int Mask(params MapSceneGate[] gates)
     {
         int mask = 0;
-        foreach (TutorialGate g in gates)
+        foreach (MapSceneGate g in gates)
             mask |= 1 << (int)g;
         return mask;
     }
 
-    const int AllGates = (1 << TutorialFlowModel.GateCount) - 1;
+    const int AllGates = (1 << MapSceneFlowModel.GateCount) - 1;
 
     // ── 레벨 ──
 
@@ -42,42 +42,42 @@ public sealed class TraitProgressRulesTests
     public void XpFill_ZeroTraits_UsesCorridor1Segment()
     {
         Assert.That(TraitProgressRules.XpFill(true, 0, 0), Is.EqualTo(0f));
-        Assert.That(TraitProgressRules.XpFill(true, 0, Mask(TutorialGate.G1_Corridor1Entry)), Is.EqualTo(1f));
+        Assert.That(TraitProgressRules.XpFill(true, 0, Mask(MapSceneGate.G1_Corridor1Entry)), Is.EqualTo(1f));
         // 다음 구간 게이트는 지금 구간에 섞이지 않는다.
-        Assert.That(TraitProgressRules.XpFill(true, 0, Mask(TutorialGate.G2_Zone2Entry)), Is.EqualTo(0f));
+        Assert.That(TraitProgressRules.XpFill(true, 0, Mask(MapSceneGate.G2_Zone2Entry)), Is.EqualTo(0f));
     }
 
     [Test]
     public void XpFill_AfterChoosingTrait_RestartsFromZeroInNextSegment()
     {
-        int g1Open = Mask(TutorialGate.G1_Corridor1Entry);
+        int g1Open = Mask(MapSceneGate.G1_Corridor1Entry);
         Assert.That(TraitProgressRules.XpFill(true, 1, g1Open), Is.EqualTo(0f));
     }
 
     [Test]
     public void XpFill_PartiallyOpenSegment_IsRatio()
     {
-        int mask = Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry);
+        int mask = Mask(MapSceneGate.G1_Corridor1Entry, MapSceneGate.G2_Zone2Entry);
         Assert.That(TraitProgressRules.XpFill(true, 1, mask), Is.EqualTo(0.5f));
 
-        mask |= Mask(TutorialGate.G3_Corridor2Entry, TutorialGate.G4_Zone3Entry);
+        mask |= Mask(MapSceneGate.G3_Corridor2Entry, MapSceneGate.G4_Zone3Entry);
         Assert.That(TraitProgressRules.XpFill(true, 2, mask), Is.EqualTo(1f / 3f).Within(1e-6));
 
-        mask |= Mask(TutorialGate.G5_SpinnerRealMode, TutorialGate.G6_Corridor3Entry, TutorialGate.G7_Zone4Entry, TutorialGate.G8_TimerStart);
+        mask |= Mask(MapSceneGate.G5_SpinnerRealMode, MapSceneGate.G6_Corridor3Entry, MapSceneGate.G7_Zone4Entry, MapSceneGate.G8_TimerStart);
         Assert.That(TraitProgressRules.XpFill(true, 3, mask), Is.EqualTo(2f / 3f).Within(1e-6));
     }
 
     [Test]
     public void XpFill_SegmentBoundaries_FullAtLastGateOfSegment()
     {
-        Assert.That(TraitProgressRules.XpFill(true, 1, Mask(TutorialGate.G2_Zone2Entry, TutorialGate.G3_Corridor2Entry)), Is.EqualTo(1f));
+        Assert.That(TraitProgressRules.XpFill(true, 1, Mask(MapSceneGate.G2_Zone2Entry, MapSceneGate.G3_Corridor2Entry)), Is.EqualTo(1f));
         Assert.That(TraitProgressRules.XpFill(true, 2,
-            Mask(TutorialGate.G4_Zone3Entry, TutorialGate.G5_SpinnerRealMode, TutorialGate.G6_Corridor3Entry)), Is.EqualTo(1f));
+            Mask(MapSceneGate.G4_Zone3Entry, MapSceneGate.G5_SpinnerRealMode, MapSceneGate.G6_Corridor3Entry)), Is.EqualTo(1f));
         Assert.That(TraitProgressRules.XpFill(true, 3,
-            Mask(TutorialGate.G7_Zone4Entry, TutorialGate.G8_TimerStart, TutorialGate.G9_Corridor4Entry)), Is.EqualTo(1f));
+            Mask(MapSceneGate.G7_Zone4Entry, MapSceneGate.G8_TimerStart, MapSceneGate.G9_Corridor4Entry)), Is.EqualTo(1f));
         // G10 이후 게이트는 어느 구간에도 없다.
         Assert.That(TraitProgressRules.XpFill(true, 3,
-            Mask(TutorialGate.G10_BossEnterAndPad, TutorialGate.G11_BossRoom)), Is.EqualTo(0f));
+            Mask(MapSceneGate.G10_BossEnterAndPad, MapSceneGate.G11_BossRoom)), Is.EqualTo(0f));
     }
 
     [TestCase(4)]

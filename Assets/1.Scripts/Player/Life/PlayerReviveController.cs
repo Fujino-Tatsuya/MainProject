@@ -59,7 +59,7 @@ public sealed class PlayerReviveController : NetworkBehaviour
 
     /// <summary>
     /// <paramref name="consumeLife"/> = false 면 목숨 검사·차감 없이 부활시킨다
-    /// (튜토리얼 교육 단계 자동 부활 — <c>TutorialDeathRules</c>). true 는 위 진입점과 같다.
+    /// (튜토리얼 교육 단계 자동 부활 — <c>MapSceneDeathRules</c>). true 는 위 진입점과 같다.
     /// </summary>
     public bool TryCompleteReviveOnServer(bool consumeLife)
     {

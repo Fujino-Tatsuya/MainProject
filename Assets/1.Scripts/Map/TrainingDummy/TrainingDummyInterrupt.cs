@@ -40,7 +40,7 @@ public readonly struct TrainingDummyInterruptSuccess
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TrainingDummy))]
 [DataTableSheet("Map", Order = 0)]
-public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget
+public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptCueSink
 {
     [Header("순환")]
     [SerializeField, Min(0f), FormerlySerializedAs("groggyDuration")]
@@ -198,8 +198,14 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayInterruptFlashRpc()
     {
-        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
-        if (interruptFlash != null)
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue == InterruptProductionCue.TargetFlash && interruptFlash != null)
             interruptFlash.PlayOnce();
     }
 }

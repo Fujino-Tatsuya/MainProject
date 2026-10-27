@@ -1,5 +1,9 @@
 # 튜토리얼 특성 복도 1~4 · 존2 흐름 (할 일 15 · S8 → v8 V2·V3)
 
+> **🟪 할 일 107 (2026-10-27)** — 복도 특성 흐름은 **유지**(이름만 `TutorialCorridorFlow` → `MapSceneTraitCorridorFlow`, 규칙 `MapSceneTraitCorridorRules/Rounds/Progress` — 맵씬에서 특성 라운드를 여는 유일한 곳).
+> 존2 안내 흐름(`TutorialZone2Flow/Model` — 자막·목표 "적 처치 n/9")과 복도1 첫 진입 쿨 초기화(`TutorialCorridor1CooldownFlow`)는 Legacy(`Assets/1.Scripts/Map/Tutorial/Legacy/`, 부착 없음).
+> 존2 진행(첫 진입 → 단계 Zone2 → 4초 뒤 기상, G3 = 전멸)은 `MapSceneZoneFlow` 가 그대로 한다. 쿨 초기화 규칙 `TutorialCooldownReset`/`Model` 은 로비 공용이라 이름·위치 그대로.
+
 > 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.2·§3.3·§3.4·§3.6·§3.8·§4·§5(복도·존2) — **v8**(2026-10-12).
 > v8 변경: **복도1 첫 진입 쿨타임 초기화**(아래 '복도1 쿨타임 초기화') · **존2 = 전멸만**(Q·E 체크·캐릭터별 Q/E 안내·슬롯 강조·넛지 제거).
 > 디렉터 API: [tutorial-director.md](tutorial-director.md) §10 · 특성: [tutorial-traits.md](tutorial-traits.md) · 안내 UI: [tutorial-guide-ui.md](tutorial-guide-ui.md) · 존1 선례: [tutorial-zone1.md](tutorial-zone1.md).
@@ -7,16 +11,16 @@
 ## 파일
 | 무엇 | 경로 |
 |---|---|
-| 복도 흐름(런타임, 모든 피어) | `Assets/1.Scripts/Map/Tutorial/Flow/TutorialCorridorFlow.cs` (+ 공용 `TutorialGuideFlowUtil.IsGuideEmpty`) |
-| 복도 순수 규칙 | `Flow/TutorialCorridorModel.cs` — `TutorialCorridorRules`(게이트·체크·단계·창 표시 매핑, 진행 중 복도) · `TutorialCorridorRounds`(복도당 라운드 1번, 라운드→복도) · `TutorialCorridorProgress`(목표 장면) |
+| 복도 흐름(런타임, 모든 피어) | `Assets/1.Scripts/Map/MapScene/Flow/MapSceneTraitCorridorFlow.cs` (+ 공용 `MapSceneGuideFlowUtil.IsGuideEmpty`) |
+| 복도 순수 규칙 | `Flow/MapSceneTraitCorridorModel.cs` — `MapSceneTraitCorridorRules`(게이트·체크·단계·창 표시 매핑, 진행 중 복도) · `MapSceneTraitCorridorRounds`(복도당 라운드 1번, 라운드→복도) · `MapSceneTraitCorridorProgress`(목표 장면) |
 | 복도1 쿨 초기화(v8, 모든 피어) | `Flow/TutorialCorridor1CooldownFlow.cs` · 순수 `Flow/TutorialCooldownResetModel.cs`(`TutorialCooldownResetModel`·`TutorialCooldownResetScope`) · 실행 `Flow/TutorialCooldownReset.cs` |
 | 존2 흐름 | `Flow/TutorialZone2Flow.cs` |
 | 존2 순수 규칙 | `Flow/TutorialZone2Model.cs` — `TutorialZone2Rules`(기상 4초) · `TutorialZone2Goal`(목표 줄 — 처치 n/total) |
-| 테스트 | `Map/Tutorial/Editor/TutorialCorridorModelTests.cs` · `TutorialZone2ModelTests.cs` · `TutorialCooldownResetModelTests.cs`(튜토리얼 러너) |
+| 테스트 | `Map/MapScene/Editor/MapSceneTraitCorridorModelTests.cs` · `TutorialZone2ModelTests.cs` · `TutorialCooldownResetModelTests.cs`(튜토리얼 러너) |
 | 씬 | `4.MapScene` 루트 `TutorialTraitDirector`(NetworkObject + `TutorialTraitDirector`, pool = `TutorialTraitPool.asset`, hash 3847683974) · `TutorialTraitUI.prefab` 인스턴스 — 추가만. EventSystem 은 부트스트랩 `PersistentEventSystem`(DontDestroyOnLoad) |
 
-붙는 방식은 존1 과 같다 — `TutorialDirector.StateChanged` 에서 `IsTutorialActive` 면 디렉터 GameObject 에 `AddComponent`(모든 피어).
-**TutorialDirector.cs 는 고치지 않았다**(기존 `ShowSubtitleServer`·`ReportCheckServer`·`SetStepServer`·`WakeZoneServer` 만 사용).
+붙는 방식은 존1 과 같다 — `MapSceneDirector.StateChanged` 에서 `IsTutorialActive` 면 디렉터 GameObject 에 `AddComponent`(모든 피어).
+**MapSceneDirector.cs 는 고치지 않았다**(기존 `ShowSubtitleServer`·`ReportCheckServer`·`SetStepServer`·`WakeZoneServer` 만 사용).
 
 ## 복도 1~4
 | 항목 | 피어 | 방법 |
@@ -37,7 +41,7 @@
 |---|---|---|
 | 조건 | 서버 | G1 열림 ∧ 그 플레이어의 서버 구간이 **복도1**(`GetPlayerAreaServer` — Alive 만, 입구 배리어 안쪽 0.5m 히스테리시스) ∧ 아직 안 받음. 0.1초 주기(실제 시간) |
 | 초기화 | 서버 | 그 플레이어의 등록 스킬 중 Q·E·R·우클릭(**기본·대체 모두** — 어쌔신 변신 Q/E 등 따로 쿨을 가진 것 포함)을 `ReduceCooldownServer(skill, 남은 시간 + 0.05)` 로 0(쿨 장부 **공개 API 만**) + `PlayerDashController.ServerResetChargeToFull()`. 자원(분노·과열)·체력·패시브 주기는 건드리지 않는다 |
-| 기록 | 서버 | `ReportCheckServer(client, TutorialCheck.Corridor1CooldownReset)`(복제 — 게이트 조건 아님). 이미 기록이 있으면(흐름이 다시 붙어도) 반복 없음 |
+| 기록 | 서버 | `ReportCheckServer(client, MapSceneCheck.Corridor1CooldownReset)`(복제 — 게이트 조건 아님). 이미 기록이 있으면(흐름이 다시 붙어도) 반복 없음 |
 | 예약 | 서버 | 초기화 순간 그 사람이 **실행 중 스킬**(거너 Q 집중 포함)·**어쌔신 변신**·**어쌔신 E 강화 대기** 중이면 예약 → 그 행동이 모두 끝난 첫 순간 한 번 더 스킬 초기화(`TutorialCooldownResetModel.TickReservation`). 변신을 강제로 끝내거나 자원을 채우지 않는다 |
 | 오너 | 로컬 | 내 복제 기록이 꺼짐→켜짐으로 바뀌는 것을 본 순간 `OwnerResetChargeToFull()`(대시 예측). **자막 없음**(사용자 변경 — `TUT_C1_COOLDOWN_RESET` 호출 제거). 처음 볼 때 이미 켜져 있으면(늦게 그린 클라) 아무것도 안 함 |
 - 첫 진입한 1명 때문에 동료를 미리 초기화하지 않는다(각자 자기 첫 진입 때). 왕복·부활 재진입 반복 없음.
@@ -60,7 +64,7 @@
 ## 문구 (`TutorialGuideTexts.asset`)
 - 채움: `TUT_Z2_INTRO`(4초) · `TUT_Z2_GOAL` · `TUT_B_PAD_WARN`(8초). v8 문구는 메뉴 `Tools/UI/튜토리얼 안내 문구 v8 적용`.
 - 더 이상 호출하지 않는 행(SO 에 남김): `TUT_C1_COOLDOWN_RESET`(사용자 변경 — 복도1 쿨 초기화는 조용히. 상수 `TutorialCorridor1CooldownFlow.CooldownResetId` 는 문구 적용 메뉴가 쓰므로 남김) · `TUT_Z2_NUDGE` · `TUT_Z2_Q`/`TUT_Z2_E` + `_PALADIN/_GUNNER/_ASSASSIN`. 상수는 `TutorialGuideIds` 에서 지웠다.
-- 새 id(목표 줄, 시나리오 §5 에 없음): `TUT_C_PICK` · `TUT_C_WAIT` · `TUT_C_NEXT` · `TUT_C4_GO_PAD`. 상수는 `TutorialCorridorFlow`(TutorialGuideIds 는 다른 레인 소유).
+- 새 id(목표 줄, 시나리오 §5 에 없음): `TUT_C_PICK` · `TUT_C_WAIT` · `TUT_C_NEXT` · `TUT_C4_GO_PAD`. 상수는 `MapSceneTraitCorridorFlow`(TutorialGuideIds 는 다른 레인 소유).
 - 창 안 문구(`TUT_C1_TRAIT_INTRO`·`TUT_C4_TRAIT_LAST`·획득 토스트)는 특성 쪽 `TutorialTraitTexts.asset` 그대로.
 
 ## 판단
@@ -83,5 +87,5 @@
 - 늦게 붙은 클라(복도·존2 도중)도 목표가 현재 상태로 보인다.
 
 ## 남은 것
-- (S12 해결) 복도 낙오자 창 위치(판단 1) · 출구 목표(`TUT_C_NEXT`)는 다음 존 단계가 이미 보이면 쓰지 않는다(`TutorialCorridorRules.ShouldShowExitObjective`) · 복도4 에서 존4 "보스방으로"가 복도 목표를 덮지 않는다 · 단계 Finished 뒤 복도 안내 중지.
+- (S12 해결) 복도 낙오자 창 위치(판단 1) · 출구 목표(`TUT_C_NEXT`)는 다음 존 단계가 이미 보이면 쓰지 않는다(`MapSceneTraitCorridorRules.ShouldShowExitObjective`) · 복도4 에서 존4 "보스방으로"가 복도 목표를 덮지 않는다 · 단계 Finished 뒤 복도 안내 중지.
 - 문구는 초안 — 기획 확정 필요(특히 `TUT_C_*` 새 id).

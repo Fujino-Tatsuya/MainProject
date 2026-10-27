@@ -11,7 +11,7 @@ public sealed class QABoss103AutoReviveTests
     [Test]
     public void 지연은_튜토리얼_자동_부활과_같다()
     {
-        var q = new QABoss103ReviveQueue(TutorialDeathRulesModel.DefaultReviveDelaySeconds);
+        var q = new QABoss103ReviveQueue(MapSceneDeathRulesModel.DefaultReviveDelaySeconds);
         Assert.AreEqual(3.0, q.DelaySeconds);
     }
 

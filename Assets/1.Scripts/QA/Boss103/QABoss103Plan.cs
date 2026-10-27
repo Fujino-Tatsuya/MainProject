@@ -41,7 +41,7 @@ public static class QABoss103Plan
     public const double CombatLimitSeconds = 30 * 60;
 
     /// <summary>
-    /// 보스 전에 고르는 특성 수 = 튜토리얼 복도 1~4 라운드(<c>TutorialCorridorFlow</c> — 복도마다 1장, 출구 G2/G4/G7/G10).
+    /// 보스 전에 고르는 특성 수 = 튜토리얼 복도 1~4 라운드(<c>MapSceneTraitCorridorFlow</c> — 복도마다 1장, 출구 G2/G4/G7/G10).
     /// 전멸 뒤 재선택 라운드 수(<c>TutorialTraitResetModel.ReselectRounds</c> = 4)와 같다.
     /// </summary>
     public const int TraitRounds = 4;

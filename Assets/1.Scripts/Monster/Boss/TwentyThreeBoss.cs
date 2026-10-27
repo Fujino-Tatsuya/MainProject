@@ -15,7 +15,7 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptCueSink
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -4963,9 +4963,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 저지 실패 = 대폭발(방 전체 즉사기 — raidSelfDestructBlastLethal) → 남은 HP 전투로(살아남은·부활한 사람).
         float warn = _boss.raidSelfDestructBlastWarn;
-        // 즉사기(팀장 10-14 — 실패하기가 너무 어려웠다): 한 방 상한을 건너뛴다. 피격 무효(대시 무적 등)는 그대로.
+        // 즉사기(팀장 10-14 — 실패하기가 너무 어려웠다): 한 방 상한을 건너뛴다.
+        // 방 전체라 데이터 칸 raidSelfDestructBlastIgnoreInvuln(0/1, 할 일 105, 기본 1)이 1 이면 전멸기 — 발동 순간 살아 있는 참가자 전원 사망 처리
+        // (칸·벽 끼임·무적 무관, BossWipeDischargeRules). 0 이면 예전처럼 칸 판정 즉사 피해(무적으로 피함).
         _electricFloor?.ServerQueueDischarge(BossTileGrid.AllMask, warn, _boss.raidSelfDestructBlastDamage,
-                                             lethal: _boss.raidSelfDestructBlastLethal);
+                                             lethal: _boss.raidSelfDestructBlastLethal,
+                                             ignoreInvulnerability: _boss.raidSelfDestructBlastIgnoreInvuln != 0);
         _raidFloorHoldUntil = Time.time + warn + 2f;
         Debug.Log("[23호/레이드] 폐기 처분 — 저지 실패, 대폭발", this);
         FightLog("④ 폐기 처분 실패 → 대폭발");
@@ -6134,7 +6137,14 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             WarnNoInterruptFlashOnce();
             return;
         }
-        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.TargetFlash || interruptFlash == null) return;
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);

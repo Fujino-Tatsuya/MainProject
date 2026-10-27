@@ -38,7 +38,7 @@ using UnityEngine;
 /// 강제 회수된다. 팔라딘 10초 / 거너 5초 기준으로 15초를 쓴다.
 /// </summary>
 [DisallowMultipleComponent]
-public class PlayerShieldVfx : BaseNetworkBehaviour
+public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
 {
     /// <summary>지금 띄워야 할 배리어. 셋 중 하나뿐이다 — 두 겹으로 띄우지 않는다.</summary>
     private enum Barrier
@@ -315,10 +315,15 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     private void InterruptWaveRpc() => PlayInterruptWave();
 
-    // 간파 연출 스위치(할 일 104 B3) — 피어마다 자기 값.
-    private void PlayInterruptWave()
+    // 간파 연출 디렉터(할 일 118) — B3 칸은 피어마다 자기 값. 켜져 있으면 디렉터가 PlayCue 로 돌려 부른다.
+    private void PlayInterruptWave() =>
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.PaladinWave,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success, IsSpawned ? OwnerClientId : 0), this);
+
+    // [각 피어] B3 충격파 원샷.
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
     {
-        if (InterruptPresentationToggles.IsOn(InterruptPresentationKind.PaladinWave))
+        if (cue == InterruptProductionCue.PaladinWave)
             interruptWave?.PlayOnce();
     }
 
