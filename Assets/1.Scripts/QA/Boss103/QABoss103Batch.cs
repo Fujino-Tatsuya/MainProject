@@ -40,6 +40,12 @@ public struct QABoss103Watch
 public static class QABoss103Batch
 {
     public const int TotalRuns = 90;
+    /// <summary>할 일 119 C3 — 같은 조건 30판(보통·숙련·초보 번갈아 → 단계마다 10판).</summary>
+    public const int TotalRuns119 = 30;
+    /// <summary>할 일 119 C3 — 리포트 비교 기준 배치(지난 103 90판). batch.txt <c>compare_dir</c> 로 바꾼다.</summary>
+    public const string CompareDirDefault = "C:/UnityProject/QA/103-20261027_0057";
+    public const string Prefix103 = "103";
+    public const string Prefix119 = "119";
     /// <summary>오류 판 재실행 횟수(끝에서 1회).</summary>
     public const int MaxRetry = 1;
 
@@ -345,8 +351,21 @@ public static class QABoss103Batch
         }
     }
 
-    /// <summary>배치 폴더 이름 = <c>103-yyyyMMdd_HHmm</c>.</summary>
-    public static string BatchFolderName(DateTime at) => "103-" + at.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture);
+    /// <summary>배치 폴더 이름 = <c>&lt;접두어&gt;-yyyyMMdd_HHmm</c>(기본 103, 할 일 119 30판은 119).</summary>
+    public static string BatchFolderName(DateTime at, string prefix = Prefix103) =>
+        prefix + "-" + at.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture);
+
+    /// <summary>배치 폴더 이름의 시각 부분(<c>yyyyMMdd_HHmm…</c>) — 접두어가 달라도 최신 폴더를 시각으로 고른다. 형식이 아니면 null.</summary>
+    public static string BatchStamp(string folderName)
+    {
+        if (string.IsNullOrEmpty(folderName))
+            return null;
+        int dash = folderName.IndexOf('-');
+        if (dash <= 0 || dash + 1 >= folderName.Length || !char.IsDigit(folderName[dash + 1]))
+            return null;
+        string head = folderName.Substring(0, dash);
+        return head == Prefix103 || head == Prefix119 ? folderName.Substring(dash + 1) : null;
+    }
 
     /// <summary>심장박동 파일 — <c>&lt;배치&gt;/hb/run&lt;n&gt;_r&lt;retry&gt;_&lt;역할&gt;.txt</c>(역할 = host · client-mppm…).</summary>
     public static string BeatPath(string outDir, int run, int retry, string role) =>

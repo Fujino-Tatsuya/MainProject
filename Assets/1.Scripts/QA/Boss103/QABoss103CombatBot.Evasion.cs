@@ -71,6 +71,9 @@ public sealed partial class QABoss103CombatBot
     private double _guardReleaseAt;
 
     private int _threatsSeen, _dashes, _guards, _walks, _noCharges, _blocks, _dashRejects, _guardRejects, _late;
+    /// <summary>할 일 119 — 즉사(굴림 없음) 위험 id(같은 위험은 한 번만 센다) · 수 · 예고 판별이 발동과 어긋난 수.</summary>
+    private readonly HashSet<string> _lethalSeen = new HashSet<string>();
+    private int _lethalNoRoll, _lethalMismatch;
 
     // 간파
     private readonly QABoss103WindowEstimate _window = new QABoss103WindowEstimate();
@@ -137,12 +140,18 @@ public sealed partial class QABoss103CombatBot
         _sensor.Bind(_boss);
         _sensor.Tick(me, now);
 
+        CheckLethalFire();
         IReadOnlyList<QABoss103Threat> threats = _sensor.Threats;
         for (int i = 0; i < threats.Count; i++)
         {
             QABoss103Threat t = threats[i];
-            if (!t.Active || _ledger.HasRolled(t.Id) || !_sensor.Contains(t, myPos, surface))
+            if (!t.Active || _ledger.HasRolled(t.Id) || _lethalSeen.Contains(t.Id) || !_sensor.Contains(t, myPos, surface))
                 continue;
+            if (t.Lethal != QABoss103LethalKind.None)
+            {
+                NoteLethal(t, now);   // 할 일 119 — 무적 무시 즉사: 굴림·대시 없음(기믹 행동은 그대로)
+                continue;
+            }
             if (!_ledger.TryRoll(t.Id, _dodgeRng, _profile.PatternHitChance, out bool dodge))
                 continue;
             _threatsSeen++;
@@ -237,6 +246,49 @@ public sealed partial class QABoss103CombatBot
         string ok = action == QABoss103DodgeAction.Dash || action == QABoss103DodgeAction.Guard ? (done ? "true" : "false") : "na";
         Report(r, action, ok, note, now);
         return true;
+    }
+
+    /// <summary>
+    /// 할 일 119 — 즉사(무적 무시) 위험 1건: 굴리지 않고 '즉사(굴림 없음)'로 1줄·판 파일 <c>lethal</c> 1줄. 같은 위험은 한 번만.
+    /// 할 일 105 로 게임이 이 방전에서 무적을 무시하므로(2회차~·④ 는 칸·위치 무관 전원 사망) 대시를 쓰지 않는다. 탑 공격 등 기믹은 C3b 가 그대로 한다.
+    /// </summary>
+    private void NoteLethal(QABoss103Threat t, double now)
+    {
+        _lethalSeen.Add(t.Id);
+        if (_lethalSeen.Count > QABoss103ThreatLedger.Memory)
+            _lethalSeen.Clear();   // 위험 id 는 종류별 회차라 다시 오지 않는다 — 기억 상한만 둔다
+        _lethalNoRoll++;
+        double hitMs = QABoss103HitTiming.HitDelay(t.Kind, t.LeadSeconds, t.GrowSeconds, double.NaN, t.Chained) * 1000.0;
+        Debug.Log($"{Tag} event=threat pattern={QABoss103Evasion.Token(t.Kind)} id={t.Id} attack={QABoss103Plan.Token(t.Attack)} bot={_character} slot={_slot} " +
+                  $"tier={_profile.Tier} roll=lethal action=none ok=na lethal={QABoss103Lethal.Token(t.Lethal)} " +
+                  $"leadMs={(double.IsNaN(t.LeadSeconds) ? "na" : F0(t.LeadSeconds * 1000.0))} hitMs={F0(hitMs)} serverT={F3(t.ServerT)} note=lethal_no_roll");
+        PartWrite(QABoss103PartFile.Format("lethal",
+            "slot", _slot.ToString(CultureInfo.InvariantCulture),
+            "pattern", QABoss103Evasion.Token(t.Kind),
+            "attack", t.Attack,
+            "id", t.Id,
+            "serverT", F3(t.ServerT),
+            "lethal", QABoss103Lethal.Token(t.Lethal),
+            "hitMs", F0(hitMs)));
+    }
+
+    /// <summary>할 일 119 — 장판 발동마다 예고 때 즉사 판별이 실제 발동(즉사 연출 플래그)과 맞았나(둘 중 하나라도 즉사일 때만 1줄).</summary>
+    private void CheckLethalFire()
+    {
+        if (!_sensor.TakeFloorFire(out QABoss103Threat warned, out ulong mask, out bool firedLethal))
+            return;
+        QABoss103LethalKind predicted = warned != null ? warned.Lethal : QABoss103LethalKind.None;
+        if (predicted == QABoss103LethalKind.None && !firedLethal)
+            return;
+        bool match = (predicted != QABoss103LethalKind.None) == firedLethal;
+        if (!match)
+            _lethalMismatch++;
+        string line = $"{Tag} event=lethal_check bot={_character} slot={_slot} predicted={QABoss103Lethal.Token(predicted)} firedLethal={(firedLethal ? "true" : "false")} " +
+                      $"match={(match ? "true" : "false")} tiles={BossTileGrid.Count(mask)} warnMs={(warned != null && !double.IsNaN(warned.LeadSeconds) ? F0(warned.LeadSeconds * 1000.0) : "na")} id={(warned != null ? warned.Id : "na")}";
+        if (match)
+            Debug.Log(line);
+        else
+            Debug.LogWarning(line);
     }
 
     /// <summary>C7e — 마지막 시도 = 마감 이만큼(초) 전. 대시 무적(0.25)이 마감을 덮을 마지막 틈.</summary>
@@ -739,7 +791,8 @@ public sealed partial class QABoss103CombatBot
 
     private string EvasionDiag() =>
         $"threats={_threatsSeen} dodgeRolls={_ledger.Dodges} takeRolls={_ledger.Takes} dashes={_dashes} dashRejects={_dashRejects} guards={_guards} walks={_walks} " +
-        $"guardRejects={_guardRejects} noCharge={_noCharges} blocked={_blocks} late={_late} counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips}";
+        $"guardRejects={_guardRejects} noCharge={_noCharges} blocked={_blocks} late={_late} lethalNoRoll={_lethalNoRoll} lethalMismatch={_lethalMismatch} " +
+        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips}";
 
     private static string F0(double v) => double.IsNaN(v) ? "na" : v.ToString("F0", CultureInfo.InvariantCulture);
     private static string F2(double v) => double.IsNaN(v) ? "na" : v.ToString("F2", CultureInfo.InvariantCulture);
