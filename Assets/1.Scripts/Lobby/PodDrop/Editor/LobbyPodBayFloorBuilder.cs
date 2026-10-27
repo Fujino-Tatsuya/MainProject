@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -8,9 +7,10 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 로비 발사대 둘레 바닥 메시 생성기(할 일 100 C2j). 메뉴 <c>Tools/Lobby/Rebuild Pod Bay Floor</c>.
 /// <para>바닥 = 바깥 범위(포드 베이 벽 중심선·인접 홀 타일 경계까지, 로비 루트 로컬 좌표) − 발사대 외곽선.
-/// 외곽선 = 발사대의 고정 메시(<see cref="SilhouetteRenderers"/>)를 바닥 근처 높이 구간(<see cref="SliceMinY"/>~<see cref="SliceMaxY"/>)으로
-/// 잘라 XZ 로 투영한 실루엣에 <see cref="Margin"/> 여유를 더한 것. 애니로 움직이는 Pod·Launcher 는 넣지 않는다.</para>
-/// <para>실루엣은 <see cref="Cell"/> 격자로 보수적 래스터화(삼각형이 조금이라도 걸치는 칸 = 막힘)한 뒤, 막힌 칸과의 틈이 여유보다 좁은 칸도 막는다.
+/// 외곽선 = 발사대의 고정 메시(<see cref="SilhouetteRenderers"/>) 전체 높이를 XZ 로 투영한 실루엣에 <see cref="Margin"/> 여유를 더한 것
+/// (위쪽 난간 플랫폼·아래 가운데 돌출부까지 — 바닥이 그 밑으로 들어가지 않는다, 2026-10-27 floor2). 애니로 움직이는 Pod·Launcher 는 넣지 않는다.</para>
+/// <para>실루엣은 <see cref="Cell"/> 격자로 보수적 래스터화(삼각형이 조금이라도 걸치는 칸 = 막힘)하고, 행마다 좌우 끝 사이를 채운 뒤(가로 오목부 막기),
+/// 막힌 칸과의 틈이 여유보다 좁은 칸도 막는다.
 /// 바닥은 바깥 범위 경계에서 이어지는 칸만 쓴다(실루엣이 둘러싼 구멍 — 포드 통로 등 — 은 비운다).</para>
 /// <para>메시: 윗면 y=0(서브메시 1, 타일 재질), 옆면·아랫면 y=−0.3(서브메시 0, 모서리 재질) — <c>SM_SB_Floor_4x4_T030_v015</c> 와 같은 구성.
 /// 윗면 UV 는 그 타일과 같은 매핑(로컬 XZ ÷ −2, 2m 주기)이라 이웃 타일 무늬가 이어진다.
@@ -29,9 +29,6 @@ public static class LobbyPodBayFloorBuilder
     /// <summary>외곽선에 넣는 발사대 고정 렌더러(이름). Pod·Launcher_Moving(스킨, 애니)·Hidden_*(꺼짐)은 뺀다.</summary>
     public static readonly string[] SilhouetteRenderers = { "Platform_Fixed", "Tunnel_Fixed" };
 
-    /// <summary>외곽선 높이 구간(로비 루트 로컬 y). 바닥 두께(−0.3~0) + 바로 위 0.5m — 바닥과 같은 높이에서 부딪히는 부분만.</summary>
-    public const float SliceMinY = -0.3f;
-    public const float SliceMaxY = 0.5f;
     public const float Margin = 0.02f;
     public const float Cell = 0.01f;
     public const float Thickness = 0.3f;
@@ -57,16 +54,23 @@ public static class LobbyPodBayFloorBuilder
     {
         public Rect Bounds;
         public int Width, Height;
-        public bool[] Floor;
+        public bool[] Floor, Blocked;
         public int BlockedCells, HoleCells;
         public bool IsFloor(int x, int z) => x >= 0 && z >= 0 && x < Width && z < Height && Floor[z * Width + x];
+
+        /// <summary>점이 든 칸 번호(범위 밖이면 −1).</summary>
+        public int CellAt(Vector2 p)
+        {
+            int x = Mathf.FloorToInt((p.x - Bounds.xMin) / Cell), z = Mathf.FloorToInt((p.y - Bounds.yMin) / Cell);
+            return x >= 0 && z >= 0 && x < Width && z < Height ? z * Width + x : -1;
+        }
     }
 
     [MenuItem(MenuPath)]
     private static void RebuildMenu()
     {
         var report = Rebuild();
-        Debug.Log($"{Tag} {report}");
+        Debug.Log($"{Tag} {report}\n점검: {Verify()}");
     }
 
     /// <summary>메시를 다시 만들어 에셋에 덮어쓰고, 로비 프리팹에 바닥 오브젝트가 없으면 만든다. 결과 요약을 돌려준다.</summary>
@@ -127,7 +131,7 @@ public static class LobbyPodBayFloorBuilder
         return tile.GetComponent<MeshRenderer>();
     }
 
-    /// <summary>발사대 고정 메시를 높이 구간으로 잘라 루트 로컬 XZ 로 투영한 볼록 다각형(선분 포함) 목록.</summary>
+    /// <summary>발사대 고정 메시 삼각형을 루트 로컬 XZ 로 투영한 삼각형(수직 면은 선분) 목록.</summary>
     public static Silhouette CollectSilhouette(Transform root)
     {
         var station = root.Find(LaunchStationName);
@@ -141,41 +145,12 @@ public static class LobbyPodBayFloorBuilder
             if (!mf.sharedMesh.isReadable) throw new System.InvalidOperationException($"{Tag} {name} 메시가 Read/Write 꺼짐.");
             sil.Renderers.Add($"{name}({mf.sharedMesh.name})");
             var m = toRoot * mf.transform.localToWorldMatrix;
-            var verts = mf.sharedMesh.vertices.Select(v => m.MultiplyPoint3x4(v)).ToArray();
+            var verts = mf.sharedMesh.vertices.Select(v => { var p = m.MultiplyPoint3x4(v); return new Vector2(p.x, p.z); }).ToArray();
             var tris = mf.sharedMesh.triangles;
             for (int i = 0; i < tris.Length; i += 3)
-            {
-                var poly = ClipSlab(verts[tris[i]], verts[tris[i + 1]], verts[tris[i + 2]]);
-                if (poly != null) sil.Polygons.Add(poly);
-            }
+                sil.Polygons.Add(new[] { verts[tris[i]], verts[tris[i + 1]], verts[tris[i + 2]] });
         }
         return sil;
-    }
-
-    private static Vector2[] ClipSlab(Vector3 a, Vector3 b, Vector3 c)
-    {
-        var pts = new List<Vector3> { a, b, c };
-        pts = ClipY(pts, SliceMinY, true);
-        if (pts.Count == 0) return null;
-        pts = ClipY(pts, SliceMaxY, false);
-        if (pts.Count == 0) return null;
-        return pts.Select(p => new Vector2(p.x, p.z)).ToArray();
-    }
-
-    // keepAbove: y >= h 를 남긴다, 아니면 y <= h.
-    private static List<Vector3> ClipY(List<Vector3> pts, float h, bool keepAbove)
-    {
-        var res = new List<Vector3>();
-        for (int i = 0; i < pts.Count; i++)
-        {
-            var p = pts[i];
-            var q = pts[(i + 1) % pts.Count];
-            float dp = keepAbove ? p.y - h : h - p.y;
-            float dq = keepAbove ? q.y - h : h - q.y;
-            if (dp >= 0) res.Add(p);
-            if ((dp >= 0) != (dq >= 0)) res.Add(Vector3.Lerp(p, q, dp / (dp - dq)));
-        }
-        return res;
     }
 
     public static Rect OuterBounds()
@@ -218,6 +193,16 @@ public static class LobbyPodBayFloorBuilder
             }
         }
 
+        // 행마다 발사대 좌우 끝 사이를 모두 막는다 — 아래 가운데 홈(터널 남쪽)·위쪽 탭 사이처럼 가로로 오목한 곳에 바닥이 들어가지 않게(floor2 요청).
+        // 아래로 벌어진 모서리 모따기는 그 행의 끝 바깥이라 그대로 바닥이 된다.
+        for (int z = 0; z < h; z++)
+        {
+            int lo = -1, hi = -1;
+            for (int x = 0; x < w; x++)
+                if (blocked[z * w + x]) { if (lo < 0) lo = x; hi = x; }
+            for (int x = lo + 1; lo >= 0 && x < hi; x++) blocked[z * w + x] = true;
+        }
+
         // 막힌 칸과의 틈(칸 경계 사이 거리)이 여유보다 좁은 칸도 막는다.
         int r = Mathf.CeilToInt(Margin / Cell) + 1;
         var kernel = new List<Vector2Int>();
@@ -249,6 +234,7 @@ public static class LobbyPodBayFloorBuilder
 
         // 바깥 범위 경계 칸에서 이어지는 칸만 바닥.
         g.Floor = new bool[w * h];
+        g.Blocked = dilated;
         var queue = new Queue<int>();
         for (int z = 0; z < h; z++)
         for (int x = 0; x < w; x++)
@@ -534,24 +520,135 @@ public static class LobbyPodBayFloorBuilder
         return d;
     }
 
-    /// <summary>현재 로비 프리팹으로 침범 검사 요약 문자열(메뉴 실행 뒤 확인용).</summary>
-    public static string Verify()
+    /// <summary>윗면 서브메시를 사각형으로 되돌린다(<see cref="BuildMesh"/> 가 사각형마다 정점 4개·인덱스 6개를 쓴다). 루트 로컬 XZ.</summary>
+    public static List<Rect> TopRects(Mesh mesh, Matrix4x4 meshToRoot)
+    {
+        var v = mesh.vertices;
+        var t = mesh.GetTriangles(1);
+        var rects = new List<Rect>();
+        for (int i = 0; i < t.Length; i += 6)
+        {
+            var pts = new[] { t[i], t[i + 1], t[i + 2], t[i + 5] }.Select(k => meshToRoot.MultiplyPoint3x4(v[k])).ToArray();
+            rects.Add(Rect.MinMaxRect(pts.Min(p => p.x), pts.Min(p => p.z), pts.Max(p => p.x), pts.Max(p => p.z)));
+        }
+        return rects;
+    }
+
+    /// <summary>켜진 기존 바닥 타일(<c>SM_SB_Floor*</c> 메시)의 루트 로컬 XZ 범위.</summary>
+    public static List<Rect> ExistingTiles(Transform root)
+    {
+        var toRoot = root.worldToLocalMatrix;
+        return root.GetComponentsInChildren<MeshFilter>(true)
+            .Where(m => m.gameObject.activeInHierarchy && m.name != FloorObjectName && m.sharedMesh != null && m.sharedMesh.name.StartsWith("SM_SB_Floor"))
+            .Select(m =>
+            {
+                var b = m.sharedMesh.bounds;
+                var mat = toRoot * m.transform.localToWorldMatrix;
+                var c = new[] { b.min, b.max, new Vector3(b.min.x, 0, b.max.z), new Vector3(b.max.x, 0, b.min.z) }.Select(p => mat.MultiplyPoint3x4(p)).ToArray();
+                return Rect.MinMaxRect(c.Min(p => p.x), c.Min(p => p.z), c.Max(p => p.x), c.Max(p => p.z));
+            }).ToList();
+    }
+
+    /// <summary>생성 바닥 윗면과 기존 타일이 겹치는 사각형 쌍 수와 겹친 넓이(m²).</summary>
+    public static (int pairs, float area) CheckTileOverlap(List<Rect> floor, List<Rect> tiles)
+    {
+        int n = 0;
+        float area = 0;
+        foreach (var f in floor)
+        foreach (var t in tiles)
+        {
+            float w = Mathf.Min(f.xMax, t.xMax) - Mathf.Max(f.xMin, t.xMin), h = Mathf.Min(f.yMax, t.yMax) - Mathf.Max(f.yMin, t.yMin);
+            if (w > 1e-4f && h > 1e-4f) { n++; area += w * h; }
+        }
+        return (n, area);
+    }
+
+    /// <summary>
+    /// 이음매 검사. 바깥 범위 둘레를 1cm 간격으로 훑어 안쪽 점이 바닥도 외곽선(여유 포함)도 아니면 틈으로 센다(그중 바깥이 기존 타일인 곳 = 타일 이음매 틈).
+    /// 바깥 범위 안 칸 중 바닥도 외곽선도 아닌 칸은 <see cref="FloorGrid.HoleCells"/>(외곽선이 둘러싼 발사대 밑)로 따로 센다.
+    /// </summary>
+    public static (int samples, int gaps, int tileSeamGaps) CheckSeams(FloorGrid g, List<Rect> floor, List<Rect> tiles)
+    {
+        const float step = 0.01f, off = 0.005f;
+        int samples = 0, gaps = 0, tileGaps = 0;
+        bool InOuter(Vector2 p) => OuterRegion.Any(r => r.Contains(p));
+        foreach (var r in OuterRegion)
+        {
+            var edges = new[]
+            {
+                (a: new Vector2(r.xMin, r.yMin), b: new Vector2(r.xMax, r.yMin), n: Vector2.down),
+                (a: new Vector2(r.xMin, r.yMax), b: new Vector2(r.xMax, r.yMax), n: Vector2.up),
+                (a: new Vector2(r.xMin, r.yMin), b: new Vector2(r.xMin, r.yMax), n: Vector2.left),
+                (a: new Vector2(r.xMax, r.yMin), b: new Vector2(r.xMax, r.yMax), n: Vector2.right),
+            };
+            foreach (var (a, b, n) in edges)
+            {
+                int count = Mathf.RoundToInt(Vector2.Distance(a, b) / step);
+                for (int i = 0; i < count; i++)
+                {
+                    var p = Vector2.Lerp(a, b, (i + 0.5f) / count);
+                    var pin = p - n * off;
+                    var pout = p + n * off;
+                    if (InOuter(pout) || !InOuter(pin)) continue; // 두 사각형이 맞닿은 안쪽 변
+                    samples++;
+                    int c = g.CellAt(pin);
+                    bool covered = floor.Any(f => f.Contains(pin)) || (c >= 0 && g.Blocked[c]);
+                    if (covered) continue;
+                    gaps++;
+                    if (tiles.Any(t => t.Contains(pout))) tileGaps++;
+                }
+            }
+        }
+        return (samples, gaps, tileGaps);
+    }
+
+    public struct CheckResult
+    {
+        public int Overlaps, Pairs, BlockedFloorCells, Tiles, TilePairs, SeamSamples, SeamGaps, TileSeamGaps, HoleCells;
+        public float MinGap, TileArea;
+
+        public override string ToString() =>
+            $"외곽선 겹침 {Overlaps}, 최소 틈 {MinGap:F4}m (검사 쌍 {Pairs}), 막힌 칸(오목부 포함) 위 바닥 칸 {BlockedFloorCells} / " +
+            $"기존 타일 {Tiles}개와 겹침 {TilePairs}쌍 {TileArea:F4}m² / " +
+            $"둘레 이음매 틈 {SeamGaps} (그중 타일 경계 {TileSeamGaps}, 표본 {SeamSamples}) / 발사대 밑 빈 칸 {HoleCells}";
+    }
+
+    /// <summary>현재 로비 프리팹의 생성 바닥을 침범·타일 겹침·이음매로 검사한다. 바닥 오브젝트가 없으면 null.</summary>
+    public static CheckResult? Check()
     {
         var root = PrefabUtility.LoadPrefabContents(LobbyPrefabPath);
         try
         {
             var floor = root.transform.Find(FloorObjectName);
-            if (floor == null) return "바닥 오브젝트 없음";
+            if (floor == null) return null;
             var sil = CollectSilhouette(root.transform);
             var mesh = floor.GetComponent<MeshFilter>().sharedMesh;
-            var (overlaps, minGap, pairs) = CheckIntrusion(mesh, root.transform.worldToLocalMatrix * floor.localToWorldMatrix, sil);
-            var sb = new StringBuilder();
-            sb.Append($"외곽선 겹침 {overlaps}, 최소 틈 {minGap:F4}m (검사 쌍 {pairs})");
-            return sb.ToString();
+            var meshToRoot = root.transform.worldToLocalMatrix * floor.localToWorldMatrix;
+            var res = new CheckResult();
+            (res.Overlaps, res.MinGap, res.Pairs) = CheckIntrusion(mesh, meshToRoot, sil);
+            var grid = Rasterize(sil);
+            var rects = TopRects(mesh, meshToRoot);
+            var tiles = ExistingTiles(root.transform);
+            res.Tiles = tiles.Count;
+            (res.TilePairs, res.TileArea) = CheckTileOverlap(rects, tiles);
+            (res.SeamSamples, res.SeamGaps, res.TileSeamGaps) = CheckSeams(grid, rects, tiles);
+            res.HoleCells = grid.HoleCells;
+            // 행 채움으로 막은 오목부(삼각형 밖)까지 포함한 막힌 칸 위 바닥 칸 수.
+            foreach (var r in rects)
+            for (float z = r.yMin + Cell * 0.5f; z < r.yMax; z += Cell)
+            for (float x = r.xMin + Cell * 0.5f; x < r.xMax; x += Cell)
+            {
+                int c = grid.CellAt(new Vector2(x, z));
+                if (c < 0 || grid.Blocked[c]) res.BlockedFloorCells++;
+            }
+            return res;
         }
         finally
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
     }
+
+    /// <summary>현재 로비 프리팹으로 침범·타일 겹침·이음매 검사 요약 문자열(메뉴 실행 뒤 확인용).</summary>
+    public static string Verify() => Check()?.ToString() ?? "바닥 오브젝트 없음";
 }
