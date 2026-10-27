@@ -19,6 +19,7 @@ internal static class SlowMotionEditModeTestRunner
         "^DarkAdaptationRendererSetupTests$",
         "^InterruptProductionDirectorTests$",      // 간파 연출 디렉터 스위치(할 일 104 → 118)
         "^InterruptProductionPrefabTests$",        // 간파 연출 디렉터 프리팹·프로필 흡수(할 일 118 C2)
+        "^InterruptProductionStageTests$",         // 간파 연출 서버 사건 4개·단계(할 일 118 C3)
     };
 
     const string Tag = "[SlowMotionTests]";

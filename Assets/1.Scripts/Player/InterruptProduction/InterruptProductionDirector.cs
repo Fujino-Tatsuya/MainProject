@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
-public sealed class InterruptProductionDirector : MonoBehaviour
+public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
@@ -65,6 +65,18 @@ public sealed class InterruptProductionDirector : MonoBehaviour
     /// <summary>성공 슬로우 프로필.</summary>
     public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
 
+    // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
+    private readonly ITimeScalePort _timeScale = new GlobalTimeScalePort();
+    private InterruptAttemptStage _attempt;
+    private InterruptResolveStage _resolve;
+    private InterruptSuccessStage _success;
+    private InterruptFailStage _fail;
+
+    private InterruptAttemptStage AttemptStage => _attempt ??= new InterruptAttemptStage(this, _timeScale);
+    private InterruptResolveStage ResolveStage => _resolve ??= new InterruptResolveStage(_timeScale);
+    private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timeScale);
+    private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timeScale);
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -108,4 +120,35 @@ public sealed class InterruptProductionDirector : MonoBehaviour
 
     /// <summary>A3 — 개인 채널 오너 줌 배율. 칸이 꺼져 있으면 1.</summary>
     public static float OwnerZoomFactor(float zoomFactor) => InterruptProductionRules.OwnerZoomFactor(Instance, zoomFactor);
+
+    // ---- 서버 사건 (간파 스킬이 알린다 — 인스턴스 없으면 아무것도 안 한다) ----
+    // 판정·피해·카운터 창은 스킬 소관. 여기는 GlobalTimeScale.ServerStart/ServerFail 과 캐릭터 성공 relay 만 부른다.
+
+    /// <summary>[서버] 시도 — 예측 적중이면 시도 슬로우를 건다. 발동 번호(0 = 없음)를 돌려준다.</summary>
+    public static uint ServerAttempt(in InterruptProductionEvent e) => Instance != null ? Instance.AttemptStage.Server(e) : 0;
+
+    /// <summary>[서버] 판정 — 시도 슬로우 정리(빗나감이면 실패 복귀).</summary>
+    public static void ServerResolve(in InterruptProductionEvent e)
+    {
+        if (Instance != null)
+            Instance.ResolveStage.Server(e);
+    }
+
+    /// <summary>[서버] 성공 — 성공 슬로우(+A1)를 걸고 시전자의 캐릭터 성공 relay 를 부른다. 판정 사건 바로 뒤에 알린다.</summary>
+    public static void ServerSuccess(in InterruptProductionEvent e)
+    {
+        if (Instance != null)
+            Instance.SuccessStage.Server(e, FindSuccessRelays(e.Caster));
+    }
+
+    /// <summary>[서버] 실패 — 판정 전 종료·앵커 누락. 모든 피어에서 불려도 발동 번호가 0 이면 아무것도 안 한다.</summary>
+    public static void ServerFail(in InterruptProductionEvent e)
+    {
+        if (Instance != null)
+            Instance.FailStage.Server(e);
+    }
+
+    // 성공은 드물어 사건마다 찾는다(값 캐싱 없음 규칙과도 맞다).
+    private static IInterruptSuccessRelay[] FindSuccessRelays(Player caster) =>
+        caster != null ? caster.GetComponentsInChildren<IInterruptSuccessRelay>(true) : null;
 }
