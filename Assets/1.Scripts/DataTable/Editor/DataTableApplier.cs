@@ -235,6 +235,13 @@ public static class DataTableApplier
                     continue;
                 }
 
+                if (resolvedField != null && resolvedField.IsDefined(typeof(SkillTooltipTagListAttribute), false) &&
+                    !SkillTooltipTags.TryValidate((string)value, out string tagError))
+                {
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {tagError}");
+                    continue;
+                }
+
                 if (value is long || value is double)
                 {
                     string rangeError = DataTableFields.CheckRange(

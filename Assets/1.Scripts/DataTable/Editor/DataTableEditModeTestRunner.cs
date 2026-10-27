@@ -22,6 +22,8 @@ internal static class DataTableEditModeTestRunner
         "^DataTableSaveGuardTests$",
         "^DataTableSheetGroupTests$",
         "^SkillTooltipFormatterTests$",
+        "^SkillTooltipTagsTests$", // 할 일 114 — 툴팁 태그 칸 파싱·테이블 검증·이름 키
+        "^SkillTooltipLayoutTests$", // 할 일 114 — 툴팁 슬롯 줄·태그 칩 줄바꿈
         "^StringTableValidatorTests$", // 로컬라이징 L1 — Strings 시트 검증
         "^StringsSheetTests$", // 로컬라이징 L1 — Strings 시트 읽기·Export
         "^ErrorCodesSheetTests$", // 로컬라이징 L1 — ErrorCodes 시트 읽기·검증·Export
