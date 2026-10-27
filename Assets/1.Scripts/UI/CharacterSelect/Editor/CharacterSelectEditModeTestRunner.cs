@@ -13,7 +13,8 @@ internal static class CharacterSelectEditModeTestRunner
     {
         "^CharacterSelectPanelRulesTests", // 포커스·확정·잠금·ESC·배경 흐름·카드 이동 연출(할 일 60)
         "^CharacterSelectConfirmButtonTests", // SELECT 셰브론 클릭 = Confirm(할 일 109, 실제 프리팹)
-        "^UiTriangleRaycastFilterTests" // 셰브론 삼각형 클릭 영역 판정(할 일 109)
+        "^UiTriangleRaycastFilterTests", // 셰브론 삼각형 클릭 영역 판정(할 일 109)
+        "^CharacterSelectChevronHoverOutlineTests" // 셰브론 hover 흰 아웃라인(할 일 109 후속, 실제 프리팹)
     };
 
     const string Tag = "[CharacterSelectTests]";

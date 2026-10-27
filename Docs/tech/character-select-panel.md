@@ -108,6 +108,7 @@
   꼭짓점 3개 = 인스펙터(rect 정규화 좌표, 0,0 = 왼쪽 아래 — rect 크기·pivot 이 바뀌어도 맞음, rect 밖 값 가능). 기본 (-0.04, 0.5)·(1, 1)·(1, 0):
   chevron.png 빗변 두 줄을 늘인 교점(끝이 둥글어 rect 왼쪽 7.5px 바깥)과 오른쪽 모서리 — 그림 픽셀이 전부 안에 들고 끝 둥근 곳 바깥 98픽셀만 더 잡힌다.
   셰브론을 고른 채 씬 뷰에서 하늘색 삼각형 기즈모로 보인다. 판정 = 순수 `UiTriangleRaycastFilter.Contains`(변·꼭짓점 위 = 안).
+- **hover 흰 아웃라인**(할 일 109 후속): 셰브론의 `UiHoverOutline` 이 Pointer Enter/Exit(삼각형 필터를 거친 레이캐스트)로 자식 `Outline_Hover`(`UiTriangleOutline` — 필터 삼각형 바깥을 두르는 선, 텍스처 없음·Raycast Target 끔, 기본 꺼짐)를 켜고 끈다. 기본 두께 6px·간격 3px·흰색(`Outline_Hover` 인스펙터), Button 이 interactable 일 때만(`onlyWhenInteractable`), 비활성화 때 끔. 잠금(준비 중)은 interactable 을 끄지 않아 잠금 중에도 hover 아웃라인이 켜진다.
 
 ### 길게 누르기(키 반복, 할 일 60·60.1)
 판단 = `CharacterSelectKeyRepeat`(순수). 패널은 매 프레임 "뒤로(W·↑·A·←) / 앞으로(S·↓·D·→) 중 하나라도 눌려 있는가"(`isPressed`)와 `Time.unscaledTime` 을 넘기고, 돌려받은 칸(-1·0·+1)만큼 `MoveFocus` 한다.

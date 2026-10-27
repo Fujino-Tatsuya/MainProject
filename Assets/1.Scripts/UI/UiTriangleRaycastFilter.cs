@@ -16,6 +16,10 @@ public sealed class UiTriangleRaycastFilter : MonoBehaviour, ICanvasRaycastFilte
     [SerializeField] private Vector2 vertexB = new Vector2(1f, 1f);
     [SerializeField] private Vector2 vertexC = new Vector2(1f, 0f);
 
+    public Vector2 VertexA => vertexA;
+    public Vector2 VertexB => vertexB;
+    public Vector2 VertexC => vertexC;
+
     public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
     {
         var rect = (RectTransform)transform;

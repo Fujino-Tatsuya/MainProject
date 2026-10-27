@@ -400,9 +400,37 @@ public static class CharacterSelectPanelAuthoring
         button.targetGraphic = image;
         // 뒤로가기와 같다 — None 이면 클릭해도 EventSystem 선택이 남지 않아 다음 Enter/Space 가 두 번 먹지 않는다.
         button.navigation = new Navigation { mode = Navigation.Mode.None };
-        if (chevron.GetComponent<UiTriangleRaycastFilter>() == null)
-            chevron.AddComponent<UiTriangleRaycastFilter>(); // 기본 꼭짓점 = chevron.png 삼각형
+        UiTriangleRaycastFilter filter = chevron.GetComponent<UiTriangleRaycastFilter>();
+        if (filter == null)
+            filter = chevron.AddComponent<UiTriangleRaycastFilter>(); // 기본 꼭짓점 = chevron.png 삼각형
+        AddChevronHoverOutline(chevron, button, filter);
         return button;
+    }
+
+    const string ChevronOutlineName = "Outline_Hover";
+
+    /// <summary>
+    /// hover 흰 아웃라인 — 자식 <see cref="UiTriangleOutline"/>(클릭 삼각형을 두르는 선, 기본 꺼짐) + 셰브론의 <see cref="UiHoverOutline"/>.
+    /// 이미 있으면 두께·색 등 손댄 값은 두고 연결만 맞춘다.
+    /// </summary>
+    static void AddChevronHoverOutline(GameObject chevron, Button button, UiTriangleRaycastFilter filter)
+    {
+        Transform existing = chevron.transform.Find(ChevronOutlineName);
+        UiTriangleOutline outline = existing != null ? existing.GetComponent<UiTriangleOutline>() : null;
+        if (outline == null)
+        {
+            RectTransform rect = existing != null ? (RectTransform)existing : NewRect(ChevronOutlineName, chevron.transform);
+            Stretch(rect);
+            outline = rect.gameObject.AddComponent<UiTriangleOutline>();
+            outline.color = Color.white;
+        }
+        outline.raycastTarget = false; // hover·클릭 영역은 셰브론 삼각형만
+        outline.Shape = filter;
+
+        UiHoverOutline hover = chevron.GetComponent<UiHoverOutline>();
+        if (hover == null)
+            hover = chevron.AddComponent<UiHoverOutline>();
+        hover.Setup(outline, button); // 기본 꺼짐
     }
 
     // ── 미리보기 캡처 ─────────────────────────────────────────
