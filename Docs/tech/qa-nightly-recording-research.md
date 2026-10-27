@@ -5,6 +5,8 @@
 > 확인처: obs-websocket 프로토콜 문서 `github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md`.
 > **2026-10-27 갱신(할 일 120)**: 조율이 위 공식 protocol.md(rpcVersion 1)로 §3.1 의 요청·응답·이벤트 칸을 확인했다(✅ 표시). 프로필 파라미터 키 이름과 출력 중 SetVideoSettings 가능 여부는 문서에 없어 [확인 필요]로 남는다.
 > 120 사양: `_lane-artifacts/common/120/120-결정.md` — 1단계(판 전체 + 저화질 + N일 삭제 + 이벤트 시각표) 구현, 2단계(리플레이 버퍼 클립) 스위치로 구현.
+> **2026-10-27 갱신(120 후속 — 팀원 PC 공유 양식)**: 공유 모드 = 리플레이 클립만, 공유 날짜 폴더 `<루트>\<MM-dd>\` 평평한 구조, OBS 녹화 경로를 날짜 폴더로(`SetRecordDirectory`), 리플레이 버퍼 실제 켜짐 확인(`GetReplayBufferStatus`). 공유 폴더 복사(robocopy·배치 폴더 사본)는 없앴다. 에이전트 양식: [qa-nightly-agent-guide.md](qa-nightly-agent-guide.md).
+> 같은 날 OBS 32.0.1 실측(메인 e05586ea): 단순 모드 '스트림과 같음' + `VBitrate` 2500 적용 확인 · 녹화 품질은 OBS 켠 채 바꾸면 안 됨 · 설정 창이 열려 있으면 출력 요청이 성공만 하고 안 켜짐 · `RecRB` 는 웹소켓으로 써도 즉시 반영 안 됨(OBS 재시작 필요). 아래 해당 줄에 ✅ 로 반영.
 
 ## 1. 결론(추천안)
 
@@ -42,7 +44,8 @@
   | `StopRecord` | 없음 | `outputPath` | 1단계 판 끝 |
   | `GetRecordStatus` | 없음 | `outputActive`·`outputPaused`·`outputTimecode`·`outputDuration`(ms)·`outputBytes` | 타임코드 기준·출력 중 확인 |
   | `StartReplayBuffer`·`StopReplayBuffer`·`SaveReplayBuffer` | 없음 | 없음 | 2단계 배치 시작·끝·이벤트 |
-  | `GetReplayBufferStatus` | 없음 | `outputActive` | 출력 중 확인 |
+  | `GetReplayBufferStatus` | 없음 | `outputActive` | 출력 중 확인 · (120 후속) 시작 뒤 실제 켜짐 확인 |
+  | `GetRecordDirectory` · `SetRecordDirectory` | 없음 · `recordDirectory` | `recordDirectory` · 없음 | (120 후속) 녹화 경로 ↔ 공유 날짜 폴더(5.3+, OBS 30+ [확인 필요]) |
   | `GetLastReplayBufferReplay` | 없음 | `savedReplayPath` | 클립 경로(이벤트를 못 받았을 때) |
   | 이벤트 `ReplayBufferSaved` | (구독 Outputs = `1<<6`) | `savedReplayPath` | 클립 경로(우선) |
   | 이벤트 `RecordStateChanged` | (구독 Outputs) | `outputActive`·`outputState`·`outputPath` | 쓰지 않음 |
@@ -51,10 +54,15 @@
   | `GetProfileParameter` | `parameterCategory`·`parameterName` | `parameterValue`·`defaultParameterValue` | 출력 모드(`Output/Mode`) |
 - 상태 코드: 500 = OutputRunning(이미 녹화 중), 501 = OutputNotRunning(녹화 중 아님). 둘 다 QA 에서는 경고 없이 넘어간다(리플레이 버퍼 시작·정지도 같게 본다).
 - 🔶 [확인 필요] `SetVideoSettings` 를 **출력 중**(녹화·리플레이 버퍼)에 불러도 되는지 — 문서에 없다. 구현은 보수적으로 둘 다 꺼져 있을 때만 부르고, 켜져 있으면 건너뛰고 경고한다.
-- 🔶 [확인 필요] 프로필 파라미터 키(OBS 프로필 `basic.ini` 기준, 작성자 지식): 출력 모드 `Output/Mode` = `Simple`·`Advanced`. 단순 모드 비트레이트 `SimpleOutput/VBitrate`(녹화 품질 "스트림과 같음"일 때 녹화에 쓰임),
-  리플레이 버퍼 `SimpleOutput/RecRB`·`SimpleOutput/RecRBTime`(고급 `AdvOut/RecRB`·`AdvOut/RecRBTime`). 고급 모드 녹화 인코더 비트레이트는 `recordEncoder.json` 이라 프로필 파라미터로 못 바꾼다.
-  바꾼 값이 다음 출력 시작에 바로 먹는지도 미확인 — 안 먹으면 런북 §5.2·§5.3 의 손 설정이 정답.
-- 녹화 폴더를 판 폴더로 바꾸는 `SetRecordDirectory` 는 v5.3(OBS 30)부터다 [확인 필요]. 지금은 쓰지 않는다 — OBS 기본 녹화 폴더에 두고 공유 폴더로 복사한다.
+- 프로필 파라미터 키(OBS 프로필 `basic.ini` 기준): 출력 모드 `Output/Mode` = `Simple`·`Advanced`.
+  - ✅(2026-10-27, OBS 32.0.1) 단순 모드 비트레이트 `SimpleOutput/VBitrate` — 녹화 품질 "스트림과 같음"일 때 녹화가 이 값을 쓴다(2500 → 약 2.6Mbps). 다른 품질이면 무시된다.
+  - ✅(2026-10-27) 리플레이 버퍼 `SimpleOutput/RecRB`·`SimpleOutput/RecRBTime`(고급 `AdvOut/RecRB`·`AdvOut/RecRBTime`) 키 이름은 맞다. 단 **`RecRB=true` 는 즉시 반영되지 않는다** — 쓴 직후 `StartReplayBuffer` 는 604, OBS 재시작 뒤 정상. → 리플레이 버퍼 사용 체크는 손으로 하고 OBS 를 재시작해 둔다.
+  - ✅(2026-10-27) **녹화 품질(`SimpleOutput/RecQuality`)은 OBS 가 켜진 채로 바꾸면 안 된다** — 이후 `StartRecord` 가 응답만 성공하고 녹화가 시작되지 않는다(OBS 재시작으로 풀림). QA 코드는 품질을 건드리지 않는다.
+  - ✅(2026-10-27) **OBS 설정 창이 열려 있으면** `StartRecord`·`StartReplayBuffer` 가 응답만 성공하고 출력이 켜지지 않는다 → (120 후속) 시작 뒤 `GetReplayBufferStatus` 로 실제 `outputActive` 를 확인하고, 아니면 경고·리포트 메모.
+  - 고급 모드 녹화 인코더 비트레이트는 `recordEncoder.json` 이라 프로필 파라미터로 못 바꾼다.
+  - 🔶 [확인 필요] `VBitrate` 만 바꾼 값이 OBS 재시작 없이 다음 출력 시작에 바로 먹는지(실측은 재시작 뒤 값).
+- (120 후속) 녹화 폴더 `SetRecordDirectory`(요청 `recordDirectory`)·`GetRecordDirectory`(응답 `recordDirectory`) — v5.3(OBS 30)부터 [확인 필요]. 공유 모드 배치 시작에 날짜 폴더로 바꾸고 끝에 원래 경로로 되돌린다(원래 값은 PC 파일 `UserSettings/QANightly.obs-record-dir.txt`).
+  출력이 켜져 있으면 부르지 않는다(보수적) — 클립은 저장 뒤 날짜 폴더로 옮긴다. 🔶 [확인 필요] 출력 중에 부르면 다음 저장부터 먹는지, 리플레이 버퍼가 바뀐 경로를 다음 `StartReplayBuffer` 에서 읽는지(실연동 미검증).
 
 ### 3.2 obs-cmd (수동 확인용, 선택)
 - 예: `obs-cmd --websocket obsws://127.0.0.1:4455/<비밀번호> recording start` / `recording stop` / `replay save` [확인 필요 — 인자 형식은 `obs-cmd --help`].
@@ -74,13 +82,13 @@
 | 주소 | `obsHost` | `QA_OBS_HOST` | `127.0.0.1` |
 | 포트 | `obsPort` | `QA_OBS_PORT` | `4455` |
 | 비밀번호 | `obsPassword`(권하지 않음) | `QA_OBS_PASSWORD`(권함) | 없음 |
-| 공유 폴더 루트 | `shareRoot` | `QA_NIGHTLY_SHARE_ROOT` | 없음(복사 안 함) |
+| 공유 폴더 루트(`<Team-Vault>\MainProject-Vault\QA_LogAndVideo`) — 있으면 공유 모드(리플레이 고정) | `shareRoot` | `QA_NIGHTLY_SHARE_ROOT` | 없음(공유 안 함) |
 | (120) 출력 해상도 | `videoWidth`·`videoHeight` | `QA_OBS_VIDEO_WIDTH`·`QA_OBS_VIDEO_HEIGHT` | 0 = 그대로 |
 | (120) fps | `videoFps` | `QA_OBS_VIDEO_FPS` | 0 = 그대로 |
 | (120) 녹화 비트레이트(kbps) | `videoBitrateKbps` | `QA_OBS_BITRATE_KBPS` | 0 = 그대로 |
 | (120) 비트레이트 키 직접 지정 | `obsBitrateParam`(`카테고리/키`) | `QA_OBS_BITRATE_PARAM` | 비움 = 출력 모드로 자동 |
-| (120) 공유 폴더 영상 보관 일수 | `videoKeepDays` | `QA_NIGHTLY_VIDEO_KEEP_DAYS` | 0 = 안 지움 |
-| (120) 2단계 스위치 | `replayOnly` | `QA_NIGHTLY_REPLAY` = `1`/`0` | 꺼짐(판 전체 녹화) |
+| (120) 공유 폴더 클립 보관 일수(`MM-dd` 폴더의 내 이름 클립만) | `videoKeepDays` | `QA_NIGHTLY_VIDEO_KEEP_DAYS` | 0 = 안 지움 |
+| (120) 2단계 스위치(공유 모드면 무시 — 항상 리플레이) | `replayOnly` | `QA_NIGHTLY_REPLAY` = `1`/`0` | 꺼짐(판 전체 녹화) |
 | (120) 리플레이 버퍼 길이 N(초) | `replaySeconds` | `QA_OBS_REPLAY_SECONDS` | 0 = OBS 설정 그대로 |
 | (120) 이벤트 뒤 기다릴 M(초) | `replayAfterSeconds` | `QA_OBS_REPLAY_AFTER` | 10 |
 | (120) 클립 쿨다운(초) | `replayCooldownSeconds` | `QA_OBS_REPLAY_COOLDOWN` | 30 |
@@ -90,8 +98,9 @@
 - 녹화 모드는 **배치 시작 때 고정**(batch.txt `record=obs|replay|off`). 주소·비밀번호는 판마다 다시 읽는다.
 - (120) 이벤트 시각표 `events.tsv` + `nightly-summary.md` "이벤트 시각표" + `report.html` "이벤트 시각표" 줄. 2단계 클립 `clips.txt` + 리포트 "리플레이 클립" 줄.
 - (120) 코드: 순수 로직 `QANightlyEvents.cs`(이벤트 표·시각표·타임코드·클립 계획·파일명·보관), 연동 `QANightlyHooks.cs`, 프로토콜 `QAObsWebSocket.cs`(`QAObsProfileParams` 포함). 테스트 `QANightlyTests`.
-- 판 끝 영상은 `robocopy` 를 따로 띄워 `<공유 폴더>/video/` 로 복사한다(다음 판 Play 의 도메인 리로드에 끊기지 않게). 결과는 `<공유 폴더>/video/robocopy.log`.
-- 리포트: `report.html` 머리말 "녹화" 줄, `nightly-summary.md` "녹화" 절, 원본 `recordings.txt`(탭 구분: 판·재실행·영상 경로·공유 사본·메모).
+- (120 후속) 공유 폴더로 복사하지 않는다(robocopy·배치 폴더 사본 없앰). 리플레이 클립은 OBS 녹화 경로(= 날짜 폴더)에 저장된 뒤 `<이름>_<HHmmss>_r<판>_<이벤트>` 로 이름만 바뀐다(경로가 다르면 같은 Move 로 날짜 폴더로 옮김).
+- 리포트: `report.html` 머리말 "녹화"·"리플레이 클립" 줄, `nightly-summary.md` 같은 절, 원본 `recordings.txt`·`clips.txt`(탭 구분: 판·재실행·영상 경로·메모).
+- (120 후속) 배치 끝 완료 키 — `progress.txt` 의 `end=done|aborted`·`batch_dir`·`share_dir`·`runs_*`·`report_name`(런북 §7.0).
 
 ## 5. 하이라이트
 
@@ -106,5 +115,5 @@
 
 ## 6. 알려진 한계
 - 녹화는 PC 화면 전체다. 에디터가 최소화되거나 화면 보호기·절전이 걸리면 검은 화면이 녹화된다 → 런북의 절전 끄기 단계.
-- `StopRecord` 직후 OBS 가 파일을 마무리하는 동안 복사가 잠깐 실패할 수 있다 → robocopy 재시도(10회·15초).
+- 리플레이 저장 직후 OBS 가 파일을 마무리하는 동안 이름 바꾸기가 잠깐 실패할 수 있다 → 1초 간격 3번 재시도, 실패면 원래 이름.
 - 웹 접근 없이 작성 — [확인 필요] 항목은 첫 실사용 전에 공식 문서로 확인한다.

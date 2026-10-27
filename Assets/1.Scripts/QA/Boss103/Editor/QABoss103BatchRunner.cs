@@ -56,6 +56,7 @@ public static class QABoss103BatchRunner
         {
             // 에디터 재시작(SessionState 비어 있음) — 사람 없이 저절로 Play 를 시작하지 않는다.
             EditorPrefs.SetBool(RunningKey, false);
+            MarkAbortedByRestart();
             Debug.LogWarning($"{Tag} 에디터를 다시 켜서 연속 루프를 멈춰 두었다 — 이어 하려면 {Root}Resume Last ({Dir}).");
         }
     }
@@ -296,6 +297,8 @@ public static class QABoss103BatchRunner
         Set("state", "prepare");
         Set("stopAfter", "0");
         Set("recycle", "0");
+        foreach (string k in QANightlyCompletion.Keys)
+            _state.Remove(k);   // 지난 완료 표시(end=…)를 지운다 — 다시 끝나면 새로 쓴다
         SetTime("notBefore", Now);
         Arm(dir);
         Log($"이어 하기 {dir} (이전 상태 {was}, 판 {Get("run")}·재실행 {Get("retry")} — 판 기록이 없는 판은 처음부터 다시).");
@@ -620,6 +623,38 @@ public static class QABoss103BatchRunner
         Log($"배치 {(endState == "done" ? "완료" : "멈춤")} — {why} · 가상 플레이어 비활성·시나리오 모드 해제·설정 파일 삭제 · 리포트 {path}");
         if (IsNightlyBatch)
             QANightlyHooks.BatchEnded(_stateDir, Get("state"), Log);
+        // 마지막 — 정리(클립 저장·OBS 경로 되돌리기)가 다 끝난 뒤 완료 키(end=done/aborted)를 한 번에 쓴다. 에이전트는 이 키를 보고 리포트를 쓴다.
+        WriteCompletion(QANightlyCompletion.EndOf(Get("state")), why);
+    }
+
+    /// <summary>progress.txt 완료 키(<see cref="QANightlyCompletion"/>)를 한 번의 파일 교체로 쓴다.</summary>
+    private static void WriteCompletion(string end, string why)
+    {
+        try
+        {
+            QABoss103Batch.Summarize(Attempts(_stateDir), Total, out int done, out _, out int errors, out _);
+            foreach (KeyValuePair<string, string> kv in QANightlyHooks.CompletionKeys(_stateDir, end, why, done, Total, errors))
+                _state[kv.Key] = kv.Value;
+            _state["updated"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+            Save();
+            Log($"완료 표시 — end={end} · 판 {done}/{Total}(오류 {errors}) · progress.txt");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"{Tag} 완료 표시 쓰기 실패: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    /// <summary>에디터 재시작으로 루프가 꺼진 배치 — 끝나지 않은 상태면 <c>end=aborted</c> 를 남긴다(에이전트가 무한히 기다리지 않게). Resume Last 가 지운다.</summary>
+    private static void MarkAbortedByRestart()
+    {
+        try
+        {
+            if (!LoadState() || !QABoss103Batch.IsActiveState(Get("state")) || Get(QANightlyCompletion.KeyEnd).Length > 0)
+                return;
+            WriteCompletion(QANightlyCompletion.Aborted, $"에디터 재시작 — 루프 정지(상태 {Get("state")}, 판 {Get("run")}). 이어 하려면 Resume Last");
+        }
+        catch { /* 표시 실패로 에디터 시작을 막지 않는다 */ }
     }
 
     // ── 판 도구 ──────────────────────────────────────────────

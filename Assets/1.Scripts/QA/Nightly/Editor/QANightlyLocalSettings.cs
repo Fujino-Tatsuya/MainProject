@@ -8,7 +8,8 @@ using UnityEngine;
 /// 파일 <c>UserSettings/QANightly.local.json</c>(gitignore 됨) → 환경변수가 덮어쓴다(프로세스 → 사용자 범위 순).
 /// <list type="bullet">
 /// <item><c>QA_NIGHTLY_OBS</c> = 1/0 — 녹화 켜기(기본 꺼짐). <c>QA_OBS_HOST</c>·<c>QA_OBS_PORT</c>·<c>QA_OBS_PASSWORD</c>.</item>
-/// <item><c>QA_NIGHTLY_SHARE_ROOT</c> — 날짜별 공유 폴더 루트(비면 복사 안 함).</item>
+/// <item><c>QA_NIGHTLY_SHARE_ROOT</c> — 공유 폴더 루트(<c>&lt;Team-Vault&gt;\MainProject-Vault\QA_LogAndVideo</c>, PC마다 다름). 비면 공유 안 함.
+///   있으면 <b>공유 모드</b> — 녹화는 리플레이 버퍼 클립만(<see cref="RecordMode"/>), 클립은 <c>&lt;루트&gt;\&lt;MM-dd&gt;\</c> 에 바로 저장.</item>
 /// <item>할 일 120 1단계 — 저화질: <c>QA_OBS_VIDEO_WIDTH</c>·<c>QA_OBS_VIDEO_HEIGHT</c>(출력 해상도)·<c>QA_OBS_VIDEO_FPS</c>·<c>QA_OBS_BITRATE_KBPS</c>
 ///   (0·비움 = OBS 설정 그대로). 영상 보관: <c>QA_NIGHTLY_VIDEO_KEEP_DAYS</c>(0·비움 = 지우지 않음).</item>
 /// <item>할 일 120 2단계 — <c>QA_NIGHTLY_REPLAY</c> = 1 이면 판 전체 녹화 대신 리플레이 버퍼 클립만(기본 꺼짐). <c>QA_OBS_REPLAY_SECONDS</c>(버퍼 길이)·
@@ -56,8 +57,11 @@ public sealed class QANightlyLocalSettings
     /// <summary>값 출처 설명(비밀번호 값은 넣지 않는다).</summary>
     public string Source = "기본값";
 
-    /// <summary>batch.txt <c>record</c> — 꺼짐·판 전체 녹화·리플레이 버퍼.</summary>
-    public string RecordMode => !ObsEnabled ? RecordOff : ReplayOnly ? RecordReplay : RecordFull;
+    /// <summary>공유 모드 — 공유 루트가 있다. 판 전체 녹화는 쓰지 않는다(용량).</summary>
+    public bool SharedMode => ShareRoot.Length > 0;
+
+    /// <summary>batch.txt <c>record</c> — 꺼짐·판 전체 녹화·리플레이 버퍼. 공유 모드면 <see cref="ReplayOnly"/> 와 관계없이 리플레이 버퍼.</summary>
+    public string RecordMode => !ObsEnabled ? RecordOff : ReplayOnly || SharedMode ? RecordReplay : RecordFull;
 
     [Serializable]
     private sealed class Json
@@ -183,9 +187,9 @@ public sealed class QANightlyLocalSettings
     public string Describe() =>
         $"녹화 {(RecordMode == RecordOff ? "꺼짐" : RecordMode == RecordReplay ? "리플레이 버퍼(클립만)" : "켜짐(판 전체)")} · OBS {QAObsProtocol.Endpoint(ObsHost, ObsPort)} · " +
         $"비밀번호 {(ObsPassword.Length > 0 ? "있음" : "없음")} · 화질 {QualityText()} · 영상 보관 {(VideoKeepDays > 0 ? VideoKeepDays + "일" : "안 지움")} · " +
-        (ReplayOnly ? $"리플레이 버퍼 {(ReplaySeconds > 0 ? ReplaySeconds + "초" : "OBS 설정")} · 이벤트 뒤 {ReplayAfterSeconds:0.#}초 · 쿨다운 {ReplayCooldownSeconds:0.#}초 · " +
+        (RecordMode == RecordReplay ? $"리플레이 버퍼 {(ReplaySeconds > 0 ? ReplaySeconds + "초" : "OBS 설정")} · 이벤트 뒤 {ReplayAfterSeconds:0.#}초 · 쿨다운 {ReplayCooldownSeconds:0.#}초 · " +
                       $"클립 이벤트 {(ClipEvents.Length > 0 ? ClipEvents : "표 전체")} · " : "") +
-        $"공유 루트 {(ShareRoot.Length > 0 ? ShareRoot : "(없음 — 복사 안 함)")} · 출처 {Source}";
+        $"공유 루트 {(SharedMode ? ShareRoot + " (공유 모드 — 리플레이 클립만, <루트>\\<MM-dd>\\)" : "(없음 — 공유 안 함)")} · 출처 {Source}";
 
     private string QualityText()
     {

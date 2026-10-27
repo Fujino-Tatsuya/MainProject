@@ -16,7 +16,7 @@ public sealed class QANightlySeed
     public const string RelativePath = "QANightly/nightly-seed.json";
     public const int MaxRuns = QABoss103Batch.TotalRuns;
 
-    /// <summary>시드 이름 = 날짜별 공유 폴더 이름(영문·숫자·-·_ 1~32자).</summary>
+    /// <summary>시드 이름 = 팀원 이름(영문·숫자·-·_ 1~32자) — 공유 날짜 폴더의 클립·리포트 파일 이름 앞에 붙는다(설정 칸 하나로 통일).</summary>
     public string Name = "";
     /// <summary>기준 시드 — 판 시드(봇 전투 난수)의 원천(<see cref="QABoss103Plan.RunSeed"/>).</summary>
     public int BaseSeed = 108;
@@ -69,7 +69,7 @@ public sealed class QANightlySeed
 
         seed.Name = (j.name ?? "").Trim();
         if (!IsValidName(seed.Name))
-            errors.Add($"name '{seed.Name}' — 영문·숫자·-·_ 1~32자(공유 폴더 이름이 된다)");
+            errors.Add($"name '{seed.Name}' — 영문·숫자·-·_ 1~32자(팀원 이름 — 공유 클립·리포트 파일 이름 앞에 붙는다)");
 
         seed.BaseSeed = j.baseSeed;
         if (seed.BaseSeed == 0)
@@ -131,34 +131,47 @@ public static class QANightlyPaths
     /// <summary>할 일 120 — 리플레이 클립 목록(<see cref="QANightlyRecording"/> 형식, 메모 = 이벤트 이름).</summary>
     public const string ClipsFile = "clips.txt";
     public const string SummaryFile = "nightly-summary.md";
-    public const string ScenarioReportPrefix = "48-";
+    /// <summary>날짜 폴더 이름 형식(연도 없음).</summary>
+    public const string DateFolderFormat = "MM-dd";
 
     /// <summary>배치 폴더 이름 — <c>N108-&lt;yyyyMMdd_HHmm&gt;-&lt;시드 이름&gt;</c>(이름순 = 시각순).</summary>
     public static string BatchFolderName(string seedName, DateTime at) =>
         BatchPrefix + at.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture) + "-" + seedName;
 
-    /// <summary>날짜별 공유 폴더 — <c>&lt;루트&gt;/&lt;yyyy-MM-dd&gt;/&lt;시드 이름&gt;</c>. 루트가 비면 null(복사 안 함). 날짜 = 배치 시작 날(자정을 넘겨도 한 밤 = 한 폴더).</summary>
-    public static string ShareDir(string root, DateTime nightStart, string seedName)
+    /// <summary>날짜 폴더 이름 <c>MM-dd</c> — 배치 시작 날(자정을 넘겨도 한 밤 = 한 폴더).</summary>
+    public static string DateFolderName(DateTime nightStart) => nightStart.ToString(DateFolderFormat, CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// 공유 날짜 폴더 — <c>&lt;루트&gt;/&lt;MM-dd&gt;</c>(평평한 구조 — 팀원 모두 같은 폴더에 자기 이름 파일만 쓴다). 루트가 비면 null(공유 안 함).
+    /// 들어가는 것 = 리플레이 클립 + 에이전트가 쓴 리포트뿐. 원본 로그·CSV·report.html 은 로컬 배치 폴더에만 남는다.
+    /// </summary>
+    public static string ShareDir(string root, DateTime nightStart)
     {
         if (string.IsNullOrWhiteSpace(root))
             return null;
-        return Path.Combine(root.Trim(), nightStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), seedName);
+        return Path.Combine(root.Trim(), DateFolderName(nightStart));
     }
 
-    /// <summary>48 시나리오 리포트 폴더(<c>48-yyyyMMdd_HHmmss[_n][-접미]</c>)의 시각. 형식이 아니면 null.</summary>
-    public static DateTime? ScenarioReportTime(string folderName)
+    /// <summary>
+    /// 그 날짜 폴더에 쓸 리포트 파일 이름 — <c>report-&lt;이름&gt;.md</c>, 이미 있으면 <c>report-&lt;이름&gt;-2.md</c>·<c>-3</c>…
+    /// <paramref name="existingFileNames"/> = 날짜 폴더의 파일 이름들(대소문자 무시).
+    /// </summary>
+    public static string ReportFileName(string name, IEnumerable<string> existingFileNames)
     {
-        if (folderName == null || !folderName.StartsWith(ScenarioReportPrefix, StringComparison.Ordinal) || folderName.Length < ScenarioReportPrefix.Length + 15)
-            return null;
-        string stamp = folderName.Substring(ScenarioReportPrefix.Length, 15);
-        return DateTime.TryParseExact(stamp, "yyyyMMdd_HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime t) ? t : (DateTime?)null;
-    }
-
-    /// <summary>판 시작(로컬 시각) 뒤에 생긴 48 리포트 폴더인가 — 같은 초 여유 1초.</summary>
-    public static bool IsScenarioReportOf(string folderName, DateTime attemptStartLocal)
-    {
-        DateTime? t = ScenarioReportTime(folderName);
-        return t.HasValue && t.Value >= attemptStartLocal.AddSeconds(-1);
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (existingFileNames != null)
+            foreach (string f in existingFileNames)
+                if (!string.IsNullOrEmpty(f))
+                    taken.Add(Path.GetFileName(f));
+        string first = $"report-{name}.md";
+        if (!taken.Contains(first))
+            return first;
+        for (int i = 2; ; i++)
+        {
+            string n = $"report-{name}-{i.ToString(CultureInfo.InvariantCulture)}.md";
+            if (!taken.Contains(n))
+                return n;
+        }
     }
 
     /// <summary>svn info 출력 → 리비전 숫자. 숫자가 아니면(실패·na·빈 값) <c>unknown</c>.</summary>
@@ -174,16 +187,15 @@ public static class QANightlyPaths
     }
 }
 
-/// <summary>할 일 108 녹화 기록 한 줄 — <c>recordings.txt</c>(탭 구분: 판·재실행·영상 경로·공유 복사 대상·메모).</summary>
+/// <summary>할 일 108 녹화 기록 한 줄 — <c>recordings.txt</c>·<c>clips.txt</c>(탭 구분: 판·재실행·영상 경로·메모).</summary>
 public sealed class QANightlyRecording
 {
     public int Run;
     public int Retry;
     public string Path = "";
-    public string Shared = "";
     public string Note = "";
 
-    public string Format() => $"{Run}\t{Retry}\t{Clean(Path)}\t{Clean(Shared)}\t{Clean(Note)}";
+    public string Format() => $"{Run}\t{Retry}\t{Clean(Path)}\t{Clean(Note)}";
 
     public static bool TryParse(string line, out QANightlyRecording rec)
     {
@@ -194,7 +206,7 @@ public sealed class QANightlyRecording
         if (f.Length < 3 || !int.TryParse(f[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int run) ||
             !int.TryParse(f[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int retry))
             return false;
-        rec = new QANightlyRecording { Run = run, Retry = retry, Path = f[2], Shared = f.Length > 3 ? f[3] : "", Note = f.Length > 4 ? f[4] : "" };
+        rec = new QANightlyRecording { Run = run, Retry = retry, Path = f[2], Note = f.Length > 3 ? f[3] : "" };
         return true;
     }
 
@@ -264,7 +276,7 @@ public static class QANightlyHeader
         Row(sb, "시작", Val(batch, "started_at", ""));
         Row(sb, "루프 상태", string.IsNullOrEmpty(loopState) ? "-" : loopState);
         Row(sb, "녹화", Val(batch, "record", "off"));
-        Row(sb, "공유 폴더", Val(batch, "share_dir", "(설정 없음 — 복사 안 함)"));
+        Row(sb, "공유 날짜 폴더", Val(batch, "share_dir", "(설정 없음 — 클립은 OBS 녹화 경로에)"));
         Row(sb, "리포트", string.IsNullOrEmpty(reportPath) ? "-" : reportPath);
 
         sb.Append("\n## 판 결과\n\n| 판 | 재실행 | 결과 | 런타임 데이터 출처 |\n|---|---|---|---|\n");
@@ -280,7 +292,7 @@ public static class QANightlyHeader
         else
             foreach (QANightlyRecording r in recordings)
                 sb.Append("- 판 ").Append(r.Run).Append(r.Retry > 0 ? " 재실행" : "").Append(": ").Append(r.Path.Length > 0 ? r.Path : "(경로 없음)")
-                  .Append(r.Shared.Length > 0 ? " → " + r.Shared : "").Append(r.Note.Length > 0 ? " · " + r.Note : "").Append('\n');
+                  .Append(r.Note.Length > 0 ? " · " + r.Note : "").Append('\n');
 
         if (Val(batch, "record", "off") == QANightlyLocalSettings.RecordReplay || (clips != null && clips.Count > 0))
         {
@@ -290,7 +302,7 @@ public static class QANightlyHeader
             else
                 foreach (QANightlyRecording c in clips)
                     sb.Append("- 판 ").Append(c.Run).Append(c.Retry > 0 ? " 재실행" : "").Append(" [").Append(c.Note.Length > 0 ? c.Note : "-").Append("]: ")
-                      .Append(c.Path.Length > 0 ? c.Path : "(경로 없음)").Append(c.Shared.Length > 0 ? " → " + c.Shared : "").Append('\n');
+                      .Append(c.Path.Length > 0 ? c.Path : "(경로 없음)").Append('\n');
         }
 
         sb.Append("\n## 이벤트 시각표\n\n");
@@ -315,5 +327,58 @@ public static class QANightlyHeader
         d != null && d.TryGetValue(k, out string v) && !string.IsNullOrEmpty(v) ? v : fallback;
 
     private static KeyValuePair<string, string> KV(string k, string v) => new KeyValuePair<string, string>(k, v ?? "");
+}
+
+/// <summary>
+/// 할 일 120 후속 — 배치 진행 파일(<c>progress.txt</c>)의 완료 키(순수). 에이전트가 이 키들을 기계적으로 읽어 배치가 끝났는지 알고 리포트를 쓴다.
+/// 루프가 정리를 모두 마친 뒤(클립 저장·OBS 녹화 경로 되돌리기 포함) 한 번에(원자적 파일 교체) 쓴다 — <c>end</c> 가 보이면 나머지 키도 다 있다.
+/// <list type="bullet">
+/// <item><c>end=done</c> — 판 전부(+오류 판 재실행) 끝. <c>end=aborted</c> — 사람 멈춤(Stop After Current Run)·에디터 재시작 등 중간에 끝남(사유 <c>end_reason</c>).</item>
+/// <item>Resume Last 로 이어 가면 완료 키를 지운다(다시 끝나면 새로 쓴다).</item>
+/// </list>
+/// </summary>
+public static class QANightlyCompletion
+{
+    public const string KeyEnd = "end";
+    public const string Done = "done";
+    public const string Aborted = "aborted";
+
+    /// <summary>완료 때 쓰는 키 전부(Resume 때 지울 목록).</summary>
+    public static readonly string[] Keys =
+        { KeyEnd, "end_reason", "end_at", "batch_dir", "share_dir", "nightly_name", "runs_done", "runs_total", "runs_error", "report_name" };
+
+    /// <summary>루프 끝 상태(<c>done</c>·<c>stopped</c>·그 밖) → <c>done</c>/<c>aborted</c>.</summary>
+    public static string EndOf(string finishState) => (finishState ?? "").Trim() == "done" ? Done : Aborted;
+
+    /// <summary>
+    /// 완료 키. <paramref name="shareDir"/>·<paramref name="name"/>·<paramref name="reportName"/> 는 야간 배치만(아니면 빈 값).
+    /// <paramref name="reportName"/> = 그 날짜 폴더에서 아직 안 쓴 <c>report-&lt;이름&gt;[-N].md</c>(제안 — 에이전트가 쓰기 직전에 다시 확인).
+    /// </summary>
+    public static List<KeyValuePair<string, string>> Format(string end, string reason, DateTime endedLocal, string batchDir,
+                                                            int runsDone, int runsTotal, int runsError, string shareDir, string name, string reportName)
+    {
+        return new List<KeyValuePair<string, string>>
+        {
+            KV("end_reason", reason),
+            KV("end_at", endedLocal.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+            KV("batch_dir", (batchDir ?? "").Replace('\\', '/')),
+            KV("share_dir", shareDir),
+            KV("nightly_name", name),
+            KV("runs_done", runsDone.ToString(CultureInfo.InvariantCulture)),
+            KV("runs_total", runsTotal.ToString(CultureInfo.InvariantCulture)),
+            KV("runs_error", runsError.ToString(CultureInfo.InvariantCulture)),
+            KV("report_name", reportName),
+            KV(KeyEnd, end == Done ? Done : Aborted),
+        };
+    }
+
+    /// <summary>progress.txt 키 → 끝났나(<c>end</c> 가 done/aborted). 아직이면 false.</summary>
+    public static bool IsFinished(IReadOnlyDictionary<string, string> progress, out string end)
+    {
+        end = progress != null && progress.TryGetValue(KeyEnd, out string v) ? (v ?? "").Trim() : "";
+        return end == Done || end == Aborted;
+    }
+
+    private static KeyValuePair<string, string> KV(string k, string v) => new KeyValuePair<string, string>(k, (v ?? "").Replace('\n', ' ').Replace('\r', ' '));
 }
 #endif

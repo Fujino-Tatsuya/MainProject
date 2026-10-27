@@ -404,7 +404,7 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
             var rec = new StringBuilder();
             foreach (QANightlyRecording r in recs)
                 rec.Append(rec.Length > 0 ? "<br>" : "").Append("판 ").Append(r.Run).Append(r.Retry > 0 ? " 재실행" : "").Append(": ")
-                   .Append(H(r.Path.Length > 0 ? r.Path : "(경로 없음)")).Append(r.Shared.Length > 0 ? " → " + H(r.Shared) : "").Append(r.Note.Length > 0 ? " · " + H(r.Note) : "");
+                   .Append(H(r.Path.Length > 0 ? r.Path : "(경로 없음)")).Append(r.Note.Length > 0 ? " · " + H(r.Note) : "");
             string record = Val(batch, "record", "off");
             Row2(sb, "녹화", record == QANightlyLocalSettings.RecordFull ? (rec.Length > 0 ? rec.ToString() : "OBS 켜짐 · 아직 영상 없음")
                            : record == QANightlyLocalSettings.RecordReplay ? "리플레이 버퍼 — 이벤트 클립만(아래 줄)" : "꺼짐");
@@ -413,7 +413,7 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
                 var clip = new StringBuilder();
                 foreach (QANightlyRecording cl in QANightlyRecording.ParseAll(input.Clips))
                     clip.Append(clip.Length > 0 ? "<br>" : "").Append("판 ").Append(cl.Run).Append(cl.Retry > 0 ? " 재실행" : "").Append(" [").Append(H(cl.Note)).Append("]: ")
-                        .Append(H(cl.Path.Length > 0 ? cl.Path : "(경로 없음)")).Append(cl.Shared.Length > 0 ? " → " + H(cl.Shared) : "");
+                        .Append(H(cl.Path.Length > 0 ? cl.Path : "(경로 없음)"));
                 Row2(sb, "리플레이 클립", clip.Length > 0 ? clip.ToString() : "없음");
             }
             // 할 일 120 — 이벤트 시각표(판·이벤트·영상 타임코드). 표 전체는 nightly-summary.md · events.tsv.
@@ -429,7 +429,7 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
             if (events.Count > maxRows)
                 ev.Append("<br>… 외 ").Append(events.Count - maxRows).Append("건");
             Row2(sb, "이벤트 시각표", ev.Length > 0 ? ev + "<br>(전체·상세: nightly-summary.md · events.tsv)" : "없음");
-            Row2(sb, "공유 폴더", H(Val(batch, "share_dir", "").Length > 0 ? Val(batch, "share_dir", "") : "설정 없음 — 복사 안 함"));
+            Row2(sb, "공유 날짜 폴더", H(Val(batch, "share_dir", "").Length > 0 ? Val(batch, "share_dir", "") + " (클립 + 에이전트 리포트만 — 로그·CSV 는 이 배치 폴더에만)" : "설정 없음 — 클립은 OBS 녹화 경로에"));
         }
         Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
         Row2(sb, "측정 규칙", "QA 끼임 복구 — 이동하려는데 목표에 못 다가간 채 2초 옆걸음 → 6초 뒤·옆 대시 → 20초 보스 둘레 링 지점으로 재배치(run_chars qa_relocates) · " +

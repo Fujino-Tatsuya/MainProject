@@ -34,7 +34,8 @@ public static class QANightlyMenu
         if (Directory.Exists(dir))
             dir += at.ToString("ss", CultureInfo.InvariantCulture);
         string toolbarBefore = DataSourcePlayMode.Current.ToString();
-        string shareDir = QANightlyPaths.ShareDir(local.ShareRoot, at, seed.Name) ?? "";
+        // 공유 날짜 폴더 = <루트>\<MM-dd>(배치 시작 날). 이미 있으면 그대로 쓴다 — 만들기·OBS 녹화 경로 지정은 BatchStarting.
+        string shareDir = QANightlyPaths.ShareDir(local.ShareRoot, at) ?? "";
         List<KeyValuePair<string, string>> batch = QANightlyHeader.BatchKeys(seed, at, QABoss103Batch.SourceTable, QABoss103RunCsv.XlsxRevision(),
             QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD"), QABoss103RunCsv.GitCommit(), Application.unityVersion, local.RecordMode, shareDir);
         batch.Add(new KeyValuePair<string, string>("data_source_toolbar_before", toolbarBefore));
@@ -57,7 +58,7 @@ public static class QANightlyMenu
             if (!r.Ok)
                 Debug.LogWarning($"{Tag} OBS 연결 확인 실패(QA 는 녹화 없이 계속 — 판마다 다시 시도) — {r.Error}");
         }
-        // 할 일 120 — 공유 폴더 지난 영상 삭제 → OBS 화질 → (2단계) 리플레이 버퍼 시작. 첫 판 Play 전(루프 첫 틱보다 먼저).
+        // 할 일 120 — 공유 폴더 지난 영상 삭제 → 날짜 폴더·OBS 녹화 경로 → OBS 화질 → 리플레이 버퍼 시작(실제 켜졌는지 확인). 첫 판 Play 전(루프 첫 틱보다 먼저).
         QANightlyHooks.BatchStarting(dir, null);
     }
 
@@ -76,7 +77,9 @@ public static class QANightlyMenu
     {
         if (TryLoadSeed(out QANightlySeed seed))
             Debug.Log($"{Tag} 시드 파일 {SeedPath} — {seed.Describe()}");
-        Debug.Log($"{Tag} PC 설정 — {QANightlyHooks.LoadLocal().Describe()}");
+        QANightlyLocalSettings local = QANightlyHooks.LoadLocal();
+        Debug.Log($"{Tag} PC 설정 — {local.Describe()}" +
+                  (local.SharedMode ? $" · 지금 시작하면 공유 날짜 폴더 {QANightlyPaths.ShareDir(local.ShareRoot, System.DateTime.Now)}" : ""));
         QABoss103BatchRunner.Status();
     }
 

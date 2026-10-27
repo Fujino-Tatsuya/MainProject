@@ -336,8 +336,13 @@ public static class QANightlyClipName
 {
     public const int MaxEvents = 6;
 
-    /// <summary><c>&lt;yyyy-MM-dd&gt;_&lt;시드&gt;_r&lt;판&gt;[re]_&lt;이벤트+이벤트&gt;&lt;확장자&gt;</c>. 재실행 판은 <c>r3re</c>. 이벤트가 많으면 앞 6개 + <c>+etc</c>.</summary>
-    public static string FileName(string nightDate, string seed, int run, int retry, IReadOnlyList<string> events, string extension)
+    public const string DefaultExtension = ".mp4";
+
+    /// <summary>
+    /// <c>&lt;이름&gt;_&lt;HHmmss&gt;_r&lt;판&gt;[re]_&lt;이벤트+이벤트&gt;&lt;확장자&gt;</c> — 이름(시드 이름 = 팀원 이름)이 앞이라 공유 날짜 폴더에서 사람별로 모인다.
+    /// 시각 = 클립 저장 시각(로컬). 재실행 판은 <c>r3re</c>. 이벤트가 많으면 앞 6개 + <c>+etc</c>. 확장자는 OBS 가 만든 그대로(없으면 .mp4).
+    /// </summary>
+    public static string FileName(string seed, DateTime savedAtLocal, int run, int retry, IReadOnlyList<string> events, string extension)
     {
         var names = new List<string>();
         if (events != null)
@@ -350,9 +355,28 @@ public static class QANightlyClipName
         string ev = names.Count == 0 ? "event"
             : names.Count > MaxEvents ? string.Join("+", names.GetRange(0, MaxEvents)) + "+etc"
             : string.Join("+", names);
-        string ext = string.IsNullOrEmpty(extension) ? ".mkv" : extension.StartsWith(".", StringComparison.Ordinal) ? extension : "." + extension;
+        string ext = string.IsNullOrEmpty(extension) ? DefaultExtension : extension.StartsWith(".", StringComparison.Ordinal) ? extension : "." + extension;
         string seedPart = Safe(seed);
-        return $"{Safe(nightDate)}_{(seedPart.Length > 0 ? seedPart : "nightly")}_r{Math.Max(0, run)}{(retry > 0 ? "re" : "")}_{ev}{ext}";
+        return $"{(seedPart.Length > 0 ? seedPart : "nightly")}_{savedAtLocal.ToString("HHmmss", CultureInfo.InvariantCulture)}_r{Math.Max(0, run)}{(retry > 0 ? "re" : "")}_{ev}{ext}";
+    }
+
+    /// <summary>
+    /// 이 이름의 클립 파일인가 — <c>&lt;이름&gt;_</c> 다음에 6자리 시각과 <c>_r</c> 이 와야 한다(이름이 <c>kim</c> 일 때 <c>kim_lee_…</c> 를 내 것으로 보지 않게).
+    /// 보관 삭제는 이것만 지운다(다른 사람 파일·리포트는 건드리지 않는다).
+    /// </summary>
+    public static bool IsOwnClip(string fileName, string seed)
+    {
+        string f = Path.GetFileName(fileName ?? "");
+        string prefix = Safe(seed);
+        if (prefix.Length == 0 || !QANightlyRetention.IsVideoFile(f))
+            return false;
+        prefix += "_";
+        if (!f.StartsWith(prefix, StringComparison.Ordinal) || f.Length < prefix.Length + 8)
+            return false;
+        for (int i = 0; i < 6; i++)
+            if (f[prefix.Length + i] < '0' || f[prefix.Length + i] > '9')
+                return false;
+        return f[prefix.Length + 6] == '_' && f[prefix.Length + 7] == 'r';
     }
 
     /// <summary>이미 있으면 <c>_2</c>·<c>_3</c>… 을 붙인 경로.</summary>
@@ -383,12 +407,12 @@ public static class QANightlyClipName
 }
 
 /// <summary>
-/// 할 일 120 — 공유 폴더 영상 보관(순수 고르기). <c>&lt;루트&gt;/&lt;yyyy-MM-dd&gt;/&lt;시드&gt;/video/</c> 의 영상 파일만 지운다 —
-/// 날짜 폴더 이름이 정확히 <c>yyyy-MM-dd</c> 가 아니면 건드리지 않고, 리포트·로그·robocopy.log 는 지우지 않는다.
+/// 할 일 120 — 공유 폴더 영상 보관(순수 고르기). <c>&lt;루트&gt;/&lt;MM-dd&gt;/</c> 바로 아래의 <b>자기 이름 클립</b>(<see cref="QANightlyClipName.IsOwnClip"/>)만 지운다 —
+/// 날짜 폴더 이름이 정확히 <c>MM-dd</c> 가 아니면 건드리지 않고, 리포트·다른 사람 파일은 지우지 않는다.
+/// 이름에 연도가 없으니 오늘 기준 과거로 읽는다(올해 그 날짜가 오늘보다 뒤면 작년).
 /// </summary>
 public static class QANightlyRetention
 {
-    public const string VideoFolder = "video";
     public static readonly string[] VideoExtensions = { ".mkv", ".mp4", ".mov", ".flv", ".ts", ".m4v", ".webm", ".avi" };
 
     public static bool IsVideoFile(string fileName)
@@ -400,16 +424,27 @@ public static class QANightlyRetention
         return false;
     }
 
-    /// <summary>날짜 폴더 이름(<c>yyyy-MM-dd</c>) → 날짜. 아니면 null.</summary>
-    public static DateTime? FolderDate(string folderName) =>
-        DateTime.TryParseExact(folderName ?? "", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime d) ? d.Date : (DateTime?)null;
+    /// <summary>
+    /// 날짜 폴더 이름(<c>MM-dd</c>, 두 자리씩) → 오늘 이전의 가장 가까운 그 날짜. 올해 날짜가 미래면 작년, 2월 29일은 가장 가까운 윤년. 형식이 아니면 null.
+    /// </summary>
+    public static DateTime? FolderDate(string folderName, DateTime today)
+    {
+        string n = folderName ?? "";
+        if (n.Length != 5 || n[2] != '-')
+            return null;
+        for (int y = today.Year; y >= today.Year - 4; y--)
+            if (DateTime.TryParseExact(y.ToString("0000", CultureInfo.InvariantCulture) + "-" + n, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime d) &&
+                d.Date <= today.Date)
+                return d.Date;
+        return null;
+    }
 
     /// <summary>보관 일수를 넘긴 날짜 폴더인가 — 오늘과의 차이 &gt; <paramref name="keepDays"/>. 0 이하 = 지우지 않음.</summary>
     public static bool IsExpired(string folderName, DateTime today, int keepDays)
     {
         if (keepDays <= 0)
             return false;
-        DateTime? d = FolderDate(folderName);
+        DateTime? d = FolderDate(folderName, today);
         return d.HasValue && (today.Date - d.Value).TotalDays > keepDays;
     }
 

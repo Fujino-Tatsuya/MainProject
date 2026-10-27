@@ -133,12 +133,32 @@ public sealed class QANightlyTests
     // ── 폴더·경로 ────────────────────────────────────────────
 
     [Test]
-    public void 날짜별_공유_폴더()
+    public void 공유_날짜_폴더는_MM_dd_평평한_구조()
     {
         var at = new DateTime(2026, 10, 27, 23, 40, 0);
-        Assert.AreEqual(Path.Combine(@"C:\Team-Vault\QA-Nightly", "2026-10-27", "eunhee"), QANightlyPaths.ShareDir(@" C:\Team-Vault\QA-Nightly ", at, "eunhee"));
-        Assert.IsNull(QANightlyPaths.ShareDir("", at, "eunhee"));
-        Assert.IsNull(QANightlyPaths.ShareDir("   ", at, "eunhee"));
+        const string root = @"C:\Team-Vault\MainProject-Vault\QA_LogAndVideo";
+        Assert.AreEqual(Path.Combine(root, "10-27"), QANightlyPaths.ShareDir(" " + root + " ", at));
+        Assert.AreEqual(Path.Combine(root, "01-05"), QANightlyPaths.ShareDir(root, new DateTime(2027, 1, 5, 0, 30, 0)));
+        Assert.IsNull(QANightlyPaths.ShareDir("", at));
+        Assert.IsNull(QANightlyPaths.ShareDir("   ", at));
+    }
+
+    [Test]
+    public void 날짜_폴더는_배치_시작_날()
+    {
+        Assert.AreEqual("10-27", QANightlyPaths.DateFolderName(new DateTime(2026, 10, 27, 23, 59, 59)));
+        Assert.AreEqual("03-01", QANightlyPaths.DateFolderName(new DateTime(2026, 3, 1, 0, 0, 0)));
+        Assert.AreEqual("12-31", QANightlyPaths.DateFolderName(new DateTime(2026, 12, 31, 22, 0, 0)), "자정을 넘겨도 시작 시각으로 정한다");
+    }
+
+    [Test]
+    public void 리포트_이름_번호_매기기()
+    {
+        Assert.AreEqual("report-eunhee.md", QANightlyPaths.ReportFileName("eunhee", null));
+        Assert.AreEqual("report-eunhee.md", QANightlyPaths.ReportFileName("eunhee", new[] { "report-kim.md", "eunhee_230000_r1_stall.mp4" }));
+        Assert.AreEqual("report-eunhee-2.md", QANightlyPaths.ReportFileName("eunhee", new[] { @"C:\v\10-27\report-eunhee.md" }));
+        Assert.AreEqual("report-eunhee-3.md", QANightlyPaths.ReportFileName("eunhee", new[] { "report-eunhee.md", "REPORT-EUNHEE-2.md" }), "대소문자 무시");
+        Assert.AreEqual("report-eunhee-2.md", QANightlyPaths.ReportFileName("eunhee", new[] { "report-eunhee.md", "report-eunhee-3.md" }), "빈 번호부터");
     }
 
     [Test]
@@ -149,17 +169,6 @@ public sealed class QANightlyTests
         Assert.AreEqual("N108-20261027_2305-base", a);
         Assert.Less(string.CompareOrdinal(a, b), 0);
         StringAssert.StartsWith(QANightlyPaths.BatchPattern.TrimEnd('*'), a);
-    }
-
-    [Test]
-    public void 판_시작_뒤_48_리포트만_고른다()
-    {
-        var start = new DateTime(2026, 10, 27, 23, 0, 0);
-        Assert.IsTrue(QANightlyPaths.IsScenarioReportOf("48-20261027_230000", start));
-        Assert.IsTrue(QANightlyPaths.IsScenarioReportOf("48-20261028_010203_2-B103", start));
-        Assert.IsFalse(QANightlyPaths.IsScenarioReportOf("48-20261027_225500", start));
-        Assert.IsFalse(QANightlyPaths.IsScenarioReportOf("88-20261027_235500", start));
-        Assert.IsFalse(QANightlyPaths.IsScenarioReportOf("48-abc", start));
     }
 
     [TestCase("527", "527")]
@@ -180,7 +189,7 @@ public sealed class QANightlyTests
     {
         QANightlySeed.TryParse(ValidSeed, out QANightlySeed s, out _);
         List<KeyValuePair<string, string>> kv = QANightlyHeader.BatchKeys(s, new DateTime(2026, 10, 27, 23, 0, 0), "table", "na",
-            "qa/Nightly-eunhee\n", "abc1234", "6000.3.16f1", QANightlyLocalSettings.RecordFull, @"C:\share\2026-10-27\eunhee");
+            "qa/Nightly-eunhee\n", "abc1234", "6000.3.16f1", QANightlyLocalSettings.RecordFull, @"C:\share\10-27");
         Dictionary<string, string> d = QABoss103Batch.ParseKeyValues(QABoss103Batch.FormatKeyValues(kv));
         Assert.AreEqual("table", d["data_source_mode"]);
         Assert.AreEqual("unknown", d["xlsx_svn_rev"]);
@@ -203,21 +212,21 @@ public sealed class QANightlyTests
             { QANightlyHeader.KeySeedName, "eunhee" }, { "xlsx_svn_rev", "528" }, { "git_branch", "qa/Nightly-eunhee" }, { "git_commit", "abc1234" },
             { "data_source_mode", "table" }, { "record", "obs" },
         };
-        var recs = new List<QANightlyRecording> { new QANightlyRecording { Run = 2, Retry = 1, Path = @"D:\obs\a.mkv", Shared = @"\\s\v\a.mkv" } };
+        var recs = new List<QANightlyRecording> { new QANightlyRecording { Run = 2, Retry = 1, Path = @"D:\obs\a.mkv" } };
         var attempts = new List<QABoss103Attempt> { new QABoss103Attempt { Run = 1, OutcomeText = "Clear", DataSource = "table" } };
         string md = QANightlyHeader.Summary(batch, recs, attempts, "done", @"C:\QA\N108\report.html");
         StringAssert.Contains("| 시드 이름 | eunhee |", md);
         StringAssert.Contains("| GameData.xlsx SVN 리비전 | 528 |", md);
         StringAssert.Contains("qa/Nightly-eunhee / abc1234", md);
         StringAssert.Contains("| 1 | 0 | Clear | table |", md);
-        StringAssert.Contains(@"판 2 재실행: D:\obs\a.mkv → \\s\v\a.mkv", md);
-        StringAssert.Contains("(설정 없음 — 복사 안 함)", md);
+        StringAssert.Contains(@"판 2 재실행: D:\obs\a.mkv", md);
+        StringAssert.Contains("(설정 없음 — 클립은 OBS 녹화 경로에)", md);
     }
 
     [Test]
     public void 녹화_기록_한줄_왕복()
     {
-        var r = new QANightlyRecording { Run = 3, Retry = 0, Path = "D:\\v\\x\ty.mkv", Shared = "", Note = "영상 경로를 못 받음" };
+        var r = new QANightlyRecording { Run = 3, Retry = 0, Path = "D:\\v\\x\ty.mkv", Note = "영상 경로를 못 받음" };
         List<QANightlyRecording> back = QANightlyRecording.ParseAll(r.Format() + "\n\nbad line\n");
         Assert.AreEqual(1, back.Count);
         Assert.AreEqual(3, back[0].Run);
@@ -351,6 +360,18 @@ public sealed class QANightlyTests
         Assert.AreEqual(QANightlyLocalSettings.RecordReplay, QANightlyLocalSettings.Merge("{\"obsEnabled\":true,\"replayOnly\":true}", _ => null).RecordMode);
         Assert.AreEqual(QANightlyLocalSettings.RecordReplay, QANightlyLocalSettings.Merge("{\"obsEnabled\":true}", k => k == "QA_NIGHTLY_REPLAY" ? "1" : null).RecordMode);
         Assert.AreEqual(QANightlyLocalSettings.RecordOff, QANightlyLocalSettings.Merge("{\"replayOnly\":true}", _ => null).RecordMode, "OBS 가 꺼져 있으면 스위치와 관계없이 꺼짐");
+    }
+
+    [Test]
+    public void PC_설정_공유_모드는_리플레이_고정()
+    {
+        QANightlyLocalSettings s = QANightlyLocalSettings.Merge("{\"obsEnabled\":true,\"replayOnly\":false,\"shareRoot\":\"C:\\\\Team-Vault\\\\MainProject-Vault\\\\QA_LogAndVideo\"}", _ => null);
+        Assert.IsTrue(s.SharedMode);
+        Assert.AreEqual(QANightlyLocalSettings.RecordReplay, s.RecordMode, "공유 루트가 있으면 판 전체 녹화를 쓰지 않는다");
+        Assert.AreEqual(QANightlyLocalSettings.RecordReplay,
+            QANightlyLocalSettings.Merge("{\"obsEnabled\":true}", k => k == "QA_NIGHTLY_SHARE_ROOT" ? @"D:\Vault\QA_LogAndVideo" : null).RecordMode, "환경변수 공유 루트도 같다");
+        Assert.AreEqual(QANightlyLocalSettings.RecordOff, QANightlyLocalSettings.Merge("{\"shareRoot\":\"D:\\\\x\"}", _ => null).RecordMode, "OBS 꺼짐이면 공유 모드여도 녹화 없음");
+        Assert.IsFalse(QANightlyLocalSettings.Merge(null, _ => null).SharedMode);
     }
 
     [Test]
@@ -666,15 +687,35 @@ public sealed class QANightlyTests
     }
 
     [Test]
-    public void 클립_파일명은_날짜_시드_판_이벤트()
+    public void 클립_파일명은_이름_시각_판_이벤트()
     {
-        Assert.AreEqual("2026-10-27_eunhee_r3_stall+death.mkv",
-            QANightlyClipName.FileName("2026-10-27", "eunhee", 3, 0, new[] { "stall", "death", "stall" }, ".mkv"));
-        Assert.AreEqual("2026-10-27_eunhee_r3re_wipe.mp4", QANightlyClipName.FileName("2026-10-27", "eunhee", 3, 1, new[] { "wipe" }, "mp4"));
-        Assert.AreEqual("2026-10-27_eunhee_r1_event.mkv", QANightlyClipName.FileName("2026-10-27", "eunhee", 1, 0, new string[0], ""));
-        Assert.AreEqual("2026-10-27_nightly_r1_ab.mkv", QANightlyClipName.FileName("2026-10-27", "", 1, 0, new[] { "a/b" }, ".mkv"), "파일명에 못 쓰는 글자는 뺀다");
-        StringAssert.EndsWith("_e1+e2+e3+e4+e5+e6+etc.mkv",
-            QANightlyClipName.FileName("2026-10-27", "x", 1, 0, new[] { "e1", "e2", "e3", "e4", "e5", "e6", "e7" }, ".mkv"));
+        var at = new DateTime(2026, 10, 27, 23, 5, 9);
+        Assert.AreEqual("eunhee_230509_r3_stall+death.mp4",
+            QANightlyClipName.FileName("eunhee", at, 3, 0, new[] { "stall", "death", "stall" }, ".mp4"));
+        Assert.AreEqual("eunhee_230509_r3re_wipe.mp4", QANightlyClipName.FileName("eunhee", at, 3, 1, new[] { "wipe" }, "mp4"));
+        Assert.AreEqual("eunhee_000001_r1_event.mp4", QANightlyClipName.FileName("eunhee", new DateTime(2026, 10, 28, 0, 0, 1), 1, 0, new string[0], ""),
+            "확장자가 없으면 .mp4");
+        Assert.AreEqual("eunhee_230509_r1_wipe.mkv", QANightlyClipName.FileName("eunhee", at, 1, 0, new[] { "wipe" }, ".mkv"), "확장자는 OBS 가 만든 그대로");
+        Assert.AreEqual("nightly_230509_r1_ab.mp4", QANightlyClipName.FileName("", at, 1, 0, new[] { "a/b" }, ".mp4"), "파일명에 못 쓰는 글자는 뺀다");
+        StringAssert.EndsWith("_e1+e2+e3+e4+e5+e6+etc.mp4",
+            QANightlyClipName.FileName("x", at, 1, 0, new[] { "e1", "e2", "e3", "e4", "e5", "e6", "e7" }, ".mp4"));
+    }
+
+    [TestCase("eunhee_230509_r3_stall.mp4", "eunhee", true)]
+    [TestCase("eunhee_230509_r3re_wipe+death.mkv", "eunhee", true)]
+    [TestCase("eunhee_230509_r3_stall_2.mp4", "eunhee", true)]
+    [TestCase(@"C:\v\10-27\eunhee_230509_r3_stall.mp4", "eunhee", true)]
+    [TestCase("kim_lee_230509_r1_stall.mp4", "kim", false)]
+    [TestCase("kim2_230509_r1_stall.mp4", "kim", false)]
+    [TestCase("kim_230509_r1_stall.mp4", "eunhee", false)]
+    [TestCase("report-eunhee.md", "eunhee", false)]
+    [TestCase("eunhee_230509_r3_stall.md", "eunhee", false)]
+    [TestCase("eunhee_2305_r3_stall.mp4", "eunhee", false)]
+    [TestCase("Replay 2026-10-27 23-05-09.mp4", "eunhee", false)]
+    [TestCase("eunhee_230509_r3_stall.mp4", "", false)]
+    public void 내_클립_판정(string file, string name, bool mine)
+    {
+        Assert.AreEqual(mine, QANightlyClipName.IsOwnClip(file, name));
     }
 
     [Test]
@@ -688,15 +729,36 @@ public sealed class QANightlyTests
     // ── 할 일 120: 공유 폴더 영상 보관 ───────────────────────
 
     [Test]
-    public void 보관_삭제는_날짜_폴더만_N일_넘긴_것()
+    public void 보관_삭제는_MM_dd_날짜_폴더만_N일_넘긴_것()
     {
         var today = new DateTime(2026, 10, 27, 23, 30, 0);
-        var names = new[] { "2026-10-27", "2026-10-20", "2026-10-19", "2026-09-01", "logs", "2026-1-5", "2026-10-19-old", "2026-11-01", "48" };
-        CollectionAssert.AreEqual(new[] { "2026-09-01", "2026-10-19" }, QANightlyRetention.ExpiredFolders(names, today, 7));
+        var names = new[] { "10-27", "10-20", "10-19", "09-01", "logs", "1-05", "10-19-old", "2026-10-01", "48", "13-01" };
+        CollectionAssert.AreEqual(new[] { "09-01", "10-19" }, QANightlyRetention.ExpiredFolders(names, today, 7));
         Assert.IsEmpty(QANightlyRetention.ExpiredFolders(names, today, 0), "0 = 지우지 않음");
-        Assert.IsFalse(QANightlyRetention.IsExpired("2026-10-26", today, 1));
-        Assert.IsTrue(QANightlyRetention.IsExpired("2026-10-25", today, 1));
-        Assert.IsNull(QANightlyRetention.FolderDate("N108-20261027_2305-base"));
+        Assert.IsFalse(QANightlyRetention.IsExpired("10-26", today, 1));
+        Assert.IsTrue(QANightlyRetention.IsExpired("10-25", today, 1));
+        Assert.IsNull(QANightlyRetention.FolderDate("N108-20261027_2305-base", today));
+        Assert.IsNull(QANightlyRetention.FolderDate("2026-10-27", today), "연도 붙은 옛 형식은 건드리지 않는다");
+    }
+
+    [Test]
+    public void 보관_날짜_폴더는_오늘_기준_과거로_읽는다()
+    {
+        var jan = new DateTime(2027, 1, 3, 9, 0, 0);
+        Assert.AreEqual(new DateTime(2026, 12, 30), QANightlyRetention.FolderDate("12-30", jan), "올해 날짜가 미래면 작년");
+        Assert.AreEqual(new DateTime(2027, 1, 3), QANightlyRetention.FolderDate("01-03", jan), "오늘은 올해");
+        Assert.IsFalse(QANightlyRetention.IsExpired("12-30", jan, 7), "해를 넘겨도 4일 전");
+        Assert.IsTrue(QANightlyRetention.IsExpired("12-20", jan, 7));
+        Assert.AreEqual(new DateTime(2026, 1, 4), QANightlyRetention.FolderDate("01-04", jan), "내일 날짜는 작년으로 읽는다");
+        Assert.IsTrue(QANightlyRetention.IsExpired("01-04", jan, 7));
+    }
+
+    [Test]
+    public void 보관_2월_29일은_가장_가까운_윤년()
+    {
+        Assert.AreEqual(new DateTime(2028, 2, 29), QANightlyRetention.FolderDate("02-29", new DateTime(2028, 3, 1)));
+        Assert.AreEqual(new DateTime(2024, 2, 29), QANightlyRetention.FolderDate("02-29", new DateTime(2027, 3, 1)));
+        Assert.IsNull(QANightlyRetention.FolderDate("02-30", new DateTime(2027, 3, 1)));
     }
 
     [TestCase("2026-10-27 23-10-05.mkv", true)]
@@ -733,6 +795,73 @@ public sealed class QANightlyTests
         string none = QANightlyHeader.Summary(new Dictionary<string, string> { { "record", QANightlyLocalSettings.RecordFull } }, null, null, "", "");
         StringAssert.Contains("| - | - | 없음 |", none);
         StringAssert.DoesNotContain("## 리플레이 클립", none, "판 전체 녹화 모드에 클립이 없으면 절을 만들지 않는다");
+    }
+
+    // ── 할 일 120 후속: 완료 표시·OBS 녹화 경로 ───────────────
+
+    [TestCase("done", "done")]
+    [TestCase("stopped", "aborted")]
+    [TestCase("", "aborted")]
+    [TestCase(null, "aborted")]
+    [TestCase("running", "aborted")]
+    public void 완료_상태는_done_아니면_aborted(string finish, string want)
+    {
+        Assert.AreEqual(want, QANightlyCompletion.EndOf(finish));
+    }
+
+    [Test]
+    public void 완료_키는_progress_txt_로_왕복하고_기계_판독된다()
+    {
+        List<KeyValuePair<string, string>> kv = QANightlyCompletion.Format(QANightlyCompletion.Done, "10판 + 오류 판 재실행 끝", new DateTime(2026, 10, 28, 4, 12, 0),
+            @"C:\UnityProject\QA\N108-20261027_2305-eunhee", 10, 10, 1, @"C:\Team-Vault\MainProject-Vault\QA_LogAndVideo\10-27", "eunhee", "report-eunhee-2.md");
+        var progress = new Dictionary<string, string> { { "state", "done" }, { "run", "10" } };
+        foreach (KeyValuePair<string, string> p in QABoss103Batch.ParseKeyValues(QABoss103Batch.FormatKeyValues(kv)))
+            progress[p.Key] = p.Value;
+        Assert.IsTrue(QANightlyCompletion.IsFinished(progress, out string end));
+        Assert.AreEqual("done", end);
+        Assert.AreEqual("C:/UnityProject/QA/N108-20261027_2305-eunhee", progress["batch_dir"]);
+        Assert.AreEqual(@"C:\Team-Vault\MainProject-Vault\QA_LogAndVideo\10-27", progress["share_dir"]);
+        Assert.AreEqual("10", progress["runs_done"]);
+        Assert.AreEqual("10", progress["runs_total"]);
+        Assert.AreEqual("1", progress["runs_error"]);
+        Assert.AreEqual("report-eunhee-2.md", progress["report_name"]);
+        Assert.AreEqual("2026-10-28 04:12:00", progress["end_at"]);
+        foreach (KeyValuePair<string, string> p in kv)
+            CollectionAssert.Contains(QANightlyCompletion.Keys, p.Key, "Resume 이 지우는 목록에 다 있어야 한다");
+
+        Assert.IsFalse(QANightlyCompletion.IsFinished(new Dictionary<string, string> { { "state", "running" } }, out _), "끝나기 전엔 end 가 없다");
+        Assert.IsFalse(QANightlyCompletion.IsFinished(null, out _));
+        List<KeyValuePair<string, string>> ab = QANightlyCompletion.Format("weird", "에디터\n재시작", DateTime.Now, "", 3, 10, 0, "", "", "");
+        Dictionary<string, string> abd = QABoss103Batch.ParseKeyValues(QABoss103Batch.FormatKeyValues(ab));
+        Assert.IsTrue(QANightlyCompletion.IsFinished(abd, out string end2));
+        Assert.AreEqual("aborted", end2);
+        Assert.AreEqual("에디터 재시작", abd["end_reason"]);
+    }
+
+    [Test]
+    public void OBS_녹화_경로_요청과_응답()
+    {
+        Assert.AreEqual("{\"recordDirectory\":\"C:\\\\Team-Vault\\\\QA_LogAndVideo\\\\10-27\"}",
+            QAObsProtocol.RecordDirectoryData(@"C:\Team-Vault\QA_LogAndVideo\10-27"));
+        const string json = "{\"op\":7,\"d\":{\"requestType\":\"GetRecordDirectory\",\"requestId\":\"g1\",\"requestStatus\":{\"result\":true,\"code\":100}," +
+                            "\"responseData\":{\"recordDirectory\":\"D:\\\\Videos\"}}}";
+        Assert.IsTrue(QAObsProtocol.TryParseResponse(json, "g1", out QAObsResult r));
+        Assert.IsTrue(r.Ok);
+        Assert.AreEqual(@"D:\Videos", r.RecordDirectory);
+    }
+
+    [Test]
+    public void OBS_리플레이_버퍼_상태_응답의_active()
+    {
+        const string on = "{\"op\":7,\"d\":{\"requestType\":\"GetReplayBufferStatus\",\"requestId\":\"s1\",\"requestStatus\":{\"result\":true,\"code\":100}," +
+                          "\"responseData\":{\"outputActive\":true}}}";
+        const string off = "{\"op\":7,\"d\":{\"requestType\":\"GetReplayBufferStatus\",\"requestId\":\"s1\",\"requestStatus\":{\"result\":true,\"code\":100}," +
+                           "\"responseData\":{\"outputActive\":false}}}";
+        Assert.IsTrue(QAObsProtocol.TryParseResponse(on, "s1", out QAObsResult a));
+        Assert.IsTrue(a.OutputActive);
+        Assert.IsTrue(QAObsProtocol.TryParseResponse(off, "s1", out QAObsResult b));
+        Assert.IsTrue(b.Ok, "요청은 성공이어도");
+        Assert.IsFalse(b.OutputActive, "실제로 안 켜졌으면 false(설정 창 열림)");
     }
 }
 #endif

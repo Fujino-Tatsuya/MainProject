@@ -29,6 +29,9 @@ public static class QAObsProtocol
     public const string SetVideoSettings = "SetVideoSettings";
     public const string SetProfileParameter = "SetProfileParameter";
     public const string GetProfileParameter = "GetProfileParameter";
+    /// <summary>할 일 120 후속 — 녹화 폴더(리플레이 클립도 여기 저장). obs-websocket 5.3+(OBS 30+). Set 은 출력이 켜져 있으면 다음 시작부터 먹는다 [확인 필요].</summary>
+    public const string GetRecordDirectory = "GetRecordDirectory";
+    public const string SetRecordDirectory = "SetRecordDirectory";
     /// <summary>이벤트 — 리플레이 저장 끝(<c>savedReplayPath</c>).</summary>
     public const string EventReplayBufferSaved = "ReplayBufferSaved";
     /// <summary>Identify <c>eventSubscriptions</c> — Outputs(1 &lt;&lt; 6: 녹화·리플레이 버퍼 상태·ReplayBufferSaved).</summary>
@@ -50,6 +53,7 @@ public static class QAObsProtocol
         public string outputTimecode = "";
         public string savedReplayPath = "";
         public string parameterValue = "";
+        public string recordDirectory = "";
     }
     [Serializable] private sealed class ResponseD { public string requestType = ""; public string requestId = ""; public StatusJson requestStatus; public DataJson responseData; }
     [Serializable] private sealed class ResponseJson { public int op = -1; public ResponseD d; }
@@ -121,6 +125,9 @@ public static class QAObsProtocol
     public static string ProfileParameterData(string category, string name, string value) =>
         "{\"parameterCategory\":\"" + Escape(category) + "\",\"parameterName\":\"" + Escape(name) + "\",\"parameterValue\":\"" + Escape(value) + "\"}";
 
+    /// <summary>SetRecordDirectory 요청 데이터.</summary>
+    public static string RecordDirectoryData(string directory) => "{\"recordDirectory\":\"" + Escape(directory) + "\"}";
+
     /// <summary>GetProfileParameter 요청 데이터.</summary>
     public static string ProfileParameterQuery(string category, string name) =>
         "{\"parameterCategory\":\"" + Escape(category) + "\",\"parameterName\":\"" + Escape(name) + "\"}";
@@ -143,7 +150,7 @@ public static class QAObsProtocol
     /// </summary>
     public static bool TryParseResponse(string json, string requestId, out QAObsResult result)
     {
-        result = new QAObsResult { OutputPath = "", OutputTimecode = "", SavedReplayPath = "", ParameterValue = "", Error = "" };
+        result = new QAObsResult { OutputPath = "", OutputTimecode = "", SavedReplayPath = "", ParameterValue = "", RecordDirectory = "", Error = "" };
         ResponseJson r;
         try { r = JsonUtility.FromJson<ResponseJson>(json); }
         catch { return false; }
@@ -163,6 +170,7 @@ public static class QAObsProtocol
             result.OutputTimecode = r.d.responseData.outputTimecode ?? "";
             result.SavedReplayPath = r.d.responseData.savedReplayPath ?? "";
             result.ParameterValue = r.d.responseData.parameterValue ?? "";
+            result.RecordDirectory = r.d.responseData.recordDirectory ?? "";
         }
         return true;
     }
@@ -290,6 +298,8 @@ public struct QAObsResult
     /// <summary>GetLastReplayBufferReplay 응답 또는 ReplayBufferSaved 이벤트의 클립 경로.</summary>
     public string SavedReplayPath;
     public string ParameterValue;
+    /// <summary>GetRecordDirectory 응답의 녹화 폴더.</summary>
+    public string RecordDirectory;
     public string Error;
 }
 
@@ -333,7 +343,7 @@ public static class QAObsClient
     }
 
     private static QAObsResult Empty() =>
-        new QAObsResult { OutputPath = "", OutputTimecode = "", SavedReplayPath = "", ParameterValue = "", Error = "" };
+        new QAObsResult { OutputPath = "", OutputTimecode = "", SavedReplayPath = "", ParameterValue = "", RecordDirectory = "", Error = "" };
 
     private static async Task<QAObsResult> SendAsync(string host, int port, string password, string requestType, string requestData, string waitEventType,
                                                      CancellationToken ct)

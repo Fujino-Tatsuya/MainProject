@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -13,13 +12,13 @@ using Debug = UnityEngine.Debug;
 /// <summary>
 /// 할 일 108 — 103 연속 루프(<see cref="QABoss103BatchRunner"/>)가 야간 배치(batch.txt 에 <c>nightly_seed</c>)일 때만 부르는 판 앞뒤 일.
 /// <list type="bullet">
-/// <item>녹화: 판 시작 전 OBS <c>StartRecord</c>, 판이 끝나 Play 가 멈춘 뒤 <c>StopRecord</c> → 영상 경로를 <c>recordings.txt</c> 에. 녹화 중 표시는 파일
-///   (<c>rec-active.txt</c>)이라 Play 진입·정지 도메인 리로드를 넘는다.</item>
-/// <item>수집: 판마다·배치 끝에 배치 폴더·48 리포트를 날짜별 공유 폴더로 복사(작은 파일은 바로, 영상은 robocopy 를 따로 띄운다 — 다음 판 도메인 리로드에 끊기지 않게).
-///   배치 끝에는 Editor.log 사본도.</item>
-/// <item>할 일 120 — 배치 시작 1회: 공유 폴더 지난 영상 삭제(보관 일수) → OBS 화질(해상도·fps·비트레이트) 적용 → (2단계) 리플레이 버퍼 시작.
+/// <item>녹화(공유 모드가 아닐 때만): 판 시작 전 OBS <c>StartRecord</c>, 판이 끝나 Play 가 멈춘 뒤 <c>StopRecord</c> → 영상 경로를 <c>recordings.txt</c> 에. 녹화 중 표시는 파일
+///   (<c>rec-active.txt</c>)이라 Play 진입·정지 도메인 리로드를 넘는다. 영상은 OBS 녹화 경로에 남는다(복사 없음).</item>
+/// <item>할 일 120 — 배치 시작 1회: 공유 폴더 지난 자기 클립 삭제(보관 일수) → 공유 날짜 폴더 만들기·OBS 녹화 경로를 그 폴더로(원래 경로는 PC 파일에 보관) →
+///   OBS 화질(해상도·fps·비트레이트) → (리플레이 모드) 리플레이 버퍼 시작 + 실제 켜졌는지 확인.
 ///   판 중: 호스트 로그를 이벤트 표(<see cref="QANightlyEvents.Table"/>)로 보고 시각표(<c>events.tsv</c>, 영상 타임코드 포함)를 쓴다.
-///   2단계면 이벤트마다 클립 예약(<see cref="QANightlyClipPlanner"/>) → <c>SaveReplayBuffer</c> → 파일 이름 바꾸기 → 공유 폴더 video/ 복사.</item>
+///   리플레이 모드면 이벤트마다 클립 예약(<see cref="QANightlyClipPlanner"/>) → <c>SaveReplayBuffer</c> → <c>&lt;이름&gt;_&lt;HHmmss&gt;_r&lt;판&gt;_&lt;이벤트&gt;</c> 로 이름 바꿔 날짜 폴더 바로 아래로.</item>
+/// <item>배치 끝: 남은 클립 저장·리플레이 버퍼 정지 → OBS 녹화 경로 되돌리기 → 로컬 요약(<c>nightly-summary.md</c>). 원본 로그·CSV·report.html 은 공유하지 않는다.</item>
 /// </list>
 /// 모든 실패는 경고(로그)만 — QA 는 계속 간다.
 /// </summary>
@@ -29,8 +28,10 @@ public static class QANightlyHooks
     private const string ActiveFile = "rec-active.txt";
     private const string ReplayActiveFile = "replay-active.txt";
     private const string PendingFile = "clip-pending.txt";
-    private const long SmallFileLimit = 64L * 1024 * 1024;
+    /// <summary>OBS 원래 녹화 경로 — PC 파일(gitignore 경로). 배치 폴더가 아니라 PC 단위라 배치가 중간에 끊겨도 다음 배치가 원래 값을 덮지 않는다.</summary>
+    public const string ObsRecordDirFile = "UserSettings/QANightly.obs-record-dir.txt";
     private const double ClipSaveTimeoutSeconds = 15.0;
+    private const int ReplayVerifyTries = 3;
     private static readonly object FileLock = new object();
 
     public static bool IsNightly(Dictionary<string, string> batch) =>
@@ -70,7 +71,7 @@ public static class QANightlyHooks
     // ── 배치 시작 (할 일 120) ────────────────────────────────
 
     /// <summary>
-    /// 배치 시작(Start Night·Resume Last) 1회 — 공유 폴더 지난 영상 삭제 → OBS 화질 적용 → (2단계) 리플레이 버퍼 시작.
+    /// 배치 시작(Start Night·Resume Last) 1회 — 공유 폴더 지난 클립 삭제 → 날짜 폴더·OBS 녹화 경로 → OBS 화질 → (리플레이 모드) 리플레이 버퍼 시작·확인.
     /// <paramref name="log"/> null = 콘솔 + 배치 loop.log.
     /// </summary>
     public static void BatchStarting(string dir, Action<string> log)
@@ -83,17 +84,25 @@ public static class QANightlyHooks
         log = log ?? DirLog(dir);
         _live = null;
         QANightlyLocalSettings s = LoadLocal();
-        PruneVideos(s.ShareRoot, Val(batch, QANightlyHeader.KeySeedName), s.VideoKeepDays, log);
+        PruneClips(s.ShareRoot, Val(batch, QANightlyHeader.KeySeedName), s.VideoKeepDays, log);
+        string share = Val(batch, "share_dir");
+        if (share.Length > 0)
+        {
+            try { Directory.CreateDirectory(share); }
+            catch (Exception e) { Warn(dir, log, $"공유 날짜 폴더를 못 만들었다(클립은 OBS 녹화 경로에 남는다) — {share} {e.GetType().Name}: {e.Message}"); }
+        }
         string mode = Val(batch, "record");
         if (mode != QANightlyLocalSettings.RecordFull && mode != QANightlyLocalSettings.RecordReplay)
             return;
+        if (share.Length > 0)
+            PointRecordDirectory(dir, s, share, log);
         ApplyQuality(s, mode == QANightlyLocalSettings.RecordReplay, log);
         if (mode == QANightlyLocalSettings.RecordReplay)
             StartReplay(dir, s, log);
     }
 
-    /// <summary>공유 루트의 날짜 폴더 중 보관 일수를 넘긴 것에서 <b>이 시드</b>의 video/ 영상 파일만 지운다. 리포트·로그·robocopy.log 는 그대로.</summary>
-    private static void PruneVideos(string root, string seed, int keepDays, Action<string> log)
+    /// <summary>공유 루트의 <c>MM-dd</c> 날짜 폴더 중 보관 일수를 넘긴 것에서 <b>이 이름의 클립</b>(<see cref="QANightlyClipName.IsOwnClip"/>)만 지운다. 리포트·다른 사람 파일은 그대로.</summary>
+    private static void PruneClips(string root, string seed, int keepDays, Action<string> log)
     {
         if (keepDays <= 0 || string.IsNullOrWhiteSpace(root) || string.IsNullOrEmpty(seed))
             return;
@@ -109,12 +118,9 @@ public static class QANightlyHooks
             long bytes = 0;
             foreach (string date in QANightlyRetention.ExpiredFolders(names, DateTime.Now, keepDays))
             {
-                string video = Path.Combine(root, date, seed, QANightlyRetention.VideoFolder);
-                if (!Directory.Exists(video))
-                    continue;
-                foreach (string f in Directory.GetFiles(video))
+                foreach (string f in Directory.GetFiles(Path.Combine(root, date)))
                 {
-                    if (!QANightlyRetention.IsVideoFile(f))
+                    if (!QANightlyClipName.IsOwnClip(f, seed))
                         continue;
                     try
                     {
@@ -126,13 +132,13 @@ public static class QANightlyHooks
                     catch (Exception e)
                     {
                         if (++failed <= 3)
-                            log($"⚠ 지난 영상 삭제 실패 — {f} {e.GetType().Name}: {e.Message}");
+                            log($"⚠ 지난 클립 삭제 실패 — {f} {e.GetType().Name}: {e.Message}");
                     }
                 }
             }
             if (deleted > 0 || failed > 0)
-                log($"영상 보관 {keepDays}일 — 지난 영상 {deleted}개({bytes / (1024 * 1024)}MB) 삭제{(failed > 0 ? $" · 실패 {failed}개" : "")} · " +
-                    $"{root}\\<날짜>\\{seed}\\video (리포트·로그는 그대로)");
+                log($"영상 보관 {keepDays}일 — 지난 클립 {deleted}개({bytes / (1024 * 1024)}MB) 삭제{(failed > 0 ? $" · 실패 {failed}개" : "")} · " +
+                    $"{root}\\<MM-dd>\\{seed}_*.영상 (리포트·다른 사람 파일은 그대로)");
         }
         catch (Exception e)
         {
@@ -141,8 +147,77 @@ public static class QANightlyHooks
     }
 
     /// <summary>
+    /// OBS 녹화 경로(리플레이 클립 저장 위치)를 공유 날짜 폴더로. 원래 경로는 PC 파일(<see cref="ObsRecordDirFile"/>)에 — 이미 있으면(지난 배치가 못 되돌림) 덮지 않는다.
+    /// 출력(녹화·리플레이 버퍼)이 켜져 있으면 OBS 를 건드리지 않고 경고만 — 클립은 저장 뒤 이름 바꾸기에서 날짜 폴더로 옮긴다(<see cref="SaveClip"/>).
+    /// </summary>
+    private static void PointRecordDirectory(string dir, QANightlyLocalSettings s, string share, Action<string> log)
+    {
+        string busy = BusyOutputs(s);
+        if (busy == null)
+        {
+            Warn(dir, log, $"OBS 연결 실패 — 녹화 경로를 날짜 폴더로 못 바꿨다(클립은 저장 뒤 날짜 폴더로 옮긴다) · {QAObsProtocol.Endpoint(s.ObsHost, s.ObsPort)}");
+            return;
+        }
+        if (busy.Length > 0)
+        {
+            Warn(dir, log, $"OBS {busy} 중이라 녹화 경로를 바꾸지 않았다(켜진 출력은 건드리지 않는다) — 클립은 저장 뒤 날짜 폴더로 옮긴다. " +
+                           "다음 밤 전에 OBS 출력을 끄고 시작할 것");
+            return;
+        }
+        QAObsResult cur = Obs(s, QAObsProtocol.GetRecordDirectory);
+        if (!cur.Ok)
+        {
+            Warn(dir, log, $"OBS 녹화 경로 확인 실패(GetRecordDirectory — OBS 30+ 필요) — 경로를 바꾸지 않았다(클립은 저장 뒤 날짜 폴더로 옮긴다) · {cur.Error}");
+            return;
+        }
+        string saved = Path.Combine(QANetSim88.OwnRoot, ObsRecordDirFile);
+        string current = (cur.RecordDirectory ?? "").Trim();
+        if (!File.Exists(saved))
+        {
+            if (IsUnder(current, s.ShareRoot))
+                log($"⚠ OBS 녹화 경로가 이미 공유 폴더 안이다({current}) — 원래 경로로 보관하지 않는다(끝나도 되돌리지 않음). OBS 설정에서 원래 경로를 손으로 맞출 것");
+            else if (current.Length > 0)
+                TryWrite(saved, current + "\n");
+        }
+        if (PathsEqual(current, share))
+        {
+            log($"OBS 녹화 경로 = 공유 날짜 폴더(이미) — {share}");
+            return;
+        }
+        QAObsResult r = Obs(s, QAObsProtocol.SetRecordDirectory, QAObsProtocol.RecordDirectoryData(share));
+        if (r.Ok)
+            log($"OBS 녹화 경로 → 공유 날짜 폴더 {share} (원래 {(current.Length > 0 ? current : "모름")} — 배치 끝에 되돌린다)");
+        else
+            Warn(dir, log, $"OBS 녹화 경로 바꾸기 실패(SetRecordDirectory) — 클립은 저장 뒤 날짜 폴더로 옮긴다 · {r.Error}");
+    }
+
+    /// <summary>배치 끝 — 보관해 둔 원래 녹화 경로로 되돌린다(출력이 꺼져 있을 때만). 되돌리면 보관 파일을 지운다.</summary>
+    private static void RestoreRecordDirectory(string dir, Action<string> log)
+    {
+        string saved = Path.Combine(QANetSim88.OwnRoot, ObsRecordDirFile);
+        string original = (SafeRead(saved) ?? "").Trim();
+        if (original.Length == 0)
+            return;
+        QANightlyLocalSettings s = LoadLocal();
+        string busy = BusyOutputs(s);
+        if (busy == null || busy.Length > 0)
+        {
+            Warn(dir, log, $"OBS 녹화 경로를 원래({original})로 못 되돌렸다 — {(busy == null ? "OBS 연결 실패" : $"OBS {busy} 중")}. 다음 배치 끝에 다시 시도(또는 OBS 설정에서 손으로)");
+            return;
+        }
+        QAObsResult r = Obs(s, QAObsProtocol.SetRecordDirectory, QAObsProtocol.RecordDirectoryData(original));
+        if (r.Ok)
+        {
+            TryDelete(saved);
+            log($"OBS 녹화 경로 되돌림 — {original}");
+        }
+        else
+            Warn(dir, log, $"OBS 녹화 경로 되돌리기 실패 — {original} {r.Error}. 다음 배치 끝에 다시 시도(또는 OBS 설정에서 손으로)");
+    }
+
+    /// <summary>
     /// 화질 적용 — 설정이 비어 있으면 아무것도 바꾸지 않는다. 해상도·fps(SetVideoSettings)는 녹화·리플레이 버퍼가 꺼져 있을 때만,
-    /// 비트레이트·리플레이 버퍼 길이는 프로필 파라미터(출력 모드별 키 — <see cref="QAObsProfileParams"/>, [확인 필요]).
+    /// 비트레이트·리플레이 버퍼 길이는 프로필 파라미터(출력 모드별 키 — <see cref="QAObsProfileParams"/>).
     /// </summary>
     private static void ApplyQuality(QANightlyLocalSettings s, bool replay, Action<string> log)
     {
@@ -217,16 +292,34 @@ public static class QANightlyHooks
                  : $"⚠ OBS 프로필 {category}/{name} = {value} ({label}) 실패(QA 는 계속) — {r.Error}");
     }
 
+    /// <summary>
+    /// 리플레이 버퍼 시작 → <c>GetReplayBufferStatus</c> 로 실제로 켜졌는지 확인(1초 간격 3번). OBS 설정 창이 열려 있으면 시작 요청이 성공만 돌려주고
+    /// 실제로는 안 켜진다(2026-10-27 실측). 안 켜졌으면 경고(loop.log·리포트 메모)만 남기고 표시 파일을 쓰지 않는다 — 다음 판 시작 때 다시 시도.
+    /// </summary>
     private static bool StartReplay(string dir, QANightlyLocalSettings s, Action<string> log)
     {
         QAObsResult r = Obs(s, QAObsProtocol.StartReplayBuffer);
         if (!r.Ok)
         {
-            log($"⚠ 리플레이 버퍼 시작 실패(QA 는 계속 — 판마다 다시 시도. OBS 설정 → 출력 → 리플레이 버퍼 사용 확인) — {QAObsProtocol.Endpoint(s.ObsHost, s.ObsPort)} {r.Error}");
+            Warn(dir, log, $"리플레이 버퍼 시작 실패(QA 는 계속 — 판마다 다시 시도. OBS 설정 → 출력 → 리플레이 버퍼 사용 체크 후 OBS 재시작) — {QAObsProtocol.Endpoint(s.ObsHost, s.ObsPort)} {r.Error}");
+            return false;
+        }
+        bool active = false;
+        for (int i = 0; i < ReplayVerifyTries && !active; i++)
+        {
+            if (i > 0)
+                Thread.Sleep(1000);
+            QAObsResult st = Obs(s, QAObsProtocol.GetReplayBufferStatus);
+            active = st.Ok && st.OutputActive;
+        }
+        if (!active)
+        {
+            Warn(dir, log, "리플레이 버퍼가 실제로 안 켜졌다(시작 요청은 성공) — OBS 설정 창이 열려 있으면 닫을 것 · 출력 → 리플레이 버퍼 사용 체크 후 OBS 재시작. " +
+                           "이대로면 클립이 없다 — 다음 판 시작 때 다시 시도");
             return false;
         }
         TryWrite(Path.Combine(dir, ReplayActiveFile), DateTime.Now.ToString("o", CultureInfo.InvariantCulture) + "\n");
-        log($"리플레이 버퍼 시작{(r.AlreadyInState ? " (이미 켜져 있었다)" : "")} — 이벤트 뒤 {s.ReplayAfterSeconds:0.#}초에 저장 · 쿨다운 {s.ReplayCooldownSeconds:0.#}초 · " +
+        log($"리플레이 버퍼 시작·확인(active){(r.AlreadyInState ? " (이미 켜져 있었다)" : "")} — 이벤트 뒤 {s.ReplayAfterSeconds:0.#}초에 저장 · 쿨다운 {s.ReplayCooldownSeconds:0.#}초 · " +
             $"클립 이벤트 {(s.ClipEvents.Length > 0 ? s.ClipEvents : "표 전체")}");
         return true;
     }
@@ -241,7 +334,7 @@ public static class QANightlyHooks
         string mode = Val(batch, "record");
         if (mode == QANightlyLocalSettings.RecordReplay)
         {
-            // 2단계 — 판 녹화 없음. 버퍼가 아직 안 켜졌으면(배치 시작 때 OBS 연결 실패) 다시 시도.
+            // 판 녹화 없음. 버퍼가 아직 안 켜졌으면(배치 시작 때 OBS 연결 실패·설정 창 열림) 다시 시도.
             if (!File.Exists(Path.Combine(dir, ReplayActiveFile)))
                 StartReplay(dir, LoadLocal(), log);
             return;
@@ -274,23 +367,47 @@ public static class QANightlyHooks
         Dictionary<string, string> batch = ReadBatch(dir);
         if (!IsNightly(batch))
             return;
-        StopRecording(dir, batch, run, retry, log);
-        Collect(dir, batch, false, "", log);
+        StopRecording(dir, run, retry, log);
+        WriteSummary(dir, batch, "", log);
     }
 
-    /// <summary>배치 끝(완료·멈춤) — 남은 녹화를 멈추고(2단계면 남은 클립 저장·리플레이 버퍼 정지) 마지막 수집 + Editor.log 사본.</summary>
+    /// <summary>배치 끝(완료·멈춤) — 남은 녹화를 멈추고(리플레이면 남은 클립 저장·리플레이 버퍼 정지) OBS 녹화 경로를 되돌린 뒤 로컬 요약.</summary>
     public static void BatchEnded(string dir, string loopState, Action<string> log)
     {
         Dictionary<string, string> batch = ReadBatch(dir);
         if (!IsNightly(batch))
             return;
-        StopRecording(dir, batch, -1, -1, log);
+        StopRecording(dir, -1, -1, log);
         if (Val(batch, "record") == QANightlyLocalSettings.RecordReplay)
             EndReplay(dir, log);
-        Collect(dir, batch, true, loopState, log);
+        RestoreRecordDirectory(dir, log);
+        WriteSummary(dir, batch, loopState, log);
     }
 
-    private static void StopRecording(string dir, Dictionary<string, string> batch, int run, int retry, Action<string> log)
+    /// <summary>
+    /// progress.txt 완료 키(<see cref="QANightlyCompletion"/>) — 야간 배치면 공유 날짜 폴더·이름·제안 리포트 이름을 채운다. OBS 호출 없음(에디터 시작 중에도 부른다).
+    /// </summary>
+    public static List<KeyValuePair<string, string>> CompletionKeys(string dir, string end, string reason, int runsDone, int runsTotal, int runsError)
+    {
+        Dictionary<string, string> batch = ReadBatch(dir);
+        string share = "", name = "", report = "";
+        if (IsNightly(batch))
+        {
+            name = Val(batch, QANightlyHeader.KeySeedName);
+            share = Val(batch, "share_dir");
+            var existing = new List<string>();
+            try
+            {
+                if (share.Length > 0 && Directory.Exists(share))
+                    existing.AddRange(Directory.GetFiles(share, "report-*.md"));
+            }
+            catch { /* 목록 실패 — 첫 이름을 제안(에이전트가 쓰기 직전에 다시 확인) */ }
+            report = QANightlyPaths.ReportFileName(name, existing);
+        }
+        return QANightlyCompletion.Format(end, reason, DateTime.Now, dir, runsDone, runsTotal, runsError, share, name, report);
+    }
+
+    private static void StopRecording(string dir, int run, int retry, Action<string> log)
     {
         string active = Path.Combine(dir, ActiveFile);
         if (!File.Exists(active))
@@ -312,22 +429,8 @@ public static class QANightlyHooks
         }
         else if (rec.Path.Length == 0)
             rec.Note = r.AlreadyInState ? "OBS 가 녹화 중이 아니었다" : "영상 경로를 못 받음";
-
-        string share = Val(batch, "share_dir");
-        if (share.Length > 0 && rec.Path.Length > 0)
-        {
-            string videoDir = Path.Combine(share, QANightlyRetention.VideoFolder);
-            rec.Shared = Path.Combine(videoDir, Path.GetFileName(rec.Path));
-            string err = LaunchRobocopy(rec.Path, videoDir);
-            if (err != null)
-            {
-                rec.Note = (rec.Note + " 영상 복사 시작 실패: " + err).Trim();
-                log($"⚠ 영상 복사 시작 실패 — {err}");
-            }
-        }
-        try { File.AppendAllText(Path.Combine(dir, QANightlyPaths.RecordingsFile), rec.Format() + "\n", new UTF8Encoding(false)); }
-        catch (Exception e) { log($"⚠ recordings.txt 쓰기 실패 — {e.Message}"); }
-        log($"녹화 정지 — 판 {rec.Run}{(rec.Retry > 0 ? " 재실행" : "")} · 영상 {(rec.Path.Length > 0 ? rec.Path : "없음")}{(rec.Shared.Length > 0 ? " → " + rec.Shared + " (robocopy)" : "")}");
+        AppendLine(Path.Combine(dir, QANightlyPaths.RecordingsFile), rec.Format());
+        log($"녹화 정지 — 판 {rec.Run}{(rec.Retry > 0 ? " 재실행" : "")} · 영상 {(rec.Path.Length > 0 ? rec.Path : "없음")}");
     }
 
     // ── 이벤트 (할 일 120) ───────────────────────────────────
@@ -339,7 +442,6 @@ public static class QANightlyHooks
         public bool Nightly;
         public string Mode = "";
         public string Seed = "";
-        public string NightDate = "";
         public string ShareDir = "";
         public QANightlyLocalSettings Settings;
         public HashSet<string> ClipEnabled;
@@ -362,7 +464,6 @@ public static class QANightlyHooks
         {
             l.Mode = Val(batch, "record");
             l.Seed = Val(batch, QANightlyHeader.KeySeedName);
-            l.NightDate = NightDate(batch);
             l.ShareDir = Val(batch, "share_dir");
             l.Settings = LoadLocal();
             l.ClipEnabled = QANightlyEvents.ParseEnabled(l.Settings.ClipEvents);
@@ -372,7 +473,7 @@ public static class QANightlyHooks
         return l;
     }
 
-    /// <summary>[메인 에디터 로그 콜백] 판 Play 중 호스트 로그 한 줄 — 이벤트 표에 맞으면 시각표에 쓰고(2단계면 클립 예약). 여기서는 로그를 내지 않는다(재귀).</summary>
+    /// <summary>[메인 에디터 로그 콜백] 판 Play 중 호스트 로그 한 줄 — 이벤트 표에 맞으면 시각표에 쓰고(리플레이 모드면 클립 예약). 여기서는 로그를 내지 않는다(재귀).</summary>
     public static void OnLog(string dir, int run, int retry, string condition, UnityEngine.LogType type)
     {
         if (_inHook || string.IsNullOrEmpty(condition) || condition.StartsWith(Tag, StringComparison.Ordinal))
@@ -434,7 +535,7 @@ public static class QANightlyHooks
         AppendLine(Path.Combine(l.Dir, QANightlyPaths.EventsFile), ev.Format());
     }
 
-    /// <summary>[루프 틱] 2단계 — 예약 시각이 된 클립을 저장한다. Play 중이면 스레드 풀에서(Play 를 막지 않게), 아니면 바로.</summary>
+    /// <summary>[루프 틱] 리플레이 모드 — 예약 시각이 된 클립을 저장한다. Play 중이면 스레드 풀에서(Play 를 막지 않게), 아니면 바로.</summary>
     public static void Tick(string dir, Action<string> log)
     {
         Live l = GetLive(dir);
@@ -468,19 +569,22 @@ public static class QANightlyHooks
 
     private sealed class ClipJob
     {
-        public string Dir, Seed, NightDate, ShareDir, Host, Password;
+        public string Dir, Seed, ShareDir, Host, Password;
         public int Port, Run, Retry;
         public List<string> Names;
     }
 
     private static ClipJob Job(Live l, List<string> names, int run, int retry) => new ClipJob
     {
-        Dir = l.Dir, Seed = l.Seed, NightDate = l.NightDate, ShareDir = l.ShareDir ?? "",
+        Dir = l.Dir, Seed = l.Seed, ShareDir = l.ShareDir ?? "",
         Host = l.Settings.ObsHost, Port = l.Settings.ObsPort, Password = l.Settings.ObsPassword,
         Run = run, Retry = retry, Names = names,
     };
 
-    /// <summary>SaveReplayBuffer → 경로(ReplayBufferSaved 이벤트, 없으면 GetLastReplayBufferReplay) → 이름 바꾸기 → 공유 폴더 video/ 복사 → clips.txt. 실패는 경고만.</summary>
+    /// <summary>
+    /// SaveReplayBuffer → 경로(ReplayBufferSaved 이벤트, 없으면 GetLastReplayBufferReplay) → <c>&lt;이름&gt;_&lt;HHmmss&gt;_r&lt;판&gt;_&lt;이벤트&gt;</c> 로 이름 바꿔
+    /// 공유 날짜 폴더 바로 아래로(공유 모드가 아니면 그 자리에서 이름만) → clips.txt. 녹화 경로가 이미 날짜 폴더면 이름 바꾸기, 아니면 옮기기 — 같은 한 번의 Move. 실패는 경고만.
+    /// </summary>
     private static void SaveClip(ClipJob j, Action<string> log)
     {
         Action<string> say = log ?? DirLog(j.Dir);
@@ -505,31 +609,20 @@ public static class QANightlyHooks
                 rec.Note += " · 클립 경로를 못 받음";
             else
             {
-                string target = QANightlyClipName.Unique(Path.GetDirectoryName(path),
-                    QANightlyClipName.FileName(j.NightDate, j.Seed, j.Run, j.Retry, j.Names, Path.GetExtension(path)), File.Exists);
+                string targetDir = j.ShareDir.Length > 0 ? j.ShareDir : Path.GetDirectoryName(path);
+                string target = QANightlyClipName.Unique(targetDir,
+                    QANightlyClipName.FileName(j.Seed, DateTime.Now, j.Run, j.Retry, j.Names, Path.GetExtension(path)), File.Exists);
                 string err = MoveWithRetry(path, target);
                 if (err == null)
                     rec.Path = target;
                 else
                 {
                     rec.Note += " · 이름 바꾸기 실패";
-                    say($"⚠ 클립 이름 바꾸기 실패(원래 이름 유지) — {path} → {Path.GetFileName(target)} {err}");
-                }
-                if (j.ShareDir.Length > 0)
-                {
-                    string videoDir = Path.Combine(j.ShareDir, QANightlyRetention.VideoFolder);
-                    rec.Shared = Path.Combine(videoDir, Path.GetFileName(rec.Path));
-                    string cerr = LaunchRobocopy(rec.Path, videoDir);
-                    if (cerr != null)
-                    {
-                        rec.Note += " · 복사 시작 실패: " + cerr;
-                        say($"⚠ 클립 복사 시작 실패 — {cerr}");
-                    }
+                    say($"⚠ 클립 이름 바꾸기·옮기기 실패(원래 자리·이름 유지) — {path} → {target} {err}");
                 }
             }
             AppendLine(Path.Combine(j.Dir, QANightlyPaths.ClipsFile), rec.Format());
-            say($"리플레이 클립 — 판 {j.Run}{(j.Retry > 0 ? " 재실행" : "")} [{events}] {(rec.Path.Length > 0 ? rec.Path : "경로 없음")}" +
-                (rec.Shared.Length > 0 ? " → " + rec.Shared + " (robocopy)" : ""));
+            say($"리플레이 클립 — 판 {j.Run}{(j.Retry > 0 ? " 재실행" : "")} [{events}] {(rec.Path.Length > 0 ? rec.Path : "경로 없음")}");
         }
         catch (Exception e)
         {
@@ -545,6 +638,9 @@ public static class QANightlyHooks
         {
             try
             {
+                string d = Path.GetDirectoryName(to);
+                if (!string.IsNullOrEmpty(d))
+                    Directory.CreateDirectory(d);
                 File.Move(from, to);
                 return null;
             }
@@ -559,50 +655,9 @@ public static class QANightlyHooks
 
     private static void SavePending(Live l) => TryWrite(Path.Combine(l.Dir, PendingFile), l.Planner.Format());
 
-    /// <summary>밤 날짜(배치 시작 날, <c>yyyy-MM-dd</c>) — 공유 폴더 이름과 같다.</summary>
-    private static string NightDate(Dictionary<string, string> batch) =>
-        DateTime.TryParseExact(Val(batch, "started_at"), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime t)
-            ? t.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-            : DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    // ── 요약 ─────────────────────────────────────────────────
 
-    // ── 수집 ─────────────────────────────────────────────────
-
-    /// <summary>아침 요약(nightly-summary.md)을 배치 폴더에 쓰고, 공유 폴더가 있으면 배치 폴더·48 리포트를 복사한다.</summary>
-    public static void Collect(string dir, Dictionary<string, string> batch, bool final, string loopState, Action<string> log)
-    {
-        WriteSummary(dir, batch, loopState, log);
-        string share = Val(batch, "share_dir");
-        if (share.Length == 0)
-            return;
-        try
-        {
-            string dst = Path.Combine(share, Path.GetFileName(dir.TrimEnd('/', '\\')));
-            int n = CopyTree(dir, dst, new[] { QABoss103Batch.BeatFolder });
-            DateTime started = DateTime.TryParseExact(Val(batch, "started_at"), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture,
-                                                      DateTimeStyles.None, out DateTime t) ? t : DateTime.MinValue;
-            string root = QAReportWriter.ScenarioRoot();
-            if (Directory.Exists(root) && started > DateTime.MinValue)
-                foreach (string d in Directory.GetDirectories(root, QANightlyPaths.ScenarioReportPrefix + "*"))
-                    if (QANightlyPaths.IsScenarioReportOf(Path.GetFileName(d), started))
-                        n += CopyTree(d, Path.Combine(share, "48", Path.GetFileName(d)), null);
-            if (final)
-            {
-                string editorLog = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Unity", "Editor", "Editor.log");
-                if (File.Exists(editorLog))
-                {
-                    Directory.CreateDirectory(Path.Combine(share, "logs"));
-                    CopyShared(editorLog, Path.Combine(share, "logs", $"Editor-{DateTime.Now:yyyyMMdd_HHmmss}.log"));
-                    n++;
-                }
-            }
-            log($"공유 폴더 수집 {n}개 → {share}");
-        }
-        catch (Exception e)
-        {
-            log($"⚠ 공유 폴더 복사 실패(QA 는 계속) — {share} {e.GetType().Name}: {e.Message}");
-        }
-    }
-
+    /// <summary>로컬 아침 요약(nightly-summary.md)을 배치 폴더에 쓴다. 공유 폴더에는 쓰지 않는다 — 공유 리포트는 에이전트가 쓴다.</summary>
     private static void WriteSummary(string dir, Dictionary<string, string> batch, string loopState, Action<string> log)
     {
         try
@@ -623,68 +678,28 @@ public static class QANightlyHooks
         }
     }
 
-    /// <summary>폴더 복사(크기·수정 시각이 같으면 건너뜀, 64MB 넘는 파일 제외). 복사한 파일 수.</summary>
-    private static int CopyTree(string src, string dst, string[] skipDirs)
-    {
-        int n = 0;
-        Directory.CreateDirectory(dst);
-        foreach (string f in Directory.GetFiles(src))
-        {
-            var fi = new FileInfo(f);
-            if (fi.Length > SmallFileLimit || fi.Name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
-                continue;
-            string to = Path.Combine(dst, fi.Name);
-            var ti = new FileInfo(to);
-            if (ti.Exists && ti.Length == fi.Length && ti.LastWriteTimeUtc >= fi.LastWriteTimeUtc)
-                continue;
-            CopyShared(f, to);
-            n++;
-        }
-        foreach (string d in Directory.GetDirectories(src))
-        {
-            string name = Path.GetFileName(d);
-            if (skipDirs != null && Array.IndexOf(skipDirs, name) >= 0)
-                continue;
-            n += CopyTree(d, Path.Combine(dst, name), null);
-        }
-        return n;
-    }
-
-    /// <summary>쓰는 중인 파일(Editor.log·CSV)도 읽게 공유 모드로 복사.</summary>
-    private static void CopyShared(string from, string to)
-    {
-        using (var src = new FileStream(from, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-        using (var dst = new FileStream(to, FileMode.Create, FileAccess.Write, FileShare.None))
-            src.CopyTo(dst);
-    }
-
-    /// <summary>영상 1개를 robocopy 로 따로 복사(기다리지 않는다 — 결과는 &lt;video&gt;/robocopy.log). 실패 사유 또는 null.</summary>
-    private static string LaunchRobocopy(string file, string dstDir)
-    {
-        try
-        {
-            Directory.CreateDirectory(dstDir);
-            string srcDir = (Path.GetDirectoryName(file) ?? "").TrimEnd('\\', '/');
-            string name = Path.GetFileName(file);
-            string logPath = Path.Combine(dstDir, "robocopy.log");
-            var psi = new ProcessStartInfo("robocopy", $"\"{srcDir}\" \"{dstDir.TrimEnd('\\', '/')}\" \"{name}\" /R:10 /W:15 /NP /LOG+:\"{logPath}\"")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            Process.Start(psi)?.Dispose();
-            return null;
-        }
-        catch (Exception e)
-        {
-            return $"{e.GetType().Name}: {e.Message}";
-        }
-    }
-
     // ── 도구 ─────────────────────────────────────────────────
 
     private static QAObsResult Obs(QANightlyLocalSettings s, string requestType, string requestData = null) =>
         QAObsClient.Request(s.ObsHost, s.ObsPort, s.ObsPassword, requestType, requestData, 5.0, null);
+
+    /// <summary>경고 — loop.log 에 ⚠ 로, 리포트(report.html 루프 메모 — logs/notes.txt)에도 남긴다.</summary>
+    private static void Warn(string dir, Action<string> log, string msg)
+    {
+        log("⚠ " + msg);
+        AppendLine(Path.Combine(dir, QABoss103Batch.LogFolder, QABoss103ReportFiles.NotesFile), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [야간·OBS] {msg}");
+    }
+
+    private static bool PathsEqual(string a, string b) =>
+        string.Equals(Norm(a), Norm(b), StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsUnder(string path, string root)
+    {
+        string p = Norm(path), r = Norm(root);
+        return p.Length > 0 && r.Length > 0 && (p.Equals(r, StringComparison.OrdinalIgnoreCase) || p.StartsWith(r + "/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string Norm(string p) => (p ?? "").Trim().Replace('\\', '/').TrimEnd('/');
 
     /// <summary>콘솔 + 배치 <c>logs/loop.log</c>(루프 로그와 같은 파일 — 스레드 풀에서도 쓴다).</summary>
     private static Action<string> DirLog(string dir) => msg =>
@@ -718,7 +733,13 @@ public static class QANightlyHooks
 
     private static void TryWrite(string path, string text)
     {
-        try { File.WriteAllText(path, text); }
+        try
+        {
+            string d = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(d))
+                Directory.CreateDirectory(d);
+            File.WriteAllText(path, text);
+        }
         catch { /* 표시 실패 — 정지 때 녹화가 남을 수 있다(OBS 가 다음 시작에 500 을 돌려준다) */ }
     }
 

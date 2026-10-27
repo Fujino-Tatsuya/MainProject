@@ -56,16 +56,23 @@ svn info --show-item last-changed-revision "Assets/50.Art/DataTable~/GameData.xl
    - 또는 메뉴 `Tools/QA/Nightly/Settings/Create Local Settings File` → `<프로젝트>/UserSettings/QANightly.local.json` 의 `obsEnabled` 를 `true` 로(비밀번호는 환경변수로).
 4. 메뉴 `Tools/QA/Nightly/Settings/Test OBS Connection` → 콘솔에 `[QA108/Nightly] OBS 연결 OK` 가 나오면 된다. 실패해도 QA 는 녹화 없이 돈다(경고만).
 
-## 5.1 (선택) 공유 폴더 루트
-- 날짜별 결과를 모을 폴더(Tailscale 공유 폴더 아래 — 예: `C:\Team-Vault\QA-Nightly`. 실제 경로는 팀장이 정한 공유 폴더로):
-  ```
-  setx QA_NIGHTLY_SHARE_ROOT "C:\Team-Vault\QA-Nightly"
-  ```
-  또는 로컬 설정 파일의 `shareRoot`. 비워 두면 복사하지 않는다.
-- 복사 위치: `<루트>/<yyyy-MM-dd>/<시드 이름>/` (날짜 = **배치 시작 날** — 자정을 넘겨도 한 밤 = 한 폴더).
+## 5.1 공유 폴더 루트 (팀원 PC 공유 양식 — 할 일 120 후속)
+> 팀원 PC 의 에이전트는 [qa-nightly-agent-guide.md](qa-nightly-agent-guide.md) 한 문서로 이 절차(경로 묻기 → 사전 준비 → 시작 → 완료 감시 → 리포트)를 따른다.
 
-> 할 일 120 — 녹화 용량 줄이기는 두 단계다. **지금은 1단계**(판 전체 녹화 + 저화질 + N일 삭제 + 이벤트 시각표). 이벤트 목록이 확정되면 스위치 하나로 **2단계**(리플레이 버퍼 클립만)로 바꾼다.
-> 모든 값은 비워 두면 **아무것도 바꾸지 않는다**(108 과 같다). 설정 목록 전체: 리서치 문서 §4.
+- 공유 루트 = 각 PC 의 Syncthing Team-Vault 아래 **`<Team-Vault>\MainProject-Vault\QA_LogAndVideo`**(PC 마다 Team-Vault 경로가 다르다 — 은희 PC 는 `C:\Team-Vault\MainProject-Vault\QA_LogAndVideo`):
+  ```
+  setx QA_NIGHTLY_SHARE_ROOT "C:\Team-Vault\MainProject-Vault\QA_LogAndVideo"
+  ```
+  또는 로컬 설정 파일(`UserSettings/QANightly.local.json`)의 `shareRoot`. 비워 두면 공유하지 않는다.
+- **날짜 폴더 `<루트>\<MM-dd>\`**(연도 없음, 날짜 = **배치 시작 날** — 자정을 넘겨도 한 밤 = 한 폴더, 이미 있으면 그대로 쓴다). 배치 시작 때 코드가 만든다.
+- **평평한 구조** — 팀원 모두 같은 날짜 폴더에 **자기 이름 파일만** 쓴다(Syncthing 충돌 방지). 이름 = 시드 파일 `name`(팀원 이름과 같은 칸 하나).
+  - 클립 `<이름>_<HHmmss>_r<판>[re]_<이벤트+이벤트>.mp4`(시각 = 클립 저장 시각, 확장자는 OBS 가 만든 그대로).
+  - 리포트 `report-<이름>.md`, 같은 날 두 번째부터 `report-<이름>-2.md`·`-3`… — **에이전트가 쓴다**(코드는 쓰지 않는다).
+- 공유 폴더에는 **클립 + 에이전트 리포트만**. 원본 로그·CSV·`report.html`·`nightly-summary.md` 는 로컬 배치 폴더에만 남고 복사하지 않는다(108 의 배치 폴더·48 리포트·Editor.log 복사는 없앴다).
+- **공유 모드(루트가 있음)면 녹화는 리플레이 버퍼 클립만**으로 고정된다(`replayOnly` 와 관계없이 batch.txt `record=replay`). 판 전체 녹화는 공유 루트가 없을 때만 쓸 수 있다(로컬 녹화, 기본 꺼짐).
+
+> 할 일 120 — 녹화 용량 줄이기. 공유 모드 = **리플레이 버퍼 클립만**(§5.3). 판 전체 녹화(§5.2 의 1단계)는 공유 루트 없이 로컬에서만.
+> 화질 값은 비워 두면 **아무것도 바꾸지 않는다**(108 과 같다). 설정 목록 전체: 리서치 문서 §4.
 
 ## 5.2 (선택) 1단계 — 저화질·저비트레이트
 배치 시작(`Start Night`·`Resume Last`) 때 1회, OBS WebSocket 으로 적용한다(로그 `logs/loop.log` 에 `OBS 화질 —`·`OBS 프로필 … =` 줄).
@@ -87,8 +94,12 @@ setx QA_OBS_BITRATE_KBPS 2500
   설정 → 출력 → 출력 모드 **단순** → 녹화 품질 **"스트림과 같음"**, 녹화 형식 mkv, 인코더 하드웨어, 방송 비트레이트 **2500 Kbps** →
   설정 → 비디오 → 출력(스케일) 해상도 **1280x720**, FPS **24**. 이 프로필을 켜 둔 채 밤을 돌리면 위 환경변수는 비워도 된다.
 
-## 5.3 (선택) 2단계 — 리플레이 버퍼 클립만 (스위치, 기본 꺼짐)
-켜면 **판 전체 녹화를 하지 않는다**. 배치 시작에 `StartReplayBuffer`, 배치 끝에 `StopReplayBuffer`. 이벤트가 나면 M초 뒤 `SaveReplayBuffer` → 클립 하나.
+## 5.3 2단계 — 리플레이 버퍼 클립만 (공유 모드면 자동, 아니면 스위치)
+켜면 **판 전체 녹화를 하지 않는다**. 배치 시작에 `StartReplayBuffer` → **`GetReplayBufferStatus` 로 실제 켜졌는지 확인**(1초 간격 3번), 배치 끝에 `StopReplayBuffer`. 이벤트가 나면 M초 뒤 `SaveReplayBuffer` → 클립 하나.
+- 안 켜졌으면(설정 창 열림·리플레이 버퍼 사용 미체크) `⚠ 리플레이 버퍼가 실제로 안 켜졌다` 를 `logs/loop.log` 와 리포트 루프 메모(`logs/notes.txt`)에 남기고 **판 시작마다 다시 시도**한다.
+- 공유 모드면 배치 시작에 **OBS 녹화 경로(`SetRecordDirectory`)를 그날 날짜 폴더로** 바꾼다 — 리플레이 클립이 처음부터 날짜 폴더에 저장된다. 원래 경로는 `GetRecordDirectory` 로 받아 PC 파일 `UserSettings/QANightly.obs-record-dir.txt` 에 두고, **배치 끝(완료·멈춤)에 되돌린 뒤 파일을 지운다**. 파일이 이미 있으면(지난 배치가 못 되돌림) 덮지 않는다.
+  - OBS 출력(녹화·리플레이 버퍼)이 **이미 켜져 있으면 경로를 바꾸지 않는다**(켜진 출력은 건드리지 않음) — 경고만 남기고, 클립은 저장 뒤 이름 바꾸기에서 날짜 폴더로 **옮긴다**(같은 한 번의 Move). 되돌릴 때도 출력이 켜져 있으면 경고하고 다음 배치 끝에 다시 시도.
+  - `GetRecordDirectory`·`SetRecordDirectory` 는 OBS 30+(obs-websocket 5.3+). 없으면 경고 후 옮기기로 같은 결과.
 ```
 setx QA_NIGHTLY_REPLAY 1
 setx QA_OBS_REPLAY_SECONDS 60
@@ -104,23 +115,26 @@ setx QA_NIGHTLY_CLIP_EVENTS ""
   일부만 클립으로: `QA_NIGHTLY_CLIP_EVENTS=stall,wipe`(비움 = 전부). 시각표에는 늘 전부 남는다. 새 이벤트는 `Table` 에 한 줄 더한다.
 - 합치기: 저장 대기(M초) 중에 오는 이벤트, 지난 저장 뒤 쿨다운 안에 오는 이벤트는 **새 클립을 만들지 않고 다음 클립 하나에 모은다**(이름에 `stall+death` 처럼). 쿨다운 안 이벤트의 저장 시각 = max(이벤트 + M, 지난 저장 + 쿨다운).
   → **버퍼 N 은 M + 쿨다운보다 길게**(기본 10 + 30 → 60초 이상) 둬야 첫 이벤트 앞 구간이 남는다.
-- 클립 파일: OBS 가 저장한 경로(`ReplayBufferSaved` 이벤트의 `savedReplayPath`, 못 받으면 `GetLastReplayBufferReplay`)를 `<yyyy-MM-dd>_<시드>_r<판>[re]_<이벤트+이벤트>.<확장자>` 로 바꾼다(재실행 판 = `r3re`, 겹치면 `_2`). 이름 바꾸기 실패는 경고 후 원래 이름. 공유 폴더 `video/` 로 robocopy, `clips.txt`·리포트 "리플레이 클립" 줄.
-- Play 중 저장은 스레드 풀에서 한다(게임을 멈추지 않게). 판이 끝나 Play 가 멈추는 도메인 리로드와 저장이 겹치면 그 클립의 이름 바꾸기·기록이 빠질 수 있다(클립 파일 자체는 OBS 폴더에 남는다).
+- 클립 파일: OBS 가 저장한 경로(`ReplayBufferSaved` 이벤트의 `savedReplayPath`, 못 받으면 `GetLastReplayBufferReplay`)를 `<이름>_<HHmmss>_r<판>[re]_<이벤트+이벤트>.<확장자>` 로 바꿔 **공유 날짜 폴더 바로 아래**에 둔다(재실행 판 = `r3re`, 겹치면 `_2`, 공유 루트가 없으면 OBS 폴더 그 자리에서 이름만). 실패는 경고 후 원래 자리·이름. `clips.txt`·리포트 "리플레이 클립" 줄. 복사(robocopy)는 없다.
+- Play 중 저장은 스레드 풀에서 한다(게임을 멈추지 않게). 판이 끝나 Play 가 멈추는 도메인 리로드와 저장이 겹치면 그 클립의 이름 바꾸기·기록이 빠질 수 있다(클립 파일 자체는 OBS 녹화 경로 — 공유 모드면 날짜 폴더 — 에 OBS 이름으로 남는다).
 - OBS 가 없거나 연결·저장 실패면 경고만, QA 는 계속(108 원칙). 버퍼 시작 실패면 판마다 다시 시도한다.
 
 ## 5.4 (선택) 공유 폴더 영상 보관 일수
 ```
 setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 ```
-- 배치 시작 때 1회, `<루트>/<yyyy-MM-dd>/<내 시드 이름>/video/` 중 **날짜가 오늘보다 N일 넘게 지난** 폴더의 **영상 파일**(mkv·mp4·mov·flv·ts·m4v·webm·avi)만 지운다.
-- 리포트·CSV·로그·`robocopy.log` 는 지우지 않는다. 이름이 정확히 `yyyy-MM-dd` 가 아닌 폴더는 건드리지 않는다. **다른 팀원 시드 폴더는 건드리지 않는다**(각자 PC 가 자기 것만).
-- 0·비움 = 지우지 않음. 실패는 경고만(`⚠ 지난 영상 삭제 실패`). OBS 녹화 폴더의 원본은 이 기능이 지우지 않는다 — 원본 폴더는 OBS·디스크 정리로 따로 관리.
+- 배치 시작 때 1회, `<루트>\<MM-dd>\` 중 **날짜가 오늘보다 N일 넘게 지난** 폴더에서 **내 이름 클립**(`<내 이름>_<HHmmss>_r…` 형식의 영상 파일 — mkv·mp4·mov·flv·ts·m4v·webm·avi)만 지운다.
+- `MM-dd` 에는 연도가 없으니 **오늘 기준 과거**로 읽는다 — 올해 그 날짜가 오늘보다 뒤면 작년(예: 1월 3일에 `12-30` = 4일 전), `02-29` 는 가장 가까운 윤년.
+- 리포트(`report-*.md`)·**다른 팀원 파일**은 지우지 않는다(각자 PC 가 자기 것만). 이름이 정확히 `MM-dd` 가 아닌 폴더(옛 `yyyy-MM-dd` 포함)는 건드리지 않는다. 빈 날짜 폴더도 지우지 않는다.
+- 0·비움 = 지우지 않음. 실패는 경고만(`⚠ 지난 클립 삭제 실패`).
 
 ## 6. 야간 QA 시작
 1. (확인) `Tools/QA/Nightly/Settings/Validate Seed File` → `시드 파일 OK — <이름> · 기준 시드 … · N판`.
 2. (확인) `Tools/QA/Nightly/Status` → 시드·PC 설정(녹화 켜짐/꺼짐·공유 루트)·루프 상태가 콘솔에 나온다.
 3. **`Tools/QA/Nightly/Start Night`** — 끝. 이후는 무인:
-   - 가상 플레이어 2·3 을 켜고(판마다 껐다 켜서 접속 거절 예방) → 판마다 설정 파일을 호스트·클론에 쓰고 → `N108` 3인 Play → 판 기록을 보면 Play 정지 → 녹화 정지·수집 → 다음 판.
+   - (시작 1회) 지난 클립 정리 → 공유 날짜 폴더 만들기·OBS 녹화 경로 지정 → 화질 → 리플레이 버퍼 시작·확인(§5.3).
+   - 가상 플레이어 2·3 을 켜고(판마다 껐다 켜서 접속 거절 예방) → 판마다 설정 파일을 호스트·클론에 쓰고 → `N108` 3인 Play → 판 기록을 보면 Play 정지 → 로컬 요약 → 다음 판.
+   - (끝 1회) 남은 클립 저장·리플레이 버퍼 정지 → OBS 녹화 경로 되돌리기 → `progress.txt` 완료 키(§7.0).
    - 오류 판(심장박동 끊김·시작 8분·Play 진입 실패 등)은 기록 후 다음 판, 끝에서 1회 재실행.
    - 🔴 돌고 있는 동안 스크립트를 고치거나 Refresh 하지 않는다. `isPlaying` 을 직접 만지지 않는다.
 - 에이전트가 MCP 로 시작할 때: `EditorApplication.ExecuteMenuItem("Tools/QA/Nightly/Start Night")`.
@@ -128,18 +142,29 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 - 에디터가 꺼졌다 켜지면 저절로 이어 가지 않는다 → `Tools/QA/Nightly/Resume Last`.
 
 ## 7. 아침 결과 확인
+0. **완료 표시(기계 판독)** — 배치 폴더 `progress.txt`(key=value 줄). 루프가 정리(클립 저장·OBS 경로 되돌리기)를 다 마친 뒤 아래 키를 **한 번에**(파일 교체) 쓴다. `end` 가 보이면 나머지도 다 있다.
+   | 키 | 뜻 |
+   |---|---|
+   | `end` | `done`(판 전부 + 오류 판 재실행 끝) · `aborted`(Stop After Current Run·에디터 재시작 등 중간 종료) |
+   | `end_reason` · `end_at` | 사유 · 끝난 시각(로컬 `yyyy-MM-dd HH:mm:ss`) |
+   | `batch_dir` | 로컬 배치 폴더(`/` 구분) |
+   | `share_dir` | 공유 날짜 폴더(공유 안 하면 빈 값) |
+   | `nightly_name` | 이름(= 시드 이름) |
+   | `runs_done` · `runs_total` · `runs_error` | 첫 실행을 마친 판 수 · 계획 판 수 · 최종 오류 판 수 |
+   | `report_name` | 그 날짜 폴더에서 아직 안 쓴 `report-<이름>[-N].md` 제안(쓰기 직전에 다시 확인) |
+   - 에디터 재시작으로 루프가 꺼지면 다음 에디터 시작 때 `end=aborted`(사유 "에디터 재시작")가 써진다. 이때는 OBS 정리(버퍼 정지·경로 되돌리기)를 못 했다. `Resume Last` 로 이어 가면 완료 키를 지우고, 다시 끝나면 새로 쓴다.
+   - 에디터가 **멈췄거나 죽어서** 다시 켜지지 않으면 `end` 가 안 생긴다 — `updated`(마지막 상태 변경 시각)가 오래 멈춰 있으면 사람에게 알린다(에이전트 가이드 §4).
 1. `Tools/QA/Nightly/Status` → `멈춤 · … 상태 done`(완료) 또는 `stopped`. 진행 `N/N`·오류 확정 수.
 2. 로컬 배치 폴더 `C:/UnityProject/QA/N108-<yyyyMMdd_HHmm>-<시드 이름>/`:
    - `nightly-summary.md` — **먼저 이것**: 시드 이름·데이터 출처·GameData.xlsx 리비전·브랜치/커밋·판 결과·녹화 목록.
    - `report.html` — 103 리포트(머리말에 같은 정보 + 통계·판 목록). `Tools/QA/Nightly/Open Report` 로 연다.
-   - `batch.txt`(배치 머리) · `runs.csv` 외 CSV · `logs/loop.log`(루프 로그, `⚠` = 녹화·복사 경고) · `recordings.txt`.
-   - 할 일 120 `events.tsv`(이벤트 시각표 원본 — 탭: 판·재실행·이벤트·시각·게임 시각(초)·영상 타임코드(초)·상세) · `clips.txt`(2단계 클립) · `clip-pending.txt`(저장 대기 — 비면 정상).
+   - `batch.txt`(배치 머리) · `runs.csv` 외 CSV · `logs/loop.log`(루프 로그, `⚠` = 녹화·OBS 경고) · `logs/notes.txt`(리포트 루프 메모 — OBS 경고 포함) · `recordings.txt`(판 전체 녹화 때만).
+   - 할 일 120 `events.tsv`(이벤트 시각표 원본 — 탭: 판·재실행·이벤트·시각·게임 시각(초)·영상 타임코드(초)·상세) · `clips.txt`(리플레이 클립 — 탭: 판·재실행·경로·이벤트/메모) · `clip-pending.txt`(저장 대기 — 비면 정상).
      `nightly-summary.md` 끝의 **이벤트 시각표** 표 — "영상 타임코드"(`H:MM:SS`)로 그 판 영상을 바로 찾아간다. 같은 이벤트가 5초 안에 반복되면 한 줄(판당 300줄 상한).
      타임코드 = 녹화 시작 직후 `GetRecordStatus` 의 녹화 경과(`outputDuration`) + 그 뒤 경과. 기준을 못 받았으면(상태 요청 실패) 녹화 시작 시각 기준(수 초 오차).
    - 로비 점검 항목(108 로비 카메라·스킬·에러 0)과 판 진행 근거는 판마다 생기는 `C:/UnityProject/QA/48-*/report.md`.
-3. 공유 폴더 `<루트>/<yyyy-MM-dd>/<시드 이름>/`:
-   - `N108-…/`(배치 폴더 사본, 심장박동 hb/ 제외) · `48/`(그 밤 48 리포트) · `logs/Editor-*.log` · `video/`(영상 + `robocopy.log`).
-4. 영상: 리포트 "녹화" 줄의 경로(OBS 녹화 폴더 원본) 또는 공유 사본. 주간에 사람이 보고 이벤트를 적는다.
+3. 공유 날짜 폴더 `<루트>\<MM-dd>\`: 내 클립 `<이름>_<HHmmss>_r<판>_<이벤트>.mp4` + 에이전트 리포트 `report-<이름>[-N].md`(다른 팀원 파일도 같이 보인다 — 건드리지 않는다).
+4. 영상: 리포트 "리플레이 클립" 줄의 경로(공유 날짜 폴더). 판 전체 녹화(로컬 모드)는 "녹화" 줄의 OBS 녹화 폴더 원본.
 5. 확인할 것: 리포트 xlsx 리비전 = §2 에서 적은 숫자 · 데이터 출처 런타임 테이블 n/n · 브랜치가 내 `qa/Nightly-<이름>`.
 
 ## 8. 팀원 브랜치 만들기 (시드만 다르게)
@@ -160,7 +185,7 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
   ```
   | 칸 | 뜻 | 값 |
   |---|---|---|
-  | `name` | 시드 이름 = 공유 폴더 이름 | 영문·숫자·`-`·`_` 1~32자 |
+  | `name` | 팀원 이름 = 시드 이름(공유 클립·리포트 파일 이름 앞) | 영문·숫자·`-`·`_` 1~32자 |
   | `baseSeed` | 판 시드(봇 전투 난수)의 원천 | 0 이 아닌 정수, 팀원마다 다르게 |
   | `traitSeed` | 특성 제시·선택 시드 | 0 = baseSeed 와 같이 씀 |
   | `botTier` | 봇 단계 | `auto`(판 번호로 보통→숙련→초보) · `Beginner` · `Normal` · `Skilled` |
@@ -184,3 +209,5 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 - 이벤트는 **호스트(메인 에디터) 로그만** 본다 — 가상 플레이어(클론) 프로세스의 에러 로그는 시각표에 안 들어간다(클론 봇의 끼임은 호스트 재배치 `qa_relocate` 로 잡힌다).
 - 게임 시각 = Play 의 `Time.time`(간파 슬로우 등 시간 배율을 탄다). 영상 위치는 "영상 타임코드" 열을 본다.
 - 108 하네스·120 은 작성 시점에 **컴파일·EditMode 테스트·Play 를 이 세션에서 못 돌렸다**(권한 거부) — 첫 실행 전에 `QANightlyTests` 를 돌린다. OBS 실연동(화질 적용·리플레이 저장·이름 바꾸기)도 미검증.
+- 120 후속(공유 양식)은 컴파일·EditMode 까지 확인. **OBS `SetRecordDirectory`·되돌리기·날짜 폴더 옮기기·`GetReplayBufferStatus` 확인은 실연동 미검증** — 첫 밤에 `logs/loop.log` 의 `OBS 녹화 경로 →`·`되돌림`·`리플레이 버퍼 시작·확인(active)` 줄을 본다.
+- 🔶 [확인 필요] 리플레이 버퍼가 켜진 채 `SetRecordDirectory` 를 부르면 다음 저장부터 먹는지 — 코드는 출력이 켜져 있으면 아예 부르지 않는다(옮기기로 대신).
