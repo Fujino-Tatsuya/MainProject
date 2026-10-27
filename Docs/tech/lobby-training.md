@@ -90,7 +90,7 @@ LobbyRadio.Active.ServerClear()                                           // [�
 
 ### 흐름
 
-1. 종료 집결 확정 → `Brief/Gathering`(`BRIEF_ROUTE` 무전) → 브리핑 위치(`Gather_Brief`) 훈련 명단 전원 5초 집결 → `Brief/InProgress`.
+1. 종료 집결 확정 → `Brief/Gathering`(`BRIEF_ROUTE` 무전) → 브리핑 위치(`Gather_Brief`) 훈련 명단 전원 집결(`gatherHoldSeconds` 3초 — 종료 텔레포트가 이미 구역 안에 둔다, "훈련 종료" 절) → `Brief/InProgress`.
 2. **[서버] 시작**(`ServerFlowChanged` 로 `Brief/InProgress` 를 본 순간, 회차당 1회): `LobbyRadio.ServerClear()`(기존 무전 종료) → 접속자 전원 조작 제한 →
    시작 지연 `leadSeconds`(0.5초) 뒤 `BRIEF_01` → 앞 줄 표시 시간이 지날 때마다 다음 줄(`LobbyRadio.ServerPlay`, 단계 번호 그대로라 폐기되지 않는다).
 3. **시간 = 서버가 잰다**: 지연 + 대사 표시 시간 합(`TutorialGuideTexts` SO 행 `durationSeconds` — 7+5+6+4초) + 끝 여유 `tailSeconds`(1초) = 23.5초.
@@ -162,14 +162,20 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - 늦은 참가자(명단 밖)는 훈련을 안 했으니 켜지지 않는다.
 - 결과(스텝 판정 표 그대로): 브리핑 집결·진행 중 = 없음(줄 4) → 브리핑 완료 = ③ → 다음 회차 Lobby = ③(줄 8, 입구 집결 인원에서도 빠짐 — 훈련을 다시 하려면 Alt+1 로 끈다).
 
-**종료 텔레포트**: 같은 순간(종료 집결 확정) 서버가 훈련 명단 전원을 로비 쪽 지점으로 옮긴다 — `LobbyTrainingDirector.TeleportRosterToTrainingEnd`.
-- 이동 = 기존 서버 텔레포트 `PlayerFallRecovery.RelocateServer`(서버 → 오너 RPC → 모터 `TeleportAuthoritative`, 로비 추락 복귀·전멸 리스폰과 같은 경로). 새 RPC 없음. 높이 +0.5m(스폰·멈춤 탈출과 같은 보정).
-- 자리 = 명단 순서대로 `TrainingEndTeleport_1/_2/_3` 하나씩, 4번째부터 처음부터 다시(순환).
-- **지점 = `LobbyTrainingEndTeleport` 컴포넌트**(`Assets/1.Scripts/Lobby/LobbyTrainingEndTeleport.cs`) — 켜질 때 정적 등록(`Active`), 진행기는 씬 참조 없이 찾는다.
-  기본 위치 = **`LobbyGuideSteps.prefab` 의 자식 `TrainingEnd`**(자식 `TrainingEndTeleport_1~3`, 루트 기준 x 0·+1.5·-1.5). 씬의 `LobbyGuideSteps` 인스턴스에 이미 따라 들어와 있다.
-- **배치법**: 씬의 `LobbyGuideSteps/TrainingEnd/TrainingEndTeleport_*` 세 점을 로비 중앙 바닥 위로 옮긴다(씬 뷰에 하늘색 원·`훈련 종료 n` 글자). 점이 더 필요하면 자식을 만들어 `points` 목록에 넣는다.
-- 지점 컴포넌트가 없거나 점이 다 비면 경고 1회 후 텔레포트 생략(훈련 흐름은 그대로).
-- 브리핑 위치(`Gather_Brief`)는 따로다 — 텔레포트 지점을 브리핑 구역 안에 두면 바로 브리핑 집결이 시작된다(배치 판단은 사용자).
+**종료 텔레포트 — 자리 = 브리핑 구역(`Gather_Brief`) 안 (10-27 결정)**: 같은 순간(종료 집결 확정) 서버가 훈련 명단 전원을
+진행기가 이미 들고 있는 `briefZone`(PartyGatherZone) 박스 안으로 옮긴다 — `LobbyTrainingDirector.TeleportRosterToTrainingEnd`.
+- 흐름: 종료 집결 확정 → `Brief/Gathering`(구역 켜기는 다음 진행기 Update 의 `ApplyZones`) → 명단 전원이 이미 구역 안 → 브리핑 집결 n/m 이 바로 차고
+  유지 `LobbyRules.gatherHoldSeconds`(3초) 뒤 확정 → `Brief/InProgress`. 원격 클라는 오너 RPC → 위치 복제가 돌아온 뒤에 안으로 세므로 왕복 지연만큼 늦게 찬다(호스트는 즉시).
+  집결 판정 조건(살아 있음·Idle/Move)은 그대로 — 텔레포트 순간 행동 중이면 끝난 뒤 센다.
+- 자리 = **`LobbyTrainingEndPlacement`**(순수 규칙, `Assets/1.Scripts/Lobby/LobbyTrainingEndPlacement.cs`, EditMode `LobbyTrainingEndPlacementTests`):
+  박스 로컬 XZ, 가장자리 여백 1m 안쪽, 간격 1.5m 격자. 한 줄 = 로컬 X 방향(지금 박스 6×11.5 → 한 줄 3명, 7줄 = 21자리), 묶음·마지막 줄은 가운데 정렬(혼자면 정중앙).
+  자리보다 많으면 처음 자리부터 순환(겹침), 박스가 여백보다 좁으면 그 축은 중심 한 줄. 박스 회전·스케일 반영(여백·간격은 월드 m).
+- 높이 = 구역 원점 바닥면(로컬 y 0 을 박스 높이 범위 안으로 자름) + 0.5m(스폰·멈춤 탈출과 같은 보정). 구역 원점이 바닥에 있다고 본다(지금 `Gather_Brief` y 0 = 바닥 y 0).
+- 이동 = 기존 서버 텔레포트 `PlayerFallRecovery.RelocateServer`(서버 → 오너 RPC → 모터 `TeleportAuthoritative`, 로비 추락 복귀·전멸 리스폰과 같은 경로). 새 RPC·상태 없음.
+  **바라보는 방향은 바꾸지 않는다**(이 경로에 회전 인자가 없다 — 돌리려면 RPC 를 새로 만들어야 해서 보류).
+- `briefZone` 이 비면 경고 1회 후 텔레포트 생략(훈련 흐름은 그대로).
+- 옛 방식(별도 점 `LobbyTrainingEndTeleport` + `LobbyGuideSteps.prefab` 자식 `TrainingEnd/TrainingEndTeleport_1~3`)은 메커니즘 하나로 지웠다.
+  점을 직접 두는 방식이 다시 필요하면 커밋 `7313de77` 의 `LobbyTrainingEndTeleport.cs`(+`.meta`, guid 4daf9530…)·프리팹 `TrainingEnd` 자식을 되살리고 진행기 목적지를 그쪽으로 돌린다.
 
 ## 훈련장 문 — 여닫힘 제거 (할 일 111, 10-27)
 

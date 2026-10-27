@@ -27,7 +27,8 @@ using UnityEngine;
 /// 훈련 중 켜서 명단에서 빠지면 <see cref="ServerRosterMemberRemoved"/> 로 단계 내용(무기 점검)이 그 사람을 기다리지 않게 한다.
 /// 요청 RPC·멈춤 탈출·리로드는 DEV_HOTKEYS 게이트 partial(<c>LobbyTrainingDirector.Recovery.cs</c>).
 /// 훈련을 끝까지 하면(종료 집결 확정) 명단 전원에게 같은 플래그가 켜진다(<see cref="LobbyTrainingFlow.OnGatherConfirmed"/>, 명단은 그대로).</item>
-/// <item>훈련 종료 텔레포트(할 일 111): 종료 집결 확정 때 명단 전원을 <see cref="LobbyTrainingEndTeleport"/> 지점으로 <see cref="PlayerFallRecovery.RelocateServer"/>. 지점이 없으면 경고 1회 후 생략.</item>
+/// <item>훈련 종료 텔레포트(할 일 111): 종료 집결 확정 때 명단 전원을 브리핑 구역(<c>briefZone</c>) 박스 안 자리(<see cref="LobbyTrainingEndPlacement"/>)로 <see cref="PlayerFallRecovery.RelocateServer"/>
+/// — 이미 구역 안이라 Brief/Gathering 집결이 바로 센다. 구역이 비면 경고 1회 후 생략.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -96,7 +97,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
     private LobbyTrainingFlow _flow;
     private bool _zonesDirty;
     private bool _loggedWaitingZones;
-    private bool _warnedNoTrainingEndPoints;
+    private bool _warnedNoBriefZone;
     private Func<bool> _joinBlockedProvider;
     private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
     private readonly List<ulong> _idBuffer = new List<ulong>();
@@ -373,40 +374,43 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
         launcher.StartGameLoading();
     }
 
-    // [서버] 훈련 종료 텔레포트 — 명단 순서대로 지점 하나씩(순환). 이동 = 기존 서버 텔레포트(오너 RPC). 지점이 없으면 경고 1회 후 생략.
+    // [서버] 훈련 종료 텔레포트 — 명단 전원을 브리핑 구역 박스 안 자리(LobbyTrainingEndPlacement, 명단 순서)로. 이미 구역 안이라 브리핑 집결이 바로 센다.
+    // 이동 = 기존 서버 텔레포트(오너 RPC — 바라보는 방향은 그대로). 높이 = 구역 원점 바닥면(박스 높이 범위 안으로) + 보정. 구역이 없으면 경고 1회 후 생략.
     private void TeleportRosterToTrainingEnd()
     {
-        var points = LobbyTrainingEndTeleport.Active;
-        if (points == null)
+        var box = briefZone != null ? briefZone.GetComponent<BoxCollider>() : null;
+        if (box == null)
         {
-            if (!_warnedNoTrainingEndPoints)
+            if (!_warnedNoBriefZone)
             {
-                _warnedNoTrainingEndPoints = true;
-                Debug.LogWarning($"{Tag} 훈련 종료 텔레포트 지점(LobbyTrainingEndTeleport)이 없다 — 텔레포트 생략(LobbyGuideSteps 프리팹 배치 확인).", this);
+                _warnedNoBriefZone = true;
+                Debug.LogWarning($"{Tag} 브리핑 구역(briefZone)이 비었다 — 훈련 종료 텔레포트 생략.", this);
             }
 
             return;
         }
 
+        // 간격·여백은 월드 m — 박스 크기를 월드로 재고, 고른 자리를 다시 로컬로 나눈다(구역 스케일 대비).
+        var scale = box.transform.lossyScale;
+        var worldSize = new Vector2(box.size.x * Mathf.Abs(scale.x), box.size.z * Mathf.Abs(scale.z));
+        var floorY = Mathf.Clamp(0f, box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
+
         var roster = _flow.TrainingRoster;
         for (var i = 0; i < roster.Count; i++)
         {
             var clientId = roster[i];
-            if (!points.TryGetPoint(i, out var point))
-            {
-                if (!_warnedNoTrainingEndPoints)
-                {
-                    _warnedNoTrainingEndPoints = true;
-                    Debug.LogWarning($"{Tag} 훈련 종료 텔레포트 지점이 비었다({points.name}) — 텔레포트 생략.", points);
-                }
-
-                return;
-            }
+            var slot = LobbyTrainingEndPlacement.Slot(i, roster.Count, worldSize,
+                LobbyTrainingEndPlacement.DefaultMargin, LobbyTrainingEndPlacement.DefaultSpacing);
+            var local = new Vector3(
+                box.center.x + (scale.x != 0f ? slot.x / Mathf.Abs(scale.x) : 0f),
+                floorY,
+                box.center.z + (scale.z != 0f ? slot.y / Mathf.Abs(scale.z) : 0f));
+            var point = box.transform.TransformPoint(local);
 
             var fall = TryGetPlayer(clientId, out var player) ? player.GetComponent<PlayerFallRecovery>() : null;
             var destination = point + Vector3.up * TrainingEndClearance;
             var moved = fall != null && fall.RelocateServer(destination);
-            Debug.Log($"[SceneFlow] {Tag} 훈련 종료 텔레포트 client {clientId} → 명단 {i + 1}번째 자리 {destination} moved={moved}");
+            Debug.Log($"[SceneFlow] {Tag} 훈련 종료 텔레포트 client {clientId} → {briefZone.name} 명단 {i + 1}번째 자리 {destination} moved={moved}");
         }
     }
 
