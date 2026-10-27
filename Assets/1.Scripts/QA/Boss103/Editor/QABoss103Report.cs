@@ -11,6 +11,12 @@ public sealed class QABoss103ReportInput
     /// <summary>batch.txt(key=value) 내용.</summary>
     public string BatchText = "";
     public string RunsCsv = "", CharsCsv = "", PatternsCsv = "", GimmicksCsv = "";
+    /// <summary>할 일 119 C3 — run_fail.csv(클리어 실패 사유). 없으면 빈칸.</summary>
+    public string FailCsv = "";
+    /// <summary>할 일 119 C3 — 비교 기준 배치(batch.txt compare_dir) 입력. 없으면 null(비교 표 대신 안내).</summary>
+    public QABoss103ReportInput Compare;
+    /// <summary>비교 기준 폴더 경로(표시용). 비면 비교 안 함.</summary>
+    public string CompareDir = "";
     /// <summary>fixes.md(사람이 적는 야간 수정 사항). 없으면 빈칸.</summary>
     public string Fixes = "";
     /// <summary>logs/notes.txt(루프 메모 — 연속 오류 휴식 등).</summary>
@@ -312,6 +318,8 @@ public static class QABoss103Report
         sb.Append("<title>할 일 103 보스 밸런싱 QA 리포트</title>\n<style>").Append(Css).Append("</style></head>\n<body><main class=\"viz-root\">\n");
         Header(sb, c, input, batch);
         Comparison(sb, c, sums);
+        PreviousComparison(sb, input, sums);
+        FailTable(sb, c, input);
         Charts(sb, c, sums);
         CharacterTables(sb, c);
         CharRuleTable(sb, c);
@@ -349,6 +357,9 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
     {
         QABoss103Batch.Summarize(c.Attempts, input.Total, out int done, out int retried, out int errors, out int valid);
         sb.Append("<h1>할 일 103 3인 보스전(웰즈&amp;23호 B) 밸런싱 QA</h1>\n");
+        string title = Val(batch, "title", "");
+        if (title.Length > 0 && title != "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA")
+            sb.Append("<div class=\"sub\"><b>").Append(H(title)).Append("</b></div>\n");   // 할 일 119 30판 등 배치 제목
         sb.Append("<div class=\"sub\">파티 팔라딘·어쌔신·거너 · 봇 단계 보통→숙련→초보 번갈아 · 판 종료 = 보스 처치 / 공용 목숨 0 전멸 / Combat 30분</div>\n");
         sb.Append("<div class=\"kpis\">");
         Kpi(sb, $"{done}/{input.Total}", $"진행(+재실행 {retried})");
@@ -392,6 +403,12 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "루프 상태", H(input.LoopState.Length > 0 ? input.LoopState : Dash));
         sb.Append("</tbody></table>\n");
 
+        // 할 일 119 C3 — 지난 103 배치와 달라진 봇·측정 규칙(비교 표를 읽기 전에 볼 것).
+        sb.Append("<h3>119 규칙 변경점(지난 103 배치 대비)</h3>\n<table><tbody>\n");
+        foreach (KeyValuePair<string, string> kv in Rules119)
+            Row2(sb, kv.Key, H(kv.Value));
+        sb.Append("</tbody></table>\n");
+
         if (errors > 0)
         {
             var reasons = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -428,6 +445,21 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         string fixes = (input.Fixes ?? "").Trim();
         sb.Append(fixes.Length > 0 ? "<pre>" + H(fixes) + "</pre>\n" : "<div class=\"muted\">없음 — 실행 중 고친 내용은 배치 폴더 fixes.md 에 적으면 여기에 그대로 보인다.</div>\n");
     }
+
+    /// <summary>할 일 119 규칙 변경점 요약(119-결정.md 1·2·4·5 + F10 목숨 소비) — 리포트 머리.</summary>
+    public static readonly KeyValuePair<string, string>[] Rules119 =
+    {
+        new KeyValuePair<string, string>("즉사 대시 안 함",
+            "즉사 패턴(북진 압박 방전·④ 폐기 처분 대폭발 — 무적 무시)은 회피 굴림·대시 무적 회피를 하지 않는다. 피격은 '즉사(굴림 없음)'로 따로 센다(lethal_no_roll) · 103 은 대시로 피하려 했다"),
+        new KeyValuePair<string, string>("벽 끼임 텔레포트",
+            "벽 속·보스방 경계 밖(예: Boundary_ZMin)에 0.25초 있으면 보스 둘레 무작위 지점으로 즉시 재배치해 플레이를 이어 간다(qa_wall_escapes) · 103 은 20초 진척 없음 재배치만"),
+        new KeyValuePair<string, string>("F10 부활 = 공용 목숨 1",
+            "부활은 F10 디버그 부활 경로(Soul 3초 뒤 봇이 요청). 1회 = 공용 목숨 1, 목숨 0 이면 부활 불가 → 전멸(qa_revives) · 103 은 QA 서버 자동 부활(부활 무적 2초 포함)"),
+        new KeyValuePair<string, string>("툴팁 규칙",
+            "캐릭터 스킬 툴팁 근거 봇 규칙 — 거너 과열 시 평타 놓기·E(긴급 냉각) 우선, 어쌔신 분노 미달이면 R 대기·일반 E(강화) 사용·변신 E(칼날 폭풍) 사용. 표·발동 횟수는 아래 '캐릭터 스킬 툴팁 규칙'"),
+        new KeyValuePair<string, string>("클리어 판정",
+            "클리어 = 보스 Unit.Died(서버) 또는 디렉터 처치 확정 중 먼저(runs.csv outcome_source) · 실패 판은 run_fail.csv 에 사유 1행"),
+    };
 
     private static void Add(SortedSet<string> set, string v)
     {
@@ -554,6 +586,239 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
                   "간파 달성 = 성공 굴림 누름 뒤 1초 안 서버 간파 성공 비율. C7e 전 판은 열이 비어 —.</div>\n<div class=\"muted\">8번 칸 = 사용/판 · 적중률(적중 판정/사용) · 피해 비중(그 캐릭터 행동별 피해 합 중). 행동별 피해는 클램프 전 값. " +
                   "실제 피격률 = 굴림이 있었던 위험에서 실제로 맞은 건수 / 굴림 수(같은 패턴 0.3초 안 다단은 1건). 굴림 없는 피격은 따로 센다.</div>\n");
     }
+
+    // ── 할 일 119 C3 — 지난 배치 비교 ─────────────────────────
+
+    /// <summary>비교 표 한 줄 — 단계 요약 → 표시값 · 차이 계산용 숫자(NaN = 차이 없음).</summary>
+    private sealed class CompareMetric
+    {
+        public string Label;
+        public Func<Summary, double> Value;
+        public Func<double, string> Format;
+        public Func<double, string> Delta;
+    }
+
+    private static readonly CompareMetric[] CompareMetrics = BuildCompareMetrics();
+
+    private static CompareMetric[] BuildCompareMetrics()
+    {
+        Func<double, string> pct1 = v => Pct(v, 1);
+        Func<double, string> dPp = v => double.IsNaN(v) ? Dash : (v >= 0 ? "+" : "") + (v * 100.0).ToString("F1", Inv) + "%p";
+        Func<double, string> n2 = v => Num(v, 2);
+        Func<double, string> d2 = v => double.IsNaN(v) ? Dash : (v >= 0 ? "+" : "") + v.ToString("N2", Inv);
+        Func<double, string> tm = Time;
+        Func<double, string> dT = v => double.IsNaN(v) ? Dash : (v >= 0 ? "+" : "−") + Time(Math.Abs(v));
+        Func<double, string> n1 = v => Num(v, 1);
+        Func<double, string> d1 = v => double.IsNaN(v) ? Dash : (v >= 0 ? "+" : "") + v.ToString("N1", Inv);
+        var list = new List<CompareMetric>
+        {
+            new CompareMetric { Label = "판 수(통계)", Value = s => s.Runs, Format = v => Num(v, 0), Delta = v => double.IsNaN(v) ? Dash : (v >= 0 ? "+" : "") + v.ToString("0", Inv) },
+            new CompareMetric { Label = "클리어율", Value = s => s.ClearRate, Format = pct1, Delta = dPp },
+            new CompareMetric { Label = "전멸률", Value = s => s.Runs > 0 ? (double)s.Wipes / s.Runs : double.NaN, Format = pct1, Delta = dPp },
+            new CompareMetric { Label = "시간초과율", Value = s => s.Runs > 0 ? (double)s.Timeouts / s.Runs : double.NaN, Format = pct1, Delta = dPp },
+            new CompareMetric { Label = "클리어 시간 평균", Value = s => s.ClearMean, Format = tm, Delta = dT },
+            new CompareMetric { Label = "클리어 시간 중앙값", Value = s => s.ClearMedian, Format = tm, Delta = dT },
+            new CompareMetric { Label = "파티 사망/판", Value = s => s.DeathsAvg, Format = n2, Delta = d2 },
+            new CompareMetric { Label = "공용 목숨 소모/판", Value = s => s.LivesUsedAvg, Format = n2, Delta = d2 },
+            new CompareMetric { Label = "입력 피격률", Value = s => s.InputHitRate, Format = pct1, Delta = dPp },
+            new CompareMetric { Label = "실제 피격률", Value = s => s.ActualHitRate, Format = pct1, Delta = dPp },
+            new CompareMetric { Label = "굴림 없는 피격/판", Value = s => s.UnrolledPerRun, Format = n1, Delta = d1 },
+            new CompareMetric { Label = "간파 시도/판", Value = s => s.CounterTries, Format = n2, Delta = d2 },
+            new CompareMetric { Label = "간파 성공/판", Value = s => s.CounterSuccess, Format = n2, Delta = d2 },
+            new CompareMetric { Label = "간파 성공률", Value = s => s.CounterRate, Format = pct1, Delta = dPp },
+            new CompareMetric { Label = "제압 횟수/판", Value = s => s.SuppressAvg, Format = n2, Delta = d2 },
+            new CompareMetric { Label = "제압 중 가한 피해/판", Value = s => s.SuppressDamageAvg, Format = v => Num(v, 0), Delta = v => double.IsNaN(v) ? Dash : (v >= 0 ? "+" : "") + v.ToString("N0", Inv) },
+        };
+        foreach (QABoss103Character ch in Chars)
+        {
+            QABoss103Character c = ch;
+            list.Add(new CompareMetric { Label = $"{CharLabel(c)} DPS", Value = s => s.Dps.TryGetValue(c, out double v) ? v : double.NaN, Format = n1, Delta = d1 });
+        }
+        return list.ToArray();
+    }
+
+    /// <summary>
+    /// 지난 배치(batch.txt <c>compare_dir</c>)와 단계별 요약을 나란히 — 같은 지표(<see cref="Summaries"/>, 오류 판 제외). 열 = 단계마다 지난 · 이번 · 차이.
+    /// </summary>
+    private static void PreviousComparison(StringBuilder sb, QABoss103ReportInput input, List<Summary> now)
+    {
+        if (string.IsNullOrEmpty(input.CompareDir))
+            return;
+        string prevName = Path.GetFileName(input.CompareDir.TrimEnd('/', '\\'));
+        sb.Append("<h2>지난 배치 비교 — ").Append(H(prevName)).Append(" → 이번</h2>\n");
+        if (input.Compare == null)
+        {
+            sb.Append("<div class=\"warnbox\">비교 기준 폴더를 읽지 못했다(없음·자기 폴더): ").Append(H(input.CompareDir)).Append(" — batch.txt compare_dir 를 고치면 다음 리포트부터 보인다.</div>\n");
+            return;
+        }
+        List<Summary> prev = Summaries(input.Compare);
+        Dictionary<string, string> pb = QABoss103Batch.ParseKeyValues(input.Compare.BatchText);
+        sb.Append("<div class=\"sub\">기준 ").Append(H(input.CompareDir)).Append(" · xlsx r").Append(H(Val(pb, "xlsx_svn_rev", "na")))
+          .Append(" · git ").Append(H(Val(pb, "git_commit", "na"))).Append(" · 총 ").Append(H(Val(pb, "total", input.Compare.Total.ToString(Inv))))
+          .Append("판 — 판 수가 달라 비율·판당 값으로 본다. 위 '119 규칙 변경점'이 차이의 일부다.</div>\n");
+        var labels = new List<string>();
+        foreach (QABoss103BotTier t in QABoss103Batch.TierOrder)
+            labels.Add(QABoss103Batch.TierLabel(t));
+        labels.Add("전체");
+        sb.Append("<div class=\"scroll\"><table><thead><tr><th class=\"l\" rowspan=\"2\">지표</th>");
+        foreach (string l in labels)
+            sb.Append("<th colspan=\"3\">").Append(H(l)).Append("</th>");
+        sb.Append("</tr><tr>");
+        for (int i = 0; i < labels.Count; i++)
+            sb.Append("<th>지난</th><th>이번</th><th>차이</th>");
+        sb.Append("</tr></thead><tbody>\n");
+        foreach (CompareMetric m in CompareMetrics)
+        {
+            sb.Append("<tr><td class=\"l\">").Append(H(m.Label)).Append("</td>");
+            for (int i = 0; i < labels.Count; i++)
+            {
+                double a = i < prev.Count && prev[i].Runs > 0 ? m.Value(prev[i]) : double.NaN;
+                double b = i < now.Count && now[i].Runs > 0 ? m.Value(now[i]) : double.NaN;
+                double d = double.IsNaN(a) || double.IsNaN(b) ? double.NaN : b - a;
+                sb.Append("<td>").Append(H(double.IsNaN(a) ? Dash : m.Format(a))).Append("</td><td>").Append(H(double.IsNaN(b) ? Dash : m.Format(b)))
+                  .Append("</td><td>").Append(H(m.Delta(d))).Append("</td>");
+            }
+            sb.Append("</tr>\n");
+        }
+        sb.Append("</tbody></table></div>\n");
+    }
+
+    // ── 할 일 119 C3 — 클리어 실패 사유 ──────────────────────
+
+    /// <summary>run_fail.csv → (판:재실행)별 마지막 행(같은 칸을 다시 돌면 뒤 행).</summary>
+    private static List<string[]> FailRows(QABoss103CsvTable t)
+    {
+        var last = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var order = new List<string>();
+        foreach (string[] r in t.Rows)
+        {
+            string k = Key(t, r);
+            if (!last.ContainsKey(k))
+                order.Add(k);
+            last[k] = r;
+        }
+        var rows = new List<string[]>();
+        foreach (string k in order)
+            rows.Add(last[k]);
+        rows.Sort((a, b) =>
+        {
+            int c = t.Num(a, "run").CompareTo(t.Num(b, "run"));
+            return c != 0 ? c : t.Num(a, "retry").CompareTo(t.Num(b, "retry"));
+        });
+        return rows;
+    }
+
+    /// <summary>패턴별 실패 집계(통계 판만) — 실패 패턴 → 단계 열(보통·숙련·초보·전체) 판 수. 테스트용 공개.</summary>
+    public static SortedDictionary<string, int[]> FailPatternCounts(QABoss103ReportInput input)
+    {
+        Ctx c = Load(input);
+        return FailPatternCounts(c, QABoss103CsvTable.Parse(input.FailCsv));
+    }
+
+    private static SortedDictionary<string, int[]> FailPatternCounts(Ctx c, QABoss103CsvTable t)
+    {
+        var map = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
+        foreach (string[] r in FailRows(t))
+        {
+            if (!c.ValidRun.TryGetValue(Key(t, r), out string[] run))
+                continue;
+            string p = t.Get(r, "fail_pattern");
+            if (p.Length == 0)
+                p = QABoss103Metrics.Unknown;
+            if (!map.TryGetValue(p, out int[] cells))
+                map[p] = cells = new int[c.Columns.Count];
+            int tier = TierIndex(c, c.Runs.Get(run, "tier"), t.Num(r, "run"));
+            if (tier >= 0)
+                cells[tier]++;
+            cells[c.Columns.Count - 1]++;
+        }
+        return map;
+    }
+
+    private static int TierIndex(Ctx c, string tierText, double run)
+    {
+        QABoss103BotTier tier = Enum.TryParse(tierText, out QABoss103BotTier tt) ? tt : QABoss103Batch.TierOf(double.IsNaN(run) ? 1 : (int)run);
+        for (int i = 0; i < c.Tiers.Count; i++)
+            if (c.Tiers[i].Tier == tier)
+                return i;
+        return -1;
+    }
+
+    private static void FailTable(StringBuilder sb, Ctx c, QABoss103ReportInput input)
+    {
+        sb.Append("<h2>클리어 실패 사유</h2>\n");
+        QABoss103CsvTable t = QABoss103CsvTable.Parse(input.FailCsv);
+        List<string[]> rows = FailRows(t);
+        if (rows.Count == 0)
+        {
+            sb.Append("<div class=\"muted\">실패 사유 기록 없음(").Append(H(QABoss103FailReason.File)).Append(" — 할 일 119 C3 부터 전멸·시간초과 판마다 1행).</div>\n");
+            return;
+        }
+
+        // 패턴별 실패 집계 — 통계 판만.
+        SortedDictionary<string, int[]> counts = FailPatternCounts(c, t);
+        var order = new List<string>(counts.Keys);
+        int all = c.Columns.Count - 1;
+        order.Sort((a, b) =>
+        {
+            int d = counts[b][all].CompareTo(counts[a][all]);
+            return d != 0 ? d : string.CompareOrdinal(a, b);
+        });
+        sb.Append("<h3>패턴별 실패 집계(통계 판)</h3>\n<table><thead><tr><th class=\"l\">실패 패턴</th>");
+        foreach (Group g in c.Columns)
+            sb.Append("<th>").Append(H(g.Label)).Append("</th>");
+        sb.Append("</tr></thead><tbody>\n");
+        foreach (string p in order)
+        {
+            sb.Append("<tr><td class=\"l\">").Append(H(p)).Append("</td>");
+            for (int i = 0; i < c.Columns.Count; i++)
+            {
+                int fails = c.Columns[i].Runs.Count - CountClears(c, c.Columns[i]);
+                int n = counts[p][i];
+                sb.Append("<td>").Append(n > 0 ? H($"{n} ({Pct(Div(n, fails), 0)})") : Dash).Append("</td>");
+            }
+            sb.Append("</tr>\n");
+        }
+        sb.Append("</tbody></table>\n<div class=\"muted\">실패 패턴 = 판정 순간 진행 중 기믹 → 판 끝 ")
+          .Append(QABoss103FailReason.RecentWaveSeconds.ToString("0", Inv))
+          .Append("초 안에 실패한 송전탑 기믹 → (전멸) 마지막 사망 패턴 → 진행 중 보스 공격 → 보스 상태 순. 괄호 = 그 단계 실패 판 중 비율.</div>\n");
+
+        sb.Append("<h3>판별 실패 사유</h3>\n<div class=\"scroll\"><table><thead><tr><th>판</th><th>재실행</th><th>단계</th><th class=\"l\">결과</th><th>전투 시간</th>" +
+                  "<th class=\"l\">실패 패턴</th><th class=\"l\">보스 패턴 · 페이즈</th><th>남은 인원</th><th>남은 공용 목숨</th><th>보스 남은 HP</th><th class=\"l\">비고</th><th>통계</th></tr></thead><tbody>\n");
+        foreach (string[] r in rows)
+        {
+            bool valid = c.ValidRun.ContainsKey(Key(t, r));
+            string tier = Enum.TryParse(t.Get(r, "tier"), out QABoss103BotTier tt) ? QABoss103Batch.TierLabel(tt) : t.Get(r, "tier");
+            string outcome = t.Get(r, "outcome");
+            if (t.Get(r, "outcome_source") == QABoss103EarlyTimeout.Note)
+                outcome += "(조기)";
+            string attack = t.Get(r, "boss_attack");
+            string boss = attack.Length > 0 ? attack : t.Get(r, "boss_state");
+            if (t.Get(r, "active_gimmick").Length > 0)
+                boss += " · 기믹 " + t.Get(r, "active_gimmick").Replace(";", "·");
+            if (t.Get(r, "boss_phase").Length > 0)
+                boss += " · 페이즈 " + t.Get(r, "boss_phase");
+            sb.Append("<tr><td>").Append(H(t.Get(r, "run"))).Append("</td><td>").Append(t.Get(r, "retry") == "1" ? "재실행" : "")
+              .Append("</td><td>").Append(H(tier)).Append("</td><td class=\"l\">").Append(H(outcome))
+              .Append("</td><td>").Append(H(Time(t.Num(r, "combat_sec")))).Append("</td><td class=\"l\">").Append(H(t.Get(r, "fail_pattern")))
+              .Append("</td><td class=\"l\">").Append(H(boss)).Append("</td><td>").Append(H(Blank(t.Get(r, "alive"))))
+              .Append("</td><td>").Append(H(Blank(t.Get(r, "lives_left")))).Append("</td><td>").Append(H(Pct(t.Num(r, "boss_hp_pct") / 100.0, 1)))
+              .Append("</td><td class=\"l\">").Append(H(t.Get(r, "note"))).Append("</td><td>").Append(valid ? "포함" : "<span class=\"muted\">제외</span>").Append("</td></tr>\n");
+        }
+        sb.Append("</tbody></table></div>\n<div class=\"muted\">남은 인원·목숨 = 판정 순간(전멸은 전멸 리스폰 전 생존 0 이 된 순간). 송전탑 수 = 그 기믹에 올라온 탑 중 부서진 수(서버). " +
+                  "전체 열은 run_fail.csv(마지막 사망·사망 귀속·기믹 실패 목록 포함).</div>\n");
+    }
+
+    private static int CountClears(Ctx c, Group g)
+    {
+        int n = 0;
+        foreach (string[] r in g.Runs)
+            if (c.Runs.Get(r, "outcome") == "Clear")
+                n++;
+        return n;
+    }
+
+    private static string Blank(string s) => string.IsNullOrEmpty(s) ? Dash : s;
 
     private static void Sec(StringBuilder sb, string title, int cols) =>
         sb.Append("<tr class=\"sec\"><td colspan=\"").Append(cols + 1).Append("\">").Append(H(title)).Append("</td></tr>\n");
@@ -1053,7 +1318,9 @@ public static class QABoss103ReportFiles
 {
     public const string NotesFile = "notes.txt";
 
-    public static QABoss103ReportInput Read(string dir, string loopState)
+    public static QABoss103ReportInput Read(string dir, string loopState) => Read(dir, loopState, true);
+
+    private static QABoss103ReportInput Read(string dir, string loopState, bool withCompare)
     {
         var input = new QABoss103ReportInput
         {
@@ -1062,6 +1329,7 @@ public static class QABoss103ReportFiles
             CharsCsv = ReadOrEmpty(Path.Combine(dir, QABoss103Csv.CharsFile)),
             PatternsCsv = ReadOrEmpty(Path.Combine(dir, QABoss103Csv.PatternsFile)),
             GimmicksCsv = ReadOrEmpty(Path.Combine(dir, QABoss103Csv.GimmicksFile)),
+            FailCsv = ReadOrEmpty(Path.Combine(dir, QABoss103FailReason.File)),
             Fixes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.FixesFile)),
             Notes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.LogFolder, NotesFile)),
             LoopState = loopState ?? "",
@@ -1070,7 +1338,20 @@ public static class QABoss103ReportFiles
         Dictionary<string, string> batch = QABoss103Batch.ParseKeyValues(input.BatchText);
         if (batch.TryGetValue("total", out string t) && int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out int total) && total > 0)
             input.Total = total;
+        // 할 일 119 C3 — 비교 기준 배치(지난 103). 자기 폴더·없는 폴더는 비교하지 않는다(비교 기준의 비교 기준은 읽지 않는다).
+        if (withCompare && batch.TryGetValue("compare_dir", out string cmp) && cmp.Length > 0)
+        {
+            input.CompareDir = cmp;
+            if (Directory.Exists(cmp) && !SameDir(cmp, dir))
+                input.Compare = Read(cmp, "", false);
+        }
         return input;
+    }
+
+    private static bool SameDir(string a, string b)
+    {
+        try { return string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
     }
 
     /// <summary>리포트를 다시 만든다(임시 파일 → 교체 — 브라우저가 반쯤 쓴 파일을 읽지 않게). 경로.</summary>

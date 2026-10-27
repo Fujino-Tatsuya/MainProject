@@ -57,6 +57,15 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private double _combatServerT;
     private int _lastBossHp = int.MinValue, _lastFightLogLength = -1;
 
+    /// <summary>할 일 119 C3 — 송전탑 구간(참여·파괴·탑 피해). 판 끝 <see cref="Stop"/> 에서 기믹 기록으로 이름을 붙인다.</summary>
+    public readonly QABoss103PylonWaveTracker Pylons = new QABoss103PylonWaveTracker();
+    /// <summary>할 일 119 C3 — 실패 사유 근거(판정 순간 상태). 전멸이면 마지막으로 생존 0 이 된 순간(전멸 리스폰 전) 상태.</summary>
+    public QABoss103FailSnapshot FailSnapshot { get; private set; }
+
+    private readonly Dictionary<ulong, PlayerLifeState> _lifeOf = new Dictionary<ulong, PlayerLifeState>();
+    private QABoss103FailSnapshot _zeroAliveSnapshot;
+    private bool _wiped;
+
     public bool CurrentEntryReadable => CurrentEntryField != null;
 
     /// <summary>C7g — 마지막으로 본 보스 HP(모르면 <see cref="int.MinValue"/>).</summary>
@@ -145,6 +154,9 @@ public sealed class QABoss103Recorder : MonoBehaviour
             _landed[p] = h;
             if (slot >= 0 && slot < _assassin.Length)
                 _assassin[slot] = p.GetComponent<AssassinState>();
+            PlayerLifeCycleController life = p.GetComponent<PlayerLifeCycleController>();
+            if (life != null && !_lifeOf.ContainsKey(p.OwnerClientId))
+                _lifeOf[p.OwnerClientId] = life.State;
             PlayerReviveController revive = p.GetComponent<PlayerReviveController>();
             if (revive != null && !_revived.ContainsKey(revive))
             {
@@ -194,6 +206,8 @@ public sealed class QABoss103Recorder : MonoBehaviour
             Activity.Note("player_hit");
             return;
         }
+        if (target is BossChargingPylon)
+            Pylons.Damage(amount);
         Activity.Note("other_damage");   // 송전탑 등 보스 외 유닛
     }
 
@@ -249,6 +263,61 @@ public sealed class QABoss103Recorder : MonoBehaviour
             _livesAtRevive[clientId] = _rule != null ? _rule.PartyLives : -1;
         if (previous != current)
             Activity.Note("life_" + current);
+        _lifeOf[clientId] = current;
+        // 할 일 119 C3 — 생존 0 순간(전멸 리스폰이 살리기 전) 상태를 남긴다. 목숨이 남아 부활하면 다음 0 순간이 덮어쓴다.
+        if (previous == PlayerLifeState.Alive && AliveCount() == 0)
+            _zeroAliveSnapshot = Capture();
+    }
+
+    private int AliveCount()
+    {
+        if (_lifeOf.Count == 0)
+            return -1;
+        int n = 0;
+        foreach (KeyValuePair<ulong, PlayerLifeState> kv in _lifeOf)
+            if (SlotOf(kv.Key) >= 0 && kv.Value == PlayerLifeState.Alive)
+                n++;
+        return n;
+    }
+
+    /// <summary>할 일 119 C3 — 지금 보스 공격·상태·페이즈, 생존 인원, 공용 목숨, 보스 HP.</summary>
+    private QABoss103FailSnapshot Capture()
+    {
+        var s = new QABoss103FailSnapshot
+        {
+            Alive = AliveCount(),
+            Lives = _rule != null ? _rule.PartyLives : Stats.LivesNow,
+            BossHpPct = BossHpPct(),
+            ServerT = Now,
+            LastAttack = Stats.AttackStarts.Count > 0 ? Stats.AttackStarts[Stats.AttackStarts.Count - 1].Value : "",
+        };
+        if (_boss != null)
+        {
+            s.BossState = _boss.State.ToString();
+            s.BossPhase = _boss.CurrentPhase;
+            if (_boss.State == MonsterState.Attack && CurrentEntryField != null && CurrentEntryField.GetValue(_boss) is BossAttackEntry e)
+            {
+                s.BossAttack = e.attackId.ToString();
+                s.BossAttackPhase = _boss.AttackPhase.ToString();
+            }
+        }
+        return s;
+    }
+
+    /// <summary>[서버] 송전탑 구간 — 참여 탑 수·그중 부서진 수. 송전기 시퀀스 중이면 이름 '송전기'(나머지는 판 끝에 기믹 기록으로).</summary>
+    private void TickPylons(double now)
+    {
+        int engaged = 0, destroyed = 0;
+        foreach (BossChargingPylon p in BossChargingPylon.Active)
+        {
+            if (p == null || !p.IsEngaged)
+                continue;
+            engaged++;
+            if (p.WasDestroyed)
+                destroyed++;
+        }
+        string label = _boss != null && _boss.IsSpawned && _boss.IsChargeSequenceActive ? QABoss103FailReason.PylonCharge : null;
+        Pylons.Tick(now, engaged, destroyed, label);
     }
 
     /// <summary>
@@ -284,6 +353,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
         {
             Stats.Wipe();
             Activity.Note("wipe");
+            _wiped = true;
         }
     }
 
@@ -390,6 +460,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
         for (int s = 0; s < _assassin.Length; s++)
             if (_assassin[s] != null)
                 Stats.Transform(s, _assassin[s].IsTransformed, now);
+        TickPylons(now);
     }
 
     private string ReadFightLog()
@@ -405,6 +476,8 @@ public sealed class QABoss103Recorder : MonoBehaviour
         if (_stopped)
             return BossHpPct();
         Update();   // 마지막 프레임 상태(변신·제압)
+        // 할 일 119 C3 — 전멸 리스폰이 이미 살렸으면 생존 0 순간 상태, 아니면 지금 상태.
+        FailSnapshot = _wiped && _zeroAliveSnapshot != null ? _zeroAliveSnapshot : Capture();
         _stopped = true;
         Stats.End(Now);
         Unsubscribe();
@@ -427,6 +500,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
                 g.ServerT = _combatServerT + g.FightT;   // 근사 — 전투 기록 개전 ≈ Combat 진입
         List<QABoss103GimmickEvent> merged = QABoss103GimmickNotify.Merge(_eventGimmicks, gimmicks);
         Stats.Gimmicks.AddRange(merged);
+        QABoss103FailReason.LabelWaves(Pylons.Waves, merged);
         Debug.Log($"{Tag} event=recorder_stop fightLog={(string.IsNullOrEmpty(text) ? "none" : source)} gimmicks={merged.Count} gimmickEvents={_eventGimmicks.Count} gimmickLogs={gimmicks.Count} " +
                   $"guard={Stats.Chars[(int)QABoss103Character.Paladin].GuardSuccess} suppress={Stats.SuppressCount} logSuppress={logSuppress} " +
                   $"hits={Stats.Hits.Count} deaths={Stats.DeathsTotal()} attackStarts={Stats.AttackStarts.Count} dealt={Stats.DamageDealtTotal()}");

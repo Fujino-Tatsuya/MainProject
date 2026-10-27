@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 103 C6 — 90판 무인 연속 루프(에디터 상태 기계). 판마다 Play 를 새로 시작하고(<c>QAScenario48Menu.Run</c> — 툴바 Play 와 같은 MPPM 경로,
+/// 할 일 103 C6 — 90판 무인 연속 루프(에디터 상태 기계). 할 일 119 C3 — 같은 루프로 30판(<c>Start 30</c>, 폴더 <c>119-…</c>). 판마다 Play 를 새로 시작하고(<c>QAScenario48Menu.Run</c> — 툴바 Play 와 같은 MPPM 경로,
 /// isPlaying 직접 토글 없음) 판 기록(runs.csv 새 행)을 보면 Play 를 멈춘 뒤 다음 판으로 간다.
 /// <list type="bullet">
 /// <item>배치 폴더 <c>C:/UnityProject/QA/103-yyyyMMdd_HHmm/</c> — CSV 4종·parts/·hb/(심장박동)·report.html·progress.txt(루프 상태)·batch.txt(배치 머리)·logs/.</item>
@@ -79,37 +79,66 @@ public static class QABoss103BatchRunner
     // ── 메뉴 ─────────────────────────────────────────────────
 
     [MenuItem(Root + "Start 90", priority = 100)]
-    public static void Start90()
+    public static void Start90() =>
+        StartBatch(QABoss103Batch.Prefix103, QABoss103Batch.TotalRuns, "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA", null);
+
+    /// <summary>
+    /// 할 일 119 C3 — 같은 조건 30판(보통→숙련→초보 번갈아 = 단계마다 10판, 기준 시드 103 그대로). 폴더 <c>119-yyyyMMdd_HHmm</c>.
+    /// 리포트는 <see cref="CompareDir"/>(지난 103 90판) 와 단계별 요약을 나란히 보인다.
+    /// </summary>
+    [MenuItem(Root + "Start 30 (119 — 단계별 10판)", priority = 99)]
+    public static void Start30() =>
+        StartBatch(QABoss103Batch.Prefix119, QABoss103Batch.TotalRuns119, "할 일 119 3인 보스전(웰즈&23호 B) QA 봇 2차 — 30판", CompareDir);
+
+    [MenuItem(Root + "Compare Folder (119 비교 기준)...", priority = 106)]
+    public static void ChooseCompareDir()
+    {
+        string dir = EditorUtility.OpenFolderPanel("119 리포트 비교 기준 배치 폴더(지난 103)", QAScenario103Menu.QARoot, "");
+        if (string.IsNullOrEmpty(dir))
+            return;
+        EditorPrefs.SetString(CompareDirKey, dir.Replace('\\', '/'));
+        Debug.Log($"{Tag} 비교 기준 배치 = {CompareDir} (다음 Start 30 부터 batch.txt compare_dir 로 남는다 — 진행 중 배치는 그 폴더 batch.txt 를 고친다).");
+    }
+
+    private static readonly string CompareDirKey = DevBootTarget.ScopedKey("QA.103.Batch.CompareDir");
+
+    /// <summary>할 일 119 C3 — 비교 기준 배치 폴더(설정값, 기본 <see cref="QABoss103Batch.CompareDirDefault"/>).</summary>
+    public static string CompareDir => EditorPrefs.GetString(CompareDirKey, QABoss103Batch.CompareDirDefault);
+
+    private static void StartBatch(string prefix, int total, string title, string compareDir)
     {
         if (!CanStart())
             return;
         DateTime at = DateTime.Now;
-        string dir = $"{QAScenario103Menu.QARoot}/{QABoss103Batch.BatchFolderName(at)}";
+        string dir = $"{QAScenario103Menu.QARoot}/{QABoss103Batch.BatchFolderName(at, prefix)}";
         if (Directory.Exists(dir))
             dir += at.ToString("ss", CultureInfo.InvariantCulture);
         Directory.CreateDirectory(dir);
         DataSourcePlayMode.Current = DataSource.Table;
         var batch = new List<KeyValuePair<string, string>>
         {
-            KV("title", "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA"),
+            KV("title", title),
             KV("started_at", at.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
             KV("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture)),
-            KV("total", QABoss103Batch.TotalRuns.ToString(CultureInfo.InvariantCulture)),
+            KV("total", total.ToString(CultureInfo.InvariantCulture)),
             KV("data_source_mode", QABoss103Batch.SourceTable),
             KV("xlsx_svn_rev", QABoss103RunCsv.XlsxRevision()),
             KV("git_commit", QABoss103RunCsv.GitCommit()),
             KV("git_branch", QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD")),
             KV("unity_version", Application.unityVersion),
         };
+        if (!string.IsNullOrEmpty(compareDir))
+            batch.Add(KV("compare_dir", compareDir));
         File.WriteAllText(Path.Combine(dir, QABoss103Batch.BatchFile), QABoss103Batch.FormatKeyValues(batch));
         _state = new Dictionary<string, string>(StringComparer.Ordinal);
         _stateDir = dir;
         Set("state", "prepare");
         Set("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture));
-        Set("total", QABoss103Batch.TotalRuns.ToString(CultureInfo.InvariantCulture));
+        Set("total", total.ToString(CultureInfo.InvariantCulture));
         SetTime("notBefore", Now);
         Arm(dir);
-        Log($"배치 시작 {dir} — {QABoss103Batch.TotalRuns}판 · 기준 시드 {Get("seed")} · 데이터 출처 테이블 · xlsx r{Find(batch, "xlsx_svn_rev")} · git {Find(batch, "git_commit")}");
+        Log($"배치 시작 {dir} — {total}판 · 기준 시드 {Get("seed")} · 데이터 출처 테이블 · xlsx r{Find(batch, "xlsx_svn_rev")} · git {Find(batch, "git_commit")}" +
+            (string.IsNullOrEmpty(compareDir) ? "" : $" · 비교 기준 {compareDir}{(Directory.Exists(compareDir) ? "" : "(폴더 없음 — 리포트에 비교 표 없음)")}"));
     }
 
     [MenuItem(Root + "Resume Last", priority = 101)]
@@ -120,7 +149,7 @@ public static class QABoss103BatchRunner
             dir = LatestBatchDir();
         if (dir == null)
         {
-            Debug.LogWarning($"{Tag} 이어 할 배치 폴더가 없다({QAScenario103Menu.QARoot}/103-*).");
+            Debug.LogWarning($"{Tag} 이어 할 배치 폴더가 없다({QAScenario103Menu.QARoot}/103-*·119-*).");
             return;
         }
         Resume(dir);
@@ -206,6 +235,7 @@ public static class QABoss103BatchRunner
     }
 
     [MenuItem(Root + "Start 90", true)]
+    [MenuItem(Root + "Start 30 (119 — 단계별 10판)", true)]
     [MenuItem(Root + "Resume Last", true)]
     [MenuItem(Root + "Resume (Choose Folder)...", true)]
     private static bool CanStartCheck() => !Running;
@@ -264,10 +294,17 @@ public static class QABoss103BatchRunner
     {
         if (!Directory.Exists(QAScenario103Menu.QARoot))
             return null;
-        string latest = null;
-        foreach (string d in Directory.GetDirectories(QAScenario103Menu.QARoot, "103-2*"))
-            if (latest == null || string.CompareOrdinal(d, latest) > 0)
+        // 103-·119- 배치 중 폴더 이름의 시각이 가장 늦은 것(접두어 순서와 무관).
+        string latest = null, latestStamp = null;
+        foreach (string d in Directory.GetDirectories(QAScenario103Menu.QARoot, "*-2*"))
+        {
+            string stamp = QABoss103Batch.BatchStamp(Path.GetFileName(d));
+            if (stamp != null && (latestStamp == null || string.CompareOrdinal(stamp, latestStamp) > 0))
+            {
                 latest = d;
+                latestStamp = stamp;
+            }
+        }
         return latest?.Replace('\\', '/');
     }
 
@@ -345,7 +382,7 @@ public static class QABoss103BatchRunner
         List<QABoss103Attempt> attempts = Attempts(_stateDir);
         if (!QABoss103Batch.TryNext(attempts, Total, out _, out _))
         {
-            Finish("90판 + 오류 판 재실행 끝", "done");
+            Finish($"{Total}판 + 오류 판 재실행 끝", "done");
             return;
         }
         if (Get("recycle") == "1")
