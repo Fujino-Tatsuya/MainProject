@@ -11,6 +11,7 @@ using UnityEngine;
 ///   (<c>_pulledPlayers</c> = 끌어오는 중 · <c>_grabbed</c> = 쥔 대상).
 /// - 쓰러짐·완전 사망 = Alive 가 아님(코드에 별도 '쓰러짐' 상태가 없다 — DeadPresentation/Soul 이 그 자리).
 /// - 무적은 여기서 거르지 않는다 — 피해는 <c>Player.CanApplyHealthDamage</c> 가 막고, 게이지 인원에서만 뺀다.
+///   보스 즉사 방전은 <see cref="PlayerInvulnerabilityBypass"/> 로 그 게이트를 넘는다(할 일 105).
 /// </summary>
 public static class BossPatternTargets
 {

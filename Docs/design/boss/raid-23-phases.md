@@ -124,7 +124,7 @@
 | 결과 | 내용 |
 |---|---|
 | **저지**(실드 파괴) | **제압 5초** → 남은 체력 전투 |
-| **실패**(30초 경과) | **즉사기** — 방 전체 1.2초 예고(`raidSelfDestructBlastWarn`) 후 **한 방 상한 무시 즉사**(`raidSelfDestructBlastLethal`). 대시 무적 등 피격 무효로만 피할 수 있다. 이후 살아남은·부활한 사람과 남은 체력 전투 |
+| **실패**(30초 경과) | **즉사기** — 방 전체 1.2초 예고(`raidSelfDestructBlastWarn`) 후 **한 방 상한 무시 즉사**(`raidSelfDestructBlastLethal`). **무적(대시 등 전부)도 무시**한다(`raidSelfDestructBlastIgnoreInvuln`, 10-27 할 일 105 — [handoff](../../tech/handoff-boss-lethal-invuln-bypass.md)). 이후 살아남은·부활한 사람과 남은 체력 전투 |
 
 ✏️ **추가할 것**:
 -

@@ -1811,16 +1811,15 @@ public class Player : Unit
     // 추락 피해는 방어력·쉴드·일반 무적을 무시한다(서버 전용 Bypass Context). (PLAN §11, §13 / W10)
     private bool _fallDamageBypass;
 
-    // 무적(대시 등) 동안 일반 피해를 차단한다. 단 추락 Bypass 중에는 통과시킨다. (PLAN §11 / W5·W10)
+    // 무적(대시 등) 동안 일반 피해를 차단한다. 단 무적 무시 중(추락 Bypass · 보스 즉사 방전)에는 통과시킨다. (PLAN §11 / W5·W10, 할 일 105)
     protected override bool CanApplyHealthDamage(int damage)
     {
-        if (_fallDamageBypass)
-            return true;
-
-        if (invulnerability != null && invulnerability.IsServerInvulnerable)
+        bool bypass = _fallDamageBypass || PlayerInvulnerabilityBypass.Active;
+        bool invulnerable = invulnerability != null && invulnerability.IsServerInvulnerable;
+        if (!PlayerInvulnerabilityBypass.AllowsHealthDamage(invulnerable, bypass))
             return false;
 
-        return base.CanApplyHealthDamage(damage);
+        return bypass || base.CanApplyHealthDamage(damage);
     }
 
     /// <summary>
