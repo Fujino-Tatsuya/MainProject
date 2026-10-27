@@ -381,6 +381,9 @@ public static class SkillTooltipAuthoring
     private const int TagChipBorder = 24;        // 9-slice 보더(px) — 모서리 반지름 + AA 여유
     private const float TagChipRadius = 22f;     // px, PPU 200 → 11 UI 단위(칩 높이 26 의 거의 반 = 알약에 가까운 둥근 사각형)
     private const float TagChipPixelsPerUnit = 200f;
+    // 칩 글자만 서울알림체 Medium — CombatHUD 등 HUD 가 쓰는 정적 에셋(git, 태그 글자 전부 있음). 다른 툴팁 글자는 FontPath 그대로.
+    // Heavy(SVN 50.Art)는 설정창 전용 · 아틀라스에 넉·백·막·저가 없다.
+    private const string TagChipFontPath = "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset";
 
     // 칩 테두리 = 같은 반지름·보더의 흰 둥근 링 9-slice(생성물 · git). 두께(px)는 링 PNG 임포터 userData 에 적어 두고, 바꾸면 그 자리에서 다시 굽는다(guid 유지).
     private const string TagChipRingSpritePath = "Assets/2.Prefabs/UI/Textures/SkillTooltipTagChipRing.png";
@@ -393,6 +396,7 @@ public static class SkillTooltipAuthoring
     /// <summary>
     /// 칩 원본을 둥근 9-slice 로 — 배경 Image = <see cref="TagChipSpritePath"/>·Sliced(글자 길이로 늘어나도 모서리 유지),
     /// 그 위에 자식 <see cref="SkillTooltipView.TagChipRingName"/> = 링 <see cref="TagChipRingSpritePath"/>·Sliced(글자색 테두리, 글자 아래).
+    /// 칩 글자 글꼴 = <see cref="TagChipFontPath"/>(서울알림체 Medium).
     /// 옛 금색 <see cref="Outline"/> 은 지운다(사각 오프셋 복제라 둥근 모서리와 어긋난다).
     /// 색은 런타임에 <see cref="SkillTooltipTagStyles"/> 가 덮는다 — 여기 색은 표가 비었을 때의 기본색.
     /// </summary>
@@ -426,7 +430,14 @@ public static class SkillTooltipAuthoring
 
         TMP_Text label = chip.GetComponentInChildren<TMP_Text>(true);
         if (label != null)
+        {
             label.color = SkillTooltipTagStyles.FallbackText;
+            TMP_FontAsset chipFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(TagChipFontPath);
+            if (chipFont != null)
+                label.font = chipFont; // 크기 15·Bold·가운데 정렬은 그대로(세로 어긋남 0.5 UI 단위 이하라 보정 없음)
+            else
+                Debug.LogWarning($"[SkillTooltip] 칩 글꼴 없음: {TagChipFontPath} — 칩 글자 글꼴을 바꾸지 않는다.");
+        }
     }
 
     /// <summary>
