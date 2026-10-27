@@ -27,6 +27,12 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
              "비워두면 연출만 빠진다")]
     [SerializeField] private EffectSocketPlayer glowLoop;
 
+    // 판정 전 방패 기 모으기(2026-10-26 민경 — handoff-paladin-interrupt-vfx). 켜고 끄는 것은 Garen_Parry 클립 이벤트
+    // (0초 StartEffect · Hit 시각 StopEffect "ShieldCharge")가 전 피어에서 한다. 여기는 판정 전에 끊긴 경우의 회수만.
+    [Tooltip("판정 전 방패 기 모으기(소켓 이펙트, Id 'ShieldCharge'). 프리팹의 'VFX/ShieldInterrupt/ShieldCharge' 를 물린다.\n" +
+             "켜고 끄기는 클립 이벤트가 하고, 여기서는 스킬이 판정 전에 끝났을 때 끄기만 한다. 비워두면 회수만 빠진다")]
+    [SerializeField] private EffectSocketPlayer chargeLoop;
+
     // 🔴 적중 충격파만 창구가 다르다. ResolveHit 은 서버에서만 도는데(OnTick=TickServer,
     //    애니 이벤트=HandleAnimationEvent 의 IsServer 게이트) 이 클래스는 MonoBehaviour 라 RPC 를 못 단다.
     [Tooltip("적중 충격파 전파 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
@@ -52,6 +58,9 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
         // 🔴 루프는 반드시 회수한다 — 핸들을 버리면 풀 인스턴스가 영영 안 돌아온다.
         //    소켓의 safetyTimeout(5s)은 이 경로가 실패했을 때를 위한 그물이지 정상 경로가 아니다.
         glowLoop?.Stop();
+
+        // 판정 전에 끊기면(경직·사망·취소) 클립의 Stop 이벤트가 안 온다. 이미 꺼져 있으면 조용한 no-op 이다.
+        chargeLoop?.Stop();
     }
 
     protected override void OnMissingInterruptData()
@@ -85,10 +94,18 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
 
     protected override bool CompleteBeforeAttackLanded => true;
 
-    protected override void OnInterruptResolutionCompleted(int resolvedCount)
+    // 충격파 = 간파 성공(카운터 창 소비) 때만(2026-10-26 민경). 예전엔 적중 1건 이상이면 터졌다.
+    // 성공은 부모의 정적 이벤트 ServerInterruptSucceeded 가 판정 1회에 한 번(여러 대상이 성공해도) 알린다 — 서버에서만 난다.
+    private void OnEnable() => ServerInterruptSucceeded += OnServerInterruptSucceeded;
+
+    private void OnDisable() => ServerInterruptSucceeded -= OnServerInterruptSucceeded;
+
+    private void OnServerInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
     {
-        // 하나라도 맞았을 때만, 대상 수와 관계없이 충격파를 한 번 재생한다.
-        if (resolvedCount > 0)
-            shieldVfx?.ServerInterruptWave();
+        // 🔴 정적 이벤트라 모든 팔라딘의 성공이 다 들어온다 — 자기 시전만.
+        if (skill != this)
+            return;
+
+        shieldVfx?.ServerInterruptWave();
     }
 }

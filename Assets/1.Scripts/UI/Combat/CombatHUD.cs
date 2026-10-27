@@ -14,6 +14,7 @@ public class CombatHUD : MonoBehaviour
     [SerializeField] private HealthVignetteHUD healthVignetteHUD;
     [SerializeField] private ShieldVignetteHUD shieldVignetteHUD;
     [SerializeField] private InterruptHighlightHUD interruptHighlightHUD;
+    [SerializeField] private TraitProgressHUD traitProgressHUD;
 
 
     private void OnEnable()
@@ -52,5 +53,8 @@ public class CombatHUD : MonoBehaviour
 
         if (interruptHighlightHUD != null)
             interruptHighlightHUD.Bind(player);
+
+        if (traitProgressHUD != null)
+            traitProgressHUD.Bind(player);
     }
 }

@@ -10,15 +10,19 @@ public static class UserInputConfig
 {
     private const string HoldSkillAsTogglePrefsKey = "Input.HoldSkillAsToggle";
     private const string DashDirectionModePrefsKey = "Input.DashDirectionMode";
+    private const string GuardSkillHoldPrefsKey = "Input.GuardSkillHold";
 
     // 저장값이 없을 때(처음 실행) 쓰는 값 — 경석 10-22: 홀드 스킬 = 토글 켬, 대시 = 캐릭터 방향(마우스 방향 꺼짐).
     // 이미 저장된 PC 는 그 값을 그대로 쓴다. enum 의 0(CharacterFacing)은 저장 호환 때문에 바꾸지 않는다.
     private const bool DefaultHoldSkillAsToggle = true;
     private const DashDirectionMode DefaultDashDirection = DashDirectionMode.CharacterFacing;
+    // 할 일 95(10-26 grill): 팔라딘 E 기본 = 홀드.
+    private const bool DefaultGuardSkillHold = true;
 
     private static bool isLoaded;
     private static bool holdSkillAsToggle;
     private static DashDirectionMode dashDirectionMode;
+    private static bool guardSkillHold;
 
     /// <summary>
     /// Hold 스킬(현재 Q 진격의 방패)을 토글로 조작한다.
@@ -71,6 +75,32 @@ public static class UserInputConfig
         }
     }
 
+    /// <summary>
+    /// 방어 스킬(현재 팔라딘 E 수호자의 의지)을 홀드로 조작한다(할 일 95).
+    /// true(기본) = 누르고 있는 동안 방어중 유지, 떼거나 최대 유지 시간(guardHoldMaxDuration)이 지나면 해제.
+    /// false = 눌러서 시작, 방어중 길이는 애니메이터 전이(1.5초)로 자동 해제, 방어중 E 재입력으로 즉시 해제(할 일 94).
+    /// 오너만 읽는다 — 오너가 누름/뗌을 서버로 보내고 판정은 서버가 한다.
+    /// </summary>
+    public static bool GuardSkillHold
+    {
+        get
+        {
+            EnsureLoaded();
+            return guardSkillHold;
+        }
+        set
+        {
+            EnsureLoaded();
+
+            if (guardSkillHold == value)
+                return;
+
+            guardSkillHold = value;
+            PlayerPrefs.SetInt(GuardSkillHoldPrefsKey, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
     private static void EnsureLoaded()
     {
         if (isLoaded)
@@ -78,6 +108,7 @@ public static class UserInputConfig
 
         isLoaded = true;
         holdSkillAsToggle = PlayerPrefs.GetInt(HoldSkillAsTogglePrefsKey, DefaultHoldSkillAsToggle ? 1 : 0) != 0;
+        guardSkillHold = PlayerPrefs.GetInt(GuardSkillHoldPrefsKey, DefaultGuardSkillHold ? 1 : 0) != 0;
 
         // 모르는 값(이후 버전에서 지운 모드 등)은 기본값으로 읽는다.
         int storedDashMode = PlayerPrefs.GetInt(DashDirectionModePrefsKey, (int)DefaultDashDirection);
@@ -94,6 +125,7 @@ public static class UserInputConfig
         isLoaded = false;
         holdSkillAsToggle = DefaultHoldSkillAsToggle;
         dashDirectionMode = DefaultDashDirection;
+        guardSkillHold = DefaultGuardSkillHold;
     }
 }
 

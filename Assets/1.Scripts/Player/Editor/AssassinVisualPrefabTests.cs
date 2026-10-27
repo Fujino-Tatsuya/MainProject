@@ -12,8 +12,9 @@ public sealed class AssassinVisualPrefabTests
     private const string VariantPath = "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab";
     private const string ModelPath = "Assets/50.Art/Char/assassin/Assassin.fbx";
     private const string BodyMaterialPath = "Assets/3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat";
-    // 일반 E 단검 날 발광 오버레이(민경 VFX, 2026-10-20) — 단검 슬롯 [0] = 몸 재질 뒤에 붙는 슬롯 [1]. 몸 재질 슬롯 수에는 세지 않는다.
-    private const string BladeGlowMaterialPath = "Assets/50.Art/VFX/_Materials/Dagger_Blade_Glow.mat";
+    // 10-26: 단검은 몸과 분리한 좌우 베이스컬러, 발광은 보존된 UV1을 사용한다.
+    private const string BladeGlowMaterialPath = "Assets/3.Materials/FlatKit/Player/WeaponOverlays/Dagger_Blade_Glow_UV1.mat";
+    private const string DaggerMaterialFolder = "Assets/3.Materials/FlatKit/Player/Assassin/";
     private const string ParentMaterialPath = "Assets/3.Materials/FlatKit/Player/FK_Paladin_Toon.mat";
     private const string BodyTexturePath = "Assets/50.Art/Char/assassin/Textures/Assassin_BaseColor.png";
     private const string ControllerPath = "Assets/4.Animations/Player/Assassin/AssassinAnimatorController.controller";
@@ -55,7 +56,7 @@ public sealed class AssassinVisualPrefabTests
 
     [TestCase(ArmaturePath)]
     [TestCase(VariantPath)]
-    public void BodyAndDaggerSlotsUseFlatKitBody(string prefabPath)
+    public void BodyAndDaggerSlotsUseOwnFlatKitMaterials(string prefabPath)
     {
         Transform armature = LoadArmature(prefabPath);
         Material body = AssetDatabase.LoadAssetAtPath<Material>(BodyMaterialPath);
@@ -69,8 +70,14 @@ public sealed class AssassinVisualPrefabTests
         {
             Transform dagger = FindDeep(armature, name);
             Assert.That(dagger, Is.Not.Null, name);
+            string side = name.EndsWith("_L") ? "L" : "R";
+            Material daggerMaterial = AssetDatabase.LoadAssetAtPath<Material>(DaggerMaterialFolder + "FK_Assassin_Dagger_" + side + ".mat");
+            Assert.That(daggerMaterial, Is.Not.Null, name + " 전용 베이스컬러 재질");
+            Assert.That(daggerMaterial.parent, Is.EqualTo(AssetDatabase.LoadAssetAtPath<Material>(ParentMaterialPath)));
+            Assert.That(AssetDatabase.GetAssetPath(daggerMaterial.GetTexture("_BaseMap")),
+                Is.EqualTo("Assets/50.Art/Char/Weapons/Handpainted_20261026/Textures/Assassin_Dagger_" + side + "_BaseColor.png"));
             foreach (Renderer renderer in dagger.GetComponentsInChildren<Renderer>(true))
-                slots += AssertDaggerSlots(renderer, body, bladeGlow);
+                slots += AssertDaggerSlots(renderer, daggerMaterial, bladeGlow);
         }
         Assert.That(slots, Is.EqualTo(ExpectedSlots), "머리·몸·단검 슬롯 수");
     }
@@ -83,12 +90,12 @@ public sealed class AssassinVisualPrefabTests
         return materials.Length;
     }
 
-    // 단검: [0] = 몸 재질, 그 뒤는 날 발광 오버레이만 허용(일반 E 버프 동안 MaterialFadeEffect 가 켠다). 몸 재질 슬롯 1개를 센다.
-    private static int AssertDaggerSlots(Renderer renderer, Material body, Material bladeGlow)
+    // 단검: [0] = 좌우 전용 재질, [1] = 기존 효과를 UV1으로 읽는 오버레이. 베이스 슬롯 1개를 센다.
+    private static int AssertDaggerSlots(Renderer renderer, Material daggerMaterial, Material bladeGlow)
     {
         Material[] materials = renderer.sharedMaterials;
         Assert.That(materials.Length, Is.GreaterThan(0), renderer.name);
-        Assert.That(materials[0], Is.EqualTo(body), $"{renderer.name}[0]");
+        Assert.That(materials[0], Is.EqualTo(daggerMaterial), $"{renderer.name}[0]");
         for (int i = 1; i < materials.Length; i++)
             Assert.That(materials[i], Is.EqualTo(bladeGlow), $"{renderer.name}[{i}] 날 발광 오버레이");
         return 1;

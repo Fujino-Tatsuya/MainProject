@@ -1,3 +1,98 @@
+# ▶▶▶ 계획 = **팔라딘 E(수호자의 의지) 연출 — 상태 클립별 VFX(점화 · 결계 · 해제 · 막아냄 · 오라 · 반격)** (2026-10-26 · grill 확정 · ✅ 승인 · ✅ MyProject 제작(미리보기 `Scenes/GuardianWillPreview`) · ✅ 민경 확인(레이어 A·B·C 유지 · B 방패 투영 곡면) · ✅ MainProject import·배선(배치 컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-26 — Q6 = E 연결만 끊기, Q9 = 레퍼런스 없음, Q10 = 결계 A+B+C 다 만들고 보고 덜어냄, 나머지 추천안).
+> 판정·피해·네트워크 무변경. 은희 영역(Player) 스크립트·클립은 **연출 배선만** → handoff.
+
+## 사실
+- 입력 E → `SkillSub` → `PlayerSkillController.Cast` → 서버 `StartSkillServer`(쿨 7초 · 피해 ×2.5 · 안전망 4초) → `OnServerStart`(방어 방향 = 시전 조준 고정, 이동·회전 불가) → 전 피어 `SubSkillGuard` 재생.
+- 단계 = `FirstMeleeGuardCounterModel`, 이벤트는 서버만 처리. 클립(공속 1): `Garen_E_GuardStart`(속도 4 → 0.25초, Custom0 @0.9 = 방어 창 열림) → `Garen_E_GuardIdle`(exitTime 전이 1.5초, 공속 무관) → `Garen_E_GuardEnd`(속도 4 → 0.25초, Custom1 @0.1 창 닫힘 · End @0.967 종료). 방어 성공 시 `PlayerShieldVfx.ServerPlayGuardCounterPose` 가 전 피어 `SubSkillCounter` 로 CrossFade — `Garen_E_GuardCounter`(1.17초, Hit @0.433 반격 · End @1.1).
+- 방어 = 정면 180° · 반격 = 고정 방향 120° · 반경 3m · 반격 중 전 방향 피해·넉백 무시.
+- 현재 E 연출 = 반격 때 `shieldVfx.ServerInterruptWave()`(우클릭 충격파 `FX_ShieldWave` 재사용) 하나뿐. `shieldVfx` 칸은 반격 자세 전환에도 쓰여 끊을 수 없다.
+- 클립 4개에 연출 이벤트 없음(`HandleSkillEvent` 만). 클립은 Humanoid, 모델 `2.Prefabs/Player/Paladin/paladin 1.fbx`.
+- 우클릭의 방패 문양 발광 `MaterialFadeEffect`(`shieldGlow`, `1486249918430601143`)가 있다. E·우클릭은 동시에 돌 수 없다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 색(Q1-C) | 방어 단계 = 흰빛·옅은 금빛 / 반격 단계 = 진한 금빛 |
+| SubSkillGuard(Q2) | `_Ignite` 방패 점화 + 발밑 빛 고리(원샷) · 방어 창 열림(Custom0 시각)에 결계 켬 |
+| SubSkillGuardIdle | `_Barrier` 루프 유지(이벤트 없음) |
+| SubSkillGuardEnd | `_Release` 결계가 빛 조각으로 흩어지며 조용히 사라짐(방어 실패) |
+| SubSkillCounter | 0초 `_Block` 방패 앞 섬광 + 결계 깨짐 · `_Aura` 몸 금빛 오라 루프(피해 무시 표시, Q11-A) · 0~Hit 진한 금빛 기 모으기 `_Charge`(루프, Hit 에서 끔 — 공속 자동) · Hit `_Counter` 바닥 120° 3m 부채꼴 충격파 + 무기 궤적 금빛 베기 호(Q12-A, 궤적은 실제 모델로 재생해 맞춤) |
+| 결계 모양(Q10) | **10-26 민경 확인: 셋 다 유지 · B 는 세로 중심선이 앞으로 나온 곡면(양옆 0.14m 휨).** A+B+C 각각 켜고 끌 수 있는 자식 레이어로 전부 제작 → 결과 보고 덜어냄. A 반원 빛 벽(높이 1.6m · 반지름 1.2m · 180° · 위로 투명 · 성문 흐름) / B 큰 방패 투영 / C 바닥 반원 문양 + 테두리선 |
+| 범위 일치(Q3-A) | 결계 180°, 반격 부채꼴 120° · 3m |
+| 막아냄 위치(Q4-A) | 방패 소켓 기준. 공격자 방향 RPC 없음 |
+| 배선(Q5) | E 클립 4개에 `EffectAnimEvents` 이벤트(전 피어) + `Player_Paladin.prefab` `VFX` 밑 `EffectSocketPlayer` 들 |
+| 기존 연출 제거(Q6) | `FirstMeleeSubSkill.ResolveCounterHit` 의 `shieldVfx.ServerInterruptWave()` 한 줄만 삭제. `shieldVfx` 칸·우클릭 충격파는 그대로 |
+| 추가 피격 불꽃(Q7) | 이번엔 없음(네트워크 필요) |
+| 미리보기(Q8-A) | `paladin 1.fbx` + E 클립 4개를 MyProject 로 복사해 실제 애니 위에서 제작 |
+| 방패 문양 발광(Q13) | `shieldGlow` 재사용 — `FirstMeleeSubSkill` `OnClientPlay` 에서 FadeIn, `OnEnd` 에서 FadeOut |
+| 공속(Q14) | 루프는 이벤트로 자동 · 원샷은 고정 길이(배율 코드 없음) |
+| 파일(Q15) | MainProject `50.Art/VFX/Common/Players/Player1/ESkill/FX_GuardianWill_{Ignite,Barrier,Release,Block,Aura,Charge,Counter}` + Entry · 재질 `_Materials/Player1/` · 텍스처 `Textures/Player1/` · 메시 `Models/Player1/` · MyProject `Export/Player1/ESkill/`. 옛 HolyShield 파일 무변경 |
+| 동료 화면(Q16-A) | 모두 같은 강도(결계를 옅게) |
+
+## 클립 이벤트(예정)
+| 클립 | 시각(정규화 아님, 클립 초) | 이벤트 |
+|---|---|---|
+| `Garen_E_GuardStart` | 0 | `PlayEffect` GuardianIgnite |
+| | 0.9(Custom0 과 같은) | `StartEffect` GuardianBarrier |
+| `Garen_E_GuardEnd` | 0.1(Custom1 과 같은) | `StopEffect` GuardianBarrier · `PlayEffect` GuardianRelease |
+| `Garen_E_GuardCounter` | 0 | `StopEffect` GuardianBarrier · `PlayEffect` GuardianBlock · `StartEffect` GuardianAura · `StartEffect` GuardianCharge |
+| | 0.433(Hit 와 같은) | `StopEffect` GuardianCharge · `PlayEffect` GuardianCounter |
+| | 1.1(End 와 같은) | `StopEffect` GuardianAura |
+
+## 취소 안전
+- 끊김(경직·사망·안전망·CrossFade 중 이탈)엔 Stop 이벤트가 안 온다 → `FirstMeleeSubSkill.OnEnd`(전 피어)에서 Barrier·Aura·Charge 소켓 `Stop()` + `shieldGlow.FadeOut()`. 소켓 safetyTimeout = Barrier 3초 · Aura 2초 · Charge 1초(그물).
+
+## 작업 순서
+1. MyProject(🔴 배치 빌드 때 닫기 요청): 모델·클립 복사 · `Tools/VFX/Guardian Will (팔라딘 E) 빌드` → 프리팹 7종 + 재질·텍스처 · 미리보기 씬 `GuardianWillPreview`(실제 애니 재생 · 방어 성공/실패 · 공속 1/1.3/0.7 · 결계 레이어 A/B/C 켜고 끄기) → 민경 확인 · 레이어 덜어내기 → **승인**.
+2. MainProject(🔴 Unity 닫고): 에셋 import(guid 유지) · Entry · `Player_Paladin.prefab` 소켓 · 클립 이벤트 · `FirstMeleeSubSkill`(충격파 1줄 삭제 · 칸 4개 `barrierLoop`·`auraLoop`·`chargeLoop`·`shieldGlow` · OnClientPlay/OnEnd).
+3. 컴파일 0 · 배선 검사 · handoff `Docs/tech/handoff-paladin-guardian-will-vfx.md`(은희) · `CONTEXT.md` · 민경 Play(방어 성공/실패 · 반격 중 피격 · 끊김 · MPPM 클라).
+
+## 리스크
+- 반격 상태 CrossFade(0.05초) 때 해제·준비 클립 이벤트가 뒤늦게 울릴 수 있다 — `StopEffect` 는 꺼져 있으면 no-op 이라 무해, 단 GuardEnd 의 `PlayEffect` Release 가 막아냄과 겹칠 수 있음(제작 때 확인, 필요하면 Release 를 Block 에 묻힘).
+- 원격 오너는 NetworkAnimator 동기로 반격 상태가 다시 들어가 Counter 클립 이벤트가 두 번 울릴 수 있다(모델 주석) — 원샷 2번 가능성, MPPM 에서 확인.
+- 결계 3레이어 겹침은 화면을 가릴 수 있다 — 기본은 옅게, 덜어내기 전제.
+- 클립 이벤트는 같은 클립을 쓰는 다른 프리팹에선 Id 가 없으면 조용히 무시(현재 팔라딘 컨트롤러만).
+
+---
+
+# ▶▶▶ 계획 = **팔라딘 우클릭(단죄의 방패) 연출 — 충격파는 간파 성공 때만 · 판정 전 방패 기 모으기** (2026-10-26 · grill 확정 · ✅ 승인 · ✅ MyProject 제작 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-26, Q1~Q7 전부 추천안). 판정·피해·네트워크 무변경. 은희 영역(Player) 스크립트·클립은 **연출 배선만** → handoff.
+
+## 사실
+- 충격파 `FX_ShieldWave_Entry` = `Player_Paladin.prefab` `VFX/ShieldInterrupt/ShieldWave`(EffectSocketPlayer) ← `PlayerShieldVfx.ServerInterruptWave()`(서버 → 전 피어 RPC) ← `FirstMeleeInterruptSkill.OnInterruptResolutionCompleted` 에서 **적중 1건 이상이면**(`resolvedCount > 0`) 재생 — 간파 창 없는 대상·상자도 포함.
+- 간파 성공 판정은 이미 있다: `PlayerInterruptSkillBase.ResolveHit` 가 카운터 창 소비(23호·중간보스·허수아비 `ServerInterruptSuccessCount` 증가)를 세고, 성공 시 정적 이벤트 `ServerInterruptSucceeded(owner, skill)` 를 **판정 1회에 한 번** 쏜다(`OnInterruptResolutionCompleted` 보다 먼저, 같은 프레임).
+- `ServerInterruptWave` 는 E(`FirstMeleeSubSkill`) 반격도 쓴다.
+- `Garen_Parry.anim`(git, 팔라딘 전용 컨트롤러만 사용): 0초 시작 · **0.333초 Hit(판정)** · 0.6초 End · 길이 1.17초. (커밋본 `5ecc21df` 는 Hit 0.25 — 0.333 은 작업 전부터 있던 로컬 변경, 10-26 민경 판단으로 유지·같이 커밋) 판정은 서버 전용이라 클라 코드는 판정 순간을 모른다. 클립 이벤트(`EffectAnimEvents` 의 `StartEffect`/`StopEffect`)는 전 피어에서 각자 울린다 — 어쌔신 클립 선례.
+- 기존 우클릭 연출: 방패 문양 발광 + 금색 `FX_ShieldGlow` 루프(스킬 내내, 소켓 `4933595309215177818`).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 간파 성공(Q1-A) | 카운터 창을 실제로 소비한 경우만(= `ServerInterruptSucceeded`). 여러 대상 성공해도 1회 |
+| 실패·적중만(Q2-A) | 추가 연출 없음 — 모으던 기만 사라짐 |
+| E 반격(Q3-A) | 그대로(반격 판정마다 충격파) |
+| 배선 ① 충격파 | `FirstMeleeInterruptSkill` 이 `ServerInterruptSucceeded` 를 구독해 **자기 시전일 때만** `shieldVfx.ServerInterruptWave()`. 기존 `resolvedCount > 0` 호출 삭제. 부모 클래스(`PlayerInterruptSkillBase`)는 무변경 |
+| 배선 ② 기 모으기(Q4-A) | `Garen_Parry.anim` 에 이벤트 2개 추가 — 0초 `StartEffect("ShieldCharge")` · 0.333초(Hit 와 같은 시각) `StopEffect("ShieldCharge")`. 공격 속도·클립 수정에 자동으로 따라감 |
+| 취소 안전 | 판정 전에 끊기면(경직·사망·취소) Stop 이벤트가 안 온다 → `FirstMeleeInterruptSkill.OnEnd` 에서도 끈다(새 칸 `chargeLoop`) + 소켓 safetyTimeout 1초 |
+| ShieldGlow(Q5-A) | 그대로(스킬 끝까지). 기 모으기는 판정 전까지 위에 겹침 |
+| 모양·색(Q6-A) | 방패 주변 금색 빛 입자가 방패 중심으로 빨려 들어가고 중심 빛이 점점 커짐(약 0.33초). 기존 우클릭 금색 |
+| 위치 | 새 `VFX/ShieldInterrupt/ShieldCharge`(EffectSocketPlayer, Id `ShieldCharge`) — 소켓은 ShieldGlow 와 같은 방패 소켓 |
+| 제작(Q7-B) | MyProject 에서 방패 대역 미리보기와 함께 → MainProject import(`50.Art/VFX/Common/Players/Player1/RightClickSkill/FX_ShieldCharge`·Entry) |
+
+## 작업 순서
+1. MyProject: `FX_ShieldCharge` 프리팹 + 미리보기(방패 대역, 키로 0.33초 재생·반복) → 민경 확인.
+2. MainProject(🔴 Unity 닫고): 에셋 import · `Player_Paladin.prefab` 에 `ShieldCharge` 소켓 + 스킬 `chargeLoop` 연결 · `Garen_Parry.anim` 이벤트 2개 · `FirstMeleeInterruptSkill` 충격파 조건 변경.
+3. 컴파일 0 · handoff `Docs/tech/handoff-paladin-interrupt-vfx.md`(은희) · 민경 Play(허수아비 간파 성공/실패, 일반 몹, 공격 속도 버프).
+
+## 리스크
+- 정적 이벤트 구독은 시전자 비교(`skill == this`)를 빠뜨리면 다른 팔라딘의 성공에도 터진다 — 반드시 비교.
+- 클립 이벤트는 같은 클립을 쓰는 다른 프리팹에서 Id 를 못 찾으면 조용히 무시된다(현재 팔라딘 컨트롤러만 사용).
+
+---
+
 # ▶▶▶ 계획 = **23호 전기 장판 VFX — 예고 스파크 · 발동 천둥 번개 · 잔광 · 피격 감전 원샷 · 즉사(번개 모양만 다르게)** (2026-10-23 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject import·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-23 — Q4 = B·C 둘 다 제작 후 Play 로 선택, Q11 = MyProject 미리보기만, 나머지 추천안).

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEditor;
@@ -1655,8 +1656,19 @@ public static class AssassinShellAuthoring
         dagger.transform.localRotation = fbx.transform.localRotation;
         float scale = AssassinHairAuthoring.ImportScale();
         dagger.transform.localScale = Vector3.one * scale;
+        string side = handBoneName == "RightHand" ? "R" : "L";
+        var daggerMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/3.Materials/FlatKit/Player/Assassin/FK_Assassin_Dagger_" + side + ".mat");
+        var paintedMesh = AssetDatabase.LoadAllAssetsAtPath("Assets/50.Art/Char/Weapons/Handpainted_20261026/Models/Assassin_Dagger_" + side + "_Textured_v01.fbx").OfType<Mesh>().FirstOrDefault();
+        var bladeGlow = AssetDatabase.LoadAssetAtPath<Material>("Assets/3.Materials/FlatKit/Player/WeaponOverlays/Dagger_Blade_Glow_UV1.mat");
         foreach (Renderer renderer in dagger.GetComponentsInChildren<Renderer>(true))
-            renderer.sharedMaterial = material;
+        {
+            if (daggerMaterial != null && paintedMesh != null && bladeGlow != null)
+            {
+                renderer.GetComponent<MeshFilter>().sharedMesh = paintedMesh;
+                renderer.sharedMaterials = new[] { daggerMaterial, bladeGlow };
+            }
+            else renderer.sharedMaterial = material;
+        }
         Debug.Log($"{Tag} 단검 부착: {handBoneName}/{fbx.name} ({material.name} · 배율 {scale})");
     }
 

@@ -8,10 +8,10 @@ using UnityEngine;
 ///
 /// | Variant | 덮는 값 |
 /// |---|---|
-/// | FK_Paladin_Sword_Toon · FK_Paladin_Shield_Toon (기존 guid 유지 — 프리팹 참조 그대로) | Base Map 없음 + 금속 틴트(텍스처가 없다) |
+/// | FK_Paladin_Sword_Toon · FK_Paladin_Shield_Toon (기존 guid 유지) | 무기별 Base Map/틴트를 보존 |
 /// | Gunner/FK_Gunner_Body (신규) | Base Map = Gunner_BaseColor_4K |
 /// | Gunner/FK_LaserGun (신규) | Base Map = LaserGun_BaseColor_Toon |
-/// | Assassin/FK_Assassin_Body (10-17, PLAN-assassin §9 V2) | Base Map = Assassin_BaseColor — 머리·몸·단검 L/R 공용(단검도 같은 아틀라스) |
+/// | Assassin/FK_Assassin_Body | Base Map = Assassin_BaseColor — 머리·몸 전용. 단검은 별도 좌우 재질(10-26) |
 ///
 /// 그리고 Gunner_Armature 의 ToonLit 슬롯(Gunner_Toon · LaserGun_Toon)과 Assassin_Armature 의 ToonLit 슬롯(Assassin_Toon —
 /// HeadNeck 2 · SourceBody 1 · 단검 L/R 1씩 = 5개)을 위 Variant 로 바꾼다. 단검 루트 배율(1.25)은 여기서 다루지 않는다.
@@ -30,7 +30,7 @@ static class FlatKitPlayerVariants
     const string AssassinDir = Root + "/Assassin";
     const string AssassinArmature = "Assets/2.Prefabs/Player/Assassin/Assassin_Armature.prefab";
     const string AssassinBodyTex = "Assets/50.Art/Char/assassin/Textures/Assassin_BaseColor.png";
-    const int AssassinSlotCount = 5; // HeadNeck 2(Head·Face 서브메시) · SourceBody 1 · 단검 L/R 1씩 — v18g 임포트 실측(10-17)
+    const int AssassinSlotCount = 3; // HeadNeck 2 · SourceBody 1. 좌우 단검 전용 재질은 제외(10-26).
 
     static readonly string[] LegacyMats =
     {
@@ -45,13 +45,13 @@ static class FlatKitPlayerVariants
         if (parent == null) { Debug.LogError($"[PlayerVariants] 부모 없음: {ParentPath}"); return; }
         if (parent.parent != null) { Debug.LogError("[PlayerVariants] 부모가 Variant 다 — 부모는 최상위여야 한다."); return; }
 
-        // 무기 — 기존 머티리얼을 그 자리에서 Variant 로(guid 유지). 텍스처가 없어 틴트만 덮는다.
+        // 무기 — 기존 GUID와 무기별 텍스처/틴트를 유지한다.
         foreach (string w in new[] { "FK_Paladin_Sword_Toon.mat", "FK_Paladin_Shield_Toon.mat" })
         {
             var m = AssetDatabase.LoadAssetAtPath<Material>($"{Root}/{w}");
             if (m == null) { Debug.LogWarning($"[PlayerVariants] 없음: {w}"); continue; }
             Color tint = m.GetColor("_BaseColor");
-            MakeVariant(m, parent, null, tint);
+            MakeVariant(m, parent, m.GetTexture("_BaseMap") as Texture2D, tint);
         }
 
         // 거너 — 신규 Variant.
@@ -132,8 +132,7 @@ static class FlatKitPlayerVariants
         Debug.Log($"[PlayerVariants] {GunnerArmature} — 슬롯 {swapped}개 교체");
     }
 
-    // Assassin_Armature: ToonLit(Assassin_Toon) 슬롯을 전부 Flat Kit Variant 로 — 몸·얼굴 서브메시·단검 L/R 이 한 아틀라스를 쓴다.
-    // 이미 바뀐 슬롯은 이름이 달라 건너뛴다(재실행 안전). 끝나고 Variant 를 쓰는 슬롯 수가 기대(5)와 다르면 알린다.
+    // 이미 분리된 단검 재질은 이름이 달라 보존된다. 몸·얼굴의 몸 재질 사용 슬롯은 3개다.
     static void AssignAssassin(Material body)
     {
         GameObject root = PrefabUtility.LoadPrefabContents(AssassinArmature);

@@ -8,6 +8,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## 작업 세션 (2026-10-26 · 무기 베이스컬러)
+- 팔라딘 검·방패 v02와 어쎄신 좌우 단검 v01을 실제 스폰 프리팹에 연결. 기존 소켓·Transform 보존, 발광은 UV1 복사본, 프리팹/재질 검사 11개 통과. 아트 SVN r527 · [전달 문서](Docs/tech/handoff-weapon-basecolors-20261026.md).
+
 ## ▶▶ 반영 (2026-10-25 · 아트(Claude+Codex)) — **타이틀 카메라 구도·라이팅·반사 프로브·심도**, 브랜치 `feature/Title-look` → `development` · 상세 [handoff-title-look.md](Docs/tech/handoff-title-look.md)
 - 1.TitleScene: VCam_Far·VCam_Near 구도, TitleOffice 라이트 3개·반사 프로브 세기 0.3(씬 오버라이드), 재베이크. `GlobalVolumeProfile` DoF 20 m·F4·65 mm(아트 씬과 공유).
 - 🔴 알려진 문제 2건(프로그래머): Play 뒤 저장하면 타이틀 카메라 3대 AA 가 SMAA 로 바뀜(`GraphicsQualityConfig` 훅) · 모니터 화면이 깊이 텍스처에 없음(DoF 20 m 는 이 상태 기준).
@@ -30,6 +33,14 @@ Update this file when a term becomes important enough that future agents or team
 - 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
 - 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
 - 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+## ▶▶ 작업 세션 (2026-10-26 · 민경(Claude) · **팔라딘 E(수호자의 의지) 연출 — 상태 클립별 VFX 7종**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject import·배선(배치 컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play
+- 은희 영역 연출 배선만: `FirstMeleeSubSkill`(임시 반격 충격파 `ServerInterruptWave` 삭제 · `shieldGlow`·`barrierLoop`·`auraLoop`·`chargeLoop` · OnClientPlay/OnEnd) · `Garen_E_GuardStart`·`GuardEnd`·`GuardCounter.anim` 이벤트 · `Player_Paladin.prefab` `VFX/GuardianWill` 소켓 7. 공유 → [handoff-paladin-guardian-will-vfx.md](Docs/tech/handoff-paladin-guardian-will-vfx.md)
+- 에셋 SVN add 필요: `ESkill/FX_GuardianWill_*` 7 + `_Entry` 7 · 새 폴더 `_Materials/Player1`(23) · `Textures/Player1`(11) · `Models/Player1`(6)
+
+## ▶▶ 작업 세션 (2026-10-26 · 민경(Claude) · **팔라딘 우클릭 연출 — 충격파 간파 성공 때만 · 방패 기 모으기**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현·배선(미커밋) · ⏳ 민경 Play
+- 은희 영역 연출 배선만: `FirstMeleeInterruptSkill`(충격파 = `ServerInterruptSucceeded` 자기 시전만 · `chargeLoop`) · `Garen_Parry.anim` 이벤트 2개 · `Player_Paladin.prefab` `ShieldCharge` 소켓. 공유 → [handoff-paladin-interrupt-vfx.md](Docs/tech/handoff-paladin-interrupt-vfx.md)
+- 에셋 SVN add 필요: `RightClickSkill/FX_ShieldCharge`·`_Entry` · `_Materials/M_ShieldCharge_*` 3
+
 ## ▶▶ 작업 세션 (2026-10-23 · 민경(Claude) · **23호 전기 장판 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현·배선(미커밋) · ⏳ 민경 Play
 - 경석 영역 추가만: `BossElectricFloor` 클라 이벤트 3개 · `FloorFireClientRpc` 에 `bool lethal`(연출용 — 호스트·클라 같은 빌드) · `TwentyThree.prefab` `VFX` 에 `BossElectricFloorVfx`. 공유 → [handoff-boss-electric-floor-vfx.md](Docs/tech/handoff-boss-electric-floor-vfx.md)
 - 에셋 SVN add 필요: `50.Art/VFX/Common/Boss/ElectricFloor/` · `_Materials/Boss/M_Floor_*` 8 · `Textures/T_Floor*` 4
