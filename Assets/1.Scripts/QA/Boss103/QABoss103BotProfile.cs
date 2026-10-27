@@ -87,6 +87,8 @@ public static class QABoss103Bot
         Dodge = 4,
         /// <summary>C3 간파 성공/실패 굴림(창 1개 1회).</summary>
         Counter = 5,
+        /// <summary>할 일 119 C2 툴팁 규칙 E 사용 굴림(<c>QABoss103CombatBot.Rules.cs</c>) — Q·R 굴림 순서를 밀지 않게 따로.</summary>
+        Rule = 6,
     }
 
     /// <summary>봇 RNG 시드 = 판 시드 × 자리(0 팔라딘·1 어쌔신·2 거너) × 용도. 같은 값 = 같은 굴림 순서.</summary>
@@ -236,6 +238,13 @@ public sealed class QABoss103StuckDetector
     public int Side { get; private set; } = -1;
 
     public bool IsSidestepping(double now) => now < _sidestepUntil;
+
+    /// <summary>할 일 119 — 처음으로(옆걸음 중이면 멈춘다). 벽 끼임 재배치 뒤 같은 끼임을 다시 세지 않게.</summary>
+    public void Reset()
+    {
+        _tracking = false;
+        _sidestepUntil = double.NegativeInfinity;
+    }
 
     /// <summary>
     /// 매 틱. <paramref name="wantsMove"/> = 이동 입력을 넣으려는 중(옆걸음 중이면 무시). 새로 끼였으면 true(옆걸음 시작).

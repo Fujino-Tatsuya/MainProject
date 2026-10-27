@@ -250,7 +250,7 @@ public static partial class QALobbyScenarios
                 break;
             Player me = Player.LocalPlayer;
             if (QALobbyFlow.InLobby && me != null && zone != null && zone.IsSpawned && !zone.ContainsPoint(me.transform.position))
-                yield return QALobbyFlow.WalkTo(ctx.Input, spot, 0.3f, 15f);
+                yield return WalkRoute103(ctx, slot, spot);
             else
                 yield return null;
 
@@ -271,6 +271,112 @@ public static partial class QALobbyScenarios
 
     /// <summary>출격 집결부터 맵 플레이어까지 상한(초) — 다른 인스턴스 걸음·5초 집결·로딩 포함.</summary>
     private const float SortieMapTimeoutSeconds = 180f;
+
+    /// <summary>
+    /// 119 C5 — 지금 자리에서 <paramref name="goal"/> 까지 씬 기준점(<see cref="WalkAnchors103"/>)을 경유해 걷는다(<see cref="QABoss103Plan.WalkRoute"/>).
+    /// 직선이 열려 있으면 직선, 길이 없으면 직선(이전 동작). 경유 걸음이 닿지 못하면 멈추고 호출자 루프가 지금 자리에서 다시 경로를 잡는다.
+    /// </summary>
+    private static IEnumerator WalkRoute103(QAScenarioContext ctx, int slot, Vector3 goal)
+    {
+        Player me = Player.LocalPlayer;
+        if (me == null)
+            yield break;
+        var nodes = new List<Vector3> { me.transform.position };
+        foreach (Vector3 a in WalkAnchors103())
+            if (Mathf.Abs(a.y - me.transform.position.y) <= WalkAnchorMaxRise)
+                nodes.Add(a);
+        nodes.Add(goal);
+        List<int> route = QABoss103Plan.WalkRoute(nodes.Count, (a, b) => WalkClear103(nodes[a], nodes[b]), (a, b) => PlanarDistance103(nodes[a], nodes[b]));
+
+        var sb = new StringBuilder();
+        if (route != null)
+            foreach (int i in route)
+                sb.Append(sb.Length > 0 ? ">" : "").Append(QABossStart88.Fmt(nodes[i]));
+        Debug.Log($"{QABoss103Plan.Tag} event=sortie_route slot={slot} from={QABoss103Plan.Token(QABossStart88.Fmt(nodes[0]))} anchors={nodes.Count - 2} route={(route != null ? QABoss103Plan.Token(sb.ToString()) : "none")}");
+        if (route == null)
+        {
+            yield return QALobbyFlow.WalkTo(ctx.Input, goal, 0.3f, 15f);
+            yield break;
+        }
+        for (int k = 0; k < route.Count; k++)
+        {
+            bool last = k == route.Count - 1;
+            Vector3 p = nodes[route[k]];
+            p.y = me.transform.position.y;
+            yield return QALobbyFlow.WalkTo(ctx.Input, p, last ? 0.3f : 0.5f, 15f);
+            if (!QALobbyFlow.LastWalkArrived)
+            {
+                Debug.Log($"{QABoss103Plan.Tag} event=sortie_route_stuck slot={slot} leg={k + 1}/{route.Count} at={QABoss103Plan.Token(Player.LocalPlayer != null ? QABossStart88.Fmt(Player.LocalPlayer.transform.position) : "na")}");
+                yield break;
+            }
+        }
+    }
+
+    /// <summary>경유점으로 쓰는 기준점의 내 발 높이 차 상한(m) — 계단 위(포드 데크) 점은 평면 걸음에서 뺀다.</summary>
+    private const float WalkAnchorMaxRise = 0.5f;
+
+    /// <summary>
+    /// 로비 걸음 경유 기준점 — 스폰 지점·출격 패드(SortieStation)·포드 발사 걷기 시작 지점(walkSlots start·entryPath)·공용 경로점(walkPath).
+    /// 좌표를 하드코딩하지 않고 씬에서 읽는다(레이아웃이 바뀌어도 열린 길을 다시 찾는다).
+    /// </summary>
+    private static List<Vector3> WalkAnchors103()
+    {
+        var list = new List<Vector3>();
+        void Add(Transform t)
+        {
+            if (t != null)
+                list.Add(t.position);
+        }
+        Transform[] spawns = QALobbyFlow.LobbySpawnPoints();
+        if (spawns != null)
+            foreach (Transform t in spawns)
+                Add(t);
+        GameObject station = GameObject.Find("SortieStation");
+        if (station != null)
+            Add(station.transform);
+        LobbyPodLaunch pod = Object.FindFirstObjectByType<LobbyPodLaunch>();
+        if (pod != null)
+        {
+            foreach (LobbyPodLaunch.WalkSlot s in pod.EditorWalkSlots)
+                if (s != null)
+                {
+                    Add(s.start);
+                    if (s.entryPath != null)
+                        foreach (Transform t in s.entryPath)
+                            Add(t);
+                }
+            foreach (Transform t in pod.EditorWalkPath)
+                Add(t);
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// 두 점 사이 평면 걸음이 Wall/Env 에 막히지 않는가 — 무릎 높이 구 캐스트(플레이어 캡슐 반경 0.38 + 여유 → 0.45).
+    /// 출발점이 벽에 붙어 있으면 구가 처음부터 겹쳐 그 벽을 못 보므로(SphereCast 는 시작 겹침을 무시) 그때만 작은 구(0.3)로 본다.
+    /// </summary>
+    private static bool WalkClear103(Vector3 a, Vector3 b)
+    {
+        Vector3 d = b - a;
+        d.y = 0f;
+        float len = d.magnitude;
+        if (len < 0.01f)
+            return true;
+        int mask = LayerMask.GetMask("Wall", "Env");
+        Vector3 origin = new Vector3(a.x, a.y + 0.6f, a.z);
+        float radius = Physics.CheckSphere(origin, WalkCastRadius, mask, QueryTriggerInteraction.Ignore) ? WalkCastRadiusHugging : WalkCastRadius;
+        return !Physics.SphereCast(origin, radius, d / len, out _, len, mask, QueryTriggerInteraction.Ignore);
+    }
+
+    private const float WalkCastRadius = 0.45f;
+    private const float WalkCastRadiusHugging = 0.3f;
+
+    private static float PlanarDistance103(Vector3 a, Vector3 b)
+    {
+        a.y = 0f;
+        b.y = 0f;
+        return Vector3.Distance(a, b);
+    }
 
     private static readonly System.Reflection.FieldInfo SortieZoneField =
         typeof(LobbyTrainingDirector).GetField("sortieZone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
