@@ -40,6 +40,9 @@ public sealed class QABoss103Recorder : MonoBehaviour
 
     private readonly Dictionary<ulong, int> _slotOf = new Dictionary<ulong, int>();
     private readonly Dictionary<Player, Action<PlayerAttackLanded>> _landed = new Dictionary<Player, Action<PlayerAttackLanded>>();
+    private readonly Dictionary<PlayerReviveController, Action<int>> _revived = new Dictionary<PlayerReviveController, Action<int>>();
+    /// <summary>할 일 119 — Soul → Alive 순간(목숨 차감 직전)의 공용 목숨. 부활 완료 이벤트의 남은 목숨과 빼서 이번 부활이 쓴 목숨을 잰다.</summary>
+    private readonly Dictionary<ulong, int> _livesAtRevive = new Dictionary<ulong, int>();
     private readonly AssassinState[] _assassin = new AssassinState[3];
     private readonly List<string> _frames = new List<string>(32);
     private readonly List<QABoss103GimmickEvent> _eventGimmicks = new List<QABoss103GimmickEvent>();
@@ -119,6 +122,10 @@ public sealed class QABoss103Recorder : MonoBehaviour
             if (kv.Key != null)
                 kv.Key.ServerAttackLanded -= kv.Value;
         _landed.Clear();
+        foreach (KeyValuePair<PlayerReviveController, Action<int>> kv in _revived)
+            if (kv.Key != null)
+                kv.Key.ServerReviveCompleted -= kv.Value;
+        _revived.Clear();
         if (_boss != null)
             _boss.ClientDamagedAttributed -= OnBossAttributed;
         if (_rule != null)
@@ -138,6 +145,14 @@ public sealed class QABoss103Recorder : MonoBehaviour
             _landed[p] = h;
             if (slot >= 0 && slot < _assassin.Length)
                 _assassin[slot] = p.GetComponent<AssassinState>();
+            PlayerReviveController revive = p.GetComponent<PlayerReviveController>();
+            if (revive != null && !_revived.ContainsKey(revive))
+            {
+                ulong id = p.OwnerClientId;
+                Action<int> r = left => OnRevived(id, left);
+                revive.ServerReviveCompleted += r;
+                _revived[revive] = r;
+            }
         }
 
         if (_boss == null)
@@ -229,8 +244,29 @@ public sealed class QABoss103Recorder : MonoBehaviour
             return;
         if (previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
             Stats.Death(SlotOf(clientId), Now);
+        // 부활(TryCompleteReviveOnServer)은 Alive 전환 → 목숨 차감 → ServerReviveCompleted 순서다. 차감 전 값을 여기서 잡는다.
+        if (previous == PlayerLifeState.Soul && current == PlayerLifeState.Alive)
+            _livesAtRevive[clientId] = _rule != null ? _rule.PartyLives : -1;
         if (previous != current)
             Activity.Note("life_" + current);
+    }
+
+    /// <summary>
+    /// 할 일 119 — [서버] 부활 완료(봇의 F10 요청 → <see cref="PlayerReviveController.TryCompleteReviveOnServer()"/>). 캐릭터별 부활 수 + 이번 부활이 쓴 공용 목숨.
+    /// F10 경로는 목숨 1 을 쓰고 0 이면 거부한다 — 1 이 아니면 runs.csv note 로 드러낸다(QA 가 목숨을 고치지는 않는다).
+    /// </summary>
+    private void OnRevived(ulong clientId, int livesLeft)
+    {
+        if (_stopped)
+            return;
+        int before = _livesAtRevive.TryGetValue(clientId, out int b) ? b : -1;
+        _livesAtRevive.Remove(clientId);
+        int used = before >= 0 ? before - livesLeft : -1;
+        int slot = SlotOf(clientId);
+        Stats.QaRevive(slot, used);
+        Debug.Log($"{Tag} event=qa_revive path=f10 character={(slot >= 0 ? QABoss103Plan.CharacterForSlot(slot).ToString() : "na")} client={clientId} " +
+                  $"livesBefore={(before >= 0 ? before.ToString() : "na")} livesLeft={livesLeft} livesUsed={(used >= 0 ? used.ToString() : "na")}" +
+                  (used >= 0 && used != 1 ? " note=" + QABoss103RunStats.ReviveLifeMismatchNote : ""));
     }
 
     private void OnLives(int lives)

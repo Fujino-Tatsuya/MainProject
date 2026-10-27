@@ -17,10 +17,11 @@ using UnityEngine.SceneManagement;
 /// <item>[서버] G10 까지 개방(<see cref="TutorialDebugActions.OpenGatesThrough"/> — 88·P572 와 같은 진입) → 파티 3명을 복도4 보스 진입 발판(<see cref="BossEnterTrigger"/>) 안에
 ///   일렬로 옮긴다(<see cref="PlayerFallRecovery.RelocateServer"/>). 봇은 움직이지 않는다 → 게임의 집결 판정(전원 발판 5초)이 엘리베이터를 연다.</item>
 /// <item>엘리베이터 → 23호 등장 연출(연출 잠금) → 각 인스턴스 봇이 Space 홀드 스킵 → <see cref="BossEncounterPhase.Combat"/> 진입 시각 기록.</item>
-/// <item>[서버] 판 종료 판정(<see cref="QABoss103Plan.Judge"/>): 보스 처치 = 클리어 / 공용 목숨 0 전멸(<see cref="PartyWipeRespawner.PartyWipeRespawned"/>,
+/// <item>[서버] 판 종료 판정(<see cref="QABoss103EndSignals"/> → <see cref="QABoss103Plan.Judge"/>): 보스 처치 = 클리어(할 일 119 — 보스 <see cref="Unit.Died"/> 이벤트 또는
+///   <see cref="BossEncounterDirector.IsBossDefeatedServer"/>, 한 번 켜지면 유지) / 공용 목숨 0 전멸(<see cref="PartyWipeRespawner.PartyWipeRespawned"/>,
 ///   리스폰 대상이 아니라 결과 화면으로 가면 씬 이탈) = 실패 / Combat 부터 30분 = 시간초과(C7g — 목숨 0·보스 HP 5분 불변이면 조기 시간초과,
-///   <see cref="QABoss103EarlyTimeout"/>). 판 기록 → <see cref="LastRecord"/> + 로그 1줄.
-///   판 동안 QA 자동 부활(<see cref="QABoss103AutoRevive"/>, C7b) — Soul 3초 뒤 정식 부활(목숨 1 차감), 목숨 0 이면 Soul 그대로 → 전멸.</item>
+///   <see cref="QABoss103EarlyTimeout"/>). 판 기록(판정 출처 <see cref="QABoss103RunRecord.OutcomeSource"/>) → <see cref="LastRecord"/> + 로그 1줄.
+///   부활(할 일 119) = 각 인스턴스 봇이 Soul 3초 뒤 F10 디버그 부활과 같은 RPC(<c>QABoss103CombatBot.Recovery.cs</c>) — 게임이 목숨 1 차감·0 이면 거부 → 전멸.</item>
 /// </list>
 /// 88 의 체력 채우기·어그로 강제·보스 타이머 정지·QA 슈퍼아머는 켜지 않는다(혹시 남아 있으면 시작 때 해제).
 /// </summary>
@@ -122,11 +123,12 @@ public static class QABoss103Match
             if (characters.TryGetValue(c.ClientId, out QABoss103Character ch))
                 rec.AddTrait(ch, c.Trait != null ? c.Trait.Id : $"#{c.TraitIndex}");
         };
-        bool wiped = false;
-        Action<IReadOnlyList<ulong>> onWipe = _ => wiped = true;
+        var signals = new QABoss103EndSignals();
+        Action<IReadOnlyList<ulong>> onWipe = _ => signals.OnWipe();
+        Action onBossDied = signals.OnBossDied;
+        Unit bossUnit = null;
         TutorialTraitDirector traits = null;
         QABoss103Recorder recorder = null;
-        QABoss103AutoRevive autoRevive = null;
         double bossHpPct = double.NaN;
         try
         {
@@ -226,9 +228,8 @@ public static class QABoss103Match
             }
             double combatStart = Time.realtimeSinceStartupAsDouble;
             QABoss103Heartbeat.MarkCombat();
-            recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터
-            autoRevive = QABoss103AutoRevive.Begin(characters, recorder.Stats);   // C7b — 보스전엔 게임 부활 수단이 없다
-            QABoss103Relocator.Begin(characters, recorder.Stats);   // C7d — 20초 끼임 → 보스 둘레 링 지점
+            recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터(F10 부활 집계 포함, 할 일 119)
+            QABoss103Relocator.Begin(characters, recorder.Stats, rec.RunSeed);   // C7d 20초 끼임 → 가장 가까운 링 지점 · 119 벽 끼임 → 무작위 링 지점
             string combatWall = DateTime.Now.ToString("HH:mm:ss.fff");
             Debug.Log($"{Tag} event=combat_start at={combatWall} introS={Time.realtimeSinceStartup - introAt:F1} skip={SkipVotes()} hostSkipPath={bot.SkipPath} hostSawLock={bot.SawCinematicLock}");
             ctx.Check(bot.SawCinematicLock, "103 연출 중 연출 잠금", $"호스트 플레이어 PlayerEncounterLock.IsCinematicLocked 관측={bot.SawCinematicLock}");
@@ -236,6 +237,11 @@ public static class QABoss103Match
 
             // 4) 판 종료 판정.
             PartyWipeRespawner.PartyWipeRespawned += onWipe;
+            // 할 일 119 — 클리어 = 게임의 실제 사망 신호(보스 Unit.Died, 서버). 디렉터 클리어 확정과 함께 래치에 모은다.
+            bossUnit = UnityEngine.Object.FindAnyObjectByType<TwentyThreeBoss>();
+            if (bossUnit != null)
+                bossUnit.Died += onBossDied;
+            Debug.Log($"{Tag} event=clear_watch bossDied={(bossUnit != null ? "subscribed" : "no_boss")} director={(BossEncounterDirector.Instance != null ? "ok" : "none")}");
             string mapScene = SceneManager.GetActiveScene().name;
             BossEncounterDirector director = BossEncounterDirector.Instance;
             var stall = new QABoss103StallWatch();
@@ -243,14 +249,14 @@ public static class QABoss103Match
             while (true)
             {
                 double elapsed = Time.realtimeSinceStartupAsDouble - combatStart;
-                bool bossDead = director != null && director.IsBossDefeatedServer;
-                bool leftMap = SceneManager.GetActiveScene().name != mapScene || director == null;
-                QABoss103Outcome outcome = QABoss103Plan.Judge(bossDead, wiped || (leftMap && !bossDead), elapsed);
+                signals.Poll(director != null && director.IsBossDefeatedServer, SceneManager.GetActiveScene().name != mapScene || director == null);
+                QABoss103Outcome outcome = signals.Judge(elapsed);
                 if (outcome == QABoss103Outcome.None && stall.Tick(elapsed, recorder.Activity.Count))
                 {
                     // C7d·C7f — 피해·사망/부활·목숨·기믹 진행·보스 HP 어느 것도 없는 교착(끼임·보스 대상 없음). 통계 제외 → 끝에서 1회 재실행.
                     rec.Outcome = QABoss103Outcome.Error;
                     rec.CombatSeconds = elapsed;
+                    rec.OutcomeSource = QABoss103Batch.ReasonStall;
                     rec.Detail = $"{QABoss103Batch.ReasonStall} — Combat 중 {QABoss103StallWatch.StallSeconds:0}초 동안 전투 활동 0(마지막 {recorder.Activity.LastKind})";
                     Debug.LogWarning($"{Tag} event=stall combatS={elapsed:F1} quietS={stall.QuietSeconds(elapsed):F1} lastActivity={recorder.Activity.LastKind} " +
                                      $"activity={recorder.Activity.Count} dealt={recorder.Stats.DamageDealtTotal()} " +
@@ -262,6 +268,7 @@ public static class QABoss103Match
                     // C7g — 목숨 0 + 보스 HP 5분 불변(북진 교착) → 30분까지 가도 같은 Timeout. 통계는 일반 Timeout 과 같이, note 로 구분.
                     rec.Outcome = QABoss103Outcome.Timeout;
                     rec.CombatSeconds = elapsed;
+                    rec.OutcomeSource = QABoss103EarlyTimeout.Note;
                     rec.Detail = QABoss103EarlyTimeout.Note;
                     Debug.LogWarning($"{Tag} event=early_timeout combatS={elapsed:F1} flatS={early.FlatSeconds(elapsed):F1} lives={recorder.Stats.LivesNow} " +
                                      $"bossHp={recorder.BossHp} lastActivity={recorder.Activity.LastKind} {BossDiag()}");
@@ -271,20 +278,22 @@ public static class QABoss103Match
                 {
                     rec.Outcome = outcome;
                     rec.CombatSeconds = elapsed;
+                    rec.OutcomeSource = signals.Source(outcome);
                     rec.Detail = outcome == QABoss103Outcome.Wipe
-                        ? (wiped ? "전멸 리스폰(PartyWipeRespawned)" : $"맵 이탈(결과 화면 — 리스폰 대상 아님) scene={SceneManager.GetActiveScene().name}")
-                        : outcome == QABoss103Outcome.Clear ? "보스 처치(IsBossDefeatedServer)" : $"Combat 부터 {QABoss103Plan.CombatLimitSeconds / 60:0}분";
+                        ? (signals.Wiped ? "전멸 리스폰(PartyWipeRespawned)" : $"맵 이탈(결과 화면 — 리스폰 대상 아님) scene={SceneManager.GetActiveScene().name}")
+                        : outcome == QABoss103Outcome.Clear ? $"보스 처치({rec.OutcomeSource})" : $"Combat 부터 {QABoss103Plan.CombatLimitSeconds / 60:0}분";
+                    Debug.Log($"{Tag} event=run_judge outcome={outcome} source={rec.OutcomeSource} combatS={elapsed:F1} bossDied={B(signals.BossDied)} " +
+                              $"directorDefeated={B(signals.DirectorDefeated)} wiped={B(signals.Wiped)} leftMap={B(signals.LeftMap)} {BossDiag()}");
                     break;
                 }
                 yield return null;
             }
-            autoRevive.Stop();
             QABoss103Relocator.Stop();
             bossHpPct = recorder.Stop();
             QABoss103Heartbeat.SetPhase("end");
 
             // 전멸 리스폰 뒤 특성 초기화 팝업 — 호스트 봇도 '아니오' 를 보낼 시간을 준다.
-            if (rec.Outcome == QABoss103Outcome.Wipe && wiped)
+            if (rec.Outcome == QABoss103Outcome.Wipe && signals.Wiped)
             {
                 int before = bot.ResetAnswers;
                 yield return ctx.Wait(() => bot == null || bot.ResetAnswers > before, ResetPromptWaitSeconds);
@@ -309,17 +318,14 @@ public static class QABoss103Match
         finally
         {
             PartyWipeRespawner.PartyWipeRespawned -= onWipe;
+            if (bossUnit != null)
+                bossUnit.Died -= onBossDied;
             if (traits != null)
                 traits.ServerTraitChosen -= onChosen;
             if (rec.Outcome == QABoss103Outcome.None)
             {
                 rec.Outcome = QABoss103Outcome.Aborted;
                 rec.Detail = "중단(시나리오 상한·예외·정지)";
-            }
-            if (autoRevive != null)
-            {
-                autoRevive.Stop();
-                UnityEngine.Object.Destroy(autoRevive.gameObject);
             }
             QABoss103Relocator.Stop();
             if (recorder != null && double.IsNaN(bossHpPct))
@@ -432,6 +438,8 @@ public static class QABoss103Match
         TwentyThreeBoss boss = UnityEngine.Object.FindAnyObjectByType<TwentyThreeBoss>();
         return boss == null ? "boss=none" : $"bossState={boss.State} aggroId={boss.AggroTargetId} bossHp={boss.CurrentHealth}";
     }
+
+    private static string B(bool v) => v ? "true" : "false";
 
     private static bool BossDeadSeen()
     {

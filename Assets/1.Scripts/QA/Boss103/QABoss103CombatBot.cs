@@ -11,6 +11,7 @@ using UnityEngine;
 ///   멈춰 있을 때만 평타(누르고 있음 — <see cref="QABoss103InputDriver.HoldBasic"/>)와 스킬을 쓴다.</item>
 /// <item>이동: 클라엔 NavMesh 가 없어 직선 이동 + 앞 바닥 레이캐스트(88 Approach 와 같은 낭떠러지 검사). 이동 중 2초 동안 0.3m 미만이면 옆걸음 0.8초(<see cref="QABoss103StuckDetector"/>).
 ///   C7d — 목표에 가까워지지 못한 채 6초면 뒤·옆 대시 탈출, 20초면 호스트 재배치 요청(<see cref="QABoss103StuckEscalation"/>·<see cref="QABoss103Relocator"/>).
+///   할 일 119 — 벽 속·보스방 경계 밖은 이 단계를 기다리지 않고 바로 무작위 링 지점 재배치(<c>QABoss103CombatBot.Recovery.cs</c>), Soul 이면 3초 뒤 F10 경로 부활 요청.
 ///   그 밖에 대시는 이동에 쓰지 않는다 — 회피 전용(C3, <c>QABoss103CombatBot.Evasion.cs</c>).</item>
 /// <item>스킬 = Q(Main)·R(Ultimate). 팔라딘 E(방어)·우클릭 간파·대시 회피는 C3 파일. 쿨이 돌면 프로필 확률로 굴리고 실패면 1초 뒤 다시(<see cref="QABoss103SkillGate"/>).
 ///   팔라딘 Q = 홀드(스킬이 끝날 때까지, 상한 <see cref="HoldCapSeconds"/>), 거너 Q = 정신 집중 → 최대 충전(<c>MaxChargeTime</c>) 뒤 좌클릭 발사,
@@ -107,6 +108,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
             _input.SetTarget(me);
         }
 
+        TickRevive(me);   // 할 일 119 — Soul 이면 싸우지 않는 동안에도 F10 경로 부활 요청
         string idle = IdleReason(me);
         if (idle != null)
         {
@@ -206,6 +208,12 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         double now = Time.realtimeSinceStartupAsDouble;
         TickEvasion(me, myPos, surface, now);
         TickCounter(me, myPos, surface, now);
+        // 할 일 119 — 벽 속·보스방 경계 밖이면 기다리지 않고 QA 재배치(무작위 링 지점). 요청한 틱은 입력을 넣지 않는다.
+        if (TickWall(me, myPos, now))
+        {
+            _driver.ReleaseBasic();
+            return;
+        }
         // C3b — 기믹(실드·드론 유도·송전탑)이 공격 대상을 고른다. 대시·방어 중에도 배정·로그는 돈다.
         AttackTarget tgt = TickGimmick(me, myPos, bossPos, surface, hittable, now);
         if (EvasionHoldsBot(now))
@@ -426,8 +434,15 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
     private void Steer(Player me, Vector3 myPos, Vector3 dir, double progress, double realNow)
     {
         double now = Time.timeAsDouble;
+        // 할 일 119 — 벽 끼임 감시가 보는 중·탈출 직후면 끼임 단계(옆걸음·대시·재배치)를 돌리지 않는다(같은 끼임에 복구 둘이 겹치지 않게).
+        bool wallBusy = WallBusy(realNow);
+        if (wallBusy)
+        {
+            _escalation.Reset();
+            _stuck.Reset();
+        }
         // C7d — 진척 없음 6초 = 대시 탈출, 20초 = 호스트 재배치(2초 옆걸음은 아래 그대로).
-        QABoss103StuckStep step = _escalation.Tick(now, progress, dir != Vector3.zero);
+        QABoss103StuckStep step = wallBusy ? QABoss103StuckStep.None : _escalation.Tick(now, progress, dir != Vector3.zero);
         if (step == QABoss103StuckStep.Relocate)
         {
             bool sent = QABoss103Relocator.Request();
@@ -437,7 +452,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         else if (step == QABoss103StuckStep.Dash && TryStuckDash(me, myPos, dir, realNow))
             return;
 
-        if (_stuck.Tick(now, myPos.x, myPos.z, dir != Vector3.zero))
+        if (!wallBusy && _stuck.Tick(now, myPos.x, myPos.z, dir != Vector3.zero))
         {
             QABoss103StuckDetector.SideDirection(dir.x, dir.z, _stuck.Side, out float sx, out float sz);
             _sidestepDir = new Vector3(sx, 0f, sz);
@@ -496,7 +511,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
                   $"surfM={F(SurfaceDistance(myPos, bossPos))} hittable={(_bossBody == null || _bossBody.enabled ? "true" : "false")} " +
                   $"attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} rejects={_castRejects} gunnerFires={_gunnerFires} " +
                   $"rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} stuck={_stuck.Escapes} {StuckDiag()} edgeBlocks={_edgeBlocks} " +
-                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()} {GimmickDiag()}");
+                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()} {GimmickDiag()} {RecoveryDiag()}");
     }
 
     private void OnDestroy()
@@ -513,7 +528,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
         Debug.Log($"{Tag} event=bot_combat_done character={_character} tier={_profile.Tier} attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} " +
                   $"transforms={_transforms} rejects={_castRejects} gunnerFires={_gunnerFires} rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} " +
-                  $"stuck={_stuck.Escapes} {StuckDiag()} edgeBlocks={_edgeBlocks} {EvasionDiag()} {GimmickDiag()}");
+                  $"stuck={_stuck.Escapes} {StuckDiag()} edgeBlocks={_edgeBlocks} {EvasionDiag()} {GimmickDiag()} {RecoveryDiag()}");
         ClosePart("destroy");
     }
 

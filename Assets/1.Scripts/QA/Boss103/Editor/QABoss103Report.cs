@@ -380,7 +380,10 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "git 커밋", $"{H(Val(batch, "git_commit", "na"))} ({H(Val(batch, "git_branch", "na"))}) · 판 기록 {H(commits.Count > 0 ? string.Join(", ", commits) : Dash)}");
         Row2(sb, "Unity", H(Val(batch, "unity_version", "na")));
         Row2(sb, "기준 시드", H(Val(batch, "seed", "na")) + " · 판 시드 = 기준 시드 × 판 번호(재실행도 같은 시드)");
-        Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
+        Row2(sb, "측정 규칙", "부활 = F10 디버그 부활 경로(Soul 3초 뒤 봇이 요청, 1회 = 공용 목숨 1, 목숨 0 이면 거부 → 전멸 · run_chars qa_revives). " +
+                             "할 일 119 이전 배치는 QA 서버 자동 부활(같은 지연·차감 + 부활 무적 2초)");
+        Row2(sb, "측정 규칙", "즉사 패턴(북진 압박 방전·④ 폐기 처분 대폭발 — 할 일 105 무적 무시)은 회피 굴림·대시 없음 → '즉사(굴림 없음)' 따로 집계(run_chars·run_patterns lethal_no_roll)");
+        Row2(sb, "측정 규칙", "벽 끼임 — 벽 속·보스방 경계 밖 0.25초면 보스 둘레 무작위 지점으로 즉시 재배치(run_chars qa_wall_escapes) · 판정 출처 runs.csv outcome_source");
         Row2(sb, "측정 규칙", "QA 끼임 복구 — 이동하려는데 목표에 못 다가간 채 2초 옆걸음 → 6초 뒤·옆 대시 → 20초 보스 둘레 링 지점으로 재배치(run_chars qa_relocates) · " +
                              "Combat 중 90초 동안 전투 활동(보스·탑 피해, 피격, 사망·부활, 공용 목숨, 기믹 진행, 보스 HP 변화)이 없으면 정체(stall) 오류 판");
         Row2(sb, "측정 규칙", "조기 시간초과: 공용 목숨 0 이고 보스 HP 5분 불변이면 Timeout 으로 처리(통계는 시간초과와 같이 집계 · 판 목록 note early_no_progress)");

@@ -194,6 +194,8 @@ public sealed class QABoss103RunRecord
     public double CombatSeconds = -1.0;
     /// <summary>판 종료 사유 상세(실패 단계·전멸 판정 출처 등).</summary>
     public string Detail = "";
+    /// <summary>할 일 119 — 판정 출처 토큰(<see cref="QABoss103EndSignals.Source"/> · stall · early_no_progress). runs.csv <c>outcome_source</c>.</summary>
+    public string OutcomeSource = "";
     /// <summary>이 판 봇 단계(C2 — 한 판의 봇 3명 공통). 프로필 값은 <see cref="QABoss103BotProfile.For"/>.</summary>
     public QABoss103BotTier BotTier = QABoss103BotTier.Normal;
     /// <summary>캐릭터 → 고른 특성 id(획득 순서).</summary>
@@ -233,7 +235,7 @@ public sealed class QABoss103RunRecord
     {
         string combat = CombatSeconds < 0.0 ? "na" : CombatSeconds.ToString("F1", CultureInfo.InvariantCulture);
         return $"{QABoss103Plan.Tag} event=run_end run={Run} outcome={Outcome} combatS={combat} seed={BaseSeed} runSeed={RunSeed} " +
-               $"botTier={BotTier} traits={TraitsToken()} detail={QABoss103Plan.Token(Detail)}";
+               $"botTier={BotTier} traits={TraitsToken()} source={QABoss103Plan.Token(OutcomeSource)} detail={QABoss103Plan.Token(Detail)}";
     }
 }
 

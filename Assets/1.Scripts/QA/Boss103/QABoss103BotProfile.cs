@@ -237,6 +237,13 @@ public sealed class QABoss103StuckDetector
 
     public bool IsSidestepping(double now) => now < _sidestepUntil;
 
+    /// <summary>할 일 119 — 처음으로(옆걸음 중이면 멈춘다). 벽 끼임 재배치 뒤 같은 끼임을 다시 세지 않게.</summary>
+    public void Reset()
+    {
+        _tracking = false;
+        _sidestepUntil = double.NegativeInfinity;
+    }
+
     /// <summary>
     /// 매 틱. <paramref name="wantsMove"/> = 이동 입력을 넣으려는 중(옆걸음 중이면 무시). 새로 끼였으면 true(옆걸음 시작).
     /// </summary>

@@ -163,6 +163,7 @@ public static class QABoss103RunCsv
             StartedAt = startedAt.ToString("yyyy-MM-dd HH:mm:ss"),
             EndedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             UnityVersion = Application.unityVersion,
+            OutcomeSource = rec.OutcomeSource,
         };
         if (rec.Outcome == QABoss103Outcome.Clear || rec.Outcome == QABoss103Outcome.Wipe || rec.Outcome == QABoss103Outcome.Timeout)
             m.Note = rec.Detail;
