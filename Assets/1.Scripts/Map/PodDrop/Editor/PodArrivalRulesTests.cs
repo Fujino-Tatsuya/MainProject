@@ -127,6 +127,32 @@ public sealed class PodArrivalRulesTests
         Assert.IsTrue(PodArrivalRules.ShouldPlayImpact(6.95, impactAt: 6.9, dissolveAt: 6.9, alreadyPlayed: false), "착지 = 디졸브 시작이어도 한 번 낸다");
     }
 
+    // ─── 해치 고정 → 열기 순서 (할 일 106) ─────────────────────────────
+
+    [Test]
+    public void HatchHold_ClosedUntilTouchdownThenOpens()
+    {
+        Assert.IsTrue(PodArrivalRules.ShouldHoldHatchClosed(started: false, elapsed: 0, touchdownAt: PodDropTimeline.NotYet), "시작 전(로딩 아래)");
+        Assert.IsTrue(PodArrivalRules.ShouldHoldHatchClosed(true, 3.0, PodDropTimeline.NotYet), "낙하·펴기 중(펴기 끝 이벤트 전 = 착지 +∞)");
+        Assert.IsTrue(PodArrivalRules.ShouldHoldHatchClosed(true, 6.49, 6.5), "착륙 중");
+        Assert.IsFalse(PodArrivalRules.ShouldHoldHatchClosed(true, 6.5, 6.5), "지면에 닿은 순간 = 열기 재생");
+        Assert.IsFalse(PodArrivalRules.ShouldHoldHatchClosed(true, 20.0, 6.5), "늦게 본 피어도 고정 안 함");
+    }
+
+    [Test]
+    public void HatchHold_EndsExactlyWhenOpenStarts()
+    {
+        var timeline = new PodDropMapTimeline(PodDropMapTimings.Default);
+        double deployed = timeline.HoverAt + 3.0;
+        double touchdown = timeline.TouchdownAt(deployed);
+        foreach (double t in new[] { 0.0, timeline.HoverAt, deployed, touchdown - 0.01, touchdown, touchdown + 1.0 })
+        {
+            bool held = PodArrivalRules.ShouldHoldHatchClosed(true, t, touchdown);
+            bool opening = t >= touchdown; // UpdatePodAnimation 의 열기 재생 조건
+            Assert.AreNotEqual(held, opening, $"t={t:0.##} 고정과 열기 재생은 겹치지도 비지도 않는다");
+        }
+    }
+
     // ─── 설정 기본값 ───────────────────────────────────────────────────
 
     [Test]

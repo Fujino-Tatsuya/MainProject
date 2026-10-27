@@ -482,6 +482,7 @@ public sealed class MapPodArrival : NetworkBehaviour
 
     // 착지 애니는 상태마다 자기 마스크 레이어(Gear·Wings·Hatches)에서 1배속으로 돈다 — 겹쳐 돌아도 서로 덮지 않는다.
     // 정지 높이 전(낙하 중)엔 펴기 클립 처음 자세로 멈춰 떨어진다. 펴기는 정지 높이 도착 순간, 열기·접기는 지면에 닿는 순간 시작(늦게 본 피어는 지난 만큼 건너뛴다).
+    // 해치는 지면에 닿기 전까지 열기 클립 0프레임에 고정(닫힌 자세) — Hatches 레이어가 비면 베이스 DP_Idle 의 열린 해치가 보인다. 고정 중 이벤트는 버린다.
     private void UpdatePodAnimation(PodDropMapTimeline timeline, bool started, double elapsed, double deployed)
     {
         if (_podAnimator == null)
@@ -491,6 +492,10 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
 
         PodDropMapTimings map = settings.Map;
+        double touchdown = timeline.TouchdownAt(deployed);
+        if (PodArrivalRules.ShouldHoldHatchClosed(started, elapsed, touchdown))
+            _podAnimator.HoldAtStart(map.hatchOpenState, -1);
+
         if (!started || elapsed < timeline.HoverAt)
         {
             _podAnimator.PoseStart(map.wingDeployState, -1);
@@ -502,7 +507,6 @@ public sealed class MapPodArrival : NetworkBehaviour
         _podAnimator.Play(map.wingDeployState, -1, sinceHover);
         _podAnimator.Play(map.gearDeployState, -1, sinceHover);
 
-        double touchdown = timeline.TouchdownAt(deployed);
         if (elapsed < touchdown)
             return;
 

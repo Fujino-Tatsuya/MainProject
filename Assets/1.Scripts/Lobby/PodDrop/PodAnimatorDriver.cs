@@ -19,6 +19,7 @@ public sealed class PodAnimatorDriver
     private readonly Dictionary<string, int> _layers = new Dictionary<string, int>();
     private readonly HashSet<string> _seen = new HashSet<string>();
     private readonly HashSet<string> _posed = new HashSet<string>();
+    private readonly HashSet<string> _held = new HashSet<string>();
     private readonly HashSet<string> _warned = new HashSet<string>();
     private AnimatorCullingMode _cullingMode;
     private bool _driven;
@@ -60,6 +61,7 @@ public sealed class PodAnimatorDriver
         }
 
         BeginDrive();
+        _held.Remove(state);
         float length = ClipLength(state);
         float normalized = length > 0f ? Mathf.Clamp01(Mathf.Max(0f, secondsIn) / length) : 0f;
         _layers[state] = layer;
@@ -84,6 +86,27 @@ public sealed class PodAnimatorDriver
 
         BeginDrive();
         _animator.speed = 0f;
+        _animator.Play(hash, layer, 0f);
+    }
+
+    /// <summary>
+    /// 이 상태만 클립 처음 자세에 고정한다 — 매 프레임 불러야 한다(다른 레이어가 1배속으로 돌아도 이 레이어는 매번 0 으로 되돌린다).
+    /// 고정 중 이 클립의 이벤트는 버린다(<see cref="ClipEvent"/> 없음). 다음 <see cref="Play"/> 가 고정을 풀고 재생한다. 이미 재생 시작했거나 없는 상태면 아무것도 안 한다.
+    /// 맵 해치(닫힌 자세)를 날개·다리 펴기 동안 물고 있을 때 쓴다 — 마스크 레이어라 다른 레이어 클립이 덮지 않는다.
+    /// </summary>
+    public void HoldAtStart(string state, int layer)
+    {
+        if (_animator == null || _animator.runtimeAnimatorController == null || string.IsNullOrEmpty(state) || HasStarted(state))
+            return;
+
+        int hash = Animator.StringToHash(state);
+        if (layer < 0)
+            layer = TopLayerWith(hash);
+        if (layer < 0 || layer >= _animator.layerCount || !_animator.HasState(layer, hash))
+            return;
+
+        BeginDrive();
+        _held.Add(state);
         _animator.Play(hash, layer, 0f);
     }
 
@@ -127,6 +150,7 @@ public sealed class PodAnimatorDriver
         _layers.Clear();
         _seen.Clear();
         _posed.Clear();
+        _held.Clear();
         if (!_driven)
             return;
 
@@ -139,7 +163,13 @@ public sealed class PodAnimatorDriver
         _animator.Rebind();
     }
 
-    private void HandleFired(string clipName) => ClipEvent?.Invoke(clipName);
+    private void HandleFired(string clipName)
+    {
+        if (_held.Contains(clipName))
+            return; // 처음 자세에 고정한 클립 — 단계 전환 이벤트로 치지 않는다
+
+        ClipEvent?.Invoke(clipName);
+    }
 
     private int TopLayerWith(int hash)
     {

@@ -61,4 +61,11 @@ public static class PodArrivalRules
         if (alreadyPlayed || elapsed < impactAt) return false;
         return dissolveAt <= impactAt || elapsed < dissolveAt;
     }
+
+    /// <summary>
+    /// 해치를 열기 클립 0프레임(닫힌 자세)에 고정해 둘까(할 일 106) — 연출 시작 전·낙하·날개/다리 펴기·착륙 내내 참, 지면에 닿은 순간부터 거짓(열기 재생).
+    /// 고정 안 하면 Hatches 레이어가 PassThrough 라 베이스 DP_Idle 의 열린 해치가 보인다. 펴기 끝이 아직이면 착지 시각은 +∞ 라 계속 고정.
+    /// </summary>
+    public static bool ShouldHoldHatchClosed(bool started, double elapsed, double touchdownAt) =>
+        !started || elapsed < touchdownAt;
 }
