@@ -311,7 +311,8 @@ public sealed class QANightlyClipPlanner
     public static QANightlyClipPlanner Parse(string text)
     {
         var p = new QANightlyClipPlanner();
-        string[] f = (text ?? "").Trim().Split('\t');
+        // 줄바꿈만 지운다 — Trim() 은 예약이 없을 때 빈 이름 칸 앞 탭까지 지워 지난 저장 시각을 버린다.
+        string[] f = (text ?? "").Trim('\r', '\n').Split('\t');
         if (f.Length < 5)
             return p;
         p.DueUtc = FromT(f[0]);
