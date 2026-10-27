@@ -16,7 +16,7 @@ public struct LobbyGuideStepInput
     public LobbyTrainingPhase Phase;
     /// <summary>내가 훈련 명단(입구 확정 때 고정)에 있다.</summary>
     public bool InTrainingRoster;
-    /// <summary>내 튜토리얼 클리어 플래그(할 일 112 Alt+1).</summary>
+    /// <summary>내 튜토리얼 클리어 플래그 — 훈련 종료 집결 확정 때 명단 전원에게 켜지고(명단은 그대로), Alt+1(할 일 112)로도 켜고 끈다.</summary>
     public bool TrainingCleared;
     /// <summary>출격 집결 카운트다운 중(캐릭터 변경 잠금 입력).</summary>
     public bool SortieCountdownActive;
@@ -36,7 +36,7 @@ public struct LobbyGuideStepInput
 /// <item>훈련 명단으로 훈련 중(입구 확정 ~ 브리핑 완료 전) → None — 훈련 안 집결 구역이 안내한다.</item>
 /// <item>캐릭터 스텝 안 끝남 + 지금 캐릭터를 바꿀 수 있음(<see cref="LobbyTrainingFlow.CharacterChangeBlock"/> = None) → CharacterSelect.</item>
 /// <item>Lobby 단계 + 클리어 플래그 꺼짐 → 입구 구역 안이면 None(집결 대기), 아니면 Tutorial.</item>
-/// <item>나머지(클리어 플래그·늦은 참가자·브리핑 완료) → Sortie.</item>
+/// <item>나머지(클리어 플래그 — 훈련 완료·Alt+1, 늦은 참가자, 브리핑 완료) → Sortie.</item>
 /// </list>
 /// </summary>
 public static class LobbyGuideStepRules

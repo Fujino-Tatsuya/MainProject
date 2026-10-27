@@ -25,7 +25,9 @@ using UnityEngine;
 /// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1): 규칙 = <see cref="LobbyTrainingFlow.SetTrainingCleared"/>, 서버 장부 → 복제 목록(<see cref="IsTrainingCleared"/>).
 /// 로비 복귀(새 진행기)·Alt+3 리로드를 넘어 남도록 서버 세션 정적 장부에도 적고, 연결 종료·호스트 셧다운 때 지운다.
 /// 훈련 중 켜서 명단에서 빠지면 <see cref="ServerRosterMemberRemoved"/> 로 단계 내용(무기 점검)이 그 사람을 기다리지 않게 한다.
-/// 요청 RPC·멈춤 탈출·리로드는 DEV_HOTKEYS 게이트 partial(<c>LobbyTrainingDirector.Recovery.cs</c>).</item>
+/// 요청 RPC·멈춤 탈출·리로드는 DEV_HOTKEYS 게이트 partial(<c>LobbyTrainingDirector.Recovery.cs</c>).
+/// 훈련을 끝까지 하면(종료 집결 확정) 명단 전원에게 같은 플래그가 켜진다(<see cref="LobbyTrainingFlow.OnGatherConfirmed"/>, 명단은 그대로).</item>
+/// <item>훈련 종료 텔레포트(할 일 111): 종료 집결 확정 때 명단 전원을 <see cref="LobbyTrainingEndTeleport"/> 지점으로 <see cref="PlayerFallRecovery.RelocateServer"/>. 지점이 없으면 경고 1회 후 생략.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -81,6 +83,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
 
     private const float SupportTickInterval = 0.25f;
 
+    // 훈련 종료 텔레포트 높이 보정 — 스폰 지점·멈춤 탈출과 같은 값(바닥에 정확히 놓으면 콜라이더가 파고든 채 시작한다).
+    private const float TrainingEndClearance = 0.5f;
+
     private static readonly LobbyGatherPoint[] Points =
     {
         LobbyGatherPoint.Entrance, LobbyGatherPoint.Sortie, LobbyGatherPoint.Train01Start, LobbyGatherPoint.Train02Start,
@@ -91,6 +96,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
     private LobbyTrainingFlow _flow;
     private bool _zonesDirty;
     private bool _loggedWaitingZones;
+    private bool _warnedNoTrainingEndPoints;
     private Func<bool> _joinBlockedProvider;
     private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
     private readonly List<ulong> _idBuffer = new List<ulong>();
@@ -325,7 +331,17 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
         Debug.Log($"[SceneFlow] {Tag} {point} 집결 확정 — {before} → {Describe()}");
         if (point == LobbyGatherPoint.Entrance)
             Debug.Log($"[SceneFlow] {Tag} 훈련 시작 — 참여 명단 고정 {_flow.TrainingRoster.Count}명 [{string.Join(",", _flow.TrainingRoster)}]");
+        if (point == LobbyGatherPoint.TrainEnd)
+        {
+            ServerClearedStore.Clear();
+            ServerClearedStore.AddRange(_flow.TrainingCleared);
+            Debug.Log($"[SceneFlow] {Tag} 훈련 종료 — 명단 [{string.Join(",", _flow.TrainingRoster)}] 튜토리얼 클리어, 클리어 [{string.Join(",", _flow.TrainingCleared)}]");
+        }
+
         OnFlowChanged();
+
+        if (point == LobbyGatherPoint.TrainEnd)
+            TeleportRosterToTrainingEnd();
 
         if (point == LobbyGatherPoint.Sortie)
             LaunchMainOnce();
@@ -355,6 +371,43 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
             return;
 
         launcher.StartGameLoading();
+    }
+
+    // [서버] 훈련 종료 텔레포트 — 명단 순서대로 지점 하나씩(순환). 이동 = 기존 서버 텔레포트(오너 RPC). 지점이 없으면 경고 1회 후 생략.
+    private void TeleportRosterToTrainingEnd()
+    {
+        var points = LobbyTrainingEndTeleport.Active;
+        if (points == null)
+        {
+            if (!_warnedNoTrainingEndPoints)
+            {
+                _warnedNoTrainingEndPoints = true;
+                Debug.LogWarning($"{Tag} 훈련 종료 텔레포트 지점(LobbyTrainingEndTeleport)이 없다 — 텔레포트 생략(LobbyGuideSteps 프리팹 배치 확인).", this);
+            }
+
+            return;
+        }
+
+        var roster = _flow.TrainingRoster;
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var clientId = roster[i];
+            if (!points.TryGetPoint(i, out var point))
+            {
+                if (!_warnedNoTrainingEndPoints)
+                {
+                    _warnedNoTrainingEndPoints = true;
+                    Debug.LogWarning($"{Tag} 훈련 종료 텔레포트 지점이 비었다({points.name}) — 텔레포트 생략.", points);
+                }
+
+                return;
+            }
+
+            var fall = TryGetPlayer(clientId, out var player) ? player.GetComponent<PlayerFallRecovery>() : null;
+            var destination = point + Vector3.up * TrainingEndClearance;
+            var moved = fall != null && fall.RelocateServer(destination);
+            Debug.Log($"[SceneFlow] {Tag} 훈련 종료 텔레포트 client {clientId} → 명단 {i + 1}번째 자리 {destination} moved={moved}");
+        }
     }
 
     private void HandleClientConnected(ulong clientId)

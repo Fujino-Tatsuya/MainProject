@@ -53,7 +53,8 @@ public enum LobbyGatherPoint : byte
 /// <item>판 끝 로비 복귀 = 새 회차: <see cref="Reset"/> 으로 Lobby 부터(기록·명단·출격 래치 초기화).</item>
 /// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1 — <see cref="SetTrainingCleared"/>): 켠 사람은 입구 집결·훈련 명단·훈련 내부 집결에서 빠지고(늦은 참가자처럼 로비 대기),
 /// 출격 집결 인원에는 남는다. 훈련 중 켜면 즉시 명단에서 빠지고, 그래서 명단이 비면 훈련·브리핑을 마친 것으로 보고 출격 집결로 넘어간다.
-/// 끄면 플래그만 지운다 — 이미 고정된 이번 회차 명단엔 다시 넣지 않고 다음 입구 확정(새 회차)부터 포함. 플래그는 <see cref="Reset"/> 을 넘어 남고 연결 종료 때 지운다.</item>
+/// 끄면 플래그만 지운다 — 이미 고정된 이번 회차 명단엔 다시 넣지 않고 다음 입구 확정(새 회차)부터 포함. 플래그는 <see cref="Reset"/> 을 넘어 남고 연결 종료 때 지운다.
+/// 훈련을 끝까지 하면(종료 집결 확정) 명단 전원에게 같은 플래그를 켠다 — 이때는 명단에서 빼지 않는다(브리핑 집결·캐릭터 잠금 유지).</item>
 /// </list>
 /// </summary>
 public sealed class LobbyTrainingFlow
@@ -311,6 +312,13 @@ public sealed class LobbyTrainingFlow
                 return true;
 
             case LobbyGatherPoint.TrainEnd:
+                // 훈련 종료 = 명단 전원 튜토리얼 클리어(Alt+1 과 같은 플래그). 명단은 그대로 — 브리핑 집결·캐릭터 잠금은 이번 회차 끝까지.
+                foreach (var clientId in _trainingRoster)
+                {
+                    if (!_trainingCleared.Contains(clientId))
+                        _trainingCleared.Add(clientId);
+                }
+
                 Set(LobbyTrainingStage.Brief, LobbyTrainingPhase.Gathering);
                 return true;
 

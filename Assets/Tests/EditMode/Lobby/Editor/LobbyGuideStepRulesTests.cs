@@ -106,6 +106,26 @@ public sealed class LobbyGuideStepRulesTests
         Assert.That(LobbyGuideStepRules.Evaluate(input), Is.EqualTo(LobbyGuideStep.Tutorial));
     }
 
+    // 훈련 종료 집결 확정 = 명단 그대로 + 클리어 플래그 켜짐 — 브리핑 집결·진행 중엔 꺼 두고, 브리핑 완료부터 ③.
+    [TestCase(LobbyTrainingPhase.Gathering, LobbyGuideStep.None)]
+    [TestCase(LobbyTrainingPhase.InProgress, LobbyGuideStep.None)]
+    [TestCase(LobbyTrainingPhase.Completed, LobbyGuideStep.Sortie)]
+    public void TrainingFinished_RosterAndCleared_SortieAfterBriefing(LobbyTrainingPhase phase, LobbyGuideStep expected)
+    {
+        var input = Training(LobbyTrainingStage.Brief, phase, inRoster: true);
+        input.TrainingCleared = true;
+        Assert.That(LobbyGuideStepRules.Evaluate(input), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void TrainingFinished_NextRound_ShowsSortieNotTutorial()
+    {
+        // 판 끝 로비 복귀·Alt+3 — 새 진행기 Lobby 단계, 명단 비어 있음, 훈련 완료 플래그는 이어짐.
+        var input = Lobby(characterDone: true);
+        input.TrainingCleared = true;
+        Assert.That(LobbyGuideStepRules.Evaluate(input), Is.EqualTo(LobbyGuideStep.Sortie));
+    }
+
     [Test]
     public void SortieStage_IsNone()
     {
