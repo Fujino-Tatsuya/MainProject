@@ -15,6 +15,31 @@ public enum DefaultAttackChainPolicy
     Loop
 }
 
+// 스텝 End 에서 다음 타를 고르는 순수 규칙(할 일 122 — EditMode 로 고정). 예약(창 안 래치)이 없으면 언제나 종료다.
+public static class DefaultAttackChainRules
+{
+    public static bool TryResolveNextStep(int currentIndex, int stepCount, DefaultAttackChainPolicy policy, bool queued,
+        out int nextIndex)
+    {
+        nextIndex = currentIndex + 1;
+        if (!queued || stepCount <= 0)
+            return false;
+
+        if (nextIndex < stepCount)
+            return true;
+
+        switch (policy)
+        {
+            case DefaultAttackChainPolicy.Loop:
+                nextIndex = 0;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+}
+
 public enum DefaultAttackMovementType
 {
     None,
@@ -116,6 +141,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private bool isRequestingAttack;
     private bool isComboWindowOpen;
     private bool hasQueuedNextAttack;
+    // 할 일 122 진단 — 이 스텝에서 ComboWindowOpen 을 받았나 / 창 밖이라 거른 예약 요청 수(서버·오프라인).
+    private bool sawComboWindowThisStep;
+    private int queueRequestsOutsideWindow;
     // 스킬 입력 때문에 지금 타로 마무리 중(할 일 77 후속) — 오너·서버가 각자 들고, 공격이 끝나면(ResetAttackRuntime) 풀린다.
     private bool isFinishingChain;
     private bool hasStartedAttack;
@@ -421,6 +449,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
             case DefaultAttackAnimationEventType.ComboWindowOpen:
                 isComboWindowOpen = true;
+                sawComboWindowThisStep = true;
                 break;
 
             case DefaultAttackAnimationEventType.ComboWindowClose:
@@ -618,7 +647,11 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 다음 타");
 
         if (!isComboWindowOpen || isFinishingChain)
+        {
+            if (!isComboWindowOpen)
+                queueRequestsOutsideWindow++;
             return;
+        }
 
         hasQueuedNextAttack = true;
         queuedAttackDirection = ResolveAttackDirection(requestedDirection);
@@ -691,6 +724,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         hasStartedAttack = true;
         hasQueuedNextAttack = false;
         isComboWindowOpen = false;
+        sawComboWindowThisStep = false;
+        queueRequestsOutsideWindow = 0;
         currentAttackIndex = attackIndex;
         attackDirection = ResolveAttackDirection(direction);
         queuedAttackDirection = attackDirection;
@@ -781,30 +816,30 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     private bool ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection)
     {
-        nextIndex = currentAttackIndex + 1;
         nextDirection = queuedAttackDirection;
-        bool hasNext = nextIndex < attackSteps.Length;
 
-        if (!hasQueuedNextAttack)
-            return false;
-
-        switch (chainPolicy)
+        if (!DefaultAttackChainRules.TryResolveNextStep(
+                currentAttackIndex, attackSteps.Length, chainPolicy, hasQueuedNextAttack, out nextIndex))
         {
-            case DefaultAttackChainPolicy.Once:
-                if (!hasNext)
-                    return false;
-                break;
-
-            case DefaultAttackChainPolicy.Loop:
-                if (!hasNext)
-                    nextIndex = 0;
-                break;
-
-            default:
-                return false;
+            WarnLoopEndedAtLastStep();
+            return false;
         }
 
         return HasAttackStep(nextIndex);
+    }
+
+    // 할 일 122 진단(에디터 전용) — Loop 인데 마지막 타에서 체인이 끝났으면 왜 예약이 없었는지 남긴다.
+    // 홀드 중 4타 뒤 1타로 안 돌아가는 증상을 Play 에서 가르기 위한 것 — 창이 안 열렸는지, 요청이 창 밖에서만 왔는지.
+    private void WarnLoopEndedAtLastStep()
+    {
+        if (chainPolicy != DefaultAttackChainPolicy.Loop || isFinishingChain ||
+            currentAttackIndex != attackSteps.Length - 1)
+            return;
+
+        Edit.Log(
+            $"[DefaultAttack] Loop 마지막 {currentAttackIndex + 1}타에서 체인 종료 — 예약 없음 " +
+            $"(창 열림 이벤트 {(sawComboWindowThisStep ? "받음" : "못 받음")}, 창 밖 예약 요청 {queueRequestsOutsideWindow}회). " +
+            "버튼을 뗐으면 정상이다.", this);
     }
 
     private void EndAttackServer()
@@ -869,7 +904,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         if (!IsNetworkActive)
         {
             if (!isComboWindowOpen)
+            {
+                queueRequestsOutsideWindow++;
                 return;
+            }
 
             hasQueuedNextAttack = true;
             queuedAttackDirection = direction;
@@ -933,6 +971,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         hasQueuedNextAttack = false;
         isFinishingChain = false;
         isComboWindowOpen = false;
+        sawComboWindowThisStep = false;
+        queueRequestsOutsideWindow = 0;
         hasStartedAttack = false;
         isRequestingAttack = false;
         hasPendingAttackClip = false;
