@@ -7,7 +7,7 @@ using UnityEngine;
 /// 원본: Docs/design/tutorial-scenario.md §3.2·§3.4·§3.6·§3.8·§4 · Docs/tech/tutorial-corridors-zone2.md.
 /// 규칙은 순수 <see cref="TutorialCorridorRules"/>·<see cref="TutorialCorridorRounds"/>·<see cref="TutorialCorridorProgress"/>(TutorialCorridorModel.cs).
 ///
-/// 붙는 곳: <see cref="TutorialZone1Flow"/> 와 같다 — 디렉터가 튜토리얼을 켠 것이 보이는 순간 디렉터 GameObject 에 런타임 부착(모든 피어).
+/// 붙는 곳: <see cref="MapSceneZoneFlow"/> 와 같다 — 디렉터가 튜토리얼을 켠 것이 보이는 순간 디렉터 GameObject 에 런타임 부착(모든 피어).
 ///
 /// 서버:
 ///  · <see cref="TutorialDirector.CorridorMidReached"/>(개인 첫 도착) → <b>그 사람에게만</b> 제시(S12 판단 1 — §3.2 "그 플레이어가 중간 지점에 왔을 때").
@@ -18,7 +18,7 @@ using UnityEngine;
 ///  · <see cref="TutorialTraitDirector.ServerTraitChosen"/>(수동·자동) → <see cref="TutorialDirector.ReportCheckServer"/>(TraitCorridorN) → 디렉터 모델이 전원/60초로 출구를 연다.
 ///  · 출구가 열리면(어떤 이유든) <b>미도착자도 참가자로 넣고</b> 미선택 전원 <see cref="TutorialTraitDirector.AutoChooseAllPendingServer"/> — 창 닫힘·토스트·무적 해제(§3.2 D14 · §3.8).
 ///  · 보스 타이머 만료(Expired)·보스방 도착 → 진행 중 복도 라운드를 같은 방식으로 즉시 자동 획득 — 강제 이동(3초 경고 뒤)·연출 잠금보다 먼저(tutorial-traits.md §3-5).
-///  · G10 → <see cref="TutorialGuideIds.BPadWarn"/> 전원(D17). 단계: 입구 G3/G6/G9 → Corridor2~4, G10 → BossEnter(Corridor1 은 존1 흐름).
+///  · G10 → <see cref="TutorialGuideIds.BPadWarn"/> 전원(D17). 단계: 입구 G3/G6/G9 → Corridor2~4, G10 → BossEnter(Corridor1 은 맵씬 존 진행 MapSceneZoneFlow).
 ///  디렉터 Commit 안(게이트 이벤트)에서 다시 Commit 하지 않게 게이트 후속 처리는 다음 Update 로 미룬다.
 /// 모든 피어(로컬 플레이어):
 ///  · 목표 = 창이 떠 있으면 "특성 고르기", 골랐으면 "동료 대기" + 대기 줄(TUT_WAIT_PARTY). 중간 지점 전에는 앞 존 흐름의 "복도로" 를 건드리지 않는다.
@@ -340,7 +340,7 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
             }
 
             int entry = TutorialCorridorRules.CorridorOfEntryGate(gate);
-            if (entry >= 2) _director.SetStepServer(TutorialCorridorRules.StepOf(entry));   // Corridor1 은 존1 흐름이 한다
+            if (entry >= 2) _director.SetStepServer(TutorialCorridorRules.StepOf(entry));   // Corridor1 은 MapSceneZoneFlow 가 한다
         }
     }
 

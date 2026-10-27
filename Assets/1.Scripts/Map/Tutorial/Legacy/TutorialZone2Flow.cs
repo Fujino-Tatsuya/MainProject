@@ -36,7 +36,7 @@ public sealed class TutorialZone2Flow : MonoBehaviour
 
     // ─── 부착(모든 피어) ───────────────────────────────────────────────────
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 존2 진행은 MapSceneZoneFlow. 보관용.
     private static void InstallBootstrap()
     {
         TutorialDirector.StateChanged -= Ensure;

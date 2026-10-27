@@ -2,7 +2,7 @@ using System;
 
 // 튜토리얼 존4(설정 → 타이머 → 패널·다리·중간보스) + 보스 진입 안내 흐름의 순수 규칙(Unity·NGO 비의존 — EditMode 테스트 대상).
 // 원본: Docs/design/tutorial-scenario.md §3.7(Z4-0~Z4-6)·§3.9(B-1·B-2)·§4 G7~G9·D4·D6·D19 · PLAN-tutorial.md S10 · Docs/tech/tutorial-zone4.md.
-// 배선(서버)은 TutorialZone4Flow, 표시(모든 피어)는 TutorialZone4Guide.
+// 배선(서버)은 TutorialZone4Flow, 표시(모든 피어)는 TutorialZone4Guide. 존4 교육 표시 규칙은 Legacy(TutorialZone4EducationDisplay, 할 일 107).
 
 /// <summary>존4 진행 단계(서버 흐름 기준).</summary>
 public enum TutorialZone4Phase : byte
@@ -216,42 +216,19 @@ public sealed class TutorialZone4Model
     }
 }
 
-/// <summary>존4 강조 대상(동시에 여러 개).</summary>
-[Flags]
-public enum TutorialZone4Highlight : byte
-{
-    None = 0,
-    /// <summary>타이머 게이지 펄스(Z4-0 — 설정 자막 동안).</summary>
-    BossTimer = 1 << 0,
-    /// <summary>가장 가까운 계단 + 중앙 섬(중간보스) — 다리 개통 뒤 처치 전(Z4-4).</summary>
-    MidbossRoute = 1 << 1,
-    /// <summary>미니맵 보스 아이콘 펄스 — G9 뒤 도착 전(Z4-6).</summary>
-    MinimapBossIcon = 1 << 2,
-}
-
 /// <summary>
-/// 존4·보스 진입 목표 패널·강조 — 복제 상태(단계·패널 카운터·G9)만으로 정한다. 늦게 붙은 클라도 <c>StateChanged</c> 한 번으로 같은 화면이 된다.
-/// 패널 다 켬 = 다리 개통 시작(기존 ZoneBridgeGateManager 규칙) → 목표는 그때 중간보스로 바뀐다(개통 1.5초는 무시).
+/// 보스 진입 목표·강조 — 복제 상태(단계·G9)만으로 정한다. 늦게 붙은 클라도 <c>StateChanged</c> 한 번으로 같은 화면이 된다.
+/// 할 일 107: 존4 교육 목표(패널 n/4·중간보스)·강조(타이머 펄스·계단/중앙 섬)는 Legacy(<c>TutorialZone4EducationDisplay</c>)로 뺐다.
 /// </summary>
 public static class TutorialZone4Display
 {
-    /// <summary>지금 띄울 존4 목표 id. 존4 전투 전·보스방 도착 뒤면 null.</summary>
-    public static string ObjectiveFor(TutorialStep step, int panels, int panelTarget, bool corridor4EntryOpen)
-    {
-        if (step == TutorialStep.Finished) return null;
-        if (corridor4EntryOpen) return TutorialGuideIds.Z4GoBoss;
-        if (step < TutorialStep.Zone4Combat) return null;
-        return panels < Math.Max(1, panelTarget) ? TutorialGuideIds.Z4PanelGoal : TutorialGuideIds.Z4Midboss;
-    }
+    /// <summary>지금 띄울 보스 진입 목표 id — G9(복도4 입구) 뒤 "보스방으로". 그 전·보스방 도착 뒤면 null.</summary>
+    public static string ObjectiveFor(TutorialStep step, bool corridor4EntryOpen) =>
+        step != TutorialStep.Finished && corridor4EntryOpen ? TutorialGuideIds.Z4GoBoss : null;
 
-    public static TutorialZone4Highlight HighlightsFor(TutorialStep step, int panels, int panelTarget, bool corridor4EntryOpen)
-    {
-        if (step == TutorialStep.Finished) return TutorialZone4Highlight.None;
-        if (corridor4EntryOpen) return TutorialZone4Highlight.MinimapBossIcon;
-        if (step == TutorialStep.Zone4Lore) return TutorialZone4Highlight.BossTimer;
-        if (step >= TutorialStep.Zone4Combat && panels >= Math.Max(1, panelTarget)) return TutorialZone4Highlight.MidbossRoute;
-        return TutorialZone4Highlight.None;
-    }
+    /// <summary>미니맵 보스 아이콘 펄스 — G9 뒤 도착 전(Z4-6).</summary>
+    public static bool ShowsMinimapBossIcon(TutorialStep step, bool corridor4EntryOpen) =>
+        step != TutorialStep.Finished && corridor4EntryOpen;
 
     /// <summary>
     /// 존4 목표가 "보스방으로"(G9 뒤 — 플레이어는 복도4)인데 복도 흐름이 고르기·대기·발판 목표를 띄웠으면 존4 가 양보한다(S12).
@@ -262,11 +239,13 @@ public static class TutorialZone4Display
         && currentObjectiveId != TutorialCorridorFlow.NextId
         && TutorialCorridorRules.IsCorridorObjective(currentObjectiveId);
 
-    /// <summary>존4 설정 자막 단계(목표 줄 없음)에 복도3 출구 목표 "다음 구역으로"가 남아 있으면 지운다(S12 — 존 첫 진입 정리).</summary>
+    /// <summary>
+    /// 존4 안(설정 자막·전투 — 목표 줄 없음)에 복도3 출구 목표 "다음 구역으로"가 남아 있으면 지운다(S12 — 존 첫 진입 정리).
+    /// 107: 전투 단계도 포함 — 교육 목표(패널 n/4)가 덮던 자리가 비었고, 소개 연출 판은 설정 단계가 바로 지나간다.
+    /// </summary>
     public static bool ShouldClearStaleCorridorObjective(TutorialStep step, string currentObjectiveId) =>
-        step == TutorialStep.Zone4Lore && currentObjectiveId == TutorialCorridorFlow.NextId;
+        (step == TutorialStep.Zone4Lore || step == TutorialStep.Zone4Combat) && currentObjectiveId == TutorialCorridorFlow.NextId;
 
-    /// <summary>이 목표 id 가 존4 흐름이 띄운 것인가 — 존4 를 벗어날 때 남의 목표는 지우지 않는다.</summary>
-    public static bool IsZone4Objective(string id) =>
-        id == TutorialGuideIds.Z4PanelGoal || id == TutorialGuideIds.Z4Midboss || id == TutorialGuideIds.Z4GoBoss;
+    /// <summary>이 목표 id 가 보스 진입 안내가 띄운 것인가 — 벗어날 때 남의 목표는 지우지 않는다.</summary>
+    public static bool IsZone4Objective(string id) => id == TutorialGuideIds.Z4GoBoss;
 }

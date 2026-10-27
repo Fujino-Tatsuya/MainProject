@@ -227,7 +227,8 @@ public sealed class TutorialMonsterLedgerTests
         Assert.IsFalse(m.IsGateOpen(TutorialGate.G3_Corridor2Entry));
 
         // G1(개인)·G2(개인)가 차례로 열리는 같은 Evaluate 에서 G3 도 연다.
-        foreach (TutorialCheck c in TutorialZone1Progress.ChecklistOrder) m.ReportCheck(0, c);   // v8 G1 여덟 항목
+        for (int bit = 0; bit < 32; bit++)   // G1 조건 항목 전부(v8 여덟 항목 — 107 뒤 맵씬은 G1 을 바로 연다)
+            if ((TutorialFlowModel.G1Mask & (1 << bit)) != 0) m.ReportCheck(0, (TutorialCheck)bit);
         m.ReportCheck(0, TutorialCheck.TraitCorridor1);
         m.Evaluate(2d);
 

@@ -83,7 +83,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     // ─── 부착(모든 피어) ───────────────────────────────────────────────────
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 존1 진행은 MapSceneZoneFlow(G1 즉시). 보관용.
     private static void InstallBootstrap()
     {
         TutorialDirector.StateChanged -= Ensure;
@@ -341,7 +341,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
                     && Time.unscaledTime - _moveReportedAt >= MoveReportRetrySeconds)
                 {
                     _moveReportedAt = Time.unscaledTime;
-                    _director.ReportLocalMoveDistance(_move.TotalMeters);
+                    // 107 Legacy: 디렉터의 오너 보고 API(ReportLocalMoveDistance·서버 상한 검증)는 지웠다 — 이동 체크는 보고하지 않는다.
                 }
             }
         }
@@ -350,7 +350,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         if (_passiveHold.Tick(Time.unscaledTimeAsDouble))
         {
             _passiveInfoPending = true;
-            _director.ReportLocalCheck(TutorialCheck.PassiveTooltip);
+            // 107 Legacy: 디렉터의 오너 보고 API(ReportLocalCheck)는 지웠다 — 패시브 체크는 보고하지 않는다.
             Render();
         }
     }

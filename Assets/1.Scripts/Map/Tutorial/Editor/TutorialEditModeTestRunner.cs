@@ -27,14 +27,10 @@ internal static class TutorialEditModeTestRunner
         "^TutorialTraitRejoinTests$", // 할 일 48 C14 R4c 판 도중 재합류 — 획득 복원(순서·중복·멱등)·라운드 참가·팝업/재선택 보관·복원
         "^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState · 86 T6a SO+Strings 출처
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
-        "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프
-        "^SpinnerComboModelTests$", // 스피너봇 연계 연습(v8 §3.5) — 간파→취약 유지→밀치기→벽 충돌→회복(그 자리) ×3·중복 방지
-        "^TutorialZone1ModelTests$", // 존1(S7·v8) — 이동 보고 상한·이동 누적·툴팁 1초·착지·목표 순서·대기 줄·공격/스킬 사용 판정
-        "^TutorialCooldownResetModelTests$", // 복도1 첫 진입 쿨타임 초기화(v8 C1-0) — 플레이어별 1회·예약·범위
+        // 107: 존1~3·스피너 연습·존4 교육 테스트(Zone1Model·Zone2Model·Zone3Rules·SpinnerPractice/ComboModel·Zone4Education)는 Legacy — 'EditMode 전체 실행'에서만 돈다.
+        "^TutorialCooldownResetModelTests$", // 쿨타임 초기화 규칙(v8 C1-0 — 로비 TrainingPlayerReset 공용) — 플레이어별 1회·예약·범위
         "^TutorialCorridorModelTests$", // 복도(S8) — 게이트 매핑·복도당 라운드 1번·진행 중 복도·목표 장면
-        "^TutorialZone2ModelTests$", // 존2(S8) — 기상 지연·E 안내·Q/E 넛지·목표 줄
-        "^TutorialZone3RulesTests$", // 존3 흐름(S9) — 시작 조건·간파 집계·빗나감/이른 간파/힌트·목표·연습 반경
-        "^TutorialZone4RulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁·목표/강조
+        "^TutorialZone4RulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·다리·만료·패드·도착 팁·보스방 목표/미니맵 강조
         "^LobbyRadioTests$", // 로비 무전(할 일 86 T6b) — 단계 → 대사 표·회차당 1회·단계 바뀜 = 대기 줄 폐기·늦은 클라·자막 큐 ClearPending·문구 행
         "^LobbyBriefingTests$", // 로비 브리핑(할 일 86 T6c) — 대사 순서·서버 시간·완료 1회·중복 시작 무시·중단 해제 신호·잠금 장부·목표 표시·문구 행
         "^TutorialSkipPlanTests$", // 구간 스킵 Alt+1~0(할 일 34) — 단축키 매핑·뒤로 거부(Alt+0 처음부터 예외)·재시작 재진입 거부·목적 구간 → 게이트·체크·처치·자동 획득 계획

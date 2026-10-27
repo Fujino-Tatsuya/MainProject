@@ -263,7 +263,7 @@ public static class TutorialStageAuthoring
                 }
             }
 
-            TutorialZone1Authoring.AddTo(root);   // S7 존1 평타 허수아비 자리(런타임 스폰)
+            // 존1 평타 허수아비 자리(TutorialZone1Authoring.AddTo)는 할 일 107 에서 뺐다 — 존1 교육은 로비 훈련(TRAIN_01)이 대신한다.
 
             PrefabUtility.SaveAsPrefabAsset(root, StagePath, out bool ok);
             Debug.Log($"[TutorialStage] {StagePath} 저장 {(ok ? "완료" : "실패")} — 회전 {StageYawSteps * 90}° · 슬롯 {Slots.Length}개(Start=스폰 후보 · BossEnter=보스 후보 · 퀘스트 없음)");

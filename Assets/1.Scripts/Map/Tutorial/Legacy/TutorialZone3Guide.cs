@@ -31,7 +31,7 @@ public sealed class TutorialZone3Guide : MonoBehaviour
     private bool _dirty = true;
     private float _retryAt;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 보관용.
     private static void InstallBootstrap()
     {
         TutorialDirector.StateChanged -= EnsureOnPeer;

@@ -3,18 +3,18 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 튜토리얼 존4 흐름 + 보스 진입 안내(S10, §3.7 Z4-0~Z4-6 · §3.9 B-1·B-2) — <b>서버 전용</b>. 규칙은 순수 <see cref="TutorialZone4Model"/>,
-/// 이 컴포넌트는 디렉터·다리 패널·보스 타이머·패드 신호를 모델에 넣고 결과(타이머 HUD·G8·기상·카운터·단계·자막)를 실행한다.
-/// 표시(목표 패널·강조·도착 정리)는 모든 피어의 <see cref="TutorialZone4Guide"/> 가 복제 상태로 그린다. 상세: Docs/tech/tutorial-zone4.md.
+/// 존4 진행 + 보스 진입 안내(S10, §3.7 Z4-0~Z4-6 · §3.9 B-1·B-2) — <b>서버 전용</b>. 규칙은 순수 <see cref="TutorialZone4Model"/>,
+/// 이 컴포넌트는 디렉터·다리 개통·보스 타이머·패드 신호를 모델에 넣고 결과(타이머 HUD·G8·기상·단계·자막)를 실행한다.
+/// 표시(보스방 목표·미니맵 강조·도착 정리)는 모든 피어의 <see cref="TutorialZone4Guide"/> 가 복제 상태로 그린다. 상세: Docs/tech/tutorial-zone4.md.
+/// 할 일 107: 존4 <b>교육</b> 부분(장치 설명·첫 패널·패널 n/4·중간보스 간파 리마인드)은 Legacy(<c>TutorialZone4EducationFlow</c>)로 뺐다.
 ///
-/// 붙는 곳: 서버에서 디렉터가 튜토리얼을 켠 순간 디렉터 GameObject 에 런타임으로 붙는다(<see cref="TutorialZone3Flow"/> 와 같은 방식 — 씬 무수정).
+/// 붙는 곳: 서버에서 디렉터가 튜토리얼을 켠 순간 디렉터 GameObject 에 런타임으로 붙는다(씬 무수정).
 ///
 /// 흐름:
 ///  · G7 열림 ∧ 존4 파티 첫 진입(순서 무관) → 단계 Zone4Lore · 타이머 HUD 표시 · 자막 TUT_Z4_LORE → TUT_Z4_TIMER_HINT(전원) · 존4 휴면 유지.
 ///  · 설정 자막 길이(<see cref="TutorialZone4Model.DefaultLoreSeconds"/>) 뒤 = G8(<see cref="TutorialDirector.StartBossTimerServer"/>) →
-///    단계 Zone4Combat · TUT_Z4_START → TUT_Z4_PANEL_INTRO · 3초 뒤 존4 일반 몬스터 기상(중간보스 제외).
-///  · 패널(<see cref="ZoneBridgeGateManager.ServerPanelActivated"/>)마다 Zone4Panels +1(첫 1번 TUT_Z4_PANEL_FIRST) ·
-///    다리 개통 완료(<see cref="ZoneBridgeGateManager.ServerBridgeOpened"/>) → TUT_Z4_BRIDGE · 중간보스 기상 · 첫 간파 창 → TUT_Z4_COUNTER_REMIND.
+///    단계 Zone4Combat · 3초 뒤 존4 일반 몬스터 기상(중간보스 제외).
+///  · 다리 개통 완료(<see cref="ZoneBridgeGateManager.ServerBridgeOpened"/>) → TUT_Z4_BRIDGE · 중간보스 기상.
 ///  · 존4 클리어(장부 — 중간보스 처치, G9 는 장부가 연다) → TUT_Z4_CLEAR → TUT_Z4_GO_BOSS. 타이머 만료 → TUT_TIMER_EXPIRED 1번.
 ///  · 패드 카운트다운 시작 → TUT_B_PAD_COUNT · 보스방 도착(<see cref="TutorialDirector.BossRoomArrived"/>) 1초 뒤 → TUT_B_BOSS_FRONT_TIP(D19).
 /// </summary>
@@ -33,11 +33,7 @@ public sealed class TutorialZone4Flow : MonoBehaviour
 
     private TutorialDirector _director;
     private TutorialZone4Model _model;
-    private MonsterCounterWindow _midbossWindow;
-    private bool _midbossWindowWasOpen;
     private bool _subscribed;
-
-    private readonly List<MonsterBase> _buffer = new List<MonsterBase>();
 
     private bool _introMode;                 // 4구역 소개 연출 켜짐 — 설정 대기·기상 지연 0, 설정 자막은 복귀 무전 뒤
     private float _loreSubtitleDelay;        // 복귀 무전 길이(데이터) — 설정 자막을 그 뒤로 미룬다
@@ -107,7 +103,6 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         TutorialDirector.GateOpened += HandleGateOpened;
         TutorialDirector.ZoneCleared += HandleZoneCleared;
         TutorialDirector.BossRoomArrived += HandleBossRoomArrived;
-        ZoneBridgeGateManager.ServerPanelActivated += HandlePanelActivated;
         ZoneBridgeGateManager.ServerBridgeOpened += HandleBridgeOpened;
         _subscribed = true;
     }
@@ -119,7 +114,6 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         TutorialDirector.GateOpened -= HandleGateOpened;
         TutorialDirector.ZoneCleared -= HandleZoneCleared;
         TutorialDirector.BossRoomArrived -= HandleBossRoomArrived;
-        ZoneBridgeGateManager.ServerPanelActivated -= HandlePanelActivated;
         ZoneBridgeGateManager.ServerBridgeOpened -= HandleBridgeOpened;
         _subscribed = false;
     }
@@ -164,8 +158,6 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         if (_model.ShouldWakeNormals(now))
             _director.WakeZoneServer(TutorialArea.Zone4, TutorialMonsterFilter.NormalOnly);
 
-        PollMidbossWindow();
-
         BossTimerManager timer = BossTimerManager.Instance;
         bool expired = timer != null && timer.State == BossTimerManager.TimerState.Expired;
         if (expired && _model.NotifyTimerExpired())
@@ -177,16 +169,6 @@ public sealed class TutorialZone4Flow : MonoBehaviour
 
         if (_model.ShouldShowBossTip(now))
             _director.ShowSubtitleServer(TutorialGuideIds.BBossFrontTip);
-    }
-
-    private void PollMidbossWindow()
-    {
-        if (_midbossWindow == null) return;
-        bool open = _midbossWindow.IsOpen;
-        if (open && !_midbossWindowWasOpen && _model.NotifyMidbossWindowOpened())
-            _director.ShowSubtitleServer(TutorialGuideIds.Z4CounterRemind);
-        _midbossWindowWasOpen = open;
-        if (_model.CounterRemindShown) _midbossWindow = null;   // 1번이면 끝 — 더 볼 필요 없다
     }
 
     // ─── 신호 ────────────────────────────────────────────────────────────
@@ -209,34 +191,18 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         }
     }
 
-    private void HandlePanelActivated(int slotId, int panelIndex, int activated, int panelCount)
-    {
-        _model.NotifyPanelActivated(out bool first);
-        if (first) _director.ShowSubtitleServer(TutorialGuideIds.Z4PanelFirst);
-        // 목표(4)에서 멈춘다 — 모든 패널을 켜면 ZoneBridgeGateManager 가 다리를 연다.
-        _director.AddCounterServer(TutorialCounter.Zone4Panels);
-        Edit.Log($"[Tutorial] 존4 패널 {activated}/{panelCount} (Slot {slotId} 패널 {panelIndex}) — 카운터 " +
-                 $"{_director.GetCounter(TutorialCounter.Zone4Panels)}/{_director.GetCounterTarget(TutorialCounter.Zone4Panels)}.", this);
-    }
-
     private void HandleBridgeOpened(int slotId)
     {
         if (!_model.NotifyBridgeOpened()) return;
         Edit.Log($"[Tutorial] 존4 다리 개통(Slot {slotId}) — 중간보스 기상.", this);
         _director.ShowSubtitleServer(TutorialGuideIds.Z4Bridge);
         _director.WakeZoneServer(TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly);
-
-        _director.GetZoneMonstersServer(TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly, _buffer);
-        _midbossWindow = _buffer.Count > 0 ? _buffer[0].GetComponent<MonsterCounterWindow>() : null;
-        _midbossWindowWasOpen = _midbossWindow != null && _midbossWindow.IsOpen;
-        _buffer.Clear();
     }
 
     private void HandleZoneCleared(TutorialArea zone)
     {
         if (zone != TutorialArea.Zone4 || !_model.NotifyCleared()) return;
         // G9 는 디렉터(존 장부 → RequestGateServer)가 연다 — 여기서는 안내만.
-        _midbossWindow = null;
         _director.ShowSubtitleServer(TutorialGuideIds.Z4Clear);
         _director.ShowSubtitleServer(TutorialGuideIds.Z4GoBoss);
     }
@@ -245,7 +211,6 @@ public sealed class TutorialZone4Flow : MonoBehaviour
     {
         // 각 클라 안내 정리는 TutorialZone4Guide 가 복제 단계(Finished)로 한다 — 팁은 그 뒤에 오게 지연.
         _model.NotifyBossArrived(Now);
-        _midbossWindow = null;
     }
 
     // ─── 실행 ────────────────────────────────────────────────────────────
@@ -269,10 +234,6 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         Edit.Log($"[Tutorial] 존4 G8 → 전투{(skippedLore ? " (설정 자막 없이 — 디버그 개방)" : "")} · " +
                  $"{_model.WakeDelaySeconds:0.#}초 뒤 일반 몬스터 기상.", this);
         _director.SetStepServer(TutorialStep.Zone4Combat);
-        // 소개 연출 판에서는 TUT_Z4_START("게이지가 차오르기 시작")·TUT_Z4_PANEL_INTRO(장치 설명)를 뺀다 — 장치 설명은 연출이 대신하고,
-        // 차오르기 시작은 타이머 HUD 가 보여 준다(경석 10-26 D8). 연출을 끈 판은 장치 설명이 따로 없으므로 예전대로 낸다.
-        if (_introMode) return;
-        _director.ShowSubtitleServer(TutorialGuideIds.Z4Start);
-        _director.ShowSubtitleServer(TutorialGuideIds.Z4PanelIntro);
+        // TUT_Z4_START·TUT_Z4_PANEL_INTRO(장치 설명)는 교육 부분이라 Legacy(TutorialZone4EducationFlow)로 뺐다(할 일 107).
     }
 }

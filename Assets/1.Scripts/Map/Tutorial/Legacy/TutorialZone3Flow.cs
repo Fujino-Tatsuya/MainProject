@@ -60,7 +60,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
     // ─── 부착(서버) ──────────────────────────────────────────────────────
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 존3 진행은 MapSceneZoneFlow. 보관용.
     private static void InstallBootstrap()
     {
         TutorialDirector.StateChanged -= EnsureOnServer;

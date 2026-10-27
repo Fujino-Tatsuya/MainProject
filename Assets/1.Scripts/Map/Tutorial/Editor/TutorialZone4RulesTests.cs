@@ -215,37 +215,33 @@ public class TutorialZone4RulesTests
         Assert.IsFalse(m.ShouldStartTimer(100d));
     }
 
-    // ─── 목표 · 강조 ───
+    // ─── 보스 진입 목표 · 강조 (교육 목표·강조는 Legacy TutorialZone4EducationTests — 할 일 107) ───
 
     [Test]
-    public void Objective_ByStepPanelsAndG9()
+    public void Objective_GoBossOnlyAfterG9()
     {
-        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Corridor3, 0, 4, false));
-        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Lore, 0, 4, false));
-        Assert.AreEqual(TutorialGuideIds.Z4PanelGoal, TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Combat, 3, 4, false));
-        Assert.AreEqual(TutorialGuideIds.Z4Midboss, TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Combat, 4, 4, false));
-        Assert.AreEqual(TutorialGuideIds.Z4GoBoss, TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Combat, 4, 4, true));
-        Assert.AreEqual(TutorialGuideIds.Z4GoBoss, TutorialZone4Display.ObjectiveFor(TutorialStep.Corridor4, 4, 4, true));
-        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Finished, 4, 4, true));
+        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Corridor3, false));
+        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Lore, false));
+        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Combat, false), "패널·중간보스 목표는 교육(Legacy)");
+        Assert.AreEqual(TutorialGuideIds.Z4GoBoss, TutorialZone4Display.ObjectiveFor(TutorialStep.Zone4Combat, true));
+        Assert.AreEqual(TutorialGuideIds.Z4GoBoss, TutorialZone4Display.ObjectiveFor(TutorialStep.Corridor4, true));
+        Assert.IsNull(TutorialZone4Display.ObjectiveFor(TutorialStep.Finished, true));
     }
 
     [Test]
-    public void Highlights_ByStepPanelsAndG9()
+    public void MinimapBossIcon_AfterG9UntilArrival()
     {
-        Assert.AreEqual(TutorialZone4Highlight.None, TutorialZone4Display.HighlightsFor(TutorialStep.Corridor3, 0, 4, false));
-        Assert.AreEqual(TutorialZone4Highlight.BossTimer, TutorialZone4Display.HighlightsFor(TutorialStep.Zone4Lore, 0, 4, false));
-        Assert.AreEqual(TutorialZone4Highlight.None, TutorialZone4Display.HighlightsFor(TutorialStep.Zone4Combat, 3, 4, false));
-        Assert.AreEqual(TutorialZone4Highlight.MidbossRoute, TutorialZone4Display.HighlightsFor(TutorialStep.Zone4Combat, 4, 4, false));
-        Assert.AreEqual(TutorialZone4Highlight.MinimapBossIcon, TutorialZone4Display.HighlightsFor(TutorialStep.Zone4Combat, 4, 4, true));
-        Assert.AreEqual(TutorialZone4Highlight.None, TutorialZone4Display.HighlightsFor(TutorialStep.Finished, 4, 4, true));
+        Assert.IsFalse(TutorialZone4Display.ShowsMinimapBossIcon(TutorialStep.Zone4Combat, false));
+        Assert.IsTrue(TutorialZone4Display.ShowsMinimapBossIcon(TutorialStep.Zone4Combat, true));
+        Assert.IsTrue(TutorialZone4Display.ShowsMinimapBossIcon(TutorialStep.BossEnter, true));
+        Assert.IsFalse(TutorialZone4Display.ShowsMinimapBossIcon(TutorialStep.Finished, true));
     }
 
     [Test]
     public void IsZone4Objective_OnlyOwnIds()
     {
-        Assert.IsTrue(TutorialZone4Display.IsZone4Objective(TutorialGuideIds.Z4PanelGoal));
-        Assert.IsTrue(TutorialZone4Display.IsZone4Objective(TutorialGuideIds.Z4Midboss));
         Assert.IsTrue(TutorialZone4Display.IsZone4Objective(TutorialGuideIds.Z4GoBoss));
+        Assert.IsFalse(TutorialZone4Display.IsZone4Objective(TutorialGuideIds.Z4PanelGoal), "교육 목표는 Legacy 몫");
         Assert.IsFalse(TutorialZone4Display.IsZone4Objective(TutorialGuideIds.Z3Boss));
         Assert.IsFalse(TutorialZone4Display.IsZone4Objective(null));
     }
@@ -261,14 +257,16 @@ public class TutorialZone4RulesTests
         Assert.IsTrue(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialCorridorFlow.GoPadId));
         Assert.IsFalse(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialCorridorFlow.NextId), "낡은 복도3 목표는 덮는다");
         Assert.IsFalse(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialGuideIds.Z4Midboss));
-        Assert.IsFalse(TutorialZone4Display.YieldsToCorridor(TutorialGuideIds.Z4PanelGoal, TutorialCorridorFlow.PickId));
     }
 
     [Test]
-    public void 설정_자막_단계엔_남은_다음_구역으로_목표를_지운다()
+    public void 존4_안에선_남은_다음_구역으로_목표를_지운다()
     {
         Assert.IsTrue(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Zone4Lore, TutorialCorridorFlow.NextId));
+        Assert.IsTrue(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Zone4Combat, TutorialCorridorFlow.NextId),
+            "107 — 소개 연출 판은 설정 단계가 바로 지나간다");
         Assert.IsFalse(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Corridor3, TutorialCorridorFlow.NextId), "복도3 안에선 그대로");
         Assert.IsFalse(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Zone4Lore, TutorialCorridorFlow.WaitId));
     }
 }
+

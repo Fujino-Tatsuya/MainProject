@@ -17,7 +17,7 @@ public static class TutorialSpinnerSpawnOverride
     private static GameObject _variant;
     private static bool _searched;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // 107 Legacy — 맵씬에서 뺐다: 스폰 훅 설치(RuntimeInitializeOnLoadMethod)를 끊었다. Variant 도 NetworkPrefabs 에서 뺐다. 보관용.
     private static void Install()
     {
         _variant = null;

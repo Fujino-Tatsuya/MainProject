@@ -519,7 +519,7 @@ public class MonsterBase : Unit
     /// 기본값 false 라 호출처가 없는 절차 맵·다른 스테이지의 몬스터 동작은 그대로다.
     /// <see cref="SetServerLogicSuspended"/>(보스 연출 정지, 무적 아님)와 플래그가 따로다 — 둘이 서로를 풀지 않는다.
     ///
-    /// 튜토리얼 스피너봇 연습 모드(<c>TutorialSpinnerPractice</c>)도 휴면은 이것 하나를 쓴다(Docs/tech/handoff-tutorial.md §2).
+    /// (튜토리얼 스피너봇 연습 모드 <c>TutorialSpinnerPractice</c> 도 이것을 썼다 — 할 일 107 에서 Legacy 로 빠져 지금은 맵씬에 없다.)
     /// </summary>
     public void SetDormantServer(bool dormant)
     {

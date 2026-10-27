@@ -29,7 +29,7 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
     private bool _localObserved;
     private bool _localHad;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 로비 대체 = TrainingPlayerReset. 보관용.
     private static void InstallBootstrap()
     {
         TutorialDirector.StateChanged -= Ensure;
