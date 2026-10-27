@@ -5,7 +5,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>메시 = 내장 Quad(프리팹 참조), 셰이더 = Lobby/FloorArrow(흐름은 셰이더가 _Time 으로 민다 — 매 프레임 스크립트 없음).</item>
 /// <item>크기 = 자식 <see cref="visual"/> 의 위치·스케일, 색·반복 수·흐름 속도·끝 페이드 = <see cref="MaterialPropertyBlock"/>(머티리얼 복제 없음).</item>
-/// <item>에디터에서 값을 바꾸면 바로 보인다(OnValidate). 단계별 켜고 끄기는 같은 루트의 <see cref="LobbyTrainingStageVisibility"/>.</item>
+/// <item>에디터에서 값을 바꾸면 바로 보인다(OnValidate). 늘 켜져 있다 — 스텝별 켜고 끄기는 경로형(<see cref="LobbyGuideSteps"/>)만 한다.</item>
 /// </list>
 /// 상세: Docs/tech/lobby-training.md "바닥 안내 화살표".
 /// </summary>

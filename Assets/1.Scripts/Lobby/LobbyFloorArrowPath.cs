@@ -13,7 +13,7 @@ using UnityEditor;
 /// Play·빌드에선 아무것도 만들지 않는다 — 켜질 때 조각마다 <see cref="MaterialPropertyBlock"/> 만 넣는다.</item>
 /// <item>조각 = 내장 Quad + 공유 머티리얼 하나(복제 없음). 텍스처 영역(UV)은 이 컴포넌트 값 — SVN 스프라이트 슬라이스에 기대지 않는다.</item>
 /// <item>흐름 = 셰이더 Lobby/FloorArrowPath 가 조각별 경로 거리로 밝기 물결을 앞으로 민다(매 프레임 스크립트 없음).</item>
-/// <item>단계별 켜고 끄기 = 같은 루트의 <see cref="LobbyTrainingStageVisibility"/>, targets = <see cref="piecesRoot"/>(다시 구워도 그대로).</item>
+/// <item>스텝별 켜고 끄기 = 부모 <see cref="LobbyGuideSteps"/> 가 이 오브젝트를 통째로 켜고 끈다(LobbyGuideSteps.prefab 의 자식 3개).</item>
 /// </list>
 /// 상세: Docs/tech/lobby-training.md "바닥 안내 화살표".
 /// </summary>

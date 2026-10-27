@@ -671,7 +671,6 @@ GameObject:
   m_Component:
   - component: {fileID: 887541041038133595}
   - component: {fileID: 8748107177363456757}
-  - component: {fileID: 6841446698142473042}
   m_Layer: 0
   m_Name: LobbyFloorArrowPath
   m_TagString: Untagged
@@ -774,21 +773,6 @@ MonoBehaviour:
     kind: 2
     distance: 9
   bakedHash: -637321150
---- !u!114 &6841446698142473042
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3563002433724165807}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f5bd3b736d07f0e418ba0c9f25257992, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LobbyTrainingStageVisibility
-  showWhen: []
-  targets:
-  - {fileID: 4872538892429071763}
 --- !u!1 &4166369338054221075
 GameObject:
   m_ObjectHideFlags: 0

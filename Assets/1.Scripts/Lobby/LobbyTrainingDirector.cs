@@ -572,6 +572,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
 
     private string Describe() => _flow != null ? $"{_flow.Stage}/{_flow.Phase}" : "(없음)";
 
+    /// <summary>[전 피어] 이 집결 지점의 씬 구역(없으면 null) — 로컬 위치 판정용(바닥 안내 스텝 <see cref="LobbyGuideSteps"/>).</summary>
+    public PartyGatherZone GatherZone(LobbyGatherPoint point) => ZoneOf(point);
+
     private PartyGatherZone ZoneOf(LobbyGatherPoint point)
     {
         switch (point)

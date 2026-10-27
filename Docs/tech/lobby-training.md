@@ -157,7 +157,7 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 ### 경로형 — `LobbyFloorArrowPath.prefab` (점선 + 삼각형, 꺾은선)
 
 - **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrowPath.prefab`
-  - 루트 = `LobbyFloorArrowPath` + `LobbyTrainingStageVisibility`(`targets` = `Pieces`, `showWhen` 비움).
+  - 루트 = `LobbyFloorArrowPath`. 켜고 끄기는 부모 `LobbyGuideSteps` 가 이 루트를 통째로 한다(아래 "안내 스텝").
   - 자식 `Start`·`Waypoint1`·`End` = 경로 점(빈 오브젝트), `Pieces` = **구운 조각**(내장 Quad + 공유 머티리얼 `M_LobbyFloorArrowPath`).
   - 셰이더 `Lobby/FloorArrowPath`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrowPath.shader`, URP Unlit 반투명), 텍스처 `50.Art/UI/Navigate/ArrowLineSet.png` **참조만**.
 - **세팅법**: 프리팹을 놓고 `Start`·`Waypoint*`·`End` 자식을 바닥 위로 옮긴다. 꺾이는 점이 더 필요하면 빈 자식을 만들어 `waypoints` 목록에 순서대로 넣는다.
@@ -199,17 +199,16 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 색·흐름은 다시 굽지 않고 바로 반영된다. 나머지(모양·점)는 다시 굽는다.
 
-**단계 표시와 같이 쓰기**: 루트의 `LobbyTrainingStageVisibility` 가 `targets = Pieces` 하나를 켜고 끈다 — 다시 구워도 `Pieces` 오브젝트는 그대로라 참조가 안 깨진다.
-`showWhen` 은 아래 대응표대로 배치할 때 고른다. 길이 여러 갈래면 프리팹을 여러 개 놓는다.
+**혼자 놓으면 늘 켜져 있다**. 스텝에 따라 켜고 끄려면 `LobbyGuideSteps.prefab` 의 자식으로 쓴다(아래).
 
 ### 직선 띠 — `LobbyFloorArrow.prefab` (병행 유지)
 
 - **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrow.prefab`
-  - 루트 = `LobbyFloorArrowStrip` + `LobbyTrainingStageVisibility`, 자식 `Visual` = 내장 Quad + `M_LobbyFloorArrow`.
+  - 루트 = `LobbyFloorArrowStrip`, 자식 `Visual` = 내장 Quad + `M_LobbyFloorArrow`. 늘 켜져 있다(스텝 켜고 끄기 없음).
   - 셰이더 `Lobby/FloorArrow`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrow.shader`, URP Unlit 반투명) — 텍스처는 사용자가 `50.Art/UI/Navigate/ArrowLineSet.png` 로 바꿨다(10-27, 처음엔 `arrow2.png`). **참조만**(SVN 파일 수정 없음).
   - 흐름은 **셰이더가 `_Time` 으로 UV 를 민다** — 매 프레임 스크립트 없음. 수치는 `MaterialPropertyBlock` 으로 넣어 머티리얼 복제·런타임 텍스처/메시 생성이 없다.
 - **배치**: 루트 위치 = 띠 **시작점**, 루트 **+Z(파란 축) = 화살표 진행 방향**. 바닥 위에 놓고 Y 축으로 돌려 방향을 맞춘다. 길이는 앞(+Z)으로 뻗는다.
-  꺾이는 길은 위 경로형을 쓴다. 편집 중엔 늘 보이고, Play 에서 단계 판정대로 켜고 꺼진다.
+  꺾이는 길·스텝 안내는 위 경로형 + 아래 `LobbyGuideSteps` 를 쓴다.
 
 #### 인스펙터 — `LobbyFloorArrowStrip` (값을 바꾸면 편집 중에도 바로 보인다)
 
@@ -225,31 +224,52 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 `length`·`width`·`heightOffset` 은 `Visual` 자식의 위치·스케일로 들어간다 — `Visual` 트랜스폼을 손으로 고치지 말 것(값이 덮인다).
 
-### 인스펙터 — `LobbyTrainingStageVisibility` (단계 체크)
+### 안내 스텝 — `LobbyGuideSteps.prefab` (경로 3개 중 지금 것 하나만)
 
-- `showWhen` 목록 = **이 중 한 줄이라도 맞으면 켠다**. 빈 목록 = 늘 꺼짐(프리팹 기본 = 비어 있음 — 배치할 때 고른다).
-  한 줄 = `stage` + 선택 `limitPhases`(끄면 그 단계 전체) + `phases`(다중 체크: Gathering / InProgress / Completed).
-- `targets` = 켜고 끌 오브젝트(직선 띠 프리팹 = `Visual`, 경로형 프리팹 = `Pieces`). 비우면 직속 자식 전부. 루트 자신은 끄지 않는다.
-- 판정 = 전 피어 로컬, 복제된 진행기 `Stage`/`Phase`(`LobbyTrainingDirector.StageChanged` + 켜질 때 `Active` 현재 값). 늦은 접속·로비 리로드도 진행기 스폰 알림으로 맞는다.
-  **진행기 없음(다른 씬·미스폰·디스폰) = 꺼짐**. 새 NetworkObject·NetworkVariable·RPC 없음. 규칙 원본 = `LobbyTrainingStageVisibilityRules`(EditMode `LobbyTrainingStageVisibilityRulesTests`).
+타이틀 → 로비에 들어온 플레이어를 순서대로 **① 캐릭터 선택 방 → ② 훈련장 입구 집결 → ③ 출격 집결** 로 안내한다. 스텝마다 경로형 화살표 하나, **지금 스텝 하나만 켠다**.
 
-### 단계 ↔ 훈련 흐름 대응 (화살표가 안내할 곳 기준)
+- **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyGuideSteps.prefab`
+  - 루트 = `LobbyGuideSteps`(`Assets/1.Scripts/Lobby/LobbyGuideSteps.cs`).
+  - 자식 3개 = `LobbyFloorArrowPath.prefab` 중첩 인스턴스 `Step1_CharacterSelect` / `Step2_Tutorial` / `Step3_Sortie`. 각자 `Start`·`Waypoint1`·`End` 가 임시 자리(서로 안 겹치게 대략 배치).
+- **배치**: 씬에 이 프리팹 **하나**를 놓고, 스텝마다 `Start`(로비 들어오는 쪽/앞 스텝 끝)·`Waypoint*`·`End`(목적지 — 캐릭터 선택 오브젝트 앞, 입구 집결 박스 안, 출격 집결 박스 안)를 바닥 위로 옮긴다.
+  옮기면 그 경로가 자동으로 다시 구워진다(경로형과 같음). 씬 참조 필드는 없다 — 진행기·구역·캐릭터 선택 오브젝트는 Play 때 찾는다.
+- **편집 중 보기**: 편집 모드에선 세 경로가 다 보이고 기즈모 글자(`1 캐릭터 선택` 등)가 경로 시작에 뜬다. 인스펙터 `editorPreview` 로 한 스텝만 볼 수 있다
+  (씬 뷰 보기 숨김 `SceneVisibilityManager` — 씬·프리팹에 저장되지 않고 Play·빌드에 영향 없음). `All` 로 되돌리면 다 보인다.
+- **판정**: 전 피어 로컬, **내 화면만**. 매 프레임 복제된 진행기(`LobbyTrainingDirector.Active` 의 단계·하위 상태·훈련 명단·클리어 플래그·출격 카운트다운)와 내 플레이어 위치를 읽는다.
+  새 NetworkObject·NetworkVariable·RPC·콜라이더·타이머 없음. 규칙 원본 = `LobbyGuideStepRules`(EditMode `LobbyGuideStepRulesTests`).
+- **완료 조건(기존 것 재사용)**:
+  - ① 캐릭터 = 캐릭터 선택 `LobbyInteractable` 의 **F 반경 안에 한 번 들어감**(프롬프트 뜨는 거리 그대로). **세션 래치** — 로비 리로드(Alt+3)·판 끝 로비 복귀를 넘어 남고, 연결이 끊기면(타이틀로 나감) 지운다.
+    캐릭터를 바꿀 수 없는 상태(훈련 명단 잠금·출격 카운트다운)면 래치와 무관하게 건너뛴다(`LobbyTrainingFlow.CharacterChangeBlock` 재사용).
+  - ② 튜토리얼 = 진행기 입구 구역(`LobbyGatherPoint.Entrance` 의 `PartyGatherZone`) **박스 안**이면 끔(집결 대기), 입구 확정(= 훈련 시작, 단계가 Lobby 를 벗어남)이면 끝.
+  - ③ 출격 = 진행기 출격 구역 박스 안이면 전부 끔. 출격 확정(Sortie 단계)이면 끝.
 
-| 안내 상황 | `stage` | `limitPhases` / `phases` |
+#### 판정 표 (위에서부터 처음 맞는 줄)
+
+| # | 입력 상태 | 켜는 스텝 |
 |---|---|---|
-| 로비 → 훈련장 입구 집결 (출격 패드도 켜져 있음) | Lobby | 끔 (Lobby 는 늘 Gathering) |
-| 입구 확정 뒤 → TRAIN_01 시작 위치 집결 | Train01 | 켬 / Gathering |
-| TRAIN_01 진행 중 | Train01 | 켬 / InProgress |
-| → TRAIN_02 시작 위치 집결 | Train02 | 켬 / Gathering |
-| → TRAIN_03 영역 집결(A 시작) | Train03A | 켬 / Gathering |
-| TRAIN_03 A→B·B→C 영역 안 확인 | Train03A·Train03B | 켬 / Completed |
-| TRAIN_03 C(대련)·D(제압) 진행 | Train03C·Train03D | 끔 (C·D 는 InProgress 만) |
-| → 종료 집결(훈련실 출구) | TrainEnd | 켬 / Gathering (TrainEnd 는 Gathering 만) |
-| → 브리핑 위치 집결 | Brief | 켬 / Gathering |
-| 브리핑 진행 중(조작 잠금) | Brief | 켬 / InProgress |
-| **브리핑 뒤 → 출격 집결** | **Brief** | **켬 / Completed** |
-| 훈련 없이 출격 집결 | Lobby | 끔 (입구 안내와 같은 단계 — 화살표를 둘 다 켜거나 출격 쪽은 Lobby + Brief/Completed 두 줄) |
-| 출격 확정 뒤(메인 진입 중) | Sortie | 보통 켜지 않음 |
+| 1 | 진행기 없음·미스폰 / 내 플레이어 없음 / 네트워크 꺼짐 | 없음 |
+| 2 | 단계 = Sortie (메인 진입 중) | 없음 |
+| 3 | 내가 출격 집결 구역 박스 안 | 없음 |
+| 4 | 훈련 명단 + 단계 ≠ Lobby + (Brief/Completed 아님) = 훈련·브리핑 진행 중 | 없음 (훈련 안 집결 구역이 안내) |
+| 5 | 캐릭터 래치 꺼짐 + 캐릭터 변경 가능(`CharacterChangeBlock` = None) | ① 캐릭터 선택 |
+| 6 | 단계 = Lobby + 클리어 플래그 꺼짐 + 입구 구역 박스 안 | 없음 (집결 대기) |
+| 7 | 단계 = Lobby + 클리어 플래그 꺼짐 | ② 튜토리얼 |
+| 8 | 그 밖 — 클리어 플래그 켜짐(Alt+1) / 늦은 참가자·명단에서 빠진 사람(훈련 중) / Brief/Completed | ③ 출격 |
+
+**건너뛰기 예**
+
+| 상황 | 결과 |
+|---|---|
+| 처음 로비 입장 | ① → (F 반경 도착) ② → (입구 박스 안) 없음 → (훈련 시작) 없음 → (브리핑 완료) ③ → (출격 박스 안) 없음 |
+| 훈련 없이 바로 출격 구역으로 감 | 출격 박스 안에선 없음(줄 3), 나오면 다시 ②(줄 7) |
+| 튜토리얼 클리어 플래그(Alt+1) | 캐릭터 래치 있으면 바로 ③, 없으면 ① → ③ |
+| Alt+3 로비 리로드 / 판 끝 로비 복귀 | 캐릭터 래치가 남아 ① 건너뜀 → 새 회차 Lobby 이면 ② (클리어 플래그면 ③) |
+| 이미 훈련 진행 중에 들어온 늦은 참가자 | 캐릭터 변경 가능하므로 ① → ③(출격 구역에서 대기, 브리핑 완료 뒤 출격 집결이 켜짐) |
+| 훈련 명단인데 브리핑 완료(Brief/Completed) | 캐릭터 잠금이라 ① 건너뛰고 ③ |
+| 출격 카운트다운 중 | ① 건너뜀(캐릭터 잠금). 카운트다운은 전원이 박스 안일 때만이라 보통 없음 |
+
+**메커니즘 정리(할 일 111 후속)**: 처음 만든 단계 체크 컴포넌트(`LobbyTrainingStageVisibility`, 미병합)는 **삭제**하고 바닥 경로 표시는 `LobbyGuideSteps` 가 전담한다.
+단계 판정은 스텝 규칙(줄 2·4·7·8)에 흡수됐다. `LobbyFloorArrowPath.prefab`·`LobbyFloorArrow.prefab` 에서도 그 컴포넌트를 뺐다 — **혼자 놓은 경로형·직선 띠는 Play 에서도 늘 켜져 있다**.
 
 전이 원본 = `LobbyTrainingFlow`(`IsPointActive`·`OnGatherConfirmed`·`ReportStageCompleted`). 튜토리얼 클리어(Alt+1)로 명단이 비면 바로 `Brief/Completed` 로 넘어간다.
 
