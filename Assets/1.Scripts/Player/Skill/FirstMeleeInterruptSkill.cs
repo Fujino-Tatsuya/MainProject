@@ -42,7 +42,7 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
     {
         // 애니메이션은 PlayerSkillController가 AnimatorStateName으로 재생한다. 여기는 방패 발광만.
         // 간파 연출 스위치(할 일 104 B1) — 끄는 쪽(OnEnd)은 늘 돈다.
-        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.PaladinShieldGlow))
+        if (!InterruptProductionDirector.IsOn(InterruptProductionCue.PaladinShieldGlow))
             return;
 
         shieldGlow?.FadeIn();

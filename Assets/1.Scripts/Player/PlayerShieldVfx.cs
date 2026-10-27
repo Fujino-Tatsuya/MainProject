@@ -318,7 +318,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     // 간파 연출 스위치(할 일 104 B3) — 피어마다 자기 값.
     private void PlayInterruptWave()
     {
-        if (InterruptPresentationToggles.IsOn(InterruptPresentationKind.PaladinWave))
+        if (InterruptProductionDirector.IsOn(InterruptProductionCue.PaladinWave))
             interruptWave?.PlayOnce();
     }
 

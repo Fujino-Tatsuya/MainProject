@@ -95,7 +95,7 @@ public sealed class InterruptSuccessFx : MonoBehaviour
 
     private void HandleStarted(uint triggerId, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
     {
-        if (_networkObject == null || !InterruptPresentationToggles.IsOn(InterruptPresentationKind.SuccessFxSlot))
+        if (_networkObject == null || !InterruptProductionDirector.IsOn(InterruptProductionCue.SuccessFxSlot))
             return;
 
         bool shouldPlay = ShouldPlay(purpose, triggerClientId, _networkObject.IsSpawned, _networkObject.OwnerClientId);

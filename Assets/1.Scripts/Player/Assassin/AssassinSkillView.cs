@@ -363,7 +363,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             return;
         insightSuccessPending = false;
         insightSlashPlayed = false;
-        if (insightSuccess != null && InterruptPresentationToggles.IsOn(InterruptPresentationKind.AssassinInsightSuccess))
+        if (insightSuccess != null && InterruptProductionDirector.IsOn(InterruptProductionCue.AssassinInsightSuccess))
             insightSuccess.PlayOnce();
     }
 

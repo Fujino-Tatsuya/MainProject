@@ -166,10 +166,11 @@ public sealed class GlobalTimeScale : MonoBehaviour
     /// 서버 전용. 슬로우를 발동하고 발동 번호를 돌려준다. 거부 시 0
     /// (서버 아님·세션 미가동·컷신 잠금·씬 전환 중). 진행 중이면 마지막 것이 이긴다(D6).
     /// <paramref name="targetPosition"/> = 연출 기준 월드 위치(이벤트에 실어 전 피어에 보낸다, 선택).
+    /// <paramref name="hitStopOn"/> = 히트스톱을 실을지(간파 연출 디렉터 A1 칸 — 이 레이어는 스위치를 모른다).
     /// </summary>
     public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId,
                             SlowMotionPurpose purpose = SlowMotionPurpose.Attempt,
-                            Vector3 targetPosition = default)
+                            Vector3 targetPosition = default, bool hitStopOn = true)
     {
         if (profile == null || !IsServerActive)
         {
@@ -188,20 +189,19 @@ public sealed class GlobalTimeScale : MonoBehaviour
             triggerId = ++_lastIssuedTriggerId; // uint 한 바퀴 — 0 은 "없음"이라 건너뛴다
         }
 
-        ServerPublish(CreateStartEvent(triggerId, Now, triggerClientId, profile, purpose, targetPosition,
-            InterruptPresentationToggles.IsOn(InterruptPresentationKind.HitStop)));
+        ServerPublish(CreateStartEvent(triggerId, Now, triggerClientId, profile, purpose, targetPosition, hitStopOn));
         return triggerId;
     }
 
     /// <summary>
-    /// 서버가 배포할 Start 이벤트. 히트스톱 스위치(할 일 104 A1)가 꺼져 있으면 히트스톱 길이만 0 으로 싣는다 —
+    /// 서버가 배포할 Start 이벤트. 히트스톱(할 일 104 A1)이 꺼져 있으면 히트스톱 길이만 0 으로 싣는다 —
     /// 서버 값 하나가 전 피어에 가서 같은 타임라인이 유지된다. 배율·진입·유지·복귀는 그대로.
     /// </summary>
     public static SlowMotionEvent CreateStartEvent(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
                                                    SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn)
     {
         var e = SlowMotionEvent.CreateStart(triggerId, time, triggerClientId, profile, purpose, targetPosition);
-        e.HitStopDuration = InterruptPresentationToggles.SelectHitStopDuration(hitStopOn, e.HitStopDuration);
+        e.HitStopDuration = InterruptProductionRules.SelectHitStopDuration(hitStopOn, e.HitStopDuration);
         return e;
     }
 

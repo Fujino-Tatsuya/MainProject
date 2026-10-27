@@ -78,7 +78,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
     {
         if (purpose != SlowMotionPurpose.Success || _networkManager == null)
             return;
-        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.DarkAdaptation))
+        if (!InterruptProductionDirector.IsOn(InterruptProductionCue.DarkAdaptation))
             return;
 
         bool triggeredByMe = triggerClientId == _networkManager.LocalClientId;

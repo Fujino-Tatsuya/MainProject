@@ -434,7 +434,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (timeScale == null || HitboxAnchor == null || owner == null || !PredictsInterruptHit())
             return;
 
-        slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
+        slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId, SlowMotionPurpose.Attempt,
+            default, InterruptProductionDirector.IsOn(InterruptProductionCue.HitStop)));
     }
 
     // 간파 성공(할 일 87): 판정 끝에 성공 프로필로 다시 건다. 마지막 것이 이기므로 시도 슬로우의 지금 배율에서 이어지고,
@@ -448,7 +449,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         Vector3 targetPosition = hasSuccessTargetPosition ? successTargetPosition : owner.transform.position;
         timeScale.ServerStart(timeScale.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success,
-            targetPosition);
+            targetPosition, InterruptProductionDirector.IsOn(InterruptProductionCue.HitStop));
     }
 
     private bool PredictsInterruptHit()
