@@ -4056,7 +4056,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 0.95, g: 0.82, b: 0.42, a: 1}
+  m_fontColor: {r: 0.8901961, g: 0.9019608, b: 0.92156863, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -5812,6 +5812,7 @@ MonoBehaviour:
   cooldownText: {fileID: 899865112900413133}
   tagRow: {fileID: 6994314233118806365}
   tagChipTemplate: {fileID: 7017516365509728060}
+  tagStyles: {fileID: 11400000, guid: 476ad2309fdaf0c4fb3429876aaa9ea1, type: 2}
   tagChipPadding: 12
   tagSpacing: 6
   headerLayout: {fileID: 6765517220180396523}
@@ -10427,7 +10428,6 @@ GameObject:
   - component: {fileID: 7017516365509728060}
   - component: {fileID: 6712768817884310332}
   - component: {fileID: 7567186999642193168}
-  - component: {fileID: 6867140073223434909}
   m_Layer: 5
   m_Name: TagChip
   m_TagString: Untagged
@@ -10476,15 +10476,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.24, g: 0.19, b: 0.08, a: 0.95}
+  m_Color: {r: 0.22745098, g: 0.24705882, b: 0.2901961, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: efff9d08056fd8a4ba37e0abf5b72223, type: 3}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: 4bdbf77357930c0458c90f6c98956d46, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -10493,21 +10493,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &6867140073223434909
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7277939597786046394}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.95, g: 0.82, b: 0.42, a: 0.8}
-  m_EffectDistance: {x: 1.5, y: -1.5}
-  m_UseGraphicAlpha: 1
 --- !u!1 &7582478341106484074
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 306b4dd53e5d9344698664edbd1da6d0, type: 3}
+  m_Name: SkillTooltipTagStyles
+  m_EditorClassIdentifier: Assembly-CSharp::SkillTooltipTagStyles
+  defaultBackground: '#3A3F4A'
+  defaultText: '#E3E6EB'
+  entries:
+  - tagId: Knockback
+    background: '#9A5418'
+    text: '#FFE3C4'
+  - tagId: Stun
+    background: '#7E6B10'
+    text: '#FFF2A8'
+  - tagId: Vulnerable
+    background: '#8C2A5E'
+    text: '#FFD3EA'
+  - tagId: Shield
+    background: '#255C9C'
+    text: '#D6E8FF'
+  - tagId: Heal
+    background: '#2A6E36'
+    text: '#CFF7D6'
+  - tagId: Overheat
+    background: '#A12C22'
+    text: '#FFD6CF'
+  - tagId: Unstoppable
+    background: '#5E3596'
+    text: '#E6D6FF'
+  - tagId: Invulnerable
+    background: '#B8BEC8'
+    text: '#14171D'

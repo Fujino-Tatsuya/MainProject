@@ -91,6 +91,25 @@ public static class SkillTooltipTags
 
     public static bool TryValidate(string ids, out string error) => TryParse(ids, null, out error);
 
+    /// <summary>태그 ID 하나(앞뒤 공백 허용·대소문자 무관). 빈 값·없는 ID 는 오류.</summary>
+    public static bool TryParseOne(string id, out SkillTooltipTag tag, out string error)
+    {
+        error = null;
+        string trimmed = id?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            tag = default;
+            error = "태그 ID 가 비어 있다.";
+            return false;
+        }
+
+        if (TryParseId(trimmed, out tag))
+            return true;
+
+        error = $"없는 태그 ID '{trimmed}' — 허용: {string.Join(", ", Enum.GetNames(typeof(SkillTooltipTag)))}";
+        return false;
+    }
+
     // Enum.TryParse 는 "1" 같은 숫자도 받으므로 이름으로만 찾는다.
     private static bool TryParseId(string id, out SkillTooltipTag tag)
     {

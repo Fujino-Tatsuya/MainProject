@@ -209,6 +209,7 @@ public static class SkillTooltipAuthoring
         EnsureFlexibleHeight(panel, body, hint, icon.rectTransform, title.rectTransform,
             subtitle.rectTransform, cooldown.rectTransform);
         TooltipLayout layout = EnsureLayout114(panel, font, icon, title, subtitle, cooldown, body, hint);
+        StyleTagChip(layout.TagChip);
 
         var so = new SerializedObject(view);
         so.FindProperty("panel").objectReferenceValue = panel.gameObject;
@@ -219,6 +220,7 @@ public static class SkillTooltipAuthoring
         so.FindProperty("cooldownText").objectReferenceValue = cooldown;
         so.FindProperty("tagRow").objectReferenceValue = layout.TagRow;
         so.FindProperty("tagChipTemplate").objectReferenceValue = layout.TagChip;
+        so.FindProperty("tagStyles").objectReferenceValue = EnsureTagStyles();
         so.FindProperty("headerLayout").objectReferenceValue = layout.HeaderLayout;
         so.FindProperty("description").objectReferenceValue = body;
         so.FindProperty("shiftHint").objectReferenceValue = hint;
@@ -243,7 +245,7 @@ public static class SkillTooltipAuthoring
         public LayoutElement HeaderLayout { get; }
     }
 
-    // 할 일 114 시안 배치. 태그·쿨다운 아이콘·칩 배경은 기획 이미지가 나올 때까지 임시 흰 사각형(SVN 원본은 참조만).
+    // 할 일 114 시안 배치. 쿨다운 시계 아이콘은 기획 이미지가 나올 때까지 임시 흰 사각형(SVN 원본은 참조만). 칩 배경은 StyleTagChip.
     private const string TempWhiteSpritePath = "Assets/50.Art/TestAssets/Temp_Images/Images/white_512.png";
     private const float HeaderMinHeight = 116f;
     private static readonly Color AccentColor = new Color(0.95f, 0.82f, 0.42f, 1f);
@@ -270,7 +272,7 @@ public static class SkillTooltipAuthoring
 
         Sprite white = AssetDatabase.LoadAssetAtPath<Sprite>(TempWhiteSpritePath);
         if (white == null)
-            Debug.LogWarning($"[SkillTooltip] 임시 스프라이트 없음: {TempWhiteSpritePath} — 시계·칩 배경을 스프라이트 없이 만든다(SVN 업데이트 확인).");
+            Debug.LogWarning($"[SkillTooltip] 임시 스프라이트 없음: {TempWhiteSpritePath} — 시계를 스프라이트 없이 만든다(SVN 업데이트 확인).");
 
         Transform oldBadge = FindDeep(panel, "KeyBadge");
         if (oldBadge != null)
@@ -335,13 +337,7 @@ public static class SkillTooltipAuthoring
 
         RectTransform chip = NewUi("TagChip", tagRow);
         Place(chip, Vector2.zero, new Vector2(60f, 26f));
-        Image chipImage = chip.gameObject.AddComponent<Image>();
-        chipImage.sprite = white;
-        chipImage.color = new Color(0.24f, 0.19f, 0.08f, 0.95f);
-        chipImage.raycastTarget = false;
-        Outline chipOutline = chip.gameObject.AddComponent<Outline>();
-        chipOutline.effectColor = new Color(AccentColor.r, AccentColor.g, AccentColor.b, 0.8f);
-        chipOutline.effectDistance = new Vector2(1.5f, -1.5f);
+        chip.gameObject.AddComponent<Image>(); // 둥근 스프라이트·색은 StyleTagChip
         RectTransform chipLabelRect = NewUi("Label", chip);
         Stretch(chipLabelRect);
         TextMeshProUGUI chipLabel = chipLabelRect.gameObject.AddComponent<TextMeshProUGUI>();
@@ -376,6 +372,104 @@ public static class SkillTooltipAuthoring
             panelGroup.padding = new RectOffset(0, 0, 0, 12);
 
         return new TooltipLayout(group.gameObject, tagRow, chip, headerLayout);
+    }
+
+    // 할 일 114 후속 — 태그 칩 = 둥근 사각형 9-slice(생성물 · git) + 태그별 색 표.
+    private const string TagChipSpritePath = "Assets/2.Prefabs/UI/Textures/SkillTooltipTagChip.png";
+    private const string TagStylesPath = GeneratedFolder + "/SkillTooltipTagStyles.asset";
+    private const int TagChipTextureSize = 64;
+    private const int TagChipBorder = 24;        // 9-slice 보더(px) — 모서리 반지름 + AA 여유
+    private const float TagChipRadius = 22f;     // px, PPU 200 → 11 UI 단위(칩 높이 26 의 거의 반 = 알약에 가까운 둥근 사각형)
+    private const float TagChipPixelsPerUnit = 200f;
+
+    /// <summary>
+    /// 칩 원본을 둥근 9-slice 로 — 배경 Image = <see cref="TagChipSpritePath"/>·Sliced(글자 길이로 늘어나도 모서리 유지),
+    /// 옛 금색 <see cref="Outline"/> 은 지운다(사각 오프셋 복제라 둥근 모서리와 어긋나고, 태그별 색이 칩을 구분한다).
+    /// 색은 런타임에 <see cref="SkillTooltipTagStyles"/> 가 덮는다 — 여기 색은 표가 비었을 때의 기본색.
+    /// </summary>
+    private static void StyleTagChip(RectTransform chip)
+    {
+        if (chip == null)
+            return;
+
+        Image image = EnsureComponent<Image>(chip.gameObject);
+        image.sprite = EnsureTagChipSprite();
+        image.type = Image.Type.Sliced;
+        image.fillCenter = true;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.color = SkillTooltipTagStyles.FallbackBackground;
+        image.raycastTarget = false;
+        if (chip.TryGetComponent(out Outline outline))
+            Object.DestroyImmediate(outline, true);
+
+        TMP_Text label = chip.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.color = SkillTooltipTagStyles.FallbackText;
+    }
+
+    /// <summary>
+    /// 흰 둥근 사각형 PNG 를 한 번 굽는다(있으면 그대로 — 임포트 설정만 맞춘다). 64×64, 반지름 22px, 가장자리 1px 부드럽게,
+    /// 9-slice 보더 24px 사방. 색은 Image.color 로 입힌다.
+    /// </summary>
+    private static Sprite EnsureTagChipSprite()
+    {
+        if (!System.IO.File.Exists(TagChipSpritePath))
+        {
+            const int size = TagChipTextureSize;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var px = new Color32[size * size];
+            float lo = TagChipRadius, hi = size - TagChipRadius;
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float fx = x + 0.5f, fy = y + 0.5f;
+                float dx = fx < lo ? lo - fx : fx > hi ? fx - hi : 0f;
+                float dy = fy < lo ? lo - fy : fy > hi ? fy - hi : 0f;
+                float d = Mathf.Sqrt(dx * dx + dy * dy); // 안쪽 사각형까지 거리
+                byte a = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(TagChipRadius - d + 0.5f));
+                px[y * size + x] = new Color32(255, 255, 255, a);
+            }
+
+            tex.SetPixels32(px);
+            tex.Apply();
+            System.IO.File.WriteAllBytes(TagChipSpritePath, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(TagChipSpritePath, ImportAssetOptions.ForceUpdate);
+        }
+
+        var importer = (TextureImporter)AssetImporter.GetAtPath(TagChipSpritePath);
+        var border = new Vector4(TagChipBorder, TagChipBorder, TagChipBorder, TagChipBorder);
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteBorder != border ||
+            !Mathf.Approximately(importer.spritePixelsPerUnit, TagChipPixelsPerUnit))
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = TagChipPixelsPerUnit;
+            importer.spriteBorder = border;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.SaveAndReimport();
+        }
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(TagChipSpritePath);
+    }
+
+    /// <summary>태그 칩 색 표 에셋 — 없을 때만 기본 색 초안으로 만든다(이후 값은 xlsx `UI` 시트·인스펙터가 원본).</summary>
+    private static SkillTooltipTagStyles EnsureTagStyles()
+    {
+        var styles = AssetDatabase.LoadAssetAtPath<SkillTooltipTagStyles>(TagStylesPath);
+        if (styles != null)
+            return styles;
+
+        EnsureFolder(GeneratedFolder);
+        styles = ScriptableObject.CreateInstance<SkillTooltipTagStyles>();
+        styles.SetEntries(SkillTooltipTagStyles.DefaultBackgroundHex, SkillTooltipTagStyles.DefaultTextHex,
+            SkillTooltipTagStyles.DefaultStyles());
+        AssetDatabase.CreateAsset(styles, TagStylesPath);
+        return styles;
     }
 
     /// <summary>
