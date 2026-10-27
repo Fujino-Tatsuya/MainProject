@@ -146,17 +146,17 @@ public class TutorialZone3RulesTests
     [Test]
     public void Display_ObjectiveByStep_ClearedByG6()
     {
-        Assert.AreEqual(TutorialGuideIds.Z3CounterGoal, TutorialZone3Display.ObjectiveFor(TutorialStep.Zone3Practice, false));
-        Assert.AreEqual(TutorialGuideIds.Z3Boss, TutorialZone3Display.ObjectiveFor(TutorialStep.Zone3Fight, false));
-        Assert.IsNull(TutorialZone3Display.ObjectiveFor(TutorialStep.Zone3Fight, true));
-        Assert.IsNull(TutorialZone3Display.ObjectiveFor(TutorialStep.Corridor2, false));
-        Assert.IsNull(TutorialZone3Display.ObjectiveFor(TutorialStep.Zone4Lore, false));
+        Assert.AreEqual(TutorialGuideIds.Z3CounterGoal, TutorialZone3Display.ObjectiveFor(MapSceneStep.Zone3Practice, false));
+        Assert.AreEqual(TutorialGuideIds.Z3Boss, TutorialZone3Display.ObjectiveFor(MapSceneStep.Zone3Fight, false));
+        Assert.IsNull(TutorialZone3Display.ObjectiveFor(MapSceneStep.Zone3Fight, true));
+        Assert.IsNull(TutorialZone3Display.ObjectiveFor(MapSceneStep.Corridor2, false));
+        Assert.IsNull(TutorialZone3Display.ObjectiveFor(MapSceneStep.Zone4Lore, false));
     }
 
     [Test]
     public void Display_PracticeObjective_FollowsComboPhase()
     {
-        const TutorialStep P = TutorialStep.Zone3Practice;
+        const MapSceneStep P = MapSceneStep.Zone3Practice;
         Assert.AreEqual(TutorialGuideIds.Z3CounterGoal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Ready), "Z3-2");
         Assert.AreEqual(TutorialGuideIds.Z3PushGoal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Stunned), "Z3-4");
         Assert.AreEqual(TutorialGuideIds.Z3PushGoal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Vulnerable));
@@ -168,13 +168,13 @@ public class TutorialZone3RulesTests
     public void Display_HighlightsOnlyInPractice_WallWhileVulnerable()
     {
         Assert.AreEqual(TutorialZone3Highlight.Spinner | TutorialZone3Highlight.RmbSlot,
-            TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, false));
+            TutorialZone3Display.HighlightsFor(MapSceneStep.Zone3Practice, false));
         Assert.AreEqual(TutorialZone3Highlight.Wall | TutorialZone3Highlight.Spinner | TutorialZone3Highlight.RmbSlot,
-            TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, false, SpinnerComboPhase.Vulnerable), "유효 벽 강조");
+            TutorialZone3Display.HighlightsFor(MapSceneStep.Zone3Practice, false, SpinnerComboPhase.Vulnerable), "유효 벽 강조");
         Assert.AreEqual(TutorialZone3Highlight.None,
-            TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, false, SpinnerComboPhase.Recovering));
-        Assert.AreEqual(TutorialZone3Highlight.None, TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Fight, false));
-        Assert.AreEqual(TutorialZone3Highlight.None, TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, true));
+            TutorialZone3Display.HighlightsFor(MapSceneStep.Zone3Practice, false, SpinnerComboPhase.Recovering));
+        Assert.AreEqual(TutorialZone3Highlight.None, TutorialZone3Display.HighlightsFor(MapSceneStep.Zone3Fight, false));
+        Assert.AreEqual(TutorialZone3Highlight.None, TutorialZone3Display.HighlightsFor(MapSceneStep.Zone3Practice, true));
         Assert.IsTrue(TutorialZone3Display.IsZone3Objective(TutorialGuideIds.Z3Goal));
         Assert.IsTrue(TutorialZone3Display.IsZone3Objective(TutorialGuideIds.Z3PushGoal));
         Assert.IsFalse(TutorialZone3Display.IsZone3Objective(TutorialGuideIds.Z2Goal));
@@ -207,7 +207,7 @@ public class TutorialZone3RulesTests
     // ─── 연계 연습 위치 · 유효 벽 ───
 
     // 2026-10-11 StageTutorial 계산값: 존3 (0.18, −160.55) 20×40(긴 축 z) · 스피너봇 스폰 (0.18, −145.95).
-    static readonly TutorialRect Zone3 = new TutorialRect(0.18f, -160.55f, 10f, 20f);
+    static readonly MapSceneRect Zone3 = new MapSceneRect(0.18f, -160.55f, 10f, 20f);
 
     [Test]
     public void PracticeLayout_LongSideWall_AnchorGapFromWall_AwayFromEnds()
@@ -237,7 +237,7 @@ public class TutorialZone3RulesTests
         Assert.AreEqual(1f, l.NormalX, 1e-4f);
 
         // 90° 돌린 존(긴 축이 로컬 z 그대로, 월드에서는 x) — 법선은 여전히 벽에서 방 안쪽.
-        var rotated = new TutorialRect(0f, 0f, 10f, 20f, 90f);
+        var rotated = new MapSceneRect(0f, 0f, 10f, 20f, 90f);
         TutorialZone3PracticeLayout r = TutorialZone3Geometry.ChoosePracticeLayout(rotated, 0f, 0f, 0.5f, 4f, 8f);
         Assert.AreEqual(4f, Gap(r, 0.5f), 1e-3f);
         Assert.AreEqual(10f, System.Math.Abs(r.WallZ), 1e-3f, "로컬 x 긴 변 → 월드 z = ±10");
@@ -246,7 +246,7 @@ public class TutorialZone3RulesTests
     // ─── 연습 반경 ───
 
     // 2026-10-11 StageTutorial 실측: 스피너봇 스폰 (0.18, −145.95) · G6 배리어 (0.18, −140.35) 4.6×0.4 → 존 쪽 면 z −140.55.
-    static readonly TutorialRect G6 = new TutorialRect(0.18f, -140.35f, 2.3f, 0.2f);
+    static readonly MapSceneRect G6 = new MapSceneRect(0.18f, -140.35f, 2.3f, 0.2f);
 
     [Test]
     public void DistanceToRect_OutsideAndInside()

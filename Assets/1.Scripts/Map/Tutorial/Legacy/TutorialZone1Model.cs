@@ -47,8 +47,8 @@ public static class TutorialZone1Rules
     /// 존1 허수아비를 거둘 때인가(S12) — G1 이 열렸고, 살아 있는 사람이 아무도 존1 에 없거나 파티가 이미 존2 단계로 넘어갔다.
     /// G1 직후 존1 에 남은 사람 눈앞에서 사라지지 않게 떠난 뒤에 거둔다.
     /// </summary>
-    public static bool ShouldDespawnDummies(bool g1Open, bool anyAlivePlayerInZone1, TutorialStep step) =>
-        g1Open && (!anyAlivePlayerInZone1 || step >= TutorialStep.Zone2);
+    public static bool ShouldDespawnDummies(bool g1Open, bool anyAlivePlayerInZone1, MapSceneStep step) =>
+        g1Open && (!anyAlivePlayerInZone1 || step >= MapSceneStep.Zone2);
 }
 
 /// <summary>
@@ -63,14 +63,14 @@ public static class TutorialZone1Rules
 public static class TutorialZone1SkillRules
 {
     /// <summary>스킬 슬롯 → 존1 체크 항목. 모르는 슬롯이면 false.</summary>
-    public static bool TryGetSkillCheck(PlayerSkillSlot slot, out TutorialCheck check)
+    public static bool TryGetSkillCheck(PlayerSkillSlot slot, out MapSceneCheck check)
     {
         switch (slot)
         {
-            case PlayerSkillSlot.Main: check = TutorialCheck.SkillQ; return true;
-            case PlayerSkillSlot.Sub: check = TutorialCheck.SkillE; return true;
-            case PlayerSkillSlot.Ultimate: check = TutorialCheck.SkillR; return true;
-            case PlayerSkillSlot.Interrupt: check = TutorialCheck.SkillInterrupt; return true;
+            case PlayerSkillSlot.Main: check = MapSceneCheck.SkillQ; return true;
+            case PlayerSkillSlot.Sub: check = MapSceneCheck.SkillE; return true;
+            case PlayerSkillSlot.Ultimate: check = MapSceneCheck.SkillR; return true;
+            case PlayerSkillSlot.Interrupt: check = MapSceneCheck.SkillInterrupt; return true;
             default: check = default; return false;
         }
     }
@@ -218,14 +218,14 @@ public readonly struct TutorialZone1View
     }
 
     public TutorialZone1Task Task { get; }
-    /// <summary>개인 체크 마스크(bit = <see cref="TutorialCheck"/>) — 체크리스트 □/■.</summary>
+    /// <summary>개인 체크 마스크(bit = <see cref="MapSceneCheck"/>) — 체크리스트 □/■.</summary>
     public int CheckMask { get; }
 
-    public bool Has(TutorialCheck c) => (CheckMask & (1 << (int)c)) != 0;
-    public bool MoveDone => Has(TutorialCheck.Move);
-    public bool DashDone => Has(TutorialCheck.Dash);
-    public bool AttackDone => Has(TutorialCheck.BasicAttack);
-    public bool PassiveDone => Has(TutorialCheck.PassiveTooltip);
+    public bool Has(MapSceneCheck c) => (CheckMask & (1 << (int)c)) != 0;
+    public bool MoveDone => Has(MapSceneCheck.Move);
+    public bool DashDone => Has(MapSceneCheck.Dash);
+    public bool AttackDone => Has(MapSceneCheck.BasicAttack);
+    public bool PassiveDone => Has(MapSceneCheck.PassiveTooltip);
 
     /// <summary>P 칸 펄스 — 패시브 차례에만.</summary>
     public bool HighlightPassiveSlot => Task == TutorialZone1Task.Passive && !PassiveDone;
@@ -235,35 +235,35 @@ public readonly struct TutorialZone1View
 public static class TutorialZone1Progress
 {
     /// <summary>체크리스트 순서 = 안내 순서(이동·대시·기본 공격·패시브·Q·E·우클릭·R).</summary>
-    public static readonly TutorialCheck[] ChecklistOrder =
+    public static readonly MapSceneCheck[] ChecklistOrder =
     {
-        TutorialCheck.Move, TutorialCheck.Dash, TutorialCheck.BasicAttack, TutorialCheck.PassiveTooltip,
-        TutorialCheck.SkillQ, TutorialCheck.SkillE, TutorialCheck.SkillInterrupt, TutorialCheck.SkillR,
+        MapSceneCheck.Move, MapSceneCheck.Dash, MapSceneCheck.BasicAttack, MapSceneCheck.PassiveTooltip,
+        MapSceneCheck.SkillQ, MapSceneCheck.SkillE, MapSceneCheck.SkillInterrupt, MapSceneCheck.SkillR,
     };
 
     /// <summary>
     /// Z1-4 패시브 툴팁을 셀 차례인가 — 이동·대시·기본 공격을 마친 뒤(§3.1 순서: 팔라딘 패시브는 첫 평타 적중에서 발동하고,
     /// 방금 본 효과를 툴팁으로 확인시키는 흐름). 그 전에 호버한 것은 세지 않는다.
     /// </summary>
-    public static bool IsPassiveTurn(TutorialPlayerProgress p) =>
-        p.Has(TutorialCheck.Move) && p.Has(TutorialCheck.Dash) && p.Has(TutorialCheck.BasicAttack);
+    public static bool IsPassiveTurn(MapScenePlayerProgress p) =>
+        p.Has(MapSceneCheck.Move) && p.Has(MapSceneCheck.Dash) && p.Has(MapSceneCheck.BasicAttack);
 
     /// <summary>
     /// 지금 할 일 = 이동 → 대시 → 기본 공격 → 패시브 → Q → E → 우클릭 → R 중 처음 남은 것.
     /// 순서와 무관하게 먼저 쓴 항목은 체크된 채 건너뛴다(v8 — 다시 시키지 않는다).
     /// 패시브를 마쳤어도 <paramref name="passiveInfoPending"/>(호버가 아직 안 끝나 캐릭터별 패시브 자막 전)이면 패시브에 머문다 — Z1-4 → 자막.
     /// </summary>
-    public static TutorialZone1View Resolve(TutorialPlayerProgress p, bool passiveInfoPending)
+    public static TutorialZone1View Resolve(MapScenePlayerProgress p, bool passiveInfoPending)
     {
         TutorialZone1Task task =
-            !p.Has(TutorialCheck.Move) ? TutorialZone1Task.Move :
-            !p.Has(TutorialCheck.Dash) ? TutorialZone1Task.Dash :
-            !p.Has(TutorialCheck.BasicAttack) ? TutorialZone1Task.Attack :
-            !p.Has(TutorialCheck.PassiveTooltip) || passiveInfoPending ? TutorialZone1Task.Passive :
-            !p.Has(TutorialCheck.SkillQ) ? TutorialZone1Task.SkillQ :
-            !p.Has(TutorialCheck.SkillE) ? TutorialZone1Task.SkillE :
-            !p.Has(TutorialCheck.SkillInterrupt) ? TutorialZone1Task.Interrupt :
-            !p.Has(TutorialCheck.SkillR) ? TutorialZone1Task.SkillR :
+            !p.Has(MapSceneCheck.Move) ? TutorialZone1Task.Move :
+            !p.Has(MapSceneCheck.Dash) ? TutorialZone1Task.Dash :
+            !p.Has(MapSceneCheck.BasicAttack) ? TutorialZone1Task.Attack :
+            !p.Has(MapSceneCheck.PassiveTooltip) || passiveInfoPending ? TutorialZone1Task.Passive :
+            !p.Has(MapSceneCheck.SkillQ) ? TutorialZone1Task.SkillQ :
+            !p.Has(MapSceneCheck.SkillE) ? TutorialZone1Task.SkillE :
+            !p.Has(MapSceneCheck.SkillInterrupt) ? TutorialZone1Task.Interrupt :
+            !p.Has(MapSceneCheck.SkillR) ? TutorialZone1Task.SkillR :
             TutorialZone1Task.Go;
 
         return new TutorialZone1View(task, p.CheckMask);
@@ -272,8 +272,8 @@ public static class TutorialZone1Progress
     /// <summary>
     /// 동료 대기 줄을 띄우는가 — 지금 열 차례인 개인 게이트가 G1 이고 나는 끝냈다(§2.1 "동료 대기 중 (1/2)" — G1 은 자동 진행 없음).
     /// </summary>
-    public static bool ShowsWait(bool hasWait, TutorialGate waitGate, TutorialPlayerProgress p) =>
-        hasWait && waitGate == TutorialGate.G1_Corridor1Entry
-        && (p.CheckMask & TutorialFlowModel.RequiredMaskOf(TutorialGate.G1_Corridor1Entry))
-           == TutorialFlowModel.RequiredMaskOf(TutorialGate.G1_Corridor1Entry);
+    public static bool ShowsWait(bool hasWait, MapSceneGate waitGate, MapScenePlayerProgress p) =>
+        hasWait && waitGate == MapSceneGate.G1_Corridor1Entry
+        && (p.CheckMask & MapSceneFlowModel.RequiredMaskOf(MapSceneGate.G1_Corridor1Entry))
+           == MapSceneFlowModel.RequiredMaskOf(MapSceneGate.G1_Corridor1Entry);
 }

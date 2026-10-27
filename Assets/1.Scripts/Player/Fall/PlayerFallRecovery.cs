@@ -250,7 +250,7 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
     }
 
     /// <summary>
-    /// [서버] 다른 주체가 정한 지점으로 옮긴다(튜토리얼 자동 부활 — <c>TutorialDeathRules</c>).
+    /// [서버] 다른 주체가 정한 지점으로 옮긴다(튜토리얼 자동 부활 — <c>MapSceneDeathRules</c>).
     /// 진행 중인 지연 복귀가 있으면 먼저 끊는다 — 안 끊으면 나중에 옛 안전지점으로 되돌린다.
     /// 추락 판정·복귀 흐름 자체는 건드리지 않는다.
     /// </summary>

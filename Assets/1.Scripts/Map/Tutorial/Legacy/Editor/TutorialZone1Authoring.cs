@@ -7,7 +7,7 @@ using UnityEngine;
 ///    <see cref="TrainingDummyInterrupt"/> 만 뺀 것(노랗게 빛나면 존3 간파 신호와 헷갈린다 — §3.1). 원본·Debug 연습장은 그대로.
 ///  · <c>StageTutorial.prefab</c> 에 자리(<see cref="TutorialZone1Dummies"/>, 비네트워크)만 둔다 — 서버가 런타임에 스폰.
 ///    공용 존 프리팹(ZoneS_typeStart)은 절차 맵도 써서 건드리지 않는다.
-/// <see cref="TutorialStageAuthoring.BuildStagePrefab"/>(2번)가 다시 만들 때도 <see cref="AddTo"/> 로 같이 만든다.
+/// <see cref="MapSceneStageAuthoring.BuildStagePrefab"/>(2번)가 다시 만들 때도 <see cref="AddTo"/> 로 같이 만든다.
 /// </summary>
 public static class TutorialZone1Authoring
 {

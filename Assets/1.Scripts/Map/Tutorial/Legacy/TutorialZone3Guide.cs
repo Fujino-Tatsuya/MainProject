@@ -6,7 +6,7 @@ using UnityEngine;
 /// (단계 Zone3Practice/Zone3Fight · G6 · Zone3Interrupts(연계) 카운터 · 스피너봇 <see cref="TutorialSpinnerPractice.ComboPhase"/>·유효 벽 지점)로 온다 —
 /// 여기서는 그 값만 읽어 <see cref="TutorialGuideUI"/> 를 맞춘다. 준비·간파 = 간파 목표 + 스피너봇·우클릭 칸 · 취약 = 밀치기 목표 + 유효 벽(화살표)·스피너봇·우클릭 칸 ·
 /// 회복 = 연계 n/3 목표만.
-/// 늦게 붙은 클라도 <see cref="TutorialDirector.StateChanged"/>(스폰 직후 1회 포함) 한 번으로 같은 화면이 된다. 자막은 디렉터 ClientRpc 가 띄운다.
+/// 늦게 붙은 클라도 <see cref="MapSceneDirector.StateChanged"/>(스폰 직후 1회 포함) 한 번으로 같은 화면이 된다. 자막은 디렉터 ClientRpc 가 띄운다.
 ///
 /// 붙는 곳: 각 피어에서 디렉터가 튜토리얼 활성으로 보일 때 디렉터 GameObject 에 런타임으로 붙는다(일반 MonoBehaviour — 씬 무수정).
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class TutorialZone3Guide : MonoBehaviour
     private const float RetrySeconds = 0.2f;
     private const float WallMarkerHeight = 1.5f;
 
-    private TutorialDirector _director;
+    private MapSceneDirector _director;
     private TutorialSpinnerPractice _practice;
     private Transform _spinner;
     private Transform _wallMarker;
@@ -34,13 +34,13 @@ public sealed class TutorialZone3Guide : MonoBehaviour
     // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 보관용.
     private static void InstallBootstrap()
     {
-        TutorialDirector.StateChanged -= EnsureOnPeer;
-        TutorialDirector.StateChanged += EnsureOnPeer;
+        MapSceneDirector.StateChanged -= EnsureOnPeer;
+        MapSceneDirector.StateChanged += EnsureOnPeer;
     }
 
     private static void EnsureOnPeer()
     {
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (d == null || !d.IsSpawned || !d.IsTutorialActive) return;
         if (d.GetComponent<TutorialZone3Guide>() != null) return;
         d.gameObject.AddComponent<TutorialZone3Guide>();
@@ -48,14 +48,14 @@ public sealed class TutorialZone3Guide : MonoBehaviour
 
     private void OnEnable()
     {
-        _director = GetComponent<TutorialDirector>();
-        TutorialDirector.StateChanged += MarkDirty;
+        _director = GetComponent<MapSceneDirector>();
+        MapSceneDirector.StateChanged += MarkDirty;
         _dirty = true;
     }
 
     private void OnDisable()
     {
-        TutorialDirector.StateChanged -= MarkDirty;
+        MapSceneDirector.StateChanged -= MarkDirty;
     }
 
     private void MarkDirty() => _dirty = true;
@@ -78,8 +78,8 @@ public sealed class TutorialZone3Guide : MonoBehaviour
         if (_practice != null && _spinner == null) _spinner = _practice.transform;
         SpinnerComboPhase combo = _practice != null ? _practice.ComboPhase : SpinnerComboPhase.Ready;
 
-        TutorialStep step = _director.Step;
-        bool g6 = _director.IsGateOpen(TutorialGate.G6_Corridor3Entry);
+        MapSceneStep step = _director.Step;
+        bool g6 = _director.IsGateOpen(MapSceneGate.G6_Corridor3Entry);
 
         ApplyObjective(ui, TutorialZone3Display.ObjectiveFor(step, g6, combo));
         ApplyHighlights(ui, TutorialZone3Display.HighlightsFor(step, g6, combo));
@@ -96,8 +96,8 @@ public sealed class TutorialZone3Guide : MonoBehaviour
             return;
         }
 
-        int n = _director.GetCounter(TutorialCounter.Zone3Interrupts);
-        int total = _director.GetCounterTarget(TutorialCounter.Zone3Interrupts);
+        int n = _director.GetCounter(MapSceneCounter.Zone3Interrupts);
+        int total = _director.GetCounterTarget(MapSceneCounter.Zone3Interrupts);
         if (id == _shownObjectiveId && n == _shownCount && total == _shownTotal
             && ui.CaptureState().ObjectiveId == id) return;
 

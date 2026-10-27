@@ -8,8 +8,8 @@ using UnityEngine.AI;
 /// 이 컴포넌트는 디렉터·스피너봇·간파 신호를 모델에 넣고 결과(기상·모드 전환·카운터·단계·자막)를 실행한다.
 /// 표시(목표 패널·강조)는 모든 피어의 <see cref="TutorialZone3Guide"/> 가 복제 상태로 그린다. 상세: Docs/tech/tutorial-zone3.md.
 ///
-/// 붙는 곳: 서버에서 디렉터가 튜토리얼을 켠 순간(<see cref="TutorialDirector.StateChanged"/> ∧ <see cref="TutorialDirector.IsTutorialActive"/>)
-/// 디렉터 GameObject 에 런타임으로 붙는다(<see cref="TutorialDeathRules"/> 와 같은 방식 — 씬·프리팹 저장 없음).
+/// 붙는 곳: 서버에서 디렉터가 튜토리얼을 켠 순간(<see cref="MapSceneDirector.StateChanged"/> ∧ <see cref="MapSceneDirector.IsTutorialActive"/>)
+/// 디렉터 GameObject 에 런타임으로 붙는다(<see cref="MapSceneDeathRules"/> 와 같은 방식 — 씬·프리팹 저장 없음).
 ///
 /// 흐름(v8 §3.5 — 간파 → 취약 밀치기 → 벽 충돌 → 회복 → 그 자리에서 다음 준비(원위치 복귀 없음 — 사용자 변경), 연계 파티 합계 3회 → 본 전투):
 ///  · 활성 순간: 연습 위치(<see cref="TutorialZone3Geometry.ChoosePracticeLayout"/> — 존3 긴 변 기준)를 정해 스피너봇을 옮기고
@@ -22,10 +22,10 @@ using UnityEngine.AI;
 ///    간파 횟수는 세지 않고, 쿨타임도 돌려주지 않는다(할 일 90).
 ///  · 연계 일(<see cref="TutorialSpinnerPractice.ServerComboEvent"/>): 벽 충돌 → Zone3Interrupts +1 · TUT_Z3_WALL_SUCCESS({n}/3) ·
 ///    밀치기 빗나감 → TUT_Z3_PUSH_HINT(5초 간격) · 회복 끝(다시 준비) → TUT_Z3_COUNTER_GOAL ·
-///    완료(3회째 회복 끝) → <b>G5</b>(<see cref="TutorialDirector.RequestGateServer"/>) → <see cref="TutorialSpinnerPractice.EnterRealMode"/>
+///    완료(3회째 회복 끝) → <b>G5</b>(<see cref="MapSceneDirector.RequestGateServer"/>) → <see cref="TutorialSpinnerPractice.EnterRealMode"/>
 ///    (교육 제한 해제 + 2초 정지) · 단계 Zone3Fight · TUT_Z3_REAL.
 ///  · 준비·간파 단계 개인 피드백: 빗나감(적중 0) TUT_Z3_MISS · 노랑 아닐 때 스피너봇 적중 TUT_Z3_EARLY — 그 시전자에게만. 연속 놓침 4·8… → TUT_Z3_HINT(전원).
-///  · 처치 = 존 장부의 존3 클리어(<see cref="TutorialDirector.ZoneCleared"/>) → TUT_ZONE_CLEAR. G6 은 장부가 이미 연다(여기서 열지 않는다).
+///  · 처치 = 존 장부의 존3 클리어(<see cref="MapSceneDirector.ZoneCleared"/>) → TUT_ZONE_CLEAR. G6 은 장부가 이미 연다(여기서 열지 않는다).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialZone3Flow : MonoBehaviour
@@ -46,7 +46,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
     [Tooltip("연습 위치를 존 끝(입구·출구)에서 이만큼(m) 안쪽으로.")]
     [SerializeField, Min(0f)] private float practiceEndClearance = TutorialZone3Geometry.DefaultEndClearance;
 
-    private TutorialDirector _director;
+    private MapSceneDirector _director;
     private TutorialZone3Model _model;
     private MonsterBase _spinner;
     private TutorialSpinnerPractice _practice;
@@ -63,13 +63,13 @@ public sealed class TutorialZone3Flow : MonoBehaviour
     // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 존3 진행은 MapSceneZoneFlow. 보관용.
     private static void InstallBootstrap()
     {
-        TutorialDirector.StateChanged -= EnsureOnServer;
-        TutorialDirector.StateChanged += EnsureOnServer;
+        MapSceneDirector.StateChanged -= EnsureOnServer;
+        MapSceneDirector.StateChanged += EnsureOnServer;
     }
 
     private static void EnsureOnServer()
     {
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (d == null || !d.IsSpawned || !d.IsServer || !d.IsTutorialActive) return;
         if (d.GetComponent<TutorialZone3Flow>() != null) return;
         d.gameObject.AddComponent<TutorialZone3Flow>();
@@ -79,7 +79,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
     private void OnEnable()
     {
-        _director = GetComponent<TutorialDirector>();
+        _director = GetComponent<MapSceneDirector>();
         NetworkManager nm = NetworkManager.Singleton;
         if (_director == null || nm == null || !nm.IsServer)
         {
@@ -93,8 +93,8 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
         // 붙기 전에 이미 지나간 신호(정상 흐름에서는 없음 — 활성 순간 붙는다)를 따라잡는다.
         bool start = false;
-        if (_director.IsGateOpen(TutorialGate.G4_Zone3Entry)) start |= _model.NotifyEntryGateOpen();
-        if (_director.HasPartyEnteredServer(TutorialArea.Zone3)) start |= _model.NotifyPartyEntered();
+        if (_director.IsGateOpen(MapSceneGate.G4_Zone3Entry)) start |= _model.NotifyEntryGateOpen();
+        if (_director.HasPartyEnteredServer(MapSceneArea.Zone3)) start |= _model.NotifyPartyEntered();
         if (start) StartPractice();
     }
 
@@ -103,9 +103,9 @@ public sealed class TutorialZone3Flow : MonoBehaviour
     private void Subscribe()
     {
         if (_subscribed) return;
-        TutorialDirector.AreaFirstEntered += HandleAreaFirstEntered;
-        TutorialDirector.GateOpened += HandleGateOpened;
-        TutorialDirector.ZoneCleared += HandleZoneCleared;
+        MapSceneDirector.AreaFirstEntered += HandleAreaFirstEntered;
+        MapSceneDirector.GateOpened += HandleGateOpened;
+        MapSceneDirector.ZoneCleared += HandleZoneCleared;
         PlayerInterruptSkillBase.ServerInterruptSucceeded += HandleInterruptSucceeded;
         PlayerInterruptSkillBase.ServerInterruptResolved += HandleInterruptResolved;
         _subscribed = true;
@@ -114,9 +114,9 @@ public sealed class TutorialZone3Flow : MonoBehaviour
     private void Unsubscribe()
     {
         if (!_subscribed) return;
-        TutorialDirector.AreaFirstEntered -= HandleAreaFirstEntered;
-        TutorialDirector.GateOpened -= HandleGateOpened;
-        TutorialDirector.ZoneCleared -= HandleZoneCleared;
+        MapSceneDirector.AreaFirstEntered -= HandleAreaFirstEntered;
+        MapSceneDirector.GateOpened -= HandleGateOpened;
+        MapSceneDirector.ZoneCleared -= HandleZoneCleared;
         PlayerInterruptSkillBase.ServerInterruptSucceeded -= HandleInterruptSucceeded;
         PlayerInterruptSkillBase.ServerInterruptResolved -= HandleInterruptResolved;
         if (_practice != null)
@@ -132,7 +132,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
     private void ResolveSpinner()
     {
-        _director.GetZoneMonstersServer(TutorialArea.Zone3, TutorialMonsterFilter.KeyOnly, _buffer);
+        _director.GetZoneMonstersServer(MapSceneArea.Zone3, MapSceneMonsterFilter.KeyOnly, _buffer);
         _spinner = _buffer.Count > 0 ? _buffer[0] : null;
         _buffer.Clear();
         if (_spinner == null)
@@ -158,16 +158,16 @@ public sealed class TutorialZone3Flow : MonoBehaviour
     // 연습용 유효 벽·연습 위치(원위치) → 연습 반경(출구 배리어 기준). 스피너봇은 이때 휴면이라 옮겨도 보는 사람이 없다(존3 진입 전).
     private void ApplyPracticeLayout()
     {
-        TutorialStageMarker stage = TutorialStageMarker.Active;
-        var areas = new TutorialAreaTracker();
-        if (!TutorialAreaLayout.TryBuild(stage != null ? stage.transform : null, areas, out string error))
+        MapSceneStageMarker stage = MapSceneStageMarker.Active;
+        var areas = new MapSceneAreaTracker();
+        if (!MapSceneAreaLayout.TryBuild(stage != null ? stage.transform : null, areas, out string error))
         {
             Edit.LogWarning($"[Tutorial] 존3: 구간 계산 실패({error}) — 연습 위치·반경 {_practice.PracticeRadius:0.##}m 그대로 · 벽 안내 화살표 없음.", this);
             return;
         }
 
         float body = BodyRadius(_spinner);
-        if (areas.TryGetArea(TutorialArea.Zone3, out TutorialRect zone))
+        if (areas.TryGetArea(MapSceneArea.Zone3, out MapSceneRect zone))
         {
             Vector3 spawn = _practice.PracticeAnchor;
             TutorialZone3PracticeLayout layout = TutorialZone3Geometry.ChoosePracticeLayout(
@@ -195,13 +195,13 @@ public sealed class TutorialZone3Flow : MonoBehaviour
             Edit.LogWarning("[Tutorial] 존3: 존3 사각형이 없다 — 연습 위치 그대로 · 벽 안내 화살표 없음.", this);
         }
 
-        int target = _director.GetCounterTarget(TutorialCounter.Zone3Interrupts);
+        int target = _director.GetCounterTarget(MapSceneCounter.Zone3Interrupts);
         if (target != _practice.ComboTarget)
             Edit.LogWarning($"[Tutorial] 존3: 디렉터 연계 목표 {target} ≠ 스피너봇 연계 목표 {_practice.ComboTarget} — 두 값을 맞출 것(완료는 스피너봇 값으로 판정).", this);
 
-        List<TutorialBarrierSpec> specs = TutorialBarrierRules.BuildSpecs(
-            areas, TutorialBarrierRules.DefaultThickness, TutorialBarrierRules.DefaultSideOverlap, out _);
-        int i = specs.FindIndex(s => s.Gate == TutorialGate.G6_Corridor3Entry);
+        List<MapSceneBarrierSpec> specs = MapSceneBarrierRules.BuildSpecs(
+            areas, MapSceneBarrierRules.DefaultThickness, MapSceneBarrierRules.DefaultSideOverlap, out _);
+        int i = specs.FindIndex(s => s.Gate == MapSceneGate.G6_Corridor3Entry);
         if (i < 0)
         {
             Edit.LogWarning($"[Tutorial] 존3: 출구 배리어(G6) 모양이 없다 — 연습 반경 {_practice.PracticeRadius:0.##}m 그대로.", this);
@@ -227,26 +227,26 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
     // ─── 신호 ────────────────────────────────────────────────────────────
 
-    private void HandleAreaFirstEntered(TutorialArea area, ulong clientId)
+    private void HandleAreaFirstEntered(MapSceneArea area, ulong clientId)
     {
-        if (area == TutorialArea.Zone3 && _model.NotifyPartyEntered()) StartPractice();
+        if (area == MapSceneArea.Zone3 && _model.NotifyPartyEntered()) StartPractice();
     }
 
-    private void HandleGateOpened(TutorialGate gate, TutorialGateOpenReason reason)
+    private void HandleGateOpened(MapSceneGate gate, MapSceneGateOpenReason reason)
     {
-        if (gate == TutorialGate.G4_Zone3Entry)
+        if (gate == MapSceneGate.G4_Zone3Entry)
         {
             if (_model.NotifyEntryGateOpen()) StartPractice();
         }
-        else if (gate == TutorialGate.G5_SpinnerRealMode)
+        else if (gate == MapSceneGate.G5_SpinnerRealMode)
         {
             if (_model.NotifyRealModeGate(out bool skipped)) StartRealMode(skipped);
         }
     }
 
-    private void HandleZoneCleared(TutorialArea zone)
+    private void HandleZoneCleared(MapSceneArea zone)
     {
-        if (zone != TutorialArea.Zone3 || !_model.NotifyCleared()) return;
+        if (zone != MapSceneArea.Zone3 || !_model.NotifyCleared()) return;
         // G6 은 디렉터(존 장부 → RequestGateServer)가 연다 — 여기서는 안내만.
         _director.ShowSubtitleServer(TutorialGuideIds.ZoneClear);
     }
@@ -258,7 +258,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         if (caster == null) return;
         _succeededCaster = caster;
 
-        if (_practice == null || _director.GetPlayerAreaServer(caster.OwnerClientId) != TutorialArea.Zone3) return;
+        if (_practice == null || _director.GetPlayerAreaServer(caster.OwnerClientId) != MapSceneArea.Zone3) return;
         if (!_model.NotifyCounterSucceeded(out bool first)) return;
 
         if (first) _director.ShowSubtitleServer(TutorialGuideIds.Z3FirstSuccess);
@@ -271,8 +271,8 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
         if ((events & SpinnerComboEvent.WallHit) != 0)
         {
-            _director.AddCounterServer(TutorialCounter.Zone3Interrupts);
-            int total = _director.GetCounterTarget(TutorialCounter.Zone3Interrupts);
+            _director.AddCounterServer(MapSceneCounter.Zone3Interrupts);
+            int total = _director.GetCounterTarget(MapSceneCounter.Zone3Interrupts);
             _director.ShowSubtitleServer(TutorialGuideIds.Z3WallSuccess,
                 new[] { "n", successes.ToString(), "total", total.ToString() });
         }
@@ -283,7 +283,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         if ((events & SpinnerComboEvent.Completed) != 0)
         {
             Edit.Log($"[Tutorial] 존3 연계 {successes}회 + 마지막 회복 끝 → G5.", this);
-            _director.RequestGateServer(TutorialGate.G5_SpinnerRealMode);   // → HandleGateOpened → 본 전투
+            _director.RequestGateServer(MapSceneGate.G5_SpinnerRealMode);   // → HandleGateOpened → 본 전투
         }
     }
 
@@ -295,7 +295,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         bool comboReady = _practice == null || _practice.ComboPhase == SpinnerComboPhase.Ready;
 
         ulong id = caster.OwnerClientId;
-        bool inZone3 = _director.GetPlayerAreaServer(id) == TutorialArea.Zone3;
+        bool inZone3 = _director.GetPlayerAreaServer(id) == MapSceneArea.Zone3;
         bool windowOpen = _window != null && _window.IsOpen;
         Vector3 d = caster.transform.position - _spinner.transform.position;
         d.y = 0f;
@@ -324,7 +324,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         Edit.Log("[Tutorial] 존3 연습 모드 시작 — 스피너봇 기상.", this);
         if (_spinner != null) _director.SetMonsterDormantServer(_spinner, false);
         if (_practice != null) _practice.EnterPractice();
-        _director.SetStepServer(TutorialStep.Zone3Practice);
+        _director.SetStepServer(MapSceneStep.Zone3Practice);
 
         // 공통 안내만 — 캐릭터별 간파 동작·사거리·후폭풍 설명은 하지 않는다(v8 §2.4·§3.5).
         _director.ShowSubtitleServer(TutorialGuideIds.Z3Intro);
@@ -336,7 +336,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         Edit.Log($"[Tutorial] 존3 G5 → 스피너봇 본 모드{(skippedPractice ? " (연습 없이 — 디버그 개방)" : "")}.", this);
         if (skippedPractice && _spinner != null) _director.SetMonsterDormantServer(_spinner, false);
         if (_practice != null) _practice.EnterRealMode();
-        _director.SetStepServer(TutorialStep.Zone3Fight);
+        _director.SetStepServer(MapSceneStep.Zone3Fight);
         _director.ShowSubtitleServer(TutorialGuideIds.Z3Real);
     }
 }
@@ -352,7 +352,7 @@ internal static class TutorialZone3WallFinder
     const float Above = 4f;
     static readonly Collider[] Buffer = new Collider[256];
 
-    public static int FindNearest(TutorialRect zone, Vector3 from, out Vector3 point, out Collider nearest)
+    public static int FindNearest(MapSceneRect zone, Vector3 from, out Vector3 point, out Collider nearest)
     {
         point = from;
         nearest = null;

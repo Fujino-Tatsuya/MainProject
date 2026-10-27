@@ -9,20 +9,20 @@ using UnityEngine.SceneManagement;
 /// 원본: Docs/design/tutorial-scenario.md §3.0·§3.1·§5(v8) · PLAN-tutorial.md S7·V1 · Docs/tech/tutorial-zone1.md.
 /// 규칙은 순수 <see cref="TutorialZone1Rules"/>·<see cref="TutorialZone1SkillRules"/>·<see cref="TutorialZone1Progress"/> 등(TutorialZone1Model.cs).
 ///
-/// 붙는 곳: <see cref="TutorialDirector"/> 가 튜토리얼을 켠 것이 그 피어에서 보이는 순간(<see cref="TutorialDirector.StateChanged"/>)
+/// 붙는 곳: <see cref="MapSceneDirector"/> 가 튜토리얼을 켠 것이 그 피어에서 보이는 순간(<see cref="MapSceneDirector.StateChanged"/>)
 /// 디렉터 GameObject 에 런타임으로 붙는다(<b>모든 피어</b> — 씬·프리팹 저장 없음). 절차 맵은 디렉터가 안 켜져 안 붙는다.
 ///
 /// 서버(G1 전이면 존1 밖에서 쓴 것도 센다 — v8 "미리 쓴 것도 인정", 체크는 되돌리지 않는다):
 ///  · 허수아비 스폰 — StageTutorial 의 <see cref="TutorialZone1Dummies"/> 자리에 간파 사이클 없는 변형을 스폰(거너 R 대상·어쌔신 분노 획득 대상)
-///  · 대시 = <see cref="PlayerDashController.ServerDashApproved"/> → <see cref="TutorialDirector.ReportCheckServer"/>(Dash)
+///  · 대시 = <see cref="PlayerDashController.ServerDashApproved"/> → <see cref="MapSceneDirector.ReportCheckServer"/>(Dash)
 ///  · 기본 공격 = <see cref="Player.ServerBasicAttackStarted"/>(한 타 실제 시작, 적중 무관) → BasicAttack
 ///  · Q·E·R·우클릭 = <see cref="PlayerSkillController.ServerSkillUsed"/>(서버 승인 — 거부·조준 취소는 안 옴) → SkillQ/E/R/Interrupt.
 ///    거너 Q 는 승인(충전 시작)이 아니라 <see cref="GunnerChargeLaserSkill.ServerFired"/>(발사)로 센다
-///  · G1 열림 → 단계 Corridor1(<see cref="TutorialDirector.SetStepServer"/>, 다음 프레임 — 디렉터 Commit 안에서 다시 Commit 하지 않게)
+///  · G1 열림 → 단계 Corridor1(<see cref="MapSceneDirector.SetStepServer"/>, 다음 프레임 — 디렉터 Commit 안에서 다시 Commit 하지 않게)
 ///  · G1 뒤 파티가 존1 을 떠나면 허수아비 디스폰(S12 — <see cref="TutorialZone1Rules.ShouldDespawnDummies"/>)
 /// 오너(로컬 플레이어):
-///  · 이동 = XZ 누적(순간이동 제외) 5m → <see cref="TutorialDirector.ReportLocalMoveDistance"/>(서버 상한 검증)
-///  · 패시브 = <see cref="SkillTooltipView.TooltipShown"/>("Passive") 가 1초 유지 → <see cref="TutorialDirector.ReportLocalCheck"/>(PassiveTooltip)
+///  · 이동 = XZ 누적(순간이동 제외) 5m → <see cref="MapSceneDirector.ReportLocalMoveDistance"/>(서버 상한 검증)
+///  · 패시브 = <see cref="SkillTooltipView.TooltipShown"/>("Passive") 가 1초 유지 → <see cref="MapSceneDirector.ReportLocalCheck"/>(PassiveTooltip)
 ///    이동·대시·기본 공격을 마친 뒤에만 센다(§3.1 순서) · 호버가 끝나면 캐릭터별 패시브 자막
 ///  · 자막: 착지 1초 뒤 환영(S0) · 대시 차례 보조 · 거너 과열 1단계 · R 조준 시작(존1 1회)
 ///  · 목표 패널 = 디렉터 복제 상태(개인 진행·대기)로 매번 다시 계산 — 체크리스트 8줄 · 캐릭터별 힌트는 목표 줄 변형 행(TUT_Z1_Q_GUNNER 등).
@@ -49,7 +49,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     private const float PlayerScanInterval = 0.5f;
     private const float MoveReportRetrySeconds = 1f;
 
-    private TutorialDirector _director;
+    private MapSceneDirector _director;
     private NetworkManager _nm;
     private bool _isServer;
 
@@ -86,13 +86,13 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 존1 진행은 MapSceneZoneFlow(G1 즉시). 보관용.
     private static void InstallBootstrap()
     {
-        TutorialDirector.StateChanged -= Ensure;
-        TutorialDirector.StateChanged += Ensure;
+        MapSceneDirector.StateChanged -= Ensure;
+        MapSceneDirector.StateChanged += Ensure;
     }
 
     private static void Ensure()
     {
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (d == null || !d.IsSpawned || !d.IsTutorialActive) return;
         if (d.GetComponent<TutorialZone1Flow>() != null) return;
         d.gameObject.AddComponent<TutorialZone1Flow>();
@@ -102,7 +102,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     private void OnEnable()
     {
-        _director = GetComponent<TutorialDirector>();
+        _director = GetComponent<MapSceneDirector>();
         _nm = NetworkManager.Singleton;
         if (_director == null || _nm == null || !_nm.IsListening)
         {
@@ -124,8 +124,8 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         SkillTooltipView.TooltipShown += HandleTooltipShown;
         SkillTooltipView.TooltipHidden += HandleTooltipHidden;
         Player.LocalPlayerChanged += BindLocal;
-        TutorialDirector.StateChanged += Render;
-        TutorialDirector.GateOpened += HandleGateOpened;
+        MapSceneDirector.StateChanged += Render;
+        MapSceneDirector.GateOpened += HandleGateOpened;
         _arrived = MapPodArrival.IsArrivalDoneLocal;
         BindLocal(Player.LocalPlayer);
         _ui = TutorialGuideUI.Instance;
@@ -143,14 +143,14 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         SkillTooltipView.TooltipShown -= HandleTooltipShown;
         SkillTooltipView.TooltipHidden -= HandleTooltipHidden;
         Player.LocalPlayerChanged -= BindLocal;
-        TutorialDirector.StateChanged -= Render;
-        TutorialDirector.GateOpened -= HandleGateOpened;
+        MapSceneDirector.StateChanged -= Render;
+        MapSceneDirector.GateOpened -= HandleGateOpened;
         BindLocal(null);
     }
 
     /// <summary>존1 단계가 진행 중인가 — G1 이 아직 닫혀 있다.</summary>
     private bool Zone1Running =>
-        _director != null && _director.IsTutorialActive && !_director.IsGateOpen(TutorialGate.G1_Corridor1Entry);
+        _director != null && _director.IsTutorialActive && !_director.IsGateOpen(MapSceneGate.G1_Corridor1Entry);
 
     private void Update()
     {
@@ -161,7 +161,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             if (_pendingCorridorStep)
             {
                 _pendingCorridorStep = false;
-                _director.SetStepServer(TutorialStep.Corridor1);
+                _director.SetStepServer(MapSceneStep.Corridor1);
             }
 
             _scanTimer -= Time.unscaledDeltaTime;
@@ -195,7 +195,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     private void SpawnDummiesServer()
     {
-        TutorialStageMarker stage = TutorialStageMarker.Active;
+        MapSceneStageMarker stage = MapSceneStageMarker.Active;
         TutorialZone1Dummies spots = stage != null ? stage.GetComponentInChildren<TutorialZone1Dummies>(true) : null;
         if (spots == null || spots.DummyPrefab == null)
         {
@@ -231,11 +231,11 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         bool anyInZone1 = false;
         foreach (ulong id in _nm.ConnectedClientsIds)
         {
-            if (_director.GetPlayerAreaServer(id) != TutorialArea.Zone1) continue;
+            if (_director.GetPlayerAreaServer(id) != MapSceneArea.Zone1) continue;
             anyInZone1 = true;
             break;
         }
-        if (!TutorialZone1Rules.ShouldDespawnDummies(_director.IsGateOpen(TutorialGate.G1_Corridor1Entry), anyInZone1, _director.Step))
+        if (!TutorialZone1Rules.ShouldDespawnDummies(_director.IsGateOpen(MapSceneGate.G1_Corridor1Entry), anyInZone1, _director.Step))
             return;
 
         int n = 0;
@@ -254,14 +254,14 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     private void HandleDashApprovedServer(Player player)
     {
         if (player == null || !Zone1Running) return;
-        _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.Dash);
+        _director.ReportCheckServer(player.OwnerClientId, MapSceneCheck.Dash);
     }
 
     // 기본 공격 한 타 실제 시작(적중 무관 — 어쌔신 강타 포함). R 대상 확정 좌클릭은 조준 경로라 여기 안 온다.
     private void HandleBasicAttackServer(Player player)
     {
         if (player == null || !Zone1Running) return;
-        _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.BasicAttack);
+        _director.ReportCheckServer(player.OwnerClientId, MapSceneCheck.BasicAttack);
     }
 
     // Q·E·R·우클릭 승인 = 실제 발동(거부·조준 취소는 안 온다). 발사형(거너 Q)은 승인 = 충전 시작이라 발사 신호에서 센다.
@@ -271,19 +271,19 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         var skills = player.GetComponent<PlayerSkillController>();
         bool countsOnFire = skills != null && skills.GetSkill(slot) is GunnerChargeLaserSkill;
         if (!TutorialZone1SkillRules.CountsOnApproval(slot, countsOnFire)) return;
-        if (TutorialZone1SkillRules.TryGetSkillCheck(slot, out TutorialCheck check))
+        if (TutorialZone1SkillRules.TryGetSkillCheck(slot, out MapSceneCheck check))
             _director.ReportCheckServer(player.OwnerClientId, check);
     }
 
     private void HandleChargeLaserFiredServer(Player player)
     {
         if (player == null || !Zone1Running) return;
-        _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.SkillQ);
+        _director.ReportCheckServer(player.OwnerClientId, MapSceneCheck.SkillQ);
     }
 
-    private void HandleGateOpened(TutorialGate gate, TutorialGateOpenReason reason)
+    private void HandleGateOpened(MapSceneGate gate, MapSceneGateOpenReason reason)
     {
-        if (gate != TutorialGate.G1_Corridor1Entry) return;
+        if (gate != MapSceneGate.G1_Corridor1Entry) return;
         if (_isServer) _pendingCorridorStep = true;
         Render();
     }
@@ -310,7 +310,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     private bool LocalAlive => _local != null && (_life == null || _life.State == PlayerLifeState.Alive);
 
-    private bool TryGetLocalProgress(out TutorialPlayerProgress progress)
+    private bool TryGetLocalProgress(out MapScenePlayerProgress progress)
     {
         progress = default;
         return _director != null && _director.TryGetPlayerProgress(_nm.LocalClientId, out progress);
@@ -327,10 +327,10 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         if (!_landing.Fired && _landing.Tick(alive && _grounding != null && _grounding.IsGrounded, dt))
             TutorialGuideUI.Instance?.ShowSubtitle(TutorialGuideIds.S0Welcome);
 
-        TryGetLocalProgress(out TutorialPlayerProgress p);
+        TryGetLocalProgress(out MapScenePlayerProgress p);
 
         // Z1-1 이동 — XZ 누적, 순간이동·사망 구간은 끊는다.
-        if (!p.Has(TutorialCheck.Move))
+        if (!p.Has(MapSceneCheck.Move))
         {
             if (!alive) _move.Break();
             else
@@ -362,8 +362,8 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             _passiveHold.Hide();
             return;
         }
-        if (!Zone1Running || !TryGetLocalProgress(out TutorialPlayerProgress p)) return;
-        if (p.Has(TutorialCheck.PassiveTooltip) || _passiveHold.IsComplete || !TutorialZone1Progress.IsPassiveTurn(p)) return;
+        if (!Zone1Running || !TryGetLocalProgress(out MapScenePlayerProgress p)) return;
+        if (p.Has(MapSceneCheck.PassiveTooltip) || _passiveHold.IsComplete || !TutorialZone1Progress.IsPassiveTurn(p)) return;
         _passiveHold.Show(Time.unscaledTimeAsDouble);
     }
 
@@ -400,13 +400,13 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         TutorialGuideUI ui = TutorialGuideUI.Instance;
         if (ui == null) return;
 
-        if (_director.IsGateOpen(TutorialGate.G1_Corridor1Entry))
+        if (_director.IsGateOpen(MapSceneGate.G1_Corridor1Entry))
         {
             _handedOff = true;
             _passiveHold.Hide();
             _passiveInfoPending = false;
             // 존1 을 지켜본 클라만 "복도로" 를 남긴다 — G1 뒤에 처음 그리는(늦은) 클라는 다음 단계(S8) 몫.
-            if (_rebuilt && _director.Step <= TutorialStep.Corridor1)
+            if (_rebuilt && _director.Step <= MapSceneStep.Corridor1)
             {
                 ui.SetObjective(TutorialGuideIds.Z1Go);
                 ui.ClearWait();
@@ -415,7 +415,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             return;
         }
 
-        if (!TryGetLocalProgress(out TutorialPlayerProgress p)) return;
+        if (!TryGetLocalProgress(out MapScenePlayerProgress p)) return;
 
         TutorialZone1View view = TutorialZone1Progress.Resolve(p, _passiveInfoPending);
         string objectiveId = ObjectiveIdOf(view.Task);
@@ -424,11 +424,11 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         var checklist = new TutorialChecklistItem[TutorialZone1Progress.ChecklistOrder.Length];
         for (int i = 0; i < checklist.Length; i++)
         {
-            TutorialCheck c = TutorialZone1Progress.ChecklistOrder[i];
+            MapSceneCheck c = TutorialZone1Progress.ChecklistOrder[i];
             checklist[i] = new TutorialChecklistItem(ChecklistIdOf(c), view.Has(c));
         }
 
-        bool hasWait = _director.TryGetWait(out TutorialGate waitGate, out int done, out int total, out float remaining);
+        bool hasWait = _director.TryGetWait(out MapSceneGate waitGate, out int done, out int total, out float remaining);
         bool showWait = TutorialZone1Progress.ShowsWait(hasWait, waitGate, p);
         // G1 은 자동 진행이 없다(-1 = 카운트다운 없이 동료 n/total 만 — TutorialGuideUI).
         float seconds = remaining < 0f ? -1f : remaining;
@@ -484,15 +484,15 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         _ => TutorialGuideIds.Z1Go,
     };
 
-    private static string ChecklistIdOf(TutorialCheck check) => check switch
+    private static string ChecklistIdOf(MapSceneCheck check) => check switch
     {
-        TutorialCheck.Move => CheckMoveId,
-        TutorialCheck.Dash => CheckDashId,
-        TutorialCheck.BasicAttack => CheckAttackId,
-        TutorialCheck.PassiveTooltip => CheckPassiveId,
-        TutorialCheck.SkillQ => CheckQId,
-        TutorialCheck.SkillE => CheckEId,
-        TutorialCheck.SkillInterrupt => CheckInterruptId,
+        MapSceneCheck.Move => CheckMoveId,
+        MapSceneCheck.Dash => CheckDashId,
+        MapSceneCheck.BasicAttack => CheckAttackId,
+        MapSceneCheck.PassiveTooltip => CheckPassiveId,
+        MapSceneCheck.SkillQ => CheckQId,
+        MapSceneCheck.SkillE => CheckEId,
+        MapSceneCheck.SkillInterrupt => CheckInterruptId,
         _ => CheckRId,
     };
 }

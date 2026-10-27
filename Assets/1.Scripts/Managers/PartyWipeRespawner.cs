@@ -38,14 +38,14 @@ public static class PartyWipeRespawner
         if (nm == null || !nm.IsListening || !nm.IsServer)
             return false;
 
-        TutorialDirector tutorial = TutorialDirector.Instance;
+        MapSceneDirector tutorial = MapSceneDirector.Instance;
         bool tutorialActive = tutorial != null && tutorial.IsTutorialActive;
         BossEncounterDirector encounter = BossEncounterDirector.Instance;
-        IReadOnlyList<TutorialPadArea> pads = TutorialDeathRules.ServerPadAreas();
+        IReadOnlyList<MapScenePadArea> pads = MapSceneDeathRules.ServerPadAreas();
 
         bool available = PartyWipeRespawnRules.CanRespawn(
             tutorialActive,
-            tutorialActive && tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad),
+            tutorialActive && tutorial.IsGateOpen(MapSceneGate.G10_BossEnterAndPad),
             pads.Count > 0,
             encounter != null && encounter.IsBossDefeatedServer);
         if (!available)
@@ -65,7 +65,7 @@ public static class PartyWipeRespawner
             return false;
 
         var points = new List<Vector3>();
-        TutorialDeathRules deathRules = tutorialActive ? tutorial.GetComponent<TutorialDeathRules>() : null;
+        MapSceneDeathRules deathRules = tutorialActive ? tutorial.GetComponent<MapSceneDeathRules>() : null;
         string where;
         if (deathRules != null && deathRules.TryFindWipeRespawnPoints(players.Count, points))
             where = "복도4";
@@ -87,7 +87,7 @@ public static class PartyWipeRespawner
         if (tutorialActive)
         {
             foreach (NetworkObject po in players)
-                tutorial.ResetBackBarrierMaskServer(po.OwnerClientId, TutorialArea.Corridor4);
+                tutorial.ResetBackBarrierMaskServer(po.OwnerClientId, MapSceneArea.Corridor4);
             tutorial.RewindForBossRetryServer();
             deathRules?.ResumeForBossRetry();
         }
@@ -135,17 +135,17 @@ public static class PartyWipeRespawner
         into.Clear();
         int ground = LayerMask.GetMask("Default", "Ground", "Env");
         int obstacle = ground | LayerMask.GetMask("Wall", "Barrier");   // 할 일 32 — 배리어는 Barrier 레이어
-        IReadOnlyList<TutorialPadArea> pads = TutorialDeathRules.ServerPadAreas();
+        IReadOnlyList<MapScenePadArea> pads = MapSceneDeathRules.ServerPadAreas();
 
         foreach (BossEnterTrigger trigger in UnityEngine.Object.FindObjectsByType<BossEnterTrigger>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
             if (!trigger.TryGetComponent(out BoxCollider box) || !box.enabled) continue;
             Bounds b = box.bounds;
-            TutorialPadArea pad = TutorialPadArea.Box(b.min.x, b.min.z, b.max.x, b.max.z);
+            MapScenePadArea pad = MapScenePadArea.Box(b.min.x, b.min.z, b.max.x, b.max.z);
             float floorY = b.min.y;
 
             var ring = new List<(float x, float z)>();
-            PartyWipeRespawnRules.RingCandidates(pad, TutorialRevivePointRules.DefaultPadMargin,
+            PartyWipeRespawnRules.RingCandidates(pad, MapSceneRevivePointRules.DefaultPadMargin,
                                                  PartyWipeRespawnRules.DefaultRingOffset, PartyWipeRespawnRules.DefaultRingStep, ring);
             var points = new List<(float x, float z)>();
             var ys = new List<float>();
@@ -158,7 +158,7 @@ public static class PartyWipeRespawner
 
             var chosen = new List<int>();
             if (!PartyWipeRespawnRules.TrySelectSpread(points, count, pad.CenterX, pad.CenterZ, PartyWipeRespawnRules.DefaultSpacing,
-                                                        pads, TutorialRevivePointRules.DefaultPadMargin, chosen))
+                                                        pads, MapSceneRevivePointRules.DefaultPadMargin, chosen))
                 continue;
 
             foreach (int i in chosen) into.Add(new Vector3(points[i].x, ys[i], points[i].z));
@@ -167,7 +167,7 @@ public static class PartyWipeRespawner
         return false;
     }
 
-    // TutorialDeathRules.TryResolveStandPoint 와 같은 규칙 — 평평한 바닥이 있고 서 있을 자리가 비었는가.
+    // MapSceneDeathRules.TryResolveStandPoint 와 같은 규칙 — 평평한 바닥이 있고 서 있을 자리가 비었는가.
     private static bool TryResolveStandPoint(float x, float z, float floorY, int ground, int obstacle, out float y)
     {
         y = floorY;

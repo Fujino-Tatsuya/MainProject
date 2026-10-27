@@ -10,7 +10,7 @@ using UnityEngine;
 /// 붙는 곳: <see cref="TutorialZone1Flow"/> 와 같다(디렉터 GameObject 런타임 부착, 모든 피어).
 ///
 /// 서버:
-///  · <see cref="TutorialDirector.AreaFirstEntered"/>(Zone2) → 단계 Zone2 → 4초(서버 실제 시간) 뒤 <see cref="TutorialDirector.WakeZoneServer"/>(Zone2)
+///  · <see cref="MapSceneDirector.AreaFirstEntered"/>(Zone2) → 단계 Zone2 → 4초(서버 실제 시간) 뒤 <see cref="MapSceneDirector.WakeZoneServer"/>(Zone2)
 ///  · G3 는 건드리지 않는다 — 존 장부(S4)가 전멸 때 이미 연다.
 /// 모든 피어(로컬 플레이어):
 ///  · 단계 Zone2 를 본 순간 자막 TUT_Z2_INTRO · 목표 TUT_Z2_GOAL(적 처치 n/장부 수)
@@ -20,7 +20,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class TutorialZone2Flow : MonoBehaviour
 {
-    private TutorialDirector _director;
+    private MapSceneDirector _director;
     private NetworkManager _nm;
     private bool _isServer;
 
@@ -39,13 +39,13 @@ public sealed class TutorialZone2Flow : MonoBehaviour
     // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 존2 진행은 MapSceneZoneFlow. 보관용.
     private static void InstallBootstrap()
     {
-        TutorialDirector.StateChanged -= Ensure;
-        TutorialDirector.StateChanged += Ensure;
+        MapSceneDirector.StateChanged -= Ensure;
+        MapSceneDirector.StateChanged += Ensure;
     }
 
     private static void Ensure()
     {
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (d == null || !d.IsSpawned || !d.IsTutorialActive) return;
         if (d.GetComponent<TutorialZone2Flow>() != null) return;
         d.gameObject.AddComponent<TutorialZone2Flow>();
@@ -55,7 +55,7 @@ public sealed class TutorialZone2Flow : MonoBehaviour
 
     private void OnEnable()
     {
-        _director = GetComponent<TutorialDirector>();
+        _director = GetComponent<MapSceneDirector>();
         _nm = NetworkManager.Singleton;
         if (_director == null || _nm == null || !_nm.IsListening)
         {
@@ -64,22 +64,22 @@ public sealed class TutorialZone2Flow : MonoBehaviour
         }
 
         _isServer = _nm.IsServer;
-        if (_isServer) TutorialDirector.AreaFirstEntered += HandleAreaFirstEnteredServer;
+        if (_isServer) MapSceneDirector.AreaFirstEntered += HandleAreaFirstEnteredServer;
 
-        TutorialDirector.StateChanged += Render;
-        TutorialDirector.GateOpened += HandleGateOpened;
+        MapSceneDirector.StateChanged += Render;
+        MapSceneDirector.GateOpened += HandleGateOpened;
         _ui = TutorialGuideUI.Instance;
         Render();
     }
 
     private void OnDisable()
     {
-        TutorialDirector.AreaFirstEntered -= HandleAreaFirstEnteredServer;
-        TutorialDirector.StateChanged -= Render;
-        TutorialDirector.GateOpened -= HandleGateOpened;
+        MapSceneDirector.AreaFirstEntered -= HandleAreaFirstEnteredServer;
+        MapSceneDirector.StateChanged -= Render;
+        MapSceneDirector.GateOpened -= HandleGateOpened;
     }
 
-    private bool G3Open => _director.IsGateOpen(TutorialGate.G3_Corridor2Entry);
+    private bool G3Open => _director.IsGateOpen(MapSceneGate.G3_Corridor2Entry);
 
     private void Update()
     {
@@ -91,13 +91,13 @@ public sealed class TutorialZone2Flow : MonoBehaviour
             if (_pendingStep)
             {
                 _pendingStep = false;
-                _director.SetStepServer(TutorialStep.Zone2);
+                _director.SetStepServer(MapSceneStep.Zone2);
             }
 
             if (!_woken && TutorialZone2Rules.ShouldWake(_enteredAt, _nm.ServerTime.Time))
             {
                 _woken = true;
-                int n = _director.WakeZoneServer(TutorialArea.Zone2);
+                int n = _director.WakeZoneServer(MapSceneArea.Zone2);
                 Edit.Log($"[Tutorial] 존2 기상 {n}마리 — 첫 진입 {TutorialZone2Rules.WakeDelaySeconds:0}초 뒤.", this);
             }
         }
@@ -111,9 +111,9 @@ public sealed class TutorialZone2Flow : MonoBehaviour
 
     // ─── 서버 ────────────────────────────────────────────────────────────
 
-    private void HandleAreaFirstEnteredServer(TutorialArea area, ulong clientId)
+    private void HandleAreaFirstEnteredServer(MapSceneArea area, ulong clientId)
     {
-        if (area != TutorialArea.Zone2 || _enteredAt >= 0d || !_director.IsTutorialActive) return;
+        if (area != MapSceneArea.Zone2 || _enteredAt >= 0d || !_director.IsTutorialActive) return;
         _enteredAt = _nm.ServerTime.Time;
         _pendingStep = true;
         Edit.Log($"[Tutorial] 존2 첫 진입(client {clientId}) — {TutorialZone2Rules.WakeDelaySeconds:0}초 뒤 기상.", this);
@@ -121,9 +121,9 @@ public sealed class TutorialZone2Flow : MonoBehaviour
 
     // ─── 로컬 ────────────────────────────────────────────────────────────
 
-    private void HandleGateOpened(TutorialGate gate, TutorialGateOpenReason reason)
+    private void HandleGateOpened(MapSceneGate gate, MapSceneGateOpenReason reason)
     {
-        if (gate == TutorialGate.G3_Corridor2Entry) Render();
+        if (gate == MapSceneGate.G3_Corridor2Entry) Render();
     }
 
     private void Render()
@@ -142,15 +142,15 @@ public sealed class TutorialZone2Flow : MonoBehaviour
             return;
         }
 
-        if (_director.Step != TutorialStep.Zone2) return;
+        if (_director.Step != MapSceneStep.Zone2) return;
 
         var goal = TutorialZone2Goal.Args(
-            _director.GetCounter(TutorialCounter.Zone2Kills), _director.GetCounterTarget(TutorialCounter.Zone2Kills));
+            _director.GetCounter(MapSceneCounter.Zone2Kills), _director.GetCounterTarget(MapSceneCounter.Zone2Kills));
 
         if (!_started)
         {
             _started = true;
-            if (TutorialGuideFlowUtil.IsGuideEmpty(ui))
+            if (MapSceneGuideFlowUtil.IsGuideEmpty(ui))
             {
                 // 늦은 클라 — 지나간 자막 없이 지금 상태만.
                 ui.RebuildFromState(new TutorialGuideState { ObjectiveId = TutorialGuideIds.Z2Goal, ObjectiveArgs = goal });

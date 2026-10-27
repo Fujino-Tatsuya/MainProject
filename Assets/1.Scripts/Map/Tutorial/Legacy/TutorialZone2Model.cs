@@ -19,7 +19,7 @@ public static class TutorialZone2Rules
 /// <summary>존2 목표 줄 TUT_Z2_GOAL — "적 처치 {n}/{total}".</summary>
 public static class TutorialZone2Goal
 {
-    /// <param name="total">장부의 존2 수(<see cref="TutorialDirector.GetCounterTarget"/>).</param>
+    /// <param name="total">장부의 존2 수(<see cref="MapSceneDirector.GetCounterTarget"/>).</param>
     public static Dictionary<string, string> Args(int kills, int total)
     {
         int t = Math.Max(0, total);

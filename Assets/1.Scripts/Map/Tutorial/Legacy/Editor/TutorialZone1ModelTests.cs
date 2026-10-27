@@ -6,14 +6,14 @@ using NUnit.Framework;
 /// </summary>
 public sealed class TutorialZone1ModelTests
 {
-    static TutorialPlayerProgress Progress(params TutorialCheck[] checks)
+    static MapScenePlayerProgress Progress(params MapSceneCheck[] checks)
     {
-        var p = new TutorialPlayerProgress { ClientId = 0, Connected = true };
-        foreach (TutorialCheck c in checks) p.CheckMask |= 1 << (int)c;
+        var p = new MapScenePlayerProgress { ClientId = 0, Connected = true };
+        foreach (MapSceneCheck c in checks) p.CheckMask |= 1 << (int)c;
         return p;
     }
 
-    static readonly TutorialCheck[] All = TutorialZone1Progress.ChecklistOrder;
+    static readonly MapSceneCheck[] All = TutorialZone1Progress.ChecklistOrder;
 
     // ─── 이동 보고 상한 ─────────────────────────────────────────────────
 
@@ -142,7 +142,7 @@ public sealed class TutorialZone1ModelTests
             TutorialZone1Task.SkillQ, TutorialZone1Task.SkillE, TutorialZone1Task.Interrupt, TutorialZone1Task.SkillR,
             TutorialZone1Task.Go,
         };
-        var done = new System.Collections.Generic.List<TutorialCheck>();
+        var done = new System.Collections.Generic.List<MapSceneCheck>();
         for (int i = 0; i < expected.Length; i++)
         {
             Assert.AreEqual(expected[i], TutorialZone1Progress.Resolve(Progress(done.ToArray()), false).Task, $"{i}단계");
@@ -154,25 +154,25 @@ public sealed class TutorialZone1ModelTests
     public void 순서를_건너_먼저_쓴_항목은_체크된_채_건너뛴다()
     {
         // R·Q 를 먼저 썼어도 이동이 남았으면 목표는 이동, 체크는 그대로. 다시 시키지 않는다.
-        TutorialZone1View v = TutorialZone1Progress.Resolve(Progress(TutorialCheck.SkillR, TutorialCheck.SkillQ), false);
+        TutorialZone1View v = TutorialZone1Progress.Resolve(Progress(MapSceneCheck.SkillR, MapSceneCheck.SkillQ), false);
         Assert.AreEqual(TutorialZone1Task.Move, v.Task);
-        Assert.IsTrue(v.Has(TutorialCheck.SkillR));
-        Assert.IsTrue(v.Has(TutorialCheck.SkillQ));
+        Assert.IsTrue(v.Has(MapSceneCheck.SkillR));
+        Assert.IsTrue(v.Has(MapSceneCheck.SkillQ));
 
         // 앞 넷 + Q 완료 → E, R 은 이미 했으니 E → 우클릭 → Go.
-        TutorialPlayerProgress p = Progress(TutorialCheck.Move, TutorialCheck.Dash, TutorialCheck.BasicAttack,
-                                            TutorialCheck.PassiveTooltip, TutorialCheck.SkillQ, TutorialCheck.SkillR);
+        MapScenePlayerProgress p = Progress(MapSceneCheck.Move, MapSceneCheck.Dash, MapSceneCheck.BasicAttack,
+                                            MapSceneCheck.PassiveTooltip, MapSceneCheck.SkillQ, MapSceneCheck.SkillR);
         Assert.AreEqual(TutorialZone1Task.SkillE, TutorialZone1Progress.Resolve(p, false).Task);
-        p.CheckMask |= 1 << (int)TutorialCheck.SkillE;
+        p.CheckMask |= 1 << (int)MapSceneCheck.SkillE;
         Assert.AreEqual(TutorialZone1Task.Interrupt, TutorialZone1Progress.Resolve(p, false).Task);
-        p.CheckMask |= 1 << (int)TutorialCheck.SkillInterrupt;
+        p.CheckMask |= 1 << (int)MapSceneCheck.SkillInterrupt;
         Assert.AreEqual(TutorialZone1Task.Go, TutorialZone1Progress.Resolve(p, false).Task, "R 은 먼저 써 둠");
     }
 
     [Test]
     public void 패시브를_마쳤어도_호버가_안_끝났으면_패시브에_머문다()
     {
-        TutorialPlayerProgress all = Progress(All);
+        MapScenePlayerProgress all = Progress(All);
         TutorialZone1View v = TutorialZone1Progress.Resolve(all, passiveInfoPending: true);
         Assert.AreEqual(TutorialZone1Task.Passive, v.Task);
         Assert.IsTrue(v.PassiveDone);
@@ -182,28 +182,28 @@ public sealed class TutorialZone1ModelTests
     [Test]
     public void P칸_강조는_패시브_차례에만()
     {
-        Assert.IsFalse(TutorialZone1Progress.Resolve(Progress(TutorialCheck.Move, TutorialCheck.Dash), false).HighlightPassiveSlot);
+        Assert.IsFalse(TutorialZone1Progress.Resolve(Progress(MapSceneCheck.Move, MapSceneCheck.Dash), false).HighlightPassiveSlot);
         Assert.IsTrue(TutorialZone1Progress.Resolve(
-            Progress(TutorialCheck.Move, TutorialCheck.Dash, TutorialCheck.BasicAttack), false).HighlightPassiveSlot);
+            Progress(MapSceneCheck.Move, MapSceneCheck.Dash, MapSceneCheck.BasicAttack), false).HighlightPassiveSlot);
     }
 
     [Test]
     public void 패시브는_이동_대시_기본공격을_마친_뒤에만_센다()
     {
-        Assert.IsFalse(TutorialZone1Progress.IsPassiveTurn(Progress(TutorialCheck.Move, TutorialCheck.Dash)));
-        Assert.IsTrue(TutorialZone1Progress.IsPassiveTurn(Progress(TutorialCheck.Move, TutorialCheck.Dash, TutorialCheck.BasicAttack)));
+        Assert.IsFalse(TutorialZone1Progress.IsPassiveTurn(Progress(MapSceneCheck.Move, MapSceneCheck.Dash)));
+        Assert.IsTrue(TutorialZone1Progress.IsPassiveTurn(Progress(MapSceneCheck.Move, MapSceneCheck.Dash, MapSceneCheck.BasicAttack)));
     }
 
     [Test]
     public void 대기_줄은_G1_차례이고_내가_여덟_항목을_끝냈을_때만()
     {
-        TutorialPlayerProgress done = Progress(All);
-        TutorialPlayerProgress notDone = Progress(TutorialCheck.Move, TutorialCheck.Dash, TutorialCheck.BasicAttack, TutorialCheck.PassiveTooltip);
+        MapScenePlayerProgress done = Progress(All);
+        MapScenePlayerProgress notDone = Progress(MapSceneCheck.Move, MapSceneCheck.Dash, MapSceneCheck.BasicAttack, MapSceneCheck.PassiveTooltip);
 
-        Assert.IsTrue(TutorialZone1Progress.ShowsWait(true, TutorialGate.G1_Corridor1Entry, done));
-        Assert.IsFalse(TutorialZone1Progress.ShowsWait(true, TutorialGate.G1_Corridor1Entry, notDone), "스킬 미사용");
-        Assert.IsFalse(TutorialZone1Progress.ShowsWait(false, TutorialGate.G1_Corridor1Entry, done));
-        Assert.IsFalse(TutorialZone1Progress.ShowsWait(true, TutorialGate.G2_Zone2Entry, done));
+        Assert.IsTrue(TutorialZone1Progress.ShowsWait(true, MapSceneGate.G1_Corridor1Entry, done));
+        Assert.IsFalse(TutorialZone1Progress.ShowsWait(true, MapSceneGate.G1_Corridor1Entry, notDone), "스킬 미사용");
+        Assert.IsFalse(TutorialZone1Progress.ShowsWait(false, MapSceneGate.G1_Corridor1Entry, done));
+        Assert.IsFalse(TutorialZone1Progress.ShowsWait(true, MapSceneGate.G2_Zone2Entry, done));
     }
 
     // ─── 디렉터 규칙과 맞물림 — 존1 체크 8개 = G1 ──────────────────────────────
@@ -212,8 +212,8 @@ public sealed class TutorialZone1ModelTests
     public void 존1_체크리스트_여덟_줄이_G1_개인_마스크와_같다()
     {
         int listed = 0;
-        foreach (TutorialCheck c in All) listed |= 1 << (int)c;
-        Assert.AreEqual(TutorialFlowModel.RequiredMaskOf(TutorialGate.G1_Corridor1Entry), listed);
+        foreach (MapSceneCheck c in All) listed |= 1 << (int)c;
+        Assert.AreEqual(MapSceneFlowModel.RequiredMaskOf(MapSceneGate.G1_Corridor1Entry), listed);
         Assert.AreEqual(TutorialZone1Task.Go, TutorialZone1Progress.Resolve(Progress(All), false).Task);
     }
 
@@ -222,12 +222,12 @@ public sealed class TutorialZone1ModelTests
     [Test]
     public void 스킬_슬롯마다_다른_체크_항목이다()
     {
-        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Main, out TutorialCheck q));
-        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Sub, out TutorialCheck e));
-        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Interrupt, out TutorialCheck rmb));
-        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Ultimate, out TutorialCheck r));
+        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Main, out MapSceneCheck q));
+        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Sub, out MapSceneCheck e));
+        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Interrupt, out MapSceneCheck rmb));
+        Assert.IsTrue(TutorialZone1SkillRules.TryGetSkillCheck(PlayerSkillSlot.Ultimate, out MapSceneCheck r));
         CollectionAssert.AreEqual(
-            new[] { TutorialCheck.SkillQ, TutorialCheck.SkillE, TutorialCheck.SkillInterrupt, TutorialCheck.SkillR },
+            new[] { MapSceneCheck.SkillQ, MapSceneCheck.SkillE, MapSceneCheck.SkillInterrupt, MapSceneCheck.SkillR },
             new[] { q, e, rmb, r });
     }
 
@@ -244,9 +244,9 @@ public sealed class TutorialZone1ModelTests
     [Test]
     public void 허수아비는_G1_뒤_파티가_존1_을_떠나면_거둔다()
     {
-        Assert.IsFalse(TutorialZone1Rules.ShouldDespawnDummies(false, false, TutorialStep.Zone1), "G1 전엔 연습 중");
-        Assert.IsFalse(TutorialZone1Rules.ShouldDespawnDummies(true, true, TutorialStep.Corridor1), "아직 존1 에 남은 사람 눈앞에서 지우지 않는다");
-        Assert.IsTrue(TutorialZone1Rules.ShouldDespawnDummies(true, false, TutorialStep.Corridor1));
-        Assert.IsTrue(TutorialZone1Rules.ShouldDespawnDummies(true, true, TutorialStep.Zone2), "파티가 존2 로 넘어갔으면 낙오자가 있어도 거둔다");
+        Assert.IsFalse(TutorialZone1Rules.ShouldDespawnDummies(false, false, MapSceneStep.Zone1), "G1 전엔 연습 중");
+        Assert.IsFalse(TutorialZone1Rules.ShouldDespawnDummies(true, true, MapSceneStep.Corridor1), "아직 존1 에 남은 사람 눈앞에서 지우지 않는다");
+        Assert.IsTrue(TutorialZone1Rules.ShouldDespawnDummies(true, false, MapSceneStep.Corridor1));
+        Assert.IsTrue(TutorialZone1Rules.ShouldDespawnDummies(true, true, MapSceneStep.Zone2), "파티가 존2 로 넘어갔으면 낙오자가 있어도 거둔다");
     }
 }

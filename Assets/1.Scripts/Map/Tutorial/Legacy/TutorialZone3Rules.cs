@@ -162,12 +162,12 @@ public static class TutorialZone3Display
     /// 연습 중에는 연계 단계별(v8 Z3-2·Z3-4·Z3-7): 준비·간파 = TUT_Z3_COUNTER_GOAL · 기절/취약 = TUT_Z3_PUSH_GOAL · 회복/완료 = TUT_Z3_GOAL.
     /// 연계 n/3 은 목표 진행도로 함께 보인다.
     /// </summary>
-    public static string ObjectiveFor(TutorialStep step, bool corridor3EntryOpen, SpinnerComboPhase combo = SpinnerComboPhase.Ready)
+    public static string ObjectiveFor(MapSceneStep step, bool corridor3EntryOpen, SpinnerComboPhase combo = SpinnerComboPhase.Ready)
     {
         if (corridor3EntryOpen) return null;
         switch (step)
         {
-            case TutorialStep.Zone3Practice:
+            case MapSceneStep.Zone3Practice:
                 switch (combo)
                 {
                     case SpinnerComboPhase.Ready: return TutorialGuideIds.Z3CounterGoal;
@@ -175,7 +175,7 @@ public static class TutorialZone3Display
                     case SpinnerComboPhase.Vulnerable: return TutorialGuideIds.Z3PushGoal;
                     default: return TutorialGuideIds.Z3Goal;
                 }
-            case TutorialStep.Zone3Fight: return TutorialGuideIds.Z3Boss;
+            case MapSceneStep.Zone3Fight: return TutorialGuideIds.Z3Boss;
             default: return null;
         }
     }
@@ -184,10 +184,10 @@ public static class TutorialZone3Display
     /// 강조 — 연습 중에만(본 모드 전환 G5 에서 끈다). 준비·간파 = 스피너봇 + 우클릭 칸(Z3-2) · 기절/취약 = 유효 벽 + 스피너봇 + 우클릭 칸(Z3-4) ·
     /// 회복 = 없음(Z3-7).
     /// </summary>
-    public static TutorialZone3Highlight HighlightsFor(TutorialStep step, bool corridor3EntryOpen,
+    public static TutorialZone3Highlight HighlightsFor(MapSceneStep step, bool corridor3EntryOpen,
                                                        SpinnerComboPhase combo = SpinnerComboPhase.Ready)
     {
-        if (step != TutorialStep.Zone3Practice || corridor3EntryOpen) return TutorialZone3Highlight.None;
+        if (step != MapSceneStep.Zone3Practice || corridor3EntryOpen) return TutorialZone3Highlight.None;
         switch (combo)
         {
             case SpinnerComboPhase.Ready:
@@ -232,7 +232,7 @@ public static class TutorialZone3Geometry
     public const float DefaultMargin = 0.5f;
 
     /// <summary>점에서 (회전된) 사각형까지 XZ 거리. 안이면 0.</summary>
-    public static float DistanceToRect(float x, float z, TutorialRect rect)
+    public static float DistanceToRect(float x, float z, MapSceneRect rect)
     {
         rect.ToLocal(x, z, out float lx, out float lz);
         float ox = Math.Max(0f, Math.Abs(lx) - rect.HalfX);
@@ -244,7 +244,7 @@ public static class TutorialZone3Geometry
     /// 연습 반경 = min(인스펙터 최대, 기준점 → 출구 배리어(G6) 박스 거리 − 몸 반경 − 여유), 0 미만이면 0(기준점 고정 —
     /// <see cref="SpinnerPracticeArea"/> 의 '0 = 고정' 규칙). 몸 가장자리가 배리어 면에 닿기 전에 멈춘다.
     /// </summary>
-    public static float ComputePracticeRadius(float anchorX, float anchorZ, TutorialRect exitBarrier,
+    public static float ComputePracticeRadius(float anchorX, float anchorZ, MapSceneRect exitBarrier,
                                               float bodyRadius, float margin, float maxRadius)
     {
         float d = DistanceToRect(anchorX, anchorZ, exitBarrier) - Math.Max(0f, bodyRadius) - Math.Max(0f, margin);
@@ -261,7 +261,7 @@ public static class TutorialZone3Geometry
     /// 연습용 유효 벽 = 존 사각형의 <b>긴 변</b> 중 스피너봇 스폰에 가까운 쪽(같으면 로컬 + 쪽). 연습 위치 = 스폰의 긴 축 좌표(존 끝에서
     /// <paramref name="endClearance"/> 안쪽으로 자름)에서, 벽 면 ↔ 몸 가장자리가 <paramref name="wallGap"/> 인 점.
     /// </summary>
-    public static TutorialZone3PracticeLayout ChoosePracticeLayout(TutorialRect zone, float spawnX, float spawnZ, float bodyRadius,
+    public static TutorialZone3PracticeLayout ChoosePracticeLayout(MapSceneRect zone, float spawnX, float spawnZ, float bodyRadius,
                                                                   float wallGap = DefaultWallGap, float endClearance = DefaultEndClearance)
     {
         zone.ToLocal(spawnX, spawnZ, out float lx, out float lz);
@@ -284,15 +284,15 @@ public static class TutorialZone3Geometry
         return new TutorialZone3PracticeLayout(wx, wz, nx, nz, ax, az);
     }
 
-    private static void ToWorld(TutorialRect r, float lx, float lz, out float x, out float z)
+    private static void ToWorld(MapSceneRect r, float lx, float lz, out float x, out float z)
     {
         LocalDirToWorld(r, lx, lz, out float dx, out float dz);
         x = r.CenterX + dx;
         z = r.CenterZ + dz;
     }
 
-    // TutorialRect.GetCorner 와 같은 회전(월드 = c·lx + s·lz, −s·lx + c·lz).
-    private static void LocalDirToWorld(TutorialRect r, float lx, float lz, out float x, out float z)
+    // MapSceneRect.GetCorner 와 같은 회전(월드 = c·lx + s·lz, −s·lx + c·lz).
+    private static void LocalDirToWorld(MapSceneRect r, float lx, float lz, out float x, out float z)
     {
         double a = r.YawDegrees * Math.PI / 180d;
         float c = (float)Math.Cos(a), s = (float)Math.Sin(a);

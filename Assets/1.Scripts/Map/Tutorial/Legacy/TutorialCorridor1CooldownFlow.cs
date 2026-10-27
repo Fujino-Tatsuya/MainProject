@@ -9,8 +9,8 @@ using UnityEngine;
 /// 원본: Docs/design/tutorial-scenario.md §3.2 · PLAN-tutorial.md V2 · Docs/tech/tutorial-corridors-zone2.md.
 /// 규칙은 순수 <see cref="TutorialCooldownResetModel"/>, 실행은 <see cref="TutorialCooldownReset"/>(쿨 장부 공개 API 만).
 ///
-/// 붙는 곳: 다른 존 흐름과 같다(<see cref="TutorialDirector.StateChanged"/> → 디렉터 GameObject 런타임 부착, 모든 피어).
-/// 서버: 구간 판정(<see cref="TutorialDirector.GetPlayerAreaServer"/>) → 초기화 → 개인 체크 <see cref="TutorialCheck.Corridor1CooldownReset"/>(복제 기록).
+/// 붙는 곳: 다른 존 흐름과 같다(<see cref="MapSceneDirector.StateChanged"/> → 디렉터 GameObject 런타임 부착, 모든 피어).
+/// 서버: 구간 판정(<see cref="MapSceneDirector.GetPlayerAreaServer"/>) → 초기화 → 개인 체크 <see cref="MapSceneCheck.Corridor1CooldownReset"/>(복제 기록).
 /// 오너: 그 복제 기록이 켜지는 것을 보면 대시 예측 충전을 가득 채운다(서버 대시 장부와 짝 — 추락 복구의 ResetChargeToOne 과 같은 방식).
 /// </summary>
 [DisallowMultipleComponent]
@@ -19,7 +19,7 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
     public const string CooldownResetId = "TUT_C1_COOLDOWN_RESET";
     private const float PollInterval = 0.1f;
 
-    private TutorialDirector _director;
+    private MapSceneDirector _director;
     private NetworkManager _nm;
     private bool _isServer;
     private float _pollTimer;
@@ -32,13 +32,13 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
     // 107 Legacy — 맵씬에서 뺐다: 런타임 부착(RuntimeInitializeOnLoadMethod)을 끊었다. 로비 대체 = TrainingPlayerReset. 보관용.
     private static void InstallBootstrap()
     {
-        TutorialDirector.StateChanged -= Ensure;
-        TutorialDirector.StateChanged += Ensure;
+        MapSceneDirector.StateChanged -= Ensure;
+        MapSceneDirector.StateChanged += Ensure;
     }
 
     private static void Ensure()
     {
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (d == null || !d.IsSpawned || !d.IsTutorialActive) return;
         if (d.GetComponent<TutorialCorridor1CooldownFlow>() != null) return;
         d.gameObject.AddComponent<TutorialCorridor1CooldownFlow>();
@@ -46,7 +46,7 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
 
     private void OnEnable()
     {
-        _director = GetComponent<TutorialDirector>();
+        _director = GetComponent<MapSceneDirector>();
         _nm = NetworkManager.Singleton;
         if (_director == null || _nm == null || !_nm.IsListening)
         {
@@ -55,14 +55,14 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
         }
 
         _isServer = _nm.IsServer;
-        TutorialDirector.StateChanged += ObserveLocal;
+        MapSceneDirector.StateChanged += ObserveLocal;
         if (_isServer) _nm.OnClientDisconnectCallback += _model.Forget;
         ObserveLocal();
     }
 
     private void OnDisable()
     {
-        TutorialDirector.StateChanged -= ObserveLocal;
+        MapSceneDirector.StateChanged -= ObserveLocal;
         if (_nm != null) _nm.OnClientDisconnectCallback -= _model.Forget;
     }
 
@@ -73,7 +73,7 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
         if (_pollTimer > 0f) return;
         _pollTimer = PollInterval;
 
-        bool g1Open = _director.IsGateOpen(TutorialGate.G1_Corridor1Entry);
+        bool g1Open = _director.IsGateOpen(MapSceneGate.G1_Corridor1Entry);
         foreach (NetworkClient client in _nm.ConnectedClientsList)
         {
             Player player = client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
@@ -81,14 +81,14 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
 
             ulong id = client.ClientId;
             bool busy = TutorialCooldownReset.IsBusy(player);
-            bool recorded = _director.TryGetPlayerProgress(id, out TutorialPlayerProgress p) && p.Has(TutorialCheck.Corridor1CooldownReset);
-            bool inCorridor1 = _director.GetPlayerAreaServer(id) == TutorialArea.Corridor1;
+            bool recorded = _director.TryGetPlayerProgress(id, out MapScenePlayerProgress p) && p.Has(MapSceneCheck.Corridor1CooldownReset);
+            bool inCorridor1 = _director.GetPlayerAreaServer(id) == MapSceneArea.Corridor1;
 
             if (_model.TryBegin(id, g1Open, inCorridor1, busy, recorded))
             {
                 int n = TutorialCooldownReset.ResetSkillsServer(player, TutorialCooldownResetScope.Corridor1Includes);
                 player.GetComponent<PlayerDashController>()?.ServerResetChargeToFull();
-                _director.ReportCheckServer(id, TutorialCheck.Corridor1CooldownReset);
+                _director.ReportCheckServer(id, MapSceneCheck.Corridor1CooldownReset);
                 Edit.Log($"[Tutorial] 복도1 첫 진입 쿨타임 초기화 — client {id} 스킬 {n}개 + 대시" +
                          (busy ? " · 진행 중 행동이 끝나면 한 번 더(예약)" : "") + ".", this);
             }
@@ -104,9 +104,9 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
     private void ObserveLocal()
     {
         if (_director == null || _nm == null || !_director.IsTutorialActive) return;
-        if (!_director.TryGetPlayerProgress(_nm.LocalClientId, out TutorialPlayerProgress p)) return;
+        if (!_director.TryGetPlayerProgress(_nm.LocalClientId, out MapScenePlayerProgress p)) return;
 
-        bool has = p.Has(TutorialCheck.Corridor1CooldownReset);
+        bool has = p.Has(MapSceneCheck.Corridor1CooldownReset);
         bool fresh = _localObserved && !_localHad && has;
         _localObserved = true;
         _localHad = has;

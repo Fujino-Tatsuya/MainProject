@@ -1741,7 +1741,7 @@ GameObject:
   - component: {fileID: 1019541882}
   - component: {fileID: 1019541881}
   m_Layer: 0
-  m_Name: TutorialSafePoints
+  m_Name: MapSceneSafePoints
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1758,7 +1758,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a32604a280d041f41a87b7ccaa0da555, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialSafePoints
+  m_EditorClassIdentifier: Assembly-CSharp::MapSceneSafePoints
   points:
   - area: 1
     point: {fileID: 917504941}
@@ -3196,7 +3196,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3840629702024370378, guid: 0ca5b6ae8f1ed014ca4658123464343a, type: 3}
       propertyPath: m_Name
-      value: TutorialDirector
+      value: MapSceneDirector
       objectReference: {fileID: 0}
     - target: {fileID: 8550612548819303543, guid: 0ca5b6ae8f1ed014ca4658123464343a, type: 3}
       propertyPath: m_LocalPosition.x

@@ -10,7 +10,7 @@ using UnityEngine;
 /// 고치면 절차 맵에도 퍼진다. 그래서 스폰 직전 훅(<see cref="MapContentSpawner.ServerMonsterPrefabOverride"/>)에서 튜토리얼일 때만 Variant 로 바꾼다.
 /// Variant 는 DefaultNetworkPrefabs 에 등록돼 있어 클라도 같은 프리팹으로 복제한다. 참조는 등록 목록에서 찾는다(씬·StageTutorial 무수정).
 ///
-/// 판별 = <see cref="TutorialStageMarker.IsActive"/>(씬 로드 때 확정 — 맵 생성 스폰보다 먼저). 절차 맵·Debug 씬 스피너봇은 그대로.
+/// 판별 = <see cref="MapSceneStageMarker.IsActive"/>(씬 로드 때 확정 — 맵 생성 스폰보다 먼저). 절차 맵·Debug 씬 스피너봇은 그대로.
 /// </summary>
 public static class TutorialSpinnerSpawnOverride
 {
@@ -28,7 +28,7 @@ public static class TutorialSpinnerSpawnOverride
     /// <summary>치환할 프리팹 — 튜토리얼 스테이지의 (연습 컴포넌트 없는) SpinnerBot 이면 Variant, 아니면 null(그대로).</summary>
     public static GameObject Resolve(GameObject prefab)
     {
-        if (prefab == null || !TutorialStageMarker.IsActive) return null;
+        if (prefab == null || !MapSceneStageMarker.IsActive) return null;
         if (prefab.GetComponent<SpinnerBot>() == null || prefab.GetComponent<TutorialSpinnerPractice>() != null) return null;
 
         GameObject variant = FindRegisteredVariant();

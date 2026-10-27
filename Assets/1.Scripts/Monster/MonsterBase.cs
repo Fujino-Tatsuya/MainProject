@@ -515,7 +515,7 @@ public class MonsterBase : Unit
     /// 피격(<see cref="ReceiveAttack"/> 거절 → 피해·피격 연출·넉백·경직·인터럽트 누적·간파 소비·피해 숫자 없음),
     /// 직접·비율 피해(<see cref="CanApplyHealthDamage"/>), <c>Unit.Knockback</c>(<see cref="OnKnockback"/> → LinearKnockback) 모두 무시.
     ///
-    /// 쓰는 곳: 튜토리얼 존 장부(<c>TutorialMonsterZones</c>) — "자기 차례가 올 때까지 휴면"(tutorial-scenario §2.2).
+    /// 쓰는 곳: 튜토리얼 존 장부(<c>MapSceneMonsterZones</c>) — "자기 차례가 올 때까지 휴면"(tutorial-scenario §2.2).
     /// 기본값 false 라 호출처가 없는 절차 맵·다른 스테이지의 몬스터 동작은 그대로다.
     /// <see cref="SetServerLogicSuspended"/>(보스 연출 정지, 무적 아님)와 플래그가 따로다 — 둘이 서로를 풀지 않는다.
     ///

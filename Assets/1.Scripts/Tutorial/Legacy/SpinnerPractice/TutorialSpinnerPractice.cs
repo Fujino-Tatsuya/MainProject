@@ -22,7 +22,7 @@ using UnityEngine.AI;
 /// <item><b>본 모드</b> — 주입을 전부 끈다 = 원래 스피너봇.</item>
 /// </list>
 /// 휴면은 여기 없다 — 모든 몬스터 공통 <see cref="MonsterBase.SetDormantServer"/>(FSM 정지 + 무적·넉백/CC 무시)를
-/// 디렉터(<c>TutorialMonsterZones</c> / <c>TutorialDirector.SetMonsterDormantServer</c>)가 건다. 휴면 중에는 전환 대기 타이머가 흐르지 않는다.
+/// 디렉터(<c>MapSceneMonsterZones</c> / <c>MapSceneDirector.SetMonsterDormantServer</c>)가 건다. 휴면 중에는 전환 대기 타이머가 흐르지 않는다.
 /// S9 순서: <c>SetMonsterDormantServer(spinner, false)</c> → <see cref="EnterPractice"/> → <see cref="EnterRealMode"/>.
 /// 집계는 새로 세지 않는다 — 간파 성공은 SpinnerBot 이 원래대로 <see cref="CombatStatsEvents.ServerCounterSucceeded"/> 를 낸다.
 /// 여기 이벤트는 그 통보와 <see cref="MonsterCounterWindow.IsOpen"/> 관찰로 만든 튜토리얼용 파생 신호다.
