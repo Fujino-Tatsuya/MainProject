@@ -242,6 +242,20 @@ public static class DataTableApplier
                     continue;
                 }
 
+                if (resolvedField != null && resolvedField.IsDefined(typeof(SkillTooltipTagIdAttribute), false) &&
+                    !SkillTooltipTags.TryParseOne((string)value, out _, out string tagIdError))
+                {
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {tagIdError}");
+                    continue;
+                }
+
+                if (resolvedField != null && resolvedField.IsDefined(typeof(HexColorTextAttribute), false) &&
+                    !HexColor.TryValidate((string)value, out string colorError))
+                {
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' — {colorError}");
+                    continue;
+                }
+
                 if (value is long || value is double)
                 {
                     string rangeError = DataTableFields.CheckRange(
@@ -279,7 +293,39 @@ public static class DataTableApplier
             }
         }
 
+        CheckTagStyles(writes, issues);
         return writes;
+    }
+
+    private static readonly Regex TagStyleIdPath = new Regex(@"^entries\.Array\.data\[(\d+)\]\.tagId$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// 태그 칩 색 표(<see cref="SkillTooltipTagStyles"/>) 전체 검사 — 칸 하나로는 못 보는 같은 ID 두 줄(오류)·줄 없는 태그(경고, 기본색).
+    /// 테이블이 쓴 ID 를 에셋 값 위에 덮어 본다.
+    /// </summary>
+    private static void CheckTagStyles(List<DataTableWrite> writes, DataTableIssues issues)
+    {
+        foreach (IGrouping<Object, DataTableWrite> group in writes.Where(w => w.Target is SkillTooltipTagStyles).GroupBy(w => w.Target))
+        {
+            var styles = (SkillTooltipTagStyles)group.Key;
+            var ids = styles.Entries.Select(e => e?.TagId).ToList();
+            foreach (DataTableWrite write in group)
+            {
+                Match match = TagStyleIdPath.Match(write.PropertyPath);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out int index) && index < ids.Count)
+                    ids[index] = (string)write.Value;
+            }
+
+            var errors = new List<string>();
+            var warnings = new List<string>();
+            // 없는·빈 ID 는 칸마다 이미 오류를 냈다 — 여기서는 중복·줄 없는 태그만.
+            SkillTooltipTagStyles.ValidateIds(ids, errors, warnings, reportInvalidIds: false);
+            string location = group.First().Source.Location;
+            foreach (string error in errors)
+                issues.Error(location, $"{styles.name}.{error}");
+            foreach (string warning in warnings)
+                issues.Warning(location, $"{styles.name}: {warning}");
+        }
     }
 
     private static SerializedObject SerializedFor(Dictionary<Object, SerializedObject> cache, Object target)
