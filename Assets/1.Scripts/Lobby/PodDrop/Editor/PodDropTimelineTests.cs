@@ -239,7 +239,7 @@ public sealed class PodDropTimelineTests
         PodDropMapTimeline t = Map();
         Assert.AreEqual(12f, t.PodHeightAt(-1d, NotYet), Eps, "시작 전 위");
         Assert.AreEqual(12f, t.PodHeightAt(t.FallAt, NotYet), Eps);
-        Assert.AreEqual(Mathf.Lerp(12f, 5f, Easing.Evaluate(Ease.InQuad, 0.5f)), t.PodHeightAt(t.FallAt + 0.3d, NotYet), Eps, "InQuad 중간");
+        Assert.AreEqual(Mathf.Lerp(12f, 5f, Easing.Evaluate(Ease.OutQuad, 0.5f)), t.PodHeightAt(t.FallAt + 0.3d, NotYet), Eps, "OutQuad 중간");
         Assert.AreEqual(5f, t.PodHeightAt(t.HoverAt, NotYet), Eps, "정지 높이");
         Assert.AreEqual(5f, t.PodHeightAt(100d, NotYet), Eps, "펴기 이벤트 전엔 계속 떠 있다");
 

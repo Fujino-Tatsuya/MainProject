@@ -175,7 +175,7 @@ public struct PodDropMapTimings
         fallHeight = 12f,
         hoverHeight = 5f,
         fallSeconds = 0.6f,
-        fallEase = Ease.InQuad,
+        fallEase = Ease.OutQuad,
         wingDeployState = "DP_WingDeploy",
         gearDeployState = "DP_GearDeploy",
         landSeconds = 1.5f,
