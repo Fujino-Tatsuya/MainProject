@@ -46,19 +46,19 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
 
     /// <summary>
     /// [서버] 복귀 지점 추가 거름(전역). 인자 = (복귀할 플레이어의 OwnerClientId, 후보 지점). false 를 돌려준 지점은 기준점·Ring 후보 모두 버린다.
-    /// 튜토리얼 배리어(<c>TutorialBarriers</c>)가 닫힌 배리어 너머·그 플레이어의 뒤 배리어 너머 구간을 빼려고 건다. 없으면 모두 허용.
+    /// 튜토리얼 배리어(<c>MapSceneBarriers</c>)가 닫힌 배리어 너머·그 플레이어의 뒤 배리어 너머 구간을 빼려고 건다. 없으면 모두 허용.
     /// </summary>
     public static System.Func<ulong, Vector3, bool> ReturnPointFilter;
 
     /// <summary>
     /// [서버] 스폰 폴백 대체(전역). 큐의 후보가 모두 실패했는데 스폰 위치마저 <see cref="ReturnPointFilter"/> 가 거부할 때만 묻는다
-    /// (인자 = OwnerClientId, 낙하 지점). null 을 돌려주거나 없으면 스폰 위치. 튜토리얼 사망 규칙(<c>TutorialDeathRules</c>)이 건다.
+    /// (인자 = OwnerClientId, 낙하 지점). null 을 돌려주거나 없으면 스폰 위치. 튜토리얼 사망 규칙(<c>MapSceneDeathRules</c>)이 건다.
     /// </summary>
     public static System.Func<ulong, Vector3, Vector3?> ReturnPointFallback;
 
     /// <summary>
     /// [서버] 복귀 지점 우선 지정(전역). 값을 돌려주면 큐·Ring 탐색 없이 그 지점을 쓴다(인자 = OwnerClientId, 낙하 지점).
-    /// null 을 돌려주거나 없으면 기존 탐색. 튜토리얼 스텝별 고정 안전 지점(<c>TutorialSafePoints</c>, 할 일 80)이 건다.
+    /// null 을 돌려주거나 없으면 기존 탐색. 튜토리얼 스텝별 고정 안전 지점(<c>MapSceneSafePoints</c>, 할 일 80)이 건다.
     /// </summary>
     public static System.Func<ulong, Vector3, Vector3?> ReturnPointOverride;
 

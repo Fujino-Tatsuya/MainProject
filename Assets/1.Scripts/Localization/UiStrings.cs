@@ -202,10 +202,14 @@ public static class UiStrings
             UnitSeconds,
             LoadingPreparing, LoadingLoading, LoadingWaitingForPlayers, LoadingActivating, LoadingStandBy,
             SkillTooltipShiftHint, SkillTooltipError, SkillTooltipPassiveBadge,
+        };
+        all.AddRange(SkillTooltipTags.Names); // 스킬 툴팁 태그 칩(UI.SkillTooltip.Tag.<ID>) — 목록은 SkillTooltipTag 한 곳
+        all.AddRange(new[]
+        {
             ResultCleared, ResultFailed, ResultAborted, ResultSurvival, ResultPlayerSlot,
             LobbyShowLastResult,
             TrainingDummyHp,
-        };
+        });
         all.AddRange(LoadingTips);
         all.AddRange(LoadingReadyMessages);
         all.AddRange(StatusEffectNames.Values);

@@ -128,7 +128,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     /// <summary>[전 피어] 현재 라운드의 창 표시 옵션(상단 설명·아래 한 줄).</summary>
     public TutorialTraitRoundDisplay RoundDisplay => (TutorialTraitRoundDisplay)roundDisplay.Value;
 
-    /// <summary>[전 피어] 누군가 특성 초기화 팝업 대기 또는 재선택 중이다 — 보스 진입 패드가 잠긴다(<see cref="TutorialBossPath.IsBossPadEnabled"/>).</summary>
+    /// <summary>[전 피어] 누군가 특성 초기화 팝업 대기 또는 재선택 중이다 — 보스 진입 패드가 잠긴다(<see cref="MapSceneBossPath.IsBossPadEnabled"/>).</summary>
     public bool IsTraitResetInProgress => IsSpawned && traitResetBusy.Value;
 
     /// <summary>[서버] 특성 1장 획득(수동·자동).</summary>
@@ -464,7 +464,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (!CanServe || resetModel == null)
             return;
 
-        TutorialDirector tutorial = TutorialDirector.Instance;
+        MapSceneDirector tutorial = MapSceneDirector.Instance;
         if (tutorial == null || !tutorial.IsTutorialActive)
         {
             Edit.Log($"{Tag} 전멸 리스폰 — 튜토리얼이 아니라 특성 초기화 팝업 없음.", this);
@@ -578,7 +578,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     // 선택 검증(제시된 후보인가·이미 골랐나)은 모델이 한다. 위반은 무시하고 로그만 남긴다.
     private bool CommitChoice(ulong clientId, int traitIndex, bool auto)
     {
-        // 재선택(개인 라운드) 획득은 복도 라운드가 아니다 — 0 으로 알려 복도 체크(TutorialCorridorFlow)가 반응하지 않게 한다.
+        // 재선택(개인 라운드) 획득은 복도 라운드가 아니다 — 0 으로 알려 복도 체크(MapSceneTraitCorridorFlow)가 반응하지 않게 한다.
         int chosenRound = model.IsPersonalRound(clientId) ? 0 : model.Round;
         TutorialTraitChoiceResult result = model.TryChoose(clientId, traitIndex);
         if (result != TutorialTraitChoiceResult.Accepted)
@@ -669,7 +669,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         }
 
         // 팝업·재선택은 전멸 팝업을 띄우는 조건(튜토리얼 진행 중)과 같을 때만 되살린다.
-        TutorialDirector tutorial = TutorialDirector.Instance;
+        MapSceneDirector tutorial = MapSceneDirector.Instance;
         bool allowReset = tutorial != null && tutorial.IsTutorialActive;
         TutorialTraitRejoinReset reset = TutorialTraitRejoin.Restore(model, resetModel, newClientId, snapshot, allowReset);
         if (reset == TutorialTraitRejoinReset.ReselectContinue)

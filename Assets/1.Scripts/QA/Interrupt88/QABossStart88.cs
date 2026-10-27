@@ -18,8 +18,8 @@ public sealed class QABossStart88Result
 /// <summary>
 /// 할 일 88 — 중간보스·23호 강제 개시 QA 훅(<b>호스트(서버)에서만</b>). 새 게임 API 없이 기존 디버그 경로만 쓴다:
 /// <list type="bullet">
-/// <item>중간보스: 구간 스킵 존4(<see cref="TutorialDirector.RequestSkip"/> = Alt+6) → G8 대기(없으면 <see cref="TutorialDebugActions.OpenGatesThrough"/>)
-///   → G8 지연 기상(3초)이 지난 뒤 존4 일반몹 휴면 → 중간보스 기상(<c>Tools/Tutorial/Debug/존4 중간보스 기상</c> 과 같은 <see cref="TutorialDirector.WakeZoneServer"/> KeyOnly)
+/// <item>중간보스: 구간 스킵 존4(<see cref="MapSceneDirector.RequestSkip"/> = Alt+6) → G8 대기(없으면 <see cref="MapSceneDebugActions.OpenGatesThrough"/>)
+///   → G8 지연 기상(3초)이 지난 뒤 존4 일반몹 휴면 → 중간보스 기상(<c>Tools/MapScene/Debug/존4 중간보스 기상</c> 과 같은 <see cref="MapSceneDirector.WakeZoneServer"/> KeyOnly)
 ///   → 파티를 중간보스 바로 옆으로(<see cref="TryFindBossRingPoints"/> — 보스와 같은 NavMesh 섬, 다리 개통 전에도 + <see cref="PlayerFallRecovery.RelocateServer"/>).</item>
 /// <item>23호: P572·M7 과 같은 G10 개방 → <see cref="BossTeleportManager.ForceStartEncounter"/> → Combat. 간파 창은
 ///   <see cref="ReserveJumpComboIfIdle"/>(F3 = <c>DevReserveJumpCombo</c>, 3번째 착지 창)로 앞당긴다.</item>
@@ -33,8 +33,8 @@ public static class QABossStart88
     private const float SkipWaitSeconds = 60f;
     private const float G8WaitSeconds = 20f;
     private const float CombatWaitSeconds = 150f;
-    /// <summary>G8 → 일반몹 지연 기상(<see cref="TutorialZone4Model.DefaultWakeDelaySeconds"/>)이 지날 때까지 + 여유.</summary>
-    public const float NormalWakeWaitSeconds = TutorialZone4Model.DefaultWakeDelaySeconds + 0.5f;
+    /// <summary>G8 → 일반몹 지연 기상(<see cref="MapSceneBossApproachModel.DefaultWakeDelaySeconds"/>)이 지날 때까지 + 여유.</summary>
+    public const float NormalWakeWaitSeconds = MapSceneBossApproachModel.DefaultWakeDelaySeconds + 0.5f;
 
     // 파티 지점 검사 — 서 있을 자리에 벽·소품·배리어·몬스터가 겹치면 버린다(스모크 4차 P8 벽 관통 'Wall_00'·'PF_Prop_SM_Prop_Ship…').
     private static readonly int StandBlockMask = LayerMask.GetMask("Default", "Wall", "Env", "Barrier", "Enemy");
@@ -63,15 +63,15 @@ public static class QABossStart88
         }
     }
 
-    private static bool CanRequestZone4SkipNow(TutorialDirector d) =>
-        CanRequestZone4Skip(d.Step, d.GetComponent<TutorialSkipController>() != null, IsLoadingFlowInProgress);
+    private static bool CanRequestZone4SkipNow(MapSceneDirector d) =>
+        CanRequestZone4Skip(d.Step, d.GetComponent<MapSceneSkipController>() != null, IsLoadingFlowInProgress);
 
     /// <summary>
-    /// 존4 구간 스킵을 지금 보내면 받아들여지는가 — 스킵 컨트롤러가 붙었고 <see cref="TutorialSkipPlan.Check"/> 가 Ok.
+    /// 존4 구간 스킵을 지금 보내면 받아들여지는가 — 스킵 컨트롤러가 붙었고 <see cref="MapSceneSkipPlan.Check"/> 가 Ok.
     /// 로딩 흐름 진행 중이면 컨트롤러가 RestartInProgress 로 거부하고 다시 시도하지 않는다.
     /// </summary>
-    public static bool CanRequestZone4Skip(TutorialStep step, bool hasSkipController, bool loadingFlowInProgress) =>
-        hasSkipController && TutorialSkipPlan.Check(step, TutorialSkipTarget.Zone4, loadingFlowInProgress) == TutorialSkipVerdict.Ok;
+    public static bool CanRequestZone4Skip(MapSceneStep step, bool hasSkipController, bool loadingFlowInProgress) =>
+        hasSkipController && MapSceneSkipPlan.Check(step, MapSceneSkipTarget.Zone4, loadingFlowInProgress) == MapSceneSkipVerdict.Ok;
 
     public static IEnumerator Start(QAInterruptTargetKind kind, QABossStart88Result result) =>
         kind == QAInterruptTargetKind.Midboss ? StartMidboss(result) : StartTwentyThree(result);
@@ -81,7 +81,7 @@ public static class QABossStart88
     {
         result.Ok = false;
         result.Target = null;
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (!IsServer || d == null || !d.IsTutorialActive)
         {
             result.Detail = $"서버·튜토리얼 활성 아님(server={IsServer}, director={(d != null)})";
@@ -91,25 +91,25 @@ public static class QABossStart88
         // 1) 존4 로 구간 스킵(이미 존4 이상이면 보내지 않고 그대로 진행).
         //    맵 첫 진입 로딩 흐름(로딩 씬 언로드·최소 표시 시간)이 끝나기 전 요청은 RestartInProgress 로 한 번 거부되고 끝난다
         //    (스모크 3차 88-20261022_143717) — 스킵 컨트롤러가 받아들일 때까지 기다렸다 한 번만 보낸다.
-        if (d.Step < TutorialStep.Zone4Lore)
+        if (d.Step < MapSceneStep.Zone4Lore)
         {
             float readyUntil = Time.realtimeSinceStartup + ReadyWaitSeconds;
-            while (d != null && d.Step < TutorialStep.Zone4Lore && !CanRequestZone4SkipNow(d) && Time.realtimeSinceStartup < readyUntil)
+            while (d != null && d.Step < MapSceneStep.Zone4Lore && !CanRequestZone4SkipNow(d) && Time.realtimeSinceStartup < readyUntil)
                 yield return null;
-            if (d == null || (d.Step < TutorialStep.Zone4Lore && !CanRequestZone4SkipNow(d)))
+            if (d == null || (d.Step < MapSceneStep.Zone4Lore && !CanRequestZone4SkipNow(d)))
             {
                 result.Detail = $"존4 스킵 {ReadyWaitSeconds:0}초 안에 보낼 수 없음(단계={(d != null ? d.Step.ToString() : "없음")}, " +
-                                $"스킵 컨트롤러={(d != null && d.GetComponent<TutorialSkipController>() != null)}, 로딩 흐름 진행 중={IsLoadingFlowInProgress})";
+                                $"스킵 컨트롤러={(d != null && d.GetComponent<MapSceneSkipController>() != null)}, 로딩 흐름 진행 중={IsLoadingFlowInProgress})";
                 yield break;
             }
         }
-        if (d.Step < TutorialStep.Zone4Lore)
+        if (d.Step < MapSceneStep.Zone4Lore)
         {
-            d.RequestSkip(TutorialSkipTarget.Zone4);
+            d.RequestSkip(MapSceneSkipTarget.Zone4);
             float until = Time.realtimeSinceStartup + SkipWaitSeconds;
-            while (d != null && d.Step < TutorialStep.Zone4Lore && Time.realtimeSinceStartup < until)
+            while (d != null && d.Step < MapSceneStep.Zone4Lore && Time.realtimeSinceStartup < until)
                 yield return null;
-            if (d == null || d.Step < TutorialStep.Zone4Lore)
+            if (d == null || d.Step < MapSceneStep.Zone4Lore)
             {
                 result.Detail = $"존4 스킵 {SkipWaitSeconds:0}초 안에 안 됨(단계={(d != null ? d.Step.ToString() : "없음")})";
                 yield break;
@@ -117,21 +117,21 @@ public static class QABossStart88
         }
 
         // 2) G8(설정 자막 끝 = 존4 전투 시작)을 기다렸다가 일반몹을 다시 재운다 — G8 이 일반몹을 깨워 간파 측정에 끼어든다.
-        //    🔴 G8 은 일반몹을 바로 깨우지 않고 TutorialZone4Flow 가 **3초 뒤** 깨운다. G8 직후에 재우면 아직 휴면이라 0마리를 재우고
+        //    🔴 G8 은 일반몹을 바로 깨우지 않고 MapSceneBossApproachGuide 가 **3초 뒤** 깨운다. G8 직후에 재우면 아직 휴면이라 0마리를 재우고
         //    3초 뒤 30마리가 깨어 런 내내 파티를 때렸다(스모크 4차 88-20261022_145020 — slept=0 → 14:50:39 NormalOnly 기상 30마리).
         //    → 지연 기상이 지난 뒤에 재운다.
         float g8Until = Time.realtimeSinceStartup + G8WaitSeconds;
-        while (!d.IsGateOpen(TutorialGate.G8_TimerStart) && Time.realtimeSinceStartup < g8Until)
+        while (!d.IsGateOpen(MapSceneGate.G8_TimerStart) && Time.realtimeSinceStartup < g8Until)
             yield return null;
-        if (!d.IsGateOpen(TutorialGate.G8_TimerStart))
-            TutorialDebugActions.OpenGatesThrough(d, TutorialGate.G8_TimerStart);
+        if (!d.IsGateOpen(MapSceneGate.G8_TimerStart))
+            MapSceneDebugActions.OpenGatesThrough(d, MapSceneGate.G8_TimerStart);
         yield return new WaitForSecondsRealtime(NormalWakeWaitSeconds);
-        int slept = d.SetZoneDormantServer(TutorialArea.Zone4, true, TutorialMonsterFilter.NormalOnly);
+        int slept = d.SetZoneDormantServer(MapSceneArea.Zone4, true, MapSceneMonsterFilter.NormalOnly);
         Debug.Log($"{Tag} event=normals_slept kind=midboss slept={slept} waitedS={NormalWakeWaitSeconds:0.0}");
 
         // 3) 중간보스 기상.
-        d.WakeZoneServer(TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly);
-        d.GetZoneMonstersServer(TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly, Buffer);
+        d.WakeZoneServer(MapSceneArea.Zone4, MapSceneMonsterFilter.KeyOnly);
+        d.GetZoneMonstersServer(MapSceneArea.Zone4, MapSceneMonsterFilter.KeyOnly, Buffer);
         MonsterBase boss = null;
         foreach (MonsterBase m in Buffer)
             if (m != null && m.GetComponent<MonsterCounterWindow>() != null) { boss = m; break; }
@@ -143,7 +143,7 @@ public static class QABossStart88
         }
 
         // 4) 파티를 중간보스 바로 옆(보스 NavMesh 섬 위)으로.
-        int moved = MovePartyNear(d, TutorialArea.Zone4, boss, out string method);
+        int moved = MovePartyNear(d, MapSceneArea.Zone4, boss, out string method);
         result.Ok = true;
         result.Target = boss;
         result.Detail = $"중간보스 {boss.name} 기상 · 일반몹 휴면 {slept} · 이동 {moved}명({method})";
@@ -172,9 +172,9 @@ public static class QABossStart88
             yield break;
         }
 
-        TutorialDirector tutorial = TutorialDirector.Instance;
-        if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad))
-            TutorialDebugActions.OpenGatesThrough(tutorial, TutorialGate.G10_BossEnterAndPad);
+        MapSceneDirector tutorial = MapSceneDirector.Instance;
+        if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(MapSceneGate.G10_BossEnterAndPad))
+            MapSceneDebugActions.OpenGatesThrough(tutorial, MapSceneGate.G10_BossEnterAndPad);
 
         BossTeleportManager tp = BossTeleportManager.Instance;
         float deadline = Time.realtimeSinceStartup + 30f;
@@ -286,15 +286,15 @@ public static class QABossStart88
         method = "none";
         if (!IsServer || boss == null)
             return 0;
-        TutorialDirector d = kind == QAInterruptTargetKind.Midboss ? TutorialDirector.Instance : null;
-        return MovePartyNear(d, TutorialArea.Zone4, boss, out method);
+        MapSceneDirector d = kind == QAInterruptTargetKind.Midboss ? MapSceneDirector.Instance : null;
+        return MovePartyNear(d, MapSceneArea.Zone4, boss, out method);
     }
 
     /// <summary>
     /// [서버] 파티를 <paramref name="boss"/> 옆으로 옮긴다. 우선 <see cref="TryFindBossRingPoints"/>(보스와 같은 NavMesh 섬, 벽·소품 겹침 없음),
-    /// 못 찾으면 예전 구간 격자(<see cref="TutorialDeathRules.TryFindAreaSpreadPoints"/> — 섬 밖일 수 있다)로 물러난다(<paramref name="d"/> 가 있을 때만). 옮긴 수.
+    /// 못 찾으면 예전 구간 격자(<see cref="MapSceneDeathRules.TryFindAreaSpreadPoints"/> — 섬 밖일 수 있다)로 물러난다(<paramref name="d"/> 가 있을 때만). 옮긴 수.
     /// </summary>
-    private static int MovePartyNear(TutorialDirector d, TutorialArea area, MonsterBase boss, out string method)
+    private static int MovePartyNear(MapSceneDirector d, MapSceneArea area, MonsterBase boss, out string method)
     {
         method = "none";
         NetworkManager nm = NetworkManager.Singleton;
@@ -319,7 +319,7 @@ public static class QABossStart88
         }
         else
         {
-            TutorialDeathRules rules = d != null ? d.GetComponent<TutorialDeathRules>() : null;
+            MapSceneDeathRules rules = d != null ? d.GetComponent<MapSceneDeathRules>() : null;
             if (rules == null || !rules.TryFindAreaSpreadPoints(area, movers.Count, near.x, near.z, Points))
             {
                 Debug.LogWarning($"{Tag} {boss.name} 근처 안전 지점 없음 — 파티를 옮기지 않는다(봇이 걸어서 접근).");
@@ -710,10 +710,10 @@ public sealed class QABossWatch88
     /// <summary>존4 일반몹 중 깨어 있는 수(중간보스 런만, 아니면 na) — 휴면이 풀려 측정에 끼어드는지 본다.</summary>
     private static string AwakeNormals(QAInterruptTargetKind kind)
     {
-        TutorialDirector d = TutorialDirector.Instance;
+        MapSceneDirector d = MapSceneDirector.Instance;
         if (kind != QAInterruptTargetKind.Midboss || d == null || !d.IsTutorialActive)
             return "na";
-        d.GetZoneMonstersServer(TutorialArea.Zone4, TutorialMonsterFilter.NormalOnly, Normals);
+        d.GetZoneMonstersServer(MapSceneArea.Zone4, MapSceneMonsterFilter.NormalOnly, Normals);
         int awake = 0;
         foreach (MonsterBase m in Normals)
             if (m != null && m.CurrentHealth > 0 && !m.IsDormant)

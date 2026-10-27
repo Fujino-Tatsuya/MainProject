@@ -21,7 +21,7 @@ using UnityEngine;
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
 [DataTableSheet("MidBoss", Order = 0)]
-public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
+public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
 {
     // 공격 종류. Smash 1종 + 펀치 3종 × L/R = 총 7종.
     enum GauntletAttackId
@@ -298,7 +298,14 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
             WarnNoInterruptFlashOnce();
             return;
         }
-        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.TargetFlash || interruptFlash == null) return;
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);

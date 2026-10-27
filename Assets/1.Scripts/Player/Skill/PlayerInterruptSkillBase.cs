@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeaverLobby.Player.Dash;
 using UnityEngine;
 
 /// <summary>간파 스킬 공용 판정 타이밍과 버퍼 크기를 제공하는 데이터 계약.</summary>
@@ -41,6 +42,14 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private bool hasSuccessTargetPosition;
     private Vector3 successTargetPosition;
 
+    // ── 대쉬 간파(할 일 115, 서버) — 대시에 실린 동안 Hit 은 보류, 대시 끝(Skill 전이)에 판정 ──
+    private bool dashAttachArmed;       // 다음 OnServerStart 가 대쉬 간파다(컨트롤러가 승인 직전에 건다)
+    private Vector3 armedDashOffset;
+    private bool attachedToDash;        // 지금 대시에 실려 있다
+    private bool pendingHit;            // 대시 중 Hit 이 왔다 — 대시 끝에 즉시 판정
+    private bool pendingEnd;            // 판정 전에 End 가 왔다 — 판정 뒤로 미룬다
+    private Vector3 predictedOffset;    // 시도 예측 오버랩을 옮길 양(예상 대시 끝 − 지금 위치, §10 Q2)
+
     // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
     [Header("간파 지연 측정")]
     [SerializeField, Min(0f)]
@@ -72,8 +81,44 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     protected IPlayerInterruptSkillData InterruptData => Data as IPlayerInterruptSkillData;
 
+    /// <summary>
+    /// [서버] 다음 <see cref="OnServerStart"/> 를 대쉬 간파로 시작한다(할 일 115) — 컨트롤러가 승인 직전에 부른다.
+    /// <paramref name="predictedEndOffset"/> = 예상 대시 끝 − 지금 위치. 시도 사건 예측 오버랩만 이만큼 옮긴다.
+    /// </summary>
+    internal void ArmDashAttach(Vector3 predictedEndOffset)
+    {
+        dashAttachArmed = true;
+        armedDashOffset = predictedEndOffset;
+    }
+
+    /// <summary>[서버] 이 시전이 대시에 실려 있다(대시 끝 전).</summary>
+    internal bool IsAttachedToDash => attachedToDash;
+
+    /// <summary>[서버] 이 시전의 Hit 판정이 이미 났다(래치).</summary>
+    internal bool HasResolvedHit => hasResolvedHit;
+
+    /// <summary>
+    /// [서버] 우클릭 → 대시 전환(할 일 115 §12) — 이미 시작된 이 시전이 대시에 옮겨 실렸다. 이후는 대쉬 간파와 같다
+    /// (대시 중 Hit 보류 → 대시 끝 Skill 전이에서 판정). 새 시전이 아니므로 시도 사건·슬로우 예측(TryStartSlowMotion)과
+    /// 준비 타이머(hitTime)는 다시 하지 않는다 — 준비 기준점은 처음 승인 시각 그대로.
+    /// </summary>
+    internal void OnTransferredToDash()
+    {
+        attachedToDash = true;
+        pendingHit = false;
+        pendingEnd = false;
+        Edit.Log("[DashInterrupt] 우클릭 → 대시 전환 — 진행 중인 간파를 대시에 실음(시도 사건 재발동 없음)", this);
+    }
+
     public override void OnServerStart(Vector3 direction, Unit target)
     {
+        attachedToDash = dashAttachArmed;
+        predictedOffset = dashAttachArmed ? armedDashOffset : Vector3.zero;
+        dashAttachArmed = false;
+        armedDashOffset = Vector3.zero;
+        pendingHit = false;
+        pendingEnd = false;
+
         base.OnServerStart(direction, target);
         slowMotion.Begin();
         activeLagPress = pendingLagPress;
@@ -114,15 +159,69 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {
         if (eventType == SkillAnimationEventType.Hit)
-            ResolveHit();
+        {
+            // 대시 중(상체 레이어 클립)에 온 Hit 은 판정하지 않고 대시 끝까지 보류한다(할 일 115).
+            if (DashInterruptRules.EvaluateResolveTiming(!attachedToDash, true) == DashInterruptResolveTiming.HoldHit)
+            {
+                if (!pendingHit)
+                    Edit.Log("[DashInterrupt] 대시 중 Hit — 대시 끝까지 판정 보류", this);
+                pendingHit = true;
+            }
+            else
+            {
+                ResolveHit();
+            }
+        }
+
+        if (eventType == SkillAnimationEventType.End && (attachedToDash || pendingEnd || pendingHit))
+        {
+            // 판정 전 End 는 판정 뒤로 미룬다 — 대시 끝 판정(또는 다음 Hit) 직후 끝낸다.
+            pendingEnd = true;
+            return;
+        }
 
         base.OnAnimationEvent(eventType);
+
+        if (eventType == SkillAnimationEventType.Hit && pendingEnd && hasResolvedHit)
+            EndDeferred();
     }
 
-    // 모든 피어에서 불리지만 발동 기록은 서버에만 있다. 판정 전 종료(완료·취소·사망)면 실패 복귀.
+    /// <summary>
+    /// [서버] 대시가 끝나 Skill 상태로 넘어왔다(할 일 115). 보류된 Hit 이 있으면 지금(= 대시 끝 지점) 판정하고,
+    /// 아직 Hit 전이면 클립 Hit(남은 준비 시간)을 기다린다. 판정 전에 온 End 는 판정 뒤에 처리한다.
+    /// </summary>
+    internal void OnDashHandOff()
+    {
+        if (!attachedToDash)
+            return;
+
+        attachedToDash = false;
+        bool resolveNow = DashInterruptRules.EvaluateResolveTiming(true, pendingHit) == DashInterruptResolveTiming.ResolveNow;
+        pendingHit = false;
+        Edit.Log($"[DashInterrupt] 대시 끝 → Skill 전이 — {(resolveNow ? "보류된 Hit 즉시 판정" : "클립 Hit 대기")}", this);
+        if (resolveNow)
+            ResolveHit();
+
+        if (pendingEnd && hasResolvedHit)
+            EndDeferred();
+    }
+
+    private void EndDeferred()
+    {
+        pendingEnd = false;
+        EndSelf(SkillEndReason.Completed);
+    }
+
+    // 모든 피어에서 불리지만 발동 기록은 서버에만 있다. 판정 전 종료(완료·취소·사망)면 실패 사건 → 디렉터가 실패 복귀.
     public override void OnEnd(SkillEndReason reason)
     {
-        FailSlowMotion(slowMotion.Abort());
+        attachedToDash = false;
+        pendingHit = false;
+        pendingEnd = false;
+        predictedOffset = Vector3.zero;
+
+        InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
+            InterruptFailReason.EndedBeforeResolve, slowMotion.Abort()));
         base.OnEnd(reason);
     }
 
@@ -190,7 +289,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (HitboxAnchor == null || owner == null)
         {
-            FailSlowMotion(slowMotion.Resolve(false));
+            InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
+                InterruptFailReason.NoHitboxAnchor, slowMotion.Resolve(false)));
             OnMissingHitboxAnchor();
             return;
         }
@@ -265,9 +365,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             OnInterruptTargetResolved(target, attackInfo);
         }
 
-        FailSlowMotion(slowMotion.Resolve(interruptLanded));
+        // 간파 연출 사건(할 일 118) — 판정 → 성공 순서로 디렉터에 알린다(빗나감 실패 복귀 → 성공 슬로우 재시작).
+        InterruptProductionDirector.ServerResolve(InterruptProductionEvent.Resolve(owner, this,
+            slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount));
         if (interruptSucceeded)
-            StartSuccessSlowMotion();
+            InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
+                hasSuccessTargetPosition, successTargetPosition));
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -428,32 +531,20 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     // 승인 시점 예측(D1·D2): 판정과 같은 앵커 오버랩을 한 번 돌려, 지금 인터럽트 가능한 예측 대상이 있으면 발동한다.
     // 각도 검사는 따로 하지 않는다 — 앵커 형태가 곧 판정 범위다. 시간 레이어가 없는 씬(오프라인 테스트)은 건너뛴다.
+    // 예측(게임 질의)만 여기서 하고, 슬로우를 걸지는 디렉터 시도 단계가 정한다(할 일 118).
     private void TryStartSlowMotion()
     {
-        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale == null || HitboxAnchor == null || owner == null || !PredictsInterruptHit())
+        if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || HitboxAnchor == null || owner == null)
             return;
 
-        slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
+        slowMotion.Started(InterruptProductionDirector.ServerAttempt(
+            InterruptProductionEvent.Attempt(owner, this, PredictsInterruptHit())));
     }
 
-    // 간파 성공(할 일 87): 판정 끝에 성공 프로필로 다시 건다. 마지막 것이 이기므로 시도 슬로우의 지금 배율에서 이어지고,
-    // 예측이 빗나가 시도 슬로우가 없었어도 건다. 연출 훅일 뿐 판정·피해·카운터 창에는 관여하지 않는다.
-    // 연출 기준 위치 = 카운터 창을 소비한 첫 대상, 없으면 시전자(C5).
-    private void StartSuccessSlowMotion()
-    {
-        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale == null)
-            return;
-
-        Vector3 targetPosition = hasSuccessTargetPosition ? successTargetPosition : owner.transform.position;
-        timeScale.ServerStart(timeScale.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success,
-            targetPosition);
-    }
-
+    // 대쉬 간파면 예상 대시 끝으로 옮겨 예측한다(할 일 115 §10 Q2) — 판정은 대시 끝 위치에서 나기 때문이다.
     private bool PredictsInterruptHit()
     {
-        int hitCount = OverlapHitboxAnchor(hitResults);
+        int hitCount = OverlapHitboxAnchor(hitResults, predictedOffset);
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = hitResults[i];
@@ -554,15 +645,4 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     private static IInterruptSlowMotionTarget FindSlowMotionTarget(Unit unit) =>
         unit != null && unit.TryGetComponent(out IInterruptSlowMotionTarget slowTarget) ? slowTarget : null;
-
-    // ServerFail 은 현재 발동 번호일 때만 먹으므로 늦게 와도 남의 슬로우를 끊지 않는다.
-    private static void FailSlowMotion(uint triggerId)
-    {
-        if (triggerId == 0)
-            return;
-
-        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale != null)
-            timeScale.ServerFail(triggerId);
-    }
 }

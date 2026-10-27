@@ -55,7 +55,7 @@ public sealed class PartyWipeRespawnRulesTests
     public void SelectSpread_SkipsPadAndMargin()
     {
         var c = new List<(float x, float z)> { (0f, 0f), (1.5f, 0f), (10f, 0f), (14f, 0f) };
-        var pads = new List<TutorialPadArea> { TutorialPadArea.Box(-1f, -1f, 2f, 1f) };   // (0,0)·(1.5,0) 은 패드 안
+        var pads = new List<MapScenePadArea> { MapScenePadArea.Box(-1f, -1f, 2f, 1f) };   // (0,0)·(1.5,0) 은 패드 안
         var chosen = new List<int>();
         Assert.IsTrue(PartyWipeRespawnRules.TrySelectSpread(c, 2, 0f, 0f, 2f, pads, 1f, chosen));
         CollectionAssert.AreEqual(new[] { 2, 3 }, chosen);
@@ -65,7 +65,7 @@ public sealed class PartyWipeRespawnRulesTests
     public void SelectSpread_PadMarginExcludesNearPoint()
     {
         var c = new List<(float x, float z)> { (2.5f, 0f), (6f, 0f) };
-        var pads = new List<TutorialPadArea> { TutorialPadArea.Box(-2f, -2f, 2f, 2f) };
+        var pads = new List<MapScenePadArea> { MapScenePadArea.Box(-2f, -2f, 2f, 2f) };
         var chosen = new List<int>();
         Assert.IsTrue(PartyWipeRespawnRules.TrySelectSpread(c, 1, 0f, 0f, 2f, pads, 1f, chosen));
         CollectionAssert.AreEqual(new[] { 1 }, chosen);   // 2.5 는 패드 + 1m 안
@@ -94,7 +94,7 @@ public sealed class PartyWipeRespawnRulesTests
     public void SelectSpread_AllOnPadOrEmpty_Fails()
     {
         var chosen = new List<int>();
-        var pads = new List<TutorialPadArea> { TutorialPadArea.Circle(0f, 0f, 5f) };
+        var pads = new List<MapScenePadArea> { MapScenePadArea.Circle(0f, 0f, 5f) };
         Assert.IsFalse(PartyWipeRespawnRules.TrySelectSpread(new List<(float x, float z)> { (1f, 1f) }, 2, 0f, 0f, 2f, pads, 1f, chosen));
         Assert.AreEqual(0, chosen.Count);
         Assert.IsFalse(PartyWipeRespawnRules.TrySelectSpread(new List<(float x, float z)>(), 1, 0f, 0f, 2f, null, 1f, chosen));
@@ -103,7 +103,7 @@ public sealed class PartyWipeRespawnRulesTests
     [Test]
     public void RingCandidates_AllOutsidePadMargin()
     {
-        foreach (TutorialPadArea pad in new[] { TutorialPadArea.Box(-3f, -3f, 3f, 3f), TutorialPadArea.Circle(10f, 5f, 2f) })
+        foreach (MapScenePadArea pad in new[] { MapScenePadArea.Box(-3f, -3f, 3f, 3f), MapScenePadArea.Circle(10f, 5f, 2f) })
         {
             var ring = new List<(float x, float z)>();
             PartyWipeRespawnRules.RingCandidates(pad, 1f, 1.5f, 1f, ring);

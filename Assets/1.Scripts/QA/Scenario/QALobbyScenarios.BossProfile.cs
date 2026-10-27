@@ -56,9 +56,9 @@ public static partial class QALobbyScenarios
                 probe.PrewarmLogs.Count == 0 ? "0회" : $"{probe.PrewarmLogs.Count}회: {string.Join(" / ", probe.PrewarmLogs)}");
 
             // M7 과 같은 진입: G10 까지 열기 → 보스전 강제 개시 → Combat.
-            TutorialDirector tutorial = TutorialDirector.Instance;
-            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad))
-                TutorialDebugActions.OpenGatesThrough(tutorial, TutorialGate.G10_BossEnterAndPad);
+            MapSceneDirector tutorial = MapSceneDirector.Instance;
+            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(MapSceneGate.G10_BossEnterAndPad))
+                MapSceneDebugActions.OpenGatesThrough(tutorial, MapSceneGate.G10_BossEnterAndPad);
             probe.SetPhase(QABossProfileProbe.Phase.BossIntro);
             BossTeleportManager tp = BossTeleportManager.Instance;
             float deadline = Time.realtimeSinceStartup + 30f;

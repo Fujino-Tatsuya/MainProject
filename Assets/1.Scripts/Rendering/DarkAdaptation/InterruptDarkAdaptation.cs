@@ -2,8 +2,9 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 간파 성공 암순응 연출 — <see cref="GlobalTimeScale.Started"/> 가 간파 성공이면 화면의 어두운 픽셀을 잠깐 낮춘다.
-/// NetworkManager.prefab 의 <see cref="GlobalTimeScale"/> 옆에 붙는다. 그리기는 <see cref="DarkAdaptationFeature"/>. 할 일 87 C3.
+/// 간파 성공 암순응 연출 — 화면의 어두운 픽셀을 잠깐 낮춘다. 할 일 87 C3.
+/// NetworkManager.prefab 의 <see cref="GlobalTimeScale"/> 옆에 붙는다. 그리기는 <see cref="DarkAdaptationFeature"/>.
+/// 수동 실행자다(할 일 118) — 언제·누구 화면 강도로 틀지는 <see cref="InterruptProductionDirector"/> 가 정해 <see cref="Play"/>·<see cref="Stop"/> 을 부른다.
 ///
 /// <list type="bullet">
 /// <item>발동자 본인 화면은 <see cref="selfIntensity"/>, 다른 사람 화면은 <see cref="othersIntensity"/>.</item>
@@ -15,7 +16,7 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(GlobalTimeScale))]
 [DataTableSheet("SlowMotion", Order = 2)]
-public sealed class InterruptDarkAdaptation : MonoBehaviour
+public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdaptationOutput
 {
     [Tooltip("간파 성공 발동자 본인 화면의 암순응 강도 [0, 1]")]
     [SerializeField, Range(0f, 1f)] private float selfIntensity = 1f;
@@ -42,7 +43,6 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
 
     private readonly InterruptDarkAdaptationModel _model = new InterruptDarkAdaptationModel();
 
-    private GlobalTimeScale _timeScale;
     private NetworkManager _networkManager;
     private ulong _triggerClientId;
     private Transform _triggerPlayer;
@@ -50,50 +50,37 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour
 
     private void Awake()
     {
-        _timeScale = GetComponent<GlobalTimeScale>();
         _networkManager = GetComponent<NetworkManager>();
-    }
-
-    private void OnEnable()
-    {
-        if (_timeScale == null)
-            return;
-
-        _timeScale.Started += HandleStarted;
-        _timeScale.ForcedReset += HandleForcedReset;
     }
 
     private void OnDisable()
     {
-        if (_timeScale != null)
-        {
-            _timeScale.Started -= HandleStarted;
-            _timeScale.ForcedReset -= HandleForcedReset;
-        }
-
         StopEffect();
     }
 
-    private void HandleStarted(uint triggerId, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
+    /// <summary>
+    /// 간파 성공 암순응을 튼다(디렉터가 부른다 — 칸·성공 여부는 이미 걸렀다). 본인 화면이면 self 강도, 아니면 others 강도.
+    /// 수치는 부르는 순간 필드에서 읽는다.
+    /// </summary>
+    public void Play(bool viewerIsCaster, ulong casterClientId, Vector3 targetPosition)
     {
-        if (purpose != SlowMotionPurpose.Success || _networkManager == null)
-            return;
-        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.DarkAdaptation))
+        // 꺼진 컴포넌트는 LateUpdate 가 안 돌아 강도가 남는다 — 옛 구독(OnEnable 동안만)과 같게 무시한다.
+        if (!isActiveAndEnabled || _networkManager == null)
             return;
 
-        bool triggeredByMe = triggerClientId == _networkManager.LocalClientId;
-        float peak = InterruptDarkAdaptationModel.SelectIntensity(triggeredByMe, selfIntensity, othersIntensity);
+        float peak = InterruptDarkAdaptationModel.SelectIntensity(viewerIsCaster, selfIntensity, othersIntensity);
         _model.Play(peak, fadeInDuration, holdDuration, fadeOutDuration);
 
-        if (_triggerClientId != triggerClientId)
+        if (_triggerClientId != casterClientId)
             _triggerPlayer = null;
-        _triggerClientId = triggerClientId;
+        _triggerClientId = casterClientId;
         _targetPosition = targetPosition;
 
         PushState();
     }
 
-    private void HandleForcedReset(uint triggerId) => StopEffect();
+    /// <summary>즉시 0(강제 리셋·세션 종료).</summary>
+    public void Stop() => StopEffect();
 
     private void LateUpdate()
     {

@@ -18,3 +18,6 @@ MonoBehaviour:
   rechargeDuration: 2
   snapshotCapacity: 32
   snapshotFreshnessTolerance: 0.1
+  dashInterruptWindow: 0.1
+  dashInterruptServerTolerance: 0.1
+  dashInterruptBlend: 0.05

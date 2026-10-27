@@ -48,13 +48,16 @@
   플레이어 프리팹·스폰·캐릭터 교체를 건드리기 전에 읽을 것.
 - **데이터 테이블**: [Docs/tech/data-table.md](Docs/tech/data-table.md) — 기획 수치는 `GameData.xlsx`(SVN)가 원본.
   툴바 `데이터: 테이블/인스펙터` 로 Play 출처를 고르고, **빌드는 항상 xlsx 값**. 새 수치를 노출할 땐 `[DataTableSheet]`·`[DataTableIgnore]`.
+- **맵씬 진행(옛 튜토리얼)**: [Docs/tech/tutorial-director.md](Docs/tech/tutorial-director.md) 맨 위 — 할 일 107(2026-10-27)로 `TutorialDirector` → `MapSceneDirector` 등 `Map/MapScene/`·`MapScene…` 이름, 존1~3 교육·스피너 연습·존4 교육은 `Map/Tutorial/Legacy/`·`Tutorial/Legacy/`(런타임 연결 끊음), 존1~3 진행은 `MapSceneZoneFlow`. 로비 공용(`Tutorial/Guide`·`Tutorial/Traits`·`TutorialCooldownReset`)은 이름 그대로.
 - **튜토리얼 특성 선택**: [Docs/tech/tutorial-traits.md](Docs/tech/tutorial-traits.md) — 디렉터 API·S12 배치 순서·placeholder 특성·알려진 제약.
 - **튜토리얼 QA**: [Docs/tech/tutorial-qa.md](Docs/tech/tutorial-qa.md) — 솔로·MPPM·회귀 Play 체크리스트·알려진 한계·병합 전 확인. 단계별 문서 목록은 [tutorial-director.md](Docs/tech/tutorial-director.md) §10.1.
 - **로비 데모 부스 운영**: [Docs/tech/lobby-demo-flow.md](Docs/tech/lobby-demo-flow.md) — 흐름·모든 PC 공용 `demo-connection.json`(role auto — 이 PC IP = hostAddress 면 호스트, host/client 명시 우선)·같은 빌드 필수·대기 화면 문구·재접속·MPPM `Client` 태그·알려진 한계.
 - **디버그 단축키**: [Docs/tech/debug-hotkeys.md](Docs/tech/debug-hotkeys.md) — 키 목록·겹침, 릴리스 빌드 포함 심볼 `DEV_HOTKEYS`(Standalone). 정식 릴리스 때 심볼만 지운다.
 - **플레이어 스탯**: [Docs/tech/player-stats.md](Docs/tech/player-stats.md) — 공격력·이동속도·공격속도·방어력·최대 체력 5종 기본%·전체%(+공격력 가하는 피해%) 공식, 서버·클라 같은 종합(`PlayerStats`), 판정은 서버 값, 공격 요청마다 서버 2차 검증(경고만). 새 스탯 추가 절차 §3.
 - **행동 입력 거부 피드백**: [Docs/tech/skill-reject-feedback.md](Docs/tech/skill-reject-feedback.md) — 거부 사유별 선입력 버퍼 처리 표(보관/버림), 오너 전용 이벤트 `CooldownRejected`·`ActionBlockedByEffect`(입력 1회=1회)·사운드 키 지정법(비우면 무음).
+- **간파 연출 디렉터**: [Docs/tech/interrupt-presentation.md §6](Docs/tech/interrupt-presentation.md) — `NetworkManager.prefab` 의 `InterruptProductionDirector` 가 단일 진입점. 간파 스킬은 사건 4개(시도·판정·성공·실패)만 알리고, 스위치 10칸·시도/성공 슬로우 프로필·개인/공용 채널은 디렉터가 든다. 새 간파 연출은 `GlobalTimeScale.Started` 직접 구독 말고 디렉터 cue(`IInterruptCueSink`)로.
 - **간파 성공 연출**: [Docs/tech/interrupt-presentation.md](Docs/tech/interrupt-presentation.md) — 시도 슬로우 → 성공 슬로우 재발동·히트스톱 → 슬로우 이벤트 목적 칸(공용 성공 신호) → 암순응 패스·`InterruptSuccessFx` 성공 이펙트 칸(Variant 가 소켓 연결)·오너 줌, 수치·렌더러 순서·알려진 제약.
+- **대쉬 간파**: [Docs/tech/dash-interrupt.md](Docs/tech/dash-interrupt.md) — 대시 시작 후 창(기본 0.1초) 안 우클릭만 소비(창 밖은 기존 선입력 버퍼), 대시에 간파가 실려 대시 끝에 Skill 전이·판정(판정 시각 = max(대시 끝, 평소 Hit)), RPC 플래그 `dashInterrupt`(새 RPC 없음)·서버 창+허용오차, 상체 레이어 `DashInterruptUpper`, `PlayerDashData` 칸 3개·알려진 한계.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조

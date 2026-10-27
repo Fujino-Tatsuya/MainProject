@@ -1,5 +1,8 @@
 # 튜토리얼 안내 UI (할 일 15 · S6)
 
+> **🟪 할 일 107 (2026-10-27)** — 안내 UI 모듈(`Assets/1.Scripts/Tutorial/Guide`)·Strings 키 `Tutorial.Guide.*` 는 로비 공용이라 **이름·위치 그대로**. 맵씬에서 존1~3 목표·자막을 띄우던 흐름은 Legacy 로 빠졌고,
+> 맵씬에 남은 소비처는 `MapSceneTraitCorridorFlow`(복도 특성)·`MapSceneBossApproachGuide/View`(존4·보스 진입)·`MapSceneZone4IntroPresentation`(소개 연출 무전)·디렉터 `ShowSubtitleServer` 다. 존1~3 행(`TUT_Z1_*`·`TUT_Z2_*`·`TUT_Z3_*`)은 지우지 않았다.
+
 > 클라 로컬 안내 UI 모듈 — **목표 패널 · 안내 자막 · 강조 표시**. 네트워크 없음.
 > 서버 튜토리얼 상태를 읽어 이 API 를 부르는 연결은 S7~S10 흐름 컴포넌트([tutorial-director.md](tutorial-director.md) §10.1 단계별 문서).
 > 씬 배치는 **S7 에서 끝났다**(`4.MapScene` 루트 `TutorialGuideUI` 인스턴스 1개, 추가만). 서버 자막은 디렉터 `ShowSubtitleServer` → ClientRpc → `ShowSubtitle` 하나로 온다.
@@ -19,7 +22,7 @@
 | 프리팹 | `Assets/2.Prefabs/UI/Tutorial/TutorialGuideUI.prefab` |
 | 문구 SO | `Assets/9.ScriptableObject/Tutorial/Guide/TutorialGuideTexts.asset` |
 
-테스트는 `TutorialEditModeTestRunner`(`Tools/Tests/튜토리얼 EditMode 테스트 실행`)의 `Fixtures` 에 있다(`^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$`, I0 에서 플레이어 러너에서 이동).
+테스트는 `MapSceneEditModeTestRunner`(`Tools/Tests/맵씬 EditMode 테스트 실행`)의 `Fixtures` 에 있다(`^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$`, I0 에서 플레이어 러너에서 이동).
 
 ## 접근 방식
 
@@ -53,7 +56,7 @@ DontDestroyOnLoad 하지 않는다 — 튜토리얼 씬에 속한다. 부르는 
   로스터는 스폰과 같은 것 — `NetworkManager` 의 `NetworkLoadingFlowController.CharacterRoster`. 씬 참조 추가 없음.
   - 해시는 Variant 마다 다르다(Player_Paladin 913233600 · Player_Gunner 816596077 · Player_Assassin 3304217410, 2026-10-12 프리팹 확인)
     `Instantiate` 가 값을 복사하고 클라는 같은 해시의 프리팹으로 만든다(NetworkPrefab 오버라이드 없음) → **모든 피어가 같은 결과, 복제 불필요.**
-  - 서버 `TutorialDirector.GetClientsOfCharacterServer` 와 클라 `TutorialGuideUI` 문구 변형이 같은 `ResolveCharacter` 를 쓴다.
+  - 서버 `MapSceneDirector.GetClientsOfCharacterServer` 와 클라 `TutorialGuideUI` 문구 변형이 같은 `ResolveCharacter` 를 쓴다.
   - 역조회 실패(로스터 없음 · 해시 불일치 · `tutorialCharacter` = None)면 경고 1회(상태·해시별) 후 고유 컴포넌트로 폴백 —
     `GunnerHeat` = 거너, `AssassinState` = 어쌔신, `FirstMeleePassive` = 팔라딘.
   - 순수 판정 `TutorialCharacterLookup`(테스트 `Editor/TutorialCharacterLookupTests.cs`). 로스터 해시 표는 로스터가 같으면 캐시한다.
