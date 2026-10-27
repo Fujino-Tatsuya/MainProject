@@ -19,6 +19,8 @@ public sealed class QABoss103ReportInput
     /// <summary>루프 상태 한 줄(실행 중 상태·멈춤).</summary>
     public string LoopState = "";
     public string GeneratedAt = "";
+    /// <summary>할 일 108 recordings.txt(판별 녹화 영상 경로). 103 단독은 빈칸.</summary>
+    public string Recordings = "";
 }
 
 /// <summary>
@@ -347,8 +349,18 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
     private static void Header(StringBuilder sb, Ctx c, QABoss103ReportInput input, Dictionary<string, string> batch)
     {
         QABoss103Batch.Summarize(c.Attempts, input.Total, out int done, out int retried, out int errors, out int valid);
-        sb.Append("<h1>할 일 103 3인 보스전(웰즈&amp;23호 B) 밸런싱 QA</h1>\n");
-        sb.Append("<div class=\"sub\">파티 팔라딘·어쌔신·거너 · 봇 단계 보통→숙련→초보 번갈아 · 판 종료 = 보스 처치 / 공용 목숨 0 전멸 / Combat 30분</div>\n");
+        bool nightly = batch.TryGetValue(QANightlyHeader.KeySeedName, out string seedName) && seedName.Length > 0;
+        if (nightly)
+        {
+            sb.Append("<h1>할 일 108 야간 QA — ").Append(H(seedName)).Append("</h1>\n");
+            sb.Append("<div class=\"sub\">한 판 = 로비 점검 → 캐릭터 선택·출격 → 맵(특성 4라운드) → 보스전 결과 · 자리 순서 ").Append(H(Val(batch, "nightly_order", Dash)))
+              .Append(" · 봇 단계 ").Append(H(Val(batch, "nightly_tier", "auto"))).Append("</div>\n");
+        }
+        else
+        {
+            sb.Append("<h1>할 일 103 3인 보스전(웰즈&amp;23호 B) 밸런싱 QA</h1>\n");
+            sb.Append("<div class=\"sub\">파티 팔라딘·어쌔신·거너 · 봇 단계 보통→숙련→초보 번갈아 · 판 종료 = 보스 처치 / 공용 목숨 0 전멸 / Combat 30분</div>\n");
+        }
         sb.Append("<div class=\"kpis\">");
         Kpi(sb, $"{done}/{input.Total}", $"진행(+재실행 {retried})");
         Kpi(sb, valid.ToString(Inv), "통계에 들어간 판");
@@ -380,6 +392,19 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "git 커밋", $"{H(Val(batch, "git_commit", "na"))} ({H(Val(batch, "git_branch", "na"))}) · 판 기록 {H(commits.Count > 0 ? string.Join(", ", commits) : Dash)}");
         Row2(sb, "Unity", H(Val(batch, "unity_version", "na")));
         Row2(sb, "기준 시드", H(Val(batch, "seed", "na")) + " · 판 시드 = 기준 시드 × 판 번호(재실행도 같은 시드)");
+        if (nightly)
+        {
+            string trait = Val(batch, "nightly_trait_seed", "0");
+            Row2(sb, "야간 시드", $"{H(seedName)} · 특성 시드 {H(trait == "0" ? "기준 시드와 같음" : trait)} · 봇 단계 {H(Val(batch, "nightly_tier", "auto"))} · " +
+                               $"자리 순서(호스트·가상 2·가상 3) {H(Val(batch, "nightly_order", Dash))}" + (Val(batch, "nightly_note", "").Length > 0 ? " · " + H(Val(batch, "nightly_note", "")) : ""));
+            List<QANightlyRecording> recs = QANightlyRecording.ParseAll(input.Recordings);
+            var rec = new StringBuilder();
+            foreach (QANightlyRecording r in recs)
+                rec.Append(rec.Length > 0 ? "<br>" : "").Append("판 ").Append(r.Run).Append(r.Retry > 0 ? " 재실행" : "").Append(": ")
+                   .Append(H(r.Path.Length > 0 ? r.Path : "(경로 없음)")).Append(r.Shared.Length > 0 ? " → " + H(r.Shared) : "").Append(r.Note.Length > 0 ? " · " + H(r.Note) : "");
+            Row2(sb, "녹화", Val(batch, "record", "off") == "obs" ? (rec.Length > 0 ? rec.ToString() : "OBS 켜짐 · 아직 영상 없음") : "꺼짐");
+            Row2(sb, "공유 폴더", H(Val(batch, "share_dir", "").Length > 0 ? Val(batch, "share_dir", "") : "설정 없음 — 복사 안 함"));
+        }
         Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
         Row2(sb, "측정 규칙", "QA 끼임 복구 — 이동하려는데 목표에 못 다가간 채 2초 옆걸음 → 6초 뒤·옆 대시 → 20초 보스 둘레 링 지점으로 재배치(run_chars qa_relocates) · " +
                              "Combat 중 90초 동안 전투 활동(보스·탑 피해, 피격, 사망·부활, 공용 목숨, 기믹 진행, 보스 HP 변화)이 없으면 정체(stall) 오류 판");
@@ -1025,6 +1050,7 @@ public static class QABoss103ReportFiles
             GimmicksCsv = ReadOrEmpty(Path.Combine(dir, QABoss103Csv.GimmicksFile)),
             Fixes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.FixesFile)),
             Notes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.LogFolder, NotesFile)),
+            Recordings = ReadOrEmpty(Path.Combine(dir, QANightlyPaths.RecordingsFile)),
             LoopState = loopState ?? "",
             GeneratedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
         };

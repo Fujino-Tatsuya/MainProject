@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static partial class QALobbyScenarios
 {
-    public static readonly string[] Known = { "S1", "S2", "S3", "S4", "S5", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "P572", "I88", "B103" };
+    public static readonly string[] Known = { "S1", "S2", "S3", "S4", "S5", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "P572", "I88", "B103", "N108" };
 
     /// <summary>시나리오 하나의 상한(초) — 러너의 감시 타이머. 넘으면 FAIL 로 끊고 다음으로 간다.</summary>
     public static float TimeLimit(string id)

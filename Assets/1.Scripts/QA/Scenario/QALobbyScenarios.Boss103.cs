@@ -17,10 +17,17 @@ public static partial class QALobbyScenarios
     /// <summary>로비·맵 진입·시작 경로 + 30분 전투 + 여유.</summary>
     public const float Boss103TimeLimitSeconds = 40f * 60f;
 
-    private static IEnumerator B103(QAScenarioContext ctx)
+    private static IEnumerator B103(QAScenarioContext ctx) => Boss103Flow(ctx, false);
+
+    /// <summary>
+    /// 103 한 판 흐름. <paramref name="lobbySmoke"/> = 할 일 108 야간 QA(<see cref="Nightly108Id"/>) — 3인 집결 뒤 캐릭터를 고르기 전에
+    /// 로비 데모 점검(<see cref="NightlyLobbySmoke"/>)을 끼운다.
+    /// </summary>
+    private static IEnumerator Boss103Flow(QAScenarioContext ctx, bool lobbySmoke)
     {
         QABoss103Config cfg = QABoss103Match.ReadConfig(out string cfgNote);
-        ctx.Eye("103 설정", $"{cfgNote} · 기준 시드 {cfg.Seed} · 판 {cfg.Run} · 판 시드 {cfg.RunSeed}");
+        ctx.Eye("103 설정", $"{cfgNote} · 기준 시드 {cfg.Seed} · 판 {cfg.Run} · 판 시드 {cfg.RunSeed}" +
+                          (cfg.Nightly.Length > 0 ? $" · 야간 시드 {cfg.Nightly} · 특성 판 시드 {cfg.TraitRunSeed} · 자리 순서 {(cfg.Order != null ? QABoss103Plan.FormatOrder(cfg.Order) : "기본")}" : ""));
 
         // C6 — 심장박동(에디터 루프가 읽는다) + 런타임 데이터 출처. 연속 루프 판은 호스트가 테이블이 아니면 바로 Error.
         QABoss103Heartbeat.Begin(cfg, ctx.Role);
@@ -55,11 +62,14 @@ public static partial class QALobbyScenarios
             yield break;
         }
 
+        if (lobbySmoke)
+            yield return NightlyLobbySmoke(ctx);
+
         var ids = new List<ulong>();
         for (int i = 0; i < LobbySession.Active.EntryCount; i++)
             ids.Add(LobbySession.Active.GetEntry(i).ClientId);
         int slot = QABoss103Plan.SlotOf(LocalId, ids);
-        QABoss103Character character = QABoss103Plan.CharacterForSlot(Mathf.Max(0, slot));
+        QABoss103Character character = cfg.CharacterForSlot(Mathf.Max(0, slot));
 
         var picked = new QAFlag();
         var pickNote = new StringBuilder();

@@ -57,6 +57,46 @@ public static class QABoss103Plan
         return PartyOrder[((slot % n) + n) % n];
     }
 
+    /// <summary>
+    /// 할 일 108 — 자리 순서 문자열(<c>Gunner,Paladin,Assassin</c>, 대소문자 무관) → 캐릭터 배열. 세 캐릭터가 한 번씩 다 있어야 한다
+    /// (계측·특성 집계가 캐릭터당 1명 전제). 틀리면 false.
+    /// </summary>
+    public static bool TryParseOrder(string text, out QABoss103Character[] order)
+    {
+        order = null;
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+        string[] parts = text.Split(',');
+        if (parts.Length != PartyOrder.Length)
+            return false;
+        var list = new QABoss103Character[parts.Length];
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string p = parts[i].Trim();
+            if (int.TryParse(p, out _) || !Enum.TryParse(p, true, out QABoss103Character c) || !Enum.IsDefined(typeof(QABoss103Character), c))
+                return false;
+            for (int j = 0; j < i; j++)
+                if (list[j] == c)
+                    return false;
+            list[i] = c;
+        }
+        order = list;
+        return true;
+    }
+
+    /// <summary>캐릭터 배열 → <c>Paladin,Assassin,Gunner</c>.</summary>
+    public static string FormatOrder(IReadOnlyList<QABoss103Character> order)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < order.Count; i++)
+        {
+            if (i > 0)
+                sb.Append(',');
+            sb.Append(order[i]);
+        }
+        return sb.ToString();
+    }
+
     /// <summary><paramref name="clientId"/> 의 자리 = 접속자(정렬 무관) 중 더 작은 id 의 수. 목록에 없으면 -1.</summary>
     public static int SlotOf(ulong clientId, IEnumerable<ulong> connected)
     {
@@ -258,8 +298,26 @@ public sealed class QABoss103Config
     public int Retry;
     /// <summary>C6 연속 루프 판(0/1) — 1 이면 호스트가 런타임 데이터 출처가 테이블이 아닐 때 그 판을 Error(data_source)로 끝낸다.</summary>
     public int Batch;
+    /// <summary>할 일 108 — 자리 → 캐릭터 순서(<c>order</c>). null = 기본(<see cref="QABoss103Plan.PartyOrder"/>).</summary>
+    public QABoss103Character[] Order;
+    /// <summary>할 일 108 — 특성 선택 시드(<c>traitSeed</c>). 0 = 따로 없음(판 시드를 같이 쓴다 — 103 과 같다).</summary>
+    public int TraitSeed;
+    /// <summary>할 일 108 — 야간 QA 시드 이름(<c>nightly</c>). 비면 103 단독 실행.</summary>
+    public string Nightly = "";
 
     public int RunSeed => QABoss103Plan.RunSeed(Seed, Run);
+
+    /// <summary>특성 제시·선택에 쓰는 판 시드 — <see cref="TraitSeed"/> 가 있으면 그것과 판 번호, 없으면 <see cref="RunSeed"/>.</summary>
+    public int TraitRunSeed => TraitSeed != 0 ? QABoss103Plan.RunSeed(TraitSeed, Run) : RunSeed;
+
+    /// <summary>자리 → 캐릭터(<see cref="Order"/> 우선).</summary>
+    public QABoss103Character CharacterForSlot(int slot)
+    {
+        if (Order == null || Order.Length == 0)
+            return QABoss103Plan.CharacterForSlot(slot);
+        int n = Order.Length;
+        return Order[((slot % n) + n) % n];
+    }
 
     /// <summary>이 판의 봇 단계(수동 지정 우선).</summary>
     public QABoss103BotTier BotTier => QABoss103Bot.ResolveTier(Run, Tier);
@@ -267,7 +325,9 @@ public sealed class QABoss103Config
     public bool HasOut => !string.IsNullOrEmpty(OutDir);
 
     public string Format() =>
-        $"seed={Seed}\nrun={Run}\ntier={(Tier.HasValue ? Tier.Value.ToString() : "auto")}\nretry={Retry}\n" + (Batch != 0 ? "batch=1\n" : "") + (HasOut ? $"out={OutDir}\n" : "");
+        $"seed={Seed}\nrun={Run}\ntier={(Tier.HasValue ? Tier.Value.ToString() : "auto")}\nretry={Retry}\n" + (Batch != 0 ? "batch=1\n" : "") + (HasOut ? $"out={OutDir}\n" : "") +
+        (Order != null && Order.Length > 0 ? $"order={QABoss103Plan.FormatOrder(Order)}\n" : "") + (TraitSeed != 0 ? $"traitSeed={TraitSeed}\n" : "") +
+        (!string.IsNullOrEmpty(Nightly) ? $"nightly={Nightly}\n" : "");
 
     public static bool TryParse(string text, out QABoss103Config cfg)
     {
@@ -285,6 +345,21 @@ public sealed class QABoss103Config
             if (key == "out")
             {
                 cfg.OutDir = line.Substring(eq + 1).Trim();
+                any = true;
+                continue;
+            }
+            if (key == "order")
+            {
+                if (QABoss103Plan.TryParseOrder(line.Substring(eq + 1), out QABoss103Character[] order))
+                {
+                    cfg.Order = order;
+                    any = true;
+                }
+                continue;
+            }
+            if (key == "nightly")
+            {
+                cfg.Nightly = line.Substring(eq + 1).Trim();
                 any = true;
                 continue;
             }
@@ -324,6 +399,11 @@ public sealed class QABoss103Config
             else if (key == "batch")
             {
                 cfg.Batch = v != 0 ? 1 : 0;
+                any = true;
+            }
+            else if (key == "traitSeed")
+            {
+                cfg.TraitSeed = v;
                 any = true;
             }
         }

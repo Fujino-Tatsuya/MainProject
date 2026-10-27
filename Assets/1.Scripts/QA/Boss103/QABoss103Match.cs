@@ -114,7 +114,7 @@ public static class QABoss103Match
         QA88TwentyThreeAssist.ReleaseActive("b103_start");
         QABossTimerHold88.ReleaseActive("b103_start");
 
-        QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.RunSeed, localCharacter);
+        QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.TraitRunSeed, localCharacter);
         QABoss103CombatBot fighter = CreateFighter(ctx, cfg, localCharacter);
         var characters = new Dictionary<ulong, QABoss103Character>();
         Action<TutorialTraitChosen> onChosen = c =>
@@ -142,7 +142,7 @@ public static class QABoss103Match
             var party = new List<string>();
             foreach (Player p in QALobbyFlow.SpawnedPlayers())
             {
-                QABoss103Character ch = QABoss103Plan.CharacterForSlot(QABoss103Plan.SlotOf(p.OwnerClientId, ids));
+                QABoss103Character ch = cfg.CharacterForSlot(QABoss103Plan.SlotOf(p.OwnerClientId, ids));
                 characters[p.OwnerClientId] = ch;
                 party.Add($"{p.OwnerClientId}:{ch}:{QALobbyFlow.CleanName(p)}");
             }
@@ -159,7 +159,7 @@ public static class QABoss103Match
                 yield break;
             }
             traits.ServerTraitChosen += onChosen;
-            bool seeded = SeedDirector(traits, QABoss103Plan.DirectorSeed(rec.RunSeed));
+            bool seeded = SeedDirector(traits, QABoss103Plan.DirectorSeed(cfg.TraitRunSeed));
             for (int round = 1; round <= QABoss103Plan.TraitRounds; round++)
             {
                 bool offered = traits.StartOfferRoundServer(ids, TutorialCorridorRules.DisplayOf(round));
@@ -352,7 +352,7 @@ public static class QABoss103Match
     /// </summary>
     public static IEnumerator RunClient(QAScenarioContext ctx, QABoss103Config cfg, QABoss103Character localCharacter)
     {
-        QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.RunSeed, localCharacter);
+        QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.TraitRunSeed, localCharacter);
         QABoss103CombatBot fighter = CreateFighter(ctx, cfg, localCharacter);
         try
         {

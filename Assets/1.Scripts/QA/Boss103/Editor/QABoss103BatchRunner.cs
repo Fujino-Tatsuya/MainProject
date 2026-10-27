@@ -87,8 +87,6 @@ public static class QABoss103BatchRunner
         string dir = $"{QAScenario103Menu.QARoot}/{QABoss103Batch.BatchFolderName(at)}";
         if (Directory.Exists(dir))
             dir += at.ToString("ss", CultureInfo.InvariantCulture);
-        Directory.CreateDirectory(dir);
-        DataSourcePlayMode.Current = DataSource.Table;
         var batch = new List<KeyValuePair<string, string>>
         {
             KV("title", "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA"),
@@ -101,16 +99,66 @@ public static class QABoss103BatchRunner
             KV("git_branch", QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD")),
             KV("unity_version", Application.unityVersion),
         };
+        StartBatch(dir, batch, QAScenario103Menu.BaseSeed, QABoss103Batch.TotalRuns, null);
+    }
+
+    /// <summary>
+    /// 새 배치 시작(103 Start 90·할 일 108 야간 QA 공용). batch.txt 를 쓰고 진행 상태를 처음부터 둔다.
+    /// <paramref name="extraState"/> = 판 설정 키(<c>scenario</c>·<c>tier</c>·<c>order</c>·<c>traitSeed</c>·<c>nightly</c>) — 없으면 103(B103·봇 단계 자동).
+    /// </summary>
+    internal static bool StartBatch(string dir, List<KeyValuePair<string, string>> batch, int seed, int total, IEnumerable<KeyValuePair<string, string>> extraState)
+    {
+        if (!CanStart())
+            return false;
+        Directory.CreateDirectory(dir);
+        DataSourcePlayMode.Current = DataSource.Table;
         File.WriteAllText(Path.Combine(dir, QABoss103Batch.BatchFile), QABoss103Batch.FormatKeyValues(batch));
         _state = new Dictionary<string, string>(StringComparer.Ordinal);
         _stateDir = dir;
         Set("state", "prepare");
-        Set("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture));
-        Set("total", QABoss103Batch.TotalRuns.ToString(CultureInfo.InvariantCulture));
+        Set("seed", seed.ToString(CultureInfo.InvariantCulture));
+        Set("total", total.ToString(CultureInfo.InvariantCulture));
+        if (extraState != null)
+            foreach (KeyValuePair<string, string> kv in extraState)
+                Set(kv.Key, kv.Value);
         SetTime("notBefore", Now);
         Arm(dir);
-        Log($"배치 시작 {dir} — {QABoss103Batch.TotalRuns}판 · 기준 시드 {Get("seed")} · 데이터 출처 테이블 · xlsx r{Find(batch, "xlsx_svn_rev")} · git {Find(batch, "git_commit")}");
+        Log($"배치 시작 {dir} — {total}판 · 시나리오 {Scenario} · 기준 시드 {Get("seed")} · 데이터 출처 테이블 · xlsx r{Find(batch, "xlsx_svn_rev")} · git {Find(batch, "git_commit")}" +
+            (IsNightlyBatch ? $" · 야간 시드 {Get("nightly")}" : ""));
+        return true;
     }
+
+    /// <summary>돌고 있나(야간 메뉴 검사용).</summary>
+    internal static bool IsRunning => Running;
+
+    /// <summary>마지막(또는 지금) 배치 폴더. 없으면 빈 값.</summary>
+    internal static string CurrentDir => Dir;
+
+    /// <summary>이름 형식(<paramref name="pattern"/>, 예 <c>N108-2*</c>)의 가장 최근 배치를 이어 한다. 없으면 false.</summary>
+    internal static bool ResumeLatest(string pattern)
+    {
+        string dir = !string.IsNullOrEmpty(Dir) && Directory.Exists(Dir) && MatchesPattern(Dir, pattern) ? Dir : LatestBatchDir(pattern);
+        if (dir == null)
+        {
+            Debug.LogWarning($"{Tag} 이어 할 배치 폴더가 없다({QAScenario103Menu.QARoot}/{pattern}).");
+            return false;
+        }
+        Resume(dir);
+        return true;
+    }
+
+    private static bool MatchesPattern(string dir, string pattern)
+    {
+        string name = Path.GetFileName(dir.TrimEnd('/', '\\'));
+        string prefix = pattern.TrimEnd('*');
+        return name.StartsWith(prefix, StringComparison.Ordinal);
+    }
+
+    /// <summary>이 배치의 시나리오(진행 상태 <c>scenario</c>, 없으면 103).</summary>
+    private static string Scenario => Get("scenario", QALobbyScenarios.Boss103Id);
+
+    /// <summary>할 일 108 야간 배치(진행 상태 <c>nightly</c> = 시드 이름).</summary>
+    private static bool IsNightlyBatch => Get("nightly").Length > 0;
 
     [MenuItem(Root + "Resume Last", priority = 101)]
     public static void ResumeLast()
@@ -260,12 +308,12 @@ public static class QABoss103BatchRunner
         _nextTick = 0;
     }
 
-    private static string LatestBatchDir()
+    private static string LatestBatchDir(string pattern = "103-2*")
     {
         if (!Directory.Exists(QAScenario103Menu.QARoot))
             return null;
         string latest = null;
-        foreach (string d in Directory.GetDirectories(QAScenario103Menu.QARoot, "103-2*"))
+        foreach (string d in Directory.GetDirectories(QAScenario103Menu.QARoot, pattern))
             if (latest == null || string.CompareOrdinal(d, latest) > 0)
                 latest = d;
         return latest?.Replace('\\', '/');
@@ -345,7 +393,7 @@ public static class QABoss103BatchRunner
         List<QABoss103Attempt> attempts = Attempts(_stateDir);
         if (!QABoss103Batch.TryNext(attempts, Total, out _, out _))
         {
-            Finish("90판 + 오류 판 재실행 끝", "done");
+            Finish($"{Total}판 + 오류 판 재실행 끝", "done");
             return;
         }
         if (Get("recycle") == "1")
@@ -422,8 +470,10 @@ public static class QABoss103BatchRunner
         Set("endAt", "0");
         Set("state", "starting");
         _netMismatch = null;
-        Log($"판 {run}{(retry > 0 ? " 재실행" : "")} 시작 — 단계 {QABoss103Batch.TierLabel(cfg.BotTier)} · 판 시드 {cfg.RunSeed} · 설정 {written}곳");
-        if (!QAScenario48Menu.Run(QALobbyScenarios.Boss103Id, 3))
+        Log($"판 {run}{(retry > 0 ? " 재실행" : "")} 시작 — 시나리오 {Scenario} · 단계 {QABoss103Batch.TierLabel(cfg.BotTier)} · 판 시드 {cfg.RunSeed} · 설정 {written}곳");
+        if (IsNightlyBatch)
+            QANightlyHooks.AttemptStarting(_stateDir, run, retry, Log);
+        if (!QAScenario48Menu.Run(Scenario, 3))
             Log("Play 시작 요청이 거절됐다(이미 Play 중) — 시작 상한까지 기다린다.");
     }
 
@@ -533,6 +583,8 @@ public static class QABoss103BatchRunner
         SetTime("notBefore", Now.AddSeconds(cooldown));
         Set("state", "prepare");
         WriteReport();
+        if (IsNightlyBatch)
+            QANightlyHooks.AttemptEnded(_stateDir, run, retry, Log);
     }
 
     private static void Finish(string why, string endState)
@@ -559,21 +611,35 @@ public static class QABoss103BatchRunner
         EditorPrefs.SetBool(RunningKey, false);
         string path = WriteReport();
         Log($"배치 {(endState == "done" ? "완료" : "멈춤")} — {why} · 가상 플레이어 비활성·시나리오 모드 해제·설정 파일 삭제 · 리포트 {path}");
+        if (IsNightlyBatch)
+            QANightlyHooks.BatchEnded(_stateDir, Get("state"), Log);
     }
 
     // ── 판 도구 ──────────────────────────────────────────────
 
     private static int Total => Math.Max(1, GetInt("total", QABoss103Batch.TotalRuns));
 
-    private static QABoss103Config Config(int run, int retry) => new QABoss103Config
+    /// <summary>판 설정 — 103 은 봇 단계 자동, 할 일 108 야간 배치는 진행 상태의 tier·order·traitSeed·nightly 를 쓴다.</summary>
+    private static QABoss103Config Config(int run, int retry)
     {
-        Seed = GetInt("seed", QABoss103Config.DefaultSeed),
-        Run = Math.Max(1, run),
-        Tier = null,
-        OutDir = _stateDir,
-        Retry = retry,
-        Batch = 1,
-    };
+        var cfg = new QABoss103Config
+        {
+            Seed = GetInt("seed", QABoss103Config.DefaultSeed),
+            Run = Math.Max(1, run),
+            Tier = null,
+            OutDir = _stateDir,
+            Retry = retry,
+            Batch = 1,
+            TraitSeed = GetInt("traitSeed"),
+            Nightly = Get("nightly"),
+        };
+        string tier = Get("tier");
+        if (tier.Length > 0 && QABoss103Config.TryParse("tier=" + tier, out QABoss103Config t))
+            cfg.Tier = t.Tier;
+        if (QABoss103Plan.TryParseOrder(Get("order"), out QABoss103Character[] order))
+            cfg.Order = order;
+        return cfg;
+    }
 
     private static List<QABoss103Attempt> Attempts(string dir)
     {
