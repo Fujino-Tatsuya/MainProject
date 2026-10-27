@@ -8076,6 +8076,7 @@ GameObject:
   - component: {fileID: 775728372579604463}
   - component: {fileID: 9062771359437980229}
   - component: {fileID: 8264927003059972359}
+  - component: {fileID: 7066430280860942865}
   m_Layer: 3
   m_Name: SB_Floor_PodBay_Generated
   m_TagString: Untagged
@@ -8156,6 +8157,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &7066430280860942865
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4508478796026611243}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 12.5, y: 0.3, z: 8}
+  m_Center: {x: -1.75, y: -0.15, z: -8}
 --- !u!1 &4536611623717501589
 GameObject:
   m_ObjectHideFlags: 0
