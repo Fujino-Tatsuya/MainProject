@@ -54,6 +54,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private bool _restartingTargetScene;
     // 소스 씬이 NGO 가 로드한 씬인가 — 서버가 StartGameLoading 에서 정해 상태 메시지로 클라에 알린다(SourceSceneUnloadRule).
     private bool _sourceIsNetworkScene;
+    // [서버] 마지막 타깃 씬 진입 종류(할 일 100 C3) — 진입 함수가 정하고 ResetFlow 는 지우지 않는다(로딩이 끝난 뒤 맵 스폰이 읽는다).
+    // 새 세션·판 종료 Single 전환에서 Direct 로 돌린다.
+    private MapEntryKind _entryKind = MapEntryKind.Direct;
     // [서버] NGO LoadScene 으로 들어와 아직 떠 있는 씬 이름. 서버 자신의 LoadComplete 로 넣고 Unity sceneUnloaded 로 뺀다.
     // NGO 의 ScenesLoaded 는 internal 이고, StartHost 때 이미 떠 있던 로컬 씬(지금의 로비)까지 담아 판별에 못 쓴다.
     private readonly HashSet<string> _networkLoadedScenes = new HashSet<string>();
@@ -88,6 +91,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
     public bool IsFlowInProgress =>
         (_phase != NetworkLoadingPhase.Idle && _phase != NetworkLoadingPhase.Completed) ||
         _targetLoadRoutine != null || _completionRoutine != null || _restartingTargetScene;
+
+    /// <summary>[서버] 지금(마지막) 타깃 씬 진입 종류 — 로비 포드 연출을 거쳐 왔으면 <see cref="MapEntryKind.Lobby"/>. 클라에선 의미 없다(늘 Direct).</summary>
+    public MapEntryKind EntryKind => _entryKind;
 
     private void Awake()
     {
@@ -160,6 +166,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _registeredMessagingManager = _networkManager.CustomMessagingManager;
         _networkLoadedScenes.Clear(); // 새 세션 — 지난 세션의 NGO 씬 기록은 이 SceneManager 와 무관하다
         _pendingRejoin.Clear();
+        _entryKind = MapEntryKind.Direct; // 새 세션(Dev Boot 포함) — 지난 세션의 로비 진입을 끌고 오지 않는다
         if (!_networkManager.IsServer)
         {
             ResetClientFlowForNewSession();
@@ -228,10 +235,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
                _networkManager.CustomMessagingManager != null;
     }
 
-    public void StartGameLoading()
+    public void StartGameLoading() => StartGameLoading(MapEntryKind.Direct);
+
+    /// <summary>[서버] 로비 → 맵 로딩. <paramref name="entryKind"/> = 맵 스폰·맵 포드 착지 연출이 읽을 진입 종류(로비 포드 연출 끝이면 Lobby).</summary>
+    public void StartGameLoading(MapEntryKind entryKind)
     {
         Debug.Log(
-            $"[SceneFlow] NetworkLoadingFlowController.StartGameLoading begin phase={_phase} " +
+            $"[SceneFlow] NetworkLoadingFlowController.StartGameLoading begin phase={_phase} entryKind={entryKind} " +
             $"listening={_networkManager != null && _networkManager.IsListening} server={IsServerActive}");
         LogLoadedScenes("StartGameLoading.begin");
         RegisterNetworkCallbacks();
@@ -252,6 +262,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         BeginMatchRoster();
         ResetFlow();
+        _entryKind = entryKind;
         _flowId++;
         _phase = NetworkLoadingPhase.LoadingScene;
         _minimumTimerStartedAt = Time.unscaledTime;
@@ -312,6 +323,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
         }
 
         ResetFlow();
+        MapEntryKind previousEntryKind = _entryKind;
+        _entryKind = MapEntryKind.Restart;
         _flowId++;
         _phase = NetworkLoadingPhase.LoadingScene;
         _minimumTimerStartedAt = Time.unscaledTime;
@@ -328,6 +341,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         {
             // 아무것도 안 바뀌었다 — 판은 그대로 이어진다. 클라가 받은 LoadingScene 상태를 Completed 로 되돌린다.
             _restartingTargetScene = false;
+            _entryKind = previousEntryKind;
             _sourceSceneName = string.Empty;
             _phase = NetworkLoadingPhase.Completed;
             BroadcastState();
@@ -445,6 +459,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         // 판 끝 — 여기부터 명단 안 사람도 재합류가 아니라 로비 입장으로 다시 받는다(C14).
         EndMatchRoster($"single={sceneName}");
+        _entryKind = MapEntryKind.Direct;
         _sessionSceneLoadRoutine = StartCoroutine(LoadSessionSceneSingle(sceneName));
         reason = null;
         return true;
@@ -1212,8 +1227,15 @@ public class NetworkLoadingFlowController : MonoBehaviour
     public CharacterRoster CharacterRoster => characterRoster;
 
     // 판 도중 재합류(SpawnRejoiner)와 같은 칸 공식이다 — RejoinSpawnPicker.SlotPose 하나로 맞춘다.
+    // 예외: 로비 포드 연출을 거쳐 왔고 맵 포드 착지 연출이 켜져 있으면 포드 착지점 좌석(낙하 없이, 할 일 100 C3). 재합류는 이 함수를 안 거친다.
     private Pose ResolvePlayerSpawnPose(int spawnIndex, Transform baseSpawnPoint)
     {
+        if (_entryKind == MapEntryKind.Lobby && baseSpawnPoint != null &&
+            MapPodArrival.Active != null && MapPodArrival.Active.TryGetSeatPoseServer(spawnIndex, baseSpawnPoint, out Pose seat))
+        {
+            return seat;
+        }
+
         return baseSpawnPoint != null
             ? RejoinSpawnPicker.SlotPose(true, baseSpawnPoint.position, baseSpawnPoint.rotation, spawn_Offset, spawnIndex)
             : RejoinSpawnPicker.SlotPose(false, Vector3.zero, Quaternion.identity, spawn_Offset, spawnIndex);
