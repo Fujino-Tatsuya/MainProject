@@ -152,15 +152,66 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 ## 바닥 안내 화살표 (할 일 111)
 
 다음 갈 곳을 바닥에 흐르는 화살표로 알려 준다. **씬 배치는 사용자가 직접**(프리팹만 제공, 씬 YAML 은 건드리지 않았다).
+두 종류를 **같이 둔다** — 꺾이는 길 안내 = **경로형**(기본 권장), 짧은 직선에 흐르는 띠 = **직선 띠**.
+
+### 경로형 — `LobbyFloorArrowPath.prefab` (점선 + 삼각형, 꺾은선)
+
+- **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrowPath.prefab`
+  - 루트 = `LobbyFloorArrowPath` + `LobbyTrainingStageVisibility`(`targets` = `Pieces`, `showWhen` 비움).
+  - 자식 `Start`·`Waypoint1`·`End` = 경로 점(빈 오브젝트), `Pieces` = **구운 조각**(내장 Quad + 공유 머티리얼 `M_LobbyFloorArrowPath`).
+  - 셰이더 `Lobby/FloorArrowPath`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrowPath.shader`, URP Unlit 반투명), 텍스처 `50.Art/UI/Navigate/ArrowLineSet.png` **참조만**.
+- **세팅법**: 프리팹을 놓고 `Start`·`Waypoint*`·`End` 자식을 바닥 위로 옮긴다. 꺾이는 점이 더 필요하면 빈 자식을 만들어 `waypoints` 목록에 순서대로 넣는다.
+  점은 루트의 **직속 자식**으로 두는 게 좋다(로컬 좌표를 그대로 써서 어디 놓아도 다시 굽지 않는다. 다른 곳의 Transform 도 되지만 루트 기준으로 환산).
+- **굽기**: 에디터에서 값을 바꾸거나 점을 옮겨 놓으면(드래그가 끝난 뒤) **자동으로 다시 굽는다**. 인스펙터 아래 **`다시 굽기`** 버튼·컴포넌트 ⋮ 메뉴 `다시 굽기` 로 바로 굽는다.
+  기즈모 선이 **빨간색이면 구운 결과가 낡음**. 프리팹 모드·씬 인스턴스 둘 다 Undo 된다. Play 중·디스크의 프리팹 에셋(열지 않은 상태)에선 굽지 않는다.
+  - 씬 인스턴스에서 조각이 줄면 프리팹에서 온 조각은 지울 수 없어 **꺼 둔다**(오버라이드). 깨끗이 하려면 프리팹 모드에서 굽는다.
+  - `Pieces` 아래에 다른 오브젝트를 넣지 말 것 — 굽기가 순서대로 재사용한다.
+- **런타임 비용**: Play·빌드에선 아무것도 만들지 않는다. 켜질 때 조각마다 `MaterialPropertyBlock`(UV 영역·경로 거리·색·흐름)만 넣는다. 머티리얼 복제·`new Mesh`·`new Texture2D` 없음.
+  흐름은 셰이더가 **조각별 경로 거리 + `_Time`** 으로 불투명도 물결을 앞으로 민다(조각 단위로 밝아졌다 어두워짐) — 매 프레임 스크립트 없음.
+- **배치 규칙**(`LobbyFloorArrowPathLayout`, EditMode `LobbyFloorArrowPathLayoutTests`):
+  - 구간마다 따로 등간격 — 양 끝 여백을 뺀 길이를 `spacing` 에 가장 가까운 간격으로 나눈다(구간마다 실제 간격이 조금 다를 수 있다).
+  - 꺾임 여백 = max(`spacing`/2, (가장 긴 조각 길이 + 가장 넓은 조각 폭)/2) — 직각에서 양쪽 조각이 모서리를 넘거나 겹치지 않는다. 예각(직각보다 좁은 꺾임)은 겹칠 수 있다.
+  - 구간이 여백보다 짧으면 그 구간엔 조각이 없다. 같은 위치의 점(길이 0 구간)은 건너뛴다.
+  - 시작 조각은 앞 끝이 시작점에 닿게, 큰 삼각형은 **중심 = 도착점**. 작은 삼각형 = 경로 전체 순서로 `triangleEvery` 번째마다.
+  - 점선은 긴 쪽, 삼각형은 꼭짓점이 그 구간 진행 방향.
+- **SVN 슬라이스 의존 없음**: 점선·삼각형 영역은 컴포넌트 `dashUv`·`triangleUv`(UV 0~1, 왼쪽 아래 기준)에 직접 들고 있다.
+  기본값 = 사용자가 잘라 둔 `ArrowLineSet_0`(x317 y556 w280 h125)·`ArrowLineSet_1`(x726 y540 w211 h188) 과 같은 픽셀 사각형 / 1254. `.meta` 슬라이스가 커밋되지 않은 PC 에서도 같게 보인다.
+  텍스처 그림이 바뀌면 이 두 값만 고친다.
+
+#### 인스펙터 — `LobbyFloorArrowPath`
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `start` / `waypoints` / `end` | 프리팹 자식 | 경로 점. 순서대로 잇는다 |
+| `material` | `M_LobbyFloorArrowPath` | 모든 조각이 공유 |
+| `spacing` | 0.8 | 조각 중심 간격(m) |
+| `dashLength` / `dashWidth` | 0.45 / 0.2 | 점선 조각 길이·폭(m) |
+| `triangleEvery` | 4 | 몇 조각마다 작은 삼각형(0 = 없음) |
+| `smallTriangleSize` | 0.35 | 작은 삼각형 폭(m), 길이는 텍스처 비율 |
+| `endTriangleSize` | 0.9 | 도착점 큰 삼각형 폭(m) |
+| `heightOffset` | 0.02 | 바닥에서 띄우는 높이 |
+| `color` | 노랑 α0.9 (HDR) | 색·투명도 |
+| `flowSpeed` | 2 | 물결 속도(m/초), 0 = 정지, 음수 = 뒤로 |
+| `flowWavelength` | 3 | 물결 한 주기(m) |
+| `flowMinAlpha` | 0.35 | 물결 골 불투명도 배율(1 = 물결 없음) |
+| `dashUv` / `triangleUv` | ArrowLineSet 영역 | 아틀라스 안 점선·삼각형(꼭짓점 위) 영역 |
+| `piecesRoot` | `Pieces` | 구운 조각 부모 — 손대지 말 것 |
+
+색·흐름은 다시 굽지 않고 바로 반영된다. 나머지(모양·점)는 다시 굽는다.
+
+**단계 표시와 같이 쓰기**: 루트의 `LobbyTrainingStageVisibility` 가 `targets = Pieces` 하나를 켜고 끈다 — 다시 구워도 `Pieces` 오브젝트는 그대로라 참조가 안 깨진다.
+`showWhen` 은 아래 대응표대로 배치할 때 고른다. 길이 여러 갈래면 프리팹을 여러 개 놓는다.
+
+### 직선 띠 — `LobbyFloorArrow.prefab` (병행 유지)
 
 - **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrow.prefab`
   - 루트 = `LobbyFloorArrowStrip` + `LobbyTrainingStageVisibility`, 자식 `Visual` = 내장 Quad + `M_LobbyFloorArrow`.
-  - 셰이더 `Lobby/FloorArrow`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrow.shader`, URP Unlit 반투명) — 텍스처는 `50.Art/VFX/Textures/ARPG Effects-Textures/arrow2.png` 를 **참조만**(SVN 파일 수정 없음).
+  - 셰이더 `Lobby/FloorArrow`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrow.shader`, URP Unlit 반투명) — 텍스처는 사용자가 `50.Art/UI/Navigate/ArrowLineSet.png` 로 바꿨다(10-27, 처음엔 `arrow2.png`). **참조만**(SVN 파일 수정 없음).
   - 흐름은 **셰이더가 `_Time` 으로 UV 를 민다** — 매 프레임 스크립트 없음. 수치는 `MaterialPropertyBlock` 으로 넣어 머티리얼 복제·런타임 텍스처/메시 생성이 없다.
 - **배치**: 루트 위치 = 띠 **시작점**, 루트 **+Z(파란 축) = 화살표 진행 방향**. 바닥 위에 놓고 Y 축으로 돌려 방향을 맞춘다. 길이는 앞(+Z)으로 뻗는다.
-  여러 줄이면 프리팹을 여러 개 놓는다(꺾이는 길 = 구간마다 하나). 편집 중엔 늘 보이고, Play 에서 단계 판정대로 켜고 꺼진다.
+  꺾이는 길은 위 경로형을 쓴다. 편집 중엔 늘 보이고, Play 에서 단계 판정대로 켜고 꺼진다.
 
-### 인스펙터 — `LobbyFloorArrowStrip` (값을 바꾸면 편집 중에도 바로 보인다)
+#### 인스펙터 — `LobbyFloorArrowStrip` (값을 바꾸면 편집 중에도 바로 보인다)
 
 | 필드 | 기본 | 뜻 |
 |---|---|---|
@@ -178,7 +229,7 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 - `showWhen` 목록 = **이 중 한 줄이라도 맞으면 켠다**. 빈 목록 = 늘 꺼짐(프리팹 기본 = 비어 있음 — 배치할 때 고른다).
   한 줄 = `stage` + 선택 `limitPhases`(끄면 그 단계 전체) + `phases`(다중 체크: Gathering / InProgress / Completed).
-- `targets` = 켜고 끌 오브젝트(프리팹 = `Visual`). 비우면 직속 자식 전부. 루트 자신은 끄지 않는다.
+- `targets` = 켜고 끌 오브젝트(직선 띠 프리팹 = `Visual`, 경로형 프리팹 = `Pieces`). 비우면 직속 자식 전부. 루트 자신은 끄지 않는다.
 - 판정 = 전 피어 로컬, 복제된 진행기 `Stage`/`Phase`(`LobbyTrainingDirector.StageChanged` + 켜질 때 `Active` 현재 값). 늦은 접속·로비 리로드도 진행기 스폰 알림으로 맞는다.
   **진행기 없음(다른 씬·미스폰·디스폰) = 꺼짐**. 새 NetworkObject·NetworkVariable·RPC 없음. 규칙 원본 = `LobbyTrainingStageVisibilityRules`(EditMode `LobbyTrainingStageVisibilityRulesTests`).
 

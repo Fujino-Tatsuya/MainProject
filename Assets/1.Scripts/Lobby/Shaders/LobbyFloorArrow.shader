@@ -1,6 +1,6 @@
 // 로비 바닥 안내 화살표(할 일 111) — 바닥에 눕힌 쿼드에 화살표 무늬가 +U(진행 방향)로 흐른다.
 // 흐름은 셰이더가 _Time 으로 직접 민다(스크립트 매 프레임 갱신 없음). 수치는 LobbyFloorArrowStrip 이 MaterialPropertyBlock 으로 넣는다.
-// 텍스처 = 50.Art arrow2.png(+U 를 가리키는 흰 화살표, Repeat) 재사용 — 참조만.
+// 텍스처 = 50.Art 참조만(처음 arrow2.png, 10-27 사용자가 ArrowLineSet.png 로 교체). 꺾이는 길은 경로형 Lobby/FloorArrowPath.
 Shader "Lobby/FloorArrow"
 {
     Properties
