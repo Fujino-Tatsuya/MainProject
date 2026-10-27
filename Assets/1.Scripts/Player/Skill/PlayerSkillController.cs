@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using BaseNetCode;
+using BeaverLobby.Player.Dash;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -73,6 +74,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private bool activeEndsOnClipEvent;
     private bool hasClipFallback;
     private int activeStartFrame;
+    // [서버] 대쉬 간파가 대시에 실린 시각(할 일 115) — Skill 전이 때 안전망을 실린 시간만큼 늦춘다.
+    private float activeDashAttachTime;
     // 상태가 다시 시작됐다고 볼 안전망 연장 폭. 같은 재생 안에서는 매 틱 계산값이 거의 같아 이보다 작다.
     private const float ClipRestartSlack = 0.05f;
     // 클립 길이를 못 구해 타이머 안전망으로 대체한 경고는 스킬당 1회.
@@ -395,7 +398,42 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         isRequestingSkill = true;
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
         RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
-            NetworkManager.ServerTime.Time);
+            NetworkManager.ServerTime.Time, false);
+        return true;
+    }
+
+    /// <summary>
+    /// [오너] 대쉬 간파 요청(할 일 115) — 대시 중 창 안 우클릭. 차단 효과·쿨타임은 호출자(PlayerDashState)가 먼저 걸렀다(§10 Q3).
+    /// 원격 오너는 대쉬 간파 사전조건으로 1차 검증하고, 서버가 최종 승인한다(거부 = RejectSkillClientRpc, 대시는 그대로).
+    /// 우클릭이 간파 스킬(<see cref="PlayerInterruptSkillBase"/>)일 때만. 방향 = 대시 방향(조준 회전 스냅 없음).
+    /// </summary>
+    public bool TryUseDashInterrupt(Vector3 dashDirection)
+    {
+        if (IsSkillActive || isRequestingSkill)
+            return false;
+
+        PlayerSkillBase skill = GetSkill(PlayerSkillSlot.Interrupt);
+        if (!(skill is PlayerInterruptSkillBase) || skill.Data == null)
+            return false;
+
+        int skillIndex = GetSkillIndex(skill);
+        if (skillIndex == InvalidSkillIndex)
+            return false;
+
+        Vector3 direction = ResolveDirection(dashDirection);
+        if (!IsNetworkActive)
+            return StartSkillServer(PlayerSkillSlot.Interrupt, skillIndex, direction, null, Vector3.zero, false, true);
+
+        if (!IsOwner)
+            return false;
+
+        if (!IsServer && !CanApproveSkill(
+                PlayerSkillSlot.Interrupt, skillIndex, direction, null, Vector3.zero, false, true, out _, out _))
+            return false;
+
+        isRequestingSkill = true;
+        RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
+            player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
     }
 
@@ -442,6 +480,60 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         ApplyPendingSlotOverrides();
     }
 
+    // ── 대쉬 간파(할 일 115) — 간파가 대시 상태에 실린 동안(FSM = Dash)의 수명 ──
+
+    /// <summary>
+    /// [오너·서버] 실린 간파를 두고 대시가 끊겼다(넉백·그랩·사망·CC·서버 취소 EndDash) — 스킬 상태 강제 이탈과 같은 정리.
+    /// 0층은 대시 포즈 그대로라 되돌리지 않고 상체 레이어만 내린다. 서버면 EndSkillClientRpc(기존 경로).
+    /// </summary>
+    internal void HandleDashInterruptAborted(PlayerSkillBase skill, PlayerActionState nextState)
+    {
+        if (skill == null || activeSkill != skill)
+            return;
+
+        activeSkill = null;
+        activeEndFallbackTime = 0f;
+
+        SkillEndReason reason = PlayerActionPoseRules.ForcedExitReason(nextState);
+        Edit.Log($"[DashInterrupt] 대시 중 강제 종료 → 간파 종료 ({reason}, 다음 상태 {nextState})", this);
+        skill.OnEnd(reason);
+        dash?.CancelDashInterruptUpper();
+
+        if (IsNetworkActive && IsServer)
+            EndSkillClientRpc(GetSkillIndex(skill), reason);
+
+        ApplyPendingSlotOverrides();
+    }
+
+    /// <summary>
+    /// [오너·서버] 대시가 끝나 실린 간파가 Skill 상태로 넘어왔다(<see cref="PlayerStateController.BeginSkillFromDash"/> 직후).
+    /// 0층이 상체 레이어의 간파 상태를 이어받고(입력 주체), 서버는 안전망을 실린 시간만큼 늦춘 뒤 보류된 Hit 을 판정한다.
+    /// </summary>
+    internal void CompleteDashInterruptHandOff(PlayerSkillBase skill)
+    {
+        if (skill == null || activeSkill != skill)
+            return;
+
+        if (skill.Data != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
+            dash?.HandOffDashInterruptToBase(skill.Data.AnimatorStateName);
+
+        if (!HasGameplayAuthority)
+            return;
+
+        // 안전망은 승인 때 시작했다 — 대시에 실려 있던 동안은 Skill 틱이 안 돌았으므로 그만큼 늦춘다.
+        if (activeEndFallbackTime > 0f)
+            activeEndFallbackTime += Mathf.Max(0f, Time.time - activeDashAttachTime);
+        activeStartFrame = Time.frameCount; // 클립 길이 안전망은 0층 인수인계 다음 프레임부터 본다
+        hasClipFallback = false;
+
+        if (skill is PlayerInterruptSkillBase interrupt)
+            interrupt.OnDashHandOff();
+    }
+
+    // 그 스킬이 지금 대시에 실려 있었으면 내린다(대시 중 스킬 종료). 실려 있었으면 true.
+    private bool DetachFromDash(PlayerSkillBase skill) =>
+        stateController != null && stateController.DetachDashInterrupt(skill);
+
     // 서버에서 실행 중인 스킬을 종료한다. 스킬 스스로(EndSelf) 또는 안전망이 호출.
     public void EndActiveSkillServer(SkillEndReason reason)
     {
@@ -459,7 +551,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
 
-        ReturnBasePoseAfterSkill(skill, reason);
+        // 대시에 실린 채 끝났으면(할 일 115) 0층은 대시 포즈다 — 상체 레이어만 내린다.
+        if (DetachFromDash(skill))
+            dash?.CancelDashInterruptUpper();
+        else
+            ReturnBasePoseAfterSkill(skill, reason);
 
         if (IsNetworkActive)
             EndSkillClientRpc(GetSkillIndex(skill), reason);
@@ -587,22 +683,38 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
     // ── 서버 처리 ──
 
+    // dashInterrupt = 대쉬 간파(할 일 115): Skill 상태로 들어가지 않고 지금 대시 상태에 간파를 싣는다. 방향 = 대시 방향.
     private bool StartSkillServer(
-        PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint)
+        PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint,
+        bool dashInterrupt = false)
     {
-        ReprojectFixedDistanceAim(slot, hasAimPoint, ref direction, ref aimPoint);
+        if (!dashInterrupt)
+            ReprojectFixedDistanceAim(slot, hasAimPoint, ref direction, ref aimPoint);
 
         if (!CanApproveSkill(
-                slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint,
+                slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint, dashInterrupt,
                 out PlayerSkillBase skill, out bool isDead))
         {
             return false;
         }
 
-        direction = ResolveDirection(direction);
+        PlayerDashState dashState = dashInterrupt ? stateController.ActiveDash : null;
+        // 서버 대시 상태의 방향을 쓴다(원격 오너면 승인 때 받은 대시 방향과 같다).
+        direction = ResolveDirection(dashState != null ? dashState.Direction : direction);
 
+        if (dashInterrupt)
+        {
+            if (!stateController.AttachDashInterrupt(skill))
+                return false;
+
+            activeDashAttachTime = Time.time;
+            // 시도 사건 예측은 예상 대시 끝에서(§10 Q2) — OnServerStart 가 이 값으로 앵커 오버랩을 옮긴다.
+            if (skill is PlayerInterruptSkillBase interrupt)
+                interrupt.ArmDashAttach(DashInterruptRules.GetPredictedEndOffset(
+                    direction, dashState.Speed, dashState.Remaining));
+        }
         // 사망 중 허용 스킬(usableWhileDead)은 FSM 상태를 점유하지 않는다 — Dead 상태 유지
-        if (!isDead && !stateController.BeginSkill(skill))
+        else if (!isDead && !stateController.BeginSkill(skill))
             return false;
 
         isRequestingSkill = false;
@@ -629,13 +741,20 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         skill.SetDamageSnapshot(damageSnapshot);
         // 지점(AimPoint)은 CanApproveSkill 이 CanUse 직전에 이미 넣었다.
 
-        Edit.Log($"[Skill] {slot} 시작 — 피해 스냅샷 {damageSnapshot}, 쿨타임 {skill.Data.CooldownTime}s", this);
+        Edit.Log($"[Skill] {slot} 시작{(dashInterrupt ? "(대쉬 간파 — 대시에 실림)" : string.Empty)} — 피해 스냅샷 {damageSnapshot}, 쿨타임 {skill.Data.CooldownTime}s", this);
 
         skill.OnServerStart(direction, target);
-        PlaySkillPresentation(skill, direction);
+        // 대쉬 간파가 OnServerStart 안에서 바로 끝났으면(데이터 누락 등) 이미 대시에서 내려졌다 — 상체 레이어를 틀지 않는다.
+        if (dashInterrupt && activeSkill != skill)
+        {
+            ServerSkillUsed?.Invoke(player, slot);
+            return true;
+        }
+
+        PlaySkillPresentation(skill, direction, dashInterrupt);
 
         if (IsNetworkActive)
-            PlaySkillClientRpc(expectedSkillIndex, direction, aimPoint, hasAimPoint);
+            PlaySkillClientRpc(expectedSkillIndex, direction, aimPoint, hasAimPoint, dashInterrupt);
 
         ServerSkillUsed?.Invoke(player, slot);
         return true;
@@ -666,27 +785,55 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         ReprojectFixedDistanceAim(slot, hasAimPoint, ref direction, ref aimPoint);
         return CanApproveSkill(
-            slot, skillIndex, direction, target, aimPoint, hasAimPoint, out _, out _);
+            slot, skillIndex, direction, target, aimPoint, hasAimPoint, false, out _, out _);
     }
 
+    // dashInterrupt = 대쉬 간파 승인(할 일 115) — CanUseSkill(Idle/Move) 대신 Dash 상태·창(EvaluateDashInterruptPreconditions).
+    // 창: 원격 오너 1차 검증 = 오너가 누른 시각으로 이미 봤다 / 서버(호스트·오프라인 포함) = 서버 대시 경과 ≤ 창 + 허용오차.
     private bool CanApproveSkill(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target,
-        Vector3 aimPoint, bool hasAimPoint,
+        Vector3 aimPoint, bool hasAimPoint, bool dashInterrupt,
         out PlayerSkillBase skill, out bool isDead)
     {
         skill = GetSkill(slot);
         isDead = stateController != null && stateController.CurrentState == PlayerActionState.Dead;
         bool assigned = skill != null && skill.Data != null && stateController != null;
         int skillIndex = assigned ? GetSkillIndex(skill) : InvalidSkillIndex;
+        float dashElapsed = 0f;
 
-        PlayerSkillApproval approval = PlayerSkillApprovalRules.EvaluatePreconditions(
-            assigned,
-            skillIndex == expectedSkillIndex,
-            IsSkillActive,
-            assigned && IsCooldownReady(skill),
-            isDead,
-            assigned && skill.Data.UsableWhileDead,
-            stateController != null && stateController.CanUseSkill);
+        PlayerSkillApproval approval;
+        if (dashInterrupt)
+        {
+            PlayerDashState dashState = stateController != null ? stateController.ActiveDash : null;
+            dashElapsed = dashState != null ? dashState.Elapsed : 0f;
+            bool withinWindow = dashState != null && dash != null &&
+                (IsNetworkActive && !IsServer
+                    ? DashInterruptRules.IsEnabled(dash.DashInterruptWindow)
+                    : DashInterruptRules.IsServerElapsedAccepted(
+                        dashElapsed, dash.DashInterruptWindow, dash.DashInterruptServerTolerance));
+
+            approval = PlayerSkillApprovalRules.EvaluateDashInterruptPreconditions(
+                assigned,
+                skillIndex == expectedSkillIndex,
+                slot == PlayerSkillSlot.Interrupt && skill is PlayerInterruptSkillBase,
+                IsSkillActive || (dashState != null && dashState.AttachedSkill != null),
+                assigned && IsCooldownReady(skill),
+                isDead,
+                dashState != null,
+                stateController != null && stateController.BlocksDashInterruptByEffect,
+                withinWindow);
+        }
+        else
+        {
+            approval = PlayerSkillApprovalRules.EvaluatePreconditions(
+                assigned,
+                skillIndex == expectedSkillIndex,
+                IsSkillActive,
+                assigned && IsCooldownReady(skill),
+                isDead,
+                assigned && skill.Data.UsableWhileDead,
+                stateController != null && stateController.CanUseSkill);
+        }
 
         if (approval == PlayerSkillApproval.Approved)
         {
@@ -710,7 +857,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                 Edit.Log($"[Skill] {slot} 거부 — 슬롯 교체 경합(요청 {expectedSkillIndex}, 현재 {skillIndex})", this);
                 break;
             case PlayerSkillApproval.SkillActive:
-                Edit.Log($"[Skill] {slot} 거부 — {activeSkill.Slot} 실행 중", this);
+                Edit.Log($"[Skill] {slot} 거부 — {(activeSkill != null ? activeSkill.Slot.ToString() : "대시에 실린 간파")} 실행 중", this);
                 break;
             case PlayerSkillApproval.Cooldown:
                 Edit.Log($"[Skill] {slot} 거부 — 쿨타임 {GetCooldownRemaining(skill):F1}s 남음", this);
@@ -723,6 +870,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                 break;
             case PlayerSkillApproval.CanUseFailed:
                 Edit.Log($"[Skill] {slot} 거부 — 스킬 자체 조건(CanUse) 불충족", this);
+                break;
+            case PlayerSkillApproval.DashWindow:
+                Edit.Log($"[DashInterrupt] 거부 — 대시 경과 {dashElapsed:F3}s 가 창(+서버 허용오차) 밖", this);
                 break;
         }
 
@@ -905,7 +1055,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     [Rpc(SendTo.Server)]
     private void RequestUseSkillRpc(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, NetworkObjectReference targetRef,
-        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, double pressedServerTime,
+        Vector3 aimPoint, bool hasAimPoint, PlayerStatReport statReport, double pressedServerTime, bool dashInterrupt,
         RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
@@ -919,7 +1069,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             interrupt.ServerSetLagPress(rpcParams.Receive.SenderClientId, pressedServerTime);
 
         Unit target = ResolveTarget(targetRef);
-        bool started = StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint);
+        bool started = StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint, dashInterrupt);
         if (interrupt != null)
             interrupt.ServerClearLagPress();
 
@@ -1031,8 +1181,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             cooldownLedger.SetRemaining(skillIndex, CooldownNow, remaining);
     }
 
+    // dashInterrupt(할 일 115): 원격 오너가 아직 대시 중이면 Skill 대신 대시에 싣고 상체 레이어를 튼다(대시 끝에 Skill 로 전이).
+    // 대시가 이미 끝났으면 일반 Skill 진입. 관찰자는 0층을 건드리지 않는다 — 오너 애니가 NetworkAnimator 로 온다.
     [ClientRpc]
-    private void PlaySkillClientRpc(int skillIndex, Vector3 direction, Vector3 aimPoint, bool hasAimPoint)
+    private void PlaySkillClientRpc(int skillIndex, Vector3 direction, Vector3 aimPoint, bool hasAimPoint, bool dashInterrupt)
     {
         if (IsServer)
             return;
@@ -1051,6 +1203,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (IsOwner && skill.Data != null && !skill.Data.CommitCooldownManually)
             cooldownLedger.Start(skillIndex, CooldownNow, skill.Data.CooldownTime);
 
+        if (dashInterrupt && IsOwner && stateController != null && stateController.AttachDashInterrupt(skill))
+        {
+            activeSkill = skill;
+            PlaySkillPresentation(skill, direction, true);
+            return;
+        }
+
         if (stateController != null &&
             !stateController.IsInSkillState &&
             !stateController.BeginSkill(skill))
@@ -1059,7 +1218,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         }
 
         activeSkill = skill;
-        PlaySkillPresentation(skill, direction);
+        // 원격 오너 대시가 이미 끝났으면 일반 간파처럼 0층에 튼다. 관찰자는 상체·0층 모두 오너 복제를 따른다.
+        PlaySkillPresentation(skill, direction, dashInterrupt && !IsOwner);
     }
 
     [ClientRpc]
@@ -1077,6 +1237,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             activeSkill = null;
             activeEndFallbackTime = 0f;
             skill.OnEnd(reason);
+
+            // 원격 오너가 아직 대시에 싣고 있었다(할 일 115) — 0층은 대시 포즈라 상체 레이어만 내린다.
+            if (DetachFromDash(skill))
+            {
+                dash?.CancelDashInterruptUpper();
+                return;
+            }
         }
 
         bool leftSkillState = stateController != null && stateController.IsInSkillState;
@@ -1143,7 +1310,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         CommitCooldownClientRpc(skillIndex, remaining, CreateOwnerClientRpcParams());
     }
 
-    private void PlaySkillPresentation(PlayerSkillBase skill, Vector3 direction)
+    // dashInterrupt(할 일 115): 대시에 실린 간파 — 회전 스냅·IsMoving·0층 CrossFade 없이 상체 레이어만 튼다(입력 주체만,
+    // 레이어 상태·가중치는 NetworkAnimator 가 복제). 0층은 대시 끝에 CompleteDashInterruptHandOff 가 이어받는다.
+    private void PlaySkillPresentation(PlayerSkillBase skill, Vector3 direction, bool dashInterrupt = false)
     {
         hasNotifiedRelease = false;
         nextAimSendTime = 0f;
@@ -1152,6 +1321,14 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             UserInputConfig.HoldSkillAsToggle;
         isToggleEndArmed = false;
         hasReportedHeld = false;
+
+        if (dashInterrupt)
+        {
+            if (!string.IsNullOrEmpty(skill.Data.AnimatorStateName))
+                dash?.BeginDashInterruptUpper(skill.Data.AnimatorStateName);
+            skill.OnClientPlay(direction);
+            return;
+        }
 
         if (skill.Data.SnapRotationOnStart && movement != null)
             movement.RotateImmediately(direction);

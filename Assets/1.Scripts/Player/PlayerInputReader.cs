@@ -170,6 +170,20 @@ public class PlayerInputReader : BaseNetworkBehaviour
     }
 
     /// <summary>
+    /// 그 입력을 누른 시각 — 선입력 버퍼에 살아 있으면 기록 시각(순위 무관), 버퍼가 꺼져 있으면 이번 프레임 눌림만 지금 시각.
+    /// 대쉬 간파 창 판정(할 일 115)이 읽는다. 버퍼는 건드리지 않는다. 지금은 우클릭(SkillInterrupt)만 이번 프레임 눌림을 본다.
+    /// </summary>
+    public bool TryGetPressTime(PlayerBufferedInput input, out float pressTime)
+    {
+        CaptureBufferedPresses();
+        if (inputBuffer.TryGetRecordedTime(input, Time.time, out pressTime))
+            return true;
+
+        pressTime = Time.time;
+        return input == PlayerBufferedInput.SkillInterrupt && InterruptPressed;
+    }
+
+    /// <summary>
     /// 행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않게 그 종류만 지운다.
     /// 다른 종류는 남긴다 — 콤보 예약은 평타를 누르고 있는 동안 매 프레임 부르므로, 비우면 공격 중 누른 스킬이 사라진다(할 일 77).
     /// </summary>

@@ -144,6 +144,22 @@ public sealed class PlayerInputBuffer
     }
 
     /// <summary>
+    /// 그 종류가 순위와 무관하게 살아 있으면 마지막으로 누른 시각을 준다(대쉬 간파 창 판정, 할 일 115). 없으면 false.
+    /// </summary>
+    public bool TryGetRecordedTime(PlayerBufferedInput input, float now, out float time)
+    {
+        int index = (int)input;
+        if (index > 0 && index < KindCount && IsAlive(index, now))
+        {
+            time = recordedAt[index];
+            return true;
+        }
+
+        time = 0f;
+        return false;
+    }
+
+    /// <summary>
     /// 그 종류가 살아 있고 <paramref name="than"/> 보다 우선순위가 높은가 — 더 높은 다른 입력(대시 등)에 밀려 있어도 참.
     /// 평타 콤보를 이을지 볼 때 쓴다(할 일 77 후속): 평타보다 높은 스킬 입력이 살아 있으면 다음 타를 잇지 않는다.
     /// </summary>

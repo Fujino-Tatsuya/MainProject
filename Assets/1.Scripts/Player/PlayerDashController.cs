@@ -236,10 +236,11 @@ public class PlayerDashController : NetworkBehaviour
     }
 
     /// <summary>[입력 주체] 대시 상태 이탈 — 이동으로 나가면 Run_Loop, 아니면 Idle. 다시 대시·사망이면 건드리지 않는다.</summary>
-    internal void PlayDodgeEnd(PlayerActionState nextState)
+    /// <param name="keepBasePose">대쉬 간파 인수인계(할 일 115) — 0층은 곧 간파 상태가 이어받으므로 덮지 않는다(구간 속도만 되돌린다).</param>
+    internal void PlayDodgeEnd(PlayerActionState nextState, bool keepBasePose = false)
     {
         StopDodgeSpeed();
-        if (player == null || !player.IsInputSource || !HasDodgeAnimation)
+        if (keepBasePose || player == null || !player.IsInputSource || !HasDodgeAnimation)
             return;
 
         bool hasRunLoop = animator.HasState(PlayerActionPoseRules.BaseLayer, PlayerActionPoseRules.RunLoopHash);
@@ -312,6 +313,12 @@ public class PlayerDashController : NetworkBehaviour
     }
 
     private float DashInterruptBlend => dashData != null ? dashData.DashInterruptBlend : 0f;
+
+    /// <summary>대쉬 간파 입력 창(초). 0 = 기능 꺼짐(DashInterruptRules.IsEnabled).</summary>
+    public float DashInterruptWindow => dashData != null ? dashData.DashInterruptWindow : 0f;
+
+    /// <summary>[서버] 대쉬 간파 승인 때 창에 더해 주는 지연 허용(초).</summary>
+    public float DashInterruptServerTolerance => dashData != null ? dashData.DashInterruptServerTolerance : 0f;
 
     private void TickDashInterruptFade()
     {

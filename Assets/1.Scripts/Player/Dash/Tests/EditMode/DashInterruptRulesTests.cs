@@ -103,5 +103,69 @@ namespace BeaverLobby.Player.Dash.EditModeTests
             Assert.AreEqual(Vector3.zero, DashInterruptRules.GetPredictedEndOffset(Vector3.forward, 20f, -0.1f));
             Assert.AreEqual(Vector3.zero, DashInterruptRules.GetPredictedEndOffset(Vector3.forward, 20f, 0f));
         }
+
+        // ── C2b: 대시 중 우클릭 처리(오너) ──
+
+        private static DashInterruptInputDecision Decide(
+            bool hasPress = true, float press = 10.05f, bool isInterruptSkill = true,
+            bool requested = false, bool blocked = false, bool cooldown = false) =>
+            DashInterruptRules.EvaluateInput(hasPress, 10f, press, Window, isInterruptSkill, requested, blocked, cooldown);
+
+        [Test]
+        public void Input_InWindowReady_Requests()
+        {
+            Assert.AreEqual(DashInterruptInputDecision.Request, Decide());
+            Assert.AreEqual(DashInterruptInputDecision.Request, Decide(press: 10.09f), "창 끝 직전");
+        }
+
+        [Test]
+        public void Input_NoPressOrOutOfWindow_LeavesBuffer()
+        {
+            Assert.AreEqual(DashInterruptInputDecision.NoPress, Decide(hasPress: false));
+            Assert.AreEqual(DashInterruptInputDecision.OutOfWindow, Decide(press: 10.2f), "창이 지난 입력은 기존 버퍼 규칙(Q1)");
+            Assert.AreEqual(DashInterruptInputDecision.OutOfWindow, Decide(press: 9.9f), "대시 전 입력");
+            Assert.IsTrue(DashInterruptRules.LeavesInput(DashInterruptInputDecision.NoPress));
+            Assert.IsTrue(DashInterruptRules.LeavesInput(DashInterruptInputDecision.OutOfWindow));
+            Assert.IsTrue(DashInterruptRules.LeavesInput(DashInterruptInputDecision.NotInterruptSkill));
+        }
+
+        [Test]
+        public void Input_WindowDisabled_OutOfWindow()
+        {
+            Assert.AreEqual(DashInterruptInputDecision.OutOfWindow,
+                DashInterruptRules.EvaluateInput(true, 10f, 10f, 0f, true, false, false, false));
+        }
+
+        [Test]
+        public void Input_NotInterruptSkill_LeavesBuffer_EvenIfRequested()
+        {
+            Assert.AreEqual(DashInterruptInputDecision.NotInterruptSkill, Decide(isInterruptSkill: false, requested: true),
+                "팔라딘 E 대체 슬롯 등 — 대상 아님");
+        }
+
+        [Test]
+        public void Input_AlreadyRequested_ConsumeOnly_BeforeRejects()
+        {
+            Assert.AreEqual(DashInterruptInputDecision.ConsumeOnly, Decide(requested: true, blocked: true, cooldown: true),
+                "대시 1회당 1번 — 재요청·거부 피드백 없음");
+            Assert.IsFalse(DashInterruptRules.LeavesInput(DashInterruptInputDecision.ConsumeOnly));
+        }
+
+        [Test]
+        public void Input_EffectBeforeCooldown()
+        {
+            Assert.AreEqual(DashInterruptInputDecision.RejectByEffect, Decide(blocked: true, cooldown: true),
+                "봉인 + 쿨이면 봉인 피드백 하나(UseSkillSlot 과 같은 순서)");
+            Assert.AreEqual(DashInterruptInputDecision.RejectByCooldown, Decide(cooldown: true));
+            Assert.IsFalse(DashInterruptRules.LeavesInput(DashInterruptInputDecision.RejectByCooldown));
+        }
+
+        [Test]
+        public void DashEnd_IntoSkill_OnlyWhenAttachedStillActive()
+        {
+            Assert.IsTrue(DashInterruptRules.EndsIntoSkill(true, true));
+            Assert.IsFalse(DashInterruptRules.EndsIntoSkill(true, false), "대시 중 이미 끝난 간파 — Idle/Move");
+            Assert.IsFalse(DashInterruptRules.EndsIntoSkill(false, false));
+        }
     }
 }
