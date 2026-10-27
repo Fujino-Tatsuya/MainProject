@@ -20,7 +20,7 @@ using UnityEngine.AI;
 /// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)은 <see cref="LobbyTrainingSparring"/>(T5c). 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
 [DataTableSheet("Lobby", Order = 0)]
-public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IOverheadHealthBarRule
+public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IOverheadHealthBarRule, IInterruptCueSink
 {
     const string Tag = "[TrainingSparring]";
 
@@ -781,8 +781,15 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayInterruptFlashRpc()
     {
-        if (!InterruptProductionDirector.IsOn(InterruptProductionCue.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
-        if (interruptFlash != null) interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue == InterruptProductionCue.TargetFlash && interruptFlash != null)
+            interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);
     }
 
     void OnVulnerableVisualChanged(bool previous, bool next) => ApplyVulnerableTint(next);

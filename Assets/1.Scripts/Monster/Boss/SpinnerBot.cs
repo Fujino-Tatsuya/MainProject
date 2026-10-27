@@ -20,7 +20,7 @@ using UnityEngine.AI;
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
 [DataTableSheet("MidBoss", Order = 1)]
-public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
+public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
 {
     enum SpinPhase { None, Window, Dash }
 
@@ -397,7 +397,14 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
             WarnNoInterruptFlashOnce();
             return;
         }
-        if (!InterruptProductionDirector.IsOn(InterruptProductionCue.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.TargetFlash || interruptFlash == null) return;
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);

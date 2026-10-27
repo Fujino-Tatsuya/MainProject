@@ -30,7 +30,7 @@ using UnityEngine.AI;
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
 [DataTableSheet("MidBoss", Order = 2)]
-public class WallBot : MonsterBase, IInterruptSlowMotionTarget
+public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
 {
     enum ShieldPhase { None, Gather, Dash, Shock }
 
@@ -386,7 +386,14 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget
             WarnNoInterruptFlashOnce();
             return;
         }
-        if (!InterruptProductionDirector.IsOn(InterruptProductionCue.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.TargetFlash || interruptFlash == null) return;
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);

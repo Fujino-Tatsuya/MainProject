@@ -145,6 +145,19 @@ public sealed class InterruptProductionChannelTests
         Assert.IsEmpty(_sink.Cues);
     }
 
+    [Test]
+    public void 섬광_대상_6종은_IInterruptCueSink()
+    {
+        // E1 수신부(PlayInterruptFlashRpc)가 Director.PlayCue(TargetFlash, …, this) 로 자신을 넘긴다(할 일 118 C6).
+        var types = new[]
+        {
+            typeof(TwentyThreeBoss), typeof(GauntletBot), typeof(SpinnerBot), typeof(WallBot),
+            typeof(TrainingDummyInterrupt), typeof(TrainingSparringBot),
+        };
+        foreach (System.Type type in types)
+            Assert.IsTrue(typeof(IInterruptCueSink).IsAssignableFrom(type), type.Name);
+    }
+
     // ─── 시도 단계(피어) ───
 
     [Test]
