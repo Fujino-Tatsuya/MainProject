@@ -385,6 +385,37 @@ public class CameraTargetSwitcher : MonoBehaviour
         playerCamera.PreviousStateIsValid = false;
     }
 
+    /// <summary>
+    /// 플레이어 vcam 을 지금 대상으로 **컷**한다(감쇠로 쓸고 지나가지 않게). 임시 추적 중이면 그 대상 그대로 컷만.
+    /// 순간이동 도착에서 쓴다 — 엘리베이터 경로는 <see cref="ClearTemporaryFollow"/> 가 컷하지만, 엘리베이터 없이 옮기면(리그 없는 구성·F11 개발 경로)
+    /// 그게 불리지 않아 카메라가 옛 자리에서 수백 m 를 감쇠로 끌려왔다(경석 10-27 — "연출 카메라 자리에서 전투가 시작되고 플레이어를 안 따라온다").
+    /// </summary>
+    public void CutToCurrentTarget()
+    {
+        EnsureCameraRig();
+        if (playerCamera == null)
+        {
+            return;
+        }
+
+        if (temporaryFollow == null)
+        {
+            // 목록이 아직 안 찼으면(대상 없음) 오너 플레이어를 다시 고른다 — Follow 를 null 로 비우면 카메라가 아무도 안 따라간다.
+            if (GetCurrentTarget() == null)
+            {
+                SelectOwnerPlayerTarget();
+            }
+
+            Transform target = GetCurrentTarget();
+            if (target != null)
+            {
+                playerCamera.Follow = target;
+            }
+        }
+        playerCamera.PreviousStateIsValid = false;
+    }
+
+
     public void SwitchToNextTarget()
     {
         SwitchTarget(1);

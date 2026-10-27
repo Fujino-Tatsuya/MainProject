@@ -48,6 +48,11 @@ public sealed class PartyWipeWatcher : MonoBehaviour
         if (networkManager != null && networkManager.IsListening && !networkManager.IsServer)
             return;
 
+        // 보스가 이미 쓰러졌으면 클리어 흐름(승리 연출 → 사망 연출 → 결과)이 결과 화면을 맡는다 — 동시 전멸로 앞당기지 않는다(PLAN-boss-victory-cinematic C12).
+        BossEncounterDirector encounter = BossEncounterDirector.Instance;
+        if (encounter != null && encounter.IsSpawned && encounter.IsBossDefeatedServer)
+            return;
+
         _checkTimer -= Time.deltaTime;
         if (_checkTimer > 0f)
             return;

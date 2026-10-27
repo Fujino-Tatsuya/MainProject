@@ -1969,7 +1969,7 @@ public class MonsterBase : Unit
             while (waited < DeathStateDetectTimeout)
             {
                 yield return null;
-                waited += Time.deltaTime;
+                waited += Time.deltaTime * DeathPresentationTimeScale;   // 늦춘 동안은 사망 상태로 늦게 넘어간다 — 검출 한도도 같은 배율로
                 AnimatorStateInfo st;
                 if (animator.IsInTransition(0))
                     st = animator.GetNextAnimatorStateInfo(0);
@@ -1987,9 +1987,34 @@ public class MonsterBase : Unit
             }
         }
 
-        if (hold > 0f)
-            yield return new WaitForSeconds(hold);
+        yield return WaitUnpaused(hold);
         fx.Play(DespawnNow);
+    }
+
+    /// <summary>
+    /// [서버] 지금 사망 표현이 흐르는 배율(보스 B 승리 연출 0.12~2.00초 슬로모션 — PLAN-boss-victory-cinematic C6, 경석 10-27).
+    /// 기본 1 = 기존 동작 그대로. 1 보다 작으면 사망 클립 검출·클립 대기·지연 디스폰이 그 배율로만 흐른다 → 애니와 같은 시계(0 = 완전 정지).
+    /// </summary>
+    protected virtual float DeathPresentationTimeScale => 1f;
+
+    /// <summary>사망 표현이 도중에 늦춰질 수 있는 몹인가(보스 B). false 면 대기가 기존 WaitForSeconds 그대로다.</summary>
+    protected virtual bool CanPauseDeathPresentation => false;
+
+    // 배율을 반영해 기다린다. 🔴 늦춤은 대기 **도중**(0.12초)에 시작되므로 WaitForSeconds 로 한 번에 기다리면 못 뺀다 — 프레임마다 센다.
+    IEnumerator WaitUnpaused(float seconds)
+    {
+        if (!CanPauseDeathPresentation)
+        {
+            if (seconds > 0f) yield return new WaitForSeconds(seconds);
+            yield break;
+        }
+
+        float left = Mathf.Max(0f, seconds);
+        while (left > 0f)
+        {
+            yield return null;
+            left -= Time.deltaTime * Mathf.Max(0f, DeathPresentationTimeScale);
+        }
     }
 
     // 드롭 아이템/보상/처치 카운트 등 사망 후처리 확장점(기본 no-op).
@@ -1997,7 +2022,7 @@ public class MonsterBase : Unit
 
     IEnumerator DespawnAfter(float delay)
     {
-        yield return new WaitForSeconds(Mathf.Max(0f, delay));
+        yield return WaitUnpaused(Mathf.Max(0f, delay));
         DespawnNow();
     }
 
