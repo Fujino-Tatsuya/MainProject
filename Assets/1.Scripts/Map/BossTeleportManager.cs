@@ -263,7 +263,7 @@ public class BossTeleportManager : NetworkBehaviour
             _gatherMembers.Add(ReadGatherMember(client.ClientId, playerObject));
         }
 
-        bool padEnabled = TutorialBossPath.IsBossPadEnabled;
+        bool padEnabled = MapSceneBossPath.IsBossPadEnabled;
         var conditions = new BossElevatorGatherConditions(
             padEnabled,
             _countdownCause == CountdownCause.Forced,
@@ -590,8 +590,8 @@ public class BossTeleportManager : NetworkBehaviour
 
             var revive = playerObject.GetComponent<PlayerReviveController>();
             // 튜토리얼 보스방 도착(G11) 전 사망은 목숨 차감 없음(tutorial-director.md S11) — 사망 규칙과 같은 프레임에 겹쳐도 차감하지 않게.
-            TutorialDirector tutorial = TutorialDirector.Instance;
-            bool free = tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G11_BossRoom);
+            MapSceneDirector tutorial = MapSceneDirector.Instance;
+            bool free = tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(MapSceneGate.G11_BossRoom);
             bool ok = revive != null && revive.TryCompleteReviveOnServer(consumeLife: !free);
 
             Edit.Log($"[BossTeleport] 강제 개시 부활 — clientId={client.ClientId} 결과={(ok ? "성공" : "실패(목숨 없음)")}", this);

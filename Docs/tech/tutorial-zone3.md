@@ -1,8 +1,13 @@
 # 튜토리얼 존3 흐름 — 스피너봇 연계 연습 (할 일 15 · S9 → v8 V4)
 
+> **🟪 Legacy (할 일 107, 2026-10-27)** — 존3 연계 연습(스피너봇 연습 모드·벽 안내·연계 3회·피드백 자막)은 맵씬에서 뺐다. 로비 훈련 TRAIN_03(`LobbyTrainingSparring`·`TrainingSparringBot`)이 대신한다.
+> 코드 보관: `Assets/1.Scripts/Map/Tutorial/Legacy/TutorialZone3Flow·Guide·Rules.cs` · `Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/`(전부). 런타임 부착·스폰 치환 훅 설치를 끊었고,
+> `SpinnerBot_Tutorial.prefab` 은 `DefaultNetworkPrefabs` 에서 뺐다(프리팹 파일은 `Assets/2.Prefabs/Monster/Tutorial/` 에 그대로 — 🔴 NGO 자동 목록 생성이 켜져 있어 이 프리팹을 다시 임포트하면 목록에 되돌아갈 수 있다. 들어 있어도 스폰 치환이 없어 쓰이지 않는다).
+> 지금 맵씬 존3 = 원래 `SpinnerBot`(존 프리팹 그대로) — G4 + 파티 첫 진입 때 핵심 몬스터 기상 · 단계 Zone3Fight · G5 즉시 요청 → 처치 = G6(`MapSceneZoneFlow`). 아래는 기록이다.
+
 > 원본: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.5(Z3-1~Z3-10)·§4 G4~G6·D2·D2-1·D25·D26·D18 — **v8**(2026-10-12) · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md) S9·§3-1 V4.
 > 디렉터: [tutorial-director.md](tutorial-director.md) · 스피너봇 쪽(몬스터 훅·연습/연계 본체): [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md) §4-2 · 안내 UI: [tutorial-guide-ui.md](tutorial-guide-ui.md).
-> 테스트: `TutorialZone3RulesTests` · `SpinnerComboModelTests` · `SpinnerPracticeModelTests`(튜토리얼 러너 `Tools/Tests/튜토리얼 EditMode 테스트 실행`).
+> 테스트: `TutorialZone3RulesTests` · `SpinnerComboModelTests` · `SpinnerPracticeModelTests`(튜토리얼 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`).
 > v8 변경: '간파 3회' → **[간파 성공 → 취약 유지 → 우클릭 밀치기 → 유효 벽 충돌 → 회복] 연계 파티 합계 3회**, 3회째 회복 끝 = G5 → 본 전투. 거너 전용 간파 설명 제거.
 > **할 일 32(2026-10-13): 벽 충돌 = 실제 Wall 레이어 콜라이더** — 가상 벽(존 사각형 긴 변) 거리 판정(`SpinnerComboGeometry`)을 지우고, 밀치기 중 스피너봇의 공용 벽 충돌 이벤트(`UnitWallImpact`, [wall-concept.md](wall-concept.md))로 연계 성공을 판정한다.
 > 🔴 **세팅 필요**: 존3(StageTutorial) 벽에 Wall 태그+레이어가 없으면 연계가 성공하지 않는다 — 활성 때 `[Tutorial] 존3 Wall 레이어 콜라이더 0개` 경고.
@@ -12,17 +17,17 @@
 ## 1. 파일
 | 무엇 | 경로 | 피어 |
 |---|---|---|
-| 순수 규칙(흐름) | `Map/Tutorial/Flow/TutorialZone3Rules.cs` — `TutorialZone3Model`(시작·첫 성공·피드백·힌트·밀치기 힌트 간격) · `TutorialZone3Display`(목표·강조 — 연계 단계별) · `TutorialZone3Geometry`(연습 반경 · **연습 위치**(긴 변 기준)) | — |
+| 순수 규칙(흐름) | `Map/Tutorial/Legacy/TutorialZone3Rules.cs` — `TutorialZone3Model`(시작·첫 성공·피드백·힌트·밀치기 힌트 간격) · `TutorialZone3Display`(목표·강조 — 연계 단계별) · `TutorialZone3Geometry`(연습 반경 · **연습 위치**(긴 변 기준)) | — |
 | 순수 규칙(연계) | `Tutorial/SpinnerPractice/SpinnerComboModel.cs` — `SpinnerComboModel`(단계·밀치기·벽 충돌 보고·회복). 벽 판정 자체는 공용 `UnitWallImpactJudge`(할 일 32) | — |
-| 흐름 | `Map/Tutorial/Flow/TutorialZone3Flow.cs`(+ `TutorialZone3WallFinder` — 안내 화살표용 가장 가까운 Wall 콜라이더 면) | 서버 |
-| 표시 | `Map/Tutorial/Flow/TutorialZone3Guide.cs` | 모든 피어 |
+| 흐름 | `Map/Tutorial/Legacy/TutorialZone3Flow.cs`(+ `TutorialZone3WallFinder` — 안내 화살표용 가장 가까운 Wall 콜라이더 면) | 서버 |
+| 표시 | `Map/Tutorial/Legacy/TutorialZone3Guide.cs` | 모든 피어 |
 | 튜토리얼 스피너봇 | `Assets/2.Prefabs/Monster/Tutorial/SpinnerBot_Tutorial.prefab`(SpinnerBot.prefab Variant) · `Tutorial/SpinnerPractice/TutorialSpinnerPractice.cs`(연습 + 연계) · `TutorialSpinnerSpawnOverride.cs` · `TutorialSpinnerHealthBarRule.cs` | 서버 스폰 → 복제 |
 
-부착: `TutorialZone3Flow`(서버)·`TutorialZone3Guide`(각 피어)는 `TutorialDirector.StateChanged` 에서 `IsTutorialActive` 일 때 디렉터 GameObject 에 런타임 `AddComponent`(씬 무수정).
+부착: `TutorialZone3Flow`(서버)·`TutorialZone3Guide`(각 피어)는 `MapSceneDirector.StateChanged` 에서 `IsTutorialActive` 일 때 디렉터 GameObject 에 런타임 `AddComponent`(씬 무수정).
 
 ## 2. 튜토리얼 스피너봇 = 전용 Variant + 스폰 치환 (S9 그대로)
 - `TutorialSpinnerPractice` 는 NetworkBehaviour 라 런타임 `AddComponent` 를 못 한다 → 튜토리얼 전용 Variant `SpinnerBot_Tutorial` 을 서버 스폰 직전 훅 `MapContentSpawner.ServerMonsterPrefabOverride` 에서
-  **`TutorialStageMarker.IsActive` 일 때만** 치환(`TutorialSpinnerSpawnOverride`). Variant hash 1723163300(원본 2973007222). 절차 맵·Debug 씬은 치환 없음.
+  **`MapSceneStageMarker.IsActive` 일 때만** 치환(`TutorialSpinnerSpawnOverride`). Variant hash 1723163300(원본 2973007222). 절차 맵·Debug 씬은 치환 없음.
 - 체력바: Variant 만 — 연습·전환 대기(`IsHealthLocked`) = 회색 "연습 중 · 체력 잠금", 본 모드 = 빨강.
 
 ## 3. 흐름 (서버 판단 → 복제/RPC 표시)
@@ -40,7 +45,7 @@
 | Z3-9 | 회복 끝, 성공 3회(`Completed`) | **`RequestGateServer(G5)`** → `EnterRealMode()`(교육 제한 해제 + 2초 정지) · `SetStepServer(Zone3Fight)` | `TUT_Z3_REAL` · 목표 `TUT_Z3_BOSS` · 강조 끔 · 체력바 빨강 |
 | Z3-10 | `ZoneCleared(Zone3)`(장부 — 스피너봇 처치) | G6 은 장부가 이미 연다 | `TUT_ZONE_CLEAR` · G6 열림 → 존3 목표 지움 |
 
-- **G5 = 수동 게이트**(v8): `TutorialFlowModel.TryGetGateCounter` 는 이제 아무 게이트도 돌려주지 않는다 — 연계 3회(카운터 3)만으로는 안 열리고 3회째 충돌 뒤 회복이 끝날 때 흐름이 연다.
+- **G5 = 수동 게이트**(v8): `MapSceneFlowModel.TryGetGateCounter` 는 이제 아무 게이트도 돌려주지 않는다 — 연계 3회(카운터 3)만으로는 안 열리고 3회째 충돌 뒤 회복이 끝날 때 흐름이 연다.
   디버그로 G5 를 먼저 열면(연습 전) 휴면을 풀고 바로 본 모드(이전과 같음).
 - 자막 = 디렉터 `ShowSubtitleServer(id, args, targets)` 하나. 지나가는 신호라 복제하지 않는다.
 - 목표·강조 = 각 피어가 복제 값(`Step`·`IsGateOpen(G6)`·`GetCounter(Zone3Interrupts)`·**스피너봇 `ComboPhase`·유효 벽 지점**)으로 다시 그린다(0.2초 주기 — 스피너봇 복제 변수는 디렉터 `StateChanged` 로 오지 않음).

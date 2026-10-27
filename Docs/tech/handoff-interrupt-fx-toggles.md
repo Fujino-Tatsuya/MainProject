@@ -1,5 +1,10 @@
 # 공유 — 간파 연출 스위치가 다른 담당 영역에 한 줄씩 들어갔다 (할 일 104)
 
+> ⚠️ **118 로 대체(2026-10-27).** `InterruptPresentationToggles` 는 삭제되고 스위치 10칸은 간파 연출 디렉터
+> `InterruptProductionDirector`(같은 `NetworkManager.prefab`)로 옮겨졌다. 아래 내용은 104 당시 기록이다 — 지금 구조는
+> [interrupt-presentation.md §6](interrupt-presentation.md#6-간파-연출-디렉터--interruptproductiondirector-할-일-118),
+> 공유는 [handoff-interrupt-director-vfx.md](handoff-interrupt-director-vfx.md)(민경) · [handoff-interrupt-director-target-flash.md](handoff-interrupt-director-target-flash.md)(경석).
+
 > 작성: 은희 레인(claude-alt), 2026-10-26. 브랜치 `feature/InterruptFxToggle`.
 > 설계 원본: [interrupt-presentation.md §6](interrupt-presentation.md#6-연출-스위치--interruptpresentationtoggles-할-일-104).
 

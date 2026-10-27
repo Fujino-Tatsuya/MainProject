@@ -335,8 +335,8 @@ public class MapContentSpawner : MonoBehaviour
 
     /// <summary>
     /// [서버] 몬스터 스폰 직전 프리팹 치환 훅. 기본 null = 그대로. 돌려준 값이 null 이면 원래 프리팹.
-    /// 튜토리얼 스테이지만 쓴다 — 공용 존 프리팹을 고치지 않고 튜토리얼 전용 Variant 로 바꿔 스폰한다
-    /// (<c>TutorialSpinnerSpawnOverride</c>, Docs/tech/handoff-tutorial-spinner.md §6). 치환 프리팹도 NetworkPrefabs 에 등록돼 있어야 한다.
+    /// 공용 존 프리팹을 고치지 않고 특정 판에서만 다른 Variant 로 바꿔 스폰할 때 쓴다. 치환 프리팹도 NetworkPrefabs 에 등록돼 있어야 한다.
+    /// 지금 설치하는 곳은 없다 — 튜토리얼 스피너봇 치환(<c>TutorialSpinnerSpawnOverride</c>)은 할 일 107 에서 Legacy 로 빼며 설치를 끊었다.
     /// </summary>
     public static System.Func<GameObject, GameObject> ServerMonsterPrefabOverride;
 

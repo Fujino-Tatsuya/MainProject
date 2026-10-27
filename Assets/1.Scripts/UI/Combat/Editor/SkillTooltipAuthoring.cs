@@ -82,6 +82,20 @@ public static class SkillTooltipAuthoring
         Debug.Log($"[SkillTooltip] 구성 완료 — {HudPath}. GameData.xlsx Export/병합은 별도로 실행할 것.");
     }
 
+    /// <summary>CombatHUD 툴팁·슬롯 연결만 다시 한다 — 스킬 데이터 문구 시드·인라인 아이콘 아틀라스 재생성은 건드리지 않는다(할 일 114 배치 갱신용).</summary>
+    [MenuItem("Tools/UI/스킬 툴팁 레이아웃만 갱신")]
+    public static void ConfigureLayoutOnly()
+    {
+        TMP_StyleSheet styleSheet = EnsureStyleSheet();
+        TMP_SpriteAsset attackSprite = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(AttackSpritePath);
+        if (attackSprite == null)
+            attackSprite = EnsureAttackSpriteAsset();
+        TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        ConfigureHud(styleSheet, attackSprite, font);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[SkillTooltip] 레이아웃 갱신 완료 — {HudPath}");
+    }
+
     private static void ConfigureHud(TMP_StyleSheet styleSheet, TMP_SpriteAsset attackSprite, TMP_FontAsset font)
     {
         GameObject root = PrefabUtility.LoadPrefabContents(HudPath);
@@ -174,43 +188,358 @@ public static class SkillTooltipAuthoring
         }
 
         bool firstBuild = FindDeep(panel, "Description") == null;
-        Image icon = EnsureImage(panel, "Icon", new Vector2(16f, -16f), new Vector2(64f, 64f));
-        TMP_Text key = EnsureText(panel, "KeyBadge", font, 18f, FontStyles.Bold, TextAlignmentOptions.Center,
-            new Vector2(88f, -18f), new Vector2(54f, 28f));
-        TMP_Text title = EnsureText(panel, "DisplayName", font, 25f, FontStyles.Bold, TextAlignmentOptions.TopLeft,
-            new Vector2(88f, -48f), new Vector2(240f, 34f));
-        TMP_Text subtitle = EnsureText(panel, "Subtitle", font, 16f, FontStyles.Italic, TextAlignmentOptions.TopLeft,
-            new Vector2(88f, -80f), new Vector2(240f, 24f));
-        TMP_Text cooldown = EnsureText(panel, "Cooldown", font, 17f, FontStyles.Normal, TextAlignmentOptions.TopRight,
-            new Vector2(330f, -20f), new Vector2(84f, 28f));
+        Image icon = EnsureImage(panel, "Icon", new Vector2(16f, -16f), new Vector2(80f, 80f));
+        TMP_Text title = EnsureText(panel, "DisplayName", font, 28f, FontStyles.Bold, TextAlignmentOptions.TopLeft,
+            new Vector2(108f, -14f), new Vector2(206f, 36f));
+        TMP_Text subtitle = EnsureText(panel, "Subtitle", font, 17f, FontStyles.Normal, TextAlignmentOptions.TopLeft,
+            new Vector2(108f, -52f), new Vector2(306f, 24f));
+        TMP_Text cooldown = EnsureText(panel, "Cooldown", font, 18f, FontStyles.Normal, TextAlignmentOptions.MidlineRight,
+            new Vector2(330f, -16f), new Vector2(84f, 28f));
         TMP_Text body = EnsureText(panel, "Description", font, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft,
-            new Vector2(16f, -104f), new Vector2(398f, 112f));
-        TMP_Text hint = EnsureText(panel, "ShiftHint", font, 14f, FontStyles.Italic, TextAlignmentOptions.Center,
-            new Vector2(16f, -230f), new Vector2(398f, 24f));
+            new Vector2(16f, -116f), new Vector2(398f, 112f));
+        TMP_Text hint = EnsureText(panel, "ShiftHint", font, 14f, FontStyles.Italic, TextAlignmentOptions.Right,
+            new Vector2(16f, -240f), new Vector2(398f, 24f));
         body.styleSheet = styleSheet;
         body.spriteAsset = attackSprite;
-        cooldown.spriteAsset = attackSprite; // 머리줄 <sprite name=cooldown>
         if (firstBuild)
         {
             body.textWrappingMode = TextWrappingModes.Normal;
             hint.color = new Color(0.72f, 0.74f, 0.78f, 1f);
-            key.color = new Color(0.95f, 0.82f, 0.42f, 1f);
         }
-        EnsureFlexibleHeight(panel, body, hint, icon.rectTransform, key.rectTransform, title.rectTransform,
+        EnsureFlexibleHeight(panel, body, hint, icon.rectTransform, title.rectTransform,
             subtitle.rectTransform, cooldown.rectTransform);
+        TooltipLayout layout = EnsureLayout114(panel, font, icon, title, subtitle, cooldown, body, hint);
+        StyleTagChip(layout.TagChip);
 
         var so = new SerializedObject(view);
         so.FindProperty("panel").objectReferenceValue = panel.gameObject;
         so.FindProperty("icon").objectReferenceValue = icon;
-        so.FindProperty("keyBadge").objectReferenceValue = key;
         so.FindProperty("displayName").objectReferenceValue = title;
         so.FindProperty("subtitle").objectReferenceValue = subtitle;
+        so.FindProperty("cooldownGroup").objectReferenceValue = layout.CooldownGroup;
         so.FindProperty("cooldownText").objectReferenceValue = cooldown;
+        so.FindProperty("tagRow").objectReferenceValue = layout.TagRow;
+        so.FindProperty("tagChipTemplate").objectReferenceValue = layout.TagChip;
+        so.FindProperty("tagStyles").objectReferenceValue = EnsureTagStyles();
+        so.FindProperty("headerLayout").objectReferenceValue = layout.HeaderLayout;
         so.FindProperty("description").objectReferenceValue = body;
         so.FindProperty("shiftHint").objectReferenceValue = hint;
         so.ApplyModifiedPropertiesWithoutUndo();
         panel.gameObject.SetActive(false);
         return view;
+    }
+
+    private readonly struct TooltipLayout
+    {
+        public TooltipLayout(GameObject cooldownGroup, RectTransform tagRow, RectTransform tagChip, LayoutElement headerLayout)
+        {
+            CooldownGroup = cooldownGroup;
+            TagRow = tagRow;
+            TagChip = tagChip;
+            HeaderLayout = headerLayout;
+        }
+
+        public GameObject CooldownGroup { get; }
+        public RectTransform TagRow { get; }
+        public RectTransform TagChip { get; }
+        public LayoutElement HeaderLayout { get; }
+    }
+
+    // 할 일 114 시안 배치. 쿨다운 시계 아이콘은 기획 이미지가 나올 때까지 임시 흰 사각형(SVN 원본은 참조만). 칩 배경은 StyleTagChip.
+    private const string TempWhiteSpritePath = "Assets/50.Art/TestAssets/Temp_Images/Images/white_512.png";
+    private const float HeaderMinHeight = 116f;
+    private static readonly Color AccentColor = new Color(0.95f, 0.82f, 0.42f, 1f);
+    private static readonly Color MutedColor = new Color(0.72f, 0.74f, 0.78f, 1f);
+
+    /// <summary>
+    /// 할 일 114 배치(좌상단 아이콘 / 이름·슬롯 줄·태그 칩 / 우상단 시계+초 / 구분선 / 설명 / 우하단 Shift 안내).
+    /// <c>Header/TagRow</c> 가 없을 때 한 번만 머리 영역을 다시 놓는다 — 이후 위치·색·크기는 프리팹 인스펙터에서 고친다(재실행은 참조만 다시 잇는다).
+    /// 옛 키 배지(<c>KeyBadge</c>)는 슬롯 줄로 합쳐 지운다.
+    /// </summary>
+    private static TooltipLayout EnsureLayout114(
+        RectTransform panel, TMP_FontAsset font, Image icon, TMP_Text title, TMP_Text subtitle, TMP_Text cooldown,
+        TMP_Text body, TMP_Text hint)
+    {
+        var header = (RectTransform)panel.Find("Header");
+        LayoutElement headerLayout = EnsureComponent<LayoutElement>(header.gameObject);
+        if (header.Find("TagRow") is RectTransform existingRow)
+        {
+            Transform existingGroup = header.Find("CooldownGroup");
+            Transform existingChip = existingRow.Find("TagChip");
+            return new TooltipLayout(existingGroup != null ? existingGroup.gameObject : cooldown.gameObject, existingRow,
+                existingChip as RectTransform, headerLayout);
+        }
+
+        Sprite white = AssetDatabase.LoadAssetAtPath<Sprite>(TempWhiteSpritePath);
+        if (white == null)
+            Debug.LogWarning($"[SkillTooltip] 임시 스프라이트 없음: {TempWhiteSpritePath} — 시계를 스프라이트 없이 만든다(SVN 업데이트 확인).");
+
+        Transform oldBadge = FindDeep(panel, "KeyBadge");
+        if (oldBadge != null)
+            Object.DestroyImmediate(oldBadge.gameObject);
+
+        headerLayout.minHeight = HeaderMinHeight;
+        headerLayout.preferredHeight = HeaderMinHeight;
+        float width = panel.sizeDelta.x;
+        const float pad = 16f;
+        const float textLeft = pad + 80f + 12f;
+
+        Place(icon.rectTransform, new Vector2(pad, -pad), new Vector2(80f, 80f));
+        icon.preserveAspect = true;
+
+        Place(title.rectTransform, new Vector2(textLeft, -12f), new Vector2(width - textLeft - pad - 116f, 38f)); // 오른쪽 116 = 쿨다운 묶음 자리
+        title.fontSize = 28f;
+        title.fontStyle = FontStyles.Bold;
+        title.alignment = TextAlignmentOptions.TopLeft;
+        title.textWrappingMode = TextWrappingModes.NoWrap;
+        title.overflowMode = TextOverflowModes.Ellipsis;
+
+        Place(subtitle.rectTransform, new Vector2(textLeft, -50f), new Vector2(width - textLeft - pad, 24f));
+        subtitle.fontSize = 17f;
+        subtitle.fontStyle = FontStyles.Normal;
+        subtitle.alignment = TextAlignmentOptions.TopLeft;
+        subtitle.color = MutedColor;
+
+        // 우상단 쿨다운 = 시계 아이콘 + 초. 숫자 폭이 바뀌어도 오른쪽 끝에 붙게 가로 레이아웃(오른쪽 정렬).
+        RectTransform group = NewUi("CooldownGroup", header);
+        group.anchorMin = group.anchorMax = new Vector2(0f, 1f); // Header 는 왼쪽 위 기준 고정 폭
+        group.pivot = new Vector2(1f, 1f);
+        group.anchoredPosition = new Vector2(width - pad, -16f);
+        group.sizeDelta = new Vector2(110f, 30f);
+        HorizontalLayoutGroup row = group.gameObject.AddComponent<HorizontalLayoutGroup>();
+        row.childAlignment = TextAnchor.MiddleRight;
+        row.spacing = 6f;
+        row.childControlWidth = true;
+        row.childControlHeight = true;
+        row.childForceExpandWidth = false;
+        row.childForceExpandHeight = false;
+
+        RectTransform clock = NewUi("CooldownIcon", group);
+        Image clockImage = clock.gameObject.AddComponent<Image>();
+        clockImage.sprite = white;
+        clockImage.color = MutedColor;
+        clockImage.raycastTarget = false;
+        clockImage.preserveAspect = true;
+        LayoutElement clockSize = clock.gameObject.AddComponent<LayoutElement>();
+        clockSize.preferredWidth = clockSize.minWidth = 22f;
+        clockSize.preferredHeight = clockSize.minHeight = 22f;
+
+        cooldown.rectTransform.SetParent(group, false);
+        cooldown.fontSize = 22f;
+        cooldown.fontStyle = FontStyles.Bold;
+        cooldown.alignment = TextAlignmentOptions.MidlineRight;
+        cooldown.textWrappingMode = TextWrappingModes.NoWrap;
+        cooldown.spriteAsset = null; // 시계는 옆 Image — 옛 <sprite name=cooldown> 은 쓰지 않는다
+
+        // 태그 칩 줄 — 이름·슬롯 줄 아래. 칩 위치·줄바꿈은 SkillTooltipView 가 매 프레임 놓는다.
+        RectTransform tagRow = NewUi("TagRow", header);
+        Place(tagRow, new Vector2(textLeft, -80f), new Vector2(width - textLeft - pad, 26f));
+
+        RectTransform chip = NewUi("TagChip", tagRow);
+        Place(chip, Vector2.zero, new Vector2(60f, 26f));
+        chip.gameObject.AddComponent<Image>(); // 둥근 스프라이트·색은 StyleTagChip
+        RectTransform chipLabelRect = NewUi("Label", chip);
+        Stretch(chipLabelRect);
+        TextMeshProUGUI chipLabel = chipLabelRect.gameObject.AddComponent<TextMeshProUGUI>();
+        if (font != null)
+            chipLabel.font = font;
+        chipLabel.fontSize = 15f;
+        chipLabel.fontStyle = FontStyles.Bold;
+        chipLabel.alignment = TextAlignmentOptions.Center;
+        chipLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        chipLabel.overflowMode = TextOverflowModes.Ellipsis;
+        chipLabel.color = AccentColor;
+        chipLabel.raycastTarget = false;
+        chip.gameObject.SetActive(false);
+
+        // 머리 영역 아래 가로 구분선 — Header 바닥에 붙어 태그가 여러 줄이면 같이 내려간다.
+        RectTransform divider = NewUi("Divider", header);
+        divider.anchorMin = new Vector2(0f, 0f);
+        divider.anchorMax = new Vector2(1f, 0f);
+        divider.pivot = new Vector2(0.5f, 0f);
+        divider.offsetMin = new Vector2(pad, 0f);
+        divider.offsetMax = new Vector2(-pad, 1.5f);
+        Image dividerImage = divider.gameObject.AddComponent<Image>();
+        dividerImage.color = new Color(0.48f, 0.42f, 0.25f, 0.7f);
+        dividerImage.raycastTarget = false;
+
+        // 설명은 구분선 아래 여백, Shift 안내는 오른쪽 아래.
+        body.margin = new Vector4(pad, 12f, pad, 0f);
+        hint.margin = new Vector4(pad, 8f, pad, 0f);
+        hint.alignment = TextAlignmentOptions.Right;
+        VerticalLayoutGroup panelGroup = panel.GetComponent<VerticalLayoutGroup>();
+        if (panelGroup != null)
+            panelGroup.padding = new RectOffset(0, 0, 0, 12);
+
+        return new TooltipLayout(group.gameObject, tagRow, chip, headerLayout);
+    }
+
+    // 할 일 114 후속 — 태그 칩 = 둥근 사각형 9-slice(생성물 · git) + 태그별 색 표.
+    private const string TagChipSpritePath = "Assets/2.Prefabs/UI/Textures/SkillTooltipTagChip.png";
+    private const string TagStylesPath = GeneratedFolder + "/SkillTooltipTagStyles.asset";
+    private const int TagChipTextureSize = 64;
+    private const int TagChipBorder = 24;        // 9-slice 보더(px) — 모서리 반지름 + AA 여유
+    private const float TagChipRadius = 22f;     // px, PPU 200 → 11 UI 단위(칩 높이 26 의 거의 반 = 알약에 가까운 둥근 사각형)
+    private const float TagChipPixelsPerUnit = 200f;
+    // 칩 글자만 서울알림체 Medium — CombatHUD 등 HUD 가 쓰는 정적 에셋(git, 태그 글자 전부 있음). 다른 툴팁 글자는 FontPath 그대로.
+    // Heavy(SVN 50.Art)는 설정창 전용 · 아틀라스에 넉·백·막·저가 없다.
+    private const string TagChipFontPath = "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset";
+
+    // 칩 테두리 = 같은 반지름·보더의 흰 둥근 링 9-slice(생성물 · git). 두께(px)는 링 PNG 임포터 userData 에 적어 두고, 바꾸면 그 자리에서 다시 굽는다(guid 유지).
+    private const string TagChipRingSpritePath = "Assets/2.Prefabs/UI/Textures/SkillTooltipTagChipRing.png";
+    private const string RingThicknessKey = "ringThicknessPx=";
+    /// <summary>링 두께 기본값(px) — PPU 200 → 1.75 UI 단위 = 칩 높이 26 의 약 6.7%(참고 이미지 비율).</summary>
+    public const float DefaultTagChipRingThickness = 3.5f;
+    public const float MinTagChipRingThickness = 1f;
+    public const float MaxTagChipRingThickness = 12f;
+
+    /// <summary>
+    /// 칩 원본을 둥근 9-slice 로 — 배경 Image = <see cref="TagChipSpritePath"/>·Sliced(글자 길이로 늘어나도 모서리 유지),
+    /// 그 위에 자식 <see cref="SkillTooltipView.TagChipRingName"/> = 링 <see cref="TagChipRingSpritePath"/>·Sliced(글자색 테두리, 글자 아래).
+    /// 칩 글자 글꼴 = <see cref="TagChipFontPath"/>(서울알림체 Medium).
+    /// 옛 금색 <see cref="Outline"/> 은 지운다(사각 오프셋 복제라 둥근 모서리와 어긋난다).
+    /// 색은 런타임에 <see cref="SkillTooltipTagStyles"/> 가 덮는다 — 여기 색은 표가 비었을 때의 기본색.
+    /// </summary>
+    private static void StyleTagChip(RectTransform chip)
+    {
+        if (chip == null)
+            return;
+
+        Image image = EnsureComponent<Image>(chip.gameObject);
+        image.sprite = EnsureTagChipSprite();
+        image.type = Image.Type.Sliced;
+        image.fillCenter = true;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.color = SkillTooltipTagStyles.FallbackBackground;
+        image.raycastTarget = false;
+        if (chip.TryGetComponent(out Outline outline))
+            Object.DestroyImmediate(outline, true);
+
+        var ring = chip.Find(SkillTooltipView.TagChipRingName) as RectTransform;
+        if (ring == null)
+            ring = NewUi(SkillTooltipView.TagChipRingName, chip);
+        Stretch(ring);
+        ring.SetSiblingIndex(0); // 배경 위 · 글자 아래
+        Image ringImage = EnsureComponent<Image>(ring.gameObject);
+        ringImage.sprite = EnsureTagChipRingSprite(null);
+        ringImage.type = Image.Type.Sliced;
+        ringImage.fillCenter = true;
+        ringImage.pixelsPerUnitMultiplier = 1f;
+        ringImage.color = SkillTooltipTagStyles.FallbackText;
+        ringImage.raycastTarget = false;
+
+        TMP_Text label = chip.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.color = SkillTooltipTagStyles.FallbackText;
+            TMP_FontAsset chipFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(TagChipFontPath);
+            if (chipFont != null)
+                label.font = chipFont; // 크기 15·Bold·가운데 정렬은 그대로(세로 어긋남 0.5 UI 단위 이하라 보정 없음)
+            else
+                Debug.LogWarning($"[SkillTooltip] 칩 글꼴 없음: {TagChipFontPath} — 칩 글자 글꼴을 바꾸지 않는다.");
+        }
+    }
+
+    /// <summary>
+    /// 흰 둥근 사각형 PNG 를 한 번 굽는다(있으면 그대로 — 임포트 설정만 맞춘다). 64×64, 반지름 22px, 가장자리 1px 부드럽게,
+    /// 9-slice 보더 24px 사방. 색은 Image.color 로 입힌다.
+    /// </summary>
+    private static Sprite EnsureTagChipSprite()
+    {
+        if (!System.IO.File.Exists(TagChipSpritePath))
+            BakeRoundedRect(TagChipSpritePath, 0f);
+        return EnsureTagChipImport(TagChipSpritePath, null);
+    }
+
+    /// <summary>
+    /// 흰 둥근 링 PNG(칩과 같은 64px·반지름 22px·보더 24px, 바깥 가장자리 = 칩 가장자리). <paramref name="thickness"/> = null 이면
+    /// 지금 구운 두께(없으면 <see cref="DefaultTagChipRingThickness"/>)를 쓴다. 파일이 없거나 두께가 다르면 그 자리에 다시 굽는다.
+    /// </summary>
+    public static Sprite EnsureTagChipRingSprite(float? thickness)
+    {
+        float? baked = BakedRingThickness();
+        float want = Mathf.Clamp(thickness ?? baked ?? DefaultTagChipRingThickness, MinTagChipRingThickness, MaxTagChipRingThickness);
+        if (!System.IO.File.Exists(TagChipRingSpritePath) || baked == null || !Mathf.Approximately(baked.Value, want))
+            BakeRoundedRect(TagChipRingSpritePath, want);
+        return EnsureTagChipImport(TagChipRingSpritePath, RingThicknessKey + want.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>지금 링 PNG 에 구운 두께(px). 파일·기록이 없으면 null.</summary>
+    public static float? BakedRingThickness()
+    {
+        if (!(AssetImporter.GetAtPath(TagChipRingSpritePath) is TextureImporter importer) ||
+            importer.userData == null || !importer.userData.StartsWith(RingThicknessKey, StringComparison.Ordinal))
+            return null;
+        return float.TryParse(importer.userData.Substring(RingThicknessKey.Length), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out float value) ? value : (float?)null;
+    }
+
+    // 흰 둥근 사각형(ring = 0) 또는 두께 ring px 의 둥근 링. 링 안쪽 = 같은 모서리 중심·반지름 (22 − ring) — 두께가 둘레 전체에서 같다.
+    private static void BakeRoundedRect(string path, float ring)
+    {
+        const int size = TagChipTextureSize;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        var px = new Color32[size * size];
+        float lo = TagChipRadius, hi = size - TagChipRadius;
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float fx = x + 0.5f, fy = y + 0.5f;
+            float dx = fx < lo ? lo - fx : fx > hi ? fx - hi : 0f;
+            float dy = fy < lo ? lo - fy : fy > hi ? fy - hi : 0f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy); // 안쪽 사각형까지 거리
+            float coverage = Mathf.Clamp01(TagChipRadius - d + 0.5f);
+            if (ring > 0f)
+                coverage -= Mathf.Clamp01(TagChipRadius - ring - d + 0.5f);
+            px[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(coverage)));
+        }
+
+        tex.SetPixels32(px);
+        tex.Apply();
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+    }
+
+    // Sprite·Single·PPU 200·보더 24px 사방. userData 가 null 이 아니면 그 값도 맞춘다(링 두께 기록).
+    private static Sprite EnsureTagChipImport(string path, string userData)
+    {
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        var border = new Vector4(TagChipBorder, TagChipBorder, TagChipBorder, TagChipBorder);
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteBorder != border ||
+            !Mathf.Approximately(importer.spritePixelsPerUnit, TagChipPixelsPerUnit) ||
+            (userData != null && importer.userData != userData))
+        {
+            if (userData != null)
+                importer.userData = userData;
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = TagChipPixelsPerUnit;
+            importer.spriteBorder = border;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.SaveAndReimport();
+        }
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    /// <summary>태그 칩 색 표 에셋 — 없을 때만 기본 색 초안으로 만든다(이후 값은 xlsx `UI` 시트·인스펙터가 원본).</summary>
+    private static SkillTooltipTagStyles EnsureTagStyles()
+    {
+        var styles = AssetDatabase.LoadAssetAtPath<SkillTooltipTagStyles>(TagStylesPath);
+        if (styles != null)
+            return styles;
+
+        EnsureFolder(GeneratedFolder);
+        styles = ScriptableObject.CreateInstance<SkillTooltipTagStyles>();
+        styles.SetEntries(SkillTooltipTagStyles.DefaultBackgroundHex, SkillTooltipTagStyles.DefaultTextHex,
+            SkillTooltipTagStyles.DefaultStyles());
+        AssetDatabase.CreateAsset(styles, TagStylesPath);
+        return styles;
     }
 
     /// <summary>

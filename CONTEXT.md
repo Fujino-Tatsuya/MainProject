@@ -792,6 +792,7 @@ Later scope:
 - Skill: A player or boss action/pattern defined by data and executed by runtime logic.
 - ScriptableObject data: Authoring-time gameplay data for skills, builds, bosses, patterns, and tuning values.
 - Vertical slice: A thin but complete path through gameplay, networking, UI/presentation, and verification.
+- 대쉬 간파 (Dash interrupt): 대시 시작 직후 짧은 창 안에 우클릭해, 대시하며 상체로 간파를 준비하고 대시 끝 지점에서 판정하는 간파. 상세는 [dash-interrupt.md](Docs/tech/dash-interrupt.md).
 
 ## Networking Language
 

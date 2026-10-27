@@ -66,7 +66,7 @@ public static class TutorialGuideIds
     public const string Z4Clear = "TUT_Z4_CLEAR";
     public const string Z4GoBoss = "TUT_Z4_GO_BOSS";
 
-    // 4구역 진입 전 소개 연출 무전(PLAN-zone4-intro-cinematic · 기획 명세 Z04_INTRO_*). 시간은 TutorialZone4IntroData(xlsx Cinematic 시트).
+    // 4구역 진입 전 소개 연출 무전(PLAN-zone4-intro-cinematic · 기획 명세 Z04_INTRO_*). 시간은 MapSceneZone4IntroData(xlsx Cinematic 시트).
     public const string Z4IntroDevices = "TUT_Z4_INTRO_DEVICES";
     public const string Z4IntroBridge = "TUT_Z4_INTRO_BRIDGE";
     public const string Z4IntroReturn = "TUT_Z4_INTRO_RETURN";
