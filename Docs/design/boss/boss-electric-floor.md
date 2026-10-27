@@ -143,7 +143,7 @@
 
 ### 6.4 피해를 받지 않는 상태
 
-- 무적 상태 — 단 레이드 즉사 방전(④ 대폭발·북진 압박 차징 실패)은 데이터 체크로 무적을 무시한다([handoff-boss-lethal-invuln-bypass.md](../../tech/handoff-boss-lethal-invuln-bypass.md))
+- 무적 상태 — 단 레이드 즉사 방전(④ 대폭발·북진 압박 차징 실패)은 데이터 0/1 칸(기본 1)으로 무적을 무시한다([handoff-boss-lethal-invuln-bypass.md](../../tech/handoff-boss-lethal-invuln-bypass.md))
 - 23호에게 실제로 붙잡혀 조작할 수 없는 상태
 - 쓰러진 상태
 - 완전히 사망한 상태

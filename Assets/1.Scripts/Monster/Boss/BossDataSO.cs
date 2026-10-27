@@ -379,9 +379,10 @@ public class BossDataSO : MonsterDataSO
              "무적(대시 등)으로 피할 수 있는지는 아래 raidSelfDestructBlastIgnoreInvuln 이 정한다.")]
     public bool raidSelfDestructBlastLethal = true;
 
-    [Tooltip("저지 실패 대폭발이 플레이어 무적을 무시하는가(할 일 105). 켜면 대시·착지 보호·추락 복귀·부활·연출·스킬 동작·특성 선택 무적 전부를 뚫는다.\n" +
-             "끄면 예전처럼 무적으로 피할 수 있다. 잡혀 있음·쓰러짐은 이 값과 무관하게 안 맞는다.")]
-    public bool raidSelfDestructBlastIgnoreInvuln = true;
+    [Tooltip("저지 실패 대폭발이 플레이어 무적을 무시하는가(할 일 105). 1=무적 무시, 0=끔.\n" +
+             "1 이면 대시·착지 보호·추락 복귀·부활·연출·스킬 동작·특성 선택 무적 전부를 뚫는다. 0 이면 예전처럼 무적으로 피할 수 있다.\n" +
+             "잡혀 있음·쓰러짐은 이 값과 무관하게 안 맞는다. xlsx 에 내보내려고 bool 대신 0/1 숫자다.")]
+    [Range(0, 1)] public int raidSelfDestructBlastIgnoreInvuln = 1;
 
     // ─── 레이드 새 페이즈(PLAN-boss-raid-relay, 경석 10-20) — phases 의 sequence 로 고른다. xlsx 미노출(인스펙터 저작) ───
     [Header("레이드 간파 릴레이 (RaidInterruptRelay) — 6시 집결 → 돌진 간파로 12시 끝선까지 밀기")]
@@ -432,9 +433,10 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("파훼 보상 — 그로기(초) · 받는 플레이어 피해 배율(제압 경로, 이 기믹 끝에서만).")]
     [DataTableIgnore] [Min(0.5f)] public float pushNorthRewardDuration = 8f;
     [DataTableIgnore] [Min(1f)] public float pushNorthRewardDamageMultiplier = 1.3f;
-    [Tooltip("차징 실패 즉사 방전이 플레이어 무적을 무시하는가(할 일 105). 켜면 대시·착지 보호·추락 복귀·부활·연출·스킬 동작·특성 선택 무적 전부를 뚫는다.\n" +
-             "끄면 예전처럼 무적으로 피할 수 있다. 잡혀 있음·쓰러짐은 이 값과 무관하게 안 맞는다.")]
-    public bool pushNorthDischargeIgnoreInvuln = true;
+    [Tooltip("차징 실패 즉사 방전이 플레이어 무적을 무시하는가(할 일 105). 1=무적 무시, 0=끔.\n" +
+             "1 이면 대시·착지 보호·추락 복귀·부활·연출·스킬 동작·특성 선택 무적 전부를 뚫는다. 0 이면 예전처럼 무적으로 피할 수 있다.\n" +
+             "잡혀 있음·쓰러짐은 이 값과 무관하게 안 맞는다. xlsx 에 내보내려고 bool 대신 0/1 숫자다.")]
+    [Range(0, 1)] public int pushNorthDischargeIgnoreInvuln = 1;
 
     [Header("0줄 자폭 — HP 0 이 되면 죽지 않고 자폭 단계(PLAN-boss-ab-test)")]
     [Tooltip("켜면 HP 가 0 이 될 피해를 HP 1 에서 멈추고 자폭(raidSelfDestruct* 값)을 예약한다.\n" +

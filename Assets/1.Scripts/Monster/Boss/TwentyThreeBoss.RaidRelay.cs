@@ -800,9 +800,9 @@ public partial class TwentyThreeBoss
         _charge?.Begin(pylons, chargeTime, _boss.raidPylonHpMultiplier);
 
         ulong mask = _pnRound == 1 ? (BossTileGrid.AllMask & ~RelaySafeMask()) : BossTileGrid.AllMask;
-        // 탑이 남으면 즉사 방전 — 무적(대시 등 전부)도 무시한다(데이터 체크 pushNorthDischargeIgnoreInvuln, 할 일 105 기본 켜짐).
+        // 탑이 남으면 즉사 방전 — 무적(대시 등 전부)도 무시한다(데이터 칸 pushNorthDischargeIgnoreInvuln 0/1, 할 일 105 기본 1).
         _electricFloor?.ServerQueueDischarge(mask, total, 0, lethal: true,
-                                             ignoreInvulnerability: _boss.pushNorthDischargeIgnoreInvuln);
+                                             ignoreInvulnerability: _boss.pushNorthDischargeIgnoreInvuln != 0);
         StartChargeBallClientRpc(transform.position, ChargeZoneRadius);
 
         Debug.Log($"[23호/북진] {_pnRound}회차 차징 {chargeTime:0.#}초(+상승 {PnRiseGrace:0.#}) · 탑 {pylons}개 · " +
