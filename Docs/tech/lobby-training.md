@@ -46,10 +46,10 @@
 | `TRAIN_03_RESET` → `TRAIN_03_WALL_GUIDE` | B→C 초기화 / C 시작 | B 완료 뒤 영역 안 확인 → `Train03C/InProgress`(명세 §9.4 초기화 순간). 같은 진입에 두 줄 — 순서대로 |
 | `TRAIN_03_SUPPRESS` | D 제압 진입 | C 완료 보고(제압 시작 순간) → `Train03D/InProgress` |
 | `TRAIN_END` | 훈련 종료 | D 완료 보고 → `TrainEnd/Gathering` |
-| `BRIEF_ROUTE` | 종료 집결 | 종료 집결 확정 → `Brief/Gathering` |
+| ~~`BRIEF_ROUTE`~~ | 종료 집결 | **재생 안 함**(할 일 111) — 종료 텔레포트가 이미 브리핑 구역 안에 두므로 이동 안내 불필요. 상수·Strings 키·문구 행은 남겨 둠 |
 | `BRIEF_01`~`04` | 브리핑 | 단계 진입 대사 아님 — `LobbyBriefing` 이 `Brief/InProgress` 동안 서버 시간으로 한 줄씩 `ServerPlay`(아래 "브리핑" 절) |
 
-`Lobby → Sortie`(훈련 없이 출격)·`Brief/InProgress`·`Brief/Completed`·`Sortie` 진입 대사는 없다(단계가 바뀌면 대기 줄 폐기만).
+`Lobby → Sortie`(훈련 없이 출격)·`Brief/Gathering`·`Brief/InProgress`·`Brief/Completed`·`Sortie` 진입 대사는 없다(단계가 바뀌면 대기 줄 폐기만).
 
 ### 단계 안 사건 대사 — 공개 API
 
@@ -90,7 +90,7 @@ LobbyRadio.Active.ServerClear()                                           // [�
 
 ### 흐름
 
-1. 종료 집결 확정 → `Brief/Gathering`(`BRIEF_ROUTE` 무전) → 브리핑 위치(`Gather_Brief`) 훈련 명단 전원 집결(`gatherHoldSeconds` 3초 — 종료 텔레포트가 이미 구역 안에 둔다, "훈련 종료" 절) → `Brief/InProgress`.
+1. 종료 집결 확정 → `Brief/Gathering`(진입 무전 없음 — 할 일 111) → 브리핑 위치(`Gather_Brief`) 훈련 명단 전원 집결(`gatherHoldSeconds` 3초 — 종료 텔레포트가 이미 구역 안에 둔다, "훈련 종료" 절) → `Brief/InProgress`.
 2. **[서버] 시작**(`ServerFlowChanged` 로 `Brief/InProgress` 를 본 순간, 회차당 1회): `LobbyRadio.ServerClear()`(기존 무전 종료) → 접속자 전원 조작 제한 →
    시작 지연 `leadSeconds`(0.5초) 뒤 `BRIEF_01` → 앞 줄 표시 시간이 지날 때마다 다음 줄(`LobbyRadio.ServerPlay`, 단계 번호 그대로라 폐기되지 않는다).
 3. **시간 = 서버가 잰다**: 지연 + 대사 표시 시간 합(`TutorialGuideTexts` SO 행 `durationSeconds` — 7+5+6+4초) + 끝 여유 `tailSeconds`(1초) = 23.5초.
