@@ -326,7 +326,7 @@ public sealed class PodDropTimelineTests
     public void Lobby_Defaults_LaunchFastSpeed()
     {
         Assert.AreEqual(6f, PodDropLobbyTimings.Default.launchFastSpeed, Eps, "213프레임부터 6배");
-        Assert.AreEqual(3f, PodDropLobbyTimings.Default.launchFastSpeed2, Eps, "553프레임부터 3배");
+        Assert.AreEqual(1f, PodDropLobbyTimings.Default.launchFastSpeed2, Eps, "553프레임부터 1배");
         Assert.AreEqual(213, PodAnimEventAuthoring.LobbyLaunchFastFrame);
         Assert.AreEqual(553, PodAnimEventAuthoring.LobbyLaunchFast2Frame);
     }
@@ -595,7 +595,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(m.landSeconds, map.landSeconds, Eps);
         // 106 추가 2 — 새 칸은 기본값, 시작 높이는 에셋에서 30 으로 고침.
         Assert.AreEqual(d.launchFastSpeed, asset.Lobby.launchFastSpeed, Eps);
-        Assert.AreEqual(d.launchFastSpeed2, asset.Lobby.launchFastSpeed2, Eps, "할 일 121 — 가속 2단계 배율(에셋에도 3)");
+        Assert.AreEqual(d.launchFastSpeed2, asset.Lobby.launchFastSpeed2, Eps, "할 일 121 — 가속 2단계 배율(에셋에도 1)");
         // 할 일 121 — 끝 대기·끝 페이드(에셋에도 1·1).
         Assert.AreEqual(1f, asset.Lobby.launchEndWaitSeconds, Eps);
         Assert.AreEqual(1f, asset.Lobby.launchEndFadeSeconds, Eps);
