@@ -82,6 +82,20 @@ public static class SkillTooltipAuthoring
         Debug.Log($"[SkillTooltip] 구성 완료 — {HudPath}. GameData.xlsx Export/병합은 별도로 실행할 것.");
     }
 
+    /// <summary>CombatHUD 툴팁·슬롯 연결만 다시 한다 — 스킬 데이터 문구 시드·인라인 아이콘 아틀라스 재생성은 건드리지 않는다(할 일 114 배치 갱신용).</summary>
+    [MenuItem("Tools/UI/스킬 툴팁 레이아웃만 갱신")]
+    public static void ConfigureLayoutOnly()
+    {
+        TMP_StyleSheet styleSheet = EnsureStyleSheet();
+        TMP_SpriteAsset attackSprite = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(AttackSpritePath);
+        if (attackSprite == null)
+            attackSprite = EnsureAttackSpriteAsset();
+        TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        ConfigureHud(styleSheet, attackSprite, font);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[SkillTooltip] 레이아웃 갱신 완료 — {HudPath}");
+    }
+
     private static void ConfigureHud(TMP_StyleSheet styleSheet, TMP_SpriteAsset attackSprite, TMP_FontAsset font)
     {
         GameObject root = PrefabUtility.LoadPrefabContents(HudPath);
@@ -174,43 +188,194 @@ public static class SkillTooltipAuthoring
         }
 
         bool firstBuild = FindDeep(panel, "Description") == null;
-        Image icon = EnsureImage(panel, "Icon", new Vector2(16f, -16f), new Vector2(64f, 64f));
-        TMP_Text key = EnsureText(panel, "KeyBadge", font, 18f, FontStyles.Bold, TextAlignmentOptions.Center,
-            new Vector2(88f, -18f), new Vector2(54f, 28f));
-        TMP_Text title = EnsureText(panel, "DisplayName", font, 25f, FontStyles.Bold, TextAlignmentOptions.TopLeft,
-            new Vector2(88f, -48f), new Vector2(240f, 34f));
-        TMP_Text subtitle = EnsureText(panel, "Subtitle", font, 16f, FontStyles.Italic, TextAlignmentOptions.TopLeft,
-            new Vector2(88f, -80f), new Vector2(240f, 24f));
-        TMP_Text cooldown = EnsureText(panel, "Cooldown", font, 17f, FontStyles.Normal, TextAlignmentOptions.TopRight,
-            new Vector2(330f, -20f), new Vector2(84f, 28f));
+        Image icon = EnsureImage(panel, "Icon", new Vector2(16f, -16f), new Vector2(80f, 80f));
+        TMP_Text title = EnsureText(panel, "DisplayName", font, 28f, FontStyles.Bold, TextAlignmentOptions.TopLeft,
+            new Vector2(108f, -14f), new Vector2(206f, 36f));
+        TMP_Text subtitle = EnsureText(panel, "Subtitle", font, 17f, FontStyles.Normal, TextAlignmentOptions.TopLeft,
+            new Vector2(108f, -52f), new Vector2(306f, 24f));
+        TMP_Text cooldown = EnsureText(panel, "Cooldown", font, 18f, FontStyles.Normal, TextAlignmentOptions.MidlineRight,
+            new Vector2(330f, -16f), new Vector2(84f, 28f));
         TMP_Text body = EnsureText(panel, "Description", font, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft,
-            new Vector2(16f, -104f), new Vector2(398f, 112f));
-        TMP_Text hint = EnsureText(panel, "ShiftHint", font, 14f, FontStyles.Italic, TextAlignmentOptions.Center,
-            new Vector2(16f, -230f), new Vector2(398f, 24f));
+            new Vector2(16f, -116f), new Vector2(398f, 112f));
+        TMP_Text hint = EnsureText(panel, "ShiftHint", font, 14f, FontStyles.Italic, TextAlignmentOptions.Right,
+            new Vector2(16f, -240f), new Vector2(398f, 24f));
         body.styleSheet = styleSheet;
         body.spriteAsset = attackSprite;
-        cooldown.spriteAsset = attackSprite; // 머리줄 <sprite name=cooldown>
         if (firstBuild)
         {
             body.textWrappingMode = TextWrappingModes.Normal;
             hint.color = new Color(0.72f, 0.74f, 0.78f, 1f);
-            key.color = new Color(0.95f, 0.82f, 0.42f, 1f);
         }
-        EnsureFlexibleHeight(panel, body, hint, icon.rectTransform, key.rectTransform, title.rectTransform,
+        EnsureFlexibleHeight(panel, body, hint, icon.rectTransform, title.rectTransform,
             subtitle.rectTransform, cooldown.rectTransform);
+        TooltipLayout layout = EnsureLayout114(panel, font, icon, title, subtitle, cooldown, body, hint);
 
         var so = new SerializedObject(view);
         so.FindProperty("panel").objectReferenceValue = panel.gameObject;
         so.FindProperty("icon").objectReferenceValue = icon;
-        so.FindProperty("keyBadge").objectReferenceValue = key;
         so.FindProperty("displayName").objectReferenceValue = title;
         so.FindProperty("subtitle").objectReferenceValue = subtitle;
+        so.FindProperty("cooldownGroup").objectReferenceValue = layout.CooldownGroup;
         so.FindProperty("cooldownText").objectReferenceValue = cooldown;
+        so.FindProperty("tagRow").objectReferenceValue = layout.TagRow;
+        so.FindProperty("tagChipTemplate").objectReferenceValue = layout.TagChip;
+        so.FindProperty("headerLayout").objectReferenceValue = layout.HeaderLayout;
         so.FindProperty("description").objectReferenceValue = body;
         so.FindProperty("shiftHint").objectReferenceValue = hint;
         so.ApplyModifiedPropertiesWithoutUndo();
         panel.gameObject.SetActive(false);
         return view;
+    }
+
+    private readonly struct TooltipLayout
+    {
+        public TooltipLayout(GameObject cooldownGroup, RectTransform tagRow, RectTransform tagChip, LayoutElement headerLayout)
+        {
+            CooldownGroup = cooldownGroup;
+            TagRow = tagRow;
+            TagChip = tagChip;
+            HeaderLayout = headerLayout;
+        }
+
+        public GameObject CooldownGroup { get; }
+        public RectTransform TagRow { get; }
+        public RectTransform TagChip { get; }
+        public LayoutElement HeaderLayout { get; }
+    }
+
+    // 할 일 114 시안 배치. 태그·쿨다운 아이콘·칩 배경은 기획 이미지가 나올 때까지 임시 흰 사각형(SVN 원본은 참조만).
+    private const string TempWhiteSpritePath = "Assets/50.Art/TestAssets/Temp_Images/Images/white_512.png";
+    private const float HeaderMinHeight = 116f;
+    private static readonly Color AccentColor = new Color(0.95f, 0.82f, 0.42f, 1f);
+    private static readonly Color MutedColor = new Color(0.72f, 0.74f, 0.78f, 1f);
+
+    /// <summary>
+    /// 할 일 114 배치(좌상단 아이콘 / 이름·슬롯 줄·태그 칩 / 우상단 시계+초 / 구분선 / 설명 / 우하단 Shift 안내).
+    /// <c>Header/TagRow</c> 가 없을 때 한 번만 머리 영역을 다시 놓는다 — 이후 위치·색·크기는 프리팹 인스펙터에서 고친다(재실행은 참조만 다시 잇는다).
+    /// 옛 키 배지(<c>KeyBadge</c>)는 슬롯 줄로 합쳐 지운다.
+    /// </summary>
+    private static TooltipLayout EnsureLayout114(
+        RectTransform panel, TMP_FontAsset font, Image icon, TMP_Text title, TMP_Text subtitle, TMP_Text cooldown,
+        TMP_Text body, TMP_Text hint)
+    {
+        var header = (RectTransform)panel.Find("Header");
+        LayoutElement headerLayout = EnsureComponent<LayoutElement>(header.gameObject);
+        if (header.Find("TagRow") is RectTransform existingRow)
+        {
+            Transform existingGroup = header.Find("CooldownGroup");
+            Transform existingChip = existingRow.Find("TagChip");
+            return new TooltipLayout(existingGroup != null ? existingGroup.gameObject : cooldown.gameObject, existingRow,
+                existingChip as RectTransform, headerLayout);
+        }
+
+        Sprite white = AssetDatabase.LoadAssetAtPath<Sprite>(TempWhiteSpritePath);
+        if (white == null)
+            Debug.LogWarning($"[SkillTooltip] 임시 스프라이트 없음: {TempWhiteSpritePath} — 시계·칩 배경을 스프라이트 없이 만든다(SVN 업데이트 확인).");
+
+        Transform oldBadge = FindDeep(panel, "KeyBadge");
+        if (oldBadge != null)
+            Object.DestroyImmediate(oldBadge.gameObject);
+
+        headerLayout.minHeight = HeaderMinHeight;
+        headerLayout.preferredHeight = HeaderMinHeight;
+        float width = panel.sizeDelta.x;
+        const float pad = 16f;
+        const float textLeft = pad + 80f + 12f;
+
+        Place(icon.rectTransform, new Vector2(pad, -pad), new Vector2(80f, 80f));
+        icon.preserveAspect = true;
+
+        Place(title.rectTransform, new Vector2(textLeft, -12f), new Vector2(width - textLeft - pad - 116f, 38f)); // 오른쪽 116 = 쿨다운 묶음 자리
+        title.fontSize = 28f;
+        title.fontStyle = FontStyles.Bold;
+        title.alignment = TextAlignmentOptions.TopLeft;
+        title.textWrappingMode = TextWrappingModes.NoWrap;
+        title.overflowMode = TextOverflowModes.Ellipsis;
+
+        Place(subtitle.rectTransform, new Vector2(textLeft, -50f), new Vector2(width - textLeft - pad, 24f));
+        subtitle.fontSize = 17f;
+        subtitle.fontStyle = FontStyles.Normal;
+        subtitle.alignment = TextAlignmentOptions.TopLeft;
+        subtitle.color = MutedColor;
+
+        // 우상단 쿨다운 = 시계 아이콘 + 초. 숫자 폭이 바뀌어도 오른쪽 끝에 붙게 가로 레이아웃(오른쪽 정렬).
+        RectTransform group = NewUi("CooldownGroup", header);
+        group.anchorMin = group.anchorMax = new Vector2(0f, 1f); // Header 는 왼쪽 위 기준 고정 폭
+        group.pivot = new Vector2(1f, 1f);
+        group.anchoredPosition = new Vector2(width - pad, -16f);
+        group.sizeDelta = new Vector2(110f, 30f);
+        HorizontalLayoutGroup row = group.gameObject.AddComponent<HorizontalLayoutGroup>();
+        row.childAlignment = TextAnchor.MiddleRight;
+        row.spacing = 6f;
+        row.childControlWidth = true;
+        row.childControlHeight = true;
+        row.childForceExpandWidth = false;
+        row.childForceExpandHeight = false;
+
+        RectTransform clock = NewUi("CooldownIcon", group);
+        Image clockImage = clock.gameObject.AddComponent<Image>();
+        clockImage.sprite = white;
+        clockImage.color = MutedColor;
+        clockImage.raycastTarget = false;
+        clockImage.preserveAspect = true;
+        LayoutElement clockSize = clock.gameObject.AddComponent<LayoutElement>();
+        clockSize.preferredWidth = clockSize.minWidth = 22f;
+        clockSize.preferredHeight = clockSize.minHeight = 22f;
+
+        cooldown.rectTransform.SetParent(group, false);
+        cooldown.fontSize = 22f;
+        cooldown.fontStyle = FontStyles.Bold;
+        cooldown.alignment = TextAlignmentOptions.MidlineRight;
+        cooldown.textWrappingMode = TextWrappingModes.NoWrap;
+        cooldown.spriteAsset = null; // 시계는 옆 Image — 옛 <sprite name=cooldown> 은 쓰지 않는다
+
+        // 태그 칩 줄 — 이름·슬롯 줄 아래. 칩 위치·줄바꿈은 SkillTooltipView 가 매 프레임 놓는다.
+        RectTransform tagRow = NewUi("TagRow", header);
+        Place(tagRow, new Vector2(textLeft, -80f), new Vector2(width - textLeft - pad, 26f));
+
+        RectTransform chip = NewUi("TagChip", tagRow);
+        Place(chip, Vector2.zero, new Vector2(60f, 26f));
+        Image chipImage = chip.gameObject.AddComponent<Image>();
+        chipImage.sprite = white;
+        chipImage.color = new Color(0.24f, 0.19f, 0.08f, 0.95f);
+        chipImage.raycastTarget = false;
+        Outline chipOutline = chip.gameObject.AddComponent<Outline>();
+        chipOutline.effectColor = new Color(AccentColor.r, AccentColor.g, AccentColor.b, 0.8f);
+        chipOutline.effectDistance = new Vector2(1.5f, -1.5f);
+        RectTransform chipLabelRect = NewUi("Label", chip);
+        Stretch(chipLabelRect);
+        TextMeshProUGUI chipLabel = chipLabelRect.gameObject.AddComponent<TextMeshProUGUI>();
+        if (font != null)
+            chipLabel.font = font;
+        chipLabel.fontSize = 15f;
+        chipLabel.fontStyle = FontStyles.Bold;
+        chipLabel.alignment = TextAlignmentOptions.Center;
+        chipLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        chipLabel.overflowMode = TextOverflowModes.Ellipsis;
+        chipLabel.color = AccentColor;
+        chipLabel.raycastTarget = false;
+        chip.gameObject.SetActive(false);
+
+        // 머리 영역 아래 가로 구분선 — Header 바닥에 붙어 태그가 여러 줄이면 같이 내려간다.
+        RectTransform divider = NewUi("Divider", header);
+        divider.anchorMin = new Vector2(0f, 0f);
+        divider.anchorMax = new Vector2(1f, 0f);
+        divider.pivot = new Vector2(0.5f, 0f);
+        divider.offsetMin = new Vector2(pad, 0f);
+        divider.offsetMax = new Vector2(-pad, 1.5f);
+        Image dividerImage = divider.gameObject.AddComponent<Image>();
+        dividerImage.color = new Color(0.48f, 0.42f, 0.25f, 0.7f);
+        dividerImage.raycastTarget = false;
+
+        // 설명은 구분선 아래 여백, Shift 안내는 오른쪽 아래.
+        body.margin = new Vector4(pad, 12f, pad, 0f);
+        hint.margin = new Vector4(pad, 8f, pad, 0f);
+        hint.alignment = TextAlignmentOptions.Right;
+        VerticalLayoutGroup panelGroup = panel.GetComponent<VerticalLayoutGroup>();
+        if (panelGroup != null)
+            panelGroup.padding = new RectOffset(0, 0, 0, 12);
+
+        return new TooltipLayout(group.gameObject, tagRow, chip, headerLayout);
     }
 
     /// <summary>

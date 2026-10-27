@@ -134,13 +134,13 @@ public sealed class UiStringsL4bFormatTests
 
         Assert.That(UiStrings.Seconds(4f, "0.0"), Is.EqualTo("4.0s"));
         Assert.That(AssassinHUD.TransformLabelText(4f, false, false), Is.EqualTo("변신 4.0s"));
-        Assert.That(SkillTooltipView.CooldownText(6f), Does.EndWith("> 6s"));
+        Assert.That(SkillTooltipView.CooldownText(6f), Is.EqualTo("6s")); // 시계 아이콘은 옆 Image(할 일 114)
     }
 
     [Test]
     public void SkillTooltip_NoRow_MatchesOldText()
     {
-        Assert.That(SkillTooltipView.CooldownText(1.5f), Is.EqualTo("<sprite name=\"cooldown\" color=#B8C4D6> 1.5초"));
+        Assert.That(SkillTooltipView.CooldownText(1.5f), Is.EqualTo("1.5초"));
         Assert.That(SkillTooltipView.ErrorText("bad"), Is.EqualTo("[오류: bad]"));
         Assert.That(UiStrings.SkillTooltipShiftHint.Text, Is.EqualTo("자세한 정보를 보려면 [Shift] 키를 누르세요"));
         Assert.That(SkillTooltipView.KeyBadgeText("Q"), Is.EqualTo("Q"));

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -13,10 +14,24 @@ public sealed class SkillTooltipView : MonoBehaviour
 
     [Header("Header")]
     [SerializeField] private Image icon;
-    [SerializeField] private TMP_Text keyBadge;
     [SerializeField] private TMP_Text displayName;
+    [Tooltip("이름 아래 슬롯 줄(예 Q 스킬) — 툴팁 부제, 부제가 없으면(패시브) 키 배지 글자")]
     [SerializeField] private TMP_Text subtitle;
+    [Tooltip("우상단 쿨다운 묶음(시계 아이콘 + 초). 쿨다운 없는 스킬은 통째로 숨긴다")]
+    [SerializeField] private GameObject cooldownGroup;
     [SerializeField] private TMP_Text cooldownText;
+
+    [Header("Tags")]
+    [Tooltip("태그 칩을 놓는 영역(왼쪽 위 기준). 가로 폭을 넘으면 다음 줄로 넘긴다")]
+    [SerializeField] private RectTransform tagRow;
+    [Tooltip("꺼 둔 칩 원본(Image + 자식 TMP). 필요한 만큼 복제한다")]
+    [SerializeField] private RectTransform tagChipTemplate;
+    [SerializeField, Min(0f)] private float tagChipPadding = 12f;
+    [SerializeField, Min(0f)] private float tagSpacing = 6f;
+    [Tooltip("머리 영역(Header) 높이 — 태그가 여러 줄이면 그만큼 늘린다")]
+    [SerializeField] private LayoutElement headerLayout;
+    [SerializeField, Min(0f)] private float headerMinHeight = 116f;
+    [SerializeField, Min(0f)] private float headerBottomPadding = 12f;
 
     [Header("Body")]
     [SerializeField] private TMP_Text description;
@@ -34,6 +49,12 @@ public sealed class SkillTooltipView : MonoBehaviour
     private float hoverStartedAt;
     private bool visible;
     private bool loggedError;
+    private bool loggedTagError;
+    private string parsedTagIds;
+    private readonly List<SkillTooltipTag> tags = new List<SkillTooltipTag>();
+    private readonly List<RectTransform> tagChips = new List<RectTransform>();
+    private readonly List<float> tagWidths = new List<float>();
+    private readonly List<Vector2> tagPositions = new List<Vector2>();
 
     /// <summary>
     /// [오너 로컬] 툴팁이 지연 뒤 실제로 떴다. 인자 = 그 슬롯의 키 표기(displayKey) —
@@ -91,6 +112,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         hoverStartedAt = Time.unscaledTime;
         SetVisible(false);
         loggedError = false;
+        loggedTagError = false;
         if (panel != null)
             panel.SetActive(false);
     }
@@ -129,6 +151,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         displayKey = key;
         cooldown = cooldownSeconds;
         loggedError = false;
+        loggedTagError = false;
 
         if (source == null)
         {
@@ -169,29 +192,25 @@ public sealed class SkillTooltipView : MonoBehaviour
         if (icon != null)
             icon.sprite = tooltip.Icon != null ? tooltip.Icon : owner.FallbackIcon; // 슬롯과 같은 그림(우클릭은 HUD 공용 아이콘)
 
-        if (keyBadge != null)
-        {
-            bool hasKey = !string.IsNullOrEmpty(displayKey);
-            keyBadge.gameObject.SetActive(hasKey);
-            keyBadge.text = hasKey ? KeyBadgeText(displayKey) : string.Empty;
-        }
-
         if (displayName != null)
             displayName.text = tooltip.DisplayName;
 
         if (subtitle != null)
         {
-            bool hasSubtitle = !string.IsNullOrWhiteSpace(tooltip.Subtitle);
-            subtitle.gameObject.SetActive(hasSubtitle);
-            subtitle.text = hasSubtitle ? tooltip.Subtitle : string.Empty;
+            string slotLine = SlotLineText(tooltip.Subtitle, displayKey);
+            subtitle.gameObject.SetActive(slotLine.Length > 0);
+            subtitle.text = slotLine;
         }
 
-        if (cooldownText != null)
-        {
-            bool hasCooldown = cooldown.HasValue;
+        bool hasCooldown = cooldown.HasValue && cooldown.Value > 0f;
+        if (cooldownGroup != null)
+            cooldownGroup.SetActive(hasCooldown);
+        else if (cooldownText != null)
             cooldownText.gameObject.SetActive(hasCooldown);
+        if (cooldownText != null)
             cooldownText.text = hasCooldown ? CooldownText(cooldown.Value) : string.Empty;
-        }
+
+        RefreshTags(tooltip.TagIds);
 
         SkillTooltipDamage damage = source.GetTooltipDamage(player);
         bool ok = SkillTooltipFormatter.TryFormat(
@@ -226,9 +245,112 @@ public sealed class SkillTooltipView : MonoBehaviour
     public static string KeyBadgeText(string key) =>
         key == PassiveHUD.DisplayKey ? UiStrings.SkillTooltipPassiveBadge.Text : key;
 
-    /// <summary>쿨타임 줄 — 아이콘 + <see cref="UiStrings.Seconds"/>(소수 최대 한 자리).</summary>
-    public static string CooldownText(float seconds) =>
-        $"<sprite name=\"cooldown\" color=#B8C4D6> {UiStrings.Seconds(seconds, "0.#")}";
+    /// <summary>
+    /// 이름 아래 슬롯 줄 — 툴팁 부제(예 "Q 스킬", Strings 번역)가 있으면 그것, 없으면(패시브) 키 배지 글자(<see cref="KeyBadgeText"/>).
+    /// 둘 다 없으면 빈 문자열(줄을 숨긴다).
+    /// </summary>
+    public static string SlotLineText(string tooltipSubtitle, string key)
+    {
+        if (!string.IsNullOrWhiteSpace(tooltipSubtitle))
+            return tooltipSubtitle;
+        return string.IsNullOrEmpty(key) ? string.Empty : KeyBadgeText(key);
+    }
+
+    /// <summary>쿨타임 숫자 — <see cref="UiStrings.Seconds"/>(소수 최대 한 자리). 시계 아이콘은 옆 Image(<c>CooldownIcon</c>)다.</summary>
+    public static string CooldownText(float seconds) => UiStrings.Seconds(seconds, "0.#");
+
+    /// <summary>
+    /// 칩 폭들을 왼쪽 위부터 가로로 놓고 <paramref name="maxWidth"/> 를 넘으면 다음 줄로 넘긴다.
+    /// <paramref name="positions"/> = 칩 왼쪽 위(아래쪽이 음수), 폭이 <paramref name="maxWidth"/> 보다 큰 칩은 그 폭으로 줄인다(<paramref name="widths"/> 를 고친다).
+    /// 반환 = 전체 높이(칩 없으면 0).
+    /// </summary>
+    public static float FlowTags(List<float> widths, float maxWidth, float spacing, float rowHeight, List<Vector2> positions)
+    {
+        positions.Clear();
+        if (widths.Count == 0)
+            return 0f;
+
+        maxWidth = Mathf.Max(1f, maxWidth);
+        float x = 0f;
+        float y = 0f;
+        for (int i = 0; i < widths.Count; i++)
+        {
+            float width = Mathf.Min(widths[i], maxWidth);
+            widths[i] = width;
+            if (x > 0f && x + width > maxWidth)
+            {
+                x = 0f;
+                y -= rowHeight + spacing;
+            }
+
+            positions.Add(new Vector2(x, y));
+            x += width + spacing;
+        }
+
+        return -y + rowHeight;
+    }
+
+    private void RefreshTags(string tagIds)
+    {
+        if (tagRow == null || tagChipTemplate == null)
+            return;
+
+        if (!string.Equals(parsedTagIds, tagIds, System.StringComparison.Ordinal))
+        {
+            parsedTagIds = tagIds;
+            // 테이블 Play·빌드는 검증에서 막는다. 인스펙터 값이 틀렸으면 아는 태그만 그리고 경고 한 번.
+            if (!SkillTooltipTags.TryParse(tagIds, tags, out string tagError) && !loggedTagError)
+            {
+                loggedTagError = true;
+                Debug.LogWarning($"[SkillTooltip] {source?.TooltipValueSource?.name}: {tagError}", source?.TooltipValueSource);
+            }
+        }
+
+        while (tagChips.Count < tags.Count)
+        {
+            RectTransform chip = Instantiate(tagChipTemplate, tagRow);
+            chip.name = tagChipTemplate.name + "_" + tagChips.Count;
+            tagChips.Add(chip);
+        }
+
+        tagWidths.Clear();
+        for (int i = 0; i < tagChips.Count; i++)
+        {
+            bool used = i < tags.Count;
+            tagChips[i].gameObject.SetActive(used);
+            if (!used)
+                continue;
+
+            TMP_Text label = tagChips[i].GetComponentInChildren<TMP_Text>(true);
+            string text = SkillTooltipTags.Name(tags[i]).Text;
+            float width = tagChipPadding * 2f;
+            if (label != null)
+            {
+                label.text = text;
+                width += label.GetPreferredValues(text).x;
+            }
+            tagWidths.Add(width);
+        }
+
+        float rowHeight = tagChipTemplate.rect.height;
+        float height = FlowTags(tagWidths, tagRow.rect.width, tagSpacing, rowHeight, tagPositions);
+        for (int i = 0; i < tags.Count; i++)
+        {
+            RectTransform chip = tagChips[i];
+            chip.anchorMin = chip.anchorMax = chip.pivot = new Vector2(0f, 1f);
+            chip.anchoredPosition = tagPositions[i];
+            chip.sizeDelta = new Vector2(tagWidths[i], rowHeight);
+        }
+
+        tagRow.gameObject.SetActive(tags.Count > 0);
+        if (headerLayout != null)
+        {
+            float tagBottom = -tagRow.anchoredPosition.y + height + headerBottomPadding;
+            float headerHeight = Mathf.Max(headerMinHeight, tags.Count > 0 ? tagBottom : 0f);
+            headerLayout.minHeight = headerHeight;
+            headerLayout.preferredHeight = headerHeight;
+        }
+    }
 
     /// <summary>툴팁 문구 오류 표시({error} = 포매터 오류 — 개발용 문장이라 번역하지 않는다).</summary>
     public static string ErrorText(string error) =>
