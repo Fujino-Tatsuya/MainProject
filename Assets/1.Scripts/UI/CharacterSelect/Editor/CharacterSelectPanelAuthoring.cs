@@ -452,32 +452,100 @@ public static class CharacterSelectPanelAuthoring
         button.targetGraphic = image;
         // 뒤로가기와 같다 — None 이면 클릭해도 EventSystem 선택이 남지 않아 다음 Enter/Space 가 두 번 먹지 않는다.
         button.navigation = new Navigation { mode = Navigation.Mode.None };
-        UiTriangleRaycastFilter filter = chevron.GetComponent<UiTriangleRaycastFilter>();
-        if (filter == null)
-            filter = chevron.AddComponent<UiTriangleRaycastFilter>(); // 기본 꼭짓점 = chevron.png 삼각형
-        AddChevronHoverOutline(chevron, button, filter);
+        if (chevron.GetComponent<UiTriangleRaycastFilter>() == null)
+            chevron.AddComponent<UiTriangleRaycastFilter>(); // 기본 꼭짓점 = chevron.png 삼각형
+        AddChevronHoverOutline(chevron, button);
         return button;
     }
 
     const string ChevronOutlineName = "Outline_Hover";
 
+    // hover 링(할 일 109 후속) — chevron.png 알파 실루엣을 두르는 흰 링을 구운 PNG(생성물 · git). 원본 아트·.meta 는 건드리지 않는다.
+    public const string ChevronRingPath = "Assets/2.Prefabs/UI/Textures/CharacterSelectChevronHoverRing.png";
+    public const float ChevronRingThickness = 9f; // 화면 px(1920×1080 기준 캔버스)
+    public const float ChevronRingGap = 3f; // 화면 px — 실루엣 가장자리에서 링 안쪽 가장자리까지
+
     /// <summary>
-    /// hover 흰 아웃라인 — 자식 <see cref="UiTriangleOutline"/>(클릭 삼각형을 두르는 선, 기본 꺼짐) + 셰브론의 <see cref="UiHoverOutline"/>.
-    /// 이미 있으면 두께·색 등 손댄 값은 두고 연결만 맞춘다.
+    /// 링 PNG 를 다시 굽고(<see cref="ChevronRingThickness"/>·<see cref="ChevronRingGap"/>, 기준 표시 크기 = 패널 셰브론 rect)
+    /// 패널 프리팹의 <c>Content/Chevron/Outline_Hover</c> 를 그 링 Image 로 맞춘다. 같은 입력 → 같은 PNG.
     /// </summary>
-    static void AddChevronHoverOutline(GameObject chevron, Button button, UiTriangleRaycastFilter filter)
+    [MenuItem("Tools/UI/Authoring/Character Select Chevron Hover Ring (굽기·연결)")]
+    public static void BakeAndApplyChevronHoverRing()
     {
-        Transform existing = chevron.transform.Find(ChevronOutlineName);
-        UiTriangleOutline outline = existing != null ? existing.GetComponent<UiTriangleOutline>() : null;
-        if (outline == null)
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            RectTransform rect = existing != null ? (RectTransform)existing : NewRect(ChevronOutlineName, chevron.transform);
-            Stretch(rect);
-            outline = rect.gameObject.AddComponent<UiTriangleOutline>();
-            outline.color = Color.white;
+            Debug.LogError($"{Tag} Play 중에는 실행하지 않는다 — 먼저 정지할 것.");
+            return;
         }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+        try
+        {
+            Transform chevron = root.transform.Find("Content/Chevron");
+            if (chevron == null)
+            {
+                Debug.LogError($"{Tag} {PanelPath} 에 Content/Chevron 이 없다.");
+                return;
+            }
+
+            Sprite ring = BakeChevronHoverRing(((RectTransform)chevron).rect.size);
+            if (ring == null)
+                return;
+            MakeChevronButton(chevron.gameObject);
+            PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool success);
+            Debug.Log($"{Tag} 셰브론 hover 링 연결 {(success ? "성공" : "실패")}: {PanelPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// chevron.png 실루엣 링을 <see cref="ChevronRingPath"/> 에 굽는다. <paramref name="displaySize"/> = 셰브론이 캔버스(1920×1080 기준)에 보이는 크기 —
+    /// 두께·간격을 그 화면 px 로 맞춘다.
+    /// </summary>
+    public static Sprite BakeChevronHoverRing(Vector2 displaySize, float thickness = ChevronRingThickness, float gap = ChevronRingGap)
+    {
+        Sprite ring = UiSilhouetteRingBaker.Bake(ArtDir + "chevron.png", ChevronRingPath, displaySize, thickness, gap, out float margin);
+        if (ring != null)
+            Debug.Log($"{Tag} 셰브론 hover 링 굽기: {ChevronRingPath} {ring.texture.width}x{ring.texture.height} — 두께 {thickness}px · 간격 {gap}px · " +
+                      $"기준 표시 {displaySize} · 여백 {margin}px");
+        return ring;
+    }
+
+    /// <summary>
+    /// hover 흰 아웃라인 — 자식 <c>Outline_Hover</c>(구운 실루엣 링 Image, 셰브론 rect 를 링 여백만큼 사방으로 늘림, 기본 꺼짐) + 셰브론의 <see cref="UiHoverOutline"/>.
+    /// 링 PNG 가 없으면 굽는다. 링 모양·rect 는 매번 맞추고, 색은 이미 있으면 둔다. 구 <c>UiTriangleOutline</c>(스크립트 삭제됨)는 걷어 낸다.
+    /// </summary>
+    static void AddChevronHoverOutline(GameObject chevron, Button button)
+    {
+        var chevronRect = (RectTransform)chevron.transform;
+        Sprite ring = AssetDatabase.LoadAssetAtPath<Sprite>(ChevronRingPath);
+        if (ring == null)
+            ring = BakeChevronHoverRing(chevronRect.rect.size);
+        if (ring == null)
+            return;
+
+        Transform existing = chevron.transform.Find(ChevronOutlineName);
+        RectTransform rect = existing != null ? (RectTransform)existing : NewRect(ChevronOutlineName, chevron.transform);
+        GameObjectUtility.RemoveMonoBehavioursWithMissingScript(rect.gameObject);
+        foreach (Graphic other in rect.GetComponents<Graphic>())
+            if (!(other is Image))
+                Object.DestroyImmediate(other);
+
+        Stretch(rect);
+        Vector2 margin = (NativeSize(ring) - chevronRect.rect.size) * 0.5f; // 링은 셰브론 가운데 정렬
+        rect.offsetMin = -margin;
+        rect.offsetMax = margin;
+
+        Image outline = rect.GetComponent<Image>();
+        if (outline == null)
+            outline = AddImage(rect.gameObject, ring, Color.white);
+        outline.sprite = ring;
+        outline.type = Image.Type.Simple;
+        outline.preserveAspect = false;
         outline.raycastTarget = false; // hover·클릭 영역은 셰브론 삼각형만
-        outline.Shape = filter;
 
         UiHoverOutline hover = chevron.GetComponent<UiHoverOutline>();
         if (hover == null)

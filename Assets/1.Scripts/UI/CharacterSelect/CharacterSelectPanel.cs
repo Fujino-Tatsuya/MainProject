@@ -333,7 +333,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
     }
 
-    /// <summary>겉모습(카드 모양·이름판·잠금 문구)을 논리 포커스에 맞춘다. 자리·크기·테두리는 SnapLayout/AnimateLayout.</summary>
+    /// <summary>겉모습(카드 모양·이름판·잠금 문구·셰브론 hover 아웃라인 잠금)을 논리 포커스에 맞춘다. 자리·크기·테두리는 SnapLayout/AnimateLayout.</summary>
     private void Redraw()
     {
         int count = _cards.Count;
@@ -362,6 +362,10 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             lockedText.color = lockedTextColor;
             lockedText.rectTransform.localScale = Vector3.one;
         }
+
+        // 잠금 중엔 셰브론 hover 아웃라인을 끈다 — 버튼은 interactable 그대로(클릭 = Confirm → Locked → 잠금 문구 강조).
+        if (confirmButton != null && confirmButton.TryGetComponent(out UiHoverOutline confirmHover))
+            confirmHover.Blocked = Rules.IsLocked;
     }
 
     private void UpdateLockedPulse()

@@ -109,7 +109,18 @@
   꼭짓점 3개 = 인스펙터(rect 정규화 좌표, 0,0 = 왼쪽 아래 — rect 크기·pivot 이 바뀌어도 맞음, rect 밖 값 가능). 기본 (-0.04, 0.5)·(1, 1)·(1, 0):
   chevron.png 빗변 두 줄을 늘인 교점(끝이 둥글어 rect 왼쪽 7.5px 바깥)과 오른쪽 모서리 — 그림 픽셀이 전부 안에 들고 끝 둥근 곳 바깥 98픽셀만 더 잡힌다.
   셰브론을 고른 채 씬 뷰에서 하늘색 삼각형 기즈모로 보인다. 판정 = 순수 `UiTriangleRaycastFilter.Contains`(변·꼭짓점 위 = 안).
-- **hover 흰 아웃라인**(할 일 109 후속): 셰브론의 `UiHoverOutline` 이 Pointer Enter/Exit(삼각형 필터를 거친 레이캐스트)로 자식 `Outline_Hover`(`UiTriangleOutline` — 필터 삼각형 바깥을 두르는 선, 텍스처 없음·Raycast Target 끔, 기본 꺼짐)를 켜고 끈다. 기본 두께 6px·간격 3px·흰색(`Outline_Hover` 인스펙터), Button 이 interactable 일 때만(`onlyWhenInteractable`), 비활성화 때 끔. 잠금(준비 중)은 interactable 을 끄지 않아 잠금 중에도 hover 아웃라인이 켜진다.
+- **hover 흰 아웃라인**(할 일 109 후속): 셰브론의 `UiHoverOutline` 이 Pointer Enter/Exit(삼각형 필터를 거친 레이캐스트 — hover 판정은 계속 삼각형)로
+  자식 `Outline_Hover` 를 켜고 끈다. Button 이 interactable 일 때만(`onlyWhenInteractable`), 비활성화 때 끔.
+  - **모양 = chevron.png 실제 알파 실루엣**(왼쪽 둥근 끝 포함)을 두르는 흰 링. `Outline_Hover` = `Image`(스프라이트 `Assets/2.Prefabs/UI/Textures/CharacterSelectChevronHoverRing.png`,
+    흰색, Raycast Target 끔, 기본 꺼짐) — rect 는 셰브론 rect 를 링 여백(13px)만큼 사방으로 늘린 것(앵커 stretch, offset ±13). 링은 셰브론 픽셀과 겹치지 않아 자식으로 위에 그려도 셰브론을 가리지 않는다.
+  - **굽기** = 메뉴 `Tools/UI/Authoring/Character Select Chevron Hover Ring (굽기·연결)`(`CharacterSelectPanelAuthoring.BakeAndApplyChevronHoverRing`) —
+    `UiSilhouetteRingBaker.Bake(원본 png, 출력 png, 기준 표시 크기, 두께, 간격)` 로 PNG 를 다시 굽고 패널 프리팹 `Outline_Hover` 를 맞춘다. `(재생성)` 메뉴도 같은 구성(링 PNG 가 있으면 그대로 쓰고 없으면 굽는다).
+    원본은 `chevron.png` 파일 바이트를 직접 읽는다(SVN 아트 Read/Write 꺼짐 — .meta 무수정). 런타임 생성 없음. 같은 입력 → 같은 픽셀(EditMode 테스트가 다시 구워 비교).
+  - 값 = `CharacterSelectPanelAuthoring.ChevronRingThickness` **9px**·`ChevronRingGap` **3px** — 셰브론 **표시 크기 기준 화면 px**(1920×1080 기준 캔버스, 기준 표시 크기 = 셰브론 rect 190×659).
+    텍스처 px = 화면 px × (원본 텍스처 폭 / 표시 폭) — 지금은 1:1 이라 링 PNG 216×685(원본 190×659 + 사방 13), PPU 100. 실루엣 = 알파 ≥ 128, 링 가장자리 1px 안티에일리어싱.
+    두께·간격을 바꾸려면 상수를 고치고 굽기 메뉴를 다시 돌린다(테스트가 PNG 와 상수를 대조한다).
+  - **잠금(준비 중) 동안은 켜지 않는다** — 패널 `Redraw`(Show·SetLocked 경로)가 `UiHoverOutline.Blocked = Rules.IsLocked` 를 넣는다. hover 중에 잠기면 바로 꺼지고, 풀리면 바로 켜진다.
+    Button 은 interactable 그대로라 잠금 중 클릭 = `Confirm()` → Locked → 잠금 문구 강조.
 
 ### 길게 누르기(키 반복, 할 일 60·60.1)
 판단 = `CharacterSelectKeyRepeat`(순수). 패널은 매 프레임 "뒤로(W·↑·A·←) / 앞으로(S·↓·D·→) 중 하나라도 눌려 있는가"(`isPressed`)와 `Time.unscaledTime` 을 넘기고, 돌려받은 칸(-1·0·+1)만큼 `MoveFocus` 한다.
