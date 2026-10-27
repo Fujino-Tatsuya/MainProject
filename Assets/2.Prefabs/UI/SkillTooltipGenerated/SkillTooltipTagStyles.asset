@@ -12,30 +12,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 306b4dd53e5d9344698664edbd1da6d0, type: 3}
   m_Name: SkillTooltipTagStyles
   m_EditorClassIdentifier: Assembly-CSharp::SkillTooltipTagStyles
-  defaultBackground: '#3A3F4A'
-  defaultText: '#E3E6EB'
+  defaultBackground: '#2A2E36E6'
+  defaultText: '#C9CED6'
   entries:
   - tagId: Knockback
-    background: '#9A5418'
-    text: '#FFE3C4'
+    background: '#3D2A12E6'
+    text: '#F2B84B'
   - tagId: Stun
-    background: '#7E6B10'
-    text: '#FFF2A8'
+    background: '#38330EE6'
+    text: '#EEDC5A'
   - tagId: Vulnerable
-    background: '#8C2A5E'
-    text: '#FFD3EA'
+    background: '#3D1530E6'
+    text: '#FF8FCF'
   - tagId: Shield
-    background: '#255C9C'
-    text: '#D6E8FF'
+    background: '#13294AE6'
+    text: '#7FB8FF'
   - tagId: Heal
-    background: '#2A6E36'
-    text: '#CFF7D6'
+    background: '#14351CE6'
+    text: '#7EE08F'
   - tagId: Overheat
-    background: '#A12C22'
-    text: '#FFD6CF'
+    background: '#45160FE6'
+    text: '#FF7B63'
   - tagId: Unstoppable
-    background: '#5E3596'
-    text: '#E6D6FF'
+    background: '#2A1A45E6'
+    text: '#C29BFF'
   - tagId: Invulnerable
-    background: '#B8BEC8'
-    text: '#14171D'
+    background: '#2E3238E6'
+    text: '#E8ECF2'

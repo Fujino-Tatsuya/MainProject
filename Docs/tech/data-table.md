@@ -220,6 +220,7 @@ GameData.xlsx (SVN, 잠금)
 
 - 새 태그 = 프로그래머가 `SkillTooltipTag` 에 한 줄 + `SkillTooltipTags` ko 이름 한 줄 → 병합 Export 로 Strings 행이 생긴다. 색 줄은 아래 `UI` 시트(없으면 기본색 + 경고).
   칩 배경 = 둥근 사각형 9-slice `Assets/2.Prefabs/UI/Textures/SkillTooltipTagChip.png`(저작 메뉴가 한 번 구운 흰 PNG · 64px · 반지름 22px · 보더 24px · PPU 200, Image Type Sliced). 기획 이미지가 나오면 이 스프라이트만 바꾼다.
+  칩 테두리 = 자식 `Ring` Image(같은 규격의 흰 둥근 링 9-slice `SkillTooltipTagChipRing.png`, Sliced, Raycast 끔) — **색은 그 태그의 글자색**(따로 칸 없음). 두께 기본 3.5px(= 1.75 UI 단위, 칩 높이 26 의 약 6.7%). 바꾸려면 `Tools/UI/스킬 툴팁 태그 칩 테두리 두께` 에서 고르고 **다시 굽기**(PNG 를 그 자리에 다시 써 guid 유지 — 프리팹 수정 없음, 두께는 링 `.meta` userData 에 기록). UI `Outline` 컴포넌트는 모서리가 어긋나 쓰지 않는다.
 
 ### 태그 칩 색 — `UI` 시트 (할 일 114 후속)
 
@@ -227,28 +228,29 @@ GameData.xlsx (SVN, 잠금)
 
 | 행 | 예 | 의미 |
 |---|---|---|
-| `defaultBackground` · `defaultText` | `#3A3F4A` · `#E3E6EB` | 표에 줄이 없는 태그의 색 |
+| `defaultBackground` · `defaultText` | `#2A2E36E6` · `#C9CED6` | 표에 줄이 없는 태그의 색 |
 | `entries[i].tagId` | `Knockback` | 태그 ID(`SkillTooltipTag` 이름, 대소문자 무관) |
-| `entries[i].background` | `#9A5418` | 칩 배경 |
-| `entries[i].text` | `#FFE3C4` | 칩 글자 |
+| `entries[i].background` | `#3D2A12E6` | 칩 배경 |
+| `entries[i].text` | `#F2B84B` | 칩 글자 **+ 둥근 테두리** |
 
 - 색 = **`#RRGGBB` 또는 `#RRGGBBAA`**(16진수, `#` 필수, 대소문자 무관). 색 이름(`red`)·3자리 축약·빈 칸은 **오류**(테이블 Play·빌드 중단, 셀 위치 표시). 파서 `HexColor`.
 - 없는 태그 ID·빈 ID·같은 태그 두 줄 = 오류. **줄이 없는 태그 = 경고**(기본색으로 그린다). 인스펙터 모드는 경고 한 번 + 기본색.
 - 줄 수(배열 크기)는 xlsx 에서 못 바꾼다(§3) — 새 태그를 넣으면 프로그래머가 에셋 `entries` 를 한 줄 늘린다(EditMode 테스트 `ProjectAsset_CoversEveryTag_WithoutErrors` 가 잡는다).
 - 에셋이 없으면 `Tools/UI/스킬 툴팁 레이아웃만 갱신` 이 기본 색으로 만들고 툴팁(`SkillTooltipView.tagStyles`)에 잇는다. 있으면 값은 건드리지 않는다.
 
-기본 색 초안(2026-10-27, 어두운 패널 위 — 글자 대비 4.5:1 이상을 테스트가 확인):
+기본 색 초안(2026-10-27 2차 — 배경 = 같은 계열 어두운 반투명(알파 `E6`), 글자·테두리 = 같은 계열 밝은 색. 반투명 배경은 툴팁 패널 `#090B11` 위에 합성한 색으로 글자 대비 4.5:1 이상을 테스트가 확인 — 초안·프로젝트 에셋 둘 다):
 
-| 태그 | 배경 | 글자 |
+| 태그 | 배경 | 글자·테두리 |
 |---|---|---|
-| Knockback 넉백 | `#9A5418` | `#FFE3C4` |
-| Stun 기절 | `#7E6B10` | `#FFF2A8` |
-| Vulnerable 취약 | `#8C2A5E` | `#FFD3EA` |
-| Shield 보호막 | `#255C9C` | `#D6E8FF` |
-| Heal 회복 | `#2A6E36` | `#CFF7D6` |
-| Overheat 과열 | `#A12C22` | `#FFD6CF` |
-| Unstoppable 저지불가 | `#5E3596` | `#E6D6FF` |
-| Invulnerable 무적 | `#B8BEC8` | `#14171D` |
+| Knockback 넉백 | `#3D2A12E6` | `#F2B84B` |
+| Stun 기절 | `#38330EE6` | `#EEDC5A` |
+| Vulnerable 취약 | `#3D1530E6` | `#FF8FCF` |
+| Shield 보호막 | `#13294AE6` | `#7FB8FF` |
+| Heal 회복 | `#14351CE6` | `#7EE08F` |
+| Overheat 과열 | `#45160FE6` | `#FF7B63` |
+| Unstoppable 저지불가 | `#2A1A45E6` | `#C29BFF` |
+| Invulnerable 무적 | `#2E3238E6` | `#E8ECF2` |
+| (기본색 — 표에 없음) | `#2A2E36E6` | `#C9CED6` |
 - 이 행은 새 필드라 병합 Export 전까지 시트에 없다 — 그동안은 SO 값(지금 전부 빈 칸 = 태그 없음)으로 돈다(§3).
 
 ### 툴팁 배치 (할 일 114)

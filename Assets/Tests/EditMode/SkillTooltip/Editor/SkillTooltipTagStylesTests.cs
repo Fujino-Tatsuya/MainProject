@@ -63,15 +63,47 @@ public sealed class SkillTooltipTagStylesTests
         Assert.That(styles.Select(s => s.Background.ToUpperInvariant()).Distinct().Count(), Is.EqualTo(styles.Length));
     }
 
+    // 반투명 배경은 툴팁 패널 색 위에 합성한 색으로 잰다. 테두리 = 글자색이라 글자 대비가 곧 테두리 대비다.
     [Test]
     public void DefaultStyles_TextIsReadableOnBackground()
     {
         foreach (SkillTooltipTagStyle style in SkillTooltipTagStyles.DefaultStyles())
-        {
-            HexColor.TryParse(style.Background, out Color32 bg, out _);
-            HexColor.TryParse(style.Text, out Color32 fg, out _);
-            Assert.That(ContrastRatio(bg, fg), Is.GreaterThanOrEqualTo(4.5), style.TagId); // WCAG AA 본문
-        }
+            AssertReadable(style.Background, style.Text, style.TagId);
+        AssertReadable(SkillTooltipTagStyles.DefaultBackgroundHex, SkillTooltipTagStyles.DefaultTextHex, "기본색");
+    }
+
+    [Test]
+    public void ProjectAsset_TextIsReadableOnBackground()
+    {
+        var styles = AssetDatabase.LoadAssetAtPath<SkillTooltipTagStyles>(AssetPath);
+        Assert.That(styles, Is.Not.Null, AssetPath);
+        foreach (SkillTooltipTagStyle style in styles.Entries)
+            AssertReadable(style.Background, style.Text, style.TagId);
+        AssertReadable(styles.DefaultBackground, styles.DefaultText, "기본색");
+    }
+
+    [Test]
+    public void OverPanel_CompositesAlpha()
+    {
+        Color32 panel = new Color32(0x10, 0x20, 0x30, 0xFF);
+        Assert.That(OverPanel(new Color32(0xFF, 0x00, 0x00, 0xFF), panel), Is.EqualTo(new Color32(0xFF, 0x00, 0x00, 0xFF)));
+        Assert.That(OverPanel(new Color32(0xFF, 0x00, 0x00, 0x00), panel), Is.EqualTo(panel));
+        Assert.That(OverPanel(new Color32(0xFF, 0xFF, 0xFF, 0x80), new Color32(0x00, 0x00, 0x00, 0xFF)).r, Is.EqualTo(0x80));
+    }
+
+    private static void AssertReadable(string background, string text, string label)
+    {
+        Assert.That(HexColor.TryParse(SkillTooltipTagStyles.TooltipPanelHex, out Color32 panel, out _), Is.True);
+        Assert.That(HexColor.TryParse(background, out Color32 bg, out _), Is.True, label);
+        Assert.That(HexColor.TryParse(text, out Color32 fg, out _), Is.True, label);
+        Assert.That(ContrastRatio(OverPanel(bg, panel), fg), Is.GreaterThanOrEqualTo(4.5), label); // WCAG AA 본문
+    }
+
+    private static Color32 OverPanel(Color32 color, Color32 panel)
+    {
+        float a = color.a / 255f;
+        byte Mix(byte c, byte p) => (byte)Mathf.RoundToInt(c * a + p * (1f - a));
+        return new Color32(Mix(color.r, panel.r), Mix(color.g, panel.g), Mix(color.b, panel.b), 0xFF);
     }
 
     [Test]

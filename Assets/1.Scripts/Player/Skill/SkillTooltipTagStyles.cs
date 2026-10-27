@@ -49,12 +49,12 @@ public sealed class SkillTooltipTagStyle
 [DataTableSheet("UI", Order = 0)]
 public sealed class SkillTooltipTagStyles : ScriptableObject
 {
-    public const string DefaultBackgroundHex = "#3A3F4A";
-    public const string DefaultTextHex = "#E3E6EB";
+    public const string DefaultBackgroundHex = "#2A2E36E6";
+    public const string DefaultTextHex = "#C9CED6";
 
     /// <summary>색 문자열마저 틀렸을 때(인스펙터 모드) 쓰는 마지막 기본값.</summary>
-    public static readonly Color32 FallbackBackground = new Color32(0x3A, 0x3F, 0x4A, 0xFF);
-    public static readonly Color32 FallbackText = new Color32(0xE3, 0xE6, 0xEB, 0xFF);
+    public static readonly Color32 FallbackBackground = new Color32(0x2A, 0x2E, 0x36, 0xE6);
+    public static readonly Color32 FallbackText = new Color32(0xC9, 0xCE, 0xD6, 0xFF);
 
     [Header("기본색 — 표에 없는 태그")]
     [SerializeField, DataTableText(Localize = false), HexColorText]
@@ -114,20 +114,23 @@ public sealed class SkillTooltipTagStyles : ScriptableObject
     }
 
     /// <summary>
-    /// 기본 색 초안(2026-10-27) — 어두운 툴팁 패널(#090B11) 위에서 서로 다른 색상환 자리 + 밝은 글자.
-    /// 무적만 밝은 회색 배경 + 어두운 글자로 눈에 띄게 했다.
+    /// 기본 색 초안(2026-10-27 2차, 참고 이미지 '넉백') — 배경 = 같은 계열 어두운 반투명(알파 E6), 글자·둥근 테두리 = 같은 계열 밝은 색.
+    /// 테두리는 따로 칸이 없고 글자색을 쓴다. 대비는 툴팁 패널(<see cref="TooltipPanelHex"/>) 위에 합성한 배경 기준.
     /// </summary>
     public static SkillTooltipTagStyle[] DefaultStyles() => new[]
     {
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Knockback), "#9A5418", "#FFE3C4"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Stun), "#7E6B10", "#FFF2A8"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Vulnerable), "#8C2A5E", "#FFD3EA"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Shield), "#255C9C", "#D6E8FF"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Heal), "#2A6E36", "#CFF7D6"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Overheat), "#A12C22", "#FFD6CF"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Unstoppable), "#5E3596", "#E6D6FF"),
-        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Invulnerable), "#B8BEC8", "#14171D"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Knockback), "#3D2A12E6", "#F2B84B"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Stun), "#38330EE6", "#EEDC5A"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Vulnerable), "#3D1530E6", "#FF8FCF"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Shield), "#13294AE6", "#7FB8FF"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Heal), "#14351CE6", "#7EE08F"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Overheat), "#45160FE6", "#FF7B63"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Unstoppable), "#2A1A45E6", "#C29BFF"),
+        new SkillTooltipTagStyle(nameof(SkillTooltipTag.Invulnerable), "#2E3238E6", "#E8ECF2"),
     };
+
+    /// <summary>칩이 놓이는 툴팁 패널 색(CombatHUD › SkillTooltipHost/Panel, 알파 0.97 은 무시) — 반투명 배경 대비 계산용.</summary>
+    public const string TooltipPanelHex = "#090B11";
 
     /// <summary>
     /// 표 전체 검사(순수 로직). 오류 = 빈·없는 태그 ID, 같은 ID 두 줄, 잘못된 색 문자열. 경고 = 표에 줄이 없는 태그(기본색으로 그린다).
