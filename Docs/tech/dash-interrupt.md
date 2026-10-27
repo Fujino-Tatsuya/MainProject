@@ -178,6 +178,34 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 
 - 승인 로그는 기존 `[Skill] Interrupt 시작(대쉬 간파 — 대시에 실림) — …`, 상체 레이어 누락 경고는 `[Dash]` 태그다.
 
+## 10.1 간파 제작용 디버그 씬 — `DebugInterruptLab` (C5, 설계안 §13)
+
+간파·대쉬 간파 타이밍을 느린 배속으로 보고 같은 허수아비에 반복해 넣어 보는 씬이다. **빌드 목록에 없다** — Dev Boot 가 Play 동안만 잠깐 넣었다 뺀다.
+
+**진입**: 메인 툴바 Dev Boot 씬 드롭다운 → `DebugInterruptLab` 선택 → Dev Boot ▶. (`Dev_Boot` → 호스트 기동 → NGO 로 이 씬 로드 → 플레이어 스폰. 캐릭터는 툴바 캐릭터 드롭다운.) 씬을 직접 열고 Play 하면 NetworkManager 가 없어 동작하지 않는다.
+
+**씬에 둔 것** (부트에서 오는 NetworkManager·`GlobalTimeScale`·간파 연출 디렉터·GameManager·EffectManager·EventSystem·GameMenu 는 두지 않는다 — `TrainingDummy.unity` 와 같은 구성)
+
+| 오브젝트 | 이유 |
+|---|---|
+| `Plane`·`Directional Light` | 바닥·조명(`TrainingDummy.unity` 에서 복사). 스폰 지점은 두지 않는다 — `MapGenerator` 가 없으면 원점 + `spawn_Offset` 으로 폴백한다 |
+| `CameraSwitcher`(프리팹) | 카메라 리그. 카메라 매니저는 대상 씬 소속이라 씬마다 둔다 |
+| `PlayerDashValidationManager`(프리팹) | 대시 서버 검증 — 맵 씬마다 두는 매니저(대시·대쉬 간파에 필요) |
+| `FloatingDamageSpawner` | 씬 싱글턴 — 없으면 데미지 숫자가 안 뜬다 |
+| `TrainingDummy_1`·`_2`(`TrainingDummy.prefab`, (±2, 0, 5)) + `DebugDummyInterruptRecovery` | 간파 표적. HUD 는 플레이어 프리팹에 있어 따로 두지 않는다 |
+| `InterruptLab` + `DebugTimeScale` | 디버그 배속 |
+
+**배속** (`DebugTimeScale` — `InterruptLab` 오브젝트 인스펙터): 슬라이더 0.05~2, 프리셋 버튼 ×0.1/×0.25/×0.5/×1. Play 중 바로 반영되고 인스펙터에 지금 `Time.timeScale`·슬로우·기본 배속이 보인다.
+- `Time.timeScale` 을 직접 쓰지 않고 `GlobalTimeScale.BaseScale`(기본 배속, 기본 1)만 정한다. 최종 = **디렉터 슬로우 배율 × 디버그 배속**(`GlobalTimeScale.ComposeScale`). 슬로우가 없을 때도 기본 배속을 쓰고, 1 로 돌리면 1 로 돌아간다. 1 이면 이 기능이 없던 때와 동작이 완전히 같다.
+- 히트스톱은 슬로우 타임라인 안의 구간(`SlowMotionTimeline`)이라 같은 곱을 받는다. `GlobalTimeScale` 밖에서 `Time.timeScale` 을 쓰는 곳은 `GameManager`(타이틀 복귀)·`DemoSessionDirector`(세션 끊김) 의 `= 1` 두 곳뿐이고 둘 다 세션 종료 뒤라, 그 시점엔 `GlobalTimeScale` 도 세션 종료로 1 로 돌린다 — 충돌 없음.
+- 컴포넌트가 꺼지거나 씬이 내려가면 기본 배속을 1 로 되돌린다.
+- **한계**: 이 피어에만 적용된다(복제 안 함) — 솔로 호스트 전제. `NetworkClock.GameNow`(쿨다운·보스 타이머 등)는 슬로우만 빼고 기본 배속은 반영하지 않는다 — 느린 배속에서 GameNow 기준 타이머는 실시간으로 흐른다.
+
+**허수아비 회복** (`DebugDummyInterruptRecovery` — 각 허수아비 인스턴스): `회복 시간`(기본 2초) — 간파 성공 → 그 시간 뒤 인터럽트 가능(노랑)으로 돌아오고, 그 상태는 시간 제한 없이 유지된다.
+- 허수아비 코드는 그대로다. 순환이 이미 [취약 → idle → 인터럽트 가능(무기한)] 이라 이 컴포넌트는 `TrainingDummyInterrupt` 의 취약 = 회복 시간, idle = 0 으로 **씬 인스턴스 오버라이드**만 맞춘다(에디터, Play 밖). 회복 시간 전부가 취약(보라, CC 가능)이다.
+- 순환은 스폰 때 만들어진다 — Play 중 바꾼 값은 다음 Play 부터. 시간은 서버 `deltaTime` 이라 디버그 배속·슬로우를 따른다(×0.1 이면 실시간 20초).
+- 씬 오버라이드라 데이터 테이블 `Map` 시트 값이 이 두 인스턴스엔 닿지 않는다 — Verify 가 이 씬을 경고하는 것은 의도다.
+
 ## 11. 범위 밖
 
 - 116(간파 예측 로그)·117(성공 예측 연출)은 이 작업 범위 밖이다. 116 은 §5 의 예측 오프셋 값을 그대로 기록하면 된다.
@@ -196,4 +224,5 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 | `Assets/1.Scripts/Player/Skill/PlayerSkillBase.cs` | `OverlapHitboxAnchor(results, offset)` |
 | `Assets/1.Scripts/Player/PlayerInputBuffer.cs` · `PlayerInputReader.cs` | `TryGetRecordedTime` · `TryGetPressTime` |
 | `Assets/4.Animations/Player/{Garen,Assassin,Gunner}/*AnimatorController.controller` · `Garen/GarenUpperBody.mask` | `DashInterruptUpper` 레이어·팔라딘 상체 마스크 |
+| `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·테스트 `Editor/DebugInterruptLabTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |
 | 테스트 `Assets/1.Scripts/Player/Dash/Tests/EditMode/DashInterruptRulesTests.cs` · `DashInterruptLayerFadeTests.cs` · `Assets/1.Scripts/Player/Editor/PlayerSkillApprovalRulesTests.cs` · `PlayerInputBufferTests.cs` | 창 경계·0=끔·허용오차·판정 시점·입력 결정·승인 사전조건·가중치 전환·버퍼 기록 시각·양 순서 창·전환(쿨 무관·Hit 이후·이미 부착·서버 허용오차)·역방향 정규화 시각 |

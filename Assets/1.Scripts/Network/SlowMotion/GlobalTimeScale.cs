@@ -13,7 +13,8 @@ using UnityEngine;
 /// <item>발동·실패·리셋 판정은 서버만 한다. 서버는 자기 타임라인에 즉시 적용하고 named message 로 전원에 배포,
 ///       클라는 받은 이벤트를 같은 규칙(<see cref="SlowMotionSession"/>)으로 넣는다(D8). 프로필 값을 실어 보낸다.</item>
 /// <item>배율은 매 프레임 게임플레이보다 먼저 정한다. <see cref="Time.fixedDeltaTime"/> 은 건드리지 않는다(R3).
-///       슬로우가 없을 땐 <see cref="Time.timeScale"/> 에 쓰지 않는다 — 이 레이어가 올린 값을 1 로 돌려놓을 때만 쓴다.</item>
+///       슬로우가 없을 땐 <see cref="Time.timeScale"/> 에 쓰지 않는다 — 이 레이어가 올린 값을 1 로 돌려놓을 때만 쓴다.
+///       예외: 기본 배속(<see cref="BaseScale"/>, 디버그 전용) ≠ 1 이면 슬로우 없이도 그 값을 쓴다.</item>
 /// <item>컷신 잠금·씬 전환 중엔 발동을 거부하고, 진행 중이면 즉시 1.0(D11).</item>
 /// <item>세션 종료·비활성·파괴·앱 종료 시 1.0 과 타임라인 초기화(R6).</item>
 /// <item>시간 레이어만 맡는다 — 간파 슬로우 프로필·히트스톱 스위치는 <see cref="InterruptProductionDirector"/> 가 들고 넘긴다(할 일 118).</item>
@@ -51,8 +52,30 @@ public sealed class GlobalTimeScale : MonoBehaviour
     /// </summary>
     public event Action<uint> ForcedReset;
 
-    /// <summary>이번 프레임 배율. 슬로우 없음 = 1.</summary>
+    /// <summary>이번 프레임 슬로우 배율(기본 배속 미포함). 슬로우 없음 = 1.</summary>
     public float CurrentScale { get; private set; } = 1f;
+
+    /// <summary>기본 배속 하한. 0 이면 게임이 멈춰 되돌릴 입력도 못 받는다.</summary>
+    public const float MinBaseScale = 0.01f;
+
+    float _baseScale = 1f;
+
+    /// <summary>
+    /// 기본 배속 — 이 피어에서만 슬로우 배율에 곱한다(복제 안 함, 디버그 씬 <c>DebugTimeScale</c> 이 쓴다).
+    /// 최종 <see cref="Time.timeScale"/> = <see cref="CurrentScale"/> × 기본 배속(<see cref="ComposeScale"/>).
+    /// 1 이면 이 값이 없던 때와 완전히 같다. 세션이 돌 때만 적용되고, 세션이 끝나면 timeScale 은 1 로 돌아간다(값은 남는다).
+    /// </summary>
+    public float BaseScale
+    {
+        get => _baseScale;
+        set => _baseScale = Mathf.Max(MinBaseScale, value);
+    }
+
+    /// <summary>최종 배율 = 슬로우 배율 × 기본 배속.</summary>
+    public static float ComposeScale(float slowScale, float baseScale) => slowScale * Mathf.Max(MinBaseScale, baseScale);
+
+    /// <summary>이 레이어가 timeScale 을 1 이 아닌 값으로 잡아야 하는가 — 슬로우 진행 중이거나 기본 배속 ≠ 1.</summary>
+    public static bool IsLayerActive(bool slowActive, float baseScale) => slowActive || !Mathf.Approximately(baseScale, 1f);
     public SlowMotionPhase CurrentPhase { get; private set; } = SlowMotionPhase.None;
     public bool IsActive => CurrentPhase != SlowMotionPhase.None;
     /// <summary>마지막 슬로우의 발동 번호. 0 = 이번 세션에 없음.</summary>
@@ -262,13 +285,14 @@ public sealed class GlobalTimeScale : MonoBehaviour
         CurrentPhase = _session.PhaseAt(t);
         CurrentScale = CurrentPhase == SlowMotionPhase.None ? 1f : _session.ScaleAt(t);
 
-        if (CurrentPhase == SlowMotionPhase.None && !_ownsTimeScale)
+        bool layerActive = IsLayerActive(CurrentPhase != SlowMotionPhase.None, _baseScale);
+        if (!layerActive && !_ownsTimeScale)
         {
             return;
         }
 
-        Time.timeScale = CurrentScale;
-        _ownsTimeScale = CurrentPhase != SlowMotionPhase.None;
+        Time.timeScale = ComposeScale(CurrentScale, _baseScale);
+        _ownsTimeScale = layerActive;
     }
 
     private void EndSession()
