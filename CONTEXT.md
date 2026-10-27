@@ -8,6 +8,13 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **23호 제압 게이지 → 제압 칸 3칸**, 브랜치 `feature/SettingsDdol`) — 기준 `Re_C_전투시스템_20261014.md` §6 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 364/0 · ⏳ 경석 Play(기믹 중 칸 유지)
+- 23호: `float _counterGauge`(100, −20) → `NetworkVariable<int> _suppressSegmentsUsed`(사용한 칸). SO `suppressSegmentCount`=3 · `counterSegmentStep`=1 · `environmentSegmentStep`=1(벽·증기 벤트 둘 다 1칸 — 경석 확정). 0칸 = 제압, 제압 끝 = 다시 꽉 참. 판정 `BossCounterProgress.ResolveSegments`.
+- HUD: HP 바 밑 회색 게이지 `Detection_Fill` → `SuppressSegmentTemplate`(꺼 둠)를 칸 수만큼 복제해 806px 를 나눠 깐다. 찬 칸 = 원본 색, 빈 칸 = `suppressSegmentEmptyColor`, 오른쪽부터 빈다.
+- 훈련 스파링(TRAIN_03)은 이번 범위 밖 — 아직 `counterGaugeStep`/`environmentGaugeStep`(20%) 게이지로 칸 수(5)를 계산한다.
+- ✅ 10-27 경석 확정: **기믹 중 간파는 칸을 안 줄인다**(`IsInGimmick` = 차징·레이지·② 전력 공급·③ 구출·④ 자폭·릴레이·연쇄·북진 — 그로기·취약은 그대로) · **기믹 보상 제압(전력 공급 차단·북진 압박 파훼·구출·자폭 저지·연쇄 전부 성공·헛잡기)은 칸을 비우지도 다시 채우지도 않는다**(`EnterSuppress(fromSegments:false)`). 칸 0 으로 들어간 제압만 끝나고 꽉 채운다. 예외: 칸 0 예약이 기믹 보상 제압에 흡수되면 끝나고 채운다(0 에 갇힘 방지).
+- ⏸ 칸 비주얼: 지금은 게이지 바 3등분처럼 보인다 → 직사각형 칸으로 바뀔 예정(기획 회의 대기). 회의 전엔 손대지 않는다.
+
 ## ▶▶ 반영 (2026-10-26~27 · 경석(Claude) · **튜토리얼 4구역 진입 전 소개 연출**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-zone4-intro-cinematic.md](PLAN-zone4-intro-cinematic.md) ✅ 승인 · ✅ 구현·커밋 · 컴파일 0 · 전투 EditMode 356/0 · 튜토리얼 456/0 · ✅ 경석 Play 1인(연출·스킵·밝기·패널 외곽선·다리 실루엣 외곽선 반경 11.725m) · ⏳ MPPM(호스트+클라 타이밍·관전자 투표) · ⏳ xlsx `Cinematic` 시트 병합 Export · 핸드오프 [handoff-zone4-intro-cinematic.md](Docs/tech/handoff-zone4-intro-cinematic.md)
 - 10-27 경석 Play 반영: 스킵 = 중간보스(다리·중앙 섬) 샷을 0.8+1.2초 보여 주고 복귀 · 연출 중 디밍·LoS 줄이기(`FogManager.dimSuppress`) · 무전 캡션 화면 아래 28% + 등장 올라옴·배지 펄스 · 장치 대사 D 패널까지 유지 · 패널 화면 중앙 + 근접 외곽선 · 다리 = 화면 공간 실루엣 외곽선(`Zone/CinematicSilhouetteOutline`, 존 중심 반경 밖 버림) · Alt+5 뒤 연출이 사라지던 버그(스킵이 G7 을 지날 때만 보류 해제).
 - 커밋 제외(의도): `StringTable.asset`(Play 자동 추가 키) · `AddressableAssetSettings.asset` · `GroupPainter/*.json` · `Dev/Editor/PlayModeHangTracer`·`PlaySessionLogRecorder` · `SettingsPreviewCapture` · `raid-23-phases.html`.

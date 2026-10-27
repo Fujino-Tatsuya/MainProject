@@ -70,13 +70,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // 🔴 배열이다. 텔레그래프는 **여러 개가 동시에** 붙는다(방향 표시 링 + 전신 틴트 + 나중에 VFX).
     //    하나만 집으면(GetComponentInChildren<T> 단일) 나머지가 조용히 안 돈다.
     IBossTelegraph[] _telegraphs;
-    // 간파 게이지 100 → 0(팀 기획 09-28). 전 피어 복제 — HUD 회색 바가 읽는다. 예전 성공 횟수(_counterGroggyCount)를 대체.
-    readonly NetworkVariable<float> _counterGauge = new NetworkVariable<float>(
-        BossCounterProgress.GaugeMax,
+    // 제압 칸 — **사용한** 칸 수(전투 시스템 명세 10-14 §6). 전 피어 복제 — HUD 칸 줄이 읽는다. 예전 간파 게이지(100 → 0)를 대체.
+    // 남은 칸이 아니라 사용한 칸을 들고 있어야 0 = 꽉 참이라 스폰 시 SO 값으로 초기화할 필요가 없다.
+    readonly NetworkVariable<int> _suppressSegmentsUsed = new NetworkVariable<int>(
+        0,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
     bool _suppressed;        // [서버] 제압 중 — 그로기 이탈 시 종료(TickSuppressExit)
-    bool _pendingSuppress;   // [서버] 필수 기믹 중 게이지 0 → 기믹이 끝나면 제압(TryConsumePendingSuppress)
+    bool _pendingSuppress;   // [서버] 필수 기믹 중 칸 0 → 기믹이 끝나면 제압(TryConsumePendingSuppress)
+    bool _suppressRefillsSegments;   // [서버] 이번 제압이 끝나면 칸을 다시 채우는가(false = 기믹 보상 제압 — 칸 유지)
 
     /// <summary>보스 데이터(읽기 전용). 방향 표시기가 각도를 판정과 **같은 출처**에서 읽기 위해 노출한다.</summary>
     public BossDataSO Data => _boss;
@@ -4896,7 +4898,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     public bool IsRaidRescueHold => _raidRescueActive || _raidRescueNext.HasValue;
 
     // ─── ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 ─────────────────────────
-    // 게이지 = 간파 게이지(_counterGauge) 재사용 — 보스 HP 바 아래에 이미 보인다(BossHealthHUD). 새 UI 없음.
+    // 예전엔 간파 게이지를 재사용했다 — 지금은 체력바 실드(아래 팀장 10-19). 제압 칸과 무관.
     void StartSelfDestructInPlace()
     {
         // 애니메이션만 — 몸 주변 전기 구슬(StartChargeBallClientRpc)은 띄우지 않는다(팀장 10-19).
@@ -6023,7 +6025,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (IsServer && RaidGimmickDamageImmune && IsFromPlayer(hitContext))
             attackInfo.damage = 0;
 
-        // 취약 중 간파 스킬 = 방향 무관 넉백(간파 성공 아님 · 게이지·취약시간 불변 — 기획 취약 §4.4). 필수 기믹 중엔 피해만.
+        // 취약 중 간파 스킬 = 방향 무관 넉백(간파 성공 아님 · 칸·취약시간 불변 — 기획 취약 §4.4). 필수 기믹 중엔 피해만.
         // 점프 체인 중엔 넉백 없이 피해만(IsInJumpChain — 이륙·공중·착지 모두 끊기지 않는다, 팀장 09-29).
         bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence && !IsInJumpChain;
 
@@ -6198,11 +6200,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     }
 
     /// <summary>
-    /// [서버] **간파 성공.** 간파 게이지를 깎고, 남으면 그로기 1.5초, 0 이면 제압(팀 기획 09-28 — 간파 §7).
+    /// [서버] **간파 성공.** 제압 칸을 1칸 줄이고, 남으면 그로기 1.5초, 0 이면 제압(전투 시스템 명세 10-14 §6).
     /// </summary>
     /// <remarks>
-    /// 🔴 송전기 전멸 그로기는 여기를 타지 않는다(<see cref="EnterPylonGroggy"/>) — 게이지와 무관(팀장 09-28).
-    /// TODO(다음 세션 — 취약): 게이지가 남으면 이 순간부터 취약 4초(그로기 1.5초 포함)를 건다(PLAN-boss-counter-vulnerable §3-2).
+    /// 🔴 송전기 전멸 그로기는 여기를 타지 않는다(<see cref="EnterPylonGroggy"/>) — 칸과 무관(팀장 09-28).
+    /// TODO(다음 세션 — 취약): 칸이 남으면 이 순간부터 취약 4초(그로기 1.5초 포함)를 건다(PLAN-boss-counter-vulnerable §3-2).
     /// </remarks>
     void EnterCounterSuccess()
     {
@@ -6227,53 +6229,71 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             return;
         }
 
-        BossCounterOutcome outcome = BossCounterProgress.Resolve(
-            _counterGauge.Value,
-            _boss != null ? _boss.counterGaugeStep : 20f,
-            data != null ? data.groggyDuration : 1.5f,
+        float groggyDuration = data != null ? data.groggyDuration : 1.5f;
+
+        // 기믹 중 간파는 칸을 줄이지 않는다(경석 10-27 Play — 간파가 잦은 기믹에서 칸이 쌓여 기믹 도중 제압이 들어갔다). 그로기·취약은 그대로.
+        if (IsInGimmick)
+        {
+            _groggyKind = BossPauseCondition.CounterGroggy;
+            StunForCounter(Mathf.Max(0.05f, groggyDuration), parryHit: true);
+            Debug.Log($"[23호] 간파 성공(기믹 중) — 칸 유지 {SuppressSegmentsRemaining}/{SuppressSegmentTotal} → 그로기 {groggyDuration:0.#}초", this);
+            StartVulnerable();
+            return;
+        }
+
+        BossSegmentOutcome outcome = BossCounterProgress.ResolveSegments(
+            SuppressSegmentsRemaining,
+            SuppressSegmentTotal,
+            _boss != null ? _boss.counterSegmentStep : 1,
+            groggyDuration,
             _boss != null ? _boss.breakDuration : 5f);
 
-        _counterGauge.Value = outcome.NextGauge;
+        SetSuppressSegmentsRemaining(outcome.NextSegments);
 
         if (outcome.IsSuppress)
         {
-            EnterSuppress("간파 성공");
+            EnterSuppress("간파 성공", fromSegments: true);
             return;
         }
 
         _groggyKind = BossPauseCondition.CounterGroggy;
         StunForCounter(outcome.Duration, parryHit: true);   // 일반 간파 = 간파 피격 클립(쓰러지지 않음)
-        Debug.Log($"[23호] 간파 성공 — 게이지 {outcome.NextGauge:0}% → 그로기 {outcome.Duration:0.#}초", this);
+        Debug.Log($"[23호] 간파 성공 — 남은 칸 {outcome.NextSegments}/{SuppressSegmentTotal} → 그로기 {outcome.Duration:0.#}초", this);
         StartVulnerable();   // 그로기 시작 시점부터 4초(D1)
     }
 
-    /// <summary>[서버] 송전기 전멸 보상 그로기 — **간파 게이지·취약과 무관**(팀장 09-28).</summary>
+    /// <summary>[서버] 송전기 전멸 보상 그로기 — **제압 칸·취약과 무관**(팀장 09-28).</summary>
     void EnterPylonGroggy(float duration)
     {
         if (!IsServer) return;
         _groggyKind = BossPauseCondition.PylonGroggy;
         StunForCounter(Mathf.Max(0.05f, duration));
-        Debug.Log($"[23호] 송전기 전멸 그로기 {duration:0.#}초 (게이지 {_counterGauge.Value:0}% 유지)", this);
+        Debug.Log($"[23호] 송전기 전멸 그로기 {duration:0.#}초 (남은 칸 {SuppressSegmentsRemaining}/{SuppressSegmentTotal} 유지)", this);
     }
 
     /// <summary>
-    /// [서버] **제압** — 게이지 0. 5초(Break 클립 = 긴 그로기), 받는 플레이어 피해 ×1.2, 종료 시 게이지 100.
+    /// [서버] **제압** — 제압 칸 0. 5초(Break 클립 = 긴 그로기), 받는 플레이어 피해 ×1.2, 종료 시 칸을 꽉 채운다.
     /// 필수 기믹(차징·레이지) 중이면 끊지 않고 **예약**한다 — 소비는 <see cref="TryConsumePendingSuppress"/>.
     /// </summary>
     /// <param name="fromReservation">
     /// 예약 소비 경로. 🔴 기믹 종료 지점(FinishChain 등)은 아직 Attack·기믹 행이라 검사를 하면 **다시 예약된다** — 건너뛴다.
     /// </param>
-    void EnterSuppress(string reason, bool fromReservation = false)
+    /// <param name="fromSegments">
+    /// 칸 0 으로 들어온 제압(간파·벽·벤트·그 예약 소비). false = 기믹 보상 제압(전력 공급 차단·북진 압박 파훼·구출 등) —
+    /// 🔴 칸을 건드리지 않는다. 비우지도, 끝나고 다시 채우지도 않고 쌓인 칸을 그대로 둔다(경석 10-27).
+    /// </param>
+    void EnterSuppress(string reason, bool fromReservation = false, bool fromSegments = false)
     {
         if (!IsServer || State == MonsterState.Dead) return;
         CancelCombo("제압");
 
-        _counterGauge.Value = 0f;
+        if (fromSegments)
+            SetSuppressSegmentsRemaining(0);
 
         if (!fromReservation && IsInMandatorySequence)
         {
             _pendingSuppress = true;
-            Debug.Log($"[23호] 게이지 0 ({reason}) — 필수 기믹 중이라 제압 **예약**", this);
+            Debug.Log($"[23호] 제압 칸 0 ({reason}) — 필수 기믹 중이라 제압 **예약**", this);
             return;
         }
 
@@ -6287,6 +6307,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         FightLog($"제압 — {reason}");
         EndVulnerable("제압 진입", releaseStun: false);   // 취약이면 즉시 종료(기획 §8.2) — Q 경직은 제압 그로기가 이어받는다
         _suppressed = true;
+        // 끝날 때 칸을 다시 채우는가 — 칸으로 들어왔거나, 칸 0 예약이 기믹 보상 제압에 흡수된 경우(안 채우면 0 에 갇힌다).
+        _suppressRefillsSegments = fromSegments || SuppressSegmentsRemaining == 0;
         _groggyKind = BossPauseCondition.Suppress;
         StunForCounter(duration);
         Debug.Log($"[23호] 제압 진입 ({reason}) — {duration:0.#}초 · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##}", this);
@@ -6302,18 +6324,18 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// <summary>
     /// [서버] 필수 기믹이 **완전히 끝나는 지점**에서 부른다 — 예약된 제압이 있으면 지금 들어간다.
     /// 호출처는 둘뿐이다: 송전기 전멸 성공(TickCharge) · 레이지 최종 종료(FinishChain).
-    /// 차징 실패 → 레이지는 연결이라 부르지 않는다(끝이 아니다). 등장 연출 중엔 게이지가 줄 수단이 없다.
+    /// 차징 실패 → 레이지는 연결이라 부르지 않는다(끝이 아니다). 등장 연출 중엔 칸이 줄 수단이 없다.
     /// </summary>
     /// <returns>제압에 들어갔으면 true — 호출측은 뒤이은 그로기·다음 행동 결정을 건너뛴다.</returns>
     bool TryConsumePendingSuppress()
     {
         if (!_pendingSuppress || !IsServer || State == MonsterState.Dead) return false;
         _pendingSuppress = false;
-        EnterSuppress("예약 소비", fromReservation: true);
+        EnterSuppress("예약 소비", fromReservation: true, fromSegments: true);   // 예약은 칸 0 경로만 만든다
         return _suppressed;
     }
 
-    // 그로기 상태를 벗어나면 제압 종료 — 게이지 100 복원(사망으로 벗어나면 복원·예약 모두 버린다).
+    // 그로기 상태를 벗어나면 제압 종료 — 칸으로 들어온 제압이면 칸 꽉 채움, 기믹 보상 제압이면 칸 유지(사망으로 벗어나면 복원·예약 모두 버린다).
     void TickSuppressExit(MonsterState previous, MonsterState next)
     {
         if (!_suppressed || previous != MonsterState.Groggy || next == MonsterState.Groggy) return;
@@ -6326,13 +6348,18 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             return;
         }
 
-        _counterGauge.Value = BossCounterProgress.GaugeMax;
-        Debug.Log("[23호] 제압 종료 — 간파 게이지 100% 복원", this);
+        if (!_suppressRefillsSegments)
+        {
+            Debug.Log($"[23호] 제압 종료 — 기믹 보상 제압이라 제압 칸 유지 {SuppressSegmentsRemaining}/{SuppressSegmentTotal}", this);
+            return;
+        }
+        SetSuppressSegmentsRemaining(SuppressSegmentTotal);
+        Debug.Log($"[23호] 제압 종료 — 제압 칸 {SuppressSegmentTotal}칸 복원", this);
     }
 
     /// <summary>
     /// [서버] 증기 벤트 분사에 맞았다(<see cref="SteamVent"/> 가 부른다 — 피해는 벤트가 이미 줬다).
-    /// 기획: 취약 중이면 넉백 여부와 무관하게 간파 게이지 −20 · 취약 즉시 종료(§6.3), 취약당 최초 1회.
+    /// 기획: 취약 중이면 넉백 여부와 무관하게 제압 칸 −1 · 취약 즉시 종료(§6.3), 취약당 최초 1회.
     /// </summary>
     public void OnSteamVentHit(SteamVent vent)
     {
@@ -6344,9 +6371,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     }
 
     #region 취약 (팀 기획 `Re_C_취약_및_제압_시스템.md` · PLAN-boss-counter-vulnerable §3-2~3-4)
-    // 간파 성공(게이지가 남음) → 그로기 1.5초 **시작 시점부터** 취약 4초(팀장 09-28 D1).
+    // 간파 성공(칸이 남음) → 그로기 1.5초 **시작 시점부터** 취약 4초(팀장 09-28 D1).
     // 취약 중 간파 스킬 = 방향 무관 3m/0.35초 넉백 + 일반 공격 중단. 넉백으로 외곽 벽에 닿거나
-    // 분사 중 벤트에 들면 게이지 −20 · 취약 즉시 종료. 게이지 0 이면 제압.
+    // 분사 중 벤트에 들면 칸 −1 · 취약 즉시 종료. 칸 0 이면 제압.
 
     readonly NetworkVariable<bool> _vulnerableVisual = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -6419,15 +6446,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         Debug.Log($"[23호] 취약 종료 — {why}", this);
     }
 
-    // 벽·벤트 공통. 게이지 −20 → 0 이면 제압, 아니면 일반 복귀(취약만 끝).
+    // 벽·벤트 공통. 칸 −1 → 0 이면 제압, 아니면 일반 복귀(취약만 끝).
     void ApplyEnvironmentInteraction(string reason)
     {
-        float step = _boss != null ? _boss.environmentGaugeStep : 20f;
-        BossCounterOutcome o = BossCounterProgress.Resolve(_counterGauge.Value, step, 0f, 0f);
-        _counterGauge.Value = o.NextGauge;
+        int step = _boss != null ? _boss.environmentSegmentStep : 1;
+        BossSegmentOutcome o = BossCounterProgress.ResolveSegments(SuppressSegmentsRemaining, SuppressSegmentTotal, step, 0f, 0f);
+        SetSuppressSegmentsRemaining(o.NextSegments);
         EndVulnerable(reason);
-        Debug.Log($"[23호] 환경 상호작용({reason}) — 게이지 {o.NextGauge:0}%", this);
-        if (o.IsSuppress) EnterSuppress(reason);
+        Debug.Log($"[23호] 환경 상호작용({reason}) — 남은 칸 {o.NextSegments}/{SuppressSegmentTotal}", this);
+        if (o.IsSuppress) EnterSuppress(reason, fromSegments: true);
     }
 
     /// <summary>[서버] 취약 중 간파 스킬 적중 → 공격자 반대 방향 넉백. 재적중이면 새 방향으로 처음부터(§5.2).</summary>
@@ -6530,7 +6557,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     //    ⚠️ 뒤집음: 09-29 결정("넉백이 끝나면 그로기·취약을 함께 끝낸다")을 벽 충돌 경로로만 좁혔다.
     //    벽 경로에서 취약 종료는 이미 ApplyEnvironmentInteraction 이 했다 — 여기선 반동 종료 뒤 그로기를 푼다(EndVulnerable 은 멱등).
     //    넉백 중 재적중은 StartVulnerableKnockback 이 새 방향 3m 로 다시 시작하므로 여기 오지 않는다.
-    //    ⚠️ 제압(벽 충돌로 게이지 0)으로 넘어갔으면 제압이 따로 5초를 가진다 — 건드리지 않는다.
+    //    ⚠️ 제압(벽 충돌로 칸 0)으로 넘어갔으면 제압이 따로 5초를 가진다 — 건드리지 않는다.
     void FinishVulnerableKnockback(string why)
     {
         bool hitWall = _kbRebound;   // 반동 = 벽 충돌 뒤에만 들어간다(TickVulnerableKnockback)
@@ -6642,6 +6669,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         else flash.ClearBaseTint();
     }
     #endregion
+
+    /// <summary>
+    /// 기믹 진행 중인가 — 이때 간파 성공은 제압 칸을 줄이지 않는다(경석 10-27). 필수 기믹(차징·레이지) · 레이드 ② 전력 공급 ·
+    /// ③ 구출 · ④ 자폭 · 간파 릴레이 · 연쇄 간파 · 북진 압박.
+    /// </summary>
+    bool IsInGimmick => IsInMandatorySequence || RaidGimmickActive || _raidCharge || _raidRescueActive || _raidSelfDestruct;
 
     /// <summary>필수 기믹(차징 · 레이지 돌진) 진행 중인가. 등장 연출은 서버 로직이 멈춰 있어 여기 올 일이 없다.</summary>
     bool IsInMandatorySequence =>
@@ -6819,8 +6852,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc] void DroneCancelClientRpc() { if (_drone != null) _drone.ClientCancel(); }
     #endregion
 
-    /// <summary>간파 게이지 0~1(전 피어 — 복제값). HUD 회색 바(`Detection_Fill`)가 읽는다.</summary>
-    public float CounterGauge01 => Mathf.Clamp01(_counterGauge.Value / BossCounterProgress.GaugeMax);
+    /// <summary>총 제압 칸(SO — 전 피어 같은 값). HUD 칸 줄이 칸 개수로 쓴다.</summary>
+    public int SuppressSegmentTotal => Mathf.Max(1, _boss != null ? _boss.suppressSegmentCount : 3);
+
+    /// <summary>남은 제압 칸 0~<see cref="SuppressSegmentTotal"/>(전 피어 — 복제값). HUD 칸 줄이 읽는다.</summary>
+    public int SuppressSegmentsRemaining => Mathf.Clamp(SuppressSegmentTotal - _suppressSegmentsUsed.Value, 0, SuppressSegmentTotal);
+
+    /// <summary>[서버] 남은 칸을 사용한 칸으로 바꿔 복제한다.</summary>
+    void SetSuppressSegmentsRemaining(int remaining) =>
+        _suppressSegmentsUsed.Value = SuppressSegmentTotal - Mathf.Clamp(remaining, 0, SuppressSegmentTotal);
 
     // 간파 성공·송전기·제압이 공유하는 "쓰러뜨리기". 체인 정리 + 그로기.
     /// <param name="parryHit">true = 일반 간파 성공 — 쓰러지는 그로기 대신 간파 피격 클립(<see cref="_parryHitGroggy"/>).</param>
@@ -6859,7 +6899,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     /// <summary>
     /// [서버] 점프 착지 간파 창(경석 10-20) — 콤보 타의 <c>landingCounterWindow</c> 만큼 착지 피해 **직후** 연다.
-    /// 성공은 일반 간파와 같은 경로(ReceiveAttack → EnterCounterSuccess = 그로기·게이지), 놓치면 그대로 전투.
+    /// 성공은 일반 간파와 같은 경로(ReceiveAttack → EnterCounterSuccess = 그로기·칸), 놓치면 그대로 전투.
     /// 한 공격에 한 번만 — 착지 히트 이벤트가 두 번 와도 다시 열지 않는다.
     /// </summary>
     void OpenLandingCounterWindow()

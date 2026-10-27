@@ -18,6 +18,18 @@ public readonly struct BossCounterOutcome
         (NextGauge, IsSuppress, Duration) = (nextGauge, isSuppress, duration);
 }
 
+/// <summary>간파·벽·벤트 한 번의 칸 판정 결과 — 다음 남은 칸, 제압 진입 여부, 전체 행동 불능 시간.</summary>
+public readonly struct BossSegmentOutcome
+{
+    /// <summary>감소 뒤 남은 제압 칸. 제압이면 0.</summary>
+    public int NextSegments { get; }
+    public bool IsSuppress { get; }
+    public float Duration { get; }
+
+    public BossSegmentOutcome(int nextSegments, bool isSuppress, float duration) =>
+        (NextSegments, IsSuppress, Duration) = (nextSegments, isSuppress, duration);
+}
+
 /// <summary>
 /// 간파 게이지 판정(팀 기획 `Re_C_간파_시스템.md` §10). 상태를 갖지 않는 순수 함수라 EditMode 로 전 경계를 고정한다.
 /// 게이지 보관·상태 전이·제압 종료 시 100 복원은 호출측(<c>TwentyThreeBoss</c>)의 몫이다.
@@ -30,6 +42,28 @@ public readonly struct BossCounterOutcome
 public static class BossCounterProgress
 {
     public const float GaugeMax = 100f;
+
+    /// <summary>
+    /// 제압 <b>칸</b> 판정(전투 시스템 명세 10-14 §6) — 23호가 쓴다. 정수 남은 칸에서 <paramref name="step"/> 칸을 빼고 0 이면 제압.
+    /// 아래 게이지판(<see cref="Resolve"/>)은 훈련 스파링(TRAIN_03)만 남아 쓴다.
+    /// </summary>
+    /// <param name="remaining">지금 남은 칸(0~<paramref name="total"/>).</param>
+    /// <param name="total">총 칸(SO <c>suppressSegmentCount</c>).</param>
+    /// <param name="step">이번 감소 칸(간파 1 · 벽 1 · 벤트 1 — SO).</param>
+    public static BossSegmentOutcome ResolveSegments(int remaining, int total, int step,
+        float groggyDuration, float suppressDuration)
+    {
+        // 음수·초과 방어 — 남은 칸은 네트워크 변수에서 온다.
+        int max = Mathf.Max(1, total);
+        int current = Mathf.Clamp(remaining, 0, max);
+        int next = Mathf.Max(0, current - Mathf.Max(0, step));
+        bool isSuppress = next == 0;
+
+        return new BossSegmentOutcome(
+            next,
+            isSuppress,
+            Mathf.Max(0.05f, isSuppress ? suppressDuration : groggyDuration));
+    }
 
     /// <param name="currentGauge">지금 간파 게이지(0~100).</param>
     /// <param name="step">이번 감소량(간파 성공 20 · 벽 20 · 벤트 20 — SO).</param>

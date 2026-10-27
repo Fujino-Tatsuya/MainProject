@@ -504,7 +504,7 @@ public partial class TwentyThreeBoss
             FightLog($"간파 릴레이 성공 — {_relayPushes}회");
             EndRaidGimmick("성공 — 12시 도달", resume: false);
             _groggyKind = BossPauseCondition.CounterGroggy;   // 장판·드론 정지 조건(그로기 종류)
-            StunForCounter(_boss.relaySuccessExhaust);        // 탈진 = 그로기 클립 재사용. 게이지·취약은 건드리지 않는다
+            StunForCounter(_boss.relaySuccessExhaust);        // 탈진 = 그로기 클립 재사용. 제압 칸·취약은 건드리지 않는다
             return;
         }
 
