@@ -363,14 +363,104 @@ public sealed class QABoss103Round2Tests
     public void 새_열은_모두_끝에_붙는다()
     {
         string[] c = QABoss103Metrics.CharsHeader;
-        Assert.AreEqual("qa_wall_escapes", c[c.Length - 2]);
-        Assert.AreEqual("lethal_no_roll", c[c.Length - 1]);
-        Assert.AreEqual("counter_roll_success", c[c.Length - 3], "C7e 끝 열 뒤");
+        int rules = QABoss103CharRules.Count;
+        Assert.AreEqual("qa_wall_escapes", c[c.Length - rules - 2]);
+        Assert.AreEqual("lethal_no_roll", c[c.Length - rules - 1]);
+        Assert.AreEqual("counter_roll_success", c[c.Length - rules - 3], "C7e 끝 열 뒤");
+        for (int i = 0; i < rules; i++)
+            Assert.AreEqual(QABoss103CharRules.Tokens[i], c[c.Length - rules + i], "C2 규칙 열이 맨 끝");
         string[] p = QABoss103Metrics.PatternsHeader;
         Assert.AreEqual("lethal_no_roll", p[p.Length - 1]);
         Assert.AreEqual("deaths", p[p.Length - 2]);
         string[] r = QABoss103Metrics.RunsHeader;
         Assert.AreEqual("note", r[r.Length - 2]);
+    }
+
+    // ── C2 툴팁 규칙 ─────────────────────────────────────────
+
+    [Test]
+    public void 규칙_발동_줄은_그_캐릭터_열에만_센다()
+    {
+        var s = new QABoss103RunStats();
+        s.Begin(0.0);
+        s.End(60.0);
+        s.AddPart(Gun, new[]
+        {
+            "rule slot=2 rule=gunner_overheat",
+            "rule slot=2 rule=gunner_overheat_e",
+            "rule slot=2 rule=gunner_overheat",
+            "rule slot=2 rule=unknown_rule",
+            "done slot=2",
+        });
+        s.AddPart(Asn, new[] { "rule slot=1 rule=assassin_enhance_e", "rule slot=1 rule=assassin_rage_wait", "done slot=1" });
+        var meta = new QABoss103RunMeta { Outcome = QABoss103Outcome.Wipe, CombatSeconds = 60.0 };
+        string[] h = QABoss103Metrics.CharsHeader;
+        List<string[]> rows = QABoss103CsvRows.Chars(meta, s);
+        Assert.AreEqual(h.Length, rows[Gun].Length);
+        Assert.AreEqual("2", rows[Gun][Array.IndexOf(h, "gunner_overheat")]);
+        Assert.AreEqual("1", rows[Gun][Array.IndexOf(h, "gunner_overheat_e")]);
+        Assert.AreEqual("", rows[Gun][Array.IndexOf(h, "assassin_enhance_e")], "다른 캐릭터 규칙 열은 빈칸");
+        Assert.AreEqual("1", rows[Asn][Array.IndexOf(h, "assassin_enhance_e")]);
+        Assert.AreEqual("1", rows[Asn][Array.IndexOf(h, "assassin_rage_wait")]);
+        Assert.AreEqual("0", rows[Asn][Array.IndexOf(h, "assassin_blade_storm_e")]);
+        Assert.AreEqual("", rows[Asn][Array.IndexOf(h, "gunner_overheat_e")]);
+        Assert.AreEqual("", rows[Pal][Array.IndexOf(h, "assassin_enhance_e")], "판 파일 없음");
+    }
+
+    [Test]
+    public void 규칙_표는_열마다_한_줄이고_주인이_맞다()
+    {
+        Assert.AreEqual(Enum.GetValues(typeof(QABoss103CharRule)).Length, QABoss103CharRules.Count);
+        Assert.AreEqual("gunner_overheat_e", QABoss103CharRules.Token(QABoss103CharRule.GunnerOverheatE));
+        foreach (QABoss103CharRule rule in Enum.GetValues(typeof(QABoss103CharRule)))
+        {
+            string token = QABoss103CharRules.Token(rule);
+            int n = 0;
+            foreach (QABoss103CharRuleRow row in QABoss103CharRules.Table)
+                if (row.Column == token)
+                {
+                    n++;
+                    Assert.AreEqual(QABoss103CharRules.Owner(rule), row.Character, token);
+                    Assert.AreEqual("신규", row.Status, token);
+                }
+            Assert.AreEqual(1, n, token + " 표 줄");
+        }
+        foreach (QABoss103CharRuleRow row in QABoss103CharRules.Table)
+            StringAssert.EndsWith("/tooltip.description", row.TooltipKey, "근거 = 툴팁 설명 키");
+    }
+
+    [Test]
+    public void 규칙_근거_툴팁_키는_StringTable_에_있다()
+    {
+        string text = System.IO.File.ReadAllText("Assets/9.ScriptableObject/Localization/StringTable.asset");
+        foreach (QABoss103CharRuleRow row in QABoss103CharRules.Table)
+            StringAssert.Contains("key: " + row.TooltipKey, text, row.Skill);
+    }
+
+    [Test]
+    public void 구간은_켜짐마다_한_번_세고_반응_지연_뒤에_반응한다()
+    {
+        var e = new QABoss103Episode();
+        Assert.IsTrue(e.Tick(true, 10.0));
+        Assert.IsFalse(e.Tick(true, 10.1), "켜진 채면 다시 세지 않는다");
+        Assert.IsFalse(e.Reacted(10.1, 300.0));
+        Assert.IsTrue(e.Reacted(10.3, 300.0));
+        Assert.IsFalse(e.Tick(false, 11.0));
+        Assert.IsFalse(e.Reacted(11.0, 0.0), "꺼지면 반응 없음");
+        Assert.IsTrue(e.Tick(true, 12.0));
+        Assert.AreEqual(2, e.Count);
+        Assert.AreEqual(12.0, e.Since);
+    }
+
+    [Test]
+    public void 리포트에_규칙_표와_발동_횟수가_나온다()
+    {
+        string html = QABoss103Report.Build(QABoss103ReportFake.Input());
+        StringAssert.Contains("캐릭터 스킬 툴팁 규칙(할 일 119)", html);
+        StringAssert.Contains("규칙 발동 횟수(판당 평균 · 합계)", html);
+        foreach (string token in QABoss103CharRules.Tokens)
+            StringAssert.Contains(token, html);
+        StringAssert.Contains("과열을 해제한다", html);
     }
 }
 #endif

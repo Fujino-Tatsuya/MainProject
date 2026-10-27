@@ -107,6 +107,8 @@ public sealed class QABoss103CharStats
     public int DodgeRolls, DodgeSuccess;
     /// <summary>C7e 봇 충실도 — 간파 성공 굴림 누름 수 / 그중 서버 간파 성공이 이어진 것.</summary>
     public int CounterHitRolls, CounterHitSuccess;
+    /// <summary>할 일 119 C2 — 툴팁 규칙 발동 횟수(판 파일 <c>rule</c>, 순서 = <see cref="QABoss103CharRules.Tokens"/>). 열은 그 규칙 캐릭터 행에만.</summary>
+    public readonly int[] RuleCounts = new int[QABoss103CharRules.Count];
 
     internal bool Transformed;
     internal double TransformSince;
@@ -433,6 +435,11 @@ public sealed class QABoss103RunStats
                         HitDelay = ParseD(Get(kv, "hitMs", "")) / 1000.0,
                     });
                     c.LethalNoRoll++;
+                    break;
+                case "rule":
+                    int rule = QABoss103CharRules.IndexOf(Get(kv, "rule", ""));
+                    if (rule >= 0)
+                        c.RuleCounts[rule]++;
                     break;
                 case "counter":
                     // 게임이 시전을 거부한 누름(쿨·상태)은 시도가 아니다.
@@ -824,6 +831,8 @@ public static class QABoss103Metrics
             // 할 일 119 — 벽 끼임 탈출 재배치 · 즉사(굴림 없음). 끝에 붙인다(배치 중간 머리 확장).
             "qa_wall_escapes", "lethal_no_roll",
         });
+        // 할 일 119 C2 — 툴팁 규칙 발동 횟수(그 캐릭터 행만). 끝에 붙인다.
+        h.AddRange(QABoss103CharRules.Tokens);
         return h.ToArray();
     }
 
@@ -957,6 +966,8 @@ public static class QABoss103CsvRows
             r.Add(c.PartPresent ? I(c.CounterHitSuccess) : "");
             r.Add(I(c.QaWallEscapes));
             r.Add(c.PartPresent ? I(c.LethalNoRoll) : "");
+            for (int i = 0; i < QABoss103CharRules.Count; i++)
+                r.Add(c.PartPresent && QABoss103CharRules.Owner((QABoss103CharRule)i) == c.Character ? I(c.RuleCounts[i]) : "");
             rows.Add(r.ToArray());
         }
         return rows;
@@ -1081,7 +1092,7 @@ public static class QABoss103Csv
 /// <summary>
 /// 봇 판 파일 — 각 봇 인스턴스(호스트·MPPM 클론)가 <c>&lt;출력 폴더&gt;/parts/run&lt;n&gt;_r&lt;retry&gt;_s&lt;자리&gt;.txt</c> 에 한 줄씩 쓰고(즉시 flush),
 /// 호스트가 판 끝에 읽어 합친다. 줄 = <c>종류 key=value …</c>(값에 공백·'=' 없음 — <see cref="QABoss103Plan.Token"/>).
-/// 종류: <c>threat</c>(회피 굴림 1건) · <c>counter</c>(간파 시도 1회) · <c>done</c>(봇 종료). 판 끝 신호 = 같은 폴더 <c>run&lt;n&gt;_r&lt;retry&gt;_end.txt</c>(호스트가 씀).
+/// 종류: <c>threat</c>(회피 굴림 1건) · <c>counter</c>(간파 시도 1회) · <c>rule</c>(할 일 119 툴팁 규칙 발동 1회) · <c>done</c>(봇 종료). 판 끝 신호 = 같은 폴더 <c>run&lt;n&gt;_r&lt;retry&gt;_end.txt</c>(호스트가 씀).
 /// </summary>
 public static class QABoss103PartFile
 {

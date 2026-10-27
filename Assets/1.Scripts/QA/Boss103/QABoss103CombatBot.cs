@@ -15,7 +15,8 @@ using UnityEngine;
 ///   그 밖에 대시는 이동에 쓰지 않는다 — 회피 전용(C3, <c>QABoss103CombatBot.Evasion.cs</c>).</item>
 /// <item>스킬 = Q(Main)·R(Ultimate). 팔라딘 E(방어)·우클릭 간파·대시 회피는 C3 파일. 쿨이 돌면 프로필 확률로 굴리고 실패면 1초 뒤 다시(<see cref="QABoss103SkillGate"/>).
 ///   팔라딘 Q = 홀드(스킬이 끝날 때까지, 상한 <see cref="HoldCapSeconds"/>), 거너 Q = 정신 집중 → 최대 충전(<c>MaxChargeTime</c>) 뒤 좌클릭 발사,
-///   R(팔라딘·거너 = 대상 지정) = 23호 지정, 어쌔신 R = 변신(변신 중엔 R 을 다시 누르지 않는다 — Q·평타는 게임이 변신 판으로 바꾼다).</item>
+///   R(팔라딘·거너 = 대상 지정) = 23호 지정, 어쌔신 R = 변신(변신 중엔 R 을 다시 누르지 않는다 — Q·평타는 게임이 변신 판으로 바꾼다).
+///   할 일 119 C2 — 툴팁 근거 캐릭터 규칙(거너 과열 E·어쌔신 분노/E)은 <c>QABoss103CombatBot.Rules.cs</c>.</item>
 /// <item>조준 오차: 보스 위치(또는 스킬 목표점)에 프로필 반경 원판 균일 오프셋(<see cref="QABoss103Bot.AimOffset"/>) — 평타는 <see cref="AimResampleSeconds"/> 마다,
 ///   스킬은 시전마다 새로 굴린다.</item>
 /// </list>
@@ -96,6 +97,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         Debug.Log($"{Tag} event=bot_profile character={character} slot={bot._slot} runSeed={runSeed} {bot._profile.Describe()} " +
                   $"band={F(bot._band.Min)}/{F(bot._band.Settle)}/{F(bot._band.Max)} reflectMissing={bot._driver.Missing}");
         bot.InitEvasion(runSeed);
+        bot.InitRules(runSeed);
         return bot;
     }
 
@@ -235,6 +237,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
 
         PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
         bool inSkill = TickActiveSkill(skills, tgt.Pos);
+        TickAssassinRage(skills);
 
         // 이동(스킬이 이동을 잠그는 동안은 넣지 않는다 — 거너 Q 집중은 이동 가능). 드론 유도는 거리 띠 대신 유도 자리로.
         if (tgt.HasSpot)
@@ -264,6 +267,14 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
         Steer(me, myPos, moveDir, progress, now);
 
+        // 할 일 119 C2 — 거너 과열: 평타 잠김이면 놓고, E(과열 해제)를 우선 쓴다(장전된 동안 다른 공격을 시작하지 않는다).
+        bool basicLocked = false;
+        if (!inSkill && TickGunnerOverheat(me, skills, tgt, !noStart, out basicLocked))
+        {
+            _driver.ReleaseBasic();
+            return;
+        }
+
         if (inSkill || !tgt.Hittable)
         {
             _driver.ReleaseBasic();
@@ -284,7 +295,9 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         // 탑 대상이면 대상 지정 R(팔라딘·거너)은 굴리지도 않는다 — 장전 상태는 보스로 돌아올 때까지 그대로.
         bool wantQ = _gateQ.Tick(ReadyQ(skills), Time.timeAsDouble, _skillRng, _profile.SkillUseChance);
         bool wantR = AllowRFor(skills, tgt) && _gateR.Tick(ReadyR(skills), Time.timeAsDouble, _skillRng, _profile.SkillUseChance);
-        if (wantQ || wantR)
+        // 할 일 119 C2 — 어쌔신 E(일반 = 다음 평타 강화, 변신 = 칼날 폭풍). 거너 E 는 위 과열 규칙, 팔라딘 E 는 C3 방어.
+        bool wantE = WantE(skills);
+        if (wantQ || wantR || wantE)
         {
             _driver.ReleaseBasic();
             if (!attackBusy && !skills.IsBusy && Time.time >= _nextCastAttempt)
@@ -300,9 +313,21 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
                     NoteAttack(tgt, "Q");
                     return;
                 }
+                if (wantE && TryCastE(skills, tgt))
+                {
+                    NoteAttack(tgt, "E");
+                    return;
+                }
             }
             if (attackBusy)
                 return;
+        }
+
+        // 할 일 119 C2 — 거너 과열 중엔 평타가 잠긴다(툴팁) — 누르지 않는다.
+        if (basicLocked)
+        {
+            _driver.ReleaseBasic();
+            return;
         }
 
         if (!skills.IsBusy && _driver.HoldBasic())
@@ -319,11 +344,13 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
     {
         if (skills == null || skills.GetSkill(PlayerSkillSlot.Ultimate) == null || !skills.IsCooldownReady(PlayerSkillSlot.Ultimate))
             return false;
-        // 어쌔신 변신 중 R 재입력 = 수동 해제 — 쓰지 않는다.
+        // 어쌔신 변신 중 R 재입력 = 수동 해제 — 쓰지 않는다. 할 일 119 C2 — 분노가 최소 변신량 미만이면 굴리지 않는다(툴팁).
         if (_character == QABoss103Character.Assassin)
         {
             AssassinState st = skills.GetComponent<AssassinState>();
             if (st != null && st.IsTransformed)
+                return false;
+            if (!AssassinCanTransform(st))
                 return false;
         }
         return true;
@@ -511,7 +538,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
                   $"surfM={F(SurfaceDistance(myPos, bossPos))} hittable={(_bossBody == null || _bossBody.enabled ? "true" : "false")} " +
                   $"attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} rejects={_castRejects} gunnerFires={_gunnerFires} " +
                   $"rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} stuck={_stuck.Escapes} {StuckDiag()} edgeBlocks={_edgeBlocks} " +
-                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()} {GimmickDiag()} {RecoveryDiag()}");
+                  $"bossHp={_boss.CurrentHealth} myHp={me.CurrentHealth} {EvasionDiag()} {GimmickDiag()} {RecoveryDiag()} {RuleDiag()}");
     }
 
     private void OnDestroy()
@@ -528,7 +555,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
         Debug.Log($"{Tag} event=bot_combat_done character={_character} tier={_profile.Tier} attackStarts={_attackStarts} castsQ={_castsQ} castsR={_castsR} " +
                   $"transforms={_transforms} rejects={_castRejects} gunnerFires={_gunnerFires} rollsQ={_gateQ.Rolls}/{_gateQ.Fails} rollsR={_gateR.Rolls}/{_gateR.Fails} " +
-                  $"stuck={_stuck.Escapes} {StuckDiag()} edgeBlocks={_edgeBlocks} {EvasionDiag()} {GimmickDiag()} {RecoveryDiag()}");
+                  $"stuck={_stuck.Escapes} {StuckDiag()} edgeBlocks={_edgeBlocks} {EvasionDiag()} {GimmickDiag()} {RecoveryDiag()} {RuleDiag()}");
         ClosePart("destroy");
     }
 

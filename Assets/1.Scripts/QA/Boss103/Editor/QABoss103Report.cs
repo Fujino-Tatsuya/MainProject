@@ -314,6 +314,7 @@ public static class QABoss103Report
         Comparison(sb, c, sums);
         Charts(sb, c, sums);
         CharacterTables(sb, c);
+        CharRuleTable(sb, c);
         PatternTable(sb, c);
         GimmickTable(sb, c);
         TraitTable(sb, c);
@@ -765,6 +766,41 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         foreach (QABoss103Character ch in Chars)
             Line(sb, CharLabel(ch), c, g =>
                 $"{Num(Div(SumChars(c, g, ch, "damage_dealt"), SumDur(c, g, ch)), 1)} · {Num(Div(SumChars(c, g, ch, "damage_taken") * 60.0, SumDur(c, g, ch)), 0)} · {Num(AvgChars(c, g, ch, "deaths"), 2)}");
+        sb.Append("</tbody></table>\n");
+    }
+
+    /// <summary>할 일 119 C2 — 캐릭터 스킬 툴팁 근거 봇 규칙 표 + 발동 횟수(run_chars 규칙 열, 판당 평균 · 합계).</summary>
+    private static void CharRuleTable(StringBuilder sb, Ctx c)
+    {
+        sb.Append("<h2>캐릭터 스킬 툴팁 규칙(").Append(H(QABoss103CharRules.Since)).Append(")</h2>\n");
+        sb.Append("<div class=\"sub\">툴팁 = 게임이 띄우는 스킬 설명(StringTable 한국어). 툴팁에 근거 없는 추측 규칙은 넣지 않았다 · 스킬 사용 빈도·반응 지연은 단계 프로필 그대로.</div>\n");
+        sb.Append("<div class=\"scroll\"><table><thead><tr><th class=\"l\">캐릭터</th><th class=\"l\">스킬</th><th class=\"l\">툴팁 원문 요지</th><th class=\"l\">봇 행동</th><th class=\"l\">상태</th><th class=\"l\">열</th></tr></thead><tbody>\n");
+        foreach (QABoss103CharRuleRow r in QABoss103CharRules.Table)
+            sb.Append("<tr><td class=\"l\">").Append(H(CharLabel(r.Character)))
+              .Append("</td><td class=\"l\">").Append(H(r.Skill))
+              .Append("</td><td class=\"l\">").Append(H(r.TooltipGist))
+              .Append("</td><td class=\"l\">").Append(H(r.BotAction))
+              .Append("</td><td class=\"l\">").Append(H(r.Status))
+              .Append("</td><td class=\"l\">").Append(H(r.Column.Length > 0 ? r.Column : Dash))
+              .Append("</td></tr>\n");
+        sb.Append("</tbody></table></div>\n");
+
+        sb.Append("<h3>규칙 발동 횟수(판당 평균 · 합계)</h3>\n<table><thead><tr><th class=\"l\">열</th>");
+        foreach (Group g in c.Columns)
+            sb.Append("<th>").Append(H(g.Label)).Append("</th>");
+        sb.Append("</tr></thead><tbody>\n");
+        for (int i = 0; i < QABoss103CharRules.Count; i++)
+        {
+            string col = QABoss103CharRules.Tokens[i];
+            QABoss103Character owner = QABoss103CharRules.Owner((QABoss103CharRule)i);
+            Line(sb, CharLabel(owner) + " " + col, c, g =>
+            {
+                double sum = 0, n = 0;
+                foreach (string[] r in CharRowsOf(c, g, owner))
+                    Acc(c.CharsT.Num(r, col), ref sum, ref n);
+                return n > 0 ? $"{Num(sum / n, 2)} · {sum.ToString("0", Inv)}" : Dash;
+            });
+        }
         sb.Append("</tbody></table>\n");
     }
 

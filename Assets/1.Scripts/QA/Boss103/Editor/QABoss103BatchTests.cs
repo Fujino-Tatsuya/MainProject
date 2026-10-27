@@ -308,7 +308,7 @@ public sealed class QABoss103BatchTests
         var meta = new QABoss103RunMeta { Outcome = QABoss103Outcome.Wipe, CombatSeconds = 60.0 };
         int col = Array.IndexOf(QABoss103Metrics.CharsHeader, "qa_relocates");
         Assert.AreEqual(Array.IndexOf(QABoss103Metrics.CharsHeader, "qa_revives") + 1, col, "qa_revives 다음 — 뒤에는 C7e 충실도 열만 붙는다(배치 중간 머리 확장)");
-        Assert.AreEqual("lethal_no_roll", QABoss103Metrics.CharsHeader[QABoss103Metrics.CharsHeader.Length - 1], "할 일 119 끝 열");
+        Assert.AreEqual("lethal_no_roll", QABoss103Metrics.CharsHeader[QABoss103Metrics.CharsHeader.Length - 1 - QABoss103CharRules.Count], "할 일 119 끝 열(뒤에 C2 규칙 열)");
         List<string[]> rows = QABoss103CsvRows.Chars(meta, s);
         Assert.AreEqual("2", rows[0][col]);
         Assert.AreEqual("0", rows[1][col]);
