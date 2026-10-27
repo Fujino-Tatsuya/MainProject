@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
@@ -20,10 +21,18 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("켜고 끄는 본체. UiModalBlocker 가 붙어 있다. 프리팹 루트(Canvas)는 늘 켜 둔다.")]
     [SerializeField] private GameObject content;
     [SerializeField] private CharacterRoster roster;
+    [Tooltip("카드 원본 — cardTemplate 이 비었을 때만 쓴다.")]
     [SerializeField] private CharacterSelectCard cardPrefab;
-    [Tooltip("카드 부모(화면 가운데 기준). 카드는 런타임에 로스터 수만큼 복제한다 — 디자인용 카드를 두지 말 것.")]
+    [Tooltip("가운데 카드 모양 원본(Content/Cards/Card_Template — 카드 프리팹 인스턴스, 가운데 자리에 놓여 있다). " +
+             "초상화(Clip/Image_Portrait) 크기·회전, 금색 테두리(Ring_Focus) 크기·색·스프라이트를 여기서 고치면 " +
+             "런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, 배율만 작다). 자신은 열 때 꺼진다. 비면 cardPrefab.")]
+    [SerializeField] private CharacterSelectCard cardTemplate;
+    [Tooltip("카드 부모(화면 가운데 기준). 카드는 런타임에 로스터 수만큼 복제한다 — cardTemplate 말고 디자인용 카드를 두지 말 것.")]
     [SerializeField] private RectTransform cardContainer;
     [SerializeField] private Button backButton;
+    [Tooltip("마우스 확정 — SELECT 셰브론(Content/Chevron)의 Button, Space 와 같은 Confirm(할 일 109). " +
+             "Navigation None 이어야 클릭 뒤 EventSystem 선택이 남지 않는다. 클릭 영역 = UiTriangleRaycastFilter.")]
+    [SerializeField] private Button confirmButton;
 
     [Header("Nameplate (포커스된 캐릭터)")]
     [SerializeField] private Image nameplatePortrait;
@@ -119,6 +128,9 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         if (backButton != null)
             backButton.onClick.AddListener(OnBackButton);
+        if (confirmButton != null)
+            confirmButton.onClick.AddListener(OnConfirmButton);
+        HideCardTemplate();
 
         if (!Rules.IsOpen && content != null)
             content.SetActive(false);
@@ -128,6 +140,8 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         if (backButton != null)
             backButton.onClick.RemoveListener(OnBackButton);
+        if (confirmButton != null)
+            confirmButton.onClick.RemoveListener(OnConfirmButton);
         foreach (CharacterSelectCard card in _cards)
             if (card != null)
                 card.Clicked -= OnCardClicked;
@@ -246,7 +260,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
     }
 
-    /// <summary>포커스된 카드로 확정(Enter·Space·가운데 카드 클릭과 같은 길). 이동 중에도 받는다 — 대상은 논리상 가운데(<see cref="FocusedCharacterId"/>).</summary>
+    /// <summary>포커스된 카드로 확정(Enter·Space·가운데 카드 클릭·SELECT 셰브론 클릭과 같은 길). 이동 중에도 받는다 — 대상은 논리상 가운데(<see cref="FocusedCharacterId"/>).</summary>
     public CharacterSelectConfirmResult Confirm()
     {
         CharacterSelectConfirmResult result = Rules.Confirm();
@@ -264,6 +278,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
     private void BuildCards()
     {
+        HideCardTemplate(); // EditMode(프리뷰 씬)는 Awake 가 돌지 않는다
         int count = roster != null ? roster.Count : 0;
         if (_cards.Count == count && _cards.TrueForAll(c => c != null))
         {
@@ -280,22 +295,30 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
         _cards.Clear();
 
-        if (cardPrefab == null || cardContainer == null)
+        CharacterSelectCard source = cardTemplate != null ? cardTemplate : cardPrefab;
+        if (source == null || cardContainer == null)
         {
             if (count > 0)
-                Debug.LogError("[CharacterSelectPanel] cardPrefab·cardContainer 가 비어 있다 — 저작 메뉴로 프리팹을 다시 만들 것.", this);
+                Debug.LogError("[CharacterSelectPanel] cardTemplate·cardPrefab·cardContainer 가 비어 있다 — 저작 메뉴로 프리팹을 다시 만들 것.", this);
             _available.Clear();
             return;
         }
 
         for (int i = 0; i < count; i++)
         {
-            CharacterSelectCard card = Instantiate(cardPrefab, cardContainer, false);
+            CharacterSelectCard card = Instantiate(source, cardContainer, false);
             card.Clicked += OnCardClicked;
             _cards.Add(card);
         }
 
         RebindCards();
+    }
+
+    /// <summary>프리팹에서 보이게 둔 가운데 카드 원본은 Play 에서 끈다 — 복제본과 겹쳐 보이지 않게.</summary>
+    private void HideCardTemplate()
+    {
+        if (cardTemplate != null && cardTemplate.gameObject.activeSelf)
+            cardTemplate.gameObject.SetActive(false);
     }
 
     private void RebindCards()
@@ -310,7 +333,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
     }
 
-    /// <summary>겉모습(카드 모양·이름판·잠금 문구)을 논리 포커스에 맞춘다. 자리·크기·테두리는 SnapLayout/AnimateLayout.</summary>
+    /// <summary>겉모습(카드 모양·이름판·잠금 문구·셰브론 hover 아웃라인 잠금)을 논리 포커스에 맞춘다. 자리·크기·테두리는 SnapLayout/AnimateLayout.</summary>
     private void Redraw()
     {
         int count = _cards.Count;
@@ -339,6 +362,10 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             lockedText.color = lockedTextColor;
             lockedText.rectTransform.localScale = Vector3.one;
         }
+
+        // 잠금 중엔 셰브론 hover 아웃라인을 끈다 — 버튼은 interactable 그대로(클릭 = Confirm → Locked → 잠금 문구 강조).
+        if (confirmButton != null && confirmButton.TryGetComponent(out UiHoverOutline confirmHover))
+            confirmHover.Blocked = Rules.IsLocked;
     }
 
     private void UpdateLockedPulse()
@@ -487,6 +514,20 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             Redraw();
             AnimateLayout(previous);
         }
+    }
+
+    /// <summary>SELECT 셰브론 버튼 — Space 와 같은 Confirm. 키 입력과 같은 조건(열림·결과 패널 위 아님)에서만 받는다.</summary>
+    private void OnConfirmButton()
+    {
+        // Navigation None 이라 클릭으로 선택되지 않지만, 혹시 남아 있으면 지운다 — 남으면 다음 Enter(Submit) 가 한 번 더 누른다.
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem != null && confirmButton != null && eventSystem.currentSelectedGameObject == confirmButton.gameObject)
+            eventSystem.SetSelectedGameObject(null);
+
+        if (!Rules.IsOpen || LobbyResultPanel.IsEscapeClaimed)
+            return;
+
+        Confirm();
     }
 
     private void OnBackButton()
