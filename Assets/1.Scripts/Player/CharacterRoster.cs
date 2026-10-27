@@ -14,6 +14,8 @@ public class CharacterRoster : ScriptableObject
         [SerializeField] private bool available = true;
         [Tooltip("튜토리얼 안내 문구 변형(_PALADIN/_GUNNER/_ASSASSIN)에 쓸 캐릭터. None = 기본 문구.")]
         [SerializeField] private TutorialCharacter tutorialCharacter;
+        [Tooltip("전투 HUD 체력바 채움(포트레잇 합성본, 435×74). 비우면 HUD 프리팹의 기본(거너) 그림.")]
+        [SerializeField] private Sprite hudHpFill;
 
         /// <summary>현재 언어 이름 — Strings 시트 <see cref="NameKey"/>, 행이 없으면 인라인 <c>displayName</c>(ko).</summary>
         public string DisplayName => Loc.Get(NameKey, InlineDisplayName);
@@ -33,6 +35,7 @@ public class CharacterRoster : ScriptableObject
         public Sprite Portrait => portrait;
         public bool Available => available;
         public TutorialCharacter TutorialCharacter => tutorialCharacter;
+        public Sprite HudHpFill => hudHpFill;
     }
 
     [SerializeField] private Entry[] entries = new Entry[0];

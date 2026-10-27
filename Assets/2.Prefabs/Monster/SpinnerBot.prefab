@@ -392,6 +392,7 @@ MonoBehaviour:
   dashRepeatInterval: 0.5
   dashSpeedMultiplier: 15
   dashMaxDistance: 40
+  dashHalfWidth: 3.1
   whipTelegraphDuration: 0.125
   sideLateralOffset: 0.65
   spinStartState: Spin Attack Start
@@ -483,7 +484,7 @@ Transform:
   m_GameObject: {fileID: 3555493707605937576}
   serializedVersion: 2
   m_LocalRotation: {x: -0.5, y: 0.5, z: 0.5, w: 0.5}
-  m_LocalPosition: {x: 0, y: 0.36, z: 0}
+  m_LocalPosition: {x: 0, y: 0.8, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -670,7 +671,7 @@ Transform:
   m_GameObject: {fileID: 6238605887474567730}
   serializedVersion: 2
   m_LocalRotation: {x: -0.5, y: 0.5, z: 0.5, w: 0.5}
-  m_LocalPosition: {x: -0, y: 0.36, z: 0}
+  m_LocalPosition: {x: -0, y: 0.8, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -755,7 +756,7 @@ MonoBehaviour:
   effect: {fileID: 11400000, guid: 929e6242063e037478d06ff71f95ed6f, type: 2}
   socket: {fileID: 2004023325636252506}
   offset: {x: 0, y: 0, z: 0}
-  scale: 2
+  scale: 1.5
   safetyTimeout: 5
 --- !u!1 &8327972900299513230
 GameObject:
@@ -925,7 +926,7 @@ MonoBehaviour:
   effect: {fileID: 11400000, guid: 929e6242063e037478d06ff71f95ed6f, type: 2}
   socket: {fileID: 4464673839280985573}
   offset: {x: 0, y: 0, z: 0}
-  scale: 2
+  scale: 1.5
   safetyTimeout: 5
 --- !u!1001 &7925796227985963977
 PrefabInstance:

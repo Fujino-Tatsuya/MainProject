@@ -216,12 +216,26 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         LastTransitionCause = DescribeCaller(callerMember, callerFile, callerLine);
 
         PlayerActionState previousState = CurrentState;
-        currentState?.Exit(nextState);
+        ExitCurrentState(nextState);
         currentState = CreateState(nextState);
         currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
         OnActionStateChanged();
         return true;
+    }
+
+    /// <summary>
+    /// 지금 나가는 상태의 Exit 가 도는 동안만 값이 있다 — 들어갈 상태. 나가는 쪽 정리 코드(공격 취소의 Idle 복귀 등)가
+    /// 다음 상태가 곧 틀 애니(대시 Dodge)를 같은 프레임에 덮지 않게 묻는다(할 일 92-3).
+    /// </summary>
+    public PlayerActionState? TransitionTarget { get; private set; }
+
+    private void ExitCurrentState(PlayerActionState nextState)
+    {
+        PlayerActionState? outer = TransitionTarget;
+        TransitionTarget = nextState;
+        currentState?.Exit(nextState);
+        TransitionTarget = outer;
     }
 
     // 상태 전이 직후 공통 — 선입력 버퍼 진단(관측 전용)과 '기본 공격 뒤 스킬' 예약 정리(할 일 44).
@@ -484,7 +498,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         LastTransitionCause = DescribeCaller(callerMember, callerFile, callerLine);
 
         PlayerActionState previousState = CurrentState;
-        currentState?.Exit(nextState.StateType);
+        ExitCurrentState(nextState.StateType);
         currentState = nextState;
         currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
@@ -1451,6 +1465,8 @@ public sealed class PlayerDashState : PlayerStateBase
     {
         Context.Player.SetAnimatorMoving(false);
         Context.Movement.RotateImmediately(direction);
+        // 나가는 상태(공격·스킬)의 정리는 Dodge 가 있으면 0층을 건드리지 않았다 — 여기서 튼 Dodge 가 최종으로 남는다.
+        Context.Dash?.PlayDodgeStart(duration);
 
         startPosition = CurrentPosition;
         PlayerGroundingSensor sensor = Context.GroundingSensor;
@@ -1480,7 +1496,15 @@ public sealed class PlayerDashState : PlayerStateBase
 
     public override void Tick()
     {
-        if (Time.time >= endTime)
+        // 구간 속도(할 일 92-5) — 끝나는 프레임에도 먼저 쓰고, 이어지는 Exit 가 기본값 1 로 되돌린다.
+        Context.Dash?.TickDodgeSpeed();
+        if (Time.time < endTime)
+            return;
+
+        // 이동 입력 중이면 Idle 을 거치지 않고 Move 로 — 하체가 Dodge → Run_Loop 로 바로 이어진다(PlayerDashController.PlayDodgeEnd).
+        PlayerActionState next = PlayerActionPoseRules.DashEndState(
+            Context.Input.HasMoveInput, Context.StatusEffects.BlocksMovement);
+        if (next != PlayerActionState.Move || !Context.Controller.ChangeState(PlayerActionState.Move))
             Context.Controller.ChangeState(PlayerActionState.Idle);
     }
 
@@ -1528,6 +1552,7 @@ public sealed class PlayerDashState : PlayerStateBase
         Context.Motor?.ClearDashMotion();
         if (Context.Motor != null)
             Context.Motor.MovementResolved -= OnMotorMovementResolved;
+        Context.Dash?.PlayDodgeEnd(nextState);
 
         float elapsed = Time.time - startTime;
         bool expired = Time.time >= endTime;

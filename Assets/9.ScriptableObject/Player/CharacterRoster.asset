@@ -18,13 +18,16 @@ MonoBehaviour:
     portrait: {fileID: 21300000, guid: cdbe6b2792f1adc48a5656ea5fdb6527, type: 3}
     available: 1
     tutorialCharacter: 1
+    hudHpFill: {fileID: 21300000, guid: fc9f0aae5e3fa854c90a141d1602e1d3, type: 3}
   - displayName: "\uAC70\uB108"
     playerPrefab: {fileID: 1006850121594653262, guid: 0fbb7232130df8540a013fe07a9f9977, type: 3}
     portrait: {fileID: 21300000, guid: 48fcc0833eb62e840b204b0b8d22e4cb, type: 3}
     available: 1
     tutorialCharacter: 2
+    hudHpFill: {fileID: 21300000, guid: d9ea7187c5e9b0c4a8523db4dd8eedc0, type: 3}
   - displayName: "\uC5B4\uC314\uC2E0"
     playerPrefab: {fileID: 768617275354264640, guid: 09946a29a8149e944b20acf9967ee741, type: 3}
     portrait: {fileID: 21300000, guid: a06f9810f538856409a924a2b44174a5, type: 3}
     available: 1
     tutorialCharacter: 3
+    hudHpFill: {fileID: 21300000, guid: b33c97e3f91d9ef43a395e6219a7acbb, type: 3}
