@@ -34,6 +34,8 @@ public sealed class QABoss103Threat
     public ulong Mask;
     /// <summary>드론: 표식 단계에서 내가 대상이었다.</summary>
     public bool TargetedMe;
+    /// <summary>할 일 119 — 무적으로 못 피하는 즉사 장판(<see cref="QABoss103Lethal.ClassifyFloor"/>). None 이 아니면 회피 굴림·대시 없음.</summary>
+    public QABoss103LethalKind Lethal;
 
     /// <summary>남은 위험 시간(초).</summary>
     public double Remaining(double now) => Math.Max(0.0, EndsAt - now);
@@ -124,6 +126,13 @@ public sealed class QABoss103ThreatSensor
     private bool _floorPending;
     private ulong _floorMask;
     private float _floorWarn;
+    private BossChargeSequence _chargeSeq;
+
+    // 할 일 119 — 장판 발동(ClientFired) 확인: 예고 때 맞춘 즉사 판별이 실제 발동의 즉사 여부와 맞는가(로그용).
+    private bool _firePending;
+    private ulong _fireMask;
+    private bool _fireLethal;
+    private QABoss103Threat _fireThreat;
 
     /// <summary>못 찾은 리플렉션 멤버(로그용, 비면 "none").</summary>
     public string Missing { get; }
@@ -162,14 +171,24 @@ public sealed class QABoss103ThreatSensor
         _bossStateWas = boss.State;
         _floor = boss.GetComponent<BossElectricFloor>();
         if (_floor != null)
+        {
             _floor.ClientWarnShown += OnFloorWarn;
+            _floor.ClientFired += OnFloorFired;
+        }
+        _chargeSeq = boss.GetComponentInChildren<BossChargeSequence>(true);
     }
 
     public void Unbind()
     {
         if (_floor != null)
+        {
             _floor.ClientWarnShown -= OnFloorWarn;
+            _floor.ClientFired -= OnFloorFired;
+        }
         _floor = null;
+        _chargeSeq = null;
+        _firePending = false;
+        _fireThreat = null;
         _boss = null;
         _cone = null;
         _drone = null;
@@ -188,6 +207,40 @@ public sealed class QABoss103ThreatSensor
         _floorPending = true;
         _floorMask = mask;
         _floorWarn = warnTime;
+    }
+
+    private void OnFloorFired(ulong mask, float vfxTime, bool lethal)
+    {
+        _firePending = true;
+        _fireMask = mask;
+        _fireLethal = lethal;
+    }
+
+    /// <summary>
+    /// 할 일 119 — 직전 장판 발동 1건(한 번만 꺼낸다). <paramref name="warned"/> = 그 발동의 예고 위험(마스크가 같을 때, 없으면 null),
+    /// <paramref name="firedLethal"/> = 게임이 보낸 즉사 연출 플래그.
+    /// </summary>
+    public bool TakeFloorFire(out QABoss103Threat warned, out ulong mask, out bool firedLethal)
+    {
+        warned = null;
+        mask = _fireMask;
+        firedLethal = _fireLethal;
+        if (!_firePending)
+            return false;
+        _firePending = false;
+        warned = _fireThreat != null && _fireThreat.Mask == _fireMask ? _fireThreat : null;
+        return true;
+    }
+
+    /// <summary>할 일 119 — 지금 보스 데이터 기준 즉사 판별 값(<see cref="QABoss103Lethal.From"/>). 상승 여유 = 탑 연출 <c>RiseGrace</c>(없으면 게임 기본 1.5초).</summary>
+    public QABoss103Lethal.Data LethalData()
+    {
+        BossDataSO d = _boss != null ? _boss.Data : null;
+        if (d == null)
+            return default;
+        float grace = _chargeSeq != null ? _chargeSeq.RiseGrace : 1.5f;   // TwentyThreeBoss.PnRiseGrace 와 같은 규칙
+        return QABoss103Lethal.From(d.pushNorthFirstChargeTime, d.pushNorthChargeTime, grace, d.pushNorthDischargeIgnoreInvuln,
+                                    d.raidSelfDestructBlastLethal, d.raidSelfDestructBlastIgnoreInvuln, d.raidSelfDestructBlastWarn);
     }
 
     /// <summary>매 프레임(전투 중). <paramref name="now"/> = 실시간(초).</summary>
@@ -325,6 +378,9 @@ public sealed class QABoss103ThreatSensor
         _floorThreat = Add(QABoss103ThreatKind.Floor, now, _floorWarn);
         _floorThreat.Mask = _floorMask;
         _floorThreat.EndsAt = now + _floorWarn + 0.15;
+        QABoss103Lethal.Data lethal = LethalData();
+        _floorThreat.Lethal = QABoss103Lethal.ClassifyFloor(_floorMask, _floorWarn, BossTileGrid.AllMask, lethal);
+        _fireThreat = _floorThreat;
     }
 
     private void TickGeneric(double now)

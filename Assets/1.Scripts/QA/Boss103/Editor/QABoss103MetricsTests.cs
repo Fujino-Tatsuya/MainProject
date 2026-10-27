@@ -311,9 +311,10 @@ public sealed class QABoss103MetricsTests
     {
         QABoss103RunStats s = Scenario();
         SortedDictionary<string, int[]> t = s.PatternTable();
-        CollectionAssert.AreEqual(new[] { 1, 1, 0, 1, 0 }, t["LeftHook"], "부채꼴 굴림 → 시간표의 LeftHook");
-        CollectionAssert.AreEqual(new[] { 0, 0, 0, 1, 1 }, t["floor"]);
-        CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 0 }, t["Dash"], "돌진 모양은 시간표보다 모양");
+        // 끝 칸 = 할 일 119 즉사(굴림 없음) — 이 판엔 없다.
+        CollectionAssert.AreEqual(new[] { 1, 1, 0, 1, 0, 0 }, t["LeftHook"], "부채꼴 굴림 → 시간표의 LeftHook");
+        CollectionAssert.AreEqual(new[] { 0, 0, 0, 1, 1, 0 }, t["floor"]);
+        CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 0, 0 }, t["Dash"], "돌진 모양은 시간표보다 모양");
         string[] run = QABoss103CsvRows.Run(Meta(), s);
         string[] h = QABoss103Metrics.RunsHeader;
         Assert.AreEqual("2", Col(h, run, "threat_rolls"));
