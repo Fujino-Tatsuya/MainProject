@@ -34,6 +34,21 @@ public sealed class TutorialSkipController : MonoBehaviour
 
     // 서버
     bool _running;
+
+    /// <summary>[서버] 구간 스킵 실행 중.</summary>
+    public bool IsRunning => _running;
+
+    /// <summary>
+    /// [서버] 지금 도는 구간 스킵이 <paramref name="gate"/> 를 지나간다 — 4구역 소개 연출은 이때만 G7 보류를 풀고 연출 없이 연다(TutorialZone4IntroFlow).
+    /// 🔴 실행 중이기만 하면 풀던 첫 구현은 Alt+5(복도3 — G7 을 안 지남)에서도 보류를 풀어 연출이 사라졌다(경석 10-27 Play).
+    /// </summary>
+    public bool IsSkippingThrough(TutorialGate gate)
+    {
+        if (!_running) return false;
+        foreach (TutorialSkipAction action in _plan)
+            if (action.Gate == gate) return true;
+        return false;
+    }
     readonly List<TutorialSkipAction> _plan = new List<TutorialSkipAction>();
     readonly List<int> _corridors = new List<int>();
     readonly List<Vector3> _points = new List<Vector3>();

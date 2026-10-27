@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b7fb412c1dfdd944b35a3cf6ade8487, type: 3}
+  m_Name: Zone4IntroCinematic
+  m_EditorClassIdentifier: 
+  introEnabled: 1
+  shots:
+  - moveSeconds: 1
+    holdSeconds: 1.6
+  - moveSeconds: 0.9
+    holdSeconds: 1.6
+  - moveSeconds: 0.9
+    holdSeconds: 1.6
+  - moveSeconds: 0.9
+    holdSeconds: 1.6
+  - moveSeconds: 1.2
+    holdSeconds: 5
+  returnBlendSeconds: 1.2
+  skipHoldSeconds: 1
+  skipToBossSeconds: 0.8
+  skipBossHoldSeconds: 1.2
+  skipReturnSeconds: 1
+  lines:
+  - lineId: TUT_Z4_INTRO_DEVICES
+    shotIndex: 0
+    delaySeconds: 0.3
+    chunkSeconds: 2.6
+    gapSeconds: 0.25
+    holdUntilNextLine: 1
+  - lineId: TUT_Z4_INTRO_BRIDGE
+    shotIndex: 4
+    delaySeconds: 0.3
+    chunkSeconds: 2.4
+    gapSeconds: 0.25
+    holdUntilNextLine: 0
+  returnLineId: TUT_Z4_INTRO_RETURN
+  returnLineDelaySeconds: 0.2
+  returnLineChunkSeconds: 1.8
+  returnLineGapSeconds: 0.25
+  maxLineWidth: 760
+  panelPitch: 50
+  panelDistance: 14
+  panelFov: 40
+  panelFocusHeight: 0
+  panelTowardCenter: 0
+  panelOutline: 1
+  bridgePitch: 58
+  bridgeAutoFit: 1
+  bridgeFitMargin: 1.1
+  bridgeDistance: 36
+  bridgeFov: 45
+  bridgeOutline: 1
+  bridgeOutlineNames: []
+  bridgeOutlineMaterial: {fileID: 2100000, guid: f062b7e76a29496ca5eed1c811d30358, type: 2}
+  bridgeOutlineMaskMaterial: {fileID: 2100000, guid: e14d3e715c27418588242616c4cb90d0, type: 2}
+  bridgeClipRadius: 11.725
+  bridgeClipFallbackRadius: 0
+  bridgeClipEdgeWidth: 0.25
+  bridgeFocusHeight: 0
+  bridgeFocusSouth: 0
+  letterboxHeight: 0.04
+  vignetteIntensity: 0.35
+  vignetteSmoothness: 0.42
+  overlayFadeSeconds: 0.4
+  dimSuppress: 1
+  skipButtonSprite: {fileID: 21300000, guid: 28aaba80a0054613b29a08d4926849c1, type: 3}
+  captionBackground: {fileID: 21300000, guid: 0a7a60b5a8de48af878d905ca39f158a, type: 3}
+  captionBadge: {fileID: 21300000, guid: b4120d8b24594140996a339ddb498d52, type: 3}
+  captionWalkie: {fileID: 21300000, guid: fdc6f9dcf0ce428d955dbbe6a297afe3, type: 3}
+  captionFont: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  captionAnchor: {x: 0.5, y: 0.28}
+  captionOffset: {x: 0, y: 0}
+  captionScale: 0.85
+  captionFontSize: 30
+  captionTextColor: {r: 0.96, g: 0.93, b: 0.86, a: 1}
+  captionFadeSeconds: 0.15
+  captionRiseDistance: 14
+  captionRiseSeconds: 0.25
+  badgePulseScale: 0.18
+  badgePulseSeconds: 0.35

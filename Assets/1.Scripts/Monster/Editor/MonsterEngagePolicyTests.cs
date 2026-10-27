@@ -140,4 +140,32 @@ public sealed class MonsterEngagePolicyTests
     {
         Assert.IsTrue(MonsterEngagePolicy.IsInAttackRange(true, Range, Range, -3f));
     }
+
+    // ── 사거리 안 어그로 전환(팀장 10-26) ───────────────────────────────────────
+
+    [Test]
+    public void 대상이_사거리_안이면_전환_탐색_안_함()
+    {
+        Assert.IsFalse(MonsterEngagePolicy.ShouldLookForInRangeTarget(2f, Range, Margin));
+    }
+
+    [Test]
+    public void 대상이_경계_여유_안이면_전환_탐색_안_함()
+    {
+        // 2.5 ~ 3.0 사이에서 깜빡여도 두 사람 사이를 오가지 않는다.
+        Assert.IsFalse(MonsterEngagePolicy.ShouldLookForInRangeTarget(2.9f, Range, Margin));
+        Assert.IsFalse(MonsterEngagePolicy.ShouldLookForInRangeTarget(Range + Margin, Range, Margin));
+    }
+
+    [Test]
+    public void 대상이_여유_밖이면_전환_탐색()
+    {
+        Assert.IsTrue(MonsterEngagePolicy.ShouldLookForInRangeTarget(3.1f, Range, Margin));
+    }
+
+    [Test]
+    public void 전환_여유가_음수여도_사거리보다_좁아지지_않는다()
+    {
+        Assert.IsFalse(MonsterEngagePolicy.ShouldLookForInRangeTarget(Range, Range, -3f));
+    }
 }

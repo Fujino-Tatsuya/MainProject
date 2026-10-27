@@ -43,16 +43,23 @@ public sealed class TutorialZone4Model
     private bool _padActive;
     private double _padShownAt = double.NegativeInfinity;
 
+    /// <param name="startOnGateOpen">
+    /// true = 설정 자막을 G7 열림 하나로 시작한다(파티 존4 진입을 기다리지 않는다). 4구역 소개 연출(PLAN-zone4-intro-cinematic)이 켜진 판 —
+    /// 연출이 끝나 G7 이 열리는 순간이 곧 타이머 시작이다(경석 10-26: 소개가 끝나고 타이머).
+    /// </param>
     public TutorialZone4Model(float loreSeconds = DefaultLoreSeconds, float wakeDelaySeconds = DefaultWakeDelaySeconds,
                               float padCountCooldownSeconds = DefaultPadCountCooldownSeconds,
-                              float bossTipDelaySeconds = DefaultBossTipDelaySeconds)
+                              float bossTipDelaySeconds = DefaultBossTipDelaySeconds,
+                              bool startOnGateOpen = false)
     {
+        StartOnGateOpen = startOnGateOpen;
         LoreSeconds = Math.Max(0f, loreSeconds);
         WakeDelaySeconds = Math.Max(0f, wakeDelaySeconds);
         PadCountCooldownSeconds = Math.Max(0f, padCountCooldownSeconds);
         BossTipDelaySeconds = Math.Max(0f, bossTipDelaySeconds);
     }
 
+    public bool StartOnGateOpen { get; }
     public float LoreSeconds { get; }
     public float WakeDelaySeconds { get; }
     public float PadCountCooldownSeconds { get; }
@@ -83,7 +90,7 @@ public sealed class TutorialZone4Model
 
     private bool TryStartLore(double now)
     {
-        if (Phase != TutorialZone4Phase.Waiting || !_entryGateOpen || !_partyEntered) return false;
+        if (Phase != TutorialZone4Phase.Waiting || !_entryGateOpen || (!_partyEntered && !StartOnGateOpen)) return false;
         Phase = TutorialZone4Phase.Lore;
         _timerAt = now + LoreSeconds;
         return true;

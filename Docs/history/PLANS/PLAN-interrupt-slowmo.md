@@ -95,3 +95,5 @@
 - EditMode: S1 산식(단계·last-wins·실패 복귀·누적 단조성) — 내가 직접 실행.
 - 컴파일/콘솔: 각 커밋 후 Refresh + 콘솔 확인.
 - MPPM(사용자): 호스트 + 클라 2 — 동시 진입·복귀, 원격 캐릭터 스냅 여부(R1), 진입 시차(R2), 오너 줌, 컷신 중 무발동.
+
+> **할 일 87 후속** — 간파 성공 슬로우·히트스톱·암순응·성공 이펙트 칸: [interrupt-presentation.md](../../tech/interrupt-presentation.md)

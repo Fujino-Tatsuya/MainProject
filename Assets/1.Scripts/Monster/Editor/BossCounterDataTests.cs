@@ -38,6 +38,10 @@ public sealed class BossCounterDataTests
 
         // 전체 행동 불능 시간 — Hit 을 앞에 더하지 않으므로 이 값이 곧 체감 시간이다(설계 §3.3).
         // ⚠️ 2026-09-28 팀 기획(간파·제압)으로 교체: 성공 횟수 → 게이지(20 × 5), 그로기 0.5 → 1.5, Break 2 → 제압 5.
+        // ⚠️ 2026-10-27 전투 시스템 명세(10-14 §6): 23호는 게이지 대신 정수 칸 — 총 3칸, 간파·벽·벤트 각 1칸. 아래 게이지 값은 훈련 스파링만 읽는다.
+        Assert.That(data.suppressSegmentCount, Is.EqualTo(3));
+        Assert.That(data.counterSegmentStep, Is.EqualTo(1));
+        Assert.That(data.environmentSegmentStep, Is.EqualTo(1));
         Assert.That(data.counterGaugeStep, Is.EqualTo(20f));
         Assert.That(data.environmentGaugeStep, Is.EqualTo(20f));
         Assert.That(data.suppressDamageMultiplier, Is.EqualTo(1.2f));

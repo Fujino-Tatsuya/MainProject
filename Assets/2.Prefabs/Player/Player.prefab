@@ -772,6 +772,7 @@ GameObject:
   - component: {fileID: 133388133837901378}
   - component: {fileID: 519902155721058497}
   - component: {fileID: 755154413323072885}
+  - component: {fileID: 3856112276083832082}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -974,6 +975,7 @@ MonoBehaviour:
   attackSpeed: 0
   maxHp: 50
   defense: 25
+  statValidationGrace: 0.5
   platformGroundCheckDistance: 0.6
 --- !u!114 &1825865676068489031
 MonoBehaviour:
@@ -988,6 +990,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInputReader
   ShowTopMostFoldoutHeaderGroup: 1
+  inputBufferSeconds: 0.2
+  bufferPriorityDash: 5
+  bufferPriorityInterrupt: 4
+  bufferPriorityUltimate: 3
+  bufferPrioritySkillMain: 2
+  bufferPrioritySkillSub: 2
+  bufferPriorityAttack: 1
 --- !u!114 &9007214485145382345
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1031,6 +1040,8 @@ MonoBehaviour:
   acceleration: 80
   alignThreshold: 0.98
   viewYaw: -45
+  attackTurnSpeed: 1500
+  attackTurnSnapAngle: 30
 --- !u!114 &800000000000000031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1087,6 +1098,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStateController
   currentStateDebug: 0
   serverKnockbackReportGraceTime: 0.25
+  effectBlockedSoundKey: 
 --- !u!114 &4711829301158223401
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1111,6 +1123,7 @@ MonoBehaviour:
     interruptSkill: {fileID: 0}
     ultimateSkill: {fileID: 0}
   endFallbackPadding: 0.1
+  cooldownRejectSoundKey: 
 --- !u!114 &1111000000000000002
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1451,6 +1464,20 @@ MonoBehaviour:
   aggroOutlineWidthPixels: 2
   skillRangeMaxTargets: 16
   aggroMaxTargets: 8
+--- !u!114 &3856112276083832082
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7134a7ab37e1c8f4f9309f088651f54d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptSuccessFx
+  casterFx: {fileID: 0}
+  targetFx: {fileID: 0}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

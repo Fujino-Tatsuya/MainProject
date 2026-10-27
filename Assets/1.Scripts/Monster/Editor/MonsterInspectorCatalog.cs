@@ -135,8 +135,11 @@ public static class MonsterInspectorCatalog
         (Combat, "counterRequiresFront", "간파는 정면에서만"),
         (Combat, "counterFrontAngle", "간파 인정 정면 각도"),
         (Combat, "backAttackAngle", "백어택 반각"),
-        (Combat, "counterGaugeStep", "간파 1회 게이지 감소"),
-        (Combat, "environmentGaugeStep", "환경 1회 게이지 감소"),
+        (Combat, "suppressSegmentCount", "총 제압 칸"),
+        (Combat, "counterSegmentStep", "간파 1회 칸 감소"),
+        (Combat, "environmentSegmentStep", "환경 1회 칸 감소"),
+        (Combat, "counterGaugeStep", "간파 1회 게이지 감소 (훈련 스파링 전용)"),
+        (Combat, "environmentGaugeStep", "환경 1회 게이지 감소 (훈련 스파링 전용)"),
         (Combat, "suppressDamageMultiplier", "제압 중 받는 피해 배율"),
 
         // ── 원거리 몬스터 전용 ──

@@ -37,6 +37,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private float endTime;
     private bool hasResolvedHit;
     private bool interruptSucceeded; // 이번 판정에서 카운터 창 소비 성공이 한 건이라도 있었는가
+    // 이번 판정에서 카운터 창을 소비한 첫 대상의 월드 위치 — 성공 연출 기준점(할 일 87 C5). 기록만 하고 판정엔 안 쓴다.
+    private bool hasSuccessTargetPosition;
+    private Vector3 successTargetPosition;
 
     // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
     [Header("간파 지연 측정")]
@@ -183,6 +186,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         hasResolvedHit = true;
         interruptSucceeded = false;
+        hasSuccessTargetPosition = false;
 
         if (HitboxAnchor == null || owner == null)
         {
@@ -243,6 +247,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             if (counterSucceeded)
             {
                 interruptSucceeded = true;
+                RecordSuccessTarget(unit);
                 if (slowMotion.IsPending)
                     interruptLanded = true;
             }
@@ -261,6 +266,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         FailSlowMotion(slowMotion.Resolve(interruptLanded));
+        if (interruptSucceeded)
+            StartSuccessSlowMotion();
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -401,7 +408,21 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
     }
 
-    private void HandleCounterSucceeded(Unit target, ulong attackerClientId) => interruptSucceeded = true;
+    private void HandleCounterSucceeded(Unit target, ulong attackerClientId)
+    {
+        interruptSucceeded = true;
+        RecordSuccessTarget(target);
+    }
+
+    // 성공 연출 기준점 — 이번 판정에서 처음 성공한 대상만 남긴다(기록만, 판정 불변).
+    private void RecordSuccessTarget(Unit target)
+    {
+        if (hasSuccessTargetPosition || target == null)
+            return;
+
+        hasSuccessTargetPosition = true;
+        successTargetPosition = target.transform.position;
+    }
 
     // ── 인터럽트 슬로우 모션 (서버) ──
 
@@ -414,6 +435,20 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
+    }
+
+    // 간파 성공(할 일 87): 판정 끝에 성공 프로필로 다시 건다. 마지막 것이 이기므로 시도 슬로우의 지금 배율에서 이어지고,
+    // 예측이 빗나가 시도 슬로우가 없었어도 건다. 연출 훅일 뿐 판정·피해·카운터 창에는 관여하지 않는다.
+    // 연출 기준 위치 = 카운터 창을 소비한 첫 대상, 없으면 시전자(C5).
+    private void StartSuccessSlowMotion()
+    {
+        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
+        if (timeScale == null)
+            return;
+
+        Vector3 targetPosition = hasSuccessTargetPosition ? successTargetPosition : owner.transform.position;
+        timeScale.ServerStart(timeScale.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success,
+            targetPosition);
     }
 
     private bool PredictsInterruptHit()
