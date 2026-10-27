@@ -18,16 +18,19 @@ internal sealed class DebugTimeScaleEditor : Editor
                 scale.floatValue = preset;
         }
         EditorGUILayout.EndHorizontal();
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("normalSpeedAfterSuccess"), new GUIContent("성공 후 1배속(초, 실제 시간)"));
         serializedObject.ApplyModifiedProperties();
 
         if (!Application.isPlaying)
             return;
 
+        var debug = (DebugTimeScale)target;
         GlobalTimeScale layer = GlobalTimeScale.Instance;
         string slow = layer != null && layer.IsActive ? $"슬로우 {layer.CurrentScale:0.###} ({layer.CurrentPhase})" : "슬로우 없음";
+        string hold = debug.IsHoldingNormalSpeed ? $"  |  성공 후 1배속 {debug.NormalSpeedRemaining:0.0}s 남음" : string.Empty;
         EditorGUILayout.HelpBox(
             layer != null
-                ? $"Time.timeScale = {Time.timeScale:0.###}  |  {slow}  ×  기본 배속 {layer.BaseScale:0.###}"
+                ? $"Time.timeScale = {Time.timeScale:0.###}  |  {slow}  ×  기본 배속 {layer.BaseScale:0.###}{hold}"
                 : "GlobalTimeScale 없음 — Dev Boot 로 들어왔는지 확인(NetworkManager.prefab 소속).",
             MessageType.None);
         Repaint();

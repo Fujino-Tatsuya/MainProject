@@ -193,7 +193,7 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 | `PlayerDashValidationManager`(프리팹) | 대시 서버 검증 — 맵 씬마다 두는 매니저(대시·대쉬 간파에 필요) |
 | `FloatingDamageSpawner` | 씬 싱글턴 — 없으면 데미지 숫자가 안 뜬다 |
 | `TrainingDummy_1`·`_2`(`TrainingDummy.prefab`, (±2, 0, 5)) + `DebugDummyInterruptRecovery` | 간파 표적. HUD 는 플레이어 프리팹에 있어 따로 두지 않는다 |
-| `InterruptLab` + `DebugTimeScale` | 디버그 배속 |
+| `InterruptLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle` | 디버그 배속(+성공 후 1배속)·쿨 0·F1 캐릭터 순환(C6) |
 
 **배속** (`DebugTimeScale` — `InterruptLab` 오브젝트 인스펙터): 슬라이더 0.05~2, 프리셋 버튼 ×0.1/×0.25/×0.5/×1. Play 중 바로 반영되고 인스펙터에 지금 `Time.timeScale`·슬로우·기본 배속이 보인다.
 - `Time.timeScale` 을 직접 쓰지 않고 `GlobalTimeScale.BaseScale`(기본 배속, 기본 1)만 정한다. 최종 = **디렉터 슬로우 배율 × 디버그 배속**(`GlobalTimeScale.ComposeScale`). 슬로우가 없을 때도 기본 배속을 쓰고, 1 로 돌리면 1 로 돌아간다. 1 이면 이 기능이 없던 때와 동작이 완전히 같다.
@@ -205,6 +205,21 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 - 허수아비 코드는 그대로다. 순환이 이미 [취약 → idle → 인터럽트 가능(무기한)] 이라 이 컴포넌트는 `TrainingDummyInterrupt` 의 취약 = 회복 시간, idle = 0 으로 **씬 인스턴스 오버라이드**만 맞춘다(에디터, Play 밖). 회복 시간 전부가 취약(보라, CC 가능)이다.
 - 순환은 스폰 때 만들어진다 — Play 중 바꾼 값은 다음 Play 부터. 시간은 서버 `deltaTime` 이라 디버그 배속·슬로우를 따른다(×0.1 이면 실시간 20초).
 - 씬 오버라이드라 데이터 테이블 `Map` 시트 값이 이 두 인스턴스엔 닿지 않는다 — Verify 가 이 씬을 경고하는 것은 의도다.
+
+**성공 후 1배속** (C6, `DebugTimeScale` 의 `성공 후 1배속(초, 실제 시간)`, 기본 3): 간파 성공 → 그 시간(실제 시간, `Time.unscaledTimeAsDouble`) 동안 기본 배속을 1 로 둔다. 끝나면 슬라이더 값으로 돌아간다 — 슬라이더는 건드리지 않으므로 그 사이 바꾼 값이 쓰인다. 그 사이 또 성공하면 그때부터 다시 잰다. 0 = 끔.
+- 디렉터 성공 슬로우·히트스톱은 그대로 곱해진다(1 × 슬로우).
+- 성공 감지 = `InterruptProductionDirector.LocalSucceeded`(각 피어, 성공 슬로우가 이 피어에서 시작될 때 — 칸 스위치와 무관). 이 구독용 이벤트 하나만 디렉터에 추가했다(새 연출 경로 아님). 성공 슬로우가 거부되면(컷신 잠금·씬 전환) 이벤트도 나지 않는다.
+
+**쿨 0** (C6, `DebugZeroCooldown` — 칸 `interrupt`·`dash`, 기본 둘 다 켬): 쿨 계산 코드는 그대로고 기존 리셋 API 만 부른다(튜토리얼 복도1 쿨 초기화와 같은 짝).
+- 간파 [서버]: 매 프레임 각 플레이어의 간파 슬롯 쿨이 남아 있으면 `PlayerSkillController.ResetCooldownServer(Interrupt)` — 성공·실패·대쉬 간파 무관. 장부 API 가 오너 HUD 장부에 미러하므로 오너 선검증(`IsBlockedByCooldown`)·서버 승인(`CanApproveSkill`) 모두 통과.
+- 대시 [서버]: `PlayerDashController.ServerDashApproved` 마다 `ServerResetChargeToFull`. [오너]: 내 예측 충전이 덜 찼으면 `OwnerResetChargeToFull`(각 피어의 씬 인스턴스가 자기 플레이어만). 리셋마다 `[Dash/서버] 충전 강제 초기화` 로그가 한 줄 남는다.
+- 컴포넌트를 끄면 평소 쿨로 돌아간다(이미 남은 쿨은 그대로 흐른다).
+
+**F1 캐릭터 순환** (C6, `DebugCharacterCycle` — `순환 순서` 기본 팔라딘(0) → 어쌔신(2) → 거너(1), 로스터 = `CharacterRoster.asset` id): 로비 캐릭터 교체(할 일 48 C12)와 같은 길 — 서버가 지금 PlayerObject 를 디스폰하고 같은 위치·회전에 새 Variant 를 `PlayerSpawnService.SpawnCharacter` 로 세운다. 카메라는 새 오너 플레이어의 `OnNetworkSpawn → CameraTargetSwitcher.FocusOwnerPlayer` 로 다시 붙는다.
+- **호스트만**(서버 API 를 바로 부른다, 새 RPC 없음). 클라 창에서 누르면 경고만.
+- 지금 캐릭터는 PlayerObject 프리팹 해시로 로스터에서 찾는다(모르면 순서의 처음). 선택 저장소(`ServerCharacterSelectionStore`)는 건드리지 않는다.
+- 새 오브젝트라 HP·쿨·상태가 새로 시작된다. 연타 방지 0.5초(실제 시간).
+- 게이트 `UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS`. F1 은 `HitVFXDebugHUD`(피격 이펙트 순환)와 같은 키지만 그 HUD 는 이 씬·부트 구성에 없어 겹치지 않는다([debug-hotkeys.md](debug-hotkeys.md)).
 
 ## 11. 범위 밖
 
