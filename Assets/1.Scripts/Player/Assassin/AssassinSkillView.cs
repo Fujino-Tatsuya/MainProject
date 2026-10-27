@@ -27,13 +27,13 @@ using UnityEngine;
 ///   일반 E 버프(날 발광·오라·차지)는 <see cref="AssassinEnhanceReadyView"/>(Assassin_Armature) 담당.
 /// - 우클릭 간파: 🔹 정식 VFX(2026-10-19 민경) — 기 모으기·튀기기·올려치기는 <c>Attack_Up_01</c> 클립의 <see cref="EffectAnimEvents"/>
 ///   이벤트가 <c>Player_Assassin/VFX/RightClick/*</c> 소켓에서 직접 재생한다. 여기 남은 것: 간파 성공 = [서버]
-///   <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/> → 전 피어 "성공 대기" → 올려치기 소켓 id 가 재생되는 순간
-///   <c>insightSuccess</c> 원샷(알림이 더 늦으면 받는 즉시), 기 모으기 안전 정지 <see cref="EndInterrupt"/>(스킬 OnEnd).
+///   간파 연출 디렉터 성공 단계의 relay(<see cref="IInterruptSuccessRelay"/>, 할 일 118) → 전 피어 "성공 대기" → 올려치기 소켓 id 가
+///   재생되는 순간 디렉터에 C2 칸을 묻고 <c>insightSuccess</c> 원샷(알림이 더 늦으면 받는 즉시), 기 모으기 안전 정지 <see cref="EndInterrupt"/>(스킬 OnEnd).
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
 /// </summary>
 [RequireComponent(typeof(AssassinState))]
-public sealed class AssassinSkillView : BaseNetworkBehaviour
+public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessRelay, IInterruptCueSink
 {
     [Header("변신 루프 — EffectCatalog.Assassin_R_BladeVortex")]
     [Tooltip("플레이어 루트 기준 월드 오프셋. 배율에 곱해지지 않는다 — 프리팹 피벗이 발밑이라 기본 0.")]
@@ -104,11 +104,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         if (animEvents != null)
             animEvents.Played += HandleAnimEffectPlayed;
     }
-
-    // 서버에서만 난다(정적 이벤트) — 시전자가 나인 것만 거른다.
-    private void OnEnable() => PlayerInterruptSkillBase.ServerInterruptSucceeded += HandleServerInterruptSucceeded;
-
-    private void OnDisable() => PlayerInterruptSkillBase.ServerInterruptSucceeded -= HandleServerInterruptSucceeded;
 
     private void Start() => SyncLoops();
 
@@ -327,10 +322,11 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             success.PlayOnce();
     }
 
-    // [서버] 간파 성공 — 전 피어에 성공 대기를 알린다. 1회성 판정 결과라 Reliable.
-    private void HandleServerInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
+    // [서버] 간파 성공 — 디렉터 성공 단계가 시전자 아래 relay 를 부른다(할 일 118). 전 피어에 성공 대기를 알린다. 1회성 판정 결과라 Reliable.
+    // 꺼진 컴포넌트는 옛 OnEnable 구독처럼 빠진다.
+    void IInterruptSuccessRelay.ServerRelaySuccess(in InterruptProductionEvent e)
     {
-        if (caster == null || caster != player)
+        if (!isActiveAndEnabled || e.Caster == null || e.Caster != player)
             return;
         if (IsNetworkActive)
             InterruptSucceededRpc();
@@ -363,7 +359,16 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             return;
         insightSuccessPending = false;
         insightSlashPlayed = false;
-        if (insightSuccess != null && InterruptProductionDirector.IsOn(InterruptProductionCue.AssassinInsightSuccess))
+        // C2 칸은 디렉터가 본다(피어마다 자기 값) — 켜져 있으면 PlayCue 로 돌려 부른다.
+        if (insightSuccess != null)
+            InterruptProductionDirector.PlayCue(InterruptProductionCue.AssassinInsightSuccess,
+                InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success, IsSpawned ? OwnerClientId : 0, player), this);
+    }
+
+    // [각 피어] C2 간파 성공 원샷.
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue == InterruptProductionCue.AssassinInsightSuccess && insightSuccess != null)
             insightSuccess.PlayOnce();
     }
 

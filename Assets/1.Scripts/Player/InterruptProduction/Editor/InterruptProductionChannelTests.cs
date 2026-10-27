@@ -118,7 +118,70 @@ public sealed class InterruptProductionChannelTests
         shared.PlayCue(InterruptProductionCue.TargetFlash, Event, sinks);
         Assert.AreEqual(1, _sink.Cues.Count);
         Assert.AreEqual(1, other.Cues.Count);
-        Assert.DoesNotThrow(() => shared.PlayCue(InterruptProductionCue.TargetFlash, Event, null));
+        Assert.DoesNotThrow(() => shared.PlayCue(InterruptProductionCue.TargetFlash, Event, (IInterruptCueSink[])null));
+    }
+
+    [Test]
+    public void 공용_채널_한_sink_PlayCue_는_칸이_켜질_때만()
+    {
+        var shared = new InterruptSharedChannel(_settings);
+
+        shared.PlayCue(InterruptProductionCue.PaladinWave, Event, _sink);
+        Assert.IsEmpty(_sink.Cues);
+
+        _settings.On.Add(InterruptProductionCue.PaladinWave);
+        shared.PlayCue(InterruptProductionCue.PaladinWave, Event, _sink);
+        CollectionAssert.AreEqual(new[] { InterruptProductionCue.PaladinWave }, _sink.Cues);
+        Assert.DoesNotThrow(() => shared.PlayCue(InterruptProductionCue.PaladinWave, Event, (IInterruptCueSink)null));
+    }
+
+    [Test]
+    public void 인스턴스가_없으면_정적_PlayCue_LocalAttempt_는_안_튼다()
+    {
+        Assume.That(InterruptProductionDirector.Instance == null, "EditMode 에 디렉터 인스턴스가 있다");
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), _sink);
+        Assert.DoesNotThrow(() => InterruptProductionDirector.LocalAttempt(InterruptProductionEvent.LocalAttempt(null, null)));
+        Assert.IsEmpty(_sink.Cues);
+    }
+
+    // ─── 시도 단계(피어) ───
+
+    [Test]
+    public void 팔라딘_시도는_B1_칸이_켜질_때만_sink_에_방패_발광()
+    {
+        var attempt = new InterruptAttemptStage(_settings, new InterruptProductionStageTests.FakeTimeScale());
+        var go = new GameObject("Paladin");
+        try
+        {
+            var skill = go.AddComponent<FirstMeleeInterruptSkill>();
+            InterruptProductionEvent e = InterruptProductionEvent.LocalAttempt(null, skill);
+
+            attempt.Local(e, _sink);
+            Assert.IsEmpty(_sink.Cues);
+
+            _settings.On.Add(InterruptProductionCue.PaladinShieldGlow);
+            attempt.Local(e, _sink);
+            CollectionAssert.AreEqual(new[] { InterruptProductionCue.PaladinShieldGlow }, _sink.Cues);
+            Assert.AreEqual(InterruptProductionPhase.Attempt, _sink.Last.Phase);
+            Assert.AreSame(skill, _sink.Last.Skill);
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
+    }
+
+    [Test]
+    public void 팔라딘이_아닌_시도는_시도_cue_없음()
+    {
+        foreach (InterruptProductionCue cue in System.Enum.GetValues(typeof(InterruptProductionCue)))
+            _settings.On.Add(cue);
+
+        var attempt = new InterruptAttemptStage(_settings, new InterruptProductionStageTests.FakeTimeScale());
+        attempt.Local(InterruptProductionEvent.LocalAttempt(null, null), _sink);
+        Assert.IsEmpty(_sink.Cues);
+        Assert.IsFalse(InterruptProductionRules.TryGetAttemptCue(null, out _));
     }
 
     // ─── 단계 ───

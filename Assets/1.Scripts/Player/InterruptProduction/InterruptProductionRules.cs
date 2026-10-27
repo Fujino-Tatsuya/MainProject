@@ -36,6 +36,19 @@ public static class InterruptProductionRules
         }
     }
 
+    /// <summary>시전 시작(OnClientPlay) 시도 cue — 팔라딘 방패 발광(B1)만. 어쌔신·거너는 없다(어쌔신 시도 연출은 클립 이벤트 C1).</summary>
+    public static bool TryGetAttemptCue(PlayerInterruptSkillBase skill, out InterruptProductionCue cue)
+    {
+        if (skill is FirstMeleeInterruptSkill)
+        {
+            cue = InterruptProductionCue.PaladinShieldGlow;
+            return true;
+        }
+
+        cue = default;
+        return false;
+    }
+
     /// <summary>B2·C1 — 클립 이벤트 재생 허용. 간파 id 가 아니면 늘 true.</summary>
     public static bool AllowsAnimEffect(InterruptProductionDirector director, string id) =>
         !TryGetAnimEffectCue(id, out InterruptProductionCue cue) || IsOn(director, cue);

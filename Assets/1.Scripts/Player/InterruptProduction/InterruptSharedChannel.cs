@@ -31,4 +31,13 @@ public sealed class InterruptSharedChannel
         for (int i = 0; i < sinks.Count; i++)
             sinks[i]?.PlayCue(cue, e);
     }
+
+    /// <summary>한 sink 판 — 캐릭터·대상 RPC 수신부가 자기 자신을 넘긴다(B1·B3·C2·E1). 칸이 꺼져 있으면 부르지 않는다.</summary>
+    public void PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e, IInterruptCueSink sink)
+    {
+        if (sink == null || !_settings.Get(cue))
+            return;
+
+        sink.PlayCue(cue, e);
+    }
 }

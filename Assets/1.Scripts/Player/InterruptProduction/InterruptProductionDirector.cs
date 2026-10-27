@@ -73,10 +73,14 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private InterruptResolveStage _resolve;
     private InterruptSuccessStage _success;
     private InterruptFailStage _fail;
+    private InterruptPersonalChannel _personal;
+    private InterruptSharedChannel _shared;
 
-    private InterruptAttemptStage AttemptStage => _attempt ??= new InterruptAttemptStage(this, _timePort);
+    private InterruptPersonalChannel PersonalChannel => _personal ??= new InterruptPersonalChannel(this);
+    private InterruptSharedChannel SharedChannel => _shared ??= new InterruptSharedChannel(this);
+    private InterruptAttemptStage AttemptStage => _attempt ??= new InterruptAttemptStage(this, _timePort, SharedChannel);
     private InterruptResolveStage ResolveStage => _resolve ??= new InterruptResolveStage(_timePort);
-    private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timePort);
+    private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timePort, PersonalChannel, SharedChannel);
     private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timePort);
 
     // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.
@@ -155,6 +159,26 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// <summary>A3 — 개인 채널 오너 줌 배율(카메라가 매 프레임 묻는다). 칸이 꺼져 있거나 인스턴스가 없으면 1.</summary>
     public static float OwnerZoomFactor(float zoomFactor) =>
         Instance != null ? Instance.SuccessStage.OwnerZoomFactor(zoomFactor) : 1f;
+
+    /// <summary>
+    /// [각 피어] 시도 — 시전 시작(OnClientPlay, 전 피어)에 스킬이 알린다. 그 스킬의 시도 cue(B1)를 공용 채널로 스킬 자신에 튼다.
+    /// 끄는 쪽(OnEnd)은 디렉터를 거치지 않는다.
+    /// </summary>
+    public static void LocalAttempt(in InterruptProductionEvent e)
+    {
+        if (Instance != null)
+            Instance.AttemptStage.Local(e, e.Skill as IInterruptCueSink);
+    }
+
+    /// <summary>
+    /// [각 피어] 캐릭터·대상 RPC 수신부(B3 충격파·C2 어쌔신 성공·E1 맞은 쪽 섬광)가 부른다 — 칸이 켜져 있으면 <paramref name="sink"/> 에 튼다(공용 채널).
+    /// 전송로(RPC)는 그대로다(설계 Q1-a). 인스턴스가 없으면 안 튼다(옛 스위치 꺼짐과 같다).
+    /// </summary>
+    public static void PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e, IInterruptCueSink sink)
+    {
+        if (Instance != null)
+            Instance.SharedChannel.PlayCue(cue, e, sink);
+    }
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
 

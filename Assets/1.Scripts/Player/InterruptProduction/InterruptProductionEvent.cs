@@ -121,6 +121,17 @@ public readonly struct InterruptProductionEvent
         new InterruptProductionEvent(InterruptProductionPhase.Success, casterClientId, null, null,
             succeeded: true, targetPosition: targetPosition, hasTarget: true, triggerId: triggerId);
 
+    /// <summary>[각 피어] 시도 — 시전 시작(OnClientPlay). 예측은 서버만 알아 비어 있다.</summary>
+    public static InterruptProductionEvent LocalAttempt(Player caster, PlayerInterruptSkillBase skill) =>
+        new InterruptProductionEvent(InterruptProductionPhase.Attempt, ClientIdOf(caster), caster, skill);
+
+    /// <summary>
+    /// [각 피어] 캐릭터·대상 RPC 로 받은 cue(B3·C2 = 성공, E1 = 성공 직전 대상 수신). RPC 는 인자가 없어
+    /// 시전자 id 만 아는 대로 채운다(대상 섬광은 0) — 받는 쪽은 cue 만 보고 튼다.
+    /// </summary>
+    public static InterruptProductionEvent LocalCue(InterruptProductionPhase phase, ulong casterClientId = 0, Player caster = null) =>
+        new InterruptProductionEvent(phase, casterClientId, caster, null);
+
     /// <summary>[각 피어] 슬로우 Failed 로 받은 실패.</summary>
     public static InterruptProductionEvent LocalFail(uint triggerId) =>
         new InterruptProductionEvent(InterruptProductionPhase.Fail, 0, null, null, triggerId: triggerId);

@@ -10,7 +10,7 @@ using UnityEngine;
 /// 판정·종료 = Garen_Parry 의 Hit·End 이벤트(PLAN-anim-event-timing P1-④). 시점 튜닝은 클립에서 이벤트를 옮긴다.
 /// <see cref="FirstMeleeInterruptSkillData.HitDelay"/>·SkillDuration 은 쓰지 않는다 — 이벤트가 안 오면 컨트롤러 안전망(MaxActiveDuration)이 끝낸다.
 /// </summary>
-public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
+public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource, IInterruptCueSink, IInterruptSuccessRelay
 {
     public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => HitAndEndEvents;
 
@@ -41,8 +41,14 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
     public override void OnClientPlay(Vector3 direction)
     {
         // 애니메이션은 PlayerSkillController가 AnimatorStateName으로 재생한다. 여기는 방패 발광만.
-        // 간파 연출 스위치(할 일 104 B1) — 끄는 쪽(OnEnd)은 늘 돈다.
-        if (!InterruptProductionDirector.IsOn(InterruptProductionCue.PaladinShieldGlow))
+        // 간파 연출 디렉터 시도 사건(할 일 118) — B1 칸이 켜져 있으면 디렉터가 PlayCue 로 돌려 부른다. 끄는 쪽(OnEnd)은 늘 돈다.
+        InterruptProductionDirector.LocalAttempt(InterruptProductionEvent.LocalAttempt(owner, this));
+    }
+
+    // [각 피어] B1 방패 발광·루프 — 디렉터가 칸을 확인한 뒤 부른다.
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.PaladinShieldGlow)
             return;
 
         shieldGlow?.FadeIn();
@@ -99,15 +105,12 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
     protected override bool CompleteBeforeAttackLanded => true;
 
     // 충격파 = 간파 성공(카운터 창 소비) 때만(2026-10-26 민경). 예전엔 적중 1건 이상이면 터졌다.
-    // 성공은 부모의 정적 이벤트 ServerInterruptSucceeded 가 판정 1회에 한 번(여러 대상이 성공해도) 알린다 — 서버에서만 난다.
-    private void OnEnable() => ServerInterruptSucceeded += OnServerInterruptSucceeded;
-
-    private void OnDisable() => ServerInterruptSucceeded -= OnServerInterruptSucceeded;
-
-    private void OnServerInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
+    // 성공은 디렉터 성공 단계가 판정 1회에 한 번(여러 대상이 성공해도) 시전자의 relay 를 부른다 — 서버에서만 난다(할 일 118).
+    // 전송로(PlayerShieldVfx.InterruptWaveRpc)는 그대로, B3 칸은 받는 피어에서 디렉터가 본다.
+    void IInterruptSuccessRelay.ServerRelaySuccess(in InterruptProductionEvent e)
     {
-        // 🔴 정적 이벤트라 모든 팔라딘의 성공이 다 들어온다 — 자기 시전만.
-        if (skill != this)
+        // 🔴 시전자 아래 relay 를 다 부르므로 자기 시전만(대체 슬롯 포함). 꺼진 컴포넌트는 옛 OnEnable 구독처럼 빠진다.
+        if (e.Skill != this || !isActiveAndEnabled)
             return;
 
         shieldVfx?.ServerInterruptWave();
