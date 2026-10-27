@@ -36,7 +36,7 @@
 
 | 대사 ID | 명세 이벤트 | 붙인 전이(진행기) |
 |---|---|---|
-| `LOBBY_TRAIN_ROUTE` | 입구 전원 집결 | 입구 집결 확정 → `Train01/Gathering` |
+| `LOBBY_TRAIN_ROUTE` | 입구 전원 집결 | 입구 집결 확정 → `Train01/Gathering`. 입구 텔레포트(할 일 111)로 이미 첫 위치 안이라 "표적 앞으로 이동해" 문구가 어색할 수 있다 — 문구 미수정(보고만) |
 | `TRAIN_01_START` | 첫 훈련 시작 | 첫 위치 집결 확정 → `Train01/InProgress` |
 | `TRAIN_01_END` | 개인 목표 전원 완료 | Train01 완료 보고 → `Train02/Gathering` |
 | `TRAIN_02_START` | 일반 전투 시작 | 두 번째 위치 집결 확정 → `Train02/InProgress` |
@@ -163,7 +163,7 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - 결과(스텝 판정 표 그대로): 브리핑 집결·진행 중 = 없음(줄 4) → 브리핑 완료 = ③ → 다음 회차 Lobby = ③(줄 8, 입구 집결 인원에서도 빠짐 — 훈련을 다시 하려면 Alt+1 로 끈다).
 
 **종료 텔레포트 — 자리 = 브리핑 구역(`Gather_Brief`) 안 (10-27 결정)**: 같은 순간(종료 집결 확정) 서버가 훈련 명단 전원을
-진행기가 이미 들고 있는 `briefZone`(PartyGatherZone) 박스 안으로 옮긴다 — `LobbyTrainingDirector.TeleportRosterToTrainingEnd`.
+진행기가 이미 들고 있는 `briefZone`(PartyGatherZone) 박스 안으로 옮긴다 — `LobbyTrainingDirector.TeleportRosterInto`(입구 텔레포트와 공용, 아래 절).
 - 흐름: 종료 집결 확정 → `Brief/Gathering`(구역 켜기는 다음 진행기 Update 의 `ApplyZones`) → 명단 전원이 이미 구역 안 → 브리핑 집결 n/m 이 바로 차고
   유지 `LobbyRules.gatherHoldSeconds`(3초) 뒤 확정 → `Brief/InProgress`. 원격 클라는 오너 RPC → 위치 복제가 돌아온 뒤에 안으로 세므로 왕복 지연만큼 늦게 찬다(호스트는 즉시).
   집결 판정 조건(살아 있음·Idle/Move)은 그대로 — 텔레포트 순간 행동 중이면 끝난 뒤 센다.
@@ -173,19 +173,32 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - 높이 = 구역 원점 바닥면(로컬 y 0 을 박스 높이 범위 안으로 자름) + 0.5m(스폰·멈춤 탈출과 같은 보정). 구역 원점이 바닥에 있다고 본다(지금 `Gather_Brief` y 0 = 바닥 y 0).
 - 이동 = 기존 서버 텔레포트 `PlayerFallRecovery.RelocateServer`(서버 → 오너 RPC → 모터 `TeleportAuthoritative`, 로비 추락 복귀·전멸 리스폰과 같은 경로). 새 RPC·상태 없음.
   **바라보는 방향은 바꾸지 않는다**(이 경로에 회전 인자가 없다 — 돌리려면 RPC 를 새로 만들어야 해서 보류).
-- `briefZone` 이 비면 경고 1회 후 텔레포트 생략(훈련 흐름은 그대로).
+- `briefZone` 이 비면 경고 1회(지점마다) 후 텔레포트 생략(훈련 흐름은 그대로).
 - 옛 방식(별도 점 `LobbyTrainingEndTeleport` + `LobbyGuideSteps.prefab` 자식 `TrainingEnd/TrainingEndTeleport_1~3`)은 메커니즘 하나로 지웠다.
   점을 직접 두는 방식이 다시 필요하면 커밋 `7313de77` 의 `LobbyTrainingEndTeleport.cs`(+`.meta`, guid 4daf9530…)·프리팹 `TrainingEnd` 자식을 되살리고 진행기 목적지를 그쪽으로 돌린다.
 
-## 훈련장 문 — 여닫힘 제거 (할 일 111, 10-27)
+## 입구 텔레포트 — 자리 = 첫 위치(`train01StartZone`) 안 (할 일 111, 10-27)
 
-- **훈련장 문(`Door_Training`) 하나만** 여닫힘을 없앴다. 나머지 로비 문 3개(`Door_Administrator`·`Door_Locker`·`Door_Operations`)는
+훈련장 문이 막혀 있으므로(아래 절) 입구 집결 확정 순간 서버가 **훈련 명단 전원**을 훈련장 안으로 옮긴다.
+- 대상 규칙 = `LobbyTrainingFlow.TeleportTargetOnConfirm`(순수, EditMode `LobbyTrainingFlowTests`): 입구(`Entrance`) → `Train01Start`, 종료(`TrainEnd`) → `Brief`, 그 밖 확정 = 없음.
+  둘 다 **확정 직후 켜지는 다음 집결 구역**이다(입구 확정 → `Train01/Gathering` → 켜지는 구역 = `Train01Start` 하나).
+- 실행 = 종료 텔레포트와 같은 `LobbyTrainingDirector.TeleportRosterInto(대상, 확정 지점)` 하나 — 자리 `LobbyTrainingEndPlacement`(여백 1m·간격 1.5m·가운데 정렬·순환),
+  높이 = 구역 원점 바닥면 + 0.5m, 이동 `PlayerFallRecovery.RelocateServer`, 새 RPC·상태 없음. 이름의 "End" 는 처음 용도 그대로 남겼다(.cs 이름·guid 변경 회피).
+- 명단 = 입구 확정 때 고정된 훈련 명단(클리어 플래그 켠 사람 제외). 늦은 참가자·명단 밖은 옮기지 않는다. `train01StartZone` 이 비면 경고 1회 후 생략.
+- 이어지는 흐름: `Train01/Gathering` 구역이 켜지면(다음 진행기 Update) 명단 전원이 이미 안 → `gatherHoldSeconds`(3초) 뒤 확정 → `Train01/InProgress`(무기 점검).
+  무전은 확정 순간 `LOBBY_TRAIN_ROUTE`("전원 확인. 표적 앞으로 이동해. 먼저 각자의 무기를 점검하겠다.", 6초)가 뜨고, 3초 + 왕복 지연 뒤 `TRAIN_01_START` 가 큐에 이어진다.
+  이미 표적 앞이라 "이동해" 가 어색할 수 있다 — 문구는 고치지 않았다(기획 판단).
+
+## 훈련장 문 — 막힘 (할 일 111, 10-27)
+
+- **훈련장 문(`Door_Training`) 하나만** 여닫힘을 없애고 **막았다** — 훈련장 출입은 입구 텔레포트(위 절)로만. 나머지 로비 문 3개(`Door_Administrator`·`Door_Locker`·`Door_Operations`)는
   근접 자동 문(`LobbyProximityDoor`·`LobbyProximityDoorRules`, 할 일 78·99) 그대로다 — 공용 문 프리팹 `PF_Room_DoorSingle_01_v003.prefab` 은 손대지 않는다.
-- 적용 위치 = 중첩 프리팹 **`PF_Lobby_Props_v003.prefab` 안 `Door_Training` 인스턴스 오버라이드** 두 개:
+- 적용 위치 = 중첩 프리팹 **`PF_Lobby_Props_v003.prefab` 안 `Door_Training` 인스턴스 오버라이드** 세 개:
   `LobbyProximityDoor` **컴포넌트 제거**(`m_RemovedComponents` — 끄기만 하면 `Awake` 가 문짝에 키네마틱 Rigidbody 를 붙이므로 제거로 했다) +
-  문짝 콜라이더(비볼록 MeshCollider, 레이어 7) **`m_Enabled: 0`**. 문 기본 자세 = 닫힘이라 닫힌 모습 그대로 지나갈 수 있다.
-- `PF_Lobby_Complete_v016` 과 `3.LobbyScene` 에는 이 문을 덮어쓰는 오버라이드가 없다(에디터에서 읽어 확인: 세 곳 모두 `Door_Training` 만 컴포넌트 없음·콜라이더 꺼짐).
-  런타임에 이름으로 문을 찾아 끄는 코드는 두지 않는다. 열린 모습으로 고정하려면 같은 인스턴스 루트를 힌지 기준 90° 돌린다(벽·소품과 겹치는지 보고 사용자가 결정).
+  문짝 콜라이더(비볼록 MeshCollider, 레이어 7 `Wall`) **`m_Enabled: 0`** +
+  **추가 `BoxCollider`**(트리거 아님, 문짝 메시 bounds 그대로 — 로컬 center (-0.63, 0.95, -0.08)·size (1.27, 1.88, 0.28), 같은 오브젝트라 레이어 `Wall`). 문틀 개구부 전체를 닫힌 문짝 모양으로 막는다.
+- `PF_Lobby_Complete_v016` 과 `3.LobbyScene` 에는 이 문을 덮어쓰는 오버라이드가 없다(에디터에서 읽어 확인: 세 곳 모두 `Door_Training` 만 근접 문 컴포넌트 없음·MeshCollider 꺼짐·BoxCollider 있음).
+  런타임에 이름으로 문을 찾아 끄는 코드는 두지 않는다.
 
 ## 바닥 안내 화살표 (할 일 111)
 

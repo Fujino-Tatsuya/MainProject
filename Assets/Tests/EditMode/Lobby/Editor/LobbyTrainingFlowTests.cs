@@ -705,4 +705,52 @@ public sealed class LobbyTrainingFlowTests
         Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.None), Is.False);
         AssertAt(flow, LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering);
     }
+
+    // 할 일 111 — 입구 확정 → 훈련장 안 첫 위치, 훈련 종료 → 브리핑 위치. 나머지 확정은 옮기지 않는다.
+    [TestCase(LobbyGatherPoint.Entrance, LobbyGatherPoint.Train01Start)]
+    [TestCase(LobbyGatherPoint.TrainEnd, LobbyGatherPoint.Brief)]
+    [TestCase(LobbyGatherPoint.Sortie, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Train01Start, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Train02Start, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Train03Area, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Brief, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.None, LobbyGatherPoint.None)]
+    public void 확정_텔레포트_대상_구역(LobbyGatherPoint confirmed, LobbyGatherPoint expected)
+    {
+        Assert.That(LobbyTrainingFlow.TeleportTargetOnConfirm(confirmed), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void 입구_확정_텔레포트_대상은_확정_직후_켜지는_구역이고_명단만_참여()
+    {
+        var flow = Create(0, 1);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.AddClient(2);   // 늦은 참가자 — 명단 밖
+
+        var target = LobbyTrainingFlow.TeleportTargetOnConfirm(LobbyGatherPoint.Entrance);
+        Assert.That(flow.IsPointActive(target), Is.True);
+        Assert.That(flow.ParticipantsFor(target), Is.EqualTo(new ulong[] { 0, 1 }));
+        Assert.That(flow.TrainingRoster, Is.EqualTo(new ulong[] { 0, 1 }));
+    }
+
+    [Test]
+    public void 종료_확정_텔레포트_대상은_확정_직후_켜지는_구역()
+    {
+        var flow = Create(0);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train01Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train01);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train02Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train02);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03A);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03B);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03C);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03D);
+        Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.TrainEnd), Is.True);
+
+        Assert.That(flow.IsPointActive(LobbyTrainingFlow.TeleportTargetOnConfirm(LobbyGatherPoint.TrainEnd)), Is.True);
+    }
 }

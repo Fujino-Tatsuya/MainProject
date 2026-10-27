@@ -223,6 +223,20 @@ public sealed class LobbyTrainingFlow
         }
     }
 
+    /// <summary>
+    /// 집결 확정 직후 훈련 명단 전원을 옮길 구역(할 일 111) — 확정으로 켜지는 다음 집결 구역 안이라 그 집결이 바로 센다. 없으면 None.
+    /// 입구 → 첫 위치(Train01Start, 훈련장 안), 훈련 종료 → 브리핑 위치. 늦은 참가자·명단 밖은 옮기지 않는다(명단만 대상).
+    /// </summary>
+    public static LobbyGatherPoint TeleportTargetOnConfirm(LobbyGatherPoint confirmed)
+    {
+        switch (confirmed)
+        {
+            case LobbyGatherPoint.Entrance: return LobbyGatherPoint.Train01Start;
+            case LobbyGatherPoint.TrainEnd: return LobbyGatherPoint.Brief;
+            default: return LobbyGatherPoint.None;
+        }
+    }
+
     /// <summary>훈련·브리핑 중 접속해 로비에서 기다리는 사람(접속자인데 훈련 명단 밖).</summary>
     public bool IsWaitingLateJoiner(ulong clientId)
     {
