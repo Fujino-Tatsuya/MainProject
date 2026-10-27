@@ -3,7 +3,8 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 122 — 팔라딘(가붕이) 평타 홀드 순환: 스텝 End 의 다음 타 규칙 + 팔라딘 데이터·클립이 4타 → 1타 순환을 받치는지.
+/// 할 일 122 — 팔라딘(가붕이) 평타 홀드 순환: 스텝 End 의 다음 타 규칙 + 팔라딘 데이터·클립이 4타 → 1타 순환을 받치는지
+/// + 공속(제압 가속)이 올라도 되감긴 1타가 같은 클립 시각(창 열림 앞)으로 들어가는지.
 /// 어쌔신은 AssassinComboWindowRulesTests, 거너는 별도 구현이라 여기서 다루지 않는다.
 /// </summary>
 public class DefaultAttackChainRulesTests
@@ -112,5 +113,98 @@ public class DefaultAttackChainRulesTests
             if (e.functionName == function && e.intParameter == (int)DefaultAttackAnimationEventType.ComboWindowOpen)
                 Assert.That(data.AttackSteps[0].LoopBackEntryTime, Is.LessThan(e.time), "1타 loopBackEntryTime < ComboWindowOpen");
         }
+    }
+
+    // ─── 제압 가속 중 순환 끊김(할 일 122 후속) ─────────────────────────────
+    // 가붕이 콤보 상태는 Speed Multiplier = AttackSpeed 파라미터라, CrossFadeInFixedTime 의 오프셋(초)은 상태 시간이다 —
+    // 클립 시각으로는 오프셋 × 속도가 된다. 되감기 진입 시각(클립 타임라인)을 그대로 넘기면 가속(1.2 × 2 = 2.4) 때
+    // 0.107 → 0.258 로 밀려 1타 창 열림(0.23)을 건너뛰고, 되감긴 1타에서 예약이 안 돼 체인이 끝난다.
+
+    const string GarenControllerPath = "Assets/4.Animations/Player/Garen/GarenAnimatorController.controller";
+
+    [TestCase(1f)]
+    [TestCase(1.2f)]
+    [TestCase(2.4f)]
+    [TestCase(4f)]
+    [TestCase(0.5f)]
+    public void LoopBackOffset_EntersSameClipTimeAtAnySpeed(float attackSpeed)
+    {
+        const float clipTime = 0.10732772f;
+        float offset = DefaultAttackChainRules.LoopBackFixedTimeOffset(clipTime, attackSpeed);
+        Assert.That(offset * attackSpeed, Is.EqualTo(clipTime).Within(1e-5f), "들어가는 클립 시각 = 오프셋 × 상태 속도");
+    }
+
+    [Test]
+    public void PaladinLoopBack_UnderSuppressHaste_EntersBeforeComboWindowOpen()
+    {
+        var data = AssetDatabase.LoadAssetAtPath<DefaultAttackData>(PaladinDataPath);
+        Assert.That(data, Is.Not.Null);
+        DefaultAttackStep first = data.AttackSteps[0];
+        float open = FirstEventTime(first.Clip, DefaultAttackAnimationEventType.ComboWindowOpen);
+        Assert.That(open, Is.GreaterThanOrEqualTo(0f), "1타 ComboWindowOpen 없음");
+
+        foreach (float rate in new[] { 1f, HasteAttackSpeedMultiplier(), 3f })
+        {
+            float attackSpeed = Mathf.Max(data.AttackSpeed, 0.1f) * rate;
+            float entered = DefaultAttackChainRules.LoopBackFixedTimeOffset(first.LoopBackEntryTime, attackSpeed) * attackSpeed;
+            Assert.That(entered, Is.LessThan(open), $"공속 배율 ×{rate}(상태 속도 {attackSpeed}) — 되감긴 1타 진입 {entered} < 창 열림 {open}");
+        }
+    }
+
+    // 엔진 전제까지 고정 — 실제 Garen 컨트롤러에 4타 → 1타 되감기 CrossFade 를 걸고 1타의 클립 시각을 잰다.
+    [TestCase(1.2f)]
+    [TestCase(2.4f)]
+    public void GarenController_LoopBackCrossFade_EntersLoopBackClipTime(float attackSpeed)
+    {
+        var data = AssetDatabase.LoadAssetAtPath<DefaultAttackData>(PaladinDataPath);
+        var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(GarenControllerPath);
+        Assert.That(data, Is.Not.Null);
+        Assert.That(controller, Is.Not.Null, GarenControllerPath);
+
+        DefaultAttackStep first = data.AttackSteps[0];
+        var go = new GameObject("DefaultAttackChainRulesTests_Animator") { hideFlags = HideFlags.HideAndDontSave };
+        try
+        {
+            var animator = go.AddComponent<Animator>();
+            animator.fireEvents = false;
+            animator.runtimeAnimatorController = controller;
+            animator.Rebind();
+            animator.Update(0f);
+            animator.SetFloat("AttackSpeed", attackSpeed);
+            animator.Play("Default_Attack3", 0, 0f);
+            animator.Update(0f);
+            animator.Update(0.1f);
+
+            animator.CrossFadeInFixedTime(Animator.StringToHash("Default_Attack0"), 0.05f, -1,
+                DefaultAttackChainRules.LoopBackFixedTimeOffset(first.LoopBackEntryTime, attackSpeed));
+            animator.Update(0f);
+
+            Assert.That(animator.IsInTransition(0), Is.True);
+            AnimatorStateInfo next = animator.GetNextAnimatorStateInfo(0);
+            Assert.That(next.shortNameHash, Is.EqualTo(Animator.StringToHash("Default_Attack0")));
+            Assert.That(next.normalizedTime * first.Clip.length, Is.EqualTo(first.LoopBackEntryTime).Within(1e-3f),
+                $"상태 속도 {attackSpeed} — 1타 진입 클립 시각");
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
+    }
+
+    static float HasteAttackSpeedMultiplier()
+    {
+        var haste = Resources.Load<SuppressHasteData>(SuppressHasteData.ResourcesPath);
+        return haste != null ? haste.Values.AttackSpeedMultiplier : SuppressHasteValues.Default.AttackSpeedMultiplier;
+    }
+
+    static float FirstEventTime(AnimationClip clip, DefaultAttackAnimationEventType type)
+    {
+        foreach (AnimationEvent e in AnimationUtility.GetAnimationEvents(clip))
+        {
+            if (e.functionName == nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent) && e.intParameter == (int)type)
+                return e.time;
+        }
+
+        return -1f;
     }
 }

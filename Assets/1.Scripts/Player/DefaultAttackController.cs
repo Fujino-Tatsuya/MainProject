@@ -38,6 +38,12 @@ public static class DefaultAttackChainRules
                 return false;
         }
     }
+
+    // 되감기 진입 시각(클립 타임라인 초) → CrossFadeInFixedTime 의 오프셋(상태 시간 초). 콤보 상태는 Speed Multiplier =
+    // AttackSpeed 파라미터라 엔진이 오프셋에 속도를 곱해 클립 시각으로 바꾼다 — 그대로 넘기면 공속이 오를수록 더 깊이 들어가
+    // 제압 가속(1.2 × 2) 때 팔라딘 1타 창 열림(0.23)을 건너뛰고 홀드 순환이 끊겼다(할 일 122 후속). 각 피어가 자기 AttackSpeed 로 나눈다.
+    public static float LoopBackFixedTimeOffset(float clipTime, float attackSpeed) =>
+        attackSpeed > 0f ? clipTime / attackSpeed : clipTime;
 }
 
 public enum DefaultAttackMovementType
@@ -141,9 +147,6 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private bool isRequestingAttack;
     private bool isComboWindowOpen;
     private bool hasQueuedNextAttack;
-    // 할 일 122 진단 — 이 스텝에서 ComboWindowOpen 을 받았나 / 창 밖이라 거른 예약 요청 수(서버·오프라인).
-    private bool sawComboWindowThisStep;
-    private int queueRequestsOutsideWindow;
     // 스킬 입력 때문에 지금 타로 마무리 중(할 일 77 후속) — 오너·서버가 각자 들고, 공격이 끝나면(ResetAttackRuntime) 풀린다.
     private bool isFinishingChain;
     private bool hasStartedAttack;
@@ -449,7 +452,6 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
             case DefaultAttackAnimationEventType.ComboWindowOpen:
                 isComboWindowOpen = true;
-                sawComboWindowThisStep = true;
                 break;
 
             case DefaultAttackAnimationEventType.ComboWindowClose:
@@ -647,11 +649,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 다음 타");
 
         if (!isComboWindowOpen || isFinishingChain)
-        {
-            if (!isComboWindowOpen)
-                queueRequestsOutsideWindow++;
             return;
-        }
 
         hasQueuedNextAttack = true;
         queuedAttackDirection = ResolveAttackDirection(requestedDirection);
@@ -724,8 +722,6 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         hasStartedAttack = true;
         hasQueuedNextAttack = false;
         isComboWindowOpen = false;
-        sawComboWindowThisStep = false;
-        queueRequestsOutsideWindow = 0;
         currentAttackIndex = attackIndex;
         attackDirection = ResolveAttackDirection(direction);
         queuedAttackDirection = attackDirection;
@@ -793,7 +789,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         if (triggerAttack)
             animator.SetTrigger(DefaultAttackHash);
         else
-            animator.CrossFadeInFixedTime(GetAttackStateHash(currentAttackIndex), 0.05f, -1, crossFadeStartTime);
+            animator.CrossFadeInFixedTime(GetAttackStateHash(currentAttackIndex), 0.05f, -1,
+                DefaultAttackChainRules.LoopBackFixedTimeOffset(crossFadeStartTime, AttackSpeed));
     }
 
     private void CompleteCurrentAttackStep()
@@ -820,26 +817,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
         if (!DefaultAttackChainRules.TryResolveNextStep(
                 currentAttackIndex, attackSteps.Length, chainPolicy, hasQueuedNextAttack, out nextIndex))
-        {
-            WarnLoopEndedAtLastStep();
             return false;
-        }
 
         return HasAttackStep(nextIndex);
-    }
-
-    // 할 일 122 진단(에디터 전용) — Loop 인데 마지막 타에서 체인이 끝났으면 왜 예약이 없었는지 남긴다.
-    // 홀드 중 4타 뒤 1타로 안 돌아가는 증상을 Play 에서 가르기 위한 것 — 창이 안 열렸는지, 요청이 창 밖에서만 왔는지.
-    private void WarnLoopEndedAtLastStep()
-    {
-        if (chainPolicy != DefaultAttackChainPolicy.Loop || isFinishingChain ||
-            currentAttackIndex != attackSteps.Length - 1)
-            return;
-
-        Edit.Log(
-            $"[DefaultAttack] Loop 마지막 {currentAttackIndex + 1}타에서 체인 종료 — 예약 없음 " +
-            $"(창 열림 이벤트 {(sawComboWindowThisStep ? "받음" : "못 받음")}, 창 밖 예약 요청 {queueRequestsOutsideWindow}회). " +
-            "버튼을 뗐으면 정상이다.", this);
     }
 
     private void EndAttackServer()
@@ -904,10 +884,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         if (!IsNetworkActive)
         {
             if (!isComboWindowOpen)
-            {
-                queueRequestsOutsideWindow++;
                 return;
-            }
 
             hasQueuedNextAttack = true;
             queuedAttackDirection = direction;
@@ -971,8 +948,6 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         hasQueuedNextAttack = false;
         isFinishingChain = false;
         isComboWindowOpen = false;
-        sawComboWindowThisStep = false;
-        queueRequestsOutsideWindow = 0;
         hasStartedAttack = false;
         isRequestingAttack = false;
         hasPendingAttackClip = false;
@@ -1041,7 +1016,7 @@ public class DefaultAttackStep
     [SerializeField] private int flatDamageBonus;
     // 이 스텝이 체인의 첫 스텝(0번)일 때만 의미가 있다: 마지막 스텝의 LoopCheck에서
     // 조기 루프백으로 들어올 때 처음(0초)이 아니라 여기서부터 재생해 윈드업을 건너뛴다.
-    // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준.
+    // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준 — 공격속도와 무관하게 같은 클립 시각으로 들어간다(DefaultAttackChainRules.LoopBackFixedTimeOffset).
     [DataTableIgnore] [SerializeField] private float loopBackEntryTime = 0f;
     // 이 스텝의 적중이 "적중 시 발동" 효과(패시브 버프 등)를 소모할 수 있는가. Player.ServerAttackLanded 에 실린다.
     [SerializeField] private bool triggersOnHit = true;
