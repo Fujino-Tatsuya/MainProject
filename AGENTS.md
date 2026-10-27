@@ -56,6 +56,7 @@
 - **행동 입력 거부 피드백**: [Docs/tech/skill-reject-feedback.md](Docs/tech/skill-reject-feedback.md) — 거부 사유별 선입력 버퍼 처리 표(보관/버림), 오너 전용 이벤트 `CooldownRejected`·`ActionBlockedByEffect`(입력 1회=1회)·사운드 키 지정법(비우면 무음).
 - **간파 연출 디렉터**: [Docs/tech/interrupt-presentation.md §6](Docs/tech/interrupt-presentation.md) — `NetworkManager.prefab` 의 `InterruptProductionDirector` 가 단일 진입점. 간파 스킬은 사건 4개(시도·판정·성공·실패)만 알리고, 스위치 10칸·시도/성공 슬로우 프로필·개인/공용 채널은 디렉터가 든다. 새 간파 연출은 `GlobalTimeScale.Started` 직접 구독 말고 디렉터 cue(`IInterruptCueSink`)로.
 - **간파 성공 연출**: [Docs/tech/interrupt-presentation.md](Docs/tech/interrupt-presentation.md) — 시도 슬로우 → 성공 슬로우 재발동·히트스톱 → 슬로우 이벤트 목적 칸(공용 성공 신호) → 암순응 패스·`InterruptSuccessFx` 성공 이펙트 칸(Variant 가 소켓 연결)·오너 줌, 수치·렌더러 순서·알려진 제약.
+- **대쉬 간파**: [Docs/tech/dash-interrupt.md](Docs/tech/dash-interrupt.md) — 대시 시작 후 창(기본 0.1초) 안 우클릭만 소비(창 밖은 기존 선입력 버퍼), 대시에 간파가 실려 대시 끝에 Skill 전이·판정(판정 시각 = max(대시 끝, 평소 Hit)), RPC 플래그 `dashInterrupt`(새 RPC 없음)·서버 창+허용오차, 상체 레이어 `DashInterruptUpper`, `PlayerDashData` 칸 3개·알려진 한계.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조

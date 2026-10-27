@@ -22,6 +22,16 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
+    /// <summary>
+    /// [각 피어] 간파 성공 사건 — 성공 슬로우가 이 피어에서 시작됐다. 칸(스위치)과 무관하게 매번 낸다.
+    /// 연출 밖 구독자(디버그 씬 <c>DebugTimeScale</c> 의 성공 후 1배속)용이다 — 새 연출은 여기 말고 칸(cue)으로 붙인다.
+    /// </summary>
+    public static event System.Action<InterruptProductionEvent> LocalSucceeded;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents() => LocalSucceeded = null;
+
     // 필드 이름은 옛 GlobalTimeScale 과 글자까지 같게 둔다 — 데이터 테이블 경로(NetworkManager.interruptProfile.scale 등)가 그대로 묶인다.
     [Header("시도 — 공용")]
     [Tooltip("인터럽트 유효타 슬로우 모양(시도). 서버 값만 쓴다. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
@@ -193,6 +203,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         bool viewerIsCaster = hasViewer && InterruptProductionRules.IsCasterView(casterClientId, _networkManager.LocalClientId);
         SuccessStage.LocalStarted(purpose, e, viewerIsCaster, hasViewer ? _darkAdaptation : null,
             FindSuccessFxSinks(casterClientId));
+        LocalSucceeded?.Invoke(e);
     }
 
     private void HandleFailed(uint triggerId) => FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));

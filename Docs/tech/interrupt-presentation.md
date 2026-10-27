@@ -180,6 +180,7 @@
 | 성공 | 판정 바로 뒤 `ServerSuccess` → 성공 슬로우(`interruptSuccessProfile`, A1 칸 = `hitStopOn`) → 시전자 아래 `IInterruptSuccessRelay` 마다 1회 | `Started(Success)` → 개인/공용 채널(A2·A4) · RPC 수신부(B3·C2·E1)가 `PlayCue` |
 | 실패 | 판정 전 종료(`OnEnd`)·앵커 누락 → `ServerFail` → 시도 슬로우 실패 복귀 | `Failed` → 실패 단계 훅(**연출 없음**) |
 
+- 대쉬 간파(할 일 115)도 같은 사건 4개를 쓴다. 단 시도 예측 오버랩은 예상 대시 끝으로 옮겨 본다 — [dash-interrupt.md §5](dash-interrupt.md#5-118-디렉터-사건-연결--새-경로-없음).
 - 호출 순서는 옛 코드와 한 줄씩 같다: 빗나감 Fail → 성공 Start → `ReportLag`. 캐릭터 relay 는 성공 Start 바로 뒤라 옛 정적 이벤트 구독보다 `ReportLag` 한 줄 앞이다(같은 프레임·같은 RPC 순서, 화면 차이 없음).
 - 정적 `PlayerInterruptSkillBase.ServerInterruptSucceeded/Resolved` 는 **로직용으로 남아 있다**(튜토리얼·통계). 연출 구독자(팔라딘·어쌔신)만 relay 로 옮겼다.
 - 슬로우가 거부돼도(컷신 잠금·씬 전환) relay·섬광 RPC 는 그대로 나간다 — 전송로를 바꾸지 않았다(설계 Q1-a). 그래서 그때 A2·A4 만 빠지고 B3·C2·E1 은 나온다(지금과 같음).
@@ -259,4 +260,4 @@
 
 - 암순응 셰이더에 흑백 실루엣·반전 모드를 얹을 수 있음(미구현, 이펙트 확정 후 결정).
 - 레퍼런스 의도 — 주변 입자가 한 점으로 모이는 효과 + 피격 대상에서 날카로운 선 수십 개가 한쪽으로 쏠려 터지는 충격파(번개 제외), targetFx 칸에 넣을 예정.
-- 115 대쉬 간파: 사건에 `Variant`(Normal/Dash) 한 칸 → 디렉터가 다른 프로필·cue 를 고를 자리. 117 성공 예측 연출: 새 단계 `Predict`/`PredictionSettled`(개인 채널 전용, 시간 배율은 바꾸지 않는다).
+- 115 대쉬 간파: 구현됐지만 사건 `Variant`(Normal/Dash) 칸은 만들지 않았다(일반 간파와 같은 프로필·cue, [dash-interrupt.md](dash-interrupt.md)) — 다른 프로필·cue 가 필요해지면 그때 이 칸을 더한다. 117 성공 예측 연출: 새 단계 `Predict`/`PredictionSettled`(개인 채널 전용, 시간 배율은 바꾸지 않는다).
