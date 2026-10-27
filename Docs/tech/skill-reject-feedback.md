@@ -31,6 +31,7 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 상태이상·쿨타임 판정은 시작 요청 **전에** 한다 — 걸리면 원격 클라도 요청을 보내지 않는다(복제된 상태이상 목록 기준, 서버 최종 검증은 그대로).
 - 원격 클라 1차 검증(할 일 75): `TryUse` → `Cast` 가 시전 요청 RPC 를 보내기 전에 서버 승인과 같은 `CanApproveSkill`(사전 조건 순서 = `PlayerSkillApprovalRules`, 그 뒤 스킬 `CanUse`)을 자기 상태로 돌린다. 걸리면 요청을 보내지 않고 `TryUse` 가 false — 위 표의 '그 밖'(즉시 버림, 이벤트 없음)이다. 쿨타임·차단 효과는 그 전에 위 행이 먼저 걸러 이벤트를 낸다. 호스트·오프라인은 서버 승인이 바로 돌아 따로 하지 않는다. 간파 카운터 창 열림 여부는 서버 승인 조건이 아니라(창이 닫혀도 간파는 피해·그로기 누적을 낸다) 1차 검증에도 없다.
 - 우클릭 = 스킬 슬롯이면 인터럽트 상태(`PlayerInterruptState`) 경로를 타지 않는다(할 일 74) — 요청 응답 대기 중 다시 누른 우클릭은 '바쁨' 행대로 보관된다.
+- 대시 중 우클릭(할 일 115 대쉬 간파): 대시 시작 후 창 안에 누른 것만 Dash 상태가 처리한다 — 차단 효과·쿨타임 거부는 위 표와 같이 이벤트 1회 + 버림, 창 밖은 버퍼 그대로(대시 후 처리). 상세 [dash-interrupt.md §1](dash-interrupt.md#1-입력-창-규칙-오너-입력-주체--playerdashstatetickdashinterruptinput).
 - 판정 순서: 스킬 = 빈 슬롯 → 바쁨 → 상태이상 → 쿨타임 → `TryUse`. 대시 = `TryBeginPredictedDash` 실패 후 상태이상 → 충전 없음 → 그 밖. 평타 = 상태이상 → `TryStart` → 과열.
 - 코드: `PlayerActionAttempt`·`PlayerActionRejectPolicy`(`PlayerInputBuffer.cs`), `PlayerStateController.RejectByEffect`·`ClassifyDashReject`, `PlayerStateBase.TryConsumeActionInput`·`TryStartSkill`.
 - 테스트: `PlayerInputBufferTests` — `Resolve_*`, `ClassifyEffectBlock_*`, `CooldownReject_*`, `EffectBlock_*`, `OtherReject_*`.

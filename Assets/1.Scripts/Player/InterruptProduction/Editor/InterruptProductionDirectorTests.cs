@@ -6,14 +6,14 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// 간파 연출 스위치(할 일 104) — 기본 꺼짐, 인스턴스 없음 = 꺼짐, 히트스톱 실림, 클립 이벤트 id 게이트, C1 꺼짐 + C2 켜짐.
+/// 간파 연출 디렉터 스위치(할 일 104 → 118 이관) — 기본 꺼짐, 인스턴스 없음 = 꺼짐, 히트스톱 실림, 클립 이벤트 id 게이트, C1 꺼짐 + C2 켜짐.
 /// </summary>
-public sealed class InterruptPresentationTogglesTests
+public sealed class InterruptProductionDirectorTests
 {
     private const string NetworkManagerPrefabPath = "Assets/2.Prefabs/Network/NetworkManager.prefab";
 
-    private static readonly InterruptPresentationKind[] AllKinds =
-        (InterruptPresentationKind[])Enum.GetValues(typeof(InterruptPresentationKind));
+    private static readonly InterruptProductionCue[] AllCues =
+        (InterruptProductionCue[])Enum.GetValues(typeof(InterruptProductionCue));
 
     private GameObject _go;
 
@@ -24,15 +24,15 @@ public sealed class InterruptPresentationTogglesTests
             Object.DestroyImmediate(_go);
     }
 
-    private InterruptPresentationToggles CreateToggles(params string[] onFields)
+    private InterruptProductionDirector CreateDirector(params string[] onFields)
     {
-        _go = new GameObject("Toggles");
-        var toggles = _go.AddComponent<InterruptPresentationToggles>();
-        var so = new SerializedObject(toggles);
+        _go = new GameObject("Director");
+        var director = _go.AddComponent<InterruptProductionDirector>();
+        var so = new SerializedObject(director);
         foreach (string field in onFields)
             so.FindProperty(field).boolValue = true;
         so.ApplyModifiedPropertiesWithoutUndo();
-        return toggles;
+        return director;
     }
 
     // ─── 기본값·인스턴스 ───
@@ -40,10 +40,10 @@ public sealed class InterruptPresentationTogglesTests
     [Test]
     public void 새_컴포넌트는_스위치_10개_전부_꺼짐()
     {
-        var toggles = CreateToggles();
-        Assert.AreEqual(10, AllKinds.Length);
-        foreach (var kind in AllKinds)
-            Assert.IsFalse(toggles.Get(kind), kind.ToString());
+        var director = CreateDirector();
+        Assert.AreEqual(10, AllCues.Length);
+        foreach (var cue in AllCues)
+            Assert.IsFalse(director.Get(cue), cue.ToString());
     }
 
     [Test]
@@ -51,33 +51,44 @@ public sealed class InterruptPresentationTogglesTests
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPrefabPath);
         Assert.IsNotNull(prefab, NetworkManagerPrefabPath);
-        var toggles = prefab.GetComponent<InterruptPresentationToggles>();
-        Assert.IsNotNull(toggles, "InterruptPresentationToggles 없음");
+        var director = prefab.GetComponent<InterruptProductionDirector>();
+        Assert.IsNotNull(director, "InterruptProductionDirector 없음");
+        Assert.IsNotNull(prefab.GetComponent<GlobalTimeScale>(), "GlobalTimeScale 과 같은 오브젝트여야 한다");
         Assert.IsNotNull(prefab.GetComponent<InterruptDarkAdaptation>(), "암순응과 같은 오브젝트여야 한다");
-        foreach (var kind in AllKinds)
-            Assert.IsFalse(toggles.Get(kind), kind.ToString());
+        foreach (var cue in AllCues)
+            Assert.IsFalse(director.Get(cue), cue.ToString());
     }
 
     [Test]
-    public void 인스턴스가_없으면_전부_꺼짐()
+    public void 인스턴스가_없으면_전부_꺼짐_줌_배율_1()
     {
-        Assume.That(InterruptPresentationToggles.Instance == null, "EditMode 에 인스턴스가 살아 있다");
-        foreach (var kind in AllKinds)
+        Assume.That(InterruptProductionDirector.Instance == null, "EditMode 에 인스턴스가 살아 있다");
+        foreach (var cue in AllCues)
         {
-            Assert.IsFalse(InterruptPresentationToggles.IsOn(kind), kind.ToString());
-            Assert.IsFalse(InterruptPresentationToggles.IsOn(null, kind), kind.ToString());
+            Assert.IsFalse(InterruptProductionDirector.IsOn(cue), cue.ToString());
+            Assert.IsFalse(InterruptProductionRules.IsOn(null, cue), cue.ToString());
         }
+
+        Assert.AreEqual(1f, InterruptProductionDirector.OwnerZoomFactor(0.7f));
     }
 
     [Test]
     public void 켠_칸만_켜짐()
     {
-        var toggles = CreateToggles("darkAdaptation", "targetFlash");
-        foreach (var kind in AllKinds)
+        var director = CreateDirector("darkAdaptation", "targetFlash");
+        foreach (var cue in AllCues)
         {
-            bool expected = kind == InterruptPresentationKind.DarkAdaptation || kind == InterruptPresentationKind.TargetFlash;
-            Assert.AreEqual(expected, InterruptPresentationToggles.IsOn(toggles, kind), kind.ToString());
+            bool expected = cue == InterruptProductionCue.DarkAdaptation || cue == InterruptProductionCue.TargetFlash;
+            Assert.AreEqual(expected, InterruptProductionRules.IsOn(director, cue), cue.ToString());
         }
+    }
+
+    [Test]
+    public void 오너_줌_칸이_켜지면_배율_그대로_꺼지면_1()
+    {
+        Assert.AreEqual(1f, InterruptProductionRules.OwnerZoomFactor(CreateDirector(), 0.7f));
+        Object.DestroyImmediate(_go);
+        Assert.AreEqual(0.7f, InterruptProductionRules.OwnerZoomFactor(CreateDirector("ownerZoom"), 0.7f));
     }
 
     // ─── A1 히트스톱 ───
@@ -113,19 +124,19 @@ public sealed class InterruptPresentationTogglesTests
 
     // ─── B2·C1 클립 이벤트 id ───
 
-    [TestCase(InterruptPresentationToggles.PaladinShieldChargeId, InterruptPresentationKind.PaladinShieldCharge)]
-    [TestCase(InterruptPresentationToggles.AssassinInsightWindupId, InterruptPresentationKind.AssassinInsightAttempt)]
-    [TestCase(InterruptPresentationToggles.AssassinInsightPopId, InterruptPresentationKind.AssassinInsightAttempt)]
-    [TestCase(InterruptPresentationToggles.AssassinInsightSlashId, InterruptPresentationKind.AssassinInsightAttempt)]
-    public void 간파_id_는_꺼지면_막고_켜지면_통과(string id, InterruptPresentationKind kind)
+    [TestCase(InterruptProductionRules.PaladinShieldChargeId, InterruptProductionCue.PaladinShieldCharge)]
+    [TestCase(InterruptProductionRules.AssassinInsightWindupId, InterruptProductionCue.AssassinInsightAttempt)]
+    [TestCase(InterruptProductionRules.AssassinInsightPopId, InterruptProductionCue.AssassinInsightAttempt)]
+    [TestCase(InterruptProductionRules.AssassinInsightSlashId, InterruptProductionCue.AssassinInsightAttempt)]
+    public void 간파_id_는_꺼지면_막고_켜지면_통과(string id, InterruptProductionCue cue)
     {
-        Assert.IsTrue(InterruptPresentationToggles.TryGetAnimEffectKind(id, out var found));
-        Assert.AreEqual(kind, found);
-        Assert.IsFalse(InterruptPresentationToggles.AllowsAnimEffect(null, id));
-        Assert.IsFalse(InterruptPresentationToggles.AllowsAnimEffect(CreateToggles(), id));
-        string field = kind == InterruptPresentationKind.PaladinShieldCharge ? "paladinShieldCharge" : "assassinInsightAttempt";
+        Assert.IsTrue(InterruptProductionRules.TryGetAnimEffectCue(id, out var found));
+        Assert.AreEqual(cue, found);
+        Assert.IsFalse(InterruptProductionRules.AllowsAnimEffect(null, id));
+        Assert.IsFalse(InterruptProductionRules.AllowsAnimEffect(CreateDirector(), id));
+        string field = cue == InterruptProductionCue.PaladinShieldCharge ? "paladinShieldCharge" : "assassinInsightAttempt";
         Object.DestroyImmediate(_go);
-        Assert.IsTrue(InterruptPresentationToggles.AllowsAnimEffect(CreateToggles(field), id));
+        Assert.IsTrue(InterruptProductionRules.AllowsAnimEffect(CreateDirector(field), id));
     }
 
     [TestCase("Assassin_NormalSlash_1")]
@@ -135,18 +146,18 @@ public sealed class InterruptPresentationTogglesTests
     [TestCase((string)null)]
     public void 다른_id_는_스위치와_무관하게_통과(string id)
     {
-        Assert.IsFalse(InterruptPresentationToggles.TryGetAnimEffectKind(id, out _));
-        Assert.IsTrue(InterruptPresentationToggles.AllowsAnimEffect(null, id));
+        Assert.IsFalse(InterruptProductionRules.TryGetAnimEffectCue(id, out _));
+        Assert.IsTrue(InterruptProductionRules.AllowsAnimEffect(null, id));
     }
 
     [Test]
     public void 프리팹_소켓_id_가_상수와_같다()
     {
-        AssertPrefabHasId("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab", InterruptPresentationToggles.PaladinShieldChargeId);
+        AssertPrefabHasId("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab", InterruptProductionRules.PaladinShieldChargeId);
         const string assassin = "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab";
-        AssertPrefabHasId(assassin, InterruptPresentationToggles.AssassinInsightWindupId);
-        AssertPrefabHasId(assassin, InterruptPresentationToggles.AssassinInsightPopId);
-        AssertPrefabHasId(assassin, InterruptPresentationToggles.AssassinInsightSlashId);
+        AssertPrefabHasId(assassin, InterruptProductionRules.AssassinInsightWindupId);
+        AssertPrefabHasId(assassin, InterruptProductionRules.AssassinInsightPopId);
+        AssertPrefabHasId(assassin, InterruptProductionRules.AssassinInsightSlashId);
     }
 
     private static void AssertPrefabHasId(string path, string id)
@@ -177,7 +188,7 @@ public sealed class InterruptPresentationTogglesTests
     {
         _go = new GameObject("Unit");
         insight = new GameObject("Insight").AddComponent<FakeEffect>();
-        insight.id = InterruptPresentationToggles.AssassinInsightSlashId;
+        insight.id = InterruptProductionRules.AssassinInsightSlashId;
         insight.transform.SetParent(_go.transform);
         other = new GameObject("Other").AddComponent<FakeEffect>();
         other.id = "Assassin_NormalSlash_1";
@@ -191,7 +202,7 @@ public sealed class InterruptPresentationTogglesTests
     [Test]
     public void 꺼짐이면_간파_id_재생만_막고_다른_id_는_재생()
     {
-        Assume.That(InterruptPresentationToggles.Instance == null);
+        Assume.That(InterruptProductionDirector.Instance == null);
         var events = CreateAnimEvents(out var insight, out var other);
 
         events.PlayEffect(insight.id);
@@ -208,7 +219,7 @@ public sealed class InterruptPresentationTogglesTests
     [Test]
     public void 꺼짐이어도_Stop_은_통과()
     {
-        Assume.That(InterruptPresentationToggles.Instance == null);
+        Assume.That(InterruptProductionDirector.Instance == null);
         var events = CreateAnimEvents(out var insight, out _);
         events.StopEffect(insight.id);
         Assert.AreEqual(1, insight.stop);
@@ -219,7 +230,7 @@ public sealed class InterruptPresentationTogglesTests
     {
         // AssassinSkillView 는 Played(올려치기 id) 를 성공 이펙트(C2) 기준 프레임으로 쓴다 —
         // C1 을 꺼 올려치기 이펙트가 안 나와도 알림은 나야 C2 가 같은 프레임에 나온다.
-        Assume.That(InterruptPresentationToggles.Instance == null);
+        Assume.That(InterruptProductionDirector.Instance == null);
         var events = CreateAnimEvents(out var insight, out _);
         string played = null;
         events.Played += id => played = id;
@@ -227,22 +238,22 @@ public sealed class InterruptPresentationTogglesTests
         events.PlayEffect(insight.id);
 
         Assert.AreEqual(0, insight.playOnce, "C1 꺼짐 — 올려치기 이펙트는 안 나온다");
-        Assert.AreEqual(InterruptPresentationToggles.AssassinInsightSlashId, played);
+        Assert.AreEqual(InterruptProductionRules.AssassinInsightSlashId, played);
 
-        var toggles = CreateTogglesOn("assassinInsightSuccess");
-        Assert.IsFalse(InterruptPresentationToggles.IsOn(toggles, InterruptPresentationKind.AssassinInsightAttempt));
-        Assert.IsTrue(InterruptPresentationToggles.IsOn(toggles, InterruptPresentationKind.AssassinInsightSuccess));
+        var director = CreateDirectorOn("assassinInsightSuccess");
+        Assert.IsFalse(InterruptProductionRules.IsOn(director, InterruptProductionCue.AssassinInsightAttempt));
+        Assert.IsTrue(InterruptProductionRules.IsOn(director, InterruptProductionCue.AssassinInsightSuccess));
     }
 
-    // _go 를 덮지 않는 별도 스위치(테스트 끝에 같이 지운다)
-    private InterruptPresentationToggles CreateTogglesOn(string field)
+    // _go 를 덮지 않는 별도 디렉터(테스트 끝에 같이 지운다)
+    private InterruptProductionDirector CreateDirectorOn(string field)
     {
-        var go = new GameObject("Toggles");
+        var go = new GameObject("Director");
         go.transform.SetParent(_go.transform);
-        var toggles = go.AddComponent<InterruptPresentationToggles>();
-        var so = new SerializedObject(toggles);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        var so = new SerializedObject(director);
         so.FindProperty(field).boolValue = true;
         so.ApplyModifiedPropertiesWithoutUndo();
-        return toggles;
+        return director;
     }
 }

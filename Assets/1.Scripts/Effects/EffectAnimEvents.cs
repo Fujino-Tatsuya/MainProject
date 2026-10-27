@@ -140,7 +140,7 @@ public class EffectAnimEvents : MonoBehaviour
     {
         IAnimEventEffect effect = Find(id);
         if (effect == null) return;
-        if (InterruptPresentationToggles.AllowsAnimEffect(id)) effect.PlayOnce();
+        if (InterruptProductionDirector.AllowsAnimEffect(id)) effect.PlayOnce();
         Played?.Invoke(id);
     }
 
@@ -149,7 +149,7 @@ public class EffectAnimEvents : MonoBehaviour
     {
         IAnimEventEffect effect = Find(id);
         if (effect == null) return;
-        if (InterruptPresentationToggles.AllowsAnimEffect(id)) effect.Play();
+        if (InterruptProductionDirector.AllowsAnimEffect(id)) effect.Play();
         Played?.Invoke(id);
     }
 

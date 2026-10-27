@@ -260,7 +260,10 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     /// 앵커는 아마추어 하위 노드이므로 회전이 반영된 방향성 판정이 된다.
     /// </summary>
     /// <returns>results에 채워진 개수. 앵커/데이터가 없으면 0.</returns>
-    protected int OverlapHitboxAnchor(Collider[] results)
+    protected int OverlapHitboxAnchor(Collider[] results) => OverlapHitboxAnchor(results, Vector3.zero);
+
+    /// <summary>앵커 형상을 월드 <paramref name="offset"/> 만큼 옮겨 질의한다 — 대쉬 간파 시도 예측(예상 대시 끝, 할 일 115).</summary>
+    protected int OverlapHitboxAnchor(Collider[] results, Vector3 offset)
     {
         if (hitboxAnchor == null || data == null || results == null)
             return 0;
@@ -271,21 +274,21 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
                 BoxColliderInfo boxInfo = default;
                 hitboxAnchor.GetBoxColliderInfo(ref boxInfo);
                 return Physics.OverlapBoxNonAlloc(
-                    boxInfo.center, boxInfo.halfExtents, results, boxInfo.orientation,
+                    boxInfo.center + offset, boxInfo.halfExtents, results, boxInfo.orientation,
                     data.HittableLayers, QueryTriggerInteraction.Collide);
 
             case OverlapCollider.Sphere:
                 SphereColliderInfo sphereInfo = default;
                 hitboxAnchor.GetSphereColliderInfo(ref sphereInfo);
                 return Physics.OverlapSphereNonAlloc(
-                    sphereInfo.center, sphereInfo.radius, results,
+                    sphereInfo.center + offset, sphereInfo.radius, results,
                     data.HittableLayers, QueryTriggerInteraction.Collide);
 
             case OverlapCollider.Capsule:
                 CapsuleColliderInfo capsuleInfo = default;
                 hitboxAnchor.GetCapsuleColliderInfo(ref capsuleInfo);
                 return Physics.OverlapCapsuleNonAlloc(
-                    capsuleInfo.point0, capsuleInfo.point1, capsuleInfo.radius, results,
+                    capsuleInfo.point0 + offset, capsuleInfo.point1 + offset, capsuleInfo.radius, results,
                     data.HittableLayers, QueryTriggerInteraction.Collide);
 
             default:

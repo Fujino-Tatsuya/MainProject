@@ -80,6 +80,7 @@ public static class PodDropScheduleView
             sb.Append($"\n  걷기              ≈{board:0.##}s ~ ?  — 경로 길이 미지, 로비 씬(3.LobbyScene)을 열면 계산");
             sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 문턱 → 좌석 미끄러짐 {t.SeatSlideSeconds:0.##}s)");
             sb.Append(LaunchLine(lobby, "가장 늦게 앉는 순간"));
+            sb.Append(EndLines(t, null, null));
             sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
             return sb.ToString();
         }
@@ -93,30 +94,78 @@ public static class PodDropScheduleView
         double launchAt = t.LaunchAt(board);
         sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 미끄러짐 {t.SeatSlideSeconds:0.##}s, 가장 늦게 앉는 사람 ≈{launchAt:0.##}s)");
         sb.Append(LaunchLine(lobby, $"≈{launchAt:0.##}s"));
+        double launchEnd = launchAt + LaunchRealSeconds(lobby, out _);
+        sb.Append(EndLines(t, launchEnd, launchAt));
         sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
-        sb.Append($"\n  총 ≈{launchAt + LaunchRealSeconds(lobby, out _, out _):0.##}초 → 로딩 화면(페이드 없음)");
+        sb.Append($"\n  총 ≈{t.LoadAt(launchEnd):0.##}초 → 로딩 화면 (발사 시작 기준 +{t.LoadAt(launchEnd) - launchAt:0.##}초)");
         return sb.ToString();
     }
 
-    // 발사 클립 시작 → 끝 이벤트(실제 초) — 가속 이벤트까지 1배속, 그 뒤 가속 배율.
-    private static float LaunchRealSeconds(PodDropLobbyTimings lobby, out float fastClipSeconds, out bool fastFound)
+    // 발사 클립 끝(서버 확정 시각) → 끝 대기 → 끝 페이드 아웃 → 로딩. 끝 시각을 모르면(경로 미지) 끝 기준 상대 초로만.
+    private static string EndLines(PodDropLobbyTimeline t, double? launchEnd, double? launchAt)
     {
-        float end = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out _);
-        fastClipSeconds = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out fastFound, PodAnimEventRelay.KindSpeedUp);
-        if (!fastFound || fastClipSeconds >= end) return end;
-        float speed = lobby.launchFastSpeed > 0f ? lobby.launchFastSpeed : 1f;
-        return fastClipSeconds + (end - fastClipSeconds) / speed;
+        if (launchEnd == null)
+            return $"\n  끝 대기·페이드     발사 끝 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LoadAfterLaunchEndSeconds:0.##}s 검게 → 로딩";
+
+        double end = launchEnd.Value;
+        string fromLaunch = launchAt != null ? $", 발사 시작 기준 +{end - launchAt.Value:0.##}s" : "";
+        return $"\n  발사 끝           ≈{end:0.##}s (서버 확정·복제{fromLaunch})" +
+               $"\n  끝 대기           ≈{end:0.##} ~ {t.EndFadeAt(end):0.##}s ({t.LaunchEndWaitSeconds:0.##}s, 마지막 자세 그대로)" +
+               (t.LaunchEndFadeSeconds > 0f
+                   ? $"\n  끝 페이드 아웃    ≈{t.EndFadeAt(end):0.##} ~ {t.LoadAt(end):0.##}s (검게, 선형 — 시작 암전과 같은 검은 화면)"
+                   : "\n  끝 페이드 아웃    없음 (대기 끝에 곧바로 로딩)") +
+               $"\n  로딩 시작         ≈{t.LoadAt(end):0.##}s (다 검어진 순간 서버가 건다 — 로딩 화면이 검은 화면 위에 뜬다)";
+    }
+
+    /// <summary>발사 클립 시점(클립 초, 1배속) — 가속 1단계 · 2단계 · 끝 이벤트. 이벤트가 없는 가속 단계는 클립 끝(그 단계 없음).</summary>
+    private struct LaunchMarks
+    {
+        public float Fast, Fast2, End;
+        public bool FastFound, Fast2Found, EndFound;
+    }
+
+    private static LaunchMarks ReadLaunchMarks(PodDropLobbyTimings lobby)
+    {
+        var m = new LaunchMarks();
+        m.End = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.EndFound);
+        m.Fast = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.FastFound, PodAnimEventRelay.KindSpeedUp);
+        m.Fast2 = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.Fast2Found, PodAnimEventRelay.KindSpeedUp2);
+        return m;
+    }
+
+    /// <summary>
+    /// 발사 클립 시작 → 클립 시각 <paramref name="clipSeconds"/>(실제 초) — 가속 1단계 이벤트까지 1배속, 2단계 이벤트까지 1단계 배율, 그 뒤 2단계 배율
+    /// (<see cref="PodDropLobbyTimeline.LaunchClipSecondsAt"/> 의 역 — 2단계가 1단계보다 앞이면 1단계 구간은 없다).
+    /// </summary>
+    internal static float LaunchRealSecondsTo(float clipSeconds, float fastClip, bool fastFound, float fastSpeed, float fast2Clip, bool fast2Found, float fast2Speed)
+    {
+        float s1 = fastSpeed > 0f ? fastSpeed : 1f;
+        float s2 = fast2Speed > 0f ? fast2Speed : 1f;
+        float f2 = fast2Found ? Mathf.Clamp(fast2Clip, 0f, clipSeconds) : clipSeconds;
+        float f1 = fastFound ? Mathf.Clamp(fastClip, 0f, f2) : f2;
+        return f1 + (f2 - f1) / s1 + (clipSeconds - f2) / s2;
+    }
+
+    // 발사 클립 시작 → 끝 이벤트(실제 초).
+    private static float LaunchRealSeconds(PodDropLobbyTimings lobby, out LaunchMarks marks)
+    {
+        marks = ReadLaunchMarks(lobby);
+        return LaunchRealSecondsTo(marks.End, marks.Fast, marks.FastFound, lobby.launchFastSpeed, marks.Fast2, marks.Fast2Found, lobby.launchFastSpeed2);
     }
 
     private static string LaunchLine(PodDropLobbyTimings lobby, string from)
     {
-        if (string.IsNullOrEmpty(lobby.launchState)) return $"\n  발사 애니         없음 — {from} 곧바로 로딩";
-        float seconds = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out bool found);
-        float real = LaunchRealSeconds(lobby, out float fast, out bool fastFound);
-        string fastText = fastFound
-            ? $"클립 {fast:0.##}s 가속 이벤트부터 ×{lobby.launchFastSpeed:0.##}"
-            : "⚠ 가속 이벤트 없음 — 끝까지 1배속";
-        return $"\n  발사 애니         {from} 부터 {lobby.launchState} 처음부터 ({fastText}, 클립 {EventText(seconds, found)} = 실제 ≈{real:0.##}s 에 로딩 — 해치 닫힘·갱도 문·포드 하강)";
+        if (string.IsNullOrEmpty(lobby.launchState)) return $"\n  발사 애니         없음 — {from} 곧바로 발사 끝";
+        float real = LaunchRealSeconds(lobby, out LaunchMarks m);
+        float RealAt(float clip) => LaunchRealSecondsTo(clip, m.Fast, m.FastFound, lobby.launchFastSpeed, m.Fast2, m.Fast2Found, lobby.launchFastSpeed2);
+        string fastText = m.FastFound
+            ? $"클립 {m.Fast:0.##}s(실제 +{RealAt(m.Fast):0.##}s) 가속 1단계 ×{lobby.launchFastSpeed:0.##}"
+            : "⚠ 가속 1단계 이벤트 없음";
+        string fast2Text = m.Fast2Found
+            ? $"클립 {m.Fast2:0.##}s(실제 +{RealAt(m.Fast2):0.##}s) 가속 2단계 ×{lobby.launchFastSpeed2:0.##}"
+            : "⚠ 가속 2단계 이벤트 없음";
+        return $"\n  발사 애니         {from} 부터 {lobby.launchState} 처음부터 ({fastText} → {fast2Text}, " +
+               $"클립 {EventText(m.End, m.EndFound)} = 실제 ≈{real:0.##}s 에 발사 끝 — 해치 닫힘·갱도 문·포드 하강)";
     }
 
     private static string EventText(float seconds, bool found) =>

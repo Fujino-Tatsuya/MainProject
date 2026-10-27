@@ -290,18 +290,19 @@ public static class CharacterSelectPanelAuthoring
             Place(black, Right, 1920f - 928f, 0f, 928f, 1080f);
             AddImage(black.gameObject, sprites.BlackPanel, Color.white);
 
-            // 카드 — 런타임에 로스터 수만큼 복제(디자인용 카드 없음). 원점 = 기준 해상도 화면 가운데, 오른쪽 앵커.
+            // 카드 — 런타임에 가운데 카드 원본(Card_Template, 배선 뒤 EnsureCardTemplate)을 로스터 수만큼 복제. 원점 = 기준 해상도 화면 가운데, 오른쪽 앵커.
             RectTransform cards = NewRect("Cards", content);
             cards.anchorMin = cards.anchorMax = Right;
             cards.pivot = new Vector2(0.5f, 0.5f);
             cards.anchoredPosition = new Vector2(-960f, 0f);
             cards.sizeDelta = Vector2.zero;
 
-            // SELECT 셰브론 띠 + 글자
+            // SELECT 셰브론 띠 + 글자 — 셰브론 = 선택 버튼(할 일 109, 삼각형만 클릭)
             RectTransform chevron = NewRect("Chevron", content);
             Vector2 chevronSize = NativeSize(sprites.Chevron);
             Place(chevron, Right, 1920f - chevronSize.x, 660f - chevronSize.y * 0.5f, chevronSize.x, chevronSize.y);
             AddImage(chevron.gameObject, sprites.Chevron, Color.white);
+            Button confirmButton = MakeChevronButton(chevron.gameObject);
 
             RectTransform badge = NewRect("SelectBadge", content);
             Vector2 badgeSize = NativeSize(sprites.SelectBadge);
@@ -365,11 +366,13 @@ public static class CharacterSelectPanelAuthoring
             viewSo.FindProperty("cardPrefab").objectReferenceValue = cardPrefab;
             viewSo.FindProperty("cardContainer").objectReferenceValue = cards;
             viewSo.FindProperty("backButton").objectReferenceValue = backButton;
+            viewSo.FindProperty("confirmButton").objectReferenceValue = confirmButton;
             viewSo.FindProperty("nameplatePortrait").objectReferenceValue = platePortraitImage;
             viewSo.FindProperty("nameplateName").objectReferenceValue = plateNameText;
             viewSo.FindProperty("lockedText").objectReferenceValue = lockedText;
             viewSo.FindProperty("hintText").objectReferenceValue = hintText;
             viewSo.ApplyModifiedPropertiesWithoutUndo();
+            EnsureCardTemplate(view);
 
             content.gameObject.SetActive(false); // 기본 닫힘 — Show 가 켠다
 
@@ -380,6 +383,174 @@ public static class CharacterSelectPanelAuthoring
         {
             Object.DestroyImmediate(root);
         }
+    }
+
+    // ── 가운데 카드 원본(할 일 109 후속) ──────────────────────
+
+    public const string CardTemplateName = "Card_Template";
+
+    /// <summary>
+    /// 패널 <c>cardContainer</c> 아래에 카드 프리팹 인스턴스 <c>Card_Template</c> 를 가운데 자리(<c>focusedSlot</c>·<c>focusScale</c>)에 두고
+    /// 패널 <c>cardTemplate</c> 칸에 넣는다 — 프리팹을 열면 가운데 카드가 보이고, 거기서 고친 값(초상화 크기·회전, Ring_Focus 크기·색·스프라이트)을
+    /// 런타임 카드가 복제해 쓴다. 미리보기 모양 = 가운데 카드(초록·테두리 켬·로스터 0번 초상화) — 런타임은 Bind·SetState·SetRingAlpha 가 다시 그린다.
+    /// 이미 있으면 손대지 않고 연결만 맞춘다(손댄 값 유지).
+    /// </summary>
+    public static CharacterSelectCard EnsureCardTemplate(CharacterSelectPanel view)
+    {
+        var viewSo = new SerializedObject(view);
+        var container = viewSo.FindProperty("cardContainer").objectReferenceValue as RectTransform;
+        var cardPrefab = viewSo.FindProperty("cardPrefab").objectReferenceValue as CharacterSelectCard;
+        if (container == null || cardPrefab == null)
+        {
+            Debug.LogError($"{Tag} cardContainer·cardPrefab 가 비어 가운데 카드 원본을 만들 수 없다.");
+            return null;
+        }
+
+        Transform existing = container.Find(CardTemplateName);
+        CharacterSelectCard template = existing != null ? existing.GetComponent<CharacterSelectCard>() : null;
+        if (template == null)
+        {
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(cardPrefab.gameObject, container);
+            go.name = CardTemplateName;
+            template = go.GetComponent<CharacterSelectCard>();
+
+            var rect = (RectTransform)go.transform;
+            rect.anchoredPosition = viewSo.FindProperty("focusedSlot").vector2Value;
+            rect.localScale = Vector3.one * viewSo.FindProperty("focusScale").floatValue;
+
+            var cardSo = new SerializedObject(template);
+            (cardSo.FindProperty("focusedVisual").objectReferenceValue as GameObject)?.SetActive(true);
+            (cardSo.FindProperty("sideBackground").objectReferenceValue as Image)?.gameObject.SetActive(false);
+            (cardSo.FindProperty("focusRing").objectReferenceValue as GameObject)?.SetActive(true);
+            var portrait = cardSo.FindProperty("portraitImage").objectReferenceValue as Image;
+            var roster = viewSo.FindProperty("roster").objectReferenceValue as CharacterRoster;
+            if (portrait != null && roster != null && roster.Count > 0 && roster.Entries[0]?.Portrait != null)
+            {
+                portrait.sprite = roster.Entries[0].Portrait; // 크기·회전을 맞춰 볼 그림(런타임은 Bind 가 바꾼다)
+                portrait.enabled = true;
+            }
+        }
+
+        viewSo.FindProperty("cardTemplate").objectReferenceValue = template;
+        viewSo.ApplyModifiedPropertiesWithoutUndo();
+        return template;
+    }
+
+    // ── SELECT 셰브론 = 선택 버튼(할 일 109) ──────────────────
+
+    /// <summary>
+    /// 셰브론 Image 를 선택 버튼으로 만든다 — Raycast Target 켬 + Button(Navigation None) + 삼각형 클릭 영역(<see cref="UiTriangleRaycastFilter"/>).
+    /// 이미 붙어 있으면 그 Button·필터를 그대로 쓴다(색 전이·꼭짓점 등 손댄 값 유지). 반환 = 패널 <c>confirmButton</c> 칸에 넣을 Button.
+    /// </summary>
+    public static Button MakeChevronButton(GameObject chevron)
+    {
+        Image image = chevron.GetComponent<Image>();
+        image.raycastTarget = true;
+        Button button = chevron.GetComponent<Button>();
+        if (button == null)
+            button = chevron.AddComponent<Button>();
+        button.targetGraphic = image;
+        // 뒤로가기와 같다 — None 이면 클릭해도 EventSystem 선택이 남지 않아 다음 Enter/Space 가 두 번 먹지 않는다.
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
+        if (chevron.GetComponent<UiTriangleRaycastFilter>() == null)
+            chevron.AddComponent<UiTriangleRaycastFilter>(); // 기본 꼭짓점 = chevron.png 삼각형
+        AddChevronHoverOutline(chevron, button);
+        return button;
+    }
+
+    const string ChevronOutlineName = "Outline_Hover";
+
+    // hover 링(할 일 109 후속) — chevron.png 알파 실루엣을 두르는 흰 링을 구운 PNG(생성물 · git). 원본 아트·.meta 는 건드리지 않는다.
+    public const string ChevronRingPath = "Assets/2.Prefabs/UI/Textures/CharacterSelectChevronHoverRing.png";
+    public const float ChevronRingThickness = 9f; // 화면 px(1920×1080 기준 캔버스)
+    public const float ChevronRingGap = 3f; // 화면 px — 실루엣 가장자리에서 링 안쪽 가장자리까지
+
+    /// <summary>
+    /// 링 PNG 를 다시 굽고(<see cref="ChevronRingThickness"/>·<see cref="ChevronRingGap"/>, 기준 표시 크기 = 패널 셰브론 rect)
+    /// 패널 프리팹의 <c>Content/Chevron/Outline_Hover</c> 를 그 링 Image 로 맞춘다. 같은 입력 → 같은 PNG.
+    /// </summary>
+    [MenuItem("Tools/UI/Authoring/Character Select Chevron Hover Ring (굽기·연결)")]
+    public static void BakeAndApplyChevronHoverRing()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogError($"{Tag} Play 중에는 실행하지 않는다 — 먼저 정지할 것.");
+            return;
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+        try
+        {
+            Transform chevron = root.transform.Find("Content/Chevron");
+            if (chevron == null)
+            {
+                Debug.LogError($"{Tag} {PanelPath} 에 Content/Chevron 이 없다.");
+                return;
+            }
+
+            Sprite ring = BakeChevronHoverRing(((RectTransform)chevron).rect.size);
+            if (ring == null)
+                return;
+            MakeChevronButton(chevron.gameObject);
+            PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool success);
+            Debug.Log($"{Tag} 셰브론 hover 링 연결 {(success ? "성공" : "실패")}: {PanelPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// chevron.png 실루엣 링을 <see cref="ChevronRingPath"/> 에 굽는다. <paramref name="displaySize"/> = 셰브론이 캔버스(1920×1080 기준)에 보이는 크기 —
+    /// 두께·간격을 그 화면 px 로 맞춘다.
+    /// </summary>
+    public static Sprite BakeChevronHoverRing(Vector2 displaySize, float thickness = ChevronRingThickness, float gap = ChevronRingGap)
+    {
+        Sprite ring = UiSilhouetteRingBaker.Bake(ArtDir + "chevron.png", ChevronRingPath, displaySize, thickness, gap, out float margin);
+        if (ring != null)
+            Debug.Log($"{Tag} 셰브론 hover 링 굽기: {ChevronRingPath} {ring.texture.width}x{ring.texture.height} — 두께 {thickness}px · 간격 {gap}px · " +
+                      $"기준 표시 {displaySize} · 여백 {margin}px");
+        return ring;
+    }
+
+    /// <summary>
+    /// hover 흰 아웃라인 — 자식 <c>Outline_Hover</c>(구운 실루엣 링 Image, 셰브론 rect 를 링 여백만큼 사방으로 늘림, 기본 꺼짐) + 셰브론의 <see cref="UiHoverOutline"/>.
+    /// 링 PNG 가 없으면 굽는다. 링 모양·rect 는 매번 맞추고, 색은 이미 있으면 둔다. 구 <c>UiTriangleOutline</c>(스크립트 삭제됨)는 걷어 낸다.
+    /// </summary>
+    static void AddChevronHoverOutline(GameObject chevron, Button button)
+    {
+        var chevronRect = (RectTransform)chevron.transform;
+        Sprite ring = AssetDatabase.LoadAssetAtPath<Sprite>(ChevronRingPath);
+        if (ring == null)
+            ring = BakeChevronHoverRing(chevronRect.rect.size);
+        if (ring == null)
+            return;
+
+        Transform existing = chevron.transform.Find(ChevronOutlineName);
+        RectTransform rect = existing != null ? (RectTransform)existing : NewRect(ChevronOutlineName, chevron.transform);
+        GameObjectUtility.RemoveMonoBehavioursWithMissingScript(rect.gameObject);
+        foreach (Graphic other in rect.GetComponents<Graphic>())
+            if (!(other is Image))
+                Object.DestroyImmediate(other);
+
+        Stretch(rect);
+        Vector2 margin = (NativeSize(ring) - chevronRect.rect.size) * 0.5f; // 링은 셰브론 가운데 정렬
+        rect.offsetMin = -margin;
+        rect.offsetMax = margin;
+
+        Image outline = rect.GetComponent<Image>();
+        if (outline == null)
+            outline = AddImage(rect.gameObject, ring, Color.white);
+        outline.sprite = ring;
+        outline.type = Image.Type.Simple;
+        outline.preserveAspect = false;
+        outline.raycastTarget = false; // hover·클릭 영역은 셰브론 삼각형만
+
+        UiHoverOutline hover = chevron.GetComponent<UiHoverOutline>();
+        if (hover == null)
+            hover = chevron.AddComponent<UiHoverOutline>();
+        hover.Setup(outline, button); // 기본 꺼짐
     }
 
     // ── 미리보기 캡처 ─────────────────────────────────────────
