@@ -149,6 +149,59 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - **유지·정리**: 진행기는 로비 씬과 함께 새로 생기므로 서버 세션 정적 장부에 적어 다음 진행기로 잇는다. 연결 종료(재접속 = 새 clientId 라 꺼진 채로 시작)·호스트 셧다운 때 지운다.
 - Lobby 단계에서 전원이 켜면 입구 집결 인원 0명 = 훈련이 시작되지 않는다(출격만).
 
+## 바닥 안내 화살표 (할 일 111)
+
+다음 갈 곳을 바닥에 흐르는 화살표로 알려 준다. **씬 배치는 사용자가 직접**(프리팹만 제공, 씬 YAML 은 건드리지 않았다).
+
+- **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrow.prefab`
+  - 루트 = `LobbyFloorArrowStrip` + `LobbyTrainingStageVisibility`, 자식 `Visual` = 내장 Quad + `M_LobbyFloorArrow`.
+  - 셰이더 `Lobby/FloorArrow`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrow.shader`, URP Unlit 반투명) — 텍스처는 `50.Art/VFX/Textures/ARPG Effects-Textures/arrow2.png` 를 **참조만**(SVN 파일 수정 없음).
+  - 흐름은 **셰이더가 `_Time` 으로 UV 를 민다** — 매 프레임 스크립트 없음. 수치는 `MaterialPropertyBlock` 으로 넣어 머티리얼 복제·런타임 텍스처/메시 생성이 없다.
+- **배치**: 루트 위치 = 띠 **시작점**, 루트 **+Z(파란 축) = 화살표 진행 방향**. 바닥 위에 놓고 Y 축으로 돌려 방향을 맞춘다. 길이는 앞(+Z)으로 뻗는다.
+  여러 줄이면 프리팹을 여러 개 놓는다(꺾이는 길 = 구간마다 하나). 편집 중엔 늘 보이고, Play 에서 단계 판정대로 켜고 꺼진다.
+
+### 인스펙터 — `LobbyFloorArrowStrip` (값을 바꾸면 편집 중에도 바로 보인다)
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `length` | 4 | 띠 길이(m), 루트에서 +Z 로 |
+| `width` | 1 | 띠 폭(m) |
+| `arrowSpacing` | 1 | 화살표 하나가 차지하는 길이(m). 폭과 같으면 원본 비율 |
+| `heightOffset` | 0.02 | 바닥에서 띄우는 높이(겹침 깜빡임 방지) |
+| `color` | 하늘색 α0.9 (HDR) | 화살표 색·투명도 |
+| `flowSpeed` | 1.5 | 흐름 속도(m/초), 음수면 뒤로 |
+| `endFade` | 0.15 | 양 끝을 지우는 구간(길이 비율 0~0.5) |
+
+`length`·`width`·`heightOffset` 은 `Visual` 자식의 위치·스케일로 들어간다 — `Visual` 트랜스폼을 손으로 고치지 말 것(값이 덮인다).
+
+### 인스펙터 — `LobbyTrainingStageVisibility` (단계 체크)
+
+- `showWhen` 목록 = **이 중 한 줄이라도 맞으면 켠다**. 빈 목록 = 늘 꺼짐(프리팹 기본 = 비어 있음 — 배치할 때 고른다).
+  한 줄 = `stage` + 선택 `limitPhases`(끄면 그 단계 전체) + `phases`(다중 체크: Gathering / InProgress / Completed).
+- `targets` = 켜고 끌 오브젝트(프리팹 = `Visual`). 비우면 직속 자식 전부. 루트 자신은 끄지 않는다.
+- 판정 = 전 피어 로컬, 복제된 진행기 `Stage`/`Phase`(`LobbyTrainingDirector.StageChanged` + 켜질 때 `Active` 현재 값). 늦은 접속·로비 리로드도 진행기 스폰 알림으로 맞는다.
+  **진행기 없음(다른 씬·미스폰·디스폰) = 꺼짐**. 새 NetworkObject·NetworkVariable·RPC 없음. 규칙 원본 = `LobbyTrainingStageVisibilityRules`(EditMode `LobbyTrainingStageVisibilityRulesTests`).
+
+### 단계 ↔ 훈련 흐름 대응 (화살표가 안내할 곳 기준)
+
+| 안내 상황 | `stage` | `limitPhases` / `phases` |
+|---|---|---|
+| 로비 → 훈련장 입구 집결 (출격 패드도 켜져 있음) | Lobby | 끔 (Lobby 는 늘 Gathering) |
+| 입구 확정 뒤 → TRAIN_01 시작 위치 집결 | Train01 | 켬 / Gathering |
+| TRAIN_01 진행 중 | Train01 | 켬 / InProgress |
+| → TRAIN_02 시작 위치 집결 | Train02 | 켬 / Gathering |
+| → TRAIN_03 영역 집결(A 시작) | Train03A | 켬 / Gathering |
+| TRAIN_03 A→B·B→C 영역 안 확인 | Train03A·Train03B | 켬 / Completed |
+| TRAIN_03 C(대련)·D(제압) 진행 | Train03C·Train03D | 끔 (C·D 는 InProgress 만) |
+| → 종료 집결(훈련실 출구) | TrainEnd | 켬 / Gathering (TrainEnd 는 Gathering 만) |
+| → 브리핑 위치 집결 | Brief | 켬 / Gathering |
+| 브리핑 진행 중(조작 잠금) | Brief | 켬 / InProgress |
+| **브리핑 뒤 → 출격 집결** | **Brief** | **켬 / Completed** |
+| 훈련 없이 출격 집결 | Lobby | 끔 (입구 안내와 같은 단계 — 화살표를 둘 다 켜거나 출격 쪽은 Lobby + Brief/Completed 두 줄) |
+| 출격 확정 뒤(메인 진입 중) | Sortie | 보통 켜지 않음 |
+
+전이 원본 = `LobbyTrainingFlow`(`IsPointActive`·`OnGatherConfirmed`·`ReportStageCompleted`). 튜토리얼 클리어(Alt+1)로 명단이 비면 바로 `Brief/Completed` 로 넘어간다.
+
 ## TRAIN_01 무기 점검 — 체크 시점
 
 개인 6항목은 존1 서버 훅을 그대로 재사용해 센다(`LobbyTrainingWeaponCheck` 구독 → `LobbyWeaponCheckRules`/`LobbyWeaponCheckModel` 판정).
