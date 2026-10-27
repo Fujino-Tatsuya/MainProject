@@ -31,7 +31,7 @@ namespace BeaverLobby.Player.Dash
         [SerializeField, Min(0f)] private float dashInterruptWindow = 0.1f;
         [Tooltip("서버 승인 때 창에 더해 주는 지연 허용(초). 원격 오너 요청이 늦게 도착해도 받아 준다.")]
         [SerializeField, Min(0f), DataTableIgnore] private float dashInterruptServerTolerance = 0.1f;
-        [Tooltip("대쉬 간파 시 Dodge → 간파 준비 클립 크로스페이드 시간(초).")]
+        [Tooltip("대쉬 간파 상체 레이어(DashInterruptUpper) 가중치 전환 시간 + 대시 끝 0층 인수인계 블렌드 시간(초). 0 = 즉시.")]
         [SerializeField, Min(0f)] private float dashInterruptBlend = 0.05f;
 
         // 연출 정렬 값이라 테이블에 올리지 않는다. 재생 속도는 컨트롤러에 DodgeSpeed 파라미터가 있을 때 구간 비율로 코드가 정한다(할 일 92-5).
