@@ -4952,9 +4952,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 저지 실패 = 대폭발(방 전체 즉사기 — raidSelfDestructBlastLethal) → 남은 HP 전투로(살아남은·부활한 사람).
         float warn = _boss.raidSelfDestructBlastWarn;
-        // 즉사기(팀장 10-14 — 실패하기가 너무 어려웠다): 한 방 상한을 건너뛴다. 피격 무효(대시 무적 등)는 그대로.
+        // 즉사기(팀장 10-14 — 실패하기가 너무 어려웠다): 한 방 상한을 건너뛴다.
+        // 방 전체라 데이터 칸 raidSelfDestructBlastIgnoreInvuln(0/1, 할 일 105, 기본 1)이 1 이면 전멸기 — 발동 순간 살아 있는 참가자 전원 사망 처리
+        // (칸·벽 끼임·무적 무관, BossWipeDischargeRules). 0 이면 예전처럼 칸 판정 즉사 피해(무적으로 피함).
         _electricFloor?.ServerQueueDischarge(BossTileGrid.AllMask, warn, _boss.raidSelfDestructBlastDamage,
-                                             lethal: _boss.raidSelfDestructBlastLethal);
+                                             lethal: _boss.raidSelfDestructBlastLethal,
+                                             ignoreInvulnerability: _boss.raidSelfDestructBlastIgnoreInvuln != 0);
         _raidFloorHoldUntil = Time.time + warn + 2f;
         Debug.Log("[23호/레이드] 폐기 처분 — 저지 실패, 대폭발", this);
         FightLog("④ 폐기 처분 실패 → 대폭발");
