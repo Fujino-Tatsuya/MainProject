@@ -8,7 +8,8 @@ using UnityEngine.Rendering;
 /// 로비 발사대 둘레 바닥 메시 생성기(할 일 100 C2j). 메뉴 <c>Tools/Lobby/Rebuild Pod Bay Floor</c>.
 /// <para>바닥 = 바깥 범위(포드 베이 벽 중심선·인접 홀 타일 경계까지, 로비 루트 로컬 좌표) − 발사대 외곽선.
 /// 외곽선 = 발사대의 고정 메시(<see cref="SilhouetteRenderers"/>) 전체 높이를 XZ 로 투영한 실루엣에 <see cref="Margin"/> 여유를 더한 것
-/// (위쪽 난간 플랫폼·아래 가운데 돌출부까지 — 바닥이 그 밑으로 들어가지 않는다, 2026-10-27 floor2). 애니로 움직이는 Pod·Launcher 는 넣지 않는다.</para>
+/// (아래 가운데 돌출부까지 — 바닥이 그 밑으로 들어가지 않는다, 2026-10-27 floor2). 애니로 움직이는 Pod·Launcher 는 넣지 않는다.
+/// 위쪽 난간 플랫폼(<see cref="RailingPlatformCutZ"/> 북쪽 — 난간 띠·가운데 돌출부)은 외곽선에서 잘라 바닥으로 덮는다(floor2 정정).</para>
 /// <para>실루엣은 <see cref="Cell"/> 격자로 보수적 래스터화(삼각형이 조금이라도 걸치는 칸 = 막힘)하고, 행마다 좌우 끝 사이를 채운 뒤(가로 오목부 막기),
 /// 막힌 칸과의 틈이 여유보다 좁은 칸도 막는다.
 /// 바닥은 바깥 범위 경계에서 이어지는 칸만 쓴다(실루엣이 둘러싼 구멍 — 포드 통로 등 — 은 비운다).</para>
@@ -28,6 +29,12 @@ public static class LobbyPodBayFloorBuilder
 
     /// <summary>외곽선에 넣는 발사대 고정 렌더러(이름). Pod·Launcher_Moving(스킨, 애니)·Hidden_*(꺼짐)은 뺀다.</summary>
     public static readonly string[] SilhouetteRenderers = { "Platform_Fixed", "Tunnel_Fixed" };
+
+    /// <summary>
+    /// 외곽선을 자르는 발사대 로컬 z. 이보다 북쪽(위쪽 난간 플랫폼)은 외곽선에서 빼 바닥으로 덮는다.
+    /// 루트 로컬 z −6.60 — 본체 윗면 북쪽 끝(−6.67)과 난간 플랫폼 남쪽 벽(−6.58) 사이 바닥 홈(2026-10-27 조사).
+    /// </summary>
+    public const float RailingPlatformCutZ = 2.22f;
 
     public const float Margin = 0.02f;
     public const float Cell = 0.01f;
@@ -131,26 +138,55 @@ public static class LobbyPodBayFloorBuilder
         return tile.GetComponent<MeshRenderer>();
     }
 
-    /// <summary>발사대 고정 메시 삼각형을 루트 로컬 XZ 로 투영한 삼각형(수직 면은 선분) 목록.</summary>
+    /// <summary>
+    /// 발사대 고정 메시 삼각형을 발사대 로컬 z ≤ <see cref="RailingPlatformCutZ"/> 로 자른 뒤 루트 로컬 XZ 로 투영한 다각형(수직 면은 선분) 목록.
+    /// </summary>
     public static Silhouette CollectSilhouette(Transform root)
     {
         var station = root.Find(LaunchStationName);
         if (station == null) throw new System.InvalidOperationException($"{Tag} {LaunchStationName} 이 없다.");
         var sil = new Silhouette();
-        var toRoot = root.worldToLocalMatrix;
+        var stationToRoot = root.worldToLocalMatrix * station.localToWorldMatrix;
         foreach (var name in SilhouetteRenderers)
         {
             var mf = station.GetComponentsInChildren<MeshFilter>(true).FirstOrDefault(m => m.name == name);
             if (mf == null || mf.sharedMesh == null) throw new System.InvalidOperationException($"{Tag} 외곽선 렌더러 {name} 이 없다.");
             if (!mf.sharedMesh.isReadable) throw new System.InvalidOperationException($"{Tag} {name} 메시가 Read/Write 꺼짐.");
             sil.Renderers.Add($"{name}({mf.sharedMesh.name})");
-            var m = toRoot * mf.transform.localToWorldMatrix;
-            var verts = mf.sharedMesh.vertices.Select(v => { var p = m.MultiplyPoint3x4(v); return new Vector2(p.x, p.z); }).ToArray();
+            var m = station.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+            var verts = mf.sharedMesh.vertices.Select(v => m.MultiplyPoint3x4(v)).ToArray();
             var tris = mf.sharedMesh.triangles;
             for (int i = 0; i < tris.Length; i += 3)
-                sil.Polygons.Add(new[] { verts[tris[i]], verts[tris[i + 1]], verts[tris[i + 2]] });
+            {
+                var clipped = ClipNorthOf(new[] { verts[tris[i]], verts[tris[i + 1]], verts[tris[i + 2]] }, RailingPlatformCutZ);
+                if (clipped.Count < 3) continue;
+                sil.Polygons.Add(clipped.Select(p => { var q = stationToRoot.MultiplyPoint3x4(p); return new Vector2(q.x, q.z); }).ToArray());
+            }
         }
         return sil;
+    }
+
+    // 볼록 다각형에서 z > cut 부분을 잘라낸다(Sutherland–Hodgman, 평면 하나).
+    private static List<Vector3> ClipNorthOf(Vector3[] poly, float cut)
+    {
+        var res = new List<Vector3>(poly.Length + 1);
+        for (int i = 0; i < poly.Length; i++)
+        {
+            var a = poly[i];
+            var b = poly[(i + 1) % poly.Length];
+            bool ain = a.z <= cut, bin = b.z <= cut;
+            if (ain) res.Add(a);
+            if (ain != bin) res.Add(Vector3.Lerp(a, b, (cut - a.z) / (b.z - a.z)));
+        }
+        return res;
+    }
+
+    /// <summary>난간 플랫폼 경계(<see cref="RailingPlatformCutZ"/>)의 루트 로컬 z.</summary>
+    public static float RailingCutRootZ(Transform root)
+    {
+        var station = root.Find(LaunchStationName);
+        if (station == null) throw new System.InvalidOperationException($"{Tag} {LaunchStationName} 이 없다.");
+        return root.InverseTransformPoint(station.TransformPoint(new Vector3(0, 0, RailingPlatformCutZ))).z;
     }
 
     public static Rect OuterBounds()
@@ -193,7 +229,7 @@ public static class LobbyPodBayFloorBuilder
             }
         }
 
-        // 행마다 발사대 좌우 끝 사이를 모두 막는다 — 아래 가운데 홈(터널 남쪽)·위쪽 탭 사이처럼 가로로 오목한 곳에 바닥이 들어가지 않게(floor2 요청).
+        // 행마다 발사대 좌우 끝 사이를 모두 막는다 — 아래 가운데 홈(터널 남쪽)처럼 가로로 오목한 곳에 바닥이 들어가지 않게(floor2 요청).
         // 아래로 벌어진 모서리 모따기는 그 행의 끝 바깥이라 그대로 바닥이 된다.
         for (int z = 0; z < h; z++)
         {
@@ -604,13 +640,14 @@ public static class LobbyPodBayFloorBuilder
 
     public struct CheckResult
     {
-        public int Overlaps, Pairs, BlockedFloorCells, Tiles, TilePairs, SeamSamples, SeamGaps, TileSeamGaps, HoleCells;
-        public float MinGap, TileArea;
+        public int Overlaps, Pairs, BlockedFloorCells, Tiles, TilePairs, SeamSamples, SeamGaps, TileSeamGaps, HoleCells, RailingUncoveredCells;
+        public float MinGap, TileArea, RailingFloorArea;
 
         public override string ToString() =>
             $"외곽선 겹침 {Overlaps}, 최소 틈 {MinGap:F4}m (검사 쌍 {Pairs}), 막힌 칸(오목부 포함) 위 바닥 칸 {BlockedFloorCells} / " +
             $"기존 타일 {Tiles}개와 겹침 {TilePairs}쌍 {TileArea:F4}m² / " +
-            $"둘레 이음매 틈 {SeamGaps} (그중 타일 경계 {TileSeamGaps}, 표본 {SeamSamples}) / 발사대 밑 빈 칸 {HoleCells}";
+            $"둘레 이음매 틈 {SeamGaps} (그중 타일 경계 {TileSeamGaps}, 표본 {SeamSamples}) / 발사대 밑 빈 칸 {HoleCells} / " +
+            $"난간 플랫폼 경계 북쪽 바닥 {RailingFloorArea:F3}m², 못 덮은 칸 {RailingUncoveredCells}";
     }
 
     /// <summary>현재 로비 프리팹의 생성 바닥을 침범·타일 겹침·이음매로 검사한다. 바닥 오브젝트가 없으면 null.</summary>
@@ -641,6 +678,16 @@ public static class LobbyPodBayFloorBuilder
                 int c = grid.CellAt(new Vector2(x, z));
                 if (c < 0 || grid.Blocked[c]) res.BlockedFloorCells++;
             }
+            // 난간 플랫폼 경계(+여유) 북쪽, 바깥 범위 안은 전부 바닥이어야 한다.
+            float cutRoot = RailingCutRootZ(root.transform);
+            for (int z = 0; z < grid.Height; z++)
+            for (int x = 0; x < grid.Width; x++)
+            {
+                var p = new Vector2(grid.Bounds.xMin + (x + 0.5f) * Cell, grid.Bounds.yMin + (z + 0.5f) * Cell);
+                if (p.y > cutRoot + Margin + Cell && OuterRegion.Any(o => o.Contains(p)) && !grid.Floor[z * grid.Width + x]) res.RailingUncoveredCells++;
+            }
+            foreach (var r in rects)
+                res.RailingFloorArea += r.width * Mathf.Max(0, r.yMax - Mathf.Max(r.yMin, cutRoot));
             return res;
         }
         finally
