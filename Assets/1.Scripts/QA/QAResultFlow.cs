@@ -148,7 +148,7 @@ public sealed class QAResultFlow
 
     /// <summary>
     /// 전멸 강제. 설계상 결과 화면까지 안 가는 경우가 둘이라 그것도 귀결로 인정하고 멈춘다(할 일 48.3 원인 분석):
-    ///  · 튜토리얼 G11(보스방 도착) 전 사망 = 차감 없이 3초 뒤 자동 부활(TutorialDeathRules, ServerDeathKeepsSoul) — 전멸이 날 수 없다.
+    ///  · 튜토리얼 G11(보스방 도착) 전 사망 = 차감 없이 3초 뒤 자동 부활(MapSceneDeathRules, ServerDeathKeepsSoul) — 전멸이 날 수 없다.
     ///    48-20261020_143105 의 '120초 안에 결과 확정 안 됨' 은 이 자동 부활 ↔ QA 재사망이 약 5초 주기로 돈 것(진단 5초 주기와 겹쳐 DeadPresentation 에 멈춘 것처럼 보였다).
     ///    QA 가 Soul 을 직접 되살리면(TryCompleteReviveOnServer) 차감 없는 구간인데도 공용 목숨이 깎이므로 이 구간에선 직접 부활하지 않는다.
     ///  · 보스 미격파 전멸 = 결과 화면 대신 전멸 리스폰(PartyWipeRespawner.PartyWipeRespawned).
@@ -198,7 +198,7 @@ public sealed class QAResultFlow
                               $"inv={(inv != null && inv.IsServerInvulnerable)} {DeathResolutionDiag(life)}]");
                 }
 
-                // 차감 없는 사망 여부는 사망이 기록된 뒤에야 참이 된다(TutorialDeathRulesModel.IsPenaltyFree) — 죽은 상태에서 본다.
+                // 차감 없는 사망 여부는 사망이 기록된 뒤에야 참이 된다(MapSceneDeathRulesModel.IsPenaltyFree) — 죽은 상태에서 본다.
                 bool keepsSoul = PlayerLifeCycleController.ServerDeathKeepsSoul != null &&
                                  PlayerLifeCycleController.ServerDeathKeepsSoul(player.OwnerClientId);
                 if (keepsSoul && (life.State == PlayerLifeState.DeadPresentation || life.State == PlayerLifeState.Soul))
@@ -229,7 +229,7 @@ public sealed class QAResultFlow
             if (freeRevived.Count > 0 && freeRevived.SetEquals(freeDeaths) && freeDeaths.Count >= CountSpawnedPlayers())
             {
                 WipeOutcome = QAWipeOutcome.TutorialAutoRevive;
-                Note($"전멸 불가 — 튜토리얼 G11 전 사망은 차감 없이 자동 부활(TutorialDeathRules). 자동 부활 확인 {freeRevived.Count}명, 공용 목숨 {(rule != null && rule.IsSpawned ? rule.PartyLives : -1)}");
+                Note($"전멸 불가 — 튜토리얼 G11 전 사망은 차감 없이 자동 부활(MapSceneDeathRules). 자동 부활 확인 {freeRevived.Count}명, 공용 목숨 {(rule != null && rule.IsSpawned ? rule.PartyLives : -1)}");
                 yield break;
             }
             yield return new WaitForSeconds(0.25f);

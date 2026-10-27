@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 로컬 플레이어의 특성(증강) 진행도 — XP 바·레벨 숫자·일반 스킬 슬롯 상단 칸. 규칙은 <see cref="TraitProgressRules"/>.
-/// 획득 목록 = <see cref="TutorialTraitDirector.GetAcquired"/>, 게이트 = <see cref="TutorialDirector.IsGateOpen"/>(둘 다 기존 복제 값).
+/// 획득 목록 = <see cref="TutorialTraitDirector.GetAcquired"/>, 게이트 = <see cref="MapSceneDirector.IsGateOpen"/>(둘 다 기존 복제 값).
 /// 두 디렉터는 맵 씬에 있어 HUD 보다 늦게 생기거나 사라지므로 매 프레임 인스턴스만 확인해 구독을 옮기고,
 /// 값은 변경 알림(<c>ClientStateChanged</c>·<c>StateChanged</c>)이 왔을 때만 다시 계산한다.
 /// </summary>
@@ -36,13 +36,13 @@ public class TraitProgressHUD : MonoBehaviour
 
     private void OnEnable()
     {
-        TutorialDirector.StateChanged += MarkDirty;
+        MapSceneDirector.StateChanged += MarkDirty;
         dirty = true;
     }
 
     private void OnDisable()
     {
-        TutorialDirector.StateChanged -= MarkDirty;
+        MapSceneDirector.StateChanged -= MarkDirty;
         SetTraitDirector(null);
     }
 
@@ -112,14 +112,14 @@ public class TraitProgressHUD : MonoBehaviour
 
     private static int OpenedGateMask()
     {
-        TutorialDirector director = TutorialDirector.Instance;
+        MapSceneDirector director = MapSceneDirector.Instance;
         if (director == null)
             return 0;
 
         int mask = 0;
-        for (int g = 0; g < TutorialFlowModel.GateCount; g++)
+        for (int g = 0; g < MapSceneFlowModel.GateCount; g++)
         {
-            if (director.IsGateOpen((TutorialGate)g))
+            if (director.IsGateOpen((MapSceneGate)g))
                 mask |= 1 << g;
         }
         return mask;

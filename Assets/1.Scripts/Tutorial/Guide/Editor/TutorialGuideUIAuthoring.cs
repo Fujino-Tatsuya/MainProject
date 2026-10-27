@@ -55,24 +55,24 @@ public static class TutorialGuideUIAuthoring
         ("TUT_Z1_CHECK_E", "E 스킬", DefaultSeconds),
         ("TUT_Z1_CHECK_RMB", "우클릭 스킬", DefaultSeconds),
         ("TUT_Z1_CHECK_R", "R 궁극기", DefaultSeconds),
-        (TutorialCorridor1CooldownFlow.CooldownResetId, "모든 스킬의 재사용 대기시간이 초기화되었습니다.", 5f),
+        ("TUT_C1_COOLDOWN_RESET", "모든 스킬의 재사용 대기시간이 초기화되었습니다.", 5f),   // 107: 쓰던 TutorialCorridor1CooldownFlow 는 Legacy
         (TutorialGuideIds.Z2Intro, "적이 깨어납니다! 모든 적을 처치하세요.", 4f),
         (TutorialGuideIds.Z2Goal, "적 처치 {n}/{total}", DefaultSeconds),
         // 존3 — 공통 안내만(캐릭터별 간파 설명 없음). "/3" 은 목표 복제값 {total}.
         (TutorialGuideIds.Z3Intro, "공격을 <b>간파</b>해 기회를 만들고, 취약한 적을 <b>벽으로 밀어내세요</b>. 동료도 이어서 밀 수 있습니다.", 7f),
         (TutorialGuideIds.Z3PracticeNote, "연계를 세 번 성공할 때까지 스피너봇은 쓰러지지 않고 공격도 피해를 주지 않습니다.", 6f),
         (TutorialGuideIds.Z3Goal, "간파 → 밀치기 → 벽 충돌 연계 ({n}/{total})", DefaultSeconds),
-        (TutorialGuideIds.Z3CounterGoal, "노랗게 빛날 때 가까이에서 적을 향해 <b>우클릭</b>으로 간파하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z3CounterGoal, "보라색으로 빛날 때 가까이에서 적을 향해 <b>우클릭</b>으로 간파하세요.", DefaultSeconds),
         (TutorialGuideIds.Z3Miss, "빗나갔습니다 — 더 가까이, 스피너봇을 향해.", 4f),
-        (TutorialGuideIds.Z3Early, "아직입니다 — 노랗게 빛날 때만 간파됩니다.", 4f),
+        (TutorialGuideIds.Z3Early, "아직입니다 — 보라색으로 빛날 때만 간파됩니다.", 4f),
         (TutorialGuideIds.Z3FirstSuccess, "간파 성공! 공격이 끊기고 적이 취약해집니다.", 4f),
         (TutorialGuideIds.Z3PushIntro, "우클릭이 다시 준비되었습니다. <b>벽 반대편</b>에서 적을 향해 우클릭하면 벽으로 밀어낼 수 있습니다.", 7f),
         (TutorialGuideIds.Z3PushGoal, "취약한 스피너봇을 <b>우클릭으로 벽에 부딪히게</b> 하세요.", DefaultSeconds),
         (TutorialGuideIds.Z3PushHint, "아직 벽에 닿지 않았습니다. 위치를 잡고 다시 밀어내세요. 동료도 이어서 밀 수 있습니다.", 5f),
         (TutorialGuideIds.Z3WallSuccess, "벽 충돌! 연계 성공 ({n}/{total})", 4f),
         (TutorialGuideIds.Z3Return, "다음 연습을 준비합니다.", 3f),
-        (TutorialGuideIds.Z3Hint, "요령: 노란빛이 보이면 바로 붙어서 우클릭. 간파는 다시 쓰기까지 몇 초 걸립니다.", 6f),
-        (TutorialGuideIds.Z3Real, "연습 끝. 이제 진짜입니다! 노란빛이 보이면 언제든 간파하세요.", 6f),
+        (TutorialGuideIds.Z3Hint, "요령: 보라빛이 보이면 바로 붙어서 우클릭. 간파는 다시 쓰기까지 몇 초 걸립니다.", 6f),
+        (TutorialGuideIds.Z3Real, "연습 끝. 이제 진짜입니다! 보라빛이 보이면 언제든 간파하세요.", 6f),
     };
 
     // 로비 무전(할 일 86 T6b) — 명세 v0.2 §14 대사 초안 그대로. 메뉴 "로비 무전 문구 추가" 가 빠진 행만 덧붙인다(고친 문구는 안 건드림).

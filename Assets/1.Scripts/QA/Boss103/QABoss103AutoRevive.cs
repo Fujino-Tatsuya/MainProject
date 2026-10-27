@@ -51,18 +51,18 @@ public sealed class QABoss103ReviveQueue
 /// 할 일 103 C7b — [호스트] 보스전 QA 자동 부활. 판(Combat ~ 판정) 동안만 산다.
 /// 튜토리얼 사망 규칙은 보스방 도착(G11) 뒤 일반 규칙으로 넘어가고, 일반 규칙엔 자동 부활이 없어(부활 수단 = F10 디버그뿐)
 /// 셋 다 Soul + 공용 목숨 남음 = 전멸도 아닌 교착이 된다. 문서(Docs/tech/party-lives-respawn.md)의 'G11 뒤 자동 부활·1개 차감' 의도를 재현한다:
-/// Soul 이 되면 <see cref="TutorialDeathRulesModel.DefaultReviveDelaySeconds"/> 뒤 정식 진입점
+/// Soul 이 되면 <see cref="MapSceneDeathRulesModel.DefaultReviveDelaySeconds"/> 뒤 정식 진입점
 /// <see cref="PlayerReviveController.TryCompleteReviveOnServer()"/>(Alive + 공용 목숨 1 차감, 그 자리). 실패(목숨 0 등)면 Soul 그대로 → 게임 전멸 판정.
 /// 성공하면 튜토리얼 규칙과 같은 부활 무적(<see cref="PlayerLandingProtection.BeginProtection"/>, Revive 2초). 게임 코드는 바꾸지 않는다.
 /// </summary>
 public sealed class QABoss103AutoRevive : MonoBehaviour
 {
     private const string Tag = QABoss103Plan.Tag;
-    /// <summary>튜토리얼 사망 규칙의 부활 무적(<c>TutorialDeathRules.reviveInvulnerabilitySeconds</c> 기본값 — 비공개라 같은 값을 둔다).</summary>
+    /// <summary>튜토리얼 사망 규칙의 부활 무적(<c>MapSceneDeathRules.reviveInvulnerabilitySeconds</c> 기본값 — 비공개라 같은 값을 둔다).</summary>
     public const float InvulnerabilitySeconds = 2f;
     public const string NoInvulnNote = "qa_revive_no_invuln";
 
-    private readonly QABoss103ReviveQueue _queue = new QABoss103ReviveQueue(TutorialDeathRulesModel.DefaultReviveDelaySeconds);
+    private readonly QABoss103ReviveQueue _queue = new QABoss103ReviveQueue(MapSceneDeathRulesModel.DefaultReviveDelaySeconds);
     private readonly List<ulong> _due = new List<ulong>();
     private IReadOnlyDictionary<ulong, QABoss103Character> _characters;
     private QABoss103RunStats _stats;

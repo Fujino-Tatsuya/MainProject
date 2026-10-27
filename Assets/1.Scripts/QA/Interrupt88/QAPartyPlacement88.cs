@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 할 일 88 — 파티를 대상 보스 바로 옆에 둘 후보 지점과 간격 선택, 런 전 위치 검사, 봇 낭떠러지 판정(순수 계산, EditMode <c>QAPartyPlacement88Tests</c>).
-/// <para>스모크 4차(88-20261022_145020): 구간 사각형 격자(<c>TutorialDeathRules.TryFindAreaSpreadPoints</c>)는 중간보스 <b>섬</b>
+/// <para>스모크 4차(88-20261022_145020): 구간 사각형 격자(<c>MapSceneDeathRules.TryFindAreaSpreadPoints</c>)는 중간보스 <b>섬</b>
 /// (다리 개통 전 NavMesh 가 끊긴 중앙 섬) 밖 플랫폼을 골랐다 — 보스는 경로가 없어 10분 동안 한 번도 공격하지 않았고(창 0),
 /// 클라 봇은 NavMesh 가 없어(클라는 베이크 안 함) 직선으로 걷다 틈에 떨어졌다. 그래서 후보를 보스 NavMesh 위치 둘레 링으로 만들고
 /// 서버가 보스→후보 경로가 끊기지 않은(같은 섬) 것만 고른다. 실제 NavMesh·물리 검사는 <c>QABossStart88</c> 이 한다.</para>

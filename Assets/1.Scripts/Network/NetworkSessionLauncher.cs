@@ -536,6 +536,14 @@ public class NetworkSessionLauncher : MonoBehaviour
         _loadingFlowController?.StartGameLoading();
     }
 
+    /// <summary>로비 포드 탑승·강하 연출(<see cref="LobbyPodLaunch"/>) 끝 → 맵 로딩. 맵에서 포드 착지 연출을 탄다(진입 종류 Lobby, 할 일 100 C3).</summary>
+    public void StartGameLoadingFromLobbyPod()
+    {
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartGameLoadingFromLobbyPod hasFlow={_loadingFlowController != null}");
+        RegisterLoadingFlowCallbacks();
+        _loadingFlowController?.StartGameLoading(MapEntryKind.Lobby);
+    }
+
     private void RegisterLoadingFlowCallbacks()
     {
         if (_loadingFlowController == null)

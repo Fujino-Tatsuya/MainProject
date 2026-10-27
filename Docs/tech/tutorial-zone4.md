@@ -1,24 +1,31 @@
 # 튜토리얼 존4 흐름 + 보스 진입 안내 — 설정 → 타이머 → 패널·다리·중간보스 (할 일 15 · S10)
 
+> **🟪 할 일 107 (2026-10-27) — 교육 부분만 Legacy, 나머지는 이름만 바뀜.**
+> - 유지: `MapSceneBossApproachGuide`(옛 `TutorialZone4Flow`, 서버) — 설정 자막(TUT_Z4_LORE·TIMER_HINT) → G8 · 일반 몬스터 기상 · 다리 개통 → TUT_Z4_BRIDGE·중간보스 기상 · 클리어 → TUT_Z4_CLEAR·GO_BOSS · 만료·패드 카운트다운·23호 정면 팁 · 재도전 래치.
+>   `MapSceneBossApproachView`(옛 `TutorialZone4Guide`, 모든 피어) — G9 뒤 "보스방으로" 목표·미니맵 보스 아이콘 펄스 · 존4 안(Lore·Combat)에 남은 복도 "다음 구역으로" 지움 · 보스방 도착 정리. 규칙 `MapSceneBossApproachModel`/`Display`(`MapSceneBossApproachRules.cs`).
+> - Legacy(`Assets/1.Scripts/Map/Tutorial/Legacy/TutorialZone4Education.cs`, 부착 없음): TUT_Z4_START·PANEL_INTRO(소개 연출이 꺼진 판)·PANEL_FIRST · 패널 n/4 카운터(`Zone4Panels`) · 중간보스 간파 리마인드(TUT_Z4_COUNTER_REMIND) · 목표 "패널 n/4"·"중간보스" · 타이머 펄스·계단/중앙 섬 강조.
+> - 4구역 소개 연출(`MapSceneZone4IntroFlow`/`Presentation`/`Data`)은 그대로 — [handoff-zone4-intro-cinematic.md](handoff-zone4-intro-cinematic.md).
+> 아래 본문은 분리 전 기준이다(타입 이름은 107 이름 변경을 따랐다).
+
 > 원본: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.7(Z4-0~Z4-6)·§3.9(B-1·B-2)·§4 G7~G10·D4·D6·D17·D19 · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md) S10.
 > 디렉터: [tutorial-director.md](tutorial-director.md)(§8 장부·§9 보스 타이머/보스 길) · 안내 UI: [tutorial-guide-ui.md](tutorial-guide-ui.md) · 존3(같은 구조): [tutorial-zone3.md](tutorial-zone3.md).
-> 테스트: `TutorialZone4RulesTests`(튜토리얼 러너 `Tools/Tests/튜토리얼 EditMode 테스트 실행`).
+> 테스트: `MapSceneBossApproachRulesTests`(튜토리얼 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`).
 
 ## 1. 파일
 | 무엇 | 경로 | 피어 |
 |---|---|---|
-| 순수 규칙 | `Map/Tutorial/Flow/TutorialZone4Rules.cs` — `TutorialZone4Model`(설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁) · `TutorialZone4Display`(목표·강조) | — |
-| 흐름 | `Map/Tutorial/Flow/TutorialZone4Flow.cs`(보스 진입 안내 포함) | 서버 |
-| 표시 | `Map/Tutorial/Flow/TutorialZone4Guide.cs`(목표·강조·도착 정리) | 모든 피어 |
+| 순수 규칙 | `Map/MapScene/Flow/MapSceneBossApproachRules.cs` — `MapSceneBossApproachModel`(설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁) · `MapSceneBossApproachDisplay`(목표·강조) | — |
+| 흐름 | `Map/MapScene/Flow/MapSceneBossApproachGuide.cs`(보스 진입 안내 포함) | 서버 |
+| 표시 | `Map/MapScene/Flow/MapSceneBossApproachView.cs`(목표·강조·도착 정리) | 모든 피어 |
 
-부착: 존3 과 같다 — `TutorialDirector.StateChanged` 에서 `IsTutorialActive` 일 때 디렉터 GameObject 에 런타임 `AddComponent`(씬 무수정).
+부착: 존3 과 같다 — `MapSceneDirector.StateChanged` 에서 `IsTutorialActive` 일 때 디렉터 GameObject 에 런타임 `AddComponent`(씬 무수정).
 보스 진입 안내는 존4 파일에 둔다(별도 `TutorialBossEnterFlow` 없음). 디렉터의 `HandleBossRoomArrived` 는 단계 Finished 만 정하고(남은 `TODO(S12)` 주석은 낡은 표시) — 안내 정리·23호 팁은 이 흐름이 `BossRoomArrived`·`IsFinished` 를 구독해 한다.
 S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패드 시계가 멈춘다(23호 팁만). 복도4 고르기·대기·발판 목표를 존4 "보스방으로" 목표가 덮어쓰지 않는다.
 
 ## 1.1 🔴 4구역 진입 전 소개 연출(2026-10-26 · 경석) — 아래 Z4-0~Z4-1/2 를 바꿨다
 계획·결정 정본 = [PLAN-zone4-intro-cinematic.md](../../PLAN-zone4-intro-cinematic.md), 기획 = SVN r520 명세 §4.5~4.8. 핸드오프 = [handoff-zone4-intro-cinematic.md](handoff-zone4-intro-cinematic.md).
-- **G7 이 바로 안 열린다**: 복도3 특성 선택 전원 완료(60초 교착 방지 포함) → G7 **보류**(`TutorialFlowModel.HoldGate`) → 살아 있는 전원이 복도3 → 소개 연출(패널 4곳 → 다리·중앙 섬 적 → 복귀) → **복귀 끝 = G7 열림**. 서버 `TutorialZone4IntroFlow` · 표시 `TutorialZone4IntroPresentation` · 복제 `TutorialDirector.Zone4Intro.cs`.
-- 연출이 켜진 판(`Resources/Tutorial/Zone4IntroCinematic` `introEnabled`)은 `TutorialZone4Model(startOnGateOpen: true)` — 설정 자막 시작 = G7 열림(존4 진입을 기다리지 않음) · 설정 대기 0초 → **즉시 G8** · 기상 지연 0초. `LORE`·`TIMER_HINT` 는 복귀 무전("어서 움직여.") 뒤로 미룬다. `START`·`PANEL_INTRO` 는 안 낸다.
+- **G7 이 바로 안 열린다**: 복도3 특성 선택 전원 완료(60초 교착 방지 포함) → G7 **보류**(`MapSceneFlowModel.HoldGate`) → 살아 있는 전원이 복도3 → 소개 연출(패널 4곳 → 다리·중앙 섬 적 → 복귀) → **복귀 끝 = G7 열림**. 서버 `MapSceneZone4IntroFlow` · 표시 `MapSceneZone4IntroPresentation` · 복제 `MapSceneDirector.Zone4Intro.cs`.
+- 연출이 켜진 판(`Resources/MapScene/Zone4IntroCinematic` `introEnabled`)은 `MapSceneBossApproachModel(startOnGateOpen: true)` — 설정 자막 시작 = G7 열림(존4 진입을 기다리지 않음) · 설정 대기 0초 → **즉시 G8** · 기상 지연 0초. `LORE`·`TIMER_HINT` 는 복귀 무전("어서 움직여.") 뒤로 미룬다. `START`·`PANEL_INTRO` 는 안 낸다.
 - 연출을 끄면 아래 표 그대로(예전 흐름).
 
 ## 2. 흐름 (서버 판단 → 복제/RPC 표시) — 연출을 끈 판 기준(켠 판은 §1.1)
@@ -33,14 +40,14 @@ S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패�
 | Z4-6 | `ZoneCleared(Zone4)`(장부 — 중간보스 처치, D4) | G9 는 장부가 연다(여기서 안 엶) | `TUT_Z4_CLEAR` → `TUT_Z4_GO_BOSS` · 목표 `TUT_Z4_GO_BOSS` · 미니맵 보스 아이콘 펄스 |
 | 만료 | `BossTimerManager.State == Expired`(서버 폴링) | — | `TUT_TIMER_EXPIRED` 1번(도착 전) |
 | B-1 | `BossTeleportManager.IsCountdownActive` 상승(만료 강제 이동 제외) | — | `TUT_B_PAD_COUNT`(재시작은 8초 간격) |
-| B-2 | `TutorialDirector.BossRoomArrived`(→ 단계 Finished) | 1초 뒤 팁 | 각 클라 `TutorialGuideUI.Clear()`(복제 `IsFinished`) → `TUT_B_BOSS_FRONT_TIP`(D19) |
+| B-2 | `MapSceneDirector.BossRoomArrived`(→ 단계 Finished) | 1초 뒤 팁 | 각 클라 `TutorialGuideUI.Clear()`(복제 `IsFinished`) → `TUT_B_BOSS_FRONT_TIP`(D19) |
 
 - 자막 = 디렉터 `ShowSubtitleServer(id, args, targets)` 하나(전부 전원). 목표·강조는 각 피어가 복제 값(`Step`·`GetCounter(Zone4Panels)`·`IsGateOpen(G9)`·`IsFinished`)으로 다시 그린다 — 목표/강조용 디렉터 RPC 없음.
 - 목표 `TUT_Z4_GO_BOSS` 는 G9 부터 도착까지 유지(복도4 특성 대기 줄은 별도 `SetWaitParty`). 내가 띄운 목표(`TUT_Z4_*`)만 지운다.
 - 디버그로 G8 을 먼저 열면 설정 자막 없이 바로 전투(자막 START·PANEL_INTRO 는 나간다).
 
 ## 3. G8 시점 근거
-- 시나리오 §3.7 Z4-1 "설정 자막이 끝나면(약 8~10초)". 문구 행 `TUT_Z4_LORE` 5초 + `TUT_Z4_TIMER_HINT` 5초 = **10초**(`TutorialZone4Model.DefaultLoreSeconds`, 흐름 인스펙터 `loreSeconds`).
+- 시나리오 §3.7 Z4-1 "설정 자막이 끝나면(약 8~10초)". 문구 행 `TUT_Z4_LORE` 5초 + `TUT_Z4_TIMER_HINT` 5초 = **10초**(`MapSceneBossApproachModel.DefaultLoreSeconds`, 흐름 인스펙터 `loreSeconds`).
 - 서버는 자막 큐를 모른다 — 고정값이다. 문구 표시 시간을 바꾸면 이 값도 맞출 것. 존4 진입 때 다른 자막이 큐에 남아 있으면(예: 복도3 특성 안내) 화면에서는 설정 자막이 그만큼 늦게 끝난다.
 - `TUT_Z4_START` 를 3초로 둬서 `TUT_Z4_PANEL_INTRO` 가 몬스터 기상(G8+3초)과 같이 뜬다.
 
@@ -70,7 +77,7 @@ S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패�
 ## 7. 판단(보수적으로 고른 것)
 - `TUT_Z4_ULT`·`TUT_Z4_ULT_ASSASSIN` 은 문구만 채우고 띄우지 않는다(조건 — 궁극기 준비·분노 게이지 — 이 명확하지 않음).
 - `TUT_Z4_MIDBOSS` 문구는 `{이름}` 자리표시자 없이 "중앙 섬의 중간보스를 처치하세요"(클라가 이름을 채울 경로가 없음).
-- `TUT_B_PAD_WARN`(G10, D17)은 이 흐름이 아니라 복도 흐름(`TutorialCorridorFlow`, S8)이 G10 열림 때 전원에게 띄운다 — [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md). 디렉터 `HandleModelGateOpened` 의 `TODO(S6)` 주석은 낡은 표시다.
+- `TUT_B_PAD_WARN`(G10, D17)은 이 흐름이 아니라 복도 흐름(`MapSceneTraitCorridorFlow`, S8)이 G10 열림 때 전원에게 띄운다 — [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md). 디렉터 `HandleModelGateOpened` 의 `TODO(S6)` 주석은 낡은 표시다.
 - 도착 정리는 클라가 복제 `IsFinished` 로 `Clear()`(자막 포함). 23호 팁은 RPC 라 정리보다 먼저 도착하면 지워진다 → 서버가 1초 늦게 보낸다.
 - 단계는 Zone4Lore·Zone4Combat 만 올린다(Corridor4·BossEnter 는 다음 단계 몫).
 

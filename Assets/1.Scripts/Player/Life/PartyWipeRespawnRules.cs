@@ -48,14 +48,14 @@ public static class PartyWipeRespawnRules
     /// 모자라면 간격 무시, 그래도 모자라면 고른 점을 처음부터 돌려 쓴다. 쓸 후보가 하나도 없으면 false(<paramref name="chosen"/> 비움).
     /// </summary>
     public static bool TrySelectSpread(IReadOnlyList<(float x, float z)> candidates, int count, float refX, float refZ, float minSpacing,
-                                       IReadOnlyList<TutorialPadArea> pads, float padMargin, List<int> chosen)
+                                       IReadOnlyList<MapScenePadArea> pads, float padMargin, List<int> chosen)
     {
         chosen.Clear();
         if (candidates == null || count <= 0) return false;
 
         var order = new List<int>();
         for (int i = 0; i < candidates.Count; i++)
-            if (!TutorialRevivePointRules.IsOnPad(pads, candidates[i].x, candidates[i].z, padMargin)) order.Add(i);
+            if (!MapSceneRevivePointRules.IsOnPad(pads, candidates[i].x, candidates[i].z, padMargin)) order.Add(i);
         if (order.Count == 0) return false;
 
         order.Sort((a, b) =>
@@ -84,7 +84,7 @@ public static class PartyWipeRespawnRules
     /// 절차 맵 폴백 후보 — 패드 범위를 <paramref name="padMargin"/> + <paramref name="offset"/> 만큼 넓힌 둘레 위 점(<paramref name="step"/> 간격).
     /// 사각형은 네 변을, 원은 원둘레를 돈다. 전부 패드 범위 + 여유 밖이다. 바닥·점유 검사는 호출자 몫.
     /// </summary>
-    public static void RingCandidates(TutorialPadArea pad, float padMargin, float offset, float step, List<(float x, float z)> into)
+    public static void RingCandidates(MapScenePadArea pad, float padMargin, float offset, float step, List<(float x, float z)> into)
     {
         float grow = Math.Max(0f, padMargin) + Math.Max(0.01f, offset);
         step = Math.Max(0.1f, step);

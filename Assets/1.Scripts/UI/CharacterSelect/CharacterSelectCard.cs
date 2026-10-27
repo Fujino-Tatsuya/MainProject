@@ -22,7 +22,8 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Image sideBackground;
     [SerializeField] private Sprite sideTopSprite;
     [SerializeField] private Sprite sideBottomSprite;
-    [Tooltip("가운데 자리 강조 금색 테두리(Image). 켜고 끄기·알파는 SetRingAlpha.")]
+    [Tooltip("가운데 자리 강조 금색 테두리(Image). 크기 = RectTransform, 색·스프라이트 = Image 칸 그대로 쓴다(코드는 덮어쓰지 않음). " +
+             "켜고 끄기·알파(Image 알파에 곱함)는 SetRingAlpha. 고칠 곳 = 패널 프리팹 Content/Cards/Card_Template/Ring_Focus.")]
     [FormerlySerializedAs("currentMarker")]
     [SerializeField] private GameObject focusRing;
     [SerializeField] private Image portraitImage;

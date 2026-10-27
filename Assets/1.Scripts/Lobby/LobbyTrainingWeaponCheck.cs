@@ -127,6 +127,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
                 PlayerSkillController.ServerSkillUsed += HandleSkillUsedServer;
                 GunnerChargeLaserSkill.ServerFired += HandleChargeLaserFiredServer;
                 NetworkManager.OnClientDisconnectCallback += HandleClientDisconnectedServer;
+                _director.ServerRosterMemberRemoved += HandleRosterMemberRemovedServer;
             }
 
             if (targetPrefab == null || targetSpots == null)
@@ -146,7 +147,10 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
         if (IsServer)
         {
             if (_director != null)
+            {
                 _director.ServerFlowChanged -= EvaluateServer;
+                _director.ServerRosterMemberRemoved -= HandleRosterMemberRemovedServer;
+            }
             PlayerDashController.ServerDashApproved -= HandleDashApprovedServer;
             Player.ServerBasicAttackStarted -= HandleBasicAttackServer;
             PlayerSkillController.ServerSkillUsed -= HandleSkillUsedServer;
@@ -296,13 +300,18 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
             _pendingComplete = true;
     }
 
-    private void HandleClientDisconnectedServer(ulong clientId)
+    private void HandleClientDisconnectedServer(ulong clientId) => RemoveFromRosterServer(clientId, "퇴장");
+
+    // 튜토리얼 클리어 플래그(로비 Alt+1)로 훈련 명단에서 빠졌다 — 퇴장과 같이 남은 사람만으로 완료 판정.
+    private void HandleRosterMemberRemovedServer(ulong clientId) => RemoveFromRosterServer(clientId, "튜토리얼 클리어로 명단 제외");
+
+    private void RemoveFromRosterServer(ulong clientId, string reason)
     {
         if (!_model.RemoveClient(clientId))
             return;
 
         SyncEntries();
-        Debug.Log($"[SceneFlow] {Tag} 명단 client {clientId} 퇴장 — 파티 완료 {_model.CompletedCount}/{_model.Roster.Count}");
+        Debug.Log($"[SceneFlow] {Tag} 명단 client {clientId} {reason} — 파티 완료 {_model.CompletedCount}/{_model.Roster.Count}");
         if (_model.TryConsumeAllComplete())
             _pendingComplete = true;
     }

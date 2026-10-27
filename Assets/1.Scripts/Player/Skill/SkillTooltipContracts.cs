@@ -15,6 +15,10 @@ public struct SkillTooltipText
     [DataTableText, TextArea(3, 10), SerializeField] private string description;
     [SerializeField] private Sprite icon;
 
+    [DataTableText(Localize = false), SkillTooltipTagList, SerializeField]
+    [Tooltip("태그 칩 ID 쉼표 구분(예 Knockback, Stun). 빈 칸 = 태그 없음. ID 목록 = SkillTooltipTag")]
+    private string tags;
+
     // 주인ID/필드경로(예 "FirstMeleeMainSkillData/tooltip"). 직렬화하지 않는다 — 주인이 getter 에서 매번 붙인다.
     [NonSerialized] private string keyPrefix;
 
@@ -22,6 +26,9 @@ public struct SkillTooltipText
     public string Subtitle => Localize(nameof(subtitle), subtitle);
     public string Description => Localize(nameof(description), description);
     public Sprite Icon => icon;
+
+    /// <summary>태그 ID 원문(쉼표 구분). 화면은 <see cref="SkillTooltipTags.TryParse"/> 로 아는 태그만 그린다.</summary>
+    public string TagIds => tags ?? string.Empty;
 
     /// <summary>키를 붙인 사본. 주인은 <c>Tooltip => tooltip.Keyed(this, nameof(tooltip))</c> 로 내보낸다.</summary>
     public SkillTooltipText Keyed(UnityEngine.Object owner, string fieldPath)

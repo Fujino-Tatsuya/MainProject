@@ -15,6 +15,37 @@ public enum DefaultAttackChainPolicy
     Loop
 }
 
+// 스텝 End 에서 다음 타를 고르는 순수 규칙(할 일 122 — EditMode 로 고정). 예약(창 안 래치)이 없으면 언제나 종료다.
+public static class DefaultAttackChainRules
+{
+    public static bool TryResolveNextStep(int currentIndex, int stepCount, DefaultAttackChainPolicy policy, bool queued,
+        out int nextIndex)
+    {
+        nextIndex = currentIndex + 1;
+        if (!queued || stepCount <= 0)
+            return false;
+
+        if (nextIndex < stepCount)
+            return true;
+
+        switch (policy)
+        {
+            case DefaultAttackChainPolicy.Loop:
+                nextIndex = 0;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    // 되감기 진입 시각(클립 타임라인 초) → CrossFadeInFixedTime 의 오프셋(상태 시간 초). 콤보 상태는 Speed Multiplier =
+    // AttackSpeed 파라미터라 엔진이 오프셋에 속도를 곱해 클립 시각으로 바꾼다 — 그대로 넘기면 공속이 오를수록 더 깊이 들어가
+    // 제압 가속(1.2 × 2) 때 팔라딘 1타 창 열림(0.23)을 건너뛰고 홀드 순환이 끊겼다(할 일 122 후속). 각 피어가 자기 AttackSpeed 로 나눈다.
+    public static float LoopBackFixedTimeOffset(float clipTime, float attackSpeed) =>
+        attackSpeed > 0f ? clipTime / attackSpeed : clipTime;
+}
+
 public enum DefaultAttackMovementType
 {
     None,
@@ -758,7 +789,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         if (triggerAttack)
             animator.SetTrigger(DefaultAttackHash);
         else
-            animator.CrossFadeInFixedTime(GetAttackStateHash(currentAttackIndex), 0.05f, -1, crossFadeStartTime);
+            animator.CrossFadeInFixedTime(GetAttackStateHash(currentAttackIndex), 0.05f, -1,
+                DefaultAttackChainRules.LoopBackFixedTimeOffset(crossFadeStartTime, AttackSpeed));
     }
 
     private void CompleteCurrentAttackStep()
@@ -781,28 +813,11 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     private bool ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection)
     {
-        nextIndex = currentAttackIndex + 1;
         nextDirection = queuedAttackDirection;
-        bool hasNext = nextIndex < attackSteps.Length;
 
-        if (!hasQueuedNextAttack)
+        if (!DefaultAttackChainRules.TryResolveNextStep(
+                currentAttackIndex, attackSteps.Length, chainPolicy, hasQueuedNextAttack, out nextIndex))
             return false;
-
-        switch (chainPolicy)
-        {
-            case DefaultAttackChainPolicy.Once:
-                if (!hasNext)
-                    return false;
-                break;
-
-            case DefaultAttackChainPolicy.Loop:
-                if (!hasNext)
-                    nextIndex = 0;
-                break;
-
-            default:
-                return false;
-        }
 
         return HasAttackStep(nextIndex);
     }
@@ -1001,7 +1016,7 @@ public class DefaultAttackStep
     [SerializeField] private int flatDamageBonus;
     // 이 스텝이 체인의 첫 스텝(0번)일 때만 의미가 있다: 마지막 스텝의 LoopCheck에서
     // 조기 루프백으로 들어올 때 처음(0초)이 아니라 여기서부터 재생해 윈드업을 건너뛴다.
-    // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준.
+    // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준 — 공격속도와 무관하게 같은 클립 시각으로 들어간다(DefaultAttackChainRules.LoopBackFixedTimeOffset).
     [DataTableIgnore] [SerializeField] private float loopBackEntryTime = 0f;
     // 이 스텝의 적중이 "적중 시 발동" 효과(패시브 버프 등)를 소모할 수 있는가. Player.ServerAttackLanded 에 실린다.
     [SerializeField] private bool triggersOnHit = true;

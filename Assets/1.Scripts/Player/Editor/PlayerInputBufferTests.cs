@@ -695,4 +695,32 @@ public sealed class PlayerInputBufferTests
         Assert.That(PlayerInputBuffer.FromSkillSlot(PlayerSkillSlot.Interrupt), Is.EqualTo(PlayerBufferedInput.SkillInterrupt));
         Assert.That(PlayerInputBuffer.FromSkillSlot(PlayerSkillSlot.Ultimate), Is.EqualTo(PlayerBufferedInput.SkillUltimate));
     }
+
+    // 대쉬 간파 창 판정(할 일 115) — 살아 있으면 순위와 무관하게 마지막 누른 시각, 만료·지움이면 없음.
+    [Test]
+    public void TryGetRecordedTime_AliveRegardlessOfPriority_LatestPress()
+    {
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.SetPriority(PlayerBufferedInput.Dash, 10);
+        buffer.Record(PlayerBufferedInput.SkillInterrupt, 10f);
+        buffer.Record(PlayerBufferedInput.SkillInterrupt, 10.05f);
+        buffer.Record(PlayerBufferedInput.Dash, 10.06f);
+
+        Assert.That(buffer.Peek(10.1f), Is.EqualTo(PlayerBufferedInput.Dash), "대시에 밀려 있어도");
+        Assert.That(buffer.TryGetRecordedTime(PlayerBufferedInput.SkillInterrupt, 10.1f, out float time), Is.True);
+        Assert.That(time, Is.EqualTo(10.05f));
+    }
+
+    [Test]
+    public void TryGetRecordedTime_ExpiredOrRemoved_False()
+    {
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.SkillInterrupt, 10f);
+        Assert.That(buffer.TryGetRecordedTime(PlayerBufferedInput.SkillInterrupt, 10.3f, out _), Is.False, "만료");
+
+        buffer.Record(PlayerBufferedInput.SkillInterrupt, 11f);
+        buffer.Consume(PlayerBufferedInput.SkillInterrupt);
+        Assert.That(buffer.TryGetRecordedTime(PlayerBufferedInput.SkillInterrupt, 11f, out _), Is.False, "소비");
+        Assert.That(buffer.TryGetRecordedTime(PlayerBufferedInput.None, 11f, out _), Is.False);
+    }
 }
