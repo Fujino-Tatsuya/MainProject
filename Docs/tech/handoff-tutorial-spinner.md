@@ -1,5 +1,9 @@
 # handoff — 튜토리얼 존3 스피너봇 연습 모드 (할 일 15 · S9 몬스터 쪽)
 
+> **🟪 Legacy (할 일 107, 2026-10-27)** — 연습 모드 코드는 `Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/` 로 옮겨 보관하고 맵씬 연결을 끊었다.
+> 경석 코드에 남은 훅 두 개는 **지우지 않았다**(동작 변화 0): `SpinnerBot` 의 `ISpinnerBotOverride`(구현체가 등록 해제된 `SpinnerBot_Tutorial` 뿐 → 맵씬 스피너봇은 늘 원래 경로) ·
+> `MapContentSpawner.ServerMonsterPrefabOverride`(설치하던 `TutorialSpinnerSpawnOverride` 의 `RuntimeInitializeOnLoadMethod` 를 지움 → 늘 null). 지울지는 경석 판단.
+
 > 받는 사람: **경석**(몬스터 영역 소유). 작성: 은희 레인(claude-alt), 2026-10-11, 브랜치 `feature/TutorialSpinnerPractice`.
 > 요지: **SpinnerBot.cs 에 주입 인터페이스 하나(`ISpinnerBotOverride`)와 호출 지점 4곳만** 넣었다.
 > MonsterBase · MonsterCounterWindow · CounterWindow · 데이터(SO/xlsx) · 프리팹은 **손대지 않았다.**
@@ -27,7 +31,7 @@
 (`SetDormant`·`startDormant`·`Dormant` 모드·휴면용 `SetServerLogicSuspended`·무한 SuperArmor)은 삭제했다.
 전환 대기의 "인지·추격·공격 정지"만 공개 API `MonsterBase.SetServerLogicSuspended(bool)` 를 쓴다.
 
-## 2. 연습 모드 본체 (`Assets/1.Scripts/Tutorial/SpinnerPractice/`)
+## 2. 연습 모드 본체 (`Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/`)
 
 | 파일 | 역할 |
 |---|---|
@@ -36,7 +40,7 @@
 | `SpinnerPracticeWindowSchedule.cs` | 순수 C# 창 간격(기본 9초) |
 | `SpinnerPracticeWindowTracker.cs` | 순수 C# 창 열림/닫힘 → 성공/놓침 · 연속 놓침 |
 | `SpinnerPracticeArea.cs` | 순수 함수 스폰 반경 클램프(위치 · 돌진 직선 끝점) |
-| `Editor/SpinnerPracticeModelTests.cs` | EditMode 22건. `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialEditModeTestRunner`)에 등록 |
+| `Editor/SpinnerPracticeModelTests.cs` | EditMode 22건. `Tools/Tests/맵씬 EditMode 테스트 실행`(`MapSceneEditModeTestRunner`)에 등록 |
 
 모드별 동작:
 
@@ -113,7 +117,7 @@ MonsterBase · TwentyThreeBoss · MonsterCounterWindow · 데이터는 무수정
 
 ## 5. 검증
 
-- 컴파일 에러 0. `SpinnerPracticeModelTests` 는 I0 이후 `Tools/Tests/튜토리얼 EditMode 테스트 실행` 에서 돈다(22건).
+- 컴파일 에러 0. `SpinnerPracticeModelTests` 는 I0 이후 `Tools/Tests/맵씬 EditMode 테스트 실행` 에서 돈다(22건).
 - 🔴 **Play 검증 안 함**(사람이 Play/MPPM 으로 확인 필요): base 휴면 중 스피너봇 무적·정지 · 휴면 해제 후 `EnterPractice` · 9초 주기 창 · 놓침 시 피해 0 밀쳐내기 ·
   간파 성공 그로기 · 반경 클램프 · 본 모드 전환 후 원래 패턴 · 클라 창에서 `Mode` 복제.
 
@@ -125,7 +129,7 @@ MonsterBase · TwentyThreeBoss · MonsterCounterWindow · 데이터는 무수정
 | 파일 | 바뀐 것 |
 |---|---|
 | `Map/MapContentSpawner.cs` | `public static Func<GameObject, GameObject> ServerMonsterPrefabOverride`(기본 null) + `SpawnMonsterInstance` 첫 2줄(돌려준 값이 null 이 아니면 그 프리팹으로 Instantiate) |
-| `Tutorial/SpinnerPractice/TutorialSpinnerSpawnOverride.cs`(신규) | 훅 설치(SubsystemRegistration). `TutorialStageMarker.IsActive` ∧ SpinnerBot(연습 컴포넌트 없음)일 때만 → NetworkPrefabs 목록에서 `TutorialSpinnerPractice` 가 붙은 SpinnerBot(=Variant)을 찾아 돌려준다 |
+| `Tutorial/SpinnerPractice/TutorialSpinnerSpawnOverride.cs`(신규) | 훅 설치(SubsystemRegistration). `MapSceneStageMarker.IsActive` ∧ SpinnerBot(연습 컴포넌트 없음)일 때만 → NetworkPrefabs 목록에서 `TutorialSpinnerPractice` 가 붙은 SpinnerBot(=Variant)을 찾아 돌려준다 |
 | `Assets/DefaultNetworkPrefabs.asset` | Variant 1줄 등록(NGO 자동 등록) |
 
 - 영향: 훅은 마커가 없으면 늘 null 을 돌려준다 → 절차 맵·Debug 씬·다른 몬스터는 그대로. 두 스폰 경로(마커·`ZoneMonsterSpawnSet`)가 모두 `SpawnMonsterInstance` 를 지나 같이 적용된다.
