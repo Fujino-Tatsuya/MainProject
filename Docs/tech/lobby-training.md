@@ -173,10 +173,13 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 ## 훈련장 문 — 여닫힘 제거 (할 일 111, 10-27)
 
-- 근접 자동 문(`LobbyProximityDoor`·`LobbyProximityDoorRules`, 할 일 78·99)과 테스트 2개를 **삭제**했다. 쓰던 곳 = `PF_Room_DoorSingle_01_v003.prefab` 하나
-  (→ `PF_Lobby_Props_v003` 안 `Door_Training`·`Door_Administrator`·`Door_Locker`·`Door_Operations` 4개, `PF_Lobby_Complete_v016` 로 로비 씬에 들어감). 씬·중첩 프리팹 오버라이드가 이 컴포넌트를 가리키는 곳은 없었다(Missing 없음).
-- 문 프리팹 기본 자세 = **닫힘**(루트 회전 0, 인스턴스는 루트 회전만 오버라이드). 문짝 콜라이더(비볼록 MeshCollider, 레이어 7)가 통과를 막으므로 **콜라이더를 꺼 두었다**(`m_Enabled: 0`) —
-  네 문 모두 닫힌 모습 그대로 지나갈 수 있다. 열린 모습으로 고정하려면 `PF_Lobby_Props_v003` 의 각 문 인스턴스 루트를 힌지 기준 90° 돌린다(벽·소품과 겹치는지 보고 사용자가 결정).
+- **훈련장 문(`Door_Training`) 하나만** 여닫힘을 없앴다. 나머지 로비 문 3개(`Door_Administrator`·`Door_Locker`·`Door_Operations`)는
+  근접 자동 문(`LobbyProximityDoor`·`LobbyProximityDoorRules`, 할 일 78·99) 그대로다 — 공용 문 프리팹 `PF_Room_DoorSingle_01_v003.prefab` 은 손대지 않는다.
+- 적용 위치 = 중첩 프리팹 **`PF_Lobby_Props_v003.prefab` 안 `Door_Training` 인스턴스 오버라이드** 두 개:
+  `LobbyProximityDoor` **컴포넌트 제거**(`m_RemovedComponents` — 끄기만 하면 `Awake` 가 문짝에 키네마틱 Rigidbody 를 붙이므로 제거로 했다) +
+  문짝 콜라이더(비볼록 MeshCollider, 레이어 7) **`m_Enabled: 0`**. 문 기본 자세 = 닫힘이라 닫힌 모습 그대로 지나갈 수 있다.
+- `PF_Lobby_Complete_v016` 과 `3.LobbyScene` 에는 이 문을 덮어쓰는 오버라이드가 없다(에디터에서 읽어 확인: 세 곳 모두 `Door_Training` 만 컴포넌트 없음·콜라이더 꺼짐).
+  런타임에 이름으로 문을 찾아 끄는 코드는 두지 않는다. 열린 모습으로 고정하려면 같은 인스턴스 루트를 힌지 기준 90° 돌린다(벽·소품과 겹치는지 보고 사용자가 결정).
 
 ## 바닥 안내 화살표 (할 일 111)
 

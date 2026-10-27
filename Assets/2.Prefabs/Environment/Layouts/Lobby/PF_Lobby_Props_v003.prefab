@@ -1264,7 +1264,12 @@ PrefabInstance:
       propertyPath: m_Name
       value: Door_Training
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    - target: {fileID: 7335009774728139487, guid: 4d13594ed2aa62e48868e8e54a518937, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: 1251342527762222460, guid: 4d13594ed2aa62e48868e8e54a518937, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
