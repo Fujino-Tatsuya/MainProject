@@ -34,6 +34,7 @@ GameData.xlsx (SVN, 잠금)
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
 | `SuppressHaste` | 제압 가속 버프(할 일 91, `SuppressHasteData` — `Assets/Resources/Player/`) · 배율 3개(`moveSpeedMultiplier`·`attackSpeedMultiplier`·`cooldownRateMultiplier`) · `durationOverride`(0 = 이번 제압 길이) · 비네팅 페이드 `vignetteFadeIn`/`vignetteFadeOut`. [handoff-suppress-haste.md](handoff-suppress-haste.md) |
 | `Cinematic` | 연출 시간(2026-10-26 — ⏳ 시트는 아직 병합 Export 전) — 튜토리얼 4구역 소개(`TutorialZone4IntroData` → `Assets/Resources/Tutorial/Zone4IntroCinematic.asset`): 샷 이동·머묾 `shots[0..4]` · 복귀·스킵 블렌드 · 대사 `lines[i]` 시작 지연·조각 표시·조각 간격 · 한 줄 최대 폭. 문구는 `Strings`(`Tutorial.Guide.TUT_Z4_INTRO_*`), 카메라 구도는 에셋 인스펙터(제외). [handoff-zone4-intro-cinematic.md](handoff-zone4-intro-cinematic.md) |
+| `UI` | 스킬 툴팁 태그 칩 색(할 일 114 후속, `SkillTooltipTagStyles` — `Assets/2.Prefabs/UI/SkillTooltipGenerated/`) — `defaultBackground`·`defaultText` · `entries[i].tagId`·`entries[i].background`·`entries[i].text`. ⏳ 병합 Export 전. [§9 태그 칩 색](#태그-칩-색--ui-시트-할-일-114-후속) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
 | `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
 | `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(`scale`·`enterDuration`·`holdDuration`·`exitDuration`·`failExitDuration`, 대상 `NetworkManager` — 타입 `InterruptProductionDirector`(Order 0, 할 일 118 C2 에서 `GlobalTimeScale` 에서 옮김, 필드 경로 그대로라 xlsx 무변경. 시트 구역 제목 `#■ GlobalTimeScale` 은 메모라 그대로. 디렉터 스위치 bool 10칸은 `[DataTableIgnore]`)) · 간파 성공 슬로우 `interruptSuccessProfile.*`(같은 5칸, 할 일 87 C1) · 맨 앞 히트스톱 `*.hitStopDuration`(실시간 초, 0 = 없음)·`*.hitStopScale`(히트스톱 배율, 두 프로필 공통 칸 — 기본 성공 0.05초·0.02, 시도 0, C2) — 프로필당 7칸 · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`) · 간파 성공 암순응(`InterruptDarkAdaptation`, 대상 `NetworkManager`, C3) `selfIntensity`·`othersIntensity`·`fadeInDuration`·`holdDuration`·`fadeOutDuration`·`luminanceThreshold`·`thresholdSoftness`·`maxDarken`·`revealRadius`·`revealSoftness`(원 중심 기준 `revealCenter` 는 enum 이라 열 없음 — 인스펙터 전용, C5). 의미는 [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) · [interrupt-presentation.md](interrupt-presentation.md) |
@@ -204,3 +205,59 @@ GameData.xlsx (SVN, 잠금)
 ```
 
 여는 태그와 `</style>`을 반드시 짝지어 쓴다. 새 키워드 색이 필요하면 `Tools/UI/스킬 툴팁 구성`이 만드는 `SkillTooltipStyles.asset`에 스타일을 추가하고 문구에서는 그 이름만 사용한다.
+
+### 태그 칩 — `tooltip.tags` (할 일 114)
+
+툴팁 이름 아래 칩(넉백·기절 등)은 **수치 시트**(`Paladin`·`Gunner`·`Assassin` 등)의 `tooltip.tags` 행에서 고친다 — `[DataTableText(Localize = false)]` 문자열 칸이라 Strings 시트로 가지 않는다.
+
+| 규칙 | 설명 |
+|---|---|
+| 형식 | 태그 ID 쉼표 구분 — `Knockback,Stun`, `Knockback, Stun`(공백 허용), 대소문자 무관. 칩 순서 = 적은 순서 |
+| 빈 칸 | 태그 없음(문자열 칸 예외 — §3) |
+| 태그 ID 목록 | 코드 한 곳 `SkillTooltipTag`(`Assets/1.Scripts/Player/Skill/SkillTooltipTags.cs`): `Knockback`·`Stun`·`Vulnerable`·`Shield`·`Heal`·`Overheat`·`Unstoppable`·`Invulnerable` |
+| 오류 | 목록에 없는 ID·같은 태그 두 번·쉼표 사이 빈 칸 → 테이블 Play·빌드 검증 오류(셀 위치와 함께 멈춤). 인스펙터 모드는 아는 태그만 그리고 경고 한 번 |
+| 화면 이름 | Strings 키 `UI.SkillTooltip.Tag.<ID>`(예 `UI.SkillTooltip.Tag.Knockback`) — 행이 없으면 코드 ko(넉백 등). [localization.md §8](localization.md#8-l4b--코드에-박힌-ui-문구) |
+
+- 새 태그 = 프로그래머가 `SkillTooltipTag` 에 한 줄 + `SkillTooltipTags` ko 이름 한 줄 → 병합 Export 로 Strings 행이 생긴다. 색 줄은 아래 `UI` 시트(없으면 기본색 + 경고).
+  칩 배경 = 둥근 사각형 9-slice `Assets/2.Prefabs/UI/Textures/SkillTooltipTagChip.png`(저작 메뉴가 한 번 구운 흰 PNG · 64px · 반지름 22px · 보더 24px · PPU 200, Image Type Sliced). 기획 이미지가 나오면 이 스프라이트만 바꾼다.
+  칩 테두리 = 자식 `Ring` Image(같은 규격의 흰 둥근 링 9-slice `SkillTooltipTagChipRing.png`, Sliced, Raycast 끔) — **색은 그 태그의 글자색**(따로 칸 없음). 두께 기본 3.5px(= 1.75 UI 단위, 칩 높이 26 의 약 6.7%). 바꾸려면 `Tools/UI/스킬 툴팁 태그 칩 테두리 두께` 에서 고르고 **다시 굽기**(PNG 를 그 자리에 다시 써 guid 유지 — 프리팹 수정 없음, 두께는 링 `.meta` userData 에 기록). UI `Outline` 컴포넌트는 모서리가 어긋나 쓰지 않는다.
+
+### 태그 칩 색 — `UI` 시트 (할 일 114 후속)
+
+칩 배경·글자색은 **`UI` 시트**의 `SkillTooltipTagStyles` 열에서 고친다(세로 표 — 행 = 필드, 열 = 에셋 하나). 태그 한 개 = `entries[i]` 3행.
+
+| 행 | 예 | 의미 |
+|---|---|---|
+| `defaultBackground` · `defaultText` | `#2A2E36E6` · `#C9CED6` | 표에 줄이 없는 태그의 색 |
+| `entries[i].tagId` | `Knockback` | 태그 ID(`SkillTooltipTag` 이름, 대소문자 무관) |
+| `entries[i].background` | `#3D2A12E6` | 칩 배경 |
+| `entries[i].text` | `#F2B84B` | 칩 글자 **+ 둥근 테두리** |
+
+- 색 = **`#RRGGBB` 또는 `#RRGGBBAA`**(16진수, `#` 필수, 대소문자 무관). 색 이름(`red`)·3자리 축약·빈 칸은 **오류**(테이블 Play·빌드 중단, 셀 위치 표시). 파서 `HexColor`.
+- 없는 태그 ID·빈 ID·같은 태그 두 줄 = 오류. **줄이 없는 태그 = 경고**(기본색으로 그린다). 인스펙터 모드는 경고 한 번 + 기본색.
+- 줄 수(배열 크기)는 xlsx 에서 못 바꾼다(§3) — 새 태그를 넣으면 프로그래머가 에셋 `entries` 를 한 줄 늘린다(EditMode 테스트 `ProjectAsset_CoversEveryTag_WithoutErrors` 가 잡는다).
+- 에셋이 없으면 `Tools/UI/스킬 툴팁 레이아웃만 갱신` 이 기본 색으로 만들고 툴팁(`SkillTooltipView.tagStyles`)에 잇는다. 있으면 값은 건드리지 않는다.
+
+기본 색 초안(2026-10-27 2차 — 배경 = 같은 계열 어두운 반투명(알파 `E6`), 글자·테두리 = 같은 계열 밝은 색. 반투명 배경은 툴팁 패널 `#090B11` 위에 합성한 색으로 글자 대비 4.5:1 이상을 테스트가 확인 — 초안·프로젝트 에셋 둘 다):
+
+| 태그 | 배경 | 글자·테두리 |
+|---|---|---|
+| Knockback 넉백 | `#3D2A12E6` | `#F2B84B` |
+| Stun 기절 | `#38330EE6` | `#EEDC5A` |
+| Vulnerable 취약 | `#3D1530E6` | `#FF8FCF` |
+| Shield 보호막 | `#13294AE6` | `#7FB8FF` |
+| Heal 회복 | `#14351CE6` | `#7EE08F` |
+| Overheat 과열 | `#45160FE6` | `#FF7B63` |
+| Unstoppable 저지불가 | `#2A1A45E6` | `#C29BFF` |
+| Invulnerable 무적 | `#2E3238E6` | `#E8ECF2` |
+| (기본색 — 표에 없음) | `#2A2E36E6` | `#C9CED6` |
+- 이 행은 새 필드라 병합 Export 전까지 시트에 없다 — 그동안은 SO 값(지금 전부 빈 칸 = 태그 없음)으로 돈다(§3).
+
+### 툴팁 배치 (할 일 114)
+
+`CombatHUD.prefab › SkillTooltipHost/Panel`. 저작 메뉴 `Tools/UI/스킬 툴팁 레이아웃만 갱신`(CombatHUD 만 — 문구 시드·인라인 아이콘 아틀라스는 안 건드림) 또는 `Tools/UI/스킬 툴팁 구성`(전부).
+
+- `Header`: 좌상단 `Icon` / 오른쪽 `DisplayName`(크게)·`Subtitle`(슬롯 줄 — 툴팁 부제, 부제가 없는 패시브는 키 배지 글자)·`TagRow`(칩, 폭을 넘으면 줄바꿈하고 Header 가 늘어난다) / 우상단 `CooldownGroup`(시계 `CooldownIcon` + 초, 쿨다운 없거나 0 이면 숨김) / 바닥 `Divider`.
+- 그 아래 `Description`(수치 강조 그대로) → 오른쪽 아래 `ShiftHint`(`UI.SkillTooltip.ShiftHint`).
+- 저작 메뉴는 `Header/TagRow` 가 없을 때만 배치를 한 번 다시 놓는다(옛 `KeyBadge` 는 지운다). 이후 위치·색·크기는 프리팹 인스펙터에서 고친다 — 재실행이 덮지 않는다.
+- Shift 상세 갱신·화면 경계 보정·표시 지연은 그대로다.
