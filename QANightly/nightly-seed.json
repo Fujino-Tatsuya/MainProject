@@ -1,9 +1,9 @@
 {
-  "name": "base",
-  "baseSeed": 108,
+  "name": "eunhee",
+  "baseSeed": 2108,
   "traitSeed": 0,
   "botTier": "auto",
-  "characterOrder": ["Paladin", "Assassin", "Gunner"],
+  "characterOrder": ["Gunner", "Paladin", "Assassin"],
   "runs": 10,
-  "note": "qa/NightlyBase 기본 시드 — 팀원 브랜치 qa/Nightly-<이름> 은 이 파일만 바꾼다(Docs/tech/qa-nightly-runbook.md §6)"
+  "note": "은희 PC 야간 — 기반 qa/NightlyBase, 이 파일만 다르다(Docs/tech/qa-nightly-runbook.md §8)"
 }
