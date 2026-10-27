@@ -141,7 +141,7 @@ MonoBehaviour:
   width: 1
   arrowSpacing: 1
   heightOffset: 0.02
-  color: {r: 0.3, g: 0.85, b: 1, a: 0.9}
+  color: {r: 1, g: 0.86402166, b: 0.1716981, a: 0.9}
   flowSpeed: 1.5
   endFade: 0.15
 --- !u!114 &653788836057114748
