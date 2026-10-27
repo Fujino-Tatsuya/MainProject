@@ -37,25 +37,26 @@ public static class PodArrivalRules
 
     /// <summary>
     /// [전 피어] 도착 연출이 끝났는가 — 튜토리얼 S0(착지 타이머·자막·목표 표시)의 시작 조건.
-    /// 연출이 꺼진 진입(Direct·Restart·폴백)은 즉시 참. 연출 컴포넌트가 아직 스폰 전이면 거짓(켜질지 모른다), 시작 시각 전이면 거짓.
+    /// 연출이 꺼진 진입(Direct·Restart·폴백)은 즉시 참. 연출 컴포넌트가 아직 스폰 전이면 거짓(켜질지 모른다), 시작 시각·열기 끝 이벤트 전이면 거짓.
     /// </summary>
     /// <param name="spawned">맵 연출 NetworkBehaviour 가 스폰돼 복제 값을 읽을 수 있는가.</param>
     /// <param name="armed">서버가 이번 진입에 연출을 켰는가(복제).</param>
     /// <param name="startAt">시작 시각(서버시간, 0 = 아직).</param>
-    /// <param name="releaseAt">시간표 해제 시각(시작 기준 초).</param>
-    public static bool IsArrivalDone(bool spawned, bool armed, double startAt, double now, float releaseAt)
+    /// <param name="openedAt">해치 열기·날개 접기 끝 이벤트 시각(서버시간, 0 = 아직) — 디졸브 시작.</param>
+    /// <param name="releaseAfterOpen">열기 끝 → 해제(초) = 디졸브 + 레터박스 아웃.</param>
+    public static bool IsArrivalDone(bool spawned, bool armed, double startAt, double openedAt, double now, float releaseAfterOpen)
     {
         if (!spawned) return false;
         if (!armed) return true;
-        if (startAt <= 0d) return false;
-        return now - startAt >= releaseAt;
+        if (startAt <= 0d || openedAt <= 0d) return false;
+        return now - openedAt >= releaseAfterOpen;
     }
 
     /// <summary>
-    /// 착지 순간 효과(이펙트·흔들림)를 지금 낼까 — 착지 시각을 지났고 아직 안 냈으며, 디졸브가 이미 시작된 늦은 피어는 건너뛴다.
-    /// 착지 여운이 0(착지 = 디졸브 시작)이면 건너뛸 구간이 없어 처음 본 순간 낸다.
+    /// 착지 순간 효과(이펙트·흔들림)를 지금 낼까 — 지면에 닿은 시각을 지났고 아직 안 냈으며, 디졸브가 이미 시작된 늦은 피어는 건너뛴다.
+    /// 착지 = 디졸브 시작이면 건너뛸 구간이 없어 처음 본 순간 낸다. 아직 안 온 시각은 +∞(<see cref="PodDropTimeline.NotYet"/>).
     /// </summary>
-    public static bool ShouldPlayImpact(double elapsed, float impactAt, float dissolveAt, bool alreadyPlayed)
+    public static bool ShouldPlayImpact(double elapsed, double impactAt, double dissolveAt, bool alreadyPlayed)
     {
         if (alreadyPlayed || elapsed < impactAt) return false;
         return dissolveAt <= impactAt || elapsed < dissolveAt;

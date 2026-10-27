@@ -8,14 +8,16 @@ using UnityEngine.SceneManagement;
 /// 로비 포드 연출을 거쳐 온 진입(<see cref="NetworkLoadingFlowController.EntryKind"/> = <see cref="MapEntryKind.Lobby"/>)일 때만 켜진다.
 /// Dev Boot·판 재시작(Alt+0)·재합류·로비 폴백 로딩은 지금과 같다(낙하 스폰·즉시 조작·S0).
 /// <list type="bullet">
-/// <item>복제: 연출 켜짐(맵 씬 스폰 때 서버가 정함) · 착지점 Pose · 시작 시각(서버시간, 로딩 화면이 걷힌 순간 <see cref="GameManager.OnMainGameReady"/>).
-/// 모든 피어가 <see cref="PodDropMapTimeline"/> 을 같은 시각으로 재생한다(로비 C2·보스 엘리베이터 89 와 같은 방식). RPC 없음.</item>
+/// <item>복제: 연출 켜짐(맵 씬 스폰 때 서버가 정함) · 착지점 Pose · 시작 시각(서버시간, 로딩 화면이 걷힌 순간 <see cref="GameManager.OnMainGameReady"/>)
+/// · 펴기 끝·열기 끝 시각(서버시간 — 호스트 포드의 클립 이벤트, 할 일 106). 모든 피어가 이 값으로 <see cref="PodDropMapTimeline"/> 을 같이 계산한다. RPC 없음.</item>
 /// <item>서버: 플레이어를 착지점 좌석에 낙하 없이 스폰(<see cref="TryGetSeatPoseServer"/> — 로딩 흐름이 부른다) → 스폰되는 대로 연출 잠금
 /// (<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단) + 숨김 → 디졸브 시작에 보이기 → 해제 시각에 잠금 해제.
-/// 연출 중 끊긴 사람은 건너뛰고 남은 인원으로 계속. 착지점을 못 찾거나 시작 시각이 오지 않으면 즉시 해제(폴백, 경고 로그).</item>
-/// <item>전 피어(로컬 표시): 레터박스(로딩이 걷힐 때 이미 덮임)·UI 숨김(<see cref="PodDropScreenOverlay"/>, 매 프레임 다시 찾음),
-/// 카메라 거리 배율 줌인, 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 낙하 → 착지 이펙트·흔들림
-/// → 착지 애니(다리·날개·해치, C2i — 시간표 시각으로 Animator 를 세운다, <see cref="PodAnimatorDriver"/>) → 디졸브(<see cref="PodDissolve"/>) → 포드 제거.</item>
+/// 단계는 호스트 포드 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 확정한다 — 날개·다리 펴기 둘 다 끝 → 착륙, 해치 열기·날개 접기 둘 다 끝 → 디졸브.
+/// 이벤트가 빠진 클립은 끝까지 돈 것으로 대신하고 경고한다. 연출 중 끊긴 사람은 건너뛰고 남은 인원으로 계속. 착지점을 못 찾거나 시작 시각이 오지 않으면 즉시 해제(폴백, 경고 로그).</item>
+/// <item>전 피어(로컬 표시): 레터박스(로딩이 걷힌 뒤 천천히 들어옴)·UI 숨김(<see cref="PodDropScreenOverlay"/>, 매 프레임 다시 찾음),
+/// 카메라 거리 배율 줌, 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 빠른 낙하 → 정지 높이(기본 5m)에서 날개·다리 펴기
+/// → 천천히 착륙(이펙트·흔들림) → 해치 열기·날개 접기 → 디졸브(<see cref="PodDissolve"/>) → 포드 제거. 클립은 1배속 재생(<see cref="PodAnimatorDriver"/>) —
+/// 클라 포드는 재생만 하고 자기 이벤트로 단계를 넘기지 않는다.</item>
 /// <item>튜토리얼: <see cref="IsArrivalDoneLocal"/> 이 참이 된 뒤에 존1 S0(착지 타이머·자막·목표)이 시작한다(<see cref="TutorialZone1Flow"/>).</item>
 /// </list>
 /// 수치·좌석 오프셋은 <see cref="PodDropSettings"/>(맵 단계) 가 원본이다 — 착지점은 플레이어 스폰 슬롯(<see cref="MapGenerator.GetRoleSlot"/>) 기준.
@@ -55,6 +57,14 @@ public sealed class MapPodArrival : NetworkBehaviour
     private readonly NetworkVariable<Quaternion> _landingRotation = new NetworkVariable<Quaternion>(
         Quaternion.identity, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 날개·다리 펴기가 둘 다 끝난 시각(서버시간, 호스트 포드 클립 이벤트) — 착륙 시작. 0 = 아직.
+    private readonly NetworkVariable<double> _deployedAt = new NetworkVariable<double>(
+        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // 해치 열기·날개 접기가 둘 다 끝난 시각(서버시간, 호스트 포드 클립 이벤트) — 디졸브 시작. 0 = 아직.
+    private readonly NetworkVariable<double> _openedAt = new NetworkVariable<double>(
+        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     /// <summary>지금 맵 씬의 포드 착지 연출(없으면 null). 로딩 흐름(좌석 스폰)·튜토리얼(S0 지연)이 읽는다.</summary>
     public static MapPodArrival Active { get; private set; }
 
@@ -74,6 +84,8 @@ public sealed class MapPodArrival : NetworkBehaviour
     private float _armedAtRealtime;
     private bool _shownServer;
     private bool _releasedServer;
+    private PodClipGate _deployGate;
+    private PodClipGate _openGate;
     private readonly HashSet<ulong> _lockedPlayerObjectIds = new HashSet<ulong>();
     private readonly List<PlayerEncounterLock> _locks = new List<PlayerEncounterLock>();
 
@@ -95,7 +107,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         {
             if (_localFinished) return true;
             if (settings == null) return true; // 시간표를 모르면 막지 않는다(서버도 설정 없이 켜지 않는다)
-            return PodArrivalRules.IsArrivalDone(IsSpawned, _armed.Value, _startAt.Value, ServerNow, LocalTimeline.ReleaseAt);
+            return PodArrivalRules.IsArrivalDone(IsSpawned, _armed.Value, _startAt.Value, _openedAt.Value, ServerNow, LocalTimeline.ReleaseAfterOpenSeconds);
         }
     }
 
@@ -153,6 +165,8 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
 
         _serverTimeline = settings.CreateMapTimeline();
+        _deployGate = new PodClipGate(settings.Map.DeployStates);
+        _openGate = new PodClipGate(settings.Map.OpenStates);
         // 이벤트만 구독한다(SubscribeMainGameReady 는 이미 준비면 즉시 부른다 — 로딩 화면 아래에서 시작하면 안 된다).
         gameManager.OnMainGameReady += HandleMainGameReadyServer;
         _readySubscribed = true;
@@ -160,9 +174,9 @@ public sealed class MapPodArrival : NetworkBehaviour
         _armed.Value = true;
         TryResolveLandingServer(null);
 
-        Debug.Log($"[SceneFlow] {Tag} 연출 켜짐(진입 {entryKind}) — 로딩이 걷히면 시작. 낙하 +{_serverTimeline.FallAt:0.##}s, 착지 +{_serverTimeline.ImpactAt:0.##}s, " +
-                  $"착지 애니 끝 +{_serverTimeline.LandingAnimsEndAt:0.##}s, " +
-                  $"보이기·디졸브 +{_serverTimeline.DissolveAt:0.##}s, 해제 +{_serverTimeline.ReleaseAt:0.##}s");
+        Debug.Log($"[SceneFlow] {Tag} 연출 켜짐(진입 {entryKind}) — 로딩이 걷히면 시작. 낙하 +{_serverTimeline.FallAt:0.##}s, " +
+                  $"정지 높이 {_serverTimeline.HoverHeight:0.##}m +{_serverTimeline.HoverAt:0.##}s 에 [{string.Join(",", _deployGate.States)}] → 끝 이벤트 → 착륙 {_serverTimeline.LandSeconds:0.##}s " +
+                  $"→ [{string.Join(",", _openGate.States)}] → 끝 이벤트 → 디졸브·해제 +{_serverTimeline.ReleaseAfterOpenSeconds:0.##}s");
     }
 
     private void UnsubscribeReady()
@@ -259,7 +273,8 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
 
         double elapsed = ServerNow - start;
-        if (!_shownServer && elapsed >= _serverTimeline.PlayersVisibleAt)
+        double opened = PodDropTimeline.EventElapsed(_openedAt.Value, start);
+        if (!_shownServer && elapsed >= _serverTimeline.DissolveAt(opened))
         {
             _shownServer = true;
             foreach (PlayerEncounterLock encounterLock in _locks)
@@ -270,8 +285,53 @@ public sealed class MapPodArrival : NetworkBehaviour
 
         LockPlayersServer(hide: !_shownServer);
 
-        if (elapsed >= _serverTimeline.ReleaseAt)
+        if (_serverTimeline.IsReleasedAt(elapsed, opened))
             ReleaseAllServer("연출 끝");
+    }
+
+    // 호스트 포드의 클립 이벤트로 단계를 확정한다 — 이벤트는 애니메이터 갱신 중에 오므로 LateUpdate(UpdatePod 뒤)에서 본다.
+    // 이벤트가 빠진 클립은 끝까지 돈 것으로 대신한다(경고). 포드가 이미 디졸브로 지워졌으면 할 일이 없다.
+    private void UpdateStagesServer(PodDropMapTimeline timeline, double elapsed, double deployed)
+    {
+        if (!IsServer || _releasedServer || _podAnimator == null)
+            return;
+
+        if (_deployedAt.Value <= 0d)
+        {
+            if (elapsed >= timeline.HoverAt && GateOpen(_deployGate, "펴기"))
+            {
+                _deployedAt.Value = ServerNow;
+                Debug.Log($"[SceneFlow] {Tag} 날개·다리 펴기 끝 +{elapsed:0.##}s — 착륙 {timeline.LandSeconds:0.##}s");
+            }
+            return;
+        }
+
+        if (_openedAt.Value <= 0d && elapsed >= timeline.TouchdownAt(deployed) && GateOpen(_openGate, "열기"))
+        {
+            _openedAt.Value = ServerNow;
+            Debug.Log($"[SceneFlow] {Tag} 해치 열기·날개 접기 끝 +{elapsed:0.##}s — 디졸브, 해제 +{timeline.ReleaseAfterOpenSeconds:0.##}s 뒤");
+        }
+    }
+
+    private bool GateOpen(PodClipGate gate, string label)
+    {
+        if (gate == null || !gate.IsOpen(_podAnimator.IsFinished, out List<string> fallbacks))
+            return false;
+
+        if (fallbacks != null)
+            Debug.LogWarning($"{Tag} {label} 클립 [{string.Join(",", fallbacks)}] 에 '{PodAnimEventRelay.FunctionName}' 이벤트가 없어 클립 끝에서 넘어간다 — " +
+                             "FBX 임포트 창(Animation 탭) 또는 Tools/Lobby/포드 애니 이벤트 메뉴로 넣을 것.", this);
+        return true;
+    }
+
+    // [전 피어] 포드 클립 이벤트 — 단계 확정은 서버만(클라 포드는 재생만 한다).
+    private void HandlePodClipEvent(string clipName)
+    {
+        if (!IsServer || _releasedServer)
+            return;
+
+        _deployGate?.Notify(clipName);
+        _openGate?.Notify(clipName);
     }
 
     // 스폰되는 대로 잠근다(플레이어 오브젝트 단위 — 로비 오브젝트가 남아 있던 프레임과 섞이지 않게). 연출 중 끊긴 사람은 자연히 빠진다.
@@ -337,11 +397,13 @@ public sealed class MapPodArrival : NetworkBehaviour
 
         double start = _startAt.Value;
         bool started = start > 0d;
-        // 시작 전(로딩 화면 아래) = t0 자세: 레터박스 덮임, 포드는 낙하 높이, 카메라는 시작 거리.
+        // 시작 전(로딩 화면 아래) = t0 자세: 레터박스 없음, 포드는 낙하 높이, 카메라는 시작 거리.
         double elapsed = started ? ServerNow - start : 0d;
+        double deployed = started ? PodDropTimeline.EventElapsed(_deployedAt.Value, start) : PodDropTimeline.NotYet;
+        double opened = started ? PodDropTimeline.EventElapsed(_openedAt.Value, start) : PodDropTimeline.NotYet;
         PodDropMapTimeline timeline = LocalTimeline;
 
-        if (started && timeline.IsReleasedAt(elapsed))
+        if (started && timeline.IsReleasedAt(elapsed, opened))
         {
             ClearLocal();
             _localFinished = true;
@@ -350,18 +412,20 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
 
         _localActive = true;
-        UpdateOverlay(timeline, elapsed);
+        UpdateOverlay(timeline, elapsed, opened);
         UpdateCamera(timeline, elapsed);
-        UpdatePod(timeline, started, elapsed);
+        UpdatePod(timeline, started, elapsed, deployed, opened);
+        if (started)
+            UpdateStagesServer(timeline, elapsed, deployed);
     }
 
-    private void UpdateOverlay(PodDropMapTimeline timeline, double elapsed)
+    private void UpdateOverlay(PodDropMapTimeline timeline, double elapsed, double opened)
     {
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         // 기본 0 = 매 프레임 — 로딩이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게(연출 몇 초 동안만).
         _overlay.HudRescanInterval = settings.Map.hudRescanSeconds;
         // 검은 화면 = 도착 페이드인(기본 0 = 없음). 시작 전엔 로딩 화면(정렬 1000) 아래에 깔려 있다가 걷히는 순간부터 밝아진다.
-        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, timeline.FadeAlphaAt(elapsed), true);
+        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed, opened) * settings.LetterboxHeight, timeline.FadeAlphaAt(elapsed), true);
     }
 
     private void UpdateCamera(PodDropMapTimeline timeline, double elapsed)
@@ -374,7 +438,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         cameraSwitcher.SetCinematicDistanceMultiplier(timeline.CameraDistanceAt(elapsed));
     }
 
-    private void UpdatePod(PodDropMapTimeline timeline, bool started, double elapsed)
+    private void UpdatePod(PodDropMapTimeline timeline, bool started, double elapsed, double deployed, double opened)
     {
         if (_podGone || !_landingReady.Value || podPrefab == null)
             return;
@@ -383,17 +447,19 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (_pod == null)
             SpawnPod(landing);
 
-        _pod.transform.SetPositionAndRotation(landing + Vector3.up * timeline.PodHeightAt(elapsed), _landingRotation.Value);
-        UpdatePodAnimation(timeline, elapsed);
+        _pod.transform.SetPositionAndRotation(landing + Vector3.up * timeline.PodHeightAt(elapsed, deployed), _landingRotation.Value);
+        UpdatePodAnimation(timeline, started, elapsed, deployed);
         if (!started)
             return;
 
-        if (PodArrivalRules.ShouldPlayImpact(elapsed, timeline.ImpactAt, timeline.DissolveAt, _impactPlayed))
+        double touchdown = timeline.TouchdownAt(deployed);
+        double dissolveAt = timeline.DissolveAt(opened);
+        if (PodArrivalRules.ShouldPlayImpact(elapsed, touchdown, dissolveAt, _impactPlayed))
             PlayImpact(landing);
-        if (elapsed >= timeline.ImpactAt)
+        if (elapsed >= touchdown)
             _impactPlayed = true; // 늦게 본 피어는 지나간 착지 효과를 내지 않는다
 
-        if (elapsed < timeline.DissolveAt)
+        if (elapsed < dissolveAt)
             return;
 
         if (_dissolve == null)
@@ -402,7 +468,7 @@ public sealed class MapPodArrival : NetworkBehaviour
             _dissolve.Begin(dissolveTemplate);
         }
 
-        float progress = timeline.DissolveProgressAt(elapsed);
+        float progress = timeline.DissolveProgressAt(elapsed, opened);
         _dissolve.SetProgress(progress);
         if (progress >= 1f)
         {
@@ -414,12 +480,35 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
     }
 
-    // 착지 애니는 상태마다 자기 마스크 레이어(Gear·Wings·Hatches)에 세운다 — 겹쳐 돌아도 서로 덮지 않는다. 시작 전(낙하 중)엔 클립 처음 자세.
-    private void UpdatePodAnimation(PodDropMapTimeline timeline, double elapsed)
+    // 착지 애니는 상태마다 자기 마스크 레이어(Gear·Wings·Hatches)에서 1배속으로 돈다 — 겹쳐 돌아도 서로 덮지 않는다.
+    // 정지 높이 전(낙하 중)엔 펴기 클립 처음 자세로 멈춰 떨어진다. 펴기는 정지 높이 도착 순간, 열기·접기는 지면에 닿는 순간 시작(늦게 본 피어는 지난 만큼 건너뛴다).
+    private void UpdatePodAnimation(PodDropMapTimeline timeline, bool started, double elapsed, double deployed)
     {
-        _podAnimator ??= new PodAnimatorDriver(_pod.GetComponent<Animator>());
-        for (int i = 0; i < timeline.LandingCues.Count; i++)
-            _podAnimator.PoseNormalized(timeline.LandingCues[i].state, -1, timeline.LandingCueProgressAt(i, elapsed));
+        if (_podAnimator == null)
+        {
+            _podAnimator = new PodAnimatorDriver(_pod.GetComponent<Animator>());
+            _podAnimator.ClipEvent += HandlePodClipEvent;
+        }
+
+        PodDropMapTimings map = settings.Map;
+        if (!started || elapsed < timeline.HoverAt)
+        {
+            _podAnimator.PoseStart(map.wingDeployState, -1);
+            _podAnimator.PoseStart(map.gearDeployState, -1);
+            return;
+        }
+
+        float sinceHover = (float)(elapsed - timeline.HoverAt);
+        _podAnimator.Play(map.wingDeployState, -1, sinceHover);
+        _podAnimator.Play(map.gearDeployState, -1, sinceHover);
+
+        double touchdown = timeline.TouchdownAt(deployed);
+        if (elapsed < touchdown)
+            return;
+
+        float sinceTouchdown = (float)(elapsed - touchdown);
+        _podAnimator.Play(map.hatchOpenState, -1, sinceTouchdown);
+        _podAnimator.Play(map.wingFoldState, -1, sinceTouchdown);
     }
 
     private void SpawnPod(Vector3 landing)

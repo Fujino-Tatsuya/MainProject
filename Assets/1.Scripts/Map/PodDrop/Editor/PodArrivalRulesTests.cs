@@ -77,31 +77,35 @@ public sealed class PodArrivalRulesTests
     [Test]
     public void ArrivalDone_NotSpawnedWaits()
     {
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(spawned: false, armed: false, startAt: 0d, now: 10d, releaseAt: 2.8f),
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(spawned: false, armed: false, startAt: 0d, openedAt: 0d, now: 10d, releaseAfterOpen: 1.5f),
             "복제 값을 읽기 전엔 켜질지 몰라 기다린다");
     }
 
     [Test]
     public void ArrivalDone_NotArmedIsImmediatelyTrue()
     {
-        Assert.IsTrue(PodArrivalRules.IsArrivalDone(spawned: true, armed: false, startAt: 0d, now: 0d, releaseAt: 2.8f),
+        Assert.IsTrue(PodArrivalRules.IsArrivalDone(spawned: true, armed: false, startAt: 0d, openedAt: 0d, now: 0d, releaseAfterOpen: 1.5f),
             "Lobby 가 아닌 진입(연출 꺼짐)은 즉시 참 — 지금 동작 유지");
     }
 
     [Test]
-    public void ArrivalDone_ArmedWaitsForStartThenRelease()
+    public void ArrivalDone_ArmedWaitsForStartOpenThenRelease()
     {
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 0d, now: 100d, releaseAt: 2.8f), "로딩이 걷히기 전");
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, now: 102.79d, releaseAt: 2.8f), "레터박스 아웃 중");
-        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, now: 102.8d, releaseAt: 2.8f), "해제 시각 = 레터박스가 다 걷힌 순간");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 0d, openedAt: 0d, now: 100d, releaseAfterOpen: 1.5f), "로딩이 걷히기 전");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 0d, now: 1000d, releaseAfterOpen: 1.5f), "열기 끝 이벤트 전(포드 클립 진행 중)");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 108d, now: 109.49d, releaseAfterOpen: 1.5f), "디졸브·레터박스 아웃 중");
+        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 108d, now: 109.5d, releaseAfterOpen: 1.5f), "해제 = 레터박스가 다 걷힌 순간");
     }
 
     [Test]
     public void ArrivalDone_MatchesDefaultTimelineRelease()
     {
         var timeline = new PodDropMapTimeline(PodDropMapTimings.Default);
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, 50d, 50d + timeline.LetterboxOutAt, timeline.ReleaseAt));
-        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, 50d, 50d + timeline.ReleaseAt, timeline.ReleaseAt));
+        const double start = 50d, opened = 58d;
+        double openedElapsed = opened - start;
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, start, opened, start + timeline.LetterboxOutAt(openedElapsed), timeline.ReleaseAfterOpenSeconds));
+        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, start, opened, start + timeline.ReleaseAt(openedElapsed), timeline.ReleaseAfterOpenSeconds));
+        Assert.IsTrue(timeline.IsReleasedAt(timeline.ReleaseAt(openedElapsed), openedElapsed), "시간표 해제와 같은 순간");
     }
 
     // ─── 착지 효과 시점 ────────────────────────────────────────────────
@@ -109,16 +113,18 @@ public sealed class PodArrivalRulesTests
     [Test]
     public void ShouldPlayImpact_OnceInWindow()
     {
-        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(0.89, impactAt: 0.9f, dissolveAt: 1.3f, alreadyPlayed: false), "착지 전");
-        Assert.IsTrue(PodArrivalRules.ShouldPlayImpact(0.9, 0.9f, 1.3f, false), "착지 순간");
-        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(1.0, 0.9f, 1.3f, true), "이미 냈다");
-        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(1.3, 0.9f, 1.3f, false), "디졸브가 시작된 뒤 본 피어는 건너뛴다");
+        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(6.49, impactAt: 6.5, dissolveAt: 8.0, alreadyPlayed: false), "착륙 전");
+        Assert.IsTrue(PodArrivalRules.ShouldPlayImpact(6.5, 6.5, 8.0, false), "지면에 닿은 순간");
+        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(7.0, 6.5, 8.0, true), "이미 냈다");
+        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(8.0, 6.5, 8.0, false), "디졸브가 시작된 뒤 본 피어는 건너뛴다");
     }
 
     [Test]
-    public void ShouldPlayImpact_ZeroSettleStillPlays()
+    public void ShouldPlayImpact_EventsNotYet()
     {
-        Assert.IsTrue(PodArrivalRules.ShouldPlayImpact(0.95, impactAt: 0.9f, dissolveAt: 0.9f, alreadyPlayed: false), "착지 여운 0 이어도 한 번 낸다");
+        Assert.IsFalse(PodArrivalRules.ShouldPlayImpact(100.0, PodDropTimeline.NotYet, PodDropTimeline.NotYet, false), "펴기 이벤트 전 = 착륙 없음");
+        Assert.IsTrue(PodArrivalRules.ShouldPlayImpact(6.6, 6.5, PodDropTimeline.NotYet, false), "열기 이벤트 전(착륙 직후)엔 낸다");
+        Assert.IsTrue(PodArrivalRules.ShouldPlayImpact(6.95, impactAt: 6.9, dissolveAt: 6.9, alreadyPlayed: false), "착지 = 디졸브 시작이어도 한 번 낸다");
     }
 
     // ─── 설정 기본값 ───────────────────────────────────────────────────

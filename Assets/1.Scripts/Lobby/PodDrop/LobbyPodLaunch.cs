@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
@@ -8,18 +7,20 @@ using UnityEngine.Serialization;
 
 /// <summary>
 /// 로비 포드 탑승·강하 연출(할 일 100 C2, 3.LobbyScene — <see cref="LobbyTrainingDirector"/> 와 같은 씬 상주 NetworkObject 에 붙는다).
-/// 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 맵 로딩 대신 <see cref="TryBeginServer"/> 에 넘긴다 → 시간표 끝(완전 암전)에 그 콜백으로 로딩.
+/// 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 맵 로딩 대신 <see cref="TryBeginServer"/> 에 넘긴다 → 발사 클립 끝 이벤트에 그 콜백으로 곧바로 로딩(페이드 없음).
 /// <list type="bullet">
-/// <item>복제: 시작 시각(서버시간), 참가 명단(플레이어 NetworkObjectId, 보행 슬롯 순서), 슬롯별 보행 시간(서버가 경로 길이 ÷ 걷는 속도로 계산).
-/// 모든 피어가 그 보행 시간으로 <see cref="PodDropLobbyTimeline"/> 을 만들어 같은 시각으로 재생한다(보스 엘리베이터 89 와 같은 방식). RPC 없음.</item>
+/// <item>복제: 시작 시각(서버시간), 참가 명단(플레이어 NetworkObjectId, 보행 슬롯 순서), 슬롯별 보행 시간(서버가 경로 길이 ÷ 걷는 속도로 계산),
+/// 해치 열림 시각(서버시간 — 호스트 발사대의 해치 클립 이벤트, 할 일 106). 모든 피어가 이 값으로 <see cref="PodDropLobbyTimeline"/> 을 같이 계산한다. RPC 없음.</item>
 /// <item>서버: 시작 순간 참가자 연출 잠금(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단),
-/// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), <see cref="PodDropLobbyTimeline.LoadAt"/> 에 콜백.
-/// 연출 중 끊긴 사람은 건너뛰고 계속한다(명단은 그대로 둔다 — 인원이 바뀌면 시간표가 바뀐다). 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
+/// 호스트 발사대 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 단계를 확정한다 — 해치 이벤트 → 해치 열림 시각 복제(탑승 시작),
+/// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), 발사 클립 끝 이벤트 → 콜백(로딩).
+/// 이벤트가 빠진 클립은 끝까지 돈 것으로 대신하고 경고한다. 연출 중 끊긴 사람은 건너뛰고 계속한다. 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
 /// <item>오너: 시작 직후 짧은 암전의 유지 구간 한가운데(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
-/// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 자기 슬롯 보행 구간 동안 그 자리 → 개인 경로점(슬롯 entryPath) → 공용 경로점(walkPath, 슬롯 합류 번호부터 리스트 순서)을
+/// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 해치가 열리면(복제) 자기 슬롯 보행 구간 동안 그 자리 → 개인 경로점(슬롯 entryPath) → 공용 경로점(walkPath, 슬롯 합류 번호부터 리스트 순서)을
 /// 평소 걷기 변위(Walk 애니)로 걷고 → 문턱까지 같은 속도로, 문턱 → 좌석은 미끄러짐 시간 동안 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
-/// <item>전 피어(로컬 표시): 레터박스·UI 숨김·암전(순간이동 암전 + 끝 페이드, <see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
-/// 발사대 Animator(C2i — 해치 열림 → 발사 클립: 해치 닫힘·갱도 문·포드 하강)를 시간표 시각으로 세운다(<see cref="PodDropLobbyTimeline.PodClipAt"/>, <see cref="PodAnimatorDriver"/>).</item>
+/// <item>전 피어(로컬 표시): 레터박스·UI 숨김·시작 암전(<see cref="PodDropScreenOverlay"/>), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
+/// 발사대 Animator 1배속 재생(<see cref="PodAnimatorDriver"/>) — 순간이동 순간 해치 클립, 해치 이벤트 프레임에서 멈춤, 가장 늦게 앉는 순간 발사 클립(해치 닫힘·갱도 문·포드 하강) 처음부터 끝까지.
+/// 클라 Animator 는 재생만 한다 — 자기 이벤트로는 해치 자세를 멈출 뿐 단계를 넘기지 않는다.</item>
 /// </list>
 /// 수치(레터박스 높이·걷는 속도 포함)는 <see cref="PodDropSettings"/>, 위치는 씬 Transform(LobbyTraining/PodLaunch) 이 원본이다.
 /// </summary>
@@ -69,7 +70,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     [SerializeField] private Transform[] seats = Array.Empty<Transform>();
 
     [Header("발사대")]
-    [Tooltip("발사대 Animator(PF_DropPod_LaunchStation_Combined_v001 루트). 연출 동안 해치·발사 클립을 시간표 시각으로 세운다(포드 하강도 클립이 한다). 비우면 애니 없음.")]
+    [Tooltip("발사대 Animator(PF_DropPod_LaunchStation_Combined_v001 루트). 연출 동안 해치·발사 클립을 1배속으로 재생하고 클립 이벤트로 단계를 넘긴다(포드 하강도 클립이 한다). 비우면 애니 없이 곧바로 넘어간다.")]
     [SerializeField] private Animator launcher;
 
     // 연출 시작 시각(서버시간). 0 = 연출 없음. 서버 write / 모두 read.
@@ -85,11 +86,26 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private readonly NetworkList<float> _walkSeconds = new NetworkList<float>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 해치 열림 시각(서버시간) — 호스트 발사대의 해치 클립 이벤트를 서버가 확정한 순간. 0 = 아직. 탑승(보행)은 이 뒤에 시작한다. 서버 write / 모두 read.
+    private readonly NetworkVariable<double> _hatchOpenedAt = new NetworkVariable<double>(
+        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private static double ServerNow =>
         NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : 0d;
 
-    // 서버 전용
-    private Coroutine _sequence;
+    // 서버 전용 — 연출 한 번의 진행 상태(null = 연출 없음)
+    private sealed class ServerRun
+    {
+        public List<ulong> Participants;
+        public PodDropLobbyTimeline Timeline;
+        public double Start;
+        public Action OnDone;
+        public bool[] Hidden;
+        public PodClipGate HatchGate;
+        public PodClipGate LaunchGate;
+    }
+
+    private ServerRun _run;
     private bool _loadIssued;
     private readonly List<ulong> _lockedClientIds = new List<ulong>();
 
@@ -99,15 +115,19 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private PodDropScreenOverlay _overlay;
     private CameraTargetSwitcher _heldCamera;
     private PodAnimatorDriver _launcherDriver;
+    private bool _hatchHeldOnBoard;
 
     // 오너 보행
     private struct OwnerWalk
     {
         public bool Active;
         public double Start;          // 어느 연출의 보행인가 — 시작 시각이 바뀌면 버린다
+        public int Slot;
+        public float GroundShare;     // 보행 시간 중 충돌을 켠 앞 구간 비율(길이 비율)
         public Vector3 WalkStart;     // 걷기 시작 지점(순간이동 목적지)
         public double TeleportAt;     // 서버시간 — 암전 유지 구간 한가운데
         public bool Teleported;
+        public bool Timed;            // 해치 열림(복제)을 받아 아래 보행 시각을 채웠다
         public bool Started;
         public Vector3[] Ground;      // 충돌을 켠 채 걷는 경유 지점(수평만 쓴다 — 높이는 지면)
         public int GroundIndex;
@@ -151,8 +171,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     {
         if (IsServer)
         {
-            if (_sequence != null) StopCoroutine(_sequence);
-            _sequence = null;
+            _run = null;
             // 로딩 전에 끝났다(씬 언로드·호스트 셧다운) — 건 잠금·숨김을 푼다. 로딩을 넘긴 뒤면 플레이어 디스폰이 함께 정리한다.
             if (!_loadIssued) ReleaseLocks("디스폰(로딩 전)");
         }
@@ -170,7 +189,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     // ---------------- 서버 ----------------
 
     /// <summary>
-    /// [서버] 포드 연출 시작 — 완전 암전 시각에 <paramref name="onDone"/>(맵 로딩)을 부른다. 설정·좌석·참가자가 없으면 false(호출자가 곧바로 로딩).
+    /// [서버] 포드 연출 시작 — 발사 클립 끝 이벤트에 <paramref name="onDone"/>(맵 로딩)을 부른다. 설정·좌석·참가자가 없으면 false(호출자가 곧바로 로딩).
     /// 참가자 기록·시작 시각 복제·연출 잠금은 이 호출 안(같은 프레임)에서 끝낸다.
     /// </summary>
     public bool TryBeginServer(Action onDone)
@@ -207,46 +226,103 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         _walkSeconds.Clear();
         foreach (float seconds in walkSeconds)
             _walkSeconds.Add(seconds);
+        _hatchOpenedAt.Value = 0d;
         _startAt.Value = start;
         _loadIssued = false;
         LockParticipants(participants);
 
-        Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
-                  $"순간이동 +{timeline.TeleportAt:0.##}s(암전 {timeline.BlackoutFadeInSeconds:0.##}/{timeline.BlackoutHoldSeconds:0.##}/{timeline.BlackoutFadeOutSeconds:0.##}s), 보행 +{timeline.WalkAt:0.##}s(간격 {timeline.WalkInterval:0.##}s, " +
-                  $"속도 {settings.Lobby.walkSpeed:0.##}m/s, 각자 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s + 미끄러짐 {timeline.SeatSlideSeconds:0.##}s), " +
-                  $"해치 열림 ~+{timeline.HatchOpenEndAt:0.##}s, 발사 +{timeline.LaunchAt:0.##}s(클립 {timeline.LaunchClipStartSeconds:0.##}~{timeline.LaunchClipEndSeconds:0.##}s ×{timeline.LaunchSpeed:0.##}), " +
-                  $"페이드 +{timeline.FadeOutAt:0.##}s, 로딩 +{timeline.LoadAt:0.##}s");
+        PodDropLobbyTimings lobby = settings.Lobby;
+        _run = new ServerRun
+        {
+            Participants = participants,
+            Timeline = timeline,
+            Start = start,
+            OnDone = onDone,
+            Hidden = new bool[participants.Count],
+            HatchGate = new PodClipGate(new[] { lobby.hatchState }),
+            LaunchGate = new PodClipGate(new[] { lobby.launchState }),
+        };
 
-        _sequence = StartCoroutine(Sequence(participants, timeline, start, onDone));
+        Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
+                  $"순간이동·해치 클립 +{timeline.TeleportAt:0.##}s(암전 {timeline.BlackoutFadeInSeconds:0.##}/{timeline.BlackoutHoldSeconds:0.##}/{timeline.BlackoutFadeOutSeconds:0.##}s), " +
+                  $"탑승은 해치 이벤트 뒤(빨라도 +{timeline.WalkReadyAt:0.##}s, 간격 {timeline.WalkInterval:0.##}s, " +
+                  $"속도 {lobby.walkSpeed:0.##}m/s, 각자 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s + 미끄러짐 {timeline.SeatSlideSeconds:0.##}s → 다 앉기 +{timeline.SeatedSeconds:0.##}s), " +
+                  $"발사 클립 '{lobby.launchState}' 끝 이벤트에 로딩");
         return true;
     }
 
-    private IEnumerator Sequence(List<ulong> participants, PodDropLobbyTimeline timeline, double start, Action onDone)
+    // 클립 이벤트(호스트 발사대)는 애니메이터 갱신 중에 오므로 같은 프레임 LateUpdate 에서 단계를 넘긴다 — 이벤트가 빠진 클립의 '끝까지 돌았다' 예비 판정보다 이벤트가 먼저 적힌다.
+    private void LateUpdate()
     {
-        // 좌석에 도착한 사람부터 숨긴다 — 경로 길이가 달라 슬롯 순서와 도착 순서가 다를 수 있다.
-        var hidden = new bool[participants.Count];
-        int remaining = participants.Count;
-        while (remaining > 0)
-        {
-            double elapsed = NetworkManager.ServerTime.Time - start;
-            for (int slot = 0; slot < participants.Count; slot++)
-            {
-                if (hidden[slot] || elapsed < timeline.WalkEndAt(slot)) continue;
-                hidden[slot] = true;
-                remaining--;
-                HideParticipant(participants[slot]);
-            }
+        if (IsServer && IsSpawned && _run != null && !_loadIssued)
+            UpdateServerRun(_run);
+    }
 
-            if (remaining > 0) yield return null;
+    private void UpdateServerRun(ServerRun run)
+    {
+        PodDropLobbyTimeline timeline = run.Timeline;
+        double elapsed = ServerNow - run.Start;
+
+        // 1) 해치 열림 — 해치 클립 이벤트(또는 이벤트 없이 끝까지 돎). 발사대가 없으면 해치 클립 시작 순간 곧바로.
+        if (_hatchOpenedAt.Value <= 0d)
+        {
+            if (elapsed < timeline.HatchAt || !GateOpen(run.HatchGate, "해치"))
+                return;
+
+            _hatchOpenedAt.Value = ServerNow;
+            Debug.Log($"[SceneFlow] {Tag} 해치 열림 +{elapsed:0.##}s — 탑승 +{timeline.BoardAt(elapsed):0.##}s 부터");
         }
 
-        while (NetworkManager.ServerTime.Time < start + timeline.LoadAt)
-            yield return null;
+        double board = timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, run.Start));
 
-        _sequence = null;
+        // 2) 좌석에 도착한 사람부터 숨긴다 — 경로 길이가 달라 슬롯 순서와 도착 순서가 다를 수 있다.
+        for (int slot = 0; slot < run.Participants.Count; slot++)
+        {
+            if (run.Hidden[slot] || elapsed < timeline.WalkEndAt(slot, board)) continue;
+            run.Hidden[slot] = true;
+            HideParticipant(run.Participants[slot]);
+        }
+
+        // 3) 발사 — 가장 늦게 앉은 순간 클립 시작(전 피어 UpdateLauncher), 끝 이벤트에 곧바로 로딩.
+        if (elapsed < timeline.LaunchAt(board) || !GateOpen(run.LaunchGate, "발사"))
+            return;
+
+        _run = null;
         _loadIssued = true;
-        Debug.Log($"[SceneFlow] {Tag} 완전 암전 — 맵 로딩 시작");
-        onDone?.Invoke();
+        Debug.Log($"[SceneFlow] {Tag} 발사 클립 끝 +{elapsed:0.##}s — 맵 로딩 시작(페이드 없음)");
+        run.OnDone?.Invoke();
+    }
+
+    // 발사대가 없으면 애니 없이 곧바로 연다. 이벤트 없이 끝까지 돈 클립으로 연 경우 경고(사용자가 FBX 클립 이벤트를 지웠다).
+    private bool GateOpen(PodClipGate gate, string label)
+    {
+        if (launcher == null || _launcherDriver == null)
+            return launcher == null;
+
+        if (!gate.IsOpen(_launcherDriver.IsFinished, out List<string> fallbacks))
+            return false;
+
+        if (fallbacks != null)
+            Debug.LogWarning($"{Tag} {label} 클립 [{string.Join(",", fallbacks)}] 에 '{PodAnimEventRelay.FunctionName}' 이벤트가 없어 클립 끝에서 넘어간다 — " +
+                             "FBX 임포트 창(Animation 탭) 또는 Tools/Lobby/포드 애니 이벤트 메뉴로 넣을 것.", this);
+        return true;
+    }
+
+    // [전 피어] 발사대 클립 이벤트. 해치 이벤트는 모든 피어에서 그 자세로 멈추게 한다(표시). 단계 확정은 서버만.
+    private void HandleLauncherClipEvent(string clipName)
+    {
+        if (settings == null)
+            return;
+
+        PodDropLobbyTimings lobby = settings.Lobby;
+        if (clipName == lobby.hatchState && !_launcherDriver.HasStarted(lobby.launchState))
+            _launcherDriver.Hold();
+
+        if (IsServer && _run != null)
+        {
+            _run.HatchGate.Notify(clipName);
+            _run.LaunchGate.Notify(clipName);
+        }
     }
 
     /// <summary>참가자 clientId(오름차순) — 플레이어 오브젝트가 있는 접속자 전원.</summary>
@@ -345,29 +421,49 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             _timeline = settings.CreateLobbyTimeline(ReplicatedWalkSeconds());
 
         double elapsed = ServerNow - start;
-        UpdateLauncher(elapsed);
+        UpdateLauncher(elapsed, _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start)));
         UpdateCamera(elapsed);
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         _overlay.HudRescanInterval = settings.Lobby.hudRescanSeconds;
-        // 레터박스는 완전 암전(LoadAt) 뒤 0 — 검은 화면 아래에서 걷힌다. UI 는 암전 전까지 새로 뜬 것도 끄고, 그 뒤엔 끈 것만 유지(로딩 씬 캔버스는 건드리지 않는다).
-        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed), elapsed < _timeline.LoadAt);
+        // 끝 암전 없음 — 발사 클립 끝에서 곧바로 로딩 화면(정렬 1000, 숨김 예외)이 이 화면(500) 위에 뜨고, 레터박스는 로비 씬과 함께 사라진다.
+        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.BlackoutAlphaAt(elapsed), true);
     }
 
-    // Base Layer(0) 에 전신 클립을 이어 세운다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.
+    // Base Layer(0) 에 전신 클립을 이어 재생한다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.
+    // 해치 클립은 순간이동 순간 처음부터, 이벤트 프레임에서 멈춤(이벤트 또는 서버 해치 열림 복제 중 먼저 온 것). 발사 클립은 가장 늦게 앉는 순간 처음부터 끝까지.
     // 발사대 프리팹엔 콜라이더가 없다(바닥은 로비 레이아웃 PodLaunch_FloorCollider — 걷는 길이라 끄지 않는다).
-    private void UpdateLauncher(double elapsed)
+    private void UpdateLauncher(double elapsed, double board)
     {
-        if (launcher == null)
+        if (launcher == null || elapsed < _timeline.HatchAt)
             return;
 
-        PodLobbyClipPose pose = _timeline.PodClipAt(elapsed);
-        if (pose.Clip == PodLobbyClip.None)
-            return;
+        if (_launcherDriver == null)
+        {
+            _launcherDriver = new PodAnimatorDriver(launcher);
+            _launcherDriver.ClipEvent += HandleLauncherClipEvent;
+        }
 
-        _launcherDriver ??= new PodAnimatorDriver(launcher);
         PodDropLobbyTimings lobby = settings.Lobby;
-        _launcherDriver.PoseSeconds(pose.Clip == PodLobbyClip.Hatch ? lobby.hatchState : lobby.launchState, 0, pose.Seconds);
+        double launchAt = _timeline.LaunchAt(board);
+        if (elapsed >= launchAt)
+        {
+            _launcherDriver.Play(lobby.launchState, 0, (float)(elapsed - launchAt));
+            return;
+        }
+
+        if (!_launcherDriver.HasStarted(lobby.hatchState))
+        {
+            _launcherDriver.Play(lobby.hatchState, 0, (float)(elapsed - _timeline.HatchAt));
+            // 해치가 이미 열린 뒤 처음 본 피어 — 따라잡은 자세로 멈춘다(지난 이벤트는 뜨지 않는다).
+            if (_hatchOpenedAt.Value > 0d) _launcherDriver.Hold();
+        }
+        else if (_hatchOpenedAt.Value > 0d && !_hatchHeldOnBoard)
+        {
+            // 자기 이벤트를 놓친 클라(늦게 시작) — 서버 해치 열림을 받은 순간 그 자세로 멈춘다.
+            _hatchHeldOnBoard = true;
+            _launcherDriver.Hold();
+        }
     }
 
     private void UpdateCamera(double elapsed)
@@ -402,6 +498,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         }
 
         _launcherDriver?.Release();
+        _hatchHeldOnBoard = false;
     }
 
     // ---------------- 오너 보행 ----------------
@@ -442,22 +539,18 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             // 서버가 정한 보행 시간(복제)을 길이 비율로 앞(충돌 켬)·뒤(→ 문턱, 충돌 끔) 구간에 나눈다 — 걷는 속도가 일정하게.
             Vector3 walkStart = walkSlot.start.position;
             float groundLength = PodLaunchRules.GroundLength(walkStart, route);
-            float share = PodLaunchRules.GroundShare(groundLength, PodLaunchRules.WalkLength(walkStart, route) - groundLength);
-            double walkStartAt = start + _timeline.WalkStartAt(slot);
 
             _walk = new OwnerWalk
             {
                 Active = true,
                 Start = start,
+                Slot = slot,
+                GroundShare = PodLaunchRules.GroundShare(groundLength, PodLaunchRules.WalkLength(walkStart, route) - groundLength),
                 WalkStart = walkStart,
                 TeleportAt = start + _timeline.TeleportAt,
                 Ground = route.Ground,
                 Approach = route.HasThreshold ? new[] { route.Interior[0] } : Array.Empty<Vector3>(),
                 Seat = route.Interior[route.Interior.Length - 1],
-                WalkStartAt = walkStartAt,
-                GroundEndAt = walkStartAt + _timeline.WalkSecondsOf(slot) * share,
-                ArriveAt = start + _timeline.WalkArriveAt(slot),
-                WalkEndAt = start + _timeline.WalkEndAt(slot),
             };
         }
 
@@ -472,6 +565,21 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             motor.PassThroughUnitsOverride = true;
             Vector3 firstTarget = _walk.Ground.Length > 0 ? _walk.Ground[0] : _walk.Approach.Length > 0 ? _walk.Approach[0] : _walk.Seat;
             TeleportOwner(po, motor, _walk.WalkStart, firstTarget - _walk.WalkStart);
+        }
+
+        // 해치가 열려야(서버 확정·복제) 보행 시각이 정해진다 — 그때까지 걷기 시작 지점에 서 있다.
+        if (!_walk.Timed)
+        {
+            if (_hatchOpenedAt.Value <= 0d)
+                return;
+
+            int walkSlotIndex = _walk.Slot;
+            double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));
+            _walk.Timed = true;
+            _walk.WalkStartAt = start + _timeline.WalkStartAt(walkSlotIndex, board);
+            _walk.GroundEndAt = _walk.WalkStartAt + _timeline.WalkSecondsOf(walkSlotIndex) * _walk.GroundShare;
+            _walk.ArriveAt = start + _timeline.WalkArriveAt(walkSlotIndex, board);
+            _walk.WalkEndAt = start + _timeline.WalkEndAt(walkSlotIndex, board);
         }
 
         if (now < _walk.WalkStartAt)
