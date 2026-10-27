@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -66,23 +68,55 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
-    private readonly ITimeScalePort _timeScale = new GlobalTimeScalePort();
+    private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
     private InterruptAttemptStage _attempt;
     private InterruptResolveStage _resolve;
     private InterruptSuccessStage _success;
     private InterruptFailStage _fail;
 
-    private InterruptAttemptStage AttemptStage => _attempt ??= new InterruptAttemptStage(this, _timeScale);
-    private InterruptResolveStage ResolveStage => _resolve ??= new InterruptResolveStage(_timeScale);
-    private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timeScale);
-    private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timeScale);
+    private InterruptAttemptStage AttemptStage => _attempt ??= new InterruptAttemptStage(this, _timePort);
+    private InterruptResolveStage ResolveStage => _resolve ??= new InterruptResolveStage(_timePort);
+    private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timePort);
+    private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timePort);
+
+    // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.
+    private GlobalTimeScale _timeScale;
+    private NetworkManager _networkManager;
+    private InterruptDarkAdaptation _darkAdaptation;
+    private readonly List<IInterruptCueSink> _sinkBuffer = new List<IInterruptCueSink>();
 
     private void Awake()
     {
+        // TryGetComponent — 없으면 진짜 null(에디터의 GetComponent 가짜 null 은 인터페이스로 넘기면 null 비교를 통과한다).
+        TryGetComponent(out _timeScale);
+        TryGetComponent(out _networkManager);
+        TryGetComponent(out _darkAdaptation);
+
         if (Instance != null && Instance != this)
             return;
 
         Instance = this;
+    }
+
+    private void OnEnable()
+    {
+        if (_timeScale == null)
+            return;
+
+        _timeScale.Started += HandleStarted;
+        _timeScale.Failed += HandleFailed;
+        _timeScale.ForcedReset += HandleForcedReset;
+    }
+
+    private void OnDisable()
+    {
+        if (ReferenceEquals(_timeScale, null))
+            return;
+
+        // 파괴된 GlobalTimeScale 도 C# 객체는 남아 있어 그대로 뗄 수 있다.
+        _timeScale.Started -= HandleStarted;
+        _timeScale.Failed -= HandleFailed;
+        _timeScale.ForcedReset -= HandleForcedReset;
     }
 
     private void OnDestroy()
@@ -118,8 +152,52 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// <summary>B2·C1 — 클립 이벤트 이펙트 재생 허용(<see cref="EffectAnimEvents"/>). 간파 id 가 아니면 늘 true.</summary>
     public static bool AllowsAnimEffect(string id) => InterruptProductionRules.AllowsAnimEffect(Instance, id);
 
-    /// <summary>A3 — 개인 채널 오너 줌 배율. 칸이 꺼져 있으면 1.</summary>
-    public static float OwnerZoomFactor(float zoomFactor) => InterruptProductionRules.OwnerZoomFactor(Instance, zoomFactor);
+    /// <summary>A3 — 개인 채널 오너 줌 배율(카메라가 매 프레임 묻는다). 칸이 꺼져 있거나 인스턴스가 없으면 1.</summary>
+    public static float OwnerZoomFactor(float zoomFactor) =>
+        Instance != null ? Instance.SuccessStage.OwnerZoomFactor(zoomFactor) : 1f;
+
+    // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
+
+    private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
+    {
+        if (purpose != SlowMotionPurpose.Success)
+            return;
+
+        var e = InterruptProductionEvent.LocalSuccess(triggerId, casterClientId, targetPosition);
+        // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다 — 옛 InterruptDarkAdaptation 과 같다.
+        bool hasViewer = _networkManager != null;
+        bool viewerIsCaster = hasViewer && InterruptProductionRules.IsCasterView(casterClientId, _networkManager.LocalClientId);
+        SuccessStage.LocalStarted(purpose, e, viewerIsCaster, hasViewer ? _darkAdaptation : null,
+            FindSuccessFxSinks(casterClientId));
+    }
+
+    private void HandleFailed(uint triggerId) => FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));
+
+    private void HandleForcedReset(uint triggerId) => SuccessStage.LocalForcedReset(_darkAdaptation);
+
+    // A4 — 발동자 플레이어의 성공 이펙트 칸. 스폰된 오브젝트 중 발동자 소유의 켜진 InterruptSuccessFx(옛 구독 조건과 같다).
+    // SpawnManager.GetPlayerNetworkObject 는 클라에서 남의 것을 찾으면 에러를 찍는다 — 스폰 목록에서 직접 찾는다.
+    private List<IInterruptCueSink> FindSuccessFxSinks(ulong casterClientId)
+    {
+        _sinkBuffer.Clear();
+        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
+        if (spawnManager == null)
+            return _sinkBuffer;
+
+        foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
+        {
+            if (networkObject == null || networkObject.OwnerClientId != casterClientId)
+                continue;
+
+            foreach (InterruptSuccessFx fx in networkObject.GetComponents<InterruptSuccessFx>())
+            {
+                if (fx.isActiveAndEnabled)
+                    _sinkBuffer.Add(fx);
+            }
+        }
+
+        return _sinkBuffer;
+    }
 
     // ---- 서버 사건 (간파 스킬이 알린다 — 인스턴스 없으면 아무것도 안 한다) ----
     // 판정·피해·카운터 창은 스킬 소관. 여기는 GlobalTimeScale.ServerStart/ServerFail 과 캐릭터 성공 relay 만 부른다.

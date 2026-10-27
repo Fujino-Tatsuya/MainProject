@@ -46,4 +46,22 @@ public static class InterruptProductionRules
 
     /// <summary>이 화면이 간파한 본인인가 — 개인 채널 기준.</summary>
     public static bool IsCasterView(ulong casterClientId, ulong localClientId) => casterClientId == localClientId;
+
+    /// <summary>A4 — 목적·발동자·그 플레이어의 OwnerClientId 로 성공 이펙트 칸 재생 여부를 정한다(옛 InterruptSuccessFx.ShouldPlay).</summary>
+    public static bool ShouldPlaySuccessFx(SlowMotionPurpose purpose, ulong triggerClientId, bool isSpawned, ulong ownerClientId) =>
+        purpose == SlowMotionPurpose.Success && isSpawned && triggerClientId == ownerClientId;
+
+    /// <summary>A4 — 재생해야 하면 연결된 칸만 고른다. 둘 다 비면 None(옛 InterruptSuccessFx.SelectSlots).</summary>
+    public static InterruptSuccessFx.Slots SelectSuccessFxSlots(bool shouldPlay, bool hasCasterFx, bool hasTargetFx)
+    {
+        if (!shouldPlay)
+            return InterruptSuccessFx.Slots.None;
+
+        InterruptSuccessFx.Slots slots = InterruptSuccessFx.Slots.None;
+        if (hasCasterFx)
+            slots |= InterruptSuccessFx.Slots.Caster;
+        if (hasTargetFx)
+            slots |= InterruptSuccessFx.Slots.Target;
+        return slots;
+    }
 }

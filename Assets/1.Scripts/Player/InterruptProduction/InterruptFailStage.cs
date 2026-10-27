@@ -19,4 +19,12 @@ public sealed class InterruptFailStage
 
         _timeScale.ServerFail(e.AttemptTriggerId);
     }
+
+    /// <summary>
+    /// [각 피어] 슬로우 실패 복귀를 받았다. 지금 실패 연출은 없다(훅만). 실패 연출을 만들 땐 주의:
+    /// 성공이 예측 대기 밖에서 온 판정은 성공 직전 Failed 가 한 번 난다 — 같은 판정의 성공과 묶어 걸러야 한다.
+    /// </summary>
+    public void Local(in InterruptProductionEvent e)
+    {
+    }
 }
