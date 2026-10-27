@@ -15,3 +15,4 @@ MonoBehaviour:
   countdownSeconds: 5
   interactRadius: 2
   characterSwapCooldownSeconds: 0.5
+  gatherHoldSeconds: 3
