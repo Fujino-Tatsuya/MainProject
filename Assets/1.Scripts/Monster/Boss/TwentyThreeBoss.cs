@@ -360,6 +360,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     long _fightPlayerDamage;
     int _fightCounters, _fightSuppressions;
 
+    /// <summary>[서버] 기믹 결과(보스, 기믹 이름, 결과, 부가 값) — QA 계측기(QABoss103Recorder) 전용. 구독자 없으면 아무 일도 안 한다.</summary>
+    public static event System.Action<TwentyThreeBoss, string, string, int> QA103GimmickResult;   // QA103 (qa 브랜치 전용 알림)
+
     void FightLog(string msg)
     {
         if (_fightStartTime < 0f) return;
@@ -2853,6 +2856,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 // ③ 각본 잡기를 전원이 피했다(범위 밖·슈퍼아머) = 성공 — 제압(PLAN-boss-raid §2).
                 _raidRescueActive = false;
                 FightLog("③ 새 가족 성공(헛잡기)");
+                QA103GimmickResult?.Invoke(this, "새 가족", "success", 0);   // QA103 (qa 브랜치 전용 알림)
                 EnterSuppress("각본 잡기 헛잡기", fromReservation: true);
                 return;
             }
@@ -3118,6 +3122,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             _raidRescueActive = false;
             Debug.Log("[23호/레이드] 새 가족 — 구출 실패(벌칙 없음)", this);
             FightLog("③ 새 가족 실패");
+            QA103GimmickResult?.Invoke(this, "새 가족", "fail", 0);   // QA103 (qa 브랜치 전용 알림)
         }
 
         _attackPhase = BossAttackPhase.None;
@@ -4823,11 +4828,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 // ② 성공 보상 = 제압(5초, 받는 피해 ×1.2). 기믹이 끝난 지점이라 예약 검사를 건너뛴다.
                 Debug.Log("[23호/레이드] 전력 공급 차단 — 제압", this);
                 FightLog("② 전력 공급 성공");
+                QA103GimmickResult?.Invoke(this, "전력 공급", "success", 0);   // QA103 (qa 브랜치 전용 알림)
                 EnterSuppress("전력 공급 차단", fromReservation: true);
                 return;
             }
             Debug.Log("[23호] 송전기 전멸 — 그로기(Break 승격 없음)", this);
             FightLog("송전기 성공");
+            QA103GimmickResult?.Invoke(this, "송전기", "success", 0);   // QA103 (qa 브랜치 전용 알림)
             // 기믹이 완전히 끝나는 지점 ① — 예약된 제압이 있으면 보상 그로기 대신 제압으로.
             if (TryConsumePendingSuppress()) return;
             EnterPylonGroggy(_boss != null ? _boss.chargeClearGroggyDuration : 1f);
@@ -4839,6 +4846,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             // ② 실패 = 레이지 대신 방전(부순 탑 칸만 안전). 보스는 바로 일반 전투로 돌아간다.
             _attackPhase = BossAttackPhase.None;
             FightLog("② 전력 공급 실패 → 방전");
+            QA103GimmickResult?.Invoke(this, "전력 공급", "fail", _safeTileScratch.Count);   // QA103 (qa 브랜치 전용 알림) — 값 = 부순 탑 칸 수(방전 안전 칸)
             StartRaidDischarge(dischargeMask);
             DecideNextAfterAction();
             return;
@@ -4846,6 +4854,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         Debug.Log("[23호] 송전기 실패 — 레이지 돌진으로 넘어간다", this);
         FightLog("송전기 실패 → 레이지");
+        QA103GimmickResult?.Invoke(this, "송전기", "fail", 0);   // QA103 (qa 브랜치 전용 알림)
         StartRageAfterCharge();
     }
 
@@ -4940,12 +4949,14 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             }
             _zeroGuard = ZeroGuard.Exploding;
             _zeroExplodeUntil = Time.time + _boss.raidSelfDestructBlastWarn + 0.5f;
+            QA103GimmickResult?.Invoke(this, "0줄 자폭", "fail", 0);   // QA103 (qa 브랜치 전용 알림)
         }
 
         if (stopped)
         {
             Debug.Log("[23호/레이드] 폐기 처분 — 실드 파괴 → 제압", this);
             FightLog($"④ 폐기 처분 저지(남은 {_attackPhaseTimer:0.0}s)");
+            QA103GimmickResult?.Invoke(this, "자폭 저지", "success", 0);   // QA103 (qa 브랜치 전용 알림)
             EnterSuppress("자폭 저지", fromReservation: true);
             return;
         }
@@ -4958,6 +4969,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _raidFloorHoldUntil = Time.time + warn + 2f;
         Debug.Log("[23호/레이드] 폐기 처분 — 저지 실패, 대폭발", this);
         FightLog("④ 폐기 처분 실패 → 대폭발");
+        QA103GimmickResult?.Invoke(this, "자폭 저지", "fail", 0);   // QA103 (qa 브랜치 전용 알림)
         DecideNextAfterAction();
     }
 
@@ -6226,6 +6238,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         {
             _raidRescueActive = false;
             FightLog("③ 새 가족 성공(간파)");
+            QA103GimmickResult?.Invoke(this, "새 가족", "success", 1);   // QA103 (qa 브랜치 전용 알림) — 값 1 = 간파 구출
             EnterSuppress("구출 성공", fromReservation: true);
             return;
         }
@@ -7102,6 +7115,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _zeroGuard = ZeroGuard.Killing;
         _pendingSuppress = false;   // 제압 예약이 남아 있으면 버린다(처치가 우선)
         FightLog("0줄 자폭 저지 — 처치");
+        QA103GimmickResult?.Invoke(this, "0줄 자폭", "success", 0);   // QA103 (qa 브랜치 전용 알림)
         BreakShield();
         TakeDamage(new AttackInfo(999999, AttackType.Default));
     }
