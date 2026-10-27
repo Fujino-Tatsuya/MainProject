@@ -104,6 +104,57 @@ public static class QABoss103Plan
         return (index - (count - 1) * 0.5f) * (spreadDegrees / (count - 1));
     }
 
+    // ── 로비 걸음 경유점 ─────────────────────────────────────────
+
+    /// <summary>
+    /// 경유점 그래프 최단 경로(다익스트라, 119 C5 — 로비 출격 걸음이 소품에 막히지 않게). 노드 0 = 출발, <paramref name="nodeCount"/>-1 = 도착,
+    /// 사이 = 씬 기준점. <paramref name="clear"/>(a, b) = 두 노드 사이 직선 걸음이 막히지 않음, <paramref name="cost"/>(a, b) = 거리(0 이상).
+    /// 반환 = 출발 다음부터 도착까지 노드 번호(도착 포함, 직선이 열려 있으면 [도착] 하나). 길이 없으면 null.
+    /// </summary>
+    public static List<int> WalkRoute(int nodeCount, Func<int, int, bool> clear, Func<int, int, float> cost)
+    {
+        if (nodeCount < 2 || clear == null || cost == null)
+            return null;
+        int goal = nodeCount - 1;
+        var dist = new float[nodeCount];
+        var prev = new int[nodeCount];
+        var done = new bool[nodeCount];
+        for (int i = 0; i < nodeCount; i++)
+        {
+            dist[i] = float.PositiveInfinity;
+            prev[i] = -1;
+        }
+        dist[0] = 0f;
+        while (true)
+        {
+            int u = -1;
+            for (int i = 0; i < nodeCount; i++)
+                if (!done[i] && !float.IsPositiveInfinity(dist[i]) && (u < 0 || dist[i] < dist[u]))
+                    u = i;
+            if (u < 0)
+                return null;
+            if (u == goal)
+                break;
+            done[u] = true;
+            for (int v = 0; v < nodeCount; v++)
+            {
+                if (done[v] || v == u)
+                    continue;
+                float d = dist[u] + Math.Max(0f, cost(u, v));
+                if (d < dist[v] && clear(u, v))
+                {
+                    dist[v] = d;
+                    prev[v] = u;
+                }
+            }
+        }
+        var route = new List<int>();
+        for (int n = goal; n != 0; n = prev[n])
+            route.Add(n);
+        route.Reverse();
+        return route;
+    }
+
     // ── 판 종료 판정 ─────────────────────────────────────────────
 
     /// <summary>
