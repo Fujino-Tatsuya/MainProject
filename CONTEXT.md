@@ -8,6 +8,13 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-10-26~27 · 경석(Claude) · **튜토리얼 4구역 진입 전 소개 연출**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-zone4-intro-cinematic.md](PLAN-zone4-intro-cinematic.md) ✅ 승인 · ✅ 구현·커밋 · 컴파일 0 · 전투 EditMode 356/0 · 튜토리얼 456/0 · ✅ 경석 Play 1인(연출·스킵·밝기·패널 외곽선·다리 실루엣 외곽선 반경 11.725m) · ⏳ MPPM(호스트+클라 타이밍·관전자 투표) · ⏳ xlsx `Cinematic` 시트 병합 Export · 핸드오프 [handoff-zone4-intro-cinematic.md](Docs/tech/handoff-zone4-intro-cinematic.md)
+- 10-27 경석 Play 반영: 스킵 = 중간보스(다리·중앙 섬) 샷을 0.8+1.2초 보여 주고 복귀 · 연출 중 디밍·LoS 줄이기(`FogManager.dimSuppress`) · 무전 캡션 화면 아래 28% + 등장 올라옴·배지 펄스 · 장치 대사 D 패널까지 유지 · 패널 화면 중앙 + 근접 외곽선 · 다리 = 화면 공간 실루엣 외곽선(`Zone/CinematicSilhouetteOutline`, 존 중심 반경 밖 버림) · Alt+5 뒤 연출이 사라지던 버그(스킵이 G7 을 지날 때만 보류 해제).
+- 커밋 제외(의도): `StringTable.asset`(Play 자동 추가 키) · `AddressableAssetSettings.asset` · `GroupPainter/*.json` · `Dev/Editor/PlayModeHangTracer`·`PlaySessionLogRecorder` · `SettingsPreviewCapture` · `raid-23-phases.html`.
+- 복도3 특성 선택 전원 완료 ∧ 살아 있는 전원 복도3 → G7 보류 → 카메라 패널 4곳 → 다리·중앙 섬 적 → 복귀 순간 G7·타이머·기상. 대사 = 무전기 캡슐(xlsx Strings 새 행 + 시간 `Cinematic` 새 시트, 한 줄씩). 스킵 = 보스 연출과 같은 규칙.
+- 🔴 보스 등장 연출 스킵 투표에 관전자(영구 사망자) 포함으로 변경(10-23 결정 뒤집음).
+- 수정 예정: `Map/Tutorial/TutorialFlowModel.cs`·`TutorialDirector.cs`(+ 새 partial `TutorialDirector.Zone4Intro.cs`)·`TutorialSkipController.cs` · `Map/Tutorial/Flow/TutorialZone4Flow.cs`·`TutorialZone4Rules.cs` · 새 `Map/Tutorial/Flow/TutorialZone4Intro*.cs` · `Map/BossIntro/BossIntroPresentation.cs`(오버레이 분리) · 새 `Map/Cinematic/*.cs` · `Map/BossEncounterDirector.cs`(투표자) · `Map/ZoneBridgeGateManager.cs`(게이트 조회) · `Tutorial/Guide/TutorialGuideUI.cs`(목표 패널 숨김) · `TutorialGuideTexts.asset`(행 3) · 새 SO `Resources/Tutorial/Zone4IntroCinematic.asset` · 테스트.
+
 ## ▶▶ 반영 (2026-10-26 · 경석(Claude) · **몬스터 Q 경직 표현 · 중간보스 취약 8초**, 브랜치 `feature/SettingsDdol`) — ✅ 구현 · 컴파일 0 · 전투 EditMode 337/0 · ⏳ 경석 Play · 규칙 정본 [monster-aggro-hitreact.md](Docs/tech/monster-aggro-hitreact.md) §2.0 · 핸드오프 [handoff-monster-stun-vfx.md](Docs/tech/handoff-monster-stun-vfx.md)(민경 확인용 + Play 체크리스트)
 - 일반 몹: Q 판정은 원래 공격을 끊고 있었다 — 피격 상태 없는 HumanoidBot 이 공격 클립을 계속 돌려 안 끊겨 보였다 → 피격 상태 없는 몹은 Hit·Knockback 동안 대기 자세 정지. Q 밀림+경직 동안 머리 위 기절 별(`MonsterStatusEffectVfxPresenter`, 표 `Resources/MonsterStatusEffectVfxSet`).
 - 중간보스: 간파 성공 = 그로기 1초(별 + 하늘색) + **취약 8초**(카운터 성공부터, 하늘색만, 움직이고 공격함, 공격 중이어도 Q 밀림+경직 — 공격 슈퍼아머를 안 건다). `MonsterCounterWindow.vulnerableDuration` 은 xlsx 행 없음(기본 8).

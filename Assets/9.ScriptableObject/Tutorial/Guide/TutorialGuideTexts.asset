@@ -252,6 +252,18 @@ MonoBehaviour:
       (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
     durationSeconds: 6
     sfx: {fileID: 0}
+  - id: TUT_Z4_INTRO_DEVICES
+    text: "장치가 네 군데나 있네.|저걸 전부 켜면… 다리를 연결할 수 있을 것 같아."
+    durationSeconds: 5
+    sfx: {fileID: 0}
+  - id: TUT_Z4_INTRO_BRIDGE
+    text: "문이 잠겨 있어.|중앙에 있는 저 녀석이 신경 쓰이는데."
+    durationSeconds: 5
+    sfx: {fileID: 0}
+  - id: TUT_Z4_INTRO_RETURN
+    text: "어서 움직여."
+    durationSeconds: 2
+    sfx: {fileID: 0}
   - id: TUT_B_PAD_WARN
     text: "\uC5D8\uB9AC\uBCA0\uC774\uD130 \uBC1C\uD310\uC5D0 <b>\uB204\uAD6C\uB4E0</b>
       \uC62C\uB77C\uC11C\uBA74 3\uCD08 \uB4A4 <b>\uD30C\uD2F0 \uC804\uC6D0</b>\uC774

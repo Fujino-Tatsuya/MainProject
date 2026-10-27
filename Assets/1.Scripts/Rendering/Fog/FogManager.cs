@@ -69,6 +69,15 @@ public sealed class FogManager : MonoBehaviour
     // 포그 또는 디밍 중 하나라도 켜져 있으면 렌더 패스를 큐잉한다(독립 토글).
     // 패스를 큐잉할 이유가 하나라도 있는지. 셋은 서로 독립이다 —
     // 어비스를 빼먹으면 "abyssEnabled 가 켜져 있는데 물안개가 없다"가 된다(2026-08-06).
+    /// <summary>
+    /// [런타임 전용 · 저장 안 됨] 디밍 줄이기 0~1 — 1 이면 층·시야 디밍이 화면을 누르지 않는다(채도·명도 = 원래대로).
+    /// 연출(4구역 소개)이 멀리 비출 때 화면이 통째로 어둡게 깔리지 않게 잠깐 올렸다 내린다(CinematicOverlay.SetDimSuppress, 경석 10-27).
+    /// </summary>
+    [System.NonSerialized] public float dimSuppress;
+
+    /// <summary>지금 켜진 포그 매니저(없으면 null). 연출이 디밍 기준점을 잠깐 옮길 때 쓴다(CinematicOverlay.SetDimFocus).</summary>
+    public static FogManager Active => s_active != null && s_active.isActiveAndEnabled ? s_active : null;
+
     public static bool HasActiveInstance
     {
         get
@@ -363,8 +372,9 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalFloat(ID_DimRangeDown, p.dimRangeDown);
         Shader.SetGlobalFloat(ID_DimFadeUp, p.dimFadeUp);
         Shader.SetGlobalFloat(ID_DimFadeDown, p.dimFadeDown);
-        Shader.SetGlobalFloat(ID_DimSaturation, p.dimSaturation);
-        Shader.SetGlobalFloat(ID_DimBrightness, p.dimBrightness);
+        // 연출이 디밍을 잠깐 줄인다(dimSuppress 0~1 — 1 이면 안 누름). 프로필 에셋은 그대로 두고 넘기는 값만 1 쪽으로 당긴다.
+        Shader.SetGlobalFloat(ID_DimSaturation, Mathf.Lerp(p.dimSaturation, 1f, dimSuppress));
+        Shader.SetGlobalFloat(ID_DimBrightness, Mathf.Lerp(p.dimBrightness, 1f, dimSuppress));
         Shader.SetGlobalFloat(ID_DimAffectSky, p.dimAffectSky);
 
         PushLos(p, playerPos);
@@ -438,10 +448,12 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalFloat(ID_LosDarken, p.losDarken);
         Shader.SetGlobalFloat(ID_LosDistanceBias, p.losDistanceBias);
         Shader.SetGlobalFloat(ID_LosEdgeFade, p.losEdgeFade);
-        Shader.SetGlobalFloat(ID_LosBrightness, p.losBrightness);
-        Shader.SetGlobalFloat(ID_LosSaturation, p.losSaturation);
+        // 연출 디밍 줄이기(dimSuppress)는 시야 차폐에도 같이 — LoS 는 기준점 한 곳에서만 레이를 쏴서, 다리·중앙 섬처럼 여러 곳을 한 화면에
+        // 비추면 기준점에서 벽 너머인 다리가 어두웠다(경석 10-27). 1 이면 벽 뒤도 원래 밝기·채도·색.
+        Shader.SetGlobalFloat(ID_LosBrightness, Mathf.Lerp(p.losBrightness, 1f, dimSuppress));
+        Shader.SetGlobalFloat(ID_LosSaturation, Mathf.Lerp(p.losSaturation, 1f, dimSuppress));
         Shader.SetGlobalColor(ID_LosTint, p.losTint);
-        Shader.SetGlobalFloat(ID_LosTintStrength, p.losTintStrength);
+        Shader.SetGlobalFloat(ID_LosTintStrength, Mathf.Lerp(p.losTintStrength, 0f, dimSuppress));
         Shader.SetGlobalFloat(ID_LosAngleJitter, p.losAngleJitter);
     }
 

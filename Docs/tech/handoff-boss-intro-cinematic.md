@@ -18,3 +18,4 @@
 - `CameraTargetSwitcher.TryGetGameplayViewRotation` 추가 — 연출 중엔 렌더 카메라 transform 이 연출 vcam 을 따르므로 "화면 방향"은 이 값으로 읽는다.
 - 스킵 입력은 `Keyboard.current.spaceKey` 를 직접 본다(연출 잠금 중이라 대시 액션은 막혀 있다). 게임 메뉴가 열려 있으면 무시.
 - 연출 끄기: 씬 `BossEncounterDirector` 인스펙터 `introEnabled` = false → 예전 흐름(도착 즉시 강하).
+- ⚠️ 뒤집음(2026-10-26 · 경석): 스킵 **투표자 = 접속자 전원(관전자·영구 사망자 포함)** — 관전자도 관전 화면으로 연출을 보고 동의한다. 분모 = 새 복제 값 `SkipVoterCount`(예전 `EligibleCount`). 잠금·워크인·보스 인원 보정 대상(`_eligibleClientIds`)은 그대로. 화면 부품(레터박스·비네팅·스킵 위젯·HUD 끄기·vcam)은 `Map/Cinematic/CinematicOverlay.cs` 로 옮겼다(4구역 소개 연출과 공유, 동작 무변경) — [handoff-zone4-intro-cinematic.md](handoff-zone4-intro-cinematic.md).
