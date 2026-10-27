@@ -204,3 +204,27 @@ GameData.xlsx (SVN, 잠금)
 ```
 
 여는 태그와 `</style>`을 반드시 짝지어 쓴다. 새 키워드 색이 필요하면 `Tools/UI/스킬 툴팁 구성`이 만드는 `SkillTooltipStyles.asset`에 스타일을 추가하고 문구에서는 그 이름만 사용한다.
+
+### 태그 칩 — `tooltip.tags` (할 일 114)
+
+툴팁 이름 아래 칩(넉백·기절 등)은 **수치 시트**(`Paladin`·`Gunner`·`Assassin` 등)의 `tooltip.tags` 행에서 고친다 — `[DataTableText(Localize = false)]` 문자열 칸이라 Strings 시트로 가지 않는다.
+
+| 규칙 | 설명 |
+|---|---|
+| 형식 | 태그 ID 쉼표 구분 — `Knockback,Stun`, `Knockback, Stun`(공백 허용), 대소문자 무관. 칩 순서 = 적은 순서 |
+| 빈 칸 | 태그 없음(문자열 칸 예외 — §3) |
+| 태그 ID 목록 | 코드 한 곳 `SkillTooltipTag`(`Assets/1.Scripts/Player/Skill/SkillTooltipTags.cs`): `Knockback`·`Stun`·`Vulnerable`·`Shield`·`Heal`·`Overheat`·`Unstoppable`·`Invulnerable` |
+| 오류 | 목록에 없는 ID·같은 태그 두 번·쉼표 사이 빈 칸 → 테이블 Play·빌드 검증 오류(셀 위치와 함께 멈춤). 인스펙터 모드는 아는 태그만 그리고 경고 한 번 |
+| 화면 이름 | Strings 키 `UI.SkillTooltip.Tag.<ID>`(예 `UI.SkillTooltip.Tag.Knockback`) — 행이 없으면 코드 ko(넉백 등). [localization.md §8](localization.md#8-l4b--코드에-박힌-ui-문구) |
+
+- 새 태그 = 프로그래머가 `SkillTooltipTag` 에 한 줄 + `SkillTooltipTags` ko 이름 한 줄 → 병합 Export 로 Strings 행이 생긴다. 칩 이미지는 기획 이미지가 나올 때까지 임시 흰 사각형(`white_512`).
+- 이 행은 새 필드라 병합 Export 전까지 시트에 없다 — 그동안은 SO 값(지금 전부 빈 칸 = 태그 없음)으로 돈다(§3).
+
+### 툴팁 배치 (할 일 114)
+
+`CombatHUD.prefab › SkillTooltipHost/Panel`. 저작 메뉴 `Tools/UI/스킬 툴팁 레이아웃만 갱신`(CombatHUD 만 — 문구 시드·인라인 아이콘 아틀라스는 안 건드림) 또는 `Tools/UI/스킬 툴팁 구성`(전부).
+
+- `Header`: 좌상단 `Icon` / 오른쪽 `DisplayName`(크게)·`Subtitle`(슬롯 줄 — 툴팁 부제, 부제가 없는 패시브는 키 배지 글자)·`TagRow`(칩, 폭을 넘으면 줄바꿈하고 Header 가 늘어난다) / 우상단 `CooldownGroup`(시계 `CooldownIcon` + 초, 쿨다운 없거나 0 이면 숨김) / 바닥 `Divider`.
+- 그 아래 `Description`(수치 강조 그대로) → 오른쪽 아래 `ShiftHint`(`UI.SkillTooltip.ShiftHint`).
+- 저작 메뉴는 `Header/TagRow` 가 없을 때만 배치를 한 번 다시 놓는다(옛 `KeyBadge` 는 지운다). 이후 위치·색·크기는 프리팹 인스펙터에서 고친다 — 재실행이 덮지 않는다.
+- Shift 상세 갱신·화면 경계 보정·표시 지연은 그대로다.
