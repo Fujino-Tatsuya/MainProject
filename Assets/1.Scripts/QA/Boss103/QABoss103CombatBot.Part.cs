@@ -15,6 +15,7 @@ public sealed partial class QABoss103CombatBot
     /// <summary>판 파일을 연다(같은 판·재실행 번호면 덮어쓴다). 출력 폴더가 없으면 끈다.</summary>
     public void AttachPart(QABoss103Config cfg)
     {
+        InitDashInterrupt(cfg);   // 할 일 116 — 판 설정 dashint
         if (!cfg.HasOut)
         {
             Debug.Log($"{Tag} event=bot_part character={_character} state=off reason=no_out_dir");

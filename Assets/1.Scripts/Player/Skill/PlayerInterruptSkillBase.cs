@@ -50,6 +50,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private bool pendingEnd;            // 판정 전에 End 가 왔다 — 판정 뒤로 미룬다
     private Vector3 predictedOffset;    // 시도 예측 오버랩을 옮길 양(예상 대시 끝 − 지금 위치, §10 Q2)
 
+    // ── 대쉬 간파 예측 로그(할 일 116 — 로그만, DashInterruptPredictLog.Enabled 일 때만) ──
+    private readonly DashInterruptPredictLog predictLog = new DashInterruptPredictLog();
+    private Collider[] predictResults;
+    private float observedPrepDelay = -1f; // 이 피어에서 관측한 시작 → Hit(초). 첫 관측 전 = -1
+    private const float PredictNearestRadius = 20f;
+
     // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
     [Header("간파 지연 측정")]
     [SerializeField, Min(0f)]
@@ -108,6 +114,123 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         pendingHit = false;
         pendingEnd = false;
         Edit.Log("[DashInterrupt] 우클릭 → 대시 전환 — 진행 중인 간파를 대시에 실음(시도 사건 재발동 없음)", this);
+    }
+
+    // ── 대쉬 간파 예측 로그(할 일 116) — 판정·타이밍·네트워크는 건드리지 않는다 ──
+
+    /// <summary>[오너·서버] 이 피어에서 시작 → Hit 이벤트까지 걸린 시간을 기억한다(다음 예측의 평소 준비 시간).</summary>
+    internal void NotePrepObserved(float delay)
+    {
+        if (DashInterruptPredictLog.Enabled && delay > 0f)
+            observedPrepDelay = delay;
+    }
+
+    /// <summary>
+    /// [서버·원격 오너] 대쉬 간파 성립 순간 예측 1줄. <paramref name="skillStartTime"/> = 준비 기준점(이 피어 Time.time).
+    /// 예상 대시 끝 = 지금 위치 + 대시 방향 × 속도 × 남은 대시 시간(§5 시도 예측과 같은 오프셋).
+    /// </summary>
+    internal void LogDashPredictCast(bool server, DashInterruptOrder order, PlayerDashState dashState, float skillStartTime)
+    {
+        if (!DashInterruptPredictLog.Enabled || owner == null || HitboxAnchor == null || dashState == null)
+            return;
+
+        Vector3 offset = DashInterruptRules.GetPredictedEndOffset(dashState.Direction, dashState.Speed, dashState.Remaining);
+        Unit target = FindPredictTarget(offset, server, out bool inRange, out bool open);
+        string windowSource = DashInterruptPredictLog.EstimateWindow(target, server, open, out float openElapsed, out float expected);
+        var input = new DashInterruptPredictInput
+        {
+            CastTime = Time.time,
+            CastPosition = owner.transform.position,
+            DashDirection = dashState.Direction,
+            DashSpeed = dashState.Speed,
+            DashRemaining = dashState.Remaining,
+            SkillStartTime = skillStartTime,
+            PrepDelay = EstimatePrepDelay(out string prepSource),
+            HasTargetInRange = inRange,
+            TargetWindowOpen = inRange && open,
+            WindowOpenElapsed = openElapsed,
+            WindowExpectedDuration = expected,
+        };
+        predictLog.BeginCast(server, order, owner, GetType().Name, input, target, prepSource, windowSource);
+    }
+
+    /// <summary>[서버·원격 오너] 대시 끝 → Skill 인수인계 순간(이 피어의 실제 대시 끝).</summary>
+    internal void LogDashPredictHandOff()
+    {
+        if (predictLog.IsActive && owner != null)
+            predictLog.NoteHandOff(owner.transform.position, Time.time);
+    }
+
+    // 평소 준비 시간 추정 — 관측값(이 피어의 지난 Hit) > 데이터 HitDelay. 출처를 함께 남긴다.
+    private float EstimatePrepDelay(out string source)
+    {
+        if (observedPrepDelay > 0f)
+        {
+            source = "observed";
+            return observedPrepDelay;
+        }
+
+        IPlayerInterruptSkillData data = InterruptData;
+        if (data != null)
+        {
+            source = EndsOnClipEvent ? "data_hit_delay_unused" : "data_hit_delay";
+            return data.HitDelay;
+        }
+
+        source = "none";
+        return -1f;
+    }
+
+    // 예상 대시 끝에서 판정 앵커 오버랩 안의 간파 대상(창 소유자) — 열린 대상을 우선. 없으면 근처에서 가장 가까운 대상(거리·각도 기록용).
+    private Unit FindPredictTarget(Vector3 offset, bool server, out bool inRange, out bool open)
+    {
+        IPlayerInterruptSkillData data = InterruptData;
+        int size = Mathf.Max(16, data != null ? data.MaxHitResults : 0);
+        if (predictResults == null || predictResults.Length < size)
+            predictResults = new Collider[size];
+
+        Unit best = null;
+        open = false;
+        int hitCount = OverlapHitboxAnchor(predictResults, offset);
+        for (int i = 0; i < hitCount; i++)
+        {
+            Unit unit = predictResults[i] != null ? ResolveHitUnit(predictResults[i], out _) : null;
+            if (unit == null || unit == owner || ShouldSkipTarget(unit))
+                continue;
+            IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
+            if (slowTarget == null)
+                continue;
+            bool unitOpen = DashInterruptPredictLog.IsWindowOpen(unit, slowTarget, server);
+            if (best == null || (unitOpen && !open))
+            {
+                best = unit;
+                open = unitOpen;
+            }
+        }
+
+        inRange = best != null;
+        if (inRange || Data == null)
+            return best;
+
+        Vector3 center = owner.transform.position + offset;
+        int nearCount = Physics.OverlapSphereNonAlloc(center, PredictNearestRadius, predictResults,
+            Data.HittableLayers, QueryTriggerInteraction.Collide);
+        float bestDistance = float.MaxValue;
+        for (int i = 0; i < nearCount; i++)
+        {
+            Unit unit = predictResults[i] != null ? ResolveHitUnit(predictResults[i], out _) : null;
+            if (unit == null || unit == owner || FindSlowMotionTarget(unit) == null)
+                continue;
+            float distance = DashInterruptPredictor.PlanarDistance(center, unit.transform.position);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = unit;
+            }
+        }
+
+        open = best != null && DashInterruptPredictLog.IsWindowOpen(best, FindSlowMotionTarget(best), server);
+        return best;
     }
 
     public override void OnServerStart(Vector3 direction, Unit target)
@@ -215,6 +338,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // 모든 피어에서 불리지만 발동 기록은 서버에만 있다. 판정 전 종료(완료·취소·사망)면 실패 사건 → 디렉터가 실패 복귀.
     public override void OnEnd(SkillEndReason reason)
     {
+        predictLog.Abort(reason.ToString()); // 판정 전 종료만 남는다(판정·인수인계 뒤면 이미 닫힘)
         attachedToDash = false;
         pendingHit = false;
         pendingEnd = false;
@@ -296,6 +420,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         int hitCount = OverlapHitboxAnchor(hitResults);
+        Unit predictTarget = null;      // 예측 로그(할 일 116) — 판정 범위 안 첫 간파 대상과 그 순간 창
+        bool predictTargetOpen = false;
         hitTargets.Clear();
         landedUnits.Clear();
         bool onHitBonusTaken = false;
@@ -337,6 +463,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
             int successBefore = slowTarget != null ? slowTarget.ServerInterruptSuccessCount : 0;
             bool openAtHit = slowTarget != null && slowTarget.ServerIsInterruptible; // 측정 전용 읽기
+            if (slowTarget != null && (predictTarget == null || (openAtHit && !predictTargetOpen)))
+            {
+                predictTarget = unit;
+                predictTargetOpen = openAtHit;
+            }
             // 보정 시각 창 상태도 수신 전에 읽는다 — 성공하면 수신 안에서 창이 소비돼 같은 서버 시각에 닫힘이 기록된다(지연 0 이면 보정 시각 = 판정 시각).
             InterruptWindowState correctedWindow =
                 slowTarget != null ? lagHit.CorrectedWindowOf(unit) : InterruptWindowState.Unknown;
@@ -372,6 +503,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
                 hasSuccessTargetPosition, successTargetPosition));
         ReportLag(lagHit);
+        if (predictLog.IsActive)
+            predictLog.Resolve(owner.transform.position, Time.time, interruptSucceeded, predictTarget, predictTargetOpen);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
         if (interruptSucceeded)

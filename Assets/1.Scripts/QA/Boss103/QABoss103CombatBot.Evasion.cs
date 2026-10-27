@@ -558,6 +558,7 @@ public sealed partial class QABoss103CombatBot
 
     private void TickCounter(Player me, Vector3 myPos, float surface, double now)
     {
+        TickDashInterrupt(me);   // 할 일 116 — 진행 중인 대쉬 간파 두 번째 입력·결과
         bool open = _boss.CounterWindowOpen;
         if (open && !_windowWas)
             OnCounterOpen(me, myPos, surface, now);
@@ -622,6 +623,8 @@ public sealed partial class QABoss103CombatBot
     /// </summary>
     private bool CounterHoldsBot(Player me, Vector3 myPos, double now)
     {
+        if (DashInterruptHoldsBot)
+            return true;   // 할 일 116 — 대쉬 간파 진행 중(입력은 TickDashInterrupt 가 잡고 있다)
         if (!_counterPending || !_counterHit || _counterWaitClose)
             return false;
         StopHold();
@@ -684,6 +687,7 @@ public sealed partial class QABoss103CombatBot
         }
 
         _counterHit = QABoss103Counter.RollHit(_counterRng, _profile.InterruptSuccessChance);
+        RollDashInterrupt();   // 할 일 116 — 이 창을 대쉬 간파로 누를지(따로 굴림, 성공 굴림 순서 불변)
         double closeAt = dashThreat != null
             ? dashThreat.DetectedAt + QABoss103HitTiming.DashLaunchDelay(dashThreat.LeadSeconds, dashThreat.GrowSeconds)
             : now + _window.EstimateMs() / 1000.0;
@@ -740,8 +744,10 @@ public sealed partial class QABoss103CombatBot
         Vector3 face = bossPos - myPos;
         if (movement != null)
             movement.RotateToward(face, 1000f);
-        bool ok = skills != null && skills.ExecuteTargetedSkill(PlayerSkillSlot.Interrupt, _boss, bossPos, true);
-        if (!ok && !final)
+        // 할 일 116 — 이 창이 대쉬 간파 굴림이면 그 순서로 누른다(대시 거부도 이 창의 표본 — 일반 간파로 다시 누르지 않는다).
+        bool dashPath = TryStartDashInterrupt(me, skills, bossPos, out bool dashCast);
+        bool ok = dashPath ? dashCast : skills != null && skills.ExecuteTargetedSkill(PlayerSkillSlot.Interrupt, _boss, bossPos, true);
+        if (!ok && !final && !dashPath)
         {
             _counterRetries++;
             return;
@@ -792,7 +798,7 @@ public sealed partial class QABoss103CombatBot
     private string EvasionDiag() =>
         $"threats={_threatsSeen} dodgeRolls={_ledger.Dodges} takeRolls={_ledger.Takes} dashes={_dashes} dashRejects={_dashRejects} guards={_guards} walks={_walks} " +
         $"guardRejects={_guardRejects} noCharge={_noCharges} blocked={_blocks} late={_late} lethalNoRoll={_lethalNoRoll} lethalMismatch={_lethalMismatch} " +
-        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips}";
+        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips} {DashInterruptDiag()}";
 
     private static string F0(double v) => double.IsNaN(v) ? "na" : v.ToString("F0", CultureInfo.InvariantCulture);
     private static string F2(double v) => double.IsNaN(v) ? "na" : v.ToString("F2", CultureInfo.InvariantCulture);

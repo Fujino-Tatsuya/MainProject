@@ -89,6 +89,8 @@ public static class QABoss103Bot
         Counter = 5,
         /// <summary>할 일 119 C2 툴팁 규칙 E 사용 굴림(<c>QABoss103CombatBot.Rules.cs</c>) — Q·R 굴림 순서를 밀지 않게 따로.</summary>
         Rule = 6,
+        /// <summary>할 일 116 대쉬 간파 굴림(창 1개 1회 — 사용 여부·순서·누름 지연) — 간파 성공/실패 굴림 순서를 밀지 않게 따로.</summary>
+        DashInterrupt = 7,
     }
 
     /// <summary>봇 RNG 시드 = 판 시드 × 자리(0 팔라딘·1 어쌔신·2 거너) × 용도. 같은 값 = 같은 굴림 순서.</summary>

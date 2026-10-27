@@ -13,6 +13,8 @@ public sealed class QABoss103ReportInput
     public string RunsCsv = "", CharsCsv = "", PatternsCsv = "", GimmicksCsv = "";
     /// <summary>할 일 119 C3 — run_fail.csv(클리어 실패 사유). 없으면 빈칸.</summary>
     public string FailCsv = "";
+    /// <summary>할 일 116 — dash_predict.csv(대쉬 간파 예측 vs 서버 판정). 없으면 빈칸(섹션 생략).</summary>
+    public string DashPredictCsv = "";
     /// <summary>할 일 119 C3 — 비교 기준 배치(batch.txt compare_dir) 입력. 없으면 null(비교 표 대신 안내).</summary>
     public QABoss103ReportInput Compare;
     /// <summary>비교 기준 폴더 경로(표시용). 비면 비교 안 함.</summary>
@@ -317,6 +319,7 @@ public static class QABoss103Report
         sb.Append("<!DOCTYPE html>\n<html lang=\"ko\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
         sb.Append("<title>할 일 103 보스 밸런싱 QA 리포트</title>\n<style>").Append(Css).Append("</style></head>\n<body><main class=\"viz-root\">\n");
         Header(sb, c, input, batch);
+        DashPredictSection(sb, input);
         Comparison(sb, c, sums);
         PreviousComparison(sb, input, sums);
         FailTable(sb, c, input);
@@ -390,6 +393,11 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Row2(sb, "xlsx SVN 리비전", $"배치 시작 r{H(Val(batch, "xlsx_svn_rev", "na"))} · 판 기록 {H(revs.Count > 0 ? "r" + string.Join(", r", revs) : Dash)}" +
                                   (revs.Count > 1 ? " <span class=\"err\">— 배치 중 리비전이 바뀌었다</span>" : ""));
         Row2(sb, "git 커밋", $"{H(Val(batch, "git_commit", "na"))} ({H(Val(batch, "git_branch", "na"))}) · 판 기록 {H(commits.Count > 0 ? string.Join(", ", commits) : Dash)}");
+        if (batch.ContainsKey("svn_rev"))   // 할 일 116 배치 머리
+            Row2(sb, "SVN 리비전(작업 사본)", "r" + H(Val(batch, "svn_rev", "na")));
+        if (batch.ContainsKey("dash_interrupt_pct"))
+            Row2(sb, "대쉬 간파 비율", H(Val(batch, "dash_interrupt_pct", "0")) + "% — 간파 창마다 굴림, 순서 대시 → 우클릭 / 우클릭 → 대시 반반, 누름 = 창 × 0.1~0.7" +
+                                    (Val(batch, "minimize_windows", "0") == "1" ? " · 메인 에디터·가상 플레이어 창 최소화" : ""));
         Row2(sb, "Unity", H(Val(batch, "unity_version", "na")));
         Row2(sb, "기준 시드", H(Val(batch, "seed", "na")) + " · 판 시드 = 기준 시드 × 판 번호(재실행도 같은 시드)");
         Row2(sb, "측정 규칙", "부활 = F10 디버그 부활 경로(Soul 3초 뒤 봇이 요청, 1회 = 공용 목숨 1, 목숨 0 이면 거부 → 전멸 · run_chars qa_revives). " +
@@ -444,6 +452,93 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         sb.Append("<h3>야간 수정 사항</h3>\n");
         string fixes = (input.Fixes ?? "").Trim();
         sb.Append(fixes.Length > 0 ? "<pre>" + H(fixes) + "</pre>\n" : "<div class=\"muted\">없음 — 실행 중 고친 내용은 배치 폴더 fixes.md 에 적으면 여기에 그대로 보인다.</div>\n");
+    }
+
+    /// <summary>
+    /// 할 일 116 — 대쉬 간파 예측 적중률(dash_predict.csv). 적중 = 서버 시전 순간 예측(성공/실패) = 서버 실제 판정(성공 / 실패·대상 없음).
+    /// 중단(판정 전 종료)·시전 없음(봇 시도가 게임에 안 들어감)은 적중률에서 빼고 수만 보인다. 오너 열 = 원격 오너 관점 예측의 적중.
+    /// </summary>
+    private static void DashPredictSection(StringBuilder sb, QABoss103ReportInput input)
+    {
+        if (string.IsNullOrEmpty(input.DashPredictCsv))
+            return;
+        QABoss103CsvTable t = QABoss103CsvTable.Parse(input.DashPredictCsv);
+        if (t.Rows.Count == 0)
+            return;
+        QABoss116DashPredict.Summary s = QABoss116DashPredict.Summarize(t);
+        QABoss116DashPredict.Tally a = s.All;
+
+        sb.Append("<h2>116 대쉬 간파 예측 적중률</h2>\n");
+        sb.Append("<div class=\"sub\">예측 = 대쉬 간파 성립 순간(서버) '판정 시각에 보스가 간파 가능 + 판정 범위 안일 것' · 실제 = 서버 판정 결과. " +
+                  "판정 시각 = max(예상 대시 끝, 시작 + 평소 준비), 위치 = 지금 + 대시 방향 × 속도 × 남은 대시 시간</div>\n");
+        sb.Append("<div class=\"kpis\">");
+        Kpi(sb, Pct(a.Accuracy, 1), $"예측 적중률(서버, 판정 {a.Judged}건)");
+        Kpi(sb, a.PredSuccessActualFail.ToString(Inv), "예측 성공 → 실제 실패", a.PredSuccessActualFail > 0);
+        Kpi(sb, a.PredFailActualSuccess.ToString(Inv), "예측 실패 → 실제 성공", a.PredFailActualSuccess > 0);
+        Kpi(sb, Pct(a.OwnerAccuracy, 1), $"원격 오너 예측 적중률({a.OwnerJudged}건)");
+        Kpi(sb, a.Aborted.ToString(Inv), "판정 전 중단");
+        Kpi(sb, a.NoCast.ToString(Inv), "봇 시도 — 시전 없음");
+        sb.Append("</div>\n");
+
+        sb.Append("<table><thead><tr><th class=\"l\">묶음</th><th>행</th><th>판정</th><th>적중</th><th>적중률</th><th>예측 성공→실패</th><th>예측 실패→성공</th>" +
+                  "<th>오너 적중률</th><th>중단</th><th>시전 없음</th></tr></thead><tbody>\n");
+        TallyRow(sb, "전체", a);
+        sb.Append("<tr class=\"sec\"><td colspan=\"10\">순서별</td></tr>\n");
+        foreach (KeyValuePair<string, QABoss116DashPredict.Tally> kv in s.ByOrder)
+            TallyRow(sb, OrderLabel(kv.Key), kv.Value);
+        sb.Append("<tr class=\"sec\"><td colspan=\"10\">캐릭터별</td></tr>\n");
+        foreach (KeyValuePair<string, QABoss116DashPredict.Tally> kv in s.ByCharacter)
+            TallyRow(sb, Enum.TryParse(kv.Key, out QABoss103Character ch) ? CharLabel(ch) : kv.Key, kv.Value);
+        sb.Append("</tbody></table>\n");
+
+        sb.Append("<h3>어긋남 이유(많은 순)</h3>\n");
+        List<KeyValuePair<string, int>> top = s.TopMismatch();
+        if (top.Count == 0)
+            sb.Append("<div class=\"muted\">어긋난 판정 없음</div>\n");
+        else
+        {
+            sb.Append("<table><thead><tr><th class=\"l\">이유</th><th>건수</th></tr></thead><tbody>\n");
+            foreach (KeyValuePair<string, int> kv in top)
+                sb.Append("<tr><td class=\"l\">").Append(H(MismatchLabel(kv.Key))).Append("</td><td>").Append(kv.Value).Append("</td></tr>\n");
+            sb.Append("</tbody></table>\n");
+        }
+
+        sb.Append("<h3>봇 대쉬 간파 시도 결과</h3>\n<table><thead><tr><th class=\"l\">결과</th><th>건수</th></tr></thead><tbody>\n");
+        var outcomes = new List<KeyValuePair<string, int>>(s.BotOutcome);
+        outcomes.Sort((x, y) => x.Value != y.Value ? y.Value.CompareTo(x.Value) : string.CompareOrdinal(x.Key, y.Key));
+        foreach (KeyValuePair<string, int> kv in outcomes)
+            sb.Append("<tr><td class=\"l\">").Append(H(kv.Key)).Append("</td><td>").Append(kv.Value).Append("</td></tr>\n");
+        sb.Append("</tbody></table>\n");
+    }
+
+    private static void TallyRow(StringBuilder sb, string label, QABoss116DashPredict.Tally t)
+    {
+        sb.Append("<tr><td class=\"l\">").Append(H(label)).Append("</td><td>").Append(t.Rows).Append("</td><td>").Append(t.Judged)
+          .Append("</td><td>").Append(t.Match).Append("</td><td>").Append(Pct(t.Accuracy, 1))
+          .Append("</td><td>").Append(t.PredSuccessActualFail).Append("</td><td>").Append(t.PredFailActualSuccess)
+          .Append("</td><td>").Append(Pct(t.OwnerAccuracy, 1)).Append("</td><td>").Append(t.Aborted)
+          .Append("</td><td>").Append(t.NoCast).Append("</td></tr>\n");
+    }
+
+    public static string OrderLabel(string token) =>
+        token == "dash_rmb" ? "대시 → 우클릭" : token == "rmb_dash" ? "우클릭 → 대시" : token;
+
+    public static string MismatchLabel(string token)
+    {
+        switch (token)
+        {
+            case "dash_shortened": return "대시가 막혀 짧아짐 (dash_shortened)";
+            case "window_closed_before_resolve": return "판정 전에 보스 간파 창이 닫힘 (window_closed_before_resolve)";
+            case "resolve_delayed": return "판정이 예상보다 늦어 창이 닫힘 (resolve_delayed)";
+            case "window_opened_after_cast": return "시전 뒤 간파 창이 열림 (window_opened_after_cast)";
+            case "window_longer_than_estimated": return "창이 추정보다 오래 열림 (window_longer_than_estimated)";
+            case "target_moved": return "보스 이동 (target_moved)";
+            case "target_rotated": return "보스 회전 (target_rotated)";
+            case "out_of_range": return "범위·각도 판단 어긋남 (out_of_range)";
+            case "network_lag": return "원격 오너 — 지연 외 원인 못 찾음 (network_lag)";
+            case "aborted": return "판정 전 중단 (aborted)";
+            default: return "원인 불명 (" + token + ")";
+        }
     }
 
     /// <summary>할 일 119 규칙 변경점 요약(119-결정.md 1·2·4·5 + F10 목숨 소비) — 리포트 머리.</summary>
@@ -1330,6 +1425,7 @@ public static class QABoss103ReportFiles
             PatternsCsv = ReadOrEmpty(Path.Combine(dir, QABoss103Csv.PatternsFile)),
             GimmicksCsv = ReadOrEmpty(Path.Combine(dir, QABoss103Csv.GimmicksFile)),
             FailCsv = ReadOrEmpty(Path.Combine(dir, QABoss103FailReason.File)),
+            DashPredictCsv = ReadOrEmpty(Path.Combine(dir, QABoss116DashPredict.File)),
             Fixes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.FixesFile)),
             Notes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.LogFolder, NotesFile)),
             LoopState = loopState ?? "",

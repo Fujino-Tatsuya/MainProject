@@ -69,6 +69,70 @@ public sealed class InterruptWindowHistory
 
         return InterruptWindowState.Unknown;
     }
+
+    // ── 대쉬 간파 예측 로그(할 일 116) — 읽기 전용 질의, 판정 불변 ──
+
+    /// <summary><paramref name="serverTime"/> 에 창이 열려 있었으면 그 열림의 시작 시각. 닫힘·기록 없음이면 false.</summary>
+    public bool TryGetOpenSince(double serverTime, out double openSince)
+    {
+        openSince = 0d;
+        for (int i = _count - 1; i >= 0; i--)
+        {
+            int index = (_start + i) % _times.Length;
+            if (_times[index] > serverTime)
+                continue;
+            if (!_open[index])
+                return false;
+            openSince = _times[index];
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary><paramref name="serverTime"/> 뒤(초과) 첫 닫힘 기록 시각. 없으면 false.</summary>
+    public bool TryGetFirstCloseAfter(double serverTime, out double closeAt)
+    {
+        for (int i = 0; i < _count; i++)
+        {
+            int index = (_start + i) % _times.Length;
+            if (_times[index] > serverTime && !_open[index])
+            {
+                closeAt = _times[index];
+                return true;
+            }
+        }
+
+        closeAt = 0d;
+        return false;
+    }
+
+    /// <summary>
+    /// 링버퍼에 남은 완결된 열림 구간(열림 → 바로 다음 닫힘) 길이의 중앙값. 구간이 없으면 false.
+    /// 간파 성공으로 일찍 닫힌 구간도 섞인다 — 추정용이다.
+    /// </summary>
+    public bool TryGetTypicalOpenDuration(out double duration)
+    {
+        var lengths = new List<double>(_count);
+        for (int i = 0; i + 1 < _count; i++)
+        {
+            int a = (_start + i) % _times.Length;
+            int b = (_start + i + 1) % _times.Length;
+            if (_open[a] && !_open[b])
+                lengths.Add(_times[b] - _times[a]);
+        }
+
+        if (lengths.Count == 0)
+        {
+            duration = 0d;
+            return false;
+        }
+
+        lengths.Sort();
+        int mid = lengths.Count / 2;
+        duration = lengths.Count % 2 == 1 ? lengths[mid] : (lengths[mid - 1] + lengths[mid]) * 0.5;
+        return true;
+    }
 }
 
 /// <summary>간파 지연 판정 계산. 순수 함수 — 실제 판정 결과는 바꾸지 않고 "지연만큼 당겨 판정했으면" 만 계산한다.</summary>

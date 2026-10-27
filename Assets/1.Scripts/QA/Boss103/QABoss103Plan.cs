@@ -311,6 +311,8 @@ public sealed class QABoss103Config
     public int Retry;
     /// <summary>C6 연속 루프 판(0/1) — 1 이면 호스트가 런타임 데이터 출처가 테이블이 아닐 때 그 판을 Error(data_source)로 끝낸다.</summary>
     public int Batch;
+    /// <summary>할 일 116 — 간파 창마다 대쉬 간파를 쓸 확률(%, 0~100). 0 = 지금처럼 일반 간파만(103·119 배치).</summary>
+    public int DashInterruptPct;
 
     public int RunSeed => QABoss103Plan.RunSeed(Seed, Run);
 
@@ -320,7 +322,8 @@ public sealed class QABoss103Config
     public bool HasOut => !string.IsNullOrEmpty(OutDir);
 
     public string Format() =>
-        $"seed={Seed}\nrun={Run}\ntier={(Tier.HasValue ? Tier.Value.ToString() : "auto")}\nretry={Retry}\n" + (Batch != 0 ? "batch=1\n" : "") + (HasOut ? $"out={OutDir}\n" : "");
+        $"seed={Seed}\nrun={Run}\ntier={(Tier.HasValue ? Tier.Value.ToString() : "auto")}\nretry={Retry}\n" + (Batch != 0 ? "batch=1\n" : "") +
+        (DashInterruptPct != 0 ? $"dashint={DashInterruptPct}\n" : "") + (HasOut ? $"out={OutDir}\n" : "");
 
     public static bool TryParse(string text, out QABoss103Config cfg)
     {
@@ -377,6 +380,11 @@ public sealed class QABoss103Config
             else if (key == "batch")
             {
                 cfg.Batch = v != 0 ? 1 : 0;
+                any = true;
+            }
+            else if (key == "dashint")
+            {
+                cfg.DashInterruptPct = Math.Max(0, Math.Min(100, v));
                 any = true;
             }
         }

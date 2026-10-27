@@ -67,6 +67,10 @@ public static class InterruptLagMonitor
             ? history.StateAt(serverTime)
             : InterruptWindowState.Unknown;
 
+    /// <summary>[서버] 그 소유자의 창 기록(읽기 전용 질의용 — 대쉬 간파 예측 로그, 할 일 116). 없으면 null.</summary>
+    public static InterruptWindowHistory HistoryOf(GameObject owner) =>
+        owner != null && Histories.TryGetValue(owner, out InterruptWindowHistory history) ? history : null;
+
     /// <summary>[서버] 보낸 클라의 RTT(ms). 호스트 자신 = 0.</summary>
     public static double RttMs(ulong clientId)
     {

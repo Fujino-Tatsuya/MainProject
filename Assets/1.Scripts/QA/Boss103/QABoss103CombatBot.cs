@@ -165,6 +165,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         _driver.ReleaseBasic();
         StopHold();
         FlushEvasion(reason);
+        AbortDashInterrupt(reason);
         FlushGimmick(reason);
         _move = QABoss103Bot.Move.Hold;
     }
@@ -547,6 +548,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         ReleaseGuard();
         _sensor.Unbind();
         RestoreDashMode();
+        ReleaseDashInterrupt();
         _driver.Release();
         if (_input != null)
         {

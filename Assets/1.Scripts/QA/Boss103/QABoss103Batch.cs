@@ -46,6 +46,11 @@ public static class QABoss103Batch
     public const string CompareDirDefault = "C:/UnityProject/QA/103-20261027_0057";
     public const string Prefix103 = "103";
     public const string Prefix119 = "119";
+    /// <summary>할 일 116 — 대쉬 간파 예측 적중률 배치(10판, 폴더 <c>116-…</c>).</summary>
+    public const int TotalRuns116 = 10;
+    public const string Prefix116 = "116";
+    /// <summary>할 일 116 — 간파 창마다 대쉬 간파를 쓸 확률(%) — 판당 대쉬 간파 표본이 일반 간파보다 많게.</summary>
+    public const int DashInterruptPct116 = 60;
     /// <summary>오류 판 재실행 횟수(끝에서 1회).</summary>
     public const int MaxRetry = 1;
 
@@ -364,7 +369,7 @@ public static class QABoss103Batch
         if (dash <= 0 || dash + 1 >= folderName.Length || !char.IsDigit(folderName[dash + 1]))
             return null;
         string head = folderName.Substring(0, dash);
-        return head == Prefix103 || head == Prefix119 ? folderName.Substring(dash + 1) : null;
+        return head == Prefix103 || head == Prefix119 || head == Prefix116 ? folderName.Substring(dash + 1) : null;
     }
 
     /// <summary>심장박동 파일 — <c>&lt;배치&gt;/hb/run&lt;n&gt;_r&lt;retry&gt;_&lt;역할&gt;.txt</c>(역할 = host · client-mppm…).</summary>

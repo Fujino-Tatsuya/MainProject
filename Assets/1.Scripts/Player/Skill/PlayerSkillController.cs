@@ -439,6 +439,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return false;
 
         isRequestingSkill = true;
+        // 예측 로그(할 일 116, 원격 오너 관점) — 요청 순간. 서버 관점은 승인 때 따로 남는다.
+        if (!IsServer)
+            ((PlayerInterruptSkillBase)skill).LogDashPredictCast(false, DashInterruptOrder.DashThenInterrupt,
+                stateController != null ? stateController.ActiveDash : null, Time.time);
         RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
             player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
@@ -589,10 +593,15 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         activeDashAttachTime = Time.time;
         if (HasGameplayAuthority && skill is PlayerInterruptSkillBase interrupt)
+        {
             interrupt.OnTransferredToDash();
+            interrupt.LogDashPredictCast(true, DashInterruptOrder.InterruptThenDash, dashState, activeStartTime); // 예측 로그(할 일 116)
+        }
 
         if (IsNetworkActive && IsOwner && !IsServer)
         {
+            if (skill is PlayerInterruptSkillBase ownerInterrupt) // 예측 로그(할 일 116, 원격 오너 관점)
+                ownerInterrupt.LogDashPredictCast(false, DashInterruptOrder.InterruptThenDash, dashState, activeStartTime);
             ownerTransferAwaitingVerdict = skill;
             RequestUseSkillRpc(skill.Slot, GetSkillIndex(skill), dashState.Direction, default, Vector3.zero, false,
                 player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
@@ -699,6 +708,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (skill == null || activeSkill != skill)
             return;
 
+        (skill as PlayerInterruptSkillBase)?.LogDashPredictHandOff(); // 예측 로그(할 일 116) — 이 피어의 실제 대시 끝
         if (skill.Data != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
             dash?.HandOffDashInterruptToBase(skill.Data.AnimatorStateName);
 
@@ -861,7 +871,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         // 우클릭 → 대시 전환은 Hit 전까지만(할 일 115 §12) — 오너는 판정을 모르므로 자기 애니메이터의 Hit 으로 본다.
         if (eventType == SkillAnimationEventType.Hit && activeSkill != null)
+        {
+            if (!activeHitEventSeen && activeSkill is PlayerInterruptSkillBase interrupt)
+                interrupt.NotePrepObserved(Time.time - activeStartTime); // 예측 로그(할 일 116) 준비 시간 관측
             activeHitEventSeen = true;
+        }
 
         activeSkill?.OnLocalAnimationEvent(eventType);
 
@@ -946,6 +960,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return true;
         }
 
+        if (dashInterrupt && skill is PlayerInterruptSkillBase dashInterruptSkill) // 예측 로그(할 일 116, 서버 관점)
+            dashInterruptSkill.LogDashPredictCast(true, DashInterruptOrder.DashThenInterrupt, dashState, Time.time);
         PlaySkillPresentation(skill, direction, dashInterrupt);
 
         if (IsNetworkActive)

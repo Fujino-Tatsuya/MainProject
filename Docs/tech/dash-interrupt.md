@@ -223,7 +223,28 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 
 ## 11. 범위 밖
 
-- 116(간파 예측 로그)·117(성공 예측 연출)은 이 작업 범위 밖이다. 116 은 §5 의 예측 오프셋 값을 그대로 기록하면 된다.
+- 117(성공 예측 연출)은 이 작업 범위 밖이다. 116 예측 로그는 §13.
+
+## 13. 예측 판정 로그 `[DashPredict]` (할 일 116 — 로그만, qa/DashInterruptPredict116)
+
+시전 순간 예측과 서버 실제 판정을 함께 남겨 117(시전 즉시 성공 예측 연출)의 근거로 쓴다. **판정·타이밍·네트워크는 바꾸지 않는다** — 새 RPC 없음.
+`DashInterruptPredictLog.Enabled`(기본 꺼짐)일 때만 계산·기록한다. QA 봇이 `dashint` > 0 판에서 켠다.
+
+- 순수 계산 `Player/Dash/DashInterruptPrediction.cs`(`DashInterruptPredictor`, 117 재사용) — 테스트 `DashInterruptPredictionTests`.
+  - 예상 대시 끝 = 지금 위치 + 대시 방향 × 속도 × 이 피어 남은 대시 시간(§5 와 같은 직선, 막힘 모름).
+  - 예상 판정 시각 = max(예상 대시 끝, t0 + 평소 준비). t0 = 대시 → 우클릭은 승인(오너는 요청) 시각, 우클릭 → 대시는 처음 승인 시각. 평소 준비 = 이 피어에서 관측한 시작 → Hit(`prepSrc=observed`), 첫 관측 전엔 SO `HitDelay`.
+  - 예측 성공 = 예상 대시 끝에서 판정 앵커 오버랩 안에 간파 대상(`IInterruptSlowMotionTarget`) + 지금 창 열림 + (추정 남은 창 ≥ 판정까지 남은 시간). 남은 창 = 서버 창 기록(`InterruptWindowHistory` 완결 구간 중앙값 − 열린 뒤 경과), 모르면 열림만으로 성공.
+  - 어긋남 분류(`ClassifyMismatch`) = 중단 → 대시 짧아짐(0.3m) → 창 닫힘 / 판정 지연(0.05초) → 대상 이동(0.5m)·회전(20°) → 원격 지연 → 범위 판단.
+- 연결(`PlayerInterruptSkillBase.LogDashPredictCast`·`LogDashPredictHandOff`, `ResolveHit`·`OnEnd`): 서버 = `StartSkillServer`(대시 → 우클릭)·`CompleteDashTransfer`(우클릭 → 대시), 원격 오너 = `TryUseDashInterrupt` 요청·`CompleteDashTransfer`. 원격 오너의 창은 복제값(23호 `CounterWindowOpen`·허수아비)만 읽고 남은 창은 모른다(`winSrc=none`).
+
+| 줄 | 주요 키 |
+|---|---|
+| `event=cast` (서버·원격 오너) | `side` `castId`(s/o + clientId + 순번) `clientId` `host` `serverT` `castServerT` `skill` `order`(dash_rmb·rmb_dash) `castPos` `dashDir` `dashSpeed` `dashRemainS` `skillAgeS` `prepS` `prepSrc` `predEndPos` `predDashEndInS` `predResolveInS` `target` `targetInRange` `targetOpen` `winOpenForS` `winExpDurS` `winRemainS` `winSrc` `distM` `angleDeg` `predict` `predReason` |
+| `event=judge` (서버) | `predict` `predReason` `result`(success·fail·no_target·aborted) `match` `mismatch` `abortReason` `resolveInS` `predResolveInS` `timeErrS` `dashEndInS` `predDashEndInS` `resolvePos` `predEndPos` `posErrM` `shortfallM` `targetInRange` `targetOpenAtResolve` `winCloseAfterCastS` `targetMoveM` `targetYawDeg` `distM` `angleDeg` `rttMs` |
+| `event=handoff` / `event=abort` (원격 오너) | 오너가 본 대시 끝 `dashEndInS` `pos` `posErrM` `shortfallM` / 판정 전 종료 `reason` |
+
+- 시각은 시전 기준 상대 초(`…InS`), 위치는 `x,z`. 오너 줄과 서버 줄은 `clientId` + `castServerT` 가장 가까운 것(0.5초 안)으로 묶는다(QA `QABoss116DashPredict`).
+- QA: 봇 규칙·`dash_predict.csv`·리포트 섹션·10판 메뉴 `Tools/QA/103/Batch/Start 10 (116 — 대쉬 간파 예측)` — 코드 주석(`QABoss103CombatBot.DashInterrupt.cs`·`QABoss116DashPredict.cs`).
 
 ## 12. 관련 파일
 

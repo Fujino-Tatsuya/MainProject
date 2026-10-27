@@ -90,6 +90,15 @@ public static class QABoss103BatchRunner
     public static void Start30() =>
         StartBatch(QABoss103Batch.Prefix119, QABoss103Batch.TotalRuns119, "할 일 119 3인 보스전(웰즈&23호 B) QA 봇 2차 — 30판", CompareDir);
 
+    /// <summary>
+    /// 할 일 116 — 대쉬 간파 예측 적중률 10판(보통→숙련→초보 번갈아, 기준 시드 103). 폴더 <c>116-yyyyMMdd_HHmm</c>.
+    /// 봇이 간파 창마다 <see cref="QABoss103Batch.DashInterruptPct116"/>% 로 대쉬 간파(대시 → 우클릭 / 우클릭 → 대시 반반)를 쓰고,
+    /// 판마다 dash_predict.csv 에 예측 vs 서버 판정이 쌓인다. 시작 때 메인 에디터·가상 플레이어 창을 최소화한다(<see cref="QAWindowMinimizer"/>).
+    /// </summary>
+    [MenuItem(Root + "Start 10 (116 — 대쉬 간파 예측)", priority = 98)]
+    public static void Start10DashPredict() =>
+        StartBatch(QABoss103Batch.Prefix116, QABoss103Batch.TotalRuns116, "할 일 116 대쉬 간파 예측 판정 QA — 10판", null, QABoss103Batch.DashInterruptPct116);
+
     [MenuItem(Root + "Compare Folder (119 비교 기준)...", priority = 106)]
     public static void ChooseCompareDir()
     {
@@ -105,10 +114,12 @@ public static class QABoss103BatchRunner
     /// <summary>할 일 119 C3 — 비교 기준 배치 폴더(설정값, 기본 <see cref="QABoss103Batch.CompareDirDefault"/>).</summary>
     public static string CompareDir => EditorPrefs.GetString(CompareDirKey, QABoss103Batch.CompareDirDefault);
 
-    private static void StartBatch(string prefix, int total, string title, string compareDir)
+    private static void StartBatch(string prefix, int total, string title, string compareDir, int dashIntPct = 0)
     {
         if (!CanStart())
             return;
+        if (dashIntPct > 0)
+            QAWindowMinimizer.MinimizeMainEditor("batch_start");   // 할 일 116 — 사용자 요청: 창 최소화(실패해도 계속)
         DateTime at = DateTime.Now;
         string dir = $"{QAScenario103Menu.QARoot}/{QABoss103Batch.BatchFolderName(at, prefix)}";
         if (Directory.Exists(dir))
@@ -129,12 +140,21 @@ public static class QABoss103BatchRunner
         };
         if (!string.IsNullOrEmpty(compareDir))
             batch.Add(KV("compare_dir", compareDir));
+        if (dashIntPct > 0)
+        {
+            // 할 일 116 — 리포트 머리: 작업 사본 SVN 리비전·대쉬 간파 비율·창 최소화.
+            batch.Add(KV("svn_rev", QABoss103RunCsv.SvnWorkingRevision()));
+            batch.Add(KV("dash_interrupt_pct", dashIntPct.ToString(CultureInfo.InvariantCulture)));
+            batch.Add(KV("minimize_windows", "1"));
+        }
         File.WriteAllText(Path.Combine(dir, QABoss103Batch.BatchFile), QABoss103Batch.FormatKeyValues(batch));
         _state = new Dictionary<string, string>(StringComparer.Ordinal);
         _stateDir = dir;
         Set("state", "prepare");
         Set("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture));
         Set("total", total.ToString(CultureInfo.InvariantCulture));
+        Set("dashint", dashIntPct.ToString(CultureInfo.InvariantCulture));
+        Set("minimize", dashIntPct > 0 ? "1" : "0");
         SetTime("notBefore", Now);
         Arm(dir);
         Log($"배치 시작 {dir} — {total}판 · 기준 시드 {Get("seed")} · 데이터 출처 테이블 · xlsx r{Find(batch, "xlsx_svn_rev")} · git {Find(batch, "git_commit")}" +
@@ -236,6 +256,7 @@ public static class QABoss103BatchRunner
 
     [MenuItem(Root + "Start 90", true)]
     [MenuItem(Root + "Start 30 (119 — 단계별 10판)", true)]
+    [MenuItem(Root + "Start 10 (116 — 대쉬 간파 예측)", true)]
     [MenuItem(Root + "Resume Last", true)]
     [MenuItem(Root + "Resume (Choose Folder)...", true)]
     private static bool CanStartCheck() => !Running;
@@ -459,7 +480,10 @@ public static class QABoss103BatchRunner
         Set("endAt", "0");
         Set("state", "starting");
         _netMismatch = null;
-        Log($"판 {run}{(retry > 0 ? " 재실행" : "")} 시작 — 단계 {QABoss103Batch.TierLabel(cfg.BotTier)} · 판 시드 {cfg.RunSeed} · 설정 {written}곳");
+        Log($"판 {run}{(retry > 0 ? " 재실행" : "")} 시작 — 단계 {QABoss103Batch.TierLabel(cfg.BotTier)} · 판 시드 {cfg.RunSeed} · 설정 {written}곳" +
+            (cfg.DashInterruptPct > 0 ? $" · 대쉬 간파 {cfg.DashInterruptPct}%" : ""));
+        if (Get("minimize") == "1")
+            QAWindowMinimizer.MinimizeVirtualPlayers("run_start");   // 할 일 116 — 실패해도 계속
         if (!QAScenario48Menu.Run(QALobbyScenarios.Boss103Id, 3))
             Log("Play 시작 요청이 거절됐다(이미 Play 중) — 시작 상한까지 기다린다.");
     }
@@ -470,6 +494,12 @@ public static class QABoss103BatchRunner
         {
             SetTime("playAt", Now);
             Set("state", "running");
+            if (Get("minimize") == "1")
+            {
+                // 할 일 116 — Play 진입 때 창이 다시 뜰 수 있어 한 번 더(포커스 안 뺏음, 실패해도 계속).
+                QAWindowMinimizer.MinimizeVirtualPlayers("play");
+                QAWindowMinimizer.MinimizeMainEditor("play");
+            }
             return;
         }
         if (Seconds("attemptAt") > QABoss103Batch.PlayStartTimeoutSeconds && !EditorApplication.isPlayingOrWillChangePlaymode)
@@ -610,6 +640,7 @@ public static class QABoss103BatchRunner
         OutDir = _stateDir,
         Retry = retry,
         Batch = 1,
+        DashInterruptPct = GetInt("dashint", 0),
     };
 
     private static List<QABoss103Attempt> Attempts(string dir)

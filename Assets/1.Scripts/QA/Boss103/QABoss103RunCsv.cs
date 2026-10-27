@@ -109,6 +109,21 @@ public static class QABoss103RunCsv
                 rows += QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss103FailReason.File), QABoss103FailReason.Header, new[] { fail });
                 Debug.Log($"{Tag} event=run_fail run={cfg.Run} retry={cfg.Retry} outcome={rec.Outcome} pattern={QABoss103Plan.Token(fail[Array.IndexOf(QABoss103FailReason.Header, "fail_pattern")])}");
             }
+            // 할 일 116 — 대쉬 간파 예측(판 파일 dp·dashint 줄) → dash_predict.csv. 대쉬 간파를 켠 판만.
+            if (cfg.DashInterruptPct > 0)
+            {
+                var dpLines = new List<string>();
+                for (int s = 0; s < 3; s++)
+                {
+                    List<string> lines = SafeRead(QABoss103PartFile.PartPath(cfg.OutDir, cfg.Run, cfg.Retry, s));
+                    if (lines != null)
+                        dpLines.AddRange(lines);
+                }
+                List<string[]> dpRows = QABoss116DashPredict.BuildRows(meta.Key(), dpLines);
+                if (dpRows.Count > 0)
+                    rows += QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss116DashPredict.File), QABoss116DashPredict.Header, dpRows);
+                Debug.Log($"{Tag} event=dash_predict_csv run={cfg.Run} retry={cfg.Retry} rows={dpRows.Count}");
+            }
             string parts = stats != null && stats.Started ? stats.PartsNote() : "";
             Debug.Log($"{Tag} event=run_csv path={QABoss103Plan.Token(cfg.OutDir)} rows={rows} run={cfg.Run} retry={cfg.Retry} outcome={rec.Outcome} " +
                       $"dataSource={meta.DataSource} xlsxRev={meta.XlsxSvnRev} git={meta.GitCommit} parts={(parts.Length > 0 ? QABoss103Plan.Token(parts) : "ok")}");
@@ -138,6 +153,10 @@ public static class QABoss103RunCsv
     /// <summary>xlsx 원본(SVN) 마지막 변경 리비전. 실패 = na.</summary>
     public static string XlsxRevision() =>
         Shell("svn", $"info --non-interactive --show-item last-changed-revision \"{Path.Combine(QANetSim88.OwnRoot, XlsxRelative)}\"");
+
+    /// <summary>할 일 116 — SVN 작업 사본 리비전(아트 폴더 <c>Assets/50.Art</c> = SVN 체크아웃). 실패 = na.</summary>
+    public static string SvnWorkingRevision() =>
+        Shell("svn", $"info --non-interactive --show-item revision \"{Path.Combine(QANetSim88.OwnRoot, "Assets/50.Art")}\"");
 
     /// <summary>git 짧은 커밋. 실패 = na.</summary>
     public static string GitCommit() => Shell("git", "rev-parse --short HEAD");
