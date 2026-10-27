@@ -192,6 +192,23 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         gates.Add(new GateState { SlotID = slotID, ActivatedMask = 0, OpenStartServerTime = -1d });
     }
 
+    /// <summary>
+    /// [모든 피어] 이 맵에 등록된 다리 게이트 중 SlotID 가 가장 작은 것(튜토리얼은 ZoneL_typeB 하나뿐) — 4구역 소개 연출의 카메라 기준점(패널·다리 조각).
+    /// 등록된 게이트가 없으면 false. SlotID 는 시드 배치라 모든 피어에서 같다.
+    /// </summary>
+    public bool TryGetFirstGate(out ZoneBridgeGate gate)
+    {
+        gate = null;
+        int best = int.MaxValue;
+        foreach (KeyValuePair<int, ZoneBridgeGate> pair in _localGates)
+        {
+            if (pair.Value == null || pair.Key >= best) continue;
+            best = pair.Key;
+            gate = pair.Value;
+        }
+        return gate != null;
+    }
+
     public void UnregisterGate(ZoneBridgeGate gate)
     {
         if (gate == null) return;

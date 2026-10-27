@@ -331,6 +331,7 @@ public sealed partial class TutorialDirector : NetworkBehaviour
         _players.OnListChanged += HandlePlayersChanged;
         _counters.OnListChanged += HandleCountersChanged;
         _timerHudShown.OnValueChanged += HandleBoolChanged;
+        EnsureZone4IntroPresentation();   // 4구역 소개 연출 표시(모든 피어) — TutorialDirector.Zone4Intro.cs
 
         // 🔴 스폰 순서가 보장되지 않는다 — 맵 생성(MapNetworkSync.OnNetworkSpawn 이 시작)이 이 스폰보다 먼저일 수 있다.
         //    그때 받은 생성 이벤트는 보류해 뒀다가 여기서 한 번만 적용한다(스폰 전 NetworkList 쓰기는 조용히 버려진다).

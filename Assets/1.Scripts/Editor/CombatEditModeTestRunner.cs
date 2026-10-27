@@ -35,11 +35,13 @@ internal static class CombatEditModeTestRunner
         "^BossRelayRoster", // BossRelayRosterTests — 레이드 간파 릴레이 명단·잠금(PLAN-boss-raid-relay)
         "^BossChainCounter", // BossChainCounterRulesTests — 레이드 연쇄 간파 회차·순번·결과
         "^BossIntroRules", // BossIntroRulesTests — 등장 시네마틱 대열·스킵 투표·홀드(PLAN-boss-encounter-cutscene)
+        "^CinematicRules", // CinematicRulesTests — 연출 대사 한 줄 나누기·조각 스케줄·샷 타임라인·구도(PLAN-zone4-intro-cinematic)
         "^BossHealthIntroFill", // BossHealthIntroFillTests — 보스 HP바 등장 차오름(1/4 → 최대)
         "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
         "^MonsterSkyStrike", // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
         "^MonsterOverheadHealthBar", // MonsterOverheadHealthBarVisibilityTests — 몬스터 발밑 체력바 표시·부착 판단
-        "^MonsterInspectorCatalog" // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
+        "^MonsterInspectorCatalog", // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
+        "^MonsterStatusEffectVfx" // MonsterStatusEffectVfxSetTests — 몬스터 머리 위 기절 이펙트 표(팔라딘 Q 경직)
     };
 
     const string Tag = "[CombatTests]";

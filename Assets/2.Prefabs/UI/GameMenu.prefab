@@ -102,7 +102,6 @@ GameObject:
   - component: {fileID: 7662351113808456355}
   - component: {fileID: 8518315242029962246}
   - component: {fileID: 9146037679235065731}
-  - component: {fileID: 8270949987532072586}
   - component: {fileID: 3287964480111362190}
   m_Layer: 5
   m_Name: GameMenu
@@ -149,7 +148,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
-  m_AdditionalShaderChannelsFlag: 0
+  m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
   m_SortingOrder: 900
@@ -194,23 +193,6 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!114 &8270949987532072586
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2573532171578181017}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ce36f73b8c6d9734aad09ae753cc3b4b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TitleScreenRaycaster
-  m_IgnoreReversedGraphics: 1
-  m_BlockingObjects: 0
-  m_BlockingMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
 --- !u!114 &3287964480111362190
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -225,10 +207,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameMenuController
   canvas: {fileID: 7662351113808456355}
   scaler: {fileID: 8518315242029962246}
-  screenRaycaster: {fileID: 9146037679235065731}
-  titleRaycaster: {fileID: 8270949987532072586}
   content: {fileID: 527588022174483028}
-  dim: {fileID: 5482556251726860466}
   pauseMenu: {fileID: 3359636021066585198}
   settingsBody: {fileID: 7326338895195442042}
   overlaySortingOrder: 900
@@ -385,6 +364,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7917656066826940604}
     m_Modifications:
+    - target: {fileID: 4871834514008884909, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_fontSize
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 4871834514008884909, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_enableAutoSizing
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4871834514008884909, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 6750605510204014584, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -465,9 +456,49 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7265594251193212117, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_fontSize
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 7265594251193212117, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_enableAutoSizing
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7265594251193212117, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8420910919190816272, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_fontSize
+      value: 48
+      objectReference: {fileID: 0}
+    - target: {fileID: 8420910919190816272, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 48
+      objectReference: {fileID: 0}
+    - target: {fileID: 8420910919190816272, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_enableAutoSizing
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8420910919190816272, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 8557447676287331962, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
       propertyPath: m_Name
       value: PauseMenu
+      objectReference: {fileID: 0}
+    - target: {fileID: 8870996114712074897, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_fontSize
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 8870996114712074897, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_enableAutoSizing
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8870996114712074897, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

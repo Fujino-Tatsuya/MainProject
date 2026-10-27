@@ -204,6 +204,10 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     private readonly NetworkVariable<int> skipVoteCount =
         new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 스킵 투표자 수 = 접속자 전원(관전자 포함 — 경석 10-26: 관전자도 연출을 보고 스킵에 동의한다). 연출 대상(EligibleCount)과 다르다.
+    private readonly NetworkVariable<int> skipVoterCount =
+        new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     // 지시 구간(Dialogue) 시작부터 카메라 복귀를 시작할 때까지(초) = 웰즈 지시 클립 길이 + 대기. 서버가 정해 복제한다(클라가 같은 순간에 블렌드를 시작하게).
     private readonly NetworkVariable<float> cameraReturnAt =
         new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -214,8 +218,11 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     /// <summary>등장 시네마틱 회차(전 피어).</summary>
     public int IntroSequence => introSequence.Value;
 
-    /// <summary>스킵 동의 수(전 피어) — 분모는 <see cref="EligibleCount"/>.</summary>
+    /// <summary>스킵 동의 수(전 피어) — 분모는 <see cref="SkipVoterCount"/>.</summary>
     public int SkipVoteCount => skipVoteCount.Value;
+
+    /// <summary>스킵 투표자 수(전 피어) = 접속자 전원(관전자 포함). 전원 동의면 스킵.</summary>
+    public int SkipVoterCount => skipVoterCount.Value;
 
     /// <summary>[전 피어] 등장 시네마틱이 화면을 잡고 있는 단계(워크인~지시).</summary>
     public bool IsIntroCinematicActive => introEnabled && IsCinematicPhase(phase.Value);
@@ -263,6 +270,8 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     public static BossEncounterDirector Instance { get; private set; }
 
     private readonly List<ulong> _eligibleClientIds = new List<ulong>();
+    // [서버] 스킵 투표자 = 접속자 전원(관전자·영혼 포함). 잠금·워크인·인원 보정은 _eligibleClientIds 그대로(경석 10-26 D5).
+    private readonly List<ulong> _skipVoterIds = new List<ulong>();
 
     private BossTeleportManager _teleportManager;
     private NetworkObject _bossNetworkObject;
@@ -429,6 +438,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _commandSent = false;
         _skipVotes.Clear();
         skipVoteCount.Value = 0;
+        RefreshSkipVoters();
         if (_introRunning) introSequence.Value = introSequence.Value + 1;
 
         SetPhase(BossEncounterPhase.Preparing);
@@ -644,11 +654,12 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         double now = NetworkManager.ServerTime.Time;
         double elapsed = now - phaseStartServerTime.Value;
 
-        // 스킵 — 빠진 참가자의 표를 지우고, 남은 전원이 동의했으면 즉시 전투.
+        // 스킵 — 투표자(접속자 전원, 관전자 포함)를 새로 세고 나간 사람의 표를 지운다. 남은 전원이 동의했으면 즉시 전투.
         if (_introRunning)
         {
-            if (_skipVotes.Prune(_eligibleClientIds)) skipVoteCount.Value = _skipVotes.Count;
-            if (_skipVotes.IsUnanimous(_eligibleClientIds))
+            RefreshSkipVoters();
+            if (_skipVotes.Prune(_skipVoterIds)) skipVoteCount.Value = _skipVotes.Count;
+            if (_skipVotes.IsUnanimous(_skipVoterIds))
             {
                 SkipIntroServer();
                 return;
@@ -826,10 +837,19 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (phase.Value == BossEncounterPhase.Dialogue &&
             NetworkManager.ServerTime.Time - phaseStartServerTime.Value >= cameraReturnAt.Value)
             return;
-        if (!_skipVotes.TryVote(sender, _eligibleClientIds))
+        RefreshSkipVoters();
+        if (!_skipVotes.TryVote(sender, _skipVoterIds))
             return;
         skipVoteCount.Value = _skipVotes.Count;
-        Edit.Log($"[BossEncounter] 스킵 동의 — client {sender} ({_skipVotes.Count}/{_eligibleClientIds.Count}).", this);
+        Edit.Log($"[BossEncounter] 스킵 동의 — client {sender} ({_skipVotes.Count}/{_skipVoterIds.Count}).", this);
+    }
+
+    // [서버] 투표자 = 지금 접속한 전원. 영구 사망자는 관전 화면으로 연출을 보므로 넣는다(경석 10-26 — 10-23 "영구 사망 제외" 뒤집음).
+    private void RefreshSkipVoters()
+    {
+        _skipVoterIds.Clear();
+        if (NetworkManager != null) _skipVoterIds.AddRange(NetworkManager.ConnectedClientsIds);
+        if (skipVoterCount.Value != _skipVoterIds.Count) skipVoterCount.Value = _skipVoterIds.Count;
     }
 
     private void ClearIntroStateServer()

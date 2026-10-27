@@ -279,7 +279,7 @@ public static class SettingsPanelAuthoring
     }
 
     // 기존 볼륨 슬라이더 → 새 행 모양(왼쪽 라벨 캡슐 · 오른쪽 슬라이더 + "100%"). 라벨(MasterVolumeLabel 등)은 슬라이더 자식이던 것을
-    // 캡슐 안으로 옮긴다 — LocalizedText 가 붙은 그 오브젝트를 그대로 쓴다. VolumeSlider·TitleScreenSlider 는 손대지 않는다.
+    // 캡슐 안으로 옮긴다 — LocalizedText 가 붙은 그 오브젝트를 그대로 쓴다. VolumeSlider 는 손대지 않는다.
     static void AdoptSliderRow(RectTransform rows, Transform content, string name)
     {
         Transform t = AdoptExisting(rows, content, name, out RectTransform wrap);
@@ -448,8 +448,7 @@ public static class SettingsPanelAuthoring
         return row;
     }
 
-    // 🔴 기본 TMP_Dropdown 을 SettingsDropdown 으로 바꾸고 템플릿에 MonitorAwareRaycaster 를 미리 붙인다.
-    //    기본 드롭다운은 목록·차단막에 일반 GraphicRaycaster 를 붙여 타이틀 모니터 RT 에서 항목이 안 눌렸다(팀장 10-12 Play).
+    // 기본 TMP_Dropdown 을 SettingsDropdown 으로 바꾼다(목록 레이어 맞춤).
     static TMP_Dropdown DropdownRow(RectTransform rows, string name, string label)
     {
         NewRow(rows, name, label, out RectTransform slot);
@@ -469,8 +468,6 @@ public static class SettingsPanelAuthoring
         settings.captionText = caption;
         settings.itemText = item;
         settings.targetGraphic = target;
-        if (template != null && template.GetComponent<MonitorAwareRaycaster>() == null)
-            template.gameObject.AddComponent<MonitorAwareRaycaster>();   // RequireComponent 로 Canvas 도 붙는다
         return settings;
     }
 
@@ -490,8 +487,7 @@ public static class SettingsPanelAuthoring
         return tg.GetComponent<Toggle>();
     }
 
-    // 볼륨 슬라이더(TitleScreenSlider — 모니터 RT 드래그 좌표 보정)를 복제해 같은 모양·같은 보정을 쓴다.
-    // 일반 Slider 로 만들면 타이틀에서 드래그 값이 튄다. 모니터가 없는 씬(ESC)에서는 TitleScreenSlider 가 기본 동작.
+    // 볼륨 슬라이더를 복제해 같은 모양을 쓴다.
     static Slider _sliderTemplate;
 
     static Slider SliderRow(RectTransform rows, string name, string label, out TMP_Text valueText)

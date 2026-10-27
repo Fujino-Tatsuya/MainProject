@@ -484,11 +484,21 @@ public class BossDataSO : MonsterDataSO
              "필드 이름은 옛 Break 그대로(직렬화 유지). 간파 성공 그로기는 base 의 groggyDuration(1.5초)을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;
 
-    [Header("간파 게이지 · 제압 (팀 기획 09-28)")]
-    [Tooltip("간파 성공 한 번에 깎이는 간파 게이지(%). 100 에서 시작, 0 이면 제압. 임시 20(= 5회).")]
+    [Header("제압 칸 (전투 시스템 명세 10-14 §6)")]
+    [Tooltip("총 제압 칸. 꽉 찬 상태에서 시작해 0 이면 제압, 제압이 끝나면 다시 꽉 채운다. 임시 3.")]
+    [Min(1)] public int suppressSegmentCount = 3;
+
+    [Tooltip("간파 성공 한 번에 줄어드는 칸. 임시 1.")]
+    [Min(0)] public int counterSegmentStep = 1;
+
+    [Tooltip("환경 상호작용(취약 중 외곽 벽 충돌 · 증기 벤트) 한 번에 줄어드는 칸. 임시 1.")]
+    [Min(0)] public int environmentSegmentStep = 1;
+
+    [Header("간파 게이지 (훈련 스파링 TRAIN_03 전용 — 23호는 위 제압 칸을 쓴다)")]
+    [Tooltip("훈련 스파링만 읽는다. 간파 성공 한 번에 깎이는 게이지(%). 100 에서 시작, 0 이면 제압. 임시 20(= 5회).")]
     [Min(0f)] public float counterGaugeStep = 20f;
 
-    [Tooltip("환경 상호작용(취약 중 외곽 벽 충돌 · 증기 벤트) 한 번에 깎이는 간파 게이지(%). 임시 20.")]
+    [Tooltip("훈련 스파링만 읽는다. 벽 충돌 한 번에 깎이는 게이지(%). 임시 20.")]
     [Min(0f)] public float environmentGaugeStep = 20f;
 
     [Tooltip("제압 중 **플레이어가 주는** 최종 피해 배율. 벤트 등 환경 피해에는 적용하지 않는다. 임시 1.2.")]

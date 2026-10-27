@@ -33,6 +33,18 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
 
     public StatusEffectType Active => _active.Value;
 
+    /// <summary>
+    /// [전 피어] 활성 상태가 바뀔 때마다(적용·해제·만료) 난다 — 무엇이 바뀌었는지는 <see cref="Active"/> 로 다시 읽는다.
+    /// 플레이어 <c>StatusEffectController.EffectsChanged</c> 와 같은 모양이다(몬스터 머리 위 상태 이펙트가 받는다).
+    /// </summary>
+    public event System.Action EffectsChanged;
+
+    public override void OnNetworkSpawn() => _active.OnValueChanged += HandleActiveChanged;
+
+    public override void OnNetworkDespawn() => _active.OnValueChanged -= HandleActiveChanged;
+
+    void HandleActiveChanged(StatusEffectType previous, StatusEffectType current) => EffectsChanged?.Invoke();
+
     // 플래그별 만료 시각(서버 전용). float.PositiveInfinity = 무한.
     readonly Dictionary<StatusEffectType, float> _expiry = new Dictionary<StatusEffectType, float>();
 

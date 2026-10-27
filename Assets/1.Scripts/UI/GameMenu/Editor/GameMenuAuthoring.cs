@@ -61,10 +61,8 @@ public static class GameMenuAuthoring
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 1f;   // 타이틀 모니터 캔버스와 같다(세로 맞춤)
-            var screenRaycaster = root.AddComponent<GraphicRaycaster>();
-            var titleRaycaster = root.AddComponent<TitleScreenRaycaster>();
-            titleRaycaster.enabled = false;
+            scaler.matchWidthOrHeight = 1f;   // 세로 맞춤
+            root.AddComponent<GraphicRaycaster>();
             var controller = root.AddComponent<GameMenuController>();
 
             var content = new GameObject("Content", typeof(RectTransform), typeof(Image), typeof(UiModalBlocker));
@@ -90,10 +88,7 @@ public static class GameMenuAuthoring
             var so = new SerializedObject(controller);
             so.FindProperty("canvas").objectReferenceValue = canvas;
             so.FindProperty("scaler").objectReferenceValue = scaler;
-            so.FindProperty("screenRaycaster").objectReferenceValue = screenRaycaster;
-            so.FindProperty("titleRaycaster").objectReferenceValue = titleRaycaster;
             so.FindProperty("content").objectReferenceValue = content;
-            so.FindProperty("dim").objectReferenceValue = dim;
             so.FindProperty("pauseMenu").objectReferenceValue = pause.GetComponent<PauseMenuView>();
             so.FindProperty("settingsBody").objectReferenceValue = body.GetComponentInChildren<SettingsBodyView>(true);
             so.ApplyModifiedPropertiesWithoutUndo();
