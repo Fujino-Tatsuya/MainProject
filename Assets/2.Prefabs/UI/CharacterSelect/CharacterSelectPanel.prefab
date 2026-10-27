@@ -1075,8 +1075,6 @@ MonoBehaviour:
   cardContainer: {fileID: 3266460037222343103}
   backButton: {fileID: 4552508416195694960}
   confirmButton: {fileID: 8786704668615232629}
-  confirmLabel: {fileID: 0}
-  confirmKeyText: {fileID: 0}
   nameplatePortrait: {fileID: 2816666081188558494}
   nameplateName: {fileID: 103775641927378669}
   lockedText: {fileID: 6705437246068123017}
@@ -1639,6 +1637,7 @@ GameObject:
   - component: {fileID: 5168610579860503040}
   - component: {fileID: 3851827776987443880}
   - component: {fileID: 8786704668615232629}
+  - component: {fileID: 853291236555586085}
   m_Layer: 5
   m_Name: Chevron
   m_TagString: Untagged
@@ -1687,7 +1686,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -1716,7 +1715,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
-    m_Mode: 3
+    m_Mode: 0
     m_WrapAround: 0
     m_SelectOnUp: {fileID: 0}
     m_SelectOnDown: {fileID: 0}
@@ -1747,3 +1746,18 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &853291236555586085
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9049434716571421612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb64484ab69dfb94993890aaebe0ddde, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UiTriangleRaycastFilter
+  vertexA: {x: -0.04, y: 0.5}
+  vertexB: {x: 1, y: 1}
+  vertexC: {x: 1, y: 0}

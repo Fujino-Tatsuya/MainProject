@@ -25,10 +25,9 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("카드 부모(화면 가운데 기준). 카드는 런타임에 로스터 수만큼 복제한다 — 디자인용 카드를 두지 말 것.")]
     [SerializeField] private RectTransform cardContainer;
     [SerializeField] private Button backButton;
-    [Tooltip("마우스 확정 — Space 와 같은 Confirm(할 일 109). Navigation None 이어야 클릭 뒤 EventSystem 선택이 남지 않는다.")]
+    [Tooltip("마우스 확정 — SELECT 셰브론(Content/Chevron)의 Button, Space 와 같은 Confirm(할 일 109). " +
+             "Navigation None 이어야 클릭 뒤 EventSystem 선택이 남지 않는다. 클릭 영역 = UiTriangleRaycastFilter.")]
     [SerializeField] private Button confirmButton;
-    [SerializeField] private TMP_Text confirmLabel;
-    [SerializeField] private TMP_Text confirmKeyText;
 
     [Header("Nameplate (포커스된 캐릭터)")]
     [SerializeField] private Image nameplatePortrait;
@@ -219,10 +218,6 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             content.SetActive(true);
         if (hintText != null)
             hintText.text = CharacterSelectUiStrings.Hint.TextOr(hintText.text);
-        if (confirmLabel != null)
-            confirmLabel.text = CharacterSelectUiStrings.ConfirmButton.TextOr(confirmLabel.text);
-        if (confirmKeyText != null)
-            confirmKeyText.text = CharacterSelectUiStrings.ConfirmKey.TextOr(confirmKeyText.text);
         Redraw();
         SnapLayout();
         SetCountedOpen(true);
@@ -259,7 +254,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
     }
 
-    /// <summary>포커스된 카드로 확정(Enter·Space·가운데 카드 클릭·선택 버튼과 같은 길). 이동 중에도 받는다 — 대상은 논리상 가운데(<see cref="FocusedCharacterId"/>).</summary>
+    /// <summary>포커스된 카드로 확정(Enter·Space·가운데 카드 클릭·SELECT 셰브론 클릭과 같은 길). 이동 중에도 받는다 — 대상은 논리상 가운데(<see cref="FocusedCharacterId"/>).</summary>
     public CharacterSelectConfirmResult Confirm()
     {
         CharacterSelectConfirmResult result = Rules.Confirm();
@@ -502,7 +497,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
     }
 
-    /// <summary>선택 버튼 — Space 와 같은 Confirm. 키 입력과 같은 조건(열림·결과 패널 위 아님)에서만 받는다.</summary>
+    /// <summary>SELECT 셰브론 버튼 — Space 와 같은 Confirm. 키 입력과 같은 조건(열림·결과 패널 위 아님)에서만 받는다.</summary>
     private void OnConfirmButton()
     {
         // Navigation None 이라 클릭으로 선택되지 않지만, 혹시 남아 있으면 지운다 — 남으면 다음 Enter(Submit) 가 한 번 더 누른다.

@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 선택 버튼(할 일 109) — 실제 패널 프리팹을 프리뷰 씬에 올려 버튼 클릭이 Space 와 같은 <see cref="CharacterSelectPanel.Confirm"/> 결과를 내는지 본다.
+/// 선택 버튼 = SELECT 셰브론(할 일 109) — 실제 패널 프리팹을 프리뷰 씬에 올려 셰브론 클릭이 Space 와 같은 <see cref="CharacterSelectPanel.Confirm"/> 결과를 내는지 본다.
 /// 다른 캐릭터 = Chosen 한 번 · 잠금 = 거부(열린 채 잠금 강조) · 지금 캐릭터 = 그냥 닫힘.
 /// EditMode 에서는 Awake 가 돌지 않아 리스너 연결(Awake)을 직접 부른다 — 클릭은 Button.OnPointerClick(실제 마우스 클릭 경로).
 /// </summary>
@@ -61,12 +61,14 @@ public sealed class CharacterSelectConfirmButtonTests
     }
 
     [Test]
-    public void Prefab_ConfirmButton_NavigationNone_WithLabels()
+    public void Prefab_ConfirmButton_IsChevron_NavigationNone_TriangleHit()
     {
+        Assert.AreEqual("Chevron", _button.name, "선택 버튼 = SELECT 셰브론(Content/Chevron)");
         Assert.AreEqual(Navigation.Mode.None, _button.navigation.mode, "클릭 뒤 EventSystem 선택이 남지 않게");
-        var so = new SerializedObject(_panel);
-        Assert.IsNotNull(so.FindProperty("confirmLabel").objectReferenceValue);
-        Assert.IsNotNull(so.FindProperty("confirmKeyText").objectReferenceValue);
+        var image = _button.GetComponent<Image>();
+        Assert.AreSame(image, _button.targetGraphic);
+        Assert.IsTrue(image.raycastTarget, "Raycast Target 이 꺼져 있으면 클릭이 닿지 않는다");
+        Assert.IsNotNull(_button.GetComponent<UiTriangleRaycastFilter>(), "클릭 영역 = 삼각형");
     }
 
     [Test]
