@@ -33,6 +33,7 @@ MonoBehaviour:
     descendEase: 7
     fadeOutSeconds: 0.6
     fadeOutEase: 0
+    launchFastSpeed: 4
     hudRescanSeconds: 0.5
   map:
     holdSeconds: 0.3

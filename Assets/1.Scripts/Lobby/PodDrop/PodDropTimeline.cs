@@ -48,7 +48,7 @@ public struct PodDropLobbyTimings
     [Tooltip("발사 상태 이름(컨트롤러 Base Layer) — 해치 닫힘·갱도 문 열림·포드 하강이 한 클립. 가장 늦게 앉는 순간 처음부터 1배속으로 재생하고, " +
              "끝 프레임 클립 이벤트(PodClipEvent)에서 곧바로 로딩 화면으로 넘어간다(페이드 없음). 비우면 앉자마자 로딩")]
     public string launchState;
-    [Tooltip("발사 클립 가속 배율 — 발사 클립의 가속 이벤트(PodClipEvent 정수 인자 1, 기본 294프레임)부터 이 배율로 끝까지 재생한다(1 = 가속 없음). " +
+    [Tooltip("발사 클립 가속 배율 — 발사 클립의 가속 이벤트(PodClipEvent 정수 인자 1, 기본 213프레임)부터 이 배율로 끝까지 재생한다(1 = 가속 없음). " +
              "전환 프레임은 FBX 임포트 창 Animation 탭에서 이벤트를 옮겨 튜닝한다. 호스트 이벤트 시각을 서버가 복제해 클라도 같은 시점에 가속한다")]
     [Min(0.01f)] public float launchFastSpeed;
 
@@ -74,7 +74,7 @@ public struct PodDropLobbyTimings
         seatSlideSeconds = 0.4f,
         hatchState = "DP_HatchLobbyOpenClose",
         launchState = "DP_LaunchCycle",
-        launchFastSpeed = 3f,
+        launchFastSpeed = 4f,
         hudRescanSeconds = 0.5f,
     };
 }

@@ -90,7 +90,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private readonly NetworkVariable<double> _hatchOpenedAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // 발사 클립 가속 시각(서버시간) — 호스트 발사대의 가속 클립 이벤트(PodClipEvent 종류 1, 기본 294프레임)를 서버가 확정한 순간. 0 = 아직.
+    // 발사 클립 가속 시각(서버시간) — 호스트 발사대의 가속 클립 이벤트(PodClipEvent 종류 1, 기본 213프레임)를 서버가 확정한 순간. 0 = 아직.
     // 클라는 자기 이벤트로 곧바로 가속하고, 이벤트를 놓쳤거나 늦게 본 피어는 이 시각으로 클립 위치를 계산해 따라잡는다(할 일 106 추가 2). 서버 write / 모두 read.
     private readonly NetworkVariable<double> _launchFastAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -456,7 +456,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
     // Base Layer(0) 에 전신 클립을 이어 재생한다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.
     // 해치 클립은 순간이동 순간 처음부터, 이벤트 프레임에서 멈춤(이벤트 또는 서버 해치 열림 복제 중 먼저 온 것). 발사 클립은 가장 늦게 앉는 순간 처음부터 끝까지.
-    // 발사 클립은 가속 이벤트(기본 294프레임)부터 배율로 돈다 — 각 피어는 자기 이벤트로 곧바로 가속하고, 이벤트를 놓친 피어는 서버 가속 시각(복제)을 받는 순간 그 위치로 옮겨 가속한다.
+    // 발사 클립은 가속 이벤트(기본 213프레임)부터 배율로 돈다 — 각 피어는 자기 이벤트로 곧바로 가속하고, 이벤트를 놓친 피어는 서버 가속 시각(복제)을 받는 순간 그 위치로 옮겨 가속한다.
     // 늦게 처음 본 피어는 1배속 구간 + 가속 구간을 반영한 위치에서 시작한다(<see cref="PodDropLobbyTimeline.LaunchClipSecondsAt"/>).
     // 발사대 프리팹엔 콜라이더가 없다(바닥은 로비 레이아웃 PodLaunch_FloorCollider — 걷는 길이라 끄지 않는다).
     private void UpdateLauncher(double elapsed, double board, double fastAt)
