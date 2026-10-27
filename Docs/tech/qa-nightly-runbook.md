@@ -207,6 +207,7 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 - 자리 순서는 세 캐릭터 1명씩만 된다(같은 캐릭터 2명 불가 — 계측이 캐릭터당 1명 전제).
 - 녹화는 화면 전체 1개 파일/판(1단계). 2단계는 이벤트 클립만(§5.3).
 - 이벤트는 **호스트(메인 에디터) 로그만** 본다 — 가상 플레이어(클론) 프로세스의 에러 로그는 시각표에 안 들어간다(클론 봇의 끼임은 호스트 재배치 `qa_relocate` 로 잡힌다).
+- QA 창 최소화(`QAWindowMinimizePolicy`, 할 일 124)는 **옵션 기본 꺼짐**이고, 야간 QA 배치 중이거나 OBS 녹화(`obsEnabled` — 판 전체·리플레이 버퍼 모두)가 켜져 있으면 옵션과 무관하게 **창을 최소화하지 않는다**(로그 `minimize_skipped reason=nightly|obs`).
 - 게임 시각 = Play 의 `Time.time`(간파 슬로우 등 시간 배율을 탄다). 영상 위치는 "영상 타임코드" 열을 본다.
 - 108 하네스·120 은 작성 시점에 **컴파일·EditMode 테스트·Play 를 이 세션에서 못 돌렸다**(권한 거부) — 첫 실행 전에 `QANightlyTests` 를 돌린다. OBS 실연동(화질 적용·리플레이 저장·이름 바꾸기)도 미검증.
 - 120 후속(공유 양식)은 컴파일·EditMode 까지 확인. **OBS `SetRecordDirectory`·되돌리기·날짜 폴더 옮기기·`GetReplayBufferStatus` 확인은 실연동 미검증** — 첫 밤에 `logs/loop.log` 의 `OBS 녹화 경로 →`·`되돌림`·`리플레이 버퍼 시작·확인(active)` 줄을 본다.
