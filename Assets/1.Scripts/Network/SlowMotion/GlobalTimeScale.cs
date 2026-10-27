@@ -16,31 +16,16 @@ using UnityEngine;
 ///       슬로우가 없을 땐 <see cref="Time.timeScale"/> 에 쓰지 않는다 — 이 레이어가 올린 값을 1 로 돌려놓을 때만 쓴다.</item>
 /// <item>컷신 잠금·씬 전환 중엔 발동을 거부하고, 진행 중이면 즉시 1.0(D11).</item>
 /// <item>세션 종료·비활성·파괴·앱 종료 시 1.0 과 타임라인 초기화(R6).</item>
+/// <item>시간 레이어만 맡는다 — 간파 슬로우 프로필·히트스톱 스위치는 <see cref="InterruptProductionDirector"/> 가 들고 넘긴다(할 일 118).</item>
 /// </list>
 /// </summary>
 [DefaultExecutionOrder(-100)]
 [RequireComponent(typeof(NetworkManager))]
-[DataTableSheet("SlowMotion", Order = 0)]
 public sealed class GlobalTimeScale : MonoBehaviour
 {
     public static GlobalTimeScale Instance { get; private set; }
 
     private const string EventMessageName = "GlobalTimeScale.Event";
-
-    [Tooltip("인터럽트 유효타 슬로우 모양. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
-    [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile();
-
-    [Tooltip("간파 성공(카운터 창 소비) 시 다시 거는 슬로우 모양. 맨 앞 히트스톱 뒤 그 배율에서 진입한다(할 일 87)")]
-    [SerializeField] private SlowMotionProfile interruptSuccessProfile = new SlowMotionProfile
-    {
-        scale = 0.25f,
-        hitStopDuration = 0.05f,
-        hitStopScale = 0.02f,
-        enterDuration = 0.05f,
-        holdDuration = 1.2f,
-        exitDuration = 0.4f,
-        failExitDuration = 0.1f,
-    };
 
     private readonly SlowMotionSession _session = new SlowMotionSession();
 
@@ -55,11 +40,6 @@ public sealed class GlobalTimeScale : MonoBehaviour
     private uint _lastIssuedTriggerId;  // 서버 발동 번호 발급기
     private bool _sceneTransitioning;    // 서버: Load/Unload 시작 ~ 완료
     private bool _ownsTimeScale;         // 이 레이어가 Time.timeScale 을 1 이 아닌 값으로 올려 둔 상태
-
-    /// <summary>인터럽트 슬로우 프로필(서버가 발동할 때 넘긴다).</summary>
-    public SlowMotionProfile InterruptProfile => interruptProfile;
-    /// <summary>간파 성공 슬로우 프로필(서버가 판정에서 성공을 확인했을 때 넘긴다).</summary>
-    public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
 
     /// <summary>슬로우 시작(전 피어). (발동 번호, 발동자 clientId, 목적, 연출 기준 월드 위치 — <see cref="CurrentTargetPosition"/>)</summary>
     public event Action<uint, ulong, SlowMotionPurpose, Vector3> Started;

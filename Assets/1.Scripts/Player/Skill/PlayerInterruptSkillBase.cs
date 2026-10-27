@@ -431,11 +431,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private void TryStartSlowMotion()
     {
         GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale == null || HitboxAnchor == null || owner == null || !PredictsInterruptHit())
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
+        if (timeScale == null || director == null || HitboxAnchor == null || owner == null || !PredictsInterruptHit())
             return;
 
-        slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId, SlowMotionPurpose.Attempt,
-            default, InterruptProductionDirector.IsOn(InterruptProductionCue.HitStop)));
+        slowMotion.Started(timeScale.ServerStart(director.InterruptProfile, owner.OwnerClientId, SlowMotionPurpose.Attempt,
+            default, director.Get(InterruptProductionCue.HitStop)));
     }
 
     // 간파 성공(할 일 87): 판정 끝에 성공 프로필로 다시 건다. 마지막 것이 이기므로 시도 슬로우의 지금 배율에서 이어지고,
@@ -444,12 +445,13 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private void StartSuccessSlowMotion()
     {
         GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        if (timeScale == null)
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
+        if (timeScale == null || director == null)
             return;
 
         Vector3 targetPosition = hasSuccessTargetPosition ? successTargetPosition : owner.transform.position;
-        timeScale.ServerStart(timeScale.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success,
-            targetPosition, InterruptProductionDirector.IsOn(InterruptProductionCue.HitStop));
+        timeScale.ServerStart(director.InterruptSuccessProfile, owner.OwnerClientId, SlowMotionPurpose.Success,
+            targetPosition, director.Get(InterruptProductionCue.HitStop));
     }
 
     private bool PredictsInterruptHit()

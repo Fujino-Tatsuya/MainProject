@@ -9,39 +9,61 @@ using UnityEngine;
 /// <item>피어마다 자기 인스턴스 값을 읽는다(동기화 없음). 단 히트스톱은 서버가 이벤트를 만들 때만 보므로 서버 값이 전 피어에 간다.</item>
 /// <item>인스턴스가 없으면(EditMode·NetworkManager 없는 씬) 전부 꺼짐.</item>
 /// <item>판정·피해·카운터 창에는 손대지 않는다 — 연출 재생 여부만 정한다.</item>
+/// <item>시도·성공 슬로우 프로필도 여기 둔다(옛 GlobalTimeScale 필드, 이름 그대로 — xlsx SlowMotion 시트 행이 그대로 묶인다).
+///       서버 인스턴스 값만 쓰인다(서버가 이벤트에 실어 보낸다). 스위치 bool 은 테이블에 내지 않는다(프리팹이 원본).</item>
 /// </list>
 /// 문서: Docs/tech/interrupt-presentation.md.
 /// </summary>
 [DisallowMultipleComponent]
+[DataTableSheet("SlowMotion", Order = 0)]
 public sealed class InterruptProductionDirector : MonoBehaviour
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
+    // 필드 이름은 옛 GlobalTimeScale 과 글자까지 같게 둔다 — 데이터 테이블 경로(NetworkManager.interruptProfile.scale 등)가 그대로 묶인다.
     [Header("시도 — 공용")]
+    [Tooltip("인터럽트 유효타 슬로우 모양(시도). 서버 값만 쓴다. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
+    [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile();
     [Tooltip("B1 방패 발광·루프 — 간파 시도(우클릭) 시작에 shieldGlow FadeIn·glowLoop Play. 끄는 쪽은 늘 돈다")]
-    [SerializeField] private bool paladinShieldGlow;
+    [DataTableIgnore, SerializeField] private bool paladinShieldGlow;
     [Tooltip("B2 방패 기 모으기 — 간파 시도 클립(Garen_Parry) 이벤트의 ShieldCharge 이펙트")]
-    [SerializeField] private bool paladinShieldCharge;
+    [DataTableIgnore, SerializeField] private bool paladinShieldCharge;
     [Tooltip("C1 기 모으기·튀기기·올려치기 — 간파 시도 클립(Attack_Up_01) 이벤트의 Assassin_InsightWindup/Pop/Slash 이펙트")]
-    [SerializeField] private bool assassinInsightAttempt;
+    [DataTableIgnore, SerializeField] private bool assassinInsightAttempt;
 
     [Header("성공 — 공용")]
+    [Tooltip("간파 성공(카운터 창 소비) 시 다시 거는 슬로우 모양. 맨 앞 히트스톱 뒤 그 배율에서 진입한다(할 일 87). 서버 값만 쓴다")]
+    [SerializeField] private SlowMotionProfile interruptSuccessProfile = new SlowMotionProfile
+    {
+        scale = 0.25f,
+        hitStopDuration = 0.05f,
+        hitStopScale = 0.02f,
+        enterDuration = 0.05f,
+        holdDuration = 1.2f,
+        exitDuration = 0.4f,
+        failExitDuration = 0.1f,
+    };
     [Tooltip("A1 히트스톱 — 간파 성공 슬로우 맨 앞의 짧은 정지. 서버 값만 쓴다(끄면 hitStopDuration 0 으로 전 피어에 실린다)")]
-    [SerializeField] private bool hitStop;
+    [DataTableIgnore, SerializeField] private bool hitStop;
     [Tooltip("A4 성공 이펙트 칸 — 간파 성공 때 Player 의 InterruptSuccessFx casterFx·targetFx 원샷")]
-    [SerializeField] private bool successFxSlot;
+    [DataTableIgnore, SerializeField] private bool successFxSlot;
     [Tooltip("B3 충격파 — 간파 성공(방패 적중) 때 PlayerShieldVfx.interruptWave 원샷")]
-    [SerializeField] private bool paladinWave;
+    [DataTableIgnore, SerializeField] private bool paladinWave;
     [Tooltip("C2 간파 성공 이펙트 — 간파 성공 때 올려치기 프레임에 AssassinSkillView.insightSuccess 원샷(C1 을 꺼도 같은 프레임에 나온다)")]
-    [SerializeField] private bool assassinInsightSuccess;
+    [DataTableIgnore, SerializeField] private bool assassinInsightSuccess;
     [Tooltip("E1 섬광 Interrupt_Flash — 간파당한 보스·엘리트·허수아비·스파링 봇 몸에서 터지는 섬광(판정·그로기는 그대로)")]
-    [SerializeField] private bool targetFlash;
+    [DataTableIgnore, SerializeField] private bool targetFlash;
     [Tooltip("A2 암순응 — 간파 성공 때 화면의 어두운 픽셀을 잠깐 낮춘다(InterruptDarkAdaptation). 본인 화면 = 강하게, 다른 화면 = 약하게")]
-    [SerializeField] private bool darkAdaptation;
+    [DataTableIgnore, SerializeField] private bool darkAdaptation;
 
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
-    [SerializeField] private bool ownerZoom;
+    [DataTableIgnore, SerializeField] private bool ownerZoom;
+
+    /// <summary>시도 슬로우 프로필 — 사건 순간 이 객체를 넘기면 이벤트가 그 순간 값을 복사한다(캐싱 아님).</summary>
+    public SlowMotionProfile InterruptProfile => interruptProfile;
+    /// <summary>성공 슬로우 프로필.</summary>
+    public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
 
     private void Awake()
     {
