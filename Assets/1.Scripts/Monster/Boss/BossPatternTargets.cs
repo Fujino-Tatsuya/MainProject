@@ -12,6 +12,7 @@ using UnityEngine;
 /// - 쓰러짐·완전 사망 = Alive 가 아님(코드에 별도 '쓰러짐' 상태가 없다 — DeadPresentation/Soul 이 그 자리).
 /// - 무적은 여기서 거르지 않는다 — 피해는 <c>Player.CanApplyHealthDamage</c> 가 막고, 게이지 인원에서만 뺀다.
 ///   보스 즉사 방전은 <see cref="PlayerInvulnerabilityBypass"/> 로 그 게이트를 넘는다(할 일 105).
+///   전멸기(방 전체 즉사 방전)는 판정 없이 유효 대상 전원을 <see cref="Kill"/> 한다(할 일 105 후속).
 /// </summary>
 public static class BossPatternTargets
 {
@@ -73,5 +74,18 @@ public static class BossPatternTargets
         var info = new AttackInfo(damage, AttackType.Default);
         var ctx = new AttackHitContext(source, sourceTransform);
         target.ReceiveAttack(info, ctx);
+    }
+
+    /// <summary>
+    /// [서버] 전멸기 사망 처리(<see cref="BossWipeDischargeRules"/>). 새 사망 경로가 아니다 — 추락 피해와 같은 무적 무시 컨텍스트
+    /// (<see cref="PlayerInvulnerabilityBypass"/>) 안에서 남은 체력만큼 직접 피해(방어력·보호막 무시)를 넣어 HP 0 →
+    /// <c>Unit.Died</c> → <c>PlayerLifeCycleController</c>(사망 연출·공용 목숨·전멸 판정)로 간다. 가드(가붕이 E)·한 방 상한을 거치지 않는다.
+    /// </summary>
+    public static void Kill(Player p)
+    {
+        if (p == null || p.CurrentHealth <= 0) return;
+        bool before = PlayerInvulnerabilityBypass.Begin();
+        try { p.ApplyDirectHealthDamage(p.CurrentHealth); }
+        finally { PlayerInvulnerabilityBypass.End(before); }
     }
 }

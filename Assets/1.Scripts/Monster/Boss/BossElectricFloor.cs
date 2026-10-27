@@ -50,7 +50,7 @@ public sealed class BossElectricFloor : MonoBehaviour
     bool _dischargeIgnoreInvuln;
     int _fireDamage;   // 이번 발동 피해(평소 = _d.damage)
     bool _fireLethal;  // 이번 발동이 즉사기인가(④ 자폭 실패) — 한 방 상한을 건너뛴다
-    bool _fireIgnoreInvuln;   // 이번 발동이 무적을 무시하는가(보스 즉사 패턴, 할 일 105) — PlayerInvulnerabilityBypass
+    bool _fireIgnoreInvuln;   // 이번 발동을 무적으로 못 피하는가(보스 즉사 패턴, 할 일 105) — 방 전체 즉사면 전멸기 사망 처리, 아니면 PlayerInvulnerabilityBypass
 
     // 즉사 피해 — 보호막까지 넘기는 충분히 큰 값(플레이어 HP 220 대).
     const int LethalDamage = 999999;
@@ -135,7 +135,8 @@ public sealed class BossElectricFloor : MonoBehaviour
 
     /// <summary>
     /// [서버] 레이드 방전 1회 요청(② 전력 공급 실패). Raid 모드에서 예고 → 발동한다.
-    /// <paramref name="lethal"/> = 한 방 상한 무시 즉사 피해. <paramref name="ignoreInvulnerability"/> = 플레이어 무적(대시 등 전부)을 무시한다(보스 즉사 패턴만).
+    /// <paramref name="lethal"/> = 한 방 상한 무시 즉사 피해. <paramref name="ignoreInvulnerability"/> = 무적(대시 등 전부)으로 못 피한다(보스 즉사 패턴만).
+    /// 즉사 + 방 전체(<see cref="BossTileGrid.AllMask"/>) + 이 값이면 전멸기 — 발동 순간 살아 있는 참가자 전원 사망 처리(<see cref="BossWipeDischargeRules"/>).
     /// </summary>
     public void ServerQueueDischarge(ulong mask, float warnTime, int damage, bool lethal = false, bool ignoreInvulnerability = false)
     {
@@ -304,7 +305,11 @@ public sealed class BossElectricFloor : MonoBehaviour
         _t = _d.vfxDuration;
         _boss.SendFloorFire(mask, _d.vfxDuration, _fireLethal);   // 즉사 여부는 연출용(즉사 방전 연출) — 판정은 아래 그대로
 
-        if (!_boss.TryGetTileGrid(out BossTileGrid grid))
+        // 전멸기(방 전체 즉사 + 무적으로 못 피함) = 칸 판정·발 위치·벽 끼임·무적과 무관하게 살아 있는 참가자 전원 사망 처리(할 일 105 후속).
+        // 피해 999999 경로와 겹치지 않는다 — 전멸기는 사망 처리 하나, 안전 칸이 있는 즉사 방전은 아래 칸 판정 + 무적 무시 피해 하나.
+        bool wipe = BossWipeDischargeRules.IsWipe(mask, _fireLethal, _fireIgnoreInvuln);
+        BossTileGrid grid = default;
+        if (!wipe && !_boss.TryGetTileGrid(out grid))
         {
             Debug.LogWarning("[전기장판] 보스방 경계를 못 찾아 판정을 건너뛴다(InvisibleBoundaries).", this);
             return;
@@ -313,6 +318,15 @@ public sealed class BossElectricFloor : MonoBehaviour
         int hit = 0, gauge = 0;
         foreach (Player p in BossPatternTargets.AllPlayers())
         {
+            if (wipe)
+            {
+                if (!BossWipeDischargeRules.ShouldKill(BossPatternTargets.IsAlive(p), _boss.IsHolding(p))) continue;
+                hit++;
+                gauge++;   // 무적이어도 실제로 죽는다 — CountsAsFloorHit(_, bypass: true) 와 같다
+                BossPatternTargets.Kill(p);
+                continue;
+            }
+
             if (!BossPatternTargets.IsValid(p, _boss)) continue;
             if (!grid.Contains(mask, BossPatternTargets.FootPosition(p))) continue;
             hit++;
@@ -332,7 +346,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         }
         ServerFloorHit?.Invoke(gauge);
         Debug.Log($"[전기장판] 발동 {_mode}{(_mode == Mode.Charge ? $"/{_group}{(_bStage > 0 ? _bStage.ToString() : "")}" : "")} — " +
-                  $"{BossTileGrid.Count(mask)}칸 · 적중 {hit}명(게이지 인원 {gauge})", this);
+                  $"{BossTileGrid.Count(mask)}칸 · {(wipe ? "전멸기 사망 처리" : "적중")} {hit}명(게이지 인원 {gauge})", this);
     }
 
     void EndVfx()
