@@ -78,6 +78,9 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     private bool _rebuilt;
     private bool _passiveHighlighted;
 
+    // 맵 포드 착지 연출이 끝났는가(할 일 100 C3) — 끝나기 전엔 착지 타이머(S0)·목표 표시를 시작하지 않는다. 연출이 없는 진입은 처음부터 참.
+    private bool _arrived;
+
     // ─── 부착(모든 피어) ───────────────────────────────────────────────────
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -123,6 +126,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         Player.LocalPlayerChanged += BindLocal;
         TutorialDirector.StateChanged += Render;
         TutorialDirector.GateOpened += HandleGateOpened;
+        _arrived = MapPodArrival.IsArrivalDoneLocal;
         BindLocal(Player.LocalPlayer);
         _ui = TutorialGuideUI.Instance;
 
@@ -166,6 +170,14 @@ public sealed class TutorialZone1Flow : MonoBehaviour
                 _scanTimer = PlayerScanInterval;
                 if (!Zone1Running && _dummies.Count > 0) TryDespawnDummiesServer();
             }
+        }
+
+        // 포드 착지 연출이 끝나는 순간 목표를 처음 그린다(S0 착지 타이머는 TickLocal 이 이때부터 센다).
+        bool arrived = MapPodArrival.IsArrivalDoneLocal;
+        if (arrived != _arrived)
+        {
+            _arrived = arrived;
+            if (arrived) Render();
         }
 
         // 안내 UI 가 늦게 깨어나거나 바뀌면 처음부터 다시 그린다.
@@ -306,7 +318,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     private void TickLocal()
     {
-        if (!Zone1Running || _local == null) return;
+        if (!Zone1Running || _local == null || !_arrived) return;
 
         float dt = Time.unscaledDeltaTime;
         bool alive = LocalAlive;
@@ -384,7 +396,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     private void Render()
     {
-        if (_director == null || _nm == null || !_director.IsTutorialActive || _handedOff) return;
+        if (_director == null || _nm == null || !_director.IsTutorialActive || _handedOff || !_arrived) return;
         TutorialGuideUI ui = TutorialGuideUI.Instance;
         if (ui == null) return;
 

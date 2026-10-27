@@ -47,6 +47,8 @@ public class CameraTargetSwitcher : MonoBehaviour
     private Vector3 basePlayerFollowOffset;
     private float slowMotionZoomDepth;
     private float appliedZoomMultiplier = 1f;
+    // 연출 카메라 거리 배율(로비 포드 강하 — 할 일 100). 슬로우 줌 배율과 곱한다. 1 = 평소.
+    private float cinematicDistanceMultiplier = 1f;
     private Quaternion fixedCameraRotation;
     private bool hasFixedCameraRotation;
     private PlayerLifeCycleController ownerLifeCycle;
@@ -328,7 +330,8 @@ public class CameraTargetSwitcher : MonoBehaviour
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
         slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);
         float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth,
-            InterruptPresentationToggles.IsOn(InterruptPresentationKind.OwnerZoom) ? slowMotionZoomFactor : 1f); // 할 일 104 A3
+            InterruptPresentationToggles.IsOn(InterruptPresentationKind.OwnerZoom) ? slowMotionZoomFactor : 1f) // 할 일 104 A3
+            * cinematicDistanceMultiplier;
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
         if (multiplier == appliedZoomMultiplier)
@@ -366,6 +369,15 @@ public class CameraTargetSwitcher : MonoBehaviour
         {
             ReturnToPlayerView();
         }
+    }
+
+    /// <summary>
+    /// 연출 동안 플레이어 vcam 거리 배율(1 = 평소, 클수록 멀리) — 팔로우 오프셋에 곱한다(슬로우 줌과 같은 방식, 둘이 곱해진다).
+    /// 로비 포드 강하(<see cref="LobbyPodLaunch"/>)가 시간표 값으로 매 프레임 넣고, 끝나면 1 로 돌린다. 0 이하는 1.
+    /// </summary>
+    public void SetCinematicDistanceMultiplier(float multiplier)
+    {
+        cinematicDistanceMultiplier = multiplier > 0f ? multiplier : 1f;
     }
 
     /// <summary>임시 추적을 끝내고 현재 대상(플레이어·관전 대상)으로 컷 복귀한다 — 그 사이 순간이동한 대상까지 쓸고 지나가지 않게.</summary>
