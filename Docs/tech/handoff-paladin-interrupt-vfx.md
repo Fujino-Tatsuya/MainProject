@@ -10,7 +10,9 @@
     **자기 시전(`skill == this`)이 간파 성공(카운터 창 소비)일 때만** `PlayerShieldVfx.ServerInterruptWave()`. 판정 1회에 한 번(여러 대상 성공해도 1회).
     → 간파 창 없는 대상·일반 몹·상자를 때리면 이제 충격파가 안 나온다(의도).
   - 새 칸 `chargeLoop`(EffectSocketPlayer) — `OnEnd` 에서 `Stop()`. 판정 전에 끊긴 경우(경직·사망·취소) 기 모으기 회수용. 켜고 끄기는 아래 클립 이벤트가 한다.
-  - `PlayerInterruptSkillBase`(부모)는 무변경. E 반격(`FirstMeleeSubSkill`)의 `ServerInterruptWave` 호출도 그대로.
+  - `PlayerInterruptSkillBase`(부모)는 무변경. ~~E 반격(`FirstMeleeSubSkill`)의 `ServerInterruptWave` 호출도 그대로.~~
+    → 정정(2026-10-27, 할 일 118): E 반격의 임시 충격파 호출은 2026-10-26 에 이미 제거됐다(`FirstMeleeSubSkill` 21줄 주석) — 지금 `ServerInterruptWave` 를 부르는 곳은 간파 성공 relay 하나뿐.
+    충격파 성공 신호도 118 에서 정적 이벤트 구독 → 디렉터 성공 단계 relay(`IInterruptSuccessRelay`)로 바뀌었다([handoff-interrupt-director-vfx.md](handoff-interrupt-director-vfx.md)).
 - `4.Animations/Player/Garen/Garen_Parry.anim` — 이벤트 2개 추가 + **Hit 시각 0.25 → 0.333초**(모션 무변경):
   - 🔴 Hit 0.333초는 제가 옮긴 게 아니라 작업 전부터 로컬에 있던 변경이다(커밋본 `5ecc21df` = 0.25). 민경 판단으로 **0.333초 유지**해 같이 올린다 — 판정이 1배속 기준 약 0.08초 늦어진다. 의도와 다르면 알려 주세요(그때는 StopEffect 도 같은 시각으로).
   - 0초 `StartEffect("ShieldCharge")` · 0.333초(Hit 와 같은 시각) `StopEffect("ShieldCharge")` — `EffectAnimEvents` 계통이라 전 피어에서 각자 울린다(어쌔신 클립 선례).
