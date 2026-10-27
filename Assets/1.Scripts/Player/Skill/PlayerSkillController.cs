@@ -1265,7 +1265,8 @@ public enum PlayerSkillApproval
     Cooldown,
     Dead,           // 사망 중 + 사망 중 허용 스킬 아님
     StateOrEffect,  // Idle/Move 아님 또는 스킬 차단 효과
-    CanUseFailed    // 스킬 자체 조건(CanUse)
+    CanUseFailed,   // 스킬 자체 조건(CanUse)
+    DashWindow      // 대쉬 간파 — 대시 경과가 창(+서버 허용오차) 밖 (할 일 115)
 }
 
 /// <summary>
@@ -1289,6 +1290,33 @@ public static class PlayerSkillApprovalRules
         if (isDead)
             return usableWhileDead ? PlayerSkillApproval.Approved : PlayerSkillApproval.Dead;
         return canUseSkillState ? PlayerSkillApproval.Approved : PlayerSkillApproval.StateOrEffect;
+    }
+
+    /// <summary>
+    /// 대쉬 간파(할 일 115) 사전 조건 — <see cref="EvaluatePreconditions"/> 와 같은 순서에서 상태 조건만 바꾼다:
+    /// Idle/Move 대신 Dash 상태 + Interrupt 슬롯만 허용, 그다음 대시 경과가 창 안인가.
+    /// 사망 중 허용 스킬도 Dash 상태가 아니므로 사망이면 항상 거부한다.
+    /// 이미 실린 간파가 있으면 호출자가 <paramref name="skillActive"/> 로 넘긴다.
+    /// </summary>
+    /// <param name="blockedByEffect">간파·스킬 차단 효과(BlocksInterrupt 또는 BlocksSkill).</param>
+    /// <param name="withinDashWindow">오너 = 누른 시각이 창 안, 서버 = 대시 경과가 창 + 허용오차 안(<c>DashInterruptRules</c>).</param>
+    public static PlayerSkillApproval EvaluateDashInterruptPreconditions(
+        bool assigned, bool skillIndexMatches, bool isInterruptSlot, bool skillActive, bool cooldownReady,
+        bool isDead, bool isDashState, bool blockedByEffect, bool withinDashWindow)
+    {
+        if (!assigned)
+            return PlayerSkillApproval.Unassigned;
+        if (!skillIndexMatches)
+            return PlayerSkillApproval.SlotRace;
+        if (skillActive)
+            return PlayerSkillApproval.SkillActive;
+        if (!cooldownReady)
+            return PlayerSkillApproval.Cooldown;
+        if (isDead)
+            return PlayerSkillApproval.Dead;
+        if (!isInterruptSlot || !isDashState || blockedByEffect)
+            return PlayerSkillApproval.StateOrEffect;
+        return withinDashWindow ? PlayerSkillApproval.Approved : PlayerSkillApproval.DashWindow;
     }
 }
 
