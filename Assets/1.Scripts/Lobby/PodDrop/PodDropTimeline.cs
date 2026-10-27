@@ -48,9 +48,12 @@ public struct PodDropLobbyTimings
     [Tooltip("발사 상태 이름(컨트롤러 Base Layer) — 해치 닫힘·갱도 문 열림·포드 하강이 한 클립. 가장 늦게 앉는 순간 처음부터 1배속으로 재생하고, " +
              "끝 프레임 클립 이벤트(PodClipEvent)부터 끝 대기 → 끝 페이드 아웃(검게) 뒤 로딩 화면으로 넘어간다(할 일 121). 비우면 앉자마자 끝 대기부터")]
     public string launchState;
-    [Tooltip("발사 클립 가속 배율 — 발사 클립의 가속 이벤트(PodClipEvent 정수 인자 1, 기본 213프레임)부터 이 배율로 끝까지 재생한다(1 = 가속 없음). " +
+    [Tooltip("발사 클립 가속 1단계 배율 — 발사 클립의 가속 1단계 이벤트(PodClipEvent 정수 인자 1, 기본 213프레임)부터 2단계 이벤트까지 이 배율로 재생한다(1 = 가속 없음). " +
              "전환 프레임은 FBX 임포트 창 Animation 탭에서 이벤트를 옮겨 튜닝한다. 호스트 이벤트 시각을 서버가 복제해 클라도 같은 시점에 가속한다")]
     [Min(0.01f)] public float launchFastSpeed;
+    [Tooltip("발사 클립 가속 2단계 배율 — 발사 클립의 가속 2단계 이벤트(PodClipEvent 정수 인자 2, 기본 553프레임)부터 이 배율로 끝까지 재생한다(1단계보다 작으면 끝으로 가며 감속). " +
+             "전환 프레임은 FBX 임포트 창 Animation 탭에서 이벤트를 옮겨 튜닝한다. 호스트 이벤트 시각을 서버가 복제해 클라도 같은 시점에 바꾼다")]
+    [Min(0.01f)] public float launchFastSpeed2;
 
     [Header("발사 끝 → 로딩 (서버가 확정한 발사 클립 끝 시각 기준)")]
     [Tooltip("발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초). 그동안 마지막 자세 그대로 보인다. 0 = 끝 이벤트 순간 곧바로 페이드")]
@@ -82,6 +85,7 @@ public struct PodDropLobbyTimings
         hatchState = "DP_HatchLobbyOpenClose",
         launchState = "DP_LaunchCycle",
         launchFastSpeed = 6f,
+        launchFastSpeed2 = 3f,
         launchEndWaitSeconds = 1f,
         launchEndFadeSeconds = 1f,
         hudRescanSeconds = 0.5f,
@@ -335,16 +339,22 @@ public sealed class PodDropLobbyTimeline
         PodDropTimeline.Progress(elapsed, WalkStartAt(slot, boardAt), WalkSecondsOf(slot));
 
     /// <summary>
-    /// 발사 클립 안 재생 위치(초, 1배속 클립 시각) — 발사 시작 <paramref name="launchAt"/> 부터 1배속, 가속 이벤트 <paramref name="fastAt"/> 부터 <paramref name="fastSpeed"/> 배속(할 일 106 추가 2).
-    /// 늦게 본 피어가 따라잡을 위치. 가속 이벤트 전(+∞)이면 1배속 그대로, 발사 전이면 0. 배율 0 이하는 1.
+    /// 발사 클립 안 재생 위치(초, 1배속 클립 시각) — 발사 시작 <paramref name="launchAt"/> 부터 1배속, 가속 1단계 이벤트 <paramref name="fastAt"/> 부터 <paramref name="fastSpeed"/> 배속(할 일 106 추가 2),
+    /// 가속 2단계 이벤트 <paramref name="fast2At"/> 부터 <paramref name="fast2Speed"/> 배속(할 일 121). 늦게 본 피어가 따라잡을 위치.
+    /// 이벤트 전(+∞)이면 그 앞 구간 배율 그대로, 발사 전이면 0. 배율 0 이하는 1. 시각이 발사보다 앞이면 발사부터, 2단계가 1단계보다 앞이면 1단계 구간은 없다.
     /// </summary>
-    public static float LaunchClipSecondsAt(double elapsed, double launchAt, double fastAt, float fastSpeed)
+    public static float LaunchClipSecondsAt(double elapsed, double launchAt, double fastAt, float fastSpeed,
+        double fast2At = PodDropTimeline.NotYet, float fast2Speed = 1f)
     {
         if (elapsed <= launchAt) return 0f;
         if (fastSpeed <= 0f) fastSpeed = 1f;
-        if (elapsed < fastAt) return (float)(elapsed - launchAt);
-        double fastFrom = Math.Max(fastAt, launchAt);
-        return (float)((fastFrom - launchAt) + (elapsed - fastFrom) * fastSpeed);
+        if (fast2Speed <= 0f) fast2Speed = 1f;
+        double from2 = Math.Max(fast2At, launchAt);
+        double from1 = Math.Min(Math.Max(fastAt, launchAt), from2);
+        if (elapsed < from1) return (float)(elapsed - launchAt);
+        double clip = from1 - launchAt;
+        if (elapsed < from2) return (float)(clip + (elapsed - from1) * fastSpeed);
+        return (float)(clip + (from2 - from1) * fastSpeed + (elapsed - from2) * fast2Speed);
     }
 
     /// <summary>경로 길이(m) ÷ 걷는 속도(m/s) = 보행 시간(초). 길이·속도가 0 이하(또는 NaN)면 0 — 무한·NaN 시간표를 만들지 않는다.</summary>

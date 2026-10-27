@@ -292,10 +292,43 @@ public sealed class PodDropTimelineTests
     }
 
     [Test]
+    public void Lobby_LaunchClipSeconds_TwoStages()
+    {
+        // 할 일 121 — 213프레임부터 6배, 553프레임부터 3배(60fps).
+        const double launch = 10d;
+        const double fast = launch + 213d / 60d;                    // 1배속으로 213프레임
+        const double fast2 = fast + (553d - 213d) / 60d / 6d;       // 6배속으로 340프레임
+        Assert.AreEqual(213f / 60f + 6f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast + 1d, launch, fast, 6f, NotYet, 3f), Eps, "2단계 이벤트 전 = 1단계 배율");
+        Assert.AreEqual(553f / 60f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast2, launch, fast, 6f, fast2, 3f), Eps, "2단계 순간 = 553프레임");
+        Assert.AreEqual(553f / 60f + 3f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast2 + 1d, launch, fast, 6f, fast2, 3f), Eps, "2단계 뒤 1초 = 클립 3초");
+        Assert.AreEqual(553f / 60f + 1f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast2 + 1d, launch, fast, 6f, fast2, 0f), Eps, "2단계 배율 0 이하 → 1배속");
+        Assert.AreEqual(2f + 3f, PodDropLobbyTimeline.LaunchClipSecondsAt(13d, launch, NotYet, 6f, 12d, 3f), Eps, "1단계 없이 2단계만 = 1배속 → 3배");
+        Assert.AreEqual(2f + 3f, PodDropLobbyTimeline.LaunchClipSecondsAt(13d, launch, 12.5d, 6f, 12d, 3f), Eps, "2단계가 1단계보다 앞이면 1단계 구간 없음");
+        Assert.AreEqual(2f * 6f + 3f, PodDropLobbyTimeline.LaunchClipSecondsAt(13d, launch, 5d, 6f, 12d, 3f), Eps, "1단계가 발사보다 앞 = 발사부터 6배 → 2단계 3배");
+    }
+
+    [Test]
+    public void Lobby_LaunchRealSeconds_TwoStages()
+    {
+        // 클립 719프레임 끝: 213/60 + 340/60/6 + 166/60/3 = 3.55 + 0.9444 + 0.9222 = 5.4167초.
+        float real = PodDropScheduleView.LaunchRealSecondsTo(719f / 60f, 213f / 60f, true, 6f, 553f / 60f, true, 3f);
+        Assert.AreEqual(213f / 60f + 340f / 360f + 166f / 180f, real, Eps);
+        Assert.AreEqual(213f / 60f + 506f / 360f, PodDropScheduleView.LaunchRealSecondsTo(719f / 60f, 213f / 60f, true, 6f, 0f, false, 3f), Eps, "2단계 없음 = 끝까지 6배");
+        Assert.AreEqual(553f / 60f + 166f / 180f, PodDropScheduleView.LaunchRealSecondsTo(719f / 60f, 0f, false, 6f, 553f / 60f, true, 3f), Eps, "1단계 없음 = 553까지 1배");
+
+        // 시간표 역과 맞는다 — 실제 초를 넣으면 클립 끝.
+        const double fast = 213d / 60d;
+        const double fast2 = fast + 340d / 360d;
+        Assert.AreEqual(719f / 60f, PodDropLobbyTimeline.LaunchClipSecondsAt(real, 0d, fast, 6f, fast2, 3f), 1e-3f);
+    }
+
+    [Test]
     public void Lobby_Defaults_LaunchFastSpeed()
     {
         Assert.AreEqual(6f, PodDropLobbyTimings.Default.launchFastSpeed, Eps, "213프레임부터 6배");
+        Assert.AreEqual(3f, PodDropLobbyTimings.Default.launchFastSpeed2, Eps, "553프레임부터 3배");
         Assert.AreEqual(213, PodAnimEventAuthoring.LobbyLaunchFastFrame);
+        Assert.AreEqual(553, PodAnimEventAuthoring.LobbyLaunchFast2Frame);
     }
 
     // ─── 맵: 빠른 낙하 → 급감속(펴기 시작) → (펴기 이벤트) → 착륙 → (열기 이벤트) → 지연 → 디졸브 → 해제 ───
@@ -562,6 +595,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(m.landSeconds, map.landSeconds, Eps);
         // 106 추가 2 — 새 칸은 기본값, 시작 높이는 에셋에서 30 으로 고침.
         Assert.AreEqual(d.launchFastSpeed, asset.Lobby.launchFastSpeed, Eps);
+        Assert.AreEqual(d.launchFastSpeed2, asset.Lobby.launchFastSpeed2, Eps, "할 일 121 — 가속 2단계 배율(에셋에도 3)");
         // 할 일 121 — 끝 대기·끝 페이드(에셋에도 1·1).
         Assert.AreEqual(1f, asset.Lobby.launchEndWaitSeconds, Eps);
         Assert.AreEqual(1f, asset.Lobby.launchEndFadeSeconds, Eps);

@@ -24,7 +24,7 @@ public sealed class PodAnimatorDriver
     private AnimatorCullingMode _cullingMode;
     private bool _driven;
 
-    /// <summary>[전 피어] 클립 애니 이벤트(<see cref="PodAnimEventRelay.FunctionName"/>) — 이벤트가 실린 클립 이름, 종류(<see cref="PodAnimEventRelay.KindStage"/>·<see cref="PodAnimEventRelay.KindSpeedUp"/>).</summary>
+    /// <summary>[전 피어] 클립 애니 이벤트(<see cref="PodAnimEventRelay.FunctionName"/>) — 이벤트가 실린 클립 이름, 종류(<see cref="PodAnimEventRelay.KindStage"/>·<see cref="PodAnimEventRelay.KindSpeedUp"/>·<see cref="PodAnimEventRelay.KindSpeedUp2"/>).</summary>
     public event Action<string, int> ClipEvent;
 
     public PodAnimatorDriver(Animator animator)
