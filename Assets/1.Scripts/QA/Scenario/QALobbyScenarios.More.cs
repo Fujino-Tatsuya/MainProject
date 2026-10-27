@@ -842,7 +842,7 @@ public static partial class QALobbyScenarios
                 $"[{snap.TraitsKey}] → [{after.TraitsKey}]{(snap.TraitCount == 0 ? " (끊기 전 특성 0개 — 약한 검증)" : "")}");
             ctx.Check(snap.ResetPrompt == after.ResetPrompt, "재합류 리셋 팝업 유지", $"{snap.ResetPrompt} → {after.ResetPrompt}");
             ctx.Check(snap.CheckMask == after.CheckMask, "재합류 튜토리얼 체크 유지", $"0x{snap.CheckMask:X} → 0x{after.CheckMask:X}");
-            ctx.Eye("재합류 뒤 배리어", $"마스크 0x{snap.BarrierMask:X} → 0x{after.BarrierMask:X} (TutorialDirector.RebindPlayer 가 0 으로 다시 쓴다 — 배리어 위치는 스크린샷)", ctx.Shot("m6_barrier"));
+            ctx.Eye("재합류 뒤 배리어", $"마스크 0x{snap.BarrierMask:X} → 0x{after.BarrierMask:X} (MapSceneDirector.RebindPlayer 가 0 으로 다시 쓴다 — 배리어 위치는 스크린샷)", ctx.Shot("m6_barrier"));
 
             // 2회차: 영혼 상태로 끊김 → 영혼으로 복귀(튜토리얼 G11 전이면 그 뒤 자동 부활).
             a = back.Player;
@@ -934,10 +934,10 @@ public static partial class QALobbyScenarios
             traits.Sort();
             s.TraitCount = traits.Count;
             s.TraitsKey = string.Join(",", traits);
-            TutorialDirector dir = TutorialDirector.Instance;
+            MapSceneDirector dir = MapSceneDirector.Instance;
             if (dir != null)
             {
-                if (dir.TryGetPlayerProgress(clientId, out TutorialPlayerProgress prog))
+                if (dir.TryGetPlayerProgress(clientId, out MapScenePlayerProgress prog))
                     s.CheckMask = prog.CheckMask;
                 s.BarrierMask = dir.GetBackBarrierMask(clientId);
             }
@@ -964,9 +964,9 @@ public static partial class QALobbyScenarios
         {
             // 전멸이 결과 대신 리스폰이 되려면 튜토리얼은 G10(보스 진입·패드)이 열려 있어야 한다(PartyWipeRespawnRules.CanRespawn,
             // party-lives-respawn.md §3.2). 강제 개시는 패드를 건너뛰어 G10 이 닫힌 채라 2차 1회차에서 결과 화면으로 갔다 — 디버그 경로로 G10 까지 연다.
-            TutorialDirector tutorial = TutorialDirector.Instance;
-            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad))
-                TutorialDebugActions.OpenGatesThrough(tutorial, TutorialGate.G10_BossEnterAndPad);
+            MapSceneDirector tutorial = MapSceneDirector.Instance;
+            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(MapSceneGate.G10_BossEnterAndPad))
+                MapSceneDebugActions.OpenGatesThrough(tutorial, MapSceneGate.G10_BossEnterAndPad);
             // 그다음 보스전 강제 개시 → Combat(보스방 도착 = G11).
             BossTeleportManager tp = BossTeleportManager.Instance;
             float deadline = Time.realtimeSinceStartup + 30f;

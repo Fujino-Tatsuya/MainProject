@@ -104,7 +104,7 @@ public sealed class QAPartyPlacement88Tests
     [Test]
     public void 일반몹_재우기는_G8_지연_기상_뒤()
     {
-        Assert.Greater(QABossStart88.NormalWakeWaitSeconds, TutorialZone4Model.DefaultWakeDelaySeconds,
+        Assert.Greater(QABossStart88.NormalWakeWaitSeconds, MapSceneBossApproachModel.DefaultWakeDelaySeconds,
             "G8 직후 재우면 3초 뒤 지연 기상이 덮어쓴다(스모크 4차)");
     }
 }

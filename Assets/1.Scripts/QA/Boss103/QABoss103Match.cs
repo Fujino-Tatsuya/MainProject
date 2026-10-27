@@ -14,7 +14,7 @@ using UnityEngine.SceneManagement;
 /// <item>[서버] 특성 4라운드(<see cref="QABoss103Plan.TraitRounds"/> = 복도 1~4) — 특성 디렉터 후보 뽑기 RNG 를 판 시드로 갈아 끼우고(리플렉션, 게임 코드 무수정)
 ///   정식 라운드(<see cref="TutorialTraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TutorialTraitRoundDisplay)"/>, 복도와 같은 표시 옵션)를 연다.
 ///   각 인스턴스의 <see cref="QABoss103LocalBot"/> 가 자기 제시에서 판 시드로 골라 정식 선택 RPC 로 보낸다. 같은 시드 = 같은 제시·같은 선택.</item>
-/// <item>[서버] G10 까지 개방(<see cref="TutorialDebugActions.OpenGatesThrough"/> — 88·P572 와 같은 진입) → 파티 3명을 복도4 보스 진입 발판(<see cref="BossEnterTrigger"/>) 안에
+/// <item>[서버] G10 까지 개방(<see cref="MapSceneDebugActions.OpenGatesThrough"/> — 88·P572 와 같은 진입) → 파티 3명을 복도4 보스 진입 발판(<see cref="BossEnterTrigger"/>) 안에
 ///   일렬로 옮긴다(<see cref="PlayerFallRecovery.RelocateServer"/>). 봇은 움직이지 않는다 → 게임의 집결 판정(전원 발판 5초)이 엘리베이터를 연다.</item>
 /// <item>엘리베이터 → 23호 등장 연출(연출 잠금) → 각 인스턴스 봇이 Space 홀드 스킵 → <see cref="BossEncounterPhase.Combat"/> 진입 시각 기록.</item>
 /// <item>[서버] 판 종료 판정(<see cref="QABoss103Plan.Judge"/>): 보스 처치 = 클리어 / 공용 목숨 0 전멸(<see cref="PartyWipeRespawner.PartyWipeRespawned"/>,
@@ -162,7 +162,7 @@ public static class QABoss103Match
             bool seeded = SeedDirector(traits, QABoss103Plan.DirectorSeed(cfg.TraitRunSeed));
             for (int round = 1; round <= QABoss103Plan.TraitRounds; round++)
             {
-                bool offered = traits.StartOfferRoundServer(ids, TutorialCorridorRules.DisplayOf(round));
+                bool offered = traits.StartOfferRoundServer(ids, MapSceneTraitCorridorRules.DisplayOf(round));
                 if (!offered)
                 {
                     Debug.LogWarning($"{Tag} event=trait_round round={round} offered=false — 풀 소진·미스폰");
@@ -181,15 +181,15 @@ public static class QABoss103Match
             ctx.Check(seeded, "103 특성 시드 고정", $"디렉터 RNG 교체={(seeded ? "ok" : "실패(필드 없음) — 같은 시드라도 제시가 달라진다")} · 특성 {rec.TraitsToken()}");
 
             // 2) G10 개방 → 발판 배치.
-            TutorialDirector tutorial = TutorialDirector.Instance;
-            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad))
-                TutorialDebugActions.OpenGatesThrough(tutorial, TutorialGate.G10_BossEnterAndPad);
+            MapSceneDirector tutorial = MapSceneDirector.Instance;
+            if (tutorial != null && tutorial.IsTutorialActive && !tutorial.IsGateOpen(MapSceneGate.G10_BossEnterAndPad))
+                MapSceneDebugActions.OpenGatesThrough(tutorial, MapSceneGate.G10_BossEnterAndPad);
             BossEnterTrigger pad = null;
-            yield return ctx.Wait(() => (pad = FindPad()) != null && TutorialBossPath.IsBossPadEnabled, PadWaitSeconds);
-            if (pad == null || !TutorialBossPath.IsBossPadEnabled)
+            yield return ctx.Wait(() => (pad = FindPad()) != null && MapSceneBossPath.IsBossPadEnabled, PadWaitSeconds);
+            if (pad == null || !MapSceneBossPath.IsBossPadEnabled)
             {
                 rec.Outcome = QABoss103Outcome.Aborted;
-                rec.Detail = $"보스 진입 발판 없음·잠김(pad={(pad != null)} enabled={TutorialBossPath.IsBossPadEnabled})";
+                rec.Detail = $"보스 진입 발판 없음·잠김(pad={(pad != null)} enabled={MapSceneBossPath.IsBossPadEnabled})";
                 yield break;
             }
             int moved = PlacePartyOnPad(pad, ids, out string placeDetail);
