@@ -79,7 +79,7 @@
   - 2·3장 순환에서 위↔아래로 바뀌는 카드는 사라졌다 나타나지 않고 **가운데 카드 뒤로 가로질러** 미끄러진다(가운데 카드가 맨 위에 그려진다).
 - `Show`(열 때)·`SetLocked` 는 애니메이션 없이 바로 정렬 — 테두리 켜짐·확대 상태.
 
-- 왼쪽 아래 이름판 = 포커스된 캐릭터의 원형 초상화·이름. 왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠.
+- 왼쪽 아래 이름판 = 포커스된 캐릭터의 원형 초상화·이름, 그 오른쪽 = 선택 버튼(할 일 109). 왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠.
 - 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬를 따라 **오른쪽으로 40px/s**(unscaled) 흐름(방향 = 10-19 결정).
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
   - 일반판 vs `_gamma` 판: 캡처 비교(왼쪽 영역 평균 밝기, 0~255) 목업 30.2 · 일반판 34.1 · `_gamma` 43.2 → **일반판** 사용(프로젝트 = Linear).
@@ -92,11 +92,15 @@
 | W/S · ↑/↓ · A/D · ←/→ · 마우스 휠 | 이전(위·왼쪽·휠 위)/다음(아래·오른쪽·휠 아래) 카드로 포커스 — 잠금 중에도 구경 가능 |
 | 이동 키 길게 누르기 | 누른 순간 1칸 → 0.25초 뒤부터 반복, 간격이 0.25초에서 선형으로 줄어 홀드 1초에 0.1초 도달 후 유지(아래 "길게 누르기"). 휠·카드 클릭은 반복 없음 |
 | Enter · 숫자패드 Enter · Space · 가운데 카드 클릭 | 선택 확정(위 규칙) |
+| 선택 버튼(`Button_Confirm`, 이름판 오른쪽 "선택 / Space", 할 일 109) | Space 와 같은 `Confirm()` — 잠금이면 잠금 문구 강조, 지금 캐릭터면 그냥 닫힘, 이동 중이면 논리 가운데 |
 | 위·아래 카드 클릭 | 그 카드로 포커스 이동 |
 | 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) |
 
 - 키는 `Keyboard.current`·`Mouse.current` 를 직접 읽는다. 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력(이동·공격·F 등)을 막는다.
-- 카드 클릭은 `Button` 이 아니라 `IPointerClickHandler` — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 막는다. 뒤로가기 버튼은 Navigation None.
+- 카드 클릭은 `Button` 이 아니라 `IPointerClickHandler` — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 막는다. 뒤로가기·선택 버튼은 Navigation None
+  (None 이면 클릭해도 선택되지 않는다). 선택 버튼은 혹시 선택이 남아 있으면 클릭 때 지우고, 키 입력과 같은 조건(열림·`LobbyResultPanel.IsEscapeClaimed` 아님)에서만 `Confirm()` 을 부른다.
+  같은 프레임에 클릭과 Space 가 겹쳐도 확정·닫힘이면 두 번째는 닫힌 패널이라 무시되고, 잠금이면 같은 강조가 다시 걸릴 뿐이다.
+- 선택 버튼 바탕 = 목업 "기본" 탭 바탕 `tab_gibon_body`(탭은 배치하지 않아 남는 아트) 재사용. 글자 = "선택"(40) + 키 안내 "Space"(24), 둘 다 런타임에 Strings 키로 바뀐다.
 
 ### 길게 누르기(키 반복, 할 일 60·60.1)
 판단 = `CharacterSelectKeyRepeat`(순수). 패널은 매 프레임 "뒤로(W·↑·A·←) / 앞으로(S·↓·D·→) 중 하나라도 눌려 있는가"(`isPressed`)와 `Time.unscaledTime` 을 넘기고, 돌려받은 칸(-1·0·+1)만큼 `MoveFocus` 한다.
@@ -131,12 +135,15 @@
 | `UI.CharacterSelect.CurrentTag` | 현재 |
 | `UI.CharacterSelect.Unavailable` | 선택 불가 |
 | `UI.CharacterSelect.Hint` | W/S·방향키 이동   Enter 선택   Esc 뒤로 |
+| `UI.CharacterSelect.ConfirmButton` | 선택 (en Select) — 할 일 109 |
+| `UI.CharacterSelect.ConfirmKey` | Space (en Space) — 선택 버튼 키 안내, 할 일 109 |
 
 캐릭터 이름은 로스터 `Character.<프리팹>.Name`(기존 키).
 
 ## 다시 만들기·미리보기
 - `Tools/UI/Authoring/Character Select Panel` — 없는 프리팹만 만든다(있으면 손대지 않음).
 - `Tools/UI/Authoring/Character Select Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 자리·색은 스크립트 상단 상수와 패널·카드 인스펙터.
+  선택 버튼도 같이 만든다. 이미 있는 프리팹에 버튼만 더하려면 에디터 명령으로 `CharacterSelectPanelAuthoring.AddConfirmButtonToExistingPanel()`(메뉴 없음, 있으면 손대지 않음 — 할 일 109 가 이걸로 넣었다).
 - `Tools/UI/Preview/Character Select Panel 캡처` — 프리뷰 씬에서 1920×1080 PNG 를 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/48.2-char-select/` 에 저장(열린 씬 무수정):
   `CharacterSelect_unlocked.png`(지금 0번·포커스 1번) · `CharacterSelect_locked.png`(지금 1번·포커스 2번·잠금) · `CharacterSelect_vs_mockup.png`(왼쪽 목업) · `CharacterSelect_bg_gamma.png`(배경 _gamma 판 비교용), 콘솔에 배경 밝기 비교.
   이동 연출은 시계를 넘겨 다 선 상태로 찍는다.
@@ -145,7 +152,7 @@
   시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
 - `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
   `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 미끄러짐)를 저장. 콘솔에 대기·간격·램프 값과 1.5초까지의 칸 이동 시각(가속 확인용).
-- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests`).
+- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 선택 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
 - 열린 동안 이동·공격·F 가 막히고 닫으면 풀리는가. 뒤 화면 클릭이 안 먹는가.
@@ -153,6 +160,7 @@
 - 다른 캐릭터 확정 → `RequestCharacterServerRpc` 가 한 번 나가고 패널이 닫히는가. 지금 캐릭터 확정 → 요청 없이 닫히는가.
 - 준비 중 열기 → 구경은 되고 확정하면 잠금 문구가 강조되는가. 열린 채 준비 해제(`SetLocked(false)`) → 바로 고를 수 있는가.
 - 결과 패널이 위에 열려 있을 때 ESC 한 번에 결과 패널만 닫히는가(선택 패널은 그대로).
+- (할 일 109) 선택 버튼 클릭 한 번 = 확정 한 번(다른 캐릭터 → 요청 1회·닫힘, 지금 캐릭터 → 닫힘, 잠금 → 잠금 문구 강조)인가. 잠금 중 클릭한 뒤 Enter/Space 를 눌러도 강조만 한 번 더 될 뿐 두 번 확정되지 않는가. 이동 중 클릭이 새 가운데로 확정되는가. 버튼이 눌림 색으로 바뀌고 "선택 / Space" 가 보이는가.
 - (할 일 60) 카드가 미끄러지듯 움직이고 연타해도 점프 없이 새 목표로 가는가. 테두리가 이동 중 꺼졌다가 가운데 카드에서 켜지고 살짝 커지는가. 이동 중 Enter 가 새 가운데로 확정되는가.
 - (할 일 60·60.1 길게 누르기) 이동 키를 누르고 있으면 0.25초 뒤부터 처음엔 천천히(0.25초 간격) 넘어가다 점점 빨라져 1초쯤부터 0.1초마다 넘어가고, 떼면 멈추는가. 가속이 자연스럽고 빨라진 뒤 미끄러짐이 끊겨 보이지 않는가.
   누른 채 반대 키 → 즉시 반대로 1칸 후 대기·느린 반복부터, 반대 키만 떼면 대기 뒤 원래 방향으로 느린 반복부터 이어지는가. 떼고 다시 누르면 다시 느리게 시작하는가. W+↑ 같이 눌러도 2칸씩 가지 않는가.

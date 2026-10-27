@@ -49,6 +49,11 @@ public static class CharacterSelectPanelAuthoring
     static readonly Color HintColor = new Color(0.62f, 0.62f, 0.62f, 1f);
     static readonly Color LockedColor = new Color(1f, 0.78f, 0.3f, 1f);
 
+    // 선택 버튼(할 일 109) — 목업 "기본" 탭 바탕(회색 비스듬한 알약, 탭은 배치하지 않아 남는 아트)을 재사용. 이름판 오른쪽.
+    const string ConfirmButtonSprite = "tab_gibon_body.png";
+    static readonly Color ConfirmTextColor = new Color(0.08f, 0.08f, 0.08f, 1f);
+    static readonly Color ConfirmKeyColor = new Color(0.22f, 0.22f, 0.22f, 1f);
+
     // ── 메뉴 ────────────────────────────────────────────────
 
     [MenuItem("Tools/UI/Authoring/Character Select Panel")]
@@ -100,7 +105,7 @@ public static class CharacterSelectPanelAuthoring
     sealed class Sprites
     {
         public Sprite BgColor, BgLoop, BlackPanel, Chevron, SelectBadge, BackButton,
-            CardGap, CardFill, CardRing, CardTop, CardBottom, Nameplate, PortraitSlot;
+            CardGap, CardFill, CardRing, CardTop, CardBottom, Nameplate, PortraitSlot, TabBody;
 
         public bool Load()
         {
@@ -117,9 +122,10 @@ public static class CharacterSelectPanelAuthoring
             CardBottom = LoadSprite("card_unselected_bottom.png");
             Nameplate = LoadSprite("nameplate_base.png");
             PortraitSlot = LoadSprite("nameplate_portrait_slot.png");
+            TabBody = LoadSprite(ConfirmButtonSprite);
             return BgColor != null && BgLoop != null && BlackPanel != null && Chevron != null && SelectBadge != null &&
                    BackButton != null && CardGap != null && CardFill != null && CardRing != null && CardTop != null &&
-                   CardBottom != null && Nameplate != null && PortraitSlot != null;
+                   CardBottom != null && Nameplate != null && PortraitSlot != null && TabBody != null;
         }
     }
 
@@ -354,6 +360,8 @@ public static class CharacterSelectPanelAuthoring
             locked.anchoredPosition -= new Vector2(500f, 0f);
             locked.gameObject.SetActive(false);
 
+            ConfirmButtonParts confirm = AddConfirmButton(content, font, sprites.TabBody);
+
             // 배선
             CharacterSelectPanel view = root.AddComponent<CharacterSelectPanel>();
             var viewSo = new SerializedObject(view);
@@ -365,6 +373,7 @@ public static class CharacterSelectPanelAuthoring
             viewSo.FindProperty("cardPrefab").objectReferenceValue = cardPrefab;
             viewSo.FindProperty("cardContainer").objectReferenceValue = cards;
             viewSo.FindProperty("backButton").objectReferenceValue = backButton;
+            WireConfirmButton(viewSo, confirm);
             viewSo.FindProperty("nameplatePortrait").objectReferenceValue = platePortraitImage;
             viewSo.FindProperty("nameplateName").objectReferenceValue = plateNameText;
             viewSo.FindProperty("lockedText").objectReferenceValue = lockedText;
@@ -379,6 +388,91 @@ public static class CharacterSelectPanelAuthoring
         finally
         {
             Object.DestroyImmediate(root);
+        }
+    }
+
+    // ── 선택 버튼(할 일 109) ──────────────────────────────────
+
+    struct ConfirmButtonParts
+    {
+        public Button Button;
+        public TMP_Text Label;
+        public TMP_Text Key;
+    }
+
+    /// <summary>이름판 오른쪽 선택 버튼 — 회색 탭 바탕 + "선택"(큰 글자) + 키 안내 "Space"(작은 글자). Content 맨 뒤 자식.</summary>
+    static ConfirmButtonParts AddConfirmButton(RectTransform content, TMP_FontAsset font, Sprite body)
+    {
+        RectTransform rect = NewRect("Button_Confirm", content);
+        Vector2 size = NativeSize(body);
+        Place(rect, BottomLeft, 575f, 935f - size.y * 0.5f, size.x, size.y); // 이름판(y 826~1043) 세로 가운데에 맞춤
+        Image image = AddImage(rect.gameObject, body, Color.white);
+        image.raycastTarget = true;
+        Button button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        // 뒤로가기와 같다 — None 이면 클릭해도 EventSystem 선택이 남지 않아 다음 Enter/Space 가 두 번 먹지 않는다.
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+        // 탭 오른쪽이 비스듬히 잘려 글자는 왼쪽으로 조금 당긴다.
+        RectTransform label = Child("Label", rect, new Vector2(-18f, 14f), new Vector2(170f, 56f));
+        TMP_Text labelText = AddText(label, font, CharacterSelectUiStrings.ConfirmButton.Ko, 40f, TextAlignmentOptions.Center, ConfirmTextColor);
+        RectTransform key = Child("Text_Key", rect, new Vector2(-24f, -28f), new Vector2(170f, 34f));
+        TMP_Text keyText = AddText(key, font, CharacterSelectUiStrings.ConfirmKey.Ko, 24f, TextAlignmentOptions.Center, ConfirmKeyColor);
+
+        return new ConfirmButtonParts { Button = button, Label = labelText, Key = keyText };
+    }
+
+    static void WireConfirmButton(SerializedObject viewSo, ConfirmButtonParts parts)
+    {
+        viewSo.FindProperty("confirmButton").objectReferenceValue = parts.Button;
+        viewSo.FindProperty("confirmLabel").objectReferenceValue = parts.Label;
+        viewSo.FindProperty("confirmKeyText").objectReferenceValue = parts.Key;
+    }
+
+    /// <summary>
+    /// 이미 있는 패널 프리팹에 선택 버튼만 더한다(할 일 109 — 재생성의 fileID 노이즈 없이). 이미 있으면 아무것도 안 한다.
+    /// 메뉴 없음 — 에디터 명령으로 한 번 부른다. 새로 만드는 프리팹은 <see cref="BuildPanelPrefab"/> 이 같은 함수로 넣는다.
+    /// </summary>
+    public static void AddConfirmButtonToExistingPanel()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogError($"{Tag} Play 중에는 실행하지 않는다 — 먼저 정지할 것.");
+            return;
+        }
+
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        Sprite body = LoadSprite(ConfirmButtonSprite);
+        if (font == null || body == null)
+            return;
+
+        GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+        try
+        {
+            var content = root.transform.Find("Content") as RectTransform;
+            CharacterSelectPanel view = root.GetComponent<CharacterSelectPanel>();
+            if (content == null || view == null)
+            {
+                Debug.LogError($"{Tag} Content·CharacterSelectPanel 을 찾지 못했다: {PanelPath}");
+                return;
+            }
+            if (content.Find("Button_Confirm") != null)
+            {
+                Debug.Log($"{Tag} 선택 버튼이 이미 있다 — 손대지 않음");
+                return;
+            }
+
+            ConfirmButtonParts parts = AddConfirmButton(content, font, body);
+            var viewSo = new SerializedObject(view);
+            WireConfirmButton(viewSo, parts);
+            viewSo.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool success);
+            Debug.Log($"{Tag} 선택 버튼 추가 {(success ? "성공" : "실패")}: {PanelPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
         }
     }
 
