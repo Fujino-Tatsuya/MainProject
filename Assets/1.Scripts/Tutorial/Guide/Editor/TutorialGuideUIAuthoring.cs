@@ -55,7 +55,7 @@ public static class TutorialGuideUIAuthoring
         ("TUT_Z1_CHECK_E", "E 스킬", DefaultSeconds),
         ("TUT_Z1_CHECK_RMB", "우클릭 스킬", DefaultSeconds),
         ("TUT_Z1_CHECK_R", "R 궁극기", DefaultSeconds),
-        (TutorialCorridor1CooldownFlow.CooldownResetId, "모든 스킬의 재사용 대기시간이 초기화되었습니다.", 5f),
+        ("TUT_C1_COOLDOWN_RESET", "모든 스킬의 재사용 대기시간이 초기화되었습니다.", 5f),   // 107: 쓰던 TutorialCorridor1CooldownFlow 는 Legacy
         (TutorialGuideIds.Z2Intro, "적이 깨어납니다! 모든 적을 처치하세요.", 4f),
         (TutorialGuideIds.Z2Goal, "적 처치 {n}/{total}", DefaultSeconds),
         // 존3 — 공통 안내만(캐릭터별 간파 설명 없음). "/3" 은 목표 복제값 {total}.

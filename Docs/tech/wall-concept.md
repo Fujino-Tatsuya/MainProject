@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|
 | 벽 | `Wall` | `Wall`(7) | 존·보스방의 벽(저작된 콜라이더) | O(플레이어 모터·NavMesh) | **O** | O(수집) |
 | 바닥 | `Ground` | `Ground`(3) | 밟는 면 | — | — | O(수집) |
-| 배리어 | (없음) | **`Barrier`(19, 새로 추가)** | 튜토리얼 배리어·개인 뒤 배리어(런타임 생성 `TutorialBarriers`) | O(플레이어 모터) · 몬스터는 NavMeshObstacle 카브 | **X** | X(카브) |
+| 배리어 | (없음) | **`Barrier`(19, 새로 추가)** | 튜토리얼 배리어·개인 뒤 배리어(런타임 생성 `MapSceneBarriers`) | O(플레이어 모터) · 몬스터는 NavMeshObstacle 카브 | **X** | X(카브) |
 | 그 밖 | — | `Default`·`Env` | 아직 분류 안 된 지오메트리·소품 | O | X(벽을 가리는 '막힘') | Default O · Env X |
 
 - Barrier 레이어의 물리 충돌 매트릭스는 Wall 과 같게 복사했다(`ProjectSettings/DynamicsManager.asset`).
@@ -22,7 +22,7 @@
 3. **배리어는 건드리지 않는다** — 런타임에 Barrier 레이어로 생긴다.
 4. 세팅 뒤 확인(Play): 넉백·밀치기로 몬스터/플레이어를 벽에 박으면 콘솔에 `[WallImpact] <유닛> → 벽 '<콜라이더>' …` 1줄(넉백 한 번에 1회). 배리어·상자·다른 유닛에 막히면 안 나와야 한다.
 5. 튜토리얼 존3: 활성 때 `[Tutorial] 존3 Wall 레이어 콜라이더 0개` 경고가 나오면 존3 벽이 아직 Wall 이 아니다(그 상태로는 연계가 성공하지 않는다).
-6. ⚠️ `Tools/Map/Authoring/Tutorial` 의 `TutorialStageAuthoring`(벽 BoxCollider 다시 붙이기)은 이제 벽 레이어를 **Wall** 로 둔다(예전 Default). 태그는 바꾸지 않는다.
+6. ⚠️ `Tools/Map/Authoring/Tutorial` 의 `MapSceneStageAuthoring`(벽 BoxCollider 다시 붙이기)은 이제 벽 레이어를 **Wall** 로 둔다(예전 Default). 태그는 바꾸지 않는다.
 
 ## 3. 공용 벽 충돌 — API
 - 판정 호출(서버): `UnitWallImpacts.ServerProbe(target, episode, direction, requested, moved, speed, pusher, out impact[, contactSlack, blockedSlack])`
@@ -59,15 +59,15 @@
 | 씬 NavMeshSurface `MonsterScene`(9 = Default·Ground) | Default·Ground | **수동 베이크하면 벽 빠짐**(테스트 씬) | — | 보고만(경석 테스트 씬 — 재베이크 전 Wall 추가 필요) |
 | `TurretHeadAim.laserBlockers`(PeekABot·TeslaBot 프리팹 = 0 → 코드 기본) | Default·Ground → **+Wall** | **예고선이 벽을 뚫음** | — | **코드 기본에 Wall 추가**(프리팹 값 0 그대로) |
 | 거너 `GunnerBasicAttackData`·`GunnerChargeLaserData.blockingLayers`(에셋 2177 → 526465) · 코드 기본 | Default·Wall·Env → **+Barrier** | 이미 Wall 포함 — **일반 존 벽에 계속 막힘** | 빠지면 배리어 관통 | **Barrier 추가**(지금처럼 배리어에 막힘) |
-| `TutorialDeathRules._obstacleMask`(부활 지점 점유) | ground·Wall → **+Barrier** | 그대로 | 배리어 위 부활 가능 | **Barrier 추가** |
+| `MapSceneDeathRules._obstacleMask`(부활 지점 점유) | ground·Wall → **+Barrier** | 그대로 | 배리어 위 부활 가능 | **Barrier 추가** |
 | `PartyWipeRespawner` 패드 링 점 장애물 | ground·Wall → **+Barrier** | 그대로 | 같음 | **Barrier 추가** |
 | `GroundProbe.TryFindGround` | Default·Ground(+호출부) | 벽 윗면에 착지 안 함(개선) | 무관 | 없음 |
 | `MapContentSpawner.TryResolveSpawnPoint` | Default·Ground | 마커가 벽 위면 아래 바닥으로 | 무관 | 없음 |
 | `MonsterCollapseDebris.PartCollisionMask` | Default·Ground·Wall·Env | 그대로 | 파편이 배리어 통과(전과 달라짐 — 무해) | 없음 |
 | `BossBomb.wallMask`(Bomb 프리팹 128 = Wall) | Wall | 보스방 벽이 Wall 이어야 미끄러짐 멈춤(BossRoomAuthoring 이 이미 Wall) | 무관 | 없음 |
 | `FogManager.losWallMask`(씬 Everything) | Everything | 그대로 | 그대로 | 없음 |
-| `TutorialBarrierPreview`(에디터 점검) | 'Wall 아닌 것 = 벽' | **Wall 벽을 못 찾음** | — | **Barrier 제외로 수정** |
-| `TutorialStageAuthoring`(에디터) | 벽 = Default 로 지정 | 사용자 세팅을 되돌림 | — | **Wall 로 지정하게 수정** |
+| `MapSceneBarrierPreview`(에디터 점검) | 'Wall 아닌 것 = 벽' | **Wall 벽을 못 찾음** | — | **Barrier 제외로 수정** |
+| `MapSceneStageAuthoring`(에디터) | 벽 = Default 로 지정 | 사용자 세팅을 되돌림 | — | **Wall 로 지정하게 수정** |
 | 플레이어 모터 스윕·대시·넉백 | obstacleMask | 위와 같음 | 위와 같음 | — |
 
 - 그 밖의 직렬화 LayerMask(2.Prefabs · 9.ScriptableObject 1051개 전수 스캔): Default 있고 Wall 없는 것은 바닥 마스크(BossBomb.groundMask 9 · 규칙 groundMask 2057)와 카메라 볼륨뿐 — 벽과 무관.

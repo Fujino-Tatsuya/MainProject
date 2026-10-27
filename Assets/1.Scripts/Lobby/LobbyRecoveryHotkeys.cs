@@ -4,7 +4,7 @@
 //  Alt+1 튜토리얼 클리어 켜기/끄기(누른 사람) · Alt+2 멈춤 탈출(누른 사람) · Alt+3 로비 다시 불러오기(호스트만).
 //  키 표 = LobbyRecoveryHotkeyRules.Table — 키 추가는 그 표 한 줄 + 서버 실행(LobbyTrainingDirector.Recovery.cs) 한 갈래.
 //
-//  부착: 씬에 배치하지 않는다 — 로비 훈련 진행기가 스폰되면(StageChanged) 그 오브젝트에 스스로 붙는다(TutorialSkipController 와 같은 방식).
+//  부착: 씬에 배치하지 않는다 — 로비 훈련 진행기가 스폰되면(StageChanged) 그 오브젝트에 스스로 붙는다(MapSceneSkipController 와 같은 방식).
 //  진행기는 로비 씬에만 있어 다른 씬(맵 튜토리얼 Alt+1~0)과 겹치지 않는다.
 //
 //  🔴 에디터·Development Build·DEV_HOTKEYS 빌드에만 있다. 심볼을 지운 릴리스 빌드엔 클래스·RPC 가 없어 입력이 무시된다 — 호스트·클라는 같은 심볼 빌드여야 한다.

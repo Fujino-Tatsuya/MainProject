@@ -111,7 +111,8 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCue
     MonsterCounterWindow _counter;
     EffectAnimEvents _effects;
 
-    // 튜토리얼 주입 지점(handoff-tutorial-spinner.md). 구현체가 없으면 null — 모든 분기가 원래 경로다.
+    // 주입 지점(handoff-tutorial-spinner.md). 구현체가 없으면 null — 모든 분기가 원래 경로다.
+    // 유일한 구현체였던 튜토리얼 연습(TutorialSpinnerPractice·SpinnerBot_Tutorial)은 할 일 107 에서 Legacy 로 빠졌다 — 지금은 늘 null.
     ISpinnerBotOverride _override;
     bool _overrideResolved;
     ISpinnerBotOverride _harmlessSpin;   // 이번 스핀이 주입 아래서 시작됐으면 그 구현체(돌진 피해 없음)
@@ -543,7 +544,7 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCue
 
 /// <summary>
 /// SpinnerBot 동작을 같은 오브젝트의 다른 컴포넌트가 덮어쓰는 주입 지점 — 튜토리얼 스피너봇 연습 모드
-/// (<c>TutorialSpinnerPractice</c>, Docs/tech/handoff-tutorial-spinner.md).
+/// (<c>TutorialSpinnerPractice</c>, Docs/tech/handoff-tutorial-spinner.md — 할 일 107 에서 Legacy, 지금 붙은 프리팹은 등록 해제된 SpinnerBot_Tutorial 뿐).
 /// 🔴 구현체가 붙어 있지 않으면 SpinnerBot 은 이전과 똑같이 돈다. 전부 서버에서만 묻는다.
 /// </summary>
 public interface ISpinnerBotOverride

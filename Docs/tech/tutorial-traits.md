@@ -1,8 +1,10 @@
 # 튜토리얼 특성 선택 (할 일 15)
 
+> **🟪 할 일 107 (2026-10-27)** — 특성 모듈(`Assets/1.Scripts/Tutorial/Traits`)은 이름 그대로. 맵씬에서 라운드를 여는 복도 흐름만 `TutorialCorridorFlow` → **`MapSceneTraitCorridorFlow`** 로 이름이 바뀌었다(동작 그대로). 디렉터는 `MapSceneDirector`.
+
 > 튜토리얼 복도에서 구역을 돌파할 때마다 특성 1장을 고른다. 특성은 **이번 작전 동안만** 유지된다.
 > 코드 폴더: `Assets/1.Scripts/Tutorial/Traits/` · 데이터: `Assets/9.ScriptableObject/Tutorial/Traits/` · UI 프리팹: `Assets/2.Prefabs/UI/Tutorial/TutorialTraitUI.prefab`.
-> 씬 배치: S8 에서 `4.MapScene` 루트에 `TutorialTraitDirector`·`TutorialTraitUI` 를 놓았다. 복도 트리거는 `TutorialCorridorFlow`([tutorial-corridors-zone2.md](tutorial-corridors-zone2.md)). 디렉터를 씬에 두지 않으면 아무 일도 일어나지 않는다.
+> 씬 배치: S8 에서 `4.MapScene` 루트에 `TutorialTraitDirector`·`TutorialTraitUI` 를 놓았다. 복도 트리거는 `MapSceneTraitCorridorFlow`([tutorial-corridors-zone2.md](tutorial-corridors-zone2.md)). 디렉터를 씬에 두지 않으면 아무 일도 일어나지 않는다.
 
 ## 1. 구조
 
@@ -140,17 +142,17 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 ## 7. 테스트
 
-`Tools/Tests/튜토리얼 EditMode 테스트 실행` 에 등록(I0 에서 플레이어 러너에서 이동): `TutorialTraitSelectionModelTests`(규칙·무적 계획) · `TutorialTraitWindowModelTests`(창 판정·문구 테이블 폴백) ·
-`TutorialTraitDeadlineModelTests`(교착 방지 게이지 — 비율·10초 강조·로컬 감소·재동기화). 게이지 표시 조건은 `TutorialCorridorModelTests`.
+`Tools/Tests/맵씬 EditMode 테스트 실행` 에 등록(I0 에서 플레이어 러너에서 이동): `TutorialTraitSelectionModelTests`(규칙·무적 계획) · `TutorialTraitWindowModelTests`(창 판정·문구 테이블 폴백) ·
+`TutorialTraitDeadlineModelTests`(교착 방지 게이지 — 비율·10초 강조·로컬 감소·재동기화). 게이지 표시 조건은 `MapSceneTraitCorridorModelTests`.
 
 ## 8. 교착 방지 게이지 (할 일 15 후속)
 
 선택 창 패널 맨 아래(`Window/Panel/Deadline`) — 가로 게이지 + `n초 뒤 자동 선택` + `선택 완료 n/전체`. 기본 꺼짐이라 안 보일 땐 창 레이아웃이 전과 같다.
 
 - **표시 조건**: 기다리는 개인 게이트가 진행 중 복도의 출구(G2/G4/G7/G10)이고 첫 완료자 뒤(자동 진행 시각이 정해짐)일 때만 —
-  `TutorialCorridorRules.ShouldShowTraitDeadline`. 첫 완료자 전·솔로 즉시 완료엔 숨김. 게이지는 창 안이라 창이 닫힌(이미 고른) 사람에겐 안 보인다.
-- **값**: `TutorialDirector.TryGetWait`(복제 대기 상태 — done/total·자동 진행까지 남은 초) · 분모 = `TutorialDirector.DeadlockSeconds`(인스펙터 `deadlockSeconds`).
-- **의존 방향**: 특성 모듈(`Assets/1.Scripts/Tutorial/Traits/**`)은 튜토리얼 디렉터를 모른다. 복도 흐름(`TutorialCorridorFlow`, **모든 피어**에 붙음)이
+  `MapSceneTraitCorridorRules.ShouldShowTraitDeadline`. 첫 완료자 전·솔로 즉시 완료엔 숨김. 게이지는 창 안이라 창이 닫힌(이미 고른) 사람에겐 안 보인다.
+- **값**: `MapSceneDirector.TryGetWait`(복제 대기 상태 — done/total·자동 진행까지 남은 초) · 분모 = `MapSceneDirector.DeadlockSeconds`(인스펙터 `deadlockSeconds`).
+- **의존 방향**: 특성 모듈(`Assets/1.Scripts/Tutorial/Traits/**`)은 튜토리얼 디렉터를 모른다. 복도 흐름(`MapSceneTraitCorridorFlow`, **모든 피어**에 붙음)이
   `Render`(디렉터 `StateChanged`·특성 `ClientStateChanged`) 때마다 `TutorialTraitSelectionView.Instance.SetDeadline(visible, remaining, total, done, count)` 로 넣는다.
   창이 늦게 깨어나면 흐름 `Update` 가 다시 넣는다.
 - **시간**: 창이 `Time.unscaledDeltaTime` 으로 로컬 감소(0 에서 멈춤 — 만료 처리는 서버), 다음 `SetDeadline` 이 서버 시각 기준 값으로 다시 맞춘다.
@@ -176,7 +178,7 @@ API:
 |---|---|
 | `bool TryGetResetPrompt(ulong clientId, out int generation)` | [전 피어] 그 플레이어가 팝업에 답해야 하나 + 세대 |
 | `void RequestResetAnswer(int generation, bool reset)` | [로컬 플레이어] 응답 → `AnswerResetPromptServerRpc`(`SendTo.Server`, 보낸 사람 = `SenderClientId`) |
-| `bool IsTraitResetInProgress` | [전 피어] 누군가 팝업 대기·재선택 중 — `TutorialBossPath.IsBossPadEnabled` 가 패드를 잠근다 |
+| `bool IsTraitResetInProgress` | [전 피어] 누군가 팝업 대기·재선택 중 — `MapSceneBossPath.IsBossPadEnabled` 가 패드를 잠근다 |
 
 - **효과 원복**: 효과를 걸 때 장부에 남긴다 — 배율 특성 = 상태이상 타입(출처 `SourceIdOf(index)` → `StatusEffectController.Remove(type, source)`),
   쿨감 특성 = 구독한 핸들러(`Player.ServerAttackLanded -=`). 거부된 배율(연출 잠금 중)은 장부에 없다(원복할 것 없음). 기존 `cooldownHooks` 목록을 이 장부로 바꿨다.
@@ -195,4 +197,4 @@ API:
   담는 것 = 획득 목록(순서) · 지금 복도 라운드에서 이미 골랐나 · 초기화 팝업 세대 / 재선택 남은 라운드·열린 후보.
 - **재스폰**: `MatchRoster.PlayerRejoined` → `TutorialTraitRejoin.Restore`(새 clientId) → 장부에 없는 획득 특성만 `ApplyEffect`(멱등) → `RebuildEntries`.
   팝업 대기였으면 같은 세대 팝업, 재선택 중이었으면 같은 후보 창(퇴장 중 다시 전멸했으면 지금 세대 팝업). 고르던 복도 제시는 되살리지 않는다(문 열림 자동 획득).
-- `TutorialDirector` 는 같은 이벤트로 `TutorialFlowModel.RebindPlayer`(체크·완전 사망 이어 받기, 뒤 배리어 0). 테스트: `TutorialTraitRejoinTests`.
+- `MapSceneDirector` 는 같은 이벤트로 `MapSceneFlowModel.RebindPlayer`(체크·완전 사망 이어 받기, 뒤 배리어 0). 테스트: `TutorialTraitRejoinTests`.

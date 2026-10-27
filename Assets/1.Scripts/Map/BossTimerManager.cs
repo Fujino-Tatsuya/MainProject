@@ -19,7 +19,7 @@ using UnityEngine;
 /// 🔴 <b>배치</b> — <see cref="BossTeleportManager"/> 와 **같은 씬 상주 GameObject** 에 붙인다.
 ///    (하나의 NetworkObject 에 NetworkBehaviour 가 여럿인 것은 정상이다.)
 ///
-/// 튜토리얼(할 일 15 S5 — Docs/tech/handoff-tutorial.md §3): <see cref="TutorialBossPath.ShouldAutoStartTimer"/> 가 false 면
+/// 튜토리얼(할 일 15 S5 — Docs/tech/handoff-tutorial.md §3): <see cref="MapSceneBossPath.ShouldAutoStartTimer"/> 가 false 면
 /// 1) 의 자동 시작을 건너뛰고 Idle 로 둔다 → 디렉터가 G8 에서 <see cref="StartTimerServer"/>(420초)로 시작한다.
 /// 만료·도착 계약(3·4)은 그대로다.
 /// </summary>
@@ -65,7 +65,7 @@ public sealed class BossTimerManager : NetworkBehaviour
     public static BossTimerManager Instance { get; private set; }
 
     public TimerState State => _state.Value;
-    public float LimitSeconds => TutorialBossPathRules.EffectiveLimitSeconds(_limitOverride.Value, limitSeconds);
+    public float LimitSeconds => MapSceneBossPathRules.EffectiveLimitSeconds(_limitOverride.Value, limitSeconds);
     public bool FillUpAsTimePasses => fillUpAsTimePasses;
 
     /// <summary>남은 시간(초). 안 도는 중이면 0.</summary>
@@ -219,9 +219,9 @@ public sealed class BossTimerManager : NetworkBehaviour
             return;
 
         // 튜토리얼(S5): 자동 시작하지 않는다 — Idle 로 두고 디렉터가 G8 에서 StartTimerServer 로 시작한다.
-        // 판별(TutorialStageMarker)은 씬 로드 때 확정돼 있어 이 이벤트·스폰 순서와 무관하다. 보류도 만들지 않으므로
+        // 판별(MapSceneStageMarker)은 씬 로드 때 확정돼 있어 이 이벤트·스폰 순서와 무관하다. 보류도 만들지 않으므로
         // 스폰 직후(ApplyPendingStart)에도 시작되지 않는다.
-        if (!TutorialBossPath.ShouldAutoStartTimer)
+        if (!MapSceneBossPath.ShouldAutoStartTimer)
         {
             _pendingStart = false;
             Edit.Log("[BossTimer] 튜토리얼 스테이지 — 맵 생성 자동 시작을 건너뛴다(G8 에서 서버가 시작).", this);
@@ -252,7 +252,7 @@ public sealed class BossTimerManager : NetworkBehaviour
         _pendingStart = false;
 
         // 튜토리얼(S5) 이중 안전 — 생성 이벤트에서 이미 걸렀지만 보류가 남았어도 자동 시작하지 않는다.
-        if (!TutorialBossPath.ShouldAutoStartTimer) return;
+        if (!MapSceneBossPath.ShouldAutoStartTimer) return;
 
         // 세션 시계로 잡아 뒀으면 그 값을 그대로 쓴다 — 시계를 섞지 않는다.
         if (_pendingUsesSessionClock)

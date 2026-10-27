@@ -48,6 +48,7 @@
   플레이어 프리팹·스폰·캐릭터 교체를 건드리기 전에 읽을 것.
 - **데이터 테이블**: [Docs/tech/data-table.md](Docs/tech/data-table.md) — 기획 수치는 `GameData.xlsx`(SVN)가 원본.
   툴바 `데이터: 테이블/인스펙터` 로 Play 출처를 고르고, **빌드는 항상 xlsx 값**. 새 수치를 노출할 땐 `[DataTableSheet]`·`[DataTableIgnore]`.
+- **맵씬 진행(옛 튜토리얼)**: [Docs/tech/tutorial-director.md](Docs/tech/tutorial-director.md) 맨 위 — 할 일 107(2026-10-27)로 `TutorialDirector` → `MapSceneDirector` 등 `Map/MapScene/`·`MapScene…` 이름, 존1~3 교육·스피너 연습·존4 교육은 `Map/Tutorial/Legacy/`·`Tutorial/Legacy/`(런타임 연결 끊음), 존1~3 진행은 `MapSceneZoneFlow`. 로비 공용(`Tutorial/Guide`·`Tutorial/Traits`·`TutorialCooldownReset`)은 이름 그대로.
 - **튜토리얼 특성 선택**: [Docs/tech/tutorial-traits.md](Docs/tech/tutorial-traits.md) — 디렉터 API·S12 배치 순서·placeholder 특성·알려진 제약.
 - **튜토리얼 QA**: [Docs/tech/tutorial-qa.md](Docs/tech/tutorial-qa.md) — 솔로·MPPM·회귀 Play 체크리스트·알려진 한계·병합 전 확인. 단계별 문서 목록은 [tutorial-director.md](Docs/tech/tutorial-director.md) §10.1.
 - **로비 데모 부스 운영**: [Docs/tech/lobby-demo-flow.md](Docs/tech/lobby-demo-flow.md) — 흐름·모든 PC 공용 `demo-connection.json`(role auto — 이 PC IP = hostAddress 면 호스트, host/client 명시 우선)·같은 빌드 필수·대기 화면 문구·재접속·MPPM `Client` 태그·알려진 한계.

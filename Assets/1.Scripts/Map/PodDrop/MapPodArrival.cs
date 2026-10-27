@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 /// 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 빠른 낙하 → 급감속하며 날개·다리 펴기 → 연출 높이(기본 5m)
 /// → 천천히 착륙(이펙트·흔들림) → 해치 열기·날개 접기 → 1초 뒤 디졸브(<see cref="PodDissolve"/>) → 포드 제거. 클립은 1배속 재생(<see cref="PodAnimatorDriver"/>) —
 /// 클라 포드는 재생만 하고 자기 이벤트로 단계를 넘기지 않는다.</item>
-/// <item>튜토리얼: <see cref="IsArrivalDoneLocal"/> 이 참이 된 뒤에 존1 S0(착지 타이머·자막·목표)이 시작한다(<see cref="TutorialZone1Flow"/>).</item>
+/// <item><see cref="IsArrivalDoneLocal"/> — 착지 연출이 끝났는가(로컬). 존1 S0 안내(<c>TutorialZone1Flow</c>)가 이것을 기다렸다 — 할 일 107 에서 Legacy 로 빠졌다.</item>
 /// </list>
 /// 수치·좌석 오프셋은 <see cref="PodDropSettings"/>(맵 단계) 가 원본이다 — 착지점은 플레이어 스폰 슬롯(<see cref="MapGenerator.GetRoleSlot"/>) 기준.
 /// </summary>

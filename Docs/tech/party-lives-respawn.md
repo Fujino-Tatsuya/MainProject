@@ -7,7 +7,7 @@
 ## 1. 사양 요약
 
 1. **공용 목숨 5개** — 클라별 LifeCount(기본 3) 대신 파티 공용 풀 5개. 값은 데이터 필드(`MultiGameRule.partyLifeCount`, Player 시트).
-   부활(Soul → Alive) **성공 때** 풀에서 1 차감(기존 '부활 시 차감' 시점 유지). 튜토리얼 G11(보스방 도착) 전 사망은 차감 없음(`TutorialDeathRules` 그대로).
+   부활(Soul → Alive) **성공 때** 풀에서 1 차감(기존 '부활 시 차감' 시점 유지). 튜토리얼 G11(보스방 도착) 전 사망은 차감 없음(`MapSceneDeathRules` 그대로).
    목숨 표시 UI 는 현재 없다(2026-10-13 검색 — 디버그 UI 언급만). 생기면 `MultiGameRule.PartyLives`/`PartyLivesChanged` 를 읽는다.
 2. **전멸 리스폰** — 공용 목숨 0 에서 전멸하면 결과 화면 대신 **복도4**(튜토리얼 존4 ~ 보스 진입 사이)에 전원 리스폰.
    보스 클리어·사용자 나가기는 기존대로 결과 화면. 리스폰 = 보스 23호 처음부터(체력·패턴·등장 연출·보스방 상태) + 공용 목숨 5 재충전 + 전원 Alive·체력 가득.
@@ -36,7 +36,7 @@
   `PartyWipeWatcher` 가 `PartyLivesRules.IsPartyWiped(풀, 구성원)` 으로 판정 — 전원 PermanentDead 이거나 풀 0 의 Soul(차감 없는 부활 대기 제외).
   구성원은 씬 탐색이 아니라 등록식 목록 `PlayerLifeCycleController.Active`(OnEnable 등록·OnDisable 해제, `ActiveRegistry<T>`)를 0.25초마다 순회하고, 규칙도 `MultiGameRule.Current`(같은 등록 방식)로 읽는다(할 일 69 — `FindObjectsByType` 1회 8 ms 실측).
   `MultiGameRule` 이 없거나 스폰 전이면 예전 규칙(전원 PermanentDead). 2단계 리스폰이 Soul 도 전원 살리므로 갇힌 Soul 은 전멸 리스폰으로 풀린다(D1 유지).
-- 튜토리얼 G11 뒤 자동 부활이 풀 0 으로 거부되면 경고 로그 후 Soul 로 남는다(`TutorialDeathRules.Revive`).
+- 튜토리얼 G11 뒤 자동 부활이 풀 0 으로 거부되면 경고 로그 후 Soul 로 남는다(`MapSceneDeathRules.Revive`).
 - **보스 강제 개시 부활**(`BossTeleportManager.ReviveSoulsForForcedStart`) — 제한시간 만료 → 경고 카운트다운 → **보스방으로 강제 이동하기 직전**에, 그 순간 Soul 인 사람을 전부 되살린다(팀장 확정 2026-09-20).
   이유: Soul 만 보스방에 도착하면 디렉터가 참가자를 못 잡아 보스가 아예 안 뜬다. 패드로 들어가는 정상 이동에는 없다(만료 강제 이동만).
   - 차감: Soul 마다 공용 풀에서 1개씩 쓴다 — 풀이 모자라면 `ConnectedClientsList` 순회 앞쪽만 산다(못 산 사람은 Soul 그대로 이동).
@@ -56,9 +56,9 @@
 | 서버 실행 | `PartyWipeRespawner`(`Managers/`, static) — `TryRespawnServer()` · 이벤트 **`PartyWipeRespawned(IReadOnlyList<ulong>)`**(3단계용) |
 | 진입 | `PartyWipeWatcher` — 전멸 확정 시 `TryRespawnServer()` 먼저, false 면 기존 `GoToResult` |
 | 생명주기 | `PlayerLifeCycleController.TryRespawnAfterWipeOnServer()` · 시체 회수 `PlayerCorpseController`(PermanentDead → 다른 상태) |
-| 튜토리얼 | `TutorialDirector.RewindForBossRetryServer`·`ResetBackBarrierMaskServer` · `TutorialFlowModel.RewindForBossRetry` · `TutorialBackBarrierRules.MaskWithFrontmost` · `TutorialDeathRules.ResumeForBossRetry`·`TryFindWipeRespawnPoints` |
+| 튜토리얼 | `MapSceneDirector.RewindForBossRetryServer`·`ResetBackBarrierMaskServer` · `MapSceneFlowModel.RewindForBossRetry` · `MapSceneBackBarrierRules.MaskWithFrontmost` · `MapSceneDeathRules.ResumeForBossRetry`·`TryFindWipeRespawnPoints` |
 | 보스(경석 영역) | `BossEncounterDirector.ResetForRetryServer`·`IsBossDefeatedServer` · `BossTeleportManager.ResetForRetryServer` · `BossTimerManager.StopForRetryServer` — [handoff-boss-encounter-reset.md](handoff-boss-encounter-reset.md) |
-| 테스트 | `PartyWipeRespawnRulesTests`(플레이어 러너) · `TutorialBossRetryTests`(튜토리얼 러너) |
+| 테스트 | `PartyWipeRespawnRulesTests`(플레이어 러너) · `MapSceneBossRetryTests`(튜토리얼 러너) |
 
 ### 3.1 흐름(서버 — `PartyWipeRespawner.TryRespawnServer`)
 
@@ -68,7 +68,7 @@
     · CanRespawn: 보스 미격파 ∧ (튜토리얼 ? G10 열림 : 보스 진입 패드 있음)
     · 지점: 튜토리얼 = 복도4(TryFindWipeRespawnPoints) → 못 찾으면 패드 둘레 / 절차 맵 = 패드 둘레. 둘 다 없으면 결과 화면(LogError)
  1) 보스 — BossEncounterDirector.ResetForRetryServer(잠금 해제·디스폰·Idle·송전탑 내림) → BossTeleportManager.ResetForRetryServer → BossTimerManager.StopForRetryServer
- 2) 튜토리얼 — ResetBackBarrierMaskServer(각자, Corridor4) → RewindForBossRetryServer → TutorialDeathRules.ResumeForBossRetry   (🔴 마스크가 먼저)
+ 2) 튜토리얼 — ResetBackBarrierMaskServer(각자, Corridor4) → RewindForBossRetryServer → MapSceneDeathRules.ResumeForBossRetry   (🔴 마스크가 먼저)
  3) 공용 목숨 재충전(TryRefillPartyLivesOnServer → 5)
  4) 플레이어(clientId 오름차순 = 지점 순서) — TryRespawnAfterWipeOnServer → 부활 무적 2초(InvulnerabilityCause.Revive) → PlayerFallRecovery.RelocateServer(지점)
  5) PartyWipeRespawned(리스폰한 clientId 목록) — 3단계 특성 재선택 팝업이 구독
@@ -92,12 +92,12 @@
 - 부활 보호: `PlayerLandingProtection.BeginProtection(InvulnerabilityCause.Revive, 2초, applyStun: false)` — 튜토리얼 자동 부활과 같은 값.
 - **R2 점검(2026-10-13, `LifeStateChanged`·`GameplayAccessChanged` 구독자 전수)**: 대부분 현재 상태만 본다 — `PlayerSoulController`(외형·장비·레이어·허트박스),
   `PlayerLifeInputPolicy`, `CameraTargetSwitcher`(관전 = 현재 상태 PermanentDead 여부), `PlayerCombatUiLifecyclePolicy`, `AssassinState`(Alive 를 떠날 때만), `SessionStatsTracker`(사망 수 = Alive→DeadPresentation 만),
-  `TutorialDirector`(완전 사망 플래그 해제 — 참가자 수 복구), `TutorialTraitDirector`. **예외 = `PlayerCorpseController`** — PermanentDead 진입 때 놓은 시체를 아무도 거두지 않아
+  `MapSceneDirector`(완전 사망 플래그 해제 — 참가자 수 복구), `TutorialTraitDirector`. **예외 = `PlayerCorpseController`** — PermanentDead 진입 때 놓은 시체를 아무도 거두지 않아
   PermanentDead → 다른 상태에서 시체를 숨기고 제거 래치를 푸는 분기를 넣었다. Play 확인 필수.
 
 ### 3.4 리스폰 지점
 
-- 튜토리얼(`TutorialDeathRules.TryFindWipeRespawnPoints`): `TutorialArea.Corridor4` 격자(`SampleGrid`, 1.5m·안쪽 1m) → 최전방 = 복도4 마스크 기준 G9 앞면 여유(0.75m) 안 제외 →
+- 튜토리얼(`MapSceneDeathRules.TryFindWipeRespawnPoints`): `MapSceneArea.Corridor4` 격자(`SampleGrid`, 1.5m·안쪽 1m) → 최전방 = 복도4 마스크 기준 G9 앞면 여유(0.75m) 안 제외 →
   바닥·점유 검사(`TryResolveStandPoint` — 부활 지점과 같은 규칙) → `PartyWipeRespawnRules.TrySelectSpread`: 패드 범위 + 1m(`IsOnPad`) 제외, 복도4 중심에 가까운 순으로 **2m 간격**.
   모자라면 간격 무시 → 그래도 모자라면 고른 점 재사용(겹침은 최후 수단). 복도4 는 G10 배리어 **뒤**라 패드와 겹치지 않는 게 정상이지만 같은 패드 제외를 건다(C3 일관).
 - 절차 맵(또는 복도4 를 못 찾은 튜토리얼): 각 `BossEnterTrigger` 의 `BoxCollider` bounds 를 패드로, 패드 + 1m + 1.5m 둘레 링(1m 간격, `RingCandidates`) → 바닥(트리거 바닥 높이 ±1m)·점유 →
@@ -106,17 +106,17 @@
 
 ### 3.5 개인 뒤 배리어(C2)
 
-- 서버 `_backBarrierMasks`(TutorialDirector)는 비트를 **더하기만** 하고 Finished 뒤엔 갱신도 멈춘다. G10 을 지난 사람은 복도4 가 자기 뒤 배리어 너머라 그대로 두면 갇힌다.
-- 리스폰 때 각자 마스크를 `TutorialBackBarrierRules.MaskWithFrontmost(Corridor4)`(= G1~G9, G10 제외)로 다시 쓴다 — `TutorialDirector.ResetBackBarrierMaskServer(clientId, Corridor4)`, 복제는 `PlayerState.BackBarrierMask`.
+- 서버 `_backBarrierMasks`(MapSceneDirector)는 비트를 **더하기만** 하고 Finished 뒤엔 갱신도 멈춘다. G10 을 지난 사람은 복도4 가 자기 뒤 배리어 너머라 그대로 두면 갇힌다.
+- 리스폰 때 각자 마스크를 `MapSceneBackBarrierRules.MaskWithFrontmost(Corridor4)`(= G1~G9, G10 제외)로 다시 쓴다 — `MapSceneDirector.ResetBackBarrierMaskServer(clientId, Corridor4)`, 복제는 `PlayerState.BackBarrierMask`.
   `FrontmostPassedArea(mask) == Corridor4`, 로컬 콜라이더(`LocalColliderMask`)에 G10 없음 → 보스 진입 존(패드 방향) 앞길이 열려 있고 G9 뒤로는 못 돌아간다. 이후 G10 을 다시 지나면 기존 갱신 그대로.
 - 🔴 **마스크를 되감기보다 먼저** 쓴다 — Finished 동안은 로컬 뒤 배리어가 꺼져 있다가 되감기로 '진행 중'이 되는 순간 켜지는데, 그때 G10 비트가 남아 있으면 복도4 앞을 막는다.
-- `TutorialRevivePointRules`·패드 제외 규칙은 이 마스크를 그대로 쓰므로 리스폰 뒤 사망 부활 지점도 복도4 다(단계 BossEnter → 복도4, 최전방 복도4).
+- `MapSceneRevivePointRules`·패드 제외 규칙은 이 마스크를 그대로 쓰므로 리스폰 뒤 사망 부활 지점도 복도4 다(단계 BossEnter → 복도4, 최전방 복도4).
 
 ### 3.6 튜토리얼 되감기 · 목숨 차감
 
-- `TutorialFlowModel.RewindForBossRetry()`(순수) — G10 열림일 때만: 단계 → BossEnter, G11 닫기(열림·교착·보류 비트), G1~G10·카운터·체크 그대로. **'앞으로만' 규칙의 유일한 예외**.
-  `TutorialDirector.RewindForBossRetryServer()` 가 `_bossArrived` 해제 + Commit. 다음 보스방 도착 때 G11·Finished·`BossRoomArrived` 가 다시 난다.
-- `TutorialDeathRules.ResumeForBossRetry()` — `_finished` 해제·대기 기록 비움·이동 표시 끔.
+- `MapSceneFlowModel.RewindForBossRetry()`(순수) — G10 열림일 때만: 단계 → BossEnter, G11 닫기(열림·교착·보류 비트), G1~G10·카운터·체크 그대로. **'앞으로만' 규칙의 유일한 예외**.
+  `MapSceneDirector.RewindForBossRetryServer()` 가 `_bossArrived` 해제 + Commit. 다음 보스방 도착 때 G11·Finished·`BossRoomArrived` 가 다시 난다.
+- `MapSceneDeathRules.ResumeForBossRetry()` — `_finished` 해제·대기 기록 비움·이동 표시 끔.
 - **목숨 차감 규칙(사양 그대로)**: 차감 기준은 사망 시점 G11. 리스폰 뒤 **보스방 재도착 전 사망 = 차감 없음**(복도4 자동 부활), **재도착(G11 다시 열림) 뒤 사망 = 차감 대상**.
 - 존 장부·몬스터·배리어 G1~G10 은 건드리지 않는다(이미 클리어). 안내 UI 흐름(복도·존4)은 `IsFinished` 가 다시 false 가 되어 다시 그릴 수 있다 — 복도 라운드는 전부 처리돼 새 창은 안 열린다(Play 확인 항목).
 
@@ -145,8 +145,8 @@
 | 서버 | `TutorialTraitDirector` — `PartyWipeRespawned` 구독 · `AnswerResetPromptServerRpc` · `RevertEffects` · `ContinueReselect` |
 | 복제 | `NetworkList<Entry>` 에 `EntryKind.ResetPrompt` 행(`TraitIndex` = 세대) · `NetworkVariable<bool> traitResetBusy`(패드 잠금) |
 | 뷰 | `TutorialTraitSelectionView` — 팝업 런타임 생성(루트 `UiModalBlocker`), 문구 `TutorialTraitTexts.ResetPrompt*Id` |
-| 패드 | `TutorialBossPath.IsBossPadEnabled` → `TutorialBossPathRules.IsPadEnabled(isTutorial, g10Open, traitResetInProgress)` |
-| 테스트 | `TutorialTraitResetModelTests`·`TutorialBossPathRulesTests.Pad_LockedWhileTraitResetInProgress`(튜토리얼 러너) |
+| 패드 | `MapSceneBossPath.IsBossPadEnabled` → `MapSceneBossPathRules.IsPadEnabled(isTutorial, g10Open, traitResetInProgress)` |
+| 테스트 | `TutorialTraitResetModelTests`·`MapSceneBossPathRulesTests.Pad_LockedWhileTraitResetInProgress`(튜토리얼 러너) |
 | API·구조 상세 | [tutorial-traits.md §9](tutorial-traits.md#9-전멸-리스폰-뒤-특성-초기화--재선택-할-일-30-3단계) |
 
 ### 4.1 흐름
@@ -172,7 +172,7 @@
 
 - **D3 — 패드 잠금(구현)**: 패드는 "살아 있는 전원이 패드 위" 가 아니라 **한 명만 서도 카운트다운 → 전원 이동**(`BossEnterTrigger`·`BossTeleportManager.SetOccupied`, 로아식).
   그래서 선택 중인 사람이 입력이 막혀도 다른 사람이 패드에 서면 끌려간다 → **팝업·재선택 중인 사람이 있는 동안 패드를 잠근다**(최소 처리 — 기존 G10 잠금과 같은 경로).
-  `TutorialBossPath.IsBossPadEnabled` 에 복제값 `IsTraitResetInProgress` 를 더했다. 잠긴 동안은 서 있어도 빈 패드로 보고되고 테두리가 숨는다(G10 전과 같은 모습).
+  `MapSceneBossPath.IsBossPadEnabled` 에 복제값 `IsTraitResetInProgress` 를 더했다. 잠긴 동안은 서 있어도 빈 패드로 보고되고 테두리가 숨는다(G10 전과 같은 모습).
   풀리는 순간 이미 서 있던 사람으로 카운트다운이 시작된다(`BossEnterTrigger.Update` 가 잠금 변화를 다시 알림). 경석 영역(`BossTeleportManager`·`BossEnterTrigger`)은 수정하지 않았다.
 - **D4 — 절차 맵(구현)**: 특성은 튜토리얼에만 있다 → 절차 맵 리스폰엔 팝업 없음. 특성 디렉터가 씬에 없으면 구독 자체가 없고, 있어도 튜토리얼이 아니면 무시한다.
 - **마감 게이지**: 기존 복도 규칙대로 — 게이지는 진행 중 복도의 출구 게이트(G2/G4/G7/G10)를 기다릴 때만 보이는데, 리스폰은 G10 뒤라 진행 중 복도가 없다 →
@@ -215,9 +215,9 @@
 
 - **EditMode(자동)**: 1단계 `PartyLivesRulesTests`(11건 — 목적지·차감·재충전·전멸·갇힌 Soul·차감 없는 Soul).
   2단계 `PartyWipeRespawnRulesTests`(11건, 플레이어 러너 — 결과/리스폰 분기·조건·보스 격파 거부·재충전 5·지점 선택 패드/여유/간격/폴백/실패·패드 둘레) ·
-  `TutorialBossRetryTests`(8건, 튜토리얼 러너 — 되감기·재도착 뒤 차감 재개·G10 전 거부·멱등·마스크 복도4 최전방·로컬 콜라이더 G10 없음·부활 구간 복도4·존1).
+  `MapSceneBossRetryTests`(8건, 튜토리얼 러너 — 되감기·재도착 뒤 차감 재개·G10 전 거부·멱등·마스크 복도4 최전방·로컬 콜라이더 G10 없음·부활 구간 복도4·존1).
   3단계 `TutorialTraitResetModelTests`(13건, 튜토리얼 러너 — 팝업 대상·예/아니오·중복·대상 아님·지난 세대·재전멸 중단·이탈 패드 해제·원복 장부 그 플레이어만 비움·
-  4라운드 재선택(3장·고른 것 제외·4회 후 종료)·개인 라운드가 남의 제시를 안 건드림·ResetPlayer/CancelOffer·풀 부족 시 건너뜀) + `TutorialBossPathRulesTests.Pad_LockedWhileTraitResetInProgress`.
+  4라운드 재선택(3장·고른 것 제외·4회 후 종료)·개인 라운드가 남의 제시를 안 건드림·ResetPlayer/CancelOffer·풀 부족 시 건너뜀) + `MapSceneBossPathRulesTests.Pad_LockedWhileTraitResetInProgress`.
 - **Play(사람)**:
   - 1단계: 솔로 — F10 부활로 공용 목숨이 5 → 4 … 0, 0 에서 사망 → PermanentDead → 결과 화면. MPPM 2인 — A 부활이 B 의 남은 목숨도 줄인다,
     풀 1 에서 둘 다 Soul → A 부활 → A 사망 → B(갇힌 Soul) 남은 채로 결과 화면. 튜토리얼 G11 전 사망은 풀이 줄지 않는다.
