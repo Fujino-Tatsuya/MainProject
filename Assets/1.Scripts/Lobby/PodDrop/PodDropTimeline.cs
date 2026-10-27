@@ -81,7 +81,7 @@ public struct PodDropLobbyTimings
         seatSlideSeconds = 0.4f,
         hatchState = "DP_HatchLobbyOpenClose",
         launchState = "DP_LaunchCycle",
-        launchFastSpeed = 4f,
+        launchFastSpeed = 6f,
         launchEndWaitSeconds = 1f,
         launchEndFadeSeconds = 1f,
         hudRescanSeconds = 0.5f,

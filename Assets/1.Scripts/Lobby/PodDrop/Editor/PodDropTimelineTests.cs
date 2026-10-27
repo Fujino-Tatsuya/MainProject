@@ -282,21 +282,19 @@ public sealed class PodDropTimelineTests
     public void Lobby_LaunchClipSeconds_FastAfterSpeedUpEvent()
     {
         const double launch = 10d;
-        Assert.AreEqual(0f, PodDropLobbyTimeline.LaunchClipSecondsAt(9d, launch, NotYet, 3f), Eps, "발사 전 0");
-        Assert.AreEqual(2f, PodDropLobbyTimeline.LaunchClipSecondsAt(12d, launch, NotYet, 3f), Eps, "가속 이벤트 전 = 1배속");
-        Assert.AreEqual(0f, PodDropLobbyTimeline.LaunchClipSecondsAt(9d, launch, NotYet, 4f), Eps, "발사 전 0");
-        Assert.AreEqual(2f, PodDropLobbyTimeline.LaunchClipSecondsAt(12d, launch, NotYet, 4f), Eps, "가속 이벤트 전 = 1배속");
+        Assert.AreEqual(0f, PodDropLobbyTimeline.LaunchClipSecondsAt(9d, launch, NotYet, 6f), Eps, "발사 전 0");
+        Assert.AreEqual(2f, PodDropLobbyTimeline.LaunchClipSecondsAt(12d, launch, NotYet, 6f), Eps, "가속 이벤트 전 = 1배속");
         const double fast = 10d + 213d / 60d; // 213프레임(60fps)
-        Assert.AreEqual(213f / 60f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast, launch, fast, 4f), Eps, "가속 순간 = 1배속 구간 끝");
-        Assert.AreEqual(213f / 60f + 4f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast + 1d, launch, fast, 4f), Eps, "가속 뒤 1초 = 클립 4초");
+        Assert.AreEqual(213f / 60f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast, launch, fast, 6f), Eps, "가속 순간 = 1배속 구간 끝");
+        Assert.AreEqual(213f / 60f + 6f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast + 1d, launch, fast, 6f), Eps, "가속 뒤 1초 = 클립 6초");
         Assert.AreEqual(213f / 60f + 1f, PodDropLobbyTimeline.LaunchClipSecondsAt(fast + 1d, launch, fast, 0f), Eps, "배율 0 이하 → 1배속");
-        Assert.AreEqual(8f, PodDropLobbyTimeline.LaunchClipSecondsAt(12d, launch, 5d, 4f), Eps, "가속 시각이 발사보다 앞이면 발사부터 배율");
+        Assert.AreEqual(12f, PodDropLobbyTimeline.LaunchClipSecondsAt(12d, launch, 5d, 6f), Eps, "가속 시각이 발사보다 앞이면 발사부터 배율");
     }
 
     [Test]
     public void Lobby_Defaults_LaunchFastSpeed()
     {
-        Assert.AreEqual(4f, PodDropLobbyTimings.Default.launchFastSpeed, Eps, "213프레임부터 4배");
+        Assert.AreEqual(6f, PodDropLobbyTimings.Default.launchFastSpeed, Eps, "213프레임부터 6배");
         Assert.AreEqual(213, PodAnimEventAuthoring.LobbyLaunchFastFrame);
     }
 
