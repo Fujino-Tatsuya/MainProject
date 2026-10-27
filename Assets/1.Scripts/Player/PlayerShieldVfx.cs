@@ -302,7 +302,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     {
         if (!IsNetworkActive)
         {
-            interruptWave?.PlayOnce();
+            PlayInterruptWave();
             return;
         }
 
@@ -313,7 +313,14 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
 
     // 원샷이라 Unreliable 이다. 한 발 유실되면 충격파 한 번이 안 뜰 뿐 상태가 어긋나지 않는다.
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    private void InterruptWaveRpc() => interruptWave?.PlayOnce();
+    private void InterruptWaveRpc() => PlayInterruptWave();
+
+    // 간파 연출 스위치(할 일 104 B3) — 피어마다 자기 값.
+    private void PlayInterruptWave()
+    {
+        if (InterruptPresentationToggles.IsOn(InterruptPresentationKind.PaladinWave))
+            interruptWave?.PlayOnce();
+    }
 
     /// <summary>
     /// [서버] 수호자의 의지(E) 방어 성공 — 반격 자세 상태로 <b>전 피어(오너 포함)</b>에서 CrossFade 한다.

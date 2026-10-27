@@ -5,6 +5,8 @@ using System.Collections.Generic;
 public enum SlowMotionPhase
 {
     None,
+    /// <summary>시작 직후 히트스톱 — 프로필의 히트스톱 배율 고정. 히트스톱 길이 0 이면 없다.</summary>
+    HitStop,
     Enter,
     Hold,
     Exit,
@@ -22,7 +24,9 @@ public enum SlowMotionPhase
 /// <list type="number">
 /// <item><b>마지막 것이 이긴다.</b> 진행 중에 <see cref="Start"/> 하면 <b>그 순간의 배율에서</b> 진입부터 다시 —
 ///       배율이 튀면 화면이 덜컥거린다. 유휴면 1.0 에서 출발한다.</item>
-/// <item><b>실패 복귀는 진행 중(진입·유지·복귀)일 때만.</b> 유휴·이미 실패 복귀 중이면 무시한다(멱등) —
+/// <item><b>히트스톱(할 일 87)은 시작 직후 한 번.</b> 길이가 0 보다 크면 히트스톱 배율 고정 → 진입은 그 배율에서 출발한다.
+///       길이 0 이면 히트스톱이 없던 때와 완전히 같다.</item>
+/// <item><b>실패 복귀는 진행 중(히트스톱·진입·유지·복귀)일 때만.</b> 유휴·이미 실패 복귀 중이면 무시한다(멱등) —
 ///       서버가 빗나감을 두 번 알려도 곡선이 다시 시작되지 않는다.</item>
 /// <item><b><see cref="LostTimeUntil"/> 은 해석적이고 단조 비감소다.</b> GameNow = 기존 − 이 값이라,
 ///       줄어들면 GameNow 가 되감긴다(상태이상 지속시간이 늘어나는 식의 버그). 1 − 배율 ≥ 0 이라 구조적으로 보장된다.</item>
@@ -47,22 +51,30 @@ public sealed class SlowMotionTimeline
         public readonly double LostAtStart;   // 이 구간 이전까지 확정된 누적 손실
         public readonly double From;          // 구간 시작 배율
         public readonly double Target;        // 유지 배율(Run)
+        public readonly double HitStop;       // 히트스톱 길이(Run). 0 = 없음
+        public readonly double HitStopScale;  // 히트스톱 배율(Run)
         public readonly double Enter, Hold, Exit;
         public readonly double FailExit;      // Run: 이 슬로우가 실패했을 때 쓸 길이 / FailRun: 자기 길이
 
         public Segment(SegmentKind kind, double start, double lostAtStart, double from, double target,
-                       double enter, double hold, double exit, double failExit)
+                       double enter, double hold, double exit, double failExit,
+                       double hitStop = 0.0, double hitStopScale = 1.0)
         {
             Kind = kind;
             Start = start;
             LostAtStart = lostAtStart;
             From = from;
             Target = target;
+            HitStop = hitStop;
+            HitStopScale = hitStopScale;
             Enter = enter;
             Hold = hold;
             Exit = exit;
             FailExit = failExit;
         }
+
+        // 진입 출발 배율 — 히트스톱이 있었으면 그 배율, 없으면 구간 시작 배율.
+        public double EnterFrom => HitStop > 0.0 ? HitStopScale : From;
     }
 
     readonly List<Segment> _segments = new List<Segment>();
@@ -70,6 +82,7 @@ public sealed class SlowMotionTimeline
 
     /// <summary>
     /// 슬로우를 시작한다. 진행 중이면 현재 배율에서 진입부터 다시(last-wins), 유휴면 1.0 에서.
+    /// 프로필에 히트스톱이 있으면 그 구간은 의도된 멈춤이라 현재 배율과 상관없이 히트스톱 배율로 바로 간다.
     /// 마지막 이벤트보다 이른 t 는 무시한다.
     /// </summary>
     public void Start(double t, SlowMotionProfile profile)
@@ -79,19 +92,18 @@ public sealed class SlowMotionTimeline
 
         Push(new Segment(SegmentKind.Run, t, LostTimeUntil(t), ScaleAtExact(t), profile.ClampedScale,
             profile.ClampedEnterDuration, profile.ClampedHoldDuration, profile.ClampedExitDuration,
-            profile.ClampedFailExitDuration));
+            profile.ClampedFailExitDuration, profile.ClampedHitStopDuration, profile.ClampedHitStopScale));
     }
 
     /// <summary>
-    /// 빗나감 — 진행 중(진입·유지·복귀)이면 현재 배율에서 실패 복귀로 넘긴다.
+    /// 빗나감 — 진행 중(히트스톱·진입·유지·복귀)이면 현재 배율에서 실패 복귀로 넘긴다.
     /// 유휴·종료 후·이미 실패 복귀 중이면 무시한다.
     /// </summary>
     public void Fail(double t)
     {
         if (!AcceptsEventAt(t)) return;
 
-        var phase = PhaseAt(t);
-        if (phase != SlowMotionPhase.Enter && phase != SlowMotionPhase.Hold && phase != SlowMotionPhase.Exit) return;
+        if (!IsRunningPhase(PhaseAt(t))) return;
 
         var current = _segments[_segments.Count - 1];
         Push(new Segment(SegmentKind.FailRun, t, LostTimeUntil(t), ScaleAtExact(t), 1.0,
@@ -119,6 +131,8 @@ public sealed class SlowMotionTimeline
         switch (s.Kind)
         {
             case SegmentKind.Run:
+                if (e < s.HitStop) return SlowMotionPhase.HitStop;
+                e -= s.HitStop;
                 if (e < s.Enter) return SlowMotionPhase.Enter;
                 if (e < s.Enter + s.Hold) return SlowMotionPhase.Hold;
                 if (e < s.Enter + s.Hold + s.Exit) return SlowMotionPhase.Exit;
@@ -132,6 +146,11 @@ public sealed class SlowMotionTimeline
 
     /// <summary>시각 t 에 슬로우가 진행 중인가(단계가 <see cref="SlowMotionPhase.None"/> 이 아님).</summary>
     public bool IsActiveAt(double t) => PhaseAt(t) != SlowMotionPhase.None;
+
+    /// <summary>실패 복귀로 넘길 수 있는 진행 단계(히트스톱·진입·유지·복귀)인가.</summary>
+    public static bool IsRunningPhase(SlowMotionPhase phase) =>
+        phase == SlowMotionPhase.HitStop || phase == SlowMotionPhase.Enter ||
+        phase == SlowMotionPhase.Hold || phase == SlowMotionPhase.Exit;
 
     /// <summary>
     /// 처음부터 t 까지 ∫(1 − 배율) dt — "슬로우로 덜 흐른 시간"(초). 단조 비감소.
@@ -147,12 +166,15 @@ public sealed class SlowMotionTimeline
         {
             case SegmentKind.Run:
             {
-                double lost = 0.0;
+                // 히트스톱: HitStopScale 고정.
+                double lost = Math.Min(e, s.HitStop) * (1.0 - s.HitStopScale);
+                e -= s.HitStop;
 
-                // 진입: linear From → Target. ∫₀ˣ (1 − From − (Target − From)·τ/E) dτ
+                // 진입: linear EnterFrom → Target. ∫₀ˣ (1 − From − (Target − From)·τ/E) dτ
+                double from = s.EnterFrom;
                 double x = Math.Min(e, s.Enter);
-                if (s.Enter > 0.0)
-                    lost += x * (1.0 - s.From) - (s.Target - s.From) * x * x / (2.0 * s.Enter);
+                if (s.Enter > 0.0 && x > 0.0)
+                    lost += x * (1.0 - from) - (s.Target - from) * x * x / (2.0 * s.Enter);
 
                 // 유지: Target 고정.
                 x = Math.Min(e - s.Enter, s.Hold);
@@ -181,7 +203,9 @@ public sealed class SlowMotionTimeline
         switch (s.Kind)
         {
             case SegmentKind.Run:
-                if (e < s.Enter) return s.From + (s.Target - s.From) * (e / s.Enter);
+                if (e < s.HitStop) return s.HitStopScale;
+                e -= s.HitStop;
+                if (e < s.Enter) return s.EnterFrom + (s.Target - s.EnterFrom) * (e / s.Enter);
                 e -= s.Enter;
                 if (e < s.Hold) return s.Target;
                 e -= s.Hold;

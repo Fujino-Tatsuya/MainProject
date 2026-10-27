@@ -30,6 +30,18 @@ public sealed class GlobalTimeScale : MonoBehaviour
     [Tooltip("인터럽트 유효타 슬로우 모양. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
     [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile();
 
+    [Tooltip("간파 성공(카운터 창 소비) 시 다시 거는 슬로우 모양. 맨 앞 히트스톱 뒤 그 배율에서 진입한다(할 일 87)")]
+    [SerializeField] private SlowMotionProfile interruptSuccessProfile = new SlowMotionProfile
+    {
+        scale = 0.25f,
+        hitStopDuration = 0.05f,
+        hitStopScale = 0.02f,
+        enterDuration = 0.05f,
+        holdDuration = 1.2f,
+        exitDuration = 0.4f,
+        failExitDuration = 0.1f,
+    };
+
     private readonly SlowMotionSession _session = new SlowMotionSession();
 
     private NetworkManager _networkManager;
@@ -46,9 +58,11 @@ public sealed class GlobalTimeScale : MonoBehaviour
 
     /// <summary>인터럽트 슬로우 프로필(서버가 발동할 때 넘긴다).</summary>
     public SlowMotionProfile InterruptProfile => interruptProfile;
+    /// <summary>간파 성공 슬로우 프로필(서버가 판정에서 성공을 확인했을 때 넘긴다).</summary>
+    public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
 
-    /// <summary>슬로우 시작(전 피어). (발동 번호, 발동자 clientId)</summary>
-    public event Action<uint, ulong> Started;
+    /// <summary>슬로우 시작(전 피어). (발동 번호, 발동자 clientId, 목적, 연출 기준 월드 위치 — <see cref="CurrentTargetPosition"/>)</summary>
+    public event Action<uint, ulong, SlowMotionPurpose, Vector3> Started;
     /// <summary>진행 중이던 슬로우가 실패 복귀로 넘어감(전 피어). (발동 번호)</summary>
     public event Action<uint> Failed;
     /// <summary>
@@ -65,6 +79,15 @@ public sealed class GlobalTimeScale : MonoBehaviour
     public uint CurrentTriggerId => _session.CurrentTriggerId;
     /// <summary>마지막 슬로우의 발동자 clientId. 진행 중인지는 <see cref="IsActive"/> 로 본다.</summary>
     public ulong CurrentTriggerClientId => _session.CurrentTriggerClientId;
+    /// <summary>마지막 슬로우의 목적. 진행 중인지는 <see cref="IsActive"/> 로 본다.</summary>
+    public SlowMotionPurpose CurrentPurpose => _session.CurrentPurpose;
+    /// <summary>마지막 슬로우의 프로필 유지 배율(정리된 값, 서버가 실어 보낸 값). 없으면 1.</summary>
+    public float CurrentProfileScale => _session.CurrentProfileScale;
+    /// <summary>
+    /// 마지막 슬로우의 연출 기준 월드 위치 — 간파 성공이면 카운터 창을 소비한 첫 대상, 못 찾으면 시전자(할 일 87 C5).
+    /// 위치를 싣지 않은 발동(시도 슬로우)은 0. 진행 중인지는 <see cref="IsActive"/> 로 본다.
+    /// </summary>
+    public Vector3 CurrentTargetPosition => _session.CurrentTargetPosition;
 
     private bool IsSessionRunning =>
         _networkManager != null && _networkManager.IsListening && _clock != null && _clock.IsRunning;
@@ -142,8 +165,11 @@ public sealed class GlobalTimeScale : MonoBehaviour
     /// <summary>
     /// 서버 전용. 슬로우를 발동하고 발동 번호를 돌려준다. 거부 시 0
     /// (서버 아님·세션 미가동·컷신 잠금·씬 전환 중). 진행 중이면 마지막 것이 이긴다(D6).
+    /// <paramref name="targetPosition"/> = 연출 기준 월드 위치(이벤트에 실어 전 피어에 보낸다, 선택).
     /// </summary>
-    public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId)
+    public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId,
+                            SlowMotionPurpose purpose = SlowMotionPurpose.Attempt,
+                            Vector3 targetPosition = default)
     {
         if (profile == null || !IsServerActive)
         {
@@ -162,8 +188,21 @@ public sealed class GlobalTimeScale : MonoBehaviour
             triggerId = ++_lastIssuedTriggerId; // uint 한 바퀴 — 0 은 "없음"이라 건너뛴다
         }
 
-        ServerPublish(SlowMotionEvent.CreateStart(triggerId, Now, triggerClientId, profile));
+        ServerPublish(CreateStartEvent(triggerId, Now, triggerClientId, profile, purpose, targetPosition,
+            InterruptPresentationToggles.IsOn(InterruptPresentationKind.HitStop)));
         return triggerId;
+    }
+
+    /// <summary>
+    /// 서버가 배포할 Start 이벤트. 히트스톱 스위치(할 일 104 A1)가 꺼져 있으면 히트스톱 길이만 0 으로 싣는다 —
+    /// 서버 값 하나가 전 피어에 가서 같은 타임라인이 유지된다. 배율·진입·유지·복귀는 그대로.
+    /// </summary>
+    public static SlowMotionEvent CreateStartEvent(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
+                                                   SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn)
+    {
+        var e = SlowMotionEvent.CreateStart(triggerId, time, triggerClientId, profile, purpose, targetPosition);
+        e.HitStopDuration = InterruptPresentationToggles.SelectHitStopDuration(hitStopOn, e.HitStopDuration);
+        return e;
     }
 
     /// <summary>
@@ -226,7 +265,7 @@ public sealed class GlobalTimeScale : MonoBehaviour
         switch (result)
         {
             case SlowMotionApplyResult.Started:
-                Started?.Invoke(e.TriggerId, e.TriggerClientId);
+                Started?.Invoke(e.TriggerId, e.TriggerClientId, e.Purpose, e.TargetPosition);
                 break;
             case SlowMotionApplyResult.Failed:
                 Failed?.Invoke(e.TriggerId);

@@ -6122,6 +6122,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             WarnNoInterruptFlashOnce();
             return;
         }
+        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.TargetFlash)) return; // 할 일 104 E1 — 섬광만 끈다
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);

@@ -16,6 +16,8 @@ GameObject:
   - component: {fileID: 1111111111111111111}
   - component: {fileID: 8945878156428303657}
   - component: {fileID: 2312403450460863167}
+  - component: {fileID: 127159849850635136}
+  - component: {fileID: 5279655060849073006}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -172,9 +174,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GlobalTimeScale
   interruptProfile:
     scale: 0.3
+    hitStopDuration: 0
+    hitStopScale: 0.02
     enterDuration: 0.05
     holdDuration: 0.35
     exitDuration: 0.25
+    failExitDuration: 0.1
+  interruptSuccessProfile:
+    scale: 0.25
+    hitStopDuration: 0.05
+    hitStopScale: 0.02
+    enterDuration: 0.05
+    holdDuration: 1.2
+    exitDuration: 0.4
     failExitDuration: 0.1
 --- !u!114 &2312403450460863167
 MonoBehaviour:
@@ -191,3 +203,49 @@ MonoBehaviour:
   runDemoFlow: 1
   lobbySceneName: 3.LobbyScene
   waitSceneName: 6.DemoConnectScene
+  mapSceneName: 4.MapScene
+--- !u!114 &127159849850635136
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74c5523d63f8bb0429aedc6a2df3dae8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptDarkAdaptation
+  selfIntensity: 1
+  othersIntensity: 0.35
+  fadeInDuration: 0.08
+  holdDuration: 0.6
+  fadeOutDuration: 0.5
+  luminanceThreshold: 0.8
+  thresholdSoftness: 0.3
+  maxDarken: 0.85
+  revealCenter: 0
+  revealRadius: 0.18
+  revealSoftness: 0.1
+--- !u!114 &5279655060849073006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b53ab57fa5d1eb844ae16be23afbaafa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptPresentationToggles
+  hitStop: 0
+  darkAdaptation: 0
+  ownerZoom: 0
+  successFxSlot: 0
+  paladinShieldGlow: 0
+  paladinShieldCharge: 0
+  paladinWave: 0
+  assassinInsightAttempt: 0
+  assassinInsightSuccess: 0
+  targetFlash: 0

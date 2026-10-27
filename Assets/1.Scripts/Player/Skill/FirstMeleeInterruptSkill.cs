@@ -41,6 +41,10 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
     public override void OnClientPlay(Vector3 direction)
     {
         // 애니메이션은 PlayerSkillController가 AnimatorStateName으로 재생한다. 여기는 방패 발광만.
+        // 간파 연출 스위치(할 일 104 B1) — 끄는 쪽(OnEnd)은 늘 돈다.
+        if (!InterruptPresentationToggles.IsOn(InterruptPresentationKind.PaladinShieldGlow))
+            return;
+
         shieldGlow?.FadeIn();
 
         // Play 는 이미 재생 중이면 먼저 회수하므로 연타로 두 번 불려도 겹치지 않는다.
