@@ -126,6 +126,10 @@ public static class QANightlyPaths
     public const string BatchPrefix = "N108-";
     public const string BatchPattern = "N108-2*";
     public const string RecordingsFile = "recordings.txt";
+    /// <summary>할 일 120 — 이벤트 시각표(<see cref="QANightlyEvent"/>).</summary>
+    public const string EventsFile = "events.tsv";
+    /// <summary>할 일 120 — 리플레이 클립 목록(<see cref="QANightlyRecording"/> 형식, 메모 = 이벤트 이름).</summary>
+    public const string ClipsFile = "clips.txt";
     public const string SummaryFile = "nightly-summary.md";
     public const string ScenarioReportPrefix = "48-";
 
@@ -215,7 +219,7 @@ public static class QANightlyHeader
 
     /// <summary>배치 머리 키(batch.txt). 103 리포트가 읽는 키(title·seed·total·data_source_mode·xlsx_svn_rev·git_*·unity_version)에 야간 키를 더한다.</summary>
     public static List<KeyValuePair<string, string>> BatchKeys(QANightlySeed seed, DateTime startedAt, string dataSourceMode, string xlsxRev,
-                                                              string gitBranch, string gitCommit, string unityVersion, bool record, string shareDir)
+                                                              string gitBranch, string gitCommit, string unityVersion, string recordMode, string shareDir)
     {
         return new List<KeyValuePair<string, string>>
         {
@@ -234,14 +238,17 @@ public static class QANightlyHeader
             KV("nightly_tier", seed.TierText),
             KV("nightly_order", QABoss103Plan.FormatOrder(seed.Order)),
             KV("nightly_note", seed.Note.Replace('\n', ' ')),
-            KV("record", record ? "obs" : "off"),
+            KV("record", string.IsNullOrEmpty(recordMode) ? QANightlyLocalSettings.RecordOff : recordMode),
             KV("share_dir", shareDir ?? ""),
         };
     }
 
-    /// <summary>아침 확인용 요약(마크다운) — 머리말 + 녹화 목록 + 판 결과(runs.csv 의 판·재실행·결과).</summary>
+    /// <summary>
+    /// 아침 확인용 요약(마크다운) — 머리말 + 판 결과(runs.csv 의 판·재실행·결과) + 녹화 목록 + (할 일 120) 이벤트 시각표·리플레이 클립.
+    /// </summary>
     public static string Summary(IReadOnlyDictionary<string, string> batch, IReadOnlyList<QANightlyRecording> recordings,
-                                 IReadOnlyList<QABoss103Attempt> attempts, string loopState, string reportPath)
+                                 IReadOnlyList<QABoss103Attempt> attempts, string loopState, string reportPath,
+                                 IReadOnlyList<QANightlyEvent> events = null, IReadOnlyList<QANightlyRecording> clips = null)
     {
         var sb = new StringBuilder();
         sb.Append("# ").Append(Val(batch, "title", "할 일 108 야간 QA")).Append("\n\n");
@@ -274,6 +281,29 @@ public static class QANightlyHeader
             foreach (QANightlyRecording r in recordings)
                 sb.Append("- 판 ").Append(r.Run).Append(r.Retry > 0 ? " 재실행" : "").Append(": ").Append(r.Path.Length > 0 ? r.Path : "(경로 없음)")
                   .Append(r.Shared.Length > 0 ? " → " + r.Shared : "").Append(r.Note.Length > 0 ? " · " + r.Note : "").Append('\n');
+
+        if (Val(batch, "record", "off") == QANightlyLocalSettings.RecordReplay || (clips != null && clips.Count > 0))
+        {
+            sb.Append("\n## 리플레이 클립\n\n");
+            if (clips == null || clips.Count == 0)
+                sb.Append("- 없음(이벤트 없음·OBS 저장 실패는 loop.log 경고)\n");
+            else
+                foreach (QANightlyRecording c in clips)
+                    sb.Append("- 판 ").Append(c.Run).Append(c.Retry > 0 ? " 재실행" : "").Append(" [").Append(c.Note.Length > 0 ? c.Note : "-").Append("]: ")
+                      .Append(c.Path.Length > 0 ? c.Path : "(경로 없음)").Append(c.Shared.Length > 0 ? " → " + c.Shared : "").Append('\n');
+        }
+
+        sb.Append("\n## 이벤트 시각표\n\n");
+        sb.Append("영상 타임코드 = 그 판 영상(녹화 목록의 같은 판) 안의 위치(H:MM:SS). 게임 시각 = Play 의 Time.time(초). 같은 이벤트 5초 안 반복은 한 줄.\n\n");
+        sb.Append("| 판 | 재실행 | 이벤트 | 시각 | 게임 시각(s) | 영상 타임코드 | 상세 |\n|---|---|---|---|---|---|---|\n");
+        if (events == null || events.Count == 0)
+            sb.Append("| - | - | 없음 | - | - | - | - |\n");
+        else
+            foreach (QANightlyEvent e in events)
+                sb.Append("| ").Append(e.Run).Append(" | ").Append(e.Retry).Append(" | ").Append(Cell(e.Name)).Append(" | ")
+                  .Append(e.At.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append(" | ")
+                  .Append(double.IsNaN(e.GameSeconds) ? "-" : e.GameSeconds.ToString("F1", CultureInfo.InvariantCulture)).Append(" | ")
+                  .Append(QANightlyTimecode.Format(e.VideoSeconds)).Append(" | ").Append(Cell(e.Detail)).Append(" |\n");
         return sb.ToString();
     }
 

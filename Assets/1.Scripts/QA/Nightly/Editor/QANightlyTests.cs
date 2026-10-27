@@ -3,8 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
+using UnityEngine;
 
-/// <summary>할 일 108 야간 QA 순수 로직 — 시드 파싱·103 설정 확장·날짜 폴더·리포트 머리말·녹화 기록·OBS 요청 메시지·PC 설정.</summary>
+/// <summary>
+/// 할 일 108 야간 QA 순수 로직 — 시드 파싱·103 설정 확장·날짜 폴더·리포트 머리말·녹화 기록·OBS 요청 메시지·PC 설정.
+/// 할 일 120 — 화질·보관·리플레이 설정, OBS 요청 데이터·응답·이벤트, 영상 타임코드, 이벤트 표·시각표, 클립 합치기·쿨다운·파일명, 보관 삭제 대상, 요약 절.
+/// </summary>
 public sealed class QANightlyTests
 {
     private const string ValidSeed =
@@ -176,7 +180,7 @@ public sealed class QANightlyTests
     {
         QANightlySeed.TryParse(ValidSeed, out QANightlySeed s, out _);
         List<KeyValuePair<string, string>> kv = QANightlyHeader.BatchKeys(s, new DateTime(2026, 10, 27, 23, 0, 0), "table", "na",
-            "qa/Nightly-eunhee\n", "abc1234", "6000.3.16f1", true, @"C:\share\2026-10-27\eunhee");
+            "qa/Nightly-eunhee\n", "abc1234", "6000.3.16f1", QANightlyLocalSettings.RecordFull, @"C:\share\2026-10-27\eunhee");
         Dictionary<string, string> d = QABoss103Batch.ParseKeyValues(QABoss103Batch.FormatKeyValues(kv));
         Assert.AreEqual("table", d["data_source_mode"]);
         Assert.AreEqual("unknown", d["xlsx_svn_rev"]);
@@ -317,6 +321,418 @@ public sealed class QANightlyTests
     {
         QANightlyLocalSettings s = QANightlyLocalSettings.Merge("{\"obsPort\":99999}", k => k == "QA_OBS_PORT" ? "abc" : null);
         Assert.AreEqual(4455, s.ObsPort);
+    }
+
+    // ── 할 일 120: PC 설정(화질·보관·리플레이) ──────────────────
+
+    [Test]
+    public void PC_설정_120_기본은_아무것도_안_바꾼다()
+    {
+        QANightlyLocalSettings s = QANightlyLocalSettings.Merge(null, _ => null);
+        Assert.AreEqual(QANightlyLocalSettings.RecordOff, s.RecordMode);
+        Assert.IsFalse(s.ReplayOnly);
+        Assert.IsFalse(s.HasQualitySettings);
+        Assert.AreEqual(0, s.VideoKeepDays);
+        Assert.AreEqual(0, s.ReplaySeconds);
+        Assert.AreEqual(10.0, s.ReplayAfterSeconds, 1e-9);
+        Assert.AreEqual(30.0, s.ReplayCooldownSeconds, 1e-9);
+        Assert.AreEqual("", s.ClipEvents);
+
+        QANightlyLocalSettings t = QANightlyLocalSettings.Merge(QANightlyLocalSettings.Template, _ => null);
+        Assert.IsFalse(t.HasQualitySettings, "서식 파일 그대로면 화질을 건드리지 않는다");
+        Assert.AreEqual(QANightlyLocalSettings.RecordOff, t.RecordMode);
+        Assert.AreEqual(10.0, t.ReplayAfterSeconds, 1e-9);
+    }
+
+    [Test]
+    public void PC_설정_120_녹화_모드_스위치()
+    {
+        Assert.AreEqual(QANightlyLocalSettings.RecordFull, QANightlyLocalSettings.Merge("{\"obsEnabled\":true}", _ => null).RecordMode);
+        Assert.AreEqual(QANightlyLocalSettings.RecordReplay, QANightlyLocalSettings.Merge("{\"obsEnabled\":true,\"replayOnly\":true}", _ => null).RecordMode);
+        Assert.AreEqual(QANightlyLocalSettings.RecordReplay, QANightlyLocalSettings.Merge("{\"obsEnabled\":true}", k => k == "QA_NIGHTLY_REPLAY" ? "1" : null).RecordMode);
+        Assert.AreEqual(QANightlyLocalSettings.RecordOff, QANightlyLocalSettings.Merge("{\"replayOnly\":true}", _ => null).RecordMode, "OBS 가 꺼져 있으면 스위치와 관계없이 꺼짐");
+    }
+
+    [Test]
+    public void PC_설정_120_파일과_환경변수()
+    {
+        const string file = "{\"obsEnabled\":true,\"videoWidth\":1280,\"videoHeight\":720,\"videoFps\":24,\"videoBitrateKbps\":2500,\"videoKeepDays\":7," +
+                            "\"replaySeconds\":90,\"replayAfterSeconds\":5,\"replayCooldownSeconds\":20,\"clipEvents\":\"stall,death\",\"obsBitrateParam\":\"SimpleOutput/VBitrate\"}";
+        var env = new Dictionary<string, string>
+        {
+            { "QA_OBS_VIDEO_FPS", "abc" }, { "QA_OBS_BITRATE_KBPS", "1500" }, { "QA_NIGHTLY_VIDEO_KEEP_DAYS", "14" }, { "QA_OBS_REPLAY_AFTER", "7.5" },
+            { "QA_OBS_REPLAY_COOLDOWN", "-3" }, { "QA_NIGHTLY_CLIP_EVENTS", "wipe" },
+        };
+        QANightlyLocalSettings s = QANightlyLocalSettings.Merge(file, k => env.TryGetValue(k, out string v) ? v : null);
+        Assert.AreEqual(1280, s.VideoWidth);
+        Assert.AreEqual(720, s.VideoHeight);
+        Assert.AreEqual(24, s.VideoFps, "숫자가 아닌 환경변수는 무시");
+        Assert.AreEqual(1500, s.BitrateKbps);
+        Assert.AreEqual(14, s.VideoKeepDays);
+        Assert.AreEqual(90, s.ReplaySeconds);
+        Assert.AreEqual(7.5, s.ReplayAfterSeconds, 1e-9);
+        Assert.AreEqual(20.0, s.ReplayCooldownSeconds, 1e-9, "음수 환경변수는 무시");
+        Assert.AreEqual("wipe", s.ClipEvents);
+        Assert.AreEqual("SimpleOutput/VBitrate", s.BitrateParam);
+        Assert.IsTrue(s.HasQualitySettings);
+        StringAssert.Contains("1280x720/24fps/1500kbps", s.Describe());
+    }
+
+    [Test]
+    public void PC_설정_120_음수는_0()
+    {
+        QANightlyLocalSettings s = QANightlyLocalSettings.Merge("{\"videoWidth\":-5,\"videoKeepDays\":-1,\"replayAfterSeconds\":-2}", _ => null);
+        Assert.AreEqual(0, s.VideoWidth);
+        Assert.AreEqual(0, s.VideoKeepDays);
+        Assert.AreEqual(0.0, s.ReplayAfterSeconds, 1e-9);
+    }
+
+    // ── 할 일 120: OBS 메시지 ────────────────────────────────
+
+    [Test]
+    public void OBS_요청_데이터_메시지()
+    {
+        Assert.AreEqual("{\"op\":1,\"d\":{\"rpcVersion\":1,\"eventSubscriptions\":64}}", QAObsProtocol.IdentifyJson(null, QAObsProtocol.SubscriptionOutputs));
+        Assert.AreEqual("{\"op\":6,\"d\":{\"requestType\":\"SaveReplayBuffer\",\"requestId\":\"r2\"}}", QAObsProtocol.RequestJson(QAObsProtocol.SaveReplayBuffer, "r2"));
+        Assert.AreEqual("{\"op\":6,\"d\":{\"requestType\":\"SetVideoSettings\",\"requestId\":\"r3\",\"requestData\":{\"fpsNumerator\":24,\"fpsDenominator\":1}}}",
+            QAObsProtocol.RequestJson(QAObsProtocol.SetVideoSettings, "r3", QAObsProtocol.VideoSettingsData(0, 0, 24)));
+        Assert.AreEqual("{\"outputWidth\":1280,\"outputHeight\":720,\"fpsNumerator\":30,\"fpsDenominator\":1}", QAObsProtocol.VideoSettingsData(1280, 720, 30));
+        Assert.AreEqual("{\"outputWidth\":960,\"outputHeight\":540}", QAObsProtocol.VideoSettingsData(960, 540, 0));
+        Assert.IsNull(QAObsProtocol.VideoSettingsData(1280, 0, 0), "짝이 안 맞는 해상도는 보내지 않는다");
+        Assert.IsNull(QAObsProtocol.VideoSettingsData(0, 0, 0));
+        Assert.AreEqual("{\"parameterCategory\":\"SimpleOutput\",\"parameterName\":\"VBitrate\",\"parameterValue\":\"2500\"}",
+            QAObsProtocol.ProfileParameterData("SimpleOutput", "VBitrate", "2500"));
+        Assert.AreEqual("{\"parameterCategory\":\"Output\",\"parameterName\":\"Mode\"}", QAObsProtocol.ProfileParameterQuery("Output", "Mode"));
+    }
+
+    [Test]
+    public void OBS_응답_데이터_녹화경과_클립경로_프로필값()
+    {
+        const string status = "{\"op\":7,\"d\":{\"requestType\":\"GetRecordStatus\",\"requestId\":\"s1\",\"requestStatus\":{\"result\":true,\"code\":100}," +
+                              "\"responseData\":{\"outputActive\":true,\"outputPaused\":false,\"outputTimecode\":\"00:00:12.345\",\"outputDuration\":12345,\"outputBytes\":1000}}}";
+        Assert.IsTrue(QAObsProtocol.TryParseResponse(status, "s1", out QAObsResult r));
+        Assert.IsTrue(r.Ok);
+        Assert.IsTrue(r.OutputActive);
+        Assert.AreEqual(12345.0, r.OutputDurationMs, 1e-6);
+        Assert.AreEqual("00:00:12.345", r.OutputTimecode);
+
+        const string last = "{\"op\":7,\"d\":{\"requestType\":\"GetLastReplayBufferReplay\",\"requestId\":\"l1\",\"requestStatus\":{\"result\":true,\"code\":100}," +
+                            "\"responseData\":{\"savedReplayPath\":\"D:\\\\obs\\\\Replay 2026-10-27 23-10-05.mkv\"}}}";
+        Assert.IsTrue(QAObsProtocol.TryParseResponse(last, "l1", out QAObsResult l));
+        Assert.AreEqual(@"D:\obs\Replay 2026-10-27 23-10-05.mkv", l.SavedReplayPath);
+
+        const string param = "{\"op\":7,\"d\":{\"requestType\":\"GetProfileParameter\",\"requestId\":\"p1\",\"requestStatus\":{\"result\":true,\"code\":100}," +
+                             "\"responseData\":{\"parameterValue\":\"Simple\",\"defaultParameterValue\":\"Simple\"}}}";
+        Assert.IsTrue(QAObsProtocol.TryParseResponse(param, "p1", out QAObsResult p));
+        Assert.AreEqual("Simple", p.ParameterValue);
+        Assert.IsFalse(QAObsProtocol.TryParseResponse(param, "other", out QAObsResult _));
+    }
+
+    [Test]
+    public void OBS_ReplayBufferSaved_이벤트()
+    {
+        const string ev = "{\"op\":5,\"d\":{\"eventType\":\"ReplayBufferSaved\",\"eventIntent\":64,\"eventData\":{\"savedReplayPath\":\"D:\\\\obs\\\\r.mkv\"}}}";
+        Assert.IsTrue(QAObsProtocol.TryParseEvent(ev, out string type, out string path));
+        Assert.AreEqual(QAObsProtocol.EventReplayBufferSaved, type);
+        Assert.AreEqual(@"D:\obs\r.mkv", path);
+        Assert.IsTrue(QAObsProtocol.TryParseEvent("{\"op\":5,\"d\":{\"eventType\":\"RecordStateChanged\",\"eventData\":{\"outputActive\":true}}}", out string t2, out string p2));
+        Assert.AreEqual("RecordStateChanged", t2);
+        Assert.AreEqual("", p2);
+        Assert.IsFalse(QAObsProtocol.TryParseEvent("{\"op\":7,\"d\":{}}", out _, out _));
+        Assert.IsFalse(QAObsProtocol.TryParseEvent("garbage", out _, out _));
+    }
+
+    [TestCase("00:01:02.500", 62500.0)]
+    [TestCase("01:00:00.000", 3600000.0)]
+    [TestCase("0:0:5", 5000.0)]
+    public void OBS_타임코드_파싱(string tc, double ms)
+    {
+        Assert.AreEqual(ms, QAObsProtocol.ParseTimecodeMs(tc), 1e-6);
+    }
+
+    [TestCase("")]
+    [TestCase((string)null)]
+    [TestCase("12:34")]
+    [TestCase("aa:bb:cc")]
+    public void OBS_타임코드_형식이_아니면_NaN(string tc)
+    {
+        Assert.IsTrue(double.IsNaN(QAObsProtocol.ParseTimecodeMs(tc)));
+    }
+
+    [Test]
+    public void OBS_프로필_파라미터_이름_출력모드별()
+    {
+        Assert.IsTrue(QAObsProfileParams.TryBitrate("Simple", "", out string c, out string n));
+        Assert.AreEqual("SimpleOutput/VBitrate", c + "/" + n);
+        Assert.IsFalse(QAObsProfileParams.TryBitrate("Advanced", "", out _, out _), "고급 모드 녹화 비트레이트는 프로필 파라미터가 아니다");
+        Assert.IsFalse(QAObsProfileParams.TryBitrate("", null, out _, out _));
+        Assert.IsTrue(QAObsProfileParams.TryBitrate("Advanced", " AdvOut / FFVBitrate ", out c, out n), "직접 지정은 모드와 관계없이");
+        Assert.AreEqual("AdvOut/FFVBitrate", c + "/" + n);
+
+        Assert.IsTrue(QAObsProfileParams.TryReplaySeconds("simple", out c, out n));
+        Assert.AreEqual("SimpleOutput/RecRBTime", c + "/" + n);
+        Assert.IsTrue(QAObsProfileParams.TryReplaySeconds("Advanced", out c, out n));
+        Assert.AreEqual("AdvOut/RecRBTime", c + "/" + n);
+        Assert.IsTrue(QAObsProfileParams.TryReplayEnable("Advanced", out c, out n));
+        Assert.AreEqual("AdvOut/RecRB", c + "/" + n);
+        Assert.IsFalse(QAObsProfileParams.TryReplaySeconds("", out _, out _));
+
+        Assert.IsFalse(QAObsProfileParams.TrySplit("VBitrate", out _, out _));
+        Assert.IsFalse(QAObsProfileParams.TrySplit("/VBitrate", out _, out _));
+        Assert.IsFalse(QAObsProfileParams.TrySplit("SimpleOutput/", out _, out _));
+    }
+
+    // ── 할 일 120: 타임코드 ──────────────────────────────────
+
+    [Test]
+    public void 영상_타임코드는_기준점_경과와_보정()
+    {
+        var anchor = new DateTime(2026, 10, 27, 14, 0, 0, DateTimeKind.Utc);
+        Assert.AreEqual(62.5, QANightlyTimecode.VideoSeconds(anchor, 2500, anchor.AddSeconds(60)), 1e-6, "이미 녹화 중이던 2.5초를 더한다");
+        Assert.AreEqual(60.0, QANightlyTimecode.VideoSeconds(anchor, 0, anchor.AddSeconds(60)), 1e-6);
+        Assert.AreEqual(0.0, QANightlyTimecode.VideoSeconds(anchor, 0, anchor.AddSeconds(-5)), 1e-6, "기준보다 앞이면 0");
+        Assert.IsTrue(double.IsNaN(QANightlyTimecode.VideoSeconds(DateTime.MinValue, 0, anchor)), "기준 없음 = 모름");
+
+        Assert.AreEqual(1200.0, QANightlyTimecode.OffsetMs(1200, "00:00:09.000"), 1e-6, "outputDuration 우선");
+        Assert.AreEqual(9000.0, QANightlyTimecode.OffsetMs(0, "00:00:09.000"), 1e-6, "없으면 outputTimecode");
+        Assert.AreEqual(0.0, QANightlyTimecode.OffsetMs(0, ""), 1e-6);
+
+        Assert.AreEqual("1:02:05", QANightlyTimecode.Format(3725.9));
+        Assert.AreEqual("0:00:00", QANightlyTimecode.Format(0));
+        Assert.AreEqual("-", QANightlyTimecode.Format(double.NaN));
+    }
+
+    [Test]
+    public void 녹화_기준점_왕복_108_형식도_읽는다()
+    {
+        var a = new QANightlyRecordAnchor { Run = 4, Retry = 1, AnchorUtc = new DateTime(2026, 10, 27, 14, 0, 0, DateTimeKind.Utc), OffsetMs = 1530 };
+        QANightlyRecordAnchor back = QANightlyRecordAnchor.Parse(a.Format());
+        Assert.AreEqual(4, back.Run);
+        Assert.AreEqual(1, back.Retry);
+        Assert.AreEqual(a.AnchorUtc, back.AnchorUtc);
+        Assert.AreEqual(1530.0, back.OffsetMs, 1e-6);
+
+        QANightlyRecordAnchor old = QANightlyRecordAnchor.Parse("3\t0\n");
+        Assert.AreEqual(3, old.Run);
+        Assert.AreEqual(DateTime.MinValue, old.AnchorUtc, "108 표시 파일 = 기준 없음(타임코드 모름)");
+        Assert.IsNull(QANightlyRecordAnchor.Parse(""));
+        Assert.IsNull(QANightlyRecordAnchor.Parse(null));
+    }
+
+    // ── 할 일 120: 이벤트 표·시각표 ──────────────────────────
+
+    [TestCase("[QA103] event=stall combatS=300.0 quietS=90.0 lastActivity=none", LogType.Warning, QANightlyEvents.Stall)]
+    [TestCase("[QA103] event=qa_relocate character=Paladin client=1 ok=true from=(0,0,0)", LogType.Log, QANightlyEvents.Stuck)]
+    [TestCase("[QA][Warning][GameplayInvariant] 플레이어 콜라이더가 벽/환경 지오메트리를 관통함", LogType.Log, QANightlyEvents.Stuck)]
+    [TestCase("[QA][Warning][Softlock] 이동 불능", LogType.Log, QANightlyEvents.Stuck)]
+    [TestCase("[QA103] event=death slot=2 client=2 state=DeadPresentation", LogType.Log, QANightlyEvents.Death)]
+    [TestCase("[QA103] event=run_end run=3 outcome=Wipe combatS=412.0 seed=108", LogType.Log, QANightlyEvents.Wipe)]
+    [TestCase("[QA103] event=run_end run=3 outcome=Timeout combatS=1800.0 seed=108", LogType.Log, QANightlyEvents.Timeout)]
+    [TestCase("[QA103] event=run_end run=3 outcome=Error combatS=300.0 seed=108", LogType.Log, QANightlyEvents.Error)]
+    [TestCase("[QA103] event=early_timeout combatS=700.0 flatS=300.0", LogType.Warning, QANightlyEvents.Timeout)]
+    [TestCase("[QA][Error][LogError] NullReferenceException", LogType.Log, QANightlyEvents.Error)]
+    [TestCase("NullReferenceException: Object reference not set", LogType.Exception, QANightlyEvents.Error)]
+    [TestCase("뭔가 실패", LogType.Error, QANightlyEvents.Error)]
+    public void 이벤트_표가_호스트_로그를_고른다(string line, LogType type, string want)
+    {
+        QANightlyEventRule r = QANightlyEvents.Match(line, type, null);
+        Assert.IsNotNull(r, line);
+        Assert.AreEqual(want, r.Name);
+    }
+
+    [TestCase("[QA103] event=qa_relocate_request character=Paladin n=1 sent=true", LogType.Log)]
+    [TestCase("[QA103] event=qa_relocate_on registered=true", LogType.Log)]
+    [TestCase("[QA103] event=run_end run=3 outcome=Clear combatS=600.0", LogType.Log)]
+    [TestCase("뭔가 실패", LogType.Warning)]
+    [TestCase("[QA][Info][LogError-Noise] 알려진 소음", LogType.Log)]
+    [TestCase("", LogType.Error)]
+    public void 이벤트가_아닌_로그는_고르지_않는다(string line, LogType type)
+    {
+        Assert.IsNull(QANightlyEvents.Match(line, type, null), line);
+    }
+
+    [Test]
+    public void 이벤트_목록_설정()
+    {
+        HashSet<string> set = QANightlyEvents.ParseEnabled(" Death, stall ;wipe");
+        CollectionAssert.AreEquivalent(new[] { "death", "stall", "wipe" }, set);
+        Assert.IsNull(QANightlyEvents.ParseEnabled(""));
+        Assert.IsNull(QANightlyEvents.ParseEnabled(" , "));
+        Assert.IsNull(QANightlyEvents.Match("[QA103] event=stall combatS=1", LogType.Warning, new HashSet<string> { "death" }));
+        Assert.IsNotNull(QANightlyEvents.Match("[QA103] event=death slot=0", LogType.Log, new HashSet<string> { "death" }));
+        foreach (QANightlyEventRule r in QANightlyEvents.Table)
+            Assert.AreEqual(r.Name, r.Name.ToLowerInvariant(), "표 이름은 소문자(설정 목록과 맞춘다)");
+    }
+
+    [Test]
+    public void 시각표_상세는_첫줄_탭없이_자른다()
+    {
+        Assert.AreEqual("a b", QANightlyEvents.Detail("a\tb\nstack"));
+        Assert.AreEqual(160, QANightlyEvents.Detail(new string('x', 500)).Length);
+        Assert.AreEqual("", QANightlyEvents.Detail(null));
+    }
+
+    [Test]
+    public void 시각표_한줄_왕복()
+    {
+        var e = new QANightlyEvent
+        {
+            Run = 2, Retry = 1, Name = QANightlyEvents.Stall, At = new DateTime(2026, 10, 27, 23, 10, 5, 250), GameSeconds = 312.54, VideoSeconds = double.NaN, Detail = "x\ty",
+        };
+        List<QANightlyEvent> back = QANightlyEvent.ParseAll(e.Format() + "\nbad\n\n");
+        Assert.AreEqual(1, back.Count);
+        Assert.AreEqual(2, back[0].Run);
+        Assert.AreEqual(1, back[0].Retry);
+        Assert.AreEqual("stall", back[0].Name);
+        Assert.AreEqual(e.At, back[0].At);
+        Assert.AreEqual(312.5, back[0].GameSeconds, 1e-6);
+        Assert.IsTrue(double.IsNaN(back[0].VideoSeconds));
+        Assert.AreEqual("x y", back[0].Detail);
+    }
+
+    [Test]
+    public void 시각표는_같은_이벤트_5초_안_반복을_거른다()
+    {
+        var t = new QANightlyEventThrottle();
+        var t0 = new DateTime(2026, 10, 27, 14, 0, 0, DateTimeKind.Utc);
+        Assert.IsTrue(t.Allow("1/0", "error", t0));
+        Assert.IsFalse(t.Allow("1/0", "error", t0.AddSeconds(4.9)));
+        Assert.IsTrue(t.Allow("1/0", "stall", t0.AddSeconds(1)), "다른 이벤트는 따로");
+        Assert.IsTrue(t.Allow("1/0", "error", t0.AddSeconds(5.1)));
+        Assert.IsTrue(t.Allow("2/0", "error", t0.AddSeconds(5.2)), "판이 바뀌면 다시 센다");
+        for (int i = 0; i < QANightlyEventThrottle.MaxPerAttempt + 5; i++)
+            t.Allow("3/0", "error", t0.AddSeconds(10 * i));
+        Assert.IsFalse(t.Allow("3/0", "death", t0.AddDays(1)), "판당 상한");
+    }
+
+    // ── 할 일 120: 리플레이 클립 ─────────────────────────────
+
+    [Test]
+    public void 클립_대기_중_이벤트는_하나로_합친다()
+    {
+        var p = new QANightlyClipPlanner();
+        var t0 = new DateTime(2026, 10, 27, 14, 0, 0, DateTimeKind.Utc);
+        p.Add(t0, "stall", 3, 0, 10, 30);
+        Assert.AreEqual(t0.AddSeconds(10), p.DueUtc, "이벤트 뒤 M초까지 담게 늦춘다");
+        p.Add(t0.AddSeconds(3), "death", 3, 0, 10, 30);
+        p.Add(t0.AddSeconds(4), "stall", 3, 0, 10, 30);
+        Assert.AreEqual(t0.AddSeconds(10), p.DueUtc, "대기 중 이벤트는 예약을 미루지 않는다");
+        Assert.IsFalse(p.TryTake(t0.AddSeconds(9.9), false, out _, out _, out _));
+        Assert.IsTrue(p.TryTake(t0.AddSeconds(10), false, out List<string> names, out int run, out int retry));
+        CollectionAssert.AreEqual(new[] { "stall", "death" }, names);
+        Assert.AreEqual(3, run);
+        Assert.AreEqual(0, retry);
+        Assert.IsFalse(p.Pending);
+        Assert.AreEqual(t0.AddSeconds(10), p.LastSaveUtc);
+    }
+
+    [Test]
+    public void 클립_쿨다운_안_이벤트는_다음_클립으로_모은다()
+    {
+        var p = new QANightlyClipPlanner();
+        var t0 = new DateTime(2026, 10, 27, 14, 0, 0, DateTimeKind.Utc);
+        p.Add(t0, "error", 1, 0, 10, 30);
+        Assert.IsTrue(p.TryTake(t0.AddSeconds(10), false, out _, out _, out _));
+        p.Add(t0.AddSeconds(12), "wipe", 1, 0, 10, 30);
+        Assert.AreEqual(t0.AddSeconds(40), p.DueUtc, "지난 저장 + 쿨다운 30초까지 미룬다");
+        p.Add(t0.AddSeconds(25), "timeout", 1, 0, 10, 30);
+        Assert.IsTrue(p.TryTake(t0.AddSeconds(40), false, out List<string> names, out _, out _));
+        CollectionAssert.AreEqual(new[] { "wipe", "timeout" }, names);
+        p.Add(t0.AddSeconds(100), "death", 2, 1, 10, 30);
+        Assert.AreEqual(t0.AddSeconds(110), p.DueUtc, "쿨다운이 지났으면 이벤트 + M초");
+        Assert.AreEqual(2, p.Run);
+        Assert.AreEqual(1, p.Retry);
+    }
+
+    [Test]
+    public void 클립_예약은_파일로_도메인_리로드를_넘는다()
+    {
+        var p = new QANightlyClipPlanner();
+        var t0 = new DateTime(2026, 10, 27, 14, 0, 0, DateTimeKind.Utc);
+        p.Add(t0, "stall", 5, 1, 8, 30);
+        p.Add(t0.AddSeconds(1), "death", 5, 1, 8, 30);
+        QANightlyClipPlanner back = QANightlyClipPlanner.Parse(p.Format());
+        Assert.AreEqual(p.DueUtc, back.DueUtc);
+        Assert.AreEqual(5, back.Run);
+        Assert.AreEqual(1, back.Retry);
+        CollectionAssert.AreEqual(new[] { "stall", "death" }, back.Names);
+        Assert.IsTrue(back.TryTake(t0, true, out List<string> names, out _, out _), "배치 끝 = 시각과 관계없이 꺼낸다");
+        Assert.AreEqual(2, names.Count);
+        QANightlyClipPlanner afterTake = QANightlyClipPlanner.Parse(back.Format());
+        Assert.IsFalse(afterTake.Pending);
+        Assert.AreEqual(t0, afterTake.LastSaveUtc);
+        Assert.IsFalse(QANightlyClipPlanner.Parse(null).Pending);
+        Assert.IsFalse(QANightlyClipPlanner.Parse("garbage").Pending);
+    }
+
+    [Test]
+    public void 클립_파일명은_날짜_시드_판_이벤트()
+    {
+        Assert.AreEqual("2026-10-27_eunhee_r3_stall+death.mkv",
+            QANightlyClipName.FileName("2026-10-27", "eunhee", 3, 0, new[] { "stall", "death", "stall" }, ".mkv"));
+        Assert.AreEqual("2026-10-27_eunhee_r3re_wipe.mp4", QANightlyClipName.FileName("2026-10-27", "eunhee", 3, 1, new[] { "wipe" }, "mp4"));
+        Assert.AreEqual("2026-10-27_eunhee_r1_event.mkv", QANightlyClipName.FileName("2026-10-27", "eunhee", 1, 0, new string[0], ""));
+        Assert.AreEqual("2026-10-27_nightly_r1_ab.mkv", QANightlyClipName.FileName("2026-10-27", "", 1, 0, new[] { "a/b" }, ".mkv"), "파일명에 못 쓰는 글자는 뺀다");
+        StringAssert.EndsWith("_e1+e2+e3+e4+e5+e6+etc.mkv",
+            QANightlyClipName.FileName("2026-10-27", "x", 1, 0, new[] { "e1", "e2", "e3", "e4", "e5", "e6", "e7" }, ".mkv"));
+    }
+
+    [Test]
+    public void 클립_이름이_겹치면_번호를_붙인다()
+    {
+        var taken = new HashSet<string> { Path.Combine("D:/obs", "a.mkv"), Path.Combine("D:/obs", "a_2.mkv") };
+        Assert.AreEqual(Path.Combine("D:/obs", "a_3.mkv"), QANightlyClipName.Unique("D:/obs", "a.mkv", taken.Contains));
+        Assert.AreEqual(Path.Combine("D:/obs", "b.mkv"), QANightlyClipName.Unique("D:/obs", "b.mkv", taken.Contains));
+    }
+
+    // ── 할 일 120: 공유 폴더 영상 보관 ───────────────────────
+
+    [Test]
+    public void 보관_삭제는_날짜_폴더만_N일_넘긴_것()
+    {
+        var today = new DateTime(2026, 10, 27, 23, 30, 0);
+        var names = new[] { "2026-10-27", "2026-10-20", "2026-10-19", "2026-09-01", "logs", "2026-1-5", "2026-10-19-old", "2026-11-01", "48" };
+        CollectionAssert.AreEqual(new[] { "2026-09-01", "2026-10-19" }, QANightlyRetention.ExpiredFolders(names, today, 7));
+        Assert.IsEmpty(QANightlyRetention.ExpiredFolders(names, today, 0), "0 = 지우지 않음");
+        Assert.IsFalse(QANightlyRetention.IsExpired("2026-10-26", today, 1));
+        Assert.IsTrue(QANightlyRetention.IsExpired("2026-10-25", today, 1));
+        Assert.IsNull(QANightlyRetention.FolderDate("N108-20261027_2305-base"));
+    }
+
+    [TestCase("2026-10-27 23-10-05.mkv", true)]
+    [TestCase("Replay.MP4", true)]
+    [TestCase("a.mov", true)]
+    [TestCase("robocopy.log", false)]
+    [TestCase("report.html", false)]
+    [TestCase("nightly-summary.md", false)]
+    [TestCase("runs.csv", false)]
+    [TestCase("events.tsv", false)]
+    [TestCase("noext", false)]
+    public void 보관_삭제는_영상_파일만(string name, bool video)
+    {
+        Assert.AreEqual(video, QANightlyRetention.IsVideoFile(name));
+    }
+
+    // ── 할 일 120: 아침 요약 ─────────────────────────────────
+
+    [Test]
+    public void 아침_요약에_이벤트_시각표와_리플레이_클립()
+    {
+        var batch = new Dictionary<string, string> { { QANightlyHeader.KeySeedName, "eunhee" }, { "record", QANightlyLocalSettings.RecordReplay } };
+        var events = new List<QANightlyEvent>
+        {
+            new QANightlyEvent { Run = 1, Retry = 0, Name = "stall", At = new DateTime(2026, 10, 27, 23, 10, 5), GameSeconds = 312.5, VideoSeconds = 312.9, Detail = "a|b" },
+        };
+        var clips = new List<QANightlyRecording> { new QANightlyRecording { Run = 1, Path = @"D:\obs\2026-10-27_eunhee_r1_stall+death.mkv", Note = "stall+death" } };
+        string md = QANightlyHeader.Summary(batch, null, null, "done", "", events, clips);
+        StringAssert.Contains("## 이벤트 시각표", md);
+        StringAssert.Contains("| 1 | 0 | stall | 23:10:05 | 312.5 | 0:05:12 | a\\|b |", md);
+        StringAssert.Contains("## 리플레이 클립", md);
+        StringAssert.Contains(@"- 판 1 [stall+death]: D:\obs\2026-10-27_eunhee_r1_stall+death.mkv", md);
+
+        string none = QANightlyHeader.Summary(new Dictionary<string, string> { { "record", QANightlyLocalSettings.RecordFull } }, null, null, "", "");
+        StringAssert.Contains("| - | - | 없음 |", none);
+        StringAssert.DoesNotContain("## 리플레이 클립", none, "판 전체 녹화 모드에 클립이 없으면 절을 만들지 않는다");
     }
 }
 #endif

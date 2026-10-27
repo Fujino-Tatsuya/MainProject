@@ -21,6 +21,9 @@ public sealed class QABoss103ReportInput
     public string GeneratedAt = "";
     /// <summary>할 일 108 recordings.txt(판별 녹화 영상 경로). 103 단독은 빈칸.</summary>
     public string Recordings = "";
+    /// <summary>할 일 120 events.tsv(이벤트 시각표)·clips.txt(리플레이 클립). 103 단독은 빈칸.</summary>
+    public string Events = "";
+    public string Clips = "";
 }
 
 /// <summary>
@@ -402,7 +405,30 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
             foreach (QANightlyRecording r in recs)
                 rec.Append(rec.Length > 0 ? "<br>" : "").Append("판 ").Append(r.Run).Append(r.Retry > 0 ? " 재실행" : "").Append(": ")
                    .Append(H(r.Path.Length > 0 ? r.Path : "(경로 없음)")).Append(r.Shared.Length > 0 ? " → " + H(r.Shared) : "").Append(r.Note.Length > 0 ? " · " + H(r.Note) : "");
-            Row2(sb, "녹화", Val(batch, "record", "off") == "obs" ? (rec.Length > 0 ? rec.ToString() : "OBS 켜짐 · 아직 영상 없음") : "꺼짐");
+            string record = Val(batch, "record", "off");
+            Row2(sb, "녹화", record == QANightlyLocalSettings.RecordFull ? (rec.Length > 0 ? rec.ToString() : "OBS 켜짐 · 아직 영상 없음")
+                           : record == QANightlyLocalSettings.RecordReplay ? "리플레이 버퍼 — 이벤트 클립만(아래 줄)" : "꺼짐");
+            if (record == QANightlyLocalSettings.RecordReplay)
+            {
+                var clip = new StringBuilder();
+                foreach (QANightlyRecording cl in QANightlyRecording.ParseAll(input.Clips))
+                    clip.Append(clip.Length > 0 ? "<br>" : "").Append("판 ").Append(cl.Run).Append(cl.Retry > 0 ? " 재실행" : "").Append(" [").Append(H(cl.Note)).Append("]: ")
+                        .Append(H(cl.Path.Length > 0 ? cl.Path : "(경로 없음)")).Append(cl.Shared.Length > 0 ? " → " + H(cl.Shared) : "");
+                Row2(sb, "리플레이 클립", clip.Length > 0 ? clip.ToString() : "없음");
+            }
+            // 할 일 120 — 이벤트 시각표(판·이벤트·영상 타임코드). 표 전체는 nightly-summary.md · events.tsv.
+            List<QANightlyEvent> events = QANightlyEvent.ParseAll(input.Events);
+            var ev = new StringBuilder();
+            const int maxRows = 60;
+            for (int i = 0; i < events.Count && i < maxRows; i++)
+            {
+                QANightlyEvent e = events[i];
+                ev.Append(ev.Length > 0 ? "<br>" : "").Append("판 ").Append(e.Run).Append(e.Retry > 0 ? " 재실행" : "").Append(" · ").Append(H(e.Name))
+                  .Append(" · ").Append(e.At.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append(" · 영상 ").Append(QANightlyTimecode.Format(e.VideoSeconds));
+            }
+            if (events.Count > maxRows)
+                ev.Append("<br>… 외 ").Append(events.Count - maxRows).Append("건");
+            Row2(sb, "이벤트 시각표", ev.Length > 0 ? ev + "<br>(전체·상세: nightly-summary.md · events.tsv)" : "없음");
             Row2(sb, "공유 폴더", H(Val(batch, "share_dir", "").Length > 0 ? Val(batch, "share_dir", "") : "설정 없음 — 복사 안 함"));
         }
         Row2(sb, "측정 규칙", "QA 자동 부활(Soul 3초 뒤, 목숨 1 차감) — 게임에 보스전 부활 수단이 없어 문서 의도를 재현");
@@ -1051,6 +1077,8 @@ public static class QABoss103ReportFiles
             Fixes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.FixesFile)),
             Notes = ReadOrEmpty(Path.Combine(dir, QABoss103Batch.LogFolder, NotesFile)),
             Recordings = ReadOrEmpty(Path.Combine(dir, QANightlyPaths.RecordingsFile)),
+            Events = ReadOrEmpty(Path.Combine(dir, QANightlyPaths.EventsFile)),
+            Clips = ReadOrEmpty(Path.Combine(dir, QANightlyPaths.ClipsFile)),
             LoopState = loopState ?? "",
             GeneratedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
         };

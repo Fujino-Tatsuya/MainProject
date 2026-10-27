@@ -67,6 +67,9 @@ public static class QABoss103BatchRunner
     {
         if (_netMismatch == null && Running && EditorApplication.isPlaying && QABoss103Batch.IsNetConfigMismatchLog(condition))
             _netMismatch = condition.Length > 160 ? condition.Substring(0, 160) : condition;
+        // 할 일 120 — 야간 배치 판 Play 중 호스트 로그 → 이벤트 시각표(2단계면 리플레이 클립 예약).
+        if (Running && EditorApplication.isPlaying && LoadState() && IsNightlyBatch)
+            QANightlyHooks.OnLog(_stateDir, GetInt("run"), GetInt("retry"), condition, type);
     }
 
     /// <summary>MPPM 가상 플레이어 에디터(클론) — 루프는 메인 에디터만 돈다.</summary>
@@ -338,6 +341,8 @@ public static class QABoss103BatchRunner
             if (!LoadState())
                 return;
             Step();
+            if (IsNightlyBatch)
+                QANightlyHooks.Tick(_stateDir, Log);   // 할 일 120 — 예약된 리플레이 클립 저장
         }
         catch (Exception e)
         {
@@ -530,6 +535,8 @@ public static class QABoss103BatchRunner
         DateTime started = DateTime.TryParse(Get("attemptLocal"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime s) ? s : DateTime.Now;
         QABoss103RunCsv.WriteLoopError(cfg, reason, note, source, started);
         Log($"판 {cfg.Run}{(cfg.Retry > 0 ? " 재실행" : "")} 오류 {reason} — {note}");
+        if (IsNightlyBatch)
+            QANightlyHooks.Event(_stateDir, cfg.Run, cfg.Retry, QANightlyEvents.Error, $"루프 판 오류 {reason} — {note}");
         if (stopPlay && EditorApplication.isPlaying)
             RequestStop($"오류 {reason}");
         else

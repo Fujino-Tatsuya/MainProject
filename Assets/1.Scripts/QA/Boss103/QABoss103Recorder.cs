@@ -228,7 +228,11 @@ public sealed class QABoss103Recorder : MonoBehaviour
         if (_stopped)
             return;
         if (previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+        {
             Stats.Death(SlotOf(clientId), Now);
+            // 할 일 120 — 야간 QA 이벤트 시각표·리플레이 클립의 '사망'(QANightlyEvents.Death).
+            Debug.Log($"{Tag} event=death slot={SlotOf(clientId)} client={clientId} state={current}");
+        }
         if (previous != current)
             Activity.Note("life_" + current);
     }

@@ -36,7 +36,7 @@ public static class QANightlyMenu
         string toolbarBefore = DataSourcePlayMode.Current.ToString();
         string shareDir = QANightlyPaths.ShareDir(local.ShareRoot, at, seed.Name) ?? "";
         List<KeyValuePair<string, string>> batch = QANightlyHeader.BatchKeys(seed, at, QABoss103Batch.SourceTable, QABoss103RunCsv.XlsxRevision(),
-            QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD"), QABoss103RunCsv.GitCommit(), Application.unityVersion, local.ObsEnabled, shareDir);
+            QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD"), QABoss103RunCsv.GitCommit(), Application.unityVersion, local.RecordMode, shareDir);
         batch.Add(new KeyValuePair<string, string>("data_source_toolbar_before", toolbarBefore));
         batch.Add(new KeyValuePair<string, string>("nightly_seed_file", QANightlySeed.RelativePath));
 
@@ -57,10 +57,16 @@ public static class QANightlyMenu
             if (!r.Ok)
                 Debug.LogWarning($"{Tag} OBS 연결 확인 실패(QA 는 녹화 없이 계속 — 판마다 다시 시도) — {r.Error}");
         }
+        // 할 일 120 — 공유 폴더 지난 영상 삭제 → OBS 화질 → (2단계) 리플레이 버퍼 시작. 첫 판 Play 전(루프 첫 틱보다 먼저).
+        QANightlyHooks.BatchStarting(dir, null);
     }
 
     [MenuItem(Root + "Resume Last", priority = 1)]
-    public static void ResumeLast() => QABoss103BatchRunner.ResumeLatest(QANightlyPaths.BatchPattern);
+    public static void ResumeLast()
+    {
+        if (QABoss103BatchRunner.ResumeLatest(QANightlyPaths.BatchPattern) && QABoss103BatchRunner.IsRunning)
+            QANightlyHooks.BatchStarting(QABoss103BatchRunner.CurrentDir, null);
+    }
 
     [MenuItem(Root + "Stop After Current Run", priority = 2)]
     public static void StopAfterCurrent() => QABoss103BatchRunner.StopAfterCurrent();
