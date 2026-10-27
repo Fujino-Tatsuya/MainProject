@@ -7,7 +7,7 @@ using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 /// <summary>
-/// 할 일 103 C4 — [호스트] 판 끝에 CSV 4종(runs·run_chars·run_patterns·run_gimmicks)을 출력 폴더(<see cref="QABoss103Config.OutDir"/>)에 append + flush.
+/// 할 일 103 C4 — [호스트] 판 끝에 CSV 4종(runs·run_chars·run_patterns·run_gimmicks, 할 일 119 C3 실패 판은 run_fail 도)을 출력 폴더(<see cref="QABoss103Config.OutDir"/>)에 append + flush.
 /// 봇 판 파일(<see cref="QABoss103PartFile"/>)을 합치고, 판 머리(데이터 출처·xlsx SVN 리비전·git 커밋·시각·Unity 버전)를 채운다.
 /// 로그 1줄 <c>[QA103] event=run_csv path=… rows=…</c>.
 /// </summary>
@@ -102,6 +102,13 @@ public static class QABoss103RunCsv
             rows += QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss103Csv.CharsFile), QABoss103Metrics.CharsHeader, QABoss103CsvRows.Chars(meta, stats));
             rows += QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss103Csv.PatternsFile), QABoss103Metrics.PatternsHeader, QABoss103CsvRows.Patterns(meta, stats));
             rows += QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss103Csv.GimmicksFile), QABoss103Metrics.GimmicksHeader, QABoss103CsvRows.Gimmicks(meta, stats));
+            // 할 일 119 C3 — 클리어 실패(전멸·시간초과) 판마다 실패 사유 1행.
+            string[] fail = QABoss103FailReason.Row(meta, stats, recorder != null ? recorder.FailSnapshot : null, recorder != null ? recorder.Pylons.Waves : null);
+            if (fail != null)
+            {
+                rows += QABoss103Csv.Append(Path.Combine(cfg.OutDir, QABoss103FailReason.File), QABoss103FailReason.Header, new[] { fail });
+                Debug.Log($"{Tag} event=run_fail run={cfg.Run} retry={cfg.Retry} outcome={rec.Outcome} pattern={QABoss103Plan.Token(fail[Array.IndexOf(QABoss103FailReason.Header, "fail_pattern")])}");
+            }
             string parts = stats != null && stats.Started ? stats.PartsNote() : "";
             Debug.Log($"{Tag} event=run_csv path={QABoss103Plan.Token(cfg.OutDir)} rows={rows} run={cfg.Run} retry={cfg.Retry} outcome={rec.Outcome} " +
                       $"dataSource={meta.DataSource} xlsxRev={meta.XlsxSvnRev} git={meta.GitCommit} parts={(parts.Length > 0 ? QABoss103Plan.Token(parts) : "ok")}");
@@ -163,6 +170,7 @@ public static class QABoss103RunCsv
             StartedAt = startedAt.ToString("yyyy-MM-dd HH:mm:ss"),
             EndedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             UnityVersion = Application.unityVersion,
+            OutcomeSource = rec.OutcomeSource,
         };
         if (rec.Outcome == QABoss103Outcome.Clear || rec.Outcome == QABoss103Outcome.Wipe || rec.Outcome == QABoss103Outcome.Timeout)
             m.Note = rec.Detail;

@@ -94,15 +94,21 @@ public sealed class QABoss103CharStats
     public int HitsTaken;
     /// <summary>굴림 없는 피격(감지 못한 위험). 판 파일이 없으면 -1.</summary>
     public int HitsUnrolled = -1;
-    /// <summary>C7b — QA 자동 부활 성공(<c>QABoss103AutoRevive</c>, 공용 목숨 1 차감).</summary>
+    /// <summary>할 일 119 — F10 디버그 부활 성공(봇이 Soul 3초 뒤 F10 과 같은 RPC, 서버 <c>PlayerReviveController.ServerReviveCompleted</c>). 1회 = 공용 목숨 1.</summary>
     public int QaRevives;
     /// <summary>C7d — QA 끼임 재배치 성공(<c>QABoss103Relocator</c>, 20초 이상 진척 없음 → 보스 둘레 링 지점).</summary>
     public int QaRelocates;
+    /// <summary>할 일 119 — 벽 속·보스방 경계 밖 감지 → QA 재배치(보스 둘레 무작위 지점) 성공.</summary>
+    public int QaWallEscapes;
+    /// <summary>할 일 119 — 즉사 패턴(무적 무시) 범위 안이라 회피 굴림 없이 둔 위험 수(판 파일 <c>lethal</c>). 판 파일이 없으면 열 비움.</summary>
+    public int LethalNoRoll;
 
     /// <summary>C7e 봇 충실도 — 회피 굴림 수 / 그중 그 위험에 피격 0(<see cref="QABoss103RunStats.Finish"/>). 판 파일이 없으면 열 비움.</summary>
     public int DodgeRolls, DodgeSuccess;
     /// <summary>C7e 봇 충실도 — 간파 성공 굴림 누름 수 / 그중 서버 간파 성공이 이어진 것.</summary>
     public int CounterHitRolls, CounterHitSuccess;
+    /// <summary>할 일 119 C2 — 툴팁 규칙 발동 횟수(판 파일 <c>rule</c>, 순서 = <see cref="QABoss103CharRules.Tokens"/>). 열은 그 규칙 캐릭터 행에만.</summary>
+    public readonly int[] RuleCounts = new int[QABoss103CharRules.Count];
 
     internal bool Transformed;
     internal double TransformSince;
@@ -135,6 +141,8 @@ public sealed class QABoss103RunStats
     public readonly List<QABoss103Hit> Deaths = new List<QABoss103Hit>();
     public readonly List<KeyValuePair<double, string>> AttackStarts = new List<KeyValuePair<double, string>>();
     public readonly List<QABoss103Roll> Rolls = new List<QABoss103Roll>();
+    /// <summary>할 일 119 — 즉사(굴림 없음) 위험(판 파일 <c>lethal</c>). 굴림 집계·충실도에는 넣지 않고, '굴림 없는 피격'에서만 덮는다.</summary>
+    public readonly List<QABoss103Roll> Lethals = new List<QABoss103Roll>();
     /// <summary>C7e — 봇 간파 누름(판 파일)과 서버 간파 성공(캐릭터, 시각).</summary>
     public readonly List<QABoss103CounterPress> CounterPresses = new List<QABoss103CounterPress>();
     public readonly List<QABoss103Hit> CounterSuccesses = new List<QABoss103Hit>();
@@ -320,18 +328,28 @@ public sealed class QABoss103RunStats
 
     public void Wipe() => Wipes++;
 
-    /// <summary>C7b — 부활 무적을 못 준 QA 자동 부활이 있었다(runs.csv note <c>qa_revive_no_invuln</c>).</summary>
-    public bool QaReviveNoInvuln;
+    /// <summary>할 일 119 — 부활 1회가 공용 목숨을 정확히 1 쓰지 않았다(runs.csv note <see cref="ReviveLifeMismatchNote"/>). F10 경로는 1 을 쓰므로 생기면 게임 쪽 변경이다.</summary>
+    public bool QaReviveLifeMismatch;
 
-    /// <summary>C7b — QA 자동 부활 성공 1회. <paramref name="invuln"/> = 부활 무적을 줬나.</summary>
-    public void QaRevive(int slot, bool invuln)
+    public const string ReviveLifeMismatchNote = "qa_revive_life_mismatch";
+
+    /// <summary>할 일 119 — F10 부활 성공 1회. <paramref name="livesUsed"/> = 그 부활로 줄어든 공용 목숨(모르면 음수 — 검사 안 함).</summary>
+    public void QaRevive(int slot, int livesUsed)
     {
         QABoss103CharStats c = C(slot);
         if (c == null)
             return;
         c.QaRevives++;
-        if (!invuln)
-            QaReviveNoInvuln = true;
+        if (livesUsed >= 0 && livesUsed != 1)
+            QaReviveLifeMismatch = true;
+    }
+
+    /// <summary>할 일 119 — 벽 끼임 탈출 재배치 성공 1회.</summary>
+    public void QaWallEscape(int slot)
+    {
+        QABoss103CharStats c = C(slot);
+        if (c != null)
+            c.QaWallEscapes++;
     }
 
     /// <summary>C7d — QA 끼임 재배치 성공 1회.</summary>
@@ -406,6 +424,23 @@ public sealed class QABoss103RunStats
                     if (r.Note == "expired")
                         c.EvadeExpired++;
                     break;
+                case "lethal":
+                    Lethals.Add(new QABoss103Roll
+                    {
+                        Slot = slot,
+                        Kind = Get(kv, "pattern", "floor"),
+                        Attack = Get(kv, "attack", "na"),
+                        ServerT = ParseD(Get(kv, "serverT", "")),
+                        Note = Get(kv, "lethal", "none"),
+                        HitDelay = ParseD(Get(kv, "hitMs", "")) / 1000.0,
+                    });
+                    c.LethalNoRoll++;
+                    break;
+                case "rule":
+                    int rule = QABoss103CharRules.IndexOf(Get(kv, "rule", ""));
+                    if (rule >= 0)
+                        c.RuleCounts[rule]++;
+                    break;
                 case "counter":
                     // 게임이 시전을 거부한 누름(쿨·상태)은 시도가 아니다.
                     bool cast = Get(kv, "cast", "true") != "false";
@@ -439,6 +474,8 @@ public sealed class QABoss103RunStats
     {
         foreach (QABoss103Roll r in Rolls)
             r.Pattern = QABoss103Metrics.PatternOfRoll(r.Kind, r.Attack, r.ServerT, AttackStarts);
+        foreach (QABoss103Roll r in Lethals)
+            r.Pattern = QABoss103Metrics.PatternOfRoll(r.Kind, r.Attack, r.ServerT, AttackStarts);
         for (int s = 0; s < Chars.Length; s++)
         {
             QABoss103CharStats c = Chars[s];
@@ -447,9 +484,10 @@ public sealed class QABoss103RunStats
                 c.HitsUnrolled = -1;
                 continue;
             }
+            // 즉사(굴림 없음) 위험에 맞은 것은 '감지 못한 위험'이 아니다 — 일부러 굴리지 않았다(할 일 119).
             int n = 0;
             foreach (QABoss103Hit h in Hits)
-                if (h.Slot == s && !QABoss103Metrics.HasRollFor(h, Rolls))
+                if (h.Slot == s && !QABoss103Metrics.HasRollFor(h, Rolls) && !QABoss103Metrics.HasLethalFor(h, Lethals))
                     n++;
             c.HitsUnrolled = n;
         }
@@ -586,16 +624,18 @@ public sealed class QABoss103RunStats
         return sb.ToString();
     }
 
-    /// <summary>패턴별 [굴림, 굴림 맞기, 굴림 피하기, 실제 피격, 사망] — 패턴 키 사전순.</summary>
+    /// <summary>패턴별 [굴림, 굴림 맞기, 굴림 피하기, 실제 피격, 사망, 즉사(굴림 없음)] — 패턴 키 사전순.</summary>
     public SortedDictionary<string, int[]> PatternTable()
     {
         var t = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
         int[] Row(string p)
         {
             if (!t.TryGetValue(p, out int[] row))
-                t[p] = row = new int[5];
+                t[p] = row = new int[6];
             return row;
         }
+        foreach (QABoss103Roll r in Lethals)
+            Row(r.Pattern ?? QABoss103Metrics.Unknown)[5]++;
         foreach (QABoss103Roll r in Rolls)
         {
             int[] row = Row(r.Pattern ?? QABoss103Metrics.Unknown);
@@ -731,6 +771,22 @@ public static class QABoss103Metrics
         return false;
     }
 
+    /// <summary>
+    /// 할 일 119 — 그 피격이 같은 캐릭터·같은 패턴의 즉사(굴림 없음) 위험에 맞은 것인가. 북진 예고는 11초 넘게 길어 <see cref="RollLookbackSeconds"/> 대신
+    /// 감지 ~ 예상 발동(<c>hitMs</c>) + <see cref="FidelityTailSeconds"/> 창으로 본다.
+    /// </summary>
+    public static bool HasLethalFor(QABoss103Hit hit, IReadOnlyList<QABoss103Roll> lethals)
+    {
+        foreach (QABoss103Roll r in lethals)
+        {
+            if (r.Slot != hit.Slot || double.IsNaN(r.ServerT) || r.Pattern != hit.Pattern)
+                continue;
+            if (hit.T >= r.ServerT - RollLookaheadSeconds && hit.T <= r.ServerT + FidelityWindow(r.HitDelay))
+                return true;
+        }
+        return false;
+    }
+
     // ── CSV 열 ───────────────────────────────────────────────
 
     public static readonly string[] KeyHeader = { "run", "retry", "tier", "seed" };
@@ -741,12 +797,14 @@ public static class QABoss103Metrics
         "traits_paladin", "traits_assassin", "traits_gunner", "boss_hp_end_pct", "suppress_count",
         "counter_tries", "counter_success", "threat_rolls", "rolled_take", "actual_hits",
         "data_source", "xlsx_svn_rev", "git_commit", "started_at", "ended_at", "unity_version", "note",
+        // 할 일 119 — 판정 출처(QABoss103EndSignals.Source · stall · early_no_progress). 배치 중간 머리 확장을 위해 끝에 붙인다.
+        "outcome_source",
     });
 
     public static readonly string[] CharsHeader = BuildCharsHeader();
 
     public static readonly string[] PatternsHeader = Concat(KeyHeader, new[]
-        { "pattern", "threats", "rolled_take", "rolled_dodge", "actual_hits", "deaths" });
+        { "pattern", "threats", "rolled_take", "rolled_dodge", "actual_hits", "deaths", "lethal_no_roll" });
 
     public static readonly string[] GimmicksHeader = Concat(KeyHeader, new[]
         { "gimmick", "result", "fight_t", "serverT", "source", "note" });
@@ -770,7 +828,11 @@ public static class QABoss103Metrics
             "evade_dodge", "evade_take", "evade_no_charge", "evade_blocked", "evade_expired", "hits_taken", "hits_unrolled",
             "qa_revives", "qa_relocates",
             "dodge_rolls", "dodge_success", "counter_hit_rolls", "counter_roll_success",
+            // 할 일 119 — 벽 끼임 탈출 재배치 · 즉사(굴림 없음). 끝에 붙인다(배치 중간 머리 확장).
+            "qa_wall_escapes", "lethal_no_roll",
         });
+        // 할 일 119 C2 — 툴팁 규칙 발동 횟수(그 캐릭터 행만). 끝에 붙인다.
+        h.AddRange(QABoss103CharRules.Tokens);
         return h.ToArray();
     }
 
@@ -800,6 +862,8 @@ public sealed class QABoss103RunMeta
     public double BossHpEndPct = double.NaN;
     public string DataSource = "", XlsxSvnRev = "", GitCommit = "", StartedAt = "", EndedAt = "", UnityVersion = "";
     public string Note = "";
+    /// <summary>할 일 119 — 판정 출처(<see cref="QABoss103EndSignals.Source"/> 등). 비면 빈칸.</summary>
+    public string OutcomeSource = "";
 
     public string[] Key() => new[] { Inv(Run), Inv(Retry), Tier.ToString(), Inv(Seed) };
 
@@ -819,8 +883,8 @@ public static class QABoss103CsvRows
         string parts = started ? s.PartsNote() : "";
         if (parts.Length > 0)
             note = note.Length > 0 ? note + " " + parts : parts;
-        if (started && s.QaReviveNoInvuln)
-            note = note.Length > 0 ? note + " " + QABoss103AutoRevive.NoInvulnNote : QABoss103AutoRevive.NoInvulnNote;
+        if (started && s.QaReviveLifeMismatch)
+            note = note.Length > 0 ? note + " " + QABoss103RunStats.ReviveLifeMismatchNote : QABoss103RunStats.ReviveLifeMismatchNote;
         var r = new List<string>(m.Key())
         {
             I(m.RunSeed),
@@ -841,6 +905,7 @@ public static class QABoss103CsvRows
             started ? I(s.Hits.Count) : "",
             m.DataSource, m.XlsxSvnRev, m.GitCommit, m.StartedAt, m.EndedAt, m.UnityVersion,
             note,
+            m.OutcomeSource ?? "",
         };
         return r.ToArray();
     }
@@ -899,6 +964,10 @@ public static class QABoss103CsvRows
             r.Add(c.PartPresent ? I(c.DodgeSuccess) : "");
             r.Add(c.PartPresent ? I(c.CounterHitRolls) : "");
             r.Add(c.PartPresent ? I(c.CounterHitSuccess) : "");
+            r.Add(I(c.QaWallEscapes));
+            r.Add(c.PartPresent ? I(c.LethalNoRoll) : "");
+            for (int i = 0; i < QABoss103CharRules.Count; i++)
+                r.Add(c.PartPresent && QABoss103CharRules.Owner((QABoss103CharRule)i) == c.Character ? I(c.RuleCounts[i]) : "");
             rows.Add(r.ToArray());
         }
         return rows;
@@ -1023,7 +1092,7 @@ public static class QABoss103Csv
 /// <summary>
 /// 봇 판 파일 — 각 봇 인스턴스(호스트·MPPM 클론)가 <c>&lt;출력 폴더&gt;/parts/run&lt;n&gt;_r&lt;retry&gt;_s&lt;자리&gt;.txt</c> 에 한 줄씩 쓰고(즉시 flush),
 /// 호스트가 판 끝에 읽어 합친다. 줄 = <c>종류 key=value …</c>(값에 공백·'=' 없음 — <see cref="QABoss103Plan.Token"/>).
-/// 종류: <c>threat</c>(회피 굴림 1건) · <c>counter</c>(간파 시도 1회) · <c>done</c>(봇 종료). 판 끝 신호 = 같은 폴더 <c>run&lt;n&gt;_r&lt;retry&gt;_end.txt</c>(호스트가 씀).
+/// 종류: <c>threat</c>(회피 굴림 1건) · <c>counter</c>(간파 시도 1회) · <c>rule</c>(할 일 119 툴팁 규칙 발동 1회) · <c>done</c>(봇 종료). 판 끝 신호 = 같은 폴더 <c>run&lt;n&gt;_r&lt;retry&gt;_end.txt</c>(호스트가 씀).
 /// </summary>
 public static class QABoss103PartFile
 {
