@@ -10,7 +10,7 @@ using UnityEngine.Serialization;
 /// 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 맵 로딩 대신 <see cref="TryBeginServer"/> 에 넘긴다 → 발사 클립 끝 이벤트에 그 콜백으로 곧바로 로딩(페이드 없음).
 /// <list type="bullet">
 /// <item>복제: 시작 시각(서버시간), 참가 명단(플레이어 NetworkObjectId, 보행 슬롯 순서), 슬롯별 보행 시간(서버가 경로 길이 ÷ 걷는 속도로 계산),
-/// 해치 열림 시각(서버시간 — 호스트 발사대의 해치 클립 이벤트, 할 일 106). 모든 피어가 이 값으로 <see cref="PodDropLobbyTimeline"/> 을 같이 계산한다. RPC 없음.</item>
+/// 해치 열림 시각(서버시간 — 호스트 발사대의 해치 클립 이벤트, 할 일 106), 발사 클립 가속 시각(호스트 가속 이벤트 — 그 뒤 발사 클립 배율 재생, 106 추가 2). 모든 피어가 이 값으로 <see cref="PodDropLobbyTimeline"/> 을 같이 계산한다. RPC 없음.</item>
 /// <item>서버: 시작 순간 참가자 연출 잠금(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단),
 /// 호스트 발사대 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 단계를 확정한다 — 해치 이벤트 → 해치 열림 시각 복제(탑승 시작),
 /// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), 발사 클립 끝 이벤트 → 콜백(로딩).
@@ -90,6 +90,11 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private readonly NetworkVariable<double> _hatchOpenedAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 발사 클립 가속 시각(서버시간) — 호스트 발사대의 가속 클립 이벤트(PodClipEvent 종류 1, 기본 294프레임)를 서버가 확정한 순간. 0 = 아직.
+    // 클라는 자기 이벤트로 곧바로 가속하고, 이벤트를 놓쳤거나 늦게 본 피어는 이 시각으로 클립 위치를 계산해 따라잡는다(할 일 106 추가 2). 서버 write / 모두 read.
+    private readonly NetworkVariable<double> _launchFastAt = new NetworkVariable<double>(
+        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private static double ServerNow =>
         NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : 0d;
 
@@ -116,6 +121,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private CameraTargetSwitcher _heldCamera;
     private PodAnimatorDriver _launcherDriver;
     private bool _hatchHeldOnBoard;
+    private bool _launchFast;
 
     // 오너 보행
     private struct OwnerWalk
@@ -227,6 +233,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         foreach (float seconds in walkSeconds)
             _walkSeconds.Add(seconds);
         _hatchOpenedAt.Value = 0d;
+        _launchFastAt.Value = 0d;
         _startAt.Value = start;
         _loadIssued = false;
         LockParticipants(participants);
@@ -309,12 +316,28 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     }
 
     // [전 피어] 발사대 클립 이벤트. 해치 이벤트는 모든 피어에서 그 자세로 멈추게 한다(표시). 단계 확정은 서버만.
-    private void HandleLauncherClipEvent(string clipName)
+    // 가속 이벤트는 모든 피어에서 곧바로 가속하고(표시), 서버는 그 시각을 복제한다 — 단계 문(해치·발사)에는 넣지 않는다.
+    private void HandleLauncherClipEvent(string clipName, int kind)
     {
         if (settings == null)
             return;
 
         PodDropLobbyTimings lobby = settings.Lobby;
+        if (kind == PodAnimEventRelay.KindSpeedUp)
+        {
+            if (clipName != lobby.launchState || !_launcherDriver.HasStarted(lobby.launchState) || _launchFast)
+                return;
+
+            _launchFast = true;
+            _launcherDriver.SetSpeed(lobby.launchFastSpeed);
+            if (IsServer && _run != null && _launchFastAt.Value <= 0d)
+            {
+                _launchFastAt.Value = ServerNow;
+                Debug.Log($"[SceneFlow] {Tag} 발사 클립 가속 ×{lobby.launchFastSpeed:0.##} +{ServerNow - _run.Start:0.##}s");
+            }
+            return;
+        }
+
         if (clipName == lobby.hatchState && !_launcherDriver.HasStarted(lobby.launchState))
             _launcherDriver.Hold();
 
@@ -421,7 +444,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             _timeline = settings.CreateLobbyTimeline(ReplicatedWalkSeconds());
 
         double elapsed = ServerNow - start;
-        UpdateLauncher(elapsed, _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start)));
+        UpdateLauncher(elapsed, _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start)),
+            PodDropTimeline.EventElapsed(_launchFastAt.Value, start));
         UpdateCamera(elapsed);
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
@@ -432,8 +456,10 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
     // Base Layer(0) 에 전신 클립을 이어 재생한다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.
     // 해치 클립은 순간이동 순간 처음부터, 이벤트 프레임에서 멈춤(이벤트 또는 서버 해치 열림 복제 중 먼저 온 것). 발사 클립은 가장 늦게 앉는 순간 처음부터 끝까지.
+    // 발사 클립은 가속 이벤트(기본 294프레임)부터 배율로 돈다 — 각 피어는 자기 이벤트로 곧바로 가속하고, 이벤트를 놓친 피어는 서버 가속 시각(복제)을 받는 순간 그 위치로 옮겨 가속한다.
+    // 늦게 처음 본 피어는 1배속 구간 + 가속 구간을 반영한 위치에서 시작한다(<see cref="PodDropLobbyTimeline.LaunchClipSecondsAt"/>).
     // 발사대 프리팹엔 콜라이더가 없다(바닥은 로비 레이아웃 PodLaunch_FloorCollider — 걷는 길이라 끄지 않는다).
-    private void UpdateLauncher(double elapsed, double board)
+    private void UpdateLauncher(double elapsed, double board, double fastAt)
     {
         if (launcher == null || elapsed < _timeline.HatchAt)
             return;
@@ -448,7 +474,23 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         double launchAt = _timeline.LaunchAt(board);
         if (elapsed >= launchAt)
         {
-            _launcherDriver.Play(lobby.launchState, 0, (float)(elapsed - launchAt));
+            float clipSeconds = PodDropLobbyTimeline.LaunchClipSecondsAt(elapsed, launchAt, fastAt, lobby.launchFastSpeed);
+            if (!_launcherDriver.HasStarted(lobby.launchState))
+            {
+                _launcherDriver.Play(lobby.launchState, 0, clipSeconds);
+                if (elapsed >= fastAt)
+                {
+                    _launchFast = true;
+                    _launcherDriver.SetSpeed(lobby.launchFastSpeed);
+                }
+            }
+            else if (!_launchFast && elapsed >= fastAt)
+            {
+                // 자기 가속 이벤트를 놓친 피어 — 서버 가속 시각 기준 위치로 옮겨 가속한다.
+                _launchFast = true;
+                _launcherDriver.Seek(lobby.launchState, clipSeconds);
+                _launcherDriver.SetSpeed(lobby.launchFastSpeed);
+            }
             return;
         }
 
@@ -499,6 +541,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
         _launcherDriver?.Release();
         _hatchHeldOnBoard = false;
+        _launchFast = false;
     }
 
     // ---------------- 오너 보행 ----------------

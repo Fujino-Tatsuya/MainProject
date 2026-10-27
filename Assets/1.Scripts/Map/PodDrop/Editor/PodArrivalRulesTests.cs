@@ -77,24 +77,24 @@ public sealed class PodArrivalRulesTests
     [Test]
     public void ArrivalDone_NotSpawnedWaits()
     {
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(spawned: false, armed: false, startAt: 0d, openedAt: 0d, now: 10d, releaseAfterOpen: 1.5f),
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(spawned: false, armed: false, startAt: 0d, openedAt: 0d, now: 10d, endAfterOpen:1.5f),
             "복제 값을 읽기 전엔 켜질지 몰라 기다린다");
     }
 
     [Test]
     public void ArrivalDone_NotArmedIsImmediatelyTrue()
     {
-        Assert.IsTrue(PodArrivalRules.IsArrivalDone(spawned: true, armed: false, startAt: 0d, openedAt: 0d, now: 0d, releaseAfterOpen: 1.5f),
+        Assert.IsTrue(PodArrivalRules.IsArrivalDone(spawned: true, armed: false, startAt: 0d, openedAt: 0d, now: 0d, endAfterOpen:1.5f),
             "Lobby 가 아닌 진입(연출 꺼짐)은 즉시 참 — 지금 동작 유지");
     }
 
     [Test]
     public void ArrivalDone_ArmedWaitsForStartOpenThenRelease()
     {
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 0d, openedAt: 0d, now: 100d, releaseAfterOpen: 1.5f), "로딩이 걷히기 전");
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 0d, now: 1000d, releaseAfterOpen: 1.5f), "열기 끝 이벤트 전(포드 클립 진행 중)");
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 108d, now: 109.49d, releaseAfterOpen: 1.5f), "디졸브·레터박스 아웃 중");
-        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 108d, now: 109.5d, releaseAfterOpen: 1.5f), "해제 = 레터박스가 다 걷힌 순간");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 0d, openedAt: 0d, now: 100d, endAfterOpen:1.5f), "로딩이 걷히기 전");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 0d, now: 1000d, endAfterOpen:1.5f), "열기 끝 이벤트 전(포드 클립 진행 중)");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 108d, now: 109.49d, endAfterOpen:1.5f), "디졸브·레터박스 아웃 중");
+        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, startAt: 100d, openedAt: 108d, now: 109.5d, endAfterOpen:1.5f), "해제 = 레터박스가 다 걷힌 순간");
     }
 
     [Test]
@@ -103,9 +103,10 @@ public sealed class PodArrivalRulesTests
         var timeline = new PodDropMapTimeline(PodDropMapTimings.Default);
         const double start = 50d, opened = 58d;
         double openedElapsed = opened - start;
-        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, start, opened, start + timeline.LetterboxOutAt(openedElapsed), timeline.ReleaseAfterOpenSeconds));
-        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, start, opened, start + timeline.ReleaseAt(openedElapsed), timeline.ReleaseAfterOpenSeconds));
-        Assert.IsTrue(timeline.IsReleasedAt(timeline.ReleaseAt(openedElapsed), openedElapsed), "시간표 해제와 같은 순간");
+        Assert.IsFalse(PodArrivalRules.IsArrivalDone(true, true, start, opened, start + timeline.DissolveAt(openedElapsed), timeline.EndAfterOpenSeconds), "디졸브 중");
+        Assert.IsTrue(PodArrivalRules.IsArrivalDone(true, true, start, opened, start + timeline.EndAt(openedElapsed), timeline.EndAfterOpenSeconds));
+        Assert.IsTrue(timeline.IsEndedAt(timeline.EndAt(openedElapsed), openedElapsed), "시간표 연출 끝과 같은 순간");
+        Assert.IsTrue(timeline.IsReleasedAt(timeline.EndAt(openedElapsed), openedElapsed), "튜토리얼 시작 땐 조작도 풀려 있다");
     }
 
     // ─── 착지 효과 시점 ────────────────────────────────────────────────

@@ -7,6 +7,8 @@ using UnityEngine;
 /// 포드 클립 애니 이벤트 저작(할 일 106) — SM_DropPod_LaunchStation_Combined_v001.fbx(SVN 아트) 클립 임포트 설정(ModelImporter.clipAnimations)에
 /// <c>PodClipEvent</c>(<see cref="PodAnimEventRelay"/>) 이벤트를 넣는다. 로비 발사대·맵 포드가 같은 FBX 클립을 쓴다(컨트롤러 AC_DropPod_LaunchStation_v001).
 /// 처음 위치: 로비 해치(DP_HatchLobbyOpenClose) = 103프레임(다 열린 자세에서 멈추고 탑승), 나머지 = 끝 프레임(다음 단계).
+/// 단계 이벤트는 정수 인자 0(<see cref="PodAnimEventRelay.KindStage"/>). 로비 발사(DP_LaunchCycle)에는 가속 이벤트(정수 인자 1 — <see cref="PodAnimEventRelay.KindSpeedUp"/>)가
+/// 하나 더 있다 — 처음 위치 294프레임, 그 뒤 발사 클립을 PodDropSettings 가속 배율로 재생(할 일 106 추가 2).
 /// 이벤트를 FBX 에 두는 이유: 사용자가 FBX 임포트 창 Animation 탭에서 끌어 옮겨 튜닝하고, 코드·SO 에 클립 시각을 흉내 내는 숫자를 두지 않으려고.
 ///
 /// 🔴 재실행해도 <b>이미 있는 이벤트는 옮기지 않는다</b> — 사용자가 옮긴 위치를 지킨다. 빠진 이벤트만 채운다. 처음 위치로 되돌리려면 "기본 위치로 재설정".
@@ -21,17 +23,22 @@ public static class PodAnimEventAuthoring
     /// <summary>로비 해치 이벤트 처음 위치(클립 프레임) — 다 열린 자세(할 일 106 사양).</summary>
     internal const int LobbyHatchOpenFrame = 103;
 
-    /// <summary>클립 하나에 넣을 이벤트 하나 — <c>Frame</c> &lt; 0 = 끝 프레임.</summary>
+    /// <summary>로비 발사 가속 이벤트 처음 위치(클립 프레임) — 여기부터 가속 배율(할 일 106 추가 2 사양).</summary>
+    internal const int LobbyLaunchFastFrame = 294;
+
+    /// <summary>클립 하나에 넣을 이벤트 하나 — <c>Frame</c> &lt; 0 = 끝 프레임. <c>Kind</c> = 이벤트 정수 인자(종류).</summary>
     internal readonly struct Spec
     {
         public readonly string Clip;
         public readonly int Frame;
+        public readonly int Kind;
         public readonly string Meaning;
 
-        public Spec(string clip, int frame, string meaning)
+        public Spec(string clip, int frame, int kind, string meaning)
         {
             Clip = clip;
             Frame = frame;
+            Kind = kind;
             Meaning = meaning;
         }
     }
@@ -43,7 +50,7 @@ public static class PodAnimEventAuthoring
     public static void AuthorReset()
     {
         if (!EditorUtility.DisplayDialog("포드 애니 이벤트 재설정",
-                "옮겨 둔 PodClipEvent 이벤트를 처음 위치(로비 해치 103프레임, 나머지 끝 프레임)로 되돌린다. 계속할까?", "재설정", "취소"))
+                "옮겨 둔 PodClipEvent 이벤트를 처음 위치(로비 해치 103프레임, 로비 발사 가속 294프레임, 나머지 끝 프레임)로 되돌린다. 계속할까?", "재설정", "취소"))
             return;
         Author(resetExisting: true);
     }
@@ -65,20 +72,22 @@ public static class PodAnimEventAuthoring
         PodDropLobbyTimings lobby = settings != null ? settings.Lobby : PodDropLobbyTimings.Default;
         PodDropMapTimings map = settings != null ? settings.Map : PodDropMapTimings.Default;
 
+        const int stage = PodAnimEventRelay.KindStage;
         var specs = new List<Spec>();
-        Add(specs, lobby.hatchState, LobbyHatchOpenFrame, "로비 해치 열림 → 멈춤·탑승");
-        Add(specs, lobby.launchState, -1, "로비 발사 끝 → 로딩");
-        Add(specs, map.wingDeployState, -1, "맵 날개 펴기 끝");
-        Add(specs, map.gearDeployState, -1, "맵 다리 펴기 끝 (둘 다 → 착륙)");
-        Add(specs, map.hatchOpenState, -1, "맵 해치 열기 끝");
-        Add(specs, map.wingFoldState, -1, "맵 날개 접기 끝 (둘 다 → 디졸브)");
+        Add(specs, lobby.hatchState, LobbyHatchOpenFrame, stage, "로비 해치 열림 → 멈춤·탑승");
+        Add(specs, lobby.launchState, LobbyLaunchFastFrame, PodAnimEventRelay.KindSpeedUp, $"로비 발사 가속 → ×{lobby.launchFastSpeed:0.##}");
+        Add(specs, lobby.launchState, -1, stage, "로비 발사 끝 → 로딩");
+        Add(specs, map.wingDeployState, -1, stage, "맵 날개 펴기 끝");
+        Add(specs, map.gearDeployState, -1, stage, "맵 다리 펴기 끝 (둘 다 → 착륙)");
+        Add(specs, map.hatchOpenState, -1, stage, "맵 해치 열기 끝");
+        Add(specs, map.wingFoldState, -1, stage, "맵 날개 접기 끝 (둘 다 → 디졸브 대기)");
         return specs;
     }
 
-    static void Add(List<Spec> specs, string clip, int frame, string meaning)
+    static void Add(List<Spec> specs, string clip, int frame, int kind, string meaning)
     {
-        if (!string.IsNullOrEmpty(clip) && specs.TrueForAll(s => s.Clip != clip))
-            specs.Add(new Spec(clip, frame, meaning));
+        if (!string.IsNullOrEmpty(clip) && specs.TrueForAll(s => s.Clip != clip || s.Kind != kind))
+            specs.Add(new Spec(clip, frame, kind, meaning));
     }
 
     /// <summary>클립 프레임 → 임포트 이벤트 정규화 시각(0 = 첫 프레임, 1 = 끝 프레임). 음수 = 끝.</summary>
@@ -114,9 +123,9 @@ public static class PodAnimEventAuthoring
             ModelImporterClipAnimation clipAnimation = clipAnimations[index];
             float time = ToNormalized(spec.Frame, clipAnimation.firstFrame, clipAnimation.lastFrame);
             AnimationEvent[] merged = AnimEventTiming.Merge(clipAnimation.events, PodAnimEventRelay.FunctionName,
-                new List<(int type, float time)> { (0, time) }, resetExisting, out int added, out int moved);
+                new List<(int type, float time)> { (spec.Kind, time) }, resetExisting, out int added, out int moved);
             string frameText = spec.Frame < 0 ? $"끝 {clipAnimation.lastFrame:0}" : spec.Frame.ToString();
-            log.AppendLine($"  {spec.Clip} — {spec.Meaning}: 프레임 {frameText} (정규화 {time:0.####}) → 추가 {added}, 재설정 {moved}");
+            log.AppendLine($"  {spec.Clip} [종류 {spec.Kind}] — {spec.Meaning}: 프레임 {frameText} (정규화 {time:0.####}) → 추가 {added}, 재설정 {moved}");
             if (added == 0 && moved == 0)
                 continue;
 
@@ -160,10 +169,11 @@ public static class PodAnimEventAuthoring
                 continue;
             }
 
-            float seconds = EventSeconds(clip, out bool found);
+            float seconds = EventSeconds(clip, spec.Kind, out bool found);
+            string missingText = spec.Kind == PodAnimEventRelay.KindSpeedUp ? "가속 없이 1배속으로 끝까지 돈다" : $"클립 끝 {clip.length:0.###}s 에서 넘어간다";
             sb.AppendLine(found
                 ? $"  ✓ {spec.Clip} — {spec.Meaning}: {seconds:0.###}s / {clip.length:0.###}s"
-                : $"  ✗ {spec.Clip} — {spec.Meaning}: 이벤트 없음(클립 끝 {clip.length:0.###}s 에서 넘어간다)");
+                : $"  ✗ {spec.Clip} — {spec.Meaning}: 이벤트 없음({missingText})");
             if (!found) missing++;
         }
 
@@ -194,15 +204,15 @@ public static class PodAnimEventAuthoring
         return null;
     }
 
-    /// <summary>클립의 첫 PodClipEvent 시각(초). 없으면 클립 길이(끝까지 돈 것으로 넘어가는 예비 동작과 같다).</summary>
-    internal static float EventSeconds(AnimationClip clip, out bool found)
+    /// <summary>클립의 첫 PodClipEvent(종류 <paramref name="kind"/>) 시각(초). 없으면 클립 길이(끝까지 돈 것으로 넘어가는 예비 동작과 같다).</summary>
+    internal static float EventSeconds(AnimationClip clip, int kind, out bool found)
     {
         found = false;
         if (clip == null) return 0f;
         float best = float.MaxValue;
         foreach (AnimationEvent e in AnimationUtility.GetAnimationEvents(clip))
         {
-            if (e.functionName != PodAnimEventRelay.FunctionName) continue;
+            if (e.functionName != PodAnimEventRelay.FunctionName || e.intParameter != kind) continue;
             found = true;
             best = Mathf.Min(best, e.time);
         }
@@ -210,11 +220,11 @@ public static class PodAnimEventAuthoring
         return found ? best : clip.length;
     }
 
-    /// <summary>시각표 표시용 — 상태(클립)의 이벤트 시각(초). 비운 이름·없는 클립 = 0(애니 없이 곧바로 넘어간다).</summary>
-    internal static float EventSecondsOf(string clipName, out bool found)
+    /// <summary>시각표 표시용 — 상태(클립)의 단계 이벤트(또는 <paramref name="kind"/>) 시각(초). 비운 이름·없는 클립 = 0(애니 없이 곧바로 넘어간다).</summary>
+    internal static float EventSecondsOf(string clipName, out bool found, int kind = PodAnimEventRelay.KindStage)
     {
         found = false;
         AnimationClip clip = LoadClip(clipName);
-        return clip != null ? EventSeconds(clip, out found) : 0f;
+        return clip != null ? EventSeconds(clip, kind, out found) : 0f;
     }
 }

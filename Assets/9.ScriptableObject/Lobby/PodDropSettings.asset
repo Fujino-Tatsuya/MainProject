@@ -43,9 +43,9 @@ MonoBehaviour:
     cameraZoomDelaySeconds: 0
     cameraZoomSeconds: 2.6
     cameraZoomEase: 3
-    fallHeight: 12
+    fallHeight: 30
     fallSeconds: 0.6
-    fallEase: 5
+    fallEase: 0
     impactEffectScale: 1.5
     shakeAmplitude: 0.6
     shakeDuration: 0.35

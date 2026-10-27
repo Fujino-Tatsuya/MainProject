@@ -24,8 +24,8 @@ public sealed class PodAnimatorDriver
     private AnimatorCullingMode _cullingMode;
     private bool _driven;
 
-    /// <summary>[전 피어] 클립 애니 이벤트(<see cref="PodAnimEventRelay.FunctionName"/>) — 이벤트가 실린 클립 이름.</summary>
-    public event Action<string> ClipEvent;
+    /// <summary>[전 피어] 클립 애니 이벤트(<see cref="PodAnimEventRelay.FunctionName"/>) — 이벤트가 실린 클립 이름, 종류(<see cref="PodAnimEventRelay.KindStage"/>·<see cref="PodAnimEventRelay.KindSpeedUp"/>).</summary>
+    public event Action<string, int> ClipEvent;
 
     public PodAnimatorDriver(Animator animator)
     {
@@ -128,6 +128,30 @@ public sealed class PodAnimatorDriver
     }
 
     /// <summary>
+    /// Animator 전체 재생 배율(로비 발사 클립 가속 — 할 일 106 추가 2). 다음 <see cref="Play"/> 가 다시 1배속으로 되돌린다.
+    /// 로비 발사대는 그때 발사 클립 하나만 돌아서 전체 배율로 충분하다.
+    /// </summary>
+    public void SetSpeed(float speed)
+    {
+        if (_animator != null && _driven)
+            _animator.speed = Mathf.Max(0f, speed);
+    }
+
+    /// <summary>
+    /// 이미 재생 중인 상태를 클립의 <paramref name="secondsIn"/> 초 자세로 옮긴다(배율은 그대로) — 자기 가속 이벤트를 놓친 클라가 서버 시각에 맞춰 따라잡을 때.
+    /// 시작 안 했거나 없는 상태면 아무것도 안 한다. 건너뛴 구간의 이벤트는 뜨지 않는다(단계 확정은 서버 몫).
+    /// </summary>
+    public void Seek(string state, float secondsIn)
+    {
+        if (_animator == null || string.IsNullOrEmpty(state) || !_layers.TryGetValue(state, out int layer) || layer < 0)
+            return;
+
+        float length = ClipLength(state);
+        float normalized = length > 0f ? Mathf.Clamp01(Mathf.Max(0f, secondsIn) / length) : 0f;
+        _animator.Play(Animator.StringToHash(state), layer, normalized);
+    }
+
+    /// <summary>
     /// 재생한 상태가 끝까지 돌았는가(이벤트가 빠졌을 때의 예비 판정). 비운 이름·Animator/컨트롤러 없음·컨트롤러에 없는 상태 = 참, 아직 시작 안 함 = 거짓.
     /// 같은 레이어가 다른 상태로 넘어간 뒤면 참. LateUpdate 에서 부르면 이번 프레임 이벤트가 먼저 처리돼 있다.
     /// </summary>
@@ -163,12 +187,12 @@ public sealed class PodAnimatorDriver
         _animator.Rebind();
     }
 
-    private void HandleFired(string clipName)
+    private void HandleFired(string clipName, int kind)
     {
         if (_held.Contains(clipName))
             return; // 처음 자세에 고정한 클립 — 단계 전환 이벤트로 치지 않는다
 
-        ClipEvent?.Invoke(clipName);
+        ClipEvent?.Invoke(clipName, kind);
     }
 
     private int TopLayerWith(int hash)
