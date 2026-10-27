@@ -382,9 +382,18 @@ public static class SkillTooltipAuthoring
     private const float TagChipRadius = 22f;     // px, PPU 200 → 11 UI 단위(칩 높이 26 의 거의 반 = 알약에 가까운 둥근 사각형)
     private const float TagChipPixelsPerUnit = 200f;
 
+    // 칩 테두리 = 같은 반지름·보더의 흰 둥근 링 9-slice(생성물 · git). 두께(px)는 링 PNG 임포터 userData 에 적어 두고, 바꾸면 그 자리에서 다시 굽는다(guid 유지).
+    private const string TagChipRingSpritePath = "Assets/2.Prefabs/UI/Textures/SkillTooltipTagChipRing.png";
+    private const string RingThicknessKey = "ringThicknessPx=";
+    /// <summary>링 두께 기본값(px) — PPU 200 → 1.75 UI 단위 = 칩 높이 26 의 약 6.7%(참고 이미지 비율).</summary>
+    public const float DefaultTagChipRingThickness = 3.5f;
+    public const float MinTagChipRingThickness = 1f;
+    public const float MaxTagChipRingThickness = 12f;
+
     /// <summary>
     /// 칩 원본을 둥근 9-slice 로 — 배경 Image = <see cref="TagChipSpritePath"/>·Sliced(글자 길이로 늘어나도 모서리 유지),
-    /// 옛 금색 <see cref="Outline"/> 은 지운다(사각 오프셋 복제라 둥근 모서리와 어긋나고, 태그별 색이 칩을 구분한다).
+    /// 그 위에 자식 <see cref="SkillTooltipView.TagChipRingName"/> = 링 <see cref="TagChipRingSpritePath"/>·Sliced(글자색 테두리, 글자 아래).
+    /// 옛 금색 <see cref="Outline"/> 은 지운다(사각 오프셋 복제라 둥근 모서리와 어긋난다).
     /// 색은 런타임에 <see cref="SkillTooltipTagStyles"/> 가 덮는다 — 여기 색은 표가 비었을 때의 기본색.
     /// </summary>
     private static void StyleTagChip(RectTransform chip)
@@ -402,6 +411,19 @@ public static class SkillTooltipAuthoring
         if (chip.TryGetComponent(out Outline outline))
             Object.DestroyImmediate(outline, true);
 
+        var ring = chip.Find(SkillTooltipView.TagChipRingName) as RectTransform;
+        if (ring == null)
+            ring = NewUi(SkillTooltipView.TagChipRingName, chip);
+        Stretch(ring);
+        ring.SetSiblingIndex(0); // 배경 위 · 글자 아래
+        Image ringImage = EnsureComponent<Image>(ring.gameObject);
+        ringImage.sprite = EnsureTagChipRingSprite(null);
+        ringImage.type = Image.Type.Sliced;
+        ringImage.fillCenter = true;
+        ringImage.pixelsPerUnitMultiplier = 1f;
+        ringImage.color = SkillTooltipTagStyles.FallbackText;
+        ringImage.raycastTarget = false;
+
         TMP_Text label = chip.GetComponentInChildren<TMP_Text>(true);
         if (label != null)
             label.color = SkillTooltipTagStyles.FallbackText;
@@ -414,34 +436,71 @@ public static class SkillTooltipAuthoring
     private static Sprite EnsureTagChipSprite()
     {
         if (!System.IO.File.Exists(TagChipSpritePath))
-        {
-            const int size = TagChipTextureSize;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var px = new Color32[size * size];
-            float lo = TagChipRadius, hi = size - TagChipRadius;
-            for (int y = 0; y < size; y++)
-            for (int x = 0; x < size; x++)
-            {
-                float fx = x + 0.5f, fy = y + 0.5f;
-                float dx = fx < lo ? lo - fx : fx > hi ? fx - hi : 0f;
-                float dy = fy < lo ? lo - fy : fy > hi ? fy - hi : 0f;
-                float d = Mathf.Sqrt(dx * dx + dy * dy); // 안쪽 사각형까지 거리
-                byte a = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(TagChipRadius - d + 0.5f));
-                px[y * size + x] = new Color32(255, 255, 255, a);
-            }
+            BakeRoundedRect(TagChipSpritePath, 0f);
+        return EnsureTagChipImport(TagChipSpritePath, null);
+    }
 
-            tex.SetPixels32(px);
-            tex.Apply();
-            System.IO.File.WriteAllBytes(TagChipSpritePath, tex.EncodeToPNG());
-            Object.DestroyImmediate(tex);
-            AssetDatabase.ImportAsset(TagChipSpritePath, ImportAssetOptions.ForceUpdate);
+    /// <summary>
+    /// 흰 둥근 링 PNG(칩과 같은 64px·반지름 22px·보더 24px, 바깥 가장자리 = 칩 가장자리). <paramref name="thickness"/> = null 이면
+    /// 지금 구운 두께(없으면 <see cref="DefaultTagChipRingThickness"/>)를 쓴다. 파일이 없거나 두께가 다르면 그 자리에 다시 굽는다.
+    /// </summary>
+    public static Sprite EnsureTagChipRingSprite(float? thickness)
+    {
+        float? baked = BakedRingThickness();
+        float want = Mathf.Clamp(thickness ?? baked ?? DefaultTagChipRingThickness, MinTagChipRingThickness, MaxTagChipRingThickness);
+        if (!System.IO.File.Exists(TagChipRingSpritePath) || baked == null || !Mathf.Approximately(baked.Value, want))
+            BakeRoundedRect(TagChipRingSpritePath, want);
+        return EnsureTagChipImport(TagChipRingSpritePath, RingThicknessKey + want.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>지금 링 PNG 에 구운 두께(px). 파일·기록이 없으면 null.</summary>
+    public static float? BakedRingThickness()
+    {
+        if (!(AssetImporter.GetAtPath(TagChipRingSpritePath) is TextureImporter importer) ||
+            importer.userData == null || !importer.userData.StartsWith(RingThicknessKey, StringComparison.Ordinal))
+            return null;
+        return float.TryParse(importer.userData.Substring(RingThicknessKey.Length), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out float value) ? value : (float?)null;
+    }
+
+    // 흰 둥근 사각형(ring = 0) 또는 두께 ring px 의 둥근 링. 링 안쪽 = 같은 모서리 중심·반지름 (22 − ring) — 두께가 둘레 전체에서 같다.
+    private static void BakeRoundedRect(string path, float ring)
+    {
+        const int size = TagChipTextureSize;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        var px = new Color32[size * size];
+        float lo = TagChipRadius, hi = size - TagChipRadius;
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float fx = x + 0.5f, fy = y + 0.5f;
+            float dx = fx < lo ? lo - fx : fx > hi ? fx - hi : 0f;
+            float dy = fy < lo ? lo - fy : fy > hi ? fy - hi : 0f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy); // 안쪽 사각형까지 거리
+            float coverage = Mathf.Clamp01(TagChipRadius - d + 0.5f);
+            if (ring > 0f)
+                coverage -= Mathf.Clamp01(TagChipRadius - ring - d + 0.5f);
+            px[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(coverage)));
         }
 
-        var importer = (TextureImporter)AssetImporter.GetAtPath(TagChipSpritePath);
+        tex.SetPixels32(px);
+        tex.Apply();
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+    }
+
+    // Sprite·Single·PPU 200·보더 24px 사방. userData 가 null 이 아니면 그 값도 맞춘다(링 두께 기록).
+    private static Sprite EnsureTagChipImport(string path, string userData)
+    {
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
         var border = new Vector4(TagChipBorder, TagChipBorder, TagChipBorder, TagChipBorder);
         if (importer.textureType != TextureImporterType.Sprite || importer.spriteBorder != border ||
-            !Mathf.Approximately(importer.spritePixelsPerUnit, TagChipPixelsPerUnit))
+            !Mathf.Approximately(importer.spritePixelsPerUnit, TagChipPixelsPerUnit) ||
+            (userData != null && importer.userData != userData))
         {
+            if (userData != null)
+                importer.userData = userData;
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.spritePixelsPerUnit = TagChipPixelsPerUnit;
@@ -454,7 +513,7 @@ public static class SkillTooltipAuthoring
             importer.SaveAndReimport();
         }
 
-        return AssetDatabase.LoadAssetAtPath<Sprite>(TagChipSpritePath);
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
     /// <summary>태그 칩 색 표 에셋 — 없을 때만 기본 색 초안으로 만든다(이후 값은 xlsx `UI` 시트·인스펙터가 원본).</summary>

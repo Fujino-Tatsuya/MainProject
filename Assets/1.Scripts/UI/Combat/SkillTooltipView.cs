@@ -24,7 +24,10 @@ public sealed class SkillTooltipView : MonoBehaviour
     [Header("Tags")]
     [Tooltip("태그 칩을 놓는 영역(왼쪽 위 기준). 가로 폭을 넘으면 다음 줄로 넘긴다")]
     [SerializeField] private RectTransform tagRow;
-    [Tooltip("꺼 둔 칩 원본(Image + 자식 TMP). 필요한 만큼 복제한다")]
+    /// <summary>칩 원본 아래 둥근 테두리 Image 이름(Sliced 링 스프라이트) — 색은 그 태그의 글자색.</summary>
+    public const string TagChipRingName = "Ring";
+
+    [Tooltip("꺼 둔 칩 원본(Image + 자식 Ring Image·TMP). 필요한 만큼 복제한다")]
     [SerializeField] private RectTransform tagChipTemplate;
     [Tooltip("태그별 칩 배경·글자색 표(GameData.xlsx › UI 시트). 비우거나 표에 없는 태그는 기본색")]
     [SerializeField] private SkillTooltipTagStyles tagStyles;
@@ -330,6 +333,9 @@ public sealed class SkillTooltipView : MonoBehaviour
             ChipColors(tags[i], out Color32 background, out Color32 foreground);
             if (tagChips[i].TryGetComponent(out Image chipImage))
                 chipImage.color = background;
+            Transform ring = tagChips[i].Find(TagChipRingName); // 둥근 테두리 = 글자색 그대로
+            if (ring != null && ring.TryGetComponent(out Image ringImage))
+                ringImage.color = foreground;
             if (label != null)
             {
                 label.text = text;
