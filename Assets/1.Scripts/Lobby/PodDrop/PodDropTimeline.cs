@@ -46,11 +46,18 @@ public struct PodDropLobbyTimings
              "이벤트 위치는 FBX 임포트 창 Animation 탭에서 옮긴다. 비우면 해치 애니 없이 곧바로 탑승")]
     public string hatchState;
     [Tooltip("발사 상태 이름(컨트롤러 Base Layer) — 해치 닫힘·갱도 문 열림·포드 하강이 한 클립. 가장 늦게 앉는 순간 처음부터 1배속으로 재생하고, " +
-             "끝 프레임 클립 이벤트(PodClipEvent)에서 곧바로 로딩 화면으로 넘어간다(페이드 없음). 비우면 앉자마자 로딩")]
+             "끝 프레임 클립 이벤트(PodClipEvent)부터 끝 대기 → 끝 페이드 아웃(검게) 뒤 로딩 화면으로 넘어간다(할 일 121). 비우면 앉자마자 끝 대기부터")]
     public string launchState;
     [Tooltip("발사 클립 가속 배율 — 발사 클립의 가속 이벤트(PodClipEvent 정수 인자 1, 기본 213프레임)부터 이 배율로 끝까지 재생한다(1 = 가속 없음). " +
              "전환 프레임은 FBX 임포트 창 Animation 탭에서 이벤트를 옮겨 튜닝한다. 호스트 이벤트 시각을 서버가 복제해 클라도 같은 시점에 가속한다")]
     [Min(0.01f)] public float launchFastSpeed;
+
+    [Header("발사 끝 → 로딩 (서버가 확정한 발사 클립 끝 시각 기준)")]
+    [Tooltip("발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초). 그동안 마지막 자세 그대로 보인다. 0 = 끝 이벤트 순간 곧바로 페이드")]
+    [Min(0f)] public float launchEndWaitSeconds;
+    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 순간 서버가 로딩을 건다(로딩 화면이 검은 화면 위에 뜬다). " +
+             "대기·페이드 둘 다 0 = 끝 이벤트 순간 곧바로 로딩(페이드 없음)")]
+    [Min(0f)] public float launchEndFadeSeconds;
 
     [Header("화면 UI")]
     [Tooltip("연출 도중 새로 뜬 화면 UI 를 다시 찾아 숨기는 간격(초). 0 = 매 프레임")]
@@ -75,6 +82,8 @@ public struct PodDropLobbyTimings
         hatchState = "DP_HatchLobbyOpenClose",
         launchState = "DP_LaunchCycle",
         launchFastSpeed = 4f,
+        launchEndWaitSeconds = 1f,
+        launchEndFadeSeconds = 1f,
         hudRescanSeconds = 0.5f,
     };
 }
@@ -223,7 +232,7 @@ public struct PodDropMapTimings
 /// <summary>
 /// 로비 포드 연출의 순수 시간표(할 일 100 C2 → 106) — 경과 시간 → 레터박스 알파·암전·카메라 거리·슬롯별 보행.
 /// 네트워크·씬을 모른다. 경과 시간은 시작 시각(출격 확정) 기준이라 늦게 본 피어도 같은 값을 얻는다(음수 = 시작 전).
-/// 클립 단계(해치 열림 → 탑승 → 발사 → 로딩)는 시각이 정해져 있지 않다 — 서버가 받은 클립 이벤트 시각(<paramref name="hatchOpenedAt"/>)을 넣어 계산한다.
+/// 클립 단계(해치 열림 → 탑승 → 발사 → 끝 대기·페이드 → 로딩)는 시각이 정해져 있지 않다 — 서버가 받은 클립 이벤트 시각(해치 열림, 발사 끝)을 넣어 계산한다.
 /// 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
 /// </summary>
 public sealed class PodDropLobbyTimeline
@@ -248,6 +257,12 @@ public sealed class PodDropLobbyTimeline
     public float WalkInterval { get; }
     /// <summary>문턱 → 좌석 미끄러짐 시간(초) — 전원 같다.</summary>
     public float SeatSlideSeconds { get; }
+    /// <summary>발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초).</summary>
+    public float LaunchEndWaitSeconds { get; }
+    /// <summary>끝 페이드 아웃 — 다 검어지기까지(초).</summary>
+    public float LaunchEndFadeSeconds { get; }
+    /// <summary>발사 클립 끝 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
+    public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds;
 
     // 슬롯별 보행 시간(초, 걷기 시작 지점 → 문턱) — 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
     private readonly float[] _walkSeconds;
@@ -277,6 +292,8 @@ public sealed class PodDropLobbyTimeline
 
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
         SeatSlideSeconds = Mathf.Max(0f, timings.seatSlideSeconds);
+        LaunchEndWaitSeconds = Mathf.Max(0f, timings.launchEndWaitSeconds);
+        LaunchEndFadeSeconds = Mathf.Max(0f, timings.launchEndFadeSeconds);
         _walkSeconds = new float[walkSeconds != null ? walkSeconds.Count : 0];
         for (int i = 0; i < _walkSeconds.Length; i++)
             _walkSeconds[i] = walkSeconds[i] > 0f ? walkSeconds[i] : 0f; // NaN 도 0
@@ -294,6 +311,12 @@ public sealed class PodDropLobbyTimeline
 
     /// <summary>발사 클립 재생 시작 = 가장 늦게 좌석에 도착한 순간. 탑승 전이면 +∞.</summary>
     public double LaunchAt(double boardAt) => boardAt + SeatedSeconds;
+
+    /// <summary>끝 페이드 아웃 시작 = 발사 클립 끝 이벤트 + 끝 대기. 이벤트 전이면 +∞.</summary>
+    public double EndFadeAt(double launchEndedAt) => launchEndedAt + LaunchEndWaitSeconds;
+
+    /// <summary>로딩 시작 = 끝 페이드가 다 검어진 순간(발사 클립 끝 이벤트 + 대기 + 페이드). 서버가 이 시각에 로딩을 건다. 이벤트 전이면 +∞.</summary>
+    public double LoadAt(double launchEndedAt) => launchEndedAt + LoadAfterLaunchEndSeconds;
 
     /// <summary>슬롯(0 = P1)이 걷기 시작하는 경과 시각(초).</summary>
     public double WalkStartAt(int slot, double boardAt) => boardAt + Mathf.Max(0, slot) * WalkInterval;
@@ -329,7 +352,7 @@ public sealed class PodDropLobbyTimeline
         pathLength > 0f && walkSpeed > 0f ? pathLength / walkSpeed : 0f;
 
     /// <summary>
-    /// 레터박스 알파(0 = 없음, 1 = 다 덮임). 들어오는 구간은 <see cref="LetterboxInEase"/>(기본 선형), 그 뒤 1 유지 — 로딩 화면으로 바로 넘어가 씬과 함께 사라진다.
+    /// 레터박스 알파(0 = 없음, 1 = 다 덮임). 들어오는 구간은 <see cref="LetterboxInEase"/>(기본 선형), 그 뒤 1 유지 — 끝 페이드 아래로 덮인 채 로비 씬과 함께 사라진다.
     /// UI 숨김도 같은 값으로 본다(&gt; 0 이면 숨김).
     /// </summary>
     public float LetterboxAlphaAt(double elapsed)
@@ -344,7 +367,7 @@ public sealed class PodDropLobbyTimeline
 
     /// <summary>
     /// 시작 암전 알파 — t=0 부터 검어지기 동안 0 → 1, 유지 동안 1(<see cref="TeleportAt"/> 가 이 한가운데), 밝아지기 동안 1 → 0, 그 뒤 0(선형).
-    /// 세 구간이 모두 0 이면 늘 0. 끝 암전은 없다(발사 클립 끝에서 곧바로 로딩 화면).
+    /// 세 구간이 모두 0 이면 늘 0. 끝 페이드는 따로(<see cref="EndFadeAlphaAt"/>) — 화면에는 둘 중 큰 값(<see cref="ScreenFadeAlphaAt"/>).
     /// </summary>
     public float BlackoutAlphaAt(double elapsed)
     {
@@ -352,6 +375,17 @@ public sealed class PodDropLobbyTimeline
         float fadeOut = 1f - PodDropTimeline.Progress(elapsed, BlackoutFadeInSeconds + BlackoutHoldSeconds, BlackoutFadeOutSeconds);
         return Mathf.Min(fadeIn, fadeOut);
     }
+
+    /// <summary>
+    /// 끝 페이드 아웃 알파(할 일 121) — 발사 클립 끝 이벤트(<paramref name="launchEndedAt"/>, 서버 확정·복제) 뒤 대기 동안 0, 페이드 구간 0 → 1(선형), 그 뒤 1 유지
+    /// (로딩 화면이 그 위에 뜨고 로비 씬과 함께 사라진다). 이벤트 전(+∞)이면 0. 페이드 0 = 대기 끝 순간 곧바로 1.
+    /// </summary>
+    public float EndFadeAlphaAt(double elapsed, double launchEndedAt) =>
+        PodDropTimeline.Progress(elapsed, EndFadeAt(launchEndedAt), LaunchEndFadeSeconds);
+
+    /// <summary>검은 화면 알파 = 시작 암전·끝 페이드 중 큰 값 — 같은 검은 화면 한 장(<see cref="PodDropScreenOverlay"/>)에 넣는다.</summary>
+    public float ScreenFadeAlphaAt(double elapsed, double launchEndedAt) =>
+        Mathf.Max(BlackoutAlphaAt(elapsed), EndFadeAlphaAt(elapsed, launchEndedAt));
 }
 
 /// <summary>

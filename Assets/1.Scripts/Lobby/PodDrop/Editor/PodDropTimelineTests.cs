@@ -145,7 +145,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(0f, t.LetterboxAlphaAt(0d), Eps);
         Assert.AreEqual(0.5f, t.LetterboxAlphaAt(0.25d), Eps, "선형");
         Assert.AreEqual(1f, t.LetterboxAlphaAt(0.5d), Eps);
-        Assert.AreEqual(1f, t.LetterboxAlphaAt(100d), Eps, "끝 암전 없음 — 로딩 화면으로 넘어갈 때까지 덮임");
+        Assert.AreEqual(1f, t.LetterboxAlphaAt(100d), Eps, "로딩 화면으로 넘어갈 때까지 덮임(끝 페이드 아래)");
 
         PodDropLobbyTimings s = PodDropLobbyTimings.Default;
         s.letterboxInEase = Ease.OutQuad;
@@ -163,7 +163,64 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(1f, t.BlackoutAlphaAt(t.TeleportAt), Eps, "순간이동 순간 = 완전 암전");
         Assert.AreEqual(0.5f, t.BlackoutAlphaAt(third * 2.5f), Eps, "밝게 — 선형");
         Assert.AreEqual(0f, t.BlackoutAlphaAt(0.4d), Eps, "다 밝아짐");
-        Assert.AreEqual(0f, t.BlackoutAlphaAt(100d), Eps, "끝 암전 없음");
+        Assert.AreEqual(0f, t.BlackoutAlphaAt(100d), Eps, "시작 암전은 다시 검어지지 않는다(끝 페이드는 따로)");
+    }
+
+    // ─── 로비: 발사 끝 → 대기 → 끝 페이드 아웃 → 로딩 (할 일 121) ─────────────
+
+    [Test]
+    public void Lobby_EndFade_WaitThenFadeThenLoad()
+    {
+        PodDropLobbyTimeline t = Lobby();
+        const double end = 20d; // 서버가 확정·복제한 발사 클립 끝(경과 초)
+        Assert.AreEqual(1f, t.LaunchEndWaitSeconds, Eps, "기본 대기 1초");
+        Assert.AreEqual(1f, t.LaunchEndFadeSeconds, Eps, "기본 페이드 1초");
+        Assert.AreEqual(2f, t.LoadAfterLaunchEndSeconds, Eps, "끝 → 로딩 2초");
+        Assert.AreEqual(21d, t.EndFadeAt(end), Eps, "페이드 시작 = 끝 + 대기");
+        Assert.AreEqual(22d, t.LoadAt(end), Eps, "로딩 = 끝 + 대기 + 페이드");
+
+        Assert.AreEqual(0f, t.EndFadeAlphaAt(end, end), Eps, "끝 순간 = 아직 밝다");
+        Assert.AreEqual(0f, t.EndFadeAlphaAt(20.99d, end), Eps, "대기 동안 0");
+        Assert.AreEqual(0.5f, t.EndFadeAlphaAt(21.5d, end), Eps, "페이드 — 선형");
+        Assert.AreEqual(1f, t.EndFadeAlphaAt(t.LoadAt(end), end), Eps, "로딩 순간 = 완전히 검다(깜빡임 없음)");
+        Assert.AreEqual(1f, t.EndFadeAlphaAt(100d, end), Eps, "로딩 화면이 뜰 때까지 검은 채 유지");
+
+        Assert.IsTrue(double.IsPositiveInfinity(t.LoadAt(NotYet)), "끝 이벤트 전 = 로딩 없음");
+        Assert.AreEqual(0f, t.EndFadeAlphaAt(100d, NotYet), Eps, "끝 이벤트 전 = 끝 페이드 없음");
+    }
+
+    [Test]
+    public void Lobby_ScreenFade_MaxOfStartBlackoutAndEndFade()
+    {
+        PodDropLobbyTimeline t = Lobby();
+        Assert.AreEqual(1f, t.ScreenFadeAlphaAt(t.TeleportAt, NotYet), Eps, "시작 암전 그대로");
+        Assert.AreEqual(0f, t.ScreenFadeAlphaAt(10d, NotYet), Eps, "중간은 밝다");
+        Assert.AreEqual(0.5f, t.ScreenFadeAlphaAt(21.5d, 20d), Eps, "끝 페이드");
+
+        // 끝 이벤트가 시작 암전 중에 와도(발사대·보행 없음 극단) 큰 쪽.
+        Assert.AreEqual(1f, t.ScreenFadeAlphaAt(t.TeleportAt, 0d), Eps);
+    }
+
+    [Test]
+    public void Lobby_EndFade_ZeroOrNegative()
+    {
+        PodDropLobbyTimings s = PodDropLobbyTimings.Default;
+        s.launchEndWaitSeconds = 0f;
+        s.launchEndFadeSeconds = 0f;
+        var none = Lobby(s);
+        Assert.AreEqual(5d, none.LoadAt(5d), Eps, "둘 다 0 = 끝 이벤트 순간 곧바로 로딩");
+        Assert.AreEqual(1f, none.EndFadeAlphaAt(5d, 5d), Eps, "페이드 0 = 그 순간 검다");
+        Assert.AreEqual(0f, none.EndFadeAlphaAt(4.99d, 5d), Eps);
+
+        s.launchEndWaitSeconds = -1f;
+        s.launchEndFadeSeconds = -1f;
+        Assert.AreEqual(0f, Lobby(s).LoadAfterLaunchEndSeconds, Eps, "음수 → 0");
+
+        s.launchEndWaitSeconds = 0.5f;
+        s.launchEndFadeSeconds = 2f;
+        var tuned = Lobby(s);
+        Assert.AreEqual(12.5d, tuned.LoadAt(10d), Eps);
+        Assert.AreEqual(0.25f, tuned.EndFadeAlphaAt(11d, 10d), Eps, "0.5초 대기 뒤 2초 중 0.5초");
     }
 
     [Test]
@@ -507,6 +564,9 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(m.landSeconds, map.landSeconds, Eps);
         // 106 추가 2 — 새 칸은 기본값, 시작 높이는 에셋에서 30 으로 고침.
         Assert.AreEqual(d.launchFastSpeed, asset.Lobby.launchFastSpeed, Eps);
+        // 할 일 121 — 끝 대기·끝 페이드(에셋에도 1·1).
+        Assert.AreEqual(1f, asset.Lobby.launchEndWaitSeconds, Eps);
+        Assert.AreEqual(1f, asset.Lobby.launchEndFadeSeconds, Eps);
         Assert.AreEqual(m.brakeDistance, map.brakeDistance, Eps);
         Assert.AreEqual(m.brakeSeconds, map.brakeSeconds, Eps);
         Assert.AreEqual(m.dissolveDelaySeconds, map.dissolveDelaySeconds, Eps);

@@ -76,7 +76,7 @@ public static class PodAnimEventAuthoring
         var specs = new List<Spec>();
         Add(specs, lobby.hatchState, LobbyHatchOpenFrame, stage, "로비 해치 열림 → 멈춤·탑승");
         Add(specs, lobby.launchState, LobbyLaunchFastFrame, PodAnimEventRelay.KindSpeedUp, $"로비 발사 가속 → ×{lobby.launchFastSpeed:0.##}");
-        Add(specs, lobby.launchState, -1, stage, "로비 발사 끝 → 로딩");
+        Add(specs, lobby.launchState, -1, stage, $"로비 발사 끝 → 대기 {lobby.launchEndWaitSeconds:0.##}s · 페이드 {lobby.launchEndFadeSeconds:0.##}s → 로딩");
         Add(specs, map.wingDeployState, -1, stage, "맵 날개 펴기 끝");
         Add(specs, map.gearDeployState, -1, stage, "맵 다리 펴기 끝 (둘 다 → 착륙)");
         Add(specs, map.hatchOpenState, -1, stage, "맵 해치 열기 끝");
