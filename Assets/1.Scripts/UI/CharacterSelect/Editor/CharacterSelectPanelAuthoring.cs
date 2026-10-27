@@ -290,7 +290,7 @@ public static class CharacterSelectPanelAuthoring
             Place(black, Right, 1920f - 928f, 0f, 928f, 1080f);
             AddImage(black.gameObject, sprites.BlackPanel, Color.white);
 
-            // 카드 — 런타임에 로스터 수만큼 복제(디자인용 카드 없음). 원점 = 기준 해상도 화면 가운데, 오른쪽 앵커.
+            // 카드 — 런타임에 가운데 카드 원본(Card_Template, 배선 뒤 EnsureCardTemplate)을 로스터 수만큼 복제. 원점 = 기준 해상도 화면 가운데, 오른쪽 앵커.
             RectTransform cards = NewRect("Cards", content);
             cards.anchorMin = cards.anchorMax = Right;
             cards.pivot = new Vector2(0.5f, 0.5f);
@@ -372,6 +372,7 @@ public static class CharacterSelectPanelAuthoring
             viewSo.FindProperty("lockedText").objectReferenceValue = lockedText;
             viewSo.FindProperty("hintText").objectReferenceValue = hintText;
             viewSo.ApplyModifiedPropertiesWithoutUndo();
+            EnsureCardTemplate(view);
 
             content.gameObject.SetActive(false); // 기본 닫힘 — Show 가 켠다
 
@@ -382,6 +383,57 @@ public static class CharacterSelectPanelAuthoring
         {
             Object.DestroyImmediate(root);
         }
+    }
+
+    // ── 가운데 카드 원본(할 일 109 후속) ──────────────────────
+
+    public const string CardTemplateName = "Card_Template";
+
+    /// <summary>
+    /// 패널 <c>cardContainer</c> 아래에 카드 프리팹 인스턴스 <c>Card_Template</c> 를 가운데 자리(<c>focusedSlot</c>·<c>focusScale</c>)에 두고
+    /// 패널 <c>cardTemplate</c> 칸에 넣는다 — 프리팹을 열면 가운데 카드가 보이고, 거기서 고친 값(초상화 크기·회전, Ring_Focus 크기·색·스프라이트)을
+    /// 런타임 카드가 복제해 쓴다. 미리보기 모양 = 가운데 카드(초록·테두리 켬·로스터 0번 초상화) — 런타임은 Bind·SetState·SetRingAlpha 가 다시 그린다.
+    /// 이미 있으면 손대지 않고 연결만 맞춘다(손댄 값 유지).
+    /// </summary>
+    public static CharacterSelectCard EnsureCardTemplate(CharacterSelectPanel view)
+    {
+        var viewSo = new SerializedObject(view);
+        var container = viewSo.FindProperty("cardContainer").objectReferenceValue as RectTransform;
+        var cardPrefab = viewSo.FindProperty("cardPrefab").objectReferenceValue as CharacterSelectCard;
+        if (container == null || cardPrefab == null)
+        {
+            Debug.LogError($"{Tag} cardContainer·cardPrefab 가 비어 가운데 카드 원본을 만들 수 없다.");
+            return null;
+        }
+
+        Transform existing = container.Find(CardTemplateName);
+        CharacterSelectCard template = existing != null ? existing.GetComponent<CharacterSelectCard>() : null;
+        if (template == null)
+        {
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(cardPrefab.gameObject, container);
+            go.name = CardTemplateName;
+            template = go.GetComponent<CharacterSelectCard>();
+
+            var rect = (RectTransform)go.transform;
+            rect.anchoredPosition = viewSo.FindProperty("focusedSlot").vector2Value;
+            rect.localScale = Vector3.one * viewSo.FindProperty("focusScale").floatValue;
+
+            var cardSo = new SerializedObject(template);
+            (cardSo.FindProperty("focusedVisual").objectReferenceValue as GameObject)?.SetActive(true);
+            (cardSo.FindProperty("sideBackground").objectReferenceValue as Image)?.gameObject.SetActive(false);
+            (cardSo.FindProperty("focusRing").objectReferenceValue as GameObject)?.SetActive(true);
+            var portrait = cardSo.FindProperty("portraitImage").objectReferenceValue as Image;
+            var roster = viewSo.FindProperty("roster").objectReferenceValue as CharacterRoster;
+            if (portrait != null && roster != null && roster.Count > 0 && roster.Entries[0]?.Portrait != null)
+            {
+                portrait.sprite = roster.Entries[0].Portrait; // 크기·회전을 맞춰 볼 그림(런타임은 Bind 가 바꾼다)
+                portrait.enabled = true;
+            }
+        }
+
+        viewSo.FindProperty("cardTemplate").objectReferenceValue = template;
+        viewSo.ApplyModifiedPropertiesWithoutUndo();
+        return template;
     }
 
     // ── SELECT 셰브론 = 선택 버튼(할 일 109) ──────────────────

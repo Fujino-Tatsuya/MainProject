@@ -9,7 +9,8 @@
 | 무엇 | 경로 |
 |---|---|
 | 패널 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectPanel.prefab` |
-| 카드 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectCard.prefab` (런타임에 로스터 수만큼 복제) |
+| 카드 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectCard.prefab` (패널 안 인스턴스 `Card_Template` 의 원본) |
+| **가운데 카드 모양은 어디서 고치나** | **`CharacterSelectPanel.prefab` > `Content/Cards/Card_Template`**(가운데 자리에 놓인 카드 프리팹 인스턴스, 패널 `cardTemplate`). 초상화 `Clip/Image_Portrait` 크기·회전, 금색 테두리 `Ring_Focus` 크기(RectTransform)·색·스프라이트(Image)를 여기서 고치면 런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, `sideScale` 로 줄 뿐). Play 에서 원본 자신은 꺼진다. 자리·배율·테두리 알파는 여전히 패널(`focusedSlot`·`focusScale`·연출)이 정한다 |
 | 뷰 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanel.cs` · `CharacterSelectCard.cs` |
 | 규칙(순수) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanelRules.cs` — 테스트 `Editor/CharacterSelectPanelRulesTests.cs` |
 | 카드 이동 연출 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectCardMotion.cs` — 같은 테스트 파일 |
@@ -149,6 +150,7 @@
 ## 다시 만들기·미리보기
 - `Tools/UI/Authoring/Character Select Panel` — 없는 프리팹만 만든다(있으면 손대지 않음).
 - `Tools/UI/Authoring/Character Select Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 자리·색은 스크립트 상단 상수와 패널·카드 인스펙터.
+  가운데 카드 원본 `Card_Template` 도 `CharacterSelectPanelAuthoring.EnsureCardTemplate`(가운데 자리·`focusScale`, 미리보기 = 초록·테두리 켬·로스터 0번 초상화, 이미 있으면 연결만)로 다시 놓인다.
   셰브론도 `CharacterSelectPanelAuthoring.MakeChevronButton`(Raycast Target·Button Navigation None·삼각형 필터, 이미 붙어 있으면 그대로 쓰고 Navigation·대상 그래픽만 맞춤)으로 선택 버튼이 되고 `confirmButton` 에 연결된다.
 - `Tools/UI/Preview/Character Select Panel 캡처` — 프리뷰 씬에서 1920×1080 PNG 를 `C:/UnityProject/_lane-artifacts/MainProject-Worktree4/48.2-char-select/` 에 저장(열린 씬 무수정):
   `CharacterSelect_unlocked.png`(지금 0번·포커스 1번) · `CharacterSelect_locked.png`(지금 1번·포커스 2번·잠금) · `CharacterSelect_vs_mockup.png`(왼쪽 목업) · `CharacterSelect_bg_gamma.png`(배경 _gamma 판 비교용), 콘솔에 배경 밝기 비교.
@@ -158,7 +160,7 @@
   시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
 - `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
   `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 미끄러짐)를 저장. 콘솔에 대기·간격·램프 값과 1.5초까지의 칸 이동 시각(가속 확인용).
-- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests`).
+- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests` + 가운데 카드 원본 `CharacterSelectCardTemplateTests` — `Card_Template` 의 초상화 크기·회전·테두리 크기·색·스프라이트가 런타임 카드에 들어가고 원본은 꺼지는지).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
 - 열린 동안 이동·공격·F 가 막히고 닫으면 풀리는가. 뒤 화면 클릭이 안 먹는가.
@@ -168,6 +170,7 @@
 - 결과 패널이 위에 열려 있을 때 ESC 한 번에 결과 패널만 닫히는가(선택 패널은 그대로).
 - (할 일 109) SELECT 셰브론 클릭 한 번 = 확정 한 번(다른 캐릭터 → 요청 1회·닫힘, 지금 캐릭터 → 닫힘, 잠금 → 잠금 문구 강조)인가. 잠금 중 클릭한 뒤 Enter/Space 를 눌러도 강조만 한 번 더 될 뿐 두 번 확정되지 않는가. 이동 중 클릭이 새 가운데로 확정되는가. 셰브론이 마우스 올림·눌림 색으로 바뀌는가.
   삼각형 밖(셰브론 rect 의 왼쪽 위·아래 빈 곳 — 아래 카드가 겹치는 자리 포함)을 누르면 확정되지 않고 그 뒤 카드 클릭이 먹는가. 'SELECT' 글자 위를 눌러도 확정되는가.
+- (할 일 109 후속) `Card_Template` 에서 초상화 크기·회전, `Ring_Focus` 크기·색을 바꾸고 Play → 가운데 카드에 그대로 나오는가. 패널을 열었을 때 카드가 겹쳐(원본 + 복제본) 보이지 않는가. 옆 카드는 줄어든 채 같은 초상화 모양인가.
 - (할 일 60) 카드가 미끄러지듯 움직이고 연타해도 점프 없이 새 목표로 가는가. 테두리가 이동 중 꺼졌다가 가운데 카드에서 켜지고 살짝 커지는가. 이동 중 Enter 가 새 가운데로 확정되는가.
 - (할 일 60·60.1 길게 누르기) 이동 키를 누르고 있으면 0.25초 뒤부터 처음엔 천천히(0.25초 간격) 넘어가다 점점 빨라져 1초쯤부터 0.1초마다 넘어가고, 떼면 멈추는가. 가속이 자연스럽고 빨라진 뒤 미끄러짐이 끊겨 보이지 않는가.
   누른 채 반대 키 → 즉시 반대로 1칸 후 대기·느린 반복부터, 반대 키만 떼면 대기 뒤 원래 방향으로 느린 반복부터 이어지는가. 떼고 다시 누르면 다시 느리게 시작하는가. W+↑ 같이 눌러도 2칸씩 가지 않는가.

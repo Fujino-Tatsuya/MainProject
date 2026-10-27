@@ -21,8 +21,13 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("켜고 끄는 본체. UiModalBlocker 가 붙어 있다. 프리팹 루트(Canvas)는 늘 켜 둔다.")]
     [SerializeField] private GameObject content;
     [SerializeField] private CharacterRoster roster;
+    [Tooltip("카드 원본 — cardTemplate 이 비었을 때만 쓴다.")]
     [SerializeField] private CharacterSelectCard cardPrefab;
-    [Tooltip("카드 부모(화면 가운데 기준). 카드는 런타임에 로스터 수만큼 복제한다 — 디자인용 카드를 두지 말 것.")]
+    [Tooltip("가운데 카드 모양 원본(Content/Cards/Card_Template — 카드 프리팹 인스턴스, 가운데 자리에 놓여 있다). " +
+             "초상화(Clip/Image_Portrait) 크기·회전, 금색 테두리(Ring_Focus) 크기·색·스프라이트를 여기서 고치면 " +
+             "런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, 배율만 작다). 자신은 열 때 꺼진다. 비면 cardPrefab.")]
+    [SerializeField] private CharacterSelectCard cardTemplate;
+    [Tooltip("카드 부모(화면 가운데 기준). 카드는 런타임에 로스터 수만큼 복제한다 — cardTemplate 말고 디자인용 카드를 두지 말 것.")]
     [SerializeField] private RectTransform cardContainer;
     [SerializeField] private Button backButton;
     [Tooltip("마우스 확정 — SELECT 셰브론(Content/Chevron)의 Button, Space 와 같은 Confirm(할 일 109). " +
@@ -125,6 +130,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             backButton.onClick.AddListener(OnBackButton);
         if (confirmButton != null)
             confirmButton.onClick.AddListener(OnConfirmButton);
+        HideCardTemplate();
 
         if (!Rules.IsOpen && content != null)
             content.SetActive(false);
@@ -272,6 +278,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
     private void BuildCards()
     {
+        HideCardTemplate(); // EditMode(프리뷰 씬)는 Awake 가 돌지 않는다
         int count = roster != null ? roster.Count : 0;
         if (_cards.Count == count && _cards.TrueForAll(c => c != null))
         {
@@ -288,22 +295,30 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
         _cards.Clear();
 
-        if (cardPrefab == null || cardContainer == null)
+        CharacterSelectCard source = cardTemplate != null ? cardTemplate : cardPrefab;
+        if (source == null || cardContainer == null)
         {
             if (count > 0)
-                Debug.LogError("[CharacterSelectPanel] cardPrefab·cardContainer 가 비어 있다 — 저작 메뉴로 프리팹을 다시 만들 것.", this);
+                Debug.LogError("[CharacterSelectPanel] cardTemplate·cardPrefab·cardContainer 가 비어 있다 — 저작 메뉴로 프리팹을 다시 만들 것.", this);
             _available.Clear();
             return;
         }
 
         for (int i = 0; i < count; i++)
         {
-            CharacterSelectCard card = Instantiate(cardPrefab, cardContainer, false);
+            CharacterSelectCard card = Instantiate(source, cardContainer, false);
             card.Clicked += OnCardClicked;
             _cards.Add(card);
         }
 
         RebindCards();
+    }
+
+    /// <summary>프리팹에서 보이게 둔 가운데 카드 원본은 Play 에서 끈다 — 복제본과 겹쳐 보이지 않게.</summary>
+    private void HideCardTemplate()
+    {
+        if (cardTemplate != null && cardTemplate.gameObject.activeSelf)
+            cardTemplate.gameObject.SetActive(false);
     }
 
     private void RebindCards()
