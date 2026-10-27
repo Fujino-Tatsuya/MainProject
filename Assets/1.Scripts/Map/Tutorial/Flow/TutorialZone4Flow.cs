@@ -39,6 +39,10 @@ public sealed class TutorialZone4Flow : MonoBehaviour
 
     private readonly List<MonsterBase> _buffer = new List<MonsterBase>();
 
+    private bool _introMode;                 // 4구역 소개 연출 켜짐 — 설정 대기·기상 지연 0, 설정 자막은 복귀 무전 뒤
+    private float _loreSubtitleDelay;        // 복귀 무전 길이(데이터) — 설정 자막을 그 뒤로 미룬다
+    private double _loreSubtitlesAt = -1d;
+
     private static double Now => Time.realtimeSinceStartupAsDouble;
 
     // ─── 부착(서버) ──────────────────────────────────────────────────────
@@ -70,7 +74,14 @@ public sealed class TutorialZone4Flow : MonoBehaviour
             return;
         }
 
-        _model = new TutorialZone4Model(loreSeconds, wakeDelaySeconds, padCountCooldownSeconds, bossTipDelaySeconds);
+        // 4구역 소개 연출이 켜진 판(PLAN-zone4-intro-cinematic, 경석 10-26): G7 = 연출 복귀가 끝난 순간 → 그 즉시 타이머(G8)·일반 몬스터 기상.
+        // 설정 자막(LORE·TIMER_HINT)은 타이머를 기다리게 하지 않고 복귀 무전("어서 움직여.") 뒤에 띄운다(_loreSubtitlesAt).
+        TutorialZone4IntroData intro = TutorialZone4IntroData.Load();
+        _introMode = intro.IntroEnabled;
+        _loreSubtitleDelay = intro.ReturnLineDelaySeconds + intro.ReturnLineChunkSeconds + intro.ReturnLineGapSeconds;
+        _model = _introMode
+            ? new TutorialZone4Model(0f, 0f, padCountCooldownSeconds, bossTipDelaySeconds, startOnGateOpen: true)
+            : new TutorialZone4Model(loreSeconds, wakeDelaySeconds, padCountCooldownSeconds, bossTipDelaySeconds);
         Subscribe();
 
         // 붙기 전에 이미 지나간 신호(정상 흐름에서는 없음 — 활성 순간 붙는다)를 따라잡는다.
@@ -135,6 +146,13 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         // 전멸 재도전 되감기로 Finished 를 벗어났다 — 도착 래치를 풀어 패드 자막·재도착 처리를 다시 돌린다.
         if (_model.NotifyBossRetry())
             Edit.Log("[Tutorial] 존4: 보스 재도전 — 도착 래치 해제.", this);
+
+        if (_loreSubtitlesAt >= 0d && now >= _loreSubtitlesAt)
+        {
+            _loreSubtitlesAt = -1d;
+            _director.ShowSubtitleServer(TutorialGuideIds.Z4Lore);
+            _director.ShowSubtitleServer(TutorialGuideIds.Z4TimerHint);
+        }
 
         if (_model.ShouldStartTimer(now))
         {
@@ -237,6 +255,11 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         Edit.Log($"[Tutorial] 존4 설정 자막 시작 — {_model.LoreSeconds:0.#}초 뒤 G8(타이머 시작).", this);
         _director.SetStepServer(TutorialStep.Zone4Lore);
         _director.ShowTimerHudServer();
+        if (_introMode)
+        {
+            _loreSubtitlesAt = Now + Mathf.Max(0f, _loreSubtitleDelay);   // 복귀 무전("어서 움직여.")과 겹치지 않게
+            return;
+        }
         _director.ShowSubtitleServer(TutorialGuideIds.Z4Lore);
         _director.ShowSubtitleServer(TutorialGuideIds.Z4TimerHint);
     }
@@ -246,6 +269,9 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         Edit.Log($"[Tutorial] 존4 G8 → 전투{(skippedLore ? " (설정 자막 없이 — 디버그 개방)" : "")} · " +
                  $"{_model.WakeDelaySeconds:0.#}초 뒤 일반 몬스터 기상.", this);
         _director.SetStepServer(TutorialStep.Zone4Combat);
+        // 소개 연출 판에서는 TUT_Z4_START("게이지가 차오르기 시작")·TUT_Z4_PANEL_INTRO(장치 설명)를 뺀다 — 장치 설명은 연출이 대신하고,
+        // 차오르기 시작은 타이머 HUD 가 보여 준다(경석 10-26 D8). 연출을 끈 판은 장치 설명이 따로 없으므로 예전대로 낸다.
+        if (_introMode) return;
         _director.ShowSubtitleServer(TutorialGuideIds.Z4Start);
         _director.ShowSubtitleServer(TutorialGuideIds.Z4PanelIntro);
     }

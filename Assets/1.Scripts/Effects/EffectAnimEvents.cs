@@ -132,12 +132,15 @@ public class EffectAnimEvents : MonoBehaviour
     /// </summary>
     public event System.Action<string> Played;
 
+    // 간파 연출 스위치(할 일 104 B2·C1) — 간파 id 만 가린다. 재생을 막아도 Played 는 난다
+    // (AssassinSkillView 가 올려치기 프레임을 성공 연출 기준으로 쓴다). Stop 은 막지 않는다.
+
     /// <summary>[릴레이] 원샷 재생.</summary>
     public void PlayEffect(string id)
     {
         IAnimEventEffect effect = Find(id);
         if (effect == null) return;
-        effect.PlayOnce();
+        if (InterruptPresentationToggles.AllowsAnimEffect(id)) effect.PlayOnce();
         Played?.Invoke(id);
     }
 
@@ -146,7 +149,7 @@ public class EffectAnimEvents : MonoBehaviour
     {
         IAnimEventEffect effect = Find(id);
         if (effect == null) return;
-        effect.Play();
+        if (InterruptPresentationToggles.AllowsAnimEffect(id)) effect.Play();
         Played?.Invoke(id);
     }
 

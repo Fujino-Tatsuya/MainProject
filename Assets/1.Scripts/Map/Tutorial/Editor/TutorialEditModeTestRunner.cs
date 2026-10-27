@@ -11,6 +11,7 @@ internal static class TutorialEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^TutorialFlowModelTests$",
+        "^TutorialGateHoldTests$", // 게이트 보류 — 4구역 소개 연출이 끝나야 G7(PLAN-zone4-intro-cinematic)
         "^TutorialAreaTrackerTests$",
         "^TutorialBarrierRulesTests$",
         "^TutorialBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록

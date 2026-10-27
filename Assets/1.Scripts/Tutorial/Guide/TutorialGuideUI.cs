@@ -103,11 +103,14 @@ public sealed class TutorialGuideUI : MonoBehaviour
     /// <summary>자막 글꼴(한글 글리프 보장) — 보스 등장 독백·스킵 안내가 같은 글꼴을 쓴다(BossIntroPresentation).</summary>
     public TMP_FontAsset SubtitleFont => subtitleText != null ? subtitleText.font : null;
 
-    /// <summary>문구 표에서 <paramref name="id"/> 를 지금 캐릭터 기준으로 찾는다(자막을 띄우지 않고 글만). 없으면 false.</summary>
+    /// <summary>
+    /// 문구 표에서 <paramref name="id"/> 를 지금 캐릭터 기준으로 찾는다(자막을 띄우지 않고 글만). 없으면 false.
+    /// 자막과 같은 출처 — Strings 키 <c>Tutorial.Guide.&lt;id&gt;</c>(현재 언어)가 있으면 그것, 없으면 SO(10-26 — 전엔 SO 만 봐서 영어로 안 바뀌었다).
+    /// </summary>
     public bool TryResolveText(string id, out string text)
     {
         text = null;
-        if (TutorialGuideText.Resolve(textTable, id, LocalCharacter(), out TutorialGuideTextRow row) != TutorialGuideTextStatus.Found
+        if (TutorialGuideText.Resolve(Source, id, LocalCharacter(), out TutorialGuideTextRow row) != TutorialGuideTextStatus.Found
             || row == null || string.IsNullOrEmpty(row.Text)) return false;
         text = row.Text;
         return true;
@@ -130,6 +133,20 @@ public sealed class TutorialGuideUI : MonoBehaviour
         if (model.Subtitles.Enqueue(subtitle))
             StartSubtitle();
     }
+
+    /// <summary>
+    /// 연출 동안 목표 패널·강조 표시만 숨긴다(자막은 남긴다 — 4구역 소개 연출, PLAN-zone4-intro-cinematic D6).
+    /// 목표·대기 내용은 그대로 갱신되고 숨김만 겹쳐 건다 — 풀면 그 순간의 목표가 보인다.
+    /// </summary>
+    public void SetObjectiveSuppressed(bool suppressed)
+    {
+        if (objectiveSuppressed == suppressed) return;
+        objectiveSuppressed = suppressed;
+        UpdateObjectivePanelVisibility();
+        if (highlightLayer != null) highlightLayer.gameObject.SetActive(!suppressed);
+    }
+
+    private bool objectiveSuppressed;
 
     /// <summary>아직 안 뜬 자막만 버린다. 지금 뜬 줄은 끝까지 보인다(로비 무전 단계 전환 — LobbyRadio).</summary>
     public void ClearPendingSubtitles() => model.Subtitles.ClearPending();
@@ -329,7 +346,7 @@ public sealed class TutorialGuideUI : MonoBehaviour
         if (objectivePanel == null)
             return;
 
-        bool visible = model.HasObjective || model.Wait.Active;
+        bool visible = (model.HasObjective || model.Wait.Active) && !objectiveSuppressed;
         objectivePanel.alpha = visible ? 1f : 0f;
         objectivePanel.interactable = false;
         objectivePanel.blocksRaycasts = false;

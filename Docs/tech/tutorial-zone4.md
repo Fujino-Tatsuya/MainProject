@@ -15,7 +15,13 @@
 보스 진입 안내는 존4 파일에 둔다(별도 `TutorialBossEnterFlow` 없음). 디렉터의 `HandleBossRoomArrived` 는 단계 Finished 만 정하고(남은 `TODO(S12)` 주석은 낡은 표시) — 안내 정리·23호 팁은 이 흐름이 `BossRoomArrived`·`IsFinished` 를 구독해 한다.
 S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패드 시계가 멈춘다(23호 팁만). 복도4 고르기·대기·발판 목표를 존4 "보스방으로" 목표가 덮어쓰지 않는다.
 
-## 2. 흐름 (서버 판단 → 복제/RPC 표시)
+## 1.1 🔴 4구역 진입 전 소개 연출(2026-10-26 · 경석) — 아래 Z4-0~Z4-1/2 를 바꿨다
+계획·결정 정본 = [PLAN-zone4-intro-cinematic.md](../../PLAN-zone4-intro-cinematic.md), 기획 = SVN r520 명세 §4.5~4.8. 핸드오프 = [handoff-zone4-intro-cinematic.md](handoff-zone4-intro-cinematic.md).
+- **G7 이 바로 안 열린다**: 복도3 특성 선택 전원 완료(60초 교착 방지 포함) → G7 **보류**(`TutorialFlowModel.HoldGate`) → 살아 있는 전원이 복도3 → 소개 연출(패널 4곳 → 다리·중앙 섬 적 → 복귀) → **복귀 끝 = G7 열림**. 서버 `TutorialZone4IntroFlow` · 표시 `TutorialZone4IntroPresentation` · 복제 `TutorialDirector.Zone4Intro.cs`.
+- 연출이 켜진 판(`Resources/Tutorial/Zone4IntroCinematic` `introEnabled`)은 `TutorialZone4Model(startOnGateOpen: true)` — 설정 자막 시작 = G7 열림(존4 진입을 기다리지 않음) · 설정 대기 0초 → **즉시 G8** · 기상 지연 0초. `LORE`·`TIMER_HINT` 는 복귀 무전("어서 움직여.") 뒤로 미룬다. `START`·`PANEL_INTRO` 는 안 낸다.
+- 연출을 끄면 아래 표 그대로(예전 흐름).
+
+## 2. 흐름 (서버 판단 → 복제/RPC 표시) — 연출을 끈 판 기준(켠 판은 §1.1)
 | 순서 | 트리거 | 서버 | 표시 |
 |---|---|---|---|
 | Z4-0 | G7 열림 ∧ `AreaFirstEntered(Zone4)`(순서 무관) | `SetStepServer(Zone4Lore)` · `ShowTimerHudServer()` · 존4 휴면 유지 | 자막 `TUT_Z4_LORE` → `TUT_Z4_TIMER_HINT`(전원) · 타이머 칸 펄스 |

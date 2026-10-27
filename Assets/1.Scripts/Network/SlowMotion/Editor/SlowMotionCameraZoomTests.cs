@@ -56,6 +56,44 @@ public sealed class SlowMotionCameraZoomTests
         Assert.AreEqual(0f, SlowMotionCameraZoom.TargetDepth(true, true, true, ProfileScale, float.NaN), Eps);
     }
 
+    [Test]
+    public void SuccessSlow_DepthUsesCurrentProfileScale()
+    {
+        // 할 일 87: 시도(0.5) 유지 중 성공(0.25)으로 다시 걸면, 줌 깊이는 지금 재생 중인 프로필(0.25) 기준이다.
+        var session = new SlowMotionSession();
+        var attempt = new SlowMotionProfile { scale = 0.5f, enterDuration = 0.125f, holdDuration = 0.25f, exitDuration = 0.25f };
+        var success = new SlowMotionProfile { scale = 0.25f, enterDuration = 0.125f, holdDuration = 1f, exitDuration = 0.5f };
+        session.Apply(SlowMotionEvent.CreateStart(1, 8.0, 1, attempt));
+        Assert.AreEqual(1f, Depth(session, 8.25), Eps, "시도 유지 = 시도 프로필 기준 최대 깊이");
+
+        session.Apply(SlowMotionEvent.CreateStart(2, 8.25, 1, success, SlowMotionPurpose.Success));
+        Assert.AreEqual(0.25f, session.CurrentProfileScale, Eps);
+        Assert.AreEqual(0.5f / 0.75f, Depth(session, 8.25), Eps, "성공 진입 시작 — 성공 프로필 기준으로 다시 깊어진다");
+        Assert.AreEqual(1f, Depth(session, 8.25 + 0.5), Eps, "성공 유지 = 최대 깊이");
+    }
+
+    [Test]
+    public void HitStopBelowProfileScale_DepthPinnedToOne()
+    {
+        // 할 일 87 C2: 히트스톱 배율(0.125)이 프로필 배율(0.25)보다 낮으면 줌 규칙은 그대로 두고 깊이 1 로 고정된다.
+        var session = new SlowMotionSession();
+        var success = new SlowMotionProfile
+        {
+            scale = 0.25f, hitStopDuration = 0.0625f, hitStopScale = 0.125f,
+            enterDuration = 0.125f, holdDuration = 1f, exitDuration = 0.5f,
+        };
+        session.Apply(SlowMotionEvent.CreateStart(1, 8.0, 1, success, SlowMotionPurpose.Success));
+
+        Assert.AreEqual(SlowMotionPhase.HitStop, session.PhaseAt(8.03125));
+        Assert.AreEqual(1f, Depth(session, 8.0), Eps, "히트스톱 시작");
+        Assert.AreEqual(1f, Depth(session, 8.03125), Eps, "히트스톱 중");
+        Assert.AreEqual(1f, Depth(session, 8.0625 + 0.0625), Eps, "히트스톱 배율 → 프로필 배율 진입 중에도 1");
+        Assert.AreEqual(1f, Depth(session, 8.0625 + 0.5), Eps, "유지");
+    }
+
+    static float Depth(SlowMotionSession session, double t) =>
+        SlowMotionCameraZoom.TargetDepth(true, true, true, session.ScaleAt(t), session.CurrentProfileScale);
+
     // ---- 오프셋 배율 ----
 
     [Test]

@@ -21,7 +21,6 @@ public sealed class PauseMenuView : MonoBehaviour
     [SerializeField] private Button continueButton;
     [SerializeField] private Button settingsButton;
     [SerializeField] private Button quitButton;
-    [SerializeField] private Button pressAnyButton;   // 아래 "Press Any Button" 캡슐 — 계속하기와 같다
 
     [Header("그만두기 팝업")]
     [SerializeField] private GameObject exitRoot;
@@ -32,7 +31,7 @@ public sealed class PauseMenuView : MonoBehaviour
     [SerializeField] private GameObject desktopSelectedRing;
     [SerializeField] private GameObject lobbySelectedRing;
 
-    /// <summary>계속하기(또는 아래 캡슐) — 메뉴를 닫아 게임으로.</summary>
+    /// <summary>계속하기 — 메뉴를 닫아 게임으로.</summary>
     public event Action ContinueRequested;
     /// <summary>설정 — 설정창 열기.</summary>
     public event Action SettingsRequested;
@@ -51,7 +50,6 @@ public sealed class PauseMenuView : MonoBehaviour
     private void Awake()
     {
         Bind(continueButton, () => ContinueRequested?.Invoke());
-        Bind(pressAnyButton, () => ContinueRequested?.Invoke());
         Bind(settingsButton, () => SettingsRequested?.Invoke());
         Bind(quitButton, () => QuitRequested?.Invoke());
         Bind(desktopButton, () => ExitToDesktopRequested?.Invoke());

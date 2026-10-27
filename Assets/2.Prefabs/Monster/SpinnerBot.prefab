@@ -393,7 +393,7 @@ MonoBehaviour:
   dashSpeedMultiplier: 15
   dashMaxDistance: 40
   dashHalfWidth: 3.1
-  whipTelegraphDuration: 0.5
+  whipTelegraphDuration: 0.125
   sideLateralOffset: 0.65
   spinStartState: Spin Attack Start
   spinLoopState: Spin Attack Loop

@@ -36,7 +36,7 @@ Material:
     - _GlowRadiusPx: 3
     - _Grain: 0.06
     - _Jitter: 0.002
-    - _Pulse: 0.18
+    - _Pulse: 0.55
     - _ScanCount: 90
     - _ScanStrength: 0.35
     - _Vignette: 0

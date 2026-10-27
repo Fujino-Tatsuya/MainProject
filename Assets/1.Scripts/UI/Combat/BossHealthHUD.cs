@@ -11,9 +11,14 @@ public class BossHealthHUD : MonoBehaviour
 {
     [SerializeField] private GameObject barRoot;
     [SerializeField] private Image hpFill;
-    [Tooltip("HP 바 밑 회색 **간파 게이지**(Detection_Fill). 100% → 0% 로 HP 와 같은 방향으로 준다(팀 기획 09-28).\n" +
-             "간파 게이지가 없는 보스면 숨긴다.")]
-    [SerializeField] private Image counterGaugeFill;
+    [Header("제압 칸(전투 시스템 명세 10-14 §6 — 예전 간파 게이지 Detection_Fill 자리)")]
+    [Tooltip("HP 바 밑 **제압 칸** 한 칸의 원본(SuppressSegmentTemplate). 자신은 꺼 두고 칸 수만큼 복제해 이 사각형을 가로로 나눠 놓는다.\n" +
+             "왼쪽부터 찬 칸, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다. 제압 칸이 없는 보스면 칸 줄 전체를 숨긴다.")]
+    [SerializeField] private Image suppressSegmentTemplate;
+    [Tooltip("칸 사이 간격(px).")]
+    [SerializeField, Min(0f)] private float suppressSegmentGap = 8f;
+    [Tooltip("빈 칸 색(원본 스프라이트에 곱한다). 찬 칸은 원본 색 그대로.")]
+    [SerializeField] private Color suppressSegmentEmptyColor = new Color(0.25f, 0.25f, 0.25f, 0.6f);
     [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     [Header("23호 레이드 ④ 자폭 실드(팀장 10-19)")]
@@ -55,10 +60,19 @@ public class BossHealthHUD : MonoBehaviour
     private bool wasShown;
 
     private Unit boundBoss;
-    private TwentyThreeBoss boundGaugeBoss;   // 간파 게이지를 가진 보스(23호)일 때만
+    private TwentyThreeBoss boundGaugeBoss;   // 제압 칸을 가진 보스(23호)일 때만
+
+    private readonly List<Image> suppressSegments = new List<Image>();
+    private Color suppressSegmentFullColor = Color.white;
 
     private void Awake()
     {
+        if (suppressSegmentTemplate != null)
+        {
+            suppressSegmentFullColor = suppressSegmentTemplate.color;
+            suppressSegmentTemplate.gameObject.SetActive(false);   // 원본은 그리지 않는다 — 복제본만 보인다
+        }
+
         if (shieldFill != null)
             shieldFill.color = shieldColor;
         else
@@ -122,14 +136,11 @@ public class BossHealthHUD : MonoBehaviour
             delayed.ForceFill(intro.Red);
         SetIntroLead(intro.Active, intro.Red, intro.White, intro.WhiteAlpha);
 
-        if (counterGaugeFill != null)
-        {
-            bool hasGauge = boundGaugeBoss != null;
-            if (counterGaugeFill.gameObject.activeSelf != hasGauge)
-                counterGaugeFill.gameObject.SetActive(hasGauge);
-            if (hasGauge)
-                counterGaugeFill.fillAmount = boundGaugeBoss.CounterGauge01;   // 복제값 — 늦은 합류도 현재 값
-        }
+        // 복제값 — 늦은 합류도 현재 칸.
+        if (boundGaugeBoss != null)
+            SetSuppressSegments(boundGaugeBoss.SuppressSegmentTotal, boundGaugeBoss.SuppressSegmentsRemaining);
+        else
+            SetSuppressSegments(0, 0);
 
         // ④ 자폭 실드 — 복제 비율(SelfDestructShield01)을 HP 바 위 덮개로.
         float shield01 = boundGaugeBoss != null ? boundGaugeBoss.SelfDestructShield01 : 0f;
@@ -144,6 +155,47 @@ public class BossHealthHUD : MonoBehaviour
     private void OnDisable()
     {
         BindBoss(null);
+    }
+
+    // ── 제압 칸 ──────────────────────────────────────────────────────────
+    // 원본 사각형(예전 게이지 806×10)을 total 칸으로 나눠 복제본을 깐다. 칸 수가 바뀔 때만 다시 만든다.
+    private void SetSuppressSegments(int total, int remaining)
+    {
+        if (suppressSegmentTemplate == null) return;
+        if (suppressSegments.Count != total)
+            BuildSuppressSegments(total);
+
+        for (int i = 0; i < suppressSegments.Count; i++)
+            suppressSegments[i].color = i < remaining ? suppressSegmentFullColor : suppressSegmentEmptyColor;
+    }
+
+    private void BuildSuppressSegments(int total)
+    {
+        for (int i = 0; i < suppressSegments.Count; i++)
+            if (suppressSegments[i] != null) Destroy(suppressSegments[i].gameObject);
+        suppressSegments.Clear();
+        if (total <= 0) return;
+
+        RectTransform src = suppressSegmentTemplate.rectTransform;
+        float width = src.sizeDelta.x;
+        float cell = Mathf.Max(1f, (width - suppressSegmentGap * (total - 1)) / total);
+        int sibling = src.GetSiblingIndex();
+
+        for (int i = 0; i < total; i++)
+        {
+            Image seg = Instantiate(suppressSegmentTemplate, src.parent, false);
+            seg.name = $"SuppressSegment_{i}";
+            seg.fillAmount = 1f;   // 원본이 Filled 타입이라 꽉 채워 둔다 — 칸은 색으로만 표시
+            seg.raycastTarget = false;
+            var rect = seg.rectTransform;
+            rect.sizeDelta = new Vector2(cell, src.sizeDelta.y);
+            rect.anchoredPosition = new Vector2(
+                src.anchoredPosition.x - width * 0.5f + cell * 0.5f + i * (cell + suppressSegmentGap),
+                src.anchoredPosition.y);
+            rect.SetSiblingIndex(sibling + 1 + i);   // 원본 자리(그리는 순서) 그대로
+            seg.gameObject.SetActive(true);
+            suppressSegments.Add(seg);
+        }
     }
 
     // ── HP 그라데이션 ──────────────────────────────────────────────────────

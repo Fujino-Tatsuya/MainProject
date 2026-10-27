@@ -340,6 +340,8 @@ public sealed class TutorialFlowModel
 
         OpenedGateMask |= 1 << (int)g;
         RequestedGateMask &= ~(1 << (int)g);
+        HeldGateMask &= ~(1 << (int)g);        // 다른 길로 열렸으면 보류도 끝(연출 쪽이 GateOpened 로 정리한다)
+        ReadyHeldGateMask &= ~(1 << (int)g);
         if (reason == TutorialGateOpenReason.Timeout) TimeoutGateMask |= 1 << (int)g;
         GateOpened?.Invoke(g, reason);
         return true;
@@ -361,6 +363,58 @@ public sealed class TutorialFlowModel
 
     public bool IsGateRequested(TutorialGate g) => (RequestedGateMask & (1 << (int)g)) != 0;
 
+    // ─── 보류(연출이 끝나야 여는 게이트 — PLAN-zone4-intro-cinematic) ─────────────
+
+    /// <summary>보류 중인 게이트(bit = <see cref="TutorialGate"/>). <see cref="Evaluate"/> 가 열 조건을 만나도 열지 않는다.</summary>
+    public int HeldGateMask { get; private set; }
+    /// <summary>보류 중에 열 조건이 찬 게이트(bit). 연 사유는 <see cref="_heldReason"/>.</summary>
+    public int ReadyHeldGateMask { get; private set; }
+    private readonly TutorialGateOpenReason[] _heldReason = new TutorialGateOpenReason[GateCount];
+
+    /// <summary>보류 중인 게이트의 열 조건이 처음 찼다(한 번). 인자 = 게이트·원래 열렸을 사유(전원 완료·교착 방지 등).</summary>
+    public event Action<TutorialGate, TutorialGateOpenReason> GateReadyWhileHeld;
+
+    public bool IsGateHeld(TutorialGate g) => (HeldGateMask & (1 << (int)g)) != 0;
+    public bool IsGateReadyHeld(TutorialGate g) => (ReadyHeldGateMask & (1 << (int)g)) != 0;
+
+    /// <summary>
+    /// 게이트를 보류한다(4구역 소개 연출 — G7). 이미 열렸으면 false. 보류해도 <see cref="TryOpenGate"/>(서버 직접·디버그 강제)는 막지 않는다 —
+    /// 보류는 <see cref="Evaluate"/> 의 자동 열림만 멈춘다.
+    /// </summary>
+    public bool HoldGate(TutorialGate g)
+    {
+        if (IsGateOpen(g) || IsGateHeld(g)) return false;
+        HeldGateMask |= 1 << (int)g;
+        return true;
+    }
+
+    /// <summary>
+    /// 보류를 푼다. 열 조건이 이미 찼으면 그때 기억한 사유로 <b>지금 연다</b>(true). 아직 안 찼으면 보류만 풀고 false — 다음 <see cref="Evaluate"/> 가 평소처럼 연다.
+    /// </summary>
+    public bool ReleaseHeldGate(TutorialGate g)
+    {
+        if (!IsGateHeld(g)) return false;
+        int bit = 1 << (int)g;
+        HeldGateMask &= ~bit;
+        if ((ReadyHeldGateMask & bit) == 0) return false;
+        ReadyHeldGateMask &= ~bit;
+        return TryOpenGate(g, _heldReason[(int)g]);
+    }
+
+    // Evaluate 가 열려던 순간. 보류 중이면 준비됨만 기록하고 false(열지 않음), 아니면 연다.
+    private bool OpenOrHold(TutorialGate g, TutorialGateOpenReason reason)
+    {
+        if (!IsGateHeld(g)) return TryOpenGate(g, reason);
+        int bit = 1 << (int)g;
+        if ((ReadyHeldGateMask & bit) == 0)
+        {
+            ReadyHeldGateMask |= bit;
+            _heldReason[(int)g] = reason;
+            GateReadyWhileHeld?.Invoke(g, reason);
+        }
+        return false;
+    }
+
     /// <summary>
     /// 개인·카운터 게이트를 재판정한다. 보고·인원 변화 직후와 주기적으로(교착 방지 시계) 부른다.
     /// 한 번 부를 때 열 수 있는 게이트를 순서대로 모두 연다.
@@ -374,13 +428,14 @@ public sealed class TutorialFlowModel
             if (!IsGateEligible(g)) return;   // 순서 — 이 뒤는 볼 필요가 없다
 
             // 보류된 요청(존 클리어가 차례보다 먼저 옴) — 차례가 왔으니 연다. 게이트 종류와 무관.
-            if (IsGateRequested(g)) { TryOpenGate(g); continue; }
+            // OpenOrHold 가 false = 연출 보류(HoldGate) 중 — 뒤 게이트는 볼 필요가 없다.
+            if (IsGateRequested(g)) { if (OpenOrHold(g, TutorialGateOpenReason.Manual)) continue; return; }
 
             if (TryGetGateCounter(g, out TutorialCounter counter))
             {
-                if (GetCounter(counter) >= GetCounterTarget(counter)) TryOpenGate(g, TutorialGateOpenReason.CounterReached);
-                else return;
-                continue;
+                if (GetCounter(counter) < GetCounterTarget(counter)) return;
+                if (OpenOrHold(g, TutorialGateOpenReason.CounterReached)) continue;
+                return;
             }
 
             if (!IsPersonalGate(g)) return;   // 수동 게이트 — 서버가 열 때까지 대기
@@ -388,15 +443,15 @@ public sealed class TutorialFlowModel
             CountCompletion(g, out int done, out int total);
             if (total == 0) return;   // 참가자 0명 — 자동으로 열지 않는다
 
-            if (done == total) { TryOpenGate(g, TutorialGateOpenReason.AllDone); continue; }
+            if (done == total) { if (OpenOrHold(g, TutorialGateOpenReason.AllDone)) continue; return; }
             if (!HasDeadlockTimeout(g)) return;   // G1 — 시간으로 넘기지 않는다
 
             if (done > 0 && _firstCompleteAt[i] < 0d) _firstCompleteAt[i] = now;
 
             if (_firstCompleteAt[i] >= 0d && now >= _firstCompleteAt[i] + DeadlockSeconds)
             {
-                TryOpenGate(g, TutorialGateOpenReason.Timeout);
-                continue;
+                if (OpenOrHold(g, TutorialGateOpenReason.Timeout)) continue;
+                return;
             }
             return;
         }
@@ -415,6 +470,7 @@ public sealed class TutorialFlowModel
             var g = (TutorialGate)i;
             if (IsGateOpen(g)) continue;
             if (!IsGateEligible(g) || !IsPersonalGate(g)) break;
+            if (IsGateReadyHeld(g)) break;   // 전원 완료 — 연출(보류)을 기다리는 중이지 동료를 기다리는 게 아니다
 
             gate = g;
             CountCompletion(g, out done, out total);

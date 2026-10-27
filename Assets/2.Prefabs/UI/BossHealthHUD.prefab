@@ -87,12 +87,12 @@ GameObject:
   - component: {fileID: 3745992953613626497}
   - component: {fileID: 293519024117429344}
   m_Layer: 5
-  m_Name: Detection_Fill
+  m_Name: SuppressSegmentTemplate
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5699615080058718831
 RectTransform:
   m_ObjectHideFlags: 0
@@ -488,7 +488,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BossHealthHUD
   barRoot: {fileID: 8487855152213422365}
   hpFill: {fileID: 5374113756952443419}
-  counterGaugeFill: {fileID: 293519024117429344}
+  suppressSegmentTemplate: {fileID: 293519024117429344}
   delayed:
     delayedFill: {fileID: 5666655772580648192}
     holdSeconds: 0.4

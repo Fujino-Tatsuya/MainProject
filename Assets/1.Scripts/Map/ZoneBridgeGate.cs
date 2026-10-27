@@ -404,6 +404,111 @@ public sealed class ZoneBridgeGate : MonoBehaviour
         _highlightedPanel = index;
     }
 
+    // ── 4구역 소개 연출용(PLAN-zone4-intro-cinematic, 경석 10-27) — 읽기·로컬 표시만 ──────────────────
+
+    /// <summary>패널 i 메시의 월드 범위(화면 판 제외). 카메라가 패널을 화면 중앙에 두는 기준. 렌더러가 없으면 false.</summary>
+    public bool TryGetPanelBounds(int index, out Bounds bounds)
+    {
+        bounds = default;
+        if (index < 0 || index >= PanelCount || panels[index] == null) return false;
+        return TryGetRendererBounds(panels[index], out bounds);
+    }
+
+    /// <summary>다리 조각 전부의 월드 범위(지금 위치 — 개통 전이면 끊긴 자리). 조각이 없으면 false.</summary>
+    public bool TryGetBridgeBounds(out Bounds bounds)
+    {
+        bounds = default;
+        bool any = false;
+        if (segments == null) return false;
+        foreach (Segment s in segments)
+        {
+            if (s.Target == null || !TryGetRendererBounds(s.Target, out Bounds b)) continue;
+            if (!any) bounds = b;
+            else bounds.Encapsulate(b);
+            any = true;
+        }
+        return any;
+    }
+
+    /// <summary>다리 조각마다 월드 범위(렌더러 없는 조각은 뺀다). <paramref name="onlyNames"/> 가 있으면 그 이름만.</summary>
+    public void GetSegmentBounds(List<Bounds> result, IReadOnlyCollection<string> onlyNames = null)
+    {
+        result.Clear();
+        if (segments == null) return;
+        foreach (Segment s in segments)
+        {
+            if (s.Target == null) continue;
+            if (onlyNames != null && onlyNames.Count > 0 && !Contains(onlyNames, s.Target.name)) continue;
+            if (TryGetRendererBounds(s.Target, out Bounds b)) result.Add(b);
+        }
+    }
+
+    static bool TryGetRendererBounds(Transform root, out Bounds bounds)
+    {
+        bounds = default;
+        bool any = false;
+        foreach (MeshRenderer r in root.GetComponentsInChildren<MeshRenderer>())
+        {
+            if (r.gameObject.name == "MonitorScreen") continue;
+            if (!any) bounds = r.bounds;
+            else bounds.Encapsulate(r.bounds);
+            any = true;
+        }
+        return any;
+    }
+
+    readonly Dictionary<Renderer, Material[]> _bridgeHighlightOriginals = new Dictionary<Renderer, Material[]>();
+
+    /// <summary>
+    /// 다리 조각에 외곽선을 켜고 끈다(소개 연출 — 다리·중앙 섬 샷). 패널 외곽선과 따로 기억해 서로 안 지운다.
+    /// <paramref name="onlyNames"/> = 이 이름의 조각만(비면 전부). <paramref name="outline"/> 이 null 이면 근접 외곽선 머티리얼.
+    /// <paramref name="mask"/> 가 있으면 조각마다 [mask, outline] 둘을 덧붙인다 — 화면 공간 실루엣 외곽선은 모든 조각의 영역 표시(mask, 먼저 그리는 큐)가
+    /// 끝난 뒤 테두리를 그려야 겹친 조각(끊긴 이동식 다리가 고정 다리 안에 반쯤 묻혀 있다)이 <b>하나의 실루엣</b>으로 이어진다(경석 10-27).
+    /// </summary>
+    public void SetBridgeHighlighted(bool on, IReadOnlyCollection<string> onlyNames = null, Material outline = null, Material mask = null)
+    {
+        if (outline == null) outline = highlightOutlineMaterial;
+        if (!on)
+        {
+            foreach (KeyValuePair<Renderer, Material[]> kv in _bridgeHighlightOriginals)
+                if (kv.Key != null) kv.Key.sharedMaterials = kv.Value;
+            _bridgeHighlightOriginals.Clear();
+            return;
+        }
+        if (outline == null || _bridgeHighlightOriginals.Count > 0 || segments == null) return;
+
+        foreach (Segment s in segments)
+        {
+            if (s.Target == null) continue;
+            if (onlyNames != null && onlyNames.Count > 0 && !Contains(onlyNames, s.Target.name)) continue;
+            foreach (MeshRenderer r in s.Target.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (_bridgeHighlightOriginals.ContainsKey(r)) continue;
+                Material[] original = r.sharedMaterials;
+                int extra = mask != null ? 2 : 1;
+                var withOutline = new Material[original.Length + extra];
+                original.CopyTo(withOutline, 0);
+                if (mask != null) withOutline[original.Length] = mask;
+                withOutline[original.Length + extra - 1] = outline;
+                _bridgeHighlightOriginals[r] = original;
+                r.sharedMaterials = withOutline;
+            }
+        }
+    }
+
+    static bool Contains(IReadOnlyCollection<string> names, string name)
+    {
+        foreach (string n in names)
+            if (string.Equals(n, name, System.StringComparison.Ordinal)) return true;
+        return false;
+    }
+
+    /// <summary>근접 외곽선 머티리얼(공용 — 고치지 말 것. 연출은 이걸 복제해 두께만 바꿔 쓴다).</summary>
+    public Material HighlightOutlineMaterial => highlightOutlineMaterial;
+
+    /// <summary>패널 i 에 외곽선이 켜져 있다(근접 외곽선·소개 연출 공용 슬롯 — 하나만).</summary>
+    public int HighlightedPanel => _highlightedPanel;
+
     // ── F 키 프롬프트(handoff-interact-prompt) ──────────────────────────
     // 패널마다 자식으로 InteractPrompt.prefab 인스턴스가 놓여 있다(높이 = 그 인스턴스의 로컬 위치).
     // 별도 직렬화 리스트를 두면 panels 와 순서를 맞춰야 하므로 패널 자식에서 찾아 처음 한 번 캐시한다.

@@ -39,6 +39,42 @@ public sealed class BossCounterProgressTests
         Assert.That(BossCounterProgress.Resolve(g, 20f, 1.5f, 5f).IsSuppress, Is.True);
     }
 
+    // ── 제압 칸(전투 시스템 명세 10-14 §6) — 23호 ──
+    // remaining / 기대 NextSegments / 기대 IsSuppress / 기대 Duration   (총 3칸, step 1, 그로기 1.5, 제압 5)
+    [TestCase(3, 2, false, 1.5f)]  // 첫 성공
+    [TestCase(2, 1, false, 1.5f)]  // 제압 직전
+    [TestCase(1, 0, true, 5f)]     // 3회째 = 제압
+    [TestCase(0, 0, true, 5f)]     // 이미 0 — 0 미만 없음
+    [TestCase(-2, 0, true, 5f)]    // 음수 방어
+    [TestCase(9, 2, false, 1.5f)]  // 초과 방어(3 으로 본다)
+    public void ResolveSegments_ReturnsExpectedOutcome(int remaining, int next, bool isSuppress, float duration)
+    {
+        BossSegmentOutcome r = BossCounterProgress.ResolveSegments(remaining, 3, 1, 1.5f, 5f);
+        Assert.That(r.NextSegments, Is.EqualTo(next));
+        Assert.That(r.IsSuppress, Is.EqualTo(isSuppress));
+        Assert.That(r.Duration, Is.EqualTo(duration));
+    }
+
+    /// 간파·벽이 섞여도 3칸을 쓰면 제압 — 순서 무관.
+    [Test]
+    public void ThreeSegments_CounterAndWallMixed_Suppress()
+    {
+        int s = 3;
+        s = BossCounterProgress.ResolveSegments(s, 3, 1, 1.5f, 5f).NextSegments;   // 간파
+        s = BossCounterProgress.ResolveSegments(s, 3, 1, 0f, 0f).NextSegments;     // 벽
+        Assert.That(s, Is.EqualTo(1));
+        Assert.That(BossCounterProgress.ResolveSegments(s, 3, 1, 1.5f, 5f).IsSuppress, Is.True);
+    }
+
+    /// 감소 칸 0 이면 칸이 줄지 않는다(SO 로 환경 감소를 끈 경우).
+    [Test]
+    public void ResolveSegments_ZeroStep_DoesNotReduce()
+    {
+        BossSegmentOutcome r = BossCounterProgress.ResolveSegments(3, 3, 0, 0f, 0f);
+        Assert.That(r.NextSegments, Is.EqualTo(3));
+        Assert.That(r.IsSuppress, Is.False);
+    }
+
     /// 창 길이는 공격 행마다 저작한다. 인스펙터 범위가 설계(0~2초)와 어긋나면 튜닝이 조용히 벗어난다.
     [Test]
     public void CounterDuration_HasZeroToTwoRange()

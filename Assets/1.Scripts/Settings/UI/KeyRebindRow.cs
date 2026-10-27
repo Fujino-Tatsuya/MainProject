@@ -65,6 +65,9 @@ public sealed class KeyRebindRow : MonoBehaviour
         action.Disable();   // 진행 중인 액션은 리바인드할 수 없다
         IsRebinding = true;
         if (keyText != null) keyText.text = SettingsUiStrings.ControlsPressKey.Text;
+        // 입력 대기 동안 이 줄만 고른 상태로 고정 + 클릭 소리 1회(대기 중 재클릭은 위 IsRebinding 에서 무음 — 경석 10-26 6차).
+        PinButton(true);
+        UiClickSound.Play();
 
         _op = action.PerformInteractiveRebinding(index)
             .WithControlsHavingToMatchPath("<Keyboard>")
@@ -83,6 +86,7 @@ public sealed class KeyRebindRow : MonoBehaviour
     {
         _op?.Dispose();
         _op = null;
+        PinButton(false);
         if (wasEnabled) action.Enable();
 
         if (completed)
@@ -106,6 +110,11 @@ public sealed class KeyRebindRow : MonoBehaviour
         if (isActiveAndEnabled) StartCoroutine(ClearRebindingNextFrame());
         else IsRebinding = false;
         Refresh();
+    }
+
+    void PinButton(bool pin)
+    {
+        if (bindButton != null && bindButton.TryGetComponent(out ButtonLabelStateColor state)) state.PinWithGraphic(pin);
     }
 
     System.Collections.IEnumerator ClearRebindingNextFrame()

@@ -41,4 +41,16 @@ public static class MonsterEngagePolicy
     /// </summary>
     public static bool IsInAttackRange(bool wasInRange, float dist, float attackRange, float exitMargin) =>
         dist <= (wasInRange ? attackRange + Mathf.Max(0f, exitMargin) : attackRange);
+
+    /// <summary>
+    /// 사거리 안 어그로 전환(팀장 10-26) — 지금 대상이 사거리 밖이면 사거리 <b>안</b>에 있는 다른 사람을 찾아볼 것인가.
+    ///
+    /// 왜 — 몬스터는 한 번 문 대상을 놓지 않아, 멀리 있는 대상을 쫓는 동안 바로 옆에서 때리는 사람을
+    /// 무시했다(분산 교전에서 GauntletBot 이 제자리에 선 원인 중 하나).
+    ///
+    /// 🔴 나가는 경계에 <paramref name="exitMargin"/> 을 더한다 — 대상이 사거리 경계에서 깜빡이면
+    ///    두 사람 사이를 매 틱 오가게 된다(<see cref="IsInAttackRange"/> 와 같은 히스테리시스).
+    /// </summary>
+    public static bool ShouldLookForInRangeTarget(float distToTarget, float attackRange, float exitMargin) =>
+        distToTarget > attackRange + Mathf.Max(0f, exitMargin);
 }
