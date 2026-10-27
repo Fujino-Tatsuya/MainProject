@@ -301,6 +301,29 @@ public class PlayerDashController : NetworkBehaviour
         animator.SetLayerWeight(layer, dashInterruptFade.Weight);
     }
 
+    /// <summary>
+    /// [입력 주체] 역방향 인수인계(우클릭 → 대시 전환, §12) — 0층에서 돌던 간파 상태를 상체 레이어가 0층의 지금 정규화 시각부터
+    /// 이어 재생하고 가중치를 0→1 로 올린다(<see cref="HandOffDashInterruptToBase"/> 의 반대). 0층은 건드리지 않는다 —
+    /// 이어지는 대시 진입(Dodge)·스킬 이탈 포즈가 정한다. 준비 시간이 다시 시작되지 않게 시각을 잇는다.
+    /// </summary>
+    internal void BeginDashInterruptUpperFromBase(string stateName)
+    {
+        if (!TryGetDashInterruptLayer(stateName, out int layer, out int stateHash))
+            return;
+
+        // 0층 시각은 CrossFade(Dodge·Idle) 전에 읽는다(지난 평가 결과). 간파로 넘어가는 중이면 다음 상태 시각.
+        AnimatorStateInfo current = animator.GetCurrentAnimatorStateInfo(PlayerActionPoseRules.BaseLayer);
+        AnimatorStateInfo next = animator.GetNextAnimatorStateInfo(PlayerActionPoseRules.BaseLayer);
+        float normalizedTime = DashInterruptLayerFade.ReverseHandoffNormalizedTime(
+            current.shortNameHash == stateHash, current.normalizedTime,
+            animator.IsInTransition(PlayerActionPoseRules.BaseLayer) && next.shortNameHash == stateHash,
+            next.normalizedTime);
+
+        animator.Play(stateHash, layer, normalizedTime);
+        dashInterruptFade = DashInterruptLayerFade.Start(animator.GetLayerWeight(layer), 1f, DashInterruptBlend);
+        animator.SetLayerWeight(layer, dashInterruptFade.Weight);
+    }
+
     /// <summary>[입력 주체] 대시 중 강제 종료(넉백·그랩·사망 등) — 상체 레이어 Empty + 가중치 0 즉시.</summary>
     internal void CancelDashInterruptUpper()
     {

@@ -94,6 +94,22 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// <summary>[서버] 이 시전이 대시에 실려 있다(대시 끝 전).</summary>
     internal bool IsAttachedToDash => attachedToDash;
 
+    /// <summary>[서버] 이 시전의 Hit 판정이 이미 났다(래치).</summary>
+    internal bool HasResolvedHit => hasResolvedHit;
+
+    /// <summary>
+    /// [서버] 우클릭 → 대시 전환(할 일 115 §12) — 이미 시작된 이 시전이 대시에 옮겨 실렸다. 이후는 대쉬 간파와 같다
+    /// (대시 중 Hit 보류 → 대시 끝 Skill 전이에서 판정). 새 시전이 아니므로 시도 사건·슬로우 예측(TryStartSlowMotion)과
+    /// 준비 타이머(hitTime)는 다시 하지 않는다 — 준비 기준점은 처음 승인 시각 그대로.
+    /// </summary>
+    internal void OnTransferredToDash()
+    {
+        attachedToDash = true;
+        pendingHit = false;
+        pendingEnd = false;
+        Edit.Log("[DashInterrupt] 우클릭 → 대시 전환 — 진행 중인 간파를 대시에 실음(시도 사건 재발동 없음)", this);
+    }
+
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         attachedToDash = dashAttachArmed;

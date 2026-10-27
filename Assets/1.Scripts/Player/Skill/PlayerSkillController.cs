@@ -76,6 +76,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private int activeStartFrame;
     // [서버] 대쉬 간파가 대시에 실린 시각(할 일 115) — Skill 전이 때 안전망을 실린 시간만큼 늦춘다.
     private float activeDashAttachTime;
+    // 우클릭 → 대시 전환(할 일 115 §12). 시작 시각·Hit 은 이 피어 기준(서버 = 승인, 원격 오너 = PlaySkillClientRpc 수신).
+    private float activeStartTime;
+    private bool activeHitEventSeen;                  // 이 피어 애니메이터에서 실행 중 스킬의 Hit 이벤트가 이미 왔다
+    private PlayerSkillBase dashTransferArmed;        // 다음 Skill→Dash 전이에서 끝내지 않고 대시에 옮겨 실을 스킬(오너 예측·서버 승인)
+    private PlayerSkillBase dashTransferInFlight;     // Skill 상태 Exit(Dash) ~ 새 대시 상태 Enter 사이
+    private PlayerSkillBase ownerTransferAwaitingVerdict; // [원격 오너] 전환 요청을 보냈다 — 서버 거부(RejectSkillClientRpc)면 간파를 끝낸다
+    private float lastTransferLogPressTime = float.NaN;
     // 상태가 다시 시작됐다고 볼 안전망 연장 폭. 같은 재생 안에서는 매 틱 계산값이 거의 같아 이보다 작다.
     private const float ClipRestartSlack = 0.05f;
     // 클립 길이를 못 구해 타이머 안전망으로 대체한 경고는 스킬당 1회.
@@ -437,6 +444,178 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         return true;
     }
 
+    /// <summary>
+    /// [입력 주체] 우클릭 → 대시 전환 준비(할 일 115 §12) — 일반 간파(Skill 상태) 중 대시 입력의 누른 시각이 간파 시작 후 창 안이고
+    /// Hit 전이면, 다음 Skill→Dash 전이에서 간파를 끝내지 않고 대시에 옮겨 싣도록 건다. 호출자(PlayerStateController)는 true 면
+    /// 기존 대시 게이트(<see cref="PlayerDashController.TryBeginPredictedDash"/>)로 대시를 시작하고, 실패하면 <see cref="DisarmDashTransfer"/>.
+    /// 쿨타임은 보지 않는다(이미 실행 중인 같은 간파). 서버(호스트·오프라인)는 서버 승인 조건까지 여기서 본다.
+    /// false 면 대시 입력을 건드리지 않는다 — 지금처럼 선입력 버퍼에 남는다.
+    /// </summary>
+    public bool TryArmDashTransfer(float dashPressTime)
+    {
+        if (player == null || !player.IsInputSource || dash == null || stateController == null ||
+            stateController.CurrentState != PlayerActionState.Skill || activeSkill == null)
+            return false;
+
+        float window = dash.DashInterruptWindow;
+        if (!DashInterruptRules.IsEnabled(window))
+            return false;
+
+        PlayerSkillBase skill = activeSkill;
+        DashInterruptTransferDecision decision = DashInterruptRules.EvaluateTransfer(
+            IsInterruptSkillInSlot(skill), dashTransferArmed != null, activeHitEventSeen,
+            activeStartTime, dashPressTime, window);
+        if (decision == DashInterruptTransferDecision.Transfer && HasGameplayAuthority)
+            decision = EvaluateServerTransfer(skill);
+
+        // 남겨 둔 대시 입력은 매 프레임 다시 보므로 같은 누름은 한 번만 남긴다.
+        if (decision != DashInterruptTransferDecision.NotInterruptSkill && dashPressTime != lastTransferLogPressTime)
+        {
+            Edit.Log(
+                $"[DashInterrupt] 간파 중 대시 — {DescribeTransfer(decision)} (간파 시작 후 {dashPressTime - activeStartTime:F3}s / 창 {window:F2}s)",
+                this);
+        }
+
+        lastTransferLogPressTime = dashPressTime;
+
+        if (decision != DashInterruptTransferDecision.Transfer)
+            return false;
+
+        dashTransferArmed = skill;
+        return true;
+    }
+
+    /// <summary>[입력 주체] <see cref="TryArmDashTransfer"/> 뒤 대시가 시작되지 못했다 — 전환 준비를 거둔다(간파는 그대로).</summary>
+    public void DisarmDashTransfer() => dashTransferArmed = null;
+
+    private bool IsInterruptSkillInSlot(PlayerSkillBase skill) =>
+        skill is PlayerInterruptSkillBase && skill == GetSkill(PlayerSkillSlot.Interrupt);
+
+    // [서버] 전환 승인 조건(§12-3) — 실행 중 스킬이 그 간파·Skill 상태·미부착·Hit 전·서버 경과 ≤ 창 + 허용오차.
+    private DashInterruptTransferDecision EvaluateServerTransfer(PlayerSkillBase requested)
+    {
+        PlayerInterruptSkillBase interrupt = activeSkill as PlayerInterruptSkillBase;
+        bool sameRunning = requested != null && requested == activeSkill && IsInterruptSkillInSlot(requested) &&
+                           stateController != null && stateController.CurrentState == PlayerActionState.Skill;
+        return DashInterruptRules.EvaluateServerTransfer(
+            sameRunning,
+            dashTransferArmed != null || (interrupt != null && interrupt.IsAttachedToDash),
+            interrupt != null && interrupt.HasResolvedHit,
+            Time.time - activeStartTime,
+            dash != null ? dash.DashInterruptWindow : 0f,
+            dash != null ? dash.DashInterruptServerTolerance : 0f);
+    }
+
+    private static string DescribeTransfer(DashInterruptTransferDecision decision) => decision switch
+    {
+        DashInterruptTransferDecision.Transfer => "대쉬 간파로 전환",
+        DashInterruptTransferDecision.AlreadyAttached => "이미 전환됨 — 대시 입력은 버퍼 그대로",
+        DashInterruptTransferDecision.HitPassed => "Hit 이후 — 대시 입력은 버퍼 그대로",
+        DashInterruptTransferDecision.OutOfWindow => "창 밖 — 대시 입력은 버퍼 그대로",
+        _ => "간파 스킬 아님 — 대시 입력은 버퍼 그대로",
+    };
+
+    // [서버] 원격 오너의 전환 요청(RequestUseSkillRpc dashInterrupt=true, 같은 간파 실행 중) — 새 시전이 아니다.
+    // 통과하면 '전환 대기'만 걸고(쿨·스냅샷·OnServerStart·PlaySkillClientRpc 없음), 이어 오는 대시 RPC 의 Skill→Dash 전이에서 싣는다.
+    private bool TryApproveDashTransferServer()
+    {
+        PlayerSkillBase skill = activeSkill;
+        float elapsed = Time.time - activeStartTime;
+        DashInterruptTransferDecision decision = EvaluateServerTransfer(skill);
+        if (decision != DashInterruptTransferDecision.Transfer)
+        {
+            Edit.Log($"[DashInterrupt] 전환 요청 거부 — {DescribeTransfer(decision)} (서버 경과 {elapsed:F3}s)", this);
+            return false;
+        }
+
+        dashTransferArmed = skill;
+        Edit.Log($"[DashInterrupt] 전환 요청 승인 — 대시를 기다림(서버 경과 {elapsed:F3}s)", this);
+        return true;
+    }
+
+    // 원격 오너 전환 요청인가 — 요청한 스킬이 지금 Skill 상태로 실행 중인 그 스킬이다(C2b 대쉬 간파는 실행 중 스킬이 없다).
+    private bool IsDashTransferRequest(int expectedSkillIndex) =>
+        activeSkill != null && GetSkillIndex(activeSkill) == expectedSkillIndex &&
+        stateController != null && stateController.IsInSkillState;
+
+    // Skill 상태가 Dash 로 나간다 — 전환이 걸려 있으면 간파를 끝내지 않고 넘긴다(새 대시 상태 Enter 에서 CompleteDashTransfer).
+    // 애니(입력 주체): 상체 레이어가 0층 간파의 지금 시각부터 이어 재생, 0층은 기존 대시 캔슬과 같은 처리(Dodge 있으면 Dodge).
+    private bool TryBeginDashTransfer(PlayerActionState nextState)
+    {
+        PlayerSkillBase skill = activeSkill;
+        if (nextState != PlayerActionState.Dash || skill == null || dashTransferArmed != skill)
+            return false;
+
+        dashTransferArmed = null;
+        // 승인 뒤 대시가 오기 전에 판정이 났다 — 전환하지 않고 기존대로 대시가 간파를 끊는다(오너는 EndSkillClientRpc 로 맞춰진다).
+        if (HasGameplayAuthority && skill is PlayerInterruptSkillBase interrupt && interrupt.HasResolvedHit)
+        {
+            Edit.Log("[DashInterrupt] 전환 취소 — 대시 도착 전에 Hit 판정이 났다(기존 대시 캔슬)", this);
+            return false;
+        }
+
+        dashTransferInFlight = skill;
+        if (skill.Data != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
+            dash?.BeginDashInterruptUpperFromBase(skill.Data.AnimatorStateName);
+        ReturnBasePoseAfterSkill(skill, SkillEndReason.DashCancelled);
+        return true;
+    }
+
+    /// <summary>
+    /// [오너·서버] 우클릭 → 대시 전환의 새 대시 상태 진입(PlayerDashState.Enter) — 넘겨받은 간파를 대시에 싣는다.
+    /// 이후는 대쉬 간파와 같다(대시 끝 Skill 전이·보류 Hit 판정). 원격 오너는 여기서 전환 요청을 보낸다 —
+    /// 이 Enter 를 부른 TryBeginPredictedDash 가 대시 RPC 를 이 뒤에 보내므로 서버에 스킬 RPC 가 먼저 닿는다(같은 신뢰 채널).
+    /// </summary>
+    internal void CompleteDashTransfer(PlayerDashState dashState)
+    {
+        PlayerSkillBase skill = dashTransferInFlight;
+        dashTransferInFlight = null;
+        if (skill == null || activeSkill != skill)
+            return;
+
+        if (dashState == null || !dashState.Attach(skill))
+        {
+            // 실을 수 없다 — 기존 대시 캔슬처럼 끝낸다.
+            activeSkill = null;
+            activeEndFallbackTime = 0f;
+            ClearDashTransfer();
+            skill.OnEnd(SkillEndReason.DashCancelled);
+            dash?.CancelDashInterruptUpper();
+            if (IsNetworkActive && IsServer)
+                EndSkillClientRpc(GetSkillIndex(skill), SkillEndReason.DashCancelled);
+            ApplyPendingSlotOverrides();
+            return;
+        }
+
+        activeDashAttachTime = Time.time;
+        if (HasGameplayAuthority && skill is PlayerInterruptSkillBase interrupt)
+            interrupt.OnTransferredToDash();
+
+        if (IsNetworkActive && IsOwner && !IsServer)
+        {
+            ownerTransferAwaitingVerdict = skill;
+            RequestUseSkillRpc(skill.Slot, GetSkillIndex(skill), dashState.Direction, default, Vector3.zero, false,
+                player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
+        }
+
+        Edit.Log($"[DashInterrupt] 간파 → 대시 전환 완료 — 대시에 실림(간파 시작 후 {Time.time - activeStartTime:F3}s)", this);
+    }
+
+    private void ClearDashTransfer()
+    {
+        dashTransferArmed = null;
+        dashTransferInFlight = null;
+        ownerTransferAwaitingVerdict = null;
+    }
+
+    // 이 피어에서 스킬이 시작됐다 — 전환 판단 기준점(t0)과 Hit 관측을 새로 잡는다.
+    private void MarkActiveSkillStarted()
+    {
+        activeStartTime = Time.time;
+        activeHitEventSeen = false;
+        ClearDashTransfer();
+    }
+
     // PlayerSkillState.Tick에서 호출 (오너 + 서버만 FSM을 틱한다)
     public void Tick()
     {
@@ -462,6 +641,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         isRequestingSkill = false;
 
+        // 우클릭 → 대시 전환(할 일 115 §12) — 간파를 끝내지 않고 새 대시 상태로 넘긴다.
+        if (TryBeginDashTransfer(nextState))
+            return;
+
+        ClearDashTransfer();
         if (activeSkill == null)
             return;
 
@@ -493,6 +677,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         activeSkill = null;
         activeEndFallbackTime = 0f;
+        ClearDashTransfer();
 
         SkillEndReason reason = PlayerActionPoseRules.ForcedExitReason(nextState);
         Edit.Log($"[DashInterrupt] 대시 중 강제 종료 → 간파 종료 ({reason}, 다음 상태 {nextState})", this);
@@ -543,6 +728,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         PlayerSkillBase skill = activeSkill;
         activeSkill = null;
         activeEndFallbackTime = 0f;
+        ClearDashTransfer();
 
         Edit.Log($"[Skill] {skill.Slot} 종료 ({reason})", this);
 
@@ -673,6 +859,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // 먼저 이 피어 로컬(오너 이동·연출)로 넘기고, 판정 경로(OnAnimationEvent)는 서버만 처리한다.
     public void HandleAnimationEvent(SkillAnimationEventType eventType)
     {
+        // 우클릭 → 대시 전환은 Hit 전까지만(할 일 115 §12) — 오너는 판정을 모르므로 자기 애니메이터의 Hit 으로 본다.
+        if (eventType == SkillAnimationEventType.Hit && activeSkill != null)
+            activeHitEventSeen = true;
+
         activeSkill?.OnLocalAnimationEvent(eventType);
 
         if (IsNetworkActive && !IsServer)
@@ -688,6 +878,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint,
         bool dashInterrupt = false)
     {
+        // 우클릭 → 대시 전환 요청(§12-3) — 같은 간파가 실행 중이면 새 시전이 아니라 전환 대기만 건다.
+        if (dashInterrupt && IsDashTransferRequest(expectedSkillIndex))
+            return TryApproveDashTransferServer();
+
         if (!dashInterrupt)
             ReprojectFixedDistanceAim(slot, hasAimPoint, ref direction, ref aimPoint);
 
@@ -730,6 +924,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         activeEndsOnClipEvent = skill.EndsOnClipEvent;
         hasClipFallback = false;
         activeStartFrame = Time.frameCount;
+        MarkActiveSkillStarted();
 
         // 쿨타임은 승인 즉시 시작, 환불 없음 — 단 수동 커밋 스킬은 발동 시점에 스스로 시작한다(CommitCooldownServer)
         if (!skill.Data.CommitCooldownManually)
@@ -1206,6 +1401,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (dashInterrupt && IsOwner && stateController != null && stateController.AttachDashInterrupt(skill))
         {
             activeSkill = skill;
+            MarkActiveSkillStarted();
             PlaySkillPresentation(skill, direction, true);
             return;
         }
@@ -1218,6 +1414,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         }
 
         activeSkill = skill;
+        MarkActiveSkillStarted();
         // 원격 오너 대시가 이미 끝났으면 일반 간파처럼 0층에 튼다. 관찰자는 상체·0층 모두 오너 복제를 따른다.
         PlaySkillPresentation(skill, direction, dashInterrupt && !IsOwner);
     }
@@ -1228,6 +1425,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (IsServer)
             return;
 
+        EndSkillFromServer(skillIndex, reason);
+    }
+
+    // [클라] 서버 결과로 스킬을 끝낸다 — EndSkillClientRpc, 그리고 원격 오너의 우클릭 → 대시 전환 거부(RejectSkillClientRpc).
+    private void EndSkillFromServer(int skillIndex, SkillEndReason reason)
+    {
         // 로컬(오너)에서 이미 정리된 경우(넉백·대시 선반영 등) 이중 처리 방지
         PlayerSkillBase endedSkill = GetSkillByIndex(skillIndex);
         bool endedHere = activeSkill != null && activeSkill == endedSkill;
@@ -1236,6 +1439,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             PlayerSkillBase skill = activeSkill;
             activeSkill = null;
             activeEndFallbackTime = 0f;
+            ClearDashTransfer();
             skill.OnEnd(reason);
 
             // 원격 오너가 아직 대시에 싣고 있었다(할 일 115) — 0층은 대시 포즈라 상체 레이어만 내린다.
@@ -1259,8 +1463,23 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     [ClientRpc]
     private void RejectSkillClientRpc(ClientRpcParams clientRpcParams = default)
     {
-        if (IsOwner)
-            isRequestingSkill = false;
+        if (!IsOwner)
+            return;
+
+        isRequestingSkill = false;
+
+        // 우클릭 → 대시 전환을 서버가 거부했다(할 일 115 §12-3) — 서버는 이어 오는 대시가 간파를 끊는다(DashCancelled).
+        // 예측으로 실어 둔 간파를 지금 같은 사유로 끝내 서버와 맞춘다(뒤에 오는 EndSkillClientRpc 는 이미 정리돼 무시된다).
+        PlayerSkillBase transferred = ownerTransferAwaitingVerdict;
+        ownerTransferAwaitingVerdict = null;
+        if (transferred != null && activeSkill == transferred)
+        {
+            // 대시가 이미 끝나 Skill 로 넘어왔으면 0층을 Idle 로 되돌려야 하므로 Cancelled(Dodge 가 이어받지 않는다).
+            bool stillInDash = stateController != null && stateController.ActiveDash != null;
+            Edit.Log("[DashInterrupt] 서버가 전환을 거부 — 실어 둔 간파 종료(대시는 그대로)", this);
+            EndSkillFromServer(GetSkillIndex(transferred),
+                stillInDash ? SkillEndReason.DashCancelled : SkillEndReason.Cancelled);
+        }
     }
 
     // ── 내부 유틸 ──
