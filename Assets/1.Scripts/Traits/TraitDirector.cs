@@ -371,6 +371,38 @@ public sealed class TraitDirector : NetworkBehaviour
         return result;
     }
 
+    /// <summary>
+    /// [서버, 디버그 특성 랩 — 할 일 135] 그 플레이어의 획득 목록을 <paramref name="traitHashes"/> 로 통째로 바꾼다(제시·라운드 참가는 비운다).
+    /// 효과는 재합류와 같은 장부 맞추기(<see cref="ApplyMissingEffects"/>)로 — 빠진 특성은 되돌리고 새 특성만 건다. 수치형은 획득 행으로 따라온다.
+    /// '획득 1회' 표시는 지운다 — 뺐다 다시 넣으면 처음 얻는 것과 같게 1회 동작이 다시 돈다. 목록이 비면 특성 임시 상태도 비운다(새 플레이와 같다).
+    /// 모르는 해시·중복은 건너뛴다(<see cref="TraitSelectionModel.RestoreAcquired"/>). 스폰 전·클라면 false.
+    /// </summary>
+    public bool ReplaceAcquiredServer(ulong clientId, IReadOnlyList<int> traitHashes)
+    {
+        if (!CanServe)
+        {
+            Edit.LogWarning($"{Tag} 획득 목록 교체 무시 — 서버에서 스폰된 뒤에만 된다.", this);
+            return false;
+        }
+
+        model.ResetPlayer(clientId);
+        int kept = model.RestoreAcquired(clientId, traitHashes ?? Array.Empty<int>());
+        appliedEffects.ClearOnce(clientId);
+        int applied = ApplyMissingEffects(clientId);
+
+        if (kept == 0)
+        {
+            Player player = FindPlayer(clientId);
+            if (player != null && player.TryGetComponent(out PlayerTraitEffects effects))
+                effects.ClearTransientServer();
+        }
+
+        RebuildEntries();
+        SyncSelectionShields();
+        Edit.Log($"{Tag} client {clientId} 획득 목록 교체 — {kept}개 보유, 새로 건 효과 {applied}개.", this);
+        return true;
+    }
+
     /// <summary>[서버] 그 플레이어가 지금 라운드 참가자인가(제시 중·고름·0장 모두).</summary>
     public bool IsInRoundServer(ulong clientId) => model != null && model.IsInRound(clientId);
 

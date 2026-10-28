@@ -280,3 +280,16 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 `TraitCatalogTests` · `TraitFixedSelectionTests` · `TraitModifierSetTests` · `TraitEffectTests` ·
 `TraitTooltipTests`·`TraitSheetBindingTests`·`TraitPickConfirmTests`·`TraitStringKeysTests`(5/5) · `Paladin|Gunner|AssassinTrait…Tests`(캐릭터 레인). `ConcussionTests` 는 전체 실행에서 돈다.
 게이지 표시 조건은 `MapSceneTraitCorridorModelTests`.
+특성 디버그 랩(§13): `DebugTraitLabTests` · `DebugTraitLabIsolationTests`.
+
+## 13. 특성 디버그 랩 `DebugTraitLab` (할 일 135)
+
+- **진입** = 툴바 Dev Boot 드롭다운 → `DebugTraitLab` → Play. 빌드 목록에 없다(Dev Boot 가 Play 동안만 넣고 뺀다 — DebugInterruptLab 과 같다). 호스트 1인 기준.
+- **씬** = 원점 스폰 · 허수아비 일렬 3개(z 5·7·9, 관통·연사) + 따로 1개(6, 0, 4) · `TraitDirector.prefab`(4.MapScene 과 같은 프리팹) · 카메라·대시 검증·피해 숫자.
+- **왼쪽 OnGUI 패널**(`Dev/TraitLab/DebugTraitLab.cs`):
+  - 캐릭터 = 팔라딘·거너·어쌔신 버튼 또는 **F1** 순환(`DebugCharacterCycle`, 같은 자리 재스폰). 바꾸기 직전 보유 특성을 비운다.
+  - 지금 캐릭터 12개를 1~4차로 나열 — 버튼 = 넣기/빼기(■ 보유). **차수당 하나**(실게임과 같다): 같은 차수 다른 것을 넣으면 기존 것을 뺀다. `규칙 무시` 를 켜면 같은 차수 동시 보유.
+  - `전부 빼기` · `차수별 랜덤`(차수마다 하나) · 보유 목록 · 2차 상충 경고(§11.3 등록부 규칙 — 막지 않고 "효과 없음" 만 표시).
+  - 배속 슬라이더 0.05~2(`DebugTimeScale`) · `쿨 0`(`DebugZeroCooldown` — Q·E·R·간파·대시, 기본 꺼짐) · `허수아비 HP 리셋`.
+- **정식 경로**: 넣기/빼기는 `TraitDirector.ReplaceAcquiredServer`(획득 목록 교체 → 재합류와 같은 장부 맞추기) — 수치형은 `PlayerTraitModifiers` 가 획득 행으로, 이벤트형은 장부로 걸고 되돌린다. 뺐다 다시 넣으면 '획득 1회' 동작도 다시 돈다(처음 얻는 것과 같게). 순수 규칙 = `TraitLabModel`.
+- 클라 창은 보기 전용(버튼 비활성, 새 RPC 없음). 패널을 클릭하면 게임 입력(기본 공격)도 같이 들어갈 수 있다.

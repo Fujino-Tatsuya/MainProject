@@ -14,6 +14,8 @@ public sealed class DebugInterruptLabIsolationTests
 {
     const float Eps = 1e-5f;
     const string LabScenePath = "Assets/0.Scenes/Debug/DebugInterruptLab.unity";
+    // 특성 디버그 랩(할 일 135)도 배속·쿨 0·F1·허수아비 회복을 재사용한다 — 그 씬도 허용(자기 격리는 DebugTraitLabIsolationTests).
+    const string TraitLabScenePath = "Assets/0.Scenes/Debug/DebugTraitLab.unity";
     const string LabFolder = "Assets/1.Scripts/Dev/InterruptLab/";
 
     static readonly System.Type[] DebugComponents =
@@ -81,7 +83,7 @@ public sealed class DebugInterruptLabIsolationTests
     {
         string[] scenes = Directory.GetFiles("Assets", "*.unity", SearchOption.AllDirectories)
             .Select(Normalize)
-            .Where(p => p != LabScenePath)
+            .Where(p => p != LabScenePath && p != TraitLabScenePath)
             .ToArray();
         Assert.IsTrue(scenes.Any(p => p.StartsWith("Assets/0.Scenes/")));
         CollectionAssert.IsEmpty(FilesUsingDebugScripts(scenes));
