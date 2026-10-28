@@ -41,7 +41,8 @@ public class GunnerHeatGauge : MonoBehaviour
 
     private void LateUpdate()
     {
-        bool show = heat != null && heat.Data != null && (player == null || !player.IsSpawned || player.IsOwner);
+        // 정온 운용(할 일 127 3/4)이면 과열이 없으니 게이지를 숨긴다(캔버스만 끈다 — 프리팹·이펙트 무수정).
+        bool show = heat != null && heat.Data != null && heat.HeatEnabled && (player == null || !player.IsSpawned || player.IsOwner);
         if (canvas != null && canvas.enabled != show)
             canvas.enabled = show;
         if (!show)

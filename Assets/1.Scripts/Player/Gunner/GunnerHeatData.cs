@@ -41,8 +41,10 @@ public class GunnerHeatData : ScriptableObject, ISkillTooltipSource
         if (player == null || attack == null)
             return default;
 
-        float minScale = StageDamageMultiplier(0);
-        float maxScale = StageDamageMultiplier(int.MaxValue);
+        // 판정(GunnerBasicAttack)과 같은 과열 모드 배율 — 한계 돌파 = 교체 표, 정온 운용 = 0단계 × (1 − 감소율).
+        GunnerHeatTraits traits = GunnerHeatTraits.From(player.TraitModifiers);
+        float minScale = traits.BasicShotScale(0, this);
+        float maxScale = traits.BasicShotScale(traits.MaxStage, this);
         return SkillTooltipDamage.FromScaledSnapshot(
             player.FinalAttackDamage, attack.AttackDamageMultiplier, attack.FlatDamageBonus, minScale, maxScale, player.DealtDamagePercent);
     }

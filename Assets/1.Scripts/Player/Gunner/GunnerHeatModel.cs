@@ -68,6 +68,16 @@ public static class GunnerHeatModel
         return new GunnerHeatState { heat = heat, anchorTime = now, overheated = overheated };
     }
 
+    /// <summary>
+    /// 축열 포격(할 일 127) — now 시점에 남은 열을 모두 소모한다. 소모 비율(남은 열 ÷ 최대치, 0~1)을 내고 열 0·과열 해제 상태를 돌려준다.
+    /// 충전 중 냉각·E 로 줄었으면 줄어든 값만 소모된다.
+    /// </summary>
+    public static GunnerHeatState SpendAll(in GunnerHeatState state, double now, GunnerHeatData data, out float spentRatio)
+    {
+        spentRatio = Mathf.Clamp01(HeatAt(state, now, data) / Mathf.Max(0.0001f, data.MaxHeat));
+        return Reset(now);
+    }
+
     /// <summary>E 냉각 — 과열도 0, 과열 해제, 대기시간 초기화(§5.5).</summary>
     public static GunnerHeatState Reset(double now) =>
         new GunnerHeatState { heat = 0f, anchorTime = now, overheated = false };
