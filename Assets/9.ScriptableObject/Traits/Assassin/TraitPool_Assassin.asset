@@ -13,4 +13,8 @@ MonoBehaviour:
   m_Name: TraitPool_Assassin
   m_EditorClassIdentifier: Assembly-CSharp::TraitCharacterPool
   character: 3
-  traits: []
+  traits:
+  - {fileID: 11400000, guid: 5ce1bca563db9c54f8f3b15b45967256, type: 2}
+  - {fileID: 11400000, guid: 048c4598457070947b87816111d983e0, type: 2}
+  - {fileID: 11400000, guid: 7223d5bf3cec07f4190e810916739e84, type: 2}
+  - {fileID: 11400000, guid: 1ee8fa043d611af4daef7dc68c53533f, type: 2}

@@ -11,6 +11,24 @@ public static partial class TraitContent
         r.Conflict("ASN_2_RESTRAINT", "ASN_1_TRANS_E_DAMAGE",
             "변신을 사용할 수 없어 ‘{traits}’의 효과를 받을 수 없습니다. 선택할까요?");
 
+        // 돌파 가속 — 명세 문구는 감소율(0.15)이고 효과는 쿨 증감(−0.15)으로 보관한다.
+        r.Value("ASN_1_Q_COOLDOWN", "cooldownReduction", CooldownReduction);
+
         // 예: r.Damage("ASN_4_Q_TRAIL", (trait, player) => SkillTooltipDamage.FromLinear(player, 계수, 고정값));
+    }
+
+    // 정의의 첫 쿨 효과 감소율(1 − 배율). 쿨 효과가 없으면 0.
+    private static object CooldownReduction(TraitDefinition trait)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (effect is TraitCooldownEffect cooldown)
+                    return 1f - cooldown.Multiplier;
+            }
+        }
+
+        return 0f;
     }
 }
