@@ -492,18 +492,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     float PhaseDamageMultiplier => ActivePhase != null ? Mathf.Max(0f, ActivePhase.damageMultiplier) : 1f;
 
     // 페이즈 이동속도 배수 — base 의 SeekBoss 가 chaseSpeed 에 곱한다.
-    // 할 일 136 — 추적 진행 방향 앞에 플레이어 몸이 붙으면 0(제자리) — 공통 이동 가드. base 추격 경로를 건드리지 않는 유일한 훅이다.
     protected override float ChaseSpeedMultiplier =>
-        ChaseBlockedByPlayer() ? 0f
-        : ActivePhase != null ? Mathf.Max(0.1f, ActivePhase.speedMultiplier) : 1f;
-
-    bool ChaseBlockedByPlayer()
-    {
-        if (!IsServer || agent == null || !agent.enabled || !agent.isOnNavMesh || !agent.hasPath) return false;
-        Vector3 dir = agent.steeringTarget - transform.position;
-        dir.y = 0f;
-        return dir.sqrMagnitude > 0.0001f && PlayerBlocksBodyMove(dir.normalized);
-    }
+        ActivePhase != null ? Mathf.Max(0.1f, ActivePhase.speedMultiplier) : 1f;
 
     public override void OnNetworkSpawn()
     {
@@ -3563,8 +3553,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // 체공 종료 — 착지점으로 이동하고 메시를 되살린 뒤 착지 클립으로 넘어간다.
     void ArriveJump()
     {
-        // 체공 중 플레이어가 착지점으로 들어왔으면 몸이 겹치지 않게 비켜 내린다(할 일 136 공통 이동 가드).
-        WarpTo(ResolveLandingClearOfPlayers(_jumpArrivePoint));
+        WarpTo(_jumpArrivePoint);
         SetModelVisibleClientRpc(true);
         SetHurtableClientRpc(true);   // 착지했으니 다시 맞는다(BeginJump 의 짝)
 
@@ -5050,7 +5039,6 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (_rageDashing)
         {
             meleeAttack?.Hit(); // 히트 윈도우가 중복 피격을 막는다
-            HoldDashWhilePlayerBlocks(_rageDashDir);   // 할 일 136 — 플레이어 몸을 파고들지 않는다
 
             // 🔴 **닿는 프레임에** 낸다. 구간이 끝날 때 몰아서 내면, 0.3초에 벽에 닿고도
             //    0.7초까지 서 있다가 뒤늦게 터진다. 판정만 읽을 뿐 돌진을 끊지는 않는다 —
@@ -5169,7 +5157,6 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (_dashCarried == null)
             TryCarryDashTarget();
-        HoldDashWhilePlayerBlocks(_dashDir);   // 할 일 136 — 캐리 안 된 플레이어(슈퍼아머 등)를 관통하지 않는다
 
         bool arrived = DashDestinationReached();
         if (_attackPhaseTimer > 0f && !arrived) return;
@@ -5385,7 +5372,6 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
         _dashPrevStopDistance = -1f;
         _dashPrevAcceleration = -1f;
-        _bodyMoveHeld = false;
         StopAgentHard();
     }
 
@@ -5441,13 +5427,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         //    두므로, 다음 틱의 도착 판정이 즉시 성립해 안전하게 끝난다.
         StartDashMove(dir, Mathf.Max(0.1f, e.lungeSpeedMultiplier), e.lungeDistance);
         _lunging = true;
-        // 판정 기준점 = 예고가 그린 **전진 끝점**. 앞에 플레이어가 붙으면 전진이 멈춰(PlayerBlocksBodyMove) 현재 위치가
+        // 판정 기준점 = 예고가 그린 **전진 끝점**. 앞에 플레이어가 붙으면 전진이 멈춰(PlayerBlocksLunge) 현재 위치가
         // 끝점에 못 미치고, 그 자리에서 판정하면 네모가 보스 뒤 2m 까지 밀려 예고 밖 백어택 위치를 때렸다(점검 10-14).
         _lungeStrikeBase = transform.position + dir * e.lungeDistance;
         _lungeStrikeBaseValid = true;
 
         // 이미 앞에 플레이어가 붙어 있으면 전진하지 않는다(파고들면 플레이어가 못 빠져나간다 — 아래 TickLunge).
-        if (PlayerBlocksBodyMove(dir)) StopLungeMove();
+        if (PlayerBlocksLunge(dir)) StopLungeMove();
 
         // 🔴 방향은 여기서 잠가 **히트까지** 유지한다(EndLunge 가 푼다). `_lunging` 과 같이 두면
         //    도착하는 순간 풀려 부채꼴이 돌아간다 — 위 필드 선언부 주석 참조.
@@ -5489,109 +5475,38 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         //    (obstacleMask +Enemy) 서버가 몸 캡슐(r 1.53)을 플레이어에게 파고들게 하면, 플레이어 쪽 스윕은
         //    시작 겹침을 "전 방향 막힘"으로 읽어 **어디로도 못 나간다**(겹침 해소는 모터 담당 — CONTEXT 인수인계).
         //    NavMeshAgent 는 플레이어를 장애물로 모르므로 보스 쪽에서 멈춰야 한다. 판정은 끝점에서 그대로 나간다.
-        if (DashDestinationReached() || PlayerBlocksBodyMove(_dashDir))
+        if (DashDestinationReached() || PlayerBlocksLunge(_dashDir))
             StopLungeMove();
     }
 
-    // ─── 보스 공통 이동 가드 (할 일 136) ─────────────────────────────────
     // 몸 캡슐을 진행 방향으로 살짝 민 자리에 살아 있는 플레이어 몸이 있는가(앞쪽 반구만 — 뒤·옆 플레이어는 무시).
-    // 🔴 서버가 몸 캡슐(r 1.53)을 플레이어에게 파고들게 하면 벽 앞 NavMesh 띠(≈1.5m)에서 플레이어가 끼인다.
-    //    전진 공격·취약 넉백·점프 착지·분노 돌진·일반 돌진·추적 이동이 **이 한 곳**으로 막는다.
-    //    내가 구속 중인 대상(돌진 캐리·잡기·끌어당김)은 몸 앞에 붙어 다니는 게 정상이라 제외한다.
     const float LungeBlockLookAhead = 0.15f;
     readonly Collider[] _lungeBlockBuffer = new Collider[8];
     int _playerBodyMask = -1;
 
-    bool PlayerBlocksBodyMove(Vector3 dir) => PlayerBlocksBody(transform.position + dir * LungeBlockLookAhead, dir);
-
-    // dir 가 0 이면 방향 무관 — 그 자리에 몸을 두면 겹치는 플레이어가 있는가(착지점 검사).
-    bool PlayerBlocksBody(Vector3 bodyPosition, Vector3 dir)
+    bool PlayerBlocksLunge(Vector3 dir)
     {
-        int n = OverlapPlayerBodies(bodyPosition);
-        bool anyDir = dir.sqrMagnitude < 0.0001f;
-        for (int i = 0; i < n; i++)
-        {
-            Collider c = _lungeBlockBuffer[i];
-            if (anyDir) return true;
-            Vector3 to = c.transform.position - transform.position;
-            to.y = 0f;
-            if (Vector3.Dot(to, dir) > 0f) return true;
-        }
-        return false;
-    }
-
-    // 몸 캡슐을 bodyPosition(루트) 에 둔 자리와 겹치는 살아 있는 플레이어 몸을 버퍼 앞쪽에 모은다. 구속 대상 제외.
-    int OverlapPlayerBodies(Vector3 bodyPosition)
-    {
-        if (!(bodyCollider is CapsuleCollider cap) || !cap.enabled) return 0;
+        if (!(bodyCollider is CapsuleCollider cap) || !cap.enabled) return false;
         if (_playerBodyMask < 0) _playerBodyMask = LayerMask.GetMask("Player");
 
         Transform t = cap.transform;
         float scale = Mathf.Max(Mathf.Abs(t.lossyScale.x), Mathf.Abs(t.lossyScale.z));
         float radius = cap.radius * scale;
         float half = Mathf.Max(0f, cap.height * Mathf.Abs(t.lossyScale.y) * 0.5f - radius);
-        Vector3 center = t.TransformPoint(cap.center) + (bodyPosition - transform.position);
+        Vector3 center = t.TransformPoint(cap.center) + dir * LungeBlockLookAhead;
         Vector3 p1 = center + t.up * half, p2 = center - t.up * half;
 
         int n = Physics.OverlapCapsuleNonAlloc(p1, p2, radius, _lungeBlockBuffer, _playerBodyMask,
                                                QueryTriggerInteraction.Ignore);
-        int kept = 0;
         for (int i = 0; i < n; i++)
         {
             Collider c = _lungeBlockBuffer[i];
             if (c == null || !MonsterTargeting.IsAttackable(c)) continue;
-            Player p = c.GetComponentInParent<Player>();
-            if (p != null && (p == _dashCarried || p == _grabbed || _pulledPlayers.Contains(p))) continue;
-            _lungeBlockBuffer[kept++] = c;
+            Vector3 to = c.transform.position - transform.position;
+            to.y = 0f;
+            if (Vector3.Dot(to, dir) > 0f) return true;
         }
-        return kept;
-    }
-
-    // 돌진(일반·분노) 중 앞에 플레이어가 붙으면 **멈춰 서고**, 비키면 같은 목적지로 다시 간다. 타이머·도착 판정은 그대로.
-    bool _bodyMoveHeld;
-
-    void HoldDashWhilePlayerBlocks(Vector3 dir)
-    {
-        if (PlayerBlocksBodyMove(dir))
-        {
-            StopAgentHard();
-            _bodyMoveHeld = true;
-        }
-        else if (_bodyMoveHeld)
-        {
-            _bodyMoveHeld = false;
-            if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = false;
-        }
-    }
-
-    // 착지점에 플레이어가 서 있으면 몸 반경 + 그 플레이어 반경만큼 비켜 내린다(NavMesh 안으로). 착지 판정·연출 기준점은 그대로.
-    Vector3 ResolveLandingClearOfPlayers(Vector3 point)
-    {
-        int n = OverlapPlayerBodies(point);
-        if (n == 0) return point;
-
-        Vector3 resolved = point;
-        for (int i = 0; i < n; i++)
-        {
-            Collider c = _lungeBlockBuffer[i];
-            Vector3 playerPos = c.transform.position;
-            Vector3 away = resolved - playerPos;
-            away.y = 0f;
-            if (away.sqrMagnitude < 0.0001f) away = transform.position - playerPos;
-            away.y = 0f;
-            if (away.sqrMagnitude < 0.0001f) away = -transform.forward;
-            float playerRadius = c is CapsuleCollider pc
-                ? pc.radius * Mathf.Max(Mathf.Abs(pc.transform.lossyScale.x), Mathf.Abs(pc.transform.lossyScale.z))
-                : 0.38f;
-            float need = BodyRadius + playerRadius + LungeBlockLookAhead;
-            Vector3 candidate = playerPos + away.normalized * need;
-            candidate.y = resolved.y;
-            if ((candidate - playerPos).sqrMagnitude > (resolved - playerPos).sqrMagnitude) resolved = candidate;
-        }
-
-        resolved = ClampInsideArena(resolved, BodyRadius);
-        if (NavMesh.Raycast(point, resolved, out NavMeshHit hit, NavMesh.AllAreas)) resolved = hit.position;
-        return resolved;
+        return false;
     }
 
     // 전진 **이동만** 멈춘다. 히트 윈도우는 끝점 판정이 써야 하므로 여기서 닫지 않는다.
@@ -6629,7 +6544,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 🔴 진행 방향 앞에 플레이어 몸이 있으면 거기서 멈춘다 — agent.Move 는 플레이어를 장애물로 몰라
         //    몸 캡슐(1.53)을 플레이어 안으로 밀어 넣고, 겹친 플레이어는 모터 스윕이 전 방향 막힘으로 읽어 끼인다(09-29 팀장 Play).
         //    벽 판정은 위에서 먼저 끝났으므로 여기서 멈춰도 벽 성공은 잃지 않는다.
-        if (PlayerBlocksBodyMove(_kbDir))
+        if (PlayerBlocksLunge(_kbDir))
         {
             FinishVulnerableKnockback("넉백 종료(플레이어에 막힘)");
             return;

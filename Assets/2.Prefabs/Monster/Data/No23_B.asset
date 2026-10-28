@@ -471,7 +471,7 @@ MonoBehaviour:
   jumpLandingState: JumpLanding
   silentLandingState: EntranceLanding
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
-  jumpLandSeparation: 2
+  jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
   chargeTimeLimit: 30
   chargeLoopStartFrame: 62
