@@ -227,9 +227,9 @@ public sealed class TraitShieldEffect : TraitTriggeredEffect
 }
 
 /// <summary>
-/// ⑥ 적중 시 밀치기 — 돌파의 방패·수호의 파동·충격 레이저·급소 파괴(+ 제압의 진격 기절 자리).
-/// 🔴 지금은 <see cref="AttackInfo"/> 의 넉백+경직 경로로 건다(23호에서 명세 §4 와 맞는 유일한 경로 — 경석 handoff 보스넉백·기절).
-/// 보스 쪽(23호 OnKnockback override·상태별 슈퍼아머)이 고쳐지면 <see cref="ApplyCrowdControl"/> 한 곳만 Unit.Knockback·상태이상(뇌진탕 4/5) 직접 걸기로 바꾼다.
+/// ⑥ 적중 시 밀치기 — 돌파의 방패·수호의 파동·충격 레이저·급소 파괴(+ 제압의 진격 = 뇌진탕 옵션 <c>concussionDuration</c>).
+/// 🔴 지금은 <see cref="AttackInfo"/> 의 넉백+경직(+뇌진탕) 경로로 건다(23호에서 명세 §4 와 맞는 유일한 경로 — 경석 handoff 보스넉백·기절).
+/// 보스 쪽(23호 OnKnockback override·상태별 슈퍼아머)이 고쳐지면 <see cref="ApplyCrowdControl"/> 한 곳만 Unit.Knockback·상태이상 직접 걸기로 바꾼다.
 /// 보스 상태를 묻지 않는다 — 걸고, 대상의 기존 거부 규칙에 맡긴다. 시전당 대상별 1회.
 /// </summary>
 [Serializable]
@@ -245,25 +245,31 @@ public sealed class TraitKnockbackEffect : TraitEffect
     [Tooltip("밀치는 시간(초).")]
     [Min(0f)]
     [SerializeField] private float pushDuration = 0.2f;
-    [Tooltip("넉백 끝난 뒤 경직(초). 🔴 0 보다 커야 23호 취약 밀림이 걸린다(qPushHit = 넉백 > 0 이고 경직 > 0). " +
-             "제압의 진격 기절 0.75 도 이 자리(뇌진탕 상태이상은 4/5).")]
+    [Tooltip("넉백 끝난 뒤 경직(초). 🔴 0 보다 커야 23호 취약 밀림이 걸린다(qPushHit = 넉백 > 0 이고 경직 > 0).")]
     [Min(0f)]
     [SerializeField] private float staggerDuration = 0.1f;
+    [Tooltip("뇌진탕(초) — 밀치기가 끝나는 순간 이만큼 기절(제압의 진격 = 0.75). 맞을 때마다 재설정, 기존 기절과는 큰 값. 0 = 없음.")]
+    [Min(0f)]
+    [SerializeField] private float concussionDuration;
 
     public TraitKnockbackEffect() { }
 
     public TraitKnockbackEffect(float pushDistance, float pushDuration, float staggerDuration,
-        AttackType[] attackTypes = null, TraitAttackForm[] forms = null)
+        AttackType[] attackTypes = null, TraitAttackForm[] forms = null, float concussionDuration = 0f)
     {
         this.pushDistance = pushDistance;
         this.pushDuration = pushDuration;
         this.staggerDuration = staggerDuration;
         this.attackTypes = attackTypes ?? Array.Empty<AttackType>();
         this.forms = forms ?? Array.Empty<TraitAttackForm>();
+        this.concussionDuration = concussionDuration;
     }
 
     /// <summary>밀기 속도(m/s) = 거리 ÷ 시간. 시간 0 이면 0(넉백 없음).</summary>
     public float PushSpeed => pushDuration > 0f ? pushDistance / pushDuration : 0f;
+
+    /// <summary>뇌진탕 기절 길이(초). 0 = 뇌진탕 없음.</summary>
+    public float ConcussionDuration => concussionDuration;
 
     public bool Matches(TraitAttackKey key) =>
         TraitModifier.Covers(MaskOf(attackTypes), (int)key.Type) && TraitModifier.Covers(MaskOf(forms), (int)key.Form);
@@ -272,9 +278,14 @@ public sealed class TraitKnockbackEffect : TraitEffect
     /// 🔴 CC 를 실제로 거는 단 한 곳 — 지금은 공격 정보의 넉백·경직 필드만 채운다(맞는 쪽 MonsterBase·23호가 처리).
     /// 이미 더 센 넉백(거리 = 속도 × 시간)이 실려 있으면 그쪽을 두고(벡터 합산 금지 — 명세 §4), 경직은 큰 값을 남긴다(합산 아님).
     /// 방향이 0 이면 그대로 둔다(수신측이 방사형으로 계산).
+    /// 뇌진탕 옵션이 있으면 <see cref="AttackInfo.concussionDuration"/> 을 채운다 — 수신측(MonsterBase)이 실제로 밀린 대상에만
+    /// <see cref="StatusEffectType.Concussion"/> 을 건다(한 타격 안에서는 큰 값, 타격마다의 재설정은 <see cref="ConcussionState"/>).
     /// </summary>
     public void ApplyCrowdControl(ref AttackInfo info, Vector3 direction)
     {
+        if (concussionDuration > 0f)
+            info.concussionDuration = Mathf.Max(info.concussionDuration, concussionDuration);
+
         float existingDistance = info.knockbackStrength * info.knockbackDuration;
         if (pushDistance > existingDistance && PushSpeed > 0f)
         {
@@ -303,6 +314,7 @@ public sealed class TraitKnockbackEffect : TraitEffect
         CheckPositive(errors, nameof(pushDistance), pushDistance);
         CheckPositive(errors, nameof(pushDuration), pushDuration);
         CheckNonNegative(errors, nameof(staggerDuration), staggerDuration);
+        CheckNonNegative(errors, nameof(concussionDuration), concussionDuration);
         if (staggerDuration <= 0f)
             errors.Add($"{nameof(TraitKnockbackEffect)}.staggerDuration = 0 — 23호 취약 밀림 조건(경직 > 0)을 못 맞춘다");
     }

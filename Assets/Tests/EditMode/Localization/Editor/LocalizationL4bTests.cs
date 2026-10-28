@@ -38,6 +38,7 @@ public sealed class UiStringsL4bTests
             [StatusEffectType.Silenced] = "침묵",
             [StatusEffectType.Debilitated] = "약화",
             [StatusEffectType.Slowed] = "둔화",
+            [StatusEffectType.Concussion] = "뇌진탕",   // 할 일 125 — 차단류에 추가
         };
 
     [Test]
