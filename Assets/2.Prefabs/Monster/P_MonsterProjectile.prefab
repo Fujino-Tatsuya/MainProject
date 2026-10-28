@@ -129,7 +129,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2141990396
+  GlobalObjectIdHash: 1774244186
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -244,5 +244,5 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   trail: {fileID: 11400000, guid: 3ed42faac15a0544c8c338c7e5f78954, type: 2}
   explode: {fileID: 11400000, guid: 88b33c4c16ab5ba46928596f04744e2c, type: 2}
-  explodeOffset: {x: 0, y: 0, z: 0}
-  scale: 0.6
+  explodeOffset: {x: 0, y: 0.01, z: 0}
+  scale: 1
