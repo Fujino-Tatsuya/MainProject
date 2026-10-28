@@ -18,6 +18,11 @@ public static partial class TraitContent
         r.Value("ASN_2_RESTRAINT", "damageIncrease", DamageIncrease);
         r.Value("ASN_2_RESTRAINT", "cooldownReduction", CooldownReduction);
 
+        // 그림자 회귀 — 창·복귀 피해 비율은 스킬 수치 칸(⑩ entries[i].value), 쿨은 증가율(배율 − 1).
+        r.Value("ASN_2_RETURN", "returnWindow", trait => SkillValue(trait, AssassinShadowReturnRules.WindowKey));
+        r.Value("ASN_2_RETURN", "returnDamageRatio", trait => SkillValue(trait, AssassinShadowReturnRules.DamageRatioKey));
+        r.Value("ASN_2_RETURN", "cooldownIncrease", CooldownIncrease);
+
         // 칼날의 영역 — 범위 효과 두 칸(강타 길이·폭 / 변신 E 반경)이 같은 필드 이름이라 첫 칸 값으로 푼다.
         r.Value("ASN_3_E_AREA", "areaIncrease", AreaIncrease);
 
@@ -74,6 +79,45 @@ public static partial class TraitContent
             {
                 if (effect is TraitCooldownEffect cooldown)
                     return 1f - cooldown.Multiplier;
+            }
+        }
+
+        return 0f;
+    }
+
+    // 정의의 첫 쿨 효과 증가율(배율 − 1). 쿨 효과가 없으면 0.
+    private static object CooldownIncrease(TraitDefinition trait)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (effect is TraitCooldownEffect cooldown)
+                    return cooldown.Multiplier - 1f;
+            }
+        }
+
+        return 0f;
+    }
+
+    // 정의의 스킬 수치 칸(⑩) 중 이름이 같은 첫 값. 없으면 0.
+    private static object SkillValue(TraitDefinition trait, string key)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            var modifiers = new System.Collections.Generic.List<TraitModifier>();
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (!(effect is TraitSkillValueEffect))
+                    continue;
+
+                modifiers.Clear();
+                effect.GetModifiers(modifiers);
+                foreach (TraitModifier modifier in modifiers)
+                {
+                    if (string.Equals(modifier.Key, key, System.StringComparison.Ordinal))
+                        return modifier.Value;
+                }
             }
         }
 

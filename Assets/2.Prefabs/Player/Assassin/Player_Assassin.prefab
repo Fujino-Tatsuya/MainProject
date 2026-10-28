@@ -52,20 +52,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &3380059220795825168
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 291120902584957618}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
-  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
-  scale: 1
 --- !u!4 &3024030988266647831
 Transform:
   m_ObjectHideFlags: 0
@@ -85,6 +71,20 @@ Transform:
   - {fileID: 379797949299454427}
   m_Father: {fileID: 7816451711114395826}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3380059220795825168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 291120902584957618}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
+  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
+  scale: 1
 --- !u!1 &328504788389169216
 GameObject:
   m_ObjectHideFlags: 0
@@ -2073,6 +2073,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8453647513839019182}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4169308675022451000}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5134222589396270654}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &768617275354264640 stripped
 GameObject:
@@ -2168,6 +2174,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinEnhanceSkill
   data: {fileID: 11400000, guid: 756398fc8604e3d4a9313c7a47691dff, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &3500920581459072486
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2182,6 +2191,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinTransformSkill
   data: {fileID: 11400000, guid: 923644d9a27227941b696e60117a8aa9, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &298444540163121787
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2196,6 +2208,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinDashStrikeSkill
   data: {fileID: 11400000, guid: 4d2d25fcbaff64e4e9fc85c8e79c3bdf, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 4169308675022451000}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &7536522311454551541
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2210,6 +2225,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinDashStrikeSkill
   data: {fileID: 11400000, guid: a6907777c060cbf4fbe547debe6d82ce, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 5134222589396270654}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &4755753809911062424
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2224,6 +2242,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinCircleStrikeSkill
   data: {fileID: 11400000, guid: 600453ab650b89243810def8cd5d48a2, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &6164440143043952877
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2238,6 +2259,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinInterruptSkill
   data: {fileID: 11400000, guid: 05cb7d246b9fd3744ac6801613bd159a, type: 2}
   hitboxAnchor: {fileID: 8465202442189913645}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
+  lagCompensationCapMs: 100
 --- !u!114 &6606962425304540108
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2414,6 +2439,40 @@ MonoBehaviour:
   targetFloorScale: 1
   targetStrike: {fileID: 0}
   targetStrikeScale: 1
+--- !u!114 &4169308675022451000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be069874241bdea42867074d6c846ad7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinShadowReturnSkill
+  data: {fileID: 11400000, guid: 7715db58c95ef034abd57bc015612f7f, type: 2}
+  hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
+--- !u!114 &5134222589396270654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be069874241bdea42867074d6c846ad7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinShadowReturnSkill
+  data: {fileID: 11400000, guid: d8f369431fb7b124cb2d117592c1263f, type: 2}
+  hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!4 &7816451711114395826 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

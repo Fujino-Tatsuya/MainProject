@@ -19,8 +19,11 @@ using UnityEngine;
 ///
 /// 단계 시점 = 클립 이벤트(PLAN-anim-event-timing P2-3): 준비 → Custom0 = 돌진 시작(시뮬레이션 피어는 이동, 서버는 경로 재구성 시작 —
 /// 각자 자기 애니메이터 기준) → 경로 끝 → End = 종료. 클립 Hit 은 쓰지 않는다(판정은 경로 스윕). 안전망 = 컨트롤러(상태 클립 실제 길이 + padding).
+///
+/// 그림자 회귀(ASN_2_RETURN, 할 일 128 5b): 특성 보유 시 이 Q 사용이 후속 칸(<see cref="PlayerSkillBase.FollowUpSkill"/> = <see cref="AssassinShadowReturnSkill"/>)을 연다
+/// — 쿨은 복귀 사용·창 만료·강제 복귀 때 장치가 시작한다. 이 Q 는 돌진 시작 위치를 출발점으로 저장하고, 복귀 스킬이 같은 돌진 '단계' 코드를 방향·거리·피해만 바꿔 쓴다.
 /// </summary>
-public sealed class AssassinDashStrikeSkill : PlayerSkillBase
+public class AssassinDashStrikeSkill : PlayerSkillBase
 {
     private static readonly SkillAnimationEventType[] RequiredEvents =
         { SkillAnimationEventType.Custom0, SkillAnimationEventType.End };
@@ -42,7 +45,15 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     private bool isServerDashPending; // 승인 ~ Custom0(준비)
     private bool isServerSweeping;    // Custom0 ~ 경로 끝
     private bool hasSuperArmor;
+    // 이 돌진 단계의 기준 피해 — 출발 = 시전 Dref, 복귀 = 복귀 실행 때 Dref × 비율. 경로 판정과 그 단계 궤적이 같이 쓴다.
     private int serverStageDref;
+    // 이 단계가 쓰는 적중 장부 — 출발 = 자기 장부(새 사용), 복귀 = 원래 Q 장부(보상 이어 감).
+    private AssassinDashHitLedger activeLedger;
+
+    // 그림자 회귀 출발점 — 서버 = 판정, 각 피어 = 오너 이동·연출(복귀 스킬이 가져간다).
+    private readonly AssassinShadowReturnOrigin serverReturnOrigin = new AssassinShadowReturnOrigin();
+    private readonly AssassinShadowReturnOrigin localReturnOrigin = new AssassinShadowReturnOrigin();
+    private PlayerTraitModifiers traitModifiers;
 
     // 서버 — 추격의 궤적 예약(할 일 128 3/5). 사망·비활성(씬 종료)에서 비운다. 대상별 1회는 궤적 하나 안에서만.
     private readonly AssassinDelayedStrikeQueue<TrailStrike> pendingTrails = new AssassinDelayedStrikeQueue<TrailStrike>();
@@ -62,7 +73,12 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     // 돌진 거리·시간은 고정(할 일 91 D7) — 클립만 빨라지면 End 가 이동보다 먼저 와 돌진이 잘린다.
     public override bool ScalesWithAttackSpeed => false;
 
-    private AssassinDashStrikeSkillData DashData => Data as AssassinDashStrikeSkillData;
+    // 돌진 설계값 — 복귀 스킬은 자기를 연 원래 Q 의 값(현재 Q 최대 거리·속도·폭)을 쓴다.
+    internal virtual AssassinDashStrikeSkillData DashData => Data as AssassinDashStrikeSkillData;
+    internal AssassinDashHitLedger Ledger => ledger;
+    internal AssassinShadowReturnOrigin ServerReturnOrigin => serverReturnOrigin;
+    internal AssassinShadowReturnOrigin LocalReturnOrigin => localReturnOrigin;
+    protected PlayerTraitModifiers TraitModifiers => traitModifiers;
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
 
     public override void Initialize(Player owner, PlayerSkillController controller)
@@ -71,7 +87,20 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         motor = owner != null ? owner.GetComponent<PlayerMotor>() : null;
         assassinState = owner != null ? owner.GetComponent<AssassinState>() : null;
         view = owner != null ? owner.GetComponent<AssassinSkillView>() : null;
+        traitModifiers = owner != null ? PlayerTraitModifiers.For(owner) : null;
     }
+
+    // 그림자 회귀 — 보유 시에만 복귀 칸을 연다(서버 승인·원격 오너 예측 같은 값). 미보유 = 기존 Q(사용 시 쿨 시작).
+    public override bool OpensFollowUp(Vector3 direction, Unit target) =>
+        AssassinShadowReturnRules.OpensReturn(
+            base.OpensFollowUp(direction, target),
+            traitModifiers != null && traitModifiers.HasTrait(TraitModeIds.AssassinShadowReturn));
+
+    // 복귀 창 = 정의 에셋 스킬 수치(없으면 인스펙터 값). 실제 시간 — 공격 가속을 타지 않는다.
+    public override float FollowUpWindowSeconds =>
+        traitModifiers != null
+            ? Mathf.Max(0f, traitModifiers.ResolveSkillValue(AssassinShadowReturnRules.WindowKey, base.FollowUpWindowSeconds))
+            : base.FollowUpWindowSeconds;
 
     // 변신 종료 대기 중에는 새 Q 를 시작하지 않는다(§10.3 — 종료가 "현재 공격 완료"를 기다리는 중).
     public override bool CanUse(Vector3 direction, Unit target) =>
@@ -92,15 +121,11 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         if (hitResults == null || hitResults.Length != data.MaxHitResults)
             hitResults = new Collider[data.MaxHitResults];
 
-        dashDirection = Flatten(direction);
         serverOrigin = owner.transform.position;
+        BeginServerStage(direction, data, out dashDirection, out serverCap, out serverStageDref, out activeLedger);
         serverTraveled = 0f;
-        serverCap = data.DashDistance;
-        // 이 돌진 단계의 원래 기준 피해(Dref) — 단계 실행 때 고정해 그 단계의 궤적이 쓴다(명세 §5).
-        serverStageDref = damageSnapshot;
         isServerDashPending = true;
         isServerSweeping = false;
-        ledger.Begin();
 
         // 서버 전용 쓰기. 클립 End 로 스킬이 끝나거나 강제 종료면 OnEnd 가 해제한다. 만료 안전망은 지속시간.
         if (owner.StatusEffects != null)
@@ -110,12 +135,40 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         }
     }
 
+    /// <summary>
+    /// [서버] 이번 돌진 단계를 정한다 — 출발 = 조준 방향 · Q 최대 거리 · 시전 Dref(단계 실행 때 고정해 그 단계 궤적이 쓴다, 명세 §5) · 새 사용 장부.
+    /// 시작 위치는 그림자 회귀 출발점으로도 저장한다(복귀 칸이 안 열리면 다음 틱에 버린다). 복귀 스킬이 덮는다.
+    /// </summary>
+    protected virtual void BeginServerStage(Vector3 requestedDirection, AssassinDashStrikeSkillData data,
+        out Vector3 direction, out float distance, out int stageDref, out AssassinDashHitLedger stageLedger)
+    {
+        direction = Flatten(requestedDirection);
+        distance = data.DashDistance;
+        stageDref = damageSnapshot;
+        ledger.Begin();
+        stageLedger = ledger;
+        serverReturnOrigin.Save(owner.transform.position);
+    }
+
+    /// <summary>[전 피어] 이 피어의 돌진 방향·거리 — 출발 = 승인 조준 방향 · Q 최대 거리. 시작 위치를 복귀용 출발점으로 저장한다. 복귀 스킬이 덮는다.</summary>
+    protected virtual void ResolveLocalStage(Vector3 requestedDirection, AssassinDashStrikeSkillData data,
+        out Vector3 direction, out float distance)
+    {
+        direction = Flatten(requestedDirection);
+        distance = data != null ? data.DashDistance : 0f;
+        if (owner != null)
+            localReturnOrigin.Save(owner.transform.position);
+    }
+
+    // 변신 Q 적중 쿨 차감을 받을 스킬 — 복귀 단계는 원래 Q.
+    protected virtual PlayerSkillBase CooldownRewardSkill => this;
+
     // 전 피어. 방향 = 서버 승인 시점의 조준(입력이 받아들여진 순간) — 도중에 바꾸지 않는다.
     public override void OnClientPlay(Vector3 direction)
     {
-        dashDirection = Flatten(direction);
-
         AssassinDashStrikeSkillData data = DashData;
+        ResolveLocalStage(direction, data, out dashDirection, out float stageDistance);
+
         // 일반 Q = 관통 일섬(시작점 기억 → OnEnd 에서 경로 위로 긋기), 변신 Q = Storm Slash 루프. 데이터 타입으로 가른다
         // (변신 상태 복제보다 확실하다. 이 인스턴스가 곧 alternateSkills[Main]).
         if (data is AssassinTransformedDashStrikeSkillData)
@@ -126,7 +179,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
             return;
 
         isLocalDashReleased = false;
-        localRemaining = data.DashDistance;
+        localRemaining = stageDistance;
         localTraveled = 0f;
         isLocallyDashing = true;
         motor.PassThroughUnitsOverride = true;
@@ -243,6 +296,10 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     {
         if (pendingTrails.Count > 0)
             FireDueTrails();
+
+        // 서버 — 복귀 칸이 닫혔으면(안 열림·만료·사망·R 전환·씬 이동·복귀 사용) 출발점을 버린다. 다른 상태 Q 가 과거 저장점을 쓰지 않는다.
+        if (serverReturnOrigin.HasValue && (controller == null || FollowUpSkill == null || controller.GetSkill(Slot) != FollowUpSkill))
+            serverReturnOrigin.Discard();
     }
 
     // 사망(살아 있음 → 그 밖)이면 예약을 버린다(명세 §9). 부활 뒤 재개 없음.
@@ -412,10 +469,10 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
             // 상자처럼 Unit 이 아닌 대상은 Hurtbox 를 키로 쓴다(가붕이 Q 와 같은 규칙).
             Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !ledger.TryRegisterTarget(target))
+            if (target == null || unit == owner || activeLedger == null || !activeLedger.TryRegisterTarget(target))
                 continue;
 
-            AttackInfo attackInfo = new AttackInfo(damageSnapshot, DamageAttackType, hitPattern: DamageHitPattern);
+            AttackInfo attackInfo = new AttackInfo(serverStageDref, DamageAttackType, hitPattern: DamageHitPattern);
             if (assassinState != null)
                 attackInfo = assassinState.WithBackAttack(attackInfo);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
@@ -439,18 +496,20 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         if (tickLandedUnits.Count == 0)
             return;
 
+        // 시전 ID = 이 스킬의 ServerCastId — 복귀는 원래 Q 시전 ID 를 이어받아 '시전당 1회' 특성(돌파의 여세 등)이 왕복을 한 번으로 거른다.
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, tickLandedUnits, this);
 
         bool landedRewardTarget = AssassinHitTargets.ContainsRewardTarget(tickLandedUnits);
 
-        // 일반 Q — 사용당 최초 유효 적중 1회만 분노 게이지 충전(§4.2). 변신 Q 는 충전 없음 — 모델도 막는다.
-        if (assassinState != null && !assassinState.IsTransformed && ledger.TryClaimRageReward(landedRewardTarget))
+        // 일반 Q — 사용당(그림자 회귀 왕복 전체) 최초 유효 적중 1회만 분노 게이지 충전(§4.2). 변신 Q 는 충전 없음 — 모델도 막는다.
+        if (assassinState != null && !assassinState.IsTransformed && activeLedger.TryClaimRageReward(landedRewardTarget))
             assassinState.ServerTryGainRage(AssassinRageSource.DashStrike);
 
         // 변신 Q — 사용당 최초 유효 적중 1회만 쿨 차감(보스·몹·송전기·허수아비, 상자 제외). 여러 대상이어도 1회.
-        if (data.HitCooldownReduction > 0f && ledger.TryClaimCooldownReward(landedRewardTarget))
+        // 그림자 회귀 출발 단계는 쿨이 아직 시작 전(복귀 때 시작)이라 차감이 저장되지 않고 보상만 소모된다(준비된 스킬엔 저장 안 함 — 기본 규칙).
+        if (data.HitCooldownReduction > 0f && activeLedger.TryClaimCooldownReward(landedRewardTarget))
         {
-            controller?.ReduceCooldownServer(this, data.HitCooldownReduction);
+            controller?.ReduceCooldownServer(CooldownRewardSkill, data.HitCooldownReduction);
             Edit.Log($"[Assassin/Q] 변신 Q 적중 — 쿨타임 {data.HitCooldownReduction:F1}s 차감", this);
         }
     }

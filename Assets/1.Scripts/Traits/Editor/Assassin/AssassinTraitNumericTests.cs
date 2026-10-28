@@ -108,10 +108,17 @@ public sealed class AssassinTraitNumericTests
     public void Pool_FollowsSpecOrder()
     {
         string[] poolIds = TraitContentTestKit.CharacterPool(TutorialCharacter.Assassin).Traits.Select(t => t.Id).ToArray();
-        string[] specOrder = TraitCatalog.Spec.Where(s => s.Character == TutorialCharacter.Assassin).Select(s => s.Id)
-            .Where(poolIds.Contains).ToArray();
-        CollectionAssert.AreEqual(specOrder, poolIds, "풀 순서 = 명세 순서(1차 3 → 2차 3 → 3차 3 → 4차 3)");
-        CollectionAssert.IsSubsetOf(new[] { Frenzy, Smash, Breakthrough, Release }, poolIds);
+        // 12개 완성(할 일 128 5b) — 명세 순서 고정. 카탈로그 순서와도 같아야 한다(목록 버전).
+        string[] expected =
+        {
+            Frenzy, Smash, Breakthrough,
+            Release, "ASN_2_RESTRAINT", "ASN_2_RETURN",
+            "ASN_3_E_AREA", "ASN_3_Q_BASIC", "ASN_3_BASIC_CDR",
+            "ASN_4_NORMAL_E_PUSH", "ASN_4_Q_TRAIL", "ASN_4_COMBO_EXTRA",
+        };
+        CollectionAssert.AreEqual(expected, poolIds, "풀 순서 = 명세 순서(1차 3 → 2차 3 → 3차 3 → 4차 3)");
+        string[] specOrder = TraitCatalog.Spec.Where(s => s.Character == TutorialCharacter.Assassin).Select(s => s.Id).ToArray();
+        CollectionAssert.AreEqual(specOrder, poolIds, "카탈로그 명세 순서 12개 전부");
     }
 
     [Test]

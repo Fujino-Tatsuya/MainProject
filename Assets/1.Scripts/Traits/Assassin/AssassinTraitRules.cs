@@ -110,6 +110,81 @@ public static class AssassinRestraintRules
 }
 
 /// <summary>
+/// 그림자 회귀(ASN_2_RETURN, 할 일 128 5b) — 모드 변경 스위치(<see cref="TraitModeIds.AssassinShadowReturn"/>)의 순수 규칙.
+/// 일반·변신 Q 각각을 쓰면 그 칸이 복귀 돌진(<see cref="AssassinShadowReturnSkill"/>, 공용 후속 시전 장치)으로 바뀐다. 창·쿨 시작·강제 복귀는 장치가 한다.
+/// 수치: 창 = <see cref="WindowKey"/>, 복귀 피해 비율 = <see cref="DamageRatioKey"/>(정의 에셋 ⑩ 스킬 수치), Q 전체 쿨 ×1.20 = 정의 에셋 쿨 효과.
+/// </summary>
+public static class AssassinShadowReturnRules
+{
+    /// <summary>복귀 창(초) 스킬 수치 이름 — 첫 돌진 종료부터, 실제 시간(공격 가속으로 줄지 않음).</summary>
+    public const string WindowKey = "ASN_Q_RETURN_WINDOW";
+    /// <summary>복귀 피해 비율 스킬 수치 이름 — 복귀 단계 실행 때의 원래 Q 기준 피해(Dref) × 비율.</summary>
+    public const string DamageRatioKey = "ASN_Q_RETURN_DAMAGE_RATIO";
+    public const float DefaultDamageRatio = 0.6f;
+
+    /// <summary>원래 Q 사용이 복귀 칸을 여는가 — 복귀 스킬이 연결돼 있고 그림자 회귀를 골랐을 때만(미보유 = 기존 Q, 사용 시 쿨 시작).</summary>
+    public static bool OpensReturn(bool returnLinked, bool hasShadowReturn) => returnLinked && hasShadowReturn;
+
+    /// <summary>
+    /// 복귀 돌진 방향·거리 — 현재 위치 → 저장된 출발점(수평), 거리 = min(남은 거리, 현재 Q 최대 거리). 저장점 도착은 보장하지 않는다(지형 정지는 이동 규칙).
+    /// 이미 출발점 위면 거리 0, 방향은 <paramref name="fallbackForward"/>(수평, 없으면 +Z).
+    /// </summary>
+    public static void Resolve(Vector3 current, Vector3 origin, float maxDistance, Vector3 fallbackForward,
+        out Vector3 direction, out float distance)
+    {
+        Vector3 toOrigin = origin - current;
+        toOrigin.y = 0f;
+        float remaining = toOrigin.magnitude;
+        if (remaining < AssassinTrailRules.MinLength)
+        {
+            fallbackForward.y = 0f;
+            direction = fallbackForward.sqrMagnitude > 1e-6f ? fallbackForward.normalized : Vector3.forward;
+            distance = 0f;
+            return;
+        }
+
+        direction = toOrigin / remaining;
+        distance = Mathf.Min(remaining, Mathf.Max(0f, maxDistance));
+    }
+
+    /// <summary>복귀 단계 기준 피해 = 그 단계 실행 때 원래 Q 기준 피해 × 비율(반올림 한 번). 이 값이 판정 피해이자 그 단계 추격의 궤적 기준이다.</summary>
+    public static int StageDamage(int sourceDref, float ratio) => TraitDerivedAttackRules.Damage(sourceDref, ratio);
+}
+
+/// <summary>
+/// [서버·각 피어] 그림자 회귀 출발점 — 원래 Q 돌진이 시작될 때 저장하고 복귀 돌진이 한 번 가져간다(가져가면 비움).
+/// 일반·변신 Q 가 각자 하나씩 가져 다른 상태 Q 가 과거 저장점을 쓰지 않는다. 복귀 칸이 닫히면(만료·사망·R 전환·씬 이동) 서버가 버린다.
+/// </summary>
+public sealed class AssassinShadowReturnOrigin
+{
+    private Vector3 point;
+
+    public bool HasValue { get; private set; }
+
+    public void Save(Vector3 position)
+    {
+        point = position;
+        HasValue = true;
+    }
+
+    public bool TryTake(out Vector3 position)
+    {
+        position = point;
+        if (!HasValue)
+            return false;
+
+        Discard();
+        return true;
+    }
+
+    public void Discard()
+    {
+        HasValue = false;
+        point = default;
+    }
+}
+
+/// <summary>
 /// 어쌔신 기본 공격 동작과 특성 사건의 묶음 규칙(할 일 128 2/5 — 돌파의 여세·사냥의 박자).
 /// 동작 1개 = 일반 연계 한 타 · 강타 1회 · 변신 4타 묶음 1개 — 동작마다 시전 ID 하나(<see cref="Player.NextServerCastId"/>)를 받아
 /// 그 동작의 모든 판정을 같은 ID 로 알린다(사냥의 박자 '동작당 1회' = 효과 거름 oncePerCast).
