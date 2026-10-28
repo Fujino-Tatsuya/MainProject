@@ -96,10 +96,13 @@ public sealed class InterruptProductionDirectorTests
     // ─── 시도 강·약(할 일 132) ───
 
     [Test]
-    public void 성공_예측은_강_실패_예측은_약_목적()
+    public void 성공_예측은_강_실패_예측은_약_대상_없음은_목적_없음()
     {
-        Assert.AreEqual(SlowMotionPurpose.Attempt, InterruptProductionRules.SelectAttemptPurpose(true));
-        Assert.AreEqual(SlowMotionPurpose.AttemptWeak, InterruptProductionRules.SelectAttemptPurpose(false));
+        Assert.IsTrue(InterruptProductionRules.TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong, out SlowMotionPurpose strong));
+        Assert.AreEqual(SlowMotionPurpose.Attempt, strong);
+        Assert.IsTrue(InterruptProductionRules.TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast.Weak, out SlowMotionPurpose weak));
+        Assert.AreEqual(SlowMotionPurpose.AttemptWeak, weak);
+        Assert.IsFalse(InterruptProductionRules.TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast.NoTarget, out _));
     }
 
     [Test]

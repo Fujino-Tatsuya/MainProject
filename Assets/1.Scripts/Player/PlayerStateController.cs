@@ -1645,7 +1645,7 @@ public sealed class PlayerDashState : PlayerStateBase
                 outcome = "쿨타임 거부(버림)";
                 break;
             case DashInterruptInputDecision.Request:
-                if (skills.TryUseDashInterrupt(direction))
+                if (skills.TryUseDashInterrupt(direction, pressTime))
                 {
                     dashInterruptRequested = true;
                     input.ConsumeBufferedInput(kind);

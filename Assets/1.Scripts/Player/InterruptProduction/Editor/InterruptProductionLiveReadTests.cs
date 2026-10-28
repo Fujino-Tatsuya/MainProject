@@ -87,7 +87,7 @@ public sealed class InterruptProductionLiveReadTests
     public void 시도_프로필_값을_바꾸면_다음_시도에_바로_쓰인다()
     {
         Set("interruptProfile.scale", 0.5f);
-        _attempt.Server(InterruptProductionEvent.Attempt(1, null, null, true));
+        _attempt.Server(InterruptProductionEvent.Attempt(1, null, null, BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong));
         Assert.AreEqual(0.5f, _port.Starts[0].profile.scale);
     }
 

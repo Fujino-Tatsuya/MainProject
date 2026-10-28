@@ -404,7 +404,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         isRequestingSkill = true;
         // 오너 즉시 예측(할 일 132) — 요청보다 먼저(호스트는 이 RPC 안에서 서버 시도 슬로우가 바로 난다).
-        PredictOwnerInterrupt(skill, false, Vector3.zero, 0f, 0f);
+        PredictOwnerInterrupt(skill, false, direction, 0f, 0f, 0f);
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
         RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
             NetworkManager.ServerTime.Time, false);
@@ -415,8 +415,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     /// [오너] 대쉬 간파 요청(할 일 115) — 대시 중 창 안 우클릭. 차단 효과·쿨타임은 호출자(PlayerDashState)가 먼저 걸렀다(§10 Q3).
     /// 원격 오너는 대쉬 간파 사전조건으로 1차 검증하고, 서버가 최종 승인한다(거부 = RejectSkillClientRpc, 대시는 그대로).
     /// 우클릭이 간파 스킬(<see cref="PlayerInterruptSkillBase"/>)일 때만. 방향 = 대시 방향(조준 회전 스냅 없음).
+    /// <paramref name="pressTime"/> = 우클릭을 누른 시각(Time.time) — 오너 즉시 예측을 누른 순간 기준으로 한다(할 일 132 정정1). 음수 = 지금.
     /// </summary>
-    public bool TryUseDashInterrupt(Vector3 dashDirection)
+    public bool TryUseDashInterrupt(Vector3 dashDirection, float pressTime = -1f)
     {
         if (IsSkillActive || isRequestingSkill)
             return false;
@@ -441,10 +442,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return false;
 
         isRequestingSkill = true;
-        // 오너 즉시 예측(할 일 132) — 예상 대시 끝·판정 시각 max(대시 끝, 평소 Hit). 요청보다 먼저(호스트는 RPC 안에서 서버 슬로우).
+        // 오너 즉시 예측(할 일 132 정정1) — 우클릭을 누른 순간 기준 예상 대시 끝·판정 시각 max(대시 끝, 평소 Hit). 요청보다 먼저(호스트는 RPC 안에서 서버 슬로우).
         PlayerDashState dashState = stateController != null ? stateController.ActiveDash : null;
         PredictOwnerInterrupt(skill, dashState != null, direction,
-            dashState != null ? dashState.Speed : 0f, dashState != null ? dashState.Remaining : 0f);
+            dashState != null ? dashState.Speed : 0f, dashState != null ? dashState.Remaining : 0f,
+            pressTime >= 0f ? Mathf.Max(0f, Time.time - pressTime) : 0f);
         RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
             player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
@@ -452,16 +454,18 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
     // [오너] 간파 입력 순간 즉시 예측(할 일 132) → 오너 연출 상태 기계(강 = 암전·빛 모임). 간파 슬롯의 간파 스킬만, 네트워크 세션에서만
     // (오프라인은 서버 슬로우가 없어 결론이 오지 않는다). 판정·슬로우에는 영향 없다.
-    private void PredictOwnerInterrupt(PlayerSkillBase skill, bool viaDash, Vector3 dashDirection, float dashSpeed, float dashRemaining)
+    // attackDirection = 근접은 요청에 싣는 시전 방향(서버 승인 예측과 같은 값), 대쉬는 대시 방향. pressAge = 대쉬 간파 우클릭을 누른 뒤 지난 시간.
+    private void PredictOwnerInterrupt(PlayerSkillBase skill, bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining,
+        float pressAge)
     {
         if (!IsNetworkActive || !IsOwner || !(skill is PlayerInterruptSkillBase interrupt) || !IsInterruptSkillInSlot(skill))
             return;
 
-        if (interrupt.TryPredictOwnerAttempt(viaDash, dashDirection, dashSpeed, dashRemaining, out DashInterruptPrediction prediction))
+        if (interrupt.TryPredictOwnerAttempt(viaDash, attackDirection, dashSpeed, dashRemaining, pressAge, out DashInterruptPrediction prediction))
         {
-            Edit.Log($"[InterruptOwner] 입력 순간 예측 — {(prediction.PredictsSuccess ? "강(성공)" : "약(실패)")} · {prediction.Reason}" +
-                     $"{(viaDash ? " · 대쉬" : string.Empty)} · 판정까지 {prediction.TimeToResolve(Time.time):F3}s · 창 남음 {prediction.WindowRemaining:F3}s", this);
-            InterruptProductionDirector.LocalOwnerAttempt(interrupt, prediction.PredictsSuccess);
+            Edit.Log($"[InterruptOwner] 입력 순간 예측 — {prediction.Forecast} · {prediction.Reason}" +
+                     $"{(viaDash ? $" · 대쉬(누른 뒤 {pressAge:F3}s)" : string.Empty)} · 판정까지 {prediction.PredictedResolveTime - Time.time:F3}s · 창 남음 {prediction.WindowRemaining:F3}s", this);
+            InterruptProductionDirector.LocalOwnerAttempt(interrupt, prediction.Forecast);
         }
     }
 

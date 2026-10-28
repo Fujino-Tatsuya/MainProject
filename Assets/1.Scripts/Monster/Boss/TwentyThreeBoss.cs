@@ -6426,6 +6426,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값. 취약·제압 차단(CounterBlockedByState)은 서버만 본다(창이 그때 열리지 않는다).
     bool IInterruptWindowReplica.ReplicatedWindowOpen => _counterWindow.Value;
 
+    // 할 일 132 정정1 — 예측 대상 각도. IsCounterFromFront 와 같은 값(정면 판정 끔 = 180, 데이터 없음 = 60).
+    float IInterruptWindowReplica.InterruptFrontAngle =>
+        _boss == null ? 60f : !_boss.counterRequiresFront ? BeaverLobby.Player.Dash.InterruptTargetGeometry.NoFrontRule : _boss.counterFrontAngle;
+
     // 클라 창 기록(열린 뒤 경과·추정 길이) — 서버는 SetCounterWindow 의 InterruptLagMonitor 가 기록한다(Record 가 거른다).
     void OnCounterJudgeReplicaChanged(bool previous, bool next) => InterruptWindowReplicaTracker.Record(gameObject, next);
 

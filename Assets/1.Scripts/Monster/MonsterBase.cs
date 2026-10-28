@@ -251,6 +251,10 @@ public class MonsterBase : Unit
 
         // 상태이상 머리 위 이펙트(기절 = 팔라딘 Q 밀림·경직) 런타임 부착. Docs/tech/handoff-monster-stun-vfx.md
         _statusVfx = MonsterStatusEffectVfxPresenter.TryInstall(this, status, bodyCollider);
+
+        // 간파 예측 대상 캐시(할 일 132 정정1, 모든 피어) — 간파 대상(IInterruptSlowMotionTarget)만 들어간다. 이미 죽은 채 합류하면 넣지 않는다.
+        if (_state.Value != MonsterState.Dead)
+            InterruptTargetRegistry.Register(this);
     }
 
     MonsterStatusEffectVfxPresenter _statusVfx;
@@ -262,6 +266,7 @@ public class MonsterBase : Unit
         _vulnerable.OnValueChanged -= OnVulnerableChanged;
         _counterJudgeWindow.OnValueChanged -= OnCounterJudgeWindowChanged;
         InterruptWindowReplicaTracker.Forget(gameObject);
+        InterruptTargetRegistry.Unregister(this);
         base.OnNetworkDespawn();
     }
 
@@ -2397,6 +2402,12 @@ public class MonsterBase : Unit
         // 몸 콜라이더 — 서버(EnterDead)만 끄면 이동 권한이 있는 원격 플레이어가 디졸브 동안 시체에 막힌다(점검 10-14).
         if (next == MonsterState.Dead && bodyCollider != null)
             bodyCollider.enabled = false;
+
+        // 간파 예측 대상 캐시(할 일 132 정정1) — 사망이면 뺀다(모든 피어, 복제 상태). 죽음에서 돌아오면 다시 넣는다.
+        if (next == MonsterState.Dead)
+            InterruptTargetRegistry.Unregister(this);
+        else if (previous == MonsterState.Dead)
+            InterruptTargetRegistry.Register(this);
 
         // 블렌드 고정·준비는 CrossFade(ResetToLocomotion)·트리거(PlayStateAnimation)보다 먼저 정한다.
         UpdateLocomotionBlendOnStateChange(previous, next);

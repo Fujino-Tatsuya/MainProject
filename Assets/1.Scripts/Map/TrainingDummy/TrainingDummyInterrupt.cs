@@ -115,12 +115,16 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
 
         _state.OnValueChanged += OnStateChanged;
         ApplyTint(_state.Value);
+
+        // 간파 예측 대상 캐시(할 일 132 정정1, 모든 피어) — 허수아비는 죽지 않아 디스폰·씬 언로드 때만 빠진다.
+        InterruptTargetRegistry.Register(_dummy);
     }
 
     public override void OnNetworkDespawn()
     {
         _state.OnValueChanged -= OnStateChanged;
         InterruptWindowReplicaTracker.Forget(gameObject);
+        InterruptTargetRegistry.Unregister(_dummy);
         _cycle = null;
         base.OnNetworkDespawn();
     }

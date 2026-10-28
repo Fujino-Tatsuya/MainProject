@@ -257,12 +257,12 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     /// <summary>
     /// [오너] 간파(근접·대쉬) 입력 순간의 즉시 예측 — 강(성공 예측)이면 오너 암전·빛 모임을 바로 켠다. 약은 아무것도 안 켠다
-    /// (줌·슬로우는 서버 시도 슬로우가 처리). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
+    /// (줌·슬로우는 서버 시도 슬로우가 처리), 대상 없음도 아무것도 안 켠다(정정1). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
     /// </summary>
-    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, bool predictsSuccess)
+    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast)
     {
         if (Instance != null)
-            Instance.OwnerPresentation.Predict(predictsSuccess, skill, Time.unscaledTime);
+            Instance.OwnerPresentation.Predict(forecast, skill, Time.unscaledTime);
     }
 
     /// <summary>[오너] 간파 스킬 애니 Hit 이벤트 — 빛 모임 끝(기존 Hit 이벤트 재사용).</summary>

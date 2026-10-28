@@ -64,7 +64,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 강_예측은_암전이_들어옴_시간에_켜지고_빛_모임_시작()
     {
-        Assert.IsTrue(_sm.Predict(true, null, 10f));
+        Assert.IsTrue(_sm.Predict(InterruptAttemptForecast.Strong, null, 10f));
         Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
         Assert.IsTrue(_sm.LightGatherActive);
         Assert.AreEqual(1, _out.GatherStarts);
@@ -78,7 +78,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 약_예측은_암전도_빛_모임도_없다()
     {
-        Assert.IsTrue(_sm.Predict(false, null, 10f));
+        Assert.IsTrue(_sm.Predict(InterruptAttemptForecast.Weak, null, 10f));
         _sm.Tick(10.5f);
         Assert.AreEqual(InterruptOwnerPresentationState.AttemptWeak, _sm.State);
         Assert.AreEqual(0f, _out.Dim);
@@ -86,10 +86,88 @@ public sealed class InterruptOwnerPresentationTests
         Assert.AreEqual(0, _out.GatherStarts);
     }
 
+    // ─── 대상 없음(할 일 132 정정1) ───
+
+    [Test]
+    public void 대상_없음_예측은_로컬_연출을_아무것도_켜지_않는다()
+    {
+        Assert.IsFalse(_sm.Predict(InterruptAttemptForecast.NoTarget, null, 10f));
+        _sm.Tick(10.5f);
+        Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State);
+        Assert.AreEqual(0f, _out.Dim);
+        Assert.IsFalse(_sm.LightGatherActive);
+        Assert.AreEqual(0, _out.GatherStarts);
+        Assert.AreEqual(0, _out.Calls.Count);
+    }
+
+    [Test]
+    public void 대상_없음_예측은_진행_중인_강_시도를_건드리지_않는다()
+    {
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        Assert.IsFalse(_sm.Predict(InterruptAttemptForecast.NoTarget, null, 10.05f));
+        Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
+        Assert.IsTrue(_sm.LightGatherActive);
+    }
+
+    [Test]
+    public void 대상_없음_뒤_서버_시도_슬로우가_와도_켜지_않는다()
+    {
+        _sm.Predict(InterruptAttemptForecast.NoTarget, null, 10f);
+        _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10.0625f);
+        _sm.Tick(10.5f);
+        Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State);
+        Assert.AreEqual(0f, _out.Dim);
+        Assert.AreEqual(0, _out.GatherStarts);
+    }
+
+    [Test]
+    public void 예측_결론_3상태()
+    {
+        var none = InterruptAttemptPrediction.BuildInput(10f, Vector3.zero, 0.3f, false, Vector3.zero, 0f, 0f, false, true, 0f, 1f);
+        Assert.AreEqual(InterruptAttemptForecast.NoTarget, DashInterruptPredictor.Predict(none).Forecast);
+        var closed = InterruptAttemptPrediction.BuildInput(10f, Vector3.zero, 0.3f, false, Vector3.zero, 0f, 0f, true, false, -1f, 1f);
+        Assert.AreEqual(InterruptAttemptForecast.Weak, DashInterruptPredictor.Predict(closed).Forecast);
+        var open = InterruptAttemptPrediction.BuildInput(10f, Vector3.zero, 0.3f, false, Vector3.zero, 0f, 0f, true, true, 0.1f, 1f);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, DashInterruptPredictor.Predict(open).Forecast);
+    }
+
+    // ─── 대쉬 예측 시점 = 우클릭 누른 순간(할 일 132 정정1) ───
+
+    [Test]
+    public void 대쉬_예측은_누른_순간으로_되돌린다()
+    {
+        // 처리 프레임(10.05) 값: 위치 (0.5,0,0) · 남은 대시 0.15 · 창 열린 뒤 0.2. 누른 뒤 0.05초.
+        var now = InterruptAttemptPrediction.BuildInput(10.05f, new Vector3(0.5f, 0f, 0f), 0.3f,
+            true, Vector3.right, 10f, 0.15f, true, true, 0.2f, 1f);
+        DashInterruptPredictInput press = InterruptAttemptPrediction.AtPress(now, 0.05f);
+
+        Assert.AreEqual(10f, press.CastTime, 1e-4f);
+        Assert.AreEqual(10f, press.SkillStartTime, 1e-4f, "준비 기준점 = 누른 순간");
+        Assert.AreEqual(0f, press.CastPosition.x, 1e-4f, "대시 선을 따라 누른 위치로");
+        Assert.AreEqual(0.2f, press.DashRemaining, 1e-4f);
+        Assert.AreEqual(0.15f, press.WindowOpenElapsed, 1e-4f);
+
+        DashInterruptPrediction a = DashInterruptPredictor.Predict(now);
+        DashInterruptPrediction b = DashInterruptPredictor.Predict(press);
+        Assert.AreEqual(a.PredictedEndPosition.x, b.PredictedEndPosition.x, 1e-4f, "예상 대시 끝은 같다");
+        Assert.AreEqual(10.3f, b.PredictedResolveTime, 1e-4f, "판정 시각 = 누른 순간 + 준비 시간(대시 끝 10.2 보다 늦음)");
+        Assert.AreEqual(10.35f, a.PredictedResolveTime, 1e-4f, "처리 프레임 기준이었다면 늦게 잡힌다");
+    }
+
+    [Test]
+    public void 누른_뒤_지난_시간이_없으면_그대로()
+    {
+        var now = InterruptAttemptPrediction.BuildInput(10f, Vector3.one, 0.3f, true, Vector3.right, 10f, 0.2f, true, true, 0.2f, 1f);
+        DashInterruptPredictInput press = InterruptAttemptPrediction.AtPress(now, 0f);
+        Assert.AreEqual(now.CastTime, press.CastTime);
+        Assert.AreEqual(now.CastPosition, press.CastPosition);
+        Assert.AreEqual(now.DashRemaining, press.DashRemaining);
+    }
+
     [Test]
     public void 서버_목적이_예측과_같으면_유지하고_번호를_기억()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10.0625f);
         _sm.Tick(10.25f);
         Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
@@ -104,7 +182,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 강_예측인데_서버가_약이면_걷기_시간에_걷는다()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.Tick(10.125f);
         _sm.ServerStarted(5, SlowMotionPurpose.AttemptWeak, true, 10.125f);
 
@@ -122,7 +200,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 약_예측인데_서버가_강이면_늦게_켜지_않는다()
     {
-        _sm.Predict(false, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10.05f);
         _sm.Tick(10.5f);
         Assert.IsTrue(_sm.Mispredicted);
@@ -133,7 +211,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 남의_슬로우는_무시한다_팀원_화면_무변화()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.AttemptWeak, false, 10.0625f);
         _sm.ServerStarted(6, SlowMotionPurpose.Success, false, 10.0625f);
         _sm.Tick(10.125f);
@@ -155,7 +233,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 서버_실패면_걷기_시간에_걷고_없음으로()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10f);
         _sm.Tick(10.125f);
         _sm.ServerFailed(5, 10.25f);
@@ -172,7 +250,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 다른_번호의_실패는_무시()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10f);
         _sm.ServerFailed(4, 10.1f);
         _sm.ServerFailed(0, 10.1f);
@@ -182,7 +260,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 판정_전_종료_거부면_실패처럼_걷는다()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.Tick(10.125f);
         _sm.LocalEnded(10.125f);
         Assert.AreEqual(InterruptOwnerPresentationState.Failed, _sm.State);
@@ -197,7 +275,7 @@ public sealed class InterruptOwnerPresentationTests
     {
         bool? hooked = null;
         _sm.SuccessEntered += dimmed => hooked = dimmed;
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10f);
         _sm.Tick(10.125f);
         _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.25f);
@@ -220,7 +298,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 같은_판정의_실패_직후_성공이면_암전을_되살린다()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10f);
         _sm.Tick(10.125f);
         _sm.ServerFailed(5, 10.25f);
@@ -235,7 +313,7 @@ public sealed class InterruptOwnerPresentationTests
     {
         bool? hooked = null;
         _sm.SuccessEntered += dimmed => hooked = dimmed;
-        _sm.Predict(false, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.AttemptWeak, true, 10f);
         _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.2f);
         _sm.Tick(10.3f);
@@ -249,7 +327,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void Hit_이벤트에_빛_모임만_멈추고_암전은_유지()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.Tick(10.125f);
         _sm.LocalHit();
         Assert.IsFalse(_sm.LightGatherActive);
@@ -265,9 +343,9 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 결론_전_중복_입력은_무시()
     {
-        _sm.Predict(true, null, 10f);
-        Assert.IsFalse(_sm.Predict(false, null, 10.05f));
-        Assert.IsFalse(_sm.Predict(true, null, 10.05f));
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        Assert.IsFalse(_sm.Predict(InterruptAttemptForecast.Weak, null, 10.05f));
+        Assert.IsFalse(_sm.Predict(InterruptAttemptForecast.Strong, null, 10.05f));
         Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
         Assert.AreEqual(1, _out.GatherStarts);
     }
@@ -275,10 +353,10 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 결론_뒤_새_입력은_새_시도()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10f);
         _sm.ServerFailed(5, 10.1f);
-        Assert.IsTrue(_sm.Predict(true, null, 10.15f));
+        Assert.IsTrue(_sm.Predict(InterruptAttemptForecast.Strong, null, 10.15f));
         Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
         Assert.AreEqual(0u, _sm.AttemptTriggerId, "새 시도는 번호를 새로 받는다");
         Assert.IsFalse(_sm.Mispredicted);
@@ -289,7 +367,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 강제_리셋은_즉시_0()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.Tick(10.125f);
         Assert.AreEqual(1f, _out.Dim);
         _sm.ForcedReset();
@@ -303,7 +381,7 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 출력_교체는_지금_값을_새_출력에_넘긴다()
     {
-        _sm.Predict(true, null, 10f);
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.Tick(10.125f);
         var next = new FakeOutput();
         _sm.SetOutputs(next, next);

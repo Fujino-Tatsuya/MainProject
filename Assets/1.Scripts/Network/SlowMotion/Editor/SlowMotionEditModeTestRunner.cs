@@ -23,6 +23,7 @@ internal static class SlowMotionEditModeTestRunner
         "^InterruptProductionChannelTests$",       // 간파 연출 피어 단계·개인/공용 채널(할 일 118 C4)
         "^InterruptProductionLiveReadTests$",      // 간파 연출 인스펙터 값 사건마다 읽기(캐싱 금지, 할 일 118 C4)
         "^InterruptOwnerPresentationTests$",       // 오너 연출 상태 기계·클라 예측 입력(할 일 132 단계 2)
+        "^InterruptTargetRegistryTests$",          // 간파 예측 대상 캐시 등록·해제(할 일 132 정정1)
         "^DebugInterruptLabTests$",                // 디버그 배속 합성·허수아비 회복(할 일 115 C5)
     };
 

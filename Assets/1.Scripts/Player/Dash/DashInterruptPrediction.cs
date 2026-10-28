@@ -6,9 +6,20 @@ namespace BeaverLobby.Player.Dash
     public enum DashInterruptPredictReason
     {
         Success,                  // 판정 시각에 간파 가능 + 판정 범위 안일 것
-        NoTargetInRange,          // 예상 판정 위치에서 판정 범위 안에 간파 대상이 없다
+        NoTargetInRange,          // 예상 판정 위치에서 사거리·각도 안에 간파 대상이 없다(InterruptTargetGeometry)
         WindowClosedNow,          // 대상은 범위 안이지만 지금 간파 창이 닫혀 있다
         WindowClosesBeforeResolve // 창은 열려 있지만 예상 남은 창 시간 < 판정까지 남은 시간
+    }
+
+    /// <summary>
+    /// 간파 시도 예측의 연출 결론(할 일 132 정정1) — 서버 시도 슬로우·오너 로컬 연출이 같은 3상태를 따른다.
+    /// 대상 없음 = 슬로우·줌·암전·빛 모임 없음(단계1 이전), 약 = 약 슬로우·약 줌, 강 = 강 슬로우·강 줌 + 오너 암전·빛 모임.
+    /// </summary>
+    public enum InterruptAttemptForecast : byte
+    {
+        NoTarget = 0,
+        Weak = 1,
+        Strong = 2,
     }
 
     /// <summary>
@@ -53,6 +64,12 @@ namespace BeaverLobby.Player.Dash
         public float WindowRemaining;    // 음수 = 모름
         public bool PredictsSuccess;
         public DashInterruptPredictReason Reason;
+
+        /// <summary>연출 결론 — 대상 없음 / 약(실패 예측) / 강(성공 예측).</summary>
+        public InterruptAttemptForecast Forecast =>
+            Reason == DashInterruptPredictReason.NoTargetInRange ? InterruptAttemptForecast.NoTarget
+            : PredictsSuccess ? InterruptAttemptForecast.Strong
+            : InterruptAttemptForecast.Weak;
 
         /// <summary>판정까지 남은 시간(예상 판정 시각 − 시전 시각).</summary>
         public float TimeToResolve(float castTime) => PredictedResolveTime - castTime;
@@ -110,6 +127,54 @@ namespace BeaverLobby.Player.Dash
             if (observedPrepDelay > 0f)
                 return observedPrepDelay;
             return hasData ? dataHitDelay : -1f;
+        }
+    }
+
+    /// <summary>
+    /// 간파 예측 대상 판정(할 일 132 정정1) — 근접·대쉬 공용 순수 계산. 판정 위치 = 근접은 지금 위치, 대쉬는 예상 대시 끝.
+    /// (1) 대상 표면까지 수평 거리 ≤ 간파 사거리(판정 앵커 전방위 도달 거리, HUD 강조 사거리와 같은 값)
+    /// (2) 대상 정면 허용각 안 — 대상의 기존 간파 정면 판정값(23호 counterFrontAngle 등, 정면 판정 없으면 180)
+    /// (3) 공격 방향(근접 = 시전 방향, 대쉬 = 대시 진행 방향)이 대상을 향함 — 허용 반각 = 대상 정면 허용각, 단 정면 반평면(90°) 이하.
+    /// 새 수치 칸은 없다. 셋 중 하나라도 밖이면 '대상 없음'.
+    /// </summary>
+    public static class InterruptTargetGeometry
+    {
+        /// <summary>정면 판정이 없는 대상의 허용각 — 어느 방향이든 인정.</summary>
+        public const float NoFrontRule = 180f;
+
+        /// <summary>공격 방향이 대상을 '향한다'고 보는 반각 상한 — 시전 정면 반평면.</summary>
+        public const float MaxAttackerHalfAngle = 90f;
+
+        /// <summary><paramref name="toOther"/> 가 <paramref name="forward"/> 기준 ±<paramref name="halfAngle"/> 안인가(수평). 겹쳐 방향을 못 구하면 안으로 본다.</summary>
+        public static bool IsInArc(Vector3 forward, Vector3 toOther, float halfAngle)
+        {
+            if (halfAngle >= NoFrontRule)
+                return true;
+
+            forward.y = 0f;
+            toOther.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f || toOther.sqrMagnitude < 0.0001f)
+                return true;
+            return Vector3.Angle(forward, toOther) <= halfAngle;
+        }
+
+        /// <summary>공격 방향 허용 반각 = min(대상 정면 허용각, 90°).</summary>
+        public static float AttackerHalfAngle(float targetFrontAngle) =>
+            Mathf.Min(Mathf.Clamp(targetFrontAngle, 0f, NoFrontRule), MaxAttackerHalfAngle);
+
+        /// <summary>
+        /// 판정 위치 <paramref name="resolvePosition"/>·공격 방향 <paramref name="attackDirection"/> 에서 이 대상이 예측 대상인가.
+        /// <paramref name="distanceToSurface"/> = 판정 위치 → 대상 콜라이더 표면 수평 거리, 각도는 대상 루트 위치로 잰다(23호 정면 판정과 같은 기준).
+        /// </summary>
+        public static bool Accepts(Vector3 resolvePosition, Vector3 attackDirection, float reach, float distanceToSurface,
+            Vector3 targetPosition, Vector3 targetForward, float targetFrontAngle)
+        {
+            if (reach <= 0f || distanceToSurface > reach)
+                return false;
+
+            Vector3 toTarget = targetPosition - resolvePosition;
+            return IsInArc(targetForward, -toTarget, targetFrontAngle) &&
+                   IsInArc(attackDirection, toTarget, AttackerHalfAngle(targetFrontAngle));
         }
     }
 }

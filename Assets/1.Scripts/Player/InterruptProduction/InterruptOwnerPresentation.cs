@@ -30,7 +30,7 @@ public interface IInterruptOwnerPresentationSettings
 /// <summary>
 /// 오너 간파 연출 상태 기계(할 일 132) — 순수 로직. 디렉터(<see cref="InterruptProductionDirector"/>)가 들고 사건을 넘긴다.
 /// <list type="bullet">
-/// <item>입력 순간 오너 예측(<see cref="Predict"/>): 강 = 오너 암전 + 빛 모임, 약 = 아무것도 안 켠다(줌·슬로우는 서버 슬로우가 처리).</item>
+/// <item>입력 순간 오너 예측(<see cref="Predict"/>): 강 = 오너 암전 + 빛 모임, 약 = 아무것도 안 켠다(줌·슬로우는 서버 슬로우가 처리), 대상 없음 = 시도로 치지 않는다.</item>
 /// <item>내 시도 슬로우가 시작되면(<see cref="ServerStarted"/>) 목적(Attempt = 강 / AttemptWeak = 약)이 예측과 다르면 걷는다.</item>
 /// <item>내 시도 슬로우 실패 복귀(<see cref="ServerFailed"/>)·판정 전 종료·거부(<see cref="LocalEnded"/>)면 걷는다.</item>
 /// <item>내 성공 슬로우(<see cref="ServerStarted"/> Success)면 암전 유지로 성공 단계 — <see cref="SuccessEntered"/> 훅(단계 5).</item>
@@ -95,12 +95,15 @@ public sealed class InterruptOwnerPresentation
         state == InterruptOwnerPresentationState.AttemptStrong || state == InterruptOwnerPresentationState.AttemptWeak;
 
     /// <summary>
-    /// [오너] 간파 입력 순간 예측. 시도가 아직 결론나지 않았으면 중복 입력으로 보고 무시한다(false).
+    /// [오너] 간파 입력 순간 예측. 대상 없음이면 아무것도 켜지 않고 상태도 그대로(false, 할 일 132 정정1).
+    /// 시도가 아직 결론나지 않았으면 중복 입력으로 보고 무시한다(false).
     /// </summary>
-    public bool Predict(bool predictsSuccess, PlayerInterruptSkillBase skill, float now)
+    public bool Predict(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, PlayerInterruptSkillBase skill, float now)
     {
-        if (IsAttempt(State))
+        if (forecast == BeaverLobby.Player.Dash.InterruptAttemptForecast.NoTarget || IsAttempt(State))
             return false;
+
+        bool predictsSuccess = forecast == BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong;
 
         _skill = skill;
         PredictedStrong = predictsSuccess;

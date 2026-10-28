@@ -1,3 +1,4 @@
+using BeaverLobby.Player.Dash;
 using UnityEngine;
 
 /// <summary>간파 사건 단계(할 일 118) — 스킬이 디렉터에 알리는 사건 4개.</summary>
@@ -36,8 +37,8 @@ public readonly struct InterruptProductionEvent
     public readonly PlayerInterruptSkillBase Skill;
     /// <summary>[판정·실패] 시도 슬로우 발동 번호. 0 = 실패 복귀할 시도 슬로우 없음.</summary>
     public readonly uint AttemptTriggerId;
-    /// <summary>[시도·서버] 승인 시 성공 예측(DashInterruptPredictor) — true = 강, false = 약 시도 슬로우(할 일 132). 예측 계산은 스킬이 한다.</summary>
-    public readonly bool PredictsHit;
+    /// <summary>[시도·서버] 승인 시 예측(DashInterruptPredictor) — 대상 없음 = 슬로우 없음, 약·강 = 약·강 시도 슬로우(할 일 132 정정1). 예측 계산은 스킬이 한다.</summary>
+    public readonly InterruptAttemptForecast Forecast;
     /// <summary>[판정] 예측 대기 중 카운터 성공이 났는가.</summary>
     public readonly bool Landed;
     /// <summary>[판정] 카운터 창 소비가 한 건이라도 있었는가.</summary>
@@ -55,7 +56,7 @@ public readonly struct InterruptProductionEvent
     public readonly uint TriggerId;
 
     private InterruptProductionEvent(InterruptProductionPhase phase, ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
-        uint attemptTriggerId = 0, bool predictsHit = false, bool landed = false, bool succeeded = false, int resolvedCount = 0,
+        uint attemptTriggerId = 0, InterruptAttemptForecast forecast = InterruptAttemptForecast.NoTarget, bool landed = false, bool succeeded = false, int resolvedCount = 0,
         Vector3 targetPosition = default, bool hasTarget = false, Vector3 casterPosition = default,
         InterruptFailReason failReason = InterruptFailReason.None, uint triggerId = 0)
     {
@@ -64,7 +65,7 @@ public readonly struct InterruptProductionEvent
         Caster = caster;
         Skill = skill;
         AttemptTriggerId = attemptTriggerId;
-        PredictsHit = predictsHit;
+        Forecast = forecast;
         Landed = landed;
         Succeeded = succeeded;
         ResolvedCount = resolvedCount;
@@ -81,11 +82,11 @@ public readonly struct InterruptProductionEvent
     private static ulong ClientIdOf(Player caster) => caster != null ? caster.OwnerClientId : 0;
 
     /// <summary>[서버] 시도 — 스킬 승인 직후.</summary>
-    public static InterruptProductionEvent Attempt(Player caster, PlayerInterruptSkillBase skill, bool predictsHit) =>
-        Attempt(ClientIdOf(caster), caster, skill, predictsHit);
+    public static InterruptProductionEvent Attempt(Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
+        Attempt(ClientIdOf(caster), caster, skill, forecast);
 
-    public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, bool predictsHit) =>
-        new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, predictsHit: predictsHit);
+    public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
+        new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, forecast: forecast);
 
     /// <summary>[서버] 판정 끝.</summary>
     public static InterruptProductionEvent Resolve(Player caster, PlayerInterruptSkillBase skill, uint attemptTriggerId,

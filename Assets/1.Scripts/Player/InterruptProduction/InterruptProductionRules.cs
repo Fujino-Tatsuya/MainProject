@@ -57,9 +57,25 @@ public static class InterruptProductionRules
     public static float OwnerZoomFactor(InterruptProductionDirector director, float zoomFactor) =>
         IsOn(director, InterruptProductionCue.OwnerZoom) ? zoomFactor : 1f;
 
-    /// <summary>시도 슬로우 강·약(할 일 132) — 성공 예측 = 강(<see cref="SlowMotionPurpose.Attempt"/>), 실패 예측 = 약(<see cref="SlowMotionPurpose.AttemptWeak"/>).</summary>
-    public static SlowMotionPurpose SelectAttemptPurpose(bool predictsSuccess) =>
-        predictsSuccess ? SlowMotionPurpose.Attempt : SlowMotionPurpose.AttemptWeak;
+    /// <summary>
+    /// 시도 슬로우 강·약(할 일 132 정정1) — 성공 예측 = 강(<see cref="SlowMotionPurpose.Attempt"/>), 실패 예측 = 약(<see cref="SlowMotionPurpose.AttemptWeak"/>).
+    /// 대상 없음이면 false — 시도 슬로우를 걸지 않는다(단계1 이전과 같다).
+    /// </summary>
+    public static bool TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, out SlowMotionPurpose purpose)
+    {
+        switch (forecast)
+        {
+            case BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong:
+                purpose = SlowMotionPurpose.Attempt;
+                return true;
+            case BeaverLobby.Player.Dash.InterruptAttemptForecast.Weak:
+                purpose = SlowMotionPurpose.AttemptWeak;
+                return true;
+            default:
+                purpose = SlowMotionPurpose.Attempt;
+                return false;
+        }
+    }
 
     /// <summary>시도 목적에 맞는 슬로우 프로필 — 약이면 약 프로필, 그 밖은 강(옛 시도) 프로필.</summary>
     public static SlowMotionProfile SelectAttemptProfile(SlowMotionPurpose purpose, IInterruptProductionSettings settings) =>
