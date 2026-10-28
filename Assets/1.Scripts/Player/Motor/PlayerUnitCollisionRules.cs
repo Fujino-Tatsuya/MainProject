@@ -58,6 +58,78 @@ public static class PlayerUnitCollisionRules
     }
 
     /// <summary>
+    /// 정적 겹침 해소 재료(할 일 136). 비보행면 관통만 모은다 — 수평 합, 전체(수직 포함) 합, 가장 깊은 관통 하나.
+    /// 수평 합이 0(벽 박스 한가운데·양쪽 벽이 상쇄)이면 전체 합, 그것도 0 이면 가장 깊은 관통으로 푼다.
+    /// </summary>
+    public struct StaticPenetration
+    {
+        public Vector3 Planar;
+        public Vector3 Full;
+        public Vector3 DeepestDirection;
+        public float DeepestDistance;
+    }
+
+    /// <summary>
+    /// ComputePenetration 결과 하나를 <see cref="StaticPenetration"/> 에 누적한다. 걸을 수 있는 면 법선(위쪽)은 접지 겹침이라 버린다.
+    /// 가장 깊은 관통은 깊이가 같으면(1e-4 m) 방향 성분 x→z→y 큰 쪽을 골라 겹침 버퍼 순서와 무관하게 서버·오너가 같은 답을 낸다.
+    /// </summary>
+    public static StaticPenetration AccumulateStaticEscape(
+        StaticPenetration acc, Vector3 direction, float distance, float maxWalkableAngle)
+    {
+        if (distance <= 0f || direction.sqrMagnitude <= 1e-8f)
+            return acc;
+        if (Vector3.Angle(direction, Vector3.up) <= maxWalkableAngle)
+            return acc;
+
+        acc.Planar = AccumulatePenetration(acc.Planar, direction, distance);
+        acc.Full += direction * distance;
+
+        const float DepthTie = 1e-4f;
+        if (distance > acc.DeepestDistance + DepthTie ||
+            (Mathf.Abs(distance - acc.DeepestDistance) <= DepthTie && PrecedesDirection(direction, acc.DeepestDirection)))
+        {
+            acc.DeepestDirection = direction;
+            acc.DeepestDistance = distance;
+        }
+
+        return acc;
+    }
+
+    /// <summary>
+    /// 정적 겹침 해소 한 틱 변위 — 수평 합 → 전체 합 → 가장 깊은 관통 순으로 처음 0 이 아닌 것을 maxSpeed × deltaTime 으로 자른다.
+    /// 수평으로 풀리면 종전과 같다(수직 0). 벽 박스 안 공중처럼 수평이 상쇄돼 0 이면 수직 성분까지 쓴다.
+    /// </summary>
+    public static Vector3 ComputeStaticEscapeStep(StaticPenetration penetration, float maxSpeed, float deltaTime)
+    {
+        Vector3 planar = ComputeSeparationStep(penetration.Planar, maxSpeed, deltaTime);
+        if (planar != Vector3.zero)
+            return planar;
+
+        Vector3 fallback = penetration.Full.magnitude >= MinSeparationDistance
+            ? penetration.Full
+            : penetration.DeepestDirection * penetration.DeepestDistance;
+        return CapStep(fallback, maxSpeed, deltaTime);
+    }
+
+    private static Vector3 CapStep(Vector3 vector, float maxSpeed, float deltaTime)
+    {
+        float distance = vector.magnitude;
+        float maxStep = Mathf.Max(0f, maxSpeed) * Mathf.Max(0f, deltaTime);
+        if (distance < MinSeparationDistance || maxStep <= 0f)
+            return Vector3.zero;
+
+        return distance <= maxStep ? vector : vector * (maxStep / distance);
+    }
+
+    private static bool PrecedesDirection(Vector3 a, Vector3 b)
+    {
+        const float Eps = 1e-4f;
+        if (Mathf.Abs(a.x - b.x) > Eps) return a.x > b.x;
+        if (Mathf.Abs(a.z - b.z) > Eps) return a.z > b.z;
+        return a.y > b.y + Eps;
+    }
+
+    /// <summary>
     /// 유닛 밀어내기가 벽에 정면으로 막혔을 때 벽을 따라 미끄러질 수평 변위. (할 일 136)
     /// 원래 변위의 접선 성분 부호를 따르고, 정면(접선 0)이면 법선 기준 고정 방향(up × n)을 골라 서버·오너가 같은 답을 낸다.
     /// 길이는 원래 변위 길이 그대로. 법선이 수평 성분이 없거나 변위가 0 이면 0.

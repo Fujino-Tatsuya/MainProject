@@ -144,15 +144,28 @@ public static class PlayerMotionSweep
         float maxWalkableAngle,
         Collider[] overlapBuffer)
     {
+        return CollectStaticPenetration(capsule, originOffset, staticMask, maxWalkableAngle, overlapBuffer).Planar;
+    }
+
+    /// <summary>
+    /// <see cref="ComputeStaticPenetration"/> 의 원재료 — 수평 합·전체 합·가장 깊은 관통(<see cref="PlayerUnitCollisionRules.StaticPenetration"/>).
+    /// </summary>
+    public static PlayerUnitCollisionRules.StaticPenetration CollectStaticPenetration(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        LayerMask staticMask,
+        float maxWalkableAngle,
+        Collider[] overlapBuffer)
+    {
+        var sum = new PlayerUnitCollisionRules.StaticPenetration();
         if (capsule == null || overlapBuffer == null || staticMask.value == 0)
-            return Vector3.zero;
+            return sum;
 
         Transform owner = capsule.transform;
         GetCapsuleWorld(capsule, owner, originOffset, out Vector3 p1, out Vector3 p2, out float radius);
         int count = Physics.OverlapCapsuleNonAlloc(
             p1, p2, radius, overlapBuffer, staticMask, QueryTriggerInteraction.Ignore);
 
-        Vector3 sum = Vector3.zero;
         Vector3 position = owner.position + originOffset;
         for (int i = 0; i < count; i++)
         {
@@ -167,7 +180,7 @@ public static class PlayerMotionSweep
                     other, otherTransform.position, otherTransform.rotation,
                     out Vector3 direction, out float distance))
             {
-                sum = PlayerUnitCollisionRules.AccumulateStaticPenetration(sum, direction, distance, maxWalkableAngle);
+                sum = PlayerUnitCollisionRules.AccumulateStaticEscape(sum, direction, distance, maxWalkableAngle);
             }
         }
 
@@ -175,8 +188,9 @@ public static class PlayerMotionSweep
     }
 
     /// <summary>
-    /// 정적 겹침 해소 한 틱 분량 — <see cref="ComputeStaticPenetration"/> 을 maxSpeed × deltaTime 으로 자른다(순간이동 아님).
-    /// 탈출 방향은 관통 해소 방향 그 자체라 다시 스윕하지 않는다.
+    /// 정적 겹침 해소 한 틱 분량 — 관통 해소 벡터를 maxSpeed × deltaTime 으로 자른다(순간이동 아님).
+    /// 탈출 방향은 관통 해소 방향 그 자체라 다시 스윕하지 않는다. 수평이 0 이면 수직까지 쓴다
+    /// (<see cref="PlayerUnitCollisionRules.ComputeStaticEscapeStep"/> — 벽 박스 안 공중에 놓인 경우).
     /// </summary>
     public static Vector3 ComputeStaticSeparationStep(
         CapsuleCollider capsule,
@@ -187,8 +201,9 @@ public static class PlayerMotionSweep
         float deltaTime,
         Collider[] overlapBuffer)
     {
-        Vector3 penetration = ComputeStaticPenetration(capsule, originOffset, staticMask, maxWalkableAngle, overlapBuffer);
-        return PlayerUnitCollisionRules.ComputeSeparationStep(penetration, maxSpeed, deltaTime);
+        PlayerUnitCollisionRules.StaticPenetration penetration =
+            CollectStaticPenetration(capsule, originOffset, staticMask, maxWalkableAngle, overlapBuffer);
+        return PlayerUnitCollisionRules.ComputeStaticEscapeStep(penetration, maxSpeed, deltaTime);
     }
 
     /// <summary>dir 로 distance 만큼 갈 때 가장 먼저 막는 면의 법선. 막는 것이 없으면 false. (할 일 136 벽 따라 밀어내기)</summary>

@@ -1028,12 +1028,16 @@ public sealed class PlayerMotor : MonoBehaviour
     }
 
     /// <summary>
-    /// 포즈 추종(구속) 결과가 정적 지형 안이면 그 자리에서 밖으로 꺼낸다(할 일 136).
-    /// 포즈는 매 틱 절대 위치로 다시 덮이므로 속도 상한 없이 관통 깊이만큼 옮긴다 — 목표점이 벽 앞으로 잘려 있으면(23호 잡기) 할 일이 없다.
+    /// 포즈 추종(포드 착석·보스 텔레포트 대기 등) 결과가 정적 지형 안이면 그 자리에서 밖으로 꺼낸다(할 일 136).
+    /// 포즈는 매 틱 절대 위치로 다시 덮이므로 속도 상한 없이 관통 깊이만큼 옮긴다.
+    /// 🔴 구속(23호 잡기 Push·Carry) 중에는 하지 않는다 — 벽 안이어도 손 소켓·정면점과 싱크를 유지한다(내려찍기 연출).
+    ///    놓인 뒤에는 <see cref="ApplyStaticDepenetration"/> 이 이동속도 × dt 로 벽 밖으로 꺼낸다.
     /// </summary>
     private void ResolvePoseStaticOverlap(ref PlayerSimulationState state, PlayerSimulationSettings settings)
     {
         if (capsule == null)
+            return;
+        if (player != null && player.CurrentState == PlayerActionState.Restrained)
             return;
 
         Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
