@@ -25,11 +25,24 @@ public readonly struct PlayerAttackLanded
     /// <summary>발행한 컴포넌트(평타·스킬·투사체). 진단용.</summary>
     public readonly Object Source;
 
+    /// <summary>
+    /// 시전 ID(할 일 125 3/5, 명세 §3 CastId) — 같은 시전의 여러 판정(틱·여러 발·여러 대상)을 묶는 값. 플레이어별로 증가하며 0 이 아니다.
+    /// 스킬 = 서버 승인 때 정한 그 시전의 ID(<see cref="PlayerSkillBase.ServerCastId"/>), 그 밖(평타 스윙·투사체 1발)은 발행마다 새 값 = 동작 1회.
+    /// '시전당 1회'·'동작당 1회 + 간격' 거름은 <see cref="TraitProcGate"/>.
+    /// </summary>
+    public readonly int CastId;
+
     public PlayerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source)
+        : this(attackType, triggersOnHit, targets, source, 0)
+    {
+    }
+
+    public PlayerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source, int castId)
     {
         AttackType = attackType;
         TriggersOnHit = triggersOnHit;
         Targets = targets;
         Source = source;
+        CastId = castId;
     }
 }

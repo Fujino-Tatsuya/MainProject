@@ -96,11 +96,14 @@ public sealed class TraitProgressRulesTests
     // ── 상단 칸 ──
 
     [Test]
-    public void CountsForSlot_OnlyCooldownReductionOnMatchingSlot()
+    public void CountsForSlot_OnlyCooldownEffectsOnMatchingSlot()
     {
-        Assert.That(TraitProgressRules.CountsForSlot(TraitEffectKind.CooldownReductionOnHit, PlayerSkillSlot.Main, PlayerSkillSlot.Main), Is.True);
-        Assert.That(TraitProgressRules.CountsForSlot(TraitEffectKind.CooldownReductionOnHit, PlayerSkillSlot.Sub, PlayerSkillSlot.Main), Is.False);
-        Assert.That(TraitProgressRules.CountsForSlot(TraitEffectKind.AttackDamageMultiplier, PlayerSkillSlot.Main, PlayerSkillSlot.Main), Is.False);
+        // 할 일 125 3/5: 옛 효과 enum 대신 효과 클래스의 AffectsCooldownOf(쿨 차감·쿨 배율)
+        var refundQ = new TraitCooldownRefundEffect(new TraitTriggerFilter(TraitTrigger.AttackLanded), 1f, new[] { PlayerSkillSlot.Main });
+        Assert.That(refundQ.AffectsCooldownOf(PlayerSkillSlot.Main), Is.True);
+        Assert.That(refundQ.AffectsCooldownOf(PlayerSkillSlot.Sub), Is.False);
+        Assert.That(new TraitCooldownEffect(-0.15f, new[] { PlayerSkillSlot.Sub }).AffectsCooldownOf(PlayerSkillSlot.Sub), Is.True);
+        Assert.That(new TraitDamageEffect(0.2f).AffectsCooldownOf(PlayerSkillSlot.Main), Is.False);
     }
 
     [TestCase(-1, 0)]

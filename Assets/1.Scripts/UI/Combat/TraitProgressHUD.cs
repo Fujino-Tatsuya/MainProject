@@ -103,7 +103,7 @@ public class TraitProgressHUD : MonoBehaviour
         foreach (int traitHash in acquired)
         {
             TraitDefinition trait = traitDirector.GetTrait(traitHash);
-            if (trait != null && TraitProgressRules.CountsForSlot(trait.EffectKind, trait.CooldownSlot, slot))
+            if (trait != null && trait.AffectsCooldownOf(slot))
                 count++;
         }
         return TraitProgressRules.ClampUpgradeStage(count);

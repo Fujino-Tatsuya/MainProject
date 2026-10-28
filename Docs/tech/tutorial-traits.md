@@ -121,9 +121,38 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 - **값·이름·설명·아이콘만** 바뀌면: 정의 에셋(`Assets/9.ScriptableObject/Tutorial/Traits/TutorialTrait_*.asset`)만 고친다.
 - **특성 추가·삭제**: 정의 에셋을 만들고 `TutorialTraitPool.asset` 의 `traits` 배열에 넣는다(인덱스 = 런타임 id). 제시 장 수는 `offerCount`.
-- **새 효과 종류**: `TutorialTraitEffectKind` 에 값 추가 → `TutorialTraitDirector.ApplyEffect` 의 `switch` 에 적용 코드 추가.
-  배율류는 `TraitDefinition.GetModifiers` 에 기여(`TraitModifier`)를 넣는다 — 상태이상이 아니라 `PlayerTraitModifiers` 출처(할 일 125 2/5, [player-stats.md](player-stats.md) §4).
-  이벤트류는 `HookCooldownReduction` 처럼 서버 이벤트 구독을 따라 한다. 소비처가 없는 스탯은 넣지 않는다(§6).
+- **효과(할 일 125 3/5)**: 옛 효과 enum 은 폐지. 특성 정의 = 효과 클래스(`TraitEffect`) 목록(`[SerializeReference]`, 인스펙터 '효과 추가') + 수치 — §4.1.
+  소비처가 없는 스탯은 넣지 않는다(§6).
+
+### 4.1 효과 클래스(할 일 125 3/5)
+
+코드: `Assets/1.Scripts/Traits/Effects/` · 서버 허브 `Player/Stats/PlayerTraitEffects.cs` · 테스트 `TraitEffectTests`(맵씬 EditMode 메뉴).
+
+| # | 클래스 | 형 | 스킬(캐릭터 레인)이 쓰는 곳 |
+|---|---|---|---|
+| ① | `TraitDamageEffect` | 수치 | 이미 연결 — Dref(`Player.ResolveDamage` 키) |
+| ② | `TraitCooldownEffect` | 수치 | 이미 연결 — `GetEffectiveCooldownTime` |
+| ③ | `TraitCooldownRefundEffect` | 사건 | 사건 발행만 필요(아래) |
+| ④ | `TraitHealEffect` | 수치+등록 | 팔라딘 패시브 회복이 `PlayerTraitEffects.HealServer` 로 연결됨(배율·초과 전달·Healed 사건) |
+| ⑤ | `TraitShieldEffect` | 사건 | 특성 채널 `ShieldType.Trait`(출처 = 특성 해시, 큰 값 유지) |
+| ⑥ | `TraitKnockbackEffect` | 등록 | 적중 직전 `PlayerTraitEffects.ModifyOutgoingAttackServer(key, castId, target, dir, ref info)` |
+| ⑦ | `TraitAreaEffect` | 수치 | `PlayerTraitModifiers.AreaMultiplier(key, axis)` |
+| ⑧ | `TraitDerivedAttackEffect` | 등록 | `PlayerTraitEffects.GetDerivedAttacks(key, list)` → `DamageFrom(Dref)`·`Counter`, 판정 `TraitHitFlags.Derived` |
+| ⑨ | `TraitNextAttackBuffEffect` | 사건 | 첫 원래 피해 판정에서 `PlayerTraitEffects.ConsumeNextAttackMultiplierServer(key, castId)` |
+| ⑩ | `TraitSkillValueEffect` | 수치 | `PlayerTraitModifiers.ResolveSkillValue(이름, 데이터 값)` |
+| — | `TraitStatEffect` | 수치 | PlayerStats 기본%·전체%·가하는 피해% |
+
+- **모드 변경 7개**는 효과 클래스가 아니다 — 스킬이 `PlayerTraitModifiers.HasTrait(TraitModeIds.…)` 로 묻고 자기 코드 안에서 분기한다.
+- **사건**: `AttackLanded` 는 `Player.ServerAttackLanded` 에서 자동(시전 ID·형태 포함). `GuardSucceeded`·`PassiveProc`·`SkillCompleted`·`BasicAttackFired` 는
+  스킬이 `PlayerTraitEffects.RaiseServer(trigger, skill)` 로 알린다(지금은 아무도 안 낸다 — 캐릭터 레인 몫). 거름 = `TraitTriggerFilter`(시전당 1회·간격).
+- **시전 ID**: `PlayerAttackLanded.CastId` — 스킬은 서버 승인 때 `PlayerSkillBase.ServerCastId` 를 받고, 그 스킬을 출처로 낸 적중은 자동으로 묶인다.
+  평타 스윙·투사체 1발은 발행마다 새 값(= 동작 1회). 여러 판정을 한 동작으로 묶어야 하면 `RaiseServerAttackLanded(..., castId)` 로 직접 준다.
+- 🔴 **밀치기**는 지금 `AttackInfo` 넉백+경직 필드 경로(23호에서 명세 §4 와 맞는 유일한 경로). 경석의 보스 쪽 수정(23호 `OnKnockback`·상태별 슈퍼아머) 뒤
+  `TraitKnockbackEffect.ApplyCrowdControl` 한 곳만 `Unit.Knockback`·상태이상 직접 걸기로 바꾼다. 경직은 0 보다 커야 23호 취약 밀림이 걸린다.
+- **되돌리기 장부**(`TraitEffectLedger`): 이벤트형 효과의 핸들을 특성 해시 단위로 기록 — 재선택 [예] = 전부 되돌림(구독·등록 해제, 다음 공격 강화 삭제) 뒤 다시 고른 것만 다시 건다.
+  '획득 1회' 동작(`HasOnceAction`)은 표시가 남아 재선택·재합류(`TraitRejoinSnapshot.UsedOnce`)에서 다시 하지 않는다. 이미 지급된 보호막은 되돌리지 않고 만료에 맡긴다.
+- 사망(살아 있음 → 그 밖)이면 허브가 대기 상태(다음 공격 강화·파생 카운터·대상별 1회 기억)를 지운다. 선택한 특성은 유지.
+- `Unit.HealHp` 는 실제 회복량(int)을 돌려준다 — 초과 회복 = 요청 − 반환값.
 
 ## 5. 데이터 테이블로 옮길 때
 

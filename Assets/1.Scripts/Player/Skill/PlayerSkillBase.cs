@@ -172,6 +172,17 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
         damageSnapshot = Mathf.Max(0, value);
     }
 
+    /// <summary>
+    /// [서버] 이번 시전의 ID(할 일 125 3/5, 명세 §3 CastId) — 서버 승인 때 컨트롤러가 <see cref="OnServerStart"/> 직전에 넣는다. 0 = 아직 시전 없음.
+    /// 이 스킬을 출처(source)로 낸 적중(Player.RaiseServerAttackLanded)은 이 값으로 묶인다.
+    /// </summary>
+    public int ServerCastId { get; private set; }
+
+    public void SetServerCastId(int castId)
+    {
+        ServerCastId = castId;
+    }
+
     public void SetAimPoint(Vector3 point, bool hasPoint)
     {
         AimPoint = point;

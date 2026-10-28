@@ -186,12 +186,35 @@ public sealed class TraitResetModel
     }
 }
 
+/// <summary>'획득 1회' 효과 실행 표시 = (특성 해시, 효과 칸 번호). 재합류 보관(<see cref="TraitRejoinSnapshot.UsedOnce"/>)에도 그대로 실린다.</summary>
+public readonly struct TraitOnceKey : IEquatable<TraitOnceKey>
+{
+    public readonly int TraitHash;
+    public readonly int EffectIndex;
+
+    public TraitOnceKey(int traitHash, int effectIndex)
+    {
+        TraitHash = traitHash;
+        EffectIndex = effectIndex;
+    }
+
+    public bool Equals(TraitOnceKey other) => TraitHash == other.TraitHash && EffectIndex == other.EffectIndex;
+    public override bool Equals(object obj) => obj is TraitOnceKey other && Equals(other);
+    public override int GetHashCode() => (TraitHash * 397) ^ EffectIndex;
+    public override string ToString() => $"{TraitHash}#{EffectIndex}";
+}
+
 /// <summary>
-/// 플레이어에게 적용한 특성 효과 장부(할 일 30) — (플레이어, 특성 ID 해시) → 원복에 필요한 핸들. Unity·NGO 비의존.
-/// 디렉터가 효과를 걸 때 기록하고, 초기화·이탈 때 그 플레이어 몫만 꺼내 되돌린다(다른 플레이어 것은 남는다).
+/// 플레이어에게 적용한 특성 효과 장부(할 일 30 → 125 3/5 되돌리기 장부) — Unity·NGO 비의존.
+///  · 적용 기록: (플레이어, 특성 ID 해시) → 원복 핸들(이벤트형 효과의 구독·등록·상태). 디렉터가 효과를 걸 때 기록하고,
+///    초기화·이탈 때 그 플레이어 몫만 꺼내 되돌린다(다른 플레이어 것은 남는다). 재선택에서 빠진 특성은 이렇게 되돌려진다.
+///  · '획득 1회' 표시: (플레이어, 특성 해시, 효과 칸) — 적용 기록을 되돌려도 남는다. 전멸 재선택으로 같은 특성을 다시 고르거나
+///    재합류로 다시 걸 때 이미 실행한 1회 동작(입장 쿨감·즉시 회복 등)을 다시 하지 않게 한다. 재합류는 보관·복원(<see cref="CaptureOnce"/>·<see cref="RestoreOnce"/>)으로 새 clientId 에 옮긴다.
 /// </summary>
 public sealed class TraitEffectLedger<THandle>
 {
+    private readonly Dictionary<ulong, List<TraitOnceKey>> once = new Dictionary<ulong, List<TraitOnceKey>>();
+
     public readonly struct Record
     {
         public readonly ulong ClientId;
@@ -253,5 +276,120 @@ public sealed class TraitEffectLedger<THandle>
         return taken.Count;
     }
 
-    public void Clear() => records.Clear();
+    /// <summary>그 플레이어의 적용 기록 특성 해시(적용 순서).</summary>
+    public void GetHashes(ulong clientId, List<int> result)
+    {
+        result.Clear();
+        for (int i = 0; i < records.Count; i++)
+        {
+            if (records[i].ClientId == clientId && !result.Contains(records[i].TraitHash))
+                result.Add(records[i].TraitHash);
+        }
+    }
+
+    /// <summary>
+    /// 획득 목록과 맞춘다 — 적용 기록 중 목록에 없는 특성은 장부에서 빼 <paramref name="toRevert"/> 에(호출자가 되돌린다),
+    /// 목록에 있는데 기록이 없는 특성은 <paramref name="toApply"/> 에(획득 순서) 채운다. 둘 다 이미 맞으면 빈 목록.
+    /// </summary>
+    public void Reconcile(ulong clientId, IReadOnlyList<int> acquired, List<int> toApply, List<Record> toRevert)
+    {
+        toApply.Clear();
+        toRevert.Clear();
+        for (int i = records.Count - 1; i >= 0; i--)
+        {
+            Record r = records[i];
+            if (r.ClientId != clientId || Contains(acquired, r.TraitHash))
+                continue;
+
+            toRevert.Insert(0, r);
+            records.RemoveAt(i);
+        }
+
+        if (acquired == null)
+            return;
+
+        for (int i = 0; i < acquired.Count; i++)
+        {
+            int hash = acquired[i];
+            if (!Has(clientId, hash) && !toApply.Contains(hash))
+                toApply.Add(hash);
+        }
+    }
+
+    // ── '획득 1회' 표시 ─────────────────────────────────────────────────
+
+    public bool HasOnce(ulong clientId, int traitHash, int effectIndex) =>
+        once.TryGetValue(clientId, out List<TraitOnceKey> keys) && keys.Contains(new TraitOnceKey(traitHash, effectIndex));
+
+    /// <summary>표시한다. 이미 있었으면 false(호출자는 1회 동작을 건너뛴다).</summary>
+    public bool MarkOnce(ulong clientId, int traitHash, int effectIndex)
+    {
+        if (!once.TryGetValue(clientId, out List<TraitOnceKey> keys))
+        {
+            keys = new List<TraitOnceKey>();
+            once.Add(clientId, keys);
+        }
+
+        var key = new TraitOnceKey(traitHash, effectIndex);
+        if (keys.Contains(key))
+            return false;
+
+        keys.Add(key);
+        return true;
+    }
+
+    /// <summary>그 플레이어의 1회 표시를 복사한다(재합류 보관용 — 장부에서는 지우지 않는다).</summary>
+    public void CaptureOnce(ulong clientId, List<TraitOnceKey> result)
+    {
+        result.Clear();
+        if (once.TryGetValue(clientId, out List<TraitOnceKey> keys))
+            result.AddRange(keys);
+    }
+
+    /// <summary>보관한 1회 표시를 (새) clientId 에 더한다. 더한 수.</summary>
+    public int RestoreOnce(ulong clientId, IReadOnlyList<TraitOnceKey> keys)
+    {
+        int added = 0;
+        if (keys == null)
+            return added;
+
+        for (int i = 0; i < keys.Count; i++)
+        {
+            if (MarkOnce(clientId, keys[i].TraitHash, keys[i].EffectIndex))
+                added++;
+        }
+
+        return added;
+    }
+
+    /// <summary>그 플레이어의 1회 표시를 지운다(퇴장 — 보관한 뒤). 지운 수.</summary>
+    public int ClearOnce(ulong clientId)
+    {
+        if (!once.TryGetValue(clientId, out List<TraitOnceKey> keys))
+            return 0;
+
+        once.Remove(clientId);
+        return keys.Count;
+    }
+
+    /// <summary>적용 기록과 1회 표시를 모두 지운다(디렉터 디스폰 = 새 판).</summary>
+    public void Clear()
+    {
+        records.Clear();
+        once.Clear();
+    }
+
+    private static bool Contains(IReadOnlyList<int> list, int value)
+    {
+        if (list == null)
+            return false;
+
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i] == value)
+                return true;
+        }
+
+        return false;
+    }
 }

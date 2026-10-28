@@ -828,8 +828,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     /// <summary>슬롯에 지금 바인딩된 스킬(대체 포함)의 유효 전체 쿨타임. 비었으면 0.</summary>
     public float GetEffectiveCooldownTime(PlayerSkillSlot slot) => GetEffectiveCooldownTime(GetSkill(slot));
 
-    // 대체 세트(어쌔신 변신 Q·E 등)의 스킬인가 — 특성 형태 구분(TraitAttackForm.Alternate).
-    private bool IsAlternateSkill(PlayerSkillBase skill) =>
+    // 대체 세트(어쌔신 변신 Q·E 등)의 스킬인가 — 특성 형태 구분(TraitAttackForm.Alternate). 특성 사건 형태(PlayerTraitEffects)도 쓴다.
+    public bool IsAlternateSkill(PlayerSkillBase skill) =>
         skill != null && alternateSkills != null && alternateSkills.GetSkill(skill.Slot) == skill;
 
     // [서버] 특성 쿨 배율이 바뀌면(획득·초기화·재합류) 돌던 쿨의 진행률을 보존한다(명세 §6) — 준비된 스킬·전체 0 은 그대로.
@@ -985,6 +985,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         int damageSnapshot = player.ResolveDamage(
             skill.Data.AttackDamageMultiplier, skill.Data.FlatDamageBonus, TraitAttackKey.ForSkill(skill.Slot, IsAlternateSkill(skill)));
         skill.SetDamageSnapshot(damageSnapshot);
+        // 시전 ID(할 일 125 3/5) — 이 시전의 여러 판정을 묶는다(특성 '시전당 1회' 거름).
+        skill.SetServerCastId(player.NextServerCastId());
         // 지점(AimPoint)은 CanApproveSkill 이 CanUse 직전에 이미 넣었다.
 
         Edit.Log($"[Skill] {slot} 시작{(dashInterrupt ? "(대쉬 간파 — 대시에 실림)" : string.Empty)} — 피해 스냅샷 {damageSnapshot}, 쿨타임 {cooldownTime}s", this);

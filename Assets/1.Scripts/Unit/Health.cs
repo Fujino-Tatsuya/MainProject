@@ -25,12 +25,15 @@ public class Health
     /// healAmount만큼 체력을 회복시키는 함수
     /// </summary>
     /// <param name="healAmount">회복시킬 체력 값</param>
-    public void HealHp(int healAmount)
+    /// <returns>실제로 오른 체력(최대 체력에 막힌 초과분 제외, 0 이상) — 특성 초과 회복(할 일 125 3/5)이 쓴다. 기존 호출부는 무시해도 된다.</returns>
+    public int HealHp(int healAmount)
     {
+        int previous = _currentHp;
         _currentHp += healAmount;
         _currentHp = Mathf.Min(_currentHp, _maxHp); // 체력이 최대 체력을 초과하지 않도록 보장
 
         Edit.Log($"[Unit] 체력 증가량: {healAmount}   /   현재 체력: {_currentHp}");
+        return Mathf.Max(0, _currentHp - previous);
     }
     /// <summary>
     /// 체력을 최대치로 회복시키는 함수

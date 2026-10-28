@@ -300,9 +300,11 @@ public sealed class TraitModifierSetTests
     [Test]
     public void TraitDefinition_StatKinds_ContributeTotalPercent_IncludingPenalty()
     {
-        TraitDefinition attack = MakeDefinition(TraitEffectKind.AttackDamageMultiplier, 1.2f);
-        TraitDefinition slow = MakeDefinition(TraitEffectKind.MoveSpeedMultiplier, 0.8f);
-        TraitDefinition onHit = MakeDefinition(TraitEffectKind.CooldownReductionOnHit, 1.5f);
+        // 3/5: 옛 효과 enum 대신 스탯 효과·이벤트형 효과(쿨 차감)
+        TraitDefinition attack = MakeDefinition(new TraitStatEffect(PlayerStatKind.AttackDamage, 0.2f));
+        TraitDefinition slow = MakeDefinition(new TraitStatEffect(PlayerStatKind.MoveSpeed, -0.2f));
+        TraitDefinition onHit = MakeDefinition(new TraitCooldownRefundEffect(
+            new TraitTriggerFilter(TraitTrigger.AttackLanded, new[] { AttackType.Default }), 1.5f, new[] { PlayerSkillSlot.Main }));
         try
         {
             var table = new Dictionary<int, ITraitModifierContributor> { [1] = attack, [2] = slow, [3] = onHit };
@@ -340,12 +342,15 @@ public sealed class TraitModifierSetTests
         }
     }
 
-    static TraitDefinition MakeDefinition(TraitEffectKind kind, float value)
+    /// <summary>효과 목록([SerializeReference])을 채운 정의 — 다른 특성 테스트도 쓴다.</summary>
+    internal static TraitDefinition MakeDefinition(params TraitEffect[] effects)
     {
         var def = ScriptableObject.CreateInstance<TraitDefinition>();
         var so = new SerializedObject(def);
-        so.FindProperty("effectKind").enumValueIndex = (int)kind;
-        so.FindProperty("value").floatValue = value;
+        SerializedProperty list = so.FindProperty("effects");
+        list.arraySize = effects.Length;
+        for (int i = 0; i < effects.Length; i++)
+            list.GetArrayElementAtIndex(i).managedReferenceValue = effects[i];
         so.ApplyModifiedPropertiesWithoutUndo();
         return def;
     }

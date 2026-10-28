@@ -330,32 +330,38 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// healAmount만큼 체력을 회복시키는 함수
     /// </summary>
     /// <param name="healAmount">회복시킬 체력 양</param>
-    public void HealHp(int healAmount)
+    /// <returns>실제 회복량(아래 오버로드와 같다). 기존 호출부는 무시해도 된다.</returns>
+    public int HealHp(int healAmount)
     {
-        HealHp(healAmount, true);
+        return HealHp(healAmount, true);
     }
 
     /// <summary>
     /// healAmount만큼 체력을 회복시킨다. countInStats=false 면 결과 통계 회복 채널
     /// (<see cref="CombatStatsEvents.ServerHealApplied"/>)을 타지 않는다 — 플레이어 기본 체력 재생(사용자 결정 10-13).
     /// </summary>
-    public void HealHp(int healAmount, bool countInStats)
+    /// <returns>실제 회복량(아래 오버로드와 같다).</returns>
+    public int HealHp(int healAmount, bool countInStats)
     {
-        if (!IsServer) return;
-        HealHp(healAmount, countInStats, OwnerClientId); // 회복 주체를 안 주면 자기 회복
+        if (!IsServer) return 0;
+        return HealHp(healAmount, countInStats, OwnerClientId); // 회복 주체를 안 주면 자기 회복
     }
 
     /// <summary>
     /// 회복 주체(<paramref name="healerClientId"/> — 결과 통계 "회복량"이 붙는 플레이어)를 지정해 회복한다.
     /// 다른 플레이어를 회복시키는 스킬은 이 오버로드로 시전자 clientId 를 넘긴다.
     /// </summary>
-    public void HealHp(int healAmount, bool countInStats, ulong healerClientId)
+    /// <returns>
+    /// 실제로 오른 체력(할 일 125 3/5 — 최대 체력에 막힌 초과분 제외, 0 이상). 서버가 아니거나 체력이 없으면 0.
+    /// 특성 초과 회복(명세 §7)은 요청량 − 이 값을 쓴다. 기존 호출부는 무시해도 된다.
+    /// </returns>
+    public int HealHp(int healAmount, bool countInStats, ulong healerClientId)
     {
-        if (!IsServer) return; // 서버에서만 체력 회복 처리
-        int previousHealth = _health.CurrentHealth;
-        _health.HealHp(healAmount);
+        if (!IsServer || _health == null) return 0; // 서버에서만 체력 회복 처리
+        int healed = _health.HealHp(healAmount);
         _currentHp.Value = _health.CurrentHealth;
-        ReportServerHeal(this, _health.CurrentHealth - previousHealth, countInStats, healerClientId);
+        ReportServerHeal(this, healed, countInStats, healerClientId);
+        return healed;
     }
 
     /// <summary>실제 회복량을 통계 채널에 알린다(회복 주체 = 대상 자신). 비집계 회복·0 회복은 발행하지 않는다(EditMode 테스트 대상).</summary>

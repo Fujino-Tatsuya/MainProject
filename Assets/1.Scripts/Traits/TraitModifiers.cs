@@ -10,7 +10,7 @@ public enum TraitModifierKind : byte
     /// <summary>슬롯 전체 쿨타임 배율. 값 = 배율(0.85 = 15% 감소, 1.2 = 20% 증가). 서로 곱한다(명세 §6).</summary>
     CooldownMultiplier = 1,
 
-    /// <summary>받는/주는 회복량 배율. 값 = 배율. 서로 곱한다. 소비처는 3/5(HealHp 실제 회복량)에서 연결한다.</summary>
+    /// <summary>특성 회복 경로(<see cref="PlayerTraitEffects.HealServer"/> — 지금은 팔라딘 패시브)의 회복 요청 배율. 값 = 배율. 서로 곱한다.</summary>
     HealMultiplier = 2,
 
     /// <summary>PlayerStats 기본% 단계 몫. 값 = %(0.2 = +20%). 같은 단계끼리 더한다(player-stats.md §2).</summary>
@@ -21,6 +21,28 @@ public enum TraitModifierKind : byte
 
     /// <summary>PlayerStats 가하는 피해% 몫. 값 = %. 같은 단계끼리 더한다.</summary>
     DealtDamagePercent = 5,
+
+    /// <summary>범위·폭 배율(할 일 125 3/5 ⑦) — 스킬이 판정 치수에 곱한다. 값 = 배율(1.3 = 30% 넓게). 축(<see cref="TraitAreaAxis"/>)·공격 키로 거른다. 서로 곱한다.</summary>
+    AreaMultiplier = 6,
+
+    /// <summary>스킬 수치 덮어쓰기(할 일 125 3/5 ⑩) — 스킬이 이름(<see cref="TraitModifier.Key"/>)으로 묻는다. 연산은 <see cref="TraitValueOp"/>.</summary>
+    SkillValue = 7,
+}
+
+/// <summary>범위 배율이 닿는 치수(비트 마스크로 쓴다 — 0 = 전부). 광폭 레이저 = 폭, 칼날의 영역 = 길이·폭·반경.</summary>
+public enum TraitAreaAxis : byte
+{
+    Width = 0,
+    Length = 1,
+    Radius = 2,
+}
+
+/// <summary>스킬 수치 덮어쓰기 연산. 한 키에 여럿이면 Set(마지막 획득 우선) → Add(합) → Multiply(곱) 순서로 적용한다.</summary>
+public enum TraitValueOp : byte
+{
+    Set = 0,
+    Add = 1,
+    Multiply = 2,
 }
 
 /// <summary>
@@ -79,8 +101,14 @@ public readonly struct TraitModifier
     public readonly int FormMask;
     public readonly int SlotMask;
     public readonly PlayerStatKind Stat;
+    /// <summary>범위 배율의 축 마스크(1 &lt;&lt; <see cref="TraitAreaAxis"/>, 0 = 전부). 다른 종류는 0.</summary>
+    public readonly int AxisMask;
+    /// <summary>스킬 수치 덮어쓰기의 수치 이름. 다른 종류는 null.</summary>
+    public readonly string Key;
+    public readonly TraitValueOp Op;
 
-    private TraitModifier(TraitModifierKind kind, float value, int attackTypeMask, int formMask, int slotMask, PlayerStatKind stat)
+    private TraitModifier(TraitModifierKind kind, float value, int attackTypeMask, int formMask, int slotMask, PlayerStatKind stat,
+        int axisMask = 0, string key = null, TraitValueOp op = TraitValueOp.Set)
     {
         Kind = kind;
         Value = value;
@@ -88,11 +116,23 @@ public readonly struct TraitModifier
         FormMask = formMask;
         SlotMask = slotMask;
         Stat = stat;
+        AxisMask = axisMask;
+        Key = key;
+        Op = op;
     }
 
     public static int MaskOf(AttackType type) => 1 << (int)type;
     public static int MaskOf(TraitAttackForm form) => 1 << (int)form;
     public static int MaskOf(PlayerSkillSlot slot) => 1 << (int)slot;
+    public static int MaskOf(TraitAreaAxis axis) => 1 << (int)axis;
+
+    /// <summary>범위·폭 배율(⑦). 마스크 0 = 전부.</summary>
+    public static TraitModifier Area(float multiplier, int axisMask = 0, int attackTypeMask = 0, int formMask = 0) =>
+        new TraitModifier(TraitModifierKind.AreaMultiplier, multiplier, attackTypeMask, formMask, 0, default, axisMask);
+
+    /// <summary>스킬 수치 덮어쓰기(⑩) — 이름 붙은 수치 하나에 연산 하나.</summary>
+    public static TraitModifier SkillValue(string key, TraitValueOp op, float value) =>
+        new TraitModifier(TraitModifierKind.SkillValue, value, 0, 0, 0, default, 0, key, op);
 
     /// <summary>피해 배율. 마스크 0 = 모든 공격 종류·형태.</summary>
     public static TraitModifier Damage(float multiplier, int attackTypeMask = 0, int formMask = 0) =>
@@ -118,13 +158,18 @@ public readonly struct TraitModifier
 
     public bool Matches(PlayerSkillSlot slot, TraitAttackForm form) => Covers(SlotMask, (int)slot) && Covers(FormMask, (int)form);
 
-    private static bool Covers(int mask, int bit) => mask == 0 || (mask & (1 << bit)) != 0;
+    public bool Matches(TraitAttackKey key, TraitAreaAxis axis) => Matches(key) && Covers(AxisMask, (int)axis);
 
-    public override string ToString() => $"{Kind} {Value} (공격 {AttackTypeMask:X}·형태 {FormMask:X}·슬롯 {SlotMask:X}·스탯 {Stat})";
+    /// <summary>마스크 0 = 전부, 아니면 그 비트가 켜져 있어야 한다(효과 클래스의 대상 거름도 같은 규칙).</summary>
+    public static bool Covers(int mask, int bit) => mask == 0 || (mask & (1 << bit)) != 0;
+
+    public override string ToString() => Kind == TraitModifierKind.SkillValue
+        ? $"{Kind} '{Key}' {Op} {Value}"
+        : $"{Kind} {Value} (공격 {AttackTypeMask:X}·형태 {FormMask:X}·슬롯 {SlotMask:X}·스탯 {Stat}·축 {AxisMask:X})";
 }
 
 /// <summary>
-/// 특성이 수치를 기여하는 창구. 특성 SO(지금은 <see cref="TraitDefinition"/>, 3/5 부터 효과 클래스 조합)가 구현한다.
+/// 특성이 수치를 기여하는 창구. 특성 SO(<see cref="TraitDefinition"/> — 효과 클래스 <see cref="TraitEffect"/> 조합의 기여를 모은다)가 구현한다.
 /// 같은 입력이면 모든 피어에서 같은 목록을 내야 한다(SO 수치만 읽는다).
 /// </summary>
 public interface ITraitModifierContributor
@@ -226,6 +271,61 @@ public sealed class TraitModifierSet
     }
 
     public float HealMultiplier => Product(TraitModifierKind.HealMultiplier);
+
+    /// <summary>범위·폭 배율(⑦) — 그 공격 키·축에 맞는 기여의 곱. 없으면 1.</summary>
+    public float AreaMultiplier(TraitAttackKey key, TraitAreaAxis axis)
+    {
+        float product = 1f;
+        for (int i = 0; i < modifiers.Count; i++)
+        {
+            TraitModifier m = modifiers[i];
+            if (m.Kind == TraitModifierKind.AreaMultiplier && m.Matches(key, axis))
+                product *= m.Value;
+        }
+
+        return product;
+    }
+
+    /// <summary>
+    /// 스킬 수치 덮어쓰기(⑩) — 이름이 같은 기여를 Set(획득 순서상 마지막) → Add(합) → Multiply(곱) 순서로 적용한다. 없으면 기본값 그대로.
+    /// 스킬은 자기 데이터 값을 기본값으로 넘기고 결과를 쓴다(예: 거너 최대 충전시간 × 0.75).
+    /// </summary>
+    public float ResolveSkillValue(string key, float baseValue)
+    {
+        if (string.IsNullOrEmpty(key))
+            return baseValue;
+
+        float value = baseValue;
+        float add = 0f;
+        float multiply = 1f;
+        for (int i = 0; i < modifiers.Count; i++)
+        {
+            TraitModifier m = modifiers[i];
+            if (m.Kind != TraitModifierKind.SkillValue || !string.Equals(m.Key, key, StringComparison.Ordinal))
+                continue;
+
+            switch (m.Op)
+            {
+                case TraitValueOp.Set: value = m.Value; break;
+                case TraitValueOp.Add: add += m.Value; break;
+                case TraitValueOp.Multiply: multiply *= m.Value; break;
+            }
+        }
+
+        return (value + add) * multiply;
+    }
+
+    /// <summary>그 이름의 스킬 수치 덮어쓰기가 하나라도 있는가.</summary>
+    public bool HasSkillValue(string key)
+    {
+        for (int i = 0; i < modifiers.Count; i++)
+        {
+            if (modifiers[i].Kind == TraitModifierKind.SkillValue && string.Equals(modifiers[i].Key, key, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
 
     public float BasePercent(PlayerStatKind stat) => StatSum(TraitModifierKind.StatBasePercent, stat);
 
@@ -330,6 +430,20 @@ public static class TraitModifierRules
                 if (v <= 0f)
                 {
                     reason = "쿨 배율 ≤ 0(감소율 1 이상)";
+                    return false;
+                }
+                break;
+            case TraitModifierKind.AreaMultiplier:
+                if (v <= 0f)
+                {
+                    reason = "범위 배율 ≤ 0";
+                    return false;
+                }
+                break;
+            case TraitModifierKind.SkillValue:
+                if (string.IsNullOrEmpty(modifier.Key))
+                {
+                    reason = "수치 이름 없음";
                     return false;
                 }
                 break;

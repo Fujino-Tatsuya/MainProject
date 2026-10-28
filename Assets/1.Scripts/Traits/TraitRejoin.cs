@@ -31,9 +31,13 @@ public sealed class TraitRejoinSnapshot
     /// <summary>열려 있던(아직 안 고른) 재선택 라운드 후보. 없으면 빈 배열.</summary>
     public readonly int[] PersonalOffered;
 
+    /// <summary>이미 실행한 '획득 1회' 효과(할 일 125 3/5 되돌리기 장부) — 재합류 뒤 효과를 다시 걸 때 이 동작은 다시 하지 않는다.</summary>
+    public readonly TraitOnceKey[] UsedOnce;
+
     public TraitRejoinSnapshot(int[] acquired, int round, bool roundDone, int resetGeneration,
-        int promptGeneration, bool reselecting, int reselectRoundsLeft, int[] personalOffered)
+        int promptGeneration, bool reselecting, int reselectRoundsLeft, int[] personalOffered, TraitOnceKey[] usedOnce = null)
     {
+        UsedOnce = usedOnce ?? Array.Empty<TraitOnceKey>();
         Acquired = acquired ?? Array.Empty<int>();
         Round = round;
         RoundDone = roundDone;
@@ -52,7 +56,8 @@ public sealed class TraitRejoinSnapshot
 
     public override string ToString() =>
         $"acquired=[{string.Join(",", Acquired)}] round={Round}{(RoundDone ? "(done)" : "")} resetGen={ResetGeneration} " +
-        $"prompt={PromptGeneration} reselect={(Reselecting ? $"{ReselectRoundsLeft} left, offered=[{string.Join(",", PersonalOffered)}]" : "no")}";
+        $"prompt={PromptGeneration} reselect={(Reselecting ? $"{ReselectRoundsLeft} left, offered=[{string.Join(",", PersonalOffered)}]" : "no")}" +
+        (UsedOnce.Length > 0 ? $" usedOnce=[{string.Join(",", UsedOnce)}]" : "");
 }
 
 /// <summary>재합류 복원 때 특성 초기화(Q-D b) 쪽에서 일어난 일.</summary>
@@ -82,8 +87,12 @@ public enum TraitRejoinReset
 /// </summary>
 public static class TraitRejoin
 {
-    /// <summary>퇴장 직전(<see cref="TraitSelectionModel.RemovePlayer"/>·<see cref="TraitResetModel.Remove"/> 전) 상태를 읽는다.</summary>
-    public static TraitRejoinSnapshot Capture(TraitSelectionModel model, TraitResetModel resetModel, ulong clientId)
+    /// <summary>
+    /// 퇴장 직전(<see cref="TraitSelectionModel.RemovePlayer"/>·<see cref="TraitResetModel.Remove"/> 전) 상태를 읽는다.
+    /// <paramref name="usedOnce"/> = 효과 장부의 '획득 1회' 표시(<see cref="TraitEffectLedger{THandle}.CaptureOnce"/>, 없으면 null).
+    /// </summary>
+    public static TraitRejoinSnapshot Capture(TraitSelectionModel model, TraitResetModel resetModel, ulong clientId,
+        IReadOnlyList<TraitOnceKey> usedOnce = null)
     {
         if (model == null)
             throw new ArgumentNullException(nameof(model));
@@ -104,8 +113,16 @@ public static class TraitRejoin
         if (!reselecting)
             personalOffered = Array.Empty<int>();
 
+        TraitOnceKey[] once = Array.Empty<TraitOnceKey>();
+        if (usedOnce != null && usedOnce.Count > 0)
+        {
+            once = new TraitOnceKey[usedOnce.Count];
+            for (int i = 0; i < once.Length; i++)
+                once[i] = usedOnce[i];
+        }
+
         return new TraitRejoinSnapshot(acquired, model.Round, roundDone, resetGeneration,
-            promptGeneration, reselecting, roundsLeft, personalOffered);
+            promptGeneration, reselecting, roundsLeft, personalOffered, once);
     }
 
     /// <summary>

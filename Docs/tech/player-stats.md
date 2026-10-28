@@ -86,7 +86,8 @@
   복제는 서버가 고른 특성 해시 목록뿐이다(`TraitDirector` 획득 행 그대로 — 플레이어 단위 복제 없음). 서버·클라가 같은 SO 를 같은 순수 함수 `TraitModifierSet`(`Assets/1.Scripts/Traits/TraitModifiers.cs`)으로 합성한다.
   그래서 보스방 입장 디버프 정리(`ClearDebuffsServer`)·연출 잠금과 무관하고, **1 미만 배율(페널티)도 그대로** 남는다(예전 상태이상 경로는 1 로 올렸다).
   특성 1장은 `ITraitModifierContributor.GetModifiers` 로 `TraitModifier` 를 기여한다. 질의 표면과 합성 규칙은 아래와 같다.
-  - 스탯 5종 기본%·전체%·가하는 피해% → `IPlayerStatSource`. 같은 단계 % 는 **합**한다(§2). 옛 `TraitEffectKind` 공격력·이동속도 배율은 전체% `값−1` 로 들어온다.
+  - 스탯 5종 기본%·전체%·가하는 피해% → `IPlayerStatSource`. 같은 단계 % 는 **합**한다(§2). 옛 `TraitEffectKind` 는 3/5 에서 폐지 — 스탯 % 는 효과 클래스 `TraitStatEffect`, 공격 계열 배율은 `TraitDamageEffect`([tutorial-traits.md](tutorial-traits.md) §4.1).
+  - 3/5 질의 추가: 범위 배율 `AreaMultiplier(key, axis)`·스킬 수치 덮어쓰기 `ResolveSkillValue(이름, 기본값)`·특성 스위치 `HasTrait(id)`. 회복 배율은 `PlayerTraitEffects.HealServer`(팔라딘 패시브)가 소비한다.
   - 공격 계열 피해 배율 `DamageMultiplier(TraitAttackKey)`. 키 = 기존 `AttackType`(평타 Default·Q/E/R·우클릭 Skill·가붕이 패시브 추가피해 None) × 형태 `TraitAttackForm`(Normal·Alternate = 대체 슬롯/변신·Enhanced = 강타).
     서로 다른 특성끼리 **곱**한다. 기준 피해 Dref 에 **한 번만** 곱한다 — `Player.ResolveDamage(계수, 고정값, key)` → `PlayerStatFormula.Snapshot(…, traitMultiplier)` = round(1차 스냅샷 × (1+가하는 피해%) × 특성 배율). 중간 정수화는 없다.
     소비처는 평타 3종, 가붕이 패시브, `PlayerSkillController` 스킬 승인 스냅샷이다. 차지·과열 후처리는 지금처럼 그 뒤에 곱한다.

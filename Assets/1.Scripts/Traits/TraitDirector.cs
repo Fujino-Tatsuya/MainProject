@@ -38,7 +38,9 @@ public readonly struct TraitChosen
 ///
 /// 효과: 배율 특성 = 여기서 걸지 않는다 — 각 피어의 <see cref="PlayerTraitModifiers"/> 가 이 디렉터의 획득 행을 읽어 같은 순수 함수로 계산한다
 /// (할 일 125 2/5, 상태이상 아님 → 보스방 디버프 정리·연출 잠금과 무관, 1 미만 페널티 유지). 획득 행이 바뀌면 원복·재적용도 자동이다.
-/// 쿨감 특성 = 그 플레이어의 <see cref="Player.ServerAttackLanded"/> 를 구독한다.
+/// 이벤트형 효과(할 일 125 3/5 — 쿨 차감·보호막·밀치기·파생 공격·다음 공격 강화) = 그 플레이어 허브(<see cref="PlayerTraitEffects"/>)에
+/// <see cref="TraitEffectBinder"/> 로 걸고, 되돌리기 장부(<see cref="TraitEffectLedger{THandle}"/>)에 특성 해시 단위로 기록한다 —
+/// 재선택은 전부 되돌린 뒤 다시 고른 것만 걸고, 재합류는 획득 목록과 맞추며, '획득 1회' 동작은 두 경우 모두 다시 하지 않는다.
 /// 선택 창 무적(T2): 제시받고 아직 안 고른 플레이어에게 <see cref="InvulnerabilityCause.TraitSelection"/> 토큰을 건다.
 /// 제시 순간 플레이어 오브젝트가 없었으면 그 플레이어가 스폰될 때(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 아직 미선택이면 다시 건다(T3).
 /// 특성 초기화(할 일 30 3단계): <see cref="PartyWipeRespawner.PartyWipeRespawned"/> → 리스폰한 각자에게 팝업 행(<see cref="EntryKind.ResetPrompt"/>) →
@@ -82,11 +84,18 @@ public sealed class TraitDirector : NetworkBehaviour
         public bool Equals(Entry o) => ClientId == o.ClientId && TraitHash == o.TraitHash && Kind == o.Kind && OfferSeq == o.OfferSeq;
     }
 
-    // 적용한 효과 하나 — 원복에 필요한 것만. 쿨감 특성 = 구독한 핸들러(배율 특성은 PlayerTraitModifiers 가 획득 행으로 계산 — 장부에 없다).
+    // 적용한 특성 하나 — 원복에 필요한 것만: 이벤트형 효과의 되돌리기 핸들(구독·등록·상태, 할 일 125 3/5).
+    // 수치형 기여는 PlayerTraitModifiers 가 획득 행으로 계산하므로 핸들이 없다(그래도 '걸었음' 기록은 남겨 재적용을 막는다).
     private sealed class AppliedEffect
     {
-        public Player Player;
-        public Action<PlayerAttackLanded> Handler;
+        public readonly List<ITraitEffectBinding> Bindings = new List<ITraitEffectBinding>();
+
+        public void Unbind()
+        {
+            for (int i = 0; i < Bindings.Count; i++)
+                Bindings[i].Unbind();
+            Bindings.Clear();
+        }
     }
 
     [SerializeField] private TraitPool pool;
@@ -118,6 +127,8 @@ public sealed class TraitDirector : NetworkBehaviour
     private readonly TraitEffectLedger<AppliedEffect> appliedEffects = new TraitEffectLedger<AppliedEffect>();
     private readonly List<TraitEffectLedger<AppliedEffect>.Record> revertScratch = new List<TraitEffectLedger<AppliedEffect>.Record>();
     private readonly List<ulong> clientScratch = new List<ulong>();
+    private readonly List<TraitOnceKey> onceScratch = new List<TraitOnceKey>();
+    private readonly List<int> applyScratch = new List<int>();
     private bool roundCompletionRaised = true;
 
     // 선택 창 무적(InvulnerabilityCause.TraitSelection) 토큰을 건 플레이어 — 모델의 "아직 안 고름"과 맞춘다.
@@ -219,14 +230,10 @@ public sealed class TraitDirector : NetworkBehaviour
             ReleaseAllSelectionShields();
         }
 
-        // 쿨감 구독을 푼다. 배율 특성은 PlayerTraitModifiers 가 디렉터를 잃으면 빈 목록(전부 1)으로 돌아간다.
+        // 이벤트형 효과를 되돌린다. 배율 특성은 PlayerTraitModifiers 가 디렉터를 잃으면 빈 목록(전부 1)으로 돌아간다.
         IReadOnlyList<TraitEffectLedger<AppliedEffect>.Record> applied = appliedEffects.All;
         for (int i = 0; i < applied.Count; i++)
-        {
-            AppliedEffect effect = applied[i].Handle;
-            if (effect.Handler != null && effect.Player != null)
-                effect.Player.ServerAttackLanded -= effect.Handler;
-        }
+            applied[i].Handle?.Unbind();
 
         appliedEffects.Clear();
         model = null;
@@ -564,16 +571,13 @@ public sealed class TraitDirector : NetworkBehaviour
         return opened;
     }
 
-    // 그 플레이어에게 이 디렉터가 건 이벤트 효과(쿨감 구독)만 되돌린다. 배율 특성은 획득 행이 비면 PlayerTraitModifiers 가 스스로 1 로 돌아간다. 되돌린 수.
+    // 그 플레이어에게 이 디렉터가 건 이벤트형 효과만 되돌린다(구독 해제·등록 해제·강화 상태 정리). 배율 특성은 획득 행이 비면
+    // PlayerTraitModifiers 가 스스로 1 로 돌아간다. '획득 1회' 표시는 남긴다 — 재선택에서 같은 특성을 다시 골라도 1회 동작을 다시 하지 않는다. 되돌린 수.
     private int RevertEffects(ulong clientId)
     {
         int count = appliedEffects.TakeAll(clientId, revertScratch);
         for (int i = 0; i < revertScratch.Count; i++)
-        {
-            AppliedEffect effect = revertScratch[i].Handle;
-            if (effect.Player != null && effect.Handler != null)
-                effect.Player.ServerAttackLanded -= effect.Handler;
-        }
+            revertScratch[i].Handle?.Unbind();
 
         revertScratch.Clear();
         return count;
@@ -652,9 +656,12 @@ public sealed class TraitDirector : NetworkBehaviour
         SaveForRejoin(clientId);
         model.RemovePlayer(clientId);
         resetModel?.Remove(clientId); // 팝업·재선택 대기가 패드 잠금으로 남지 않게
-        // 떠난 플레이어 오브젝트는 곧 사라진다 — 원복 없이 장부에서만 뺀다.
+        // 떠난 플레이어 오브젝트는 곧 사라진다 — 장부에서 빼고 핸들만 푼다(허브 쪽 참조 정리). '획득 1회' 표시는 SaveForRejoin 이 보관했다.
         appliedEffects.TakeAll(clientId, revertScratch);
+        for (int i = 0; i < revertScratch.Count; i++)
+            revertScratch[i].Handle?.Unbind();
         revertScratch.Clear();
+        appliedEffects.ClearOnce(clientId);
 
         RebuildEntries();
         SyncSelectionShields();
@@ -671,7 +678,9 @@ public sealed class TraitDirector : NetworkBehaviour
         if (!MatchRoster.Server.IsActive || !MatchRoster.Server.TryGetPlayerIdByLastClient(clientId, out string playerId))
             return;
 
-        TraitRejoinSnapshot snapshot = TraitRejoin.Capture(model, resetModel, clientId);
+        appliedEffects.CaptureOnce(clientId, onceScratch);
+        TraitRejoinSnapshot snapshot = TraitRejoin.Capture(model, resetModel, clientId, onceScratch);
+        onceScratch.Clear();
         RejoinMemory.Server.SaveTraits(playerId, snapshot);
         Edit.Log($"{Tag} client {clientId}({playerId}) 퇴장 — 재합류용 특성 보관 {snapshot} (보관 {RejoinMemory.Server.TraitCount}건).", this);
     }
@@ -698,6 +707,8 @@ public sealed class TraitDirector : NetworkBehaviour
         else if (reset == TraitRejoinReset.ReselectOffer)
             roundDisplay.Value = (byte)TraitRoundDisplay.None; // 재선택 창엔 복도 안내 문구를 붙이지 않는다(ContinueReselect 와 같다)
 
+        // '획득 1회' 표시를 새 clientId 로 먼저 옮긴다 — 아래에서 효과를 다시 걸 때 이미 한 1회 동작을 건너뛴다.
+        appliedEffects.RestoreOnce(newClientId, snapshot.UsedOnce);
         int applied = ApplyMissingEffects(newClientId);
         RebuildEntries();
         SyncSelectionShields();
@@ -708,22 +719,25 @@ public sealed class TraitDirector : NetworkBehaviour
                  $"초기화 {reset}{(snapshot.HadResetState && !allowReset ? "(튜토리얼 아님 — 건너뜀)" : "")}.", this);
     }
 
-    // 획득했는데 효과 장부에 없는 특성만 효과를 건다 — 복원 직후 + 스폰 전에 자동 획득돼 효과를 놓친 것까지. 건 수.
+    // 획득 목록과 효과 장부를 맞춘다 — 목록에 없는 기록은 되돌리고, 장부에 없는 획득 특성만 효과를 건다
+    // (복원 직후 + 스폰 전에 자동 획득돼 효과를 놓친 것까지). 건 수.
     private int ApplyMissingEffects(ulong clientId)
     {
-        IReadOnlyList<int> acquired = model.GetAcquired(clientId);
-        int applied = 0;
-        for (int i = 0; i < acquired.Count; i++)
-        {
-            int traitHash = acquired[i];
-            if (appliedEffects.Has(clientId, traitHash))
-                continue;
+        appliedEffects.Reconcile(clientId, model.GetAcquired(clientId), applyScratch, revertScratch);
+        for (int i = 0; i < revertScratch.Count; i++)
+            revertScratch[i].Handle?.Unbind();
+        revertScratch.Clear();
 
+        int applied = 0;
+        for (int i = 0; i < applyScratch.Count; i++)
+        {
+            int traitHash = applyScratch[i];
             ApplyEffect(clientId, traitHash, GetTrait(traitHash));
             if (appliedEffects.Has(clientId, traitHash))
                 applied++;
         }
 
+        applyScratch.Clear();
         return applied;
     }
 
@@ -805,44 +819,23 @@ public sealed class TraitDirector : NetworkBehaviour
             return;
         }
 
-        // 배율 종류(공격력·이동속도)는 여기서 걸지 않는다 — 획득 행을 읽는 PlayerTraitModifiers 몫(할 일 125 2/5).
-        if (trait.EffectKind != TraitEffectKind.CooldownReductionOnHit)
-            return;
+        if (appliedEffects.Has(clientId, traitHash))
+            return; // 이미 걸었다(멱등)
 
+        // 수치형 기여(①②④⑦⑩·스탯)는 여기서 걸지 않는다 — 획득 행을 읽는 PlayerTraitModifiers 몫(할 일 125 2/5).
+        // 이벤트형(③⑤⑥⑧⑨)은 플레이어 허브에 건다(3/5). 플레이어가 아직 없으면 기록하지 않는다 — 재합류·다음 맞추기(ApplyMissingEffects)가 다시 건다.
         Player player = FindPlayer(clientId);
         if (player == null)
         {
-            Edit.LogWarning($"{Tag} client {clientId} 의 Player 를 못 찾았다 — '{trait.Id}' 효과를 적용하지 못했다.", this);
+            Edit.LogWarning($"{Tag} client {clientId} 의 Player 를 못 찾았다 — '{trait.Id}' 이벤트 효과를 걸지 못했다(수치 효과는 획득 행으로 적용).", this);
             return;
         }
 
-        HookCooldownReduction(clientId, player, trait, traitHash);
-    }
-
-    private void HookCooldownReduction(ulong clientId, Player player, TraitDefinition trait, int traitHash)
-    {
-        PlayerSkillController skills = player.GetComponent<PlayerSkillController>();
-        if (skills == null)
-        {
-            Edit.LogWarning($"{Tag} '{player.name}' 에 PlayerSkillController 가 없다 — '{trait.Id}' 미적용.", player);
-            return;
-        }
-
-        AttackType trigger = trait.TriggerAttackType;
-        PlayerSkillSlot slot = trait.CooldownSlot;
-        float seconds = trait.Value;
-        Action<PlayerAttackLanded> handler = landed =>
-        {
-            if (landed.AttackType != trigger || skills == null)
-                return;
-
-            PlayerSkillBase skill = skills.GetSkill(slot);
-            if (skill != null)
-                skills.ReduceCooldownServer(skill, seconds);
-        };
-
-        player.ServerAttackLanded += handler;
-        appliedEffects.Add(clientId, traitHash, new AppliedEffect { Player = player, Handler = handler });
+        var applied = new AppliedEffect();
+        int onceRan = TraitEffectBinder.Bind(trait.Effects, PlayerTraitEffects.For(player), clientId, traitHash, appliedEffects, applied.Bindings);
+        appliedEffects.Add(clientId, traitHash, applied);
+        if (applied.Bindings.Count > 0 || onceRan > 0)
+            Edit.Log($"{Tag} client {clientId} '{trait.Id}' 이벤트 효과 {applied.Bindings.Count}개 걸음, 1회 동작 {onceRan}개 실행.", this);
     }
 
     // ── 동기화 ─────────────────────────────────────────────────────────────

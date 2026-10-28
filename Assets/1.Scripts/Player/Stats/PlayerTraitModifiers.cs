@@ -10,7 +10,8 @@ using UnityEngine;
 /// 그래서 보스방 입장 디버프 정리·연출 잠금(상태이상 일괄 해제)과 무관하고, 1 미만 배율(페널티)도 그대로 남는다.
 ///
 /// 소비처: <see cref="PlayerStats"/>(스탯 5종 %·가하는 피해% — <see cref="IPlayerStatSource"/>), 피해 기준(Dref, <see cref="Player.ResolveDamage(float,int,TraitAttackKey)"/>),
-/// 스킬 전체 쿨(<see cref="PlayerSkillController.GetEffectiveCooldownTime"/>). 회복 배율은 질의만 있고 소비처는 3/5.
+/// 스킬 전체 쿨(<see cref="PlayerSkillController.GetEffectiveCooldownTime"/>), 회복 배율(<see cref="PlayerTraitEffects.HealServer"/>).
+/// 3/5: 범위 배율(⑦)·스킬 수치 덮어쓰기(⑩)·특성 스위치(<see cref="HasTrait"/>)는 질의 표면만 — 스킬 연결은 캐릭터 레인.
 /// 획득 목록이 바뀌면(획득·특성 초기화·재합류·디렉터 교체) 다음 LateUpdate 에 다시 합성하고 <see cref="Changed"/> 를 낸다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -49,8 +50,34 @@ public sealed class PlayerTraitModifiers : MonoBehaviour, IPlayerStatSource
     /// <summary>슬롯 전체 쿨 배율(일반/대체 형태 구분). 없으면 1.</summary>
     public float CooldownMultiplier(PlayerSkillSlot slot, TraitAttackForm form) => set.CooldownMultiplier(slot, form);
 
-    /// <summary>회복 배율. 없으면 1. 소비처는 3/5.</summary>
+    /// <summary>회복 배율. 없으면 1. 소비처 = 특성 회복 경로(<see cref="PlayerTraitEffects.HealServer"/>).</summary>
     public float HealMultiplier => set.HealMultiplier;
+
+    /// <summary>⑦ 범위·폭 배율(스킬이 판정·표시 치수에 곱한다). 없으면 1.</summary>
+    public float AreaMultiplier(TraitAttackKey key, TraitAreaAxis axis) => set.AreaMultiplier(key, axis);
+
+    /// <summary>⑩ 스킬 수치 덮어쓰기 — 이름 붙은 스킬 수치(데이터 값 = 기본값)에 특성 연산을 적용한 값.</summary>
+    public float ResolveSkillValue(string key, float baseValue) => set.ResolveSkillValue(key, baseValue);
+
+    /// <summary>
+    /// 특성 스위치 질의(할 일 125 3/5) — 그 ID 의 특성을 골랐는가. 모드 변경 7개(<see cref="TraitModeIds"/>)의 스킬 전용 분기가 묻는다.
+    /// 서버·클라 같은 획득 행을 읽는다(판정은 서버 값).
+    /// </summary>
+    public bool HasTrait(string traitId)
+    {
+        if (string.IsNullOrEmpty(traitId))
+            return false;
+
+        int hash = TraitIdHash.Of(traitId);
+        IReadOnlyList<int> hashes = set.TraitHashes;
+        for (int i = 0; i < hashes.Count; i++)
+        {
+            if (hashes[i] == hash)
+                return true;
+        }
+
+        return false;
+    }
 
     public float GetBasePercent(PlayerStatKind kind) => set.BasePercent(kind);
     public float GetTotalPercent(PlayerStatKind kind) => set.TotalPercent(kind);

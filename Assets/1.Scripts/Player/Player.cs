@@ -1760,13 +1760,32 @@ public class Player : Unit
     /// [서버] 공격 판정 경로(평타·스킬·투사체)가 적중 대상 목록을 넘긴다. 대상이 없으면 발행하지 않는다.
     /// 🔴 "효과가 만든 피해"(패시브 추가타 등)는 여기로 보내지 말 것 — 적중 효과가 자기 자신을 재발동시킨다.
     /// </summary>
-    public void RaiseServerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source)
+    public void RaiseServerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source) =>
+        RaiseServerAttackLanded(attackType, triggersOnHit, targets, source, 0);
+
+    /// <summary>
+    /// [서버] 위와 같고 시전 ID 를 직접 준다(할 일 125 3/5) — 여러 판정을 한 시전·한 동작으로 묶어야 하는 공격(변신 4타 묶음 등)이 쓴다.
+    /// 0 = 자동: 출처가 스킬이면 그 스킬의 이번 시전 ID(<see cref="PlayerSkillBase.ServerCastId"/>), 아니면 이 발행 하나 = 새 시전.
+    /// </summary>
+    public void RaiseServerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source, int castId)
     {
         // 서버 전용 계약을 발행 지점에서 강제한다 — 오너 클라가 부르면 구독자가 로컬 전용 효과를 낸다.
         if (!IsServer || targets == null || targets.Count == 0)
             return;
 
-        ServerAttackLanded?.Invoke(new PlayerAttackLanded(attackType, triggersOnHit, targets, source));
+        if (castId == 0)
+            castId = source is PlayerSkillBase skill && skill.ServerCastId != 0 ? skill.ServerCastId : NextServerCastId();
+
+        ServerAttackLanded?.Invoke(new PlayerAttackLanded(attackType, triggersOnHit, targets, source, castId));
+    }
+
+    private int serverCastSeq;
+
+    /// <summary>[서버] 이 플레이어의 새 시전 ID(1부터 증가, 0 은 쓰지 않는다). 스킬 승인·여러 판정을 묶는 공격이 시작 때 하나 받는다.</summary>
+    public int NextServerCastId()
+    {
+        serverCastSeq = serverCastSeq >= int.MaxValue - 1 ? 1 : serverCastSeq + 1;
+        return serverCastSeq;
     }
 
     /// <summary>
