@@ -1,8 +1,11 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using Unity.Netcode;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 /// <summary>
 /// SerializedProperty 경로 ↔ C# 필드(FieldInfo). 템플릿(어떤 필드를 내보낼지)과 적용기(범위 검증)가 같이 쓴다.
@@ -35,6 +38,92 @@ public static class DataTableFields
         }
 
         return last;
+    }
+
+    /// <summary>
+    /// <see cref="Resolve(Type, string)"/> + <c>[SerializeReference]</c> 칸. 선언 타입으로 못 찾으면(다형 목록 원소의 하위 타입 필드 —
+    /// 특성 효과 <c>effects[0].damageIncrease</c>, 할 일 125) 대상 객체의 실제 값을 따라가 그 런타임 타입에서 찾는다.
+    /// </summary>
+    public static FieldInfo Resolve(Object target, string propertyPath)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        return Resolve(target.GetType(), propertyPath) ?? WalkInstance(target, propertyPath, null);
+    }
+
+    /// <summary><see cref="IsUnderExcluded(Type, string)"/> + <c>[SerializeReference]</c> 칸(실제 값의 런타임 타입으로 조상을 본다).</summary>
+    public static bool IsUnderExcluded(Object target, string propertyPath)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        if (IsUnderExcluded(target.GetType(), propertyPath))
+        {
+            return true;
+        }
+
+        var chain = new List<FieldInfo>();
+        WalkInstance(target, propertyPath, chain);
+        for (int i = 0; i < chain.Count - 1; i++)
+        {
+            if (IsExcluded(chain[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // 실제 값을 따라 경로를 걷는다 — 배열 원소·참조 칸은 들어 있는 객체의 런타임 타입에서 필드를 찾는다. 못 찾으면 null.
+    private static FieldInfo WalkInstance(object root, string propertyPath, List<FieldInfo> chain)
+    {
+        object current = root;
+        FieldInfo last = null;
+        string[] parts = propertyPath.Split('.');
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i] == "Array")
+            {
+                i++;
+                if (i >= parts.Length || !TryParseDataIndex(parts[i], out int index) || !(current is IList list) || index >= list.Count)
+                {
+                    return null;
+                }
+
+                current = list[index];
+                continue;
+            }
+
+            if (current == null)
+            {
+                return null;
+            }
+
+            last = FindField(current.GetType(), parts[i]);
+            if (last == null)
+            {
+                return null;
+            }
+
+            chain?.Add(last);
+            current = last.GetValue(current);
+        }
+
+        return last;
+    }
+
+    private static bool TryParseDataIndex(string part, out int index)
+    {
+        index = -1;
+        const string prefix = "data[";
+        return part.StartsWith(prefix, StringComparison.Ordinal) && part.EndsWith("]", StringComparison.Ordinal) &&
+               int.TryParse(part.Substring(prefix.Length, part.Length - prefix.Length - 1), NumberStyles.None, CultureInfo.InvariantCulture, out index);
     }
 
     /// <summary>기술 값 표시 또는 네트워크 상태(NetworkVariable·NetworkList — 인스펙터 초기값이 아니라 런타임 동기화 값).</summary>

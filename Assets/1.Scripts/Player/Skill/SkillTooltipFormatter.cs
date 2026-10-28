@@ -6,6 +6,18 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 /// <summary>
+/// 툴팁 값 소스가 직렬화 필드 말고 이름으로 값을 내줄 때(할 일 125 특성 카드 — 별칭·효과 목록 안 필드). 자리표시자의 첫 칸에만 쓴다.
+/// </summary>
+public interface ISkillTooltipValueSource
+{
+    /// <summary>
+    /// 이름의 값. 이 소스가 모르는 이름이면 false + <paramref name="error"/> null(포매터가 소스의 직렬화 필드에서 찾는다),
+    /// 알지만 쓸 수 없으면(같은 이름이 둘 등) false + 이유.
+    /// </summary>
+    bool TryGetTooltipValue(string name, out object value, out string error);
+}
+
+/// <summary>
 /// 툴팁 문자열의 자리표시자와 TMP style 태그를 검증·치환하는 순수 C# 포매터.
 /// Unity 직렬화 경로와 같은 <c>field.nested[0]</c> 표기를 사용한다.
 /// 문법(중괄호·style 짝)과 자리표시자 추출은 <see cref="LocText"/> — 문자열 시트 검증과 같은 규칙이다.
@@ -228,14 +240,35 @@ public static class SkillTooltipFormatter
                 return false;
             }
 
-            FieldInfo field = FindField(value.GetType(), name);
-            if (field == null)
+            // 첫 칸은 값 소스가 먼저 푼다(특성 툴팁 — 별칭·효과 필드, TraitTooltipValueSource). 모르는 이름이면 필드 찾기로.
+            object sourced = null;
+            bool fromSource = false;
+            if (segmentIndex == 0 && value is ISkillTooltipValueSource source)
             {
-                error = $"필드 '{path}'가 없다.";
-                return false;
+                fromSource = source.TryGetTooltipValue(name, out sourced, out string sourceError);
+                if (!fromSource && sourceError != null)
+                {
+                    error = $"필드 '{path}' — {sourceError}";
+                    return false;
+                }
             }
 
-            value = field.GetValue(value);
+            if (fromSource)
+            {
+                value = sourced;
+            }
+            else
+            {
+                FieldInfo field = FindField(value.GetType(), name);
+                if (field == null)
+                {
+                    error = $"필드 '{path}'가 없다.";
+                    return false;
+                }
+
+                value = field.GetValue(value);
+            }
+
             if (index.HasValue)
             {
                 if (!(value is IList list) || index.Value < 0 || index.Value >= list.Count)

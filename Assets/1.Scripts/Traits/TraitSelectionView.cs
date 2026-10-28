@@ -12,6 +12,9 @@ using UnityEngine.UI;
 /// - 교착 방지 게이지(창 안): 값은 바깥(복도 흐름)이 <see cref="SetDeadline"/> 으로 넣는다 — 이 뷰는 튜토리얼 디렉터를 모른다.
 /// - 특성 초기화 팝업(할 일 30): 내 팝업 행(<see cref="TraitDirector.TryGetResetPrompt"/>)이 있으면 연다. 질문 + [예]/[아니오], 루트에 <see cref="UiModalBlocker"/>.
 ///   프리팹(저작 메뉴 결과)을 다시 만들지 않으려고 창과 같은 캔버스에 <b>런타임 생성</b>한다. 한 세대에는 한 번만 답한다.
+/// - 카드(할 일 125 5/5): 이름 / 분류 줄 / 설명(<see cref="TraitCardView"/>) + 창 아래 도움말 한 줄(<see cref="TraitUiStrings.Help"/>).
+/// - 2차 상충 확인창(할 일 125 5/5, 명세 §2): 고른 특성이 보유 특성의 효과를 없애면 [확인]/[취소] — 규칙 <see cref="TraitPickConfirmModel"/>,
+///   초기화 팝업과 같이 런타임 생성. 60초 출구 자동 선택은 서버가 첫 후보를 고르므로 확인창이 없다(창이 닫히면 확인창도 보내지 않고 닫힌다).
 /// 씬에 하나 두면 된다(별도 캔버스 — CombatHUD 와 무관). 디렉터가 없으면 아무것도 보이지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -26,6 +29,8 @@ public sealed class TraitSelectionView : MonoBehaviour
     [SerializeField] private TMP_Text lastNoticeText;
     [SerializeField] private RectTransform cardContainer;
     [SerializeField] private TraitCardView cardTemplate;
+    [Tooltip("카드 아래 도움말 한 줄(UI.Trait.Help — 명세 §2 CC 공통 안내). 비어 있으면 그리지 않는다.")]
+    [SerializeField] private TMP_Text helpText;
     [Tooltip("같은 창에서 연속 클릭을 무시하는 시간(초). 서버가 거부하면 이 시간 뒤 다시 고를 수 있다.")]
     [SerializeField, Min(0f)] private float requestCooldown = 1f;
 
@@ -87,6 +92,15 @@ public sealed class TraitSelectionView : MonoBehaviour
     private int resetPromptGeneration;
     private int answeredResetGeneration;
 
+    // 2차 상충 확인창(할 일 125 5/5, 런타임 생성 — 초기화 팝업과 같은 방식). 규칙은 TraitPickConfirmModel.
+    private readonly TraitPickConfirmModel confirm = new TraitPickConfirmModel();
+    private readonly List<string> ownedIds = new List<string>();
+    private readonly List<string> disabledNames = new List<string>();
+    private GameObject confirmPrompt;
+    private TMP_Text confirmText;
+    private TMP_Text confirmYesText;
+    private TMP_Text confirmNoText;
+
     private static readonly Color PromptPanelColor = new Color(0.035f, 0.045f, 0.065f, 0.97f);
     private static readonly Color PromptOutlineColor = new Color(0.48f, 0.42f, 0.25f, 0.9f);
     private static readonly Color PromptAccentColor = new Color(0.95f, 0.82f, 0.42f, 1f);
@@ -98,6 +112,7 @@ public sealed class TraitSelectionView : MonoBehaviour
         if (iconTemplate != null)
             iconTemplate.gameObject.SetActive(false);
         BuildResetPrompt();
+        BuildConfirmPrompt();
         SetActive(window, false);
         SetActive(toast, false);
         SetActive(tooltip, false);
@@ -116,6 +131,7 @@ public sealed class TraitSelectionView : MonoBehaviour
         Bind(null);
         CloseWindow();
         CloseResetPrompt();
+        CloseConfirmPrompt();
         SetActive(toast, false);
         SetDeadline(false, 0f, 0f, 0, 0);
     }
@@ -213,19 +229,23 @@ public sealed class TraitSelectionView : MonoBehaviour
     private void OpenWindow()
     {
         ClearCards();
+        CloseConfirmPrompt(); // 새 제시 — 지난 확인창은 보내지 않고 버린다
+        Player viewer = LocalPlayer();
         if (cardTemplate != null && cardContainer != null)
         {
             for (int i = 0; i < offered.Count; i++)
             {
                 TraitCardView card = Instantiate(cardTemplate, cardContainer);
                 card.gameObject.SetActive(true);
-                card.Bind(director.GetTrait(offered[i]), offered[i], placeholderIcon, HandleCardClicked);
+                card.Bind(director.GetTrait(offered[i]), offered[i], placeholderIcon, HandleCardClicked, viewer);
                 cards.Add(card);
             }
         }
 
         if (title != null)
             title.text = TextOf(TraitTexts.TitleId);
+        if (helpText != null)
+            helpText.text = TraitUiStrings.Help.Text;
         nextRequestAt = 0f;
         SetActive(window, true);
     }
@@ -233,7 +253,16 @@ public sealed class TraitSelectionView : MonoBehaviour
     private void CloseWindow()
     {
         SetActive(window, false);
+        CloseConfirmPrompt(); // 자동 선택·확정으로 창이 닫히면 확인창도 보내지 않고 닫는다
         ClearCards();
+    }
+
+    private static Player LocalPlayer()
+    {
+        NetworkObject playerObject = NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null
+            ? NetworkManager.Singleton.LocalClient.PlayerObject
+            : null;
+        return playerObject != null ? playerObject.GetComponent<Player>() : null;
     }
 
     private void ApplyRoundTexts(TraitRoundDisplay display)
@@ -255,8 +284,91 @@ public sealed class TraitSelectionView : MonoBehaviour
         if (director == null || !model.IsOpen || Time.unscaledTime < nextRequestAt)
             return;
 
+        // 2차 상충(명세 §2) — 보유 특성의 효과를 없애는 선택이면 확인창부터. 아니면 바로 요청.
+        ownedIds.Clear();
+        for (int i = 0; i < acquired.Count; i++)
+            ownedIds.Add(director.GetTrait(acquired[i])?.Id);
+        TraitDefinition chosen = director.GetTrait(traitHash);
+        int send = confirm.Click(traitHash, chosen != null ? chosen.Id : null, ownedIds, TraitContent.Registry);
+        if (confirm.IsAsking)
+        {
+            OpenConfirmPrompt(chosen);
+            return;
+        }
+
+        SendChoose(send);
+    }
+
+    private void SendChoose(int traitHash)
+    {
+        if (traitHash == TraitIdHash.None || director == null || !model.IsOpen)
+            return;
+
         nextRequestAt = Time.unscaledTime + requestCooldown;
         director.RequestChoose(traitHash); // 확정되면 제시 행이 사라져 Evaluate 가 창을 닫는다
+    }
+
+    // ── 2차 상충 확인창(할 일 125 5/5) ───────────────────────────────────
+
+    private void OpenConfirmPrompt(TraitDefinition chosen)
+    {
+        disabledNames.Clear();
+        foreach (string id in confirm.DisabledIds)
+        {
+            TraitDefinition owned = FindAcquired(id);
+            disabledNames.Add(owned != null ? owned.DisplayName : id);
+        }
+
+        if (confirmText != null)
+            confirmText.text = TraitPickConfirmModel.FormatMessage(chosen != null ? chosen.Id : null, disabledNames, TraitContent.Registry);
+        if (confirmYesText != null)
+            confirmYesText.text = TraitUiStrings.ConflictConfirm.Text;
+        if (confirmNoText != null)
+            confirmNoText.text = TraitUiStrings.ConflictCancel.Text;
+        if (confirmPrompt != null)
+            confirmPrompt.transform.SetAsLastSibling(); // 특성 창 위
+        SetActive(confirmPrompt, true);
+    }
+
+    private TraitDefinition FindAcquired(string id)
+    {
+        for (int i = 0; i < acquired.Count; i++)
+        {
+            TraitDefinition trait = director != null ? director.GetTrait(acquired[i]) : null;
+            if (trait != null && trait.Id == id)
+                return trait;
+        }
+
+        return null;
+    }
+
+    private void HandleConfirmAnswer(bool accept)
+    {
+        if (!confirm.IsAsking)
+        {
+            CloseConfirmPrompt();
+            return;
+        }
+
+        int hash = accept ? confirm.Confirm() : TraitIdHash.None;
+        CloseConfirmPrompt();
+        SendChoose(hash);
+    }
+
+    private void CloseConfirmPrompt()
+    {
+        confirm.Reset();
+        SetActive(confirmPrompt, false);
+    }
+
+    // 초기화 팝업과 같은 모양 — 질문 + [확인]/[취소]. 꺼진 채 UiModalBlocker 를 붙여 켜질 때만 입력을 막는다.
+    private void BuildConfirmPrompt()
+    {
+        if (confirmPrompt != null)
+            return;
+
+        confirmPrompt = BuildPrompt("TraitConflictPrompt", () => HandleConfirmAnswer(true), () => HandleConfirmAnswer(false),
+            out confirmText, out confirmYesText, out confirmNoText);
     }
 
     private void ClearCards()
@@ -316,10 +428,18 @@ public sealed class TraitSelectionView : MonoBehaviour
         if (resetPrompt != null)
             return;
 
+        resetPrompt = BuildPrompt("ResetPrompt", () => HandleResetAnswer(true), () => HandleResetAnswer(false),
+            out resetPromptText, out resetYesText, out resetNoText);
+    }
+
+    // 창과 같은 캔버스에 질문 + 버튼 2개 모달을 만든다(꺼진 채). 초기화 팝업·상충 확인창이 같이 쓴다.
+    private GameObject BuildPrompt(string name, UnityEngine.Events.UnityAction onYes, UnityEngine.Events.UnityAction onNo,
+        out TMP_Text question, out TMP_Text yes, out TMP_Text no)
+    {
         Transform parent = window != null && window.transform.parent != null ? window.transform.parent : transform;
         TMP_FontAsset font = title != null ? title.font : null;
 
-        RectTransform root = NewUi("ResetPrompt", parent);
+        RectTransform root = NewUi(name, parent);
         root.gameObject.SetActive(false);
         root.anchorMin = Vector2.zero;
         root.anchorMax = Vector2.one;
@@ -347,7 +467,7 @@ public sealed class TraitSelectionView : MonoBehaviour
         panelLayout.childForceExpandHeight = false;
         panel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        resetPromptText = NewText("Question", panel, font, 30f, FontStyles.Bold, PromptAccentColor);
+        question = NewText("Question", panel, font, 30f, FontStyles.Bold, PromptAccentColor);
 
         RectTransform buttons = NewUi("Buttons", panel);
         HorizontalLayoutGroup buttonsLayout = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -358,9 +478,9 @@ public sealed class TraitSelectionView : MonoBehaviour
         LayoutElement buttonsElement = buttons.gameObject.AddComponent<LayoutElement>();
         buttonsElement.preferredHeight = buttonsElement.minHeight = 64f;
 
-        resetYesText = NewButton("Yes", buttons, font, () => HandleResetAnswer(true));
-        resetNoText = NewButton("No", buttons, font, () => HandleResetAnswer(false));
-        resetPrompt = root.gameObject;
+        yes = NewButton("Yes", buttons, font, onYes);
+        no = NewButton("No", buttons, font, onNo);
+        return root.gameObject;
     }
 
     private static TMP_Text NewButton(string name, Transform parent, TMP_FontAsset font, UnityEngine.Events.UnityAction onClick)
@@ -503,7 +623,7 @@ public sealed class TraitSelectionView : MonoBehaviour
         if (tooltipName != null)
             tooltipName.text = trait.DisplayName;
         if (tooltipDescription != null)
-            tooltipDescription.text = trait.Description;
+            tooltipDescription.text = TraitCardView.DescriptionOf(trait, LocalPlayer(), this);
         SetActive(tooltip, true);
     }
 

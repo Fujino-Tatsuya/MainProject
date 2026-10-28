@@ -13,4 +13,8 @@ MonoBehaviour:
   m_Name: TraitPool
   m_EditorClassIdentifier: Assembly-CSharp::TraitPool
   traits: []
+  characterPools:
+  - {fileID: 11400000, guid: 002f46f7c32827a41a982c8d6467b563, type: 2}
+  - {fileID: 11400000, guid: cf6bc500ff016414bb413ea19d2965c4, type: 2}
+  - {fileID: 11400000, guid: 0c5c01b87c85828489cc33fa65a920cf, type: 2}
   offerCount: 3

@@ -7,12 +7,17 @@ using UnityEngine.UI;
 /// 튜토리얼 특성 선택 UI 프리팹 저작(할 일 15 T2). 실행할 때마다 프리팹 내용을 처음부터 다시 만든다(같은 경로 = guid 유지).
 /// 손으로 다듬기 시작하면 이 메뉴를 다시 돌리지 말 것 — 덮어쓴다.
 /// 별도 Screen Space Overlay 캔버스라 CombatHUD 와 무관하다. 씬 배치는 S12(복도 씬)에서 프리팹을 끌어다 둔다.
+/// <para>
+/// 할 일 125 5/5 — 카드 분류 줄·창 도움말 줄은 <see cref="AddCategoryAndHelp"/>(<c>분류·도움말 줄 추가</c>)가 <b>지금 프리팹에 빠진 것만</b> 더한다
+/// (배치·글꼴·색 유지, 이미 있으면 저장하지 않음). 상충 확인창은 프리팹이 아니라 런타임 생성(<see cref="TraitSelectionView"/>).
+/// </para>
 /// </summary>
 public static class TraitUiAuthoring
 {
     private const string Folder = "Assets/2.Prefabs/UI/Tutorial";
     private const string PrefabPath = Folder + "/TraitUI.prefab";
-    private const string FontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
+    // 10-21 서울알림체 교체(518ae574) — 전체 재생성이 옛 NotoSansKR 로 되돌리지 않게.
+    private const string FontPath = "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset";
     private const string TextTablePath = "Assets/9.ScriptableObject/Traits/TraitTexts.asset";
     private const int SortingOrder = 60; // CombatHUD(0) 위
 
@@ -128,12 +133,17 @@ public static class TraitUiAuthoring
             LayoutElement cardIconElement = cardIconRect.gameObject.AddComponent<LayoutElement>();
             cardIconElement.preferredHeight = cardIconElement.minHeight = 104f;
             TMP_Text cardName = NewText("Name", cardTemplate, font, 26f, FontStyles.Bold, TextAlignmentOptions.Center, AccentColor);
+            TMP_Text cardCategory = NewText(CategoryName, cardTemplate, font, CategorySize, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
             TMP_Text cardDescription = NewText("Description", cardTemplate, font, 19f, FontStyles.Normal, TextAlignmentOptions.Top, Color.white);
             TraitCardView cardView = cardTemplate.gameObject.AddComponent<TraitCardView>();
             SetRef(cardView, "button", button);
             SetRef(cardView, "icon", cardIcon);
             SetRef(cardView, "displayName", cardName);
+            SetRef(cardView, "category", cardCategory);
             SetRef(cardView, "description", cardDescription);
+
+            TMP_Text help = NewText(HelpName, panel, font, HelpSize, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
+            help.text = TraitUiStrings.Help.Ko;
 
             TMP_Text lastNotice = NewText("LastNotice", panel, font, 20f, FontStyles.Italic, TextAlignmentOptions.Center, AccentColor);
             lastNotice.text = TraitTexts.LastNotice;
@@ -189,6 +199,7 @@ public static class TraitUiAuthoring
             so.FindProperty("lastNoticeText").objectReferenceValue = lastNotice;
             so.FindProperty("cardContainer").objectReferenceValue = cards;
             so.FindProperty("cardTemplate").objectReferenceValue = cardView;
+            so.FindProperty("helpText").objectReferenceValue = help;
             so.FindProperty("deadlineRoot").objectReferenceValue = deadline.gameObject;
             so.FindProperty("deadlineFill").objectReferenceValue = fill;
             so.FindProperty("deadlineSecondsText").objectReferenceValue = deadlineSeconds;
@@ -221,6 +232,90 @@ public static class TraitUiAuthoring
         {
             Object.DestroyImmediate(root);
         }
+    }
+
+    private const string CategoryName = "Category";
+    private const string HelpName = "Help";
+    private const float CategorySize = 18f;
+    private const float HelpSize = 18f;
+
+    /// <summary>
+    /// 지금 프리팹에 카드 분류 줄(<c>CardTemplate/Category</c> — 이름 바로 아래)·창 도움말 줄(<c>Panel/Help</c> — 카드 줄 바로 아래)이 없으면 더한다.
+    /// 다른 자식·배치·글꼴은 건드리지 않는다(글꼴·색은 옆 글자에서 복사). 둘 다 이미 연결돼 있으면 저장하지 않는다(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 분류·도움말 줄 추가 (배치 유지)")]
+    public static void AddCategoryAndHelp()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            bool changed = false;
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var viewSo = new SerializedObject(view);
+            var cardView = viewSo.FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            if (cardView == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿(cardTemplate)이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            var cardSo = new SerializedObject(cardView);
+            SerializedProperty category = cardSo.FindProperty("category");
+            if (category.objectReferenceValue == null)
+            {
+                var name = cardSo.FindProperty("displayName").objectReferenceValue as TMP_Text;
+                TMP_Text text = CloneTextStyle(CategoryName, cardView.transform, name, CategorySize, FontStyles.Normal, SubtleColor);
+                text.alignment = TextAlignmentOptions.Center;
+                if (name != null)
+                    text.transform.SetSiblingIndex(name.transform.GetSiblingIndex() + 1);
+                category.objectReferenceValue = text;
+                cardSo.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+
+            SerializedProperty help = viewSo.FindProperty("helpText");
+            if (help.objectReferenceValue == null)
+            {
+                var cards = viewSo.FindProperty("cardContainer").objectReferenceValue as RectTransform;
+                var title = viewSo.FindProperty("title").objectReferenceValue as TMP_Text;
+                Transform panel = cards != null ? cards.parent : null;
+                if (panel == null)
+                {
+                    Debug.LogError("[Trait] TraitUI.prefab 의 카드 줄(cardContainer) 부모 패널을 못 찾았다.");
+                    return;
+                }
+
+                TMP_Text text = CloneTextStyle(HelpName, panel, title, HelpSize, FontStyles.Normal, SubtleColor);
+                text.alignment = TextAlignmentOptions.Center;
+                text.text = TraitUiStrings.Help.Ko;
+                text.transform.SetSiblingIndex(cards.GetSiblingIndex() + 1);
+                help.objectReferenceValue = text;
+                viewSo.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 분류·도움말 줄이 이미 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 분류·도움말 줄 추가 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 옆 글자(source)의 글꼴을 따라 새 TMP 를 만든다. source 가 없으면 기본 글꼴.
+    private static TMP_Text CloneTextStyle(string name, Transform parent, TMP_Text source, float size, FontStyles style, Color color)
+    {
+        TMP_FontAsset font = source != null ? source.font : AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        TMP_Text text = NewText(name, parent, font, size, style, TextAlignmentOptions.Center, color);
+        text.gameObject.layer = parent.gameObject.layer;
+        return text;
     }
 
     private static Image AddPanel(GameObject target)

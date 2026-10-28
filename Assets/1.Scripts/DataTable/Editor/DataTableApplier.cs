@@ -196,7 +196,7 @@ public static class DataTableApplier
                     continue;
                 }
 
-                FieldInfo resolvedField = DataTableFields.Resolve(targetType, path);
+                FieldInfo resolvedField = DataTableFields.Resolve(target, path); // [SerializeReference] 칸(특성 효과)은 실제 값의 타입으로
                 if (property.propertyType == SerializedPropertyType.String && DataTableFields.IsLocalizedText(resolvedField))
                 {
                     localizedSkipped.Add(entry); // 번역 문구는 Strings 시트가 원본 — 수치 시트 칸은 적용하지 않는다(병합 Export 가 옮긴다).

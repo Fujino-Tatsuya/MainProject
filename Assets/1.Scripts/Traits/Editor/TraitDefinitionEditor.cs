@@ -8,7 +8,7 @@ using UnityEngine;
 /// 기본 인스펙터만으로는 칸에 넣을 효과 종류를 고를 수 없다. 종류 목록은 <see cref="TraitEffect"/> 의 구체 하위 클래스 전부.
 /// 아래에 데이터 검증 오류(<see cref="TraitDefinition.Validate"/>)를 보여 준다.
 /// </summary>
-[CustomEditor(typeof(TraitDefinition))]
+[CustomEditor(typeof(TraitDefinition), true)] // 캐릭터 하위 타입(Paladin/Gunner/AssassinTraitDefinition)도 — 할 일 125 5/5
 internal sealed class TraitDefinitionEditor : Editor
 {
     public override void OnInspectorGUI()
