@@ -506,10 +506,11 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
             assassinState.ServerTryGainRage(AssassinRageSource.DashStrike);
 
         // 변신 Q — 사용당 최초 유효 적중 1회만 쿨 차감(보스·몹·송전기·허수아비, 상자 제외). 여러 대상이어도 1회.
-        // 그림자 회귀 출발 단계는 쿨이 아직 시작 전(복귀 때 시작)이라 차감이 저장되지 않고 보상만 소모된다(준비된 스킬엔 저장 안 함 — 기본 규칙).
+        // 그림자 회귀 출발 단계는 쿨이 아직 시작 전(복귀·만료 때 시작) — 장치가 차감을 보류했다가 쿨이 시작될 때 바른다(할 일 133 h).
+        // 보상은 장부가 왕복 전체 1회로 거르므로 복귀 단계 적중은 다시 차감하지 않는다.
         if (data.HitCooldownReduction > 0f && activeLedger.TryClaimCooldownReward(landedRewardTarget))
         {
-            controller?.ReduceCooldownServer(CooldownRewardSkill, data.HitCooldownReduction);
+            controller?.ReduceCooldownOrHoldServer(CooldownRewardSkill, data.HitCooldownReduction);
             Edit.Log($"[Assassin/Q] 변신 Q 적중 — 쿨타임 {data.HitCooldownReduction:F1}s 차감", this);
         }
     }

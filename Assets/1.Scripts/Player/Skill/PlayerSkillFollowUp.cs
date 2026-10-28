@@ -30,6 +30,13 @@ public static class PlayerSkillFollowUpRules
     public static bool StartsCooldownOnApproval(PlayerSkillFollowUpKind kind, bool commitCooldownManually) =>
         kind == PlayerSkillFollowUpKind.Normal && !commitCooldownManually;
 
+    /// <summary>
+    /// 후속 창 시각(초, 실제 시간) — 세션 중 = <see cref="NetworkClock.UnslowedGameNow"/>(서버 시간 − 일시정지, 간파 슬로우·히트스톱 무관 —
+    /// 슬로우 타임라인과 같은 도메인), 세션 밖 = unscaled 시간. Time.time 은 슬로우 중 덜 흘러 창이 늘어난다(할 일 133 i).
+    /// </summary>
+    public static double WindowNow(bool sessionRunning, double unslowedGameNow, double unscaledNow) =>
+        sessionRunning ? unslowedGameNow : unscaledNow;
+
     public static bool IsSet(byte mask, int slot) => slot >= 0 && slot < SlotCount && (mask & (1 << slot)) != 0;
 
     public static byte With(byte mask, int slot, bool set)
@@ -50,8 +57,8 @@ public static class PlayerSkillFollowUpRules
 }
 
 /// <summary>
-/// [서버] 칸별 후속 상태 — 열림·원래/후속 스킬 인덱스·원래 시전 ID·창. 닫는 메서드는 '지금 쿨을 시작할 원래 스킬 인덱스'를 돌려준다.
-/// 시간은 호출자가 넣는다(컨트롤러 = Time.time).
+/// [서버] 칸별 후속 상태 — 열림·원래/후속 스킬 인덱스·원래 시전 ID·창·쿨 시작 전 차감 보류. 닫는 메서드는 '지금 쿨을 시작할 원래 스킬 인덱스'를 돌려준다.
+/// 시간은 호출자가 넣는다(컨트롤러 = 실제 시간 — 간파 슬로우·히트스톱에 창이 늘지 않는다, 할 일 133 i).
 /// </summary>
 public sealed class PlayerSkillFollowUpModel
 {
@@ -66,6 +73,8 @@ public sealed class PlayerSkillFollowUpModel
     }
 
     private readonly Entry[] entries = new Entry[PlayerSkillFollowUpRules.SlotCount];
+    // 원래 스킬 인덱스 → 쿨 시작 전에 받은 쿨 차감(초). 쿨이 시작될 때 한 번 가져간다(할 일 133 h).
+    private readonly Dictionary<int, float> heldReductions = new Dictionary<int, float>();
 
     /// <summary>후속이 열린 칸 비트(복제값).</summary>
     public byte OpenMask { get; private set; }
@@ -96,8 +105,32 @@ public sealed class PlayerSkillFollowUpModel
             return false;
 
         entries[slot] = new Entry { Open = true, Source = sourceIndex, FollowUp = followUpIndex, CastId = castId };
+        heldReductions.Remove(sourceIndex); // 새 사용 — 이전 사용의 보류분은 남기지 않는다
         RecalculateMask();
         return true;
+    }
+
+    /// <summary>
+    /// 후속에 묶여 쿨이 아직 시작 전인 원래 스킬이 받은 쿨 차감을 보류한다(쿨이 시작되면 <see cref="TakeHeldReduction"/> 으로 적용).
+    /// 묶여 있지 않거나 0 이하면 false(호출자가 평소처럼 바로 줄인다).
+    /// </summary>
+    public bool HoldReduction(int sourceIndex, float seconds)
+    {
+        if (seconds <= 0f || !HoldsSource(sourceIndex))
+            return false;
+
+        heldReductions[sourceIndex] = (heldReductions.TryGetValue(sourceIndex, out float held) ? held : 0f) + seconds;
+        return true;
+    }
+
+    /// <summary>쿨 시작 때 보류된 차감을 가져간다(가져가면 비움). 없으면 0.</summary>
+    public float TakeHeldReduction(int sourceIndex)
+    {
+        if (!heldReductions.TryGetValue(sourceIndex, out float held))
+            return 0f;
+
+        heldReductions.Remove(sourceIndex);
+        return held;
     }
 
     /// <summary>창을 지금부터 시작한다. 이미 시작했거나 그 원래 스킬의 후속이 아니면 무시. 0초 = 다음 만료 검사에 닫힌다.</summary>

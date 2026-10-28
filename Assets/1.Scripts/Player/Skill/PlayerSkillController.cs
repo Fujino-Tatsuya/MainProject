@@ -158,6 +158,16 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
     // 쿨 장부 전용 시각. 시계가 없으면(Awake 전) 실시간으로 대신한다.
     private float CooldownNow => cooldownClock != null ? cooldownClock.SkillNow : Time.time;
+    // 후속 창 전용 시각 — 실제 시간(슬로우·히트스톱에 창이 늘지 않음). 규칙은 PlayerSkillFollowUpRules.WindowNow.
+    private static float FollowUpWindowNow
+    {
+        get
+        {
+            NetworkClock clock = NetworkClock.Instance;
+            bool running = clock != null && clock.IsRunning;
+            return (float)PlayerSkillFollowUpRules.WindowNow(running, running ? clock.UnslowedGameNow : 0d, Time.unscaledTimeAsDouble);
+        }
+    }
 
     private void Awake()
     {
@@ -868,8 +878,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         }
 
         float cooldownTime = GetEffectiveCooldownTime(skill);
-        cooldownLedger.Start(skillIndex, CooldownNow, cooldownTime);
-        Edit.Log($"[Skill] {skill.Slot} 쿨타임 시작 {cooldownTime}s", this);
+        float now = CooldownNow;
+        cooldownLedger.Start(skillIndex, now, cooldownTime);
+        // 후속 창 동안 보류한 차감(그림자 회귀 출발 단계의 변신 Q 적중 등)을 시작한 쿨에 한 번 바른다.
+        float held = followUps.TakeHeldReduction(skillIndex);
+        if (held > 0f)
+            cooldownLedger.Reduce(skillIndex, now, held);
+        Edit.Log($"[Skill] {skill.Slot} 쿨타임 시작 {cooldownTime}s{(held > 0f ? $" − 보류 차감 {held:0.##}s" : string.Empty)}", this);
 
         MirrorCooldownToOwner(skillIndex);
     }
@@ -931,6 +946,22 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return;
 
         MirrorCooldownToOwner(skillIndex);
+    }
+
+    /// <summary>
+    /// [서버] 위와 같고, 후속 창에 묶여 쿨이 아직 시작 전이면 버리지 않고 보류했다가 쿨이 시작될 때 바른다(할 일 133 h — 그림자 회귀 출발 단계 적중).
+    /// 보류는 그 사용 한 번에만 남는다(다음 원래 스킬 사용이 비운다).
+    /// </summary>
+    public void ReduceCooldownOrHoldServer(PlayerSkillBase skill, float seconds)
+    {
+        int skillIndex = GetSkillIndex(skill);
+        if (HasGameplayAuthority && skillIndex != InvalidSkillIndex && followUps.HoldReduction(skillIndex, seconds))
+        {
+            Edit.Log($"[Skill] {skill.Slot} 쿨 차감 {seconds:0.##}s 보류 — 후속 창이 열려 쿨 시작 전(시작 때 적용)", this);
+            return;
+        }
+
+        ReduceCooldownServer(skill, seconds);
     }
 
     /// <summary>[서버] 슬롯에 지금 바인딩된 스킬(대체 슬롯 포함)의 남은 쿨타임을 감소시킨다.</summary>
@@ -1650,7 +1681,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (!HasGameplayAuthority || sourceIndex == InvalidSkillIndex)
             return;
 
-        if (followUps.BeginWindow((int)source.Slot, sourceIndex, Time.time, source.FollowUpWindowSeconds))
+        if (followUps.BeginWindow((int)source.Slot, sourceIndex, FollowUpWindowNow, source.FollowUpWindowSeconds))
             Edit.Log($"[Skill] {source.Slot} 후속 창 시작 {source.FollowUpWindowSeconds:0.##}s (스킬 지정)", this);
     }
 
@@ -1758,7 +1789,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return;
         }
 
-        float now = Time.time;
+        float now = FollowUpWindowNow;
         for (int i = 0; i < SlotCount; i++)
         {
             if (!followUps.IsOpen(i) || followUps.IsWindowStarted(i))

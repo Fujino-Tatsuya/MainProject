@@ -286,15 +286,90 @@ public sealed class AssassinTraitShadowReturnTests
         Assert.IsFalse(ledger.TryClaimCooldownReward(true));
     }
 
-    [Test]
-    public void TransformedQ_OutboundHitWhileCooldownHeld_ReductionNotStored()
+    // 장치가 쿨 시작 때 하는 일 — StartCooldownNow 와 같은 순서(시작 → 보류 차감 한 번).
+    static void StartWithHeld(PlayerSkillFollowUpModel model, PlayerSkillCooldownLedger ledger, int sourceIndex, float now, float cooldown)
     {
-        // 출발 적중 시점엔 원래 Q 쿨이 아직 시작 전(창 동안 보류) — 준비된 스킬엔 차감을 저장하지 않는다(기본 규칙).
+        if (sourceIndex < 0 || !ledger.IsReady(sourceIndex, now))
+            return;
+        ledger.Start(sourceIndex, now, cooldown);
+        float held = model.TakeHeldReduction(sourceIndex);
+        if (held > 0f)
+            ledger.Reduce(sourceIndex, now, held);
+    }
+
+    // 변신 Q 적중 차감 경로(ReduceCooldownOrHoldServer) — 묶여 있으면 보류, 아니면 바로.
+    static void ReduceOrHold(PlayerSkillFollowUpModel model, PlayerSkillCooldownLedger ledger, int sourceIndex, float now, float seconds)
+    {
+        if (!model.HoldReduction(sourceIndex, seconds))
+            ledger.Reduce(sourceIndex, now, seconds);
+    }
+
+    [Test]
+    public void TransformedQ_OutboundHitBeforeCooldown_HeldThenAppliedOnceWhenCooldownStarts()
+    {
+        const float cooldown = 3.6f, reduction = 1.5f; // 변신 Q 3 × 1.2, 적중 차감 1.5
+        var model = new PlayerSkillFollowUpModel();
         var ledger = new PlayerSkillCooldownLedger(4);
-        ledger.Reduce(TransformedSourceIndex, 1f, 1.5f);
-        Assert.IsTrue(ledger.IsReady(TransformedSourceIndex, 1f));
-        ledger.Start(TransformedSourceIndex, 2f, 3.6f);
-        Assert.AreEqual(3.6f, ledger.GetRemaining(TransformedSourceIndex, 2f), Eps, "복귀 때 시작한 쿨은 전체 3 × 1.2");
+        var hits = new AssassinDashHitLedger();
+
+        // 출발 단계 적중 — 쿨 시작 전이라 보류(버리지 않는다).
+        model.Open(Q, TransformedSourceIndex, TransformedReturnIndex, 5);
+        hits.Begin();
+        Assert.IsTrue(hits.TryClaimCooldownReward(true));
+        ReduceOrHold(model, ledger, TransformedSourceIndex, 1f, reduction);
+        Assert.IsTrue(ledger.IsReady(TransformedSourceIndex, 1f), "창 동안 쿨 미시작 — 준비 상태 그대로");
+
+        // 복귀 사용 = 쿨 시작 + 보류 차감 적용.
+        int source = model.Consume(Q, TransformedReturnIndex);
+        StartWithHeld(model, ledger, source, 2f, cooldown);
+        Assert.AreEqual(cooldown - reduction, ledger.GetRemaining(TransformedSourceIndex, 2f), Eps, "쿨 시작 때 1.5초 차감");
+
+        // 복귀 단계 적중 — 왕복 전체 1회라 다시 차감하지 않는다.
+        hits.BeginNextStage();
+        Assert.IsFalse(hits.TryClaimCooldownReward(true), "왕복 전체 1회");
+        Assert.AreEqual(0f, model.TakeHeldReduction(TransformedSourceIndex), Eps, "보류분은 한 번만 가져간다");
+        Assert.AreEqual(cooldown - reduction, ledger.GetRemaining(TransformedSourceIndex, 2f), Eps);
+    }
+
+    [Test]
+    public void TransformedQ_HeldReduction_AppliedOnExpiry_AndNotCarriedToNextUse()
+    {
+        var model = new PlayerSkillFollowUpModel();
+        var ledger = new PlayerSkillCooldownLedger(4);
+        var closed = new List<int>();
+
+        // 출발 적중 후 창 만료 = 쿨 시작 + 보류 차감.
+        model.Open(Q, TransformedSourceIndex, TransformedReturnIndex, 1);
+        Assert.IsTrue(model.HoldReduction(TransformedSourceIndex, 1.5f));
+        model.BeginWindow(Q, TransformedSourceIndex, 1f, 3f);
+        Assert.AreEqual(1, model.CollectExpired(4f, closed));
+        StartWithHeld(model, ledger, closed[0], 4f, 3.6f);
+        Assert.AreEqual(2.1f, ledger.GetRemaining(TransformedSourceIndex, 4f), Eps, "만료 때 시작한 쿨에도 적용");
+
+        // 묶여 있지 않으면 보류하지 않는다(평소처럼 바로 줄인다).
+        Assert.IsFalse(model.HoldReduction(TransformedSourceIndex, 1.5f), "후속 닫힘 = 보류 없음");
+
+        // 시작 못 한 보류분은 다음 사용이 비운다.
+        model.Open(Q, TransformedSourceIndex, TransformedReturnIndex, 2);
+        model.HoldReduction(TransformedSourceIndex, 1.5f);
+        model.Open(Q, TransformedSourceIndex, TransformedReturnIndex, 3);
+        Assert.AreEqual(0f, model.TakeHeldReduction(TransformedSourceIndex), Eps, "새 사용 = 이전 보류분 없음");
+    }
+
+    // ── 복귀 창 = 실제 시간(슬로우·히트스톱에 늘지 않음, 할 일 133 i) ──────
+
+    [Test]
+    public void Window_RealTime_SlowMotionDoesNotExtend()
+    {
+        Assert.AreEqual(12.5, PlayerSkillFollowUpRules.WindowNow(true, 12.5, 99.0), 1e-9, "세션 중 = 일시정지만 뺀 서버 시간(슬로우 보정 전)");
+        Assert.AreEqual(99.0, PlayerSkillFollowUpRules.WindowNow(false, 0.0, 99.0), 1e-9, "세션 밖 = unscaled");
+
+        // 창 시작 t=10(실제), 0.2배 슬로우로 게임 시간은 0.6초만 흘러도 실제 3초가 지나면 닫힌다.
+        var model = new PlayerSkillFollowUpModel();
+        model.Open(Q, SourceIndex, ReturnIndex, 1);
+        model.BeginWindow(Q, SourceIndex, (float)PlayerSkillFollowUpRules.WindowNow(true, 10.0, 0.0), 3f);
+        Assert.AreEqual(0, model.CollectExpired((float)PlayerSkillFollowUpRules.WindowNow(true, 12.99, 0.0), null));
+        Assert.AreEqual(1, model.CollectExpired((float)PlayerSkillFollowUpRules.WindowNow(true, 13.0, 0.0), null), "실제 3초 = 만료");
     }
 
     // ── 같은 시전 ID · 강제 복귀(R 전환·사망) · 저장점 폐기 ─────────────

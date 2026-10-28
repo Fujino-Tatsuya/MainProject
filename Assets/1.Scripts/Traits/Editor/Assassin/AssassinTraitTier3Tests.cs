@@ -262,6 +262,37 @@ public sealed class AssassinTraitTier3Tests
         }
     }
 
+    [Test]
+    public void Area_TransformedE_AimMarkerRadius_EqualsHitRadius()
+    {
+        // 조준 원(PlayerSkillTargeting) = 그 칸 스킬 키(E·변신)로 같은 반경 배율을 묻는다 — 판정(ScaledRadius)과 같은 값(할 일 133 d).
+        TraitAttackKey markerKey = TraitAttackKey.ForSkill(PlayerSkillSlot.Sub, alternate: true);
+        Assert.AreEqual(AssassinTraitAreaRules.CircleStrike, markerKey, "변신 E 칸 키 = 판정 키");
+
+        var data = ScriptableObject.CreateInstance<AssassinCircleStrikeSkillData>();
+        try
+        {
+            var so = new UnityEditor.SerializedObject(data);
+            so.FindProperty("aoeRadius").floatValue = 2f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            TraitModifierSet owned = SetOf(Area);
+            float hit = AssassinTraitAreaRules.ScaleRadius(data.AreaRadius, owned.AreaMultiplier(AssassinTraitAreaRules.CircleStrike, TraitAreaAxis.Radius));
+            float marker = PlayerSkillTargeting.GroundMarkerRadius(data, owned.AreaMultiplier(markerKey, TraitAreaAxis.Radius));
+            Assert.AreEqual(2.5f, hit, Eps);
+            Assert.AreEqual(hit, marker, Eps, "보유 = 표시 반경도 ×1.25");
+
+            Assert.AreEqual(2f, PlayerSkillTargeting.GroundMarkerRadius(data, SetOf().AreaMultiplier(markerKey, TraitAreaAxis.Radius)), Eps,
+                "미보유 = 기존 값(데이터 반경)");
+            Assert.AreEqual(2f, PlayerSkillTargeting.GroundMarkerRadius(data, owned.AreaMultiplier(NormalE, TraitAreaAxis.Radius)), Eps,
+                "일반 E 칸은 배율 없음");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(data);
+        }
+    }
+
     // ── 돌파의 여세 ─────────────────────────────────────────────────────
 
     [Test]
