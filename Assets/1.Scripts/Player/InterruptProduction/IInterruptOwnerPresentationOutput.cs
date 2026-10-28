@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 오너 암전 강도 출력(할 일 132) — 0 = 없음, 1 = 칸에 정한 색·불투명도 그대로. 오너 화면에만 붙는다.
-/// 실제 렌더(마스크 암전)는 단계 3 이 붙인다 — 그 전엔 <see cref="InterruptOwnerPresentationLogOutput"/>.
+/// 실제 렌더 = <see cref="InterruptOwnerDimOutput"/>(마스크 암전, 단계 3) — 디렉터가 없으면 <see cref="InterruptOwnerPresentationLogOutput"/>.
 /// </summary>
 public interface IInterruptOwnerDimOutput
 {
@@ -19,7 +19,7 @@ public interface IInterruptLightGatherOutput
     void StopLightGather();
 }
 
-/// <summary>단계 3·4 전 임시 출력 — 바뀔 때만 에디터 로그(빌드에선 호출째 빠진다).</summary>
+/// <summary>임시 출력(빛 모임 = 단계 4 전, 암전 = 렌더 출력이 없을 때) — 바뀔 때만 에디터 로그(빌드에선 호출째 빠진다).</summary>
 public sealed class InterruptOwnerPresentationLogOutput : IInterruptOwnerDimOutput, IInterruptLightGatherOutput
 {
     private float _lastLoggedDim = -1f;

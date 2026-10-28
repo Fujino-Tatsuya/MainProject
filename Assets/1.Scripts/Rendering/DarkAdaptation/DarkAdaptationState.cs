@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// <see cref="InterruptDarkAdaptation"/> → <see cref="DarkAdaptationFeature"/> 값 통로. 할 일 87 C3.
-/// 강도가 0 이면 렌더러 기능이 패스를 넣지 않는다.
+/// <see cref="InterruptDarkAdaptation"/>(휘도)·<see cref="InterruptOwnerDimOutput"/>(마스크) → <see cref="DarkAdaptationFeature"/> 값 통로. 할 일 87 C3·132.
+/// 강도가 0 이면 렌더러 기능이 그 모드의 패스를 넣지 않는다.
 /// </summary>
 public static class DarkAdaptationState
 {
@@ -21,13 +21,67 @@ public static class DarkAdaptationState
     /// <summary>원형 가장자리 부드러움(화면 높이 비율).</summary>
     public static float RevealSoftness = 0.1f;
 
+    // ---- 마스크 암전(오너, 할 일 132) — InterruptOwnerDimOutput 이 쓴다 ----
+
+    /// <summary>오너 마스크 암전 강도 [0, 1]. 0 = 꺼짐(마스크 패스 없음).</summary>
+    public static float MaskIntensity;
+    /// <summary>
+    /// 마스크 패스가 덮개 알파를 써 넣을 대상 — 흰색 RGB + 알파 = 1 − 남김. 최상위 오버레이 캔버스(HUD 덮개)가 이것을 화면에 깐다.
+    /// 없으면 마스크 패스를 넣지 않는다.
+    /// </summary>
+    public static RenderTexture MaskCoverTarget;
+
+    /// <summary>휘도 암순응만 끈다(마스크 암전은 오너 출력이 따로 끈다).</summary>
     public static void Clear()
     {
         Intensity = 0f;
         RevealRadius = 0f;
     }
 
+    public static void ClearMask()
+    {
+        MaskIntensity = 0f;
+        MaskCoverTarget = null;
+    }
+
     // 도메인 리로드를 끈 Play 진입에서도 이전 값이 남지 않게.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetOnLoad() => Clear();
+    private static void ResetOnLoad()
+    {
+        Clear();
+        ClearMask();
+    }
+}
+
+/// <summary><see cref="DarkAdaptationFeature"/> 의 모드(할 일 132) — 한 기능에 두 패스, 강도가 0 인 모드는 넣지 않는다.</summary>
+[System.Flags]
+public enum DarkAdaptationMode
+{
+    None = 0,
+    /// <summary>휘도 암순응(팀원·기존 A2) — 어두운 픽셀만 낮춘다.</summary>
+    Luminance = 1,
+    /// <summary>마스크 암전(오너) — 비트 4 렌더러만 남기고 화면 전체(HUD 포함)를 덮는다.</summary>
+    Mask = 2,
+}
+
+/// <summary>모드 선택·덮개 색 순수 로직(EditMode 테스트 대상).</summary>
+public static class DarkAdaptationModes
+{
+    /// <summary>강도가 0 보다 큰 모드만. 마스크는 덮개 대상이 있어야 한다. 둘 다 0 이면 None — 패스 없음(평소 비용 0).</summary>
+    public static DarkAdaptationMode Select(float luminanceIntensity, float maskIntensity, bool hasMaskTarget)
+    {
+        DarkAdaptationMode mode = DarkAdaptationMode.None;
+        if (luminanceIntensity > 0f)
+            mode |= DarkAdaptationMode.Luminance;
+        if (maskIntensity > 0f && hasMaskTarget)
+            mode |= DarkAdaptationMode.Mask;
+        return mode;
+    }
+
+    /// <summary>덮개 알파 = 불투명도 × 강도(둘 다 [0, 1]로 자른다).</summary>
+    public static float CoverAlpha(float opacity, float intensity) => Mathf.Clamp01(opacity) * Mathf.Clamp01(intensity);
+
+    /// <summary>덮개 색 — RGB 는 칸 색, 알파는 <see cref="CoverAlpha"/>(칸 색의 알파는 쓰지 않는다 — 불투명도 칸 하나로).</summary>
+    public static Color CoverColor(Color color, float opacity, float intensity) =>
+        new Color(color.r, color.g, color.b, CoverAlpha(opacity, intensity));
 }

@@ -18,7 +18,8 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
-public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings
+public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
+    IInterruptOwnerDimLook
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
@@ -106,6 +107,10 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [DataTableIgnore, SerializeField, Min(0f)] private float ownerDimOutDuration = 0.2f;
     [Tooltip("서버 성공 확정 뒤 오너 암전을 걷기 시작할 때까지(초, 실시간) — 적중 섬광(할 일 132 단계 5) 전 임시 동작")]
     [DataTableIgnore, SerializeField, Min(0f)] private float ownerSuccessHoldDuration = 0.4f;
+    [Tooltip("오너 암전 덮개 색(RGB만 쓴다) — 남길 것(오너·간파 대상·잔상·빛 모임·오너 무기 이펙트) 밖의 월드·HUD 를 덮는다. 예: 검정, 남색")]
+    [DataTableIgnore, SerializeField] private Color ownerDimColor = Color.black;
+    [Tooltip("오너 암전 덮개 불투명도 [0, 1] — 1 = 100%(완전히 덮음), 0.9 = 90%")]
+    [DataTableIgnore, SerializeField, Range(0f, 1f)] private float ownerDimOpacity = 1f;
 
     /// <summary>시도 슬로우 프로필(강) — 사건 순간 이 객체를 넘기면 이벤트가 그 순간 값을 복사한다(캐싱 아님).</summary>
     public SlowMotionProfile InterruptProfile => interruptProfile;
@@ -117,6 +122,8 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public float OwnerDimInDuration => ownerDimInDuration;
     public float OwnerDimOutDuration => ownerDimOutDuration;
     public float OwnerSuccessHoldDuration => ownerSuccessHoldDuration;
+    public Color OwnerDimColor => ownerDimColor;
+    public float OwnerDimOpacity => ownerDimOpacity;
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
     private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
@@ -134,13 +141,17 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timePort, PersonalChannel, SharedChannel);
     private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timePort);
 
-    // 오너 연출 상태 기계(할 일 132). 출력은 단계 3(암전 마스크)·4(빛 모임 VFX)가 SetOwnerOutputs 로 갈아 끼운다 — 그 전엔 로그.
+    // 오너 연출 상태 기계(할 일 132). 암전 = 마스크 암전 렌더 출력(단계 3, Awake 에서 만든다 — 없으면 로그), 빛 모임 = 단계 4 전까지 로그.
     private readonly InterruptOwnerPresentationLogOutput _ownerLogOutput = new InterruptOwnerPresentationLogOutput();
+    private InterruptOwnerDimOutput _ownerDimOutput;
     private InterruptOwnerPresentation _ownerPresentation;
+
+    private IInterruptOwnerDimOutput DefaultOwnerDimOutput =>
+        _ownerDimOutput != null ? _ownerDimOutput : (IInterruptOwnerDimOutput)_ownerLogOutput;
 
     /// <summary>오너 연출 상태 기계 — 단계 5(적중 섬광)가 <see cref="InterruptOwnerPresentation.SuccessEntered"/> 를 구독한다.</summary>
     public InterruptOwnerPresentation OwnerPresentation =>
-        _ownerPresentation ??= new InterruptOwnerPresentation(this, _ownerLogOutput, _ownerLogOutput);
+        _ownerPresentation ??= new InterruptOwnerPresentation(this, DefaultOwnerDimOutput, _ownerLogOutput);
 
     // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.
     private GlobalTimeScale _timeScale;
@@ -159,6 +170,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             return;
 
         Instance = this;
+        _ownerDimOutput = new InterruptOwnerDimOutput(this);
     }
 
     private void OnEnable()
@@ -192,6 +204,10 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     private void OnDestroy()
     {
+        // 비트 원복·덮개 캔버스·RT 정리(상태 기계는 OnDisable 에서 이미 0 을 넘겼다).
+        _ownerDimOutput?.Dispose();
+        _ownerDimOutput = null;
+
         if (Instance == this)
             Instance = null;
     }
@@ -258,11 +274,27 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// <summary>
     /// [오너] 간파(근접·대쉬) 입력 순간의 즉시 예측 — 강(성공 예측)이면 오너 암전·빛 모임을 바로 켠다. 약은 아무것도 안 켠다
     /// (줌·슬로우는 서버 시도 슬로우가 처리), 대상 없음도 아무것도 안 켠다(정정1). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
+    /// <paramref name="owner"/>·<paramref name="target"/> = 암전에 남길 오너 캐릭터(무기 이펙트 포함 하위 전부)·이번 시도 간파 대상(예측이 고른 캐시 대상).
     /// </summary>
-    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast)
+    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast,
+        GameObject owner, GameObject target)
+    {
+        if (Instance == null)
+            return;
+
+        // 받아들인 시도만 대상을 바꾼다 — 태깅은 다음 프레임 암전이 0 → 양수가 될 때(들어옴 램프 첫 값).
+        if (Instance.OwnerPresentation.Predict(forecast, skill, Time.unscaledTime))
+            Instance._ownerDimOutput?.SetSubjects(owner, target);
+    }
+
+    /// <summary>
+    /// [오너] 이번 오너 암전에 함께 남길 루트(빛 모임 VFX 등, 단계 4). 암전이 걷히면 빠진다 — 시도마다 다시 부른다.
+    /// 렌더링 레이어 비트 4 를 그 순간 루트 아래 렌더러에 붙인다(<see cref="InterruptOwnerMaskTagger"/>).
+    /// </summary>
+    public static void KeepInOwnerDim(GameObject root)
     {
         if (Instance != null)
-            Instance.OwnerPresentation.Predict(forecast, skill, Time.unscaledTime);
+            Instance._ownerDimOutput?.KeepWhileDimmed(root);
     }
 
     /// <summary>[오너] 간파 스킬 애니 Hit 이벤트 — 빛 모임 끝(기존 Hit 이벤트 재사용).</summary>
@@ -279,14 +311,16 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
     }
 
-    /// <summary>오너 암전·빛 모임 출력을 갈아 끼운다(단계 3 렌더·단계 4 VFX). null 이면 로그 출력으로 돌아간다.</summary>
+    /// <summary>
+    /// 오너 암전·빛 모임 출력을 갈아 끼운다(단계 4 VFX 등). null 이면 기본 — 암전 = 마스크 암전 렌더 출력, 빛 모임 = 로그.
+    /// </summary>
     public static void SetOwnerOutputs(IInterruptOwnerDimOutput dimOutput, IInterruptLightGatherOutput gatherOutput)
     {
         if (Instance == null)
             return;
 
         Instance.OwnerPresentation.SetOutputs(
-            dimOutput ?? Instance._ownerLogOutput, gatherOutput ?? Instance._ownerLogOutput);
+            dimOutput ?? Instance.DefaultOwnerDimOutput, gatherOutput ?? Instance._ownerLogOutput);
     }
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----

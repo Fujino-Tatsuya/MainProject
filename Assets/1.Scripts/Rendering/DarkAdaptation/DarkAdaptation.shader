@@ -4,6 +4,7 @@
 //  휘도 임계보다 어두운 픽셀만 낮추고 밝은 픽셀(빛 이펙트·발광)은 남긴다.
 //  후처리 전(HDR)에 돌므로 임계는 HDR 휘도 기준이고, 남긴 픽셀에서 Bloom 이 그대로 나온다.
 //  시전자 화면 좌표 주변은 원형으로 살린다(반경 0 = 원형 끔). 화면비는 _DarkAdaptAspect 로 보정한다.
+//  패스 1(MaskCover) = 오너 마스크 암전 덮개 알파(할 일 132).
 // ----------------------------------------------------------------------------
 Shader "Hidden/Rendering/DarkAdaptation"
 {
@@ -55,6 +56,32 @@ Shader "Hidden/Rendering/DarkAdaptation"
                 float darken = _DarkAdaptParams.x * _DarkAdaptParams.w * (1.0 - keep) * (1.0 - RevealAmount(uv));
                 color.rgb *= 1.0 - darken;
                 return color;
+            }
+            ENDHLSL
+        }
+
+        // 패스 1 — 마스크 암전 덮개(할 일 132). 입력 = 비트 4 렌더러만 다시 그린 남김 레이어(투명 검정 위).
+        // 출력 = 흰색 + 알파(1 − 남김). HUD 위 최상위 오버레이 캔버스가 이 알파로 칸 색을 깐다 — 남길 픽셀만 뚫린다.
+        Pass
+        {
+            Name "MaskCover"
+            ZWrite Off ZTest Always Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment FragCover
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+
+            half4 FragCover(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                half4 kept = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_PointClamp, input.texcoord);
+
+                // 불투명은 알파 1, 가산 입자는 알파가 낮아도 색이 남는다 — 둘 중 큰 쪽을 남김으로 본다.
+                half keep = saturate(max(kept.a, max(kept.r, max(kept.g, kept.b))));
+                return half4(1.0, 1.0, 1.0, 1.0 - keep);
             }
             ENDHLSL
         }

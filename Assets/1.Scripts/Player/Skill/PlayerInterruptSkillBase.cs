@@ -539,7 +539,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         DashInterruptPrediction prediction = DashInterruptPredictor.Predict(BuildPredictInput(false, attachedToDash,
-            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f));
+            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f, out _));
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
             InterruptProductionEvent.Attempt(owner, this, prediction.Forecast)));
     }
@@ -549,29 +549,32 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// (<see cref="IInterruptWindowReplica"/>·<see cref="InterruptWindowReplicaTracker"/>)으로 본다. 결과는 오너 연출(암전·빛 모임)에만 쓴다.
     /// <paramref name="attackDirection"/> = 근접은 요청에 싣는 시전(조준) 방향 — 서버 승인 예측도 같은 값을 받는다(회전 스냅 전 바라보는 방향이 아니라
     /// 판정 때 앵커가 향할 방향). 대쉬는 대시 방향. <paramref name="pressAge"/> = 대쉬 간파 우클릭을 누른 뒤 지난 시간 — 예측을 누른 순간으로 되돌린다.
+    /// <paramref name="target"/> = 예측이 고른 간파 대상(대상 없음이면 null) — 오너 암전에 남긴다(할 일 132 단계 3).
     /// 데이터·앵커가 없으면 false.
     /// </summary>
     internal bool TryPredictOwnerAttempt(bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining, float pressAge,
-        out DashInterruptPrediction prediction)
+        out DashInterruptPrediction prediction, out Unit target)
     {
         prediction = default;
+        target = null;
         if (InterruptData == null || HitboxAnchor == null || owner == null)
             return false;
 
-        prediction = DashInterruptPredictor.Predict(BuildPredictInput(true, viaDash, attackDirection, dashSpeed, dashRemaining, pressAge));
+        prediction = DashInterruptPredictor.Predict(BuildPredictInput(true, viaDash, attackDirection, dashSpeed, dashRemaining, pressAge,
+            out target));
         return true;
     }
 
     // 근접 = 지금 위치·판정 시각 지금 + 준비 시간. 대쉬 간파 = 예상 대시 끝 위치(할 일 115 §10 Q2)·판정 시각 max(대시 끝, 평소 Hit).
     // ownerView = 오너 클라 즉시 예측(창 = 복제값), 아니면 서버 승인 예측(창 = 서버 값). 예상 대시 끝은 누른 순간으로 되돌려도 같아 대상 탐색은 지금 값으로 한다.
     private DashInterruptPredictInput BuildPredictInput(bool ownerView,
-        bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining, float pressAge)
+        bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining, float pressAge, out Unit target)
     {
         IPlayerInterruptSkillData data = InterruptData;
         float prepDelay = DashInterruptPredictor.EstimatePrepDelay(observedPrepDelay, data != null, data != null ? data.HitDelay : 0f);
         Vector3 castPosition = owner.transform.position;
         Vector3 resolvePosition = castPosition + InterruptAttemptPrediction.PredictOffset(viaDash, attackDirection, dashSpeed, dashRemaining);
-        Unit target = FindPredictTarget(resolvePosition, attackDirection, ownerView, out bool open);
+        target = FindPredictTarget(resolvePosition, attackDirection, ownerView, out bool open);
         GameObject targetObject = target != null ? target.gameObject : null;
         float openElapsed, expectedDuration;
         if (ownerView)

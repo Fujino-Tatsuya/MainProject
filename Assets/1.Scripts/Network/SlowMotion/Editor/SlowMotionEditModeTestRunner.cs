@@ -17,6 +17,7 @@ internal static class SlowMotionEditModeTestRunner
         "^BossTimerClockTests$",  // 보스 제한시간 GameNow 도메인(D16)
         "^InterruptDarkAdaptationModelTests$",     // 간파 성공 암순응(할 일 87 C3)
         "^DarkAdaptationRendererSetupTests$",
+        "^InterruptOwnerDimTests$",                // 오너 마스크 암전 모드·비트 태깅·덮개 색(할 일 132 단계 3)
         "^InterruptProductionDirectorTests$",      // 간파 연출 디렉터 스위치(할 일 104 → 118)
         "^InterruptProductionPrefabTests$",        // 간파 연출 디렉터 프리팹·프로필 흡수(할 일 118 C2)
         "^InterruptProductionStageTests$",         // 간파 연출 서버 사건 4개·단계(할 일 118 C3)
