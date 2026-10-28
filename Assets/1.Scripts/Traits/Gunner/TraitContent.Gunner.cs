@@ -84,6 +84,7 @@ public static class GunnerTraitTooltip
     /// <summary>
     /// 잔류 포격 {dmg} — 판정식(GunnerChargeLaserSkill.Fire) round(Dref × 충전 배율 × 저장 단계 배율 × 축열 배율)의 원래 발 × 비율.
     /// 최소 = 충전 0·0단계·소모 0, 최대 = 최대 충전·도달 가능한 최고 단계(정온 운용 0)·축열 최대 소모(축열 포격만, 한계 돌파 = 교체 표).
+    /// 집속 연사를 가졌으면 원래 발 묶음 = 발수 × round(원래 발 × 발당 배율)(판정의 예정 합계와 같은 식, 할 일 127 4/4).
     /// </summary>
     public static SkillTooltipDamage EchoQDamage(TraitDefinition trait, Player player)
     {
@@ -94,8 +95,9 @@ public static class GunnerTraitTooltip
             return default;
 
         GunnerHeatTraits heat = GunnerHeatTraits.From(player.TraitModifiers);
+        GunnerVolleyTraits volley = GunnerVolleyTraits.From(player.TraitModifiers);
         return DerivedDamage(player, q.AttackDamageMultiplier, q.FlatDamageBonus, GunnerTraitRules.QAttackKey,
-            q.MinShotScale(heat), q.MaxShotScale(heat), derived.DamageRatio);
+            q.MinShotScale(heat), q.MaxShotScale(heat), derived.DamageRatio, volley.ShotCount, volley.PerShotDamageRatio);
     }
 
     /// <summary>기본 공격 원래 발 상태 배율 최소(0단계)~최대(도달 가능한 최고 단계) — 판정과 같은 <see cref="GunnerHeatTraits.BasicShotScale"/>.</summary>
@@ -107,20 +109,26 @@ public static class GunnerTraitTooltip
 
     /// <summary>원래 발 피해(Dref × 상태 배율, 최소~최대) × 파생 비율. 집중 포화·적 방어·백어택은 넣지 않는다(명세 §8).</summary>
     public static SkillTooltipDamage DerivedDamage(Player player, float coefficient, int flatBonus, TraitAttackKey key,
-        float minimumScale, float maximumScale, float ratio)
+        float minimumScale, float maximumScale, float ratio, int shotCount = 1, float perShotRatio = 1f)
     {
         float trait = player.TraitDamageMultiplier(key);
         int dref = PlayerStatFormula.Snapshot(Mathf.RoundToInt(player.FinalAttackDamage), coefficient, flatBonus, player.DealtDamagePercent, trait);
-        return DerivedDamage(dref, coefficient * trait, Mathf.RoundToInt(flatBonus * trait), minimumScale, maximumScale, ratio);
+        return DerivedDamage(dref, coefficient * trait, Mathf.RoundToInt(flatBonus * trait), minimumScale, maximumScale, ratio, shotCount, perShotRatio);
     }
 
-    /// <summary>순수 판(테스트) — 원래 발 = round(dref × 배율), 파생 = 원래 발 × 비율(<see cref="TraitDerivedAttackRules.Damage"/>).</summary>
-    public static SkillTooltipDamage DerivedDamage(int dref, float coefficient, int flatBonus, float minimumScale, float maximumScale, float ratio)
+    /// <summary>
+    /// 순수 판(테스트) — 원래 발 = round(dref × 배율 × 발당 배율), 묶음 = 발수 × 원래 발, 파생 = 묶음 × 비율(<see cref="TraitDerivedAttackRules.Damage"/>).
+    /// 단발(발수 1·발당 1)은 원래 발 × 비율 그대로다.
+    /// </summary>
+    public static SkillTooltipDamage DerivedDamage(int dref, float coefficient, int flatBonus, float minimumScale, float maximumScale, float ratio,
+        int shotCount = 1, float perShotRatio = 1f)
     {
-        int minimum = TraitDerivedAttackRules.Damage(Mathf.Max(0, Mathf.RoundToInt(dref * minimumScale)), ratio);
-        int maximum = TraitDerivedAttackRules.Damage(Mathf.Max(0, Mathf.RoundToInt(dref * maximumScale)), ratio);
+        int shots = Mathf.Max(1, shotCount);
+        float bundle = shots * perShotRatio;
+        int minimum = TraitDerivedAttackRules.Damage(shots * Mathf.Max(0, Mathf.RoundToInt(dref * (minimumScale * perShotRatio))), ratio);
+        int maximum = TraitDerivedAttackRules.Damage(shots * Mathf.Max(0, Mathf.RoundToInt(dref * (maximumScale * perShotRatio))), ratio);
         return new SkillTooltipDamage(minimum, maximum,
-            coefficient * minimumScale * ratio, coefficient * maximumScale * ratio,
-            Mathf.RoundToInt(flatBonus * minimumScale * ratio), Mathf.RoundToInt(flatBonus * maximumScale * ratio));
+            coefficient * minimumScale * bundle * ratio, coefficient * maximumScale * bundle * ratio,
+            Mathf.RoundToInt(flatBonus * minimumScale * bundle * ratio), Mathf.RoundToInt(flatBonus * maximumScale * bundle * ratio));
     }
 }
