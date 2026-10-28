@@ -30,5 +30,5 @@ MonoBehaviour:
         forms: 
         pushDistance: 0.1
         pushDuration: 0.1
-        staggerDuration: 0.1
+        staggerDuration: 0
         concussionDuration: 0.75

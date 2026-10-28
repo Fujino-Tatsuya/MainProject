@@ -31,7 +31,7 @@ MonoBehaviour:
         forms: 
         pushDistance: 2
         pushDuration: 0.25
-        staggerDuration: 0.1
+        staggerDuration: 0
         concussionDuration: 0
     - rid: 7237886673742725444
       type: {class: TraitSkillValueEffect, ns: , asm: Assembly-CSharp}
