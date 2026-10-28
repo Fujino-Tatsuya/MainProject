@@ -4,20 +4,21 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>[서버] 특성 1장 획득 통지.</summary>
-public readonly struct TutorialTraitChosen
+public readonly struct TraitChosen
 {
     public readonly ulong ClientId;
-    public readonly int TraitIndex;
-    public readonly TutorialTraitDefinition Trait;
+    /// <summary>특성 ID 의 고정 해시(<see cref="TraitIdHash"/>).</summary>
+    public readonly int TraitHash;
+    public readonly TraitDefinition Trait;
     /// <summary>true = 교착 방지·타이머 만료로 서버가 대신 골랐다. false = 플레이어가 직접 골랐다.</summary>
     public readonly bool Auto;
     /// <summary>복도 라운드 번호. 0 = 재선택(개인 라운드, 할 일 30) 획득 — 복도 라운드가 아니다.</summary>
     public readonly int Round;
 
-    public TutorialTraitChosen(ulong clientId, int traitIndex, TutorialTraitDefinition trait, bool auto, int round)
+    public TraitChosen(ulong clientId, int traitHash, TraitDefinition trait, bool auto, int round)
     {
         ClientId = clientId;
-        TraitIndex = traitIndex;
+        TraitHash = traitHash;
         Trait = trait;
         Auto = auto;
         Round = round;
@@ -26,60 +27,64 @@ public readonly struct TutorialTraitChosen
 
 /// <summary>
 /// 튜토리얼 복도 특성 선택의 <b>상태 소유자</b>(씬 상주 NetworkObject, 서버 권한 — 할 일 15 T1).
-/// 규칙은 <see cref="TutorialTraitSelectionModel"/> 이 갖고, 여기는 NGO 동기화·RPC 검증·효과 적용만 한다.
+/// 규칙은 <see cref="TraitSelectionModel"/> 이 갖고, 여기는 NGO 동기화·RPC 검증·효과 적용만 한다.
 ///
 /// 동기화: 플레이어별 "제시 후보"와 "획득 특성"을 행 단위로 <see cref="NetworkList{T}"/> 에 복제한다
 /// (<see cref="ZoneBridgeGateManager"/> 와 같은 씬 매니저 + NetworkList 패턴). 클라는 자기 clientId 행만 읽으면 된다.
 /// 제시 행은 아직 안 고른 동안만 존재한다 — 고르면 사라지고 획득 행이 생긴다.
+/// 특성 키(할 일 125) = 정의 ID 의 고정 해시(<see cref="TraitIdHash"/>) — 풀 배열 순서와 무관하다.
+/// 후보 = 캐릭터·차수별 고정 3개(<see cref="TraitCatalog"/>, 차수 = 획득 수 + 1), 자동 선택 = 첫 번째. 캐릭터를 모르거나 정의가 없으면 0장(Empty).
+/// 접속 때 서버 풀의 목록 버전(<see cref="TraitCatalogIndex.Version"/>)을 복제해 클라가 자기 값과 비교한다 — 다르면 오류 로그.
 ///
 /// 효과: 배율 특성 = 영구(duration 0) 상태이상, 특성마다 다른 출처 id 라 서로 곱해진다.
 /// 쿨감 특성 = 그 플레이어의 <see cref="Player.ServerAttackLanded"/> 를 구독한다.
 /// 선택 창 무적(T2): 제시받고 아직 안 고른 플레이어에게 <see cref="InvulnerabilityCause.TraitSelection"/> 토큰을 건다.
 /// 제시 순간 플레이어 오브젝트가 없었으면 그 플레이어가 스폰될 때(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 아직 미선택이면 다시 건다(T3).
 /// 특성 초기화(할 일 30 3단계): <see cref="PartyWipeRespawner.PartyWipeRespawned"/> → 리스폰한 각자에게 팝업 행(<see cref="EntryKind.ResetPrompt"/>) →
-/// 응답 RPC 를 서버가 <see cref="TutorialTraitResetModel"/> 로 검증 → [예] = 그 플레이어 효과만 원복 + 혼자만의 라운드 4번(<see cref="TutorialTraitSelectionModel.StartPersonalRound"/>).
+/// 응답 RPC 를 서버가 <see cref="TraitResetModel"/> 로 검증 → [예] = 그 플레이어 효과만 원복 + 혼자만의 라운드 4번(<see cref="TraitSelectionModel.StartPersonalRound"/>).
 /// 팝업·재선택 중인 사람이 있으면 <see cref="IsTraitResetInProgress"/> 가 보스 진입 패드를 잠근다(D3). 원본: Docs/tech/party-lives-respawn.md §4.
 /// 판 도중 재합류(할 일 48 C14 R4c): 퇴장 때 상태를 playerId 키로 <see cref="RejoinMemory"/> 에 보관 → <see cref="MatchRoster.PlayerRejoined"/> 때
-/// 새 clientId 로 획득 목록·라운드 참가·팝업/재선택을 되돌리고 효과를 다시 건다(<see cref="TutorialTraitRejoin"/>).
+/// 새 clientId 로 획득 목록·라운드 참가·팝업/재선택을 되돌리고 효과를 다시 건다(<see cref="TraitRejoin"/>).
 /// 이 컴포넌트를 씬에 두지 않으면 아무 일도 하지 않는다(튜토리얼 외 영향 없음).
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class TutorialTraitDirector : NetworkBehaviour
+public sealed class TraitDirector : NetworkBehaviour
 {
-    private const string Tag = "[TutorialTrait]";
+    private const string Tag = "[Trait]";
 
-    // 특성 상태이상의 출처 id 대역 — NetworkObjectId(작은 수)와 겹치지 않게 높은 대역을 쓴다. + 풀 인덱스.
-    private const ulong TraitSourceIdBase = 0x5452_4149_5400_0000UL;
+    // 특성 상태이상의 출처 id 대역 — NetworkObjectId(작은 수)와 겹치지 않게 높은 32비트에 둔다. 낮은 32비트 = 특성 ID 해시.
+    private const ulong TraitSourceIdBase = 0x5452_4149_0000_0000UL;
 
     public enum EntryKind : byte
     {
         Offered = 0,
         Acquired = 1,
-        /// <summary>특성 초기화 팝업 대기(할 일 30) — <see cref="Entry.TraitIndex"/> 자리에 팝업 세대를 담는다.</summary>
+        /// <summary>특성 초기화 팝업 대기(할 일 30) — <see cref="Entry.TraitHash"/> 자리에 팝업 세대를 담는다.</summary>
         ResetPrompt = 2,
     }
 
-    /// <summary>복제 행 하나 = (플레이어, 특성 인덱스, 제시/획득, 그 플레이어의 제시 번호).</summary>
+    /// <summary>복제 행 하나 = (플레이어, 특성 ID 해시, 제시/획득, 그 플레이어의 제시 번호).</summary>
     public struct Entry : INetworkSerializable, IEquatable<Entry>
     {
         public ulong ClientId;
-        public int TraitIndex;
+        /// <summary>제시·획득 행 = 특성 ID 해시(<see cref="TraitIdHash"/>). 팝업 행 = 팝업 세대.</summary>
+        public int TraitHash;
         public EntryKind Kind;
-        /// <summary>제시·획득 행 = 그 플레이어의 <see cref="TutorialTraitSelectionModel.GetOfferSeq"/>(창 판정용). 팝업 행 = 0.</summary>
+        /// <summary>제시·획득 행 = 그 플레이어의 <see cref="TraitSelectionModel.GetOfferSeq"/>(창 판정용). 팝업 행 = 0.</summary>
         public int OfferSeq;
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
             s.SerializeValue(ref ClientId);
-            s.SerializeValue(ref TraitIndex);
+            s.SerializeValue(ref TraitHash);
             s.SerializeValue(ref Kind);
             s.SerializeValue(ref OfferSeq);
         }
 
-        public bool Equals(Entry o) => ClientId == o.ClientId && TraitIndex == o.TraitIndex && Kind == o.Kind && OfferSeq == o.OfferSeq;
+        public bool Equals(Entry o) => ClientId == o.ClientId && TraitHash == o.TraitHash && Kind == o.Kind && OfferSeq == o.OfferSeq;
     }
 
-    // 적용한 효과 하나 — 원복에 필요한 것만. 배율 특성 = 상태이상 타입(출처는 SourceIdOf(index)), 쿨감 특성 = 구독한 핸들러.
+    // 적용한 효과 하나 — 원복에 필요한 것만. 배율 특성 = 상태이상 타입(출처는 SourceIdOf(hash)), 쿨감 특성 = 구독한 핸들러.
     private sealed class AppliedEffect
     {
         public Player Player;
@@ -87,7 +92,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         public Action<PlayerAttackLanded> Handler;
     }
 
-    [SerializeField] private TutorialTraitPool pool;
+    [SerializeField] private TraitPool pool;
 
     private readonly NetworkList<Entry> entries = new NetworkList<Entry>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -95,7 +100,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private readonly NetworkVariable<int> round = new NetworkVariable<int>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // TutorialTraitRoundDisplay 플래그(byte) — 현재 라운드의 창 표시 옵션.
+    // TraitRoundDisplay 플래그(byte) — 현재 라운드의 창 표시 옵션.
     private readonly NetworkVariable<byte> roundDisplay = new NetworkVariable<byte>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -103,12 +108,18 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private readonly NetworkVariable<bool> traitResetBusy = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 서버 풀의 특성 목록 버전(할 일 125) — 클라가 자기 풀 버전과 비교한다. 0 = 아직 안 씀.
+    private readonly NetworkVariable<int> catalogVersion = new NetworkVariable<int>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private bool versionMismatchLogged;
+
     // 서버 전용
-    private TutorialTraitSelectionModel model;
-    private TutorialTraitResetModel resetModel;
+    private TraitSelectionModel model;
+    private TraitResetModel resetModel;
     private System.Random random;
-    private readonly TutorialTraitEffectLedger<AppliedEffect> appliedEffects = new TutorialTraitEffectLedger<AppliedEffect>();
-    private readonly List<TutorialTraitEffectLedger<AppliedEffect>.Record> revertScratch = new List<TutorialTraitEffectLedger<AppliedEffect>.Record>();
+    private readonly TraitEffectLedger<AppliedEffect> appliedEffects = new TraitEffectLedger<AppliedEffect>();
+    private readonly List<TraitEffectLedger<AppliedEffect>.Record> revertScratch = new List<TraitEffectLedger<AppliedEffect>.Record>();
     private readonly List<ulong> clientScratch = new List<ulong>();
     private bool roundCompletionRaised = true;
 
@@ -118,21 +129,29 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private readonly List<ulong> shieldAcquireScratch = new List<ulong>();
     private bool shieldRetryRequested;
 
-    public static TutorialTraitDirector Instance { get; private set; }
+    public static TraitDirector Instance { get; private set; }
 
-    public TutorialTraitPool Pool => pool;
+    private static readonly TraitCatalogIndex EmptyCatalog = new TraitCatalogIndex(Array.Empty<string>());
+
+    public TraitPool Pool => pool;
+
+    /// <summary>[전 피어] 풀 조회표(고정 후보·목록 버전·검증). 풀이 없으면 빈 표.</summary>
+    public TraitCatalogIndex Catalog => pool != null ? pool.Catalog : EmptyCatalog;
+
+    /// <summary>[전 피어] 특성 ID 해시의 정의(복제 행의 <see cref="Entry.TraitHash"/>). 없으면 null.</summary>
+    public TraitDefinition GetTrait(int traitHash) => pool != null ? pool.GetByHash(traitHash) : null;
 
     /// <summary>[전 피어] 현재 복도 제시 라운드 번호(0 = 아직 없음). 재선택(개인 라운드)은 올리지 않는다 — 창 판정은 <see cref="GetOfferSeq"/>.</summary>
     public int Round => round.Value;
 
     /// <summary>[전 피어] 현재 라운드의 창 표시 옵션(상단 설명·아래 한 줄).</summary>
-    public TutorialTraitRoundDisplay RoundDisplay => (TutorialTraitRoundDisplay)roundDisplay.Value;
+    public TraitRoundDisplay RoundDisplay => (TraitRoundDisplay)roundDisplay.Value;
 
     /// <summary>[전 피어] 누군가 특성 초기화 팝업 대기 또는 재선택 중이다 — 보스 진입 패드가 잠긴다(<see cref="MapSceneBossPath.IsBossPadEnabled"/>).</summary>
     public bool IsTraitResetInProgress => IsSpawned && traitResetBusy.Value;
 
     /// <summary>[서버] 특성 1장 획득(수동·자동).</summary>
-    public event Action<TutorialTraitChosen> ServerTraitChosen;
+    public event Action<TraitChosen> ServerTraitChosen;
 
     /// <summary>[서버] 현재 라운드 참가자 전원이 골랐다(0장 제시·이탈 포함). 인자 = 라운드 번호.</summary>
     public event Action<int> ServerRoundCompleted;
@@ -156,13 +175,22 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         roundDisplay.OnValueChanged += HandleRoundDisplayChanged;
 
         if (!IsServer)
+        {
+            catalogVersion.OnValueChanged += HandleCatalogVersionChanged;
+            CheckCatalogVersion(catalogVersion.Value);
             return;
+        }
 
         if (pool == null)
             Edit.LogError($"{Tag} 특성 풀이 비었다 — 제시가 동작하지 않는다.", this);
 
-        model = new TutorialTraitSelectionModel(pool != null ? pool.Count : 0, CollectUnusableIndices());
-        resetModel = new TutorialTraitResetModel();
+        TraitCatalogIndex catalog = Catalog;
+        LogCatalogErrors(catalog);
+        catalogVersion.Value = catalog.Version;
+        Edit.Log($"{Tag} 특성 목록 버전 {catalog.Version} — 제시 가능 정의 {catalog.Count}개(풀 {pool?.Count ?? 0}칸).", this);
+
+        model = new TraitSelectionModel(FillFixedCandidates, catalog.Contains);
+        resetModel = new TraitResetModel();
         random = new System.Random();
         NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
@@ -180,6 +208,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         entries.OnListChanged -= HandleEntriesChanged;
         round.OnValueChanged -= HandleRoundChanged;
         roundDisplay.OnValueChanged -= HandleRoundDisplayChanged;
+        catalogVersion.OnValueChanged -= HandleCatalogVersionChanged;
 
         if (IsServer && NetworkManager != null)
             NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
@@ -194,7 +223,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         }
 
         // 쿨감 구독만 푼다 — 배율 상태이상은 디스폰 뒤 플레이어에 남아도 예전처럼 둔다(씬 종료와 함께 사라진다).
-        IReadOnlyList<TutorialTraitEffectLedger<AppliedEffect>.Record> applied = appliedEffects.All;
+        IReadOnlyList<TraitEffectLedger<AppliedEffect>.Record> applied = appliedEffects.All;
         for (int i = 0; i < applied.Count; i++)
         {
             AppliedEffect effect = applied[i].Handle;
@@ -216,10 +245,10 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     /// [서버] 접속 중인 전원에게 새 라운드 후보를 제시한다. 이미 얻은 특성은 빠지고, 남은 후보가 적으면 남은 만큼만.
     /// false = 아무에게도 1장도 제시하지 못했다(풀 소진·미스폰) → 호출자는 선택 단계를 건너뛴다.
     /// </summary>
-    public bool StartOfferRoundServer() => StartOfferRoundServer(TutorialTraitRoundDisplay.None);
+    public bool StartOfferRoundServer() => StartOfferRoundServer(TraitRoundDisplay.None);
 
     /// <summary>[서버] 접속 중인 전원에게 제시 — 창 표시 옵션(상단 설명·아래 한 줄)을 같이 정한다. 반환값은 위와 같다.</summary>
-    public bool StartOfferRoundServer(TutorialTraitRoundDisplay display)
+    public bool StartOfferRoundServer(TraitRoundDisplay display)
     {
         if (!CanServe)
             return false;
@@ -233,10 +262,10 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     /// <summary>[서버] 지정한 플레이어들에게 새 라운드 후보를 제시한다. 반환값은 위와 같다.</summary>
     public bool StartOfferRoundServer(IEnumerable<ulong> clientIds) =>
-        StartOfferRoundServer(clientIds, TutorialTraitRoundDisplay.None);
+        StartOfferRoundServer(clientIds, TraitRoundDisplay.None);
 
     /// <summary>[서버] 지정한 플레이어들에게 제시 + 창 표시 옵션. 반환값은 위와 같다.</summary>
-    public bool StartOfferRoundServer(IEnumerable<ulong> clientIds, TutorialTraitRoundDisplay display)
+    public bool StartOfferRoundServer(IEnumerable<ulong> clientIds, TraitRoundDisplay display)
     {
         if (!CanServe)
         {
@@ -260,20 +289,20 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     /// <summary>
     /// [서버] 지금 라운드에 참가자 1명을 더한다 — 복도 중간 지점에 늦게 도착한 사람에게만 제시한다(할 일 15 S12).
-    /// 이미 참가한 사람의 제시·선택은 그대로 둔다. 이미 참가자면 <see cref="TutorialTraitJoinResult.AlreadyInRound"/>(변경 없음).
-    /// <see cref="TutorialTraitJoinResult.Empty"/> = 0장(고를 것 없음 — 호출자가 바로 다음 단계로).
+    /// 이미 참가한 사람의 제시·선택은 그대로 둔다. 이미 참가자면 <see cref="TraitJoinResult.AlreadyInRound"/>(변경 없음).
+    /// <see cref="TraitJoinResult.Empty"/> = 0장(고를 것 없음 — 호출자가 바로 다음 단계로).
     /// 라운드가 이미 완료로 알려졌어도 새 미선택자가 생기면 그 사람이 고를 때 <see cref="ServerRoundCompleted"/> 가 다시 난다.
     /// </summary>
-    public TutorialTraitJoinResult AddParticipantServer(ulong clientId)
+    public TraitJoinResult AddParticipantServer(ulong clientId)
     {
         if (!CanServe)
-            return TutorialTraitJoinResult.NoRound;
+            return TraitJoinResult.NoRound;
 
-        TutorialTraitJoinResult result = model.AddParticipant(clientId, random.Next);
-        if (result != TutorialTraitJoinResult.Offered && result != TutorialTraitJoinResult.Empty)
+        TraitJoinResult result = model.AddParticipant(clientId, random.Next);
+        if (result != TraitJoinResult.Offered && result != TraitJoinResult.Empty)
             return result;
 
-        if (result == TutorialTraitJoinResult.Offered)
+        if (result == TraitJoinResult.Offered)
             roundCompletionRaised = false;
         RebuildEntries();
         SyncSelectionShields();
@@ -287,7 +316,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     /// [서버, 디버그 구간 스킵 — 할 일 34] 아무에게도 제시하지 않고 새 라운드만 연다(라운드 번호 + 창 표시 옵션).
     /// 참가자는 <see cref="GrantParticipantServer"/> 로 넣는다 — 호출자가 그 사이에 이 라운드 번호를 복도에 묶어 둘 수 있게 둘로 나눴다.
     /// </summary>
-    public void StartRoundWithoutOfferServer(TutorialTraitRoundDisplay display)
+    public void StartRoundWithoutOfferServer(TraitRoundDisplay display)
     {
         if (!CanServe)
             return;
@@ -304,22 +333,22 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     /// <summary>
     /// [서버, 디버그 구간 스킵 — 할 일 34] 지금 라운드에 참가자 1명을 <b>제시 없이</b> 넣고 바로 무작위 1장을 획득시킨다
-    /// (<see cref="TutorialTraitSelectionModel.AddParticipantWithoutOffer"/>). 제시 행·제시 번호가 생기지 않아 클라 창이 열리지 않는다.
+    /// (<see cref="TraitSelectionModel.AddParticipantWithoutOffer"/>). 제시 행·제시 번호가 생기지 않아 클라 창이 열리지 않는다.
     /// 효과 적용·<see cref="ServerTraitChosen"/>(Auto = true)·라운드 완료 판정은 <see cref="AutoChooseServer"/> 와 같다.
     /// </summary>
-    public TutorialTraitJoinResult GrantParticipantServer(ulong clientId)
+    public TraitJoinResult GrantParticipantServer(ulong clientId)
     {
         if (!CanServe)
-            return TutorialTraitJoinResult.NoRound;
+            return TraitJoinResult.NoRound;
 
-        TutorialTraitJoinResult result = model.AddParticipantWithoutOffer(clientId, random.Next, out int traitIndex);
-        if (result == TutorialTraitJoinResult.Granted)
+        TraitJoinResult result = model.AddParticipantWithoutOffer(clientId, random.Next, out int traitHash);
+        if (result == TraitJoinResult.Granted)
         {
-            FinishAcquire(clientId, traitIndex, model.Round, auto: true, "자동·제시 없음");
+            FinishAcquire(clientId, traitHash, model.Round, auto: true, "자동·제시 없음");
             return result;
         }
 
-        if (result == TutorialTraitJoinResult.Empty)
+        if (result == TraitJoinResult.Empty)
         {
             RebuildEntries();
             SyncSelectionShields();
@@ -342,8 +371,8 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (!CanServe)
             return false;
 
-        int traitIndex = model.PickAutoChoice(clientId, random.Next);
-        return traitIndex >= 0 && CommitChoice(clientId, traitIndex, auto: true);
+        int traitHash = model.PickAutoChoice(clientId, random.Next);
+        return traitHash >= 0 && CommitChoice(clientId, traitHash, auto: true);
     }
 
     /// <summary>[서버] 이번 라운드에서 아직 안 고른 전원을 자동 획득 처리한다. 처리한 인원 수를 반환한다.</summary>
@@ -374,7 +403,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     // ── 클라 API ───────────────────────────────────────────────────────────
 
     /// <summary>[로컬 플레이어] 제시된 후보 중 하나를 고른다. 판정은 서버가 한다.</summary>
-    public void RequestChoose(int traitIndex)
+    public void RequestChoose(int traitHash)
     {
         if (!IsSpawned)
         {
@@ -382,7 +411,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             return;
         }
 
-        ChooseTraitServerRpc(traitIndex);
+        ChooseTraitServerRpc(traitHash);
     }
 
     /// <summary>[전 피어] 그 플레이어에게 지금 제시된 후보(아직 안 골랐을 때만, 제시 순서).</summary>
@@ -436,7 +465,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         {
             if (entries[i].ClientId == clientId && entries[i].Kind == EntryKind.ResetPrompt)
             {
-                generation = entries[i].TraitIndex;
+                generation = entries[i].TraitHash;
                 return true;
             }
         }
@@ -493,14 +522,14 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     private void CommitResetAnswer(ulong clientId, int generation, bool reset)
     {
-        TutorialTraitResetAnswer result = resetModel.Answer(clientId, generation, reset);
-        if (result == TutorialTraitResetAnswer.NotPrompted || result == TutorialTraitResetAnswer.StaleGeneration)
+        TraitResetAnswer result = resetModel.Answer(clientId, generation, reset);
+        if (result == TraitResetAnswer.NotPrompted || result == TraitResetAnswer.StaleGeneration)
         {
             Edit.LogWarning($"{Tag} 초기화 응답 거부: client {clientId} 세대 {generation} — {result}.", this);
             return;
         }
 
-        if (result == TutorialTraitResetAnswer.Reset)
+        if (result == TraitResetAnswer.Reset)
         {
             int reverted = RevertEffects(clientId);
             model.ResetPlayer(clientId);
@@ -534,7 +563,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
         // 재선택 창엔 복도 안내 문구(소개·마지막)를 붙이지 않는다. 옵션을 행보다 먼저 쓴다(StartOfferRoundServer 와 같은 순서).
         // 전역 라운드 번호는 그대로 — 창은 그 플레이어의 제시 번호로 열리므로 다른 사람 창이 닫히지 않는다.
-        roundDisplay.Value = (byte)TutorialTraitRoundDisplay.None;
+        roundDisplay.Value = (byte)TraitRoundDisplay.None;
         return opened;
     }
 
@@ -551,7 +580,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             if (effect.Handler != null)
                 effect.Player.ServerAttackLanded -= effect.Handler;
             else if (effect.Player.StatusEffects != null)
-                effect.Player.StatusEffects.Remove(effect.StatType, SourceIdOf(revertScratch[i].TraitIndex));
+                effect.Player.StatusEffects.Remove(effect.StatType, SourceIdOf(revertScratch[i].TraitHash));
         }
 
         revertScratch.Clear();
@@ -569,34 +598,34 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     // 씬 상주 오브젝트라 오너가 없다 — 누구나 호출하고 보낸 사람은 SenderClientId 로 가린다.
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    private void ChooseTraitServerRpc(int traitIndex, RpcParams p = default)
+    private void ChooseTraitServerRpc(int traitHash, RpcParams p = default)
     {
         if (model != null)
-            CommitChoice(p.Receive.SenderClientId, traitIndex, auto: false);
+            CommitChoice(p.Receive.SenderClientId, traitHash, auto: false);
     }
 
     // 선택 검증(제시된 후보인가·이미 골랐나)은 모델이 한다. 위반은 무시하고 로그만 남긴다.
-    private bool CommitChoice(ulong clientId, int traitIndex, bool auto)
+    private bool CommitChoice(ulong clientId, int traitHash, bool auto)
     {
         // 재선택(개인 라운드) 획득은 복도 라운드가 아니다 — 0 으로 알려 복도 체크(MapSceneTraitCorridorFlow)가 반응하지 않게 한다.
         int chosenRound = model.IsPersonalRound(clientId) ? 0 : model.Round;
-        TutorialTraitChoiceResult result = model.TryChoose(clientId, traitIndex);
-        if (result != TutorialTraitChoiceResult.Accepted)
+        TraitChoiceResult result = model.TryChoose(clientId, traitHash);
+        if (result != TraitChoiceResult.Accepted)
         {
-            Edit.LogWarning($"{Tag} {(auto ? "자동 " : "")}선택 거부: client {clientId} 특성 {traitIndex} — {result}.", this);
+            Edit.LogWarning($"{Tag} {(auto ? "자동 " : "")}선택 거부: client {clientId} 특성 {traitHash} — {result}.", this);
             return false;
         }
 
-        FinishAcquire(clientId, traitIndex, chosenRound, auto, auto ? "자동" : "수동");
+        FinishAcquire(clientId, traitHash, chosenRound, auto, auto ? "자동" : "수동");
         return true;
     }
 
     // 모델이 획득을 확정한 뒤의 공통 처리 — 효과 적용·재선택 이어가기·행/무적 동기화·획득 통지·라운드 완료 판정.
     // 선택 창 경로(CommitChoice)와 제시 없는 획득(GrantParticipantServer)이 같이 쓴다. how = 로그용.
-    private void FinishAcquire(ulong clientId, int traitIndex, int chosenRound, bool auto, string how)
+    private void FinishAcquire(ulong clientId, int traitHash, int chosenRound, bool auto, string how)
     {
-        TutorialTraitDefinition trait = pool != null ? pool.Get(traitIndex) : null;
-        ApplyEffect(clientId, traitIndex, trait);
+        TraitDefinition trait = GetTrait(traitHash);
+        ApplyEffect(clientId, traitHash, trait);
 
         // 재선택 중이면 다음 라운드를 바로 연다 — 무적 토큰을 풀었다 다시 걸지 않게 행·무적 동기화보다 먼저.
         bool reselecting = resetModel != null && resetModel.IsReselecting(clientId);
@@ -608,9 +637,9 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (reselecting)
             SyncResetBusy();
 
-        Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitIndex}) {how} — 라운드 {chosenRound}" +
+        Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitHash}) {how} — 라운드 {chosenRound}" +
                  $"{(reselecting ? $" (재선택, 남은 {resetModel.RoundsLeft(clientId)})" : "")}.", this);
-        ServerTraitChosen?.Invoke(new TutorialTraitChosen(clientId, traitIndex, trait, auto, chosenRound));
+        ServerTraitChosen?.Invoke(new TraitChosen(clientId, traitHash, trait, auto, chosenRound));
         CheckRoundCompleted();
     }
 
@@ -650,7 +679,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (!MatchRoster.Server.IsActive || !MatchRoster.Server.TryGetPlayerIdByLastClient(clientId, out string playerId))
             return;
 
-        TutorialTraitRejoinSnapshot snapshot = TutorialTraitRejoin.Capture(model, resetModel, clientId);
+        TraitRejoinSnapshot snapshot = TraitRejoin.Capture(model, resetModel, clientId);
         RejoinMemory.Server.SaveTraits(playerId, snapshot);
         Edit.Log($"{Tag} client {clientId}({playerId}) 퇴장 — 재합류용 특성 보관 {snapshot} (보관 {RejoinMemory.Server.TraitCount}건).", this);
     }
@@ -662,7 +691,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (!CanServe)
             return;
 
-        if (!RejoinMemory.Server.TryTakeTraits(playerId, out TutorialTraitRejoinSnapshot snapshot))
+        if (!RejoinMemory.Server.TryTakeTraits(playerId, out TraitRejoinSnapshot snapshot))
         {
             Edit.Log($"{Tag} 재합류 {playerId} client {oldClientId}→{newClientId} — 보관한 특성 기록 없음.", this);
             return;
@@ -671,11 +700,11 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         // 팝업·재선택은 전멸 팝업을 띄우는 조건(튜토리얼 진행 중)과 같을 때만 되살린다.
         MapSceneDirector tutorial = MapSceneDirector.Instance;
         bool allowReset = tutorial != null && tutorial.IsTutorialActive;
-        TutorialTraitRejoinReset reset = TutorialTraitRejoin.Restore(model, resetModel, newClientId, snapshot, allowReset);
-        if (reset == TutorialTraitRejoinReset.ReselectContinue)
+        TraitRejoinReset reset = TraitRejoin.Restore(model, resetModel, newClientId, snapshot, allowReset);
+        if (reset == TraitRejoinReset.ReselectContinue)
             ContinueReselect(newClientId);
-        else if (reset == TutorialTraitRejoinReset.ReselectOffer)
-            roundDisplay.Value = (byte)TutorialTraitRoundDisplay.None; // 재선택 창엔 복도 안내 문구를 붙이지 않는다(ContinueReselect 와 같다)
+        else if (reset == TraitRejoinReset.ReselectOffer)
+            roundDisplay.Value = (byte)TraitRoundDisplay.None; // 재선택 창엔 복도 안내 문구를 붙이지 않는다(ContinueReselect 와 같다)
 
         int applied = ApplyMissingEffects(newClientId);
         RebuildEntries();
@@ -694,12 +723,12 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         int applied = 0;
         for (int i = 0; i < acquired.Count; i++)
         {
-            int traitIndex = acquired[i];
-            if (appliedEffects.Has(clientId, traitIndex))
+            int traitHash = acquired[i];
+            if (appliedEffects.Has(clientId, traitHash))
                 continue;
 
-            ApplyEffect(clientId, traitIndex, pool != null ? pool.Get(traitIndex) : null);
-            if (appliedEffects.Has(clientId, traitIndex))
+            ApplyEffect(clientId, traitHash, GetTrait(traitHash));
+            if (appliedEffects.Has(clientId, traitHash))
                 applied++;
         }
 
@@ -776,11 +805,11 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     // ── 효과 ───────────────────────────────────────────────────────────────
 
-    private void ApplyEffect(ulong clientId, int traitIndex, TutorialTraitDefinition trait)
+    private void ApplyEffect(ulong clientId, int traitHash, TraitDefinition trait)
     {
         if (trait == null)
         {
-            Edit.LogError($"{Tag} 특성 {traitIndex} 정의가 없다 — 효과 없이 획득만 기록한다.", this);
+            Edit.LogError($"{Tag} 특성 {traitHash} 정의가 없다 — 효과 없이 획득만 기록한다.", this);
             return;
         }
 
@@ -793,19 +822,19 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
         switch (trait.EffectKind)
         {
-            case TutorialTraitEffectKind.AttackDamageMultiplier:
-                ApplyStatModifier(clientId, player, StatusEffectType.AttackDamageModifier, trait, traitIndex);
+            case TraitEffectKind.AttackDamageMultiplier:
+                ApplyStatModifier(clientId, player, StatusEffectType.AttackDamageModifier, trait, traitHash);
                 break;
-            case TutorialTraitEffectKind.MoveSpeedMultiplier:
-                ApplyStatModifier(clientId, player, StatusEffectType.MoveSpeedModifier, trait, traitIndex);
+            case TraitEffectKind.MoveSpeedMultiplier:
+                ApplyStatModifier(clientId, player, StatusEffectType.MoveSpeedModifier, trait, traitHash);
                 break;
-            case TutorialTraitEffectKind.CooldownReductionOnHit:
-                HookCooldownReduction(clientId, player, trait, traitIndex);
+            case TraitEffectKind.CooldownReductionOnHit:
+                HookCooldownReduction(clientId, player, trait, traitHash);
                 break;
         }
     }
 
-    private void ApplyStatModifier(ulong clientId, Player player, StatusEffectType type, TutorialTraitDefinition trait, int traitIndex)
+    private void ApplyStatModifier(ulong clientId, Player player, StatusEffectType type, TraitDefinition trait, int traitHash)
     {
         StatusEffectController effects = player.StatusEffects;
         if (effects == null)
@@ -814,16 +843,16 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             return;
         }
 
-        ulong sourceId = SourceIdOf(traitIndex);
+        ulong sourceId = SourceIdOf(traitHash);
         // duration 0 = 영구. 출처가 특성마다 달라 다른 배율 특성과 곱해진다.
         effects.Apply(type, trait.StatMultiplier, 0f, sourceId);
         if (effects.GetStackCount(type, sourceId) == 0)
             Edit.LogWarning($"{Tag} '{trait.Id}' 상태이상이 거부됐다(연출 잠금 중 등) — 효과가 없다.", player);
         else
-            appliedEffects.Add(clientId, traitIndex, new AppliedEffect { Player = player, StatType = type });
+            appliedEffects.Add(clientId, traitHash, new AppliedEffect { Player = player, StatType = type });
     }
 
-    private void HookCooldownReduction(ulong clientId, Player player, TutorialTraitDefinition trait, int traitIndex)
+    private void HookCooldownReduction(ulong clientId, Player player, TraitDefinition trait, int traitHash)
     {
         PlayerSkillController skills = player.GetComponent<PlayerSkillController>();
         if (skills == null)
@@ -846,7 +875,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         };
 
         player.ServerAttackLanded += handler;
-        appliedEffects.Add(clientId, traitIndex, new AppliedEffect { Player = player, Handler = handler });
+        appliedEffects.Add(clientId, traitHash, new AppliedEffect { Player = player, Handler = handler });
     }
 
     // ── 동기화 ─────────────────────────────────────────────────────────────
@@ -866,14 +895,14 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
                 AddRows(clientId, model.GetOffered(clientId), EntryKind.Offered, offerSeq);
             AddRows(clientId, model.GetAcquired(clientId), EntryKind.Acquired, offerSeq);
             if (resetModel != null && resetModel.TryGetPrompt(clientId, out int generation))
-                entries.Add(new Entry { ClientId = clientId, TraitIndex = generation, Kind = EntryKind.ResetPrompt });
+                entries.Add(new Entry { ClientId = clientId, TraitHash = generation, Kind = EntryKind.ResetPrompt });
         }
     }
 
     private void AddRows(ulong clientId, IReadOnlyList<int> traitIndices, EntryKind kind, int offerSeq)
     {
         for (int i = 0; i < traitIndices.Count; i++)
-            entries.Add(new Entry { ClientId = clientId, TraitIndex = traitIndices[i], Kind = kind, OfferSeq = offerSeq });
+            entries.Add(new Entry { ClientId = clientId, TraitHash = traitIndices[i], Kind = kind, OfferSeq = offerSeq });
     }
 
     private void CollectRows(ulong clientId, EntryKind kind, List<int> result)
@@ -885,7 +914,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         for (int i = 0; i < entries.Count; i++)
         {
             if (entries[i].ClientId == clientId && entries[i].Kind == kind)
-                result.Add(entries[i].TraitIndex);
+                result.Add(entries[i].TraitHash);
         }
     }
 
@@ -897,7 +926,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     // ── 조회 ───────────────────────────────────────────────────────────────
 
-    public static ulong SourceIdOf(int traitIndex) => TraitSourceIdBase + (ulong)Mathf.Max(0, traitIndex);
+    public static ulong SourceIdOf(int traitHash) => TraitSourceIdBase | unchecked((uint)traitHash);
 
     private Player FindPlayer(ulong clientId)
     {
@@ -907,18 +936,58 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         return client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
     }
 
-    private List<int> CollectUnusableIndices()
+    // ── 고정 후보(할 일 125) ────────────────────────────────────────────────
+
+    // 모델의 후보 공급자 — 그 플레이어 캐릭터의 tier 차 고정 후보(정의가 등록된 것만, 표 순서).
+    private void FillFixedCandidates(ulong clientId, int tier, List<int> result)
     {
-        var unusable = new List<int>();
-        if (pool == null)
-            return unusable;
+        TutorialCharacter character = ResolveCharacterServer(clientId);
+        Catalog.GetCandidates(character, tier, result);
+        if (character == TutorialCharacter.None)
+            Edit.LogWarning($"{Tag} client {clientId} 의 캐릭터를 모른다 — {tier}차 후보 0장.", this);
+        else if (result.Count == 0 && tier <= TraitCatalog.TierCount)
+            Edit.Log($"{Tag} client {clientId} {character} {tier}차 — 등록된 정의가 없어 후보 0장(건너뜀).", this);
+    }
 
-        for (int i = 0; i < pool.Count; i++)
-        {
-            if (pool.Get(i) == null)
-                unusable.Add(i);
-        }
+    // 캐릭터 판별 = 기존 방식(스폰된 Player 의 PrefabIdHash → 로스터 역조회, 실패 시 고유 컴포넌트 — TutorialLocalPlayerInfo).
+    // 플레이어 오브젝트가 아직 없으면(스폰 전 제시) 서버 캐릭터 선택 저장소 → 로스터 칸의 캐릭터.
+    private TutorialCharacter ResolveCharacterServer(ulong clientId)
+    {
+        Player player = FindPlayer(clientId);
+        if (player != null)
+            return TutorialLocalPlayerInfo.ResolveCharacter(player);
 
-        return unusable;
+        NetworkLoadingFlowController flow = NetworkManager != null ? NetworkManager.GetComponent<NetworkLoadingFlowController>() : null;
+        CharacterRoster roster = flow != null ? flow.CharacterRoster : null;
+        if (roster != null &&
+            ServerCharacterSelectionStore.TryGet(clientId, out int characterId) &&
+            roster.TryGetAvailableCharacter(characterId, out CharacterRoster.Entry entry) && entry != null)
+            return entry.TutorialCharacter;
+
+        return TutorialCharacter.None;
+    }
+
+    // ── 특성 목록 버전(할 일 125) ───────────────────────────────────────────
+
+    private void HandleCatalogVersionChanged(int previous, int current) => CheckCatalogVersion(current);
+
+    // 클라: 서버가 쓴 버전과 내 풀 버전을 비교한다 — 다르면 같은 빌드·같은 풀이 아니다(특성 해시가 서로 다른 정의를 가리킬 수 있다).
+    private void CheckCatalogVersion(int serverVersion)
+    {
+        TraitCatalogIndex catalog = Catalog;
+        TraitVersionCheck check = TraitCatalog.CompareVersion(serverVersion, catalog.Version);
+        if (check != TraitVersionCheck.Mismatch || versionMismatchLogged)
+            return;
+
+        versionMismatchLogged = true;
+        Edit.LogError($"{Tag} 특성 목록 버전 불일치 — 서버 {serverVersion}, 이 클라 {catalog.Version}. " +
+                      "서버와 같은 빌드(같은 TraitPool·정의 ID)로 접속해야 한다. 특성 표시·선택이 어긋날 수 있다.", this);
+    }
+
+    private void LogCatalogErrors(TraitCatalogIndex catalog)
+    {
+        IReadOnlyList<string> errors = catalog.Errors;
+        for (int i = 0; i < errors.Count; i++)
+            Edit.LogError($"{Tag} 특성 풀 검증 오류: {errors[i]}", this);
     }
 }

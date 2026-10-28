@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>특성 초기화 팝업 응답의 판정 결과(할 일 30). Kept·Reset 외에는 서버가 무시하고 로그만 남긴다.</summary>
-public enum TutorialTraitResetAnswer
+public enum TraitResetAnswer
 {
     /// <summary>[아니오] — 특성 유지, 팝업만 닫힌다.</summary>
     Kept,
@@ -18,10 +18,10 @@ public enum TutorialTraitResetAnswer
 /// 전멸 리스폰 뒤 특성 초기화 팝업·재선택 진행의 순수 규칙(할 일 30 3단계) — Unity·NGO 비의존, EditMode 테스트 대상.
 /// 플레이어별 상태 = 없음 → 팝업 대기(세대 번호) → (예) 재선택 중(남은 라운드) → 없음.
 /// 세대 = 전멸 리스폰 한 번. 다시 전멸하면 새 세대로 전원 팝업을 다시 띄우고 지난 세대 응답은 버린다.
-/// 라운드 제시·선택 자체는 <see cref="TutorialTraitSelectionModel"/> 몫 — 여기는 "몇 라운드 남았나"만 센다.
+/// 라운드 제시·선택 자체는 <see cref="TraitSelectionModel"/> 몫 — 여기는 "몇 라운드 남았나"만 센다.
 /// 원본: Docs/tech/party-lives-respawn.md §4.
 /// </summary>
-public sealed class TutorialTraitResetModel
+public sealed class TraitResetModel
 {
     /// <summary>재선택 라운드 수 — 복도 1~4 와 같은 4번.</summary>
     public const int ReselectRounds = 4;
@@ -79,23 +79,23 @@ public sealed class TutorialTraitResetModel
     /// 팝업 응답 판정. 대기 중이고 세대가 맞을 때만 받는다(중복·지연 응답 거부).
     /// Kept = 상태 비움. Reset = 재선택 중(남은 라운드 <see cref="ReselectRounds"/>) — 호출자가 원복 후 <see cref="TryTakeReselectRound"/> 로 라운드를 연다.
     /// </summary>
-    public TutorialTraitResetAnswer Answer(ulong clientId, int generation, bool reset)
+    public TraitResetAnswer Answer(ulong clientId, int generation, bool reset)
     {
         if (!players.TryGetValue(clientId, out PlayerState state) || state.PromptGeneration == 0)
-            return TutorialTraitResetAnswer.NotPrompted;
+            return TraitResetAnswer.NotPrompted;
         if (state.PromptGeneration != generation)
-            return TutorialTraitResetAnswer.StaleGeneration;
+            return TraitResetAnswer.StaleGeneration;
 
         if (!reset)
         {
             players.Remove(clientId);
-            return TutorialTraitResetAnswer.Kept;
+            return TraitResetAnswer.Kept;
         }
 
         state.PromptGeneration = 0;
         state.Reselecting = true;
         state.RoundsLeft = ReselectRounds;
-        return TutorialTraitResetAnswer.Reset;
+        return TraitResetAnswer.Reset;
     }
 
     /// <summary>재선택 중인가(팝업에 예 — 라운드가 남았거나 마지막 라운드 진행 중).</summary>
@@ -187,21 +187,21 @@ public sealed class TutorialTraitResetModel
 }
 
 /// <summary>
-/// 플레이어에게 적용한 특성 효과 장부(할 일 30) — (플레이어, 특성 인덱스) → 원복에 필요한 핸들. Unity·NGO 비의존.
+/// 플레이어에게 적용한 특성 효과 장부(할 일 30) — (플레이어, 특성 ID 해시) → 원복에 필요한 핸들. Unity·NGO 비의존.
 /// 디렉터가 효과를 걸 때 기록하고, 초기화·이탈 때 그 플레이어 몫만 꺼내 되돌린다(다른 플레이어 것은 남는다).
 /// </summary>
-public sealed class TutorialTraitEffectLedger<THandle>
+public sealed class TraitEffectLedger<THandle>
 {
     public readonly struct Record
     {
         public readonly ulong ClientId;
-        public readonly int TraitIndex;
+        public readonly int TraitHash;
         public readonly THandle Handle;
 
-        public Record(ulong clientId, int traitIndex, THandle handle)
+        public Record(ulong clientId, int traitHash, THandle handle)
         {
             ClientId = clientId;
-            TraitIndex = traitIndex;
+            TraitHash = traitHash;
             Handle = handle;
         }
     }
@@ -212,7 +212,7 @@ public sealed class TutorialTraitEffectLedger<THandle>
 
     public IReadOnlyList<Record> All => records;
 
-    public void Add(ulong clientId, int traitIndex, THandle handle) => records.Add(new Record(clientId, traitIndex, handle));
+    public void Add(ulong clientId, int traitHash, THandle handle) => records.Add(new Record(clientId, traitHash, handle));
 
     /// <summary>그 플레이어의 기록 수.</summary>
     public int CountOf(ulong clientId)
@@ -228,11 +228,11 @@ public sealed class TutorialTraitEffectLedger<THandle>
     }
 
     /// <summary>그 플레이어에게 그 특성의 기록이 있는가(재합류 복원이 효과를 두 번 걸지 않게).</summary>
-    public bool Has(ulong clientId, int traitIndex)
+    public bool Has(ulong clientId, int traitHash)
     {
         for (int i = 0; i < records.Count; i++)
         {
-            if (records[i].ClientId == clientId && records[i].TraitIndex == traitIndex)
+            if (records[i].ClientId == clientId && records[i].TraitHash == traitHash)
                 return true;
         }
 

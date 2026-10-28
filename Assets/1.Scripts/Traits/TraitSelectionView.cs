@@ -5,17 +5,17 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 튜토리얼 특성 선택 UI(할 일 15 T2) — 로컬 플레이어 전용 표시. 상태는 <see cref="TutorialTraitDirector"/> 복제값만 읽는다.
+/// 튜토리얼 특성 선택 UI(할 일 15 T2) — 로컬 플레이어 전용 표시. 상태는 <see cref="TraitDirector"/> 복제값만 읽는다.
 /// - 선택 창: 중앙 모달. 창 루트의 <see cref="UiModalBlocker"/> 가 켜져 있는 동안 로컬 Player 입력(이동·대시 포함)이 막힌다. 일시정지 없음.
-/// - 열림/닫힘 판정은 <see cref="TutorialTraitWindowModel"/>(내 제시 번호 기준 — 한 번 닫힌 제시 재표시 금지·획득 토스트 판정).
+/// - 열림/닫힘 판정은 <see cref="TraitWindowModel"/>(내 제시 번호 기준 — 한 번 닫힌 제시 재표시 금지·획득 토스트 판정).
 /// - 획득 특성 다시 보기: 좌상단 아이콘 줄 + 호버 툴팁.
 /// - 교착 방지 게이지(창 안): 값은 바깥(복도 흐름)이 <see cref="SetDeadline"/> 으로 넣는다 — 이 뷰는 튜토리얼 디렉터를 모른다.
-/// - 특성 초기화 팝업(할 일 30): 내 팝업 행(<see cref="TutorialTraitDirector.TryGetResetPrompt"/>)이 있으면 연다. 질문 + [예]/[아니오], 루트에 <see cref="UiModalBlocker"/>.
+/// - 특성 초기화 팝업(할 일 30): 내 팝업 행(<see cref="TraitDirector.TryGetResetPrompt"/>)이 있으면 연다. 질문 + [예]/[아니오], 루트에 <see cref="UiModalBlocker"/>.
 ///   프리팹(저작 메뉴 결과)을 다시 만들지 않으려고 창과 같은 캔버스에 <b>런타임 생성</b>한다. 한 세대에는 한 번만 답한다.
 /// 씬에 하나 두면 된다(별도 캔버스 — CombatHUD 와 무관). 디렉터가 없으면 아무것도 보이지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class TutorialTraitSelectionView : MonoBehaviour
+public sealed class TraitSelectionView : MonoBehaviour
 {
     [Header("선택 창 (UiModalBlocker 가 붙은 루트, 기본 꺼짐)")]
     [SerializeField] private GameObject window;
@@ -25,7 +25,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     [SerializeField] private GameObject lastNoticeRoot;
     [SerializeField] private TMP_Text lastNoticeText;
     [SerializeField] private RectTransform cardContainer;
-    [SerializeField] private TutorialTraitCardView cardTemplate;
+    [SerializeField] private TraitCardView cardTemplate;
     [Tooltip("같은 창에서 연속 클릭을 무시하는 시간(초). 서버가 거부하면 이 시간 뒤 다시 고를 수 있다.")]
     [SerializeField, Min(0f)] private float requestCooldown = 1f;
 
@@ -37,7 +37,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     [SerializeField] private TMP_Text deadlineDoneText;
     [SerializeField] private Color deadlineColor = new Color(0.95f, 0.82f, 0.42f, 1f);
     [SerializeField] private Color deadlineTextColor = Color.white;
-    [Tooltip("남은 시간이 TutorialTraitDeadlineModel.UrgentSeconds 이하일 때 게이지·텍스트 색.")]
+    [Tooltip("남은 시간이 TraitDeadlineModel.UrgentSeconds 이하일 때 게이지·텍스트 색.")]
     [SerializeField] private Color deadlineUrgentColor = new Color(1f, 0.36f, 0.30f, 1f);
 
     [Header("획득 토스트")]
@@ -47,33 +47,33 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
 
     [Header("획득 특성 다시 보기")]
     [SerializeField] private RectTransform acquiredContainer;
-    [SerializeField] private TutorialTraitIconView iconTemplate;
+    [SerializeField] private TraitIconView iconTemplate;
     [SerializeField] private GameObject tooltip;
     [SerializeField] private TMP_Text tooltipName;
     [SerializeField] private TMP_Text tooltipDescription;
 
     [Header("공용")]
-    [Tooltip("문구 테이블(TutorialTraitTexts.asset). 비어 있거나 ID 행이 없으면 코드 상수 기본값.")]
-    [SerializeField] private TutorialTraitTextTable texts;
+    [Tooltip("문구 테이블(TraitTexts.asset). 비어 있거나 ID 행이 없으면 코드 상수 기본값.")]
+    [SerializeField] private TraitTextTable texts;
     [Tooltip("특성 아이콘이 비었을 때 쓸 그림. 비어 있으면 빈 칸(흰 사각형).")]
     [SerializeField] private Sprite placeholderIcon;
 
     /// <summary>씬의 창(하나). 게이지 값을 넣는 쪽(복도 흐름)이 찾는다.</summary>
-    public static TutorialTraitSelectionView Instance { get; private set; }
+    public static TraitSelectionView Instance { get; private set; }
 
-    private readonly TutorialTraitWindowModel model = new TutorialTraitWindowModel();
-    private readonly TutorialTraitDeadlineModel deadline = new TutorialTraitDeadlineModel();
+    private readonly TraitWindowModel model = new TraitWindowModel();
+    private readonly TraitDeadlineModel deadline = new TraitDeadlineModel();
     private readonly List<int> offered = new List<int>();
     private readonly List<int> acquired = new List<int>();
     private readonly List<int> shownAcquired = new List<int>();
-    private readonly List<TutorialTraitCardView> cards = new List<TutorialTraitCardView>();
-    private readonly List<TutorialTraitIconView> icons = new List<TutorialTraitIconView>();
+    private readonly List<TraitCardView> cards = new List<TraitCardView>();
+    private readonly List<TraitIconView> icons = new List<TraitIconView>();
 
-    private TutorialTraitDirector director;
+    private TraitDirector director;
     private bool dirty;
     private float nextRequestAt;
     private float toastHideAt;
-    private TutorialTraitIconView hoveredIcon;
+    private TraitIconView hoveredIcon;
     private int shownDeadlineSeconds = -1;
     private int shownDeadlineDone = -1;
     private int shownDeadlineCount = -1;
@@ -132,7 +132,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
 
     private void Update()
     {
-        TutorialTraitDirector current = TutorialTraitDirector.Instance;
+        TraitDirector current = TraitDirector.Instance;
         if (current != null && !current.IsSpawned)
             current = null;
         if (current != director)
@@ -155,7 +155,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         }
     }
 
-    private void Bind(TutorialTraitDirector next)
+    private void Bind(TraitDirector next)
     {
         if (director != null)
             director.ClientStateChanged -= MarkDirty;
@@ -188,7 +188,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         director.GetAcquired(localId, acquired);
 
         // 전역 라운드가 아니라 내 제시 번호로 판정한다 — 다른 사람의 재선택 라운드가 내 창을 닫지 않게(할 일 30).
-        TutorialTraitWindowUpdate update = model.Evaluate(director.GetOfferSeq(localId), offered.Count > 0, acquired.Count);
+        TraitWindowUpdate update = model.Evaluate(director.GetOfferSeq(localId), offered.Count > 0, acquired.Count);
         if (update.Closed && !update.Opened)
             CloseWindow();
         if (update.Opened)
@@ -213,20 +213,19 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     private void OpenWindow()
     {
         ClearCards();
-        TutorialTraitPool pool = director.Pool;
         if (cardTemplate != null && cardContainer != null)
         {
             for (int i = 0; i < offered.Count; i++)
             {
-                TutorialTraitCardView card = Instantiate(cardTemplate, cardContainer);
+                TraitCardView card = Instantiate(cardTemplate, cardContainer);
                 card.gameObject.SetActive(true);
-                card.Bind(pool != null ? pool.Get(offered[i]) : null, offered[i], placeholderIcon, HandleCardClicked);
+                card.Bind(director.GetTrait(offered[i]), offered[i], placeholderIcon, HandleCardClicked);
                 cards.Add(card);
             }
         }
 
         if (title != null)
-            title.text = TextOf(TutorialTraitTexts.TitleId);
+            title.text = TextOf(TraitTexts.TitleId);
         nextRequestAt = 0f;
         SetActive(window, true);
     }
@@ -237,27 +236,27 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         ClearCards();
     }
 
-    private void ApplyRoundTexts(TutorialTraitRoundDisplay display)
+    private void ApplyRoundTexts(TraitRoundDisplay display)
     {
-        bool showIntro = (display & TutorialTraitRoundDisplay.Intro) != 0;
-        bool showLast = (display & TutorialTraitRoundDisplay.LastNotice) != 0;
+        bool showIntro = (display & TraitRoundDisplay.Intro) != 0;
+        bool showLast = (display & TraitRoundDisplay.LastNotice) != 0;
         SetActive(introRoot, showIntro);
         SetActive(lastNoticeRoot, showLast);
         if (showIntro && introText != null)
-            introText.text = TextOf(TutorialTraitTexts.IntroId);
+            introText.text = TextOf(TraitTexts.IntroId);
         if (showLast && lastNoticeText != null)
-            lastNoticeText.text = TextOf(TutorialTraitTexts.LastNoticeId);
+            lastNoticeText.text = TextOf(TraitTexts.LastNoticeId);
     }
 
-    private string TextOf(string id) => TutorialTraitTextTable.Resolve(texts, id);
+    private string TextOf(string id) => TraitTextTable.Resolve(texts, id);
 
-    private void HandleCardClicked(int traitIndex)
+    private void HandleCardClicked(int traitHash)
     {
         if (director == null || !model.IsOpen || Time.unscaledTime < nextRequestAt)
             return;
 
         nextRequestAt = Time.unscaledTime + requestCooldown;
-        director.RequestChoose(traitIndex); // 확정되면 제시 행이 사라져 Evaluate 가 창을 닫는다
+        director.RequestChoose(traitHash); // 확정되면 제시 행이 사라져 Evaluate 가 창을 닫는다
     }
 
     private void ClearCards()
@@ -288,11 +287,11 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
 
         resetPromptGeneration = generation;
         if (resetPromptText != null)
-            resetPromptText.text = TextOf(TutorialTraitTexts.ResetPromptTitleId);
+            resetPromptText.text = TextOf(TraitTexts.ResetPromptTitleId);
         if (resetYesText != null)
-            resetYesText.text = TextOf(TutorialTraitTexts.ResetPromptYesId);
+            resetYesText.text = TextOf(TraitTexts.ResetPromptYesId);
         if (resetNoText != null)
-            resetNoText.text = TextOf(TutorialTraitTexts.ResetPromptNoId);
+            resetNoText.text = TextOf(TraitTexts.ResetPromptNoId);
         if (resetPrompt != null)
             resetPrompt.transform.SetAsLastSibling(); // 특성 창 위
         SetActive(resetPrompt, true);
@@ -458,8 +457,8 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
             return;
 
         if (toastText != null)
-            toastText.text = TutorialTraitTexts.FormatPicked(
-                TextOf(TutorialTraitTexts.PickedId), TextOf(TutorialTraitTexts.PickedLocationId));
+            toastText.text = TraitTexts.FormatPicked(
+                TextOf(TraitTexts.PickedId), TextOf(TraitTexts.PickedLocationId));
         toastHideAt = Time.unscaledTime + toastSeconds;
         toast.SetActive(true);
     }
@@ -479,17 +478,16 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         if (iconTemplate == null || acquiredContainer == null || director == null)
             return;
 
-        TutorialTraitPool pool = director.Pool;
         for (int i = 0; i < shownAcquired.Count; i++)
         {
-            TutorialTraitIconView view = Instantiate(iconTemplate, acquiredContainer);
+            TraitIconView view = Instantiate(iconTemplate, acquiredContainer);
             view.gameObject.SetActive(true);
-            view.Bind(pool != null ? pool.Get(shownAcquired[i]) : null, placeholderIcon, HandleIconHover);
+            view.Bind(director.GetTrait(shownAcquired[i]), placeholderIcon, HandleIconHover);
             icons.Add(view);
         }
     }
 
-    private void HandleIconHover(TutorialTraitIconView view, TutorialTraitDefinition trait)
+    private void HandleIconHover(TraitIconView view, TraitDefinition trait)
     {
         if (trait == null)
         {

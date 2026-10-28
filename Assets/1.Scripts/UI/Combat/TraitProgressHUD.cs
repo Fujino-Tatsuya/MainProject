@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 로컬 플레이어의 특성(증강) 진행도 — XP 바·레벨 숫자·일반 스킬 슬롯 상단 칸. 규칙은 <see cref="TraitProgressRules"/>.
-/// 획득 목록 = <see cref="TutorialTraitDirector.GetAcquired"/>, 게이트 = <see cref="MapSceneDirector.IsGateOpen"/>(둘 다 기존 복제 값).
+/// 획득 목록 = <see cref="TraitDirector.GetAcquired"/>, 게이트 = <see cref="MapSceneDirector.IsGateOpen"/>(둘 다 기존 복제 값).
 /// 두 디렉터는 맵 씬에 있어 HUD 보다 늦게 생기거나 사라지므로 매 프레임 인스턴스만 확인해 구독을 옮기고,
 /// 값은 변경 알림(<c>ClientStateChanged</c>·<c>StateChanged</c>)이 왔을 때만 다시 계산한다.
 /// </summary>
@@ -24,7 +24,7 @@ public class TraitProgressHUD : MonoBehaviour
 
     private readonly List<int> acquired = new List<int>();
     private Player player;
-    private TutorialTraitDirector traitDirector;
+    private TraitDirector traitDirector;
     private bool dirty = true;
 
     public void Bind(Player boundPlayer)
@@ -48,14 +48,14 @@ public class TraitProgressHUD : MonoBehaviour
 
     private void Update()
     {
-        if (traitDirector != TutorialTraitDirector.Instance)
-            SetTraitDirector(TutorialTraitDirector.Instance);
+        if (traitDirector != TraitDirector.Instance)
+            SetTraitDirector(TraitDirector.Instance);
 
         if (dirty)
             Refresh();
     }
 
-    private void SetTraitDirector(TutorialTraitDirector director)
+    private void SetTraitDirector(TraitDirector director)
     {
         if (traitDirector != null)
             traitDirector.ClientStateChanged -= MarkDirty;
@@ -96,14 +96,13 @@ public class TraitProgressHUD : MonoBehaviour
 
     private int UpgradeStage(PlayerSkillSlot slot)
     {
-        TutorialTraitPool pool = traitDirector.Pool;
-        if (pool == null)
+        if (traitDirector.Pool == null)
             return 0;
 
         int count = 0;
-        foreach (int index in acquired)
+        foreach (int traitHash in acquired)
         {
-            TutorialTraitDefinition trait = pool.Get(index);
+            TraitDefinition trait = traitDirector.GetTrait(traitHash);
             if (trait != null && TraitProgressRules.CountsForSlot(trait.EffectKind, trait.CooldownSlot, slot))
                 count++;
         }

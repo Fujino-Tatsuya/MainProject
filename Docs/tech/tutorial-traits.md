@@ -1,5 +1,14 @@
 # 튜토리얼 특성 선택 (할 일 15)
 
+> **🟦 할 일 125 (1/5, 2026-10-28) — 아래 본문보다 우선.** 모든 `TutorialTrait…` 타입이 **`Trait…`** 로 바뀌었다(.meta GUID 그대로).
+> 코드 `Assets/1.Scripts/Traits/` · 데이터 `Assets/9.ScriptableObject/Traits/`(`TraitPool.asset`·`TraitTexts.asset`, 옛 placeholder 6개는 `Traits/Legacy/` — 풀에서 뺐다) · 프리팹 `2.Prefabs/Managers/TraitDirector.prefab`·`2.Prefabs/UI/Tutorial/TraitUI.prefab`.
+> - **영구 ID = 명세 문자열 ID**(`PAL_1_Q_DAMAGE` 등). 네트워크 행·재합류 보관의 특성 키 = ID 의 FNV-1a 32 해시(`TraitIdHash.Of`) — 풀 배열 인덱스는 더 이상 식별에 쓰지 않는다.
+> - **후보 = 캐릭터·차수별 고정 3개**(`TraitCatalog` 명세표 순서, 차수 = 획득 수 + 1). 랜덤 없음, 자동 선택·제시 없는 획득 = 첫 번째. 캐릭터 판별 = `TutorialLocalPlayerInfo.ResolveCharacter`(오브젝트 없으면 선택 저장소 → 로스터). 정의가 등록되지 않은 후보는 빠지고, 0장이면 기존 Empty 흐름.
+> - 풀 검증(`TraitCatalogIndex.Errors`) — 빈 ID·해시 0·중복·해시 충돌·명세표에 없는 ID 는 오류 로그 + 제시 안 함.
+> - **목록 버전**: 서버가 풀 순서 ID 해시 목록의 버전을 `NetworkVariable` 로 복제 → 클라가 자기 값과 다르면 오류 로그(접속은 끊지 않는다).
+> - 36개 정의 에셋은 캐릭터 레인(126~128) 몫. 그 전까지 풀이 비어 복도 특성 라운드는 0장으로 지나간다.
+> - 테스트: `TraitCatalogTests`·`TraitFixedSelectionTests`(맵씬 EditMode 메뉴에 포함). 옛 무작위 모드(`TraitSelectionModel(int poolSize, …)`)는 기존 테스트용으로 남아 있다.
+
 > **🟪 할 일 107 (2026-10-27)** — 특성 모듈(`Assets/1.Scripts/Tutorial/Traits`)은 이름 그대로. 맵씬에서 라운드를 여는 복도 흐름만 `TutorialCorridorFlow` → **`MapSceneTraitCorridorFlow`** 로 이름이 바뀌었다(동작 그대로). 디렉터는 `MapSceneDirector`.
 
 > 튜토리얼 복도에서 구역을 돌파할 때마다 특성 1장을 고른다. 특성은 **이번 작전 동안만** 유지된다.

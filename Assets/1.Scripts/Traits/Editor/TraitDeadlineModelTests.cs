@@ -1,12 +1,12 @@
 using NUnit.Framework;
 
 /// <summary>특성 창 교착 방지 게이지 고정 (할 일 15 후속) — 표시·비율·10초 강조·로컬 감소·재동기화·문구.</summary>
-public sealed class TutorialTraitDeadlineModelTests
+public sealed class TraitDeadlineModelTests
 {
     [Test]
     public void HiddenByDefault()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
 
         Assert.That(model.Visible, Is.False);
         Assert.That(model.IsUrgent, Is.False, "숨김이면 0초여도 강조하지 않는다");
@@ -16,7 +16,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Sync_FillIsRemainingOverTotal()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 45f, 60f, 1, 3);
 
         Assert.That(model.Visible, Is.True);
@@ -28,7 +28,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Fill_ClampsAndZeroTotalIsEmpty()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 90f, 60f, 1, 2);
         Assert.That(model.Fill, Is.EqualTo(1f), "남은 > 전체(인스펙터 값 불일치)면 가득");
 
@@ -43,11 +43,11 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Urgent_AtTenSecondsOrLess()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 10.01f, 60f, 1, 2);
         Assert.That(model.IsUrgent, Is.False);
 
-        model.Sync(true, TutorialTraitDeadlineModel.UrgentSeconds, 60f, 1, 2);
+        model.Sync(true, TraitDeadlineModel.UrgentSeconds, 60f, 1, 2);
         Assert.That(model.IsUrgent, Is.True, "10초 이하");
 
         model.Sync(true, 0f, 60f, 1, 2);
@@ -57,7 +57,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Tick_DecreasesLocallyAndStopsAtZero()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 11f, 60f, 1, 2);
 
         model.Tick(0.5f);
@@ -77,7 +77,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Tick_IgnoredWhileHidden()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Tick(5f);
 
         Assert.That(model.Remaining, Is.EqualTo(0f));
@@ -87,7 +87,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Sync_ResyncsToServerValue()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 40f, 60f, 1, 3);
         model.Tick(3f);
         Assert.That(model.Remaining, Is.EqualTo(37f).Within(1e-5f));
@@ -101,7 +101,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void SyncHidden_ClearsValues()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 5f, 60f, 1, 2);
         model.Sync(false, 5f, 60f, 1, 2);
 
@@ -114,7 +114,7 @@ public sealed class TutorialTraitDeadlineModelTests
     [Test]
     public void Texts_RoundSecondsUpAndShowDoneOverTotal()
     {
-        var model = new TutorialTraitDeadlineModel();
+        var model = new TraitDeadlineModel();
         model.Sync(true, 9.2f, 60f, 2, 3);
 
         Assert.That(model.DisplaySeconds, Is.EqualTo(10), "올림 — 0.x초 남아도 0 으로 보이지 않게");

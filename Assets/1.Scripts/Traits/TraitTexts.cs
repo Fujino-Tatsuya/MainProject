@@ -4,22 +4,22 @@ using System;
 /// 특성 선택 라운드의 표시 옵션(할 일 15 T2). 라운드를 여는 쪽(복도 트리거)이 정하고, 디렉터가 클라까지 복제한다.
 /// </summary>
 [Flags]
-public enum TutorialTraitRoundDisplay : byte
+public enum TraitRoundDisplay : byte
 {
     None = 0,
 
-    /// <summary>창 상단 설명(<see cref="TutorialTraitTexts.IntroId"/>) — 복도1.</summary>
+    /// <summary>창 상단 설명(<see cref="TraitTexts.IntroId"/>) — 복도1.</summary>
     Intro = 1 << 0,
 
-    /// <summary>창 아래 한 줄(<see cref="TutorialTraitTexts.LastNoticeId"/>) — 복도4.</summary>
+    /// <summary>창 아래 한 줄(<see cref="TraitTexts.LastNoticeId"/>) — 복도4.</summary>
     LastNotice = 1 << 1,
 }
 
 /// <summary>
 /// 특성 선택 UI 문구 ID 와 상수 기본값(할 일 15 T2) — Unity 비의존.
-/// 실제 표시 문구는 <see cref="TutorialTraitTextTable"/> 에셋이 우선이고, 에셋·행이 없을 때 여기 값으로 폴백한다(T3).
+/// 실제 표시 문구는 <see cref="TraitTextTable"/> 에셋이 우선이고, 에셋·행이 없을 때 여기 값으로 폴백한다(T3).
 /// </summary>
-public static class TutorialTraitTexts
+public static class TraitTexts
 {
     public const string TitleId = "TUT_C1_TRAIT_TITLE";
     public const string IntroId = "TUT_C1_TRAIT_INTRO";

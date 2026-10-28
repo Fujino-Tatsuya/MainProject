@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bd54aeaa9a9127f439106443ae8ea7d1, type: 3}
-  m_Name: TutorialTraitTexts
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialTraitTextTable
+  m_Name: TraitTexts
+  m_EditorClassIdentifier: Assembly-CSharp::TraitTextTable
   entries:
   - id: TUT_C1_TRAIT_TITLE
     text: "\uD2B9\uC131 \uC120\uD0DD"

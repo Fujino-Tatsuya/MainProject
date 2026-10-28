@@ -4,15 +4,15 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>획득 특성 다시 보기 줄의 아이콘 1개. 호버하면 이름·설명 툴팁을 요청한다.</summary>
-public sealed class TutorialTraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public sealed class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [SerializeField] private Image icon;
 
-    private TutorialTraitDefinition trait;
-    private Action<TutorialTraitIconView, TutorialTraitDefinition> hoverChanged;
+    private TraitDefinition trait;
+    private Action<TraitIconView, TraitDefinition> hoverChanged;
 
-    public void Bind(TutorialTraitDefinition definition, Sprite placeholderIcon,
-        Action<TutorialTraitIconView, TutorialTraitDefinition> onHoverChanged)
+    public void Bind(TraitDefinition definition, Sprite placeholderIcon,
+        Action<TraitIconView, TraitDefinition> onHoverChanged)
     {
         trait = definition;
         hoverChanged = onHoverChanged;

@@ -2,7 +2,7 @@
 /// 전투 HUD 의 특성(증강) 진행도 규칙 — Unity 비의존 순수 함수. 표시는 <see cref="TraitProgressHUD"/>.
 ///  · 레벨 = 획득 특성 수 + 1(튜토리얼 밖 = 1).
 ///  · XP 바 = 지금 구간(획득 특성 수로 고른 복도 구간)의 게이트 중 열린 비율. 4장 다 얻으면 가득, 튜토리얼 밖 = 0.
-///  · 스킬 상단 칸 = 그 슬롯의 쿨 감소 특성(<see cref="TutorialTraitEffectKind.CooldownReductionOnHit"/>) 개수, 최대 <see cref="MaxUpgradeStage"/>.
+///  · 스킬 상단 칸 = 그 슬롯의 쿨 감소 특성(<see cref="TraitEffectKind.CooldownReductionOnHit"/>) 개수, 최대 <see cref="MaxUpgradeStage"/>.
 /// </summary>
 public static class TraitProgressRules
 {
@@ -42,8 +42,8 @@ public static class TraitProgressRules
         return (float)opened / gates.Length;
     }
 
-    public static bool CountsForSlot(TutorialTraitEffectKind kind, PlayerSkillSlot traitSlot, PlayerSkillSlot slot) =>
-        kind == TutorialTraitEffectKind.CooldownReductionOnHit && traitSlot == slot;
+    public static bool CountsForSlot(TraitEffectKind kind, PlayerSkillSlot traitSlot, PlayerSkillSlot slot) =>
+        kind == TraitEffectKind.CooldownReductionOnHit && traitSlot == slot;
 
     public static int ClampUpgradeStage(int count) => count < 0 ? 0 : count > MaxUpgradeStage ? MaxUpgradeStage : count;
 

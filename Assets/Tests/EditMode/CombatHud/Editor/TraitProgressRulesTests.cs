@@ -98,9 +98,9 @@ public sealed class TraitProgressRulesTests
     [Test]
     public void CountsForSlot_OnlyCooldownReductionOnMatchingSlot()
     {
-        Assert.That(TraitProgressRules.CountsForSlot(TutorialTraitEffectKind.CooldownReductionOnHit, PlayerSkillSlot.Main, PlayerSkillSlot.Main), Is.True);
-        Assert.That(TraitProgressRules.CountsForSlot(TutorialTraitEffectKind.CooldownReductionOnHit, PlayerSkillSlot.Sub, PlayerSkillSlot.Main), Is.False);
-        Assert.That(TraitProgressRules.CountsForSlot(TutorialTraitEffectKind.AttackDamageMultiplier, PlayerSkillSlot.Main, PlayerSkillSlot.Main), Is.False);
+        Assert.That(TraitProgressRules.CountsForSlot(TraitEffectKind.CooldownReductionOnHit, PlayerSkillSlot.Main, PlayerSkillSlot.Main), Is.True);
+        Assert.That(TraitProgressRules.CountsForSlot(TraitEffectKind.CooldownReductionOnHit, PlayerSkillSlot.Sub, PlayerSkillSlot.Main), Is.False);
+        Assert.That(TraitProgressRules.CountsForSlot(TraitEffectKind.AttackDamageMultiplier, PlayerSkillSlot.Main, PlayerSkillSlot.Main), Is.False);
     }
 
     [TestCase(-1, 0)]

@@ -6,7 +6,7 @@ using System;
 /// 스냅샷 사이에는 <see cref="Tick"/>(실제 시간)으로 남은 초를 로컬로 줄이고, 다음 <see cref="Sync"/> 가 서버 값으로 다시 맞춘다.
 /// 이 모듈은 튜토리얼 디렉터·게이트를 모른다 — 어떤 게이트를 기다리는지 판단은 넣는 쪽 몫.
 /// </summary>
-public sealed class TutorialTraitDeadlineModel
+public sealed class TraitDeadlineModel
 {
     /// <summary>이 초 이하로 남으면 강조색(게이지·텍스트).</summary>
     public const float UrgentSeconds = 10f;

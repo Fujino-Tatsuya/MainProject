@@ -8,12 +8,12 @@ using UnityEngine.UI;
 /// 손으로 다듬기 시작하면 이 메뉴를 다시 돌리지 말 것 — 덮어쓴다.
 /// 별도 Screen Space Overlay 캔버스라 CombatHUD 와 무관하다. 씬 배치는 S12(복도 씬)에서 프리팹을 끌어다 둔다.
 /// </summary>
-public static class TutorialTraitUiAuthoring
+public static class TraitUiAuthoring
 {
     private const string Folder = "Assets/2.Prefabs/UI/Tutorial";
-    private const string PrefabPath = Folder + "/TutorialTraitUI.prefab";
+    private const string PrefabPath = Folder + "/TraitUI.prefab";
     private const string FontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
-    private const string TextTablePath = "Assets/9.ScriptableObject/Tutorial/Traits/TutorialTraitTexts.asset";
+    private const string TextTablePath = "Assets/9.ScriptableObject/Traits/TraitTexts.asset";
     private const int SortingOrder = 60; // CombatHUD(0) 위
 
     private static readonly Color PanelColor = new Color(0.035f, 0.045f, 0.065f, 0.97f);
@@ -27,9 +27,9 @@ public static class TutorialTraitUiAuthoring
         EnsureFolder(Folder);
         TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
         Sprite placeholder = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-        TutorialTraitTextTable texts = EnsureTextTable();
+        TraitTextTable texts = EnsureTextTable();
 
-        var root = new GameObject("TutorialTraitUI", typeof(RectTransform));
+        var root = new GameObject("TraitUI", typeof(RectTransform));
         try
         {
             root.layer = LayerMask.NameToLayer("UI");
@@ -41,7 +41,7 @@ public static class TutorialTraitUiAuthoring
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
             root.AddComponent<GraphicRaycaster>();
-            TutorialTraitSelectionView view = root.AddComponent<TutorialTraitSelectionView>();
+            TraitSelectionView view = root.AddComponent<TraitSelectionView>();
 
             // ── 획득 특성 다시 보기(좌상단) ──
             RectTransform list = NewUi("AcquiredList", root.transform);
@@ -61,7 +61,7 @@ public static class TutorialTraitUiAuthoring
             Image iconImage = iconImageRect.gameObject.AddComponent<Image>();
             iconImage.raycastTarget = false;
             iconImage.preserveAspect = true;
-            TutorialTraitIconView iconView = iconTemplate.gameObject.AddComponent<TutorialTraitIconView>();
+            TraitIconView iconView = iconTemplate.gameObject.AddComponent<TraitIconView>();
             SetRef(iconView, "icon", iconImage);
 
             RectTransform tooltip = NewUi("AcquiredTooltip", root.transform);
@@ -90,10 +90,10 @@ public static class TutorialTraitUiAuthoring
             panel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             TMP_Text title = NewText("Title", panel, font, 40f, FontStyles.Bold, TextAlignmentOptions.Center, AccentColor);
-            title.text = TutorialTraitTexts.Title;
+            title.text = TraitTexts.Title;
 
             TMP_Text intro = NewText("Intro", panel, font, 21f, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
-            intro.text = TutorialTraitTexts.Intro;
+            intro.text = TraitTexts.Intro;
 
             RectTransform cards = NewUi("Cards", panel);
             HorizontalLayoutGroup cardsLayout = cards.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -129,14 +129,14 @@ public static class TutorialTraitUiAuthoring
             cardIconElement.preferredHeight = cardIconElement.minHeight = 104f;
             TMP_Text cardName = NewText("Name", cardTemplate, font, 26f, FontStyles.Bold, TextAlignmentOptions.Center, AccentColor);
             TMP_Text cardDescription = NewText("Description", cardTemplate, font, 19f, FontStyles.Normal, TextAlignmentOptions.Top, Color.white);
-            TutorialTraitCardView cardView = cardTemplate.gameObject.AddComponent<TutorialTraitCardView>();
+            TraitCardView cardView = cardTemplate.gameObject.AddComponent<TraitCardView>();
             SetRef(cardView, "button", button);
             SetRef(cardView, "icon", cardIcon);
             SetRef(cardView, "displayName", cardName);
             SetRef(cardView, "description", cardDescription);
 
             TMP_Text lastNotice = NewText("LastNotice", panel, font, 20f, FontStyles.Italic, TextAlignmentOptions.Center, AccentColor);
-            lastNotice.text = TutorialTraitTexts.LastNotice;
+            lastNotice.text = TraitTexts.LastNotice;
 
             // ── 교착 방지 게이지(창 아래 — 첫 완료자 뒤에만 켜진다, 기본 꺼짐이라 꺼져 있을 땐 레이아웃 변화 없음) ──
             RectTransform deadline = NewUi("Deadline", panel);
@@ -215,7 +215,7 @@ public static class TutorialTraitUiAuthoring
             window.gameObject.SetActive(false);
 
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-            Debug.Log($"[TutorialTrait] UI 프리팹 저장 — {PrefabPath}");
+            Debug.Log($"[Trait] UI 프리팹 저장 — {PrefabPath}");
         }
         finally
         {
@@ -294,14 +294,14 @@ public static class TutorialTraitUiAuthoring
     }
 
     /// <summary>문구 테이블 에셋(T3) — 없으면 상수 기본값으로 만든다. 있으면 그대로 쓴다(기획이 고친 문구 보존).</summary>
-    public static TutorialTraitTextTable EnsureTextTable()
+    public static TraitTextTable EnsureTextTable()
     {
-        var table = AssetDatabase.LoadAssetAtPath<TutorialTraitTextTable>(TextTablePath);
+        var table = AssetDatabase.LoadAssetAtPath<TraitTextTable>(TextTablePath);
         if (table != null)
             return table;
 
         EnsureFolder(System.IO.Path.GetDirectoryName(TextTablePath).Replace('\\', '/'));
-        table = ScriptableObject.CreateInstance<TutorialTraitTextTable>();
+        table = ScriptableObject.CreateInstance<TraitTextTable>();
         AssetDatabase.CreateAsset(table, TextTablePath);
         AssetDatabase.SaveAssets();
         return table;

@@ -31,7 +31,7 @@ public static class MapSceneBossPath
         get
         {
             MapSceneDirector d = MapSceneDirector.Instance;
-            TutorialTraitDirector traits = TutorialTraitDirector.Instance;
+            TraitDirector traits = TraitDirector.Instance;
             return MapSceneBossPathRules.IsPadEnabled(IsTutorialStage, d != null && d.IsGateOpen(MapSceneGate.G10_BossEnterAndPad),
                 traits != null && traits.IsTraitResetInProgress);
         }

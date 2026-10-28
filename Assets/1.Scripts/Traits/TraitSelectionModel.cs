@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>선택 요청의 판정 결과. Accepted 외에는 서버가 무시하고 로그만 남긴다.</summary>
-public enum TutorialTraitChoiceResult
+public enum TraitChoiceResult
 {
     Accepted,
     /// <summary>이번 라운드에 제시받은 적이 없다(라운드 참가자가 아니거나 0장 제시).</summary>
@@ -14,7 +14,7 @@ public enum TutorialTraitChoiceResult
 }
 
 /// <summary>라운드 참가자 추가(늦은 도착) 결과.</summary>
-public enum TutorialTraitJoinResult
+public enum TraitJoinResult
 {
     /// <summary>1장 이상 제시했다 — 고를 때까지 미선택.</summary>
     Offered,
@@ -24,19 +24,32 @@ public enum TutorialTraitJoinResult
     AlreadyInRound,
     /// <summary>시작한 라운드가 없다(또는 서버 준비 전).</summary>
     NoRound,
-    /// <summary>제시 없이 바로 무작위 1장을 획득했다(<see cref="TutorialTraitSelectionModel.AddParticipantWithoutOffer"/> — 디버그 구간 스킵).</summary>
+    /// <summary>제시 없이 바로 무작위 1장을 획득했다(<see cref="TraitSelectionModel.AddParticipantWithoutOffer"/> — 디버그 구간 스킵).</summary>
     Granted,
 }
 
 /// <summary>
-/// 튜토리얼 특성 선택의 순수 규칙(할 일 15 T1) — Unity·NGO 비의존, EditMode 테스트 대상.
-/// 플레이어(clientId)별로 이번 라운드 제시 후보·선택 완료 여부·획득 목록을 가진다.
-/// 특성은 풀 인덱스(0..poolSize-1)로 다룬다. 난수는 <c>next(maxExclusive)</c> 로 주입한다(0 이상 maxExclusive 미만).
+/// 고정 후보 공급(할 일 125) — 그 플레이어의 <paramref name="tier"/> 차(1~4) 후보 특성 키를 순서대로 <paramref name="result"/> 에 채운다.
+/// 채우기 전에 <paramref name="result"/> 는 비어 있다. 캐릭터를 모르거나 후보가 없으면 비운 채 둔다.
 /// </summary>
-public sealed class TutorialTraitSelectionModel
+public delegate void TraitCandidateSource(ulong clientId, int tier, List<int> result);
+
+/// <summary>
+/// 특성 선택의 순수 규칙(할 일 15 T1) — Unity·NGO 비의존, EditMode 테스트 대상.
+/// 플레이어(clientId)별로 이번 라운드 제시 후보·선택 완료 여부·획득 목록을 가진다.
+///
+/// 두 방식:
+///  · 고정 후보(할 일 125, 디렉터가 쓴다) — <see cref="TraitSelectionModel(TraitCandidateSource, Func{int, bool})"/>.
+///    특성 키 = 특성 ID 해시(<see cref="TraitIdHash"/>). 차수 = 그 플레이어의 획득 수 + 1. 후보는 공급자 순서 그대로(이미 얻은 것 제외),
+///    자동 선택·제시 없는 획득 = 첫 번째. 난수 인자는 무시한다.
+///  · 무작위(옛 방식) — <see cref="TraitSelectionModel(int, IEnumerable{int})"/>. 특성 키 = 풀 인덱스(0..poolSize-1),
+///    난수는 <c>next(maxExclusive)</c> 로 주입한다(0 이상 maxExclusive 미만).
+/// </summary>
+public sealed class TraitSelectionModel
 {
     private sealed class PlayerState
     {
+        public ulong ClientId;
         public readonly List<int> Offered = new List<int>();
         public readonly List<int> Acquired = new List<int>();
         public bool InRound;
@@ -48,17 +61,58 @@ public sealed class TutorialTraitSelectionModel
 
     private readonly int poolSize;
     private readonly HashSet<int> unusable;
+    private readonly TraitCandidateSource fixedCandidates;
+    private readonly Func<int, bool> isKnownTrait;
     private readonly Dictionary<ulong, PlayerState> players = new Dictionary<ulong, PlayerState>();
     private readonly List<int> candidateScratch = new List<int>();
+    private readonly List<int> sourceScratch = new List<int>();
     private int roundOfferCount;
     private int lastOfferSeq;
 
+    /// <summary>무작위 방식(옛 튜토리얼 풀). 특성 키 = 풀 인덱스.</summary>
     /// <param name="poolSize">풀 크기.</param>
     /// <param name="unusableIndices">제시하면 안 되는 인덱스(빈 칸 등). null 가능.</param>
-    public TutorialTraitSelectionModel(int poolSize, IEnumerable<int> unusableIndices = null)
+    public TraitSelectionModel(int poolSize, IEnumerable<int> unusableIndices = null)
     {
         this.poolSize = Math.Max(0, poolSize);
         unusable = unusableIndices != null ? new HashSet<int>(unusableIndices) : new HashSet<int>();
+    }
+
+    /// <summary>고정 후보 방식(할 일 125). 특성 키 = ID 해시.</summary>
+    /// <param name="candidates">플레이어·차수별 고정 후보 공급자.</param>
+    /// <param name="isKnownTrait">유효한 특성 키인가(재합류 복원·후보 검증). null 이면 공급자가 낸 키를 모두 믿는다(복원은 0 만 거른다).</param>
+    public TraitSelectionModel(TraitCandidateSource candidates, Func<int, bool> isKnownTrait)
+    {
+        fixedCandidates = candidates ?? throw new ArgumentNullException(nameof(candidates));
+        this.isKnownTrait = isKnownTrait;
+        unusable = new HashSet<int>();
+    }
+
+    /// <summary>고정 후보 방식인가.</summary>
+    public bool IsFixed => fixedCandidates != null;
+
+    /// <summary>그 플레이어가 다음에 받을 차수(획득 수 + 1). 고정 후보 방식에서 후보를 고르는 기준이다.</summary>
+    public int NextTier(ulong clientId) => GetAcquired(clientId).Count + 1;
+
+    // 그 플레이어의 후보를 고른다 — 고정 방식 = 공급자 순서에서 이미 얻은 것·중복·무효 제외 후 앞 count 개, 무작위 방식 = PickCandidates.
+    private void PickFor(PlayerState state, int count, Func<int, int> next, List<int> result)
+    {
+        if (!IsFixed)
+        {
+            PickCandidates(poolSize, state.Acquired, unusable, count, next, result);
+            return;
+        }
+
+        result.Clear();
+        sourceScratch.Clear();
+        fixedCandidates(state.ClientId, state.Acquired.Count + 1, sourceScratch);
+        int take = Math.Max(0, count);
+        for (int i = 0; i < sourceScratch.Count && result.Count < take; i++)
+        {
+            int key = sourceScratch[i];
+            if (IsRestorable(key) && !state.Acquired.Contains(key) && !result.Contains(key))
+                result.Add(key);
+        }
     }
 
     /// <summary>지금까지 시작한 라운드 수(첫 라운드 = 1).</summary>
@@ -134,53 +188,53 @@ public sealed class TutorialTraitSelectionModel
     /// 그 사람에게만 라운드 시작 때와 같은 장 수로 후보를 뽑고, 이미 참가한 사람의 제시·선택은 건드리지 않는다.
     /// 이미 참가자면(고른 뒤 왕복 포함) 무시한다 — 한 라운드에 창은 한 번만.
     /// </summary>
-    public TutorialTraitJoinResult AddParticipant(ulong clientId, Func<int, int> next)
+    public TraitJoinResult AddParticipant(ulong clientId, Func<int, int> next)
     {
         if (next == null)
             throw new ArgumentNullException(nameof(next));
         if (Round == 0)
-            return TutorialTraitJoinResult.NoRound;
+            return TraitJoinResult.NoRound;
 
         PlayerState state = GetOrCreate(clientId);
         if (state.InRound)
-            return TutorialTraitJoinResult.AlreadyInRound;
+            return TraitJoinResult.AlreadyInRound;
 
         state.InRound = true;
         state.Personal = false;
         Offer(state, roundOfferCount, next);
-        return state.Chosen ? TutorialTraitJoinResult.Empty : TutorialTraitJoinResult.Offered;
+        return state.Chosen ? TraitJoinResult.Empty : TraitJoinResult.Offered;
     }
 
     /// <summary>
     /// 지금 라운드에 참가자 1명을 <b>제시 없이</b> 더하고 바로 무작위 1장을 획득시킨다(할 일 34 디버그 구간 스킵).
     /// 제시 후보·제시 번호(<see cref="GetOfferSeq"/>)를 건드리지 않으므로 클라 창이 열리지 않는다. 후보는 <see cref="AddParticipant"/> 와 같은
-    /// 규칙(획득·사용 불가 제외)으로 뽑고, 라운드 장 수가 0 이거나 풀이 소진됐으면 <see cref="TutorialTraitJoinResult.Empty"/>.
-    /// 이미 참가자면 무시한다. <paramref name="traitIndex"/> = 획득한 인덱스(<see cref="TutorialTraitJoinResult.Granted"/> 아니면 -1).
+    /// 규칙(획득·사용 불가 제외)으로 뽑고, 라운드 장 수가 0 이거나 풀이 소진됐으면 <see cref="TraitJoinResult.Empty"/>.
+    /// 이미 참가자면 무시한다. <paramref name="traitIndex"/> = 획득한 인덱스(<see cref="TraitJoinResult.Granted"/> 아니면 -1).
     /// </summary>
-    public TutorialTraitJoinResult AddParticipantWithoutOffer(ulong clientId, Func<int, int> next, out int traitIndex)
+    public TraitJoinResult AddParticipantWithoutOffer(ulong clientId, Func<int, int> next, out int traitIndex)
     {
         if (next == null)
             throw new ArgumentNullException(nameof(next));
 
         traitIndex = -1;
         if (Round == 0)
-            return TutorialTraitJoinResult.NoRound;
+            return TraitJoinResult.NoRound;
 
         PlayerState state = GetOrCreate(clientId);
         if (state.InRound)
-            return TutorialTraitJoinResult.AlreadyInRound;
+            return TraitJoinResult.AlreadyInRound;
 
         state.InRound = true;
         state.Personal = false;
         state.Chosen = true;
         state.Offered.Clear();
-        PickCandidates(poolSize, state.Acquired, unusable, Math.Min(1, roundOfferCount), next, candidateScratch);
+        PickFor(state, Math.Min(1, roundOfferCount), next, candidateScratch);
         if (candidateScratch.Count == 0)
-            return TutorialTraitJoinResult.Empty;
+            return TraitJoinResult.Empty;
 
         traitIndex = candidateScratch[0];
         state.Acquired.Add(traitIndex);
-        return TutorialTraitJoinResult.Granted;
+        return TraitJoinResult.Granted;
     }
 
     /// <summary>
@@ -204,7 +258,7 @@ public sealed class TutorialTraitSelectionModel
     private void Offer(PlayerState state, int offerCount, Func<int, int> next)
     {
         state.Offered.Clear();
-        PickCandidates(poolSize, state.Acquired, unusable, offerCount, next, candidateScratch);
+        PickFor(state, offerCount, next, candidateScratch);
         state.Offered.AddRange(candidateScratch);
         state.Chosen = state.Offered.Count == 0;
         state.OfferSeq = ++lastOfferSeq;
@@ -242,22 +296,22 @@ public sealed class TutorialTraitSelectionModel
     }
 
     /// <summary>선택 판정. Accepted 면 획득 목록에 넣고 이번 라운드를 완료 처리한다.</summary>
-    public TutorialTraitChoiceResult TryChoose(ulong clientId, int traitIndex)
+    public TraitChoiceResult TryChoose(ulong clientId, int traitIndex)
     {
         if (!players.TryGetValue(clientId, out PlayerState state) || !state.InRound)
-            return TutorialTraitChoiceResult.NoOffer;
+            return TraitChoiceResult.NoOffer;
         if (state.Chosen)
-            return state.Offered.Count == 0 ? TutorialTraitChoiceResult.NoOffer : TutorialTraitChoiceResult.AlreadyChosen;
+            return state.Offered.Count == 0 ? TraitChoiceResult.NoOffer : TraitChoiceResult.AlreadyChosen;
         if (!state.Offered.Contains(traitIndex))
-            return TutorialTraitChoiceResult.NotOffered;
+            return TraitChoiceResult.NotOffered;
 
         state.Chosen = true;
         state.Acquired.Add(traitIndex);
-        return TutorialTraitChoiceResult.Accepted;
+        return TraitChoiceResult.Accepted;
     }
 
     /// <summary>
-    /// 자동 획득 대상: 아직 안 고른 참가자의 제시 후보 중 무작위 1장. 대상이 아니면 -1.
+    /// 자동 획득 대상: 아직 안 고른 참가자의 제시 후보 중 1장 — 고정 후보 방식은 첫 번째, 무작위 방식은 무작위. 대상이 아니면 -1.
     /// 판정만 한다 — 실제 획득은 반환값으로 <see cref="TryChoose"/> 를 부른다.
     /// </summary>
     public int PickAutoChoice(ulong clientId, Func<int, int> next)
@@ -268,7 +322,7 @@ public sealed class TutorialTraitSelectionModel
             return -1;
 
         List<int> offered = players[clientId].Offered;
-        return offered[ClampIndex(next(offered.Count), offered.Count)];
+        return IsFixed ? offered[0] : offered[ClampIndex(next(offered.Count), offered.Count)];
     }
 
     /// <summary>이번 라운드 참가자이고 1장 이상 제시받았는데 아직 안 골랐다.</summary>
@@ -291,7 +345,7 @@ public sealed class TutorialTraitSelectionModel
 
     /// <summary>
     /// 그 플레이어의 제시 번호(0 = 제시받은 적 없음). 그 플레이어에게 새 제시가 들어갈 때만 바뀐다 —
-    /// 다른 사람의 라운드·참가 추가·재선택에는 변하지 않는다. 창은 이 번호로 열고 닫는다(<see cref="TutorialTraitWindowModel"/>).
+    /// 다른 사람의 라운드·참가 추가·재선택에는 변하지 않는다. 창은 이 번호로 열고 닫는다(<see cref="TraitWindowModel"/>).
     /// </summary>
     public int GetOfferSeq(ulong clientId)
     {
@@ -377,7 +431,7 @@ public sealed class TutorialTraitSelectionModel
 
     /// <summary>
     /// 재합류 — 퇴장 전에 지금 복도 라운드에서 이미 골랐던(0장 포함) 사람을 "참가·고름"으로 되돌린다.
-    /// 그래야 문이 열릴 때 미도착자 자동 획득·중간 지점 늦은 도착이 같은 라운드에서 한 장을 더 주지 않는다(<see cref="TutorialTraitJoinResult.AlreadyInRound"/>).
+    /// 그래야 문이 열릴 때 미도착자 자동 획득·중간 지점 늦은 도착이 같은 라운드에서 한 장을 더 주지 않는다(<see cref="TraitJoinResult.AlreadyInRound"/>).
     /// 라운드가 그새 바뀌었거나 이미 참가 중이면 아무것도 안 하고 false.
     /// </summary>
     public bool RestoreRoundDone(ulong clientId, int round)
@@ -427,7 +481,10 @@ public sealed class TutorialTraitSelectionModel
         return true;
     }
 
-    private bool IsRestorable(int index) => index >= 0 && index < poolSize && !unusable.Contains(index);
+    // 고정 방식 = 유효한 특성 키(0 = 없음은 거른다), 무작위 방식 = 풀 범위 안·사용 가능 인덱스.
+    private bool IsRestorable(int key) => IsFixed
+        ? key != TraitIdHash.None && (isKnownTrait == null || isKnownTrait(key))
+        : key >= 0 && key < poolSize && !unusable.Contains(key);
 
     /// <summary>접속 종료 — 라운드 참가에서 빼서 전원 완료 판단을 막지 않게 한다. 획득 목록도 지운다.</summary>
     public void RemovePlayer(ulong clientId)
@@ -449,7 +506,7 @@ public sealed class TutorialTraitSelectionModel
     {
         if (!players.TryGetValue(clientId, out PlayerState state))
         {
-            state = new PlayerState();
+            state = new PlayerState { ClientId = clientId };
             players.Add(clientId, state);
         }
 

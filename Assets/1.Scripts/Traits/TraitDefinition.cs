@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>튜토리얼 특성 효과 종류. 지금 실제로 소비처가 있는 효과만 둔다(공격속도·방어·최대체력 배율은 소비처 없음).</summary>
-public enum TutorialTraitEffectKind
+public enum TraitEffectKind
 {
     /// <summary>공격력 배율(영구 상태이상 AttackDamageModifier). 값 = 배율, 1 이상.</summary>
     AttackDamageMultiplier,
@@ -17,16 +17,16 @@ public enum TutorialTraitEffectKind
 }
 
 /// <summary>
-/// 튜토리얼 복도에서 고르는 특성 1장(할 일 15). 기획서가 오면 이 에셋의 값만 바꾼다.
-/// 런타임 식별은 풀(<see cref="TutorialTraitPool"/>) 안의 인덱스로 한다 — 모든 피어가 같은 풀 에셋을 참조한다.
+/// 복도에서 고르는 특성 1장(할 일 15 → 125).
+/// 영구 ID = 명세 문자열 ID(<c>PAL_1_Q_DAMAGE</c> 등, <see cref="TraitCatalog"/>). 네트워크·재합류 보관은 그 고정 해시(<see cref="IdHash"/>)로 한다.
 /// </summary>
-[CreateAssetMenu(fileName = "TutorialTrait", menuName = "Tutorial/Trait Definition")]
-public sealed class TutorialTraitDefinition : ScriptableObject
+[CreateAssetMenu(fileName = "Trait", menuName = "Tutorial/Trait Definition")]
+public sealed class TraitDefinition : ScriptableObject
 {
     // 배율 1 미만은 디버프로 분류돼 보스방 연출(ClearDebuffsServer)이 지운다 — 특성은 1 이상만 허용한다.
     public const float MinStatMultiplier = 1f;
 
-    [Tooltip("기획 문서용 고유 id. 로그·데이터 매칭에 쓴다(동기화는 풀 인덱스).")]
+    [Tooltip("영구 ID — 명세 문자열 ID(예: PAL_1_Q_DAMAGE). 후보표(TraitCatalog)와 맞아야 제시된다. 동기화는 이 ID 의 고정 해시.")]
     [SerializeField] private string id = "";
     [SerializeField] private string displayName = "";
     [TextArea(2, 4)]
@@ -34,7 +34,7 @@ public sealed class TutorialTraitDefinition : ScriptableObject
     [SerializeField] private Sprite icon;
 
     [Header("효과")]
-    [SerializeField] private TutorialTraitEffectKind effectKind = TutorialTraitEffectKind.AttackDamageMultiplier;
+    [SerializeField] private TraitEffectKind effectKind = TraitEffectKind.AttackDamageMultiplier;
     [Tooltip("배율 종류 = 배율(1 이상), 쿨감 종류 = 감소 초.")]
     [SerializeField] private float value = 1.1f;
 
@@ -45,10 +45,12 @@ public sealed class TutorialTraitDefinition : ScriptableObject
     [SerializeField] private PlayerSkillSlot cooldownSlot = PlayerSkillSlot.Main;
 
     public string Id => id;
+    /// <summary>영구 ID 의 고정 해시(<see cref="TraitIdHash.Of"/>) — 네트워크·보관 키.</summary>
+    public int IdHash => TraitIdHash.Of(id);
     public string DisplayName => displayName;
     public string Description => description;
     public Sprite Icon => icon;
-    public TutorialTraitEffectKind EffectKind => effectKind;
+    public TraitEffectKind EffectKind => effectKind;
     public float Value => value;
     public AttackType TriggerAttackType => triggerAttackType;
     public PlayerSkillSlot CooldownSlot => cooldownSlot;
@@ -58,7 +60,7 @@ public sealed class TutorialTraitDefinition : ScriptableObject
 
     private void OnValidate()
     {
-        if (effectKind != TutorialTraitEffectKind.CooldownReductionOnHit && value < MinStatMultiplier)
-            Debug.LogWarning($"[TutorialTrait] '{name}' 배율 {value} < 1 — 디버프로 분류돼 보스방 연출 때 지워진다. 1로 취급한다.", this);
+        if (effectKind != TraitEffectKind.CooldownReductionOnHit && value < MinStatMultiplier)
+            Debug.LogWarning($"[Trait] '{name}' 배율 {value} < 1 — 디버프로 분류돼 보스방 연출 때 지워진다. 1로 취급한다.", this);
     }
 }
