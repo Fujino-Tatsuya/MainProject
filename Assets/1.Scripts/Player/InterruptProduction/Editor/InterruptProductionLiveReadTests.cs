@@ -97,9 +97,11 @@ public sealed class InterruptProductionLiveReadTests
         var dark = new FakeDarkAdaptation();
         var e = InterruptProductionEvent.LocalSuccess(1, 1, Vector3.zero);
 
-        _success.LocalStarted(SlowMotionPurpose.Success, e, true, dark, null);
+        // 암순응은 적중 섬광 순간에 튼다(할 일 132 단계 5) — 본인 화면·오버레이 없음 = self.
+        var moment = new InterruptHitFlashMoment(e, true, false);
+        _success.LocalFlash(moment, dark);
         Set("darkAdaptation", true);
-        _success.LocalStarted(SlowMotionPurpose.Success, e, true, dark, null);
+        _success.LocalFlash(moment, dark);
 
         Assert.AreEqual(1, dark.Plays);
     }

@@ -304,6 +304,6 @@ public sealed class InterruptOwnerDimTests
     {
         public float OwnerDimInDuration => 0.1f;
         public float OwnerDimOutDuration => 0.2f;
-        public float OwnerSuccessHoldDuration => 0.4f;
+        public float OwnerSuccessDimReleaseDelay => 0.3f;
     }
 }

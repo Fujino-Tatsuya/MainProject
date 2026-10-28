@@ -36,7 +36,7 @@ public sealed class InterruptLightGatherTests
     {
         public float OwnerDimInDuration => 0.125f;
         public float OwnerDimOutDuration => 0.25f;
-        public float OwnerSuccessHoldDuration => 0.5f;
+        public float OwnerSuccessDimReleaseDelay => 0.5f;
     }
 
     private readonly List<Object> _created = new List<Object>();

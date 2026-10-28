@@ -123,11 +123,12 @@ public sealed class InterruptOwnerDimOutput : IInterruptOwnerDimOutput, IDisposa
 /// 오너 암전 HUD 덮개(할 일 132) — 최상위 Screen Space Overlay 캔버스 하나에 화면 전체 RawImage.
 /// 텍스처 = 렌더 기능이 쓴 덮개 RT(흰색 + 알파 1 − 남김), 색 = 칸 색·불투명도 × 강도 → 남길 오브젝트 픽셀만 뚫리고 월드·HUD 전부 덮인다.
 /// 오버레이 UI 는 URP 가 카메라 렌더 맨 끝에 그려서, 같은 프레임의 덮개 RT 를 그대로 쓴다.
-/// 순서: <see cref="SortingOrder"/> = PerformanceOverlay(short.MaxValue) 바로 아래, 나머지 모든 UI 위. 입력은 받지 않는다(레이캐스터 없음).
+/// 순서: <see cref="SortingOrder"/> = 적중 섬광 오버레이(<see cref="InterruptHitFlashOverlay.SortingOrder"/>) 바로 아래, 나머지 모든 UI 위.
+/// 입력은 받지 않는다(레이캐스터 없음).
 /// </summary>
 public sealed class InterruptOwnerHudCover : IDisposable
 {
-    public const int SortingOrder = short.MaxValue - 1;
+    public const int SortingOrder = InterruptHitFlashOverlay.SortingOrder - 1;
 
     private GameObject _root;
     private Canvas _canvas;

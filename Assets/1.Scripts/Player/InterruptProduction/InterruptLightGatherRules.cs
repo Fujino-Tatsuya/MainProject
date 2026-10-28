@@ -48,19 +48,23 @@ public static class InterruptLightGatherRules
     /// 재질의 덮어쓸 텍스처 칸에 맞춰 키워드를 맞춘다(셰이더 GUI 가 칸을 바꿀 때마다 부른다). 바뀐 경우만 true.
     /// 칸이 없는 재질은 건드리지 않는다.
     /// </summary>
-    public static bool ApplyOverrideKeyword(Material material)
+    public static bool ApplyOverrideKeyword(Material material) =>
+        ApplyOverrideKeyword(material, OverrideTextureProperty, OverrideTextureKeyword);
+
+    /// <summary>칸 하나판 — 텍스처 속성 <paramref name="property"/> 가 차 있으면 <paramref name="keyword"/> 를 켠다(적중 섬광 오버레이의 단계별 칸도 쓴다).</summary>
+    public static bool ApplyOverrideKeyword(Material material, string property, string keyword)
     {
-        if (material == null || !material.HasProperty(OverrideTextureProperty))
+        if (material == null || !material.HasProperty(property))
             return false;
 
-        bool wanted = UsesOverrideTexture(material.GetTexture(OverrideTextureProperty));
-        if (material.IsKeywordEnabled(OverrideTextureKeyword) == wanted)
+        bool wanted = UsesOverrideTexture(material.GetTexture(property));
+        if (material.IsKeywordEnabled(keyword) == wanted)
             return false;
 
         if (wanted)
-            material.EnableKeyword(OverrideTextureKeyword);
+            material.EnableKeyword(keyword);
         else
-            material.DisableKeyword(OverrideTextureKeyword);
+            material.DisableKeyword(keyword);
         return true;
     }
 }

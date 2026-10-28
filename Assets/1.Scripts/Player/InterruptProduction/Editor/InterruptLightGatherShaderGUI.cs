@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 빛 모임 셰이더(<c>BeaverLobby/VFX/InterruptLightGather</c>) 재질 인스펙터(할 일 132 단계 4).
+/// 빛 모임 셰이더(<c>BeaverLobby/VFX/InterruptLightGather</c>)·적중 섬광 월드 셰이더(<c>BeaverLobby/VFX/InterruptHitFlash</c>, 단계 5) 재질 인스펙터(할 일 132 단계 4).
 /// '덮어쓸 텍스처' 칸이 차면 <see cref="InterruptLightGatherRules.OverrideTextureKeyword"/> 를 켜고, 비면 끈다(= 절차 생성).
 /// </summary>
 public sealed class InterruptLightGatherShaderGUI : ShaderGUI

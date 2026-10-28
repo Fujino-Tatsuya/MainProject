@@ -16,10 +16,10 @@ public sealed class InterruptOwnerPresentationTests
         // 이진 소수로 딱 떨어지는 길이 — 램프 끝 비교가 부동소수 오차로 흔들리지 않게(디렉터 기본값은 아래 따로 확인).
         public float In = 0.125f;
         public float Out = 0.25f;
-        public float Hold = 0.5f;
+        public float Release = 0.5f;
         public float OwnerDimInDuration => In;
         public float OwnerDimOutDuration => Out;
-        public float OwnerSuccessHoldDuration => Hold;
+        public float OwnerSuccessDimReleaseDelay => Release;
     }
 
     private sealed class FakeOutput : IInterruptOwnerDimOutput, IInterruptLightGatherOutput
@@ -271,28 +271,48 @@ public sealed class InterruptOwnerPresentationTests
     // ─── 성공 인계 ───
 
     [Test]
-    public void 서버_성공이면_암전_유지로_성공_단계_훅()
+    public void 서버_성공이면_암전_유지_뒤_섬광_순간에_즉시_끈다()
     {
-        bool? hooked = null;
-        _sm.SuccessEntered += dimmed => hooked = dimmed;
         _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.Attempt, true, 10f);
         _sm.Tick(10.125f);
         _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.25f);
 
         Assert.AreEqual(InterruptOwnerPresentationState.Success, _sm.State);
-        Assert.AreEqual(true, hooked);
+        Assert.IsTrue(_sm.SuccessDimmed, "강 시도의 성공 = 섬광 오버레이 조건");
         Assert.IsFalse(_sm.LightGatherActive);
         _sm.Tick(10.5f);
-        Assert.AreEqual(1f, _out.Dim, "유지 시간 동안 암전 그대로");
+        Assert.AreEqual(1f, _out.Dim, "섬광 1~3단계(0.5) 동안 암전 그대로");
 
-        // 임시 동작 — 유지(0.5) 뒤 걷기(0.25), 끝나면 없음.
+        // 섬광 순간(성공 + 0.5) — 걷기 램프 없이 그 프레임에 0, 그리고 없음.
         _sm.Tick(10.75f);
-        _sm.Tick(10.875f);
-        Assert.AreEqual(0.5f, _out.Dim, 1e-4f);
-        _sm.Tick(11f);
         Assert.AreEqual(0f, _out.Dim);
         Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State);
+    }
+
+    [Test]
+    public void 섬광_순간이_0이면_성공_프레임에_끈다()
+    {
+        _timings.Release = 0f;
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        _sm.Tick(10.125f);
+        _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.25f);
+        _sm.Tick(10.25f);
+        Assert.AreEqual(0f, _out.Dim);
+        Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State);
+    }
+
+    [Test]
+    public void 성공_암전_중_강제_리셋은_즉시_0이고_섬광_조건도_끈다()
+    {
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        _sm.Tick(10.125f);
+        _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.25f);
+        _sm.ForcedReset();
+        Assert.AreEqual(0f, _out.Dim);
+        Assert.IsFalse(_sm.SuccessDimmed);
+        _sm.Tick(10.8f);
+        Assert.AreEqual(0f, _out.Dim, "예약된 끄기가 남아 다시 켜지지 않는다");
     }
 
     [Test]
@@ -311,15 +331,14 @@ public sealed class InterruptOwnerPresentationTests
     [Test]
     public void 약_시도가_성공하면_암전_없이_성공_단계()
     {
-        bool? hooked = null;
-        _sm.SuccessEntered += dimmed => hooked = dimmed;
         _sm.Predict(InterruptAttemptForecast.Weak, null, 10f);
         _sm.ServerStarted(5, SlowMotionPurpose.AttemptWeak, true, 10f);
         _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.2f);
-        _sm.Tick(10.3f);
         Assert.AreEqual(InterruptOwnerPresentationState.Success, _sm.State);
-        Assert.AreEqual(false, hooked);
+        Assert.IsFalse(_sm.SuccessDimmed, "약 시도의 성공 = 섬광 오버레이 없음");
+        _sm.Tick(10.3f);
         Assert.AreEqual(0f, _out.Dim);
+        Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State, "끌 암전이 없어 바로 결론");
     }
 
     // ─── 빛 모임 끝 = Hit ───
@@ -402,7 +421,7 @@ public sealed class InterruptOwnerPresentationTests
             var so = new SerializedObject(go.AddComponent<InterruptProductionDirector>());
             Assert.AreEqual(0.1f, so.FindProperty("ownerDimInDuration").floatValue, 1e-6f);
             Assert.AreEqual(0.2f, so.FindProperty("ownerDimOutDuration").floatValue, 1e-6f);
-            Assert.AreEqual(0.4f, so.FindProperty("ownerSuccessHoldDuration").floatValue, 1e-6f);
+            Assert.IsNull(so.FindProperty("ownerSuccessHoldDuration"), "임시 성공 유지 칸은 섬광 순간으로 대체돼 없다(할 일 132 단계 5)");
         }
         finally
         {
