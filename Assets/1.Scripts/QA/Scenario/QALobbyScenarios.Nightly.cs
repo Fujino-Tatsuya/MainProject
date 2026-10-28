@@ -4,7 +4,8 @@ using System.Text;
 
 /// <summary>
 /// 할 일 108 팀원별 야간 QA 한 판(N108, MPPM 호스트 + 가상 2) — 로비 → 맵 → 보스 결과까지.
-/// 103 한 판(<see cref="Boss103Flow"/>)에 로비 데모 점검(<see cref="NightlyLobbySmoke"/> — S1·M1 의 스폰·카메라·이동/대시/평타/스킬)을 끼운 것이다.
+/// 103 한 판(<see cref="Boss103Flow"/>)과 같되 할 일 130 부터 로비는 3인 접속 대기 자리로만 쓴다 — 호스트가 자리별 캐릭터를 서버 저장소에 넣고 바로 맵
+/// (로비 데모 점검 <see cref="NightlyLobbySmoke"/>·선택대·출격 집결은 건너뛴다. 점검 코드는 남겨 둔다).
 /// 팀원별 차이(자리 순서·특성 시드·봇 단계·기준 시드)는 설정 파일(<see cref="QABoss103Config"/> 의 <c>order</c>·<c>traitSeed</c>·<c>tier</c>·<c>seed</c>)로만 들어온다.
 /// 실행·연속 루프는 에디터 메뉴 <c>Tools/QA/Nightly</c>.
 /// </summary>
@@ -18,7 +19,7 @@ public static partial class QALobbyScenarios
     private static IEnumerator N108(QAScenarioContext ctx) => Boss103Flow(ctx, true);
 
     /// <summary>
-    /// 로비 데모 점검 — 판정은 48 리포트 항목으로만 남기고 실패해도 판을 끊지 않는다(보스전 통계는 103 판 기록이 원본).
+    /// 로비 데모 점검(할 일 130 부터 야간 판에서는 부르지 않는다) — 판정은 48 리포트 항목으로만 남기고 실패해도 판을 끊지 않는다(보스전 통계는 103 판 기록이 원본).
     /// </summary>
     private static IEnumerator NightlyLobbySmoke(QAScenarioContext ctx)
     {

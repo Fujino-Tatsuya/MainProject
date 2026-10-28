@@ -331,6 +331,42 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
             LaunchMainOnce();
     }
 
+    /// <summary>
+    /// [서버] QA 야간 맵 직행용(할 일 130) — 출격 집결을 기다리지 않고 출격 확정과 같은 전이(<see cref="LobbyTrainingFlow.OnGatherConfirmed"/> Sortie)를 건 뒤
+    /// <see cref="LaunchMainOnce"/> 로 메인 진입을 1회 내보낸다(래치·포드 연출 분기 그대로). 이번 호출로 래치를 걸었으면 true.
+    /// 서버가 아니거나 스폰 전, 출격으로 넘어갈 수 없는 단계(훈련 중), 이미 내보냈으면 경고하고 false. 게임 흐름에서는 부르지 않는다.
+    /// </summary>
+    public bool ServerLaunchMainForQA()
+    {
+        if (!IsServer || _flow == null)
+        {
+            Debug.LogWarning($"{Tag} QA 맵 직행 거절 — 서버가 아니거나 스폰 전.", this);
+            return false;
+        }
+
+        if (_flow.HasLaunched)
+        {
+            Debug.LogWarning($"{Tag} QA 맵 직행 거절 — 이미 메인 진입을 내보냄({Describe()}).", this);
+            return false;
+        }
+
+        if (_flow.Stage != LobbyTrainingStage.Sortie)
+        {
+            var before = Describe();
+            if (!_flow.OnGatherConfirmed(LobbyGatherPoint.Sortie))
+            {
+                Debug.LogWarning($"{Tag} QA 맵 직행 거절 — 지금 출격으로 넘어갈 수 없다({before}).", this);
+                return false;
+            }
+
+            Debug.Log($"[SceneFlow] {Tag} QA 맵 직행 — {before} → {Describe()}");
+            OnFlowChanged();
+        }
+
+        LaunchMainOnce();
+        return _flow != null && _flow.HasLaunched;
+    }
+
     // 출격 확정 → 메인 진입. 래치를 먼저 걸어 로딩 흐름의 로비 시작 조건(ServerHasLaunched)을 통과시키고, 재확정·중복은 무시한다.
     private void LaunchMainOnce()
     {
