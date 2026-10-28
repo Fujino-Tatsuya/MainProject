@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -63,4 +64,190 @@ public static class AssassinBasicAttackTraitRules
     /// 빗나가도 그 판정에서 소모되고, 변신 4타 묶음의 2~4타는 강화되지 않는다.
     /// </summary>
     public static bool ConsumesNextAttackBuff(int hitNumberInAction) => hitNumberInAction == 1;
+}
+
+/// <summary>
+/// 급소 파괴(ASN_4_NORMAL_E_PUSH, 할 일 128 3/5) — 일반 E 강타 적중 순간의 밀치기 방향. 밀치기 자체(CC)는 공용 <see cref="TraitKnockbackEffect.ApplyCrowdControl"/> 한 곳이 건다.
+/// 강타만 거르는 건 효과 칸(attackTypes [Default] · forms [Enhanced]) — 변신 E(SkillE/Alternate)·일반 E 준비는 키가 달라 맞지 않는다. 대상별 1회 = 동작 시전 ID × 대상.
+/// </summary>
+public static class AssassinStrikePushRules
+{
+    /// <summary>
+    /// 밀치는 방향 = 플레이어 → 대상(수평). 같은 위치(수평 거리 ≈ 0)면 강타 조준 방향 <paramref name="aimDirection"/>. 둘 다 0 이면 0(수신측이 방사형으로 계산).
+    /// </summary>
+    public static Vector3 Direction(Vector3 attackerPosition, Vector3 targetPosition, Vector3 aimDirection)
+    {
+        Vector3 toTarget = targetPosition - attackerPosition;
+        toTarget.y = 0f;
+        if (toTarget.sqrMagnitude > 1e-6f)
+            return toTarget.normalized;
+
+        aimDirection.y = 0f;
+        return aimDirection.sqrMagnitude > 1e-6f ? aimDirection.normalized : Vector3.zero;
+    }
+}
+
+/// <summary>
+/// 어쌔신 파생 공격(⑧ <see cref="TraitDerivedAttackEffect"/>)의 이름 — 정의 에셋 <c>derivedKey</c> 와 스킬 코드가 같은 값을 쓴다(할 일 128 3/5).
+/// 파생 판정 = <see cref="TraitHitFlags.Derived"/>: 피해만(특성 사건·분노·쿨감·CC·간파·다음 공격 강화 없음, <see cref="Player.RaiseServerAttackLanded"/> 금지), VFX 없음.
+/// </summary>
+public static class AssassinDerivedAttackKeys
+{
+    /// <summary>추격의 궤적 — Q 돌진 단계가 정상 종료되면 지나온 선분에 한 번.</summary>
+    public const string QTrail = "ASN_Q_TRAIL";
+
+    /// <summary>끝없는 칼날 — 기본 공격 4타(변신 묶음 마지막 판정)를 실행하면 같은 범위에 한 번.</summary>
+    public const string ComboExtra = "ASN_COMBO_EXTRA";
+
+    /// <summary><paramref name="attacks"/>(<see cref="PlayerTraitEffects.GetDerivedAttacks"/> 결과)에서 이름이 같은 첫 명세. 없으면 false.</summary>
+    public static bool TryFind(IReadOnlyList<TraitDerivedAttack> attacks, string key, out TraitDerivedAttack found)
+    {
+        found = null;
+        if (attacks == null)
+            return false;
+
+        for (int i = 0; i < attacks.Count; i++)
+        {
+            if (attacks[i] != null && string.Equals(attacks[i].Key, key, System.StringComparison.Ordinal))
+            {
+                found = attacks[i];
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+/// <summary>
+/// 추격의 궤적(ASN_4_Q_TRAIL, 할 일 128 3/5) — Q 돌진 '단계' 하나가 끝났을 때 궤적을 예약할지와 그 선분.
+/// 단계 = 일반·변신 Q 출발 돌진(그림자 회귀 복귀 돌진도 같은 함수로 — 기준 피해만 복귀 배율을 바른 값).
+/// 선분 = 출발점 → 출발점 + 방향 × 실제 이동 거리(서버 재구성 경로, 벽 조기 종료 보고로 줄어든 상한까지 — 벽 너머·이동 안 한 구간 제외).
+/// </summary>
+public static class AssassinTrailRules
+{
+    /// <summary>이보다 짧게 움직인 단계는 지나온 길이 없다고 본다(출발 전에 끝남 등).</summary>
+    public const float MinLength = 0.01f;
+
+    /// <summary>
+    /// 그 돌진 단계가 궤적을 남기는가 — 정상 종료(<see cref="SkillEndReason.Completed"/>, 벽 앞 안전 정지 포함)이고 실제로 움직였을 때만.
+    /// 강제 중단(사망·피격·대시 취소·안전망 종료)은 없음.
+    /// </summary>
+    public static bool Schedules(SkillEndReason reason, float traveled) =>
+        reason == SkillEndReason.Completed && !float.IsNaN(traveled) && !float.IsInfinity(traveled) && traveled >= MinLength;
+
+    /// <summary>실제 지나온 선분의 끝점(수평 방향 × 거리). 거리는 0 아래로 내려가지 않는다.</summary>
+    public static Vector3 SegmentEnd(Vector3 start, Vector3 direction, float traveled)
+    {
+        direction.y = 0f;
+        direction = direction.sqrMagnitude > 1e-6f ? direction.normalized : Vector3.zero;
+        return start + direction * Mathf.Max(0f, traveled);
+    }
+
+    /// <summary>선분을 원래 Q 경로 폭·높이의 상자로 — 중심은 선분 가운데(높이 절반만 올림), 회전은 선분 방향.</summary>
+    public static void Box(Vector3 start, Vector3 end, float width, float height,
+        out Vector3 center, out Vector3 halfExtents, out Quaternion rotation)
+    {
+        Vector3 along = end - start;
+        along.y = 0f;
+        float length = along.magnitude;
+        center = (start + end) * 0.5f + Vector3.up * (Mathf.Max(0f, height) * 0.5f);
+        halfExtents = new Vector3(Mathf.Max(0f, width) * 0.5f, Mathf.Max(0f, height) * 0.5f, length * 0.5f);
+        rotation = length > 1e-6f ? Quaternion.LookRotation(along / length) : Quaternion.identity;
+    }
+}
+
+/// <summary>
+/// 끝없는 칼날(ASN_4_COMBO_EXTRA, 할 일 128 3/5) — 어느 판정에서 추가 베기를 예약하나.
+/// 일반 연계 4타(마지막 원래 타)의 마지막 판정 · 변신 4타 묶음의 마지막 판정만. 일반 E 강타는 독립 단발이라 세지 않는다.
+/// 일반 연계는 콤보 모델이 끊기면(유예 만료·스킬·대시·피격 취소) 1타부터라, 마지막 타에 닿았다 = 1~4타가 이어졌다.
+/// </summary>
+public static class AssassinComboExtraRules
+{
+    /// <param name="stepIndex">일반 연계 타 번호(0부터). 변신 묶음·강타는 무시.</param>
+    /// <param name="hitNumber">그 동작 안에서 1부터 센 판정 번호.</param>
+    public static bool Schedules(AssassinBasicAttackMode mode, int stepIndex, int normalStepCount, int hitNumber, int hitCount)
+    {
+        if (hitNumber < 1 || hitNumber != Mathf.Max(1, hitCount))
+            return false;
+
+        switch (mode)
+        {
+            case AssassinBasicAttackMode.Normal:
+                return normalStepCount > 0 && stepIndex == normalStepCount - 1;
+            case AssassinBasicAttackMode.Transformed:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>추가 베기 지연 — 공격 가속기(공격속도 배율, 제압 가속 포함)를 탄다: 지연 ÷ 배율.</summary>
+    public static float Delay(float delay, float attackSpeedRate) =>
+        PlayerAttackSpeedRules.Duration(Mathf.Max(0f, delay), attackSpeedRate);
+}
+
+/// <summary>어쌔신 파생 공격 카드 {dmg}(명세 §8) — 원래 공격 1회 기준 피해(Dref) × 파생 비율. Shift 계산식 항은 계수·고정값 × 비율.</summary>
+public static class AssassinDerivedTooltipRules
+{
+    public static SkillTooltipDamage From(int sourceDref, float coefficient, int flatBonus, float ratio)
+    {
+        ratio = Mathf.Max(0f, ratio);
+        int damage = TraitDerivedAttackRules.Damage(sourceDref, ratio);
+        float scaledCoefficient = coefficient * ratio;
+        int scaledFlat = Mathf.RoundToInt(flatBonus * ratio);
+        return new SkillTooltipDamage(damage, damage, scaledCoefficient, scaledCoefficient, scaledFlat, scaledFlat);
+    }
+
+    /// <summary>정의의 첫 파생 공격 효과 비율. 없으면 0.</summary>
+    public static float RatioOf(TraitDefinition trait)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (effect is TraitDerivedAttackEffect derived)
+                    return derived.DamageRatio;
+            }
+        }
+
+        return 0f;
+    }
+}
+
+/// <summary>
+/// [서버] 어쌔신 파생 공격 예약 줄(할 일 128 3/5) — 지연 뒤 한 번 판정할 것들을 시각 순서로 든다. 순수 C#(EditMode 대상).
+/// 사망·씬 종료·비활성에서 <see cref="Clear"/> — 이전 시전의 예약이 남지 않는다.
+/// </summary>
+public sealed class AssassinDelayedStrikeQueue<T>
+{
+    private readonly List<(double due, T payload)> entries = new List<(double due, T payload)>();
+
+    public int Count => entries.Count;
+
+    /// <summary><paramref name="now"/> + <paramref name="delay"/>(음수 = 0) 에 낼 것을 넣는다. 같은 시각이면 넣은 순서.</summary>
+    public void Schedule(double now, float delay, T payload)
+    {
+        double due = now + System.Math.Max(0f, delay);
+        int index = entries.Count;
+        while (index > 0 && entries[index - 1].due > due)
+            index--;
+        entries.Insert(index, (due, payload));
+    }
+
+    /// <summary>시각이 된 가장 이른 것 하나를 꺼낸다. 없으면 false.</summary>
+    public bool TryPopDue(double now, out T payload)
+    {
+        if (entries.Count > 0 && entries[0].due <= now)
+        {
+            payload = entries[0].payload;
+            entries.RemoveAt(0);
+            return true;
+        }
+
+        payload = default;
+        return false;
+    }
+
+    public void Clear() => entries.Clear();
 }

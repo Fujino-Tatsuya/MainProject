@@ -42,6 +42,13 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     private bool isServerDashPending; // 승인 ~ Custom0(준비)
     private bool isServerSweeping;    // Custom0 ~ 경로 끝
     private bool hasSuperArmor;
+    private int serverStageDref;
+
+    // 서버 — 추격의 궤적 예약(할 일 128 3/5). 사망·비활성(씬 종료)에서 비운다. 대상별 1회는 궤적 하나 안에서만.
+    private readonly AssassinDelayedStrikeQueue<TrailStrike> pendingTrails = new AssassinDelayedStrikeQueue<TrailStrike>();
+    private readonly HashSet<Object> trailTargets = new HashSet<Object>();
+    private readonly List<TraitDerivedAttack> derivedAttacks = new List<TraitDerivedAttack>();
+    private PlayerTraitEffects traitEffects;
 
     // 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)
     private bool isLocallyDashing;
@@ -89,6 +96,8 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         serverOrigin = owner.transform.position;
         serverTraveled = 0f;
         serverCap = data.DashDistance;
+        // 이 돌진 단계의 원래 기준 피해(Dref) — 단계 실행 때 고정해 그 단계의 궤적이 쓴다(명세 §5).
+        serverStageDref = damageSnapshot;
         isServerDashPending = true;
         isServerSweeping = false;
         ledger.Begin();
@@ -192,6 +201,8 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
             case SkillAnimationEventType.End:
                 if (isServerSweeping)
                     SweepServerTo(serverCap);
+                // 출발 돌진 단계 정상 종료(벽 앞 정지 포함) — 추격의 궤적. 출발 전이면 이동 0 이라 없다.
+                ServerEndDashStage(SkillEndReason.Completed, serverOrigin, dashDirection, serverTraveled, serverStageDref);
                 EndSelf(SkillEndReason.Completed);
                 break;
         }
@@ -215,9 +226,122 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         base.OnEnd(reason);
     }
 
+    private void OnEnable()
+    {
+        PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
+    }
+
     private void OnDisable()
     {
         StopLocalDash();
+        PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
+        pendingTrails.Clear();   // 씬 종료·비활성 — 예약이 남지 않게
+    }
+
+    // 서버 — 예약된 궤적은 스킬이 끝난 뒤에 나가므로 OnTick(실행 중만) 이 아니라 여기서 돈다.
+    private void Update()
+    {
+        if (pendingTrails.Count > 0)
+            FireDueTrails();
+    }
+
+    // 사망(살아 있음 → 그 밖)이면 예약을 버린다(명세 §9). 부활 뒤 재개 없음.
+    private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (owner != null && clientId == owner.OwnerClientId && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+            pendingTrails.Clear();
+    }
+
+    // ── 추격의 궤적(ASN_4_Q_TRAIL) ──
+
+    /// <summary>
+    /// [서버] 돌진 '단계' 하나가 끝났다 — 정상 종료이고 실제로 움직였으면 지나온 선분(<paramref name="start"/> → 방향 × <paramref name="traveled"/>)에
+    /// 원래 Q 경로 폭으로 추격의 궤적을 예약한다. 피해 = <paramref name="stageDref"/>(그 단계 원래 기준 피해) × 비율.
+    /// 출발 돌진 = 시전 Dref, 그림자 회귀 복귀 돌진은 복귀 배율을 바른 Dref 를 넘긴다(할 일 128 H5).
+    /// </summary>
+    private void ServerEndDashStage(SkillEndReason reason, Vector3 start, Vector3 direction, float traveled, int stageDref)
+    {
+        AssassinDashStrikeSkillData data = DashData;
+        if (data == null || owner == null || !AssassinTrailRules.Schedules(reason, traveled))
+            return;
+
+        traitEffects ??= PlayerTraitEffects.For(owner);
+        if (traitEffects == null)
+            return;
+
+        bool alternate = controller != null && controller.IsAlternateSkill(this);
+        traitEffects.GetDerivedAttacks(TraitAttackKey.ForSkill(Slot, alternate), derivedAttacks);
+        if (!AssassinDerivedAttackKeys.TryFind(derivedAttacks, AssassinDerivedAttackKeys.QTrail, out TraitDerivedAttack trail))
+            return;
+
+        Vector3 end = AssassinTrailRules.SegmentEnd(start, direction, traveled);
+        var strike = new TrailStrike(start, end, data.PathWidth, data.PathHeight, trail.DamageFrom(stageDref));
+        pendingTrails.Schedule(Time.timeAsDouble, trail.Delay, strike);
+        Edit.Log($"[Assassin/Q] 추격의 궤적 예약 — {traveled:F2}m, 기준 {stageDref} → {strike.Damage}, {trail.Delay:F2}초 뒤", this);
+    }
+
+    // [서버] 시각이 된 궤적을 낸다 — 파생 판정(피해만: 특성 사건·분노·쿨감·CC·간파·다음 공격 강화·백어택 연출 없음).
+    private void FireDueTrails()
+    {
+        while (pendingTrails.TryPopDue(Time.timeAsDouble, out TrailStrike strike))
+            FireTrail(strike);
+    }
+
+    private void FireTrail(TrailStrike strike)
+    {
+        AssassinDashStrikeSkillData data = DashData;
+        if (data == null || owner == null)
+            return;
+
+        if (hitResults == null || hitResults.Length != data.MaxHitResults)
+            hitResults = new Collider[Mathf.Max(1, data.MaxHitResults)];
+
+        AssassinTrailRules.Box(strike.Start, strike.End, strike.Width, strike.Height,
+            out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
+        int count = Physics.OverlapBoxNonAlloc(center, halfExtents, hitResults, rotation, data.HittableLayers, QueryTriggerInteraction.Collide);
+
+        trailTargets.Clear();
+        int landed = 0;
+        for (int i = 0; i < count; i++)
+        {
+            Collider hit = hitResults[i];
+            if (hit == null)
+                continue;
+
+            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+            Object target = unit != null ? (Object)unit : hurtbox;
+            if (target == null || unit == owner || !trailTargets.Add(target))
+                continue;
+
+            AttackInfo attackInfo = new AttackInfo(strike.Damage, DamageAttackType, hitPattern: DamageHitPattern);
+            if (assassinState != null)
+                attackInfo = assassinState.WithBackAttack(attackInfo);
+            var hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
+            bool resolved = hurtbox != null ? hurtbox.ReceiveAttack(attackInfo, hitContext) : unit.ReceiveAttack(attackInfo, hitContext);
+            if (resolved)
+                landed++;
+        }
+
+        trailTargets.Clear();
+        Edit.Log($"[Assassin/Q] 추격의 궤적 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
+    }
+
+    private readonly struct TrailStrike
+    {
+        public readonly Vector3 Start;
+        public readonly Vector3 End;
+        public readonly float Width;
+        public readonly float Height;
+        public readonly int Damage;
+
+        public TrailStrike(Vector3 start, Vector3 end, float width, float height, int damage)
+        {
+            Start = start;
+            End = end;
+            Width = width;
+            Height = height;
+            Damage = damage;
+        }
     }
 
     // ── 오너 이동 ──

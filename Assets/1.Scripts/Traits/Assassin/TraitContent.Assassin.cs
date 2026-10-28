@@ -20,7 +20,45 @@ public static partial class TraitContent
         // 사냥의 박자 — 발동 간격은 효과 거름(filter.minInterval)에 있다.
         r.Value("ASN_3_BASIC_CDR", "procInterval", ProcInterval);
 
-        // 예: r.Damage("ASN_4_Q_TRAIL", (trait, player) => SkillTooltipDamage.FromLinear(player, 계수, 고정값));
+        // 추격의 궤적 — 현재 상태(일반/변신) 출발 Q 1회 기준 피해 × 비율(명세 §8). 복귀 궤적(×0.6)은 도움말 몫.
+        r.Damage("ASN_4_Q_TRAIL", QTrailDamage);
+
+        // 끝없는 칼날 — 현재 상태(일반/변신) 기본 공격 마지막 원래 타 × 비율.
+        r.Damage("ASN_4_COMBO_EXTRA", ComboExtraDamage);
+    }
+
+    private static SkillTooltipDamage QTrailDamage(TraitDefinition trait, Player player)
+    {
+        PlayerSkillController skills = player != null ? player.GetComponent<PlayerSkillController>() : null;
+        PlayerSkillBase q = skills != null ? skills.GetSkill(PlayerSkillSlot.Main) : null;
+        if (q == null || q.Data == null)
+            return default;
+
+        var key = TraitAttackKey.ForSkill(PlayerSkillSlot.Main, skills.IsAlternateSkill(q));
+        int dref = player.ResolveDamage(q.Data.AttackDamageMultiplier, q.Data.FlatDamageBonus, key);
+        return AssassinDerivedTooltipRules.From(dref, q.Data.AttackDamageMultiplier, q.Data.FlatDamageBonus,
+            AssassinDerivedTooltipRules.RatioOf(trait));
+    }
+
+    private static SkillTooltipDamage ComboExtraDamage(TraitDefinition trait, Player player)
+    {
+        AssassinBasicAttack basic = player != null ? player.GetComponent<AssassinBasicAttack>() : null;
+        AssassinBasicAttackData data = basic != null ? basic.Data : null;
+        if (data == null)
+            return default;
+
+        AssassinState state = player.GetComponent<AssassinState>();
+        bool transformed = state != null && state.IsTransformed;
+        AssassinBasicAttackStepData last;
+        bool found = transformed
+            ? data.TryGetTransformedStep(out last)
+            : data.TryGetNormalStep(data.NormalSteps != null ? data.NormalSteps.Length - 1 : -1, out last);
+        if (!found || last == null)
+            return default;
+
+        var key = new TraitAttackKey(AttackType.Default, transformed ? TraitAttackForm.Alternate : TraitAttackForm.Normal);
+        int dref = player.ResolveDamage(last.AttackDamageMultiplier, 0, key);
+        return AssassinDerivedTooltipRules.From(dref, last.AttackDamageMultiplier, 0, AssassinDerivedTooltipRules.RatioOf(trait));
     }
 
     // 정의의 첫 쿨 효과 감소율(1 − 배율). 쿨 효과가 없으면 0.

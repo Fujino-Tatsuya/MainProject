@@ -67,6 +67,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // [서버] 이 동작(일반 한 타·강타 1회·변신 묶음)의 시전 ID — 판정마다 특성 사건에 실어 '동작당 1회'로 묶는다(할 일 128 2/5).
     private int serverActionCastId;
     private PlayerTraitEffects traitEffects;
+    // [서버] 끝없는 칼날 예약(할 일 128 3/5) — 사망·비활성(씬 종료)에서 비운다.
+    private readonly AssassinDelayedStrikeQueue<ComboExtraStrike> pendingComboExtras = new AssassinDelayedStrikeQueue<ComboExtraStrike>();
+    private readonly System.Collections.Generic.List<TraitDerivedAttack> derivedAttacks = new System.Collections.Generic.List<TraitDerivedAttack>();
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
     // 이 타의 방향 — 몸 회전·판정·전진이 모두 이 값이다(일반 타는 이동 입력 우선, AssassinAttackDirectionRules).
@@ -177,6 +180,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             hasPendingClip = false;
             PlayAttackClip();
         }
+
+        if (pendingComboExtras.Count > 0 && HasGameplayAuthority)
+            FireDueComboExtras();
 
         if (player == null || combo == null)
             return;
@@ -735,13 +741,19 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
+        // 급소 파괴 — 대상마다 적중 직전 특성 수정자(밀치기)를 거친다. 강타 키(Default/Enhanced)만 효과가 맞는다(칼날의 영역으로 넓어진 범위 포함).
         bool landed = coneAttack.Fire(
             attackDirection,
             range,
             angle,
             damage,
             data.TriggersOnHit,
-            serverActionCastId);
+            serverActionCastId,
+            traitKey);
+
+        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 범위에 추가 베기 1회 예약.
+        if (AssassinComboExtraRules.Schedules(currentMode, currentStepIndex, NormalStepCount, hitsFired, step.HitCount))
+            ScheduleComboExtra(step, traitKey, range, angle);
 
         // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
         if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
@@ -766,6 +778,64 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (multiplier != 1f)
             Edit.Log($"[Assassin/평타] 다음 공격 강화 소모 ×{multiplier:F2} — {key}, 동작 {serverActionCastId}", this);
         return multiplier;
+    }
+
+    private int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
+
+    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·범위는 지금 값으로 고정(새 조준·이동 없음).
+    // 지연만 공격 가속기를 탄다. VFX 없음(판정만).
+    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, float range, float angle)
+    {
+        traitEffects ??= PlayerTraitEffects.For(this);
+        if (traitEffects == null)
+            return;
+
+        traitEffects.GetDerivedAttacks(key, derivedAttacks);
+        if (!AssassinDerivedAttackKeys.TryFind(derivedAttacks, AssassinDerivedAttackKeys.ComboExtra, out TraitDerivedAttack extra))
+            return;
+
+        int sourceDref = player.ResolveDamage(step.AttackDamageMultiplier, 0, key);
+        var strike = new ComboExtraStrike(transform.position, attackDirection, range, angle, extra.DamageFrom(sourceDref));
+        float delay = AssassinComboExtraRules.Delay(extra.Delay, AttackSpeedRate);
+        pendingComboExtras.Schedule(Time.timeAsDouble, delay, strike);
+        Edit.Log($"[Assassin/평타] 끝없는 칼날 예약 — {key}, 기준 {sourceDref} → {strike.Damage}, {delay:F3}초 뒤", this);
+    }
+
+    // [서버] 시각이 된 추가 베기를 낸다(파생 판정 — 특성·분노·쿨감·CC·백어택 연출 없음).
+    private void FireDueComboExtras()
+    {
+        while (pendingComboExtras.TryPopDue(Time.timeAsDouble, out ComboExtraStrike strike))
+        {
+            if (assassinState != null)
+                coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
+            int landed = coneAttack.FireDerived(strike.Origin, strike.Direction, strike.Range, strike.Angle, strike.Damage);
+            Edit.Log($"[Assassin/평타] 끝없는 칼날 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
+        }
+    }
+
+    // 사망(살아 있음 → 그 밖)이면 예약을 버린다(명세 §9). 부활 뒤 재개 없음.
+    private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (player != null && clientId == player.OwnerClientId && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+            pendingComboExtras.Clear();
+    }
+
+    private readonly struct ComboExtraStrike
+    {
+        public readonly Vector3 Origin;
+        public readonly Vector3 Direction;
+        public readonly float Range;
+        public readonly float Angle;
+        public readonly int Damage;
+
+        public ComboExtraStrike(Vector3 origin, Vector3 direction, float range, float angle, int damage)
+        {
+            Origin = origin;
+            Direction = direction;
+            Range = range;
+            Angle = angle;
+            Damage = damage;
+        }
     }
 
     // 원래 타격 = Dref × 다음 기본 공격 강화(명세 §5) — 특성 배율과 함께 곱한 뒤 마지막에 한 번만 정수화한다.
@@ -848,9 +918,16 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             motor.MovementResolved -= HandleLungeMovementResolved;
     }
 
+    private void OnEnable()
+    {
+        PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
+    }
+
     private void OnDisable()
     {
         StopLunge();
+        PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
+        pendingComboExtras.Clear();   // 씬 종료·비활성 — 예약이 남지 않게
     }
 
     private void RejectStartRpcIfNeeded()
