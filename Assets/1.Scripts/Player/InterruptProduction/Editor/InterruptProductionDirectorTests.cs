@@ -46,8 +46,17 @@ public sealed class InterruptProductionDirectorTests
             Assert.IsFalse(director.Get(cue), cue.ToString());
     }
 
+    // 할 일 132 단계 6 — 새 체계에 들어오는 공용 칸(A1~A4)만 켜고, 캐릭터별 연출(B·C·E)은 꺼 둔다(새 적중 섬광이 대신).
+    private static readonly InterruptProductionCue[] PrefabOnCues =
+    {
+        InterruptProductionCue.HitStop,
+        InterruptProductionCue.DarkAdaptation,
+        InterruptProductionCue.OwnerZoom,
+        InterruptProductionCue.SuccessFxSlot,
+    };
+
     [Test]
-    public void NetworkManager_프리팹에_붙어_있고_전부_꺼짐()
+    public void NetworkManager_프리팹에_붙어_있고_A1_A4만_켜짐()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPrefabPath);
         Assert.IsNotNull(prefab, NetworkManagerPrefabPath);
@@ -56,7 +65,7 @@ public sealed class InterruptProductionDirectorTests
         Assert.IsNotNull(prefab.GetComponent<GlobalTimeScale>(), "GlobalTimeScale 과 같은 오브젝트여야 한다");
         Assert.IsNotNull(prefab.GetComponent<InterruptDarkAdaptation>(), "암순응과 같은 오브젝트여야 한다");
         foreach (var cue in AllCues)
-            Assert.IsFalse(director.Get(cue), cue.ToString());
+            Assert.AreEqual(Array.IndexOf(PrefabOnCues, cue) >= 0, director.Get(cue), cue.ToString());
     }
 
     [Test]

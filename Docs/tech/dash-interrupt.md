@@ -82,7 +82,11 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 ## 5. 118 디렉터 사건 연결 — 새 경로 없음
 
-- **시도**: 승인 순간 `OnServerStart` → `ServerAttempt(예측)` 그대로. 단 대쉬 간파는 예측 오버랩을 **예상 대시 끝**으로 옮긴다 — 오프셋 = 대시 방향 × 대시 속도 × 서버 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset` → `PredictsInterruptHit` → `OverlapHitboxAnchor(results, offset)`). 판정 오버랩은 옮기지 않는다(실제 위치).
+- **시도**: 승인 순간 `OnServerStart` → `ServerAttempt(예측 3상태)` 그대로. 예측은 근접·대쉬 공용 `DashInterruptPredictor`(할 일 132 — [interrupt-presentation.md §0.2](interrupt-presentation.md#02-흐름)):
+  - 판정 위치 = **예상 대시 끝** = 시전 위치 + 대시 방향 × 대시 속도 × 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset`), 판정 시각 = max(예상 대시 끝, 평소 Hit).
+  - 대상 = 오버랩 없이 `InterruptTargetRegistry` 캐시 + `InterruptTargetGeometry`(간파 사거리 · 대상 정면 허용각 — 지금 대쉬 간파 대상은 기존 판정값 그대로, 정면 판정 없으면 180 · **대시 방향**이 대상을 향함). 밖이면 '대상 없음' = 슬로우 없음.
+  - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
+  - 판정 오버랩은 옮기지 않는다(실제 위치).
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
 - 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
@@ -119,7 +123,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 - **원격 오너: 서버 대시가 더 짧다.** 서버 대시는 요청 도착 때 시작하되 길이 = 지연을 뺀 남은 시간(`RemainingServerDuration`)이라, 서버가 오너 화면의 대시 끝보다 **먼저** Skill 로 넘어가 판정할 수 있다. 판정 위치는 서버가 가진 오너 복제 위치라, 그 순간 복제 위치가 아직 대시 끝에 닿지 않았을 수 있다(일반 간파와 같은 수준의 위치 오차 + 대시 이동분).
 - 원격 오너에서 `PlaySkillClientRpc` 가 오너 대시 끝 뒤에 오면 오너는 일반 Skill 로 0층 전신 클립을 처음부터 튼다 — 서버 판정 시각과 화면 클립 시각이 어긋날 수 있다.
-- 시도 예측 오프셋은 서버 남은 대시 시간 기준 직선 이동이다 — 대시가 유닛·벽에 막히면 예측이 실제 판정 위치보다 멀다(시도 슬로우 오발동 → 실패 복귀 가능).
+- 시도 예측 오프셋은 남은 대시 시간 기준 직선 이동이다 — 대시가 유닛·벽에 막히면 예측이 실제 판정 위치보다 멀다(강 시도 슬로우·오너 암전 오발동 → 실패 복귀 가능).
 - `PlayerDashData.dashInterruptBlend` 의 툴팁은 "Dodge → 간파 준비 클립 크로스페이드" 라고 적혀 있지만 실제 용도는 **상체 레이어 가중치 전환 시간 + 인수인계 0층 CrossFade 시간**이다(§6).
 - 이벤트 중복·레이어 블렌드 모양·관찰자 화면은 Play/MPPM 확인 전이다.
 
@@ -149,6 +153,11 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 간파·대쉬 간파 타이밍을 느린 배속으로 보고 같은 허수아비에 반복해 넣어 보는 씬이다. **빌드 목록에 없다** — Dev Boot 가 Play 동안만 잠깐 넣었다 뺀다.
 
 **진입**: 메인 툴바 Dev Boot 씬 드롭다운 → `DebugInterruptLab` 선택 → Dev Boot ▶. (`Dev_Boot` → 호스트 기동 → NGO 로 이 씬 로드 → 플레이어 스폰. 캐릭터는 툴바 캐릭터 드롭다운.) 씬을 직접 열고 Play 하면 NetworkManager 가 없어 동작하지 않는다.
+
+**132 연출 확인**(할 일 132 단계 6 점검 — 씬 변경 없음): 간파 연출 디렉터·암전 렌더 기능·빛 모임 소켓은 부트의 `NetworkManager`·플레이어 프리팹·`PC_Renderer` 에서 오고,
+허수아비 두 개가 스폰 때 `InterruptTargetRegistry` 에 등록된다(`TrainingDummyInterrupt`, 정면 판정 없음 = 180). 허수아비가 **노랑(인터럽트 가능)** 일 때 사거리 안에서 그쪽으로 우클릭 = 강(암전·빛 모임 → 성공 섬광),
+노랑이 아닐 때 = 약(약 슬로우·줌만), 허수아비와 먼 곳·등진 방향 = 대상 없음(아무것도 없음). 23호는 이 씬에 없다 — 정면 허용각 확인은 보스 씬에서.
+⚠️ 이 씬의 허수아비 창은 무기한(`DebugDummyInterruptRecovery`)이라 창 '추정 길이' = 지난번 노랑이 된 뒤 간파까지 기다린 시간(중앙값)이 된다 — 그보다 오래 기다렸다 누르면 창이 열려 있어도 **약**으로 예측될 수 있다(예측 규칙대로의 동작, 보스 창은 길이가 정해져 있어 해당 없음).
 
 **씬에 둔 것** (부트에서 오는 NetworkManager·`GlobalTimeScale`·간파 연출 디렉터·GameManager·EffectManager·EventSystem·GameMenu 는 두지 않는다 — `TrainingDummy.unity` 와 같은 구성)
 
@@ -196,6 +205,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 | 파일 | 내용 |
 |---|---|
 | `Assets/1.Scripts/Player/Dash/DashInterruptRules.cs` | 순수 규칙 — 창 판정·입력 결정·서버 승인 창·판정 시점·max·예상 대시 끝 오프셋 |
+| `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs` · `Assets/1.Scripts/Player/Skill/InterruptAttemptPrediction.cs` · `InterruptTargetRegistry.cs` | 할 일 132 — 근접·대쉬 공용 예측기·대상 판정(`InterruptTargetGeometry`)·예측 입력 구성(`AtPress`)·대상 캐시 |
 | `Assets/1.Scripts/Player/Dash/DashInterruptLayerFade.cs` | 상체 레이어 가중치 전환·인수인계 정규화 시각 |
 | `Assets/1.Scripts/Player/Dash/PlayerDashData.cs` · `Assets/9.ScriptableObject/Player/PlayerDashData.asset` | SO 칸 3개 |
 | `Assets/1.Scripts/Player/PlayerDashController.cs` | 상체 레이어 시작·인수인계·취소, `PlayDodgeEnd(keepBasePose)`, 창·허용오차 조회 |
