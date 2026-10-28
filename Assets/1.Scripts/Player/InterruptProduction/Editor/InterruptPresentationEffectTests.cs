@@ -118,6 +118,7 @@ public sealed class InterruptPresentationEffectTests
         Assert.IsFalse(director.Get(InterruptProductionCue.DarkAdaptation), "팀원 암순응(A2) 끔");
         Assert.IsTrue(director.Get(InterruptProductionCue.HitStop), "A1 히트스톱 그대로");
         Assert.IsTrue(director.Get(InterruptProductionCue.OwnerZoom), "A3 오너 줌 그대로");
+        Assert.IsTrue(director.Get(InterruptProductionCue.SuccessFxSlot), "A4 성공 이펙트 칸 켬 그대로");
         Assert.Greater(director.InterruptSuccessProfile.hitStopDuration, 0f, "성공 히트스톱 프로필 그대로");
     }
 

@@ -189,26 +189,23 @@ public sealed class DebugInterruptLabTests
     // ─── 132 §17 튜닝 패널 ─────────────────────────────────────────────
 
     [Test]
-    public void 튜닝_패널은_모든_효과와_팀원_암순응을_한_줄씩()
+    public void 튜닝_패널은_모든_효과와_팀원_암순응_성공_이펙트를_한_줄씩()
     {
         var effects = new System.Collections.Generic.List<InterruptPresentationEffect>();
-        int cues = 0;
+        var cues = new System.Collections.Generic.List<InterruptProductionCue>();
         foreach (DebugInterruptTuningPanel.Row row in DebugInterruptTuningPanel.Rows)
         {
             Assert.IsFalse(string.IsNullOrEmpty(row.Label));
             if (row.IsCue)
-            {
-                Assert.AreEqual(InterruptProductionCue.DarkAdaptation, row.Cue, "스위치 칸 줄은 팀원 암순응(A2)만");
-                cues++;
-            }
+                cues.Add(row.Cue);
             else
-            {
                 effects.Add(row.Effect);
-            }
         }
 
         CollectionAssert.AreEquivalent(InterruptPresentationEffectRules.All, effects, "효과 칸 하나에 한 줄");
-        Assert.AreEqual(1, cues);
+        CollectionAssert.AreEquivalent(
+            new[] { InterruptProductionCue.DarkAdaptation, InterruptProductionCue.SuccessFxSlot }, cues,
+            "스위치 칸 줄은 팀원 암순응(A2)·성공 이펙트(A4)만");
     }
 
     [Test]
@@ -235,6 +232,12 @@ public sealed class DebugInterruptLabTests
             foreach (InterruptPresentationEffect effect in InterruptPresentationEffectRules.All)
                 Assert.AreEqual(effect == InterruptPresentationEffect.OwnerDim, director.IsEffectOn(effect), effect.ToString());
             Assert.IsFalse(director.Get(InterruptProductionCue.DarkAdaptation), "기본값 = 팀원 암순응 끔");
+            Assert.IsTrue(director.Get(InterruptProductionCue.SuccessFxSlot), "암전만 = A4 는 건드리지 않음(켬 유지)");
+
+            director.Set(InterruptProductionCue.SuccessFxSlot, false);
+            DebugInterruptTuningPanel.SetDefaults(director);
+            Assert.IsFalse(director.Get(InterruptProductionCue.SuccessFxSlot), "암전만 = A4 지금 값 그대로(끈 것도 그대로)");
+
             Assert.IsFalse(DebugInterruptTuningPanel.Rows[0].Get(null), "디렉터가 없으면 꺼짐");
         }
         finally

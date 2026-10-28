@@ -53,7 +53,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         }
     }
 
-    /// <summary>패널 줄 — 계획서 §17-1 의 효과 전부(효과 칸 9 + 팀원 암순응 A2).</summary>
+    /// <summary>패널 줄 — 계획서 §17-1 의 효과 전부(효과 칸 9 + 팀원 암순응 A2) + A4 성공 이펙트 칸(프리팹 값 켬 그대로).</summary>
     public static readonly Row[] Rows =
     {
         new Row("오너 암전", InterruptPresentationEffect.OwnerDim),
@@ -66,6 +66,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         new Row("월드 섬광", InterruptPresentationEffect.WorldFlash),
         new Row("적중 지점 라이트", InterruptPresentationEffect.HitLight),
         new Row("팀원 암순응 (A2)", InterruptProductionCue.DarkAdaptation),
+        new Row("성공 이펙트 (A4)", InterruptProductionCue.SuccessFxSlot),
     };
 
     /// <summary>배속 버튼 — 끝값 + 인스펙터 프리셋.</summary>
@@ -152,10 +153,18 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             row.Set(director, on);
     }
 
-    /// <summary>기본값(오너 암전만 켬 — §17-1)으로 되돌린다. 팀원 암순응(A2)도 끈다.</summary>
+    /// <summary>
+    /// 기본값(오너 암전만 켬 — §17-1)으로 되돌린다. 팀원 암순응(A2)도 끈다.
+    /// A4 성공 이펙트 칸은 §17 효과 칸이 아니라 켬 유지 스위치라 건드리지 않는다(지금 값 그대로).
+    /// </summary>
     public static void SetDefaults(InterruptProductionDirector director)
     {
         foreach (Row row in Rows)
+        {
+            if (row.IsCue && row.Cue == InterruptProductionCue.SuccessFxSlot)
+                continue;
+
             row.Set(director, !row.IsCue && InterruptPresentationEffectRules.DefaultOn(row.Effect));
+        }
     }
 }
