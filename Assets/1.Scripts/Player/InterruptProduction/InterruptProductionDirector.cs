@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// <summary>
 /// 간파 연출 디렉터(할 일 118) — 간파 연출의 단일 진입점. NetworkManager.prefab 의 <see cref="GlobalTimeScale"/> 옆에 붙는다.
@@ -19,7 +20,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
 public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
-    IInterruptOwnerDimLook, IInterruptHitFlashSettings
+    IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
@@ -110,24 +111,37 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("오너 암전 덮개 불투명도 [0, 1] — 1 = 100%(완전히 덮음), 0.9 = 90%")]
     [DataTableIgnore, SerializeField, Range(0f, 1f)] private float ownerDimOpacity = 1f;
 
-    // 적중 섬광(할 일 132 단계 5) — 성공 Started 순간(히트스톱 안) 1단계 시작, 각 길이는 시간 기준 칸의 시계(기본 실시간, §14). 이 피어 값을 쓴다.
-    // 연출 길이라 애니 이벤트로 대체할 스킬 타이밍이 아니다(계획서 확정). xlsx 칸이 아직 없어 [DataTableIgnore] — 프리팹이 원본.
-    [Header("성공 — 적중 섬광(할 일 132 단계 5)")]
-    [Tooltip("섬광 진행기 시계 — 실시간(기본): 1~4단계·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 슬로우·히트스톱과 무관 / 스케일: 성공 슬로우·히트스톱을 따라 느려진다. 진행 중에 바꾸면 다음 성공부터")]
+    // 적중 섬광(할 일 132 §15) — 성공 Started 순간(히트스톱 안) ② 시작, 각 길이는 시간 기준 칸의 시계(기본 실시간, §14). 이 피어 값을 쓴다.
+    // 기본 길이 = 레퍼런스 영상 30fps 프레임 수(2·1·1·3·6). 연출 길이라 애니 이벤트로 대체할 스킬 타이밍이 아니다(계획서 확정).
+    // xlsx 칸이 아직 없어 [DataTableIgnore] — 프리팹이 원본. 화면 효과(②~⑥)는 오너만, 팀원은 섬광 순간에 월드 섬광 + 암순응.
+    [Header("성공 — 적중 섬광(할 일 132 §15)")]
+    [Tooltip("섬광 진행기 시계 — 실시간(기본): ②~⑥·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 슬로우·히트스톱과 무관 / 스케일: 성공 슬로우·히트스톱을 따라 느려진다. 진행 중에 바꾸면 다음 성공부터")]
     [DataTableIgnore, SerializeField] private InterruptEffectTimeBase hitFlashTimeBase = InterruptEffectTimeBase.Unscaled;
-    [Tooltip("1단계 — 검은 배경 위 흰 폭발(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashBurstDuration = 0.1f;
-    [Tooltip("2단계 — 빛 갈라짐(스타버스트) + 원형 충격파(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashGlareDuration = 0.1f;
-    [Tooltip("3단계 — 화면 전체 흰색 반전(오너 화면, 초, 진행기 시계). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashInvertDuration = 0.1f;
-    [Tooltip("4단계 — 실제 화면 복귀: 3단계 그림이 걷히는 시간(오너 화면, 초, 진행기 시계). 0 = 바로 끊김")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashReturnDuration = 0.1f;
-    [Tooltip("3단계 흰 반전 위 검은 집중선(적중 지점으로 모이는 선)")]
-    [DataTableIgnore, SerializeField] private bool hitFlashSpeedLines = true;
-    [Tooltip("오너 화면 섬광 오버레이 재질(BeaverLobby/UI/InterruptHitFlashOverlay) — 색·단계별 덮어쓸 텍스처 칸은 재질에. 비면 오버레이 없음")]
+    [Tooltip("② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어 + 푸른 충격파 고리(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashStarburstDuration = 0.067f;
+    [Tooltip("③ 화이트아웃 — 화면 전체 밝은 회청색 + 방사형 블러(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashWhiteoutDuration = 0.033f;
+    [Tooltip("④ 스미어 — 검정 위 오너·대상·빔이 흰 덩어리로 번진 한 장(오너 화면, 초, 진행기 시계). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashSmearDuration = 0.033f;
+    [Tooltip("⑤ 색수차 블러 — 실제 화면 위 방사형 블러 + 무지개 색수차 + 블룸 상승(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashAberrationDuration = 0.1f;
+    [Tooltip("⑥ 가라앉음 — 블룸 덩어리 + 무지개 고리 퍼짐, 블러·색수차 0 으로(오너 화면, 초, 진행기 시계). 0 = 바로 끊김")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashSettleDuration = 0.2f;
+    [Tooltip("오너 화면 섬광 오버레이 재질(BeaverLobby/UI/InterruptHitFlashOverlay) — 색·단계별 덮어쓸 텍스처 칸은 재질에. 비면 오버레이 그림 없음")]
     [DataTableIgnore, SerializeField] private Material hitFlashOverlayMaterial;
-    [Tooltip("4단계 적중 지점 월드 섬광(파랑·흰 + 블룸) 프리팹 — 모든 피어가 섬광 순간에 튼다. 첫 재생 때 한 번 만들어 재사용. 비면 월드 섬광 없음")]
+    [Tooltip("② 렌즈 플레어 모양(URP Lens Flare (SRP) 에셋) — 아나모픽 가로 빛살 최장·베이지. 비면 플레어 없음")]
+    [DataTableIgnore, SerializeField] private LensFlareDataSRP hitFlashLensFlare;
+    [Tooltip("② 렌즈 플레어 세기(LensFlareComponentSRP.intensity)")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashFlareIntensity = 1f;
+    [Tooltip("② 렌즈 플레어 크기(LensFlareComponentSRP.scale)")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashFlareScale = 1f;
+    [Tooltip("방사형 블러 최대 세기 [0, 1] — ③ 에서 이 값, ⑤ 0.8→0.6배, ⑥ 0.6배→0. 픽셀에서 적중 지점까지 거리 중 번지는 비율")]
+    [DataTableIgnore, SerializeField, Range(0f, 1f)] private float hitFlashBlurStrength = 0.35f;
+    [Tooltip("⑤⑥ 색수차 Volume 프로필 — 이 피어 전용 전역 Volume(우선순위 1000)의 가중치만 움직인다(에셋 값은 그대로). 비면 색수차 없음")]
+    [DataTableIgnore, SerializeField] private VolumeProfile hitFlashAberrationProfile;
+    [Tooltip("⑤⑥ 블룸 Volume 프로필 — 가중치만큼 씬 블룸을 이 값 쪽으로 올린다. 비면 블룸 상승 없음")]
+    [DataTableIgnore, SerializeField] private VolumeProfile hitFlashBloomProfile;
+    [Tooltip("섬광 순간(⑤ 시작) 적중 지점 월드 섬광(파랑·흰 코어 + 블룸) 프리팹 — 모든 피어가 튼다. 첫 재생 때 한 번 만들어 재사용. 비면 월드 섬광 없음")]
     [DataTableIgnore, SerializeField] private InterruptHitFlashVfx hitFlashWorldVfx;
     [Tooltip("월드 섬광 크기 배율(루트 스케일)")]
     [DataTableIgnore, SerializeField, Min(0.01f)] private float hitFlashWorldScale = 1f;
@@ -146,12 +160,20 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public Color OwnerDimColor => ownerDimColor;
     public float OwnerDimOpacity => ownerDimOpacity;
 
-    public float HitFlashBurstDuration => hitFlashBurstDuration;
-    public float HitFlashGlareDuration => hitFlashGlareDuration;
-    public float HitFlashInvertDuration => hitFlashInvertDuration;
-    public float HitFlashReturnDuration => hitFlashReturnDuration;
-    public bool HitFlashSpeedLines => hitFlashSpeedLines;
+    public float HitFlashStarburstDuration => hitFlashStarburstDuration;
+    public float HitFlashWhiteoutDuration => hitFlashWhiteoutDuration;
+    public float HitFlashSmearDuration => hitFlashSmearDuration;
+    public float HitFlashAberrationDuration => hitFlashAberrationDuration;
+    public float HitFlashSettleDuration => hitFlashSettleDuration;
     public InterruptEffectTimeBase HitFlashTimeBase => hitFlashTimeBase;
+
+    public Material HitFlashOverlayMaterial => hitFlashOverlayMaterial;
+    public LensFlareDataSRP HitFlashLensFlare => hitFlashLensFlare;
+    public float HitFlashFlareIntensity => hitFlashFlareIntensity;
+    public float HitFlashFlareScale => hitFlashFlareScale;
+    public float HitFlashBlurStrength => hitFlashBlurStrength;
+    public VolumeProfile HitFlashAberrationProfile => hitFlashAberrationProfile;
+    public VolumeProfile HitFlashBloomProfile => hitFlashBloomProfile;
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
     private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
@@ -186,7 +208,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public InterruptOwnerPresentation OwnerPresentation =>
         _ownerPresentation ??= new InterruptOwnerPresentation(this, DefaultOwnerDimOutput, DefaultLightGatherOutput);
 
-    // 적중 섬광(할 일 132 단계 5) — 오버레이(오너 화면)는 Awake 에서 만든다(없으면 오버레이 없이 섬광 순간만). 월드 섬광은 첫 재생 때 한 번 만든다.
+    // 적중 섬광(할 일 132 §15) — 오너 화면 출력(오버레이·플레어·블러·Volume)은 Awake 에서 객체만 만든다(실제 오브젝트는 첫 재생 때). 월드 섬광은 첫 재생 때 한 번 만든다.
     private InterruptHitFlashOverlay _hitFlashOverlay;
     private InterruptHitFlashSequencer _hitFlash;
     private InterruptHitFlashVfx _hitFlashWorld;
@@ -214,7 +236,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         Instance = this;
         _ownerDimOutput = new InterruptOwnerDimOutput(this);
         _ownerLightGatherOutput = new InterruptLightGatherOwnerOutput(InterruptLightGatherOwnerOutput.FindSocket, KeepInOwnerDim);
-        _hitFlashOverlay = new InterruptHitFlashOverlay(() => hitFlashOverlayMaterial);
+        _hitFlashOverlay = new InterruptHitFlashOverlay(this);
     }
 
     private void OnEnable()
@@ -418,8 +440,8 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
         var e = InterruptProductionEvent.LocalSuccess(triggerId, casterClientId, targetPosition);
 
-        // 적중 섬광(할 일 132 단계 5) — 히트스톱이 이 순간 시작하므로 1단계도 지금(히트스톱 길이 0 이어도 같다).
-        // 오너 오버레이 = 내 성공 ∧ 그 순간 오너 암전이 켜져 있음(강 시도). 섬광 순간(1~3단계 뒤) = 모든 피어 월드 섬광 + 암순응.
+        // 적중 섬광(할 일 132 §15) — 히트스톱이 이 순간 시작하므로 ② 도 지금(히트스톱 길이 0 이어도 같다).
+        // 오너 화면 섬광(②~⑥) = 내 성공 ∧ 그 순간 오너 암전이 켜져 있음(강 시도). 섬광 순간(②③④ 뒤 = ⑤ 시작) = 모든 피어 월드 섬광 + 암순응.
         float now = InterruptEffectTime.Now(HitFlash.Clock);
         bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
             viewerIsCaster && OwnerPresentation.SuccessDimmed);
@@ -446,7 +468,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         SuccessStage.LocalForcedReset(_darkAdaptation);
     }
 
-    // 섬광 순간(성공 Started + 1~3단계, 진행기 시계) — 오너 암전 끔(본인 화면) + 적중 지점 월드 섬광(모든 피어) + 암순응(남 = others, 오버레이 없던 본인 = self).
+    // 섬광 순간(성공 Started + ②③④, 진행기 시계) — 오너 암전 끔(본인 화면) + 적중 지점 월드 섬광(모든 피어) + 암순응(남 = others, 오버레이 없던 본인 = self).
     private void HandleHitFlashMoment(InterruptHitFlashMoment moment)
     {
         if (moment.ViewerIsCaster)
@@ -474,7 +496,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         _hitFlashWorld.Play(position, hitFlashWorldScale);
     }
 
-    // 강제 리셋·꺼짐 — 오버레이 즉시 끔, 남은 섬광 순간 취소, 월드 섬광 지움.
+    // 강제 리셋·꺼짐 — 오너 화면 효과 즉시 복구(오버레이·플레어·블러·Volume 가중치), 남은 섬광 순간 취소, 월드 섬광 지움.
     private void StopHitFlash()
     {
         _hitFlash?.ForcedReset();

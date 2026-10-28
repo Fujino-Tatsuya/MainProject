@@ -27,7 +27,7 @@ internal static class SlowMotionEditModeTestRunner
         "^InterruptOwnerPresentationTests$",       // 오너 연출 상태 기계·클라 예측 입력(할 일 132 단계 2)
         "^InterruptTargetRegistryTests$",          // 간파 예측 대상 캐시 등록·해제(할 일 132 정정1)
         "^InterruptLightGatherTests$",             // 빛 모임 재생 규칙·소켓 폴백·텍스처 칸 키워드·프리팹 소켓(할 일 132 단계 4)
-        "^InterruptHitFlashTests$",                // 적중 섬광 단계·섬광 순간·오너/팀원 분기·암전 걷힘·텍스처 칸·프리팹(할 일 132 단계 5)
+        "^InterruptHitFlashTests$",                // 적중 섬광 ②~⑥ 시간표·섬광 순간·오너/팀원 분기·Volume 복구·텍스처 칸·프리팹·렌더러(할 일 132 §15)
         "^DebugInterruptLabTests$",                // 디버그 배속 합성·허수아비 회복(할 일 115 C5)
     };
 

@@ -2,65 +2,91 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>적중 섬광 단계(할 일 132 단계 5). 1~3 = 오너 화면 오버레이, 4 = 실제 화면 복귀(오버레이가 걷히고 월드 섬광).</summary>
+/// <summary>
+/// 적중 섬광 단계(할 일 132 §15 — 레퍼런스 영상 30fps 기준 재구성). 번호 = 계획서 ②~⑥(① = 성공 Started 순간·히트스톱 시작).
+/// ②③④ = 오너 암전 위 오너 화면 그림, 그 합의 끝 = 섬광 순간(오너 암전 걷힘·월드 섬광·팀원 암순응), ⑤⑥ = 실제 화면 위 오너 화면 효과.
+/// </summary>
 public enum InterruptHitFlashStage
 {
     None = 0,
-    /// <summary>1. 검은 배경 위 흰 폭발(중심 = 적중 지점 화면 위치).</summary>
-    Burst = 1,
-    /// <summary>2. 빛 갈라짐(스타버스트 글레어) + 원형 충격파 링.</summary>
-    Glare = 2,
-    /// <summary>3. 화면 전체 흰색 반전(+ 검은 집중선 칸).</summary>
-    Invert = 3,
-    /// <summary>4. 실제 화면 복귀 — 3단계 그림이 걷힌다. 시작 순간 = 월드 섬광·오너 암전 걷힘·팀원 암순응.</summary>
-    Return = 4,
+    /// <summary>② 적중 지점 중심 베이지 스타버스트 렌즈 플레어(아나모픽 가로 빛살 최장) + 푸른 충격파 고리. 배경은 오너 암전 그대로.</summary>
+    Starburst = 2,
+    /// <summary>③ 화면 전체 밝은 회청색 + 적중 지점 중심 강한 방사형 블러 — 유일하게 화면을 덮는 단계.</summary>
+    Whiteout = 3,
+    /// <summary>④ 검정 배경 위 마스크 암전 남김 영역(오너·대상·빔)이 흰 덩어리로 번진 한 장(방향 블러).</summary>
+    Smear = 4,
+    /// <summary>⑤ 섬광 순간에 시작 — 실제 화면 위 방사형 블러 + 무지개 색수차 + 블룸 상승.</summary>
+    Aberration = 5,
+    /// <summary>⑥ 블룸 덩어리 + 무지개빛 충격파 고리 퍼짐, 블러·색수차 0 으로 감소.</summary>
+    Settle = 6,
 }
 
-/// <summary>적중 섬광 칸(할 일 132 단계 5) — 디렉터가 구현하고, 성공 사건마다 읽는다(캐싱 없음).</summary>
+/// <summary>적중 섬광 칸(할 일 132 §15) — 디렉터가 구현하고, 성공 사건마다 읽는다(캐싱 없음).</summary>
 public interface IInterruptHitFlashSettings
 {
     /// <summary>단계 길이(초, <see cref="HitFlashTimeBase"/> 시계). 0 = 그 단계 건너뜀.</summary>
-    float HitFlashBurstDuration { get; }
-    float HitFlashGlareDuration { get; }
-    float HitFlashInvertDuration { get; }
-    float HitFlashReturnDuration { get; }
-    /// <summary>3단계 검은 집중선.</summary>
-    bool HitFlashSpeedLines { get; }
+    float HitFlashStarburstDuration { get; }
+    float HitFlashWhiteoutDuration { get; }
+    float HitFlashSmearDuration { get; }
+    float HitFlashAberrationDuration { get; }
+    float HitFlashSettleDuration { get; }
     /// <summary>진행기 시계(할 일 132 §14) — 실시간(기본) = 슬로우와 무관, 스케일 = 성공 슬로우·히트스톱을 따라 느려진다. 섬광 순간도 이 시계다.</summary>
     InterruptEffectTimeBase HitFlashTimeBase { get; }
 }
 
 /// <summary>
-/// 적중 섬광 시간표(할 일 132 단계 5) — 성공 순간 칸을 한 번 복사한다. 시각은 성공 Started 기준 경과(진행기 시계 초).
-/// 히트스톱은 성공 Started 순간부터라 1단계는 늘 히트스톱 안에서 시작한다(히트스톱 길이 0 이어도 같은 순간).
-/// 스케일 시계면 1단계는 히트스톱(0.02배) 동안 거의 멈춰 있다.
+/// 적중 섬광 시간표(할 일 132 §15) — 성공 순간 칸을 한 번 복사한다. 시각은 성공 Started 기준 경과(진행기 시계 초).
+/// 히트스톱은 성공 Started 순간부터라 ②는 늘 히트스톱 안에서 시작한다(히트스톱 길이 0 이어도 같은 순간).
 /// </summary>
 public readonly struct InterruptHitFlashTimeline
 {
-    public readonly float Burst;
-    public readonly float Glare;
-    public readonly float Invert;
-    public readonly float Return;
-
-    public InterruptHitFlashTimeline(float burst, float glare, float invert, float ret)
+    /// <summary>단계 순서 — 시간표·진행기·테스트가 같은 목록을 쓴다.</summary>
+    public static readonly InterruptHitFlashStage[] Order =
     {
-        Burst = Sanitize(burst);
-        Glare = Sanitize(glare);
-        Invert = Sanitize(invert);
-        Return = Sanitize(ret);
+        InterruptHitFlashStage.Starburst, InterruptHitFlashStage.Whiteout, InterruptHitFlashStage.Smear,
+        InterruptHitFlashStage.Aberration, InterruptHitFlashStage.Settle,
+    };
+
+    public readonly float Starburst;
+    public readonly float Whiteout;
+    public readonly float Smear;
+    public readonly float Aberration;
+    public readonly float Settle;
+
+    public InterruptHitFlashTimeline(float starburst, float whiteout, float smear, float aberration, float settle)
+    {
+        Starburst = Sanitize(starburst);
+        Whiteout = Sanitize(whiteout);
+        Smear = Sanitize(smear);
+        Aberration = Sanitize(aberration);
+        Settle = Sanitize(settle);
     }
 
     public static InterruptHitFlashTimeline From(IInterruptHitFlashSettings settings) =>
         settings == null
             ? default
-            : new InterruptHitFlashTimeline(settings.HitFlashBurstDuration, settings.HitFlashGlareDuration,
-                settings.HitFlashInvertDuration, settings.HitFlashReturnDuration);
+            : new InterruptHitFlashTimeline(settings.HitFlashStarburstDuration, settings.HitFlashWhiteoutDuration,
+                settings.HitFlashSmearDuration, settings.HitFlashAberrationDuration, settings.HitFlashSettleDuration);
 
-    /// <summary>섬광 순간(4단계 시작) — 1~3단계 길이 합. 월드 섬광·오너 암전 걷힘·팀원 암순응이 이때다.</summary>
-    public float FlashMoment => Burst + Glare + Invert;
+    /// <summary>섬광 순간(⑤ 시작) — ②+③+④ 길이 합. 오너 암전 걷힘·월드 섬광·팀원 암순응이 이때다.</summary>
+    public float FlashMoment => Starburst + Whiteout + Smear;
 
-    /// <summary>전체 길이(1~4단계).</summary>
-    public float Total => FlashMoment + Return;
+    /// <summary>전체 길이(②~⑥).</summary>
+    public float Total => FlashMoment + Aberration + Settle;
+
+    /// <summary>단계 시작 시각(성공 Started 기준). None = 전체 끝.</summary>
+    public float StartOf(InterruptHitFlashStage stage)
+    {
+        float start = 0f;
+        for (int i = 0; i < Order.Length; i++)
+        {
+            if (Order[i] == stage)
+                return start;
+            start += LengthOf(Order[i]);
+        }
+
+        return start;
+    }
 
     /// <summary>경과 → 단계와 그 단계 진행도 [0, 1). 시작 전·끝난 뒤 = None. 길이 0 단계는 건너뛴다.</summary>
     public InterruptHitFlashStage StageAt(float elapsed, out float progress)
@@ -70,13 +96,13 @@ public readonly struct InterruptHitFlashTimeline
             return InterruptHitFlashStage.None;
 
         float start = 0f;
-        for (int i = 1; i <= 4; i++)
+        for (int i = 0; i < Order.Length; i++)
         {
-            float length = LengthOf((InterruptHitFlashStage)i);
+            float length = LengthOf(Order[i]);
             if (elapsed < start + length)
             {
                 progress = (elapsed - start) / length;
-                return (InterruptHitFlashStage)i;
+                return Order[i];
             }
 
             start += length;
@@ -89,15 +115,48 @@ public readonly struct InterruptHitFlashTimeline
     {
         switch (stage)
         {
-            case InterruptHitFlashStage.Burst: return Burst;
-            case InterruptHitFlashStage.Glare: return Glare;
-            case InterruptHitFlashStage.Invert: return Invert;
-            case InterruptHitFlashStage.Return: return Return;
+            case InterruptHitFlashStage.Starburst: return Starburst;
+            case InterruptHitFlashStage.Whiteout: return Whiteout;
+            case InterruptHitFlashStage.Smear: return Smear;
+            case InterruptHitFlashStage.Aberration: return Aberration;
+            case InterruptHitFlashStage.Settle: return Settle;
             default: return 0f;
         }
     }
 
     private static float Sanitize(float value) => float.IsNaN(value) || value < 0f ? 0f : value;
+}
+
+/// <summary>
+/// 한 프레임의 오너 화면 효과 세기(할 일 132 §15) — 전부 [0, 1]. 실제 크기는 각 칸(플레어 세기·블러 세기·Volume 프로필 값)이 곱한다.
+/// </summary>
+public readonly struct InterruptHitFlashLook
+{
+    /// <summary>② 렌즈 플레어(LensFlareComponentSRP 세기 배율).</summary>
+    public readonly float Flare;
+    /// <summary>적중 지점 중심 방사형 블러(렌더 기능 패스).</summary>
+    public readonly float Blur;
+    /// <summary>색수차 Volume 가중치.</summary>
+    public readonly float Aberration;
+    /// <summary>블룸 Volume 가중치.</summary>
+    public readonly float Bloom;
+
+    public InterruptHitFlashLook(float flare, float blur, float aberration, float bloom)
+    {
+        Flare = Mathf.Clamp01(flare);
+        Blur = Mathf.Clamp01(blur);
+        Aberration = Mathf.Clamp01(aberration);
+        Bloom = Mathf.Clamp01(bloom);
+    }
+}
+
+/// <summary>오너 화면 섬광 출력(②~⑥) — 실제 = <see cref="InterruptHitFlashOverlay"/>(오버레이 캔버스·렌즈 플레어·방사형 블러·Volume).</summary>
+public interface IInterruptHitFlashOverlayOutput
+{
+    /// <param name="worldCenter">적중 지점(월드) — 출력이 화면 위치로 바꾼다.</param>
+    void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter);
+    /// <summary>즉시 전부 원래대로(오버레이 끔·플레어 끔·블러 0·Volume 가중치 복구).</summary>
+    void Hide();
 }
 
 /// <summary>섬광 순간 한 건 — 디렉터가 월드 섬광·암순응을 튼다.</summary>
@@ -106,7 +165,7 @@ public readonly struct InterruptHitFlashMoment
     public readonly InterruptProductionEvent Event;
     /// <summary>이 화면이 발동자 본인.</summary>
     public readonly bool ViewerIsCaster;
-    /// <summary>이 화면에서 오너 섬광 오버레이(1~3단계)가 돌았다 — 본인 self 암순응을 대신한다.</summary>
+    /// <summary>이 화면에서 오너 화면 섬광(②~⑥)이 돌았다 — 본인 self 암순응을 대신한다.</summary>
     public readonly bool OwnerOverlay;
 
     public InterruptHitFlashMoment(in InterruptProductionEvent e, bool viewerIsCaster, bool ownerOverlay)
@@ -117,38 +176,30 @@ public readonly struct InterruptHitFlashMoment
     }
 }
 
-/// <summary>오너 화면 섬광 오버레이(1~3단계 + 4단계 걷힘) 출력 — 실제 = <see cref="InterruptHitFlashOverlay"/>.</summary>
-public interface IInterruptHitFlashOverlayOutput
-{
-    /// <param name="worldCenter">적중 지점(월드) — 출력이 화면 위치로 바꾼다.</param>
-    void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter, bool speedLines);
-    void Hide();
-}
-
 /// <summary>본인/남 화면의 섬광 순간 암순응 선택.</summary>
 public enum InterruptHitFlashDarkAdaptation
 {
     None,
-    /// <summary>본인 화면 — 오버레이가 안 돈 경우(약 예측이 성공)만.</summary>
+    /// <summary>본인 화면 — 오너 화면 섬광이 안 돈 경우(약 예측이 성공)만.</summary>
     Self,
     /// <summary>다른 사람 화면.</summary>
     Others,
 }
 
-/// <summary>적중 섬광 순수 규칙(할 일 132 단계 5).</summary>
+/// <summary>적중 섬광 순수 규칙(할 일 132 §15).</summary>
 public static class InterruptHitFlashRules
 {
-    /// <summary>오버레이 덮어쓸 텍스처 칸(셰이더 속성) — 단계 1·2·3(4단계는 3단계 그림이 걷힌다).</summary>
-    public static readonly string[] OverlayTextureProperties = { "_BurstTex", "_GlareTex", "_InvertTex" };
-    /// <summary>위 칸이 차 있을 때 켜는 셰이더 키워드 — 꺼져 있으면 그 단계는 절차 생성.</summary>
-    public static readonly string[] OverlayTextureKeywords = { "_BURST_TEX_ON", "_GLARE_TEX_ON", "_INVERT_TEX_ON" };
+    /// <summary>오버레이 덮어쓸 텍스처 칸(셰이더 속성) — ②③④(⑤⑥은 실제 화면 효과라 그림 칸 없음).</summary>
+    public static readonly string[] OverlayTextureProperties = { "_StarburstTex", "_WhiteoutTex", "_SmearTex" };
+    /// <summary>위 칸이 차 있을 때 켜는 셰이더 키워드 — 꺼져 있으면 그 단계는 절차 생성(②는 렌즈 플레어 층 + 절차 고리).</summary>
+    public static readonly string[] OverlayTextureKeywords = { "_STARBURST_TEX_ON", "_WHITEOUT_TEX_ON", "_SMEAR_TEX_ON" };
 
-    /// <summary>오너 오버레이를 트는가 — 내 성공이고 그 순간 오너 암전이 켜져 있을 때(강 시도)만. 약 예측·대상 없음·실패 = 없음.</summary>
+    /// <summary>오너 화면 섬광을 트는가 — 내 성공이고 그 순간 오너 암전이 켜져 있을 때(강 시도)만. 약 예측·대상 없음·실패·팀원 = 없음.</summary>
     public static bool ShouldPlayOwnerOverlay(SlowMotionPurpose purpose, bool viewerIsCaster, bool successDimmed) =>
         purpose == SlowMotionPurpose.Success && viewerIsCaster && successDimmed;
 
     /// <summary>
-    /// 섬광 순간 암순응 — 남 화면 = others, 본인 화면 = 오버레이가 돌았으면 없음(마스크 암전·섬광이 대신 — 겹치면 두 번 어두워진다),
+    /// 섬광 순간 암순응 — 남 화면 = others, 본인 화면 = 오너 화면 섬광이 돌았으면 없음(마스크 암전·섬광이 대신 — 겹치면 두 번 어두워진다),
     /// 안 돌았으면 self(약 예측이 성공한 경우).
     /// </summary>
     public static InterruptHitFlashDarkAdaptation SelectDarkAdaptation(bool viewerIsCaster, bool ownerOverlay) =>
@@ -156,15 +207,14 @@ public static class InterruptHitFlashRules
         : ownerOverlay ? InterruptHitFlashDarkAdaptation.None
         : InterruptHitFlashDarkAdaptation.Self;
 
-    /// <summary>오버레이 단계의 덮어쓸 텍스처 칸 순번(0~2). 4단계 = 3단계 칸. 없으면 -1.</summary>
+    /// <summary>단계의 덮어쓸 텍스처 칸 순번(0~2). ⑤⑥·None = -1.</summary>
     public static int OverlayTextureIndex(InterruptHitFlashStage stage)
     {
         switch (stage)
         {
-            case InterruptHitFlashStage.Burst: return 0;
-            case InterruptHitFlashStage.Glare: return 1;
-            case InterruptHitFlashStage.Invert:
-            case InterruptHitFlashStage.Return: return 2;
+            case InterruptHitFlashStage.Starburst: return 0;
+            case InterruptHitFlashStage.Whiteout: return 1;
+            case InterruptHitFlashStage.Smear: return 2;
             default: return -1;
         }
     }
@@ -177,16 +227,80 @@ public static class InterruptHitFlashRules
             changed |= InterruptLightGatherRules.ApplyOverrideKeyword(material, OverlayTextureProperties[i], OverlayTextureKeywords[i]);
         return changed;
     }
+
+    /// <summary>
+    /// 단계·진행도 → 오너 화면 효과 세기. ② 플레어, ③ 블러 최대, ④ 그림만, ⑤ 블러 0.8→0.6·색수차 1·블룸 0→1 상승,
+    /// ⑥ 블러 0.6→0·색수차 1→0·블룸 1→0(끝까지 남다가 가라앉음). 끝 = 전부 0.
+    /// </summary>
+    public static InterruptHitFlashLook Look(InterruptHitFlashStage stage, float progress)
+    {
+        float t = Mathf.Clamp01(progress);
+        switch (stage)
+        {
+            case InterruptHitFlashStage.Starburst: return new InterruptHitFlashLook(1f - 0.4f * t, 0f, 0f, 0f);
+            case InterruptHitFlashStage.Whiteout: return new InterruptHitFlashLook(0f, 1f, 0f, 0f);
+            case InterruptHitFlashStage.Aberration: return new InterruptHitFlashLook(0f, Mathf.Lerp(0.8f, 0.6f, t), 1f, EaseOut(t));
+            case InterruptHitFlashStage.Settle: return new InterruptHitFlashLook(0f, 0.6f * (1f - t), 1f - t, 1f - t * t);
+            default: return default;
+        }
+    }
+
+    /// <summary>적중 지점 뷰포트 좌표 → 화면 효과 중심. 카메라 뒤(z ≤ 0)·NaN 이면 화면 가운데.</summary>
+    public static Vector2 ViewportCenter(Vector3 viewportPoint) =>
+        viewportPoint.z <= 0f || float.IsNaN(viewportPoint.x) || float.IsNaN(viewportPoint.y)
+            ? new Vector2(0.5f, 0.5f)
+            : new Vector2(viewportPoint.x, viewportPoint.y);
+
+    private static float EaseOut(float t)
+    {
+        float k = 1f - t;
+        return 1f - k * k * k;
+    }
 }
 
 /// <summary>
-/// 적중 섬광 진행기(할 일 132 단계 5) — 순수 로직. 디렉터가 성공 단계(purpose==Success) 안에서 사건을 넘기고 매 프레임 Tick 한다.
+/// 섬광 Volume 가중치 스냅샷(할 일 132 §15) — 재생 첫 프레임에 색수차·블룸 Volume 의 지금 가중치를 저장하고, 끝·강제 리셋에 그 값으로 되돌린다.
+/// 재생 중 다시 잡지 않는다(새 성공이 이어져도 처음 값으로 돌아간다). Volume 프로필 에셋은 건드리지 않는다 — 가중치만.
+/// </summary>
+public sealed class InterruptHitFlashVolumeSnapshot
+{
+    public bool Captured { get; private set; }
+    public float Aberration { get; private set; }
+    public float Bloom { get; private set; }
+
+    /// <summary>재생 시작 — 이미 잡아 뒀으면 무시(true = 이번에 잡음).</summary>
+    public bool Capture(float aberrationWeight, float bloomWeight)
+    {
+        if (Captured)
+            return false;
+
+        Captured = true;
+        Aberration = aberrationWeight;
+        Bloom = bloomWeight;
+        return true;
+    }
+
+    /// <summary>끝·리셋 — 잡아 둔 값을 돌려주고 비운다. 잡은 적이 없으면 false(되돌릴 것 없음).</summary>
+    public bool Release(out float aberrationWeight, out float bloomWeight)
+    {
+        aberrationWeight = Aberration;
+        bloomWeight = Bloom;
+        if (!Captured)
+            return false;
+
+        Captured = false;
+        return true;
+    }
+}
+
+/// <summary>
+/// 적중 섬광 진행기(할 일 132 §15) — 순수 로직. 디렉터가 성공 단계(purpose==Success) 안에서 사건을 넘기고 매 프레임 Tick 한다.
 /// 시각(now)은 모두 <see cref="Clock"/> 시계 — 디렉터가 <see cref="InterruptEffectTime.Now"/> 로 읽어 넘긴다(할 일 132 §14).
 /// <list type="bullet">
-/// <item>오너 오버레이(<see cref="BeginOwnerOverlay"/>): 1~4단계를 출력에 넘기고 끝나면 숨긴다. 새 성공이 오면 처음부터.</item>
-/// <item>섬광 순간(<see cref="ScheduleFlash"/>): 모든 피어가 성공 Started + 1~3단계 길이 뒤에 <c>onFlash</c> 를 부른다(월드 섬광·암순응·오너 암전 끔).
+/// <item>오너 화면 섬광(<see cref="BeginOwnerOverlay"/>): ②~⑥ 을 출력에 넘기고 끝나면 숨긴다(전부 복구). 새 성공이 오면 처음부터.</item>
+/// <item>섬광 순간(<see cref="ScheduleFlash"/>): 모든 피어가 성공 Started + ②③④ 길이 뒤에 <c>onFlash</c> 를 부른다(월드 섬광·암순응·오너 암전 끔).
 ///       여러 발동자의 성공은 각각 따로 온다.</item>
-/// <item>강제 리셋(<see cref="ForcedReset"/>): 오버레이 즉시 끔, 남은 섬광 순간 취소.</item>
+/// <item>강제 리셋(<see cref="ForcedReset"/>): 화면 효과 즉시 복구, 남은 섬광 순간 취소.</item>
 /// </list>
 /// 오너 암전 끄기는 이 진행기의 섬광 순간(<c>onFlash</c>)에 디렉터가 오너 상태 기계에 알린다 — 시간표는 이 진행기 하나다.
 /// </summary>
@@ -207,7 +321,6 @@ public sealed class InterruptHitFlashSequencer
     private InterruptHitFlashTimeline _overlayTimeline;
     private float _overlayStart;
     private Vector3 _overlayCenter;
-    private bool _overlaySpeedLines;
     private InterruptEffectTimeBase _clock = InterruptEffectTimeBase.Unscaled;
 
     public InterruptHitFlashSequencer(IInterruptHitFlashSettings settings, IInterruptHitFlashOverlayOutput overlay,
@@ -225,7 +338,7 @@ public sealed class InterruptHitFlashSequencer
     public int PendingFlashCount => _pending.Count;
 
     /// <summary>
-    /// 진행기 시계 — 쉬는 동안(오버레이·남은 섬광 순간 없음)만 칸(<see cref="IInterruptHitFlashSettings.HitFlashTimeBase"/>)을 따라간다.
+    /// 진행기 시계 — 쉬는 동안(화면 섬광·남은 섬광 순간 없음)만 칸(<see cref="IInterruptHitFlashSettings.HitFlashTimeBase"/>)을 따라간다.
     /// 진행 중에 칸을 바꾸면 다음 성공부터(두 시계는 값이 달라 섞으면 단계가 튄다).
     /// </summary>
     public InterruptEffectTimeBase Clock
@@ -238,25 +351,24 @@ public sealed class InterruptHitFlashSequencer
         }
     }
 
-    /// <summary>오버레이 출력 교체(디버그·테스트). 돌던 오버레이는 옛 출력에서 숨긴다.</summary>
+    /// <summary>출력 교체(디버그·테스트). 돌던 효과는 옛 출력에서 복구한다.</summary>
     public void SetOverlayOutput(IInterruptHitFlashOverlayOutput overlay)
     {
         _overlay?.Hide();
         _overlay = overlay;
     }
 
-    /// <summary>[오너] 섬광 오버레이 시작 — 성공 Started 순간(<paramref name="now"/>). 칸은 이 순간 읽는다.</summary>
+    /// <summary>[오너] 화면 섬광 시작 — 성공 Started 순간(<paramref name="now"/>). 칸은 이 순간 읽는다.</summary>
     public void BeginOwnerOverlay(Vector3 worldCenter, float now)
     {
         _overlayTimeline = InterruptHitFlashTimeline.From(_settings);
         _overlayStart = now;
         _overlayCenter = worldCenter;
-        _overlaySpeedLines = _settings != null && _settings.HitFlashSpeedLines;
         OverlayActive = true;
         UpdateOverlay(now);
     }
 
-    /// <summary>[각 피어] 섬광 순간 예약 — 성공 Started + 1~3단계 길이. 그 길이가 0 이면 바로 부른다.</summary>
+    /// <summary>[각 피어] 섬광 순간 예약 — 성공 Started + ②③④ 길이. 그 길이가 0 이면 바로 부른다.</summary>
     public void ScheduleFlash(in InterruptHitFlashMoment moment, float now)
     {
         float due = now + InterruptHitFlashTimeline.From(_settings).FlashMoment;
@@ -294,7 +406,7 @@ public sealed class InterruptHitFlashSequencer
             _onFlash?.Invoke(_due[i]);
     }
 
-    /// <summary>강제 리셋(컷신·씬 전환·세션 종료)·디렉터 꺼짐 — 오버레이 즉시 끔, 남은 섬광 순간 취소.</summary>
+    /// <summary>강제 리셋(컷신·씬 전환·세션 종료)·디렉터 꺼짐 — 화면 효과 즉시 복구, 남은 섬광 순간 취소.</summary>
     public void ForcedReset()
     {
         _pending.Clear();
@@ -312,7 +424,7 @@ public sealed class InterruptHitFlashSequencer
 
         OverlayStage = stage;
         OverlayProgress = progress;
-        _overlay?.Show(stage, progress, _overlayCenter, _overlaySpeedLines);
+        _overlay?.Show(stage, progress, _overlayCenter);
     }
 
     private void HideOverlay()

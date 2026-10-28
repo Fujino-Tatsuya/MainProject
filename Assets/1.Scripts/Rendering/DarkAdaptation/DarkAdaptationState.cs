@@ -44,12 +44,31 @@ public static class DarkAdaptationState
         MaskCoverTarget = null;
     }
 
+    // ---- 적중 섬광(오너, 할 일 132 §15) — InterruptHitFlashOverlay 가 쓴다 ----
+
+    /// <summary>적중 지점 중심 방사형 블러 세기 [0, 1] — 픽셀에서 중심까지 거리 중 샘플이 덮는 비율. 0 = 꺼짐(패스 없음).</summary>
+    public static float HitFlashBlurStrength;
+    /// <summary>방사형 블러 중심(뷰포트 0~1).</summary>
+    public static Vector2 HitFlashBlurCenter = new Vector2(0.5f, 0.5f);
+    /// <summary>
+    /// 렌즈 플레어 층 — 켜진 LensFlareComponentSRP 들을 투명 검정 위에 따로 그려 넣을 대상(②). 오버레이 캔버스가 오너 암전 위에 더한다.
+    /// 없으면 플레어 층 패스를 넣지 않는다.
+    /// </summary>
+    public static RenderTexture HitFlashFlareTarget;
+
+    public static void ClearHitFlash()
+    {
+        HitFlashBlurStrength = 0f;
+        HitFlashFlareTarget = null;
+    }
+
     // 도메인 리로드를 끈 Play 진입에서도 이전 값이 남지 않게.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetOnLoad()
     {
         Clear();
         ClearMask();
+        ClearHitFlash();
     }
 }
 
@@ -62,6 +81,10 @@ public enum DarkAdaptationMode
     Luminance = 1,
     /// <summary>마스크 암전(오너) — 비트 4 렌더러만 남기고 화면 전체(HUD 포함)를 덮는다.</summary>
     Mask = 2,
+    /// <summary>적중 섬광 방사형 블러(오너, 할 일 132 §15) — 카메라 컬러(HDR, 후처리 전).</summary>
+    RadialBlur = 4,
+    /// <summary>적중 섬광 렌즈 플레어 층(오너, 할 일 132 §15) — 플레어만 외부 RT 에.</summary>
+    FlareLayer = 8,
 }
 
 /// <summary>모드 선택·덮개 색 순수 로직(EditMode 테스트 대상).</summary>
@@ -75,6 +98,18 @@ public static class DarkAdaptationModes
             mode |= DarkAdaptationMode.Luminance;
         if (maskIntensity > 0f && hasMaskTarget)
             mode |= DarkAdaptationMode.Mask;
+        return mode;
+    }
+
+    /// <summary>적중 섬광 모드까지 — 블러 세기가 양수면 방사형 블러, 플레어 대상이 있으면 플레어 층. 평소엔 둘 다 없다.</summary>
+    public static DarkAdaptationMode Select(float luminanceIntensity, float maskIntensity, bool hasMaskTarget,
+        float blurStrength, bool hasFlareTarget)
+    {
+        DarkAdaptationMode mode = Select(luminanceIntensity, maskIntensity, hasMaskTarget);
+        if (blurStrength > 0f)
+            mode |= DarkAdaptationMode.RadialBlur;
+        if (hasFlareTarget)
+            mode |= DarkAdaptationMode.FlareLayer;
         return mode;
     }
 

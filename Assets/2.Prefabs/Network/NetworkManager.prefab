@@ -261,4 +261,7 @@ MonoBehaviour:
   ownerZoom: 1
   hitFlashTimeBase: 0
   hitFlashOverlayMaterial: {fileID: 2100000, guid: 4349f51186ca1d04dbc37ba5986e7e28, type: 2}
+  hitFlashLensFlare: {fileID: 11400000, guid: fcf746276f0103f49bd87368ddf37519, type: 2}
+  hitFlashAberrationProfile: {fileID: 11400000, guid: 6288be39943ea2a4091062599015e694, type: 2}
+  hitFlashBloomProfile: {fileID: 11400000, guid: 6f297671c6ab2794ca393a95b93e9294, type: 2}
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}

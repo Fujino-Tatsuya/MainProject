@@ -9,7 +9,7 @@ public enum InterruptOwnerPresentationState
     AttemptStrong,
     /// <summary>시도 — 실패 예측(약).</summary>
     AttemptWeak,
-    /// <summary>서버 확정 성공 — 암전 유지, 적중 섬광 3단계 끝(섬광 순간)에 즉시 끈다.</summary>
+    /// <summary>서버 확정 성공 — 암전 유지, 적중 섬광 ④ 끝(섬광 순간)에 즉시 끈다.</summary>
     Success,
     /// <summary>서버 확정 실패(또는 판정 전 종료·거부) — 암전·빛 모임을 걷는 중.</summary>
     Failed,
@@ -192,8 +192,8 @@ public sealed class InterruptOwnerPresentation
     }
 
     /// <summary>
-    /// [오너] 적중 섬광 진행기의 섬광 순간(성공 Started + 섬광 1~3단계, 진행기 시계) — 이번 성공(<paramref name="triggerId"/>)의 암전을 램프 없이 끈다.
-    /// 흰 반전(3단계)이 화면을 덮은 채 끝나는 순간이다. 다른 성공·성공 단계 밖이면 무시한다.
+    /// [오너] 적중 섬광 진행기의 섬광 순간(성공 Started + 섬광 ②③④, 진행기 시계) — 이번 성공(<paramref name="triggerId"/>)의 암전을 램프 없이 끈다.
+    /// ④ 스미어 한 장(검정 위 흰 덩어리)이 끝나는 순간이다. 다른 성공·성공 단계 밖이면 무시한다.
     /// </summary>
     public void SuccessFlashMoment(uint triggerId, float now)
     {

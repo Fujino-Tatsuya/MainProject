@@ -19,19 +19,15 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties: 
+  m_LockedProperties:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _BurstTex:
+    - _CoverTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _GlareTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _InvertTex:
+    - _FlareTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -39,18 +35,34 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SmearTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _StarburstTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WhiteoutTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _Aspect: 1.7777
-    - _LineDensity: 120
+    - _FlareGain: 1
     - _Progress: 0
-    - _RayCount: 12
-    - _SpeedLines: 1
+    - _RainbowIntensity: 1.2
+    - _SmearLength: 0.12
     - _Stage: 0
+    - _StreakCount: 160
+    - _WhiteoutOpacity: 0.94
     m_Colors:
-    - _BackColor: {r: 0, g: 0, b: 0, a: 1}
     - _Center: {r: 0.5, g: 0.5, b: 0, a: 0}
-    - _FlashColor: {r: 1, g: 1, b: 1, a: 1}
-    - _LineColor: {r: 0, g: 0, b: 0, a: 1}
+    - _RingColor: {r: 0.45, g: 0.72, b: 1.6, a: 1}
+    - _SmearBackColor: {r: 0, g: 0, b: 0, a: 1}
+    - _SmearColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SmearDirection: {r: 1, g: 0.12, b: 0, a: 0}
+    - _WhiteoutColor: {r: 0.82, g: 0.88, b: 0.96, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

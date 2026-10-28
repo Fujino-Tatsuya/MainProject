@@ -53,7 +53,7 @@ public sealed class InterruptSuccessStage
     }
 
     /// <summary>
-    /// [각 피어] 적중 섬광 순간(성공 Started + 섬광 1~3단계 길이, 할 일 132 단계 5) — 암순응.
+    /// [각 피어] 적중 섬광 순간(성공 Started + 섬광 ②③④ 길이 = ⑤ 시작, 할 일 132 §15) — 암순응.
     /// 다른 화면 = 공용 채널(others). 본인 화면 = 섬광 오버레이가 돌았으면 없음(마스크 암전·섬광이 대신), 안 돌았으면 개인 채널(self).
     /// </summary>
     public void LocalFlash(in InterruptHitFlashMoment moment, IInterruptDarkAdaptationOutput darkAdaptation)

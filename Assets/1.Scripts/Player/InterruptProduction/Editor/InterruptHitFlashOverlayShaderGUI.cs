@@ -2,12 +2,12 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 적중 섬광 오버레이 셰이더(<c>BeaverLobby/UI/InterruptHitFlashOverlay</c>) 재질 인스펙터(할 일 132 단계 5).
+/// 적중 섬광 오버레이 셰이더(<c>BeaverLobby/UI/InterruptHitFlashOverlay</c>) 재질 인스펙터(할 일 132 §15).
 /// 단계별 '덮어쓸 텍스처' 칸이 차면 그 단계 키워드(<see cref="InterruptHitFlashRules.OverlayTextureKeywords"/>)를 켜고, 비면 끈다(= 절차 생성).
 /// </summary>
 public sealed class InterruptHitFlashOverlayShaderGUI : ShaderGUI
 {
-    private static readonly string[] StageNames = { "1단계 폭발", "2단계 빛 갈라짐", "3·4단계 흰 반전" };
+    private static readonly string[] StageNames = { "② 스타버스트", "③ 화이트아웃", "④ 스미어" };
 
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
     {
