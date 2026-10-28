@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Text;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -42,6 +44,14 @@ public sealed partial class QABoss103CombatBot
     private readonly int[] _dashIntOrderCounts = new int[3];
     private bool _dashIntLogHooked;
 
+    // 할 일 116-C4 — 대쉬 간파 예측 랩(QABoss116LabProbe.Active)에서만 쓰는 판단 근거 값. 랩이 아니면 비어 있고 줄도 그대로다.
+    private readonly List<string> _labGate = new List<string>();
+    private readonly StringBuilder _labSeen = new StringBuilder();
+    private string _labSeenLast;
+    private double _labFirstT = -1.0;
+    private float _labFirstAt = -1f, _labDashStartAt = -1f, _labDashTotal = -1f, _labPressAt = -1f;
+    private string _labDashLog = "";
+
     /// <summary>판 설정에서 대쉬 간파 비율을 읽고, 켜져 있으면 예측 로그를 켜고 판 파일로 모은다.</summary>
     private void InitDashInterrupt(QABoss103Config cfg)
     {
@@ -80,6 +90,9 @@ public sealed partial class QABoss103CombatBot
         _dashIntPlan = _dashIntRng != null ? QABoss116DashPlan.Roll(_dashIntRng, _dashIntPct, out _dashIntDelayFrac) : QABoss116Order.None;
     }
 
+    /// <summary>지금까지 남긴 대쉬 간파 시도 수(<c>dashint</c> 줄 수) — 할 일 116-C4 랩 판 시도 상한.</summary>
+    public int DashInterruptAttempts => _dashIntCount;
+
     /// <summary>대쉬 간파 진행 중 — 이번 틱 다른 이동·공격 입력을 막는다.</summary>
     private bool DashInterruptHoldsBot => _dashIntPhase != DashIntPhase.Idle;
 
@@ -96,6 +109,7 @@ public sealed partial class QABoss103CombatBot
         PlayerInputReader reader = me.GetComponent<PlayerInputReader>();
         if (order == QABoss116Order.None || dash == null || reader == null || skills == null || _dashIntPhase != DashIntPhase.Idle)
             return false;
+        LabBegin(me);
         float window = dash.DashInterruptWindow;
         if (!BeaverLobby.Player.Dash.DashInterruptRules.IsEnabled(window) || !dash.IsReady ||
             (order == QABoss116Order.RmbDash && DashLatchField == null))
@@ -113,7 +127,14 @@ public sealed partial class QABoss103CombatBot
 
         if (order == QABoss116Order.DashRmb)
         {
+            if (QABoss116LabProbe.Active)
+                QABoss116LabProbe.BeginCapture();
             cast = dash.TryBeginPredictedDash(cancelsAction: false);
+            if (QABoss116LabProbe.Active)
+            {
+                _labDashLog = QABoss116LabProbe.EndCapture();
+                LabNoteDashStart(me);
+            }
             if (!cast)
             {
                 LogDashInterrupt(order, "dash_rejected", 0f);
@@ -146,18 +167,22 @@ public sealed partial class QABoss103CombatBot
         _input.SetMove(Vector3.zero);
         if (_boss != null)
             _driver.SetAim(_boss.transform.position);
+        if (QABoss116LabProbe.Active)
+            LabTick(me, skills);
 
         switch (_dashIntPhase)
         {
             case DashIntPhase.WaitPress when _dashIntOrder == QABoss116Order.DashRmb:
                 if (me.CurrentState != PlayerActionState.Dash)
                 {
+                    LabResnapshot(me);   // 랩 — 대시가 끝난(끊긴) 순간 상태
                     EndDashInterrupt("dash_ended_before_press");
                     return;
                 }
                 if (Time.time < _dashIntPressAt)
                     return;
                 _dashIntServerT = ServerNow();
+                _labPressAt = Time.time;
                 reader.SetVirtualSkillInput(PlayerSkillSlot.Interrupt, true);
                 _dashIntPhase = DashIntPhase.ReleaseRmb;
                 _dashIntObserveUntil = Time.time + DashIntObserveSeconds;
@@ -176,7 +201,10 @@ public sealed partial class QABoss103CombatBot
                     return;
                 }
                 if (Time.realtimeSinceStartupAsDouble > _dashIntSkillDeadline)
+                {
+                    LabResnapshot(me);   // 랩 — 상한 순간의 쿨·진행 스킬·상태
                     EndDashInterrupt("rmb_not_started");
+                }
                 return;
 
             case DashIntPhase.WaitPress: // 우클릭 → 대시
@@ -189,10 +217,13 @@ public sealed partial class QABoss103CombatBot
                     return;
                 if (dash == null || !dash.IsReady)
                 {
+                    LabResnapshot(me);   // 랩 — 첫 입력 때가 아니라 지금(누르려던 순간) 충전 값
                     EndDashInterrupt("no_charge");
                     return;
                 }
                 _dashIntServerT = ServerNow();
+                _labPressAt = Time.time;
+                LabResnapshot(me);   // 랩 — 대시를 누르는 순간의 게이트 값(no_dash 근거)
                 DashLatchField.SetValue(reader, true);   // Space 한 번 — 래치·버퍼 기록은 입력 리더 규칙 그대로
                 _dashLockUntil = Time.realtimeSinceStartupAsDouble + DashLockSeconds;
                 _dashIntPhase = DashIntPhase.Observe;
@@ -256,7 +287,8 @@ public sealed partial class QABoss103CombatBot
         string token = QABoss116DashPlan.Token(order);
         Debug.Log($"{Tag} event=bot_rule character={_character} rule=dash_interrupt n={_dashIntCount} order={token} outcome={outcome} " +
                   $"delayS={delayS.ToString("F3", CultureInfo.InvariantCulture)} window={_counterWindows} clientId={clientId} serverT={F3(serverT)}");
-        PartWrite(QABoss103PartFile.Format(QABoss116DashPredict.BotKind,
+        var kv = new List<string>
+        {
             "slot", _slot.ToString(CultureInfo.InvariantCulture),
             "character", _character.ToString(),
             "clientId", clientId.ToString(CultureInfo.InvariantCulture),
@@ -264,7 +296,94 @@ public sealed partial class QABoss103CombatBot
             "outcome", outcome,
             "delayS", delayS.ToString("F3", CultureInfo.InvariantCulture),
             "window", _counterWindows.ToString(CultureInfo.InvariantCulture),
-            "serverT", F3(serverT)));
+            "serverT", F3(serverT),
+        };
+        if (QABoss116LabProbe.Active)
+            LabAppend(kv, delayS);
+        PartWrite(QABoss103PartFile.Format(QABoss116DashPredict.BotKind, kv.ToArray()));
+        LabReset();
+    }
+
+    // ── 할 일 116-C4 랩 판단 근거 값(QABoss116LabProbe.Active 일 때만) ───────────
+
+    /// <summary>대쉬 간파 첫 입력 직전 — 게이트 값·첫 입력 시각.</summary>
+    private void LabBegin(Player me)
+    {
+        LabReset();
+        if (!QABoss116LabProbe.Active)
+            return;
+        _labFirstT = ServerNow();
+        _labFirstAt = Time.time;
+        QABoss116LabProbe.Snapshot(me, _boss, _labGate);
+        LabSee(me, me.GetComponent<PlayerSkillController>());
+    }
+
+    /// <summary>게이트 값을 지금 값으로 다시 잡는다(우클릭 → 대시의 대시 누름 순간).</summary>
+    private void LabResnapshot(Player me)
+    {
+        if (!QABoss116LabProbe.Active)
+            return;
+        _labGate.Clear();
+        QABoss116LabProbe.Snapshot(me, _boss, _labGate);
+    }
+
+    /// <summary>대시 상태가 보이면 시작 시각·전체 길이(경과 + 남음)를 적는다(한 번).</summary>
+    private void LabNoteDashStart(Player me)
+    {
+        if (_labDashStartAt >= 0f)
+            return;
+        PlayerDashState ds = DashStateOf(me);
+        if (ds == null)
+            return;
+        _labDashStartAt = Time.time - ds.Elapsed;
+        _labDashTotal = ds.Elapsed + ds.Remaining;
+    }
+
+    private void LabTick(Player me, PlayerSkillController skills)
+    {
+        LabSee(me, skills);
+        LabNoteDashStart(me);
+    }
+
+    /// <summary>지나간 (상태, 진행 스킬) 순서 — 바뀔 때만 붙인다(rmb_not_started 등 근거).</summary>
+    private void LabSee(Player me, PlayerSkillController skills)
+    {
+        string skill = skills != null && skills.ActiveSkill != null ? skills.ActiveSkill.GetType().Name : "none";
+        string now = me.CurrentState + (skill != "none" ? ":" + skill : "") + (skills != null && skills.IsBusy && skill == "none" ? ":busy" : "");
+        if (now == _labSeenLast || _labSeen.Length > 160)
+            return;
+        if (_labSeen.Length > 0)
+            _labSeen.Append('>');
+        _labSeen.Append(now);
+        _labSeenLast = now;
+    }
+
+    private void LabAppend(List<string> kv, float plannedS)
+    {
+        Player me = _driver.Player;
+        float now = Time.time;
+        float age = _labDashStartAt < 0f ? -1f
+            : _labPressAt >= 0f && _dashIntOrder == QABoss116Order.DashRmb ? _labPressAt - _labDashStartAt
+            : now - _labDashStartAt;
+        QABoss116LabProbe.Add(kv, "firstT", _labFirstT >= 0.0 ? F3(_labFirstT) : "na");
+        QABoss116LabProbe.Add(kv, "plannedS", QABoss116LabProbe.F3(plannedS));
+        QABoss116LabProbe.Add(kv, "dashAgeS", age >= 0f ? QABoss116LabProbe.F3(age) : "na");
+        QABoss116LabProbe.Add(kv, "dashTotalS", _labDashTotal >= 0f ? QABoss116LabProbe.F3(_labDashTotal) : "na");
+        QABoss116LabProbe.Add(kv, "waitS", _labFirstAt >= 0f ? QABoss116LabProbe.F3(now - _labFirstAt) : "na");
+        QABoss116LabProbe.Add(kv, "endState", me != null ? me.CurrentState.ToString() : "na");
+        QABoss116LabProbe.Add(kv, "seen", _labSeen.ToString());
+        QABoss116LabProbe.Add(kv, "dashLog", _labDashLog);
+        kv.AddRange(_labGate);
+    }
+
+    private void LabReset()
+    {
+        _labGate.Clear();
+        _labSeen.Clear();
+        _labSeenLast = null;
+        _labFirstT = -1.0;
+        _labFirstAt = _labDashStartAt = _labDashTotal = _labPressAt = -1f;
+        _labDashLog = "";
     }
 
     private static double ServerNow()

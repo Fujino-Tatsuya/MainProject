@@ -146,8 +146,9 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         PlayerEncounterLock encounterLock = me.GetComponent<PlayerEncounterLock>();
         if (encounterLock != null && (encounterLock.IsCinematicLocked || encounterLock.IsCinematicInputLocked))
             return "cinematic_lock";
+        // 할 일 116-C4 — 대쉬 간파 예측 랩(디버그 씬, 보스 연출·디렉터 없음)은 랩 판 진행 중을 Combat 으로 본다. 랩이 아니면 그대로.
         BossEncounterDirector d = BossEncounterDirector.Instance;
-        if (d == null || !d.IsSpawned || d.Phase != BossEncounterPhase.Combat)
+        if (!QABoss116LabProbe.Active && (d == null || !d.IsSpawned || d.Phase != BossEncounterPhase.Combat))
             return "phase_" + (d != null ? d.Phase.ToString() : "none");
         if (!ResolveBoss())
             return "no_boss";

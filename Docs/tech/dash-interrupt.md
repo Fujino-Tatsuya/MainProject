@@ -246,6 +246,13 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 - 시각은 시전 기준 상대 초(`…InS`), 위치는 `x,z`. 오너 줄과 서버 줄은 `clientId` + `castServerT` 가장 가까운 것(0.5초 안)으로 묶는다(QA `QABoss116DashPredict`).
 - QA: 봇 규칙·`dash_predict.csv`·리포트 섹션·10판 메뉴 `Tools/QA/103/Batch/Start 10 (116 — 대쉬 간파 예측)` — 코드 주석(`QABoss103CombatBot.DashInterrupt.cs`·`QABoss116DashPredict.cs`).
 
+### 13.1 예측 랩 (116-C4, qa 브랜치 전용) — 보스전 대신 통제된 환경
+
+- 씬 `Assets/0.Scenes/Debug/DebugDashPredictLab.unity`(빌드 목록 밖, Dev Boot 진입) — 바닥 40×32m, 둘레 벽 + 서쪽 **복도(안쪽 폭 5.5m, 벽에 붙은 기둥 2개) = 벽 구간**, 동쪽 = 열린 구간. 시도마다 구간은 실제 측정(내 위치 → 가장 가까운 Wall/Env 표면 ≤ 3m = 벽)으로 다시 가른다. `BossArea`(`TwentyThreeArenaContext`)가 랩 Variant 를 스폰.
+- 23호 Variant `Assets/2.Prefabs/Monster/Boss/QA/TwentyThree_DashPredictLab.prefab`(= `TwentyThree_Raid` 의 Variant, 오버라이드는 `data` 하나) → SO `QA/No23_DashPredictLab.asset`(No23_B 복사본 — xlsx 행이 없어 테이블 Play 에도 이 값). 남긴 패턴 = 단일 Dash(창 1.5s) · `JumpJumpJump`(3번째 착지 0.8s) · `JumpDash`(후속 돌진 0.7s). 끈 것 = Grab 가중치 0(혼자면 잡힌 본인이 간파 불가)·훅/점프 콤보·개전 콤보·`phases`(송전탑·북진)·`raidScript`·`selfDestructAtZero`. 전투 시작 훅(`OnServerLogicResumed`)을 부르지 않아 장판·드론·방전도 없다. 보스 코드·원본 프리팹 무수정.
+- 진행자 `QA/Boss116Lab/QABoss116LabDirector`(씬 배치, 호스트): 보스 체력 85% 아래·플레이어 50% 아래면 가득, 간파 쿨 즉시 초기화(대시 충전은 실제 규칙), 카운터 창 열림/닫힘·대시 궤적(의도 vs 실제·막힌 지점·충돌체) 기록, 30초마다 벽 ↔ 열린 구간 이동. 카메라 `QABoss116LabCamera` = 플레이어·보스 가운데 + 거리 따라 줌아웃.
+- 배치 `Tools/QA/116/Dash Predict Lab — Host 10`: 호스트 1명(가상 플레이어 끔) × 10판, 판 = 180초 또는 시도 60회 중 먼저, 대쉬 간파 100%, 캐릭터 = Dev Boot 툴바, 데이터 출처 = 테이블. **창 최소화 없음**(사람이 화면을 본다). 결과 `C:/UnityProject/QA/116lab-<시각>/` — `lab_attempts.csv`(시도 1행: 결과 사유·상세 원인·구간·창 시각·대시 궤적·예측/판정) · `lab_windows.csv` · `lab_dashes.csv` · `dash_predict.csv` · `lab_runs.csv` · `report.html`. 순수 규칙 `QABoss116Lab`(테스트 `QABoss116LabTests`).
+
 ## 12. 관련 파일
 
 | 파일 | 내용 |
