@@ -12,10 +12,12 @@ public enum SlowMotionEventKind : byte
 /// <summary>슬로우를 왜 걸었는가(할 일 87). 연출 쪽이 시도·성공을 가른다.</summary>
 public enum SlowMotionPurpose : byte
 {
-    /// <summary>간파 시도 — 승인 시 예측으로 건 슬로우. Fail·Reset 도 이 값이다.</summary>
+    /// <summary>간파 시도 — 승인 시 성공 예측(강)으로 건 슬로우. Fail·Reset 도 이 값이다.</summary>
     Attempt = 0,
     /// <summary>간파 성공 — 판정에서 카운터 창을 소비했을 때 다시 건 슬로우.</summary>
     Success = 1,
+    /// <summary>간파 시도 — 승인 시 실패 예측(약)으로 건 슬로우(할 일 132). 오너 줌 배율을 강과 가르려고 따로 둔다.</summary>
+    AttemptWeak = 2,
 }
 
 /// <summary>

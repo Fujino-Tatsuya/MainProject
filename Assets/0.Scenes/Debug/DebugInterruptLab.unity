@@ -428,6 +428,7 @@ GameObject:
   - component: {fileID: 1297765373}
   - component: {fileID: 1297765376}
   - component: {fileID: 1297765375}
+  - component: {fileID: 1297765377}
   m_Layer: 0
   m_Name: InterruptLab
   m_TagString: Untagged
@@ -449,6 +450,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DebugTimeScale
   scale: 1
   normalSpeedAfterSuccess: 3
+--- !u!114 &1297765377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1297765372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c3e91a4d2f84b6a9e05c1b8f3a2d6e1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::DebugInterruptTuningPanel
+  expanded: 1
+  width: 240
 --- !u!4 &1297765374
 Transform:
   m_ObjectHideFlags: 0

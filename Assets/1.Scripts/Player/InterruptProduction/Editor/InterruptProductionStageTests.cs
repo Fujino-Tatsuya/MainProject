@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeaverLobby.Player.Dash;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -12,11 +13,13 @@ public sealed class InterruptProductionStageTests
 
     internal sealed class FakeSettings : IInterruptProductionSettings
     {
-        public SlowMotionProfile Attempt = new SlowMotionProfile { scale = 0.3f };
+        public SlowMotionProfile Attempt = new SlowMotionProfile { scale = 0.15f };
+        public SlowMotionProfile Weak = new SlowMotionProfile { scale = 0.5f };
         public SlowMotionProfile Success = new SlowMotionProfile { scale = 0.25f, hitStopDuration = 0.05f };
         public readonly HashSet<InterruptProductionCue> On = new HashSet<InterruptProductionCue>();
 
         public SlowMotionProfile InterruptProfile => Attempt;
+        public SlowMotionProfile InterruptWeakProfile => Weak;
         public SlowMotionProfile InterruptSuccessProfile => Success;
         public bool Get(InterruptProductionCue cue) => On.Contains(cue);
     }
@@ -78,20 +81,34 @@ public sealed class InterruptProductionStageTests
     private static InterruptProductionEvent Success(bool hasTarget, Vector3 target, Vector3 caster) =>
         InterruptProductionEvent.Success(Caster, null, null, hasTarget, target, caster);
 
-    // ① 예측 false → ServerStart 0회, 번호 0
+    // ⓪ 대상 없음 → 시도 슬로우 없음(할 일 132 정정1 — 단계1 이전과 같다)
     [Test]
-    public void 시도_예측_빗나감이면_슬로우_없음()
+    public void 시도_대상_없음이면_슬로우_없음()
     {
-        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, predictsHit: false));
+        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.NoTarget));
         Assert.AreEqual(0u, id);
-        Assert.IsEmpty(_port.Calls);
+        Assert.AreEqual(0, _port.Starts.Count);
+        Assert.AreEqual(0, _port.Calls.Count);
     }
 
-    // ② 예측 true → 시도 프로필로 1회
+    // ① 실패 예측(대상 있음) → 약 프로필·AttemptWeak 로 1회(할 일 132)
     [Test]
-    public void 시도_예측_적중이면_시도_프로필로_1회()
+    public void 시도_실패_예측이면_약_프로필로_1회()
     {
-        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, predictsHit: true));
+        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Weak));
+        Assert.AreEqual(7u, id);
+        Assert.AreEqual(1, _port.Starts.Count);
+        Assert.AreSame(_settings.Weak, _port.Starts[0].profile);
+        Assert.AreEqual(Caster, _port.Starts[0].clientId);
+        Assert.AreEqual(SlowMotionPurpose.AttemptWeak, _port.Starts[0].purpose);
+        Assert.AreEqual(Vector3.zero, _port.Starts[0].position);
+    }
+
+    // ② 성공 예측 → 강(옛 시도) 프로필로 1회
+    [Test]
+    public void 시도_성공_예측이면_강_프로필로_1회()
+    {
+        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong));
         Assert.AreEqual(7u, id);
         Assert.AreEqual(1, _port.Starts.Count);
         Assert.AreSame(_settings.Attempt, _port.Starts[0].profile);
@@ -103,9 +120,9 @@ public sealed class InterruptProductionStageTests
     [Test]
     public void 시도_슬로우도_히트스톱_칸을_넘긴다()
     {
-        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, true));
+        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong));
         _settings.On.Add(InterruptProductionCue.HitStop);
-        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, true));
+        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong));
         Assert.IsFalse(_port.Starts[0].hitStopOn);
         Assert.IsTrue(_port.Starts[1].hitStopOn);
     }
@@ -150,7 +167,7 @@ public sealed class InterruptProductionStageTests
     [Test]
     public void 성공인데_예측_대기에_못_잡혔으면_실패_다음_성공_시작()
     {
-        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, true));
+        uint id = _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong));
         _resolve.Server(InterruptProductionEvent.Resolve(Caster, null, null, id, landed: false, succeeded: true, resolvedCount: 1));
         _success.Server(Success(true, Vector3.one, Vector3.zero), null);
 
@@ -199,7 +216,7 @@ public sealed class InterruptProductionStageTests
     {
         // relay 는 성공 단계에만 넘어간다 — 다른 단계는 받는 창구가 없다(컴파일 수준 보장). 성공 0회면 0.
         var relay = new FakeRelay();
-        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, true));
+        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong));
         _resolve.Server(InterruptProductionEvent.Resolve(Caster, null, null, 7, false, false, 0));
         _fail.Server(InterruptProductionEvent.Fail(Caster, null, null, InterruptFailReason.EndedBeforeResolve, 7));
         Assert.AreEqual(0, relay.Count);
@@ -209,7 +226,7 @@ public sealed class InterruptProductionStageTests
     public void 디렉터_인스턴스가_없으면_서버_사건은_무시()
     {
         Assume.That(InterruptProductionDirector.Instance == null, "EditMode 에 인스턴스가 살아 있다");
-        Assert.AreEqual(0u, InterruptProductionDirector.ServerAttempt(InterruptProductionEvent.Attempt(Caster, null, null, true)));
+        Assert.AreEqual(0u, InterruptProductionDirector.ServerAttempt(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong)));
         Assert.DoesNotThrow(() =>
         {
             InterruptProductionDirector.ServerResolve(InterruptProductionEvent.Resolve(Caster, null, null, 3, false, false, 0));

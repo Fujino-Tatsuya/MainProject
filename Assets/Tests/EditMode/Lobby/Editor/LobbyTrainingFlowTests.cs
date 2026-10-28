@@ -615,6 +615,63 @@ public sealed class LobbyTrainingFlowTests
         Assert.That(flow.TrainingCleared, Is.EquivalentTo(new ulong[] { 0 }));
     }
 
+    // ── 할 일 111: 훈련을 끝까지 하면 클리어 플래그 ──
+
+    [Test]
+    public void 종료_집결_확정이면_훈련_명단_전원_클리어_명단은_그대로()
+    {
+        var flow = Create(0, 1);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.AddClient(5);   // 늦은 참가자 — 훈련 안 했으니 플래그 없음
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train01Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train01);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train02Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train02);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03A);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03B);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03C);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03D);
+        Assert.That(flow.TrainingCleared, Is.Empty, "종료 집결 전엔 아직 아님");
+
+        Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.TrainEnd), Is.True);
+
+        AssertAt(flow, LobbyTrainingStage.Brief, LobbyTrainingPhase.Gathering);
+        Assert.That(flow.TrainingCleared, Is.EquivalentTo(new ulong[] { 0, 1 }));
+        Assert.That(flow.IsTrainingCleared(5), Is.False);
+        Assert.That(flow.TrainingRoster, Is.EquivalentTo(new ulong[] { 0, 1 }), "브리핑 집결 인원 유지");
+        Assert.That(flow.ParticipantsFor(LobbyGatherPoint.Brief), Is.EquivalentTo(new ulong[] { 0, 1 }));
+        Assert.That(flow.CharacterChangeBlockFor(0, false), Is.EqualTo(LobbyCharacterChangeReject.TrainingLocked));
+    }
+
+    [Test]
+    public void 훈련을_마친_사람은_새_회차_입구_집결에서_빠진다()
+    {
+        var flow = Create(0, 1);
+        RunTrainingToBriefCompleted(flow);
+        flow.AddClient(2);   // 브리핑 뒤 접속 — 훈련 안 함
+
+        flow.Reset();
+
+        Assert.That(flow.TrainingCleared, Is.EquivalentTo(new ulong[] { 0, 1 }));
+        Assert.That(flow.ParticipantsFor(LobbyGatherPoint.Entrance), Is.EquivalentTo(new ulong[] { 2 }));
+        Assert.That(flow.ParticipantsFor(LobbyGatherPoint.Sortie), Is.EquivalentTo(new ulong[] { 0, 1, 2 }));
+    }
+
+    [Test]
+    public void 훈련_완료_플래그도_Alt1_로_끌_수_있다()
+    {
+        var flow = Create(0);
+        RunTrainingToBriefCompleted(flow);
+
+        Assert.That(SetCleared(flow, 0, true), Is.False, "이미 켜짐");
+        Assert.That(SetCleared(flow, 0, false), Is.True);
+        Assert.That(flow.TrainingRoster, Is.EquivalentTo(new ulong[] { 0 }), "끄기는 명단을 건드리지 않는다");
+        AssertAt(flow, LobbyTrainingStage.Brief, LobbyTrainingPhase.Completed);
+    }
+
     // ── 할 일 112: 멈춤 탈출(로비 Alt+2) 안전 지점 ──
 
     [TestCase(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering, LobbyGatherPoint.None)]
@@ -647,5 +704,53 @@ public sealed class LobbyTrainingFlowTests
 
         Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.None), Is.False);
         AssertAt(flow, LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering);
+    }
+
+    // 할 일 111 — 입구 확정 → 훈련장 안 첫 위치, 훈련 종료 → 브리핑 위치. 나머지 확정은 옮기지 않는다.
+    [TestCase(LobbyGatherPoint.Entrance, LobbyGatherPoint.Train01Start)]
+    [TestCase(LobbyGatherPoint.TrainEnd, LobbyGatherPoint.Brief)]
+    [TestCase(LobbyGatherPoint.Sortie, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Train01Start, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Train02Start, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Train03Area, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.Brief, LobbyGatherPoint.None)]
+    [TestCase(LobbyGatherPoint.None, LobbyGatherPoint.None)]
+    public void 확정_텔레포트_대상_구역(LobbyGatherPoint confirmed, LobbyGatherPoint expected)
+    {
+        Assert.That(LobbyTrainingFlow.TeleportTargetOnConfirm(confirmed), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void 입구_확정_텔레포트_대상은_확정_직후_켜지는_구역이고_명단만_참여()
+    {
+        var flow = Create(0, 1);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.AddClient(2);   // 늦은 참가자 — 명단 밖
+
+        var target = LobbyTrainingFlow.TeleportTargetOnConfirm(LobbyGatherPoint.Entrance);
+        Assert.That(flow.IsPointActive(target), Is.True);
+        Assert.That(flow.ParticipantsFor(target), Is.EqualTo(new ulong[] { 0, 1 }));
+        Assert.That(flow.TrainingRoster, Is.EqualTo(new ulong[] { 0, 1 }));
+    }
+
+    [Test]
+    public void 종료_확정_텔레포트_대상은_확정_직후_켜지는_구역()
+    {
+        var flow = Create(0);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train01Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train01);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train02Start);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train02);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03A);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03B);
+        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03C);
+        flow.ReportStageCompleted(LobbyTrainingStage.Train03D);
+        Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.TrainEnd), Is.True);
+
+        Assert.That(flow.IsPointActive(LobbyTrainingFlow.TeleportTargetOnConfirm(LobbyGatherPoint.TrainEnd)), Is.True);
     }
 }

@@ -69,6 +69,15 @@ Update this file when a term becomes important enough that future agents or team
 - 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
 - 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
 - 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+## ▶▶ 작업 세션 (2026-10-28 · 민경(Claude) · **맵 포드 착지 바람 링 `FX_Pod_WindRing`**, 브랜치 `feature/VFX`) — ✅ MyProject 제작(빌더 `Tools/VFX/Pod Wind Ring`)·민경 승인 · ✅ MainProject 반입·배선(배선 검사 통과, 미커밋) · ⏳ 민경 Play(맵 진입 포드 착지)
+- `4.MapScene` `MapPodArrival.impactEffect` 1줄: `FX_Ground_Crash_Entry` → `FX_Pod_WindRing_Entry`(computedDuration 1). 23호 `TwentyThree.prefab` GroundCrash 소켓은 옛 이펙트 그대로. 배율 = `PodDropSettings.impactEffectScale`(1.5).
+- 구성: 흙색 섞인 회색 먼지(알파 블렌드) 링 메시 고리 3(Haze·Soft·Sharp — 통합 셰이더 마스크 침식으로 결대로 부서지며 사라짐) + 왜곡 고리(HS_Distortion, URP 불투명 텍스처 필요 — PC_RPAsset 켜짐) + 먼지 뭉게 14 + 바람 줄기 22. 약 1초.
+- 에셋 SVN add: `Common/PodDrop/FX_Pod_WindRing{.prefab,_Entry.asset}` · 새 폴더 `_Materials/PodWindRing`(6) · `Textures/PodWindRing`(7) · `Models/PodWindRing`(4) (+ 폴더 .meta)
+
+## ▶▶ 작업 세션 (2026-10-28 · 민경(Claude) · **팔라딘 패시브 추가 피해 VFX `FX_Paladin_Smite`**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 제작·민경 손질 · ✅ MainProject 반입·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play
+- 🔴 은희 영역: `FirstMeleePassive.PlayAdditionalHitLocal`(회전·`PlayRecallable`→`SiphonMotes`) · `Player_Paladin.prefab` `additionalHit` 1줄. 공유 → [handoff-paladin-passive-smite-vfx.md](Docs/tech/handoff-paladin-passive-smite-vfx.md)
+- 에셋 SVN add: `Common/Players/Player1/PassiveSkill/FX_Paladin_Smite{.prefab,_Entry.asset}` · `_Materials/Player1/M_Smite_*`(9) · `Textures/Player1/T_Smite_*`(4)
+
 ## ▶▶ 작업 세션 (2026-10-27 · 민경(Claude) · **송전탑 01B 덮개 머리만 · 전기선 조명 · 차징 가슴 조명**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(배치 컴파일 0, 미커밋) · ⏳ 민경 Play
 - `FX_PylonCharge_01B` `Shell`·`ShellArcs` = 새 `Pylon_01B_ShellHead.asset`(꼭대기 원판만) · `FX_PylonTether` 에 `TetherLight_L/_R`(줄 가운데 양옆 1m · 번갈아 번쩍) + 줄 재질(`M_Pylon_TetherGlow`·`TetherCore`) 밝기 2배 · `BossChargeTetherView` 가슴 조명 60(차징 구슬 신호) · 조명 전부 그림자 Soft. 10-28: 차징 중 장판 칸 흐리게 — 🔴 경석 `BossElectricFloor.cs` 에 `ClientTileBrightness` 추가. 공유 → [handoff-boss-pylon-vfx.md](Docs/tech/handoff-boss-pylon-vfx.md) §4·§5
 - 에셋 SVN: add `Models/BossCharger_01B/Pylon_01B_ShellHead.asset` · 수정 `Common/Boss/Pylon/FX_PylonCharge_01B.prefab` · `FX_PylonTether.prefab` · `_Materials/Boss/M_Pylon_Tether{Glow,Core}.mat`

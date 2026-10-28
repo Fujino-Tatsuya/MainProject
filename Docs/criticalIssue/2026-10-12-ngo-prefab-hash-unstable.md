@@ -71,10 +71,16 @@ guid 도 `NetworkObject` 의 fileID 도 그대로다. **프리팹 에셋인데 "
 
 ### A. 씬 타입(2) 오염 — 3개 · **이미 커밋돼 있다**
 
+> ✅ **2026-10-28: `ChompBot`·`P_MonsterProjectile` 해결.** 에디터가 두 프리팹을 다시 임포트하면서
+> 해시가 안정형(identifierType 1 = ImportedAsset)으로 다시 찍혔고, 그대로 커밋했다.
+> `ChompBot` 3936025811 → **1085786765** · `P_MonsterProjectile` 2141990396 → **1774244186**.
+> 역산으로 확인 — `targetObjectId` 는 그대로고 `identifierType` 만 2 → 1 로 바뀐 값이다.
+> **남은 것 = `bossroom.prefab`(4130406446) 하나.**
+
 | 프리팹 | 현재 해시 | 목록 등록 | 마지막으로 이 줄을 바꾼 커밋 |
 |---|---|---|---|
-| `Monster/ChompBot.prefab` | 3936025811 | O | `47a93f7f` 잡몹 8종 붕괴 사망 배선 |
-| `Monster/P_MonsterProjectile.prefab` | 2141990396 | O | `fa9b8d5a` 투사체 궤적 scale |
+| ~~`Monster/ChompBot.prefab`~~ ✅ 해결(1085786765) | ~~3936025811~~ | O | `47a93f7f` 잡몹 8종 붕괴 사망 배선 |
+| ~~`Monster/P_MonsterProjectile.prefab`~~ ✅ 해결(1774244186) | ~~2141990396~~ | O | `fa9b8d5a` 투사체 궤적 scale |
 | `Environment/Layouts/Zones/bossroom.prefab` | 4130406446 | – | `8dbb04fa` 보스룸 수정함 |
 
 셋 다 씬이나 다른 프리팹 안에 **놓여 있는** 프리팹이다 — `ChompBot` 은 `MonsterScene`·

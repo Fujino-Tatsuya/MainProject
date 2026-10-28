@@ -49,13 +49,21 @@ public sealed class InterruptProductionChannelTests
         _sink = new FakeSink();
     }
 
-    private void Started(SlowMotionPurpose purpose, bool viewerIsCaster) =>
-        _success.LocalStarted(purpose, Event, viewerIsCaster, _dark, new IInterruptCueSink[] { _sink });
+    private void Started(SlowMotionPurpose purpose, bool viewerIsCaster)
+    {
+        // 피어 성공 = Started(성공 이펙트 칸) → 섬광 순간(암순응, 할 일 132 단계 5). 시도 슬로우엔 섬광 순간이 없다.
+        _success.LocalStarted(purpose, Event, new IInterruptCueSink[] { _sink });
+        if (purpose == SlowMotionPurpose.Success)
+            Flash(viewerIsCaster, ownerOverlay: false);
+    }
+
+    private void Flash(bool viewerIsCaster, bool ownerOverlay) =>
+        _success.LocalFlash(new InterruptHitFlashMoment(Event, viewerIsCaster, ownerOverlay), _dark);
 
     // ─── 개인 / 공용 ───
 
     [Test]
-    public void 본인_화면은_암순응_self_강도()
+    public void 본인_화면은_오버레이가_안_돌았으면_암순응_self_강도()
     {
         _settings.On.Add(InterruptProductionCue.DarkAdaptation);
         Started(SlowMotionPurpose.Success, viewerIsCaster: true);
@@ -66,12 +74,30 @@ public sealed class InterruptProductionChannelTests
     }
 
     [Test]
+    public void 본인_화면은_섬광_오버레이가_돌았으면_암순응_없음()
+    {
+        _settings.On.Add(InterruptProductionCue.DarkAdaptation);
+        Flash(viewerIsCaster: true, ownerOverlay: true);
+        Assert.IsEmpty(_dark.Plays, "마스크 암전·섬광이 대신 — 두 번 어두워지지 않게");
+    }
+
+    [Test]
     public void 다른_사람_화면은_암순응_others_강도()
     {
         _settings.On.Add(InterruptProductionCue.DarkAdaptation);
         Started(SlowMotionPurpose.Success, viewerIsCaster: false);
         Assert.AreEqual(1, _dark.Plays.Count);
         Assert.IsFalse(_dark.Plays[0].viewerIsCaster);
+    }
+
+    [Test]
+    public void 성공_Started_만으로는_암순응_없음_섬광_순간에_튼다()
+    {
+        _settings.On.Add(InterruptProductionCue.DarkAdaptation);
+        _success.LocalStarted(SlowMotionPurpose.Success, Event, new IInterruptCueSink[] { _sink });
+        Assert.IsEmpty(_dark.Plays);
+        Flash(viewerIsCaster: false, ownerOverlay: false);
+        Assert.AreEqual(1, _dark.Plays.Count);
     }
 
     [Test]
@@ -225,7 +251,8 @@ public sealed class InterruptProductionChannelTests
     {
         _settings.On.Add(InterruptProductionCue.DarkAdaptation);
         _settings.On.Add(InterruptProductionCue.SuccessFxSlot);
-        Assert.DoesNotThrow(() => _success.LocalStarted(SlowMotionPurpose.Success, Event, true, null, new IInterruptCueSink[] { _sink }));
+        Assert.DoesNotThrow(() => _success.LocalStarted(SlowMotionPurpose.Success, Event, new IInterruptCueSink[] { _sink }));
+        Assert.DoesNotThrow(() => _success.LocalFlash(new InterruptHitFlashMoment(Event, true, false), null));
         Assert.AreEqual(1, _sink.Cues.Count);
     }
 

@@ -33,12 +33,16 @@ public sealed class InterruptProductionPrefabTests
     }
 
     [Test]
-    public void 디렉터_프로필_값이_옛_GlobalTimeScale_값과_같다()
+    public void 디렉터_프로필_값이_132_강_약_처음_값이다()
     {
         var director = LoadPrefab().GetComponent<InterruptProductionDirector>();
         Assert.IsNotNull(director, "InterruptProductionDirector 없음");
         var so = new SerializedObject(director);
-        AssertProfile(so.FindProperty("interruptProfile"), 0.3f, 0f, 0.02f, 0.05f, 0.35f, 0.25f, 0.1f);
+        // 강 = 옛 시도 자리(interruptProfile), 약 = 새 칸 — 나머지 칸은 옛 시도 값 그대로(할 일 132)
+        AssertProfile(so.FindProperty("interruptProfile"), 0.15f, 0f, 0.02f, 0.05f, 0.5f, 0.25f, 0.1f);
+        AssertProfile(so.FindProperty("interruptWeakProfile"), 0.5f, 0f, 0.02f, 0.05f, 0.2f, 0.25f, 0.1f);
+        Assert.AreEqual(0.7f, so.FindProperty("interruptZoomFactor").floatValue, 1e-6f);
+        Assert.AreEqual(0.93f, so.FindProperty("interruptWeakZoomFactor").floatValue, 1e-6f);
         AssertProfile(so.FindProperty("interruptSuccessProfile"), 0.25f, 0.05f, 0.02f, 0.05f, 1.2f, 0.4f, 0.1f);
     }
 
@@ -49,7 +53,8 @@ public sealed class InterruptProductionPrefabTests
         try
         {
             var so = new SerializedObject(go.AddComponent<InterruptProductionDirector>());
-            AssertProfile(so.FindProperty("interruptProfile"), 0.3f, 0f, 0.02f, 0.05f, 0.35f, 0.25f, 0.1f);
+            AssertProfile(so.FindProperty("interruptProfile"), 0.15f, 0f, 0.02f, 0.05f, 0.5f, 0.25f, 0.1f);
+            AssertProfile(so.FindProperty("interruptWeakProfile"), 0.5f, 0f, 0.02f, 0.05f, 0.2f, 0.25f, 0.1f);
             AssertProfile(so.FindProperty("interruptSuccessProfile"), 0.25f, 0.05f, 0.02f, 0.05f, 1.2f, 0.4f, 0.1f);
         }
         finally
@@ -66,6 +71,7 @@ public sealed class InterruptProductionPrefabTests
         var so = new SerializedObject(timeScale);
         Assert.IsNull(so.FindProperty("interruptProfile"), "같은 대상에 같은 경로가 둘이면 데이터 테이블이 모호 오류");
         Assert.IsNull(so.FindProperty("interruptSuccessProfile"));
+        Assert.IsNull(so.FindProperty("interruptWeakProfile"));
     }
 
     [Test]
