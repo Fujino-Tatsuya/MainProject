@@ -81,17 +81,5 @@ namespace BeaverLobby.Player.Dash.EditModeTests
             Assert.AreEqual(0f, DashInterruptLayerFade.HandoffNormalizedTime(true, -0.2f), Eps);
             Assert.AreEqual(0f, DashInterruptLayerFade.HandoffNormalizedTime(false, 0.6f), Eps, "상태 밖이면 처음부터");
         }
-
-        [Test]
-        public void ReverseHandoffNormalizedTime_ContinuesBaseTime()
-        {
-            Assert.AreEqual(0.3f, DashInterruptLayerFade.ReverseHandoffNormalizedTime(true, 0.3f, false, 0f), Eps,
-                "0층 간파 시각에서 이어 간다(준비 재시작 없음)");
-            Assert.AreEqual(0.05f, DashInterruptLayerFade.ReverseHandoffNormalizedTime(false, 0.8f, true, 0.05f), Eps,
-                "0층이 간파로 넘어가는 중이면 다음 상태 시각");
-            Assert.AreEqual(1f, DashInterruptLayerFade.ReverseHandoffNormalizedTime(true, 1.4f, false, 0f), Eps);
-            Assert.AreEqual(0f, DashInterruptLayerFade.ReverseHandoffNormalizedTime(false, 0.8f, false, 0.5f), Eps,
-                "0층이 간파가 아니면 처음부터");
-        }
     }
 }

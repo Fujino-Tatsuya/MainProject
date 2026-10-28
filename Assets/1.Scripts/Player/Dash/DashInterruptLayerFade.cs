@@ -57,17 +57,5 @@ namespace BeaverLobby.Player.Dash
         /// </summary>
         public static float HandoffNormalizedTime(bool upperInState, float upperNormalizedTime) =>
             upperInState ? Mathf.Clamp01(upperNormalizedTime) : 0f;
-
-        /// <summary>
-        /// 역방향 인수인계(우클릭 → 대시 전환, §12) 때 상체 레이어가 시작할 정규화 시각 — 0층이 그 상태면 그 시각,
-        /// 0층이 그 상태로 넘어가는 중(CrossFade 직후)이면 다음 상태 시각, 둘 다 아니면 0. 0~1 로 자른다.
-        /// </summary>
-        public static float ReverseHandoffNormalizedTime(
-            bool baseInState, float baseNormalizedTime, bool baseEnteringState, float nextNormalizedTime)
-        {
-            if (baseInState)
-                return Mathf.Clamp01(baseNormalizedTime);
-            return baseEnteringState ? Mathf.Clamp01(nextNormalizedTime) : 0f;
-        }
     }
 }

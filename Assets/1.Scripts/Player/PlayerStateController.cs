@@ -164,22 +164,6 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
             context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash, attempt);
         }
 
-        // 우클릭 → 대시 전환(할 일 115 §12) — 대시로 끊을 수 없는 일반 간파 중이라도, 대시 누른 시각이 간파 시작 후 창 안이고
-        // Hit 전이면 간파를 끝내지 않고 대시에 옮겨 싣는다(TryArmDashTransfer → 기존 대시 게이트·피드백 그대로).
-        // 전환 조건이 아니면 대시 입력은 지금처럼 버퍼에 남는다.
-        if (!dashHandled && !dashDropped && context.Input != null && context.Dash != null && context.Skills != null &&
-            CurrentState == PlayerActionState.Skill &&
-            context.Input.TryGetPressTime(PlayerBufferedInput.Dash, out float dashPressTime) &&
-            context.Skills.TryArmDashTransfer(dashPressTime))
-        {
-            dashHandled = context.Dash.TryBeginPredictedDash(cancelsAction: true);
-            if (!dashHandled)
-                context.Skills.DisarmDashTransfer();
-            PlayerActionAttempt attempt = dashHandled ? PlayerActionAttempt.Started : ClassifyDashReject();
-            dashDropped = !dashHandled && attempt != PlayerActionAttempt.Blocked;
-            context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash, attempt);
-        }
-
         // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 바로 실행되지 않는 경우.
         // 공격·스킬 모션 중 Shift를 누르면 TryBeginPredictedDash가 호출조차 되지 않아
         // 시작 로그도, 거부 로그도 남지 않는다(누른 프레임에만 한 줄이므로 스팸이 아니다).
@@ -1552,8 +1536,6 @@ public sealed class PlayerDashState : PlayerStateBase
         Context.Movement.RotateImmediately(direction);
         // 나가는 상태(공격·스킬)의 정리는 Dodge 가 있으면 0층을 건드리지 않았다 — 여기서 튼 Dodge 가 최종으로 남는다.
         Context.Dash?.PlayDodgeStart(duration);
-        // 우클릭 → 대시 전환이면 나가는 Skill 상태가 넘긴 간파를 이 대시에 싣는다(할 일 115 §12). 아니면 아무것도 안 한다.
-        Context.Skills?.CompleteDashTransfer(this);
 
         startPosition = CurrentPosition;
         PlayerGroundingSensor sensor = Context.GroundingSensor;

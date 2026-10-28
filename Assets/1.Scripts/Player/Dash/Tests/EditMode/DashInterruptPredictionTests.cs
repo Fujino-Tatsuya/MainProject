@@ -54,7 +54,7 @@ namespace BeaverLobby.Player.Dash.EditModeTests
             Assert.AreEqual(10.3f, DashInterruptPredictor.Predict(Input(dashRemaining: 0.2f, prep: 0.3f)).PredictedResolveTime, 1e-4f);
             // 대시 0.5 > 준비 0.3 → 대시 끝
             Assert.AreEqual(10.5f, DashInterruptPredictor.Predict(Input(dashRemaining: 0.5f, prep: 0.3f)).PredictedResolveTime, 1e-4f);
-            // 우클릭 → 대시: 준비 기준점 t0 = 0.1초 전 → 평소 Hit = 10.2, 대시 끝 10.1 → 10.2
+            // 준비 기준점 t0 = 0.1초 전(우클릭 누른 뒤 예측까지 지난 시간) → 평소 Hit = 10.2, 대시 끝 10.1 → 10.2
             Assert.AreEqual(10.2f, DashInterruptPredictor.Predict(Input(dashRemaining: 0.1f, prep: 0.3f, skillAge: 0.1f)).PredictedResolveTime, 1e-4f);
             // 준비 시간 모름(-1) = 0 으로 본다 → 대시 끝
             Assert.AreEqual(10.2f, DashInterruptPredictor.Predict(Input(dashRemaining: 0.2f, prep: -1f)).PredictedResolveTime, 1e-4f);
