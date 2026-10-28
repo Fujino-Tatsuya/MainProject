@@ -30,7 +30,7 @@ using UnityEngine.AI;
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
 [DataTableSheet("MidBoss", Order = 2)]
-public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
+public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     enum ShieldPhase { None, Gather, Dash, Shock }
 
@@ -350,6 +350,9 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSin
 
     /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
+
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값(MonsterBase).
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => CounterJudgeWindowReplica;
 
     // 카운터 성공 — 모으기를 취소하고 즉시 그로기. 그로기 자세는 `Hit` 클립으로 보여 준다
     // (이 컨트롤러엔 그로기 상태가 없다 — PLAN §9.1. `PlayStateAnimation` 에서 트리거를 친다).

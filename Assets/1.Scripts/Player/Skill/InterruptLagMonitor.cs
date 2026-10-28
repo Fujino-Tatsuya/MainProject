@@ -78,10 +78,7 @@ public static class InterruptLagMonitor
         if (owner == null || !Histories.TryGetValue(owner, out InterruptWindowHistory history) || !TryServerNow(out double now))
             return;
 
-        if (openNow && history.TryGetOpenSince(now, out double since))
-            openElapsed = (float)(now - since);
-        if (history.TryGetTypicalOpenDuration(out double typical))
-            expectedDuration = (float)typical;
+        history.Estimate(now, openNow, out openElapsed, out expectedDuration);
     }
 
     /// <summary>[서버] 보낸 클라의 RTT(ms). 호스트 자신 = 0.</summary>

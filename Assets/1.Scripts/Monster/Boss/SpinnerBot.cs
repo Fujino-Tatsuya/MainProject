@@ -20,7 +20,7 @@ using UnityEngine.AI;
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
 [DataTableSheet("MidBoss", Order = 1)]
-public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
+public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     enum SpinPhase { None, Window, Dash }
 
@@ -363,6 +363,9 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCue
 
     /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
+
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값(MonsterBase).
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => CounterJudgeWindowReplica;
 
     // 카운터 성공 — 돌진을 취소하고 즉시 그로기. 그로기 애니는 `IsDizzy` 불로 컨트롤러가 잡는다
     // (2026-09-08 SVN r292 에서 `AnyState → Dizzy` 전이를 넣었다. 그 전에는 논리만 그로기였다).

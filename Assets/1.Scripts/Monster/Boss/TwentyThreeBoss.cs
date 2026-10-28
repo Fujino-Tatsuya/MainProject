@@ -15,7 +15,7 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptCueSink
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -514,6 +514,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 카운터 창 표현은 모든 피어에서 돈다(서버가 창을 쓰고, 각 피어가 텔레그래프를 구동).
         _counterVisual.OnValueChanged += OnCounterWindowChanged;
+        _counterWindow.OnValueChanged += OnCounterJudgeReplicaChanged;   // 할 일 132 — 오너 클라 간파 시도 예측용 창 기록
         _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
         ApplyVulnerableTint(_vulnerableVisual.Value);   // 늦게 합류한 클라도 지금 값으로
         ResolveTelegraphs();
@@ -559,6 +560,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         FlushFightLog("중단(디스폰 — 전멸·재도전·종료)");
         PlayerHitDamageCap.Clear(this);
         _counterVisual.OnValueChanged -= OnCounterWindowChanged;
+        _counterWindow.OnValueChanged -= OnCounterJudgeReplicaChanged;
         _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
         _wellsState.OnValueChanged -= OnWellsStateChanged;
 
@@ -6420,6 +6422,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
+
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값. 취약·제압 차단(CounterBlockedByState)은 서버만 본다(창이 그때 열리지 않는다).
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => _counterWindow.Value;
+
+    // 클라 창 기록(열린 뒤 경과·추정 길이) — 서버는 SetCounterWindow 의 InterruptLagMonitor 가 기록한다(Record 가 거른다).
+    void OnCounterJudgeReplicaChanged(bool previous, bool next) => InterruptWindowReplicaTracker.Record(gameObject, next);
 
     float VulnerableDuration => _boss != null ? Mathf.Max(0f, _boss.vulnerableDuration) : 4f;
     float KnockbackDistance => _boss != null ? Mathf.Max(0f, _boss.vulnerableKnockbackDistance) : 3f;

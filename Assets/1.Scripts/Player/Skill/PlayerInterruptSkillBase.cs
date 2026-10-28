@@ -28,6 +28,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
     private Collider[] hitResults;
     private Collider[] queryResults; // 오너 HUD 질의 전용(HasTargetInOmniRange)
+    private Collider[] ownerPredictResults; // 오너 즉시 예측 전용(TryPredictOwnerAttempt, 할 일 132) — 호스트는 서버 판정 버퍼와 겹치지 않게 따로
     // 상자처럼 Unit이 아닌 IAttackReceiver도 있으므로 Hurtbox까지 중복 방지 키로 쓴다.
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
     private readonly List<Unit> landedUnits = new List<Unit>();
@@ -234,6 +235,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
             InterruptFailReason.EndedBeforeResolve, slowMotion.Abort()));
+        // 오너 연출(할 일 132) — 서버 결론 없이 끝났으면(남의 슬로우가 덮음·거부 등) 걷는다. 이미 결론났으면 아무것도 안 한다.
+        if (owner != null && owner.IsInputSource)
+            InterruptProductionDirector.LocalOwnerEnded();
         base.OnEnd(reason);
     }
 
@@ -549,42 +553,62 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || HitboxAnchor == null || owner == null)
             return;
 
-        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(BuildPredictInput());
+        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(BuildPredictInput(
+            hitResults, false, attachedToDash, armedDashDirection, armedDashSpeed, armedDashRemaining));
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
             InterruptProductionEvent.Attempt(owner, this, prediction.PredictsSuccess)));
     }
 
+    /// <summary>
+    /// [오너] 간파 입력 순간 즉시 예측(할 일 132) — 서버 승인 예측과 같은 앵커 오버랩·같은 예측기, 창은 복제값
+    /// (<see cref="IInterruptWindowReplica"/>·<see cref="InterruptWindowReplicaTracker"/>)으로 본다. 결과는 오너 연출(암전·빛 모임)에만 쓴다.
+    /// 서버와 같게 지금 바라보는 방향의 앵커로 본다(승인 예측도 회전 스냅 전에 돈다). 데이터·앵커가 없으면 false.
+    /// </summary>
+    internal bool TryPredictOwnerAttempt(bool viaDash, Vector3 dashDirection, float dashSpeed, float dashRemaining,
+        out DashInterruptPrediction prediction)
+    {
+        prediction = default;
+        IPlayerInterruptSkillData data = InterruptData;
+        if (data == null || HitboxAnchor == null || owner == null)
+            return false;
+
+        if (ownerPredictResults == null || ownerPredictResults.Length != data.MaxHitResults)
+            ownerPredictResults = new Collider[data.MaxHitResults];
+
+        prediction = DashInterruptPredictor.Predict(BuildPredictInput(
+            ownerPredictResults, true, viaDash, dashDirection, dashSpeed, dashRemaining));
+        return true;
+    }
+
     // 근접 = 지금 위치·판정 시각 지금 + 준비 시간. 대쉬 간파 = 예상 대시 끝 위치(할 일 115 §10 Q2)·판정 시각 max(대시 끝, 평소 Hit).
-    private DashInterruptPredictInput BuildPredictInput()
+    // ownerView = 오너 클라 즉시 예측(창 = 복제값), 아니면 서버 승인 예측(창 = 서버 값).
+    private DashInterruptPredictInput BuildPredictInput(Collider[] buffer, bool ownerView,
+        bool viaDash, Vector3 dashDirection, float dashSpeed, float dashRemaining)
     {
         IPlayerInterruptSkillData data = InterruptData;
         float prepDelay = DashInterruptPredictor.EstimatePrepDelay(observedPrepDelay, data != null, data != null ? data.HitDelay : 0f);
-        var input = DashInterruptPredictInput.ForMelee(Time.time, owner.transform.position, prepDelay);
-        if (attachedToDash)
-        {
-            input.DashDirection = armedDashDirection;
-            input.DashSpeed = armedDashSpeed;
-            input.DashRemaining = armedDashRemaining;
-        }
+        Vector3 offset = InterruptAttemptPrediction.PredictOffset(viaDash, dashDirection, dashSpeed, dashRemaining);
+        Unit target = FindPredictTarget(buffer, offset, ownerView, out bool open);
+        GameObject targetObject = target != null ? target.gameObject : null;
+        float openElapsed, expectedDuration;
+        if (ownerView)
+            InterruptWindowReplicaTracker.Estimate(targetObject, open, out openElapsed, out expectedDuration);
+        else
+            InterruptLagMonitor.EstimateWindow(targetObject, open, out openElapsed, out expectedDuration);
 
-        Vector3 offset = DashInterruptRules.GetPredictedEndOffset(input.DashDirection, input.DashSpeed, input.DashRemaining);
-        Unit target = FindPredictTarget(offset, out bool open);
-        input.HasTargetInRange = target != null;
-        input.TargetWindowOpen = open;
-        InterruptLagMonitor.EstimateWindow(target != null ? target.gameObject : null, open,
-            out input.WindowOpenElapsed, out input.WindowExpectedDuration);
-        return input;
+        return InterruptAttemptPrediction.BuildInput(Time.time, owner.transform.position, prepDelay,
+            viaDash, dashDirection, dashSpeed, dashRemaining, target != null, open, openElapsed, expectedDuration);
     }
 
     // 예측 위치에서 판정 앵커 오버랩 안의 간파 대상(창 소유자) — 지금 창이 열린 대상을 우선한다. 없으면 null.
-    private Unit FindPredictTarget(Vector3 offset, out bool open)
+    private Unit FindPredictTarget(Collider[] buffer, Vector3 offset, bool ownerView, out bool open)
     {
         Unit best = null;
         open = false;
-        int hitCount = OverlapHitboxAnchor(hitResults, offset);
+        int hitCount = OverlapHitboxAnchor(buffer, offset);
         for (int i = 0; i < hitCount; i++)
         {
-            Collider hit = hitResults[i];
+            Collider hit = buffer[i];
             if (hit == null)
                 continue;
 
@@ -596,7 +620,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             if (slowTarget == null)
                 continue;
 
-            bool unitOpen = slowTarget.ServerIsInterruptible;
+            bool unitOpen = ownerView
+                ? slowTarget is IInterruptWindowReplica replica && replica.ReplicatedWindowOpen
+                : slowTarget.ServerIsInterruptible;
             if (best == null || (unitOpen && !open))
             {
                 best = unit;

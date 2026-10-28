@@ -18,7 +18,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
-public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings
+public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
@@ -97,12 +97,26 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
 
+    // 오너 암전·빛 모임(할 일 132) — 오너 클라가 입력 순간 예측해 바로 켜고, 서버 결과로 걷거나 성공에 넘긴다. 이 피어 값을 쓴다.
+    // 데이터 테이블 열 후보지만 아직 xlsx 칸이 없어 [DataTableIgnore] — 프리팹이 원본.
+    [Header("시도·결론 — 개인(오너 암전·빛 모임, 할 일 132)")]
+    [Tooltip("강 시도(성공 예측) 입력 순간 오너 암전이 0 → 1 로 들어오는 시간(초, 실시간)")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float ownerDimInDuration = 0.1f;
+    [Tooltip("예측 빗나감(서버 목적이 다름)·서버 실패·판정 전 종료 때 오너 암전을 걷는 시간(초, 실시간). 빛 모임은 그 순간 멈춘다")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float ownerDimOutDuration = 0.2f;
+    [Tooltip("서버 성공 확정 뒤 오너 암전을 걷기 시작할 때까지(초, 실시간) — 적중 섬광(할 일 132 단계 5) 전 임시 동작")]
+    [DataTableIgnore, SerializeField, Min(0f)] private float ownerSuccessHoldDuration = 0.4f;
+
     /// <summary>시도 슬로우 프로필(강) — 사건 순간 이 객체를 넘기면 이벤트가 그 순간 값을 복사한다(캐싱 아님).</summary>
     public SlowMotionProfile InterruptProfile => interruptProfile;
     /// <summary>시도 슬로우 프로필(약).</summary>
     public SlowMotionProfile InterruptWeakProfile => interruptWeakProfile;
     /// <summary>성공 슬로우 프로필.</summary>
     public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
+
+    public float OwnerDimInDuration => ownerDimInDuration;
+    public float OwnerDimOutDuration => ownerDimOutDuration;
+    public float OwnerSuccessHoldDuration => ownerSuccessHoldDuration;
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
     private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
@@ -119,6 +133,14 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private InterruptResolveStage ResolveStage => _resolve ??= new InterruptResolveStage(_timePort);
     private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timePort, PersonalChannel, SharedChannel);
     private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timePort);
+
+    // 오너 연출 상태 기계(할 일 132). 출력은 단계 3(암전 마스크)·4(빛 모임 VFX)가 SetOwnerOutputs 로 갈아 끼운다 — 그 전엔 로그.
+    private readonly InterruptOwnerPresentationLogOutput _ownerLogOutput = new InterruptOwnerPresentationLogOutput();
+    private InterruptOwnerPresentation _ownerPresentation;
+
+    /// <summary>오너 연출 상태 기계 — 단계 5(적중 섬광)가 <see cref="InterruptOwnerPresentation.SuccessEntered"/> 를 구독한다.</summary>
+    public InterruptOwnerPresentation OwnerPresentation =>
+        _ownerPresentation ??= new InterruptOwnerPresentation(this, _ownerLogOutput, _ownerLogOutput);
 
     // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.
     private GlobalTimeScale _timeScale;
@@ -149,8 +171,16 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         _timeScale.ForcedReset += HandleForcedReset;
     }
 
+    private void Update()
+    {
+        // 오너 암전 램프·성공 임시 걷기 — 실시간(슬로우 중에도 걷기 시간이 그대로).
+        _ownerPresentation?.Tick(Time.unscaledTime);
+    }
+
     private void OnDisable()
     {
+        _ownerPresentation?.ForcedReset();
+
         if (ReferenceEquals(_timeScale, null))
             return;
 
@@ -223,25 +253,74 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             Instance.SharedChannel.PlayCue(cue, e, sink);
     }
 
+    // ---- 오너 사건 (할 일 132 — 간파한 본인 화면만, 오너 연출 상태 기계로) ----
+
+    /// <summary>
+    /// [오너] 간파(근접·대쉬) 입력 순간의 즉시 예측 — 강(성공 예측)이면 오너 암전·빛 모임을 바로 켠다. 약은 아무것도 안 켠다
+    /// (줌·슬로우는 서버 시도 슬로우가 처리). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
+    /// </summary>
+    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, bool predictsSuccess)
+    {
+        if (Instance != null)
+            Instance.OwnerPresentation.Predict(predictsSuccess, skill, Time.unscaledTime);
+    }
+
+    /// <summary>[오너] 간파 스킬 애니 Hit 이벤트 — 빛 모임 끝(기존 Hit 이벤트 재사용).</summary>
+    public static void LocalOwnerHit()
+    {
+        if (Instance != null)
+            Instance._ownerPresentation?.LocalHit();
+    }
+
+    /// <summary>[오너] 판정 전 종료·서버 거부 — 결론이 없으면 실패처럼 걷는다.</summary>
+    public static void LocalOwnerEnded()
+    {
+        if (Instance != null)
+            Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
+    }
+
+    /// <summary>오너 암전·빛 모임 출력을 갈아 끼운다(단계 3 렌더·단계 4 VFX). null 이면 로그 출력으로 돌아간다.</summary>
+    public static void SetOwnerOutputs(IInterruptOwnerDimOutput dimOutput, IInterruptLightGatherOutput gatherOutput)
+    {
+        if (Instance == null)
+            return;
+
+        Instance.OwnerPresentation.SetOutputs(
+            dimOutput ?? Instance._ownerLogOutput, gatherOutput ?? Instance._ownerLogOutput);
+    }
+
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
 
     private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
     {
+        // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다 — 옛 InterruptDarkAdaptation 과 같다.
+        bool hasViewer = _networkManager != null;
+        bool viewerIsCaster = hasViewer && InterruptProductionRules.IsCasterView(casterClientId, _networkManager.LocalClientId);
+
+        // 오너 연출(할 일 132) — 내 슬로우만(팀원 화면은 시도 단계 무변화). 시도 목적이 예측과 다르면 걷고, 성공이면 성공 단계로.
+        if (viewerIsCaster)
+            OwnerPresentation.ServerStarted(triggerId, purpose, true, Time.unscaledTime);
+
         if (purpose != SlowMotionPurpose.Success)
             return;
 
         var e = InterruptProductionEvent.LocalSuccess(triggerId, casterClientId, targetPosition);
-        // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다 — 옛 InterruptDarkAdaptation 과 같다.
-        bool hasViewer = _networkManager != null;
-        bool viewerIsCaster = hasViewer && InterruptProductionRules.IsCasterView(casterClientId, _networkManager.LocalClientId);
         SuccessStage.LocalStarted(purpose, e, viewerIsCaster, hasViewer ? _darkAdaptation : null,
             FindSuccessFxSinks(casterClientId));
         LocalSucceeded?.Invoke(e);
     }
 
-    private void HandleFailed(uint triggerId) => FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));
+    private void HandleFailed(uint triggerId)
+    {
+        _ownerPresentation?.ServerFailed(triggerId, Time.unscaledTime);
+        FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));
+    }
 
-    private void HandleForcedReset(uint triggerId) => SuccessStage.LocalForcedReset(_darkAdaptation);
+    private void HandleForcedReset(uint triggerId)
+    {
+        _ownerPresentation?.ForcedReset();
+        SuccessStage.LocalForcedReset(_darkAdaptation);
+    }
 
     // A4 — 발동자 플레이어의 성공 이펙트 칸. 스폰된 오브젝트 중 발동자 소유의 켜진 InterruptSuccessFx(옛 구독 조건과 같다).
     // SpawnManager.GetPlayerNetworkObject 는 클라에서 남의 것을 찾으면 에러를 찍는다 — 스폰 목록에서 직접 찾는다.

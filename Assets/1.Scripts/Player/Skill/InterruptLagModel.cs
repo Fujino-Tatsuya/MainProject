@@ -117,6 +117,20 @@ public sealed class InterruptWindowHistory
         duration = lengths.Count % 2 == 1 ? lengths[mid] : (lengths[mid - 1] + lengths[mid]) * 0.5;
         return true;
     }
+
+    /// <summary>
+    /// 간파 시도 예측(할 일 132)용 창 추정 — <paramref name="now"/> 에 열린 뒤 경과·추정 길이(초). 모르면 -1.
+    /// 서버(<see cref="InterruptLagMonitor.EstimateWindow"/>)·오너 클라(<see cref="InterruptWindowReplicaTracker"/>) 공용.
+    /// </summary>
+    public void Estimate(double now, bool openNow, out float openElapsed, out float expectedDuration)
+    {
+        openElapsed = -1f;
+        expectedDuration = -1f;
+        if (openNow && TryGetOpenSince(now, out double since))
+            openElapsed = (float)(now - since);
+        if (TryGetTypicalOpenDuration(out double typical))
+            expectedDuration = (float)typical;
+    }
 }
 
 /// <summary>간파 지연 판정 계산. 순수 함수 — 실제 판정 결과는 바꾸지 않고 "지연만큼 당겨 판정했으면" 만 계산한다.</summary>

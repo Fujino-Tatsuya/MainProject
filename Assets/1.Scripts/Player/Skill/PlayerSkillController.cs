@@ -403,6 +403,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return false;
 
         isRequestingSkill = true;
+        // 오너 즉시 예측(할 일 132) — 요청보다 먼저(호스트는 이 RPC 안에서 서버 시도 슬로우가 바로 난다).
+        PredictOwnerInterrupt(skill, false, Vector3.zero, 0f, 0f);
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
         RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
             NetworkManager.ServerTime.Time, false);
@@ -439,9 +441,28 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return false;
 
         isRequestingSkill = true;
+        // 오너 즉시 예측(할 일 132) — 예상 대시 끝·판정 시각 max(대시 끝, 평소 Hit). 요청보다 먼저(호스트는 RPC 안에서 서버 슬로우).
+        PlayerDashState dashState = stateController != null ? stateController.ActiveDash : null;
+        PredictOwnerInterrupt(skill, dashState != null, direction,
+            dashState != null ? dashState.Speed : 0f, dashState != null ? dashState.Remaining : 0f);
         RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
             player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
+    }
+
+    // [오너] 간파 입력 순간 즉시 예측(할 일 132) → 오너 연출 상태 기계(강 = 암전·빛 모임). 간파 슬롯의 간파 스킬만, 네트워크 세션에서만
+    // (오프라인은 서버 슬로우가 없어 결론이 오지 않는다). 판정·슬로우에는 영향 없다.
+    private void PredictOwnerInterrupt(PlayerSkillBase skill, bool viaDash, Vector3 dashDirection, float dashSpeed, float dashRemaining)
+    {
+        if (!IsNetworkActive || !IsOwner || !(skill is PlayerInterruptSkillBase interrupt) || !IsInterruptSkillInSlot(skill))
+            return;
+
+        if (interrupt.TryPredictOwnerAttempt(viaDash, dashDirection, dashSpeed, dashRemaining, out DashInterruptPrediction prediction))
+        {
+            Edit.Log($"[InterruptOwner] 입력 순간 예측 — {(prediction.PredictsSuccess ? "강(성공)" : "약(실패)")} · {prediction.Reason}" +
+                     $"{(viaDash ? " · 대쉬" : string.Empty)} · 판정까지 {prediction.TimeToResolve(Time.time):F3}s · 창 남음 {prediction.WindowRemaining:F3}s", this);
+            InterruptProductionDirector.LocalOwnerAttempt(interrupt, prediction.PredictsSuccess);
+        }
     }
 
     /// <summary>
@@ -866,6 +887,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             if (!activeHitEventSeen && activeSkill is PlayerInterruptSkillBase interrupt)
                 interrupt.NotePrepObserved(Time.time - activeStartTime);
             activeHitEventSeen = true;
+            // 빛 모임 끝 = 오너 애니 Hit(할 일 132 — 기존 Hit 이벤트 재사용, 새 타이머 칸 없음).
+            if (activeSkill is PlayerInterruptSkillBase && player != null && player.IsInputSource)
+                InterruptProductionDirector.LocalOwnerHit();
         }
 
         activeSkill?.OnLocalAnimationEvent(eventType);
@@ -1483,6 +1507,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             Edit.Log("[DashInterrupt] 서버가 전환을 거부 — 실어 둔 간파 종료(대시는 그대로)", this);
             EndSkillFromServer(GetSkillIndex(transferred),
                 stillInDash ? SkillEndReason.DashCancelled : SkillEndReason.Cancelled);
+        }
+        else
+        {
+            // 새 시전 거부 — 입력 순간 켠 오너 간파 연출(할 일 132)이 있으면 걷는다(결론난 시도·다른 스킬이면 아무것도 안 한다).
+            InterruptProductionDirector.LocalOwnerEnded();
         }
     }
 
