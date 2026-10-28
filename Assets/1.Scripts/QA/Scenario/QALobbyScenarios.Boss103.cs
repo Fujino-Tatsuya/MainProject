@@ -113,6 +113,7 @@ public static partial class QALobbyScenarios
     /// 로스터에서 그 캐릭터(<see cref="CharacterRoster.Entry.TutorialCharacter"/>) 칸을 찾아 정식 요청(<see cref="LobbySession.RequestCharacter"/>)으로 바꾼다.
     /// dev 86 로비부터 서버가 캐릭터 선택대(<see cref="LobbyInteractableKind.CharacterSelect"/>) 반경 + 여유 안에서만 받으므로 먼저 걸어간다 —
     /// 자리마다 선택대 둘레 다른 각도(<see cref="QABoss103Plan.ArcAngle"/>, 스폰 쪽을 향한 호). 서버 순간이동은 쓰지 않는다.
+    /// 129-2 — 걸음은 출격과 같은 경유점 경로(<see cref="WalkRoute103"/>, 로그 char_route). 직선은 벽에 막혀 출격 구역 안에 멈출 수 있었다.
     /// </summary>
     private static IEnumerator PickCharacter103(QAScenarioContext ctx, QABoss103Character character, int slot, int count, QAFlag ok, StringBuilder note)
     {
@@ -164,7 +165,7 @@ public static partial class QALobbyScenarios
             // 걷기 → 요청 → 3초 대기. 거부·미반영이면 사유를 남기고 다시 걸어간 뒤 재요청(교체 쿨다운·교체 중 거부 포함).
             for (int attempt = 1; attempt <= CharacterRequestAttempts; attempt++)
             {
-                yield return QALobbyFlow.WalkTo(ctx.Input, spot, 0.3f, 25f);
+                yield return WalkRoute103(ctx, slot, spot, "char");
                 float dist = Player.LocalPlayer != null ? NearestInteractable.PlanarDistance(Player.LocalPlayer.transform.position, station.Position) : -1f;
                 int rejectsBefore = rejects;
                 LobbySession.Active?.RequestCharacter(target);
@@ -275,8 +276,9 @@ public static partial class QALobbyScenarios
     /// <summary>
     /// 119 C5 — 지금 자리에서 <paramref name="goal"/> 까지 씬 기준점(<see cref="WalkAnchors103"/>)을 경유해 걷는다(<see cref="QABoss103Plan.WalkRoute"/>).
     /// 직선이 열려 있으면 직선, 길이 없으면 직선(이전 동작). 경유 걸음이 닿지 못하면 멈추고 호출자 루프가 지금 자리에서 다시 경로를 잡는다.
+    /// <paramref name="label"/> = 로그 이벤트 접두(출격 sortie_route · 129-2 캐릭터 선택대 char_route).
     /// </summary>
-    private static IEnumerator WalkRoute103(QAScenarioContext ctx, int slot, Vector3 goal)
+    private static IEnumerator WalkRoute103(QAScenarioContext ctx, int slot, Vector3 goal, string label = "sortie")
     {
         Player me = Player.LocalPlayer;
         if (me == null)
@@ -292,7 +294,7 @@ public static partial class QALobbyScenarios
         if (route != null)
             foreach (int i in route)
                 sb.Append(sb.Length > 0 ? ">" : "").Append(QABossStart88.Fmt(nodes[i]));
-        Debug.Log($"{QABoss103Plan.Tag} event=sortie_route slot={slot} from={QABoss103Plan.Token(QABossStart88.Fmt(nodes[0]))} anchors={nodes.Count - 2} route={(route != null ? QABoss103Plan.Token(sb.ToString()) : "none")}");
+        Debug.Log($"{QABoss103Plan.Tag} event={label}_route slot={slot} from={QABoss103Plan.Token(QABossStart88.Fmt(nodes[0]))} anchors={nodes.Count - 2} route={(route != null ? QABoss103Plan.Token(sb.ToString()) : "none")}");
         if (route == null)
         {
             yield return QALobbyFlow.WalkTo(ctx.Input, goal, 0.3f, 15f);
@@ -306,7 +308,7 @@ public static partial class QALobbyScenarios
             yield return QALobbyFlow.WalkTo(ctx.Input, p, last ? 0.3f : 0.5f, 15f);
             if (!QALobbyFlow.LastWalkArrived)
             {
-                Debug.Log($"{QABoss103Plan.Tag} event=sortie_route_stuck slot={slot} leg={k + 1}/{route.Count} at={QABoss103Plan.Token(Player.LocalPlayer != null ? QABossStart88.Fmt(Player.LocalPlayer.transform.position) : "na")}");
+                Debug.Log($"{QABoss103Plan.Tag} event={label}_route_stuck slot={slot} leg={k + 1}/{route.Count} at={QABoss103Plan.Token(Player.LocalPlayer != null ? QABossStart88.Fmt(Player.LocalPlayer.transform.position) : "na")}");
                 yield break;
             }
         }
