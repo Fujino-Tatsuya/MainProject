@@ -7,7 +7,7 @@ using UnityEngine;
 
 /// <summary>
 /// 집속 연사 수치 — 모드는 특성 스위치(<see cref="PlayerTraitModifiers.HasTrait"/> · <see cref="TraitModeIds.GunnerVolley"/>),
-/// 수치는 거너 효과(<see cref="GunnerVolleyEffect"/>)가 기여한 ⑩ 스킬 수치. 특성이 없으면 <see cref="None"/>(단발 — 원래 동작).
+/// 수치는 정의 GUN_3_VOLLEY 의 공용 스킬 수치 효과(<see cref="TraitSkillValueEffect"/>)가 기여한 ⑩ 스킬 수치. 특성이 없으면 <see cref="None"/>(단발 — 원래 동작).
 /// 런타임은 <see cref="From(PlayerTraitModifiers)"/>, 테스트·카드 합성은 <see cref="From(TraitModifierSet)"/>.
 /// </summary>
 public readonly struct GunnerVolleyTraits

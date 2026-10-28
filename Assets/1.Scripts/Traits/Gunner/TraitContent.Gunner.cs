@@ -10,7 +10,7 @@ public static partial class TraitContent
 {
     static partial void RegisterGunner(TraitContentRegistry.Registrar r)
     {
-        // 나머지 토큰은 거너 효과 필드 이름 그대로 풀린다(GunnerTraitEffects.cs — chargeTimeReduction·heatGainIncrease 등).
+        // 나머지 토큰은 공용 스킬 수치 효과 칸 이름(entries[j].name — chargeTimeReduction·heatGainIncrease 등, 할 일 133)으로 풀린다.
         // 공용 효과 필드와 명세 토큰 이름이 다른 것만 별칭으로 둔다.
         r.Value("GUN_1_WIDTH", "widthIncrease", trait => GunnerTraitTooltip.QWidthMultiplier(trait) - 1f);
         // 명세 §8 — 표시용 검증값(발수 × 발당 배율). 독립 조정값이 아니다.

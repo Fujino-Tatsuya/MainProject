@@ -132,7 +132,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | ⑦ | `TraitAreaEffect` | 수치 | `PlayerTraitModifiers.AreaMultiplier(key, axis)` |
 | ⑧ | `TraitDerivedAttackEffect` | 등록 | `PlayerTraitEffects.GetDerivedAttacks(key, list)` → `DamageFrom(Dref)`·`Counter`, 판정 `TraitHitFlags.Derived` |
 | ⑨ | `TraitNextAttackBuffEffect` | 사건 | 첫 원래 피해 판정에서 `PlayerTraitEffects.ConsumeNextAttackMultiplierServer(key, castId)` |
-| ⑩ | `TraitSkillValueEffect` | 수치 | `PlayerTraitModifiers.ResolveSkillValue(이름, 데이터 값)` |
+| ⑩ | `TraitSkillValueEffect` | 수치 | `PlayerTraitModifiers.ResolveSkillValue(이름, 데이터 값)` — 칸 = `key`·`op`·`scale`(Raw / OnePlus 1+값 / OneMinus 1−값)·`value`·`name`(카드 토큰). 캐릭터 전용 수치 칸(거너 7종·돌파의 방패)은 할 일 133 에서 이걸로 합쳤다 — 새 '스킬 수치 바꾸기' 특성도 새 클래스 말고 이 칸으로 |
 | — | `TraitStatEffect` | 수치 | PlayerStats 기본%·전체%·가하는 피해% |
 
 - **모드 변경 7개**(돌파의 방패·집속 연사·그림자 회귀·한계 돌파·축열 포격·정온 운용·절제된 분노)는 효과 클래스가 아니다 — 스킬이 `PlayerTraitModifiers.HasTrait(TraitModeIds.…)` 로 묻고 자기 코드 안에서 분기한다.
@@ -220,7 +220,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 | 표기 | 값 |
 |---|---|
-| `{이름}` · `{이름:%}` · `{이름:0.0}` | `TraitTooltipValueSource` 가 첫 칸을 ① 등록부 별칭 → ② 정의 자신의 필드(`{effects[0].damageIncrease}` 경로 포함) → ③ 효과 목록 안 필드 이름 순으로 푼다. ③ 은 그 이름을 가진 효과가 **정확히 하나**여야 한다(둘 이상 = 오류 → 경로나 별칭) |
+| `{이름}` · `{이름:%}` · `{이름:0.0}` | `TraitTooltipValueSource` 가 첫 칸을 ① 등록부 별칭 → ② 정의 자신의 필드(`{effects[0].damageIncrease}` 경로 포함) → ③ 효과 목록 안 필드 이름 또는 ⑩ 스킬 수치 칸의 `name`(해석 전 값 — 감소율 0.25 그대로) 순으로 푼다. ③ 은 그 이름을 가진 효과가 **정확히 하나**여야 한다(둘 이상 = 오류 → 경로나 별칭) |
 | `{dmg}` | 특성별 계산식(`TraitContentRegistry.Registrar.Damage` — 캐릭터 레인). 계산식이 없으면 **검증 오류**. 로컬 플레이어가 없으면 `UI.Trait.Card.DamageUnknown`("-") — 0 으로 보이지 않는다 |
 | `<style=heal>` 등 | 스킬 툴팁과 같은 Style Sheet([data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자)) |
 
@@ -258,6 +258,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - 캐릭터마다 한 장, **세로 표** — 열 = 특성 정의 에셋 파일 이름, 행 = 직렬화 경로(`effects[0].damageIncrease`, `effects[1].filter.minInterval`). 비율 0.20 = 20%, 시간 초, 거리 m.
 - 연결 = 캐릭터 정의 하위 타입의 `[DataTableSheet(TraitSheets.X)]`(`Traits/<캐릭터>/<캐릭터>TraitDefinition.cs`). 기반 `TraitDefinition`(Legacy)은 테이블 대상이 아니다.
 - 데이터 테이블이 `[SerializeReference]` 효과 칸을 따라간다(`DataTableFields.Resolve(target, path)` — 실제 값의 런타임 타입으로 필드·`[Range]`·`[Min]`·`[DataTableIgnore]` 를 찾는다). 원소 이름표는 `effects[0] · TraitDamageEffect`.
+- ⑩ 스킬 수치 칸은 `effects[i].entries[j].value` 행으로 나간다(원소 안쪽 배열 — 할 일 133 에서 Export 누락 수정). 같은 행 이름도 특성(열)마다 뜻이 달라 칸의 `key`·`name` 은 인스펙터에서 본다. 133 행 변경 목록 = `_lane-artifacts/common/133/xlsx-columns-c.md`.
 - 문자열(`id`·이름·분류·설명)·enum 배열(공격 종류 거름 등)·bool 은 수치 시트에 나가지 않는다 — 문구는 Strings, 거름은 인스펙터.
 - **시트가 xlsx 에 없으면 아무것도 적용하지 않는다**(오류·경고 없음 → 인스펙터 값). 빈 표·머리글만 있는 표도 통과(`TraitSheetBindingTests`). 효과 칸 번호가 정의에 없으면(배열 밖) 오류 — 테이블은 효과를 늘리지 않는다.
 - 🔴 시트 추가·Export 는 **병합 때 메인이** 최신 development 워크트리에서 한다 — 이 브랜치 코드가 development 에 들어가기 전에 xlsx(SVN)에 시트가 생기면 다른 워크트리는 '시트 이름에 맞는 타입이 없다' 오류로 테이블 Play·빌드가 멈춘다.

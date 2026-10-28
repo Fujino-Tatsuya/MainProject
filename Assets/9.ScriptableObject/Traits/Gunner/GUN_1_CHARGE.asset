@@ -19,11 +19,16 @@ MonoBehaviour:
     {chargeTimeReduction:%} \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
   icon: {fileID: 0}
   effects:
-  - rid: 7237886673644683617
+  - rid: 7237886675317424396
   references:
     version: 2
     RefIds:
-    - rid: 7237886673644683617
-      type: {class: GunnerChargeTimeEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7237886675317424396
+      type: {class: TraitSkillValueEffect, ns: , asm: Assembly-CSharp}
       data:
-        chargeTimeReduction: 0.25
+        entries:
+        - name: chargeTimeReduction
+          key: GUN_Q_MAX_CHARGE_TIME
+          op: 2
+          scale: 2
+          value: 0.25

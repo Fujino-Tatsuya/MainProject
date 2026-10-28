@@ -31,6 +31,16 @@ public abstract class TraitEffect
     /// <summary>그 슬롯의 쿨에 관여하는가(전투 HUD 스킬 강화 칸 — <see cref="TraitProgressHUD"/>).</summary>
     public virtual bool AffectsCooldownOf(PlayerSkillSlot slot) => false;
 
+    /// <summary>
+    /// 카드 설명 토큰 <c>{이름}</c> 을 필드가 아닌 이름 붙은 칸으로 푼다(⑩ 스킬 수치 칸의 <c>name</c>, 할 일 133). 없으면 false.
+    /// <see cref="TraitTooltipValueSource"/> 가 효과 필드 이름과 같은 단계에서 묻는다(정의 안에서 둘 이상 = 오류).
+    /// </summary>
+    public virtual bool TryGetNamedValue(string name, out object value)
+    {
+        value = null;
+        return false;
+    }
+
     /// <summary>데이터 검증(명세 §9 — 음수 시간·거리, 발수 &lt; 1, NaN·무한). 오류 문장을 덧붙인다.</summary>
     public virtual void Validate(List<string> errors) { }
 

@@ -21,19 +21,56 @@ MonoBehaviour:
     \uB298\uC5B4\uB0A9\uB2C8\uB2E4."
   icon: {fileID: 0}
   effects:
-  - rid: 7237886673644683618
+  - rid: 7237886675317424399
   references:
     version: 2
     RefIds:
-    - rid: 7237886673644683618
-      type: {class: GunnerOverdriveEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7237886675317424399
+      type: {class: TraitSkillValueEffect, ns: , asm: Assembly-CSharp}
       data:
-        heatGainIncrease: 0.35
-        basicStageScale0: 1
-        basicStageScale1: 1.2
-        basicStageScale2: 1.4
-        basicStageScale3: 1.6
-        skillStageScale0: 1
-        skillStageScale1: 1.25
-        skillStageScale2: 1.5
-        skillStageScale3: 1.75
+        entries:
+        - name: heatGainIncrease
+          key: GUN_BASIC_HEAT_PER_SHOT
+          op: 2
+          scale: 1
+          value: 0.35
+        - name: basicStageScale0
+          key: GUN_BASIC_STAGE_DAMAGE_0
+          op: 0
+          scale: 0
+          value: 1
+        - name: basicStageScale1
+          key: GUN_BASIC_STAGE_DAMAGE_1
+          op: 0
+          scale: 0
+          value: 1.2
+        - name: basicStageScale2
+          key: GUN_BASIC_STAGE_DAMAGE_2
+          op: 0
+          scale: 0
+          value: 1.4
+        - name: basicStageScale3
+          key: GUN_BASIC_STAGE_DAMAGE_3
+          op: 0
+          scale: 0
+          value: 1.6
+        - name: skillStageScale0
+          key: GUN_SKILL_STAGE_DAMAGE_0
+          op: 0
+          scale: 0
+          value: 1
+        - name: skillStageScale1
+          key: GUN_SKILL_STAGE_DAMAGE_1
+          op: 0
+          scale: 0
+          value: 1.25
+        - name: skillStageScale2
+          key: GUN_SKILL_STAGE_DAMAGE_2
+          op: 0
+          scale: 0
+          value: 1.5
+        - name: skillStageScale3
+          key: GUN_SKILL_STAGE_DAMAGE_3
+          op: 0
+          scale: 0
+          value: 1.75

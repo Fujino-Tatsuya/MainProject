@@ -8,7 +8,7 @@ using System.Reflection;
 /// <list type="number">
 /// <item>등록부 별칭(<see cref="TraitContentRegistry.Registrar.Value"/>) — 다른 SO 값·표시용 파생 값</item>
 /// <item>정의 자신의 직렬화 필드(<c>{effects[0].damageIncrease}</c> 처럼 경로로도 쓸 수 있다)</item>
-/// <item>효과 목록 안 필드 이름(<c>{damageIncrease}</c>) — 그 이름을 가진 효과가 정확히 하나여야 한다(둘 이상 = 오류, 경로나 별칭을 쓸 것)</item>
+/// <item>효과 목록 안 필드 이름(<c>{damageIncrease}</c>) 또는 이름 붙은 칸(⑩ 스킬 수치 칸 name — <see cref="TraitEffect.TryGetNamedValue"/>) — 그 이름을 가진 효과가 정확히 하나여야 한다(둘 이상 = 오류, 경로나 별칭을 쓸 것)</item>
 /// </list>
 /// 어디에도 없으면 오류(포매터가 다른 데서 찾지 않는다 — 조용히 0 으로 보이지 않게).
 /// </summary>
@@ -54,7 +54,8 @@ public sealed class TraitTooltipValueSource : ISkillTooltipValueSource
                 continue;
 
             FieldInfo field = FindField(effects[i].GetType(), name, typeof(object));
-            if (field == null)
+            object named = null;
+            if (field == null && !effects[i].TryGetNamedValue(name, out named))
                 continue;
 
             if (found >= 0)
@@ -64,7 +65,7 @@ public sealed class TraitTooltipValueSource : ISkillTooltipValueSource
             }
 
             found = i;
-            value = field.GetValue(effects[i]);
+            value = field != null ? field.GetValue(effects[i]) : named;
         }
 
         if (found >= 0)

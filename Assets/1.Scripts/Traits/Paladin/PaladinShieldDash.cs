@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) 수치 한 벌 — 정의 에셋의 스킬 수치 기여(⑩, <see cref="PaladinShieldDashEffect"/>)에서 읽는다.
+/// 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) 수치 한 벌 — 정의 에셋의 스킬 수치 기여(⑩ 공용 <see cref="TraitSkillValueEffect"/> 칸 — 할 일 133 에서 옛 PaladinShieldDashEffect 를 합쳤다)에서 읽는다.
 /// 스킬은 <see cref="PlayerTraitModifiers.ResolveSkillValue"/>(이름, 0)으로, 카드·테스트는 정의에서 직접(<see cref="FromTrait"/>) 같은 이름으로 읽는다.
 /// 값이 하나라도 없거나 0 이하면 <see cref="IsValid"/> = 거짓 — 스킬은 원래 Q 로 돌고 오류를 남긴다(콘텐츠 검증이 먼저 잡는다).
 /// </summary>

@@ -20,13 +20,26 @@ MonoBehaviour:
     \uB9DE\uD788\uBA74 \uCD1D {totalDamageRatio:%}\uC758 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
   icon: {fileID: 0}
   effects:
-  - rid: 7237886673644683622
+  - rid: 7237886675317424401
   references:
     version: 2
     RefIds:
-    - rid: 7237886673644683622
-      type: {class: GunnerVolleyEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7237886675317424401
+      type: {class: TraitSkillValueEffect, ns: , asm: Assembly-CSharp}
       data:
-        shotCount: 5
-        shotInterval: 0.15
-        perShotDamageRatio: 0.28
+        entries:
+        - name: shotCount
+          key: GUN_Q_VOLLEY_SHOT_COUNT
+          op: 0
+          scale: 0
+          value: 5
+        - name: shotInterval
+          key: GUN_Q_VOLLEY_SHOT_INTERVAL
+          op: 0
+          scale: 0
+          value: 0.15
+        - name: perShotDamageRatio
+          key: GUN_Q_VOLLEY_PER_SHOT_RATIO
+          op: 0
+          scale: 0
+          value: 0.28

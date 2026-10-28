@@ -487,9 +487,23 @@ public sealed class TraitNextAttackBuffEffect : TraitTriggeredEffect
     }
 }
 
+/// <summary>⑩ 스킬 수치 칸의 값 해석 — 시트·카드에는 기획 명세 그대로의 값(감소율 0.25 등)을 두고, 연산에 넣을 때만 바꾼다.</summary>
+public enum TraitSkillValueScale : byte
+{
+    /// <summary>값 그대로.</summary>
+    Raw = 0,
+    /// <summary>1 + 값(증가율 0.35 → × 1.35).</summary>
+    OnePlus = 1,
+    /// <summary>1 − 값(감소율 0.25 → × 0.75). 값은 0 이상 1 미만.</summary>
+    OneMinus = 2,
+}
+
 /// <summary>
-/// ⑩ 스킬 수치 덮어쓰기 — 이름 붙은 스킬 수치에 Set/Add/Multiply(예: 고속 집속 GUN_Q_MAX_CHARGE_TIME × 0.75, 한계 돌파 과열 증가 × 1.35).
+/// ⑩ 스킬 수치 덮어쓰기 — 이름 붙은 스킬 수치에 Set/Add/Multiply(예: 고속 집속 GUN_Q_MAX_CHARGE_TIME × (1 − 0.25), 한계 돌파 과열 증가 × (1 + 0.35)).
 /// 스킬은 <see cref="PlayerTraitModifiers.ResolveSkillValue"/>(이름, 데이터 값)으로 읽는다. 이름은 스킬 코드와 데이터가 맞춘다.
+/// 시트 Traits_&lt;캐릭터&gt; 행 = <c>effects[i].entries[j].value</c>(숫자 칸만 — key·name·op·scale 은 인스펙터 칸, 할 일 133).
+/// 카드 설명 토큰 = 칸의 <see cref="Entry.name"/>(<c>{chargeTimeReduction:%}</c> → 그 칸의 value, 해석 전 값).
+/// 캐릭터 전용 수치 칸(옛 GunnerChargeTimeEffect 등 거너 7종·PaladinShieldDashEffect)은 할 일 133 에서 이 효과로 합쳤다.
 /// </summary>
 [Serializable]
 public sealed class TraitSkillValueEffect : TraitEffect
@@ -497,17 +511,29 @@ public sealed class TraitSkillValueEffect : TraitEffect
     [Serializable]
     public struct Entry
     {
+        [Tooltip("카드 설명 토큰 이름({name}) — 비우면 토큰으로 안 쓴다. 정의 안에서 겹치면 안 된다.")]
+        public string name;
         [Tooltip("스킬 수치 이름 — 스킬 코드가 묻는 이름과 같아야 한다.")]
         public string key;
         public TraitValueOp op;
+        [Tooltip("값 해석 — Raw 그대로, OnePlus = 1 + 값(증가율), OneMinus = 1 − 값(감소율).")]
+        public TraitSkillValueScale scale;
+        [Tooltip("스킬 수치 값(해석 전 — 증가율·감소율이면 비율 0.25 = 25%). 칸마다 뜻은 key·name 을 볼 것.")]
         public float value;
 
-        public Entry(string key, TraitValueOp op, float value)
+        public Entry(string key, TraitValueOp op, float value, string name = null, TraitSkillValueScale scale = TraitSkillValueScale.Raw)
         {
+            this.name = name;
             this.key = key;
             this.op = op;
+            this.scale = scale;
             this.value = value;
         }
+
+        /// <summary>연산에 넣는 값(<see cref="scale"/> 적용).</summary>
+        public float Applied => scale == TraitSkillValueScale.OnePlus ? 1f + value
+            : scale == TraitSkillValueScale.OneMinus ? 1f - value
+            : value;
     }
 
     [SerializeField] private Entry[] entries = Array.Empty<Entry>();
@@ -516,26 +542,62 @@ public sealed class TraitSkillValueEffect : TraitEffect
 
     public TraitSkillValueEffect(params Entry[] entries) => this.entries = entries ?? Array.Empty<Entry>();
 
+    public IReadOnlyList<Entry> Entries => entries ?? Array.Empty<Entry>();
+
     public override void GetModifiers(List<TraitModifier> result)
     {
         if (entries == null)
             return;
 
         foreach (Entry entry in entries)
-            result.Add(TraitModifier.SkillValue(entry.key, entry.op, entry.value));
+            result.Add(TraitModifier.SkillValue(entry.key, entry.op, entry.Applied));
+    }
+
+    public override bool TryGetNamedValue(string name, out object value)
+    {
+        value = null;
+        if (entries == null || string.IsNullOrEmpty(name))
+            return false;
+
+        foreach (Entry entry in entries)
+        {
+            if (string.Equals(entry.name, name, StringComparison.Ordinal))
+            {
+                value = entry.value;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public override void Validate(List<string> errors)
     {
         if (entries == null || entries.Length == 0)
+        {
             errors.Add($"{nameof(TraitSkillValueEffect)}.entries 가 비었다");
-        else
-            for (int i = 0; i < entries.Length; i++)
-            {
-                if (string.IsNullOrWhiteSpace(entries[i].key))
-                    errors.Add($"{nameof(TraitSkillValueEffect)}.entries[{i}].key 가 비었다");
-                CheckFinite(errors, $"entries[{i}].value", entries[i].value);
-            }
+            return;
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < entries.Length; i++)
+        {
+            Entry entry = entries[i];
+            string field = $"entries[{i}].value";
+            if (string.IsNullOrWhiteSpace(entry.key))
+                errors.Add($"{nameof(TraitSkillValueEffect)}.entries[{i}].key 가 비었다");
+            if (!string.IsNullOrEmpty(entry.name) && !names.Add(entry.name))
+                errors.Add($"{nameof(TraitSkillValueEffect)}.entries[{i}].name '{entry.name}' 이 겹친다");
+
+            CheckFinite(errors, field, entry.value);
+            // 시간·거리·비율·발수뿐이라 Set·Multiply 는 음수가 될 수 없다(Add 는 깎기가 있어 음수 허용). 감소율은 1 미만(배율 > 0).
+            if (entry.op != TraitValueOp.Add && entry.Applied < 0f)
+                errors.Add($"{nameof(TraitSkillValueEffect)}.{field} = {entry.value} — 연산 값 {entry.Applied} < 0");
+            if (entry.scale != TraitSkillValueScale.Raw && entry.value < 0f)
+                errors.Add($"{nameof(TraitSkillValueEffect)}.{field} = {entry.value} < 0(증가율·감소율)");
+            if (entry.scale == TraitSkillValueScale.OneMinus && entry.value >= 1f)
+                errors.Add($"{nameof(TraitSkillValueEffect)}.{field} = {entry.value} ≥ 1(감소율)");
+        }
     }
 }
 

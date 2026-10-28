@@ -110,7 +110,7 @@ public sealed class PaladinTraitDashTests
         Assert.AreEqual("Q가 {dashDistance}m를 빠르게 돌진하며 {dmg}의 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.",
             def.InlineDescription, "명세 '문법 원문' 그대로");
         Assert.AreEqual(1, def.Effects.Count);
-        Assert.IsInstanceOf<PaladinShieldDashEffect>(def.Effects[0], "시트에 칸 이름(effects[0].dashDistance 등)으로 나가는 수치 칸");
+        Assert.IsInstanceOf<TraitSkillValueEffect>(def.Effects[0], "공용 스킬 수치 칸(시트 행 effects[0].entries[j].value, 카드 토큰 = 칸 name — 할 일 133)");
 
         Assert.IsTrue(TraitTooltip.Format(def, def.InlineDescription, null, false, TraitContent.Build(), out string text, out string error), error);
         StringAssert.StartsWith("Q가 3m를 빠르게 돌진하며 ", Plain(text));
@@ -207,8 +207,12 @@ public sealed class PaladinTraitDashTests
         Assert.IsNotEmpty(missing, "수치 누락 = 오류");
 
         var bad = new List<string>();
-        new PaladinShieldDashEffect(0f, 18f, -0.1f, 0.12f, 1.25f, 3f, float.NaN).Validate(bad);
-        Assert.AreEqual(3, bad.Count, "거리 0·음수 준비·NaN 넉백 시간 = 정의 검증 오류(명세 §9) — " + string.Join("\n", bad));
+        new TraitSkillValueEffect(
+            new TraitSkillValueEffect.Entry(PaladinTraitValues.DashDistanceKey, TraitValueOp.Set, 3f, "dashDistance"),
+            new TraitSkillValueEffect.Entry(PaladinTraitValues.DashPrepareKey, TraitValueOp.Set, -0.1f, "prepareTime"),
+            new TraitSkillValueEffect.Entry(PaladinTraitValues.DashPushDurationKey, TraitValueOp.Set, float.NaN, "pushDuration")).Validate(bad);
+        // 거리 0 처럼 '0 이하' 는 공용 칸이 아니라 돌진 설정(IsValid → 위 '수치 누락 = 오류')이 막는다(할 일 133 — 공용 칸은 Set 음수만 막는다).
+        Assert.AreEqual(2, bad.Count, "음수 준비·NaN 넉백 시간 = 정의 검증 오류(명세 §9) — " + string.Join("\n", bad));
     }
 
     // ── 경로·판정 ───────────────────────────────────────────────────────

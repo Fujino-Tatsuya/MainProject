@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 거너 특성 수치 이름·질의(할 일 127). 스킬 코드(<c>Player/Gunner/*</c>)·정의 에셋(<c>9.ScriptableObject/Traits/Gunner/</c>)·카드 툴팁(<c>TraitContent.Gunner.cs</c>)이 같은 이름을 쓴다.
-/// 스킬 수치 이름은 거너 효과(<c>GunnerTraitEffects.cs</c>)가 기여하고 스킬이 <see cref="PlayerTraitModifiers.ResolveSkillValue"/> 로 묻는다(⑩ 과 같은 기여).
+/// 스킬 수치 이름은 정의 에셋의 공용 스킬 수치 효과(<see cref="TraitSkillValueEffect"/>, 할 일 133 에서 옛 거너 전용 효과 7종을 합침)가 기여하고 스킬이 <see cref="PlayerTraitModifiers.ResolveSkillValue"/> 로 묻는다(⑩ 과 같은 기여).
 /// </summary>
 public static class GunnerTraitRules
 {

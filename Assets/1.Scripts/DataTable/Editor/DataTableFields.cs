@@ -91,7 +91,14 @@ public static class DataTableFields
             if (parts[i] == "Array")
             {
                 i++;
-                if (i >= parts.Length || !TryParseDataIndex(parts[i], out int index) || !(current is IList list) || index >= list.Count)
+                // "entries.Array" 자체(배열 머리) = 배열 필드 — 타입 판 Resolve 와 같다. 이게 null 이면 순회가 배열 안으로 못 들어가
+                // [SerializeReference] 원소 안쪽 배열(⑩ 스킬 수치 entries[j].value)이 시트에서 빠진다(할 일 133).
+                if (i >= parts.Length)
+                {
+                    return last;
+                }
+
+                if (!TryParseDataIndex(parts[i], out int index) || !(current is IList list) || index >= list.Count)
                 {
                     return null;
                 }

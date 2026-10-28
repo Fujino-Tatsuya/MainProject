@@ -21,11 +21,16 @@ MonoBehaviour:
     Q\uC640 R\uC758 \uACFC\uC5F4 \uBCF4\uB108\uC2A4\uB3C4 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4."
   icon: {fileID: 0}
   effects:
-  - rid: 7237886673644683620
+  - rid: 7237886675317424397
   references:
     version: 2
     RefIds:
-    - rid: 7237886673644683620
-      type: {class: GunnerCoolModeEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7237886675317424397
+      type: {class: TraitSkillValueEffect, ns: , asm: Assembly-CSharp}
       data:
-        basicDamagePenalty: 0.15
+        entries:
+        - name: basicDamagePenalty
+          key: GUN_BASIC_COOL_DAMAGE_PENALTY
+          op: 0
+          scale: 0
+          value: 0.15

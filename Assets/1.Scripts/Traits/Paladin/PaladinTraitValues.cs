@@ -27,7 +27,7 @@ public static class PaladinTraitValues
     /// <summary>진격의 충격 파생 공격 이름(⑧ derivedKey). Q 가 <see cref="PlayerTraitEffects.GetDerivedAttacks"/> 결과에서 이 이름만 고른다.</summary>
     public const string QBlastKey = "PAL_Q_BLAST";
 
-    // 돌파의 방패 모드 전용 스킬 수치(⑩) 이름 — 정의 에셋 PAL_2_DASH 의 PaladinShieldDashEffect 가 Set 으로 낸다(시트 Traits_Paladin 에 칸 이름으로 나간다).
+    // 돌파의 방패 모드 전용 스킬 수치(⑩) 이름 — 정의 에셋 PAL_2_DASH 의 공용 스킬 수치 효과(TraitSkillValueEffect) 칸이 Set 으로 낸다(시트 Traits_Paladin 행 effects[0].entries[j].value, 카드 토큰 = 칸 name).
     // Q 가 ResolveSkillValue(이름, 0)으로 읽는다(0 = 특성 없음·데이터 누락 → 원래 Q).
     public const string DashDistanceKey = "PAL_Q_DASH_DISTANCE";
     public const string DashSpeedKey = "PAL_Q_DASH_SPEED";

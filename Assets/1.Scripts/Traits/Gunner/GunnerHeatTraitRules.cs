@@ -15,7 +15,7 @@ public enum GunnerHeatMode : byte
 
 /// <summary>
 /// 거너 2차 과열 모드 질의(할 일 127 3/4). 모드는 특성 스위치(<see cref="PlayerTraitModifiers.HasTrait"/> · <see cref="TraitModeIds"/>)로 정하고,
-/// 수치는 거너 효과(<see cref="GunnerOverdriveEffect"/>·<see cref="GunnerHeatShotEffect"/>·<see cref="GunnerCoolModeEffect"/>)가 기여한 ⑩ 스킬 수치를 읽는다.
+/// 수치는 정의 GUN_2_OVERDRIVE·GUN_2_HEAT_SHOT·GUN_2_COOL_MODE 의 공용 스킬 수치 효과(<see cref="TraitSkillValueEffect"/>)가 기여한 ⑩ 스킬 수치를 읽는다.
 /// 서버 판정·클라 표시·카드 툴팁이 같은 값을 쓴다 — 판정식(기본 공격·Q·R)과 툴팁 최소~최대가 이 한 곳을 지난다.
 /// 런타임은 <see cref="From(PlayerTraitModifiers)"/>, 테스트·카드 합성은 <see cref="From(TraitModifierSet)"/>.
 /// </summary>

@@ -21,11 +21,16 @@ MonoBehaviour:
     \uAC15\uD574\uC9D1\uB2C8\uB2E4."
   icon: {fileID: 0}
   effects:
-  - rid: 7237886673644683619
+  - rid: 7237886675317424398
   references:
     version: 2
     RefIds:
-    - rid: 7237886673644683619
-      type: {class: GunnerHeatShotEffect, ns: , asm: Assembly-CSharp}
+    - rid: 7237886675317424398
+      type: {class: TraitSkillValueEffect, ns: , asm: Assembly-CSharp}
       data:
-        maxSpentDamageBonus: 0.6
+        entries:
+        - name: maxSpentDamageBonus
+          key: GUN_Q_HEAT_SPENT_DAMAGE_BONUS
+          op: 0
+          scale: 0
+          value: 0.6

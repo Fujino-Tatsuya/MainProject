@@ -202,4 +202,39 @@ public class TraitSheetBindingTests
         CollectionAssert.DoesNotContain(paths, "displayName");
         Assert.AreEqual("effects[0] · TraitDamageEffect", fields.First(f => f.Path == "effects[0].damageIncrease").Element);
     }
+
+    [Test]
+    public void SkillValueEntries_ExportAsRows_BindApplyRestore()
+    {
+        // 할 일 133 c — [SerializeReference] 원소 안쪽 배열(⑩ entries)도 숫자 칸(value)만 시트 행으로 나간다. key·name(문자열)·op·scale(enum)은 아니다.
+        GunnerTraitDefinition def = TraitContentTestKit.Make<GunnerTraitDefinition>("GUN_1_CHARGE", "고속 집속", "", "{chargeTimeReduction:%}",
+            new TraitSkillValueEffect(
+                new TraitSkillValueEffect.Entry(GunnerTraitRules.QMaxChargeTime, TraitValueOp.Multiply, 0.25f, "chargeTimeReduction", TraitSkillValueScale.OneMinus),
+                new TraitSkillValueEffect.Entry(GunnerTraitRules.QVolleyShotCount, TraitValueOp.Set, 5f, "shotCount")));
+        created.Add(def);
+
+        List<string> paths = DataTableTemplate.CollectFields(def).Select(f => f.Path).ToList();
+        CollectionAssert.AreEqual(new[] { "effects[0].entries[0].value", "effects[0].entries[1].value" }, paths);
+
+        var lookup = new MemoryLookup();
+        lookup.Targets["GUN_1_CHARGE"] = def;
+        var issues = new DataTableIssues();
+        List<DataTableWrite> writes = Bind(new[]
+        {
+            Sheet(TraitSheets.Gunner,
+                new[] { "필드", "#설명", "GUN_1_CHARGE" },
+                new[] { "effects[0].entries[0].value", "", "0.4" }),
+        }, lookup, issues);
+        Assert.IsFalse(issues.HasErrors, Describe(issues));
+        Assert.AreEqual(1, writes.Count);
+
+        DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(writes);
+        Assert.IsTrue(new TraitTooltipValueSource(def, null).TryGetTooltipValue("chargeTimeReduction", out object applied, out string error), error);
+        Assert.AreEqual(0.4f, (float)applied, 1e-5f, "카드 토큰 = 칸 name, 해석 전 값");
+        Assert.AreEqual(0.6f, GunnerTraitTooltip.SkillValue(def, GunnerTraitRules.QMaxChargeTime, 1f), 1e-5f, "연산 = × (1 − 0.4)");
+
+        DataTableApplier.Restore(snapshot);
+        new TraitTooltipValueSource(def, null).TryGetTooltipValue("chargeTimeReduction", out object restored, out _);
+        Assert.AreEqual(0.25f, (float)restored, 1e-5f);
+    }
 }
