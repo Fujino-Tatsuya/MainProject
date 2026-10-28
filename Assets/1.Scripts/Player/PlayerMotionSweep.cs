@@ -132,6 +132,91 @@ public static class PlayerMotionSweep
         return sum;
     }
 
+    /// <summary>
+    /// 이미 파고든 정적 지형(벽·턱 등 비보행면)에서 빠져나갈 수평 관통 벡터의 합. 겹침이 없으면 0. (할 일 136)
+    /// 시작부터 겹친 정적 콜라이더는 <see cref="TryCast"/> 가 전 방향 0 을 내므로 스윕 전에 이 값으로 먼저 푼다.
+    /// 걸을 수 있는 면(바닥·완경사)의 접지 겹침은 제외한다 — 경사에서 미끄러져 내려가지 않게.
+    /// </summary>
+    public static Vector3 ComputeStaticPenetration(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        LayerMask staticMask,
+        float maxWalkableAngle,
+        Collider[] overlapBuffer)
+    {
+        if (capsule == null || overlapBuffer == null || staticMask.value == 0)
+            return Vector3.zero;
+
+        Transform owner = capsule.transform;
+        GetCapsuleWorld(capsule, owner, originOffset, out Vector3 p1, out Vector3 p2, out float radius);
+        int count = Physics.OverlapCapsuleNonAlloc(
+            p1, p2, radius, overlapBuffer, staticMask, QueryTriggerInteraction.Ignore);
+
+        Vector3 sum = Vector3.zero;
+        Vector3 position = owner.position + originOffset;
+        for (int i = 0; i < count; i++)
+        {
+            Collider other = overlapBuffer[i];
+            if (other == null || other.transform == owner || other.transform.IsChildOf(owner))
+                continue;
+            if (IsUnitLayer(other.gameObject.layer))
+                continue;
+
+            Transform otherTransform = other.transform;
+            if (Physics.ComputePenetration(capsule, position, owner.rotation,
+                    other, otherTransform.position, otherTransform.rotation,
+                    out Vector3 direction, out float distance))
+            {
+                sum = PlayerUnitCollisionRules.AccumulateStaticPenetration(sum, direction, distance, maxWalkableAngle);
+            }
+        }
+
+        return sum;
+    }
+
+    /// <summary>
+    /// 정적 겹침 해소 한 틱 분량 — <see cref="ComputeStaticPenetration"/> 을 maxSpeed × deltaTime 으로 자른다(순간이동 아님).
+    /// 탈출 방향은 관통 해소 방향 그 자체라 다시 스윕하지 않는다.
+    /// </summary>
+    public static Vector3 ComputeStaticSeparationStep(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        LayerMask staticMask,
+        float maxWalkableAngle,
+        float maxSpeed,
+        float deltaTime,
+        Collider[] overlapBuffer)
+    {
+        Vector3 penetration = ComputeStaticPenetration(capsule, originOffset, staticMask, maxWalkableAngle, overlapBuffer);
+        return PlayerUnitCollisionRules.ComputeSeparationStep(penetration, maxSpeed, deltaTime);
+    }
+
+    /// <summary>dir 로 distance 만큼 갈 때 가장 먼저 막는 면의 법선. 막는 것이 없으면 false. (할 일 136 벽 따라 밀어내기)</summary>
+    public static bool TryGetBlockingNormal(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        Vector3 dir,
+        float distance,
+        float maxWalkableAngle,
+        LayerMask obstacleMask,
+        float skin,
+        RaycastHit[] buffer,
+        out Vector3 normal)
+    {
+        normal = Vector3.zero;
+        if (capsule == null || buffer == null || distance <= 0f || dir.sqrMagnitude <= 1e-8f)
+            return false;
+
+        if (!TryCast(capsule, capsule.transform, originOffset, dir.normalized, distance, maxWalkableAngle,
+                obstacleMask, skin, buffer, out RaycastHit hit, out _))
+        {
+            return false;
+        }
+
+        normal = hit.normal;
+        return true;
+    }
+
     private static Vector3 ResolveCore(
         CapsuleCollider capsule,
         Transform owner,

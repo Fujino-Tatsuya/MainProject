@@ -43,6 +43,40 @@ public static class PlayerUnitCollisionRules
         return sum + planar * distance;
     }
 
+    /// <summary>
+    /// 정적 지형 ComputePenetration 결과 하나를 수평 성분만 누적한다. (할 일 136)
+    /// 해소 방향이 걸을 수 있는 면 법선(위쪽)이면 접지 겹침이라 버린다 — 경사에서 옆으로 미끄러지지 않게.
+    /// </summary>
+    public static Vector3 AccumulateStaticPenetration(Vector3 sum, Vector3 direction, float distance, float maxWalkableAngle)
+    {
+        if (distance <= 0f || direction.sqrMagnitude <= 1e-8f)
+            return sum;
+        if (Vector3.Angle(direction, Vector3.up) <= maxWalkableAngle)
+            return sum;
+
+        return AccumulatePenetration(sum, direction, distance);
+    }
+
+    /// <summary>
+    /// 유닛 밀어내기가 벽에 정면으로 막혔을 때 벽을 따라 미끄러질 수평 변위. (할 일 136)
+    /// 원래 변위의 접선 성분 부호를 따르고, 정면(접선 0)이면 법선 기준 고정 방향(up × n)을 골라 서버·오너가 같은 답을 낸다.
+    /// 길이는 원래 변위 길이 그대로. 법선이 수평 성분이 없거나 변위가 0 이면 0.
+    /// </summary>
+    public static Vector3 ComputeWallSlideStep(Vector3 step, Vector3 wallNormal)
+    {
+        Vector3 planarStep = new Vector3(step.x, 0f, step.z);
+        Vector3 planarNormal = new Vector3(wallNormal.x, 0f, wallNormal.z);
+        float length = planarStep.magnitude;
+        if (length < MinSeparationDistance || planarNormal.sqrMagnitude <= 1e-8f)
+            return Vector3.zero;
+
+        Vector3 tangent = Vector3.Cross(Vector3.up, planarNormal.normalized);
+        float side = Vector3.Dot(planarStep, tangent);
+        if (side < -1e-4f)
+            tangent = -tangent;
+        return tangent * length;
+    }
+
     /// <summary>누적 관통 벡터를 이번 틱에 옮길 수평 변위로 바꾼다 — 길이는 maxSpeed × deltaTime 을 넘지 않는다.</summary>
     public static Vector3 ComputeSeparationStep(Vector3 penetrationSum, float maxSpeed, float deltaTime)
     {
