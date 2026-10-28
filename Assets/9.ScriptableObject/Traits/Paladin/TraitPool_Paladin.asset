@@ -13,4 +13,9 @@ MonoBehaviour:
   m_Name: TraitPool_Paladin
   m_EditorClassIdentifier: Assembly-CSharp::TraitCharacterPool
   character: 1
-  traits: []
+  traits:
+  - {fileID: 11400000, guid: 000ae75bdb9fb364e9520a687ac5828c, type: 2}
+  - {fileID: 11400000, guid: 02159ce94d143e749b06a24ff13f0ff6, type: 2}
+  - {fileID: 11400000, guid: b77233babc9afb1479ea6f1bf9143d82, type: 2}
+  - {fileID: 11400000, guid: 4e57c99d8eb99b54cad12c4d9c33e795, type: 2}
+  - {fileID: 11400000, guid: 8bff8caa1934d5a4bacfc38824400400, type: 2}

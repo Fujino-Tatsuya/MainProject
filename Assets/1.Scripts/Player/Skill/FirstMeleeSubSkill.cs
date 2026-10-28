@@ -466,6 +466,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             forward.y = 0f;
             float angle = toAttacker.sqrMagnitude > 0.0001f ? Vector3.Angle(forward, toAttacker) : 0f;
             Edit.Log($"[Skill] 수호자의 의지 — 방어 성공: {attacker.name} (각도 {angle:0.#}°, 피해 {attackInfo.damage} 흡수)", this);
+
+            // 특성 사건(할 일 126 — 수호의 순환 E 쿨 −2초 등). 첫 방어 성공(BlockAndCounter)에서만 낸다 — 반격 중 무시(Ignore)·방어 실패(Pass)는 아님.
+            // E 쿨은 승인 즉시 커밋(commitCooldownManually = 0)이라 이 시점에 이미 돌고 있다(명세 §6 '방어 진입 시 커밋'). 시전당 1회는 효과 거름(oncePerCast).
+            PlayerTraitEffects.For(owner).RaiseServer(TraitTrigger.GuardSucceeded, this);
         }
 
         return verdict != GuardVerdict.Pass;
