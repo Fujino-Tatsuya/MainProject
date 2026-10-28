@@ -489,11 +489,28 @@ public sealed class TraitEffectTests
     }
 
     [Test]
-    public void Knockback_ZeroStagger_IsValidationError()
+    public void Knockback_ZeroStagger_IsValid()
     {
+        // 할 일 134 — 23호도 넉백 세기만으로 취약 밀림이 걸린다. 경직 0 = 밀기만
         var errors = new List<string>();
         new TraitKnockbackEffect(2f, 0.2f, 0f).Validate(errors);
-        Assert.IsNotEmpty(errors);
+        Assert.IsEmpty(errors, string.Join("\n", errors));
+
+        var info = new AttackInfo(10, AttackType.SkillQ);
+        new TraitKnockbackEffect(2f, 0.2f, 0f).ApplyCrowdControl(ref info, Vector3.forward);
+        Assert.Greater(info.knockbackStrength, 0f, "밀기는 실린다");
+        Assert.AreEqual(0f, info.staggerDuration, "경직 없음");
+    }
+
+    [Test]
+    public void Knockback_DefaultStagger_IsZero()
+    {
+        var info = new AttackInfo(10, AttackType.SkillQ);
+        new TraitKnockbackEffect().ApplyCrowdControl(ref info, Vector3.forward);
+        Assert.AreEqual(0f, info.staggerDuration, "인스펙터 기본 경직 = 0");
+        var errors = new List<string>();
+        new TraitKnockbackEffect().Validate(errors);
+        Assert.IsEmpty(errors, string.Join("\n", errors));
     }
 
     // ── ⑦ 범위·폭 ───────────────────────────────────────────────────────

@@ -228,8 +228,8 @@ public sealed class TraitShieldEffect : TraitTriggeredEffect
 
 /// <summary>
 /// ⑥ 적중 시 밀치기 — 돌파의 방패·수호의 파동·충격 레이저·급소 파괴(+ 제압의 진격 = 뇌진탕 옵션 <c>concussionDuration</c>).
-/// 🔴 지금은 <see cref="AttackInfo"/> 의 넉백+경직(+뇌진탕) 경로로 건다(23호에서 명세 §4 와 맞는 유일한 경로 — 경석 handoff 보스넉백·기절).
-/// 보스 쪽(23호 OnKnockback override·상태별 슈퍼아머)이 고쳐지면 <see cref="ApplyCrowdControl"/> 한 곳만 Unit.Knockback·상태이상 직접 걸기로 바꾼다.
+/// 지금은 <see cref="AttackInfo"/> 의 넉백(+경직·뇌진탕) 경로로 건다. 경직은 0 이어도 된다 — 23호도 넉백 세기만으로 취약 밀림이 걸린다(할 일 134).
+/// 보스 쪽 거부 규칙(상태별 슈퍼아머)·23호 넉백 입구(Unit.Knockback → OnKnockback)는 134 로 들어왔다 — 직접 걸기로 바꿀 때도 <see cref="ApplyCrowdControl"/> 한 곳만 고친다.
 /// 보스 상태를 묻지 않는다 — 걸고, 대상의 기존 거부 규칙에 맡긴다. 시전당 대상별 1회.
 /// </summary>
 [Serializable]
@@ -245,9 +245,9 @@ public sealed class TraitKnockbackEffect : TraitEffect
     [Tooltip("밀치는 시간(초).")]
     [Min(0f)]
     [SerializeField] private float pushDuration = 0.2f;
-    [Tooltip("넉백 끝난 뒤 경직(초). 🔴 0 보다 커야 23호 취약 밀림이 걸린다(qPushHit = 넉백 > 0 이고 경직 > 0).")]
+    [Tooltip("넉백 끝난 뒤 경직(초). 0 = 경직 없이 밀기만(23호 취약 밀림도 경직 없이 걸린다 — 할 일 134).")]
     [Min(0f)]
-    [SerializeField] private float staggerDuration = 0.1f;
+    [SerializeField] private float staggerDuration;
     [Tooltip("뇌진탕(초) — 밀치기가 끝나는 순간 이만큼 기절(제압의 진격 = 0.75). 맞을 때마다 재설정, 기존 기절과는 큰 값. 0 = 없음.")]
     [Min(0f)]
     [SerializeField] private float concussionDuration;
@@ -315,8 +315,6 @@ public sealed class TraitKnockbackEffect : TraitEffect
         CheckPositive(errors, nameof(pushDuration), pushDuration);
         CheckNonNegative(errors, nameof(staggerDuration), staggerDuration);
         CheckNonNegative(errors, nameof(concussionDuration), concussionDuration);
-        if (staggerDuration <= 0f)
-            errors.Add($"{nameof(TraitKnockbackEffect)}.staggerDuration = 0 — 23호 취약 밀림 조건(경직 > 0)을 못 맞춘다");
     }
 
     /// <summary>[서버] 등록된 밀치기 1개 — 키가 맞고 이 시전에서 이 대상이 처음일 때만 <see cref="ApplyCrowdControl"/>.</summary>
