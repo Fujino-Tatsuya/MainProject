@@ -44,21 +44,37 @@ public sealed class BossCrowdControlRulesTests
     }
 
     // ── 상태별 슈퍼아머 표(평상/취약/제압 × 공격 중) ───────────────────
-    // MonsterStatusEffect 와 같은 조립: HasSuperArmor = 공격별 플래그 OR 상태별, 거부 판정 플래그 = EffectiveActive.
+    // MonsterStatusEffect 와 같은 조립: 밀치기 거부 = HasSuperArmor(공격별 플래그 OR 상태별),
+    // 상태이상 거부 = RejectsStatus(공격별 = 차단류 전부, 상태별 = 기절·뇌진탕만).
 
     const float Stun = ConcussionState.DefaultStunSeconds;
 
+    // 상태별 슈퍼아머가 거부하지 않는 차단류 — 평상·제압에서도 걸린다.
+    const StatusEffectType OtherCrowdControl =
+        StatusEffectType.Slowed | StatusEffectType.Rooted | StatusEffectType.Silenced |
+        StatusEffectType.Debilitated | StatusEffectType.Airborne;
+
     public enum BossPhase { Normal, Vulnerable, Suppressed }
 
-    static (bool armor, StatusEffectType effective) TwentyThree(BossPhase phase, bool attacking)
+    readonly struct Armor
+    {
+        public readonly StatusEffectType Flags;   // 복제 플래그(공격별 SuperArmor)
+        public readonly bool State;               // 상태별 슈퍼아머
+
+        public Armor(StatusEffectType flags, bool state) { Flags = flags; State = state; }
+
+        public bool RejectsKnockback => (Flags & StatusEffectType.SuperArmor) != 0 || State;
+        public bool Rejects(StatusEffectType incoming) => BossCrowdControlRules.RejectsStatus(Flags, State, incoming);
+    }
+
+    static Armor TwentyThree(BossPhase phase, bool attacking)
     {
         bool vulnerable = phase == BossPhase.Vulnerable;
         bool suppressed = phase == BossPhase.Suppressed;
         // 23호 공격은 전부 superArmor: 1(No23*.asset) — 공격 중이면 행 값 true 로 본다
         StatusEffectType flags = attacking && BossCrowdControlRules.AppliesAttackSuperArmor(true, vulnerable)
             ? StatusEffectType.SuperArmor : StatusEffectType.None;
-        bool state = BossCrowdControlRules.StateSuperArmor(vulnerable, suppressed);
-        return ((flags & StatusEffectType.SuperArmor) != 0 || state, BossCrowdControlRules.EffectiveActive(flags, state));
+        return new Armor(flags, BossCrowdControlRules.StateSuperArmor(vulnerable, suppressed));
     }
 
     [TestCase(BossPhase.Normal, false, false)]
@@ -68,38 +84,70 @@ public sealed class BossCrowdControlRulesTests
     [TestCase(BossPhase.Suppressed, false, false)]
     public void TwentyThree_Table_KnockbackStunConcussion(BossPhase phase, bool attacking, bool allowed)
     {
-        var (armor, effective) = TwentyThree(phase, attacking);
+        Armor armor = TwentyThree(phase, attacking);
 
-        Assert.AreEqual(allowed, !armor, "밀치기(Unit.Knockback 슈퍼아머 가드)");
-        Assert.AreEqual(allowed, !StatusEffectImmunityPolicy.ShouldIgnoreApplication(effective, StatusEffectType.Stunned), "기절");
+        Assert.AreEqual(allowed, !armor.RejectsKnockback, "밀치기(Unit.Knockback 슈퍼아머 가드)");
+        Assert.AreEqual(allowed, !armor.Rejects(StatusEffectType.Stunned), "기절");
 
         var concussion = new ConcussionState();
         Assert.AreEqual(allowed ? ConcussionState.ApplyResult.Pending : ConcussionState.ApplyResult.Rejected,
-            concussion.Apply(Stun, true, effective), "뇌진탕");
+            concussion.Apply(Stun, true, armor.Rejects(StatusEffectType.Concussion)), "뇌진탕");
+    }
+
+    [TestCase(BossPhase.Normal, StatusEffectType.Slowed)]
+    [TestCase(BossPhase.Normal, StatusEffectType.Rooted)]
+    [TestCase(BossPhase.Normal, StatusEffectType.Silenced)]
+    [TestCase(BossPhase.Normal, StatusEffectType.Debilitated)]
+    [TestCase(BossPhase.Normal, StatusEffectType.Airborne)]
+    [TestCase(BossPhase.Vulnerable, StatusEffectType.Slowed)]
+    [TestCase(BossPhase.Vulnerable, StatusEffectType.Airborne)]
+    [TestCase(BossPhase.Suppressed, StatusEffectType.Slowed)]
+    [TestCase(BossPhase.Suppressed, StatusEffectType.Rooted)]
+    [TestCase(BossPhase.Suppressed, StatusEffectType.Silenced)]
+    [TestCase(BossPhase.Suppressed, StatusEffectType.Debilitated)]
+    [TestCase(BossPhase.Suppressed, StatusEffectType.Airborne)]
+    public void TwentyThree_StateArmor_AllowsOtherCrowdControl(BossPhase phase, StatusEffectType incoming)
+    {
+        // 공격 밖 — 상태별 슈퍼아머는 밀치기·기절·뇌진탕만 거부한다(둔화·속박·침묵·약화·띄우기는 예전처럼 걸린다)
+        Assert.IsFalse(TwentyThree(phase, false).Rejects(incoming));
+    }
+
+    [TestCase(StatusEffectType.Slowed)]
+    [TestCase(StatusEffectType.Rooted)]
+    [TestCase(StatusEffectType.Silenced)]
+    [TestCase(StatusEffectType.Debilitated)]
+    [TestCase(StatusEffectType.Airborne)]
+    [TestCase(StatusEffectType.Stunned)]
+    [TestCase(StatusEffectType.Concussion)]
+    public void TwentyThree_AttackSuperArmor_StillRejectsAllCrowdControl(StatusEffectType incoming)
+    {
+        // 공격별 슈퍼아머(평상 공격 중)는 기존대로 차단류 전부를 거부한다
+        Assert.IsTrue(TwentyThree(BossPhase.Normal, true).Rejects(incoming));
     }
 
     [Test]
     public void TwentyThree_VulnerablePushEnd_ConvertsConcussionToStun()
     {
-        var (_, vulnerable) = TwentyThree(BossPhase.Vulnerable, false);
+        Armor vulnerable = TwentyThree(BossPhase.Vulnerable, false);
         var concussion = new ConcussionState();
 
         // 취약 중 Q 적중 — 자체 밀림 중(IsSelfKnockedBack) 이라 대기
-        Assert.AreEqual(ConcussionState.ApplyResult.Pending, concussion.Apply(Stun, true, vulnerable));
+        Assert.AreEqual(ConcussionState.ApplyResult.Pending,
+            concussion.Apply(Stun, true, vulnerable.Rejects(StatusEffectType.Concussion)));
         // 밀림 끝(FinishVulnerableKnockback → ConsumeConcussionAfterPush) — 아직 취약이면 기절
-        Assert.AreEqual(Stun, concussion.ConsumeOnKnockbackEnd(vulnerable), 1e-4f);
+        Assert.AreEqual(Stun, concussion.ConsumeOnKnockbackEnd(vulnerable.Rejects(StatusEffectType.Stunned)), 1e-4f);
     }
 
     [TestCase(BossPhase.Normal)]       // 벽 충돌로 취약이 끝난 뒤 밀림이 끝남
     [TestCase(BossPhase.Suppressed)]   // 벽 충돌로 칸 0 → 제압
     public void TwentyThree_PushEnd_NotVulnerableAnymore_NoStun(BossPhase phaseAtEnd)
     {
-        var (_, vulnerable) = TwentyThree(BossPhase.Vulnerable, false);
-        var (_, atEnd) = TwentyThree(phaseAtEnd, false);
+        Armor vulnerable = TwentyThree(BossPhase.Vulnerable, false);
+        Armor atEnd = TwentyThree(phaseAtEnd, false);
         var concussion = new ConcussionState();
-        concussion.Apply(Stun, true, vulnerable);
+        concussion.Apply(Stun, true, vulnerable.Rejects(StatusEffectType.Concussion));
 
-        Assert.AreEqual(0f, concussion.ConsumeOnKnockbackEnd(atEnd), 1e-4f, "넉백 종료 순간 자격 재확인");
+        Assert.AreEqual(0f, concussion.ConsumeOnKnockbackEnd(atEnd.Rejects(StatusEffectType.Stunned)), 1e-4f, "넉백 종료 순간 자격 재확인");
         Assert.IsFalse(concussion.IsPending);
     }
 
@@ -109,12 +157,20 @@ public sealed class BossCrowdControlRulesTests
     [TestCase(true, true)]     // 취약 = 허용
     public void MidBoss_StunAndConcussion_OnlyWhileVulnerable(bool vulnerable, bool allowed)
     {
-        bool state = BossCrowdControlRules.MidBossStateSuperArmor(true, vulnerable);
-        StatusEffectType effective = BossCrowdControlRules.EffectiveActive(StatusEffectType.None, state);
+        var armor = new Armor(StatusEffectType.None, BossCrowdControlRules.MidBossStateSuperArmor(true, vulnerable));
 
-        Assert.AreEqual(allowed, !state, "밀치기");
-        Assert.AreEqual(allowed, !StatusEffectImmunityPolicy.ShouldIgnoreApplication(effective, StatusEffectType.Stunned), "기절");
-        Assert.AreEqual(allowed, !StatusEffectImmunityPolicy.ShouldIgnoreApplication(effective, StatusEffectType.Concussion), "뇌진탕");
+        Assert.AreEqual(allowed, !armor.RejectsKnockback, "밀치기");
+        Assert.AreEqual(allowed, !armor.Rejects(StatusEffectType.Stunned), "기절");
+        Assert.AreEqual(allowed, !armor.Rejects(StatusEffectType.Concussion), "뇌진탕");
+    }
+
+    [TestCase(false)]   // 평상(공격 밖)
+    [TestCase(true)]    // 취약
+    public void MidBoss_StateArmor_AllowsOtherCrowdControl(bool vulnerable)
+    {
+        var armor = new Armor(StatusEffectType.None, BossCrowdControlRules.MidBossStateSuperArmor(true, vulnerable));
+
+        Assert.IsFalse(armor.Rejects(OtherCrowdControl), "둔화·속박·침묵·약화·띄우기는 상태와 무관하게 걸린다");
     }
 
     [Test]
@@ -124,11 +180,12 @@ public sealed class BossCrowdControlRulesTests
     }
 
     [Test]
-    public void EffectiveActive_KeepsOtherFlags()
+    public void RejectsStatus_StateArmorBlocksOnlyStunAndConcussion()
     {
-        Assert.AreEqual(StatusEffectType.Stunned | StatusEffectType.SuperArmor,
-            BossCrowdControlRules.EffectiveActive(StatusEffectType.Stunned, true));
-        Assert.AreEqual(StatusEffectType.Stunned, BossCrowdControlRules.EffectiveActive(StatusEffectType.Stunned, false));
+        Assert.AreEqual(StatusEffectType.Stunned | StatusEffectType.Concussion, BossCrowdControlRules.StateSuperArmorBlocked);
+        Assert.IsFalse(BossCrowdControlRules.RejectsStatus(StatusEffectType.None, true, StatusEffectType.SuperArmor),
+            "SuperArmor 자체(공격별 슈퍼아머 걸기)는 거부하지 않는다");
+        Assert.IsFalse(BossCrowdControlRules.RejectsStatus(StatusEffectType.None, false, StatusEffectType.Stunned), "슈퍼아머 없음 = 허용");
     }
 
     // ── 공격별 슈퍼아머 ───────────────────────────────────────────────

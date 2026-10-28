@@ -148,10 +148,10 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 ### 5.1 밀치기·뇌진탕(할 일 125 3/5·4/5)
 
 - 🔴 **밀치기는 `AttackInfo` 넉백(+경직) 필드 경로 한 곳** — CC 를 실제로 거는 코드는 `TraitKnockbackEffect.ApplyCrowdControl` 하나다.
-  보스 쪽(할 일 134)은 들어왔다: 23호 넉백 입구 = `Unit.Knockback`(`OnKnockback` override) · 보스·중간보스 상태별 슈퍼아머(평상·제압 거부, 취약 허용) — 표는 [monster-aggro-hitreact.md §2.2](monster-aggro-hitreact.md).
+  보스 쪽(할 일 134)은 들어왔다: 23호 넉백 입구 = `Unit.Knockback`(`OnKnockback` override) · 보스·중간보스 상태별 슈퍼아머(평상·제압에서 밀치기·기절·뇌진탕만 거부, 취약 허용 — 둔화·속박·침묵·약화·띄우기는 상태와 무관하게 걸린다) — 표는 [monster-aggro-hitreact.md §2.2](monster-aggro-hitreact.md).
   **경직은 0 이어도 된다**(기본값 0, '경직 0 금지' 검증 제거) — 23호도 넉백 세기만으로 취약 밀림이 걸린다. 직접 걸기로 바꿀 때도 그 메서드 한 곳만 고친다. 보스 질의 인터페이스는 없다.
 - **뇌진탕**(`StatusEffectType.Concussion`, 순수 규칙 `ConcussionState`): 맞을 때마다 남은 시간을 0.75초로 **재설정**(가산 아님) → 넉백이 끝나는 순간 기절(Stunned)로 전환
-  (넉백 중이 아니면 즉시). 기존 기절과 겹치면 남은 시간 중 큰 값. 상태가 제압으로 바뀌면 대기 중인 '밀치기 후 기절'은 취소. 차단류 CC(`BlockedCrowdControl`)라 슈퍼아머 대상은 거부.
+  (넉백 중이 아니면 즉시). 기존 기절과 겹치면 남은 시간 중 큰 값. 상태가 제압으로 바뀌면 대기 중인 '밀치기 후 기절'은 취소. 차단류 CC(`BlockedCrowdControl`)라 슈퍼아머 대상은 거부(보스·중간보스 상태별 슈퍼아머도 거부 — 거부 여부는 수신측이 정해 `ConcussionState` 에 넘긴다).
   효과·머리 위 표시는 기절과 같다(새 VFX 없음). 플레이어 쪽은 즉시 기절 변환.
 - 특성 입구 = `TraitKnockbackEffect.concussionDuration`(0 = 없음) → `AttackInfo.concussionDuration`. 팔라딘 Q 매 틱 적용(제압의 진격)은 캐릭터 레인이 쓴다. 테스트 `ConcussionTests`.
 

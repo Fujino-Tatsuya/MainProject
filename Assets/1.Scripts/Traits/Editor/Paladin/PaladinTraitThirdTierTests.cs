@@ -282,16 +282,16 @@ public sealed class PaladinTraitThirdTierTests
         for (int tick = 0; tick < 6; tick++)
         {
             float concussion = carry.Resolve(1, tick == 0 ? 0.75f : 0f);
-            Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(concussion, true, StatusEffectType.None), $"틱 {tick} 재설정");
+            Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(concussion, true, false), $"틱 {tick} 재설정");
             if (tick == 2)
             {
                 // 틱 사이에 넉백이 잠깐 끝난 경우(넉백 시간 = 틱 간격) — 소비된 기절은 다음 틱 밀치기가 덮지만, 이어 실은 뇌진탕이 다시 대기한다.
-                state.ConsumeOnKnockbackEnd(StatusEffectType.None);
+                state.ConsumeOnKnockbackEnd(false);
             }
             carry.EndTick();
         }
 
-        float end = state.ConsumeOnKnockbackEnd(StatusEffectType.None);
+        float end = state.ConsumeOnKnockbackEnd(false);
         if (end > 0f) { stuns++; stunLength = end; }
         Assert.AreEqual(1, stuns, "마지막 밀치기 뒤 기절이 남는다");
         Assert.AreEqual(0.75f, stunLength, Eps);
@@ -309,8 +309,8 @@ public sealed class PaladinTraitThirdTierTests
         bool pushed = MonsterHitReactionPolicy.CanEnterKnockback(state, armor, rank, vulnerable);
         var concussion = new ConcussionState();
         if (pushed)
-            concussion.Apply(0.75f, true, armor ? StatusEffectType.SuperArmor : StatusEffectType.None);
-        float stun = concussion.ConsumeOnKnockbackEnd(StatusEffectType.None);
+            concussion.Apply(0.75f, true, armor);
+        float stun = concussion.ConsumeOnKnockbackEnd(false);
         Assert.AreEqual(stunned ? 0.75f : 0f, stun, Eps);
     }
 
@@ -320,11 +320,11 @@ public sealed class PaladinTraitThirdTierTests
         Assert.IsTrue(MonsterStatusEffect.CancelsPendingConcussion(MonsterState.Knockback, MonsterState.Groggy), "밀치기 중 제압(그로기) 진입 = 예약 기절 취소");
 
         var armored = new ConcussionState();
-        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, armored.Apply(0.75f, true, StatusEffectType.SuperArmor), "슈퍼아머 거부");
+        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, armored.Apply(0.75f, true, true), "슈퍼아머 거부");
 
         var lateArmor = new ConcussionState();
-        lateArmor.Apply(0.75f, true, StatusEffectType.None);
-        Assert.AreEqual(0f, lateArmor.ConsumeOnKnockbackEnd(StatusEffectType.SuperArmor), Eps, "넉백 끝 순간 자격 재확인");
+        lateArmor.Apply(0.75f, true, false);
+        Assert.AreEqual(0f, lateArmor.ConsumeOnKnockbackEnd(true), Eps, "넉백 끝 순간 자격 재확인");
 
         Assert.AreEqual(1.2f, ConcussionState.MergeStun(1.2f, 0.75f), Eps, "기존 기절이 더 길면 유지");
         Assert.AreEqual(0.75f, ConcussionState.MergeStun(0.3f, 0.75f), Eps, "짧으면 0.75 — 합산 아님");

@@ -48,21 +48,24 @@
 
 특성(할 일 125~128)은 보스 상태를 묻지 않고 밀치기·기절·뇌진탕을 **그냥 걸고**, 대상의 슈퍼아머가 거부한다. 그 규칙이 아래 표 하나다(순수 규칙 `BossCrowdControlRules`, 테스트 `BossCrowdControlRulesTests`).
 
-| 상태 | 밀치기(`Unit.Knockback`·AttackInfo 넉백) | 기절·뇌진탕(`Stunned`·`Concussion`) | 피해 |
-|---|---|---|---|
-| 평상(공격 밖 포함) | 거부 | 거부 | 정상 |
-| 취약(23호 4초 · 중간보스 8초) | **허용** | **허용** | 정상 |
-| 제압(23호 그로기 5초) | 거부 | 거부 | 정상(×1.2) |
+| 상태 | 밀치기(`Unit.Knockback`·AttackInfo 넉백) | 기절·뇌진탕(`Stunned`·`Concussion`) | 둔화·속박·침묵·약화·띄우기 | 피해 |
+|---|---|---|---|---|
+| 평상(공격 밖 포함) | 거부 | 거부 | 허용 | 정상 |
+| 취약(23호 4초 · 중간보스 8초) | **허용** | **허용** | 허용 | 정상 |
+| 제압(23호 그로기 5초) | 거부 | 거부 | 허용 | 정상(×1.2) |
 
-- **거부 수단 = 슈퍼아머 한 값.** `MonsterStatusEffect.HasSuperArmor` = 공격별 슈퍼아머(복제 `SuperArmor` 플래그) **OR** 상태별 슈퍼아머(`IMonsterStateSuperArmor`).
-  이 값이 넉백 입구(`Unit.Knockback` 가드)·`StatusEffectImmunityPolicy`(기절류)·`ConcussionState`(뇌진탕 적용·넉백 끝 자격 재확인)에 같이 들어간다.
+- 표는 **상태별 슈퍼아머**(`IMonsterStateSuperArmor`)의 범위다 — 밀치기·기절·뇌진탕만 거부하고 나머지 상태이상은 예전처럼 걸린다.
+  공격별 슈퍼아머(복제 `SuperArmor` 플래그 — 공격 중)는 이 표와 별개로 예전대로 차단류 CC 전부를 거부한다.
+- 상태별 슈퍼아머는 `SuperArmor` 플래그를 얹지 않고 두 군데에만 들어간다:
+  - 밀치기 — `MonsterStatusEffect.HasSuperArmor`(= 공격별 **OR** 상태별) → 넉백 입구(`Unit.Knockback` 가드).
+  - 기절·뇌진탕 — `BossCrowdControlRules.RejectsStatus`(공격별 = `StatusEffectImmunityPolicy`, 상태별 = `StateSuperArmorBlocked`). `MonsterStatusEffect` 의 상태이상 적용·기절 연장·`ConcussionState`(뇌진탕 적용·넉백 끝 자격 재확인)가 전부 이 판정 하나를 본다.
   상태별 값은 서버 판정용이라 복제하지 않는다(머리 위 표시 없음).
 - 구현: 23호 `TwentyThreeBoss.CrowdControl.cs`(평상·제압 on, 취약 off) · `GauntletBot`·`SpinnerBot`·`WallBot`(취약 밖 on — 튜토리얼 스피너 연습 개체는 제외).
 - **취약 중엔 공격별 슈퍼아머를 걸지 않는다** — 중간보스 `UsesAttackSuperArmor` 와 같은 규칙을 23호(`BossCrowdControlRules.AppliesAttackSuperArmor`)에도 적용. 23호 공격 8종은 전부 `superArmor: 1` 이라 안 그러면 취약 중 공격하는 동안 Q·간파 넉백이 막힌다.
 - **넉백 입구 = `Unit.Knockback`.** 23호는 `OnKnockback` 을 override 해 취약이면 자체 밀림(`StartVulnerableKnockback` — 고정 거리 `vulnerableKnockbackDistance`·콤보 끊기·NavMesh 정지·벽 튕김), 아니면 무시한다(옛 "IKnockbackable 없음" 오류 로그 없음).
   필수 기믹·점프 체인 중엔 피해만. 세기 값은 쓰지 않는다. 피격의 Q 분기(`qPushHit`)·간파 넉백(`vulnerableHit`)도 이 입구를 탄다 — 조건 = 취약 · 플레이어 · 넉백 세기 > 0(**경직 > 0 조건 없음**).
 - **23호 뇌진탕**: 23호는 `AutoHitReactions=false` 라 `MonsterBase` 넉백 경로를 안 탄다 → 자체 밀림 중(`IMonsterSelfKnockback`)이면 뇌진탕을 대기했다가 밀림이 끝날 때(`FinishVulnerableKnockback`) 기절로 넘긴다(`ConsumeConcussionOnKnockbackEnd` → `ExtendStun`).
-  벽 충돌로 취약이 끝났거나 제압으로 넘어갔으면 슈퍼아머라 기절 없음. Q 경직 그로기 진입이 대기를 취소하므로 뇌진탕은 경직 **뒤에** 건다.
+  벽 충돌로 취약이 끝났거나 제압으로 넘어갔으면 상태별 슈퍼아머라 기절 없음. Q 경직 그로기 진입이 대기를 취소하므로 뇌진탕은 경직 **뒤에** 건다.
 
 ## 2.1 바닥 예고(데칼) — 간파 가능한 공격만 (팀장 10-26)
 

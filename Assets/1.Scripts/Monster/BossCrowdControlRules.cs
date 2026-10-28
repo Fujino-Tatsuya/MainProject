@@ -1,5 +1,5 @@
 /// <summary>
-/// [서버] 몬스터가 상태(평상·취약·제압)에 따라 상시 슈퍼아머를 거는가 — <see cref="MonsterStatusEffect.HasSuperArmor"/> 가 공격별 슈퍼아머와 OR 한다.
+/// [서버] 몬스터가 상태(평상·취약·제압)에 따라 상시 슈퍼아머를 거는가 — 밀치기·기절·뇌진탕만 거부한다(SuperArmor 플래그를 얹지 않는다).
 /// 구현: 23호(평상·제압 on, 취약 off) · 중간보스 3종(취약 밖 on). 규칙 = <see cref="BossCrowdControlRules"/>.
 /// </summary>
 public interface IMonsterStateSuperArmor
@@ -19,15 +19,16 @@ public interface IMonsterSelfKnockback
 /// <summary>
 /// 보스·중간보스 상태별 CC 규칙(할 일 134 — 경석 handoff 보스넉백·기절). MonoBehaviour 밖 순수 계산(EditMode 테스트가 고정한다).
 ///
-/// | 상태 | 밀치기 | 기절·뇌진탕 |
-/// |---|---|---|
-/// | 평상(공격 밖 포함) | 거부 | 거부 |
-/// | 취약 | 허용 | 허용 |
-/// | 제압 | 거부 | 거부 |
-/// 피해는 어느 상태든 정상.
+/// | 상태 | 밀치기 | 기절·뇌진탕 | 둔화·속박·침묵·약화·띄우기 |
+/// |---|---|---|---|
+/// | 평상(공격 밖 포함) | 거부 | 거부 | 허용 |
+/// | 취약 | 허용 | 허용 | 허용 |
+/// | 제압 | 거부 | 거부 | 허용 |
+/// 피해는 어느 상태든 정상. 공격별 슈퍼아머(SuperArmor 플래그)는 이 표와 별개로 예전처럼 차단류 CC 전부를 거부한다.
 ///
-/// 거부 수단은 슈퍼아머 하나다 — 상태별 슈퍼아머 OR 공격별 슈퍼아머(SuperArmor 플래그)가
-/// <see cref="Unit.HasSuperArmor"/>(넉백 입구 <see cref="Unit.Knockback"/>)와 <see cref="StatusEffectImmunityPolicy"/>(기절·뇌진탕)에 같이 들어간다.
+/// 상태별 슈퍼아머는 SuperArmor 플래그를 얹지 않는다 — 두 군데에만 들어간다:
+///  - 밀치기: <see cref="MonsterStatusEffect.HasSuperArmor"/>(= 공격별 OR 상태별) → 넉백 입구 <see cref="Unit.Knockback"/> 가드.
+///  - 기절·뇌진탕: <see cref="RejectsStatus"/>(<see cref="StateSuperArmorBlocked"/>).
 /// </summary>
 public static class BossCrowdControlRules
 {
@@ -37,12 +38,16 @@ public static class BossCrowdControlRules
     /// <summary>중간보스 상태별 슈퍼아머 — 취약(카운터 성공부터 8초) 밖이면 on(공격 밖 평상 포함). 중간보스 등급이 아니면 off.</summary>
     public static bool MidBossStateSuperArmor(bool isMidBoss, bool vulnerable) => isMidBoss && !vulnerable;
 
+    /// <summary>상태별 슈퍼아머가 거부하는 상태이상 — 기절·뇌진탕뿐(밀치기는 넉백 입구가 따로 거부한다).</summary>
+    public const StatusEffectType StateSuperArmorBlocked = StatusEffectType.Stunned | StatusEffectType.Concussion;
+
     /// <summary>
-    /// 거부 판정에 넣는 활성 플래그 = 복제 플래그 + (상태별 슈퍼아머면 SuperArmor).
-    /// <see cref="StatusEffectImmunityPolicy"/>·<see cref="ConcussionState"/> 에 이 값을 준다.
+    /// 몬스터가 들어오는 상태이상을 거부하는가 — 공격별 슈퍼아머(<paramref name="active"/> 의 SuperArmor → 차단류 전부, <see cref="StatusEffectImmunityPolicy"/>)
+    /// OR 상태별 슈퍼아머(기절·뇌진탕만). <see cref="MonsterStatusEffect"/> 의 적용·기절·뇌진탕 판정이 전부 이것 하나를 본다.
     /// </summary>
-    public static StatusEffectType EffectiveActive(StatusEffectType active, bool stateSuperArmor) =>
-        stateSuperArmor ? active | StatusEffectType.SuperArmor : active;
+    public static bool RejectsStatus(StatusEffectType active, bool stateSuperArmor, StatusEffectType incoming) =>
+        StatusEffectImmunityPolicy.ShouldIgnoreApplication(active, incoming)
+        || (stateSuperArmor && (incoming & StateSuperArmorBlocked) != 0);
 
     /// <summary>
     /// 이번 공격에 공격별 슈퍼아머를 거는가 — 취약 중엔 걸지 않는다(취약 = 밀치기·기절 허용).

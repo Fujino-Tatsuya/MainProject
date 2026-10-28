@@ -7,8 +7,8 @@ using UnityEngine;
 public partial class TwentyThreeBoss : IMonsterStateSuperArmor, IMonsterSelfKnockback
 {
     /// <summary>
-    /// [서버] 상태별 슈퍼아머 — 평상 on · 취약 off · 제압 on(할 일 134). 공격별 슈퍼아머(BossAttackEntry.superArmor)와 OR 해
-    /// <see cref="Unit.HasSuperArmor"/> 한 값이 넉백 거부와 기절·뇌진탕 거부(<see cref="StatusEffectImmunityPolicy"/>)를 같이 정한다.
+    /// [서버] 상태별 슈퍼아머 — 평상 on · 취약 off · 제압 on(할 일 134). 밀치기·기절·뇌진탕만 거부한다 —
+    /// 넉백은 <see cref="Unit.HasSuperArmor"/>(공격별 슈퍼아머와 OR), 기절·뇌진탕은 <see cref="BossCrowdControlRules.RejectsStatus"/>. 둔화·속박 등은 걸린다.
     /// </summary>
     bool IMonsterStateSuperArmor.StateSuperArmor => BossCrowdControlRules.StateSuperArmor(IsVulnerable, _suppressed);
 

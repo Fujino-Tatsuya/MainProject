@@ -9,6 +9,7 @@ using UnityEngine;
 //
 // 규칙:
 //  - 슈퍼아머(SuperArmor) 활성 중에는 들어오는 CC(SuperArmor 외 전부)를 무시한다.
+//    보스·중간보스 상태별 슈퍼아머(할 일 134)는 기절·뇌진탕만 무시한다 — 판정은 Rejects 한 곳(BossCrowdControlRules.RejectsStatus).
 //  - duration <= 0 이면 무한 지속(수동 해제 전까지). 그 외엔 서버 Tick으로 만료.
 [DisallowMultipleComponent]
 public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStatusEffectFacade
@@ -61,7 +62,8 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     // 경직(Hit 전이) 봉쇄 = 슈퍼아머면 공격 취소/피격 리액션을 막는다.
     public bool BlocksInterrupt => HasSuperArmor;
 
-    // 공격별 슈퍼아머(복제 플래그) OR 상태별 슈퍼아머(할 일 134 — 보스·중간보스 평상·제압, IMonsterStateSuperArmor).
+    // 밀치기 거부(Unit.Knockback 가드) = 공격별 슈퍼아머(복제 플래그) OR 상태별 슈퍼아머(할 일 134 — 보스·중간보스 평상·제압, IMonsterStateSuperArmor).
+    // 상태이상 거부는 이 값이 아니라 Rejects 가 정한다(상태별은 기절·뇌진탕만).
     // 🔴 상태별 값은 서버 판정용이다(복제하지 않는다 — 머리 위 표시 없음).
     public bool HasSuperArmor => Has(StatusEffectType.SuperArmor) || StateSuperArmor;
 
@@ -86,8 +88,9 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
         }
     }
 
-    // 거부 판정(ConcussionState)에 주는 플래그 — 상태별 슈퍼아머까지 넣는다.
-    StatusEffectType EffectiveActive => BossCrowdControlRules.EffectiveActive(_active.Value, StateSuperArmor);
+    // [서버] 들어오는 상태이상을 거부하는가 — 공격별 슈퍼아머 = 차단류 전부, 상태별 슈퍼아머 = 기절·뇌진탕만.
+    bool Rejects(StatusEffectType incoming) =>
+        BossCrowdControlRules.RejectsStatus(_active.Value, StateSuperArmor, incoming);
 
     // IStatusEffectFacade — Unit의 Final* 스탯 계산용 배율.
     // 몹은 아직 스탯 modifier(버프/디버프 배율) 시스템이 없어 항상 1f(무효과).
@@ -117,8 +120,8 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
         {
             if ((type & flag) == 0) continue;
 
-            // 슈퍼아머 중에는 CC(슈퍼아머 외) 적용 무시.
-            if (flag != StatusEffectType.SuperArmor && HasSuperArmor)
+            // 슈퍼아머 중에는 CC 적용 무시(SuperArmor 자체는 항상 건다).
+            if (Rejects(flag))
                 continue;
 
             next |= flag;
@@ -175,7 +178,7 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     // 넉백 중 = 대기(Concussion 플래그 + 기절 표시를 같이 건다 — 효과·머리 위 표시는 기절과 같다), 아니면 즉시 기절(큰 값).
     void ApplyConcussion(float stunSeconds)
     {
-        switch (_concussion.Apply(stunSeconds, IsKnockedBack, EffectiveActive))
+        switch (_concussion.Apply(stunSeconds, IsKnockedBack, Rejects(StatusEffectType.Concussion)))
         {
             case ConcussionState.ApplyResult.Pending:
                 _expiry[StatusEffectType.Concussion] = float.PositiveInfinity;   // 넉백 끝(소비)·취소로만 지운다
@@ -194,7 +197,7 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     public float ConsumeConcussionOnKnockbackEnd()
     {
         if (!IsServer || !_concussion.IsPending) return 0f;
-        float stun = _concussion.ConsumeOnKnockbackEnd(EffectiveActive);
+        float stun = _concussion.ConsumeOnKnockbackEnd(Rejects(StatusEffectType.Stunned));
         ClearConcussionFlag();
         return stun;
     }
@@ -217,7 +220,7 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
 
     void SetStunAtLeast(float duration, StatusEffectType alsoSet)
     {
-        if (duration <= 0f || HasSuperArmor) return;
+        if (duration <= 0f || Rejects(StatusEffectType.Stunned)) return;
 
         float expireAt = Time.time + duration;
         if (_expiry.TryGetValue(StatusEffectType.Stunned, out float existing) && (_active.Value & StatusEffectType.Stunned) != 0)

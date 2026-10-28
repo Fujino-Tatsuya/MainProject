@@ -16,9 +16,9 @@ public sealed class ConcussionTests
     public void Apply_DuringKnockback_ResetsTo075_NotAdded()
     {
         var state = new ConcussionState();
-        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(Stun, true, StatusEffectType.None));
-        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(Stun, true, StatusEffectType.None));
-        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(Stun, true, StatusEffectType.None));
+        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(Stun, true, false));
+        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(Stun, true, false));
+        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(Stun, true, false));
 
         Assert.AreEqual(0.75f, state.PendingStun, Eps, "3번 맞아도 0.75 — 합산 아님");
     }
@@ -27,8 +27,8 @@ public sealed class ConcussionTests
     public void Apply_LongerPending_ResetToIncoming_NotMax()
     {
         var state = new ConcussionState();
-        state.Apply(2f, true, StatusEffectType.None);
-        state.Apply(Stun, true, StatusEffectType.None);
+        state.Apply(2f, true, false);
+        state.Apply(Stun, true, false);
 
         Assert.AreEqual(0.75f, state.PendingStun, Eps, "재설정 = 들어온 값으로 갱신(큰 값 유지 아님)");
     }
@@ -39,18 +39,18 @@ public sealed class ConcussionTests
     public void KnockbackEnd_ConvertsToStun_AndClearsPending()
     {
         var state = new ConcussionState();
-        state.Apply(Stun, true, StatusEffectType.Stunned);
+        state.Apply(Stun, true, false);
 
-        Assert.AreEqual(0.75f, state.ConsumeOnKnockbackEnd(StatusEffectType.Stunned | StatusEffectType.Concussion), Eps);
+        Assert.AreEqual(0.75f, state.ConsumeOnKnockbackEnd(false), Eps);
         Assert.IsFalse(state.IsPending);
-        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(StatusEffectType.None), Eps, "한 번만 바뀐다");
+        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(false), Eps, "한 번만 바뀐다");
     }
 
     [Test]
     public void Apply_NotKnockedBack_StunsImmediately()
     {
         var state = new ConcussionState();
-        Assert.AreEqual(ConcussionState.ApplyResult.StunNow, state.Apply(Stun, false, StatusEffectType.None));
+        Assert.AreEqual(ConcussionState.ApplyResult.StunNow, state.Apply(Stun, false, false));
         Assert.IsFalse(state.IsPending, "즉시 기절 — 대기 없음");
     }
 
@@ -58,7 +58,7 @@ public sealed class ConcussionTests
     public void KnockbackEnd_WithoutPending_ReturnsZero()
     {
         var state = new ConcussionState();
-        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(StatusEffectType.None), Eps);
+        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(false), Eps);
     }
 
     // ── 기존 기절과 큰 값 ─────────────────────────────────────────────
@@ -72,14 +72,14 @@ public sealed class ConcussionTests
         Assert.AreEqual(expected, ConcussionState.MergeStun(existing, incoming), Eps);
     }
 
-    // ── 슈퍼아머 거부 ─────────────────────────────────────────────────
+    // ── 슈퍼아머 거부(거부 여부는 수신측 판정 — 몬스터는 BossCrowdControlRules.RejectsStatus) ──────
 
     [Test]
     public void SuperArmor_RejectsConcussion()
     {
         var state = new ConcussionState();
-        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, state.Apply(Stun, true, StatusEffectType.SuperArmor));
-        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, state.Apply(Stun, false, StatusEffectType.SuperArmor));
+        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, state.Apply(Stun, true, true));
+        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, state.Apply(Stun, false, true));
         Assert.IsFalse(state.IsPending);
     }
 
@@ -87,9 +87,9 @@ public sealed class ConcussionTests
     public void SuperArmor_AtKnockbackEnd_NoStun()
     {
         var state = new ConcussionState();
-        state.Apply(Stun, true, StatusEffectType.None);
+        state.Apply(Stun, true, false);
 
-        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(StatusEffectType.SuperArmor), Eps, "넉백 종료 순간 자격 재확인");
+        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(true), Eps, "넉백 종료 순간 자격 재확인");
         Assert.IsFalse(state.IsPending);
     }
 
@@ -106,7 +106,7 @@ public sealed class ConcussionTests
     public void ZeroDuration_Rejected()
     {
         var state = new ConcussionState();
-        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, state.Apply(0f, true, StatusEffectType.None));
+        Assert.AreEqual(ConcussionState.ApplyResult.Rejected, state.Apply(0f, true, false));
     }
 
     // ── 제압(그로기) 전환 시 대기 기절 취소 ─────────────────────────────
@@ -115,10 +115,10 @@ public sealed class ConcussionTests
     public void Cancel_ClearsPending()
     {
         var state = new ConcussionState();
-        state.Apply(Stun, true, StatusEffectType.None);
+        state.Apply(Stun, true, false);
 
         Assert.IsTrue(state.Cancel());
-        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(StatusEffectType.None), Eps, "취소 뒤 넉백이 끝나도 기절 없음");
+        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(false), Eps, "취소 뒤 넉백이 끝나도 기절 없음");
         Assert.IsFalse(state.Cancel(), "두 번째 취소는 할 일 없음");
     }
 

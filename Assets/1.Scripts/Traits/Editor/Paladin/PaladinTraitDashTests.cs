@@ -372,9 +372,9 @@ public sealed class PaladinTraitDashTests
 
         // 수신측: 밀린 상태로 1회 → 넉백 끝나는 순간 1회 기절, 그 뒤 없음.
         var state = new ConcussionState();
-        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(info.concussionDuration, true, StatusEffectType.None));
-        Assert.AreEqual(0.75f, state.ConsumeOnKnockbackEnd(StatusEffectType.None), Eps, "단발 넉백 끝 = 기절 0.75");
-        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(StatusEffectType.None), Eps, "대상별 1회");
+        Assert.AreEqual(ConcussionState.ApplyResult.Pending, state.Apply(info.concussionDuration, true, false));
+        Assert.AreEqual(0.75f, state.ConsumeOnKnockbackEnd(false), Eps, "단발 넉백 끝 = 기절 0.75");
+        Assert.AreEqual(0f, state.ConsumeOnKnockbackEnd(false), Eps, "대상별 1회");
 
         foreach (ITraitEffectBinding b in bindings) b?.Unbind();
     }
