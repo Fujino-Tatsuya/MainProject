@@ -98,6 +98,20 @@ public sealed class AssassinTraitRestraintTests
         transformEndTime = start + Rules.DurationFor(fuel),
     };
 
+    // ── HUD 표시(할 일 133) ─────────────────────────────────────────────
+
+    [Test]
+    public void Hud_Restrained_HidesOnlyUltimateSlot_AndRageGauge()
+    {
+        Assert.IsTrue(AssassinRestraintRules.HidesHudSlot(true, PlayerSkillSlot.Ultimate), "R 칸 숨김");
+        foreach (PlayerSkillSlot slot in new[] { PlayerSkillSlot.Main, PlayerSkillSlot.Sub, PlayerSkillSlot.Interrupt })
+            Assert.IsFalse(AssassinRestraintRules.HidesHudSlot(true, slot), $"{slot} 는 그대로");
+        Assert.IsFalse(AssassinRestraintRules.HidesHudSlot(false, PlayerSkillSlot.Ultimate), "미선택 = R 보임");
+
+        Assert.IsFalse(AssassinRestraintRules.ShowsRageGauge(true), "머리 위 분노 줄 숨김");
+        Assert.IsTrue(AssassinRestraintRules.ShowsRageGauge(false));
+    }
+
     // ── 정의 데이터·카드 ────────────────────────────────────────────────
 
     [Test]

@@ -30,12 +30,14 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         [System.NonSerialized] public bool iconBaseColorCached;
         [System.NonSerialized] public bool iconTinted;     // 후속 시전 중 아이콘 색 곱하기(할 일 128 5a)
         [System.NonSerialized] public Color iconTint;
+        [System.NonSerialized] public bool hiddenByTrait;  // 특성이 슬롯을 없앴다(절제된 분노 = R, 할 일 133) — 슬롯 루트를 끈다
     }
 
     [SerializeField] private SlotWidget[] slots;
     [SerializeField] private Color blockedColor = new Color(0.35f, 0.35f, 0.35f, 0.75f);
 
     private PlayerSkillController skillController;
+    private AssassinState assassinState;
     private Player boundPlayer;
     private bool isBlocked;
 
@@ -52,6 +54,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
         boundPlayer = player;
         skillController = player != null ? player.GetComponent<PlayerSkillController>() : null;
+        assassinState = player != null ? player.GetComponent<AssassinState>() : null;
         if (skillController != null)
             skillController.SlotBindingChanged += HandleSlotBindingChanged;
 
@@ -225,6 +228,8 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             if (widget == null)
                 continue;
 
+            ApplyTraitHidden(widget);
+
             float remaining = 0f;
             float total = 0f;
 
@@ -248,6 +253,20 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                     : remaining < 1f ? remaining.ToString("F1") : Mathf.CeilToInt(remaining).ToString();
             }
         }
+    }
+
+    // 절제된 분노(할 일 133) — R 슬롯 루트(CooldownFill 의 부모, CacheSlotColors 와 같은 기준)를 런타임에 끈다. 프리팹은 그대로.
+    // 바뀔 때만 SetActive — 특성 초기화로 풀리면 다시 켠다.
+    private void ApplyTraitHidden(SlotWidget widget)
+    {
+        bool hidden = assassinState != null && AssassinRestraintRules.HidesHudSlot(assassinState.IsRestrained, widget.slot);
+        if (hidden == widget.hiddenByTrait)
+            return;
+
+        widget.hiddenByTrait = hidden;
+        Transform slotRoot = widget.cooldownFill != null ? widget.cooldownFill.transform.parent : null;
+        if (slotRoot != null)
+            slotRoot.gameObject.SetActive(!hidden);
     }
 
     private void CacheSlotColors()
