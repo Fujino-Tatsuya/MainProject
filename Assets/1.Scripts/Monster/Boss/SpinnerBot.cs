@@ -20,8 +20,13 @@ using UnityEngine.AI;
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
 [DataTableSheet("MidBoss", Order = 1)]
-public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
+public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink, IMonsterStateSuperArmor
 {
+    // 할 일 134 — 취약 밖(공격 밖 평상 포함) 상시 슈퍼아머 = 밀치기·기절·뇌진탕 거부, 취약 = 허용(BossCrowdControlRules).
+    // 튜토리얼 연습 개체(Override 주입)는 제외 — 자기 슈퍼아머를 직접 건다(TutorialSpinnerPractice).
+    bool IMonsterStateSuperArmor.StateSuperArmor =>
+        Override == null && BossCrowdControlRules.MidBossStateSuperArmor(Rank == MonsterRank.MidBoss, IsMidBossVulnerable);
+
     enum SpinPhase { None, Window, Dash }
 
     [Header("스핀 — 선택")]

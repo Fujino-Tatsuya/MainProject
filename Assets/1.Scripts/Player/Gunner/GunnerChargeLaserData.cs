@@ -73,6 +73,18 @@ public class GunnerChargeLaserData : PlayerSkillData
     public float StageDamageMultiplier(int stage) => Pick(stageDamageMultipliers, stage);
     public float StageShieldMultiplier(int stage) => Pick(stageShieldMultipliers, stage);
 
+    /// <summary>
+    /// 원래 발 피해 상태 배율 최소 = 충전 0 · 0단계 · 축열 소모 0 (판정식 GunnerChargeLaserSkill.Fire 와 같은 표, 할 일 127 3/4).
+    /// </summary>
+    public float MinShotScale(in GunnerHeatTraits traits) => DamageMultiplierAt(0f) * traits.SkillStageScale(0, StageDamageMultiplier(0));
+
+    /// <summary>최대 = 최대 충전 · 도달 가능한 최고 단계(정온 운용 0) · 축열 최대 소모(축열 포격만).</summary>
+    public float MaxShotScale(in GunnerHeatTraits traits)
+    {
+        int top = traits.MaxStage;
+        return DamageMultiplierAt(1f) * traits.SkillStageScale(top, StageDamageMultiplier(top)) * traits.MaxHeatShotScale;
+    }
+
     private static float Pick(float[] table, int stage)
     {
         if (table == null || table.Length == 0)
@@ -85,8 +97,8 @@ public class GunnerChargeLaserData : PlayerSkillData
         if (player == null)
             return default;
 
-        float minScale = DamageMultiplierAt(0f) * StageDamageMultiplier(0);
-        float maxScale = DamageMultiplierAt(1f) * StageDamageMultiplier(int.MaxValue);
+        float minScale = MinShotScale(GunnerHeatTraits.From(player.TraitModifiers));
+        float maxScale = MaxShotScale(GunnerHeatTraits.From(player.TraitModifiers));
         return SkillTooltipDamage.FromScaledSnapshot(
             player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale, player.DealtDamagePercent);
     }

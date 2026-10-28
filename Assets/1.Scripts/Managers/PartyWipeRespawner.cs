@@ -26,7 +26,7 @@ public static class PartyWipeRespawner
     private const float FloorTolerance = 1f;
 
     /// <summary>
-    /// [서버] 전멸 리스폰이 끝났다(리스폰한 clientId 목록, 오름차순). 특성 초기화 팝업(<see cref="TutorialTraitDirector"/>, 3단계)이 구독한다.
+    /// [서버] 전멸 리스폰이 끝났다(리스폰한 clientId 목록, 오름차순). 특성 초기화 팝업(<see cref="TraitDirector"/>, 3단계)이 구독한다.
     /// 같은 판에서 여러 번 날 수 있다(전멸할 때마다).
     /// </summary>
     public static event Action<IReadOnlyList<ulong>> PartyWipeRespawned;

@@ -52,8 +52,11 @@ public class GunnerTrackingLaserData : PlayerSkillData
         if (player == null)
             return default;
 
-        float minScale = StageDamageMultiplier(0);
-        float maxScale = StageDamageMultiplier(int.MaxValue);
+        // 판정(GunnerTrackingLaserSkill)과 같은 과열 모드 표 — 한계 돌파 = 교체 표, 정온 운용 = 0단계만.
+        GunnerHeatTraits traits = GunnerHeatTraits.From(player.TraitModifiers);
+        int top = traits.MaxStage;
+        float minScale = traits.SkillStageScale(0, StageDamageMultiplier(0));
+        float maxScale = traits.SkillStageScale(top, StageDamageMultiplier(top));
         return SkillTooltipDamage.FromScaledSnapshot(
             player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale, player.DealtDamagePercent);
     }

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 /// 서버 전용 재합류 보관소 — 할 일 48 C14. 판 도중 나간 사람의 상태를 playerId 키로 들고 있다가 같은 사람이
 /// 다시 스폰되면(<see cref="MatchRoster.PlayerRejoined"/>) 각 시스템이 꺼내 간다. 꺼내면 지운다(같은 기록을 두 번 되돌리지 않는다).
 /// <list type="bullet">
-/// <item>특성(R4c): <see cref="TutorialTraitDirector"/> 가 퇴장 때 <see cref="SaveTraits"/>, 재합류 때 <see cref="TryTakeTraits"/>.
+/// <item>특성(R4c): <see cref="TraitDirector"/> 가 퇴장 때 <see cref="SaveTraits"/>, 재합류 때 <see cref="TryTakeTraits"/>.
 /// 특성 디렉터가 새로 스폰되면(맵 다시 로드) 이전 판 특성 기록은 의미가 없어 <see cref="ClearTraits"/>.</item>
 /// <item>생명·체력(R5c): NGO 는 퇴장 콜백(OnClientDisconnectCallback)보다 <b>먼저</b> PlayerObject 를 디스폰한다(NetworkConnectionManager.OnClientDisconnectFromServer).
 /// 그래서 <see cref="PlayerLifeCycleController"/> 가 디스폰 때 clientId 키로 <see cref="NoteDespawnedLife"/> 하고, 퇴장 콜백이
@@ -22,8 +22,8 @@ public sealed class RejoinMemory
     /// <summary>서버 인스턴스.</summary>
     public static RejoinMemory Server { get; } = new RejoinMemory();
 
-    readonly Dictionary<string, TutorialTraitRejoinSnapshot> _traits =
-        new Dictionary<string, TutorialTraitRejoinSnapshot>(StringComparer.Ordinal);
+    readonly Dictionary<string, TraitRejoinSnapshot> _traits =
+        new Dictionary<string, TraitRejoinSnapshot>(StringComparer.Ordinal);
     readonly Dictionary<string, PlayerRejoinLifeRecord> _lives =
         new Dictionary<string, PlayerRejoinLifeRecord>(StringComparer.Ordinal);
     // 디스폰 순간 생명 기록(clientId 키) — 퇴장 콜백에서 playerId 키로 옮기거나 버린다.
@@ -43,7 +43,7 @@ public sealed class RejoinMemory
     public int Count => _traits.Count + _lives.Count + _despawnedLives.Count;
 
     /// <summary>퇴장 — 그 playerId 의 특성 상태를 보관한다(이전 기록은 덮는다). playerId·기록이 비면 false.</summary>
-    public bool SaveTraits(string playerId, TutorialTraitRejoinSnapshot snapshot)
+    public bool SaveTraits(string playerId, TraitRejoinSnapshot snapshot)
     {
         if (string.IsNullOrEmpty(playerId) || snapshot == null)
             return false;
@@ -53,7 +53,7 @@ public sealed class RejoinMemory
     }
 
     /// <summary>재합류 — 그 playerId 의 특성 기록을 꺼내고 지운다. 없으면 false.</summary>
-    public bool TryTakeTraits(string playerId, out TutorialTraitRejoinSnapshot snapshot)
+    public bool TryTakeTraits(string playerId, out TraitRejoinSnapshot snapshot)
     {
         snapshot = null;
         if (string.IsNullOrEmpty(playerId) || !_traits.TryGetValue(playerId, out snapshot))

@@ -42,6 +42,9 @@ public struct AttackInfo
     public float knockbackStrength;   // 지속 밀기 속도(m/s). 0이면 넉백 없음.
     public float knockbackDuration;   // 지속 밀기 시간(초).
     public float staggerDuration;     // 넉백 종료 후 Stunned 경직 시간(초).
+    // 뇌진탕(할 일 125) — 넉백이 끝나면 걸 기절(초). 0 = 없음. 실제로 밀린 대상에만(MonsterBase.ReceiveAttack), 규칙은 ConcussionState.
+    // 생성자 인자 없음 — 특성 밀치기(TraitKnockbackEffect.ApplyCrowdControl)가 채운다.
+    public float concussionDuration;
     // 밀기 방향(월드, 수평). zero면 수신측이 방사형(몹-공격자)으로 계산한다.
     // 방향성 공격(Q 전진 견인 등)은 반드시 명시할 것 — 이동하는 시전자의 방사형 계산은
     // 시전자가 대상을 따라잡는 순간 옆/뒤로 뒤집힌다.
@@ -68,6 +71,7 @@ public struct AttackInfo
         this.knockbackDuration = Mathf.Max(0f, knockbackDuration);
         this.staggerDuration = Mathf.Max(0f, staggerDuration);
         this.knockbackDirection = knockbackDirection;
+        this.concussionDuration = 0f;
     }
 }
 

@@ -148,7 +148,7 @@ public sealed class MapSceneZone4IntroFlow : MonoBehaviour
     private void StartIntro()
     {
         // 60초 교착 방지로 준비된 경우 아직 특성 창이 열린 사람이 있다 — 연출 위에 창이 남지 않게 먼저 닫는다(자동 획득).
-        TutorialTraitDirector traits = TutorialTraitDirector.Instance;
+        TraitDirector traits = TraitDirector.Instance;
         int auto = traits != null ? traits.AutoChooseAllPendingServer() : 0;
 
         Lock();

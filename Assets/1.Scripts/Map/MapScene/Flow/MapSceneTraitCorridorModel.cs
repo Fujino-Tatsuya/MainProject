@@ -39,11 +39,11 @@ public static class MapSceneTraitCorridorRules
     };
 
     /// <summary>창 표시 옵션 — 복도1 = 상단 설명, 복도4 = 아래 한 줄(게이지 계속), 2·3 = 없음(D7).</summary>
-    public static TutorialTraitRoundDisplay DisplayOf(int corridor) => corridor switch
+    public static TraitRoundDisplay DisplayOf(int corridor) => corridor switch
     {
-        1 => TutorialTraitRoundDisplay.Intro,
-        4 => TutorialTraitRoundDisplay.LastNotice,
-        _ => TutorialTraitRoundDisplay.None,
+        1 => TraitRoundDisplay.Intro,
+        4 => TraitRoundDisplay.LastNotice,
+        _ => TraitRoundDisplay.None,
     };
 
     /// <summary>복도 출구 다음 존이 첫 진입 때 거는 단계 — 존2 · 존3 연습 · 존4 설정 자막 · (복도4) 보스방 도착.</summary>

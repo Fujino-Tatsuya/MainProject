@@ -200,11 +200,18 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
         statusEffects.Remove(StatusEffectType.PassiveCharge, ChargeSourceId);
         SetReadyAtServer(ClockNow + cooldownTime);
 
-        int bonusDamage = owner.ResolveDamage(bonusDamageMultiplier, bonusFlatDamage);
+        // 특성 사건(할 일 126 — 불굴의 순환 Q·E 중 긴 쪽 −1초). 발동 1회 = 사건 1회(시전 ID 0 = 매번 새 발동).
+        // 아래 회복·초과 전달·보호막은 이 사건을 다시 내지 않는다(명세 — 추가 패시브 발동 아님).
+        PlayerTraitEffects.For(owner).RaiseServer(
+            new TraitTriggerEvent(TraitTrigger.PassiveProc, AttackType.None, TraitAttackForm.Normal, 0, false));
 
+        // 패시브 추가피해 = 공격 계열 미지정(AttackType.None) 키 — 평타·Q 등 계열을 고른 배율은 붙지 않고 '모든 공격' 배율만 붙는다(할 일 125).
+        int bonusDamage = owner.ResolveDamage(bonusDamageMultiplier, bonusFlatDamage, new TraitAttackKey(AttackType.None));
+
+        // 특성 회복 경로(할 일 125 3/5) — 특성 없으면 회복 배율 1·전달 없음이라 예전 HealHp 와 같다.
         int healAmount = Mathf.RoundToInt(owner.MaxHp * (healPercent / 100f));
         if (healAmount > 0)
-            owner.HealHp(healAmount);
+            PlayerTraitEffects.For(owner).HealServer(healAmount);
 
         ServerPlayProcVfx(target);
 

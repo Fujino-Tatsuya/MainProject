@@ -158,7 +158,7 @@
 [클라] 내 행이 있고 아직 답하지 않은 세대 → 팝업(UiModalBlocker = 이동·대시·공격 차단) → [예]/[아니오] → AnswerResetPromptServerRpc(세대, 예/아니오)
 [서버] 보낸 사람(SenderClientId) 기준 Answer — 대기 중·세대 일치만 받는다(대상 아님·중복·지난 세대 = 거부 + 경고 로그)
  · 아니오: 상태 비움(특성 유지, 팝업 닫힘)
- · 예: RevertEffects(그 플레이어 장부만 — 배율 상태이상 Remove(type, SourceIdOf(index)) · ServerAttackLanded 구독 해제)
+ · 예: RevertEffects(그 플레이어 장부만 — ServerAttackLanded 구독 해제. 배율 특성은 획득 행이 비면 PlayerTraitModifiers 가 1 로 — 할 일 125 2/5)
        → selection.ResetPlayer → ContinueReselect: 남은 라운드 1 빼고 StartPersonalRound(후보 = 풀 OfferCount(3)장, 획득 제외) — 0장이면 다음 라운드
        → 고를 때마다(CommitChoice) 다음 라운드를 열고, 4라운드를 다 쓰면 재선택 끝
  → 행·무적(TraitSelection 토큰 — 기존 SyncSelectionShields)·traitResetBusy 동기화. 아무도 대기·재선택 중이 아니면 패드가 다시 열린다

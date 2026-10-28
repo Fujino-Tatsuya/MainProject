@@ -42,6 +42,15 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 판정 기준점 (MainSkill/SubSkill/InterruptAttack/UltimateSkill 앵커). E처럼 판정 없는 스킬은 비워도 된다.
     [SerializeField] private ColliderInfo hitboxAnchor;
 
+    // 후속 시전(할 일 128 5a, PlayerSkillFollowUp.cs) — 비우면 기존 동작 그대로.
+    [Header("후속 시전")]
+    [Tooltip("이 스킬을 쓰면 같은 칸이 잠깐 바뀔 후속 스킬(같은 슬롯, 별도 컴포넌트·데이터). 후속을 쓰거나 창이 끝나면 돌아오고 그때 이 스킬 쿨이 시작된다.")]
+    [SerializeField] private PlayerSkillBase followUpSkill;
+    [Tooltip("후속 창 길이(초). 기본 시작 = 이 스킬이 끝났을 때, 스킬이 BeginFollowUpWindow() 로 일찍 열 수 있다.")]
+    [SerializeField, Min(0f)] private float followUpWindowSeconds = 3f;
+    [Tooltip("후속 스킬이 이 스킬의 시전 ID(ServerCastId)를 이어받는가 — 같은 시전의 다른 단계로 묶을 때.")]
+    [SerializeField] private bool followUpInheritsCastId = true;
+
     protected Player owner;
     protected PlayerSkillController controller;
     protected int damageSnapshot;
@@ -56,6 +65,33 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     public bool HasAimPoint { get; private set; }
 
     public abstract PlayerSkillSlot Slot { get; }
+
+    // ── 후속 시전(할 일 128 5a) ──
+
+    /// <summary>이 스킬에 연결된 후속 스킬. 컨트롤러가 Awake 에 등록한다(같은 슬롯, 후속의 후속은 지원 안 함).</summary>
+    public virtual PlayerSkillBase FollowUpSkill => followUpSkill;
+
+    /// <summary>후속 창 길이(초). 시작 시점은 기본 = 이 스킬 종료, 일찍 열려면 <see cref="BeginFollowUpWindow"/>.</summary>
+    public virtual float FollowUpWindowSeconds => followUpWindowSeconds;
+
+    /// <summary>후속 스킬이 이 스킬의 시전 ID 를 이어받는가.</summary>
+    public virtual bool FollowUpInheritsCastId => followUpInheritsCastId;
+
+    /// <summary>
+    /// 이번 시전이 후속을 여는가 — 서버 승인(CanUse 통과 뒤)과 원격 오너 예측에서 같은 값을 본다. 기본 = 후속이 연결돼 있으면 항상.
+    /// 거짓이면 기존대로 승인 때 쿨이 시작된다. 조건을 둘 스킬은 덮는다(서버가 최종 — 오너와 달라도 서버 값이 이긴다).
+    /// </summary>
+    public virtual bool OpensFollowUp(Vector3 direction, Unit target) => FollowUpSkill != null;
+
+    /// <summary>[후속 스킬] 지금 이 스킬을 칸에 올린 원래 스킬. 후속이 아니면 null.</summary>
+    public PlayerSkillBase FollowUpSource => controller != null ? controller.GetFollowUpSource(this) : null;
+
+    /// <summary>[서버] 후속 창을 지금부터 시작한다(예: 첫 돌진 종료). 안 부르면 이 스킬이 끝날 때 시작된다. 이미 시작했으면 무시.</summary>
+    protected void BeginFollowUpWindow()
+    {
+        if (controller != null)
+            controller.BeginFollowUpWindowServer(this);
+    }
 
     // 슬롯은 PlayerSkillController 바인딩과 각 구현의 Slot 계약으로 이미 검증된다.
     // 우클릭 Interrupt는 Q/E/R 슬롯이 아니므로 범용 Skill로 남긴다.
@@ -170,6 +206,17 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     public void SetDamageSnapshot(int value)
     {
         damageSnapshot = Mathf.Max(0, value);
+    }
+
+    /// <summary>
+    /// [서버] 이번 시전의 ID(할 일 125 3/5, 명세 §3 CastId) — 서버 승인 때 컨트롤러가 <see cref="OnServerStart"/> 직전에 넣는다. 0 = 아직 시전 없음.
+    /// 이 스킬을 출처(source)로 낸 적중(Player.RaiseServerAttackLanded)은 이 값으로 묶인다.
+    /// </summary>
+    public int ServerCastId { get; private set; }
+
+    public void SetServerCastId(int castId)
+    {
+        ServerCastId = castId;
     }
 
     public void SetAimPoint(Vector3 point, bool hasPoint)

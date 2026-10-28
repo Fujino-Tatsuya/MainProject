@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c86ed8e67005623418a6b6494f670ee6, type: 3}
+  m_Name: TraitPool_Assassin
+  m_EditorClassIdentifier: Assembly-CSharp::TraitCharacterPool
+  character: 3
+  traits:
+  - {fileID: 11400000, guid: 5ce1bca563db9c54f8f3b15b45967256, type: 2}
+  - {fileID: 11400000, guid: 048c4598457070947b87816111d983e0, type: 2}
+  - {fileID: 11400000, guid: 7223d5bf3cec07f4190e810916739e84, type: 2}
+  - {fileID: 11400000, guid: 1ee8fa043d611af4daef7dc68c53533f, type: 2}
+  - {fileID: 11400000, guid: 33850316c72dfee57c1ac4a7b03cd240, type: 2}
+  - {fileID: 11400000, guid: 3bf258fbc86fc324c9b906fdb53890bf, type: 2}
+  - {fileID: 11400000, guid: a63028c927859b84e8f352c6cefab18f, type: 2}
+  - {fileID: 11400000, guid: 7143d4106ae830044bdfbcddfff63007, type: 2}
+  - {fileID: 11400000, guid: f752544b920a6c84e8601d5f898afcaa, type: 2}
+  - {fileID: 11400000, guid: 60ddcb7694f52424b9d243a3ea81fd2e, type: 2}
+  - {fileID: 11400000, guid: 7fd1715c962754245b196b1eca45058c, type: 2}
+  - {fileID: 11400000, guid: a7263ffc866357145b55b35f942268c4, type: 2}

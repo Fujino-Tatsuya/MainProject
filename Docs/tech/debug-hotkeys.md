@@ -26,7 +26,7 @@
 | 키 | 기능 | 파일 | 게이트 | 변경 전 릴리스 | 겹침 |
 |---|---|---|---|---|---|
 | F1 | 피격 이펙트 종류 순환 | `Assets/1.Scripts/Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F1 — DebugCharacterCycle |
-| F1 | 캐릭터 순환 팔라딘 → 어쌔신 → 거너(호스트, 같은 자리 재스폰) — **DebugInterruptLab 씬 전용**. [dash-interrupt.md §10.1](dash-interrupt.md) | `Dev/InterruptLab/DebugCharacterCycle.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 115 C6) | ⚠️ F1 — HitVFXDebugHUD(그 HUD 는 이 씬에 없어 실제로는 안 겹침) |
+| F1 | 캐릭터 순환 팔라딘 → 어쌔신 → 거너(호스트, 같은 자리 재스폰) — **DebugInterruptLab·DebugTraitLab 씬 전용**(특성 랩은 바꾸기 직전 보유 특성을 비운다). [dash-interrupt.md §10.1](dash-interrupt.md) · [tutorial-traits.md §13](tutorial-traits.md) | `Dev/InterruptLab/DebugCharacterCycle.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 115 C6 · 135) | ⚠️ F1 — HitVFXDebugHUD(그 HUD 는 이 씬에 없어 실제로는 안 겹침) |
 | F2 | 타격점 계산 방식 순환 | `Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | |
 | F3 | 23호 다음 행동 = 점프·점프·점프 콤보 예약(호스트) — 3번째 착지 간파 창 확인용 | `Dev/DevBossAttackHotkeys.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |

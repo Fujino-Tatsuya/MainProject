@@ -10,6 +10,7 @@ public enum ShieldType : byte
     None = 0,
     HolyShield = 1,     // 가붕이 E 수호자의 의지
     GunnerCharge = 2,   // 거너 Q 충전 레이저
+    Trait = 3,          // 특성 보호막 채널(할 일 125 3/5) — 출처 = 특성 해시(TraitShieldRules), 같은 특성 채널은 큰 값 유지(Replace 로 갈아 끼움)
 }
 
 /// <summary>같은 종류·같은 출처의 보호막을 다시 받을 때의 처리.</summary>

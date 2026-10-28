@@ -13,6 +13,8 @@ internal static class PlayerEditModeTestRunner
     {
         "^StatusEffectImmunityTests$", // PLAN-assassin A1 — SuperArmor 의미 통일
         "^PlayerSkillCooldownLedgerTests$", // PLAN-assassin A2 — 스킬 단위 쿨 장부·슬롯 교체
+        "^PlayerTraitCooldownRescaleTests$", // 할 일 125 (2/5) — 특성 쿨 배율 변경 시 진행률 보존·준비 유지·전체 0 예외·장부 전체 기억
+        "^PlayerStatFormulaTests$", // 할 일 83·91 — 스탯 종합 공식·출처·검증 보고(특성 출처 연결 회귀 확인용으로 여기서도 돈다)
         "^CooldownClockTests$", // 할 일 91 T2 — 쿨 시계 적분: 배율 1·중간 변경·0·슬로우·원천 역행·교체
         "^CooldownRateWiringTests$", // 할 일 91 T8 — 쿨 배율 = CooldownRateModifier 곱(없음 1·곱·스택), 배율 2 스킬·대시·패시브 절반, 중간 해제 2→1
         "^PassiveCooldownSyncTests$", // 할 일 91 T4 — 가붕이 패시브 내부 쿨: 남은 초 도장·피어 환산·늦은 참가·배율 2·피격 감소

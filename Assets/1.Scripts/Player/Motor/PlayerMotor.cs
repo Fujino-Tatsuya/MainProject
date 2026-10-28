@@ -397,7 +397,9 @@ public sealed class PlayerMotor : MonoBehaviour
         input.PoseRotation = pendingPoseRotation;
 
         PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
-        bool separated = ApplyUnitSeparation(ref simulationState, settings, deltaTime);
+        // 정적 지형 겹침을 먼저 푼다 — 유닛 밀어내기 스윕이 벽 시작 겹침에 막혀 0 이 되지 않게(할 일 136).
+        bool separated = ApplyStaticDepenetration(ref simulationState, settings, deltaTime);
+        separated |= ApplyUnitSeparation(ref simulationState, settings, deltaTime);
 
         DiagnoseSimulationInput("owner", rawInput, simulationState, input, settings, deltaTime);
 
@@ -408,6 +410,8 @@ public sealed class PlayerMotor : MonoBehaviour
 
         ClearPendingMotion();
         simulationState = result.State;
+        if (result.AppliesPoseRotation)
+            ResolvePoseStaticOverlap(ref simulationState, settings);
         movement?.CommitSimulationState(simulationState, !result.AppliesPoseRotation);
 
         if (result.AppliesPoseRotation)
@@ -503,7 +507,8 @@ public sealed class PlayerMotor : MonoBehaviour
 
         PlayerSimulationSettings settings =
             CaptureSimulationSettings(serverObservationState.IsSoul);
-        bool separated = ApplyUnitSeparation(ref serverObservationState, settings, deltaTime);
+        bool separated = ApplyStaticDepenetration(ref serverObservationState, settings, deltaTime);
+        separated |= ApplyUnitSeparation(ref serverObservationState, settings, deltaTime);
         DiagnoseSimulationInput(
             "server-observation",
             rawInput,
@@ -523,6 +528,8 @@ public sealed class PlayerMotor : MonoBehaviour
 
         ClearServerPendingMotion();
         serverObservationState = result.State;
+        if (result.AppliesPoseRotation)
+            ResolvePoseStaticOverlap(ref serverObservationState, settings);
         resultState = serverObservationState;
 
         simulationState = serverObservationState;
@@ -941,11 +948,112 @@ public sealed class PlayerMotor : MonoBehaviour
             settings.CollisionSkin,
             settings.MaxSweepIterations,
             castBuffer);
+
+        // 벽에 정면으로 밀려 거의 못 움직였으면 벽을 따라 미끄러진다 — 유닛과 벽 사이에 끼어 멈추지 않게(할 일 136).
+        if (resolved.sqrMagnitude < step.sqrMagnitude * 0.25f &&
+            PlayerMotionSweep.TryGetBlockingNormal(
+                capsule,
+                originOffset,
+                step,
+                step.magnitude + settings.CollisionSkin,
+                settings.MaxWalkableSlopeAngle,
+                settings.ObstacleMask.value & ~unitMask,
+                settings.CollisionSkin,
+                castBuffer,
+                out Vector3 wallNormal))
+        {
+            Vector3 slide = PlayerUnitCollisionRules.ComputeWallSlideStep(step, wallNormal);
+            if (slide != Vector3.zero)
+            {
+                Vector3 slid = PlayerMotionSweep.Resolve(
+                    capsule,
+                    originOffset,
+                    slide,
+                    slide,
+                    state.IsGrounded,
+                    settings.StepOffset,
+                    settings.MaxWalkableSlopeAngle,
+                    settings.ObstacleMask.value & ~unitMask,
+                    settings.CollisionSkin,
+                    settings.MaxSweepIterations,
+                    castBuffer);
+                if (slid.sqrMagnitude > resolved.sqrMagnitude)
+                    resolved = slid;
+            }
+        }
+
         if (resolved.sqrMagnitude <= 1e-10f)
             return false;
 
         state.Position += resolved;
         return true;
+    }
+
+    private LayerMask ResolveStaticMask(PlayerSimulationSettings settings)
+    {
+        return settings.ObstacleMask.value & ~LayerMask.GetMask("Enemy", "Player");
+    }
+
+    /// <summary>
+    /// 이미 파고든 정적 지형(벽·Env 등)에서 빠져나온다(할 일 136). 유닛 밀어내기보다 먼저 돈다 — 정적이 우선.
+    /// 시작 겹침 상태의 스윕은 전 방향 0 이라 이동·밀어내기가 모두 막히므로 스윕 없이 관통 해소 방향으로 옮긴다.
+    /// 길이는 이동속도(MaxSpeed) × dt 로 묶어 순간이동하지 않는다. 오너·서버 커밋 경로가 같은 계산을 돈다.
+    /// </summary>
+    /// <returns>위치를 옮겼는가(커밋 필요).</returns>
+    private bool ApplyStaticDepenetration(
+        ref PlayerSimulationState state,
+        PlayerSimulationSettings settings,
+        float deltaTime)
+    {
+        if (capsule == null)
+            return false;
+
+        float speed = settings.MaxSpeed > 0f
+            ? settings.MaxSpeed
+            : (gameRule != null ? gameRule.UnitSeparationSpeed : DefaultUnitSeparationSpeed);
+        Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
+        Vector3 step = PlayerMotionSweep.ComputeStaticSeparationStep(
+            capsule,
+            state.Position - currentPosition,
+            ResolveStaticMask(settings),
+            settings.MaxWalkableSlopeAngle,
+            speed,
+            deltaTime,
+            overlapBuffer);
+        if (step == Vector3.zero)
+            return false;
+
+        state.Position += step;
+        return true;
+    }
+
+    /// <summary>
+    /// 포즈 추종(포드 착석·보스 텔레포트 대기 등) 결과가 정적 지형 안이면 그 자리에서 밖으로 꺼낸다(할 일 136).
+    /// 포즈는 매 틱 절대 위치로 다시 덮이므로 속도 상한 없이 관통 깊이만큼 옮긴다.
+    /// 🔴 구속(23호 잡기 Push·Carry) 중에는 하지 않는다 — 벽 안이어도 손 소켓·정면점과 싱크를 유지한다(내려찍기 연출).
+    ///    놓인 뒤에는 <see cref="ApplyStaticDepenetration"/> 이 이동속도 × dt 로 벽 밖으로 꺼낸다.
+    /// </summary>
+    private void ResolvePoseStaticOverlap(ref PlayerSimulationState state, PlayerSimulationSettings settings)
+    {
+        if (capsule == null)
+            return;
+        if (player != null && player.CurrentState == PlayerActionState.Restrained)
+            return;
+
+        Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
+        LayerMask staticMask = ResolveStaticMask(settings);
+        for (int i = 0; i < 3; i++)
+        {
+            Vector3 penetration = PlayerMotionSweep.ComputeStaticPenetration(
+                capsule,
+                state.Position - currentPosition,
+                staticMask,
+                settings.MaxWalkableSlopeAngle,
+                overlapBuffer);
+            if (penetration.magnitude < PlayerUnitCollisionRules.MinSeparationDistance)
+                return;
+            state.Position += penetration;
+        }
     }
 
     private void ApplyRigidbodyPose(Vector3 position, Quaternion rotation, bool applyRotation)

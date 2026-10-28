@@ -9,6 +9,7 @@ using UnityEngine;
 //
 // 규칙:
 //  - 슈퍼아머(SuperArmor) 활성 중에는 들어오는 CC(SuperArmor 외 전부)를 무시한다.
+//    보스·중간보스 상태별 슈퍼아머(할 일 134)는 기절·뇌진탕만 무시한다 — 판정은 Rejects 한 곳(BossCrowdControlRules.RejectsStatus).
 //  - duration <= 0 이면 무한 지속(수동 해제 전까지). 그 외엔 서버 Tick으로 만료.
 [DisallowMultipleComponent]
 public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStatusEffectFacade
@@ -23,6 +24,7 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
         StatusEffectType.Silenced,
         StatusEffectType.Debilitated,
         StatusEffectType.SuperArmor,
+        StatusEffectType.Concussion,
     };
 
     // 활성 상태(복제). 서버 write / 모두 read.
@@ -60,7 +62,35 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     // 경직(Hit 전이) 봉쇄 = 슈퍼아머면 공격 취소/피격 리액션을 막는다.
     public bool BlocksInterrupt => HasSuperArmor;
 
-    public bool HasSuperArmor => Has(StatusEffectType.SuperArmor);
+    // 밀치기 거부(Unit.Knockback 가드) = 공격별 슈퍼아머(복제 플래그) OR 상태별 슈퍼아머(할 일 134 — 보스·중간보스 평상·제압, IMonsterStateSuperArmor).
+    // 상태이상 거부는 이 값이 아니라 Rejects 가 정한다(상태별은 기절·뇌진탕만).
+    // 🔴 상태별 값은 서버 판정용이다(복제하지 않는다 — 머리 위 표시 없음).
+    public bool HasSuperArmor => Has(StatusEffectType.SuperArmor) || StateSuperArmor;
+
+    IMonsterStateSuperArmor _stateArmor;
+    IMonsterSelfKnockback _selfKnockback;
+    bool _crowdControlSourcesCached;
+
+    void CacheCrowdControlSources()
+    {
+        if (_crowdControlSourcesCached) return;
+        _stateArmor = GetComponent<IMonsterStateSuperArmor>();
+        _selfKnockback = GetComponent<IMonsterSelfKnockback>();
+        _crowdControlSourcesCached = true;
+    }
+
+    bool StateSuperArmor
+    {
+        get
+        {
+            CacheCrowdControlSources();
+            return _stateArmor != null && _stateArmor.StateSuperArmor;
+        }
+    }
+
+    // [서버] 들어오는 상태이상을 거부하는가 — 공격별 슈퍼아머 = 차단류 전부, 상태별 슈퍼아머 = 기절·뇌진탕만.
+    bool Rejects(StatusEffectType incoming) =>
+        BossCrowdControlRules.RejectsStatus(_active.Value, StateSuperArmor, incoming);
 
     // IStatusEffectFacade — Unit의 Final* 스탯 계산용 배율.
     // 몹은 아직 스탯 modifier(버프/디버프 배율) 시스템이 없어 항상 1f(무효과).
@@ -75,6 +105,14 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     {
         if (!IsServer || type == StatusEffectType.None) return;
 
+        // 뇌진탕은 만료형 플래그가 아니라 '넉백 끝나면 기절' 대기라 따로 처리한다(ConcussionState).
+        if ((type & StatusEffectType.Concussion) != 0)
+        {
+            ApplyConcussion(duration);
+            type &= ~StatusEffectType.Concussion;
+            if (type == StatusEffectType.None) return;
+        }
+
         float expireAt = duration <= 0f ? float.PositiveInfinity : Time.time + duration;
         StatusEffectType next = _active.Value;
 
@@ -82,8 +120,8 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
         {
             if ((type & flag) == 0) continue;
 
-            // 슈퍼아머 중에는 CC(슈퍼아머 외) 적용 무시.
-            if (flag != StatusEffectType.SuperArmor && HasSuperArmor)
+            // 슈퍼아머 중에는 CC 적용 무시(SuperArmor 자체는 항상 건다).
+            if (Rejects(flag))
                 continue;
 
             next |= flag;
@@ -104,6 +142,8 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
             next &= ~flag;
             _expiry.Remove(flag);
         }
+        if ((type & StatusEffectType.Concussion) != 0)
+            _concussion.Cancel();
         _active.Value = next;
     }
 
@@ -111,7 +151,88 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     {
         if (!IsServer) return;
         _expiry.Clear();
+        _concussion.Cancel();
         _active.Value = StatusEffectType.None;
+    }
+    #endregion
+
+    #region 뇌진탕(할 일 125 — 규칙은 ConcussionState)
+    // 서버 전용 대기 상태. 복제되는 것은 Concussion·Stunned 플래그뿐이다.
+    ConcussionState _concussion;
+    MonsterBase _monster;
+
+    /// <summary>[서버] 넉백이 끝나면 걸 기절이 대기 중인가.</summary>
+    public bool HasPendingConcussion => _concussion.IsPending;
+
+    bool IsKnockedBack
+    {
+        get
+        {
+            if (_monster == null) _monster = GetComponent<MonsterBase>();
+            CacheCrowdControlSources();
+            return (_monster != null && _monster.State == MonsterState.Knockback)
+                || (_selfKnockback != null && _selfKnockback.IsSelfKnockedBack);   // 23호 자체 밀림(할 일 134)
+        }
+    }
+
+    // 넉백 중 = 대기(Concussion 플래그 + 기절 표시를 같이 건다 — 효과·머리 위 표시는 기절과 같다), 아니면 즉시 기절(큰 값).
+    void ApplyConcussion(float stunSeconds)
+    {
+        switch (_concussion.Apply(stunSeconds, IsKnockedBack, Rejects(StatusEffectType.Concussion)))
+        {
+            case ConcussionState.ApplyResult.Pending:
+                _expiry[StatusEffectType.Concussion] = float.PositiveInfinity;   // 넉백 끝(소비)·취소로만 지운다
+                SetStunAtLeast(stunSeconds, StatusEffectType.Concussion);
+                break;
+            case ConcussionState.ApplyResult.StunNow:
+                SetStunAtLeast(stunSeconds, StatusEffectType.None);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// [서버] 넉백 종료(MonsterBase.ExitKnockback) — 대기 중이던 기절 길이를 돌려주고 대기·Concussion 플래그를 지운다.
+    /// 지금 슈퍼아머면 0(자격 재확인). 기절 적용은 호출부가 <see cref="ExtendStun"/> 으로(경직과 큰 값).
+    /// </summary>
+    public float ConsumeConcussionOnKnockbackEnd()
+    {
+        if (!IsServer || !_concussion.IsPending) return 0f;
+        float stun = _concussion.ConsumeOnKnockbackEnd(Rejects(StatusEffectType.Stunned));
+        ClearConcussionFlag();
+        return stun;
+    }
+
+    /// <summary>[서버] 대기 중인 '밀치기 후 기절' 취소(제압·그로기 진입 등 — <see cref="CancelsPendingConcussion"/>).</summary>
+    public void CancelConcussion()
+    {
+        if (!IsServer || !_concussion.Cancel()) return;
+        ClearConcussionFlag();
+    }
+
+    /// <summary>[서버] 기절을 남은 시간과 큰 값으로 건다(합산 아님 — 뇌진탕 명세 §4). 슈퍼아머면 무시.</summary>
+    public void ExtendStun(float duration) => SetStunAtLeast(duration, StatusEffectType.None);
+
+    /// <summary>
+    /// 몬스터 상태 전이가 대기 중인 뇌진탕을 취소하는가 — 그로기(제압 포함) 진입, 또는 넉백이 정상 종료(ExitKnockback 이 먼저 소비) 말고 다른 길로 끝남.
+    /// </summary>
+    public static bool CancelsPendingConcussion(MonsterState previous, MonsterState next) =>
+        next == MonsterState.Groggy || (previous == MonsterState.Knockback && next != MonsterState.Knockback);
+
+    void SetStunAtLeast(float duration, StatusEffectType alsoSet)
+    {
+        if (duration <= 0f || Rejects(StatusEffectType.Stunned)) return;
+
+        float expireAt = Time.time + duration;
+        if (_expiry.TryGetValue(StatusEffectType.Stunned, out float existing) && (_active.Value & StatusEffectType.Stunned) != 0)
+            expireAt = Time.time + ConcussionState.MergeStun(existing - Time.time, duration);
+        _expiry[StatusEffectType.Stunned] = expireAt;
+        _active.Value |= StatusEffectType.Stunned | alsoSet;
+    }
+
+    void ClearConcussionFlag()
+    {
+        _expiry.Remove(StatusEffectType.Concussion);
+        _active.Value &= ~StatusEffectType.Concussion;
     }
     #endregion
 

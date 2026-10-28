@@ -13,6 +13,7 @@ using UnityEngine;
 /// </list>
 /// 끝나면 <see cref="IsIdle"/> 이 true — 쓰는 쪽이 다시 <see cref="Connect"/> 해서 재사용한다.
 ///
+/// 조명: 프리팹의 <see cref="lightLeft"/>·<see cref="lightRight"/>(TetherLight_L/_R)를 줄 가운데 양옆에 두고 번갈아 번쩍이게 한다 — 밝기·범위·그림자는 각 Light 에 저장.
 /// 토막 둘을 그리려고 층마다 LineRenderer 를 두 개(A = 송전기 쪽, B = 보스 쪽) 쓴다 — 연결 중에는 A 하나가 전체를 그린다.
 /// MyProject 미리보기와 MainProject 가 <b>같은 guid</b> 로 공유한다.
 /// </summary>
@@ -49,7 +50,27 @@ public class ElectricTether : MonoBehaviour
     [SerializeField, Min(1f)] float surgeWidthMul = 1.8f;
     [SerializeField, Min(0.01f)] float fadeTime = 0.2f;
 
+    [Header("조명 — 줄 가운데 양옆의 포인트 라이트 2개, 수명 다한 전구처럼 번갈아 번쩍(10-27 민경)")]
+    [Tooltip("밝기·범위·색·그림자는 각 Light 에 저장한 값을 쓴다 — Light 의 Intensity 가 번쩍일 때 최대 밝기")]
+    [SerializeField] Light lightLeft;
+    [SerializeField] Light lightRight;
+    [Tooltip("줄 가운데에서 양옆(줄과 수직인 수평 방향)으로 떨어진 거리(m)")]
+    [SerializeField, Min(0f)] float lightSideOffset = 1f;
+    [Tooltip("번쩍이지 않을 때 밝기(최대 대비)")]
+    [SerializeField, Range(0f, 1f)] float lightIdleLevel = 0.15f;
+    [Tooltip("번쩍 사이 쉬는 시간(초) 범위 — 쉴 때마다 반대쪽으로 넘어간다")]
+    [SerializeField] Vector2 lightGap = new Vector2(0.05f, 0.4f);
+    [Tooltip("번쩍 한 번의 길이(초) 범위")]
+    [SerializeField] Vector2 lightFlash = new Vector2(0.03f, 0.1f);
+    [Tooltip("번쩍일 때 같은 쪽에서 두세 번 떨듯이 연달아 번쩍일 확률")]
+    [SerializeField, Range(0f, 1f)] float lightStutterChance = 0.3f;
+
     const int MaxPulses = 32;
+    float _lightMaxL, _lightMaxR;
+    float _flickerTimer;
+    bool _flashOn;
+    int _flashSide;      // 0 = 왼쪽, 1 = 오른쪽
+    int _stutterLeft;
 
     Transform _from;
     Transform _to;
@@ -78,6 +99,8 @@ public class ElectricTether : MonoBehaviour
         if (glowA != null) _glowWidth = glowA.widthMultiplier;
         if (coreA != null) _coreWidth = coreA.widthMultiplier;
         _particles = new ParticleSystem.Particle[MaxPulses];
+        if (lightLeft != null) { _lightMaxL = lightLeft.intensity; lightLeft.enabled = false; }
+        if (lightRight != null) { _lightMaxR = lightRight.intensity; lightRight.enabled = false; }
         Show(false, false);
     }
 
@@ -138,6 +161,8 @@ public class ElectricTether : MonoBehaviour
 
         Vector3 a = From(), b = To();
         float speedMul = 1f;
+        // 조명 — 밝기 배율과 켜질 구간(송전기 쪽 0 ~ 보스 쪽 1, 두 토막).
+        float lightLevel = 1f, litA = 1f, litB = 1f;
 
         switch (_phase)
         {
@@ -145,6 +170,7 @@ public class ElectricTether : MonoBehaviour
             {
                 float k = Mathf.Clamp01(_t / extendTime);
                 Draw(glowA, coreA, a, b, 0f, k);
+                litA = k;
                 if (k >= 1f) { _phase = Phase.Connected; _t = 0f; }
                 break;
             }
@@ -159,6 +185,7 @@ public class ElectricTether : MonoBehaviour
                 Show(true, true);
                 Draw(glowA, coreA, a, b, 0f, half);
                 Draw(glowB, coreB, a, b, 1f - half, 1f);
+                litA = half; litB = 1f - half; lightLevel = 1f - k;
                 if (k >= 1f) Stop();
                 break;
             }
@@ -168,6 +195,7 @@ public class ElectricTether : MonoBehaviour
                 speedMul = surgeSpeedMul;
                 SetWidth(1f + (surgeWidthMul - 1f) * k, 1f + (surgeWidthMul - 1f) * k);
                 Draw(glowA, coreA, a, b, 0f, 1f);
+                lightLevel = 1f + (surgeWidthMul - 1f) * k;
                 if (k >= 1f)
                 {
                     Emit(endFlash, b, endFlashCount);
@@ -185,6 +213,7 @@ public class ElectricTether : MonoBehaviour
                 float w = (1f - k) * _fadeFrom;
                 SetWidth(w, w);
                 Draw(glowA, coreA, a, b, 0f, 1f);
+                lightLevel = w;
                 if (k >= 1f) Stop();
                 break;
             }
@@ -192,6 +221,48 @@ public class ElectricTether : MonoBehaviour
 
         bool flowing = _phase == Phase.Connected || _phase == Phase.Surging;
         TickPulses(a, b, flowing, speedMul);
+        if (_phase != Phase.Idle) UpdateLights(a, b, lightLevel, litA, litB, speedMul);
+    }
+
+    // 조명 — 줄 가운데에서 양옆으로 lightSideOffset 만큼(높이는 줄과 같게). 가운데가 그려져 있을 때만 켠다.
+    // 평소엔 lightIdleLevel 로 은은하다가 불규칙하게 한쪽씩 번갈아 번쩍(가끔 같은 쪽에서 두세 번 떨듯이). 과충전 땐 빨라진다(speedMul).
+    void UpdateLights(Vector3 a, Vector3 b, float level, float litA, float litB, float speedMul)
+    {
+        if (lightLeft == null && lightRight == null) return;
+        bool lit = 0.5f <= litA || 0.5f >= litB;
+
+        _flickerTimer -= Time.deltaTime * speedMul;
+        if (_flickerTimer <= 0f)
+        {
+            if (_flashOn)
+            {
+                _flashOn = false;
+                if (_stutterLeft > 0) { _stutterLeft--; _flickerTimer = Random.Range(0.03f, 0.06f); }
+                else { _flashSide = 1 - _flashSide; _flickerTimer = Random.Range(lightGap.x, lightGap.y); }
+            }
+            else
+            {
+                _flashOn = true;
+                _flickerTimer = Random.Range(lightFlash.x, lightFlash.y);
+                if (_stutterLeft == 0 && Random.value < lightStutterChance) _stutterLeft = Random.Range(1, 3);
+            }
+        }
+
+        Vector3 mid = Vector3.Lerp(a, b, 0.5f);
+        Vector3 side = Vector3.Cross(b - a, Vector3.up);
+        side = side.sqrMagnitude > 0.0001f ? side.normalized : Vector3.right;
+        SetLight(lightLeft, _lightMaxL, mid - side * lightSideOffset, lit, level, _flashOn && _flashSide == 0);
+        SetLight(lightRight, _lightMaxR, mid + side * lightSideOffset, lit, level, _flashOn && _flashSide == 1);
+    }
+
+    void SetLight(Light l, float max, Vector3 at, bool lit, float level, bool flashing)
+    {
+        if (l == null) return;
+        float intensity = lit ? max * level * (flashing ? 1f : lightIdleLevel) : 0f;
+        l.enabled = intensity > 0.001f;
+        if (!l.enabled) return;
+        l.transform.position = at;
+        l.intensity = intensity;
     }
 
     // 송전기 쪽 t0 ~ 보스 쪽 t1 구간을 지그재그로 그린다. 끝점(0·1)은 흔들지 않는다 — 소켓에 붙어 있어야 한다.
@@ -299,6 +370,8 @@ public class ElectricTether : MonoBehaviour
         _pulseCount = 0;
         if (pulses != null) pulses.SetParticles(_particles, 0);
         Show(false, false);
+        if (lightLeft != null) lightLeft.enabled = false;
+        if (lightRight != null) lightRight.enabled = false;
     }
 
     // 월드 시뮬레이션이라 옮겨도 이미 나간 입자는 제자리에 남는다. 방출량 0·버스트 없음이라 Play 는 아무것도 안 낸다.

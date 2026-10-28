@@ -753,14 +753,50 @@ public class PlayerSkillTargeting : MonoBehaviour
         return GroundPointTargeting.IsWithinRange(owner.transform.position, worldPoint, range);
     }
 
-    // 어쌔신 고정 거리 AoE처럼 효과 반경이 있으면 일반 지점 마커 반경보다 우선한다.
-    // 둘 다 하나의 데칼을 공유해 중복 원이 생기지 않는다.
-    private static float GetGroundMarkerRadius(PlayerSkillData data)
+    // 효과 반경 — 판정과 같은 특성 반경 배율(⑦, 칼날의 영역 = 변신 E 반경)을 그 스킬의 공격 키로 묻는다(할 일 133 d).
+    private float GetGroundMarkerRadius(PlayerSkillData data)
+    {
+        float multiplier = 1f;
+        if (data != null && owner != null && owner.TraitModifiers != null &&
+            TryFindSkillKey(data, out TraitAttackKey key))
+            multiplier = owner.TraitModifiers.AreaMultiplier(key, TraitAreaAxis.Radius);
+
+        return GroundMarkerRadius(data, multiplier);
+    }
+
+    private static readonly PlayerSkillSlot[] SkillSlots =
+        { PlayerSkillSlot.Main, PlayerSkillSlot.Sub, PlayerSkillSlot.Interrupt, PlayerSkillSlot.Ultimate };
+
+    // 표시 중인 데이터를 가진 현재 칸 스킬의 특성 공격 키(일반/변신 구분). 못 찾으면 false(배율 1).
+    private bool TryFindSkillKey(PlayerSkillData data, out TraitAttackKey key)
+    {
+        key = default;
+        if (controller == null)
+            return false;
+
+        foreach (PlayerSkillSlot slot in SkillSlots)
+        {
+            PlayerSkillBase skill = controller.GetSkill(slot);
+            if (skill != null && skill.Data == data)
+            {
+                key = TraitAttackKey.ForSkill(slot, controller.IsAlternateSkill(skill));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 지점·대상 원 반경. 어쌔신 고정 거리 AoE처럼 효과 반경이 있으면 일반 지점 마커 반경보다 우선한다(둘 다 하나의 데칼을 공유).
+    /// 효과 반경엔 판정과 같은 식(<see cref="AssassinTraitAreaRules.ScaleRadius(float,float)"/>)으로 특성 반경 배율을 바른다 — 미보유 = 1(기존 값).
+    /// </summary>
+    public static float GroundMarkerRadius(PlayerSkillData data, float radiusMultiplier)
     {
         if (data == null)
             return 0f;
 
-        return data.AoeRadius > 0f ? data.AoeRadius : data.GroundMarkerRadius;
+        return data.AoeRadius > 0f ? AssassinTraitAreaRules.ScaleRadius(data.AoeRadius, radiusMultiplier) : data.GroundMarkerRadius;
     }
 
     private void SetTargetMarker(Unit target, float radius)
