@@ -10,6 +10,9 @@ public static partial class TraitContent
     {
         // 수호 재정비 — 명세 cooldownReduction(0.15) = 효과 cooldownChange(−0.15)의 부호 반대.
         r.Value("PAL_1_E_COOLDOWN", "cooldownReduction", trait => PaladinTraitValues.CooldownReduction(trait));
+        // 돌파의 방패 — {dmg} = 교체 Q 1회(DQfull × 1.25, 명세 §8). dashDistance 는 효과 필드 이름 그대로라 별칭 없음.
+        // 2차 상충 없음 — 1차(진격 강화·수호 재정비·불굴의 회복) 중 이 모드에서 효과를 잃는 것이 없다(진격 강화는 Dref 로 들어간다).
+        r.Damage("PAL_2_DASH", (trait, player) => PaladinTraitValues.DashDamage(trait, player));
         // 나누는 불굴 — 명세 allyRange(12m) = 효과 overflowShareRange.
         r.Value("PAL_2_SHARE_HEAL", "allyRange", trait => PaladinTraitValues.AllyRange(trait));
         // 제압의 진격 — 명세 stunDuration(0.75초) = 밀치기 효과 concussionDuration.
@@ -25,7 +28,5 @@ public static partial class TraitContent
         // 불굴의 가호 — 명세 healToShieldRatio(0.75)·shieldDuration(4초)·shieldCapMaxHpRatio(0.1) = 보호막 효과 amountRatio·duration·capMaxHpRatio.
         r.Value("PAL_4_HEAL_SHIELD", "healToShieldRatio", trait => PaladinTraitValues.HealToShieldRatio(trait));
         r.Value("PAL_4_HEAL_SHIELD", "shieldDuration", trait => PaladinTraitValues.ShieldDuration(trait));
-        r.Value("PAL_4_HEAL_SHIELD", "shieldCapMaxHpRatio", trait => PaladinTraitValues.ShieldCapMaxHpRatio(trait));
-        // 예: r.Damage("PAL_2_DASH", (trait, player) => SkillTooltipDamage.FromLinear(player, 계수, 고정값));
-    }
+        r.Value("PAL_4_HEAL_SHIELD", "shieldCapMaxHpRatio", trait => PaladinTraitValues.ShieldCapMaxHpRatio(trait));    }
 }

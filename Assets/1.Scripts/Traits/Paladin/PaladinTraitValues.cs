@@ -12,6 +12,8 @@ public static class PaladinTraitValues
     public const string PassiveHeal = "PAL_1_PASSIVE_HEAL";
     public const string ERefund = "PAL_2_E_REFUND";
     public const string ShareHeal = "PAL_2_SHARE_HEAL";
+    /// <summary>돌파의 방패 — 모드 변경(효과 클래스 없이 Q 가 <see cref="PlayerTraitModifiers.HasTrait"/> 로 묻는다).</summary>
+    public const string Dash = TraitModeIds.PaladinShieldDash;
     public const string QStun = "PAL_3_Q_STUN";
     public const string EShield = "PAL_3_E_SHIELD";
     public const string PassiveCdr = "PAL_3_PASSIVE_CDR";
@@ -24,6 +26,28 @@ public static class PaladinTraitValues
 
     /// <summary>진격의 충격 파생 공격 이름(⑧ derivedKey). Q 가 <see cref="PlayerTraitEffects.GetDerivedAttacks"/> 결과에서 이 이름만 고른다.</summary>
     public const string QBlastKey = "PAL_Q_BLAST";
+
+    // 돌파의 방패 모드 전용 스킬 수치(⑩) 이름 — 정의 에셋 PAL_2_DASH 의 PaladinShieldDashEffect 가 Set 으로 낸다(시트 Traits_Paladin 에 칸 이름으로 나간다).
+    // Q 가 ResolveSkillValue(이름, 0)으로 읽는다(0 = 특성 없음·데이터 누락 → 원래 Q).
+    public const string DashDistanceKey = "PAL_Q_DASH_DISTANCE";
+    public const string DashSpeedKey = "PAL_Q_DASH_SPEED";
+    public const string DashPrepareKey = "PAL_Q_DASH_PREPARE";
+    public const string DashRecoveryKey = "PAL_Q_DASH_RECOVERY";
+    public const string DashDamageRatioKey = "PAL_Q_DASH_DAMAGE_RATIO";
+    public const string DashPushDistanceKey = "PAL_Q_DASH_PUSH_DISTANCE";
+    public const string DashPushDurationKey = "PAL_Q_DASH_PUSH_DURATION";
+
+    /// <summary>
+    /// 돌파의 방패 카드 <c>{dmg}</c>(명세 §8) = 교체 Q 1회 = DQfull × fullCastDamageRatio(<see cref="PaladinTraitRules.QPacketDamage(int,float,float,float)"/>).
+    /// 틱 Dref 는 판정과 같은 식(진격 강화 포함). 플레이어·Q 가 없으면 default(화면 "-").
+    /// </summary>
+    public static SkillTooltipDamage DashDamage(TraitDefinition trait, Player player)
+    {
+        if (trait == null)
+            return default;
+
+        return QPacketTooltip(player, PaladinShieldDashSettings.FromTrait(trait).DamageRatio, 1f);
+    }
 
     /// <summary>수호 재정비 카드 <c>{cooldownReduction:%}</c> = −cooldownChange(0.15 = 15% 감소).</summary>
     public static float CooldownReduction(TraitDefinition trait) => -EffectField(trait, "cooldownChange");
@@ -64,12 +88,26 @@ public static class PaladinTraitValues
     public static float QBlastRatio(TraitDefinition trait) => EffectField(trait, "damageRatio");
 
     /// <summary>
-    /// 진격의 충격 카드 <c>{dmg}</c>(명세 §8) = 현재 Q 묶음(DQpacket, <see cref="PaladinTraitRules.QPacketDamage"/>) × 파생 배율.
-    /// 틱 Dref 는 판정과 같은 식(<see cref="Player.ResolveDamage(float,int,TraitAttackKey)"/> — 진격 강화 포함). 플레이어·Q 가 없으면 default(화면 "-").
+    /// 진격의 충격 카드 <c>{dmg}</c>(명세 §8) = 현재 Q 묶음(DQpacket, <see cref="PaladinTraitRules.QPacketDamage(int,float,float,float)"/>) × 파생 배율.
+    /// 돌파의 방패를 골랐으면 묶음 = 교체 단발 피해(판정과 같은 분기). 틱 Dref 는 판정과 같은 식(<see cref="Player.ResolveDamage(float,int,TraitAttackKey)"/> — 진격 강화 포함).
+    /// 플레이어·Q 가 없으면 default(화면 "-").
     /// </summary>
     public static SkillTooltipDamage QBlastDamage(TraitDefinition trait, Player player)
     {
         if (player == null || trait == null)
+            return default;
+
+        float dashRatio = 0f;
+        if (player.TryGetComponent(out PlayerTraitModifiers modifiers) && modifiers.HasTrait(Dash))
+            dashRatio = PaladinShieldDashSettings.From(modifiers).DamageRatio;
+
+        return QPacketTooltip(player, dashRatio, QBlastRatio(trait));
+    }
+
+    /// <summary>현재 Q 묶음(DQpacket — <paramref name="dashRatio"/> &gt; 0 이면 교체 단발) × <paramref name="ratio"/> 의 카드 표시 피해.</summary>
+    private static SkillTooltipDamage QPacketTooltip(Player player, float dashRatio, float ratio)
+    {
+        if (player == null)
             return default;
 
         PlayerSkillController skills = player.GetComponent<PlayerSkillController>();
@@ -78,13 +116,13 @@ public static class PaladinTraitValues
         if (data == null)
             return default;
 
-        float ratio = QBlastRatio(trait);
         TraitAttackKey key = TraitAttackKey.ForSkill(PlayerSkillSlot.Main, skills.IsAlternateSkill(q));
         int tickDref = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus, key);
-        int damage = TraitDerivedAttackRules.Damage(PaladinTraitRules.QPacketDamage(tickDref, data.MaxActiveDuration, data.TickInterval), ratio);
+        int damage = TraitDerivedAttackRules.Damage(PaladinTraitRules.QPacketDamage(tickDref, data.MaxActiveDuration, data.TickInterval, dashRatio), ratio);
         int ticks = PaladinTraitRules.PlannedHoldTicks(data.MaxActiveDuration, data.TickInterval);
-        float coefficient = data.AttackDamageMultiplier * ticks * ratio;
-        int flat = TraitHealRules.RoundHalfUp((double)data.FlatDamageBonus * ticks * ratio);
+        float packetRatio = dashRatio > 0f ? dashRatio : 1f;
+        float coefficient = data.AttackDamageMultiplier * ticks * packetRatio * ratio;
+        int flat = TraitHealRules.RoundHalfUp((double)data.FlatDamageBonus * ticks * packetRatio * ratio);
         return new SkillTooltipDamage(damage, damage, coefficient, coefficient, flat, flat);
     }
 
