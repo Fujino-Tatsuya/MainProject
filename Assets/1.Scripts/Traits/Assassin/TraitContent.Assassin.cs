@@ -14,6 +14,12 @@ public static partial class TraitContent
         // 돌파 가속 — 명세 문구는 감소율(0.15)이고 효과는 쿨 증감(−0.15)으로 보관한다.
         r.Value("ASN_1_Q_COOLDOWN", "cooldownReduction", CooldownReduction);
 
+        // 칼날의 영역 — 범위 효과 두 칸(강타 길이·폭 / 변신 E 반경)이 같은 필드 이름이라 첫 칸 값으로 푼다.
+        r.Value("ASN_3_E_AREA", "areaIncrease", AreaIncrease);
+
+        // 사냥의 박자 — 발동 간격은 효과 거름(filter.minInterval)에 있다.
+        r.Value("ASN_3_BASIC_CDR", "procInterval", ProcInterval);
+
         // 예: r.Damage("ASN_4_Q_TRAIL", (trait, player) => SkillTooltipDamage.FromLinear(player, 계수, 고정값));
     }
 
@@ -26,6 +32,41 @@ public static partial class TraitContent
             {
                 if (effect is TraitCooldownEffect cooldown)
                     return 1f - cooldown.Multiplier;
+            }
+        }
+
+        return 0f;
+    }
+
+    // 정의의 첫 범위 효과 증가율(배율 − 1). 범위 효과가 없으면 0.
+    private static object AreaIncrease(TraitDefinition trait)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            var modifiers = new System.Collections.Generic.List<TraitModifier>();
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (!(effect is TraitAreaEffect))
+                    continue;
+
+                effect.GetModifiers(modifiers);
+                if (modifiers.Count > 0)
+                    return modifiers[0].Value - 1f;
+            }
+        }
+
+        return 0f;
+    }
+
+    // 정의의 첫 쿨 차감 효과의 발동 간격(초). 없으면 0.
+    private static object ProcInterval(TraitDefinition trait)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (effect is TraitCooldownRefundEffect refund && refund.Filter != null)
+                    return refund.Filter.MinInterval;
             }
         }
 

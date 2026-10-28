@@ -32,13 +32,16 @@ public sealed class AssassinConeAttack : BaseAttack
             hitResults = new Collider[size];
     }
 
-    /// <summary>서버에서 한 타당 한 번 호출한다.</summary>
+    /// <summary>
+    /// 서버에서 한 타당 한 번 호출한다. <paramref name="castId"/> = 이 판정이 속한 기본 공격 동작의 시전 ID(특성 '동작당 1회' 묶음, 0 = 이 판정 하나).
+    /// </summary>
     public bool Fire(
         Vector3 direction,
         float range,
         float angle,
         int damageSnapshot,
-        bool triggersOnHit)
+        bool triggersOnHit,
+        int castId = 0)
     {
         if (!IsServer || owner == null)
             return false;
@@ -110,7 +113,7 @@ public sealed class AssassinConeAttack : BaseAttack
         }
 
         if (landedUnits.Count > 0)
-            owner.RaiseServerAttackLanded(AttackType.Default, triggersOnHit, landedUnits, this);
+            owner.RaiseServerAttackLanded(AttackType.Default, triggersOnHit, landedUnits, this, castId);
 
         return anyResolved;
     }

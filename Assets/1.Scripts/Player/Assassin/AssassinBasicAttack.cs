@@ -64,6 +64,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // 이번 타(일반 1타·강타 1회)의 분노 게이지 충전을 이미 받았는가 — 타 하나에 1번(§4.2).
     private bool rageClaimed;
     private int hitsFired;
+    // [서버] 이 동작(일반 한 타·강타 1회·변신 묶음)의 시전 ID — 판정마다 특성 사건에 실어 '동작당 1회'로 묶는다(할 일 128 2/5).
+    private int serverActionCastId;
+    private PlayerTraitEffects traitEffects;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
     // 이 타의 방향 — 몸 회전·판정·전진이 모두 이 값이다(일반 타는 이동 입력 우선, AssassinAttackDirectionRules).
@@ -575,6 +578,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             assassinState?.ServerConsumeEnhancement();
         }
 
+        serverActionCastId = player.NextServerCastId();
         BeginRuntime(stepIndex, direction, mode, step, turnDelay);
         if (IsNetworkActive)
             StartRpc(stepIndex, attackDirection, (byte)mode, turnDelay);
@@ -720,16 +724,24 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         hitsFired++;
-        int damage = player.ResolveDamage(step.AttackDamageMultiplier, 0, new TraitAttackKey(AttackType.Default, TraitFormOf(currentMode)));
+        var traitKey = new TraitAttackKey(AttackType.Default, TraitFormOf(currentMode));
+        // 돌파의 여세 — 이 동작의 첫 판정에서만 소모한다(빗나가도). 같은 판정의 모든 대상이 같은 배율, 변신 묶음 2~4타는 그대로.
+        float nextAttackMultiplier = AssassinBasicAttackTraitRules.ConsumesNextAttackBuff(hitsFired)
+            ? ConsumeNextAttackBuff(traitKey)
+            : 1f;
+        int damage = ResolveHitDamage(step.AttackDamageMultiplier, traitKey, nextAttackMultiplier);
+        // 칼날의 영역 — 판정 치수(강타 길이·폭)만 배율. 전진·판정 중심(몸)은 그대로.
+        AssassinTraitAreaRules.ScaleCone(player.TraitModifiers, traitKey, step.Range, step.Angle, out float range, out float angle);
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
         bool landed = coneAttack.Fire(
             attackDirection,
-            step.Range,
-            step.Angle,
+            range,
+            angle,
             damage,
-            data.TriggersOnHit);
+            data.TriggersOnHit,
+            serverActionCastId);
 
         // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
         if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
@@ -744,6 +756,25 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
                 ? AssassinRageSource.EnhancedStrike
                 : AssassinRageSource.BasicAttack);
         }
+    }
+
+    // [서버] 다음 기본 공격 1회 강화(⑨ 돌파의 여세)를 이 동작 시전 ID 로 소모한다. 없거나 서버가 아니면 1.
+    private float ConsumeNextAttackBuff(TraitAttackKey key)
+    {
+        traitEffects ??= PlayerTraitEffects.For(this);
+        float multiplier = traitEffects != null ? traitEffects.ConsumeNextAttackMultiplierServer(key, serverActionCastId) : 1f;
+        if (multiplier != 1f)
+            Edit.Log($"[Assassin/평타] 다음 공격 강화 소모 ×{multiplier:F2} — {key}, 동작 {serverActionCastId}", this);
+        return multiplier;
+    }
+
+    // 원래 타격 = Dref × 다음 기본 공격 강화(명세 §5) — 특성 배율과 함께 곱한 뒤 마지막에 한 번만 정수화한다.
+    private int ResolveHitDamage(float coefficient, TraitAttackKey key, float nextAttackMultiplier)
+    {
+        if (nextAttackMultiplier == 1f || player.Stats == null)
+            return player.ResolveDamage(coefficient, 0, key);
+
+        return player.Stats.ResolveDamage(coefficient, 0, player.TraitDamageMultiplier(key) * nextAttackMultiplier);
     }
 
     private void CompleteCurrentStep()

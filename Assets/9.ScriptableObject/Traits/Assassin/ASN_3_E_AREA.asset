@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c29cc7a6b1d47b046aa92501db8cbe93, type: 3}
+  m_Name: ASN_3_E_AREA
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
+  id: ASN_3_E_AREA
+  displayName: "\uCE7C\uB0A0\uC758 \uC601\uC5ED"
+  category: "E \uAC15\uD654"
+  description: "\uC77C\uBC18 E \uAC15\uD0C0\uC758 \uACF5\uACA9 \uBC94\uC704\uC640
+    \uBCC0\uC2E0 E\uC758 \uBC18\uACBD\uC774 {areaIncrease:%} \uB298\uC5B4\uB0A9\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673709695195
+  - rid: 7237886673709695196
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673709695195
+      type: {class: TraitAreaEffect, ns: , asm: Assembly-CSharp}
+      data:
+        areaIncrease: 0.25
+        axes: 0100
+        attackTypes: 01000000
+        forms: 02
+    - rid: 7237886673709695196
+      type: {class: TraitAreaEffect, ns: , asm: Assembly-CSharp}
+      data:
+        areaIncrease: 0.25
+        axes: 02
+        attackTypes: 04000000
+        forms: 01
