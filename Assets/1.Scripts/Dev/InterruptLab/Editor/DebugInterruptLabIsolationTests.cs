@@ -24,6 +24,7 @@ public sealed class DebugInterruptLabIsolationTests
         typeof(DebugZeroCooldown),
         typeof(DebugCharacterCycle),
         typeof(DebugDummyInterruptRecovery),
+        typeof(DebugInterruptTuningPanel), // 132 §17 튜닝 패널
     };
 
     static string[] DebugScriptGuids()
@@ -57,6 +58,22 @@ public sealed class DebugInterruptLabIsolationTests
         Assert.IsTrue(guids.All(g => !string.IsNullOrEmpty(g)));
         // 검색이 실제로 잡는지 — 랩 씬에는 붙어 있어야 한다
         Assert.AreEqual(1, FilesUsingDebugScripts(new[] { LabScenePath }).Length);
+    }
+
+    [Test]
+    public void 튜닝_패널은_랩_씬에서_배속과_같은_오브젝트에_붙어_있다()
+    {
+        // 패널은 같은 오브젝트의 DebugTimeScale 을 배속으로 쓴다(132 §17) — 씬 YAML 에서 두 컴포넌트의 m_GameObject 가 같아야 한다.
+        string text = File.ReadAllText(LabScenePath);
+        string GameObjectOf(System.Type type)
+        {
+            string guid = DebugScriptGuids()[System.Array.IndexOf(DebugComponents, type)];
+            Match match = Regex.Match(text, @"m_GameObject: \{fileID: (\d+)\}\s+m_Enabled: 1\s+m_EditorHideFlags: 0\s+m_Script: \{fileID: 11500000, guid: " + guid);
+            Assert.IsTrue(match.Success, type.Name + " 가 랩 씬에 켜진 채 붙어 있어야 한다");
+            return match.Groups[1].Value;
+        }
+
+        Assert.AreEqual(GameObjectOf(typeof(DebugTimeScale)), GameObjectOf(typeof(DebugInterruptTuningPanel)));
     }
 
     [Test]

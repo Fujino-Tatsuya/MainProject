@@ -28,7 +28,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
     [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
-    [Tooltip("내가 일으킨 인터럽트 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10)")]
+    [Tooltip("내가 일으킨 간파 성공 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10). 시도 강·약 배율은 InterruptProductionDirector 칸(할 일 132). 시도에서 이어진 성공은 둘 중 더 깊은 쪽(강 0.7 → 성공은 0.7 유지)")]
     [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = 0.85f;
 
     // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
@@ -45,7 +45,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     private CinemachineFollow playerCameraFollow;
     // 줌은 원래 오프셋에 배율을 곱해서 쓴다 — 매 프레임 현재 값에 곱하면 오차가 쌓인다.
     private Vector3 basePlayerFollowOffset;
-    private float slowMotionZoomDepth;
+    private readonly SlowMotionOwnerZoom ownerSlowZoom = new();
     private float appliedZoomMultiplier = 1f;
     // 연출 카메라 거리 배율(로비 포드 강하 — 할 일 100). 슬로우 줌 배율과 곱한다. 1 = 평소.
     private float cinematicDistanceMultiplier = 1f;
@@ -320,18 +320,24 @@ public class CameraTargetSwitcher : MonoBehaviour
         bool sessionRunning = timeScale != null && networkManager != null && networkManager.IsListening;
         bool slowActive = sessionRunning && timeScale.IsActive;
 
-        float targetDepth = SlowMotionCameraZoom.TargetDepth(
-            slowActive,
-            slowActive && timeScale.CurrentTriggerClientId == networkManager.LocalClientId,
-            sessionRunning && !IsInFallView && !IsSpectatorMode,
-            slowActive ? timeScale.CurrentScale : 1f,
-            slowActive ? timeScale.CurrentProfileScale : 1f); // 지금 재생 중인 프로필(시도·성공) 기준
+        bool mine = slowActive && timeScale.CurrentTriggerClientId == networkManager.LocalClientId &&
+                    !IsInFallView && !IsSpectatorMode;
+        // 내 간파 한 건(시도 → 성공) = 줌인 1·줌아웃 1(할 일 132). 강·약 시도 배율 = 디렉터 칸(A3), 성공 = 이 칸.
+        // 강 시도 결론 전이면 시도 복귀 중에도 줌을 붙잡는다 — 디렉터 오너 상태를 묻기만 한다(GlobalTimeScale 직접 구독 없음).
+        var input = new SlowMotionOwnerZoomInput { Mine = mine };
+        if (mine)
+        {
+            input.TriggerId = timeScale.CurrentTriggerId;
+            input.Purpose = timeScale.CurrentPurpose;
+            input.Phase = timeScale.CurrentPhase;
+            input.CurrentScale = timeScale.CurrentScale;
+            input.ProfileScale = timeScale.CurrentProfileScale;
+            input.ZoomFactor = InterruptProductionDirector.OwnerZoomFactor(timeScale.CurrentPurpose, slowMotionZoomFactor);
+            input.AwaitingStrongResult = InterruptProductionDirector.OwnerAwaitsStrongResult;
+        }
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
-        slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);
-        float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth,
-            InterruptProductionDirector.OwnerZoomFactor(slowMotionZoomFactor)) // 할 일 104 A3 — 디렉터 개인 채널(118)
-            * cinematicDistanceMultiplier;
+        float multiplier = ownerSlowZoom.Step(input, Time.unscaledDeltaTime) * cinematicDistanceMultiplier;
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
         if (multiplier == appliedZoomMultiplier)

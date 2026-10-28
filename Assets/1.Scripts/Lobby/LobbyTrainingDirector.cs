@@ -25,7 +25,11 @@ using UnityEngine;
 /// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1): 규칙 = <see cref="LobbyTrainingFlow.SetTrainingCleared"/>, 서버 장부 → 복제 목록(<see cref="IsTrainingCleared"/>).
 /// 로비 복귀(새 진행기)·Alt+3 리로드를 넘어 남도록 서버 세션 정적 장부에도 적고, 연결 종료·호스트 셧다운 때 지운다.
 /// 훈련 중 켜서 명단에서 빠지면 <see cref="ServerRosterMemberRemoved"/> 로 단계 내용(무기 점검)이 그 사람을 기다리지 않게 한다.
-/// 요청 RPC·멈춤 탈출·리로드는 DEV_HOTKEYS 게이트 partial(<c>LobbyTrainingDirector.Recovery.cs</c>).</item>
+/// 요청 RPC·멈춤 탈출·리로드는 DEV_HOTKEYS 게이트 partial(<c>LobbyTrainingDirector.Recovery.cs</c>).
+/// 훈련을 끝까지 하면(종료 집결 확정) 명단 전원에게 같은 플래그가 켜진다(<see cref="LobbyTrainingFlow.OnGatherConfirmed"/>, 명단은 그대로).</item>
+/// <item>집결 확정 텔레포트(할 일 111, <see cref="LobbyTrainingFlow.TeleportTargetOnConfirm"/>): 입구 확정 → 첫 위치(<c>train01StartZone</c>, 훈련장 안),
+/// 종료 집결 확정 → 브리핑 구역(<c>briefZone</c>). 명단 전원을 그 박스 안 자리(<see cref="LobbyTrainingEndPlacement"/>)로 <see cref="PlayerFallRecovery.RelocateServer"/>
+/// — 이미 구역 안이라 다음 집결이 바로 센다. 늦은 참가자·명단 밖은 그대로. 구역이 비면 지점마다 경고 1회 후 생략.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -81,6 +85,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
 
     private const float SupportTickInterval = 0.25f;
 
+    // 집결 확정 텔레포트 높이 보정 — 스폰 지점·멈춤 탈출과 같은 값(바닥에 정확히 놓으면 콜라이더가 파고든 채 시작한다).
+    private const float TeleportClearance = 0.5f;
+
     private static readonly LobbyGatherPoint[] Points =
     {
         LobbyGatherPoint.Entrance, LobbyGatherPoint.Sortie, LobbyGatherPoint.Train01Start, LobbyGatherPoint.Train02Start,
@@ -91,6 +98,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
     private LobbyTrainingFlow _flow;
     private bool _zonesDirty;
     private bool _loggedWaitingZones;
+    private readonly HashSet<LobbyGatherPoint> _warnedNoTeleportZone = new HashSet<LobbyGatherPoint>();
     private Func<bool> _joinBlockedProvider;
     private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
     private readonly List<ulong> _idBuffer = new List<ulong>();
@@ -325,7 +333,18 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
         Debug.Log($"[SceneFlow] {Tag} {point} 집결 확정 — {before} → {Describe()}");
         if (point == LobbyGatherPoint.Entrance)
             Debug.Log($"[SceneFlow] {Tag} 훈련 시작 — 참여 명단 고정 {_flow.TrainingRoster.Count}명 [{string.Join(",", _flow.TrainingRoster)}]");
+        if (point == LobbyGatherPoint.TrainEnd)
+        {
+            ServerClearedStore.Clear();
+            ServerClearedStore.AddRange(_flow.TrainingCleared);
+            Debug.Log($"[SceneFlow] {Tag} 훈련 종료 — 명단 [{string.Join(",", _flow.TrainingRoster)}] 튜토리얼 클리어, 클리어 [{string.Join(",", _flow.TrainingCleared)}]");
+        }
+
         OnFlowChanged();
+
+        var teleportTarget = LobbyTrainingFlow.TeleportTargetOnConfirm(point);
+        if (teleportTarget != LobbyGatherPoint.None)
+            TeleportRosterInto(teleportTarget, point);
 
         if (point == LobbyGatherPoint.Sortie)
             LaunchMainOnce();
@@ -391,6 +410,45 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
             return;
 
         launcher.StartGameLoading();
+    }
+
+    // [서버] 집결 확정 텔레포트(입구 → Train01Start, 훈련 종료 → Brief) — 명단 전원을 대상 구역 박스 안 자리(LobbyTrainingEndPlacement, 명단 순서)로.
+    // 이미 구역 안이라 다음 집결이 바로 센다. 이동 = 기존 서버 텔레포트(오너 RPC — 바라보는 방향은 그대로).
+    // 높이 = 구역 원점 바닥면(박스 높이 범위 안으로) + 보정. 구역이 없으면 지점마다 경고 1회 후 생략.
+    private void TeleportRosterInto(LobbyGatherPoint target, LobbyGatherPoint confirmed)
+    {
+        var zone = ZoneOf(target);
+        var box = zone != null ? zone.GetComponent<BoxCollider>() : null;
+        if (box == null)
+        {
+            if (_warnedNoTeleportZone.Add(target))
+                Debug.LogWarning($"{Tag} {target} 집결 구역(BoxCollider)이 비었다 — {confirmed} 확정 텔레포트 생략.", this);
+
+            return;
+        }
+
+        // 간격·여백은 월드 m — 박스 크기를 월드로 재고, 고른 자리를 다시 로컬로 나눈다(구역 스케일 대비).
+        var scale = box.transform.lossyScale;
+        var worldSize = new Vector2(box.size.x * Mathf.Abs(scale.x), box.size.z * Mathf.Abs(scale.z));
+        var floorY = Mathf.Clamp(0f, box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
+
+        var roster = _flow.TrainingRoster;
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var clientId = roster[i];
+            var slot = LobbyTrainingEndPlacement.Slot(i, roster.Count, worldSize,
+                LobbyTrainingEndPlacement.DefaultMargin, LobbyTrainingEndPlacement.DefaultSpacing);
+            var local = new Vector3(
+                box.center.x + (scale.x != 0f ? slot.x / Mathf.Abs(scale.x) : 0f),
+                floorY,
+                box.center.z + (scale.z != 0f ? slot.y / Mathf.Abs(scale.z) : 0f));
+            var point = box.transform.TransformPoint(local);
+
+            var fall = TryGetPlayer(clientId, out var player) ? player.GetComponent<PlayerFallRecovery>() : null;
+            var destination = point + Vector3.up * TeleportClearance;
+            var moved = fall != null && fall.RelocateServer(destination);
+            Debug.Log($"[SceneFlow] {Tag} {confirmed} 확정 텔레포트 client {clientId} → {zone.name} 명단 {i + 1}번째 자리 {destination} moved={moved}");
+        }
     }
 
     private void HandleClientConnected(ulong clientId)
@@ -607,6 +665,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour
     private void HandlePhaseChanged(LobbyTrainingPhase previous, LobbyTrainingPhase current) => StageChanged?.Invoke(Stage, current);
 
     private string Describe() => _flow != null ? $"{_flow.Stage}/{_flow.Phase}" : "(없음)";
+
+    /// <summary>[전 피어] 이 집결 지점의 씬 구역(없으면 null) — 로컬 위치 판정용(바닥 안내 스텝 <see cref="LobbyGuideSteps"/>).</summary>
+    public PartyGatherZone GatherZone(LobbyGatherPoint point) => ZoneOf(point);
 
     private PartyGatherZone ZoneOf(LobbyGatherPoint point)
     {

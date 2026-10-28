@@ -774,6 +774,7 @@ GameObject:
   - component: {fileID: 755154413323072885}
   - component: {fileID: 3856112276083832082}
   - component: {fileID: 7998302284108203543}
+  - component: {fileID: 3401547853169930430}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1491,6 +1492,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3da8275d62d47db4d967dcfcfca7b4a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerTraitModifiers
+--- !u!114 &3401547853169930430
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30fe75fe1be95fe4c8cda224ca601a61, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptLightGatherSocket
+  socket: {fileID: 0}
+  vfxPrefab: {fileID: 95648635594801534, guid: e89347426849ad1479ee07697150b4e8, type: 3}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

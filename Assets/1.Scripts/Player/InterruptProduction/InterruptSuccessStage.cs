@@ -4,7 +4,7 @@ using System.Collections.Generic;
 /// 간파 연출 — 성공 단계(할 일 118).
 /// [서버] 성공 슬로우(+히트스톱 A1)를 다시 걸고, 시전자의 캐릭터 성공 전송로(relay)를 부른다.
 /// 슬로우가 거부돼도(컷신 잠금·씬 전환) relay 는 부른다 — 지금 캐릭터 RPC 전송로와 같다(설계 Q1-a).
-/// [각 피어] 슬로우 Started(Success) 를 받아 개인·공용 채널로 나눠 암순응(A2)·성공 이펙트 칸(A4)을 튼다.
+/// [각 피어] 슬로우 Started(Success) 를 받아 성공 이펙트 칸(A4)을 틀고, 적중 섬광 순간에 개인·공용 채널로 나눠 암순응(A2)을 튼다.
 /// </summary>
 public sealed class InterruptSuccessStage
 {
@@ -42,20 +42,31 @@ public sealed class InterruptSuccessStage
 
     /// <summary>
     /// [각 피어] 슬로우 시작을 받았다. 간파 성공(<see cref="SlowMotionPurpose.Success"/>)일 때만 튼다 — 시도 슬로우는 무반응.
-    /// 암순응: 본인 화면 = 개인 채널(self), 다른 화면 = 공용 채널(others). 성공 이펙트 칸 = 공용(발동자 플레이어의 칸).
+    /// 성공 이펙트 칸 = 공용(발동자 플레이어의 칸). 암순응은 섬광 순간(<see cref="LocalFlash"/>)으로 옮겼다(할 일 132 단계 5).
     /// </summary>
-    public void LocalStarted(SlowMotionPurpose purpose, in InterruptProductionEvent e, bool viewerIsCaster,
-        IInterruptDarkAdaptationOutput darkAdaptation, IReadOnlyList<IInterruptCueSink> successFxSinks)
+    public void LocalStarted(SlowMotionPurpose purpose, in InterruptProductionEvent e, IReadOnlyList<IInterruptCueSink> successFxSinks)
     {
         if (purpose != SlowMotionPurpose.Success)
             return;
 
-        if (viewerIsCaster)
-            _personal.PlayDarkAdaptation(e, darkAdaptation);
-        else
-            _shared.PlayDarkAdaptation(e, darkAdaptation);
-
         _shared.PlayCue(InterruptProductionCue.SuccessFxSlot, e, successFxSinks);
+    }
+
+    /// <summary>
+    /// [각 피어] 적중 섬광 순간(성공 Started + 섬광 ②③④ 길이 = ⑤ 시작, 할 일 132 §15) — 암순응.
+    /// 다른 화면 = 공용 채널(others). 본인 화면 = 섬광 오버레이가 돌았으면 없음(마스크 암전·섬광이 대신), 안 돌았으면 개인 채널(self).
+    /// </summary>
+    public void LocalFlash(in InterruptHitFlashMoment moment, IInterruptDarkAdaptationOutput darkAdaptation)
+    {
+        switch (InterruptHitFlashRules.SelectDarkAdaptation(moment.ViewerIsCaster, moment.OwnerOverlay))
+        {
+            case InterruptHitFlashDarkAdaptation.Self:
+                _personal.PlayDarkAdaptation(moment.Event, darkAdaptation);
+                break;
+            case InterruptHitFlashDarkAdaptation.Others:
+                _shared.PlayDarkAdaptation(moment.Event, darkAdaptation);
+                break;
+        }
     }
 
     /// <summary>[각 피어] 슬로우 강제 리셋(컷신·씬 전환·세션 종료) — 남아 있는 암순응을 즉시 끈다(칸과 무관하게 늘 끈다).</summary>

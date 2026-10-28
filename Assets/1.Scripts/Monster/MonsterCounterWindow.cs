@@ -69,15 +69,15 @@ public class MonsterCounterWindow : MonoBehaviour
     {
         bool wasOpen = _window.IsOpen;
         _window.Open(WindowDuration);
-        if (wasOpen) InterruptLagMonitor.RecordWindow(gameObject, false);   // 다시 열기 = 닫힘 → 열림
-        if (_window.IsOpen) InterruptLagMonitor.RecordWindow(gameObject, true);
+        if (wasOpen) RecordTransition(false);   // 다시 열기 = 닫힘 → 열림
+        if (_window.IsOpen) RecordTransition(true);
     }
 
     /// <summary>시간을 흘린다. <b>이번 틱에 만료됐으면 true</b> — 호출측이 "실패 확정"을 한 번만 처리한다.</summary>
     public bool TickAndDetectExpiry(float deltaTime)
     {
         bool expired = _window.TickAndDetectExpiry(deltaTime);
-        if (expired) InterruptLagMonitor.RecordWindow(gameObject, false);
+        if (expired) RecordTransition(false);
         return expired;
     }
 
@@ -85,7 +85,7 @@ public class MonsterCounterWindow : MonoBehaviour
     public bool TryConsumeInterrupt()
     {
         bool consumed = _window.TryConsumeInterrupt();
-        if (consumed) InterruptLagMonitor.RecordWindow(gameObject, false);
+        if (consumed) RecordTransition(false);
         return consumed;
     }
 
@@ -94,6 +94,15 @@ public class MonsterCounterWindow : MonoBehaviour
     {
         bool wasOpen = _window.IsOpen;
         _window.Close();
-        if (wasOpen) InterruptLagMonitor.RecordWindow(gameObject, false);
+        if (wasOpen) RecordTransition(false);
+    }
+
+    // 간파 지연 측정(서버 기록) + 판정 창 복제(할 일 132 — 오너 클라 시도 예측용, MonsterBase 가 서버·스폰일 때만 쓴다).
+    // 다시 열기(닫힘 → 열림)는 같은 틱이라 복제로는 '열림 유지'로만 보인다.
+    void RecordTransition(bool open)
+    {
+        InterruptLagMonitor.RecordWindow(gameObject, open);
+        if (_owner == null) _owner = GetComponent<MonsterBase>();
+        if (_owner != null) _owner.ServerReplicateCounterWindow(open);
     }
 }

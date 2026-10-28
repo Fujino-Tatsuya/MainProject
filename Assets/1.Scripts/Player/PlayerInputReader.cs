@@ -171,7 +171,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     /// <summary>
     /// 그 입력을 누른 시각 — 선입력 버퍼에 살아 있으면 기록 시각(순위 무관), 버퍼가 꺼져 있으면 이번 프레임 눌림만 지금 시각.
-    /// 대쉬 간파 창 판정(할 일 115)이 읽는다. 버퍼는 건드리지 않는다. 이번 프레임 눌림은 우클릭(SkillInterrupt)·대시(Dash, §12 전환)만 본다.
+    /// 대쉬 간파 창 판정(할 일 115)이 읽는다. 버퍼는 건드리지 않는다. 지금은 우클릭(SkillInterrupt)만 이번 프레임 눌림을 본다.
     /// </summary>
     public bool TryGetPressTime(PlayerBufferedInput input, out float pressTime)
     {
@@ -180,8 +180,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
             return true;
 
         pressTime = Time.time;
-        return (input == PlayerBufferedInput.SkillInterrupt && InterruptPressed) ||
-               (input == PlayerBufferedInput.Dash && DashPressed);
+        return input == PlayerBufferedInput.SkillInterrupt && InterruptPressed;
     }
 
     /// <summary>

@@ -181,7 +181,7 @@ public sealed class LobbyBriefing : NetworkBehaviour
         if (!_model.Start(_lineBuffer, leadSeconds, tailSeconds))
             return;
 
-        // 명세 §4 — 브리핑이 시작되면 기존 무전(BRIEF_ROUTE 등)을 끈다.
+        // 명세 §4 — 브리핑이 시작되면 재생 중·대기 중인 기존 무전(TRAIN_END 등)을 끈다.
         var radio = LobbyRadio.Active;
         if (radio != null)
             radio.ServerClear();
