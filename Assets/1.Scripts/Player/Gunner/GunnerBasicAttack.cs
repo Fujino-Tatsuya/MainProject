@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -83,6 +84,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private float lastHoldSignalTime;
     private bool endingGracefully;
 
+    // 특성(할 일 127) — 관통 탄도·집중 포화·이중 출력. 서버에서만 쓴다.
+    private PlayerTraitEffects traitEffects;
+    private GunnerBeamAttack.TargetHitHook focusFireHook;
+    private readonly List<TraitDerivedAttack> derivedBuffer = new List<TraitDerivedAttack>();
+    private readonly GunnerDelayedShots extraShots = new GunnerDelayedShots();
+    private readonly List<GunnerDerivedShot> dueExtraShots = new List<GunnerDerivedShot>();
+    private bool lifeSubscribed;
+
     public bool CanStartApprovedAttack => data != null && heat != null && !heat.IsOverheated;
     public GunnerBasicAttackData Data => data;
 
@@ -114,6 +123,36 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        focusFireHook = ApplyFocusFire;
+    }
+
+    private void OnEnable()
+    {
+        if (!lifeSubscribed)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
+            lifeSubscribed = true;
+        }
+    }
+
+    // 씬 종료·비활성 — 예약한 추가 레이저를 버린다(명세 §9).
+    private void OnDisable()
+    {
+        if (lifeSubscribed)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
+            lifeSubscribed = false;
+        }
+
+        extraShots.Clear();
+    }
+
+    // 사망(살아 있음 → 그 밖) — 예약한 추가 레이저 취소. 발수 카운터는 공용 장부(PlayerTraitEffects.ClearTransientServer)가 0 으로 돌린다.
+    private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (player != null && clientId == player.OwnerClientId && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+            extraShots.Clear();
     }
 
     // ── IPlayerBasicAttack ───────────────────────────────────────────────
@@ -461,17 +500,68 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         Vector3 origin = muzzle != null
             ? muzzle.position
             : transform.position + Vector3.up * data.MuzzleHeight;
-        bool hit = beam.Fire(origin, direction, data.Range, data.BeamWidth * 0.5f,
-                             data.HittableLayers, data.BlockingLayers, damage, data.TriggersOnHit, out Vector3 end);
+        bool hit = FireBeam(origin, direction, damage, data.TriggersOnHit, TraitHitFlags.Original, out Vector3 end);
 
         heat.ServerAddShot(data.HeatPerShot); // 허공이어도 증가(§4.2)
         lastShotTime = now;
         player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 발 발사(적중 무관)
+        CommitShotForTraits(origin, direction, damage);
         if (IsNetworkActive)
             ShotRpc(origin, end, hit);
         else
             PlayShot(origin, end, hit);
         return true;
+    }
+
+    // ── 특성(할 일 127) ──────────────────────────────────────────────────
+
+    // 한 발 판정 — 관통 탄도면 적을 꿰뚫고(첫 적 100%·이후 각각 비율, 벽에서 멈춤), 아니면 첫 대상 1체(원래 동작).
+    // 집중 포화는 대상마다 피해 순간 위치로(hook). 원래 발·추가 발이 같은 정책을 쓴다 — 추가 발은 Derived(적중 사건·패시브 없음).
+    private bool FireBeam(Vector3 origin, Vector3 direction, int damage, bool triggersOnHit, TraitHitFlags flags, out Vector3 end)
+    {
+        float pierceRatio = GunnerTraitRules.PierceSecondaryRatioFor(player.TraitModifiers);
+        return pierceRatio >= 0f
+            ? beam.FireThrough(origin, direction, data.Range, data.BeamWidth * 0.5f, data.HittableLayers, data.BlockingLayers,
+                               damage, pierceRatio, triggersOnHit, out end, flags, focusFireHook)
+            : beam.Fire(origin, direction, data.Range, data.BeamWidth * 0.5f, data.HittableLayers, data.BlockingLayers,
+                        damage, triggersOnHit, out end, flags, focusFireHook);
+    }
+
+    private void ApplyFocusFire(Unit target, ref AttackInfo info) => GunnerTrackingLaser.ApplyFocusFire(player, target, ref info);
+
+    // 원래 기본 공격 발사 커밋(빗나가도) — 특성 사건 BasicAttackFired + 이중 출력 발수. 취소된 공격·Q·추가 발은 여기를 지나지 않는다.
+    private void CommitShotForTraits(Vector3 origin, Vector3 direction, int shotDamage)
+    {
+        if (traitEffects == null)
+            traitEffects = PlayerTraitEffects.For(player);
+        if (traitEffects == null)
+            return;
+
+        traitEffects.RaiseServer(new TraitTriggerEvent(TraitTrigger.BasicAttackFired, AttackType.Default, TraitAttackForm.Normal, 0));
+
+        // 이중 출력 — N 번째 원래 발이면 그 발 피해 × 비율의 추가 레이저를 공격 가속 반영 지연 뒤로 예약(같은 방향·사거리·폭·관통 정책).
+        TraitDerivedAttack extra = GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.BasicAttackKey,
+            GunnerTraitRules.BasicExtraDerivedKey, derivedBuffer);
+        if (GunnerDualOutputRules.CountOriginalShot(extra, shotDamage, AttackSpeedRate, out int extraDamage, out float delay))
+            extraShots.Schedule(Time.timeAsDouble, delay, new GunnerDerivedShot(origin, direction, data.Range, data.BeamWidth, extraDamage));
+    }
+
+    // [서버] 예약된 추가 레이저 — 판정만(VFX 없음, 할 일 127 범위 밖). 과열·패시브·쿨·발수·특성 사건 없음, 행동 잠금 없음.
+    private void TickExtraShotsServer()
+    {
+        if (extraShots.Count == 0)
+            return;
+
+        extraShots.CollectDue(Time.timeAsDouble, dueExtraShots);
+        if (data == null || beam == null || player == null || player.CurrentHealth <= 0)
+            return;
+
+        for (int i = 0; i < dueExtraShots.Count; i++)
+        {
+            GunnerDerivedShot shot = dueExtraShots[i];
+            bool hit = FireBeam(shot.Origin, shot.Direction, shot.Damage, false, TraitHitFlags.Derived, out _);
+            Edit.Log($"[Gunner] 이중 출력 추가 레이저 — 피해 {shot.Damage}, 적중 {hit}", this);
+        }
     }
 
     private void TickServer()
@@ -704,6 +794,9 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     // (상태는 복제하지 않는다 — 시작 RPC 기준 시각). 판정은 여전히 서버 시각으로 검증한다.
     private void Update()
     {
+        if (HasGameplayAuthority)
+            TickExtraShotsServer(); // 공격이 끝난 뒤에도 돈다(추가 발은 행동 잠금 없음)
+
         if (!active || data == null || player.CurrentState != PlayerActionState.AttackReady)
             return;
 

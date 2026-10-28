@@ -32,6 +32,19 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private float ownerChargeStartTime;
     private float ownerChargeMaxTime;
 
+    // 특성(할 일 127) — 충격 레이저·집중 포화·잔류 포격. 서버에서만 쓴다.
+    // 원래 발 묶음은 지금 단발 Q 1발이다. 집속 연사(4/4)는 발마다 같은 시전 ID·같은 echoPlan 에 AddOriginalShot 한다.
+    private PlayerTraitEffects traitEffects;
+    private GunnerBeamAttack.TargetHitHook originalHitHook;
+    private GunnerBeamAttack.TargetHitHook echoHitHook;
+    private Vector3 hitDirection;
+    private readonly GunnerCastCcGate pushGate = new GunnerCastCcGate();
+    private readonly GunnerEchoPlan echoPlan = new GunnerEchoPlan();
+    private readonly GunnerDelayedShots echoShots = new GunnerDelayedShots();
+    private readonly List<GunnerDerivedShot> dueEchoShots = new List<GunnerDerivedShot>();
+    private readonly List<TraitDerivedAttack> derivedBuffer = new List<TraitDerivedAttack>();
+    private bool lifeSubscribed;
+
     /// <summary>
     /// [서버] Q 를 실제로 <b>발사</b>했다(충전 시작·대시 취소·피격 종료는 안 난다). 튜토리얼 판정 훅(v8 Z1-5 "거너 Q 는 발사까지").
     /// 승인 시점 신호는 <see cref="PlayerSkillController.ServerSkillUsed"/>(충전 시작)이다.
@@ -77,6 +90,39 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         movement = owner.GetComponent<PlayerMovement>();
         lineIndicator = owner.GetComponentInChildren<SkillLineIndicator>(true);
         hoverOutline = owner.GetComponent<PlayerEnemyHoverOutline>();
+        originalHitHook = ApplyOriginalHit;
+        echoHitHook = ApplyEchoHit;
+    }
+
+    private void OnEnable()
+    {
+        if (!lifeSubscribed)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
+            lifeSubscribed = true;
+        }
+    }
+
+    // 씬 종료·비활성 — 예약한 잔류 포격을 버린다(명세 §9).
+    private void OnDisable()
+    {
+        if (lifeSubscribed)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
+            lifeSubscribed = false;
+        }
+
+        echoShots.Clear();
+    }
+
+    // 사망(살아 있음 → 그 밖) — 예약한 잔류 포격 취소·밀치기 승인 기억 정리(공용 밀치기 장부와 같은 시점).
+    private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (owner != null && clientId == owner.OwnerClientId && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+        {
+            echoShots.Clear();
+            pushGate.Reset();
+        }
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => QData != null && beam != null;
@@ -88,6 +134,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         chargeMaxTime = EffectiveMaxChargeTime(QData);
         aim = direction;
         fired = false;
+        // 새 시전은 새 묶음 — 이미 예약된 이전 시전의 잔류 포격(echoShots)은 덮어쓰지 않는다.
+        echoPlan.Reset();
 
         // 시전 시작 순간의 단계를 저장 — 과열 중이면 3단계(§5.6)
         storedStage = heat != null ? heat.CaptureStage() : 0;
@@ -204,9 +252,13 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
         float length = beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers);
 
+        hitDirection = direction;
         int hitCount = beam.FirePiercing(origin, direction, length, width, data.BeamHeight,
                                          data.HittableLayers, damage, DamageAttackType,
-                                         DamageHitPattern, data.TriggersOnHit);
+                                         DamageHitPattern, data.TriggersOnHit,
+                                         TraitHitFlags.Original, originalHitHook);
+        // 잔류 포격 묶음 — 예정 단일 대상 피해(실제 총 피해·맞힌 수 아님)와 첫 발 위치·방향·최종 충전 사거리·폭.
+        echoPlan.AddOriginalShot(origin, direction, range, width, damage);
 
         beam.CollectAllies(origin, direction, length, width, data.BeamHeight, data.AllyLayers, allies);
         for (int i = 0; i < allies.Count; i++)
@@ -281,6 +333,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
                 // 쓰러짐·사망·조작 불가·피격 취소 = 쿨타임 없음(수동 커밋이라 자연히 안 돈다 — §6.6)
                 Edit.Log($"[Gunner/Q] 발사 없이 종료({reason}) — 쿨타임 없음", this);
             }
+            ScheduleEcho(reason);
             ClearStatus();
         }
 
@@ -310,6 +363,86 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             clippedMin,
             clippedMax);
         return true;
+    }
+
+    // ── 특성(할 일 127) ──────────────────────────────────────────────────
+
+    private PlayerTraitEffects TraitEffects
+    {
+        get
+        {
+            if (traitEffects == null && owner != null)
+                traitEffects = PlayerTraitEffects.For(owner);
+            return traitEffects;
+        }
+    }
+
+    // 원래 Q 발 대상 1건 — 집중 포화(자기 R 범위 안이면 피해 배율) → 충격 레이저(밀치기).
+    private void ApplyOriginalHit(Unit target, ref AttackInfo info)
+    {
+        GunnerTrackingLaser.ApplyFocusFire(owner, target, ref info);
+        ApplyImpactPush(target, ref info);
+    }
+
+    // 잔류 포격 대상 1건 — 집중 포화만(파생 = 밀치기·보호막·자원 없음).
+    private void ApplyEchoHit(Unit target, ref AttackInfo info) => GunnerTrackingLaser.ApplyFocusFire(owner, target, ref info);
+
+    /// <summary>
+    /// 충격 레이저(GUN_3_Q_PUSH) — 공용 밀치기 경로(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/> → TraitKnockbackEffect.ApplyCrowdControl)를
+    /// 레이저 진행 방향으로. 시전 전체에서 대상별 유효 승인 1회 — 지금 슈퍼아머(면역)인 대상은 요청하지 않아 같은 시전의 다음 원래 발에서 승인될 수 있다.
+    /// 특성이 없으면 공용 경로가 아무것도 바꾸지 않는다(승인 기록도 없음).
+    /// </summary>
+    private void ApplyImpactPush(Unit target, ref AttackInfo info)
+    {
+        if (target == null || TraitEffects == null)
+            return;
+
+        int castId = ServerCastId;
+        int targetId = target.GetInstanceID();
+        if (!pushGate.ShouldRequest(castId, targetId, target.HasSuperArmor))
+            return;
+
+        float before = info.knockbackStrength * info.knockbackDuration;
+        TraitEffects.ModifyOutgoingAttackServer(GunnerTraitRules.QAttackKey, castId, target, hitDirection, ref info);
+        if (info.knockbackStrength * info.knockbackDuration > before)
+            pushGate.MarkApproved(castId, targetId);
+    }
+
+    // [서버] 잔류 포격(GUN_4_ECHO_Q) — 정상 종료(발사 후 End 이벤트·그 안전망)에서만 지연 뒤 1회 예약. 중단·사망·발사 전 종료면 없음.
+    private void ScheduleEcho(SkillEndReason reason)
+    {
+        TraitDerivedAttack echo = GunnerTraitRules.FindDerived(TraitEffects, GunnerTraitRules.QAttackKey,
+            GunnerTraitRules.QEchoDerivedKey, derivedBuffer);
+        if (echoPlan.TryBuildEcho(fired, reason, echo, out GunnerDerivedShot shot))
+        {
+            echoShots.Schedule(Time.timeAsDouble, echo.Delay, shot);
+            Edit.Log($"[Gunner/Q] 잔류 포격 예약 — {echo.Delay:0.##}초 뒤, 피해 {shot.Damage}(예정 합계 {echoPlan.PlannedDamageSum})", this);
+        }
+
+        echoPlan.Reset();
+    }
+
+    // [서버] 예약된 잔류 포격 — 저장한 위치·방향·충전 사거리·폭, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
+    // 열 소모·보호막·밀치기·쿨·적중 사건·연쇄 없음(Derived).
+    private void Update()
+    {
+        if (echoShots.Count == 0 || !HasAuthority)
+            return;
+
+        echoShots.CollectDue(Time.timeAsDouble, dueEchoShots);
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || owner.CurrentHealth <= 0)
+            return;
+
+        for (int i = 0; i < dueEchoShots.Count; i++)
+        {
+            GunnerDerivedShot shot = dueEchoShots[i];
+            float length = beam.CastLength(shot.Origin, shot.Direction, shot.Range, data.BeamWidth * 0.5f, data.BlockingLayers);
+            int hitCount = beam.FirePiercing(shot.Origin, shot.Direction, length, shot.Width, data.BeamHeight,
+                                             data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
+                                             false, TraitHitFlags.Derived, echoHitHook);
+            Edit.Log($"[Gunner/Q] 잔류 포격 — 사거리 {length:0.0}/{shot.Range:0.0}, 폭 {shot.Width:0.##}, 피해 {shot.Damage} ×{hitCount}", this);
+        }
     }
 
     private void ClearStatus()

@@ -64,6 +64,31 @@ public static class GunnerTraitRules
     public static float AutoFireDelay(float effectiveMaxChargeTime, float autoFireHoldTime) =>
         ClampChargeTime(effectiveMaxChargeTime) + Mathf.Max(0f, autoFireHoldTime);
 
+    /// <summary>관통 탄도 — 두 번째 적부터 피해 비율. 특성이 없으면 음수(관통 없음, 첫 대상 1체 — 원래 동작).</summary>
+    public static float PierceSecondaryRatioFor(PlayerTraitModifiers modifiers) =>
+        modifiers != null ? modifiers.ResolveSkillValue(BasicPierceSecondaryRatio, -1f) : -1f;
+
+    /// <summary>집중 포화 — 자신의 R 범위 안 대상 피해 보너스. 특성이 없으면 0.</summary>
+    public static float FocusFireBonusFor(PlayerTraitModifiers modifiers) =>
+        modifiers != null ? modifiers.ResolveSkillValue(RFocusDamageBonus, 0f) : 0f;
+
+    /// <summary>그 원래 공격 키에 붙은 파생 공격 중 이름이 맞는 첫 번째(없으면 null). 서버 전용 목록.</summary>
+    public static TraitDerivedAttack FindDerived(PlayerTraitEffects effects, TraitAttackKey key, string derivedKey,
+        System.Collections.Generic.List<TraitDerivedAttack> buffer)
+    {
+        if (effects == null)
+            return null;
+
+        effects.GetDerivedAttacks(key, buffer);
+        for (int i = 0; i < buffer.Count; i++)
+        {
+            if (buffer[i].Key == derivedKey)
+                return buffer[i];
+        }
+
+        return null;
+    }
+
     /// <summary>광폭 레이저 — 특성을 반영한 Q 판정 폭(데이터 폭 × 1.3). 사거리·높이는 바꾸지 않는다. VFX 폭은 이 값을 쓰지 않는다.</summary>
     public static float QBeamWidthFor(PlayerTraitModifiers modifiers, float dataBeamWidth) =>
         modifiers != null ? dataBeamWidth * modifiers.AreaMultiplier(QAttackKey, TraitAreaAxis.Width) : dataBeamWidth;
