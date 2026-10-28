@@ -89,7 +89,23 @@ public static class QABoss116LabManual
         for (int i = 0; i < top.Count && i < 4; i++)
             sb.Append(i > 0 ? ", " : "").Append(top[i].Key).Append(' ').Append(top[i].Value);
         sb.Append(" · 카운터 창 안 ").Append(Count(s, "in")).Append("/밖 ").Append(Count(s, "out"))
-          .Append(" · dash_shortened ").Append(a.Shortened).Append(" · 폴더 ").Append(dir);
+          .Append(" · dash_shortened ").Append(a.Shortened);
+        // 116-C6 — 대시 끊긴 이유 상위(순서 무관 합계)
+        var reasons = new List<KeyValuePair<string, int>>();
+        foreach (KeyValuePair<string, SortedDictionary<string, int>> kv in s.StopReasons)
+        {
+            int n = 0;
+            foreach (int v in kv.Value.Values)
+                n += v;
+            reasons.Add(new KeyValuePair<string, int>(kv.Key, n));
+        }
+        reasons.Sort((x, y) => x.Value != y.Value ? y.Value.CompareTo(x.Value) : string.CompareOrdinal(x.Key, y.Key));
+        sb.Append(" · 대시 끊긴 이유 ");
+        if (reasons.Count == 0)
+            sb.Append("없음");
+        for (int i = 0; i < reasons.Count && i < 3; i++)
+            sb.Append(i > 0 ? ", " : "").Append(reasons[i].Key).Append(' ').Append(reasons[i].Value);
+        sb.Append(" · 폴더 ").Append(dir);
         return sb.ToString();
     }
 

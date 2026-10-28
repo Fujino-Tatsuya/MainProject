@@ -6,10 +6,10 @@ using System.Globalization;
 /// <summary>
 /// 할 일 116-C4 — 대쉬 간파 예측 랩(호스트 1명 · 전용 디버그 씬 <c>DebugDashPredictLab</c>)의 순수 규칙(EditMode <c>QABoss116LabTests</c>).
 /// <list type="bullet">
-/// <item>랩 설정 파일(<see cref="QABoss116LabConfig"/>) — 봇 설정(<see cref="QABoss103Config"/>)에 판 길이·시도 상한·구간 교대 간격을 더한다.</item>
-/// <item>구간(<see cref="Zone"/>) — 시도 순간 내 몸에서 가장 가까운 Wall/Env 까지 거리로 벽 근처/열린 쪽을 가른다.</item>
+/// <item>랩 설정 파일(<see cref="QABoss116LabConfig"/>) — 봇 설정(<see cref="QABoss103Config"/>)에 판 길이·시도 상한을 더한다.</item>
 /// <item>봇 시도 결과 사유 7종 + 나머지의 상세 원인(<see cref="Cause"/>) — 봇이 판 파일 <c>dashint</c> 줄에 붙인 판단 근거 값만으로 정한다.</item>
 /// <item>판 파일 줄(<c>dashint</c>·<c>dp</c>·<c>labwin</c>·<c>labdash</c>) → CSV 3종(<see cref="BuildAttempts"/>·<see cref="BuildWindows"/>·<see cref="BuildDashes"/>)과 요약(<see cref="Summarize"/>).</item>
+/// <item>116-C6: 벽 구간 제거. 대시 1회의 끊긴 이유(<see cref="QABoss116DashStop"/>)·프레임 이동 요약을 시도 행에 붙이고, 순서×캐릭터별 의도 vs 실제 거리를 센다.</item>
 /// </list>
 /// 시각은 모두 호스트 <c>NetworkManager.ServerTime</c>(초) — 봇 시도·예측 로그·카운터 창·대시 궤적이 같은 시계다.
 /// </summary>
@@ -24,20 +24,12 @@ public static class QABoss116Lab
     public const double RunSeconds = 180.0;
     /// <summary>1판 대쉬 간파 시도 상한.</summary>
     public const int MaxAttempts = 60;
-    /// <summary>벽 구간 ↔ 열린 구간 교대 간격(실제 시간 초).</summary>
-    public const double ZoneSeconds = 30.0;
     /// <summary>랩은 간파 창마다 대쉬 간파(%).</summary>
     public const int DashInterruptPct = 100;
-    /// <summary>이 거리(m) 안에 Wall/Env 표면이 있으면 벽 근처.</summary>
-    public const float WallNearMeters = 3.0f;
-
-    public const string ZoneWall = "wall";
-    public const string ZoneOpen = "open";
 
     // 판 파일 줄 종류(랩 디렉터가 parts/run<n>_r<retry>_lab.txt 에 쓴다)
     public const string WindowKind = "labwin";
     public const string DashKind = "labdash";
-    public const string ZoneKind = "labzone";
     public const string EndKind = "labend";
 
     public const string AttemptsFile = "lab_attempts.csv";
@@ -60,13 +52,6 @@ public static class QABoss116Lab
         System.IO.Path.Combine(outDir, QABoss103PartFile.Folder, $"run{run}_r{retry}_labdone.txt");
 
     public static string BatchFolderName(DateTime at) => Prefix + "-" + at.ToString("yyyyMMdd_HHmm", CultureInfo.InvariantCulture);
-
-    /// <summary>벽까지 거리(m, 모름 = 음수) → 구간.</summary>
-    public static string Zone(float wallMeters) => wallMeters >= 0f && wallMeters <= WallNearMeters ? ZoneWall : ZoneOpen;
-
-    /// <summary>이번 구간(판 시작부터 실제 초) — 짝수 칸 = 벽, 홀수 칸 = 열린 쪽(첫 칸 벽).</summary>
-    public static string PlannedZone(double elapsed, double zoneSeconds) =>
-        zoneSeconds <= 0.0 || double.IsNaN(elapsed) || ((long)Math.Floor(Math.Max(0.0, elapsed) / zoneSeconds)) % 2 == 0 ? ZoneWall : ZoneOpen;
 
     /// <summary>판이 끝났나 — 시간 상한 또는 시도 상한(먼저 닿는 것). 끝이면 사유.</summary>
     public static string EndReason(double elapsed, int attempts, double runSeconds, int maxAttempts)
@@ -177,12 +162,17 @@ public static class QABoss116Lab
 
     public static readonly string[] AttemptsHeader = Concat(QABoss103Metrics.KeyHeader, new[]
     {
-        "n", "character", "order", "outcome", "cause", "zone", "zone_planned", "wall_m", "wall_name", "boss_m", "attack", "boss_state",
+        "n", "character", "order", "outcome", "cause", "boss_m", "attack", "boss_state",
         "server_t", "first_t", "delay_s", "window_s", "dash_age_s", "dash_total_s", "wait_s",
         "charge", "max_charge", "next_charge_s", "state", "end_state", "can_move", "can_dash_act", "grounded", "input_src", "dash_on",
         "skill_busy", "active_skill", "int_cd_s", "seen", "dash_log",
         "win_n", "win_open_t", "win_close_t", "win_dur_s", "t_from_open_s", "t_to_close_s",
         "dash_start_t", "dash_intent_m", "dash_actual_m", "dash_short_m", "dash_blocked", "dash_block_pos", "dash_block_collider", "dash_block_layer", "dash_block_at_s",
+        // 할 일 116-C6 — 묶인 대시의 전환·끊긴 이유·프레임 이동(labdash 줄 그대로)
+        "dash_start_pos", "dash_end_pos", "dash_prev_state", "dash_prev_frame", "dash_transfer", "dash_expired", "dash_next_state",
+        "dash_stop_reason", "dash_stop_detail", "dash_caller", "dash_ticks", "dash_req_m", "dash_applied_m", "dash_blocked_ticks",
+        "dash_frames", "dash_move_frames", "dash_first_move_frame", "dash_first_move_s", "dash_min_ts", "dash_upper_w",
+        "dash_can_move_prev", "dash_root_motion", "dash_boss_along_m", "dash_boss_lateral_m", "dash_interrupt_aborted",
         "cast_id", "predict", "pred_reason", "result", "match", "mismatch", "shortfall_m", "pos_err_m", "time_err_s",
         "pred_resolve_in_s", "resolve_in_s", "win_close_after_cast_s", "target_open_at_resolve",
         // 할 일 116-C5 — 시도 출처(bot·human)·두 입력 간격·입력 순간 카운터 창 열림(사람 시도만 값이 있다)
@@ -191,14 +181,46 @@ public static class QABoss116Lab
 
     public static readonly string[] WindowsHeader = Concat(QABoss103Metrics.KeyHeader, new[]
     {
-        "win_n", "open_t", "close_t", "dur_s", "attack", "boss_state", "zone_planned", "player_wall_m", "boss_m", "attempts", "outcomes",
+        "win_n", "open_t", "close_t", "dur_s", "attack", "boss_state", "boss_m", "attempts", "outcomes",
     });
 
-    public static readonly string[] DashesHeader = Concat(QABoss103Metrics.KeyHeader, new[]
+    /// <summary>labdash 줄 키 → 대시 CSV 열(116-C6 열 포함). 시도 CSV 는 같은 키를 <c>dash_</c> 를 붙여 쓴다(<see cref="DashAttemptCols"/>).</summary>
+    private static readonly (string Col, string Key)[] DashCols =
     {
-        "dash_n", "start_t", "end_t", "start_pos", "end_pos", "dir", "speed", "intent_m", "actual_m", "short_m", "blocked",
-        "block_pos", "block_collider", "block_layer", "block_at_s", "wall_m", "zone", "end_state", "attached", "attempt_n",
-    });
+        ("start_pos", "startPos"), ("end_pos", "endPos"), ("dir", "dir"), ("speed", "speed"), ("dur_s", "durS"), ("intent_m", "intentM"), ("actual_m", "actualM"),
+        ("short_m", "shortM"), ("blocked", "blocked"), ("block_pos", "blockPos"), ("block_collider", "blockCollider"), ("block_layer", "blockLayer"),
+        ("block_at_s", "blockAtS"), ("end_state", "endState"), ("attached", "attached"),
+        ("prev_state", "prevState"), ("prev_frame", "prevFrame"), ("transfer", "transfer"), ("expired", "expired"), ("next_state", "nextState"),
+        ("stop_reason", "stopReason"), ("stop_detail", "stopDetail"), ("caller", "caller"), ("ticks", "ticks"), ("req_m", "reqM"), ("applied_m", "appliedM"),
+        ("log_actual_m", "logActualM"), ("blocked_ticks", "blockedTicks"), ("lost_ground", "lostGround"), ("exit_elapsed_s", "exitElapsedS"),
+        ("frames", "frames"), ("move_frames", "moveFrames"), ("first_move_frame", "firstMoveFrame"), ("first_move_s", "firstMoveS"),
+        ("min_ts", "minTs"), ("upper_w", "upperW"), ("can_move_prev", "canMovePrev"), ("root_motion", "rootMotion"),
+        ("boss_m", "bossM"), ("boss_along_m", "bossAlongM"), ("boss_lateral_m", "bossLateralM"), ("interrupt_aborted", "interruptAborted"),
+    };
+
+    private static readonly (string Col, string Key)[] DashAttemptCols =
+    {
+        ("dash_intent_m", "intentM"), ("dash_actual_m", "actualM"), ("dash_short_m", "shortM"), ("dash_blocked", "blocked"), ("dash_block_pos", "blockPos"),
+        ("dash_block_collider", "blockCollider"), ("dash_block_layer", "blockLayer"), ("dash_block_at_s", "blockAtS"),
+        ("dash_start_pos", "startPos"), ("dash_end_pos", "endPos"), ("dash_prev_state", "prevState"), ("dash_prev_frame", "prevFrame"),
+        ("dash_transfer", "transfer"), ("dash_expired", "expired"), ("dash_next_state", "nextState"), ("dash_stop_reason", "stopReason"),
+        ("dash_stop_detail", "stopDetail"), ("dash_caller", "caller"), ("dash_ticks", "ticks"), ("dash_req_m", "reqM"), ("dash_applied_m", "appliedM"),
+        ("dash_blocked_ticks", "blockedTicks"), ("dash_frames", "frames"), ("dash_move_frames", "moveFrames"), ("dash_first_move_frame", "firstMoveFrame"),
+        ("dash_first_move_s", "firstMoveS"), ("dash_min_ts", "minTs"), ("dash_upper_w", "upperW"), ("dash_can_move_prev", "canMovePrev"),
+        ("dash_root_motion", "rootMotion"), ("dash_boss_along_m", "bossAlongM"), ("dash_boss_lateral_m", "bossLateralM"),
+        ("dash_interrupt_aborted", "interruptAborted"),
+    };
+
+    public static readonly string[] DashesHeader = Concat(QABoss103Metrics.KeyHeader, Concat(new[] { "dash_n", "start_t", "end_t" },
+        Concat(Cols(DashCols), new[] { "attempt_n", "order", "character" })));
+
+    private static string[] Cols((string Col, string Key)[] map)
+    {
+        var r = new string[map.Length];
+        for (int i = 0; i < map.Length; i++)
+            r[i] = map[i].Col;
+        return r;
+    }
 
     private sealed class Win
     {
@@ -330,11 +352,6 @@ public static class QABoss116Lab
             Set(r, AttemptsHeader, "order", Get(b, "order"));
             Set(r, AttemptsHeader, "outcome", outcome);
             Set(r, AttemptsHeader, "cause", Cause(outcome, b));
-            float wall = (float)Dbl(b, "wallM");
-            Set(r, AttemptsHeader, "zone", Get(b, "wallM").Length > 0 ? Zone(float.IsNaN(wall) ? -1f : wall) : "");
-            Copy(r, b, "zone_planned", "zonePlanned");
-            Copy(r, b, "wall_m", "wallM");
-            Copy(r, b, "wall_name", "wallName");
             Copy(r, b, "boss_m", "bossM");
             Copy(r, b, "attack", "attack");
             Copy(r, b, "boss_state", "bossState");
@@ -390,14 +407,8 @@ public static class QABoss116Lab
             {
                 d.Attempt = n;
                 Set(r, AttemptsHeader, "dash_start_t", F3(d.Start));
-                Copy(r, d.Kv, "dash_intent_m", "intentM");
-                Copy(r, d.Kv, "dash_actual_m", "actualM");
-                Copy(r, d.Kv, "dash_short_m", "shortM");
-                Copy(r, d.Kv, "dash_blocked", "blocked");
-                Copy(r, d.Kv, "dash_block_pos", "blockPos");
-                Copy(r, d.Kv, "dash_block_collider", "blockCollider");
-                Copy(r, d.Kv, "dash_block_layer", "blockLayer");
-                Copy(r, d.Kv, "dash_block_at_s", "blockAtS");
+                foreach ((string col, string k) in DashAttemptCols)
+                    Copy(r, d.Kv, col, k);
             }
 
             Cast best = null;
@@ -464,8 +475,6 @@ public static class QABoss116Lab
             Set(r, WindowsHeader, "dur_s", F3(w.Close - w.Open));
             Set(r, WindowsHeader, "attack", Get(w.Kv, "attack"));
             Set(r, WindowsHeader, "boss_state", Get(w.Kv, "bossState"));
-            Set(r, WindowsHeader, "zone_planned", Get(w.Kv, "zonePlanned"));
-            Set(r, WindowsHeader, "player_wall_m", Get(w.Kv, "wallM"));
             Set(r, WindowsHeader, "boss_m", Get(w.Kv, "bossM"));
             Set(r, WindowsHeader, "attempts", w.Outcomes.Count.ToString(CultureInfo.InvariantCulture));
             Set(r, WindowsHeader, "outcomes", string.Join(";", w.Outcomes));
@@ -481,6 +490,7 @@ public static class QABoss116Lab
         List<Dash> dashes = Dashes(all);
         // 시도 번호 묶기 — BuildAttempts 와 같은 규칙.
         int n = 0;
+        var bound = new Dictionary<Dash, Dictionary<string, string>>();
         foreach (string line in all)
         {
             if (!QABoss103PartFile.TryParse(line, out string kind, out Dictionary<string, string> kv) || kind != QABoss116DashPredict.BotKind)
@@ -494,6 +504,7 @@ public static class QABoss116Lab
                 if (x.Attempt < 0 && !double.IsNaN(x.Start) && x.Start >= firstT - DashLeadSeconds && x.Start <= lastT + DashLagSeconds)
                 {
                     x.Attempt = n;
+                    bound[x] = kv;
                     break;
                 }
         }
@@ -504,16 +515,14 @@ public static class QABoss116Lab
             Set(r, DashesHeader, "dash_n", d.N.ToString(CultureInfo.InvariantCulture));
             Set(r, DashesHeader, "start_t", F3(d.Start));
             Set(r, DashesHeader, "end_t", F3(d.End));
-            foreach ((string col, string k) in new[]
-                     {
-                         ("start_pos", "startPos"), ("end_pos", "endPos"), ("dir", "dir"), ("speed", "speed"), ("intent_m", "intentM"), ("actual_m", "actualM"),
-                         ("short_m", "shortM"), ("blocked", "blocked"), ("block_pos", "blockPos"), ("block_collider", "blockCollider"), ("block_layer", "blockLayer"),
-                         ("block_at_s", "blockAtS"), ("wall_m", "wallM"), ("end_state", "endState"), ("attached", "attached"),
-                     })
+            foreach ((string col, string k) in DashCols)
                 Set(r, DashesHeader, col, Get(d.Kv, k));
-            float wall = (float)Dbl(d.Kv, "wallM");
-            Set(r, DashesHeader, "zone", Get(d.Kv, "wallM").Length > 0 ? Zone(float.IsNaN(wall) ? -1f : wall) : "");
             Set(r, DashesHeader, "attempt_n", d.Attempt > 0 ? d.Attempt.ToString(CultureInfo.InvariantCulture) : "");
+            if (bound.TryGetValue(d, out Dictionary<string, string> attempt))
+            {
+                Set(r, DashesHeader, "order", Get(attempt, "order"));
+                Set(r, DashesHeader, "character", Get(attempt, "character"));
+            }
             rows.Add(r);
         }
         return rows;
@@ -565,10 +574,20 @@ public static class QABoss116Lab
         }
     }
 
+    /// <summary>순서×캐릭터 한 칸 — 묶인 대시의 의도·실제·덜 간 거리 평균과 끊긴 이유(116-C6).</summary>
+    public sealed class DistBucket
+    {
+        public int Attempts, Dashes, Shortened, Transfers;
+        public double Intent, Actual, Short;
+        public readonly SortedDictionary<string, int> Reasons = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        public double MeanIntent => Dashes > 0 ? Intent / Dashes : double.NaN;
+        public double MeanActual => Dashes > 0 ? Actual / Dashes : double.NaN;
+        public double MeanShort => Dashes > 0 ? Short / Dashes : double.NaN;
+    }
+
     public sealed class Summary
     {
         public readonly Bucket All = new Bucket();
-        public readonly SortedDictionary<string, Bucket> ByZone = new SortedDictionary<string, Bucket>(StringComparer.Ordinal);
         public readonly SortedDictionary<string, Bucket> ByOrder = new SortedDictionary<string, Bucket>(StringComparer.Ordinal);
         /// <summary>첫 입력 순간 카운터 창 — in·out·unknown(봇 시도는 값이 없어 unknown). 할 일 116-C5.</summary>
         public readonly SortedDictionary<string, Bucket> ByCounter = new SortedDictionary<string, Bucket>(StringComparer.Ordinal);
@@ -576,6 +595,10 @@ public static class QABoss116Lab
         public readonly SortedDictionary<string, SortedDictionary<string, int>> Causes = new SortedDictionary<string, SortedDictionary<string, int>>(StringComparer.Ordinal);
         /// <summary>막힌 대시의 충돌체 → 수.</summary>
         public readonly SortedDictionary<string, int> Blockers = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        /// <summary>"순서 × 캐릭터" → 거리 칸(116-C6).</summary>
+        public readonly SortedDictionary<string, DistBucket> ByOrderCharacter = new SortedDictionary<string, DistBucket>(StringComparer.Ordinal);
+        /// <summary>대시 끊긴 이유 → 순서 → 수(묶인 대시만, 116-C6).</summary>
+        public readonly SortedDictionary<string, SortedDictionary<string, int>> StopReasons = new SortedDictionary<string, SortedDictionary<string, int>>(StringComparer.Ordinal);
         public int Windows, WindowsWithAttempt;
         public double WindowMedianS = double.NaN;
     }
@@ -586,8 +609,9 @@ public static class QABoss116Lab
         foreach (string[] r in attempts.Rows)
         {
             s.All.Add(attempts, r);
-            Of(s.ByZone, Or(attempts.Get(r, "zone"), "unknown")).Add(attempts, r);
-            Of(s.ByOrder, Or(attempts.Get(r, "order"), "unknown")).Add(attempts, r);
+            string order = Or(attempts.Get(r, "order"), "unknown");
+            Of(s.ByOrder, order).Add(attempts, r);
+            AddDistance(s, attempts, r, order);
             string open = attempts.Get(r, "counter_open_first");
             Of(s.ByCounter, open == "true" ? "in" : open == "false" ? "out" : "unknown").Add(attempts, r);
             string outcome = Or(attempts.Get(r, "outcome"), "none");
@@ -616,6 +640,31 @@ public static class QABoss116Lab
             }
         }
         return s;
+    }
+
+    /// <summary>순서×캐릭터 거리 칸과 끊긴 이유 — 대시가 묶인 시도만 거리·이유를 센다(시도 수는 전부).</summary>
+    private static void AddDistance(Summary s, QABoss103CsvTable t, string[] r, string order)
+    {
+        string k = order + " × " + Or(t.Get(r, "character"), "unknown");
+        if (!s.ByOrderCharacter.TryGetValue(k, out DistBucket b))
+            s.ByOrderCharacter[k] = b = new DistBucket();
+        b.Attempts++;
+        double intent = t.Num(r, "dash_intent_m"), actual = t.Num(r, "dash_actual_m"), shortM = t.Num(r, "dash_short_m");
+        if (double.IsNaN(intent) || double.IsNaN(actual))
+            return;
+        b.Dashes++;
+        b.Intent += intent;
+        b.Actual += actual;
+        b.Short += double.IsNaN(shortM) ? Math.Max(0.0, intent - actual) : shortM;
+        if (!double.IsNaN(shortM) && shortM >= ShortfallMeters)
+            b.Shortened++;
+        if (t.Get(r, "dash_transfer") == "true")
+            b.Transfers++;
+        string reason = Or(t.Get(r, "dash_stop_reason"), "unknown");
+        Inc(b.Reasons, reason);
+        if (!s.StopReasons.TryGetValue(reason, out SortedDictionary<string, int> byOrder))
+            s.StopReasons[reason] = byOrder = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        Inc(byOrder, order);
     }
 
     private static Bucket Of(SortedDictionary<string, Bucket> d, string k)
@@ -677,7 +726,7 @@ public static class QABoss116Lab
 
 /// <summary>
 /// 할 일 116-C4 — 랩 판 설정(<c>&lt;프로젝트 루트&gt;/qa116lab.txt</c>, 배치 메뉴가 판마다 쓴다). 봇 설정 줄(<see cref="QABoss103Config.Format"/>) +
-/// <c>run_s</c>(판 상한 초)·<c>max_attempts</c>(시도 상한)·<c>zone_s</c>(구간 교대 초). 파일이 없으면 랩 씬은 봇 없이(사람이 직접) 돈다.
+/// <c>run_s</c>(판 상한 초)·<c>max_attempts</c>(시도 상한). 파일이 없으면 랩 씬은 봇 없이(사람이 직접) 돈다. 옛 <c>zone_s</c> 줄은 무시한다(116-C6 벽 구간 제거).
 /// </summary>
 public sealed class QABoss116LabConfig
 {
@@ -686,12 +735,10 @@ public sealed class QABoss116LabConfig
     public QABoss103Config Bot = new QABoss103Config { DashInterruptPct = QABoss116Lab.DashInterruptPct };
     public double RunSeconds = QABoss116Lab.RunSeconds;
     public int MaxAttempts = QABoss116Lab.MaxAttempts;
-    public double ZoneSeconds = QABoss116Lab.ZoneSeconds;
 
     public string Format() =>
         Bot.Format() +
-        $"run_s={RunSeconds.ToString("0.###", CultureInfo.InvariantCulture)}\nmax_attempts={MaxAttempts.ToString(CultureInfo.InvariantCulture)}\n" +
-        $"zone_s={ZoneSeconds.ToString("0.###", CultureInfo.InvariantCulture)}\n";
+        $"run_s={RunSeconds.ToString("0.###", CultureInfo.InvariantCulture)}\nmax_attempts={MaxAttempts.ToString(CultureInfo.InvariantCulture)}\n";
 
     public static bool TryParse(string text, out QABoss116LabConfig cfg)
     {
@@ -710,8 +757,6 @@ public sealed class QABoss116LabConfig
                 cfg.RunSeconds = Math.Max(10.0, rs);
             else if (k == "max_attempts" && int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out int ma))
                 cfg.MaxAttempts = Math.Max(0, ma);
-            else if (k == "zone_s" && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double zs))
-                cfg.ZoneSeconds = Math.Max(0.0, zs);
         }
         return true;
     }

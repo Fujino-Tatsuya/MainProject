@@ -51,7 +51,6 @@ public static class QABoss116LabManualFinalizer
             batch["data_source_mode"] = DataSourcePlayMode.Current.ToString();
             batch["run_s"] = "수동";
             batch["max_attempts"] = "–";
-            batch["zone_s"] = QABoss116LabDirector.ZoneToggleKey + " 키";
             batch["xlsx_svn_rev"] = QABoss103RunCsv.XlsxRevision();
             batch["svn_rev"] = QABoss103RunCsv.SvnWorkingRevision();
             batch["git_commit"] = QABoss103RunCsv.GitCommit();

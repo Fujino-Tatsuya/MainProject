@@ -5,34 +5,32 @@ using System.Globalization;
 using System.IO;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.AI;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 할 일 116-C4 — 대쉬 간파 예측 랩 씬(<c>DebugDashPredictLab</c>)의 진행자(호스트에서만 돈다, 씬 배치형). 게임 코드는 바꾸지 않고 기존 서버 API 만 부른다.
 /// <list type="bullet">
 /// <item><b>살려 두기</b>: 23호 체력이 <see cref="bossHealBelow"/> 아래면 가득(<see cref="Unit.SetCurrentHealthOnServer"/>) — 페이즈 임계(0.7) 위라 페이즈가 안 넘어간다.
 ///   내 플레이어도 <see cref="playerHealBelow"/> 아래면 가득. 간파 쿨은 남아 있으면 바로 초기화(창마다 시도 표본 — 대시 충전은 실제 규칙 그대로 둔다: 거부·충전 없음 원인을 보려고).</item>
-/// <item><b>카운터 창 기록</b>: 23호 <see cref="TwentyThreeBoss.CounterWindowOpen"/> 열림/닫힘마다 <c>labwin</c> 줄(서버 시각·공격 행·보스 상태·구간·내 벽 거리).</item>
-/// <item><b>대시 궤적</b>: 내 플레이어 대시 1회마다 <c>labdash</c> 줄 — 시작/끝 위치, 의도 거리 vs 실제 거리, 처음 막힌 지점·충돌체 이름/레이어(<see cref="QABoss116Lab.DashDistances"/>).</item>
-/// <item><b>구간 교대</b>: <see cref="QABoss116LabConfig.ZoneSeconds"/> 마다 벽 구간(복도) ↔ 열린 구간으로 보스·플레이어를 옮긴다(보스 공격·창·내 대시/스킬 중이 아닐 때, 5초 넘게 못 옮기면 그대로 옮김).</item>
+/// <item><b>카운터 창 기록</b>: 23호 <see cref="TwentyThreeBoss.CounterWindowOpen"/> 열림/닫힘마다 <c>labwin</c> 줄(서버 시각·공격 행·보스 상태·보스 거리).</item>
+/// <item><b>대시 궤적·끊긴 이유</b>(116-C6): 내 플레이어 대시 1회마다 <c>labdash</c> 줄 — 시작/끝 위치, 의도 거리 vs 실제 거리, 처음 막힌 지점·충돌체,
+///   진입 이전 상태·우클릭→대시 전환 여부, 게임 <c>[Dash]</c> 로그로 본 끝 사유(<see cref="QABoss116DashStop"/>), 프레임별 이동 요약(첫 이동 프레임·이동 프레임 수).
+///   대시 진입·종료 줄을 <c>Application.logMessageReceived</c> 로 받으므로 프레임 사이에 끝난 대시(진입 프레임 종료)도 남는다.</item>
 /// <item><b>판</b>: 설정 파일(<see cref="QABoss116LabConfig"/>, 배치 메뉴가 씀)이 있으면 전투 봇(<see cref="QABoss103CombatBot"/> 대쉬 간파 규칙)을 붙이고,
 ///   시간 상한·시도 상한 중 먼저 닿으면 끝 파일(<see cref="QABoss116Lab.DonePath"/>)을 쓴다 — 에디터 배치가 보고 Play 를 멈춘다.
 ///   설정 파일이 오래됐거나 깨졌으면 봇·기록 없이 살려 두기·카메라만(<see cref="QABoss116LabMode.Plain"/>).</item>
 /// <item><b>수동 모드</b>(할 일 116-C5, 설정 파일 없음 — 사람이 Dev Boot 로 직접): 예측 로그를 켜고, 사람 입력 시도(<see cref="QABoss116LabManualInput"/>)·창·대시·예측 줄을
 ///   메모리에 모았다가 Play 정지(<see cref="OnDestroy"/>) 때 <c>C:/UnityProject/QA/116manual-…/parts/</c> 에 쓴다 — 에디터 훅(<c>QABoss116LabManualFinalizer</c>)이 C4 집계로 CSV·report.html.
-///   30초 구간 교대 대신 <see cref="ZoneToggleKey"/> 로 벽 ↔ 열린 구간, 랩 카메라는 끈다(평소 플레이어 카메라).</item>
+///   랩 카메라는 끈다(평소 플레이어 카메라).</item>
 /// </list>
+/// 116-C6: 벽 구간·구간 이동(F2·30초 교대)은 없앴다 — 씬의 구간 지점 오브젝트는 남아 있지만 코드는 참조하지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class QABoss116LabDirector : MonoBehaviour
 {
     private const string Tag = QABoss116Lab.Tag;
-    /// <summary>수동 모드 구간 이동 키(Docs/tech/debug-hotkeys.md — F2 는 HitVFXDebugHUD 와 겹치지만 그 HUD 는 이 씬에 없다).</summary>
-    public const Key ZoneToggleKey = Key.F2;
     /// <summary>설정 파일이 이보다 오래됐으면(배치가 남긴 찌꺼기) 무시한다.</summary>
     private const double ConfigMaxAgeMinutes = 15.0;
-    private const float ZoneMoveForceSeconds = 5f;
+    private const string UpperLayerName = "DashInterruptUpper";
     // 정적 초기화에서 LayerMask 를 부르면 MonoBehaviour 생성(에디터 AddComponent)에서 예외 — 처음 쓸 때 구한다.
     private static int _obstacleMask = -1;
     private static int ObstacleMask => _obstacleMask >= 0 ? _obstacleMask
@@ -45,14 +43,6 @@ public sealed class QABoss116LabDirector : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float playerHealBelow = 0.5f;
     [Tooltip("간파 쿨이 남아 있으면 바로 초기화(창마다 시도). 대시 충전은 건드리지 않는다.")]
     [SerializeField] private bool resetInterruptCooldown = true;
-
-    [Header("구간(벽 = 복도 / 열린 쪽)")]
-    [SerializeField] private Transform wallBossSpot;
-    [SerializeField] private Transform wallPlayerSpot;
-    [SerializeField] private Transform openBossSpot;
-    [SerializeField] private Transform openPlayerSpot;
-    [Tooltip("설정 파일 없이(사람이 직접) 돌 때도 구간을 교대할까.")]
-    [SerializeField] private bool cycleZonesWithoutConfig;
 
     private QABoss116LabConfig _cfg;
     private bool _batch;
@@ -70,26 +60,35 @@ public sealed class QABoss116LabDirector : MonoBehaviour
     private TwentyThreeBoss _boss;
     private bool _started, _ended;
     private double _startedAt;
-    private string _zone = "";
-    private int _zoneIndex = -1;
-    private float _zonePendingSince = -1f;
-    private int _bossHeals, _playerHeals, _cdResets, _zoneMoves;
+    private int _bossHeals, _playerHeals, _cdResets;
 
     // 카운터 창
     private bool _windowWas;
     private int _windows;
     private double _windowOpenT;
 
-    // 대시 궤적
-    private bool _tracking;
+    // 대시 궤적 + 끊긴 이유(116-C6) — 기록은 게임 '[Dash] 상태 진입' 줄에서 열고 '[Dash] 종료:' 줄 다음 프레임에 닫는다.
+    private bool _logHooked;
+    private QABoss116DashRecord _rec;
+    private PlayerDashState _recState, _lastClosedState;
+    private bool _recClosing;
+    private int _transferFrame = -1, _recOpenFrame;
     private int _dashN;
-    private Vector3 _dashStart, _dashPrev, _dashDir;
-    private float _dashSpeed, _dashTotal, _dashElapsedPrev, _dashWall;
-    private double _dashStartT;
+    private Vector3 _dashStart, _dashPrev, _dashDir, _dashEnd;
+    private float _dashSpeed, _dashTotal, _dashElapsedPrev;
+    private double _dashStartT, _dashEndT;
     private bool _dashStalled, _dashAttached;
     private Vector3 _stallPos;
     private float _stallAt;
     private string _stallCollider = "", _stallLayer = "";
+    // 대시 직전 프레임 값(진입 순간은 이미 Dash 상태라 이동 잠금이 의미 없다)
+    private bool _prevCanMove;
+    private string _prevFrameState = "";
+    private string _dashPrevCanMove = "na", _dashPrevFrameState = "", _dashRootMotion = "na", _dashBossM = "na", _dashBossAlong = "na", _dashBossLateral = "na";
+    private Animator _anim;
+    private Player _animOf;
+    private int _upperLayer = -1;
+    private readonly List<string> _pendingConsole = new List<string>();
 
     private void Start()
     {
@@ -117,7 +116,7 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         if (Manual)
             BeginManual();
         Debug.Log($"{Tag} event=lab_director mode={_mode.ToString().ToLowerInvariant()} run={_cfg.Bot.Run} retry={_cfg.Bot.Retry} runS={_cfg.RunSeconds:0} " +
-                  $"maxAttempts={_cfg.MaxAttempts} zoneS={_cfg.ZoneSeconds:0} dashint={_cfg.Bot.DashInterruptPct} out={QABoss103Plan.Token(_cfg.Bot.OutDir)}");
+                  $"maxAttempts={_cfg.MaxAttempts} dashint={_cfg.Bot.DashInterruptPct} out={QABoss103Plan.Token(_cfg.Bot.OutDir)}");
     }
 
     private void Update()
@@ -138,9 +137,7 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         KeepAlive(me);
         TickWindow(me);
         TickDash(me);
-        TickZone(me);
-        if (Manual && Keyboard.current != null && Keyboard.current[ZoneToggleKey].wasPressedThisFrame)
-            ToggleZone(me);
+        FlushConsole();
 
         if (_batch)
         {
@@ -155,7 +152,7 @@ public sealed class QABoss116LabDirector : MonoBehaviour
     {
         _started = true;
         _startedAt = Time.realtimeSinceStartupAsDouble;
-        QABoss116LabProbe.PlannedZone = "";
+        HookGameLog(true);
         if (Manual)
         {
             _character = CharacterOf(me).ToString();
@@ -163,9 +160,8 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             Write(QABoss103PartFile.Format("labrun", "event", "start", "mode", "manual", "character", _character, "t", F3(ServerNow()), "boss", _boss.name,
                 "clients", NetworkManager.Singleton.ConnectedClientsIds.Count.ToString(CultureInfo.InvariantCulture),
                 "data", _boss.MonsterData != null ? _boss.MonsterData.name : "na"));
-            MoveZone(me, QABoss116Lab.ZoneWall, 0, false);
-            Debug.Log($"{Tag} event=lab_start mode=manual player={me.name} character={_character} boss={_boss.name} — 사람 조작 기록 중. " +
-                      $"{ZoneToggleKey} = 벽 ↔ 열린 구간. Play 를 멈추면 {QABoss116LabManual.QARoot}/{QABoss116LabManual.Prefix}-<시각>/ 에 CSV·report.html.");
+            Debug.Log($"{Tag} event=lab_start mode=manual player={me.name} character={_character} boss={_boss.name} — 사람 조작 기록 중(우클릭→대시·대시→우클릭). " +
+                      $"Play 를 멈추면 {QABoss116LabManual.QARoot}/{QABoss116LabManual.Prefix}-<시각>/ 에 CSV·report.html.");
             return;
         }
         if (!_batch)
@@ -202,8 +198,9 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         int attempts = _bot != null ? _bot.DashInterruptAttempts : 0;
         double elapsed = Time.realtimeSinceStartupAsDouble - _startedAt;
         QABoss116LabProbe.Active = false;
-        if (_tracking)
+        if (_rec != null)
             FinishDash(Player.LocalPlayer);
+        HookGameLog(false);
         if (_windowWas)
             Write(QABoss103PartFile.Format(QABoss116Lab.WindowKind, "event", "close", "n", _windows.ToString(CultureInfo.InvariantCulture), "t", F3(ServerNow()), "note", "run_end"));
         if (_bot != null)
@@ -215,9 +212,9 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         string summary = QABoss103PartFile.Format(QABoss116Lab.EndKind, "reason", reason, "attempts", attempts.ToString(CultureInfo.InvariantCulture),
             "elapsedS", elapsed.ToString("0.0", CultureInfo.InvariantCulture), "windows", _windows.ToString(CultureInfo.InvariantCulture),
             "dashes", _dashN.ToString(CultureInfo.InvariantCulture), "bossHeals", _bossHeals.ToString(CultureInfo.InvariantCulture),
-            "playerHeals", _playerHeals.ToString(CultureInfo.InvariantCulture), "cdResets", _cdResets.ToString(CultureInfo.InvariantCulture),
-            "zoneMoves", _zoneMoves.ToString(CultureInfo.InvariantCulture));
+            "playerHeals", _playerHeals.ToString(CultureInfo.InvariantCulture), "cdResets", _cdResets.ToString(CultureInfo.InvariantCulture));
         Write(summary);
+        FlushConsole();
         _part?.Dispose();
         _part = null;
         try
@@ -241,6 +238,7 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             return;
         }
         // Play 정지·씬 내림 — 끝 파일 없이 끝났으면 봇·판 파일만 닫는다(배치가 그 판을 오류로 적는다).
+        HookGameLog(false);
         QABoss116LabProbe.Active = false;
         if (_bot != null)
         {
@@ -297,7 +295,10 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             _predictHooked = false;
         }
         if (_manualLines == null || _ended)
+        {
+            HookGameLog(false);
             return;
+        }
         _ended = true;
         if (_manualInput != null)
             _manualInput.Flush();
@@ -307,8 +308,9 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             return;
         }
         Player me = Player.LocalPlayer;
-        if (_tracking)
+        if (_rec != null)
             FinishDash(me);
+        HookGameLog(false);
         if (_windowWas)
             Write(QABoss103PartFile.Format(QABoss116Lab.WindowKind, "event", "close", "n", _windows.ToString(CultureInfo.InvariantCulture), "t", F3(_lastServerT), "note", "run_end"));
         int attempts = _manualInput != null ? _manualInput.Attempts : 0;
@@ -316,8 +318,8 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         Write(QABoss103PartFile.Format(QABoss116Lab.EndKind, "reason", "manual_stop", "attempts", attempts.ToString(CultureInfo.InvariantCulture),
             "elapsedS", elapsed.ToString("0.0", CultureInfo.InvariantCulture), "windows", _windows.ToString(CultureInfo.InvariantCulture),
             "dashes", _dashN.ToString(CultureInfo.InvariantCulture), "bossHeals", _bossHeals.ToString(CultureInfo.InvariantCulture),
-            "playerHeals", _playerHeals.ToString(CultureInfo.InvariantCulture), "cdResets", _cdResets.ToString(CultureInfo.InvariantCulture),
-            "zoneMoves", _zoneMoves.ToString(CultureInfo.InvariantCulture)));
+            "playerHeals", _playerHeals.ToString(CultureInfo.InvariantCulture), "cdResets", _cdResets.ToString(CultureInfo.InvariantCulture)));
+        _pendingConsole.Clear();   // 정지 중 — 대시 콘솔 줄은 버린다(판 파일에는 이미 있다)
         if (attempts == 0)
         {
             Debug.Log($"{Tag} 수동 모드 결과 — 대쉬 간파 시도 0회(카운터 창 {_windows}·대시 {_dashN}회, {elapsed:0}초) — 빈 요약, 결과 폴더를 만들지 않았다.");
@@ -352,13 +354,6 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         {
             Debug.LogWarning($"{Tag} 수동 모드 결과 쓰기 실패: {e.GetType().Name}: {e.Message}");
         }
-    }
-
-    /// <summary>수동 모드 <see cref="ZoneToggleKey"/> — 벽 ↔ 열린 구간(지금 무엇을 하든 바로 옮긴다).</summary>
-    private void ToggleZone(Player me)
-    {
-        string want = _zone == QABoss116Lab.ZoneWall ? QABoss116Lab.ZoneOpen : QABoss116Lab.ZoneWall;
-        MoveZone(me, want, _zoneIndex + 1, false);
     }
 
     // ── 살려 두기 ─────────────────────────────────────────────
@@ -400,7 +395,6 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             _windowOpenT = t;
         }
         Vector3 p = me.transform.position, b = _boss.transform.position;
-        float wall = QABoss116LabProbe.WallDistance(p, out string wallName);
         string line = QABoss103PartFile.Format(QABoss116Lab.WindowKind,
             "event", open ? "open" : "close",
             "n", _windows.ToString(CultureInfo.InvariantCulture),
@@ -408,70 +402,174 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             "attack", QABoss116LabProbe.AttackOf(_boss),
             "bossState", _boss.State.ToString(),
             "vulnerable", QABoss116LabProbe.B(_boss.IsVulnerable),
-            "zonePlanned", _zone,
-            "wallM", QABoss116LabProbe.F2(wall),
-            "wallName", wallName,
             "bossM", QABoss116LabProbe.F2(new Vector2(b.x - p.x, b.z - p.z).magnitude),
             "durS", open ? "na" : F3(t - _windowOpenT));
         Write(line);
         Debug.Log($"{Tag} event=counter_window {line.Substring(QABoss116Lab.WindowKind.Length + 1)}");
     }
 
-    // ── 대시 궤적 ─────────────────────────────────────────────
+    // ── 대시 궤적 + 끊긴 이유(116-C6) ────────────────────────
+
+    private void HookGameLog(bool on)
+    {
+        if (on == _logHooked)
+            return;
+        _logHooked = on;
+        if (on)
+            Application.logMessageReceived += OnGameLog;
+        else
+            Application.logMessageReceived -= OnGameLog;
+    }
+
+    /// <summary>
+    /// 게임 대시 로그(<c>PlayerDashState</c>·<c>PlayerDashController</c>·<c>PlayerSkillController</c> 의 <c>Edit.Log</c>) — 호스트 1명 랩이라 [Dash] 줄은 내 플레이어 것.
+    /// 진입 줄 = 새 기록, 종료 줄 = 끝 값(다음 프레임에 줄을 쓴다 — 바로 뒤 '이동 없음/손실' 줄까지 받으려고), 그 사이 줄 = 도중 신호.
+    /// </summary>
+    private void OnGameLog(string condition, string stackTrace, LogType type)
+    {
+        if (!_started || _ended || condition == null || !condition.StartsWith("[Dash", StringComparison.Ordinal))
+            return;
+        Player me = Player.LocalPlayer;
+        if (condition.StartsWith(QABoss116DashStop.TransferMark, StringComparison.Ordinal))
+        {
+            _transferFrame = Time.frameCount;   // 같은 호출에서 곧 진입 줄이 온다(PlayerDashState.Enter → CompleteDashTransfer 가 먼저)
+            return;
+        }
+        if (QABoss116DashStop.TryParseEnter(condition, out string prev, out float speed, out float duration, out float dirX, out float dirZ))
+        {
+            if (_rec != null)
+                FinishDash(me);   // 대시가 대시를 덮었다 — 앞 기록은 이미 종료 줄을 받았다
+            OpenDash(me, prev, speed, duration, dirX, dirZ, ServerNow());
+            return;
+        }
+        if (_rec == null)
+            return;
+        if (QABoss116DashStop.TryParseExit(condition, _rec))
+        {
+            _recClosing = true;
+            _dashEnd = me != null ? me.transform.position : _dashPrev;
+            _dashEndT = ServerNow();
+            return;
+        }
+        _rec.Feed(condition);
+    }
+
+    private void OpenDash(Player me, string prevState, float speed, float duration, float dirX, float dirZ, double startT)
+    {
+        _rec = new QABoss116DashRecord
+        {
+            PrevState = prevState,
+            Transfer = _transferFrame == Time.frameCount,
+            Speed = speed,
+            Duration = duration,
+            DirX = dirX,
+            DirZ = dirZ,
+        };
+        _transferFrame = -1;
+        _recState = null;
+        _recClosing = false;
+        _recOpenFrame = Time.frameCount;
+        _dashN++;
+        Vector3 pos = me != null ? me.transform.position : Vector3.zero;
+        _dashStart = _dashPrev = _dashEnd = pos;
+        Vector3 dir = new Vector3(float.IsNaN(dirX) ? 0f : dirX, 0f, float.IsNaN(dirZ) ? 0f : dirZ);
+        _dashDir = dir.sqrMagnitude > 1e-4f ? dir.normalized : me != null ? Flat(me.transform.forward) : Vector3.forward;
+        _dashSpeed = float.IsNaN(speed) ? 0f : speed;
+        _dashTotal = float.IsNaN(duration) ? 0f : duration;
+        _dashElapsedPrev = 0f;
+        _dashStartT = startT;
+        _dashEndT = -1.0;
+        _dashStalled = false;
+        _dashAttached = false;
+        _stallCollider = _stallLayer = "";
+        _dashPrevCanMove = QABoss116LabProbe.B(_prevCanMove);
+        _dashPrevFrameState = _prevFrameState;
+        Animator anim = AnimOf(me);
+        _dashRootMotion = anim != null ? QABoss116LabProbe.B(anim.applyRootMotion) : "na";
+        _dashBossM = _dashBossAlong = _dashBossLateral = "na";
+        if (_boss != null)
+        {
+            Vector3 tb = _boss.transform.position - pos;
+            tb.y = 0f;
+            float along = Vector3.Dot(tb, _dashDir);
+            _dashBossM = QABoss116LabProbe.F2(tb.magnitude);
+            _dashBossAlong = QABoss116LabProbe.F2(along);
+            _dashBossLateral = QABoss116LabProbe.F2((tb - _dashDir * along).magnitude);
+        }
+    }
 
     private void TickDash(Player me)
     {
         PlayerStateController sc = me.GetComponent<PlayerStateController>();
         PlayerDashState ds = sc != null ? sc.ActiveDash : null;
         Vector3 pos = me.transform.position;
-        if (ds != null && !_tracking)
-        {
-            _tracking = true;
-            _dashN++;
-            _dashStart = pos;
-            _dashPrev = pos;
-            _dashDir = ds.Direction;
-            _dashSpeed = ds.Speed;
-            _dashTotal = ds.Elapsed + ds.Remaining;
-            _dashElapsedPrev = ds.Elapsed;
-            _dashStartT = ServerNow() - ds.Elapsed;
-            _dashWall = QABoss116LabProbe.WallDistance(pos, out _);
-            _dashStalled = false;
-            _dashAttached = false;
-            _stallCollider = _stallLayer = "";
-            return;
-        }
-        if (!_tracking)
-            return;
-        if (ds == null)
+        if (_rec != null && _recClosing)
         {
             FinishDash(me);
+            ds = ds == _lastClosedState ? null : ds;
+        }
+        if (_rec == null)
+        {
+            if (ds == null || ds == _lastClosedState)
+            {
+                // 대시 밖 — 다음 대시의 '직전 프레임' 값
+                _prevCanMove = me.CanMove;
+                PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
+                _prevFrameState = me.CurrentState + (skills != null && skills.ActiveSkill != null ? ":" + skills.ActiveSkill.GetType().Name : "");
+                return;
+            }
+            // 진입 줄을 못 받았다(로그 꺼짐 등) — 상태 객체로 연다. 끝 사유는 no_exit_log 로 남는다.
+            OpenDash(me, "no_enter_log", ds.Speed, ds.Elapsed + ds.Remaining, ds.Direction.x, ds.Direction.z, ServerNow() - ds.Elapsed);
+        }
+        if (ds == null)
+        {
+            if (_recState != null || Time.frameCount - _recOpenFrame > 2)
+                FinishDash(me);   // 상태는 끝났는데 종료 줄이 없다
             return;
         }
+        if (_recState == null)
+        {
+            _recState = ds;
+            _dashSpeed = ds.Speed;
+            _dashTotal = ds.Elapsed + ds.Remaining;
+            _dashDir = ds.Direction;
+        }
+        if (ds != _recState)
+            return;
         if (ds.AttachedSkill != null)
             _dashAttached = true;
         float dt = ds.Elapsed - _dashElapsedPrev;
         Vector3 step = pos - _dashPrev;
         step.y = 0f;
+        float progress = Vector3.Dot(step, _dashDir);
         float expected = _dashSpeed * dt;
         // 처음 막힌 지점 — 이번 프레임 대시 방향 진척이 기대의 40% 미만(대시 시작 0.03초 뒤부터).
-        if (!_dashStalled && ds.Elapsed > 0.03f && expected > 0.02f && Vector3.Dot(step, _dashDir) < expected * 0.4f)
+        if (!_dashStalled && ds.Elapsed > 0.03f && expected > 0.02f && progress < expected * 0.4f)
         {
             _dashStalled = true;
             _stallPos = pos;
             _stallAt = ds.Elapsed;
             ProbeBlocker(me, _dashPrev, out _stallCollider, out _stallLayer);
         }
+        Animator anim = AnimOf(me);
+        _rec.Frame(progress, ds.Elapsed, Time.timeScale, anim != null && _upperLayer >= 0 ? anim.GetLayerWeight(_upperLayer) : -1f);
         _dashPrev = pos;
         _dashElapsedPrev = ds.Elapsed;
     }
 
     private void FinishDash(Player me)
     {
-        _tracking = false;
-        Vector3 end = me != null ? me.transform.position : _dashPrev;
+        QABoss116DashRecord rec = _rec;
+        _rec = null;
+        _lastClosedState = _recState;
+        _recState = null;
+        _recClosing = false;
+        if (rec == null)
+            return;
+        Vector3 end = rec.HasExit ? _dashEnd : me != null ? me.transform.position : _dashPrev;
         QABoss116Lab.DashDistances(_dashSpeed, _dashTotal, _dashStart.x, _dashStart.z, end.x, end.z, _dashDir.x, _dashDir.z,
             out float intent, out float actual, out float shortfall, out bool blocked);
+        string reason = QABoss116DashStop.Classify(rec, shortfall);
         if (blocked && !_dashStalled && me != null)
         {
             // 프레임 진척으로는 못 잡았는데 덜 갔다 — 끝 지점에서 대시 방향으로 다시 찾는다.
@@ -480,14 +578,16 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             ProbeBlocker(me, end, out _stallCollider, out _stallLayer);
         }
         bool hasStall = _dashStalled || blocked;
-        string line = QABoss103PartFile.Format(QABoss116Lab.DashKind,
+        var kv = new List<string>
+        {
             "n", _dashN.ToString(CultureInfo.InvariantCulture),
             "startT", F3(_dashStartT),
-            "endT", F3(ServerNow()),
+            "endT", F3(_dashEndT >= 0.0 ? _dashEndT : ServerNow()),
             "startPos", Xz(_dashStart),
             "endPos", Xz(end),
             "dir", Xz(_dashDir),
             "speed", QABoss116LabProbe.F2(_dashSpeed),
+            "durS", QABoss116LabProbe.F3(_dashTotal),
             "intentM", QABoss116LabProbe.F2(intent),
             "actualM", QABoss116LabProbe.F2(actual),
             "shortM", QABoss116LabProbe.F2(shortfall),
@@ -496,13 +596,48 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             "blockCollider", hasStall ? _stallCollider : "na",
             "blockLayer", hasStall ? _stallLayer : "na",
             "blockAtS", hasStall ? QABoss116LabProbe.F3(_stallAt) : "na",
-            "wallM", QABoss116LabProbe.F2(_dashWall),
-            "zonePlanned", _zone,
             "endState", me != null ? me.CurrentState.ToString() : "na",
-            "attached", QABoss116LabProbe.B(_dashAttached));
+            "attached", QABoss116LabProbe.B(_dashAttached),
+            "prevFrame", _dashPrevFrameState,
+            "canMovePrev", _dashPrevCanMove,
+            "rootMotion", _dashRootMotion,
+            "bossM", _dashBossM,
+            "bossAlongM", _dashBossAlong,
+            "bossLateralM", _dashBossLateral,
+        };
+        kv.AddRange(rec.ToKv(reason));
+        string line = QABoss103PartFile.Format(QABoss116Lab.DashKind, kv.ToArray());
         Write(line);
-        if (blocked)
-            Debug.Log($"{Tag} event=dash_blocked {line.Substring(QABoss116Lab.DashKind.Length + 1)}");
+        // 로그 콜백 안에서 부를 수 있어 콘솔 줄은 다음 Update 에 찍는다.
+        if (blocked || reason != QABoss116DashStop.Full)
+            _pendingConsole.Add($"{Tag} event=dash_cut reason={reason} prev={rec.PrevState} transfer={QABoss116LabProbe.B(rec.Transfer)} " +
+                                $"intentM={QABoss116LabProbe.F2(intent)} actualM={QABoss116LabProbe.F2(actual)} next={rec.NextState} detail={QABoss103Plan.Token(rec.Detail())}");
+    }
+
+    private void FlushConsole()
+    {
+        if (_pendingConsole.Count == 0)
+            return;
+        string[] lines = _pendingConsole.ToArray();
+        _pendingConsole.Clear();
+        foreach (string l in lines)
+            Debug.Log(l);
+    }
+
+    /// <summary>내 플레이어 Animator 와 상체 레이어(<c>DashInterruptUpper</c>) 번호 — 플레이어가 바뀌면 다시 찾는다.</summary>
+    private Animator AnimOf(Player me)
+    {
+        if (me == null)
+            return null;
+        if (me != _animOf || _anim == null)
+        {
+            _animOf = me;
+            _anim = me.GetComponentInChildren<Animator>();
+            _upperLayer = -1;
+        }
+        if (_upperLayer < 0 && _anim != null && _anim.isInitialized)
+            _upperLayer = _anim.GetLayerIndex(UpperLayerName);
+        return _anim;
     }
 
     /// <summary>내 캡슐을 <paramref name="from"/> 에서 대시 방향으로 0.6m 쓸어 처음 닿는 벽·몸(바닥 면 제외).</summary>
@@ -536,59 +671,6 @@ public sealed class QABoss116LabDirector : MonoBehaviour
                 layer = LayerMask.LayerToName(h.collider.gameObject.layer);
             }
         }
-    }
-
-    // ── 구간 ──────────────────────────────────────────────────
-
-    private void TickZone(Player me)
-    {
-        if (Manual || (!_batch && !cycleZonesWithoutConfig))
-            return;   // 수동 모드는 자동 교대 없이 ZoneToggleKey 로만
-        if (wallBossSpot == null || wallPlayerSpot == null || openBossSpot == null || openPlayerSpot == null)
-            return;
-        double elapsed = Time.realtimeSinceStartupAsDouble - _startedAt;
-        int index = _cfg.ZoneSeconds > 0.0 ? (int)Math.Floor(elapsed / _cfg.ZoneSeconds) : 0;
-        if (index == _zoneIndex)
-            return;
-        string want = QABoss116Lab.PlannedZone(elapsed, _cfg.ZoneSeconds);
-        if (_zonePendingSince < 0f)
-            _zonePendingSince = Time.realtimeSinceStartup;
-        bool busy = _boss.State == MonsterState.Attack || _boss.CounterWindowOpen || me.CurrentState == PlayerActionState.Dash ||
-                    me.CurrentState == PlayerActionState.Skill;
-        if (busy && _zoneIndex >= 0 && Time.realtimeSinceStartup - _zonePendingSince < ZoneMoveForceSeconds)
-            return;
-        _zonePendingSince = -1f;
-        MoveZone(me, want, index, busy);
-    }
-
-    /// <summary>보스·플레이어를 그 구간 자리로 옮기고 <c>labzone</c> 줄을 남긴다(자리가 비었으면 아무것도 안 함).</summary>
-    private void MoveZone(Player me, string want, int index, bool busy)
-    {
-        if (wallBossSpot == null || wallPlayerSpot == null || openBossSpot == null || openPlayerSpot == null)
-            return;
-        _zoneIndex = index;
-        _zone = want;
-        QABoss116LabProbe.PlannedZone = want;
-        Transform bossSpot = want == QABoss116Lab.ZoneWall ? wallBossSpot : openBossSpot;
-        Transform playerSpot = want == QABoss116Lab.ZoneWall ? wallPlayerSpot : openPlayerSpot;
-
-        bool bossOk = false;
-        NavMeshAgent agent = _boss.GetComponent<NavMeshAgent>();
-        if (agent != null && agent.enabled && agent.isOnNavMesh)
-            bossOk = agent.Warp(bossSpot.position);
-        else
-        {
-            _boss.transform.position = bossSpot.position;
-            bossOk = true;
-        }
-        _boss.transform.rotation = Quaternion.LookRotation(Flat(playerSpot.position - bossSpot.position));
-        _boss.SetSpawnAnchor(bossSpot.position);
-        bool playerOk = me.TryGetComponent(out PlayerFallRecovery mover) && mover.RelocateServer(playerSpot.position);
-        _zoneMoves++;
-        string line = QABoss103PartFile.Format(QABoss116Lab.ZoneKind, "zone", want, "index", index.ToString(CultureInfo.InvariantCulture),
-            "t", F3(ServerNow()), "bossOk", QABoss116LabProbe.B(bossOk), "playerOk", QABoss116LabProbe.B(playerOk), "forced", QABoss116LabProbe.B(busy));
-        Write(line);
-        Debug.Log($"{Tag} event=zone {line.Substring(QABoss116Lab.ZoneKind.Length + 1)}");
     }
 
     // ── 도구 ──────────────────────────────────────────────────

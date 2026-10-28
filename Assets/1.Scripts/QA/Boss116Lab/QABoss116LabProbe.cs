@@ -10,21 +10,14 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>대시 시작 게이트 값(<c>PlayerDashController.TryBeginPredictedDash</c> 검사 순서와 같은 값) — 충전·다음 충전·상태·CanMove·접지·입력 주체.</item>
 /// <item>게임 대시 거부 로그(<c>[Dash] 시작 불가 …</c>) 캡처(<see cref="BeginCapture"/>/<see cref="EndCapture"/>) — 같은 호출 안에서 찍힌 줄만.</item>
-/// <item>벽 거리(<see cref="WallDistance"/>) — 내 위치에서 가장 가까운 Wall/Env 표면(수평 m) — 구간(<see cref="QABoss116Lab.Zone"/>) 근거.</item>
 /// </list>
+/// 116-C6: 벽 거리·구간 값은 없앴다(벽 구간 제거).
 /// </summary>
 public static class QABoss116LabProbe
 {
     /// <summary>랩 판 진행 중 — 봇이 상세 값을 붙인다.</summary>
     public static bool Active { get; set; }
 
-    /// <summary>디렉터가 정한 지금 구간(wall·open) — 시도 줄 <c>zonePlanned</c>.</summary>
-    public static string PlannedZone { get; set; } = "";
-
-    private static int _wallMask = -1;
-    private static int WallMask => _wallMask >= 0 ? _wallMask : _wallMask = LayerMask.GetMask("Wall", "Env");
-    private const float WallScanRadius = 8f;
-    private static readonly Collider[] Hits = new Collider[32];
     private static readonly FieldInfo CurrentEntryField =
         typeof(TwentyThreeBoss).GetField("_currentEntry", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -35,7 +28,6 @@ public static class QABoss116LabProbe
     private static void ResetStatics()
     {
         Active = false;
-        PlannedZone = "";
         _capturing = false;
         _captured = null;
         Application.logMessageReceived -= OnLog;
@@ -74,29 +66,6 @@ public static class QABoss116LabProbe
 
     // ── 값 ────────────────────────────────────────────────────
 
-    /// <summary>내 위치에서 가장 가까운 Wall/Env 표면까지 수평 거리(m). <see cref="WallScanRadius"/> 안에 없으면 -1.</summary>
-    public static float WallDistance(Vector3 pos, out string name)
-    {
-        name = "";
-        int n = Physics.OverlapSphereNonAlloc(pos + Vector3.up, WallScanRadius, Hits, WallMask, QueryTriggerInteraction.Ignore);
-        float best = -1f;
-        for (int i = 0; i < n; i++)
-        {
-            Collider c = Hits[i];
-            if (c == null)
-                continue;
-            Vector3 probe = new Vector3(pos.x, c.bounds.center.y, pos.z);
-            Vector3 p = c is MeshCollider mc && !mc.convex ? c.bounds.ClosestPoint(probe) : c.ClosestPoint(probe);
-            float d = new Vector2(p.x - pos.x, p.z - pos.z).magnitude;
-            if (best < 0f || d < best)
-            {
-                best = d;
-                name = c.name;
-            }
-        }
-        return best;
-    }
-
     /// <summary>보스가 지금 하는 공격 행 이름(<c>_currentEntry.attackId</c>, 리플렉션). 모르면 빈칸.</summary>
     public static string AttackOf(TwentyThreeBoss boss)
     {
@@ -112,17 +81,13 @@ public static class QABoss116LabProbe
 
     /// <summary>
     /// 시도 판단 근거 값(key, value 순서로 <paramref name="kv"/> 에 붙인다). <paramref name="prefix"/> = 끝 시점 값이면 "end"(<c>endState</c> 만).
-    /// 키: zonePlanned wallM wallName bossM attack bossState charge maxCharge nextChargeS state canMove canDashAct grounded inputSrc dashOn skillBusy activeSkill intCdS windowS.
+    /// 키: bossM attack bossState charge maxCharge nextChargeS state canMove canDashAct grounded inputSrc dashOn skillBusy activeSkill intCdS windowS.
     /// </summary>
     public static void Snapshot(Player me, TwentyThreeBoss boss, List<string> kv)
     {
         if (me == null)
             return;
         Vector3 pos = me.transform.position;
-        float wall = WallDistance(pos, out string wallName);
-        Add(kv, "zonePlanned", PlannedZone);
-        Add(kv, "wallM", F2(wall));
-        Add(kv, "wallName", wallName);
         if (boss != null)
         {
             Vector3 b = boss.transform.position;

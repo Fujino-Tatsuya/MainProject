@@ -21,7 +21,7 @@ public static class QABoss116LabReport
     public static readonly string[] RunsHeader =
     {
         "run", "retry", "tier", "seed", "status", "end_reason", "character", "attempts", "elapsed_s", "windows", "dashes",
-        "boss_heals", "player_heals", "cd_resets", "zone_moves", "clients", "note", "started_at", "ended_at",
+        "boss_heals", "player_heals", "cd_resets", "clients", "note", "started_at", "ended_at",
     };
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -65,7 +65,6 @@ public static class QABoss116LabReport
         Set("boss_heals", QABoss116Lab.Get(end, "bossHeals"));
         Set("player_heals", QABoss116Lab.Get(end, "playerHeals"));
         Set("cd_resets", QABoss116Lab.Get(end, "cdResets"));
-        Set("zone_moves", QABoss116Lab.Get(end, "zoneMoves"));
         Set("clients", QABoss116Lab.Get(start, "clients"));
         Set("note", note);
         Set("started_at", startedAt);
@@ -133,7 +132,7 @@ public static class QABoss116LabReport
           .Append(" · git ").Append(H(Val(batch, "git_commit", "?"))).Append(" (").Append(H(Val(batch, "git_branch", "?"))).Append(")")
           .Append(" · SVN r").Append(H(Val(batch, "svn_rev", "?"))).Append(" · xlsx r").Append(H(Val(batch, "xlsx_svn_rev", "?")))
           .Append(" · 데이터 출처 ").Append(H(Val(batch, "data_source_mode", "?"))).Append(" · 판 ").Append(H(Val(batch, "run_s", "?"))).Append("초/시도 ")
-          .Append(H(Val(batch, "max_attempts", "?"))).Append("회 상한 · 구간 교대 ").Append(H(Val(batch, "zone_s", "?"))).Append("초</div>\n");
+          .Append(H(Val(batch, "max_attempts", "?"))).Append("회 상한</div>\n");
 
         QABoss116Lab.Bucket a = s.All;
         sb.Append("<div class=\"kpis\">");
@@ -146,9 +145,8 @@ public static class QABoss116LabReport
         Kpi(sb, double.IsNaN(s.WindowMedianS) ? "–" : s.WindowMedianS.ToString("0.00", Inv) + "s", "카운터 창 길이 중앙값");
         sb.Append("</div>\n");
 
-        sb.Append("<h2>벽 근처 vs 열린 구간</h2>\n<div class=\"sub\">구간 = 시도 첫 입력 순간 내 위치에서 가장 가까운 Wall/Env 표면 거리 ≤ ")
-          .Append(QABoss116Lab.WallNearMeters.ToString("0.0", Inv)).Append("m 이면 벽. 계획 구간(보스·플레이어를 옮긴 곳)은 CSV zone_planned.</div>\n");
-        BucketTable(sb, "구간", s.ByZone);
+        DistanceTable(sb, s);
+        StopReasonTable(sb, s);
         sb.Append("<h2>순서별</h2>\n");
         BucketTable(sb, "순서", s.ByOrder);
         if (manual)
@@ -174,8 +172,9 @@ public static class QABoss116LabReport
             sb.Append("</tbody></table>\n");
         }
 
-        sb.Append("<h2>dash_shortened 행(의도 vs 실제)</h2>\n<table><thead><tr><th>판</th><th>#</th><th class=\"l\">구간</th><th class=\"l\">순서</th><th>벽 m</th>" +
-                  "<th>의도 m</th><th>실제 m</th><th>덜 감 m</th><th>판정 덜 감 m</th><th class=\"l\">막힌 지점</th><th class=\"l\">충돌체(레이어)</th></tr></thead><tbody>\n");
+        sb.Append("<h2>dash_shortened·덜 간 대시 행(의도 vs 실제)</h2>\n<table><thead><tr><th>판</th><th>#</th><th class=\"l\">순서</th><th class=\"l\">캐릭터</th>" +
+                  "<th class=\"l\">진입 전</th><th>전환</th><th>의도 m</th><th>실제 m</th><th>덜 감 m</th><th>판정 덜 감 m</th><th class=\"l\">끊긴 이유</th><th class=\"l\">근거</th>" +
+                  "<th class=\"l\">다음 상태</th><th>틱</th><th>요청/적용 m</th><th>첫 이동 프레임(초)</th><th>이동/전체 프레임</th><th class=\"l\">충돌체(레이어)</th></tr></thead><tbody>\n");
         int shown = 0;
         foreach (string[] r in attempts.Rows)
         {
@@ -184,10 +183,15 @@ public static class QABoss116LabReport
             if (++shown > 200)
                 break;
             sb.Append("<tr><td>").Append(H(attempts.Get(r, "run"))).Append("</td><td>").Append(H(attempts.Get(r, "n"))).Append("</td><td class=\"l\">")
-              .Append(H(attempts.Get(r, "zone"))).Append("</td><td class=\"l\">").Append(H(attempts.Get(r, "order"))).Append("</td><td>")
-              .Append(H(attempts.Get(r, "wall_m"))).Append("</td><td>").Append(H(attempts.Get(r, "dash_intent_m"))).Append("</td><td>")
-              .Append(H(attempts.Get(r, "dash_actual_m"))).Append("</td><td>").Append(H(attempts.Get(r, "dash_short_m"))).Append("</td><td>")
-              .Append(H(attempts.Get(r, "shortfall_m"))).Append("</td><td class=\"l\">").Append(H(attempts.Get(r, "dash_block_pos"))).Append("</td><td class=\"l\">")
+              .Append(H(attempts.Get(r, "order"))).Append("</td><td class=\"l\">").Append(H(attempts.Get(r, "character"))).Append("</td><td class=\"l\">")
+              .Append(H(attempts.Get(r, "dash_prev_frame"))).Append("</td><td>").Append(H(attempts.Get(r, "dash_transfer"))).Append("</td><td>")
+              .Append(H(attempts.Get(r, "dash_intent_m"))).Append("</td><td>").Append(H(attempts.Get(r, "dash_actual_m"))).Append("</td><td>")
+              .Append(H(attempts.Get(r, "dash_short_m"))).Append("</td><td>").Append(H(attempts.Get(r, "shortfall_m"))).Append("</td><td class=\"l\">")
+              .Append(H(attempts.Get(r, "dash_stop_reason"))).Append("</td><td class=\"l\">").Append(H(attempts.Get(r, "dash_stop_detail"))).Append(' ')
+              .Append(H(attempts.Get(r, "dash_caller"))).Append("</td><td class=\"l\">").Append(H(attempts.Get(r, "dash_next_state"))).Append("</td><td>")
+              .Append(H(attempts.Get(r, "dash_ticks"))).Append("</td><td>").Append(H(attempts.Get(r, "dash_req_m"))).Append('/').Append(H(attempts.Get(r, "dash_applied_m")))
+              .Append("</td><td>").Append(H(attempts.Get(r, "dash_first_move_frame"))).Append(" (").Append(H(attempts.Get(r, "dash_first_move_s"))).Append(")</td><td>")
+              .Append(H(attempts.Get(r, "dash_move_frames"))).Append('/').Append(H(attempts.Get(r, "dash_frames"))).Append("</td><td class=\"l\">")
               .Append(H(attempts.Get(r, "dash_block_collider"))).Append(" (").Append(H(attempts.Get(r, "dash_block_layer"))).Append(")</td></tr>\n");
         }
         sb.Append("</tbody></table>\n");
@@ -208,6 +212,57 @@ public static class QABoss116LabReport
           .Append("회 · CSV: lab_attempts·lab_windows·lab_dashes·dash_predict·lab_runs</footer>\n</main></body></html>\n");
         return sb.ToString();
     }
+
+    /// <summary>116-C6 — 순서(dash_rmb = 대시→우클릭, rmb_dash = 우클릭→대시)×캐릭터별 의도 vs 실제 거리(묶인 대시 평균).</summary>
+    private static void DistanceTable(StringBuilder sb, QABoss116Lab.Summary s)
+    {
+        sb.Append("<h2>순서×캐릭터별 의도 vs 실제 거리</h2>\n<div class=\"sub\">dash_rmb = 대시→우클릭, rmb_dash = 우클릭→대시. 의도 = 대시 속도 × 지속, 실제 = 시작→끝을 대시 방향에 투영. " +
+                  "덜 감 = 덜 간 거리 ≥ ").Append(QABoss116Lab.ShortfallMeters.ToString("0.0", Inv)).Append("m 인 대시 수. 전환 = 우클릭→대시로 진행 중 간파가 대시에 실린 수.</div>\n");
+        if (s.ByOrderCharacter.Count == 0)
+        {
+            sb.Append("<div class=\"muted\">시도 없음</div>\n");
+            return;
+        }
+        sb.Append("<table><thead><tr><th class=\"l\">순서 × 캐릭터</th><th>시도</th><th>대시 묶임</th><th>전환</th><th>평균 의도 m</th><th>평균 실제 m</th>" +
+                  "<th>평균 덜 감 m</th><th>덜 감</th><th class=\"l\">끊긴 이유</th></tr></thead><tbody>\n");
+        foreach (KeyValuePair<string, QABoss116Lab.DistBucket> kv in s.ByOrderCharacter)
+        {
+            QABoss116Lab.DistBucket b = kv.Value;
+            sb.Append("<tr><td class=\"l\">").Append(H(kv.Key)).Append("</td><td>").Append(b.Attempts).Append("</td><td>").Append(b.Dashes)
+              .Append("</td><td>").Append(b.Transfers).Append("</td><td>").Append(M(b.MeanIntent)).Append("</td><td>").Append(M(b.MeanActual))
+              .Append("</td><td>").Append(M(b.MeanShort)).Append("</td><td>").Append(b.Shortened).Append("</td><td class=\"l\">").Append(H(Join(b.Reasons)))
+              .Append("</td></tr>\n");
+        }
+        sb.Append("</tbody></table>\n");
+    }
+
+    /// <summary>116-C6 — 대시 끊긴 이유 상위(묶인 대시, 많은 순) · 순서별 수 · 코드 근거.</summary>
+    private static void StopReasonTable(StringBuilder sb, QABoss116Lab.Summary s)
+    {
+        sb.Append("<h2>대시 끊긴 이유 상위</h2>\n<div class=\"sub\">게임 [Dash] 로그(진입·종료·유닛 막힘·서버 취소)와 프레임 관측으로 분류 — 우선순위는 Docs/tech/dash-interrupt.md §13.1. " +
+                  "이동 잠금·루트모션·상체 레이어·슬로우는 대시 이동 계산에 안 들어가 이유가 아니라 CSV 참고 열(dash_can_move_prev·dash_root_motion·dash_upper_w·dash_min_ts).</div>\n");
+        if (s.StopReasons.Count == 0)
+        {
+            sb.Append("<div class=\"muted\">묶인 대시 없음</div>\n");
+            return;
+        }
+        var rows = new List<KeyValuePair<string, SortedDictionary<string, int>>>(s.StopReasons);
+        int Total(SortedDictionary<string, int> d) { int n = 0; foreach (int v in d.Values) n += v; return n; }
+        rows.Sort((x, y) => Total(y.Value) != Total(x.Value) ? Total(y.Value).CompareTo(Total(x.Value)) : string.CompareOrdinal(x.Key, y.Key));
+        sb.Append("<table><thead><tr><th class=\"l\">이유</th><th>합계</th><th>대시→우클릭</th><th>우클릭→대시</th><th>그 밖</th><th class=\"l\">설명 — 코드 근거</th></tr></thead><tbody>\n");
+        foreach (KeyValuePair<string, SortedDictionary<string, int>> kv in rows)
+        {
+            int dashRmb = kv.Value.TryGetValue("dash_rmb", out int a) ? a : 0;
+            int rmbDash = kv.Value.TryGetValue("rmb_dash", out int b) ? b : 0;
+            int total = Total(kv.Value);
+            sb.Append("<tr><td class=\"l\">").Append(H(kv.Key)).Append("</td><td>").Append(total).Append("</td><td>").Append(dashRmb).Append("</td><td>")
+              .Append(rmbDash).Append("</td><td>").Append(total - dashRmb - rmbDash).Append("</td><td class=\"l\">").Append(H(QABoss116DashStop.Describe(kv.Key)))
+              .Append("</td></tr>\n");
+        }
+        sb.Append("</tbody></table>\n");
+    }
+
+    private static string M(double v) => double.IsNaN(v) ? "–" : v.ToString("0.00", Inv);
 
     private static void BucketTable(StringBuilder sb, string label, SortedDictionary<string, QABoss116Lab.Bucket> d)
     {

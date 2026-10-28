@@ -204,7 +204,7 @@ public sealed class QABoss116LabManualTests
         var tr = new QABoss116ManualTracker();
         QABoss116ManualAttempt rejected = Run(tr, F(0.00f, dash: true, charge: 0, open: true), F(0.05f, rmb: true, charge: 0, open: true)).Single();
         var gate = new List<string> { "charge", "0", "maxCharge", "2", "nextChargeS", "0.80", "canMove", "true", "grounded", "true", "dashOn", "true",
-            "inputSrc", "true", "wallM", "1.20", "windowS", "0.100" };
+            "inputSrc", "true", "windowS", "0.100" };
         var lines = new List<string>
         {
             "labwin event=open n=1 t=99.500 attack=Dash",
@@ -218,7 +218,6 @@ public sealed class QABoss116LabManualTests
         Assert.AreEqual("dash_rmb", Col("order"));
         Assert.AreEqual("dash_rejected", Col("outcome"));
         Assert.AreEqual("no_charge", Col("cause"));
-        Assert.AreEqual("wall", Col("zone"));
         Assert.AreEqual("1", Col("win_n"));
         Assert.AreEqual("true", Col("counter_open_first"));
         Assert.AreEqual("0.050", Col("gap_s"));
@@ -231,6 +230,7 @@ public sealed class QABoss116LabManualTests
         StringAssert.Contains("시도 1", line);
         StringAssert.Contains("dash_rejected 1", line);
         StringAssert.Contains("카운터 창 안 1/밖 0", line);
+        StringAssert.Contains("대시 끊긴 이유 없음", line, "대시가 안 선 시도라 끊긴 이유가 없다(116-C6)");
         StringAssert.Contains("116manual-x", line);
     }
 

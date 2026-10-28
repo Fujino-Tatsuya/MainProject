@@ -88,7 +88,6 @@ public static class QABoss116LabBatchRunner
             KV("total", QABoss116Lab.TotalRuns.ToString(CultureInfo.InvariantCulture)),
             KV("run_s", QABoss116Lab.RunSeconds.ToString("0", CultureInfo.InvariantCulture)),
             KV("max_attempts", QABoss116Lab.MaxAttempts.ToString(CultureInfo.InvariantCulture)),
-            KV("zone_s", QABoss116Lab.ZoneSeconds.ToString("0", CultureInfo.InvariantCulture)),
             KV("dash_interrupt_pct", QABoss116Lab.DashInterruptPct.ToString(CultureInfo.InvariantCulture)),
             KV("data_source_mode", QABoss103Batch.SourceTable),
             KV("minimize_windows", "0"),
