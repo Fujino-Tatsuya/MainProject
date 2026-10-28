@@ -69,6 +69,54 @@ public sealed class InterruptWindowHistory
 
         return InterruptWindowState.Unknown;
     }
+
+    /// <summary>
+    /// <paramref name="serverTime"/> 에 창이 열려 있으면 그 열림 기록 시각. 닫혀 있거나 기록이 없으면 false.
+    /// 간파 시도 예측(할 일 132)의 '열린 뒤 경과' 용 — 판정에는 쓰지 않는다.
+    /// </summary>
+    public bool TryGetOpenSince(double serverTime, out double openSince)
+    {
+        openSince = 0d;
+        for (int i = _count - 1; i >= 0; i--)
+        {
+            int index = (_start + i) % _times.Length;
+            if (_times[index] > serverTime)
+                continue;
+            if (!_open[index])
+                return false;
+            openSince = _times[index];
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 남은 기록에서 열림 → 닫힘 길이의 중앙값(창 추정 길이). 완결된 열림이 없으면 false.
+    /// 간파 시도 예측(할 일 132)의 '창 추정 길이' 용.
+    /// </summary>
+    public bool TryGetTypicalOpenDuration(out double duration)
+    {
+        var lengths = new List<double>(_count);
+        for (int i = 0; i + 1 < _count; i++)
+        {
+            int a = (_start + i) % _times.Length;
+            int b = (_start + i + 1) % _times.Length;
+            if (_open[a] && !_open[b])
+                lengths.Add(_times[b] - _times[a]);
+        }
+
+        if (lengths.Count == 0)
+        {
+            duration = 0d;
+            return false;
+        }
+
+        lengths.Sort();
+        int mid = lengths.Count / 2;
+        duration = lengths.Count % 2 == 1 ? lengths[mid] : (lengths[mid - 1] + lengths[mid]) * 0.5;
+        return true;
+    }
 }
 
 /// <summary>간파 지연 판정 계산. 순수 함수 — 실제 판정 결과는 바꾸지 않고 "지연만큼 당겨 판정했으면" 만 계산한다.</summary>

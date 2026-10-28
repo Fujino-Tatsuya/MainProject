@@ -224,13 +224,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptProductionDirector
   interruptProfile:
-    scale: 0.3
+    scale: 0.15
     hitStopDuration: 0
     hitStopScale: 0.02
     enterDuration: 0.05
-    holdDuration: 0.35
+    holdDuration: 0.5
     exitDuration: 0.25
     failExitDuration: 0.1
+  interruptWeakProfile:
+    scale: 0.5
+    hitStopDuration: 0
+    hitStopScale: 0.02
+    enterDuration: 0.05
+    holdDuration: 0.2
+    exitDuration: 0.25
+    failExitDuration: 0.1
+  interruptZoomFactor: 0.7
+  interruptWeakZoomFactor: 0.93
   paladinShieldGlow: 0
   paladinShieldCharge: 0
   assassinInsightAttempt: 0

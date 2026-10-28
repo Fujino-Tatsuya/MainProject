@@ -67,6 +67,23 @@ public static class InterruptLagMonitor
             ? history.StateAt(serverTime)
             : InterruptWindowState.Unknown;
 
+    /// <summary>
+    /// [서버] 간파 시도 예측(할 일 132)용 창 추정 — 지금 열린 뒤 경과·추정 길이(초, 서버 시각 기준). 모르면 -1.
+    /// 예측(연출 강·약)에만 쓰고 판정에는 쓰지 않는다.
+    /// </summary>
+    public static void EstimateWindow(GameObject owner, bool openNow, out float openElapsed, out float expectedDuration)
+    {
+        openElapsed = -1f;
+        expectedDuration = -1f;
+        if (owner == null || !Histories.TryGetValue(owner, out InterruptWindowHistory history) || !TryServerNow(out double now))
+            return;
+
+        if (openNow && history.TryGetOpenSince(now, out double since))
+            openElapsed = (float)(now - since);
+        if (history.TryGetTypicalOpenDuration(out double typical))
+            expectedDuration = (float)typical;
+    }
+
     /// <summary>[서버] 보낸 클라의 RTT(ms). 호스트 자신 = 0.</summary>
     public static double RttMs(ulong clientId)
     {

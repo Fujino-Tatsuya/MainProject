@@ -861,7 +861,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         // 우클릭 → 대시 전환은 Hit 전까지만(할 일 115 §12) — 오너는 판정을 모르므로 자기 애니메이터의 Hit 으로 본다.
         if (eventType == SkillAnimationEventType.Hit && activeSkill != null)
+        {
+            // 첫 Hit 까지 걸린 시간 = 다음 간파 시도 예측의 평소 준비 시간(할 일 132).
+            if (!activeHitEventSeen && activeSkill is PlayerInterruptSkillBase interrupt)
+                interrupt.NotePrepObserved(Time.time - activeStartTime);
             activeHitEventSeen = true;
+        }
 
         activeSkill?.OnLocalAnimationEvent(eventType);
 
@@ -902,10 +907,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                 return false;
 
             activeDashAttachTime = Time.time;
-            // 시도 사건 예측은 예상 대시 끝에서(§10 Q2) — OnServerStart 가 이 값으로 앵커 오버랩을 옮긴다.
+            // 시도 사건 예측은 예상 대시 끝·판정 시각에서(§10 Q2, 할 일 132) — OnServerStart 가 이 값으로 예측한다.
             if (skill is PlayerInterruptSkillBase interrupt)
-                interrupt.ArmDashAttach(DashInterruptRules.GetPredictedEndOffset(
-                    direction, dashState.Speed, dashState.Remaining));
+                interrupt.ArmDashAttach(direction, dashState.Speed, dashState.Remaining);
         }
         // 사망 중 허용 스킬(usableWhileDead)은 FSM 상태를 점유하지 않는다 — Dead 상태 유지
         else if (!isDead && !stateController.BeginSkill(skill))

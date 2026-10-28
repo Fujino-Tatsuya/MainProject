@@ -33,9 +33,34 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private static void ResetStaticEvents() => LocalSucceeded = null;
 
     // 필드 이름은 옛 GlobalTimeScale 과 글자까지 같게 둔다 — 데이터 테이블 경로(NetworkManager.interruptProfile.scale 등)가 그대로 묶인다.
+    // 강 = 옛 시도 프로필 자리(interruptProfile) 그대로, 약은 새 칸(할 일 132) — 옛 xlsx 행이 강 프로필에 그대로 묶인다.
     [Header("시도 — 공용")]
-    [Tooltip("인터럽트 유효타 슬로우 모양(시도). 서버 값만 쓴다. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
-    [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile();
+    [Tooltip("간파 시도 슬로우 모양 — 성공 예측(강). 서버 값만 쓴다. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
+    [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile
+    {
+        scale = 0.15f,
+        hitStopDuration = 0f,
+        hitStopScale = 0.02f,
+        enterDuration = 0.05f,
+        holdDuration = 0.5f,
+        exitDuration = 0.25f,
+        failExitDuration = 0.1f,
+    };
+    [Tooltip("간파 시도 슬로우 모양 — 실패 예측(약). 서버 값만 쓴다(할 일 132)")]
+    [SerializeField] private SlowMotionProfile interruptWeakProfile = new SlowMotionProfile
+    {
+        scale = 0.5f,
+        hitStopDuration = 0f,
+        hitStopScale = 0.02f,
+        enterDuration = 0.05f,
+        holdDuration = 0.2f,
+        exitDuration = 0.25f,
+        failExitDuration = 0.1f,
+    };
+    [Tooltip("내가 일으킨 강 시도 슬로우의 유지 단계 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음. 이 피어 값을 쓴다(A3 칸이 켜져야 쓰인다)")]
+    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float interruptZoomFactor = 0.7f;
+    [Tooltip("내가 일으킨 약 시도 슬로우의 유지 단계 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음. 이 피어 값을 쓴다(A3 칸이 켜져야 쓰인다)")]
+    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float interruptWeakZoomFactor = 0.93f;
     [Tooltip("B1 방패 발광·루프 — 간파 시도(우클릭) 시작에 shieldGlow FadeIn·glowLoop Play. 끄는 쪽은 늘 돈다")]
     [DataTableIgnore, SerializeField] private bool paladinShieldGlow;
     [Tooltip("B2 방패 기 모으기 — 간파 시도 클립(Garen_Parry) 이벤트의 ShieldCharge 이펙트")]
@@ -72,8 +97,10 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
 
-    /// <summary>시도 슬로우 프로필 — 사건 순간 이 객체를 넘기면 이벤트가 그 순간 값을 복사한다(캐싱 아님).</summary>
+    /// <summary>시도 슬로우 프로필(강) — 사건 순간 이 객체를 넘기면 이벤트가 그 순간 값을 복사한다(캐싱 아님).</summary>
     public SlowMotionProfile InterruptProfile => interruptProfile;
+    /// <summary>시도 슬로우 프로필(약).</summary>
+    public SlowMotionProfile InterruptWeakProfile => interruptWeakProfile;
     /// <summary>성공 슬로우 프로필.</summary>
     public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
 
@@ -166,9 +193,15 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// <summary>B2·C1 — 클립 이벤트 이펙트 재생 허용(<see cref="EffectAnimEvents"/>). 간파 id 가 아니면 늘 true.</summary>
     public static bool AllowsAnimEffect(string id) => InterruptProductionRules.AllowsAnimEffect(Instance, id);
 
-    /// <summary>A3 — 개인 채널 오너 줌 배율(카메라가 매 프레임 묻는다). 칸이 꺼져 있거나 인스턴스가 없으면 1.</summary>
-    public static float OwnerZoomFactor(float zoomFactor) =>
-        Instance != null ? Instance.SuccessStage.OwnerZoomFactor(zoomFactor) : 1f;
+    /// <summary>
+    /// A3 — 개인 채널 오너 줌 배율(카메라가 매 프레임 묻는다). 지금 슬로우 목적으로 강·약 시도(이 디렉터 칸)·성공(<paramref name="successZoomFactor"/>)
+    /// 배율을 고른다(할 일 132). 칸이 꺼져 있거나 인스턴스가 없으면 1.
+    /// </summary>
+    public static float OwnerZoomFactor(SlowMotionPurpose purpose, float successZoomFactor) =>
+        Instance != null
+            ? Instance.SuccessStage.OwnerZoomFactor(InterruptProductionRules.SelectOwnerZoomFactor(
+                purpose, Instance.interruptZoomFactor, Instance.interruptWeakZoomFactor, successZoomFactor))
+            : 1f;
 
     /// <summary>
     /// [각 피어] 시도 — 시전 시작(OnClientPlay, 전 피어)에 스킬이 알린다. 그 스킬의 시도 cue(B1)를 공용 채널로 스킬 자신에 튼다.
@@ -237,7 +270,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     // ---- 서버 사건 (간파 스킬이 알린다 — 인스턴스 없으면 아무것도 안 한다) ----
     // 판정·피해·카운터 창은 스킬 소관. 여기는 GlobalTimeScale.ServerStart/ServerFail 과 캐릭터 성공 relay 만 부른다.
 
-    /// <summary>[서버] 시도 — 예측 적중이면 시도 슬로우를 건다. 발동 번호(0 = 없음)를 돌려준다.</summary>
+    /// <summary>[서버] 시도 — 성공 예측 = 강 / 실패 예측 = 약 시도 슬로우를 건다(할 일 132). 발동 번호(0 = 없음)를 돌려준다.</summary>
     public static uint ServerAttempt(in InterruptProductionEvent e) => Instance != null ? Instance.AttemptStage.Server(e) : 0;
 
     /// <summary>[서버] 판정 — 시도 슬로우 정리(빗나감이면 실패 복귀).</summary>

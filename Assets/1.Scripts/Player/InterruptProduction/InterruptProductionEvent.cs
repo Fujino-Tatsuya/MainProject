@@ -36,7 +36,7 @@ public readonly struct InterruptProductionEvent
     public readonly PlayerInterruptSkillBase Skill;
     /// <summary>[판정·실패] 시도 슬로우 발동 번호. 0 = 실패 복귀할 시도 슬로우 없음.</summary>
     public readonly uint AttemptTriggerId;
-    /// <summary>[시도·서버] 승인 시 예측(앵커 오버랩) 결과 — 예측 계산은 스킬이 한다.</summary>
+    /// <summary>[시도·서버] 승인 시 성공 예측(DashInterruptPredictor) — true = 강, false = 약 시도 슬로우(할 일 132). 예측 계산은 스킬이 한다.</summary>
     public readonly bool PredictsHit;
     /// <summary>[판정] 예측 대기 중 카운터 성공이 났는가.</summary>
     public readonly bool Landed;

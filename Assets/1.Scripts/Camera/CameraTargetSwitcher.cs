@@ -28,7 +28,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
     [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
-    [Tooltip("내가 일으킨 인터럽트 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10)")]
+    [Tooltip("내가 일으킨 간파 성공 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10). 시도 강·약 배율은 InterruptProductionDirector 칸(할 일 132)")]
     [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = 0.85f;
 
     // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
@@ -329,8 +329,10 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
         slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);
+        // 할 일 104 A3 — 디렉터 개인 채널(118). 지금(마지막) 슬로우 목적으로 고른다: 강·약 시도 = 디렉터 칸, 성공 = 이 칸(할 일 132).
         float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth,
-            InterruptProductionDirector.OwnerZoomFactor(slowMotionZoomFactor)) // 할 일 104 A3 — 디렉터 개인 채널(118)
+            InterruptProductionDirector.OwnerZoomFactor(
+                timeScale != null ? timeScale.CurrentPurpose : SlowMotionPurpose.Success, slowMotionZoomFactor))
             * cinematicDistanceMultiplier;
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
