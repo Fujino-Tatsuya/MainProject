@@ -4167,7 +4167,7 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: af0dfc99a6e059f4c92446f9f24c568f, type: 2}
   podPrefab: {fileID: 6749872165798839983, guid: f4fe9ae51772b1445aaa3a4b77f624b8, type: 3}
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
-  impactEffect: {fileID: 11400000, guid: 3078e051ba344584a9906b584983709b, type: 2}
+  impactEffect: {fileID: 11400000, guid: 0340563727d84afcba38c82d12721a2f, type: 2}
   letterboxHeight: 0.04
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
