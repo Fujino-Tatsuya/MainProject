@@ -77,6 +77,18 @@ public static class PlayerUnitCollisionRules
         return tangent * length;
     }
 
+    /// <summary>
+    /// 구속 배치 스윕 결과로 시전자 중심에서 놓을 거리를 정한다(할 일 136). 막혔으면 벽 앞 skin 만큼 띄운 지점, 아니면 요청 거리 그대로.
+    /// </summary>
+    public static float ClampPlacementDistance(float requestedDistance, bool blocked, float hitDistance, float skin)
+    {
+        float requested = Mathf.Max(0f, requestedDistance);
+        if (!blocked)
+            return requested;
+
+        return Mathf.Clamp(hitDistance - Mathf.Max(0f, skin), 0f, requested);
+    }
+
     /// <summary>누적 관통 벡터를 이번 틱에 옮길 수평 변위로 바꾼다 — 길이는 maxSpeed × deltaTime 을 넘지 않는다.</summary>
     public static Vector3 ComputeSeparationStep(Vector3 penetrationSum, float maxSpeed, float deltaTime)
     {

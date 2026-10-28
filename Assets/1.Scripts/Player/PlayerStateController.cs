@@ -1318,6 +1318,15 @@ public sealed class PlayerRestrainedState : PlayerStateBase
     public override void Exit(PlayerActionState nextState)
     {
         FaceInstigator();
+
+        // 놓는 자리도 같은 규칙 — 시전자 중심에서 벽 앞까지만(할 일 136). 마지막 포즈가 이미 잘려 있으면 할 일이 없다.
+        if (Context.Player.IsMotionAuthority && motor != null && instigator != null)
+        {
+            Vector3 current = Context.Player.transform.position;
+            Vector3 placed = ClampToStatic(current);
+            if ((placed - current).sqrMagnitude > 0.0001f)
+                motor.SetPoseTarget(placed, Context.Player.transform.rotation);
+        }
         // TODO: Stop the restrained animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", false);
     }
@@ -1331,7 +1340,22 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         if (!TryGetTargetPose(out Vector3 position, out Quaternion rotation))
             return;
 
-        motor?.SetPoseTarget(position, rotation);
+        motor?.SetPoseTarget(ClampToStatic(position), rotation);
+    }
+
+    /// <summary>
+    /// 포즈 목표점을 시전자 중심 → 목표점 정적 스윕(플레이어 몸)으로 잘라 벽 앞에 둔다(할 일 136).
+    /// Push 정면점(grabRadius × 0.6 ≈ 2.2m)·Carry 손 소켓이 벽 너머로 나가 몸이 벽에 박히던 것을 막는다.
+    /// 스윕 높이는 목표점 높이 — 시전자 피벗 높이를 쓰면 바닥·턱에 걸린다.
+    /// </summary>
+    private Vector3 ClampToStatic(Vector3 target)
+    {
+        if (motor == null || instigator == null)
+            return target;
+
+        Vector3 origin = instigator.transform.position;
+        origin.y = target.y;
+        return motor.ClampPlacementToStatic(origin, target);
     }
 
     /// <summary>추종할 목표 위치·회전. 대상이 사라졌거나 소켓이 없으면 false — 이때 위치만 놓아준다.</summary>
