@@ -25,9 +25,10 @@ public interface IInterruptHitFlashScreenSettings
 /// <summary>
 /// 적중 섬광 오너 화면 출력(할 일 132 §15) — <see cref="IInterruptHitFlashOverlayOutput"/> 실제 출력. 오너 화면에서만 불린다.
 /// <list type="bullet">
-/// <item>오버레이 캔버스(②③④⑥ 그림): 오너 암전 덮개(<see cref="InterruptOwnerHudCover"/>)와 같은 방식 — 최상위 Screen Space Overlay 캔버스 하나에 화면 전체 RawImage.
+/// <item>오버레이 캔버스(②③④ 그림, ⑤⑥ 은 꺼 둔다): 오너 암전 덮개(<see cref="InterruptOwnerHudCover"/>)와 같은 방식 — 최상위 Screen Space Overlay 캔버스 하나에 화면 전체 RawImage.
 ///       월드·HUD·암전 덮개 전부 위(<see cref="SortingOrder"/> = PerformanceOverlay 바로 아래, 암전 덮개 바로 위). 재질이 단계·진행도·중심으로 절차 생성,
-///       단계별 '덮어쓸 텍스처' 칸이 차면 그 단계는 그 텍스처. ② = 플레어 층 RT + 푸른 고리를 더함, ③ = 회청색 화이트아웃, ④ = 암전 덮개 RT 의 남김 영역을 흰 덩어리로 번짐, ⑥ = 무지개 고리.</item>
+///       단계별 '덮어쓸 텍스처' 칸이 차면 그 단계는 그 텍스처. ② = 플레어 층 RT(부드러운 포화) + 얇은 푸른 고리를 더함, ③ = 회청색 화이트아웃(남김 영역 실루엣이 비침),
+///       ④ = 암전 덮개 RT 의 남김 영역을 키워 공격 방향(화면 투영, <see cref="InterruptHitFlashRules.TryScreenDirection"/>)으로 늘인 흰 덩어리.</item>
 /// <item>렌즈 플레어(②): 적중 지점의 LensFlareComponentSRP 하나. 렌더 기능(<see cref="DarkAdaptationFeature"/>)이 플레어 층 RT 에만 따로 그리고 캔버스가 암전 위에 더한다.</item>
 /// <item>방사형 블러(③⑤⑥): <see cref="DarkAdaptationState.HitFlashBlurStrength"/> — 렌더 기능이 후처리 전 카메라 컬러에 건다(HUD 는 블러 밖).</item>
 /// <item>색수차·블룸(⑤⑥): 이 출력 소유의 전역 Volume 둘(우선순위 <see cref="VolumePriority"/>) 가중치만 움직인다. 첫 프레임에 가중치를 스냅샷하고
@@ -47,6 +48,7 @@ public sealed class InterruptHitFlashOverlay : IInterruptHitFlashOverlayOutput, 
     private static readonly int AspectId = Shader.PropertyToID("_Aspect");
     private static readonly int FlareTexId = Shader.PropertyToID("_FlareTex");
     private static readonly int CoverTexId = Shader.PropertyToID("_CoverTex");
+    private static readonly int SmearAxisId = Shader.PropertyToID("_SmearAxis");
 
     private readonly IInterruptHitFlashScreenSettings _settings;
     private readonly InterruptHitFlashVolumeSnapshot _snapshot = new InterruptHitFlashVolumeSnapshot();
@@ -71,12 +73,12 @@ public sealed class InterruptHitFlashOverlay : IInterruptHitFlashOverlayOutput, 
     /// <summary>② 플레어가 켜져 있다 — 확인용.</summary>
     public bool FlareActive => _flare != null && _flare.enabled;
 
-    public void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter)
+    public void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter, Vector3 worldDirection)
     {
         Camera camera = Camera.main;
-        Vector2 center = camera != null
-            ? InterruptHitFlashRules.ViewportCenter(camera.WorldToViewportPoint(worldCenter))
-            : new Vector2(0.5f, 0.5f);
+        Vector3 viewport = camera != null ? camera.WorldToViewportPoint(worldCenter) : new Vector3(0.5f, 0.5f, 1f);
+        Vector2 center = InterruptHitFlashRules.ViewportCenter(viewport);
+        float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 1f;
         InterruptHitFlashLook look = InterruptHitFlashRules.Look(stage, progress);
 
         EnsureRoot();
@@ -88,15 +90,26 @@ public sealed class InterruptHitFlashOverlay : IInterruptHitFlashOverlayOutput, 
         if (!EnsureCanvas())
             return;
 
+        // ⑤⑥ 은 그림이 없다 — 캔버스를 꺼 둔다(블러·Volume 은 위에서 이미 넘겼다).
+        _canvas.enabled = InterruptHitFlashRules.OverlayDraws(stage);
+        if (!_canvas.enabled)
+            return;
+
+        // ④ 방향 — 공격 방향(월드)을 적중 지점에서 한 걸음 앞 점으로 투영. 모르면 z = 0(재질 기본 방향).
+        Vector2 axis = Vector2.zero;
+        bool hasAxis = camera != null && worldDirection.sqrMagnitude > 1e-8f &&
+            InterruptHitFlashRules.TryScreenDirection(viewport, camera.WorldToViewportPoint(worldCenter + worldDirection.normalized),
+                aspect, out axis);
+        _instance.SetVector(SmearAxisId, hasAxis ? new Vector4(axis.x, axis.y, 1f, 0f) : Vector4.zero);
+
         _instance.SetFloat(StageId, (float)stage);
         _instance.SetFloat(ProgressId, Mathf.Clamp01(progress));
         _instance.SetVector(CenterId, center);
-        _instance.SetFloat(AspectId, Screen.height > 0 ? (float)Screen.width / Screen.height : 1f);
+        _instance.SetFloat(AspectId, aspect);
         // 덮개 RT(흰색 + 알파 1 − 남김) — 없으면 흰 텍스처(= 전부 덮음, 남김 없음).
         RenderTexture cover = DarkAdaptationState.MaskCoverTarget;
         _instance.SetTexture(CoverTexId, cover != null ? cover : Texture2D.whiteTexture);
         _instance.SetTexture(FlareTexId, DarkAdaptationState.HitFlashFlareTarget != null ? _flareTarget : Texture2D.blackTexture);
-        _canvas.enabled = true;
     }
 
     public void Hide()

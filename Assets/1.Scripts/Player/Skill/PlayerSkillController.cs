@@ -464,7 +464,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                      $"{(viaDash ? $" · 대쉬(누른 뒤 {pressAge:F3}s)" : string.Empty)} · 판정까지 {prediction.PredictedResolveTime - Time.time:F3}s · 창 남음 {prediction.WindowRemaining:F3}s", this);
             // 오너 암전에 남길 것 = 내 캐릭터 하위 전부(몸·무기·하위에 붙은 무기 이펙트) + 이번 시도 대상.
             InterruptProductionDirector.LocalOwnerAttempt(interrupt, prediction.Forecast,
-                player != null ? player.gameObject : null, target != null ? target.gameObject : null);
+                player != null ? player.gameObject : null, target != null ? target.gameObject : null, attackDirection);
         }
     }
 

@@ -76,6 +76,12 @@ public sealed class InterruptOwnerPresentation
     /// <summary>마지막 서버 확정 성공에 들어선 순간 암전이 켜져 있었다(강 시도) — 적중 섬광 오버레이 조건. 새 시도·리셋에 false.</summary>
     public bool SuccessDimmed { get; private set; }
 
+    /// <summary>
+    /// 이번 시도의 공격 방향(월드) — 입력 순간 예측이 받은 값(근접 = 요청에 싣는 시전 방향, 대쉬 = 대시 방향). 0 = 모름.
+    /// 적중 섬광 ④ 스미어가 화면에 투영해 덩어리를 늘린다(할 일 132 §16). 받아들인 예측마다 바뀐다.
+    /// </summary>
+    public Vector3 AttackDirection { get; private set; }
+
     /// <summary>마지막 서버 확정 성공의 발동 번호 — 그 성공의 섬광 순간만 암전을 끈다(새 성공이 오면 새 섬광 순간을 기다린다).</summary>
     public uint SuccessTriggerId { get; private set; }
 
@@ -105,9 +111,10 @@ public sealed class InterruptOwnerPresentation
 
     /// <summary>
     /// [오너] 간파 입력 순간 예측. 대상 없음이면 아무것도 켜지 않고 상태도 그대로(false, 할 일 132 정정1).
-    /// 시도가 아직 결론나지 않았으면 중복 입력으로 보고 무시한다(false).
+    /// 시도가 아직 결론나지 않았으면 중복 입력으로 보고 무시한다(false). <paramref name="attackDirection"/> = <see cref="AttackDirection"/>.
     /// </summary>
-    public bool Predict(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, PlayerInterruptSkillBase skill, float now)
+    public bool Predict(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, PlayerInterruptSkillBase skill, float now,
+        Vector3 attackDirection = default)
     {
         if (!Accepts(forecast))
             return false;
@@ -115,6 +122,7 @@ public sealed class InterruptOwnerPresentation
         bool predictsSuccess = forecast == BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong;
 
         _skill = skill;
+        AttackDirection = attackDirection;
         PredictedStrong = predictsSuccess;
         Mispredicted = false;
         AttemptTriggerId = 0;

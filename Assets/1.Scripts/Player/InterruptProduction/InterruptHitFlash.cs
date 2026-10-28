@@ -9,15 +9,15 @@ using UnityEngine;
 public enum InterruptHitFlashStage
 {
     None = 0,
-    /// <summary>② 적중 지점 중심 베이지 스타버스트 렌즈 플레어(아나모픽 가로 빛살 최장) + 푸른 충격파 고리. 배경은 오너 암전 그대로.</summary>
+    /// <summary>② 적중 지점 중심 베이지 스타버스트 렌즈 플레어(부드러운 코어 + 길이 제각각 빛살, 아나모픽 가로 빛살 최장) + 얇고 흐린 푸른 고리. 배경은 오너 암전 그대로.</summary>
     Starburst = 2,
-    /// <summary>③ 화면 전체 밝은 회청색 + 적중 지점 중심 강한 방사형 블러 — 유일하게 화면을 덮는 단계.</summary>
+    /// <summary>③ 화면 전체 밝은 회청색(약 0.75) + 적중 지점 중심 강한 방사형 블러, 오너·대상 블러 실루엣이 비친다 — 유일하게 화면을 덮는 단계.</summary>
     Whiteout = 3,
-    /// <summary>④ 검정 배경 위 마스크 암전 남김 영역(오너·대상·빔)이 흰 덩어리로 번진 한 장(방향 블러).</summary>
+    /// <summary>④ 검정 배경 위 마스크 암전 남김 영역(오너·대상·빔)을 키워 공격 방향으로 늘인 흰 덩어리 한 장.</summary>
     Smear = 4,
-    /// <summary>⑤ 섬광 순간에 시작 — 실제 화면 위 방사형 블러 + 무지개 색수차 + 블룸 상승.</summary>
+    /// <summary>⑤ 섬광 순간에 시작 — 실제 화면 위 방사형 블러 + Volume 색수차(가장자리) + 블룸 최대.</summary>
     Aberration = 5,
-    /// <summary>⑥ 블룸 덩어리 + 무지개빛 충격파 고리 퍼짐, 블러·색수차 0 으로 감소.</summary>
+    /// <summary>⑥ 블룸 덩어리가 남다가 가라앉음, 블러·색수차 0 으로 감소.</summary>
     Settle = 6,
 }
 
@@ -154,7 +154,8 @@ public readonly struct InterruptHitFlashLook
 public interface IInterruptHitFlashOverlayOutput
 {
     /// <param name="worldCenter">적중 지점(월드) — 출력이 화면 위치로 바꾼다.</param>
-    void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter);
+    /// <param name="worldDirection">공격 방향(월드, 근접 = 시전 방향·대쉬 = 대시 방향) — 출력이 화면 방향으로 투영해 ④ 스미어를 늘린다. 0 = 모름(재질 기본 방향).</param>
+    void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter, Vector3 worldDirection);
     /// <summary>즉시 전부 원래대로(오버레이 끔·플레어 끔·블러 0·Volume 가중치 복구).</summary>
     void Hide();
 }
@@ -229,7 +230,7 @@ public static class InterruptHitFlashRules
     }
 
     /// <summary>
-    /// 단계·진행도 → 오너 화면 효과 세기. ② 플레어, ③ 블러 최대, ④ 그림만, ⑤ 블러 0.8→0.6·색수차 1·블룸 0→1 상승,
+    /// 단계·진행도 → 오너 화면 효과 세기. ② 플레어, ③ 블러 최대, ④ 그림만, ⑤ 블러 0.8→0.6·색수차 1·블룸 1(섬광 순간부터 최대 — 코어가 번진다, §16),
     /// ⑥ 블러 0.6→0·색수차 1→0·블룸 1→0(끝까지 남다가 가라앉음). 끝 = 전부 0.
     /// </summary>
     public static InterruptHitFlashLook Look(InterruptHitFlashStage stage, float progress)
@@ -239,11 +240,15 @@ public static class InterruptHitFlashRules
         {
             case InterruptHitFlashStage.Starburst: return new InterruptHitFlashLook(1f - 0.4f * t, 0f, 0f, 0f);
             case InterruptHitFlashStage.Whiteout: return new InterruptHitFlashLook(0f, 1f, 0f, 0f);
-            case InterruptHitFlashStage.Aberration: return new InterruptHitFlashLook(0f, Mathf.Lerp(0.8f, 0.6f, t), 1f, EaseOut(t));
+            case InterruptHitFlashStage.Aberration: return new InterruptHitFlashLook(0f, Mathf.Lerp(0.8f, 0.6f, t), 1f, 1f);
             case InterruptHitFlashStage.Settle: return new InterruptHitFlashLook(0f, 0.6f * (1f - t), 1f - t, 1f - t * t);
             default: return default;
         }
     }
+
+    /// <summary>오버레이 캔버스가 그림을 그리는 단계 — ②③④. ⑤⑥ 은 실제 화면 효과(블러·Volume)뿐이라 캔버스를 끈다(§16 무지개 고리 제거).</summary>
+    public static bool OverlayDraws(InterruptHitFlashStage stage) =>
+        stage == InterruptHitFlashStage.Starburst || stage == InterruptHitFlashStage.Whiteout || stage == InterruptHitFlashStage.Smear;
 
     /// <summary>적중 지점 뷰포트 좌표 → 화면 효과 중심. 카메라 뒤(z ≤ 0)·NaN 이면 화면 가운데.</summary>
     public static Vector2 ViewportCenter(Vector3 viewportPoint) =>
@@ -251,10 +256,22 @@ public static class InterruptHitFlashRules
             ? new Vector2(0.5f, 0.5f)
             : new Vector2(viewportPoint.x, viewportPoint.y);
 
-    private static float EaseOut(float t)
+    /// <summary>
+    /// ④ 스미어 방향 투영(§16) — 적중 지점과 그 지점 + 공격 방향의 뷰포트 좌표 → 화면 방향(화면 높이 단위, 길이 1).
+    /// 두 점 중 하나라도 카메라 뒤·NaN 이거나 화면 위 길이가 거의 0(카메라 축과 나란한 방향)이면 false — 재질 기본 방향을 쓴다.
+    /// </summary>
+    public static bool TryScreenDirection(Vector3 viewportCenter, Vector3 viewportAhead, float aspect, out Vector2 direction)
     {
-        float k = 1f - t;
-        return 1f - k * k * k;
+        direction = Vector2.zero;
+        if (viewportCenter.z <= 0f || viewportAhead.z <= 0f)
+            return false;
+
+        var delta = new Vector2((viewportAhead.x - viewportCenter.x) * Mathf.Max(aspect, 1e-4f), viewportAhead.y - viewportCenter.y);
+        if (float.IsNaN(delta.x) || float.IsNaN(delta.y) || delta.sqrMagnitude < 1e-10f)
+            return false;
+
+        direction = delta.normalized;
+        return true;
     }
 }
 
@@ -321,6 +338,7 @@ public sealed class InterruptHitFlashSequencer
     private InterruptHitFlashTimeline _overlayTimeline;
     private float _overlayStart;
     private Vector3 _overlayCenter;
+    private Vector3 _overlayDirection;
     private InterruptEffectTimeBase _clock = InterruptEffectTimeBase.Unscaled;
 
     public InterruptHitFlashSequencer(IInterruptHitFlashSettings settings, IInterruptHitFlashOverlayOutput overlay,
@@ -358,12 +376,16 @@ public sealed class InterruptHitFlashSequencer
         _overlay = overlay;
     }
 
-    /// <summary>[오너] 화면 섬광 시작 — 성공 Started 순간(<paramref name="now"/>). 칸은 이 순간 읽는다.</summary>
-    public void BeginOwnerOverlay(Vector3 worldCenter, float now)
+    /// <summary>
+    /// [오너] 화면 섬광 시작 — 성공 Started 순간(<paramref name="now"/>). 칸은 이 순간 읽는다.
+    /// <paramref name="worldDirection"/> = 이번 시도의 공격 방향(오너 상태 <see cref="InterruptOwnerPresentation.AttackDirection"/>, 0 = 모름).
+    /// </summary>
+    public void BeginOwnerOverlay(Vector3 worldCenter, Vector3 worldDirection, float now)
     {
         _overlayTimeline = InterruptHitFlashTimeline.From(_settings);
         _overlayStart = now;
         _overlayCenter = worldCenter;
+        _overlayDirection = worldDirection;
         OverlayActive = true;
         UpdateOverlay(now);
     }
@@ -424,7 +446,7 @@ public sealed class InterruptHitFlashSequencer
 
         OverlayStage = stage;
         OverlayProgress = progress;
-        _overlay?.Show(stage, progress, _overlayCenter);
+        _overlay?.Show(stage, progress, _overlayCenter, _overlayDirection);
     }
 
     private void HideOverlay()

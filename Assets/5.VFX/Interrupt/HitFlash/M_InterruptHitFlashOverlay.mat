@@ -52,14 +52,20 @@ Material:
     - _Aspect: 1.7777
     - _FlareGain: 1
     - _Progress: 0
-    - _RainbowIntensity: 1.2
-    - _SmearLength: 0.12
+    - _RingIntensity: 0.6
+    - _RingRadius: 0.42
+    - _RingWidth: 0.01
+    - _SmearGrow: 0.018
+    - _SmearLength: 0.22
     - _Stage: 0
     - _StreakCount: 160
-    - _WhiteoutOpacity: 0.94
+    - _WhiteoutOpacity: 0.75
+    - _WhiteoutSilhouette: 0.6
+    - _WhiteoutSilhouetteBlur: 0.35
     m_Colors:
     - _Center: {r: 0.5, g: 0.5, b: 0, a: 0}
     - _RingColor: {r: 0.45, g: 0.72, b: 1.6, a: 1}
+    - _SmearAxis: {r: 1, g: 0, b: 0, a: 0}
     - _SmearBackColor: {r: 0, g: 0, b: 0, a: 1}
     - _SmearColor: {r: 1, g: 1, b: 1, a: 1}
     - _SmearDirection: {r: 1, g: 0.12, b: 0, a: 0}

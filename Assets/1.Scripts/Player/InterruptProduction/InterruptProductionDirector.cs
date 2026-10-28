@@ -117,15 +117,15 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Header("성공 — 적중 섬광(할 일 132 §15)")]
     [Tooltip("섬광 진행기 시계 — 실시간(기본): ②~⑥·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 슬로우·히트스톱과 무관 / 스케일: 성공 슬로우·히트스톱을 따라 느려진다. 진행 중에 바꾸면 다음 성공부터")]
     [DataTableIgnore, SerializeField] private InterruptEffectTimeBase hitFlashTimeBase = InterruptEffectTimeBase.Unscaled;
-    [Tooltip("② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어 + 푸른 충격파 고리(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
+    [Tooltip("② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(부드러운 코어 + 제각각 빛살) + 얇은 푸른 고리(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashStarburstDuration = 0.067f;
-    [Tooltip("③ 화이트아웃 — 화면 전체 밝은 회청색 + 방사형 블러(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
+    [Tooltip("③ 화이트아웃 — 화면 전체 밝은 회청색(오너·대상 블러 실루엣이 비침) + 강한 방사형 블러(오너 화면, 초, 진행기 시계). 불투명도·실루엣은 오버레이 재질 칸. 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashWhiteoutDuration = 0.033f;
-    [Tooltip("④ 스미어 — 검정 위 오너·대상·빔이 흰 덩어리로 번진 한 장(오너 화면, 초, 진행기 시계). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
+    [Tooltip("④ 스미어 — 검정 위 오너·대상·빔이 커진 흰 덩어리로 공격 방향(시전/대시 방향 화면 투영)으로 늘어난 한 장(오너 화면, 초, 진행기 시계). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashSmearDuration = 0.033f;
-    [Tooltip("⑤ 색수차 블러 — 실제 화면 위 방사형 블러 + 무지개 색수차 + 블룸 상승(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
+    [Tooltip("⑤ 색수차 블러 — 실제 화면 위 방사형 블러 + Volume 색수차(가장자리) + 블룸 최대(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashAberrationDuration = 0.1f;
-    [Tooltip("⑥ 가라앉음 — 블룸 덩어리 + 무지개 고리 퍼짐, 블러·색수차 0 으로(오너 화면, 초, 진행기 시계). 0 = 바로 끊김")]
+    [Tooltip("⑥ 가라앉음 — 블룸 덩어리가 가라앉고 블러·색수차 0 으로(오너 화면, 초, 진행기 시계). 0 = 바로 끊김")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashSettleDuration = 0.2f;
     [Tooltip("오너 화면 섬광 오버레이 재질(BeaverLobby/UI/InterruptHitFlashOverlay) — 색·단계별 덮어쓸 텍스처 칸은 재질에. 비면 오버레이 그림 없음")]
     [DataTableIgnore, SerializeField] private Material hitFlashOverlayMaterial;
@@ -136,12 +136,12 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("② 렌즈 플레어 크기(LensFlareComponentSRP.scale)")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashFlareScale = 1f;
     [Tooltip("방사형 블러 최대 세기 [0, 1] — ③ 에서 이 값, ⑤ 0.8→0.6배, ⑥ 0.6배→0. 픽셀에서 적중 지점까지 거리 중 번지는 비율")]
-    [DataTableIgnore, SerializeField, Range(0f, 1f)] private float hitFlashBlurStrength = 0.35f;
+    [DataTableIgnore, SerializeField, Range(0f, 1f)] private float hitFlashBlurStrength = 0.6f;
     [Tooltip("⑤⑥ 색수차 Volume 프로필 — 이 피어 전용 전역 Volume(우선순위 1000)의 가중치만 움직인다(에셋 값은 그대로). 비면 색수차 없음")]
     [DataTableIgnore, SerializeField] private VolumeProfile hitFlashAberrationProfile;
-    [Tooltip("⑤⑥ 블룸 Volume 프로필 — 가중치만큼 씬 블룸을 이 값 쪽으로 올린다. 비면 블룸 상승 없음")]
+    [Tooltip("⑤⑥ 블룸 Volume 프로필 — 가중치만큼 씬 블룸을 이 값 쪽으로 올린다(섬광 순간 가중치 1 — 세기는 프로필 intensity). 비면 블룸 상승 없음")]
     [DataTableIgnore, SerializeField] private VolumeProfile hitFlashBloomProfile;
-    [Tooltip("섬광 순간(⑤ 시작) 적중 지점 월드 섬광(파랑·흰 코어 + 블룸) 프리팹 — 모든 피어가 튼다. 첫 재생 때 한 번 만들어 재사용. 비면 월드 섬광 없음")]
+    [Tooltip("섬광 순간(⑤ 시작) 적중 지점 월드 섬광(부드러운 파랑·흰 빛 덩어리 + 블룸 + 적중 지점 Point Light) 프리팹 — 모든 피어가 튼다. 첫 재생 때 한 번 만들어 재사용. 실시간 상한·라이트 칸은 프리팹에. 비면 월드 섬광 없음")]
     [DataTableIgnore, SerializeField] private InterruptHitFlashVfx hitFlashWorldVfx;
     [Tooltip("월드 섬광 크기 배율(루트 스케일)")]
     [DataTableIgnore, SerializeField, Min(0.01f)] private float hitFlashWorldScale = 1f;
@@ -354,9 +354,10 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// [오너] 간파(근접·대쉬) 입력 순간의 즉시 예측 — 강(성공 예측)이면 오너 암전·빛 모임을 바로 켠다. 약은 아무것도 안 켠다
     /// (줌·슬로우는 서버 시도 슬로우가 처리), 대상 없음도 아무것도 안 켠다(정정1). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
     /// <paramref name="owner"/>·<paramref name="target"/> = 암전에 남길 오너 캐릭터(무기 이펙트 포함 하위 전부)·이번 시도 간파 대상(예측이 고른 캐시 대상).
+    /// <paramref name="attackDirection"/> = 근접은 요청에 싣는 시전 방향, 대쉬는 대시 방향 — 적중 섬광 ④ 스미어 방향(할 일 132 §16).
     /// </summary>
     public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast,
-        GameObject owner, GameObject target)
+        GameObject owner, GameObject target, Vector3 attackDirection)
     {
         if (Instance == null)
             return;
@@ -368,7 +369,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             return;
 
         Instance._ownerDimOutput?.SetSubjects(owner, target);
-        presentation.Predict(forecast, skill, Time.unscaledTime);
+        presentation.Predict(forecast, skill, Time.unscaledTime, attackDirection);
     }
 
     /// <summary>
@@ -445,8 +446,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         float now = InterruptEffectTime.Now(HitFlash.Clock);
         bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
             viewerIsCaster && OwnerPresentation.SuccessDimmed);
+        // ④ 스미어 방향 = 이번 강 시도의 공격 방향(오너 상태 — 입력 순간 예측이 받은 시전/대시 방향).
         if (ownerOverlay)
-            HitFlash.BeginOwnerOverlay(FlashPoint(targetPosition), now);
+            HitFlash.BeginOwnerOverlay(FlashPoint(targetPosition), OwnerPresentation.AttackDirection, now);
         HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), now);
 
         SuccessStage.LocalStarted(purpose, e, FindSuccessFxSinks(casterClientId));

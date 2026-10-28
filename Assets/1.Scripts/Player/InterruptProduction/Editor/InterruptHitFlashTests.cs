@@ -67,14 +67,16 @@ public sealed class InterruptHitFlashTests
         public InterruptHitFlashStage Stage;
         public float Progress;
         public Vector3 Center;
+        public Vector3 Direction;
         public int Shows;
         public int Hides;
 
-        public void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter)
+        public void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter, Vector3 worldDirection)
         {
             Stage = stage;
             Progress = progress;
             Center = worldCenter;
+            Direction = worldDirection;
             Shows++;
         }
 
@@ -94,6 +96,7 @@ public sealed class InterruptHitFlashTests
     }
 
     private static readonly Vector3 Target = new Vector3(3f, 0f, 4f);
+    private static readonly Vector3 Attack = new Vector3(0f, 0f, 1f);
 
     private FakeSettings _settings;
     private FakeOverlay _overlay;
@@ -182,17 +185,21 @@ public sealed class InterruptHitFlashTests
     [Test]
     public void 화면_섬광은_성공_Started_순간_스타버스트부터_히트스톱_길이와_무관()
     {
-        _sequencer.BeginOwnerOverlay(Target, 20f);
+        _sequencer.BeginOwnerOverlay(Target, Attack, 20f);
         Assert.IsTrue(_sequencer.OverlayActive);
         Assert.AreEqual(InterruptHitFlashStage.Starburst, _overlay.Stage);
         Assert.AreEqual(0f, _overlay.Progress);
         Assert.AreEqual(Target, _overlay.Center);
+        Assert.AreEqual(Attack, _overlay.Direction, "공격 방향을 출력에 넘긴다(④ 스미어)");
+        _sequencer.Tick(20.109375f);
+        Assert.AreEqual(InterruptHitFlashStage.Smear, _overlay.Stage);
+        Assert.AreEqual(Attack, _overlay.Direction, "단계가 바뀌어도 같은 방향");
     }
 
     [Test]
     public void 화면_섬광_단계가_진행기_시계로_넘어가고_끝나면_한_번_숨긴다()
     {
-        _sequencer.BeginOwnerOverlay(Target, 20f);
+        _sequencer.BeginOwnerOverlay(Target, Attack, 20f);
         _sequencer.Tick(20.0625f);
         Assert.AreEqual(InterruptHitFlashStage.Whiteout, _overlay.Stage);
         _sequencer.Tick(20.109375f);
@@ -251,7 +258,7 @@ public sealed class InterruptHitFlashTests
     [Test]
     public void 강제_리셋은_화면_섬광_즉시_끄고_섬광_순간_취소()
     {
-        _sequencer.BeginOwnerOverlay(Target, 20f);
+        _sequencer.BeginOwnerOverlay(Target, Attack, 20f);
         _sequencer.ScheduleFlash(Moment(true, true), 20f);
         _sequencer.Tick(20.07f);
         _sequencer.ForcedReset();
@@ -298,7 +305,7 @@ public sealed class InterruptHitFlashTests
         // 디렉터와 같은 배선 — 팀원 화면은 BeginOwnerOverlay 를 부르지 않고 섬광 순간만 예약한다.
         bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, false, false);
         if (ownerOverlay)
-            _sequencer.BeginOwnerOverlay(Target, 0f);
+            _sequencer.BeginOwnerOverlay(Target, Attack, 0f);
         _sequencer.ScheduleFlash(Moment(false, ownerOverlay), 0f);
 
         for (float t = 0f; t <= 0.5f; t += 1f / 64f)
@@ -327,7 +334,7 @@ public sealed class InterruptHitFlashTests
         owner.ServerStarted(7, SlowMotionPurpose.Success, true, 20.25f);
         Assert.IsTrue(InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, true, owner.SuccessDimmed));
 
-        sequencer.BeginOwnerOverlay(Target, 20.25f);
+        sequencer.BeginOwnerOverlay(Target, Attack, 20.25f);
         sequencer.ScheduleFlash(Moment(true, true), 20.25f);
 
         owner.Tick(20.359375f);
@@ -392,7 +399,7 @@ public sealed class InterruptHitFlashTests
         owner.Tick(-0.5f);
         owner.ServerStarted(7, SlowMotionPurpose.Success, true, 0f);
         Assert.AreEqual(timeBase, sequencer.Clock);
-        sequencer.BeginOwnerOverlay(Target, ClockAt(0.0));
+        sequencer.BeginOwnerOverlay(Target, Attack, ClockAt(0.0));
         sequencer.ScheduleFlash(Moment(true, true), ClockAt(0.0));
 
         InterruptHitFlashStage last = InterruptHitFlashStage.Starburst;
@@ -534,7 +541,8 @@ public sealed class InterruptHitFlashTests
         InterruptHitFlashLook aberrationEnd = InterruptHitFlashRules.Look(InterruptHitFlashStage.Aberration, 1f);
         Assert.AreEqual(1f, aberrationStart.Aberration, "⑤ 색수차");
         Assert.Greater(aberrationStart.Blur, 0f, "⑤ 블러");
-        Assert.Greater(aberrationEnd.Bloom, aberrationStart.Bloom, "⑤ 블룸 상승");
+        Assert.AreEqual(1f, aberrationStart.Bloom, "섬광 순간(⑤ 시작)부터 블룸 가중치 최대 — 코어가 번진다(§16)");
+        Assert.AreEqual(1f, aberrationEnd.Bloom, "⑤ 동안 유지");
 
         InterruptHitFlashLook settleStart = InterruptHitFlashRules.Look(InterruptHitFlashStage.Settle, 0f);
         InterruptHitFlashLook settleEnd = InterruptHitFlashRules.Look(InterruptHitFlashStage.Settle, 1f);
@@ -595,7 +603,7 @@ public sealed class InterruptHitFlashTests
         {
             var sequencer = new InterruptHitFlashSequencer(_settings, output, _flashes.Add);
 
-            sequencer.BeginOwnerOverlay(Target, 0f);
+            sequencer.BeginOwnerOverlay(Target, Attack, 0f);
             Assert.IsTrue(output.FlareActive, "② 플레어");
             Assert.IsNotNull(DarkAdaptationState.HitFlashFlareTarget, "② 플레어 층");
             Assert.AreEqual(0f, DarkAdaptationState.HitFlashBlurStrength);
@@ -620,7 +628,7 @@ public sealed class InterruptHitFlashTests
             Assert.IsFalse(output.FlareActive);
 
             // 끝까지 돌면 끝에 복구.
-            sequencer.BeginOwnerOverlay(Target, 10f);
+            sequencer.BeginOwnerOverlay(Target, Vector3.zero, 10f);
             sequencer.Tick(10.3f);
             Assert.Greater(output.AberrationWeight, 0f);
             sequencer.Tick(10.5f);
@@ -674,6 +682,18 @@ public sealed class InterruptHitFlashTests
     }
 
     [Test]
+    public void 오버레이_재질_칸_16_수정()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(OverlayMaterialPath);
+        Assert.IsNotNull(material, OverlayMaterialPath);
+        Assert.AreEqual(0.75f, material.GetFloat("_WhiteoutOpacity"), 1e-4f, "③ 화이트아웃 불투명도 ~0.75");
+        Assert.Greater(material.GetFloat("_WhiteoutSilhouette"), 0f, "③ 오너·대상 실루엣이 비친다");
+        Assert.Greater(material.GetFloat("_SmearGrow"), 0f, "④ 실루엣을 키운다");
+        Assert.IsFalse(material.HasProperty("_RainbowIntensity"), "⑤⑥ 무지개 고리 칸은 없앴다(Volume 색수차만)");
+        Assert.IsTrue(material.HasProperty("_SmearAxis"), "④ 공격 방향(런타임)");
+    }
+
+    [Test]
     public void 월드_섬광_재질_칸은_빛_모임과_같은_키워드_규칙()
     {
         Shader shader = Shader.Find(WorldShaderName);
@@ -698,6 +718,205 @@ public sealed class InterruptHitFlashTests
         Assert.AreEqual(3, Shader.Find(DarkAdaptationShaderName).passCount, "휘도·마스크 덮개·방사형 블러");
     }
 
+    // ─── §16 스미어 방향·오버레이 단계 ───
+
+    [Test]
+    public void 스미어_방향은_공격_방향을_화면에_투영한다()
+    {
+        const float Aspect = 16f / 9f;
+        var center = new Vector3(0.5f, 0.5f, 10f);
+
+        Assert.IsTrue(InterruptHitFlashRules.TryScreenDirection(center, new Vector3(0.6f, 0.5f, 10f), Aspect, out Vector2 right));
+        Assert.AreEqual(1f, right.x, 1e-5f, "화면 오른쪽");
+        Assert.AreEqual(0f, right.y, 1e-5f);
+
+        // 뷰포트 x 0.1 = 화면 높이 단위 0.1 × 화면비 — 같은 높이 단위만큼 위로 가면 45°.
+        Assert.IsTrue(InterruptHitFlashRules.TryScreenDirection(center, new Vector3(0.6f, 0.5f + 0.1f * Aspect, 10f), Aspect, out Vector2 diagonal));
+        Assert.AreEqual(diagonal.x, diagonal.y, 1e-5f, "화면비 보정");
+        Assert.AreEqual(1f, diagonal.magnitude, 1e-5f, "길이 1");
+
+        Assert.IsTrue(InterruptHitFlashRules.TryScreenDirection(center, new Vector3(0.5f, 0.3f, 10f), Aspect, out Vector2 down));
+        Assert.AreEqual(-1f, down.y, 1e-5f, "화면 아래");
+
+        Assert.IsFalse(InterruptHitFlashRules.TryScreenDirection(center, new Vector3(0.6f, 0.5f, -1f), Aspect, out _), "앞 점이 카메라 뒤");
+        Assert.IsFalse(InterruptHitFlashRules.TryScreenDirection(new Vector3(0.5f, 0.5f, -1f), center, Aspect, out _), "적중 지점이 카메라 뒤");
+        Assert.IsFalse(InterruptHitFlashRules.TryScreenDirection(center, center, Aspect, out _), "카메라 축과 나란한 방향 = 화면 길이 0 → 재질 기본 방향");
+        Assert.IsFalse(InterruptHitFlashRules.TryScreenDirection(center, new Vector3(float.NaN, 0.5f, 10f), Aspect, out _));
+    }
+
+    [Test]
+    public void 스미어_방향_투영_탑다운_카메라()
+    {
+        // 탑다운(아래로 60°) 카메라 — 월드 +x 공격 = 화면 오른쪽, 월드 +z 공격 = 화면 위쪽.
+        var cameraObject = Track(new GameObject("Camera"));
+        var camera = cameraObject.AddComponent<Camera>();
+        camera.transform.SetPositionAndRotation(new Vector3(0f, 10f, -6f), Quaternion.Euler(60f, 0f, 0f));
+        camera.aspect = 16f / 9f;
+        Vector3 hit = new Vector3(0f, 1f, 0f);
+
+        Vector3 c = camera.WorldToViewportPoint(hit);
+        Assert.IsTrue(InterruptHitFlashRules.TryScreenDirection(c, camera.WorldToViewportPoint(hit + Vector3.right), camera.aspect, out Vector2 x));
+        Assert.AreEqual(1f, x.x, 1e-3f);
+        Assert.IsTrue(InterruptHitFlashRules.TryScreenDirection(c, camera.WorldToViewportPoint(hit + Vector3.forward), camera.aspect, out Vector2 z));
+        Assert.AreEqual(0f, z.x, 1e-3f);
+        Assert.Greater(z.y, 0.99f, "앞(+z) = 화면 위");
+    }
+
+    [Test]
+    public void 오버레이_캔버스는_스타버스트_화이트아웃_스미어만_그린다()
+    {
+        Assert.IsTrue(InterruptHitFlashRules.OverlayDraws(InterruptHitFlashStage.Starburst));
+        Assert.IsTrue(InterruptHitFlashRules.OverlayDraws(InterruptHitFlashStage.Whiteout));
+        Assert.IsTrue(InterruptHitFlashRules.OverlayDraws(InterruptHitFlashStage.Smear));
+        Assert.IsFalse(InterruptHitFlashRules.OverlayDraws(InterruptHitFlashStage.Aberration), "⑤ 무지개 원 없음 — Volume 색수차만");
+        Assert.IsFalse(InterruptHitFlashRules.OverlayDraws(InterruptHitFlashStage.Settle), "⑥ 무지개 고리 없음");
+        Assert.IsFalse(InterruptHitFlashRules.OverlayDraws(InterruptHitFlashStage.None));
+    }
+
+    [Test]
+    public void 오너_상태가_시도의_공격_방향을_든다()
+    {
+        var dim = new FakeDim();
+        var owner = new InterruptOwnerPresentation(_settings, dim, dim);
+        Assert.AreEqual(Vector3.zero, owner.AttackDirection, "처음엔 모름");
+
+        owner.Predict(InterruptAttemptForecast.Strong, null, 0f, Vector3.right);
+        Assert.AreEqual(Vector3.right, owner.AttackDirection, "근접 = 시전 방향 / 대쉬 = 대시 방향(입력 순간 예측이 받은 값)");
+        Assert.IsFalse(owner.Predict(InterruptAttemptForecast.Strong, null, 0.05f, Vector3.forward), "결론 전 중복 입력");
+        Assert.AreEqual(Vector3.right, owner.AttackDirection, "무시한 입력은 방향을 바꾸지 않는다");
+
+        owner.ServerStarted(9, SlowMotionPurpose.Success, true, 0.2f);
+        Assert.IsTrue(owner.SuccessDimmed);
+        Assert.AreEqual(Vector3.right, owner.AttackDirection, "성공 사건 순간에도 그 시도의 방향");
+    }
+
+    // ─── §16 월드 섬광 실시간 상한·라이트 ───
+
+    // 실시간 1/60초 프레임으로 시계를 돌려 끝난 실시간을 잰다. timeScaleAt = 실시간 → 그 프레임 Time.timeScale.
+    private static float RunClock(float effectLength, float cap, System.Func<float, float> timeScaleAt, out InterruptHitFlashVfxClock clock)
+    {
+        const float Dt = 1f / 60f;
+        clock = default;
+        clock.Begin(effectLength, cap);
+        float real = 0f;
+        for (int i = 0; i < 600 && clock.Running; i++)
+        {
+            float scale = timeScaleAt(real);
+            clock.Advance(Dt * scale, Dt);
+            real += Dt;
+        }
+
+        return real;
+    }
+
+    [Test]
+    public void 월드_섬광은_스케일_시간이어도_실시간_상한_안에_끝난다()
+    {
+        // 성공 슬로우 0.25 — 상한 없으면 0.45 / 0.25 = 1.8초 남는다.
+        float real = RunClock(0.45f, 0.3f, _ => 0.25f, out InterruptHitFlashVfxClock slow);
+        Assert.LessOrEqual(real, 0.3f + 1f / 60f + 1e-4f, "실시간 약 0.3s 상한");
+        Assert.GreaterOrEqual(slow.EffectElapsed, 0.45f - 1e-4f, "효과는 끝까지 돈다(빨리 감기)");
+        Assert.IsFalse(slow.CutByCap);
+
+        // 히트스톱(0.02) 0.05s 뒤 슬로우 0.25 — 시간 배율이 바뀌어도 남은 몫을 다시 나눈다.
+        real = RunClock(0.45f, 0.3f, t => t < 0.05f ? 0.02f : 0.25f, out InterruptHitFlashVfxClock hitStop);
+        Assert.LessOrEqual(real, 0.3f + 1f / 60f + 1e-4f);
+        Assert.GreaterOrEqual(hitStop.EffectElapsed, 0.45f - 1e-4f);
+    }
+
+    [Test]
+    public void 월드_섬광_슬로우가_없으면_원래_빠르기()
+    {
+        float speed = 0f;
+        var clock = default(InterruptHitFlashVfxClock);
+        clock.Begin(0.2f, 0.3f);
+        float real = 0f;
+        while (clock.Running)
+        {
+            speed = Mathf.Max(speed, clock.Advance(1f / 60f, 1f / 60f));
+            real += 1f / 60f;
+        }
+
+        Assert.AreEqual(1f, speed, 1e-5f, "상한 안에 끝나면 배속 1(느려지지도 빨라지지도 않음)");
+        Assert.AreEqual(0.2f, real, 1f / 60f + 1e-4f);
+
+        clock.Begin(0.45f, 0f);
+        Assert.AreEqual(1f, clock.Advance(0.25f / 60f, 1f / 60f), "상한 0 = 상한 없음");
+    }
+
+    [Test]
+    public void 시간이_멈추면_상한에서_잘린다()
+    {
+        float real = RunClock(0.45f, 0.3f, _ => 0f, out InterruptHitFlashVfxClock frozen);
+        Assert.LessOrEqual(real, 0.3f + 1f / 60f + 1e-4f);
+        Assert.IsTrue(frozen.CutByCap, "남은 입자는 지운다");
+    }
+
+    [Test]
+    public void 라이트_번쩍_곡선_시간에서_세기()
+    {
+        AnimationCurve linear = AnimationCurve.Linear(0f, 1f, 1f, 0f);
+        Assert.AreEqual(0f, InterruptEffectLight.Pulse(linear, 10f, -0.01f, 0.25f), "시작 전");
+        Assert.AreEqual(10f, InterruptEffectLight.Pulse(linear, 10f, 0f, 0.25f), 1e-4f, "섬광 순간 = 최대");
+        Assert.AreEqual(5f, InterruptEffectLight.Pulse(linear, 10f, 0.125f, 0.25f), 1e-4f);
+        Assert.AreEqual(0f, InterruptEffectLight.Pulse(linear, 10f, 0.25f, 0.25f), "끝 = 0(꺼짐)");
+        Assert.AreEqual(0f, InterruptEffectLight.Pulse(linear, 10f, 0f, 0f), "길이 0 = 라이트 없음");
+        Assert.AreEqual(0f, InterruptEffectLight.Pulse(AnimationCurve.Constant(0f, 1f, -1f), 10f, 0.1f, 0.25f), "음수 곡선 = 0");
+    }
+
+    private InterruptHitFlashVfx NewWorldVfx()
+    {
+        var go = Track(new GameObject("WorldFlash"));
+        go.AddComponent<ParticleSystem>();
+        return go.AddComponent<InterruptHitFlashVfx>();
+    }
+
+    [Test]
+    public void 적중_지점_라이트는_섬광_순간_켜져_곡선대로_꺼진다()
+    {
+        InterruptHitFlashVfx vfx = NewWorldVfx();
+        float peak = new SerializedObject(vfx).FindProperty("lightIntensity").floatValue;
+        vfx.Play(Target, 2f);
+
+        Light light = vfx.HitLight;
+        Assert.IsNotNull(light);
+        Assert.AreEqual(LightType.Point, light.type);
+        Assert.AreEqual(LightShadows.None, light.shadows, "그림자 기본 끔");
+        Assert.AreEqual(Target, light.transform.position, "적중 지점");
+        Assert.AreEqual(2f * new SerializedObject(vfx).FindProperty("lightRange").floatValue, light.range, 1e-4f, "반경 × 루트 스케일");
+        Assert.IsTrue(light.enabled);
+        Assert.AreEqual(peak, light.intensity, 1e-4f, "섬광 순간 = 최대");
+
+        float last = light.intensity;
+        for (float t = 0f; t < vfx.LightDuration - 0.02f; t += 0.02f)
+        {
+            vfx.Tick(0.02f, 0.005f);
+            Assert.LessOrEqual(light.intensity, last + 1e-4f, $"줄어든다 {t}");
+            last = light.intensity;
+        }
+
+        vfx.Tick(0.05f, 0.0125f);
+        Assert.IsFalse(light.enabled, "~0.25s(실시간) 뒤 꺼짐 — 슬로우와 무관");
+    }
+
+    [Test]
+    public void 월드_섬광과_라이트는_재사용한다()
+    {
+        InterruptHitFlashVfx vfx = NewWorldVfx();
+        vfx.Play(Target, 1f);
+        Light first = vfx.HitLight;
+        int children = vfx.transform.childCount;
+
+        vfx.Play(Target + Vector3.right, 1f);
+        Assert.AreSame(first, vfx.HitLight, "두 번째 재생에 새 라이트 없음");
+        Assert.AreEqual(children, vfx.transform.childCount, "새 오브젝트 없음");
+        Assert.IsTrue(first.enabled, "다시 번쩍");
+
+        vfx.Stop();
+        Assert.IsFalse(first.enabled, "강제 리셋 = 라이트 끔");
+        Assert.IsFalse(vfx.Clock.Running);
+    }
+
     // ─── 순서·디렉터·프리팹·렌더러 ───
 
     [Test]
@@ -720,6 +939,7 @@ public sealed class InterruptHitFlashTests
         Assert.AreEqual(0.2f, so.FindProperty("hitFlashSettleDuration").floatValue, 1e-6f);
         foreach (string removed in new[] { "hitFlashBurstDuration", "hitFlashGlareDuration", "hitFlashInvertDuration", "hitFlashReturnDuration", "hitFlashSpeedLines" })
             Assert.IsNull(so.FindProperty(removed), removed + " — 옛 1~4단계 칸은 없앤다");
+        Assert.AreEqual(0.6f, so.FindProperty("hitFlashBlurStrength").floatValue, 1e-6f, "방사형 블러 강하게(§16)");
         Assert.AreEqual(1f, so.FindProperty("hitFlashWorldScale").floatValue, 1e-6f);
         Assert.AreEqual(1f, so.FindProperty("hitFlashHeightOffset").floatValue, 1e-6f);
         Assert.AreEqual(InterruptEffectTimeBase.Unscaled, director.HitFlashTimeBase, "진행기 기본 = 실시간 시계");
@@ -770,6 +990,28 @@ public sealed class InterruptHitFlashTests
 
         Assert.IsNotNull(horizontal);
         Assert.AreEqual(0f, Mathf.Repeat(horizontal.rotation, 180f), 1e-3f, "가장 긴 빛살 = 가로(아나모픽)");
+        Assert.GreaterOrEqual(horizontal.fallOff, 0.6f, "가로 빛살 끝이 서서히 흐려진다(완만한 감쇠, §16)");
+
+        // §16 — 딱딱한 흰 원판 대신 작은 부드러운 코어, 빛살 길이는 제각각(+ 무작위 다수).
+        var rayLengths = new HashSet<float>();
+        bool randomRays = false;
+        foreach (LensFlareDataElementSRP element in flare.elements)
+        {
+            bool round = Mathf.Abs(element.sizeXY.x - element.sizeXY.y) < 1e-3f;
+            if (round)
+            {
+                Assert.LessOrEqual(element.sizeXY.x * element.uniformScale, 1.2f, "코어는 작게");
+                Assert.GreaterOrEqual(element.fallOff, 0.4f, "코어는 부드럽게(가우시안에 가까운 감쇠)");
+                continue;
+            }
+
+            rayLengths.Add(element.sizeXY.x);
+            if (element.allowMultipleElement && element.distribution == SRPLensFlareDistribution.Random && element.count >= 8)
+                randomRays = true;
+        }
+
+        Assert.GreaterOrEqual(rayLengths.Count, 8, "빛살 길이 제각각");
+        Assert.IsTrue(randomRays, "무작위 회전·길이 빛살 다수");
 
         var aberration = AssetDatabase.LoadAssetAtPath<VolumeProfile>(AberrationProfilePath);
         Assert.IsTrue(aberration.TryGet(out ChromaticAberration ca) && ca.intensity.overrideState && ca.intensity.value > 0f, "색수차 오버라이드");
@@ -807,8 +1049,18 @@ public sealed class InterruptHitFlashTests
         Assert.IsNotNull(vfx);
         Assert.AreEqual(InterruptEffectTimeBase.Scaled, vfx.TimeBase, "기본 스케일 — 성공 슬로우를 따라 느리게 터진다");
 
+        Assert.AreEqual(0.3f, vfx.RealTimeCap, 1e-6f, "실시간 상한 0.3s(§16)");
+        Assert.AreEqual(0.25f, vfx.LightDuration, 1e-6f, "라이트 ~0.25s(§16)");
+        Assert.IsNull(prefab.GetComponentInChildren<Light>(true), "라이트는 프리팹에 두지 않고 첫 재생 때 한 번 만든다");
+
         ParticleSystem[] systems = prefab.GetComponentsInChildren<ParticleSystem>(true);
-        Assert.GreaterOrEqual(systems.Length, 4, "중심·번짐·광선·링(+불티)");
+        Assert.AreEqual(3, systems.Length, "중심·파란 번짐·불티 — 바퀴살 광선·고리 없음(§16)");
+        foreach (Transform child in prefab.GetComponentsInChildren<Transform>(true))
+        {
+            Assert.AreNotEqual("Rays", child.name);
+            Assert.AreNotEqual("Ring", child.name);
+        }
+
         foreach (ParticleSystem system in systems)
         {
             ParticleSystem.MainModule main = system.main;

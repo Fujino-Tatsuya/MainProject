@@ -103,7 +103,7 @@ Shader "Hidden/Rendering/DarkAdaptation"
 
             float4 _HitFlashBlur;   // xy=중심(뷰포트 0~1), z=세기(중심까지 거리 중 샘플이 덮는 비율 [0, 1])
 
-            #define BLUR_SAMPLES 12
+            #define BLUR_SAMPLES 16   // §16 강한 블러(칸 0.6)에서 계단이 덜 보이게
 
             half4 FragBlur(Varyings input) : SV_Target
             {

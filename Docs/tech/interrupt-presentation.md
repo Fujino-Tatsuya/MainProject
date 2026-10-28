@@ -2,6 +2,8 @@
 
 > 🔹 할 일 132(2026-10-28, 브랜치 `feature/InterruptPresentation2`): 시도를 **예측 3상태(대상 없음/약/강)** 로 나누고, 강 시도에 **오너 암전·빛 모임**,
 > 성공에 **적중 섬광 ②~⑥ 5단계**(§15 재구성 — 스타버스트·화이트아웃·스미어·색수차 블러·가라앉음) 를 얹었다. 흐름 [§0](#0-132-체계--예측-3상태강약오너-암전빛-모임적중-섬광-할-일-132) 이 이 문서의 맨 앞 사실이다.
+> 🔹 §16 퀄리티 수정(사용자 Play 녹화 분석): 섬광이 딱딱한 도형처럼 보이던 것 — 부드러운 코어·제각각 빛살·얇은 고리, 화이트아웃 0.75·실루엣 비침, 스미어 = 공격 방향,
+> 무지개 원 제거, 월드 섬광 = 빛 덩어리·실시간 0.3s 상한, 섬광 순간 블룸 최대, **실제 Point Light 2개**(적중 지점·빛 모임 소켓) — [§0.9](#09-16-퀄리티-수정--라이트스미어-방향렌더-판단).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
 > 🔹 스위치 10칸(디렉터): 132 단계 6 부터 **A1 히트스톱·A2 암순응·A3 오너 줌·A4 성공 이펙트 칸 = 켬**, B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
@@ -68,7 +70,8 @@
 | 오너 암전(마스크) | ✓ 강 예측 때만 | — | 칸 없음(§0.6) |
 | 빛 모임(월드) | ✓ 입력 순간 강 예측 | ✓ 서버 강 시도 슬로우 받을 때 | 칸 없음 |
 | 섬광 화면 효과 ②~⑥(오버레이·렌즈 플레어·방사형 블러·색수차·블룸 Volume) | ✓ 성공 순간 오너 암전이 켜져 있었을 때(= 강 시도 성공) | — | 칸 없음 |
-| 월드 섬광(적중 지점 파랑·흰 코어 + 블룸) | ✓ 섬광 순간(⑤ 시작) | ✓ 섬광 순간 | 칸 없음 |
+| 월드 섬광(적중 지점 파랑·흰 빛 덩어리 + 블룸 + 적중 지점 Point Light) | ✓ 섬광 순간(⑤ 시작) | ✓ 섬광 순간 | 칸 없음 |
+| 빛 모임 소켓 Point Light(차지 동안 상승, Hit 에서 끔) | ✓ 빛 모임과 같이 | ✓ 빛 모임과 같이 | 칸 없음 |
 | 휘도 암순응 | 화면 효과가 돌았으면 없음(두 번 어두워짐 방지) · 약 시도 성공이면 self 강도 | others 강도(0.35), 섬광 순간 | A2 |
 | 성공 이펙트 칸 casterFx/targetFx | ✓ | ✓ | A4 |
 
@@ -83,13 +86,15 @@
 | 오너 암전 걷힘(예측 빗나감·실패·판정 전 종료) | 0.2s | 실시간(고정) | 디렉터 `ownerDimOutDuration` |
 | 카메라 줌 블렌드 | — | 실시간(고정) | `SlowMotionOwnerZoom` |
 | 빛 모임 파티클 | 파티클 수명 | **스케일**(기본) | `FX_InterruptLightGather` › `InterruptLightGatherVfx.timeBase` |
-| ② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(아나모픽 가로 빛살 최장) + 푸른 충격파 고리 · 0 → 0.067 | 0.067(2f) | **진행기 시계**(기본 실시간) | 디렉터 `hitFlashStarburstDuration` |
-| ③ 화이트아웃 — 화면 전체 밝은 회청색 + 방사형 블러(유일하게 화면을 덮음) · 0.067 → 0.1 | 0.033(1f) | 진행기 시계 | `hitFlashWhiteoutDuration` |
-| ④ 스미어 — 검정 위 오너·대상·빔(암전 남김 영역)이 흰 덩어리로 방향 블러 · 0.1 → 0.133 · 끝 = **섬광 순간** | 0.033(1f) | 진행기 시계 | `hitFlashSmearDuration` |
-| 섬광 순간 = ②+③+④ = ⑤ 시작 — 오너 암전 끔 · 월드 섬광 시작 · 팀원 암순응 시작 | **0.133** | 진행기 시계 | 계산값(따로 칸 없음) |
-| ⑤ 색수차 블러 — 실제 화면 + 방사형 블러 + 무지개 색수차 + 블룸 상승 · 0.133 → 0.233 | 0.1(3f) | 진행기 시계 | `hitFlashAberrationDuration` |
-| ⑥ 가라앉음 — 블룸 덩어리 + 무지개 충격파 고리, 블러·색수차 → 0 · 0.233 → **0.433 끝** | 0.2(6f) | 진행기 시계 | `hitFlashSettleDuration` |
-| 월드 섬광 파티클 | 파티클 수명 | **스케일**(기본) | `FX_InterruptHitFlash` › `InterruptHitFlashVfx.timeBase` |
+| 빛 모임 소켓 라이트 상승 | 0.5s 에 최대, Hit 까지 유지 | 빛 모임과 같은 시계(스케일) | `FX_InterruptLightGather` › `lightRiseDuration`·`lightRiseCurve` |
+| ② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(부드러운 코어 + 길이 제각각 빛살, 아나모픽 가로 빛살 최장·끝 흐림) + 얇고 흐린 푸른 고리 · 0 → 0.067 | 0.067(2f) | **진행기 시계**(기본 실시간) | 디렉터 `hitFlashStarburstDuration` |
+| ③ 화이트아웃 — 화면 전체 밝은 회청색(0.75) + 강한 방사형 블러, 오너·대상 블러 실루엣이 비침 · 0.067 → 0.1 | 0.033(1f) | 진행기 시계 | `hitFlashWhiteoutDuration` |
+| ④ 스미어 — 검정 위 오너·대상·빔(암전 남김 영역)을 키워 **공격 방향**으로 늘인 흰 덩어리 · 0.1 → 0.133 · 끝 = **섬광 순간** | 0.033(1f) | 진행기 시계 | `hitFlashSmearDuration` |
+| 섬광 순간 = ②+③+④ = ⑤ 시작 — 오너 암전 끔 · 월드 섬광·적중 지점 라이트 시작 · 팀원 암순응 시작 | **0.133** | 진행기 시계 | 계산값(따로 칸 없음) |
+| ⑤ 색수차 블러 — 실제 화면 + 방사형 블러 + Volume 색수차(가장자리) + 블룸 최대 · 0.133 → 0.233 | 0.1(3f) | 진행기 시계 | `hitFlashAberrationDuration` |
+| ⑥ 가라앉음 — 블룸 덩어리가 가라앉음, 블러·색수차 → 0 · 0.233 → **0.433 끝** | 0.2(6f) | 진행기 시계 | `hitFlashSettleDuration` |
+| 월드 섬광 파티클 | 파티클 수명(최장 0.45) — **실시간 0.3s 상한** | **스케일**(기본) + 상한 넘으면 배속 | `FX_InterruptHitFlash` › `InterruptHitFlashVfx.timeBase`·`realTimeCap` |
+| 적중 지점 라이트 | 0.25s(곡선) | **실시간** | `FX_InterruptHitFlash` › `lightDuration`·`lightCurve` |
 
 길이는 레퍼런스 영상(30fps) 프레임 수(괄호 f). 단계별 화면 효과 세기(`InterruptHitFlashRules.Look`, 0~1 × 칸 최대값):
 
@@ -98,8 +103,8 @@
 | ② | 1 → 0.6 | 0 | 0 | 0 | 플레어 층 + 푸른 고리(가산) |
 | ③ | 0 | **1** | 0 | 0 | 회청색 화이트아웃(덮음) |
 | ④ | 0 | 0 | 0 | 0 | 스미어 한 장(덮음) |
-| ⑤ | 0 | 0.8 → 0.6 | 1 | 0 → 1(상승) | 없음 |
-| ⑥ | 0 | 0.6 → 0 | 1 → 0 | 1 → 0(끝까지 남다가 가라앉음) | 무지개 고리(가산) |
+| ⑤ | 0 | 0.8 → 0.6 | 1 | **1**(섬광 순간부터 최대 — 코어가 번짐, §16) | 없음(캔버스 끔) |
+| ⑥ | 0 | 0.6 → 0 | 1 → 0 | 1 → 0(끝까지 남다가 가라앉음) | 없음(캔버스 끔 — §16 무지개 고리 제거) |
 
 - **진행기 시계** = 디렉터 `hitFlashTimeBase`(기본 **실시간** — 히트스톱·슬로우와 무관하게 섬광 순간 0.133s·끝 0.433s). 섬광 순간은 진행기가 한 번 알리고(시간표 하나) 디렉터가 그 순간 오너 암전 끔·월드 섬광·암순응을
   같은 프레임에 튼다 — 오너 상태 기계는 따로 시간을 재지 않는다(`InterruptOwnerPresentation.SuccessFlashMoment`). 진행 중에 칸을 바꾸면 다음 성공부터.
@@ -130,7 +135,7 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 | `hitFlashOverlayMaterial` | `M_InterruptHitFlashOverlay` | 각 피어 | 참조 — 비우면 오버레이 그림 없음(플레어·블러·Volume 은 돈다) |
 | `hitFlashLensFlare` | `LF_InterruptHitFlashStarburst` | 각 피어 | 참조 — 비우면 ② 플레어 없음 |
 | `hitFlashFlareIntensity` · `hitFlashFlareScale` | 1 · 1 | 각 피어 | `[DataTableIgnore]` |
-| `hitFlashBlurStrength` | 0.35(③ 최대 — 픽셀에서 적중 지점까지 거리 중 번지는 비율) | 각 피어 | `[DataTableIgnore]` |
+| `hitFlashBlurStrength` | 0.6(③ 최대 — 픽셀에서 적중 지점까지 거리 중 번지는 비율, §16 강하게 0.35 → 0.6·샘플 12 → 16) | 각 피어 | `[DataTableIgnore]` |
 | `hitFlashAberrationProfile` · `hitFlashBloomProfile` | `VP_InterruptHitFlash_Aberration` · `VP_InterruptHitFlash_Bloom` | 각 피어 | 참조 — 비우면 그 Volume 없음 |
 | `hitFlashWorldVfx` | `FX_InterruptHitFlash` | 각 피어 | 참조 — 비우면 월드 섬광 없음 |
 | `hitFlashWorldScale` · `hitFlashHeightOffset` | 1 · 1m | 각 피어 | `[DataTableIgnore]` |
@@ -163,17 +168,22 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 - 대쉬 잔상: SVN `DashAfterimage.cs` 가 Ghost 생성 때 리터럴 `1u << 4` 를 더한다(SVN 커밋 대기 — §5).
 
 **적중 섬광 오너 화면 효과**(할 일 132 §15 — `InterruptHitFlashOverlay` 하나가 출력, 오너 화면에서만):
-- **오버레이 캔버스**(②③④⑥ 그림) = 암전 덮개 바로 위 캔버스(short.MaxValue − 1). 미리 곱한 알파 섞기 — ②⑥ 는 가산(배경 암전 그대로), ③④ 는 덮음.
-  ④ 스미어는 **암전 덮개 RT**(`DarkAdaptationState.MaskCoverTarget`, 알파 = 1 − 남김)를 방향을 따라 12번 읽어 남김 영역(오너·대상·빛 모임)을 흰 덩어리로 번지게 한다.
-- **렌즈 플레어**(②) = URP Lens Flare (SRP) — 적중 지점에 `LensFlareComponentSRP` 하나(첫 사용 때 생성, 가림 판정·거리 감쇠 끔) + 에셋 `LF_InterruptHitFlashStarburst`(원형 요소 13개 — 가로 빛살 길이 16·세로 6·대각 4.5·잔 빛살 2.8·코어, 베이지 `(1, 0.9, 0.74)`, 텍스처 없음).
+- **오버레이 캔버스**(②③④ 그림, ⑤⑥ 은 캔버스 끔 — `InterruptHitFlashRules.OverlayDraws`) = 암전 덮개 바로 위 캔버스(short.MaxValue − 1). 미리 곱한 알파 섞기 — ② 는 가산(배경 암전 그대로), ③④ 는 덮음.
+  ② 플레어 층은 `1 − e^(−x·_FlareGain)` 로 부드럽게 포화(HDR 세기가 1 에서 잘려 딱딱한 원판이 되지 않게), 고리는 얇게(`_RingWidth` 0.01 → 퍼지며 3배로 흐려짐)·`_RingIntensity` 0.6·(1−t)² 로 사라짐.
+  ③ 화이트아웃 불투명도 `_WhiteoutOpacity` **0.75** — 덮개 RT 남김 영역을 적중 지점 쪽으로 8번 번지게 읽어(`_WhiteoutSilhouetteBlur` 0.35) 그 자리를 `_WhiteoutSilhouette` 0.6 만큼 덜 덮는다 → 아래 블러 걸린 오너·대상이 흐린 실루엣으로 비친다.
+  ④ 스미어는 **암전 덮개 RT**(`DarkAdaptationState.MaskCoverTarget`, 알파 = 1 − 남김)를 공격 방향 반대로 12번(뒤 25%·앞 100%) 읽되 매번 상하좌우 팽창(`_SmearGrow` 0.018)해 최댓값을 모은다 → 남김 영역(오너·대상·빛 모임)이 크고 하얀 덩어리로 공격 방향으로 늘어난다(`_SmearLength` 0.22).
+  방향 = 런타임 `_SmearAxis`(§0.9), 모르면 재질 `_SmearDirection`.
+- **렌즈 플레어**(②) = URP Lens Flare (SRP) — 적중 지점에 `LensFlareComponentSRP` 하나(첫 사용 때 생성, 가림 판정·거리 감쇠 끔) + 에셋 `LF_InterruptHitFlashStarburst`(원형 요소 13개, 베이지 `(1, 0.9, 0.74)`, 텍스처 없음 —
+  §16: 가로 빛살 16(감쇠 0.75 = 끝이 서서히 흐림)·세로 4.2·대각 5/3.4/4.4/2.9·잔 빛살 2.1/3.3/1.7/2.6/1.4 + **무작위 빛살 16개**(요소 하나 Random 분포, 회전·길이 ±55%·세기 ±50%, seed 7) · 코어 2.2 원판(감쇠 0.05) → **0.9·감쇠 0.55**(작고 부드러운 코어)).
   카메라 컬러는 암전 덮개(HUD 위 캔버스)에 가려지므로 `DarkAdaptationFeature` 의 **플레어 층 패스**(`FlareLayerPassName`, AfterRenderingPostProcessing, 언세이프 패스)가
   켜진 플레어만 외부 RT(ARGBHalf 화면 크기, 첫 사용 1회·크기 바뀔 때만 다시)에 `LensFlareCommonSRP.DoLensFlareDataDrivenCommon` 으로 그리고, 오버레이가 덮개 위에 더한다.
   셰이더 = 렌더러 기능 칸 `_lensFlareShader`(URP `Hidden/Universal Render Pipeline/LensFlareDataDriven`, PC·Mobile 렌더러 둘 다 연결).
   → URP 에셋의 `Data Driven Lens Flare`(PC_RPAsset **꺼짐** · Mobile_RPAsset 켜짐)와 **무관하게** 돈다 — 켜는 변경 불필요. Mobile 은 URP 자체 플레어도 카메라 컬러에 그리지만 ② 동안 암전 덮개 아래라 안 보이고 ③ 부터 컴포넌트를 끈다.
 - **방사형 블러**(③⑤⑥) = `DarkAdaptationFeature` 패스 2 `HitFlashRadialBlur`(같은 `_shader`) — BeforeRenderingPostProcessing, 휘도·마스크 패스 뒤.
-  카메라 컬러(HDR)를 적중 지점 쪽으로 12번 겹쳐 읽는다 → 뒤의 Bloom·색수차(후처리)가 블러 위에 걸린다. **HUD 는 블러 밖**(오버레이 캔버스라 그 위에 그려진다).
+  카메라 컬러(HDR)를 적중 지점 쪽으로 16번 겹쳐 읽는다 → 뒤의 Bloom·색수차(후처리)가 블러 위에 걸린다. **HUD 는 블러 밖**(오버레이 캔버스라 그 위에 그려진다).
 - **색수차·블룸**(⑤⑥) = 이 출력이 만든 전역 `Volume` 둘(우선순위 **1000** — 씬 전역 Volume 위, 기본 레이어 = 카메라 Volume 마스크 Default) 의 **가중치만** 움직인다.
-  가중치 w 면 씬 값 → 프로필 값으로 w 만큼 섞인다(블룸 = 씬 블룸에서 intensity 3·threshold 0.8 쪽으로 상승). 프로필 에셋·씬 Volume 은 건드리지 않는다.
+  가중치 w 면 씬 값 → 프로필 값으로 w 만큼 섞인다(블룸 = 씬 블룸에서 intensity **6**·threshold 0.8 쪽으로 — 섬광 순간 가중치 1). 프로필 에셋·씬 Volume 은 건드리지 않는다.
+  색수차는 URP 후처리라 원래 화면 가장자리에서 번진다 — §16 에서 오버레이 무지개 원을 없애고 이것만 남겼다(세기 1 → **0.6**, 가장자리 살짝).
   재생 첫 프레임 가중치 스냅샷(`InterruptHitFlashVolumeSnapshot`) → 끝·강제 리셋에 그 값으로 복구(가중치 0 이면 Volume 꺼 둠).
 - 평소 비용 0 — 블러 세기 0·플레어 대상 없음이면 패스를 넣지 않는다(`DarkAdaptationModes.Select` 5칸판).
 
@@ -182,10 +192,10 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 | 연출 | 에셋 | 셰이더 | 덮어쓸 텍스처 칸 |
 |---|---|---|---|
 | 빛 모임(흰 빛 기둥 + 모여드는 입자 + 중심 빛) | `LightGather/FX_InterruptLightGather.prefab` · `M_InterruptLightGather_Pillar`·`_Mote` | `BeaverLobby/VFX/InterruptLightGather`(가산 언릿, HDR `_Color` → 블룸) | 재질마다 `_OverrideTex` |
-| 월드 섬광(섬광 순간 — 흰 중심·파란 번짐·광선·링·불티) | `HitFlash/FX_InterruptHitFlash.prefab` · `M_InterruptHitFlash_Core`·`_Rays`·`_Ring` | `BeaverLobby/VFX/InterruptHitFlash` | 재질마다 `_OverrideTex` |
-| 섬광 오버레이(②③④⑥, 오너 화면) | `HitFlash/M_InterruptHitFlashOverlay.mat` | `BeaverLobby/UI/InterruptHitFlashOverlay` | `_StarburstTex`(② 가산) · `_WhiteoutTex`(③) · `_SmearTex`(④) + `_FlareGain` · `_RingColor` · `_WhiteoutColor`·`_WhiteoutOpacity`·`_StreakCount` · `_SmearColor`·`_SmearBackColor`·`_SmearDirection`·`_SmearLength` · `_RainbowIntensity` |
+| 월드 섬광(섬광 순간 — 흰 중심·파란 번짐·불티, 전부 가우시안 빛 덩어리 + 적중 지점 Point Light) | `HitFlash/FX_InterruptHitFlash.prefab` · `M_InterruptHitFlash_Core`(§16 광선 `_Rays`·고리 `_Ring` 자식·재질 삭제) | `BeaverLobby/VFX/InterruptHitFlash`(`_Falloff` 4 — 가우시안 날카로움) | 재질마다 `_OverrideTex` |
+| 섬광 오버레이(②③④, 오너 화면) | `HitFlash/M_InterruptHitFlashOverlay.mat` | `BeaverLobby/UI/InterruptHitFlashOverlay` | `_StarburstTex`(② 가산) · `_WhiteoutTex`(③) · `_SmearTex`(④) + `_FlareGain` · `_RingColor`·`_RingIntensity`·`_RingWidth`·`_RingRadius` · `_WhiteoutColor`·`_WhiteoutOpacity`·`_WhiteoutSilhouette`·`_WhiteoutSilhouetteBlur`·`_StreakCount` · `_SmearColor`·`_SmearBackColor`·`_SmearDirection`·`_SmearLength`·`_SmearGrow` |
 | ② 렌즈 플레어 | `HitFlash/LF_InterruptHitFlashStarburst.asset`(LensFlareDataSRP) | URP LensFlareDataDriven | 요소에 텍스처 칸(지금 없음 = 절차 원형) |
-| ⑤⑥ 색수차 · 블룸 | `HitFlash/VP_InterruptHitFlash_Aberration.asset`(ChromaticAberration 1) · `VP_InterruptHitFlash_Bloom.asset`(Bloom 3·threshold 0.8·scatter 0.75·옅은 파랑 틴트) | URP 후처리 | — |
+| ⑤⑥ 색수차 · 블룸 | `HitFlash/VP_InterruptHitFlash_Aberration.asset`(ChromaticAberration 0.6) · `VP_InterruptHitFlash_Bloom.asset`(Bloom 6·threshold 0.8·scatter 0.75·옅은 파랑 틴트) | URP 후처리 | — |
 
 - **덮어쓸 텍스처 사용법**: 재질 인스펙터에서 칸에 텍스처를 넣으면 셰이더 GUI 가 키워드를 켜 그 텍스처로 그린다(헬프 박스에 '덮어쓸 텍스처 사용' 표시). 비우면 절차 생성으로 돌아간다.
   파티클 셰이더는 텍스처 RGBA × `_Color` × 파티클 색, 오버레이는 화면 전체 UV 로 RGBA 그대로다. 상세: [handoff-interrupt-132-vfx.md](handoff-interrupt-132-vfx.md).
@@ -210,7 +220,38 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 - **플레어 층은 Play 미확인.** URP 내부 함수(`DoLensFlareDataDrivenCommon`)를 외부 RT 에 직접 부른다 — RT 상하 방향·플레어 크기(요소 sizeXY × 0.1 화면 단위)·세기는 Play 로 확인·튜닝한다.
   URP 버전이 바뀌면 그 함수 인자가 바뀔 수 있다(지금 17.3).
 - **⑥ 이후 블룸은 씬 Volume 값으로 돌아간다** — 섬광 Volume 은 가중치만이라 씬에 블룸이 없으면(활성 끔) ⑤⑥ 동안만 블룸이 생긴다.
-- 강도·색·단계 길이·이펙트 시간 기준·블룸 세기는 Play 튜닝 전 처음 값이다.
+- 강도·색·단계 길이·이펙트 시간 기준·블룸 세기는 Play 튜닝 전 처음 값이다. §16 값(플레어 요소·고리·화이트아웃·스미어·라이트 세기/반경)도 **Play 미확인** — §0.9.
+
+### 0.9 §16 퀄리티 수정 — 라이트·스미어 방향·렌더 판단
+
+**적중 지점 Point Light**(`InterruptHitFlashVfx`, 월드 섬광과 같은 순간·모든 피어): 첫 재생 때 자식 `HitLight` 하나를 만들어 재사용(재생마다 생성 없음, 쉬는 동안 꺼짐 — 추가 라이트 슬롯을 차지하지 않음).
+섬광 순간 `lightIntensity` **12**(색 `(0.62, 0.8, 1)` 파랑·흰, 반경 `lightRange` **7m × 루트 스케일**, 그림자 `lightShadows` **끔**)로 번쩍 켜져 `lightDuration` **0.25s**(실시간) 동안 `lightCurve`(1 → 0.35@0.35 → 0)로 꺼진다. 강제 리셋 = 즉시 끔.
+**빛 모임 소켓 Point Light**(`InterruptLightGatherVfx`): 첫 재생 때 자식 `GatherLight` 하나(재사용). 차지 시작 0 → `lightRiseDuration` **0.5s**(빛 모임 시계, 기본 스케일) 동안 `lightRiseCurve`(EaseInOut)로 `lightIntensity` **3**(반경 2.5m, 색 `(0.85, 0.92, 1)`, 그림자 끔)까지 올라 유지, 정지(= 발동자 Hit·실패·리셋)에서 바로 끔.
+- 라이트 칸은 전부 **프리팹(이펙트 컴포넌트)** 칸 — 플레이어 Variant 를 건드리지 않는다(빛 모임 VFX 는 소켓이 첫 재생 때 플레이어 아래 한 번 만든다).
+- 렌더링 레이어 = 기본(비트 0 = 조명). 오너 암전 남김 비트 4 와 무관하게 모든 렌더러를 비춘다.
+
+**월드 섬광 실시간 상한**(`InterruptHitFlashVfxClock`): 파티클은 스케일 시간 그대로 두되, 프레임마다 '남은 효과 길이 ÷ 남은 실시간' 비율로 `simulationSpeed`(≥ 1)를 올려 `realTimeCap` **0.3s** 안에 끝낸다.
+성공 슬로우 0.25 에서 0.45s 짜리 빛 덩어리가 1.8s 남던 것 → 0.3s. 슬로우가 없거나 약해 원래 상한 안이면 배속 1(빨라지지 않음). 시간이 멈추면(스케일 0) 상한에서 남은 입자를 지운다. 0 = 상한 없음.
+
+**④ 스미어 방향 출처** = **오너 상태**(`InterruptOwnerPresentation.AttackDirection`) — 입력 순간 예측(`PlayerSkillController.PredictOwnerInterrupt`)이 받은 공격 방향을
+`Director.LocalOwnerAttempt(…, attackDirection)` → `Predict(…, attackDirection)` 로 그 시도에 저장한다(근접 = 요청 RPC 에 싣는 시전 방향, 대쉬 = 대시 방향 — 대상 판정 ③과 같은 값).
+성공 `Started` 에 디렉터가 `HitFlash.BeginOwnerOverlay(적중 지점, AttackDirection, now)` 로 넘기고, 출력이 적중 지점과 '적중 지점 + 방향 1m' 를 `Camera.main` 뷰포트로 투영해
+화면 방향(화면 높이 단위, `InterruptHitFlashRules.TryScreenDirection`)을 `_SmearAxis` 에 넣는다. 성공 사건(서버 `Started`)에는 방향이 실려 오지 않는다(새 RPC·필드 없음) —
+오버레이는 오너 화면에서만 돌고 오너는 자기 입력 방향을 이미 알기 때문. 카메라 뒤·카메라 축과 나란한 방향·모름(0) = 재질 기본 방향.
+
+**URP 추가 라이트 한도**(조사 2026-10-28):
+| | PC (`PC_RPAsset` + `PC_Renderer`) | Mobile (`Mobile_RPAsset` + `Mobile_Renderer`) |
+|---|---|---|
+| 렌더링 경로 | **Forward+** (`m_RenderingMode: 2`) | **Forward** (`m_RenderingMode: 0`) |
+| 추가 라이트 | 픽셀(`m_AdditionalLightsRenderingMode: 1`) · 물체당 한도 4 는 Forward+ 에서 **무시**(클러스터, 화면 전체 가시 라이트 한도 내) | 픽셀 · **물체당 4개** — 이미 라이트 4개 받는 물체는 섬광 라이트 중 하나가 빠질 수 있다(가까운·밝은 순) |
+| 추가 라이트 그림자 | 지원(켬) — 섬광 라이트는 기본 끔 | 미지원 — 칸을 켜도 그림자 없음 |
+| 라이트 레이어 | 켬(`m_SupportsLightLayers: 1`) — 라이트·렌더러 비트 0 이 겹쳐야 비춤 | 켬 |
+영향: 섬광·빛 모임 라이트는 짧게(0.25s·차지 동안)만 켜지고 쉬는 동안 `enabled = false` 라 평소 비용 0. 다인원이 동시에 간파하면 피어 수만큼 동시 라이트(최대 플레이어 수 × 2).
+
+**오너 암전 중 남긴 오브젝트가 라이트를 받나** — **받는다.** 마스크 남김 패스는 비트 4 렌더러를 원래 머티리얼(`UniversalForward`)로 `CreateDrawingSettings(… lightData …)`·전역 텍스처/상태 그대로 다시 그리므로
+라이팅 경로가 같다(Forward+ 클러스터 버퍼·Forward 물체당 라이트 인덱스 모두 같은 프레임 값). 단 그 재그리기는 **덮개 알파(남김 모양)만** 만들고, 화면에 보이는 남김 픽셀은 원래 카메라 컬러다 —
+즉 오너·대상·빛 모임은 실제 라이트를 받은 모습 그대로 뚫린 구멍으로 보인다. 덮인 월드도 빛을 받지만 덮개에 가려 안 보인다.
+시간상: 빛 모임 라이트는 암전 동안 켜져 있어 오너·무기 주변만 밝히고(덮인 바닥은 안 보임), 적중 지점 라이트는 섬광 순간(= 암전 걷힘)에 켜져 걷힌 월드 전체를 비춘다.
 
 ## 1. 흐름 (132 이전 공통 경로 — 성공·실패·슬로우 배포)
 

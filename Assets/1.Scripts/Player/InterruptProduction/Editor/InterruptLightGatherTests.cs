@@ -378,6 +378,69 @@ public sealed class InterruptLightGatherTests
         Assert.IsFalse(InterruptLightGatherRules.ApplyOverrideKeyword(null));
     }
 
+    // ─── 소켓 라이트(§16) ───
+
+    private InterruptLightGatherVfx NewGatherVfx()
+    {
+        var go = Track(new GameObject("Gather"));
+        go.AddComponent<ParticleSystem>();
+        return go.AddComponent<InterruptLightGatherVfx>();
+    }
+
+    [Test]
+    public void 상승_곡선은_차지_동안_오르고_그_뒤_유지()
+    {
+        AnimationCurve linear = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+        Assert.AreEqual(0f, InterruptEffectLight.Rise(linear, 4f, -0.1f, 0.5f), "시작 전");
+        Assert.AreEqual(0f, InterruptEffectLight.Rise(linear, 4f, 0f, 0.5f));
+        Assert.AreEqual(2f, InterruptEffectLight.Rise(linear, 4f, 0.25f, 0.5f), 1e-5f);
+        Assert.AreEqual(4f, InterruptEffectLight.Rise(linear, 4f, 0.5f, 0.5f), 1e-5f);
+        Assert.AreEqual(4f, InterruptEffectLight.Rise(linear, 4f, 3f, 0.5f), 1e-5f, "차지가 길어도 꺼지지 않는다(끄는 쪽은 Hit)");
+        Assert.AreEqual(4f, InterruptEffectLight.Rise(linear, 4f, 0f, 0f), "길이 0 = 바로 최대");
+    }
+
+    [Test]
+    public void 빛_모임_라이트는_차지_동안_세지고_정지에서_꺼진다()
+    {
+        InterruptLightGatherVfx vfx = NewGatherVfx();
+        vfx.Play(null);
+        Light light = vfx.GatherLight;
+        Assert.IsNotNull(light, "첫 재생 때 만든다");
+        Assert.AreEqual(LightType.Point, light.type);
+        Assert.AreEqual(LightShadows.None, light.shadows, "그림자 기본 끔");
+        Assert.AreEqual(0f, light.intensity, "차지 시작 = 0");
+
+        vfx.TickLight(vfx.LightRiseDuration * 0.5f);
+        float half = light.intensity;
+        Assert.IsTrue(light.enabled);
+        Assert.Greater(half, 0f);
+        Assert.Less(half, vfx.LightIntensityPeak);
+
+        vfx.TickLight(vfx.LightRiseDuration);
+        Assert.AreEqual(vfx.LightIntensityPeak, light.intensity, 1e-4f, "최대에서 유지");
+
+        vfx.Stop();
+        Assert.IsFalse(light.enabled, "Hit(정지) = 바로 끔");
+        Assert.AreEqual(0f, light.intensity);
+        vfx.TickLight(1f);
+        Assert.IsFalse(light.enabled, "정지 뒤엔 다시 켜지지 않는다");
+    }
+
+    [Test]
+    public void 빛_모임_라이트는_재사용한다()
+    {
+        InterruptLightGatherVfx vfx = NewGatherVfx();
+        vfx.Play(null);
+        Light first = vfx.GatherLight;
+        int children = vfx.transform.childCount;
+        vfx.Stop();
+
+        vfx.Play(null);
+        Assert.AreSame(first, vfx.GatherLight, "두 번째 재생에 새 라이트 없음");
+        Assert.AreEqual(children, vfx.transform.childCount, "새 오브젝트 없음");
+        Assert.AreEqual(0f, vfx.GatherLight.intensity, "다시 0 에서 오른다");
+    }
+
     // ─── 프리팹 ───
 
     [Test]
@@ -418,6 +481,9 @@ public sealed class InterruptLightGatherTests
 
         var so = new SerializedObject(vfx);
         Assert.AreSame(vfx.GetComponent<ParticleSystem>(), so.FindProperty("root").objectReferenceValue);
+        Assert.Greater(vfx.LightIntensityPeak, 0f, "소켓 라이트 칸(§16)");
+        Assert.AreEqual(LightShadows.None, (LightShadows)so.FindProperty("lightShadows").enumValueIndex, "그림자 기본 끔");
+        Assert.IsNull(vfx.GetComponentInChildren<Light>(true), "라이트는 프리팹에 두지 않고 첫 재생 때 한 번 만든다");
 
         var renderers = vfx.GetComponentsInChildren<ParticleSystemRenderer>(true);
         Assert.GreaterOrEqual(renderers.Length, 2, "기둥 + 모여드는 입자");
