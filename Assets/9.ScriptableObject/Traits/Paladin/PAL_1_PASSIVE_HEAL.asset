@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 373410ab17bd61649b8252afc374b55d, type: 3}
+  m_Name: PAL_1_PASSIVE_HEAL
+  m_EditorClassIdentifier: Assembly-CSharp::PaladinTraitDefinition
+  id: PAL_1_PASSIVE_HEAL
+  displayName: "\uBD88\uAD74\uC758 \uD68C\uBCF5"
+  category: "\uD328\uC2DC\uBE0C \uAC15\uD654"
+  description: "\uD328\uC2DC\uBE0C\uC758 \uCCB4\uB825 <style=heal>\uD68C\uBCF5</style>\uB7C9\uC774
+    {healIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673742725264
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673742725264
+      type: {class: TraitHealEffect, ns: , asm: Assembly-CSharp}
+      data:
+        healIncrease: 0.25
+        overflowShareRange: 0
+        overflowTransferRatio: 1
