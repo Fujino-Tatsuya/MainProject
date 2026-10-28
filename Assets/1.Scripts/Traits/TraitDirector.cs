@@ -209,6 +209,14 @@ public sealed class TraitDirector : NetworkBehaviour
         int stale = RejoinMemory.Server.ClearTraits();
         if (stale > 0)
             Edit.Log($"{Tag} 디렉터 스폰 — 이전 특성 재합류 기록 {stale}건을 버린다.", this);
+
+        // 새 플레이 — 판을 넘어 살아 있는 플레이어의 특성 임시 상태(이중 출력 발수·다음 공격 강화·대상별 1회 기억)도 비운다(명세 §9).
+        IReadOnlyList<PlayerLifeCycleController> lives = PlayerLifeCycleController.Active;
+        for (int i = 0; i < lives.Count; i++)
+        {
+            if (lives[i] != null && lives[i].TryGetComponent(out PlayerTraitEffects effects))
+                effects.ClearTransientServer();
+        }
     }
 
     public override void OnNetworkDespawn()
