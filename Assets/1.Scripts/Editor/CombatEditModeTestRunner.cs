@@ -31,6 +31,7 @@ internal static class CombatEditModeTestRunner
         "^BossRaidRules", // BossRaidRulesTests — 레이드 변형 구간 예약·인원 HP·피해 상한(PLAN-boss-raid W1)
         "^BossAggro",    // BossAggroPolicyTests · BossAggroPolicyThreatTests
         "^BossThreat",   // BossThreatTableTests — 위협 어그로(PLAN-boss-aggro)
+        "^BossCrowdControl", // BossCrowdControlRulesTests — 보스·중간보스 상태별 넉백·기절·뇌진탕(할 일 134)
         "^BossCombo",    // BossComboPolicyTests — 콤보 후보·다음 타(PLAN-boss-combo)
         "^BossRelayRoster", // BossRelayRosterTests — 레이드 간파 릴레이 명단·잠금(PLAN-boss-raid-relay)
         "^BossChainCounter", // BossChainCounterRulesTests — 레이드 연쇄 간파 회차·순번·결과
