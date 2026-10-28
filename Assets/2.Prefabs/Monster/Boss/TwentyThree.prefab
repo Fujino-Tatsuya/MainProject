@@ -484,7 +484,7 @@ MonoBehaviour:
   effect: {fileID: 11400000, guid: ca4484519e927ed4ca1984de7759f364, type: 2}
   socket: {fileID: 6822614871550549647}
   offset: {x: 0, y: 0, z: 0}
-  scale: 3
+  scale: 1
   safetyTimeout: 5
 --- !u!1 &1700975306886457903
 GameObject:
