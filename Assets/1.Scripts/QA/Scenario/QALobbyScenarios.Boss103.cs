@@ -20,8 +20,9 @@ public static partial class QALobbyScenarios
     private static IEnumerator B103(QAScenarioContext ctx) => Boss103Flow(ctx, false);
 
     /// <summary>
-    /// 103 한 판 흐름. <paramref name="lobbySmoke"/> = 할 일 108 야간 QA(<see cref="Nightly108Id"/>) — 3인 집결 뒤 캐릭터를 고르기 전에
-    /// 로비 데모 점검(<see cref="NightlyLobbySmoke"/>)을 끼운다.
+    /// 103 한 판 흐름. <paramref name="lobbySmoke"/> = 할 일 108 야간 QA(<see cref="Nightly108Id"/>) — 할 일 130 부터 3인 집결 뒤
+    /// 로비 점검·선택대·출격 집결을 건너뛰고 맵 직행(<see cref="DirectLaunch130"/>, 단계 판정 <see cref="QABoss103Plan.LobbyStepsFor"/>).
+    /// 수동(B103)은 선택대 걷기 + 출격 집결 그대로.
     /// </summary>
     private static IEnumerator Boss103Flow(QAScenarioContext ctx, bool lobbySmoke)
     {
@@ -62,7 +63,9 @@ public static partial class QALobbyScenarios
             yield break;
         }
 
-        if (lobbySmoke)
+        // 할 일 130 — 야간은 로비 점검·선택대·출격 집결을 건너뛰고 맵 직행(호스트가 자리별 캐릭터를 서버 저장소에 넣는다).
+        QABoss103LobbySteps steps = QABoss103Plan.LobbyStepsFor(lobbySmoke);
+        if ((steps & QABoss103LobbySteps.LobbySmoke) != 0)
             yield return NightlyLobbySmoke(ctx);
 
         var ids = new List<ulong>();
@@ -71,23 +74,29 @@ public static partial class QALobbyScenarios
         int slot = QABoss103Plan.SlotOf(LocalId, ids);
         QABoss103Character character = cfg.CharacterForSlot(Mathf.Max(0, slot));
 
-        var picked = new QAFlag();
-        var pickNote = new StringBuilder();
-        yield return PickCharacter103(ctx, character, Mathf.Max(0, slot), ids.Count, picked, pickNote);
-        ctx.Check(picked.Value, $"103 캐릭터 고정(자리 {slot})", $"{character} → 로비 캐릭터 id {LocalCharacterId()} ({PrefabName(Roster(), LocalCharacterId())}) · {pickNote}");
-        if (!picked.Value)
+        if ((steps & QABoss103LobbySteps.PickCharacter) != 0)
         {
-            QABoss103Match.AbortBeforeMap(ctx, cfg, $"캐릭터 {character} 고정 실패 — {pickNote}");
-            yield break;
+            var picked = new QAFlag();
+            var pickNote = new StringBuilder();
+            yield return PickCharacter103(ctx, character, Mathf.Max(0, slot), ids.Count, picked, pickNote);
+            ctx.Check(picked.Value, $"103 캐릭터 고정(자리 {slot})", $"{character} → 로비 캐릭터 id {LocalCharacterId()} ({PrefabName(Roster(), LocalCharacterId())}) · {pickNote}");
+            if (!picked.Value)
+            {
+                QABoss103Match.AbortBeforeMap(ctx, cfg, $"캐릭터 {character} 고정 실패 — {pickNote}");
+                yield break;
+            }
         }
 
-        // dev 86 로비 — 준비 패드 대신 출격 집결 구역(Gather_Sortie)에 전원 5초 → 진행기가 메인 진입.
         var inMap = new QAFlag();
-        var sortieNote = new StringBuilder();
-        yield return Sortie103(ctx, Mathf.Max(0, slot), ids.Count, inMap, sortieNote);
+        var mapNote = new StringBuilder();
+        if ((steps & QABoss103LobbySteps.DirectLaunch) != 0)
+            yield return DirectLaunch130(ctx, cfg, ids, Mathf.Max(0, slot), inMap, mapNote);
+        else if ((steps & QABoss103LobbySteps.Sortie) != 0)
+            // dev 86 로비 — 준비 패드 대신 출격 집결 구역(Gather_Sortie)에 전원 5초 → 진행기가 메인 진입.
+            yield return Sortie103(ctx, Mathf.Max(0, slot), ids.Count, inMap, mapNote);
         if (!inMap.Value)
         {
-            QABoss103Match.AbortBeforeMap(ctx, cfg, $"맵 진입 실패 — {sortieNote}");
+            QABoss103Match.AbortBeforeMap(ctx, cfg, $"맵 진입 실패 — {mapNote}");
             yield break;
         }
         QABoss103Heartbeat.SetPhase("map");
@@ -213,6 +222,73 @@ public static partial class QALobbyScenarios
         dir.Normalize();
         dir = Quaternion.Euler(0f, QABoss103Plan.ArcAngle(slot, count), 0f) * dir;
         return station.Position + dir * (station.Radius * 0.7f);
+    }
+
+    /// <summary>
+    /// 할 일 130 야간 맵 직행 — 호스트는 자리별 캐릭터(<see cref="QABoss103Plan.TryMapSlotCharacterIds"/>, 선택대 요청과 같은 로스터 id)를
+    /// 서버 저장소(<see cref="ServerCharacterSelectionStore.Set"/> — 맵 스폰 <see cref="PlayerSpawnService"/> 가 읽는다)에 넣고
+    /// 진행기 <see cref="LobbyTrainingDirector.ServerLaunchMainForQA"/> 로 메인 진입. 클라는 걷지 않는다.
+    /// 결과는 내 맵 플레이어가 설 때까지(상한 <see cref="SortieMapTimeoutSeconds"/>). 로비 외형은 기본 캐릭터인 채 넘어간다(맵 스폰만 자리 캐릭터).
+    /// </summary>
+    private static IEnumerator DirectLaunch130(QAScenarioContext ctx, QABoss103Config cfg, List<ulong> ids, int slot, QAFlag ok, StringBuilder note)
+    {
+        ok.Value = false;
+        float started = Time.realtimeSinceStartup;
+        if (QALobbyFlow.IsServer)
+        {
+            CharacterRoster roster = Roster();
+            var rosterCharacters = new List<QABoss103Character?>();
+            if (roster != null)
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    QABoss103Character? c = null;
+                    if (roster.TryGetAvailableCharacter(i, out CharacterRoster.Entry e))
+                        foreach (QABoss103Character q in QABoss103Plan.PartyOrder)
+                            if (e.TutorialCharacter == ToTutorialCharacter(q))
+                                c = q;
+                    rosterCharacters.Add(c);
+                }
+            if (!QABoss103Plan.TryMapSlotCharacterIds(ids, cfg.CharacterForSlot, rosterCharacters, out List<QABoss103SlotPick> picks, out string failure))
+            {
+                note.Append($"자리 캐릭터 id 못 찾음 — {failure} · 로스터={(roster != null ? roster.name : "없음")}");
+                ctx.Fail("130 맵 직행(자리 캐릭터 저장)", note.ToString());
+                yield break;
+            }
+
+            var stored = new StringBuilder();
+            bool allStored = true;
+            foreach (QABoss103SlotPick p in picks)
+            {
+                ServerCharacterSelectionStore.Set(p.ClientId, p.CharacterId);
+                bool back = ServerCharacterSelectionStore.TryGet(p.ClientId, out int got) && got == p.CharacterId;
+                allStored &= back;
+                stored.Append(stored.Length > 0 ? ", " : "").Append($"자리{p.Slot} client{p.ClientId} {p.Character}=id{p.CharacterId}({PrefabName(roster, p.CharacterId)}){(back ? "" : " 읽기 불일치")}");
+                Debug.Log($"{QABoss103Plan.Tag} event=direct_store slot={p.Slot} client={p.ClientId} character={p.Character} id={p.CharacterId} readBack={(back ? "true" : "false")}");
+            }
+            ctx.Eye("130 자리별 저장 id", stored.ToString());
+
+            LobbyTrainingDirector d = LobbyTrainingDirector.Active;
+            bool launched = allStored && d != null && d.ServerLaunchMainForQA();
+            ctx.Check(launched, "130 맵 직행",
+                $"로비 점검·선택대·출격 집결 건너뜀 · {QABoss103Plan.FormatSlotPicks(picks)} · 진행기={(d != null ? "있음" : "없음")} · 저장 확인={allStored} · {LobbyStage103()}");
+            Debug.Log($"{QABoss103Plan.Tag} event=direct_launch ok={(launched ? "true" : "false")} {LobbyStage103()}");
+            if (!launched)
+            {
+                note.Append($"진행기 메인 진입 거절 — 진행기={(d != null ? "있음" : "없음")} 저장 확인={allStored} {LobbyStage103()}");
+                yield break;
+            }
+        }
+        else
+        {
+            ctx.Eye("130 맵 직행", $"자리 {slot} — 로비에서 걷지 않고 호스트 맵 진입 대기");
+        }
+
+        yield return ctx.Wait(() => QALobbyFlow.InMapWithPlayer, SortieMapTimeoutSeconds);
+        ok.Value = QALobbyFlow.InMapWithPlayer;
+        note.Append($"{Time.realtimeSinceStartup - started:F0}초 · scene={QAUtil.ActiveSceneName()} · {LobbyStage103()}");
+        Debug.Log($"{QABoss103Plan.Tag} event=direct_end slot={slot} ok={(ok.Value ? "true" : "false")} {QABoss103Plan.Token(note.ToString())}");
+        if (!ok.Value)
+            ctx.Fail("맵 진입(직행)", $"{SortieMapTimeoutSeconds:F0}초 안에 맵 플레이어 없음 — {note}", ctx.Shot("map_timeout"));
     }
 
     /// <summary>

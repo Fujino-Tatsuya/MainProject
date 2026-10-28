@@ -28,6 +28,38 @@ public enum QABoss103Character
     Gunner = 2,
 }
 
+/// <summary>할 일 130 — 한 판이 로비에서 밟는 단계(<see cref="QABoss103Plan.LobbyStepsFor"/>).</summary>
+[Flags]
+public enum QABoss103LobbySteps
+{
+    None = 0,
+    /// <summary>108 로비 데모 점검(스폰·카메라·스킬).</summary>
+    LobbySmoke = 1,
+    /// <summary>캐릭터 선택대로 걸어가 정식 요청.</summary>
+    PickCharacter = 2,
+    /// <summary>출격 집결 구역에 전원 모여 메인 진입.</summary>
+    Sortie = 4,
+    /// <summary>호스트가 자리별 캐릭터를 서버 저장소에 넣고 진행기 QA 진입으로 바로 맵.</summary>
+    DirectLaunch = 8,
+}
+
+/// <summary>할 일 130 — 자리 한 칸의 저장 대상(clientId·자리·캐릭터·로스터 id).</summary>
+public readonly struct QABoss103SlotPick
+{
+    public readonly ulong ClientId;
+    public readonly int Slot;
+    public readonly QABoss103Character Character;
+    public readonly int CharacterId;
+
+    public QABoss103SlotPick(ulong clientId, int slot, QABoss103Character character, int characterId)
+    {
+        ClientId = clientId;
+        Slot = slot;
+        Character = character;
+        CharacterId = characterId;
+    }
+}
+
 /// <summary>
 /// 할 일 103 3인 보스전 밸런싱 QA 의 순수 규칙(EditMode <c>QABoss103PlanTests</c>) — 판 종료 판정·30분 상한·시드 → 특성 선택·
 /// 파티 자리 → 캐릭터·판 기록 한 줄. Unity·네트워크 의존 없음.
@@ -135,6 +167,56 @@ public static class QABoss103Plan
         if (TryCharacterOfPrefab(actualPrefabName, out QABoss103Character actual) && actual == expected)
             return null;
         return $"자리 {slot} 캐릭터 불일치 — 기대 {expected} · 실제 {actualPrefabName}";
+    }
+
+    // ── 로비 단계(할 일 130) ─────────────────────────────────────
+
+    /// <summary>
+    /// 이 판이 로비에서 밟는 단계. 야간(N108) = 맵 직행만(로비 점검·선택대·출격 집결을 건너뛰고 호스트가 자리별 캐릭터를 서버 저장소에 넣은 뒤 메인 진입),
+    /// 수동(B103) = 선택대 걷기 + 출격 집결(이전 그대로).
+    /// </summary>
+    public static QABoss103LobbySteps LobbyStepsFor(bool nightly) =>
+        nightly ? QABoss103LobbySteps.DirectLaunch : QABoss103LobbySteps.PickCharacter | QABoss103LobbySteps.Sortie;
+
+    /// <summary>
+    /// 자리별 로스터 캐릭터 id — <paramref name="clientIds"/> 의 자리(<see cref="SlotOf"/>) → <paramref name="characterForSlot"/> →
+    /// <paramref name="rosterCharacters"/>(로스터 칸 i 의 캐릭터, 못 쓰는 칸은 null)에서 처음 맞는 칸(선택대 요청과 같은 id). 한 자리라도 못 찾으면 false + 사유.
+    /// </summary>
+    public static bool TryMapSlotCharacterIds(IReadOnlyList<ulong> clientIds, Func<int, QABoss103Character> characterForSlot,
+        IReadOnlyList<QABoss103Character?> rosterCharacters, out List<QABoss103SlotPick> picks, out string failure)
+    {
+        picks = new List<QABoss103SlotPick>();
+        failure = null;
+        foreach (ulong id in clientIds)
+        {
+            int slot = SlotOf(id, clientIds);
+            QABoss103Character want = characterForSlot(slot);
+            int target = -1;
+            if (rosterCharacters != null)
+                for (int i = 0; i < rosterCharacters.Count; i++)
+                    if (rosterCharacters[i] == want)
+                    {
+                        target = i;
+                        break;
+                    }
+            if (target < 0)
+            {
+                failure = $"자리 {slot}(client {id}) {want} 로스터 칸 없음";
+                return false;
+            }
+            picks.Add(new QABoss103SlotPick(id, slot, want, target));
+        }
+        picks.Sort((a, b) => a.Slot.CompareTo(b.Slot));
+        return true;
+    }
+
+    /// <summary>자리별 저장 id 한 줄 — <c>자리0 client0 Gunner=id2, …</c>.</summary>
+    public static string FormatSlotPicks(IReadOnlyList<QABoss103SlotPick> picks)
+    {
+        var sb = new StringBuilder();
+        foreach (QABoss103SlotPick p in picks)
+            sb.Append(sb.Length > 0 ? ", " : "").Append($"자리{p.Slot} client{p.ClientId} {p.Character}=id{p.CharacterId}");
+        return sb.ToString();
     }
 
     // ── 발판 배치 ────────────────────────────────────────────────
