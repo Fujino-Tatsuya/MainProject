@@ -26,7 +26,7 @@ public interface IInterruptHitFlashSettings
     float HitFlashReturnDuration { get; }
     /// <summary>3단계 검은 집중선.</summary>
     bool HitFlashSpeedLines { get; }
-    /// <summary>진행기 시계(할 일 132 §14) — 스케일(기본) = 성공 슬로우·히트스톱을 따라 느려진다. 섬광 순간도 이 시계다.</summary>
+    /// <summary>진행기 시계(할 일 132 §14) — 실시간(기본) = 슬로우와 무관, 스케일 = 성공 슬로우·히트스톱을 따라 느려진다. 섬광 순간도 이 시계다.</summary>
     InterruptEffectTimeBase HitFlashTimeBase { get; }
 }
 
@@ -208,7 +208,7 @@ public sealed class InterruptHitFlashSequencer
     private float _overlayStart;
     private Vector3 _overlayCenter;
     private bool _overlaySpeedLines;
-    private InterruptEffectTimeBase _clock = InterruptEffectTimeBase.Scaled;
+    private InterruptEffectTimeBase _clock = InterruptEffectTimeBase.Unscaled;
 
     public InterruptHitFlashSequencer(IInterruptHitFlashSettings settings, IInterruptHitFlashOverlayOutput overlay,
         Action<InterruptHitFlashMoment> onFlash)

@@ -14,6 +14,7 @@ internal static class SlowMotionEditModeTestRunner
         "^SlowMotionSessionTests$",
         "^InterruptSlowMotionTrackerTests$",
         "^SlowMotionCameraZoomTests$",
+        "^SlowMotionOwnerZoomTests$",              // 오너 줌 한 번 — 시도→성공 사슬 한 세션(할 일 132)
         "^BossTimerClockTests$",  // 보스 제한시간 GameNow 도메인(D16)
         "^InterruptDarkAdaptationModelTests$",     // 간파 성공 암순응(할 일 87 C3)
         "^DarkAdaptationRendererSetupTests$",

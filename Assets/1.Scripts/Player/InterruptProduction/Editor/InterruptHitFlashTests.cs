@@ -25,7 +25,7 @@ public sealed class InterruptHitFlashTests
         public float Invert = 0.125f;
         public float Return = 0.125f;
         public bool SpeedLines = true;
-        public InterruptEffectTimeBase TimeBase = InterruptEffectTimeBase.Scaled;
+        public InterruptEffectTimeBase TimeBase = InterruptEffectTimeBase.Unscaled; // 디렉터 기본과 같게
 
         public float HitFlashBurstDuration => Burst;
         public float HitFlashGlareDuration => Glare;
@@ -320,7 +320,7 @@ public sealed class InterruptHitFlashTests
         public float DimOffReal;                      // 오너 암전이 0 이 된 때(실시간)
     }
 
-    // 실시간 1/1000초 프레임으로 성공 슬로우 곡선을 돌린다 — 진행기는 스케일 시계(실시간 − 덜 흐른 시간), 오너 기계는 실시간.
+    // 실시간 1/1000초 프레임으로 성공 슬로우 곡선을 돌린다 — 진행기는 칸의 시계(스케일 = 실시간 − 덜 흐른 시간), 오너 기계는 실시간.
     private CurveRun RunUnderSuccessCurve(InterruptEffectTimeBase timeBase)
     {
         const double Dt = 0.001;
@@ -377,7 +377,7 @@ public sealed class InterruptHitFlashTests
     }
 
     [Test]
-    public void 스케일_시계면_섬광_단계와_섬광_순간이_성공_슬로우를_따라_늘어난다()
+    public void 칸을_스케일로_바꾸면_섬광_단계와_섬광_순간이_성공_슬로우를_따라_늘어난다()
     {
         CurveRun run = RunUnderSuccessCurve(InterruptEffectTimeBase.Scaled);
 
@@ -396,14 +396,17 @@ public sealed class InterruptHitFlashTests
     }
 
     [Test]
-    public void 실시간_시계로_되돌리면_슬로우와_무관하게_0_1초씩()
+    public void 기본_실시간_시계면_히트스톱_슬로우와_무관하게_섬광_순간_0_3초_끝_0_4초()
     {
-        CurveRun run = RunUnderSuccessCurve(InterruptEffectTimeBase.Unscaled);
+        var director = Track(new GameObject("Director")).AddComponent<InterruptProductionDirector>();
+        CurveRun run = RunUnderSuccessCurve(director.HitFlashTimeBase);
         Assert.AreEqual(0.5f, run.FirstBurstProgressAfterHitStop, 0.02f, "히트스톱 중에도 실시간으로 나아간다");
         Assert.AreEqual(0.1f, run.StageStartReal[1], 0.0015f);
-        Assert.AreEqual(0.3f, run.StageStartReal[3], 0.0015f);
-        Assert.AreEqual(0.4f, run.StageStartReal[4], 0.0015f);
-        Assert.AreEqual(run.FlashReal, run.DimOffReal, 1e-6f);
+        Assert.AreEqual(0.2f, run.StageStartReal[2], 0.0015f);
+        Assert.AreEqual(0.3f, run.StageStartReal[3], 0.0015f, "4단계 시작 = 섬광 순간 실시간 0.3s");
+        Assert.AreEqual(0.4f, run.StageStartReal[4], 0.0015f, "끝 실시간 0.4s");
+        Assert.AreEqual(run.StageStartReal[3], run.FlashReal, 1e-6f, "섬광 순간(월드 섬광·암순응) = 진행기 4단계 시작 같은 프레임");
+        Assert.AreEqual(run.FlashReal, run.DimOffReal, 1e-6f, "오너 암전 끔 = 섬광 순간 같은 프레임");
     }
 
     [Test]
@@ -429,16 +432,16 @@ public sealed class InterruptHitFlashTests
     [Test]
     public void 진행기_시계는_쉬는_동안만_칸을_따른다()
     {
-        Assert.AreEqual(InterruptEffectTimeBase.Scaled, _sequencer.Clock, "기본 스케일");
-        _settings.TimeBase = InterruptEffectTimeBase.Unscaled;
-        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, _sequencer.Clock, "쉬는 중엔 바로 따른다");
+        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, _sequencer.Clock, "기본 실시간");
+        _settings.TimeBase = InterruptEffectTimeBase.Scaled;
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, _sequencer.Clock, "쉬는 중엔 바로 따른다");
 
         _sequencer.ScheduleFlash(Moment(false, false), 0f);
-        _settings.TimeBase = InterruptEffectTimeBase.Scaled;
-        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, _sequencer.Clock, "진행 중 칸을 바꾸면 다음 성공부터");
+        _settings.TimeBase = InterruptEffectTimeBase.Unscaled;
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, _sequencer.Clock, "진행 중 칸을 바꾸면 다음 성공부터");
 
         _sequencer.Tick(1f);
-        Assert.AreEqual(InterruptEffectTimeBase.Scaled, _sequencer.Clock);
+        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, _sequencer.Clock);
     }
 
     [Test]
@@ -551,7 +554,7 @@ public sealed class InterruptHitFlashTests
         Assert.IsTrue(so.FindProperty("hitFlashSpeedLines").boolValue);
         Assert.AreEqual(1f, so.FindProperty("hitFlashWorldScale").floatValue, 1e-6f);
         Assert.AreEqual(1f, so.FindProperty("hitFlashHeightOffset").floatValue, 1e-6f);
-        Assert.AreEqual(InterruptEffectTimeBase.Scaled, director.HitFlashTimeBase, "진행기 기본 = 스케일 시계");
+        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, director.HitFlashTimeBase, "진행기 기본 = 실시간 시계");
         Assert.AreEqual(0.3f, InterruptHitFlashTimeline.From(director).FlashMoment, 1e-5f, "섬광 순간(진행기 시계)");
     }
 
@@ -570,6 +573,8 @@ public sealed class InterruptHitFlashTests
         var vfx = so.FindProperty("hitFlashWorldVfx").objectReferenceValue as InterruptHitFlashVfx;
         Assert.IsNotNull(vfx, "hitFlashWorldVfx");
         Assert.AreEqual(WorldVfxPath, AssetDatabase.GetAssetPath(vfx));
+        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, prefab.GetComponent<InterruptProductionDirector>().HitFlashTimeBase,
+            "섬광 진행기 = 실시간");
     }
 
     [Test]

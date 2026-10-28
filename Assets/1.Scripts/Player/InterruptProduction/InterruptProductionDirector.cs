@@ -110,11 +110,11 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("오너 암전 덮개 불투명도 [0, 1] — 1 = 100%(완전히 덮음), 0.9 = 90%")]
     [DataTableIgnore, SerializeField, Range(0f, 1f)] private float ownerDimOpacity = 1f;
 
-    // 적중 섬광(할 일 132 단계 5) — 성공 Started 순간(히트스톱 안) 1단계 시작, 각 길이는 시간 기준 칸의 시계(기본 스케일, §14). 이 피어 값을 쓴다.
+    // 적중 섬광(할 일 132 단계 5) — 성공 Started 순간(히트스톱 안) 1단계 시작, 각 길이는 시간 기준 칸의 시계(기본 실시간, §14). 이 피어 값을 쓴다.
     // 연출 길이라 애니 이벤트로 대체할 스킬 타이밍이 아니다(계획서 확정). xlsx 칸이 아직 없어 [DataTableIgnore] — 프리팹이 원본.
     [Header("성공 — 적중 섬광(할 일 132 단계 5)")]
-    [Tooltip("섬광 진행기 시계 — 스케일(기본): 1~4단계·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 성공 슬로우·히트스톱을 따라 느려진다 / 실시간: 슬로우와 무관. 진행 중에 바꾸면 다음 성공부터")]
-    [DataTableIgnore, SerializeField] private InterruptEffectTimeBase hitFlashTimeBase = InterruptEffectTimeBase.Scaled;
+    [Tooltip("섬광 진행기 시계 — 실시간(기본): 1~4단계·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 슬로우·히트스톱과 무관 / 스케일: 성공 슬로우·히트스톱을 따라 느려진다. 진행 중에 바꾸면 다음 성공부터")]
+    [DataTableIgnore, SerializeField] private InterruptEffectTimeBase hitFlashTimeBase = InterruptEffectTimeBase.Unscaled;
     [Tooltip("1단계 — 검은 배경 위 흰 폭발(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashBurstDuration = 0.1f;
     [Tooltip("2단계 — 빛 갈라짐(스타버스트) + 원형 충격파(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]

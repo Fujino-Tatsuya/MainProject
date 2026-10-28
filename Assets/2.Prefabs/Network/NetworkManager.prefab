@@ -259,5 +259,6 @@ MonoBehaviour:
   targetFlash: 0
   darkAdaptation: 1
   ownerZoom: 1
+  hitFlashTimeBase: 0
   hitFlashOverlayMaterial: {fileID: 2100000, guid: 4349f51186ca1d04dbc37ba5986e7e28, type: 2}
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}
