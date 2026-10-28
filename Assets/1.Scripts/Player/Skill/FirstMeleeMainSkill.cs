@@ -39,6 +39,10 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     private readonly List<Unit> tickLandedUnits = new List<Unit>();
     // 제압의 진격(할 일 126) — 이번 시전에서 뇌진탕을 받은 대상을 지속 밀치기 동안 이어 싣는다(서버).
     private readonly PaladinQConcussionCarry traitConcussionCarry = new PaladinQConcussionCarry();
+    // 진격의 충격(할 일 126) — Q 종료 지점 파생 판정(서버). 원래 Q 틱 버퍼와 따로 둔다.
+    private readonly List<TraitDerivedAttack> traitDerivedAttacks = new List<TraitDerivedAttack>();
+    private readonly Collider[] traitBlastResults = new Collider[16];
+    private readonly HashSet<Object> traitBlastTargets = new HashSet<Object>();
 
     // 진행 방향 장부. 이동 권위 피어는 실제 이동에, 서버는 판정·넉백 방향에 사용한다.
     private Vector3 heading = Vector3.forward;
@@ -212,6 +216,10 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         isLocallySimulating = false;
         traitConcussionCarry.Reset();
 
+        // 진격의 충격 — 정상 종료·홀드 해제·최대 유지 시간 도달이면 종료 순간 위치·방향으로 1회 예약. 사망·강제 중단·대시 끊김은 없음.
+        if (owner != null && owner.IsServer && PaladinTraitRules.QBlastFires(reason, owner.CurrentHealth))
+            ScheduleTraitBlastServer();
+
         // 🔴 종료 사유를 가리지 않는다. 취소·사망·안전망 만료 어느 쪽으로 끝나도 여기를 지나므로
         //    루프가 남는 경로가 없다. (Stop 은 재생 중이 아니면 조용한 no-op 이다)
         smashLoop?.Stop();
@@ -220,6 +228,80 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)
             owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);
+    }
+
+    // ── 진격의 충격(PAL_4_Q_BLAST, 할 일 126) ──
+
+    /// <summary>
+    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 전방 forwardOffset 지점·반경 radius 판정을 delay 뒤 1회 예약한다.
+    /// 피해 = DQpacket(<see cref="PaladinTraitRules.QPacketDamage"/> — 이 시전의 틱 Dref 스냅샷 × 예정 틱 수) × 파생 배율. 실제 맞힌 틱·적 수와 무관하다.
+    /// </summary>
+    private void ScheduleTraitBlastServer()
+    {
+        if (Data == null || !isActiveAndEnabled)
+            return;
+
+        TraitAttackKey key = TraitAttackKey.ForSkill(Slot, controller != null && controller.IsAlternateSkill(this));
+        PlayerTraitEffects.For(owner).GetDerivedAttacks(key, traitDerivedAttacks);
+        int packet = PaladinTraitRules.QPacketDamage(damageSnapshot, Data.MaxActiveDuration, Data.TickInterval);
+        // 플레이어는 씬을 넘어 살아 있으므로 '씬 전환 취소'는 활성 씬으로 가른다.
+        int sceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
+
+        for (int i = 0; i < traitDerivedAttacks.Count; i++)
+        {
+            TraitDerivedAttack attack = traitDerivedAttacks[i];
+            if (attack.Key != PaladinTraitValues.QBlastKey)
+                continue;
+
+            if (attack.Radius <= 0f)
+            {
+                Debug.LogWarning("[Skill] 진격의 충격 — 반경이 0 이라 판정하지 않습니다(특성 데이터 확인).", this);
+                continue;
+            }
+
+            Vector3 center = owner.transform.position + heading * attack.ForwardOffset;
+            StartCoroutine(RunTraitBlastServer(center, attack.Radius, attack.DamageFrom(packet), attack.Delay, sceneHandle));
+        }
+
+        traitDerivedAttacks.Clear();
+    }
+
+    /// <summary>
+    /// [서버] 파생 판정 1회 — 대상별 1회 피해만(<see cref="TraitHitFlags.Derived"/>: 특성·자원·CC·간파 없음).
+    /// 그래서 패시브 추가피해(ServerTakeOnHitBonus)·밀치기 수정자·<see cref="Player.RaiseServerAttackLanded"/> 를 부르지 않는다.
+    /// 지형 차단은 원래 Q 판정처럼 없다(같은 레이어 Overlap). 지연 동안 시전자가 죽거나 씬이 바뀌면 취소한다. 이펙트 없음(판정만).
+    /// </summary>
+    private System.Collections.IEnumerator RunTraitBlastServer(Vector3 center, float radius, int damage, float delay, int sceneHandle)
+    {
+        if (delay > 0f)
+            yield return new WaitForSeconds(delay);
+
+        if (owner == null || !owner.IsServer || owner.CurrentHealth <= 0 || UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle != sceneHandle || Data == null)
+            yield break;
+
+        int hitCount = Physics.OverlapSphereNonAlloc(center, radius, traitBlastResults, Data.HittableLayers, QueryTriggerInteraction.Collide);
+        traitBlastTargets.Clear();
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = traitBlastResults[i];
+            if (hit == null)
+                continue;
+
+            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+            Object target = unit != null ? (Object)unit : hurtbox;
+            if (target == null || unit == owner || !traitBlastTargets.Add(target))
+                continue;
+
+            AttackInfo attackInfo = new AttackInfo(damage, DamageAttackType, isInterruptAttack: false, hitPattern: DamageHitPattern);
+            AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
+            bool resolved = hurtbox != null
+                ? hurtbox.ReceiveAttack(attackInfo, hitContext)
+                : unit.ReceiveAttack(attackInfo, hitContext);
+            if (resolved)
+                Edit.Log($"[Skill] 진격의 충격 — {target.name} 추가 피해 {damage}", this);
+        }
+
+        traitBlastTargets.Clear();
     }
 
     private void Update()

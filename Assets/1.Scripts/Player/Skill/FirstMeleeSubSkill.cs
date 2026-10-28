@@ -78,6 +78,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // 키가 Object 인 이유는 FirstMeleeMainSkill.tickTargets 와 같다(Unit 이 아닌 IAttackReceiver 는 Hurtbox 가 키).
     private readonly HashSet<Object> counterTargets = new HashSet<Object>();
     private readonly List<Unit> counterLandedUnits = new List<Unit>();
+    // 수호의 파동(할 일 126) — 반격 부채꼴 밖 반경 안 적에게 피해 없는 밀치기만 걸 때 대상 1회(여러 콜라이더).
+    private readonly HashSet<Unit> traitPushTargets = new HashSet<Unit>();
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
 
@@ -386,8 +388,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         forward.y = 0f;
 
+        // 수호의 파동(할 일 126) — 반경 0 = 특성 없음. 반격(전방 부채꼴)보다 넓은 원이라 질의는 둘 중 큰 반경으로 한 번 한다(반격 판정은 부채꼴 검사가 그대로 거른다).
+        float pushRadius = TraitPushRadius();
         int hitCount = Physics.OverlapSphereNonAlloc(
-            origin, data.CounterRange, counterHitResults, data.HittableLayers, QueryTriggerInteraction.Collide);
+            origin, Mathf.Max(data.CounterRange, pushRadius), counterHitResults, data.HittableLayers, QueryTriggerInteraction.Collide);
         counterTargets.Clear();
         counterLandedUnits.Clear();
         bool onHitBonusTaken = false;
@@ -423,6 +427,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
                 isInterruptAttack: false,
                 hitPattern: DamageHitPattern);
+            // 수호의 파동 — 반격 피해 판정 1건에 밀치기를 같이 싣는다(피해는 그대로, 추가 피해 없음).
+            if (IsTraitPushCandidate(unit, hit, origin, pushRadius))
+                ApplyTraitPushServer(unit, origin, ref attackInfo);
             AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
 
             bool resolved = hurtbox != null
@@ -439,6 +446,65 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         }
 
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, counterLandedUnits, this);
+
+        if (pushRadius > 0f)
+            ResolveTraitPushOnlyServer(origin, hitCount, pushRadius);
+    }
+
+    // ── 수호의 파동(PAL_4_E_PUSH, 할 일 126) ──
+
+    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다.
+    private float TraitPushRadius() =>
+        owner != null && owner.TraitModifiers != null
+            ? owner.TraitModifiers.ResolveSkillValue(PaladinTraitValues.EPushRadiusKey, 0f)
+            : 0f;
+
+    // 특성 밀치기 대상 = 살아 있는 몬스터만(아군·기믹/환경 오브젝트는 특성 CC 없음 — 명세 §4). 보스 상태는 묻지 않는다 — 수신측 거부 규칙에 맡긴다.
+    private bool IsTraitPushCandidate(Unit unit, Collider hit, Vector3 origin, float pushRadius) =>
+        pushRadius > 0f && unit is MonsterBase && unit != owner && unit.CurrentHealth > 0 &&
+        PaladinTraitRules.InsidePushRadius(origin, hit.ClosestPoint(origin), pushRadius);
+
+    /// <summary>
+    /// [서버] 특성 밀치기 연결 한 곳 — 공용 수정자(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/>)가 시전당 대상별 1회로 밀치기를 싣는다.
+    /// 방향 = 반격 판정 순간 플레이어 위치에서 대상 쪽(방사형). 벽 충돌은 수신측이 이 넉백 실행 하나당 1회로 센다.
+    /// </summary>
+    private void ApplyTraitPushServer(Unit unit, Vector3 origin, ref AttackInfo info)
+    {
+        Vector3 direction = unit.transform.position - origin;
+        direction.y = 0f;
+        TraitAttackKey key = TraitAttackKey.ForSkill(Slot, controller != null && controller.IsAlternateSkill(this));
+        PlayerTraitEffects.For(owner).ModifyOutgoingAttackServer(key, ServerCastId, unit, direction, ref info);
+    }
+
+    /// <summary>
+    /// [서버] 반격 부채꼴 밖(또는 반격 거리 밖)이지만 밀치기 반경 안인 적 — 피해 없는 밀치기만 건다(반격 피해·패시브·적중 사건 없음).
+    /// 이미 반격 피해와 함께 밀린 대상은 공용 수정자가 이 시전에서 다시 싣지 않아(시전당 대상별 1회) 여기서 건너뛴다.
+    /// </summary>
+    private void ResolveTraitPushOnlyServer(Vector3 origin, int hitCount, float pushRadius)
+    {
+        traitPushTargets.Clear();
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = counterHitResults[i];
+            if (hit == null)
+                continue;
+
+            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+            if (!IsTraitPushCandidate(unit, hit, origin, pushRadius) || !traitPushTargets.Add(unit))
+                continue;
+
+            AttackInfo pushInfo = new AttackInfo(0, DamageAttackType, isInterruptAttack: false, hitPattern: DamageHitPattern);
+            ApplyTraitPushServer(unit, origin, ref pushInfo);
+            if (pushInfo.knockbackStrength <= 0f || pushInfo.knockbackDuration <= 0f)
+                continue;
+
+            AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
+            bool resolved = hurtbox != null
+                ? hurtbox.ReceiveAttack(pushInfo, hitContext)
+                : unit.ReceiveAttack(pushInfo, hitContext);
+            if (resolved)
+                Edit.Log($"[Skill] 수호의 파동 — {unit.name} 밀치기(피해 없음)", this);
+        }
     }
 
     // ── IPlayerIncomingAttackGuard (서버) ──

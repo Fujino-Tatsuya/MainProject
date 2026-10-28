@@ -18,6 +18,14 @@ public static partial class TraitContent
         r.Value("PAL_3_E_SHIELD", "shieldMaxHpRatio", trait => PaladinTraitValues.ShieldMaxHpRatio(trait));
         r.Value("PAL_3_E_SHIELD", "shieldDuration", trait => PaladinTraitValues.ShieldDuration(trait));
         // 불굴의 순환 — 명세 refundSeconds = 효과 필드 이름 그대로라 별칭 없음.
+        // 수호의 파동 — 명세 radius(3m) = 스킬 수치 효과 PAL_E_PUSH_RADIUS. pushDistance·pushDuration 은 밀치기 효과 필드 이름 그대로.
+        r.Value("PAL_4_E_PUSH", "radius", trait => PaladinTraitValues.EPushRadius(trait));
+        // 진격의 충격 — {dmg} = 현재 Q 묶음(DQpacket) × 0.30(명세 §8).
+        r.Damage("PAL_4_Q_BLAST", (trait, player) => PaladinTraitValues.QBlastDamage(trait, player));
+        // 불굴의 가호 — 명세 healToShieldRatio(0.75)·shieldDuration(4초)·shieldCapMaxHpRatio(0.1) = 보호막 효과 amountRatio·duration·capMaxHpRatio.
+        r.Value("PAL_4_HEAL_SHIELD", "healToShieldRatio", trait => PaladinTraitValues.HealToShieldRatio(trait));
+        r.Value("PAL_4_HEAL_SHIELD", "shieldDuration", trait => PaladinTraitValues.ShieldDuration(trait));
+        r.Value("PAL_4_HEAL_SHIELD", "shieldCapMaxHpRatio", trait => PaladinTraitValues.ShieldCapMaxHpRatio(trait));
         // 예: r.Damage("PAL_2_DASH", (trait, player) => SkillTooltipDamage.FromLinear(player, 계수, 고정값));
     }
 }
