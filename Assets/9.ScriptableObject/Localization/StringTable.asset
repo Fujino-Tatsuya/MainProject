@@ -1313,6 +1313,30 @@ MonoBehaviour:
   - key: Tutorial.Guide.TUT_Z4_INTRO_RETURN
     ko: "\uC5B4\uC11C \uC6C0\uC9C1\uC5EC."
     en: Get moving.
+  - key: UI.SkillTooltip.Tag.Knockback
+    ko: "\uB109\uBC31"
+    en: "\uB109\uBC31"
+  - key: UI.SkillTooltip.Tag.Stun
+    ko: "\uAE30\uC808"
+    en: "\uAE30\uC808"
+  - key: UI.SkillTooltip.Tag.Vulnerable
+    ko: "\uCDE8\uC57D"
+    en: "\uCDE8\uC57D"
+  - key: UI.SkillTooltip.Tag.Shield
+    ko: "\uBCF4\uD638\uB9C9"
+    en: "\uBCF4\uD638\uB9C9"
+  - key: UI.SkillTooltip.Tag.Heal
+    ko: "\uD68C\uBCF5"
+    en: "\uD68C\uBCF5"
+  - key: UI.SkillTooltip.Tag.Overheat
+    ko: "\uACFC\uC5F4"
+    en: "\uACFC\uC5F4"
+  - key: UI.SkillTooltip.Tag.Unstoppable
+    ko: "\uC800\uC9C0\uBD88\uAC00"
+    en: "\uC800\uC9C0\uBD88\uAC00"
+  - key: UI.SkillTooltip.Tag.Invulnerable
+    ko: "\uBB34\uC801"
+    en: "\uBB34\uC801"
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218
