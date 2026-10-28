@@ -7,7 +7,7 @@ using UnityEngine.UI;
 /// 🔸 어쌔신 임시 HUD(PLAN-assassin A12) — 어쌔신 고유 UI 프리팹(Assassin/AssassinHUD.prefab)으로 <c>Assassin_Armature/HUD</c> 에 중첩된다.
 /// 공용 CombatHUD 와 분리한 것은 캐릭터 HUD 규약이다(player-prefabs.md §7 5-2). 오너 화면에서만 보이고, 유령 중엔 Armature 와 함께 숨는다.
 /// 표시: 분노 게이지 가로 바(최소 변신량 눈금, 최소량 이상이면 색 변경, 변신 중엔 줄어든다) · 변신 남은 시간 바(시작 후 해제 가능 시점 눈금)
-/// · 일반 E 강화 준비 · 변신 종료 대기.
+/// · 일반 E 강화 준비 · 변신 종료 대기. 절제된 분노(ASN_2_RESTRAINT)면 분노 게이지 줄을 숨긴다.
 /// 값은 전부 <see cref="AssassinState"/> 스냅샷에서 매 프레임 읽는다(전 피어 복제값이라 늦은 접속도 같은 화면).
 /// 위치·모양은 임시 — 정식 UI 가 오면 이 프리팹만 교체한다.
 /// </summary>
@@ -16,6 +16,8 @@ public sealed class AssassinHUD : MonoBehaviour
     [SerializeField] private Canvas canvas;
 
     [Header("분노 게이지")]
+    [Tooltip("분노 게이지 줄 전체 — 절제된 분노(R·분노 없음)면 숨긴다.")]
+    [SerializeField] private GameObject rageRoot;
     [Tooltip("채움 막대 — anchorMax.x 를 게이지 비율로 바꾼다(스프라이트 없이 동작).")]
     [SerializeField] private RectTransform rageFill;
     [SerializeField] private Image rageFillImage;
@@ -71,6 +73,12 @@ public sealed class AssassinHUD : MonoBehaviour
 
     private void RefreshRage()
     {
+        bool rageShown = !state.IsRestrained;
+        if (rageRoot != null && rageRoot.activeSelf != rageShown)
+            rageRoot.SetActive(rageShown);
+        if (!rageShown)
+            return;
+
         float max = state.MaxRage;
         float rage = state.Rage;
         bool transformed = state.IsTransformed;

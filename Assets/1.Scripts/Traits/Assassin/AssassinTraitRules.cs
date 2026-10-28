@@ -52,6 +52,63 @@ public static class AssassinTraitAreaRules
         ScaleRadius(radius, modifiers != null ? modifiers.AreaMultiplier(key, TraitAreaAxis.Radius) : 1f);
 }
 
+/// <summary>절제된 분노 적용 중 서버가 이번 틱에 할 일(<see cref="AssassinRestraintRules.Decide"/>).</summary>
+public enum AssassinRestraintAction
+{
+    None,
+    /// <summary>변신 중 — 종료를 요청한다(해제 제한 시간 무시). 실제 종료는 기존 "현재 공격 완료 후" 경로가 한다.</summary>
+    RequestTransformEnd,
+    /// <summary>일반 상태인데 분노가 남았다 — 0 으로.</summary>
+    ClearRage,
+}
+
+/// <summary>
+/// 절제된 분노(ASN_2_RESTRAINT, 할 일 128 4/5) — 모드 변경 스위치(<see cref="TraitModeIds.AssassinRestraint"/>)의 순수 규칙.
+/// R(변신) 사용 불가 · 분노 획득 중지 · 분노 0. 패시브 백어택은 그대로. 수치(일반 Q·강타 피해 ×1.35, 일반 Q·E 쿨 ×0.75)는 정의 에셋 효과.
+/// 이미 변신 중에 고르면 즉시 강제 취소하지 않는다 — 종료 요청만 넣고 기존 안전 종료(현재 원자 공격 완료 후, <see cref="AssassinStateModel.ShouldFinishTransform"/>)가
+/// 변신을 끝낸 뒤 다음 틱에 분노를 0 으로 만든다. 서버만 쓰고 스냅샷 복제로 클라에 간다.
+/// </summary>
+public static class AssassinRestraintRules
+{
+    /// <summary>R 변신 시작 가능 — 절제된 분노면 언제나 불가.</summary>
+    public static bool CanBeginTransform(bool restrained, bool canBeginOtherwise) => !restrained && canBeginOtherwise;
+
+    /// <summary>분노 획득(적중 충전·훈련 보정) 가능 — 절제된 분노면 불가.</summary>
+    public static bool CanGainRage(bool restrained) => !restrained;
+
+    /// <summary>이번 틱에 할 일. 종료 요청이 이미 들어가 있으면 기다린다(종료 대기 중 분노는 건드리지 않는다).</summary>
+    public static AssassinRestraintAction Decide(bool restrained, in AssassinStateSnapshot state)
+    {
+        if (!restrained)
+            return AssassinRestraintAction.None;
+
+        if (state.transformed)
+            return state.releaseRequested ? AssassinRestraintAction.None : AssassinRestraintAction.RequestTransformEnd;
+
+        return state.rage > 0f ? AssassinRestraintAction.ClearRage : AssassinRestraintAction.None;
+    }
+
+    /// <summary><paramref name="action"/> 을 스냅샷에 적용한다. 바뀌었으면 true.</summary>
+    public static bool Apply(ref AssassinStateSnapshot state, AssassinRestraintAction action)
+    {
+        switch (action)
+        {
+            case AssassinRestraintAction.RequestTransformEnd:
+                if (!state.transformed || state.releaseRequested)
+                    return false;
+                state.releaseRequested = true;
+                return true;
+            case AssassinRestraintAction.ClearRage:
+                if (state.transformed || state.rage <= 0f)
+                    return false;
+                state.rage = 0f;
+                return true;
+            default:
+                return false;
+        }
+    }
+}
+
 /// <summary>
 /// 어쌔신 기본 공격 동작과 특성 사건의 묶음 규칙(할 일 128 2/5 — 돌파의 여세·사냥의 박자).
 /// 동작 1개 = 일반 연계 한 타 · 강타 1회 · 변신 4타 묶음 1개 — 동작마다 시전 ID 하나(<see cref="Player.NextServerCastId"/>)를 받아
@@ -155,6 +212,9 @@ public static class AssassinTrailRules
         halfExtents = new Vector3(Mathf.Max(0f, width) * 0.5f, Mathf.Max(0f, height) * 0.5f, length * 0.5f);
         rotation = length > 1e-6f ? Quaternion.LookRotation(along / length) : Quaternion.identity;
     }
+
+    /// <summary>궤적 지연 — 끝없는 칼날과 같은 공격 가속기를 탄다(명세 §6): 지연 ÷ 공격속도 배율.</summary>
+    public static float Delay(float delay, float attackSpeedRate) => AssassinComboExtraRules.Delay(delay, attackSpeedRate);
 }
 
 /// <summary>

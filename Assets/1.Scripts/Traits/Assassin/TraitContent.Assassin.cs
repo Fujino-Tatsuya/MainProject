@@ -14,6 +14,10 @@ public static partial class TraitContent
         // 돌파 가속 — 명세 문구는 감소율(0.15)이고 효과는 쿨 증감(−0.15)으로 보관한다.
         r.Value("ASN_1_Q_COOLDOWN", "cooldownReduction", CooldownReduction);
 
+        // 절제된 분노 — 피해 효과 두 칸(일반 Q / 강타)이 같은 필드 이름이라 첫 칸 값, 쿨은 감소율 별칭(돌파 가속과 같은 식).
+        r.Value("ASN_2_RESTRAINT", "damageIncrease", DamageIncrease);
+        r.Value("ASN_2_RESTRAINT", "cooldownReduction", CooldownReduction);
+
         // 칼날의 영역 — 범위 효과 두 칸(강타 길이·폭 / 변신 E 반경)이 같은 필드 이름이라 첫 칸 값으로 푼다.
         r.Value("ASN_3_E_AREA", "areaIncrease", AreaIncrease);
 
@@ -70,6 +74,21 @@ public static partial class TraitContent
             {
                 if (effect is TraitCooldownEffect cooldown)
                     return 1f - cooldown.Multiplier;
+            }
+        }
+
+        return 0f;
+    }
+
+    // 정의의 첫 피해 효과 증가율(배율 − 1). 피해 효과가 없으면 0.
+    private static object DamageIncrease(TraitDefinition trait)
+    {
+        if (trait != null && trait.Effects != null)
+        {
+            foreach (TraitEffect effect in trait.Effects)
+            {
+                if (effect is TraitDamageEffect damage)
+                    return damage.Multiplier - 1f;
             }
         }
 

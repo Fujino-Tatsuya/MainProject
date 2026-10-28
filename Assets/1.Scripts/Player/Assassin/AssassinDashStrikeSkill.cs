@@ -276,8 +276,9 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
         Vector3 end = AssassinTrailRules.SegmentEnd(start, direction, traveled);
         var strike = new TrailStrike(start, end, data.PathWidth, data.PathHeight, trail.DamageFrom(stageDref));
-        pendingTrails.Schedule(Time.timeAsDouble, trail.Delay, strike);
-        Edit.Log($"[Assassin/Q] 추격의 궤적 예약 — {traveled:F2}m, 기준 {stageDref} → {strike.Damage}, {trail.Delay:F2}초 뒤", this);
+        float delay = AssassinTrailRules.Delay(trail.Delay, owner.AttackSpeedRate);
+        pendingTrails.Schedule(Time.timeAsDouble, delay, strike);
+        Edit.Log($"[Assassin/Q] 추격의 궤적 예약 — {traveled:F2}m, 기준 {stageDref} → {strike.Damage}, {delay:F3}초 뒤", this);
     }
 
     // [서버] 시각이 된 궤적을 낸다 — 파생 판정(피해만: 특성 사건·분노·쿨감·CC·간파·다음 공격 강화·백어택 연출 없음).

@@ -408,6 +408,18 @@ public sealed class AssassinTraitTier4Tests
         Assert.AreEqual(0f, AssassinComboExtraRules.Delay(-1f, 1f), Eps);
     }
 
+    [Test]
+    public void Trail_Delay_ScaledByAttackAcceleration_LikeCombo()
+    {
+        // 명세 §6 — 공격 지연·연사 간격·회수 시간은 같은 공격 가속기. 추격의 궤적 0.15초도 끝없는 칼날처럼 ÷ 공격속도.
+        Assert.AreEqual(0.15f, AssassinTrailRules.Delay(0.15f, 1f), Eps);
+        Assert.AreEqual(0.075f, AssassinTrailRules.Delay(0.15f, 2f), Eps, "제압 가속(공격속도 ×2) = 지연 절반");
+        Assert.AreEqual(0.3f, AssassinTrailRules.Delay(0.15f, 0.5f), Eps, "감속");
+        Assert.AreEqual(0f, AssassinTrailRules.Delay(-1f, 1f), Eps);
+        foreach (float rate in new[] { 0.5f, 1f, 1.5f, 2f })
+            Assert.AreEqual(AssassinComboExtraRules.Delay(0.15f, rate), AssassinTrailRules.Delay(0.15f, rate), Eps, $"같은 가속기 ×{rate}");
+    }
+
     // ── 예약 줄(사망·씬 취소·재사용) ────────────────────────────────────
 
     [Test]

@@ -157,9 +157,10 @@ public sealed class AssassinTraitTier3Tests
     public void Pool_Tier3_AfterRelease_InSpecOrder()
     {
         string[] poolIds = TraitContentTestKit.CharacterPool(TutorialCharacter.Assassin).Traits.Select(t => t.Id).ToArray();
-        int release = Array.IndexOf(poolIds, "ASN_2_RELEASE");
-        Assert.GreaterOrEqual(release, 0);
-        CollectionAssert.AreEqual(new[] { Area, Momentum, Rhythm }, poolIds.Skip(release + 1).Take(3).ToArray(),
+        Assert.GreaterOrEqual(Array.IndexOf(poolIds, "ASN_2_RELEASE"), 0);
+        // 2차(완전 해방 · 절제된 분노 · 그림자 회귀 — 들어와 있는 것) 마지막 뒤.
+        int lastTier2 = Array.FindLastIndex(poolIds, id => id.StartsWith("ASN_2_", StringComparison.Ordinal));
+        CollectionAssert.AreEqual(new[] { Area, Momentum, Rhythm }, poolIds.Skip(lastTier2 + 1).Take(3).ToArray(),
             "3차는 명세 순서(칼날의 영역 → 돌파의 여세 → 사냥의 박자)");
     }
 
