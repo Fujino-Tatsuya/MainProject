@@ -191,35 +191,6 @@ public static class PlayerMotionSweep
         return PlayerUnitCollisionRules.ComputeSeparationStep(penetration, maxSpeed, deltaTime);
     }
 
-    /// <summary>
-    /// 몸을 origin(루트 위치)에 둔 채 target 까지 정적 지형으로 스윕해, 벽 앞에서 자른 루트 위치를 돌려준다. (할 일 136)
-    /// 구속 포즈(23호 잡기 Push 정면점·Carry 손 소켓)가 벽 너머로 나가 몸이 벽에 박히지 않게 한다.
-    /// 걸을 수 있는 면은 접선 이동이라 막지 않는다(<see cref="TryCast"/> 규칙 그대로).
-    /// </summary>
-    public static Vector3 ClampPlacement(
-        CapsuleCollider capsule,
-        Vector3 origin,
-        Vector3 target,
-        LayerMask staticMask,
-        float maxWalkableAngle,
-        float skin,
-        RaycastHit[] buffer)
-    {
-        if (capsule == null || buffer == null || staticMask.value == 0)
-            return target;
-
-        Vector3 delta = target - origin;
-        float distance = delta.magnitude;
-        if (distance <= 1e-5f)
-            return target;
-
-        Transform owner = capsule.transform;
-        Vector3 dir = delta / distance;
-        bool blocked = TryCast(capsule, owner, origin - owner.position, dir, distance + skin, maxWalkableAngle,
-            staticMask, skin, buffer, out _, out float hitDistance);
-        return origin + dir * PlayerUnitCollisionRules.ClampPlacementDistance(distance, blocked, hitDistance, skin);
-    }
-
     /// <summary>dir 로 distance 만큼 갈 때 가장 먼저 막는 면의 법선. 막는 것이 없으면 false. (할 일 136 벽 따라 밀어내기)</summary>
     public static bool TryGetBlockingNormal(
         CapsuleCollider capsule,

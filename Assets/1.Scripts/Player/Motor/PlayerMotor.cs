@@ -170,26 +170,6 @@ public sealed class PlayerMotor : MonoBehaviour
             castBuffer);
     }
 
-    /// <summary>
-    /// 몸을 origin 에 둔 채 target 까지 정적 지형(벽·Env 등, 유닛 제외)으로 스윕해 벽 앞에서 자른 루트 위치(할 일 136).
-    /// 구속 포즈 목표점·놓는 자리 검증용. 씬 상태는 바꾸지 않는다.
-    /// </summary>
-    public Vector3 ClampPlacementToStatic(Vector3 origin, Vector3 target)
-    {
-        if (capsule == null)
-            return target;
-
-        PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
-        return PlayerMotionSweep.ClampPlacement(
-            capsule,
-            origin,
-            target,
-            ResolveStaticMask(settings),
-            settings.MaxWalkableSlopeAngle,
-            settings.CollisionSkin,
-            castBuffer);
-    }
-
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
