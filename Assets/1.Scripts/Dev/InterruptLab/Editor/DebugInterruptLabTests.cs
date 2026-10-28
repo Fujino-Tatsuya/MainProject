@@ -185,4 +185,61 @@ public sealed class DebugInterruptLabTests
         Assert.IsFalse(DebugZeroCooldown.NeedsOwnerRefill(2, 2));
         Assert.IsFalse(DebugZeroCooldown.NeedsOwnerRefill(0, 0)); // 장부 없음(준비 전)
     }
+
+    // ─── 132 §17 튜닝 패널 ─────────────────────────────────────────────
+
+    [Test]
+    public void 튜닝_패널은_모든_효과와_팀원_암순응을_한_줄씩()
+    {
+        var effects = new System.Collections.Generic.List<InterruptPresentationEffect>();
+        int cues = 0;
+        foreach (DebugInterruptTuningPanel.Row row in DebugInterruptTuningPanel.Rows)
+        {
+            Assert.IsFalse(string.IsNullOrEmpty(row.Label));
+            if (row.IsCue)
+            {
+                Assert.AreEqual(InterruptProductionCue.DarkAdaptation, row.Cue, "스위치 칸 줄은 팀원 암순응(A2)만");
+                cues++;
+            }
+            else
+            {
+                effects.Add(row.Effect);
+            }
+        }
+
+        CollectionAssert.AreEquivalent(InterruptPresentationEffectRules.All, effects, "효과 칸 하나에 한 줄");
+        Assert.AreEqual(1, cues);
+    }
+
+    [Test]
+    public void 튜닝_패널_배속_버튼은_범위_끝을_포함()
+    {
+        CollectionAssert.Contains(DebugInterruptTuningPanel.SpeedButtons, DebugTimeScale.MinScale);
+        CollectionAssert.Contains(DebugInterruptTuningPanel.SpeedButtons, DebugTimeScale.MaxScale);
+        foreach (float speed in DebugInterruptTuningPanel.SpeedButtons)
+            Assert.AreEqual(speed, DebugTimeScale.ClampScale(speed), Eps);
+    }
+
+    [Test]
+    public void 튜닝_패널_토글은_디렉터_런타임_값만_바꾼다()
+    {
+        var go = new UnityEngine.GameObject("Director");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            DebugInterruptTuningPanel.SetAll(director, true);
+            foreach (DebugInterruptTuningPanel.Row row in DebugInterruptTuningPanel.Rows)
+                Assert.IsTrue(row.Get(director), row.Label);
+
+            DebugInterruptTuningPanel.SetDefaults(director);
+            foreach (InterruptPresentationEffect effect in InterruptPresentationEffectRules.All)
+                Assert.AreEqual(effect == InterruptPresentationEffect.OwnerDim, director.IsEffectOn(effect), effect.ToString());
+            Assert.IsFalse(director.Get(InterruptProductionCue.DarkAdaptation), "기본값 = 팀원 암순응 끔");
+            Assert.IsFalse(DebugInterruptTuningPanel.Rows[0].Get(null), "디렉터가 없으면 꺼짐");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+    }
 }

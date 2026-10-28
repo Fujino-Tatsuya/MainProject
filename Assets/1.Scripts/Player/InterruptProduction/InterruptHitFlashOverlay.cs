@@ -3,8 +3,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 
-/// <summary>적중 섬광 오너 화면 칸(할 일 132 §15) — 디렉터가 구현하고, 보일 때마다 읽는다.</summary>
-public interface IInterruptHitFlashScreenSettings
+/// <summary>
+/// 적중 섬광 오너 화면 칸(할 일 132 §15) — 디렉터가 구현하고, 보일 때마다 읽는다.
+/// ②~⑥ 효과 칸(<see cref="IInterruptPresentationEffectSettings"/>, §17)이 꺼진 단계는 그리지 않는다(진행기 시간표는 그대로).
+/// </summary>
+public interface IInterruptHitFlashScreenSettings : IInterruptPresentationEffectSettings
 {
     /// <summary>오버레이 캔버스 재질(<c>BeaverLobby/UI/InterruptHitFlashOverlay</c>) — 색·덮어쓸 텍스처 칸은 재질에. 비면 그림 없음.</summary>
     Material HitFlashOverlayMaterial { get; }
@@ -79,7 +82,9 @@ public sealed class InterruptHitFlashOverlay : IInterruptHitFlashOverlayOutput, 
         Vector3 viewport = camera != null ? camera.WorldToViewportPoint(worldCenter) : new Vector3(0.5f, 0.5f, 1f);
         Vector2 center = InterruptHitFlashRules.ViewportCenter(viewport);
         float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 1f;
-        InterruptHitFlashLook look = InterruptHitFlashRules.Look(stage, progress);
+        // 꺼진 단계(§17) = 그 단계 동안 아무것도 그리지 않는다 — 세기 0·캔버스 끔(진행·섬광 순간은 진행기가 그대로 돈다).
+        bool visible = InterruptPresentationEffectRules.StageVisible(_settings, stage);
+        InterruptHitFlashLook look = visible ? InterruptHitFlashRules.Look(stage, progress) : default;
 
         EnsureRoot();
         ApplyFlare(look.Flare, worldCenter);
@@ -91,7 +96,7 @@ public sealed class InterruptHitFlashOverlay : IInterruptHitFlashOverlayOutput, 
             return;
 
         // ⑤⑥ 은 그림이 없다 — 캔버스를 꺼 둔다(블러·Volume 은 위에서 이미 넘겼다).
-        _canvas.enabled = InterruptHitFlashRules.OverlayDraws(stage);
+        _canvas.enabled = visible && InterruptHitFlashRules.OverlayDraws(stage);
         if (!_canvas.enabled)
             return;
 

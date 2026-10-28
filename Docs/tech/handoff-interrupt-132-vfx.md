@@ -10,16 +10,17 @@
 | 연출 | 언제·누가 보나 | 프리팹·재질 | 셰이더 |
 |---|---|---|---|
 | **빛 모임** — 흰 빛 기둥 + 사방에서 모여드는 입자 + 중심 빛 + 작은 Point Light(차지 동안 세짐) | 강 시도(성공 예측) 입력 순간 → 간파 애니 Hit. 오너 + 팀원 | `LightGather/FX_InterruptLightGather.prefab` · `M_InterruptLightGather_Pillar` · `M_InterruptLightGather_Mote` | `BeaverLobby/VFX/InterruptLightGather` |
-| **월드 섬광** — 흰 중심·파란 번짐·불티(가우시안 빛 덩어리) + 적중 지점 Point Light | 성공 섬광 순간(성공 후 0.133초 = ⑤ 시작) 적중 지점. 모두. 슬로우 중에도 실시간 0.3초 안에 끝남 | `HitFlash/FX_InterruptHitFlash.prefab` · `M_InterruptHitFlash_Core` | `BeaverLobby/VFX/InterruptHitFlash` |
-| **화면 섬광 오버레이**(②③④) — ② 플레어 층 + 얇은 푸른 고리 / ③ 회청색 화이트아웃(0.75, 실루엣 비침) / ④ 암전 남김 영역을 키워 공격 방향으로 늘인 흰 스미어 | 강 시도 성공 때 오너 화면만, 0~0.133초 | `HitFlash/M_InterruptHitFlashOverlay.mat`(디렉터 `hitFlashOverlayMaterial` 칸) | `BeaverLobby/UI/InterruptHitFlashOverlay` |
+| **월드 섬광** — 흰 중심·파란 번짐·불티(가우시안 빛 덩어리) + 적중 지점 Point Light | 성공 섬광 순간(성공 후 6 프레임째 = ⑤ 시작) 적중 지점. 모두. 슬로우 중에도 실시간 0.3초 안에 끝남 | `HitFlash/FX_InterruptHitFlash.prefab` · `M_InterruptHitFlash_Core` | `BeaverLobby/VFX/InterruptHitFlash` |
+| **화면 섬광 오버레이**(②③④) — ② 플레어 층 + 얇은 푸른 고리 / ③ 회청색 화이트아웃(0.75, 실루엣 비침) / ④ 암전 남김 영역을 키워 공격 방향으로 늘인 흰 스미어 | 강 시도 성공 때 오너 화면만, 성공 후 0~6 프레임 | `HitFlash/M_InterruptHitFlashOverlay.mat`(디렉터 `hitFlashOverlayMaterial` 칸) | `BeaverLobby/UI/InterruptHitFlashOverlay` |
 | **② 렌즈 플레어** — 베이지 별 모양, 작고 부드러운 코어 + 길이 제각각 빛살(무작위 16개 포함), 가로(아나모픽) 빛살이 가장 길고 끝이 흐림 | ② 동안 오너 화면만 | `HitFlash/LF_InterruptHitFlashStarburst.asset`(URP Lens Flare (SRP) 데이터, 디렉터 `hitFlashLensFlare`) | URP LensFlareDataDriven |
 | **⑤⑥ 색수차·블룸** — 가장자리 색수차(0.6), 섬광 순간 블룸 최대(6) 후 가라앉음 | ⑤⑥ 동안 오너 화면만 | `HitFlash/VP_InterruptHitFlash_Aberration.asset` · `VP_InterruptHitFlash_Bloom.asset`(Volume 프로필 — 런타임은 가중치만 움직인다) | URP 후처리 |
 
 - 파티클 셰이더 둘 다 **가산 언릿 + HDR `_Color`**(기본 (6,6,6) — 1 넘으면 블룸). 시간은 `_Time` 대신 파티클 나이로 움직여 파티클 시간 기준을 따른다.
 - 시간 기준 = 프리팹 루트 `InterruptLightGatherVfx.timeBase` · `InterruptHitFlashVfx.timeBase`(둘 다 기본 **스케일** — 슬로우를 따라 느려진다, 할 일 132 §14).
   재생할 때마다 모든 파티클 `useUnscaledTime` 에 칸 값을 넣으므로 자식 파티클을 더할 때 따로 맞출 필요 없다. 실시간으로 되돌리려면 그 칸만 바꾼다.
-- 섬광 단계(할 일 132 §15 재구성 — 레퍼런스 영상 30fps): ② 스타버스트 0.067 → ③ 화이트아웃 0.033 → ④ 스미어 0.033 → **섬광 순간 0.133**(오너 암전 걷힘·월드 섬광·팀원 암순응)
-  → ⑤ 색수차 블러 0.1 → ⑥ 가라앉음 0.2 → 끝 0.433. 길이는 디렉터 칸(`hitFlashStarburstDuration` 등 5칸), 시계는 `hitFlashTimeBase`(기본 **실시간**) — 월드 섬광 파티클 자체만 스케일 시간으로 느리게 터진다.
+- 섬광 단계(할 일 132 §15 재구성 → §17 프레임): ② 스타버스트 2 프레임 → ③ 화이트아웃 2 프레임 → ④ 스미어 2 프레임 → **섬광 순간 = 6 프레임째**(오너 암전 걷힘·월드 섬광·라이트·팀원 암순응)
+  → ⑤ 색수차 블러 0.1초 → ⑥ 가라앉음 0.2초. 길이는 디렉터 칸(`hitFlashStarburstFrames`·`WhiteoutFrames`·`SmearFrames` + `hitFlashAberrationDuration`·`SettleDuration`), ⑤⑥ 시계는 `hitFlashTimeBase`(기본 **실시간**) — 월드 섬광 파티클 자체만 스케일 시간으로 느리게 터진다.
+- 🟪 **§17 기본값 = 오너 암전만 켬** — 위 표의 빛 모임·월드 섬광·라이트·②~⑥ 는 디렉터 `show*` 칸이 기본 **꺼짐**이라 Play 에서 안 보인다. 보려면 `DebugInterruptLab` 씬 오른쪽 위 튜닝 패널에서 켜거나, 디렉터 칸을 켠다(저장하면 기본값이 바뀐다 — 은희와 합의).
   표·누가 보나·렌더 순서: [interrupt-presentation.md §0.4·§0.7](interrupt-presentation.md).
   월드 섬광 크기(`hitFlashWorldScale`)·높이(`hitFlashHeightOffset` 1m)는 `NetworkManager.prefab › InterruptProductionDirector` 칸이다.
 - 월드 섬광 실시간 상한 = `FX_InterruptHitFlash` 루트 `InterruptHitFlashVfx.realTimeCap`(0.3초, 0 = 상한 없음) — 스케일 시간이어도 슬로우 중 이 시간 안에 끝나게 파티클 배속을 올린다.

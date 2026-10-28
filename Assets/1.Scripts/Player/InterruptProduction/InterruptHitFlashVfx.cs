@@ -111,7 +111,28 @@ public sealed class InterruptHitFlashVfx : MonoBehaviour
     /// <summary>파티클 실시간 상한 시계 — 확인용.</summary>
     public InterruptHitFlashVfxClock Clock => _clock;
 
-    public void Play(Vector3 position, float scale)
+    /// <summary>
+    /// 섬광 순간 재생. <paramref name="particles"/>·<paramref name="light"/> = 디렉터 효과 칸(월드 섬광·적중 지점 라이트, 할 일 132 §17) —
+    /// 끈 쪽은 그리지 않는다(돌던 것도 멈춘다).
+    /// </summary>
+    public void Play(Vector3 position, float scale, bool particles = true, bool light = true)
+    {
+        float rootScale = Mathf.Max(0.01f, scale);
+        transform.SetPositionAndRotation(position, Quaternion.identity);
+        transform.localScale = Vector3.one * rootScale;
+
+        if (particles)
+            PlayParticles();
+        else
+            StopParticles();
+
+        if (light)
+            PlayLight(rootScale);
+        else
+            StopLight();
+    }
+
+    private void PlayParticles()
     {
         if (root == null && !TryGetComponent(out root))
             return;
@@ -125,13 +146,20 @@ public sealed class InterruptHitFlashVfx : MonoBehaviour
             main.simulationSpeed = 1f;
         }
 
-        float rootScale = Mathf.Max(0.01f, scale);
-        transform.SetPositionAndRotation(position, Quaternion.identity);
-        transform.localScale = Vector3.one * rootScale;
         root.Clear(true);
         root.Play(true);
         _clock.Begin(EffectLength(_systems), realTimeCap);
+    }
 
+    private void StopParticles()
+    {
+        if (root != null)
+            root.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        _clock.Stop();
+    }
+
+    private void PlayLight(float rootScale)
+    {
         // 라이트 — 첫 재생 때 한 번 만들고 재사용. 칸 값은 재생마다 넣는다.
         _light = InterruptEffectLight.Ensure(_light, transform, "HitLight");
         // 라이트 반경은 부모 스케일을 따르지 않는다 — 루트 스케일을 직접 곱한다.
@@ -144,9 +172,12 @@ public sealed class InterruptHitFlashVfx : MonoBehaviour
     /// <summary>강제 리셋 — 남은 입자까지 지우고 라이트를 끈다.</summary>
     public void Stop()
     {
-        if (root != null)
-            root.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        _clock.Stop();
+        StopParticles();
+        StopLight();
+    }
+
+    private void StopLight()
+    {
         _lightElapsed = -1f;
         InterruptEffectLight.SetIntensity(_light, 0f);
     }

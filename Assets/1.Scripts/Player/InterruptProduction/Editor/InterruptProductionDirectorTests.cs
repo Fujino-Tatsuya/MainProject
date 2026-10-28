@@ -47,16 +47,16 @@ public sealed class InterruptProductionDirectorTests
     }
 
     // 할 일 132 단계 6 — 새 체계에 들어오는 공용 칸(A1~A4)만 켜고, 캐릭터별 연출(B·C·E)은 꺼 둔다(새 적중 섬광이 대신).
+    // §17 — A2 암순응(= 팀원 암순응)은 기본 끔(오너 암전만 켬 기본값). 슬로우·줌·히트스톱(A1·A3)과 A4 는 그대로.
     private static readonly InterruptProductionCue[] PrefabOnCues =
     {
         InterruptProductionCue.HitStop,
-        InterruptProductionCue.DarkAdaptation,
         InterruptProductionCue.OwnerZoom,
         InterruptProductionCue.SuccessFxSlot,
     };
 
     [Test]
-    public void NetworkManager_프리팹에_붙어_있고_A1_A4만_켜짐()
+    public void NetworkManager_프리팹에_붙어_있고_A1_A3_A4만_켜짐()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPrefabPath);
         Assert.IsNotNull(prefab, NetworkManagerPrefabPath);

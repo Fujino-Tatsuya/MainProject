@@ -257,8 +257,17 @@ MonoBehaviour:
   paladinWave: 0
   assassinInsightSuccess: 0
   targetFlash: 0
-  darkAdaptation: 1
+  darkAdaptation: 0
   ownerZoom: 1
+  showOwnerDim: 1
+  showLightGather: 0
+  showStarburst: 0
+  showWhiteout: 0
+  showSmear: 0
+  showAberration: 0
+  showSettle: 0
+  showWorldFlash: 0
+  showHitLight: 0
   hitFlashTimeBase: 0
   hitFlashOverlayMaterial: {fileID: 2100000, guid: 4349f51186ca1d04dbc37ba5986e7e28, type: 2}
   hitFlashLensFlare: {fileID: 11400000, guid: fcf746276f0103f49bd87368ddf37519, type: 2}

@@ -4,8 +4,10 @@
 > 성공에 **적중 섬광 ②~⑥ 5단계**(§15 재구성 — 스타버스트·화이트아웃·스미어·색수차 블러·가라앉음) 를 얹었다. 흐름 [§0](#0-132-체계--예측-3상태강약오너-암전빛-모임적중-섬광-할-일-132) 이 이 문서의 맨 앞 사실이다.
 > 🔹 §16 퀄리티 수정(사용자 Play 녹화 분석): 섬광이 딱딱한 도형처럼 보이던 것 — 부드러운 코어·제각각 빛살·얇은 고리, 화이트아웃 0.75·실루엣 비침, 스미어 = 공격 방향,
 > 무지개 원 제거, 월드 섬광 = 빛 덩어리·실시간 0.3s 상한, 섬광 순간 블룸 최대, **실제 Point Light 2개**(적중 지점·빛 모임 소켓) — [§0.9](#09-16-퀄리티-수정--라이트스미어-방향렌더-판단).
+> 🔹 §17 튜닝 도구(2026-10-28): 디렉터에 **효과별 켜기/끄기 칸 9개**(기본 = **오너 암전만 켬**, 팀원 암순응 = A2 칸 → 기본 끔) — 끈 효과는 그리기만 안 하고 상태 기계·시간표·섬광 순간은 그대로.
+> ②③④ 길이 = **렌더 프레임 수**(기본 2·2·2, 섬광 순간 = 6 프레임째), ⑤⑥ = 초. DebugInterruptLab 씬 OnGUI **튜닝 패널** — [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
-> 🔹 스위치 10칸(디렉터): 132 단계 6 부터 **A1 히트스톱·A2 암순응·A3 오너 줌·A4 성공 이펙트 칸 = 켬**, B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
+> 🔹 스위치 10칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸 = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
@@ -44,9 +46,10 @@
                Failed(발동 번호) / 판정 전 종료(LocalOwnerEnded) → 걷기 · 오너 애니 Hit 이벤트 → 빛 모임 정지
   [팀원 화면]   남의 강 시도(Attempt) → 발동자 소켓에서 빛 모임 → 발동자 Hit(PeerCasterHit)·실패·성공·리셋에 정지
                시도 단계에 그 외 변화 없음
-  [모든 화면]   Success → 적중 섬광 진행기(InterruptHitFlashSequencer, 진행기 시계 = 기본 실시간 §0.4)
-                 0.0 ②(오너 화면 효과, 아래 조건) · 0.067 ③ · 0.1 ④ · 0.133 섬광 순간 = ⑤ 시작 = 오너 암전 끔 + 월드 섬광(FX_InterruptHitFlash) + 암순응
-                 · 0.233 ⑥ · 0.433 끝(실시간 초 — 히트스톱·슬로우와 무관. 칸을 스케일로 바꾸면 성공 슬로우를 따라 늘어난다)
+  [모든 화면]   Success → 적중 섬광 진행기(InterruptHitFlashSequencer, ②③④ = 렌더 프레임 수 · ⑤⑥ = 진행기 시계 초 §0.4)
+                 프레임 0 ②(오너 화면 효과, 아래 조건) · 2 ③ · 4 ④ · 6 섬광 순간 = ⑤ 시작 = 오너 암전 끔 + 월드 섬광(FX_InterruptHitFlash)·라이트 + 암순응
+                 · 섬광 순간 + 0.1s ⑥ · + 0.3s 끝(기본 실시간 — 칸을 스케일로 바꾸면 ⑤⑥ 만 성공 슬로우를 따라 늘어난다)
+                 효과 칸(§0.6)이 꺼진 효과는 그리지 않을 뿐 시간표·섬광 순간 사건은 그대로
                  A4 성공 이펙트 칸은 Started 즉시(§2.4)
 ```
 
@@ -67,18 +70,19 @@
 |---|---|---|---|
 | 시도 슬로우 강·약 · 성공 슬로우 · 히트스톱 | ✓ | ✓ | 서버 타임라인(A1 = 히트스톱) |
 | 오너 줌(강 0.7 / 약 0.93 / 성공 0.85) | ✓ | — | A3 |
-| 오너 암전(마스크) | ✓ 강 예측 때만 | — | 칸 없음(§0.6) |
-| 빛 모임(월드) | ✓ 입력 순간 강 예측 | ✓ 서버 강 시도 슬로우 받을 때 | 칸 없음 |
-| 섬광 화면 효과 ②~⑥(오버레이·렌즈 플레어·방사형 블러·색수차·블룸 Volume) | ✓ 성공 순간 오너 암전이 켜져 있었을 때(= 강 시도 성공) | — | 칸 없음 |
-| 월드 섬광(적중 지점 파랑·흰 빛 덩어리 + 블룸 + 적중 지점 Point Light) | ✓ 섬광 순간(⑤ 시작) | ✓ 섬광 순간 | 칸 없음 |
-| 빛 모임 소켓 Point Light(차지 동안 상승, Hit 에서 끔) | ✓ 빛 모임과 같이 | ✓ 빛 모임과 같이 | 칸 없음 |
-| 휘도 암순응 | 화면 효과가 돌았으면 없음(두 번 어두워짐 방지) · 약 시도 성공이면 self 강도 | others 강도(0.35), 섬광 순간 | A2 |
+| 오너 암전(마스크) | ✓ 강 예측 때만 | — | `showOwnerDim`(**켬**, §0.6) |
+| 빛 모임(월드) + 소켓 Point Light(차지 동안 상승, Hit 에서 끔) | ✓ 입력 순간 강 예측 | ✓ 서버 강 시도 슬로우 받을 때 | `showLightGather`(끔) |
+| 섬광 화면 효과 ②~⑥(오버레이·렌즈 플레어·방사형 블러·색수차·블룸 Volume) | ✓ 성공 순간 오너 암전 **상태**가 켜져 있었을 때(= 강 시도 성공 — 암전 칸을 꺼도 같다) | — | `showStarburst`·`showWhiteout`·`showSmear`·`showAberration`·`showSettle`(끔) |
+| 월드 섬광(적중 지점 파랑·흰 빛 덩어리 + 블룸) | ✓ 섬광 순간(⑤ 시작) | ✓ 섬광 순간 | `showWorldFlash`(끔) |
+| 적중 지점 Point Light | ✓ 섬광 순간 | ✓ 섬광 순간 | `showHitLight`(끔) |
+| 휘도 암순응 | 화면 효과가 돌았으면 없음(두 번 어두워짐 방지) · 약 시도 성공이면 self 강도 | others 강도(0.35), 섬광 순간 | A2 `darkAdaptation`(= 팀원 암순응, **끔**) |
 | 성공 이펙트 칸 casterFx/targetFx | ✓ | ✓ | A4 |
 
 ### 0.4 시간표 (기본값) · 시간 기준
 
 이펙트(빛 모임·월드 섬광 파티클)는 `GlobalTimeScale`(`Time.timeScale`)을 따라 느려진다(**스케일 시간**, 할 일 132 §14). 각 이펙트에 시간 기준 칸(`InterruptEffectTimeBase` — 스케일/실시간)이 있어 실시간으로 되돌릴 수 있다.
-섬광 오버레이 진행기는 기본 **실시간**이다(칸으로 스케일 전환 가능). 오너 암전 램프와 카메라 줌 블렌드는 늘 실시간이다.
+섬광 진행기는 ②③④·섬광 순간을 **렌더 프레임 수**로 재고(§17 — 시계와 무관), ⑤⑥ 은 진행기 시계(기본 **실시간**, 칸으로 스케일 전환 가능) 초로 잰다.
+오너 암전 램프와 카메라 줌 블렌드는 늘 실시간이다.
 
 | 구간 | 길이 | 시계 | 칸 |
 |---|---|---|---|
@@ -87,16 +91,16 @@
 | 카메라 줌 블렌드 | — | 실시간(고정) | `SlowMotionOwnerZoom` |
 | 빛 모임 파티클 | 파티클 수명 | **스케일**(기본) | `FX_InterruptLightGather` › `InterruptLightGatherVfx.timeBase` |
 | 빛 모임 소켓 라이트 상승 | 0.5s 에 최대, Hit 까지 유지 | 빛 모임과 같은 시계(스케일) | `FX_InterruptLightGather` › `lightRiseDuration`·`lightRiseCurve` |
-| ② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(부드러운 코어 + 길이 제각각 빛살, 아나모픽 가로 빛살 최장·끝 흐림) + 얇고 흐린 푸른 고리 · 0 → 0.067 | 0.067(2f) | **진행기 시계**(기본 실시간) | 디렉터 `hitFlashStarburstDuration` |
-| ③ 화이트아웃 — 화면 전체 밝은 회청색(0.75) + 강한 방사형 블러, 오너·대상 블러 실루엣이 비침 · 0.067 → 0.1 | 0.033(1f) | 진행기 시계 | `hitFlashWhiteoutDuration` |
-| ④ 스미어 — 검정 위 오너·대상·빔(암전 남김 영역)을 키워 **공격 방향**으로 늘인 흰 덩어리 · 0.1 → 0.133 · 끝 = **섬광 순간** | 0.033(1f) | 진행기 시계 | `hitFlashSmearDuration` |
-| 섬광 순간 = ②+③+④ = ⑤ 시작 — 오너 암전 끔 · 월드 섬광·적중 지점 라이트 시작 · 팀원 암순응 시작 | **0.133** | 진행기 시계 | 계산값(따로 칸 없음) |
-| ⑤ 색수차 블러 — 실제 화면 + 방사형 블러 + Volume 색수차(가장자리) + 블룸 최대 · 0.133 → 0.233 | 0.1(3f) | 진행기 시계 | `hitFlashAberrationDuration` |
-| ⑥ 가라앉음 — 블룸 덩어리가 가라앉음, 블러·색수차 → 0 · 0.233 → **0.433 끝** | 0.2(6f) | 진행기 시계 | `hitFlashSettleDuration` |
+| ② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(부드러운 코어 + 길이 제각각 빛살, 아나모픽 가로 빛살 최장·끝 흐림) + 얇고 흐린 푸른 고리 · 프레임 0 → 2 | **2 프레임** | **렌더 프레임**(시계 무관) | 디렉터 `hitFlashStarburstFrames` |
+| ③ 화이트아웃 — 화면 전체 밝은 회청색(0.75) + 강한 방사형 블러, 오너·대상 블러 실루엣이 비침 · 프레임 2 → 4 | 2 프레임 | 렌더 프레임 | `hitFlashWhiteoutFrames` |
+| ④ 스미어 — 검정 위 오너·대상·빔(암전 남김 영역)을 키워 **공격 방향**으로 늘인 흰 덩어리 · 프레임 4 → 6 · 끝 = **섬광 순간** | 2 프레임 | 렌더 프레임 | `hitFlashSmearFrames` |
+| 섬광 순간 = ②+③+④ 끝 프레임 = ⑤ 시작 — 오너 암전 끔 · 월드 섬광·적중 지점 라이트 시작 · 팀원 암순응 시작 | **6 프레임째** | 렌더 프레임 | 계산값(따로 칸 없음) |
+| ⑤ 색수차 블러 — 실제 화면 + 방사형 블러 + Volume 색수차(가장자리) + 블룸 최대 · 섬광 순간 → +0.1 | 0.1s | **진행기 시계**(기본 실시간) | `hitFlashAberrationDuration` |
+| ⑥ 가라앉음 — 블룸 덩어리가 가라앉음, 블러·색수차 → 0 · +0.1 → **+0.3 끝** | 0.2s | 진행기 시계 | `hitFlashSettleDuration` |
 | 월드 섬광 파티클 | 파티클 수명(최장 0.45) — **실시간 0.3s 상한** | **스케일**(기본) + 상한 넘으면 배속 | `FX_InterruptHitFlash` › `InterruptHitFlashVfx.timeBase`·`realTimeCap` |
 | 적중 지점 라이트 | 0.25s(곡선) | **실시간** | `FX_InterruptHitFlash` › `lightDuration`·`lightCurve` |
 
-길이는 레퍼런스 영상(30fps) 프레임 수(괄호 f). 단계별 화면 효과 세기(`InterruptHitFlashRules.Look`, 0~1 × 칸 최대값):
+②③④ 는 §17 에서 초 칸(0.067·0.033·0.033)을 렌더 프레임 수 칸으로 바꿨다 — 60fps 에서 2 프레임 = 0.033s, 프레임레이트가 달라도 '몇 장 보이나'가 같다. 단계별 화면 효과 세기(`InterruptHitFlashRules.Look`, 0~1 × 칸 최대값):
 
 | 단계 | 렌즈 플레어 | 방사형 블러 | 색수차 Volume | 블룸 Volume | 오버레이 그림 |
 |---|---|---|---|---|---|
@@ -106,19 +110,21 @@
 | ⑤ | 0 | 0.8 → 0.6 | 1 | **1**(섬광 순간부터 최대 — 코어가 번짐, §16) | 없음(캔버스 끔) |
 | ⑥ | 0 | 0.6 → 0 | 1 → 0 | 1 → 0(끝까지 남다가 가라앉음) | 없음(캔버스 끔 — §16 무지개 고리 제거) |
 
-- **진행기 시계** = 디렉터 `hitFlashTimeBase`(기본 **실시간** — 히트스톱·슬로우와 무관하게 섬광 순간 0.133s·끝 0.433s). 섬광 순간은 진행기가 한 번 알리고(시간표 하나) 디렉터가 그 순간 오너 암전 끔·월드 섬광·암순응을
-  같은 프레임에 튼다 — 오너 상태 기계는 따로 시간을 재지 않는다(`InterruptOwnerPresentation.SuccessFlashMoment`). 진행 중에 칸을 바꾸면 다음 성공부터.
-- ② 시작 = 성공 `Started` 순간 = 히트스톱 시작 순간(히트스톱 길이 0 이어도 같다). 각 길이 0 = 그 단계 건너뜀.
+- **②③④ = 렌더 프레임**: 진행기가 `Time.frameCount` 로 성공 `Started` 프레임부터 센다(히트스톱으로 시간이 거의 멈춰도 프레임은 넘어간다).
+  섬광 순간 = 그 프레임 + ②+③+④(기본 6) — 진행기가 한 번 알리고(시간표 하나) 디렉터가 그 프레임에 오너 암전 끔·월드 섬광·라이트·암순응을 튼다
+  (오너 상태 기계는 따로 재지 않는다 — `InterruptOwnerPresentation.SuccessFlashMoment`). ⑤ 의 0초 = 섬광 순간 프레임의 진행기 시각.
+- **⑤⑥ = 진행기 시계** = 디렉터 `hitFlashTimeBase`(기본 **실시간**). 진행 중에 칸을 바꾸면 다음 성공부터.
+- ② 시작 = 성공 `Started` 순간 = 히트스톱 시작 순간(히트스톱 길이 0 이어도 같다). 각 길이 0 = 그 단계 건너뜀(②③④ 모두 0 이면 섬광 순간 = Started 프레임).
+- 순수 로직: `InterruptHitFlashTimeline.StageAt(지난 프레임, 섬광 순간 뒤 초)` · `InterruptHitFlashSequencer.Tick(시각, 프레임)` — EditMode 가 프레임·시각을 직접 넘겨 확인한다.
 - 빛 모임은 입력 순간 → 오너 애니 Hit 이벤트까지(기존 Hit 이벤트 재사용, SO 타이머 칸 없음).
 - 셰이더는 `_Time` 을 쓰지 않는다 — 빛 모임·월드 섬광은 파티클 나이(AgePercent·수명 곡선)라 파티클 시간 기준을 그대로 따르고, 오버레이는 진행기가 넘기는 `_Progress` 로 그린다.
 - 팀원 암순응 곡선 자체(`InterruptDarkAdaptation` 0.08/0.6/0.5)는 실시간 그대로다(§3) — 시작 시각만 섬광 순간을 따른다.
 
-기본(실시간 진행기) = 섬광 순간 0.133s · 끝 0.433s — 히트스톱·성공 슬로우와 무관
-(EditMode `InterruptHitFlashTests.기본_실시간_시계면_히트스톱_슬로우와_무관하게_섬광_순간_0_133초_끝_0_433초` · `디렉터_기본_시간표_섬광_순간_0_133_끝_0_433`).
+기본 = 2+2+2 프레임 뒤 섬광 순간 · 그 뒤 실시간 0.3s 끝 — 히트스톱·성공 슬로우와 무관
+(EditMode `InterruptHitFlashTests.기본_실시간_시계면_2_2_2_프레임_뒤_섬광_순간_그_뒤_실시간_0_3초` · `디렉터_기본_시간표_2_2_2_프레임_뒤_섬광_순간_그_뒤_0_3초`).
 
-**칸을 스케일로 바꾸면** 성공 슬로우(히트스톱 0.05s×0.02 → 진입 0.05s 0.02→0.25 → 유지 0.25 1.2s → 복귀 0.4s)를 따라 늘어난다 —
-히트스톱(스케일 0.001) 동안 ② 는 1.5% 만 나아가 거의 멈춰 보이고, 그 뒤 스케일 0.25 구간에서 길이 × 4 로 늘어난다(섬광 순간 실시간 약 0.6s).
-EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_섬광_순간이_성공_슬로우를_따라_늘어난다` 가 순서·섬광 순간 = 암전 끔 같은 프레임을 확인한다.
+**칸을 스케일로 바꾸면** ⑤⑥ 만 성공 슬로우(유지 0.25)를 따라 길이 × 약 4 로 늘어난다 — ②③④·섬광 순간 프레임은 그대로
+(EditMode `칸을_스케일로_바꾸면_색수차_가라앉음만_성공_슬로우를_따라_늘어나고_섬광_순간_프레임은_그대로`).
 
 ### 0.5 새 수치 칸 — 전부 `NetworkManager.prefab › InterruptProductionDirector`
 
@@ -130,8 +136,10 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 | `interruptWeakZoomFactor`(약 줌) | 0.93 | 각 피어 | 🟨 **반영 예정** |
 | `ownerDimInDuration` · `ownerDimOutDuration` | 0.1 · 0.2 | 각 피어 | `[DataTableIgnore]` — 프리팹이 원본 |
 | `ownerDimColor` · `ownerDimOpacity` | 검정 · 1(100%) — 예: 남색 0.9 | 각 피어 | `[DataTableIgnore]`(색은 테이블 열 아님) |
-| `hitFlashTimeBase`(진행기 시계) | 실시간(Unscaled) | 각 피어 | `[DataTableIgnore]` |
-| `hitFlashStarburstDuration` · `WhiteoutDuration` · `SmearDuration` · `AberrationDuration` · `SettleDuration` | 0.067 · 0.033 · 0.033 · 0.1 · 0.2(진행기 시계 초) | 각 피어 | `[DataTableIgnore]` |
+| `show*` 연출 켜기/끄기 9칸(§0.6) | `showOwnerDim` 켬, 나머지 8칸 끔 | 각 피어 | `[DataTableIgnore]` — 프리팹이 원본 |
+| `hitFlashTimeBase`(⑤⑥ 시계) | 실시간(Unscaled) | 각 피어 | `[DataTableIgnore]` |
+| `hitFlashStarburstFrames` · `WhiteoutFrames` · `SmearFrames` | 2 · 2 · 2(렌더 프레임 수) | 각 피어 | `[DataTableIgnore]` |
+| `hitFlashAberrationDuration` · `SettleDuration` | 0.1 · 0.2(진행기 시계 초) | 각 피어 | `[DataTableIgnore]` |
 | `hitFlashOverlayMaterial` | `M_InterruptHitFlashOverlay` | 각 피어 | 참조 — 비우면 오버레이 그림 없음(플레어·블러·Volume 은 돈다) |
 | `hitFlashLensFlare` | `LF_InterruptHitFlashStarburst` | 각 피어 | 참조 — 비우면 ② 플레어 없음 |
 | `hitFlashFlareIntensity` · `hitFlashFlareScale` | 1 · 1 | 각 피어 | `[DataTableIgnore]` |
@@ -140,21 +148,37 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 | `hitFlashWorldVfx` | `FX_InterruptHitFlash` | 각 피어 | 참조 — 비우면 월드 섬광 없음 |
 | `hitFlashWorldScale` · `hitFlashHeightOffset` | 1 · 1m | 각 피어 | `[DataTableIgnore]` |
 
-- 옛 1~4단계 칸(`hitFlashBurst/Glare/Invert/ReturnDuration`·`hitFlashSpeedLines`)은 §15 재구성으로 없앴다(프리팹 YAML 에도 없음 — 테스트가 확인).
+- 옛 1~4단계 칸(`hitFlashBurst/Glare/Invert/ReturnDuration`·`hitFlashSpeedLines`)은 §15 재구성으로, ②③④ 초 칸(`hitFlashStarburst/Whiteout/SmearDuration`)은 §17 프레임 칸으로 없앴다(프리팹 YAML 에도 없음 — 테스트가 확인).
+- `show*` 9칸은 프리팹 YAML 에 명시해 뒀다(기본값 = 오너 암전만).
 - 오너 암전·섬광 수치 칸들은 `NetworkManager.prefab` YAML 에 아직 써 있지 않아 **코드 기본값**이 쓰인다(인스펙터에서 바꾸고 저장하면 그때 써진다).
   예외 `hitFlashTimeBase: 0`(실시간)은 명시해 뒀다 — 스케일 기본 시절 메모리에 올라간 프리팹이 리임포트 없이 스케일로 남지 않게. 에셋 참조 5칸도 명시.
 - 이펙트 시간 기준(§0.4): `FX_InterruptLightGather` › `InterruptLightGatherVfx.timeBase` · `FX_InterruptHitFlash` › `InterruptHitFlashVfx.timeBase`(둘 다 기본 **스케일** —
   재생할 때마다 모든 파티클 `useUnscaledTime` 에 넣는다, 프리팹 파티클 값도 스케일로 맞춤). 소켓은 §0.7.
 
-### 0.6 스위치 칸이 없는 새 연출 (132 단계 6 판단)
+### 0.6 연출 켜기/끄기 칸 · 튜닝 패널 (§17)
 
-오너 암전·빛 모임·적중 섬광에는 디렉터 cue 칸을 **더하지 않았다**(10칸 유지). 셋 다 132 체계의 본체라 끌 일이 튜닝·디버그뿐이고,
-상태 기계(강 예측 → 암전 → 성공 때 암전이 켜져 있었으면 화면 섬광)에 서로 물려 있어 칸 하나로 일부만 끄면 조건이 꼬인다. 끄고 싶을 때:
-- 섬광 오버레이 그림 = `hitFlashOverlayMaterial` 비움 · 플레어 = `hitFlashLensFlare` 비움 · 블러 = `hitFlashBlurStrength` 0 · 색수차/블룸 = 프로필 칸 비움
-  · 월드 섬광 = `hitFlashWorldVfx` 비움(섬광 순간·암순응은 그대로 돈다).
-- 오너 암전 = `ownerDimOpacity` 0(상태 기계·오버레이 조건은 그대로 — 화면만 안 덮인다).
-- 빛 모임 = `Player.prefab` 루트 `InterruptLightGatherSocket.vfxPrefab` 비움(로컬, 저장 금지).
-필요해지면 §6.6 순서로 cue 를 더한다(기본 켬).
+132 단계 6 에서는 칸 하나로 일부만 끄면 상태 기계 조건(강 예측 → 암전 → 성공 때 암전이 켜져 있었으면 화면 섬광)이 꼬일까 봐 칸을 안 뒀다.
+§17 에서 **'그리기만 안 함'** 칸으로 더했다 — 칸은 출력 쪽에서만 읽고, 상태 기계·진행기 시간표·섬광 순간 사건은 칸과 무관하게 그대로 돈다
+(예: ②③④ 를 꺼도 6 프레임째 섬광 순간에 오너 암전 상태가 걷힌다, 오너 암전 칸을 꺼도 `SuccessDimmed` 는 서서 ②~⑥ 오버레이 조건이 그대로).
+
+| 효과 칸(`InterruptPresentationEffect`) | 디렉터 필드 | 기본 | 끄면 막히는 곳 |
+|---|---|---|---|
+| 오너 암전 | `showOwnerDim` | **켬** | `InterruptOwnerOutputGate` 가 덮개에 0 을 넘김(상태 값은 그대로). Play 중 바꾸면 다음 프레임(`Sync`) |
+| 빛 모임(VFX + 소켓 라이트) | `showLightGather` | 끔 | 오너 = 문이 시작을 안 넘김, 팀원 = 디렉터가 `InterruptLightGatherPeers.Begin` 을 안 부름. 시작 순간 읽음(돌던 빛 모임은 끝까지) |
+| ② 스타버스트 · ③ 화이트아웃 · ④ 스미어 · ⑤ 색수차 블러 · ⑥ 가라앉음(블룸) | `showStarburst`·`showWhiteout`·`showSmear`·`showAberration`·`showSettle` | 끔 | `InterruptHitFlashOverlay.Show` 가 그 단계 동안 세기 0·캔버스 끔(플레어·블러·Volume 가중치 0) |
+| 월드 섬광 파티클 | `showWorldFlash` | 끔 | `InterruptHitFlashVfx.Play(…, particles: false)` — 둘 다 끄면 월드 섬광 오브젝트를 만들지도 않음 |
+| 적중 지점 라이트 | `showHitLight` | 끔 | `InterruptHitFlashVfx.Play(…, light: false)` — 끈 채 첫 재생이면 라이트를 만들지 않음 |
+| 팀원 암순응 | 기존 **A2** `darkAdaptation` | **끔** | 새 칸을 더하지 않고 A2 하나로 정리(본인 self 강도 = 약 예측 성공도 같은 칸) |
+
+- 슬로우·줌·히트스톱은 연출 그림이 아니라 그대로다(A1 `hitStop`·A3 `ownerZoom` 켬, 프로필 그대로). A4·B·C·E 칸도 그대로.
+- 런타임 API: `director.IsEffectOn/SetEffect(InterruptPresentationEffect, bool)`, `director.Get/Set(InterruptProductionCue, bool)` — 인스턴스 값만 바꾸고 저장하지 않는다.
+- 에셋 칸을 비우는 옛 방법(`hitFlashOverlayMaterial` 비움 등)도 그대로 먹지만, 튜닝은 위 칸으로 한다.
+
+**튜닝 패널** `DebugInterruptTuningPanel`(`Assets/1.Scripts/Dev/InterruptLab/`) — `DebugInterruptLab.unity` 의 `InterruptLab` 오브젝트(`DebugTimeScale` 옆)에만 있다.
+- Play 중 화면 오른쪽 위 OnGUI 박스(제목 버튼으로 접기). 줄마다 위 효과 10개(효과 칸 9 + 팀원 암순응 A2) 토글, `전부 켬`·`암전만`(기본값) 버튼.
+- 배속 = 같은 오브젝트 `DebugTimeScale` 슬라이더(0.05~2) + 버튼(0.05·0.1·0.25·0.5·1·2). 성공 후 1배속 복귀(기본 3초)는 `DebugTimeScale` 규칙 그대로 — 그 동안 남은 시간을 표시.
+- 토글은 이 피어 디렉터 런타임 값만 바꾼다 — 프리팹·씬 저장 없음, **Play 종료 시 원래 값**(MPPM 이면 피어마다 따로).
+- 격리: 빌드 목록·다른 씬·프리팹에 없음 — `DebugInterruptLabIsolationTests` 가 디버그 컴포넌트 목록에 넣어 검사, 같은 오브젝트 배치도 확인.
 
 ### 0.7 렌더러 · 에셋 위치
 
@@ -216,7 +240,9 @@ EditMode `InterruptHitFlashTests.칸을_스케일로_바꾸면_섬광_단계와_
 - **잔상 비트는 SVN 커밋 뒤부터.** `DashAfterimage.cs` 한 줄이 SVN 에 들어가기 전에는 잔상이 암전에 덮인다. 🔴 SVN 을 git 보다 먼저 커밋한다(메인이 병합 직전).
 - **팀원 빛 모임은 발동자 Hit 릴레이로 끈다**(새 RPC 없음) — 관찰자 애니메이터가 Hit 을 못 받으면 실패·성공·리셋 때 꺼진다.
 - **HUD 도 덮는다.** 오너 암전 동안 내 HP·쿨 HUD 가 안 보인다(계획서 확정). ③④ 섬광 중도 같다. ⑤⑥ 방사형 블러·색수차·블룸은 HUD 에 걸리지 않는다.
-- **진행기 칸을 스케일로 바꾸면 섬광이 길어진다**(기본은 실시간 0.133s). 성공 슬로우 아래 섬광 순간이 실시간 약 0.6s 로 늘고, ② 는 히트스톱 0.05s 동안 거의 멈춰 있다.
+- **진행기 칸을 스케일로 바꾸면 ⑤⑥ 이 길어진다**(기본은 섬광 순간 뒤 실시간 0.3s). ②③④·섬광 순간은 렌더 프레임 수라 칸과 무관하다(§17).
+- **②③④ 는 프레임레이트를 따른다**(§17) — 2 프레임 = 60fps 0.033s · 30fps 0.067s · 144fps 0.014s. 에디터·MPPM 처럼 프레임이 들쭉날쭉하면 화면에 머무는 실시간도 들쭉날쭉하다.
+- **오너 암전 칸을 끄고 ④ 스미어만 켜면 남김 실루엣이 안 나올 수 있다**(Play 미확인) — 스미어는 암전 덮개 RT(`MaskCoverTarget`)를 읽는데, 암전 강도 0 이면 그 RT 가 비어 흰 텍스처(= 남김 없음)로 대신한다.
 - **플레어 층은 Play 미확인.** URP 내부 함수(`DoLensFlareDataDrivenCommon`)를 외부 RT 에 직접 부른다 — RT 상하 방향·플레어 크기(요소 sizeXY × 0.1 화면 단위)·세기는 Play 로 확인·튜닝한다.
   URP 버전이 바뀌면 그 함수 인자가 바뀔 수 있다(지금 17.3).
 - **⑥ 이후 블룸은 씬 Volume 값으로 돌아간다** — 섬광 Volume 은 가중치만이라 씬에 블룸이 없으면(활성 끔) ⑤⑥ 동안만 블룸이 생긴다.
@@ -339,7 +365,7 @@ xlsx: 강·성공은 기존 열, **약 `interruptWeakProfile.*` 는 반영 예�
 | `revealRadius` | 0.18 | 중심 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔 |
 | `revealSoftness` | 0.1 | 원 가장자리 부드러움(화면 높이 비율) |
 
-**언제.** 할 일 132 단계 5 부터 성공 `Started` 즉시가 아니라 **적중 섬광 순간**(②③④ 뒤 = ⑤ 시작, 기본 0.133초)에 튼다.
+**언제.** 할 일 132 단계 5 부터 성공 `Started` 즉시가 아니라 **적중 섬광 순간**(②③④ 뒤 = ⑤ 시작, 기본 성공 Started 6 프레임째)에 튼다. §17 부터 A2 기본 꺼짐.
 
 **본인/타인.** `Started` 의 발동자 clientId 가 이 피어의 `LocalClientId` 면 `selfIntensity`(디렉터 개인 채널), 아니면 `othersIntensity`(공용 채널).
 단 본인 화면에서 섬광 오버레이가 돌았으면(강 시도 성공) self 암순응은 생략한다 — 마스크 암전·섬광이 대신한다(`InterruptHitFlashRules.SelectDarkAdaptation`).
@@ -392,7 +418,7 @@ xlsx: 강·성공은 기존 열, **약 `interruptWeakProfile.*` 는 반영 예�
 4. Play — 간파 성공 시 모든 화면에서 한 번 재생된다. 원샷이라 소켓·대상을 따라가지 않고 재생 순간 위치에 찍힌다.
 
 캐릭터별 기존 성공 연출(가붕이 `PlayerShieldVfx` 충격파 B3, 어쌔신 `AssassinSkillView` 성공 소켓 C2)은 코드가 그대로지만 132 단계 6 부터 **스위치가 꺼져** 나오지 않는다(새 적중 섬광이 대신).
-A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(0~0.433초)과 겹쳐 보이면 칸을 비운다.
+A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 프레임 + 0.3초)과 겹쳐 보이면 칸을 비운다.
 빛 모임·적중 섬광 텍스처 바꾸기는 §0.7·[handoff-interrupt-132-vfx.md](handoff-interrupt-132-vfx.md).
 
 ## 5. 알려진 제약
@@ -455,8 +481,8 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(0~
 |---|---|---|---|
 | 시도(강·약)·성공 슬로우 · 히트스톱 | — · A1 | 서버 타임라인(전 피어 공용) | 채널을 거치지 않는다. `Time.timeScale` 은 피어 전역이라 개인 슬로우는 불가 |
 | 오너 줌 | A3 | 개인 | 카메라가 매 프레임 `Director.OwnerZoomFactor(목적, 성공 배율)`·`Director.OwnerAwaitsStrongResult` 질의 → `SlowMotionOwnerZoom`(시도~성공 줌 한 번). 내 슬로우인지는 카메라가 본다 |
-| 오너 암전 · 섬광 오버레이 | (칸 없음) | 개인(오너 상태 기계) | §0.3 |
-| 빛 모임 · 월드 섬광 | (칸 없음) | 오너 = 입력 순간 예측 / 팀원·모두 = 슬로우 이벤트 | §0.3 |
+| 오너 암전 · 섬광 오버레이 | 효과 칸 `show*`(§0.6) | 개인(오너 상태 기계) | §0.3 |
+| 빛 모임 · 월드 섬광 · 적중 지점 라이트 | 효과 칸 `show*`(§0.6) | 오너 = 입력 순간 예측 / 팀원·모두 = 슬로우 이벤트 | §0.3 |
 | 암순응 self 강도 | A2 | 개인 | 발동자 == `LocalClientId` ∧ 섬광 오버레이 안 돎(약 시도 성공), 섬광 순간 |
 | 암순응 others 강도 | A2 | 공용 | 그 외 화면, 섬광 순간. 칸은 하나(설계 Q3-a) |
 | 성공 이펙트 칸 casterFx/targetFx | A4 | 공용 | 발동자 소유 켜진 `InterruptSuccessFx` |
@@ -466,15 +492,15 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(0~
 ### 6.4 스위치·프로필 위치
 
 `NetworkManager.prefab › InterruptProductionDirector`. 인스펙터는 `[Header]` 로 "시도 — 공용 / 성공 — 공용 / 성공 — 개인 / 시도·결론 — 개인(오너 암전·빛 모임) / 성공 — 적중 섬광" 으로 묶여 있다.
-**스위치 기본값(할 일 132 단계 6)**: 새 체계에 들어오는 공용 칸 **A1·A2·A3·A4 = 켬**, 캐릭터별·맞은 쪽 연출 **B1·B2·B3·C1·C2·E1 = 꺼짐**(새 적중 섬광이 대신).
-새 컴포넌트(코드 기본값)는 여전히 전부 꺼짐이다 — 켬은 프리팹 값이다.
+**스위치 기본값(할 일 132 단계 6 → §17)**: 공용 칸 **A1·A3·A4 = 켬**, **A2 = 꺼짐**(§17 기본값 — 팀원 암순응 끔), 캐릭터별·맞은 쪽 연출 **B1·B2·B3·C1·C2·E1 = 꺼짐**(새 적중 섬광이 대신).
+새 컴포넌트(코드 기본값)는 여전히 전부 꺼짐이다 — 켬은 프리팹 값이다. 효과 칸 `show*` 는 [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
 
 | 칸 | 필드 | 프리팹 | 무엇이 언제 | 재생 지점 → 디렉터 |
 |---|---|---|---|---|
 | — | `interruptProfile` · `interruptWeakProfile` | — | 강·약 시도 슬로우 모양 | 시도 단계 `ServerStart` (xlsx `SlowMotion`, §2.1) |
 | — | `interruptSuccessProfile` | — | 성공 슬로우 모양 | 성공 단계 `ServerStart` (xlsx `SlowMotion`, §2.1) |
 | A1 | `hitStop` | **켬** | 성공 슬로우 맨 앞 정지(섬광 ② 가 같은 순간 시작) | 성공 단계가 `GlobalTimeScale.ServerStart(…, hitStopOn)` 로 넘긴다 — 꺼지면 이벤트의 `hitStopDuration` 0 |
-| A2 | `darkAdaptation` | **켬** | 성공 섬광 순간 화면 휘도 암순응(팀원 others · 오버레이 없던 본인 self) | 섬광 순간 개인/공용 채널 → `InterruptDarkAdaptation.Play` |
+| A2 | `darkAdaptation` | 꺼짐(§17) | 성공 섬광 순간 화면 휘도 암순응(팀원 others · 오버레이 없던 본인 self) — 튜닝 패널 '팀원 암순응' | 섬광 순간 개인/공용 채널 → `InterruptDarkAdaptation.Play` |
 | A3 | `ownerZoom` | **켬** | 내가 일으킨 슬로우(강·약·성공) 동안 카메라 줌 | `CameraTargetSwitcher` → `Director.OwnerZoomFactor` — 꺼지면 배율 1 |
 | A4 | `successFxSlot` | **켬** | 공용 성공 이펙트 칸(§2.4, base·Variant 칸은 지금 비어 있음) | 성공 단계 공용 채널 → `InterruptSuccessFx`(sink) |
 | B1 | `paladinShieldGlow` | 꺼짐 | 팔라딘 간파 시도 방패 발광·루프 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 스킬(sink). `OnEnd` 끄기·회수는 늘 돈다 |
@@ -527,7 +553,9 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(0~
 `InterruptProductionStageTests`(가짜 포트로 서버 사건 순서) · `InterruptProductionChannelTests`(개인/공용·시도 B1·한 sink `PlayCue`·섬광 대상 6종) · `InterruptProductionLiveReadTests`(캐싱 금지 회귀).
 `InterruptSuccessFxTests` 는 플레이어 러너. 데이터 테이블 러너로 `SlowMotion` 바인딩 확인.
 할 일 132 추가(같은 슬로우 모션 메뉴): `InterruptOwnerPresentationTests`(상태 기계) · `InterruptTargetRegistryTests`(캐시) · `InterruptOwnerDimTests`(마스크 암전·비트 4) ·
-`InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1~A4 켬). 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`).
+`InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1·A3·A4 켬) ·
+`InterruptPresentationEffectTests`(§17 효과 칸 기본값·프리팹·그리기만 끔·섬광 순간 정상) · `DebugInterruptLabTests`(튜닝 패널 줄·배속 버튼).
+격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`).
 
 ## 7. 이후 확장
 

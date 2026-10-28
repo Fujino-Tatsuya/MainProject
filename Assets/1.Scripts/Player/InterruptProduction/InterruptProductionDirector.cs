@@ -92,12 +92,36 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [DataTableIgnore, SerializeField] private bool assassinInsightSuccess;
     [Tooltip("E1 섬광 Interrupt_Flash — 간파당한 보스·엘리트·허수아비·스파링 봇 몸에서 터지는 섬광(판정·그로기는 그대로)")]
     [DataTableIgnore, SerializeField] private bool targetFlash;
-    [Tooltip("A2 암순응 — 간파 성공 때 화면의 어두운 픽셀을 잠깐 낮춘다(InterruptDarkAdaptation). 본인 화면 = 강하게, 다른 화면 = 약하게")]
+    [Tooltip("A2 암순응(= 팀원 암순응 켜기/끄기, 할 일 132 §17) — 섬광 순간 화면의 어두운 픽셀을 잠깐 낮춘다(InterruptDarkAdaptation). " +
+             "다른 화면 = 약하게, 본인 화면 = 오너 화면 섬광이 안 돈 성공(약 예측)만 강하게")]
     [DataTableIgnore, SerializeField] private bool darkAdaptation;
 
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
+
+    // 연출 켜기/끄기(할 일 132 §17) — 끈 효과는 그리기만 안 한다. 오너 상태 기계·섬광 시간표·섬광 순간 사건(암전 걷힘 등)은 그대로 돈다.
+    // 기본 = 오너 암전만 켬. 팀원 암순응 = 위 A2 칸, 슬로우·줌·히트스톱 = A1·A3·프로필 그대로. 이 피어 값을 쓴다(그릴 때마다 읽음).
+    // DebugInterruptLab 의 튜닝 패널(DebugInterruptTuningPanel)이 Play 중 런타임 값만 바꾼다.
+    [Header("연출 켜기/끄기 — 그리기만(할 일 132 §17)")]
+    [Tooltip("오너 암전(마스크 암전 덮개) 그림. 끄면 암전 상태 기계는 그대로 돌고 덮개만 0")]
+    [DataTableIgnore, SerializeField] private bool showOwnerDim = true;
+    [Tooltip("빛 모임 VFX + 소켓 라이트(본인·팀원 화면). 시작 순간 읽는다 — 돌던 빛 모임은 끝까지")]
+    [DataTableIgnore, SerializeField] private bool showLightGather;
+    [Tooltip("② 스타버스트(렌즈 플레어 + 푸른 고리). 끄면 그 프레임 동안 아무것도 안 그린다(시간표 그대로)")]
+    [DataTableIgnore, SerializeField] private bool showStarburst;
+    [Tooltip("③ 화이트아웃(회청색 덮개 + 방사형 블러)")]
+    [DataTableIgnore, SerializeField] private bool showWhiteout;
+    [Tooltip("④ 스미어(흰 덩어리 한 장)")]
+    [DataTableIgnore, SerializeField] private bool showSmear;
+    [Tooltip("⑤ 색수차 블러(방사형 블러 + Volume 색수차 + 블룸)")]
+    [DataTableIgnore, SerializeField] private bool showAberration;
+    [Tooltip("⑥ 가라앉음(블룸·블러·색수차 감소)")]
+    [DataTableIgnore, SerializeField] private bool showSettle;
+    [Tooltip("월드 섬광 파티클(모든 피어, 섬광 순간)")]
+    [DataTableIgnore, SerializeField] private bool showWorldFlash;
+    [Tooltip("적중 지점 Point Light(모든 피어, 섬광 순간)")]
+    [DataTableIgnore, SerializeField] private bool showHitLight;
 
     // 오너 암전·빛 모임(할 일 132) — 오너 클라가 입력 순간 예측해 바로 켜고, 서버 결과로 걷거나 성공에 넘긴다. 이 피어 값을 쓴다.
     // 데이터 테이블 열 후보지만 아직 xlsx 칸이 없어 [DataTableIgnore] — 프리팹이 원본.
@@ -111,18 +135,18 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("오너 암전 덮개 불투명도 [0, 1] — 1 = 100%(완전히 덮음), 0.9 = 90%")]
     [DataTableIgnore, SerializeField, Range(0f, 1f)] private float ownerDimOpacity = 1f;
 
-    // 적중 섬광(할 일 132 §15) — 성공 Started 순간(히트스톱 안) ② 시작, 각 길이는 시간 기준 칸의 시계(기본 실시간, §14). 이 피어 값을 쓴다.
-    // 기본 길이 = 레퍼런스 영상 30fps 프레임 수(2·1·1·3·6). 연출 길이라 애니 이벤트로 대체할 스킬 타이밍이 아니다(계획서 확정).
+    // 적중 섬광(할 일 132 §15·§17) — 성공 Started 순간(히트스톱 안) ② 시작. ②③④ = 렌더 프레임 수(§17-3), 그 끝 프레임 = 섬광 순간,
+    // ⑤⑥ = 시간 기준 칸의 시계(기본 실시간, §14) 초. 이 피어 값을 쓴다. 연출 길이라 애니 이벤트로 대체할 스킬 타이밍이 아니다(계획서 확정).
     // xlsx 칸이 아직 없어 [DataTableIgnore] — 프리팹이 원본. 화면 효과(②~⑥)는 오너만, 팀원은 섬광 순간에 월드 섬광 + 암순응.
-    [Header("성공 — 적중 섬광(할 일 132 §15)")]
-    [Tooltip("섬광 진행기 시계 — 실시간(기본): ②~⑥·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 슬로우·히트스톱과 무관 / 스케일: 성공 슬로우·히트스톱을 따라 느려진다. 진행 중에 바꾸면 다음 성공부터")]
+    [Header("성공 — 적중 섬광(할 일 132 §15·§17)")]
+    [Tooltip("⑤⑥ 시계 — 실시간(기본): 슬로우·히트스톱과 무관 / 스케일: 성공 슬로우를 따라 느려진다. ②③④·섬광 순간은 프레임 수라 이 칸을 타지 않는다. 진행 중에 바꾸면 다음 성공부터")]
     [DataTableIgnore, SerializeField] private InterruptEffectTimeBase hitFlashTimeBase = InterruptEffectTimeBase.Unscaled;
-    [Tooltip("② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(부드러운 코어 + 제각각 빛살) + 얇은 푸른 고리(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashStarburstDuration = 0.067f;
-    [Tooltip("③ 화이트아웃 — 화면 전체 밝은 회청색(오너·대상 블러 실루엣이 비침) + 강한 방사형 블러(오너 화면, 초, 진행기 시계). 불투명도·실루엣은 오버레이 재질 칸. 0 = 건너뜀")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashWhiteoutDuration = 0.033f;
-    [Tooltip("④ 스미어 — 검정 위 오너·대상·빔이 커진 흰 덩어리로 공격 방향(시전/대시 방향 화면 투영)으로 늘어난 한 장(오너 화면, 초, 진행기 시계). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
-    [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashSmearDuration = 0.033f;
+    [Tooltip("② 스타버스트 — 오너 암전 위 베이지 렌즈 플레어(부드러운 코어 + 제각각 빛살) + 얇은 푸른 고리(오너 화면, 렌더 프레임 수). 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0)] private int hitFlashStarburstFrames = 2;
+    [Tooltip("③ 화이트아웃 — 화면 전체 밝은 회청색(오너·대상 블러 실루엣이 비침) + 강한 방사형 블러(오너 화면, 렌더 프레임 수). 불투명도·실루엣은 오버레이 재질 칸. 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0)] private int hitFlashWhiteoutFrames = 2;
+    [Tooltip("④ 스미어 — 검정 위 오너·대상·빔이 커진 흰 덩어리로 공격 방향(시전/대시 방향 화면 투영)으로 늘어난 한 장(오너 화면, 렌더 프레임 수). 끝 프레임 = 섬광 순간: 오너 암전 끔·월드 섬광·라이트·팀원 암순응. 0 = 건너뜀")]
+    [DataTableIgnore, SerializeField, Min(0)] private int hitFlashSmearFrames = 2;
     [Tooltip("⑤ 색수차 블러 — 실제 화면 위 방사형 블러 + Volume 색수차(가장자리) + 블룸 최대(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashAberrationDuration = 0.1f;
     [Tooltip("⑥ 가라앉음 — 블룸 덩어리가 가라앉고 블러·색수차 0 으로(오너 화면, 초, 진행기 시계). 0 = 바로 끊김")]
@@ -160,9 +184,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public Color OwnerDimColor => ownerDimColor;
     public float OwnerDimOpacity => ownerDimOpacity;
 
-    public float HitFlashStarburstDuration => hitFlashStarburstDuration;
-    public float HitFlashWhiteoutDuration => hitFlashWhiteoutDuration;
-    public float HitFlashSmearDuration => hitFlashSmearDuration;
+    public int HitFlashStarburstFrames => hitFlashStarburstFrames;
+    public int HitFlashWhiteoutFrames => hitFlashWhiteoutFrames;
+    public int HitFlashSmearFrames => hitFlashSmearFrames;
     public float HitFlashAberrationDuration => hitFlashAberrationDuration;
     public float HitFlashSettleDuration => hitFlashSettleDuration;
     public InterruptEffectTimeBase HitFlashTimeBase => hitFlashTimeBase;
@@ -204,9 +228,23 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private IInterruptLightGatherOutput DefaultLightGatherOutput =>
         _ownerLightGatherOutput != null ? _ownerLightGatherOutput : (IInterruptLightGatherOutput)_ownerLogOutput;
 
+    // 효과 칸 문(할 일 132 §17) — 상태 기계와 출력 사이. 끈 효과는 여기서 그리기만 막는다.
+    private InterruptOwnerOutputGate _ownerGate;
+
     /// <summary>오너 연출 상태 기계 — 성공에 들어선 순간 암전이 켜져 있었으면(<see cref="InterruptOwnerPresentation.SuccessDimmed"/>) 적중 섬광 오버레이를 튼다.</summary>
-    public InterruptOwnerPresentation OwnerPresentation =>
-        _ownerPresentation ??= new InterruptOwnerPresentation(this, DefaultOwnerDimOutput, DefaultLightGatherOutput);
+    public InterruptOwnerPresentation OwnerPresentation
+    {
+        get
+        {
+            if (_ownerPresentation == null)
+            {
+                _ownerGate = new InterruptOwnerOutputGate(this, DefaultOwnerDimOutput, DefaultLightGatherOutput);
+                _ownerPresentation = new InterruptOwnerPresentation(this, _ownerGate, _ownerGate);
+            }
+
+            return _ownerPresentation;
+        }
+    }
 
     // 적중 섬광(할 일 132 §15) — 오너 화면 출력(오버레이·플레어·블러·Volume)은 Awake 에서 객체만 만든다(실제 오브젝트는 첫 재생 때). 월드 섬광은 첫 재생 때 한 번 만든다.
     private InterruptHitFlashOverlay _hitFlashOverlay;
@@ -251,10 +289,11 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     private void Update()
     {
-        // 오너 암전 램프 = 실시간(슬로우·히트스톱 중에도 0.1/0.2초 그대로). 적중 섬광 단계·섬광 순간 = 진행기 시계(기본 스케일) —
+        // 오너 암전 램프 = 실시간(슬로우·히트스톱 중에도 0.1/0.2초 그대로). 적중 섬광 ②③④·섬광 순간 = 렌더 프레임 수, ⑤⑥ = 진행기 시계(기본 실시간) —
         // 성공 암전 끄기도 그 섬광 순간에 진행기가 알린다(HandleHitFlashMoment, 시간표 하나).
         _ownerPresentation?.Tick(Time.unscaledTime);
-        _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock));
+        _ownerGate?.Sync(); // 오너 암전 칸을 Play 중에 바꾸면 바로(§17)
+        _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock), Time.frameCount);
     }
 
     private void OnDisable()
@@ -300,6 +339,62 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             case InterruptProductionCue.AssassinInsightSuccess: return assassinInsightSuccess;
             case InterruptProductionCue.TargetFlash: return targetFlash;
             default: return false;
+        }
+    }
+
+    /// <summary>
+    /// 칸을 런타임에 바꾼다(디버그 패널 — 할 일 132 §17). 이 인스턴스 값만 바꾸고 저장하지 않는다(Play 종료 시 원래 값).
+    /// 다음 사건부터 쓰인다(사건마다 읽는 규칙 그대로).
+    /// </summary>
+    public void Set(InterruptProductionCue cue, bool on)
+    {
+        switch (cue)
+        {
+            case InterruptProductionCue.HitStop: hitStop = on; break;
+            case InterruptProductionCue.DarkAdaptation: darkAdaptation = on; break;
+            case InterruptProductionCue.OwnerZoom: ownerZoom = on; break;
+            case InterruptProductionCue.SuccessFxSlot: successFxSlot = on; break;
+            case InterruptProductionCue.PaladinShieldGlow: paladinShieldGlow = on; break;
+            case InterruptProductionCue.PaladinShieldCharge: paladinShieldCharge = on; break;
+            case InterruptProductionCue.PaladinWave: paladinWave = on; break;
+            case InterruptProductionCue.AssassinInsightAttempt: assassinInsightAttempt = on; break;
+            case InterruptProductionCue.AssassinInsightSuccess: assassinInsightSuccess = on; break;
+            case InterruptProductionCue.TargetFlash: targetFlash = on; break;
+        }
+    }
+
+    /// <summary>연출 효과 칸(할 일 132 §17) — 그릴 때마다 읽는다.</summary>
+    public bool IsEffectOn(InterruptPresentationEffect effect)
+    {
+        switch (effect)
+        {
+            case InterruptPresentationEffect.OwnerDim: return showOwnerDim;
+            case InterruptPresentationEffect.LightGather: return showLightGather;
+            case InterruptPresentationEffect.Starburst: return showStarburst;
+            case InterruptPresentationEffect.Whiteout: return showWhiteout;
+            case InterruptPresentationEffect.Smear: return showSmear;
+            case InterruptPresentationEffect.Aberration: return showAberration;
+            case InterruptPresentationEffect.Settle: return showSettle;
+            case InterruptPresentationEffect.WorldFlash: return showWorldFlash;
+            case InterruptPresentationEffect.HitLight: return showHitLight;
+            default: return false;
+        }
+    }
+
+    /// <summary>연출 효과 칸을 런타임에 바꾼다(디버그 패널). 이 인스턴스 값만 — 저장하지 않는다.</summary>
+    public void SetEffect(InterruptPresentationEffect effect, bool on)
+    {
+        switch (effect)
+        {
+            case InterruptPresentationEffect.OwnerDim: showOwnerDim = on; break;
+            case InterruptPresentationEffect.LightGather: showLightGather = on; break;
+            case InterruptPresentationEffect.Starburst: showStarburst = on; break;
+            case InterruptPresentationEffect.Whiteout: showWhiteout = on; break;
+            case InterruptPresentationEffect.Smear: showSmear = on; break;
+            case InterruptPresentationEffect.Aberration: showAberration = on; break;
+            case InterruptPresentationEffect.Settle: showSettle = on; break;
+            case InterruptPresentationEffect.WorldFlash: showWorldFlash = on; break;
+            case InterruptPresentationEffect.HitLight: showHitLight = on; break;
         }
     }
 
@@ -414,8 +509,11 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         if (Instance == null)
             return;
 
-        Instance.OwnerPresentation.SetOutputs(
+        // 갈아 끼운 출력도 효과 칸 문 뒤에 둔다(§17).
+        InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
+        Instance._ownerGate = new InterruptOwnerOutputGate(Instance,
             dimOutput ?? Instance.DefaultOwnerDimOutput, gatherOutput ?? Instance.DefaultLightGatherOutput);
+        presentation.SetOutputs(Instance._ownerGate, Instance._ownerGate);
     }
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
@@ -431,8 +529,12 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             OwnerPresentation.ServerStarted(triggerId, purpose, true, Time.unscaledTime);
 
         // 빛 모임(할 일 132 단계 4) — 남의 강 시도면 이 화면에 튼다(본인 화면은 입력 순간 예측이 이미 켰다). 성공이면 그 발동자 것을 끈다.
+        // 빛 모임 칸(§17)이 꺼져 있으면 틀지 않는다(그리기만 — 끄는 사건은 그대로 와도 빈 목록이라 무해).
         if (hasViewer && InterruptLightGatherRules.ShouldPlayForPeer(purpose, viewerIsCaster))
-            _peerLightGather.Begin(casterClientId, triggerId, FindLightGatherSocket(casterClientId));
+        {
+            if (showLightGather)
+                _peerLightGather.Begin(casterClientId, triggerId, FindLightGatherSocket(casterClientId));
+        }
         else if (purpose == SlowMotionPurpose.Success)
             _peerLightGather.EndCaster(casterClientId);
 
@@ -441,15 +543,17 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
         var e = InterruptProductionEvent.LocalSuccess(triggerId, casterClientId, targetPosition);
 
-        // 적중 섬광(할 일 132 §15) — 히트스톱이 이 순간 시작하므로 ② 도 지금(히트스톱 길이 0 이어도 같다).
-        // 오너 화면 섬광(②~⑥) = 내 성공 ∧ 그 순간 오너 암전이 켜져 있음(강 시도). 섬광 순간(②③④ 뒤 = ⑤ 시작) = 모든 피어 월드 섬광 + 암순응.
+        // 적중 섬광(할 일 132 §15·§17) — 히트스톱이 이 순간 시작하므로 ② 도 이 프레임(히트스톱 길이 0 이어도 같다).
+        // 오너 화면 섬광(②~⑥) = 내 성공 ∧ 그 순간 오너 암전 상태가 켜져 있음(강 시도 — 암전 칸을 꺼도 상태는 돈다).
+        // 섬광 순간(②③④ 프레임 뒤 = ⑤ 시작) = 모든 피어 월드 섬광·라이트 + 암순응.
         float now = InterruptEffectTime.Now(HitFlash.Clock);
+        int frame = Time.frameCount;
         bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
             viewerIsCaster && OwnerPresentation.SuccessDimmed);
         // ④ 스미어 방향 = 이번 강 시도의 공격 방향(오너 상태 — 입력 순간 예측이 받은 시전/대시 방향).
         if (ownerOverlay)
-            HitFlash.BeginOwnerOverlay(FlashPoint(targetPosition), OwnerPresentation.AttackDirection, now);
-        HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), now);
+            HitFlash.BeginOwnerOverlay(FlashPoint(targetPosition), OwnerPresentation.AttackDirection, now, frame);
+        HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), frame);
 
         SuccessStage.LocalStarted(purpose, e, FindSuccessFxSinks(casterClientId));
         LocalSucceeded?.Invoke(e);
@@ -484,8 +588,12 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     private Vector3 FlashPoint(Vector3 targetPosition) => targetPosition + Vector3.up * hitFlashHeightOffset;
 
+    // 월드 섬광 파티클·적중 지점 라이트 — 효과 칸(§17)이 둘 다 꺼져 있으면 만들지도 않는다.
     private void PlayWorldFlash(Vector3 position)
     {
+        if (!showWorldFlash && !showHitLight)
+            return;
+
         if (_hitFlashWorld == null)
         {
             if (hitFlashWorldVfx == null)
@@ -495,7 +603,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             _hitFlashWorld.name = hitFlashWorldVfx.name;
         }
 
-        _hitFlashWorld.Play(position, hitFlashWorldScale);
+        _hitFlashWorld.Play(position, hitFlashWorldScale, showWorldFlash, showHitLight);
     }
 
     // 강제 리셋·꺼짐 — 오너 화면 효과 즉시 복구(오버레이·플레어·블러·Volume 가중치), 남은 섬광 순간 취소, 월드 섬광 지움.

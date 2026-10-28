@@ -21,21 +21,23 @@ public enum InterruptHitFlashStage
     Settle = 6,
 }
 
-/// <summary>적중 섬광 칸(할 일 132 §15) — 디렉터가 구현하고, 성공 사건마다 읽는다(캐싱 없음).</summary>
+/// <summary>적중 섬광 칸(할 일 132 §15·§17) — 디렉터가 구현하고, 성공 사건마다 읽는다(캐싱 없음).</summary>
 public interface IInterruptHitFlashSettings
 {
-    /// <summary>단계 길이(초, <see cref="HitFlashTimeBase"/> 시계). 0 = 그 단계 건너뜀.</summary>
-    float HitFlashStarburstDuration { get; }
-    float HitFlashWhiteoutDuration { get; }
-    float HitFlashSmearDuration { get; }
+    /// <summary>②③④ 길이(렌더 프레임 수, §17-3). 0 = 그 단계 건너뜀.</summary>
+    int HitFlashStarburstFrames { get; }
+    int HitFlashWhiteoutFrames { get; }
+    int HitFlashSmearFrames { get; }
+    /// <summary>⑤⑥ 길이(초, <see cref="HitFlashTimeBase"/> 시계). 0 = 그 단계 건너뜀.</summary>
     float HitFlashAberrationDuration { get; }
     float HitFlashSettleDuration { get; }
-    /// <summary>진행기 시계(할 일 132 §14) — 실시간(기본) = 슬로우와 무관, 스케일 = 성공 슬로우·히트스톱을 따라 느려진다. 섬광 순간도 이 시계다.</summary>
+    /// <summary>⑤⑥ 시계(할 일 132 §14) — 실시간(기본) = 슬로우와 무관, 스케일 = 성공 슬로우를 따라 느려진다. ②③④·섬광 순간은 프레임 수라 이 칸을 타지 않는다.</summary>
     InterruptEffectTimeBase HitFlashTimeBase { get; }
 }
 
 /// <summary>
-/// 적중 섬광 시간표(할 일 132 §15) — 성공 순간 칸을 한 번 복사한다. 시각은 성공 Started 기준 경과(진행기 시계 초).
+/// 적중 섬광 시간표(할 일 132 §15·§17) — 성공 순간 칸을 한 번 복사한다.
+/// ②③④ = 성공 Started 프레임부터 렌더 프레임 수, 그 끝 프레임 = 섬광 순간(⑤ 시작). ⑤⑥ = 섬광 순간부터 진행기 시계 초.
 /// 히트스톱은 성공 Started 순간부터라 ②는 늘 히트스톱 안에서 시작한다(히트스톱 길이 0 이어도 같은 순간).
 /// </summary>
 public readonly struct InterruptHitFlashTimeline
@@ -47,17 +49,17 @@ public readonly struct InterruptHitFlashTimeline
         InterruptHitFlashStage.Aberration, InterruptHitFlashStage.Settle,
     };
 
-    public readonly float Starburst;
-    public readonly float Whiteout;
-    public readonly float Smear;
+    public readonly int StarburstFrames;
+    public readonly int WhiteoutFrames;
+    public readonly int SmearFrames;
     public readonly float Aberration;
     public readonly float Settle;
 
-    public InterruptHitFlashTimeline(float starburst, float whiteout, float smear, float aberration, float settle)
+    public InterruptHitFlashTimeline(int starburstFrames, int whiteoutFrames, int smearFrames, float aberration, float settle)
     {
-        Starburst = Sanitize(starburst);
-        Whiteout = Sanitize(whiteout);
-        Smear = Sanitize(smear);
+        StarburstFrames = System.Math.Max(0, starburstFrames);
+        WhiteoutFrames = System.Math.Max(0, whiteoutFrames);
+        SmearFrames = System.Math.Max(0, smearFrames);
         Aberration = Sanitize(aberration);
         Settle = Sanitize(settle);
     }
@@ -65,62 +67,94 @@ public readonly struct InterruptHitFlashTimeline
     public static InterruptHitFlashTimeline From(IInterruptHitFlashSettings settings) =>
         settings == null
             ? default
-            : new InterruptHitFlashTimeline(settings.HitFlashStarburstDuration, settings.HitFlashWhiteoutDuration,
-                settings.HitFlashSmearDuration, settings.HitFlashAberrationDuration, settings.HitFlashSettleDuration);
+            : new InterruptHitFlashTimeline(settings.HitFlashStarburstFrames, settings.HitFlashWhiteoutFrames,
+                settings.HitFlashSmearFrames, settings.HitFlashAberrationDuration, settings.HitFlashSettleDuration);
 
-    /// <summary>섬광 순간(⑤ 시작) — ②+③+④ 길이 합. 오너 암전 걷힘·월드 섬광·팀원 암순응이 이때다.</summary>
-    public float FlashMoment => Starburst + Whiteout + Smear;
+    /// <summary>섬광 순간(⑤ 시작) 프레임 — 성공 Started 프레임 + ②+③+④. 오너 암전 걷힘·월드 섬광·라이트·팀원 암순응이 이 프레임이다.</summary>
+    public int FlashMomentFrames => StarburstFrames + WhiteoutFrames + SmearFrames;
 
-    /// <summary>전체 길이(②~⑥).</summary>
-    public float Total => FlashMoment + Aberration + Settle;
+    /// <summary>섬광 순간 뒤 길이(⑤+⑥, 초).</summary>
+    public float AfterFlashDuration => Aberration + Settle;
 
-    /// <summary>단계 시작 시각(성공 Started 기준). None = 전체 끝.</summary>
-    public float StartOf(InterruptHitFlashStage stage)
+    /// <summary>프레임 수로 재는 단계(②③④).</summary>
+    public static bool IsFrameStage(InterruptHitFlashStage stage) =>
+        stage == InterruptHitFlashStage.Starburst || stage == InterruptHitFlashStage.Whiteout || stage == InterruptHitFlashStage.Smear;
+
+    /// <summary>②③④ 시작 프레임(성공 Started 기준). ⑤⑥·None = 섬광 순간 프레임.</summary>
+    public int StartFrameOf(InterruptHitFlashStage stage)
     {
-        float start = 0f;
-        for (int i = 0; i < Order.Length; i++)
+        switch (stage)
         {
-            if (Order[i] == stage)
-                return start;
-            start += LengthOf(Order[i]);
+            case InterruptHitFlashStage.Starburst: return 0;
+            case InterruptHitFlashStage.Whiteout: return StarburstFrames;
+            case InterruptHitFlashStage.Smear: return StarburstFrames + WhiteoutFrames;
+            default: return FlashMomentFrames;
         }
-
-        return start;
     }
 
-    /// <summary>경과 → 단계와 그 단계 진행도 [0, 1). 시작 전·끝난 뒤 = None. 길이 0 단계는 건너뛴다.</summary>
-    public InterruptHitFlashStage StageAt(float elapsed, out float progress)
+    /// <summary>⑤⑥ 시작 시각(섬광 순간 기준 초). None = ⑥ 끝. ②③④ = 0.</summary>
+    public float StartAfterFlashOf(InterruptHitFlashStage stage)
+    {
+        switch (stage)
+        {
+            case InterruptHitFlashStage.Settle: return Aberration;
+            case InterruptHitFlashStage.None: return AfterFlashDuration;
+            default: return 0f;
+        }
+    }
+
+    /// <summary>
+    /// 지금 단계와 그 단계 진행도 [0, 1). <paramref name="elapsedFrames"/> = 성공 Started 프레임 뒤 지난 렌더 프레임 수,
+    /// <paramref name="secondsSinceFlash"/> = 섬광 순간 뒤 지난 시간(초 — 섬광 순간 전엔 쓰지 않는다). 시작 전·끝난 뒤 = None. 길이 0 단계는 건너뛴다.
+    /// </summary>
+    public InterruptHitFlashStage StageAt(int elapsedFrames, float secondsSinceFlash, out float progress)
     {
         progress = 0f;
-        if (elapsed < 0f || float.IsNaN(elapsed))
+        if (elapsedFrames < 0)
             return InterruptHitFlashStage.None;
 
-        float start = 0f;
-        for (int i = 0; i < Order.Length; i++)
+        if (elapsedFrames < FlashMomentFrames)
         {
-            float length = LengthOf(Order[i]);
-            if (elapsed < start + length)
+            for (int i = 0; i < 3; i++)
             {
-                progress = (elapsed - start) / length;
-                return Order[i];
+                InterruptHitFlashStage stage = Order[i];
+                int start = StartFrameOf(stage);
+                int length = FramesOf(stage);
+                if (elapsedFrames < start + length)
+                {
+                    progress = (float)(elapsedFrames - start) / length;
+                    return stage;
+                }
             }
+        }
 
-            start += length;
+        if (secondsSinceFlash < 0f || float.IsNaN(secondsSinceFlash))
+            return InterruptHitFlashStage.None;
+
+        if (secondsSinceFlash < Aberration)
+        {
+            progress = secondsSinceFlash / Aberration;
+            return InterruptHitFlashStage.Aberration;
+        }
+
+        if (secondsSinceFlash < Aberration + Settle)
+        {
+            progress = (secondsSinceFlash - Aberration) / Settle;
+            return InterruptHitFlashStage.Settle;
         }
 
         return InterruptHitFlashStage.None;
     }
 
-    public float LengthOf(InterruptHitFlashStage stage)
+    /// <summary>②③④ 프레임 수. ⑤⑥·None = 0.</summary>
+    public int FramesOf(InterruptHitFlashStage stage)
     {
         switch (stage)
         {
-            case InterruptHitFlashStage.Starburst: return Starburst;
-            case InterruptHitFlashStage.Whiteout: return Whiteout;
-            case InterruptHitFlashStage.Smear: return Smear;
-            case InterruptHitFlashStage.Aberration: return Aberration;
-            case InterruptHitFlashStage.Settle: return Settle;
-            default: return 0f;
+            case InterruptHitFlashStage.Starburst: return StarburstFrames;
+            case InterruptHitFlashStage.Whiteout: return WhiteoutFrames;
+            case InterruptHitFlashStage.Smear: return SmearFrames;
+            default: return 0;
         }
     }
 
@@ -311,11 +345,12 @@ public sealed class InterruptHitFlashVolumeSnapshot
 }
 
 /// <summary>
-/// 적중 섬광 진행기(할 일 132 §15) — 순수 로직. 디렉터가 성공 단계(purpose==Success) 안에서 사건을 넘기고 매 프레임 Tick 한다.
-/// 시각(now)은 모두 <see cref="Clock"/> 시계 — 디렉터가 <see cref="InterruptEffectTime.Now"/> 로 읽어 넘긴다(할 일 132 §14).
+/// 적중 섬광 진행기(할 일 132 §15·§17) — 순수 로직. 디렉터가 성공 단계(purpose==Success) 안에서 사건을 넘기고 매 프레임 Tick 한다.
+/// 프레임(frame)은 렌더 프레임 번호(디렉터 = Time.frameCount) — ②③④·섬광 순간을 잰다.
+/// 시각(now)은 <see cref="Clock"/> 시계 — 디렉터가 <see cref="InterruptEffectTime.Now"/> 로 읽어 넘긴다(할 일 132 §14). ⑤⑥ 만 잰다.
 /// <list type="bullet">
 /// <item>오너 화면 섬광(<see cref="BeginOwnerOverlay"/>): ②~⑥ 을 출력에 넘기고 끝나면 숨긴다(전부 복구). 새 성공이 오면 처음부터.</item>
-/// <item>섬광 순간(<see cref="ScheduleFlash"/>): 모든 피어가 성공 Started + ②③④ 길이 뒤에 <c>onFlash</c> 를 부른다(월드 섬광·암순응·오너 암전 끔).
+/// <item>섬광 순간(<see cref="ScheduleFlash"/>): 모든 피어가 성공 Started 프레임 + ②③④ 프레임 수에 <c>onFlash</c> 를 부른다(월드 섬광·암순응·오너 암전 끔).
 ///       여러 발동자의 성공은 각각 따로 온다.</item>
 /// <item>강제 리셋(<see cref="ForcedReset"/>): 화면 효과 즉시 복구, 남은 섬광 순간 취소.</item>
 /// </list>
@@ -325,7 +360,7 @@ public sealed class InterruptHitFlashSequencer
 {
     private struct Pending
     {
-        public float Due;
+        public int DueFrame;
         public InterruptHitFlashMoment Moment;
     }
 
@@ -336,7 +371,9 @@ public sealed class InterruptHitFlashSequencer
     private IInterruptHitFlashOverlayOutput _overlay;
 
     private InterruptHitFlashTimeline _overlayTimeline;
-    private float _overlayStart;
+    private int _overlayStartFrame;
+    private bool _overlayFlashed;   // 화면 섬광이 섬광 순간 프레임을 지났다 — ⑤⑥ 은 그때 시각(_overlayFlashTime)부터
+    private float _overlayFlashTime;
     private Vector3 _overlayCenter;
     private Vector3 _overlayDirection;
     private InterruptEffectTimeBase _clock = InterruptEffectTimeBase.Unscaled;
@@ -377,37 +414,38 @@ public sealed class InterruptHitFlashSequencer
     }
 
     /// <summary>
-    /// [오너] 화면 섬광 시작 — 성공 Started 순간(<paramref name="now"/>). 칸은 이 순간 읽는다.
+    /// [오너] 화면 섬광 시작 — 성공 Started 순간(<paramref name="now"/>·<paramref name="frame"/>). 칸은 이 순간 읽는다.
     /// <paramref name="worldDirection"/> = 이번 시도의 공격 방향(오너 상태 <see cref="InterruptOwnerPresentation.AttackDirection"/>, 0 = 모름).
     /// </summary>
-    public void BeginOwnerOverlay(Vector3 worldCenter, Vector3 worldDirection, float now)
+    public void BeginOwnerOverlay(Vector3 worldCenter, Vector3 worldDirection, float now, int frame)
     {
         _overlayTimeline = InterruptHitFlashTimeline.From(_settings);
-        _overlayStart = now;
+        _overlayStartFrame = frame;
+        _overlayFlashed = false;
         _overlayCenter = worldCenter;
         _overlayDirection = worldDirection;
         OverlayActive = true;
-        UpdateOverlay(now);
+        UpdateOverlay(now, frame);
     }
 
-    /// <summary>[각 피어] 섬광 순간 예약 — 성공 Started + ②③④ 길이. 그 길이가 0 이면 바로 부른다.</summary>
-    public void ScheduleFlash(in InterruptHitFlashMoment moment, float now)
+    /// <summary>[각 피어] 섬광 순간 예약 — 성공 Started 프레임 + ②③④ 프레임 수. 그 합이 0 이면 바로 부른다.</summary>
+    public void ScheduleFlash(in InterruptHitFlashMoment moment, int frame)
     {
-        float due = now + InterruptHitFlashTimeline.From(_settings).FlashMoment;
-        if (due <= now)
+        int due = frame + InterruptHitFlashTimeline.From(_settings).FlashMomentFrames;
+        if (due <= frame)
         {
             _onFlash?.Invoke(moment);
             return;
         }
 
-        _pending.Add(new Pending { Due = due, Moment = moment });
+        _pending.Add(new Pending { DueFrame = due, Moment = moment });
     }
 
-    /// <summary>매 프레임(<see cref="Clock"/> 시계).</summary>
-    public void Tick(float now)
+    /// <summary>매 프레임 — <paramref name="now"/> = <see cref="Clock"/> 시계, <paramref name="frame"/> = 렌더 프레임 번호.</summary>
+    public void Tick(float now, int frame)
     {
         if (OverlayActive)
-            UpdateOverlay(now);
+            UpdateOverlay(now, frame);
 
         if (_pending.Count == 0)
             return;
@@ -416,7 +454,7 @@ public sealed class InterruptHitFlashSequencer
         _due.Clear();
         for (int i = 0; i < _pending.Count; i++)
         {
-            if (_pending[i].Due > now)
+            if (_pending[i].DueFrame > frame)
                 continue;
 
             _due.Add(_pending[i].Moment);
@@ -435,9 +473,18 @@ public sealed class InterruptHitFlashSequencer
         HideOverlay();
     }
 
-    private void UpdateOverlay(float now)
+    private void UpdateOverlay(float now, int frame)
     {
-        InterruptHitFlashStage stage = _overlayTimeline.StageAt(now - _overlayStart, out float progress);
+        // 섬광 순간 프레임에 처음 닿은 Tick 의 시각이 ⑤ 시작 — 같은 Tick 에서 부르는 섬광 순간(onFlash)과 같은 프레임이다.
+        int elapsedFrames = frame - _overlayStartFrame;
+        if (!_overlayFlashed && elapsedFrames >= _overlayTimeline.FlashMomentFrames)
+        {
+            _overlayFlashed = true;
+            _overlayFlashTime = now;
+        }
+
+        InterruptHitFlashStage stage = _overlayTimeline.StageAt(elapsedFrames,
+            _overlayFlashed ? now - _overlayFlashTime : -1f, out float progress);
         if (stage == InterruptHitFlashStage.None)
         {
             HideOverlay();
