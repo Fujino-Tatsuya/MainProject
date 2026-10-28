@@ -253,7 +253,7 @@ public static class QABoss103Match
             double combatStart = Time.realtimeSinceStartupAsDouble;
             QABoss103Heartbeat.MarkCombat();
             recorder = QABoss103Recorder.Begin(characters);   // C4 계측 — Combat 진입부터(F10 부활 집계 포함, 할 일 119)
-            QABoss103Relocator.Begin(characters, recorder.Stats, rec.RunSeed);   // C7d 20초 끼임 → 가장 가까운 링 지점 · 119 벽 끼임 → 무작위 링 지점
+            QABoss103Relocator.Begin(characters, recorder.Stats, cfg);   // C7d 20초 끼임 → 가장 가까운 링 지점 · 119 벽 끼임 → 무작위 링 지점 · 138-2 직전 스크린샷
             string combatWall = DateTime.Now.ToString("HH:mm:ss.fff");
             Debug.Log($"{Tag} event=combat_start at={combatWall} introS={Time.realtimeSinceStartup - introAt:F1} skip={SkipVotes()} hostSkipPath={bot.SkipPath} hostSawLock={bot.SawCinematicLock}");
             ctx.Check(bot.SawCinematicLock, "103 연출 중 연출 잠금", $"호스트 플레이어 PlayerEncounterLock.IsCinematicLocked 관측={bot.SawCinematicLock}");

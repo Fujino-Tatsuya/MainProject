@@ -191,7 +191,7 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
   | `traitSeed` | 특성 제시·선택 시드 | 0 = baseSeed 와 같이 씀 |
   | `botTier` | 봇 단계 | `auto`(판 번호로 보통→숙련→초보) · `Beginner` · `Normal` · `Skilled` |
   | `characterOrder` | 자리 0(호스트)·1·2 의 캐릭터 | `Paladin`·`Assassin`·`Gunner` 를 한 번씩 |
-  | `runs` | 한 밤 판 수 | 1~90 (판당 최대 약 45분 — 10판 ≈ 하룻밤) |
+  | `runs` | 한 밤 판 수 | 1~500 (판당 최대 약 45분 — 10판 ≈ 하룻밤. 종료 시각 옵션이 없어 아침까지 돌리려면 크게) |
 - 절차(에디터를 끈 상태):
   ```
   git switch qa/NightlyBase && git pull

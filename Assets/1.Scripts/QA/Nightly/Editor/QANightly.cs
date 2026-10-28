@@ -14,7 +14,8 @@ using UnityEngine;
 public sealed class QANightlySeed
 {
     public const string RelativePath = "QANightly/nightly-seed.json";
-    public const int MaxRuns = QABoss103Batch.TotalRuns;
+    /// <summary>한 밤 판 수 상한 — 할 일 138-2 아침까지 계속 돌리기(종료 시각 옵션 없음)로 103 배치 90판보다 크게.</summary>
+    public const int MaxRuns = 500;
 
     /// <summary>시드 이름 = 팀원 이름(영문·숫자·-·_ 1~32자) — 공유 날짜 폴더의 클립·리포트 파일 이름 앞에 붙는다(설정 칸 하나로 통일).</summary>
     public string Name = "";

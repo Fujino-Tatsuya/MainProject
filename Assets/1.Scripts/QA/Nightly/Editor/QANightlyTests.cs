@@ -56,7 +56,7 @@ public sealed class QANightlyTests
     [TestCase("{\"name\":\"x\",\"characterOrder\":[\"Paladin\",\"Paladin\",\"Gunner\"]}", "characterOrder")]
     [TestCase("{\"name\":\"x\",\"characterOrder\":[\"Paladin\",\"Gunner\"]}", "characterOrder")]
     [TestCase("{\"name\":\"x\",\"runs\":0}", "runs")]
-    [TestCase("{\"name\":\"x\",\"runs\":91}", "runs")]
+    [TestCase("{\"name\":\"x\",\"runs\":501}", "runs")]
     [TestCase("", "비어")]
     public void 틀린_시드는_칸을_짚어_거절(string json, string field)
     {

@@ -4,6 +4,6 @@
   "traitSeed": 0,
   "botTier": "auto",
   "characterOrder": ["Paladin", "Assassin", "Gunner"],
-  "runs": 10,
+  "runs": 500,
   "note": "qa/NightlyBase 기본 시드 — 팀원 브랜치 qa/Nightly-<이름> 은 이 파일만 바꾼다(Docs/tech/qa-nightly-runbook.md §6)"
 }
