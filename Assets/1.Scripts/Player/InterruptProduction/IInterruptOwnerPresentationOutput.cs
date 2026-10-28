@@ -11,7 +11,7 @@ public interface IInterruptOwnerDimOutput
 
 /// <summary>
 /// 빛 모임 시작/정지 출력(할 일 132) — 강 시도(성공 예측) 입력 순간 시작, Hit 이벤트·예측 빗나감·실패에 정지.
-/// 실제 VFX(캐릭터 소켓)는 단계 4 가 붙인다. <paramref name="skill"/> = 입력한 간파 스킬(소켓 찾기용, 테스트에선 null).
+/// 실제 VFX = <see cref="InterruptLightGatherOwnerOutput"/>(캐릭터 소켓, 단계 4). <paramref name="skill"/> = 입력한 간파 스킬(소켓 찾기용, 테스트에선 null).
 /// </summary>
 public interface IInterruptLightGatherOutput
 {
@@ -19,7 +19,7 @@ public interface IInterruptLightGatherOutput
     void StopLightGather();
 }
 
-/// <summary>임시 출력(빛 모임 = 단계 4 전, 암전 = 렌더 출력이 없을 때) — 바뀔 때만 에디터 로그(빌드에선 호출째 빠진다).</summary>
+/// <summary>임시 출력(디렉터가 실제 출력을 못 만들었을 때) — 바뀔 때만 에디터 로그(빌드에선 호출째 빠진다).</summary>
 public sealed class InterruptOwnerPresentationLogOutput : IInterruptOwnerDimOutput, IInterruptLightGatherOutput
 {
     private float _lastLoggedDim = -1f;

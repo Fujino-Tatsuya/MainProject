@@ -94,13 +94,17 @@ public sealed class InterruptOwnerPresentation
     private static bool IsAttempt(InterruptOwnerPresentationState state) =>
         state == InterruptOwnerPresentationState.AttemptStrong || state == InterruptOwnerPresentationState.AttemptWeak;
 
+    /// <summary>이 예측을 새 시도로 받아들이는가 — 대상 없음·결론 안 난 시도 중이면 false(<see cref="Predict"/> 와 같은 조건).</summary>
+    public bool Accepts(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast) =>
+        forecast != BeaverLobby.Player.Dash.InterruptAttemptForecast.NoTarget && !IsAttempt(State);
+
     /// <summary>
     /// [오너] 간파 입력 순간 예측. 대상 없음이면 아무것도 켜지 않고 상태도 그대로(false, 할 일 132 정정1).
     /// 시도가 아직 결론나지 않았으면 중복 입력으로 보고 무시한다(false).
     /// </summary>
     public bool Predict(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, PlayerInterruptSkillBase skill, float now)
     {
-        if (forecast == BeaverLobby.Player.Dash.InterruptAttemptForecast.NoTarget || IsAttempt(State))
+        if (!Accepts(forecast))
             return false;
 
         bool predictsSuccess = forecast == BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong;

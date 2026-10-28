@@ -141,17 +141,22 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private InterruptSuccessStage SuccessStage => _success ??= new InterruptSuccessStage(this, _timePort, PersonalChannel, SharedChannel);
     private InterruptFailStage FailStage => _fail ??= new InterruptFailStage(_timePort);
 
-    // 오너 연출 상태 기계(할 일 132). 암전 = 마스크 암전 렌더 출력(단계 3, Awake 에서 만든다 — 없으면 로그), 빛 모임 = 단계 4 전까지 로그.
+    // 오너 연출 상태 기계(할 일 132). 암전 = 마스크 암전 렌더 출력(단계 3), 빛 모임 = 플레이어 소켓 VFX(단계 4) — 둘 다 Awake 에서 만든다(없으면 로그).
     private readonly InterruptOwnerPresentationLogOutput _ownerLogOutput = new InterruptOwnerPresentationLogOutput();
     private InterruptOwnerDimOutput _ownerDimOutput;
+    private InterruptLightGatherOwnerOutput _ownerLightGatherOutput;
     private InterruptOwnerPresentation _ownerPresentation;
+    // 팀원 화면의 남(발동자) 빛 모임(할 일 132 단계 4) — 서버 강 시도 슬로우로 켜고 발동자 Hit·실패·성공·리셋으로 끈다.
+    private readonly InterruptLightGatherPeers _peerLightGather = new InterruptLightGatherPeers();
 
     private IInterruptOwnerDimOutput DefaultOwnerDimOutput =>
         _ownerDimOutput != null ? _ownerDimOutput : (IInterruptOwnerDimOutput)_ownerLogOutput;
+    private IInterruptLightGatherOutput DefaultLightGatherOutput =>
+        _ownerLightGatherOutput != null ? _ownerLightGatherOutput : (IInterruptLightGatherOutput)_ownerLogOutput;
 
     /// <summary>오너 연출 상태 기계 — 단계 5(적중 섬광)가 <see cref="InterruptOwnerPresentation.SuccessEntered"/> 를 구독한다.</summary>
     public InterruptOwnerPresentation OwnerPresentation =>
-        _ownerPresentation ??= new InterruptOwnerPresentation(this, DefaultOwnerDimOutput, _ownerLogOutput);
+        _ownerPresentation ??= new InterruptOwnerPresentation(this, DefaultOwnerDimOutput, DefaultLightGatherOutput);
 
     // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.
     private GlobalTimeScale _timeScale;
@@ -171,6 +176,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
         Instance = this;
         _ownerDimOutput = new InterruptOwnerDimOutput(this);
+        _ownerLightGatherOutput = new InterruptLightGatherOwnerOutput(InterruptLightGatherOwnerOutput.FindSocket, KeepInOwnerDim);
     }
 
     private void OnEnable()
@@ -192,6 +198,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private void OnDisable()
     {
         _ownerPresentation?.ForcedReset();
+        _peerLightGather.EndAll();
 
         if (ReferenceEquals(_timeScale, null))
             return;
@@ -282,9 +289,14 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         if (Instance == null)
             return;
 
-        // 받아들인 시도만 대상을 바꾼다 — 태깅은 다음 프레임 암전이 0 → 양수가 될 때(들어옴 램프 첫 값).
-        if (Instance.OwnerPresentation.Predict(forecast, skill, Time.unscaledTime))
-            Instance._ownerDimOutput?.SetSubjects(owner, target);
+        // 받아들일 시도만 대상을 바꾼다 — 태깅은 다음 프레임 암전이 0 → 양수가 될 때(들어옴 램프 첫 값).
+        // 대상을 예측보다 먼저 넘긴다: 예측이 같은 호출 안에서 빛 모임을 켜며 KeepInOwnerDim 으로 넣은 루트를 SetSubjects 가 비우지 않게.
+        InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
+        if (!presentation.Accepts(forecast))
+            return;
+
+        Instance._ownerDimOutput?.SetSubjects(owner, target);
+        presentation.Predict(forecast, skill, Time.unscaledTime);
     }
 
     /// <summary>
@@ -304,6 +316,16 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             Instance._ownerPresentation?.LocalHit();
     }
 
+    /// <summary>
+    /// [각 피어] 남(<paramref name="casterClientId"/>)의 간파 스킬 애니 Hit 이벤트 — 이 화면에서 튼 그 발동자의 빛 모임 끝(할 일 132 단계 4).
+    /// 각 피어가 자기 애니메이터(복제된 발동자 애니)의 Hit 을 받는 기존 경로를 쓴다 — 새 RPC 없음.
+    /// </summary>
+    public static void PeerCasterHit(ulong casterClientId)
+    {
+        if (Instance != null)
+            Instance._peerLightGather.EndCaster(casterClientId);
+    }
+
     /// <summary>[오너] 판정 전 종료·서버 거부 — 결론이 없으면 실패처럼 걷는다.</summary>
     public static void LocalOwnerEnded()
     {
@@ -312,7 +334,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     }
 
     /// <summary>
-    /// 오너 암전·빛 모임 출력을 갈아 끼운다(단계 4 VFX 등). null 이면 기본 — 암전 = 마스크 암전 렌더 출력, 빛 모임 = 로그.
+    /// 오너 암전·빛 모임 출력을 갈아 끼운다(디버그·테스트 등). null 이면 기본 — 암전 = 마스크 암전 렌더 출력, 빛 모임 = 플레이어 소켓 VFX.
     /// </summary>
     public static void SetOwnerOutputs(IInterruptOwnerDimOutput dimOutput, IInterruptLightGatherOutput gatherOutput)
     {
@@ -320,7 +342,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             return;
 
         Instance.OwnerPresentation.SetOutputs(
-            dimOutput ?? Instance.DefaultOwnerDimOutput, gatherOutput ?? Instance._ownerLogOutput);
+            dimOutput ?? Instance.DefaultOwnerDimOutput, gatherOutput ?? Instance.DefaultLightGatherOutput);
     }
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
@@ -335,6 +357,12 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         if (viewerIsCaster)
             OwnerPresentation.ServerStarted(triggerId, purpose, true, Time.unscaledTime);
 
+        // 빛 모임(할 일 132 단계 4) — 남의 강 시도면 이 화면에 튼다(본인 화면은 입력 순간 예측이 이미 켰다). 성공이면 그 발동자 것을 끈다.
+        if (hasViewer && InterruptLightGatherRules.ShouldPlayForPeer(purpose, viewerIsCaster))
+            _peerLightGather.Begin(casterClientId, triggerId, FindLightGatherSocket(casterClientId));
+        else if (purpose == SlowMotionPurpose.Success)
+            _peerLightGather.EndCaster(casterClientId);
+
         if (purpose != SlowMotionPurpose.Success)
             return;
 
@@ -347,13 +375,34 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     private void HandleFailed(uint triggerId)
     {
         _ownerPresentation?.ServerFailed(triggerId, Time.unscaledTime);
+        _peerLightGather.EndTrigger(triggerId);
         FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));
     }
 
     private void HandleForcedReset(uint triggerId)
     {
         _ownerPresentation?.ForcedReset();
+        _peerLightGather.EndAll();
         SuccessStage.LocalForcedReset(_darkAdaptation);
+    }
+
+    // 빛 모임 — 발동자 소유의 켜진 InterruptLightGatherSocket(Player.prefab base 루트). 찾는 방식은 FindSuccessFxSinks 와 같다.
+    private IInterruptLightGatherPlayer FindLightGatherSocket(ulong casterClientId)
+    {
+        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
+        if (spawnManager == null)
+            return null;
+
+        foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
+        {
+            if (networkObject == null || networkObject.OwnerClientId != casterClientId)
+                continue;
+
+            if (networkObject.TryGetComponent(out InterruptLightGatherSocket socket) && socket.isActiveAndEnabled)
+                return socket;
+        }
+
+        return null;
     }
 
     // A4 — 발동자 플레이어의 성공 이펙트 칸. 스폰된 오브젝트 중 발동자 소유의 켜진 InterruptSuccessFx(옛 구독 조건과 같다).

@@ -720,9 +720,14 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             if (!activeHitEventSeen && activeSkill is PlayerInterruptSkillBase interrupt)
                 interrupt.NotePrepObserved(Time.time - activeStartTime);
             activeHitEventSeen = true;
-            // 빛 모임 끝 = 오너 애니 Hit(할 일 132 — 기존 Hit 이벤트 재사용, 새 타이머 칸 없음).
-            if (activeSkill is PlayerInterruptSkillBase && player != null && player.IsInputSource)
-                InterruptProductionDirector.LocalOwnerHit();
+            // 빛 모임 끝 = 발동자 애니 Hit(할 일 132 — 기존 Hit 이벤트 재사용, 새 타이머 칸 없음). 오너 화면 = 오너 연출, 다른 화면 = 그 발동자 빛 모임.
+            if (activeSkill is PlayerInterruptSkillBase && player != null)
+            {
+                if (player.IsInputSource)
+                    InterruptProductionDirector.LocalOwnerHit();
+                else
+                    InterruptProductionDirector.PeerCasterHit(OwnerClientId);
+            }
         }
 
         activeSkill?.OnLocalAnimationEvent(eventType);
