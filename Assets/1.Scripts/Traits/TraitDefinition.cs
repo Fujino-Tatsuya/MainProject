@@ -1,12 +1,15 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>튜토리얼 특성 효과 종류. 지금 실제로 소비처가 있는 효과만 둔다(공격속도·방어·최대체력 배율은 소비처 없음).</summary>
+/// <summary>
+/// 튜토리얼 특성 효과 종류(3/5 에서 효과 클래스 조합으로 바뀐다). 배율 종류는 <see cref="PlayerTraitModifiers"/> 출처로 들어간다(할 일 125 2/5 — 상태이상 아님).
+/// </summary>
 public enum TraitEffectKind
 {
-    /// <summary>공격력 배율(영구 상태이상 AttackDamageModifier). 값 = 배율, 1 이상.</summary>
+    /// <summary>공격력 전체%(PlayerStats 출처 <see cref="PlayerTraitModifiers"/>). 값 = 배율(1.2 = +20%, 1 미만 = 페널티).</summary>
     AttackDamageMultiplier,
 
-    /// <summary>이동속도 배율(영구 상태이상 MoveSpeedModifier). 값 = 배율, 1 이상.</summary>
+    /// <summary>이동속도 전체%(PlayerStats 출처 <see cref="PlayerTraitModifiers"/>). 값 = 배율(1 미만 = 페널티).</summary>
     MoveSpeedMultiplier,
 
     /// <summary>
@@ -19,13 +22,11 @@ public enum TraitEffectKind
 /// <summary>
 /// 복도에서 고르는 특성 1장(할 일 15 → 125).
 /// 영구 ID = 명세 문자열 ID(<c>PAL_1_Q_DAMAGE</c> 등, <see cref="TraitCatalog"/>). 네트워크·재합류 보관은 그 고정 해시(<see cref="IdHash"/>)로 한다.
+/// 수치 기여(<see cref="ITraitModifierContributor"/>)는 각 피어가 같은 SO 에서 읽는다 — <see cref="PlayerTraitModifiers"/>.
 /// </summary>
 [CreateAssetMenu(fileName = "Trait", menuName = "Tutorial/Trait Definition")]
-public sealed class TraitDefinition : ScriptableObject
+public sealed class TraitDefinition : ScriptableObject, ITraitModifierContributor
 {
-    // 배율 1 미만은 디버프로 분류돼 보스방 연출(ClearDebuffsServer)이 지운다 — 특성은 1 이상만 허용한다.
-    public const float MinStatMultiplier = 1f;
-
     [Tooltip("영구 ID — 명세 문자열 ID(예: PAL_1_Q_DAMAGE). 후보표(TraitCatalog)와 맞아야 제시된다. 동기화는 이 ID 의 고정 해시.")]
     [SerializeField] private string id = "";
     [SerializeField] private string displayName = "";
@@ -35,7 +36,7 @@ public sealed class TraitDefinition : ScriptableObject
 
     [Header("효과")]
     [SerializeField] private TraitEffectKind effectKind = TraitEffectKind.AttackDamageMultiplier;
-    [Tooltip("배율 종류 = 배율(1 이상), 쿨감 종류 = 감소 초.")]
+    [Tooltip("배율 종류 = 배율(1.2 = +20%, 1 미만 = 페널티), 쿨감 종류 = 감소 초.")]
     [SerializeField] private float value = 1.1f;
 
     [Header("쿨감 보조 값 (CooldownReductionOnHit 전용)")]
@@ -55,12 +56,26 @@ public sealed class TraitDefinition : ScriptableObject
     public AttackType TriggerAttackType => triggerAttackType;
     public PlayerSkillSlot CooldownSlot => cooldownSlot;
 
-    /// <summary>배율 효과에 실제로 쓰는 값 — 1 미만이면 1로 올린다(디버프 분류 방지).</summary>
-    public float StatMultiplier => Mathf.Max(MinStatMultiplier, value);
+    /// <summary>
+    /// 수치 기여(할 일 125 2/5) — 배율 종류는 전체% 로 넣는다(예전 영구 상태이상 <c>AttackDamageModifier</c>·<c>MoveSpeedModifier</c> 와 같은 단계·같은 값).
+    /// 상태이상이 아니므로 1 미만도 그대로 적용되고 보스방 디버프 정리에 지워지지 않는다. 쿨감 종류는 이벤트 효과라 수치 기여가 없다.
+    /// </summary>
+    public void GetModifiers(List<TraitModifier> result)
+    {
+        switch (effectKind)
+        {
+            case TraitEffectKind.AttackDamageMultiplier:
+                result.Add(TraitModifier.StatTotal(PlayerStatKind.AttackDamage, value - 1f));
+                break;
+            case TraitEffectKind.MoveSpeedMultiplier:
+                result.Add(TraitModifier.StatTotal(PlayerStatKind.MoveSpeed, value - 1f));
+                break;
+        }
+    }
 
     private void OnValidate()
     {
-        if (effectKind != TraitEffectKind.CooldownReductionOnHit && value < MinStatMultiplier)
-            Debug.LogWarning($"[Trait] '{name}' 배율 {value} < 1 — 디버프로 분류돼 보스방 연출 때 지워진다. 1로 취급한다.", this);
+        if (effectKind != TraitEffectKind.CooldownReductionOnHit && value < 0f)
+            Debug.LogWarning($"[Trait] '{name}' 배율 {value} < 0 — 스탯이 0 으로 떨어진다.", this);
     }
 }

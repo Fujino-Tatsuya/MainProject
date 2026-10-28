@@ -455,7 +455,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
         int stage = heat.CurrentStage;
-        int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus);
+        int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus, new TraitAttackKey(AttackType.Default));
         int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heat.StageDamageMultiplier(stage)));
 
         Vector3 origin = muzzle != null

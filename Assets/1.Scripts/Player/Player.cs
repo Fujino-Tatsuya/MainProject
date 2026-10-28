@@ -196,6 +196,7 @@ public class Player : Unit
 
     private PlayerStats stats;
     private PlayerMovement statsMovement;
+    private PlayerTraitModifiers traitModifiers;
 
     /// <summary>플레이어 스탯 종합(할 일 83) — 모든 피어에서 같은 값. 판정은 서버가, 툴팁·HUD·검증 보고는 오너가 읽는다.</summary>
     public PlayerStats Stats => stats;
@@ -234,9 +235,25 @@ public class Player : Unit
     public float CooldownRate =>
         StatusEffects != null ? StatusEffects.GetStatMultiplier(StatusEffectType.CooldownRateModifier) : 1f;
 
-    /// <summary>판정·툴팁 공용 피해 스냅샷(가하는 피해% 포함).</summary>
+    /// <summary>판정·툴팁 공용 피해 스냅샷(가하는 피해% 포함). 특성 공격 계열 배율은 넣지 않는다 — 판정은 키를 받는 오버로드를 쓴다.</summary>
     public int ResolveDamage(float coefficient, int flatBonus) =>
         stats != null ? stats.ResolveDamage(coefficient, flatBonus) : PlayerStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
+
+    /// <summary>
+    /// 원래 공격의 기준 피해 Dref(할 일 125 2/5, 명세 §5) = 위 스냅샷 × 그 공격 계열의 특성 피해 배율 — 특성은 여기서 <b>한 번만</b> 곱한다.
+    /// 차지·과열 등 기존 후처리는 지금처럼 이 값 뒤에 곱한다. 특성이 없으면 위 오버로드와 같다.
+    /// </summary>
+    public int ResolveDamage(float coefficient, int flatBonus, TraitAttackKey key) =>
+        stats != null
+            ? stats.ResolveDamage(coefficient, flatBonus, TraitDamageMultiplier(key))
+            : PlayerStatFormula.RawSnapshot(base.FinalAttackDamage, coefficient, flatBonus);
+
+    /// <summary>특성 수치 출처(할 일 125 2/5) — 상태이상 아님. Awake 이후 항상 있다.</summary>
+    public PlayerTraitModifiers TraitModifiers => traitModifiers;
+
+    /// <summary>그 공격 계열의 특성 피해 배율(전 피어 같은 값). 없으면 1.</summary>
+    public float TraitDamageMultiplier(TraitAttackKey key) =>
+        traitModifiers != null ? traitModifiers.DamageMultiplier(key) : 1f;
 
     public float DealtDamagePercent => stats != null ? stats.DealtDamagePercent : 0f;
 
@@ -251,6 +268,9 @@ public class Player : Unit
     {
         statsMovement = GetComponent<PlayerMovement>();
         stats = new PlayerStats(BaseStatValue, GetComponent<StatusEffectController>());
+        // 특성 수치 출처(할 일 125 2/5) — Player.prefab 에 붙어 있다. 없으면(테스트·옛 프리팹) 붙인다.
+        traitModifiers = PlayerTraitModifiers.For(this);
+        stats.Register(traitModifiers);
 
         // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         if (GetComponent<StatusEffectController>() == null)

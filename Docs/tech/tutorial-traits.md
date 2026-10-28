@@ -23,7 +23,7 @@ TutorialTraitPool (SO) ── TutorialTraitDefinition (SO) × N        문구: T
         ▼                                                                        ▼
 TutorialTraitDirector (씬 상주 NetworkBehaviour, 서버 권한) ──NetworkList──▶ TutorialTraitSelectionView (로컬 UI)
    ├ 규칙: TutorialTraitSelectionModel (순수)                              ├ 판정: TutorialTraitWindowModel (순수)
-   ├ 효과: 영구 상태이상 / Player.ServerAttackLanded 구독                   └ 카드·아이콘: TutorialTraitCardView · TutorialTraitIconView
+   ├ 효과: 수치 = PlayerTraitModifiers(획득 행 읽음, player-stats.md §4) / 이벤트 = Player.ServerAttackLanded 구독   └ 카드·아이콘: TutorialTraitCardView · TutorialTraitIconView
    └ 무적: PlayerInvulnerability (InvulnerabilityCause.TraitSelection)
 ```
 
@@ -83,7 +83,6 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | `void GetAcquired(ulong clientId, List<int> result)` | 그 플레이어의 획득 특성(획득 순서) |
 | `bool HasPendingChoice(ulong clientId)` | 제시 행이 있나(지금 골라야 하나) |
 | `event Action ClientStateChanged` | 복제 상태(제시·획득·라운드·표시 옵션) 변경 — UI 는 프레임당 한 번 모아 평가 |
-| `static ulong SourceIdOf(int traitIndex)` | 특성 상태이상의 출처 id(디버그·조회) |
 
 ### 호출 순서 (한 라운드)
 
@@ -123,7 +122,8 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - **값·이름·설명·아이콘만** 바뀌면: 정의 에셋(`Assets/9.ScriptableObject/Tutorial/Traits/TutorialTrait_*.asset`)만 고친다.
 - **특성 추가·삭제**: 정의 에셋을 만들고 `TutorialTraitPool.asset` 의 `traits` 배열에 넣는다(인덱스 = 런타임 id). 제시 장 수는 `offerCount`.
 - **새 효과 종류**: `TutorialTraitEffectKind` 에 값 추가 → `TutorialTraitDirector.ApplyEffect` 의 `switch` 에 적용 코드 추가.
-  배율류는 `ApplyStatModifier`(영구 상태이상, 특성별 출처 id)를, 이벤트류는 `HookCooldownReduction` 처럼 서버 이벤트 구독을 따라 한다. 소비처가 없는 스탯은 넣지 않는다(§6).
+  배율류는 `TraitDefinition.GetModifiers` 에 기여(`TraitModifier`)를 넣는다 — 상태이상이 아니라 `PlayerTraitModifiers` 출처(할 일 125 2/5, [player-stats.md](player-stats.md) §4).
+  이벤트류는 `HookCooldownReduction` 처럼 서버 이벤트 구독을 따라 한다. 소비처가 없는 스탯은 넣지 않는다(§6).
 
 ## 5. 데이터 테이블로 옮길 때
 
@@ -189,8 +189,8 @@ API:
 | `void RequestResetAnswer(int generation, bool reset)` | [로컬 플레이어] 응답 → `AnswerResetPromptServerRpc`(`SendTo.Server`, 보낸 사람 = `SenderClientId`) |
 | `bool IsTraitResetInProgress` | [전 피어] 누군가 팝업 대기·재선택 중 — `MapSceneBossPath.IsBossPadEnabled` 가 패드를 잠근다 |
 
-- **효과 원복**: 효과를 걸 때 장부에 남긴다 — 배율 특성 = 상태이상 타입(출처 `SourceIdOf(index)` → `StatusEffectController.Remove(type, source)`),
-  쿨감 특성 = 구독한 핸들러(`Player.ServerAttackLanded -=`). 거부된 배율(연출 잠금 중)은 장부에 없다(원복할 것 없음). 기존 `cooldownHooks` 목록을 이 장부로 바꿨다.
+- **효과 원복**: 쿨감 특성 = 걸 때 장부에 구독한 핸들러를 남기고 원복 때 `Player.ServerAttackLanded -=`. 기존 `cooldownHooks` 목록을 이 장부로 바꿨다.
+  배율 특성은 장부에 없다 — 획득 행이 비면 `PlayerTraitModifiers` 가 스스로 1 로 돌아간다(할 일 125 2/5, 상태이상 출처 `SourceIdOf` 폐지).
 - **재선택 라운드**: `ContinueReselect` — 남은 라운드를 하나 빼고 `StartPersonalRound`(0장이면 다음 라운드로 넘어감). 고를 때(`CommitChoice`) 재선택 중이면
   행·무적 동기화 **전에** 다음 라운드를 열어 무적 토큰을 풀었다 다시 걸지 않는다. 표시 옵션은 `None`(소개·마지막 문구 없음).
   재선택은 전역 라운드 번호(`Round`)를 올리지 않고, 그 획득 통지(`TutorialTraitChosen.Round`)는 **0** 이라 복도 흐름의 체크 보고·자동 획득이 반응하지 않는다(`IsPersonalRound`). `ServerRoundCompleted` 도 다시 나지 않는다(완료 플래그를 건드리지 않음).

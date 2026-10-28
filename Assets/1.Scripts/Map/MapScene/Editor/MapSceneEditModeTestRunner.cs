@@ -26,6 +26,7 @@ internal static class MapSceneEditModeTestRunner
         "^TraitResetModelTests$", // 할 일 30 (3) 전멸 리스폰 뒤 특성 초기화 — 팝업 응답 검증·원복 장부·4라운드 재선택·재전멸·이탈
         "^TraitRejoinTests$", // 할 일 48 C14 R4c 판 도중 재합류 — 획득 복원(순서·중복·멱등)·라운드 참가·팝업/재선택 보관·복원
         "^TraitCatalogTests$", // 할 일 125 (1/5) 특성 ID 고정 해시·명세 고정표 36개·검증(중복·충돌·모르는 ID)·고정 후보 순서·목록 버전 비교
+        "^TraitModifierSetTests$", // 할 일 125 (2/5) 특성 수치 출처 — 빈 목록 1·배율 곱/스탯 % 합·페널티 유지·형태/슬롯 거름·같은 ID 1회·서버/클라 같은 값·재선택 재합성·Dref
         "^TraitFixedSelectionTests$", // 할 일 125 (1/5) 고정 후보 선택 — 차수 = 획득 수+1·자동 선택 첫 번째·후보 0 = Empty·재선택 1차부터·재합류 해시 복원
         "^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState · 86 T6a SO+Strings 출처
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정

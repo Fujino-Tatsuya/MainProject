@@ -206,7 +206,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                 if (skill != null && skill.Data != null)
                 {
                     remaining = skillController.GetCooldownRemaining(widget.slot);
-                    total = skill.Data.CooldownTime;
+                    total = skillController.GetEffectiveCooldownTime(skill); // 특성 쿨 배율 포함(할 일 125)
                 }
             }
 

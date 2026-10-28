@@ -36,7 +36,8 @@ public readonly struct TraitChosen
 /// 후보 = 캐릭터·차수별 고정 3개(<see cref="TraitCatalog"/>, 차수 = 획득 수 + 1), 자동 선택 = 첫 번째. 캐릭터를 모르거나 정의가 없으면 0장(Empty).
 /// 접속 때 서버 풀의 목록 버전(<see cref="TraitCatalogIndex.Version"/>)을 복제해 클라가 자기 값과 비교한다 — 다르면 오류 로그.
 ///
-/// 효과: 배율 특성 = 영구(duration 0) 상태이상, 특성마다 다른 출처 id 라 서로 곱해진다.
+/// 효과: 배율 특성 = 여기서 걸지 않는다 — 각 피어의 <see cref="PlayerTraitModifiers"/> 가 이 디렉터의 획득 행을 읽어 같은 순수 함수로 계산한다
+/// (할 일 125 2/5, 상태이상 아님 → 보스방 디버프 정리·연출 잠금과 무관, 1 미만 페널티 유지). 획득 행이 바뀌면 원복·재적용도 자동이다.
 /// 쿨감 특성 = 그 플레이어의 <see cref="Player.ServerAttackLanded"/> 를 구독한다.
 /// 선택 창 무적(T2): 제시받고 아직 안 고른 플레이어에게 <see cref="InvulnerabilityCause.TraitSelection"/> 토큰을 건다.
 /// 제시 순간 플레이어 오브젝트가 없었으면 그 플레이어가 스폰될 때(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 아직 미선택이면 다시 건다(T3).
@@ -51,9 +52,6 @@ public readonly struct TraitChosen
 public sealed class TraitDirector : NetworkBehaviour
 {
     private const string Tag = "[Trait]";
-
-    // 특성 상태이상의 출처 id 대역 — NetworkObjectId(작은 수)와 겹치지 않게 높은 32비트에 둔다. 낮은 32비트 = 특성 ID 해시.
-    private const ulong TraitSourceIdBase = 0x5452_4149_0000_0000UL;
 
     public enum EntryKind : byte
     {
@@ -84,11 +82,10 @@ public sealed class TraitDirector : NetworkBehaviour
         public bool Equals(Entry o) => ClientId == o.ClientId && TraitHash == o.TraitHash && Kind == o.Kind && OfferSeq == o.OfferSeq;
     }
 
-    // 적용한 효과 하나 — 원복에 필요한 것만. 배율 특성 = 상태이상 타입(출처는 SourceIdOf(hash)), 쿨감 특성 = 구독한 핸들러.
+    // 적용한 효과 하나 — 원복에 필요한 것만. 쿨감 특성 = 구독한 핸들러(배율 특성은 PlayerTraitModifiers 가 획득 행으로 계산 — 장부에 없다).
     private sealed class AppliedEffect
     {
         public Player Player;
-        public StatusEffectType StatType;
         public Action<PlayerAttackLanded> Handler;
     }
 
@@ -222,7 +219,7 @@ public sealed class TraitDirector : NetworkBehaviour
             ReleaseAllSelectionShields();
         }
 
-        // 쿨감 구독만 푼다 — 배율 상태이상은 디스폰 뒤 플레이어에 남아도 예전처럼 둔다(씬 종료와 함께 사라진다).
+        // 쿨감 구독을 푼다. 배율 특성은 PlayerTraitModifiers 가 디렉터를 잃으면 빈 목록(전부 1)으로 돌아간다.
         IReadOnlyList<TraitEffectLedger<AppliedEffect>.Record> applied = appliedEffects.All;
         for (int i = 0; i < applied.Count; i++)
         {
@@ -567,20 +564,15 @@ public sealed class TraitDirector : NetworkBehaviour
         return opened;
     }
 
-    // 그 플레이어에게 이 디렉터가 건 효과만 되돌린다 — 배율 상태이상(출처 = 특성별 id) 제거·쿨감 구독 해제. 되돌린 수.
+    // 그 플레이어에게 이 디렉터가 건 이벤트 효과(쿨감 구독)만 되돌린다. 배율 특성은 획득 행이 비면 PlayerTraitModifiers 가 스스로 1 로 돌아간다. 되돌린 수.
     private int RevertEffects(ulong clientId)
     {
         int count = appliedEffects.TakeAll(clientId, revertScratch);
         for (int i = 0; i < revertScratch.Count; i++)
         {
             AppliedEffect effect = revertScratch[i].Handle;
-            if (effect.Player == null)
-                continue;
-
-            if (effect.Handler != null)
+            if (effect.Player != null && effect.Handler != null)
                 effect.Player.ServerAttackLanded -= effect.Handler;
-            else if (effect.Player.StatusEffects != null)
-                effect.Player.StatusEffects.Remove(effect.StatType, SourceIdOf(revertScratch[i].TraitHash));
         }
 
         revertScratch.Clear();
@@ -813,6 +805,10 @@ public sealed class TraitDirector : NetworkBehaviour
             return;
         }
 
+        // 배율 종류(공격력·이동속도)는 여기서 걸지 않는다 — 획득 행을 읽는 PlayerTraitModifiers 몫(할 일 125 2/5).
+        if (trait.EffectKind != TraitEffectKind.CooldownReductionOnHit)
+            return;
+
         Player player = FindPlayer(clientId);
         if (player == null)
         {
@@ -820,36 +816,7 @@ public sealed class TraitDirector : NetworkBehaviour
             return;
         }
 
-        switch (trait.EffectKind)
-        {
-            case TraitEffectKind.AttackDamageMultiplier:
-                ApplyStatModifier(clientId, player, StatusEffectType.AttackDamageModifier, trait, traitHash);
-                break;
-            case TraitEffectKind.MoveSpeedMultiplier:
-                ApplyStatModifier(clientId, player, StatusEffectType.MoveSpeedModifier, trait, traitHash);
-                break;
-            case TraitEffectKind.CooldownReductionOnHit:
-                HookCooldownReduction(clientId, player, trait, traitHash);
-                break;
-        }
-    }
-
-    private void ApplyStatModifier(ulong clientId, Player player, StatusEffectType type, TraitDefinition trait, int traitHash)
-    {
-        StatusEffectController effects = player.StatusEffects;
-        if (effects == null)
-        {
-            Edit.LogWarning($"{Tag} '{player.name}' 에 StatusEffectController 가 없다 — '{trait.Id}' 미적용.", player);
-            return;
-        }
-
-        ulong sourceId = SourceIdOf(traitHash);
-        // duration 0 = 영구. 출처가 특성마다 달라 다른 배율 특성과 곱해진다.
-        effects.Apply(type, trait.StatMultiplier, 0f, sourceId);
-        if (effects.GetStackCount(type, sourceId) == 0)
-            Edit.LogWarning($"{Tag} '{trait.Id}' 상태이상이 거부됐다(연출 잠금 중 등) — 효과가 없다.", player);
-        else
-            appliedEffects.Add(clientId, traitHash, new AppliedEffect { Player = player, StatType = type });
+        HookCooldownReduction(clientId, player, trait, traitHash);
     }
 
     private void HookCooldownReduction(ulong clientId, Player player, TraitDefinition trait, int traitHash)
@@ -925,8 +892,6 @@ public sealed class TraitDirector : NetworkBehaviour
     private void HandleRoundDisplayChanged(byte previous, byte current) => ClientStateChanged?.Invoke();
 
     // ── 조회 ───────────────────────────────────────────────────────────────
-
-    public static ulong SourceIdOf(int traitHash) => TraitSourceIdBase | unchecked((uint)traitHash);
 
     private Player FindPlayer(ulong clientId)
     {

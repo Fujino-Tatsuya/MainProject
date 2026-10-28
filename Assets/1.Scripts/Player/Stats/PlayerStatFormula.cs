@@ -78,10 +78,14 @@ public static class PlayerStatFormula
         return Mathf.Max(0, Mathf.RoundToInt(finalAttack * coefficient) + flatBonus);
     }
 
-    public static int Snapshot(int finalAttack, float coefficient, int flatBonus, float dealtPercent)
+    /// <summary>
+    /// 피해 스냅샷 = round(1차 스냅샷 × (1 + 가하는 피해%) × 특성 공격 계열 배율). 특성 배율(할 일 125 2/5, 명세 §5 Dref)은 중간에 정수로 자르지 않고
+    /// 마지막 반올림 한 번에 같이 넣는다. 1 미만(페널티)도 그대로, 0 미만은 0. 기본 1 이면 이전 식과 같다.
+    /// </summary>
+    public static int Snapshot(int finalAttack, float coefficient, int flatBonus, float dealtPercent, float traitMultiplier = 1f)
     {
         int raw = RawSnapshot(finalAttack, coefficient, flatBonus);
-        return Mathf.Max(0, Mathf.RoundToInt(raw * Mathf.Max(0f, 1f + dealtPercent)));
+        return Mathf.Max(0, Mathf.RoundToInt(raw * Mathf.Max(0f, 1f + dealtPercent) * Mathf.Max(0f, traitMultiplier)));
     }
 
     /// <summary>실수 값을 천분율 정수로 — 검증 보고에 실어 보낼 때 float 오차를 비교에서 뺀다.</summary>

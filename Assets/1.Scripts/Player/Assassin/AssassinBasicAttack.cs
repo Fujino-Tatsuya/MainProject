@@ -704,6 +704,14 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         _ => stepIndex,
     };
 
+    // 특성 피해 배율 키의 형태(할 일 125) — 강타 = Enhanced, 변신 묶음 = Alternate(변신 Q·E 대체 스킬과 같은 구분).
+    private static TraitAttackForm TraitFormOf(AssassinBasicAttackMode mode) => mode switch
+    {
+        AssassinBasicAttackMode.Enhanced => TraitAttackForm.Enhanced,
+        AssassinBasicAttackMode.Transformed => TraitAttackForm.Alternate,
+        _ => TraitAttackForm.Normal,
+    };
+
     // 타격마다 현재 범위를 다시 판정한다(§3.3). 변신 묶음은 Hit 이벤트 4번 = 4타.
     private void FireCurrentHit()
     {
@@ -712,7 +720,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         hitsFired++;
-        int damage = player.ResolveDamage(step.AttackDamageMultiplier, 0);
+        int damage = player.ResolveDamage(step.AttackDamageMultiplier, 0, new TraitAttackKey(AttackType.Default, TraitFormOf(currentMode)));
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);

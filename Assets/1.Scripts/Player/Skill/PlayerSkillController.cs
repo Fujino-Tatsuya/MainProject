@@ -66,6 +66,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private PlayerSkillCooldownLedger cooldownLedger;
     // 쿨 장부의 시간축. 피어마다 자기 시계 — 서버↔오너는 남은 초만 주고받는다(할 일 91 · PLAN-91 §3.3).
     private PlayerCooldownClock cooldownClock;
+    private PlayerTraitModifiers traitModifiers;
     private PlayerSkillSlotBindingModel slotBindings;
     private byte locallyAppliedOverrideMask;
     private PlayerSkillBase activeSkill;
@@ -174,6 +175,17 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         cooldownLedger = new PlayerSkillCooldownLedger(registeredSkills.Count);
         cooldownClock = PlayerCooldownClock.For(this);
         slotBindings = new PlayerSkillSlotBindingModel(alternateMask);
+
+        // 특성 쿨 배율 출처(할 일 125 2/5) — Player.Awake 와 같은 인스턴스(For 가 하나만 만든다).
+        traitModifiers = PlayerTraitModifiers.For(this);
+        traitModifiers.Changed += HandleTraitModifiersChanged;
+    }
+
+    public override void OnDestroy()
+    {
+        if (traitModifiers != null)
+            traitModifiers.Changed -= HandleTraitModifiersChanged;
+        base.OnDestroy();
     }
 
     public override void OnNetworkSpawn()
@@ -791,10 +803,47 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return;
         }
 
-        cooldownLedger.Start(skillIndex, CooldownNow, skill.Data.CooldownTime);
-        Edit.Log($"[Skill] {skill.Slot} 쿨타임 시작 {skill.Data.CooldownTime}s", this);
+        float cooldownTime = GetEffectiveCooldownTime(skill);
+        cooldownLedger.Start(skillIndex, CooldownNow, cooldownTime);
+        Edit.Log($"[Skill] {skill.Slot} 쿨타임 시작 {cooldownTime}s", this);
 
         MirrorCooldownToOwner(skillIndex);
+    }
+
+    /// <summary>
+    /// 이 스킬의 유효 전체 쿨타임(할 일 125 2/5, 명세 §6) = 데이터 쿨 × 특성 슬롯 쿨 배율(일반/대체 형태 구분, 서로 곱). 전 피어 같은 값.
+    /// 제압 가속은 여기 곱하지 않는다 — 쿨 시계 진행 속도(<see cref="PlayerCooldownClock"/> 배율)로 따로 곱해진다(새 사용의 전체 쿨을 다시 줄이지 않음).
+    /// </summary>
+    public float GetEffectiveCooldownTime(PlayerSkillBase skill)
+    {
+        if (skill == null || skill.Data == null)
+            return 0f;
+
+        float multiplier = traitModifiers != null
+            ? traitModifiers.CooldownMultiplier(skill.Slot, IsAlternateSkill(skill) ? TraitAttackForm.Alternate : TraitAttackForm.Normal)
+            : 1f;
+        return Mathf.Max(0f, skill.Data.CooldownTime * multiplier);
+    }
+
+    /// <summary>슬롯에 지금 바인딩된 스킬(대체 포함)의 유효 전체 쿨타임. 비었으면 0.</summary>
+    public float GetEffectiveCooldownTime(PlayerSkillSlot slot) => GetEffectiveCooldownTime(GetSkill(slot));
+
+    // 대체 세트(어쌔신 변신 Q·E 등)의 스킬인가 — 특성 형태 구분(TraitAttackForm.Alternate).
+    private bool IsAlternateSkill(PlayerSkillBase skill) =>
+        skill != null && alternateSkills != null && alternateSkills.GetSkill(skill.Slot) == skill;
+
+    // [서버] 특성 쿨 배율이 바뀌면(획득·초기화·재합류) 돌던 쿨의 진행률을 보존한다(명세 §6) — 준비된 스킬·전체 0 은 그대로.
+    private void HandleTraitModifiersChanged()
+    {
+        if (!HasGameplayAuthority || cooldownLedger == null)
+            return;
+
+        float now = CooldownNow;
+        for (int i = 0; i < registeredSkills.Count; i++)
+        {
+            if (cooldownLedger.Rescale(i, now, GetEffectiveCooldownTime(registeredSkills[i])))
+                MirrorCooldownToOwner(i);
+        }
     }
 
     /// <summary>[서버] 등록된 특정 스킬의 남은 쿨타임을 감소시킨다. 결과는 0초 아래로 내려가지 않는다.</summary>
@@ -927,16 +976,18 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         MarkActiveSkillStarted();
 
         // 쿨타임은 승인 즉시 시작, 환불 없음 — 단 수동 커밋 스킬은 발동 시점에 스스로 시작한다(CommitCooldownServer)
+        float cooldownTime = GetEffectiveCooldownTime(skill);
         if (!skill.Data.CommitCooldownManually)
-            cooldownLedger.Start(expectedSkillIndex, CooldownNow, skill.Data.CooldownTime);
+            cooldownLedger.Start(expectedSkillIndex, CooldownNow, cooldownTime);
 
-        // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯)
+        // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯) + 특성 공격 계열 배율(Dref, 할 일 125)
         // 툴팁 계산식도 같은 계수·고정값을 쓰므로 판정 공식을 바꿀 때 SkillTooltipDamage 계산도 같이 바꿀 것.
-        int damageSnapshot = player.ResolveDamage(skill.Data.AttackDamageMultiplier, skill.Data.FlatDamageBonus);
+        int damageSnapshot = player.ResolveDamage(
+            skill.Data.AttackDamageMultiplier, skill.Data.FlatDamageBonus, TraitAttackKey.ForSkill(skill.Slot, IsAlternateSkill(skill)));
         skill.SetDamageSnapshot(damageSnapshot);
         // 지점(AimPoint)은 CanApproveSkill 이 CanUse 직전에 이미 넣었다.
 
-        Edit.Log($"[Skill] {slot} 시작{(dashInterrupt ? "(대쉬 간파 — 대시에 실림)" : string.Empty)} — 피해 스냅샷 {damageSnapshot}, 쿨타임 {skill.Data.CooldownTime}s", this);
+        Edit.Log($"[Skill] {slot} 시작{(dashInterrupt ? "(대쉬 간파 — 대시에 실림)" : string.Empty)} — 피해 스냅샷 {damageSnapshot}, 쿨타임 {cooldownTime}s", this);
 
         skill.OnServerStart(direction, target);
         // 대쉬 간파가 OnServerStart 안에서 바로 끝났으면(데이터 누락 등) 이미 대시에서 내려졌다 — 상체 레이어를 틀지 않는다.
@@ -1396,7 +1447,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 서버 시점과의 오차(전송 지연)는 HUD 표시용으로 허용, 검증은 여전히 서버 장부가 담당 (그릴 합의)
         // 수동 커밋 스킬은 CommitCooldownClientRpc 가 따로 미러한다.
         if (IsOwner && skill.Data != null && !skill.Data.CommitCooldownManually)
-            cooldownLedger.Start(skillIndex, CooldownNow, skill.Data.CooldownTime);
+            cooldownLedger.Start(skillIndex, CooldownNow, GetEffectiveCooldownTime(skill));
 
         if (dashInterrupt && IsOwner && stateController != null && stateController.AttachDashInterrupt(skill))
         {
@@ -1723,6 +1774,8 @@ public static class PlayerSkillApprovalRules
 public sealed class PlayerSkillCooldownLedger
 {
     private readonly float[] nextReadyTimes;
+    // 마지막 Start 의 전체 쿨(특성 배율 포함) — 배율이 바뀔 때 진행률 보존 기준(할 일 125, Rescale). SetRemaining 은 바꾸지 않는다.
+    private readonly float[] fullDurations;
 
     public int Count => nextReadyTimes.Length;
 
@@ -1732,6 +1785,34 @@ public sealed class PlayerSkillCooldownLedger
             throw new ArgumentOutOfRangeException(nameof(skillCount));
 
         nextReadyTimes = new float[skillCount];
+        fullDurations = new float[skillCount];
+    }
+
+    /// <summary>마지막으로 시작한 쿨의 전체 시간. 시작한 적 없으면 0.</summary>
+    public float GetFull(int skillIndex) => IsValid(skillIndex) ? fullDurations[skillIndex] : 0f;
+
+    /// <summary>
+    /// 전체 쿨이 newFull 로 바뀌었다 — 돌던 쿨의 진행률을 보존해 남은 시간을 바꾼다(<see cref="TraitModifierRules.RescaleRemaining"/>).
+    /// 준비됐거나(남은 0) 기존 전체가 0 이면 남은 시간은 그대로, 전체만 기록한다. 남은 시간이 바뀌었으면 true.
+    /// </summary>
+    public bool Rescale(int skillIndex, float now, float newFull)
+    {
+        if (!IsValid(skillIndex))
+            return false;
+
+        float oldFull = fullDurations[skillIndex];
+        newFull = Math.Max(0f, newFull);
+        fullDurations[skillIndex] = newFull;
+        if (oldFull == newFull)
+            return false;
+
+        float remaining = GetRemaining(skillIndex, now);
+        float rescaled = TraitModifierRules.RescaleRemaining(remaining, oldFull, newFull);
+        if (rescaled == remaining)
+            return false;
+
+        nextReadyTimes[skillIndex] = now + rescaled;
+        return true;
     }
 
     public bool IsReady(int skillIndex, float now) =>
@@ -1742,8 +1823,11 @@ public sealed class PlayerSkillCooldownLedger
 
     public void Start(int skillIndex, float now, float duration)
     {
-        if (IsValid(skillIndex))
-            nextReadyTimes[skillIndex] = now + Math.Max(0f, duration);
+        if (!IsValid(skillIndex))
+            return;
+
+        nextReadyTimes[skillIndex] = now + Math.Max(0f, duration);
+        fullDurations[skillIndex] = Math.Max(0f, duration);
     }
 
     public void SetRemaining(int skillIndex, float now, float remaining)
