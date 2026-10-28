@@ -254,7 +254,7 @@ public sealed class PaladinTraitFourthTierTests
         Assert.AreEqual(0.25f, counter.knockbackDuration, Eps);
         Assert.AreEqual(2f, counter.knockbackStrength * counter.knockbackDuration, Eps, "밀치는 거리 2m");
         Assert.AreEqual(Vector3.right, counter.knockbackDirection, "방향 = 플레이어 위치 → 대상(방사형)");
-        Assert.That(counter.staggerDuration, Is.GreaterThan(0f), "경직 > 0 — 보스 취약 밀림 조건(23호 qPushHit)");
+        Assert.AreEqual(0f, counter.staggerDuration, Eps, "경직 없음(명세) — 23호 취약 밀림은 넉백 세기만 본다(할 일 134)");
         Assert.AreEqual(0f, counter.concussionDuration, Eps, "기절 없음");
 
         // 같은 시전·같은 대상 = 다시 안 민다 → 피해 없는 밀치기 전용 판정은 건너뛴다(대상별 1회).
