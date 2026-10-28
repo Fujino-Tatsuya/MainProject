@@ -1,4 +1,22 @@
 /// <summary>
+/// [서버] 몬스터가 상태(평상·취약·제압)에 따라 상시 슈퍼아머를 거는가 — <see cref="MonsterStatusEffect.HasSuperArmor"/> 가 공격별 슈퍼아머와 OR 한다.
+/// 구현: 23호(평상·제압 on, 취약 off) · 중간보스 3종(취약 밖 on). 규칙 = <see cref="BossCrowdControlRules"/>.
+/// </summary>
+public interface IMonsterStateSuperArmor
+{
+    bool StateSuperArmor { get; }
+}
+
+/// <summary>
+/// [서버] <c>MonsterState.Knockback</c> 을 쓰지 않는 자체 밀림 중인가(23호 취약 넉백) — 뇌진탕 대기 판정(넉백 중 = 대기)이 본다.
+/// 밀림이 끝날 때 구현측이 <see cref="MonsterStatusEffect.ConsumeConcussionOnKnockbackEnd"/> 로 기절을 넘긴다.
+/// </summary>
+public interface IMonsterSelfKnockback
+{
+    bool IsSelfKnockedBack { get; }
+}
+
+/// <summary>
 /// 보스·중간보스 상태별 CC 규칙(할 일 134 — 경석 handoff 보스넉백·기절). MonoBehaviour 밖 순수 계산(EditMode 테스트가 고정한다).
 ///
 /// | 상태 | 밀치기 | 기절·뇌진탕 |
@@ -13,6 +31,19 @@
 /// </summary>
 public static class BossCrowdControlRules
 {
+    /// <summary>23호 상태별 슈퍼아머 — 평상 on · 취약 off · 제압 on.</summary>
+    public static bool StateSuperArmor(bool vulnerable, bool suppressed) => suppressed || !vulnerable;
+
+    /// <summary>중간보스 상태별 슈퍼아머 — 취약(카운터 성공부터 8초) 밖이면 on(공격 밖 평상 포함). 중간보스 등급이 아니면 off.</summary>
+    public static bool MidBossStateSuperArmor(bool isMidBoss, bool vulnerable) => isMidBoss && !vulnerable;
+
+    /// <summary>
+    /// 거부 판정에 넣는 활성 플래그 = 복제 플래그 + (상태별 슈퍼아머면 SuperArmor).
+    /// <see cref="StatusEffectImmunityPolicy"/>·<see cref="ConcussionState"/> 에 이 값을 준다.
+    /// </summary>
+    public static StatusEffectType EffectiveActive(StatusEffectType active, bool stateSuperArmor) =>
+        stateSuperArmor ? active | StatusEffectType.SuperArmor : active;
+
     /// <summary>
     /// 이번 공격에 공격별 슈퍼아머를 거는가 — 취약 중엔 걸지 않는다(취약 = 밀치기·기절 허용).
     /// 중간보스 <c>MonsterBase.UsesAttackSuperArmor</c>(취약 중 안 건다)와 같은 규칙이다.

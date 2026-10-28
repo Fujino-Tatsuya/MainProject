@@ -6091,6 +6091,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         {
             // 넉백 입구 = Unit.Knockback(할 일 134) → OnKnockback → StartVulnerableKnockback(고정 거리)
             Knockback(VulnerableKnockbackDirection(hitContext, attackInfo), attackInfo.knockbackStrength);
+            TryApplyConcussionAfterPush(attackInfo);
         }
         else if (qPushHit && resolved && State != MonsterState.Dead)
         {
@@ -6105,6 +6106,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 _vulnerableStunGroggy = true;
                 Debug.Log($"[23호] 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초(남은 취약까지)", this);
             }
+            TryApplyConcussionAfterPush(attackInfo);   // 경직(그로기 진입 = 대기 취소) 뒤
         }
 
         return resolved;
@@ -6568,6 +6570,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         bool hitWall = _kbRebound;   // 반동 = 벽 충돌 뒤에만 들어간다(TickVulnerableKnockback)
         _kbActive = false;
         _kbRebound = false;
+        ConsumeConcussionAfterPush();   // 뇌진탕 대기 → 기절(할 일 134). 벽으로 취약이 끝났거나 제압이면 슈퍼아머라 0
         if (!IsServer || State == MonsterState.Dead || _suppressed) return;
 
         if (!hitWall)

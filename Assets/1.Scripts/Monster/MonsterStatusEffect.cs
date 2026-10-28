@@ -61,7 +61,33 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     // 경직(Hit 전이) 봉쇄 = 슈퍼아머면 공격 취소/피격 리액션을 막는다.
     public bool BlocksInterrupt => HasSuperArmor;
 
-    public bool HasSuperArmor => Has(StatusEffectType.SuperArmor);
+    // 공격별 슈퍼아머(복제 플래그) OR 상태별 슈퍼아머(할 일 134 — 보스·중간보스 평상·제압, IMonsterStateSuperArmor).
+    // 🔴 상태별 값은 서버 판정용이다(복제하지 않는다 — 머리 위 표시 없음).
+    public bool HasSuperArmor => Has(StatusEffectType.SuperArmor) || StateSuperArmor;
+
+    IMonsterStateSuperArmor _stateArmor;
+    IMonsterSelfKnockback _selfKnockback;
+    bool _crowdControlSourcesCached;
+
+    void CacheCrowdControlSources()
+    {
+        if (_crowdControlSourcesCached) return;
+        _stateArmor = GetComponent<IMonsterStateSuperArmor>();
+        _selfKnockback = GetComponent<IMonsterSelfKnockback>();
+        _crowdControlSourcesCached = true;
+    }
+
+    bool StateSuperArmor
+    {
+        get
+        {
+            CacheCrowdControlSources();
+            return _stateArmor != null && _stateArmor.StateSuperArmor;
+        }
+    }
+
+    // 거부 판정(ConcussionState)에 주는 플래그 — 상태별 슈퍼아머까지 넣는다.
+    StatusEffectType EffectiveActive => BossCrowdControlRules.EffectiveActive(_active.Value, StateSuperArmor);
 
     // IStatusEffectFacade — Unit의 Final* 스탯 계산용 배율.
     // 몹은 아직 스탯 modifier(버프/디버프 배율) 시스템이 없어 항상 1f(무효과).
@@ -140,14 +166,16 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
         get
         {
             if (_monster == null) _monster = GetComponent<MonsterBase>();
-            return _monster != null && _monster.State == MonsterState.Knockback;
+            CacheCrowdControlSources();
+            return (_monster != null && _monster.State == MonsterState.Knockback)
+                || (_selfKnockback != null && _selfKnockback.IsSelfKnockedBack);   // 23호 자체 밀림(할 일 134)
         }
     }
 
     // 넉백 중 = 대기(Concussion 플래그 + 기절 표시를 같이 건다 — 효과·머리 위 표시는 기절과 같다), 아니면 즉시 기절(큰 값).
     void ApplyConcussion(float stunSeconds)
     {
-        switch (_concussion.Apply(stunSeconds, IsKnockedBack, _active.Value))
+        switch (_concussion.Apply(stunSeconds, IsKnockedBack, EffectiveActive))
         {
             case ConcussionState.ApplyResult.Pending:
                 _expiry[StatusEffectType.Concussion] = float.PositiveInfinity;   // 넉백 끝(소비)·취소로만 지운다
@@ -166,7 +194,7 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStat
     public float ConsumeConcussionOnKnockbackEnd()
     {
         if (!IsServer || !_concussion.IsPending) return 0f;
-        float stun = _concussion.ConsumeOnKnockbackEnd(_active.Value);
+        float stun = _concussion.ConsumeOnKnockbackEnd(EffectiveActive);
         ClearConcussionFlag();
         return stun;
     }
