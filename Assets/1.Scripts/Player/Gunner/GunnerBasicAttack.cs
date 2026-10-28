@@ -493,16 +493,18 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         Vector3 direction = GunnerAttackFacingModel.Flatten(requested, movement.CurrentFacing);
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
+        // 2차 과열 모드(할 일 127 3/4): 한계 돌파 = 단계 배율표 교체·과열 증가 ×1.35, 정온 운용 = 0단계 × (1 − 감소율)·과열 없음.
+        GunnerHeatTraits heatTraits = heat.Traits;
         int stage = heat.CurrentStage;
         int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus, new TraitAttackKey(AttackType.Default));
-        int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heat.StageDamageMultiplier(stage)));
+        int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heatTraits.BasicShotScale(stage, heat.Data)));
 
         Vector3 origin = muzzle != null
             ? muzzle.position
             : transform.position + Vector3.up * data.MuzzleHeight;
         bool hit = FireBeam(origin, direction, damage, data.TriggersOnHit, TraitHitFlags.Original, out Vector3 end);
 
-        heat.ServerAddShot(data.HeatPerShot); // 허공이어도 증가(§4.2)
+        heat.ServerAddShot(heatTraits.HeatPerShot(data.HeatPerShot)); // 허공이어도 증가(§4.2). 최대치 제한은 모델, 정온 운용이면 증가 없음
         lastShotTime = now;
         player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 발 발사(적중 무관)
         CommitShotForTraits(origin, direction, damage);

@@ -64,7 +64,10 @@ public static class GunnerTraitTooltip
     public static int RequiredCount(TraitDefinition trait, string derivedKey) =>
         FindDerived(trait, derivedKey)?.CreateRuntime(0).Counter.Required ?? 0;
 
-    /// <summary>이중 출력 {dmg} — 판정식(GunnerBasicAttack) round(Dref × 과열 단계 배율)의 원래 발 × 비율.</summary>
+    /// <summary>
+    /// 이중 출력 {dmg} — 판정식(GunnerBasicAttack) round(Dref × 기본 공격 상태 배율)의 원래 발 × 비율.
+    /// 상태 배율은 플레이어의 2차 과열 모드를 따른다(<see cref="GunnerHeatTraits.BasicShotScale"/>) — 한계 돌파 = 교체 표 최소~최대, 정온 운용 = 0단계 × (1 − 감소율) 한 값.
+    /// </summary>
     public static SkillTooltipDamage ExtraBasicDamage(TraitDefinition trait, Player player)
     {
         TraitDerivedAttackEffect derived = FindDerived(trait, GunnerTraitRules.BasicExtraDerivedKey);
@@ -73,11 +76,15 @@ public static class GunnerTraitTooltip
         if (derived == null || attack == null || heat == null)
             return default;
 
+        BasicScaleRange(GunnerHeatTraits.From(player.TraitModifiers), heat, out float minimum, out float maximum);
         return DerivedDamage(player, attack.AttackDamageMultiplier, attack.FlatDamageBonus, GunnerTraitRules.BasicAttackKey,
-            heat.StageDamageMultiplier(0), heat.StageDamageMultiplier(int.MaxValue), derived.DamageRatio);
+            minimum, maximum, derived.DamageRatio);
     }
 
-    /// <summary>잔류 포격 {dmg} — 판정식(GunnerChargeLaserSkill.Fire) round(Dref × 충전 배율 × 저장 단계 배율)의 원래 발 × 비율. 최소 = 충전 0·0단계, 최대 = 최대 충전·최고 단계.</summary>
+    /// <summary>
+    /// 잔류 포격 {dmg} — 판정식(GunnerChargeLaserSkill.Fire) round(Dref × 충전 배율 × 저장 단계 배율 × 축열 배율)의 원래 발 × 비율.
+    /// 최소 = 충전 0·0단계·소모 0, 최대 = 최대 충전·도달 가능한 최고 단계(정온 운용 0)·축열 최대 소모(축열 포격만, 한계 돌파 = 교체 표).
+    /// </summary>
     public static SkillTooltipDamage EchoQDamage(TraitDefinition trait, Player player)
     {
         TraitDerivedAttackEffect derived = FindDerived(trait, GunnerTraitRules.QEchoDerivedKey);
@@ -86,9 +93,16 @@ public static class GunnerTraitTooltip
         if (derived == null || q == null)
             return default;
 
+        GunnerHeatTraits heat = GunnerHeatTraits.From(player.TraitModifiers);
         return DerivedDamage(player, q.AttackDamageMultiplier, q.FlatDamageBonus, GunnerTraitRules.QAttackKey,
-            q.DamageMultiplierAt(0f) * q.StageDamageMultiplier(0), q.DamageMultiplierAt(1f) * q.StageDamageMultiplier(int.MaxValue),
-            derived.DamageRatio);
+            q.MinShotScale(heat), q.MaxShotScale(heat), derived.DamageRatio);
+    }
+
+    /// <summary>기본 공격 원래 발 상태 배율 최소(0단계)~최대(도달 가능한 최고 단계) — 판정과 같은 <see cref="GunnerHeatTraits.BasicShotScale"/>.</summary>
+    public static void BasicScaleRange(in GunnerHeatTraits heat, GunnerHeatData data, out float minimum, out float maximum)
+    {
+        minimum = heat.BasicShotScale(0, data);
+        maximum = heat.BasicShotScale(heat.MaxStage, data);
     }
 
     /// <summary>원래 발 피해(Dref × 상태 배율, 최소~최대) × 파생 비율. 집중 포화·적 방어·백어택은 넣지 않는다(명세 §8).</summary>

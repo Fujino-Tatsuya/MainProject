@@ -13,4 +13,6 @@ public interface IOverheadTraitGauge
     Color FillColor { get; }
     /// <summary>눈금 위치(0~1). 음수면 눈금을 숨긴다.</summary>
     float MarkerPosition { get; }
+    /// <summary>게이지 줄을 보일지(예: 거너 정온 운용 특성 = 과열 없음 → false). 기본 true — 구현하지 않은 공급자는 그대로 보인다.</summary>
+    bool Visible => true;
 }

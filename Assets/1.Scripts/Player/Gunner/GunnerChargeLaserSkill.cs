@@ -8,7 +8,7 @@ using UnityEngine;
 /// 좌클릭 또는 (최대 집중 + 유지시간) 자동 → 현재 조준으로 발사: 사거리·피해는 집중 시간으로 최소→최대 보간,
 /// 지형에서 끊기는 굵은 직선 안의 적·오브젝트에 피해, 아군(시전자 제외)에 보호막(합산) — 전부 대상별 1회.
 /// 쿨타임은 발사 순간부터(수동 커밋). 발사 없이 끝나면(쓰러짐·사망·조작 불가·피격 취소) 쿨타임 없음.
-/// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다.
+/// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다(축열 포격 특성만 첫 발에서 모두 소모).
 /// 발사 후 회복 종료 = 발사 때 GunnerBeamView 가 트는 Gunner_Q_Fire 클립(gunner_skill_Q_fire)의 End 이벤트(서버).
 /// 안 오면 maxActiveDuration 안전망(시전 시작부터).
 /// </summary>
@@ -24,7 +24,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
     // 서버 런타임
     private float chargeStartTime;
-    private int storedStage;
+    // 시전 스냅샷(할 일 127 3/4) — 시작 순간 과열 단계 + 첫 발 직전 축열 소모. 원래 발 전체·잔류 포격이 같은 값을 쓴다.
+    private readonly GunnerQCastSnapshot castSnapshot = new GunnerQCastSnapshot();
     private Vector3 aim;
     private bool fired;
     private bool statusApplied;
@@ -137,8 +138,9 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         // 새 시전은 새 묶음 — 이미 예약된 이전 시전의 잔류 포격(echoShots)은 덮어쓰지 않는다.
         echoPlan.Reset();
 
-        // 시전 시작 순간의 단계를 저장 — 과열 중이면 3단계(§5.6)
-        storedStage = heat != null ? heat.CaptureStage() : 0;
+        // 시전 시작 순간의 단계를 저장 — 과열 중이면 3단계(§5.6). 정온 운용이면 0.
+        int storedStage = heat != null ? heat.CaptureStage() : 0;
+        castSnapshot.Begin(storedStage);
 
         StatusEffectController effects = owner.StatusEffects;
         if (effects != null)
@@ -244,9 +246,20 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         float factor = ChargeFactor(data, Time.time - chargeStartTime, chargeMaxTime);
         float range = data.RangeAt(factor);
         float width = EffectiveBeamWidth(data);
-        // 툴팁의 최소~최대 계산도 같은 집중·과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
-        int damage = Mathf.Max(0, Mathf.RoundToInt(
-            damageSnapshot * data.DamageMultiplierAt(factor) * data.StageDamageMultiplier(storedStage)));
+        // 축열 포격(할 일 127 3/4) — 첫 발 실제 발사 직전 남은 열을 모두 소모(열 0·과열 해제)하고 그 비율로 Q 피해 보너스.
+        // 소모와 발사 커밋이 같은 서버 호출 안이다(원자). 충전 취소·발사 전 종료는 여기 오지 않아 소모 없음, 빗나가도 소모.
+        GunnerHeatTraits heatTraits = heat != null ? heat.Traits : GunnerHeatTraits.From(Traits);
+        if (!castSnapshot.FirstShotCommitted)
+        {
+            float spent = heatTraits.SpendsHeatOnQ && heat != null ? heat.ServerSpendAll() : 0f;
+            castSnapshot.CommitFirstShot(heatTraits, spent);
+        }
+
+        // 툴팁의 최소~최대 계산도 같은 집중·과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것(GunnerChargeLaserData·GunnerTraitTooltip).
+        // 한계 돌파 = 단계 배율표 교체, 정온 운용 = 0단계. 보호막 단계 배율은 원래 표(축열 보너스 없음).
+        int storedStage = heatTraits.EffectiveStage(castSnapshot.StoredStage);
+        int damage = castSnapshot.ShotDamage(damageSnapshot, data.DamageMultiplierAt(factor),
+            heatTraits.SkillStageScale(storedStage, data.StageDamageMultiplier(storedStage)));
         int shield = Mathf.Max(0, Mathf.RoundToInt(data.ShieldAmount * data.StageShieldMultiplier(storedStage)));
 
         Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
@@ -278,7 +291,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
                                      stopped, BuildHitPoints(origin, direction, length));
 
         Edit.Log($"[Gunner/Q] 발사 — 집중 {factor:0.00}(최대 {chargeMaxTime:0.##}초), 사거리 {length:0.0}/{range:0.0}, 폭 {width:0.##}, 피해 {damage} ×{hitCount}, " +
-                 $"보호막 {shield} ×{allies.Count}, 저장 단계 {storedStage}", this);
+                 $"보호막 {shield} ×{allies.Count}, 저장 단계 {storedStage}, 과열 모드 {heatTraits.Mode}" +
+                 (heatTraits.SpendsHeatOnQ ? $", 축열 소모 {castSnapshot.HeatSpentRatio:0.00} ×{castSnapshot.HeatShotScale:0.00}" : ""), this);
     }
 
     /// <summary>
