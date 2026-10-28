@@ -28,7 +28,9 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private Vector3 aim;
     private bool fired;
     private bool statusApplied;
+    private float chargeMaxTime;
     private float ownerChargeStartTime;
+    private float ownerChargeMaxTime;
 
     /// <summary>
     /// [서버] Q 를 실제로 <b>발사</b>했다(충전 시작·대시 취소·피격 종료는 안 난다). 튜토리얼 판정 훅(v8 Z1-5 "거너 Q 는 발사까지").
@@ -53,6 +55,18 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private GunnerChargeLaserData QData => Data as GunnerChargeLaserData;
     private ulong SourceId => owner != null ? owner.NetworkObjectId : 0;
     private bool HasAuthority => owner != null && (!owner.IsSpawned || owner.IsServer);
+    private PlayerTraitModifiers Traits => owner != null ? owner.TraitModifiers : null;
+
+    // 특성(할 일 127) — 고속 집속 = 최대 충전시간 ×0.75(피해·사거리 끝점·자동 발사 유지시간 그대로),
+    // 광폭 레이저 = 판정 폭 ×1.3(사거리·높이 그대로). 시전 시작(충전시간)·발사(폭) 순간 값으로 쓴다.
+    private float EffectiveMaxChargeTime(GunnerChargeLaserData data) =>
+        GunnerTraitRules.QMaxChargeTimeFor(Traits, data.MaxChargeTime);
+
+    private float EffectiveBeamWidth(GunnerChargeLaserData data) =>
+        GunnerTraitRules.QBeamWidthFor(Traits, data.BeamWidth);
+
+    private static float ChargeFactor(GunnerChargeLaserData data, float elapsed, float maxChargeTime) =>
+        data.ChargeFactor(GunnerTraitRules.DataClockElapsed(elapsed, data.MaxChargeTime, maxChargeTime));
 
     public override void Initialize(Player owner, PlayerSkillController controller)
     {
@@ -71,6 +85,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     {
         State = SkillState.Charging;
         chargeStartTime = Time.time;
+        chargeMaxTime = EffectiveMaxChargeTime(QData);
         aim = direction;
         fired = false;
 
@@ -95,7 +110,11 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     {
         ownerChargeStartTime = Time.time;
         if (QData != null)
-            view?.BeginCharge(QData.MaxChargeTime);
+        {
+            // 연출 코드는 그대로 — 충전 완료 시점만 특성 충전시간에 맞춰 넘긴다.
+            ownerChargeMaxTime = EffectiveMaxChargeTime(QData);
+            view?.BeginCharge(ownerChargeMaxTime);
+        }
     }
 
     public override void OnOwnerTick(Vector3 aimDirection)
@@ -116,19 +135,25 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         aimDirection = aimDirection.sqrMagnitude > 0.001f
             ? aimDirection.normalized
             : owner.transform.forward;
-        float factor = data.ChargeFactor(Time.time - ownerChargeStartTime);
+        float factor = ChargeFactor(data, Time.time - ownerChargeStartTime, ownerChargeMaxTime);
         float range = data.RangeAt(factor);
+        float width = EffectiveBeamWidth(data);
         Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        // 지형 차단은 데이터 폭으로 잰다 — 광폭 레이저가 사거리를 바꾸지 않게(발사와 같은 식).
         float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
-        lineIndicator.ShowCharge(origin, aimDirection, 0f, length, data.BeamWidth);
+        lineIndicator.ShowCharge(origin, aimDirection, 0f, length, width);
         // 지금 쏘면 맞을 적에 외곽선(할 일 58) — 발사(Fire)와 같은 사거리·폭·높이·앵커.
-        hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, data));
+        hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, width, data));
     }
 
-    /// <summary>발사 판정 상자 — <see cref="Fire"/> 의 <see cref="GunnerBeamAttack.FirePiercing"/> 와 같은 인자(오너 미리보기 공용).</summary>
-    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data)
+    /// <summary>발사 판정 상자 — <see cref="Fire"/> 의 <see cref="GunnerBeamAttack.FirePiercing"/> 와 같은 인자(오너 미리보기 공용). 폭 = 데이터 폭(특성 없음).</summary>
+    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data) =>
+        FireVolume(origin, direction, length, data.BeamWidth, data);
+
+    /// <summary>폭을 따로 받는 판(광폭 레이저 — <see cref="GunnerTraitRules.QBeamWidthFor"/>).</summary>
+    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, float width, GunnerChargeLaserData data)
     {
-        return SkillHitVolume.Beam(origin, direction, length, data.BeamWidth, data.BeamHeight, data.HittableLayers);
+        return SkillHitVolume.Beam(origin, direction, length, width, data.BeamHeight, data.HittableLayers);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -145,7 +170,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         if (data == null)
             return;
 
-        if (State == SkillState.Charging && Time.time >= chargeStartTime + data.MaxChargeTime + data.AutoFireHoldTime)
+        if (State == SkillState.Charging && Time.time >= chargeStartTime + GunnerTraitRules.AutoFireDelay(chargeMaxTime, data.AutoFireHoldTime))
             Fire(aim);
     }
 
@@ -168,8 +193,9 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         direction = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
         movement?.RotateImmediately(direction);
 
-        float factor = data.ChargeFactor(Time.time - chargeStartTime);
+        float factor = ChargeFactor(data, Time.time - chargeStartTime, chargeMaxTime);
         float range = data.RangeAt(factor);
+        float width = EffectiveBeamWidth(data);
         // 툴팁의 최소~최대 계산도 같은 집중·과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
         int damage = Mathf.Max(0, Mathf.RoundToInt(
             damageSnapshot * data.DamageMultiplierAt(factor) * data.StageDamageMultiplier(storedStage)));
@@ -178,11 +204,11 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
         float length = beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers);
 
-        int hitCount = beam.FirePiercing(origin, direction, length, data.BeamWidth, data.BeamHeight,
+        int hitCount = beam.FirePiercing(origin, direction, length, width, data.BeamHeight,
                                          data.HittableLayers, damage, DamageAttackType,
                                          DamageHitPattern, data.TriggersOnHit);
 
-        beam.CollectAllies(origin, direction, length, data.BeamWidth, data.BeamHeight, data.AllyLayers, allies);
+        beam.CollectAllies(origin, direction, length, width, data.BeamHeight, data.AllyLayers, allies);
         for (int i = 0; i < allies.Count; i++)
             allies[i].AddShield(ShieldType.GunnerCharge, SourceId, shield, data.ShieldDuration);
 
@@ -195,10 +221,11 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         //    착탄 연출을 띄울지 말지가 여기서 갈린다(좌클릭의 stopped 와 같은 신호).
         bool stopped = length < range - 0.01f;
         // 보호막 연출은 안 싣는다 — 받은 아군의 PlayerShieldVfx 가 복제된 보호막 목록을 보고 띄운다.
+        // 🔴 연출 폭은 데이터 폭 그대로(광폭 레이저 VFX 폭 반영은 별도 할 일 — 판정만 넓힌다).
         view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth,
                                      stopped, BuildHitPoints(origin, direction, length));
 
-        Edit.Log($"[Gunner/Q] 발사 — 집중 {factor:0.00}, 사거리 {length:0.0}/{range:0.0}, 피해 {damage} ×{hitCount}, " +
+        Edit.Log($"[Gunner/Q] 발사 — 집중 {factor:0.00}(최대 {chargeMaxTime:0.##}초), 사거리 {length:0.0}/{range:0.0}, 폭 {width:0.##}, 피해 {damage} ×{hitCount}, " +
                  $"보호막 {shield} ×{allies.Count}, 저장 단계 {storedStage}", this);
     }
 
@@ -279,7 +306,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         shape = SkillPreviewShapes.ChargeLaser(
             data.MinRange,
             data.MaxRange,
-            data.BeamWidth,
+            EffectiveBeamWidth(data),
             clippedMin,
             clippedMax);
         return true;

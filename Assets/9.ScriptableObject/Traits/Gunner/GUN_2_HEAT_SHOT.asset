@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db1f5d62f1e91ba488ce78d5559dafeb, type: 3}
+  m_Name: GUN_2_HEAT_SHOT
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerTraitDefinition
+  id: GUN_2_HEAT_SHOT
+  displayName: "\uCD95\uC5F4 \uD3EC\uACA9"
+  category: "Q \uBCC0\uACBD \xB7 \uACFC\uC5F4 \uC18C\uBAA8"
+  description: "Q\uB97C \uBC1C\uC0AC\uD558\uBA74 \uACFC\uC5F4\uC744 \uBAA8\uB450
+    \uC18C\uBAA8\uD569\uB2C8\uB2E4. \uB9CE\uC774 \uC18C\uBAA8\uD560\uC218\uB85D Q
+    \uD53C\uD574\uAC00 \uC99D\uAC00\uD558\uBA70, \uCD5C\uB300 {maxSpentDamageBonus:%}\uAE4C\uC9C0
+    \uAC15\uD574\uC9D1\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673644683619
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673644683619
+      type: {class: GunnerHeatShotEffect, ns: , asm: Assembly-CSharp}
+      data:
+        maxSpentDamageBonus: 0.6

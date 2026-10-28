@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db1f5d62f1e91ba488ce78d5559dafeb, type: 3}
+  m_Name: GUN_1_CHARGE
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerTraitDefinition
+  id: GUN_1_CHARGE
+  displayName: "\uACE0\uC18D \uC9D1\uC18D"
+  category: "Q \uAC15\uD654"
+  description: "Q\uB97C \uB05D\uAE4C\uC9C0 \uCDA9\uC804\uD558\uB294 \uC2DC\uAC04\uC774
+    {chargeTimeReduction:%} \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673644683617
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673644683617
+      type: {class: GunnerChargeTimeEffect, ns: , asm: Assembly-CSharp}
+      data:
+        chargeTimeReduction: 0.25
