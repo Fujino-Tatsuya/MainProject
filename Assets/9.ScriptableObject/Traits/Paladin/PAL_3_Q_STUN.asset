@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 373410ab17bd61649b8252afc374b55d, type: 3}
+  m_Name: PAL_3_Q_STUN
+  m_EditorClassIdentifier: Assembly-CSharp::PaladinTraitDefinition
+  id: PAL_3_Q_STUN
+  displayName: "\uC81C\uC555\uC758 \uC9C4\uACA9"
+  category: "Q \uAC15\uD654 \xB7 \uAE30\uC808"
+  description: "Q\uB85C \uBC00\uCE5C \uC801\uC744 \uBC00\uCE58\uAE30\uAC00 \uB05D\uB09C
+    \uB4A4 {stunDuration}\uCD08 \uB3D9\uC548 <style=stun>\uAE30\uC808</style>\uC2DC\uD0B5\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673742725365
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673742725365
+      type: {class: TraitKnockbackEffect, ns: , asm: Assembly-CSharp}
+      data:
+        attackTypes: 03000000
+        forms: 
+        pushDistance: 0.1
+        pushDuration: 0.1
+        staggerDuration: 0.1
+        concussionDuration: 0.75

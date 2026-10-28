@@ -327,6 +327,12 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 pendingDeferredCounter = false;
         }
 
+        // 특성 사건(할 일 126 — 수호의 잔광 보호막). 방어 성공 뒤 피해 무시(반격 단계)는 E 가 끝나는 지금 끝난다 —
+        // 반격 클립 End(Completed)든 대시·경직·안전망 끊김이든 같다. 방어 실패·사망이면 내지 않는다(예약 취소).
+        // E 의 '정상 종료' 사건(SkillCompleted)으로 내고, 같은 시전 중복은 효과 거름(oncePerCast — 방어 성공 시전 ID)이 막는다.
+        if (IsServerPeer && PaladinTraitRules.GrantsGuardAfterglow(model.Blocked, reason, owner.CurrentHealth))
+            PlayerTraitEffects.For(owner).RaiseServer(TraitTrigger.SkillCompleted, this);
+
         model.Reset();
 
         // 🔴 종료 사유를 가리지 않는다 — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).

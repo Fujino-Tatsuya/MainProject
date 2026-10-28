@@ -11,12 +11,24 @@ public static class PaladinTraitValues
     public const string PassiveHeal = "PAL_1_PASSIVE_HEAL";
     public const string ERefund = "PAL_2_E_REFUND";
     public const string ShareHeal = "PAL_2_SHARE_HEAL";
+    public const string QStun = "PAL_3_Q_STUN";
+    public const string EShield = "PAL_3_E_SHIELD";
+    public const string PassiveCdr = "PAL_3_PASSIVE_CDR";
 
     /// <summary>수호 재정비 카드 <c>{cooldownReduction:%}</c> = −cooldownChange(0.15 = 15% 감소).</summary>
     public static float CooldownReduction(TraitDefinition trait) => -EffectField(trait, "cooldownChange");
 
     /// <summary>나누는 불굴 카드 <c>{allyRange}</c> = 초과 회복 전달 범위(m).</summary>
     public static float AllyRange(TraitDefinition trait) => EffectField(trait, "overflowShareRange");
+
+    /// <summary>제압의 진격 카드 <c>{stunDuration}</c> = 밀치기 효과의 뇌진탕 길이(초).</summary>
+    public static float StunDuration(TraitDefinition trait) => EffectField(trait, "concussionDuration");
+
+    /// <summary>수호의 잔광 카드 <c>{shieldMaxHpRatio:%}</c> = 보호막 효과의 최대 체력 비율(0.1 = 10%).</summary>
+    public static float ShieldMaxHpRatio(TraitDefinition trait) => EffectField(trait, "amountRatio");
+
+    /// <summary>수호의 잔광 카드 <c>{shieldDuration}</c> = 보호막 지속(초).</summary>
+    public static float ShieldDuration(TraitDefinition trait) => EffectField(trait, "duration");
 
     private static float EffectField(TraitDefinition trait, string field)
     {

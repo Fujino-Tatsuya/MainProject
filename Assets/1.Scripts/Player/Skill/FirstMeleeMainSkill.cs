@@ -37,6 +37,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     private readonly HashSet<Object> tickTargets = new HashSet<Object>();
     // 이번 틱에 맞은 Unit (Player.ServerAttackLanded 통지용). Unit 이 아닌 대상(상자 등)은 빠진다.
     private readonly List<Unit> tickLandedUnits = new List<Unit>();
+    // 제압의 진격(할 일 126) — 이번 시전에서 뇌진탕을 받은 대상을 지속 밀치기 동안 이어 싣는다(서버).
+    private readonly PaladinQConcussionCarry traitConcussionCarry = new PaladinQConcussionCarry();
 
     // 진행 방향 장부. 이동 권위 피어는 실제 이동에, 서버는 판정·넉백 방향에 사용한다.
     private Vector3 heading = Vector3.forward;
@@ -77,6 +79,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         if (hitResults == null || hitResults.Length != data.MaxHitResults)
             hitResults = new Collider[data.MaxHitResults];
+        traitConcussionCarry.Reset();
 
         // 홀드 동안 CC 면역. 만료 안전망은 지속시간, 정상/강제 종료 시엔 OnEnd가 즉시 해제한다.
         // (오프라인에서는 상태이상 시스템이 비활성 — 스탯 계열과 동일 제약)
@@ -164,6 +167,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                 staggerDuration: data.StaggerDuration,
                 knockbackDirection: heading,
                 hitPattern: DamageHitPattern);
+            // 특성 밀치기·뇌진탕(할 일 126 — 제압의 진격). Unit 이 아닌 대상(상자 등)은 특성 CC 없음(명세 §4).
+            if (unit != null)
+                ApplyTraitCrowdControlServer(unit, heading, ref attackInfo);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
             bool resolved = hurtbox != null
@@ -180,7 +186,23 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             Edit.Log($"[Skill] 진격의 방패 틱 — {target.name} 피해 {attackInfo.damage} + 견인", this);
         }
 
+        traitConcussionCarry.EndTick();
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, tickLandedUnits, this);
+    }
+
+    /// <summary>
+    /// [서버] 특성 밀치기·뇌진탕 연결 한 곳(할 일 126) — 원래 Q 판정 1건이 대상에 들어가기 직전. 돌파의 방패(4/4) 단발 넉백도 이걸 부른다.
+    /// 공용 수정자(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/>)가 시전당 대상별 1회로 밀치기·뇌진탕을 싣고,
+    /// 뇌진탕은 지속 밀치기 동안 매 틱 이어 싣는다(<see cref="PaladinQConcussionCarry"/>). 보스 상태는 묻지 않는다 — 수신측 거부 규칙에 맡긴다.
+    /// </summary>
+    internal void ApplyTraitCrowdControlServer(Unit unit, Vector3 direction, ref AttackInfo info)
+    {
+        if (unit == null || owner == null)
+            return;
+
+        TraitAttackKey key = TraitAttackKey.ForSkill(Slot, controller != null && controller.IsAlternateSkill(this));
+        PlayerTraitEffects.For(owner).ModifyOutgoingAttackServer(key, ServerCastId, unit, direction, ref info);
+        info.concussionDuration = traitConcussionCarry.Resolve(unit.GetInstanceID(), info.concussionDuration);
     }
 
     public override void OnEnd(SkillEndReason reason)
@@ -188,6 +210,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         base.OnEnd(reason);
 
         isLocallySimulating = false;
+        traitConcussionCarry.Reset();
 
         // 🔴 종료 사유를 가리지 않는다. 취소·사망·안전망 만료 어느 쪽으로 끝나도 여기를 지나므로
         //    루프가 남는 경로가 없다. (Stop 은 재생 중이 아니면 조용한 no-op 이다)
