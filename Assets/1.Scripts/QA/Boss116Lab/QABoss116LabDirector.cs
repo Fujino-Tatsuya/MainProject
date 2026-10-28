@@ -6,6 +6,7 @@ using System.IO;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// 할 일 116-C4 — 대쉬 간파 예측 랩 씬(<c>DebugDashPredictLab</c>)의 진행자(호스트에서만 돈다, 씬 배치형). 게임 코드는 바꾸지 않고 기존 서버 API 만 부른다.
@@ -17,13 +18,18 @@ using UnityEngine.AI;
 /// <item><b>구간 교대</b>: <see cref="QABoss116LabConfig.ZoneSeconds"/> 마다 벽 구간(복도) ↔ 열린 구간으로 보스·플레이어를 옮긴다(보스 공격·창·내 대시/스킬 중이 아닐 때, 5초 넘게 못 옮기면 그대로 옮김).</item>
 /// <item><b>판</b>: 설정 파일(<see cref="QABoss116LabConfig"/>, 배치 메뉴가 씀)이 있으면 전투 봇(<see cref="QABoss103CombatBot"/> 대쉬 간파 규칙)을 붙이고,
 ///   시간 상한·시도 상한 중 먼저 닿으면 끝 파일(<see cref="QABoss116Lab.DonePath"/>)을 쓴다 — 에디터 배치가 보고 Play 를 멈춘다.
-///   설정 파일이 없으면(사람이 Dev Boot 로 직접) 봇 없이 살려 두기·기록(콘솔)·카메라만.</item>
+///   설정 파일이 오래됐거나 깨졌으면 봇·기록 없이 살려 두기·카메라만(<see cref="QABoss116LabMode.Plain"/>).</item>
+/// <item><b>수동 모드</b>(할 일 116-C5, 설정 파일 없음 — 사람이 Dev Boot 로 직접): 예측 로그를 켜고, 사람 입력 시도(<see cref="QABoss116LabManualInput"/>)·창·대시·예측 줄을
+///   메모리에 모았다가 Play 정지(<see cref="OnDestroy"/>) 때 <c>C:/UnityProject/QA/116manual-…/parts/</c> 에 쓴다 — 에디터 훅(<c>QABoss116LabManualFinalizer</c>)이 C4 집계로 CSV·report.html.
+///   30초 구간 교대 대신 <see cref="ZoneToggleKey"/> 로 벽 ↔ 열린 구간, 랩 카메라는 끈다(평소 플레이어 카메라).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class QABoss116LabDirector : MonoBehaviour
 {
     private const string Tag = QABoss116Lab.Tag;
+    /// <summary>수동 모드 구간 이동 키(Docs/tech/debug-hotkeys.md — F2 는 HitVFXDebugHUD 와 겹치지만 그 HUD 는 이 씬에 없다).</summary>
+    public const Key ZoneToggleKey = Key.F2;
     /// <summary>설정 파일이 이보다 오래됐으면(배치가 남긴 찌꺼기) 무시한다.</summary>
     private const double ConfigMaxAgeMinutes = 15.0;
     private const float ZoneMoveForceSeconds = 5f;
@@ -50,6 +56,15 @@ public sealed class QABoss116LabDirector : MonoBehaviour
 
     private QABoss116LabConfig _cfg;
     private bool _batch;
+    private QABoss116LabMode _mode = QABoss116LabMode.Plain;
+    private bool Manual => _mode == QABoss116LabMode.Manual;
+    // 수동 모드 판 버퍼(Play 정지 때 한 번에 쓴다 — 시도 0 이면 폴더를 만들지 않는다)
+    private List<string> _manualLines;
+    private QABoss116LabManualInput _manualInput;
+    private bool _predictHooked;
+    private string _character = "";
+    private DateTime _manualStartedAt;
+    private double _lastServerT = -1.0;
     private QABoss103CombatBot _bot;
     private QABoss103PartWriter _part;
     private TwentyThreeBoss _boss;
@@ -79,24 +94,29 @@ public sealed class QABoss116LabDirector : MonoBehaviour
     private void Start()
     {
         string path = Path.Combine(QANetSim88.OwnRoot, QABoss116LabConfig.FileName);
+        bool exists = false;
         try
         {
-            if (File.Exists(path) && (DateTime.Now - File.GetLastWriteTime(path)).TotalMinutes <= ConfigMaxAgeMinutes &&
+            exists = File.Exists(path);
+            if (exists && (DateTime.Now - File.GetLastWriteTime(path)).TotalMinutes <= ConfigMaxAgeMinutes &&
                 QABoss116LabConfig.TryParse(File.ReadAllText(path), out QABoss116LabConfig cfg))
             {
                 _cfg = cfg;
                 _batch = cfg.Bot.HasOut;
             }
-            else if (File.Exists(path))
-                Debug.LogWarning($"{Tag} 설정 파일이 {ConfigMaxAgeMinutes:0}분보다 오래됐거나 깨졌다 — 무시하고 사람 모드({path}).");
+            else if (exists)
+                Debug.LogWarning($"{Tag} 설정 파일이 {ConfigMaxAgeMinutes:0}분보다 오래됐거나 깨졌다 — 무시하고 사람 모드(기록 없음 — 수동 기록을 쓰려면 이 파일을 지울 것: {path}).");
         }
         catch (Exception e)
         {
             Debug.LogWarning($"{Tag} 설정 읽기 실패({e.Message}) — 사람 모드.");
         }
         _cfg ??= new QABoss116LabConfig();
+        _mode = QABoss116LabManual.ResolveMode(exists, _batch);
         Application.runInBackground = true;
-        Debug.Log($"{Tag} event=lab_director mode={(_batch ? "batch" : "manual")} run={_cfg.Bot.Run} retry={_cfg.Bot.Retry} runS={_cfg.RunSeconds:0} " +
+        if (Manual)
+            BeginManual();
+        Debug.Log($"{Tag} event=lab_director mode={_mode.ToString().ToLowerInvariant()} run={_cfg.Bot.Run} retry={_cfg.Bot.Retry} runS={_cfg.RunSeconds:0} " +
                   $"maxAttempts={_cfg.MaxAttempts} zoneS={_cfg.ZoneSeconds:0} dashint={_cfg.Bot.DashInterruptPct} out={QABoss103Plan.Token(_cfg.Bot.OutDir)}");
     }
 
@@ -113,11 +133,14 @@ public sealed class QABoss116LabDirector : MonoBehaviour
 
         if (!_started)
             Begin(me);
+        _lastServerT = ServerNow();
 
         KeepAlive(me);
         TickWindow(me);
         TickDash(me);
         TickZone(me);
+        if (Manual && Keyboard.current != null && Keyboard.current[ZoneToggleKey].wasPressedThisFrame)
+            ToggleZone(me);
 
         if (_batch)
         {
@@ -133,9 +156,21 @@ public sealed class QABoss116LabDirector : MonoBehaviour
         _started = true;
         _startedAt = Time.realtimeSinceStartupAsDouble;
         QABoss116LabProbe.PlannedZone = "";
+        if (Manual)
+        {
+            _character = CharacterOf(me).ToString();
+            _manualStartedAt = DateTime.Now;
+            Write(QABoss103PartFile.Format("labrun", "event", "start", "mode", "manual", "character", _character, "t", F3(ServerNow()), "boss", _boss.name,
+                "clients", NetworkManager.Singleton.ConnectedClientsIds.Count.ToString(CultureInfo.InvariantCulture),
+                "data", _boss.MonsterData != null ? _boss.MonsterData.name : "na"));
+            MoveZone(me, QABoss116Lab.ZoneWall, 0, false);
+            Debug.Log($"{Tag} event=lab_start mode=manual player={me.name} character={_character} boss={_boss.name} — 사람 조작 기록 중. " +
+                      $"{ZoneToggleKey} = 벽 ↔ 열린 구간. Play 를 멈추면 {QABoss116LabManual.QARoot}/{QABoss116LabManual.Prefix}-<시각>/ 에 CSV·report.html.");
+            return;
+        }
         if (!_batch)
         {
-            Debug.Log($"{Tag} event=lab_start mode=manual player={me.name} boss={_boss.name} — 봇 없음(사람 조작). 살려 두기·창/대시 기록(콘솔)만.");
+            Debug.Log($"{Tag} event=lab_start mode=plain player={me.name} boss={_boss.name} — 봇 없음(사람 조작). 살려 두기·창/대시 기록(콘솔)만.");
             return;
         }
 
@@ -200,6 +235,11 @@ public sealed class QABoss116LabDirector : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Manual)
+        {
+            EndManual();
+            return;
+        }
         // Play 정지·씬 내림 — 끝 파일 없이 끝났으면 봇·판 파일만 닫는다(배치가 그 판을 오류로 적는다).
         QABoss116LabProbe.Active = false;
         if (_bot != null)
@@ -208,6 +248,117 @@ public sealed class QABoss116LabDirector : MonoBehaviour
             Destroy(_bot.gameObject);
         }
         _part?.Dispose();
+    }
+
+    // ── 수동 모드(할 일 116-C5) ──────────────────────────────
+
+    /// <summary>수동 모드 사람 입력 관측기가 읽는다.</summary>
+    public TwentyThreeBoss Boss => _boss != null && _boss.IsSpawned ? _boss : null;
+    public bool Started => _started && !_ended;
+    public string Character => _character;
+    public int CounterWindows => _windows;
+
+    private void BeginManual()
+    {
+        _manualLines = new List<string>(1024);
+        DashInterruptPredictLog.Enabled = true;
+        DashInterruptPredictLog.LineEmitted += OnPredictLine;
+        _predictHooked = true;
+        foreach (QABoss116LabCamera cam in FindObjectsByType<QABoss116LabCamera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            cam.enabled = false;   // 평소 플레이어 카메라 그대로
+        _manualInput = gameObject.AddComponent<QABoss116LabManualInput>();
+        _manualInput.Init(this);
+    }
+
+    private void OnPredictLine(string line)
+    {
+        string part = QABoss116DashPredict.ToPartLine(line);
+        if (part != null)
+            WriteManual(part);
+    }
+
+    /// <summary>수동 모드 판 버퍼에 한 줄(사람 시도 <c>dashint</c>·창·대시·예측 줄).</summary>
+    public void WriteManual(string line)
+    {
+        if (_manualLines != null && !string.IsNullOrEmpty(line))
+            _manualLines.Add(line);
+    }
+
+    /// <summary>
+    /// Play 정지 — 진행 중 시도·대시·창을 닫고, 시도가 1건 이상이면 결과 폴더에 판 파일·batch.txt 를 쓴 뒤 에디터 훅에 넘긴다
+    /// (CSV·report.html = <c>QABoss116LabManualFinalizer</c>, 같은 정지 직후). 시도 0 이면 폴더를 만들지 않는다.
+    /// </summary>
+    private void EndManual()
+    {
+        if (_predictHooked)
+        {
+            DashInterruptPredictLog.LineEmitted -= OnPredictLine;
+            DashInterruptPredictLog.Enabled = false;
+            _predictHooked = false;
+        }
+        if (_manualLines == null || _ended)
+            return;
+        _ended = true;
+        if (_manualInput != null)
+            _manualInput.Flush();
+        if (!_started)
+        {
+            Debug.Log($"{Tag} event=manual_end 랩이 시작되지 않았다(플레이어·23호 스폰 전 정지) — 결과 폴더 없음.");
+            return;
+        }
+        Player me = Player.LocalPlayer;
+        if (_tracking)
+            FinishDash(me);
+        if (_windowWas)
+            Write(QABoss103PartFile.Format(QABoss116Lab.WindowKind, "event", "close", "n", _windows.ToString(CultureInfo.InvariantCulture), "t", F3(_lastServerT), "note", "run_end"));
+        int attempts = _manualInput != null ? _manualInput.Attempts : 0;
+        double elapsed = Time.realtimeSinceStartupAsDouble - _startedAt;
+        Write(QABoss103PartFile.Format(QABoss116Lab.EndKind, "reason", "manual_stop", "attempts", attempts.ToString(CultureInfo.InvariantCulture),
+            "elapsedS", elapsed.ToString("0.0", CultureInfo.InvariantCulture), "windows", _windows.ToString(CultureInfo.InvariantCulture),
+            "dashes", _dashN.ToString(CultureInfo.InvariantCulture), "bossHeals", _bossHeals.ToString(CultureInfo.InvariantCulture),
+            "playerHeals", _playerHeals.ToString(CultureInfo.InvariantCulture), "cdResets", _cdResets.ToString(CultureInfo.InvariantCulture),
+            "zoneMoves", _zoneMoves.ToString(CultureInfo.InvariantCulture)));
+        if (attempts == 0)
+        {
+            Debug.Log($"{Tag} 수동 모드 결과 — 대쉬 간파 시도 0회(카운터 창 {_windows}·대시 {_dashN}회, {elapsed:0}초) — 빈 요약, 결과 폴더를 만들지 않았다.");
+            return;
+        }
+        try
+        {
+            DateTime at = _manualStartedAt == default ? DateTime.Now : _manualStartedAt;
+            string dir = $"{QABoss116LabManual.QARoot}/{QABoss116LabManual.FolderName(at)}";
+            if (Directory.Exists(dir))
+                dir += DateTime.Now.ToString("ss", CultureInfo.InvariantCulture);
+            string part = QABoss116Lab.LabPartPath(dir, 1, 0);
+            Directory.CreateDirectory(Path.GetDirectoryName(part));
+            File.WriteAllLines(part, _manualLines, new System.Text.UTF8Encoding(false));
+            var batch = new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>("title", "할 일 116-C5 대쉬 간파 예측 랩 — 수동 모드(사람 입력)"),
+                new KeyValuePair<string, string>("mode", "manual"),
+                new KeyValuePair<string, string>("started_at", at.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                new KeyValuePair<string, string>("ended_at", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                new KeyValuePair<string, string>("scene", QABoss116Lab.ScenePath),
+                new KeyValuePair<string, string>("character", _character),
+                new KeyValuePair<string, string>("total", "1"),
+                new KeyValuePair<string, string>("attempts", attempts.ToString(CultureInfo.InvariantCulture)),
+                new KeyValuePair<string, string>("unity_version", Application.unityVersion),
+            };
+            File.WriteAllText(Path.Combine(dir, QABoss103Batch.BatchFile), QABoss103Batch.FormatKeyValues(batch));
+            UnityEditor.SessionState.SetString(QABoss116LabManual.PendingKey, dir);
+            Debug.Log($"{Tag} event=manual_end attempts={attempts} windows={_windows} dashes={_dashN} dir={QABoss103Plan.Token(dir)} — 에디터로 돌아가면 CSV·report.html 을 만든다.");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"{Tag} 수동 모드 결과 쓰기 실패: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    /// <summary>수동 모드 <see cref="ZoneToggleKey"/> — 벽 ↔ 열린 구간(지금 무엇을 하든 바로 옮긴다).</summary>
+    private void ToggleZone(Player me)
+    {
+        string want = _zone == QABoss116Lab.ZoneWall ? QABoss116Lab.ZoneOpen : QABoss116Lab.ZoneWall;
+        MoveZone(me, want, _zoneIndex + 1, false);
     }
 
     // ── 살려 두기 ─────────────────────────────────────────────
@@ -391,8 +542,8 @@ public sealed class QABoss116LabDirector : MonoBehaviour
 
     private void TickZone(Player me)
     {
-        if (!_batch && !cycleZonesWithoutConfig)
-            return;
+        if (Manual || (!_batch && !cycleZonesWithoutConfig))
+            return;   // 수동 모드는 자동 교대 없이 ZoneToggleKey 로만
         if (wallBossSpot == null || wallPlayerSpot == null || openBossSpot == null || openPlayerSpot == null)
             return;
         double elapsed = Time.realtimeSinceStartupAsDouble - _startedAt;
@@ -406,8 +557,16 @@ public sealed class QABoss116LabDirector : MonoBehaviour
                     me.CurrentState == PlayerActionState.Skill;
         if (busy && _zoneIndex >= 0 && Time.realtimeSinceStartup - _zonePendingSince < ZoneMoveForceSeconds)
             return;
-        _zoneIndex = index;
         _zonePendingSince = -1f;
+        MoveZone(me, want, index, busy);
+    }
+
+    /// <summary>보스·플레이어를 그 구간 자리로 옮기고 <c>labzone</c> 줄을 남긴다(자리가 비었으면 아무것도 안 함).</summary>
+    private void MoveZone(Player me, string want, int index, bool busy)
+    {
+        if (wallBossSpot == null || wallPlayerSpot == null || openBossSpot == null || openPlayerSpot == null)
+            return;
+        _zoneIndex = index;
         _zone = want;
         QABoss116LabProbe.PlannedZone = want;
         Transform bossSpot = want == QABoss116Lab.ZoneWall ? wallBossSpot : openBossSpot;
@@ -445,6 +604,11 @@ public sealed class QABoss116LabDirector : MonoBehaviour
 
     private void Write(string line)
     {
+        if (Manual)
+        {
+            WriteManual(line);
+            return;
+        }
         if (_part == null)
             return;
         try { _part.Write(line); }

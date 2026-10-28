@@ -219,7 +219,8 @@ public sealed class QABoss116LabTests
 
     // ── 격리 ─────────────────────────────────────────────────
 
-    private static readonly System.Type[] LabComponents = { typeof(QABoss116LabDirector), typeof(QABoss116LabCamera) };
+    // QABoss116LabManualInput(C5)은 씬에 놓지 않고 디렉터가 수동 모드에서만 붙인다 — 어느 씬·프리팹에도 없어야 한다.
+    private static readonly System.Type[] LabComponents = { typeof(QABoss116LabDirector), typeof(QABoss116LabCamera), typeof(QABoss116LabManualInput) };
 
     private static string GuidOf(System.Type t) =>
         AssetDatabase.AssetPathToGUID(AssetDatabase.FindAssets($"t:MonoScript {t.Name}").Select(AssetDatabase.GUIDToAssetPath)

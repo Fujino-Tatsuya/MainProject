@@ -26,8 +26,8 @@ public static class QABoss116LabReport
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-    /// <summary>판 1회 결과를 CSV 들에 붙인다. 쓴 시도 행 수.</summary>
-    public static int AppendRun(string dir, QABoss103Config cfg, string status, string note, string startedAt)
+    /// <summary>판 1회 결과를 CSV 들에 붙인다. 쓴 시도 행 수. <paramref name="tier"/> = 판 열 tier 값(비우면 봇 단계 — 수동 모드는 "manual").</summary>
+    public static int AppendRun(string dir, QABoss103Config cfg, string status, string note, string startedAt, string tier = null)
     {
         var lines = new List<string>();
         for (int s = 0; s < 3; s++)
@@ -36,7 +36,7 @@ public static class QABoss116LabReport
         AddLines(lab, QABoss116Lab.LabPartPath(dir, cfg.Run, cfg.Retry));
         lines.AddRange(lab);
 
-        string[] key = { cfg.Run.ToString(Inv), cfg.Retry.ToString(Inv), cfg.BotTier.ToString(), cfg.Seed.ToString(Inv) };
+        string[] key = { cfg.Run.ToString(Inv), cfg.Retry.ToString(Inv), string.IsNullOrEmpty(tier) ? cfg.BotTier.ToString() : tier, cfg.Seed.ToString(Inv) };
         List<string[]> attempts = QABoss116Lab.BuildAttempts(key, lines);
         QABoss103Csv.Append(Path.Combine(dir, QABoss116Lab.AttemptsFile), QABoss116Lab.AttemptsHeader, attempts);
         QABoss103Csv.Append(Path.Combine(dir, QABoss116Lab.WindowsFile), QABoss116Lab.WindowsHeader, QABoss116Lab.BuildWindows(key, lines));
@@ -121,10 +121,14 @@ public static class QABoss116LabReport
         try { batchText = File.ReadAllText(Path.Combine(dir, QABoss103Batch.BatchFile)); } catch { }
         Dictionary<string, string> batch = QABoss103Batch.ParseKeyValues(batchText);
         QABoss116Lab.Summary s = QABoss116Lab.Summarize(attempts, windows);
+        bool manual = Val(batch, "mode", "") == "manual";   // 할 일 116-C5 수동 모드(사람 입력)
 
         var sb = new StringBuilder(32 * 1024);
         sb.Append("<!DOCTYPE html>\n<html lang=\"ko\"><head><meta charset=\"utf-8\"><title>116 대쉬 간파 예측 랩</title><style>").Append(Css).Append("</style></head><body><main>\n");
-        sb.Append("<h1>116 대쉬 간파 예측 랩 — 호스트 1명 · 23호 랩 Variant</h1>\n<div class=\"sub\">")
+        sb.Append(manual
+                ? "<h1>116 대쉬 간파 예측 랩 — 수동 모드(사람 입력) · 23호 랩 Variant</h1>\n<div class=\"sub\">캐릭터 " + H(Val(batch, "character", "?")) +
+                  " · " + H(Val(batch, "started_at", "?")) + " ~ " + H(Val(batch, "ended_at", "?")) + "<br>"
+                : "<h1>116 대쉬 간파 예측 랩 — 호스트 1명 · 23호 랩 Variant</h1>\n<div class=\"sub\">")
           .Append(H(dir)).Append(" · 상태 ").Append(H(loopState ?? "")).Append(" · 판 ").Append(runs.Rows.Count).Append('/').Append(H(Val(batch, "total", "?")))
           .Append(" · git ").Append(H(Val(batch, "git_commit", "?"))).Append(" (").Append(H(Val(batch, "git_branch", "?"))).Append(")")
           .Append(" · SVN r").Append(H(Val(batch, "svn_rev", "?"))).Append(" · xlsx r").Append(H(Val(batch, "xlsx_svn_rev", "?")))
@@ -133,7 +137,7 @@ public static class QABoss116LabReport
 
         QABoss116Lab.Bucket a = s.All;
         sb.Append("<div class=\"kpis\">");
-        Kpi(sb, a.Attempts.ToString(Inv), "봇 대쉬 간파 시도");
+        Kpi(sb, a.Attempts.ToString(Inv), manual ? "사람 대쉬 간파 시도" : "봇 대쉬 간파 시도");
         Kpi(sb, a.Casts.ToString(Inv), "서버 시전(예측 줄)");
         Kpi(sb, Pct(a.Accuracy), $"예측 적중률(판정 {a.Judged}건)");
         Kpi(sb, a.Shortened.ToString(Inv), "어긋남 — 대시 막힘(dash_shortened)");
@@ -147,8 +151,13 @@ public static class QABoss116LabReport
         BucketTable(sb, "구간", s.ByZone);
         sb.Append("<h2>순서별</h2>\n");
         BucketTable(sb, "순서", s.ByOrder);
+        if (manual)
+        {
+            sb.Append("<h2>카운터 창 안 vs 밖(첫 입력 순간 23호 창)</h2>\n");
+            BucketTable(sb, "창", s.ByCounter);
+        }
 
-        sb.Append("<h2>봇 시도 결과 사유 → 상세 원인</h2>\n<table><thead><tr><th class=\"l\">결과</th><th class=\"l\">상세 원인</th><th>건수</th></tr></thead><tbody>\n");
+        sb.Append("<h2>").Append(manual ? "사람" : "봇").Append(" 시도 결과 사유 → 상세 원인</h2>\n<table><thead><tr><th class=\"l\">결과</th><th class=\"l\">상세 원인</th><th>건수</th></tr></thead><tbody>\n");
         foreach (KeyValuePair<string, SortedDictionary<string, int>> o in s.Causes)
             foreach (KeyValuePair<string, int> c in o.Value)
                 sb.Append("<tr><td class=\"l\">").Append(H(o.Key)).Append("</td><td class=\"l\">").Append(H(c.Key)).Append("</td><td>").Append(c.Value).Append("</td></tr>\n");

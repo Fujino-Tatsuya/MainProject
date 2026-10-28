@@ -153,7 +153,13 @@ public static class QABoss116Lab
                 return "dash_ended_before_attach";
             }
             case "attached":
-                return $"press_at_{F2(Dbl(kv, "dashAgeS"))}s_of_{F2(Dbl(kv, "windowS"))}s";
+            {
+                // 사람 우클릭 → 대시(C5)는 대시 경과가 없다 — 두 입력 간격(gapS)으로 대신한다.
+                double age = Dbl(kv, "dashAgeS");
+                if (double.IsNaN(age))
+                    age = Dbl(kv, "gapS");
+                return $"press_at_{F2(age)}s_of_{F2(Dbl(kv, "windowS"))}s";
+            }
             case "interrupt_ended_before_dash":
                 return "interrupt_ended_" + Or(Get(kv, "endState"), "na");
             case "dash_without_transfer":
@@ -179,6 +185,8 @@ public static class QABoss116Lab
         "dash_start_t", "dash_intent_m", "dash_actual_m", "dash_short_m", "dash_blocked", "dash_block_pos", "dash_block_collider", "dash_block_layer", "dash_block_at_s",
         "cast_id", "predict", "pred_reason", "result", "match", "mismatch", "shortfall_m", "pos_err_m", "time_err_s",
         "pred_resolve_in_s", "resolve_in_s", "win_close_after_cast_s", "target_open_at_resolve",
+        // 할 일 116-C5 — 시도 출처(bot·human)·두 입력 간격·입력 순간 카운터 창 열림(사람 시도만 값이 있다)
+        "source", "gap_s", "counter_open_first", "counter_open_second", "same_frame",
     });
 
     public static readonly string[] WindowsHeader = Concat(QABoss103Metrics.KeyHeader, new[]
@@ -352,6 +360,11 @@ public static class QABoss116Lab
             Copy(r, b, "int_cd_s", "intCdS");
             Copy(r, b, "seen", "seen");
             Copy(r, b, "dash_log", "dashLog");
+            Set(r, AttemptsHeader, "source", Or(Get(b, "source"), "bot"));
+            Copy(r, b, "gap_s", "gapS");
+            Copy(r, b, "counter_open_first", "counterOpenFirst");
+            Copy(r, b, "counter_open_second", "counterOpenSecond");
+            Copy(r, b, "same_frame", "sameFrame");
 
             Win w = WindowAt(wins, firstT);
             if (w != null)
@@ -557,6 +570,8 @@ public static class QABoss116Lab
         public readonly Bucket All = new Bucket();
         public readonly SortedDictionary<string, Bucket> ByZone = new SortedDictionary<string, Bucket>(StringComparer.Ordinal);
         public readonly SortedDictionary<string, Bucket> ByOrder = new SortedDictionary<string, Bucket>(StringComparer.Ordinal);
+        /// <summary>첫 입력 순간 카운터 창 — in·out·unknown(봇 시도는 값이 없어 unknown). 할 일 116-C5.</summary>
+        public readonly SortedDictionary<string, Bucket> ByCounter = new SortedDictionary<string, Bucket>(StringComparer.Ordinal);
         /// <summary>결과 사유 → 상세 원인 → 수.</summary>
         public readonly SortedDictionary<string, SortedDictionary<string, int>> Causes = new SortedDictionary<string, SortedDictionary<string, int>>(StringComparer.Ordinal);
         /// <summary>막힌 대시의 충돌체 → 수.</summary>
@@ -573,6 +588,8 @@ public static class QABoss116Lab
             s.All.Add(attempts, r);
             Of(s.ByZone, Or(attempts.Get(r, "zone"), "unknown")).Add(attempts, r);
             Of(s.ByOrder, Or(attempts.Get(r, "order"), "unknown")).Add(attempts, r);
+            string open = attempts.Get(r, "counter_open_first");
+            Of(s.ByCounter, open == "true" ? "in" : open == "false" ? "out" : "unknown").Add(attempts, r);
             string outcome = Or(attempts.Get(r, "outcome"), "none");
             if (!s.Causes.TryGetValue(outcome, out SortedDictionary<string, int> causes))
                 s.Causes[outcome] = causes = new SortedDictionary<string, int>(StringComparer.Ordinal);
