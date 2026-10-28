@@ -80,6 +80,9 @@ public sealed class InterruptOwnerPresentation
     /// <summary>마지막 서버 확정 성공에 들어선 순간 암전이 켜져 있었다(강 시도) — 적중 섬광 오버레이 조건. 새 시도·리셋에 false.</summary>
     public bool SuccessDimmed { get; private set; }
 
+    /// <summary>강 시도가 결론(성공·실패·판정 전 종료) 전이다 — 오너 줌이 시도 복귀 중에도 줌을 붙잡는 조건(할 일 132).</summary>
+    public bool AwaitsStrongResult => State == InterruptOwnerPresentationState.AttemptStrong;
+
     /// <summary>출력 교체(단계 3·4 가 실제 렌더·VFX 를 붙일 때). 지금 값을 새 출력에 한 번 넘긴다.</summary>
     public void SetOutputs(IInterruptOwnerDimOutput dimOutput, IInterruptLightGatherOutput gatherOutput)
     {

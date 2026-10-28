@@ -299,6 +299,13 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             : 1f;
 
     /// <summary>
+    /// A3 — 내 강 시도가 아직 결론 전인가(오너 상태 기계 <see cref="InterruptOwnerPresentation.AwaitsStrongResult"/>).
+    /// 카메라가 시도 슬로우 복귀 중에도 줌을 붙잡을지 묻는다 — 성공이 이어지면 줌인·줌아웃이 한 번씩(할 일 132). 인스턴스가 없으면 false.
+    /// </summary>
+    public static bool OwnerAwaitsStrongResult =>
+        Instance != null && Instance._ownerPresentation != null && Instance._ownerPresentation.AwaitsStrongResult;
+
+    /// <summary>
     /// [각 피어] 시도 — 시전 시작(OnClientPlay, 전 피어)에 스킬이 알린다. 그 스킬의 시도 cue(B1)를 공용 채널로 스킬 자신에 튼다.
     /// 끄는 쪽(OnEnd)은 디렉터를 거치지 않는다.
     /// </summary>

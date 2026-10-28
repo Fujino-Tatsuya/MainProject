@@ -216,6 +216,11 @@ xlsx: 강·성공은 기존 열, **약 `interruptWeakProfile.*` 는 반영 예�
 | `interruptWeakZoomFactor` | 디렉터(Order 0) | 0.93 | 내가 일으킨 **약** 시도 슬로우 배율 — 🟨 xlsx 반영 예정 |
 
 - 슬로우 목적(`Attempt`/`AttemptWeak`/`Success`)으로 배율을 고른다(`InterruptProductionRules.SelectOwnerZoomFactor`). 줌 깊이는 지금 재생 중인 프로필 배율 기준. A3 꺼짐 = 배율 1.
+- **줌 한 번(10-28 수정)** — `SlowMotionOwnerZoom`(순수 모델, 카메라가 매 프레임 질의해 넣는다): 내 간파 한 건(시도 → 이어진 내 성공 = 발동 번호 사슬)을 한 줌 세션으로 본다.
+  - 세션 동안 목표 깊이는 복귀 단계(Exit·FailExit) 전까지 줄지 않는다. 강 시도가 결론 전(`Director.OwnerAwaitsStrongResult` = 오너 상태 `AttemptStrong`)이면 **시도 Exit 중에도 붙잡는다** → 시도 유지가 끝난 뒤 성공이 와도 다시 줌인하지 않는다.
+  - 배율은 세션에서 본 가장 깊은 쪽(min) — 강(0.7) → 성공 = 0.7 유지, 약(0.93) → 성공 = 0.85 로 더 깊게만. 성공 칸 `slowMotionZoomFactor` 는 약 → 성공·시도 없는 성공에서 쓰인다(남김).
+  - 세션 끝 = 성공 슬로우 복귀·실패 복귀·시도 슬로우 끝(결론 없음)·남의 슬로우 덮음·강제 리셋·낙하/관전 → 한 번 복귀.
+  - 알려진 한계: 시도 슬로우가 **완전히 끝난 뒤**(강 기준 입력 후 0.8초) 성공이 오면 새 세션이라 다시 줌인한다. 약 시도는 결론 전 붙잡지 않는다 — 약 Exit 뒤 성공이면 다시 깊어진다(약 = 실패 예측이라 늦게 빠지는 쪽을 피함).
 
 ### 2.3 암순응 — `InterruptDarkAdaptation` (시트 `SlowMotion`, Order 2)
 
@@ -350,7 +355,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(0~
 | 연출 | 칸 | 채널 | 판단 |
 |---|---|---|---|
 | 시도(강·약)·성공 슬로우 · 히트스톱 | — · A1 | 서버 타임라인(전 피어 공용) | 채널을 거치지 않는다. `Time.timeScale` 은 피어 전역이라 개인 슬로우는 불가 |
-| 오너 줌 | A3 | 개인 | 카메라가 매 프레임 `Director.OwnerZoomFactor(목적, 성공 배율)` 질의. 내 슬로우인지는 카메라가 본다 |
+| 오너 줌 | A3 | 개인 | 카메라가 매 프레임 `Director.OwnerZoomFactor(목적, 성공 배율)`·`Director.OwnerAwaitsStrongResult` 질의 → `SlowMotionOwnerZoom`(시도~성공 줌 한 번). 내 슬로우인지는 카메라가 본다 |
 | 오너 암전 · 섬광 오버레이 | (칸 없음) | 개인(오너 상태 기계) | §0.3 |
 | 빛 모임 · 월드 섬광 | (칸 없음) | 오너 = 입력 순간 예측 / 팀원·모두 = 슬로우 이벤트 | §0.3 |
 | 암순응 self 강도 | A2 | 개인 | 발동자 == `LocalClientId` ∧ 섬광 오버레이 안 돎(약 시도 성공), 섬광 순간 |
