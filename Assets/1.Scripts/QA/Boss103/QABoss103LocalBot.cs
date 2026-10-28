@@ -9,12 +9,12 @@ using UnityEngine.InputSystem.LowLevel;
 /// <summary>
 /// 할 일 103 — 인스턴스마다(호스트·가상 플레이어) 자기 로컬 플레이어 몫의 판 진행 입력을 넣는다. 전투 봇은 C2.
 /// <list type="bullet">
-/// <item>특성: 내 제시(<see cref="TutorialTraitDirector.GetOffered"/>)가 새로 오면 판 시드로 1장 고르고(<see cref="QABoss103Plan.PickOffer"/>)
-///   정식 선택 RPC(<see cref="TutorialTraitDirector.RequestChoose"/>)로 보낸다 — 제시 번호(OfferSeq)마다 한 번.</item>
+/// <item>특성: 내 제시(<see cref="TraitDirector.GetOffered"/>, 캐릭터·차수별 고정 3개)가 새로 오면 판 시드로 1장 고르고(<see cref="QABoss103Plan.PickOffer"/>)
+///   정식 선택 RPC(<see cref="TraitDirector.RequestChoose"/>)로 보낸다 — 제시 번호(OfferSeq)마다 한 번. 제시가 고정표와 다르면 <c>fixedOffer=false</c> 경고.</item>
 /// <item>23호 등장 연출 스킵: 연출 중이면 가상 키보드 Space 를 누른 채로 두어 dev 홀드 스킵 경로(<c>BossIntroPresentation.TickSkip</c>)를 탄다.
 ///   홀드 표(<c>BossIntroSkipHold.Voted</c>, 리플렉션 읽기)가 홀드 시간 + 1.5초 안에 안 서면(포커스 없는 MPPM 클론은 배경 입력이 막힐 수 있다)
 ///   같은 경로가 부르는 <see cref="BossEncounterDirector.RequestSkipVote"/> 를 직접 부른다. 어느 쪽인지 <c>skip_path</c> 로 남긴다.</item>
-/// <item>전멸 리스폰 뒤 특성 초기화 팝업: '아니오'(<see cref="TutorialTraitDirector.RequestResetAnswer"/>(gen, false)).</item>
+/// <item>전멸 리스폰 뒤 특성 초기화 팝업: '아니오'(<see cref="TraitDirector.RequestResetAnswer"/>(gen, false)).</item>
 /// </list>
 /// </summary>
 public sealed class QABoss103LocalBot : MonoBehaviour
@@ -27,6 +27,7 @@ public sealed class QABoss103LocalBot : MonoBehaviour
 
     private readonly List<int> _offers = new List<int>();
     private readonly List<int> _acquired = new List<int>();
+    private readonly List<string> _offerIds = new List<string>();
     private int _runSeed;
     private QABoss103Character _character;
 
@@ -39,6 +40,8 @@ public sealed class QABoss103LocalBot : MonoBehaviour
 
     /// <summary>고른 특성 id(순서).</summary>
     public readonly List<string> Picks = new List<string>();
+    /// <summary>제시가 캐릭터·차수별 고정 후보와 달랐던 수(<see cref="QABoss103Plan.IsFixedOffer"/>).</summary>
+    public int OfferMismatches { get; private set; }
     /// <summary>연출 스킵 경로(space·rpc·na) — 연출 회차마다 마지막 값.</summary>
     public string SkipPath { get; private set; } = "na";
     /// <summary>연출 중 내 플레이어가 연출 잠금(<see cref="PlayerEncounterLock.IsCinematicLocked"/>)이었던 적이 있나.</summary>
@@ -69,7 +72,7 @@ public sealed class QABoss103LocalBot : MonoBehaviour
 
     private void TickTraits()
     {
-        TutorialTraitDirector d = TutorialTraitDirector.Instance;
+        TraitDirector d = TraitDirector.Instance;
         if (d == null || !d.IsSpawned)
             return;
         ulong me = LocalId;
@@ -96,10 +99,27 @@ public sealed class QABoss103LocalBot : MonoBehaviour
             return;
         _handledOfferSeq = seq;
         d.RequestChoose(pick);
-        TutorialTraitDefinition def = d.Pool != null ? d.Pool.Get(pick) : null;
-        string id = def != null ? def.Id : $"#{pick}";
+        string id = IdOf(d, pick);
         Picks.Add(id);
-        Debug.Log($"{Tag} event=trait_pick character={_character} nth={nth} round={d.Round} offerSeq={seq} offers={string.Join("+", _offers)} pick={pick} id={QABoss103Plan.Token(id)}");
+        _offerIds.Clear();
+        foreach (int hash in _offers)
+            _offerIds.Add(IdOf(d, hash));
+        // 고정 후보(할 일 125) — 제시 = 캐릭터·차수(nth)별 표 3개 그대로여야 한다.
+        bool isFixed = QABoss103Plan.IsFixedOffer(_character, nth, _offerIds);
+        if (!isFixed)
+            OfferMismatches++;
+        string offers = QABoss103Plan.Token(string.Join("+", _offerIds));
+        if (isFixed)
+            Debug.Log($"{Tag} event=trait_pick character={_character} nth={nth} round={d.Round} offerSeq={seq} offers={offers} fixedOffer=true id={QABoss103Plan.Token(id)}");
+        else
+            Debug.LogWarning($"{Tag} event=trait_pick character={_character} nth={nth} round={d.Round} offerSeq={seq} offers={offers} fixedOffer=false " +
+                             $"want={QABoss103Plan.Token(string.Join("+", QABoss103Plan.FixedOfferIds(_character, nth)))} id={QABoss103Plan.Token(id)}");
+    }
+
+    private static string IdOf(TraitDirector d, int traitHash)
+    {
+        TraitDefinition def = d.GetTrait(traitHash);
+        return def != null ? def.Id : $"#{traitHash}";
     }
 
     private void TickIntroSkip()

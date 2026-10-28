@@ -925,7 +925,7 @@ public static partial class QALobbyScenarios
             var s = new M6Snapshot { Hp = p.CurrentHealth, MaxHp = p.MaxHp, Life = p.GetComponent<PlayerLifeCycleController>().State };
             s.HpRatio = s.MaxHp > 0 ? (float)s.Hp / s.MaxHp : 0f;
             var traits = new List<int>();
-            TutorialTraitDirector td = TutorialTraitDirector.Instance;
+            TraitDirector td = TraitDirector.Instance;
             if (td != null)
             {
                 td.GetAcquired(clientId, traits);

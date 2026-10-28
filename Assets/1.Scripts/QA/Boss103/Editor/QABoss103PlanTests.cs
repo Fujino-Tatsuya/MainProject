@@ -74,7 +74,49 @@ public sealed class QABoss103PlanTests
             foreach (QABoss103Character c in QABoss103Plan.PartyOrder)
                 Assert.AreEqual(QABoss103Plan.PickOffer(777, nth, c, offers), QABoss103Plan.PickOffer(777, nth, c, offers));
         Assert.AreEqual(QABoss103Plan.RunSeed(103, 5), QABoss103Plan.RunSeed(103, 5));
-        Assert.AreEqual(QABoss103Plan.DirectorSeed(42), QABoss103Plan.DirectorSeed(42));
+    }
+
+    // ── 고정 후보(할 일 125) ────────────────────────────────
+
+    [Test]
+    public void 고정_후보는_캐릭터_차수마다_표_3개()
+    {
+        foreach (QABoss103Character c in QABoss103Plan.PartyOrder)
+            for (int tier = 1; tier <= QABoss103Plan.TraitRounds; tier++)
+                Assert.AreEqual(TraitCatalog.CandidatesPerTier, QABoss103Plan.FixedOfferIds(c, tier).Count, $"{c} {tier}차");
+        CollectionAssert.AreEqual(new[] { "PAL_1_Q_DAMAGE", "PAL_1_E_COOLDOWN", "PAL_1_PASSIVE_HEAL" },
+            QABoss103Plan.FixedOfferIds(QABoss103Character.Paladin, 1));
+        Assert.AreEqual(0, QABoss103Plan.FixedOfferIds(QABoss103Character.Gunner, 5).Count);
+    }
+
+    [Test]
+    public void 제시가_고정표와_순서까지_같아야_고정_후보()
+    {
+        var ok = new List<string> { "GUN_2_OVERDRIVE", "GUN_2_HEAT_SHOT", "GUN_2_COOL_MODE" };
+        Assert.IsTrue(QABoss103Plan.IsFixedOffer(QABoss103Character.Gunner, 2, ok));
+        Assert.IsFalse(QABoss103Plan.IsFixedOffer(QABoss103Character.Gunner, 3, ok), "다른 차수");
+        Assert.IsFalse(QABoss103Plan.IsFixedOffer(QABoss103Character.Paladin, 2, ok), "다른 캐릭터");
+        Assert.IsFalse(QABoss103Plan.IsFixedOffer(QABoss103Character.Gunner, 2, new List<string> { "GUN_2_OVERDRIVE", "GUN_2_HEAT_SHOT" }), "빠진 후보");
+        Assert.IsFalse(QABoss103Plan.IsFixedOffer(QABoss103Character.Gunner, 2, null));
+    }
+
+    [Test]
+    public void 획득_ID_는_그_캐릭터_차수의_후보여야_한다()
+    {
+        Assert.IsTrue(QABoss103Plan.IsFixedPick(QABoss103Character.Assassin, 4, "ASN_4_Q_TRAIL"));
+        Assert.IsFalse(QABoss103Plan.IsFixedPick(QABoss103Character.Assassin, 3, "ASN_4_Q_TRAIL"), "차수 다름");
+        Assert.IsFalse(QABoss103Plan.IsFixedPick(QABoss103Character.Gunner, 4, "ASN_4_Q_TRAIL"), "캐릭터 다름");
+        Assert.IsFalse(QABoss103Plan.IsFixedPick(QABoss103Character.Paladin, 1, "#12345"), "모르는 ID");
+    }
+
+    [Test]
+    public void 봇은_고정_후보_해시_중_하나를_고른다()
+    {
+        var offers = new List<int>();
+        foreach (string id in QABoss103Plan.FixedOfferIds(QABoss103Character.Paladin, 3))
+            offers.Add(TraitIdHash.Of(id));
+        for (int seed = 0; seed < 50; seed++)
+            CollectionAssert.Contains(offers, QABoss103Plan.PickOffer(seed, 3, QABoss103Character.Paladin, offers));
     }
 
     [Test]
@@ -205,12 +247,12 @@ public sealed class QABoss103PlanTests
     public void 판_기록_한_줄은_QA103_접두와_고정_순서_특성()
     {
         var rec = new QABoss103RunRecord { Run = 3, BaseSeed = 103, RunSeed = 55, Outcome = QABoss103Outcome.Wipe, CombatSeconds = 612.34, Detail = "전멸 리스폰 (x=1)" };
-        rec.AddTrait(QABoss103Character.Gunner, "trait_move_10");
-        rec.AddTrait(QABoss103Character.Paladin, "trait_attack_10");
-        rec.AddTrait(QABoss103Character.Paladin, "trait_hit_cdr_q");
+        rec.AddTrait(QABoss103Character.Gunner, "GUN_1_CHARGE");
+        rec.AddTrait(QABoss103Character.Paladin, "PAL_1_Q_DAMAGE");
+        rec.AddTrait(QABoss103Character.Paladin, "PAL_2_DASH");
         string line = rec.ToLogLine();
         StringAssert.StartsWith("[QA103] event=run_end run=3 outcome=Wipe combatS=612.3 seed=103 runSeed=55 ", line);
-        StringAssert.Contains("traits=Paladin:trait_attack_10+trait_hit_cdr_q;Gunner:trait_move_10 ", line);
+        StringAssert.Contains("traits=Paladin:PAL_1_Q_DAMAGE+PAL_2_DASH;Gunner:GUN_1_CHARGE ", line);
         StringAssert.EndsWith("detail=전멸_리스폰_(x_1)", line);
         Assert.AreEqual(2, rec.TraitCount(QABoss103Character.Paladin));
         Assert.AreEqual(0, rec.TraitCount(QABoss103Character.Assassin));

@@ -3,7 +3,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -11,9 +10,10 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// 할 일 103 C1 — 3인 보스전 1판(맵 진입 뒤). 시작 경로는 실제 게임 흐름을 탄다(<see cref="BossTeleportManager.ForceStartEncounter"/> 직접 호출 없음):
 /// <list type="number">
-/// <item>[서버] 특성 4라운드(<see cref="QABoss103Plan.TraitRounds"/> = 복도 1~4) — 특성 디렉터 후보 뽑기 RNG 를 판 시드로 갈아 끼우고(리플렉션, 게임 코드 무수정)
-///   정식 라운드(<see cref="TutorialTraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TutorialTraitRoundDisplay)"/>, 복도와 같은 표시 옵션)를 연다.
-///   각 인스턴스의 <see cref="QABoss103LocalBot"/> 가 자기 제시에서 판 시드로 골라 정식 선택 RPC 로 보낸다. 같은 시드 = 같은 제시·같은 선택.</item>
+/// <item>[서버] 특성 4라운드(<see cref="QABoss103Plan.TraitRounds"/> = 복도 1~4) — 정식 라운드(<see cref="TraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TraitRoundDisplay)"/>,
+///   복도와 같은 표시 옵션)를 연다. 후보 = 캐릭터·차수별 고정 3개(할 일 125)라 시드 주입이 필요 없다.
+///   각 인스턴스의 <see cref="QABoss103LocalBot"/> 가 자기 제시에서 판 시드로 골라 정식 선택 RPC 로 보낸다. 같은 시드 = 같은 선택.
+///   호스트는 획득마다 그 ID 가 그 캐릭터·차수의 고정 후보인지 확인한다(<see cref="QABoss103Plan.IsFixedPick"/>).</item>
 /// <item>[서버] G10 까지 개방(<see cref="MapSceneDebugActions.OpenGatesThrough"/> — 88·P572 와 같은 진입) → 파티 3명을 복도4 보스 진입 발판(<see cref="BossEnterTrigger"/>) 안에
 ///   일렬로 옮긴다(<see cref="PlayerFallRecovery.RelocateServer"/>). 봇은 움직이지 않는다 → 게임의 집결 판정(전원 발판 5초)이 엘리베이터를 연다.</item>
 /// <item>엘리베이터 → 23호 등장 연출(연출 잠금) → 각 인스턴스 봇이 Space 홀드 스킵 → <see cref="BossEncounterPhase.Combat"/> 진입 시각 기록.</item>
@@ -37,8 +37,6 @@ public static class QABoss103Match
     private const float CombatWaitSeconds = 120f;
     private const float ResetPromptWaitSeconds = 5f;
 
-    private static readonly FieldInfo DirectorRandomField =
-        typeof(TutorialTraitDirector).GetField("random", BindingFlags.Instance | BindingFlags.NonPublic);
     private static readonly int FloorMask = LayerMask.GetMask("Default", "Ground", "Env");
 
     /// <summary>마지막으로 끝난 판 기록(호스트). C4 계측·C6 루프가 읽는다.</summary>
@@ -118,16 +116,25 @@ public static class QABoss103Match
         QABoss103LocalBot bot = QABoss103LocalBot.Create(cfg.TraitRunSeed, localCharacter);
         QABoss103CombatBot fighter = CreateFighter(ctx, cfg, localCharacter);
         var characters = new Dictionary<ulong, QABoss103Character>();
-        Action<TutorialTraitChosen> onChosen = c =>
+        var offPicks = new List<string>();
+        Action<TraitChosen> onChosen = c =>
         {
-            if (characters.TryGetValue(c.ClientId, out QABoss103Character ch))
-                rec.AddTrait(ch, c.Trait != null ? c.Trait.Id : $"#{c.TraitIndex}");
+            if (!characters.TryGetValue(c.ClientId, out QABoss103Character ch))
+                return;
+            string id = c.Trait != null ? c.Trait.Id : $"#{c.TraitHash}";
+            rec.AddTrait(ch, id);
+            int tier = rec.TraitCount(ch);
+            if (!QABoss103Plan.IsFixedPick(ch, tier, id))
+            {
+                offPicks.Add($"{ch}:{tier}:{id}");
+                Debug.LogWarning($"{Tag} event=trait_fixed ok=false character={ch} tier={tier} id={QABoss103Plan.Token(id)} auto={B(c.Auto)}");
+            }
         };
         var signals = new QABoss103EndSignals();
         Action<IReadOnlyList<ulong>> onWipe = _ => signals.OnWipe();
         Action onBossDied = signals.OnBossDied;
         Unit bossUnit = null;
-        TutorialTraitDirector traits = null;
+        TraitDirector traits = null;
         QABoss103Recorder recorder = null;
         double bossHpPct = double.NaN;
         try
@@ -163,7 +170,7 @@ public static class QABoss103Match
 
             // 1) 특성 4라운드.
             QABoss103Heartbeat.SetPhase("traits");
-            traits = TutorialTraitDirector.Instance;
+            traits = TraitDirector.Instance;
             if (traits == null || !traits.IsSpawned)
             {
                 rec.Outcome = QABoss103Outcome.Aborted;
@@ -171,7 +178,6 @@ public static class QABoss103Match
                 yield break;
             }
             traits.ServerTraitChosen += onChosen;
-            bool seeded = SeedDirector(traits, QABoss103Plan.DirectorSeed(cfg.TraitRunSeed));
             for (int round = 1; round <= QABoss103Plan.TraitRounds; round++)
             {
                 bool offered = traits.StartOfferRoundServer(ids, MapSceneTraitCorridorRules.DisplayOf(round));
@@ -180,17 +186,25 @@ public static class QABoss103Match
                     Debug.LogWarning($"{Tag} event=trait_round round={round} offered=false — 풀 소진·미스폰");
                     continue;
                 }
-                TutorialTraitDirector t = traits;
+                TraitDirector t = traits;
                 yield return ctx.Wait(() => t == null || t.IsRoundCompleteServer, TraitRoundWaitSeconds);
                 int auto = 0;
                 if (ctx.TimedOut && traits != null)
                     auto = traits.AutoChooseAllPendingServer();
                 Debug.Log($"{Tag} event=trait_round round={round} directorRound={(traits != null ? traits.Round : 0)} complete={(!ctx.TimedOut ? "true" : "false")} autoChosen={auto}");
             }
+            var shortCounts = new List<string>();
             foreach (QABoss103Character ch in QABoss103Plan.PartyOrder)
                 if (rec.TraitCount(ch) != QABoss103Plan.TraitRounds)
+                {
+                    shortCounts.Add($"{ch}:{rec.TraitCount(ch)}");
                     Debug.LogWarning($"{Tag} event=trait_count character={ch} n={rec.TraitCount(ch)} want={QABoss103Plan.TraitRounds}");
-            ctx.Check(seeded, "103 특성 시드 고정", $"디렉터 RNG 교체={(seeded ? "ok" : "실패(필드 없음) — 같은 시드라도 제시가 달라진다")} · 특성 {rec.TraitsToken()}");
+                }
+            bool fixedOk = offPicks.Count == 0 && shortCounts.Count == 0;
+            ctx.Check(fixedOk, "103 특성 고정 후보",
+                $"캐릭터·차수 고정 후보 밖 획득 {(offPicks.Count == 0 ? "없음" : string.Join(", ", offPicks))} · " +
+                $"{QABoss103Plan.TraitRounds}개 미달 {(shortCounts.Count == 0 ? "없음" : string.Join(", ", shortCounts))} · " +
+                $"호스트 제시 불일치 {bot.OfferMismatches}회 · 특성 {rec.TraitsToken()}");
 
             // 2) G10 개방 → 발판 배치.
             MapSceneDirector tutorial = MapSceneDirector.Instance;
@@ -462,19 +476,6 @@ public static class QABoss103Match
         var ids = new List<ulong>(NetworkManager.Singleton.ConnectedClientsIds);
         ids.Sort();
         return ids;
-    }
-
-    /// <summary>[서버] 특성 디렉터의 후보 뽑기 RNG 를 시드 고정 RNG 로 바꾼다(비공개 필드 — 게임 코드 무수정). 성공 여부.</summary>
-    private static bool SeedDirector(TutorialTraitDirector d, int seed)
-    {
-        if (DirectorRandomField == null || DirectorRandomField.FieldType != typeof(System.Random))
-        {
-            Debug.LogWarning($"{Tag} event=trait_seed ok=false reason=field_missing");
-            return false;
-        }
-        DirectorRandomField.SetValue(d, new System.Random(seed));
-        Debug.Log($"{Tag} event=trait_seed ok=true directorSeed={seed}");
-        return true;
     }
 
     private static BossEnterTrigger FindPad()

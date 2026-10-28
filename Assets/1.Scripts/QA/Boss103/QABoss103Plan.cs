@@ -74,7 +74,7 @@ public static class QABoss103Plan
 
     /// <summary>
     /// 보스 전에 고르는 특성 수 = 튜토리얼 복도 1~4 라운드(<c>MapSceneTraitCorridorFlow</c> — 복도마다 1장, 출구 G2/G4/G7/G10).
-    /// 전멸 뒤 재선택 라운드 수(<c>TutorialTraitResetModel.ReselectRounds</c> = 4)와 같다.
+    /// 전멸 뒤 재선택 라운드 수(<c>TraitResetModel.ReselectRounds</c> = 4)와 같다.
     /// </summary>
     public const int TraitRounds = 4;
 
@@ -335,11 +335,8 @@ public static class QABoss103Plan
     /// <summary>판 시드 = 기준 시드와 판 번호를 섞은 값(같은 기준 시드·같은 판 = 같은 값).</summary>
     public static int RunSeed(int baseSeed, int run) => Mix(baseSeed, run, 0x103, 0);
 
-    /// <summary>특성 디렉터 후보 뽑기에 넣을 시드(서버 <c>System.Random</c>).</summary>
-    public static int DirectorSeed(int runSeed) => Mix(runSeed, 0x7A17, 0, 0);
-
     /// <summary>
-    /// 그 캐릭터의 <paramref name="nth"/>(1부터 — 이미 얻은 수 + 1) 번째 선택에서 제시받은 <paramref name="offers"/> 중 고를 특성 인덱스.
+    /// 그 캐릭터의 <paramref name="nth"/>(1부터 — 이미 얻은 수 + 1 = 차수) 번째 선택에서 제시받은 <paramref name="offers"/>(특성 ID 해시) 중 고를 키.
     /// 같은 (판 시드·순번·캐릭터·제시 목록) = 같은 결과. 제시가 비면 -1.
     /// </summary>
     public static int PickOffer(int runSeed, int nth, QABoss103Character character, IReadOnlyList<int> offers)
@@ -349,6 +346,44 @@ public static class QABoss103Plan
         uint h = (uint)Mix(runSeed, nth, (int)character + 1, 0x51C7);
         return offers[(int)(h % (uint)offers.Count)];
     }
+
+    // ── 고정 후보(할 일 125) ─────────────────────────────────────
+
+    /// <summary>QA 캐릭터 → 특성 표의 캐릭터.</summary>
+    public static TutorialCharacter TraitCharacterOf(QABoss103Character character) => character switch
+    {
+        QABoss103Character.Paladin => TutorialCharacter.Paladin,
+        QABoss103Character.Assassin => TutorialCharacter.Assassin,
+        QABoss103Character.Gunner => TutorialCharacter.Gunner,
+        _ => TutorialCharacter.None,
+    };
+
+    /// <summary>그 캐릭터 <paramref name="tier"/> 차의 고정 후보 ID(명세 고정표 <see cref="TraitCatalog.Spec"/> 순서).</summary>
+    public static List<string> FixedOfferIds(QABoss103Character character, int tier)
+    {
+        var ids = new List<string>();
+        TutorialCharacter c = TraitCharacterOf(character);
+        foreach (TraitCatalog.Slot slot in TraitCatalog.Spec)
+            if (slot.Character == c && slot.Tier == tier)
+                ids.Add(slot.Id);
+        return ids;
+    }
+
+    /// <summary>제시받은 ID 목록이 그 캐릭터·차수의 고정 후보와 순서까지 같은가.</summary>
+    public static bool IsFixedOffer(QABoss103Character character, int tier, IReadOnlyList<string> offeredIds)
+    {
+        List<string> want = FixedOfferIds(character, tier);
+        if (offeredIds == null || offeredIds.Count != want.Count)
+            return false;
+        for (int i = 0; i < want.Count; i++)
+            if (!string.Equals(want[i], offeredIds[i], StringComparison.Ordinal))
+                return false;
+        return true;
+    }
+
+    /// <summary>획득한 특성 ID 가 그 캐릭터 <paramref name="tier"/> 차의 고정 후보 중 하나인가.</summary>
+    public static bool IsFixedPick(QABoss103Character character, int tier, string id) =>
+        TraitCatalog.TryGetSlot(id, out TraitCatalog.Slot slot) && slot.Character == TraitCharacterOf(character) && slot.Tier == tier;
 
     /// <summary>정수 4개를 섞는 해시(SplitMix 계열) — 런타임·플랫폼과 무관하게 같은 값.</summary>
     public static int Mix(int a, int b, int c, int d)
