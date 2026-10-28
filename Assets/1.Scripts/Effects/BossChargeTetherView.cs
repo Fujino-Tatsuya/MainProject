@@ -16,6 +16,12 @@ using UnityEngine;
 ///       <see cref="fadeGrace"/> 동안 기다렸다가 사라지게 한다 — 그 사이 Stop 이 오면 과충전으로 바꾼다.</item>
 /// </list>
 ///
+/// 가슴 조명(10-27 민경): 차징 구슬이 재생되는 동안 가슴에 포인트 라이트 — 서서히 밝아지고 은은히 깜빡임,
+/// 과충전은 첫 줄이 가슴에 닿는 순간 크게 번쩍 → 꺼짐, 끊김(Abort)은 <see cref="abortLightFadeTime"/> 에 꺼짐. 실행 중에 만든다(프리팹 무수정).
+///
+/// 전기 장판 칸(10-28 민경): 차징 구슬 재생 중엔 장판 예고·발동 칸을 <see cref="floorTileBrightnessWhileCharging"/> 로 흐리게(<see cref="BossElectricFloor.ClientTileBrightness"/>).
+/// 맵 해(10-28 민경): 차징 구슬 재생 중엔 씬의 Directional Light 를 <see cref="sunFadeTime"/> 에 걸쳐 끄고, 끝나면 원래 밝기로.
+///
 /// 가슴 소켓: <see cref="chest"/> 를 지정하면 그것, 비우면 뼈 <see cref="chestBone"/> 를 이름으로 찾아 <see cref="chestOffset"/>(보스 기준) 만큼 띄운 점.
 /// </summary>
 [DisallowMultipleComponent]
@@ -42,6 +48,34 @@ public class BossChargeTetherView : MonoBehaviour
     [Tooltip("뼈 위치에서 보스 기준(앞 = +Z)으로 띄우는 거리")]
     [SerializeField] Vector3 chestOffset = new Vector3(0f, 0f, 0.4f);
 
+    [Header("가슴 조명(차징 중)")]
+    [SerializeField] Color chargeLightColor = new Color(0.45f, 0.85f, 1f, 1f);
+    [SerializeField, Min(0f)] float chargeLightIntensity = 60f;
+    [SerializeField, Min(0.1f)] float chargeLightRange = 6f;
+    [Tooltip("구슬 재생 시작부터 다 밝아지기까지(초)")]
+    [SerializeField, Min(0.01f)] float chargeLightRampTime = 0.6f;
+    [Tooltip("차징 중 깜빡임 폭 — 0 이면 chargeLightIntensity 로 고정")]
+    [SerializeField, Range(0f, 1f)] float chargeLightFlicker = 0f;
+    [Tooltip("과충전 순간 밝기 — 이 값에서 overchargeLightTime 동안 0 으로")]
+    [SerializeField, Min(0f)] float overchargeLightIntensity = 180f;
+    [SerializeField, Min(0.01f)] float overchargeLightTime = 0.35f;
+    [SerializeField, Min(0.01f)] float abortLightFadeTime = 0.2f;
+    [SerializeField] LightShadows chargeLightShadows = LightShadows.Soft;
+
+    [Header("전기 장판 칸 흐리게(차징 중)")]
+    [Tooltip("차징 중 장판 예고·발동 칸 밝기(원래 대비). 1 이면 그대로")]
+    [SerializeField, Range(0f, 1f)] float floorTileBrightnessWhileCharging = 0.4f;
+    [Tooltip("흐려지고 돌아오는 데 걸리는 시간(초)")]
+    [SerializeField, Min(0.01f)] float floorTileFadeTime = 0.3f;
+
+    [Header("맵 해(Directional Light) 끄기(차징 중)")]
+    [Tooltip("차징 구슬 재생 중 씬의 Directional Light 를 끈다(끝나면 원래 밝기로)")]
+    [SerializeField] bool sunOffWhileCharging = true;
+    [Tooltip("꺼지고 돌아오는 데 걸리는 시간(초)")]
+    [SerializeField, Min(0.01f)] float sunFadeTime = 0.3f;
+
+    enum LightMode { Off, Charging, AwaitSurge, Flash, FadeOut }
+
     class Link
     {
         public ElectricTether tether;
@@ -54,9 +88,27 @@ public class BossChargeTetherView : MonoBehaviour
     Transform _bone;
     Transform _chestPoint;
     bool _overchargePending;
+    Light _light;
+    LightMode _lightMode;
+    float _lightLevel;      // 차징 밝기 비율(0 → 1)
+    float _lightT;          // 번쩍·꺼짐 경과(초)
+    float _lightFrom;       // 꺼지기 시작할 때의 밝기
+    BossElectricFloor _floor;   // 보스 루트에 실행 중 붙는다(TwentyThreeBoss) — 처음 쓸 때 찾는다
+    float _floorBrightness = 1f;
+    Light _sun;                 // 씬의 Directional Light — 차징이 처음 시작될 때 찾는다
+    float _sunIntensity;        // 원래 밝기(끄기 시작할 때 저장)
+    float _sunLevel = 1f;       // 0 = 꺼짐 · 1 = 원래
 
     void Awake()
     {
+        _light = new GameObject("ChargeChestLight").AddComponent<Light>();
+        _light.transform.SetParent(transform, false);
+        _light.type = LightType.Point;
+        _light.color = chargeLightColor;
+        _light.range = chargeLightRange;
+        _light.shadows = chargeLightShadows;
+        _light.enabled = false;
+
         if (chest == null)
         {
             _bone = FindDeep(BossRoot, chestBone);
@@ -78,6 +130,12 @@ public class BossChargeTetherView : MonoBehaviour
         PylonChargeView.PhaseChanged -= OnPhaseChanged;
         if (chargeBall != null) chargeBall.Finished -= OnBallFinished;
         foreach (Link l in _links.Values) if (l.tether != null) l.tether.Fade();
+        _lightMode = LightMode.Off;
+        _lightLevel = 0f;
+        if (_light != null) _light.enabled = false;
+        _floorBrightness = 1f;
+        if (_floor != null) _floor.ClientTileBrightness = 1f;
+        RestoreSun();   // 보스가 사라져도 해가 꺼진 채 남지 않게
     }
 
     Transform Chest => chest != null ? chest : _chestPoint;
@@ -130,6 +188,100 @@ public class BossChargeTetherView : MonoBehaviour
             if (_links[v].tether != null) Destroy(_links[v].tether.gameObject);
             _links.Remove(v);
         }
+
+        UpdateChestLight();
+        UpdateFloorBrightness();
+        UpdateSun();
+    }
+
+    // 맵 해 — 차징 구슬 재생 중엔 sunFadeTime 에 걸쳐 0 까지 낮춰 끄고, 끝나면 원래 밝기로 돌린다(전 피어 각자, 네트워크 없음).
+    void UpdateSun()
+    {
+        bool charging = sunOffWhileCharging && chargeBall != null && chargeBall.IsPlaying;
+        if (charging && _sunLevel >= 1f)
+        {
+            if (_sun == null) _sun = FindSun();
+            if (_sun != null) _sunIntensity = _sun.intensity;   // 매 차징 시작 때 원래 값을 다시 읽는다
+        }
+        if (_sun == null) return;
+        float level = Mathf.MoveTowards(_sunLevel, charging ? 0f : 1f, Time.deltaTime / sunFadeTime);
+        if (Mathf.Approximately(level, _sunLevel) && level >= 1f) return;
+        _sunLevel = level;
+        _sun.intensity = _sunIntensity * level;
+        _sun.enabled = level > 0f;
+    }
+
+    static Light FindSun()
+    {
+        if (RenderSettings.sun != null && RenderSettings.sun.type == LightType.Directional) return RenderSettings.sun;
+        foreach (Light l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+            if (l.type == LightType.Directional && l.isActiveAndEnabled) return l;
+        return null;
+    }
+
+    void RestoreSun()
+    {
+        if (_sun != null && _sunLevel < 1f) { _sun.intensity = _sunIntensity; _sun.enabled = true; }
+        _sunLevel = 1f;
+    }
+
+    // 전기 장판 칸 — 차징 구슬 재생 중엔 floorTileBrightnessWhileCharging 로 흐리게, 끝나면 원래대로(둘 다 floorTileFadeTime 에 걸쳐).
+    void UpdateFloorBrightness()
+    {
+        if (_floor == null && !BossRoot.TryGetComponent(out _floor)) return;
+        float target = chargeBall != null && chargeBall.IsPlaying ? floorTileBrightnessWhileCharging : 1f;
+        float step = Mathf.Max(0.0001f, 1f - floorTileBrightnessWhileCharging) / floorTileFadeTime * Time.deltaTime;
+        _floorBrightness = Mathf.MoveTowards(_floorBrightness, target, step);
+        _floor.ClientTileBrightness = _floorBrightness;
+    }
+
+    // 가슴 조명 — 구슬 재생 중이면 차징(다시 재생되면 처음부터), 끝나면 OnBallFinished·OnSurgeArrived 가 정한 대로 꺼진다.
+    void UpdateChestLight()
+    {
+        if (_light == null) return;
+        bool playing = chargeBall != null && chargeBall.IsPlaying;
+        if (playing && _lightMode != LightMode.Charging)
+        {
+            _lightMode = LightMode.Charging;
+            _lightLevel = 0f;
+        }
+        else if (!playing && _lightMode == LightMode.Charging)
+        {
+            // 종료 신호 없이 멈춤(구슬 쪽 컴포넌트가 꺼짐 등) — 끊김처럼 끈다.
+            _lightFrom = _light.enabled ? _light.intensity : 0f;
+            _lightMode = LightMode.FadeOut;
+            _lightT = 0f;
+        }
+
+        float intensity = 0f;
+        switch (_lightMode)
+        {
+            case LightMode.Charging:
+            case LightMode.AwaitSurge:   // 과충전 줄이 가슴에 닿을 때까지 그대로
+                if (_lightMode == LightMode.Charging) _lightLevel = Mathf.Min(1f, _lightLevel + Time.deltaTime / chargeLightRampTime);
+                intensity = chargeLightIntensity * _lightLevel * (1f - chargeLightFlicker * Mathf.PerlinNoise(Time.time * 8f, 0.37f));
+                break;
+            case LightMode.Flash:
+                _lightT += Time.deltaTime;
+                intensity = overchargeLightIntensity * Mathf.Clamp01(1f - _lightT / overchargeLightTime);
+                if (_lightT >= overchargeLightTime) _lightMode = LightMode.Off;
+                break;
+            case LightMode.FadeOut:
+                _lightT += Time.deltaTime;
+                intensity = _lightFrom * Mathf.Clamp01(1f - _lightT / abortLightFadeTime);
+                if (_lightT >= abortLightFadeTime) _lightMode = LightMode.Off;
+                break;
+        }
+        _light.enabled = intensity > 0.001f;
+        if (!_light.enabled) return;
+        _light.transform.position = Chest.position;
+        _light.intensity = intensity;
+    }
+
+    void StartLightFlash()
+    {
+        _lightMode = LightMode.Flash;
+        _lightT = 0f;
     }
 
     Link Get(PylonChargeView view)
@@ -158,7 +310,17 @@ public class BossChargeTetherView : MonoBehaviour
     // 구슬 종료 — Stop(aborted = false) = 시간 초과.
     void OnBallFinished(bool aborted)
     {
-        if (aborted) return;
+        if (aborted)
+        {
+            // 끊김 — 가슴 조명만 빠르게 끈다.
+            if (_light != null && (_lightMode == LightMode.Charging || _lightMode == LightMode.AwaitSurge))
+            {
+                _lightFrom = _light.enabled ? _light.intensity : 0f;
+                _lightMode = LightMode.FadeOut;
+                _lightT = 0f;
+            }
+            return;
+        }
         foreach (Link l in _links.Values)
         {
             if (l.tether == null || !l.tether.IsConnected) continue;
@@ -166,6 +328,9 @@ public class BossChargeTetherView : MonoBehaviour
             l.tether.Surge();
             _overchargePending = true;
         }
+        // 이어진 줄이 있으면 줄이 가슴에 닿을 때, 없으면 바로 번쩍.
+        if (_overchargePending) _lightMode = LightMode.AwaitSurge;
+        else StartLightFlash();
     }
 
     // 첫 줄이 가슴에 닿는 순간 큰 섬광 한 번.
@@ -173,6 +338,7 @@ public class BossChargeTetherView : MonoBehaviour
     {
         if (!_overchargePending) return;
         _overchargePending = false;
+        StartLightFlash();
         if (overcharge != null && EffectManager.TryGet(out EffectManager effects, this))
             effects.Play(overcharge, Chest.position, Quaternion.identity, overchargeScale);
     }

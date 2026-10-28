@@ -1,3 +1,45 @@
+# ▶▶▶ 계획 = **송전탑 01B 덮개 머리만 · 전기선 라인 광원 · 차징 가슴 조명** (2026-10-27 · grill 확정 · ✅ 승인 · ✅ 구현(배치 컴파일 0 · 원판 덮개 512삼각형 · 참조 검사 통과 · 캡처, 미커밋) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-27 — Q1 = A, Q5 = B, Q7 = B, 나머지 추천안). **MainProject 에서 바로 작업**(MyProject 미리보기 없음).
+> 판정·네트워크·송전기 상태 무변경. 경석 영역(`TwentyThree.prefab`·`bossroom.prefab`) 은 **수정 안 함** — 조명은 민경 코드가 실행 중에 만든다.
+
+## 사실
+- `FX_PylonCharge_01B.prefab`(bossroom 송전기 4개가 씀) 의 `Shell` = 실제 송전탑 모델(`Env_Mv_bosscharger_upper_01B.fbx`, 머티리얼 `Generic_01_A`) 을 1.5mm 띄운 **덮개 복사본**(면 15,088 동일, 삼각형이 서로 떨어진 메시) · 머티리얼 `M_Pylon_ShellRim_01B`. 덮개를 머리만 남기면 나머지는 아래 실제 모델의 원래 머티리얼이 보인다. Coil·Core 덮개는 별도 메시라 그대로.
+- 실제 모델 부품 42개 중 꼭대기 원판 = 높이 0 ~ −0.195m · 반경 0.735m(덮개는 +0.002m).
+- `ShellArcs`(입자) 가 `Pylon_01B_Shell` 메시 전체에서 나온다.
+- 전기선 = `ElectricTether`(LineRenderer, `FX_PylonTether`) · 송전기마다 하나(최대 4) · `BossChargeTetherView`(TwentyThree `VFX`) 가 잇고 끊는다. 가슴 점 = `Chest`.
+- 차징 구슬 `EffectStagePlayer`(chargeBall) — `IsPlaying` · `Finished(aborted)`(false = 시간 초과 과충전, true = 전부 파괴·간파·사망). URP 실시간에는 선 광원이 없다 → 포인트 라이트를 줄 따라 늘어놓는다. 렌더 경로 Forward+.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 머리 범위(Q1-A) | 꼭대기 원판만(덮개에서 중심 높이가 −0.2m 위인 삼각형) |
+| 전기 입자(Q2-A) | `ShellArcs` 도 원판 덮개에서만 |
+| 메시(Q3-A) | 새 `50.Art/VFX/Models/BossCharger_01B/Pylon_01B_ShellHead.asset` 을 만들어 `Shell` 렌더러·`ShellArcs` 모양에 바꿔 끼움. 원래 `Pylon_01B_Shell.asset` 은 그대로 |
+| 전기선 조명(Q4-A) | 줄마다 포인트 라이트 3개(송전탑 쪽·가운데·보스 쪽, 줄을 따라 움직임) · 그림자 없음 · 줄 상태에 맞춰 밝기(뻗어 나감 0 → 1 · 연결 중 깜빡임 · 과충전 굵어질 때 밝게 · 끊김/사라짐 꺼짐). `ElectricTether` 가 실행 중에 만든다 |
+| 차징 조명 위치(Q5-B) | 가슴(전기줄이 닿는 점) |
+| 차징 조명 흐름(Q6) | 구슬 재생 시작 → 서서히 밝아짐 · 차징 중 은은한 깜빡임 · 과충전 줄이 가슴에 닿는 순간 크게 번쩍 → 꺼짐 · 끊김(Abort) → 0.2초에 꺼짐 · 색 시안. `BossChargeTetherView` 가 실행 중에 만든다 |
+| 작업 흐름(Q7-B · Q8-A) | MainProject 직접. 코드는 Unity 켠 채로 고치고, **메시 생성·프리팹 교체·컴파일 검사·캡처는 Unity 닫고 배치 한 번에** |
+| 시작값(Q9) | 전기선 조명 개당 밝기 1.5 · 범위 2.5m / 가슴 조명 차징 4 · 범위 6m · 과충전 순간 12 — 인스펙터에서 조정 |
+| 수정(10-27 민경 Play 후) | 가슴 조명 차징 밝기 **60** · **전기선 조명 제거**(`ElectricTether` 원복) → 대신 줄 재질 `M_Pylon_TetherGlow`(0.25,1.3,3.5 → 0.5,2.6,7)·`M_Pylon_TetherCore`(1.6,3.2,6 → 3.2,6.4,12) Color(HDR) 2배 |
+| 수정 6(10-28 민경) | 차징 구슬 재생 중 **맵 Directional Light 끄기**(0.3초 전환, 끝나면 원래 밝기) — `BossChargeTetherView` 가 실행 중 찾음, `4.MapScene` 무수정 |
+| 수정 5(10-28 민경) | **차징 중 전기 장판 칸 흐리게** — `BossElectricFloor.ClientTileBrightness`(경석 파일, 칸 `_Tint` 알파 배율 · 연출 전용) 를 `BossChargeTetherView` 가 차징 구슬 재생 중 0.4 로(0.3초 전환). 예고·발동 칸 모두, 칸 VFX 프리팹은 그대로. handoff §5 |
+| 수정 4(10-27 민경 grill) | 가슴 조명 깜빡임 0 → 차징 중 **60 고정**(인스펙터에 55.x 로 보이던 원인 = 깜빡임). 전선 조명 3개 → **`TetherLight_L`·`_R` 2개**를 `FX_PylonTether.prefab` 에 실제 Light 로(Intensity 30 · Range 10 · Soft) — 줄 가운데에서 줄과 수직인 수평으로 ±1m, 평소 15% + 불규칙하게 번갈아 번쩍(쉼 0.05~0.4초 · 번쩍 0.03~0.1초 · 30% 확률로 같은 쪽 두세 번), 과충전 땐 빨라짐(speedMul)·밝아짐, 줄 가운데가 안 그려지면 꺼짐 |
+| 수정 3(10-27 민경) | 과충전 순간 밝기 12 → **180**(차징 60 보다 밝게) |
+| 수정 2(10-27 민경) | **전기선 조명 다시 넣음** + 전기선·가슴 조명 **그림자 Soft**(`lightShadows`·`chargeLightShadows`). 줄 재질 2배는 유지 |
+
+## 작업 순서
+1. 코드(Unity 켠 채): `ElectricTether` — 조명 3개 생성·줄 위치 따라가기·단계별 밝기. `BossChargeTetherView` — 가슴 조명 생성·구슬 재생/종료·과충전 섬광.
+2. 🔴 Unity 닫고 배치: `Pylon_01B_ShellHead.asset` 생성 → `FX_PylonCharge_01B.prefab` 의 `Shell` 메시·`ShellArcs` 모양 메시 교체 → 컴파일 0 · 참조 검사 · 덮개 캡처.
+3. 문서: `CONTEXT.md` · handoff(경석 — 보스 가슴 조명이 생김, 프리팹은 무수정) · 민경 Play(송전기 올라옴·파괴·과충전·MPPM).
+
+## 리스크
+- 조명 수: 송전기 4 × 3 + 가슴 1 = 최대 13개(그림자 없음). Forward+ 라 한도 여유. 너무 밝거나 많으면 줄당 개수·범위만 줄인다.
+- `ElectricTether` 는 MyProject 미리보기와 같은 guid 로 공유 — MainProject 만 바꾸면 MyProject 쪽은 예전 판(되가져오지 않음).
+- 원판 덮개 경계는 원판 아래 받침과 만나는 자리 — 경계가 직선으로 보이면 범위를 조정.
+
+---
+
 # ▶▶▶ 계획 = **23호 착지 균열 VFX 재제작(`FX_GroundBreak`) — 균열 발광·전류·깨진 바닥 조각·튀는 돌** (2026-10-27 · grill 확정 · ✅ 승인 · ✅ MyProject 제작(중간·큰 두 벌, 미리보기 `Scenes/GroundBreakPreview`) · ✅ 민경 확정 = **중간** · 균열 띠 두껍게(굵은 줄기 0.5→0.7m · 심 폭 2.5배, 전류 그대로) · ✅ 깨진 바닥 재설계(맞물린 판 + 바닥 타일 무늬 맞춤) · ✅ 5차(벌어진 판 틈 빛) 민경 승인 · ✅ MainProject 반입·배선(배치 컴파일 0 · 배선 검사 통과 · computedDuration 2.9, 미커밋) · ✅ 6~8차(테두리 · 판 위 금) 재반입(배선 검사 통과 · 판 위 금 렌더러 39) · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-27 — Q12 = 조각 들림 중간·큰 두 버전 제작 후 비교, 나머지 추천안). 레퍼런스 = 사용자 첨부 3장(파란 전기 균열 2 · 붉은 깨진 바닥 1 — 3번은 형태만).

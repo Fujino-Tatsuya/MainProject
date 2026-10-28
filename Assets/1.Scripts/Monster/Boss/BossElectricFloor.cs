@@ -356,6 +356,23 @@ public sealed class BossElectricFloor : MonoBehaviour
     /// <summary>[전 피어] 예고·연출 즉시 제거(모드 전환·제압·기믹 종료·사망).</summary>
     public event Action ClientCleared;
 
+    float _tileBrightness = 1f;
+    bool _brightnessDirty;
+
+    /// <summary>[전 피어] 예고·발동 칸 밝기 배율(0~1, 칸 알파에 곱한다). 연출 전용 — 판정·표시 범위 무관.
+    /// 23호 차징 중 흐리게(2026-10-28 민경 — BossChargeTetherView 가 정한다, Docs/tech/handoff-boss-pylon-vfx.md §5).</summary>
+    public float ClientTileBrightness
+    {
+        get => _tileBrightness;
+        set
+        {
+            value = Mathf.Clamp01(value);
+            if (Mathf.Approximately(value, _tileBrightness)) return;
+            _tileBrightness = value;
+            _brightnessDirty = true;
+        }
+    }
+
     public void ClientShowWarn(ulong mask, float warnTime)
     {
         if (!EnsureView()) return;
@@ -383,6 +400,11 @@ public sealed class BossElectricFloor : MonoBehaviour
     void PaintWarnTile(int r, int c, int i)
     {
         EnemyC3Visuals.PaintPlate(_outer[i],_fill[i],"15",true);
+        if (_tileBrightness < 1f)
+        {
+            EnemyC3Visuals.PaintLayer(_outer[i], "15", true, false, _tileBrightness);
+            EnemyC3Visuals.PaintLayer(_fill[i], "15", true, true, _tileBrightness);
+        }
     }
 
     public void ClientFire(ulong mask, float vfxTime, bool lethal = false)
@@ -406,7 +428,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         ForEachTile(mask, (r, c, i) =>
         {
             PlaceTile(_outer[i], r, c, i, FullTile);
-            EnemyC3Visuals.PaintActive(_outer[i]);
+            EnemyC3Visuals.PaintActive(_outer[i], _tileBrightness);
             _outer[i].gameObject.SetActive(true);
 
             if (_d.electricVfxPrefab != null)
@@ -442,8 +464,10 @@ public sealed class BossElectricFloor : MonoBehaviour
             col.a *= 0.55f + 0.45f * Mathf.Sin(Time.time * _d.electricFlickerSpeed);   // 임시 전기 — 빠른 깜빡임
         float s = FullTile * Mathf.Clamp01(k);                      // 안쪽 진한 사각형이 중심에서 차오른다(§9-2)
         // Play 중 스타일 조절 — 경고 칸만 다시 칠한다(진행은 그대로).
-        bool repaint = !_viewFiring && _paintedStyleVersion != TelegraphStyleSO.Version;
+        // 칸 밝기 배율이 바뀌어도 다시 칠한다(차징 중 흐리게). 발동 칸은 아래에서 매 프레임 칠한다.
+        bool repaint = !_viewFiring && (_paintedStyleVersion != TelegraphStyleSO.Version || _brightnessDirty);
         if (repaint) _paintedStyleVersion = TelegraphStyleSO.Version;
+        _brightnessDirty = false;
 
         // 매 프레임 도는 곳이라 람다(ForEachTile) 대신 루프 — 할당 0.
         for (int r = 0; r < BossTileGrid.Size; r++)
@@ -451,7 +475,7 @@ public sealed class BossElectricFloor : MonoBehaviour
             {
                 if (!BossTileGrid.Has(_viewMask, r, c)) continue;
                 int i = BossTileGrid.Bit(r, c);
-                if (_viewFiring) EnemyC3Visuals.PaintActive(_outer[i],_d.electricColor.a>0?col.a/_d.electricColor.a:1);
+                if (_viewFiring) EnemyC3Visuals.PaintActive(_outer[i],(_d.electricColor.a>0?col.a/_d.electricColor.a:1)*_tileBrightness);
                 else
                 {
                     if (repaint) PaintWarnTile(r, c, i);
