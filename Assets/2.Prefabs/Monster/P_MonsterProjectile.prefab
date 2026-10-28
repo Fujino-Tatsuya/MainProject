@@ -244,5 +244,5 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   trail: {fileID: 11400000, guid: 3ed42faac15a0544c8c338c7e5f78954, type: 2}
   explode: {fileID: 11400000, guid: 88b33c4c16ab5ba46928596f04744e2c, type: 2}
-  explodeOffset: {x: 0, y: 0, z: 0}
-  scale: 0.6
+  explodeOffset: {x: 0, y: 0.01, z: 0}
+  scale: 1

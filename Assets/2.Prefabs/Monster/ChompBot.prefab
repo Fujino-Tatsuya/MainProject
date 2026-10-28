@@ -313,6 +313,7 @@ Transform:
   - {fileID: 3796325343604789818}
   - {fileID: 175077971607170442}
   - {fileID: 5422868752590224343}
+  - {fileID: 3822752981082478153}
   m_Father: {fileID: 4998502004633112037}
   m_LocalEulerAnglesHint: {x: 88.38154, y: 90, z: 90}
 --- !u!1 &3341625838416616944
@@ -343,8 +344,7 @@ Transform:
   m_LocalPosition: {x: 0.00006733557, y: 0.004711534, z: -0.000053349042}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 3822752981082478153}
+  m_Children: []
   m_Father: {fileID: 7999292454765025595}
   m_LocalEulerAnglesHint: {x: -0.913721, y: 15.225035, z: -0.24866918}
 --- !u!1 &3512761385528285380
@@ -870,6 +870,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ExplodeDeath
   ShowTopMostFoldoutHeaderGroup: 1
   partSet: {fileID: 11400000, guid: 304e7ccec2eccf24784a71c79b7c8776, type: 2}
+  explosionEffect: {fileID: 0}
   burstHeight: 0
   explosionScale: 1
   outwardSpeed: {x: 1.5, y: 2.5}
@@ -1098,11 +1099,11 @@ Transform:
   m_GameObject: {fileID: 6853815908437907898}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.0017, z: 0.01127}
+  m_LocalPosition: {x: 0, y: 0.002, z: 0.02}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 8337383468949604239}
+  m_Father: {fileID: 7999292454765025595}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7098687982489952724
 GameObject:
