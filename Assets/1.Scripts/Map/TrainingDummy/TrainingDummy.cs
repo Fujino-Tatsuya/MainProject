@@ -189,7 +189,7 @@ public sealed class TrainingDummy : Unit
     /// 여기 로직은 그 본문(방향 폴백 체인 포함)을 옮겨온 것이다.
     ///
     /// 프리팹의 `LinearKnockback` 은 <b>다른 경로</b>다 — `Unit.Knockback(방향, 세기)` 이 쓰는
-    /// 임펄스 방식이고, 보스가 플레이어를 밀 때 쓴다. 플레이어 스킬은 그쪽을 호출하지 않는다.
+    /// 세기→거리 직접 밀기(할 일 136 전엔 임펄스)이고, 보스가 플레이어를 밀 때 쓴다. 플레이어 스킬은 그쪽을 호출하지 않는다.
     /// 붙여만 두는 이유는 보스가 허수아비를 밀 때 `Unit.OnKnockback` 이 LogError 를 찍지 않게 하려는 것.
     ///
     /// `MonsterBase` 와 달리 NavMesh 경계 클램프는 하지 않는다 — 허수아비는 NavMesh 밖에 놓일 수
@@ -277,13 +277,18 @@ public sealed class TrainingDummy : Unit
         // 남은 넉백을 안 지우면 복귀 → 남은 시간 동안 다시 밀림 → 재이탈 루프가 된다.
         _knockbackTimer = 0f;
 
-        // LinearKnockback(임펄스 경로)이 남긴 속도도 같은 이유로 지운다.
+        // LinearKnockback(Unit.Knockback 경로)의 남은 밀림도 같은 이유로 지운다(할 일 136 — 이제 직접 이동이라 속도가 아니라 밀림 자체를 끝낸다).
+        if (TryGetComponent(out LinearKnockback linearKnockback))
+            linearKnockback.CancelKnockback();
+
+        // 외부가 바디를 Dynamic 으로 바꿔 둔 경우를 대비해 스폰 당시 값으로 원복한다.
         if (_rigidbody != null)
         {
-            _rigidbody.linearVelocity = Vector3.zero;
-            _rigidbody.angularVelocity = Vector3.zero;
-            // LinearKnockback.EndKnockback 은 NavMeshAgent 가 있을 때만 isKinematic 을 되돌린다.
-            // 허수아비엔 에이전트가 없으니 여기서 스폰 당시 값으로 직접 원복한다.
+            if (!_rigidbody.isKinematic)
+            {
+                _rigidbody.linearVelocity = Vector3.zero;
+                _rigidbody.angularVelocity = Vector3.zero;
+            }
             _rigidbody.isKinematic = _spawnKinematic;
         }
 
