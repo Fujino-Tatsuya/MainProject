@@ -7,20 +7,36 @@ using UnityEngine;
 ///
 /// <list type="bullet">
 /// <item>모든 피어가 각자 섬광 순간(성공 Started + 섬광 1~3단계 길이)에 튼다 — 디렉터가 한 번 만들어 재사용한다(매 재생 생성 없음).</item>
-/// <item>파티클은 실시간(useUnscaledTime) — 성공 슬로우(0.25) 중에도 같은 빠르기로 터진다. 프리팹에 박아 두었다.</item>
+/// <item>시간 기준 칸(<see cref="timeBase"/>, 기본 스케일 — 성공 슬로우 0.25 를 따라 느리게 터진다)은 재생할 때마다 모든 파티클에 넣는다.
+///       셰이더는 시간을 쓰지 않는다(파티클 나이·색 수명 곡선) — 파티클 시간 기준을 그대로 따른다.</item>
 /// <item>크기 = 루트 스케일(파티클 Scaling Mode = Hierarchy).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class InterruptHitFlashVfx : MonoBehaviour
 {
+    [Tooltip("월드 섬광 재생 시간 기준 — 스케일(기본): 성공 슬로우를 따라 느려진다 / 실시간: 슬로우 중에도 같은 빠르기")]
+    [SerializeField] private InterruptEffectTimeBase timeBase = InterruptEffectTimeBase.Scaled;
+
     [Tooltip("재생할 루트 파티클(자식 포함). 비우면 이 오브젝트의 ParticleSystem")]
     [SerializeField] private ParticleSystem root;
+
+    private ParticleSystem[] _systems;
+
+    public InterruptEffectTimeBase TimeBase => timeBase;
 
     public void Play(Vector3 position, float scale)
     {
         if (root == null && !TryGetComponent(out root))
             return;
+
+        _systems ??= GetComponentsInChildren<ParticleSystem>(true);
+        bool unscaled = InterruptEffectTime.UsesUnscaledTime(timeBase);
+        for (int i = 0; i < _systems.Length; i++)
+        {
+            ParticleSystem.MainModule main = _systems[i].main;
+            main.useUnscaledTime = unscaled;
+        }
 
         transform.SetPositionAndRotation(position, Quaternion.identity);
         transform.localScale = Vector3.one * Mathf.Max(0.01f, scale);

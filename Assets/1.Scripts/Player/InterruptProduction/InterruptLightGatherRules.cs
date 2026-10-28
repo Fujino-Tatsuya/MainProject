@@ -1,12 +1,24 @@
 using UnityEngine;
 
-/// <summary>빛 모임 재생 시간 기준(할 일 132 단계 4).</summary>
-public enum InterruptLightGatherTimeBase
+/// <summary>
+/// 간파 이펙트 시간 기준(할 일 132 §14) — 빛 모임·월드 섬광 파티클·적중 섬광 진행기가 같이 쓴다. 기본 = 스케일.
+/// 오너 암전 들어옴/걷힘·카메라 줌 블렌드는 이 칸을 타지 않고 늘 실시간이다.
+/// </summary>
+public enum InterruptEffectTimeBase
 {
-    /// <summary>실시간 — 강 슬로우(0.15)·히트스톱 중에도 같은 빠르기로 보인다(기본).</summary>
+    /// <summary>실시간 — 슬로우·히트스톱 중에도 같은 빠르기로 보인다.</summary>
     Unscaled,
-    /// <summary>스케일 시간 — 슬로우를 따라 느려진다.</summary>
+    /// <summary>스케일 시간(Time.timeScale = GlobalTimeScale) — 슬로우를 따라 느려진다(기본).</summary>
     Scaled,
+}
+
+/// <summary>시간 기준 → 시계(할 일 132 §14).</summary>
+public static class InterruptEffectTime
+{
+    public static bool UsesUnscaledTime(InterruptEffectTimeBase timeBase) => timeBase == InterruptEffectTimeBase.Unscaled;
+
+    /// <summary>그 시간 기준의 지금 — 실시간 = Time.unscaledTime, 스케일 = Time.time.</summary>
+    public static float Now(InterruptEffectTimeBase timeBase) => UsesUnscaledTime(timeBase) ? Time.unscaledTime : Time.time;
 }
 
 /// <summary>빛 모임 한 벌 — 플레이어 소켓(<see cref="InterruptLightGatherSocket"/>)이 구현한다. 테스트는 가짜를 넣는다.</summary>
@@ -38,8 +50,6 @@ public static class InterruptLightGatherRules
 
     /// <summary>붙일 곳 — 캐릭터 Variant 가 연결한 소켓, 비어 있으면(base) 캐릭터 중심.</summary>
     public static Transform ResolveAnchor(Transform socket, Transform center) => socket != null ? socket : center;
-
-    public static bool UsesUnscaledTime(InterruptLightGatherTimeBase timeBase) => timeBase == InterruptLightGatherTimeBase.Unscaled;
 
     /// <summary>덮어쓸 텍스처를 쓰는가 — 비어 있으면 셰이더 절차 생성.</summary>
     public static bool UsesOverrideTexture(Texture overrideTexture) => overrideTexture != null;

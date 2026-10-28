@@ -16,10 +16,8 @@ public sealed class InterruptOwnerPresentationTests
         // 이진 소수로 딱 떨어지는 길이 — 램프 끝 비교가 부동소수 오차로 흔들리지 않게(디렉터 기본값은 아래 따로 확인).
         public float In = 0.125f;
         public float Out = 0.25f;
-        public float Release = 0.5f;
         public float OwnerDimInDuration => In;
         public float OwnerDimOutDuration => Out;
-        public float OwnerSuccessDimReleaseDelay => Release;
     }
 
     private sealed class FakeOutput : IInterruptOwnerDimOutput, IInterruptLightGatherOutput
@@ -281,25 +279,40 @@ public sealed class InterruptOwnerPresentationTests
         Assert.AreEqual(InterruptOwnerPresentationState.Success, _sm.State);
         Assert.IsTrue(_sm.SuccessDimmed, "강 시도의 성공 = 섬광 오버레이 조건");
         Assert.IsFalse(_sm.LightGatherActive);
-        _sm.Tick(10.5f);
-        Assert.AreEqual(1f, _out.Dim, "섬광 1~3단계(0.5) 동안 암전 그대로");
+        _sm.Tick(30f);
+        Assert.AreEqual(1f, _out.Dim, "섬광 순간 전엔 실시간이 얼마나 흘러도 암전 그대로(따로 재지 않는다)");
+        Assert.AreEqual(InterruptOwnerPresentationState.Success, _sm.State);
 
-        // 섬광 순간(성공 + 0.5) — 걷기 램프 없이 그 프레임에 0, 그리고 없음.
-        _sm.Tick(10.75f);
+        // 섬광 순간(진행기 사건) — 걷기 램프 없이 그 호출에서 0, 그리고 없음.
+        _sm.SuccessFlashMoment(6, 30f);
         Assert.AreEqual(0f, _out.Dim);
         Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State);
     }
 
     [Test]
-    public void 섬광_순간이_0이면_성공_프레임에_끈다()
+    public void 섬광_순간은_이번_성공_것만_암전을_끈다()
     {
-        _timings.Release = 0f;
         _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
         _sm.Tick(10.125f);
         _sm.ServerStarted(6, SlowMotionPurpose.Success, true, 10.25f);
-        _sm.Tick(10.25f);
+        _sm.SuccessFlashMoment(5, 10.5f);
+        Assert.AreEqual(1f, _out.Dim, "다른 성공(앞 판정)의 섬광 순간");
+
+        _sm.ServerStarted(7, SlowMotionPurpose.Success, true, 10.5f);
+        _sm.SuccessFlashMoment(6, 10.75f);
+        Assert.AreEqual(1f, _out.Dim, "새 성공이 오면 새 섬광 순간을 기다린다");
+        _sm.SuccessFlashMoment(7, 11f);
         Assert.AreEqual(0f, _out.Dim);
-        Assert.AreEqual(InterruptOwnerPresentationState.None, _sm.State);
+    }
+
+    [Test]
+    public void 성공_단계_밖_섬광_순간은_무시()
+    {
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        _sm.Tick(10.125f);
+        _sm.SuccessFlashMoment(0, 10.25f);
+        Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
+        Assert.AreEqual(1f, _out.Dim);
     }
 
     [Test]

@@ -42,8 +42,9 @@
                Failed(발동 번호) / 판정 전 종료(LocalOwnerEnded) → 걷기 · 오너 애니 Hit 이벤트 → 빛 모임 정지
   [팀원 화면]   남의 강 시도(Attempt) → 발동자 소켓에서 빛 모임 → 발동자 Hit(PeerCasterHit)·실패·성공·리셋에 정지
                시도 단계에 그 외 변화 없음
-  [모든 화면]   Success → 적중 섬광 진행기(InterruptHitFlashSequencer, 실시간)
-                 0.0s 1단계(오너 오버레이, 아래 조건) … 0.3s 섬광 순간 = 월드 섬광(FX_InterruptHitFlash) + 암순응 … 0.4s 끝
+  [모든 화면]   Success → 적중 섬광 진행기(InterruptHitFlashSequencer, 진행기 시계 = 기본 스케일 시간 §0.4)
+                 0.0 1단계(오너 오버레이, 아래 조건) … 0.3 섬광 순간 = 오너 암전 끔 + 월드 섬광(FX_InterruptHitFlash) + 암순응 … 0.4 끝
+                 (스케일 초 — 성공 슬로우 아래 실시간으로 섬광 순간 ≈ 1.27s · 끝 ≈ 1.47s)
                  A4 성공 이펙트 칸은 Started 즉시(§2.4)
 ```
 
@@ -71,20 +72,45 @@
 | 휘도 암순응 | 오버레이가 돌았으면 없음(두 번 어두워짐 방지) · 약 시도 성공이면 self 강도 | others 강도(0.35), 섬광 순간 | A2 |
 | 성공 이펙트 칸 casterFx/targetFx | ✓ | ✓ | A4 |
 
-### 0.4 시간표 (기본값, 전부 실시간)
+### 0.4 시간표 (기본값) · 시간 기준
 
-| 구간 | 길이 | 칸(디렉터) |
-|---|---|---|
-| 오너 암전 들어옴(강 입력 순간 0 → 1) | 0.1s | `ownerDimInDuration` |
-| 오너 암전 걷힘(예측 빗나감·실패·판정 전 종료) | 0.2s | `ownerDimOutDuration` |
-| 섬광 1단계 — 검은 배경 위 흰 폭발 | 0.1s | `hitFlashBurstDuration` |
-| 섬광 2단계 — 빛 갈라짐(스타버스트) + 원형 충격파 | 0.1s | `hitFlashGlareDuration` |
-| 섬광 3단계 — 화면 전체 흰 반전(+검은 집중선) · 끝 = **섬광 순간** | 0.1s | `hitFlashInvertDuration` |
-| 섬광 4단계 — 실제 화면 복귀(3단계 그림이 걷힘) | 0.1s | `hitFlashReturnDuration` |
-| 오너 암전 끄는 때(성공) = 1~3단계 합 | 0.3s | 계산값 `OwnerSuccessDimReleaseDelay` — 따로 칸 없음 |
+이펙트는 `GlobalTimeScale`(`Time.timeScale`)을 따라 느려진다(**스케일 시간**, 할 일 132 §14). 각 이펙트에 시간 기준 칸(`InterruptEffectTimeBase` — 스케일/실시간)이 있어 실시간으로 되돌릴 수 있다.
+오너 암전 램프와 카메라 줌 블렌드만 늘 실시간이다.
 
+| 구간 | 길이 | 시계 | 칸 |
+|---|---|---|---|
+| 오너 암전 들어옴(강 입력 순간 0 → 1) | 0.1s | 실시간(고정) | 디렉터 `ownerDimInDuration` |
+| 오너 암전 걷힘(예측 빗나감·실패·판정 전 종료) | 0.2s | 실시간(고정) | 디렉터 `ownerDimOutDuration` |
+| 카메라 줌 블렌드 | — | 실시간(고정) | `SlowMotionOwnerZoom` |
+| 빛 모임 파티클 | 파티클 수명 | **스케일**(기본) | `FX_InterruptLightGather` › `InterruptLightGatherVfx.timeBase` |
+| 섬광 1단계 — 검은 배경 위 흰 폭발 | 0.1 | **진행기 시계** | 디렉터 `hitFlashBurstDuration` |
+| 섬광 2단계 — 빛 갈라짐(스타버스트) + 원형 충격파 | 0.1 | 진행기 시계 | `hitFlashGlareDuration` |
+| 섬광 3단계 — 화면 전체 흰 반전(+검은 집중선) · 끝 = **섬광 순간** | 0.1 | 진행기 시계 | `hitFlashInvertDuration` |
+| 섬광 4단계 — 실제 화면 복귀(3단계 그림이 걷힘) | 0.1 | 진행기 시계 | `hitFlashReturnDuration` |
+| 섬광 순간 = 1~3단계 합 — 오너 암전 끔 · 월드 섬광 시작 · 팀원 암순응 시작 | 0.3 | 진행기 시계 | 계산값(따로 칸 없음) |
+| 월드 섬광 파티클 | 파티클 수명 | **스케일**(기본) | `FX_InterruptHitFlash` › `InterruptHitFlashVfx.timeBase` |
+
+- **진행기 시계** = 디렉터 `hitFlashTimeBase`(기본 **스케일**). 섬광 순간은 진행기가 한 번 알리고(시간표 하나) 디렉터가 그 순간 오너 암전 끔·월드 섬광·암순응을
+  같은 프레임에 튼다 — 오너 상태 기계는 따로 시간을 재지 않는다(`InterruptOwnerPresentation.SuccessFlashMoment`). 진행 중에 칸을 바꾸면 다음 성공부터.
 - 1단계 시작 = 성공 `Started` 순간 = 히트스톱 시작 순간(히트스톱 길이 0 이어도 같다). 각 길이 0 = 그 단계 건너뜀.
 - 빛 모임은 입력 순간 → 오너 애니 Hit 이벤트까지(기존 Hit 이벤트 재사용, SO 타이머 칸 없음).
+- 셰이더는 `_Time` 을 쓰지 않는다 — 빛 모임·월드 섬광은 파티클 나이(AgePercent·수명 곡선)라 파티클 시간 기준을 그대로 따르고, 오버레이는 진행기가 넘기는 `_Progress` 로 그린다.
+- 팀원 암순응 곡선 자체(`InterruptDarkAdaptation` 0.08/0.6/0.5)는 실시간 그대로다(§3) — 시작 시각만 섬광 순간을 따른다.
+
+**성공 슬로우(히트스톱 0.05s×0.02 → 진입 0.05s 0.02→0.25 → 유지 0.25 1.2s → 복귀 0.4s) 아래 체감(실시간) 길이** — 스케일 진행기 기본값,
+EditMode `InterruptHitFlashTests.스케일_시계면_섬광_단계와_섬광_순간이_성공_슬로우를_따라_늘어난다` 가 확인:
+
+| 구간 | 스케일 길이 | 실시간 시작 → 끝 | 체감 길이 |
+|---|---|---|---|
+| 히트스톱(성공 Started 직후) | 0.001 | 0 → 0.05s | 0.05s — 1단계 1% 진행(거의 멈춘 그림) |
+| 진입(0.02 → 0.25) | 0.00675 | 0.05 → 0.10s | 0.05s — 1단계 7.75% 까지 |
+| 섬광 1단계 | 0.1 | 0 → 0.469s | **0.47s** |
+| 섬광 2단계 | 0.1 | 0.469 → 0.869s | **0.40s** |
+| 섬광 3단계 | 0.1 | 0.869 → 1.269s | **0.40s** |
+| 섬광 순간(오너 암전 끔·월드 섬광·암순응) | 0.3 | **1.269s** | — (유지 끝 1.30s 직전) |
+| 섬광 4단계 | 0.1 | 1.269 → 1.474s | **0.21s** — 유지 끝(1.30s) 뒤 복귀 곡선에 걸쳐 빨라진다 |
+
+실시간으로 되돌리면(`hitFlashTimeBase` = Unscaled) 0.1s 씩 · 섬광 순간 0.3s · 끝 0.4s(132 단계 5 원래 값).
 
 ### 0.5 새 수치 칸 — 전부 `NetworkManager.prefab › InterruptProductionDirector`
 
@@ -96,14 +122,16 @@
 | `interruptWeakZoomFactor`(약 줌) | 0.93 | 각 피어 | 🟨 **반영 예정** |
 | `ownerDimInDuration` · `ownerDimOutDuration` | 0.1 · 0.2 | 각 피어 | `[DataTableIgnore]` — 프리팹이 원본 |
 | `ownerDimColor` · `ownerDimOpacity` | 검정 · 1(100%) — 예: 남색 0.9 | 각 피어 | `[DataTableIgnore]`(색은 테이블 열 아님) |
-| `hitFlashBurstDuration` · `GlareDuration` · `InvertDuration` · `ReturnDuration` | 0.1 · 0.1 · 0.1 · 0.1 | 각 피어 | `[DataTableIgnore]` |
+| `hitFlashTimeBase`(진행기 시계) | 스케일 | 각 피어 | `[DataTableIgnore]` |
+| `hitFlashBurstDuration` · `GlareDuration` · `InvertDuration` · `ReturnDuration` | 0.1 · 0.1 · 0.1 · 0.1(진행기 시계 초) | 각 피어 | `[DataTableIgnore]` |
 | `hitFlashSpeedLines` | 켬 | 각 피어 | `[DataTableIgnore]` |
 | `hitFlashOverlayMaterial` | `M_InterruptHitFlashOverlay` | 각 피어 | 참조 — 비우면 오버레이 없음 |
 | `hitFlashWorldVfx` | `FX_InterruptHitFlash` | 각 피어 | 참조 — 비우면 월드 섬광 없음 |
 | `hitFlashWorldScale` · `hitFlashHeightOffset` | 1 · 1m | 각 피어 | `[DataTableIgnore]` |
 
 - 오너 암전·섬광 칸들은 `NetworkManager.prefab` YAML 에 아직 써 있지 않아 **코드 기본값**이 쓰인다(인스펙터에서 바꾸고 저장하면 그때 써진다).
-- 빛 모임 시간 기준: `FX_InterruptLightGather` 의 `InterruptLightGatherVfx.timeBase`(기본 **실시간** — 강 슬로우 0.15 중에도 같은 속도). 소켓은 §0.7.
+- 이펙트 시간 기준(§0.4): `FX_InterruptLightGather` › `InterruptLightGatherVfx.timeBase` · `FX_InterruptHitFlash` › `InterruptHitFlashVfx.timeBase`(둘 다 기본 **스케일** —
+  재생할 때마다 모든 파티클 `useUnscaledTime` 에 넣는다, 프리팹 파티클 값도 스케일로 맞춤). 소켓은 §0.7.
 
 ### 0.6 스위치 칸이 없는 새 연출 (132 단계 6 판단)
 
@@ -152,7 +180,9 @@
 - **잔상 비트는 SVN 커밋 뒤부터.** `DashAfterimage.cs` 한 줄이 SVN 에 들어가기 전에는 잔상이 암전에 덮인다. 🔴 SVN 을 git 보다 먼저 커밋한다(메인이 병합 직전).
 - **팀원 빛 모임은 발동자 Hit 릴레이로 끈다**(새 RPC 없음) — 관찰자 애니메이터가 Hit 을 못 받으면 실패·성공·리셋 때 꺼진다.
 - **HUD 도 덮는다.** 오너 암전 동안 내 HP·쿨 HUD 가 안 보인다(계획서 확정). 오버레이 섬광 중도 같다.
-- 강도·색·단계 길이·빛 모임 시간 기준·블룸 세기는 Play 튜닝 전 처음 값이다.
+- **스케일 시간이면 섬광이 길어진다.** 성공 슬로우 아래 섬광 순간이 실시간 약 1.27s(실시간 기준 0.3s)라 오너 암전·흰 반전도 그만큼 길게 남고,
+  1단계는 히트스톱 0.05s 동안 거의 멈춰 있다(§0.4 표). 성공 프로필 유지(1.2s)가 섬광 길이를 정하는 셈이라 프로필을 줄이면 섬광 순간이 복귀 곡선 안으로 밀린다.
+- 강도·색·단계 길이·이펙트 시간 기준·블룸 세기는 Play 튜닝 전 처음 값이다.
 
 ## 1. 흐름 (132 이전 공통 경로 — 성공·실패·슬로우 배포)
 

@@ -110,16 +110,18 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("오너 암전 덮개 불투명도 [0, 1] — 1 = 100%(완전히 덮음), 0.9 = 90%")]
     [DataTableIgnore, SerializeField, Range(0f, 1f)] private float ownerDimOpacity = 1f;
 
-    // 적중 섬광(할 일 132 단계 5) — 성공 Started 순간(히트스톱 안) 1단계 시작, 각 길이 실시간. 이 피어 값을 쓴다.
+    // 적중 섬광(할 일 132 단계 5) — 성공 Started 순간(히트스톱 안) 1단계 시작, 각 길이는 시간 기준 칸의 시계(기본 스케일, §14). 이 피어 값을 쓴다.
     // 연출 길이라 애니 이벤트로 대체할 스킬 타이밍이 아니다(계획서 확정). xlsx 칸이 아직 없어 [DataTableIgnore] — 프리팹이 원본.
     [Header("성공 — 적중 섬광(할 일 132 단계 5)")]
-    [Tooltip("1단계 — 검은 배경 위 흰 폭발(오너 화면, 초, 실시간). 0 = 건너뜀")]
+    [Tooltip("섬광 진행기 시계 — 스케일(기본): 1~4단계·섬광 순간(오너 암전 끔·월드 섬광·팀원 암순응)이 성공 슬로우·히트스톱을 따라 느려진다 / 실시간: 슬로우와 무관. 진행 중에 바꾸면 다음 성공부터")]
+    [DataTableIgnore, SerializeField] private InterruptEffectTimeBase hitFlashTimeBase = InterruptEffectTimeBase.Scaled;
+    [Tooltip("1단계 — 검은 배경 위 흰 폭발(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashBurstDuration = 0.1f;
-    [Tooltip("2단계 — 빛 갈라짐(스타버스트) + 원형 충격파(오너 화면, 초, 실시간). 0 = 건너뜀")]
+    [Tooltip("2단계 — 빛 갈라짐(스타버스트) + 원형 충격파(오너 화면, 초, 진행기 시계). 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashGlareDuration = 0.1f;
-    [Tooltip("3단계 — 화면 전체 흰색 반전(오너 화면, 초, 실시간). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
+    [Tooltip("3단계 — 화면 전체 흰색 반전(오너 화면, 초, 진행기 시계). 끝나는 순간 = 섬광 순간: 오너 암전 끔·월드 섬광·팀원 암순응. 0 = 건너뜀")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashInvertDuration = 0.1f;
-    [Tooltip("4단계 — 실제 화면 복귀: 3단계 그림이 걷히는 시간(오너 화면, 초, 실시간). 0 = 바로 끊김")]
+    [Tooltip("4단계 — 실제 화면 복귀: 3단계 그림이 걷히는 시간(오너 화면, 초, 진행기 시계). 0 = 바로 끊김")]
     [DataTableIgnore, SerializeField, Min(0f)] private float hitFlashReturnDuration = 0.1f;
     [Tooltip("3단계 흰 반전 위 검은 집중선(적중 지점으로 모이는 선)")]
     [DataTableIgnore, SerializeField] private bool hitFlashSpeedLines = true;
@@ -141,8 +143,6 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     public float OwnerDimInDuration => ownerDimInDuration;
     public float OwnerDimOutDuration => ownerDimOutDuration;
-    /// <summary>오너 암전 끄는 때 = 섬광 순간(1~3단계 길이 합) — 섬광 진행기와 같은 칸에서 계산한다.</summary>
-    public float OwnerSuccessDimReleaseDelay => InterruptHitFlashTimeline.From(this).FlashMoment;
     public Color OwnerDimColor => ownerDimColor;
     public float OwnerDimOpacity => ownerDimOpacity;
 
@@ -151,6 +151,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public float HitFlashInvertDuration => hitFlashInvertDuration;
     public float HitFlashReturnDuration => hitFlashReturnDuration;
     public bool HitFlashSpeedLines => hitFlashSpeedLines;
+    public InterruptEffectTimeBase HitFlashTimeBase => hitFlashTimeBase;
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
     private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
@@ -228,10 +229,10 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     private void Update()
     {
-        // 오너 암전 램프·성공 암전 끄기·적중 섬광 단계 — 실시간(슬로우·히트스톱 중에도 길이가 그대로). 둘 다 같은 섬광 순간을 같은 프레임에 본다.
-        float now = Time.unscaledTime;
-        _ownerPresentation?.Tick(now);
-        _hitFlash?.Tick(now);
+        // 오너 암전 램프 = 실시간(슬로우·히트스톱 중에도 0.1/0.2초 그대로). 적중 섬광 단계·섬광 순간 = 진행기 시계(기본 스케일) —
+        // 성공 암전 끄기도 그 섬광 순간에 진행기가 알린다(HandleHitFlashMoment, 시간표 하나).
+        _ownerPresentation?.Tick(Time.unscaledTime);
+        _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock));
     }
 
     private void OnDisable()
@@ -419,7 +420,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
         // 적중 섬광(할 일 132 단계 5) — 히트스톱이 이 순간 시작하므로 1단계도 지금(히트스톱 길이 0 이어도 같다).
         // 오너 오버레이 = 내 성공 ∧ 그 순간 오너 암전이 켜져 있음(강 시도). 섬광 순간(1~3단계 뒤) = 모든 피어 월드 섬광 + 암순응.
-        float now = Time.unscaledTime;
+        float now = InterruptEffectTime.Now(HitFlash.Clock);
         bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
             viewerIsCaster && OwnerPresentation.SuccessDimmed);
         if (ownerOverlay)
@@ -445,9 +446,12 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         SuccessStage.LocalForcedReset(_darkAdaptation);
     }
 
-    // 섬광 순간(성공 Started + 1~3단계) — 적중 지점 월드 섬광(모든 피어) + 암순응(남 = others, 오버레이 없던 본인 = self).
+    // 섬광 순간(성공 Started + 1~3단계, 진행기 시계) — 오너 암전 끔(본인 화면) + 적중 지점 월드 섬광(모든 피어) + 암순응(남 = others, 오버레이 없던 본인 = self).
     private void HandleHitFlashMoment(InterruptHitFlashMoment moment)
     {
+        if (moment.ViewerIsCaster)
+            _ownerPresentation?.SuccessFlashMoment(moment.Event.TriggerId, Time.unscaledTime);
+
         PlayWorldFlash(FlashPoint(moment.Event.TargetPosition));
 
         // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다.

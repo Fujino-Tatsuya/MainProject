@@ -25,16 +25,17 @@ public sealed class InterruptHitFlashTests
         public float Invert = 0.125f;
         public float Return = 0.125f;
         public bool SpeedLines = true;
+        public InterruptEffectTimeBase TimeBase = InterruptEffectTimeBase.Scaled;
 
         public float HitFlashBurstDuration => Burst;
         public float HitFlashGlareDuration => Glare;
         public float HitFlashInvertDuration => Invert;
         public float HitFlashReturnDuration => Return;
         public bool HitFlashSpeedLines => SpeedLines;
+        public InterruptEffectTimeBase HitFlashTimeBase => TimeBase;
 
         public float OwnerDimInDuration => 0.125f;
         public float OwnerDimOutDuration => 0.25f;
-        public float OwnerSuccessDimReleaseDelay => InterruptHitFlashTimeline.From(this).FlashMoment;
     }
 
     private sealed class FakeOverlay : IInterruptHitFlashOverlayOutput
@@ -149,7 +150,7 @@ public sealed class InterruptHitFlashTests
     [Test]
     public void 오버레이는_성공_Started_순간_1단계부터_히트스톱_길이와_무관()
     {
-        // 히트스톱(스케일 시간 정지)은 진행에 쓰지 않는다 — 실시간 now 만 본다. Started 순간 바로 1단계.
+        // 히트스톱 길이와 상관없이 Started 순간 바로 1단계(진행 빠르기는 진행기 시계 — 아래 '배율 곡선' 테스트).
         _sequencer.BeginOwnerOverlay(Target, 20f);
         Assert.IsTrue(_sequencer.OverlayActive);
         Assert.AreEqual(InterruptHitFlashStage.Burst, _overlay.Stage);
@@ -159,7 +160,7 @@ public sealed class InterruptHitFlashTests
     }
 
     [Test]
-    public void 오버레이_단계가_실시간으로_넘어가고_끝나면_한_번_숨긴다()
+    public void 오버레이_단계가_진행기_시계로_넘어가고_끝나면_한_번_숨긴다()
     {
         _sequencer.BeginOwnerOverlay(Target, 20f);
         _sequencer.Tick(20.1875f);
@@ -272,27 +273,181 @@ public sealed class InterruptHitFlashTests
     [Test]
     public void 오너_암전_걷힘은_섬광_순간과_같은_프레임()
     {
+        // 디렉터와 같은 배선 — 진행기의 섬광 순간이 오너 암전도 끈다(시간표 하나).
         var dim = new FakeDim();
         var owner = new InterruptOwnerPresentation(_settings, dim, dim);
+        var sequencer = new InterruptHitFlashSequencer(_settings, _overlay, m =>
+        {
+            _flashes.Add(m);
+            if (m.ViewerIsCaster)
+                owner.SuccessFlashMoment(m.Event.TriggerId, 0f);
+        });
         owner.Predict(InterruptAttemptForecast.Strong, null, 20f);
         owner.Tick(20.125f);
-        owner.ServerStarted(9, SlowMotionPurpose.Success, true, 20.25f);
+        owner.ServerStarted(7, SlowMotionPurpose.Success, true, 20.25f);
         Assert.IsTrue(InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, true, owner.SuccessDimmed));
 
-        _sequencer.BeginOwnerOverlay(Target, 20.25f);
-        _sequencer.ScheduleFlash(Moment(true, true), 20.25f);
+        sequencer.BeginOwnerOverlay(Target, 20.25f);
+        sequencer.ScheduleFlash(Moment(true, true), 20.25f);
 
         owner.Tick(20.5f);
-        _sequencer.Tick(20.5f);
+        sequencer.Tick(20.5f);
         Assert.AreEqual(1f, dim.Dim, "3단계 흰 반전 동안 암전 유지");
         Assert.AreEqual(InterruptHitFlashStage.Invert, _overlay.Stage);
         Assert.IsEmpty(_flashes);
 
         owner.Tick(20.625f);
-        _sequencer.Tick(20.625f);
+        sequencer.Tick(20.625f);
         Assert.AreEqual(0f, dim.Dim, "4단계 시작 = 암전 즉시 끔");
         Assert.AreEqual(InterruptHitFlashStage.Return, _overlay.Stage);
         Assert.AreEqual(1, _flashes.Count, "같은 순간 월드 섬광");
+    }
+
+    // ─── 시간 기준(할 일 132 §14) ───
+
+    // 성공 프로필(NetworkManager.prefab 값) — 히트스톱 0.05s×0.02 → 진입 0.05s → 유지 0.25 1.2s → 복귀 0.4s.
+    private static SlowMotionProfile SuccessProfile() => new SlowMotionProfile
+    {
+        scale = 0.25f, hitStopDuration = 0.05f, hitStopScale = 0.02f,
+        enterDuration = 0.05f, holdDuration = 1.2f, exitDuration = 0.4f, failExitDuration = 0.1f,
+    };
+
+    private struct CurveRun
+    {
+        public float FirstBurstProgressAfterHitStop; // 히트스톱 끝(실시간 0.05) 1단계 진행도
+        public float[] StageStartReal;               // 단계 1~4 시작·끝(실시간) — [0]=1단계 시작 … [4]=끝
+        public float FlashReal;                       // 섬광 순간(실시간)
+        public float DimOffReal;                      // 오너 암전이 0 이 된 때(실시간)
+    }
+
+    // 실시간 1/1000초 프레임으로 성공 슬로우 곡선을 돌린다 — 진행기는 스케일 시계(실시간 − 덜 흐른 시간), 오너 기계는 실시간.
+    private CurveRun RunUnderSuccessCurve(InterruptEffectTimeBase timeBase)
+    {
+        const double Dt = 0.001;
+        _settings.Burst = _settings.Glare = _settings.Invert = _settings.Return = 0.1f;
+        _settings.TimeBase = timeBase;
+
+        var timeline = new SlowMotionTimeline();
+        timeline.Start(0.0, SuccessProfile());
+        float ClockAt(double t) => timeBase == InterruptEffectTimeBase.Scaled ? (float)(t - timeline.LostTimeUntil(t)) : (float)t;
+
+        var dim = new FakeDim();
+        var owner = new InterruptOwnerPresentation(_settings, dim, dim);
+        var run = new CurveRun { StageStartReal = new float[5], FlashReal = -1f, DimOffReal = -1f };
+        double now = 0.0;
+        var sequencer = new InterruptHitFlashSequencer(_settings, _overlay, m =>
+        {
+            run.FlashReal = (float)now;
+            if (m.ViewerIsCaster)
+                owner.SuccessFlashMoment(m.Event.TriggerId, (float)now);
+        });
+
+        // 강 시도 → 암전 다 들어온 뒤 성공(실시간 0). 시도 중 암전은 0 → 1 로 이미 올라 있다.
+        owner.Predict(InterruptAttemptForecast.Strong, null, -1f);
+        owner.Tick(-0.5f);
+        owner.ServerStarted(7, SlowMotionPurpose.Success, true, 0f);
+        Assert.AreEqual(timeBase, sequencer.Clock);
+        sequencer.BeginOwnerOverlay(Target, ClockAt(0.0));
+        sequencer.ScheduleFlash(Moment(true, true), ClockAt(0.0));
+
+        InterruptHitFlashStage last = InterruptHitFlashStage.Burst;
+        for (int i = 1; i <= 3000; i++)
+        {
+            now = i * Dt;
+            owner.Tick((float)now);
+            sequencer.Tick(ClockAt(now));
+            if (i == 50)
+                run.FirstBurstProgressAfterHitStop = sequencer.OverlayStage == InterruptHitFlashStage.Burst ? sequencer.OverlayProgress : -1f;
+            if (run.DimOffReal < 0f && dim.Dim <= 0f)
+                run.DimOffReal = (float)now;
+
+            InterruptHitFlashStage stage = sequencer.OverlayStage;
+            if (stage != last)
+            {
+                int index = stage == InterruptHitFlashStage.None ? 4 : (int)stage - 1;
+                run.StageStartReal[index] = (float)now;
+                last = stage;
+            }
+
+            if (stage == InterruptHitFlashStage.None && run.FlashReal >= 0f)
+                break;
+        }
+
+        return run;
+    }
+
+    [Test]
+    public void 스케일_시계면_섬광_단계와_섬광_순간이_성공_슬로우를_따라_늘어난다()
+    {
+        CurveRun run = RunUnderSuccessCurve(InterruptEffectTimeBase.Scaled);
+
+        // 히트스톱(0.05s×0.02) 동안 스케일 0.001 — 1단계는 1% 만 나아간 채 거의 멈춰 보인다.
+        Assert.AreEqual(0.01f, run.FirstBurstProgressAfterHitStop, 0.002f);
+
+        // 해석값(보고 표): 히트스톱·진입 실시간 0.1 동안 스케일 0.00775, 이후 유지 0.25 — 단계 하나(스케일 0.1) = 실시간 0.4.
+        const float Tol = 0.0025f;
+        Assert.AreEqual(0.469f, run.StageStartReal[1], Tol, "2단계 시작(1단계 실시간 약 0.47s)");
+        Assert.AreEqual(0.869f, run.StageStartReal[2], Tol, "3단계 시작");
+        Assert.AreEqual(1.269f, run.StageStartReal[3], Tol, "4단계 시작 = 섬광 순간");
+        Assert.AreEqual(1.474f, run.StageStartReal[4], Tol, "끝 — 4단계는 복귀 곡선(0.25 → 1)에 걸쳐 약 0.2s");
+
+        Assert.AreEqual(run.StageStartReal[3], run.FlashReal, 1e-6f, "섬광 순간(월드 섬광·암순응) = 진행기 4단계 시작 같은 프레임");
+        Assert.AreEqual(run.FlashReal, run.DimOffReal, 1e-6f, "오너 암전 끔 = 섬광 순간 같은 프레임");
+    }
+
+    [Test]
+    public void 실시간_시계로_되돌리면_슬로우와_무관하게_0_1초씩()
+    {
+        CurveRun run = RunUnderSuccessCurve(InterruptEffectTimeBase.Unscaled);
+        Assert.AreEqual(0.5f, run.FirstBurstProgressAfterHitStop, 0.02f, "히트스톱 중에도 실시간으로 나아간다");
+        Assert.AreEqual(0.1f, run.StageStartReal[1], 0.0015f);
+        Assert.AreEqual(0.3f, run.StageStartReal[3], 0.0015f);
+        Assert.AreEqual(0.4f, run.StageStartReal[4], 0.0015f);
+        Assert.AreEqual(run.FlashReal, run.DimOffReal, 1e-6f);
+    }
+
+    [Test]
+    public void 오너_암전_들어옴과_걷힘은_슬로우_중에도_실시간()
+    {
+        // 들어옴 0.125·걷힘 0.25(실시간) — 진행기 시계와 상관없이 실시간 now 로만 램프한다.
+        var dim = new FakeDim();
+        var owner = new InterruptOwnerPresentation(_settings, dim, dim);
+        owner.Predict(InterruptAttemptForecast.Strong, null, 0f);
+        owner.Tick(0.0625f);
+        Assert.AreEqual(0.5f, dim.Dim, 1e-4f, "들어옴 절반 = 실시간 0.0625s");
+        owner.Tick(0.125f);
+        Assert.AreEqual(1f, dim.Dim);
+
+        owner.ServerStarted(5, SlowMotionPurpose.Attempt, true, 0.125f);
+        owner.ServerFailed(5, 0.25f);
+        owner.Tick(0.375f);
+        Assert.AreEqual(0.5f, dim.Dim, 1e-4f, "걷힘 절반 = 실시간 0.125s");
+        owner.Tick(0.5f);
+        Assert.AreEqual(0f, dim.Dim);
+    }
+
+    [Test]
+    public void 진행기_시계는_쉬는_동안만_칸을_따른다()
+    {
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, _sequencer.Clock, "기본 스케일");
+        _settings.TimeBase = InterruptEffectTimeBase.Unscaled;
+        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, _sequencer.Clock, "쉬는 중엔 바로 따른다");
+
+        _sequencer.ScheduleFlash(Moment(false, false), 0f);
+        _settings.TimeBase = InterruptEffectTimeBase.Scaled;
+        Assert.AreEqual(InterruptEffectTimeBase.Unscaled, _sequencer.Clock, "진행 중 칸을 바꾸면 다음 성공부터");
+
+        _sequencer.Tick(1f);
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, _sequencer.Clock);
+    }
+
+    [Test]
+    public void 시간_기준_시계_선택()
+    {
+        Assert.IsTrue(InterruptEffectTime.UsesUnscaledTime(InterruptEffectTimeBase.Unscaled));
+        Assert.IsFalse(InterruptEffectTime.UsesUnscaledTime(InterruptEffectTimeBase.Scaled));
+        Assert.AreEqual(Time.unscaledTime, InterruptEffectTime.Now(InterruptEffectTimeBase.Unscaled));
+        Assert.AreEqual(Time.time, InterruptEffectTime.Now(InterruptEffectTimeBase.Scaled));
     }
 
     [Test]
@@ -384,7 +539,7 @@ public sealed class InterruptHitFlashTests
     }
 
     [Test]
-    public void 디렉터_섬광_칸_기본값과_암전_끄는_때()
+    public void 디렉터_섬광_칸_기본값()
     {
         var go = Track(new GameObject("Director"));
         var director = go.AddComponent<InterruptProductionDirector>();
@@ -396,7 +551,8 @@ public sealed class InterruptHitFlashTests
         Assert.IsTrue(so.FindProperty("hitFlashSpeedLines").boolValue);
         Assert.AreEqual(1f, so.FindProperty("hitFlashWorldScale").floatValue, 1e-6f);
         Assert.AreEqual(1f, so.FindProperty("hitFlashHeightOffset").floatValue, 1e-6f);
-        Assert.AreEqual(0.3f, director.OwnerSuccessDimReleaseDelay, 1e-5f, "암전 끄는 때 = 섬광 순간");
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, director.HitFlashTimeBase, "진행기 기본 = 스케일 시계");
+        Assert.AreEqual(0.3f, InterruptHitFlashTimeline.From(director).FlashMoment, 1e-5f, "섬광 순간(진행기 시계)");
     }
 
     [Test]
@@ -417,18 +573,20 @@ public sealed class InterruptHitFlashTests
     }
 
     [Test]
-    public void 월드_섬광_프리팹_파티클은_실시간_원샷_계층_스케일()
+    public void 월드_섬광_프리팹_파티클은_스케일_시간_원샷_계층_스케일()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(WorldVfxPath);
         Assert.IsNotNull(prefab, WorldVfxPath);
-        Assert.IsNotNull(prefab.GetComponent<InterruptHitFlashVfx>());
+        var vfx = prefab.GetComponent<InterruptHitFlashVfx>();
+        Assert.IsNotNull(vfx);
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, vfx.TimeBase, "기본 스케일 — 성공 슬로우를 따라 느리게 터진다");
 
         ParticleSystem[] systems = prefab.GetComponentsInChildren<ParticleSystem>(true);
         Assert.GreaterOrEqual(systems.Length, 4, "중심·번짐·광선·링(+불티)");
         foreach (ParticleSystem system in systems)
         {
             ParticleSystem.MainModule main = system.main;
-            Assert.IsTrue(main.useUnscaledTime, system.name + " 실시간 — 성공 슬로우 중에도 같은 빠르기");
+            Assert.IsFalse(main.useUnscaledTime, system.name + " 스케일 시간(재생 때 칸 값으로 다시 넣는다)");
             Assert.IsFalse(main.playOnAwake, system.name);
             Assert.IsFalse(main.loop, system.name);
             Assert.AreEqual(ParticleSystemScalingMode.Hierarchy, main.scalingMode, system.name);

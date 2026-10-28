@@ -15,8 +15,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class InterruptLightGatherVfx : MonoBehaviour
 {
-    [Tooltip("빛 모임 재생 시간 기준 — 실시간(기본): 강 슬로우 0.15·히트스톱 중에도 같은 빠르기 / 스케일: 슬로우를 따라 느려진다")]
-    [SerializeField] private InterruptLightGatherTimeBase timeBase = InterruptLightGatherTimeBase.Unscaled;
+    [Tooltip("빛 모임 재생 시간 기준 — 스케일(기본): 슬로우를 따라 느려진다 / 실시간: 강 슬로우 0.15·히트스톱 중에도 같은 빠르기")]
+    [SerializeField] private InterruptEffectTimeBase timeBase = InterruptEffectTimeBase.Scaled;
 
     [Tooltip("재생할 루트 파티클(자식 포함). 비우면 이 오브젝트의 ParticleSystem")]
     [SerializeField] private ParticleSystem root;
@@ -24,7 +24,7 @@ public sealed class InterruptLightGatherVfx : MonoBehaviour
     private ParticleSystem[] _systems;
     private Transform _anchor;
 
-    public InterruptLightGatherTimeBase TimeBase => timeBase;
+    public InterruptEffectTimeBase TimeBase => timeBase;
 
     /// <summary>방출 중(정지 전).</summary>
     public bool IsEmitting => root != null && root.isEmitting;
@@ -35,7 +35,7 @@ public sealed class InterruptLightGatherVfx : MonoBehaviour
             return;
 
         _systems ??= GetComponentsInChildren<ParticleSystem>(true);
-        bool unscaled = InterruptLightGatherRules.UsesUnscaledTime(timeBase);
+        bool unscaled = InterruptEffectTime.UsesUnscaledTime(timeBase);
         for (int i = 0; i < _systems.Length; i++)
         {
             ParticleSystem.MainModule main = _systems[i].main;

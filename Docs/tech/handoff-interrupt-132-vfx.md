@@ -12,7 +12,8 @@
 | **화면 섬광 오버레이**(1~3단계 + 4 걷힘) — 흰 폭발 / 빛 갈라짐+충격파 링 / 흰 반전+검은 집중선 | 강 시도 성공 때 오너 화면만, 0~0.4초 | `HitFlash/M_InterruptHitFlashOverlay.mat`(디렉터 `hitFlashOverlayMaterial` 칸) | `BeaverLobby/UI/InterruptHitFlashOverlay` |
 
 - 파티클 셰이더 둘 다 **가산 언릿 + HDR `_Color`**(기본 (6,6,6) — 1 넘으면 블룸). 시간은 `_Time` 대신 파티클 나이로 움직여 파티클 시간 기준을 따른다.
-- 빛 모임 시간 기준 = 프리팹 루트 `InterruptLightGatherVfx.timeBase`(기본 **실시간** — 강 슬로우 0.15 중에도 같은 속도). 월드 섬광은 실시간 파티클.
+- 시간 기준 = 프리팹 루트 `InterruptLightGatherVfx.timeBase` · `InterruptHitFlashVfx.timeBase`(둘 다 기본 **스케일** — 슬로우를 따라 느려진다, 할 일 132 §14).
+  재생할 때마다 모든 파티클 `useUnscaledTime` 에 칸 값을 넣으므로 자식 파티클을 더할 때 따로 맞출 필요 없다. 실시간으로 되돌리려면 그 칸만 바꾼다.
 - 섬광 단계 길이(각 0.1초)·월드 섬광 크기(`hitFlashWorldScale`)·높이(`hitFlashHeightOffset` 1m)는 `NetworkManager.prefab › InterruptProductionDirector` 칸이다.
 - `Assets/5.VFX/` 는 **git** 이다(SVN `Assets/50.Art/` 아님) — 손그림 텍스처를 넣으면 텍스처 파일 위치(SVN 아트)와 재질(git) 커밋을 맞출 것.
 

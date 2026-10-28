@@ -22,11 +22,6 @@ public interface IInterruptOwnerPresentationSettings
     float OwnerDimInDuration { get; }
     /// <summary>암전·빛 모임 걷기(예측 빗나감·실패, 초, 실시간).</summary>
     float OwnerDimOutDuration { get; }
-    /// <summary>
-    /// 성공 확정 뒤 오너 암전을 끄는 때(초, 실시간) = 적중 섬광 1~3단계 길이 합(<see cref="InterruptHitFlashTimeline.FlashMoment"/>).
-    /// 흰 반전이 화면을 덮은 채 끝나는 순간이라 램프 없이 즉시 끈다.
-    /// </summary>
-    float OwnerSuccessDimReleaseDelay { get; }
 }
 
 /// <summary>
@@ -35,11 +30,12 @@ public interface IInterruptOwnerPresentationSettings
 /// <item>입력 순간 오너 예측(<see cref="Predict"/>): 강 = 오너 암전 + 빛 모임, 약 = 아무것도 안 켠다(줌·슬로우는 서버 슬로우가 처리), 대상 없음 = 시도로 치지 않는다.</item>
 /// <item>내 시도 슬로우가 시작되면(<see cref="ServerStarted"/>) 목적(Attempt = 강 / AttemptWeak = 약)이 예측과 다르면 걷는다.</item>
 /// <item>내 시도 슬로우 실패 복귀(<see cref="ServerFailed"/>)·판정 전 종료·거부(<see cref="LocalEnded"/>)면 걷는다.</item>
-/// <item>내 성공 슬로우(<see cref="ServerStarted"/> Success)면 암전 유지로 성공 단계 — 섬광 순간(<see cref="IInterruptOwnerPresentationSettings.OwnerSuccessDimReleaseDelay"/>)에 즉시 끈다.
+/// <item>내 성공 슬로우(<see cref="ServerStarted"/> Success)면 암전 유지로 성공 단계 — 적중 섬광 진행기의 섬광 순간(<see cref="SuccessFlashMoment"/>)에 즉시 끈다.
 /// 그 순간 암전이 켜져 있었는지(<see cref="SuccessDimmed"/>)로 디렉터가 섬광 오버레이를 튼다.</item>
 /// <item>빛 모임 끝 = 오너 애니 Hit 이벤트(<see cref="LocalHit"/>). 강제 리셋(<see cref="ForcedReset"/>)은 즉시 0.</item>
 /// </list>
-/// 시각(now)은 실시간(Time.unscaledTime) — 슬로우 중에도 걷기 0.2초가 그대로다. 팀원 화면은 이 기계를 타지 않는다.
+/// 시각(now)은 실시간(Time.unscaledTime) — 슬로우 중에도 들어옴 0.1·걷기 0.2초가 그대로다. 성공 암전을 끄는 때만 진행기 시계(기본 스케일)를 따르는데,
+/// 이 기계가 따로 재지 않고 진행기 사건을 받는다(시간표 하나, 할 일 132 §14). 팀원 화면은 이 기계를 타지 않는다.
 /// </summary>
 public sealed class InterruptOwnerPresentation
 {
@@ -55,7 +51,7 @@ public sealed class InterruptOwnerPresentation
     private float _pushedDim;
 
     private bool _strongStanding;   // 이 시도가 강으로 남아 있다(예측 강 ∧ 서버 목적이 어긋나지 않음) — 실패 직후 같은 판정 성공이면 암전을 되살린다
-    private float _successReleaseAt = -1f;
+    private bool _awaitingFlash;    // 성공 암전이 섬광 순간을 기다린다
     private PlayerInterruptSkillBase _skill;
 
     public InterruptOwnerPresentation(IInterruptOwnerPresentationSettings settings,
@@ -79,6 +75,9 @@ public sealed class InterruptOwnerPresentation
 
     /// <summary>마지막 서버 확정 성공에 들어선 순간 암전이 켜져 있었다(강 시도) — 적중 섬광 오버레이 조건. 새 시도·리셋에 false.</summary>
     public bool SuccessDimmed { get; private set; }
+
+    /// <summary>마지막 서버 확정 성공의 발동 번호 — 그 성공의 섬광 순간만 암전을 끈다(새 성공이 오면 새 섬광 순간을 기다린다).</summary>
+    public uint SuccessTriggerId { get; private set; }
 
     /// <summary>강 시도가 결론(성공·실패·판정 전 종료) 전이다 — 오너 줌이 시도 복귀 중에도 줌을 붙잡는 조건(할 일 132).</summary>
     public bool AwaitsStrongResult => State == InterruptOwnerPresentationState.AttemptStrong;
@@ -120,7 +119,7 @@ public sealed class InterruptOwnerPresentation
         Mispredicted = false;
         AttemptTriggerId = 0;
         _strongStanding = predictsSuccess;
-        _successReleaseAt = -1f;
+        _awaitingFlash = false;
         SuccessDimmed = false;
         State = predictsSuccess ? InterruptOwnerPresentationState.AttemptStrong : InterruptOwnerPresentationState.AttemptWeak;
 
@@ -149,7 +148,7 @@ public sealed class InterruptOwnerPresentation
 
         if (purpose == SlowMotionPurpose.Success)
         {
-            EnterSuccess(now);
+            EnterSuccess(triggerId, now);
             return;
         }
 
@@ -192,6 +191,20 @@ public sealed class InterruptOwnerPresentation
         FadeOut(now);
     }
 
+    /// <summary>
+    /// [오너] 적중 섬광 진행기의 섬광 순간(성공 Started + 섬광 1~3단계, 진행기 시계) — 이번 성공(<paramref name="triggerId"/>)의 암전을 램프 없이 끈다.
+    /// 흰 반전(3단계)이 화면을 덮은 채 끝나는 순간이다. 다른 성공·성공 단계 밖이면 무시한다.
+    /// </summary>
+    public void SuccessFlashMoment(uint triggerId, float now)
+    {
+        if (!_awaitingFlash || State != InterruptOwnerPresentationState.Success || triggerId != SuccessTriggerId)
+            return;
+
+        _awaitingFlash = false;
+        RampTo(0f, 0f, now);
+        Tick(now);
+    }
+
     /// <summary>[오너] 애니 Hit 이벤트 — 빛 모임 끝.</summary>
     public void LocalHit()
     {
@@ -204,7 +217,7 @@ public sealed class InterruptOwnerPresentation
         SetGather(false);
         _dimFrom = _dimTo = 0f;
         _rampDuration = 0f;
-        _successReleaseAt = -1f;
+        _awaitingFlash = false;
         SuccessDimmed = false;
         _strongStanding = false;
         AttemptTriggerId = 0;
@@ -212,20 +225,13 @@ public sealed class InterruptOwnerPresentation
         PushValue(0f);
     }
 
-    /// <summary>매 프레임(실시간) — 램프 진행·성공 섬광 순간 암전 끄기·걷기 끝나면 없음으로.</summary>
+    /// <summary>매 프레임(실시간) — 램프 진행·걷기(또는 섬광 순간 끄기) 끝나면 없음으로.</summary>
     public void Tick(float now)
     {
-        if (State == InterruptOwnerPresentationState.Success && _successReleaseAt >= 0f && now >= _successReleaseAt)
-        {
-            // 흰 반전(섬광 3단계)이 화면을 덮은 채 끝나는 순간 — 램프 없이 끈다.
-            _successReleaseAt = -1f;
-            RampTo(0f, 0f, now);
-        }
-
         Push(now);
 
         bool concluded = State == InterruptOwnerPresentationState.Failed ||
-                         (State == InterruptOwnerPresentationState.Success && _successReleaseAt < 0f);
+                         (State == InterruptOwnerPresentationState.Success && !_awaitingFlash);
         if (concluded && _pushedDim <= 0f && DimAt(now) <= 0f)
         {
             State = InterruptOwnerPresentationState.None;
@@ -233,23 +239,18 @@ public sealed class InterruptOwnerPresentation
         }
     }
 
-    private void EnterSuccess(float now)
+    private void EnterSuccess(uint triggerId, float now)
     {
         // 같은 판정에서 실패 복귀가 성공 바로 앞에 한 번 날 수 있다(예측 대기 밖 성공) — 강이 살아 있으면 암전을 되살린다.
         // 약 시도의 성공은 끌 암전이 없다(섬광 오버레이도 없다).
         bool dimmed = _strongStanding;
         State = InterruptOwnerPresentationState.Success;
         SuccessDimmed = dimmed;
+        SuccessTriggerId = triggerId;
+        _awaitingFlash = dimmed;
         SetGather(false);
         if (dimmed)
-        {
             RampTo(1f, _settings.OwnerDimInDuration, now);
-            _successReleaseAt = now + Mathf.Max(0f, _settings.OwnerSuccessDimReleaseDelay);
-        }
-        else
-        {
-            _successReleaseAt = -1f;
-        }
 
         Push(now);
     }

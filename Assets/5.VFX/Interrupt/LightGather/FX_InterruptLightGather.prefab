@@ -51,7 +51,7 @@ ParticleSystem:
   looping: 1
   prewarm: 0
   playOnAwake: 0
-  useUnscaledTime: 1
+  useUnscaledTime: 0
   autoRandomSeed: 1
   startDelay:
     serializedVersion: 2
@@ -4948,7 +4948,7 @@ ParticleSystem:
   looping: 1
   prewarm: 0
   playOnAwake: 0
-  useUnscaledTime: 1
+  useUnscaledTime: 0
   autoRandomSeed: 1
   startDelay:
     serializedVersion: 2
@@ -9803,7 +9803,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 16eb1448b548c5b49b7190a4cdad6896, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptLightGatherVfx
-  timeBase: 0
+  timeBase: 1
   root: {fileID: 5018102965146560167}
 --- !u!1 &9219335061595222016
 GameObject:
@@ -9856,7 +9856,7 @@ ParticleSystem:
   looping: 1
   prewarm: 0
   playOnAwake: 0
-  useUnscaledTime: 1
+  useUnscaledTime: 0
   autoRandomSeed: 1
   startDelay:
     serializedVersion: 2

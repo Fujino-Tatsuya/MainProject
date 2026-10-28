@@ -36,7 +36,6 @@ public sealed class InterruptLightGatherTests
     {
         public float OwnerDimInDuration => 0.125f;
         public float OwnerDimOutDuration => 0.25f;
-        public float OwnerSuccessDimReleaseDelay => 0.5f;
     }
 
     private readonly List<Object> _created = new List<Object>();
@@ -339,16 +338,7 @@ public sealed class InterruptLightGatherTests
         Assert.AreSame(first, second, "매 재생 생성 금지 — 재사용");
 
         foreach (ParticleSystem ps in first.GetComponentsInChildren<ParticleSystem>(true))
-            Assert.IsTrue(ps.main.useUnscaledTime, $"{ps.name} — 기본 실시간");
-    }
-
-    // ─── 시간 기준 ───
-
-    [Test]
-    public void 시간_기준_실시간이면_unscaled()
-    {
-        Assert.IsTrue(InterruptLightGatherRules.UsesUnscaledTime(InterruptLightGatherTimeBase.Unscaled));
-        Assert.IsFalse(InterruptLightGatherRules.UsesUnscaledTime(InterruptLightGatherTimeBase.Scaled));
+            Assert.IsFalse(ps.main.useUnscaledTime, $"{ps.name} — 기본 스케일 시간(슬로우를 따라 느려진다)");
     }
 
     // ─── 덮어쓸 텍스처 → 절차 생성 키워드 ───
@@ -424,7 +414,7 @@ public sealed class InterruptLightGatherTests
     {
         var vfx = AssetDatabase.LoadAssetAtPath<InterruptLightGatherVfx>(VfxPrefabPath);
         Assert.IsNotNull(vfx, VfxPrefabPath);
-        Assert.AreEqual(InterruptLightGatherTimeBase.Unscaled, vfx.TimeBase, "기본 실시간 — 강 슬로우 0.15 중에도 보이게");
+        Assert.AreEqual(InterruptEffectTimeBase.Scaled, vfx.TimeBase, "기본 스케일 — 강 슬로우 0.15 를 따라 느려진다(할 일 132 §14)");
 
         var so = new SerializedObject(vfx);
         Assert.AreSame(vfx.GetComponent<ParticleSystem>(), so.FindProperty("root").objectReferenceValue);

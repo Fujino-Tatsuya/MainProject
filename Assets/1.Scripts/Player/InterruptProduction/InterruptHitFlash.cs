@@ -19,18 +19,21 @@ public enum InterruptHitFlashStage
 /// <summary>적중 섬광 칸(할 일 132 단계 5) — 디렉터가 구현하고, 성공 사건마다 읽는다(캐싱 없음).</summary>
 public interface IInterruptHitFlashSettings
 {
-    /// <summary>단계 길이(초, 실시간). 0 = 그 단계 건너뜀.</summary>
+    /// <summary>단계 길이(초, <see cref="HitFlashTimeBase"/> 시계). 0 = 그 단계 건너뜀.</summary>
     float HitFlashBurstDuration { get; }
     float HitFlashGlareDuration { get; }
     float HitFlashInvertDuration { get; }
     float HitFlashReturnDuration { get; }
     /// <summary>3단계 검은 집중선.</summary>
     bool HitFlashSpeedLines { get; }
+    /// <summary>진행기 시계(할 일 132 §14) — 스케일(기본) = 성공 슬로우·히트스톱을 따라 느려진다. 섬광 순간도 이 시계다.</summary>
+    InterruptEffectTimeBase HitFlashTimeBase { get; }
 }
 
 /// <summary>
-/// 적중 섬광 시간표(할 일 132 단계 5) — 성공 순간 칸을 한 번 복사한다. 시각은 성공 Started 기준 경과(실시간 초).
+/// 적중 섬광 시간표(할 일 132 단계 5) — 성공 순간 칸을 한 번 복사한다. 시각은 성공 Started 기준 경과(진행기 시계 초).
 /// 히트스톱은 성공 Started 순간부터라 1단계는 늘 히트스톱 안에서 시작한다(히트스톱 길이 0 이어도 같은 순간).
+/// 스케일 시계면 1단계는 히트스톱(0.02배) 동안 거의 멈춰 있다.
 /// </summary>
 public readonly struct InterruptHitFlashTimeline
 {
@@ -177,14 +180,15 @@ public static class InterruptHitFlashRules
 }
 
 /// <summary>
-/// 적중 섬광 진행기(할 일 132 단계 5) — 순수 로직. 디렉터가 성공 단계(purpose==Success) 안에서 사건을 넘기고 매 프레임(실시간) Tick 한다.
+/// 적중 섬광 진행기(할 일 132 단계 5) — 순수 로직. 디렉터가 성공 단계(purpose==Success) 안에서 사건을 넘기고 매 프레임 Tick 한다.
+/// 시각(now)은 모두 <see cref="Clock"/> 시계 — 디렉터가 <see cref="InterruptEffectTime.Now"/> 로 읽어 넘긴다(할 일 132 §14).
 /// <list type="bullet">
 /// <item>오너 오버레이(<see cref="BeginOwnerOverlay"/>): 1~4단계를 출력에 넘기고 끝나면 숨긴다. 새 성공이 오면 처음부터.</item>
-/// <item>섬광 순간(<see cref="ScheduleFlash"/>): 모든 피어가 성공 Started + 1~3단계 길이 뒤에 <c>onFlash</c> 를 부른다(월드 섬광·암순응).
+/// <item>섬광 순간(<see cref="ScheduleFlash"/>): 모든 피어가 성공 Started + 1~3단계 길이 뒤에 <c>onFlash</c> 를 부른다(월드 섬광·암순응·오너 암전 끔).
 ///       여러 발동자의 성공은 각각 따로 온다.</item>
 /// <item>강제 리셋(<see cref="ForcedReset"/>): 오버레이 즉시 끔, 남은 섬광 순간 취소.</item>
 /// </list>
-/// 오너 암전 걷힘은 오너 상태 기계(<see cref="InterruptOwnerPresentation"/>)가 같은 섬광 순간(<see cref="InterruptHitFlashTimeline.FlashMoment"/>)에 한다.
+/// 오너 암전 끄기는 이 진행기의 섬광 순간(<c>onFlash</c>)에 디렉터가 오너 상태 기계에 알린다 — 시간표는 이 진행기 하나다.
 /// </summary>
 public sealed class InterruptHitFlashSequencer
 {
@@ -204,6 +208,7 @@ public sealed class InterruptHitFlashSequencer
     private float _overlayStart;
     private Vector3 _overlayCenter;
     private bool _overlaySpeedLines;
+    private InterruptEffectTimeBase _clock = InterruptEffectTimeBase.Scaled;
 
     public InterruptHitFlashSequencer(IInterruptHitFlashSettings settings, IInterruptHitFlashOverlayOutput overlay,
         Action<InterruptHitFlashMoment> onFlash)
@@ -218,6 +223,20 @@ public sealed class InterruptHitFlashSequencer
     public InterruptHitFlashStage OverlayStage { get; private set; }
     public float OverlayProgress { get; private set; }
     public int PendingFlashCount => _pending.Count;
+
+    /// <summary>
+    /// 진행기 시계 — 쉬는 동안(오버레이·남은 섬광 순간 없음)만 칸(<see cref="IInterruptHitFlashSettings.HitFlashTimeBase"/>)을 따라간다.
+    /// 진행 중에 칸을 바꾸면 다음 성공부터(두 시계는 값이 달라 섞으면 단계가 튄다).
+    /// </summary>
+    public InterruptEffectTimeBase Clock
+    {
+        get
+        {
+            if (!OverlayActive && _pending.Count == 0 && _settings != null)
+                _clock = _settings.HitFlashTimeBase;
+            return _clock;
+        }
+    }
 
     /// <summary>오버레이 출력 교체(디버그·테스트). 돌던 오버레이는 옛 출력에서 숨긴다.</summary>
     public void SetOverlayOutput(IInterruptHitFlashOverlayOutput overlay)
@@ -250,7 +269,7 @@ public sealed class InterruptHitFlashSequencer
         _pending.Add(new Pending { Due = due, Moment = moment });
     }
 
-    /// <summary>매 프레임(실시간).</summary>
+    /// <summary>매 프레임(<see cref="Clock"/> 시계).</summary>
     public void Tick(float now)
     {
         if (OverlayActive)
