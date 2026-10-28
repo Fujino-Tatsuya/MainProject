@@ -112,6 +112,31 @@ public static class QABoss103Plan
         return found ? smaller : -1;
     }
 
+    /// <summary>
+    /// 스폰된 플레이어 프리팹 이름(<c>Player_Paladin</c> — Variant 이름 = <c>Player_</c> + 캐릭터, 대소문자 무관) → 캐릭터.
+    /// 그 밖의 이름은 false.
+    /// </summary>
+    public static bool TryCharacterOfPrefab(string prefabName, out QABoss103Character character)
+    {
+        character = default;
+        const string prefix = "Player_";
+        if (string.IsNullOrEmpty(prefabName) || !prefabName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+        string rest = prefabName.Substring(prefix.Length);
+        return !int.TryParse(rest, out _) && Enum.TryParse(rest, true, out character) && Enum.IsDefined(typeof(QABoss103Character), character);
+    }
+
+    /// <summary>
+    /// 할 일 129 — 자리의 기대 캐릭터와 실제 스폰 프리팹 이름이 다르면 판 중단 사유, 같으면 null.
+    /// 모르는 이름도 불일치로 본다(봇이 기대 캐릭터로 취급하면 특성·통계가 오염된다).
+    /// </summary>
+    public static string CharacterMismatch(int slot, QABoss103Character expected, string actualPrefabName)
+    {
+        if (TryCharacterOfPrefab(actualPrefabName, out QABoss103Character actual) && actual == expected)
+            return null;
+        return $"자리 {slot} 캐릭터 불일치 — 기대 {expected} · 실제 {actualPrefabName}";
+    }
+
     // ── 발판 배치 ────────────────────────────────────────────────
 
     /// <summary>발판 안 일렬 배치 간격 기본값(m) — 서로 겹치지 않을 만큼.</summary>

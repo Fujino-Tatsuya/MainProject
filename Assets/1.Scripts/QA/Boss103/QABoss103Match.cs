@@ -142,14 +142,24 @@ public static class QABoss103Match
             }
             List<ulong> ids = SortedClientIds();
             var party = new List<string>();
+            string mismatch = null;
             foreach (Player p in QALobbyFlow.SpawnedPlayers())
             {
-                QABoss103Character ch = cfg.CharacterForSlot(QABoss103Plan.SlotOf(p.OwnerClientId, ids));
+                int slot = QABoss103Plan.SlotOf(p.OwnerClientId, ids);
+                QABoss103Character ch = cfg.CharacterForSlot(slot);
                 characters[p.OwnerClientId] = ch;
                 party.Add($"{p.OwnerClientId}:{ch}:{QALobbyFlow.CleanName(p)}");
+                mismatch ??= QABoss103Plan.CharacterMismatch(slot, ch, QALobbyFlow.CleanName(p));
             }
             Debug.Log($"{Tag} event=run_start run={rec.Run} seed={rec.BaseSeed} runSeed={rec.RunSeed} botTier={rec.BotTier} party={QABoss103Plan.Token(string.Join(",", party))}");
             ctx.Eye("103 파티", string.Join(", ", party));
+            // 할 일 129 — 클라 캐릭터 고정이 안 돌아 기본 캐릭터로 남으면 봇이 다른 캐릭터로 취급한다(특성·통계 오염).
+            if (mismatch != null)
+            {
+                rec.Outcome = QABoss103Outcome.Aborted;
+                rec.Detail = mismatch;
+                yield break;
+            }
 
             // 1) 특성 4라운드.
             QABoss103Heartbeat.SetPhase("traits");
