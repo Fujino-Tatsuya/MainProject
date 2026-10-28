@@ -134,6 +134,7 @@ public sealed class PlayerTraitEffects : MonoBehaviour, ITraitEffectHost
     /// <summary>
     /// [서버] ⑥ 원래 공격 1건이 대상에 들어가기 직전 — 특성 수정자(밀치기)가 공격 정보를 고친다. 파생 공격에는 부르지 않는다(CC 없음).
     /// castId = 그 시전(스킬은 <see cref="PlayerSkillBase.ServerCastId"/>), 대상별 1회는 대상 유닛 단위.
+    /// 대상이 지금 밀치기를 거부하면(<see cref="Unit.AcceptsKnockback"/>) 싣지도 기록하지도 않는다 — 같은 시전의 뒤 발이 다시 시도한다.
     /// </summary>
     public void ModifyOutgoingAttackServer(TraitAttackKey key, int castId, Unit target, Vector3 direction, ref AttackInfo info)
     {
@@ -141,8 +142,7 @@ public sealed class PlayerTraitEffects : MonoBehaviour, ITraitEffectHost
             return;
 
         int targetId = target != null ? target.GetInstanceID() : 0;
-        for (int i = 0; i < attackModifiers.Count; i++)
-            attackModifiers[i].Modify(key, castId, targetId, direction, ref info);
+        TraitAttackModifiers.Apply(attackModifiers, key, castId, targetId, target == null || target.AcceptsKnockback, direction, ref info);
     }
 
     /// <summary>[서버] ⑨ 그 공격 판정에 붙는 다음 공격 강화 배율(없으면 1)을 내고 소모한다. 같은 시전의 다른 대상은 같은 배율.</summary>
@@ -198,7 +198,9 @@ public sealed class PlayerTraitEffects : MonoBehaviour, ITraitEffectHost
             if (other == null || other == player)
                 continue;
 
-            bool eligible = other.isActiveAndEnabled && other.CurrentHealth > 0;
+            bool eligible = TraitHealRules.IsShareRecipientEligible(other.isActiveAndEnabled,
+                other.TryGetComponent(out PlayerLifeCycleController life) ? life.State : PlayerLifeState.Alive,
+                other.TryGetComponent(out PlayerEncounterLock encounterLock) && encounterLock.IsCinematicHidden);
             healCandidates.Add(new TraitHealCandidate(other.OwnerClientId, other.CurrentHealth, other.MaxHp,
                 (other.transform.position - origin).sqrMagnitude, eligible));
             healCandidatePlayers.Add(other);

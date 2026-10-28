@@ -25,6 +25,10 @@ public sealed class SuppressHasteRulesTests
         }
 
         public bool Remove(StatusEffectType type, ulong sourceId) => Effects.Remove((type, sourceId));
+
+        // 진입 쿨 차감(할 일 133)은 PaladinTraitBasicTests 가 본다 — 여기선 쿨 없음.
+        public float GetEffectiveCooldownTime(PlayerSkillSlot slot) => 0f;
+        public void ReduceCooldown(PlayerSkillSlot slot, float seconds) { }
     }
 
     static readonly SuppressHasteValues Values = new SuppressHasteValues(2f, 2f, 2f, 0f);

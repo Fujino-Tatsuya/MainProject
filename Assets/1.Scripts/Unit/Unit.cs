@@ -827,10 +827,16 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     public void Knockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
-        if (HasSuperArmor) return;
+        if (!AcceptsKnockback) return;
 
         OnKnockback(direction, strength);
     }
+
+    /// <summary>
+    /// 지금 밀치기를 받는가 — <see cref="Knockback"/> 가드와 같은 판정(슈퍼아머 = 공격별 OR 보스 상태별이면 거부).
+    /// 특성 밀치기의 '시전당 대상별 1회' 기록이 거부된 대상을 쓰지 않게 미리 묻는다(할 일 133).
+    /// </summary>
+    public bool AcceptsKnockback => !HasSuperArmor;
 
     protected virtual void OnKnockback(Vector3 direction, float strength)
     {

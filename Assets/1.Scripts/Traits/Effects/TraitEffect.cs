@@ -140,6 +140,24 @@ public interface ITraitAttackModifier
     void Modify(TraitAttackKey key, int castId, int targetId, Vector3 direction, ref AttackInfo info);
 }
 
+/// <summary>⑥ 수정자 목록을 한 대상에 거친다 — 서버 허브(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/>)와 테스트가 같은 경로를 쓴다.</summary>
+public static class TraitAttackModifiers
+{
+    /// <summary>
+    /// 대상이 지금 밀치기를 거부하면(<see cref="Unit.AcceptsKnockback"/> false — 보스 슈퍼아머 등) 아무 수정자도 부르지 않는다 —
+    /// '시전당 대상별 1회' 기록이 남지 않아 같은 시전의 뒤 발이 다시 시도할 수 있다(할 일 133). 지금 수정자는 밀치기뿐이다.
+    /// </summary>
+    public static void Apply(IReadOnlyList<ITraitAttackModifier> modifiers, TraitAttackKey key, int castId, int targetId,
+        bool targetAcceptsKnockback, Vector3 direction, ref AttackInfo info)
+    {
+        if (modifiers == null || !targetAcceptsKnockback)
+            return;
+
+        for (int i = 0; i < modifiers.Count; i++)
+            modifiers[i].Modify(key, castId, targetId, direction, ref info);
+    }
+}
+
 /// <summary>
 /// 이벤트형 효과의 발동 조건 — 사건 종류 + 공격 키 거름 + '시전당 1회'·'간격'(<see cref="TraitProcGate"/>).
 /// 빈 배열 = 전부. requireTriggersOnHit = "적중 시 발동" 공격만(평타 스텝·스킬 데이터의 TriggersOnHit).

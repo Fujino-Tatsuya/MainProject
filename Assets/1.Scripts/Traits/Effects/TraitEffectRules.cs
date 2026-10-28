@@ -242,6 +242,14 @@ public static class TraitHealRules
     public static int Transfer(int overflow, float ratio) => RoundHalfUp(Math.Max(0, overflow) * Math.Max(0f, ratio));
 
     /// <summary>
+    /// 초과 회복 받을 아군 자격(<see cref="TraitHealCandidate.Eligible"/>) — 활성 · 생존(<see cref="PlayerLifeState.Alive"/>) · 같은 전투 공간.
+    /// 쓰러짐(DeadPresentation·Soul)·관전(PermanentDead) 제외. 같은 전투 공간 = 연출 숨김(<see cref="PlayerEncounterLock.IsCinematicHidden"/> —
+    /// 엘리베이터·포드 안에서 필드 밖에 있는 동안) 아님. 범위(12m)·체력 미만은 <see cref="PickOverflowRecipient"/> 가 본다.
+    /// </summary>
+    public static bool IsShareRecipientEligible(bool activeAndEnabled, PlayerLifeState lifeState, bool cinematicHidden) =>
+        activeAndEnabled && lifeState == PlayerLifeState.Alive && !cinematicHidden;
+
+    /// <summary>
     /// 초과 회복 받을 아군 — 자격·범위 안·체력이 최대 미만 중 HP/MaxHP 최소, 동률은 잃은 체력 큰 순, 그다음 Id 작은 순. 없으면 -1.
     /// </summary>
     public static int PickOverflowRecipient(IReadOnlyList<TraitHealCandidate> candidates, float range)

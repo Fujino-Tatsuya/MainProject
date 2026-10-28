@@ -253,9 +253,55 @@ public sealed class PaladinTraitBasicTests
         host.Raise(Guard(1));
         Assert.AreEqual(2f, host.Remaining[PlayerSkillSlot.Sub], Eps, "고정 차감이 제압 차감보다 먼저(명세 §6 틱 순서)");
 
-        float suppressEntry = full * 0.5f;
-        Assert.AreEqual(2.975f, suppressEntry, Eps, "제압 차감은 전체 시간의 절반 — 남은 시간의 절반이 아님");
-        Assert.AreEqual(0f, TraitCooldownRefundRules.Reduce(host.Remaining[PlayerSkillSlot.Sub], suppressEntry), Eps);
+        Assert.AreEqual(2.975f, SuppressHasteRules.EntryCooldownReduction(full), Eps, "제압 차감은 전체 시간의 절반 — 남은 시간의 절반이 아님");
+
+        // 실제 제압 진입 경로(SuppressHasteRules.Grant — 23호 SuppressStarted → SuppressHaste.GrantServer)
+        var target = new FakeSuppressTarget(host);
+        target.Full[PlayerSkillSlot.Sub] = full;
+        Assert.AreEqual(1, SuppressHasteRules.Grant(new[] { target }, SuppressHasteValues.Default, 1, 5f));
+        Assert.AreEqual(0f, host.Remaining[PlayerSkillSlot.Sub], Eps, "§10 검산 — 남은 0초");
+    }
+
+    [Test]
+    public void SuppressEntry_ReducesQERightClickByHalfOfFull_NotUltimate_Once()
+    {
+        var host = new FakeHost();
+        host.Remaining[PlayerSkillSlot.Main] = 5f;
+        host.Remaining[PlayerSkillSlot.Sub] = 1f;
+        host.Remaining[PlayerSkillSlot.Interrupt] = 6f;
+        host.Remaining[PlayerSkillSlot.Ultimate] = 30f;
+        var target = new FakeSuppressTarget(host);
+        target.Full[PlayerSkillSlot.Main] = 8f;
+        target.Full[PlayerSkillSlot.Sub] = 7f;
+        target.Full[PlayerSkillSlot.Interrupt] = 10f;
+        target.Full[PlayerSkillSlot.Ultimate] = 40f;
+
+        SuppressHasteRules.Grant(new[] { target }, SuppressHasteValues.Default, 1, 5f);
+
+        Assert.AreEqual(1f, host.Remaining[PlayerSkillSlot.Main], Eps, "Q 5 − 전체 8 × 0.5");
+        Assert.AreEqual(0f, host.Remaining[PlayerSkillSlot.Sub], Eps, "0 아래 없음");
+        Assert.AreEqual(1f, host.Remaining[PlayerSkillSlot.Interrupt], Eps, "우클릭 6 − 전체 10 × 0.5");
+        Assert.AreEqual(30f, host.Remaining[PlayerSkillSlot.Ultimate], Eps, "R 제외");
+
+        target.State = PlayerLifeState.Soul;
+        host.Remaining[PlayerSkillSlot.Main] = 5f;
+        SuppressHasteRules.Grant(new[] { target }, SuppressHasteValues.Default, 1, 5f);
+        Assert.AreEqual(5f, host.Remaining[PlayerSkillSlot.Main], Eps, "쓰러진 대상은 버프·차감 둘 다 없음");
+    }
+
+    sealed class FakeSuppressTarget : ISuppressHasteTarget
+    {
+        private readonly FakeHost host;
+        public readonly Dictionary<PlayerSkillSlot, float> Full = new Dictionary<PlayerSkillSlot, float>();
+        public PlayerLifeState State = PlayerLifeState.Alive;
+
+        public FakeSuppressTarget(FakeHost host) => this.host = host;
+
+        public PlayerLifeState LifeState => State;
+        public void Apply(StatusEffectType type, float magnitude, float duration, ulong sourceId, int maxStacks) { }
+        public bool Remove(StatusEffectType type, ulong sourceId) => false;
+        public float GetEffectiveCooldownTime(PlayerSkillSlot slot) => Full.TryGetValue(slot, out float f) ? f : 0f;
+        public void ReduceCooldown(PlayerSkillSlot slot, float seconds) => host.ReduceCooldown(slot, seconds);
     }
 
     [Test]
@@ -333,6 +379,25 @@ public sealed class PaladinTraitBasicTests
         Assert.AreEqual(1, Pick(C(1, 0, 1000, 1), C(2, 900, 1000, 1)), "사망(HP 0) 제외");
         Assert.AreEqual(-1, Pick(C(1, 1000, 1000, 1), C(2, 100, 1000, 20)), "유효 대상 없음 = 버림");
         Assert.AreEqual(-1, Pick(), "아군 없음(솔로) = 버림");
+    }
+
+    [TestCase(true, PlayerLifeState.Alive, false, true, TestName = "ShareHeal_Eligible_AliveSameSpace")]
+    [TestCase(true, PlayerLifeState.DeadPresentation, false, false, TestName = "ShareHeal_Eligible_DownedExcluded")]
+    [TestCase(true, PlayerLifeState.Soul, false, false, TestName = "ShareHeal_Eligible_SoulExcluded")]
+    [TestCase(true, PlayerLifeState.PermanentDead, false, false, TestName = "ShareHeal_Eligible_SpectatorExcluded")]
+    [TestCase(true, PlayerLifeState.Alive, true, false, TestName = "ShareHeal_Eligible_OtherSpaceHiddenExcluded")]
+    [TestCase(false, PlayerLifeState.Alive, false, false, TestName = "ShareHeal_Eligible_InactiveExcluded")]
+    public void ShareHeal_RecipientEligibility(bool active, PlayerLifeState state, bool hidden, bool expected)
+    {
+        Assert.AreEqual(expected, TraitHealRules.IsShareRecipientEligible(active, state, hidden));
+
+        // 자격 없는 아군이 비율이 더 낮아도 다음 자격자에게 간다
+        var candidates = new[]
+        {
+            new TraitHealCandidate(1, 100, 1000, 1f, TraitHealRules.IsShareRecipientEligible(active, state, hidden)),
+            new TraitHealCandidate(2, 900, 1000, 1f, TraitHealRules.IsShareRecipientEligible(true, PlayerLifeState.Alive, false)),
+        };
+        Assert.AreEqual(expected ? 0 : 1, TraitHealRules.PickOverflowRecipient(candidates, 12f));
     }
 
     [Test]

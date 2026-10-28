@@ -252,7 +252,7 @@ public sealed class TraitEffectTests
         new TraitCooldownRefundEffect(new TraitTriggerFilter(TraitTrigger.GuardSucceeded), 2f, new[] { PlayerSkillSlot.Sub })
             .BindServer(host, 1);
         host.Raise(Guard(1));
-        Assert.AreEqual(0f, TraitCooldownRefundRules.Reduce(host.Remaining[PlayerSkillSlot.Sub], 5.95f * 0.5f));
+        Assert.AreEqual(0f, TraitCooldownRefundRules.Reduce(host.Remaining[PlayerSkillSlot.Sub], SuppressHasteRules.EntryCooldownReduction(5.95f)));
     }
 
     [Test]
@@ -486,6 +486,27 @@ public sealed class TraitEffectTests
 
         binding.Unbind();
         Assert.IsEmpty(host.AttackModifiers);
+    }
+
+    [Test]
+    public void Knockback_RejectedBySuperArmor_NotRecorded_LaterHitSameCastRetries()
+    {
+        // 할 일 133 — 보스가 슈퍼아머로 밀치기를 거부하면 '시전당 대상별 1회' 기록을 남기지 않는다.
+        var host = new FakeHost();
+        new TraitKnockbackEffect(2f, 0.2f, 0f, new[] { AttackType.SkillQ }).BindServer(host, 1);
+        var q = new TraitAttackKey(AttackType.SkillQ);
+
+        AttackInfo rejected = new AttackInfo(10, AttackType.SkillQ);
+        TraitAttackModifiers.Apply(host.AttackModifiers, q, 1, 100, false, Vector3.forward, ref rejected);
+        Assert.AreEqual(0f, rejected.knockbackStrength, "거부 중 = 싣지 않는다");
+
+        AttackInfo retry = new AttackInfo(10, AttackType.SkillQ);
+        TraitAttackModifiers.Apply(host.AttackModifiers, q, 1, 100, true, Vector3.forward, ref retry);
+        Assert.Greater(retry.knockbackStrength, 0f, "같은 시전의 뒤 발 = 다시 시도해 적용");
+
+        AttackInfo again = new AttackInfo(10, AttackType.SkillQ);
+        TraitAttackModifiers.Apply(host.AttackModifiers, q, 1, 100, true, Vector3.forward, ref again);
+        Assert.AreEqual(0f, again.knockbackStrength, "적용된 뒤엔 같은 시전·같은 대상 1회");
     }
 
     [Test]

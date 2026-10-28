@@ -230,7 +230,8 @@ public sealed class TraitShieldEffect : TraitTriggeredEffect
 /// ⑥ 적중 시 밀치기 — 돌파의 방패·수호의 파동·충격 레이저·급소 파괴(+ 제압의 진격 = 뇌진탕 옵션 <c>concussionDuration</c>).
 /// 지금은 <see cref="AttackInfo"/> 의 넉백(+경직·뇌진탕) 경로로 건다. 경직은 0 이어도 된다 — 23호도 넉백 세기만으로 취약 밀림이 걸린다(할 일 134).
 /// 보스 쪽 거부 규칙(상태별 슈퍼아머)·23호 넉백 입구(Unit.Knockback → OnKnockback)는 134 로 들어왔다 — 직접 걸기로 바꿀 때도 <see cref="ApplyCrowdControl"/> 한 곳만 고친다.
-/// 보스 상태를 묻지 않는다 — 걸고, 대상의 기존 거부 규칙에 맡긴다. 시전당 대상별 1회.
+/// 보스 상태를 묻지 않는다 — 걸고, 대상의 기존 거부 규칙에 맡긴다. 시전당 대상별 1회 — 밀치기를 받는 대상에만 기록한다
+/// (슈퍼아머로 거부 중이면 허브가 부르지 않는다, <see cref="TraitAttackModifiers.Apply"/>).
 /// </summary>
 [Serializable]
 public sealed class TraitKnockbackEffect : TraitEffect
