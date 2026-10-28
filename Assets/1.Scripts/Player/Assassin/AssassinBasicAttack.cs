@@ -8,7 +8,7 @@ using UnityEngine;
 /// 입력과 방향은 오너가 보내며(눌림은 바뀔 때 즉시 + 눌린 동안 주기 신호) 시작/예약 승인(서버 자기 애니 진행 기준),
 /// 연결 판단, 판정, 피해는 서버가 담당한다.
 /// 모드는 <see cref="AssassinState"/> 로 고른다 — 변신 중 = Speed_Attack_Loop 4타 묶음, 일반 E 강화 준비 = 강타 1회, 그 외 = 일반 4타.
-/// 일반 타는 매 타 시작 때 짧게 전진한다(할 일 96) — 이동 입력이 있으면 그 방향, 없으면 조준. 몸·판정·전진이 같은 방향이다.
+/// 일반 타는 매 타 시작 때 짧게 전진한다(할 일 96) — 방향은 모든 모드가 조준(할 일 137). 몸·판정·전진이 같은 방향이다.
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
@@ -66,7 +66,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private int hitsFired;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
-    // 이 타의 방향 — 몸 회전·판정·전진이 모두 이 값이다(일반 타는 이동 입력 우선, AssassinAttackDirectionRules).
+    // 이 타의 방향 — 몸 회전·판정·전진이 모두 이 값이다(모든 모드 조준, AssassinAttackDirectionRules).
     private Vector3 attackDirection;
     // [서버] 다음 타 재료 — 조준과 이동 입력(없으면 0)을 따로 들고, 다음 타 모드가 정해진 뒤 방향을 고른다.
     private Vector3 serverNextAim;
@@ -360,7 +360,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     /// <summary>
     /// [서버] 모드를 골라 첫 타(또는 다음 타·다음 묶음)를 시작한다. 실패하면 오너 요청을 거절한다.
-    /// 방향은 모드가 정해진 뒤 고른다 — 일반 타는 이동 입력 우선, 강타·변신 묶음은 조준(AssassinAttackDirectionRules).
+    /// 방향은 모드와 무관하게 조준이다(AssassinAttackDirectionRules, 할 일 137 — 이동 입력은 실려 오지만 쓰지 않는다).
     /// <paramref name="turnDelay"/> 가 없으면 고른 방향으로 서버가 잰다(다음 타).
     /// </summary>
     private bool StartServerAttack(Vector3 aimDirection, Vector3 moveDirection, float? turnDelay)
