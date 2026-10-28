@@ -1,10 +1,10 @@
 # 대쉬 간파 — 대시 시작 직후 우클릭으로 대시하며 간파 준비, 대시 끝 지점에서 판정
 
-> 할 일 115(2026-10-27, 브랜치 `feature/DashInterrupt`). 구현 커밋 C1 `07a85d46` · C2a `f0f56ee2` · C2b `a5af6d8b` · C4(우클릭 → 대시 전환, §2.1).
+> 할 일 115(2026-10-27, 브랜치 `feature/DashInterrupt`). 구현 커밋 C1 `07a85d46` · C2a `f0f56ee2` · C2b `a5af6d8b`. C4(우클릭 → 대시 전환)는 할 일 132 정정2(2026-10-28, 사용자 지시)로 폐기 — §2.1.
 > 설계안: `_lane-artifacts/MainProject-Worktree2/115/115-설계안.md`(레포 밖, §10·§11·§12 확정 절이 우선). 문서와 코드가 다르면 코드가 기준이다.
 > 연출 디렉터는 [interrupt-presentation.md §6](interrupt-presentation.md#6-간파-연출-디렉터--interruptproductiondirector-할-일-118), 입력 거부 피드백은 [skill-reject-feedback.md](skill-reject-feedback.md).
 
-**한 줄 정의**: 대시와 우클릭을 **순서 상관없이** 짧은 창(기본 0.1초) 안에 누르면 — 대시 → 우클릭(§1·§2) 또는 우클릭 → 대시(§2.1) — 대시는 그대로 진행하면서(이동·무적·충돌 그대로) 상체만 간파 준비 자세를 취하고, **대시가 끝나는 지점·대시 방향**에서 간파를 판정한다.
+**한 줄 정의**: **대시 → 우클릭 순서로만**, 대시 시작 후 짧은 창(기본 0.1초) 안에 우클릭을 누르면(§1·§2) 대시는 그대로 진행하면서(이동·무적·충돌 그대로) 상체만 간파 준비 자세를 취하고, **대시가 끝나는 지점·대시 방향**에서 간파를 판정한다.
 
 - 대상: 우클릭 슬롯이 간파 스킬(`PlayerInterruptSkillBase`)인 캐릭터 — 팔라딘·어쌔신·거너. 팔라딘 E 처럼 우클릭이 다른 스킬로 바뀐 동안은 대상이 아니다.
 - `dashInterruptWindow = 0` 이면 기능이 꺼지고 지금과 완전히 같다.
@@ -49,41 +49,14 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - 대시 끝에 실린 간파가 이미 끝났으면(`EndsIntoSkill` 거짓) 기존대로 Idle/Move.
 - 안전망 시간은 승인 때 시작했으므로 Skill 전이 때 실려 있던 시간만큼 늦춘다(`CompleteDashInterruptHandOff`, `activeDashAttachTime`).
 
-## 2.1 우클릭 → 대시 전환 (C4, 설계안 §12)
+## 2.1 우클릭 → 대시 순서 — 대쉬 간파 아님 (C4 전환 폐기, 할 일 132 정정2)
 
-일반 간파가 이미 시작(승인)된 뒤 창 안에 대시를 누르면, **간파를 끝내지 않고 같은 스킬 인스턴스를 대시 상태에 옮겨 실어** 위 §2 의 대쉬 간파 경로로 넘긴다. 일반 간파에 지연(보류 후 결정)은 넣지 않았다 — 우클릭은 언제나 즉시 일반 간파로 나가고, 대시가 오면 그때 '전환'한다.
+2026-10-28 사용자 지시(게임플레이 변경)로 우클릭 → 대시 전환(C4 — 진행 중인 일반 간파를 대시에 옮겨 싣던 경로)을 없앴다. 대쉬 간파는 **대시 → 우클릭 순서만**이다.
 
-```
-Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ 창 && Hit 전 && 대시 가능(기존 대시 게이트)
-   ▼ TryArmDashTransfer → TryBeginPredictedDash(cancelsAction) → BeginDash
- Skill 상태 Exit(Dash): HandleSkillStateExit 가 간파를 끝내지 않음(TryBeginDashTransfer)
-   · 상체 DashInterruptUpper 가 0층 간파의 지금 정규화 시각부터 같은 상태를 이어 재생(BeginDashInterruptUpperFromBase, 가중치 0→1 = dashInterruptBlend)
-   · 0층 = 기존 대시 캔슬과 같은 처리(ReturnBasePoseAfterSkill(DashCancelled) → Dodge 가 있으면 Dodge, 없으면 Idle)
- Dash 상태 Enter: CompleteDashTransfer → PlayerDashState.Attach(같은 간파) — 이후 §2 와 동일
-```
-
-- **입력**(`PlayerStateController.Tick`, 오너 입력 주체): 간파 Skill 상태에서 대시 입력(이번 프레임 또는 버퍼 기록 시각, `TryGetPressTime(Dash)`)을 `DashInterruptRules.EvaluateTransfer` 로 본다 — 간파 스킬 아님 → 이미 실림/대기 → Hit 지남 → 창 밖 → 전환. **전환이 아니면 대시 입력은 지금처럼 버퍼에 남는다**(간파가 끝난 뒤 나감).
-  - 창 = 대시 누른 시각이 **이 피어의 간파 시작 시각** 후 `[0, 창]`(경계 포함). 원격 오너의 t0 = `PlaySkillClientRpc` 수신 시각.
-  - Hit 전 = 이 피어 애니메이터에서 실행 중 스킬의 Hit 이벤트가 아직 안 왔다(`activeHitEventSeen`). 서버(호스트·오프라인)는 판정 래치(`HasResolvedHit`)도 같은 프레임에 본다.
-  - 대시 가능 여부는 기존 `TryBeginPredictedDash` 게이트·피드백 그대로 — 충전 없음·비접지·CC 면 기존 대시 거부 처리(`ClassifyDashReject`)이고 전환 준비는 거둔다(`DisarmDashTransfer`). 간파는 그대로 진행.
-  - 팔라딘 E 대체 슬롯·`dashInterruptWindow = 0` 이면 대상 아님.
-- **비용·피드백 1회**: 간파 쿨은 t0 승인 때 1회뿐 — 전환은 쿨을 다시 보지도, 재시작·재차감하지도 않는다(이미 실행 중인 같은 인스턴스). 대시 충전은 대시 1회분. 거부 피드백도 대시 거부 1회뿐.
-- **준비 시간 기준점 = 처음 우클릭 승인 시각 t0** — 상체 레이어가 0층 클립 시각을 이어 재생하므로 준비가 다시 시작되지 않는다. 판정 시각 = max(대시 끝, t0 + 평소 준비).
-- **118 디렉터**: 시도(Attempt) 사건은 t0 승인 때 1회로 끝 — 전환은 `OnServerStart`·`TryStartSlowMotion` 을 다시 부르지 않는다(`PlayerInterruptSkillBase.OnTransferredToDash` 는 부착 표시만). 판정·성공·실패는 §5 그대로 1회.
-- **무적**: 전환 후 대시 구간만(기존 대시 무적 경로).
-
-### 네트워크 (새 RPC 없음)
-
-| 피어 | 처리 |
-|---|---|
-| 원격 오너 | 대시 상태 Enter(`CompleteDashTransfer`)에서 `RequestUseSkillRpc(Interrupt, dashInterrupt: true)` 를 보낸다. 이 Enter 는 `TryBeginPredictedDash` 의 `BeginDash` 안이고 대시 RPC(`SubmitDashRequestServerRpc`)는 그 뒤에 나가므로 **스킬 RPC 가 먼저** 간다. 전환 준비는 대시가 실제로 시작될 때만 보내므로 대시 게이트에서 막히면 RPC 도 없다 |
-| 서버 — 전환 요청 해석 | `StartSkillServer` 가 맨 앞에서 `IsDashTransferRequest`(요청 스킬 = Skill 상태로 실행 중인 그 스킬)면 새 시전이 아니라 `TryApproveDashTransferServer`: `EvaluateServerTransfer` — 그 간파·미부착·Hit 판정 전·**서버 경과(서버 승인 후) ≤ 창 + `dashInterruptServerTolerance`**. 통과 = '전환 대기'(`dashTransferArmed`)만 걸고 쿨·스냅샷·`OnServerStart`·`PlaySkillClientRpc`·`ServerSkillUsed` 없음 |
-| 서버 — 대시 도착 | `BeginDash` → Skill Exit(Dash) 에서 전환 대기면 간파를 끝내지 않고 새 대시에 싣는다. 전환 대기가 없거나 그사이 Hit 판정이 났으면 **기존 동작**(대시가 간파를 `DashCancelled` 로 끊음 → `EndSkillClientRpc`) |
-| 서버 거부 | `RejectSkillClientRpc` → 원격 오너는 예측으로 실어 둔 간파를 서버와 같은 사유로 끝낸다(대시 중 = `DashCancelled`, 상체 레이어 취소). 뒤에 오는 `EndSkillClientRpc` 는 이미 정리돼 무시 |
-| 호스트·오프라인 | 오너 판단 때 서버 조건까지 같은 프레임에 보고 바로 전환(RPC 없음) |
-
-- 두 RPC 는 같은 NetworkObject·기본 신뢰(Reliable) 전송이라 보낸 순서대로 도착한다. 코드상 순서가 뒤집히는 경로는 찾지 못했다(스킬 RPC = `[Rpc(SendTo.Server)]`, 대시 RPC = `[ServerRpc]`, 둘 다 기본 delivery).
-- `ValidateStatReport`(2차 검증 경고)는 전환 요청에도 그대로 돈다.
+우클릭(일반 간파) 중 대시를 누르면 **기존 일반 규칙**대로다:
+- 간파 스킬(팔라딘·어쌔신·거너 우클릭)은 `CanBeCanceledByDash` 를 덮지 않아(기본 false) 대시로 끊을 수 없다 → `PlayerStateController.Tick` 이 그 대시를 실행하지 않는다.
+- 대시 입력은 선입력 버퍼(0.2초)에 남아, 간파가 끝나 Idle/Move 로 돌아올 때 아직 살아 있으면 **일반 대시**로 나가고 지나면 버려진다([skill-reject-feedback.md §0.2](skill-reject-feedback.md)). 그 대시 뒤 창 안 우클릭은 다시 §1 의 대쉬 간파 대상이다(쿨이면 쿨 거부).
+- 간파는 끊기지 않고 끝까지 진행한다(판정·연출·쿨 그대로).
 
 ## 3. 위치·방향·비용·무적
 
@@ -109,7 +82,11 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 
 ## 5. 118 디렉터 사건 연결 — 새 경로 없음
 
-- **시도**: 승인 순간 `OnServerStart` → `ServerAttempt(예측)` 그대로. 단 대쉬 간파는 예측 오버랩을 **예상 대시 끝**으로 옮긴다 — 오프셋 = 대시 방향 × 대시 속도 × 서버 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset` → `PredictsInterruptHit` → `OverlapHitboxAnchor(results, offset)`). 판정 오버랩은 옮기지 않는다(실제 위치).
+- **시도**: 승인 순간 `OnServerStart` → `ServerAttempt(예측 3상태)` 그대로. 예측은 근접·대쉬 공용 `DashInterruptPredictor`(할 일 132 — [interrupt-presentation.md §0.2](interrupt-presentation.md#02-흐름)):
+  - 판정 위치 = **예상 대시 끝** = 시전 위치 + 대시 방향 × 대시 속도 × 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset`), 판정 시각 = max(예상 대시 끝, 평소 Hit).
+  - 대상 = 오버랩 없이 `InterruptTargetRegistry` 캐시 + `InterruptTargetGeometry`(간파 사거리 · 대상 정면 허용각 — 지금 대쉬 간파 대상은 기존 판정값 그대로, 정면 판정 없으면 180 · **대시 방향**이 대상을 향함). 밖이면 '대상 없음' = 슬로우 없음.
+  - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
+  - 판정 오버랩은 옮기지 않는다(실제 위치).
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
 - 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
@@ -146,15 +123,9 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 
 - **원격 오너: 서버 대시가 더 짧다.** 서버 대시는 요청 도착 때 시작하되 길이 = 지연을 뺀 남은 시간(`RemainingServerDuration`)이라, 서버가 오너 화면의 대시 끝보다 **먼저** Skill 로 넘어가 판정할 수 있다. 판정 위치는 서버가 가진 오너 복제 위치라, 그 순간 복제 위치가 아직 대시 끝에 닿지 않았을 수 있다(일반 간파와 같은 수준의 위치 오차 + 대시 이동분).
 - 원격 오너에서 `PlaySkillClientRpc` 가 오너 대시 끝 뒤에 오면 오너는 일반 Skill 로 0층 전신 클립을 처음부터 튼다 — 서버 판정 시각과 화면 클립 시각이 어긋날 수 있다.
-- 시도 예측 오프셋은 서버 남은 대시 시간 기준 직선 이동이다 — 대시가 유닛·벽에 막히면 예측이 실제 판정 위치보다 멀다(시도 슬로우 오발동 → 실패 복귀 가능).
+- 시도 예측 오프셋은 남은 대시 시간 기준 직선 이동이다 — 대시가 유닛·벽에 막히면 예측이 실제 판정 위치보다 멀다(강 시도 슬로우·오너 암전 오발동 → 실패 복귀 가능).
 - `PlayerDashData.dashInterruptBlend` 의 툴팁은 "Dodge → 간파 준비 클립 크로스페이드" 라고 적혀 있지만 실제 용도는 **상체 레이어 가중치 전환 시간 + 인수인계 0층 CrossFade 시간**이다(§6).
 - 이벤트 중복·레이어 블렌드 모양·관찰자 화면은 Play/MPPM 확인 전이다.
-- **우클릭 → 대시 전환 후 슬로우 재예측 없음.** 시도 사건·슬로우 예측은 t0 위치(전환 전, 대시 오프셋 없음) 기준 그대로다 — 대시 끝 판정 위치와 어긋나면 시도 슬로우 오발동 → 실패 복귀 또는 슬로우 없이 성공이 날 수 있다. 116 예측 로그에서 다룬다.
-- **원격 오너 전환의 서버 창은 RTT 만큼 늦게 잰다.** 서버 t0 = 우클릭 요청 도착, 오너 t0 = 승인 수신(약 RTT 뒤)이라 서버 경과 ≈ RTT + 오너 경과. 창 0.1 + 허용오차 0.1 기준으로 RTT 가 크면 창 끝 근처 전환이 서버에서 거부된다 → 간파가 끝나고 대시만 남는다(쿨은 이미 소모). LAN 에선 문제없을 것으로 보지만 Play 확인 필요.
-- 원격 오너가 우클릭 요청 응답을 기다리는 동안(승인 전, 아직 Idle/Move) 누른 대시는 전환 대상이 아니다 — 기존대로 대시가 먼저 나가고 서버에서 간파가 대시로 끊긴다.
-- 전환 승인 뒤 서버의 대시 검증이 거부되면 서버 간파는 Skill 로 계속 가지만 오너는 대시 취소(`EndDash`)로 간파를 끝낸다 — 오너 화면과 서버 판정이 어긋난다(드묾).
-- 전환 거부(`RejectSkillClientRpc`)는 별도 식별자가 없다 — 오너는 전환 요청 뒤 첫 거부를 전환 거부로 본다(스킬 실행 중엔 다른 스킬 요청을 보내지 않으므로 겹치지 않는다).
-- 전환 순간 0층이 간파 → Dodge(또는 Idle)로 블렌드되는 짧은 동안 0층 간파 클립 이벤트가 상체 레이어와 겹쳐 날 수 있다 — Hit·End 는 래치·보류로 한 번만 처리되지만 이펙트 이벤트 중복은 🟧 Play 확인 항목.
 
 ## 9. 수치 — `PlayerDashData` (`9.ScriptableObject/Player/PlayerDashData.asset`, 모든 캐릭터 공용)
 
@@ -173,8 +144,7 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 | `PlayerDashState.TickDashInterruptInput` | 우클릭 처리 결과(요청·이미 요청·차단 효과·쿨타임·창 밖·간파 스킬 아님) + 대시 경과/창 — 같은 누름은 1줄 |
 | `PlayerSkillController.CanApproveSkill` | `거부 — 대시 경과 …s 가 창(+서버 허용오차) 밖` |
 | `PlayerSkillController.HandleDashInterruptAborted` | `대시 중 강제 종료 → 간파 종료 (사유, 다음 상태)` |
-| `PlayerInterruptSkillBase` | `대시 중 Hit — 대시 끝까지 판정 보류` · `대시 끝 → Skill 전이 — 보류된 Hit 즉시 판정 / 클립 Hit 대기` · `우클릭 → 대시 전환 — 진행 중인 간파를 대시에 실음` |
-| `PlayerSkillController` (전환, §2.1) | `간파 중 대시 — 대쉬 간파로 전환 / 창 밖·Hit 이후·이미 전환됨 — 대시 입력은 버퍼 그대로` + 간파 시작 후 경과/창(같은 누름 1줄) · `전환 요청 승인/거부 — … (서버 경과)` · `간파 → 대시 전환 완료` · `전환 취소 — 대시 도착 전에 Hit 판정` · `서버가 전환을 거부 — 실어 둔 간파 종료` |
+| `PlayerInterruptSkillBase` | `대시 중 Hit — 대시 끝까지 판정 보류` · `대시 끝 → Skill 전이 — 보류된 Hit 즉시 판정 / 클립 Hit 대기` |
 
 - 승인 로그는 기존 `[Skill] Interrupt 시작(대쉬 간파 — 대시에 실림) — …`, 상체 레이어 누락 경고는 `[Dash]` 태그다.
 
@@ -183,6 +153,11 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 간파·대쉬 간파 타이밍을 느린 배속으로 보고 같은 허수아비에 반복해 넣어 보는 씬이다. **빌드 목록에 없다** — Dev Boot 가 Play 동안만 잠깐 넣었다 뺀다.
 
 **진입**: 메인 툴바 Dev Boot 씬 드롭다운 → `DebugInterruptLab` 선택 → Dev Boot ▶. (`Dev_Boot` → 호스트 기동 → NGO 로 이 씬 로드 → 플레이어 스폰. 캐릭터는 툴바 캐릭터 드롭다운.) 씬을 직접 열고 Play 하면 NetworkManager 가 없어 동작하지 않는다.
+
+**132 연출 확인**(할 일 132 단계 6 점검 — 씬 변경 없음): 간파 연출 디렉터·암전 렌더 기능·빛 모임 소켓은 부트의 `NetworkManager`·플레이어 프리팹·`PC_Renderer` 에서 오고,
+허수아비 두 개가 스폰 때 `InterruptTargetRegistry` 에 등록된다(`TrainingDummyInterrupt`, 정면 판정 없음 = 180). 허수아비가 **노랑(인터럽트 가능)** 일 때 사거리 안에서 그쪽으로 우클릭 = 강(암전·빛 모임 → 성공 섬광),
+노랑이 아닐 때 = 약(약 슬로우·줌만), 허수아비와 먼 곳·등진 방향 = 대상 없음(아무것도 없음). 23호는 이 씬에 없다 — 정면 허용각 확인은 보스 씬에서.
+⚠️ 이 씬의 허수아비 창은 무기한(`DebugDummyInterruptRecovery`)이라 창 '추정 길이' = 지난번 노랑이 된 뒤 간파까지 기다린 시간(중앙값)이 된다 — 그보다 오래 기다렸다 누르면 창이 열려 있어도 **약**으로 예측될 수 있다(예측 규칙대로의 동작, 보스 창은 길이가 정해져 있어 해당 없음).
 
 **씬에 둔 것** (부트에서 오는 NetworkManager·`GlobalTimeScale`·간파 연출 디렉터·GameManager·EffectManager·EventSystem·GameMenu 는 두지 않는다 — `TrainingDummy.unity` 와 같은 구성)
 
@@ -193,7 +168,7 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 | `PlayerDashValidationManager`(프리팹) | 대시 서버 검증 — 맵 씬마다 두는 매니저(대시·대쉬 간파에 필요) |
 | `FloatingDamageSpawner` | 씬 싱글턴 — 없으면 데미지 숫자가 안 뜬다 |
 | `TrainingDummy_1`·`_2`(`TrainingDummy.prefab`, (±2, 0, 5)) + `DebugDummyInterruptRecovery` | 간파 표적. HUD 는 플레이어 프리팹에 있어 따로 두지 않는다 |
-| `InterruptLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle` | 디버그 배속(+성공 후 1배속)·쿨 0·F1 캐릭터 순환(C6) |
+| `InterruptLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle`·`DebugInterruptTuningPanel` | 디버그 배속(+성공 후 1배속)·쿨 0·F1 캐릭터 순환(C6)·간파 연출 튜닝 패널(132 §17) |
 
 **배속** (`DebugTimeScale` — `InterruptLab` 오브젝트 인스펙터): 슬라이더 0.05~2, 프리셋 버튼 ×0.1/×0.25/×0.5/×1. Play 중 바로 반영되고 인스펙터에 지금 `Time.timeScale`·슬로우·기본 배속이 보인다.
 - `Time.timeScale` 을 직접 쓰지 않고 `GlobalTimeScale.BaseScale`(기본 배속, 기본 1)만 정한다. 최종 = **디렉터 슬로우 배율 × 디버그 배속**(`GlobalTimeScale.ComposeScale`). 슬로우가 없을 때도 기본 배속을 쓰고, 1 로 돌리면 1 로 돌아간다. 1 이면 이 기능이 없던 때와 동작이 완전히 같다.
@@ -209,6 +184,12 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 **성공 후 1배속** (C6, `DebugTimeScale` 의 `성공 후 1배속(초, 실제 시간)`, 기본 3): 간파 성공 → 그 시간(실제 시간, `Time.unscaledTimeAsDouble`) 동안 기본 배속을 1 로 둔다. 끝나면 슬라이더 값으로 돌아간다 — 슬라이더는 건드리지 않으므로 그 사이 바꾼 값이 쓰인다. 그 사이 또 성공하면 그때부터 다시 잰다. 0 = 끔.
 - 디렉터 성공 슬로우·히트스톱은 그대로 곱해진다(1 × 슬로우).
 - 성공 감지 = `InterruptProductionDirector.LocalSucceeded`(각 피어, 성공 슬로우가 이 피어에서 시작될 때 — 칸 스위치와 무관). 이 구독용 이벤트 하나만 디렉터에 추가했다(새 연출 경로 아님). 성공 슬로우가 거부되면(컷신 잠금·씬 전환) 이벤트도 나지 않는다.
+
+**간파 연출 튜닝 패널** (할 일 132 §17, `DebugInterruptTuningPanel` — `InterruptLab` 오브젝트, `DebugTimeScale` 옆): Play 중 화면 오른쪽 위 OnGUI 박스(제목 버튼으로 접기).
+- 연출 효과 10줄 토글 — 오너 암전 · 빛 모임(VFX+라이트) · ②스타버스트 · ③화이트아웃 · ④스미어 · ⑤색수차 블러 · ⑥가라앉음(블룸) · 월드 섬광 · 적중 지점 라이트 · 팀원 암순응(A2). `전부 켬`·`암전만`(기본값) 버튼.
+- 배속 = 같은 오브젝트 `DebugTimeScale` 슬라이더(0.05~2)와 버튼 ×0.05/0.1/0.25/0.5/1/2 — 위 '배속'·'성공 후 1배속' 규칙 그대로(1배속 중이면 남은 초 표시).
+- 토글은 이 피어 `InterruptProductionDirector` 런타임 값만 바꾼다 — 프리팹·씬 저장 없음, Play 를 끝내면 프리팹 값(기본 = 오너 암전만 켬). 끈 효과는 그리기만 안 하고 상태 기계·섬광 순간은 그대로 돈다.
+  칸 표·의미: [interrupt-presentation.md §0.6](interrupt-presentation.md).
 
 **쿨 0** (C6, `DebugZeroCooldown` — 칸 `interrupt`·`dash`, 기본 둘 다 켬): 쿨 계산 코드는 그대로고 기존 리셋 API 만 부른다(튜토리얼 복도1 쿨 초기화와 같은 짝).
 - 간파 [서버]: 매 프레임 각 플레이어의 간파 슬롯 쿨이 남아 있으면 `PlayerSkillController.ResetCooldownServer(Interrupt)` — 성공·실패·대쉬 간파 무관. 장부 API 가 오너 HUD 장부에 미러하므로 오너 선검증(`IsBlockedByCooldown`)·서버 승인(`CanApproveSkill`) 모두 통과.
@@ -229,15 +210,16 @@ Skill(일반 간파, 시작 t0) ──(오너) 대시 누른 시각 − t0 ≤ �
 
 | 파일 | 내용 |
 |---|---|
-| `Assets/1.Scripts/Player/Dash/DashInterruptRules.cs` | 순수 규칙 — 창 판정·입력 결정·서버 승인 창·판정 시점·max·예상 대시 끝 오프셋·전환 판단(`EvaluateTransfer`·`EvaluateServerTransfer`) |
-| `Assets/1.Scripts/Player/Dash/DashInterruptLayerFade.cs` | 상체 레이어 가중치 전환·인수인계 정규화 시각(정·역방향) |
+| `Assets/1.Scripts/Player/Dash/DashInterruptRules.cs` | 순수 규칙 — 창 판정·입력 결정·서버 승인 창·판정 시점·max·예상 대시 끝 오프셋 |
+| `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs` · `Assets/1.Scripts/Player/Skill/InterruptAttemptPrediction.cs` · `InterruptTargetRegistry.cs` | 할 일 132 — 근접·대쉬 공용 예측기·대상 판정(`InterruptTargetGeometry`)·예측 입력 구성(`AtPress`)·대상 캐시 |
+| `Assets/1.Scripts/Player/Dash/DashInterruptLayerFade.cs` | 상체 레이어 가중치 전환·인수인계 정규화 시각 |
 | `Assets/1.Scripts/Player/Dash/PlayerDashData.cs` · `Assets/9.ScriptableObject/Player/PlayerDashData.asset` | SO 칸 3개 |
-| `Assets/1.Scripts/Player/PlayerDashController.cs` | 상체 레이어 시작·인수인계·역방향 인수인계(`BeginDashInterruptUpperFromBase`)·취소, `PlayDodgeEnd(keepBasePose)`, 창·허용오차 조회 |
-| `Assets/1.Scripts/Player/PlayerStateController.cs` | `PlayerDashState` 창 입력·부착/분리·대시 끝 Skill 전이·강제 종료·Enter 전환 부착, `Tick` 의 간파 중 대시 전환 입력, `BeginSkillFromDash`·`AttachDashInterrupt`·`ActiveDash` |
-| `Assets/1.Scripts/Player/Skill/PlayerSkillController.cs` | `TryUseDashInterrupt`, RPC 2개 플래그, 승인 분기, `HandleDashInterruptAborted`·`CompleteDashInterruptHandOff`, 전환 `TryArmDashTransfer`·`TryApproveDashTransferServer`·`TryBeginDashTransfer`·`CompleteDashTransfer`·거부 처리, `PlayerSkillApprovalRules.EvaluateDashInterruptPreconditions`·`PlayerSkillApproval.DashWindow` |
-| `Assets/1.Scripts/Player/Skill/PlayerInterruptSkillBase.cs` | Hit 보류·End 연기·`OnDashHandOff`·시도 예측 오프셋·`OnTransferredToDash`·`HasResolvedHit` |
+| `Assets/1.Scripts/Player/PlayerDashController.cs` | 상체 레이어 시작·인수인계·취소, `PlayDodgeEnd(keepBasePose)`, 창·허용오차 조회 |
+| `Assets/1.Scripts/Player/PlayerStateController.cs` | `PlayerDashState` 창 입력·부착/분리·대시 끝 Skill 전이·강제 종료, `BeginSkillFromDash`·`AttachDashInterrupt`·`ActiveDash` |
+| `Assets/1.Scripts/Player/Skill/PlayerSkillController.cs` | `TryUseDashInterrupt`, RPC 2개 플래그, 승인 분기, `HandleDashInterruptAborted`·`CompleteDashInterruptHandOff`, `PlayerSkillApprovalRules.EvaluateDashInterruptPreconditions`·`PlayerSkillApproval.DashWindow` |
+| `Assets/1.Scripts/Player/Skill/PlayerInterruptSkillBase.cs` | Hit 보류·End 연기·`OnDashHandOff`·시도 예측 오프셋 |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillBase.cs` | `OverlapHitboxAnchor(results, offset)` |
 | `Assets/1.Scripts/Player/PlayerInputBuffer.cs` · `PlayerInputReader.cs` | `TryGetRecordedTime` · `TryGetPressTime` |
 | `Assets/4.Animations/Player/{Garen,Assassin,Gunner}/*AnimatorController.controller` · `Garen/GarenUpperBody.mask` | `DashInterruptUpper` 레이어·팔라딘 상체 마스크 |
-| `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·테스트 `Editor/DebugInterruptLabTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |
-| 테스트 `Assets/1.Scripts/Player/Dash/Tests/EditMode/DashInterruptRulesTests.cs` · `DashInterruptLayerFadeTests.cs` · `Assets/1.Scripts/Player/Editor/PlayerSkillApprovalRulesTests.cs` · `PlayerInputBufferTests.cs` | 창 경계·0=끔·허용오차·판정 시점·입력 결정·승인 사전조건·가중치 전환·버퍼 기록 시각·양 순서 창·전환(쿨 무관·Hit 이후·이미 부착·서버 허용오차)·역방향 정규화 시각 |
+| `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·`DebugInterruptTuningPanel`(132 §17)·테스트 `Editor/DebugInterruptLabTests.cs`·`Editor/DebugInterruptLabIsolationTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |
+| 테스트 `Assets/1.Scripts/Player/Dash/Tests/EditMode/DashInterruptRulesTests.cs` · `DashInterruptLayerFadeTests.cs` · `Assets/1.Scripts/Player/Editor/PlayerSkillApprovalRulesTests.cs` · `PlayerInputBufferTests.cs` | 창 경계·0=끔·허용오차·판정 시점·입력 결정·승인 사전조건·가중치 전환·버퍼 기록 시각 |

@@ -21,7 +21,7 @@ using UnityEngine;
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
 [DataTableSheet("MidBoss", Order = 0)]
-public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCueSink
+public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     // 공격 종류. Smash 1종 + 펀치 3종 × L/R = 총 7종.
     enum GauntletAttackId
@@ -255,6 +255,9 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptCu
 
     /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
+
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값(MonsterBase).
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => CounterJudgeWindowReplica;
 
     // 카운터 성공 — 스매시를 취소하고 즉시 그로기.
     // 🔴 이 컨트롤러에는 그로기·피격 클립도, 그로기 파라미터도 없다(PLAN §9.1). 그래서 그로기를

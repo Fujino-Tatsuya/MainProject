@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DarkAdaptationFeature
   m_Active: 1
   _shader: {fileID: 4800000, guid: 1c0bfbbe5a92c294db94e8025f88ccc4, type: 3}
+  _lensFlareShader: {fileID: 4800000, guid: 6cda457ac28612740adb23da5d39ea92, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

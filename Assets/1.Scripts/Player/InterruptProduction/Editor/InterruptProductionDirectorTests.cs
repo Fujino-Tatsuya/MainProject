@@ -46,8 +46,17 @@ public sealed class InterruptProductionDirectorTests
             Assert.IsFalse(director.Get(cue), cue.ToString());
     }
 
+    // 할 일 132 단계 6 — 새 체계에 들어오는 공용 칸(A1~A4)만 켜고, 캐릭터별 연출(B·C·E)은 꺼 둔다(새 적중 섬광이 대신).
+    // §17 — A2 암순응(= 팀원 암순응)은 기본 끔(오너 암전만 켬 기본값). 슬로우·줌·히트스톱(A1·A3)과 A4 는 그대로.
+    private static readonly InterruptProductionCue[] PrefabOnCues =
+    {
+        InterruptProductionCue.HitStop,
+        InterruptProductionCue.OwnerZoom,
+        InterruptProductionCue.SuccessFxSlot,
+    };
+
     [Test]
-    public void NetworkManager_프리팹에_붙어_있고_전부_꺼짐()
+    public void NetworkManager_프리팹에_붙어_있고_A1_A3_A4만_켜짐()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPrefabPath);
         Assert.IsNotNull(prefab, NetworkManagerPrefabPath);
@@ -56,7 +65,7 @@ public sealed class InterruptProductionDirectorTests
         Assert.IsNotNull(prefab.GetComponent<GlobalTimeScale>(), "GlobalTimeScale 과 같은 오브젝트여야 한다");
         Assert.IsNotNull(prefab.GetComponent<InterruptDarkAdaptation>(), "암순응과 같은 오브젝트여야 한다");
         foreach (var cue in AllCues)
-            Assert.IsFalse(director.Get(cue), cue.ToString());
+            Assert.AreEqual(Array.IndexOf(PrefabOnCues, cue) >= 0, director.Get(cue), cue.ToString());
     }
 
     [Test]
@@ -69,7 +78,9 @@ public sealed class InterruptProductionDirectorTests
             Assert.IsFalse(InterruptProductionRules.IsOn(null, cue), cue.ToString());
         }
 
-        Assert.AreEqual(1f, InterruptProductionDirector.OwnerZoomFactor(0.7f));
+        Assert.AreEqual(1f, InterruptProductionDirector.OwnerZoomFactor(SlowMotionPurpose.Attempt, 0.7f));
+        Assert.AreEqual(1f, InterruptProductionDirector.OwnerZoomFactor(SlowMotionPurpose.AttemptWeak, 0.7f));
+        Assert.AreEqual(1f, InterruptProductionDirector.OwnerZoomFactor(SlowMotionPurpose.Success, 0.7f));
     }
 
     [Test]
@@ -89,6 +100,72 @@ public sealed class InterruptProductionDirectorTests
         Assert.AreEqual(1f, InterruptProductionRules.OwnerZoomFactor(CreateDirector(), 0.7f));
         Object.DestroyImmediate(_go);
         Assert.AreEqual(0.7f, InterruptProductionRules.OwnerZoomFactor(CreateDirector("ownerZoom"), 0.7f));
+    }
+
+    // ─── 시도 강·약(할 일 132) ───
+
+    [Test]
+    public void 성공_예측은_강_실패_예측은_약_대상_없음은_목적_없음()
+    {
+        Assert.IsTrue(InterruptProductionRules.TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong, out SlowMotionPurpose strong));
+        Assert.AreEqual(SlowMotionPurpose.Attempt, strong);
+        Assert.IsTrue(InterruptProductionRules.TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast.Weak, out SlowMotionPurpose weak));
+        Assert.AreEqual(SlowMotionPurpose.AttemptWeak, weak);
+        Assert.IsFalse(InterruptProductionRules.TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast.NoTarget, out _));
+    }
+
+    [Test]
+    public void 시도_목적별_프로필_선택()
+    {
+        var settings = new InterruptProductionStageTests.FakeSettings();
+        Assert.AreSame(settings.Attempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, settings));
+        Assert.AreSame(settings.Weak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, settings));
+    }
+
+    [TestCase(SlowMotionPurpose.Attempt, 0.7f)]
+    [TestCase(SlowMotionPurpose.AttemptWeak, 0.93f)]
+    [TestCase(SlowMotionPurpose.Success, 0.85f)]
+    public void 슬로우_목적별_줌_배율_선택(SlowMotionPurpose purpose, float expected)
+    {
+        Assert.AreEqual(expected, InterruptProductionRules.SelectOwnerZoomFactor(purpose, 0.7f, 0.93f, 0.85f));
+    }
+
+    // 시도 예측 창 추정(InterruptLagMonitor.EstimateWindow 의 재료) — 열린 뒤 경과·추정 길이
+    [Test]
+    public void 창_기록_지금_열린_시각과_닫혀_있으면_없음()
+    {
+        var history = new InterruptWindowHistory();
+        history.Record(1.0, true);
+        history.Record(1.5, false);
+        history.Record(3.0, true);
+        Assert.IsTrue(history.TryGetOpenSince(3.2, out double since));
+        Assert.AreEqual(3.0, since, 1e-9);
+        Assert.IsFalse(history.TryGetOpenSince(2.0, out _), "닫힌 구간");
+        Assert.IsFalse(new InterruptWindowHistory().TryGetOpenSince(1.0, out _), "기록 없음");
+    }
+
+    [Test]
+    public void 창_추정_길이는_완결된_열림의_중앙값()
+    {
+        var history = new InterruptWindowHistory();
+        Assert.IsFalse(history.TryGetTypicalOpenDuration(out _));
+        history.Record(0.0, true);
+        history.Record(0.4, false);
+        history.Record(1.0, true);
+        history.Record(1.6, false);
+        history.Record(2.0, true);
+        history.Record(2.5, false);
+        history.Record(3.0, true); // 아직 열림 — 길이에 안 들어간다
+        Assert.IsTrue(history.TryGetTypicalOpenDuration(out double duration));
+        Assert.AreEqual(0.5, duration, 1e-9);
+    }
+
+    [Test]
+    public void 새_디렉터_줌_배율_기본값_강_0_7_약_0_93()
+    {
+        var so = new SerializedObject(CreateDirector());
+        Assert.AreEqual(0.7f, so.FindProperty("interruptZoomFactor").floatValue, 1e-6f);
+        Assert.AreEqual(0.93f, so.FindProperty("interruptWeakZoomFactor").floatValue, 1e-6f);
     }
 
     // ─── A1 히트스톱 ───

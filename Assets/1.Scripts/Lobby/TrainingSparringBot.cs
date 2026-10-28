@@ -20,7 +20,7 @@ using UnityEngine.AI;
 /// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)은 <see cref="LobbyTrainingSparring"/>(T5c). 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
 [DataTableSheet("Lobby", Order = 0)]
-public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IOverheadHealthBarRule, IInterruptCueSink
+public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IOverheadHealthBarRule, IInterruptCueSink
 {
     const string Tag = "[TrainingSparring]";
 
@@ -777,6 +777,13 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         IsServer && _windupLeft > 0f && Counter != null && Counter.IsOpen && !CounterBlockedByState;
 
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
+
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값(MonsterBase). 준비 남은 시간(_windupLeft)·취약은 서버만 본다.
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => CounterJudgeWindowReplica;
+
+    // 할 일 132 정정1 — 예측 대상 각도. IsCounterFromFront 와 같은 값(규칙 없음 = 정면 0°, 정면 판정 끔 = 180).
+    float IInterruptWindowReplica.InterruptFrontAngle =>
+        counterRules == null ? 0f : !counterRules.counterRequiresFront ? BeaverLobby.Player.Dash.InterruptTargetGeometry.NoFrontRule : counterRules.counterFrontAngle;
 
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayInterruptFlashRpc()

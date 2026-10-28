@@ -57,6 +57,44 @@ public static class InterruptProductionRules
     public static float OwnerZoomFactor(InterruptProductionDirector director, float zoomFactor) =>
         IsOn(director, InterruptProductionCue.OwnerZoom) ? zoomFactor : 1f;
 
+    /// <summary>
+    /// 시도 슬로우 강·약(할 일 132 정정1) — 성공 예측 = 강(<see cref="SlowMotionPurpose.Attempt"/>), 실패 예측 = 약(<see cref="SlowMotionPurpose.AttemptWeak"/>).
+    /// 대상 없음이면 false — 시도 슬로우를 걸지 않는다(단계1 이전과 같다).
+    /// </summary>
+    public static bool TrySelectAttemptPurpose(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, out SlowMotionPurpose purpose)
+    {
+        switch (forecast)
+        {
+            case BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong:
+                purpose = SlowMotionPurpose.Attempt;
+                return true;
+            case BeaverLobby.Player.Dash.InterruptAttemptForecast.Weak:
+                purpose = SlowMotionPurpose.AttemptWeak;
+                return true;
+            default:
+                purpose = SlowMotionPurpose.Attempt;
+                return false;
+        }
+    }
+
+    /// <summary>시도 목적에 맞는 슬로우 프로필 — 약이면 약 프로필, 그 밖은 강(옛 시도) 프로필.</summary>
+    public static SlowMotionProfile SelectAttemptProfile(SlowMotionPurpose purpose, IInterruptProductionSettings settings) =>
+        purpose == SlowMotionPurpose.AttemptWeak ? settings.InterruptWeakProfile : settings.InterruptProfile;
+
+    /// <summary>
+    /// 지금 재생 중인 슬로우 목적별 오너 줌 배율(할 일 132) — 강 시도 / 약 시도 / 성공(카메라 <c>slowMotionZoomFactor</c>).
+    /// A3 칸 on/off 는 따로(<see cref="OwnerZoomFactor"/>) 본다.
+    /// </summary>
+    public static float SelectOwnerZoomFactor(SlowMotionPurpose purpose, float strongZoomFactor, float weakZoomFactor, float successZoomFactor)
+    {
+        switch (purpose)
+        {
+            case SlowMotionPurpose.Attempt: return strongZoomFactor;
+            case SlowMotionPurpose.AttemptWeak: return weakZoomFactor;
+            default: return successZoomFactor;
+        }
+    }
+
     /// <summary>이 화면이 간파한 본인인가 — 개인 채널 기준.</summary>
     public static bool IsCasterView(ulong casterClientId, ulong localClientId) => casterClientId == localClientId;
 

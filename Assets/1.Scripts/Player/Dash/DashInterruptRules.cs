@@ -23,19 +23,6 @@ namespace BeaverLobby.Player.Dash
     }
 
     /// <summary>
-    /// 일반 간파 중 대시 입력(우클릭 → 대시 순서)을 같은 간파의 대쉬 간파로 옮길지. (할 일 115 §12)
-    /// <see cref="Transfer"/> 가 아니면 대시 입력은 손대지 않는다 — 지금처럼 선입력 버퍼에 남아 간파가 끝난 뒤 나간다.
-    /// </summary>
-    public enum DashInterruptTransferDecision
-    {
-        NotInterruptSkill, // 실행 중 스킬이 그 우클릭 간파(PlayerInterruptSkillBase)가 아니다
-        AlreadyAttached,   // 이미 대시에 실렸거나 전환 대기 중이다
-        HitPassed,         // 간파 Hit(판정)이 이미 지났다
-        OutOfWindow,       // 간파 시작 후 창 밖(창 0 = 기능 끔 포함)
-        Transfer           // 전환 — 같은 간파 인스턴스를 대시에 싣는다(쿨·디렉터 시도 재발동 없음)
-    }
-
-    /// <summary>
     /// 대쉬 간파(대시 시작 직후 짧은 창 안에 우클릭 → 대시하며 간파 준비 → 대시 끝 지점에서 판정)의 순수 규칙. (할 일 115)
     /// 시각은 모두 같은 시간축의 초. 창·허용오차 값은 <see cref="PlayerDashData"/>.
     /// 판정 시각 = max(대시 끝, 평소 Hit) — 평소 간파보다 빠르지 않고, 대시가 짧으면 남은 준비 시간만큼 미룬다.
@@ -102,45 +89,6 @@ namespace BeaverLobby.Player.Dash
                 return false;
 
             return serverDashElapsed >= 0f && serverDashElapsed <= window + Mathf.Max(0f, tolerance);
-        }
-
-        /// <summary>
-        /// [오너] 우클릭 → 대시 전환 판단(§12) — 간파 스킬 아님 → 이미 실림/대기 → Hit 지남 → 창 밖 → 전환 순.
-        /// 창 = 대시 누른 시각이 간파 시작(이 피어 기준) 후 창 안인가(경계 포함, <see cref="IsPressInWindow"/> 와 같은 규칙).
-        /// 쿨타임은 보지 않는다 — 이미 승인돼 실행 중인 같은 간파라서다. 대시 가능 여부(충전·접지·CC)는 호출자가 대시 게이트로 본다.
-        /// </summary>
-        public static DashInterruptTransferDecision EvaluateTransfer(
-            bool isInterruptSkill, bool alreadyAttached, bool hitReached,
-            float skillStartTime, float dashPressTime, float window)
-        {
-            if (!isInterruptSkill)
-                return DashInterruptTransferDecision.NotInterruptSkill;
-            if (alreadyAttached)
-                return DashInterruptTransferDecision.AlreadyAttached;
-            if (hitReached)
-                return DashInterruptTransferDecision.HitPassed;
-            return IsPressInWindow(skillStartTime, dashPressTime, window)
-                ? DashInterruptTransferDecision.Transfer
-                : DashInterruptTransferDecision.OutOfWindow;
-        }
-
-        /// <summary>
-        /// [서버] 우클릭 → 대시 전환 요청 승인(§12-3) — 실행 중 스킬이 그 간파이고, 아직 안 실렸고, Hit 판정 전이고,
-        /// 서버 기준 간파 시작 후 경과 ≤ 창 + 허용오차(<see cref="IsServerElapsedAccepted"/>)여야 한다. 쿨타임은 보지 않는다.
-        /// </summary>
-        public static DashInterruptTransferDecision EvaluateServerTransfer(
-            bool isSameInterruptRunning, bool alreadyAttached, bool hitResolved,
-            float serverElapsedSinceStart, float window, float tolerance)
-        {
-            if (!isSameInterruptRunning)
-                return DashInterruptTransferDecision.NotInterruptSkill;
-            if (alreadyAttached)
-                return DashInterruptTransferDecision.AlreadyAttached;
-            if (hitResolved)
-                return DashInterruptTransferDecision.HitPassed;
-            return IsServerElapsedAccepted(serverElapsedSinceStart, window, tolerance)
-                ? DashInterruptTransferDecision.Transfer
-                : DashInterruptTransferDecision.OutOfWindow;
         }
 
         /// <summary>

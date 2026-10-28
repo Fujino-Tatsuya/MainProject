@@ -4,7 +4,10 @@
 /// </summary>
 public interface IInterruptProductionSettings
 {
+    /// <summary>시도 슬로우 — 성공 예측(강).</summary>
     SlowMotionProfile InterruptProfile { get; }
+    /// <summary>시도 슬로우 — 실패 예측(약, 할 일 132).</summary>
+    SlowMotionProfile InterruptWeakProfile { get; }
     SlowMotionProfile InterruptSuccessProfile { get; }
     bool Get(InterruptProductionCue cue);
 }

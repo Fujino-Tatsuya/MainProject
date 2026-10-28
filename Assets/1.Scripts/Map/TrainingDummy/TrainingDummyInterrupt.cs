@@ -40,7 +40,7 @@ public readonly struct TrainingDummyInterruptSuccess
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TrainingDummy))]
 [DataTableSheet("Map", Order = 0)]
-public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptCueSink
+public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     [Header("순환")]
     [SerializeField, Min(0f), FormerlySerializedAs("groggyDuration")]
@@ -93,6 +93,9 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
     /// <summary>[서버] 슬로우 모션 성공 판별 — 타격 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _cycle != null ? _cycle.SuccessCount : 0;
 
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 창 복제값(_state). 이미 복제되던 값이라 전송 추가 없음.
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => IsInterruptible;
+
     /// <summary>[서버] 인터럽트 성공. 취약 진입 직후에 한 번 발화한다.</summary>
     public event Action<TrainingDummyInterruptSuccess> ServerInterruptSucceeded;
 
@@ -112,11 +115,16 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
 
         _state.OnValueChanged += OnStateChanged;
         ApplyTint(_state.Value);
+
+        // 간파 예측 대상 캐시(할 일 132 정정1, 모든 피어) — 허수아비는 죽지 않아 디스폰·씬 언로드 때만 빠진다.
+        InterruptTargetRegistry.Register(_dummy);
     }
 
     public override void OnNetworkDespawn()
     {
         _state.OnValueChanged -= OnStateChanged;
+        InterruptWindowReplicaTracker.Forget(gameObject);
+        InterruptTargetRegistry.Unregister(_dummy);
         _cycle = null;
         base.OnNetworkDespawn();
     }
@@ -174,6 +182,8 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
         ApplyTint(current);
         // 간파 지연 측정(측정만) — 서버에서만 기록된다(RecordWindow 가 거른다).
         InterruptLagMonitor.RecordWindow(gameObject, current == TrainingDummyInterruptState.Interruptible);
+        // 오너 클라 간파 시도 예측용 창 기록(할 일 132) — 클라에서만 기록된다(Record 가 거른다).
+        InterruptWindowReplicaTracker.Record(gameObject, current == TrainingDummyInterruptState.Interruptible);
     }
 
     // BossCounterTelegraph 와 같은 방식 — 베이스 틴트로 넣어야 피격 플래시가 이 색 위에서 Lerp 하고 끝나도 돌아온다.
