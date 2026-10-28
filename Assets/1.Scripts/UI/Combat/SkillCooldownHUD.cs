@@ -26,6 +26,10 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         [System.NonSerialized] public Color[] normalColors;
         [System.NonSerialized] public Sprite defaultIcon;
         [System.NonSerialized] public bool defaultIconCached;
+        [System.NonSerialized] public Color iconBaseColor;
+        [System.NonSerialized] public bool iconBaseColorCached;
+        [System.NonSerialized] public bool iconTinted;     // 후속 시전 중 아이콘 색 곱하기(할 일 128 5a)
+        [System.NonSerialized] public Color iconTint;
     }
 
     [SerializeField] private SlotWidget[] slots;
@@ -107,6 +111,11 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                 widget.cooldownIcon.sprite = widget.icon.sprite;
         }
 
+        // 후속 시전 중이면 후속 스킬 데이터의 tint 를 아이콘에 곱한다(기본 흰색 = 변화 없음).
+        widget.iconTinted = data != null && skillController.IsFollowUpOpen(widget.slot);
+        widget.iconTint = widget.iconTinted ? data.FollowUpIconTint : Color.white;
+        ApplyIconTint(widget);
+
         widget.hover?.Bind(
             player,
             source,
@@ -179,7 +188,26 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                         ? blockedColor
                         : widget.normalColors[i];
             }
+
+            ApplyIconTint(widget);
         }
+    }
+
+    // 아이콘 색 = 원래 색 × 후속 tint. 차단 중에는 차단 색이 우선한다(SetBlocked 가 해제 때 다시 부른다).
+    private void ApplyIconTint(SlotWidget widget)
+    {
+        if (widget.icon == null)
+            return;
+
+        if (!widget.iconBaseColorCached)
+        {
+            int index = widget.graphics != null ? System.Array.IndexOf(widget.graphics, widget.icon) : -1;
+            widget.iconBaseColor = index >= 0 ? widget.normalColors[index] : widget.icon.color;
+            widget.iconBaseColorCached = true;
+        }
+
+        if (!isBlocked)
+            widget.icon.color = widget.iconTinted ? widget.iconBaseColor * widget.iconTint : widget.iconBaseColor;
     }
 
     private void Update()

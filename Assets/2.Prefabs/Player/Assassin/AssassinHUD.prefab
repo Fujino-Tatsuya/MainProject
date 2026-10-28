@@ -235,6 +235,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AssassinHUD
   canvas: {fileID: 4649822902334575126}
+  rageRoot: {fileID: 672746789627711152}
   rageFill: {fileID: 776833507903118525}
   rageFillImage: {fileID: 5169015979554029211}
   rageMinTick: {fileID: 2941791904754527681}

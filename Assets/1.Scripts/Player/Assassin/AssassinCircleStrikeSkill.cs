@@ -25,6 +25,8 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
     // 서버 — 확정 순간 고정한 원 중심(높이 = 플레이어 발)
     private Vector3 areaCenter;
+    // 서버 — 확정 순간 고정한 판정 반경(데이터 반경 × 칼날의 영역 반경 배율). 5타 모두 이 값.
+    private float areaRadius;
     private bool hasInvulnerability;
 
     private static readonly SkillAnimationEventType[] RequiredEvents =
@@ -67,6 +69,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
         // 확정 지점은 컨트롤러가 서버 위치 기준으로 재투영해 넘긴다(A4). 없으면 승인 방향 × 중심 거리.
         Vector3 origin = owner.transform.position;
         areaCenter = AreaCenter(origin, HasAimPoint ? AimPoint : origin + direction * data.CenterDistance);
+        areaRadius = ScaledRadius(data);
 
         sequence.Begin(data.HitCount);
 
@@ -77,7 +80,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
             hasInvulnerability = true;
         }
 
-        Edit.Log($"[Assassin/E변신] 공격 시작 — 중심 {areaCenter}, 반경 {data.AreaRadius:F1}m, {data.HitCount}타, 피해 {damageSnapshot}/타", this);
+        Edit.Log($"[Assassin/E변신] 공격 시작 — 중심 {areaCenter}, 반경 {areaRadius:F2}m, {data.HitCount}타, 피해 {damageSnapshot}/타", this);
     }
 
     // 전 피어 — 원 루프 연출(Multi Slashes). 클라는 서버 재투영 지점을 모르므로 승인 방향 × 중심 거리로 근사한다
@@ -128,7 +131,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
         if (data == null || owner == null || hitResults == null)
             return;
 
-        SkillHitVolume area = HitVolume(areaCenter, data);
+        SkillHitVolume area = HitVolume(areaCenter, data, areaRadius);
         int count = area.Overlap(hitResults, area.Mask, QueryTriggerInteraction.Collide);
 
         strikeLandedUnits.Clear();
@@ -180,9 +183,13 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
             return false;
         }
 
-        volume = HitVolume(AreaCenter(casterPosition, aimPoint), data);
+        volume = HitVolume(AreaCenter(casterPosition, aimPoint), data, ScaledRadius(data));
         return true;
     }
+
+    // 판정 반경 = 데이터 반경 × 칼날의 영역 반경 배율(서버 확정·오너 미리보기 공용 — 특성 수치는 전 피어 같은 값). 원 베기 VFX 크기는 데이터 반경 그대로.
+    private float ScaledRadius(AssassinCircleStrikeSkillData data) =>
+        AssassinTraitAreaRules.ScaleRadius(owner != null ? owner.TraitModifiers : null, AssassinTraitAreaRules.CircleStrike, data.AreaRadius);
 
     /// <summary>원 중심 = 시전 지점의 수평 위치 + 시전자 발 높이(서버 확정·오너 미리보기 공용).</summary>
     public static Vector3 AreaCenter(Vector3 casterPosition, Vector3 point)
@@ -192,9 +199,13 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
     }
 
     /// <summary>판정 원기둥(서버 타격·오너 미리보기 공용) — 반경 aoeRadius, 높이 areaHeight, 피격 레이어 hittableLayers.</summary>
-    public static SkillHitVolume HitVolume(Vector3 areaCenter, AssassinCircleStrikeSkillData data)
+    public static SkillHitVolume HitVolume(Vector3 areaCenter, AssassinCircleStrikeSkillData data) =>
+        HitVolume(areaCenter, data, data.AreaRadius);
+
+    /// <summary>위와 같고 반경을 직접 준다(특성 반경 배율을 바른 값).</summary>
+    public static SkillHitVolume HitVolume(Vector3 areaCenter, AssassinCircleStrikeSkillData data, float radius)
     {
-        return SkillHitVolume.CircleColumn(areaCenter, data.AreaRadius, data.AreaHeight, data.HittableLayers);
+        return SkillHitVolume.CircleColumn(areaCenter, radius, data.AreaHeight, data.HittableLayers);
     }
 
     private void RemoveInvulnerability()

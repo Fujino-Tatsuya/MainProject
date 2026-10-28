@@ -52,6 +52,15 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 후속 시전(할 일 128 5a) — 후속이 열린 칸 비트. 서버가 쓰고 재접속·늦은 합류도 이 값으로 복원한다.
+    private readonly NetworkVariable<byte> followUpSlots = new NetworkVariable<byte>(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    // [원격 오너] 승인됐는데 서버 복제값이 예측과 다를 때(조건 불일치) 서버 값을 따르기까지의 유예.
+    private const float FollowUpPredictionGrace = 0.5f;
+
     private Player player;
     private PlayerStateController stateController;
     private PlayerInputReader inputReader;
@@ -69,6 +78,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private PlayerTraitModifiers traitModifiers;
     private PlayerSkillSlotBindingModel slotBindings;
     private byte locallyAppliedOverrideMask;
+    // 후속 시전(할 일 128 5a): 서버 상태·원격 오너 예측·후속 → 원래 스킬·마지막으로 알린 칸 비트(SlotBindingChanged 비교용).
+    private readonly PlayerSkillFollowUpModel followUps = new PlayerSkillFollowUpModel();
+    private readonly PlayerSkillFollowUpPrediction followUpPrediction = new PlayerSkillFollowUpPrediction();
+    private readonly Dictionary<PlayerSkillBase, PlayerSkillBase> followUpSources = new Dictionary<PlayerSkillBase, PlayerSkillBase>();
+    private readonly List<int> closedFollowUpSources = new List<int>(PlayerSkillFollowUpRules.SlotCount);
+    private byte lastNotifiedFollowUpMask;
     private PlayerSkillBase activeSkill;
     private float activeEndFallbackTime;
     // [서버] 이벤트 방식 스킬 — 안전망을 상태 클립 길이로 맞춘다(ResolveClipFallback). hasClipFallback = 한 번이라도 클립 길이로 정했다.
@@ -172,6 +187,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             RegisterSkill(alternate, slot);
         }
 
+        // 후속 스킬은 기본·대체 뒤에 같은 슬롯 순서로 붙인다 — 기존 인덱스는 그대로, 모든 피어에서 순서가 같다.
+        for (int i = 0; i < SlotCount; i++)
+            RegisterFollowUp(GetSetSkill((PlayerSkillSlot)i, false));
+        for (int i = 0; i < SlotCount; i++)
+            RegisterFollowUp(alternateSkills?.GetSkill((PlayerSkillSlot)i));
+
         cooldownLedger = new PlayerSkillCooldownLedger(registeredSkills.Count);
         cooldownClock = PlayerCooldownClock.For(this);
         slotBindings = new PlayerSkillSlotBindingModel(alternateMask);
@@ -179,12 +200,15 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 특성 쿨 배율 출처(할 일 125 2/5) — Player.Awake 와 같은 인스턴스(For 가 하나만 만든다).
         traitModifiers = PlayerTraitModifiers.For(this);
         traitModifiers.Changed += HandleTraitModifiersChanged;
+
+        UnityEngine.SceneManagement.SceneManager.activeSceneChanged += HandleActiveSceneChanged;
     }
 
     public override void OnDestroy()
     {
         if (traitModifiers != null)
             traitModifiers.Changed -= HandleTraitModifiersChanged;
+        UnityEngine.SceneManagement.SceneManager.activeSceneChanged -= HandleActiveSceneChanged;
         base.OnDestroy();
     }
 
@@ -192,16 +216,23 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         base.OnNetworkSpawn();
         activeSlotOverrides.OnValueChanged += HandleOverrideMaskChanged;
+        followUpSlots.OnValueChanged += HandleFollowUpSlotsChanged;
 
         if (IsServer && slotBindings != null && activeSlotOverrides.Value != slotBindings.ActiveMask)
             activeSlotOverrides.Value = slotBindings.ActiveMask;
+        if (IsServer && followUpSlots.Value != followUps.OpenMask)
+            followUpSlots.Value = followUps.OpenMask;
 
         locallyAppliedOverrideMask = activeSlotOverrides.Value;
+        followUpPrediction.Clear();
+        NotifyFollowUpBindingChanged();
     }
 
     public override void OnNetworkDespawn()
     {
         activeSlotOverrides.OnValueChanged -= HandleOverrideMaskChanged;
+        followUpSlots.OnValueChanged -= HandleFollowUpSlotsChanged;
+        followUpPrediction.Clear();
         base.OnNetworkDespawn();
     }
 
@@ -239,9 +270,19 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             if (skill != null && skill != activeSkill && cooldownLedger.IsReady(i, CooldownNow))
                 skill.ResetToReady();
         }
+
+        if (HasGameplayAuthority)
+            TickFollowUpsServer();
+        else if (followUpPrediction.Tick(Time.time, FollowUpPredictionGrace))
+            NotifyFollowUpBindingChanged();
     }
 
-    public PlayerSkillBase GetSkill(PlayerSkillSlot slot)
+    /// <summary>칸에 지금 쓸 스킬 — 현재 세트(기본/대체)의 그 칸 스킬, 후속이 열려 있으면 그 후속 스킬(할 일 128 5a).</summary>
+    public PlayerSkillBase GetSkill(PlayerSkillSlot slot) =>
+        PlayerSkillFollowUpRules.Resolve(GetSetSkill(slot, true), CurrentFollowUpMask, (int)slot);
+
+    // 현재 세트의 그 칸 스킬(후속 한 겹 아래). useOverrides = false 면 기본 세트.
+    private PlayerSkillBase GetSetSkill(PlayerSkillSlot slot, bool useOverrides)
     {
         PlayerSkillBase baseSkill = slot switch
         {
@@ -253,7 +294,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         };
 
         int slotIndex = (int)slot;
-        if (slotIndex < 0 || slotIndex >= SlotCount || (CurrentOverrideMask & (1 << slotIndex)) == 0)
+        if (!useOverrides || slotIndex < 0 || slotIndex >= SlotCount || (CurrentOverrideMask & (1 << slotIndex)) == 0)
             return baseSkill;
 
         return alternateSkills?.GetSkill(slot) ?? baseSkill;
@@ -287,6 +328,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private byte CurrentOverrideMask => IsNetworkActive
         ? activeSlotOverrides.Value
         : slotBindings != null ? slotBindings.ActiveMask : (byte)0;
+
+    // 후속이 열린 칸 — 서버(호스트·오프라인) = 자기 상태, 원격 피어 = 복제값(오너는 그 위에 예측 한 겹).
+    private byte CurrentFollowUpMask => HasGameplayAuthority
+        ? followUps.OpenMask
+        : followUpPrediction.Effective(followUpSlots.Value);
 
     // ── 오너 입력 진입점 ──
 
@@ -413,6 +459,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 원격 오너만 — 호스트는 같은 프레임에 서버 승인이 바로 돈다(왕복 없음).
         if (!IsServer && !PassesOwnerPrecheck(slot, skillIndex, direction, sentTarget, aimPoint, hasAimPoint))
             return false;
+
+        if (!IsServer)
+            PredictFollowUp(slot, skill, direction, sentTarget);
 
         isRequestingSkill = true;
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
@@ -793,11 +842,26 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         StartCooldownServer(skill);
     }
 
-    /// <summary>[서버] 등록된 특정 스킬의 쿨타임을 시작한다. 이미 진행 중이면 남은 시간을 유지한다.</summary>
+    /// <summary>
+    /// [서버] 등록된 특정 스킬의 쿨타임을 시작한다. 이미 진행 중이면 남은 시간을 유지한다.
+    /// 후속 창이 열려 있는 원래 스킬이면 무시한다 — 쿨은 복귀 때 시작된다(할 일 128 5a).
+    /// </summary>
     public void StartCooldownServer(PlayerSkillBase skill)
     {
         int skillIndex = GetSkillIndex(skill);
-        if (!HasGameplayAuthority || skillIndex == InvalidSkillIndex || skill.Data == null ||
+        if (skillIndex != InvalidSkillIndex && followUps.HoldsSource(skillIndex))
+        {
+            Edit.Log($"[Skill] {skill.Slot} 쿨타임 시작 보류 — 후속 창이 열려 있다(복귀 때 시작)", this);
+            return;
+        }
+
+        StartCooldownNow(skillIndex);
+    }
+
+    private void StartCooldownNow(int skillIndex)
+    {
+        PlayerSkillBase skill = GetSkillByIndex(skillIndex);
+        if (!HasGameplayAuthority || skill == null || skill.Data == null ||
             !cooldownLedger.IsReady(skillIndex, CooldownNow))
         {
             return;
@@ -829,8 +893,15 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     public float GetEffectiveCooldownTime(PlayerSkillSlot slot) => GetEffectiveCooldownTime(GetSkill(slot));
 
     // 대체 세트(어쌔신 변신 Q·E 등)의 스킬인가 — 특성 형태 구분(TraitAttackForm.Alternate). 특성 사건 형태(PlayerTraitEffects)도 쓴다.
-    public bool IsAlternateSkill(PlayerSkillBase skill) =>
-        skill != null && alternateSkills != null && alternateSkills.GetSkill(skill.Slot) == skill;
+    // 후속 스킬은 자기를 연 원래 스킬의 세트를 따른다(할 일 128 5a).
+    public bool IsAlternateSkill(PlayerSkillBase skill)
+    {
+        if (skill == null || alternateSkills == null)
+            return false;
+        if (followUpSources.TryGetValue(skill, out PlayerSkillBase source))
+            skill = source;
+        return alternateSkills.GetSkill(skill.Slot) == skill;
+    }
 
     // [서버] 특성 쿨 배율이 바뀌면(획득·초기화·재합류) 돌던 쿨의 진행률을 보존한다(명세 §6) — 준비된 스킬·전체 0 은 그대로.
     private void HandleTraitModifiersChanged()
@@ -975,10 +1046,18 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         activeStartFrame = Time.frameCount;
         MarkActiveSkillStarted();
 
+        // 후속 시전(할 일 128 5a) — 후속을 여는 원래 스킬·후속 스킬은 여기서 쿨을 시작하지 않는다(복귀 때 원래 쿨 시작).
+        PlayerSkillFollowUpKind followUpKind = ClassifyFollowUpServer(slot, skill, expectedSkillIndex, direction, target);
+
         // 쿨타임은 승인 즉시 시작, 환불 없음 — 단 수동 커밋 스킬은 발동 시점에 스스로 시작한다(CommitCooldownServer)
         float cooldownTime = GetEffectiveCooldownTime(skill);
-        if (!skill.Data.CommitCooldownManually)
+        if (PlayerSkillFollowUpRules.StartsCooldownOnApproval(followUpKind, skill.Data.CommitCooldownManually))
+        {
             cooldownLedger.Start(expectedSkillIndex, CooldownNow, cooldownTime);
+            // 후속이 연결된 스킬은 오너가 승인 RPC 로 스스로 장부를 시작하지 않는다(열릴지 모름) — 서버가 미러한다.
+            if (skill.FollowUpSkill != null)
+                MirrorCooldownToOwner(expectedSkillIndex);
+        }
 
         // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯) + 특성 공격 계열 배율(Dref, 할 일 125)
         // 툴팁 계산식도 같은 계수·고정값을 쓰므로 판정 공식을 바꿀 때 SkillTooltipDamage 계산도 같이 바꿀 것.
@@ -986,10 +1065,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             skill.Data.AttackDamageMultiplier, skill.Data.FlatDamageBonus, TraitAttackKey.ForSkill(skill.Slot, IsAlternateSkill(skill)));
         skill.SetDamageSnapshot(damageSnapshot);
         // 시전 ID(할 일 125 3/5) — 이 시전의 여러 판정을 묶는다(특성 '시전당 1회' 거름).
-        skill.SetServerCastId(player.NextServerCastId());
+        // 후속 스킬은 원래 스킬이 이어받게 정했으면 원래 시전 ID 를 그대로 쓴다(같은 시전의 다른 단계).
+        int castId = ResolveFollowUpCastId(slot, followUpKind);
+        skill.SetServerCastId(castId);
+        ApplyFollowUpApproval(slot, skill, expectedSkillIndex, followUpKind, castId);
         // 지점(AimPoint)은 CanApproveSkill 이 CanUse 직전에 이미 넣었다.
 
-        Edit.Log($"[Skill] {slot} 시작{(dashInterrupt ? "(대쉬 간파 — 대시에 실림)" : string.Empty)} — 피해 스냅샷 {damageSnapshot}, 쿨타임 {cooldownTime}s", this);
+        Edit.Log($"[Skill] {slot} 시작{(dashInterrupt ? "(대쉬 간파 — 대시에 실림)" : string.Empty)}{DescribeFollowUp(followUpKind)} — 피해 스냅샷 {damageSnapshot}, 쿨타임 {cooldownTime}s", this);
 
         skill.OnServerStart(direction, target);
         // 대쉬 간파가 OnServerStart 안에서 바로 끝났으면(데이터 누락 등) 이미 대시에서 내려졌다 — 상체 레이어를 틀지 않는다.
@@ -1448,8 +1530,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 표시용 쿨타임 미러 — 이 RPC 수신 = 서버 승인이므로 오너도 장부를 기록한다.
         // 서버 시점과의 오차(전송 지연)는 HUD 표시용으로 허용, 검증은 여전히 서버 장부가 담당 (그릴 합의)
         // 수동 커밋 스킬은 CommitCooldownClientRpc 가 따로 미러한다.
-        if (IsOwner && skill.Data != null && !skill.Data.CommitCooldownManually)
+        // 후속이 연결된 스킬·후속 스킬도 서버 미러만 따른다 — 쿨 시작이 복귀 시점이라 승인과 다르다(할 일 128 5a).
+        if (IsOwner && skill.Data != null && !skill.Data.CommitCooldownManually &&
+            skill.FollowUpSkill == null && !followUpSources.ContainsKey(skill))
             cooldownLedger.Start(skillIndex, CooldownNow, GetEffectiveCooldownTime(skill));
+
+        if (IsOwner)
+            followUpPrediction.MarkApproved(Time.time);
 
         if (dashInterrupt && IsOwner && stateController != null && stateController.AttachDashInterrupt(skill))
         {
@@ -1521,6 +1608,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         isRequestingSkill = false;
 
+        // 후속 칸 예측을 버리고 서버 값으로 원복한다(할 일 128 5a).
+        if (followUpPrediction.HasPrediction)
+        {
+            followUpPrediction.Reject();
+            NotifyFollowUpBindingChanged();
+        }
+
         // 우클릭 → 대시 전환을 서버가 거부했다(할 일 115 §12-3) — 서버는 이어 오는 대시가 간파를 끊는다(DashCancelled).
         // 예측으로 실어 둔 간파를 지금 같은 사유로 끝내 서버와 맞춘다(뒤에 오는 EndSkillClientRpc 는 이미 정리돼 무시된다).
         PlayerSkillBase transferred = ownerTransferAwaitingVerdict;
@@ -1532,6 +1626,224 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             Edit.Log("[DashInterrupt] 서버가 전환을 거부 — 실어 둔 간파 종료(대시는 그대로)", this);
             EndSkillFromServer(GetSkillIndex(transferred),
                 stillInDash ? SkillEndReason.DashCancelled : SkillEndReason.Cancelled);
+        }
+    }
+
+    // ── 후속 시전(할 일 128 5a) — 규칙·순수 상태는 PlayerSkillFollowUp.cs ──
+
+    /// <summary>후속 스킬을 칸에 올린 원래 스킬. 후속이 아니면 null.</summary>
+    public PlayerSkillBase GetFollowUpSource(PlayerSkillBase followUp) =>
+        followUp != null && followUpSources.TryGetValue(followUp, out PlayerSkillBase source) ? source : null;
+
+    /// <summary>이 칸이 지금 후속 스킬로 바뀌어 있는가(원격 오너는 예측 포함). HUD tint 등 표시용.</summary>
+    public bool IsFollowUpOpen(PlayerSkillSlot slot)
+    {
+        PlayerSkillBase setSkill = GetSetSkill(slot, true);
+        return setSkill != null && setSkill.FollowUpSkill != null &&
+               PlayerSkillFollowUpRules.IsSet(CurrentFollowUpMask, (int)slot);
+    }
+
+    /// <summary>[서버] 원래 스킬이 후속 창을 지금부터 시작한다(<see cref="PlayerSkillBase.BeginFollowUpWindow"/>). 안 열렸거나 이미 시작했으면 무시.</summary>
+    public void BeginFollowUpWindowServer(PlayerSkillBase source)
+    {
+        int sourceIndex = GetSkillIndex(source);
+        if (!HasGameplayAuthority || sourceIndex == InvalidSkillIndex)
+            return;
+
+        if (followUps.BeginWindow((int)source.Slot, sourceIndex, Time.time, source.FollowUpWindowSeconds))
+            Edit.Log($"[Skill] {source.Slot} 후속 창 시작 {source.FollowUpWindowSeconds:0.##}s (스킬 지정)", this);
+    }
+
+    private void RegisterFollowUp(PlayerSkillBase source)
+    {
+        PlayerSkillBase followUp = source != null ? source.FollowUpSkill : null;
+        if (followUp == null)
+            return;
+
+        if (followUp == source || followUp.FollowUpSkill != null)
+        {
+            Debug.LogError($"[Player] {source.GetType().Name}의 후속 스킬 연결이 잘못됐습니다(자기 자신 또는 후속의 후속은 지원 안 함).", this);
+            return;
+        }
+
+        if (followUpSources.ContainsKey(followUp) || skillIndices.ContainsKey(followUp))
+        {
+            Debug.LogError($"[Player] 후속 스킬 {followUp.GetType().Name}이 다른 스킬과 중복 등록됐습니다.", this);
+            return;
+        }
+
+        RegisterSkill(followUp, source.Slot);
+        followUpSources.Add(followUp, source);
+    }
+
+    // 이 스킬에 등록까지 끝난 후속이 연결돼 있는가.
+    private bool HasLinkedFollowUp(PlayerSkillBase skill) =>
+        skill != null && skill.FollowUpSkill != null && GetFollowUpSource(skill.FollowUpSkill) == skill;
+
+    // [서버] 승인된 시전이 후속을 여는가/쓰는가. 여는 조건(OpensFollowUp)은 CanUse 통과 뒤에 본다.
+    private PlayerSkillFollowUpKind ClassifyFollowUpServer(
+        PlayerSkillSlot slot, PlayerSkillBase skill, int skillIndex, Vector3 direction, Unit target)
+    {
+        bool isOpenFollowUp = followUps.FollowUpOf((int)slot) == skillIndex;
+        bool hasLink = HasLinkedFollowUp(skill);
+        return PlayerSkillFollowUpRules.Classify(
+            isOpenFollowUp, hasLink, hasLink && !isOpenFollowUp && skill.OpensFollowUp(direction, target));
+    }
+
+    // [서버] 시전 ID — 후속 사용이고 원래 스킬이 이어받게 정했으면 원래 시전 ID, 아니면 새 ID.
+    private int ResolveFollowUpCastId(PlayerSkillSlot slot, PlayerSkillFollowUpKind kind)
+    {
+        if (kind == PlayerSkillFollowUpKind.UseFollowUp)
+        {
+            PlayerSkillBase source = GetSkillByIndex(followUps.SourceOf((int)slot));
+            if (source != null && source.FollowUpInheritsCastId)
+                return followUps.CastIdOf((int)slot);
+        }
+
+        return player.NextServerCastId();
+    }
+
+    // [서버] 승인 결과를 후속 상태에 반영한다 — 열기(칸 교체) / 사용(복귀 + 원래 쿨 시작).
+    private void ApplyFollowUpApproval(
+        PlayerSkillSlot slot, PlayerSkillBase skill, int skillIndex, PlayerSkillFollowUpKind kind, int castId)
+    {
+        switch (kind)
+        {
+            case PlayerSkillFollowUpKind.OpenFollowUp:
+                followUps.Open((int)slot, skillIndex, GetSkillIndex(skill.FollowUpSkill), castId);
+                PublishFollowUps();
+                break;
+            case PlayerSkillFollowUpKind.UseFollowUp:
+                int sourceIndex = followUps.Consume((int)slot, skillIndex);
+                if (sourceIndex >= 0)
+                    StartCooldownNow(sourceIndex);
+                PublishFollowUps();
+                break;
+        }
+    }
+
+    private static string DescribeFollowUp(PlayerSkillFollowUpKind kind) => kind switch
+    {
+        PlayerSkillFollowUpKind.OpenFollowUp => " (후속 열림 — 쿨은 복귀 때)",
+        PlayerSkillFollowUpKind.UseFollowUp => " (후속 사용 — 원래 스킬로 복귀, 원래 쿨 시작)",
+        _ => string.Empty
+    };
+
+    // [원격 오너] 시전 요청을 보내며 칸을 먼저 바꿔 둔다. 서버 복제값이 오면 내리고, 거부되면 원복한다.
+    private void PredictFollowUp(PlayerSkillSlot slot, PlayerSkillBase skill, Vector3 direction, Unit target)
+    {
+        bool isOpenFollowUp = PlayerSkillFollowUpRules.IsSet(CurrentFollowUpMask, (int)slot) &&
+                              GetFollowUpSource(skill) != null;
+        bool hasLink = HasLinkedFollowUp(skill);
+        PlayerSkillFollowUpKind kind = PlayerSkillFollowUpRules.Classify(
+            isOpenFollowUp, hasLink, hasLink && !isOpenFollowUp && skill.OpensFollowUp(direction, target));
+        if (kind == PlayerSkillFollowUpKind.Normal)
+            return;
+
+        followUpPrediction.Predict((int)slot, kind == PlayerSkillFollowUpKind.OpenFollowUp);
+        NotifyFollowUpBindingChanged();
+    }
+
+    // [서버] 창 시작(원래 스킬이 끝났다)·만료·강제 복귀(사망·스킬 막힘).
+    private void TickFollowUpsServer()
+    {
+        if (followUps.OpenMask == 0)
+            return;
+
+        bool dead = stateController != null && stateController.CurrentState == PlayerActionState.Dead;
+        if (dead || (player != null && player.StatusEffects != null && player.StatusEffects.BlocksSkill))
+        {
+            followUps.CloseAll(closedFollowUpSources);
+            FinishClosedFollowUps(dead ? "사망" : "스킬 막힘");
+            return;
+        }
+
+        float now = Time.time;
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (!followUps.IsOpen(i) || followUps.IsWindowStarted(i))
+                continue;
+
+            int sourceIndex = followUps.SourceOf(i);
+            PlayerSkillBase source = GetSkillByIndex(sourceIndex);
+            if (source != null && source == activeSkill)
+                continue;
+
+            followUps.BeginWindow(i, sourceIndex, now, source != null ? source.FollowUpWindowSeconds : 0f);
+        }
+
+        if (followUps.CollectExpired(now, closedFollowUpSources) > 0)
+            FinishClosedFollowUps("창 만료");
+    }
+
+    // [서버] 대체 세트가 바뀐 칸의 후속을 닫는다.
+    private void CloseFollowUpsOnSetChange(byte changedSlots)
+    {
+        if (changedSlots == 0 || followUps.OpenMask == 0)
+            return;
+
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (PlayerSkillFollowUpRules.IsSet(changedSlots, i) && followUps.IsOpen(i))
+                closedFollowUpSources.Add(followUps.ForceClose(i));
+        }
+
+        if (closedFollowUpSources.Count > 0)
+            FinishClosedFollowUps("대체 세트 교체");
+    }
+
+    private void HandleActiveSceneChanged(UnityEngine.SceneManagement.Scene previous, UnityEngine.SceneManagement.Scene next)
+    {
+        if (!HasGameplayAuthority || followUps.OpenMask == 0)
+            return;
+
+        followUps.CloseAll(closedFollowUpSources);
+        FinishClosedFollowUps("씬 이동");
+    }
+
+    // [서버] 닫힌 후속의 원래 스킬 쿨을 지금 시작하고 복제한다.
+    private void FinishClosedFollowUps(string reason)
+    {
+        for (int i = 0; i < closedFollowUpSources.Count; i++)
+        {
+            int sourceIndex = closedFollowUpSources[i];
+            PlayerSkillBase source = GetSkillByIndex(sourceIndex);
+            Edit.Log($"[Skill] {(source != null ? source.Slot.ToString() : "?")} 후속 복귀 ({reason}) — 원래 스킬 쿨 시작", this);
+            StartCooldownNow(sourceIndex);
+        }
+
+        closedFollowUpSources.Clear();
+        PublishFollowUps();
+    }
+
+    private void PublishFollowUps()
+    {
+        if (IsNetworkActive && IsServer && followUpSlots.Value != followUps.OpenMask)
+            followUpSlots.Value = followUps.OpenMask;
+
+        NotifyFollowUpBindingChanged();
+    }
+
+    // [원격 피어] 서버 확정값 — 오너 예측이 같아졌으면 내린다.
+    private void HandleFollowUpSlotsChanged(byte previous, byte current)
+    {
+        if (HasGameplayAuthority)
+            return;
+
+        followUpPrediction.ResolveServerMask(current);
+        NotifyFollowUpBindingChanged();
+    }
+
+    // 지금 칸 비트가 마지막으로 알린 값과 다른 칸만 SlotBindingChanged 로 알린다(HUD 아이콘·tint 재바인딩).
+    private void NotifyFollowUpBindingChanged()
+    {
+        byte current = CurrentFollowUpMask;
+        byte changed = (byte)(current ^ lastNotifiedFollowUpMask);
+        lastNotifiedFollowUpMask = current;
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if ((changed & (1 << i)) != 0)
+                SlotBindingChanged?.Invoke((PlayerSkillSlot)i);
         }
     }
 
@@ -1551,6 +1863,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     private void PublishSlotOverrides()
     {
         byte current = slotBindings.ActiveMask;
+        // 세트가 바뀐 칸의 후속은 원래 스킬로 복귀 + 쿨 시작(할 일 128 5a 규칙 4) — 후속은 '현재 세트의 그 칸' 위 한 겹이다.
+        byte published = IsNetworkActive ? activeSlotOverrides.Value : locallyAppliedOverrideMask;
+        CloseFollowUpsOnSetChange((byte)(published ^ current));
+
         if (IsNetworkActive)
         {
             activeSlotOverrides.Value = current;

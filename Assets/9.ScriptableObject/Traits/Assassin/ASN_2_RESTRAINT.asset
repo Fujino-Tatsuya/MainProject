@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c29cc7a6b1d47b046aa92501db8cbe93, type: 3}
+  m_Name: ASN_2_RESTRAINT
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
+  id: ASN_2_RESTRAINT
+  displayName: "절제된 분노"
+  category: "R 제거 · 일반 Q/E 강화"
+  description: "R과 변신을 사용할 수 없습니다.
+    대신 일반 Q와 E 피해가 {damageIncrease:%} 증가하고
+    재사용 대기시간이 {cooldownReduction:%} 줄어듭니다."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673709695301
+  - rid: 7237886673709695302
+  - rid: 7237886673709695303
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673709695301
+      type: {class: TraitDamageEffect, ns: , asm: Assembly-CSharp}
+      data:
+        damageIncrease: 0.35
+        attackTypes: 03000000
+        forms: 00
+    - rid: 7237886673709695302
+      type: {class: TraitDamageEffect, ns: , asm: Assembly-CSharp}
+      data:
+        damageIncrease: 0.35
+        attackTypes: 01000000
+        forms: 02
+    - rid: 7237886673709695303
+      type: {class: TraitCooldownEffect, ns: , asm: Assembly-CSharp}
+      data:
+        cooldownChange: -0.25
+        slots: 0000000001000000
+        forms: 00
