@@ -128,10 +128,46 @@ public sealed class QABoss103PlanTests
     }
 
     [Test]
-    public void 제시가_비면_마이너스1()
+    public void 제시가_비면_None()
     {
-        Assert.AreEqual(-1, QABoss103Plan.PickOffer(1, 1, QABoss103Character.Gunner, new List<int>()));
-        Assert.AreEqual(-1, QABoss103Plan.PickOffer(1, 1, QABoss103Character.Gunner, null));
+        Assert.AreEqual(TraitIdHash.None, QABoss103Plan.PickOffer(1, 1, QABoss103Character.Gunner, new List<int>()));
+        Assert.AreEqual(TraitIdHash.None, QABoss103Plan.PickOffer(1, 1, QABoss103Character.Gunner, null));
+    }
+
+    [Test]
+    public void 음수_해시_후보도_고른다()
+    {
+        // 특성 키 = TraitIdHash.Of(ID) — 음수도 정상 특성. 봇은 음수 해시를 "없음"으로 버리면 안 된다.
+        var offers = new List<int> { -1, -123456789, int.MinValue };
+        var picked = new HashSet<int>();
+        for (int seed = 0; seed < 200; seed++)
+        {
+            int pick = QABoss103Plan.PickOffer(seed, 1 + seed % 4, (QABoss103Character)(seed % 3), offers);
+            Assert.AreNotEqual(TraitIdHash.None, pick);
+            CollectionAssert.Contains(offers, pick);
+            picked.Add(pick);
+        }
+        Assert.AreEqual(offers.Count, picked.Count, "음수 해시 후보가 전부 한 번은 골라져야 한다");
+    }
+
+    [Test]
+    public void 실제_음수_해시_특성_ID가_고정표에_있으면_고른다()
+    {
+        // 고정표 ID 중 해시가 음수인 것만 모아 제시 — 봇이 고른 값이 그 목록 안(없음 아님)이어야 한다.
+        var offers = new List<int>();
+        foreach (TraitCatalog.Slot slot in TraitCatalog.Spec)
+        {
+            int h = TraitIdHash.Of(slot.Id);
+            if (h < 0 && offers.Count < TraitCatalog.CandidatesPerTier)
+                offers.Add(h);
+        }
+        Assume.That(offers.Count, Is.GreaterThan(0), "고정표에 음수 해시 ID 없음");
+        for (int seed = 0; seed < 50; seed++)
+        {
+            int pick = QABoss103Plan.PickOffer(seed, 1, QABoss103Character.Paladin, offers);
+            Assert.AreNotEqual(TraitIdHash.None, pick);
+            CollectionAssert.Contains(offers, pick);
+        }
     }
 
     [Test]

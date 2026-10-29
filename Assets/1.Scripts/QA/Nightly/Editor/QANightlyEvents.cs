@@ -14,6 +14,12 @@ public sealed class QANightlyEventRule
     /// <summary>에러·예외·Assert 로그에만.</summary>
     public readonly bool ErrorLogOnly;
     public readonly string[] Needles;
+    /// <summary>
+    /// 기록 전용 — 시각표(events.tsv)에만 남긴다: 클립 예약·5초 반복 거르기 없음, 리포트 이벤트 요약에서 빠진다(문제 신호가 아니라 진행 기록).
+    /// </summary>
+    public bool Trace;
+    /// <summary>상세 칸 최대 길이(<see cref="QANightlyEvents.Detail"/>).</summary>
+    public int DetailMax = QANightlyEvents.DefaultDetailMax;
 
     public QANightlyEventRule(string name, string label, bool errorLogOnly, params string[] needles)
     {
@@ -48,6 +54,12 @@ public static class QANightlyEvents
     public const string Death = "death";
     public const string Wipe = "wipe";
     public const string Timeout = "timeout";
+    /// <summary>할 일 140 — 특성 라운드 진행(기록 전용 <see cref="QANightlyEventRule.Trace"/>).</summary>
+    public const string Trait = "trait";
+
+    public const int DefaultDetailMax = 160;
+    /// <summary>계측 필드가 붙는 줄(재배치·특성 라운드) — 뒤쪽 필드가 잘리지 않게.</summary>
+    public const int LongDetailMax = 800;
 
     /// <summary>위에서부터 처음 맞는 줄. 같은 이름 여러 줄 = 같은 이벤트의 여러 근거.</summary>
     public static readonly QANightlyEventRule[] Table =
@@ -64,6 +76,7 @@ public static class QANightlyEvents
         new QANightlyEventRule(Wipe, "전멸(run_end Wipe)", false, "event=run_end ", "outcome=Wipe "),
         new QANightlyEventRule(Timeout, "시간초과 — 30분(run_end Timeout)", false, "event=run_end ", "outcome=Timeout "),
         new QANightlyEventRule(Timeout, "시간초과 — 조기(목숨 0·보스 HP 5분 불변)", false, "event=early_timeout "),
+        new QANightlyEventRule(Trait, "특성 라운드 — 라운드·완료·자동 선택·획득 ID(기록 전용)", false, "event=trait_round ") { Trace = true, DetailMax = LongDetailMax },
     };
 
     /// <summary>쉼표 목록 → 켤 이벤트 이름(소문자). 비면 null(= 표 전체).</summary>
@@ -90,8 +103,17 @@ public static class QANightlyEvents
         return null;
     }
 
+    /// <summary>기록 전용 이벤트 이름인가(<see cref="QANightlyEventRule.Trace"/>) — 리포트 요약에서 뺀다.</summary>
+    public static bool IsTrace(string name)
+    {
+        foreach (QANightlyEventRule r in Table)
+            if (r.Trace && r.Name == name)
+                return true;
+        return false;
+    }
+
     /// <summary>시각표 상세 칸 — 첫 줄, 탭·줄바꿈 없이, 최대 <paramref name="max"/> 자.</summary>
-    public static string Detail(string condition, int max = 160)
+    public static string Detail(string condition, int max = DefaultDetailMax)
     {
         string s = condition ?? "";
         int nl = s.IndexOf('\n');

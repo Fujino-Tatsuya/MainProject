@@ -309,10 +309,16 @@ public static class QANightlyHeader
         sb.Append("\n## 이벤트 시각표\n\n");
         sb.Append("영상 타임코드 = 그 판 영상(녹화 목록의 같은 판) 안의 위치(H:MM:SS). 게임 시각 = Play 의 Time.time(초). 같은 이벤트 5초 안 반복은 한 줄.\n\n");
         sb.Append("| 판 | 재실행 | 이벤트 | 시각 | 게임 시각(s) | 영상 타임코드 | 상세 |\n|---|---|---|---|---|---|---|\n");
-        if (events == null || events.Count == 0)
+        // 기록 전용(특성 라운드)은 events.tsv 에만 — 문제 신호 표를 덮지 않게.
+        var shown = new List<QANightlyEvent>();
+        if (events != null)
+            foreach (QANightlyEvent e in events)
+                if (!QANightlyEvents.IsTrace(e.Name))
+                    shown.Add(e);
+        if (shown.Count == 0)
             sb.Append("| - | - | 없음 | - | - | - | - |\n");
         else
-            foreach (QANightlyEvent e in events)
+            foreach (QANightlyEvent e in shown)
                 sb.Append("| ").Append(e.Run).Append(" | ").Append(e.Retry).Append(" | ").Append(Cell(e.Name)).Append(" | ")
                   .Append(e.At.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append(" | ")
                   .Append(double.IsNaN(e.GameSeconds) ? "-" : e.GameSeconds.ToString("F1", CultureInfo.InvariantCulture)).Append(" | ")

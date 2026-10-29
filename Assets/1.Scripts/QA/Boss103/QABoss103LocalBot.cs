@@ -95,7 +95,7 @@ public sealed class QABoss103LocalBot : MonoBehaviour
         int nth = _acquired.Count + 1;
         d.GetOffered(me, _offers);
         int pick = QABoss103Plan.PickOffer(_runSeed, nth, _character, _offers);
-        if (pick < 0)
+        if (pick == TraitIdHash.None)   // 특성 키는 ID 해시라 음수도 정상 — 없음 = 0 뿐
             return;
         _handledOfferSeq = seq;
         d.RequestChoose(pick);

@@ -486,7 +486,7 @@ public static class QANightlyHooks
                 return;
             QANightlyEventRule rule = QANightlyEvents.Match(condition, type, null);
             if (rule != null)
-                Record(l, run, retry, rule.Name, condition, GameSeconds());
+                Record(l, run, retry, rule.Name, QANightlyEvents.Detail(condition, rule.DetailMax), GameSeconds(), rule.Trace);
         }
         catch
         {
@@ -505,21 +505,23 @@ public static class QANightlyHooks
         {
             Live l = GetLive(dir);
             if (l != null && l.Nightly)
-                Record(l, run, retry, name, detail, GameSeconds());
+                Record(l, run, retry, name, QANightlyEvents.Detail(detail), GameSeconds(), false);
         }
         catch { /* 시각표 실패로 QA 를 멈추지 않는다 */ }
     }
 
     private static double GameSeconds() => EditorApplication.isPlaying ? UnityEngine.Time.timeAsDouble : double.NaN;
 
-    private static void Record(Live l, int run, int retry, string name, string detail, double gameSeconds)
+    /// <param name="detail">이미 자른 상세(<see cref="QANightlyEvents.Detail"/>).</param>
+    /// <param name="trace">기록 전용(<see cref="QANightlyEventRule.Trace"/>) — 반복 거르기·클립 예약 없이 시각표에만.</param>
+    private static void Record(Live l, int run, int retry, string name, string detail, double gameSeconds, bool trace)
     {
         DateTime nowUtc = DateTime.UtcNow;
-        if (!l.Throttle.Allow(run + "/" + retry, name, nowUtc))
+        if (!trace && !l.Throttle.Allow(run + "/" + retry, name, nowUtc))
             return;
         var ev = new QANightlyEvent
         {
-            Run = run, Retry = retry, Name = name, At = nowUtc.ToLocalTime(), GameSeconds = gameSeconds, Detail = QANightlyEvents.Detail(detail),
+            Run = run, Retry = retry, Name = name, At = nowUtc.ToLocalTime(), GameSeconds = gameSeconds, Detail = detail ?? "",
         };
         if (l.Mode == QANightlyLocalSettings.RecordFull)
         {
@@ -527,7 +529,7 @@ public static class QANightlyHooks
             if (a != null && a.Run == run && a.Retry == retry)
                 ev.VideoSeconds = QANightlyTimecode.VideoSeconds(a.AnchorUtc, a.OffsetMs, nowUtc);
         }
-        else if (l.Mode == QANightlyLocalSettings.RecordReplay && (l.ClipEnabled == null || l.ClipEnabled.Contains(name)))
+        else if (!trace && l.Mode == QANightlyLocalSettings.RecordReplay && (l.ClipEnabled == null || l.ClipEnabled.Contains(name)))
         {
             l.Planner.Add(nowUtc, name, run, retry, l.Settings.ReplayAfterSeconds, l.Settings.ReplayCooldownSeconds);
             SavePending(l);

@@ -188,10 +188,14 @@ public static class QABoss103Match
                 }
                 TraitDirector t = traits;
                 yield return ctx.Wait(() => t == null || t.IsRoundCompleteServer, TraitRoundWaitSeconds);
+                // complete = 대기 끝 순간 디렉터의 실제 판정(봇이 스스로 다 골랐나) — 자동 선택 전에 읽는다.
+                bool complete = traits != null && traits.IsRoundCompleteServer;
                 int auto = 0;
                 if (ctx.TimedOut && traits != null)
                     auto = traits.AutoChooseAllPendingServer();
-                Debug.Log($"{Tag} event=trait_round round={round} directorRound={(traits != null ? traits.Round : 0)} complete={(!ctx.TimedOut ? "true" : "false")} autoChosen={auto}");
+                // 야간 events.tsv 에도 남는다(QANightlyEvents 'trait' 기록 전용 줄).
+                Debug.Log($"{Tag} event=trait_round round={round} directorRound={(traits != null ? traits.Round : 0)} complete={B(complete)} autoChosen={auto} " +
+                          $"acquired={QABoss103Plan.Token(AcquiredToken(traits, ids))}");
             }
             var shortCounts = new List<string>();
             foreach (QABoss103Character ch in QABoss103Plan.PartyOrder)
@@ -464,6 +468,27 @@ public static class QABoss103Match
     }
 
     private static string B(bool v) => v ? "true" : "false";
+
+    /// <summary>trait_round 줄 — 클라마다 지금까지 얻은 특성 ID(<c>0:A+B;1:C+D</c>). 정의를 못 찾으면 <c>#해시</c>(음수 가능).</summary>
+    private static string AcquiredToken(TraitDirector traits, List<ulong> ids)
+    {
+        if (traits == null)
+            return "na";
+        var hashes = new List<int>();
+        var parts = new List<string>();
+        foreach (ulong id in ids)
+        {
+            traits.GetAcquired(id, hashes);
+            var names = new List<string>();
+            foreach (int h in hashes)
+            {
+                TraitDefinition def = traits.GetTrait(h);
+                names.Add(def != null ? def.Id : $"#{h}");
+            }
+            parts.Add($"{id}:{(names.Count > 0 ? string.Join("+", names) : "none")}");
+        }
+        return string.Join(";", parts);
+    }
 
     private static bool BossDeadSeen()
     {

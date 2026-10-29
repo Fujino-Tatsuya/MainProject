@@ -429,7 +429,8 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
                 Row2(sb, "리플레이 클립", clip.Length > 0 ? clip.ToString() : "없음");
             }
             // 할 일 120 — 이벤트 시각표(판·이벤트·영상 타임코드). 표 전체는 nightly-summary.md · events.tsv.
-            List<QANightlyEvent> events = QANightlyEvent.ParseAll(input.Events);
+            // 기록 전용(특성 라운드 등)은 문제 신호가 아니라 요약에서 뺀다 — events.tsv 에는 남는다.
+            List<QANightlyEvent> events = QANightlyEvent.ParseAll(input.Events).FindAll(e => !QANightlyEvents.IsTrace(e.Name));
             var ev = new StringBuilder();
             const int maxRows = 60;
             for (int i = 0; i < events.Count && i < maxRows; i++)

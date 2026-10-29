@@ -586,6 +586,34 @@ public sealed class QANightlyTests
     }
 
     [Test]
+    public void 특성_라운드_줄은_기록_전용으로_시각표에()
+    {
+        string line = "[QA103] event=trait_round round=4 directorRound=4 complete=true autoChosen=0 acquired=" + new string('x', 400) + "_TAIL";
+        QANightlyEventRule r = QANightlyEvents.Match(line, LogType.Log, null);
+        Assert.IsNotNull(r);
+        Assert.AreEqual(QANightlyEvents.Trait, r.Name);
+        Assert.IsTrue(r.Trace, "클립·반복 거르기 없음");
+        StringAssert.EndsWith("_TAIL", QANightlyEvents.Detail(line, r.DetailMax), "획득 ID 가 잘리지 않는다");
+        Assert.IsTrue(QANightlyEvents.IsTrace(QANightlyEvents.Trait));
+        Assert.IsFalse(QANightlyEvents.IsTrace(QANightlyEvents.Stuck));
+        // 에러 로그는 여전히 오류로 — 기록 전용 줄이 표 앞에서 가로채지 않는다.
+        Assert.AreEqual(QANightlyEvents.Error, QANightlyEvents.Match(line, LogType.Error, null).Name);
+    }
+
+    [Test]
+    public void 요약_이벤트_표에서_기록_전용은_빠진다()
+    {
+        var events = new List<QANightlyEvent>
+        {
+            new QANightlyEvent { Run = 1, Name = QANightlyEvents.Trait, At = new DateTime(2026, 10, 29, 1, 0, 0), Detail = "TRAIT_ROW" },
+            new QANightlyEvent { Run = 1, Name = QANightlyEvents.Stuck, At = new DateTime(2026, 10, 29, 1, 0, 5), Detail = "STUCK_ROW" },
+        };
+        string md = QANightlyHeader.Summary(new Dictionary<string, string>(), null, null, "done", "", events);
+        StringAssert.Contains("STUCK_ROW", md);
+        StringAssert.DoesNotContain("TRAIT_ROW", md);
+    }
+
+    [Test]
     public void 시각표_상세는_첫줄_탭없이_자른다()
     {
         Assert.AreEqual("a b", QANightlyEvents.Detail("a\tb\nstack"));

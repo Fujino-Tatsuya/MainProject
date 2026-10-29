@@ -337,12 +337,13 @@ public static class QABoss103Plan
 
     /// <summary>
     /// 그 캐릭터의 <paramref name="nth"/>(1부터 — 이미 얻은 수 + 1 = 차수) 번째 선택에서 제시받은 <paramref name="offers"/>(특성 ID 해시) 중 고를 키.
-    /// 같은 (판 시드·순번·캐릭터·제시 목록) = 같은 결과. 제시가 비면 -1.
+    /// 같은 (판 시드·순번·캐릭터·제시 목록) = 같은 결과. 제시가 비면 <see cref="TraitIdHash.None"/>(0).
+    /// 키는 ID 해시라 음수도 정상 특성이다 — 없음 판정은 <c>== TraitIdHash.None</c> 로만 한다(&lt; 0 금지).
     /// </summary>
     public static int PickOffer(int runSeed, int nth, QABoss103Character character, IReadOnlyList<int> offers)
     {
         if (offers == null || offers.Count == 0)
-            return -1;
+            return TraitIdHash.None;
         uint h = (uint)Mix(runSeed, nth, (int)character + 1, 0x51C7);
         return offers[(int)(h % (uint)offers.Count)];
     }
