@@ -14,6 +14,7 @@ internal static class MapSceneEditModeTestRunner
         "^MapSceneGateHoldTests$", // 게이트 보류 — 4구역 소개 연출이 끝나야 G7(PLAN-zone4-intro-cinematic)
         "^MapSceneAreaTrackerTests$",
         "^MapSceneBarrierRulesTests$",
+        "^MapSceneBarrierMonsterBlockTests$", // 할 일 148 — 열린 배리어도 몬스터 카브는 남는다(복도 늘 몬스터 출입 금지)
         "^MapSceneBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^MapSceneMonsterLedgerTests$",
         "^MapSceneBossPathRulesTests$",
