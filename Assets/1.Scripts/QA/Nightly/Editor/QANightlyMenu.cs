@@ -40,6 +40,8 @@ public static class QANightlyMenu
             QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD"), QABoss103RunCsv.GitCommit(), Application.unityVersion, local.RecordMode, shareDir);
         batch.Add(new KeyValuePair<string, string>("data_source_toolbar_before", toolbarBefore));
         batch.Add(new KeyValuePair<string, string>("nightly_seed_file", QANightlySeed.RelativePath));
+        // 할 일 140-3 — Assets/50.Art SVN 리비전·origin/development 포함 여부. 테이블 사전 검사는 루프 첫 준비(Play 전)에서.
+        batch.AddRange(QANightlyHooks.VcsKeys());
 
         var state = new List<KeyValuePair<string, string>>
         {
@@ -66,7 +68,10 @@ public static class QANightlyMenu
     public static void ResumeLast()
     {
         if (QABoss103BatchRunner.ResumeLatest(QANightlyPaths.BatchPattern) && QABoss103BatchRunner.IsRunning)
+        {
+            QANightlyHooks.RefreshVcs(QABoss103BatchRunner.CurrentDir, null);
             QANightlyHooks.BatchStarting(QABoss103BatchRunner.CurrentDir, null);
+        }
     }
 
     [MenuItem(Root + "Stop After Current Run", priority = 2)]

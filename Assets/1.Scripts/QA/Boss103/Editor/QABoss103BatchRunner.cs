@@ -38,6 +38,8 @@ public static class QABoss103BatchRunner
     private const double VpSettleSeconds = 15.0;
     private const double VpReadyTimeoutSeconds = 180.0;
     private const double StopRetrySeconds = 30.0;
+    /// <summary>할 일 140-3 — 진행 상태 키. 1 = 다음 준비에서 테이블 사전 검사(배치 시작·이어 하기·play_start 오류 뒤).</summary>
+    private const string TableCheckKey = "tableCheck";
 
     private static double _nextTick;
     private static double _nextRunningCheck;
@@ -341,6 +343,7 @@ public static class QABoss103BatchRunner
         EditorPrefs.SetBool(RunningKey, true);
         SessionState.SetString(LiveSessionKey, "1");
         DataSourcePlayMode.Current = DataSource.Table;
+        _state[TableCheckKey] = "1";   // 할 일 140-3 — 첫 준비에서 테이블 사전 검사(야간 배치만)
         Save();
         _nextTick = 0;
     }
@@ -451,6 +454,18 @@ public static class QABoss103BatchRunner
         {
             Finish($"{Total}판 + 오류 판 재실행 끝", "done");
             return;
+        }
+        if (IsNightlyBatch && Get(TableCheckKey) == "1")
+        {
+            // 할 일 140-3 — 테이블 준비 오류면 Play 진입이 취소돼 판마다 180초를 기다리다 play_start 로 버린다. Play 없이 바로 멈춘다.
+            string stop = QANightlyHooks.CheckTableSync(_stateDir, Log);
+            Set(TableCheckKey, "0");
+            if (stop != null)
+            {
+                Note($"Play 시도 안 함 — {stop}");
+                Finish(stop, "stopped");
+                return;
+            }
         }
         if (Get("recycle") == "1")
         {
@@ -586,6 +601,9 @@ public static class QABoss103BatchRunner
         DateTime started = DateTime.TryParse(Get("attemptLocal"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime s) ? s : DateTime.Now;
         QABoss103RunCsv.WriteLoopError(cfg, reason, note, source, started);
         Log($"판 {cfg.Run}{(cfg.Retry > 0 ? " 재실행" : "")} 오류 {reason} — {note}");
+        if (reason == QABoss103Batch.ReasonPlayStart)
+            Set(TableCheckKey, "1");   // 할 일 140-3 — 테이블 오류로 진입이 취소됐나 다음 준비에서 확인
+
         if (IsNightlyBatch)
             QANightlyHooks.Event(_stateDir, cfg.Run, cfg.Retry, QANightlyEvents.Error, $"루프 판 오류 {reason} — {note}");
         if (stopPlay && EditorApplication.isPlaying)

@@ -265,11 +265,17 @@ public static class QANightlyHeader
     {
         var sb = new StringBuilder();
         sb.Append("# ").Append(Val(batch, "title", "할 일 108 야간 QA")).Append("\n\n");
+        string tableSync = Val(batch, QANightlyTableSync.KeyTableSync, "");
+        if (QANightlyTableSync.IsStop(tableSync))
+            sb.Append("> ⚠ 배치 멈춤(Play 시도 안 함) — ").Append(tableSync.Replace('\n', ' ')).Append("\n\n");
         sb.Append("| 항목 | 값 |\n|---|---|\n");
         Row(sb, "시드 이름", Val(batch, KeySeedName, "unknown"));
         Row(sb, "데이터 출처(툴바)", Val(batch, "data_source_mode", "unknown") + " — 판마다 런타임 출처는 runs.csv data_source 열(테이블이 아니면 오류 판)");
         Row(sb, "GameData.xlsx SVN 리비전", Val(batch, "xlsx_svn_rev", "unknown"));
+        Row(sb, "Assets/50.Art SVN 리비전", Val(batch, QANightlyTableSync.KeyArtRev, QANightlyTableSync.Na));
         Row(sb, "브랜치 / 커밋", Val(batch, "git_branch", "unknown") + " / " + Val(batch, "git_commit", "unknown"));
+        Row(sb, "origin/development 포함", QANightlyTableSync.DevLine(Val(batch, QANightlyTableSync.KeyDevRef, ""), Val(batch, QANightlyTableSync.KeyDevMerged, "")));
+        Row(sb, "테이블 사전 검사", tableSync.Length > 0 ? tableSync : "-");
         Row(sb, "Unity", Val(batch, "unity_version", "unknown"));
         Row(sb, "기준 시드 / 특성 시드", Val(batch, "seed", "unknown") + " / " + Val(batch, "nightly_trait_seed", "0") + "(0 = 기준 시드)");
         Row(sb, "봇 단계 / 자리 순서", Val(batch, "nightly_tier", "auto") + " / " + Val(batch, "nightly_order", ""));

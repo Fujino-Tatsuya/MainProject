@@ -657,6 +657,131 @@ public static class QANightlyHooks
 
     private static void SavePending(Live l) => TryWrite(Path.Combine(l.Dir, PendingFile), l.Planner.Format());
 
+    // ── 테이블 싱크 사전 검사 (할 일 140-3) ─────────────────────
+
+    /// <summary>
+    /// 배치 머리 VCS 키(<see cref="QANightlyTableSync"/>) — Assets/50.Art SVN 리비전·origin/development 짧은 커밋·HEAD 포함 여부.
+    /// 원격 ref 는 fetch 없이 로컬 ref 기준. git/svn 실패는 na(배치는 계속).
+    /// </summary>
+    public static List<KeyValuePair<string, string>> VcsKeys()
+    {
+        string art = QANightlyTableSync.OrNa(QABoss103RunCsv.Shell("svn",
+            $"info --non-interactive --show-item revision \"{Path.Combine(QANetSim88.OwnRoot, "Assets/50.Art")}\""));
+        string devRef = QANightlyTableSync.OrNa(QABoss103RunCsv.Shell("git", "rev-parse --short origin/development"));
+        string merged = QANightlyTableSync.DevMerged(ExitCode("git", "merge-base --is-ancestor origin/development HEAD"));
+        return new List<KeyValuePair<string, string>>
+        {
+            new KeyValuePair<string, string>(QANightlyTableSync.KeyArtRev, art),
+            new KeyValuePair<string, string>(QANightlyTableSync.KeyDevRef, devRef),
+            new KeyValuePair<string, string>(QANightlyTableSync.KeyDevMerged, merged),
+        };
+    }
+
+    /// <summary>Resume — 이어 가는 지금 코드·리비전으로 batch.txt VCS 키(git_commit·git_branch·xlsx 포함)를 갱신한다. 바뀐 값은 loop.log 에 남긴다.</summary>
+    public static void RefreshVcs(string dir, Action<string> log)
+    {
+        Dictionary<string, string> batch = ReadBatch(dir);
+        if (!IsNightly(batch))
+            return;
+        log = log ?? DirLog(dir);
+        var keys = new List<KeyValuePair<string, string>>
+        {
+            new KeyValuePair<string, string>("xlsx_svn_rev", QANightlyPaths.NormalizeRevision(QABoss103RunCsv.XlsxRevision())),
+            new KeyValuePair<string, string>("git_commit", QANightlyTableSync.OrNa(QABoss103RunCsv.GitCommit())),
+            new KeyValuePair<string, string>("git_branch", QANightlyTableSync.OrNa(QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD"))),
+        };
+        keys.AddRange(VcsKeys());
+        var changed = new List<string>();
+        foreach (KeyValuePair<string, string> kv in keys)
+        {
+            string was = Val(batch, kv.Key);
+            if (was != kv.Value)
+                changed.Add($"{kv.Key} {(was.Length > 0 ? was : "-")}→{kv.Value}");
+            batch[kv.Key] = kv.Value;
+        }
+        TryWrite(Path.Combine(dir, QABoss103Batch.BatchFile), QABoss103Batch.FormatKeyValues(batch));
+        log($"이어 하기 VCS — {(changed.Count > 0 ? string.Join(" · ", changed) : "배치 시작 때와 같음")} · " +
+            QANightlyTableSync.DevLine(Val(batch, QANightlyTableSync.KeyDevRef), Val(batch, QANightlyTableSync.KeyDevMerged)));
+    }
+
+    /// <summary>
+    /// 테이블 Play 준비(<see cref="DataTableSource.Load"/> — Play 진입 때와 같은 검사)를 미리 돌린다. 결과는 batch.txt <c>table_sync</c> 에 남긴다.
+    /// 오류면 멈춤 문구(<see cref="QANightlyTableSync.StopMessage"/>), 아니면 null.
+    /// 규칙은 <c>DataSourcePlayMode.PrepareTablePlay</c> 와 같다 — 툴바 출처가 인스펙터면 테이블을 안 읽고(배치는 Arm·판 시작마다 테이블로 맞추므로 실제로는 안 생긴다),
+    /// xlsx 가 없으면 막지 않는다(SO 값으로 돈다). 사운드 시트 자동 싱크(디스크에 씀)는 돌리지 않는다.
+    /// </summary>
+    public static string CheckTableSync(string dir, Action<string> log)
+    {
+        log = log ?? DirLog(dir);
+        string result;
+        string stop = null;
+        if (DataSourcePlayMode.Current != DataSource.Table)
+            result = "skipped_inspector";
+        else
+        {
+            DataTableSource.Result r;
+            try { r = DataTableSource.Load(); }
+            catch (Exception e)
+            {
+                // 검사 자체 실패로 배치를 멈추지 않는다 — Play 진입 때 같은 오류면 기존 play_start 처리로 간다.
+                log($"⚠ 테이블 사전 검사 실패(그대로 진행) — {e.GetType().Name}: {e.Message}");
+                return null;
+            }
+            if (r.FileCount == 0)
+                result = QANightlyTableSync.NoXlsx;
+            else
+            {
+                var errors = new List<KeyValuePair<string, string>>();
+                foreach (DataTableIssue i in r.Issues.Items)
+                    if (i.Kind == DataTableIssueKind.Error)
+                        errors.Add(new KeyValuePair<string, string>(i.Location, i.Message));
+                List<string> missing = QANightlyTableSync.Classify(errors, out int other, out string firstOther);
+                stop = QANightlyTableSync.StopMessage(missing, other, firstOther);
+                result = stop ?? QANightlyTableSync.Ok;
+                if (stop == null)
+                    log($"테이블 사전 검사 OK — xlsx {r.FileCount}개 · 필드 {r.Writes.Count}개 · 오류 0");
+            }
+        }
+        Dictionary<string, string> batch = ReadBatch(dir);
+        batch[QANightlyTableSync.KeyTableSync] = result;
+        TryWrite(Path.Combine(dir, QABoss103Batch.BatchFile), QABoss103Batch.FormatKeyValues(batch));
+        if (stop == null && result != QANightlyTableSync.Ok)
+            log($"테이블 사전 검사 건너뜀 — {result}");
+        return stop;
+    }
+
+    /// <summary>명령 1개의 종료 코드(상한 5초). 실행 실패·시간 초과 = null.</summary>
+    private static int? ExitCode(string exe, string args)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(exe, args)
+            {
+                WorkingDirectory = QANetSim88.OwnRoot,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            using (System.Diagnostics.Process p = System.Diagnostics.Process.Start(psi))
+            {
+                if (p == null)
+                    return null;
+                p.StandardOutput.ReadToEnd();
+                if (!p.WaitForExit(5000))
+                {
+                    try { p.Kill(); } catch { }
+                    return null;
+                }
+                return p.ExitCode;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ── 요약 ─────────────────────────────────────────────────
 
     /// <summary>로컬 아침 요약(nightly-summary.md)을 배치 폴더에 쓴다. 공유 폴더에는 쓰지 않는다 — 공유 리포트는 에이전트가 쓴다.</summary>
