@@ -27,6 +27,7 @@ MonoBehaviour:
   attackRange: 3.4
   leashRadius: 22
   retargetInterval: 0
+  loseTargetRadius: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
   avoidanceRadius: 0.3
@@ -316,11 +317,16 @@ MonoBehaviour:
     steps:
     - attack: 0
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 1
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 5
       forceFire: 0
+      landingCounterWindow: 0
     chainOnHit: 1
+    windup: 0
+    windupStartNormalized: 0
   - name: HookUpper
     weight: 15
     allowedFromPhase: 0
@@ -328,9 +334,13 @@ MonoBehaviour:
     steps:
     - attack: 0
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 2
       forceFire: 0
+      landingCounterWindow: 0
     chainOnHit: 1
+    windup: 0
+    windupStartNormalized: 0
   - name: DashGrab
     weight: 25
     allowedFromPhase: 0
@@ -338,9 +348,13 @@ MonoBehaviour:
     steps:
     - attack: 5
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 3
       forceFire: 1
+      landingCounterWindow: 0
     chainOnHit: 1
+    windup: 0
+    windupStartNormalized: 0
   - name: JumpDash
     weight: 25
     allowedFromPhase: 0
@@ -348,9 +362,13 @@ MonoBehaviour:
     steps:
     - attack: 4
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 5
       forceFire: 0
+      landingCounterWindow: 0
     chainOnHit: 1
+    windup: 0
+    windupStartNormalized: 0
   - name: UpperGrab
     weight: 10
     allowedFromPhase: 0
@@ -358,9 +376,13 @@ MonoBehaviour:
     steps:
     - attack: 2
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 3
       forceFire: 1
+      landingCounterWindow: 0
     chainOnHit: 1
+    windup: 0
+    windupStartNormalized: 0
   - name: HookHookHook
     weight: 15
     allowedFromPhase: 0
@@ -368,11 +390,16 @@ MonoBehaviour:
     steps:
     - attack: 0
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 1
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 0
       forceFire: 0
+      landingCounterWindow: 0
     chainOnHit: 1
+    windup: 0
+    windupStartNormalized: 0
   - name: JumpJumpJump
     weight: 21
     allowedFromPhase: 0
@@ -380,8 +407,10 @@ MonoBehaviour:
     steps:
     - attack: 4
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 4
       forceFire: 0
+      landingCounterWindow: 0
     - attack: 4
       forceFire: 0
       landingCounterWindow: 0.8
@@ -416,18 +445,70 @@ MonoBehaviour:
   - 4.55
   playerHitDamageCapRatio: 0.9
   raidScript: 1
-  selfDestructAtZero: 1
   raidChargeTimeLimit: 25
   raidDroneGuideCooldown: 1.5
   raidDischargeWarnTime: 2.5
   raidDischargeDamage: 150
+  raidPylonHpMultiplier: 2
   raidSelfDestructTime: 30
   raidSelfDestructGaugeDamage: 750
+  raidSelfDestructCounterBonus: 35
+  raidSelfDestructCounterInterval: 5
+  raidSelfDestructCounterWindow: 1.5
+  raidSelfDestructDamageReduction: 0.9
+  raidSelfDestructBlastWarn: 1.2
+  raidSelfDestructBlastDamage: 190
+  raidSelfDestructBlastLethal: 1
+  raidSelfDestructBlastIgnoreInvuln: 1
+  relaySafeLines: 3
+  relayCorridorHalfWidth: 3.5
+  relayGatherWarn: 7
+  relayOpeningDamage: 80
+  relayReady: 1
+  relayPrepare: 1.8
+  relayCounterWindow: 0.9
+  relayPushDistance: 2.8
+  relayPushTime: 0.45
+  relaySoloPushMultiplier: 2
+  relayReposition: 1.2
+  relayGoalInset: 4
+  relayTimeout: 60
+  relayFailDashDamage: 55
+  relaySuccessExhaust: 6
+  relaySideInterval: 2
+  relaySideWarn: 0.8
+  relaySideDamage: 7
+  relayResumeDelay: 2
+  pushNorthFirstChargeTime: 12
+  pushNorthChargeTime: 10
+  pushNorthStunTime: 3
+  pushNorthStepTiles: 1
+  pushNorthPushTime: 0.45
+  pushNorthRewardDuration: 8
+  pushNorthRewardDamageMultiplier: 1.3
+  pushNorthDischargeIgnoreInvuln: 1
+  selfDestructAtZero: 1
+  chainMarkTime: 1
+  chainCounterWindow: 1.5
+  chainHitStun: 1
+  chainInterval: 1.5
+  chainFailWarn: 1
+  chainFailDamage: 70
+  chainDashDamage: 40
+  chainPartialGroggy: 1.5
+  chainPartialVulnerable: 8
+  useFacingRules: 0
+  counterRequiresFront: 1
   counterFrontAngle: 90
   backAttackAngle: 60
   hitReactionState: getowned
   hitReactionStateRight: getowned_R
+  parryRetreatDistance: 2
+  parryRetreatTime: 0.5
   breakDuration: 5
+  suppressSegmentCount: 3
+  counterSegmentStep: 1
+  environmentSegmentStep: 1
   counterGaugeStep: 20
   environmentGaugeStep: 20
   suppressDamageMultiplier: 1.2
@@ -439,6 +520,14 @@ MonoBehaviour:
   vulnerableTint: {r: 0.45, g: 0.75, b: 1, a: 1}
   aggroRetargetInterval: 8
   aggroAvoidsRepeatTarget: 1
+  threatAggro: 1
+  threatHalfLife: 6
+  threatSwitchRatio: 1.3
+  threatMinHold: 4
+  threatMinScore: 30
+  farPressureDistance: 8
+  farPressureWeightMultiplier: 4
+  farPressureCooldownScale: 0.5
   chargeClearGroggyDuration: 1.5
   grabRadius: 3.74
   grabHoldDuration: 1.13
@@ -470,7 +559,6 @@ MonoBehaviour:
   jumpHoverState: JumpHover
   jumpLandingState: JumpLanding
   silentLandingState: EntranceLanding
-  jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
   chargeTimeLimit: 30
@@ -494,12 +582,11 @@ MonoBehaviour:
   dashStunDuration: 1
   dashKnockbackStrength: 5
   bombThrowInterval: 6
-  bombPrefab: {fileID: 7643126938755057433, guid: ede00d4e6aaec7442abf1ed83b4a7234, type: 3}
   spreadAngle: 15
   electricFloor: {fileID: 11400000, guid: 3dc6da150d6e4c29a2d414faad7d1234, type: 2}
   wellsDrone: {fileID: 11400000, guid: 18b9ee564410be04a95d0ef34173cac3, type: 2}
   globalAttackInterval: 1.5
-  chargeAuraRadius: 5.5
+  chargeAuraRadius: 3
   chargeAuraInterval: 1
   chargeAuraDamage: 20
   chargeAuraKnockbackStrength: 5
