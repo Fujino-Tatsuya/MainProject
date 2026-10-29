@@ -364,7 +364,8 @@ public sealed class PaladinTraitFourthTierTests
         Assert.AreEqual(PaladinTraitValues.QBlastKey, blast.Key);
         Assert.AreEqual(0.3f, blast.DamageRatio, Eps);
         Assert.AreEqual(2f, blast.Radius, Eps, "반경 2m");
-        Assert.AreEqual(1f, blast.ForwardOffset, Eps, "전방 1m 중심");
+        Assert.AreEqual(1f, blast.ForwardOffset, Eps, "전방 1m 꼭짓점");
+        Assert.AreEqual(90f, blast.Angle, Eps, "90° 부채꼴(할 일 146)");
         Assert.AreEqual(0.05f, blast.Delay, Eps);
         Assert.IsTrue(blast.Counter.Tick() && blast.Counter.Tick(), "매 정상 종료마다(N번마다 아님)");
 
@@ -377,6 +378,26 @@ public sealed class PaladinTraitFourthTierTests
 
         UnbindAll(bindings);
         Assert.IsEmpty(host.DerivedFor(QKey), "특성 없음(되돌림) = 충격 없음");
+    }
+
+    // 할 일 146 — 원 → 90° 부채꼴. 반경은 호출 쪽 구 질의, 여기선 각도만(대상 표면 기준, 꼭짓점이 콜라이더 안이면 중심 방향).
+    [Test]
+    public void QBlast_Sector_90Degrees_FrontOnly()
+    {
+        Vector3 apex = new Vector3(2f, 0f, 2f);
+        Vector3 forward = Vector3.forward;
+        Vector3 At(float yaw, float distance) => apex + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * distance;
+
+        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(0f, 1.5f), At(0f, 1.5f)), "정면");
+        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(44.5f, 1.5f), At(44.5f, 1.5f)), "반각 45° 안");
+        Assert.IsFalse(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(46f, 1.5f), At(46f, 1.5f)), "반각 45° 밖");
+        Assert.IsFalse(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(180f, 1f), At(180f, 1f)), "뒤 = 제외(예전 원은 포함)");
+        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(0f, 1f) + Vector3.up * 3f, At(0f, 1f)), "높이 무시");
+        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, apex, At(10f, 0.5f)), "꼭짓점을 덮은 대상 = 중심 방향");
+        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 360f, At(180f, 1f), At(180f, 1f)), "360 = 원(다른 파생 공격 기본값)");
+
+        var spec = new TraitDerivedAttackEffect("X", 0.3f).CreateRuntime(1);
+        Assert.AreEqual(360f, spec.Angle, Eps, "angle 칸 기본 = 원 — 진격의 충격 외 파생 공격은 그대로");
     }
 
     [Test]

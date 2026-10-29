@@ -343,11 +343,14 @@ public sealed class TraitDerivedAttack
     public readonly float Delay;
     public readonly float Radius;
     public readonly float ForwardOffset;
+    /// <summary>판정 부채꼴 전체 각도(도). 360 이상 = 원.</summary>
+    public readonly float Angle;
     public readonly TraitShotCounter Counter;
 
     public TraitDerivedAttack(int traitHash, string key, int sourceAttackTypeMask, int sourceFormMask,
-        float damageRatio, float delay, float radius, float forwardOffset, int requiredCount)
+        float damageRatio, float delay, float radius, float forwardOffset, int requiredCount, float angle = 360f)
     {
+        Angle = angle;
         TraitHash = traitHash;
         Key = key ?? string.Empty;
         SourceAttackTypeMask = sourceAttackTypeMask;

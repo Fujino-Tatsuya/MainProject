@@ -392,6 +392,9 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
     [SerializeField] private float radius;
     [Tooltip("판정 중심 앞쪽 거리(m).")]
     [SerializeField] private float forwardOffset;
+    [Tooltip("판정 부채꼴 각도(도, 전체) — 판정 중심에서 앞쪽으로 반경 radius 만큼. 360 = 원(기본). 지금 쓰는 곳 = 진격의 충격(90).")]
+    [Range(1f, 360f)]
+    [SerializeField] private float angle = 360f;
     [Tooltip("원래 공격 N번마다 1회(이중 출력 3). 1 = 매번.")]
     [Min(1)]
     [SerializeField] private int requiredCount = 1;
@@ -399,7 +402,8 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
     public TraitDerivedAttackEffect() { }
 
     public TraitDerivedAttackEffect(string derivedKey, float damageRatio, AttackType[] sourceAttackTypes = null,
-        TraitAttackForm[] sourceForms = null, float delay = 0f, float radius = 0f, float forwardOffset = 0f, int requiredCount = 1)
+        TraitAttackForm[] sourceForms = null, float delay = 0f, float radius = 0f, float forwardOffset = 0f, int requiredCount = 1,
+        float angle = 360f)
     {
         this.derivedKey = derivedKey;
         this.damageRatio = damageRatio;
@@ -409,6 +413,7 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
         this.radius = radius;
         this.forwardOffset = forwardOffset;
         this.requiredCount = requiredCount;
+        this.angle = angle;
     }
 
     public string DerivedKey => derivedKey;
@@ -416,7 +421,7 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
 
     public TraitDerivedAttack CreateRuntime(int traitHash) =>
         new TraitDerivedAttack(traitHash, derivedKey, MaskOf(sourceAttackTypes), MaskOf(sourceForms),
-            damageRatio, delay, radius, forwardOffset, requiredCount);
+            damageRatio, delay, radius, forwardOffset, requiredCount, angle);
 
     public override ITraitEffectBinding BindServer(ITraitEffectHost host, int traitHash)
     {
@@ -436,6 +441,8 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
         CheckNonNegative(errors, nameof(delay), delay);
         CheckNonNegative(errors, nameof(radius), radius);
         CheckFinite(errors, nameof(forwardOffset), forwardOffset);
+        if (!(angle > 0f) || angle > 360f)
+            errors.Add($"{nameof(TraitDerivedAttackEffect)}.angle = {angle} — 0 초과 360 이하");
         if (requiredCount < 1)
             errors.Add($"{nameof(TraitDerivedAttackEffect)}.requiredCount = {requiredCount} < 1");
     }

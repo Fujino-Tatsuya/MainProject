@@ -36,6 +36,30 @@ public static class PaladinTraitRules
         casterHealth > 0 &&
         (reason == SkillEndReason.Completed || reason == SkillEndReason.Released || reason == SkillEndReason.MaxDurationReached);
 
+    /// <summary>
+    /// 진격의 충격(할 일 146) — 대상이 판정 부채꼴(꼭짓점 <paramref name="apex"/>, 정면 <paramref name="forward"/>, 전체 각도 <paramref name="angle"/>) 각도 안인가(바닥 평면).
+    /// 반경은 호출 쪽 구 질의가 거른다. 각도 기준 = 대상 콜라이더의 꼭짓점에 가장 가까운 점(<paramref name="closestPoint"/>) — 반격 부채꼴과 같은 표면 기준.
+    /// 꼭짓점이 콜라이더 안(가장 가까운 점 = 꼭짓점)이면 콜라이더 중심 방향으로 본다. 360 이상 = 원(각도 검사 없음).
+    /// </summary>
+    public static bool QBlastInSector(Vector3 apex, Vector3 forward, float angle, Vector3 closestPoint, Vector3 boundsCenter)
+    {
+        if (angle >= 360f)
+            return true;
+
+        forward.y = 0f;
+        Vector3 toTarget = closestPoint - apex;
+        toTarget.y = 0f;
+        if (toTarget.sqrMagnitude < 0.0001f)
+        {
+            toTarget = boundsCenter - apex;
+            toTarget.y = 0f;
+        }
+
+        if (forward.sqrMagnitude < 0.0001f || toTarget.sqrMagnitude < 0.0001f)
+            return true;
+        return Vector3.Angle(forward, toTarget) <= Mathf.Clamp(angle, 0f, 360f) * 0.5f;
+    }
+
     /// <summary>기본 Q 의 예정 틱 수 = 최대 유지 시간 ÷ 틱 간격(내림). 홀드 틱은 시작 뒤 간격마다 1회라 안전망 padding(&lt; 간격) 안에서는 늘지 않는다.</summary>
     public static int PlannedHoldTicks(float holdDuration, float tickInterval)
     {

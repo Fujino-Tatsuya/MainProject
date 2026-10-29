@@ -290,7 +290,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // ── 진격의 충격(PAL_4_Q_BLAST, 할 일 126) ──
 
     /// <summary>
-    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 전방 forwardOffset 지점·반경 radius 판정을 delay 뒤 1회 예약한다.
+    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 전방 forwardOffset 지점을 꼭짓점으로 반경 radius·각도 angle 부채꼴 판정을 delay 뒤 1회 예약한다.
     /// 피해 = DQpacket(<see cref="PaladinTraitRules.QPacketDamage(int,float,float,float)"/> — 이 시전의 틱 Dref 스냅샷 × 예정 틱 수,
     /// 돌파의 방패면 그 × 교체 배율 = 교체 단발 피해) × 파생 배율. 실제 맞힌 틱·적 수와 무관하다.
     /// </summary>
@@ -317,8 +317,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                 continue;
             }
 
-            Vector3 center = owner.transform.position + heading * attack.ForwardOffset;
-            StartCoroutine(RunTraitBlastServer(center, attack.Radius, attack.DamageFrom(packet), attack.Delay, sceneHandle));
+            // 부채꼴 꼭짓점 = Q 끝 지점 + 정면 forwardOffset, 정면 = 마지막 진행 방향(할 일 146 — 원 → 90° 부채꼴, 각도 = 효과 칸 angle).
+            Vector3 apex = owner.transform.position + heading * attack.ForwardOffset;
+            StartCoroutine(RunTraitBlastServer(apex, heading, attack.Radius, attack.Angle, attack.DamageFrom(packet), attack.Delay, sceneHandle));
         }
 
         traitDerivedAttacks.Clear();
@@ -329,7 +330,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     /// 그래서 패시브 추가피해(ServerTakeOnHitBonus)·밀치기 수정자·<see cref="Player.RaiseServerAttackLanded"/> 를 부르지 않는다.
     /// 지형 차단은 원래 Q 판정처럼 없다(같은 레이어 Overlap). 지연 동안 시전자가 죽거나 씬이 바뀌면 취소한다. 이펙트 없음(판정만).
     /// </summary>
-    private System.Collections.IEnumerator RunTraitBlastServer(Vector3 center, float radius, int damage, float delay, int sceneHandle)
+    private System.Collections.IEnumerator RunTraitBlastServer(Vector3 apex, Vector3 forward, float radius, float angle, int damage, float delay, int sceneHandle)
     {
         if (delay > 0f)
             yield return new WaitForSeconds(delay);
@@ -337,12 +338,12 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         if (owner == null || !owner.IsServer || owner.CurrentHealth <= 0 || UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle != sceneHandle || Data == null)
             yield break;
 
-        int hitCount = Physics.OverlapSphereNonAlloc(center, radius, traitBlastResults, Data.HittableLayers, QueryTriggerInteraction.Collide);
+        int hitCount = Physics.OverlapSphereNonAlloc(apex, radius, traitBlastResults, Data.HittableLayers, QueryTriggerInteraction.Collide);
         traitBlastTargets.Clear();
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = traitBlastResults[i];
-            if (hit == null)
+            if (hit == null || !PaladinTraitRules.QBlastInSector(apex, forward, angle, hit.ClosestPoint(apex), hit.bounds.center))
                 continue;
 
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);

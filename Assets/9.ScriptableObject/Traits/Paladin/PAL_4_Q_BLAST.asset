@@ -33,4 +33,5 @@ MonoBehaviour:
         delay: 0.05
         radius: 2
         forwardOffset: 1
+        angle: 90
         requiredCount: 1
