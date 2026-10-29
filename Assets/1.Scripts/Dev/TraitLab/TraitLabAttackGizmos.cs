@@ -124,38 +124,41 @@ public static class TraitLabAttackShapes
     {
         const TraitLabGizmoCategory B = TraitLabGizmoCategory.Basic;
 
-        // 가붕이 — 단계 앵커(비었으면 기본 앵커). 여러 단계가 같은 앵커면 한 번만 그리고 라벨에 단계를 모은다.
+        // 가붕이 — 단계의 판정 도형(할 일 153 3단계). 도형마다 넓은 질의 상자(직사각형이면 판정 영역 그대로)를 임시로 그린다 — 6단계에서 AttackShapeDrawing 으로 통합.
+        // 여러 단계가 같은 상자면 한 번만 그리고 라벨에 단계를 모은다.
         if (player.TryGetComponent(out DefaultAttackController melee) && melee.isActiveAndEnabled && melee.AttackSteps != null)
         {
             IReadOnlyList<DefaultAttackStep> steps = melee.AttackSteps;
-            var anchors = new List<ColliderInfo>();
+            var boxes = new List<(Vector3 center, Vector3 half, Quaternion rotation)>();
             var labels = new List<string>();
             for (int i = 0; i < steps.Count; i++)
             {
-                if (steps[i] == null || steps[i].HitType != DefaultAttackHitType.Overlap)
+                if (steps[i] == null || steps[i].HitType != DefaultAttackHitType.Overlap || steps[i].HitArea == null)
                     continue;
 
-                ColliderInfo anchor = PlayerDefaultAttack.ResolveHitbox(steps[i], melee.DefaultHitbox);
-                if (anchor == null)
-                    continue;
+                AttackShapePose pose = PlayerDefaultAttack.ResolvePose(steps[i], position, facing);
+                foreach (AttackShape shape in steps[i].HitArea.Shapes)
+                {
+                    if (shape == null)
+                        continue;
 
-                int index = anchors.IndexOf(anchor);
-                if (index < 0)
-                {
-                    anchors.Add(anchor);
-                    labels.Add($"평타 {i + 1}");
-                }
-                else
-                {
-                    labels[index] += $"·{i + 1}";
+                    shape.GetBroadBox(pose, out Vector3 center, out Vector3 half, out Quaternion rotation);
+                    int index = boxes.FindIndex(b => (b.center - center).sqrMagnitude < 1e-6f && (b.half - half).sqrMagnitude < 1e-6f
+                        && Quaternion.Angle(b.rotation, rotation) < 0.01f);
+                    if (index < 0)
+                    {
+                        boxes.Add((center, half, rotation));
+                        labels.Add($"평타 {i + 1}");
+                    }
+                    else if (!labels[index].EndsWith($"{i + 1}"))
+                    {
+                        labels[index] += $"·{i + 1}";
+                    }
                 }
             }
 
-            for (int i = 0; i < anchors.Count; i++)
-            {
-                if (TraitLabGizmoShape.TryFromAnchor(B, labels[i] + "타", anchors[i], Vector3.zero, out TraitLabGizmoShape shape))
-                    shapes.Add(shape);
-            }
+            for (int i = 0; i < boxes.Count; i++)
+                shapes.Add(TraitLabGizmoShape.Box(B, labels[i] + "타", boxes[i].center, boxes[i].half, boxes[i].rotation));
         }
 
         // 어쌔신 — 그 타의 앵커 상자를 조준 방향·칼날의 영역 배율로 놓는 판정 함수 그대로.

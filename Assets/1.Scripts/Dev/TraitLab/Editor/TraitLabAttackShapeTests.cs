@@ -60,20 +60,16 @@ public sealed class TraitLabAttackShapeTests
     }
 
     [Test]
-    public void DefaultAttackResolveHitbox_StepHitboxFirst_ElseDefault()
+    public void DefaultAttackResolvePose_IsCasterFeetPlusAim()
     {
-        var root = new GameObject("TraitLabAttackShapeTests");
-        try
-        {
-            root.AddComponent<BoxCollider>();
-            ColliderInfo fallback = root.AddComponent<ColliderInfo>();
+        var caster = new Vector3(3f, 0.5f, -2f);
+        AttackShapePose pose = PlayerDefaultAttack.ResolvePose(new DefaultAttackStep(), caster, new Vector3(1f, 0.7f, 0f));
+        Assert.AreEqual(caster, pose.Position, "기준점 = 시전자 발밑");
+        Assert.AreEqual(1f, pose.Forward.x, Eps, "정면 = 조준 방향(바닥 평면)");
+        Assert.AreEqual(0f, pose.Forward.y, Eps);
 
-            Assert.AreSame(fallback, PlayerDefaultAttack.ResolveHitbox(null, fallback), "단계 없음 = 기본 앵커");
-            Assert.AreSame(fallback, PlayerDefaultAttack.ResolveHitbox(new DefaultAttackStep(), fallback), "단계 hitbox 비었음 = 기본 앵커");
-        }
-        finally
-        {
-            Object.DestroyImmediate(root);
-        }
+        AttackShapePose noStep = PlayerDefaultAttack.ResolvePose(null, caster, Vector3.back);
+        Assert.AreEqual(caster, noStep.Position, "단계 없음도 같은 규칙(기즈모가 판정과 같은 포즈)");
+        Assert.AreEqual(-1f, noStep.Forward.z, Eps);
     }
 }

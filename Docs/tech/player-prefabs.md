@@ -72,7 +72,7 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 │                             이동(PlayerMotor/PlayerMovement) · 스킬 · 생명주기 · 상태이상 · HurtBox
 └─ Armature                ← 캐릭터. 이걸 교체해서 플레이 캐릭터를 바꾼다
    ├─ (리그/본 계층)          모델 · Animator · SkinnedMeshRenderer
-   ├─ DefaultAttack/AAC1~4    캐릭터별 평타 히트박스
+   ├─ DefaultAttack           (빈 컨테이너 — 평타 판정은 데이터 SO 의 도형, 할 일 153)
    ├─ MainSkill/InterruptAttack  캐릭터별 스킬 히트박스
    └─ L/R_WeaponSocket        무기 소켓
 ```
@@ -121,7 +121,7 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 | `PlayerMovement.armature` | ✅ | `transform.Find("Armature")` (`PlayerMovement.cs:38`) — 🔴 **자식 이름이 정확히 `Armature` 여야 한다** |
 | `PlayerLandingProtection.blinkVisualRoot` | ✅ | 비면 루트 전체에서 `Renderer` 를 긁는다 (`PlayerLandingProtection.cs:161`) |
 | `PlayerSoulController.soulVisualRoot` | ✅ | `PlayableCharacterVisual.VisualRoot` → `transform.Find("Armature")` → `transform` 순 폴백 (`PlayerSoulController.cs:175`) |
-| `DefaultAttackController.defaultHitbox` | ❌ | **수동 배선 필수.** 평타 판정 히트박스(`ColliderInfo`) |
+| ~~`DefaultAttackController.defaultHitbox`~~ | — | 할 일 153 3단계에서 삭제. 평타 판정은 `PlayerDefaultAttackData` 단계별 `hitArea`(도형, [attack-shapes.md](attack-shapes.md)) |
 | `FirstMeleeMainSkill.hitboxAnchor` · `FirstMeleeInterruptSkill.hitboxAnchor` | ❌ | **수동 배선 필수.** 비면 런타임 에러 (`FirstMeleeInterruptSkill.cs:87`) |
 | `TrailTransform.weaponTrailEffect` (무기 FBX 안) | ❌ | 무기 궤적. Armature 의 `WeaponTrailEffect` 를 가리킨다 |
 | `WeaponTransformRelay.weapon` (`PlayerWaeponSlot` 아래) | ❌ | 무기는 Armature 밖(`PlayerWaeponSlot`)에 있고 소켓만 Armature 안에 있다 |
@@ -291,7 +291,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 | `Player.attackDamage` | `5` | `33` | 🟡 위와 같은 커밋 |
 | `Player.moveSpeed` / `defense` | 10 / 25 | 10 / 25 | 동일 |
 | `PlayerDefaultAttack.targetLayer` / `DefaultAttackController.hittableLayers` | `256` | `17408` | ⚪ **둘 다 죽은 데이터다.** 양쪽 프리팹이 같은 `PlayerDefaultAttackData.asset` 을 물고 있고, `Awake` 의 `ApplyData()` 가 SO 값 **`17664`(Enemy+Projectile+EnemyHurtBox)** 로 덮어쓴다 (`DefaultAttackController.cs:123`, `PlayerDefaultAttack.Configure`). 🔴 **인스펙터에 보이는 값과 런타임 값이 다르다** — 이것 자체가 함정이다 |
-| `DefaultAttackController.attackSteps` | `[]` | `[]` | SO 에서 주입된다. 스텝별 `Hitbox` 는 SO 에 없어서 `defaultHitbox` 로 폴백 |
+| `DefaultAttackController.attackSteps` | — | — | 할 일 153 부터 직렬화 안 함 — SO 에서만 주입된다(단계별 판정 도형 `hitArea` 포함) |
 | `Player.animator` · `DefaultAttackController.animator` · `PlayerSkillController.animator` | 배선됨 | **비어 있음** | ⚪ 버그 아님 — §1.4 자동 보정 |
 | `PlayerLandingProtection.blinkVisualRoot` | 배선됨 | **비어 있음** | ⚪ 경미 — 비면 루트 전체 `Renderer` 를 긁어서 Paladin 은 **무기 메시까지 함께** 깜빡인다 |
 | 루트 `NetworkTransform` | **Owner (`AuthorityMode: 1`)** | Owner (`1`) | ✅ 양쪽 동일 |

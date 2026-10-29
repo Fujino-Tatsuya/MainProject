@@ -121,14 +121,15 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     [Tooltip("공격이 끝나고 남은 클립을 이동 입력으로 끊을 때의 블렌드 시간(초). 짧으면 툭 끊기고 길면 공격 포즈가 남아 보인다.")]
     [SerializeField, Min(0f)] private float tailToMovementBlendSeconds = 0.12f;
     [SerializeField] private DefaultAttackChainPolicy chainPolicy = DefaultAttackChainPolicy.Loop;
-    [SerializeField] private DefaultAttackStep[] attackSteps =
+    // 단계는 데이터(attackData → ApplyData)에서만 온다 — 컴포넌트에 직렬화하지 않는다(할 일 153: 단계의 판정 도형이
+    // [SerializeReference] 라 컴포넌트에 두면 프리팹 임포트마다 직렬화 레이아웃 오류가 났다). 아래는 데이터 없을 때의 기본값.
+    [NonSerialized] private DefaultAttackStep[] attackSteps =
     {
         new DefaultAttackStep(),
         new DefaultAttackStep(),
         new DefaultAttackStep(),
         new DefaultAttackStep()
     };
-    [SerializeField] private ColliderInfo defaultHitbox;
     [SerializeField] private LayerMask hittableLayers;
     [SerializeField] private float endFallbackPadding = 0.1f;
 
@@ -171,9 +172,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private float pendingCrossFadeStartTime;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
-    // 판정 단계·기본 앵커(읽기 전용) — 특성 랩 공격 범위 기즈모(할 일 152)가 PlayerDefaultAttack.ResolveHitbox 로 같은 앵커를 고른다.
+    // 판정 단계(읽기 전용) — 특성 랩 공격 범위 기즈모(할 일 152)가 단계의 판정 도형(HitArea)을 그린다.
     public System.Collections.Generic.IReadOnlyList<DefaultAttackStep> AttackSteps => attackSteps;
-    public ColliderInfo DefaultHitbox => defaultHitbox;
 
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
@@ -216,7 +216,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         if (attackData != null)
             ApplyData(attackData);
         else
-            playerDefaultAttack.Configure(defaultHitbox, hittableLayers);
+            playerDefaultAttack.Configure(hittableLayers);
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -331,7 +331,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         hittableLayers = data.HittableLayers;
 
         if (playerDefaultAttack != null)
-            playerDefaultAttack.Configure(defaultHitbox, hittableLayers, data.MaxHitResults);
+            playerDefaultAttack.Configure(hittableLayers, data.MaxHitResults);
 
         ValidateAttackStates();
     }
@@ -1014,7 +1014,8 @@ public class DefaultAttackStep
     [SerializeField] private DefaultAttackRotationType rotationType = DefaultAttackRotationType.SnapOnStart;
     [DataTableIgnore] [SerializeField] private float trackRotationSpeed = 12f;
     [SerializeField] private DefaultAttackHitType hitType = DefaultAttackHitType.Overlap;
-    [SerializeField] private ColliderInfo hitbox;
+    [Tooltip("Overlap 판정 영역(할 일 153) — 기준점 = 시전자 발밑 + 이 타의 조준 방향(CasterAim). 예전 프리팹 상자 Armature/DefaultAttack/AAC1 을 옮긴 직사각형이 기본.")]
+    [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet(AttackShapeOrigin.CasterAim, PaladinStrikeRect());
     [SerializeField] private GameObject projectilePrefab;
     [SerializeField] private float projectileSpeed = 12f;
     [SerializeField] private float raycastRange = 20f;
@@ -1034,7 +1035,7 @@ public class DefaultAttackStep
     public DefaultAttackRotationType RotationType => rotationType;
     public float TrackRotationSpeed => trackRotationSpeed;
     public DefaultAttackHitType HitType => hitType;
-    public ColliderInfo Hitbox => hitbox;
+    public AttackShapeSet HitArea => hitArea;
     public GameObject ProjectilePrefab => projectilePrefab;
     public float ProjectileSpeed => projectileSpeed;
     public float RaycastRange => raycastRange;
@@ -1044,4 +1045,15 @@ public class DefaultAttackStep
     public bool TriggersOnHit => triggersOnHit;
 
     private float ClipDuration => clip != null ? clip.length : 0f;
+
+    /// <summary>
+    /// 가붕이 평타 기본 판정 도형(할 일 153) — 예전 프리팹 상자(<c>Armature/DefaultAttack/AAC1</c>, 4타 공용 BoxCollider
+    /// center (0, 1, 0.5)·size (2.6, 2, 2.1))를 발밑 기준 직사각형으로 옮긴 값.
+    /// 앞 1.55 / 뒤 0.55 / 폭 2.6, 상자 기준 축의 Armature 대비 회전 −0.03°(<c>DefaultAttack</c> 로컬 y 359.97).
+    /// 높이 0 ~ 2.039: 상자는 Armature 높이(0.039) 위 0~2 m 였고, 판정 점(몸 표면에서 발밑에 가장 가까운 점)으로는
+    /// 발 높이를 걸친 대상이 높이 0 에 찍혀 아래 끝을 0 으로 둬야 예전에 맞던 대상이 그대로 맞는다.
+    /// Armature 의 수평 위치(루트 축 x −0.142·z 0.014 — 루트는 돌지 않아 조준과 함께 돌지 않는 고정 어긋남)는 옮기지 않았다(기준점 = 루트 발밑).
+    /// </summary>
+    public static AttackRectShape PaladinStrikeRect() =>
+        new AttackRectShape(1.55f, 2.6f, 0.55f) { YawOffset = -0.03f, MinHeight = 0f, MaxHeight = 2.039f };
 }
