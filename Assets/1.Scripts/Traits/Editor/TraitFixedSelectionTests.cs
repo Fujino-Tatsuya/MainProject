@@ -83,8 +83,23 @@ public sealed class TraitFixedSelectionTests
     {
         TraitSelectionModel model = NewModel();
         model.StartRound(new[] { Pal, Gun }, 3, Rng);
-        Assert.AreEqual(H("PAL_1_Q_DAMAGE"), model.PickAutoChoice(Pal, Rng));
-        Assert.AreEqual(H("GUN_1_BASIC_DAMAGE"), model.PickAutoChoice(Gun, Rng));
+        Assert.IsTrue(model.TryPickAutoChoice(Pal, Rng, out int pal));
+        Assert.AreEqual(H("PAL_1_Q_DAMAGE"), pal);
+        Assert.IsTrue(model.TryPickAutoChoice(Gun, Rng, out int gun));
+        Assert.AreEqual(H("GUN_1_BASIC_DAMAGE"), gun);
+    }
+
+    [Test]
+    public void AutoChoice_NegativeHash_IsAccepted()
+    {
+        // 해시가 음수인 특성도 자동 획득돼야 한다(10-29 야간 QA: 음수를 "없음"으로 버려 라운드가 안 끝남).
+        Assert.Less(H("PAL_1_Q_DAMAGE"), 0, "전제: 이 ID 의 해시는 음수");
+        TraitSelectionModel model = NewModel();
+        model.StartRound(new[] { Pal }, 3, Rng);
+
+        Assert.IsTrue(model.TryPickAutoChoice(Pal, Rng, out int pick));
+        Assert.AreEqual(TraitChoiceResult.Accepted, model.TryChoose(Pal, pick));
+        Assert.IsTrue(model.IsRoundComplete());
     }
 
     [Test]
@@ -118,7 +133,7 @@ public sealed class TraitFixedSelectionTests
         TraitSelectionModel model = NewModel();
         Assert.IsFalse(model.StartRound(new[] { Pal, Gun }, 3, Rng));
         Assert.IsTrue(model.IsRoundComplete());
-        Assert.AreEqual(-1, model.PickAutoChoice(Pal, Rng));
+        Assert.IsFalse(model.TryPickAutoChoice(Pal, Rng, out _));
     }
 
     [Test]

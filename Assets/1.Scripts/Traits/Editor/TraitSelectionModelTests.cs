@@ -209,15 +209,16 @@ public sealed class TraitSelectionModelTests
     }
 
     [Test]
-    public void PickAutoChoice_OnlyForPending_FromOffered()
+    public void TryPickAutoChoice_OnlyForPending_FromOffered()
     {
         var model = new TraitSelectionModel(6);
         model.StartRound(new[] { Host, Client1 }, 3, First);
 
-        Assert.That(model.PickAutoChoice(Host, _ => 2), Is.EqualTo(2));
+        Assert.That(model.TryPickAutoChoice(Host, _ => 2, out int hostPick), Is.True);
+        Assert.That(hostPick, Is.EqualTo(2));
         model.TryChoose(Client1, 0);
-        Assert.That(model.PickAutoChoice(Client1, First), Is.EqualTo(-1), "이미 고른 플레이어는 대상 아님");
-        Assert.That(model.PickAutoChoice(99, First), Is.EqualTo(-1), "참가자 아님");
+        Assert.That(model.TryPickAutoChoice(Client1, First, out _), Is.False, "이미 고른 플레이어는 대상 아님");
+        Assert.That(model.TryPickAutoChoice(99, First, out _), Is.False, "참가자 아님");
         Assert.That(model.HasPendingChoice(Host), Is.True, "판정만 하고 획득하지 않는다");
     }
 
@@ -233,7 +234,8 @@ public sealed class TraitSelectionModelTests
         Assert.That(pending, Is.EqualTo(new[] { Client1 }));
         Assert.That(model.IsRoundComplete(), Is.False);
 
-        model.TryChoose(Client1, model.PickAutoChoice(Client1, First));
+        Assert.That(model.TryPickAutoChoice(Client1, First, out int pick1), Is.True);
+        model.TryChoose(Client1, pick1);
         Assert.That(model.IsRoundComplete(), Is.True);
     }
 
@@ -419,7 +421,7 @@ public sealed class TraitSelectionModelTests
 
         foreach (ulong id in pending)
         {
-            int pick = model.PickAutoChoice(id, First);
+            Assert.That(model.TryPickAutoChoice(id, First, out int pick), Is.True);
             Assert.That(pick, Is.GreaterThanOrEqualTo(0));
             Assert.That(model.TryChoose(id, pick), Is.EqualTo(TraitChoiceResult.Accepted));
         }
