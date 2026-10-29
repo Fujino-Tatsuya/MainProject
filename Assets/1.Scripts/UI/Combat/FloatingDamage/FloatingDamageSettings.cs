@@ -189,6 +189,16 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Tooltip("화면 가장자리에서 숫자 중심까지 최소 거리(px).")]
     [SerializeField] Vector2 screenEdgePadding = new Vector2(60f, 30f);
 
+    [Header("카메라 줌 배율 (154)")]
+    [Tooltip("켜면 카메라 줌에 비례해 숫자 크기와 픽셀 오프셋(생성·분산·유형·상승/하강·흔들림)을 같은 배율로 바꾼다.\n" +
+             "줌인하면 커지고 줌아웃하면 작아진다. 간파 슬로우 줌인도 따라간다. 끄면 항상 1배.")]
+    [SerializeField, DataTableIgnore] bool zoomScaleEnabled = true;
+    [Tooltip("배율 1 이 되는 기준 — 평소 게임 카메라에서 화면 중앙 바닥의 월드 1m 가 Canvas 몇 단위(1080p px)인지.\n" +
+             "기본 89.8 = PlayerFollowCamera(FOV 34 · 팔로우 오프셋 (7,17,-7) → 거리 19.67m).")]
+    [SerializeField, Min(1f), DataTableIgnore] float zoomReferenceUnitsPerMeter = 89.8f;
+    [SerializeField, Min(0.01f), DataTableIgnore] float zoomScaleMin = 0.5f;
+    [SerializeField, Min(0.01f), DataTableIgnore] float zoomScaleMax = 2f;
+
     [Header("생성 위치 (px)")]
     [Tooltip("몸 중심에서 화면 위쪽으로.")]
     [SerializeField] float spawnOffset = 20f;
@@ -295,6 +305,12 @@ public sealed class FloatingDamageSettings : ScriptableObject
         style = default;
         return false;
     }
+
+    public bool ZoomScaleEnabled => zoomScaleEnabled;
+
+    public float EvaluateZoomScale(float currentUnitsPerMeter) =>
+        FloatingDamageZoomScalePolicy.Evaluate(
+            zoomScaleEnabled, currentUnitsPerMeter, zoomReferenceUnitsPerMeter, zoomScaleMin, zoomScaleMax);
 
     public FloatingDamageTier ClassifyTier(int amount, int baseMaxHp, MonsterRank rank)
     {

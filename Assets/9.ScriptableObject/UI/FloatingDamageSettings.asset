@@ -18,6 +18,10 @@ MonoBehaviour:
   referenceResolution: {x: 1920, y: 1080}
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
+  zoomScaleEnabled: 1
+  zoomReferenceUnitsPerMeter: 89.8
+  zoomScaleMin: 0.5
+  zoomScaleMax: 2
   spawnOffset: 20
   spawnScatter: {x: 12, y: 6}
   riseDuration: 0.2
