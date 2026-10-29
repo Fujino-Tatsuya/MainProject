@@ -1,50 +1,40 @@
 using NUnit.Framework;
 using UnityEngine;
 
-/// <summary>어쌔신 일반 타 매 타 전진(할 일 96) — 방향 선택·모드별 거리/시간·공격속도 배율.</summary>
+/// <summary>
+/// 어쌔신 평타 방향(할 일 137 — 모든 모드 조준, 팔라딘·거너와 같은 공용 규칙)과
+/// 일반 타 매 타 전진(할 일 96) 모드별 거리/시간·공격속도 배율.
+/// </summary>
 public sealed class AssassinNormalLungeRulesTests
 {
     private static readonly Vector3 Aim = new Vector3(0f, 0f, 1f);
 
-    [Test]
-    public void NormalWithMoveInputUsesMoveDirection()
-    {
-        Vector3 result = AssassinAttackDirectionRules.Resolve(AssassinBasicAttackMode.Normal, new Vector3(2f, 0f, 0f), Aim);
-        Assert.That(Vector3.Distance(result, Vector3.right), Is.LessThan(1e-5f));
-    }
-
-    [Test]
-    public void NormalWithoutMoveInputUsesAim()
-    {
-        Assert.That(AssassinAttackDirectionRules.Resolve(AssassinBasicAttackMode.Normal, Vector3.zero, Aim), Is.EqualTo(Aim));
-    }
-
-    [Test]
-    public void NormalWithTinyMoveInputUsesAim()
-    {
-        Vector3 tiny = new Vector3(0.01f, 0f, 0.01f);
-        Assert.That(AssassinAttackDirectionRules.Resolve(AssassinBasicAttackMode.Normal, tiny, Aim), Is.EqualTo(Aim));
-    }
-
-    [Test]
-    public void NormalMoveDirectionIsFlattened()
-    {
-        Vector3 result = AssassinAttackDirectionRules.Resolve(AssassinBasicAttackMode.Normal, new Vector3(1f, 5f, 0f), Aim);
-        Assert.That(result.y, Is.EqualTo(0f));
-        Assert.That(Vector3.Distance(result, Vector3.right), Is.LessThan(1e-5f));
-    }
-
-    [Test]
-    public void VerticalOnlyMoveInputCountsAsNoInput()
-    {
-        Assert.That(AssassinAttackDirectionRules.Resolve(AssassinBasicAttackMode.Normal, Vector3.up, Aim), Is.EqualTo(Aim));
-    }
-
+    // 이동 입력이 조준과 달라도 일반·강타·변신 묶음 모두 조준을 고른다 — 일반 타 전진도 이 방향이다.
+    [TestCase(AssassinBasicAttackMode.Normal)]
     [TestCase(AssassinBasicAttackMode.Enhanced)]
     [TestCase(AssassinBasicAttackMode.Transformed)]
-    public void EnhancedAndTransformedIgnoreMoveInput(AssassinBasicAttackMode mode)
+    public void MoveInputDifferentFromAimUsesAim(AssassinBasicAttackMode mode)
     {
-        Assert.That(AssassinAttackDirectionRules.Resolve(mode, Vector3.right, Aim), Is.EqualTo(Aim));
+        Assert.That(AssassinAttackDirectionRules.Resolve(mode, new Vector3(2f, 0f, 0f), Aim), Is.EqualTo(Aim));
+        Assert.That(AssassinAttackDirectionRules.Resolve(mode, -Aim, Aim), Is.EqualTo(Aim));
+    }
+
+    [TestCase(AssassinBasicAttackMode.Normal)]
+    [TestCase(AssassinBasicAttackMode.Enhanced)]
+    [TestCase(AssassinBasicAttackMode.Transformed)]
+    public void NoMoveInputUsesAim(AssassinBasicAttackMode mode)
+    {
+        Assert.That(AssassinAttackDirectionRules.Resolve(mode, Vector3.zero, Aim), Is.EqualTo(Aim));
+    }
+
+    // 조준이 어느 쪽이든 그대로 따라간다 — 이동 입력은 결과에 영향이 없다.
+    [Test]
+    public void NormalFollowsAimRegardlessOfMoveInput()
+    {
+        Vector3 aim = new Vector3(-1f, 0f, 1f).normalized;
+        Vector3[] moves = { Vector3.zero, Vector3.right, Vector3.back, new Vector3(1f, 5f, 0f), Vector3.up };
+        foreach (Vector3 move in moves)
+            Assert.That(AssassinAttackDirectionRules.Resolve(AssassinBasicAttackMode.Normal, move, aim), Is.EqualTo(aim));
     }
 
     [Test]
