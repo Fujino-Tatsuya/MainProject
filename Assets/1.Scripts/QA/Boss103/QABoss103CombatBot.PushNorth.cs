@@ -198,19 +198,11 @@ public sealed partial class QABoss103CombatBot
     // ── 할 일 140-4 — 성공 굴림 누름 자리 ───────────────────────
 
     /// <summary>
-    /// 보스 HurtBox 실제 표면까지 수평 거리(<see cref="Collider.ClosestPoint"/>, HurtBox 중심 높이). <see cref="SurfaceDistance"/> 는 AABB 라
-    /// 보스가 대각선을 보면(북진 = 화면 남쪽) 최대 반경 × (√2 − 1) ≈ 0.7m 짧게 본다. HurtBox 가 꺼졌으면 <see cref="SurfaceDistance"/>.
+    /// 보스 HurtBox 실제 표면까지 수평 거리. 139-4 부터 <see cref="SurfaceDistance"/> 가 같은 실제 표면 거리라 그대로 위임한다
+    /// (예전엔 AABB 라 보스가 대각선을 보면 최대 반경 × (√2 − 1) ≈ 0.7m 짧게 봤다).
     /// </summary>
-    private float TrueSurfaceDistance(Vector3 myPos)
-    {
-        if (_boss == null)
-            return float.NaN;
-        if (_bossHurt == null || !_bossHurt.enabled)
-            return SurfaceDistance(myPos, _boss.transform.position);
-        Vector3 p = new Vector3(myPos.x, _bossHurt.bounds.center.y, myPos.z);
-        Vector3 q = _bossHurt.ClosestPoint(p);
-        return QAPartyPlacement88.HorizontalDistance(p, q);
-    }
+    private float TrueSurfaceDistance(Vector3 myPos) =>
+        _boss == null ? float.NaN : SurfaceDistance(myPos, _boss.transform.position);
 
     /// <summary>북진 누름 자리 — 실제 표면 거리 ≤ 사거리 − 여유 + 정면각 ≤ 서버 한도 − 여유(<see cref="QABoss103PushNorthCounter.InPressSpot"/>).</summary>
     private bool PnInPressSpot(Vector3 myPos, double reach)

@@ -97,6 +97,17 @@ public static class QABoss103PushNorthCounter
         return Math.Max(0.0, Math.Sqrt(dx * dx + dz * dz) - Math.Max(0.0, radius));
     }
 
+    /// <summary>
+    /// AABB XZ 사각형까지 수평 거리(안이면 0) — 139-4 전 게임·봇이 쓰던 근사(게임 쪽 함수는 139-4 에서 삭제됨).
+    /// 이제 거리 판단은 실제 콜라이더 표면 거리를 쓰고, 이 값은 <c>pn_server_cast</c> 의 <c>aabbSurfM</c> 비교·원인 재현 테스트에만 쓴다.
+    /// </summary>
+    public static double AabbSurfaceDistance(double px, double pz, double minX, double minZ, double maxX, double maxZ)
+    {
+        double dx = Math.Max(0.0, Math.Max(minX - px, px - maxX));
+        double dz = Math.Max(0.0, Math.Max(minZ - pz, pz - maxZ));
+        return Math.Sqrt(dx * dx + dz * dz);
+    }
+
     /// <summary>창 열림이 활성 탑 소멸(<paramref name="clearedAt"/>, 음수 = 못 봄) 뒤 <see cref="LinkSeconds"/> 안인가.</summary>
     public static bool IsPushNorthWindow(double openAt, double clearedAt, double link = LinkSeconds) =>
         clearedAt >= 0.0 && openAt >= clearedAt && openAt - clearedAt <= link;

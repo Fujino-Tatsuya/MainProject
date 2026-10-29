@@ -188,7 +188,7 @@ public sealed partial class QABoss103CombatBot
     private static float PylonSurface(PylonView v, Vector3 myPos)
     {
         if (v.Body != null && v.Body.enabled)
-            return (float)InterruptOmniRangeModel.HorizontalDistanceToBounds(myPos, v.Body.bounds);
+            return InterruptOmniRangeModel.HorizontalDistanceToCollider(myPos, v.Body);
         return Mathf.Max(0f, QAPartyPlacement88.HorizontalDistance(myPos, v.Pylon.transform.position) - v.Extent);
     }
 

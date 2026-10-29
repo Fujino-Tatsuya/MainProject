@@ -109,7 +109,7 @@ public sealed class QABoss103PushNorthCounterTests
         Vector3 dir = new Vector3(1f, 0f, -1f).normalized;
         float d = 1.73f + 1.7f * Mathf.Sqrt(2f);   // AABB 표면 거리 1.73 이 되는 중심 거리
         Vector3 bot = dir * d;
-        double aabb = InterruptOmniRangeModel.HorizontalDistanceToBounds(bot, hurt);
+        double aabb = QABoss103PushNorthCounter.AabbSurfaceDistance(bot.x, bot.z, hurt.min.x, hurt.min.z, hurt.max.x, hurt.max.z);
         double real = QABoss103PushNorthCounter.CylinderSurfaceDistance(bot.x, bot.z, 0.0, 0.0, 1.7);
         Assert.AreEqual(1.73, aabb, 1e-3, "봇·오너 예측이 본 거리(사거리 1.75 안)");
         Assert.Greater(real, 1.75 + 0.6, "실제 표면은 사거리 밖 0.6m 이상 — 서버 판정 상자가 안 닿는다");

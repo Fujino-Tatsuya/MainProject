@@ -474,7 +474,7 @@ public sealed class QAInterruptBot88 : MonoBehaviour
         }
 
         double surf = _hurtCollider != null && _hurtCollider.enabled
-            ? InterruptOmniRangeModel.HorizontalDistanceToBounds(pivot, _hurtCollider.bounds)
+            ? InterruptOmniRangeModel.HorizontalDistanceToCollider(pivot, _hurtCollider)
             : double.NaN;
         string inReach = double.IsNaN(surf) || double.IsNaN(reach) ? "na" : surf <= reach ? "true" : "false";
         Vector3 face = anchor != null ? anchor.transform.forward : me.transform.forward;

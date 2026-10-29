@@ -511,14 +511,17 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         return QAPartyPlacement88.IsSafeStep(found, foot.y, found ? hit.point.y : 0f);
     }
 
-    /// <summary>보스 HurtBox 표면까지 수평 거리. HurtBox 가 꺼졌으면(체공) 켜져 있을 때 본 반경으로 중심 거리에서 뺀다.</summary>
+    /// <summary>
+    /// 보스 HurtBox 실제 표면까지 수평 거리 — 게임 간파 거리와 같은 기준(<see cref="InterruptOmniRangeModel.HorizontalDistanceToCollider"/>, 할 일 139-4).
+    /// HurtBox 가 꺼졌으면(체공) 켜져 있을 때 본 반경으로 중심 거리에서 뺀다.
+    /// </summary>
     private float SurfaceDistance(Vector3 myPos, Vector3 bossPos)
     {
         if (_bossHurt != null && _bossHurt.enabled)
         {
             Bounds b = _bossHurt.bounds;
             _bossRadius = Mathf.Max(_bossRadius, Mathf.Max(b.extents.x, b.extents.z));
-            return (float)InterruptOmniRangeModel.HorizontalDistanceToBounds(myPos, b);
+            return InterruptOmniRangeModel.HorizontalDistanceToCollider(myPos, _bossHurt);
         }
         return Mathf.Max(0f, QAPartyPlacement88.HorizontalDistance(myPos, bossPos) - _bossRadius);
     }

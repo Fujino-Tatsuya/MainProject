@@ -268,7 +268,8 @@ public sealed class QABoss103Recorder : MonoBehaviour
         {
             Vector3 p = new Vector3(pos.x, hurt.bounds.center.y, pos.z);
             trueSurf = QAPartyPlacement88.HorizontalDistance(p, hurt.ClosestPoint(p));
-            aabbSurf = InterruptOmniRangeModel.HorizontalDistanceToBounds(pos, hurt.bounds);
+            Bounds b = hurt.bounds;
+            aabbSurf = QABoss103PushNorthCounter.AabbSurfaceDistance(pos.x, pos.z, b.min.x, b.min.z, b.max.x, b.max.z);
         }
         PlayerSkillController skills = owner.GetComponent<PlayerSkillController>();
         double reach = QABoss103CombatBot.CounterReach(owner, skills);
