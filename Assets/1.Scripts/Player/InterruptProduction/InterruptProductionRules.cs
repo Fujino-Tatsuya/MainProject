@@ -77,6 +77,12 @@ public static class InterruptProductionRules
         }
     }
 
+    /// <summary>
+    /// 판정 사건이 시도 슬로우를 실패 복귀시키는가 — 예측 대기 중 성공이 없었거나(빗나감) 선착순에서 밀렸다(할 일 143, 선점 = 피해만 · 연출 없음).
+    /// 거의 동시에 눌러 강 시도가 이미 돌던 두 번째 성공자도 여기서 정리된다(오너 암전 걷기·빛 모임 정지 = 실패 복귀와 같다).
+    /// </summary>
+    public static bool ResolveFailsAttempt(bool landed, bool preempted) => !landed || preempted;
+
     /// <summary>시도 목적에 맞는 슬로우 프로필 — 약이면 약 프로필, 그 밖은 강(옛 시도) 프로필.</summary>
     public static SlowMotionProfile SelectAttemptProfile(SlowMotionPurpose purpose, IInterruptProductionSettings settings) =>
         purpose == SlowMotionPurpose.AttemptWeak ? settings.InterruptWeakProfile : settings.InterruptProfile;

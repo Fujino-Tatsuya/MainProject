@@ -23,11 +23,20 @@ public static class InterruptWindowReplicaTracker
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics() => Histories.Clear();
 
-    /// <summary>[클라] 복제된 창 전이 기록. 서버·오프라인이면 아무것도 안 한다(서버는 InterruptLagMonitor 가 기록).</summary>
+    /// <summary>
+    /// [클라] 복제된 창 전이 기록. 서버·오프라인이면 아무것도 안 한다(서버는 InterruptLagMonitor 가 기록).
+    /// 열림은 호스트 포함 모든 피어에서 로컬 선착순 장부(<see cref="InterruptLocalWindowClaims"/>, 할 일 143-2)를 초기화한다 — 서버 장부와 같은 복제값 전이.
+    /// </summary>
     public static void Record(GameObject owner, bool open)
     {
         NetworkManager nm = NetworkManager.Singleton;
-        if (owner == null || nm == null || !nm.IsListening || nm.IsServer)
+        if (owner == null || nm == null || !nm.IsListening)
+            return;
+
+        if (open)
+            InterruptLocalWindowClaims.Local.WindowOpened(TargetIdOf(owner));
+
+        if (nm.IsServer)
             return;
 
         if (!Histories.TryGetValue(owner, out InterruptWindowHistory history))
@@ -44,8 +53,18 @@ public static class InterruptWindowReplicaTracker
     /// <summary>[클라] 대상이 디스폰된다 — 기록을 지운다.</summary>
     public static void Forget(GameObject owner)
     {
-        if (owner != null)
-            Histories.Remove(owner);
+        if (owner == null)
+            return;
+
+        Histories.Remove(owner);
+        InterruptLocalWindowClaims.Local.Forget(TargetIdOf(owner));
+    }
+
+    /// <summary>로컬 선착순 장부 키 — 창 소유자의 NetworkObjectId(NetworkBehaviour.NetworkObject 와 같은 찾기). 없으면 0.</summary>
+    public static ulong TargetIdOf(GameObject owner)
+    {
+        NetworkObject networkObject = owner != null ? owner.GetComponentInParent<NetworkObject>() : null;
+        return networkObject != null ? networkObject.NetworkObjectId : 0;
     }
 
     /// <summary>

@@ -5,7 +5,8 @@ using UnityEngine;
 /// <summary>
 /// [서버] 간파 지연 측정 기록기(할 일 74 후속 — 측정만, 보정 없음). 판정 결과를 바꾸지 않는다.
 /// <list type="bullet">
-/// <item>카운터 창 소유자(<see cref="IInterruptSlowMotionTarget"/> 구현체)가 창 열림/닫힘 때 <see cref="RecordWindow"/> 를 부른다.</item>
+/// <item>카운터 창 소유자(<see cref="IInterruptSlowMotionTarget"/> 구현체)가 창 열림/닫힘 때 <see cref="RecordWindow"/> 를 부른다
+/// (간파 선착순 장부 <see cref="InterruptWindowClaims"/> 도 이 전이를 받는다 — 할 일 143).</item>
 /// <item>간파 판정(<see cref="PlayerInterruptSkillBase"/>)이 <see cref="ReportJudgement"/> 로 1줄 로그 + 집계.</item>
 /// <item>판 종료(<see cref="SessionStatsTracker"/> 확정·비활성, 앱 종료) 때 <see cref="FlushSummary"/> 가 요약 줄을 찍는다.</item>
 /// </list>
@@ -46,10 +47,17 @@ public static class InterruptLagMonitor
         return true;
     }
 
-    /// <summary>[서버] 카운터 창 전이 기록. 키 = 소유자 GameObject(간파가 판정 콜라이더에서 찾는 Unit 과 같은 GameObject).</summary>
+    /// <summary>
+    /// [서버] 카운터 창 전이 기록. 키 = 소유자 GameObject(간파가 판정 콜라이더에서 찾는 Unit 과 같은 GameObject).
+    /// 간파 선착순 장부(<see cref="InterruptWindowClaims"/>, 할 일 143)에도 같은 전이를 넘긴다 — 판정에 쓰이는 유일한 몫이다(장부는 서버 판정만 읽는다).
+    /// </summary>
     public static void RecordWindow(GameObject owner, bool open)
     {
-        if (owner == null || !TryServerNow(out double now))
+        if (owner == null)
+            return;
+
+        InterruptWindowClaims.Server.RecordWindow(owner.GetInstanceID(), open);
+        if (!TryServerNow(out double now))
             return;
 
         if (!Histories.TryGetValue(owner, out InterruptWindowHistory history))

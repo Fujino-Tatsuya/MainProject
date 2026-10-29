@@ -6,13 +6,14 @@
 > 무지개 원 제거, 월드 섬광 = 빛 덩어리·실시간 0.3s 상한, 섬광 순간 블룸 최대, **실제 Point Light 2개**(적중 지점·빛 모임 소켓) — [§0.9](#09-16-퀄리티-수정--라이트스미어-방향렌더-판단).
 > 🔹 §17 튜닝 도구(2026-10-28): 디렉터에 **효과별 켜기/끄기 칸 9개**(기본 = **오너 암전만 켬**, 팀원 암순응 = A2 칸 → 기본 끔) — 끈 효과는 그리기만 안 하고 상태 기계·시간표·섬광 순간은 그대로.
 > ②③④ 길이 = **렌더 프레임 수**(기본 2·2·2, 섬광 순간 = 6 프레임째), ⑤⑥ = 초. DebugInterruptLab 씬 OnGUI **튜닝 패널** — [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
+> 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
 > 🔹 스위치 10칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸 = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
 > 수치 원본은 `GameData.xlsx` `SlowMotion` 시트([data-table.md](data-table.md)). 계획서: `_lane-artifacts/MainProject-Worktree4/132/132-간파연출-계획.md`(레포 밖).
-> 다른 담당 영역 공유: [handoff-interrupt-132-monster.md](handoff-interrupt-132-monster.md)(경석) · [handoff-interrupt-132-vfx.md](handoff-interrupt-132-vfx.md)(민경).
+> 다른 담당 영역 공유: [handoff-interrupt-132-monster.md](handoff-interrupt-132-monster.md)(경석) · [handoff-interrupt-132-vfx.md](handoff-interrupt-132-vfx.md)(민경) · [handoff-interrupt-first-come.md](handoff-interrupt-first-come.md)(경석, 143).
 
 ## 0. 132 체계 — 예측 3상태·강/약·오너 암전·빛 모임·적중 섬광 (할 일 132)
 
@@ -25,6 +26,7 @@
 | 시도 · **강**(성공 예측) | 판정 시각까지 창이 버틸 것 | 강 슬로우(`interruptProfile`)·강 줌 + **오너 암전** + **빛 모임** |
 | 성공(서버 확정) | 카운터 창 소비 | 히트스톱(A1) 시작 = ② 스타버스트 → ③ 화이트아웃 → ④ 스미어 → **섬광 순간**(오너 암전 즉시 끔·월드 섬광·팀원 암순응) = ⑤ 색수차 블러 → ⑥ 가라앉음 · 성공 슬로우 |
 | 실패(서버 확정) | 판정 빗나감·판정 전 종료·거부 | 슬로우 실패 복귀 + 오너 암전 0.2초에 걷음·빛 모임 정지. 섬광 없음 |
+| 선점(서버 확정, 할 일 143) | 다른 플레이어가 먼저 성공시킨 창 | 피해만 — 실패와 같은 정리(섬광·성공 연출 없음) · [§0.10](#010-선착순-한-명-할-일-143) |
 
 ### 0.2 흐름
 
@@ -279,6 +281,46 @@
 즉 오너·대상·빛 모임은 실제 라이트를 받은 모습 그대로 뚫린 구멍으로 보인다. 덮인 월드도 빛을 받지만 덮개에 가려 안 보인다.
 시간상: 빛 모임 라이트는 암전 동안 켜져 있어 오너·무기 주변만 밝히고(덮인 바닥은 안 보임), 적중 지점 라이트는 섬광 순간(= 암전 걷힘)에 켜져 걷힌 월드 전체를 비춘다.
 
+### 0.10 선착순 한 명 (할 일 143)
+
+보스 간파 창 하나에 여러 플레이어가 간파를 넣으면 **서버에서 먼저 성공 판정된 1명만** 지금처럼 처리한다(넉백·보스 반응·132 연출 전부).
+두 번째 이후 = **피해만** — 간파로 생기는 대상 반응(카운터 그로기·칸 감소·취약 넉백·기믹 처리)도, 연출(A1 히트스톱·성공 슬로우·A3 줌·A4·오너 암전·적중 섬광·A2 암순응·B3·C2·E1)도 없다.
+
+**왜 생기나(실제 경로).** 23호·중간보스·스파링 봇·허수아비는 첫 성공을 받는 **그 수신 호출 안에서 창을 닫고 취약/그로기로 넘어간다**. 그래서 두 번째 사람의 판정은
+'창 닫힘 = 실패'가 되지만, 표식(`isInterruptAttack`)이 그대로라 23호·스파링 봇에선 **취약 중 간파 = 방향 무관 넉백**이 한 번 더 났다(첫 성공자의 반응을 덮음).
+또 둘 다 창이 열린 동안 눌렀으면 두 오너 모두 강 시도(암전·빛 모임)가 돌았다.
+
+| 항목 | 규칙 |
+|---|---|
+| 장부 | `InterruptWindowClaims`(순수 클래스, `Assets/1.Scripts/Player/Skill/`) — 서버 런타임 인스턴스 `InterruptWindowClaims.Server`. 키 = 대상 GameObject 인스턴스 id · 시전자 `Player` 인스턴스 id |
+| 창 식별 | 대상의 카운터 창이 **한 번 열린 것** = 한 창. 기존 창 전이 훅 `InterruptLagMonitor.RecordWindow`(23호 `SetCounterWindow`·`MonsterCounterWindow`·허수아비)가 장부에도 넘긴다 — **보스 코드 무수정**, 새 복제값 없음 |
+| 기록 | `ResolveHit` 에서 카운터 성공(성공 수 전후 비교)이 난 대상에 `Claim(대상, 시전자, 서버 Time.time)` — 첫 성공자만 남는다 |
+| 새 창 = 초기화 | 창이 열리면 그 대상 기록을 새로 시작한다(앞 창 첫 성공자 버림) |
+| 닫힘 = 늦게 시작한 시전만 초기화 | 보스가 첫 성공 수신 안에서 창을 닫으므로 닫힘은 기록을 지우지 않는다. **다른 사람이 성공시킨 창이 열려 있거나, 닫혔어도 이 시전이 첫 성공 시각 이전(같은 시각 포함)에 서버에서 시작했으면 선점**. 닫힌 뒤 새로 시작한 시전은 자유 — 취약 중 간파 넉백 같은 기존 규칙 그대로 |
+| 같은 사람 | 첫 성공자 자신의 다른 시전 = 자기 창(정상 처리) |
+| 대상별 | 대상마다 따로 — 23호 창을 선점당해도 다른 대상(중간보스 등)은 독립 |
+| 두 번째 처리(한 곳) | `PlayerInterruptSkillBase.ResolveHit`(근접·대쉬·팔라딘·거너·어쌔신 공통) — 선점된 대상에는 **`isInterruptAttack: false`** 로 수신시킨다. 대상은 표식이 없으면 간파 반응을 아예 보지 않는다(피해·제압 배율·자폭 실드 흡수 등 피해 규칙은 그대로) |
+| 연출(디렉터) | 판정 사건 `Resolve` 에 **`Preempted`**(선점된 대상이 있고 이 판정에 성공이 하나도 없음)를 싣는다. 성공 사건은 안 나므로 성공 연출 전부 없음. 디렉터 판정 단계가 `InterruptProductionRules.ResolveFailsAttempt(landed, preempted)` 로 시도 슬로우를 **실패 복귀** — 각 피어 `Failed` → 오너 암전 걷기·빛 모임 정지(§0.2) |
+| 선점 시도 억제 | 서버 승인 예측(`FindPredictTarget`, 서버 쪽)이 장부를 본다 — 남이 성공시킨 창은 닫힌 것처럼 예측 → 강 시도 슬로우 없음. 오너 즉시 예측은 아래 **로컬 장부**를 본다(할 일 143-2) |
+| 로컬 장부(1차 창 닫기, 할 일 143-2) | `InterruptLocalWindowClaims`(순수 클래스, `Assets/1.Scripts/Player/Skill/`) — 각 피어(호스트 포함) 런타임 인스턴스 `InterruptLocalWindowClaims.Local`. 키 = 대상 NetworkObjectId. **닫힘** = 이 창에서 **남의 강 시도**(`Started(Attempt)`) 또는 **남의 성공**(`Started(Success)`)을 받음 — 디렉터 `HandleStarted` 한 곳이 넘긴다. **남의 약 시도(`AttemptWeak`)·내 것은 안 닫음**(그 사람이 실패하면 내가 첫 성공일 수 있다). **새 창 = 초기화** — 서버 장부와 같은 복제값 열림 전이(`IInterruptWindowReplica` 대상이 부르는 `InterruptWindowReplicaTracker.Record`, 호스트도 지난다). 디스폰(`Forget`) 때 지움 |
+| 로컬 장부 읽기(한 곳) | 오너 즉시 예측 `PlayerInterruptSkillBase.FindPredictTarget`(ownerView — 근접·대쉬, 팔라딘·거너·어쌔신 공통)이 닫힌 창을 **닫힘**으로 본다 → 예측 약 → 오너 암전·빛 모임·섬광 없음. **피해 요청은 그대로 보내고 최종 판정은 서버 장부**다 |
+| 대상 찾기(전송 없음, 할 일 143-3) | **슬로우 메시지·`GlobalTimeScale.Started`·`ITimeScalePort` 모양은 그대로**(대상 칸 없음 — 143-2 의 `TargetObjectId` 칸은 되돌림). 각 피어가 이미 아는 것으로 대상을 다시 찾는다 — 디렉터가 `TriggerClientId` 로 시전자 플레이어 오브젝트(스폰 목록)의 간파 슬롯 스킬을 찾아: **강 시도** = `FindPeerAttemptTargetId` — 시전자 복제 위치·바라보는 방향으로 오너 즉시 예측과 같은 사거리·정면각 탐색(창 = 복제값, 로컬 장부 무시), 거기 열린 창이 없으면 시전자에게 가장 가까운 열린 창(강 = 서버가 열린 창을 봤다). **성공** = `FindPeerSuccessTargetId` — 성공 슬로우의 연출 기준 위치(서버가 실은 첫 성공 대상 위치)가 판정 콜라이더 범위 안인 대상 + 그 시전자의 강 시도가 닫아 둔 창. 새 RPC 없음, **추가 빌드 조건 없음** |
+| 다시 열림(할 일 143-3) | 창을 닫은 **남의 강 시도가 실패**하면(그 발동 번호의 `Failed`·`ForcedReset` 수신 — 디렉터 `HandleFailed`/`HandleForcedReset` → `AttemptEnded`) 다시 연다 → 그 뒤 내 간파는 정상 강 예측·연출. **성공으로 닫힌 창은 계속 닫힘**(실패 신호가 와도). 한 창을 여러 사람 강 시도가 닫았으면 **전부 실패해야** 열림(성공이 하나라도 있으면 닫힘 유지) |
+| 거의 동시 | 상대 신호가 닿기 **전**에 둘 다 열린 창에서 눌러 강 시도가 돌던 중 서버 판정이 '두 번째'로 오면 → 섬광 없음 · 시도 슬로우 실패 복귀 · 오너 암전 0.2초 걷기(`Failed`). 새 RPC 없음 |
+| 정적 이벤트 | `ServerInterruptSucceeded`·`CombatStatsEvents.ServerCounterSucceeded` = **두 번째에겐 안 남**(창을 소비하지 않았다 — 결과 화면 간파 수·튜토리얼 '간파 성공'에 중복으로 안 잡힌다). `ServerInterruptResolved` = **그대로 남**(판정 1회·수신 대상 수 — 피해는 들어갔다. 구독자는 레거시 존3 튜토리얼 피드백뿐이고 반응 트리거가 아니다). 피해 통계는 일반 피해 경로라 그대로 |
+
+**알려진 한계**
+- 같은 창 판정은 **서버 시작 시각** 기준이다. 오너 화면에선 창이 열려 보였지만(복제 지연) 서버에선 첫 성공 뒤에 승인된 시전은 '새 시전'이라 취약 넉백이 난다 — 서버 기준 규칙(사양).
+- **지연 한계(143-2)**: 상대 신호(강 시도·성공 슬로우)가 내 피어에 닿기 **전**의 동시 입력은 로컬 장부로 못 막는다 — 기존 서버 판정 뒤 암전 걷힘(`Failed`, 0.2초)으로 처리된다.
+- **실패 신호가 없는 시도(143-3)**: 슬로우는 마지막 것이 이긴다 — 남의 강 시도 A 가 다른 슬로우(B)에 덮인 뒤 빗나가면 서버 `ServerFail(A)` 이 무시돼 A 의 실패 신호가 오지 않는다. 그 창은 새 창이 열릴 때까지 닫힘으로 남는다(보수적 — 내 다음 입력은 약 예측, 판정은 서버). 시도 슬로우가 이미 끝난 뒤의 실패(`NoEffect`)도 같다.
+- **피어 대상 찾기 근사(143-3)**: 시전자 위치·방향은 이 피어의 복제값이고 대쉬 간파의 예상 대시 끝은 모른다 — 사거리·정면각 탐색이 빗나가면 가장 가까운 열린 창으로 고른다. 열린 창이 여럿 가까이 있으면 다른 대상을 닫을 수 있다(연출만 영향, 판정은 서버).
+- 창 열림 복제값과 상대 시도 신호가 같은 서버 프레임에 나가면 클라에서 시도 신호가 먼저 처리되고 뒤이은 열림이 장부를 지울 수 있다(드묾) — 그때는 위 지연 한계와 같이 서버 판정으로 정리된다.
+- 한 시전이 선점된 대상과 다른 대상의 정상 성공을 같이 맞히면 정상 성공 쪽 연출은 그대로 난다(`Preempted` = 성공이 하나도 없을 때만).
+- 간파 지연 측정 로그(`[InterruptLag]`)는 두 번째 사람의 판정을 실패로 적는다(창 닫힘) — 측정 전용이라 손대지 않았다.
+- 장부는 디스폰 때 지우지 않는다(인스턴스 id 는 세션 안에서 재사용되지 않음). 도메인 리로드 끈 Play 진입은 `SubsystemRegistration` 에서 비운다.
+- 테스트: `InterruptWindowClaimsTests`(기록·두 번째 거절·같은 사람·닫힘/새 창 초기화·대상별), `InterruptProductionStageTests.판정_선점이면_시도_슬로우_실패_복귀`,
+  `InterruptLocalWindowClaimsTests`(남의 강 시도·성공 닫힘·남의 약 시도·내 것 안 닫음·새 창 초기화·대상별·디스폰), `InterruptProductionStageTests.시도와_성공_슬로우는_대상_id_를_싣는다`, `SlowMotionSessionTests.Start_이벤트_대상_id_직렬화_왕복`. 판정 지점·창 전이 연결·연출 정리는 MPPM 2인 Play 확인.
+
 ## 1. 흐름 (132 이전 공통 경로 — 성공·실패·슬로우 배포)
 
 ```
@@ -466,8 +508,8 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | 사건 | [서버] 누가 알리나 → 디렉터가 하는 일 | [각 피어] 디렉터가 하는 일 |
 |---|---|---|
 | 시도 | `TryStartSkillServer` → `ServerAttempt(예측 3상태)` → 대상 없음 = 없음 / 약 = `interruptWeakProfile`(`AttemptWeak`) / 강 = `interruptProfile`(`Attempt`), 발동 번호 반환 | [오너] 입력 순간 `LocalOwnerAttempt`(오너 암전·빛 모임, §0.2) · `OnClientPlay` → `LocalAttempt` → B1(꺼짐) · 클립 이벤트 B2·C1 은 `AllowsAnimEffect(id)` · 남의 강 시도 = 팀원 빛 모임 |
-| 판정 | `ResolveHit` 끝 → `ServerResolve` → 빗나가면 시도 슬로우 `ServerFail` | [오너] 애니 Hit → `LocalOwnerHit`(빛 모임 끝) · 팀원 `PeerCasterHit` |
-| 성공 | 판정 바로 뒤 `ServerSuccess` → 성공 슬로우(`interruptSuccessProfile`, A1 칸 = `hitStopOn`) → 시전자 아래 `IInterruptSuccessRelay` 마다 1회 | `Started(Success)` → A4 즉시 · 적중 섬광 진행기 → 섬광 순간 월드 섬광·A2 · RPC 수신부(B3·C2·E1, 꺼짐)가 `PlayCue` |
+| 판정 | `ResolveHit` 끝 → `ServerResolve` → 빗나가거나 **선점됨**(`Preempted`, 할 일 143 — 남이 먼저 성공시킨 창, 피해만)이면 시도 슬로우 `ServerFail` | [오너] 애니 Hit → `LocalOwnerHit`(빛 모임 끝) · 팀원 `PeerCasterHit` · 선점 = `Failed` 로 오너 암전 걷기([§0.10](#010-선착순-한-명-할-일-143)) |
+| 성공 | 판정 바로 뒤 `ServerSuccess` — 그 창의 **첫 성공자만**(선점된 대상은 표식 없이 수신돼 성공이 안 난다, §0.10) → 성공 슬로우(`interruptSuccessProfile`, A1 칸 = `hitStopOn`) → 시전자 아래 `IInterruptSuccessRelay` 마다 1회 | `Started(Success)` → A4 즉시 · 적중 섬광 진행기 → 섬광 순간 월드 섬광·A2 · RPC 수신부(B3·C2·E1, 꺼짐)가 `PlayCue` |
 | 실패 | 판정 전 종료(`OnEnd`)·앵커 누락 → `ServerFail` → 시도 슬로우 실패 복귀 | `Failed` → 오너 암전 걷기·빛 모임 정지(실패 단계 자체 연출 없음) · [오너] `OnEnd`·거부 → `LocalOwnerEnded` |
 
 - 대쉬 간파(할 일 115)도 같은 사건 4개를 쓴다. 예측 판정 위치는 예상 대시 끝, 예측 시점은 우클릭 누른 순간 — [dash-interrupt.md §5](dash-interrupt.md#5-118-디렉터-사건-연결--새-경로-없음).
