@@ -6,7 +6,8 @@ using UnityEngine;
 /// <summary>
 /// 할 일 139-6 단계 1 — 간파 창 길이 해석기(<see cref="InterruptWindowLengthResolver"/>)와 예측 경과 게임초 통일.
 /// 허수아비: 본게임 = 무기한, 랩 무기한 = 무기한, 랩 주기 = 열림 길이(서버만 — 원격 클라는 모름 → 관측 중앙값 폴백).
-/// 단계 2 — 중간보스 3종·로비 스파링 봇 = <see cref="MonsterCounterWindow.WindowDuration"/>(서버·클라 같음), 23호는 아직 모름.
+/// 단계 2 — 중간보스 3종·로비 스파링 봇 = <see cref="MonsterCounterWindow.WindowDuration"/>(서버·클라 같음).
+/// 단계 3 — 23호는 <see cref="TwentyThreeInterruptWindowLengthTests"/>.
 /// 서버·오너의 실제 시계 연결(InterruptLagMonitor·InterruptWindowReplicaTracker 의 Time.time)은 NetworkManager 가 필요해 Play 확인.
 /// </summary>
 public sealed class InterruptWindowLengthResolverTests
@@ -111,7 +112,8 @@ public sealed class InterruptWindowLengthResolverTests
                  })
             Assert.IsNull(LoadPrefab(path).GetComponent<TrainingDummyInterrupt>(), path);
 
-        // 23호 프리팹에도 MonsterCounterWindow 가 있지만 23호 창은 자기 계통 — 단계 3 어댑터 전까지 모름(관측 중앙값).
+        // 23호 프리팹에도 MonsterCounterWindow(1.5)가 있지만 23호 창은 자기 계통 — 23호 어댑터(단계 3)가 맡고,
+        // 창이 닫혀 있으면(스폰 전 프리팹) 모름. 1.5 가 새어 나오지 않는다.
         GameObject boss = LoadPrefab("Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab");
         Assert.AreEqual(InterruptWindowLengthResolver.Unknown, InterruptWindowLengthResolver.Resolve(boss, true));
         Assert.AreEqual(InterruptWindowLengthResolver.Unknown, InterruptWindowLengthResolver.Resolve(boss, false));
@@ -124,7 +126,7 @@ public sealed class InterruptWindowLengthResolverTests
     {
         var go = new GameObject("resolver-test");
         float value = 0.75f;
-        bool Fake(GameObject owner, bool isServer, out float length)
+        bool Fake(GameObject owner, bool isServer, float openElapsed, out float length)
         {
             length = value;
             return owner == go;

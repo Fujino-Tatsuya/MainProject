@@ -99,11 +99,11 @@ public static class InterruptWindowReplicaTracker
             return;
         }
 
-        float localLength = InterruptWindowLengthResolver.Resolve(owner, false);
+        // 경과를 먼저 구한다 — 해석기(23호)가 '열릴 때의 공개 상태'를 경과로 되짚는다.
         if (Histories.TryGetValue(owner, out InterruptWindowHistory history))
-            history.Estimate(Time.timeAsDouble, openNow, localLength, out openElapsed, out expectedDuration);
-        else
-            expectedDuration = localLength;
+            history.Estimate(Time.timeAsDouble, openNow, out openElapsed, out expectedDuration);
+        expectedDuration = InterruptWindowLengthResolver.PreferLocal(
+            InterruptWindowLengthResolver.Resolve(owner, false, openElapsed), expectedDuration);
     }
 
     private static void PruneDestroyed()

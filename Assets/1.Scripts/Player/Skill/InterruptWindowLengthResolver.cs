@@ -24,12 +24,16 @@ public static class InterruptWindowLengthResolver
     /// <summary>
     /// 어댑터 — 이 창 소유자를 맡으면 true 와 길이(게임초·<see cref="Unbounded"/>·<see cref="Unknown"/>), 안 맡으면 false(다음 어댑터).
     /// <paramref name="isServer"/> = 서버 예측인가(서버만 아는 값이 있는 대상 — 예: 랩 허수아비 게이트).
+    /// <paramref name="openElapsed"/> = 이 피어 창 기록의 '열린 뒤 경과'(게임초, 모르면 -1) — 열림 순간의 공개 상태가 종류를 가르는 대상용(23호).
     /// </summary>
-    public delegate bool Adapter(GameObject owner, bool isServer, out float length);
+    public delegate bool Adapter(GameObject owner, bool isServer, float openElapsed, out float length);
 
-    // 기본 어댑터 — 허수아비(단계 1)·중간보스·로비 스파링 봇(단계 2). 맡는 대상이 겹치지 않는다(허수아비엔 MonsterBase 가 없다).
-    // 할 일 139-6 단계 3~4 에서 23호 어댑터가 여기 붙는다.
-    private static readonly List<Adapter> Adapters = new List<Adapter> { TryTrainingDummy, TryMidBossCounterWindow };
+    // 기본 어댑터 — 허수아비(단계 1)·중간보스·로비 스파링 봇(단계 2)·23호(단계 3). 맡는 대상이 겹치지 않는다
+    // (허수아비엔 MonsterBase 가 없고, 중간보스 어댑터는 봇 타입으로 한정해 23호를 맡지 않는다).
+    private static readonly List<Adapter> Adapters = new List<Adapter>
+    {
+        TryTrainingDummy, TryMidBossCounterWindow, TwentyThreeInterruptWindowLength.TryResolve,
+    };
 
     /// <summary>어댑터를 뒤에 붙인다(이미 있으면 그대로).</summary>
     public static void Register(Adapter adapter)
@@ -40,15 +44,18 @@ public static class InterruptWindowLengthResolver
 
     public static void Unregister(Adapter adapter) => Adapters.Remove(adapter);
 
-    /// <summary>창 소유자의 이번 열림 길이(게임초). 맡는 어댑터가 없거나 값이 이상하면(NaN·음수) <see cref="Unknown"/>.</summary>
-    public static float Resolve(GameObject owner, bool isServer)
+    /// <summary>
+    /// 창 소유자의 이번 열림 길이(게임초). 맡는 어댑터가 없거나 값이 이상하면(NaN·음수) <see cref="Unknown"/>.
+    /// <paramref name="openElapsed"/> = 이 피어 창 기록의 열린 뒤 경과(게임초, 모르면 -1).
+    /// </summary>
+    public static float Resolve(GameObject owner, bool isServer, float openElapsed = -1f)
     {
         if (owner == null)
             return Unknown;
 
         for (int i = 0; i < Adapters.Count; i++)
         {
-            if (Adapters[i](owner, isServer, out float length))
+            if (Adapters[i](owner, isServer, openElapsed, out float length))
                 return Sanitize(length);
         }
 
@@ -71,7 +78,7 @@ public static class InterruptWindowLengthResolver
         return isServer ? gate.OpenWindowLength : Unknown;
     }
 
-    private static bool TryTrainingDummy(GameObject owner, bool isServer, out float length)
+    private static bool TryTrainingDummy(GameObject owner, bool isServer, float openElapsed, out float length)
     {
         if (!owner.TryGetComponent(out TrainingDummyInterrupt dummy))
         {
@@ -90,7 +97,7 @@ public static class InterruptWindowLengthResolver
     /// 성공·피격·상태 이탈·Gauntlet 타격 순간(OnAttackHit) 같은 조기 닫힘은 복제 bool 로만 안다.
     /// 🔴 타입으로 한정한다 — 23호 프리팹에도 <see cref="MonsterCounterWindow"/> 가 붙어 있지만 23호 창은 자기 계통이라 이 길이가 아니다.
     /// </summary>
-    private static bool TryMidBossCounterWindow(GameObject owner, bool isServer, out float length)
+    private static bool TryMidBossCounterWindow(GameObject owner, bool isServer, float openElapsed, out float length)
     {
         length = Unknown;
         if (!owner.TryGetComponent(out MonsterBase monster)
