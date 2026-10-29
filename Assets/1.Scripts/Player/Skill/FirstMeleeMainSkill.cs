@@ -43,6 +43,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     private readonly List<TraitDerivedAttack> traitDerivedAttacks = new List<TraitDerivedAttack>();
     private readonly Collider[] traitBlastResults = new Collider[16];
     private readonly HashSet<Object> traitBlastTargets = new HashSet<Object>();
+    private readonly List<AttackShapeHit> traitBlastHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> traitBlastResolveTarget;
 
     // 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) — Q 모드 변경. 특성이 있으면 홀드·지속 타격·지속 밀치기·조향 대신
     // 입력 순간 방향으로 준비 → 고정 거리 돌진 → 회수. 서버는 경로 장부로 대상당 피해 1회 + 넉백 1회를 낸다.
@@ -300,7 +302,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // ── 진격의 충격(PAL_4_Q_BLAST, 할 일 126) ──
 
     /// <summary>
-    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 전방 forwardOffset 지점을 꼭짓점으로 반경 radius·각도 angle 부채꼴 판정을 delay 뒤 1회 예약한다.
+    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 효과 hitArea(기준점 = Q 끝 지점 + 마지막 진행 방향) 판정을 delay 뒤 1회 예약한다.
     /// 피해 = DQpacket(<see cref="PaladinTraitRules.QPacketDamage(int,float,float,float)"/> — 이 시전의 틱 Dref 스냅샷 × 예정 틱 수,
     /// 돌파의 방패면 그 × 교체 배율 = 교체 단발 피해) × 파생 배율. 실제 맞힌 틱·적 수와 무관하다.
     /// </summary>
@@ -321,15 +323,15 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             if (attack.Key != PaladinTraitValues.QBlastKey)
                 continue;
 
-            if (attack.Radius <= 0f)
+            if (attack.HitArea.IsEmpty)
             {
-                Debug.LogWarning("[Skill] 진격의 충격 — 반경이 0 이라 판정하지 않습니다(특성 데이터 확인).", this);
+                Debug.LogWarning("[Skill] 진격의 충격 — 판정 도형(hitArea)이 비어 판정하지 않습니다(특성 데이터 확인).", this);
                 continue;
             }
 
-            // 부채꼴 꼭짓점 = Q 끝 지점 + 정면 forwardOffset, 정면 = 마지막 진행 방향(할 일 146 — 원 → 90° 부채꼴, 각도 = 효과 칸 angle).
-            Vector3 apex = PaladinTraitRules.QBlastApex(owner.transform.position, heading, attack.ForwardOffset);
-            StartCoroutine(RunTraitBlastServer(apex, heading, attack.Radius, attack.Angle, attack.DamageFrom(packet), attack.Delay, sceneHandle));
+            // 기준점 = Q 끝 지점 + 마지막 진행 방향(효과 hitArea, 기준점 Point — 할 일 153). 지연 동안 움직여도 이 포즈로 고정.
+            AttackShapePose pose = PaladinTraitRules.QBlastPose(attack.HitArea, owner.transform.position, heading);
+            StartCoroutine(RunTraitBlastServer(attack.HitArea, pose, attack.DamageFrom(packet), attack.Delay, sceneHandle));
         }
 
         traitDerivedAttacks.Clear();
@@ -340,7 +342,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     /// 그래서 패시브 추가피해(ServerTakeOnHitBonus)·밀치기 수정자·<see cref="Player.RaiseServerAttackLanded"/> 를 부르지 않는다.
     /// 지형 차단은 원래 Q 판정처럼 없다(같은 레이어 Overlap). 지연 동안 시전자가 죽거나 씬이 바뀌면 취소한다. 이펙트 없음(판정만).
     /// </summary>
-    private System.Collections.IEnumerator RunTraitBlastServer(Vector3 apex, Vector3 forward, float radius, float angle, int damage, float delay, int sceneHandle)
+    private System.Collections.IEnumerator RunTraitBlastServer(AttackShapeSet area, AttackShapePose pose, int damage, float delay, int sceneHandle)
     {
         if (delay > 0f)
             yield return new WaitForSeconds(delay);
@@ -348,18 +350,16 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         if (owner == null || !owner.IsServer || owner.CurrentHealth <= 0 || UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle != sceneHandle || Data == null)
             yield break;
 
-        int hitCount = Physics.OverlapSphereNonAlloc(apex, radius, traitBlastResults, Data.HittableLayers, QueryTriggerInteraction.Collide);
         traitBlastTargets.Clear();
-        for (int i = 0; i < hitCount; i++)
+        traitBlastHits.Clear();
+        traitBlastResolveTarget ??= ResolveTraitBlastTarget;
+        AttackShapeQuery.Collect(area, pose, Data.HittableLayers, QueryTriggerInteraction.Collide, traitBlastResults, traitBlastResolveTarget,
+            traitBlastTargets, traitBlastHits);
+        for (int i = 0; i < traitBlastHits.Count; i++)
         {
-            Collider hit = traitBlastResults[i];
-            if (hit == null || !PaladinTraitRules.QBlastInSector(apex, forward, angle, hit.ClosestPoint(apex), hit.bounds.center))
-                continue;
-
+            Collider hit = traitBlastHits[i].Collider;
+            Object target = traitBlastHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !traitBlastTargets.Add(target))
-                continue;
 
             AttackInfo attackInfo = new AttackInfo(damage, DamageAttackType, isInterruptAttack: false, hitPattern: DamageHitPattern);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
@@ -371,6 +371,16 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         }
 
         traitBlastTargets.Clear();
+        traitBlastHits.Clear();
+    }
+
+    // 진격의 충격 1회 피격 키 = Unit, 없으면 Hurtbox. 시전자 자신은 null(대상 아님).
+    private Object ResolveTraitBlastTarget(Collider hit)
+    {
+        Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+        if (unit != null)
+            return unit == owner ? null : unit;
+        return hurtbox;
     }
 
     // ── 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) ──

@@ -252,7 +252,7 @@ public sealed class AssassinTraitTier4Tests
         TraitDerivedAttack spec = DerivedSpec(Trail, host, AssassinDerivedAttackKeys.QTrail);
         Assert.AreEqual(0.25f, spec.DamageRatio, Eps);
         Assert.AreEqual(0.15f, spec.Delay, Eps);
-        Assert.AreEqual(0f, spec.Radius, Eps, "원래 Q 경로 폭 재사용");
+        Assert.IsTrue(spec.HitArea.IsEmpty, "판정 도형 없음 = 원래 Q 경로 폭 재사용(할 일 153)");
 
         Assert.AreEqual(1, host.DerivedFor(NormalQ).Count, "일반 Q");
         Assert.AreEqual(1, host.DerivedFor(TransformedQ).Count, "변신 Q");
@@ -330,6 +330,7 @@ public sealed class AssassinTraitTier4Tests
         TraitDerivedAttack spec = DerivedSpec(Combo, host, AssassinDerivedAttackKeys.ComboExtra);
         Assert.AreEqual(0.7f, spec.DamageRatio, Eps);
         Assert.AreEqual(0.08f, spec.Delay, Eps);
+        Assert.IsTrue(spec.HitArea.IsEmpty, "판정 도형 없음 = 마지막 원래 한 타의 도형 재사용(할 일 153)");
 
         Assert.AreEqual(1, host.DerivedFor(NormalBasic).Count, "일반 연계");
         Assert.AreEqual(1, host.DerivedFor(TransformedBasic).Count, "변신 묶음");

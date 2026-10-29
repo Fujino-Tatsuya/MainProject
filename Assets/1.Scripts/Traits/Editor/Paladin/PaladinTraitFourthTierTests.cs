@@ -363,9 +363,7 @@ public sealed class PaladinTraitFourthTierTests
         TraitDerivedAttack blast = forQ[0];
         Assert.AreEqual(PaladinTraitValues.QBlastKey, blast.Key);
         Assert.AreEqual(0.3f, blast.DamageRatio, Eps);
-        Assert.AreEqual(2f, blast.Radius, Eps, "반경 2m");
-        Assert.AreEqual(0f, blast.ForwardOffset, Eps, "꼭짓점 = Q 끝 지점(전방 밀기 없음)");
-        Assert.AreEqual(90f, blast.Angle, Eps, "90° 부채꼴(할 일 146)");
+        Assert.IsFalse(blast.HitArea.IsEmpty, "판정 도형 = hitArea(값은 QBlast_Asset_HitArea_… 에서)");
         Assert.AreEqual(0.05f, blast.Delay, Eps);
         Assert.IsTrue(blast.Counter.Tick() && blast.Counter.Tick(), "매 정상 종료마다(N번마다 아님)");
 
@@ -380,24 +378,73 @@ public sealed class PaladinTraitFourthTierTests
         Assert.IsEmpty(host.DerivedFor(QKey), "특성 없음(되돌림) = 충격 없음");
     }
 
-    // 할 일 146 — 원 → 90° 부채꼴. 반경은 호출 쪽 구 질의, 여기선 각도만(대상 표면 기준, 꼭짓점이 콜라이더 안이면 중심 방향).
+    // 할 일 146 — 원 → 90° 부채꼴, 할 일 153 4/6 — 판정 = 효과 hitArea(기준점 Point = Q 끝 지점 + 마지막 진행 방향).
+    [Test]
+    public void QBlast_Asset_HitArea_PointSector_Range2_Angle90_Height2()
+    {
+        AttackShapeSet area = QBlastArea();
+        Assert.AreEqual(AttackShapeOrigin.Point, area.Origin, "기준점 = Q 끝 지점 + 마지막 진행 방향");
+        Assert.AreEqual(1, area.Shapes.Count, "도형 1개");
+        var sector = area.Shapes[0] as AttackSectorShape;
+        Assert.IsNotNull(sector, "부채꼴");
+        Assert.AreEqual(2f, sector.Range, Eps, "range 2(사용자 확정)");
+        Assert.AreEqual(90f, sector.Angle, Eps, "angle 90");
+        Assert.AreEqual(0f, sector.MinOffset, Eps, "minOffset 0");
+        Assert.AreEqual(0f, sector.ForwardOffset, Eps, "forwardOffset 0 — 꼭짓점 = Q 끝 지점");
+        Assert.AreEqual(0f, sector.SideOffset, Eps);
+        Assert.AreEqual(0f, sector.YawOffset, Eps);
+        Assert.AreEqual(-2f, sector.MinHeight, Eps, "높이 ±range — 예전 구 질의(반경 2) 체감");
+        Assert.AreEqual(2f, sector.MaxHeight, Eps);
+
+        var errors = new List<string>();
+        Load(PaladinTraitValues.QBlast).Effects.OfType<TraitDerivedAttackEffect>().Single().Validate(errors);
+        Assert.IsEmpty(errors, string.Join("\n", errors));
+
+        // 시트 Traits_Paladin 행 = effects[0].hitArea.shapes[0].칸(병합 Export 때 생긴다). angle 칸(146)은 없어졌다.
+        List<string> rows = DataTableTemplate.CollectFields(Load(PaladinTraitValues.QBlast)).Select(f => f.Path).ToList();
+        CollectionAssert.IsSubsetOf(new[] { "effects[0].hitArea.shapes[0].range", "effects[0].hitArea.shapes[0].angle",
+            "effects[0].hitArea.shapes[0].minHeight", "effects[0].hitArea.shapes[0].maxHeight" }, rows, string.Join(", ", rows));
+        CollectionAssert.DoesNotContain(rows, "effects[0].angle");
+    }
+
     [Test]
     public void QBlast_Sector_90Degrees_FrontOnly()
     {
-        Vector3 apex = new Vector3(2f, 0f, 2f);
-        Vector3 forward = Vector3.forward;
-        Vector3 At(float yaw, float distance) => apex + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * distance;
+        AttackShapeSet area = QBlastArea();
+        Vector3 qEnd = new Vector3(2f, 0f, 2f);
+        AttackShapePose pose = PaladinTraitRules.QBlastPose(area, qEnd, Vector3.forward);
+        Assert.AreEqual(qEnd, pose.Position, "기준 = Q 끝 지점");
+        Assert.AreEqual(Vector3.forward, pose.Forward, "정면 = 마지막 진행 방향");
+        Vector3 At(float yaw, float distance) => qEnd + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * distance;
 
-        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(0f, 1.5f), At(0f, 1.5f)), "정면");
-        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(44.5f, 1.5f), At(44.5f, 1.5f)), "반각 45° 안");
-        Assert.IsFalse(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(46f, 1.5f), At(46f, 1.5f)), "반각 45° 밖");
-        Assert.IsFalse(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(180f, 1f), At(180f, 1f)), "뒤 = 제외(예전 원은 포함)");
-        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, At(0f, 1f) + Vector3.up * 3f, At(0f, 1f)), "높이 무시");
-        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 90f, apex, At(10f, 0.5f)), "꼭짓점을 덮은 대상 = 중심 방향");
-        Assert.IsTrue(PaladinTraitRules.QBlastInSector(apex, forward, 360f, At(180f, 1f), At(180f, 1f)), "360 = 원(다른 파생 공격 기본값)");
+        Assert.IsTrue(area.Contains(pose, At(0f, 1.5f)), "정면");
+        Assert.IsTrue(area.Contains(pose, At(44.5f, 1.5f)), "반각 45° 안");
+        Assert.IsTrue(area.Contains(pose, At(-44.5f, 1.5f)), "반각 45° 안(왼쪽)");
+        Assert.IsFalse(area.Contains(pose, At(46f, 1.5f)), "반각 45° 밖");
+        Assert.IsFalse(area.Contains(pose, At(180f, 1f)), "뒤 = 제외(예전 원은 포함)");
+        Assert.IsTrue(area.Contains(pose, At(0f, 1.99f)), "반경 안");
+        Assert.IsFalse(area.Contains(pose, At(0f, 2.05f)), "반경 밖");
+        Assert.IsTrue(area.Contains(pose, At(0f, 1f) + Vector3.up * 1.9f), "높이 2 안");
+        Assert.IsFalse(area.Contains(pose, At(0f, 1f) + Vector3.up * 2.1f), "높이 2 밖");
+        Assert.IsFalse(area.Contains(pose, At(0f, 1f) + Vector3.down * 2.1f), "아래 2 밖");
 
-        var spec = new TraitDerivedAttackEffect("X", 0.3f).CreateRuntime(1);
-        Assert.AreEqual(360f, spec.Angle, Eps, "angle 칸 기본 = 원 — 진격의 충격 외 파생 공격은 그대로");
+        // 꼭짓점이 몸 안(가장 가까운 점 = 기준점) = 바닥 평면은 콜라이더 중심 쪽으로 본다(예전 QBlastInSector 동작).
+        Vector3 probe = AttackShapeQuery.ProbePoint(pose.Position, qEnd, At(10f, 0.5f));
+        Assert.IsTrue(area.Contains(pose, probe), "꼭짓점을 덮은 대상 = 중심 방향(앞)");
+        Vector3 behind = AttackShapeQuery.ProbePoint(pose.Position, qEnd, At(180f, 0.5f));
+        Assert.IsFalse(area.Contains(pose, behind), "꼭짓점을 덮었지만 중심이 등 뒤 = 밖");
+
+        AttackShapePose turned = PaladinTraitRules.QBlastPose(area, qEnd, Vector3.right);
+        Assert.IsTrue(area.Contains(turned, qEnd + Vector3.right * 1.5f), "진행 방향을 따라 돈다");
+        Assert.IsFalse(area.Contains(turned, qEnd + Vector3.forward * 1.5f));
+    }
+
+    static AttackShapeSet QBlastArea()
+    {
+        PaladinTraitDefinition def = Load(PaladinTraitValues.QBlast);
+        TraitDerivedAttack blast = def.Effects.OfType<TraitDerivedAttackEffect>().Single().CreateRuntime(def.IdHash);
+        Assert.AreEqual(PaladinTraitValues.QBlastKey, blast.Key);
+        return blast.HitArea;
     }
 
     [Test]

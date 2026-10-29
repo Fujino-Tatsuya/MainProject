@@ -105,7 +105,7 @@ hitArea.shapes[1].length            (hitArea.shapes[1] · AttackRectShape)
 | 1 | 코어(이 문서·도형 4종·질의·그리기·테스트) — 기존 판정 코드는 아직 안 바뀜 |
 | 2 | 어쌔신 평타·강타·변신 묶음 — ✅ `AssassinBasicAttackStepData.hitArea`(부채꼴 1개, 높이 ±range), `AssassinConeAttack.Fire·FireDerived` = `Collect`, 칼날의 영역 = `AssassinTraitAreaRules.ScaleArea`. 144 프리팹 상자·`AssassinStrikeBox` 삭제 |
 | 3 | 팔라딘 평타 — ✅ `DefaultAttackStep.hitArea`(직사각형 1개, 4타 같은 값 = 예전 `Armature/DefaultAttack/AAC1` 상자: 앞 1.55·뒤 0.55·폭 2.6·yaw −0.03°·높이 0~2.039), `PlayerDefaultAttack.HitOverlap` = `Collect`(기준점 발밑 + 그 타 조준 방향). 프리팹 `AAC1~4`·`defaultHitbox`·단계 `hitbox` 삭제, `DefaultAttackController.attackSteps` 는 직렬화 안 함(데이터에서만) |
-| 4 | 특성 추가 공격 5종 |
+| 4 | 특성 추가 공격 5종 — ✅ `TraitDerivedAttackEffect.hitArea`(런타임 `TraitDerivedAttack.HitArea`). **비우면 원래 공격 치수 재사용**. 진격의 충격(`PAL_4_Q_BLAST`)만 도형: 기준점 `Point` = Q 끝 지점 + 마지막 진행 방향(`PaladinTraitRules.QBlastPose`), 부채꼴 range 2·angle 90·minOffset 0·forwardOffset 0·높이 ±2(예전 반경 2 구 질의 체감), `FirstMeleeMainSkill.RunTraitBlastServer` = `Collect`. `QBlastApex`·`QBlastInSector` 삭제. 나머지 4종(이중 출력·잔류 포격 = 원래 레이저, 추격의 궤적 = Q 경로 상자, 끝없는 칼날 = 마지막 한 타 도형 — 2단계)은 비움. 효과 칸 `angle` 삭제(시트에 행 없음), `radius`·`forwardOffset` 은 시트 `Traits_*` 행 때문에 미사용 칸으로 유지 |
 | 5 | 캐릭터별 Q·E 스킬 |
 | 6 | DebugTraitLab 기즈모 통합(할 일 152 기즈모 → `AttackShapeDrawing`) |
 

@@ -387,14 +387,15 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
     [Tooltip("원래 공격 뒤 지연(초).")]
     [Min(0f)]
     [SerializeField] private float delay;
-    [Tooltip("판정 반경(m). 0 = 원래 공격 치수 재사용.")]
+    [Tooltip("판정 도형(할 일 153). 비우면 원래 공격 치수 재사용(이중 출력·잔류 포격·추격의 궤적·끝없는 칼날). 진격의 충격 = Point(Q 끝 지점 + 마지막 진행 방향) 부채꼴.")]
+    [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet();
+    // ⚠️ 미사용(할 일 153 4/6 — 판정은 hitArea). GameData.xlsx Traits_Paladin/Gunner/Assassin 시트에 effects[0].radius·forwardOffset 행이 있어
+    //    지우면 테이블 모드가 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
+    [Tooltip("미사용 — 판정은 hitArea(할 일 153). 시트 행 정리 뒤 지운다.")]
     [Min(0f)]
     [SerializeField] private float radius;
-    [Tooltip("판정 중심 앞쪽 거리(m).")]
+    [Tooltip("미사용 — 판정은 hitArea(할 일 153). 시트 행 정리 뒤 지운다.")]
     [SerializeField] private float forwardOffset;
-    [Tooltip("판정 부채꼴 각도(도, 전체) — 판정 중심에서 앞쪽으로 반경 radius 만큼. 360 = 원(기본). 지금 쓰는 곳 = 진격의 충격(90).")]
-    [Range(1f, 360f)]
-    [SerializeField] private float angle = 360f;
     [Tooltip("원래 공격 N번마다 1회(이중 출력 3). 1 = 매번.")]
     [Min(1)]
     [SerializeField] private int requiredCount = 1;
@@ -402,26 +403,24 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
     public TraitDerivedAttackEffect() { }
 
     public TraitDerivedAttackEffect(string derivedKey, float damageRatio, AttackType[] sourceAttackTypes = null,
-        TraitAttackForm[] sourceForms = null, float delay = 0f, float radius = 0f, float forwardOffset = 0f, int requiredCount = 1,
-        float angle = 360f)
+        TraitAttackForm[] sourceForms = null, float delay = 0f, AttackShapeSet hitArea = null, int requiredCount = 1)
     {
         this.derivedKey = derivedKey;
         this.damageRatio = damageRatio;
         this.sourceAttackTypes = sourceAttackTypes ?? Array.Empty<AttackType>();
         this.sourceForms = sourceForms ?? Array.Empty<TraitAttackForm>();
         this.delay = delay;
-        this.radius = radius;
-        this.forwardOffset = forwardOffset;
+        this.hitArea = hitArea ?? new AttackShapeSet();
         this.requiredCount = requiredCount;
-        this.angle = angle;
     }
 
     public string DerivedKey => derivedKey;
     public float DamageRatio => damageRatio;
+    public AttackShapeSet HitArea => hitArea;
 
     public TraitDerivedAttack CreateRuntime(int traitHash) =>
         new TraitDerivedAttack(traitHash, derivedKey, MaskOf(sourceAttackTypes), MaskOf(sourceForms),
-            damageRatio, delay, radius, forwardOffset, requiredCount, angle);
+            damageRatio, delay, hitArea, requiredCount);
 
     public override ITraitEffectBinding BindServer(ITraitEffectHost host, int traitHash)
     {
@@ -439,10 +438,10 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
             errors.Add($"{nameof(TraitDerivedAttackEffect)}.derivedKey 가 비었다");
         CheckPositive(errors, nameof(damageRatio), damageRatio);
         CheckNonNegative(errors, nameof(delay), delay);
-        CheckNonNegative(errors, nameof(radius), radius);
-        CheckFinite(errors, nameof(forwardOffset), forwardOffset);
-        if (!(angle > 0f) || angle > 360f)
-            errors.Add($"{nameof(TraitDerivedAttackEffect)}.angle = {angle} — 0 초과 360 이하");
+        int before = errors.Count;
+        hitArea?.Validate(errors);
+        for (int i = before; i < errors.Count; i++)
+            errors[i] = $"{nameof(TraitDerivedAttackEffect)}.hitArea.{errors[i]}";
         if (requiredCount < 1)
             errors.Add($"{nameof(TraitDerivedAttackEffect)}.requiredCount = {requiredCount} < 1");
     }

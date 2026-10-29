@@ -10,14 +10,18 @@ public sealed class TraitLabAttackShapeTests
     const float Eps = 1e-4f;
 
     [Test]
-    public void QBlastApex_IsQEndPlusHeadingTimesOffset()
+    public void QBlastPose_IsQEndPlusHeading_ShapeOffsetMovesApex()
     {
         var end = new Vector3(1f, 0.5f, 2f);
-        Assert.AreEqual(end, PaladinTraitRules.QBlastApex(end, Vector3.forward, 0f), "forwardOffset 0 = Q 끝 지점");
-        Vector3 pushed = PaladinTraitRules.QBlastApex(end, Vector3.right, 1.5f);
-        Assert.AreEqual(2.5f, pushed.x, Eps);
-        Assert.AreEqual(0.5f, pushed.y, Eps);
-        Assert.AreEqual(2f, pushed.z, Eps);
+        var area = new AttackShapeSet(AttackShapeOrigin.Point, new AttackSectorShape(2f, 90f) { ForwardOffset = 1.5f });
+        AttackShapePose pose = PaladinTraitRules.QBlastPose(area, end, Vector3.right);
+        Assert.AreEqual(end, pose.Position, "기준 = Q 끝 지점");
+        Assert.AreEqual(1f, pose.Forward.x, Eps, "정면 = 진행 방향");
+
+        AttackShapePose apex = area.Shapes[0].ShapePose(pose);
+        Assert.AreEqual(2.5f, apex.Position.x, Eps, "꼭짓점 = 끝 지점 + 정면 × 도형 forwardOffset(기즈모와 판정이 같은 값)");
+        Assert.AreEqual(0.5f, apex.Position.y, Eps);
+        Assert.AreEqual(2f, apex.Position.z, Eps);
     }
 
     [Test]

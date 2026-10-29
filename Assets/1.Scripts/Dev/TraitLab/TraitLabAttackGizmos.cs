@@ -256,18 +256,24 @@ public static class TraitLabAttackShapes
                             shapes.Add(dashEnd);
                     }
 
-                    // 진격의 충격 — Q 가 여기서 끝났다면(꼭짓점 = 끝 지점 + 정면 forwardOffset).
+                    // 진격의 충격 — Q 가 여기서 끝났다면(기준 = 끝 지점 + 정면). 부채꼴 도형만 임시 표시(6단계에서 AttackShapeDrawing 으로 통합).
                     if (traitEffects != null)
                     {
                         traitEffects.GetDerivedAttacks(key, DerivedBuffer);
                         for (int i = 0; i < DerivedBuffer.Count; i++)
                         {
                             TraitDerivedAttack blast = DerivedBuffer[i];
-                            if (blast.Key != PaladinTraitValues.QBlastKey || blast.Radius <= 0f)
+                            if (blast.Key != PaladinTraitValues.QBlastKey)
                                 continue;
 
-                            Vector3 apex = PaladinTraitRules.QBlastApex(position, facing, blast.ForwardOffset);
-                            shapes.Add(TraitLabGizmoShape.Sector(T, $"진격의 충격 r{blast.Radius:0.#} {blast.Angle:0}°", apex, facing, blast.Radius, blast.Angle));
+                            AttackShapePose blastPose = PaladinTraitRules.QBlastPose(blast.HitArea, position, facing);
+                            foreach (AttackShape shape in blast.HitArea.Shapes)
+                            {
+                                if (shape is not AttackSectorShape sector)
+                                    continue;
+                                AttackShapePose shapePose = sector.ShapePose(blastPose);
+                                shapes.Add(TraitLabGizmoShape.Sector(T, $"진격의 충격 r{sector.Range:0.#} {sector.Angle:0}°", shapePose.Position, shapePose.Forward, sector.Range, sector.Angle));
+                            }
                         }
                     }
                     break;
