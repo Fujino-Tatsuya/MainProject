@@ -205,7 +205,10 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         position.y = Mathf.Clamp(position.y, padding.y, Mathf.Max(padding.y, size.y - padding.y));
 
         _rect.anchoredPosition = position;
-        _rect.localScale = Vector3.one * CurrentScale();
+        // 해상도 하한(154) — 유지 크기 기준 실제 px 가 하한보다 작으면 같은 배율로 키운다(애니 비율 유지).
+        float minPixel = FloatingDamageMinPixelPolicy.Multiplier(_settings.MinScreenPixelHeight,
+            _digitHeight * _look.holdScale * _displayScaleMultiplier, scaleFactor);
+        _rect.localScale = Vector3.one * (CurrentScale() * minPixel);
         SetAlpha(CurrentAlpha());
     }
 

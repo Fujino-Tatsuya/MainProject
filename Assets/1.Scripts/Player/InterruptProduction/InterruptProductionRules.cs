@@ -77,6 +77,12 @@ public static class InterruptProductionRules
         }
     }
 
+    /// <summary>
+    /// 판정 사건이 시도 슬로우를 실패 복귀시키는가 — 예측 대기 중 성공이 없었거나(빗나감) 선착순에서 밀렸다(할 일 143, 선점 = 피해만 · 연출 없음).
+    /// 거의 동시에 눌러 강 시도가 이미 돌던 두 번째 성공자도 여기서 정리된다(오너 암전 걷기·빛 모임 정지 = 실패 복귀와 같다).
+    /// </summary>
+    public static bool ResolveFailsAttempt(bool landed, bool preempted) => !landed || preempted;
+
     /// <summary>시도 목적에 맞는 슬로우 프로필 — 약이면 약 프로필, 그 밖은 강(옛 시도) 프로필.</summary>
     public static SlowMotionProfile SelectAttemptProfile(SlowMotionPurpose purpose, IInterruptProductionSettings settings) =>
         purpose == SlowMotionPurpose.AttemptWeak ? settings.InterruptWeakProfile : settings.InterruptProfile;
@@ -94,6 +100,19 @@ public static class InterruptProductionRules
             default: return successZoomFactor;
         }
     }
+
+    /// <summary>
+    /// A5 — 이 화면(오너)에서 지금 피해 숫자를 숨기는가(할 일 154). 구간 = 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·예측 빗나감이면 암전 걷기 끝).
+    /// 오너 상태 기계·섬광 진행기는 본인 시도만 타므로 팀원 화면은 늘 false. 약 시도·대상 없음은 암전이 없어 false.
+    /// <list type="bullet">
+    /// <item><paramref name="ownerState"/> = 강 시도 중 — 입력 프레임은 램프 첫 값이 0 이라 상태로 본다.</item>
+    /// <item><paramref name="ownerDim"/> &gt; 0 — 상태 기계 암전 값(효과 칸으로 덮개를 꺼도 값은 돈다). 성공~섬광 순간·실패 걷기 동안.</item>
+    /// <item><paramref name="hitFlashOverlayActive"/> — 오너 섬광 ②~⑥ 이 도는 동안(섬광 순간에 암전이 0 이 된 뒤 ⑤⑥ 끝까지).</item>
+    /// </list>
+    /// </summary>
+    public static bool ShouldHideDamageNumbers(bool switchOn, InterruptOwnerPresentationState ownerState, float ownerDim,
+        bool hitFlashOverlayActive) =>
+        switchOn && (ownerState == InterruptOwnerPresentationState.AttemptStrong || ownerDim > 0f || hitFlashOverlayActive);
 
     /// <summary>이 화면이 간파한 본인인가 — 개인 채널 기준.</summary>
     public static bool IsCasterView(ulong casterClientId, ulong localClientId) => casterClientId == localClientId;

@@ -1,200 +1,194 @@
-# 플로팅 데미지(Floating Damage) — 무엇을 기반으로 만들 것인가
+# 플로팅 데미지(피해 숫자) — 실제 동작 기준 설계
 
-작성 2026-08-05 / 브랜치 `feature/FloatingDamage` (base `Convayor-V2` c256a5d21) / 워크트리 `MainProject-WorkTree`
+갱신 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
 
-목적: 구현 착수 전에 **이 레포에 이미 있는 구조 중 무엇에 얹는 게 맞는지**를 실측 근거로 확정한다.
-아직 미결정인 항목은 §6에 모아 뒀다. 구현(Codex 위임)은 §6이 닫힌 뒤에 시작한다.
-
----
-
-## 1. 결론 요약
-
-| 항목 | 결론 | 근거 |
-|---|---|---|
-| 데이터 소스 | 기본은 **`Unit.ClientDamaged` 복제 기반 시임 확장**(RPC 0건), 공격자 식별이 필요한 필터에서만 서버 RPC 경로 | 이미 같은 목적(HitFlash)으로 검증된 경로. 서버가 감산을 끝낸 **실제 수치**가 전 피어에 복제됨 |
-| 표시 방식 | **World-space TMP + 오브젝트 풀** | `OverheadHealthBar.prefab` / `UnitOverheadHealthBar`가 이미 월드스페이스 빌보드로 동작 중 → 같은 장치 재사용 |
-| 부착 방식 | Unit 계열 공통 자동 부착 (HitFlash와 동일 패턴) | 플레이어·몹·보스 전부 `Unit` 파생 → 프리팹 개별 배선 불필요 |
-| 신규 필요 | 텍스트 팝업 프리팹 + 풀 + 스포너, `Unit`에 델타 포함 이벤트 1개 | 레포에 데미지 텍스트 코드 0건, 범용 오브젝트 풀 0건 |
-
-`Assets` 전체에 `DamageText` / `FloatingText` / `DamagePopup` 계열 코드는 **0건** — 백지에서 시작한다.
+**출처** — 기획 「Re:C 데미지 숫자 표기 v0.2」(§3 구간 · §4 위치 · §5 흐름, 수치는 임시값)
++ 은희 결정(2026-10-01: 누적 숫자는 대상을 따라감 · 누적 구간은 합계로 판정)
++ 할 일 154 결정 1~6(§11). 기획과 다른 곳은 그 줄에 적었다.
 
 ---
 
-## 2. 실측한 기존 구조
+## 1. 한눈에
 
-### 2-1. 서버 피해 파이프라인 (권위 = 서버)
+| 항목 | 동작 |
+|---|---|
+| 그리는 곳 | 스포너가 직접 만드는 **Screen Space Overlay** Canvas(`FloatingDamageCanvas`, 1920×1080 기준 · 높이 맞춤 · 정렬 50). Canvas 단위 = 기획 px |
+| 글자 | TMP 아님 — **이미지 숫자**(`FloatingDamageDigitSet` 스프라이트, 외곽선 색도 DigitSet). 굵은 변형 스프라이트 없음 → 기획의 "높음 = 한 단계 굵게"는 표현 안 함 |
+| 생성점 | 대상의 **몸 중심**(§2) 을 화면에 투영 + 픽셀 오프셋 합산 |
+| 흐름 | 단발 = 뜨고 떨어지며 사라짐 / 누적(Multi) = 한 숫자에 합산하다 사라짐(§3) |
+| 크기·색 | 피해 강도 3구간(낮음/중간/높음) — 대상 등급별 %(§4) |
+| 줌 | **카메라 줌과 무관** — 크기·픽셀 오프셋 고정(§7: 넣었다가 뺐음, 154) |
+| 해상도 | 높이 맞춤 + 실제 px 하한 16(§4, 154) |
+| 간파 중 | 내 강 시도 ~ 성공 섬광 끝 동안 내 화면만 숨김(§5, 154) |
+| 데이터 | 서버가 피해마다 `ClientDamageDealtClientRpc` 로 실제 감소량 + 공격자 + 공격 종류를 보냄(§6) |
+| 수치 원본 | SO 에셋. **xlsx(GameData) 미연결** |
+
+## 2. 생성 위치 — 앵커 + 픽셀 오프셋
+
+### 2-1. 앵커(월드 점) 우선순위 — `FloatingDamageSpawner.ResolveAnchor(Unit)`
+1. 대상 **Unit 과 같은 GameObject(루트)** 에 `FloatingDamageAnchor` 가 있으면 그 `WorldPosition`
+   = (`anchorTransform` 위치, 비었으면 `transform.TransformPoint(localOffset)`) + `worldOffset`.
+2. 없으면 루트의 **Collider**(켜져 있을 때) `bounds.center` — 몸 중심.
+3. 그것도 없으면 `transform.position + (0, 1, 0)`.
+
+- 단발은 **첫 타격 때 월드 점에 고정**(넉백·이동을 따라가지 않음 — 기획 §4).
+- 누적은 매 프레임 앵커를 다시 읽어 **대상을 따라간다**(은희 2026-10-01 — 기획 §4 와 다름). 대상이 꺼지면 마지막 점에 남는다.
+- 카메라 뒤(투영 z ≤ 0)이거나 `Camera.main` 이 없으면 투명.
+
+### 2-2. 픽셀 오프셋 합산 (Canvas 단위 = 1080p px, +y = 위)
 
 ```
-공격자 → Hurtbox → IAttackReceiver.ReceiveAttack(AttackInfo, AttackHitContext)
-       → Unit.TakeDamage(AttackInfo)  →  Unit.ApplyHealthDamage(damage, ignoreDefenseAndShield)
+x = 투영x + style.offset.x + scatter.x + shake
+y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
+→ 화면 가장자리 여백(60, 30) 안으로 클램프
 ```
 
-- [Unit.cs:74](Assets/1.Scripts/Unit/Unit.cs:74) `ApplyHealthDamage` — `if (!IsServer) return;` 서버 전용. `CanApplyHealthDamage`로 무적/차단 판정.
-- [Unit.cs:111](Assets/1.Scripts/Unit/Unit.cs:111) `ApplyMitigatedHealthDamage` — **경감 공식**
-  - 방어력: `최종 = 피해 × 100 / (100 + 방어력)` (방어력 100 = 50% 경감)
-  - 실드 우선 흡수 → 잔여만 HP로. 즉 **HP 감소량 ≠ AttackInfo.damage**
-- [Unit.cs:100](Assets/1.Scripts/Unit/Unit.cs:100) 결과를 `_currentHp.Value`(NetworkVariable, Write=Server)에 반영.
-- 특수 진입점: `ApplyDirectHealthDamage`(방어/실드 무시), `ApplyMaxHealthPercentDamage`, `ApplyCurrentHealthPercentDamage` — Vent 등 해저드가 사용.
-- (2026-10-07 결과 화면 통계) `ApplyHealthDamage` 는 체력 반영 뒤·사망 통지(`NotifyDeathTransition`) **전에**
-  서버 정적 이벤트 `CombatStatsEvents.ServerDamageApplied(대상, 공격자 clientId, HP+실드 실제 감소량, 체력 0 도달)` 를 낸다.
-  실제 감소량은 체력 클램프 **후** 값이라 막타 초과분이 빠진다(표시용 `ClientDamageDealtClientRpc` 는 클램프 전 값 — 둘은 다르다).
-  읽기 전용 발행이라 판정 무수정 원칙은 그대로다. 구독자가 없으면 null 검사 한 번(할당 0). 소비자 = `SessionStatsTracker`.
-  상세: [PLAN-result-stats.md](../history/PLANS/PLAN-result-stats.md), [handoff-result-stats-monster-hooks.md](handoff-result-stats-monster-hooks.md).
+| 칸 | 기본 |
+|---|---|
+| `spawnOffset` | 20 (몸 중심에서 위로) |
+| `spawnScatter` | ±12 / ±6 무작위(생성 때 1회) |
+| `popupStyles[kind].offset` | ShieldDamage (0, 64), 나머지 0 |
+| 상승/하강 | `riseDistance` 24, `fallDistance` 12 |
+| 흔들림 | `shakeDistance` 3, `shakeDuration` 0.08 (좌우 sin 1주기, 높음 구간만) |
 
-**함의:** 클라이언트가 `AttackInfo.damage`로 숫자를 추정하면 방어력·실드 때문에 실제와 어긋난다. 숫자는 서버 결과에서 와야 한다.
+### 2-3. 대상별 위치 오프셋 설정법 (154 — 사용자 작업)
+코드 수정 없이 **프리팹 루트에 `FloatingDamageAnchor` 를 붙이면 된다.** 지금은 23호(`TwentyThree.prefab`·`TwentyThree_Solo.prefab`) 에만 있다.
 
-### 2-2. 이미 있는 "로컬 연출" 시임 — 이게 핵심
+- **반드시 Unit 이 붙은 루트에.** `ResolveAnchor` 가 `target.TryGetComponent` 로 루트만 보므로 **자식에 붙이면 무시된다.**
+  (2026-10-29 확인: `2.Prefabs` 의 Unit 프리팹 24개 중 캐릭터·몬스터는 전부 루트에 Unit. 예외 1개는 `bossroom.prefab` 의 환경 장치.)
+- 붙이면 **몸 중심(콜라이더) 대신 앵커 점을 쓴다** — 오프셋이 아니라 대체다. 그래서 값을 줄 때:
+  - 본·소켓을 따라가게: `anchorTransform` 에 본 지정(+ 필요하면 `worldOffset` 으로 m 단위 미세 조정).
+  - 고정 높이: `anchorTransform` 비우고 `localOffset` = 루트(발) 기준 위치. 예) 지금 몸 중심이 콜라이더 중심 y≈1 이면 `(0, 1, 0)` 에서 시작해 조정.
+- 대상별:
+  - **플레이어**: 역할 공통이면 `Player.prefab` 루트, 캐릭터마다 다르면 그 Variant(`Player_Paladin.prefab` 등) 루트에서 추가/덮어쓰기.
+    (참고 — 로컬 플레이어 자기 피격은 숫자를 안 띄우므로 팀원 화면에서만 보인다.)
+  - **일반 몬스터·중간보스·보스**: 각 몬스터 프리팹 루트.
+- 앵커가 없는 프리팹은 위치가 전과 똑같다(콜라이더 중심).
+- 떠 있는 누적 숫자는 매 프레임 앵커를 다시 읽어 Play 중 값 수정이 바로 보인다. 씬 뷰에서 선택하면 노란 구로 점이 보인다.
 
-[Unit.cs:449-483](Assets/1.Scripts/Unit/Unit.cs:449)
+## 3. 단발 / 누적 흐름 (기획 §4·§5)
 
-```csharp
-public event System.Action ClientDamaged;          // 델타 없음(현재)
+`AttackInfo` 의 `AttackHitPattern` 으로 갈린다.
 
-public override void OnNetworkSpawn() {
-    _currentHp.OnValueChanged += OnHpReplicated;
-    _currentShield.OnValueChanged += OnShieldReplicated;
-    if (GetComponent<HitFlash>() == null)
-        gameObject.AddComponent<HitFlash>();        // Unit 계열 전체 자동 부착
-}
-void OnHpReplicated(int previous, int next)      { if (next < previous) ClientDamaged?.Invoke(); }
-void OnShieldReplicated(int previous, int next)  { if (next < previous) ClientDamaged?.Invoke(); }
-```
-
-- **RPC 0건**: NetworkVariable 복제만으로 전 피어가 감소를 안다. [HitFlash.cs:10](Assets/1.Scripts/Unit/HitFlash.cs:10) 주석이 이 정책을 명시("데미지 판정과 무관한 순수 로컬 연출 — RPC/추가 트래픽 없음").
-- **자동 부착 패턴**: `HitFlash`는 프리팹 배선 없이 `OnNetworkSpawn`이 붙인다. 플로팅 데미지도 동일하게 하면 몹/보스/플레이어 전부 공짜로 커버된다.
-- **현재 한계 3가지** (구현 시 반드시 다뤄야 함)
-  1. `ClientDamaged`가 `Action` — **감소량을 안 넘긴다**. 델타는 `OnHpReplicated(previous, next)` 안에만 존재.
-  2. NetworkVariable은 tick 단위 델타 전송 → **같은 tick 내 연타 2히트가 1개로 합쳐질 수 있다**(숫자 1개, 합계값).
-  3. **공격자 정보가 없다** → "내가 준 딜만 표시" 필터는 이 경로만으로는 불가.
-
-### 2-3. UI 자산 현황
-
-| 자산 | 위치 | 성격 |
+| | 단발 `Single` | 누적 `Multi` |
 |---|---|---|
-| `CombatHUD` | [CombatHUD.cs](Assets/1.Scripts/UI/Combat/CombatHUD.cs), `2.Prefabs/UI/CombatHUD.prefab`, `Paladin.prefab` 자식 | Screen-space. `Player.LocalPlayerChanged` 구독 → 위젯 Bind |
-| `UnitOverheadHealthBar` | [UnitOverheadHealthBar.cs](Assets/1.Scripts/UI/Combat/UnitOverheadHealthBar.cs), `2.Prefabs/UI/OverheadHealthBar.prefab`, `Paladin.prefab` 자식 | **World-space 빌보드** — `LateUpdate`에서 `transform.rotation = Camera.main.transform.rotation` |
-| TMP | `PlayerHealthHUD` / `StatusEffectHUD` / `PassiveHUD` / `ResultStatsView` 등에서 이미 사용 | 한글 폰트 에셋 확보됨 |
-| 범용 오브젝트 풀 | **없음** (`BroAudio` 내부 풀만 존재) | `UnityEngine.Pool.ObjectPool<T>` 또는 자체 풀 신설 |
+| 생성 | 타격마다 **따로** 뜬다(단발 연타도 따로 — 의도, 154 결정 3) | 같은 누적 키의 살아 있는 숫자가 있으면 값만 더함 |
+| 상승 | `riseDuration` 0.2s 동안 24px (OutCubic) | 같음 |
+| 이후 | 최고점에서 끝까지 12px 완만히 하강(InOutSine), 끝 `fadeDuration` 0.25s 흐려짐 | 마지막 타격 후 `accumulateHold` 0.5s 유지 → 0.25s 동안 하강하며 흐려짐. **흐려지는 중에 맞아도 누적**(유지로 복귀) |
+| 표시 시간 | max(구간 `singleDuration`, rise+fade) — 낮음 0.65 / 중간 0.75 / 높음 0.85s | 타격이 이어지는 동안 계속 |
+| 값 갱신 연출 | — | 펀치 ×1.05 / 0.06s(OutQuad), 간격 0.1s 안이면 값만 갱신 |
 
-주의: 현행 플레이어 프리팹은 `Paladin.prefab`이다(`2.Prefabs/Player/Player.prefab`에는 오버헤드바 미부착).
+**누적 키** = 공격자 clientId + 공격 종류(`AttackType`) + 대상(InstanceID) + 숫자 종류(`PopupKind`). **Multi 만** 키를 만든다
+(`FloatingDamageAccumulationPolicy`). 보호막 숫자와 HP 숫자는 종류가 달라 따로 누적된다.
 
----
+시간은 `Time.deltaTime` — **슬로우·히트스톱 때 숫자도 느려진다**(그대로 유지 — 154 결정 5).
 
-## 3. 데이터 소스 — 3안 비교 (옵션화 요청 반영)
+## 4. 피해 강도 구간 · 색 · 크기 · 강조
 
-세 안 모두 하나의 SO 설정(`FloatingDamageSettings`)의 enum으로 전환 가능하게 만들 수 있다. 단 **비용이 같지 않다.**
+피해 비율(%) = 피해 ÷ 대상 최대 체력 × 100. 경계값은 위 구간에 속한다(`FloatingDamageTierPolicy`).
+누적 숫자는 **누적 합계로** 판정(은희 2026-10-01 — 기획 §5 "개별 타격 기준"과 다름). 합계는 줄지 않으므로 구간은 오르기만 하고, 오를 때 그 구간 등장 확대를 다시 보여 준다.
 
-| | A. 복제 기반 (권장 기본값) | B. 서버 RPC 브로드캐스트 | C. 로컬 추정 |
-|---|---|---|---|
-| 수치 정확도 | ◎ 서버 감산 결과 그대로 | ◎ 서버가 명시 전송 | ✗ 방어력·실드 경감 반영 못 함 |
-| 네트워크 비용 | 없음(기존 복제 재사용) | 히트당 1 RPC | 없음 |
-| 연타 분리 | △ 같은 tick 합산 가능 | ◎ 히트별 분리 | ◎ |
-| 공격자 식별("내 딜만") | ✗ 불가 | ◎ 가능 | △ 자기 공격만 아는 수준 |
-| 크리티컬/타입 구분 | ✗ 채널(HP/실드)만 | ◎ 임의 메타 실을 수 있음 | ✗ |
-| 추가 작업량 | 소 (이벤트 시그니처 확장) | 중 (RPC + AttackInfo에 공격자 전달 확인 필요) | 소 |
-
-**확정(2026-08-05):** 표시 필터를 SO enum으로 전환 가능하게 하기로 했으므로 **A와 B를 모두 1차에 구현**한다.
-- 기본값 = **A(복제 기반)**. 필터가 `AllDamage`인 동안에는 RPC가 전혀 흐르지 않는다.
-- 필터가 공격자 식별을 요구하는 값(`OwnDealtOnly`, `AllWithOwnEmphasis`)으로 바뀌면 **B(서버 RPC)** 경로가 켜진다. 즉 데이터 소스는 필터 설정에서 파생되며, 사용자가 별도로 고르지 않는다.
-- C(로컬 추정)는 채택하지 않는다 — A가 이미 무비용이고 더 정확하다. 옵션 값으로도 만들지 않는다(죽은 분기 금지).
-
----
-
-## 4. 표현 방식 — 3안 비교
-
-| | ㄱ. World-space TMP + 풀 (권장) | ㄴ. Screen-space Canvas + 월드→스크린 투영 | ㄷ. VFX Graph / 셰이더 |
-|---|---|---|---|
-| 기존 구조 재사용 | ◎ `OverheadHealthBar`와 동일 장치 | △ `CombatHUD`(Screen-space) 얹기 | ✗ 신규 |
-| 거리에 따른 크기 | 원근 축소(원하면 스케일 보정) | 일정 | 원근 |
-| 프레임 비용 | 팝업당 캔버스 갱신, 풀로 억제 | 매 프레임 투영 + 오클루전 직접 처리 | 최저(대량 유리) |
-| 글자 렌더 난이도 | 낮음(TMP 그대로) | 낮음 | 높음(글리프 아틀라스 직접) |
-| 구현량 | 소~중 | 중 | 대 |
-
-**권장:** ㄱ. 근거 — ①레포에 이미 월드스페이스 빌보드 선례가 있어 카메라 정렬 코드를 그대로 따를 수 있고, ②쿼터뷰 고정 카메라라 투영 보정의 이점이 작으며, ③숫자 수백 개를 동시에 띄우는 게임이 아니라 ㄷ의 성능 이점이 회수되지 않는다.
-
-구성안:
-```
-FloatingDamageSpawner (씬 상주 1개, 풀 소유)
-  └─ FloatingDamagePopup (프리팹: World-space Canvas + TMP_Text) — §4-1 상태머신으로 동작
-FloatingDamagePresenter (Unit에 자동 부착 — HitFlash 패턴)
-        - Unit의 델타 포함 이벤트 구독 → 이 유닛의 Active 팝업에 누적 요청
-        - 표시 필터 판정(자기 피격 제외 규칙 포함)
-FloatingDamageSettings (SO: 색/폰트크기/체류·애니·페이드 시간/산포 각도·속도·중력/동시표시 상한/표시필터 enum)
-```
-
-### 4-1. 팝업 상태머신 (확정)
-
-숫자는 "뜨자마자 날아가는" 방식이 아니라, **대상별로 하나가 체력바 옆에 붙어 피해를 모으다가 떨어져 나가는** 방식이다.
-
-| 상태 | 동작 | 이탈 조건 |
+| 등급 | 중간 ≥ | 높음 ≥ |
 |---|---|---|
-| **Active** | 대상 오버헤드 체력바 **옆에 위치 고정**. 새 피해가 들어오면 **값을 합산**하고 스케일 펀치. 대상·채널당 1개만 존재 | 마지막 피격 후 `stayTimeout`(SO, 기본 0.3초) 동안 새 피해가 없으면 → Animating |
-| **Animating** | SO로 지정한 **산포 각도 범위 안에서 랜덤 방향**으로 이동(속도·중력 SO). 진행에 따라 **색이 점점 어두워짐** | `animateDuration` 경과 → FadingOut |
-| **FadingOut** | 이동 감쇠를 유지하며 **알파가 0으로** | `fadeDuration` 경과 → 풀 반납 |
+| 일반(Normal) | 15% | 50% |
+| 중간보스(MidBoss) | 5% | 20% |
+| 보스(Boss) | 0.75% | 3% |
 
-- Active 상태의 팝업만 값을 받는다. Animating/FadingOut 중에 새 피해가 오면 **새 Active 팝업이 생성**되고, 기존 팝업은 자기 수명대로 끝난다.
-- Active 앵커는 대상의 오버헤드 체력바 옆(월드 오프셋). **로컬 플레이어 자신이 받은 피해는 표시하지 않는다**(아래) → 오버헤드 체력바가 오너에게 숨겨지는 문제는 발생하지 않는다.
-- 빌보드 회전은 세 상태 모두 `UnitOverheadHealthBar`와 동일하게 `LateUpdate`에서 `Camera.main` 회전을 추종한다.
+| 구간 | HP 숫자 색 | 유지 크기 | 등장 확대 | 흔들림 |
+|---|---|---|---|---|
+| 낮음 | 노랑 (1, 0.85, 0.2) | ×0.5 | 없음 | 없음 |
+| 중간 | 주황 (1, 0.55, 0.1) | ×1.0 | ×1.1 → 0.08s | 없음 |
+| 높음 | 빨강 (1, 0.2, 0.15) | ×1.4 | ×1.63 → 0.12s (OutBack) | 3px 0.08s |
 
-### 4-2. 표시 필터 (확정)
+- 크기 배율의 100% = `popupStyles[kind].height`(Damage 36px · ShieldDamage 34px).
+- **해상도 하한(154)** — Canvas 가 높이 맞춤(1080 기준)이라 숫자 실제 px = 높이 × 유지 크기 × 팀원 배율 × (화면 높이 ÷ 1080).
+  이 값이 `minScreenPixelHeight`(기본 **16 실제 px**)보다 작으면 그 높이까지 같은 배율로 키운다(`FloatingDamageMinPixelPolicy`, 등장 확대·펀치 비율은 그대로, 0 = 끔).
+  16 근거: 1080p 내 낮음(18px)은 그대로 두고, 그보다 작은 팀원 낮음(13.5px)·720p 낮음(12px)부터 올린다(16px = 흔한 본문 글자 최소 크기).
 
-- **고정 규칙: 로컬 플레이어가 받은 피해는 숫자로 띄우지 않는다.** 자기 피격은 HitFlash와 화면 HUD가 이미 담당한다.
-- 그 외 대상에 대해 SO enum으로 전환:
-  - `AllDamage` (기본) — 모든 유닛의 모든 피해. 복제 기반, RPC 없음
-  - `OwnDealtOnly` — 내가 준 딜만. RPC 경로 사용
-  - `AllWithOwnEmphasis` — 전부 표시 + 내 딜 강조. 내 숫자는 기존 크기·불투명도, 팀원 숫자는 SO의
-    `teammateScaleMultiplier`·`teammateAlpha`를 팝/펀치 스케일과 페이드 전체에 곱한다. RPC 경로 사용
+  | 화면 (화면 높이 ÷ 1080) | 낮음 내/팀원 | 중간 내/팀원 | 높음 내/팀원 |
+  |---|---|---|---|
+  | 1920×1080 · 2560×1080 (1.0) | 18 / 13.5→**16** | 36 / 27 | 50.4 / 37.8 |
+  | 1680×1050 (0.972) | 17.5 / 13.1→**16** | 35 / 26.3 | 49 / 36.8 |
+  | 1920×1200 (1.111) | 20 / 15→**16** | 40 / 30 | 56 / 42 |
+  | 1280×720 (0.667) | 12→**16** / 9→**16** | 24 / 18 | 33.6 / 25.2 |
+  | 960×540 (0.5) | 9→**16** / 6.8→**16** | 18 / 13.5→**16** | 25.2 / 18.9 |
+  | 3440×1440 (1.333) | 24 / 18 | 48 / 36 | 67.2 / 50.4 |
+  | 3840×2160 (2.0) | 36 / 27 | 72 / 54 | 100.8 / 75.6 |
 
-현재 기본 에셋은 `AllWithOwnEmphasis`, 팀원 크기 `0.75`, 최대 알파 `200/255`다. 공격자가 플레이어가
-아닌 피해도 로컬 공격이 아니므로 팀원 스타일을 사용한다. `AllDamage`는 로컬 여부와 무관하게 모두 같은 모양이다.
+  가로 길이(울트라와이드·16:10)는 크기에 영향 없다 — 높이 맞춤이 원근 카메라(세로 FOV)의 월드 크기와 같이 늘고 줄어서다. 다른 HUD 처럼 가로·반반 맞춤으로 바꾸지 않는다.
+  **MPPM 가상 플레이어·작은 Game 뷰**: Game 뷰가 고정 1920×1080 이면 렌더는 1080 이고 창에 축소해 보여 준다(가상 플레이어 레이아웃 실측 0.39·0.25배) —
+  화면 높이가 1080 이라 하한이 안 걸리고 모든 UI 가 같이 작아진다. 크기 확인은 창을 키우거나 Free Aspect 로.
+- **높음 강조 간격** `highEmphasisInterval` 0.3s — 같은 공격자·같은 대상 기준. 간격 안이면 크기·값만 반영하고 등장 확대·흔들림은 생략(`FloatingDamageEmphasisGate`).
+- HP 피해(`PopupKind.Damage`)만 구간 색, 다른 종류는 `popupStyles` 색.
 
-### 4-3. 추상화 수준 (확정)
+## 5. 표시 필터 · 자기 피격 · 팀원 스타일
 
-**팝업 유형 타입 + 채널 계약만** 추상화한다. 어셈블러 전면 교체형 인터페이스 조합은 하지 않는다(간접성 과다).
+| 값 | 동작 |
+|---|---|
+| `AllDamage` | 전부 같은 모양 |
+| `OwnDealtOnly` | 내가 준 피해만 |
+| `AllWithOwnEmphasis` (**에셋 값**) | 전부 표시, 팀원·몬스터 쪽 공격은 크기 ×0.75 · 최대 알파 200/255 |
+| `Off` | 숨김(설정창 "끄기") |
 
-- `PopupKind { Damage, Heal, ShieldDamage, Status, Text }` — 1차는 **Damage만 실구현**, 나머지는 enum 값과 계약만 존재
-- 채널 계약: `struct FloatingPopupRequest { Unit target; PopupKind kind; int amount; bool fromLocalPlayer; }` 수준의 단일 진입점 → 힐·상태이상은 나중에 이 진입점만 호출하면 붙는다
-- 색·서식은 `PopupKind`별 SO 테이블에서 조회 → 새 유형 추가 시 코드 분기 증식 없음
+- 실제 값 = **설정창 저장값(PlayerPrefs `Settings.Gameplay.DamageNumbers`) 우선**, 없으면 에셋 값(`GameplayConfig.DamageNumbers`). 에셋은 고치지 않는다.
+- enum 은 SO·PlayerPrefs 에 정수로 저장 — **끝에만 추가**.
+- **로컬 플레이어가 받은 피해는 띄우지 않는다**(Presenter·Spawner 양쪽에서 거름). 자기 피격은 HUD·HitFlash 담당.
+- 공격자가 플레이어가 아닌 피해도 "로컬 공격 아님" → 팀원 스타일.
+- **간파 중 숨김(154)** — 간파 연출 디렉터 A5 `hideDamageNumbers`(기본 켬)가 켜져 있으면, **내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝**
+  (실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 동안 **이 화면만** `FloatingDamageCanvas` 의 Canvas 를 끈다(`enabled = false`).
+  숫자 생성·수명·누적은 그대로 돌아 끝나면 살아 있는 숫자가 보인다. 약 시도·대상 없음·팀원 화면은 숨기지 않는다.
+  스포너 `LateUpdate` 가 `InterruptProductionDirector.DamageNumbersHidden` 을 읽는다(디렉터는 스포너를 모름). 규칙 = `InterruptProductionRules.ShouldHideDamageNumbers`
+  — [interrupt-presentation.md §6.4](interrupt-presentation.md#64-스위치프로필-위치) A5.
 
----
+## 6. 보호막 숫자 · 데이터 경로
 
-## 5. 코드 접점 (변경 예정 지점)
+- **데이터 = 서버 RPC**(154 결정 2 — 그대로). 서버 `Unit` 이 HP/보호막 실제 감소량을 계산한 뒤 **피해마다**
+  `ClientDamageDealtClientRpc(hp, shield, attackerClientId, attackType, hitPattern)` → 각 클라 `Unit.ClientDamagedAttributed`
+  → 자동 부착된 `FloatingDamagePresenter`(Unit `OnNetworkSpawn` 이 붙임) → `FloatingDamageSpawner.Submit`.
+  값은 체력 클램프 **전**(막타 초과분 포함). 결과 통계(`CombatStatsEvents.ServerDamageApplied`)는 클램프 후라 다르다.
+- 한 타격이 보호막과 체력을 함께 깎으면 보호막 숫자 → HP 숫자 순으로 같은 프레임에 둘 뜬다.
+- **보호막 숫자(141)**: `PopupKind.ShieldDamage`, 밝은 하늘색 **#7FD8FF**, 높이 34px, **+64px 위**(HP 숫자와 안 겹치게).
+- HP 를 거치지 않는 흡수(23호 자폭 실드)는 파생 클래스가 `Unit.ReportAbsorbedShieldDamage` 로 같은 RPC 를 보낸다.
+- 훈련 더미는 자체 `TrainingDummyDamagePresenter` 로 같은 스포너에 넣는다.
 
-| 파일 | 변경 | 비고 |
-|---|---|---|
-| [Unit.cs:449~483](Assets/1.Scripts/Unit/Unit.cs:449) | 델타 포함 이벤트 추가 — 예: `event Action<int /*amount*/, DamageChannel /*Hp\|Shield*/> ClientDamagedAmount` | 기존 `ClientDamaged`는 유지(HitFlash 무수정 원칙) |
-| `Unit.OnNetworkSpawn` | `FloatingDamagePresenter` 자동 부착 | HitFlash와 동일 위치·동일 조건 |
-| 신규 `FloatingDamagePresenter.cs` | 이벤트 → 스포너 요청 | 표시 필터 판정 위치 |
-| 신규 `FloatingDamageSpawner.cs` | 풀 + 동시표시 상한 | 씬 상주. MapScene 배치 필요 |
-| 신규 `FloatingDamagePopup.cs` + 프리팹 | 상승/페이드/빌보드 | `2.Prefabs/UI/` |
-| 신규 `FloatingDamageSettings.cs` + `.asset` | 수치·정책 SO | 프로젝트 관례상 수치는 SO로 (보스/스킬 전례) |
+## 7. 카메라 줌 배율 — 넣었다가 뺐음 (154)
 
-원칙: **판정 코드는 건드리지 않는다.** `ApplyHealthDamage` / `ApplyMitigatedHealthDamage` 로직 무수정, 읽기 전용 소비만 추가.
+숫자 크기·픽셀 오프셋은 **카메라 줌과 무관**하다(Overlay Canvas 단위 고정 — 간파 슬로우 줌인에도 그대로).
+92376865 에서 줌 비례 배율(`FloatingDamageZoomScalePolicy`, Settings `zoomScale*` 칸)을 넣었으나 사용자 결정으로 **필요 없어 뺐다**.
+다시 필요하면 그 커밋을 참고한다.
 
-검증 환경: `MapScene`이 런타임 씬. 멀티 확인은 MPPM 2인(호스트+클라)에서 서로의 피격 숫자가 각자 화면에 뜨는지 본다.
+## 8. 풀 · 갱신 시점
 
----
+- `ObjectPool`, 동시 최대 `maxConcurrentPopups` **32** — 넘치면 가장 오래된 숫자부터 즉시 반납.
+- 위치·크기·알파 반영은 스포너가 **`Canvas.willRenderCanvases`** 에서 `ApplyLayout` — 카메라가 LateUpdate 에서 움직인 뒤라 한 프레임 밀리지 않는다. 시간 진행은 각 숫자의 `Update`(`Time.deltaTime`).
+- 스포너는 씬 상주 1개(`2.Prefabs/Managers/FloatingDamageSpawner.prefab` — MapScene·디버그 씬 배치).
 
-## 6. 결정 사항 (2026-08-05 확정)
+## 9. 코드 지도
 
-| # | 항목 | 결정 |
-|---|---|---|
-| 1 | 표시 범위 (1차) | **데미지 숫자만** 실구현. 힐·실드·상태이상은 `PopupKind` 계약만 뚫어 두고 미구현 |
-| 2 | 추상화 수준 | 팝업 유형 타입 + 채널 계약만 (§4-3) |
-| 3 | 표시 필터 | SO enum 3종 전환 가능 + **자기 피격 미표시** 고정 규칙 (§4-2) |
-| 4 | 데이터 소스 | A(복제) 기본, 필터가 공격자 식별을 요구하면 B(RPC) 경로 (§3) |
-| 5 | 연타 처리 | 상태머신으로 해결 — Active 동안 **합산**, 무피격 `stayTimeout` 후 이탈 (§4-1) |
-| 6 | Animating 방향 | SO 산포 각도 범위 내 랜덤 + 속도·중력 SO 조정 |
-| 7 | 크리티컬 | **도입하지 않음** — 현재 전투 코드에 크리티컬 판정이 없고, 넣으면 데미지 계산식까지 번진다 |
+| 파일 | 역할 |
+|---|---|
+| `FloatingDamageSpawner` | Overlay Canvas·풀·누적 키 표·앵커 결정·렌더 직전 배치 |
+| `FloatingDamagePopup` | 숫자 1개의 시간 함수(상승·유지·하강·페이드·펀치·흔들림) |
+| `FloatingDamagePresenter` | Unit 이벤트 → 필터 → Submit |
+| `FloatingDamageSettings` | 수치 SO + 표시 필터·스타일·구간·모양 · 해상도 하한 규칙 `FloatingDamageMinPixelPolicy` |
+| `FloatingDamageTier` / `FloatingDamageAccumulationPolicy` | 구간 판정·강조 간격 / 누적 키 |
+| `FloatingDamageDigitSet` / `FloatingDamageNumberView` | 이미지 글꼴 / 글자 Image |
+| `FloatingDamageAnchor` | 대상별 생성점(§2-3) |
 
-여전히 열려 있는 값(구현 중 기본값으로 넣고 에디터에서 튜닝):
-- `stayTimeout` 기본 0.3초 / `animateDuration` 기본 0.5초 / `fadeDuration` 기본 0.3초
-- 동시표시 상한 기본 32 — 초과 시 가장 오래된 팝업부터 즉시 반납
-- 산포 각도 기본 = 수직 기준 ±35°
+## 10. xlsx
+`FloatingDamageSettings` 는 `GameData.xlsx` 에 **연결하지 않는다**(시트 없음, 154 결정 7). 튜닝은 에셋 인스펙터에서.
 
----
+## 11. 할 일 154 결정 기록 (2026-10-29)
 
-## 부록: 이번 세션 인프라 변경 (코드 외)
+1. 줌에 맞춰 숫자 크기 변경 — 92376865 에 구현했다가 사용자 결정으로 **뺐다**(필요 없음, §7).
+2. 데이터는 RPC 방식 그대로(§6).
+3. 단발 연타는 타격마다 따로 뜨는 것이 의도(§3).
+4. 생성점 = 몸 중심 확정(§2).
+5. 슬로우·히트스톱 때 숫자 느려짐 그대로(§3).
+6. 굵은 스프라이트 없음 — 높음 구간 "굵게"는 표현하지 않는다(§1).
+7. 대상별 위치 오프셋 = 프리팹 루트 `FloatingDamageAnchor`, xlsx 미연결(§2-3·§10). 코드 수정 없음 — 프리팹 부착은 사용자 몫.
+8. 후속 — 간파 중 숨김(§5, 디렉터 A5) · 해상도 하한 `minScreenPixelHeight` 16(§4).
 
-- `feature/ConveyorBelt` 로컬 삭제(원격 `MainProject/feature/ConveyorBelt`는 백업으로 유지). 해당 작업은 `Convayor-V2`에 전부 포함됨 확인.
-- Codex 위임 레인 `soul`(경로 `MainProject-BeaverLobby`, 폴더 삭제됨)을 `fd`(`MainProject-WorkTree`)로 교체 — `agent-context-bridge/codex-tray.ps1`, `codex-monitor-fd.bat` 신설. 워처 `-ProjectRoot`를 자기 워크트리로 한정해 다른 브랜치 폴더 오염 방지.
+## 역사
+2026-08-05 초안은 World-space TMP · NetworkVariable 복제 기반 · "체력바 옆 Active 상태머신"을 검토했으나, 구현은
+Overlay Canvas + 이미지 숫자 + 서버 RPC + 기획 v0.2 흐름으로 바뀌었다. 옛 비교안은 git 기록에 있다.

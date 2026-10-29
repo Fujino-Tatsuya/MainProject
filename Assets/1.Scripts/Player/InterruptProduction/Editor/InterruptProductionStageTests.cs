@@ -144,6 +144,25 @@ public sealed class InterruptProductionStageTests
         Assert.IsEmpty(_port.Calls);
     }
 
+    // ④-b 선점(할 일 143) — 거의 동시에 눌러 강 시도가 돌던 두 번째 성공자도 실패 복귀로 정리(섬광·성공 슬로우 없음)
+    [TestCase(false)]
+    [TestCase(true)]
+    public void 판정_선점이면_시도_슬로우_실패_복귀(bool landed)
+    {
+        _resolve.Server(InterruptProductionEvent.Resolve(Caster, null, null, 5, landed, succeeded: false, resolvedCount: 1, preempted: true));
+        CollectionAssert.AreEqual(new[] { 5u }, _port.Fails);
+        Assert.IsEmpty(_port.Starts);
+    }
+
+    [Test]
+    public void 규칙_판정_실패_복귀는_빗나감_또는_선점()
+    {
+        Assert.IsTrue(InterruptProductionRules.ResolveFailsAttempt(landed: false, preempted: false));
+        Assert.IsTrue(InterruptProductionRules.ResolveFailsAttempt(landed: false, preempted: true));
+        Assert.IsTrue(InterruptProductionRules.ResolveFailsAttempt(landed: true, preempted: true));
+        Assert.IsFalse(InterruptProductionRules.ResolveFailsAttempt(landed: true, preempted: false));
+    }
+
     // ⑤ 성공 → ServerStart(성공 프로필, Success, 대상 위치, hitStopOn=칸 값)
     [TestCase(false)]
     [TestCase(true)]

@@ -18,7 +18,7 @@ public static class GameplayConfig
     const string ScreenShakeKey = "Settings.Gameplay.ScreenShake";
 
     /// <summary>
-    /// 데미지 숫자 표시 방식. 저장값이 없으면 <paramref name="authoredDefault"/>(SO 저작값 — 지금 OwnDealtOnly)를 그대로 쓴다.
+    /// 데미지 숫자 표시 방식. 저장값이 없으면 <paramref name="authoredDefault"/>(SO 저작값 — FloatingDamageSettings.asset 은 AllWithOwnEmphasis)를 그대로 쓴다.
     /// 🔴 SO 에셋은 고치지 않는다 — 런타임에 이 값으로 덮어 읽을 뿐이다.
     /// </summary>
     public static FloatingDamageDisplayFilter DamageNumbers(FloatingDamageDisplayFilter authoredDefault)

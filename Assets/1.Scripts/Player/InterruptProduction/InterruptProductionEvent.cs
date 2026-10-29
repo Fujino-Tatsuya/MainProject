@@ -45,6 +45,11 @@ public readonly struct InterruptProductionEvent
     public readonly bool Succeeded;
     /// <summary>[판정] 수신이 받아들여진 대상 수.</summary>
     public readonly int ResolvedCount;
+    /// <summary>
+    /// [판정] 선점됨(할 일 143) — 다른 플레이어가 먼저 성공시킨 창에 들어가 피해만 줬고, 이 판정에 성공이 하나도 없다.
+    /// 디렉터가 시도 슬로우를 실패 복귀로 정리한다(<see cref="InterruptProductionRules.ResolveFailsAttempt"/>).
+    /// </summary>
+    public readonly bool Preempted;
     /// <summary>[성공] 카운터 창을 소비한 첫 대상의 판정 순간 위치. <see cref="HasTarget"/> 가 false 면 의미 없다.</summary>
     public readonly Vector3 TargetPosition;
     public readonly bool HasTarget;
@@ -58,7 +63,7 @@ public readonly struct InterruptProductionEvent
     private InterruptProductionEvent(InterruptProductionPhase phase, ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
         uint attemptTriggerId = 0, InterruptAttemptForecast forecast = InterruptAttemptForecast.NoTarget, bool landed = false, bool succeeded = false, int resolvedCount = 0,
         Vector3 targetPosition = default, bool hasTarget = false, Vector3 casterPosition = default,
-        InterruptFailReason failReason = InterruptFailReason.None, uint triggerId = 0)
+        InterruptFailReason failReason = InterruptFailReason.None, uint triggerId = 0, bool preempted = false)
     {
         Phase = phase;
         CasterClientId = casterClientId;
@@ -74,6 +79,7 @@ public readonly struct InterruptProductionEvent
         CasterPosition = casterPosition;
         FailReason = failReason;
         TriggerId = triggerId;
+        Preempted = preempted;
     }
 
     /// <summary>성공 연출 기준 위치 — 대상이 있으면 대상, 없으면 시전자(할 일 87 C5).</summary>
@@ -88,15 +94,16 @@ public readonly struct InterruptProductionEvent
     public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
         new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, forecast: forecast);
 
-    /// <summary>[서버] 판정 끝.</summary>
+    /// <summary>[서버] 판정 끝. <paramref name="preempted"/> = 선착순에서 밀려 피해만 줬다(할 일 143).</summary>
     public static InterruptProductionEvent Resolve(Player caster, PlayerInterruptSkillBase skill, uint attemptTriggerId,
-        bool landed, bool succeeded, int resolvedCount) =>
-        Resolve(ClientIdOf(caster), caster, skill, attemptTriggerId, landed, succeeded, resolvedCount);
+        bool landed, bool succeeded, int resolvedCount, bool preempted = false) =>
+        Resolve(ClientIdOf(caster), caster, skill, attemptTriggerId, landed, succeeded, resolvedCount, preempted);
 
     public static InterruptProductionEvent Resolve(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
-        uint attemptTriggerId, bool landed, bool succeeded, int resolvedCount) =>
+        uint attemptTriggerId, bool landed, bool succeeded, int resolvedCount, bool preempted = false) =>
         new InterruptProductionEvent(InterruptProductionPhase.Resolve, casterClientId, caster, skill,
-            attemptTriggerId: attemptTriggerId, landed: landed, succeeded: succeeded, resolvedCount: resolvedCount);
+            attemptTriggerId: attemptTriggerId, landed: landed, succeeded: succeeded, resolvedCount: resolvedCount,
+            preempted: preempted);
 
     /// <summary>[서버] 성공 — 판정과 같은 호출 안, 판정 사건 바로 뒤.</summary>
     public static InterruptProductionEvent Success(Player caster, PlayerInterruptSkillBase skill, bool hasTarget, Vector3 targetPosition) =>
