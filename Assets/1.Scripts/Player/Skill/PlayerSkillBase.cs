@@ -117,6 +117,10 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 이 스킬의 조준 모드(SingleTarget/GroundPoint)를 공용 대시가 취소할 수 있는가. 기본 아니오(조준 중 대시 입력 무시).
     public virtual bool CanCancelAimByDash => false;
 
+    // 기본 공격 이어가기(할 일 146) — 이 스킬이 정상 종료됐을 때 좌클릭이 아직 눌려 있으면 기본 공격을 잇는가(입력 주체 피어가 종료 순간에 묻는다).
+    // 거너는 기본 공격 자체가 홀드 시작이라 필요 없다. 기본 아니오.
+    public virtual bool ResumesBasicAttackOnHold => false;
+
     // 시전 시 들어갈 상태기계 상태(스킬 상태 계열). 기본 Skill, 거너 Q = Focus(발사 시 Skill 로 넘어감).
     public virtual PlayerActionState EntryActionState => PlayerActionState.Skill;
 

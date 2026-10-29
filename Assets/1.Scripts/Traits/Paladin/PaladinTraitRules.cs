@@ -102,6 +102,11 @@ public static class PaladinTraitRules
     /// </summary>
     public static SkillState QStartState(bool shieldDash) => shieldDash ? SkillState.Active : SkillState.Charging;
 
+    /// <summary>
+    /// Q 가 끝난 뒤 좌클릭 홀드면 기본 공격을 잇는가(할 일 146) — 돌파의 방패 모드일 때만. 원래 Q(홀드 스킬)는 잇지 않는다.
+    /// </summary>
+    public static bool QResumesBasicAttack(bool hasTrait, in PaladinShieldDashSettings settings) => UsesShieldDash(hasTrait, settings);
+
     /// <summary>기본 Q 의 유효 최대 거리(m) = 전진 속도 × 최대 유지 시간.</summary>
     public static float BaseQMaxDistance(float advanceSpeed, float maxActiveDuration) =>
         Math.Max(0f, advanceSpeed) * Math.Max(0f, maxActiveDuration);

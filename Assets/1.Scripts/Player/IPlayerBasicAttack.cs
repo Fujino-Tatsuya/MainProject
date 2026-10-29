@@ -124,6 +124,14 @@ public static class PlayerBasicAttackInputRules
         startsOnHold && attackHeld && !attackBlocked && !skillBusy;
 
     /// <summary>
+    /// 기본 공격 이어가기(할 일 146 — 거너 E 와 같은 동작을 다른 캐릭터 스킬에도) — 끝난 스킬이 이어가기를 허락했고
+    /// 정상 종료(완료·홀드 해제)였으면 다음 Idle/Move 한 번은 홀드 시작 캐릭터처럼 본다(<see cref="ShouldStartOnHold"/> 의 startsOnHold).
+    /// 대시·피격·사망·안전망 종료는 잇지 않는다. 그 한 번에 좌클릭을 떼고 있었으면 이어가기는 사라진다.
+    /// </summary>
+    public static bool ArmsResumeAfterSkill(bool skillResumesBasicAttack, SkillEndReason reason) =>
+        skillResumesBasicAttack && (reason == SkillEndReason.Completed || reason == SkillEndReason.Released);
+
+    /// <summary>
     /// 기본 공격 중 스킬 입력 — 예약 캐릭터가 아니면 손대지 않는다. 판정 순서는 Idle/Move 와 같다:
     /// 차단 효과(상태이상) → 쿨타임 → 예약. 사용 조건(CanUse)·조준 진입은 공격이 끝나 실제로 시도할 때 본다.
     /// </summary>

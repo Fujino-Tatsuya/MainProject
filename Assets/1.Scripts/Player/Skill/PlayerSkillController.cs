@@ -109,8 +109,30 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // [오너] ReportsHeldInput 스킬에 마지막으로 보낸 누름 상태. 시전마다 첫 틱에 한 번은 보낸다(hasReportedHeld).
     private bool hasReportedHeld;
     private bool lastReportedHeld;
+    // [입력 주체] 기본 공격 이어가기(할 일 146) — 이어가기를 허락한 스킬이 정상 종료됐다. 다음 Idle/Move 한 번이 가져간다.
+    private bool basicAttackResumeArmed;
 
     public PlayerSkillBase ActiveSkill => activeSkill;
+
+    /// <summary>
+    /// [입력 주체] 기본 공격 이어가기(할 일 146)를 가져간다 — 직전 스킬이 이어가기를 허락하고 정상 종료됐으면 true, 한 번 읽으면 사라진다.
+    /// Idle/Move 의 행동 입력 처리가 매 틱 맨 앞에서 부른다(그 틱에 좌클릭을 누르고 있으면 홀드 시작처럼 기본 공격을 시작).
+    /// </summary>
+    public bool TakeBasicAttackResume()
+    {
+        bool armed = basicAttackResumeArmed;
+        basicAttackResumeArmed = false;
+        return armed;
+    }
+
+    // 스킬 종료 경로(서버 정상 종료·원격 오너 종료 RPC)에서 — 입력 주체 피어만 기록한다. 강제 종료(HandleSkillStateExit)는 부르지 않는다.
+    private void ArmBasicAttackResume(PlayerSkillBase skill, SkillEndReason reason)
+    {
+        if (player == null || !player.IsInputSource || skill == null)
+            return;
+
+        basicAttackResumeArmed = PlayerBasicAttackInputRules.ArmsResumeAfterSkill(skill.ResumesBasicAttackOnHold, reason);
+    }
     public bool IsSkillActive => activeSkill != null;
     // 전 피어 — 실행 중(관찰자는 PlaySkillClientRpc~EndSkillClientRpc) 스킬이 공격속도를 타면 Animator.speed = 배율(할 일 91 T5).
     public bool ScalesAnimatorWithAttackSpeed => activeSkill != null && activeSkill.ScalesWithAttackSpeed;
@@ -662,6 +684,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         Edit.Log($"[Skill] {skill.Slot} 종료 ({reason})", this);
 
         skill.OnEnd(reason);
+        ArmBasicAttackResume(skill, reason);
 
         if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
@@ -1470,6 +1493,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             activeSkill = null;
             activeEndFallbackTime = 0f;
             skill.OnEnd(reason);
+            ArmBasicAttackResume(skill, reason);
 
             // 원격 오너가 아직 대시에 싣고 있었다(할 일 115) — 0층은 대시 포즈라 상체 레이어만 내린다.
             if (DetachFromDash(skill))

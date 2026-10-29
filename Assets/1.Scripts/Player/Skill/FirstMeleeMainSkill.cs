@@ -71,6 +71,16 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // 전진은 스킬이 직접 수행 — 기본 이동/회전은 잠근다
     public override bool CanMoveWhileActive => false;
 
+    // 돌파의 방패(PAL_2_DASH)면 돌진이 끝난 뒤 좌클릭 홀드로 기본 공격을 잇는다(할 일 146). 특성 보유는 모든 피어가 같은 값으로 읽는다.
+    public override bool ResumesBasicAttackOnHold
+    {
+        get
+        {
+            PaladinShieldDashSettings dash = ResolveShieldDash(out bool hasDashTrait);
+            return PaladinTraitRules.QResumesBasicAttack(hasDashTrait, dash);
+        }
+    }
+
     private FirstMeleeMainSkillData MainSkillData => Data as FirstMeleeMainSkillData;
 
     public override void Initialize(Player owner, PlayerSkillController controller)

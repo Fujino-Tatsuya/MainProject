@@ -21,6 +21,39 @@ public sealed class PlayerBasicAttackInputRulesTests
         Assert.That(PlayerBasicAttackInputRules.ShouldStartOnHold(true, true, false, true), Is.False, "스킬 실행·요청 중");
     }
 
+    // 할 일 146 — 거너 E 와 같은 '스킬 뒤 홀드 이어가기'를 어쌔신 E·돌파의 방패 Q 에. 정상 종료만 잇는다.
+    [TestCase(SkillEndReason.Completed, true)]
+    [TestCase(SkillEndReason.Released, true)]
+    [TestCase(SkillEndReason.MaxDurationReached, false)]
+    [TestCase(SkillEndReason.Cancelled, false)]
+    [TestCase(SkillEndReason.CasterDied, false)]
+    [TestCase(SkillEndReason.DashCancelled, false)]
+    public void ArmsResumeAfterSkill_OnlyNormalEnd(SkillEndReason reason, bool expected)
+    {
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(true, reason), Is.EqualTo(expected));
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(false, reason), Is.False, "이어가기를 허락하지 않은 스킬은 안 잇는다");
+    }
+
+    [Test]
+    public void ResumeAfterSkill_StartsLikeHoldCharacter_OnlyWhileHeld()
+    {
+        bool resume = PlayerBasicAttackInputRules.ArmsResumeAfterSkill(true, SkillEndReason.Completed);
+        Assert.That(PlayerBasicAttackInputRules.ShouldStartOnHold(false || resume, true, false, false), Is.True, "끝난 뒤 아직 누르고 있음 = 평타 이어감");
+        Assert.That(PlayerBasicAttackInputRules.ShouldStartOnHold(false || resume, false, false, false), Is.False, "끝나기 전에 뗐으면 안 이음");
+        Assert.That(PlayerBasicAttackInputRules.ShouldStartOnHold(false || resume, true, true, false), Is.False, "공격 차단 효과 중");
+        Assert.That(PlayerBasicAttackInputRules.ShouldStartOnHold(false || resume, true, false, true), Is.False, "다른 스킬 요청 중");
+    }
+
+    [Test]
+    public void ResumeAfterSkill_PrefabSkills_AssassinEAlways_PaladinQNeedsTrait_GunnerByHoldStart()
+    {
+        var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab");
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        Assert.That(assassin.GetComponent<AssassinEnhanceSkill>().ResumesBasicAttackOnHold, Is.True, "어쌔신 일반 E = 항상");
+        Assert.That(paladin.GetComponent<FirstMeleeMainSkill>().ResumesBasicAttackOnHold, Is.False, "특성 없는 가붕이 Q = 원래 Q — 이어가기 없음");
+        Assert.That(assassin.GetComponent<AssassinBasicAttack>().StartsOnHold, Is.False, "어쌔신은 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
+    }
+
     [Test]
     public void ClassifySkillDuringAttack_NonReservingCharacter_LeavesInputToBuffer()
     {
