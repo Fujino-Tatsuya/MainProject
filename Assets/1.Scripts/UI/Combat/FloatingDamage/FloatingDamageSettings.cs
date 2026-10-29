@@ -104,12 +104,21 @@ public struct FloatingPopupStyle
     public Color color;
     [Tooltip("100% 크기일 때 글자 높이(px, 1080p 기준).")]
     [FormerlySerializedAs("fontSize"), Min(1f)] public float height;
+    [Tooltip("이 유형 숫자의 고정 화면 오프셋(px, 1080p 기준 · +y = 위). 한 타격이 보호막과 체력을 함께 깎으면\n" +
+             "두 숫자가 같은 프레임·같은 자리에 뜬다 — 유형끼리 오프셋을 벌려 겹치지 않게 한다.")]
+    public Vector2 offset;
 
     public FloatingPopupStyle(PopupKind kind, Color color, float height)
+        : this(kind, color, height, Vector2.zero)
+    {
+    }
+
+    public FloatingPopupStyle(PopupKind kind, Color color, float height, Vector2 offset)
     {
         this.kind = kind;
         this.color = color;
         this.height = height;
+        this.offset = offset;
     }
 }
 
@@ -236,7 +245,8 @@ public sealed class FloatingDamageSettings : ScriptableObject
     {
         new FloatingPopupStyle(PopupKind.Damage, new Color(1f, 0.82f, 0.18f, 1f), 36f),
         new FloatingPopupStyle(PopupKind.Heal, new Color(0.28f, 1f, 0.38f, 1f), 36f),
-        new FloatingPopupStyle(PopupKind.ShieldDamage, new Color(0.3f, 0.8f, 1f, 1f), 34f),
+        // 밝은 하늘색 #7FD8FF · 체력 숫자 위로 64px(141 — 실드를 깨고 체력까지 들어간 한 타격의 두 숫자 분리).
+        new FloatingPopupStyle(PopupKind.ShieldDamage, new Color(127f / 255f, 216f / 255f, 1f, 1f), 34f, new Vector2(0f, 64f)),
         new FloatingPopupStyle(PopupKind.Status, new Color(0.85f, 0.55f, 1f, 1f), 30f),
         new FloatingPopupStyle(PopupKind.Text, Color.white, 30f)
     };

@@ -6060,9 +6060,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 실드가 남아 있는 동안 HP 는 안 깎이고, 실드를 넘친 몫만 HP 로 간다. 실드가 0 이면 TickSelfDestruct 가 저지로 끝낸다.
         bool selfDestructHit = IsServer && _raidSelfDestruct && _attackPhase == BossAttackPhase.ChargeWait && IsFromPlayer(hitContext);
         int rawDamage = attackInfo.damage;
+        int absorbed = 0;
         if (selfDestructHit && attackInfo.damage > 0 && _selfDestructShieldLeft > 0)
         {
-            int absorbed = Mathf.Min(attackInfo.damage, _selfDestructShieldLeft);
+            absorbed = Mathf.Min(attackInfo.damage, _selfDestructShieldLeft);
             _selfDestructShieldLeft -= absorbed;
             attackInfo.damage -= absorbed;
             _selfDestructShield01.Value = _selfDestructShieldTotal > 0 ? (float)_selfDestructShieldLeft / _selfDestructShieldTotal : 0f;
@@ -6075,6 +6076,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
+        // 실드가 받은 몫은 base 의 피해 숫자 RPC 에 안 실린다(위에서 이미 뺐다) — 하늘색 숫자로 따로 알린다(141).
+        if (resolved && absorbed > 0)
+            ReportAbsorbedShieldDamage(absorbed, attackInfo, hitContext);
         if (IsServer && resolved && IsFromPlayer(hitContext))
         {
             _fightPlayerDamage += selfDestructHit ? rawDamage : attackInfo.damage;   // 기록 = 실드에 들어간 몫 포함
