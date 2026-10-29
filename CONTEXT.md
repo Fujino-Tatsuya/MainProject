@@ -14,6 +14,7 @@ Update this file when a term becomes important enough that future agents or team
 - 10-27 경석 Play 피드백 반영(상세 PLAN §9): 배경 틴트 34% · 인물·보스 회색은 보스 디졸브까지 · 슬로모션 0.1 · 플레이어 공격 끝 프레임 유지 · 글리치 3구간 · 타이포 외곽선 0.22·진입 느리게 · 연출 중 실루엣·호버 외곽선 끔 · 처치 순간 보스 이펙트·바닥 예고 정리 · 마스크 깊이 텍스처 비교(주황 점선) · 보스 Flat Kit 외곽선 ×0.35.
 - 테스트 키 F11(호스트, `Dev/DevBossFinalBlow.cs`): 어디서든 → 튜토리얼 G10 강제 개방 → 엘리베이터 스킵(시작 시각만 당김) → 등장 연출 스킵 → 23호 HP 1. 완료 직후·2초 뒤 카메라 진단 로그.
 - ▶ 다음 세션: 연출 수정 이어서(경석 피드백 대기) → MPPM 3인 확인 → development 병합. 렌더러 에셋은 안 건드림(연출 중 EnqueuePass).
+- 10-29 최신화: SVN r549 핀 · origin/development(90c619ca, 132 간파 연출 포함) feature 로 머지 · 컴파일 0 · 전투 EditMode 416/0 · feature 푸시(development 미반영). 머지 뒤 수정 2건 — F11 코드 `Tutorial…` → `MapScene…` 이름 변경 반영, 인스펙터 사전에 할 일 105 새 칸 2개(`raidSelfDestructBlastIgnoreInvuln`·`pushNorthDischargeIgnoreInvuln`) 추가(development 단독으로도 이 테스트 1건이 실패한다). ⏳ Play 확인: 간파 성공 막타 때 암전·섬광이 승리 연출 시작(`ServerForceReset` → 디렉터 `ForcedReset`)에 걷히는지.
 
 ## ▶▶ 반영 (2026-10-27 · 경석(Claude) · **23호 제압 게이지 → 제압 칸 3칸**, 브랜치 `feature/SettingsDdol`) — 기준 `Re_C_전투시스템_20261014.md` §6 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 364/0 · ⏳ 경석 Play(기믹 중 칸 유지)
 - 23호: `float _counterGauge`(100, −20) → `NetworkVariable<int> _suppressSegmentsUsed`(사용한 칸). SO `suppressSegmentCount`=3 · `counterSegmentStep`=1 · `environmentSegmentStep`=1(벽·증기 벤트 둘 다 1칸 — 경석 확정). 0칸 = 제압, 제압 끝 = 다시 꽉 참. 판정 `BossCounterProgress.ResolveSegments`.

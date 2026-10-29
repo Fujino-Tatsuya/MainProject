@@ -128,26 +128,26 @@ public class DevBossFinalBlow : MonoBehaviour
 
         // 1) 튜토리얼 중이면 보스 진입 단계로. 🔴 Alt+8 구간 스킵은 게이트마다 정식 경로(존 처치·특성 자동 획득)를 최대 5초씩 기다려 느리다
         //    (경석 10-27 Play) — 보스 테스트엔 필요 없으니 디버그 메뉴와 같은 강제 개방으로 한 프레임에 연다. 순서 규칙에 막히면 그때만 Alt+8 경로.
-        TutorialDirector tutorial = TutorialDirector.Instance;
-        if (tutorial != null && tutorial.IsTutorialActive && tutorial.Step < TutorialStep.BossEnter)
+        MapSceneDirector tutorial = MapSceneDirector.Instance;
+        if (tutorial != null && tutorial.IsTutorialActive && tutorial.Step < MapSceneStep.BossEnter)
         {
             if (!_tutorialSkipRequested)
             {
                 _tutorialSkipRequested = true;
-                TutorialStep from = tutorial.Step;
-                TutorialDebugActions.OpenGatesThrough(tutorial, TutorialGate.G10_BossEnterAndPad);
-                if (tutorial.IsGateOpen(TutorialGate.G10_BossEnterAndPad) && tutorial.SetStepServer(TutorialStep.BossEnter))
+                MapSceneStep from = tutorial.Step;
+                MapSceneDebugActions.OpenGatesThrough(tutorial, MapSceneGate.G10_BossEnterAndPad);
+                if (tutorial.IsGateOpen(MapSceneGate.G10_BossEnterAndPad) && tutorial.SetStepServer(MapSceneStep.BossEnter))
                 {
                     Debug.Log($"{Tag} 튜토리얼 {from} → 보스 진입(게이트 G10 까지 강제 개방)");
                 }
                 else
                 {
-                    tutorial.RequestSkip(TutorialSkipTarget.BossEnter);
+                    tutorial.RequestSkip(MapSceneSkipTarget.BossEnter);
                     Debug.LogWarning($"{Tag} 튜토리얼 강제 개방이 막혔다 → Alt+8 구간 스킵으로 대신(게이트마다 기다려 느리다)");
                     _tutorialSlowPath = true;
                 }
             }
-            if (tutorial.Step < TutorialStep.BossEnter)
+            if (tutorial.Step < MapSceneStep.BossEnter)
             {
                 Status("튜토리얼 보스 진입 스킵 대기");
                 return;
