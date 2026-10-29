@@ -7,7 +7,8 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// 할 일 153 1/6 — 공격 판정 도형 코어. 도형별 안/밖 경계 · 도넛(minOffset·minRadius) · 오프셋(앞·옆·회전) · 포즈 회전 ·
-/// 배율 Scale · 높이 범위 · 넓은 상자 ⊇ 판정 · 외곽선 = 판정 경계 · 합집합·1회 피격 · 발밑 겹침 판정 점 · 실제 Overlap 수집 · 데이터 테이블 행.
+/// 배율 Scale · 높이 범위 · 넓은 상자 ⊇ 판정 · 외곽선 = 판정 경계 · 최근접 점(무차별 대입 대조) · 몸 겹침(구 해석 몸 — 스침·도넛·기준점이 몸 안) ·
+/// 합집합·1회 피격 · 실제 Overlap 수집 · 직사각형 = Physics.OverlapBox 대조(무작위 상자·캡슐·구) · 데이터 테이블 행.
 /// </summary>
 public class AttackShapeTests
 {
@@ -248,40 +249,160 @@ public class AttackShapeTests
         Assert.AreEqual(2, donut.Count, "도넛 = 고리 2개");
     }
 
-    // ── 합집합·1회 피격 ─────────────────────────────────────────────────
+    // ── 최근접 점(도형 영역 3D) ─────────────────────────────────────────
 
     [Test]
-    public void Union_AnyShapeHits_SameKeyOnce()
+    public void ClosestPoint_IsInsideAndNearest_BruteForce()
+    {
+        var pose = new AttackShapePose(new Vector3(1f, 0.5f, -2f), new Vector3(1f, 0f, 1f));
+        var random = new System.Random(153);
+        foreach (AttackShape shape in Samples().Append(new AttackTriangleShape(2f, 1f)).Append(new AttackSectorShape(2f, 200f, 0.8f) { ForwardOffset = -1f }))
+        {
+            // 바닥 평면 안 표본(격자 0.02 m) — 최근접 후보의 정답 근사.
+            var inside = new List<Vector3>();
+            for (float x = -5f; x <= 7f; x += 0.02f)
+            for (float z = -7f; z <= 5f; z += 0.02f)
+            {
+                var point = new Vector3(x, pose.Position.y, z);
+                if (shape.Contains(pose, point))
+                    inside.Add(point);
+            }
+            Assert.Greater(inside.Count, 0, shape.ToString());
+
+            for (int q = 0; q < 150; q++)
+            {
+                var query = new Vector3((float)random.NextDouble() * 12f - 5f, pose.Position.y, (float)random.NextDouble() * 12f - 7f);
+                Vector3 closest = shape.ClosestPoint(pose, query);
+                Assert.IsTrue(shape.Contains(pose, closest), $"{shape} 최근접 점이 도형 밖: {query} → {closest}");
+                float best = inside.Min(p => (p - query).sqrMagnitude);
+                Assert.LessOrEqual(Vector3.Distance(closest, query), Mathf.Sqrt(best) + 1e-3f, $"{shape} 더 가까운 안 점이 있다: {query}");
+                if (shape.Contains(pose, query))
+                    Assert.AreEqual(query, closest, $"{shape} 안 점은 그대로");
+            }
+        }
+    }
+
+    [Test]
+    public void ClosestPoint_ClampsHeight()
+    {
+        var pose = new AttackShapePose(new Vector3(0f, 10f, 0f), Vector3.forward);
+        var circle = new AttackCircleShape(2f) { MinHeight = -1f, MaxHeight = 3f };
+        Assert.AreEqual(P(0f, 2f, 13f), circle.ClosestPoint(pose, P(0f, 5f, 20f)), "위 → 상한, 바닥 평면은 반경으로");
+        Assert.AreEqual(P(1f, 0f, 9f), circle.ClosestPoint(pose, P(1f, 0f, 0f)), "아래 → 하한");
+        Assert.AreEqual(P(0f, 1f, 11f), circle.ClosestPoint(pose, P(0f, 1f, 11f)), "안 = 그대로");
+        Assert.AreEqual(P(0f, 1f, 10f), new AttackCircleShape(2f, 1f).ClosestPoint(pose, P(0f, 0f, 10f)), "도넛 중심 = 정면 안쪽 경계");
+    }
+
+    [Test]
+    public void Support_CoversEveryContainedPoint()
+    {
+        var pose = new AttackShapePose(new Vector3(1f, 0.5f, -2f), new Vector3(1f, 0f, 1f));
+        var random = new System.Random(1532);
+        foreach (AttackShape shape in Samples().Append(new AttackTriangleShape(2f, 1f)).Append(new AttackSectorShape(2f, 200f, 0.8f) { ForwardOffset = -1f }))
+        {
+            var inside = new List<Vector3>();
+            for (float x = -5f; x <= 7f; x += 0.05f)
+            for (float z = -7f; z <= 5f; z += 0.05f)
+            {
+                var point = new Vector3(x, pose.Position.y, z);
+                if (shape.Contains(pose, point))
+                    inside.Add(point);
+            }
+
+            for (int q = 0; q < 40; q++)
+            {
+                var direction = new Vector3((float)random.NextDouble() * 2f - 1f, 0f, (float)random.NextDouble() * 2f - 1f);
+                float support = float.MinValue;
+                for (int piece = 0; piece < shape.ConvexPieceCount; piece++)
+                    support = Mathf.Max(support, Vector3.Dot(shape.Support(pose, piece, direction), direction));
+                float farthest = inside.Max(p => Vector3.Dot(p, direction));
+                Assert.GreaterOrEqual(support, farthest - 1e-3f, $"{shape} 지지점보다 먼 안 점: {direction}");
+                if (!shape.HasHole) // 빈 곳 있는 도형의 조각은 빈 곳을 채운 껍질이라 더 멀 수 있다
+                    Assert.LessOrEqual(support, farthest + 0.08f * direction.magnitude, $"{shape} 지지점이 도형보다 너무 멀다: {direction}");
+            }
+        }
+    }
+
+    [Test]
+    public void Overlaps_RandomSpheres_MatchExactDistance_EveryShape()
+    {
+        // 구 몸 정답 = 몸 중심에서 도형 최근접 점까지 거리 ≤ 반경(최근접 점은 무차별 대입으로 따로 검증). 경계 ±0.01 m 는 건너뛴다.
+        var pose = new AttackShapePose(new Vector3(1f, 0.5f, -2f), new Vector3(1f, 0f, 1f));
+        var random = new System.Random(1533);
+        float R(float min, float max) => min + (float)random.NextDouble() * (max - min);
+        foreach (AttackShape shape in Samples().Append(new AttackTriangleShape(2f, 1f)).Append(new AttackSectorShape(2f, 200f, 0.8f) { ForwardOffset = -1f }))
+        {
+            int hit = 0, miss = 0;
+            for (int n = 0; n < 600; n++)
+            {
+                var center = new Vector3(R(-5f, 7f), pose.Position.y + R(-3f, 5f), R(-7f, 5f));
+                float radius = R(0.1f, 1.5f);
+                float gap = Vector3.Distance(center, shape.ClosestPoint(pose, center)) - radius;
+                if (Mathf.Abs(gap) < 0.01f)
+                    continue;
+                bool expected = gap < 0f;
+                Assert.AreEqual(expected, AttackShapeQuery.Overlaps(shape, pose, new AttackShapeTestSphere(center, radius), out _),
+                    $"{shape} 구 {center} r{radius:0.###} 틈 {gap:0.####}");
+                if (expected) hit++; else miss++;
+            }
+            Assert.Greater(hit, 10, shape + " 맞음 표본");
+            Assert.Greater(miss, 10, shape + " 빠짐 표본");
+        }
+    }
+
+    // ── 몸 겹침 판정 ─────────────────────────────────────────────────────
+
+    [Test]
+    public void Overlaps_SphereBody_ExactGrazeAndMiss()
+    {
+        var rect = new AttackRectShape(16f, 1.2f) { MinHeight = -1f, MaxHeight = 1f };
+        Assert.IsTrue(AttackShapeQuery.Overlaps(rect, Origin, new AttackShapeTestSphere(P(1.6f, 10f), 1f), out Vector3 point), "옆면이 폭 경계에 닿음 = 맞음");
+        Assert.IsTrue(rect.Contains(Origin, point), "겹친 점은 도형 안");
+        Assert.IsTrue(AttackShapeQuery.Overlaps(rect, Origin, new AttackShapeTestSphere(P(1.59f, 10f), 1f), out _));
+        Assert.IsFalse(AttackShapeQuery.Overlaps(rect, Origin, new AttackShapeTestSphere(P(1.61f, 10f), 1f), out _), "0.01 m 떨어짐");
+        Assert.IsTrue(AttackShapeQuery.Overlaps(rect, Origin, new AttackShapeTestSphere(P(0f, 10f, 1.9f), 1f), out _), "위로 높이 경계 걸침");
+        Assert.IsFalse(AttackShapeQuery.Overlaps(rect, Origin, new AttackShapeTestSphere(P(0f, 10f, 2.1f), 1f), out _), "높이 위 밖");
+        Assert.IsTrue(AttackShapeQuery.Overlaps(rect, Origin, new AttackShapeTestSphere(P(0f, -0.9f), 1f), out _), "시작 뒤 중심 — 몸 앞쪽이 걸침");
+    }
+
+    [Test]
+    public void Overlaps_OriginOrCenterInsideBody_NoFootSpecialCase()
+    {
+        // 기준점(찬 부채꼴 꼭짓점)이 몸 안이면 몸 중심이 등 뒤여도 겹친다 — 예전 '발밑 겹침 → 중심 x·z' 특례 없음.
+        var front = new AttackSectorShape(3f, 90f);
+        Assert.IsTrue(AttackShapeQuery.Overlaps(front, Origin, new AttackShapeTestSphere(P(0f, -0.5f), 1f), out _), "꼭짓점이 몸 안 = 맞음");
+        Assert.IsFalse(AttackShapeQuery.Overlaps(front, Origin, new AttackShapeTestSphere(P(0f, -1.2f), 1f), out _), "등 뒤로 떨어짐");
+        Assert.IsTrue(AttackShapeQuery.Overlaps(front, Origin, new AttackShapeTestSphere(P(2.8f, 0f), 2f), out _), "옆 변(45°)에 걸친 큰 몸");
+
+        // 원 중심이 큰 몸 안 — 몸 중심이 반경 밖이어도 맞는다.
+        var circle = new AttackCircleShape(2f) { MinHeight = 0f, MaxHeight = 3f };
+        Assert.IsTrue(AttackShapeQuery.Overlaps(circle, Origin, new AttackShapeTestSphere(P(2.5f, 0f, 0.5f), 3f), out _));
+
+        // 부채꼴·원 도넛 — 안쪽 빈 곳의 몸은 안쪽 경계에 닿아야 맞는다.
+        var donut = new AttackSectorShape(3f, 90f, minOffset: 1.5f);
+        Assert.IsTrue(AttackShapeQuery.Overlaps(donut, Origin, new AttackShapeTestSphere(P(0f, 0.8f), 0.75f), out _), "빈 곳에서 안쪽 경계 걸침");
+        Assert.IsFalse(AttackShapeQuery.Overlaps(donut, Origin, new AttackShapeTestSphere(P(0f, 0.6f), 0.75f), out _), "빈 곳 안에만");
+        var ring = new AttackCircleShape(3f, minRadius: 1.5f);
+        Assert.IsTrue(AttackShapeQuery.Overlaps(ring, Origin, new AttackShapeTestSphere(Vector3.zero, 1.6f), out _), "빈 곳 중심, 반경이 안쪽 경계를 넘음");
+        Assert.IsFalse(AttackShapeQuery.Overlaps(ring, Origin, new AttackShapeTestSphere(Vector3.zero, 1.4f), out _));
+    }
+
+    [Test]
+    public void Union_AnyShapeOverlaps_SameKeyOnce()
     {
         var shapes = new AttackShape[] { new AttackSectorShape(2f, 90f), null, new AttackCircleShape(1f) { ForwardOffset = 5f } };
         var seen = new HashSet<string>();
 
-        Assert.IsTrue(AttackShapeQuery.TryAccept(shapes, Origin, P(0f, 5.5f), P(0f, 6f), "A", seen, out _), "두 번째 도형 안 = 피격");
-        Assert.IsFalse(AttackShapeQuery.TryAccept(shapes, Origin, P(0f, 1f), P(0f, 1f), "A", seen, out _), "같은 대상은 한 공격에 1회");
+        Assert.IsTrue(AttackShapeQuery.TryAccept(shapes, Origin, new AttackShapeTestSphere(P(0f, 6.2f), 0.3f), "A", seen, out _), "두 번째 도형과 겹침 = 피격");
+        Assert.IsFalse(AttackShapeQuery.TryAccept(shapes, Origin, new AttackShapeTestSphere(P(0f, 1f), 0.3f), "A", seen, out _), "같은 대상은 한 공격에 1회");
 
-        Assert.IsFalse(AttackShapeQuery.TryAccept(shapes, Origin, P(0f, 3.5f), P(0f, 3.5f), "B", seen, out _), "도형 사이 빈틈 = 밖");
+        Assert.IsFalse(AttackShapeQuery.TryAccept(shapes, Origin, new AttackShapeTestSphere(P(0f, 3f), 0.4f), "B", seen, out _), "도형 사이 빈틈 = 밖");
         Assert.IsFalse(seen.Contains("B"), "밖이면 기록하지 않는다 — 같은 대상의 다른 콜라이더가 안이면 맞는다");
-        Assert.IsTrue(AttackShapeQuery.TryAccept(shapes, Origin, P(0.3f, 1f), P(0.3f, 1.5f), "B", seen, out _));
+        Assert.IsTrue(AttackShapeQuery.TryAccept(shapes, Origin, new AttackShapeTestSphere(P(0f, 3f), 1.1f), "B", seen, out _), "두 도형 사이를 덮는 큰 몸");
 
-        Assert.IsFalse(AttackShapeQuery.TryAccept(shapes, Origin, P(0f, 1f), P(0f, 1f), null, seen, out _), "키 없음 = 대상 아님");
+        Assert.IsFalse(AttackShapeQuery.TryAccept(shapes, Origin, new AttackShapeTestSphere(P(0f, 1f), 0.3f), (string)null, seen, out _), "키 없음 = 대상 아님");
         Assert.IsFalse(AttackShapeQuery.AnyContains(null, Origin, Vector3.zero));
-    }
-
-    [Test]
-    public void ProbePoint_FootOverlapUsesBoundsCenterPlanarOnly()
-    {
-        Vector3 origin = new Vector3(1f, 0f, 1f);
-        Assert.AreEqual(P(1f, 2f, 0.5f), AttackShapeQuery.ProbePoint(origin, P(1f, 2f, 0.5f), P(5f, 5f, 5f)), "보통 = 가장 가까운 점");
-
-        Vector3 probe = AttackShapeQuery.ProbePoint(origin, P(1f, 1f, 0.2f), P(1f, -1f, 2f));
-        Assert.AreEqual(P(1f, -1f, 0.2f), probe, "발밑 겹침 = x·z 는 중심, 높이는 가장 가까운 점");
-
-        // 기준점이 몸 안이고 몸 중심이 등 뒤 = 정면 부채꼴 밖(예전 QBlastInSector 와 같은 동작).
-        var front = new AttackShape[] { new AttackSectorShape(3f, 90f) };
-        var seen = new HashSet<string>();
-        Assert.IsFalse(AttackShapeQuery.TryAccept(front, Origin, Vector3.zero, P(0f, -0.5f, 1f), "behind", seen, out _));
-        Assert.IsTrue(AttackShapeQuery.TryAccept(front, Origin, Vector3.zero, P(0f, 0.5f, 1f), "ahead", seen, out _));
-        Assert.IsTrue(AttackShapeQuery.TryAccept(front, Origin, Vector3.zero, Vector3.zero, "exact", seen, out _), "중심도 기준점 = 찬 부채꼴 꼭짓점");
+        Assert.IsFalse(AttackShapeQuery.AnyOverlaps(null, Origin, new AttackShapeTestSphere(Vector3.zero, 1f), out _));
     }
 
     // ── 실제 Overlap 수집 ───────────────────────────────────────────────
@@ -322,11 +443,84 @@ public class AttackShapeTests
         CollectionAssert.AreEquivalent(new Object[] { boss, side }, hits.Select(h => h.Target).ToArray(), "부채꼴 + 원 합집합, 뒤·높이 밖·자기 자신 제외");
         Assert.AreEqual(2, added, "같은 대상(Boss 두 콜라이더)은 1회");
         AttackShapeHit bossHit = hits.First(h => h.Target == boss);
-        Assert.AreEqual(bossHit.Collider.ClosestPoint(far), bossHit.Point, "판정 점 = 몸 표면에서 기준점에 가장 가까운 점");
+        Assert.IsTrue(set.Contains(pose, bossHit.Point), "겹친 점 = 도형 안");
+        Assert.Less(Vector3.Distance(bossHit.Collider.ClosestPoint(bossHit.Point), bossHit.Point), 1e-4f, "겹친 점 = 몸(표면 또는 안)");
 
         Assert.AreEqual(0, AttackShapeQuery.Collect(set, pose, ~0, QueryTriggerInteraction.Collide, new Collider[32],
             c => roots.Contains(c.transform.root.gameObject) ? c.transform.root.gameObject : null, seen, hits), "같은 seen = 다음 틱에도 1회");
         Assert.IsNotNull(owner);
+    }
+
+    // 상자·캡슐·구 하나(열린 씬에 저장 안 함). 지우기 전까지 TearDown 목록에 둔다.
+    private GameObject RandomBody(int kind, Vector3 position, Quaternion rotation, System.Func<float, float, float> range)
+    {
+        var go = new GameObject("AttackShapeTests_Random") { hideFlags = HideFlags.DontSave };
+        created.Add(go);
+        go.transform.SetPositionAndRotation(position, rotation);
+        if (kind == 0)
+            go.AddComponent<BoxCollider>().size = new Vector3(range(0.2f, 2f), range(0.2f, 2f), range(0.2f, 2f));
+        else if (kind == 1)
+        {
+            var capsule = go.AddComponent<CapsuleCollider>();
+            capsule.radius = range(0.2f, 0.9f);
+            capsule.height = range(0.5f, 3f);
+        }
+        else
+            go.AddComponent<SphereCollider>().radius = range(0.2f, 1.5f);
+        Physics.SyncTransforms();
+        return go;
+    }
+
+    private static bool OverlapBoxHas(Vector3 center, Vector3 half, Quaternion rotation, Collider[] buffer, Collider body)
+    {
+        int count = Physics.OverlapBoxNonAlloc(center, half, buffer, rotation, ~0, QueryTriggerInteraction.Collide);
+        bool found = false;
+        for (int i = 0; i < count; i++)
+            found |= buffer[i] == body;
+        return found;
+    }
+
+    [Test]
+    public void Collect_RectMatchesPhysicsOverlapBox_RandomBodies()
+    {
+        // 직사각형 기둥은 넓은 질의 상자와 같은 영역이다 → Physics.OverlapBox 결과가 '몸이 겹치면 맞음'의 정답.
+        // 무작위 상자·캡슐·구(돌림 포함)를 경계 근처에 두고, 경계에서 ±Band 안(허용 오차 차이)인 몸은 건너뛴다.
+        const float Band = 0.01f;
+        Vector3 far = new Vector3(-5000f, 0f, 5000f);
+        var pose = new AttackShapePose(far, new Vector3(0.6f, 0f, 1f));
+        var rect = new AttackRectShape(10f, 1.2f, 0.5f) { YawOffset = 12f, SideOffset = 0.3f, MinHeight = -1f, MaxHeight = 1f };
+        var set = new AttackShapeSet(AttackShapeOrigin.Point, rect);
+        rect.GetBroadBox(pose, out Vector3 center, out Vector3 half, out Quaternion rotation);
+        var random = new System.Random(1531);
+        float R(float min, float max) => min + (float)random.NextDouble() * (max - min);
+        var buffer = new Collider[8];
+        int compared = 0, hitsCount = 0;
+
+        for (int n = 0; n < 300; n++)
+        {
+            GameObject go = RandomBody(n % 3, center + rotation * new Vector3(R(-2.5f, 2.5f), R(-2.2f, 2.2f), R(-6f, 6f)),
+                Quaternion.Euler(R(-40f, 40f), R(0f, 360f), R(-40f, 40f)), R);
+            Collider body = go.GetComponent<Collider>();
+            bool inner = OverlapBoxHas(center, half - Vector3.one * Band, rotation, buffer, body);
+            bool outer = OverlapBoxHas(center, half + Vector3.one * Band, rotation, buffer, body);
+
+            if (inner == outer)
+            {
+                var hits = new List<AttackShapeHit>();
+                AttackShapeQuery.Collect(set, pose, ~0, QueryTriggerInteraction.Collide, new Collider[8],
+                    c => c == body ? go : null, new HashSet<Object>(), hits);
+                Assert.AreEqual(inner, hits.Count == 1, $"#{n} {body.GetType().Name} at {go.transform.position - far} rot {go.transform.eulerAngles}");
+                compared++;
+                if (inner) hitsCount++;
+            }
+
+            created.Remove(go);
+            Object.DestroyImmediate(go);
+        }
+
+        Assert.Greater(compared, 250, "비교 수");
+        Assert.Greater(hitsCount, 40, "맞음 표본");
+        Assert.Greater(compared - hitsCount, 40, "빠짐 표본");
     }
 
     // ── 데이터 테이블 행 ───────────────────────────────────────────────
@@ -372,5 +566,29 @@ public class AttackShapeTests
         errors.Clear();
         new AttackShapeSet(AttackShapeOrigin.Point, new AttackTriangleShape(2f, 1f)).Validate(errors);
         Assert.AreEqual(0, errors.Count, string.Join("\n", errors));
+    }
+}
+
+/// <summary>테스트용 해석 몸(구) — Physics 없이 <see cref="AttackShapeQuery.Overlaps{TBody}"/> 를 본다.</summary>
+public readonly struct AttackShapeTestSphere : IAttackShapeBody
+{
+    private readonly Vector3 center;
+    private readonly float radius;
+
+    public AttackShapeTestSphere(Vector3 center, float radius)
+    {
+        this.center = center;
+        this.radius = radius;
+    }
+
+    public Vector3 Center => center;
+
+    public Vector3 Support(Vector3 direction) => center + direction.normalized * radius;
+
+    public Vector3 ClosestPoint(Vector3 point)
+    {
+        Vector3 offset = point - center;
+        float distance = offset.magnitude;
+        return distance <= radius ? point : center + offset * (radius / distance);
     }
 }

@@ -425,8 +425,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 isInterruptAttack: false,
                 hitPattern: DamageHitPattern);
             // 수호의 파동 — 반격 피해 판정 1건에 밀치기를 같이 싣는다(피해는 그대로, 추가 피해 없음).
-            // 같은 판정 점(몸 표면에서 발밑에 가장 가까운 점)이 밀치기 원 안이면.
-            if (IsTraitPushCandidate(unit) && pushArea != null && pushArea.Contains(pose, counterHits[i].Point))
+            // 같은 콜라이더가 밀치기 원에도 겹치면.
+            if (IsTraitPushCandidate(unit) && pushArea != null && AttackShapeQuery.Overlaps(pushArea, pose, hit))
                 ApplyTraitPushServer(unit, origin, ref attackInfo);
             AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
 

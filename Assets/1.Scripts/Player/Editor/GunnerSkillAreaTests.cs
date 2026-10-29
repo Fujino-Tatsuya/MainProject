@@ -7,7 +7,7 @@ using UnityEngine;
 /// <summary>
 /// 할 일 153 5b단계 — 거너 Q 충전 레이저 판정 도형. 직사각형(최대 충전 기준, 기준점 = 발사 원점 + 조준 방향)이 예전 발사 상자
 /// (<c>SkillHitVolume.Beam</c>: 발사 원점에서 length · beamWidth · 높이 2 를 원점 높이 중심)와 격자에서 같은지 — 충전 최소/최대·지형 차단 길이·광폭 레이저 ×1.3,
-/// 잔류 포격이 저장한 포즈·도형으로 같은 영역을 재판정하는지, SO 값, 실제 Overlap 수집과 알려진 차이(판정 점 = 발사 원점 쪽 가장 가까운 점).
+/// 잔류 포격이 저장한 포즈·도형으로 같은 영역을 재판정하는지, SO 값, 실제 Overlap 수집이 예전 상자 겹침과 같은지(옆면·높이 걸침 포함).
 /// 거너 E(냉각 백스텝)는 피해 판정이 없다.
 /// </summary>
 public sealed class GunnerSkillAreaTests
@@ -188,7 +188,7 @@ public sealed class GunnerSkillAreaTests
     }
 
     [Test]
-    public void QArea_RealOverlap_CenterHit_SideGrazeIsKnownDifference()
+    public void QArea_RealOverlap_SameAsOldBeamBox_IncludingSideGraze()
     {
         GunnerChargeLaserData data = QData();
         Vector3 caster = new Vector3(5000f, 0f, 5000f); // 열린 씬 콜라이더와 떨어진 곳
@@ -196,22 +196,28 @@ public sealed class GunnerSkillAreaTests
         float length = data.RangeAt(1f);
 
         GameObject center = Sphere("Center", origin + new Vector3(0f, 0f, 10f), 0.3f);
-        GameObject farEnd = Sphere("FarEnd", origin + new Vector3(0f, 0f, length + 0.4f), 0.5f); // 끝을 넘어 걸침 — 가까운 면이 안
+        GameObject farEnd = Sphere("FarEnd", origin + new Vector3(0f, 0f, length + 0.4f), 0.5f); // 끝을 넘어 걸침
         GameObject beyond = Sphere("Beyond", origin + new Vector3(0f, 0f, length + 1f), 0.5f);
-        GameObject graze = Sphere("Graze", origin + new Vector3(1.2f, 0f, 10f), 1f); // 몸 옆면만 레이저 폭에 걸침
+        // 10 m 앞 반경 1 m 몸 — 옆면만 레이저 폭(±0.6)에 걸침: 중심 옆 1.2·1.59 m 맞음, 1.7 m 빠짐(0.6 + 1 = 1.6 까지).
+        GameObject graze = Sphere("Graze", origin + new Vector3(1.2f, 0f, 10f), 1f);
+        GameObject edge = Sphere("Edge", origin + new Vector3(-1.59f, 0f, 10f), 1f);
+        GameObject beside = Sphere("Beside", origin + new Vector3(1.7f, 0f, 10f), 1f);
+        GameObject above = Sphere("Above", origin + new Vector3(0f, 1.9f, 10f), 1f);   // 위로 높이 경계(+1) 걸침
+        GameObject over = Sphere("Over", origin + new Vector3(0f, 2.1f, 10f), 1f);     // 높이 밖
         Physics.SyncTransforms();
 
-        var roots = new HashSet<GameObject> { center, farEnd, beyond, graze };
+        var roots = new HashSet<GameObject> { center, farEnd, beyond, graze, edge, beside, above, over };
         var hits = new List<AttackShapeHit>();
         AttackShapeQuery.Collect(data.FireArea(length, data.BeamWidth), data.FirePose(origin, Vector3.forward), ~0,
             QueryTriggerInteraction.Collide, new Collider[32],
             c => roots.Contains(c.gameObject) ? c.gameObject : null, new HashSet<Object>(), hits);
-        CollectionAssert.AreEquivalent(new Object[] { center, farEnd }, hits.Select(h => h.Target).ToArray());
+        var expected = new Object[] { center, farEnd, graze, edge, above };
+        CollectionAssert.AreEquivalent(expected, hits.Select(h => h.Target).ToArray());
 
-        // 예전 상자 겹침은 옆면만 걸친 큰 몸도 맞혔다 — 판정 점(발사 원점 쪽 가장 가까운 점)이 폭 밖이라 이제는 빠진다(attack-shapes.md §9).
+        // 예전 상자 겹침과 같은 결과.
         SkillHitVolume old = SkillHitVolume.Beam(origin, Vector3.forward, length, data.BeamWidth, OldBeamHeight, ~0);
         var buffer = new Collider[32];
         int count = old.Overlap(buffer, ~0, QueryTriggerInteraction.Collide);
-        Assert.IsTrue(buffer.Take(count).Any(c => c.gameObject == graze), "예전 상자는 옆면 걸침을 맞혔다");
+        CollectionAssert.AreEquivalent(expected, buffer.Take(count).Select(c => c.gameObject).Where(roots.Contains).ToArray(), "예전 상자 겹침");
     }
 }

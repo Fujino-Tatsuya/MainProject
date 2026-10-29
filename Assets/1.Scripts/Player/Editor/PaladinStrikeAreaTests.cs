@@ -66,10 +66,89 @@ public sealed class PaladinStrikeAreaTests
         AttackShapePose pose = PlayerDefaultAttack.ResolvePose(null, caster, Vector3.forward);
         Vector3 front = caster + Vector3.forward;
 
-        Assert.IsTrue(area.Contains(pose, front), "발 높이(가장 가까운 점이 발 높이에 찍히는 대상)");
+        Assert.IsTrue(area.Contains(pose, front), "발 높이");
         Assert.IsTrue(area.Contains(pose, front + Vector3.up * 2.03f), "상자 위 끝(Armature 0.039 + 2) 안");
         Assert.IsFalse(area.Contains(pose, front + Vector3.up * 2.05f), "상자 위 끝 밖");
         Assert.IsFalse(area.Contains(pose, front + Vector3.down * 0.05f), "발보다 아래(예전 상자도 못 닿음)");
+    }
+
+    [Test]
+    public void StrikeRect_RealOverlap_CornerGraze_MatchesOldBox()
+    {
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, DefaultAttackStep.PaladinStrikeRect());
+        var caster = new Vector3(7000f, 0f, 7000f); // 열린 씬 콜라이더와 떨어진 곳
+        var created = new List<GameObject>();
+        try
+        {
+            foreach (Vector3 aim in AimDirections())
+            {
+                AttackShapePose pose = PlayerDefaultAttack.ResolvePose(null, caster, aim);
+                Quaternion axes = Quaternion.LookRotation(aim) * Quaternion.Euler(0f, OldYaw, 0f);
+                // 예전 상자 = Armature 높이 0.039 위 center (0, 1, 0.5)·size (2.6, 2, 2.1).
+                Vector3 oldCenter = caster + axes * new Vector3(OldCenter.x, 0f, OldCenter.z) + Vector3.up * (0.039f + OldCenter.y);
+                Vector3 corner = caster + axes * new Vector3(OldSize.x * 0.5f, 0f, OldCenter.z + OldSize.z * 0.5f) + Vector3.up * 1f;
+                Vector3 diagonal = axes * new Vector3(1f, 0f, 1f).normalized;
+                Vector3 rightEdge = caster + axes * new Vector3(OldSize.x * 0.5f, 0f, 0.5f) + Vector3.up * 1f;
+
+                // 모서리 바깥 대각선 구(반경 0.5) — 표면이 모서리를 0.05 m 넘음/0.05 m 못 미침, 45° 돌린 상자 꼭짓점이 옆 변을 0.05 m 파고듦/0.05 m 떨어짐.
+                var bodies = new List<(GameObject go, bool expected, string label)>();
+                GameObject Sphere(Vector3 at, float radius)
+                {
+                    var go = new GameObject("PaladinStrikeAreaTests_Body") { hideFlags = HideFlags.DontSave };
+                    created.Add(go);
+                    go.transform.position = at;
+                    go.AddComponent<SphereCollider>().radius = radius;
+                    return go;
+                }
+                GameObject Diamond(Vector3 at)
+                {
+                    var go = new GameObject("PaladinStrikeAreaTests_Body") { hideFlags = HideFlags.DontSave };
+                    created.Add(go);
+                    go.transform.SetPositionAndRotation(at, axes * Quaternion.Euler(0f, 45f, 0f));
+                    go.AddComponent<BoxCollider>().size = Vector3.one * 0.8f;
+                    return go;
+                }
+                float halfDiagonal = 0.8f * Mathf.Sqrt(2f) * 0.5f;
+                Vector3 side = axes * Vector3.right;
+                bodies.Add((Sphere(corner + diagonal * 0.45f, 0.5f), true, "모서리 구 걸침"));
+                bodies.Add((Sphere(corner + diagonal * 0.55f, 0.5f), false, "모서리 구 떨어짐"));
+                bodies.Add((Diamond(rightEdge + side * (halfDiagonal - 0.05f)), true, "돌린 상자 꼭짓점 걸침"));
+                bodies.Add((Diamond(rightEdge + side * (halfDiagonal + 0.05f)), false, "돌린 상자 꼭짓점 떨어짐"));
+                Physics.SyncTransforms();
+
+                var oldBuffer = new Collider[32];
+                int oldCount = Physics.OverlapBoxNonAlloc(oldCenter, OldSize * 0.5f, oldBuffer, axes, ~0, QueryTriggerInteraction.Collide);
+                var oldHits = new HashSet<GameObject>();
+                for (int i = 0; i < oldCount; i++)
+                    oldHits.Add(oldBuffer[i].gameObject);
+
+                var mine = new HashSet<GameObject>();
+                foreach (var body in bodies)
+                    mine.Add(body.go);
+                var hits = new List<AttackShapeHit>();
+                AttackShapeQuery.Collect(area, pose, ~0, QueryTriggerInteraction.Collide, new Collider[32],
+                    c => mine.Contains(c.gameObject) ? c.gameObject : null, new HashSet<Object>(), hits);
+                var newHits = new HashSet<Object>();
+                foreach (AttackShapeHit hit in hits)
+                    newHits.Add(hit.Target);
+
+                foreach (var body in bodies)
+                {
+                    Assert.AreEqual(body.expected, oldHits.Contains(body.go), $"예전 상자 {body.label} aim={aim}");
+                    Assert.AreEqual(body.expected, newHits.Contains(body.go), $"도형 {body.label} aim={aim}");
+                }
+
+                foreach (var body in bodies)
+                    Object.DestroyImmediate(body.go);
+                created.Clear();
+            }
+        }
+        finally
+        {
+            foreach (GameObject go in created)
+                if (go != null)
+                    Object.DestroyImmediate(go);
+        }
     }
 
     [Test]

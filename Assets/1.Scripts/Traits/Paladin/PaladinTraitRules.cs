@@ -14,8 +14,8 @@ public static class PaladinTraitRules
         blockedThisCast && reason != SkillEndReason.CasterDied && casterHealth > 0;
 
     /// <summary>
-    /// 수호의 파동(PAL_4_E_PUSH) 판정 영역(할 일 153) — 반격 판정 순간 플레이어 발밑 중심 원(반경 = 특성 스킬 수치, 대상 콜라이더 표면 기준 —
-    /// 반격 부채꼴과 같은 판정 점). 높이 ±반경(예전 넓은 질의 = 발밑 중심 3D 구). 반경 0 이하 = 특성 없음 = null.
+    /// 수호의 파동(PAL_4_E_PUSH) 판정 영역(할 일 153) — 반격 판정 순간 플레이어 발밑 중심 원(반경 = 특성 스킬 수치, 대상 몸이 원과 겹치면 —
+    /// 반격 부채꼴과 같은 규칙). 높이 ±반경(예전 넓은 질의 = 발밑 중심 3D 구). 반경 0 이하 = 특성 없음 = null.
     /// 반경이 특성 값이라 SO 도형이 아니라 여기서 만든다(xlsx 행 없음 — 수치는 PAL_4_E_PUSH 효과 칸).
     /// </summary>
     public static AttackShapeSet EPushArea(float radius) =>

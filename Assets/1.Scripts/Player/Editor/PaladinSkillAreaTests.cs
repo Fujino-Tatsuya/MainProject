@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// 할 일 153 5a단계 — 가붕이 Q·E 판정 도형. Q 직사각형이 예전 프리팹 앵커(<c>Armature/MainSkill</c>)와 같은 영역인지(모서리 안/밖·진행 방향 회전·높이·돌파의 방패 표본),
-/// E 반격 부채꼴이 예전 규칙(표면 거리 ≤ 3 m · 바닥 평면 각 ≤ 60°, 발밑 겹침이면 중심 방향)과 격자에서 같은지, 수호의 파동 원 유무, SO 값, 프리팹 앵커 삭제.
+/// E 반격 부채꼴이 예전 규칙(표면 거리 ≤ 3 m · 바닥 평면 각 ≤ 60°)과 격자에서 같은지·몸 겹침(발밑이 몸 안·큰 보스·옆 변 걸침), 수호의 파동 원 유무, SO 값, 프리팹 앵커 삭제.
 /// </summary>
 public sealed class PaladinSkillAreaTests
 {
@@ -143,27 +143,29 @@ public sealed class PaladinSkillAreaTests
     }
 
     [Test]
-    public void ECounterSector_FootOverlap_UsesBoundsCenter_LikeOldRule()
+    public void ECounterSector_BodyOverlap_FootInsideAndBigBoss()
     {
         AttackShapeSet area = new AttackShapeSet(AttackShapeOrigin.CasterAim, FirstMeleeSubSkillData.CounterSector());
         AttackShapePose pose = FirstMeleeSubSkill.CounterPose(area, Vector3.zero, Vector3.forward);
-        var seen = new HashSet<Object>();
-        Object key = new GameObject("PaladinSkillAreaTests_Target");
-        try
+        var seen = new HashSet<string>();
+        bool Hit(Vector3 center, float radius)
         {
-            Assert.IsTrue(AttackShapeQuery.TryAccept(area.Shapes, pose, Vector3.zero, new Vector3(0f, 0f, 2f), key, seen, out _), "발밑 겹침 + 중심 앞 = 안");
             seen.Clear();
-            Assert.IsFalse(AttackShapeQuery.TryAccept(area.Shapes, pose, Vector3.zero, new Vector3(0f, 0f, -2f), key, seen, out _), "발밑 겹침 + 중심 뒤 = 밖");
-            seen.Clear();
-            Assert.IsTrue(AttackShapeQuery.TryAccept(area.Shapes, pose, Vector3.zero, new Vector3(0f, 1f, 0f), key, seen, out _), "중심까지 겹침 = 안");
-            seen.Clear();
-            // 큰 보스 — 중심이 10 m 밖이어도 표면이 3 m 안이면 맞는다.
-            Assert.IsTrue(AttackShapeQuery.TryAccept(area.Shapes, pose, new Vector3(0f, 0f, 2.9f), new Vector3(0f, 0f, 10f), key, seen, out _), "표면 2.9 m");
+            return AttackShapeQuery.TryAccept(area.Shapes, pose, new AttackShapeTestSphere(center, radius), "target", seen, out _);
         }
-        finally
-        {
-            Object.DestroyImmediate(key);
-        }
+
+        Assert.IsTrue(Hit(new Vector3(0f, 0f, 2f), 2.5f), "발밑이 몸 안 + 중심 앞 = 안");
+        // 발밑이 몸 안이면 부채꼴 꼭짓점이 몸과 겹친다 — 중심이 뒤여도 맞음(예전 '중심 방향' 특례 없음, 겹치면 맞음 규칙).
+        Assert.IsTrue(Hit(new Vector3(0f, 0f, -2f), 2.5f), "발밑이 몸 안 + 중심 뒤 = 안");
+        Assert.IsFalse(Hit(new Vector3(0f, 0f, -2f), 1.9f), "몸이 발밑에 못 닿는 뒤 = 밖");
+        // 큰 보스 — 중심이 10 m 밖이어도 표면이 3 m 안이면 맞는다.
+        Assert.IsTrue(Hit(new Vector3(0f, 0f, 10f), 7.1f), "표면 2.9 m");
+        Assert.IsFalse(Hit(new Vector3(0f, 0f, 10f), 6.9f), "표면 3.1 m");
+        // 부채꼴 옆 변(60°) 바깥에서 몸 옆면만 걸침.
+        Vector3 edgeOutward = Quaternion.Euler(0f, 150f, 0f) * Vector3.forward; // 오른쪽 변(60°)의 바깥 법선
+        Vector3 onEdge = Quaternion.Euler(0f, 60f, 0f) * Vector3.forward * 2f;
+        Assert.IsTrue(Hit(onEdge + edgeOutward * 0.49f, 0.5f), "옆 변 걸침");
+        Assert.IsFalse(Hit(onEdge + edgeOutward * 0.51f, 0.5f), "옆 변 떨어짐");
     }
 
     [Test]

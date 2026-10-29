@@ -431,11 +431,10 @@ public sealed class PaladinTraitFourthTierTests
         Assert.IsFalse(area.Contains(pose, At(0f, 1f) + Vector3.up * 2.1f), "높이 2 밖");
         Assert.IsFalse(area.Contains(pose, At(0f, 1f) + Vector3.down * 2.1f), "아래 2 밖");
 
-        // 꼭짓점이 몸 안(가장 가까운 점 = 기준점) = 바닥 평면은 콜라이더 중심 쪽으로 본다(예전 QBlastInSector 동작).
-        Vector3 probe = AttackShapeQuery.ProbePoint(pose.Position, qEnd, At(10f, 0.5f));
-        Assert.IsTrue(area.Contains(pose, probe), "꼭짓점을 덮은 대상 = 중심 방향(앞)");
-        Vector3 behind = AttackShapeQuery.ProbePoint(pose.Position, qEnd, At(180f, 0.5f));
-        Assert.IsFalse(area.Contains(pose, behind), "꼭짓점을 덮었지만 중심이 등 뒤 = 밖");
+        // 몸이 부채꼴과 조금이라도 겹치면 맞음 — 꼭짓점(Q 끝 지점)을 덮은 몸은 중심이 등 뒤여도 맞는다(예전 QBlastInSector '중심 방향' 특례 없음).
+        Assert.IsTrue(AttackShapeQuery.AnyOverlaps(area.Shapes, pose, new AttackShapeTestSphere(At(10f, 0.5f), 0.6f), out _), "꼭짓점을 덮은 대상(중심 앞)");
+        Assert.IsTrue(AttackShapeQuery.AnyOverlaps(area.Shapes, pose, new AttackShapeTestSphere(At(180f, 0.5f), 0.6f), out _), "꼭짓점을 덮은 대상(중심 등 뒤)");
+        Assert.IsFalse(AttackShapeQuery.AnyOverlaps(area.Shapes, pose, new AttackShapeTestSphere(At(180f, 0.7f), 0.6f), out _), "등 뒤로 꼭짓점에 못 닿음");
 
         AttackShapePose turned = PaladinTraitRules.QBlastPose(area, qEnd, Vector3.right);
         Assert.IsTrue(area.Contains(turned, qEnd + Vector3.right * 1.5f), "진행 방향을 따라 돈다");

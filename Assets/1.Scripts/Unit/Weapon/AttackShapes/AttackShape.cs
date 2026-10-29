@@ -7,7 +7,7 @@ using UnityEngine;
 /// <see cref="AttackShapeSet"/> 의 <c>[SerializeReference]</c> 목록으로 조합한다(특성 효과 <see cref="TraitEffect"/> 와 같은 방식 — 원소 숫자 칸이 xlsx 행).
 /// 종류 4개: <see cref="AttackSectorShape"/>·<see cref="AttackCircleShape"/>·<see cref="AttackRectShape"/>·<see cref="AttackTriangleShape"/>.
 ///
-/// 순수 C# 이다(Physics·MonoBehaviour 없음) — 판정 <see cref="Contains"/>, 넓은 질의 상자 <see cref="GetBroadBox"/>,
+/// 순수 C# 이다(Physics·MonoBehaviour 없음) — 판정 <see cref="Contains"/>, 최근접 점 <see cref="ClosestPoint"/>, 지지점 <see cref="Support"/>(몸 겹침 GJK), 넓은 질의 상자 <see cref="GetBroadBox"/>,
 /// 배율 <see cref="Scaled"/>, 외곽선 <see cref="AppendOutlines"/> 가 <b>같은 로컬 수식</b>에서 나온다(기즈모 = 판정).
 /// 판정은 바닥 평면 2D + 높이 범위(기준점 높이 기준 <see cref="minHeight"/>~<see cref="maxHeight"/>).
 /// 설명: Docs/tech/attack-shapes.md.
@@ -54,6 +54,49 @@ public abstract class AttackShape
 
     /// <summary>도형 로컬 바닥 평면(x 오른쪽, y 정면, 원점 = 도형 포즈)에서 안인가(경계 포함).</summary>
     public abstract bool ContainsLocal(Vector2 local);
+
+    /// <summary>
+    /// 도형 영역(바닥 평면 도형 × 높이 범위의 3D 기둥)에서 월드 점에 가장 가까운 점. 안의 점은 그대로다.
+    /// 기둥이라 바닥 평면 최근접(<see cref="ClosestLocal"/>)과 높이 고정이 따로 풀린다. 겹침 판정(<see cref="AttackShapeQuery.Overlaps{TBody}"/>)이 쓴다.
+    /// </summary>
+    public Vector3 ClosestPoint(in AttackShapePose pose, Vector3 point)
+    {
+        if (Contains(pose, point))
+            return point;
+
+        float low = Mathf.Min(minHeight, maxHeight);
+        float high = Mathf.Max(minHeight, maxHeight);
+        float dy = Mathf.Clamp(point.y - pose.Position.y, low, high);
+        AttackShapePose shapePose = ShapePose(pose);
+        return shapePose.FromPlanarLocal(ClosestLocal(shapePose.ToPlanarLocal(point)), dy);
+    }
+
+    /// <summary>도형 로컬 바닥 평면에서 <paramref name="local"/> 에 가장 가까운 도형 안 점(안이면 그대로). 크기 0 도형은 남은 선·점에서 고른다.</summary>
+    public abstract Vector2 ClosestLocal(Vector2 local);
+
+    /// <summary>어떤 점도 품지 않는 도형(길이 0 삼각형) — 겹침 판정이 바로 거짓.</summary>
+    public virtual bool IsEmpty => false;
+
+    /// <summary>바닥 평면 볼록 조각 수 — 겹침 판정(GJK)은 조각마다 본다. 보통 1, 180° 넘는 부채꼴은 2.</summary>
+    public virtual int ConvexPieceCount => 1;
+
+    /// <summary>안쪽이 빈 도형(부채꼴 minOffset·원 minRadius) — 조각은 빈 곳을 채운 껍질이라 겹침 판정이 빈 곳을 따로 다듬는다.</summary>
+    public virtual bool HasHole => false;
+
+    /// <summary>
+    /// 볼록 조각 <paramref name="piece"/> 의 바닥 평면 지지점 — 로컬 방향 <paramref name="direction"/> 으로 가장 먼 점(빈 곳은 채운 껍질).
+    /// 방향이 0 이면 껍질의 아무 점.
+    /// </summary>
+    public abstract Vector2 SupportLocal(int piece, Vector2 direction);
+
+    /// <summary>볼록 조각 × 높이 범위 기둥의 월드 지지점 — 월드 방향 <paramref name="direction"/> 으로 가장 먼 점. 겹침 판정(GJK)이 쓴다.</summary>
+    public Vector3 Support(in AttackShapePose pose, int piece, Vector3 direction)
+    {
+        AttackShapePose shapePose = ShapePose(pose);
+        var local = new Vector2(Vector3.Dot(direction, shapePose.Right), Vector3.Dot(direction, shapePose.Forward));
+        float height = direction.y >= 0f ? Mathf.Max(minHeight, maxHeight) : Mathf.Min(minHeight, maxHeight);
+        return shapePose.FromPlanarLocal(SupportLocal(piece, local), height);
+    }
 
     /// <summary>도형 로컬 바닥 평면 경계 사각형(x 오른쪽, y 정면).</summary>
     public abstract void GetLocalBounds(out Vector2 min, out Vector2 max);
@@ -140,6 +183,44 @@ public abstract class AttackShape
             float rad = Mathf.Lerp(fromDeg, toDeg, i / (float)segments) * Mathf.Deg2Rad;
             points.Add(new Vector2(Mathf.Sin(rad) * radius, Mathf.Cos(rad) * radius));
         }
+    }
+
+    /// <summary>선분 <paramref name="a"/>→<paramref name="b"/> 위에서 <paramref name="p"/> 에 가장 가까운 점.</summary>
+    protected static Vector2 ClosestOnSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        Vector2 ab = b - a;
+        float lengthSqr = ab.sqrMagnitude;
+        if (lengthSqr < 1e-12f)
+            return a;
+        return a + ab * Mathf.Clamp01(Vector2.Dot(p - a, ab) / lengthSqr);
+    }
+
+    /// <summary>원점 중심 도넛(<paramref name="inner"/>~<paramref name="outer"/>)에서 가장 가까운 점 — 거리만 고정. 원점이면 정면(+y) 쪽.</summary>
+    protected static Vector2 ClosestInRing(Vector2 p, float inner, float outer)
+    {
+        float distance = p.magnitude;
+        float clamped = Mathf.Clamp(distance, inner, outer);
+        if (distance < 1e-6f)
+            return Vector2.up * clamped;
+        return p * (clamped / distance);
+    }
+
+    /// <summary>점들 중 방향으로 가장 먼 점.</summary>
+    protected static Vector2 FarthestOf(Vector2 direction, Vector2 a, Vector2 b, Vector2 c)
+    {
+        Vector2 best = a;
+        if (Vector2.Dot(b, direction) > Vector2.Dot(best, direction))
+            best = b;
+        if (Vector2.Dot(c, direction) > Vector2.Dot(best, direction))
+            best = c;
+        return best;
+    }
+
+    /// <summary>원점 중심 원의 지지점. 방향 0 이면 정면 쪽.</summary>
+    protected static Vector2 CircleSupport(Vector2 direction, float radius)
+    {
+        float length = direction.magnitude;
+        return length < 1e-12f ? Vector2.up * radius : direction * (radius / length);
     }
 
     protected static Vector2[] Circle(float radius, int segments)

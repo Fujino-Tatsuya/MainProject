@@ -37,8 +37,7 @@ public class FirstMeleeMainSkillData : PlayerSkillData
     /// <summary>
     /// 가붕이 Q 기본 판정 도형(할 일 153) — 예전 프리팹 앵커(<c>Armature/MainSkill</c> BoxCollider center (0, 0, 0.8)·size (2, 1, 2),
     /// 앵커 로컬 y 359.97)를 발밑 기준 직사각형으로 옮긴 값. 앞 1.8 / 뒤 0.2 / 폭 2 / yaw −0.03°.
-    /// 높이 −0.461 ~ 0.539: 상자는 Armature 높이(0.039)를 중심으로 ±0.5 m 였고, 판정 점(몸 표면에서 발밑에 가장 가까운 점)이
-    /// 그 범위에 들면 예전 상자와 겹친 것과 같다. Armature 의 수평 위치(루트 축 x −0.142·z 0.014)는 평타(3단계)처럼 옮기지 않았다(기준점 = 루트 발밑).
+    /// 높이 −0.461 ~ 0.539: 상자는 Armature 높이(0.039)를 중심으로 ±0.5 m 였다(몸이 이 기둥과 겹치면 맞음 = 예전 상자 겹침). Armature 의 수평 위치(루트 축 x −0.142·z 0.014)는 평타(3단계)처럼 옮기지 않았다(기준점 = 루트 발밑).
     /// </summary>
     public static AttackRectShape ShieldPushRect() =>
         new AttackRectShape(1.8f, 2f, 0.2f) { YawOffset = -0.03f, MinHeight = -0.461f, MaxHeight = 0.539f };

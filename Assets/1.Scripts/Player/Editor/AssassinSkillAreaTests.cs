@@ -8,7 +8,7 @@ using UnityEngine;
 /// 할 일 153 5c단계 — 어쌔신 Q·E 스킬 판정 도형.
 /// Q 돌진 경로 직사각형(기준점 = 구간 시작 + 돌진 방향, 구간 길이로 맞춤)이 예전 구간 상자(<c>PathBox</c>: 폭 pathWidth 1.2 · 높이 pathHeight 2 를 발부터 위로)와 격자에서 같은지,
 /// 추격의 궤적이 같은 도형을 지나온 선분 길이로 재사용하는지, 변신 E 원(기준점 = 지면 조준점)이 예전 원기둥(반경 2 · 높이 3, AABB 원 거름)과 같은지·칼날의 영역 ×1.25,
-/// SO 값, 실제 Overlap 수집과 알려진 차이(판정 점 = 기준점 쪽 가장 가까운 점 — 긴 구간의 옆면 걸침, 변신 E 의 AABB 모서리·발밑 겹침).
+/// SO 값, 실제 Overlap 수집(몸 겹침 — 긴 구간 옆면 걸침·출발점 뒤 몸은 예전 상자와 같음, 변신 E 는 원 중심이 큰 몸 안이면 맞음·AABB 모서리만 걸친 몸은 빠짐).
 /// 일반 E(단검 강화)는 판정이 없다(강타는 평타 2단계).
 /// </summary>
 public sealed class AssassinSkillAreaTests
@@ -294,54 +294,55 @@ public sealed class AssassinSkillAreaTests
     }
 
     [Test]
-    public void QPath_RealOverlap_TickSegmentsKeepSideGraze_LongSegmentLosesIt()
+    public void QPath_RealOverlap_SideGrazeAndBehindStart_SameAsOldBox_TickOrLongSegment()
     {
         var data = Load<AssassinDashStrikeSkillData>(QDataPath);
         var origin = new Vector3(5000f, 0f, 5000f); // 열린 씬 콜라이더와 떨어진 곳
         Vector3 heading = Vector3.forward;
 
         GameObject center = Sphere("Center", origin + new Vector3(0f, 0.5f, 3f), 0.3f);
-        GameObject graze = Sphere("Graze", origin + new Vector3(1.45f, 0.5f, 2.5f), 1f); // 반경 1 몸 — 옆면만 경로 폭(±0.6)에 걸침(중심 옆 1.45m)
-        GameObject beside = Sphere("Beside", origin + new Vector3(1.7f, 0.5f, 2.5f), 1f); // 예전에도 밖(1.7 > 0.6 + 1)
+        // 3 m 앞 반경 1 m 몸 — 옆면만 경로 폭(±0.6)에 걸침: 중심 옆 1.45·1.59 m 맞음, 1.7 m 빠짐(0.6 + 1 = 1.6 까지).
+        GameObject graze = Sphere("Graze", origin + new Vector3(1.45f, 0.5f, 3f), 1f);
+        GameObject edge = Sphere("Edge", origin + new Vector3(-1.59f, 0.5f, 3f), 1f);
+        GameObject beside = Sphere("Beside", origin + new Vector3(1.7f, 0.5f, 3f), 1f);
+        GameObject behind = Sphere("Behind", origin + new Vector3(0f, 0.5f, -0.6f), 1f); // 중심이 출발점 뒤 — 몸 앞쪽이 경로에 걸침
         Physics.SyncTransforms();
-        var roots = new HashSet<GameObject> { center, graze, beside };
+        var roots = new HashSet<GameObject> { center, graze, edge, beside, behind };
+        var expected = new Object[] { center, graze, edge, behind };
 
-        Assert.IsTrue(OldPathOverlaps(data, origin, heading, 0f, data.DashDistance, graze), "예전 상자는 옆면 걸침을 맞혔다");
-        Assert.IsFalse(OldPathOverlaps(data, origin, heading, 0f, data.DashDistance, beside));
+        foreach (GameObject go in roots)
+            Assert.AreEqual(expected.Contains(go), OldPathOverlaps(data, origin, heading, 0f, data.DashDistance, go), "예전 상자 " + go.name);
 
-        // 매 틱 구간(60 m/s · 60fps ≈ 1m) — 몸 옆을 지나는 구간 시작이 가까워 판정 점이 폭 안으로 들어온다(예전과 같음).
-        CollectionAssert.AreEquivalent(new Object[] { center, graze },
-            CollectPath(data, origin, heading, new[] { 0f, 1f, 2f, 3f, 4f, 5f }, roots), "틱 구간 1m");
-
-        // 한 구간으로 몰아 훑으면(End 몰아치기·추격의 궤적 5m) 판정 점 = 출발점 쪽 가장 가까운 점이라 옆면 걸침이 빠진다(attack-shapes.md §9).
-        CollectionAssert.AreEquivalent(new Object[] { center },
-            CollectPath(data, origin, heading, new[] { 0f, data.DashDistance }, roots), "한 구간 5m");
+        // 매 틱 구간(60 m/s · 60fps ≈ 1m)이든 한 구간으로 몰아 훑든(End 몰아치기·추격의 궤적 5m) 같다.
+        CollectionAssert.AreEquivalent(expected, CollectPath(data, origin, heading, new[] { 0f, 1f, 2f, 3f, 4f, 5f }, roots), "틱 구간 1m");
+        CollectionAssert.AreEquivalent(expected, CollectPath(data, origin, heading, new[] { 0f, data.DashDistance }, roots), "한 구간 5m");
     }
 
     [Test]
-    public void ECircle_RealOverlap_CornerAndFootOverlap_AreKnownDifferences()
+    public void ECircle_RealOverlap_BodyOverlap_FootInsideAndDiagonalGraze()
     {
         var data = Load<AssassinCircleStrikeSkillData>(EDataPath);
         var caster = new Vector3(6000f, 0f, 6000f);
         Vector3 areaCenter = caster + new Vector3(0f, 0f, 1.5f);
 
         GameObject inside = Sphere("Inside", areaCenter + new Vector3(0.5f, 0.5f, 0f), 0.3f);
-        GameObject rim = Sphere("Rim", areaCenter + new Vector3(2.4f, 0.5f, 0f), 0.5f);       // 표면이 반경 2 안(1.9)
-        GameObject corner = Sphere("Corner", areaCenter + new Vector3(1.8f, 0.5f, 1.8f), 0.5f); // AABB 모서리만 원 안(몸 표면은 2.05 — 밖)
-        GameObject big = Sphere("Big", areaCenter + new Vector3(2.5f, 0.5f, 0f), 3f);          // 원 중심이 몸 안(발밑 겹침), 몸 중심은 2.5m
+        GameObject rim = Sphere("Rim", areaCenter + new Vector3(2.4f, 0.5f, 0f), 0.5f);         // 표면이 반경 2 안(1.9)
+        GameObject diagonal = Sphere("Diagonal", areaCenter + new Vector3(1.8f, 0.5f, 1.8f), 0.6f); // 대각선 표면 1.95 — 맞음
+        GameObject corner = Sphere("Corner", areaCenter + new Vector3(1.8f, 0.5f, 1.8f), 0.5f);    // 대각선 표면 2.05 — 몸은 원에 안 닿음(AABB 모서리만 원 안)
+        GameObject big = Sphere("Big", areaCenter + new Vector3(2.5f, 0.5f, 0f), 3f);            // 원 중심이 몸 안, 몸 중심은 2.5m — 맞음
         Physics.SyncTransforms();
-        var roots = new HashSet<GameObject> { inside, rim, corner, big };
+        var roots = new HashSet<GameObject> { inside, rim, diagonal, corner, big };
 
         var hits = new List<AttackShapeHit>();
         AttackShapeQuery.Collect(data.StrikeArea(1f), data.StrikePose(caster, areaCenter), ~0, QueryTriggerInteraction.Collide,
             new Collider[32], c => roots.Contains(c.gameObject) ? c.gameObject : null, new HashSet<Object>(), hits);
-        CollectionAssert.AreEquivalent(new Object[] { inside, rim }, hits.Select(h => h.Target).ToArray());
+        CollectionAssert.AreEquivalent(new Object[] { inside, rim, diagonal, big }, hits.Select(h => h.Target).ToArray());
 
-        // 예전 = 원기둥 외접 상자 겹침 + AABB 원 거름 — 모서리·발밑 겹침 큰 몸도 맞혔다.
+        // 예전 = 원기둥 외접 상자 겹침 + AABB 원 거름 — 몸이 원에 안 닿는 AABB 모서리(corner)도 맞혔다. 남은 차이는 이것 하나(attack-shapes.md §9).
         SkillHitVolume old = SkillHitVolume.CircleColumn(areaCenter, 2f, OldAreaHeight, ~0);
         var buffer = new Collider[32];
         int count = old.Overlap(buffer, ~0, QueryTriggerInteraction.Collide);
         var oldAccepted = buffer.Take(count).Where(c => old.Accepts(c.bounds)).Select(c => c.gameObject).ToList();
-        CollectionAssert.IsSubsetOf(new[] { inside, rim, corner, big }, oldAccepted);
+        CollectionAssert.IsSubsetOf(new[] { inside, rim, diagonal, corner, big }, oldAccepted);
     }
 }

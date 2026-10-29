@@ -39,12 +39,69 @@ public sealed class AttackSectorShape : AttackShape
         float distance = local.magnitude;
         if (distance > range + Epsilon || distance < minOffset - Epsilon)
             return false;
-        // 꼭짓점(발밑 겹침)은 방향이 없다 — 찬 부채꼴이면 안(예전 진격의 충격 QBlastInSector 와 같다).
+        // 꼭짓점은 방향이 없다 — 찬 부채꼴이면 안.
         if (angle >= 360f || distance < Epsilon)
             return true;
 
         float half = Mathf.Clamp(angle, 0f, 360f) * 0.5f;
         return Vector2.Angle(Vector2.up, local) <= half + AngleEpsilon;
+    }
+
+    public override Vector2 ClosestLocal(Vector2 local)
+    {
+        if (ContainsLocal(local))
+            return local;
+
+        float r = Mathf.Max(0f, range);
+        float inner = Mathf.Clamp(minOffset, 0f, r);
+        float half = Mathf.Clamp(angle, 0f, 360f) * 0.5f;
+        // 각 안 — 거리만 [minOffset, range] 로.
+        if (angle >= 360f || (local.sqrMagnitude >= 1e-12f && Vector2.Angle(Vector2.up, local) <= half))
+            return ClosestInRing(local, inner, r);
+
+        // 각 밖 — 두 옆 변(minOffset → range, 호 끝점 포함) 중 가까운 쪽.
+        float rad = half * Mathf.Deg2Rad;
+        var right = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad));
+        var left = new Vector2(-right.x, right.y);
+        Vector2 onRight = ClosestOnSegment(local, right * inner, right * r);
+        Vector2 onLeft = ClosestOnSegment(local, left * inner, left * r);
+        return (onRight - local).sqrMagnitude <= (onLeft - local).sqrMagnitude ? onRight : onLeft;
+    }
+
+    // 180° 넘는(360 미만) 부채꼴은 볼록이 아니라 정면 기준 오른쪽·왼쪽 반으로 나눈다.
+    public override int ConvexPieceCount => angle > 180f && angle < 360f ? 2 : 1;
+
+    public override bool HasHole => minOffset > Epsilon;
+
+    public override Vector2 SupportLocal(int piece, Vector2 direction)
+    {
+        float r = Mathf.Max(0f, range);
+        if (angle >= 360f)
+            return CircleSupport(direction, r);
+
+        float half = Mathf.Clamp(angle, 0f, 360f) * 0.5f;
+        float from = -half, to = half;
+        if (ConvexPieceCount == 2)
+        {
+            if (piece == 0) from = 0f;
+            else to = 0f;
+        }
+
+        // 꼭짓점·호 두 끝, 방향이 호 안이면 그 방향 호 위 점.
+        Vector2 best = FarthestOf(direction, Vector2.zero, Edge(from) * r, Edge(to) * r);
+        if (direction.sqrMagnitude >= 1e-12f)
+        {
+            float bearing = Mathf.Atan2(direction.x, direction.y) * Mathf.Rad2Deg; // + = 오른쪽
+            if (bearing >= from && bearing <= to)
+                best = direction.normalized * r;
+        }
+        return best;
+    }
+
+    private static Vector2 Edge(float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        return new Vector2(Mathf.Sin(rad), Mathf.Cos(rad));
     }
 
     public override void GetLocalBounds(out Vector2 min, out Vector2 max)
@@ -131,6 +188,16 @@ public sealed class AttackCircleShape : AttackShape
         return distance <= radius + Epsilon && distance >= minRadius - Epsilon;
     }
 
+    public override Vector2 ClosestLocal(Vector2 local)
+    {
+        float r = Mathf.Max(0f, radius);
+        return ClosestInRing(local, Mathf.Clamp(minRadius, 0f, r), r);
+    }
+
+    public override bool HasHole => minRadius > Epsilon;
+
+    public override Vector2 SupportLocal(int piece, Vector2 direction) => CircleSupport(direction, Mathf.Max(0f, radius));
+
     public override void GetLocalBounds(out Vector2 min, out Vector2 max)
     {
         float r = Mathf.Max(0f, radius);
@@ -185,6 +252,18 @@ public sealed class AttackRectShape : AttackShape
 
     public override bool ContainsLocal(Vector2 local) =>
         local.y <= length + Epsilon && local.y >= -backOffset - Epsilon && Mathf.Abs(local.x) <= width * 0.5f + Epsilon;
+
+    public override Vector2 ClosestLocal(Vector2 local)
+    {
+        GetLocalBounds(out Vector2 min, out Vector2 max);
+        return new Vector2(Mathf.Clamp(local.x, min.x, max.x), Mathf.Clamp(local.y, min.y, max.y));
+    }
+
+    public override Vector2 SupportLocal(int piece, Vector2 direction)
+    {
+        GetLocalBounds(out Vector2 min, out Vector2 max);
+        return new Vector2(direction.x >= 0f ? max.x : min.x, direction.y >= 0f ? max.y : min.y);
+    }
 
     public override void GetLocalBounds(out Vector2 min, out Vector2 max)
     {
@@ -242,6 +321,35 @@ public sealed class AttackTriangleShape : AttackShape
 
         float halfAt = width * 0.5f * Mathf.Clamp01(local.y / length);
         return Mathf.Abs(local.x) <= halfAt + Epsilon;
+    }
+
+    public override bool IsEmpty => !(length > 0f);
+
+    public override Vector2 SupportLocal(int piece, Vector2 direction)
+    {
+        float l = Mathf.Max(0f, length);
+        float halfWidth = Mathf.Max(0f, width) * 0.5f;
+        return FarthestOf(direction, Vector2.zero, new Vector2(-halfWidth, l), new Vector2(halfWidth, l));
+    }
+
+    public override Vector2 ClosestLocal(Vector2 local)
+    {
+        if (ContainsLocal(local))
+            return local;
+
+        // 세 변 중 가까운 쪽. 길이 0 이면 판정 없음(IsEmpty) — 꼭짓점을 돌려줘도 겹침이 아니다.
+        float l = Mathf.Max(0f, length);
+        float halfWidth = Mathf.Max(0f, width) * 0.5f;
+        var baseLeft = new Vector2(-halfWidth, l);
+        var baseRight = new Vector2(halfWidth, l);
+        Vector2 best = ClosestOnSegment(local, Vector2.zero, baseLeft);
+        Vector2 candidate = ClosestOnSegment(local, baseLeft, baseRight);
+        if ((candidate - local).sqrMagnitude < (best - local).sqrMagnitude)
+            best = candidate;
+        candidate = ClosestOnSegment(local, baseRight, Vector2.zero);
+        if ((candidate - local).sqrMagnitude < (best - local).sqrMagnitude)
+            best = candidate;
+        return best;
     }
 
     public override void GetLocalBounds(out Vector2 min, out Vector2 max)
