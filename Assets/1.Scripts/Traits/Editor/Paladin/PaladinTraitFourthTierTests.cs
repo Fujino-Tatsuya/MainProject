@@ -364,7 +364,7 @@ public sealed class PaladinTraitFourthTierTests
         Assert.AreEqual(PaladinTraitValues.QBlastKey, blast.Key);
         Assert.AreEqual(0.3f, blast.DamageRatio, Eps);
         Assert.AreEqual(2f, blast.Radius, Eps, "반경 2m");
-        Assert.AreEqual(1f, blast.ForwardOffset, Eps, "전방 1m 꼭짓점");
+        Assert.AreEqual(0f, blast.ForwardOffset, Eps, "꼭짓점 = Q 끝 지점(전방 밀기 없음)");
         Assert.AreEqual(90f, blast.Angle, Eps, "90° 부채꼴(할 일 146)");
         Assert.AreEqual(0.05f, blast.Delay, Eps);
         Assert.IsTrue(blast.Counter.Tick() && blast.Counter.Tick(), "매 정상 종료마다(N번마다 아님)");

@@ -32,6 +32,6 @@ MonoBehaviour:
         damageRatio: 0.3
         delay: 0.05
         radius: 2
-        forwardOffset: 1
+        forwardOffset: 0
         angle: 90
         requiredCount: 1
