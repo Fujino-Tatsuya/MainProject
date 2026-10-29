@@ -110,8 +110,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -22.5}
-  m_SizeDelta: {x: 64, y: 16}
+  m_AnchoredPosition: {x: 0, y: -38}
+  m_SizeDelta: {x: 845, y: 27}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3745992953613626497
 CanvasRenderer:
@@ -150,7 +150,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1.25
+  m_PixelsPerUnitMultiplier: 0.74
 --- !u!1 &7238892783165824184
 GameObject:
   m_ObjectHideFlags: 0
@@ -225,7 +225,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1.25
+  m_PixelsPerUnitMultiplier: 0.74
 --- !u!1 &7723439157690393187
 GameObject:
   m_ObjectHideFlags: 0
@@ -643,7 +643,12 @@ MonoBehaviour:
   suppressSegmentTemplate: {fileID: 2242345262937056144}
   suppressSegmentFill: {fileID: 4100741899494714415}
   suppressSegmentGap: 8
-  suppressRowWidth: 0
+  suppressRowSlot: {fileID: 2090647673521643858}
+  suppressRowSlotPixels:
+    x: 57
+    y: 45
+    width: 812
+    height: 16
   delayed:
     delayedFill: {fileID: 5666655772580648192}
     holdSeconds: 0.4

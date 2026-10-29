@@ -4,11 +4,48 @@ namespace VeyTrace.UI
 {
     /// <summary>
     /// 보스 제압 칸 줄의 배치·표시 규칙(BossHealthHUD 가 쓴다). 칸은 가로 한 줄, 원본 자리를 가운데로 좌우 대칭.
-    /// 줄 폭은 고정(기본 = HP 바 폭)이고 칸 수로 N등분한다(할 일 151): 칸 폭 = (줄 폭 − 간격×(N−1)) / N.
-    /// 왼쪽부터 찬 칸이고, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다.
+    /// 줄 영역 = 보스 정보 슬롯 이미지(slot_boss_info)의 아래칸 자리(할 일 151 후속, 10-30)이고 칸 수로 N등분한다:
+    /// 칸 폭 = (줄 폭 − 간격×(N−1)) / N. 왼쪽부터 찬 칸이고, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다.
     /// </summary>
     public static class BossSuppressCellLayout
     {
+        /// <summary>칸 줄 전체 영역(px) — 슬롯 사각형 가운데 기준 가운데 좌표와 크기(반올림 전).</summary>
+        public readonly struct RowArea
+        {
+            public readonly float CenterX;
+            public readonly float CenterY;
+            public readonly float Width;
+            public readonly float Height;
+
+            public RowArea(float centerX, float centerY, float width, float height)
+            {
+                CenterX = centerX;
+                CenterY = centerY;
+                Width = width;
+                Height = height;
+            }
+
+            /// <summary>칸 높이(정수 px).</summary>
+            public float PixelHeight => Px(Height);
+        }
+
+        /// <summary>
+        /// 슬롯 이미지 안의 픽셀 영역(왼쪽 위 원점, x·y·폭·높이) → 슬롯 사각형 가운데 기준 HUD 좌표(위가 +y).
+        /// 슬롯 Image 가 이미지를 사각형에 꽉 늘려 그린다고 본다(Type Simple, Preserve Aspect 끔) — 가로·세로 배율이 따로다.
+        /// 이미지나 슬롯 크기가 0 이면 빈 영역.
+        /// </summary>
+        public static RowArea SlotPixelsToRow(float imageWidth, float imageHeight, float slotWidth, float slotHeight,
+            float pixelX, float pixelY, float pixelWidth, float pixelHeight)
+        {
+            if (imageWidth <= 0f || imageHeight <= 0f || slotWidth <= 0f || slotHeight <= 0f) return default;
+
+            float sx = slotWidth / imageWidth;
+            float sy = slotHeight / imageHeight;
+            float centerX = (pixelX + pixelWidth * 0.5f - imageWidth * 0.5f) * sx;
+            float centerY = (imageHeight * 0.5f - (pixelY + pixelHeight * 0.5f)) * sy;
+            return new RowArea(centerX, centerY, Math.Max(0f, pixelWidth) * sx, Math.Max(0f, pixelHeight) * sy);
+        }
+
         /// <summary>한 칸의 좌우 끝(px, 줄 가운데 기준). 정수 픽셀로 맞춘 값.</summary>
         public readonly struct CellSpan
         {
