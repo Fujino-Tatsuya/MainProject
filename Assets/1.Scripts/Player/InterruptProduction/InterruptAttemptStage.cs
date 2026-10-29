@@ -29,8 +29,9 @@ public sealed class InterruptAttemptStage
         SlowMotionProfile profile = InterruptProductionRules.SelectAttemptProfile(purpose, _settings);
 
         // 히트스톱 칸은 시도 슬로우에도 지금처럼 넘긴다(시도 프로필 hitStopDuration 기본 0 — 동작 동일).
+        // 대상 id = 예측이 고른 대상 — 각 피어 로컬 선착순 장부가 강 시도로 그 창을 닫는다(할 일 143-2).
         return _timeScale.ServerStart(profile, e.CasterClientId, purpose, default(Vector3),
-            _settings.Get(InterruptProductionCue.HitStop));
+            _settings.Get(InterruptProductionCue.HitStop), e.TargetObjectId);
     }
 
     /// <summary>

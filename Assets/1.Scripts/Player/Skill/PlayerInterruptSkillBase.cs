@@ -47,6 +47,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // 이번 판정에서 카운터 창을 소비한 첫 대상의 월드 위치 — 성공 연출 기준점(할 일 87 C5). 기록만 하고 판정엔 안 쓴다.
     private bool hasSuccessTargetPosition;
     private Vector3 successTargetPosition;
+    private ulong successTargetObjectId;
     // 간파 선착순(할 일 143, 서버) — 이 시전의 서버 시작 시각. 다른 사람이 먼저 성공시킨 창이면 이 시각으로 '같은 창 시도'를 가린다.
     private float serverCastStartTime;
 
@@ -393,7 +394,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount, resolvePreempted));
         if (interruptSucceeded)
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
-                hasSuccessTargetPosition, successTargetPosition));
+                hasSuccessTargetPosition, successTargetPosition, hasSuccessTargetPosition ? successTargetObjectId : 0));
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -548,7 +549,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         hasSuccessTargetPosition = true;
         successTargetPosition = target.transform.position;
+        successTargetObjectId = TargetObjectIdOf(target);
     }
+
+    // 로컬 선착순 장부 키(할 일 143-2) — 슬로우 이벤트에 실을 대상 NetworkObjectId. 없거나 스폰 전이면 0(= 없음).
+    private static ulong TargetObjectIdOf(Unit target) =>
+        target != null && target.IsSpawned ? target.NetworkObjectId : 0;
 
     // ── 인터럽트 슬로우 모션 (서버) ──
 
@@ -561,9 +567,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         DashInterruptPrediction prediction = DashInterruptPredictor.Predict(BuildPredictInput(false, attachedToDash,
-            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f, out _));
+            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f, out Unit predictTarget));
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
-            InterruptProductionEvent.Attempt(owner, this, prediction.Forecast)));
+            InterruptProductionEvent.Attempt(owner, this, prediction.Forecast, TargetObjectIdOf(predictTarget))));
     }
 
     /// <summary>
@@ -633,9 +639,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                 continue;
 
             // 서버는 선착순 장부도 본다(할 일 143) — 남이 먼저 성공시킨 창은 닫힌 것처럼 예측(강 시도 슬로우 없음).
-            // 오너는 장부가 없다 — 지금 대상은 첫 성공 순간 창을 닫아 복제값이 닫힘으로 바뀐다(§0.10).
+            // 오너는 로컬 선착순 장부(할 일 143-2)를 본다 — 남의 강 시도·성공을 이미 받은 창은 닫힌 것처럼 예측(약 — 오너 암전·빛 모임·섬광 없음).
+            // 근접·대쉬 간파, 모든 캐릭터가 이 한 곳을 지난다(§0.10).
             bool unitOpen = ownerView
-                ? entry.Replica != null && entry.Replica.ReplicatedWindowOpen
+                ? entry.Replica != null && entry.Replica.ReplicatedWindowOpen &&
+                  !InterruptLocalWindowClaims.Local.IsClosed(TargetObjectIdOf(unit))
                 : entry.Target.ServerIsInterruptible && InterruptWindowClaims.Server.Evaluate(
                     unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) != InterruptClaimVerdict.Preempted;
             if (best == null || (unitOpen && !open))

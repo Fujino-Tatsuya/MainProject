@@ -518,11 +518,16 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
 
-    private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
+    private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition, ulong targetObjectId)
     {
         // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다 — 옛 InterruptDarkAdaptation 과 같다.
         bool hasViewer = _networkManager != null;
         bool viewerIsCaster = hasViewer && InterruptProductionRules.IsCasterView(casterClientId, _networkManager.LocalClientId);
+
+        // 로컬 선착순(할 일 143-2) — 남의 강 시도·성공이면 그 대상의 이 창을 이 피어에서 닫는다. 이후 내 입력 예측은 약(오너 암전·빛 모임·섬광 없음).
+        // 판정은 서버 장부(InterruptWindowClaims) 그대로 — 여기는 오너 연출만 1차로 막는다.
+        if (hasViewer)
+            InterruptLocalWindowClaims.Local.Observe(targetObjectId, casterClientId, purpose, _networkManager.LocalClientId);
 
         // 오너 연출(할 일 132) — 내 슬로우만(팀원 화면은 시도 단계 무변화). 시도 목적이 예측과 다르면 걷고, 성공이면 성공 단계로.
         if (viewerIsCaster)
