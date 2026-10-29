@@ -41,6 +41,7 @@
 | Insert | 존별 성능 누적 초기화 | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
 | F9 / Shift+F9 | 가장 가까운 몬스터 / 전부 즉사 (호스트) | `Utility/DevMonsterKill.cs` (자동 생성) | DEV_HOTKEYS | ✗ |  |
 | F10 | 디버그 부활(로컬 오너, 소울 상태일 때) | `Player/Life/PlayerReviveController.cs` (Player 프리팹) | 없음 | ✓ | |
+| F11 | 보스 막타 직전까지 자동 진행(호스트) — 어디서든: 튜토리얼 중이면 게이트 G10 까지 강제 개방 + 단계 보스 진입(디버그 메뉴 경로, 한 프레임 — 순서 규칙에 막힐 때만 Alt+8 경로) → 엘리베이터 스킵(정상 엘리베이터 경로에 시작 시각만 마지막 페이드 직전으로 당김 — 카메라 복귀도 정상 경로) → 등장 연출 스킵(전원 동의 스킵 경로) → 전투 시작 뒤 23호 남은 HP 페이즈 기믹·0줄 자폭을 끝난 것으로 두고 HP 1. 다음 한 대가 실제 처치(보스 B 승리 연출 테스트). 진행 중인 엘리베이터·기믹은 끝나길 기다림, 60초 제한 | `Dev/DevBossFinalBlow.cs` (자동 생성) + `TwentyThreeBoss.DevPrepareFinalBlowServer` · `BossTeleportManager.DevStartElevatorSkippedServer` · `Map/BossEncounterDirector.Dev.cs` | DEV_HOTKEYS | — (신규, 10-27) | |
 | F12 | 조각 폭발(FragmentExploder 가 붙은 오브젝트 전부) | `fragments/FragmentExploder.cs` | 없음 | ✓ | |
 | Alt+1~9, Alt+0 | 튜토리얼 구간 스킵 / Alt+0 판 재시작 (호스트, 튜토리얼 중) | `Map/MapScene/MapSceneSkipController.cs` (+ `MapSceneDirector.Skip.cs`·`MapSceneDebugActions.cs`·`Flow/MapSceneTraitCorridorFlow.cs`) | DEV_HOTKEYS | ✗ | Alt+1~3 — 로비 예외 상황(씬이 달라 실제로는 안 겹침: 이쪽은 맵 씬 튜토리얼 중만) |
 | Alt+1 | **로비(3.LobbyScene)** 튜토리얼 클리어 플래그 켜기/끄기 — 누른 사람만(서버 확정·복제). 켜면 훈련 명단·훈련 내부 집결에서 빠지고 출격 집결엔 남는다, 끄면 다음 회차부터 다시 훈련. 훈련을 끝까지 해도(종료 집결 확정) 같은 플래그가 켜지므로, 그 뒤 누르면 **끈다**. 규칙 [lobby-training.md](lobby-training.md) "튜토리얼 클리어 플래그" | `Lobby/LobbyRecoveryHotkeys.cs` (자동 생성 — 진행기에 붙음) + `Lobby/LobbyTrainingDirector.Recovery.cs`(RPC) · 표 `Lobby/LobbyRecoveryHotkeyRules.cs` | DEV_HOTKEYS | — (신규, 할 일 112) | Alt+1 — 튜토리얼 스킵(맵 씬만) |
@@ -52,7 +53,7 @@
 
 파일 경로는 `Assets/1.Scripts/` 기준.
 
-- 23호 예약(F3)은 `TwentyThreeBoss.cs` 의 `DevReserveJumpCombo`·`ConsumeDevReservation` 블록(같은 게이트)을 쓴다. 단타 예약 5종(F3 훅·Shift+F3·F4·F6·F9·F11)은 2026-10-20 경석 요청으로 걷어 냈다 — F11 은 비어 있다(F4 는 10-22 보스 체력 10% 깎기, F6 은 10-26 보스방 지정 위치 이동(할 일 102)으로 씀).
+- 23호 예약(F3)은 `TwentyThreeBoss.cs` 의 `DevReserveJumpCombo`·`ConsumeDevReservation` 블록(같은 게이트)을 쓴다. 단타 예약 5종(F3 훅·Shift+F3·F4·F6·F9·F11)은 2026-10-20 경석 요청으로 걷어 냈다 — F11 은 10-27 23호 막타 준비로 다시 씀(F4 는 10-22 보스 체력 10% 깎기, F6 은 10-26 보스방 지정 위치 이동(할 일 102)으로 씀).
 - **겹침은 표시만 했다** — 코드는 고치지 않았다.
   F8·F7 은 둘 다 씬에 붙어 있을 때만 겹친다. `[ ]` 는 관전 모드이고 미니맵이 슬롯 밖일 때만 겹친다.
 - 일반 조작 키(ESC·이동·스킬·F 상호작용·Alt+Enter 창 모드 등)는 디버그 단축키가 아니라 제외했다.

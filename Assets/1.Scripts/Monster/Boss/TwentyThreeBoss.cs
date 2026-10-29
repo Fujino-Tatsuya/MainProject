@@ -6068,6 +6068,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             _selfDestructShield01.Value = _selfDestructShieldTotal > 0 ? (float)_selfDestructShieldLeft / _selfDestructShieldTotal : 0f;
         }
 
+        // 승리 연출 막타(PLAN-boss-victory-cinematic C1·C3) — HP 또는 자폭 실드에 피해를 준 마지막 플레이어.
+        // 🔴 base **전에** 기록한다: Died 가 base 안에서 먼저 터진다. 0줄 자폭은 실드 파괴 뒤 공격자 없는 처치라 여기서 남긴 값을 쓴다.
+        if (IsServer && rawDamage > 0 && CurrentHealth > 0 && IsFromPlayer(hitContext))
+            RecordVictoryHit(hitContext);
+
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
         if (IsServer && resolved && IsFromPlayer(hitContext))
@@ -6081,6 +6086,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             _fightCounters++;
             _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 ReceiveAttack 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
             EnterCounterSuccess();
+            // 간파 피격 클립을 트는 그로기일 때만 두 발짝 뒤로(경석 10-29) — 제압·기믹 처리(릴레이·구출 등)는 그 자리.
+            if (_parryHitGroggy.Value && State == MonsterState.Groggy)
+                StartParryRetreat();
             CombatStatsEvents.RaiseServerCounterSucceeded(this, GetAttackerClientId(hitContext)); // 결과 화면 통계(판정 무관)
 
             // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
@@ -6395,6 +6403,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     bool _environmentConsumed;           // [서버] 이번 취약에서 환경 상호작용을 이미 썼나(§6.1 최초 1회)
 
     bool _kbActive, _kbRebound;          // [서버] 넉백 / 벽 반동 진행 중
+    bool _kbParryRetreat;                // [서버] 지금 넉백이 간파 후퇴인가 — 벽 보상 없음·끝나도 취약·그로기 무관(경석 10-29)
     Vector3 _kbDir;
     float _kbLeft, _kbSpeed;
     int _kbFrame = -1;                   // 같은 틱 여러 적중 → 첫 적중만 넉백(§5.3)
@@ -6436,6 +6445,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     float VulnerableDuration => _boss != null ? Mathf.Max(0f, _boss.vulnerableDuration) : 4f;
     float KnockbackDistance => _boss != null ? Mathf.Max(0f, _boss.vulnerableKnockbackDistance) : 3f;
     float KnockbackTime => _boss != null ? Mathf.Max(0.01f, _boss.vulnerableKnockbackTime) : 0.35f;
+    float ParryRetreatDistance => _boss != null ? Mathf.Max(0f, _boss.parryRetreatDistance) : 2f;
+    float ParryRetreatTime => _boss != null ? Mathf.Max(0.01f, _boss.parryRetreatTime) : 0.5f;
     float ReboundDistance => _boss != null ? Mathf.Max(0f, _boss.wallReboundDistance) : 0.5f;
     float ReboundTime => _boss != null ? Mathf.Max(0.01f, _boss.wallReboundTime) : 0.3f;
 
@@ -6504,11 +6515,37 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         _kbActive = true;
         _kbRebound = false;
+        _kbParryRetreat = false;   // 후퇴 중 다음 적중이면 취약 넉백이 이어받는다(새 방향 3m)
         _kbDir = dir;
         _kbLeft = KnockbackDistance;
         _kbSpeed = KnockbackDistance / KnockbackTime;
         if (agent != null && agent.enabled && agent.isOnNavMesh) { agent.ResetPath(); agent.velocity = Vector3.zero; }
         Debug.Log($"[23호] 취약 넉백 — {KnockbackDistance:0.#}m / {KnockbackTime:0.##}초", this);
+    }
+
+    /// <summary>
+    /// [서버] 일반 간파 성공 후퇴 — 간파 피격 클립이 제자리라 몸을 등 쪽으로 <c>parryRetreatDistance</c> 민다(경석 10-29).
+    /// 취약 넉백과 같은 이동(<see cref="TickVulnerableKnockback"/>)을 쓰되 벽에선 멈추기만 한다 — 간파 직후 취약이 켜져 있어
+    /// 그대로 두면 후퇴만으로 벽 보상(칸 소비)이 터진다.
+    /// </summary>
+    void StartParryRetreat()
+    {
+        float dist = ParryRetreatDistance;
+        if (dist <= 0f) return;
+        Vector3 dir = -transform.forward;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
+        dir.Normalize();
+
+        _kbFrame = Time.frameCount;   // 같은 처리 시점의 다른 적중(다단 히트)이 취약 넉백으로 덮지 않게
+        _kbActive = true;
+        _kbRebound = false;
+        _kbParryRetreat = true;
+        _kbDir = dir;
+        _kbLeft = dist;
+        _kbSpeed = dist / ParryRetreatTime;
+        if (agent != null && agent.enabled && agent.isOnNavMesh) { agent.ResetPath(); agent.velocity = Vector3.zero; }
+        Debug.Log($"[23호] 간파 후퇴 — {dist:0.#}m / {ParryRetreatTime:0.##}초", this);
     }
 
     // 진행 중 **일반** 공격을 끊는다(잡기면 그 자리 해제 — D9). 그로기면 변위만(타이머 불변).
@@ -6543,6 +6580,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         float step = Mathf.Min(_kbLeft, _kbSpeed * dt);
         Vector3 delta = _kbDir * step;
+
+        // 간파 후퇴는 벽에서 멈추기만 한다 — 아래 벽 보상으로 내려가지 않게 먼저 끊는다.
+        if (_kbParryRetreat && HitsArenaWall(transform.position + delta, _kbDir))
+        {
+            FinishVulnerableKnockback("간파 후퇴 종료(벽)");
+            return;
+        }
 
         // 외곽 벽: 넉백(반동 아님) 중 · 취약 중 · 이번 취약에서 처음일 때만(§6.1·§6.2·§5.4).
         if (!_kbRebound && IsVulnerable && !_environmentConsumed && HitsArenaWall(transform.position + delta, _kbDir))
@@ -6584,8 +6628,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     void FinishVulnerableKnockback(string why)
     {
         bool hitWall = _kbRebound;   // 반동 = 벽 충돌 뒤에만 들어간다(TickVulnerableKnockback)
+        bool parryRetreat = _kbParryRetreat;
         _kbActive = false;
         _kbRebound = false;
+        _kbParryRetreat = false;
+        if (parryRetreat)   // 간파 후퇴는 취약·그로기를 건드리지 않는다
+        {
+            Debug.Log($"[23호] {(why == "넉백 종료" ? "간파 후퇴 종료" : why)}", this);
+            return;
+        }
         if (!IsServer || State == MonsterState.Dead || _suppressed) return;
 
         if (!hitWall)
@@ -6742,6 +6793,121 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     protected override bool KeepPrefabAgentRadius => true;
 
     // 플레이어 스킬은 대부분 sourceUnit 을 비우고 sourceTransform 에 시전자 루트를 싣는다(FirstMelee*Skill) — 둘 다 본다.
+    // ─── 승리 연출 막타 기록(서버) ─────────────────────────────────────────
+    bool _victoryHitValid;
+    ulong _victoryHitClientId = ulong.MaxValue;
+    Vector3 _victoryHitPoint;
+
+    /// <summary>[서버] 플레이어 피해 한 번 — 공격자·타격점(C2: 명중점이 문맥에 없어 보스 콜라이더의 공격자 쪽 가장 가까운 점으로 근사).</summary>
+    void RecordVictoryHit(AttackHitContext ctx)
+    {
+        ulong clientId = GetAttackerClientId(ctx);
+        if (clientId == ulong.MaxValue) return;
+
+        Vector3 from = ctx.sourceTransform != null ? ctx.sourceTransform.position : ctx.sourcePosition;
+        Collider body = ctx.hitCollider != null ? ctx.hitCollider : bodyCollider;
+        Vector3 point;
+        if (body != null && body.enabled)
+        {
+            // 공격자 가슴 높이에서 잰다 — 발 높이로 재면 보스 발목이 타격점이 된다.
+            Vector3 probe = from + Vector3.up * 1.2f;
+            point = body.ClosestPoint(probe);
+            if ((point - probe).sqrMagnitude < 0.0001f) point = body.bounds.center;   // 공격자가 콜라이더 안이면 중심
+        }
+        else
+        {
+            point = transform.position + Vector3.up * 1.5f;
+        }
+
+        _victoryHitValid = true;
+        _victoryHitClientId = clientId;
+        _victoryHitPoint = point;
+    }
+
+    /// <summary>[서버] 승리 연출 막타 — HP·자폭 실드에 마지막으로 피해를 준 플레이어와 그 타격점. 없으면 false.</summary>
+    public bool TryGetVictoryHit(out ulong clientId, out Vector3 hitPoint)
+    {
+        clientId = _victoryHitClientId;
+        hitPoint = _victoryHitPoint;
+        return _victoryHitValid;
+    }
+
+    /// <summary>[서버] 승리 연출 슬로모션 구간(0.12~2.00)엔 사망 클립·디졸브 대기가 클라 애니와 같은 배율로만 흐른다(C6, 경석 10-27).</summary>
+    protected override float DeathPresentationTimeScale =>
+        BossEncounterDirector.Instance != null && BossEncounterDirector.Instance.IsVictoryWorldFrozenFor(this)
+            ? BossVictoryConfig.Load().slowMotionScale
+            : 1f;
+
+    // 승리 연출 대상(보스 B)일 수 있는 건 23호뿐 — 대기를 프레임 단위로 센다. 연출이 없으면 멈춤이 0 이라 결과는 같다.
+    protected override bool CanPauseDeathPresentation => true;
+
+    /// <summary>
+    /// [이 피어] 승리 연출 시작 — 보스의 공격·타격·예고 이펙트를 전부 걷는다(경석 10-27: 훅 도중 처치되면 이펙트가 연출 컷에 남았다).
+    /// 소켓 이펙트(훅·어퍼 타격·돌진 궤적·실드 등) · 보스를 추종하는 EffectManager 이펙트 · 착지 예고 원 · 차징 오라 · 몸에 붙은 파티클.
+    /// 디졸브 파티클은 이 뒤에 생기므로 영향이 없다. 반환 = 걷은 EffectManager 이펙트 수(진단).
+    /// </summary>
+    public int StopPresentationEffectsLocal()
+    {
+        int released = 0;
+        if (EffectManager.TryGet(out EffectManager effects, this))
+        {
+            effects.ReleaseImmediate(_boundaryHandle);
+            effects.ReleaseImmediate(_indicatorHandle);
+            released = effects.ReleaseAllFollowingImmediate(transform);
+        }
+        _boundaryHandle = EffectHandle.None;
+        _indicatorHandle = EffectHandle.None;
+
+        foreach (EffectSocketPlayer socket in GetComponentsInChildren<EffectSocketPlayer>(true))
+            if (socket != null) socket.Stop();
+        foreach (ParticleSystem ps in GetComponentsInChildren<ParticleSystem>(true))
+            if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        if (_chargeAuraTelegraph != null) _chargeAuraTelegraph.Hide();
+        // 바닥 예고 — 훅·어퍼·돌진 부채꼴(피어마다 RPC 로 생긴다) · 점프 착지 원.
+        BossAttackConeTelegraph cone = _attackCone != null ? _attackCone : GetComponent<BossAttackConeTelegraph>();
+        if (cone != null) cone.Hide();
+        if (_c3JumpTelegraph != null) { _c3JumpTelegraph.SetActive(false); Destroy(_c3JumpTelegraph); _c3JumpTelegraph = null; }
+        return released;
+    }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    /// <summary>
+    /// [서버] 개발용 막타 준비(F11 — <c>DevBossFinalBlow</c>, 경석 10-27): 남은 HP 페이즈 기믹을 전부 끝난 것으로, 0줄 자폭도 끝난 것으로 두고
+    /// 체력을 1 로 만든다 → **다음 한 대가 실제 처치**(막타 기록·승리 연출·사망 보류·결과 화면이 실제와 같다).
+    /// 기믹·자폭이 진행 중이면 상태가 꼬이므로 거절한다(ok = false — F11 이 끝나길 기다렸다 다시 부른다). 반환 = 결과 한 줄.
+    /// </summary>
+    public string DevPrepareFinalBlowServer(out bool ok)
+    {
+        ok = false;
+        if (!IsServer) return "서버가 아니다";
+        if (State == MonsterState.Dead || CurrentHealth <= 0) return "이미 죽었다";
+        if (IsInGimmick || _raidSelfDestruct || _zeroGuard == ZeroGuard.Reserved || _zeroGuard == ZeroGuard.Active || _zeroGuard == ZeroGuard.Exploding)
+            return "기믹·자폭 진행 중 — 끝나길 기다린다";
+        ok = true;
+
+        // 1) HP 페이즈 — 마지막 페이즈까지 들어간 것으로(배율도 마지막 페이즈), 예약된 기믹은 버린다.
+        BossPhaseEntry[] phases = _boss != null ? _boss.phases : null;
+        int last = phases != null ? phases.Length : 0;
+        int skipped = _pendingPhaseSequences.Count;
+        _pendingPhaseSequences.Clear();
+        if (CurrentPhase < last)
+        {
+            CurrentPhase = last;
+            OnPhaseEntered(last);
+        }
+
+        // 2) 0줄 자폭 — 끝난 것으로(Done = 다음 치명타는 보호 없이 사망).
+        _zeroGuard = ZeroGuard.Done;
+        _pendingSuppress = false;
+
+        // 3) 체력 1 — 방어력·실드 무시 직접 피해(Done 이라 HP 1 보호에 안 걸린다).
+        int before = CurrentHealth;
+        if (CurrentHealth > 1) ApplyDirectHealthDamage(CurrentHealth - 1);
+        FightLog("[Dev] 막타 준비 — 페이즈·자폭 완료, HP 1");
+        return $"HP {before} → {CurrentHealth}/{FinalMaxHp} · 페이즈 {CurrentPhase}/{last} · 버린 예약 기믹 {skipped}개 · 자폭 완료";
+    }
+#endif
+
     static bool IsFromPlayer(AttackHitContext ctx) =>
         ctx.sourceUnit is Player ||
         (ctx.sourceTransform != null && ctx.sourceTransform.GetComponentInParent<Player>() != null);
@@ -6764,6 +6930,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             _pendingSuppress = false;
             EndVulnerable("사망");
             _kbActive = false;
+            _kbParryRetreat = false;
         }
     }
 
