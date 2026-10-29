@@ -139,6 +139,9 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Reliable)]
     void PlayDissolveRpc() => PlayLocal();
 
+    /// <summary>[이 피어] 디졸브가 시작됐는가. 보스 B 승리 연출이 이 순간 회색 인물·주황 배경을 원래 색으로 돌린다(PLAN-boss-victory-cinematic).</summary>
+    public bool HasStarted => _played;
+
     void PlayLocal()
     {
         if (_played) return;   // 재전송·재진입 방어

@@ -271,6 +271,19 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     protected ulong DamageAttackerClientId => _damageAttackerClientId;
 
     /// <summary>
+    /// [서버] 파생이 <see cref="Health"/> 밖에서 직접 흡수한 보호막 피해(23호 자폭 실드)를 피해 숫자로 알린다.
+    /// 그 몫은 base.ReceiveAttack 전에 attackInfo.damage 에서 빠지므로 <see cref="ApplyHealthDamage"/> 의 RPC 에 안 실린다.
+    /// 같은 RPC 의 Shield 채널로 보낸다 — 공격자 귀속·표시 필터·누적 키는 일반 보호막 피해와 같다(141).
+    /// </summary>
+    protected void ReportAbsorbedShieldDamage(int amount, AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        if (!IsServer || !IsSpawned || amount <= 0) return;
+
+        ClientDamageDealtClientRpc(0, amount, ResolveAttackerClientId(hitContext),
+            (byte)attackInfo.attackType, (byte)attackInfo.hitPattern);
+    }
+
+    /// <summary>
     /// 피격 문맥의 공격자 clientId(플레이어가 아니면 ulong.MaxValue). <see cref="ReceiveAttack"/> 이 끝난 뒤처럼
     /// <see cref="DamageAttackerClientId"/> 가 이미 되돌려진 시점에 파생 클래스가 쓴다(23호 카운터 성공 통계).
     /// </summary>

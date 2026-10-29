@@ -86,9 +86,12 @@ public sealed class EnemyOutlineFeature : ScriptableRendererFeature
         };
     }
 
+    /// <summary>연출이 잠깐 끈다(보스 B 승리 연출 — 외곽선이 컷을 깬다, 경석 10-27).</summary>
+    public static bool SuppressedByCinematic;
+
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        if (_pass == null || _compositeMaterial == null || _maskPrimaryMaterial == null)
+        if (_pass == null || _compositeMaterial == null || _maskPrimaryMaterial == null || SuppressedByCinematic)
             return;
 
         // 칠할 대상이 없으면(대부분의 프레임) 마스크 RT 클리어와 합성을 통째로 건너뛴다.
