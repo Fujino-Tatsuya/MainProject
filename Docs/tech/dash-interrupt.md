@@ -103,6 +103,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
   - **AABB 거리 착시(할 일 139-4)** — 예측은 앵커 오버랩이라 영향 없었지만, HUD 강조와 랩 CSV 거리 열(`InterruptTargetRegistry.Entry.TryGetHorizontalDistance`)은 대상 콜라이더 **AABB** 까지 재서 대상이 월드 대각선에 있으면 최대 r(√2−1) 짧았다(23호 캡슐 r 1.7 → 0.70m, 거너 '1.73m' = 실제 2.1~2.4m). 이제 둘 다 `HorizontalDistanceToCollider` — `Collider.ClosestPoint`(질의점 높이 = 대상 AABB 중심 높이, 안이면 0, 트리거 포함). 비볼록 MeshCollider 등 ClosestPoint 미지원은 AABB 표면 근사. 테스트 `Assets/1.Scripts/Player/Editor/InterruptOmniRangeModelTests.cs`.
   - **보정 랩 재현**(§10.2 `InterruptCalibrationLab`, 어쌔신 또는 거너, `includeMelee` 켬 — 근접 간파): ⓐ 허수아비 정면에서 표면 1.6~1.75m(허수아비 중심에서 2.1~2.25m) 떨어져 허수아비 쪽으로 우클릭 · ⓑ 허수아비가 조준 방향과 75° 옆, 표면 1.3m 에서 우클릭. **수정 전 = 강(암전) + 서버 실패, 수정 후 = 대상 없음(연출 없음)**. 대조: 정면 1.5m·옆 75° 0.55m 는 강 + 서버 성공. 팔라딘은 정면 1.7~1.88m 띠가 같은 증상이다.
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
+  선착순 한 명(할 일 143)도 같은 `ResolveHit` 에서 거른다 — 같은 창 판정 기준 시각 = 승인(`OnServerStart`) 순간([interrupt-presentation.md §0.10](interrupt-presentation.md#010-선착순-한-명-할-일-143)).
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
 - 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
 - 캐릭터 이펙트(클립 이벤트)는 같은 클립을 상체 레이어에서 트므로 같이 나온다(§6 이벤트 중복 방지 참고).

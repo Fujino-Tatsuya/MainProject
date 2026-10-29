@@ -57,6 +57,19 @@ public class BossHealthHUD : MonoBehaviour
     [Tooltip("흰 구간 밖으로 빛이 번지는 폭(px). 바 높이 28 기준.")]
     [SerializeField, Min(1f)] private float introGlowSpread = 14f;
 
+    [Header("무적 잠김(할 일 147 — 보스가 피해를 안 받는 동안 바를 밝은 회색 + 자물쇠)")]
+    [Tooltip("바 가운데 자물쇠 아이콘(프리팹의 HP_LockIcon). 비우면 색만 바뀐다.")]
+    [SerializeField] private Image hpLockIcon;
+    [Tooltip("무적 동안 HP 채움 색. HP_Fill 모양 안에 이 색 덮개를 런타임 생성해 덮는다(스프라이트가 색이 칠해져 곱하기로는 회색이 안 나온다).")]
+    [SerializeField] private Color hpLockColor = new Color(0.902f, 0.902f, 0.902f, 1f);   // #E6E6E6
+    [Tooltip("무적이 풀릴 때 회색·자물쇠가 걷히는 시간(초). 0 = 즉시. 최대 0.2초.")]
+    [SerializeField, Range(0f, BossHpLockDisplay.MaxReleaseSeconds)] private float hpLockReleaseSeconds = 0.15f;
+    [Tooltip("해제 끝에서 자물쇠가 커지는 정도(0.3 = 1.3배까지 커지며 사라진다).")]
+    [SerializeField, Min(0f)] private float hpLockReleasePop = 0.3f;
+
+    private readonly BossHpLockDisplay hpLock = new BossHpLockDisplay();
+    private Image hpLockTint;
+
     private readonly BossHealthIntroFill introFill = new BossHealthIntroFill();
     private Unit introPlayedFor;              // 이 보스로 차오름을 한 번 했다(재도전 = 새 보스 인스턴스라 다시 한다)
     private bool wasShown;
@@ -83,6 +96,9 @@ public class BossHealthHUD : MonoBehaviour
 
         if (hpGradientEnabled)
             BuildHpGradient();
+
+        BuildHpLockTint();
+        ApplyHpLock(default);
     }
 
     private void OnDestroy()
@@ -114,6 +130,8 @@ public class BossHealthHUD : MonoBehaviour
             wasShown = false;
             introFill.Cancel();
             SetIntroLead(false, 0f, 0f, 0f);
+            hpLock.Reset();
+            ApplyHpLock(default);
             return;
         }
 
@@ -152,6 +170,48 @@ public class BossHealthHUD : MonoBehaviour
             bool show = shield01 > 0f;
             if (shieldFill.gameObject.activeSelf != show) shieldFill.gameObject.SetActive(show);
             if (show) shieldFill.fillAmount = Mathf.Clamp01(shield01);
+        }
+
+        // 무적 잠김 — 복제값(HpLocked). 웰즈는 23호 등에 탄 장식이라 자기 HP·무적이 없다 → 23호 값 하나로 충분.
+        bool locked = boundGaugeBoss != null && boundGaugeBoss.HpLocked;
+        ApplyHpLock(hpLock.Evaluate(locked, Time.unscaledDeltaTime, hpLockReleaseSeconds, hpLockReleasePop));
+    }
+
+    // ── 무적 잠김 ──────────────────────────────────────────────────────────
+    // HP_Fill 은 그라데이션 Mask 다(BuildHpGradient) — 그 안 맨 위에 단색 덮개를 깔아 채움 모양 그대로 회색으로 덮는다.
+    // 그라데이션을 끈 경우에도 덮개가 바 모양 밖으로 안 나가게 Mask 를 붙이되 원래 스프라이트는 그대로 그린다.
+    private void BuildHpLockTint()
+    {
+        if (hpFill == null) return;
+
+        Mask mask = hpFill.GetComponent<Mask>();
+        if (mask == null)
+        {
+            mask = hpFill.gameObject.AddComponent<Mask>();
+            mask.showMaskGraphic = true;
+        }
+
+        hpLockTint = NewImage("HP_LockTint", hpFill.rectTransform, null);   // 마지막 자식 = HP_Gradient 위
+        hpLockTint.gameObject.SetActive(false);
+    }
+
+    private void ApplyHpLock(BossHpLockDisplay.Frame frame)
+    {
+        bool tint = frame.Tint01 > 0f;
+        if (hpLockTint != null)
+        {
+            if (hpLockTint.gameObject.activeSelf != tint) hpLockTint.gameObject.SetActive(tint);
+            if (tint) hpLockTint.color = WithAlpha(hpLockColor, hpLockColor.a * frame.Tint01);
+        }
+
+        if (hpLockIcon != null)
+        {
+            if (hpLockIcon.gameObject.activeSelf != frame.ShowLock) hpLockIcon.gameObject.SetActive(frame.ShowLock);
+            if (frame.ShowLock)
+            {
+                hpLockIcon.color = WithAlpha(hpLockIcon.color, frame.LockAlpha);
+                hpLockIcon.rectTransform.localScale = Vector3.one * frame.LockScale;
+            }
         }
     }
 
