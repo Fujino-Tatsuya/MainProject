@@ -403,6 +403,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             AttackShapeQuery.Collect(counterArea, pose, data.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
                 resolveCounterTarget, counterTargets, counterHits);
         bool onHitBonusTaken = false;
+        // 특성 연출 사건(할 일 145) — 반격 순간 1번(밀린 대상이 없어도). 원 도형·포즈 = 아래 밀치기 판정과 같다.
+        if (pushArea != null)
+            TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinGuardWave, TraitFxKind.Activated, origin, pose.Forward, origin, pose);
 
         for (int i = 0; i < counterHits.Count; i++)
         {
@@ -426,8 +429,12 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 hitPattern: DamageHitPattern);
             // 수호의 파동 — 반격 피해 판정 1건에 밀치기를 같이 싣는다(피해는 그대로, 추가 피해 없음).
             // 같은 콜라이더가 밀치기 원에도 겹치면.
+            bool pushed = false;
             if (IsTraitPushCandidate(unit) && pushArea != null && AttackShapeQuery.Overlaps(pushArea, pose, hit))
+            {
                 ApplyTraitPushServer(unit, origin, ref attackInfo);
+                pushed = attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f;
+            }
             AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
 
             bool resolved = hurtbox != null
@@ -436,6 +443,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
             if (!resolved)
                 continue;
+
+            if (pushed)
+                SendGuardWaveHit(origin, hit, unit);
 
             if (unit != null)
                 counterLandedUnits.Add(unit);
@@ -529,9 +539,20 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             bool resolved = hurtbox != null
                 ? hurtbox.ReceiveAttack(pushInfo, hitContext)
                 : unit.ReceiveAttack(pushInfo, hitContext);
-            if (resolved)
-                Edit.Log($"[Skill] 수호의 파동 — {unit.name} 밀치기(피해 없음)", this);
+            if (!resolved)
+                continue;
+            Edit.Log($"[Skill] 수호의 파동 — {unit.name} 밀치기(피해 없음)", this);
+            SendGuardWaveHit(origin, hit, unit);
         }
+    }
+
+    // [서버] 특성 연출 사건(할 일 145) — 수호의 파동 밀치기가 실린 대상마다 1번(반격 피해와 함께 밀렸든 밀치기만 받았든). 방향 = 밀치는 방향.
+    private void SendGuardWaveHit(Vector3 origin, Collider hit, Unit unit)
+    {
+        Vector3 direction = unit.transform.position - origin;
+        direction.y = 0f;
+        TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinGuardWave, TraitFxKind.Hit, hit.bounds.center,
+            direction.sqrMagnitude > 1e-6f ? direction.normalized : owner.transform.forward, hit.bounds.center, target: unit);
     }
 
     // ── IPlayerIncomingAttackGuard (서버) ──

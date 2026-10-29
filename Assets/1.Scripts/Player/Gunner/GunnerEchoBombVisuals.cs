@@ -89,6 +89,14 @@ public sealed class GunnerEchoBombVisuals
         Follow(orb);
     }
 
+    /// <summary>그 폭탄이 붙은 대상의 네트워크 ID(특성 연출 사건용, 할 일 145). 모르는 번호면 false.</summary>
+    public bool TryGetTargetId(int id, out ulong targetId)
+    {
+        int index = IndexOf(id);
+        targetId = index >= 0 ? orbs[index].TargetId : 0UL;
+        return index >= 0;
+    }
+
     /// <summary>폭탄이 빠졌다(터짐·빈 폭발) — 구체를 지우고 마지막 위치를 돌려준다. 모르는 번호거나 대상을 한 번도 못 찾았으면 false(위치 없음).</summary>
     public bool Remove(int id, out Vector3 lastPosition)
     {

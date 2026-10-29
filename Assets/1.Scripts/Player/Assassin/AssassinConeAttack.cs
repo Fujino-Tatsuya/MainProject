@@ -117,8 +117,9 @@ public sealed class AssassinConeAttack : BaseAttack
     /// [서버] 파생 공격(⑧ 끝없는 칼날) 판정 — 저장한 판정 도형·포즈(<paramref name="pose"/> = 그때 시전자 발밑·조준 방향)에 피해만 한 번(<see cref="TraitHitFlags.Derived"/>).
     /// 적중 보너스·특성 사건(<see cref="Player.RaiseServerAttackLanded"/>)·밀치기·백어택 연출 없음. 백어택 피해 배율은 맞는 쪽 규칙대로(지금 상태).
     /// 대상별 1회는 이 판정 안에서만 센다. 반환 = 맞은 대상 수.
+    /// <paramref name="landedResult"/> 가 있으면 맞은 유닛을 덧붙인다(특성 연출 사건용, 할 일 145 — 분노 등 원래 적중 목록과 따로).
     /// </summary>
-    public int FireDerived(AttackShapeSet area, in AttackShapePose pose, int damageSnapshot)
+    public int FireDerived(AttackShapeSet area, in AttackShapePose pose, int damageSnapshot, List<Unit> landedResult = null)
     {
         if (!IsServer || owner == null)
             return 0;
@@ -148,6 +149,8 @@ public sealed class AssassinConeAttack : BaseAttack
                 continue;
 
             landed++;
+            if (unit != null)
+                landedResult?.Add(unit);
             Edit.Log($"[Assassin/평타] 파생 적중 — {(unit != null ? unit.name : hurtbox.name)} 피해 {info.damage}", this);
         }
 

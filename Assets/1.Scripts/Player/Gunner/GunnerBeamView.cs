@@ -210,6 +210,10 @@ public class GunnerBeamView : BaseNetworkBehaviour
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private GunnerEchoBombVisuals echoBombVisuals;
 
+    // 특성 연출 사건(할 일 145) — 시전자·Q 스킬(광폭 레이저 도형). 처음 쓸 때 찾는다.
+    private Player traitFxPlayer;
+    private GunnerChargeLaserSkill traitFxSkill;
+
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
@@ -245,7 +249,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (IsNetworkActive)
             echoBombStates.Add(new GunnerEchoBombState(bombId, targetId));
         else
-            echoBombVisuals.Add(bombId, targetId);
+            AddEchoBomb(bombId, targetId);
     }
 
     /// <summary>[서버] 폭탄이 터졌다(대상에게 피해, 또는 대상이 먼저 사라져 그 자리 빈 폭발) — 전 피어가 구체를 지우고 그 자리에 폭발 연출.</summary>
@@ -286,7 +290,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         switch (change.Type)
         {
             case NetworkListEvent<GunnerEchoBombState>.EventType.Add:
-                echoBombVisuals.Add(change.Value.BombId, change.Value.TargetId);
+                AddEchoBomb(change.Value.BombId, change.Value.TargetId);
                 break;
             case NetworkListEvent<GunnerEchoBombState>.EventType.Remove:
             case NetworkListEvent<GunnerEchoBombState>.EventType.RemoveAt:
@@ -312,10 +316,28 @@ public class GunnerBeamView : BaseNetworkBehaviour
     }
 
     // 폭발 연출 = Q 몬스터 적중 연출(chargeMonsterHitPlayer)을 구체의 마지막 자리에 한 번. 비어 있으면 구체만 사라진다.
+    // 특성 연출 사건(할 일 145) Exploded — 구체를 한 번이라도 띄운 폭탄만(위치를 안다). 대상이 먼저 사라진 빈 폭발도 같다(Target = null 또는 죽은 유닛).
     private void PlayEchoBombBurst(int bombId)
     {
-        if (echoBombVisuals.Remove(bombId, out Vector3 position))
-            PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
+        bool known = echoBombVisuals.TryGetTargetId(bombId, out ulong targetId);
+        if (!echoBombVisuals.Remove(bombId, out Vector3 position))
+            return;
+
+        PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
+        traitFxPlayer ??= GetComponent<Player>();
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Exploded, traitFxPlayer, position, transform.forward,
+            position, known ? GunnerEchoBombTargets.Find(targetId) : null, variant: bombId));
+    }
+
+    // 붙이기 + 특성 연출 사건(할 일 145) Attached — 변경 사건(전 피어, 서버도 자기 변경을 받는다)·오프라인 직접 경로에서만. 늦은 합류의 초기 목록(Sync)은 내지 않는다.
+    private void AddEchoBomb(int bombId, ulong targetId)
+    {
+        echoBombVisuals.Add(bombId, targetId);
+        Unit target = GunnerEchoBombTargets.Find(targetId);
+        Vector3 position = target != null ? GunnerEchoBombTargets.BodyPoint(target) : transform.position;
+        traitFxPlayer ??= GetComponent<Player>();
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Attached, traitFxPlayer, position, transform.forward,
+            position, target, variant: bombId));
     }
 
     /// <summary>
@@ -554,6 +576,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         }
 
         PlayChargeBeam(origin, end, width, stopped, hitPoints);
+        RaiseWideLaserFx(origin, end, hitPoints);
 
         // 빔이 스친 아군의 보호막 연출은 **그 아군의 PlayerShieldVfx** 가 띄운다.
         // 보호막 목록이 이미 전 피어에 복제되므로 여기서 좌표를 실어 보낼 이유가 없다.
@@ -602,6 +625,32 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         for (int i = 0; i < hitPoints.Length; i++)
             PlayAt(chargeMonsterHitPlayer, hitPoints[i], facing);
+    }
+
+    /// <summary>
+    /// [전 피어] 특성 연출 사건(할 일 145) — 광폭 레이저를 가진 거너의 Q 한 발(집속 연사면 발마다). 이 RPC(ClientsAndHost)라 호스트도 1번.
+    /// 도형 = 그 발의 판정 도형(사거리 = 이번 발 길이, 폭 = 특성 폭), 맞은 몬스터마다 빔 위 지점으로 Hit(대상 없음 — 위치만).
+    /// </summary>
+    private void RaiseWideLaserFx(Vector3 origin, Vector3 end, Vector3[] hitPoints)
+    {
+        traitFxPlayer ??= GetComponent<Player>();
+        if (!TraitSkillFx.Has(traitFxPlayer, TraitFxTrait.GunnerWideLaser))
+            return;
+
+        traitFxSkill ??= GetComponentInChildren<GunnerChargeLaserSkill>(true);
+        GunnerChargeLaserData data = traitFxSkill != null ? traitFxSkill.Data as GunnerChargeLaserData : null;
+        Vector3 delta = end - origin;
+        Vector3 direction = new Vector3(delta.x, 0f, delta.z);
+        direction = direction.sqrMagnitude > 1e-6f ? direction.normalized : transform.forward;
+        AttackShapeSet shape = data != null ? data.FireArea(delta.magnitude, traitFxSkill.EffectiveBeamWidth(data)) : null;
+        AttackShapePose pose = data != null ? data.FirePose(origin, direction) : new AttackShapePose(origin, direction);
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerWideLaser, TraitFxKind.Activated, traitFxPlayer, origin, direction, end,
+            shape: shape, pose: pose));
+
+        if (hitPoints == null)
+            return;
+        for (int i = 0; i < hitPoints.Length; i++)
+            TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerWideLaser, TraitFxKind.Hit, traitFxPlayer, hitPoints[i], direction, hitPoints[i]));
     }
 
     private void UpdateChargeBeam()
