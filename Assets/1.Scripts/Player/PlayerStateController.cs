@@ -1568,6 +1568,8 @@ public sealed class PlayerDashState : PlayerStateBase
         // 구간 속도(할 일 92-5) — 끝나는 프레임에도 먼저 쓰고, 이어지는 Exit 가 기본값 1 로 되돌린다.
         Context.Dash?.TickDodgeSpeed();
         TickDashInterruptInput();
+        // 대쉬 간파 재예측(할 일 139-2) — 누를 때 창이 닫혀 약이었으면 창이 열리는 순간 강으로(오너 연출·서버 시도 슬로우 각자).
+        Context.Skills?.TickDashInterruptReprediction(this);
         if (Time.time < endTime)
             return;
 

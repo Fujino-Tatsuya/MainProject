@@ -309,38 +309,13 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     /// <returns>results에 채워진 개수. 앵커/데이터가 없으면 0.</returns>
     protected int OverlapHitboxAnchor(Collider[] results) => OverlapHitboxAnchor(results, Vector3.zero);
 
-    /// <summary>앵커 형상을 월드 <paramref name="offset"/> 만큼 옮겨 질의한다 — 대쉬 간파 시도 예측(예상 대시 끝, 할 일 115).</summary>
+    /// <summary>앵커 형상을 월드 <paramref name="offset"/> 만큼 옮겨 질의한다(<see cref="HitboxAnchorShape"/> — 간파 시도 예측과 같은 형상·질의).</summary>
     protected int OverlapHitboxAnchor(Collider[] results, Vector3 offset)
     {
-        if (hitboxAnchor == null || data == null || results == null)
+        if (data == null || results == null || !HitboxAnchorShape.TryRead(hitboxAnchor, out HitboxAnchorShape shape))
             return 0;
 
-        switch (hitboxAnchor.OverlapCollider)
-        {
-            case OverlapCollider.Box:
-                BoxColliderInfo boxInfo = default;
-                hitboxAnchor.GetBoxColliderInfo(ref boxInfo);
-                return Physics.OverlapBoxNonAlloc(
-                    boxInfo.center + offset, boxInfo.halfExtents, results, boxInfo.orientation,
-                    data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Sphere:
-                SphereColliderInfo sphereInfo = default;
-                hitboxAnchor.GetSphereColliderInfo(ref sphereInfo);
-                return Physics.OverlapSphereNonAlloc(
-                    sphereInfo.center + offset, sphereInfo.radius, results,
-                    data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Capsule:
-                CapsuleColliderInfo capsuleInfo = default;
-                hitboxAnchor.GetCapsuleColliderInfo(ref capsuleInfo);
-                return Physics.OverlapCapsuleNonAlloc(
-                    capsuleInfo.point0 + offset, capsuleInfo.point1 + offset, capsuleInfo.radius, results,
-                    data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            default:
-                return 0;
-        }
+        return shape.Offset(offset).Overlap(results, data.HittableLayers);
     }
 
     /// <summary>
