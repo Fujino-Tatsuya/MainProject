@@ -122,12 +122,16 @@ public sealed class TraitLabAttackShapeTests
         var shapes = new List<TraitLabGizmoShape>();
         float width = data.BeamWidth * 1.3f;
 
-        TraitLabAttackShapes.AddGunnerQ(null, data, width, "Q", Caster, Facing, true, shapes);
+        TraitLabAttackShapes.AddGunnerQ(null, data, width, "Q", Caster, Facing, shapes);
         Vector3 origin = GunnerChargeLaserSkill.FireOrigin(Caster, data);
         AttackShapeSet shot = GunnerChargeLaserSkill.ShotArea(null, data, origin, Facing, data.RangeAt(1f), width, out AttackShapePose pose, out float length);
         AssertSame(shot, pose, shapes[0], TraitLabGizmoCategory.Skill, "Q 최대 충전");
-        AssertSame(shot, pose, shapes[1], TraitLabGizmoCategory.Trait, "잔류 포격");
+        Assert.AreEqual(1, shapes.Count, "잔류 포격은 레이저 재판정이 아니다(할 일 149 — 대상에 붙는 폭탄)");
         Assert.AreEqual(data.RangeAt(1f), length, Eps, "지형 차단 없음 = 최대 충전 사거리(판정과 같은 RangeAt)");
+
+        // 폭탄 표식은 스폰된 대상에만(네트워크 없는 EditMode = 대상 없음 → 안 그린다).
+        TraitLabAttackShapes.AddGunnerEchoBombs(new[] { new GunnerEchoBomb(1, 99UL, 0d, 10) }, shapes);
+        Assert.AreEqual(1, shapes.Count);
 
         Vector3 side = new Vector3(Facing.z, 0f, -Facing.x);
         Vector3 wide = shapes[0].Pose.Position + Facing * 1f + side * data.BeamWidth * 0.6f;

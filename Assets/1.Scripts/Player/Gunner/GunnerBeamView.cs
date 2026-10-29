@@ -99,6 +99,13 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [Tooltip("FX_GunnerQVent_Entry. 발사 후 총구 열기·연기")]
     [SerializeField] private EffectSocketPlayer chargeVentPlayer;
 
+    // 잔류 포격(GUN_4_ECHO_Q, 할 일 149) — 원래 발에 맞은 대상 몸통에 붙어 따라다니는 에너지 폭탄 구체.
+    // 판정·폭발 시각은 서버(GunnerChargeLaserSkill)가 들고, 여기는 복제 목록(echoBombStates)을 보고 그리기만 한다.
+    [Header("잔류 포격 에너지 폭탄 VFX")]
+    [Tooltip("대상 몸통에 붙는 구체 프리팹. 폭탄마다 하나씩 복제해 따라가게 한다. 비우면 구체가 안 보인다(피해는 그대로). " +
+             "임시 = GunnerEchoBomb_Temp(기본 Sphere + Emissive.mat)")]
+    [SerializeField] private GameObject echoBombPrefab;
+
     // 🔴 **집중 발밑 링은 뺐다**(2026-10-06). 감속(×0.5)과 조준 고정은 조작감으로 이미 읽히고,
     //    그 연출의 화살표는 위로 솟아 '모인다'(충전) 기호였다 — 묶여 있다는 신호와 반대였다.
     //    에셋(FX_GunnerFocusRing)도 지웠다(2026-10-07). 되살리려면 SVN 기록에서 꺼낼 것.
@@ -198,12 +205,117 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private PlayerMovement movement;
     private SkillLineIndicator lineIndicator;
 
+    // 잔류 포격 폭탄 — 붙어 있는 폭탄 목록(대상 ID). 늦게 합류한 클라도 지금 붙은 구체를 본다(새 RPC 없음).
+    private readonly NetworkList<GunnerEchoBombState> echoBombStates = new NetworkList<GunnerEchoBombState>(
+        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private GunnerEchoBombVisuals echoBombVisuals;
+
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
+        echoBombVisuals = new GunnerEchoBombVisuals(echoBombPrefab);
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        echoBombStates.OnListChanged += HandleEchoBombsChanged;
+        SyncEchoBombs(); // 늦은 합류 — 초기 목록은 변경 사건 없이 온다
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        echoBombStates.OnListChanged -= HandleEchoBombsChanged;
+        echoBombVisuals.Clear();
+        base.OnNetworkDespawn();
+    }
+
+    public override void OnDestroy()
+    {
+        echoBombVisuals?.Clear();
+        base.OnDestroy();
+    }
+
+    /// <summary>[서버] 잔류 포격 폭탄을 대상에 붙인다 — 전 피어가 대상 몸통에 구체를 띄운다.</summary>
+    public void ServerAttachEchoBomb(int bombId, ulong targetId)
+    {
+        if (IsNetworkActive)
+            echoBombStates.Add(new GunnerEchoBombState(bombId, targetId));
+        else
+            echoBombVisuals.Add(bombId, targetId);
+    }
+
+    /// <summary>[서버] 폭탄이 터졌다(대상에게 피해, 또는 대상이 먼저 사라져 그 자리 빈 폭발) — 전 피어가 구체를 지우고 그 자리에 폭발 연출.</summary>
+    public void ServerDetonateEchoBomb(int bombId)
+    {
+        if (!IsNetworkActive)
+        {
+            PlayEchoBombBurst(bombId);
+            return;
+        }
+
+        for (int i = 0; i < echoBombStates.Count; i++)
+        {
+            if (echoBombStates[i].BombId != bombId)
+                continue;
+            echoBombStates.RemoveAt(i);
+            return;
+        }
+    }
+
+    /// <summary>[서버] 예약 취소(사수 사망·씬 종료) — 터뜨리지 않고 구체만 지운다.</summary>
+    public void ServerClearEchoBombs()
+    {
+        if (IsNetworkActive)
+        {
+            if (echoBombStates.Count > 0)
+                echoBombStates.Clear();
+        }
+        else
+        {
+            echoBombVisuals?.Clear();
+        }
+    }
+
+    // [전 피어] 서버도 자기 변경 사건을 받는다(NetworkList) — 호스트 화면도 같은 경로.
+    private void HandleEchoBombsChanged(NetworkListEvent<GunnerEchoBombState> change)
+    {
+        switch (change.Type)
+        {
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Add:
+                echoBombVisuals.Add(change.Value.BombId, change.Value.TargetId);
+                break;
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Remove:
+            case NetworkListEvent<GunnerEchoBombState>.EventType.RemoveAt:
+                PlayEchoBombBurst(change.Value.BombId);
+                break;
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Clear:
+                echoBombVisuals.Clear();
+                break;
+            default:
+                SyncEchoBombs();
+                break;
+        }
+    }
+
+    private static readonly List<GunnerEchoBombState> EchoBombScratch = new List<GunnerEchoBombState>();
+
+    private void SyncEchoBombs()
+    {
+        EchoBombScratch.Clear();
+        for (int i = 0; i < echoBombStates.Count; i++)
+            EchoBombScratch.Add(echoBombStates[i]);
+        echoBombVisuals.Sync(EchoBombScratch);
+    }
+
+    // 폭발 연출 = Q 몬스터 적중 연출(chargeMonsterHitPlayer)을 구체의 마지막 자리에 한 번. 비어 있으면 구체만 사라진다.
+    private void PlayEchoBombBurst(int bombId)
+    {
+        if (echoBombVisuals.Remove(bombId, out Vector3 position))
+            PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
     }
 
     /// <summary>
@@ -956,5 +1068,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
             if (lines[i] != null && lines[i].enabled && Time.time >= hideTimes[i])
                 lines[i].enabled = false;
         }
+
+        // 잔류 포격 구체 — 대상 이동·넉백을 따라간다(대상 움직임 뒤라 LateUpdate).
+        if (echoBombVisuals != null && echoBombVisuals.Count > 0)
+            echoBombVisuals.Tick();
     }
 }

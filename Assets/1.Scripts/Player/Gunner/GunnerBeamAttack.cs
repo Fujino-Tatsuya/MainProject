@@ -259,6 +259,29 @@ public class GunnerBeamAttack : BaseAttack
         return resolved;
     }
 
+    /// <summary>
+    /// [서버] 정해진 유닛 하나에게 1회(잔류 포격 에너지 폭탄, 할 일 149) — 도형 질의 없이 그 대상만. 자기 자신·시체는 거른다.
+    /// 수신 경로·대상별 수정(hook)·파생 플래그는 <see cref="FirePiercing"/> 과 같다.
+    /// </summary>
+    public bool HitUnit(Unit target, int damageSnapshot, AttackType type, AttackHitPattern pattern,
+                        TraitHitFlags flags = TraitHitFlags.Original, TargetHitHook hook = null)
+    {
+        if (!IsServer || target == null || target == owner || target.CurrentHealth <= 0)
+            return false;
+
+        SetAttackType(type);
+        SetHitPattern(pattern);
+        SetDamageSnapshot(damageSnapshot);
+        if (!ResolveTarget(null, null, target, damageSnapshot, false, flags, hook))
+            return false;
+
+        landedBuffer.Clear();
+        landedBuffer.Add(target);
+        if ((flags & TraitHitFlags.CanProcTraits) != 0)
+            RaiseLanded(false);
+        return true;
+    }
+
     /// <summary>같은 판정 도형 안의 살아 있는 아군 플레이어(시전자 제외)를 모은다 — 보호막 대상(아군별 1회).</summary>
     public void CollectAllies(AttackShapeSet area, in AttackShapePose pose, LayerMask allyLayers, List<Player> result)
     {
