@@ -95,8 +95,13 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private float EffectiveMaxChargeTime(GunnerChargeLaserData data) =>
         GunnerTraitRules.QMaxChargeTimeFor(Traits, data.MaxChargeTime);
 
-    private float EffectiveBeamWidth(GunnerChargeLaserData data) =>
+    // 발사 판정 폭 — 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
+    public float EffectiveBeamWidth(GunnerChargeLaserData data) =>
         GunnerTraitRules.QBeamWidthFor(Traits, data.BeamWidth);
+
+    /// <summary>레이저 출발점 = 시전자 위치 + 위로 MuzzleHeight(발사·충전 미리보기·특성 랩 기즈모 공용).</summary>
+    public static Vector3 FireOrigin(Vector3 casterPosition, GunnerChargeLaserData data) =>
+        casterPosition + Vector3.up * data.MuzzleHeight;
 
     private static float ChargeFactor(GunnerChargeLaserData data, float elapsed, float maxChargeTime) =>
         data.ChargeFactor(GunnerTraitRules.DataClockElapsed(elapsed, data.MaxChargeTime, maxChargeTime));
@@ -209,7 +214,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         float factor = ChargeFactor(data, Time.time - ownerChargeStartTime, ownerChargeMaxTime);
         float range = data.RangeAt(factor);
         float width = EffectiveBeamWidth(data);
-        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 origin = FireOrigin(owner.transform.position, data);
         // 지형 차단은 데이터 폭으로 잰다 — 광폭 레이저가 사거리를 바꾸지 않게(발사와 같은 식).
         float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
         lineIndicator.ShowCharge(origin, aimDirection, 0f, length, width);
@@ -311,7 +316,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             return;
 
         Vector3 direction = shotDirection;
-        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 origin = FireOrigin(owner.transform.position, data);
         float length = beam.CastLength(origin, direction, shotRange, data.BeamWidth * 0.5f, data.BlockingLayers);
 
         int hitCount = beam.FirePiercing(origin, direction, length, shotWidth, data.BeamHeight,
@@ -431,7 +436,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         forward.y = 0f;
         forward = forward.sqrMagnitude > 0.001f ? forward.normalized : owner.transform.forward;
-        Vector3 castOrigin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 castOrigin = FireOrigin(owner.transform.position, data);
         float radius = data.BeamWidth * 0.5f;
         float clippedMin = beam.CastLength(castOrigin, forward, data.MinRange, radius, data.BlockingLayers);
         float clippedMax = beam.CastLength(castOrigin, forward, data.MaxRange, radius, data.BlockingLayers);

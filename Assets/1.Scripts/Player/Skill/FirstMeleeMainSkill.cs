@@ -328,7 +328,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             }
 
             // 부채꼴 꼭짓점 = Q 끝 지점 + 정면 forwardOffset, 정면 = 마지막 진행 방향(할 일 146 — 원 → 90° 부채꼴, 각도 = 효과 칸 angle).
-            Vector3 apex = owner.transform.position + heading * attack.ForwardOffset;
+            Vector3 apex = PaladinTraitRules.QBlastApex(owner.transform.position, heading, attack.ForwardOffset);
             StartCoroutine(RunTraitBlastServer(apex, heading, attack.Radius, attack.Angle, attack.DamageFrom(packet), attack.Delay, sceneHandle));
         }
 
@@ -375,8 +375,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
     // ── 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) ──
 
-    /// <summary>특성을 골랐는가 + 그 수치(스킬 수치 ⑩). 없으면 default.</summary>
-    private PaladinShieldDashSettings ResolveShieldDash(out bool hasTrait)
+    /// <summary>특성을 골랐는가 + 그 수치(스킬 수치 ⑩). 없으면 default. 특성 랩 공격 범위 기즈모(할 일 152)도 이 값으로 모드·거리를 정한다.</summary>
+    public PaladinShieldDashSettings ResolveShieldDash(out bool hasTrait)
     {
         hasTrait = false;
         if (owner == null || !owner.TryGetComponent(out PlayerTraitModifiers modifiers))

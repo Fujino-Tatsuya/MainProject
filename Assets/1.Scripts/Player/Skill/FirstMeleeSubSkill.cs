@@ -453,8 +453,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     // ── 수호의 파동(PAL_4_E_PUSH, 할 일 126) ──
 
-    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다.
-    private float TraitPushRadius() =>
+    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다. 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
+    public float TraitPushRadius() =>
         owner != null && owner.TraitModifiers != null
             ? owner.TraitModifiers.ResolveSkillValue(PaladinTraitValues.EPushRadiusKey, 0f)
             : 0f;

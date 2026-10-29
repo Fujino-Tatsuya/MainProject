@@ -444,6 +444,19 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
         SweepSegment(from, target);
     }
 
+    /// <summary>
+    /// 돌진 경로 구간 [<paramref name="from"/>, <paramref name="to"/>](출발점 기준 거리 m) 판정 상자 — 폭 PathWidth·높이 PathHeight, 회전 = 돌진 방향.
+    /// 서버 경로 판정(<see cref="SweepSegment"/>)과 특성 랩 공격 범위 기즈모(할 일 152, 0 ~ DashDistance)가 같이 쓴다.
+    /// </summary>
+    public static void PathBox(Vector3 origin, Vector3 direction, float from, float to, AssassinDashStrikeSkillData data,
+        out Vector3 center, out Vector3 halfExtents, out Quaternion rotation)
+    {
+        float length = to - from;
+        center = origin + direction * (from + length * 0.5f) + Vector3.up * (data.PathHeight * 0.5f);
+        halfExtents = new Vector3(data.PathWidth * 0.5f, data.PathHeight * 0.5f, length * 0.5f);
+        rotation = Quaternion.LookRotation(direction);
+    }
+
     // 이번 틱에 새로 나아간 구간 [from, to] 를 폭 PathWidth 상자로 훑는다(끝점만 보지 않는다).
     private void SweepSegment(float from, float to)
     {
@@ -451,11 +464,9 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
         if (data == null || owner == null || hitResults == null)
             return;
 
-        float length = to - from;
-        Vector3 center = serverOrigin + dashDirection * (from + length * 0.5f) + Vector3.up * (data.PathHeight * 0.5f);
-        Vector3 halfExtents = new Vector3(data.PathWidth * 0.5f, data.PathHeight * 0.5f, length * 0.5f);
+        PathBox(serverOrigin, dashDirection, from, to, data, out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
         int count = Physics.OverlapBoxNonAlloc(
-            center, halfExtents, hitResults, Quaternion.LookRotation(dashDirection),
+            center, halfExtents, hitResults, rotation,
             data.HittableLayers, QueryTriggerInteraction.Collide);
 
         tickLandedUnits.Clear();

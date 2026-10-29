@@ -171,6 +171,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private float pendingCrossFadeStartTime;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
+    // 판정 단계·기본 앵커(읽기 전용) — 특성 랩 공격 범위 기즈모(할 일 152)가 PlayerDefaultAttack.ResolveHitbox 로 같은 앵커를 고른다.
+    public System.Collections.Generic.IReadOnlyList<DefaultAttackStep> AttackSteps => attackSteps;
+    public ColliderInfo DefaultHitbox => defaultHitbox;
+
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
     // 콤보 중 언제든 대시로 끊는다(할 일 9). 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 끊긴다(CancelCurrentAttack).

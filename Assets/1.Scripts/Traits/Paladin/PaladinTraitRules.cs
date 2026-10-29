@@ -37,6 +37,13 @@ public static class PaladinTraitRules
         (reason == SkillEndReason.Completed || reason == SkillEndReason.Released || reason == SkillEndReason.MaxDurationReached);
 
     /// <summary>
+    /// 진격의 충격 부채꼴 꼭짓점 = Q 끝 지점 + 정면(<paramref name="heading"/>) × <paramref name="forwardOffset"/>(효과 칸 forwardOffset).
+    /// 서버 판정(<see cref="FirstMeleeMainSkill"/>)과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.
+    /// </summary>
+    public static Vector3 QBlastApex(Vector3 qEndPosition, Vector3 heading, float forwardOffset) =>
+        qEndPosition + heading * forwardOffset;
+
+    /// <summary>
     /// 진격의 충격(할 일 146) — 대상이 판정 부채꼴(꼭짓점 <paramref name="apex"/>, 정면 <paramref name="forward"/>, 전체 각도 <paramref name="angle"/>) 각도 안인가(바닥 평면).
     /// 반경은 호출 쪽 구 질의가 거른다. 각도 기준 = 대상 콜라이더의 꼭짓점에 가장 가까운 점(<paramref name="closestPoint"/>) — 반격 부채꼴과 같은 표면 기준.
     /// 꼭짓점이 콜라이더 안(가장 가까운 점 = 꼭짓점)이면 콜라이더 중심 방향으로 본다. 360 이상 = 원(각도 검사 없음).

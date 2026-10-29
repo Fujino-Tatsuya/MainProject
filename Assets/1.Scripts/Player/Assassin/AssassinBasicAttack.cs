@@ -724,6 +724,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         _ => stepIndex,
     };
 
+    /// <summary>그 묶음의 특성 키(피해 배율·범위 배율·파생 공격 공용) — 판정과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.</summary>
+    public static TraitAttackKey TraitKeyFor(AssassinBasicAttackMode mode) => new TraitAttackKey(AttackType.Default, TraitFormOf(mode));
+
     // 특성 피해 배율 키의 형태(할 일 125) — 강타 = Enhanced, 변신 묶음 = Alternate(변신 Q·E 대체 스킬과 같은 구분).
     private static TraitAttackForm TraitFormOf(AssassinBasicAttackMode mode) => mode switch
     {
@@ -740,16 +743,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         hitsFired++;
-        var traitKey = new TraitAttackKey(AttackType.Default, TraitFormOf(currentMode));
+        TraitAttackKey traitKey = TraitKeyFor(currentMode);
         // 돌파의 여세 — 이 동작의 첫 판정에서만 소모한다(빗나가도). 같은 판정의 모든 대상이 같은 배율, 변신 묶음 2~4타는 그대로.
         float nextAttackMultiplier = AssassinBasicAttackTraitRules.ConsumesNextAttackBuff(hitsFired)
             ? ConsumeNextAttackBuff(traitKey)
             : 1f;
         int damage = ResolveHitDamage(step.AttackDamageMultiplier, traitKey, nextAttackMultiplier);
-        // 칼날의 영역 — 판정 상자 길이·폭만 배율. 전진·판정 기준점(몸)은 그대로.
-        AssassinTraitAreaRules.BoxScale(player.TraitModifiers, traitKey, out float lengthScale, out float widthScale);
-        ColliderInfo hitbox = HitboxFor(currentMode, currentStepIndex);
-        if (!AssassinStrikeBox.TryPlace(hitbox, transform, attackDirection, lengthScale, widthScale, out AssassinStrikeBox box))
+        if (!TryPlaceHitBox(currentMode, currentStepIndex, attackDirection, out AssassinStrikeBox box))
         {
             Debug.LogError($"[Assassin/평타] {currentMode} {currentStepIndex + 1}타 판정 상자(BoxCollider+ColliderInfo)가 배정되지 않았습니다 — 판정 생략.", this);
             return;
@@ -796,7 +796,19 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         return multiplier;
     }
 
-    private int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
+    public int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
+
+    /// <summary>
+    /// 그 타의 판정 상자 — 앵커(<see cref="HitboxFor"/>)를 <paramref name="direction"/>·발밑 기준으로 놓고 칼날의 영역 길이·폭 배율을 바른다.
+    /// 서버 판정(<see cref="FireCurrentHit"/>)과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. 앵커가 없으면 false.
+    /// </summary>
+    public bool TryPlaceHitBox(AssassinBasicAttackMode mode, int stepIndex, Vector3 direction, out AssassinStrikeBox box)
+    {
+        TraitAttackKey traitKey = TraitKeyFor(mode);
+        // 칼날의 영역 — 판정 상자 길이·폭만 배율. 전진·판정 기준점(몸)은 그대로.
+        AssassinTraitAreaRules.BoxScale(player != null ? player.TraitModifiers : null, traitKey, out float lengthScale, out float widthScale);
+        return AssassinStrikeBox.TryPlace(HitboxFor(mode, stepIndex), transform, direction, lengthScale, widthScale, out box);
+    }
 
     // 이 타의 판정 상자 앵커 — 일반 = 타 순서, 강타·변신 묶음 = 각자 하나.
     private ColliderInfo HitboxFor(AssassinBasicAttackMode mode, int stepIndex) => mode switch

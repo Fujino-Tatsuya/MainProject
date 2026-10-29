@@ -39,11 +39,15 @@ public class PlayerDefaultAttack : BaseAttack
             hitResults = new Collider[resultCount];
     }
 
+    /// <summary>그 타의 판정 앵커 — 단계 hitbox, 비었으면 기본 hitbox(판정·특성 랩 공격 범위 기즈모 공용, 할 일 152).</summary>
+    public static ColliderInfo ResolveHitbox(DefaultAttackStep step, ColliderInfo defaultHitbox) =>
+        step != null && step.Hitbox != null ? step.Hitbox : defaultHitbox;
+
     public void PrepareStep(DefaultAttackStep step, int damageSnapshot, Vector3 direction)
     {
         currentStep = step;
         attackDirection = direction.sqrMagnitude >= 0.001f ? direction.normalized : transform.forward;
-        hitbox = step != null && step.Hitbox != null ? step.Hitbox : defaultHitbox;
+        hitbox = ResolveHitbox(step, defaultHitbox);
         SetDamageSnapshot(damageSnapshot);
         damagedUnits.Clear();
         damagedHurtboxes.Clear();
