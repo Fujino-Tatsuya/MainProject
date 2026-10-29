@@ -85,6 +85,7 @@ public static class QABoss103Relocator
         }
         _characters = null;
         _stats = null;
+        QABoss103StuckCamera.Release();   // 할 일 140 — 판마다 RT·텍스처를 풀어 Play 종료 뒤 남지 않게
     }
 
     /// <summary>[오너 봇] 재배치 요청. 보냈으면(또는 호스트에서 바로 처리했으면) true.</summary>
@@ -141,7 +142,11 @@ public static class QABoss103Relocator
         Vector3 from = po != null ? po.transform.position : Vector3.zero;
         // 할 일 140 — 옮기기 전 상태(구속·겹친 콜라이더·발밑·직전 2초 잡기 전환). 읽기만.
         Player probed = po != null ? po.GetComponent<Player>() : null;
-        string probe = QABoss103StuckProbe.Fields(probed, QABoss103StuckProbe.HostGrab(clientId, Time.realtimeSinceStartupAsDouble));
+        string state = QABoss103StuckProbe.StateToken(probed);
+        string what = QABoss103StuckProbe.Overlaps(probed);
+        string ground = QABoss103StuckProbe.Ground(probed);
+        string grab = QABoss103StuckProbe.HostGrab(clientId, Time.realtimeSinceStartupAsDouble);
+        string probe = QABoss103StuckProbe.Fields(state, what, ground, grab);
         Vector3 to = from;
         if (reason == null)
         {
@@ -152,7 +157,8 @@ public static class QABoss103Relocator
             else
             {
                 to = wall ? Points[_rng.Next(Points.Count)] : Nearest(from);
-                shot = Shot(clientId, why, character);
+                // 할 일 140 — 옮기기 전에 동기로 찍는다(끼인 자리를 비추는 임시 카메라).
+                shot = Shot(clientId, why, character, from, state, what, ground, grab);
                 if (!mover.RelocateServer(to))
                     reason = "relocate_rejected";
             }
@@ -186,10 +192,11 @@ public static class QABoss103Relocator
     }
 
     /// <summary>
-    /// 할 일 138-2 — 순간이동 직전 호스트 화면 1장(<see cref="QABoss103StuckShot"/>). 반환 = 파일 이름 · <c>cooldown</c> · null(출력 폴더 없음·실패).
-    /// 캡처는 프레임 끝에 쓰인다 — 호스트 플레이어는 같은 틱에 옮겨져 이동 뒤 화면, 원격 플레이어는 오너 RPC 왕복 전이라 이동 전 화면이다.
+    /// 할 일 138-2 · 140 — 순간이동 직전 끼인 자리 3시점 한 장(<see cref="QABoss103StuckCamera"/>) + 같은 이름 <c>.txt</c>(<see cref="QABoss103StuckShot.InfoText"/>).
+    /// 반환 = 파일 이름 · <c>cooldown</c> · null(출력 폴더 없음·실패). 동기 렌더라 호스트·원격 플레이어 모두 이동 전 자리다.
     /// </summary>
-    private static string Shot(ulong clientId, QABoss103RelocateReason why, string character)
+    private static string Shot(ulong clientId, QABoss103RelocateReason why, string character, Vector3 from,
+                               string state, string what, string ground, string grab)
     {
         double now = Time.realtimeSinceStartupAsDouble;
         if (QABoss103StuckShot.InCooldown(now, LastShot.TryGetValue(clientId, out double last) ? last : (double?)null))
@@ -201,8 +208,12 @@ public static class QABoss103Relocator
             return null;
         try
         {
-            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
-            ScreenCapture.CaptureScreenshot(path);
+            double ms = QABoss103StuckCamera.Capture(path, from);
+            System.IO.File.WriteAllText(QABoss103StuckShot.InfoPathFor(path),
+                QABoss103StuckShot.InfoText(_cfg != null ? _cfg.Run : 0, _cfg != null ? _cfg.Retry : 0, clientId, character, from.x, from.y, from.z,
+                    what, state, Token(why), ground, grab),
+                new System.Text.UTF8Encoding(false));
+            Debug.Log($"{Tag} event=qa_relocate_shot ok=true file={name} ms={ms:F0}");
         }
         catch (System.Exception e)
         {

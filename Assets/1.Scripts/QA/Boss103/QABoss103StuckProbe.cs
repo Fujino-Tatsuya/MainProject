@@ -194,8 +194,11 @@ public static class QABoss103StuckProbe
     }
 
     /// <summary>한 줄에 붙일 필드 묶음(<c> state=… what=… ground=… grab=…</c>, 앞 공백 포함). 값은 토큰화.</summary>
-    public static string Fields(Player p, string grab) =>
-        $" state={QABoss103Plan.Token(StateToken(p))} what={QABoss103Plan.Token(Overlaps(p))} ground={QABoss103Plan.Token(Ground(p))} grab={QABoss103Plan.Token(grab)}";
+    public static string Fields(Player p, string grab) => Fields(StateToken(p), Overlaps(p), Ground(p), grab);
+
+    /// <summary>이미 읽은 값으로 같은 필드 묶음.</summary>
+    public static string Fields(string state, string what, string ground, string grab) =>
+        $" state={QABoss103Plan.Token(state)} what={QABoss103Plan.Token(what)} ground={QABoss103Plan.Token(ground)} grab={QABoss103Plan.Token(grab)}";
 
     private static string Name(Collider c) => $"{c.name}({LayerMask.LayerToName(c.gameObject.layer)})";
 

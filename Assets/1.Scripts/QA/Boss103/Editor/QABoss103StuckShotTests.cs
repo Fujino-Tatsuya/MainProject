@@ -50,5 +50,65 @@ public class QABoss103StuckShotTests
         Assert.IsFalse(QABoss103StuckShot.InCooldown(110, 100));
         Assert.IsFalse(QABoss103StuckShot.InCooldown(130, 100));
     }
+
+    // ── 할 일 140: 임시 카메라 3시점 + 설명 파일 ─────────────────
+
+    [Test]
+    public void 설명_파일은_같은_이름_txt()
+    {
+        string png = System.IO.Path.Combine("C:/QA/b", "stuck", "run1_r0_010203_wall_Paladin.png");
+        Assert.AreEqual(System.IO.Path.Combine("C:/QA/b", "stuck", "run1_r0_010203_wall_Paladin.txt"), QABoss103StuckShot.InfoPathFor(png));
+    }
+
+    [Test]
+    public void 설명_파일_필드()
+    {
+        string text = QABoss103StuckShot.InfoText(7, 1, 2, "Gunner", 1.234, 3.75, -5, "Boundary_N(Wall)", "Restrained_carry", "wall", "Floor(Env)@3.60", "carry@-1.20");
+        StringAssert.Contains("run=7\n", text);
+        StringAssert.Contains("retry=1\n", text);
+        StringAssert.Contains("client=2\n", text);
+        StringAssert.Contains("character=Gunner\n", text);
+        StringAssert.Contains("from=1.23,3.75,-5.00\n", text);
+        StringAssert.Contains("what=Boundary_N(Wall)\n", text);
+        StringAssert.Contains("state=Restrained_carry\n", text);
+        StringAssert.Contains("reason=wall\n", text);
+        StringAssert.Contains("grab=carry@-1.20\n", text);
+        StringAssert.Contains("character=na\n", QABoss103StuckShot.InfoText(1, 0, 0, null, 0, 0, 0, "", null, "stuck", null, null));
+    }
+
+    [Test]
+    public void 시점_1은_위에서_수직_직교()
+    {
+        var target = new UnityEngine.Vector3(10f, 3.7f, -4f);
+        QABoss103StuckCamera.View v = QABoss103StuckCamera.ViewFor(0, target);
+        Assert.IsTrue(v.Orthographic);
+        Assert.AreEqual(target.y + QABoss103StuckCamera.TopHeight, v.Position.y, 1e-4);
+        Assert.AreEqual(target.x, v.Position.x, 1e-4);
+        Assert.AreEqual(target.z, v.Position.z, 1e-4);
+        UnityEngine.Vector3 fwd = v.Rotation * UnityEngine.Vector3.forward;
+        Assert.AreEqual(-1f, fwd.y, 1e-4, "아래를 본다");
+    }
+
+    [Test]
+    public void 시점_2_3은_옆_45도_서로_반대편_거리6_높이2()
+    {
+        var target = new UnityEngine.Vector3(1f, 3.5f, 2f);
+        QABoss103StuckCamera.View a = QABoss103StuckCamera.ViewFor(1, target);
+        QABoss103StuckCamera.View b = QABoss103StuckCamera.ViewFor(2, target);
+        Assert.IsFalse(a.Orthographic);
+        Assert.IsFalse(b.Orthographic);
+        foreach (QABoss103StuckCamera.View v in new[] { a, b })
+        {
+            UnityEngine.Vector3 d = v.Position - target;
+            Assert.AreEqual(QABoss103StuckCamera.SideHeight, d.y, 1e-4);
+            Assert.AreEqual(QABoss103StuckCamera.SideDistance, new UnityEngine.Vector2(d.x, d.z).magnitude, 1e-4);
+        }
+        UnityEngine.Vector3 da = a.Position - target, db = b.Position - target;
+        Assert.AreEqual(da.x, da.z, 1e-4, "45° = x·z 같은 쪽");
+        Assert.AreEqual(-da.x, db.x, 1e-4, "반대편");
+        Assert.AreEqual(-da.z, db.z, 1e-4, "반대편");
+        UnityEngine.Vector3 look = target + UnityEngine.Vector3.up * QABoss103StuckCamera.LookHeight - a.Position;
+        Assert.Greater(UnityEngine.Vector3.Dot(a.Rotation * UnityEngine.Vector3.forward, look.normalized), 0.9999f, "대상을 본다");
+    }
 }
 #endif
