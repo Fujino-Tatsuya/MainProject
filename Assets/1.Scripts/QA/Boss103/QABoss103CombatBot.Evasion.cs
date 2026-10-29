@@ -591,6 +591,13 @@ public sealed partial class QABoss103CombatBot
             return;
         // 성공 굴림 — 마감까지 조건(사거리·정면·Idle/Move)이 맞을 때 누르고, 거부되면 다시 누른다. 마감이 지나면 마지막으로 1회.
         bool last = now >= _counterDeadline;
+        // 할 일 140-4 — 북진 창은 사거리 끝이 아니라 여유 자리에 멈춘 뒤 누른다(PnShouldPress).
+        if (_pnWindow)
+        {
+            if (PnShouldPress(me, myPos, now))
+                PressCounter(me, myPos, now, open, last);
+            return;
+        }
         if (last || CounterReady(me, myPos))
             PressCounter(me, myPos, now, open, last);
     }
@@ -627,6 +634,14 @@ public sealed partial class QABoss103CombatBot
     /// </summary>
     private bool CounterHoldsBot(Player me, Vector3 myPos, double now)
     {
+        // 할 일 140-4 — 북진 성공 굴림은 누른 뒤 판정까지 멈춰 있는다(원거리 거리 벌리기가 선딜 동안 사거리 밖으로 끌고 가지 않게).
+        if (PnHoldsAfterPress(now))
+        {
+            StopHold();
+            _driver.ReleaseBasic();
+            _input.SetMove(Vector3.zero);
+            return true;
+        }
         // 할 일 140-2 — 활성 탑이 막 다 사라졌으면(북진 무력화 직전) 창이 열리기 전에도 보스 정면 쪽으로 걷는다.
         bool pre = !_counterPending && PnPreApproach(now);
         if (!pre && (!_counterPending || !_counterHit || _counterWaitClose))
@@ -642,21 +657,36 @@ public sealed partial class QABoss103CombatBot
             return true;
         }
         PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
-        bool inRange = SurfaceDistance(myPos, bossPos) <= CounterReach(me, skills) - 0.2;
-        bool front = CounterFront(myPos, out _, out _);
+        double reach = CounterReach(me, skills);
+        // 할 일 140-4 — 북진 성공 굴림 = 실제 표면 거리·좁힌 정면 한도의 누름 자리까지 걷는다. 그 밖은 기존 규칙(AABB 거리 ≤ 사거리 − 0.2).
+        bool pnSpot = _pnWindow && _counterHit && !pre;
+        bool inRange, front;
+        if (pnSpot)
+            inRange = front = PnInPressSpot(myPos, reach);
+        else
+        {
+            inRange = SurfaceDistance(myPos, bossPos) <= reach - 0.2;
+            front = CounterFront(myPos, out _, out _);
+        }
         Vector3 move = Vector3.zero;
         if (!inRange || !front)
         {
-            move = CounterSpot(myPos) - myPos;
+            move = CounterSpot(myPos, pnSpot ? PnStandOff(reach) : CounterStandOff) - myPos;
             move.y = 0f;
             move = move.sqrMagnitude > 0.04f ? move.normalized : Vector3.zero;
         }
-        _input.SetMove(move != Vector3.zero && IsSafeStep(myPos, move) ? move : Vector3.zero);
+        move = move != Vector3.zero && IsSafeStep(myPos, move) ? move : Vector3.zero;
+        _input.SetMove(move);
+        if (pnSpot)
+            NotePnStill(move == Vector3.zero, now);
         return true;
     }
 
     /// <summary>간파하러 설 자리 — 보스 정면(정면 밖이면 내 쪽 옆으로 돌아 들어가는 방향) 표면 + <see cref="CounterStandOff"/>.</summary>
-    private Vector3 CounterSpot(Vector3 myPos)
+    private Vector3 CounterSpot(Vector3 myPos) => CounterSpot(myPos, CounterStandOff);
+
+    /// <summary><see cref="CounterSpot(Vector3)"/> 의 표면 거리 지정판(북진 누름 자리 — 사거리가 짧으면 더 붙는다).</summary>
+    private Vector3 CounterSpot(Vector3 myPos, float standOff)
     {
         Vector3 bossPos = _boss.transform.position;
         bool front = CounterFront(myPos, out _, out _);
@@ -670,7 +700,7 @@ public sealed partial class QABoss103CombatBot
         if (Vector3.Dot(side, to) < 0f)
             side = -side;
         Vector3 spotDir = front ? fwd : (fwd + side).normalized;
-        return bossPos + spotDir * (_bossRadius + CounterStandOff);
+        return bossPos + spotDir * (_bossRadius + standOff);
     }
 
     private void OnCounterOpen(Player me, Vector3 myPos, float surface, double now)
@@ -807,7 +837,8 @@ public sealed partial class QABoss103CombatBot
                   $"reactMs={F0(_profile.ReactionMs)} windowEstMs={F0(_counterEstMs)} dashWindow={(_counterIsDash ? "true" : "false")} retries={_counterRetries} " +
                   $"windowSamples={_window.Count} openAtPress={(openNow ? "true" : "false")} front={(front ? "true" : "false")} frontDeg={F0(frontDeg)} frontLimit={F0(limit)} " +
                   $"surfM={F2(surface)} reachM={F2(reach)} inRange={(surface <= reach ? "true" : "false")} state={me.CurrentState} cast={(ok ? "true" : "false")} serverT={F3(serverT)}" +
-                  (_pnWindow ? $" pushNorth=true whiff={(whiff ? "true" : "false")}" : ""));
+                  $" trueSurfM={F2(TrueSurfaceDistance(myPos))}" +
+                  (_pnWindow ? $" pushNorth=true whiff={(whiff ? "true" : "false")} {PnPressDiag(reach, now)}" : ""));
         PartCounter(_counterHit, ok, serverT);
     }
 
@@ -815,7 +846,7 @@ public sealed partial class QABoss103CombatBot
     /// 간파 사거리(보스 표면까지 수평 m) — 우클릭 판정 앵커를 어느 방향으로 돌려도 닿는 최대 거리(<see cref="InterruptOmniRangeModel"/>, 88 진단과 같은 계산).
     /// 앵커를 못 읽으면 <see cref="CounterReachFallback"/>.
     /// </summary>
-    private static double CounterReach(Player me, PlayerSkillController skills)
+    internal static double CounterReach(Player me, PlayerSkillController skills)
     {
         ColliderInfo anchor = skills != null ? skills.GetSkill(PlayerSkillSlot.Interrupt)?.HitboxAnchor : null;
         if (anchor == null)

@@ -31,6 +31,9 @@ public sealed partial class QABoss103CombatBot
     private float _pnOpenDist, _pnOpenSurf;
     private Vector3 _pnDashDir;
     private int _pnWindows, _pnTries, _pnDashTries;
+    // 할 일 140-4 — 누름 자리에서 이동 입력 0 인 틱 수·시작 시각(누를 때 멈춤 확인)
+    private int _pnStillTicks;
+    private double _pnStillSince = -1.0;
 
     /// <summary>매 틱(간파 판정 전) — 직전 틱에 활성 탑이 있었는데 지금 하나도 없으면 소멸 시각을 남긴다.</summary>
     private void ObservePylonClear(double now)
@@ -94,6 +97,8 @@ public sealed partial class QABoss103CombatBot
         _pnReason = null;
         _pnPressAt = _pnDashAt = -1.0;
         _pnJudgeAt = double.NaN;
+        _pnStillTicks = 0;
+        _pnStillSince = -1.0;
         _pnCloseAt = QABoss103PushNorthCounter.CloseAt(now, clearedAt, PnStunSeconds());
         _pnOpenGameT = Time.timeAsDouble;
         NetworkManager nm = NetworkManager.Singleton;
@@ -189,6 +194,70 @@ public sealed partial class QABoss103CombatBot
         Debug.Log($"{Tag} event=pn_dash_interrupt bot={_character} slot={_slot} ok=true step=dash gapM={F2(gap)} toDeadlineMs={F0((_counterDeadline - now) * 1000.0)}");
         return true;
     }
+
+    // ── 할 일 140-4 — 성공 굴림 누름 자리 ───────────────────────
+
+    /// <summary>
+    /// 보스 HurtBox 실제 표면까지 수평 거리(<see cref="Collider.ClosestPoint"/>, HurtBox 중심 높이). <see cref="SurfaceDistance"/> 는 AABB 라
+    /// 보스가 대각선을 보면(북진 = 화면 남쪽) 최대 반경 × (√2 − 1) ≈ 0.7m 짧게 본다. HurtBox 가 꺼졌으면 <see cref="SurfaceDistance"/>.
+    /// </summary>
+    private float TrueSurfaceDistance(Vector3 myPos)
+    {
+        if (_boss == null)
+            return float.NaN;
+        if (_bossHurt == null || !_bossHurt.enabled)
+            return SurfaceDistance(myPos, _boss.transform.position);
+        Vector3 p = new Vector3(myPos.x, _bossHurt.bounds.center.y, myPos.z);
+        Vector3 q = _bossHurt.ClosestPoint(p);
+        return QAPartyPlacement88.HorizontalDistance(p, q);
+    }
+
+    /// <summary>북진 누름 자리 — 실제 표면 거리 ≤ 사거리 − 여유 + 정면각 ≤ 서버 한도 − 여유(<see cref="QABoss103PushNorthCounter.InPressSpot"/>).</summary>
+    private bool PnInPressSpot(Vector3 myPos, double reach)
+    {
+        CounterFront(myPos, out double frontDeg, out float limit);
+        bool requiresFront = !(BossDataField != null && BossDataField.GetValue(_boss) is BossDataSO data) || data.counterRequiresFront;
+        return QABoss103PushNorthCounter.InPressSpot(TrueSurfaceDistance(myPos), reach, frontDeg, limit, requiresFront);
+    }
+
+    /// <summary>북진 누름 자리로 걸어갈 표면 거리 — 기본 <see cref="CounterStandOff"/>, 누름 거리가 짧으면 그 절반.</summary>
+    private static float PnStandOff(double reach) =>
+        Mathf.Min(CounterStandOff, (float)(QABoss103PushNorthCounter.PressDistance(reach) * 0.5));
+
+    /// <summary>누름 자리 대기 틱 — 이동 입력이 0 이면 멈춤 누적, 움직이면 초기화.</summary>
+    private void NotePnStill(bool still, double now)
+    {
+        if (!still)
+        {
+            _pnStillTicks = 0;
+            _pnStillSince = -1.0;
+            return;
+        }
+        _pnStillTicks++;
+        if (_pnStillSince < 0.0)
+            _pnStillSince = now;
+    }
+
+    /// <summary>북진 성공 굴림 — 지금 누를까(<see cref="QABoss103PushNorthCounter.ShouldPress"/>). 시전 가능 상태가 아니면 마감 전엔 기다린다.</summary>
+    private bool PnShouldPress(Player me, Vector3 myPos, double now)
+    {
+        PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
+        bool castable = skills != null && !skills.IsBusy &&
+                        (me.CurrentState == PlayerActionState.Idle || me.CurrentState == PlayerActionState.Move);
+        bool spot = castable && PnInPressSpot(myPos, CounterReach(me, skills));
+        bool settled = QABoss103PushNorthCounter.IsSettled(_pnStillTicks, _pnStillSince >= 0.0 ? now - _pnStillSince : 0.0);
+        return QABoss103PushNorthCounter.ShouldPress(now, _counterDeadline, spot, settled, castable && CounterReady(me, myPos));
+    }
+
+    /// <summary>북진 성공 굴림을 눌렀고(대쉬 간파 아님) 판정 + 잠깐 전이다 — 멈춰 있는다.</summary>
+    private bool PnHoldsAfterPress(double now) =>
+        _pnWindow && _pnTried && _pnCast && !_pnDash && _counterHit && !double.IsNaN(_pnJudgeAt) &&
+        now < _pnJudgeAt + QABoss103PushNorthCounter.PostPressHoldSeconds;
+
+    /// <summary>counter_try 북진 꼬리 — 누름 거리·멈춘 틱·시간.</summary>
+    private string PnPressDiag(double reach, double now) =>
+        $"pressM={F2(QABoss103PushNorthCounter.PressDistance(reach))} stillTicks={_pnStillTicks} " +
+        $"stillMs={(_pnStillSince >= 0.0 ? F0((now - _pnStillSince) * 1000.0) : "na")}";
 
     /// <summary>④ 창 1개 결과 줄. <paramref name="closedAt"/> = 관측 닫힘(NaN = 못 봄 — 싸움에서 빠짐).</summary>
     private void EndPnWindow(double closedAt, string idleReason)

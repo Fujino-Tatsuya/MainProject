@@ -58,6 +58,12 @@ public static class QANightlyEvents
     public const string Trait = "trait";
     /// <summary>할 일 140-2 — 북진 무력화 간파 창 결과(기록 전용, 봇 <c>event=pn_counter</c>). 이름 = <see cref="QABoss103PushNorthCounter.Event"/>.</summary>
     public const string PushNorthCounter = "pn_counter";
+    /// <summary>할 일 140-4 — 23호 서버 진단 '인터럽트가 카운터로 성립하지 않았다'(어느 조건이 거짓인지, 기록 전용). 대상에 닿았는데 실패한 간파만 난다.</summary>
+    public const string CounterReject = "counter_reject";
+    /// <summary>할 일 140-4 — 23호 서버 '[23호/북진] 간파 — 위로 …' = 북진 간파 성립(기록 전용).</summary>
+    public const string PushNorthCounterOk = "pn_counter_ok";
+    /// <summary>할 일 140-4 — 북진 중 서버가 받은 간파 판정 1회(기록 전용, 호스트 계측기). 이름 = <see cref="QABoss103PushNorthCounter.ServerCastEvent"/>.</summary>
+    public const string PushNorthServerCast = "pn_server_cast";
 
     public const int DefaultDetailMax = 160;
     /// <summary>계측 필드가 붙는 줄(재배치·특성 라운드) — 뒤쪽 필드가 잘리지 않게.</summary>
@@ -80,6 +86,9 @@ public static class QANightlyEvents
         new QANightlyEventRule(Timeout, "시간초과 — 조기(목숨 0·보스 HP 5분 불변)", false, "event=early_timeout "),
         new QANightlyEventRule(Trait, "특성 라운드 — 라운드·완료·자동 선택·획득 ID(기록 전용)", false, "event=trait_round ") { Trace = true, DetailMax = LongDetailMax },
         new QANightlyEventRule(PushNorthCounter, "북진 무력화 간파 — 창 열림·거리·시도(대쉬 간파)·결과(기록 전용, 호스트 봇)", false, "event=pn_counter ") { Trace = true, DetailMax = LongDetailMax },
+        new QANightlyEventRule(CounterReject, "23호 간파 불성립 — 서버 진단(창·정면·상태·공격, 기록 전용)", false, "[23호] 인터럽트가 카운터로 성립하지 않았다") { Trace = true, DetailMax = LongDetailMax },
+        new QANightlyEventRule(PushNorthCounterOk, "북진 간파 성립 — 서버(위로 밀림 m, 기록 전용)", false, "[23호/북진] 간파 ") { Trace = true, DetailMax = LongDetailMax },
+        new QANightlyEventRule(PushNorthServerCast, "북진 간파 서버 판정 — 서버가 본 위치·표면 거리·정면각·오버랩(기록 전용, 호스트 계측기)", false, "event=pn_server_cast ") { Trace = true, DetailMax = LongDetailMax },
     };
 
     /// <summary>쉼표 목록 → 켤 이벤트 이름(소문자). 비면 null(= 표 전체).</summary>

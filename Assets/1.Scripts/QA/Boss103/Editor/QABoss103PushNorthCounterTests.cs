@@ -98,5 +98,110 @@ public sealed class QABoss103PushNorthCounterTests
         Assert.IsTrue(r.Trace, "기록 전용 — 요약 표·클립 제외");
         StringAssert.EndsWith("closeMs=na", QANightlyEvents.Detail(line, r.DetailMax), "뒤쪽 필드가 잘리지 않는다");
     }
+
+    // ── 할 일 140-4 ──
+
+    [Test]
+    public void 대각선을_보는_보스는_AABB_거리가_실제보다_짧다_원인_재현()
+    {
+        // 23호 HurtBox = 수직 캡슐 r 1.7. 북진 중 보스는 화면 남쪽(카메라 yaw 315 → 월드 (0.71, 0, -0.71))을 본다.
+        Bounds hurt = new Bounds(new Vector3(0f, 2.89f, 0f), new Vector3(3.4f, 5.78f, 3.4f));
+        Vector3 dir = new Vector3(1f, 0f, -1f).normalized;
+        float d = 1.73f + 1.7f * Mathf.Sqrt(2f);   // AABB 표면 거리 1.73 이 되는 중심 거리
+        Vector3 bot = dir * d;
+        double aabb = InterruptOmniRangeModel.HorizontalDistanceToBounds(bot, hurt);
+        double real = QABoss103PushNorthCounter.CylinderSurfaceDistance(bot.x, bot.z, 0.0, 0.0, 1.7);
+        Assert.AreEqual(1.73, aabb, 1e-3, "봇·오너 예측이 본 거리(사거리 1.75 안)");
+        Assert.Greater(real, 1.75 + 0.6, "실제 표면은 사거리 밖 0.6m 이상 — 서버 판정 상자가 안 닿는다");
+        Assert.AreEqual(1.7 * (Mathf.Sqrt(2f) - 1f), real - aabb, 1e-3, "차이 = 반경 × (√2 − 1)");
+        Assert.AreEqual(0.0, QABoss103PushNorthCounter.CylinderSurfaceDistance(0.5, 0.0, 0.0, 0.0, 1.7), E, "안이면 0");
+    }
+
+    [Test]
+    public void 누름_여유는_0_5m_사거리가_작으면_비율()
+    {
+        Assert.AreEqual(0.5, QABoss103PushNorthCounter.PressMargin(1.75), E);
+        Assert.AreEqual(1.25, QABoss103PushNorthCounter.PressDistance(1.75), E, "사거리 1.75 → 실제 표면 1.25m 안에서");
+        Assert.AreEqual(0.3, QABoss103PushNorthCounter.PressMargin(1.0), E, "1m × 0.3");
+        Assert.AreEqual(0.7, QABoss103PushNorthCounter.PressDistance(1.0), E);
+        Assert.AreEqual(0.0, QABoss103PushNorthCounter.PressMargin(0.0), E);
+        Assert.AreEqual(0.0, QABoss103PushNorthCounter.PressDistance(double.NaN), E, "사거리 못 읽음 = 0");
+    }
+
+    [Test]
+    public void 정면_한도는_서버_값보다_15도_안쪽_절반보다_좁히지_않는다()
+    {
+        Assert.AreEqual(75.0, QABoss103PushNorthCounter.FrontLimit(90.0, true), E, "dev No23 = 90");
+        Assert.AreEqual(45.0, QABoss103PushNorthCounter.FrontLimit(60.0, true), E, "코드 기본 60");
+        Assert.AreEqual(10.0, QABoss103PushNorthCounter.FrontLimit(20.0, true), E, "20 − 15 = 5 < 절반 10");
+        Assert.AreEqual(180.0, QABoss103PushNorthCounter.FrontLimit(90.0, false), E, "정면 판정 꺼짐");
+    }
+
+    [Test]
+    public void 누름_자리는_실제_거리와_좁힌_정면()
+    {
+        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(1.2, 1.75, 70.0, 90.0, true));
+        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(1.73, 1.75, 2.0, 90.0, true), "사거리 끝 2cm = 지난 배치의 누름 자리");
+        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(1.0, 1.75, 80.0, 90.0, true), "정면 한도 75 밖");
+        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(1.0, 1.75, 170.0, 90.0, false), "정면 판정 꺼짐");
+    }
+
+    [Test]
+    public void 멈춤은_틱과_시간_둘_다()
+    {
+        Assert.IsTrue(QABoss103PushNorthCounter.IsSettled(2, 0.1));
+        Assert.IsFalse(QABoss103PushNorthCounter.IsSettled(1, 0.5), "틱 부족");
+        Assert.IsFalse(QABoss103PushNorthCounter.IsSettled(10, 0.05), "시간 부족");
+    }
+
+    [Test]
+    public void 누름_판단_자리_멈춤_마감_앞_사거리_마감()
+    {
+        const double deadline = 12.6;
+        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true, true, true), "자리 + 멈춤");
+        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true, false, true), "아직 움직이는 중");
+        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, false, true, true), "사거리 안이어도 여유 자리 전엔 기다린다");
+        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false, false, true), "마감 0.4초 앞부터 사거리 안이면");
+        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false, false, false), "사거리 밖은 마감까지 기다린다");
+        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline, deadline, false, false, false), "마감 = 조건 없이 1회(기존 규칙)");
+    }
+
+    [Test]
+    public void 서버_판정_줄_형식과_야간_기록_전용_규칙()
+    {
+        string line = QABoss103PushNorthCounter.FormatServerCastLine("[QA103]", "Gunner", 2, "PnStun", true, 0, false,
+            1.234, -5.678, 3.0, -4.0, 2.43, 1.73, 1.75, 12.4, 90.0, "false", 278.9421);
+        Assert.AreEqual("[QA103] event=pn_server_cast bot=Gunner slot=2 step=PnStun windowOpen=true resolved=0 success=false pos=1.23/-5.68 boss=3.00/-4.00 " +
+                        "trueSurfM=2.43 aabbSurfM=1.73 reachM=1.75 frontDeg=12 frontLimit=90 overlap=false serverT=278.942", line);
+        StringAssert.Contains("step=na", QABoss103PushNorthCounter.FormatServerCastLine("[QA103]", "a b", -1, null, false, 1, true,
+            double.NaN, 0, 0, 0, double.NaN, 0, 0, 0, double.NaN, null, 0));
+
+        QANightlyEventRule r = QANightlyEvents.Match(line, LogType.Log, null);
+        Assert.IsNotNull(r);
+        Assert.AreEqual(QANightlyEvents.PushNorthServerCast, r.Name);
+        Assert.AreEqual(QABoss103PushNorthCounter.ServerCastEvent, QANightlyEvents.PushNorthServerCast, "계측기 줄 이름과 표 이름이 같다");
+        Assert.IsTrue(r.Trace);
+        StringAssert.EndsWith("serverT=278.942", QANightlyEvents.Detail(line, r.DetailMax));
+    }
+
+    [Test]
+    public void 서버_간파_진단_줄은_기록_전용으로_시각표에()
+    {
+        // TwentyThreeBoss.ReceiveAttack 진단(LogWarning)·OnPushNorthCounter(Log) 문구 그대로.
+        string reject = "[23호] 인터럽트가 카운터로 성립하지 않았다 — 서버=True · 창열림=True · 정면=False (허용 90°) · 상태=Attack · 페이즈=ChargeWait · 공격=ChargeSequence";
+        QANightlyEventRule r = QANightlyEvents.Match(reject, LogType.Warning, null);
+        Assert.IsNotNull(r);
+        Assert.AreEqual(QANightlyEvents.CounterReject, r.Name);
+        Assert.IsTrue(r.Trace);
+        StringAssert.EndsWith("공격=ChargeSequence", QANightlyEvents.Detail(reject, r.DetailMax), "어느 조건이 거짓인지 끝까지 남는다");
+
+        QANightlyEventRule ok = QANightlyEvents.Match("[23호/북진] 간파 — 위로 4.2m (남은 12.6m)", LogType.Log, null);
+        Assert.IsNotNull(ok);
+        Assert.AreEqual(QANightlyEvents.PushNorthCounterOk, ok.Name);
+        Assert.IsTrue(ok.Trace);
+
+        Assert.IsNull(QANightlyEvents.Match("[23호/북진] 2회차 탑 전부 파괴 — 무력화 3초(간파 1회 = 1칸)", LogType.Log, null), "무력화 시작 줄은 간파 성립이 아니다");
+        Assert.IsNull(QANightlyEvents.Match("[23호/북진] 시작 — 1칸 4.2m · 위 끝까지 12.6m", LogType.Log, null));
+    }
 }
 #endif
