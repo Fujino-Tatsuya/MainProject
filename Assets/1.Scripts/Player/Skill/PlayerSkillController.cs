@@ -287,6 +287,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     public PlayerSkillBase GetSkill(PlayerSkillSlot slot) =>
         PlayerSkillFollowUpRules.Resolve(GetSetSkill(slot, true), CurrentFollowUpMask, (int)slot);
 
+    /// <summary>칸의 쿨을 가진 스킬 — 현재 세트(기본/대체)의 그 칸 스킬. 후속 창이 열려 있어도 후속이 아니라 그 창을 연 원래 스킬(쿨 보상·차감 대상).</summary>
+    public PlayerSkillBase GetCooldownOwnerSkill(PlayerSkillSlot slot) => GetSetSkill(slot, true);
+
     // 현재 세트의 그 칸 스킬(후속 한 겹 아래). useOverrides = false 면 기본 세트.
     private PlayerSkillBase GetSetSkill(PlayerSkillSlot slot, bool useOverrides)
     {
