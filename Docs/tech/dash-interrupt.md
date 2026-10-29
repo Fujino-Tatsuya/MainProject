@@ -202,6 +202,76 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - 새 오브젝트라 HP·쿨·상태가 새로 시작된다. 연타 방지 0.5초(실제 시간).
 - 게이트 `UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS`. F1 은 `HitVFXDebugHUD`(피격 이펙트 순환)와 같은 키지만 그 HUD 는 이 씬·부트 구성에 없어 겹치지 않는다([debug-hotkeys.md](debug-hotkeys.md)).
 
+## 10.2 예측 보정 랩(139) — `InterruptCalibrationLab`
+
+"분명 맞췄는데 강 연출이 안 뜬다" 를 잡으려고, 대쉬 간파 한 번마다 **오너 예측(강/약/대상 없음)·서버 예측·서버 판정·판정 시점 실제 창 상태·사람의 판단(성공이어야 했나)** 을 표본 하나로 모아 CSV 로 남기는 씬이다.
+기록만 한다 — 예측식(`DashInterruptPredictor`)·허용치 칸은 고치지 않는다(데이터를 본 뒤 새 할 일). 계획 원본: 할 일 139 계획서(grill 2026-10-29).
+
+**씬**: `Assets/0.Scenes/Debug/InterruptCalibrationLab.unity` — `DebugInterruptLab` 을 `AssetDatabase.CopyAsset` 으로 복제(새 guid)한 뒤 아래만 바꿨다. **빌드 목록에 없다**(§10.1 과 같이 Dev Boot 가 Play 동안만 넣었다 뺀다).
+
+| 오브젝트 | §10.1 대비 |
+|---|---|
+| `Plane`·`Directional Light`·`CameraSwitcher`·`PlayerDashValidationManager`·`FloatingDamageSpawner` | 그대로 |
+| `TrainingDummy`(`TrainingDummy.prefab`, (0, 0, 5)) + `DebugDummyInterruptRecovery`·**`DebugDummyInterruptWindowMode`** | 허수아비 **하나만** 남겼다(`_2` 삭제, `_1` 을 가운데로). 창 모드 기본 = 무기한, 주기 0.6s/1.5s |
+| `InterruptCalibrationLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle`·`DebugInterruptTuningPanel`·**`InterruptCalibrationCapture`·`InterruptCalibrationQuestionPanel`** | 랩 오브젝트 이름 변경. 캡처·질문 패널의 `windowMode`(+ 패널 `capture`)는 씬에서 명시 연결 |
+
+보스는 원래 없다. 강·약 연출은 부트 `NetworkManager` 의 `InterruptProductionDirector` 경로 그대로 켜져 있다(튜닝 패널 기본 = 오너 암전만, §10.1).
+격리: `DebugInterruptLabIsolationTests` 가 두 랩 씬을 디버그 씬으로 보고(빌드 목록·다른 씬·프리팹에 디버그 컴포넌트 없음), 이 씬의 허수아비 하나·창 모드 연결도 YAML 로 확인한다.
+
+**진입**: 메인 툴바 Dev Boot 씬 드롭다운 → `InterruptCalibrationLab` → Dev Boot ▶ (솔로 호스트. `DevBootSceneCatalog` 가 `Assets/0.Scenes` 아래를 자동으로 찾아 등록 코드 없음). 씬을 직접 열고 Play 하면 동작하지 않는다(§10.1 과 같음).
+
+**화면** — 왼쪽 아래 `간파 예측 보정(139)` 패널(제목 버튼으로 접기, 너비 320), 오른쪽 위는 §10.1 튜닝 패널(겹치지 않는다). 질문 창은 화면 가운데.
+- 첫 줄: 표본 수 · 건너뜀(Esc) · 짝 실패 버림 / 대기열 · 넘쳐 버림 · 지금 단계.
+- 일치율 4줄(실시간): 오너 예측 ↔ 답 · 서버 예측 ↔ 답 · 서버 결과 ↔ 답 · 오너 ↔ 서버 예측. 강 = true·약 = false, 서버 성공 = true. 대상 없음·값 없음은 분모에서 뺀다.
+- `기록:` 이번 세션 폴더 · `지금 summary 쓰기` 버튼(표본 0 개면 안 씀).
+- `허수아비 창:` `무기한`/`주기` 토글 · `열림`/`닫힘` 길이(슬라이더 0~3s, 0.05 단위, ± 버튼 — 키보드 입력 칸 없음) — Play 중 바로 적용.
+- `예측기 관측 기록 초기화` — 예측기가 쌓은 창 길이 관측(중앙값의 재료, `InterruptWindowReplicaTracker`)을 지운다. 모드·길이를 바꾼 뒤 누르면 지난 모드의 관측이 섞이지 않는다.
+- 패널 위에 마우스가 있는 동안은 플레이어 입력(이동·대시·간파·스킬)을 막는다(`UiInputGateManager`).
+
+**질문 흐름** (`InterruptCalibrationQuestionPanel` + 순수 `InterruptCalibrationQuestionFlow`)
+1. 서버 판정 = 표본 완성 → 질문 대기열.
+2. 판정 + **0.5초(실시간)** 가 지나고 `GlobalTimeScale` 가 평소(슬로우·히트스톱·실패 복귀 끝, `IsActive = false`)면 시간을 멈추고 묻는다. 평소로 안 돌아와도 판정 + 3초(실시간)면 그냥 묻는다.
+   `waitDebugNormalSpeedHold`(기본 끔)를 켜면 §10.1 '성공 후 1배속' 이 끝날 때까지도 기다린다.
+3. 정지 = `Time.timeScale` 기억 → 0(가장 늦은 LateUpdate 에서 덮어씀) + 솔로 호스트면 `NetworkClock.Pause`. 재개 = 기억한 배율로 돌리고 시계 재개, 그 뒤엔 `GlobalTimeScale` 이 평소대로 쓴다.
+4. 답: **Y** = 성공이어야 했음(true) · **N** = 실패여야 했음(false) · **Esc** = 건너뛰기(기록 안 함, seq·일치율에 안 들어감). 버튼도 같다. 묻는 동안 플레이어 입력을 막고, 답한 뒤 마우스 버튼을 다 뗄 때까지 더 막는다(클릭이 공격으로 새지 않게).
+5. 질문 중 다음 표본이 오면 줄 선다(최대 8, 넘치면 새 표본 버림). 대기 표본이 바로 물을 수 있으면 멈춘 채로 다음 질문.
+
+**기록** — `C:/UnityProject/QA/139calib-<yyyyMMdd_HHmmss>/` (씬 시작마다 새 폴더, 첫 답 때 만든다 — 표본 0 개 세션은 폴더가 없다)
+- `samples.csv` — 답(Y/N) 마다 즉시 한 줄(UTF-8 BOM, 헤더 1줄, 값 없음 = 빈 칸, 시각은 같은 피어 `Time.time` 초).
+
+| 열 | 뜻 |
+|---|---|
+| `seq`·`real_time` | 기록 번호(1부터) · 판정 실시간(`realtimeSinceStartup`) |
+| `window_mode`·`window_open_len`·`window_closed_len` | 판정 때 허수아비 창 모드(Unbounded/Periodic)·주기 길이 |
+| `press_age` | 대시 입력 → 우클릭 간격(초) |
+| `cast_time`·`cast_pos_*`·`dash_dir_*`·`dash_speed`·`dash_remaining`·`skill_start_time`·`prep_delay`·`has_target_in_range`·`target_window_open`·`window_open_elapsed`·`window_expected_duration` | 오너 입력 순간 `DashInterruptPredictInput` 필드 그대로(음수 = 예측기 기준 '모름') |
+| `resolve_pos_*`·`target_distance`·`target_angle` | 예상 판정 위치(대시 끝) · 대상 판정 콜라이더 표면까지 수평 거리 · 대시 방향 ↔ 대상 방향 각도(도). 대상 없음이면 가장 가까운 등록 대상으로 잰다 |
+| `predicted_resolve_time`·`predicted_window_remaining` | 예측 판정 시각 · 그때 창 남은 시간 추정 |
+| `owner_forecast`·`owner_reason` | 오너 예측(강/약/대상 없음) · 예측기 Reason |
+| `server_forecast` | 서버 승인 시점 예측(시도 슬로우 강/약, 대상 없음 = NoTarget) |
+| `server_succeeded` | 서버 판정 성공/실패 |
+| `actual_window_open`·`actual_open_elapsed`·`actual_remaining` | 판정 시점 실제 허수아비 창(열림 여부 · 열린 뒤 경과 · 실제 남은 시간 — 닫혀 있으면 경과·남은 시간 빈 칸, 무기한이면 남은 시간 빈 칸) |
+| `user_answer` | 사람 답(true = 성공이어야 했음) |
+
+- `summary.txt` — 표본 수, 일치율 4개(+제외 수), 불일치 유형별 개수(예: 오너 강·답 false / 오너 약·답 true), 오너 예측 ↔ 답 불일치의 오너 Reason 별 개수.
+  패널이 꺼질 때(씬 나감·Play 정지 포함)·앱 종료·`지금 summary 쓰기` 버튼에서 (다시) 쓴다.
+
+**짝짓기 규칙** (`InterruptCalibrationPairing`)
+- 오너 요청에 시전 번호가 없어 **대기 표본은 하나**만 둔다. 오너 예측·서버 예측은 들어온 순서와 무관하게 그 표본에 붙고, 서버 판정이 오면 닫혀 질문으로 간다(빠진 쪽 칸은 빈 칸).
+- 같은 쪽(오너 또는 서버) 예측이 또 오면 앞 표본은 판정 누락으로 버리고 새로 연다. 대기 표본 없이 온 판정도 버린다.
+- 대기 표본이 열리고 **3초(게임 시간)** 안에 판정이 안 오면 버린다(판정 전 종료·넉백 등). 버린 수 = 패널 `짝 실패 버림`.
+- 대쉬 간파만 기록한다. 근접 간파는 `InterruptCalibrationCapture.includeMelee`(기본 끔)를 켜면 같은 구조로 들어온다.
+
+**주기 창 규칙** (`DummyInterruptWindowSchedule`, 서버 `deltaTime` = 디버그 배속·슬로우를 따른다)
+- 열림 → 닫힘 반복, 경계 시각은 바뀐 뒤 단계. 열림 0 = 열리지 않음, 닫힘 0 = 계속 열림. 주기로 바꾸면 열림 처음부터, 도중 길이 변경은 지금 단계 경과 유지.
+- **회복 중엔 주기 시계가 멈춘다** — 간파 성공 → 회복(`DebugDummyInterruptRecovery`, 기본 2초, 취약·보라)이 끝나면 **닫힘 단계 처음부터** 다시 시작한다(성공 직후 잘린 열림이 다시 나오지 않게, 관측 창 길이가 열림 길이로 모인다).
+
+**알려진 한계**
+- **솔로 호스트만**. 캡처·창 모드·정지가 서버와 오너가 같은 피어라는 전제다(클라 창에서는 서버 판정·실제 창 상태가 안 들어온다).
+- **허수아비 하나** 전제 — 창 모드·실제 창 상태는 연결된(없으면 씬에서 처음 찾은) 허수아비 하나만 본다. 허수아비를 늘리면 다른 허수아비 표본의 창 칸이 틀린다.
+- 무기한 모드에서는 창 추정 길이 = 지난번 기다린 시간이라(§10.1 ⚠️) '약' 이 나오는 것이 예측 규칙대로다 — 증상 재현용. 주기 모드 표본과 섞어 보지 말 것(`window_mode` 열로 나눈다).
+- Esc 는 질문 중에만 이 패널이 쓴다. 부트의 게임 메뉴가 같은 프레임에 Esc 를 받는지는 Play 확인 전이다.
+
 ## 11. 범위 밖
 
 - 116(간파 예측 로그)·117(성공 예측 연출)은 이 작업 범위 밖이다. 116 은 §5 의 예측 오프셋 값을 그대로 기록하면 된다.
@@ -222,4 +292,5 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 | `Assets/1.Scripts/Player/PlayerInputBuffer.cs` · `PlayerInputReader.cs` | `TryGetRecordedTime` · `TryGetPressTime` |
 | `Assets/4.Animations/Player/{Garen,Assassin,Gunner}/*AnimatorController.controller` · `Garen/GarenUpperBody.mask` | `DashInterruptUpper` 레이어·팔라딘 상체 마스크 |
 | `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·`DebugInterruptTuningPanel`(132 §17)·테스트 `Editor/DebugInterruptLabTests.cs`·`Editor/DebugInterruptLabIsolationTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |
+| `Assets/0.Scenes/Debug/InterruptCalibrationLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/Calibration/` · `DebugDummyInterruptWindowMode.cs`·`DummyInterruptWindowSchedule.cs` | 예측 보정 랩(§10.2, 할 일 139) — 캡처·짝짓기·질문 창·기록·주기 창. 테스트 `Editor/InterruptCalibration*Tests.cs`·`DummyInterruptWindowScheduleTests.cs`, 메뉴 `Tools/Tests/간파 랩 EditMode 테스트 실행` |
 | 테스트 `Assets/1.Scripts/Player/Dash/Tests/EditMode/DashInterruptRulesTests.cs` · `DashInterruptLayerFadeTests.cs` · `Assets/1.Scripts/Player/Editor/PlayerSkillApprovalRulesTests.cs` · `PlayerInputBufferTests.cs` | 창 경계·0=끔·허용오차·판정 시점·입력 결정·승인 사전조건·가중치 전환·버퍼 기록 시각 |
