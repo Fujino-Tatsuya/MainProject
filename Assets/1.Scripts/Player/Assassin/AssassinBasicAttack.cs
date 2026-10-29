@@ -34,16 +34,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     [SerializeField] private AssassinBasicAttackData data;
     [SerializeField] private Animator animator;
 
-    // 판정 상자(할 일 144) — 가붕이 평타 AAC1~4 처럼 프리팹 Armature/DefaultAttack 아래 BoxCollider(+ColliderInfo)를 사용자가 세팅한다.
-    // 방향은 몸 회전이 아니라 그 타의 조준 방향, 기준점 = 시전자 발밑(AssassinStrikeBox). 특성 범위 배율은 상자 길이·폭에 곱한다.
-    [Header("판정 상자 (할 일 144 — BoxCollider + ColliderInfo)")]
-    [Tooltip("일반 1~4타 판정 상자. 순서 = 타 순서. 비면 그 타는 판정하지 않는다(오류 로그).")]
-    [SerializeField] private ColliderInfo[] normalStepHitboxes = new ColliderInfo[4];
-    [Tooltip("일반 E 강타 판정 상자. 칼날의 영역(ASN_3_E_AREA)은 이 상자의 길이(z)·폭(x)을 배율로 키운다.")]
-    [SerializeField] private ColliderInfo enhancedHitbox;
-    [Tooltip("변신 평타 묶음(4타 공용) 판정 상자.")]
-    [SerializeField] private ColliderInfo transformedHitbox;
-
     private Player player;
     private PlayerStateController stateController;
     private PlayerInputReader input;
@@ -749,9 +739,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             ? ConsumeNextAttackBuff(traitKey)
             : 1f;
         int damage = ResolveHitDamage(step.AttackDamageMultiplier, traitKey, nextAttackMultiplier);
-        if (!TryPlaceHitBox(currentMode, currentStepIndex, attackDirection, out AssassinStrikeBox box))
+        if (!TryGetHitArea(currentMode, currentStepIndex, attackDirection, out AttackShapeSet area, out AttackShapePose pose))
         {
-            Debug.LogError($"[Assassin/평타] {currentMode} {currentStepIndex + 1}타 판정 상자(BoxCollider+ColliderInfo)가 배정되지 않았습니다 — 판정 생략.", this);
+            Debug.LogError($"[Assassin/평타] {currentMode} {currentStepIndex + 1}타 판정 도형(hitArea)이 비어 있습니다 — 판정 생략.", this);
             return;
         }
 
@@ -761,15 +751,16 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 급소 파괴 — 대상마다 적중 직전 특성 수정자(밀치기)를 거친다. 강타 키(Default/Enhanced)만 효과가 맞는다(칼날의 영역으로 넓어진 범위 포함).
         bool landed = coneAttack.Fire(
             attackDirection,
-            box,
+            area,
+            pose,
             damage,
             data.TriggersOnHit,
             serverActionCastId,
             traitKey);
 
-        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 상자에 추가 베기 1회 예약.
+        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 도형·포즈에 추가 베기 1회 예약.
         if (AssassinComboExtraRules.Schedules(currentMode, currentStepIndex, NormalStepCount, hitsFired, step.HitCount))
-            ScheduleComboExtra(step, traitKey, box);
+            ScheduleComboExtra(step, traitKey, area, pose);
 
         // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
         if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
@@ -799,30 +790,27 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     public int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
 
     /// <summary>
-    /// 그 타의 판정 상자 — 앵커(<see cref="HitboxFor"/>)를 <paramref name="direction"/>·발밑 기준으로 놓고 칼날의 영역 길이·폭 배율을 바른다.
-    /// 서버 판정(<see cref="FireCurrentHit"/>)과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. 앵커가 없으면 false.
+    /// 그 타의 판정 도형(할 일 153) — 단 데이터 <see cref="AssassinBasicAttackStepData.HitArea"/> 에 칼날의 영역 길이·폭 배율을 바른 것과,
+    /// 기준 포즈(시전자 발밑 + <paramref name="direction"/> — 몸 회전이 아니라 그 타의 조준 방향).
+    /// 서버 판정(<see cref="FireCurrentHit"/>)과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. 단이 없거나 도형이 비면 false.
     /// </summary>
-    public bool TryPlaceHitBox(AssassinBasicAttackMode mode, int stepIndex, Vector3 direction, out AssassinStrikeBox box)
+    public bool TryGetHitArea(AssassinBasicAttackMode mode, int stepIndex, Vector3 direction, out AttackShapeSet area, out AttackShapePose pose)
     {
-        TraitAttackKey traitKey = TraitKeyFor(mode);
-        // 칼날의 영역 — 판정 상자 길이·폭만 배율. 전진·판정 기준점(몸)은 그대로.
-        AssassinTraitAreaRules.BoxScale(player != null ? player.TraitModifiers : null, traitKey, out float lengthScale, out float widthScale);
-        return AssassinStrikeBox.TryPlace(HitboxFor(mode, stepIndex), transform, direction, lengthScale, widthScale, out box);
+        area = null;
+        pose = default;
+        if (!TryGetStep(mode, stepIndex, out AssassinBasicAttackStepData step) || step.HitArea == null || step.HitArea.IsEmpty)
+            return false;
+
+        // 칼날의 영역 — 판정 도형 길이·폭만 배율. 전진·판정 기준점(몸)은 그대로.
+        area = AssassinTraitAreaRules.ScaleArea(player != null ? player.TraitModifiers : null, TraitKeyFor(mode), step.HitArea);
+        Vector3 position = transform.position;
+        pose = area.ResolvePose(position, direction, position, direction);
+        return true;
     }
 
-    // 이 타의 판정 상자 앵커 — 일반 = 타 순서, 강타·변신 묶음 = 각자 하나.
-    private ColliderInfo HitboxFor(AssassinBasicAttackMode mode, int stepIndex) => mode switch
-    {
-        AssassinBasicAttackMode.Enhanced => enhancedHitbox,
-        AssassinBasicAttackMode.Transformed => transformedHitbox,
-        _ => normalStepHitboxes != null && stepIndex >= 0 && stepIndex < normalStepHitboxes.Length
-            ? normalStepHitboxes[stepIndex]
-            : null,
-    };
-
-    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·상자는 지금 값으로 고정(새 조준·이동 없음).
+    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·도형은 지금 값으로 고정(새 조준·이동 없음).
     // 지연만 공격 가속기를 탄다. VFX 없음(판정만).
-    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, in AssassinStrikeBox box)
+    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, AttackShapeSet area, in AttackShapePose pose)
     {
         traitEffects ??= PlayerTraitEffects.For(this);
         if (traitEffects == null)
@@ -833,7 +821,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         int sourceDref = player.ResolveDamage(step.AttackDamageMultiplier, 0, key);
-        var strike = new ComboExtraStrike(transform.position, box, extra.DamageFrom(sourceDref));
+        var strike = new ComboExtraStrike(area, pose, extra.DamageFrom(sourceDref));
         float delay = AssassinComboExtraRules.Delay(extra.Delay, AttackSpeedRate);
         pendingComboExtras.Schedule(Time.timeAsDouble, delay, strike);
         Edit.Log($"[Assassin/평타] 끝없는 칼날 예약 — {key}, 기준 {sourceDref} → {strike.Damage}, {delay:F3}초 뒤", this);
@@ -846,7 +834,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         {
             if (assassinState != null)
                 coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
-            int landed = coneAttack.FireDerived(strike.Origin, strike.Box, strike.Damage);
+            int landed = coneAttack.FireDerived(strike.Area, strike.Pose, strike.Damage);
             Edit.Log($"[Assassin/평타] 끝없는 칼날 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
         }
     }
@@ -860,14 +848,14 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private readonly struct ComboExtraStrike
     {
-        public readonly Vector3 Origin;
-        public readonly AssassinStrikeBox Box;
+        public readonly AttackShapeSet Area;
+        public readonly AttackShapePose Pose;
         public readonly int Damage;
 
-        public ComboExtraStrike(Vector3 origin, AssassinStrikeBox box, int damage)
+        public ComboExtraStrike(AttackShapeSet area, AttackShapePose pose, int damage)
         {
-            Origin = origin;
-            Box = box;
+            Area = area;
+            Pose = pose;
             Damage = damage;
         }
     }

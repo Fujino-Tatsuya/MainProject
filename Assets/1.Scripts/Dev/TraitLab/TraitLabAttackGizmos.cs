@@ -13,7 +13,7 @@ public enum TraitLabGizmoCategory
 
 /// <summary>
 /// 기즈모 한 개 — 판정 코드가 만든 형상 값을 그대로 담는다(여기서 수치를 만들지 않는다).
-/// 상자(OverlapBox·SkillHitVolume.Beam·AssassinStrikeBox)·구·캡슐(SphereCast 경로 포함)·바닥 부채꼴(360 = 원)·원기둥(SkillHitVolume.CircleColumn).
+/// 상자(OverlapBox·SkillHitVolume.Beam)·구·캡슐(SphereCast 경로 포함)·바닥 부채꼴(360 = 원)·원기둥(SkillHitVolume.CircleColumn).
 /// </summary>
 public readonly struct TraitLabGizmoShape
 {
@@ -200,8 +200,18 @@ public static class TraitLabAttackShapes
     static void AddStrikeBox(AssassinBasicAttack attack, AssassinBasicAttackMode mode, int step, Vector3 facing,
         TraitLabGizmoCategory category, string label, List<TraitLabGizmoShape> shapes)
     {
-        if (attack.TryPlaceHitBox(mode, step, facing, out AssassinStrikeBox box))
-            shapes.Add(TraitLabGizmoShape.Box(category, label, box.Center, box.HalfExtents, box.Rotation));
+        // 할 일 153 2단계 — 판정 도형(부채꼴)만 임시로 옮겨 그린다. 6단계에서 AttackShapeDrawing 으로 통합.
+        if (!attack.TryGetHitArea(mode, step, facing, out AttackShapeSet area, out AttackShapePose pose))
+            return;
+
+        foreach (AttackShape shape in area.Shapes)
+        {
+            if (shape is AttackSectorShape sector)
+            {
+                AttackShapePose shapePose = sector.ShapePose(pose);
+                shapes.Add(TraitLabGizmoShape.Sector(category, label, shapePose.Position, shapePose.Forward, sector.Range, sector.Angle));
+            }
+        }
     }
 
     // ── 스킬 ──

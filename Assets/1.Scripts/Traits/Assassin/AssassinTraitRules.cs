@@ -7,20 +7,27 @@ using UnityEngine;
 /// </summary>
 public static class AssassinTraitAreaRules
 {
-    /// <summary>일반 E 강타(강화한 기본 공격) — 판정 상자 길이·폭.</summary>
+    /// <summary>일반 E 강타(강화한 기본 공격) — 판정 도형 길이·폭.</summary>
     public static readonly TraitAttackKey EnhancedStrike = new TraitAttackKey(AttackType.Default, TraitAttackForm.Enhanced);
 
     /// <summary>변신 E 원형 5타 — 원 반경.</summary>
     public static readonly TraitAttackKey CircleStrike = new TraitAttackKey(AttackType.SkillE, TraitAttackForm.Alternate);
 
-    /// <summary>
-    /// 평타 판정 상자(할 일 144, <see cref="AssassinStrikeBox"/>)의 콜라이더 스케일 배율 — 길이(z) = Length 축, 폭(x) = Width 축.
-    /// 몸 기준점에서 늘어나므로 상자 뒤 끝(몸)은 그대로고 앞 끝·양옆만 나간다. 특성 출처가 없으면 둘 다 1.
-    /// </summary>
-    public static void BoxScale(PlayerTraitModifiers modifiers, TraitAttackKey key, out float lengthMultiplier, out float widthMultiplier)
+    /// <summary>그 공격 키의 길이(Length 축)·폭(Width 축) 배율. 특성 출처가 없으면 둘 다 1, 음수는 0.</summary>
+    public static void AreaScale(PlayerTraitModifiers modifiers, TraitAttackKey key, out float lengthMultiplier, out float widthMultiplier)
     {
         lengthMultiplier = modifiers != null ? Mathf.Max(0f, modifiers.AreaMultiplier(key, TraitAreaAxis.Length)) : 1f;
         widthMultiplier = modifiers != null ? Mathf.Max(0f, modifiers.AreaMultiplier(key, TraitAreaAxis.Width)) : 1f;
+    }
+
+    /// <summary>
+    /// 평타 판정 도형(할 일 153)에 길이·폭 배율을 바른 <b>복사본</b> — 부채꼴이면 range × 길이, angle × 폭(<see cref="AttackShape.Scaled"/>).
+    /// 기준점(몸 발밑)은 그대로라 꼭짓점은 안 움직인다. 배율이 둘 다 1 이면 원본을 그대로 돌려준다(SO 를 고치지 않으므로 공유해도 된다).
+    /// </summary>
+    public static AttackShapeSet ScaleArea(PlayerTraitModifiers modifiers, TraitAttackKey key, AttackShapeSet area)
+    {
+        AreaScale(modifiers, key, out float length, out float width);
+        return area == null || (length == 1f && width == 1f) ? area : area.Scaled(length, width);
     }
 
     /// <summary>원 반경 × 배율(0 미만 배율은 0).</summary>

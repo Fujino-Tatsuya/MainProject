@@ -23,7 +23,7 @@ internal static class PlayerEditModeTestRunner
         "^AssassinComboModelTests$", // PLAN-assassin A6 — 평타 순서·0.8초 유예·스킬 리셋
         "^AssassinComboWindowRulesTests$", // 할 일 47 연장 — 평타 다음 타 예약 창(정규화 시간·경계·단별 기본값)
         "^AssassinLungeModelTests$", // 할 일 19 — 일반 E 강타 전진 거리 분배
-        "^AssassinStrikeBoxTests$", // 할 일 144 — 평타 판정 상자: 조준 방향 배치·앵커 오프셋·예전 부채꼴 덮음·프리팹 배선
+        "^AssassinStrikeBoxTests$", // 할 일 144·153 — 평타 판정 도형: 예전 부채꼴 값·경계 안/밖·조준 방향 회전·프리팹 옛 상자 제거
         "^AssassinStateModelTests$", // PLAN-assassin A7 — 분노 게이지(충전·상한·최소량·감소·보존)·변신 지속·해제 2초·종료 대기·쓰러짐 정리
         "^AssassinDashStrikeModelTests$", // PLAN-assassin A8 — Q 경로 대상 1회·쿨 차감 1회·보고 거리 상한
         "^AssassinCircleStrikeModelTests$", // PLAN-assassin A9 — 변신 E 원 판정·타당 1회·5타·무적 구간·종료 대기

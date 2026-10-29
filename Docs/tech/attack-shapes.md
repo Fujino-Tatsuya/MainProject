@@ -103,7 +103,7 @@ hitArea.shapes[1].length            (hitArea.shapes[1] · AttackRectShape)
 | 단계 | 내용 |
 |---|---|
 | 1 | 코어(이 문서·도형 4종·질의·그리기·테스트) — 기존 판정 코드는 아직 안 바뀜 |
-| 2 | 어쌔신 평타·강타·변신 묶음 |
+| 2 | 어쌔신 평타·강타·변신 묶음 — ✅ `AssassinBasicAttackStepData.hitArea`(부채꼴 1개, 높이 ±range), `AssassinConeAttack.Fire·FireDerived` = `Collect`, 칼날의 영역 = `AssassinTraitAreaRules.ScaleArea`. 144 프리팹 상자·`AssassinStrikeBox` 삭제 |
 | 3 | 팔라딘 평타 |
 | 4 | 특성 추가 공격 5종 |
 | 5 | 캐릭터별 Q·E 스킬 |

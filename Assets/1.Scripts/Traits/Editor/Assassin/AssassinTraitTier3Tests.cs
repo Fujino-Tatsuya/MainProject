@@ -207,7 +207,7 @@ public sealed class AssassinTraitTier3Tests
     }
 
     [Test]
-    public void Area_StrikeBox_DimensionsTimes1_25_NotArea()
+    public void Area_StrikeSector_RangeAndAngleTimes1_25_NotArea()
     {
         TraitModifierSet set = SetOf(Area);
         float length = set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Length);
@@ -215,34 +215,41 @@ public sealed class AssassinTraitTier3Tests
         Assert.AreEqual(1.25f, length, Eps, "길이 ×1.25");
         Assert.AreEqual(1.25f, width, Eps, "폭 ×1.25");
 
-        // 강타 기본 상자(할 일 144) — 몸에서 앞 1.8m, 폭 3.12m. 콜라이더 스케일 배율로 앞 끝 2.25m·반폭 1.95m.
-        var center = new Vector3(0f, 1f, 0.9f);
-        var size = new Vector3(3.12f, 2f, 1.8f);
-        AssassinStrikeBox scaled = AssassinStrikeBox.Place(Vector3.zero, Vector3.forward, Matrix4x4.identity, center, size, length, width);
-        Assert.AreEqual(1.125f, scaled.Center.z, Eps, "중심도 몸 기준으로 같은 배율 — 뒤 끝은 몸 그대로");
-        Assert.AreEqual(1.125f, scaled.HalfExtents.z, Eps);
-        Assert.AreEqual(1.95f, scaled.HalfExtents.x, Eps);
-        Assert.AreEqual(1f, scaled.HalfExtents.y, Eps, "높이는 그대로");
-        Assert.IsTrue(scaled.Contains(new Vector3(0f, 1f, 2.2f)));
-        Assert.IsFalse(scaled.Contains(new Vector3(0f, 1f, 2.3f)));
+        // 강타 기본 부채꼴(할 일 153) r1.8·120° → 길이 배율 = range 2.25, 폭 배율 = angle 150°. 꼭짓점(발밑)·높이는 그대로.
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, AssassinBasicAttackStepData.StrikeSector(1.8f, 120f));
+        var scaled = (AttackSectorShape)area.Scaled(length, width).Shapes[0];
+        Assert.AreEqual(2.25f, scaled.Range, Eps);
+        Assert.AreEqual(150f, scaled.Angle, Eps);
+        Assert.AreEqual(0f, scaled.MinOffset, Eps);
+        Assert.AreEqual(1.8f, scaled.MaxHeight, Eps, "높이는 배율 없음");
 
-        // 미보유 = 그대로
-        TraitModifierSet none = SetOf();
-        AssassinStrikeBox plain = AssassinStrikeBox.Place(Vector3.zero, Vector3.forward, Matrix4x4.identity, center, size,
-            none.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Length),
-            none.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Width));
-        Assert.AreEqual(0.9f, plain.HalfExtents.z, Eps);
-        Assert.AreEqual(1.56f, plain.HalfExtents.x, Eps);
+        var pose = new AttackShapePose(Vector3.zero, Vector3.forward);
+        Assert.IsTrue(scaled.Contains(pose, new Vector3(0f, 0f, 2.2f)));
+        Assert.IsFalse(scaled.Contains(pose, new Vector3(0f, 0f, 2.3f)));
+        Vector3 side = Quaternion.Euler(0f, 72f, 0f) * Vector3.forward * 2f;   // 정면에서 72° — 새 반각 75° 안, 원래 반각 60° 밖
+        Assert.IsTrue(scaled.Contains(pose, side));
+        Assert.IsFalse(area.Contains(pose, side));
+
+        // 원본 SO 값은 그대로(복사본)
+        var original = (AttackSectorShape)area.Shapes[0];
+        Assert.AreEqual(1.8f, original.Range, Eps);
+        Assert.AreEqual(120f, original.Angle, Eps);
     }
 
     [Test]
-    public void Area_BoxRule_WidthOnly_KeepsLength()
+    public void Area_SectorRule_WidthOnly_KeepsRange()
     {
-        AssassinStrikeBox box = AssassinStrikeBox.Place(Vector3.zero, Vector3.forward, Matrix4x4.identity,
-            new Vector3(0f, 1f, 1f), new Vector3(2f, 2f, 2f), 1f, 1.25f);
-        Assert.AreEqual(1f, box.HalfExtents.z, Eps);
-        Assert.AreEqual(1f, box.Center.z, Eps);
-        Assert.AreEqual(1.25f, box.HalfExtents.x, Eps);
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackSectorShape(2f, 100f));
+        var scaled = (AttackSectorShape)area.Scaled(1f, 1.2f).Shapes[0];
+        Assert.AreEqual(2f, scaled.Range, Eps);
+        Assert.AreEqual(120f, scaled.Angle, Eps);
+    }
+
+    [Test]
+    public void Area_ScaleArea_NoTraitSource_ReturnsSameSet()
+    {
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackSectorShape(1.8f, 120f));
+        Assert.AreSame(area, AssassinTraitAreaRules.ScaleArea(null, AssassinTraitAreaRules.EnhancedStrike, area), "특성 출처 없음 = 원본 그대로");
     }
 
     [Test]
