@@ -34,6 +34,10 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
     public override bool CanMoveWhileActive => false;
+
+    // 좌클릭 홀드 중 변신 E — 5타가 끝난 뒤 아직 누르고 있으면 기본 공격을 잇는다(할 일 146, 어쌔신 일반 E 와 같은 규칙).
+    public override bool ResumesBasicAttackOnHold => true;
+
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
 
     private AssassinCircleStrikeSkillData StrikeData => Data as AssassinCircleStrikeSkillData;

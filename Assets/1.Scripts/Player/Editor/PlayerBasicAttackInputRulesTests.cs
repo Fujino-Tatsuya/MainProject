@@ -54,6 +54,24 @@ public sealed class PlayerBasicAttackInputRulesTests
         Assert.That(assassin.GetComponent<AssassinBasicAttack>().StartsOnHold, Is.False, "어쌔신은 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
     }
 
+    // 변신 E(원형 5타)도 어쌔신 일반 E 와 같은 규칙 — 정상 종료(완료·홀드 해제)만 잇고 대시·피격·사망 끊김은 안 잇는다.
+    [TestCase(SkillEndReason.Completed, true)]
+    [TestCase(SkillEndReason.Released, true)]
+    [TestCase(SkillEndReason.Cancelled, false)]
+    [TestCase(SkillEndReason.CasterDied, false)]
+    [TestCase(SkillEndReason.DashCancelled, false)]
+    public void ResumeAfterSkill_AssassinCircleStrike_SameRuleAsAssassinE(SkillEndReason reason, bool expected)
+    {
+        var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab");
+        var circleStrike = assassin.GetComponentInChildren<AssassinCircleStrikeSkill>(true);
+        var enhance = assassin.GetComponent<AssassinEnhanceSkill>();
+        Assert.That(circleStrike, Is.Not.Null, "변신 E 가 어쌔신 프리팹에 있다");
+        Assert.That(circleStrike.ResumesBasicAttackOnHold, Is.True, "변신 E = 항상");
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(circleStrike.ResumesBasicAttackOnHold, reason), Is.EqualTo(expected));
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(circleStrike.ResumesBasicAttackOnHold, reason),
+            Is.EqualTo(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(enhance.ResumesBasicAttackOnHold, reason)), "일반 E 와 같은 결과");
+    }
+
     [Test]
     public void ClassifySkillDuringAttack_NonReservingCharacter_LeavesInputToBuffer()
     {
