@@ -222,14 +222,23 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, width, data));
     }
 
-    /// <summary>발사 판정 상자 — <see cref="Fire"/> 의 <see cref="GunnerBeamAttack.FirePiercing"/> 와 같은 인자(오너 미리보기 공용). 폭 = 데이터 폭(특성 없음).</summary>
+    /// <summary>
+    /// 발사 판정 상자(오너 미리보기 공용) — <see cref="Fire"/> 와 같은 판정 도형(<see cref="GunnerChargeLaserData.FireArea"/>)·포즈의
+    /// 첫 도형 넓은 질의 상자(직사각형이면 판정 영역 그대로). 폭 = 데이터 폭(특성 없음).
+    /// </summary>
     public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data) =>
         FireVolume(origin, direction, length, data.BeamWidth, data);
 
     /// <summary>폭을 따로 받는 판(광폭 레이저 — <see cref="GunnerTraitRules.QBeamWidthFor"/>).</summary>
     public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, float width, GunnerChargeLaserData data)
     {
-        return SkillHitVolume.Beam(origin, direction, length, width, data.BeamHeight, data.HittableLayers);
+        AttackShapeSet area = data.FireArea(length, width);
+        AttackShape shape = area.IsEmpty ? null : area.Shapes[0];
+        if (shape == null)
+            return SkillHitVolume.Box(origin, Vector3.zero, Quaternion.identity, data.HittableLayers);
+
+        shape.GetBroadBox(data.FirePose(origin, direction), out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
+        return SkillHitVolume.Box(center, halfExtents, rotation, data.HittableLayers);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -319,15 +328,17 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         Vector3 origin = FireOrigin(owner.transform.position, data);
         float length = beam.CastLength(origin, direction, shotRange, data.BeamWidth * 0.5f, data.BlockingLayers);
 
-        int hitCount = beam.FirePiercing(origin, direction, length, shotWidth, data.BeamHeight,
-                                         data.HittableLayers, shotDamage, DamageAttackType,
+        // 판정 = 최대 충전 도형을 지형 차단 뒤 길이·광폭 폭으로 맞춘 복사본, 기준점 = 발사 원점 + 첫 발 방향(할 일 153).
+        AttackShapeSet area = data.FireArea(length, shotWidth);
+        AttackShapePose pose = data.FirePose(origin, direction);
+        int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shotDamage, DamageAttackType,
                                          DamageHitPattern, data.TriggersOnHit,
                                          TraitHitFlags.Original, originalHitHook);
         // 잔류 포격 묶음 — 예정 단일 대상 피해(실제 총 피해·맞힌 수 아님)를 발마다 더하고, 첫 발 위치·방향·최종 충전 사거리·폭을 저장.
         echoPlan.AddOriginalShot(origin, direction, shotRange, shotWidth, shotDamage);
 
-        // 아군 보호막 — 같은 아군은 시전당 원래 보호막량 1회(시전자 제외는 CollectAllies).
-        beam.CollectAllies(origin, direction, length, shotWidth, data.BeamHeight, data.AllyLayers, allies);
+        // 아군 보호막 — 같은 판정 도형. 같은 아군은 시전당 원래 보호막량 1회(시전자 제외는 CollectAllies).
+        beam.CollectAllies(area, pose, data.AllyLayers, allies);
         int shielded = 0;
         for (int i = 0; i < allies.Count; i++)
         {
@@ -507,7 +518,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         echoPlan.Reset();
     }
 
-    // [서버] 예약된 잔류 포격 — 저장한 위치·방향·충전 사거리·폭, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
+    // [서버] 예약된 잔류 포격 — 저장한 위치·방향(포즈)·충전 사거리·폭(도형 배율)으로 원래 발과 같은 판정 도형, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
     // 열 소모·보호막·밀치기·쿨·적중 사건·연쇄 없음(Derived).
     private void Update()
     {
@@ -523,7 +534,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         {
             GunnerDerivedShot shot = dueEchoShots[i];
             float length = beam.CastLength(shot.Origin, shot.Direction, shot.Range, data.BeamWidth * 0.5f, data.BlockingLayers);
-            int hitCount = beam.FirePiercing(shot.Origin, shot.Direction, length, shot.Width, data.BeamHeight,
+            int hitCount = beam.FirePiercing(data.FireArea(length, shot.Width), data.FirePose(shot.Origin, shot.Direction),
                                              data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
                                              false, TraitHitFlags.Derived, echoHitHook);
             Edit.Log($"[Gunner/Q] 잔류 포격 — 사거리 {length:0.0}/{shot.Range:0.0}, 폭 {shot.Width:0.##}, 피해 {shot.Damage} ×{hitCount}", this);

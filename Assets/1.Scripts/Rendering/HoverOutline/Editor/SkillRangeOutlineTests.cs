@@ -152,10 +152,16 @@ public sealed class SkillRangeOutlineTests
         float length = data.RangeAt(0.5f);
 
         SkillHitVolume preview = GunnerChargeLaserSkill.FireVolume(origin, dir, length, data);
-        // 발사(Fire) → FirePiercing(origin, direction, length, BeamWidth, BeamHeight, HittableLayers) → OverlapBeamBox
-        SkillHitVolume server = SkillHitVolume.Beam(origin, dir, length, data.BeamWidth, data.BeamHeight, data.HittableLayers);
+        // 발사(Fire) → FirePiercing(FireArea(length, BeamWidth), FirePose(origin, dir)) → AttackShapeQuery.Collect 의 넓은 질의 상자(할 일 153)
+        data.FireArea(length, data.BeamWidth).Shapes[0].GetBroadBox(data.FirePose(origin, dir),
+            out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
+        SkillHitVolume server = SkillHitVolume.Box(center, halfExtents, rotation, data.HittableLayers);
 
         AssertSameVolume(server, preview);
+        // 예전 발사 상자(SkillHitVolume.Beam, 높이 2)와도 같은 상자(경계 허용 오차만큼만 크다).
+        SkillHitVolume old = SkillHitVolume.Beam(origin, dir, length, data.BeamWidth, 2f, data.HittableLayers);
+        Assert.That(Vector3.Distance(old.Center, preview.Center), Is.LessThan(1e-4f));
+        Assert.That(Vector3.Distance(old.HalfExtents, preview.HalfExtents), Is.LessThan(1e-3f));
     }
 
     // ── 어쌔신 변신 E: 원기둥 ──
