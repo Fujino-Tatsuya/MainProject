@@ -56,11 +56,12 @@
 - **예측 함수 하나**(`DashInterruptPredictor`, `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs`) — 근접·대쉬 공용.
   판정 시각 = 근접 `지금 + 준비 시간`, 대쉬 `max(예상 대시 끝, 평소 Hit)`. 준비 시간 = 이 피어 관측값 > 데이터 HitDelay > 모름(0).
   남은 창 = 창 추정 길이(과거 관측) − 열린 뒤 경과. **모르면 '열려 있음'만으로 강**.
-- **대상 판정**(`InterruptTargetGeometry`, 새 수치 칸 없음): ① 판정 위치(근접 = 지금, 대쉬 = 예상 대시 끝) → 대상 콜라이더 표면 수평 거리 ≤ 간파 사거리(HUD 강조 사거리와 같은 값)
-  ② 대상 정면 허용각 안(23호 `counterFrontAngle` 등 기존 판정값, 정면 판정 없는 대상 = 180) ③ 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)이 대상을 향함(반각 = min(정면 허용각, 90)).
+- **대상 판정**(할 일 139-3, 새 수치 칸 없음): ① 판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치(근접 = 지금, 대쉬 = 예상 대시 끝)에 놓은 오버랩에 닿음
+  (`HitboxAnchorShape` — 서버 `ResolveHit` 과 같은 형상·질의) ② 대상 정면 허용각 안(`InterruptTargetGeometry.FacesAttacker` — 23호 `counterFrontAngle` 등 기존 판정값, 정면 판정 없는 대상 = 180).
+  HUD 강조 사거리(전방위 = 돌면 닿는 거리)보다 좁다. 원인·앵커 수치·재현은 [dash-interrupt.md §5](dash-interrupt.md).
 - **대쉬 간파 예측 시점 = 우클릭을 누른 순간**(`InterruptAttemptPrediction.AtPress` 가 처리 프레임 값을 누른 뒤 경과만큼 되돌림). 대쉬 → 우클릭 순서만([dash-interrupt.md §2.1](dash-interrupt.md)).
 - **대상 캐시** `InterruptTargetRegistry`(서버·클라 같은 규칙): 등록 = 대상 스폰(모든 피어 — 23호 = 보스전 시작 Spawn, 중간보스·스파링 봇 = `MonsterBase`, 허수아비 = `TrainingDummyInterrupt`),
-  해제 = 디스폰·사망(MonsterBase Dead)·씬 언로드. 실제 판정(`ResolveHit` 오버랩)은 캐시를 쓰지 않는다.
+  해제 = 디스폰·사망(MonsterBase Dead)·씬 언로드. 예측 오버랩에 걸린 Unit 중 캐시에 있는 것만 대상이다. 실제 판정(`ResolveHit` 오버랩)은 캐시를 쓰지 않는다.
 - **서버가 슬로우 강·약을 정한다**(`Time.timeScale` 은 전 피어 공용). 오너 클라 예측은 암전·빛 모임만 켠다 — 서버 결과가 다르면 실패 규칙으로 걷는다.
   오너가 약·대상 없음으로 봤는데 서버가 강이면 오너 화면은 암전·빛 모임 없이 강 슬로우·줌만 받는다(뒤늦게 켜지 않는다).
 
@@ -555,7 +556,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 할 일 132 추가(같은 슬로우 모션 메뉴): `InterruptOwnerPresentationTests`(상태 기계) · `InterruptTargetRegistryTests`(캐시) · `InterruptOwnerDimTests`(마스크 암전·비트 4) ·
 `InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1·A3·A4 켬) ·
 `InterruptPresentationEffectTests`(§17 효과 칸 기본값·프리팹·그리기만 끔·섬광 순간 정상) · `DebugInterruptLabTests`(튜닝 패널 줄·배속 버튼).
-격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`).
+격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`), 앵커 형상 대상 검사는 `HitboxAnchorShapeTests`(Assembly-CSharp-Editor).
 
 ## 7. 이후 확장
 

@@ -6,7 +6,7 @@ namespace BeaverLobby.Player.Dash.EditModeTests
     /// <summary>
     /// 할 일 139-2 — 139 예측 보정 랩 표본(세션 139calib-20261029_170741, 27개)의 CSV 값으로 바뀐 예측 규칙을 재현한다.
     /// ① 열린 창의 길이 추정이 틀렸으면(경과 &gt; 추정 길이) 버리고 판정까지 남은 시간이 짧으면 강(seq 5·8·15·19·26, 22 는 해당 없음),
-    /// ② 누를 때 창이 닫혀 약이면 대시 중 재예측 대상(seq 16), ③ 판정 위치가 대상과 겹치면 공격 방향 검사 생략(seq 10).
+    /// ② 누를 때 창이 닫혀 약이면 대시 중 재예측 대상(seq 16). (③ 겹침 규칙은 139-3 에서 앵커 형상 오버랩으로 대체 — seq 10 은 HitboxAnchorShapeTests)
     /// </summary>
     public class DashInterruptCalibrationSampleTests
     {
@@ -132,37 +132,16 @@ namespace BeaverLobby.Player.Dash.EditModeTests
             Assert.IsTrue(DashInterruptPredictor.ShouldRepredictDuringDash(new DashInterruptPrediction { Reason = DashInterruptPredictReason.WindowClosedNow }));
         }
 
-        // ─── ③ 겹침이면 공격 방향 생략(seq 10) ───
-
-        private const float Reach = 1.5f;
-        private static readonly Vector3 DummyPosition = new Vector3(0f, 0f, 5f); // 랩 허수아비 (0, 0, 5)
-        private static readonly Vector3 Seq10Resolve = new Vector3(0.38058f, 0.015f, 4.99015f);
-        private static readonly Vector3 Seq10Dash = new Vector3(0.70711f, 0f, 0.70711f);
-
-        [Test]
-        public void 표본10_판정_위치가_대상과_겹치면_공격_방향이_등져도_대상_있음()
-        {
-            Vector3 toTarget = DummyPosition - Seq10Resolve;
-            toTarget.y = 0f;
-            Assert.AreEqual(133.5f, Vector3.Angle(Seq10Dash, toTarget), 0.5f, "CSV target_angle 133.5");
-
-            Assert.IsTrue(InterruptTargetGeometry.Accepts(Seq10Resolve, Seq10Dash, Reach, 0f,
-                DummyPosition, Vector3.back, InterruptTargetGeometry.NoFrontRule), "거리 0 — 이전 규칙은 대상 없음");
-            Assert.IsTrue(InterruptTargetGeometry.Accepts(Seq10Resolve, Seq10Dash, Reach, InterruptTargetGeometry.OverlapDistance,
-                DummyPosition, Vector3.back, InterruptTargetGeometry.NoFrontRule), "경계 포함");
-            Assert.IsFalse(InterruptTargetGeometry.Accepts(Seq10Resolve, Seq10Dash, Reach, 0.1f,
-                DummyPosition, Vector3.back, InterruptTargetGeometry.NoFrontRule), "겹침이 아니면 예전대로 공격 방향을 본다");
-        }
+        // ③(겹침이면 공격 방향 생략, seq 10)은 할 일 139-3 에서 없앴다 — 판정 앵커 실제 모양 오버랩이 seq 10 을 대상 있음으로 본다.
+        // 표본 7·8·10 형상 검사는 Assets/1.Scripts/Player/Editor/HitboxAnchorShapeTests.cs.
 
         [Test]
         public void 겹쳐도_대상_정면_허용각은_그대로_본다()
         {
             // 23호처럼 정면 판정(±60)이 있는 대상의 등 뒤에서 겹치면 여전히 대상 없음 — 정면 판정은 대상의 실제 간파 규칙.
-            Vector3 behind = DummyPosition + Vector3.forward * 0.3f;
-            Assert.IsFalse(InterruptTargetGeometry.Accepts(behind, Vector3.forward, Reach, 0f, DummyPosition, Vector3.back, 60f));
-            Vector3 front = DummyPosition + Vector3.back * 0.3f;
-            Assert.IsTrue(InterruptTargetGeometry.Accepts(front, Vector3.back, Reach, 0f, DummyPosition, Vector3.back, 60f),
-                "정면에서 겹치면 등진 공격 방향이어도 대상 있음");
+            Vector3 dummy = new Vector3(0f, 0f, 5f);
+            Assert.IsFalse(InterruptTargetGeometry.FacesAttacker(dummy + Vector3.forward * 0.3f, dummy, Vector3.back, 60f));
+            Assert.IsTrue(InterruptTargetGeometry.FacesAttacker(dummy + Vector3.back * 0.3f, dummy, Vector3.back, 60f));
         }
     }
 }

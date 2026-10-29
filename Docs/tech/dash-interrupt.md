@@ -84,17 +84,22 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 - **시도**: 승인 순간 `OnServerStart` → `ServerAttempt(예측 3상태)` 그대로. 예측은 근접·대쉬 공용 `DashInterruptPredictor`(할 일 132 — [interrupt-presentation.md §0.2](interrupt-presentation.md#02-흐름)):
   - 판정 위치 = **예상 대시 끝** = 시전 위치 + 대시 방향 × 대시 속도 × 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset`), 판정 시각 = max(예상 대시 끝, 평소 Hit).
-  - 대상 = 오버랩 없이 `InterruptTargetRegistry` 캐시 + `InterruptTargetGeometry`(간파 사거리 · 대상 정면 허용각 — 지금 대쉬 간파 대상은 기존 판정값 그대로, 정면 판정 없으면 180 · **대시 방향**이 대상을 향함). 밖이면 '대상 없음' = 슬로우 없음.
+  - 대상 = **판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치에 놓은 오버랩**(`HitboxAnchorShape` — 서버 `ResolveHit` 의 `OverlapHitboxAnchor` 와 같은 형상 계산·같은 질의, 할 일 139-3)에 걸린 Unit 중 `InterruptTargetRegistry` 캐시에 있는 것(창 소유자) + `InterruptTargetGeometry.FacesAttacker`(대상 정면 허용각 — 기존 판정값 그대로, 정면 판정 없으면 180). 밖이면 '대상 없음' = 슬로우 없음.
+  - 오너 HUD 강조 사거리(`HasTargetInOmniRange`)는 '돌면 닿는 거리'(앵커 먼 모서리) 표시라 예측보다 넓다 — 강조가 켜져도 그 방향이면 대상 없음일 수 있다.
   - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
   - 판정 오버랩은 옮기지 않는다(실제 위치).
-- **예측 규칙 보정(할 일 139-2, §10.2 표본 27개 근거)** — `DashInterruptPredictor`·`InterruptTargetGeometry` 공용 규칙이라 ①③은 근접 간파에도 같이 적용된다, ②는 대쉬 간파만:
+- **예측 규칙 보정(할 일 139-2, §10.2 표본 27개 근거)** — `DashInterruptPredictor` 공용 규칙이라 ①은 근접 간파에도 같이 적용된다, ②는 대쉬 간파만:
   - **① 틀린 창 길이 추정 버리기**: 창이 지금 열려 있는데 열린 뒤 경과 > 추정 길이(관측 중앙값, `IsWindowEstimateStale`)면 추정이 틀린 것으로 보고 버린다(남은 창 = 모름 -1). 그때 판정까지 남은 시간 ≤ **`StaleWindowMaxTimeToResolve` = 0.4초**면 강(`Success`), 길면 약(`WindowClosesBeforeResolve`). 무기한 허수아비 창(§10.1 ⚠️)의 표본 seq 5·8·15·19·26 이 약 → 강. seq 22 는 경과 0.924 < 추정 1.243 이라 해당 없음(남은 0.319 < 판정까지 0.345 — 약 그대로).
   - **② 대시 중 재예측(약 → 강만)**: 누른(서버 = 승인) 순간 대상은 범위 안인데 창이 닫혀 약(`WindowClosedNow`, `ShouldRepredictDuringDash`)이었으면, 그 대시 동안 매 프레임 같은 예측기로 다시 본다(`PlayerDashState.Tick` → `PlayerSkillController.TickDashInterruptReprediction`). 입력 = 지금 위치·남은 대시·창, 준비 기준점은 처음 시도의 t0(`InterruptAttemptPrediction.ForReprediction`). 강이 되는 순간 한 번:
     - 오너 = 복제 창으로 → `InterruptProductionDirector.LocalOwnerUpgrade` → `InterruptOwnerPresentation.UpgradeToStrong`(암전·빛 모임이 늦게 켜짐). 올린 뒤 서버의 약 목적(승인 때 예측)이 늦게 와도 내리지 않는다. 서버 강이 먼저 와 있었어도 켠다.
     - 서버 = 서버 창으로 → `PlayerInterruptSkillBase.TickServerDashReprediction` 이 **강 시도 슬로우를 다시 건다**(`GlobalTimeScale` 은 마지막 발동이 이긴다 — 기존 슬로우 배포로 전 피어가 받음, 새 RPC 없음). 레이어가 거부하면(0) 약 슬로우 번호를 그대로 둔다.
     - 강 → 약 내리기 없음. 근접 간파는 재예측하지 않는다. 표본 seq 16(누를 때 닫힘 → 0.04초 뒤 열림 → 서버 성공).
-  - **③ 겹침이면 공격 방향 생략**: 판정 위치 → 대상 표면 수평 거리 ≤ **`InterruptTargetGeometry.OverlapDistance` = 0.05m** 면 (3) 공격 방향 검사를 건너뛴다(판정 오버랩은 방향과 무관하게 닿는다). (2) 대상 정면 허용각은 대상의 실제 간파 규칙이라 그대로 본다. 표본 seq 10(거리 0·각도 133° → 대상 없음이었는데 서버 성공).
-  - 남은 한계(표본 seq 8): ①로 강이 되지만 서버는 실패했다 — 판정 위치에서 대상 표면까지 1.31m·대시 방향과 75° 라, 전방위 사거리(앵커를 어느 방향으로 돌려도 닿는 최대 거리) 안이지만 실제 판정 앵커(전방 상자)는 옆 75° 에서 그 거리까지 닿지 않는다. 각도·거리 규칙을 앵커 모양에 맞추는 것은 표본 1개라 이번에 하지 않았다.
+  - ~~③ 겹침이면 공격 방향 생략~~(`OverlapDistance` 0.05m) — **할 일 139-3 에서 없앴다**. 아래 앵커 형상 검사가 seq 10(거리 0·각도 133° · 서버 성공)을 그대로 대상 있음으로 본다(상자 가까운 면이 겹친 허수아비 캡슐에 닿는다).
+- **예측 사거리 = 판정 앵커 실제 모양(할 일 139-3)** — 원인: 예전 대상 검사는 **전방위 사거리**(앵커를 어느 방향으로 돌려도 닿는 최대 거리 = 상자 먼 모서리) + 공격 방향 반평면(±90°)이라, 실제 판정(공격 방향에 놓인 상자)보다 정면은 모서리까지·옆은 반평면 끝까지 넓었다 → 예측 강 + 서버 실패.
+  - 앵커 값(프리팹 저작값, Armature 직속·회전 0 — 팔라딘 -0.1°): 어쌔신·거너 상자 중심 z 0.9 · 반폭 0.7 · 반길이 0.7 → **정면 도달 1.6m · 옆 0.7m · 전방위 1.746m**. 팔라딘 중심 z 0.9 · 반폭 0.8 · 반길이 0.8 → **정면 1.7m · 옆 0.8m · 전방위 1.879m**. 거리는 플레이어 위치 → 대상 표면.
+  - 새 규칙: 지금 앵커 형상을 플레이어 위치 수직축으로 돌려 공격 방향을 향하게 하고(`HitboxAnchorShape.Aimed`) 판정 위치로 옮겨(`Offset`) 서버와 같은 `Overlap` 질의. 걸린 Unit 중 캐시 대상만, 그리고 대상 정면 허용각(23호). 공격 방향 반평면·사거리 비교는 없어졌다. 허용 오차 칸 없음. 판정 동작은 그대로(`OverlapHitboxAnchor` 가 같은 형상 함수를 쓸 뿐).
+  - 야간 QA 봇(23호) 로그의 강 예측 surf 1.71~1.74m(봇 reachM 1.75)·표본 seq 8(옆 1.31m·75°) 은 이제 대상 없음.
+  - **보정 랩 재현**(§10.2 `InterruptCalibrationLab`, 어쌔신 또는 거너, `includeMelee` 켬 — 근접 간파): ⓐ 허수아비 정면에서 표면 1.6~1.75m(허수아비 중심에서 2.1~2.25m) 떨어져 허수아비 쪽으로 우클릭 · ⓑ 허수아비가 조준 방향과 75° 옆, 표면 1.3m 에서 우클릭. **수정 전 = 강(암전) + 서버 실패, 수정 후 = 대상 없음(연출 없음)**. 대조: 정면 1.5m·옆 75° 0.55m 는 강 + 서버 성공. 팔라딘은 정면 1.7~1.88m 띠가 같은 증상이다.
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
 - 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
@@ -293,14 +298,14 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 | 파일 | 내용 |
 |---|---|
 | `Assets/1.Scripts/Player/Dash/DashInterruptRules.cs` | 순수 규칙 — 창 판정·입력 결정·서버 승인 창·판정 시점·max·예상 대시 끝 오프셋 |
-| `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs` · `Assets/1.Scripts/Player/Skill/InterruptAttemptPrediction.cs` · `InterruptTargetRegistry.cs` | 할 일 132 — 근접·대쉬 공용 예측기·대상 판정(`InterruptTargetGeometry`)·예측 입력 구성(`AtPress`)·대상 캐시 |
+| `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs` · `Assets/1.Scripts/Player/Skill/InterruptAttemptPrediction.cs` · `InterruptTargetRegistry.cs` | 할 일 132 — 근접·대쉬 공용 예측기·대상 정면 판정(`InterruptTargetGeometry`)·예측 입력 구성(`AtPress`)·대상 캐시 |
 | `Assets/1.Scripts/Player/Dash/DashInterruptLayerFade.cs` | 상체 레이어 가중치 전환·인수인계 정규화 시각 |
 | `Assets/1.Scripts/Player/Dash/PlayerDashData.cs` · `Assets/9.ScriptableObject/Player/PlayerDashData.asset` | SO 칸 3개 |
 | `Assets/1.Scripts/Player/PlayerDashController.cs` | 상체 레이어 시작·인수인계·취소, `PlayDodgeEnd(keepBasePose)`, 창·허용오차 조회 |
 | `Assets/1.Scripts/Player/PlayerStateController.cs` | `PlayerDashState` 창 입력·부착/분리·대시 끝 Skill 전이·강제 종료, `BeginSkillFromDash`·`AttachDashInterrupt`·`ActiveDash` |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillController.cs` | `TryUseDashInterrupt`, RPC 2개 플래그, 승인 분기, `HandleDashInterruptAborted`·`CompleteDashInterruptHandOff`, `PlayerSkillApprovalRules.EvaluateDashInterruptPreconditions`·`PlayerSkillApproval.DashWindow` |
 | `Assets/1.Scripts/Player/Skill/PlayerInterruptSkillBase.cs` | Hit 보류·End 연기·`OnDashHandOff`·시도 예측 오프셋 |
-| `Assets/1.Scripts/Player/Skill/PlayerSkillBase.cs` | `OverlapHitboxAnchor(results, offset)` |
+| `Assets/1.Scripts/Player/Skill/PlayerSkillBase.cs` · `HitboxAnchorShape.cs` | `OverlapHitboxAnchor(results, offset)` · 판정 앵커 형상(읽기·돌리기·옮기기·오버랩) — 판정·시도 예측 공용(할 일 139-3), 테스트 `Assets/1.Scripts/Player/Editor/HitboxAnchorShapeTests.cs` |
 | `Assets/1.Scripts/Player/PlayerInputBuffer.cs` · `PlayerInputReader.cs` | `TryGetRecordedTime` · `TryGetPressTime` |
 | `Assets/4.Animations/Player/{Garen,Assassin,Gunner}/*AnimatorController.controller` · `Garen/GarenUpperBody.mask` | `DashInterruptUpper` 레이어·팔라딘 상체 마스크 |
 | `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·`DebugInterruptTuningPanel`(132 §17)·테스트 `Editor/DebugInterruptLabTests.cs`·`Editor/DebugInterruptLabIsolationTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |

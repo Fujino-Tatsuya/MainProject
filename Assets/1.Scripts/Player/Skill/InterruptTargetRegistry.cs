@@ -3,14 +3,15 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 간파 예측 대상 캐시(할 일 132 정정1) — 간파 시도 예측(서버 승인·오너 입력 순간)은 누를 때마다 오버랩하지 않고 여기 등록된 대상의
-/// 거리·각도만 계산한다(<see cref="BeaverLobby.Player.Dash.InterruptTargetGeometry"/>). 서버·클라 모두 같은 규칙으로 채운다.
+/// 간파 예측 대상 캐시(할 일 132 정정1) — 간파 시도 예측(서버 승인·오너 입력 순간)은 판정 앵커 오버랩(<see cref="HitboxAnchorShape"/>, 할 일 139-3)에 걸린 Unit 중
+/// 여기 등록된 대상만 보고, 창 복제값·정면 허용각(<see cref="BeaverLobby.Player.Dash.InterruptTargetGeometry"/>)을 여기서 읽는다. 서버·클라 모두 같은 규칙으로 채운다.
 /// <list type="bullet">
 /// <item>등록 = 대상 스폰(OnNetworkSpawn, 모든 피어). 23호는 보스전 시작(BossEncounterDirector 가 Spawn)이 곧 등록이다.
 /// 중간보스·스파링 봇 = <see cref="MonsterBase"/>, 허수아비 = <see cref="TrainingDummyInterrupt"/>.</item>
 /// <item>해제 = 디스폰(OnNetworkDespawn — 보스전 끝·씬 전환 디스폰 포함)·사망(MonsterBase Dead 상태, 모든 피어)·씬 언로드(남은 것 정리).</item>
 /// </list>
 /// 대상 = <see cref="IInterruptSlowMotionTarget"/> 를 가진 Unit 만(창 소유자). 실제 판정(ResolveHit 오버랩)은 이 캐시를 쓰지 않는다.
+/// 표면 거리(<see cref="Entry.TryGetHorizontalDistance"/>)는 예측 랩 기록용이다 — 예측 판단에는 쓰지 않는다.
 /// </summary>
 public static class InterruptTargetRegistry
 {
