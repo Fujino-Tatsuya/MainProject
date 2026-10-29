@@ -81,6 +81,16 @@ public static class InterruptLagMonitor
         history.Estimate(now, openNow, out openElapsed, out expectedDuration);
     }
 
+    /// <summary>
+    /// [서버] 모든 소유자의 창 관측 기록을 비운다(할 일 139 디버그 랩) — 마지막 전이만 남긴다(<see cref="InterruptWindowHistory.ClearKeepingLatest"/>).
+    /// 진입점은 <see cref="InterruptWindowReplicaTracker.ResetObservations"/>.
+    /// </summary>
+    public static void ResetWindowObservations()
+    {
+        foreach (InterruptWindowHistory history in Histories.Values)
+            history.ClearKeepingLatest();
+    }
+
     /// <summary>[서버] 보낸 클라의 RTT(ms). 호스트 자신 = 0.</summary>
     public static double RttMs(ulong clientId)
     {

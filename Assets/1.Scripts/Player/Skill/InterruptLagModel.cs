@@ -55,6 +55,20 @@ public sealed class InterruptWindowHistory
     }
 
     /// <summary>
+    /// 관측 기록을 비운다(할 일 139 — 디버그 랩 예측기 관측 초기화). <b>마지막 전이 하나만 남긴다</b> — 지금 창 상태와
+    /// '열린 뒤 경과'는 그대로 읽히고, 완결된 열림이 없어 <see cref="TryGetTypicalOpenDuration"/> 은 다음 열림→닫힘 전까지 false.
+    /// </summary>
+    public void ClearKeepingLatest()
+    {
+        if (_count <= 1)
+            return;
+
+        int latest = (_start + _count - 1) % _times.Length;
+        _start = latest;
+        _count = 1;
+    }
+
+    /// <summary>
     /// <paramref name="serverTime"/> 에 창이 열려 있었는가. 그 시각 이하의 마지막 기록을 따른다(경계 시각 = 바뀐 뒤 상태).
     /// 기록이 없거나 남은 가장 오래된 기록보다 이른 시각이면 Unknown — 덮어써진 구간은 추측하지 않는다.
     /// </summary>

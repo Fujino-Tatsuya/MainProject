@@ -23,6 +23,7 @@ public sealed class DebugInterruptLabIsolationTests
         typeof(DebugCharacterCycle),
         typeof(DebugDummyInterruptRecovery),
         typeof(DebugInterruptTuningPanel), // 132 §17 튜닝 패널
+        typeof(DebugDummyInterruptWindowMode), // 139 허수아비 창 모드
     };
 
     static string[] DebugScriptGuids()
@@ -164,5 +165,22 @@ public sealed class DebugInterruptLabIsolationTests
 
         // 검색이 실제로 잡는지 — 디버그 배속은 구독한다
         Assert.IsTrue(subscribe.IsMatch(File.ReadAllText(LabFolder + "DebugTimeScale.cs")));
+    }
+
+    // ─── (e) 허수아비 창 게이트(139) ───────────────────────────────────
+
+    [Test]
+    public void 허수아비_창_게이트는_디버그_폴더_밖에서_걸지_않는다()
+    {
+        var assign = new Regex(@"\bServerWindowGate\s*=(?!=)");
+        string[] assigners = Directory.GetFiles("Assets", "*.cs", SearchOption.AllDirectories)
+            .Select(Normalize)
+            .Where(p => !p.StartsWith(LabFolder))
+            .Where(p => assign.IsMatch(File.ReadAllText(p)))
+            .ToArray();
+        CollectionAssert.IsEmpty(assigners);
+
+        // 검색이 실제로 잡는지 — 랩 창 모드는 건다
+        Assert.IsTrue(assign.IsMatch(File.ReadAllText(LabFolder + "DebugDummyInterruptWindowMode.cs")));
     }
 }

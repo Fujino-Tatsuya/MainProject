@@ -49,6 +49,18 @@ public static class InterruptWindowReplicaTracker
     }
 
     /// <summary>
+    /// 간파 시도 예측이 쓰는 창 관측 기록(추정 길이 중앙값의 재료)을 비운다 — 할 일 139 디버그 랩의 단일 진입점.
+    /// 클라 복제값 기록과 서버 기록(<see cref="InterruptLagMonitor.ResetWindowObservations"/>)을 함께 비운다.
+    /// 마지막 전이 하나는 남긴다 — 지금 열림·열린 뒤 경과는 유지되고, 추정 길이는 다음 열림→닫힘 관측 전까지 모름(-1).
+    /// </summary>
+    public static void ResetObservations()
+    {
+        foreach (InterruptWindowHistory history in Histories.Values)
+            history.ClearKeepingLatest();
+        InterruptLagMonitor.ResetWindowObservations();
+    }
+
+    /// <summary>
     /// [오너] 간파 시도 예측용 창 추정 — 열린 뒤 경과·추정 길이(초). 모르면 -1.
     /// 서버(호스트)는 서버 기록, 클라는 복제값 기록에서 구한다.
     /// </summary>
