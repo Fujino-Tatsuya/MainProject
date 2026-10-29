@@ -7,42 +7,21 @@ using UnityEngine;
 /// </summary>
 public static class AssassinTraitAreaRules
 {
-    /// <summary>일반 E 강타(강화한 기본 공격) — 부채꼴 길이·폭.</summary>
+    /// <summary>일반 E 강타(강화한 기본 공격) — 판정 상자 길이·폭.</summary>
     public static readonly TraitAttackKey EnhancedStrike = new TraitAttackKey(AttackType.Default, TraitAttackForm.Enhanced);
 
     /// <summary>변신 E 원형 5타 — 원 반경.</summary>
     public static readonly TraitAttackKey CircleStrike = new TraitAttackKey(AttackType.SkillE, TraitAttackForm.Alternate);
 
     /// <summary>
-    /// 부채꼴 판정의 치수 배율. 길이 = 사거리 × <paramref name="lengthMultiplier"/>, 폭 = 끝 현 길이(<see cref="ConeWidth"/>) × <paramref name="widthMultiplier"/>.
-    /// 두 배율이 같으면 각도는 그대로(닮은꼴 확대 — 사거리만 늘려도 폭이 같은 비율로 는다). 다르면 폭이 맞게 각도를 고친다(180° 이상은 폭 = 지름이라 그대로).
+    /// 평타 판정 상자(할 일 144, <see cref="AssassinStrikeBox"/>)의 콜라이더 스케일 배율 — 길이(z) = Length 축, 폭(x) = Width 축.
+    /// 몸 기준점에서 늘어나므로 상자 뒤 끝(몸)은 그대로고 앞 끝·양옆만 나간다. 특성 출처가 없으면 둘 다 1.
     /// </summary>
-    public static void ScaleCone(float range, float angle, float lengthMultiplier, float widthMultiplier,
-        out float scaledRange, out float scaledAngle)
+    public static void BoxScale(PlayerTraitModifiers modifiers, TraitAttackKey key, out float lengthMultiplier, out float widthMultiplier)
     {
-        lengthMultiplier = Mathf.Max(0f, lengthMultiplier);
-        widthMultiplier = Mathf.Max(0f, widthMultiplier);
-        scaledRange = range * lengthMultiplier;
-        scaledAngle = angle;
-        if (lengthMultiplier <= 0f || Mathf.Approximately(lengthMultiplier, widthMultiplier) || angle >= 180f)
-            return;
-
-        float halfSin = Mathf.Sin(angle * 0.5f * Mathf.Deg2Rad) * widthMultiplier / lengthMultiplier;
-        scaledAngle = 2f * Mathf.Asin(Mathf.Clamp01(halfSin)) * Mathf.Rad2Deg;
+        lengthMultiplier = modifiers != null ? Mathf.Max(0f, modifiers.AreaMultiplier(key, TraitAreaAxis.Length)) : 1f;
+        widthMultiplier = modifiers != null ? Mathf.Max(0f, modifiers.AreaMultiplier(key, TraitAreaAxis.Width)) : 1f;
     }
-
-    /// <summary>스킬 판정용 — 그 공격 키의 길이·폭 배율로 <see cref="ScaleCone(float,float,float,float,out float,out float)"/>. 특성 출처가 없으면 그대로.</summary>
-    public static void ScaleCone(PlayerTraitModifiers modifiers, TraitAttackKey key, float range, float angle,
-        out float scaledRange, out float scaledAngle)
-    {
-        float length = modifiers != null ? modifiers.AreaMultiplier(key, TraitAreaAxis.Length) : 1f;
-        float width = modifiers != null ? modifiers.AreaMultiplier(key, TraitAreaAxis.Width) : 1f;
-        ScaleCone(range, angle, length, width, out scaledRange, out scaledAngle);
-    }
-
-    /// <summary>부채꼴 끝의 폭(현 길이) — 180° 미만 = 2r·sin(θ/2), 이상 = 지름 2r.</summary>
-    public static float ConeWidth(float range, float angle) =>
-        angle >= 180f ? 2f * range : 2f * range * Mathf.Sin(angle * 0.5f * Mathf.Deg2Rad);
 
     /// <summary>원 반경 × 배율(0 미만 배율은 0).</summary>
     public static float ScaleRadius(float radius, float multiplier) => radius * Mathf.Max(0f, multiplier);

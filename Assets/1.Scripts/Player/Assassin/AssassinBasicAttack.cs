@@ -34,6 +34,16 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     [SerializeField] private AssassinBasicAttackData data;
     [SerializeField] private Animator animator;
 
+    // 판정 상자(할 일 144) — 가붕이 평타 AAC1~4 처럼 프리팹 Armature/DefaultAttack 아래 BoxCollider(+ColliderInfo)를 사용자가 세팅한다.
+    // 방향은 몸 회전이 아니라 그 타의 조준 방향, 기준점 = 시전자 발밑(AssassinStrikeBox). 특성 범위 배율은 상자 길이·폭에 곱한다.
+    [Header("판정 상자 (할 일 144 — BoxCollider + ColliderInfo)")]
+    [Tooltip("일반 1~4타 판정 상자. 순서 = 타 순서. 비면 그 타는 판정하지 않는다(오류 로그).")]
+    [SerializeField] private ColliderInfo[] normalStepHitboxes = new ColliderInfo[4];
+    [Tooltip("일반 E 강타 판정 상자. 칼날의 영역(ASN_3_E_AREA)은 이 상자의 길이(z)·폭(x)을 배율로 키운다.")]
+    [SerializeField] private ColliderInfo enhancedHitbox;
+    [Tooltip("변신 평타 묶음(4타 공용) 판정 상자.")]
+    [SerializeField] private ColliderInfo transformedHitbox;
+
     private Player player;
     private PlayerStateController stateController;
     private PlayerInputReader input;
@@ -736,24 +746,30 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             ? ConsumeNextAttackBuff(traitKey)
             : 1f;
         int damage = ResolveHitDamage(step.AttackDamageMultiplier, traitKey, nextAttackMultiplier);
-        // 칼날의 영역 — 판정 치수(강타 길이·폭)만 배율. 전진·판정 중심(몸)은 그대로.
-        AssassinTraitAreaRules.ScaleCone(player.TraitModifiers, traitKey, step.Range, step.Angle, out float range, out float angle);
+        // 칼날의 영역 — 판정 상자 길이·폭만 배율. 전진·판정 기준점(몸)은 그대로.
+        AssassinTraitAreaRules.BoxScale(player.TraitModifiers, traitKey, out float lengthScale, out float widthScale);
+        ColliderInfo hitbox = HitboxFor(currentMode, currentStepIndex);
+        if (!AssassinStrikeBox.TryPlace(hitbox, transform, attackDirection, lengthScale, widthScale, out AssassinStrikeBox box))
+        {
+            Debug.LogError($"[Assassin/평타] {currentMode} {currentStepIndex + 1}타 판정 상자(BoxCollider+ColliderInfo)가 배정되지 않았습니다 — 판정 생략.", this);
+            return;
+        }
+
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
         // 급소 파괴 — 대상마다 적중 직전 특성 수정자(밀치기)를 거친다. 강타 키(Default/Enhanced)만 효과가 맞는다(칼날의 영역으로 넓어진 범위 포함).
         bool landed = coneAttack.Fire(
             attackDirection,
-            range,
-            angle,
+            box,
             damage,
             data.TriggersOnHit,
             serverActionCastId,
             traitKey);
 
-        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 범위에 추가 베기 1회 예약.
+        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 상자에 추가 베기 1회 예약.
         if (AssassinComboExtraRules.Schedules(currentMode, currentStepIndex, NormalStepCount, hitsFired, step.HitCount))
-            ScheduleComboExtra(step, traitKey, range, angle);
+            ScheduleComboExtra(step, traitKey, box);
 
         // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
         if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
@@ -782,9 +798,19 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
 
-    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·범위는 지금 값으로 고정(새 조준·이동 없음).
+    // 이 타의 판정 상자 앵커 — 일반 = 타 순서, 강타·변신 묶음 = 각자 하나.
+    private ColliderInfo HitboxFor(AssassinBasicAttackMode mode, int stepIndex) => mode switch
+    {
+        AssassinBasicAttackMode.Enhanced => enhancedHitbox,
+        AssassinBasicAttackMode.Transformed => transformedHitbox,
+        _ => normalStepHitboxes != null && stepIndex >= 0 && stepIndex < normalStepHitboxes.Length
+            ? normalStepHitboxes[stepIndex]
+            : null,
+    };
+
+    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·상자는 지금 값으로 고정(새 조준·이동 없음).
     // 지연만 공격 가속기를 탄다. VFX 없음(판정만).
-    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, float range, float angle)
+    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, in AssassinStrikeBox box)
     {
         traitEffects ??= PlayerTraitEffects.For(this);
         if (traitEffects == null)
@@ -795,7 +821,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         int sourceDref = player.ResolveDamage(step.AttackDamageMultiplier, 0, key);
-        var strike = new ComboExtraStrike(transform.position, attackDirection, range, angle, extra.DamageFrom(sourceDref));
+        var strike = new ComboExtraStrike(transform.position, box, extra.DamageFrom(sourceDref));
         float delay = AssassinComboExtraRules.Delay(extra.Delay, AttackSpeedRate);
         pendingComboExtras.Schedule(Time.timeAsDouble, delay, strike);
         Edit.Log($"[Assassin/평타] 끝없는 칼날 예약 — {key}, 기준 {sourceDref} → {strike.Damage}, {delay:F3}초 뒤", this);
@@ -808,7 +834,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         {
             if (assassinState != null)
                 coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
-            int landed = coneAttack.FireDerived(strike.Origin, strike.Direction, strike.Range, strike.Angle, strike.Damage);
+            int landed = coneAttack.FireDerived(strike.Origin, strike.Box, strike.Damage);
             Edit.Log($"[Assassin/평타] 끝없는 칼날 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
         }
     }
@@ -823,17 +849,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private readonly struct ComboExtraStrike
     {
         public readonly Vector3 Origin;
-        public readonly Vector3 Direction;
-        public readonly float Range;
-        public readonly float Angle;
+        public readonly AssassinStrikeBox Box;
         public readonly int Damage;
 
-        public ComboExtraStrike(Vector3 origin, Vector3 direction, float range, float angle, int damage)
+        public ComboExtraStrike(Vector3 origin, AssassinStrikeBox box, int damage)
         {
             Origin = origin;
-            Direction = direction;
-            Range = range;
-            Angle = angle;
+            Box = box;
             Damage = damage;
         }
     }

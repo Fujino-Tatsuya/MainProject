@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 어쌔신 평타의 서버 부채꼴 판정. 피해 진입점과 적중 보너스/통지는 <see cref="PlayerDefaultAttack"/>과 같은 계약을 쓴다.
+/// 어쌔신 평타의 서버 판정. 피해 진입점과 적중 보너스/통지는 <see cref="PlayerDefaultAttack"/>과 같은 계약을 쓴다.
+/// 판정 모양 = 프리팹 콜라이더 상자(<see cref="AssassinStrikeBox"/>, 할 일 144 — 예전 코드 부채꼴 대체). 클래스 이름은 프리팹 참조 때문에 그대로 둔다.
 /// </summary>
 [RequireComponent(typeof(Player))]
 public sealed class AssassinConeAttack : BaseAttack
@@ -39,8 +40,7 @@ public sealed class AssassinConeAttack : BaseAttack
     /// </summary>
     public bool Fire(
         Vector3 direction,
-        float range,
-        float angle,
+        in AssassinStrikeBox box,
         int damageSnapshot,
         bool triggersOnHit,
         int castId = 0,
@@ -51,9 +51,6 @@ public sealed class AssassinConeAttack : BaseAttack
 
         direction.y = 0f;
         direction = direction.sqrMagnitude >= 0.001f ? direction.normalized : transform.forward;
-        range = Mathf.Max(0f, range);
-        float halfAngle = Mathf.Clamp(angle, 0f, 360f) * 0.5f;
-        Vector3 origin = transform.position;
         if (traitKey.HasValue)
             traitEffects ??= PlayerTraitEffects.For(owner);
 
@@ -64,17 +61,12 @@ public sealed class AssassinConeAttack : BaseAttack
 
         bool anyResolved = false;
         bool onHitBonusTaken = false;
-        int count = Physics.OverlapSphereNonAlloc(
-            origin,
-            range,
-            hitResults,
-            targetLayer,
-            QueryTriggerInteraction.Collide);
+        int count = Overlap(box);
 
         for (int i = 0; i < count; i++)
         {
             Collider hit = hitResults[i];
-            if (hit == null || !IsInsideCone(hit, origin, direction, range, halfAngle))
+            if (hit == null)
                 continue;
 
             if (TryGetHurtbox(hit, out Hurtbox hurtbox))
@@ -131,19 +123,14 @@ public sealed class AssassinConeAttack : BaseAttack
     }
 
     /// <summary>
-    /// [서버] 파생 공격(⑧ 끝없는 칼날) 판정 — 저장한 위치·방향·범위의 부채꼴에 피해만 한 번(<see cref="TraitHitFlags.Derived"/>).
+    /// [서버] 파생 공격(⑧ 끝없는 칼날) 판정 — 저장한 위치(<paramref name="origin"/> = 그때 시전자 위치)·상자에 피해만 한 번(<see cref="TraitHitFlags.Derived"/>).
     /// 적중 보너스·특성 사건(<see cref="Player.RaiseServerAttackLanded"/>)·밀치기·백어택 연출 없음. 백어택 피해 배율은 맞는 쪽 규칙대로(지금 상태).
     /// 대상별 1회는 이 판정 안에서만 센다. 반환 = 맞은 대상 수.
     /// </summary>
-    public int FireDerived(Vector3 origin, Vector3 direction, float range, float angle, int damageSnapshot)
+    public int FireDerived(Vector3 origin, in AssassinStrikeBox box, int damageSnapshot)
     {
         if (!IsServer || owner == null)
             return 0;
-
-        direction.y = 0f;
-        direction = direction.sqrMagnitude >= 0.001f ? direction.normalized : transform.forward;
-        range = Mathf.Max(0f, range);
-        float halfAngle = Mathf.Clamp(angle, 0f, 360f) * 0.5f;
 
         SetDamageSnapshot(damageSnapshot);
         damagedUnits.Clear();
@@ -151,11 +138,11 @@ public sealed class AssassinConeAttack : BaseAttack
         landedUnits.Clear();
 
         int landed = 0;
-        int count = Physics.OverlapSphereNonAlloc(origin, range, hitResults, targetLayer, QueryTriggerInteraction.Collide);
+        int count = Overlap(box);
         for (int i = 0; i < count; i++)
         {
             Collider hit = hitResults[i];
-            if (hit == null || !IsInsideCone(hit, origin, direction, range, halfAngle) || !IsInTargetLayer(hit))
+            if (hit == null || !IsInTargetLayer(hit))
                 continue;
 
             Hurtbox hurtbox = hit.GetComponentInParent<Hurtbox>();
@@ -208,24 +195,8 @@ public sealed class AssassinConeAttack : BaseAttack
         return resolved;
     }
 
-    private bool IsInsideCone(Collider hit, Vector3 origin, Vector3 forward, float range, float halfAngle)
-    {
-        Vector3 closest = hit.ClosestPoint(origin);
-        Vector3 toTarget = closest - origin;
-        toTarget.y = 0f;
-
-        if (toTarget.sqrMagnitude > range * range)
-            return false;
-
-        // 발밑을 포함하는 콜라이더는 중심 방향으로 한 번 더 판정한다.
-        if (toTarget.sqrMagnitude < 0.0001f)
-        {
-            toTarget = hit.bounds.center - origin;
-            toTarget.y = 0f;
-        }
-
-        return toTarget.sqrMagnitude < 0.0001f || Vector3.Angle(forward, toTarget) <= halfAngle;
-    }
+    private int Overlap(in AssassinStrikeBox box) =>
+        Physics.OverlapBoxNonAlloc(box.Center, box.HalfExtents, hitResults, box.Rotation, targetLayer, QueryTriggerInteraction.Collide);
 
     private int? TakeOnHitBonus(Unit target, bool triggersOnHit, ref bool bonusTaken)
     {

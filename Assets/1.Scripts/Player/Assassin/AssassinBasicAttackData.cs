@@ -13,7 +13,11 @@ public sealed class AssassinBasicAttackStepData
 {
     [DataTableIgnore] [SerializeField] private AnimationClip clip;
     [SerializeField] private float attackDamageMultiplier = 1f;
+    // ⚠️ 미사용 2칸(할 일 144) — 판정 모양은 프리팹 AssassinBasicAttack 의 판정 상자(Armature/DefaultAttack/*, BoxCollider)로 옮겼다.
+    //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
+    [Tooltip("⚠️ 미사용 — 판정 범위는 프리팹 Armature/DefaultAttack 아래 판정 상자(BoxCollider)다.")]
     [SerializeField, Min(0.1f)] private float range = 1.5f;
+    [Tooltip("⚠️ 미사용 — 판정 범위는 프리팹 Armature/DefaultAttack 아래 판정 상자(BoxCollider)다.")]
     [SerializeField, Range(1f, 360f)] private float angle = 90f;
     // ⚠️ 미사용 3칸(PLAN-anim-event-timing P2-1) — 재생 속도는 Animator 상태 speed, 예약 창은 클립 ComboWindowOpen/Close 이벤트로 옮겼다.
     //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 "필드 없음"으로 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
