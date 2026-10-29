@@ -73,7 +73,7 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 └─ Armature                ← 캐릭터. 이걸 교체해서 플레이 캐릭터를 바꾼다
    ├─ (리그/본 계층)          모델 · Animator · SkinnedMeshRenderer
    ├─ DefaultAttack           (빈 컨테이너 — 평타 판정은 데이터 SO 의 도형, 할 일 153)
-   ├─ MainSkill/InterruptAttack  캐릭터별 스킬 히트박스
+   ├─ InterruptAttack         간파 판정 상자(가붕이 Q·E 판정은 데이터 SO 의 도형, 할 일 153 5a)
    └─ L/R_WeaponSocket        무기 소켓
 ```
 
@@ -122,7 +122,8 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 | `PlayerLandingProtection.blinkVisualRoot` | ✅ | 비면 루트 전체에서 `Renderer` 를 긁는다 (`PlayerLandingProtection.cs:161`) |
 | `PlayerSoulController.soulVisualRoot` | ✅ | `PlayableCharacterVisual.VisualRoot` → `transform.Find("Armature")` → `transform` 순 폴백 (`PlayerSoulController.cs:175`) |
 | ~~`DefaultAttackController.defaultHitbox`~~ | — | 할 일 153 3단계에서 삭제. 평타 판정은 `PlayerDefaultAttackData` 단계별 `hitArea`(도형, [attack-shapes.md](attack-shapes.md)) |
-| `FirstMeleeMainSkill.hitboxAnchor` · `FirstMeleeInterruptSkill.hitboxAnchor` | ❌ | **수동 배선 필수.** 비면 런타임 에러 (`FirstMeleeInterruptSkill.cs:87`) |
+| ~~`FirstMeleeMainSkill.hitboxAnchor`~~ | — | 할 일 153 5a단계에서 비움·`Armature/MainSkill` 삭제. Q 판정은 `FirstMeleeMainSkillData.hitArea`(도형) |
+| `FirstMeleeInterruptSkill.hitboxAnchor` | ❌ | **수동 배선 필수.** 비면 런타임 에러 (`FirstMeleeInterruptSkill.cs:87`) |
 | `TrailTransform.weaponTrailEffect` (무기 FBX 안) | ❌ | 무기 궤적. Armature 의 `WeaponTrailEffect` 를 가리킨다 |
 | `WeaponTransformRelay.weapon` (`PlayerWaeponSlot` 아래) | ❌ | 무기는 Armature 밖(`PlayerWaeponSlot`)에 있고 소켓만 Armature 안에 있다 |
 

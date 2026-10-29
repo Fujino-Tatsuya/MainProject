@@ -106,7 +106,8 @@ hitArea.shapes[1].length            (hitArea.shapes[1] · AttackRectShape)
 | 2 | 어쌔신 평타·강타·변신 묶음 — ✅ `AssassinBasicAttackStepData.hitArea`(부채꼴 1개, 높이 ±range), `AssassinConeAttack.Fire·FireDerived` = `Collect`, 칼날의 영역 = `AssassinTraitAreaRules.ScaleArea`. 144 프리팹 상자·`AssassinStrikeBox` 삭제 |
 | 3 | 팔라딘 평타 — ✅ `DefaultAttackStep.hitArea`(직사각형 1개, 4타 같은 값 = 예전 `Armature/DefaultAttack/AAC1` 상자: 앞 1.55·뒤 0.55·폭 2.6·yaw −0.03°·높이 0~2.039), `PlayerDefaultAttack.HitOverlap` = `Collect`(기준점 발밑 + 그 타 조준 방향). 프리팹 `AAC1~4`·`defaultHitbox`·단계 `hitbox` 삭제, `DefaultAttackController.attackSteps` 는 직렬화 안 함(데이터에서만) |
 | 4 | 특성 추가 공격 5종 — ✅ `TraitDerivedAttackEffect.hitArea`(런타임 `TraitDerivedAttack.HitArea`). **비우면 원래 공격 치수 재사용**. 진격의 충격(`PAL_4_Q_BLAST`)만 도형: 기준점 `Point` = Q 끝 지점 + 마지막 진행 방향(`PaladinTraitRules.QBlastPose`), 부채꼴 range 2·angle 90·minOffset 0·forwardOffset 0·높이 ±2(예전 반경 2 구 질의 체감), `FirstMeleeMainSkill.RunTraitBlastServer` = `Collect`. `QBlastApex`·`QBlastInSector` 삭제. 나머지 4종(이중 출력·잔류 포격 = 원래 레이저, 추격의 궤적 = Q 경로 상자, 끝없는 칼날 = 마지막 한 타 도형 — 2단계)은 비움. 효과 칸 `angle` 삭제(시트에 행 없음), `radius`·`forwardOffset` 은 시트 `Traits_*` 행 때문에 미사용 칸으로 유지 |
-| 5 | 캐릭터별 Q·E 스킬 |
+| 5a | 가붕이 Q·E — ✅ Q `FirstMeleeMainSkillData.hitArea`(직사각형 1개 = 예전 앵커 `Armature/MainSkill` 상자 center 0,0,0.8 · size 2,1,2: 앞 1.8·뒤 0.2·폭 2·yaw −0.03°·높이 −0.461~0.539), 기준점 = 발밑 + 진행 방향(`FirstMeleeMainSkill.ResolvePose`), 틱마다 `Collect`(틱당 대상 1회). 돌파의 방패(`PAL_2_DASH`)는 같은 도형을 경로 표본마다 표본 지점(바닥 평면) + 시전자 높이 + 돌진 방향으로 옮겨(`ShieldDashSamplePose`) 훑고 시전 1회는 경로 장부. E `FirstMeleeSubSkillData.hitArea`(부채꼴 range 3·angle 120·높이 ±3 = 예전 counterRange·counterAngle·3D 구), 기준점 = 반격 순간 발밑 + 고정 방어 방향(`FirstMeleeSubSkill.CounterPose`). 수호의 파동(`PAL_4_E_PUSH`) = `PaladinTraitRules.EPushArea(반경)` 원(높이 ±반경, 특성 없으면 null) — 반격 맞은 대상은 같은 판정 점이 원 안이면 밀치기 동승, 나머지는 원으로 따로 `Collect`(살아 있는 몬스터만). 삭제: 프리팹 `Armature/MainSkill`·Q `hitboxAnchor`, `FirstMeleeGuardRules.IsInsideCounterSector`, `PaladinTraitRules.InsidePushRadius`. `counterAngle`·`counterRange` 는 xlsx 행 때문에 미사용 칸으로 유지 |
+| 5b | 다른 캐릭터 Q·E 스킬 |
 | 6 | DebugTraitLab 기즈모 통합(할 일 152 기즈모 → `AttackShapeDrawing`) |
 
 간파 상자(`InterruptAttack`)는 어느 단계에도 들어가지 않는다.
@@ -115,3 +116,4 @@ hitArea.shapes[1].length            (hitArea.shapes[1] · AttackRectShape)
 
 - 판정 점은 **기준점 쪽** 가장 가까운 점 하나다. 도형이 기준점에서 멀리 떨어진 경우(큰 `forwardOffset`·`sideOffset`) 큰 몸의 반대편 일부만 도형에 걸치면 놓칠 수 있다 — 기존 방식과 같은 한계.
 - 외곽선은 바닥(기준점 높이) 한 겹만 그린다. 높이 범위는 그리지 않는다.
+- 발밑 겹침(기준점이 대상 몸 안)이면 판정 점이 중심 x·z 라 거리도 중심으로 잰다. 예전 가붕이 E 반격은 이때 거리를 표면(0)으로 쟀으므로, 시전자가 중심이 반경 밖인 큰 몸 안에 들어간 드문 경우만 달라진다.

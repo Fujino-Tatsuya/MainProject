@@ -62,7 +62,7 @@ internal static class PlayerEditModeTestRunner
         "^AssassinHairArmClearanceTests$", // 할 일 47 후속 — 팔 밀어내기 후처리: 겹침만 밀기·상한·회전만(길이 보존)·팔 캡슐 4개
         "^PlayerAnimationEventRequirementTests$", // PLAN-anim-event-timing P0-1 — 스킬·평타가 선언한 클립 이벤트가 플레이어 프리팹 컨트롤러·클립에 있는가
         "^AssassinVisualPrefabTests$", // PLAN-assassin §9 — v18 비주얼: Flat Kit 슬롯 5개·부모·BaseMap, 단검 루트 = 임포트 배율, Armature 루트·판정 박스 배율 1
-        "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침)·반격 부채꼴(표면 거리·평면 각도)
+        "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침). 반격 부채꼴은 PaladinSkillAreaTests(할 일 153)
         "^FirstMeleeGuardCounterModelTests$", // PLAN-paladin-counter-e C3 — 팔라딘 E 단계: 방어 불가 Pass·대기 경계·반격 중 무시(now < counterEndAt)·반격 1회·같은 틱 둘 다·Clamp·반격 보장·넉백
         "^FirstMeleeGuardAttackSpeedTests$", // 할 일 91 A5 — 팔라딘 E 준비·해제·반격만 공속(AttackSpeedRate), 방어중 제외·고정 전환·이벤트 순서
         "^LobbyReadyRulesTests$", // 할 일 48 C8 — 로비 전원 준비 → 카운트다운·취소·새 접속 Ready 초기화·캐릭터 변경 거부·시작 1회 래치(호스트 예외 없음)
@@ -76,6 +76,7 @@ internal static class PlayerEditModeTestRunner
         "^InterruptSuccessFxTests$", // 할 일 87 C4 — 간파 성공 이펙트: 목적·발동자·스폰 여부 → 재생, Player.prefab base 빈 칸
         "^AttackShapeTests$", // 할 일 153 1/6 — 공격 판정 도형 코어: 4종 경계·도넛·오프셋·배율·높이·합집합 1회·Overlap 수집·데이터 테이블 행
         "^PaladinStrikeAreaTests$", // 할 일 153 3/6 — 가붕이 평타 직사각형 = 예전 AAC1 상자(모서리 안/밖·조준 회전·높이)·SO 4타 값·프리팹 옛 상자 없음·간파 상자 남음
+        "^PaladinSkillAreaTests$", // 할 일 153 5a/6 — 가붕이 Q 직사각형 = 예전 MainSkill 앵커(모서리·높이·돌진 표본)·E 반격 부채꼴 = 예전 규칙(격자 일치)·수호의 파동 원·SO 값·프리팹 앵커 없음
     };
 
     const string Tag = "[PlayerTests]";

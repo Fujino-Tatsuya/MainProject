@@ -104,7 +104,7 @@ public sealed class PaladinStrikeAreaTests
     }
 
     [Test]
-    public void Prefab_NoOldStrikeBoxes_InterruptAndMainSkillAnchorsKept()
+    public void Prefab_NoOldStrikeBoxes_InterruptAnchorKept()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
         Assert.IsNotNull(prefab, PrefabPath);
@@ -120,7 +120,7 @@ public sealed class PaladinStrikeAreaTests
         Assert.IsNotNull(interrupt, "간파 상자");
         Assert.IsNotNull(interrupt.GetComponent<BoxCollider>(), "간파 상자 BoxCollider");
         Assert.IsNotNull(interrupt.GetComponent<ColliderInfo>(), "간파 상자 ColliderInfo");
-        Assert.IsNotNull(prefab.transform.Find("Armature/MainSkill")?.GetComponent<ColliderInfo>(), "Q 앵커(5단계까지 그대로)");
+        // Q 앵커(Armature/MainSkill)는 5단계에서 도형으로 옮겨 지웠다 — PaladinSkillAreaTests.
 
         var controller = prefab.GetComponent<DefaultAttackController>();
         Assert.IsNotNull(controller, "DefaultAttackController");

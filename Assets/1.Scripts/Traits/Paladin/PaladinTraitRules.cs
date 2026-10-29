@@ -14,18 +14,14 @@ public static class PaladinTraitRules
         blockedThisCast && reason != SkillEndReason.CasterDied && casterHealth > 0;
 
     /// <summary>
-    /// 수호의 파동(PAL_4_E_PUSH) — 반격 판정 순간 플레이어 위치(<paramref name="origin"/>) 중심 반경 안인가(바닥 평면, 대상 콜라이더 표면 기준 —
-    /// 반격 부채꼴 거리와 같은 기준). 반경 0 이하 = 특성 없음.
+    /// 수호의 파동(PAL_4_E_PUSH) 판정 영역(할 일 153) — 반격 판정 순간 플레이어 발밑 중심 원(반경 = 특성 스킬 수치, 대상 콜라이더 표면 기준 —
+    /// 반격 부채꼴과 같은 판정 점). 높이 ±반경(예전 넓은 질의 = 발밑 중심 3D 구). 반경 0 이하 = 특성 없음 = null.
+    /// 반경이 특성 값이라 SO 도형이 아니라 여기서 만든다(xlsx 행 없음 — 수치는 PAL_4_E_PUSH 효과 칸).
     /// </summary>
-    public static bool InsidePushRadius(Vector3 origin, Vector3 closestPoint, float radius)
-    {
-        if (!(radius > 0f))
-            return false;
-
-        Vector3 toTarget = closestPoint - origin;
-        toTarget.y = 0f;
-        return toTarget.sqrMagnitude <= radius * radius;
-    }
+    public static AttackShapeSet EPushArea(float radius) =>
+        radius > 0f
+            ? new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackCircleShape(radius) { MinHeight = -radius, MaxHeight = radius })
+            : null;
 
     /// <summary>
     /// 진격의 충격(PAL_4_Q_BLAST) — Q 가 끝난 사유로 충격을 낼까. 정상 종료(Completed — 지형 안전 정지 포함)·홀드 해제(Released)·

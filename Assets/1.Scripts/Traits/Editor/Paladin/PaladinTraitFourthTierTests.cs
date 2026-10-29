@@ -292,19 +292,22 @@ public sealed class PaladinTraitFourthTierTests
         Assert.AreEqual(3f, SetOf(def).ResolveSkillValue(PaladinTraitValues.EPushRadiusKey, 0f), Eps, "E 가 읽는 반경 = 3m");
         Assert.AreEqual(0f, new TraitModifierSet().ResolveSkillValue(PaladinTraitValues.EPushRadiusKey, 0f), Eps, "특성 없음 = 0 = 밀치기 없음");
 
+        // 밀치기 원(할 일 153 — 도형) = 발밑 중심 반경, 높이 ±반경(예전 3D 구 넓은 질의).
         Vector3 origin = new Vector3(1f, 0f, 1f);
-        Assert.IsTrue(PaladinTraitRules.InsidePushRadius(origin, origin + new Vector3(3f, 0f, 0f), 3f), "경계 3m = 포함");
-        Assert.IsTrue(PaladinTraitRules.InsidePushRadius(origin, origin + new Vector3(0f, 0f, -2.99f), 3f), "뒤쪽도(주변 원형)");
-        Assert.IsFalse(PaladinTraitRules.InsidePushRadius(origin, origin + new Vector3(3.01f, 0f, 0f), 3f), "3m 밖 = 제외");
-        Assert.IsTrue(PaladinTraitRules.InsidePushRadius(origin, origin + new Vector3(2f, 5f, 2f), 3f), "높이는 무시(바닥 평면)");
-        Assert.IsFalse(PaladinTraitRules.InsidePushRadius(origin, origin, 0f), "반경 0 = 특성 없음");
+        AttackShapeSet push = PaladinTraitRules.EPushArea(3f);
+        AttackShapePose pose = FirstMeleeSubSkill.CounterPose(push, origin, Vector3.right);
+        Assert.IsTrue(push.Contains(pose, origin + new Vector3(3f, 0f, 0f)), "경계 3m = 포함");
+        Assert.IsTrue(push.Contains(pose, origin + new Vector3(0f, 0f, -2.99f)), "뒤쪽도(주변 원형)");
+        Assert.IsFalse(push.Contains(pose, origin + new Vector3(3.01f, 0f, 0f)), "3m 밖 = 제외");
+        Assert.IsTrue(push.Contains(pose, origin + new Vector3(2f, 2.9f, 2f)), "높이 ±반경 안");
+        Assert.IsFalse(push.Contains(pose, origin + new Vector3(0.5f, 3.1f, 0f)), "반경보다 높으면 밖(예전 3D 구 질의에도 안 걸림)");
+        Assert.IsNull(PaladinTraitRules.EPushArea(0f), "반경 0 = 특성 없음");
 
         // 반격 부채꼴(120°·3m)보다 넓은 원 — 옆·뒤 적은 반격 피해 없이 밀치기만 받는다(별도 수집 필요).
         FirstMeleeSubSkillData e = LoadData<FirstMeleeSubSkillData>(EDataPath);
         Vector3 side = origin + new Vector3(0f, 0f, -2f);
-        Assert.IsFalse(FirstMeleeGuardRules.IsInsideCounterSector(origin, Vector3.right, side, side, e.CounterRange, e.CounterAngle),
-            "뒤쪽 2m = 반격 부채꼴 밖");
-        Assert.IsTrue(PaladinTraitRules.InsidePushRadius(origin, side, 3f), "하지만 밀치기 반경 안");
+        Assert.IsFalse(e.HitArea.Contains(FirstMeleeSubSkill.CounterPose(e.HitArea, origin, Vector3.right), side), "뒤쪽 2m = 반격 부채꼴 밖");
+        Assert.IsTrue(push.Contains(pose, side), "하지만 밀치기 반경 안");
     }
 
     [TestCase(MonsterState.Chase, false, MonsterRank.Normal, false, true, TestName = "EPush_Eligibility_NormalMonster_Pushed")]

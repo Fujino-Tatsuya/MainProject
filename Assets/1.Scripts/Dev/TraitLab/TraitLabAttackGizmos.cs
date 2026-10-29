@@ -200,6 +200,21 @@ public static class TraitLabAttackShapes
         }
     }
 
+    // 할 일 153 — 도형마다 넓은 질의 상자(직사각형이면 판정 영역 그대로)를 임시로 그린다. 6단계에서 AttackShapeDrawing 으로 통합.
+    static void AddBroadBoxes(TraitLabGizmoCategory category, string label, AttackShapeSet area, AttackShapePose pose, List<TraitLabGizmoShape> shapes)
+    {
+        if (area == null)
+            return;
+
+        foreach (AttackShape shape in area.Shapes)
+        {
+            if (shape == null)
+                continue;
+            shape.GetBroadBox(pose, out Vector3 center, out Vector3 half, out Quaternion rotation);
+            shapes.Add(TraitLabGizmoShape.Box(category, label, center, half, rotation));
+        }
+    }
+
     static void AddStrikeBox(AssassinBasicAttack attack, AssassinBasicAttackMode mode, int step, Vector3 facing,
         TraitLabGizmoCategory category, string label, List<TraitLabGizmoShape> shapes)
     {
@@ -244,16 +259,18 @@ public static class TraitLabAttackShapes
             switch (skill)
             {
                 case FirstMeleeMainSkill paladinQ:
-                    // 돌파의 방패 — 같은 앵커를 돌진 경로 끝까지 옮겨 훑는다(경로 = 판정과 같은 PaladinShieldDashPath).
+                    // 판정 도형(할 일 153 5단계) — 넓은 질의 상자(직사각형이면 판정 영역 그대로)를 임시로 그린다(6단계에서 AttackShapeDrawing 으로 통합).
+                    AttackShapeSet qArea = (skill.Data as FirstMeleeMainSkillData)?.HitArea;
+                    AddBroadBoxes(S, $"{slotName} 판정", qArea, FirstMeleeMainSkill.ResolvePose(qArea, position, facing), shapes);
+
+                    // 돌파의 방패 — 같은 도형을 돌진 경로 끝 표본으로 옮긴다(경로 = 판정과 같은 PaladinShieldDashPath).
                     PaladinShieldDashSettings dash = paladinQ.ResolveShieldDash(out bool hasDashTrait);
                     if (PaladinTraitRules.UsesShieldDash(hasDashTrait, dash))
                     {
                         ShieldDashPath.Begin(position, facing, dash);
-                        Vector3 offset = ShieldDashPath.PointAt(ShieldDashPath.Cap) - position;
-                        offset.y = 0f;
+                        AttackShapePose dashEndPose = FirstMeleeMainSkill.ShieldDashSamplePose(qArea, ShieldDashPath.PointAt(ShieldDashPath.Cap), position.y, ShieldDashPath.Heading);
                         ShieldDashPath.End();
-                        if (TraitLabGizmoShape.TryFromAnchor(T, $"돌파의 방패 끝 {dash.Distance:0.#}m", skill.HitboxAnchor, offset, out TraitLabGizmoShape dashEnd))
-                            shapes.Add(dashEnd);
+                        AddBroadBoxes(T, $"돌파의 방패 끝 {dash.Distance:0.#}m", qArea, dashEndPose, shapes);
                     }
 
                     // 진격의 충격 — Q 가 여기서 끝났다면(기준 = 끝 지점 + 정면). 부채꼴 도형만 임시 표시(6단계에서 AttackShapeDrawing 으로 통합).
@@ -279,7 +296,19 @@ public static class TraitLabAttackShapes
                     break;
 
                 case FirstMeleeSubSkill paladinE when skill.Data is FirstMeleeSubSkillData eData:
-                    shapes.Add(TraitLabGizmoShape.Sector(S, $"E 반격 r{eData.CounterRange:0.#} {eData.CounterAngle:0}°", position, facing, eData.CounterRange, eData.CounterAngle));
+                    // 반격 판정 도형(할 일 153 5단계) — 부채꼴만 임시 표시(6단계에서 AttackShapeDrawing 으로 통합).
+                    AttackShapePose counterPose = FirstMeleeSubSkill.CounterPose(eData.HitArea, position, facing);
+                    if (eData.HitArea != null)
+                    {
+                        foreach (AttackShape shape in eData.HitArea.Shapes)
+                        {
+                            if (shape is not AttackSectorShape sector)
+                                continue;
+                            AttackShapePose shapePose = sector.ShapePose(counterPose);
+                            shapes.Add(TraitLabGizmoShape.Sector(S, $"E 반격 r{sector.Range:0.#} {sector.Angle:0}°", shapePose.Position, shapePose.Forward, sector.Range, sector.Angle));
+                        }
+                    }
+
                     float pushRadius = paladinE.TraitPushRadius();
                     if (pushRadius > 0f)
                         shapes.Add(TraitLabGizmoShape.Sector(T, $"수호의 파동 r{pushRadius:0.#}", position, facing, pushRadius, 360f));

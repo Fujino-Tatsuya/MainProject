@@ -358,4 +358,16 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
 
         return hit.GetComponentInParent<Unit>();
     }
+
+    /// <summary>
+    /// 판정 도형 질의(<see cref="AttackShapeQuery"/>, 할 일 153)의
+    /// 1회 피격 키 — <see cref="ResolveHitUnit"/> 의 Unit, 없으면 Hurtbox(상자처럼 Unit 이 아닌 대상). 시전자 자신은 null(대상 아님).
+    /// </summary>
+    protected Object ResolveShapeTarget(Collider hit)
+    {
+        Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+        if (unit != null)
+            return unit == owner ? null : unit;
+        return hurtbox;
+    }
 }
