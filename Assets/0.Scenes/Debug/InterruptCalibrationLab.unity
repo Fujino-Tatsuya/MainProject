@@ -602,7 +602,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1605594336166664510, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 4268230034
+      value: 3288646110
+      objectReference: {fileID: 0}
+    - target: {fileID: 1605594336166664510, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: SceneMigrationSynchronization
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1605594336166664510, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: InScenePlacedSourceGlobalObjectIdHash
+      value: 3019180679
       objectReference: {fileID: 0}
     - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
       propertyPath: resetDistance
