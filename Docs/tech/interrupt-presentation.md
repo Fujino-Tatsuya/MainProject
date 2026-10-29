@@ -8,7 +8,7 @@
 > ②③④ 길이 = **렌더 프레임 수**(기본 2·2·2, 섬광 순간 = 6 프레임째), ⑤⑥ = 초. DebugInterruptLab 씬 OnGUI **튜닝 패널** — [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
 > 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
-> 🔹 스위치 10칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸 = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
+> 🔹 스위치 11칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 피해 숫자 숨김(154) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
@@ -485,7 +485,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 ### 6.1 구조
 
 - **디렉터 = `NetworkManager.prefab` 루트의 MonoBehaviour 1개**(`GlobalTimeScale`·`InterruptDarkAdaptation` 옆). 코드 `Assets/1.Scripts/Player/InterruptProduction/`.
-  스위치 10칸 + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
+  스위치 11칸(cue 10 + A5 피해 숫자 숨김) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
 - 간파 스킬(`PlayerInterruptSkillBase`)은 **사건 4개(시도·판정·성공·실패)만 알린다** — 슬로우 시작·실패·성공 재시작 코드는 스킬에 없다.
   판정·피해·카운터 창·그로기·통계는 그대로 스킬·대상(서버) 소관이고, 디렉터는 재생 여부와 슬로우 호출만 한다.
 - 단계마다 클래스가 따로 — `InterruptAttemptStage`·`InterruptResolveStage`·`InterruptSuccessStage`·`InterruptFailStage`.
@@ -551,6 +551,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | C1 | `assassinInsightAttempt` | 꺼짐 | 어쌔신 기 모으기·튀기기·올려치기(클립 `Attack_Up_01`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |
 | C2 | `assassinInsightSuccess` | 꺼짐 | 어쌔신 간파 성공 이펙트 | `AssassinSkillView.TryPlayInsightSuccess`(대기·올려치기 프레임 맞추기는 View) → `Director.PlayCue(AssassinInsightSuccess, …, this)` |
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |
+| A5 | `hideDamageNumbers` | **켬**(코드 기본값 — 프리팹에 저장 안 됨) | 피해 숫자 숨김(154) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 동안 **본인 화면만** 피해 숫자 캔버스 끔. 숫자 생성·수명은 그대로 | `FloatingDamageSpawner.LateUpdate` → `Director.DamageNumbersHidden` = `InterruptProductionRules.ShouldHideDamageNumbers(칸, 오너 상태 기계 State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive)`. cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideDamageNumbers` |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
 
@@ -566,7 +567,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 - **사건이 올 때마다 디렉터 필드를 읽는다(캐싱 없음).** Play 중 Hierarchy `DontDestroyOnLoad › NetworkManager › InterruptProductionDirector` 에서 바꾸면 다음 간파부터 바로 쓰인다.
   프리팹 에셋을 고치면 Play 중 인스턴스엔 안 닿는다(Unity 기본).
 - **슬로우 프로필·히트스톱(A1) = 호스트(서버) 인스턴스 값만.** 서버가 사건 순간 값을 이벤트에 실어 보내고 전 피어가 같은 닫힌 식으로 재생한다 — 클라 값은 무시. MPPM 에서는 호스트 에디터에서 바꾼다.
-- **나머지 9칸 = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
+- **나머지 10칸(A5 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
   줌 배율·오너 암전·섬광 칸(§0.5)도 각 피어 값이다.
 - 테이블 모드 Play 는 시작 때 프로필이 xlsx 값으로 덮인 뒤, 그 이후 인스펙터 변경은 Play 끝날 때까지 산다([data-table.md](data-table.md) §6).
 
@@ -597,6 +598,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 할 일 132 추가(같은 슬로우 모션 메뉴): `InterruptOwnerPresentationTests`(상태 기계) · `InterruptTargetRegistryTests`(캐시) · `InterruptOwnerDimTests`(마스크 암전·비트 4) ·
 `InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1·A3·A4 켬) ·
 `InterruptPresentationEffectTests`(§17 효과 칸 기본값·프리팹·그리기만 끔·섬광 순간 정상) · `DebugInterruptLabTests`(튜닝 패널 줄·배속 버튼).
+할 일 154: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬).
 격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`).
 
 ## 7. 이후 확장

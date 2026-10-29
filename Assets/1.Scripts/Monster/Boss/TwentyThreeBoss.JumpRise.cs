@@ -45,6 +45,7 @@ public partial class TwentyThreeBoss
     // 애니메이션 평가 뒤에 덮어써야 한 프레임 밀리지 않는다.
     void LateUpdate()
     {
+        PublishHpLockServer();   // HP 바 잠김 복제(TwentyThreeBoss.HpLock.cs) — 이 클래스의 유일한 LateUpdate 라 여기서 부른다
         if (!_riseActive || _riseTarget == null) return;
         float t = Mathf.Clamp01((Time.time - _riseStart) / _riseDuration);
         float worldUp = _riseHeight * t * t;   // 가속 상승 — 처음엔 클립 그대로, 끝으로 갈수록 확 솟는다

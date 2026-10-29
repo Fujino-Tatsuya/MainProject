@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// 간파 연출 디렉터(할 일 118) — 간파 연출의 단일 진입점. NetworkManager.prefab 의 <see cref="GlobalTimeScale"/> 옆에 붙는다.
-/// 104 스위치 10칸(<see cref="InterruptProductionCue"/>)을 들고, 재생 지점은 정적 API 로 묻는다.
+/// 104 스위치 10칸(<see cref="InterruptProductionCue"/>) + A5 피해 숫자 숨김(154)을 들고, 재생 지점은 정적 API 로 묻는다.
 ///
 /// <list type="bullet">
 /// <item>사건이 올 때마다 필드를 읽는다(캐싱 없음) — Play 중 인스펙터에서 바꾸면 다음 사건부터 바로 쓰인다.</item>
@@ -99,6 +99,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
+    [Tooltip("A5 피해 숫자 숨김(할 일 154) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) 동안 이 화면의 피해 숫자 캔버스를 끈다. " +
+             "숫자 생성·수명은 그대로(가리기만). 팀원 화면은 그대로")]
+    [DataTableIgnore, SerializeField] private bool hideDamageNumbers = true;
 
     // 연출 켜기/끄기(할 일 132 §17) — 끈 효과는 그리기만 안 한다. 오너 상태 기계·섬광 시간표·섬광 순간 사건(암전 걷힘 등)은 그대로 돈다.
     // 기본 = 오너 암전만 켬. 팀원 암순응 = 위 A2 칸, 슬로우·줌·히트스톱 = A1·A3·프로필 그대로. 이 피어 값을 쓴다(그릴 때마다 읽음).
@@ -422,6 +425,23 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// </summary>
     public static bool OwnerAwaitsStrongResult =>
         Instance != null && Instance._ownerPresentation != null && Instance._ownerPresentation.AwaitsStrongResult;
+
+    /// <summary>A5 칸(할 일 154) — 런타임 값(저장하지 않음, 디버그·테스트).</summary>
+    public bool HideDamageNumbers
+    {
+        get => hideDamageNumbers;
+        set => hideDamageNumbers = value;
+    }
+
+    /// <summary>
+    /// A5 — 이 화면에서 지금 피해 숫자를 숨기는가(<see cref="InterruptProductionRules.ShouldHideDamageNumbers"/>). 피해 숫자 스포너가 매 프레임 읽는다
+    /// (디렉터 → 스포너 한 방향, 디렉터는 스포너를 모른다). 인스턴스가 없으면 false.
+    /// </summary>
+    public static bool DamageNumbersHidden =>
+        Instance != null && InterruptProductionRules.ShouldHideDamageNumbers(Instance.hideDamageNumbers,
+            Instance._ownerPresentation != null ? Instance._ownerPresentation.State : InterruptOwnerPresentationState.None,
+            Instance._ownerPresentation != null ? Instance._ownerPresentation.DimIntensity : 0f,
+            Instance._hitFlash != null && Instance._hitFlash.OverlayActive);
 
     /// <summary>
     /// [각 피어] 시도 — 시전 시작(OnClientPlay, 전 피어)에 스킬이 알린다. 그 스킬의 시도 cue(B1)를 공용 채널로 스킬 자신에 튼다.
