@@ -11,6 +11,7 @@ internal static class InterruptLabEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^InterruptCalibrationTests$",
+        "^InterruptCalibrationCaptureTests$",
         "^DebugInterruptLabTests$",
         "^DebugInterruptLabIsolationTests$",
         "^DummyInterruptWindowScheduleTests$",

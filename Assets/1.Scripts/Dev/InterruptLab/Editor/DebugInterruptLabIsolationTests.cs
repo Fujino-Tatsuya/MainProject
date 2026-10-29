@@ -24,6 +24,7 @@ public sealed class DebugInterruptLabIsolationTests
         typeof(DebugDummyInterruptRecovery),
         typeof(DebugInterruptTuningPanel), // 132 §17 튜닝 패널
         typeof(DebugDummyInterruptWindowMode), // 139 허수아비 창 모드
+        typeof(InterruptCalibrationCapture), // 139 예측 보정 캡처(랩 씬은 단계 5)
     };
 
     static string[] DebugScriptGuids()
@@ -182,5 +183,23 @@ public sealed class DebugInterruptLabIsolationTests
 
         // 검색이 실제로 잡는지 — 랩 창 모드는 건다
         Assert.IsTrue(assign.IsMatch(File.ReadAllText(LabFolder + "DebugDummyInterruptWindowMode.cs")));
+    }
+
+    // ─── (f) 예측 보정 계측 훅(139 단계 3) ─────────────────────────────
+
+    [Test]
+    public void 예측_보정_계측_훅은_디버그_폴더_밖에서_구독하지_않는다()
+    {
+        var subscribe = new Regex(@"\bCalibration(OwnerPredicted|ServerPredicted|ServerJudged)\s*\+=");
+        string[] subscribers = Directory.GetFiles("Assets", "*.cs", SearchOption.AllDirectories)
+            .Select(Normalize)
+            .Where(p => !p.StartsWith(LabFolder))
+            .Where(p => subscribe.IsMatch(File.ReadAllText(p)))
+            .ToArray();
+        CollectionAssert.IsEmpty(subscribers);
+
+        // 검색이 실제로 잡는지 — 캡처기는 셋 다 구독한다
+        string capture = File.ReadAllText(LabFolder + "Calibration/InterruptCalibrationCapture.cs");
+        Assert.AreEqual(3, subscribe.Matches(capture).Count);
     }
 }

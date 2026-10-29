@@ -51,6 +51,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private float armedDashSpeed;
     private float armedDashRemaining;
     private bool attachedToDash;        // 지금 대시에 실려 있다
+    private bool castViaDash;           // 이번 시전이 대쉬 간파로 시작했다(판정 때 attachedToDash 는 이미 내려가 있다) — 계측 전용
     private bool pendingHit;            // 대시 중 Hit 이 왔다 — 대시 끝에 즉시 판정
     private bool pendingEnd;            // 판정 전에 End 가 왔다 — 판정 뒤로 미룬다
 
@@ -113,6 +114,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         attachedToDash = dashAttachArmed;
+        castViaDash = dashAttachArmed;
         dashAttachArmed = false;
         pendingHit = false;
         pendingEnd = false;
@@ -264,12 +266,54 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// </summary>
     public static event System.Action<Player, PlayerInterruptSkillBase> ServerInterruptSucceeded;
 
+    // ── 예측 보정 계측(할 일 139) — 디버그 랩(InterruptCalibrationLab) 전용 읽기 훅. 판정·연출·타이밍은 바꾸지 않는다 ──
+    // 구독자가 없으면 null 검사 하나뿐이다. 랩 폴더 밖에서 구독하지 않는다(DebugInterruptLabIsolationTests).
+
+    /// <summary>시도 예측 한 번의 입력·결과(계측 전용). <see cref="Target"/> = 예측이 고른 대상(대상 없음이면 null).</summary>
+    public readonly struct CalibrationPrediction
+    {
+        public CalibrationPrediction(PlayerInterruptSkillBase skill, bool viaDash, float pressAge, Vector3 attackDirection,
+            in DashInterruptPredictInput input, in DashInterruptPrediction prediction, Unit target)
+        {
+            Skill = skill;
+            ViaDash = viaDash;
+            PressAge = pressAge;
+            AttackDirection = attackDirection;
+            Input = input;
+            Prediction = prediction;
+            Target = target;
+        }
+
+        public PlayerInterruptSkillBase Skill { get; }
+        public bool ViaDash { get; }
+        public float PressAge { get; }
+        public Vector3 AttackDirection { get; }
+        public DashInterruptPredictInput Input { get; }
+        public DashInterruptPrediction Prediction { get; }
+        public Unit Target { get; }
+    }
+
+    /// <summary>[오너] 입력 순간 즉시 예측(<see cref="TryPredictOwnerAttempt"/>)을 했다. 계측 전용(할 일 139).</summary>
+    public static event System.Action<CalibrationPrediction> CalibrationOwnerPredicted;
+
+    /// <summary>[서버] 승인 시점 시도 예측(시도 슬로우 강·약)을 했다. 계측 전용(할 일 139). 시간 레이어가 없는 씬에선 나지 않는다.</summary>
+    public static event System.Action<CalibrationPrediction> CalibrationServerPredicted;
+
+    /// <summary>
+    /// [서버] 간파 판정 1회가 끝났다 — 인자 = 그 스킬, 대쉬 간파로 시작했는가, 카운터 창 소비 성공. 계측 전용(할 일 139).
+    /// 판정 앵커 누락·판정 전 종료에선 나지 않는다.
+    /// </summary>
+    public static event System.Action<PlayerInterruptSkillBase, bool, bool> CalibrationServerJudged;
+
     // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticEvents()
     {
         ServerInterruptResolved = null;
         ServerInterruptSucceeded = null;
+        CalibrationOwnerPredicted = null;
+        CalibrationServerPredicted = null;
+        CalibrationServerJudged = null;
     }
 
     private void CompleteResolution(int resolvedCount)
@@ -373,6 +417,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
                 hasSuccessTargetPosition, successTargetPosition));
         ReportLag(lagHit);
+        CalibrationServerJudged?.Invoke(this, castViaDash, interruptSucceeded);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
         if (interruptSucceeded)
@@ -538,8 +583,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || HitboxAnchor == null || owner == null)
             return;
 
-        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(BuildPredictInput(false, attachedToDash,
-            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f, out _));
+        Vector3 attackDirection = attachedToDash ? armedDashDirection : castDirection;
+        DashInterruptPredictInput input = BuildPredictInput(false, attachedToDash,
+            attackDirection, armedDashSpeed, armedDashRemaining, 0f, out Unit target);
+        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(input);
+        CalibrationServerPredicted?.Invoke(
+            new CalibrationPrediction(this, attachedToDash, 0f, attackDirection, input, prediction, target));
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
             InterruptProductionEvent.Attempt(owner, this, prediction.Forecast)));
     }
@@ -560,8 +609,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (InterruptData == null || HitboxAnchor == null || owner == null)
             return false;
 
-        prediction = DashInterruptPredictor.Predict(BuildPredictInput(true, viaDash, attackDirection, dashSpeed, dashRemaining, pressAge,
-            out target));
+        DashInterruptPredictInput input = BuildPredictInput(true, viaDash, attackDirection, dashSpeed, dashRemaining, pressAge,
+            out target);
+        prediction = DashInterruptPredictor.Predict(input);
+        CalibrationOwnerPredicted?.Invoke(
+            new CalibrationPrediction(this, viaDash, pressAge, attackDirection, input, prediction, target));
         return true;
     }
 

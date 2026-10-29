@@ -34,6 +34,9 @@ public sealed class DebugDummyInterruptWindowMode : MonoBehaviour, ITrainingDumm
     /// <summary>회복 중이 아닐 때 지금 창이 열려 있어야 하는가(마지막 서버 틱 기준).</summary>
     public bool ScheduleOpen => Schedule.IsOpen;
 
+    /// <summary>[서버] 실제 창 상태(회복 포함, 마지막 서버 틱 기준) — 예측 보정 표본의 판정 시점 창 상태(할 일 139 단계 3).</summary>
+    public DummyInterruptWindowActual Actual { get; } = new DummyInterruptWindowActual();
+
     DummyInterruptWindowSchedule Schedule =>
         _schedule ??= new DummyInterruptWindowSchedule(mode, openSeconds, closedSeconds);
 
@@ -66,8 +69,12 @@ public sealed class DebugDummyInterruptWindowMode : MonoBehaviour, ITrainingDumm
             _target.ServerWindowGate = null;
     }
 
-    bool ITrainingDummyWindowGate.TickWindowOpen(float deltaTime, bool recovering) =>
-        Schedule.Tick(deltaTime, recovering);
+    bool ITrainingDummyWindowGate.TickWindowOpen(float deltaTime, bool recovering)
+    {
+        bool open = Schedule.Tick(deltaTime, recovering);
+        Actual.Observe(Time.time, recovering, Schedule);
+        return open;
+    }
 
 #if UNITY_EDITOR
     // Play 중 인스펙터 변경도 바로 적용한다(Play 밖에선 Schedule 이 첫 사용 때 직렬화 값으로 만들어진다).

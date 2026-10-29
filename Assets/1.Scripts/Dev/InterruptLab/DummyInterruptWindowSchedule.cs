@@ -152,3 +152,49 @@ public sealed class DummyInterruptWindowSchedule
         return false;
     }
 }
+
+/// <summary>
+/// 디버그 랩 허수아비의 <b>실제</b> 창 상태(할 일 139 단계 3 — 예측 보정 표본의 '판정 시점 실제 창 상태').
+/// 실제 열림 = 회복 중 아님 ∧ 스케줄 열림. 서버 틱마다 <see cref="Observe"/> 로 마지막 상태를 남긴다 — 판정은 그 틱 상태로 창을 본다.
+/// 시각은 호출측이 넘기는 Time.time(초).
+/// <list type="bullet">
+/// <item><b>열린 시각</b> — 주기(열림·닫힘 둘 다 0 보다 큼)는 지금 − 단계 경과(스케줄 기준), 그 밖(무기한·닫힘 0)은 닫힘 → 열림을 본 틱.</item>
+/// <item><b>남은 시간</b> — 주기에서 열려 있을 때만 열림 길이 − 열린 뒤 경과(0 미만 = 0). 무기한·닫힘 0·닫혀 있음 = 모름(-1).</item>
+/// </list>
+/// </summary>
+public sealed class DummyInterruptWindowActual
+{
+    /// <summary>마지막 틱에 실제로 열려 있었는가.</summary>
+    public bool IsOpen { get; private set; }
+
+    /// <summary>실제로 열린 시각. 닫혀 있으면 -1.</summary>
+    public float OpenSince { get; private set; } = -1f;
+
+    bool _cycles;
+    float _openSeconds;
+
+    public void Observe(float now, bool recovering, DummyInterruptWindowSchedule schedule)
+    {
+        bool open = !recovering && schedule.IsOpen;
+        _cycles = schedule.Mode == DummyInterruptWindowMode.Periodic && schedule.OpenSeconds > 0f && schedule.ClosedSeconds > 0f;
+        _openSeconds = schedule.OpenSeconds;
+        if (!open)
+        {
+            IsOpen = false;
+            OpenSince = -1f;
+            return;
+        }
+
+        if (_cycles)
+            OpenSince = now - schedule.PhaseElapsed;
+        else if (!IsOpen)
+            OpenSince = now;
+        IsOpen = true;
+    }
+
+    /// <summary>열린 뒤 경과(초). 닫혀 있으면 -1.</summary>
+    public float OpenElapsed(float now) => IsOpen ? Math.Max(0f, now - OpenSince) : -1f;
+
+    /// <summary>남은 열림(초). 주기에서 열려 있을 때만, 아니면 -1.</summary>
+    public float Remaining(float now) => IsOpen && _cycles ? Math.Max(0f, _openSeconds - OpenElapsed(now)) : -1f;
+}
