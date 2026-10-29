@@ -7,7 +7,7 @@ using UnityEngine;
 ///
 /// · 움직이는 건 칸(<c>PF_Prop_object_MV_bossroomenter</c>, 문 Animator 가 자식)뿐 — 레일·램프·파츠·floor_charger 는 바닥에 고정된 구조물이다.
 /// · 칸 높이 = <see cref="_landedLocalY"/> + 타임라인 오프셋. 문은 컨트롤러에 전이가 없어 <see cref="Animator.Play(int,int,float)"/> 로 상태를 직접 고른다
-///   (<see cref="TutorialElevatorDoor"/> 와 같은 방식).
+///   (<see cref="MapSceneElevatorDoor"/> 와 같은 방식).
 /// · 경과 시간으로 매 프레임 다시 계산하므로 늦게 합류해도 같은 그림. 지난 단계 경계의 이벤트는 처음 적용할 때 순서대로 한꺼번에 낸다.
 /// · 상승은 끝 높이 없이 계속된다. <see cref="BossElevatorPhase.Blackout"/>(완전 암전)에 닿으면 재생을 멈추고 <see cref="ResetToIdle"/> 한 뒤
 ///   <see cref="OnBlackout"/> 을 낸다. 화면 페이드 자체는 리그가 그리지 않는다 — 호출자가 <see cref="OnFadeOutStart"/>·
@@ -98,7 +98,7 @@ public sealed class BossElevatorRig : MonoBehaviour
     public Transform FocusPoint => transform;
 
     /// <summary>
-    /// 대기(재생 밖) 문 포즈가 열림인가. 튜토리얼 G10(<see cref="TutorialElevatorDoor"/>)이 켠다 —
+    /// 대기(재생 밖) 문 포즈가 열림인가. 튜토리얼 G10(<see cref="MapSceneElevatorDoor"/>)이 켠다 —
     /// 재생 중엔 리그가 문을 쥐고, <see cref="ResetToIdle"/> 에서 이 값대로 Open 끝 프레임/Closed 로 돌아간다.
     /// </summary>
     public bool IdleDoorOpen { get; set; }

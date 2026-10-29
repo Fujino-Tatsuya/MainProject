@@ -1,19 +1,29 @@
-# 튜토리얼 진행 상태 — TutorialDirector
+# 맵씬 진행 상태 — MapSceneDirector (옛 TutorialDirector)
+
+> **🟪 할 일 107 (2026-10-27) — 맵씬 튜토리얼 정리.** 교육은 로비 훈련([lobby-training.md](lobby-training.md))이 맡고, 맵씬(`4.MapScene`)은 **메인 스테이지**다.
+> - **빠진 것 → Legacy(코드 보관, 런타임 연결 끊음)**: 존1 체크리스트(`TutorialZone1Flow/Model`·허수아비 `TutorialZone1Dummies`)·존2 안내(`TutorialZone2Flow/Model`)·존3 스피너 연습(`TutorialZone3Flow/Guide/Rules`·`SpinnerPractice` 전부·`SpinnerBot_Tutorial.prefab` 네트워크 등록 해제)·복도1 쿨 초기화(`TutorialCorridor1CooldownFlow`)·존4 교육(`TutorialZone4EducationFlow/Guide/Display` — 장치 설명·첫 패널·패널 n/4·중간보스 간파 리마인드·강조).
+>   위치: `Assets/1.Scripts/Map/Tutorial/Legacy/`(+`Editor/`) · `Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/`. `RuntimeInitializeOnLoadMethod` 부착을 지웠으니 맵씬에서 돌지 않는다. 디렉터의 존1 오너 보고 API(`ReportLocalCheck`·`ReportLocalMoveDistance`)도 지웠다.
+> - **대신 도는 것**: `MapSceneZoneFlow`(최소 진행 — 할 일 86 PLAN `_lane-artifacts/common/86-lobby-training/PLAN-86-lobby-training.md` §3.7 "G1·G5 검사 제거, 구역은 전투·클리어 조건만") — 활성 즉시 **G1** → Corridor1 · 존2 첫 진입 → 4초 뒤 기상(G3 = 전멸) · G4 + 존3 첫 진입 → 핵심(스피너봇) 기상 · Zone3Fight · **G5** 요청(G6 = 처치). 존 목표 줄·존 자막은 없다(복도 "다음 구역으로"가 남으면 지운다).
+> - **남은 것 → 이름만 MapScene…**: 코드 `Assets/1.Scripts/Map/MapScene/`(+`Flow/`·`Editor/`), 프리팹 `Assets/2.Prefabs/Managers/MapSceneDirector.prefab`(GUID·`GlobalObjectIdHash` 그대로), 씬 오브젝트 `MapSceneDirector`·`MapSceneSafePoints`, 연출 데이터 `Assets/Resources/MapScene/Zone4IntroCinematic.asset`.
+>   존4 = `MapSceneBossApproachGuide`(서버 — 설정 자막→G8·기상·다리·클리어/보스방/만료/패드/23호 팁) + `MapSceneBossApproachView`(모든 피어 — 보스방 목표·미니맵 강조·도착 정리). **특성 라운드를 여는 곳은 `MapSceneTraitCorridorFlow` 하나**(이름만 바뀜).
+>   이름 대응표 전체: 커밋 메시지·`_lane-artifacts/MainProject-Worktree2/107/rename-map.txt`. 메뉴 `Tools/Tutorial/Debug/*` → `Tools/MapScene/Debug/*`, `Tools/Map/Authoring/Tutorial/*` → `Tools/Map/Authoring/MapScene/*`, 테스트 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`.
+> - **이름 유지(로비 공용)**: `Assets/1.Scripts/Tutorial/Guide` 전부 · `Tutorial/Traits` 전부 · `TutorialCooldownReset`/`Model`(위치도 `Map/Tutorial/Flow` 그대로) · Strings 키 `Tutorial.Guide.*` · 로그 태그 `[Tutorial]`(QA 로그 호환).
+> - 아래 본문은 옛 튜토리얼(S0~S12) 기준 서술이 섞여 있다 — 존1~3·스피너 연습·존4 교육 항목은 Legacy 기록으로 읽는다.
 
 > 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4(**v8**, 2026-10-12 — 반영 계획 PLAN-tutorial §3-1) · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md).
 > v8 에서 바뀐 디렉터 규칙: G1 = 여덟 항목·교착 방지 제외 · G5 = 수동(연계 3회 + 마지막 복귀) · 체크 항목 SkillR·SkillInterrupt·Corridor1CooldownReset 추가 · `AttackHits` 삭제. 목숨 차감 기준 G11 은 그대로(사용자 확정, §11).
-> 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
-> 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
+> 코드: `Assets/1.Scripts/Map/MapScene/` — `MapSceneFlowModel`(순수 규칙) · `MapSceneDirector`(서버 소유·복제) · `MapSceneStageMarker`(판별).
+> 테스트: 메뉴 `Tools/Tests/맵씬 EditMode 테스트 실행`(`MapSceneFlowModelTests` · `MapSceneAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
 > S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11. 스텝별 고정 안전 지점(낙사 복귀, 할 일 80)은 §12.
 > **Play 검증 체크리스트(S0~S12 전 단계·MPPM·회귀·병합 전 확인)**: [tutorial-qa.md](tutorial-qa.md).
 
 ## 1. 판별 — 한 곳
-- `StageTutorial.prefab` 루트에 `TutorialStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
-- **튜토리얼 여부는 `TutorialStageMarker.IsActive` 하나만 본다.** 켜진 스테이지에 마커가 있으면 true, 절차 맵(`Stage1_Procedural`)·Debug 씬은 false.
+- `StageTutorial.prefab` 루트에 `MapSceneStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
+- **튜토리얼 여부는 `MapSceneStageMarker.IsActive` 하나만 본다.** 켜진 스테이지에 마커가 있으면 true, 절차 맵(`Stage1_Procedural`)·Debug 씬은 false.
   타이머 지연(S5)·패드 잠금·몬스터 휴면 등 튜토리얼 전용 규칙은 모두 이 값으로 거른다(절차 맵에 퍼지지 않게).
 
 ## 2. 배치 · 스폰 순서
-- `4.MapScene` 루트 `TutorialDirector`(NetworkObject + `TutorialDirector`) — `ZoneBridgeGateManager`·`BossTeleportManager` 와 같은 씬 상주 NetworkObject.
+- `4.MapScene` 루트 `MapSceneDirector`(NetworkObject + `MapSceneDirector`) — `ZoneBridgeGateManager`·`BossTeleportManager` 와 같은 씬 상주 NetworkObject.
 - 서버가 `MapGenerator.OnGenerated` 를 받았을 때 마커가 있으면 활성화한다. **스폰 순서 가정 없음**: 생성 이벤트가 스폰보다 먼저 오면
   보류 플래그만 세우고 `OnNetworkSpawn`(IsServer) 에서 한 번만 적용한다(스폰 전 NetworkVariable/NetworkList 쓰기는 버려진다 — [PLAN-boss-timer.md](../history/PLANS/PLAN-boss-timer.md) 리스크 4).
   `OnGenerated` 구독은 `OnEnable`(스폰 전), 판정은 `NetworkManager.Singleton`(스폰 전 프로퍼티 null 함정).
@@ -23,7 +33,7 @@
 | 복제 값 | 내용 |
 |---|---|
 | `_active` | 튜토리얼 활성 |
-| `_step` (`TutorialStep`) | 현재 단계 — 앞으로만 |
+| `_step` (`MapSceneStep`) | 현재 단계 — 앞으로만 |
 | `_openedGates` / `_timeoutGates` | 게이트 G1~G11 열림 비트 / 그중 교착 방지로 열린 것 (G5 = 스피너봇 본 모드, G8 = 타이머 시작, G11 = 보스방 도착 — 목숨 차감 기준) |
 | `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·기본 공격·패시브 툴팁·Q·E·R·우클릭·특성 복도1~4·복도1 쿨 초기화 기록 — v8) · 접속 · 완전 사망 · 지난 배리어 마스크(개인 뒤 배리어 — §7). v8 에서 적중 횟수(`AttackHits`) 삭제 |
 | `_counters` (NetworkList) | 파티 카운터: 존2 처치 n/9 · 존3 **연계**(간파 → 취약 밀치기 → 벽 충돌) n/3 · 존4 패널 n/4 |
@@ -31,9 +41,9 @@
 
 늦은 클라는 이 값만으로 다시 그린다(이벤트 재생 없음).
 
-## 4. 규칙 (`TutorialFlowModel`)
+## 4. 규칙 (`MapSceneFlowModel`)
 - 게이트는 **G1 → G11 순서로만** 열린다(앞이 닫혀 있으면 뒤는 거부).
-- 개인 게이트 G1(v8: 이동·대시·패시브 툴팁 + **기본 공격·Q·E·R·우클릭 각 1회** = `TutorialFlowModel.G1Mask`)·G2/G4/G7/G10(복도1~4 특성) = 참가자 **전원 완료**.
+- 개인 게이트 G1(v8: 이동·대시·패시브 툴팁 + **기본 공격·Q·E·R·우클릭 각 1회** = `MapSceneFlowModel.G1Mask`)·G2/G4/G7/G10(복도1~4 특성) = 참가자 **전원 완료**.
   특성 게이트(G2/G4/G7/G10)만 **첫 완료자 후 60초** 자동 진행(서버 실제 시간 = `ServerTime` — 슬로우모션·솔로 일시정지 무관, 인스펙터 `deadlockSeconds`) —
   **G1 은 교착 방지 제외**(v8 §2.1, `HasDeadlockTimeout(G1) == false` — 대기 표시의 자동 진행 시각도 -1). 시계는 그 게이트가 열 차례가 된 뒤부터 잰다. 첫 완료자가 나가도 시계는 계속 간다.
 - v8: **카운터로 자동 열리는 게이트는 없다**(`TryGetGateCounter` 항상 false). G5(스피너봇 본 모드) = 연계 3회 + 마지막 원위치 복귀 뒤 존3 흐름이 `RequestGateServer(G5)`. 나머지(G3·G6·G8·G9)는 서버가 `TryOpenGateServer`/`RequestGateServer` 로 연다.
@@ -46,19 +56,19 @@
 ## 5. API
 | 쪽 | API |
 |---|---|
-| 서버 | `ReportCheckServer(clientId, TutorialCheck)` · `AddCounterServer(counter, n)` · `TryOpenGateServer(gate)` · `SetStepServer(step)` |
-| 오너 클라 | `ReportLocalCheck(PassiveTooltip)` → `ReportOwnerCheckServerRpc`(서버 재검증: 항목·G1 전·PlayerObject) · 이동은 **`ReportLocalMoveDistance(m)`** → `ReportOwnerMoveServerRpc`(Alive·거리 상한 검증, S7). 거리 없는 `ReportLocalCheck(Move)` 는 서버가 거부한다 — [tutorial-zone1.md](tutorial-zone1.md) |
+| 서버 | `ReportCheckServer(clientId, MapSceneCheck)` · `AddCounterServer(counter, n)` · `TryOpenGateServer(gate)` · `SetStepServer(step)` |
+| 오너 클라 | (107 에서 삭제 — 옛 존1 이동·패시브 보고 `ReportLocalCheck`·`ReportLocalMoveDistance` 와 RPC 2개. 기록은 [tutorial-zone1.md](tutorial-zone1.md)) |
 | 모두 읽기 | `IsTutorialActive` · `Step` · `IsGateOpen` · `WasGateAutoOpened` · `GetCounter`/`GetCounterTarget` · `TryGetPlayerProgress` · `TryGetWait` |
 | 이벤트(정적) | `StepChanged` · `GateOpened(gate, reason)` — 서버는 실제 이유, 클라는 Timeout/Manual 만 · `StateChanged`(아무 복제 변화 + 스폰 직후 1회 — 다시 그리기 신호) |
 
 S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 
-다음 단계가 붙일 자리는 `TutorialDirector` 클래스 주석(S3 배리어 → `GateOpened`/`IsGateOpen`, S4 → G3·Zone2Kills, S9 → Zone3Interrupts, S12 → Timeout 열림 시 특성 자동 획득).
+다음 단계가 붙일 자리는 `MapSceneDirector` 클래스 주석(S3 배리어 → `GateOpened`/`IsGateOpen`, S4 → G3·Zone2Kills, S9 → Zone3Interrupts, S12 → Timeout 열림 시 특성 자동 획득).
 S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 남은 `TODO(S6/S8/S12)` 주석은 낡은 표시다).
 
 ## 6. 구간 감지 (S2)
-> 코드: `TutorialAreaTracker`(순수 규칙 · `TutorialRect` · `TutorialCorridorGeometry`) · `TutorialAreaLayout`(저작 데이터 → 모양, 기즈모) · `TutorialDirector`(서버 폴링·이벤트).
-> 테스트: `TutorialAreaTrackerTests`(튜토리얼 러너).
+> 코드: `MapSceneAreaTracker`(순수 규칙 · `MapSceneRect` · `MapSceneCorridorGeometry`) · `MapSceneAreaLayout`(저작 데이터 → 모양, 기즈모) · `MapSceneDirector`(서버 폴링·이벤트).
+> 테스트: `MapSceneAreaTrackerTests`(튜토리얼 러너).
 
 **구간 모양 — 저작 데이터에서 계산(하드코딩 좌표 없음)**
 - 존 = `StageTutorial` 슬롯 `SlotID` 0~3 → 존1~4, 4 → 보스 진입. 사각형 = 슬롯 `transform.position` · `Footprint` · 슬롯 Y 회전.
@@ -84,7 +94,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 보스 진입 | (−29.47, −101.1) 20×20 | (−29.5, −101.1) |
 
 **판정 규칙**
-- 서버만, 튜토리얼 활성(`TutorialStageMarker` 있음 → 디렉터 활성)일 때만. 주기 `areaPollInterval`(기본 0.15초, 실제 시간 — 슬로우모션 무관).
+- 서버만, 튜토리얼 활성(`MapSceneStageMarker` 있음 → 디렉터 활성)일 때만. 주기 `areaPollInterval`(기본 0.15초, 실제 시간 — 슬로우모션 무관).
 - 위치 = 서버가 보는 `PlayerObject.transform`. 원격 플레이어는 오너 권한 이동의 NetworkTransform 복제값이라 늦고 흔들린다 → 히스테리시스:
   새 구간은 경계에서 **안쪽 `areaEnterMargin`(기본 0.5m)** 까지 들어와야 진입, 지금 구간은 **바깥 `areaExitMargin`(기본 1.0m)** 을 넘어야 이탈. 둘 다 인스펙터 값.
 - 🔴 **판정 대상 = `PlayerLifeState.Alive` 뿐.** 사망 연출·영혼(Soul)·완전 사망(PermanentDead)은 판정하지 않는다 — 현재 구간 None,
@@ -95,22 +105,22 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 **이벤트 · API (서버)**
 | | |
 |---|---|
-| `TutorialDirector.AreaFirstEntered(area, clientId)` | 파티 첫 진입 — 존1~4·보스 진입 각각 판 전체 1번(복도는 없음). 존1 은 스폰 착지 직후 나온다 |
-| `TutorialDirector.CorridorMidReached(clientId, corridor 1~4)` | 개인 첫 복도 중간 지점 — 플레이어마다 복도마다 1번, 왕복해도 재발행 없음 |
+| `MapSceneDirector.AreaFirstEntered(area, clientId)` | 파티 첫 진입 — 존1~4·보스 진입 각각 판 전체 1번(복도는 없음). 존1 은 스폰 착지 직후 나온다 |
+| `MapSceneDirector.CorridorMidReached(clientId, corridor 1~4)` | 개인 첫 복도 중간 지점 — 플레이어마다 복도마다 1번, 왕복해도 재발행 없음 |
 | `GetPlayerAreaServer(clientId)` · `HasPartyEnteredServer(area)` · `HasReachedCorridorMidServer(clientId, n)` | 조회 |
 
 이벤트만 낸다. 단계 갱신(`SetStepServer`)·안내(S6)·존2/3/4 시작(S8~S10)·특성 창(S8/S12)은 구독해서 붙인다. 복제 상태는 아직 없다(늦은 클라는 `Step` 으로 그린다).
 
-**디버그**: 씬에서 `Stage1`(StageTutorial 루트, `TutorialStageMarker`)을 선택하면 존(하늘색)·복도(노랑)·안쪽/바깥 여유(옅은 선)·복도 중간 지점(분홍) 기즈모.
+**디버그**: 씬에서 `Stage1`(StageTutorial 루트, `MapSceneStageMarker`)을 선택하면 존(하늘색)·복도(노랑)·안쪽/바깥 여유(옅은 선)·복도 중간 지점(분홍) 기즈모.
 
 ## 7. 배리어 (S3)
-> 코드: `TutorialBarrierRules`(순수 — 매핑·모양·진입 가능·추락 후보) · `TutorialBarriers`(런타임, 모든 피어) · `PlayerSafePointTracker.ReturnPointFilter`(훅).
-> 테스트: `TutorialBarrierRulesTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/Tutorial/5. Preview Barriers`(열린 씬, 저장 안 됨) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
+> 코드: `MapSceneBarrierRules`(순수 — 매핑·모양·진입 가능·추락 후보) · `MapSceneBarriers`(런타임, 모든 피어) · `PlayerSafePointTracker.ReturnPointFilter`(훅).
+> 테스트: `MapSceneBarrierRulesTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/MapScene/5. Preview Barriers`(열린 씬, 저장 안 됨) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
 
 **8개 = 복도 n 입구(앞 존 쪽)·출구(다음 존 쪽)**: 복도1 G1/G2 · 복도2 G3/G4 · 복도3 G6/G7 · 복도4 G9/G10. G5·G8·G11 은 배리어 없음.
 - 모양 = §6 복도 사각형의 양 끝에서 **복도 안쪽으로** 두께 0.4m(존 사각형을 침범하지 않음), 가로 = 복도 너비 + 양옆 0.3m(복도 벽 안으로 파고듦), 높이 3m.
   2026-10-11 프리팹 점검: 8개 모두 양옆 벽 안쪽 면 ±1.38m, 벽 바깥 면 ±2.63m(배리어 반폭 2.3m — 벽 밖으로 안 나옴).
-- 어디에: Play 중에만 `TutorialStageMarker.Start` 가 StageTutorial 루트에 `TutorialBarriers` 를 붙이고, 그것이 루트 아래 `TutorialBarriers/Barrier_G*` 를 만든다.
+- 어디에: Play 중에만 `MapSceneStageMarker.Start` 가 StageTutorial 루트에 `MapSceneBarriers` 를 붙이고, 그것이 루트 아래 `MapSceneBarriers/Barrier_G*` 를 만든다.
   🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼 참조 한 줄뿐.
 
 **언제 · 어떻게 여나**
@@ -123,37 +133,37 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   배리어는 벽이 아니다 — 공용 벽 충돌 이벤트(`UnitWallImpact`)가 나지 않는다.
   걷기·대시·이동 스킬(어쌔신 Q 돌진·평타 전진, 거너 E 백스텝·우클릭 반동, 팔라딘 전진)·넉백이 모두 같은 스윕(`PlayerMovementSimulation`)이라 막힌다.
   스윕을 안 타는 것 = 순간이동(`TeleportAuthoritative` — 스폰·추락 복구·보스방 이동)과 23호 잡기/밀기(`PlayerRestrainedState` — 보스방 전용).
-  Barrier 는 거너 평타·차지 레이저 차단 레이어에도 있어(할 일 32 에서 추가) 배리어 너머로는 거너 빔이 막힌다. 부활·리스폰 점유 검사(`TutorialDeathRules`·`PartyWipeRespawner`)도 Wall|Barrier 를 본다.
+  Barrier 는 거너 평타·차지 레이저 차단 레이어에도 있어(할 일 32 에서 추가) 배리어 너머로는 거너 빔이 막힌다. 부활·리스폰 점유 검사(`MapSceneDeathRules`·`PartyWipeRespawner`)도 Wall|Barrier 를 본다.
 - 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Barrier 는 NavMesh 베이크 수집(Default·Ground·Wall)에 안 들어가 다리 재베이크에 섞이지 않는다.
-- 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
+- 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `MapSceneBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백(존1)은 원래 거르지 않았다 —
   C2 부터는 그 사람의 뒤 배리어 너머면 대체 지점을 쓴다(아래 '뒤 배리어 예외').
 - 타이머 만료·패드 이동은 `BossTeleportManager` 순간이동이라 배리어와 무관(§4 "만료 강제 이동은 G9·G10 과 무관").
 
 **개인 뒤 배리어 (15 후속 C1, 2026-10-12)** — 배리어를 지나 앞 구간으로 넘어간 플레이어 **본인만** 뒤로 못 돌아간다. 뒤에 남은 동료의 전진은 막지 않는다.
-> 코드: `TutorialBackBarrierRules`(순수 — 지남 판정·마스크 갱신·로컬 콜라이더 목록) · `TutorialDirector`(서버 판정·복제) · `TutorialBarriers`(각 피어 로컬 콜라이더).
-> 테스트: `TutorialBackBarrierRulesTests`(튜토리얼 러너). 디버그: `Tools/Tutorial/Debug/뒤 배리어 마스크 로그 (클라별)`.
-- **복제 필드**: `_players[i].BackBarrierMask`(int, `PlayerState`) — 지난 배리어, bit = `1 << (int)TutorialGate`(게이트 열림 마스크와 같은 배치). 한 번 켜지면 끄지 않는다.
+> 코드: `MapSceneBackBarrierRules`(순수 — 지남 판정·마스크 갱신·로컬 콜라이더 목록) · `MapSceneDirector`(서버 판정·복제) · `MapSceneBarriers`(각 피어 로컬 콜라이더).
+> 테스트: `MapSceneBackBarrierRulesTests`(튜토리얼 러너). 디버그: `Tools/MapScene/Debug/뒤 배리어 마스크 로그 (클라별)`.
+- **복제 필드**: `_players[i].BackBarrierMask`(int, `PlayerState`) — 지난 배리어, bit = `1 << (int)MapSceneGate`(게이트 열림 마스크와 같은 배치). 한 번 켜지면 끄지 않는다.
   읽기 = `GetBackBarrierMask(clientId)`(모든 피어, 복제값) · `GetBackBarrierMaskServer(clientId)`(서버 원본 — 부활·추락 복구 예외(C2, 아래)가 쓴다) · `BackBarrierClearance`.
 - **지남 판정(서버, `PollAreas` 주기)**: 게이트가 **열린** 배리어만. 배리어 박스의 진행 방향 쪽 면에서 `backBarrierClearance`(기본 0.75m — 플레이어 캡슐 반경 이상, 인스펙터) 이상 나아갔고
-  너머 구간(입구 G1/G3/G6/G9 = 복도 n, 출구 G2/G4/G7/G10 = 다음 존·보스 진입) 사각형 안에 있을 때. 진행 방향은 `TutorialBarrierSpec.AlongX`·`Forward`.
+  너머 구간(입구 G1/G3/G6/G9 = 복도 n, 출구 G2/G4/G7/G10 = 다음 존·보스 진입) 사각형 안에 있을 때. 진행 방향은 `MapSceneBarrierSpec.AlongX`·`Forward`.
   `Alive` 만 판정, 단계 Finished 뒤엔 판정 안 함. 새로 지나면 서버 로그 `[TutorialBarrier] 뒤 배리어 G* 닫힘 — client n`.
-- **막기(각 피어, 로컬 플레이어 기준)**: `TutorialBarriers` 가 자기 `LocalClientId` 의 복제 마스크로 `지난 ∧ 열린 게이트`(닫힌 배리어는 일반 배리어가 막으니 중복 생성 안 함)를
-  같은 자리의 `TutorialBarriers/BackBarrier_G*` 로 켠다 — Barrier 레이어 BoxCollider + 같은 머티리얼, **NavMeshObstacle 없음**(몬스터는 안 막음).
+- **막기(각 피어, 로컬 플레이어 기준)**: `MapSceneBarriers` 가 자기 `LocalClientId` 의 복제 마스크로 `지난 ∧ 열린 게이트`(닫힌 배리어는 일반 배리어가 막으니 중복 생성 안 함)를
+  같은 자리의 `MapSceneBarriers/BackBarrier_G*` 로 켠다 — Barrier 레이어 BoxCollider + 같은 머티리얼, **NavMeshObstacle 없음**(몬스터는 안 막음).
   이동이 오너 권한·오너 로컬 스윕이라 이 피어의 콜라이더는 이 피어의 로컬 플레이어만 막는다(남의 플레이어는 복제 위치라 무관). 늦은 클라는 스폰 직후 `StateChanged` 로 같은 결과.
   켤 때 로컬 플레이어 콜라이더 bounds 와 겹치면 켜지 않고 다음 프레임(`Update`)에 다시 시도(끼임 방지).
 - 사망(Soul) 중에도 유지(Soul 도 같은 모터 스윕 — `PlayerMotor.ResolveObstacleMask` 가 Soul 에서도 Wall 을 남긴다). 튜토리얼 비활성(비튜토리얼 스테이지)이면 안 만들고, 단계 Finished 면 끈다.
 
 **뒤 배리어 예외 — 스폰·부활·추락 복구·순간이동 (15 후속 C2, 2026-10-12)** — 서버가 그 플레이어를 자기 뒤 배리어 너머로 옮기지 않는다. 기준은 늘 **그 clientId 의 서버 마스크**(`GetBackBarrierMaskServer`)다(호스트 로컬 값 아님).
-> 순수: `TutorialBackBarrierRules.FrontmostPassedArea`(지나온 최전방 구간 = 지난 배리어 중 가장 앞 것의 너머 구간, 없으면 존1) · `IsAreaBehind` ·
+> 순수: `MapSceneBackBarrierRules.FrontmostPassedArea`(지나온 최전방 구간 = 지난 배리어 중 가장 앞 것의 너머 구간, 없으면 존1) · `IsAreaBehind` ·
 > `IsNearPassedFace`(지난 배리어 너머 구간이면서 앞면에서 `BackBarrierClearance` 미만 — 로컬 콜라이더와 겹칠 자리) · `IsReturnPointAllowed`(추락 복구 후보).
-> 테스트: `TutorialBackBarrierRulesTests`·`TutorialDeathRulesTests`(튜토리얼 러너).
-- **자동 부활**(§11): 지금 단계 구간이 그 플레이어의 최전방 구간보다 뒤면 최전방 구간으로 올리고, 찾는 순서도 최전방 구간에서 멈춘다(`TutorialRevivePointRules.AreaOrder(step, mask, passed)`).
+> 테스트: `MapSceneBackBarrierRulesTests`·`MapSceneDeathRulesTests`(튜토리얼 러너).
+- **자동 부활**(§11): 지금 단계 구간이 그 플레이어의 최전방 구간보다 뒤면 최전방 구간으로 올리고, 찾는 순서도 최전방 구간에서 멈춘다(`MapSceneRevivePointRules.AreaOrder(step, mask, passed)`).
   '가장 먼 후보' 폴백도 같은 순서 안에서만. 지난 배리어 앞면 여유 안 격자점은 버린다. G10 을 지난 사람만 보스 진입 존에서 부활(복도4 가 그 사람의 뒤 배리어 너머 — 갇힘 방지).
   후보가 없으면 그 자리(사망 지점은 이미 그 사람이 서 있던 곳이라 뒤 배리어 앞쪽).
 - **추락 복구**: `PlayerSafePointTracker.ReturnPointFilter` 가 `Func<ulong, Vector3, bool>`(OwnerClientId, 후보)로 바뀌었다(null = 모두 허용, 기존과 같음).
-  `TutorialBarriers.IsReturnPointAllowed(clientId, p)` → `TutorialBackBarrierRules.IsReturnPointAllowed` — 닫힌 배리어 너머 + 그 사람의 뒤 배리어 너머 + 지난 배리어 앞면 여유 안을 거부. 마스크 0 이면 기존 `IsPointReachable` 과 같다.
-  스폰 폴백(존1)이 필터에 거부되면 `PlayerSafePointTracker.ReturnPointFallback`(서버, `TutorialDeathRules` 가 건다)이 부활과 같은 규칙의 안전 지점을 준다 — 못 찾으면 기존대로 스폰.
+  `MapSceneBarriers.IsReturnPointAllowed(clientId, p)` → `MapSceneBackBarrierRules.IsReturnPointAllowed` — 닫힌 배리어 너머 + 그 사람의 뒤 배리어 너머 + 지난 배리어 앞면 여유 안을 거부. 마스크 0 이면 기존 `IsPointReachable` 과 같다.
+  스폰 폴백(존1)이 필터에 거부되면 `PlayerSafePointTracker.ReturnPointFallback`(서버, `MapSceneDeathRules` 가 건다)이 부활과 같은 규칙의 안전 지점을 준다 — 못 찾으면 기존대로 스폰.
   추락 사망(Soul 로 옮기기)도 같은 `ResolveReturnPoint` 라 함께 적용된다.
 - **순간이동 점검**: `TeleportAuthoritative` 경로 = 추락 복구(위 필터)·부활 재배치(`RelocateServer` — 위 부활 규칙)·스폰 포즈(`Player.PlaceOwnerAtSpawnClientRpc` — 최초 스폰 존1, 그때 마스크 0)·
   보스방 이동(`BossTeleportManager` — 목적지가 튜토리얼 구간 밖이라 지남 판정·뒤 배리어와 무관, Finished 에서 끈다). 뒤 배리어 너머로 옮기는 경로는 없다.
@@ -164,9 +174,9 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   카운트다운이 시작되지 않는다. 상세 §11 '보스 진입 패드 제외'.
 
 ## 8. 존 장부 · 몬스터 휴면 (S4)
-> 코드: `TutorialMonsterLedger`(순수 — 존 배정·클리어 규칙·필터) · `TutorialMonsterZones`(서버 — MonsterBase 참조·휴면 적용·사망 구독) · `TutorialDirector`(배선·API) ·
+> 코드: `MapSceneMonsterLedger`(순수 — 존 배정·클리어 규칙·필터) · `MapSceneMonsterZones`(서버 — MonsterBase 참조·휴면 적용·사망 구독) · `MapSceneDirector`(배선·API) ·
 > 몬스터 훅 `MonsterBase.SetDormantServer` — 무엇을 왜 바꿨는지는 [handoff-tutorial.md](handoff-tutorial.md).
-> 테스트: `TutorialMonsterLedgerTests`(튜토리얼 러너 — 장부 + 게이트 보류). 디버그 메뉴: `Tools/Tutorial/Debug/*`(Play 중 호스트).
+> 테스트: `MapSceneMonsterLedgerTests`(튜토리얼 러너 — 장부 + 게이트 보류). 디버그 메뉴: `Tools/MapScene/Debug/*`(Play 중 호스트).
 
 **장부 만들기 — 활성화 순간(서버)**
 - `MapGenerator.OnGenerated` 는 `MapContentSpawner.SpawnPlacements`(몬스터 `Spawn()` 동기 완료) **뒤**에 온다 → 디렉터 활성(그 이벤트 또는 그 뒤 자기 스폰)에서 몬스터가 이미 다 있다.
@@ -189,25 +199,25 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 존2 | 전멸(`AllDead`) | G3 |
 | 존3 | 핵심 처치(`KeyDead` — 스피너봇) | G6 |
 | 존4 | 핵심 처치(`KeyDead` — 중간보스, 일반 몹 남아도 됨 D4) | G9 |
-- 핵심이 없는 존은 전멸로 본다. 판정은 사망 때만 — 0마리 존은 클리어되지 않는다. 존마다 1번(`TutorialDirector.ZoneCleared` 정적 이벤트, 서버).
+- 핵심이 없는 존은 전멸로 본다. 판정은 사망 때만 — 0마리 존은 클리어되지 않는다. 존마다 1번(`MapSceneDirector.ZoneCleared` 정적 이벤트, 서버).
 - 사망 = `MonsterDeathEvents.ServerMonsterDied`. 존2 사망마다 `Zone2Kills` +1. **처치 목표 = 장부의 존2 수**(0 이면 인스펙터 `zone2KillTarget`).
   목표는 `_counters` 뒤쪽 절반으로 복제한다(`GetCounterTarget` — 클라도 실제 수를 본다).
 
-**게이트 보류** — `TutorialFlowModel.RequestGate` / `TutorialDirector.RequestGateServer`
+**게이트 보류** — `MapSceneFlowModel.RequestGate` / `MapSceneDirector.RequestGateServer`
 - 존 클리어 = "조건은 이미 충족, 순서만 기다림". 차례(앞 게이트 열림)면 즉시 열고, 아니면 `RequestedGateMask` 에 남겨 **앞 게이트가 열리는 그 `Evaluate` 에서** 연다(조건 재확인 없음 — 처치는 되돌릴 수 없다).
 - 예: 디버그로 존2 를 G2 전에 정리 → G3 보류 → 복도1 특성 전원 선택으로 G2 가 열리는 순간 G3 도 열림. 중간보스를 G8(타이머 시작) 전에 잡음 → G8 열릴 때 G9.
 - `TryOpenGateServer` 는 그대로(순서가 안 맞으면 거부) — 보류가 필요한 쪽만 `RequestGateServer` 를 쓴다.
 
-**디버그(Play 중 호스트, `Tools/Tutorial/Debug/`)**: 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 ·
+**디버그(Play 중 호스트, `Tools/MapScene/Debug/`)**: 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 ·
 존2 전멸(깨워서 처치) · 존3 핵심 처치 · 존4 핵심 처치. F9(DevMonsterKill)는 휴면 몬스터를 못 죽인다(무적) — 먼저 깨울 것.
-처치·강제 개방 코드는 `TutorialDebugActions`(런타임 — 구간 스킵 Alt+1~0 과 공용, §10.5).
+처치·강제 개방 코드는 `MapSceneDebugActions`(런타임 — 구간 스킵 Alt+1~0 과 공용, §10.5).
 
 ## 9. 보스 타이머 · 보스 길 (S5)
-> 코드: `TutorialBossPathRules`(순수) · `TutorialBossPath`(판별 한 곳 — 경석 코드가 묻는 곳) · `TutorialElevatorDoor`(모든 피어) · `TutorialDirector`(G8·HUD·도착) ·
+> 코드: `MapSceneBossPathRules`(순수) · `MapSceneBossPath`(판별 한 곳 — 경석 코드가 묻는 곳) · `MapSceneElevatorDoor`(모든 피어) · `MapSceneDirector`(G8·HUD·도착) ·
 > 경석 코드 훅(`BossTimerManager`·`BossTimerHUD`·`BossEnterTrigger`·`BossEnterZoneVisual`) — 무엇을 왜는 [handoff-tutorial.md](handoff-tutorial.md) §3.
-> 테스트: `TutorialBossPathRulesTests`(튜토리얼 러너). 회귀: `BossTimerClockTests`(슬로우 모션 러너). 디버그: `Tools/Tutorial/Debug/` 보스 길 6개(G11 열기 = 목숨 차감 기준만 켬, 이동·Finished 없음).
+> 테스트: `MapSceneBossPathRulesTests`(튜토리얼 러너). 회귀: `BossTimerClockTests`(슬로우 모션 러너). 디버그: `Tools/MapScene/Debug/` 보스 길 6개(G11 열기 = 목숨 차감 기준만 켬, 이동·Finished 없음).
 
-**판별**: `TutorialBossPath.IsTutorialStage` = `TutorialStageMarker.IsActive` && 씬에 `TutorialDirector`. 둘 다 씬 로드(OnEnable·Awake) 때 정해져
+**판별**: `MapSceneBossPath.IsTutorialStage` = `MapSceneStageMarker.IsActive` && 씬에 `MapSceneDirector`. 둘 다 씬 로드(OnEnable·Awake) 때 정해져
 `MapGenerator.OnGenerated`·NetworkObject 스폰 순서와 무관하다 → 타이머는 디렉터 활성 전에도 **한 프레임도 자동 시작하지 않는다**. 디렉터가 씬에 없으면 잠금도 없다(교착 방지).
 
 | 항목 | 튜토리얼 | 비튜토리얼(절차 맵) |
@@ -235,51 +245,52 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 |---|---|---|
 | S6 안내 UI | [tutorial-guide-ui.md](tutorial-guide-ui.md) | 목표 패널·자막·강조 API, 문구 변형·치환 규칙, 화면 배치 |
 | 훅 | [tutorial-player-hooks.md](tutorial-player-hooks.md) | 대시 승인·툴팁 표시/숨김·간파 판정·스킬 사용·과열·조준 시작 이벤트 · v8 기본 공격 시작·거너 Q 발사 |
-| S0·S7 존1(v8) | [tutorial-zone1.md](tutorial-zone1.md) | 착지 환영·이동 5m·대시·**기본 공격·Q·E·R·우클릭 각 1회**·패시브 1초·G1(교착 방지 없음)·캐릭터별 힌트·허수아비 디스폰 |
-| S8 복도1~4·존2(v8) | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고 · **복도1 첫 진입 쿨 초기화** · 존2 기상 4초·**전멸만** |
-| S9 존3(v8) | [tutorial-zone3.md](tutorial-zone3.md) | 스피너봇 Variant 스폰 치환·유효 벽·연습 위치·**간파 → 취약 밀치기 → 벽 충돌 → 복귀 연계 3회** → G5 → 본 모드 → G6 |
-| S10 존4·보스 진입 | [tutorial-zone4.md](tutorial-zone4.md) | 설정 자막 10초 → G8 → 패널·다리·중간보스 → G9 · 만료·패드·도착 정리 · 재베이크/고정 조각 조사 |
+| 107 맵씬 정리 | 이 문서 맨 위 | Legacy 로 뺀 것·`MapSceneZoneFlow` 최소 진행·이름 대응·로비 공용 유지 |
+| S0·S7 존1(v8) — **Legacy** | [tutorial-zone1.md](tutorial-zone1.md) | (107 Legacy) 착지 환영·이동 5m·대시·기본 공격·Q·E·R·우클릭 각 1회·패시브 1초·G1·허수아비. 지금 맵씬은 G1 즉시 |
+| S8 복도1~4·존2(v8) | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고(**유지** — `MapSceneTraitCorridorFlow`) · 복도1 첫 진입 쿨 초기화·존2 안내(**Legacy**) · 존2 기상 4초·전멸(`MapSceneZoneFlow`) |
+| S9 존3(v8) — **Legacy** | [tutorial-zone3.md](tutorial-zone3.md) | (107 Legacy) 스피너봇 Variant 스폰 치환·연계 연습 3회 → G5. 지금 맵씬은 원래 스피너봇 기상 + G5 즉시 요청 → 처치 = G6 |
+| S10 존4·보스 진입 | [tutorial-zone4.md](tutorial-zone4.md) | 설정 자막 10초 → G8 → 다리·중간보스 → G9 · 만료·패드·도착 정리(**유지** — `MapSceneBossApproachGuide/View`) · 장치 설명·패널 n/4·간파 리마인드(**Legacy**) · 재베이크/고정 조각 조사 |
 | 특성 | [tutorial-traits.md](tutorial-traits.md) | 특성 디렉터 API·라운드·무적 토큰·placeholder 6종·xlsx 이관 메모 |
 | S11 사망 | 이 문서 §11 | 자동 부활·목숨 차감(G11 보스방 도착)·부활 지점(단계 구간) |
 | QA | [tutorial-qa.md](tutorial-qa.md) | 사람이 위에서부터 따라 하는 Play/MPPM 체크리스트 · 알려진 한계 · 병합 전 확인 |
 
 **handoff (다른 담당 코드에 넣은 훅 — 경석 공유)**
-- [handoff-tutorial.md](handoff-tutorial.md) — `MonsterBase` 휴면(`SetDormantServer`), 스피너봇 휴면 통합(I0), 보스 타이머 지연 시작·HUD 숨김·패드 잠금(`TutorialBossPath` 한 곳 판별).
-- [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md) — `SpinnerBot` 주입 인터페이스(`ISpinnerBotOverride`)·연습/전환 대기/본 모드, `MapContentSpawner.ServerMonsterPrefabOverride` 스폰 치환 훅.
+- [handoff-tutorial.md](handoff-tutorial.md) — `MonsterBase` 휴면(`SetDormantServer`), 스피너봇 휴면 통합(I0), 보스 타이머 지연 시작·HUD 숨김·패드 잠금(`MapSceneBossPath` 한 곳 판별).
+- [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md) — `SpinnerBot` 주입 인터페이스(`ISpinnerBotOverride`)·연습/전환 대기/본 모드, `MapContentSpawner.ServerMonsterPrefabOverride` 스폰 치환 훅. **107: 구현체·설치처는 Legacy — 두 훅은 남았지만 지금은 늘 비어 있다.**
 - 존3/4 레인 별도 handoff 는 없다 — 존4 의 `ZoneBridgeGateManager` 정적 이벤트 2개(`ServerPanelActivated`·`ServerBridgeOpened`)와 재베이크·고정 조각 조사는 [tutorial-zone4.md](tutorial-zone4.md) §4·§6 에 있다.
 
-**`TutorialDirector`** (씬 상주 NetworkObject, `Instance`)
+**`MapSceneDirector`** (씬 상주 NetworkObject, `Instance`)
 
 | 쪽 | 시그니처 |
 |---|---|
-| 읽기(모든 피어) | `bool IsTutorialActive` · `TutorialStep Step` · `bool IsGateOpen(TutorialGate)` · `bool WasGateAutoOpened(TutorialGate)` · `int GetCounter(TutorialCounter)` · `int GetCounterTarget(TutorialCounter)` · `bool TryGetPlayerProgress(ulong, out TutorialPlayerProgress)` · `bool TryGetWait(out TutorialGate, out int done, out int total, out float autoAdvanceRemaining)` · `bool IsTimerHudShown` · `bool IsBossTimerStarted`(= G8) · `bool IsFinished`(단계 Finished) · `float BossTimerLimitSeconds` · `float AreaEnterMargin/AreaExitMargin` |
-| 서버 쓰기 | `bool ReportCheckServer(ulong, TutorialCheck)` · `bool AddCounterServer(TutorialCounter, int = 1)` · `bool TryOpenGateServer(TutorialGate, TutorialGateOpenReason = Manual)`(순서 어기면 거부) · `bool RequestGateServer(TutorialGate)`(차례 전이면 보류) · `bool SetStepServer(TutorialStep)`(앞으로만) · `void ShowTimerHudServer()` · `bool StartBossTimerServer()`(= G8) · `void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)`(S9 — 자막 RPC 하나, targets null = 전원) · `ulong[] GetClientsOfCharacterServer(TutorialCharacter)` |
-| 서버 몬스터 | `int SetZoneDormantServer(TutorialArea, bool, TutorialMonsterFilter = All)` · `int WakeZoneServer(TutorialArea, filter = All)` · `bool SetMonsterDormantServer(MonsterBase, bool)` · `void GetZoneMonstersServer(TutorialArea, filter, List<MonsterBase>)` · `bool TryGetZoneMonsterCountServer(zone, filter, out total, out alive)` · `bool IsZoneClearedServer(TutorialArea)` · `string DescribeMonsterZonesServer()` |
-| 서버 구간 | `TutorialArea GetPlayerAreaServer(ulong)` · `bool HasPartyEnteredServer(TutorialArea)` · `bool HasReachedCorridorMidServer(ulong, int)` |
-| 오너 클라 | `void ReportLocalCheck(TutorialCheck)`(PassiveTooltip — Move 는 거리 없이 보내면 서버 거부) · `void ReportLocalMoveDistance(float meters)`(S7, 서버 상한 검증) · `static bool IsOwnerReportable(TutorialCheck)` |
-| 정적 이벤트 — 양쪽 | `StepChanged(TutorialStep from, to)` · `GateOpened(TutorialGate, TutorialGateOpenReason)`(클라 이유 = Timeout/Manual 만) · `StateChanged()`(아무 복제 변화 + 스폰 직후 1회) |
-| 정적 이벤트 — 서버만 | `AreaFirstEntered(TutorialArea, ulong)` · `CorridorMidReached(ulong, int corridor)` · `ZoneCleared(TutorialArea)` · `BossRoomArrived(IReadOnlyList<ulong>)` |
+| 읽기(모든 피어) | `bool IsTutorialActive` · `MapSceneStep Step` · `bool IsGateOpen(MapSceneGate)` · `bool WasGateAutoOpened(MapSceneGate)` · `int GetCounter(MapSceneCounter)` · `int GetCounterTarget(MapSceneCounter)` · `bool TryGetPlayerProgress(ulong, out MapScenePlayerProgress)` · `bool TryGetWait(out MapSceneGate, out int done, out int total, out float autoAdvanceRemaining)` · `bool IsTimerHudShown` · `bool IsBossTimerStarted`(= G8) · `bool IsFinished`(단계 Finished) · `float BossTimerLimitSeconds` · `float AreaEnterMargin/AreaExitMargin` |
+| 서버 쓰기 | `bool ReportCheckServer(ulong, MapSceneCheck)` · `bool AddCounterServer(MapSceneCounter, int = 1)` · `bool TryOpenGateServer(MapSceneGate, MapSceneGateOpenReason = Manual)`(순서 어기면 거부) · `bool RequestGateServer(MapSceneGate)`(차례 전이면 보류) · `bool SetStepServer(MapSceneStep)`(앞으로만) · `void ShowTimerHudServer()` · `bool StartBossTimerServer()`(= G8) · `void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)`(S9 — 자막 RPC 하나, targets null = 전원) · `ulong[] GetClientsOfCharacterServer(TutorialCharacter)` |
+| 서버 몬스터 | `int SetZoneDormantServer(MapSceneArea, bool, MapSceneMonsterFilter = All)` · `int WakeZoneServer(MapSceneArea, filter = All)` · `bool SetMonsterDormantServer(MonsterBase, bool)` · `void GetZoneMonstersServer(MapSceneArea, filter, List<MonsterBase>)` · `bool TryGetZoneMonsterCountServer(zone, filter, out total, out alive)` · `bool IsZoneClearedServer(MapSceneArea)` · `string DescribeMonsterZonesServer()` |
+| 서버 구간 | `MapSceneArea GetPlayerAreaServer(ulong)` · `bool HasPartyEnteredServer(MapSceneArea)` · `bool HasReachedCorridorMidServer(ulong, int)` |
+| 정적 이벤트 — 양쪽 | `StepChanged(MapSceneStep from, to)` · `GateOpened(MapSceneGate, MapSceneGateOpenReason)`(클라 이유 = Timeout/Manual 만) · `StateChanged()`(아무 복제 변화 + 스폰 직후 1회) |
+| 정적 이벤트 — 서버만 | `AreaFirstEntered(MapSceneArea, ulong)` · `CorridorMidReached(ulong, int corridor)` · `ZoneCleared(MapSceneArea)` · `BossRoomArrived(IReadOnlyList<ulong>)` |
 
 **그 밖의 컴포넌트**
-- `TutorialStageMarker` — `static bool IsActive` · `static TutorialStageMarker Active` · `static bool OwnsGeneratedMap(MapGenerator)` · `Material BarrierMaterial`. Play 중 `Start` 에서 `TutorialBarriers`·`TutorialElevatorDoor` 를 붙인다.
-- `TutorialBossPath`(모든 피어) — `IsTutorialStage` · `ShouldAutoStartTimer` · `ShouldHideTimerHud(TimerState)` · `IsBossPadEnabled`.
-- `TutorialBarriers`(모든 피어) — `static Active` · `bool IsBuilt` · `bool IsBarrierClosed(TutorialGate)` · `bool IsReturnPointAllowed(Vector3)`(서버 추락 복구 필터).
-- `TutorialElevatorDoor`(모든 피어) — `bool IsOpened`.
+- `MapSceneStageMarker` — `static bool IsActive` · `static MapSceneStageMarker Active` · `static bool OwnsGeneratedMap(MapGenerator)` · `Material BarrierMaterial`. Play 중 `Start` 에서 `MapSceneBarriers`·`MapSceneElevatorDoor` 를 붙인다.
+- `MapSceneBossPath`(모든 피어) — `IsTutorialStage` · `ShouldAutoStartTimer` · `ShouldHideTimerHud(TimerState)` · `IsBossPadEnabled`.
+- `MapSceneBarriers`(모든 피어) — `static Active` · `bool IsBuilt` · `bool IsBarrierClosed(MapSceneGate)` · `bool IsReturnPointAllowed(Vector3)`(서버 추락 복구 필터).
+- `MapSceneElevatorDoor`(모든 피어) — `bool IsOpened`.
 - `BossTimerManager`(경석) — `bool StartTimerServer(float limitSecondsOverride = 0f)` · `TimerState State` · `float LimitSeconds` · `float RemainingSeconds` · `float Fill01`.
-- 순수: `TutorialFlowModel` · `TutorialAreaTracker`/`TutorialAreaLayout` · `TutorialBarrierRules` · `TutorialMonsterLedger` · `TutorialBossPathRules`.
-- 열거형: `TutorialStep`(None·Zone1·Corridor1·Zone2·Corridor2·Zone3Practice·Zone3Fight·Corridor3·Zone4Lore·Zone4Combat·Corridor4·BossEnter·Finished) ·
-  `TutorialGate`(G1~G11) · `TutorialCheck`(Move·Dash·BasicAttack·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4·SkillR·SkillInterrupt·Corridor1CooldownReset — v8) · `TutorialCounter`(Zone2Kills·Zone3Interrupts(= v8 연계)·Zone4Panels) ·
-  `TutorialArea`(None·Zone1~4·Corridor1~4·BossEnter) · `TutorialMonsterFilter`(All·NormalOnly·KeyOnly) · `TutorialGateOpenReason`(Manual·AllDone·Timeout·CounterReached).
+- 순수: `MapSceneFlowModel` · `MapSceneAreaTracker`/`MapSceneAreaLayout` · `MapSceneBarrierRules` · `MapSceneMonsterLedger` · `MapSceneBossPathRules`.
+- 열거형: `MapSceneStep`(None·Zone1·Corridor1·Zone2·Corridor2·Zone3Practice·Zone3Fight·Corridor3·Zone4Lore·Zone4Combat·Corridor4·BossEnter·Finished) ·
+  `MapSceneGate`(G1~G11) · `MapSceneCheck`(Move·Dash·BasicAttack·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4·SkillR·SkillInterrupt·Corridor1CooldownReset — v8) · `MapSceneCounter`(Zone2Kills·Zone3Interrupts(= v8 연계)·Zone4Panels) ·
+  `MapSceneArea`(None·Zone1~4·Corridor1~4·BossEnter) · `MapSceneMonsterFilter`(All·NormalOnly·KeyOnly) · `MapSceneGateOpenReason`(Manual·AllDone·Timeout·CounterReached).
 
 ### 10.2 S6~S12 가 붙일 자리
 > ✅ **모두 붙었다(S12 기준).** 실제 구현은 디렉터 본문이 아니라 디렉터 GameObject 에 런타임 `AddComponent` 되는 흐름 컴포넌트다 —
-> `TutorialZone1Flow`(S7) · `TutorialCorridorFlow`·`TutorialZone2Flow`(S8 — G10 `TUT_B_PAD_WARN` 포함) · `TutorialZone3Flow`/`Guide`(S9) · `TutorialZone4Flow`/`Guide`(S10 — 보스방 도착 정리·23호 팁 포함) · `TutorialDeathRules`(S11).
+> `TutorialZone1Flow`(S7) · `MapSceneTraitCorridorFlow`·`TutorialZone2Flow`(S8 — G10 `TUT_B_PAD_WARN` 포함) · `TutorialZone3Flow`/`Guide`(S9) · `MapSceneBossApproachGuide`/`View`(S10 — 보스방 도착 정리·23호 팁 포함) · `MapSceneDeathRules`(S11).
+> **107 뒤 지금 붙는 것**: `MapSceneZoneFlow` · `MapSceneTraitCorridorFlow` · `MapSceneBossApproachGuide`/`View` · `MapSceneZone4IntroFlow`/`Presentation` · `MapSceneDeathRules` · `MapSceneSkipController`(존1·2·3 흐름은 Legacy — 붙지 않는다).
 > 단계 갱신(`SetStepServer`)도 각 흐름이 부른다. 디렉터 코드에 남은 `TODO(S6)`·`TODO(S8/S12)`·`TODO(S12)` 주석 4곳은 **낡은 표시**다(동작은 이벤트 구독 쪽에 있음 — 코드 정리 때 지울 것).
 > 아래 표는 처음 계획(이력)이다.
 
 | 단계 | 자리 | 할 일 |
 |---|---|---|
-| S6 안내 UI | `TutorialDirector.HandleAreaFirstEntered` `TODO(S6)` · `HandleModelGateOpened` `TODO(S6)`(G10 → `TUT_B_PAD_WARN` 전원) | 단계 갱신 규칙(`SetStepServer` — 아직 아무도 안 부른다: 활성 때 Zone1, 도착 때 Finished 뿐) · 목표 패널·자막(늦은 클라 = `StateChanged` 로 재구성) |
+| S6 안내 UI | `MapSceneDirector.HandleAreaFirstEntered` `TODO(S6)` · `HandleModelGateOpened` `TODO(S6)`(G10 → `TUT_B_PAD_WARN` 전원) | 단계 갱신 규칙(`SetStepServer` — 아직 아무도 안 부른다: 활성 때 Zone1, 도착 때 Finished 뿐) · 목표 패널·자막(늦은 클라 = `StateChanged` 로 재구성) |
 | S7 존1 | `ReportOwnerCheckServerRpc` `TODO(S7)`(이동 거리 검증) | Dash·AttackHit = `ReportCheckServer` · Move·PassiveTooltip = `ReportLocalCheck` |
 | S8 존2·복도 | `HandleCorridorMidReached` `TODO(S8/S12)` · `AreaFirstEntered(Zone2)` | 존2 안내 4초 뒤 `WakeZoneServer(Zone2)` · 특성 창 → `ReportCheckServer(TraitCorridorN)` |
 | S9 존3 | `AreaFirstEntered(Zone3)` · handoff-tutorial.md §2 | 스피너봇 휴면 해제 → 연습 모드 → `AddCounterServer(Zone3Interrupts)` → G5 자동 → 본 모드 |
@@ -290,11 +301,11 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 ### 10.3 함정
 - **스폰 순서**: `MapGenerator.OnGenerated` 가 디렉터·타이머 스폰보다 먼저 올 수 있다 — 서버는 보류 후 `OnNetworkSpawn` 에서 적용. 스폰 전 NetworkVariable/NetworkList 쓰기는 버려진다.
   스폰 전에는 `NetworkManager`(NetworkBehaviour 프로퍼티)가 null → `NetworkManager.Singleton` 으로 판정. 클라의 존 스폰(맵 생성)과 디렉터 스폰도 순서가 없다 — 존 오브젝트를 찾는 클라 코드는 재시도(엘리베이터 문처럼).
-- **튜토리얼 판별은 `TutorialStageMarker` 하나**(경석 코드는 `TutorialBossPath` 경유). 디렉터 `_active` 복제를 기다리는 판정은 스폰 전에 false 라 늦다.
+- **튜토리얼 판별은 `MapSceneStageMarker` 하나**(경석 코드는 `MapSceneBossPath` 경유). 디렉터 `_active` 복제를 기다리는 판정은 스폰 전에 false 라 늦다.
 - **게이트 순서·보류**: G1→G11 순서만. `TryOpenGateServer` 는 차례가 아니면 거부, 존 클리어처럼 조건이 이미 충족된 것은 `RequestGateServer`(보류 → 앞 게이트 열리는 `Evaluate` 에서 연다).
   G8 이 열리면 보류된 G9 가 같이 열린다(중간보스를 타이머 전에 잡은 경우). 게이트 이벤트로 일을 붙일 때 **어느 경로로 열려도** 오는 `HandleModelGateOpened`(서버)·`GateOpened` 에 붙일 것.
 - **휴면은 `MonsterBase.SetDormantServer` 하나**(I0 에서 통합 완료) — 스피너봇 연습 컴포넌트에는 휴면이 없고 연습/전환 대기/본 모드만 있다(handoff-tutorial.md §2).
-- **씬 hash**: `4.MapScene` 의 `TutorialDirector` NetworkObject `GlobalObjectIdHash 114710176`. development 재반영·씬 머지 때 이 값이 0/중복이 되면 스폰이 깨진다 — 머지 뒤 확인.
+- **씬 hash**: `4.MapScene` 의 `MapSceneDirector` NetworkObject `GlobalObjectIdHash 114710176`. development 재반영·씬 머지 때 이 값이 0/중복이 되면 스폰이 깨진다 — 머지 뒤 확인.
   씬 상주 NetworkBehaviour 에 NetworkVariable 을 더하는 것(이번 `_timerHudShown`·`_limitOverride`)은 hash 와 무관하지만 모든 피어가 같은 빌드여야 한다.
 - **Stage1 = 모든 판**(Start → 항상 튜토리얼). 튜토리얼 규칙(타이머 지연·패드 잠금·휴면)이 사실상 본게임 규칙이 된다 → D1 팀장 합의 전 development 병합 금지.
   절차 맵(`Stage1_Procedural`)에서 기존 동작이 그대로인지는 마커 유무 하나로 갈린다.
@@ -315,12 +326,12 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   🔴 절차 맵(`Stage1_Procedural`)에서 타이머가 맵 생성 직후 자동 시작·HUD 빈 틀·패드 즉시 활성·문 Closed 로 **기존과 같다**.
 
 ### 10.5 구간 스킵 Alt+1~0 (할 일 34 — QA·테스트용)
-> 코드: `TutorialSkipPlan`(순수 계획) · `TutorialSkipController`(런타임 — 입력·패널·서버 실행) · `TutorialDirector.Skip.cs`(호스트 전용 ServerRpc) ·
-> `TutorialDebugActions`(강제 개방·존 처치 — `Tools/Tutorial/Debug/*` 메뉴와 공용) · `TutorialCorridorFlow.SkipRoundServer` · `TutorialDeathRules.TryFindAreaSpreadPoints`.
-> 테스트: `TutorialSkipPlanTests`(튜토리얼 러너). 단축키 표·QA 메모: [tutorial-qa.md 0.4](tutorial-qa.md#04-디버그-메뉴-play-중-호스트-toolstutorialdebug).
+> 코드: `MapSceneSkipPlan`(순수 계획) · `MapSceneSkipController`(런타임 — 입력·패널·서버 실행) · `MapSceneDirector.Skip.cs`(호스트 전용 ServerRpc) ·
+> `MapSceneDebugActions`(강제 개방·존 처치 — `Tools/MapScene/Debug/*` 메뉴와 공용) · `MapSceneTraitCorridorFlow.SkipRoundServer` · `MapSceneDeathRules.TryFindAreaSpreadPoints`.
+> 테스트: `MapSceneSkipPlanTests`(튜토리얼 러너). 단축키 표·QA 메모: [tutorial-qa.md 0.4](tutorial-qa.md#04-디버그-메뉴-play-중-호스트-toolstutorialdebug).
 - **빌드**: 모두 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`(계획 모델만 예외 — 순수 코드). 릴리스 빌드엔 컨트롤러·RPC 가 없어 입력이 무시된다. 로그는 `Debug.Log`(`Edit.*` 는 빌드에서 사라짐).
 - **권한**: 각 피어의 컨트롤러가 Alt+숫자를 읽는다. 호스트가 아니면 "호스트만" 토스트로 끝. 호스트는 `RequestSkip` → `RequestSkipServerRpc` — 서버가 보낸 사람 = 서버 자신(호스트)인지 다시 검증.
-- **판정**(`TutorialSkipPlan.Check(step, target, restartInProgress)`): 판 재시작 진행 중(`NetworkLoadingFlowController.IsFlowInProgress`)이면 무엇이든 거부(`RestartInProgress`).
+- **판정**(`MapSceneSkipPlan.Check(step, target, restartInProgress)`): 판 재시작 진행 중(`NetworkLoadingFlowController.IsFlowInProgress`)이면 무엇이든 거부(`RestartInProgress`).
   Alt+0(`Restart`) = 뒤로 가기 예외 — 어느 구간·Finished 뒤에도 허용. 그 밖엔 지금 구간 = 디렉터 `Step` 의 구간(`CurrentOf`), 목적 < 지금 = 뒤로 → 거부(토스트·로그), Finished = 거부,
   같은 구간 = 게이트 없이 다시 옮기기만. 이전 스킵이 진행 중이면 거부(Alt+0 은 진행 중 스킵을 끊고 실행). 존1 은 단축키가 없다(지금 구간 기준값으로만 남음).
 - **처음부터(Alt+0 — 판 재시작, 할 일 34 후속 3)**: 확인 없이 `NetworkLoadingFlowController.TryRestartTargetScene` — 정식 진입과 같은 로딩 흐름을 탄다:
@@ -329,13 +340,13 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   씬과 함께 새로 생긴다. 유지: `ServerCharacterSelectionStore`(세션 정적) · NetworkManager·GameManager 등 DDOL 매니저(`GameState` 가 Loading → MainGame 으로 돌아 MainGameReady 가 다시 발행되고, `NetworkClock.MarkMainGameStart` 재스탬프).
   Dev_Boot(Single 로드) 경로에서도 같은 흐름. 이 컴포넌트는 맵과 함께 사라지므로 재시작은 NetworkManager 쪽이 끝까지 진행한다. 거부 = 로딩 흐름 진행 중·타깃 씬 미로드·로딩 씬 로드 실패(판 그대로).
   - **수정(후속 4)**: Dev_Boot 재시작에서 로딩 씬이 안 내려가고 몬스터가 로딩 씬에 남던 버그 — 표시 시간 0(`SetEditorDefaults(...,0,0)`)이라 완료 루틴이 진행률 0.9(활성화 전)에서 바로 로딩 씬 언로드를 요청 → NGO `SceneEventInProgress` 거절(재시도 없음) → 로딩 씬이 활성 씬으로 남고 그 안에 Instantiate 된 몬스터도 남음. 완료 루틴이 타깃 `LoadEventCompleted` 를 먼저 기다린다([scene-flow-audit.md §8](scene-flow-audit.md)).
-- **계획**(`TutorialSkipPlan.Build`): 목적 구간 입구 게이트(복도 n = G1/G3/G6/G9, 다음 존 = G2/G4/G7, 보스 진입·보스방 = G10)까지 **닫힌 게이트만** G1 부터 순서대로, 게이트마다 정식 경로 하나:
-  G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `TutorialCorridorFlow.SkipRoundServer`(**제시 없이** 라운드를 열고(`StartRoundWithoutOfferServer`) 아직 참가하지 않은 접속자마다 `GrantParticipantServer` = 바로 무작위 1장 획득 → `ServerTraitChosen`(Auto) → 특성 체크 → 전원 완료.
+- **계획**(`MapSceneSkipPlan.Build`): 목적 구간 입구 게이트(복도 n = G1/G3/G6/G9, 다음 존 = G2/G4/G7, 보스 진입·보스방 = G10)까지 **닫힌 게이트만** G1 부터 순서대로, 게이트마다 정식 경로 하나:
+  G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `MapSceneTraitCorridorFlow.SkipRoundServer`(**제시 없이** 라운드를 열고(`StartRoundWithoutOfferServer`) 아직 참가하지 않은 접속자마다 `GrantParticipantServer` = 바로 무작위 1장 획득 → `ServerTraitChosen`(Auto) → 특성 체크 → 전원 완료.
   제시 행·플레이어별 제시 번호(OfferSeq)가 생기지 않아 **클라 특성 창이 열리지 않는다**. 이미 중간 지점에 도착해 창을 보던 사람만 `AutoChooseAllPendingServer` 로 창이 닫힌다) ·
-  G3/G6/G9 = 그 존 살아 있는 몬스터 전부 깨워 처치(`TutorialDebugActions.KillZoneMonsters` — 장부 클리어 → `RequestGateServer`, 0마리면 직접 요청) ·
+  G3/G6/G9 = 그 존 살아 있는 몬스터 전부 깨워 처치(`MapSceneDebugActions.KillZoneMonsters` — 장부 클리어 → `RequestGateServer`, 0마리면 직접 요청) ·
   G5 = 연계 카운터를 목표까지 + `RequestGateServer(G5)`(존3 흐름이 '연습 없이' 본 모드로) · G8 = `StartBossTimerServer`(존4 흐름이 '설정 자막 없이' 전투 시작 + 420초 타이머).
   존3 규칙 파일은 고치지 않는다 — 디렉터·흐름의 기존 공개 API 만 부른다.
-- **실행**(서버 코루틴): 단계마다 게이트가 열리기를 최대 5초(실제 시간) 기다린다. 안 열리면 경고 후 `TutorialDebugActions.OpenGatesThrough`(디버그 메뉴 강제 개방과 같은 코드). 그래도 안 열리면 중단·이동 없음.
+- **실행**(서버 코루틴): 단계마다 게이트가 열리기를 최대 5초(실제 시간) 기다린다. 안 열리면 경고 후 `MapSceneDebugActions.OpenGatesThrough`(디버그 메뉴 강제 개방과 같은 코드). 그래도 안 열리면 중단·이동 없음.
   끝나면 `SetStepServer(StepOf(목적))`(앞으로만 — 존은 첫 진입 단계) → 접속자마다(완전 사망 제외) `ResetBackBarrierMaskServer(id, 목적 구간)`(전멸 리스폰과 같은 예외 — 최전방 = 목적 구간) →
   `TryFindAreaSpreadPoints`(전멸 리스폰과 같은 규칙: 격자·바닥·점유·지난 배리어 앞면 여유·패드 + 1m 밖·2m 간격 — 기준점 = 그 구간 입구 배리어, 존1 = 가운데) → `PlayerFallRecovery.RelocateServer`(= `TeleportAuthoritative`).
   존이면 구간 감지가 새 위치로 `AreaFirstEntered` 를 내서 그 존 흐름(존2 4초 기상 · 존3 연습 · 존4 설정 자막)이 평소대로 시작한다. 복도면 그 복도 특성은 도착 뒤 중간 지점에서 평소대로.
@@ -348,12 +359,12 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   처음부터: DDOL 풀(`EffectManager`)에 떠 있던 이펙트는 정리하지 않는다(풀 수명대로 사라짐). 타깃 씬 언로드가 실패하면 같은 씬을 겹쳐 올리지 않고 남은 판에 플레이어만 다시 스폰한다(에러 로그).
 
 ## 11. 사망 규칙 (S11)
-> 코드: `TutorialDeathRulesModel`·`TutorialRevivePointRules`(순수) · `TutorialDeathRules`(서버, 디렉터에 런타임 부착). 테스트: `TutorialDeathRulesTests`(튜토리얼 러너).
+> 코드: `MapSceneDeathRulesModel`·`MapSceneRevivePointRules`(순수) · `MapSceneDeathRules`(서버, 디렉터에 런타임 부착). 테스트: `MapSceneDeathRulesTests`(튜토리얼 러너).
 > 훅(기본값 = 기존 동작): `PlayerLifeCycleController.ServerDeathKeepsSoul` · `PlayerReviveController.TryCompleteReviveOnServer(bool consumeLife)` · `PlayerFallRecovery.RelocateServer`.
 > **목숨 = 파티 공용 풀 5개**(할 일 30, 2026-10-13 — 아래 '목숨'은 전부 공용 풀) · 전멸 → 복도4 리스폰 · 특성 재선택: [party-lives-respawn.md](party-lives-respawn.md).
 
 - 부착: 서버에서 `StateChanged` 때 `IsTutorialActive` 면 디렉터 GameObject 에 `AddComponent`(씬·프리팹 저장 없음). 비튜토리얼은 안 붙는다.
-- 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G11)`(보스방 도착 — `TutorialDeathRulesModel.IsLifeChargedAt(mask)`, 단계 기준, 위치 무관).
+- 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G11)`(보스방 도착 — `MapSceneDeathRulesModel.IsLifeChargedAt(mask)`, 단계 기준, 위치 무관).
   G11 전(존1~복도4·패드 대기·타이머 만료 강제 이동 중 — **G8 타이머 시작 뒤 포함**)은 목숨 수와 무관하게 Soul(훅), 부활 시 차감 없음.
   G11 뒤는 기존 규칙(공용 목숨 0 → PermanentDead → 전멸이면 PartyWipeWatcher — 공용 0 의 갇힌 Soul 도 탈락으로 센다, party-lives-respawn.md §2). 10-12 이전 기준은 G8 이었다 — G8 은 타이머 시작·존4 기상 용도로만 남는다.
   G11 은 도착과 같은 순간 열리고 사망 규칙도 도착·Finished 로 끝나므로, 실제로 튜토리얼 규칙 아래 차감이 일어나는 경로는 없다(G11 뒤 사망 = 일반 규칙).
@@ -361,42 +372,42 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
   안전한 곳이 없으면 몬스터에서 가장 먼 후보, 후보가 없으면 그 자리.
 - 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시'(Soul 이 되는 대로). 이동 중 사망도 같다.
-  부활 자리 = 카운트다운이 아직 켜져 있으면 **보스 진입 고정 지점**(§12 — `TutorialSafePoints.TryResolveFixedPoint(BossEnter)`, 할 일 80 2026-10-22), 지점이 없거나
+  부활 자리 = 카운트다운이 아직 켜져 있으면 **보스 진입 고정 지점**(§12 — `MapSceneSafePoints.TryResolveFixedPoint(BossEnter)`, 할 일 80 2026-10-22), 지점이 없거나
   카운트다운이 끝난 뒤(엘리베이터 연출 잠금 보류 → 도착 뒤)면 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
 - 연출 잠금(`PlayerEncounterLock`) 중이면 보류 + 경고 1회, 풀리면 다음 프레임 부활(사망 연출 해소도 잠금 해제 뒤 진행).
 - 추락 생존 복구는 그대로. 추락 사망은 기존대로 안전지점에 Soul 로 옮겨진 뒤 같은 규칙으로 부활.
-- '지금 단계 구간'(부활 지점의 기준 구간) = **디렉터 `Step` 의 구간**(S12 — `TutorialRevivePointRules.StepArea`·`ResolveStageArea(step, mask)`).
+- '지금 단계 구간'(부활 지점의 기준 구간) = **디렉터 `Step` 의 구간**(S12 — `MapSceneRevivePointRules.StepArea`·`ResolveStageArea(step, mask)`).
   배리어 기준(열린 배리어로 들어갈 수 있는 가장 앞 구간)은 **상한**으로만 쓴다(둘 중 앞쪽). 두 기준이 어긋나던 구간 = 복도 출구(G2·G4·G7)가 열렸지만
   아직 아무도 다음 존에 안 들어간 동안(단계는 복도) — 배리어 기준이면 다음 존에서 되살아나 그 존 첫 진입·기상을 앞당겼다. 보스 진입·종료 단계는 복도4.
-  테스트: `TutorialDeathRulesTests` 의 단계 기준 2건.
+  테스트: `MapSceneDeathRulesTests` 의 단계 기준 2건.
 - **개인 뒤 배리어(C2, §7)**: 부활 지점은 그 플레이어(clientId)가 지나온 최전방 구간 이상 — 단계 구간이 그보다 뒤면 올린다(`ResolveStageArea(step, mask, passed)`·`AreaOrder(step, mask, passed)`).
   지난 배리어 앞면 여유(`BackBarrierClearance`) 안 격자점은 버린다. G10 을 지난 사람은 예외로 보스 진입 존. 마스크 0(뒤에 남은 동료)은 위 규칙 그대로.
-  같은 탐색이 추락 복구 스폰 폴백의 대체 지점(`PlayerSafePointTracker.ReturnPointFallback`)도 준다. 테스트: `TutorialDeathRulesTests` 의 뒤 배리어 4건.
+  같은 탐색이 추락 복구 스폰 폴백의 대체 지점(`PlayerSafePointTracker.ReturnPointFallback`)도 준다. 테스트: `MapSceneDeathRulesTests` 의 뒤 배리어 4건.
 - **보스 진입 패드 제외(C3, 2026-10-12)**: G10 을 지난 사람은 보스 진입 존에서 부활하므로, 부활 격자점이 진입 패드 위면 부활만으로 보스방 카운트다운이 시작될 수 있었다.
-  - 패드 범위 = 서버 씬의 모든 `BossEnterTrigger` GameObject 의 켜진 **트리거** 콜라이더 bounds 를 XZ 로 투영(`TutorialDeathRules.ServerPadAreas()` — 박스·메시 = 사각형, 구·캡슐 = 원, 프레임당 1회 갱신).
+  - 패드 범위 = 서버 씬의 모든 `BossEnterTrigger` GameObject 의 켜진 **트리거** 콜라이더 bounds 를 XZ 로 투영(`MapSceneDeathRules.ServerPadAreas()` — 박스·메시 = 사각형, 구·캡슐 = 원, 프레임당 1회 갱신).
     트리거는 서버에만 붙으므로 클라·비튜토리얼·스폰 전이면 빈 목록 = 기존 동작.
-  - 순수 규칙 `TutorialPadArea`·`TutorialRevivePointRules.IsOnPad`·`TrySelect(…, pads, padMargin, …)`: 패드 범위 + `DefaultPadMargin`(1m) 안 후보는 안전 후보·'가장 먼 후보' 폴백 모두에서 뺀다.
+  - 순수 규칙 `MapScenePadArea`·`MapSceneRevivePointRules.IsOnPad`·`TrySelect(…, pads, padMargin, …)`: 패드 범위 + `DefaultPadMargin`(1m) 안 후보는 안전 후보·'가장 먼 후보' 폴백 모두에서 뺀다.
   - 빼고 나서 후보가 없고 그 사람이 G10 을 지났으면 폴백 = `PadFallbackCandidates` — G10 배리어 앞면에서 보스 진입 존 쪽 1m·가로 가운데.
     그 점이 패드 여유 안이면 더 안쪽(패드 쪽)으로 가지 않고 ① 배리어 쪽 `BackBarrierClearance`(0.75m) 지점 ② 배리어를 따라 옆으로 0.5m 간격(배리어 박스 가로 끝 1m 안쪽까지).
     배리어 앞면 0.75m 미만으로는 붙이지 않는다(개인 뒤 배리어 콜라이더 끼임 방지). 바닥·점유 검사를 통과한 첫 점. 그래도 없으면 기존대로 그 자리.
-  - 추락 복구: 거름(`TutorialBackBarrierRules.IsReturnPointAllowed(…, pads)` — `TutorialBarriers.IsReturnPointAllowed` 가 넘김)이 패드 범위 + 1m 를 **누구에게나** 거부하고,
-    스폰 폴백 대체(`ReturnPointFallback`)는 위 부활 탐색을 그대로 쓴다. 테스트: `TutorialDeathRulesTests` 패드 5건 · `TutorialBackBarrierRulesTests` 패드 1건.
+  - 추락 복구: 거름(`MapSceneBackBarrierRules.IsReturnPointAllowed(…, pads)` — `MapSceneBarriers.IsReturnPointAllowed` 가 넘김)이 패드 범위 + 1m 를 **누구에게나** 거부하고,
+    스폰 폴백 대체(`ReturnPointFallback`)는 위 부활 탐색을 그대로 쓴다. 테스트: `MapSceneDeathRulesTests` 패드 5건 · `MapSceneBackBarrierRulesTests` 패드 1건.
 - **전멸 리스폰 · 보스 재도전 되감기(할 일 30 (2), 2026-10-13)** — 상세 [party-lives-respawn.md §3](party-lives-respawn.md#3-전멸--복도4-리스폰-2단계--구현됨).
-  - 공용 목숨 0 전멸 + G10 열림이면 결과 화면 대신 `PartyWipeRespawner` 가 전원을 **복도4** 에 리스폰(`TutorialDeathRules.TryFindWipeRespawnPoints` — 복도4 격자·바닥·점유·G9 앞면 여유·패드 + 1m 밖·2m 간격).
-  - 되감기 `TutorialDirector.RewindForBossRetryServer`(순수 `TutorialFlowModel.RewindForBossRetry`) — **단계·게이트 '앞으로만' 규칙의 유일한 예외**: Finished → BossEnter, G11 닫기, 도착 래치 해제. G1~G10·장부·카운터 그대로.
-  - 개인 뒤 배리어 `ResetBackBarrierMaskServer(clientId, Corridor4)` = `TutorialBackBarrierRules.MaskWithFrontmost(Corridor4)`(G1~G9, G10 제외) — **되감기보다 먼저** 쓴다(되감기로 진행 중이 되는 순간 G10 뒤 배리어가 앞길을 막지 않게).
-  - 사망 규칙 `TutorialDeathRules.ResumeForBossRetry` — `_finished` 해제·대기 기록 비움. **보스방 재도착 전 사망 = 차감 없음**(복도4 자동 부활), **재도착(G11 다시 열림) 뒤 사망 = 다시 차감**(사양 그대로). 테스트: `TutorialBossRetryTests`.
+  - 공용 목숨 0 전멸 + G10 열림이면 결과 화면 대신 `PartyWipeRespawner` 가 전원을 **복도4** 에 리스폰(`MapSceneDeathRules.TryFindWipeRespawnPoints` — 복도4 격자·바닥·점유·G9 앞면 여유·패드 + 1m 밖·2m 간격).
+  - 되감기 `MapSceneDirector.RewindForBossRetryServer`(순수 `MapSceneFlowModel.RewindForBossRetry`) — **단계·게이트 '앞으로만' 규칙의 유일한 예외**: Finished → BossEnter, G11 닫기, 도착 래치 해제. G1~G10·장부·카운터 그대로.
+  - 개인 뒤 배리어 `ResetBackBarrierMaskServer(clientId, Corridor4)` = `MapSceneBackBarrierRules.MaskWithFrontmost(Corridor4)`(G1~G9, G10 제외) — **되감기보다 먼저** 쓴다(되감기로 진행 중이 되는 순간 G10 뒤 배리어가 앞길을 막지 않게).
+  - 사망 규칙 `MapSceneDeathRules.ResumeForBossRetry` — `_finished` 해제·대기 기록 비움. **보스방 재도착 전 사망 = 차감 없음**(복도4 자동 부활), **재도착(G11 다시 열림) 뒤 사망 = 다시 차감**(사양 그대로). 테스트: `MapSceneBossRetryTests`.
 - **리스폰 뒤 특성 초기화 · 재선택(할 일 30 (3), 2026-10-13)** — 상세 [party-lives-respawn.md §4](party-lives-respawn.md#4-특성-초기화--재선택-3단계--구현됨) · [tutorial-traits.md §9](tutorial-traits.md#9-전멸-리스폰-뒤-특성-초기화--재선택-할-일-30-3단계).
   - 리스폰 직후 각자 "특성을 초기화하고 다시 선택할까요?" 팝업(`TutorialTraitDirector` — `PartyWipeRespawned` 구독, 튜토리얼일 때만). 예 = 그 플레이어 특성 효과만 원복 + 혼자 4라운드(3장 중 1장, 고른 것 제외, 선택 중 무적). 아니오 = 유지.
-  - 🔴 **팝업·재선택 중인 사람이 있으면 보스 진입 패드가 잠긴다**(`TutorialBossPath.IsBossPadEnabled` — G10 전 잠금과 같은 경로·테두리 숨김). 패드는 한 명만 서도 전원을 끌고 가기 때문(D3).
+  - 🔴 **팝업·재선택 중인 사람이 있으면 보스 진입 패드가 잠긴다**(`MapSceneBossPath.IsBossPadEnabled` — G10 전 잠금과 같은 경로·테두리 숨김). 패드는 한 명만 서도 전원을 끌고 가기 때문(D3).
     끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).
 
 ## 12. 스텝별 고정 안전 지점 (할 일 80 — 1안, 2026-10-22)
-> 코드: `TutorialSafePointRules`(순수 — 복귀 구간·지금 스텝 구간·지점 고르기·점유 레이어·주변 링·복귀 높이·기본 위치) · `TutorialSafePoints`(4.MapScene 상주, 서버) ·
-> 훅 `PlayerSafePointTracker.ReturnPointOverride`(신규, 기본 null = 기존 동작). 저작: `Tools/Map/Authoring/Tutorial/8. Place Safe Points (열린 씬)`.
-> 테스트: `TutorialSafePointRulesTests`(튜토리얼 러너). 디렉터·흐름 코드는 바꾸지 않았다(디렉터 공개 API 만 부른다).
+> 코드: `MapSceneSafePointRules`(순수 — 복귀 구간·지금 스텝 구간·지점 고르기·점유 레이어·주변 링·복귀 높이·기본 위치) · `MapSceneSafePoints`(4.MapScene 상주, 서버) ·
+> 훅 `PlayerSafePointTracker.ReturnPointOverride`(신규, 기본 null = 기존 동작). 저작: `Tools/Map/Authoring/MapScene/8. Place Safe Points (열린 씬)`.
+> 테스트: `MapSceneSafePointRulesTests`(튜토리얼 러너). 디렉터·흐름 코드는 바꾸지 않았다(디렉터 공개 API 만 부른다).
 
-**데이터** — `4.MapScene` 루트 `TutorialSafePoints`(비네트워크) + 자식 `SafePoint_{구간}` 9개(존1~4·복도1~4·보스 진입). 지점 = 씬 Transform 참조(`points`).
+**데이터** — `4.MapScene` 루트 `MapSceneSafePoints`(비네트워크) + 자식 `SafePoint_{구간}` 9개(존1~4·복도1~4·보스 진입). 지점 = 씬 Transform 참조(`points`).
 저작 메뉴가 **빠진 구간만** 기본 위치에 만든다(멱등 — 손으로 옮긴 지점은 그대로). 기본 위치(2026-10-22 배치, Y = 스테이지 0):
 
 | 구간 | 기본 위치(월드 XZ) | 규칙 |
@@ -411,29 +422,29 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 복도4 | (−11.73, −101.11) | G9 앞면 + 1.5m |
 | 보스 진입 | (−21.97, −101.11) | G10 앞면 + 2.5m(패드 위에 두지 말 것 — 런타임이 거르지 않는다) |
 
-튜닝 값(전부 `TutorialSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 복귀 높이 `dropHeight`(기본 3m — 고른 자리 Y + 3 에서 떨어져 착지) ·
+튜닝 값(전부 `MapSceneSafePoints` 인스펙터 — 씬 데이터): 낙사 사용 `useOnFall` · 복귀 높이 `dropHeight`(기본 3m — 고른 자리 Y + 3 에서 떨어져 착지) ·
 점유 반경 `occupancyRadius`(0.4) · 링 후보 바닥 탐색 `floorSearchHeight`(±1.5) · `maxFlatAngle`(10°).
 
 **언제(서버, 튜토리얼 활성)** — **낙사**: 추락 생존·추락 사망의 복귀 지점(`ResolveReturnPoint`)을 큐·Ring 탐색 대신 아래 구간별 자리로. 연출(낙하 카메라·0.75초 지연·무적·입력 잠금)은 기존 그대로.
 낙사 말고는 되돌리지 않는다 — 처음 구현에 있던 구간 이탈(1.5초)·끼임(2초) 자동 복귀는 요청 범위 밖이라 뺐다(2026-10-22).
 
-**복귀 구간(2026-10-22 사용자 결정 — 순수 `TutorialSafePointRules.ReturnPhase(active, step, countdownActive, encounterBusy)`)**
+**복귀 구간(2026-10-22 사용자 결정 — 순수 `MapSceneSafePointRules.ReturnPhase(active, step, countdownActive, encounterBusy)`)**
 
 | 구간 | 코드 경계 | 낙사 | 사망 부활 |
 |---|---|---|---|
 | 스텝 진행 | 단계 Zone1~BossEnter · 카운트다운·이동 연출 아님 | 지금 스텝 구간 고정 지점(아래 선택 순서) | 기존(§8 — 3초 뒤 지금 단계 구간 격자) |
-| 보스방 이동 카운트다운 | `BossTeleportManager.IsCountdownActive`(`_teleportAt > 0` — 설정 `BeginCountdown`, 해제 `CancelCountdown`·엘리베이터 시작·리그 없는 이동·`AbortArrival`) | **보스 진입(`SafePoint_BossEnter`) 고정 지점** — 같은 선택 순서(`FixedPointArea` = BossEnter) | 즉시, **같은 보스 진입 고정 지점**(`TutorialDeathRules.Revive` — 카운트다운이 켜져 있을 때만) |
+| 보스방 이동 카운트다운 | `BossTeleportManager.IsCountdownActive`(`_teleportAt > 0` — 설정 `BeginCountdown`, 해제 `CancelCountdown`·엘리베이터 시작·리그 없는 이동·`AbortArrival`) | **보스 진입(`SafePoint_BossEnter`) 고정 지점** — 같은 선택 순서(`FixedPointArea` = BossEnter) | 즉시, **같은 보스 진입 고정 지점**(`MapSceneDeathRules.Revive` — 카운트다운이 켜져 있을 때만) |
 | 엘리베이터 연출·도착 ACK 대기 | 카운트다운 끝 뒤 `IsEncounterBusy`(`_pending`(`_elevatorRunning` 구간 포함)·`_awaitingArrival`) | **변경 없음** — override null(기존 큐 → `ReturnPointFallback` → 스폰) · 할 일 89 | 변경 없음(참가자 입력 잠금 = 보류) |
-| 보스방 도착 뒤(보스전) | 단계 `Finished`(`CompleteArrival` → `AlivePlayersArrived` → `TutorialDirector.HandleBossRoomArrived`) | **재합류 모서리 규칙**(`BossRoomRejoin.TryCollectCorners` + `RejoinSpawnPicker.FarthestCorner` — 다른 플레이어·`TwentyThreeBoss` 에서 가장 먼 모서리, [handoff-boss-room-rejoin-corners.md](handoff-boss-room-rejoin-corners.md)) 모서리 Y + `dropHeight` | 일반 규칙(그대로) |
+| 보스방 도착 뒤(보스전) | 단계 `Finished`(`CompleteArrival` → `AlivePlayersArrived` → `MapSceneDirector.HandleBossRoomArrived`) | **재합류 모서리 규칙**(`BossRoomRejoin.TryCollectCorners` + `RejoinSpawnPicker.FarthestCorner` — 다른 플레이어·`TwentyThreeBoss` 에서 가장 먼 모서리, [handoff-boss-room-rejoin-corners.md](handoff-boss-room-rejoin-corners.md)) 모서리 Y + `dropHeight` | 일반 규칙(그대로) |
 
 - 카운트다운 중엔 `IsEncounterBusy` 도 true(카운트다운 코루틴) — 카운트다운이 먼저다. 카운트다운이 패드 이탈로 취소되면 다시 스텝 구간.
 - 카운트다운은 타이머 만료 강제 이동이면 G10 전(존4 등)에서도 켜진다 — 그때도 보스 진입 지점(사용자 사양 그대로, 곧 엘리베이터로 끌려간다).
 - 보스전 모서리를 못 찾으면(모서리 그룹·`InvisibleBoundaries` 둘 다 없음) 경고 후 기존 경로. 모서리는 점유·링 검사를 하지 않는다(재합류와 같다).
 - 도착 무효(`ArrivalAborted` — ACK 타임아웃)는 단계가 Finished 가 아니라 '스텝 진행'(보스 진입 지점)으로 본다.
 
-**어느 지점**: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(`TutorialSafePointRules.StepArea` = `TutorialRevivePointRules.ResolveStageArea(step, mask, passed)` —
+**어느 지점**: 자동 부활과 같은 '그 플레이어 기준 지금 단계 구간'(`MapSceneSafePointRules.StepArea` = `MapSceneRevivePointRules.ResolveStageArea(step, mask, passed)` —
 단계 구간을 배리어 상한으로 내리고, 그 플레이어의 지나온 최전방 구간보다 뒤면 그 구간으로 올림)의 지점 **하나만** 쓴다(`TryPickStepPoint`).
-- 🔴 **최종 선택 순서(2026-10-22 사용자 정정)** — `TutorialSafePointRules.PickSpot`:
+- 🔴 **최종 선택 순서(2026-10-22 사용자 정정)** — `MapSceneSafePointRules.PickSpot`:
   1. **점유 검사 = 정적 장애물만**(`BlockingLayers` = Default·Ground·Env·Wall·Barrier, `CheckSphere` 반경 `occupancyRadius`). 몬스터·플레이어·시체 등 유닛은 보지 않는다 —
      몬스터가 지점 위에 있어도 지점 그대로, 겹치면 유닛 충돌 밀어내기(할 일 11)가 푼다. 지점 자체는 바닥 검사를 하지 않는다(저작 위치를 믿는다).
   2. 지점이 정적 장애물에 막히면 **주변 링**(`TryFindNearestFree` — 반경 0.75/1.5/2.25/3m × 8방향, 가까운 것부터, 그 구간 사각형 안만)에서

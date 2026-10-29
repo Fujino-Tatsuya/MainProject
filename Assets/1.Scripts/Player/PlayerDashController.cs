@@ -43,6 +43,13 @@ public class PlayerDashController : NetworkBehaviour
     private float dodgeClock;          // Dodge 재생 경과(초) — 프레임마다 Time.deltaTime 만큼, Animator 가 상태 시간을 쌓는 방식과 같다
     private int dodgeClockFrame = -1;  // 같은 프레임 두 번(Enter 직후 Tick) 쌓지 않게
     private bool dodgeSpeedDriving;
+    // 대쉬 간파 상체 레이어(할 일 115 §11) — 컨트롤러 맨 위 DashInterruptUpper. 없으면 아무것도 안 한다(경고 1회).
+    public const string DashInterruptUpperLayerName = "DashInterruptUpper";
+    private static readonly int DashInterruptEmptyHash = Animator.StringToHash("Empty");
+    private RuntimeAnimatorController dashInterruptLayerCheckedFor;
+    private int dashInterruptLayer = -1;
+    private bool dashInterruptLayerWarned;
+    private DashInterruptLayerFade dashInterruptFade;
 
     private DashRuntimeConfig config;
     private DashChargeLedger predictedLedger;
@@ -229,10 +236,11 @@ public class PlayerDashController : NetworkBehaviour
     }
 
     /// <summary>[입력 주체] 대시 상태 이탈 — 이동으로 나가면 Run_Loop, 아니면 Idle. 다시 대시·사망이면 건드리지 않는다.</summary>
-    internal void PlayDodgeEnd(PlayerActionState nextState)
+    /// <param name="keepBasePose">대쉬 간파 인수인계(할 일 115) — 0층은 곧 간파 상태가 이어받으므로 덮지 않는다(구간 속도만 되돌린다).</param>
+    internal void PlayDodgeEnd(PlayerActionState nextState, bool keepBasePose = false)
     {
         StopDodgeSpeed();
-        if (player == null || !player.IsInputSource || !HasDodgeAnimation)
+        if (keepBasePose || player == null || !player.IsInputSource || !HasDodgeAnimation)
             return;
 
         bool hasRunLoop = animator.HasState(PlayerActionPoseRules.BaseLayer, PlayerActionPoseRules.RunLoopHash);
@@ -249,6 +257,126 @@ public class PlayerDashController : NetworkBehaviour
                         PlayerActionPoseRules.IdleHash, dashData.DodgeEndBlend, PlayerActionPoseRules.BaseLayer);
                 break;
         }
+    }
+
+    // ── 대쉬 간파 상체 레이어(할 일 115 §11) ──
+    // 대시 중 하체 = 0층 대시 포즈 그대로, 상체 = DashInterruptUpper(상체 마스크)에서 간파 준비 클립.
+    // 대시 끝에 0층이 같은 상태를 이어받고 상체 레이어는 Empty 로 빠진다. 입력 주체만 돌린다 —
+    // 레이어 상태·가중치는 오너 권한 NetworkAnimator 가 서버·관찰자에 복제한다(CheckForStateChange 가 레이어 가중치 변화를 보낸다).
+
+    /// <summary>[입력 주체] 상체 레이어에서 간파 준비 상태를 처음부터 재생하고 가중치를 0→1 로 올린다. 0층은 건드리지 않는다.</summary>
+    /// <param name="stateName">간파 스킬 SO 의 AnimatorStateName — 상체 레이어에도 같은 이름으로 있다.</param>
+    internal void BeginDashInterruptUpper(string stateName)
+    {
+        if (!TryGetDashInterruptLayer(stateName, out int layer, out int stateHash))
+            return;
+
+        animator.Play(stateHash, layer, 0f);
+        dashInterruptFade = DashInterruptLayerFade.Start(animator.GetLayerWeight(layer), 1f, DashInterruptBlend);
+        animator.SetLayerWeight(layer, dashInterruptFade.Weight);
+    }
+
+    /// <summary>
+    /// [입력 주체] 대시 끝 인수인계 — 0층을 같은 상태로 상체 레이어의 지금 정규화 시각에서 시작하고, 같은 프레임에
+    /// 상체 레이어를 Empty 로 즉시 바꾼다(블렌드 없음 — 상체 클립 이벤트가 0층과 겹쳐 두 번 나지 않게). 가중치는 1→0.
+    /// </summary>
+    internal void HandOffDashInterruptToBase(string stateName)
+    {
+        if (!TryGetDashInterruptLayer(stateName, out int layer, out int stateHash))
+            return;
+
+        // 상체 시각은 Empty 로 바꾸기 전에 읽는다(지난 평가 결과).
+        AnimatorStateInfo upper = animator.GetCurrentAnimatorStateInfo(layer);
+        float normalizedTime = DashInterruptLayerFade.HandoffNormalizedTime(
+            upper.shortNameHash == stateHash, upper.normalizedTime);
+
+        if (animator.HasState(PlayerActionPoseRules.BaseLayer, stateHash))
+        {
+            animator.CrossFadeInFixedTime(
+                stateHash, DashInterruptBlend, PlayerActionPoseRules.BaseLayer, normalizedTime * upper.length);
+        }
+
+        animator.Play(DashInterruptEmptyHash, layer, 0f);
+        dashInterruptFade = DashInterruptLayerFade.Start(animator.GetLayerWeight(layer), 0f, DashInterruptBlend);
+        animator.SetLayerWeight(layer, dashInterruptFade.Weight);
+    }
+
+    /// <summary>[입력 주체] 대시 중 강제 종료(넉백·그랩·사망 등) — 상체 레이어 Empty + 가중치 0 즉시.</summary>
+    internal void CancelDashInterruptUpper()
+    {
+        if (!TryGetDashInterruptLayer(null, out int layer, out _))
+            return;
+
+        animator.Play(DashInterruptEmptyHash, layer, 0f);
+        dashInterruptFade = DashInterruptLayerFade.Hold(0f);
+        animator.SetLayerWeight(layer, 0f);
+    }
+
+    private float DashInterruptBlend => dashData != null ? dashData.DashInterruptBlend : 0f;
+
+    /// <summary>대쉬 간파 입력 창(초). 0 = 기능 꺼짐(DashInterruptRules.IsEnabled).</summary>
+    public float DashInterruptWindow => dashData != null ? dashData.DashInterruptWindow : 0f;
+
+    /// <summary>[서버] 대쉬 간파 승인 때 창에 더해 주는 지연 허용(초).</summary>
+    public float DashInterruptServerTolerance => dashData != null ? dashData.DashInterruptServerTolerance : 0f;
+
+    private void TickDashInterruptFade()
+    {
+        if (!dashInterruptFade.IsActive || animator == null || dashInterruptLayer < 0)
+            return;
+
+        animator.SetLayerWeight(dashInterruptLayer, dashInterruptFade.Advance(Time.deltaTime));
+    }
+
+    // 상체 레이어(와 stateName 이 주어지면 그 상태)를 찾는다. 컨트롤러가 바뀌면 다시 찾는다. 없으면 경고 1회 후 false.
+    private bool TryGetDashInterruptLayer(string stateName, out int layer, out int stateHash)
+    {
+        layer = -1;
+        stateHash = 0;
+        if (player == null || !player.IsInputSource || animator == null || !animator.isInitialized)
+            return false;
+
+        RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+        if (controller == null)
+            return false;
+
+        if (controller != dashInterruptLayerCheckedFor)
+        {
+            dashInterruptLayerCheckedFor = controller;
+            dashInterruptLayer = animator.GetLayerIndex(DashInterruptUpperLayerName);
+            dashInterruptFade = DashInterruptLayerFade.Hold(0f);
+        }
+
+        if (dashInterruptLayer < 0)
+        {
+            WarnDashInterruptLayerOnce($"컨트롤러 '{controller.name}' 에 '{DashInterruptUpperLayerName}' 레이어가 없다");
+            return false;
+        }
+
+        if (stateName == null)
+        {
+            layer = dashInterruptLayer;
+            return true;
+        }
+
+        stateHash = Animator.StringToHash(stateName);
+        if (!animator.HasState(dashInterruptLayer, stateHash))
+        {
+            WarnDashInterruptLayerOnce($"'{DashInterruptUpperLayerName}' 레이어에 상태 '{stateName}' 이 없다");
+            return false;
+        }
+
+        layer = dashInterruptLayer;
+        return true;
+    }
+
+    private void WarnDashInterruptLayerOnce(string why)
+    {
+        if (dashInterruptLayerWarned)
+            return;
+
+        dashInterruptLayerWarned = true;
+        Edit.LogWarning($"[Dash] 대쉬 간파 상체 레이어 생략 — {why}. 상체 마스킹 없이 진행한다.", this);
     }
 
     private void BuildRuntime()
@@ -352,6 +480,8 @@ public class PlayerDashController : NetworkBehaviour
         // 예측 무적을 대시 상태에 맞춘다(오너 로컬 Hurtbox 즉시 반영). 서버 무적은 승인 토큰이 확정.
         if (invulnerability != null && stateController != null)
             invulnerability.SetOwnerPredicted(stateController.CurrentState == PlayerActionState.Dash);
+
+        TickDashInterruptFade();
     }
 
     private void FixedUpdate()

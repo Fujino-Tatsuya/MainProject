@@ -25,6 +25,15 @@ namespace BeaverLobby.Player.Dash
         [SerializeField, Min(1), DataTableIgnore] private int snapshotCapacity = 32;                // 서버 과거 상태 Ring Buffer
         [SerializeField, Min(0f), DataTableIgnore] private float snapshotFreshnessTolerance = 0.1f; // 요청시각과 Snapshot 최대 간격(초)
 
+        // 판정 규칙은 DashInterruptRules(할 일 115).
+        [Header("대쉬 간파")]
+        [Tooltip("대시 시작 후 이 초 안에 우클릭하면 대쉬 간파(대시하며 간파 준비 → 대시 끝 지점에서 판정). 0 = 기능 끔.")]
+        [SerializeField, Min(0f)] private float dashInterruptWindow = 0.1f;
+        [Tooltip("서버 승인 때 창에 더해 주는 지연 허용(초). 원격 오너 요청이 늦게 도착해도 받아 준다.")]
+        [SerializeField, Min(0f), DataTableIgnore] private float dashInterruptServerTolerance = 0.1f;
+        [Tooltip("대쉬 간파 상체 레이어(DashInterruptUpper) 가중치 전환 시간 + 대시 끝 0층 인수인계 블렌드 시간(초). 0 = 즉시.")]
+        [SerializeField, Min(0f)] private float dashInterruptBlend = 0.05f;
+
         // 연출 정렬 값이라 테이블에 올리지 않는다. 재생 속도는 컨트롤러에 DodgeSpeed 파라미터가 있을 때 구간 비율로 코드가 정한다(할 일 92-5).
         [Header("애니메이션 (컨트롤러 Base 레이어에 이 상태가 있을 때만 — 어쌔신)")]
         [Tooltip("대시 시작 때 Base 레이어에서 CrossFade 할 상태 이름. 컨트롤러에 없으면(팔라딘·거너) 대시 애니를 틀지 않는다.")]
@@ -50,6 +59,9 @@ namespace BeaverLobby.Player.Dash
         public float RechargeDuration => rechargeDuration;
         public int SnapshotCapacity => snapshotCapacity;
         public float SnapshotFreshnessTolerance => snapshotFreshnessTolerance;
+        public float DashInterruptWindow => dashInterruptWindow;
+        public float DashInterruptServerTolerance => dashInterruptServerTolerance;
+        public float DashInterruptBlend => dashInterruptBlend;
         public string DodgeStateName => dodgeStateName;
         public float DodgeStartBlend => dodgeStartBlend;
         public float DodgeEndBlend => dodgeEndBlend;

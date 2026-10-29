@@ -81,8 +81,11 @@ public sealed class LobbyRadioTests
             LobbyRadioIds.LobbyTrainRoute, LobbyRadioIds.Train01Start, LobbyRadioIds.Train01End, LobbyRadioIds.Train02Start,
             LobbyRadioIds.Train02End, LobbyRadioIds.Train03Start, LobbyRadioIds.Train03Cc,
             LobbyRadioIds.Train03Reset, LobbyRadioIds.Train03WallGuide, LobbyRadioIds.Train03Suppress,
-            LobbyRadioIds.TrainEnd, LobbyRadioIds.BriefRoute,
+            LobbyRadioIds.TrainEnd,
         }, all);
+        // 할 일 111 — 종료 텔레포트로 이미 브리핑 구역 안이라 Brief/Gathering 진입 대사(BRIEF_ROUTE)는 없다.
+        Assert.That(LobbyRadioSchedule.LinesOnEnter(LobbyTrainingStage.Brief, LobbyTrainingPhase.Gathering), Is.Empty);
+        Assert.That(radio.HasPlayed(LobbyRadioIds.BriefRoute), Is.False);
 
         // 단계가 바뀐 전이마다 번호 1씩: Train01·02·03A·03B·03C·03D·TrainEnd·Brief·Sortie = 9번.
         CollectionAssert.AreEqual(Enumerable.Range(1, 9), serials);

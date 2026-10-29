@@ -30,7 +30,7 @@ using UnityEngine.AI;
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
 [DataTableSheet("MidBoss", Order = 2)]
-public class WallBot : MonsterBase, IInterruptSlowMotionTarget
+public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     enum ShieldPhase { None, Gather, Dash, Shock }
 
@@ -351,6 +351,9 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget
     /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
 
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값(MonsterBase).
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => CounterJudgeWindowReplica;
+
     // 카운터 성공 — 모으기를 취소하고 즉시 그로기. 그로기 자세는 `Hit` 클립으로 보여 준다
     // (이 컨트롤러엔 그로기 상태가 없다 — PLAN §9.1. `PlayStateAnimation` 에서 트리거를 친다).
     void CounterSucceeded()
@@ -386,6 +389,14 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget
             WarnNoInterruptFlashOnce();
             return;
         }
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.TargetFlash || interruptFlash == null) return;
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);

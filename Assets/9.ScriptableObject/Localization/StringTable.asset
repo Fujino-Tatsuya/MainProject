@@ -571,7 +571,7 @@ MonoBehaviour:
     en: Assassin
   - key: UI.StatusEffect.Grabbed
     ko: "\uBD99\uC7A1\uD798"
-    en: "\uBD99\uC7A1\uD798"
+    en: Grabbed
   - key: UI.Pause.Title
     ko: "\uBA54\uB274"
     en: Menu
@@ -752,43 +752,43 @@ MonoBehaviour:
     en: EXIT
   - key: UI.StatusEffect.BaseAttackDamageModifier
     ko: BaseAttackDamage
-    en: BaseAttackDamage
+    en: Base Attack
   - key: UI.StatusEffect.DealtDamageModifier
     ko: DealtDamage
-    en: DealtDamage
+    en: Damage Dealt
   - key: UI.StatusEffect.MoveSpeedBaseModifier
     ko: MoveSpeedBase
-    en: MoveSpeedBase
+    en: Base Move Speed
   - key: UI.StatusEffect.AttackSpeedBaseModifier
     ko: AttackSpeedBase
-    en: AttackSpeedBase
+    en: Base Attack Speed
   - key: UI.StatusEffect.DefenseBaseModifier
     ko: DefenseBase
-    en: DefenseBase
+    en: Base Defense
   - key: UI.StatusEffect.MaxHpBaseModifier
     ko: MaxHpBase
-    en: MaxHpBase
+    en: Base Max HP
   - key: UI.StatusEffect.MoveSpeedFinalMultiplier
     ko: MoveSpeedFinalMultiplier
-    en: MoveSpeedFinalMultiplier
+    en: Move Speed Multiplier
   - key: UI.StatusEffect.AttackSpeedFinalMultiplier
     ko: AttackSpeedFinalMultiplier
-    en: AttackSpeedFinalMultiplier
+    en: Attack Speed Multiplier
   - key: UI.StatusEffect.CooldownRateModifier
     ko: "\uC81C\uC555 \uAC00\uC18D"
     en: Suppress Haste
   - key: UI.Lobby.GatherCount
     ko: "\uC9D1\uACB0 {gathered}/{total}"
-    en: "\uC9D1\uACB0 {gathered}/{total}"
+    en: Gathered {gathered}/{total}
   - key: UI.Lobby.GatherCountdown
     ko: "{time} \uD6C4 \uC774\uB3D9"
-    en: "{time} \uD6C4 \uC774\uB3D9"
+    en: Moving in {time}
   - key: UI.Lobby.Train01Title
     ko: "\uBB34\uAE30 \uC810\uAC80"
-    en: "\uBB34\uAE30 \uC810\uAC80"
+    en: Weapon Check
   - key: UI.Lobby.Train01BasicAttack
     ko: "\uAE30\uBCF8 \uACF5\uACA9"
-    en: "\uAE30\uBCF8 \uACF5\uACA9"
+    en: Basic Attack
   - key: UI.Lobby.Train01SkillQ
     ko: Q
     en: Q
@@ -800,19 +800,19 @@ MonoBehaviour:
     en: R
   - key: UI.Lobby.Train01RightClick
     ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
-    en: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    en: Right-Click Skill
   - key: UI.Lobby.Train01Dash
     ko: "\uB300\uC2DC"
-    en: "\uB300\uC2DC"
+    en: Dash
   - key: UI.Lobby.Train01PartyDone
     ko: "\uC644\uB8CC {done}/{total}"
-    en: "\uC644\uB8CC {done}/{total}"
+    en: Done {done}/{total}
   - key: UI.Lobby.Train02Title
     ko: "\uC77C\uBC18 \uC804\uD22C"
-    en: "\uC77C\uBC18 \uC804\uD22C"
+    en: Basic Combat
   - key: UI.Lobby.Train02Remaining
     ko: "\uB0A8\uC740 \uC0C1\uB300 {remaining}/{total}"
-    en: "\uB0A8\uC740 \uC0C1\uB300 {remaining}/{total}"
+    en: Enemies Left {remaining}/{total}
   - key: Tutorial.Guide.TUT_S0_WELCOME
     ko: "\uC791\uC804 \uAD6C\uC5ED\uC5D0 \uC9C4\uC785\uD588\uC2B5\uB2C8\uB2E4. \uAE30\uBCF8
       \uC870\uC791\uBD80\uD130 \uC810\uAC80\uD569\uB2C8\uB2E4."
@@ -1294,6 +1294,25 @@ MonoBehaviour:
   - key: UI.Lobby.Train03Finish
     ko: "\uB9C8\uBB34\uB9AC\uD558\uC138\uC694"
     en: Finish it!
+  - key: Tutorial.Guide.BOSS_INTRO_WellsCommand
+    ko: "23\uD638. \uBD84\uC1C4\uD574\uB77C."
+    en: No. 23. Crush them.
+  - key: UI.Settings.Controls.GuardSkillHold
+    ko: "\uBC29\uC5B4 \uC2A4\uD0AC: \uB204\uB974\uB294 \uB3D9\uC548 \uC720\uC9C0"
+    en: 'Guard Skill: Hold'
+  - key: Tutorial.Guide.TUT_Z4_INTRO_DEVICES
+    ko: "\uC7A5\uCE58\uAC00 \uB124 \uAD70\uB370\uB098 \uC788\uB124.|\uC800\uAC78
+      \uC804\uBD80 \uCF1C\uBA74\u2026 \uB2E4\uB9AC\uB97C \uC5F0\uACB0\uD560 \uC218
+      \uC788\uC744 \uAC83 \uAC19\uC544."
+    en: "There are four devices here.|If we turn them all on\u2026 I think we can
+      connect the bridge."
+  - key: Tutorial.Guide.TUT_Z4_INTRO_BRIDGE
+    ko: "\uBB38\uC774 \uC7A0\uACA8 \uC788\uC5B4.|\uC911\uC559\uC5D0 \uC788\uB294
+      \uC800 \uB140\uC11D\uC774 \uC2E0\uACBD \uC4F0\uC774\uB294\uB370."
+    en: The door is locked.|That thing in the middle is bothering me.
+  - key: Tutorial.Guide.TUT_Z4_INTRO_RETURN
+    ko: "\uC5B4\uC11C \uC6C0\uC9C1\uC5EC."
+    en: Get moving.
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

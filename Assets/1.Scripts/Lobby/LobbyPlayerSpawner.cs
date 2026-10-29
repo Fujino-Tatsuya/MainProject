@@ -186,6 +186,17 @@ public sealed class LobbyPlayerSpawner : MonoBehaviour
         return true;
     }
 
+    /// <summary>[서버] 이 사람 자리(스폰 지점)의 위치 — 추락 복귀와 같은 곳(로비 Alt+2 멈춤 탈출이 쓴다). 자리가 없으면 false.</summary>
+    public bool TryGetSpawnPosition(ulong clientId, out Vector3 position)
+    {
+        position = default;
+        if (!IsServer || !_slotByClient.TryGetValue(clientId, out var slot))
+            return false;
+
+        position = ResolveSpawnPose(slot).position;
+        return true;
+    }
+
     private int AcquireSlot(ulong clientId)
     {
         if (_slotByClient.TryGetValue(clientId, out var existing))

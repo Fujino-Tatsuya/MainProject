@@ -55,7 +55,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
     /// <summary>
     /// [서버] 사망 목적지 훅(전역, 인자 = OwnerClientId). true 면 공용 목숨 수와 무관하게 Soul 로 보낸다.
-    /// 튜토리얼 교육 단계의 차감 없는 자동 부활(<c>TutorialDeathRules</c>)이 건다. null = 기존 규칙(공용 목숨 0 → PermanentDead).
+    /// 튜토리얼 교육 단계의 차감 없는 자동 부활(<c>MapSceneDeathRules</c>)이 건다. null = 기존 규칙(공용 목숨 0 → PermanentDead).
     /// 전멸 판정(<c>PartyWipeWatcher</c>)도 이 훅으로 '차감 없는 부활 대기 Soul' 을 가린다.
     /// </summary>
     public static Func<ulong, bool> ServerDeathKeepsSoul;

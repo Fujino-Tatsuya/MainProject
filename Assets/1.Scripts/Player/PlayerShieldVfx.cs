@@ -38,7 +38,7 @@ using UnityEngine;
 /// 강제 회수된다. 팔라딘 10초 / 거너 5초 기준으로 15초를 쓴다.
 /// </summary>
 [DisallowMultipleComponent]
-public class PlayerShieldVfx : BaseNetworkBehaviour
+public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
 {
     /// <summary>지금 띄워야 할 배리어. 셋 중 하나뿐이다 — 두 겹으로 띄우지 않는다.</summary>
     private enum Barrier
@@ -302,7 +302,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     {
         if (!IsNetworkActive)
         {
-            interruptWave?.PlayOnce();
+            PlayInterruptWave();
             return;
         }
 
@@ -313,7 +313,19 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
 
     // 원샷이라 Unreliable 이다. 한 발 유실되면 충격파 한 번이 안 뜰 뿐 상태가 어긋나지 않는다.
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    private void InterruptWaveRpc() => interruptWave?.PlayOnce();
+    private void InterruptWaveRpc() => PlayInterruptWave();
+
+    // 간파 연출 디렉터(할 일 118) — B3 칸은 피어마다 자기 값. 켜져 있으면 디렉터가 PlayCue 로 돌려 부른다.
+    private void PlayInterruptWave() =>
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.PaladinWave,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success, IsSpawned ? OwnerClientId : 0), this);
+
+    // [각 피어] B3 충격파 원샷.
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue == InterruptProductionCue.PaladinWave)
+            interruptWave?.PlayOnce();
+    }
 
     /// <summary>
     /// [서버] 수호자의 의지(E) 방어 성공 — 반격 자세 상태로 <b>전 피어(오너 포함)</b>에서 CrossFade 한다.

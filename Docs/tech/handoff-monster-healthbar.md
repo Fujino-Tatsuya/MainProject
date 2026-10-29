@@ -52,14 +52,14 @@
 | `Assets/2.Prefabs/UI/MonsterHealthBar_Normal.prefab` (2차 새) | guid `5c33ecbb342fd194ea857586168d286b`. 120×14 |
 | `Assets/2.Prefabs/UI/MonsterHealthBar_MidBoss.prefab` (2차 새) | guid `c4c5ec006feba194fafd4150eff23e56`. Normal 의 Variant, 120×**21** |
 | `Assets/2.Prefabs/Monster/Tutorial/SpinnerBot_Tutorial.prefab` | (2차) 박혀 있던 `OverheadHealthBar` 자식 인스턴스 **제거**. §4 |
-| `Assets/1.Scripts/Tutorial/SpinnerPractice/TutorialSpinnerHealthBarRule.cs`·`TutorialSpinnerSpawnOverride.cs` | (2차) 주석만 — 바 출처가 바뀌었다 |
+| `Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/TutorialSpinnerHealthBarRule.cs`·`TutorialSpinnerSpawnOverride.cs` | (2차) 주석만 — 바 출처가 바뀌었다 |
 | `Assets/1.Scripts/UI/Combat/Editor/MonsterOverheadHealthBarVisibilityTests.cs` | EditMode 테스트 |
 | `Assets/1.Scripts/Editor/CombatEditModeTestRunner.cs` | `^MonsterOverheadHealthBar` 픽스처(`Tools/Tests/전투 EditMode 테스트 실행`) |
 
 `OverheadHealthBar.prefab`(플레이어 바)은 **수정하지 않았다.**
 
 **훅 위치를 MonsterBase 로 고른 이유**: 몬스터 스폰 경로가 여럿이다(`MonsterSpawner`·`MapContentSpawner`·`ZoneMonsterSpawnSet`·
-`TutorialMonsterZones`·`BossEncounterDirector` …). 스포너마다 넣으면 빠지는 곳이 생기므로 모든 경로가 거치는 `OnNetworkSpawn` 한 곳에 둔다.
+`MapSceneMonsterZones`·`BossEncounterDirector` …). 스포너마다 넣으면 빠지는 곳이 생기므로 모든 경로가 거치는 `OnNetworkSpawn` 한 곳에 둔다.
 `Unit.OnNetworkSpawn` 이 `HitFlash`·`FloatingDamagePresenter` 를 자동 부착하는 것과 같은 패턴이다.
 
 ### 부착 판단 (`DecideInstall`, 순서가 규칙)

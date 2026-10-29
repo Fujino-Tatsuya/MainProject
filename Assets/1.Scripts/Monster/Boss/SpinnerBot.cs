@@ -20,7 +20,7 @@ using UnityEngine.AI;
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
 [DataTableSheet("MidBoss", Order = 1)]
-public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
+public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
 {
     enum SpinPhase { None, Window, Dash }
 
@@ -111,7 +111,8 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
     MonsterCounterWindow _counter;
     EffectAnimEvents _effects;
 
-    // 튜토리얼 주입 지점(handoff-tutorial-spinner.md). 구현체가 없으면 null — 모든 분기가 원래 경로다.
+    // 주입 지점(handoff-tutorial-spinner.md). 구현체가 없으면 null — 모든 분기가 원래 경로다.
+    // 유일한 구현체였던 튜토리얼 연습(TutorialSpinnerPractice·SpinnerBot_Tutorial)은 할 일 107 에서 Legacy 로 빠졌다 — 지금은 늘 null.
     ISpinnerBotOverride _override;
     bool _overrideResolved;
     ISpinnerBotOverride _harmlessSpin;   // 이번 스핀이 주입 아래서 시작됐으면 그 구현체(돌진 피해 없음)
@@ -363,6 +364,9 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
     /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
     int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
 
+    // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 판정 창 복제값(MonsterBase).
+    bool IInterruptWindowReplica.ReplicatedWindowOpen => CounterJudgeWindowReplica;
+
     // 카운터 성공 — 돌진을 취소하고 즉시 그로기. 그로기 애니는 `IsDizzy` 불로 컨트롤러가 잡는다
     // (2026-09-08 SVN r292 에서 `AnyState → Dizzy` 전이를 넣었다. 그 전에는 논리만 그로기였다).
     void CounterSucceeded()
@@ -397,6 +401,14 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
             WarnNoInterruptFlashOnce();
             return;
         }
+        // 간파 연출 디렉터 E1 칸(할 일 118, 피어마다 자기 값) — 켜져 있으면 디렉터가 아래 PlayCue 를 부른다. 섬광만 끈다.
+        InterruptProductionDirector.PlayCue(InterruptProductionCue.TargetFlash,
+            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success), this);
+    }
+
+    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
+    {
+        if (cue != InterruptProductionCue.TargetFlash || interruptFlash == null) return;
 
         // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
         interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);
@@ -535,7 +547,7 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
 
 /// <summary>
 /// SpinnerBot 동작을 같은 오브젝트의 다른 컴포넌트가 덮어쓰는 주입 지점 — 튜토리얼 스피너봇 연습 모드
-/// (<c>TutorialSpinnerPractice</c>, Docs/tech/handoff-tutorial-spinner.md).
+/// (<c>TutorialSpinnerPractice</c>, Docs/tech/handoff-tutorial-spinner.md — 할 일 107 에서 Legacy, 지금 붙은 프리팹은 등록 해제된 SpinnerBot_Tutorial 뿐).
 /// 🔴 구현체가 붙어 있지 않으면 SpinnerBot 은 이전과 똑같이 돈다. 전부 서버에서만 묻는다.
 /// </summary>
 public interface ISpinnerBotOverride

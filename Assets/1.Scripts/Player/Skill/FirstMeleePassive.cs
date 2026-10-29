@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -50,11 +51,17 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     [Tooltip("발동 순간 시전자에게 한 번 터뜨릴 회복 연출. 프리팹의 'VFX/PassiveSkill/Heal' 을 물린다. 비워두면 연출만 빠진다")]
     [SerializeField] private EffectSocketPlayer healBurst;
 
-    [Tooltip("추가 피해를 맞은 대상에게 한 번 터뜨릴 연출. FX_Additional_Hit_Entry 를 물린다. 소켓이 아니라 엔트리인 이유는 붙을 자리가 '그때 맞은 남'이라서다")]
+    [Tooltip("추가 피해를 맞은 대상에게 한 번 터뜨릴 연출. FX_Paladin_Smite_Entry 를 물린다. 소켓이 아니라 엔트리인 이유는 붙을 자리가 '그때 맞은 남'이라서다")]
     [SerializeField] private EffectEntry additionalHit;
 
     [Tooltip("추가 피해 연출 배율")]
     [DataTableIgnore] [SerializeField, Min(0.01f)] private float additionalHitScale = 1f;
+
+    [Tooltip("이 몸통 높이(미터)까지는 배율 1. 더 큰 대상(엘리트·보스)은 몸통 높이 ÷ 이 값만큼 연출을 키운다. 잡몹 히트박스 높이 2m 기준")]
+    [DataTableIgnore] [SerializeField, Min(0.01f)] private float additionalHitReferenceHeight = 2f;
+
+    [Tooltip("몸통 크기로 키우는 배율의 상한")]
+    [DataTableIgnore] [SerializeField, Min(1f)] private float additionalHitMaxSizeScale = 3f;
 
     [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
     [SerializeField] private Vector3 additionalHitFallbackOffset = new Vector3(0f, 1f, 0f);
@@ -263,6 +270,9 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     /// 타격점이 아니라 <b>몸통 중심</b>에 둔다. 접촉점은 기본 피격 이펙트가 이미 쓰고 있어서,
     /// 같은 자리에 겹치면 "한 대 더"가 아니라 "한 대가 밝아졌다"로 읽힌다.
     /// 중심은 SkinnedMeshRenderer의 월드 바운즈에서 뽑는다 — 몹 덩치에 맞춰 알아서 따라간다.
+    ///
+    /// 회전 = 시전자 → 대상 수평 방향(+Z = 때린 방향). 관통·등 뒤 불티가 이 방향을 쓴다.
+    /// 인스턴스의 <see cref="SiphonMotes"/> 에 시전자를 넘겨 빛 알갱이가 팔라딘에게 흘러들게 한다.
     /// </summary>
     private void PlayAdditionalHitLocal(Transform target)
     {
@@ -273,6 +283,22 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
             ? body.bounds.center
             : target.position + additionalHitFallbackOffset;
 
-        EffectManager.Instance.Play(additionalHit, position, Quaternion.identity, additionalHitScale);
+        // 덩치 큰 대상에게 잡몹 크기 그대로 찍으면 몸통에 비해 초라해 보인다 — 몸통 높이에 비례해 키운다(잡몹은 1).
+        float sizeScale = body != null
+            ? Mathf.Clamp(body.bounds.size.y / additionalHitReferenceHeight, 1f, additionalHitMaxSizeScale)
+            : 1f;
+
+        Vector3 direction = position - transform.position;
+        direction.y = 0f;
+        Quaternion rotation = direction.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(direction) : Quaternion.identity;
+
+        EffectHandle handle = EffectManager.Instance.PlayRecallable(additionalHit, position, rotation, additionalHitScale * sizeScale);
+        EffectManager.Instance.GetInstances(handle, InstanceBuffer);
+        foreach (GameObject instance in InstanceBuffer)
+            foreach (SiphonMotes motes in instance.GetComponentsInChildren<SiphonMotes>(true))
+                motes.SetTarget(transform);
+        InstanceBuffer.Clear();
     }
+
+    private static readonly List<GameObject> InstanceBuffer = new List<GameObject>();
 }

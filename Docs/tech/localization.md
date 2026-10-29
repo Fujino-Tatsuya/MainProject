@@ -211,7 +211,7 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
 ### 수집 제외
 
 - 번역 대상이 아닌 `[DataTableText]` 는 **`[DataTableText(Localize = false)]`** — 수치 시트 문자열 칸으로만 남고 Strings 에 안 간다.
-  지금: `SoundEntry.key`(코드 ID)·`SoundEntry.description`(기획 메모).
+  지금: `SoundEntry.key`(코드 ID)·`SoundEntry.description`(기획 메모)·`SkillTooltipText.tags`(태그 ID 목록 — 화면 이름은 `UI.SkillTooltip.Tag.<ID>` 코드 키, [data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자)).
 - 튜토리얼 문구(`TutorialGuideTextTable`·`TutorialTraitTextTable`)는 아직 `[DataTableText]` 가 없어 수집되지 않는다(별도 레인).
 
 ### 단일 원본 — Strings
@@ -345,7 +345,8 @@ Export 가 ErrorCodes 시트에 없는 코드를 **ko = 지금 문구, `#분류`
 | `UI.Loading.Ready1`~`Ready3` | Enter... · All players are ready. · Starting... | | `readyMessages[0~2]` — 〃 |
 | `UI.SkillTooltip.ShiftHint` | 자세한 정보를 보려면 [Shift] 키를 누르세요 | | `SkillTooltipView` |
 | `UI.SkillTooltip.Error` | [오류: {error}] | `{error}` = 포매터 오류(개발용, 번역 안 함) | 〃 `ErrorText` |
-| `UI.SkillTooltip.PassiveBadge` | Passive | | 〃 `KeyBadgeText` — 패시브 칸 키 배지만 |
+| `UI.SkillTooltip.PassiveBadge` | Passive | | 〃 `KeyBadgeText` — 패시브 칸 슬롯 줄(부제가 없을 때)만 |
+| `UI.SkillTooltip.Tag.<태그 ID>` | Knockback 넉백 · Stun 기절 · Vulnerable 취약 · Shield 보호막 · Heal 회복 · Overheat 과열 · Unstoppable 저지불가 · Invulnerable 무적 | | 〃 태그 칩 — 키·ko 는 `SkillTooltipTags`(ID 목록 = enum `SkillTooltipTag`), 할 일 114 |
 | `UI.StatusEffect.<enum 이름>` | enum 이름에서 `Modifier` 뺀 것(`Stunned`·`MoveSpeed`…) | | `StatusEffectHUD.DisplayName` — `None` 빼고 enum 전부 |
 | `UI.Result.Cleared` · `Failed` · `Aborted` | CLEAR · FAILED · ABORTED | | `ResultStatsView.OutcomeText` — 행이 없으면 씬 `clearedLabel` 등 |
 | `UI.Result.Survival` | 생존 시간  {time} | `{time}` = mm:ss | 〃 `SurvivalText` — 행이 없으면 씬 `survivalPrefix` + 시간 |

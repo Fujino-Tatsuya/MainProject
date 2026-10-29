@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using BeaverLobby.Player.Dash;
 using UnityEngine;
 
 [RequireComponent(typeof(Player))]
@@ -402,6 +403,38 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 
         // 서버 취소가 대시 종료 후에 도착한 경우 — 대시는 이미 끝나 있어 아무 일도 일어나지 않는다.
         Edit.Log($"[Dash] EndDash 무효: 현재 상태가 Dash가 아닙니다(={CurrentState}).", this);
+    }
+
+    // ── 대쉬 간파(할 일 115) — FSM 은 Dash 그대로, 간파 스킬은 대시 상태에 '실린다'. 대시가 끝나면 Skill 로 바로 넘어간다 ──
+
+    /// <summary>지금 대시 상태. 대시 중이 아니면 null.</summary>
+    public PlayerDashState ActiveDash => currentState as PlayerDashState;
+
+    /// <summary>대쉬 간파를 막는 차단 효과(스킬 또는 간파 봉인)가 걸려 있다.</summary>
+    public bool BlocksDashInterruptByEffect =>
+        context.StatusEffects.BlocksSkill || context.StatusEffects.BlocksInterrupt;
+
+    /// <summary>지금 대시에 간파 스킬을 싣는다. 대시 중이 아니거나 이미 실려 있으면 false.</summary>
+    public bool AttachDashInterrupt(PlayerSkillBase skill) =>
+        skill != null && currentState is PlayerDashState dash && dash.Attach(skill);
+
+    /// <summary>지금 대시에 실린 그 스킬을 내린다(대시 중 스킬 종료). 실려 있지 않았으면 false.</summary>
+    public bool DetachDashInterrupt(PlayerSkillBase skill) =>
+        skill != null && currentState is PlayerDashState dash && dash.Detach(skill);
+
+    /// <summary>
+    /// 대시가 끝나(시간 만료·유닛 막힘) 실린 간파를 Skill 상태로 잇는다 — Idle/Move 를 거치지 않고, 애니는 재시작하지 않는다.
+    /// CanUseSkill 을 보지 않는다(이미 승인돼 실행 중인 스킬). 그 대시가 지금 상태가 아니면 false.
+    /// </summary>
+    internal bool BeginSkillFromDash(PlayerDashState dash, PlayerSkillBase skill)
+    {
+        if (skill == null || currentState != dash)
+            return false;
+
+        dash.MarkHandOff();
+        SetState(new PlayerSkillState(context, skill, skill.EntryActionState));
+        context.Skills?.CompleteDashInterruptHandOff(skill);
+        return true;
     }
 
     /// <summary>스킬 실행 상태 계열(Skill·Focus)인가. 스킬 수명은 이 계열 안에서는 유지된다.</summary>
@@ -1440,6 +1473,12 @@ public sealed class PlayerDashState : PlayerStateBase
     private bool lostGroundingDuringDash;
     private bool wasGrounded;
 
+    // ── 대쉬 간파(할 일 115) ──
+    private PlayerSkillBase attachedSkill;   // 실린 간파(서버 승인 뒤). 대시 끝에 Skill 로 잇는다
+    private bool dashInterruptRequested;     // [입력 주체] 이 대시에서 이미 요청했다 — 대시 1회당 1번
+    private bool handingOff;                 // 대시 끝 → Skill 인수인계로 나가는 중(Exit 가 강제 종료로 보지 않게)
+    private float lastLoggedPressTime = float.NaN;
+
     public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration)
         : base(context)
     {
@@ -1456,6 +1495,36 @@ public sealed class PlayerDashState : PlayerStateBase
 
     public override PlayerActionState StateType => PlayerActionState.Dash;
     public override bool RequiresStateAuthorityTick => true;
+
+    public Vector3 Direction => direction;
+    public float Speed => speed;
+    /// <summary>이 피어에서 대시가 시작된 뒤 지난 초.</summary>
+    public float Elapsed => Time.time - startTime;
+    /// <summary>남은 대시 시간(초, 음수 없음).</summary>
+    public float Remaining => Mathf.Max(0f, endTime - Time.time);
+    /// <summary>실린 간파(할 일 115). 없으면 null.</summary>
+    public PlayerSkillBase AttachedSkill => attachedSkill;
+
+    internal bool Attach(PlayerSkillBase skill)
+    {
+        if (attachedSkill != null)
+            return false;
+
+        attachedSkill = skill;
+        dashInterruptRequested = true;
+        return true;
+    }
+
+    internal bool Detach(PlayerSkillBase skill)
+    {
+        if (attachedSkill == null || attachedSkill != skill)
+            return false;
+
+        attachedSkill = null;
+        return true;
+    }
+
+    internal void MarkHandOff() => handingOff = true;
 
     /// <summary>대시 이동량 계산에 쓰는 Motor/Rigidbody 기준 현재 위치.</summary>
     private Vector3 CurrentPosition =>
@@ -1498,7 +1567,11 @@ public sealed class PlayerDashState : PlayerStateBase
     {
         // 구간 속도(할 일 92-5) — 끝나는 프레임에도 먼저 쓰고, 이어지는 Exit 가 기본값 1 로 되돌린다.
         Context.Dash?.TickDodgeSpeed();
+        TickDashInterruptInput();
         if (Time.time < endTime)
+            return;
+
+        if (TryHandOffDashInterrupt())
             return;
 
         // 이동 입력 중이면 Idle 을 거치지 않고 Move 로 — 하체가 Dodge → Run_Loop 로 바로 이어진다(PlayerDashController.PlayDodgeEnd).
@@ -1506,6 +1579,96 @@ public sealed class PlayerDashState : PlayerStateBase
             Context.Input.HasMoveInput, Context.StatusEffects.BlocksMovement);
         if (next != PlayerActionState.Move || !Context.Controller.ChangeState(PlayerActionState.Move))
             Context.Controller.ChangeState(PlayerActionState.Idle);
+    }
+
+    /// <summary>
+    /// [입력 주체] 대쉬 간파 입력(할 일 115) — 누른 시각(이번 프레임 또는 선입력 버퍼 기록)이 대시 시작 후 창 안인 우클릭만 쓴다.
+    /// 창 밖·우클릭이 간파 스킬이 아닌 경우는 손대지 않는다 — 기존 선입력 버퍼 규칙대로 대시 끝난 뒤 처리된다(§10 Q1).
+    /// 차단 효과·쿨타임 거부는 Idle/Move 의 UseSkillSlot 과 같다(피드백 1회 + 버림, §10 Q3). 로그는 입력 1회당 1줄.
+    /// </summary>
+    private void TickDashInterruptInput()
+    {
+        PlayerSkillController skills = Context.Skills;
+        PlayerInputReader input = Context.Input;
+        if (skills == null || input == null || Context.Dash == null || !Context.Player.IsInputSource)
+            return;
+
+        float window = Context.Dash.DashInterruptWindow;
+        if (!DashInterruptRules.IsEnabled(window) ||
+            !input.TryGetPressTime(PlayerBufferedInput.SkillInterrupt, out float pressTime))
+            return;
+
+        bool isInterruptSkill = skills.GetSkill(PlayerSkillSlot.Interrupt) is PlayerInterruptSkillBase;
+        bool alreadyRequested = dashInterruptRequested || skills.IsBusy;
+        DashInterruptInputDecision decision = DashInterruptRules.EvaluateInput(
+            true, startTime, pressTime, window, isInterruptSkill, alreadyRequested,
+            Context.Controller.BlocksDashInterruptByEffect,
+            isInterruptSkill && !alreadyRequested && skills.IsBlockedByCooldown(PlayerSkillSlot.Interrupt));
+
+        // 남겨 둔 입력은 매 프레임 다시 보므로 같은 누름은 한 번만 남긴다.
+        bool firstLook = pressTime != lastLoggedPressTime;
+        lastLoggedPressTime = pressTime;
+
+        const PlayerBufferedInput kind = PlayerBufferedInput.SkillInterrupt;
+        string outcome;
+        switch (decision)
+        {
+            case DashInterruptInputDecision.ConsumeOnly:
+                input.ConsumeBufferedInput(kind);
+                outcome = "이미 요청 — 소비만";
+                break;
+            case DashInterruptInputDecision.RejectByEffect:
+                input.ResolveBufferedInput(kind, Context.Controller.RejectByEffect(kind));
+                outcome = "차단 효과 거부";
+                break;
+            case DashInterruptInputDecision.RejectByCooldown:
+                skills.NotifyCooldownRejected(PlayerSkillSlot.Interrupt);
+                input.ResolveBufferedInput(kind, PlayerActionAttempt.OutOfResource);
+                outcome = "쿨타임 거부(버림)";
+                break;
+            case DashInterruptInputDecision.Request:
+                if (skills.TryUseDashInterrupt(direction, pressTime))
+                {
+                    dashInterruptRequested = true;
+                    input.ConsumeBufferedInput(kind);
+                    outcome = "요청";
+                }
+                else
+                {
+                    input.ResolveBufferedInput(kind, PlayerActionAttempt.Rejected);
+                    outcome = "요청 실패(사전 검증 거부 — 버림)";
+                }
+                break;
+            default: // 창 밖·간파 스킬 아님 — 버퍼 그대로
+                outcome = decision == DashInterruptInputDecision.OutOfWindow
+                    ? "창 밖 — 버퍼 그대로(대시 후 처리)"
+                    : "우클릭이 간파 스킬 아님 — 버퍼 그대로";
+                break;
+        }
+
+        if (firstLook)
+        {
+            Edit.Log(
+                $"[DashInterrupt] 우클릭 {outcome} — 대시 경과 {pressTime - startTime:F3}s / 창 {window:F2}s",
+                Context.Player);
+        }
+    }
+
+    /// <summary>
+    /// 대시 끝(시간 만료·유닛 막힘)에 실린 간파가 아직 실행 중이면 Idle/Move 대신 Skill 상태로 잇는다(할 일 115). 이었으면 true.
+    /// 서버·오너 각자 자기 대시 끝에서 돈다.
+    /// </summary>
+    private bool TryHandOffDashInterrupt()
+    {
+        PlayerSkillBase skill = attachedSkill;
+        bool stillActive = skill != null && Context.Skills != null && Context.Skills.ActiveSkill == skill;
+        if (!DashInterruptRules.EndsIntoSkill(skill != null, stillActive))
+        {
+            attachedSkill = null;
+            return false;
+        }
+
+        return Context.Controller.BeginSkillFromDash(this, skill);
     }
 
     public override void FixedTick()
@@ -1552,7 +1715,16 @@ public sealed class PlayerDashState : PlayerStateBase
         Context.Motor?.ClearDashMotion();
         if (Context.Motor != null)
             Context.Motor.MovementResolved -= OnMotorMovementResolved;
-        Context.Dash?.PlayDodgeEnd(nextState);
+        // 대쉬 간파 인수인계면 0층은 곧 간파 상태가 이어받는다 — Dodge 끝 포즈로 덮지 않는다(할 일 115).
+        Context.Dash?.PlayDodgeEnd(nextState, handingOff);
+
+        // 실린 간파를 Skill 로 잇지 못하고 대시가 끊겼다(넉백·그랩·사망·CC·서버 취소 EndDash) — 간파도 강제 종료.
+        if (attachedSkill != null && !handingOff)
+        {
+            PlayerSkillBase skill = attachedSkill;
+            attachedSkill = null;
+            Context.Skills?.HandleDashInterruptAborted(skill, nextState);
+        }
 
         float elapsed = Time.time - startTime;
         bool expired = Time.time >= endTime;
@@ -1638,7 +1810,9 @@ public sealed class PlayerDashState : PlayerStateBase
             Edit.Log(
                 $"[Dash] tick #{tickCount}: 유닛에 막혀 대시 종료 — 요청 {requested:F3}m → 적용 {applied:F3}m",
                 Context.Player);
-            Context.Controller.ChangeState(PlayerActionState.Idle);
+            // 실린 간파가 있으면 이 시점이 '대시 끝' — 바로 Skill 로 잇는다(할 일 115 §7).
+            if (!TryHandOffDashInterrupt())
+                Context.Controller.ChangeState(PlayerActionState.Idle);
             return;
         }
 

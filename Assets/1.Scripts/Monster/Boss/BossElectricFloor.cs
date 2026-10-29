@@ -47,13 +47,18 @@ public sealed class BossElectricFloor : MonoBehaviour
     float _dischargeWarn;
     int _dischargeDamage;
     bool _dischargeLethal;
+    bool _dischargeIgnoreInvuln;
     int _fireDamage;   // 이번 발동 피해(평소 = _d.damage)
     bool _fireLethal;  // 이번 발동이 즉사기인가(④ 자폭 실패) — 한 방 상한을 건너뛴다
+    bool _fireIgnoreInvuln;   // 이번 발동을 무적으로 못 피하는가(보스 즉사 패턴, 할 일 105) — 방 전체 즉사면 전멸기 사망 처리, 아니면 PlayerInvulnerabilityBypass
 
     // 즉사 피해 — 보호막까지 넘기는 충분히 큰 값(플레이어 HP 220 대).
     const int LethalDamage = 999999;
 
-    /// <summary>[서버] 장판 1회 발동에서 실제로 맞은 인원(무적·잡힘·쓰러짐 제외, 보호막이 막아도 포함). 보스 고유 게이지(B6) 훅 — 지금 구독자 없음.</summary>
+    /// <summary>
+    /// [서버] 장판 1회 발동에서 실제로 맞은 인원(무적·잡힘·쓰러짐 제외, 보호막이 막아도 포함). 보스 고유 게이지(B6) 훅 — 지금 구독자 없음.
+    /// 무적 무시 방전이면 무적인 사람도 실제로 맞으므로 센다(<see cref="PlayerInvulnerabilityBypass.CountsAsFloorHit"/>).
+    /// </summary>
     public event Action<int> ServerFloorHit;
 
     BossElectricFloorDataSO _ownedDefaults;   // 데이터가 비어 직접 만든 기본값 — 우리가 지운다
@@ -128,10 +133,15 @@ public sealed class BossElectricFloor : MonoBehaviour
         else if (_mode == Mode.Raid) TickRaid(dt);
     }
 
-    /// <summary>[서버] 레이드 방전 1회 요청(② 전력 공급 실패). Raid 모드에서 예고 → 발동한다.</summary>
-    public void ServerQueueDischarge(ulong mask, float warnTime, int damage, bool lethal = false)
+    /// <summary>
+    /// [서버] 레이드 방전 1회 요청(② 전력 공급 실패). Raid 모드에서 예고 → 발동한다.
+    /// <paramref name="lethal"/> = 한 방 상한 무시 즉사 피해. <paramref name="ignoreInvulnerability"/> = 무적(대시 등 전부)으로 못 피한다(보스 즉사 패턴만).
+    /// 즉사 + 방 전체(<see cref="BossTileGrid.AllMask"/>) + 이 값이면 전멸기 — 발동 순간 살아 있는 참가자 전원 사망 처리(<see cref="BossWipeDischargeRules"/>).
+    /// </summary>
+    public void ServerQueueDischarge(ulong mask, float warnTime, int damage, bool lethal = false, bool ignoreInvulnerability = false)
     {
         _dischargeLethal = lethal;
+        _dischargeIgnoreInvuln = ignoreInvulnerability;
         _dischargePending = true;
         _dischargeMask = mask;
         _dischargeWarn = Mathf.Max(0.3f, warnTime);
@@ -164,6 +174,7 @@ public sealed class BossElectricFloor : MonoBehaviour
             Warn(_mask, _dischargeWarn);
             _fireDamage = _dischargeLethal ? LethalDamage : _dischargeDamage;
             _fireLethal = _dischargeLethal;
+            _fireIgnoreInvuln = _dischargeIgnoreInvuln;
             return;
         }
 
@@ -280,6 +291,7 @@ public sealed class BossElectricFloor : MonoBehaviour
     {
         _fireDamage = _d.damage;   // 레이드 방전은 TickRaid 가 이 뒤에 덮어쓴다
         _fireLethal = false;
+        _fireIgnoreInvuln = false;
         _step = Step.Warn;
         _t = time;
         _shown = true;
@@ -293,7 +305,11 @@ public sealed class BossElectricFloor : MonoBehaviour
         _t = _d.vfxDuration;
         _boss.SendFloorFire(mask, _d.vfxDuration, _fireLethal);   // 즉사 여부는 연출용(즉사 방전 연출) — 판정은 아래 그대로
 
-        if (!_boss.TryGetTileGrid(out BossTileGrid grid))
+        // 전멸기(방 전체 즉사 + 무적으로 못 피함) = 칸 판정·발 위치·벽 끼임·무적과 무관하게 살아 있는 참가자 전원 사망 처리(할 일 105 후속).
+        // 피해 999999 경로와 겹치지 않는다 — 전멸기는 사망 처리 하나, 안전 칸이 있는 즉사 방전은 아래 칸 판정 + 무적 무시 피해 하나.
+        bool wipe = BossWipeDischargeRules.IsWipe(mask, _fireLethal, _fireIgnoreInvuln);
+        BossTileGrid grid = default;
+        if (!wipe && !_boss.TryGetTileGrid(out grid))
         {
             Debug.LogWarning("[전기장판] 보스방 경계를 못 찾아 판정을 건너뛴다(InvisibleBoundaries).", this);
             return;
@@ -302,20 +318,35 @@ public sealed class BossElectricFloor : MonoBehaviour
         int hit = 0, gauge = 0;
         foreach (Player p in BossPatternTargets.AllPlayers())
         {
+            if (wipe)
+            {
+                if (!BossWipeDischargeRules.ShouldKill(BossPatternTargets.IsAlive(p), _boss.IsHolding(p))) continue;
+                hit++;
+                gauge++;   // 무적이어도 실제로 죽는다 — CountsAsFloorHit(_, bypass: true) 와 같다
+                BossPatternTargets.Kill(p);
+                continue;
+            }
+
             if (!BossPatternTargets.IsValid(p, _boss)) continue;
             if (!grid.Contains(mask, BossPatternTargets.FootPosition(p))) continue;
             hit++;
-            if (!BossPatternTargets.IsInvulnerable(p)) gauge++;
+            if (PlayerInvulnerabilityBypass.CountsAsFloorHit(BossPatternTargets.IsInvulnerable(p), _fireIgnoreInvuln)) gauge++;
             // 출처 = 발 위치(맞은 타일). 보스 위치를 넘기면 보호막 파문 등이 보스 쪽에서 맞은 것처럼 보인다.
             Vector3 foot = BossPatternTargets.FootPosition(p);
             // 즉사기는 이 한 번만 한 방 상한(PlayerHitDamageCap)을 끈다 — 넣자마자 다시 켠다.
+            // 무적 무시(보스 즉사 패턴)도 같은 방식 — Player.CanApplyHealthDamage 가 이 동안만 무적을 넘긴다.
             PlayerHitDamageCap.LethalOverride = _fireLethal;
+            PlayerInvulnerabilityBypass.Active = _fireIgnoreInvuln;
             try { BossPatternTargets.Damage(p, _fireDamage, foot, _boss.transform); }
-            finally { PlayerHitDamageCap.LethalOverride = false; }
+            finally
+            {
+                PlayerHitDamageCap.LethalOverride = false;
+                PlayerInvulnerabilityBypass.Active = false;
+            }
         }
         ServerFloorHit?.Invoke(gauge);
         Debug.Log($"[전기장판] 발동 {_mode}{(_mode == Mode.Charge ? $"/{_group}{(_bStage > 0 ? _bStage.ToString() : "")}" : "")} — " +
-                  $"{BossTileGrid.Count(mask)}칸 · 적중 {hit}명(게이지 인원 {gauge})", this);
+                  $"{BossTileGrid.Count(mask)}칸 · {(wipe ? "전멸기 사망 처리" : "적중")} {hit}명(게이지 인원 {gauge})", this);
     }
 
     void EndVfx()
@@ -356,6 +387,23 @@ public sealed class BossElectricFloor : MonoBehaviour
     /// <summary>[전 피어] 예고·연출 즉시 제거(모드 전환·제압·기믹 종료·사망).</summary>
     public event Action ClientCleared;
 
+    float _tileBrightness = 1f;
+    bool _brightnessDirty;
+
+    /// <summary>[전 피어] 예고·발동 칸 밝기 배율(0~1, 칸 알파에 곱한다). 연출 전용 — 판정·표시 범위 무관.
+    /// 23호 차징 중 흐리게(2026-10-28 민경 — BossChargeTetherView 가 정한다, Docs/tech/handoff-boss-pylon-vfx.md §5).</summary>
+    public float ClientTileBrightness
+    {
+        get => _tileBrightness;
+        set
+        {
+            value = Mathf.Clamp01(value);
+            if (Mathf.Approximately(value, _tileBrightness)) return;
+            _tileBrightness = value;
+            _brightnessDirty = true;
+        }
+    }
+
     public void ClientShowWarn(ulong mask, float warnTime)
     {
         if (!EnsureView()) return;
@@ -383,6 +431,11 @@ public sealed class BossElectricFloor : MonoBehaviour
     void PaintWarnTile(int r, int c, int i)
     {
         EnemyC3Visuals.PaintPlate(_outer[i],_fill[i],"15",true);
+        if (_tileBrightness < 1f)
+        {
+            EnemyC3Visuals.PaintLayer(_outer[i], "15", true, false, _tileBrightness);
+            EnemyC3Visuals.PaintLayer(_fill[i], "15", true, true, _tileBrightness);
+        }
     }
 
     public void ClientFire(ulong mask, float vfxTime, bool lethal = false)
@@ -406,7 +459,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         ForEachTile(mask, (r, c, i) =>
         {
             PlaceTile(_outer[i], r, c, i, FullTile);
-            EnemyC3Visuals.PaintActive(_outer[i]);
+            EnemyC3Visuals.PaintActive(_outer[i], _tileBrightness);
             _outer[i].gameObject.SetActive(true);
 
             if (_d.electricVfxPrefab != null)
@@ -442,8 +495,10 @@ public sealed class BossElectricFloor : MonoBehaviour
             col.a *= 0.55f + 0.45f * Mathf.Sin(Time.time * _d.electricFlickerSpeed);   // 임시 전기 — 빠른 깜빡임
         float s = FullTile * Mathf.Clamp01(k);                      // 안쪽 진한 사각형이 중심에서 차오른다(§9-2)
         // Play 중 스타일 조절 — 경고 칸만 다시 칠한다(진행은 그대로).
-        bool repaint = !_viewFiring && _paintedStyleVersion != TelegraphStyleSO.Version;
+        // 칸 밝기 배율이 바뀌어도 다시 칠한다(차징 중 흐리게). 발동 칸은 아래에서 매 프레임 칠한다.
+        bool repaint = !_viewFiring && (_paintedStyleVersion != TelegraphStyleSO.Version || _brightnessDirty);
         if (repaint) _paintedStyleVersion = TelegraphStyleSO.Version;
+        _brightnessDirty = false;
 
         // 매 프레임 도는 곳이라 람다(ForEachTile) 대신 루프 — 할당 0.
         for (int r = 0; r < BossTileGrid.Size; r++)
@@ -451,7 +506,7 @@ public sealed class BossElectricFloor : MonoBehaviour
             {
                 if (!BossTileGrid.Has(_viewMask, r, c)) continue;
                 int i = BossTileGrid.Bit(r, c);
-                if (_viewFiring) EnemyC3Visuals.PaintActive(_outer[i],_d.electricColor.a>0?col.a/_d.electricColor.a:1);
+                if (_viewFiring) EnemyC3Visuals.PaintActive(_outer[i],(_d.electricColor.a>0?col.a/_d.electricColor.a:1)*_tileBrightness);
                 else
                 {
                     if (repaint) PaintWarnTile(r, c, i);

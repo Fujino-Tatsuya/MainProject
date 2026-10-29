@@ -41,7 +41,7 @@ public readonly struct BossElevatorGatherConditions
         AwaitingArrival = awaitingArrival;
     }
 
-    /// <summary>튜토리얼 발판 잠금이 아니다(<see cref="TutorialBossPath.IsBossPadEnabled"/>).</summary>
+    /// <summary>튜토리얼 발판 잠금이 아니다(<see cref="MapSceneBossPath.IsBossPadEnabled"/>).</summary>
     public bool PadEnabled { get; }
 
     /// <summary>제한시간 만료·구간 스킵 강제 카운트다운 진행 중(<see cref="BossTeleportManager.ForceStartEncounter"/>).</summary>

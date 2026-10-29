@@ -45,13 +45,14 @@ internal static class PlayerEditModeTestRunner
         "^AimIndicatorPlacementTests$", // 할 일 33 — 에임 인디케이터 3D 쿼드: yaw·수평 회전·발밑 높이·전방 오프셋·스케일
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
         "^UnitWallImpactJudgeTests$", // 할 일 32 — 공용 벽 충돌: 스윕 결과 → 벽 충돌·제외 규칙(자기·배리어·유닛·상자·시작 겹침)·막힘 거리·에피소드당 1회
-        // 튜토리얼 픽스처(특성·안내 UI·스피너봇 연습)는 TutorialEditModeTestRunner 로 옮겼다(할 일 15 I0).
+        // 튜토리얼 픽스처(특성·안내 UI·스피너봇 연습)는 MapSceneEditModeTestRunner 로 옮겼다(할 일 15 I0).
         "^PlayerMotionSweepStepTests$", // 모터 스윕 — 단차·급경사·낙하 착지(실제 CapsuleCast)
         "^PlayerUnitCollisionRulesTests$", // 할 일 11 — 유닛 장애물 마스크(Soul·유닛 통과)·겹침 밀어내기 상한
         "^PlayerUnitPenetrationTests$", // 할 일 11 — 겹친 유닛 관통 수집(실제 ComputePenetration)·비몸체 Player 콜라이더 무시
         "^DashDirectionRulesTests$", // 할 일 25 — 대시 방향 옵션(캐릭터 정면 기본 / 마우스 방향) 선택 규칙
         "^PlayerInputBufferTests$", // 할 일 44 — 선입력 버퍼 기록·만료·덮어쓰기·거부 사유별 보관/버림
         "^PlayerInputBufferDiagnosticsTests$", // 할 일 44 후속 — 선입력 버퍼 진단: 즉시·버퍼 실행·만료·놓친 간격·중앙값/90%
+        "^DefaultAttackChainRulesTests$", // 할 일 122 — 팔라딘 평타 End 다음 타 규칙(Loop 4→1·Once 종료·예약 없음 종료)·팔라딘 SO Loop·스텝 창 열림 < End
         "^PlayerBasicAttackInputRulesTests$", // 할 일 44 5차 — 거너 홀드 시작·공격 중 스킬 입력은 지금 발 마무리 뒤 예약(다음 발 금지·만료 없음·마지막 1개·연타 1회)
         "^AssassinHairClipRulesTests$", // 할 일 47 — 머리카락 구동기: 클립 → 보정 종류(회피 v15·v16·v13), 클립 안 초, trailing 재설정(전환·루프·되감기·리셋)
         "^AssassinHairPrefabTests$", // 할 일 47 — Armature 머리카락 체인 7×4 본·캡처·몸 캡슐·구동기·보정 2종, Variant 중첩
@@ -69,6 +70,7 @@ internal static class PlayerEditModeTestRunner
         "^LobbyProximityDoorRulesTests$", // 할 일 78 — 로비 근접 문: 열림<닫힘 반경 히스테리시스·여닫는 시간 따로·평면 거리
         "^LobbyProximityDoorPenetrationTests$", // 할 일 99 — 로비 문짝 다음 자세 × 몸 캡슐 겹침(실제 Box·비볼록 MeshCollider → 문짝 상자, 돌아 있는 문)
         "^PlayerRejoinLifeRulesTests$", // 할 일 48 C14 R5c — 재합류 생명: 퇴장 기록(사망 연출 목적지·체력 비율)·복원 판정·복원 체력·전멸 덮어쓰기 값
+        "^InterruptSuccessFxTests$", // 할 일 87 C4 — 간파 성공 이펙트: 목적·발동자·스폰 여부 → 재생, Player.prefab base 빈 칸
     };
 
     const string Tag = "[PlayerTests]";

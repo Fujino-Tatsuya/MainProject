@@ -69,6 +69,13 @@ public class MonsterBase : Unit
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 간파(카운터) **판정** 창 복제(할 일 132) — 서버 MonsterCounterWindow 의 개폐를 그대로 옮긴다(표시 _counterVisual 은 0.15초 먼저 꺼진다).
+    // 오너 클라의 간파 시도 예측(연출 강·약)만 읽는다. 판정은 서버 MonsterCounterWindow 그대로. 창이 없는 몹은 늘 false(전송 없음).
+    readonly NetworkVariable<bool> _counterJudgeWindow = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // 중간보스 취약(카운터 성공부터 vulnerableDuration 초 — 팀장 10-26) 복제. Q 관통 판정·하늘색이 전부 이 값을 본다.
     // 서버만 쓴다(ServerBeginCounterVulnerable / ServerEndVulnerable). 그로기(1초)와는 따로 간다 — 그로기가 끝나도 취약은 남는다.
     readonly NetworkVariable<bool> _vulnerable = new NetworkVariable<bool>(
@@ -216,10 +223,12 @@ public class MonsterBase : Unit
         _state.OnValueChanged += OnStateChanged;
         _counterVisual.OnValueChanged += OnCounterVisualChanged;
         _vulnerable.OnValueChanged += OnVulnerableChanged;
+        _counterJudgeWindow.OnValueChanged += OnCounterJudgeWindowChanged;
         ApplyCounterWindowVisual(_counterVisual.Value);   // 늦게 합류한 클라도 지금 값으로
 
         if (IsServer)
         {
+            ServerReplicateCounterWindow(false);   // 풀 재사용 — 이전 생애의 판정 창 복제값을 남기지 않는다
             ServerEndVulnerable();   // 풀 재사용 — 이전 생애의 취약을 남기지 않는다
             ServerInitialize();
         }
@@ -242,6 +251,10 @@ public class MonsterBase : Unit
 
         // 상태이상 머리 위 이펙트(기절 = 팔라딘 Q 밀림·경직) 런타임 부착. Docs/tech/handoff-monster-stun-vfx.md
         _statusVfx = MonsterStatusEffectVfxPresenter.TryInstall(this, status, bodyCollider);
+
+        // 간파 예측 대상 캐시(할 일 132 정정1, 모든 피어) — 간파 대상(IInterruptSlowMotionTarget)만 들어간다. 이미 죽은 채 합류하면 넣지 않는다.
+        if (_state.Value != MonsterState.Dead)
+            InterruptTargetRegistry.Register(this);
     }
 
     MonsterStatusEffectVfxPresenter _statusVfx;
@@ -251,8 +264,29 @@ public class MonsterBase : Unit
         _state.OnValueChanged -= OnStateChanged;
         _counterVisual.OnValueChanged -= OnCounterVisualChanged;
         _vulnerable.OnValueChanged -= OnVulnerableChanged;
+        _counterJudgeWindow.OnValueChanged -= OnCounterJudgeWindowChanged;
+        InterruptWindowReplicaTracker.Forget(gameObject);
+        InterruptTargetRegistry.Unregister(this);
         base.OnNetworkDespawn();
     }
+
+    /// <summary>
+    /// [전 피어] 간파 **판정** 창 복제값(할 일 132) — 서버 <c>MonsterCounterWindow</c> 개폐를 옮긴 값. 오너 클라의 간파 시도 예측만 읽는다.
+    /// 표시(<c>_counterVisual</c>)와 달리 조기 소등이 없다.
+    /// </summary>
+    protected bool CounterJudgeWindowReplica => _counterJudgeWindow.Value;
+
+    /// <summary>[서버] <c>MonsterCounterWindow</c> 가 열고 닫을 때 부른다(할 일 132). 스폰 전·클라에선 아무것도 안 한다.</summary>
+    internal void ServerReplicateCounterWindow(bool open)
+    {
+        if (!IsServer || !IsSpawned || _counterJudgeWindow.Value == open)
+            return;
+
+        _counterJudgeWindow.Value = open;
+    }
+
+    // 클라 창 기록(열린 뒤 경과·추정 길이) — 서버는 InterruptLagMonitor 가 따로 기록한다(Record 가 거른다).
+    void OnCounterJudgeWindowChanged(bool previous, bool next) => InterruptWindowReplicaTracker.Record(gameObject, next);
 
     void OnVulnerableChanged(bool previous, bool next) => RefreshVulnerableTint();
 
@@ -515,11 +549,11 @@ public class MonsterBase : Unit
     /// 피격(<see cref="ReceiveAttack"/> 거절 → 피해·피격 연출·넉백·경직·인터럽트 누적·간파 소비·피해 숫자 없음),
     /// 직접·비율 피해(<see cref="CanApplyHealthDamage"/>), <c>Unit.Knockback</c>(<see cref="OnKnockback"/> → LinearKnockback) 모두 무시.
     ///
-    /// 쓰는 곳: 튜토리얼 존 장부(<c>TutorialMonsterZones</c>) — "자기 차례가 올 때까지 휴면"(tutorial-scenario §2.2).
+    /// 쓰는 곳: 튜토리얼 존 장부(<c>MapSceneMonsterZones</c>) — "자기 차례가 올 때까지 휴면"(tutorial-scenario §2.2).
     /// 기본값 false 라 호출처가 없는 절차 맵·다른 스테이지의 몬스터 동작은 그대로다.
     /// <see cref="SetServerLogicSuspended"/>(보스 연출 정지, 무적 아님)와 플래그가 따로다 — 둘이 서로를 풀지 않는다.
     ///
-    /// 튜토리얼 스피너봇 연습 모드(<c>TutorialSpinnerPractice</c>)도 휴면은 이것 하나를 쓴다(Docs/tech/handoff-tutorial.md §2).
+    /// (튜토리얼 스피너봇 연습 모드 <c>TutorialSpinnerPractice</c> 도 이것을 썼다 — 할 일 107 에서 Legacy 로 빠져 지금은 맵씬에 없다.)
     /// </summary>
     public void SetDormantServer(bool dormant)
     {
@@ -2393,6 +2427,12 @@ public class MonsterBase : Unit
         // 몸 콜라이더 — 서버(EnterDead)만 끄면 이동 권한이 있는 원격 플레이어가 디졸브 동안 시체에 막힌다(점검 10-14).
         if (next == MonsterState.Dead && bodyCollider != null)
             bodyCollider.enabled = false;
+
+        // 간파 예측 대상 캐시(할 일 132 정정1) — 사망이면 뺀다(모든 피어, 복제 상태). 죽음에서 돌아오면 다시 넣는다.
+        if (next == MonsterState.Dead)
+            InterruptTargetRegistry.Unregister(this);
+        else if (previous == MonsterState.Dead)
+            InterruptTargetRegistry.Register(this);
 
         // 블렌드 고정·준비는 CrossFade(ResetToLocomotion)·트리거(PlayStateAnimation)보다 먼저 정한다.
         UpdateLocomotionBlendOnStateChange(previous, next);

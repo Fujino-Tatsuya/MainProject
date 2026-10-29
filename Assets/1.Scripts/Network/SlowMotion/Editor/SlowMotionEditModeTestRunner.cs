@@ -14,7 +14,22 @@ internal static class SlowMotionEditModeTestRunner
         "^SlowMotionSessionTests$",
         "^InterruptSlowMotionTrackerTests$",
         "^SlowMotionCameraZoomTests$",
+        "^SlowMotionOwnerZoomTests$",              // 오너 줌 한 번 — 시도→성공 사슬 한 세션(할 일 132)
         "^BossTimerClockTests$",  // 보스 제한시간 GameNow 도메인(D16)
+        "^InterruptDarkAdaptationModelTests$",     // 간파 성공 암순응(할 일 87 C3)
+        "^DarkAdaptationRendererSetupTests$",
+        "^InterruptOwnerDimTests$",                // 오너 마스크 암전 모드·비트 태깅·덮개 색(할 일 132 단계 3)
+        "^InterruptProductionDirectorTests$",      // 간파 연출 디렉터 스위치(할 일 104 → 118)
+        "^InterruptProductionPrefabTests$",        // 간파 연출 디렉터 프리팹·프로필 흡수(할 일 118 C2)
+        "^InterruptProductionStageTests$",         // 간파 연출 서버 사건 4개·단계(할 일 118 C3)
+        "^InterruptProductionChannelTests$",       // 간파 연출 피어 단계·개인/공용 채널(할 일 118 C4)
+        "^InterruptProductionLiveReadTests$",      // 간파 연출 인스펙터 값 사건마다 읽기(캐싱 금지, 할 일 118 C4)
+        "^InterruptOwnerPresentationTests$",       // 오너 연출 상태 기계·클라 예측 입력(할 일 132 단계 2)
+        "^InterruptTargetRegistryTests$",          // 간파 예측 대상 캐시 등록·해제(할 일 132 정정1)
+        "^InterruptLightGatherTests$",             // 빛 모임 재생 규칙·소켓 폴백·텍스처 칸 키워드·프리팹 소켓(할 일 132 단계 4)
+        "^InterruptHitFlashTests$",                // 적중 섬광 ②~⑥ 시간표·섬광 순간·오너/팀원 분기·Volume 복구·텍스처 칸·프리팹·렌더러(할 일 132 §15)
+        "^InterruptPresentationEffectTests$",      // 연출 켜기/끄기 칸 — 기본 암전만·그리기만 끔·섬광 순간 정상(할 일 132 §17)
+        "^DebugInterruptLabTests$",                // 디버그 배속 합성·허수아비 회복·튜닝 패널(할 일 115 C5, 132 §17)
     };
 
     const string Tag = "[SlowMotionTests]";

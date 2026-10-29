@@ -51,12 +51,18 @@ public enum LobbyGatherPoint : byte
 /// 출격 집결 인원에는 포함. 연결 종료자는 모든 명단에서 뺀다.</item>
 /// <item>출격 확정 = 메인 진입: Sortie 진입 뒤 <see cref="TryConsumeLaunch"/> 가 회차마다 한 번만 true(옛 Ready 패드 카운트다운 대체).</item>
 /// <item>판 끝 로비 복귀 = 새 회차: <see cref="Reset"/> 으로 Lobby 부터(기록·명단·출격 래치 초기화).</item>
+/// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1 — <see cref="SetTrainingCleared"/>): 켠 사람은 입구 집결·훈련 명단·훈련 내부 집결에서 빠지고(늦은 참가자처럼 로비 대기),
+/// 출격 집결 인원에는 남는다. 훈련 중 켜면 즉시 명단에서 빠지고, 그래서 명단이 비면 훈련·브리핑을 마친 것으로 보고 출격 집결로 넘어간다.
+/// 끄면 플래그만 지운다 — 이미 고정된 이번 회차 명단엔 다시 넣지 않고 다음 입구 확정(새 회차)부터 포함. 플래그는 <see cref="Reset"/> 을 넘어 남고 연결 종료 때 지운다.
+/// 훈련을 끝까지 하면(종료 집결 확정) 명단 전원에게 같은 플래그를 켠다 — 이때는 명단에서 빼지 않는다(브리핑 집결·캐릭터 잠금 유지).</item>
 /// </list>
 /// </summary>
 public sealed class LobbyTrainingFlow
 {
     readonly List<ulong> _connected = new List<ulong>();
     readonly List<ulong> _trainingRoster = new List<ulong>();
+    readonly List<ulong> _trainingCleared = new List<ulong>();
+    readonly List<ulong> _entranceBuffer = new List<ulong>();
 
     public LobbyTrainingStage Stage { get; private set; } = LobbyTrainingStage.Lobby;
 
@@ -149,12 +155,86 @@ public sealed class LobbyTrainingFlow
         return true;
     }
 
-    /// <summary>연결 종료 확정 — 접속자·훈련 명단 모두에서 뺀다. 없으면 false.</summary>
+    /// <summary>연결 종료 확정 — 접속자·훈련 명단·클리어 플래그 모두에서 뺀다. 없으면 false.</summary>
     public bool RemoveClient(ulong clientId)
     {
         var removed = _connected.Remove(clientId);
         removed |= _trainingRoster.Remove(clientId);
+        _trainingCleared.Remove(clientId);
         return removed;
+    }
+
+    /// <summary>튜토리얼 클리어 플래그가 켜진 접속자(켠 순서).</summary>
+    public IReadOnlyList<ulong> TrainingCleared => _trainingCleared;
+
+    public bool IsTrainingCleared(ulong clientId) => _trainingCleared.Contains(clientId);
+
+    /// <summary>
+    /// 튜토리얼 클리어 플래그를 켜고 끈다(접속자만). 바뀌었으면 true, 같은 값·접속자 아님이면 false.
+    /// 켜면 훈련 명단에서 바로 뺀다(<paramref name="leftRoster"/> = 이번에 명단에서 빠졌다). 그래서 훈련 중 명단이 비면
+    /// 훈련·브리핑을 마친 것으로 보고 Brief/Completed(출격 집결 활성)로 넘긴다(<paramref name="skippedToSortie"/>) — 아무도 안 남은 훈련 집결에서 멈추지 않게.
+    /// 끄면 플래그만 지운다 — 이번 회차 명단은 그대로, 다음 입구 확정부터 다시 포함.
+    /// </summary>
+    public bool SetTrainingCleared(ulong clientId, bool cleared, out bool leftRoster, out bool skippedToSortie)
+    {
+        leftRoster = false;
+        skippedToSortie = false;
+        if (!_connected.Contains(clientId) || IsTrainingCleared(clientId) == cleared)
+            return false;
+
+        if (!cleared)
+        {
+            _trainingCleared.Remove(clientId);
+            return true;
+        }
+
+        _trainingCleared.Add(clientId);
+        leftRoster = _trainingRoster.Remove(clientId);
+        if (leftRoster && _trainingRoster.Count == 0 && IsTrainingInProgress)
+        {
+            Set(LobbyTrainingStage.Brief, LobbyTrainingPhase.Completed);
+            skippedToSortie = true;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 멈춤 탈출(로비 Alt+2)로 옮길 집결 구역 — 훈련 명단이고 훈련 단계 중이면 그 단계 시작·영역 구역, 아니면 None(= 로비 스폰 지점).
+    /// 브리핑 위치 집결 중 명단은 브리핑 위치, 브리핑 완료·출격·Lobby 단계·명단 밖(늦은 참가자·클리어 플래그)은 스폰 지점.
+    /// </summary>
+    public static LobbyGatherPoint RecoveryPointFor(LobbyTrainingStage stage, LobbyTrainingPhase phase, bool isInTrainingRoster)
+    {
+        if (!isInTrainingRoster)
+            return LobbyGatherPoint.None;
+
+        switch (stage)
+        {
+            case LobbyTrainingStage.Train01: return LobbyGatherPoint.Train01Start;
+            case LobbyTrainingStage.Train02: return LobbyGatherPoint.Train02Start;
+            case LobbyTrainingStage.Train03A:
+            case LobbyTrainingStage.Train03B:
+            case LobbyTrainingStage.Train03C:
+            case LobbyTrainingStage.Train03D: return LobbyGatherPoint.Train03Area;
+            case LobbyTrainingStage.TrainEnd: return LobbyGatherPoint.TrainEnd;
+            case LobbyTrainingStage.Brief:
+                return phase == LobbyTrainingPhase.Completed ? LobbyGatherPoint.None : LobbyGatherPoint.Brief;
+            default: return LobbyGatherPoint.None;
+        }
+    }
+
+    /// <summary>
+    /// 집결 확정 직후 훈련 명단 전원을 옮길 구역(할 일 111) — 확정으로 켜지는 다음 집결 구역 안이라 그 집결이 바로 센다. 없으면 None.
+    /// 입구 → 첫 위치(Train01Start, 훈련장 안), 훈련 종료 → 브리핑 위치. 늦은 참가자·명단 밖은 옮기지 않는다(명단만 대상).
+    /// </summary>
+    public static LobbyGatherPoint TeleportTargetOnConfirm(LobbyGatherPoint confirmed)
+    {
+        switch (confirmed)
+        {
+            case LobbyGatherPoint.Entrance: return LobbyGatherPoint.Train01Start;
+            case LobbyGatherPoint.TrainEnd: return LobbyGatherPoint.Brief;
+            default: return LobbyGatherPoint.None;
+        }
     }
 
     /// <summary>훈련·브리핑 중 접속해 로비에서 기다리는 사람(접속자인데 훈련 명단 밖).</summary>
@@ -169,10 +249,20 @@ public sealed class LobbyTrainingFlow
         return point == LobbyGatherPoint.Entrance || point == LobbyGatherPoint.Sortie;
     }
 
-    /// <summary>이 구역 참여자 명단.</summary>
+    /// <summary>이 구역 참여자 명단 — 출격 = 접속자 전원, 입구 = 접속자 중 클리어 플래그 끈 사람, 그 밖 = 훈련 명단.</summary>
     public IReadOnlyList<ulong> ParticipantsFor(LobbyGatherPoint point)
     {
-        return UsesConnectedClients(point) ? _connected : _trainingRoster;
+        if (point != LobbyGatherPoint.Entrance)
+            return UsesConnectedClients(point) ? _connected : _trainingRoster;
+
+        _entranceBuffer.Clear();
+        foreach (var clientId in _connected)
+        {
+            if (!_trainingCleared.Contains(clientId))
+                _entranceBuffer.Add(clientId);
+        }
+
+        return _entranceBuffer;
     }
 
     /// <summary>지금 켜져 있어야 하는 구역인가.</summary>
@@ -213,7 +303,7 @@ public sealed class LobbyTrainingFlow
             case LobbyGatherPoint.Entrance:
                 HasStartedTraining = true;
                 _trainingRoster.Clear();
-                _trainingRoster.AddRange(_connected);
+                _trainingRoster.AddRange(ParticipantsFor(LobbyGatherPoint.Entrance));   // 클리어 플래그 켠 사람은 뺀다
                 Set(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering);
                 return true;
 
@@ -236,6 +326,13 @@ public sealed class LobbyTrainingFlow
                 return true;
 
             case LobbyGatherPoint.TrainEnd:
+                // 훈련 종료 = 명단 전원 튜토리얼 클리어(Alt+1 과 같은 플래그). 명단은 그대로 — 브리핑 집결·캐릭터 잠금은 이번 회차 끝까지.
+                foreach (var clientId in _trainingRoster)
+                {
+                    if (!_trainingCleared.Contains(clientId))
+                        _trainingCleared.Add(clientId);
+                }
+
                 Set(LobbyTrainingStage.Brief, LobbyTrainingPhase.Gathering);
                 return true;
 

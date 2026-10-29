@@ -7,7 +7,7 @@ using UnityEngine;
 // 이 컴포넌트는 발판 박스만 내놓는다 — 판정은 BossTeleportManager 가 서버 Update 에서 참가자마다
 // 본체(transform.position)가 박스 안인지(ContainsPoint) 보고 파티 집결 규칙(BossElevatorGather)으로 한다.
 // 트리거 Enter/Exit 를 쓰지 않는다: 플레이어 콜라이더가 여럿이라 Exit 가 깜빡이고, 사망·디스폰엔 Exit 가 안 온다.
-// 튜토리얼(S5) 발판 잠금(TutorialBossPath.IsBossPadEnabled)도 판정 쪽에서 본다.
+// 튜토리얼(S5) 발판 잠금(MapSceneBossPath.IsBossPadEnabled)도 판정 쪽에서 본다.
 [RequireComponent(typeof(BoxCollider))]
 public class BossEnterTrigger : MonoBehaviour
 {

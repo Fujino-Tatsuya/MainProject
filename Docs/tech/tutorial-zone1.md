@@ -1,5 +1,10 @@
 # 튜토리얼 존1 흐름 (할 일 15 · S7 → v8 V1)
 
+> **🟪 Legacy (할 일 107, 2026-10-27)** — 존1 교육(체크리스트·허수아비·자막·목표)은 맵씬에서 뺐다. 로비 훈련 TRAIN_01(`LobbyTrainingWeaponCheck` — [lobby-training.md](lobby-training.md))이 대신한다.
+> 코드는 `Assets/1.Scripts/Map/Tutorial/Legacy/`(`TutorialZone1Flow`·`TutorialZone1Model`·`TutorialZone1Dummies`, 테스트·저작 `Legacy/Editor/`)에 보관 — 런타임 부착을 끊어 돌지 않는다.
+> 디렉터 오너 보고 API(`ReportLocalCheck`·`ReportLocalMoveDistance`)는 지웠다. `StageTutorial.prefab` 의 `TutorialZone1Dummies`(+Spot 3개)도 뺐다(허수아비 프리팹 `TrainingDummy_Tutorial` 은 로비가 쓰므로 등록 유지).
+> 지금 맵씬 존1 = **G1 즉시 열림**(`MapSceneZoneFlow` — [tutorial-director.md](tutorial-director.md) 맨 위). 아래는 기록이다(타입 이름은 107 이름 변경을 따랐다).
+
 > 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §3.0·§3.1·§5(공통·존1) — **v8**(2026-10-12) · 계획: [../../PLAN-tutorial.md](../history/PLANS/PLAN-tutorial.md) S7·§3-1 V1.
 > 디렉터 API 전체는 [tutorial-director.md](tutorial-director.md) §10, 훅은 [tutorial-player-hooks.md](tutorial-player-hooks.md), 안내 UI 는 [tutorial-guide-ui.md](tutorial-guide-ui.md).
 > v8 변경: 평타 '허수아비 적중 5회' 제거 → **기본 공격·Q·E·R·우클릭 각각 실제 사용 1회**(적중 불필요) · **G1 은 60초 교착 방지 제외** · 체크리스트 8줄 · 캐릭터별 힌트.
@@ -7,27 +12,27 @@
 ## 파일
 | 무엇 | 경로 |
 |---|---|
-| 흐름(런타임, 모든 피어) | `Assets/1.Scripts/Map/Tutorial/Flow/TutorialZone1Flow.cs` |
+| 흐름(런타임, 모든 피어) | `Assets/1.Scripts/Map/Tutorial/Legacy/TutorialZone1Flow.cs` |
 | 순수 규칙 | `Flow/TutorialZone1Model.cs` — `TutorialZone1Rules`(이동 보고 상한) · `TutorialZone1SkillRules`(공격·스킬 사용 판정) · `TutorialMoveAccumulator` · `TutorialTooltipHold` · `TutorialLandingTimer` · `TutorialZone1Progress`(목표 순서·체크리스트·대기 줄) |
 | 허수아비 자리 | `Flow/TutorialZone1Dummies.cs`(StageTutorial 자식, 비네트워크) |
 | 저작 | `Flow/Editor/TutorialZone1Authoring.cs` — 메뉴 `Tools/Map/Authoring/Tutorial/8. Place Zone1 Dummies (StageTutorial Prefab)`. `2. Build StageTutorial Prefab` 도 같이 만든다 |
 | 허수아비 변형 | `Assets/2.Prefabs/TrainingDummy_Tutorial.prefab` — `TrainingDummy.prefab` 의 Prefab Variant, `TrainingDummyInterrupt` 제거(간파 노랑 사이클 없음). `DefaultNetworkPrefabs.asset` 등록 |
-| 테스트 | `Map/Tutorial/Editor/TutorialZone1ModelTests.cs`(튜토리얼 러너) · G1 마스크·교착 제외는 `TutorialFlowModelTests` |
+| 테스트 | `Map/Tutorial/Legacy/Editor/TutorialZone1ModelTests.cs`(튜토리얼 러너) · G1 마스크·교착 제외는 `MapSceneFlowModelTests` |
 
 ## 붙는 방식
-`TutorialDirector.StateChanged` 에서 `IsTutorialActive` 가 보이면 디렉터 GameObject 에 `AddComponent`(모든 피어 — 사망 규칙 S11 과 같은 부트스트랩, 씬·프리팹 저장 없음). 절차 맵은 디렉터가 안 켜져 안 붙는다.
+`MapSceneDirector.StateChanged` 에서 `IsTutorialActive` 가 보이면 디렉터 GameObject 에 `AddComponent`(모든 피어 — 사망 규칙 S11 과 같은 부트스트랩, 씬·프리팹 저장 없음). 절차 맵은 디렉터가 안 켜져 안 붙는다.
 
 ## 개인 항목 8개 = G1 (v8 §3.1·§4)
-`TutorialFlowModel.G1Mask` = 이동 · 대시 · 패시브 툴팁 + **기본 공격 · Q · E · R · 우클릭**(`TutorialCheck.BasicAttack/SkillQ/SkillE/SkillR/SkillInterrupt`).
+`MapSceneFlowModel.G1Mask` = 이동 · 대시 · 패시브 툴팁 + **기본 공격 · Q · E · R · 우클릭**(`MapSceneCheck.BasicAttack/SkillQ/SkillE/SkillR/SkillInterrupt`).
 - 체크는 한 번 켜지면 끄지 않는다 — **존1 들어오기 전(G1 전 어디서든)에 쓴 것도 인정**, 사망·부활로 되돌리지 않는다.
-- **G1 = 참가자 전원 완료일 때만**. 첫 완료자 뒤 60초 자동 진행이 없다(`TutorialFlowModel.HasDeadlockTimeout(G1) == false`). 특성 게이트(G2·G4·G7·G10)는 그대로 60초.
+- **G1 = 참가자 전원 완료일 때만**. 첫 완료자 뒤 60초 자동 진행이 없다(`MapSceneFlowModel.HasDeadlockTimeout(G1) == false`). 특성 게이트(G2·G4·G7·G10)는 그대로 60초.
 - 대기 줄(나는 끝냈고 동료가 남음) = `TUT_WAIT_PARTY_NOAUTO` "동료를 기다리는 중 (n/total)" — 카운트다운 없음(디렉터 `TryGetWait` 남은 초 -1 → 안내 UI 가 음수면 이 행).
 
 ## 판정
 | 항목 | 피어 | 방법 |
 |---|---|---|
 | S0 환영 | 오너 | `PlayerGroundingSensor.IsGrounded` 가 **연속 1초**(낙하·튕김·사망 중 0) → 자막 `TUT_S0_WELCOME` 1번 |
-| Z1-1 이동 5m | 오너 → 서버 | XZ 누적(한 프레임에 30m/s 넘는 이동 = 순간이동으로 버림, 사망 중 끊음) → `TutorialDirector.ReportLocalMoveDistance(m)` 1초 간격 재시도. 서버 `ReportOwnerMoveServerRpc`: G1 전·PlayerObject·Alive + **상한** = 5m ≤ 보고 ≤ 30 m/s × (튜토리얼 활성 뒤 경과) + 3m |
+| Z1-1 이동 5m | 오너 → 서버 | XZ 누적(한 프레임에 30m/s 넘는 이동 = 순간이동으로 버림, 사망 중 끊음) → `MapSceneDirector.ReportLocalMoveDistance(m)` 1초 간격 재시도. 서버 `ReportOwnerMoveServerRpc`: G1 전·PlayerObject·Alive + **상한** = 5m ≤ 보고 ≤ 30 m/s × (튜토리얼 활성 뒤 경과) + 3m |
 | Z1-2 대시 | 서버 | `PlayerDashController.ServerDashApproved` → `ReportCheckServer(Dash)` |
 | Z1-3 기본 공격 | 서버 | **`Player.ServerBasicAttackStarted`**(신규 정적 이벤트) — 기본 공격 1타가 실제로 시작될 때(적중 무관): 가붕이 `DefaultAttackController.StartAttackServer` · 거너 `GunnerBasicAttack.ServerFire`(한 발) · 어쌔신 `AssassinBasicAttack.StartServer`(강타 포함). 거부된 요청·거너 준비 자세만으로는 안 난다. **R 대상 확정 좌클릭은 조준 경로라 기본 공격으로 안 센다** |
 | Z1-4 패시브 1초 | 오너 → 서버 | `SkillTooltipView.TooltipShown("Passive")` 뒤 1초 안에 `TooltipHidden`/다른 키가 안 오면 `ReportLocalCheck(PassiveTooltip)`. **이동·대시·기본 공격을 마친 뒤에만** 센다(§3.1 순서). 호버가 끝나면 캐릭터별 자막 `TUT_Z1_PASSIVE_INFO` |
@@ -70,7 +75,7 @@
 ## 디렉터에 더한 것 (S7 · v8)
 - `void ReportLocalMoveDistance(float meters)`(오너) → `ReportOwnerMoveServerRpc`(서버 상한 검증, `TutorialZone1Rules.IsMoveReportPlausible`).
 - 활성 시각 `_activatedServerTime`(ServerTime) — 상한 검증의 기준.
-- v8: 복제 `PlayerState` 에서 `AttackHits` 삭제(적중 횟수 없음). `TutorialCheck` 값 10~12 추가(SkillR·SkillInterrupt·Corridor1CooldownReset). 모든 피어가 같은 빌드여야 한다.
+- v8: 복제 `PlayerState` 에서 `AttackHits` 삭제(적중 횟수 없음). `MapSceneCheck` 값 10~12 추가(SkillR·SkillInterrupt·Corridor1CooldownReset). 모든 피어가 같은 빌드여야 한다.
 
 ## 플레이어 쪽 훅 (v8 — 은희 영역, 동작 무변경)
 | 훅 | 위치 | 비고 |

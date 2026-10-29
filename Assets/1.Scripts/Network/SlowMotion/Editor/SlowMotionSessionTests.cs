@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
+using UnityEngine;
 
 /// <summary>
 /// 전역 시간 레이어의 순수 규칙 — 발동 번호 문지기(<see cref="SlowMotionSession"/>), 이벤트 직렬화(<see cref="SlowMotionEvent"/>),
@@ -228,7 +229,165 @@ public sealed class SlowMotionSessionTests
         }
     }
 
+    // ─── 목적·프로필 배율 기억(할 일 87) ──────────────────────────────
+
+    [Test]
+    public void 세션은_마지막_Start_의_목적과_프로필_배율을_기억한다()
+    {
+        var s = new SlowMotionSession();
+        Assert.AreEqual(SlowMotionPurpose.Attempt, s.CurrentPurpose);
+        Assert.AreEqual(1f, s.CurrentProfileScale, "아직 슬로우가 없으면 1");
+
+        s.Apply(Start(1, T0));
+        Assert.AreEqual(SlowMotionPurpose.Attempt, s.CurrentPurpose);
+        Assert.AreEqual(0.5f, s.CurrentProfileScale, Eps);
+
+        s.Apply(SlowMotionEvent.CreateStart(2, T0 + 0.25, 1, P(0.25f), SlowMotionPurpose.Success));
+        Assert.AreEqual(SlowMotionPurpose.Success, s.CurrentPurpose);
+        Assert.AreEqual(0.25f, s.CurrentProfileScale, Eps);
+
+        // 버린 Start·Fail 은 기억을 바꾸지 않는다.
+        s.Apply(Start(1, T0 + 0.3125, scale: 0.75f));
+        s.Apply(SlowMotionEvent.CreateFail(2, T0 + 0.375));
+        Assert.AreEqual(SlowMotionPurpose.Success, s.CurrentPurpose);
+        Assert.AreEqual(0.25f, s.CurrentProfileScale, Eps);
+
+        s.Clear();
+        Assert.AreEqual(SlowMotionPurpose.Attempt, s.CurrentPurpose);
+        Assert.AreEqual(1f, s.CurrentProfileScale);
+    }
+
+    [Test]
+    public void 프로필_배율은_정리된_값으로_기억한다()
+    {
+        var s = new SlowMotionSession();
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, new SlowMotionProfile { scale = -2f }));
+
+        Assert.AreEqual(SlowMotionProfile.MinScale, s.CurrentProfileScale, Eps);
+    }
+
+    [Test]
+    public void 진행_중_Success_Start_는_지금_배율에서_이어진다()
+    {
+        // 시도 슬로우(0.5) 유지 중에 성공 슬로우(0.25)를 다시 걸면 1.0 으로 튀지 않고 0.5 에서 진입한다.
+        var s = new SlowMotionSession();
+        s.Apply(Start(1, T0));
+        double t = T0 + 0.25;
+        Assert.AreEqual(0.5f, s.ScaleAt(t), Eps);
+
+        Assert.AreEqual(SlowMotionApplyResult.Started,
+            s.Apply(SlowMotionEvent.CreateStart(2, t, 1, P(0.25f), SlowMotionPurpose.Success)));
+        Assert.AreEqual(0.5f, s.ScaleAt(t), Eps, "진입 시작 = 직전 배율");
+        Assert.AreEqual(0.375f, s.ScaleAt(t + 0.0625), Eps, "진입 절반 = 0.5 → 0.25 의 중간");
+        Assert.AreEqual(0.25f, s.ScaleAt(t + 0.125), Eps);
+        Assert.AreEqual(SlowMotionPhase.Hold, s.PhaseAt(t + 0.25));
+    }
+
     // ─── 직렬화 ───────────────────────────────────────────────────────
+
+    [Test]
+    public void 이벤트_크기는_목적_칸과_히트스톱_칸과_대상_위치를_포함한다()
+    {
+        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7 + 4 * 3, SlowMotionEvent.SerializedSize);
+    }
+
+    [Test]
+    public void Start_이벤트_대상_위치_직렬화_왕복()
+    {
+        var position = new Vector3(1.5f, -0.25f, 1234.125f);
+        var r = RoundTrip(SlowMotionEvent.CreateStart(1, 1.0, 3, P(0.25f), SlowMotionPurpose.Success, position));
+        Assert.AreEqual(position, r.TargetPosition);
+
+        Assert.AreEqual(Vector3.zero, RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P())).TargetPosition, "기본 = 0");
+        Assert.AreEqual(Vector3.zero, RoundTrip(SlowMotionEvent.CreateFail(1, 1.0)).TargetPosition, "Fail = 0");
+        Assert.AreEqual(Vector3.zero, RoundTrip(SlowMotionEvent.CreateReset(1, 1.0)).TargetPosition, "Reset = 0");
+    }
+
+    [Test]
+    public void 세션은_마지막_Start_의_대상_위치를_기억한다()
+    {
+        var s = new SlowMotionSession();
+        Assert.AreEqual(Vector3.zero, s.CurrentTargetPosition);
+
+        var first = new Vector3(1f, 0f, 2f);
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, P(), SlowMotionPurpose.Success, first));
+        Assert.AreEqual(first, s.CurrentTargetPosition);
+
+        // 버린 Start·Fail 은 기억을 바꾸지 않는다.
+        s.Apply(SlowMotionEvent.CreateStart(1, T0 + 0.25, 1, P(), SlowMotionPurpose.Success, new Vector3(9f, 9f, 9f)));
+        s.Apply(SlowMotionEvent.CreateFail(1, T0 + 0.25));
+        Assert.AreEqual(first, s.CurrentTargetPosition);
+
+        var second = new Vector3(-3f, 0.5f, 4f);
+        s.Apply(SlowMotionEvent.CreateStart(2, T0 + 0.5, 1, P(), SlowMotionPurpose.Success, second));
+        Assert.AreEqual(second, s.CurrentTargetPosition, "마지막 것이 이긴다");
+
+        s.Clear();
+        Assert.AreEqual(Vector3.zero, s.CurrentTargetPosition);
+    }
+
+    [Test]
+    public void Start_이벤트_히트스톱_직렬화_왕복()
+    {
+        var profile = new SlowMotionProfile { scale = 0.25f, hitStopDuration = 0.05f, hitStopScale = 0.02f };
+        var r = RoundTrip(SlowMotionEvent.CreateStart(1, 1.0, 3, profile, SlowMotionPurpose.Success));
+
+        Assert.AreEqual(0.05f, r.HitStopDuration);
+        Assert.AreEqual(0.02f, r.HitStopScale);
+        var back = r.ToProfile();
+        Assert.AreEqual(0.05f, back.hitStopDuration);
+        Assert.AreEqual(0.02f, back.hitStopScale);
+
+        var none = RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P()));
+        Assert.AreEqual(0f, none.HitStopDuration, "기본 프로필 = 히트스톱 없음");
+    }
+
+    [Test]
+    public void 히트스톱_중_Fail_은_Failed()
+    {
+        var s = new SlowMotionSession();
+        var profile = P();
+        profile.hitStopDuration = 0.0625f;
+        profile.hitStopScale = 0.125f;
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, profile, SlowMotionPurpose.Success));
+        Assert.AreEqual(SlowMotionPhase.HitStop, s.PhaseAt(T0 + 0.03125));
+        Assert.IsTrue(s.IsActiveAt(T0 + 0.03125));
+
+        Assert.AreEqual(SlowMotionApplyResult.Failed, s.Apply(SlowMotionEvent.CreateFail(1, T0 + 0.03125)));
+        Assert.AreEqual(SlowMotionPhase.FailExit, s.PhaseAt(T0 + 0.03125));
+        Assert.AreEqual(0.125f, s.ScaleAt(T0 + 0.03125), Eps);
+    }
+
+    [Test]
+    public void 히트스톱_중_Reset_은_Reset()
+    {
+        var s = new SlowMotionSession();
+        var profile = P();
+        profile.hitStopDuration = 0.0625f;
+        profile.hitStopScale = 0.125f;
+        s.Apply(SlowMotionEvent.CreateStart(1, T0, 1, profile));
+
+        Assert.AreEqual(SlowMotionApplyResult.Reset, s.Apply(SlowMotionEvent.CreateReset(1, T0 + 0.03125)));
+        Assert.AreEqual(1f, s.ScaleAt(T0 + 0.03125));
+    }
+
+    [Test]
+    public void Start_이벤트_목적_직렬화_왕복()
+    {
+        var success = RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P(0.25f), SlowMotionPurpose.Success));
+        Assert.AreEqual(SlowMotionPurpose.Success, success.Purpose);
+        Assert.AreEqual(0.25f, success.Scale);
+
+        var attempt = RoundTrip(SlowMotionEvent.CreateStart(1, 0.5, 3, P()));
+        Assert.AreEqual(SlowMotionPurpose.Attempt, attempt.Purpose, "기본 목적 = 시도");
+    }
+
+    [Test]
+    public void Fail_Reset_의_목적은_시도_고정()
+    {
+        Assert.AreEqual(SlowMotionPurpose.Attempt, RoundTrip(SlowMotionEvent.CreateFail(1, 1.0)).Purpose);
+        Assert.AreEqual(SlowMotionPurpose.Attempt, RoundTrip(SlowMotionEvent.CreateReset(1, 1.0)).Purpose);
+    }
 
     static SlowMotionEvent RoundTrip(in SlowMotionEvent e)
     {

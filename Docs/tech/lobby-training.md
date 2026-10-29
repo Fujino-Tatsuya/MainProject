@@ -36,7 +36,7 @@
 
 | 대사 ID | 명세 이벤트 | 붙인 전이(진행기) |
 |---|---|---|
-| `LOBBY_TRAIN_ROUTE` | 입구 전원 집결 | 입구 집결 확정 → `Train01/Gathering` |
+| `LOBBY_TRAIN_ROUTE` | 입구 전원 집결 | 입구 집결 확정 → `Train01/Gathering`. 입구 텔레포트(할 일 111)로 이미 첫 위치 안이라 "표적 앞으로 이동해" 문구가 어색할 수 있다 — 문구 미수정(보고만) |
 | `TRAIN_01_START` | 첫 훈련 시작 | 첫 위치 집결 확정 → `Train01/InProgress` |
 | `TRAIN_01_END` | 개인 목표 전원 완료 | Train01 완료 보고 → `Train02/Gathering` |
 | `TRAIN_02_START` | 일반 전투 시작 | 두 번째 위치 집결 확정 → `Train02/InProgress` |
@@ -46,10 +46,10 @@
 | `TRAIN_03_RESET` → `TRAIN_03_WALL_GUIDE` | B→C 초기화 / C 시작 | B 완료 뒤 영역 안 확인 → `Train03C/InProgress`(명세 §9.4 초기화 순간). 같은 진입에 두 줄 — 순서대로 |
 | `TRAIN_03_SUPPRESS` | D 제압 진입 | C 완료 보고(제압 시작 순간) → `Train03D/InProgress` |
 | `TRAIN_END` | 훈련 종료 | D 완료 보고 → `TrainEnd/Gathering` |
-| `BRIEF_ROUTE` | 종료 집결 | 종료 집결 확정 → `Brief/Gathering` |
+| ~~`BRIEF_ROUTE`~~ | 종료 집결 | **재생 안 함**(할 일 111) — 종료 텔레포트가 이미 브리핑 구역 안에 두므로 이동 안내 불필요. 상수·Strings 키·문구 행은 남겨 둠 |
 | `BRIEF_01`~`04` | 브리핑 | 단계 진입 대사 아님 — `LobbyBriefing` 이 `Brief/InProgress` 동안 서버 시간으로 한 줄씩 `ServerPlay`(아래 "브리핑" 절) |
 
-`Lobby → Sortie`(훈련 없이 출격)·`Brief/InProgress`·`Brief/Completed`·`Sortie` 진입 대사는 없다(단계가 바뀌면 대기 줄 폐기만).
+`Lobby → Sortie`(훈련 없이 출격)·`Brief/Gathering`·`Brief/InProgress`·`Brief/Completed`·`Sortie` 진입 대사는 없다(단계가 바뀌면 대기 줄 폐기만).
 
 ### 단계 안 사건 대사 — 공개 API
 
@@ -90,7 +90,7 @@ LobbyRadio.Active.ServerClear()                                           // [�
 
 ### 흐름
 
-1. 종료 집결 확정 → `Brief/Gathering`(`BRIEF_ROUTE` 무전) → 브리핑 위치(`Gather_Brief`) 훈련 명단 전원 5초 집결 → `Brief/InProgress`.
+1. 종료 집결 확정 → `Brief/Gathering`(진입 무전 없음 — 할 일 111) → 브리핑 위치(`Gather_Brief`) 훈련 명단 전원 집결(`gatherHoldSeconds` 3초 — 종료 텔레포트가 이미 구역 안에 둔다, "훈련 종료" 절) → `Brief/InProgress`.
 2. **[서버] 시작**(`ServerFlowChanged` 로 `Brief/InProgress` 를 본 순간, 회차당 1회): `LobbyRadio.ServerClear()`(기존 무전 종료) → 접속자 전원 조작 제한 →
    시작 지연 `leadSeconds`(0.5초) 뒤 `BRIEF_01` → 앞 줄 표시 시간이 지날 때마다 다음 줄(`LobbyRadio.ServerPlay`, 단계 번호 그대로라 폐기되지 않는다).
 3. **시간 = 서버가 잰다**: 지연 + 대사 표시 시간 합(`TutorialGuideTexts` SO 행 `durationSeconds` — 7+5+6+4초) + 끝 여유 `tailSeconds`(1초) = 23.5초.
@@ -134,6 +134,195 @@ LobbyRadio.Active.ServerClear()                                           // [�
 
 명세 §10 "실전 초기화"(체력 최대·쿨타임·보정 제거·암살자 변신 해제·분노 0·거너 과열 0)는 **구현하지 않는다** — 메인 진입 때 MapScene 이 플레이어를 새로 스폰하므로
 (로비 오브젝트는 디스폰) 새 오브젝트의 기본값이 곧 실전 초기값이다(메인 결정 10-22). 훈련 보정 체력 하한도 브리핑에선 이미 0 이다(진행기).
+
+## 튜토리얼 클리어 플래그 (할 일 112, 로비 Alt+1)
+
+QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-hotkeys.md) §3). 규칙 원본 = `LobbyTrainingFlow.SetTrainingCleared`(EditMode `LobbyTrainingFlowTests`).
+
+- **누른 사람만**, 서버 확정 → 진행기 복제 목록(`LobbyTrainingDirector.IsTrainingCleared`). 결과는 누른 사람에게만 토스트.
+- **켜면**: 입구 집결 인원·훈련 명단(입구 확정 때 고정)·훈련 내부 집결(Train01~TrainEnd·브리핑 위치)에서 빠진다 = 늦은 참가자와 같은 "로비 대기".
+  **출격 집결 인원엔 남는다**(접속자 전원). 브리핑 조작 제한은 접속자 전원이라 이 사람도 잠긴다. 캐릭터 변경은 늦은 참가자처럼 허용.
+- **훈련 중에 켜면** 즉시 명단에서 빠진다 — 진행 중 집결 구역 명단·체력 하한·무기 점검(TRAIN_01 개인 체크 장부, `ServerRosterMemberRemoved`)이 그 사람을 기다리지 않는다.
+  그래서 **명단이 비면** 훈련·브리핑을 마친 것으로 보고 `Brief/Completed`(출격 집결 활성)로 넘긴다 — 아무도 없는 집결에서 멈추지 않게.
+- **끄면**: 플래그만 지운다. 이미 고정된 이번 회차 명단엔 다시 넣지 않고, **다음 입구 확정(판 끝 로비 복귀·Alt+3 리로드 뒤 새 회차)부터** 다시 훈련 명단.
+  Lobby 단계(입구 확정 전)에 끄면 이번 입구 확정부터 포함된다.
+- **유지·정리**: 진행기는 로비 씬과 함께 새로 생기므로 서버 세션 정적 장부에 적어 다음 진행기로 잇는다. 연결 종료(재접속 = 새 clientId 라 꺼진 채로 시작)·호스트 셧다운 때 지운다.
+- Lobby 단계에서 전원이 켜면 입구 집결 인원 0명 = 훈련이 시작되지 않는다(출격만).
+- **훈련을 끝까지 하면 자동으로 켜진다**(할 일 111, 아래 "훈련 종료"). 그래서 훈련을 마친 사람이 Alt+1 을 누르면 **끈다**(다음 회차에 다시 훈련).
+
+## 훈련 종료 — 클리어 플래그·텔레포트 (할 일 111)
+
+**원인(10-27)**: 안내 스텝 ③(출격)은 `TrainingCleared`(진행기 복제 `trainingCleared` = Alt+1 과 같은 목록) 또는 `Brief/Completed` 로 켜진다.
+그런데 이 목록을 켜는 곳이 **Alt+1(`ServerSetTrainingCleared`) 하나뿐**이었다 — 훈련을 정상 완료해도 플래그가 안 켜져,
+판 끝 로비 복귀·Alt+3 리로드(새 진행기 = Lobby 단계, 명단 비움) 뒤엔 다시 ②(튜토리얼)로 안내했다. 스텝 판정은 맞는 상태를 읽고 있었다(판정 변경 없음).
+
+**수정 — 메커니즘 하나**: 종료 집결 확정(`TrainEnd` 확정 → `Brief/Gathering`, `LobbyTrainingFlow.OnGatherConfirmed`)에서 **훈련 명단 전원에게 같은 클리어 플래그**를 켠다.
+- 새 상태 없음 — 같은 `_trainingCleared` → 같은 복제 목록 → 같은 서버 세션 장부(`ServerClearedStore`, 로비 복귀·리로드를 넘어 남고 연결 종료 때 지움). 늦은 접속도 NetworkList 로 그대로 받는다.
+- Alt+1 과 다른 점 하나: **명단에서 빼지 않는다** — 이번 회차 브리핑 집결 인원·캐릭터 잠금은 그대로(Alt+1 처럼 빼면 명단이 비어 브리핑을 건너뛴다).
+- 늦은 참가자(명단 밖)는 훈련을 안 했으니 켜지지 않는다.
+- 결과(스텝 판정 표 그대로): 브리핑 집결·진행 중 = 없음(줄 4) → 브리핑 완료 = ③ → 다음 회차 Lobby = ③(줄 8, 입구 집결 인원에서도 빠짐 — 훈련을 다시 하려면 Alt+1 로 끈다).
+
+**종료 텔레포트 — 자리 = 브리핑 구역(`Gather_Brief`) 안 (10-27 결정)**: 같은 순간(종료 집결 확정) 서버가 훈련 명단 전원을
+진행기가 이미 들고 있는 `briefZone`(PartyGatherZone) 박스 안으로 옮긴다 — `LobbyTrainingDirector.TeleportRosterInto`(입구 텔레포트와 공용, 아래 절).
+- 흐름: 종료 집결 확정 → `Brief/Gathering`(구역 켜기는 다음 진행기 Update 의 `ApplyZones`) → 명단 전원이 이미 구역 안 → 브리핑 집결 n/m 이 바로 차고
+  유지 `LobbyRules.gatherHoldSeconds`(3초) 뒤 확정 → `Brief/InProgress`. 원격 클라는 오너 RPC → 위치 복제가 돌아온 뒤에 안으로 세므로 왕복 지연만큼 늦게 찬다(호스트는 즉시).
+  집결 판정 조건(살아 있음·Idle/Move)은 그대로 — 텔레포트 순간 행동 중이면 끝난 뒤 센다.
+- 자리 = **`LobbyTrainingEndPlacement`**(순수 규칙, `Assets/1.Scripts/Lobby/LobbyTrainingEndPlacement.cs`, EditMode `LobbyTrainingEndPlacementTests`):
+  박스 로컬 XZ, 가장자리 여백 1m 안쪽, 간격 1.5m 격자. 한 줄 = 로컬 X 방향(지금 박스 6×11.5 → 한 줄 3명, 7줄 = 21자리), 묶음·마지막 줄은 가운데 정렬(혼자면 정중앙).
+  자리보다 많으면 처음 자리부터 순환(겹침), 박스가 여백보다 좁으면 그 축은 중심 한 줄. 박스 회전·스케일 반영(여백·간격은 월드 m).
+- 높이 = 구역 원점 바닥면(로컬 y 0 을 박스 높이 범위 안으로 자름) + 0.5m(스폰·멈춤 탈출과 같은 보정). 구역 원점이 바닥에 있다고 본다(지금 `Gather_Brief` y 0 = 바닥 y 0).
+- 이동 = 기존 서버 텔레포트 `PlayerFallRecovery.RelocateServer`(서버 → 오너 RPC → 모터 `TeleportAuthoritative`, 로비 추락 복귀·전멸 리스폰과 같은 경로). 새 RPC·상태 없음.
+  **바라보는 방향은 바꾸지 않는다**(이 경로에 회전 인자가 없다 — 돌리려면 RPC 를 새로 만들어야 해서 보류).
+- `briefZone` 이 비면 경고 1회(지점마다) 후 텔레포트 생략(훈련 흐름은 그대로).
+- 옛 방식(별도 점 `LobbyTrainingEndTeleport` + `LobbyGuideSteps.prefab` 자식 `TrainingEnd/TrainingEndTeleport_1~3`)은 메커니즘 하나로 지웠다.
+  점을 직접 두는 방식이 다시 필요하면 커밋 `7313de77` 의 `LobbyTrainingEndTeleport.cs`(+`.meta`, guid 4daf9530…)·프리팹 `TrainingEnd` 자식을 되살리고 진행기 목적지를 그쪽으로 돌린다.
+
+## 입구 텔레포트 — 자리 = 첫 위치(`train01StartZone`) 안 (할 일 111, 10-27)
+
+훈련장 문이 막혀 있으므로(아래 절) 입구 집결 확정 순간 서버가 **훈련 명단 전원**을 훈련장 안으로 옮긴다.
+- 대상 규칙 = `LobbyTrainingFlow.TeleportTargetOnConfirm`(순수, EditMode `LobbyTrainingFlowTests`): 입구(`Entrance`) → `Train01Start`, 종료(`TrainEnd`) → `Brief`, 그 밖 확정 = 없음.
+  둘 다 **확정 직후 켜지는 다음 집결 구역**이다(입구 확정 → `Train01/Gathering` → 켜지는 구역 = `Train01Start` 하나).
+- 실행 = 종료 텔레포트와 같은 `LobbyTrainingDirector.TeleportRosterInto(대상, 확정 지점)` 하나 — 자리 `LobbyTrainingEndPlacement`(여백 1m·간격 1.5m·가운데 정렬·순환),
+  높이 = 구역 원점 바닥면 + 0.5m, 이동 `PlayerFallRecovery.RelocateServer`, 새 RPC·상태 없음. 이름의 "End" 는 처음 용도 그대로 남겼다(.cs 이름·guid 변경 회피).
+- 명단 = 입구 확정 때 고정된 훈련 명단(클리어 플래그 켠 사람 제외). 늦은 참가자·명단 밖은 옮기지 않는다. `train01StartZone` 이 비면 경고 1회 후 생략.
+- 이어지는 흐름: `Train01/Gathering` 구역이 켜지면(다음 진행기 Update) 명단 전원이 이미 안 → `gatherHoldSeconds`(3초) 뒤 확정 → `Train01/InProgress`(무기 점검).
+  무전은 확정 순간 `LOBBY_TRAIN_ROUTE`("전원 확인. 표적 앞으로 이동해. 먼저 각자의 무기를 점검하겠다.", 6초)가 뜨고, 3초 + 왕복 지연 뒤 `TRAIN_01_START` 가 큐에 이어진다.
+  이미 표적 앞이라 "이동해" 가 어색할 수 있다 — 문구는 고치지 않았다(기획 판단).
+
+## 훈련장 문 — 막힘 (할 일 111, 10-27)
+
+- **훈련장 문(`Door_Training`) 하나만** 여닫힘을 없애고 **막았다** — 훈련장 출입은 입구 텔레포트(위 절)로만. 나머지 로비 문 3개(`Door_Administrator`·`Door_Locker`·`Door_Operations`)는
+  근접 자동 문(`LobbyProximityDoor`·`LobbyProximityDoorRules`, 할 일 78·99) 그대로다 — 공용 문 프리팹 `PF_Room_DoorSingle_01_v003.prefab` 은 손대지 않는다.
+- 적용 위치 = 중첩 프리팹 **`PF_Lobby_Props_v003.prefab` 안 `Door_Training` 인스턴스 오버라이드** 세 개:
+  `LobbyProximityDoor` **컴포넌트 제거**(`m_RemovedComponents` — 끄기만 하면 `Awake` 가 문짝에 키네마틱 Rigidbody 를 붙이므로 제거로 했다) +
+  문짝 콜라이더(비볼록 MeshCollider, 레이어 7 `Wall`) **`m_Enabled: 0`** +
+  **추가 `BoxCollider`**(트리거 아님, 문짝 메시 bounds 그대로 — 로컬 center (-0.63, 0.95, -0.08)·size (1.27, 1.88, 0.28), 같은 오브젝트라 레이어 `Wall`). 문틀 개구부 전체를 닫힌 문짝 모양으로 막는다.
+- `PF_Lobby_Complete_v016` 과 `3.LobbyScene` 에는 이 문을 덮어쓰는 오버라이드가 없다(에디터에서 읽어 확인: 세 곳 모두 `Door_Training` 만 근접 문 컴포넌트 없음·MeshCollider 꺼짐·BoxCollider 있음).
+  런타임에 이름으로 문을 찾아 끄는 코드는 두지 않는다.
+
+## 바닥 안내 화살표 (할 일 111)
+
+다음 갈 곳을 바닥에 흐르는 화살표로 알려 준다. **씬 배치는 사용자가 직접**(프리팹만 제공, 씬 YAML 은 건드리지 않았다).
+두 종류를 **같이 둔다** — 꺾이는 길 안내 = **경로형**(기본 권장), 짧은 직선에 흐르는 띠 = **직선 띠**.
+
+### 경로형 — `LobbyFloorArrowPath.prefab` (점선 + 삼각형, 꺾은선)
+
+- **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrowPath.prefab`
+  - 루트 = `LobbyFloorArrowPath`. 켜고 끄기는 부모 `LobbyGuideSteps` 가 이 루트를 통째로 한다(아래 "안내 스텝").
+  - 자식 `Start`·`Waypoint1`·`End` = 경로 점(빈 오브젝트), `Pieces` = **구운 조각**(내장 Quad + 공유 머티리얼 `M_LobbyFloorArrowPath`).
+  - 셰이더 `Lobby/FloorArrowPath`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrowPath.shader`, URP Unlit 반투명), 텍스처 `50.Art/UI/Navigate/ArrowLineSet.png` **참조만**.
+- **세팅법**: 프리팹을 놓고 `Start`·`Waypoint*`·`End` 자식을 바닥 위로 옮긴다. 꺾이는 점이 더 필요하면 빈 자식을 만들어 `waypoints` 목록에 순서대로 넣는다.
+  점은 루트의 **직속 자식**으로 두는 게 좋다(로컬 좌표를 그대로 써서 어디 놓아도 다시 굽지 않는다. 다른 곳의 Transform 도 되지만 루트 기준으로 환산).
+- **굽기**: 에디터에서 값을 바꾸거나 점을 옮겨 놓으면(드래그가 끝난 뒤) **자동으로 다시 굽는다**. 인스펙터 아래 **`다시 굽기`** 버튼·컴포넌트 ⋮ 메뉴 `다시 굽기` 로 바로 굽는다.
+  기즈모 선이 **빨간색이면 구운 결과가 낡음**. 프리팹 모드·씬 인스턴스 둘 다 Undo 된다. Play 중·디스크의 프리팹 에셋(열지 않은 상태)에선 굽지 않는다.
+  - 씬 인스턴스에서 조각이 줄면 프리팹에서 온 조각은 지울 수 없어 **꺼 둔다**(오버라이드). 깨끗이 하려면 프리팹 모드에서 굽는다.
+  - `Pieces` 아래에 다른 오브젝트를 넣지 말 것 — 굽기가 순서대로 재사용한다.
+- **런타임 비용**: Play·빌드에선 아무것도 만들지 않는다. 켜질 때 조각마다 `MaterialPropertyBlock`(UV 영역·경로 거리·색·흐름)만 넣는다. 머티리얼 복제·`new Mesh`·`new Texture2D` 없음.
+  흐름은 셰이더가 **조각별 경로 거리 + `_Time`** 으로 불투명도 물결을 앞으로 민다(조각 단위로 밝아졌다 어두워짐) — 매 프레임 스크립트 없음.
+- **배치 규칙**(`LobbyFloorArrowPathLayout`, EditMode `LobbyFloorArrowPathLayoutTests`):
+  - 구간마다 따로 등간격 — 양 끝 여백을 뺀 길이를 `spacing` 에 가장 가까운 간격으로 나눈다(구간마다 실제 간격이 조금 다를 수 있다).
+  - 꺾임 여백 = max(`spacing`/2, (가장 긴 조각 길이 + 가장 넓은 조각 폭)/2) — 직각에서 양쪽 조각이 모서리를 넘거나 겹치지 않는다. 예각(직각보다 좁은 꺾임)은 겹칠 수 있다.
+  - 구간이 여백보다 짧으면 그 구간엔 조각이 없다. 같은 위치의 점(길이 0 구간)은 건너뛴다.
+  - 시작 조각은 앞 끝이 시작점에 닿게, 큰 삼각형은 **중심 = 도착점**. 작은 삼각형 = 경로 전체 순서로 `triangleEvery` 번째마다.
+  - 점선은 긴 쪽, 삼각형은 꼭짓점이 그 구간 진행 방향.
+- **SVN 슬라이스 의존 없음**: 점선·삼각형 영역은 컴포넌트 `dashUv`·`triangleUv`(UV 0~1, 왼쪽 아래 기준)에 직접 들고 있다.
+  기본값 = 사용자가 잘라 둔 `ArrowLineSet_0`(x317 y556 w280 h125)·`ArrowLineSet_1`(x726 y540 w211 h188) 과 같은 픽셀 사각형 / 1254. `.meta` 슬라이스가 커밋되지 않은 PC 에서도 같게 보인다.
+  텍스처 그림이 바뀌면 이 두 값만 고친다.
+
+#### 인스펙터 — `LobbyFloorArrowPath`
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `start` / `waypoints` / `end` | 프리팹 자식 | 경로 점. 순서대로 잇는다 |
+| `material` | `M_LobbyFloorArrowPath` | 모든 조각이 공유 |
+| `spacing` | 0.8 | 조각 중심 간격(m) |
+| `dashLength` / `dashWidth` | 0.45 / 0.2 | 점선 조각 길이·폭(m) |
+| `triangleEvery` | 4 | 몇 조각마다 작은 삼각형(0 = 없음) |
+| `smallTriangleSize` | 0.35 | 작은 삼각형 폭(m), 길이는 텍스처 비율 |
+| `endTriangleSize` | 0.9 | 도착점 큰 삼각형 폭(m) |
+| `heightOffset` | 0.02 | 바닥에서 띄우는 높이 |
+| `color` | 노랑 α0.9 (HDR) | 색·투명도 |
+| `flowSpeed` | 2 | 물결 속도(m/초), 0 = 정지, 음수 = 뒤로 |
+| `flowWavelength` | 3 | 물결 한 주기(m) |
+| `flowMinAlpha` | 0.35 | 물결 골 불투명도 배율(1 = 물결 없음) |
+| `dashUv` / `triangleUv` | ArrowLineSet 영역 | 아틀라스 안 점선·삼각형(꼭짓점 위) 영역 |
+| `piecesRoot` | `Pieces` | 구운 조각 부모 — 손대지 말 것 |
+
+색·흐름은 다시 굽지 않고 바로 반영된다. 나머지(모양·점)는 다시 굽는다.
+
+**혼자 놓으면 늘 켜져 있다**. 스텝에 따라 켜고 끄려면 `LobbyGuideSteps.prefab` 의 자식으로 쓴다(아래).
+
+### 직선 띠 — `LobbyFloorArrow.prefab` (병행 유지)
+
+- **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrow.prefab`
+  - 루트 = `LobbyFloorArrowStrip`, 자식 `Visual` = 내장 Quad + `M_LobbyFloorArrow`. 늘 켜져 있다(스텝 켜고 끄기 없음).
+  - 셰이더 `Lobby/FloorArrow`(`Assets/1.Scripts/Lobby/Shaders/LobbyFloorArrow.shader`, URP Unlit 반투명) — 텍스처는 사용자가 `50.Art/UI/Navigate/ArrowLineSet.png` 로 바꿨다(10-27, 처음엔 `arrow2.png`). **참조만**(SVN 파일 수정 없음).
+  - 흐름은 **셰이더가 `_Time` 으로 UV 를 민다** — 매 프레임 스크립트 없음. 수치는 `MaterialPropertyBlock` 으로 넣어 머티리얼 복제·런타임 텍스처/메시 생성이 없다.
+- **배치**: 루트 위치 = 띠 **시작점**, 루트 **+Z(파란 축) = 화살표 진행 방향**. 바닥 위에 놓고 Y 축으로 돌려 방향을 맞춘다. 길이는 앞(+Z)으로 뻗는다.
+  꺾이는 길·스텝 안내는 위 경로형 + 아래 `LobbyGuideSteps` 를 쓴다.
+
+#### 인스펙터 — `LobbyFloorArrowStrip` (값을 바꾸면 편집 중에도 바로 보인다)
+
+| 필드 | 기본 | 뜻 |
+|---|---|---|
+| `length` | 4 | 띠 길이(m), 루트에서 +Z 로 |
+| `width` | 1 | 띠 폭(m) |
+| `arrowSpacing` | 1 | 화살표 하나가 차지하는 길이(m). 폭과 같으면 원본 비율 |
+| `heightOffset` | 0.02 | 바닥에서 띄우는 높이(겹침 깜빡임 방지) |
+| `color` | 하늘색 α0.9 (HDR) | 화살표 색·투명도 |
+| `flowSpeed` | 1.5 | 흐름 속도(m/초), 음수면 뒤로 |
+| `endFade` | 0.15 | 양 끝을 지우는 구간(길이 비율 0~0.5) |
+
+`length`·`width`·`heightOffset` 은 `Visual` 자식의 위치·스케일로 들어간다 — `Visual` 트랜스폼을 손으로 고치지 말 것(값이 덮인다).
+
+### 안내 스텝 — `LobbyGuideSteps.prefab` (경로 3개 중 지금 것 하나만)
+
+타이틀 → 로비에 들어온 플레이어를 순서대로 **① 캐릭터 선택 방 → ② 훈련장 입구 집결 → ③ 출격 집결** 로 안내한다. 스텝마다 경로형 화살표 하나, **지금 스텝 하나만 켠다**.
+
+- **프리팹**: `Assets/2.Prefabs/Lobby/FloorArrow/LobbyGuideSteps.prefab`
+  - 루트 = `LobbyGuideSteps`(`Assets/1.Scripts/Lobby/LobbyGuideSteps.cs`).
+  - 자식 3개 = `LobbyFloorArrowPath.prefab` 중첩 인스턴스 `Step1_CharacterSelect` / `Step2_Tutorial` / `Step3_Sortie`. 각자 `Start`·`Waypoint1`·`End` 가 임시 자리(서로 안 겹치게 대략 배치).
+- **배치**: 씬에 이 프리팹 **하나**를 놓고, 스텝마다 `Start`(로비 들어오는 쪽/앞 스텝 끝)·`Waypoint*`·`End`(목적지 — 캐릭터 선택 오브젝트 앞, 입구 집결 박스 안, 출격 집결 박스 안)를 바닥 위로 옮긴다.
+  옮기면 그 경로가 자동으로 다시 구워진다(경로형과 같음). 씬 참조 필드는 없다 — 진행기·구역·캐릭터 선택 오브젝트는 Play 때 찾는다.
+- **편집 중 보기**: 편집 모드에선 세 경로가 다 보이고 기즈모 글자(`1 캐릭터 선택` 등)가 경로 시작에 뜬다. 인스펙터 `editorPreview` 로 한 스텝만 볼 수 있다
+  (씬 뷰 보기 숨김 `SceneVisibilityManager` — 씬·프리팹에 저장되지 않고 Play·빌드에 영향 없음). `All` 로 되돌리면 다 보인다.
+- **판정**: 전 피어 로컬, **내 화면만**. 매 프레임 복제된 진행기(`LobbyTrainingDirector.Active` 의 단계·하위 상태·훈련 명단·클리어 플래그·출격 카운트다운)와 내 플레이어 위치를 읽는다.
+  새 NetworkObject·NetworkVariable·RPC·콜라이더·타이머 없음. 규칙 원본 = `LobbyGuideStepRules`(EditMode `LobbyGuideStepRulesTests`).
+- **완료 조건(기존 것 재사용)**:
+  - ① 캐릭터 = 캐릭터 선택 `LobbyInteractable` 의 **F 반경 안에 한 번 들어감**(프롬프트 뜨는 거리 그대로). **세션 래치** — 로비 리로드(Alt+3)·판 끝 로비 복귀를 넘어 남고, 연결이 끊기면(타이틀로 나감) 지운다.
+    캐릭터를 바꿀 수 없는 상태(훈련 명단 잠금·출격 카운트다운)면 래치와 무관하게 건너뛴다(`LobbyTrainingFlow.CharacterChangeBlock` 재사용).
+  - ② 튜토리얼 = 진행기 입구 구역(`LobbyGatherPoint.Entrance` 의 `PartyGatherZone`) **박스 안**이면 끔(집결 대기), 입구 확정(= 훈련 시작, 단계가 Lobby 를 벗어남)이면 끝.
+  - ③ 출격 = 진행기 출격 구역 박스 안이면 전부 끔. 출격 확정(Sortie 단계)이면 끝.
+
+#### 판정 표 (위에서부터 처음 맞는 줄)
+
+| # | 입력 상태 | 켜는 스텝 |
+|---|---|---|
+| 1 | 진행기 없음·미스폰 / 내 플레이어 없음 / 네트워크 꺼짐 | 없음 |
+| 2 | 단계 = Sortie (메인 진입 중) | 없음 |
+| 3 | 내가 출격 집결 구역 박스 안 | 없음 |
+| 4 | 훈련 명단 + 단계 ≠ Lobby + (Brief/Completed 아님) = 훈련·브리핑 진행 중 | 없음 (훈련 안 집결 구역이 안내) |
+| 5 | 캐릭터 래치 꺼짐 + 캐릭터 변경 가능(`CharacterChangeBlock` = None) | ① 캐릭터 선택 |
+| 6 | 단계 = Lobby + 클리어 플래그 꺼짐 + 입구 구역 박스 안 | 없음 (집결 대기) |
+| 7 | 단계 = Lobby + 클리어 플래그 꺼짐 | ② 튜토리얼 |
+| 8 | 그 밖 — 클리어 플래그 켜짐(훈련 완료·Alt+1) / 늦은 참가자·명단에서 빠진 사람(훈련 중) / Brief/Completed | ③ 출격 |
+
+**건너뛰기 예**
+
+| 상황 | 결과 |
+|---|---|
+| 처음 로비 입장 | ① → (F 반경 도착) ② → (입구 박스 안) 없음 → (훈련 시작) 없음 → (브리핑 완료) ③ → (출격 박스 안) 없음 |
+| 훈련 없이 바로 출격 구역으로 감 | 출격 박스 안에선 없음(줄 3), 나오면 다시 ②(줄 7) |
+| 튜토리얼 클리어 플래그(Alt+1) | 캐릭터 래치 있으면 바로 ③, 없으면 ① → ③ |
+| Alt+3 로비 리로드 / 판 끝 로비 복귀 | 캐릭터 래치가 남아 ① 건너뜀 → 새 회차 Lobby 이면 ② (클리어 플래그면 ③ — 훈련을 끝까지 했으면 켜져 있다) |
+| 이미 훈련 진행 중에 들어온 늦은 참가자 | 캐릭터 변경 가능하므로 ① → ③(출격 구역에서 대기, 브리핑 완료 뒤 출격 집결이 켜짐) |
+| 훈련 명단인데 브리핑 완료(Brief/Completed) | 캐릭터 잠금이라 ① 건너뛰고 ③ |
+| 출격 카운트다운 중 | ① 건너뜀(캐릭터 잠금). 카운트다운은 전원이 박스 안일 때만이라 보통 없음 |
+
+**메커니즘 정리(할 일 111 후속)**: 처음 만든 단계 체크 컴포넌트(`LobbyTrainingStageVisibility`, 미병합)는 **삭제**하고 바닥 경로 표시는 `LobbyGuideSteps` 가 전담한다.
+단계 판정은 스텝 규칙(줄 2·4·7·8)에 흡수됐다. `LobbyFloorArrowPath.prefab`·`LobbyFloorArrow.prefab` 에서도 그 컴포넌트를 뺐다 — **혼자 놓은 경로형·직선 띠는 Play 에서도 늘 켜져 있다**.
+
+전이 원본 = `LobbyTrainingFlow`(`IsPointActive`·`OnGatherConfirmed`·`ReportStageCompleted`). 튜토리얼 클리어(Alt+1)로 명단이 비면 바로 `Brief/Completed` 로 넘어간다.
 
 ## TRAIN_01 무기 점검 — 체크 시점
 

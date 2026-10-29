@@ -800,7 +800,10 @@ public partial class TwentyThreeBoss
         _charge?.Begin(pylons, chargeTime, _boss.raidPylonHpMultiplier);
 
         ulong mask = _pnRound == 1 ? (BossTileGrid.AllMask & ~RelaySafeMask()) : BossTileGrid.AllMask;
-        _electricFloor?.ServerQueueDischarge(mask, total, 0, lethal: true);
+        // 탑이 남으면 즉사 방전 — 데이터 칸 pushNorthDischargeIgnoreInvuln(0/1, 할 일 105 기본 1)이 1 이면 무적으로 못 피한다:
+        // 전체 범위 회차(2회차~)는 전멸기 = 살아 있는 참가자 전원 사망 처리, 1회차(안전 구역 있음)는 칸 판정 + 무적 무시 즉사 피해(BossWipeDischargeRules).
+        _electricFloor?.ServerQueueDischarge(mask, total, 0, lethal: true,
+                                             ignoreInvulnerability: _boss.pushNorthDischargeIgnoreInvuln != 0);
         StartChargeBallClientRpc(transform.position, ChargeZoneRadius);
 
         Debug.Log($"[23호/북진] {_pnRound}회차 차징 {chargeTime:0.#}초(+상승 {PnRiseGrace:0.#}) · 탑 {pylons}개 · " +

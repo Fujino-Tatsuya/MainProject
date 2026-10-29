@@ -56,7 +56,7 @@
 
 | 동작 | 연결 | 타이밍 기준 |
 |---|---|---|
-| 가붕이 콤보(`DefaultAttackController`) | 상태 파라미터 `AttackSpeed` = 데이터 공속 × 배율 | 클립 이벤트(Hit·ComboWindow·End). 종료 안전망·전진 속도도 같은 재생 시간을 쓴다 |
+| 가붕이 콤보(`DefaultAttackController`) | 상태 파라미터 `AttackSpeed` = 데이터 공속 × 배율 | 클립 이벤트(Hit·ComboWindow·End). 종료 안전망·전진 속도도 같은 재생 시간을 쓴다. 4타 → 1타 되감기 진입(`loopBackEntryTime`, 클립 시각)은 `CrossFadeInFixedTime` 오프셋이 상태 속도에 곱해지므로 ÷ `AttackSpeed` 로 넘긴다(`DefaultAttackChainRules.LoopBackFixedTimeOffset` — 안 나누면 제압 가속 때 1타 창 열림을 건너뛰어 홀드 순환이 끊겼다, 할 일 122) |
 | 어쌔신 평타(`AssassinBasicAttack`) | 공격 중 `Animator.speed` = 배율 | 클립 이벤트. 종료 안전망 = 클립 길이(감속이면 ÷ 배율), 강타 전진 시간 ÷ 배율 |
 | 거너 평타(`GunnerBasicAttack`) | 데이터 시간(준비·발사 간격·후속 동작·입력 창·발 잠금) ÷ 배율 + 공격 중 `Animator.speed` = 배율 | 데이터 시간 값. `FireSpeed` 는 배율 전 간격 기준(두 번 곱하지 않음) |
 | 공속을 타는 스킬 | 실행 중 `Animator.speed` = 배율(`PlayerSkillController`) | 클립 이벤트. 임시 안전망 `maxActiveDuration`(감속이면 ÷ 배율), 클립 안전망은 `Animator.speed` 포함(`PlayerSkillSafetyNet.Probe`) |

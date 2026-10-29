@@ -73,8 +73,9 @@ public static class LobbyRadioSchedule
             case LobbyTrainingStage.TrainEnd:
                 return phase == LobbyTrainingPhase.Gathering ? new[] { LobbyRadioIds.TrainEnd } : None;
             case LobbyTrainingStage.Brief:
-                // Gathering = 종료 집결 확정 직후. 브리핑 본문(BRIEF_01~04)은 T6c.
-                return phase == LobbyTrainingPhase.Gathering ? new[] { LobbyRadioIds.BriefRoute } : None;
+                // 진입 대사 없음 — 종료 텔레포트로 이미 브리핑 구역 안이라 이동 안내(BRIEF_ROUTE) 불필요(할 일 111, 키·문구는 남김).
+                // 브리핑 본문(BRIEF_01~04)은 T6c.
+                return None;
             default:
                 return None;
         }
