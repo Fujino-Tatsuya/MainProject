@@ -19,7 +19,11 @@ public static class InterruptLagMonitor
     public const string ReasonSceneEnd = "scene_end";
     public const string ReasonQuit = "quit";
 
+    // 지연 판정용 — 서버 ServerTime(실시간). InterruptLagJudge 의 보정 판정 시각과 같은 시계.
     private static readonly Dictionary<GameObject, InterruptWindowHistory> Histories =
+        new Dictionary<GameObject, InterruptWindowHistory>();
+    // 간파 시도 예측용(할 일 139-6) — 게임초(Time.time). 창 타이머·판정까지 남은 시간과 같은 시계라 슬로우 중 경과가 실시간만큼 늘지 않는다.
+    private static readonly Dictionary<GameObject, InterruptWindowHistory> PredictionHistories =
         new Dictionary<GameObject, InterruptWindowHistory>();
     private static readonly InterruptLagSummary Summary = new InterruptLagSummary();
     private static readonly List<string> Lines = new List<string>();
@@ -28,6 +32,7 @@ public static class InterruptLagMonitor
     private static void ResetStatics()
     {
         Histories.Clear();
+        PredictionHistories.Clear();
         Summary.Clear();
         Application.quitting -= HandleQuitting;
         Application.quitting += HandleQuitting;
@@ -60,13 +65,19 @@ public static class InterruptLagMonitor
         if (!TryServerNow(out double now))
             return;
 
-        if (!Histories.TryGetValue(owner, out InterruptWindowHistory history))
+        HistoryOf(Histories, owner).Record(now, open);
+        HistoryOf(PredictionHistories, owner).Record(Time.timeAsDouble, open);
+    }
+
+    private static InterruptWindowHistory HistoryOf(Dictionary<GameObject, InterruptWindowHistory> histories, GameObject owner)
+    {
+        if (!histories.TryGetValue(owner, out InterruptWindowHistory history))
         {
             history = new InterruptWindowHistory();
-            Histories.Add(owner, history);
+            histories.Add(owner, history);
         }
 
-        history.Record(now, open);
+        return history;
     }
 
     /// <summary>[서버] 그 소유자의 <paramref name="serverTime"/> 시각 창 상태(기록 기준).</summary>
@@ -76,17 +87,22 @@ public static class InterruptLagMonitor
             : InterruptWindowState.Unknown;
 
     /// <summary>
-    /// [서버] 간파 시도 예측(할 일 132)용 창 추정 — 지금 열린 뒤 경과·추정 길이(초, 서버 시각 기준). 모르면 -1.
+    /// [서버] 간파 시도 예측(할 일 132)용 창 추정 — 지금 열린 뒤 경과·추정 길이(게임초, 할 일 139-6). 모르면 -1, 무기한 길이 = +∞.
+    /// 길이는 로컬로 아는 값(<see cref="InterruptWindowLengthResolver"/>) 우선, 모르면 관측 중앙값.
     /// 예측(연출 강·약)에만 쓰고 판정에는 쓰지 않는다.
     /// </summary>
     public static void EstimateWindow(GameObject owner, bool openNow, out float openElapsed, out float expectedDuration)
     {
         openElapsed = -1f;
         expectedDuration = -1f;
-        if (owner == null || !Histories.TryGetValue(owner, out InterruptWindowHistory history) || !TryServerNow(out double now))
+        if (owner == null || !TryServerNow(out _))
             return;
 
-        history.Estimate(now, openNow, out openElapsed, out expectedDuration);
+        float localLength = InterruptWindowLengthResolver.Resolve(owner, true);
+        if (PredictionHistories.TryGetValue(owner, out InterruptWindowHistory history))
+            history.Estimate(Time.timeAsDouble, openNow, localLength, out openElapsed, out expectedDuration);
+        else
+            expectedDuration = localLength;
     }
 
     /// <summary>
@@ -96,6 +112,8 @@ public static class InterruptLagMonitor
     public static void ResetWindowObservations()
     {
         foreach (InterruptWindowHistory history in Histories.Values)
+            history.ClearKeepingLatest();
+        foreach (InterruptWindowHistory history in PredictionHistories.Values)
             history.ClearKeepingLatest();
     }
 
@@ -125,7 +143,7 @@ public static class InterruptLagMonitor
         bool force = reason == ReasonSessionEnd && TryServerNow(out _);
         if (Summary.IsEmpty && !force)
         {
-            Histories.Clear();
+            ClearHistories();
             return;
         }
 
@@ -135,7 +153,13 @@ public static class InterruptLagMonitor
             Debug.Log(line);
 
         Summary.Clear();
+        ClearHistories();
+    }
+
+    private static void ClearHistories()
+    {
         Histories.Clear();
+        PredictionHistories.Clear();
     }
 
     private static void HandleQuitting() => FlushSummary(ReasonQuit);

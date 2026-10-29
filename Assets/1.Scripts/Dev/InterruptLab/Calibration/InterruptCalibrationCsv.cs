@@ -82,7 +82,9 @@ public static class InterruptCalibrationCsv
         return sb.ToString();
     }
 
-    static string F(float? v) => v.HasValue ? v.Value.ToString("0.#####", Inv) : "";
+    // 무기한 창 길이·남은 창(+∞, 할 일 139-6) = "inf".
+    static string F(float? v) =>
+        !v.HasValue ? "" : float.IsPositiveInfinity(v.Value) ? "inf" : v.Value.ToString("0.#####", Inv);
     static string B(bool? v) => v.HasValue ? (v.Value ? "true" : "false") : "";
 }
 #endif

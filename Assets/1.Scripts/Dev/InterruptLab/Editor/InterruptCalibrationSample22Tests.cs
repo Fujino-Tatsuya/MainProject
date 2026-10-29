@@ -3,14 +3,14 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 139-5 — 보정 표본 22번(세션 139calib-20261029_170741) '무기한 창 추정 오류' 재현. <b>현재 동작(약)을 고정한다</b> — 고치는 테스트가 아니다.
+/// 할 일 139-5 → 139-6 — 보정 표본 22번(세션 139calib-20261029_170741) '무기한 창 추정 오류' 재현과 해결.
 /// <list type="bullet">
 /// <item>무기한 허수아비(<see cref="TrainingDummyInterruptCycle"/>, 게이트 Unbounded)는 시간으로 닫히지 않는다 — 닫힘 전이는 간파 성공뿐이다.</item>
-/// <item>창 기록(<see cref="InterruptWindowHistory"/>)은 '열림 → 성공으로 닫힘'을 창 길이로 센다 — 추정 길이 = 지난 성공들까지 걸린 시간의 중앙값.</item>
-/// <item>그래서 열린 뒤 0.924s 에 누르면 추정 남은 0.319s &lt; 판정까지 0.345s → 약(WindowClosesBeforeResolve). 서버 창은 판정 때도 열려 있어 성공.</item>
+/// <item>창 기록(<see cref="InterruptWindowHistory"/>)은 '열림 → 성공으로 닫힘'을 창 길이로 센다 — 관측 중앙값 = 지난 성공들까지 걸린 시간의 중앙값(1.24323).</item>
+/// <item>139-5(관측 중앙값만): 열린 뒤 0.924s 에 누르면 추정 남은 0.319s &lt; 판정까지 0.345s → 약(WindowClosesBeforeResolve). 서버 창은 판정 때도 열려 있어 성공.</item>
+/// <item>139-6(해결): 창 길이는 로컬로 아는 값(<see cref="InterruptWindowLengthResolver"/>) 우선 — 랩 무기한 게이트 = +∞ → 남은 창 +∞ → 강.</item>
 /// </list>
-/// 이전 열림 길이 3개는 추정 길이 1.24323 이 나오게 고른 값이다(그 세션의 창 전이 원본 기록은 남아 있지 않다).
-/// 기록 시각은 실제와 같이 서버 ServerTime(배속·슬로우와 무관한 실시간) 기준으로 둔다.
+/// 이전 열림 길이 3개는 관측 중앙값 1.24323 이 나오게 고른 값이다(그 세션의 창 전이 원본 기록은 남아 있지 않다).
 /// 조사 보고: _lane-artifacts/MainProject-Worktree3/139-5/window-inventory.md
 /// </summary>
 public sealed class InterruptCalibrationSample22Tests
@@ -32,8 +32,17 @@ public sealed class InterruptCalibrationSample22Tests
             history.Record(serverTime, cycle.IsInterruptible);
     }
 
+    // 랩 허수아비 게이트(DebugDummyInterruptWindowMode)와 같은 길이 — 스케줄이 정한다.
+    sealed class ScheduleGate : ITrainingDummyWindowGate
+    {
+        readonly DummyInterruptWindowSchedule _schedule;
+        public ScheduleGate(DummyInterruptWindowSchedule schedule) => _schedule = schedule;
+        public bool TickWindowOpen(float deltaTime, bool recovering) => _schedule.Tick(deltaTime, recovering);
+        public float OpenWindowLength => _schedule.OpenWindowLength;
+    }
+
     [Test]
-    public void 표본22_무기한_창_추정_오류_성공으로_닫힌_열림이_창_길이가_되어_약()
+    public void 표본22_무기한_창_해결_로컬_길이_무기한이면_관측_중앙값을_안_써서_강()
     {
         TrainingDummyInterruptCycle cycle = LabCycle();
         var history = new InterruptWindowHistory();
@@ -63,30 +72,27 @@ public sealed class InterruptCalibrationSample22Tests
 
         // seq 22: 다시 열린 뒤 0.924s 에 누름.
         double press = t + OpenElapsedAtPress;
-        history.Estimate(press, cycle.IsInterruptible, out float openElapsed, out float expected);
+
+        // 139-5 동작(관측 중앙값만): 추정 남은 0.3194 < 판정까지 0.34473 → 약.
+        history.Estimate(press, cycle.IsInterruptible, out float openElapsed, out float observed);
         Assert.AreEqual(OpenElapsedAtPress, openElapsed, 1e-4f);
-        Assert.AreEqual(ExpectedDurationInCsv, expected, 1e-5f);
+        Assert.AreEqual(ExpectedDurationInCsv, observed, 1e-5f);
+        DashInterruptPrediction before = DashInterruptPredictor.Predict(Seq22Input(openElapsed, observed));
+        Assert.AreEqual(0.3194f, before.WindowRemaining, 1e-3f);
+        Assert.AreEqual(PrepDelay, before.TimeToResolve(CastTime), 1e-4f);
+        Assert.AreEqual(InterruptAttemptForecast.Weak, before.Forecast);
 
-        DashInterruptPrediction p = DashInterruptPredictor.Predict(new DashInterruptPredictInput
-        {
-            CastTime = CastTime,
-            CastPosition = new Vector3(0.41469f, 0.015f, 1.14153f),
-            DashDirection = new Vector3(0f, 0f, 1f),
-            DashSpeed = 16f,
-            DashRemaining = DashRemaining,
-            SkillStartTime = CastTime,
-            PrepDelay = PrepDelay,
-            HasTargetInRange = true,
-            TargetWindowOpen = true,
-            WindowOpenElapsed = openElapsed,
-            WindowExpectedDuration = expected,
-        });
+        // 139-6: 서버(솔로 호스트 = 오너) 예측은 랩 무기한 게이트 값을 직접 읽는다 → 길이 +∞.
+        var gate = new ScheduleGate(new DummyInterruptWindowSchedule(DummyInterruptWindowMode.Unbounded));
+        float local = InterruptWindowLengthResolver.ForTrainingDummy(true, gate);
+        Assert.IsTrue(float.IsPositiveInfinity(local), "랩 무기한 = 마감 없음");
+        history.Estimate(press, cycle.IsInterruptible, local, out openElapsed, out float expected);
+        Assert.IsTrue(float.IsPositiveInfinity(expected), "로컬 길이가 관측 중앙값보다 우선");
 
-        // 현재 동작(고정): 추정 남은 0.3194 < 판정까지 0.34473 → 약.
-        Assert.AreEqual(0.3194f, p.WindowRemaining, 1e-3f);
-        Assert.AreEqual(PrepDelay, p.TimeToResolve(CastTime), 1e-4f);
-        Assert.AreEqual(DashInterruptPredictReason.WindowClosesBeforeResolve, p.Reason);
-        Assert.AreEqual(InterruptAttemptForecast.Weak, p.Forecast);
+        DashInterruptPrediction p = DashInterruptPredictor.Predict(Seq22Input(openElapsed, expected));
+        Assert.IsTrue(float.IsPositiveInfinity(p.WindowRemaining), "무기한 = 남은 창 무한");
+        Assert.AreEqual(DashInterruptPredictReason.Success, p.Reason);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, p.Forecast);
 
         // 실제 서버 창: 판정까지 시간을 흘려도 그대로 열림·남은 시간 없음 → 성공(CSV server_succeeded=true·actual_remaining 빈 칸).
         Assert.IsFalse(cycle.Tick(PrepDelay));
@@ -94,6 +100,21 @@ public sealed class InterruptCalibrationSample22Tests
         Assert.AreEqual(0f, cycle.Remaining);
         Assert.IsTrue(cycle.TryInterrupt(), "서버 판정은 성공");
     }
+
+    static DashInterruptPredictInput Seq22Input(float openElapsed, float expected) => new DashInterruptPredictInput
+    {
+        CastTime = CastTime,
+        CastPosition = new Vector3(0.41469f, 0.015f, 1.14153f),
+        DashDirection = new Vector3(0f, 0f, 1f),
+        DashSpeed = 16f,
+        DashRemaining = DashRemaining,
+        SkillStartTime = CastTime,
+        PrepDelay = PrepDelay,
+        HasTargetInRange = true,
+        TargetWindowOpen = true,
+        WindowOpenElapsed = openElapsed,
+        WindowExpectedDuration = expected,
+    };
 
     [Test]
     public void 표본22_무기한_창_추정_오류_기본_허수아비_순환도_회복_중_닫힘_중복은_길이로_세지_않는다()

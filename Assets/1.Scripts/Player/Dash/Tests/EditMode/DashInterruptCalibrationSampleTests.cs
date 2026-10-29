@@ -53,6 +53,7 @@ namespace BeaverLobby.Player.Dash.EditModeTests
         public void 표본22_경과가_추정_길이_안이면_예전대로_남은_창으로_본다()
         {
             // seq 22: 경과 0.924 < 추정 1.243 → 남은 0.319 < 판정까지 0.345 → 약(그대로). 무기한 창이라 실제로는 열려 있었다(답 true).
+            // 예측기 규칙은 그대로다 — 139-6 은 입력(창 길이)을 바꿔 해결했다: 랩 무기한 = +∞ → 강(InterruptCalibrationSample22Tests).
             DashInterruptPrediction p = DashInterruptPredictor.Predict(
                 Row(84.99547f, 0.41469f, 1.14153f, 0f, 1f, 0.22197f, 0.34473f, true, true, 0.92383f, 1.24323f));
             Assert.AreEqual(DashInterruptPredictReason.WindowClosesBeforeResolve, p.Reason);

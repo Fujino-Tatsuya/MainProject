@@ -454,6 +454,8 @@ public sealed class InterruptCalibrationQuestionPanel : MonoBehaviour
     }
 
     static string Seconds(float? value) =>
-        value.HasValue ? value.Value.ToString("0.000", CultureInfo.InvariantCulture) + "s" : "-";
+        !value.HasValue ? "-"
+        : float.IsPositiveInfinity(value.Value) ? "무기한"
+        : value.Value.ToString("0.000", CultureInfo.InvariantCulture) + "s";
 }
 #endif

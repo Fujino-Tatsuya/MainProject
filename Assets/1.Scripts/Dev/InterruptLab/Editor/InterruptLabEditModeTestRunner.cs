@@ -14,6 +14,7 @@ internal static class InterruptLabEditModeTestRunner
         "^InterruptCalibrationCaptureTests$",
         "^InterruptCalibrationQuestionTests$",
         "^InterruptCalibrationSample22Tests$",
+        "^InterruptWindowLengthResolverTests$",
         "^DebugInterruptLabTests$",
         "^DebugInterruptLabIsolationTests$",
         "^DummyInterruptWindowScheduleTests$",

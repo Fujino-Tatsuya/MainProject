@@ -30,6 +30,12 @@ public interface ITrainingDummyWindowGate
     /// <paramref name="recovering"/> = 인터럽트 성공 후 회복 중(취약·대기) — 이때 반환값은 쓰이지 않는다.
     /// </summary>
     bool TickWindowOpen(float deltaTime, bool recovering);
+
+    /// <summary>
+    /// 이 게이트가 여는 열림 하나의 길이(게임초, 할 일 139-6 — 간파 시도 예측의 창 길이). +∞ = 시간으로 닫히지 않음.
+    /// 서버 값이다 — 예측은 서버만 이 값을 쓴다(<see cref="InterruptWindowLengthResolver.ForTrainingDummy"/>).
+    /// </summary>
+    float OpenWindowLength { get; }
 }
 
 /// <summary>
@@ -116,6 +122,7 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
     /// <summary>
     /// [서버] 창 게이트(할 일 139, 디버그 랩 전용). null = 기존 동작(무기한 열림).
     /// 게이트를 떼면 닫아 둔 창을 바로 연다 — 게이트 없이 닫힌 채로 남지 않게.
+    /// 랩 컴포넌트는 OnEnable 에서 모든 피어에 건다 — 클라는 '랩 게이트가 있다'만 쓴다(할 일 139-6 창 길이 해석, 클라 값은 Play 중 변경이 복제되지 않음).
     /// </summary>
     public ITrainingDummyWindowGate ServerWindowGate
     {
