@@ -9,7 +9,6 @@ using UnityEngine;
 /// 화면에 투영한 뒤 기획의 픽셀 오프셋을 더한다. 오버레이 Canvas(1920×1080 기준) 단위가 곧 기획 px 다.
 /// 위치 반영은 스포너가 <c>Canvas.willRenderCanvases</c> 에서 <see cref="ApplyLayout"/> 로 한다 —
 /// 카메라가 LateUpdate 에서 움직여도 한 프레임 밀리지 않게.
-/// 카메라 줌 배율(<see cref="FloatingDamageZoomScalePolicy"/>)은 크기와 픽셀 오프셋에 같이 곱한다(할 일 154).
 ///
 /// - 단발(<see cref="AttackHitPattern.Single"/>): 상승 → 최고점에서 하강하며 끝 0.25s 동안 흐려짐 → 제거.
 /// - 누적(<see cref="AttackHitPattern.Multi"/>): 상승 후 유지. 타격마다 값 갱신 + 펀치.
@@ -34,8 +33,6 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     Action<FloatingDamagePopup> _release;
 
     Vector3 _anchorWorld;
-    float _groundY;
-    float _zoomScale = 1f;
     Vector2 _scatter;
     bool _accumulates;
     FloatingDamageTier _tier;
@@ -84,8 +81,6 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _emphasisGate = emphasisGate;
         _release = release;
         _anchorWorld = anchorWorld;
-        _groundY = request.target != null ? request.target.transform.position.y : anchorWorld.y;
-        _zoomScale = 1f;
         _accumulates = request.hitPattern == AttackHitPattern.Multi;
         _amount = Mathf.Max(0, request.amount);
         _styleColor = style.color;
@@ -189,10 +184,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         // 누적 숫자는 대상을 따라간다(은희 2026-10-01 — 기획 §4 "따라가지 않음"과 다름, 단발만 고정).
         // 대상이 사라지거나 꺼지면 마지막 위치에 남는다.
         if (_accumulates && _request.target != null && _request.target.isActiveAndEnabled)
-        {
             _anchorWorld = FloatingDamageSpawner.ResolveAnchor(_request.target);
-            _groundY = _request.target.transform.position.y;
-        }
 
         Camera camera = Camera.main;
         Vector3 screen = camera != null ? camera.WorldToScreenPoint(_anchorWorld) : Vector3.zero;
@@ -203,13 +195,9 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         }
 
         float scaleFactor = Mathf.Max(0.0001f, _canvas.scaleFactor);
-        // 줌 배율(154) — 크기와 픽셀 오프셋에 같이 곱해 숫자와 몸 사이 거리 비율을 유지한다. 화면 가장자리 여백은 그대로.
-        _zoomScale = _settings.ZoomScaleEnabled
-            ? _settings.EvaluateZoomScale(FloatingDamageZoomScalePolicy.MeasureUnitsPerMeter(camera, _groundY, scaleFactor))
-            : 1f;
         Vector2 position = new Vector2(screen.x / scaleFactor, screen.y / scaleFactor);
-        position.x += (_styleOffset.x + _scatter.x + ShakeOffset()) * _zoomScale;
-        position.y += (_settings.SpawnOffset + _styleOffset.y + _scatter.y + VerticalOffset()) * _zoomScale;
+        position.x += _styleOffset.x + _scatter.x + ShakeOffset();
+        position.y += _settings.SpawnOffset + _styleOffset.y + _scatter.y + VerticalOffset();
 
         Vector2 size = _canvasRect.rect.size;
         Vector2 padding = _settings.ScreenEdgePadding;
@@ -217,7 +205,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         position.y = Mathf.Clamp(position.y, padding.y, Mathf.Max(padding.y, size.y - padding.y));
 
         _rect.anchoredPosition = position;
-        _rect.localScale = Vector3.one * (CurrentScale() * _zoomScale);
+        _rect.localScale = Vector3.one * CurrentScale();
         SetAlpha(CurrentAlpha());
     }
 

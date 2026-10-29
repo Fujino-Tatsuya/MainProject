@@ -17,7 +17,7 @@
 | 생성점 | 대상의 **몸 중심**(§2) 을 화면에 투영 + 픽셀 오프셋 합산 |
 | 흐름 | 단발 = 뜨고 떨어지며 사라짐 / 누적(Multi) = 한 숫자에 합산하다 사라짐(§3) |
 | 크기·색 | 피해 강도 3구간(낮음/중간/높음) — 대상 등급별 %(§4) |
-| 줌 | 카메라 줌에 비례해 크기·픽셀 오프셋을 같은 배율로(§7, 154) |
+| 줌 | **카메라 줌과 무관** — 크기·픽셀 오프셋 고정(§7: 넣었다가 뺐음, 154) |
 | 데이터 | 서버가 피해마다 `ClientDamageDealtClientRpc` 로 실제 감소량 + 공격자 + 공격 종류를 보냄(§6) |
 | 수치 원본 | SO 에셋. **xlsx(GameData) 미연결** |
 
@@ -36,9 +36,9 @@
 ### 2-2. 픽셀 오프셋 합산 (Canvas 단위 = 1080p px, +y = 위)
 
 ```
-x = 투영x + (style.offset.x + scatter.x + shake) × 줌배율
-y = 투영y + (spawnOffset + style.offset.y + scatter.y + rise/fall) × 줌배율
-→ 화면 가장자리 여백(60, 30) 안으로 클램프(여백은 줌배율 미적용)
+x = 투영x + style.offset.x + scatter.x + shake
+y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
+→ 화면 가장자리 여백(60, 30) 안으로 클램프
 ```
 
 | 칸 | 기본 |
@@ -127,25 +127,11 @@ y = 투영y + (spawnOffset + style.offset.y + scatter.y + rise/fall) × 줌배�
 - HP 를 거치지 않는 흡수(23호 자폭 실드)는 파생 클래스가 `Unit.ReportAbsorbedShieldDamage` 로 같은 RPC 를 보낸다.
 - 훈련 더미는 자체 `TrainingDummyDamagePresenter` 로 같은 스포너에 넣는다.
 
-## 7. 카메라 줌 배율 (154)
+## 7. 카메라 줌 배율 — 넣었다가 뺐음 (154)
 
-**결정 1**: Overlay 는 유지하고 줌에 비례해 숫자를 키우고 줄인다. 평소 게임 카메라 = 1배, 줌인 → 커짐, 줌아웃 → 작아짐, 간파 슬로우 줌인도 따라간다.
-
-- 이 게임의 줌 = Cinemachine `CinemachineFollow.FollowOffset` **거리**를 배율로 곱하는 것(`CameraTargetSwitcher.UpdateSlowMotionZoom` — 간파 슬로우 줌 × 로비 포드 강하 `cinematicDistanceMultiplier`). 원근(FOV 34) 카메라, FOV·orthographicSize 는 안 바꾼다.
-- 카메라 코드는 안 고친다. 매 프레임 **투영으로 잰다**(`FloatingDamageZoomScalePolicy.MeasureUnitsPerMeter`):
-  카메라 정면이 대상 발 높이 평면과 만나는 점(= 화면 중앙 바닥)에서 카메라 위쪽 1m 를 `WorldToScreenPoint` 두 점으로 재 Canvas 단위로 바꾼다.
-  숫자 위치가 아니라 화면 중앙에서 재므로 화면 위·아래 원근 차이·앵커 높이와 무관하게 **줌만** 반영된다.
-- 배율 = 현재 ÷ `zoomReferenceUnitsPerMeter`, [`zoomScaleMin`, `zoomScaleMax`] 클램프, 끔·잘못된 값(카메라가 바닥을 안 내려다봄 등)이면 1 (`FloatingDamageZoomScalePolicy.Evaluate`, EditMode 테스트 `FloatingDamageZoomScaleTests`).
-- **픽셀 오프셋도 같은 배율**(spawnOffset·scatter·style offset·rise/fall·shake) — 숫자와 몸 사이 거리 비율 유지(사용자 추천안). 화면 가장자리 여백은 그대로.
-- 팀원 배율·구간 크기·펀치와 곱해진다.
-
-| 칸 | 기본 | 뜻 |
-|---|---|---|
-| `zoomScaleEnabled` | 켬 | 끄면 항상 1배(이전 동작) |
-| `zoomReferenceUnitsPerMeter` | 89.8 | 배율 1 기준. `PlayerFollowCamera.prefab`(FOV 34 · 오프셋 (7,17,-7) → 거리 19.67m) 실측 89.78. 카메라 프리팹을 바꾸면 같이 맞춘다 |
-| `zoomScaleMin` / `zoomScaleMax` | 0.5 / 2 | 배율 클램프 |
-
-예) 간파 성공 줌 0.85 → 1/0.85 ≈ **1.18배**.
+숫자 크기·픽셀 오프셋은 **카메라 줌과 무관**하다(Overlay Canvas 단위 고정 — 간파 슬로우 줌인에도 그대로).
+92376865 에서 줌 비례 배율(`FloatingDamageZoomScalePolicy`, Settings `zoomScale*` 칸)을 넣었으나 사용자 결정으로 **필요 없어 뺐다**.
+다시 필요하면 그 커밋을 참고한다.
 
 ## 8. 풀 · 갱신 시점
 
@@ -158,10 +144,9 @@ y = 투영y + (spawnOffset + style.offset.y + scatter.y + rise/fall) × 줌배�
 | 파일 | 역할 |
 |---|---|
 | `FloatingDamageSpawner` | Overlay Canvas·풀·누적 키 표·앵커 결정·렌더 직전 배치 |
-| `FloatingDamagePopup` | 숫자 1개의 시간 함수(상승·유지·하강·페이드·펀치·흔들림)·줌 배율 적용 |
+| `FloatingDamagePopup` | 숫자 1개의 시간 함수(상승·유지·하강·페이드·펀치·흔들림) |
 | `FloatingDamagePresenter` | Unit 이벤트 → 필터 → Submit |
 | `FloatingDamageSettings` | 수치 SO + 표시 필터·스타일·구간·모양 |
-| `FloatingDamageZoomScale` | 줌 배율 정적 규칙 |
 | `FloatingDamageTier` / `FloatingDamageAccumulationPolicy` | 구간 판정·강조 간격 / 누적 키 |
 | `FloatingDamageDigitSet` / `FloatingDamageNumberView` | 이미지 글꼴 / 글자 Image |
 | `FloatingDamageAnchor` | 대상별 생성점(§2-3) |
@@ -171,7 +156,7 @@ y = 투영y + (spawnOffset + style.offset.y + scatter.y + rise/fall) × 줌배�
 
 ## 11. 할 일 154 결정 기록 (2026-10-29)
 
-1. 줌에 맞춰 숫자 크기 변경 — Overlay 유지, 크기·픽셀 오프셋 같은 배율(§7). **구현**.
+1. 줌에 맞춰 숫자 크기 변경 — 92376865 에 구현했다가 사용자 결정으로 **뺐다**(필요 없음, §7).
 2. 데이터는 RPC 방식 그대로(§6).
 3. 단발 연타는 타격마다 따로 뜨는 것이 의도(§3).
 4. 생성점 = 몸 중심 확정(§2).
