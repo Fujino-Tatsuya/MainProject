@@ -518,7 +518,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
 
-    private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition, ulong targetObjectId)
+    private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
     {
         // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다 — 옛 InterruptDarkAdaptation 과 같다.
         bool hasViewer = _networkManager != null;
@@ -526,8 +526,8 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
         // 로컬 선착순(할 일 143-2) — 남의 강 시도·성공이면 그 대상의 이 창을 이 피어에서 닫는다. 이후 내 입력 예측은 약(오너 암전·빛 모임·섬광 없음).
         // 판정은 서버 장부(InterruptWindowClaims) 그대로 — 여기는 오너 연출만 1차로 막는다.
-        if (hasViewer)
-            InterruptLocalWindowClaims.Local.Observe(targetObjectId, casterClientId, purpose, _networkManager.LocalClientId);
+        if (hasViewer && !viewerIsCaster)
+            ObserveLocalClaim(triggerId, casterClientId, purpose, targetPosition);
 
         // 오너 연출(할 일 132) — 내 슬로우만(팀원 화면은 시도 단계 무변화). 시도 목적이 예측과 다르면 걷고, 성공이면 성공 단계로.
         if (viewerIsCaster)
@@ -564,8 +564,49 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         LocalSucceeded?.Invoke(e);
     }
 
+    // 슬로우 메시지는 대상을 싣지 않는다(할 일 143-3) — 시전자 플레이어의 간파 스킬이 이 피어의 복제 위치·방향·창으로 대상을 다시 찾는다.
+    private void ObserveLocalClaim(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
+    {
+        if (purpose != SlowMotionPurpose.Attempt && purpose != SlowMotionPurpose.Success)
+            return;
+
+        PlayerInterruptSkillBase skill = FindInterruptSkill(casterClientId);
+        ulong viewer = _networkManager.LocalClientId;
+        if (purpose == SlowMotionPurpose.Attempt)
+        {
+            if (skill != null)
+                InterruptLocalWindowClaims.Local.ObserveAttempt(skill.FindPeerAttemptTargetId(), triggerId, casterClientId, purpose, viewer);
+            return;
+        }
+
+        InterruptLocalWindowClaims.Local.ObserveSuccess(skill != null ? skill.FindPeerSuccessTargetId(targetPosition) : 0,
+            casterClientId, viewer);
+    }
+
+    // 발동자 플레이어의 간파 슬롯 스킬. 찾는 방식은 FindSuccessFxSinks 와 같다(스폰 목록에서 발동자 소유 플레이어 오브젝트).
+    private PlayerInterruptSkillBase FindInterruptSkill(ulong casterClientId)
+    {
+        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
+        if (spawnManager == null)
+            return null;
+
+        foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
+        {
+            if (networkObject == null || !networkObject.IsPlayerObject || networkObject.OwnerClientId != casterClientId)
+                continue;
+
+            PlayerSkillController controller = networkObject.GetComponentInChildren<PlayerSkillController>();
+            if (controller != null)
+                return controller.GetSkill(PlayerSkillSlot.Interrupt) as PlayerInterruptSkillBase;
+        }
+
+        return null;
+    }
+
     private void HandleFailed(uint triggerId)
     {
+        // 강 시도가 빗나갔다(할 일 143-3) — 그 시도가 닫은 창은 다른 강 시도·성공이 없으면 다시 열린다.
+        InterruptLocalWindowClaims.Local.AttemptEnded(triggerId);
         _ownerPresentation?.ServerFailed(triggerId, Time.unscaledTime);
         _peerLightGather.EndTrigger(triggerId);
         FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));
@@ -573,6 +614,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     private void HandleForcedReset(uint triggerId)
     {
+        InterruptLocalWindowClaims.Local.AttemptEnded(triggerId);
         _ownerPresentation?.ForcedReset();
         _peerLightGather.EndAll();
         StopHitFlash();

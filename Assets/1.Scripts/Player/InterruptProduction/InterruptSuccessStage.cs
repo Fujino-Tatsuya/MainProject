@@ -29,7 +29,7 @@ public sealed class InterruptSuccessStage
     public uint Server(in InterruptProductionEvent e, IReadOnlyList<IInterruptSuccessRelay> relays)
     {
         uint triggerId = _timeScale.ServerStart(_settings.InterruptSuccessProfile, e.CasterClientId, SlowMotionPurpose.Success,
-            e.EffectPosition, _settings.Get(InterruptProductionCue.HitStop), e.TargetObjectId);
+            e.EffectPosition, _settings.Get(InterruptProductionCue.HitStop));
 
         if (relays != null)
         {

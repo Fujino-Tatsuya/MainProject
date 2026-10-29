@@ -47,7 +47,6 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // 이번 판정에서 카운터 창을 소비한 첫 대상의 월드 위치 — 성공 연출 기준점(할 일 87 C5). 기록만 하고 판정엔 안 쓴다.
     private bool hasSuccessTargetPosition;
     private Vector3 successTargetPosition;
-    private ulong successTargetObjectId;
     // 간파 선착순(할 일 143, 서버) — 이 시전의 서버 시작 시각. 다른 사람이 먼저 성공시킨 창이면 이 시각으로 '같은 창 시도'를 가린다.
     private float serverCastStartTime;
 
@@ -394,7 +393,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount, resolvePreempted));
         if (interruptSucceeded)
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
-                hasSuccessTargetPosition, successTargetPosition, hasSuccessTargetPosition ? successTargetObjectId : 0));
+                hasSuccessTargetPosition, successTargetPosition));
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -549,10 +548,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         hasSuccessTargetPosition = true;
         successTargetPosition = target.transform.position;
-        successTargetObjectId = TargetObjectIdOf(target);
     }
 
-    // 로컬 선착순 장부 키(할 일 143-2) — 슬로우 이벤트에 실을 대상 NetworkObjectId. 없거나 스폰 전이면 0(= 없음).
+    // 로컬 선착순 장부 키(할 일 143-2) — 대상 NetworkObjectId. 없거나 스폰 전이면 0(= 없음).
     private static ulong TargetObjectIdOf(Unit target) =>
         target != null && target.IsSpawned ? target.NetworkObjectId : 0;
 
@@ -567,9 +565,83 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         DashInterruptPrediction prediction = DashInterruptPredictor.Predict(BuildPredictInput(false, attachedToDash,
-            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f, out Unit predictTarget));
+            attachedToDash ? armedDashDirection : castDirection, armedDashSpeed, armedDashRemaining, 0f, out _));
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
-            InterruptProductionEvent.Attempt(owner, this, prediction.Forecast, TargetObjectIdOf(predictTarget))));
+            InterruptProductionEvent.Attempt(owner, this, prediction.Forecast)));
+    }
+
+    /// <summary>
+    /// [각 피어] 이 스킬 시전자(남)의 강 시도 슬로우를 받은 순간 — 그 시도의 대상 NetworkObjectId 를 이 피어에서 다시 찾는다(할 일 143-3).
+    /// 슬로우 메시지는 대상을 싣지 않는다. 시전자 위치·바라보는 방향으로 오너 즉시 예측과 같은 사거리·정면각 탐색(창 = 복제값, 로컬 장부 무시)을 하고,
+    /// 거기 열린 창이 없으면 시전자에게 가장 가까운 열린 창(강 = 서버가 열린 창을 봤다 — 복제 위치·방향·대시 진행 차이 보정). 열린 창이 없으면 0.
+    /// </summary>
+    internal ulong FindPeerAttemptTargetId()
+    {
+        if (InterruptData == null || owner == null)
+            return 0;
+
+        Vector3 position = owner.transform.position;
+        if (HitboxAnchor != null)
+        {
+            Unit target = FindPredictTarget(position, owner.transform.forward, true, out bool open, applyLocalClaims: false);
+            if (target != null && open)
+                return TargetObjectIdOf(target);
+        }
+
+        Unit nearest = null;
+        float nearestSqr = float.MaxValue;
+        InterruptTargetRegistry.CopyLiveTo(predictCandidates);
+        for (int i = 0; i < predictCandidates.Count; i++)
+        {
+            InterruptTargetRegistry.Entry entry = predictCandidates[i];
+            Unit unit = entry.Unit;
+            if (unit == owner || ShouldSkipTarget(unit) || entry.Replica == null || !entry.Replica.ReplicatedWindowOpen)
+                continue;
+
+            Vector3 d = unit.transform.position - position;
+            float sqr = d.x * d.x + d.z * d.z;
+            if (sqr < nearestSqr)
+            {
+                nearest = unit;
+                nearestSqr = sqr;
+            }
+        }
+
+        predictCandidates.Clear();
+        return TargetObjectIdOf(nearest);
+    }
+
+    /// <summary>
+    /// [각 피어] 이 스킬 시전자(남)의 성공 슬로우를 받은 순간 — 연출 기준 위치(서버가 실은 첫 성공 대상 위치)가 판정 콜라이더 범위 안에 든
+    /// 간파 대상 NetworkObjectId(할 일 143-3). 여럿이면 중심이 가장 가까운 것, 없으면 0(대상을 못 찾아 기준 위치가 시전자일 때 등).
+    /// </summary>
+    internal ulong FindPeerSuccessTargetId(Vector3 effectPosition)
+    {
+        if (InterruptData == null || Data == null)
+            return 0;
+
+        Unit best = null;
+        float bestSqr = float.MaxValue;
+        InterruptTargetRegistry.CopyLiveTo(predictCandidates);
+        for (int i = 0; i < predictCandidates.Count; i++)
+        {
+            InterruptTargetRegistry.Entry entry = predictCandidates[i];
+            Unit unit = entry.Unit;
+            if (unit == owner || ShouldSkipTarget(unit) ||
+                !entry.TryGetHorizontalDistance(effectPosition, Data.HittableLayers, out float distance) || distance > 0f)
+                continue;
+
+            Vector3 d = unit.transform.position - effectPosition;
+            float sqr = d.x * d.x + d.z * d.z;
+            if (sqr < bestSqr)
+            {
+                best = unit;
+                bestSqr = sqr;
+            }
+        }
+
+        predictCandidates.Clear();
+        return TargetObjectIdOf(best);
     }
 
     /// <summary>
@@ -617,7 +689,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     // 판정 위치에서 사거리·각도 안의 간파 대상(창 소유자, 캐시에서) — 지금 창이 열린 대상을 우선한다. 없으면 null.
     // 사거리 = 판정 앵커 전방위 도달 거리(HUD 강조 사거리와 같은 값), 거리 = 판정 레이어 콜라이더 표면까지 수평 거리.
-    private Unit FindPredictTarget(Vector3 resolvePosition, Vector3 attackDirection, bool ownerView, out bool open)
+    // applyLocalClaims = 오너 창 판단에 로컬 선착순 장부를 넣는가(피어 대상 재탐색은 넣지 않는다 — 할 일 143-3).
+    private Unit FindPredictTarget(Vector3 resolvePosition, Vector3 attackDirection, bool ownerView, out bool open,
+        bool applyLocalClaims = true)
     {
         Unit best = null;
         open = false;
@@ -643,7 +717,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             // 근접·대쉬 간파, 모든 캐릭터가 이 한 곳을 지난다(§0.10).
             bool unitOpen = ownerView
                 ? entry.Replica != null && entry.Replica.ReplicatedWindowOpen &&
-                  !InterruptLocalWindowClaims.Local.IsClosed(TargetObjectIdOf(unit))
+                  !(applyLocalClaims && InterruptLocalWindowClaims.Local.IsClosed(TargetObjectIdOf(unit)))
                 : entry.Target.ServerIsInterruptible && InterruptWindowClaims.Server.Evaluate(
                     unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) != InterruptClaimVerdict.Preempted;
             if (best == null || (unitOpen && !open))

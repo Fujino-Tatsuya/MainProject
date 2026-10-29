@@ -286,19 +286,9 @@ public sealed class SlowMotionSessionTests
     // ─── 직렬화 ───────────────────────────────────────────────────────
 
     [Test]
-    public void 이벤트_크기는_목적_칸과_히트스톱_칸과_대상_위치와_대상_id_를_포함한다()
+    public void 이벤트_크기는_목적_칸과_히트스톱_칸과_대상_위치를_포함한다()
     {
-        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7 + 4 * 3 + 8, SlowMotionEvent.SerializedSize);
-    }
-
-    [Test]
-    public void Start_이벤트_대상_id_직렬화_왕복()
-    {
-        var r = RoundTrip(SlowMotionEvent.CreateStart(1, 1.0, 3, P(), SlowMotionPurpose.Attempt, Vector3.zero, ulong.MaxValue - 5));
-        Assert.AreEqual(ulong.MaxValue - 5, r.TargetObjectId);
-
-        Assert.AreEqual(0ul, RoundTrip(SlowMotionEvent.CreateStart(2, 1.0, 3, P())).TargetObjectId, "기본 = 0(없음)");
-        Assert.AreEqual(0ul, RoundTrip(SlowMotionEvent.CreateFail(1, 1.0)).TargetObjectId, "Fail = 0");
+        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7 + 4 * 3, SlowMotionEvent.SerializedSize);
     }
 
     [Test]

@@ -27,16 +27,15 @@ public sealed class InterruptProductionStageTests
     internal sealed class FakeTimeScale : ITimeScalePort
     {
         public readonly List<string> Calls = new List<string>();
-        public readonly List<(SlowMotionProfile profile, ulong clientId, SlowMotionPurpose purpose, Vector3 position, bool hitStopOn, ulong targetObjectId)> Starts =
-            new List<(SlowMotionProfile, ulong, SlowMotionPurpose, Vector3, bool, ulong)>();
+        public readonly List<(SlowMotionProfile profile, ulong clientId, SlowMotionPurpose purpose, Vector3 position, bool hitStopOn)> Starts =
+            new List<(SlowMotionProfile, ulong, SlowMotionPurpose, Vector3, bool)>();
         public readonly List<uint> Fails = new List<uint>();
         public uint NextId = 7;
 
-        public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn,
-            ulong targetObjectId)
+        public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn)
         {
             Calls.Add("Start:" + purpose);
-            Starts.Add((profile, triggerClientId, purpose, targetPosition, hitStopOn, targetObjectId));
+            Starts.Add((profile, triggerClientId, purpose, targetPosition, hitStopOn));
             return NextId;
         }
 
@@ -116,19 +115,6 @@ public sealed class InterruptProductionStageTests
         Assert.AreEqual(Caster, _port.Starts[0].clientId);
         Assert.AreEqual(SlowMotionPurpose.Attempt, _port.Starts[0].purpose);
         Assert.AreEqual(Vector3.zero, _port.Starts[0].position);
-    }
-
-    // 할 일 143-2 — 시도·성공 슬로우가 간파 대상 id 를 싣는다(각 피어 로컬 선착순 장부용)
-    [Test]
-    public void 시도와_성공_슬로우는_대상_id_를_싣는다()
-    {
-        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Strong, 41));
-        _success.Server(InterruptProductionEvent.Success(Caster, null, null, true, Vector3.one, Vector3.zero, 42), null);
-        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.Weak));
-
-        Assert.AreEqual(41ul, _port.Starts[0].targetObjectId);
-        Assert.AreEqual(42ul, _port.Starts[1].targetObjectId);
-        Assert.AreEqual(0ul, _port.Starts[2].targetObjectId, "기본 = 0(없음)");
     }
 
     [Test]

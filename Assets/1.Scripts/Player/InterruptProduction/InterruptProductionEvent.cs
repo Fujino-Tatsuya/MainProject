@@ -59,18 +59,12 @@ public readonly struct InterruptProductionEvent
     public readonly InterruptFailReason FailReason;
     /// <summary>[피어 성공] 슬로우 발동 번호(중복 방지용).</summary>
     public readonly uint TriggerId;
-    /// <summary>
-    /// [서버 시도·성공] 간파 대상 NetworkObjectId — 시도 = 예측이 고른 대상, 성공 = 카운터 창을 소비한 첫 대상. 0 = 없음.
-    /// 슬로우 이벤트에 실려 각 피어의 로컬 선착순 장부(<see cref="InterruptLocalWindowClaims"/>, 할 일 143-2)로 간다.
-    /// </summary>
-    public readonly ulong TargetObjectId;
 
     private InterruptProductionEvent(InterruptProductionPhase phase, ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
         uint attemptTriggerId = 0, InterruptAttemptForecast forecast = InterruptAttemptForecast.NoTarget, bool landed = false, bool succeeded = false, int resolvedCount = 0,
         Vector3 targetPosition = default, bool hasTarget = false, Vector3 casterPosition = default,
-        InterruptFailReason failReason = InterruptFailReason.None, uint triggerId = 0, bool preempted = false, ulong targetObjectId = 0)
+        InterruptFailReason failReason = InterruptFailReason.None, uint triggerId = 0, bool preempted = false)
     {
-        TargetObjectId = targetObjectId;
         Phase = phase;
         CasterClientId = casterClientId;
         Caster = caster;
@@ -93,15 +87,12 @@ public readonly struct InterruptProductionEvent
 
     private static ulong ClientIdOf(Player caster) => caster != null ? caster.OwnerClientId : 0;
 
-    /// <summary>[서버] 시도 — 스킬 승인 직후. <paramref name="targetObjectId"/> = 예측이 고른 대상(0 = 없음).</summary>
-    public static InterruptProductionEvent Attempt(Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast,
-        ulong targetObjectId = 0) =>
-        Attempt(ClientIdOf(caster), caster, skill, forecast, targetObjectId);
+    /// <summary>[서버] 시도 — 스킬 승인 직후.</summary>
+    public static InterruptProductionEvent Attempt(Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
+        Attempt(ClientIdOf(caster), caster, skill, forecast);
 
-    public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast,
-        ulong targetObjectId = 0) =>
-        new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, forecast: forecast,
-            targetObjectId: targetObjectId);
+    public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
+        new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, forecast: forecast);
 
     /// <summary>[서버] 판정 끝. <paramref name="preempted"/> = 선착순에서 밀려 피해만 줬다(할 일 143).</summary>
     public static InterruptProductionEvent Resolve(Player caster, PlayerInterruptSkillBase skill, uint attemptTriggerId,
@@ -115,16 +106,14 @@ public readonly struct InterruptProductionEvent
             preempted: preempted);
 
     /// <summary>[서버] 성공 — 판정과 같은 호출 안, 판정 사건 바로 뒤.</summary>
-    public static InterruptProductionEvent Success(Player caster, PlayerInterruptSkillBase skill, bool hasTarget, Vector3 targetPosition,
-        ulong targetObjectId = 0) =>
+    public static InterruptProductionEvent Success(Player caster, PlayerInterruptSkillBase skill, bool hasTarget, Vector3 targetPosition) =>
         Success(ClientIdOf(caster), caster, skill, hasTarget, targetPosition,
-            caster != null ? caster.transform.position : default, targetObjectId);
+            caster != null ? caster.transform.position : default);
 
     public static InterruptProductionEvent Success(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
-        bool hasTarget, Vector3 targetPosition, Vector3 casterPosition, ulong targetObjectId = 0) =>
+        bool hasTarget, Vector3 targetPosition, Vector3 casterPosition) =>
         new InterruptProductionEvent(InterruptProductionPhase.Success, casterClientId, caster, skill,
-            succeeded: true, targetPosition: targetPosition, hasTarget: hasTarget, casterPosition: casterPosition,
-            targetObjectId: targetObjectId);
+            succeeded: true, targetPosition: targetPosition, hasTarget: hasTarget, casterPosition: casterPosition);
 
     /// <summary>[서버] 실패 — 판정 전 종료·앵커 누락. 빗나감은 판정 사건이 처리한다.</summary>
     public static InterruptProductionEvent Fail(Player caster, PlayerInterruptSkillBase skill, InterruptFailReason reason, uint attemptTriggerId) =>

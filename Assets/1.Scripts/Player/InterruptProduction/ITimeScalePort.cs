@@ -6,12 +6,8 @@ using UnityEngine;
 /// </summary>
 public interface ITimeScalePort
 {
-    /// <summary>
-    /// <see cref="GlobalTimeScale.ServerStart"/> — 발동 번호, 거부 시 0.
-    /// <paramref name="targetObjectId"/> = 간파 대상 NetworkObjectId(0 = 없음, 로컬 선착순 장부용 — 할 일 143-2).
-    /// </summary>
-    uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn,
-        ulong targetObjectId);
+    /// <summary><see cref="GlobalTimeScale.ServerStart"/> — 발동 번호, 거부 시 0.</summary>
+    uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn);
 
     /// <summary><see cref="GlobalTimeScale.ServerFail"/> — 현재 발동 번호일 때만 실패 복귀.</summary>
     void ServerFail(uint triggerId);
@@ -24,12 +20,10 @@ public interface ITimeScalePort
 public sealed class GlobalTimeScalePort : ITimeScalePort
 {
     public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition,
-        bool hitStopOn, ulong targetObjectId)
+        bool hitStopOn)
     {
         GlobalTimeScale timeScale = GlobalTimeScale.Instance;
-        return timeScale != null
-            ? timeScale.ServerStart(profile, triggerClientId, purpose, targetPosition, hitStopOn, targetObjectId)
-            : 0;
+        return timeScale != null ? timeScale.ServerStart(profile, triggerClientId, purpose, targetPosition, hitStopOn) : 0;
     }
 
     public void ServerFail(uint triggerId)
