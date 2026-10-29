@@ -88,6 +88,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
   - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
   - 판정 오버랩은 옮기지 않는다(실제 위치).
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
+  선착순 한 명(할 일 143)도 같은 `ResolveHit` 에서 거른다 — 같은 창 판정 기준 시각 = 승인(`OnServerStart`) 순간([interrupt-presentation.md §0.10](interrupt-presentation.md#010-선착순-한-명-할-일-143)).
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
 - 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
 - 캐릭터 이펙트(클립 이벤트)는 같은 클립을 상체 레이어에서 트므로 같이 나온다(§6 이벤트 중복 방지 참고).

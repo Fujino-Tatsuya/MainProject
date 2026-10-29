@@ -24,6 +24,9 @@ public interface IPlayerInterruptSkillData
 /// 간파 사거리·각도(<see cref="InterruptTargetGeometry"/>) 안 대상과 창을 모아 <see cref="DashInterruptPredictor"/>(근접·대쉬 공용)로 예측하고,
 /// 대상 없음 = 슬로우 없음 / 성공 예측 = 강 / 실패 예측 = 약 시도 슬로우를 건다. 판정(ResolveHit)은 여전히 앵커 오버랩이다.
 /// 판정에서 그 인터럽트가 하나도 성공하지 않거나 판정 전에 스킬이 끝나면 실패 복귀시킨다.
+///
+/// 간파 선착순(할 일 143): 판정(ResolveHit)이 대상마다 <see cref="InterruptWindowClaims"/> 를 묻는다 — 다른 플레이어가 먼저 성공시킨 창이면
+/// 간파 표식 없이 피해만 주고(대상 반응 없음), 판정 사건에 선점됨을 실어 디렉터가 시도 슬로우를 실패 복귀로 정리한다. 근접·대쉬·캐릭터 공통.
 /// </summary>
 public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
@@ -44,6 +47,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // 이번 판정에서 카운터 창을 소비한 첫 대상의 월드 위치 — 성공 연출 기준점(할 일 87 C5). 기록만 하고 판정엔 안 쓴다.
     private bool hasSuccessTargetPosition;
     private Vector3 successTargetPosition;
+    // 간파 선착순(할 일 143, 서버) — 이 시전의 서버 시작 시각. 다른 사람이 먼저 성공시킨 창이면 이 시각으로 '같은 창 시도'를 가린다.
+    private float serverCastStartTime;
 
     // ── 대쉬 간파(할 일 115, 서버) — 대시에 실린 동안 Hit 은 보류, 대시 끝(Skill 전이)에 판정 ──
     private bool dashAttachArmed;       // 다음 OnServerStart 가 대쉬 간파다(컨트롤러가 승인 직전에 건다)
@@ -117,6 +122,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         pendingHit = false;
         pendingEnd = false;
         castDirection = direction;
+        serverCastStartTime = Time.time;
 
         base.OnServerStart(direction, target);
         slowMotion.Begin();
@@ -261,6 +267,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// [서버] 간파 시전 하나가 열린 카운터 창을 맞혀 소비했다(23호·중간보스 <see cref="CombatStatsEvents.ServerCounterSucceeded"/>,
     /// 허수아비 인터럽트 성공). 여러 대상이 성공해도 시전당 1회. 인자 = 시전자, 그 간파 스킬 인스턴스(대체 슬롯 포함).
     /// 같은 판정 안에서 <see cref="ServerInterruptResolved"/> 보다 먼저 난다. 시전자 쿨 감소는 없다(할 일 90 에서 제거).
+    /// 선착순에서 밀린 두 번째 이후 성공자(할 일 143)에게는 나지 않는다 — 창을 소비하지 않았다(피해·<see cref="ServerInterruptResolved"/> 는 그대로).
     /// </summary>
     public static event System.Action<Player, PlayerInterruptSkillBase> ServerInterruptSucceeded;
 
@@ -301,6 +308,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         landedUnits.Clear();
         bool onHitBonusTaken = false;
         bool interruptLanded = false;
+        bool anyPreempted = false;
         int resolvedCount = 0;
         LagHit lagHit = BeginLagHit();
 
@@ -328,14 +336,25 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                     : resolvedDamage + bonus;
             }
 
-            AttackInfo attackInfo = DecorateAttackInfo(new AttackInfo(resolvedDamage, DamageAttackType,
-                isInterruptAttack: true, hitPattern: DamageHitPattern));
-            AttackHitContext hitContext =
-                new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
-
             // 성공 수를 이 수신 호출 하나의 전후로 비교한다 — 다른 공격의 성공이 섞이지 않는다.
             // 슬로우 모션 판별과 간파 성공 판정(허수아비)이 같은 비교를 쓴다.
             IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
+
+            // 간파 선착순(할 일 143) — 다른 사람이 먼저 성공시킨 창이면 간파 표식을 빼고 피해만 준다.
+            // 대상은 표식이 없으면 카운터·취약 넉백·그로기 등 간파 반응을 아예 보지 않는다(보스 코드 무수정).
+            bool preempted = slowTarget != null && InterruptWindowClaims.Server.Evaluate(
+                unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) == InterruptClaimVerdict.Preempted;
+            if (preempted)
+            {
+                anyPreempted = true;
+                Edit.Log($"[InterruptFirstCome] {unit.name} 창은 다른 플레이어가 먼저 성공 — {owner.name} 는 피해만", this);
+            }
+
+            AttackInfo attackInfo = DecorateAttackInfo(new AttackInfo(resolvedDamage, DamageAttackType,
+                isInterruptAttack: !preempted, hitPattern: DamageHitPattern));
+            AttackHitContext hitContext =
+                new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
+
             int successBefore = slowTarget != null ? slowTarget.ServerInterruptSuccessCount : 0;
             bool openAtHit = slowTarget != null && slowTarget.ServerIsInterruptible; // 측정 전용 읽기
             // 보정 시각 창 상태도 수신 전에 읽는다 — 성공하면 수신 안에서 창이 소비돼 같은 서버 시각에 닫힘이 기록된다(지연 0 이면 보정 시각 = 판정 시각).
@@ -348,6 +367,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             if (counterSucceeded)
             {
                 interruptSucceeded = true;
+                InterruptWindowClaims.Server.Claim(unit.gameObject.GetInstanceID(), owner.GetInstanceID(), Time.time);
                 RecordSuccessTarget(unit);
                 if (slowMotion.IsPending)
                     interruptLanded = true;
@@ -366,9 +386,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             OnInterruptTargetResolved(target, attackInfo);
         }
 
-        // 간파 연출 사건(할 일 118) — 판정 → 성공 순서로 디렉터에 알린다(빗나감 실패 복귀 → 성공 슬로우 재시작).
+        // 간파 연출 사건(할 일 118) — 판정 → 성공 순서로 디렉터에 알린다(빗나감·선점 실패 복귀 → 성공 슬로우 재시작).
+        // 선점(할 일 143) = 밀린 창이 있고 이 판정에 성공이 하나도 없다 — 성공 사건이 없으니 성공 연출(A1~A4·섬광·relay)도 없다.
+        bool resolvePreempted = anyPreempted && !interruptSucceeded;
         InterruptProductionDirector.ServerResolve(InterruptProductionEvent.Resolve(owner, this,
-            slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount));
+            slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount, resolvePreempted));
         if (interruptSucceeded)
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
                 hasSuccessTargetPosition, successTargetPosition));
@@ -610,9 +632,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                     t.position, t.forward, entry.FrontAngle))
                 continue;
 
+            // 서버는 선착순 장부도 본다(할 일 143) — 남이 먼저 성공시킨 창은 닫힌 것처럼 예측(강 시도 슬로우 없음).
+            // 오너는 장부가 없다 — 지금 대상은 첫 성공 순간 창을 닫아 복제값이 닫힘으로 바뀐다(§0.10).
             bool unitOpen = ownerView
                 ? entry.Replica != null && entry.Replica.ReplicatedWindowOpen
-                : entry.Target.ServerIsInterruptible;
+                : entry.Target.ServerIsInterruptible && InterruptWindowClaims.Server.Evaluate(
+                    unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) != InterruptClaimVerdict.Preempted;
             if (best == null || (unitOpen && !open))
             {
                 best = unit;
