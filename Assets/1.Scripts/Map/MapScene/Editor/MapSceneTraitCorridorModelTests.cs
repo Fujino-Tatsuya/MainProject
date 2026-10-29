@@ -46,10 +46,10 @@ public sealed class MapSceneTraitCorridorModelTests
     [Test]
     public void 창_표시는_복도1_설명_복도4_한줄_나머지_없음()
     {
-        Assert.AreEqual(TutorialTraitRoundDisplay.Intro, MapSceneTraitCorridorRules.DisplayOf(1));
-        Assert.AreEqual(TutorialTraitRoundDisplay.None, MapSceneTraitCorridorRules.DisplayOf(2));
-        Assert.AreEqual(TutorialTraitRoundDisplay.None, MapSceneTraitCorridorRules.DisplayOf(3));
-        Assert.AreEqual(TutorialTraitRoundDisplay.LastNotice, MapSceneTraitCorridorRules.DisplayOf(4));
+        Assert.AreEqual(TraitRoundDisplay.Intro, MapSceneTraitCorridorRules.DisplayOf(1));
+        Assert.AreEqual(TraitRoundDisplay.None, MapSceneTraitCorridorRules.DisplayOf(2));
+        Assert.AreEqual(TraitRoundDisplay.None, MapSceneTraitCorridorRules.DisplayOf(3));
+        Assert.AreEqual(TraitRoundDisplay.LastNotice, MapSceneTraitCorridorRules.DisplayOf(4));
     }
 
     // ─── 라운드 1회 ─────────────────────────────────────────────────────

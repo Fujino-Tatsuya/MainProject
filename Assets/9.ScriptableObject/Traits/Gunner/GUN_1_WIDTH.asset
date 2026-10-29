@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db1f5d62f1e91ba488ce78d5559dafeb, type: 3}
+  m_Name: GUN_1_WIDTH
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerTraitDefinition
+  id: GUN_1_WIDTH
+  displayName: "\uAD11\uD3ED \uB808\uC774\uC800"
+  category: "Q \uAC15\uD654"
+  description: "Q \uB808\uC774\uC800\uC758 \uD3ED\uC774 {widthIncrease:%} \uB113\uC5B4\uC9D1\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673644683420
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673644683420
+      type: {class: TraitAreaEffect, ns: , asm: Assembly-CSharp}
+      data:
+        areaIncrease: 0.3
+        axes: 00
+        attackTypes: 03000000
+        forms: 

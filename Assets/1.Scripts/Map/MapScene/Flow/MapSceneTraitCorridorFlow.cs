@@ -12,12 +12,12 @@ using UnityEngine;
 ///
 /// 서버:
 ///  · <see cref="MapSceneDirector.CorridorMidReached"/>(개인 첫 도착) → <b>그 사람에게만</b> 제시(S12 판단 1 — §3.2 "그 플레이어가 중간 지점에 왔을 때").
-///    복도 첫 도착이면 <see cref="TutorialTraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TutorialTraitRoundDisplay)"/> 로 라운드를 열고,
-///    이후 도착자는 <see cref="TutorialTraitDirector.AddParticipantServer"/>(같은 라운드 — 기존 제시·선택 보존). 앞 존에 있는 사람에게는 창을 띄우지 않는다.
+///    복도 첫 도착이면 <see cref="TraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TraitRoundDisplay)"/> 로 라운드를 열고,
+///    이후 도착자는 <see cref="TraitDirector.AddParticipantServer"/>(같은 라운드 — 기존 제시·선택 보존). 앞 존에 있는 사람에게는 창을 띄우지 않는다.
 ///    출구가 이미 열렸거나 타이머 만료 뒤 도착이면 창을 띄우지 않는다.
 ///  · 제시를 못 받은 사람(0장·디렉터 없음)은 도착 때 바로 체크 → 게이트가 그 사람을 기다리지 않는다.
-///  · <see cref="TutorialTraitDirector.ServerTraitChosen"/>(수동·자동) → <see cref="MapSceneDirector.ReportCheckServer"/>(TraitCorridorN) → 디렉터 모델이 전원/60초로 출구를 연다.
-///  · 출구가 열리면(어떤 이유든) <b>미도착자도 참가자로 넣고</b> 미선택 전원 <see cref="TutorialTraitDirector.AutoChooseAllPendingServer"/> — 창 닫힘·토스트·무적 해제(§3.2 D14 · §3.8).
+///  · <see cref="TraitDirector.ServerTraitChosen"/>(수동·자동) → <see cref="MapSceneDirector.ReportCheckServer"/>(TraitCorridorN) → 디렉터 모델이 전원/60초로 출구를 연다.
+///  · 출구가 열리면(어떤 이유든) <b>미도착자도 참가자로 넣고</b> 미선택 전원 <see cref="TraitDirector.AutoChooseAllPendingServer"/> — 창 닫힘·토스트·무적 해제(§3.2 D14 · §3.8).
 ///  · 보스 타이머 만료(Expired)·보스방 도착 → 진행 중 복도 라운드를 같은 방식으로 즉시 자동 획득 — 강제 이동(3초 경고 뒤)·연출 잠금보다 먼저(tutorial-traits.md §3-5).
 ///  · G10 → <see cref="TutorialGuideIds.BPadWarn"/> 전원(D17). 단계: 입구 G3/G6/G9 → Corridor2~4, G10 → BossEnter(Corridor1 은 맵씬 존 진행 MapSceneZoneFlow).
 ///  디렉터 Commit 안(게이트 이벤트)에서 다시 Commit 하지 않게 게이트 후속 처리는 다음 Update 로 미룬다.
@@ -26,7 +26,7 @@ using UnityEngine;
 ///  · 출구가 열리면 이 흐름이 쓰던 목표를 "다음 구역으로"(복도4 = 엘리베이터 발판으로) 바꾸고 손을 뗀다. 존 첫 진입 안내는 각 존 흐름 몫 —
 ///    다음 존 단계가 이미 보이면(같은 틱 반영) 그 존 목표를 덮지 않는다(<see cref="MapSceneTraitCorridorRules.ShouldShowExitObjective"/>). 단계 Finished 뒤엔 그리지 않는다.
 ///  · 처음 그릴 때 안내 UI 가 비어 있으면(늦은 클라) <see cref="TutorialGuideUI.RebuildFromState"/>.
-///  · 특성 창 교착 방지 게이지 — 복제 대기 상태(<see cref="MapSceneDirector.TryGetWait"/>)를 <see cref="TutorialTraitSelectionView.SetDeadline"/> 으로 넣는다
+///  · 특성 창 교착 방지 게이지 — 복제 대기 상태(<see cref="MapSceneDirector.TryGetWait"/>)를 <see cref="TraitSelectionView.SetDeadline"/> 으로 넣는다
 ///    (표시 = <see cref="MapSceneTraitCorridorRules.ShouldShowTraitDeadline"/>). 특성 모듈은 디렉터를 모른다 — 의존은 이 흐름 → 특성 뷰 한 방향.
 /// </summary>
 [DisallowMultipleComponent]
@@ -39,7 +39,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
     public const string GoPadId = "TUT_C4_GO_PAD";
 
     private MapSceneDirector _director;
-    private TutorialTraitDirector _traits;
+    private TraitDirector _traits;
     private NetworkManager _nm;
     private bool _isServer;
 
@@ -52,7 +52,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
     // 로컬
     private TutorialGuideUI _ui;
     private int _ownedCorridor;
-    private TutorialTraitSelectionView _traitView;
+    private TraitSelectionView _traitView;
 
     // ─── 부착(모든 피어) ───────────────────────────────────────────────────
 
@@ -92,11 +92,11 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
 
         MapSceneDirector.StateChanged += Render;
         MapSceneDirector.GateOpened += HandleGateOpened;
-        BindTraits(TutorialTraitDirector.Instance);
+        BindTraits(TraitDirector.Instance);
         _ui = TutorialGuideUI.Instance;
 
         if (_traits == null)
-            Edit.LogWarning("[Tutorial] 복도 흐름: 씬에 TutorialTraitDirector 가 없다 — 복도 특성은 건너뛰고 중간 지점 도착만으로 체크한다.", this);
+            Edit.LogWarning("[Tutorial] 복도 흐름: 씬에 TraitDirector 가 없다 — 복도 특성은 건너뛰고 중간 지점 도착만으로 체크한다.", this);
         Edit.Log($"[Tutorial] 복도 흐름 켜짐 (서버:{_isServer}) — 특성 디렉터 {(_traits != null ? "있음" : "없음")}.", this);
         Render();
     }
@@ -112,7 +112,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
         _traitView = null;
     }
 
-    private void BindTraits(TutorialTraitDirector traits)
+    private void BindTraits(TraitDirector traits)
     {
         if (_traits != null)
         {
@@ -130,9 +130,9 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
     {
         if (_director == null) return;
 
-        if (TutorialTraitDirector.Instance != _traits)
+        if (TraitDirector.Instance != _traits)
         {
-            BindTraits(TutorialTraitDirector.Instance);
+            BindTraits(TraitDirector.Instance);
             Render();
         }
 
@@ -150,7 +150,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
         }
 
         // 특성 창이 늦게 깨어나면 게이지 값을 다시 넣는다.
-        if (TutorialTraitSelectionView.Instance != _traitView) PushTraitDeadline();
+        if (TraitSelectionView.Instance != _traitView) PushTraitDeadline();
     }
 
     // ─── 서버: 라운드 ──────────────────────────────────────────────────────
@@ -215,8 +215,8 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
             return;
         }
 
-        TutorialTraitJoinResult result = _traits.AddParticipantServer(clientId);
-        if (result == TutorialTraitJoinResult.Empty || result == TutorialTraitJoinResult.NoRound)
+        TraitJoinResult result = _traits.AddParticipantServer(clientId);
+        if (result == TraitJoinResult.Empty || result == TraitJoinResult.NoRound)
             _director.ReportCheckServer(clientId, check);
         Edit.Log($"[Tutorial] 복도{corridor} 늦은 도착 client {clientId} — 라운드 {round} 참가 {result}.", this);
     }
@@ -232,16 +232,16 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
         foreach (ulong id in _clientScratch)
         {
             if (_traits.IsInRoundServer(id)) continue;
-            TutorialTraitJoinResult result = _traits.AddParticipantServer(id);
-            if (result == TutorialTraitJoinResult.Empty)
+            TraitJoinResult result = _traits.AddParticipantServer(id);
+            if (result == TraitJoinResult.Empty)
                 _director.ReportCheckServer(id, MapSceneTraitCorridorRules.CheckOf(corridor));
-            if (result == TutorialTraitJoinResult.Offered || result == TutorialTraitJoinResult.Empty)
+            if (result == TraitJoinResult.Offered || result == TraitJoinResult.Empty)
                 added++;
         }
         return added;
     }
 
-    private void HandleTraitChosenServer(TutorialTraitChosen chosen)
+    private void HandleTraitChosenServer(TraitChosen chosen)
     {
         int corridor = _rounds.CorridorOfRound(chosen.Round);
         if (corridor == 0 || !_director.IsTutorialActive) return;
@@ -267,10 +267,10 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
     /// <summary>
     /// [서버, 디버그 구간 스킵 — <see cref="MapSceneSkipController"/>] 건너뛰는 복도의 특성 라운드를 <b>창 없이</b> 끝낸다:
-    /// 라운드를 아직 안 열었으면 제시 없이 열고(<see cref="TutorialTraitDirector.StartRoundWithoutOfferServer"/>), 아직 참가하지 않은 접속자는
-    /// 제시 없이 바로 무작위 1장 획득(<see cref="TutorialTraitDirector.GrantParticipantServer"/>) — 제시 번호가 안 올라 클라 창이 열렸다 닫히며 깜빡이지 않는다.
-    /// 이미 중간 지점에 도착해 창을 보고 있던 사람만 정식 자동 획득(<see cref="TutorialTraitDirector.AutoChooseAllPendingServer"/>)으로 창이 닫힌다.
-    /// 어느 쪽이든 <see cref="TutorialTraitDirector.ServerTraitChosen"/> → <see cref="HandleTraitChosenServer"/> 가 특성 체크를 보고한다.
+    /// 라운드를 아직 안 열었으면 제시 없이 열고(<see cref="TraitDirector.StartRoundWithoutOfferServer"/>), 아직 참가하지 않은 접속자는
+    /// 제시 없이 바로 무작위 1장 획득(<see cref="TraitDirector.GrantParticipantServer"/>) — 제시 번호가 안 올라 클라 창이 열렸다 닫히며 깜빡이지 않는다.
+    /// 이미 중간 지점에 도착해 창을 보고 있던 사람만 정식 자동 획득(<see cref="TraitDirector.AutoChooseAllPendingServer"/>)으로 창이 닫힌다.
+    /// 어느 쪽이든 <see cref="TraitDirector.ServerTraitChosen"/> → <see cref="HandleTraitChosenServer"/> 가 특성 체크를 보고한다.
     /// 고를 게 없던 사람(0장·특성 디렉터 없음)은 정식 흐름처럼 바로 체크한다.
     /// 출구 게이트는 디렉터 모델이 전원 완료로 연다. 이 복도 체크가 켜진 인원 수가 아니라 획득 수를 돌려준다.
     /// </summary>
@@ -294,7 +294,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
                 _clientScratch.Clear();
                 foreach (ulong id in _nm.ConnectedClientsIds) _clientScratch.Add(id);
                 foreach (ulong id in _clientScratch)
-                    if (!_traits.IsInRoundServer(id) && _traits.GrantParticipantServer(id) == TutorialTraitJoinResult.Granted)
+                    if (!_traits.IsInRoundServer(id) && _traits.GrantParticipantServer(id) == TraitJoinResult.Granted)
                         auto++;
                 auto += _traits.AutoChooseAllPendingServer();
             }
@@ -442,7 +442,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
     // 복제 대기 상태가 바뀔 때마다(StateChanged·특성 복제 변경 → Render) 서버 시각 기준 남은 초로 다시 맞춘다. 사이 감소는 창이 한다.
     private void PushTraitDeadline()
     {
-        _traitView = TutorialTraitSelectionView.Instance;
+        _traitView = TraitSelectionView.Instance;
         if (_traitView == null || _director == null) return;
 
         bool show = false;

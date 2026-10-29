@@ -914,8 +914,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     private int CalculateDamageSnapshot(DefaultAttackStep step)
     {
-        // 공격 스탯 종합(기본%·전체%·가하는 피해%) 기준 — 툴팁과 같은 식(PlayerStatFormula)
-        return player != null ? player.ResolveDamage(step.AttackDamageMultiplier, step.FlatDamageBonus) : 0;
+        // 공격 스탯 종합(기본%·전체%·가하는 피해%) 기준 — 툴팁과 같은 식(PlayerStatFormula). 특성 평타 배율 포함(Dref, 할 일 125)
+        return player != null
+            ? player.ResolveDamage(step.AttackDamageMultiplier, step.FlatDamageBonus, new TraitAttackKey(AttackType.Default))
+            : 0;
     }
 
     private Vector3 GetCurrentAimDirection()

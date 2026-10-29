@@ -35,7 +35,7 @@ public static class AssassinDashStrikeRules
 
 /// <summary>
 /// Q 사용 1회의 적중 장부. 같은 대상은 사용당 1회만 피해(§7.1), 변신 Q 쿨 차감은 사용당 최초 유효 적중 1회(§7.3),
-/// 일반 Q 분노 게이지 충전도 사용당 최초 유효 적중 1회(§4.2).
+/// 일반 Q 분노 게이지 충전도 사용당 최초 유효 적중 1회(§4.2). 그림자 회귀 왕복은 한 사용이다(<see cref="BeginNextStage"/>).
 /// 키는 Unit 또는 (Unit 이 아닌 상자의) Hurtbox — 호출자가 정한다.
 /// </summary>
 public sealed class AssassinDashHitLedger
@@ -52,6 +52,15 @@ public sealed class AssassinDashHitLedger
         damagedTargets.Clear();
         CooldownRewardClaimed = false;
         RageRewardClaimed = false;
+    }
+
+    /// <summary>
+    /// 같은 사용의 다음 돌진 단계(그림자 회귀 복귀) — 피해 대상만 비우고 보상(분노·쿨 차감)은 이어 간다.
+    /// 같은 적도 단계마다 피해를 받고, 보상은 왕복 전체 최초 유효 적중 1회(출발이 빗나가면 복귀에서 인정).
+    /// </summary>
+    public void BeginNextStage()
+    {
+        damagedTargets.Clear();
     }
 
     /// <summary>이번 사용에서 처음 보는 대상이면 true 를 돌려주고 기록한다.</summary>

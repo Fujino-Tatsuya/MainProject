@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c86ed8e67005623418a6b6494f670ee6, type: 3}
+  m_Name: TraitPool_Gunner
+  m_EditorClassIdentifier: Assembly-CSharp::TraitCharacterPool
+  character: 2
+  traits:
+  - {fileID: 11400000, guid: dcdd08108f67f89428d8e01d479d4680, type: 2}
+  - {fileID: 11400000, guid: afcb8b28d9efb9f409b415e9b191f2b9, type: 2}
+  - {fileID: 11400000, guid: 7e130268b7ba1494488dc963d4176296, type: 2}
+  - {fileID: 11400000, guid: d00028c2ad1e0ca4390d40c367cb2a6d, type: 2}
+  - {fileID: 11400000, guid: b250ba807095a184d8b8e4effa767098, type: 2}
+  - {fileID: 11400000, guid: db3db9aacba9faa4ab87aa3a48acb1ac, type: 2}
+  - {fileID: 11400000, guid: b2e8fc8622186a34bb0e0236fdabf288, type: 2}
+  - {fileID: 11400000, guid: 53a1d723369a18d44ae398c9e8767232, type: 2}
+  - {fileID: 11400000, guid: be17823a9e8870e409f3cc8b39e0650b, type: 2}
+  - {fileID: 11400000, guid: 33162911076654948bcf44b1349051fa, type: 2}
+  - {fileID: 11400000, guid: 6a91058f0415f2d4e9868d2ed6dd62e4, type: 2}
+  - {fileID: 11400000, guid: a996f7cb88236b843be4c5119dbf2fab, type: 2}

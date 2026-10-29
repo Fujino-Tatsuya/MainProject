@@ -1675,7 +1675,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 공격별 슈퍼아머. SO 전역 플래그(hasSuperArmorWhileAttacking)는 꺼진 상태를 전제한다
         // — 켜져 있으면 ValidateContract 가 LogError 로 잡는다.
         // 체인 공격은 전체 길이 동안 유지해야 중간에 경직으로 끊기지 않는다.
-        if (e != null && e.superArmor && status != null)
+        // 취약 중엔 걸지 않는다 — 취약 = 밀치기·기절 허용(할 일 134, BossCrowdControlRules).
+        if (e != null && BossCrowdControlRules.AppliesAttackSuperArmor(e.superArmor, IsVulnerable) && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
 
         // 카운터 창: 창을 여는 공격(Grab·Dash)이면 지금 연다.
@@ -2178,7 +2179,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             telegraph + (data != null ? data.attackDuration : 0.9f) + ChainBudgetSlack);
 
         // 슈퍼아머도 늘어난 길이로 다시 건다 — 위에서 옛 _stateTimer 로 걸렸기 때문이다.
-        if (e.superArmor && status != null)
+        if (BossCrowdControlRules.AppliesAttackSuperArmor(e.superArmor, IsVulnerable) && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
 
         // [G2-P] 준비동작 클립이 저작돼 있으면 **얼리는 대신 그걸 재생**한다(2026-09-23).
@@ -6034,10 +6035,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 점프 체인 중엔 넉백 없이 피해만(IsInJumpChain — 이륙·공중·착지 모두 끊기지 않는다, 팀장 09-29).
         bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence && !IsInJumpChain;
 
-        // 취약 중 팔라딘 Q(진격의 방패) = 밀림 + 경직(경석 Play 10-20). 넉백·경직을 **둘 다** 싣는 플레이어 공격은 지금 Q 하나뿐이다.
-        // 경직은 남은 취약 시간까지만 — 취약이 풀리면 보스가 바로 움직인다(EndVulnerable).
-        bool qPushHit = IsServer && IsVulnerable && !IsInterruptAttack(attackInfo) && IsFromPlayer(hitContext)
-                        && attackInfo.knockbackStrength > 0f && attackInfo.staggerDuration > 0f
+        // 취약 중 넉백 세기 > 0 인 플레이어 공격(팔라딘 Q·특성 밀치기) = 밀림(+ 경직이 실려 있으면 경직, 경석 Play 10-20).
+        // 경직 > 0 조건은 뺐다(할 일 134). 경직은 남은 취약 시간까지만 — 취약이 풀리면 보스가 바로 움직인다(EndVulnerable).
+        bool qPushHit = IsServer && BossCrowdControlRules.QualifiesPushHit(
+                            IsVulnerable, IsInterruptAttack(attackInfo), IsFromPlayer(hitContext), attackInfo.knockbackStrength)
                         && !IsInMandatorySequence && !IsInJumpChain;
 
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
@@ -6060,9 +6061,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 실드가 남아 있는 동안 HP 는 안 깎이고, 실드를 넘친 몫만 HP 로 간다. 실드가 0 이면 TickSelfDestruct 가 저지로 끝낸다.
         bool selfDestructHit = IsServer && _raidSelfDestruct && _attackPhase == BossAttackPhase.ChargeWait && IsFromPlayer(hitContext);
         int rawDamage = attackInfo.damage;
+        int absorbed = 0;
         if (selfDestructHit && attackInfo.damage > 0 && _selfDestructShieldLeft > 0)
         {
-            int absorbed = Mathf.Min(attackInfo.damage, _selfDestructShieldLeft);
+            absorbed = Mathf.Min(attackInfo.damage, _selfDestructShieldLeft);
             _selfDestructShieldLeft -= absorbed;
             attackInfo.damage -= absorbed;
             _selfDestructShield01.Value = _selfDestructShieldTotal > 0 ? (float)_selfDestructShieldLeft / _selfDestructShieldTotal : 0f;
@@ -6075,6 +6077,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
+        // 실드가 받은 몫은 base 의 피해 숫자 RPC 에 안 실린다(위에서 이미 뺐다) — 하늘색 숫자로 따로 알린다(141).
+        if (resolved && absorbed > 0)
+            ReportAbsorbedShieldDamage(absorbed, attackInfo, hitContext);
         if (IsServer && resolved && IsFromPlayer(hitContext))
         {
             _fightPlayerDamage += selfDestructHit ? rawDamage : attackInfo.damage;   // 기록 = 실드에 들어간 몫 포함
@@ -6098,11 +6103,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
         else if (vulnerableHit && resolved && State != MonsterState.Dead)
         {
-            StartVulnerableKnockback(hitContext, attackInfo);
+            // 넉백 입구 = Unit.Knockback(할 일 134) → OnKnockback → StartVulnerableKnockback(고정 거리)
+            Knockback(VulnerableKnockbackDirection(hitContext, attackInfo), attackInfo.knockbackStrength);
+            TryApplyConcussionAfterPush(attackInfo);
         }
         else if (qPushHit && resolved && State != MonsterState.Dead)
         {
-            StartVulnerableKnockback(hitContext, attackInfo);
+            Knockback(VulnerableKnockbackDirection(hitContext, attackInfo), attackInfo.knockbackStrength);
             float stun = Mathf.Min(attackInfo.staggerDuration, _vulnerableUntil - Time.time);
             if (stun > 0.05f && State != MonsterState.Groggy)
             {
@@ -6113,6 +6120,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 _vulnerableStunGroggy = true;
                 Debug.Log($"[23호] 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초(남은 취약까지)", this);
             }
+            TryApplyConcussionAfterPush(attackInfo);   // 경직(그로기 진입 = 대기 취소) 뒤
         }
 
         return resolved;
@@ -6491,23 +6499,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (o.IsSuppress) EnterSuppress(reason, fromSegments: true);
     }
 
-    /// <summary>[서버] 취약 중 간파 스킬 적중 → 공격자 반대 방향 넉백. 재적중이면 새 방향으로 처음부터(§5.2).</summary>
-    void StartVulnerableKnockback(AttackHitContext ctx, AttackInfo info)
+    /// <summary>[서버] 취약 넉백(입구 = OnKnockback). 재적중이면 새 방향으로 처음부터(§5.2).</summary>
+    void StartVulnerableKnockback(Vector3 dir)
     {
         if (_kbFrame == Time.frameCount) return;   // 같은 처리 시점의 두 번째 적중은 피해만(§5.3)
         _kbFrame = Time.frameCount;
         // 🔴 타 사이(Idle)의 취약 넉백은 InterruptForKnockback 이 Attack 밖이라 그냥 돌아간다 — 여기서 끊는다(Codex 10-18).
         CancelCombo("취약 넉백");
 
-        Vector3 from = ctx.sourceTransform != null ? ctx.sourceTransform.position : ctx.sourcePosition;
-        Vector3 dir = transform.position - from;
         dir.y = 0f;
-        if (dir.sqrMagnitude < 0.0001f)   // 위치가 겹쳐 방향을 못 구하면 스킬 공격 방향(§5.1)
-        {
-            dir = info.knockbackDirection;
-            if (dir.sqrMagnitude < 0.0001f && ctx.sourceTransform != null) dir = ctx.sourceTransform.forward;
-            dir.y = 0f;
-        }
         if (dir.sqrMagnitude < 0.0001f) dir = -transform.forward;
         dir.Normalize();
 
@@ -6631,6 +6631,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         bool parryRetreat = _kbParryRetreat;
         _kbActive = false;
         _kbRebound = false;
+        ConsumeConcussionAfterPush();   // 뇌진탕 대기 → 기절(할 일 134). 벽으로 취약이 끝났거나 제압이면 슈퍼아머라 0
         _kbParryRetreat = false;
         if (parryRetreat)   // 간파 후퇴는 취약·그로기를 건드리지 않는다
         {

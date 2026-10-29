@@ -70,6 +70,10 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     [SerializeField] private string animatorStateName = "";
     [SerializeField] private bool snapRotationOnStart = true;
 
+    [Header("후속 시전")]
+    [Tooltip("이 스킬이 후속 스킬로 칸에 올라와 있는 동안 HUD 아이콘에 곱할 색(할 일 128 5a). 흰색 = 변화 없음.")]
+    [SerializeField, DataTableIgnore] private Color followUpIconTint = Color.white;
+
     public PlayerSkillInputType InputType => inputType;
     public float CooldownTime => cooldownTime;
     public bool CommitCooldownManually => commitCooldownManually;
@@ -93,6 +97,7 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public float HoverMarkerDistance => hoverMarkerDistance;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
+    public Color FollowUpIconTint => followUpIconTint;
     public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public Object TooltipValueSource => this;
 

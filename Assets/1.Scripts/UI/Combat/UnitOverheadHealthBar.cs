@@ -251,6 +251,12 @@ public class UnitOverheadHealthBar : MonoBehaviour
         if (traitGauge == null)
             return;
 
+        bool visible = traitGauge.Visible;
+        if (traitRoot != null && traitRoot.activeSelf != visible)
+            traitRoot.SetActive(visible);
+        if (!visible)
+            return;
+
         if (traitFill != null)
         {
             traitFill.fillAmount = Mathf.Clamp01(traitGauge.Fill);

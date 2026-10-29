@@ -105,7 +105,7 @@ public static class UiStrings
     public static readonly UiString TrainingDummyHp = new UiString("UI.TrainingDummy.Hp", "{hp} / {max}", "TrainingDummy.prefab — 머리 위 체력({hp} = 현재, {max} = 최대)");
 
     // 상태이상 이름 — StatusEffectHUD·머리 위 라벨. 키 = UI.StatusEffect.<enum 이름>.
-    // ko = 차단류 CC 6종(BlockedCrowdControl)은 아래 한국어(할 일 50 확정), 나머지는 enum 이름에서 Modifier 를 뺀 것
+    // ko = 차단류 CC(BlockedCrowdControl — 할 일 50 6종 + 125 뇌진탕)는 아래 한국어, 나머지는 enum 이름에서 Modifier 를 뺀 것
     private static readonly Dictionary<StatusEffectType, string> StatusEffectHints = new Dictionary<StatusEffectType, string>
     {
         [StatusEffectType.Airborne] = "공중에 뜸",
@@ -131,6 +131,7 @@ public static class UiStrings
         [StatusEffectType.MoveSpeedFinalMultiplier] = "이동 속도 최종 배율",
         [StatusEffectType.AttackSpeedFinalMultiplier] = "공격 속도 최종 배율",
         [StatusEffectType.CooldownRateModifier] = "쿨타임 줄어드는 속도 배율",
+        [StatusEffectType.Concussion] = "뇌진탕",
     };
 
     private static readonly Dictionary<StatusEffectType, UiString> StatusEffectNames = BuildStatusEffectNames();
@@ -223,6 +224,7 @@ public static class UiStrings
         all.AddRange(LobbyUiStrings.All);       // 걷는 로비 상호작용·준비·카운트다운(UI.Lobby.*, 할 일 48 C10)
         all.AddRange(CharacterSelectUiStrings.All); // 로비 캐릭터 선택 패널(UI.CharacterSelect.*)
         all.AddRange(LobbyResultUiStrings.All);     // 로비 결과 패널 정적 라벨(UI.LobbyResult.*)
+        all.AddRange(TraitUiStrings.All);           // 특성 선택 화면 분류 줄·상충 확인창·도움말(UI.Trait.*, 할 일 125) — 특성별 Trait.<ID>.* 는 TraitStringKeyCollector
         return all;
     }
 

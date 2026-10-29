@@ -32,6 +32,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     private PlayerLifeCycleController lifeCycle;
     private AssassinEnhanceSkill enhanceSkill;
     private AssassinTransformSkill transformSkill;
+    private PlayerTraitModifiers traitModifiers;
 
     /// <summary>[전 피어] 스냅샷이 바뀌었다(이전, 현재). 변신 중 게이지 감소는 스냅샷을 바꾸지 않는다 — 표시는 <see cref="Rage"/> 를 매 프레임 읽는다.</summary>
     public event Action<AssassinStateSnapshot, AssassinStateSnapshot> StateChanged;
@@ -84,8 +85,14 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
         return attackInfo;
     }
 
-    /// <summary>일반 상태 + 게이지 ≥ 최소 변신량. 오너는 입력·HUD 판정에, 서버는 R 승인(<see cref="AssassinTransformSkill.CanUse"/>)에 쓴다.</summary>
-    public bool CanBeginTransform => AssassinStateModel.CanBeginTransform(State, Rules);
+    /// <summary>
+    /// 절제된 분노(ASN_2_RESTRAINT)를 골랐다 — R(변신)·분노 기능 없음(규칙 <see cref="AssassinRestraintRules"/>). 서버·클라 같은 획득 행을 읽는다.
+    /// </summary>
+    public bool IsRestrained => traitModifiers != null && traitModifiers.HasTrait(TraitModeIds.AssassinRestraint);
+
+    /// <summary>일반 상태 + 게이지 ≥ 최소 변신량 + 절제된 분노 아님. 오너는 입력·HUD 판정에, 서버는 R 승인(<see cref="AssassinTransformSkill.CanUse"/>)에 쓴다.</summary>
+    public bool CanBeginTransform =>
+        AssassinRestraintRules.CanBeginTransform(IsRestrained, AssassinStateModel.CanBeginTransform(State, Rules));
     public bool CanPrepareEnhancement => AssassinStateModel.CanPrepareEnhancement(State);
 
     private AssassinStateSnapshot State => IsNetworkActive ? state.Value : offlineState;
@@ -101,6 +108,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
         lifeCycle = GetComponent<PlayerLifeCycleController>();
         enhanceSkill = GetComponent<AssassinEnhanceSkill>();
         transformSkill = GetComponent<AssassinTransformSkill>();
+        traitModifiers = PlayerTraitModifiers.For(this);
 
         if (lifeCycle != null)
             lifeCycle.LifeStateChanged += HandleLifeStateChanged;
@@ -136,7 +144,10 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
             TickOwnerReleaseInput();
 
         if (HasStateAuthority)
+        {
+            TickServerRestraint();
             TickServerTransformEnd();
+        }
     }
 
     // ── 서버 API (스킬·평타가 호출) ──
@@ -147,7 +158,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     /// </summary>
     public bool ServerTryGainRage(AssassinRageSource source)
     {
-        if (!HasStateAuthority)
+        if (!HasStateAuthority || !AssassinRestraintRules.CanGainRage(IsRestrained))
             return false;
 
         AssassinStateSnapshot next = State;
@@ -165,7 +176,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     /// </summary>
     public bool ServerRaiseRageTo(float amount)
     {
-        if (!HasStateAuthority)
+        if (!HasStateAuthority || !AssassinRestraintRules.CanGainRage(IsRestrained))
             return false;
 
         AssassinStateSnapshot next = State;
@@ -277,6 +288,23 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
 
         Write(next);
         Edit.Log($"[Assassin] 변신 수동 해제 요청 (경과 {AssassinStateModel.Elapsed(next, Now()):F2}s)", this);
+    }
+
+    // ── 절제된 분노 (ASN_2_RESTRAINT) ──
+
+    // 변신 중에 골랐으면 종료 요청만 넣는다 — 아래 TickServerTransformEnd 가 현재 공격 완료 후 기존 경로(슬롯 원복·R 쿨)로 끝낸다.
+    // 일반 상태가 되면 남은 분노를 0 으로. 스냅샷 복제로 클라 HUD·R 차단이 따라온다.
+    private void TickServerRestraint()
+    {
+        AssassinStateSnapshot next = State;
+        AssassinRestraintAction action = AssassinRestraintRules.Decide(IsRestrained, next);
+        if (!AssassinRestraintRules.Apply(ref next, action))
+            return;
+
+        Write(next);
+        Edit.Log(action == AssassinRestraintAction.RequestTransformEnd
+            ? "[Assassin] 절제된 분노 — 변신 중 선택, 현재 공격 완료 후 종료"
+            : "[Assassin] 절제된 분노 — 분노 0", this);
     }
 
     // ── 종료 ──

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c29cc7a6b1d47b046aa92501db8cbe93, type: 3}
+  m_Name: ASN_1_Q_COOLDOWN
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
+  id: ASN_1_Q_COOLDOWN
+  displayName: "\uB3CC\uD30C \uAC00\uC18D"
+  category: "\uC77C\uBC18 Q \uAC15\uD654"
+  description: "\uC77C\uBC18 Q \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774
+    {cooldownReduction:%} \uAC10\uC18C\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673709695120
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673709695120
+      type: {class: TraitCooldownEffect, ns: , asm: Assembly-CSharp}
+      data:
+        cooldownChange: -0.15
+        slots: 00000000
+        forms: 00

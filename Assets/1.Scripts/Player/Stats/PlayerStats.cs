@@ -81,9 +81,12 @@ public sealed class PlayerStats
     public int FinalDefense => FinalInt(PlayerStatKind.Defense);
     public int FinalMaxHp => FinalInt(PlayerStatKind.MaxHp);
 
-    /// <summary>판정·툴팁 공용 피해 스냅샷 — round(최종 공격력 × 계수) + 고정값, 그 뒤 가하는 피해%.</summary>
-    public int ResolveDamage(float coefficient, int flatBonus) =>
-        PlayerStatFormula.Snapshot(FinalAttackDamage, coefficient, flatBonus, DealtDamagePercent);
+    /// <summary>
+    /// 판정·툴팁 공용 피해 스냅샷 — round(최종 공격력 × 계수) + 고정값, 그 뒤 가하는 피해% × 특성 공격 계열 배율(할 일 125, 기본 1).
+    /// 특성 배율은 <see cref="PlayerTraitModifiers.DamageMultiplier"/> 값을 호출자가 넘긴다(공격 계열을 아는 곳이 호출자라서).
+    /// </summary>
+    public int ResolveDamage(float coefficient, int flatBonus, float traitDamageMultiplier = 1f) =>
+        PlayerStatFormula.Snapshot(FinalAttackDamage, coefficient, flatBonus, DealtDamagePercent, traitDamageMultiplier);
 
     public PlayerStatReport CreateReport() => new PlayerStatReport
     {

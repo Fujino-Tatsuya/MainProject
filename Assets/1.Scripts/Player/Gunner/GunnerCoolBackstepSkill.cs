@@ -42,9 +42,9 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
     {
         State = SkillState.Active;
 
-        // 막혀서 거리가 짧아져도 냉각은 정상 적용(§7.3)
+        // 막혀서 거리가 짧아져도 냉각은 정상 적용(§7.3). 정온 운용(할 일 127 3/4)이면 과열 로직이 없어 냉각 없이 백스텝만(쿨은 정상).
         heat?.ServerResetToZero();
-        Edit.Log("[Gunner/E] 냉각 백스텝 — 과열도 0", this);
+        Edit.Log(heat != null && !heat.HeatEnabled ? "[Gunner/E] 백스텝 — 정온 운용(냉각 없음)" : "[Gunner/E] 냉각 백스텝 — 과열도 0", this);
     }
 
     // 전 피어. 방향은 서버 승인 시점의 조준(= 입력 순간). 무기 전방으로 냉기 → 반동으로 정반대 이동.

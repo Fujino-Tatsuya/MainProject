@@ -43,6 +43,10 @@ public enum StatusEffectType
     MoveSpeedFinalMultiplier = 1 << 20,   // 이동속도 최종 배율
     AttackSpeedFinalMultiplier = 1 << 21, // 공격속도 최종 배율
     CooldownRateModifier = 1 << 22,       // 쿨타임 줄어드는 속도 배율(쿨 시계 — PLAN-91 §3.3)
+
+    // 뇌진탕(할 일 125) — 밀치기(넉백)가 끝나는 순간 기절로 바뀌는 대기 표식. 넉백 중이 아니면 걸리는 즉시 기절.
+    // 규칙은 ConcussionState(순수 계산). 차단류라 슈퍼아머가 거부한다. 표시는 기절과 같다(대기 중에도 Stunned 를 같이 건다).
+    Concussion = 1 << 23,
 }
 
 /// <summary>SuperArmor가 신규 상태효과 적용을 거부하는 공통 판정.</summary>
@@ -50,7 +54,8 @@ public static class StatusEffectImmunityPolicy
 {
     public const StatusEffectType BlockedCrowdControl =
         StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |
-        StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated;
+        StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated |
+        StatusEffectType.Concussion;
 
     public static bool ShouldIgnoreApplication(StatusEffectType activeEffects, StatusEffectType incomingType)
     {
@@ -83,7 +88,8 @@ public static class StatusEffectCategories
 
     private const StatusEffectType Debuffs =
         StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |
-        StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated;
+        StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated |
+        StatusEffectType.Concussion;
 
     public static StatusEffectCategory Of(in StatusEffectInstance instance) => Of(instance.type, instance.magnitude);
 

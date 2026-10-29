@@ -30,8 +30,11 @@ using UnityEngine.AI;
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
 [DataTableSheet("MidBoss", Order = 2)]
-public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
+public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor
 {
+    // 할 일 134 — 취약 밖(공격 밖 평상 포함) 상시 슈퍼아머 = 밀치기·기절·뇌진탕 거부, 취약 = 허용(BossCrowdControlRules).
+    bool IMonsterStateSuperArmor.StateSuperArmor => BossCrowdControlRules.MidBossStateSuperArmor(Rank == MonsterRank.MidBoss, IsMidBossVulnerable);
+
     enum ShieldPhase { None, Gather, Dash, Shock }
 
     [Header("방패 3단 — 선택")]
