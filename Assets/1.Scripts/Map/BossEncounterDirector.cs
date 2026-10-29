@@ -31,7 +31,7 @@ using UnityEngine.AI;
 ///    "BT 개방" 같은 별도 게이트가 필요 없다. 연출(하강·임팩트)만 이 클래스의 책임으로 남았다.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class BossEncounterDirector : NetworkBehaviour
+public sealed partial class BossEncounterDirector : NetworkBehaviour
 {
     [Header("보스")]
     [Tooltip("스폰할 보스 프리팹(NetworkObject 필수). No.23 = TwentyThree.prefab")]
@@ -307,6 +307,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         // 등장 시네마틱 로컬 표시(카메라·레터박스·비네팅·독백·스킵 UI·스킵 입력) — 모든 피어. 씬 무수정(런타임 부착).
         if (GetComponent<BossIntroPresentation>() == null)
             gameObject.AddComponent<BossIntroPresentation>();
+        // 보스 B 승리 연출 로컬 표시(PLAN-boss-victory-cinematic) — 모든 피어, 런타임 부착.
+        if (GetComponent<BossVictoryPresentation>() == null)
+            gameObject.AddComponent<BossVictoryPresentation>();
 
         if (!IsServer)
             return;
@@ -552,6 +555,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         }
 
         CacheBossComponents(bossInstance);
+        MarkVictoryVariantServer(prefab);
 
         // 인원 HP 보정용(레이드 변형). OnNetworkSpawn 에서 읽으므로 Spawn() **전**에 넣는다.
         if (bossInstance.TryGetComponent(out TwentyThreeBoss twentyThree))
@@ -638,6 +642,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (!IsServer || !IsSpawned)
             return;
 
+        TickVictoryServer();
         TickResultTransition();
 
         if (!IsCinematicPhase(phase.Value))
@@ -1316,6 +1321,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         // 안전망만 먼저 건다. 실제 전환 시각은 HandleBossVanished 가 앞당긴다.
         _resultTransitionAt = NetworkManager.ServerTime.Time + defeatResultTimeoutSeconds;
         Edit.Log("[BossEncounter] 보스 격파 — 클리어로 기록, 사망 연출 끝을 기다린다.", this);
+
+        // 보스 B 면 승리 연출(안전망을 정지 구간만큼 미루고 결과 전환 하한을 건다).
+        TryStartVictoryServer();
     }
 
     // [서버] 사망 클립 → 디졸브가 끝나 보스가 디스폰되는 순간.
@@ -1333,6 +1341,10 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     private void TickResultTransition()
     {
         if (_resultTransitionAt <= 0d || NetworkManager.ServerTime.Time < _resultTransitionAt)
+            return;
+
+        // 승리 연출(3.20초)이 끝나기 전엔 넘어가지 않는다 — 짧은 사망 클립·FX 누락에서도 연출이 잘리지 않게(C6).
+        if (HoldsResultForVictory())
             return;
 
         _resultTransitionAt = 0d;

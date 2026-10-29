@@ -14,7 +14,7 @@ public interface ISuppressHasteTarget
     /// <summary><see cref="PlayerSkillController.GetEffectiveCooldownTime(PlayerSkillSlot)"/> 와 같은 뜻(유효 전체 쿨 = 데이터 × 특성 배율).</summary>
     float GetEffectiveCooldownTime(PlayerSkillSlot slot);
 
-    /// <summary><see cref="PlayerSkillController.ReduceCooldownServer(PlayerSkillSlot, float)"/> 와 같은 뜻(0 아래 없음).</summary>
+    /// <summary>그 칸 쿨 주인 스킬(<see cref="PlayerSkillController.GetCooldownOwnerSkill"/>)의 남은 쿨을 줄인다(0 아래 없음, 후속 창이면 보류).</summary>
     void ReduceCooldown(PlayerSkillSlot slot, float seconds);
 }
 

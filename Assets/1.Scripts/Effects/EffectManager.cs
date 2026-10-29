@@ -422,6 +422,25 @@ public class EffectManager : MonoBehaviour
         Recycle(active);
     }
 
+    /// <summary>
+    /// <paramref name="root"/> 또는 그 자손을 추종 중인 이펙트를 전부 outro 없이 즉시 반납한다(이 피어). 반납한 수.
+    /// 보스 B 승리 연출이 처치 순간 보스의 공격·타격 이펙트를 걷는 데 쓴다(경석 10-27 — 훅 도중 처치되면 이펙트가 남았다).
+    /// </summary>
+    public int ReleaseAllFollowingImmediate(Transform root)
+    {
+        if (root == null) return 0;
+        int released = 0;
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            ActiveEffect active = _slots[i];
+            if (!active.inUse || active.follow == null) continue;
+            if (active.follow != root && !active.follow.IsChildOf(root)) continue;
+            Recycle(active);
+            released++;
+        }
+        return released;
+    }
+
     #endregion
 
     #region 히트스톱

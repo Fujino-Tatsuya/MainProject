@@ -8,7 +8,20 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **23호 제압 게이지 → 제압 칸 3칸**, 브랜치 `feature/SettingsDdol`) — 기준 `Re_C_전투시스템_20261014.md` §6 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 364/0 · ⏳ 경석 Play(기믹 중 칸 유지)
+## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **보스 B 승리 연출(BOSS DOWN)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) ✅ 승인(Q1~Q3 권장안·R1~R6 문서대로) · ✅ 구현 · ✅ 커밋·feature 푸시 · ✅ 10-29 development 병합 · 전투 EditMode 416/0 · ✅ 경석 MPPM(사망 연출 정상) · 기획 원본 `보스_승리연출_v02_프로그래머_전달사양.md`(10-26)
+- 확정(grill): 보스 B 만 · 전원 같은 화면(막타 = 좌측 전경) · 처치 순간부터 조작 잠금 · 3.2초 뒤 32° 유지 → 결과 화면 · 타이포 코드 생성 · 음영 살린 회색조 · 사망 팀원 그대로.
+- 수정 예정: 새 `Map/BossVictory/*` · `Rendering/BossVictory/*` · `TwentyThreeBoss.cs` · `MonsterBase.cs`(사망 보류 훅) · `BossEncounterDirector.cs` · URP 렌더러 에셋.
+- 10-27 경석 Play 피드백 반영(상세 PLAN §9): 배경 틴트 34% · 인물·보스 회색은 보스 디졸브까지 · 슬로모션 0.1 · 플레이어 공격 끝 프레임 유지 · 글리치 3구간 · 타이포 외곽선 0.22·진입 느리게 · 연출 중 실루엣·호버 외곽선 끔 · 처치 순간 보스 이펙트·바닥 예고 정리 · 마스크 깊이 텍스처 비교(주황 점선) · 보스 Flat Kit 외곽선 ×0.35.
+- 테스트 키 F11(호스트, `Dev/DevBossFinalBlow.cs`): 어디서든 → 튜토리얼 G10 강제 개방 → 엘리베이터 스킵(시작 시각만 당김) → 등장 연출 스킵 → 23호 HP 1. 완료 직후·2초 뒤 카메라 진단 로그.
+- ⚠️ 알려진 문제(10-29 경석 MPPM, 보류): 벽에 붙어 있다가 23호 잡기 → 내려치기 끝에 놓이면 플레이어가 **벽 안에 낀다**. 서버 `ReleaseGrabbedPlayer` 는 위치를 안 건드리고(`OnGrabThrowRelease` 비어 있음) 오너 `EndRestrained` 가 손 소켓 위치 그대로 풀어 주는 것으로 추정 — 미확인.
+- 렌더러 에셋은 안 건드림(연출 중 EnqueuePass).
+- 10-29 최신화: SVN r549 핀 · origin/development(90c619ca, 132 간파 연출 포함) feature 로 머지 · 컴파일 0 · 전투 EditMode 416/0 · feature 푸시(development 미반영). 머지 뒤 수정 2건 — F11 코드 `Tutorial…` → `MapScene…` 이름 변경 반영, 인스펙터 사전에 할 일 105 새 칸 2개(`raidSelfDestructBlastIgnoreInvuln`·`pushNorthDischargeIgnoreInvuln`) 추가(development 단독으로도 이 테스트 1건이 실패한다). ⏳ Play 확인: 간파 성공 막타 때 암전·섬광이 승리 연출 시작(`ServerForceReset` → 디렉터 `ForcedReset`)에 걷히는지.
+
+## ▶▶ 반영 (2026-10-29 · 경석(Claude) · **23호 간파 성공 두 발짝 후퇴**, 브랜치 `feature/SettingsDdol`) — ✅ 구현 · 컴파일 0 · 전투 EditMode 416/0 · ⏳ 경석 Play(미끄러짐 체감 → 거슬리면 뒷걸음 클립 아트 요청)
+- 간파 피격 클립 `Boss_23_ParryHit_InPlace`(이지원 r511)는 루트 이동 0 · 프리팹 `m_ApplyRootMotion: 0` → 서버가 등 쪽(`-forward`)으로 민다. SO `parryRetreatDistance` 2m · `parryRetreatTime` 0.5초(xlsx 열 생기기 전까지 코드 기본값).
+- 대상 = 간파 피격 클립을 트는 그로기(일반·기믹 중 간파)만. 제압·릴레이·구출은 제자리. 취약 넉백 이동(`TickVulnerableKnockback`)을 공유하되 `_kbParryRetreat` 면 **벽에선 멈추기만**(간파 직후 취약이 켜져 있어 그대로면 벽 보상 = 칸 소비가 터진다) · 끝나도 취약·그로기 그대로 · 후퇴 중 다음 적중은 취약 넉백 3m 가 이어받는다.
+
+## ▶▶ 반영 (2026-10-27 · 경석(Claude) · **23호 제압 게이지 → 제압 칸 3칸**, 브랜치 `feature/SettingsDdol`) — 기준 `Re_C_전투시스템_20261014.md` §6 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 364/0 · ⏳ 경석 Play(기믹 중 칸 유지)
 - 23호: `float _counterGauge`(100, −20) → `NetworkVariable<int> _suppressSegmentsUsed`(사용한 칸). SO `suppressSegmentCount`=3 · `counterSegmentStep`=1 · `environmentSegmentStep`=1(벽·증기 벤트 둘 다 1칸 — 경석 확정). 0칸 = 제압, 제압 끝 = 다시 꽉 참. 판정 `BossCounterProgress.ResolveSegments`.
 - HUD: HP 바 밑 회색 게이지 `Detection_Fill` → `SuppressSegmentTemplate`(꺼 둠)를 칸 수만큼 복제해 806px 를 나눠 깐다. 찬 칸 = 원본 색, 빈 칸 = `suppressSegmentEmptyColor`, 오른쪽부터 빈다.
 - 훈련 스파링(TRAIN_03)은 이번 범위 밖 — 아직 `counterGaugeStep`/`environmentGaugeStep`(20%) 게이지로 칸 수(5)를 계산한다.

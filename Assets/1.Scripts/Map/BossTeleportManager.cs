@@ -366,6 +366,35 @@ public class BossTeleportManager : NetworkBehaviour
         return true;
     }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    private bool _devSkipElevator;
+
+    /// <summary>
+    /// [서버] 개발용 엘리베이터 스킵 시작(F11 — <c>DevBossFinalBlow</c>, 경석 10-27). 카운트다운 없이 <b>정상 엘리베이터 경로</b>(<see cref="StartElevatorSequence"/>)를 타되,
+    /// 시작 시각만 마지막 페이드 아웃 직전까지 지난 것으로 당긴다 — 서버는 문 앞·숨김·암전·보스방 이동(도착 ACK)을 정상 순서로 바로 지나가고,
+    /// 각 피어도 같은 시작 시각으로 리그·카메라(엘리베이터 추적 → 도착 때 플레이어로 컷 복귀)를 정상 경로로 처리한다.
+    /// 대상은 패드 위치와 무관하게 영구 사망자를 뺀 접속자 전원. 이미 엘리베이터·도착 대기 중이면 거절(끝나길 기다린다). 반환 = 결과 한 줄(null = 시작함).
+    /// </summary>
+    public string DevStartElevatorSkippedServer()
+    {
+        if (!IsServer || !IsSpawned) return "서버가 아니다";
+        if (_elevatorRunning) return "엘리베이터 연출 진행 중 — 끝나길 기다린다";
+        if (_awaitingArrival.Count > 0) return "도착 대기 중";
+        if (_pending != null || IsCountdownActive) CancelCountdown();
+        ReviveSoulsForForcedStart();
+        _devSkipElevator = true;
+        StartElevatorSequence();
+        _devSkipElevator = false;
+        return null;
+    }
+
+    // 시작 시각을 당길 초 — 마지막 페이드 아웃 시작까지(그 페이드만 보이고 암전 → 보스방).
+    private float ConsumeDevElevatorSkip(BossElevatorTimeline timeline) =>
+        _devSkipElevator ? Mathf.Max(0f, timeline.FadeOutStartAt) : 0f;
+#else
+    private float ConsumeDevElevatorSkip(BossElevatorTimeline timeline) => 0f;
+#endif
+
     /// <summary>강제 카운트다운 대기 → 엘리베이터 연출. 재도전 리셋(<see cref="CancelCountdown"/>)만 멈춘다.</summary>
     private IEnumerator TeleportAfter(double teleportAt)
     {
@@ -405,7 +434,7 @@ public class BossTeleportManager : NetworkBehaviour
         // 🔴 여기부터 취소 없음 — 발판 이탈·사망은 집결 카운트다운만 취소한다. 재도전 리셋만 이 시퀀스를 멈춘다.
         _elevatorRunning = true;
         BossElevatorTimeline timeline = rig.BuildTimeline(participants.Count);
-        double start = NetworkManager.ServerTime.Time;
+        double start = NetworkManager.ServerTime.Time - ConsumeDevElevatorSkip(timeline);
 
         // 참가자 순서를 시작 시각보다 먼저 쓴다 — 피어가 시작 시각을 보는 순간 인원(시간표)도 맞아 있게.
         _elevatorClientIds.Clear();
@@ -752,8 +781,16 @@ public class BossTeleportManager : NetworkBehaviour
         _fadingIn = true;
 
         // 보스룸 도착 — 엘리베이터 암전 유지를 끝내고(기존 페이드 인으로) 카메라를 플레이어로 컷 복귀.
+        // 🔴 SetCameraFollow(null) 은 엘리베이터 임시 추적이 있을 때만 컷한다. 엘리베이터 없이 왔으면(리그 없는 구성·F11) 따로 컷해야
+        //    카메라가 옛 자리에서 감쇠로 끌려오지 않는다.
         _elevatorArrivedLocal = true;
+        bool hadTemporaryFollow = _cameraFollow != null;
         SetCameraFollow(null);
+        if (!hadTemporaryFollow)
+        {
+            CameraTargetSwitcher cameraSwitcher = CameraTargetSwitcher.Active;
+            if (cameraSwitcher != null) cameraSwitcher.CutToCurrentTarget();
+        }
 
         // 적용 완료를 서버에 통보 — 서버는 전원 ACK 이후에만 다음 단계로 넘어간다.
         ArrivalAppliedServerRpc(sequence);

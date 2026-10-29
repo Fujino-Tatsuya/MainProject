@@ -46,6 +46,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
             encounterLock.CinematicHiddenChanged += HandleCinematicLockChanged;
             encounterLock.CinematicInputLockChanged += HandleCinematicLockChanged;
         }
+        VictoryInputHeldChanged += ApplyCurrentAccess;
     }
 
     private void Start()
@@ -64,6 +65,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
             encounterLock.CinematicHiddenChanged -= HandleCinematicLockChanged;
             encounterLock.CinematicInputLockChanged -= HandleCinematicLockChanged;
         }
+        VictoryInputHeldChanged -= ApplyCurrentAccess;
     }
 
     private void HandleGameplayAccessChanged(PlayerLifeGameplayAccess access)
@@ -106,12 +108,38 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
                      $"elevatorLock={lastLoggedElevatorLock} allowsMovement={allowsMovement}", this);
         }
 
+        // 🔴 보스 승리 연출 홀드는 취소 판정에 넣지 않는다 — 막타 공격 동작을 살린 채 0.12초에 얼려야 한다(PLAN-boss-victory-cinematic Q1).
+        //    스킬 취소는 2.00초 정식 잠금(SetCinematicInputLockServer)이 한다.
         CancelCombatActions(allowsCombatInput);
 
         // DeadPresentation/PermanentDead는 PlayerInput 자체를 끄고 Direction을 즉시 0으로 만든다.
         // Soul은 PlayerInput을 유지하되 아래 전투 게이트만 닫아 이동 입력을 보존한다.
-        inputReader.SetInputEnabled(allowsMovement);
-        inputReader.SetCombatInputEnabled(allowsCombatInput);
+        inputReader.SetInputEnabled(allowsMovement && !VictoryInputHeld);
+        inputReader.SetCombatInputEnabled(allowsCombatInput && !VictoryInputHeld);
+    }
+
+    // ── 보스 승리 연출 입력 홀드(로컬, 오너만 의미 있음) ──
+    // 처치 순간부터 입력만 막는다(행동 취소 없음). BossVictoryPresentation 이 켜고, 씬이 끝날 때 끈다.
+    private static bool victoryInputHeld;
+    private static event System.Action VictoryInputHeldChanged;
+
+    // 도메인 리로드 없이 Play 를 다시 켜도 지난 판 홀드가 남지 않게.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetVictoryInputHeld()
+    {
+        victoryInputHeld = false;
+        VictoryInputHeldChanged = null;
+    }
+
+    /// <summary>보스 승리 연출 입력 홀드 중인가.</summary>
+    public static bool VictoryInputHeld => victoryInputHeld;
+
+    /// <summary>보스 승리 연출 입력 홀드를 켜고 끈다 — 모든 정책 인스턴스가 즉시 다시 적용한다.</summary>
+    public static void SetVictoryInputHeld(bool held)
+    {
+        if (victoryInputHeld == held) return;
+        victoryInputHeld = held;
+        VictoryInputHeldChanged?.Invoke();
     }
 
     /// <summary>

@@ -65,6 +65,9 @@ public sealed class PlayerSilhouetteFeature : ScriptableRendererFeature
     /// </summary>
     public static bool DevEnabled = true;
 
+    /// <summary>연출이 잠깐 끈다(보스 B 승리 연출 — 보스에 가려진 플레이어 윤곽선이 컷을 깬다, 경석 10-27). F7 측정 토글(<see cref="DevEnabled"/>)과 별개.</summary>
+    public static bool SuppressedByCinematic;
+
     private Material _maskLocalMaterial;
     private Material _maskRemoteMaterial;
     private Material _compositeMaterial;
@@ -98,7 +101,7 @@ public sealed class PlayerSilhouetteFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        if (!DevEnabled)
+        if (!DevEnabled || SuppressedByCinematic)
             return;
 
         if (_pass == null || _compositeMaterial == null || _maskLocalMaterial == null)

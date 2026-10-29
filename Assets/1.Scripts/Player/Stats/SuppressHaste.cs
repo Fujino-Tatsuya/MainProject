@@ -146,12 +146,14 @@ public static class SuppressHaste
                 : null;
         }
 
-        public float GetEffectiveCooldownTime(PlayerSkillSlot slot) => skills != null ? skills.GetEffectiveCooldownTime(slot) : 0f;
+        // 후속 창(어쌔신 그림자 회귀 등)이 열려 있어도 원래 스킬 기준 — 쿨 시작 전이면 보류했다가 시작 때 바른다.
+        public float GetEffectiveCooldownTime(PlayerSkillSlot slot) =>
+            skills != null ? skills.GetEffectiveCooldownTime(skills.GetCooldownOwnerSkill(slot)) : 0f;
 
         public void ReduceCooldown(PlayerSkillSlot slot, float seconds)
         {
             if (skills != null)
-                skills.ReduceCooldownServer(slot, seconds);
+                skills.ReduceCooldownOrHoldServer(skills.GetCooldownOwnerSkill(slot), seconds);
         }
 
         public PlayerLifeState LifeState => life.State;
