@@ -311,18 +311,22 @@ public sealed class TraitSelectionModel
     }
 
     /// <summary>
-    /// 자동 획득 대상: 아직 안 고른 참가자의 제시 후보 중 1장 — 고정 후보 방식은 첫 번째, 무작위 방식은 무작위. 대상이 아니면 -1.
-    /// 판정만 한다 — 실제 획득은 반환값으로 <see cref="TryChoose"/> 를 부른다.
+    /// 자동 획득 대상: 아직 안 고른 참가자의 제시 후보 중 1장 — 고정 후보 방식은 첫 번째, 무작위 방식은 무작위. 대상이 아니면 false.
+    /// 판정만 한다 — 실제 획득은 <paramref name="traitHash"/> 로 <see cref="TryChoose"/> 를 부른다.
+    /// 특성 키는 ID 해시라 음수일 수 있다 — "없음"은 반환값 false 로만 나타낸다.
     /// </summary>
-    public int PickAutoChoice(ulong clientId, Func<int, int> next)
+    public bool TryPickAutoChoice(ulong clientId, Func<int, int> next, out int traitHash)
     {
         if (next == null)
             throw new ArgumentNullException(nameof(next));
+
+        traitHash = TraitIdHash.None;
         if (!HasPendingChoice(clientId))
-            return -1;
+            return false;
 
         List<int> offered = players[clientId].Offered;
-        return IsFixed ? offered[0] : offered[ClampIndex(next(offered.Count), offered.Count)];
+        traitHash = IsFixed ? offered[0] : offered[ClampIndex(next(offered.Count), offered.Count)];
+        return true;
     }
 
     /// <summary>이번 라운드 참가자이고 1장 이상 제시받았는데 아직 안 골랐다.</summary>

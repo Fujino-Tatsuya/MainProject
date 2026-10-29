@@ -415,8 +415,8 @@ public sealed class TraitDirector : NetworkBehaviour
         if (!CanServe)
             return false;
 
-        int traitHash = model.PickAutoChoice(clientId, random.Next);
-        return traitHash >= 0 && CommitChoice(clientId, traitHash, auto: true);
+        return model.TryPickAutoChoice(clientId, random.Next, out int traitHash)
+            && CommitChoice(clientId, traitHash, auto: true);
     }
 
     /// <summary>[서버] 이번 라운드에서 아직 안 고른 전원을 자동 획득 처리한다. 처리한 인원 수를 반환한다.</summary>
