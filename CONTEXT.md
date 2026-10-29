@@ -82,6 +82,11 @@ Update this file when a term becomes important enough that future agents or team
 - 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
 - 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
 - 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+## ▶▶ 작업 세션 (2026-10-29 · 민경(Claude) · **트렌치커버 벤트 연기 — 구멍 9개 랜덤 분출**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 제작(A·B·C 비교 → **B 확정**)·민경 승인 · ✅ MainProject 반입·배선(미커밋) · ⏳ 민경 Play(존) · 핸드오프 [handoff-vent-smoke-vfx.md](Docs/tech/handoff-vent-smoke-vfx.md)
+- `2.Prefabs/Environment/Architecture/Floors/floor_metal_trenchcover.prefab` 에 `SmokeHole_1~9` 소켓(+ `FX_Vent_Smoke_Cel`) · 루트 `VentSmokeEmitter`(신규 `1.Scripts/Effects/VentSmokeEmitter.cs`) 추가. 옛 자식 `FX_Smoke_2` 는 뺀 채(민경 결정). 존 4종에 자동 반영.
+- `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab`: FBX 원본 트렌치커버 12개 → 벤트 프리팹으로 교체(오버라이드 보존, 씬 참조 영향 없음 확인). 연기 높이 처음의 2배(약 4.2m) · 분출 머리 덩어리 `Blast` · 붉은 밑동 · 분출 전 예고 `Leak`(0.45초, `burstDuration` 1.25~2.05)로 재반입.
+- 에셋 SVN add: `Common/Env/FX_Vent_Smoke_Cel.prefab` · 새 폴더 `_Materials/VentSmoke`(M_VentSmoke_Cel) · `Textures/VentSmoke`(T_VentSmoke_Cel) (+ 폴더 .meta)
+
 ## ▶▶ 작업 세션 (2026-10-28 · 민경(Claude) · **맵 포드 착지 바람 링 `FX_Pod_WindRing`**, 브랜치 `feature/VFX`) — ✅ MyProject 제작(빌더 `Tools/VFX/Pod Wind Ring`)·민경 승인 · ✅ MainProject 반입·배선(배선 검사 통과, 미커밋) · ⏳ 민경 Play(맵 진입 포드 착지)
 - `4.MapScene` `MapPodArrival.impactEffect` 1줄: `FX_Ground_Crash_Entry` → `FX_Pod_WindRing_Entry`(computedDuration 1). 23호 `TwentyThree.prefab` GroundCrash 소켓은 옛 이펙트 그대로. 배율 = `PodDropSettings.impactEffectScale`(1.5).
 - 구성: 흙색 섞인 회색 먼지(알파 블렌드) 링 메시 고리 3(Haze·Soft·Sharp — 통합 셰이더 마스크 침식으로 결대로 부서지며 사라짐) + 왜곡 고리(HS_Distortion, URP 불투명 텍스처 필요 — PC_RPAsset 켜짐) + 먼지 뭉게 14 + 바람 줄기 22. 약 1초.
