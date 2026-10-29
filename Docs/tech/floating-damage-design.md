@@ -18,6 +18,8 @@
 | 흐름 | 단발 = 뜨고 떨어지며 사라짐 / 누적(Multi) = 한 숫자에 합산하다 사라짐(§3) |
 | 크기·색 | 피해 강도 3구간(낮음/중간/높음) — 대상 등급별 %(§4) |
 | 줌 | **카메라 줌과 무관** — 크기·픽셀 오프셋 고정(§7: 넣었다가 뺐음, 154) |
+| 해상도 | 높이 맞춤 + 실제 px 하한 16(§4, 154) |
+| 간파 중 | 내 강 시도 ~ 성공 섬광 끝 동안 내 화면만 숨김(§5, 154) |
 | 데이터 | 서버가 피해마다 `ClientDamageDealtClientRpc` 로 실제 감소량 + 공격자 + 공격 종류를 보냄(§6) |
 | 수치 원본 | SO 에셋. **xlsx(GameData) 미연결** |
 
@@ -99,6 +101,23 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 | 높음 | 빨강 (1, 0.2, 0.15) | ×1.4 | ×1.63 → 0.12s (OutBack) | 3px 0.08s |
 
 - 크기 배율의 100% = `popupStyles[kind].height`(Damage 36px · ShieldDamage 34px).
+- **해상도 하한(154)** — Canvas 가 높이 맞춤(1080 기준)이라 숫자 실제 px = 높이 × 유지 크기 × 팀원 배율 × (화면 높이 ÷ 1080).
+  이 값이 `minScreenPixelHeight`(기본 **16 실제 px**)보다 작으면 그 높이까지 같은 배율로 키운다(`FloatingDamageMinPixelPolicy`, 등장 확대·펀치 비율은 그대로, 0 = 끔).
+  16 근거: 1080p 내 낮음(18px)은 그대로 두고, 그보다 작은 팀원 낮음(13.5px)·720p 낮음(12px)부터 올린다(16px = 흔한 본문 글자 최소 크기).
+
+  | 화면 (화면 높이 ÷ 1080) | 낮음 내/팀원 | 중간 내/팀원 | 높음 내/팀원 |
+  |---|---|---|---|
+  | 1920×1080 · 2560×1080 (1.0) | 18 / 13.5→**16** | 36 / 27 | 50.4 / 37.8 |
+  | 1680×1050 (0.972) | 17.5 / 13.1→**16** | 35 / 26.3 | 49 / 36.8 |
+  | 1920×1200 (1.111) | 20 / 15→**16** | 40 / 30 | 56 / 42 |
+  | 1280×720 (0.667) | 12→**16** / 9→**16** | 24 / 18 | 33.6 / 25.2 |
+  | 960×540 (0.5) | 9→**16** / 6.8→**16** | 18 / 13.5→**16** | 25.2 / 18.9 |
+  | 3440×1440 (1.333) | 24 / 18 | 48 / 36 | 67.2 / 50.4 |
+  | 3840×2160 (2.0) | 36 / 27 | 72 / 54 | 100.8 / 75.6 |
+
+  가로 길이(울트라와이드·16:10)는 크기에 영향 없다 — 높이 맞춤이 원근 카메라(세로 FOV)의 월드 크기와 같이 늘고 줄어서다. 다른 HUD 처럼 가로·반반 맞춤으로 바꾸지 않는다.
+  **MPPM 가상 플레이어·작은 Game 뷰**: Game 뷰가 고정 1920×1080 이면 렌더는 1080 이고 창에 축소해 보여 준다(가상 플레이어 레이아웃 실측 0.39·0.25배) —
+  화면 높이가 1080 이라 하한이 안 걸리고 모든 UI 가 같이 작아진다. 크기 확인은 창을 키우거나 Free Aspect 로.
 - **높음 강조 간격** `highEmphasisInterval` 0.3s — 같은 공격자·같은 대상 기준. 간격 안이면 크기·값만 반영하고 등장 확대·흔들림은 생략(`FloatingDamageEmphasisGate`).
 - HP 피해(`PopupKind.Damage`)만 구간 색, 다른 종류는 `popupStyles` 색.
 
@@ -115,6 +134,11 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 - enum 은 SO·PlayerPrefs 에 정수로 저장 — **끝에만 추가**.
 - **로컬 플레이어가 받은 피해는 띄우지 않는다**(Presenter·Spawner 양쪽에서 거름). 자기 피격은 HUD·HitFlash 담당.
 - 공격자가 플레이어가 아닌 피해도 "로컬 공격 아님" → 팀원 스타일.
+- **간파 중 숨김(154)** — 간파 연출 디렉터 A5 `hideDamageNumbers`(기본 켬)가 켜져 있으면, **내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝**
+  (실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 동안 **이 화면만** `FloatingDamageCanvas` 의 Canvas 를 끈다(`enabled = false`).
+  숫자 생성·수명·누적은 그대로 돌아 끝나면 살아 있는 숫자가 보인다. 약 시도·대상 없음·팀원 화면은 숨기지 않는다.
+  스포너 `LateUpdate` 가 `InterruptProductionDirector.DamageNumbersHidden` 을 읽는다(디렉터는 스포너를 모름). 규칙 = `InterruptProductionRules.ShouldHideDamageNumbers`
+  — [interrupt-presentation.md §6.4](interrupt-presentation.md#64-스위치프로필-위치) A5.
 
 ## 6. 보호막 숫자 · 데이터 경로
 
@@ -146,7 +170,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 | `FloatingDamageSpawner` | Overlay Canvas·풀·누적 키 표·앵커 결정·렌더 직전 배치 |
 | `FloatingDamagePopup` | 숫자 1개의 시간 함수(상승·유지·하강·페이드·펀치·흔들림) |
 | `FloatingDamagePresenter` | Unit 이벤트 → 필터 → Submit |
-| `FloatingDamageSettings` | 수치 SO + 표시 필터·스타일·구간·모양 |
+| `FloatingDamageSettings` | 수치 SO + 표시 필터·스타일·구간·모양 · 해상도 하한 규칙 `FloatingDamageMinPixelPolicy` |
 | `FloatingDamageTier` / `FloatingDamageAccumulationPolicy` | 구간 판정·강조 간격 / 누적 키 |
 | `FloatingDamageDigitSet` / `FloatingDamageNumberView` | 이미지 글꼴 / 글자 Image |
 | `FloatingDamageAnchor` | 대상별 생성점(§2-3) |
@@ -163,6 +187,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 5. 슬로우·히트스톱 때 숫자 느려짐 그대로(§3).
 6. 굵은 스프라이트 없음 — 높음 구간 "굵게"는 표현하지 않는다(§1).
 7. 대상별 위치 오프셋 = 프리팹 루트 `FloatingDamageAnchor`, xlsx 미연결(§2-3·§10). 코드 수정 없음 — 프리팹 부착은 사용자 몫.
+8. 후속 — 간파 중 숨김(§5, 디렉터 A5) · 해상도 하한 `minScreenPixelHeight` 16(§4).
 
 ## 역사
 2026-08-05 초안은 World-space TMP · NetworkVariable 복제 기반 · "체력바 옆 Active 상태머신"을 검토했으나, 구현은

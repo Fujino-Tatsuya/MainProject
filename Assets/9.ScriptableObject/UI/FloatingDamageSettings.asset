@@ -18,6 +18,7 @@ MonoBehaviour:
   referenceResolution: {x: 1920, y: 1080}
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
+  minScreenPixelHeight: 16
   spawnOffset: 20
   spawnScatter: {x: 12, y: 6}
   riseDuration: 0.2
