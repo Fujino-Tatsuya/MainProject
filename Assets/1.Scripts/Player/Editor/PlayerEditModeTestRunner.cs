@@ -74,6 +74,7 @@ internal static class PlayerEditModeTestRunner
         "^LobbyProximityDoorPenetrationTests$", // 할 일 99 — 로비 문짝 다음 자세 × 몸 캡슐 겹침(실제 Box·비볼록 MeshCollider → 문짝 상자, 돌아 있는 문)
         "^PlayerRejoinLifeRulesTests$", // 할 일 48 C14 R5c — 재합류 생명: 퇴장 기록(사망 연출 목적지·체력 비율)·복원 판정·복원 체력·전멸 덮어쓰기 값
         "^InterruptSuccessFxTests$", // 할 일 87 C4 — 간파 성공 이펙트: 목적·발동자·스폰 여부 → 재생, Player.prefab base 빈 칸
+        "^AttackShapeTests$", // 할 일 153 1/6 — 공격 판정 도형 코어: 4종 경계·도넛·오프셋·배율·높이·합집합 1회·Overlap 수집·데이터 테이블 행
     };
 
     const string Tag = "[PlayerTests]";
