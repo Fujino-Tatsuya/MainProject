@@ -27,8 +27,9 @@ public static class InterruptWindowLengthResolver
     /// </summary>
     public delegate bool Adapter(GameObject owner, bool isServer, out float length);
 
-    // 기본 어댑터. 할 일 139-6 단계 2~4 에서 몬스터 카운터 창·23호 어댑터가 여기 붙는다.
-    private static readonly List<Adapter> Adapters = new List<Adapter> { TryTrainingDummy };
+    // 기본 어댑터 — 허수아비(단계 1)·중간보스·로비 스파링 봇(단계 2). 맡는 대상이 겹치지 않는다(허수아비엔 MonsterBase 가 없다).
+    // 할 일 139-6 단계 3~4 에서 23호 어댑터가 여기 붙는다.
+    private static readonly List<Adapter> Adapters = new List<Adapter> { TryTrainingDummy, TryMidBossCounterWindow };
 
     /// <summary>어댑터를 뒤에 붙인다(이미 있으면 그대로).</summary>
     public static void Register(Adapter adapter)
@@ -79,6 +80,26 @@ public static class InterruptWindowLengthResolver
         }
 
         length = ForTrainingDummy(isServer, dummy.ServerWindowGate);
+        return true;
+    }
+
+    /// <summary>
+    /// 중간보스(SpinnerBot·GauntletBot·WallBot)·로비 스파링 봇(<see cref="TrainingSparringBot"/>) 창 길이 = <see cref="MonsterCounterWindow.WindowDuration"/>
+    /// (저작값 ÷ 몬스터 SO 공격속도). 네 봇 모두 창을 이 길이로 열고 같은 길이의 단계 타이머로 닫는다.
+    /// 저작값·SO 는 모든 피어가 같은 에셋이라 서버·원격 클라가 같은 값이다(공격속도는 버프·디버프 없는 SO 값 — <see cref="MonsterBase.AttackAnimSpeed"/>).
+    /// 성공·피격·상태 이탈·Gauntlet 타격 순간(OnAttackHit) 같은 조기 닫힘은 복제 bool 로만 안다.
+    /// 🔴 타입으로 한정한다 — 23호 프리팹에도 <see cref="MonsterCounterWindow"/> 가 붙어 있지만 23호 창은 자기 계통이라 이 길이가 아니다.
+    /// </summary>
+    private static bool TryMidBossCounterWindow(GameObject owner, bool isServer, out float length)
+    {
+        length = Unknown;
+        if (!owner.TryGetComponent(out MonsterBase monster)
+            || !(monster is SpinnerBot || monster is GauntletBot || monster is WallBot || monster is TrainingSparringBot))
+            return false;
+
+        // 카운터 없음(컴포넌트 없음·길이 0)이면 창이 열리지 않는다 — 모름.
+        if (owner.TryGetComponent(out MonsterCounterWindow counter) && counter.WindowDuration > 0f)
+            length = counter.WindowDuration;
         return true;
     }
 
