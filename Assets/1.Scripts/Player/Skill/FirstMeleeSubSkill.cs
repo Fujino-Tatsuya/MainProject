@@ -391,16 +391,16 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             return;
 
         forward.y = 0f;
-        AttackShapePose pose = CounterPose(data.HitArea, origin, forward);
+        AttackShapeSet counterArea = CounterArea(data, origin, forward, out AttackShapePose pose);
 
         // 수호의 파동(할 일 126) — 반경 0 = 특성 없음.
-        AttackShapeSet pushArea = PaladinTraitRules.EPushArea(TraitPushRadius());
+        AttackShapeSet pushArea = TraitPushArea();
         counterTargets.Clear();
         counterHits.Clear();
         counterLandedUnits.Clear();
         resolveCounterTarget ??= ResolveShapeTarget;
-        if (data.HitArea != null)
-            AttackShapeQuery.Collect(data.HitArea, pose, data.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
+        if (counterArea != null)
+            AttackShapeQuery.Collect(counterArea, pose, data.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
                 resolveCounterTarget, counterTargets, counterHits);
         bool onHitBonusTaken = false;
 
@@ -458,7 +458,21 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             ? area.ResolvePose(origin, guardForward, origin, guardForward)
             : new AttackShapePose(origin, guardForward);
 
+    /// <summary>
+    /// 반격 판정 영역(데이터 hitArea)·기준 포즈(<see cref="CounterPose"/>) — 수호의 파동 원(<see cref="TraitPushArea"/>)도 이 포즈를 쓴다.
+    /// 서버 반격 판정(<see cref="ResolveCounterHit"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet CounterArea(FirstMeleeSubSkillData data, Vector3 origin, Vector3 guardForward, out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = CounterPose(area, origin, guardForward);
+        return area;
+    }
+
     // ── 수호의 파동(PAL_4_E_PUSH, 할 일 126) ──
+
+    /// <summary>수호의 파동 판정 영역(<see cref="PaladinTraitRules.EPushArea"/> — 반경 = 특성 수치). 특성 없으면 null. 판정·특성 랩 기즈모 공용.</summary>
+    public AttackShapeSet TraitPushArea() => PaladinTraitRules.EPushArea(TraitPushRadius());
 
     // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다. 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
     public float TraitPushRadius() =>

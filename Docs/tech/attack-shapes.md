@@ -120,7 +120,10 @@ hitArea.shapes[1].length            (hitArea.shapes[1] · AttackRectShape)
 1. 공격 데이터 SO 에 `[SerializeField] private AttackShapeSet hitArea = new AttackShapeSet();`(카테고리 시트 `[DataTableSheet]` 는 그 SO 가 이미 가진 것).
 2. 인스펙터 '도형 추가' 로 도형을 넣고 기준점 종류를 고른다. 오류는 `hitArea.Validate(errors)`.
 3. [서버] 판정 시점에: `pose = hitArea.ResolvePose(...)` → 특성 배율이 있으면 `area = hitArea.Scaled(l, w)` → `AttackShapeQuery.Collect(area, pose, data.HittableLayers, QueryTriggerInteraction.Collide, buffer, ResolveTarget, seen, hits)` → `hits` 마다 피해.
-4. 기즈모: `AttackShapeDrawing.DrawGizmos(area, pose, color)`(OnDrawGizmos) 또는 `DrawHandles`(씬 GUI).
+4. 기즈모: `AttackShapeDrawing.DrawGizmos(area, pose, color)`(OnDrawGizmos) 또는 `DrawHandles`(씬 GUI). (도형, 포즈) 는 판정이 쓰는 그 함수에서 받는다 — 판정 안에서 인라인으로 만들고 있으면 공용 정적 함수로 꺼내 판정과 기즈모가 같이 부른다.
+   특성 랩 공격 범위 기즈모(`Dev/TraitLab/TraitLabAttackGizmos.cs`)에 새 공격을 넣으려면 `TraitLabAttackShapes` 에 그 공용 함수를 부르는 `Add…` 한 줄 + `TraitLabAttackShapeTests` 에 동일성 테스트 하나.
+
+**특성 랩 기즈모 사용법**: DebugTraitLab 씬 Play → 패널 `공격 범위 기즈모` 체크(기본 꺼짐) → 분류 3개(■ 기본공격 하늘 · 스킬 주황 · 특성 추가 공격 분홍) 켜고 끄기. 씬의 모든 플레이어를 지금 위치·바라보는 방향 기준으로 매 프레임 다시 모아 특성 넣기·빼기가 바로 반영된다. Game 뷰는 상단 Gizmos 버튼을 켜야 보인다. 특성 추가 공격(파생 명세)·거너 R 은 서버 전용이라 호스트 창에서만 나온다. 라벨 '(도형 아님)' = 판정 도형이 아닌 콜라이더 판정.
 5. 테스트: 그 공격의 기대 형상을 `Contains` 로 확인한다(Physics 없이).
 
 ## 8. 이관 단계
@@ -135,13 +138,13 @@ hitArea.shapes[1].length            (hitArea.shapes[1] · AttackRectShape)
 | 5b | 거너 Q — ✅ `GunnerChargeLaserData.hitArea`(직사각형 1개 = **최대 충전** 기준, 예전 발사 상자 `SkillHitVolume.Beam`: length 16(예전 `maxRange`)·width 1.2(예전 `beamWidth`)·뒤 0·높이 −1~1(예전 `beamHeight` 2 를 원점 높이 중심)). 기준점 `Point` = 발사 원점 `FireOrigin`(발밑 + 위로 `muzzleHeight`) + 조준 방향(`GunnerChargeLaserData.FirePose`). 발마다 `FireArea(길이, 폭)` = `Scaled(길이 / length, 폭 / width)` — 길이 = 충전 사거리(`minRange` → 도형 length 보간)를 지형 차단(SphereCast, 반경 = 데이터 폭/2 — 광폭 제외)으로 자른 값, 폭 = 광폭 레이저(`GUN_1_WIDTH`) ×1.3. `GunnerBeamAttack.FirePiercing`·`CollectAllies`(보호막) = `Collect`(대상 키 Unit, 없으면 Hurtbox · 자기 몸·시체 제외). 잔류 포격(`GUN_4_ECHO_Q`) = 첫 발 포즈(원점·방향)·충전 사거리·폭으로 같은 도형, 지형 차단은 그때 다시. `MaxRange`·`BeamWidth` 는 도형에서 읽는다(지형 차단 반경·발사 연출 폭·미리보기 공용). 오너 미리보기 `FireVolume` = 첫 도형 넓은 질의 상자(`SkillHitVolume.Box`). `maxRange`·`beamWidth`·`beamHeight` 는 xlsx 행 때문에 미사용 칸으로 유지. 거너 E(냉각 백스텝)는 피해 판정이 없다. 평타(SphereCast)·R 추적 레이저(구)는 범위 밖 |
 | 5c | 어쌔신 Q·E — ✅ Q `AssassinDashStrikeSkillData.hitArea`(일반·변신 Q 각 SO, 직사각형 1개 = 예전 구간 상자 `PathBox`: length 5(**기준 길이** = SO 돌진 거리 — 구간마다 구간 길이로 맞추므로 판정엔 영향 없음, 0 이면 판정 없음)·width 1.2(예전 `pathWidth`)·뒤 0·높이 0~2(예전 `pathHeight` 2 를 발부터 위로)). 기준점 `Point` = 경로 구간 시작(서버 재구성 출발점 + 방향 × from) + 돌진 방향(`AssassinDashStrikeSkill.PathSegment` → `PathArea(구간 길이)` = `Scaled(구간 / length, 1)`·`PathPose`). 매 틱 구간 `Collect`(질의 안 1회) → 사용당 1회는 기존 적중 장부(`AssassinDashHitLedger`, 그림자 회귀 복귀는 원래 Q 장부·단계별). 그림자 회귀(`AssassinShadowReturnSkill`)는 같은 단계 코드라 같은 도형(원래 Q 데이터). 추격의 궤적(`ASN_4_Q_TRAIL`, 도형 비움) = 같은 도형을 지나온 선분 길이로(기준점 = 선분 시작). `PathWidth` 는 도형에서 읽고 `pathWidth` 는 xlsx 행 때문에 미사용 칸으로 유지, `pathHeight`(DataTableIgnore)·`AssassinTrailRules.Box`·`PathBox` 삭제. 변신 E `AssassinCircleStrikeSkillData.hitArea`(원 1개 = 예전 원기둥: radius 2(예전 `aoeRadius`)·높이 0~3(예전 `areaHeight`)), 기준점 `Point` = 원 중심(지면 조준점, 높이 = 시전자 발) + 시전자 → 중심 방향(`StrikePose`). 칼날의 영역(`ASN_3_E_AREA`) = `StrikeArea(반경 배율)` = `Scaled(배율, 1)`, 5타 모두 확정 순간 영역·포즈. `AoeRadius` 를 덮어써(`PlayerSkillData.AoeRadius` virtual) 조준 원·VFX·미리보기가 도형 radius 를 읽는다 — 이 SO 의 베이스 `aoeRadius` 칸은 미사용. 오너 미리보기 `PreviewVolume` = 같은 도형의 원기둥(`SkillHitVolume.CircleColumn`). `areaHeight` 삭제. 일반 E(단검 강화)는 판정 없음(강타 = 2단계 평타), R 변신은 판정 없음, 간파 `InterruptAttack` 그대로 |
 | 5d | 남은 캐릭터 Q·E 스킬(있으면) |
-| 6 | DebugTraitLab 기즈모 통합(할 일 152 기즈모 → `AttackShapeDrawing`) |
+| 6 | DebugTraitLab 기즈모 통합 — ✅ `TraitLabAttackGizmos` 는 각 공격이 서버 판정에 넘기는 그 (도형, 포즈) 를 판정과 같은 공용 함수로 받아 `AttackShapeDrawing.DrawGizmos` 로만 그린다(기즈모 쪽 수치·형상 계산 없음). 꺼낸 공용 함수(판정 동작 불변): `PlayerDefaultAttack.StepArea`·`FirstMeleeMainSkill.HoldArea`·`ShieldDashSampleArea`·`FirstMeleeSubSkill.CounterArea`·`TraitPushArea`·`AssassinCircleStrikeSkill.ResolveStrikeArea`(+ `RadiusMultiplier` 공개)·`GunnerChargeLaserSkill.ShotArea`(지형 차단 길이 포함). 기존 공용: `AssassinBasicAttack.TryGetHitArea`·`AssassinDashStrikeSkill.PathSegment`·`PaladinTraitRules.QBlastPose`. 152 임시 그리기(넓은 질의 상자·임시 부채꼴·원기둥, `AddStrikeBox`·`AddBroadBoxes`)는 삭제. 도형 아닌 판정(거너 평타 캡슐·R 추적 구·간파 앵커 상자)만 콜라이더 형상 + 라벨 '(도형 아님)'. `AttackShapeDrawing` 은 높이 범위(minHeight·maxHeight 고리 + 세로 모서리, 옅게)도 그린다. 테스트 `TraitLabAttackShapeTests`(기즈모 = 판정 동일성·외곽선 = Contains 경계) |
 
 간파 상자(`InterruptAttack`)는 어느 단계에도 들어가지 않는다.
 
 ## 9. 알려진 제약
 
-- 외곽선은 바닥(기준점 높이) 한 겹만 그린다. 높이 범위는 그리지 않는다.
+- 외곽선은 바닥(기준점 높이 + lift) 고리를 진하게, 높이 범위(`minHeight`·`maxHeight`) 고리와 세로 모서리(고리당 최대 8개)를 옅게 그린다(`heightRange: false` 면 바닥만). 도넛은 안쪽 고리까지.
 - 몸 겹침(§4)은 볼록 도형(180° 넘는 부채꼴은 두 조각)·볼록 몸에서 정확하다. 남는 근사:
   - 비볼록 MeshCollider·Terrain 등은 경계 상자(AABB)로 본다 — 실제 몸보다 넓게 맞는다. 볼록 MeshCollider 도 메시를 읽을 수 없으면(빌드 Read/Write 꺼짐) AABB.
   - 도넛(부채꼴 `minOffset`·원 `minRadius` > 0)은 빈 곳 밖 겹침을 교대 투영으로 찾아 기울어진 상자·캡슐이 빈 곳 쪽으로 걸친 경우를 약 4% 놓친다(구 몸은 정확). 지금 데이터에 도넛은 없다(모두 0).

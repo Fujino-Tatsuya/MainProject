@@ -12,59 +12,55 @@ public enum TraitLabGizmoCategory
 }
 
 /// <summary>
-/// 기즈모 한 개 — 판정 코드가 만든 형상 값을 그대로 담는다(여기서 수치를 만들지 않는다).
-/// 상자(OverlapBox·SkillHitVolume.Beam)·구·캡슐(SphereCast 경로 포함)·바닥 부채꼴(360 = 원)·원기둥(SkillHitVolume.CircleColumn).
+/// 기즈모 한 개(할 일 152·153 6단계). 판정 도형 공격 = 판정 코드가 서버 판정에 넘기는 그 (<see cref="AttackShapeSet"/>, <see cref="AttackShapePose"/>) 를 그대로 담고
+/// <see cref="AttackShapeDrawing"/> 으로만 그린다(여기서 수치·형상을 만들지 않는다).
+/// 도형 판정이 아닌 것(거너 평타 캡슐 레이저·R 추적 구·간파 앵커 상자)만 콜라이더 형상(상자·구·캡슐)으로 담고 라벨에 '(도형 아님)' 을 붙인다.
 /// </summary>
 public readonly struct TraitLabGizmoShape
 {
-    public enum ShapeKind { Box, Sphere, Capsule, Sector, Column }
+    public enum ShapeKind { Area, Box, Sphere, Capsule }
+
+    public const string NotShapeSuffix = " (도형 아님)";
 
     public readonly ShapeKind Kind;
     public readonly TraitLabGizmoCategory Category;
     public readonly string Label;
-    public readonly Vector3 Center;      // 상자 중심·구 중심·부채꼴 꼭짓점·원기둥 바닥 중심·캡슐 끝 0
-    public readonly Vector3 Extents;     // 상자 반 크기 / 부채꼴 정면 / 캡슐 끝 1
+    public readonly AttackShapeSet Area;     // Area — 판정 도형
+    public readonly AttackShapePose Pose;    // Area — 판정 기준 포즈
+    public readonly Vector3 Center;          // 상자 중심·구 중심·캡슐 끝 0
+    public readonly Vector3 Extents;         // 상자 반 크기 / 캡슐 끝 1
     public readonly Quaternion Rotation;
     public readonly float Radius;
-    public readonly float Angle;         // 부채꼴 전체 각도
-    public readonly float Height;        // 원기둥 높이
 
-    TraitLabGizmoShape(ShapeKind kind, TraitLabGizmoCategory category, string label, Vector3 center, Vector3 extents,
-        Quaternion rotation, float radius, float angle, float height)
+    TraitLabGizmoShape(ShapeKind kind, TraitLabGizmoCategory category, string label, AttackShapeSet area, in AttackShapePose pose,
+        Vector3 center, Vector3 extents, Quaternion rotation, float radius)
     {
         Kind = kind;
         Category = category;
         Label = label;
+        Area = area;
+        Pose = pose;
         Center = center;
         Extents = extents;
         Rotation = rotation;
         Radius = radius;
-        Angle = angle;
-        Height = height;
     }
 
+    /// <summary>판정 도형 공격 — 판정 함수가 낸 영역·포즈 그대로.</summary>
+    public static TraitLabGizmoShape FromArea(TraitLabGizmoCategory c, string label, AttackShapeSet area, in AttackShapePose pose) =>
+        new TraitLabGizmoShape(ShapeKind.Area, c, label, area, pose, Vector3.zero, Vector3.zero, Quaternion.identity, 0f);
+
     public static TraitLabGizmoShape Box(TraitLabGizmoCategory c, string label, Vector3 center, Vector3 halfExtents, Quaternion rotation) =>
-        new TraitLabGizmoShape(ShapeKind.Box, c, label, center, halfExtents, rotation, 0f, 0f, 0f);
+        new TraitLabGizmoShape(ShapeKind.Box, c, label + NotShapeSuffix, null, default, center, halfExtents, rotation, 0f);
 
     public static TraitLabGizmoShape Sphere(TraitLabGizmoCategory c, string label, Vector3 center, float radius) =>
-        new TraitLabGizmoShape(ShapeKind.Sphere, c, label, center, Vector3.zero, Quaternion.identity, radius, 0f, 0f);
+        new TraitLabGizmoShape(ShapeKind.Sphere, c, label + NotShapeSuffix, null, default, center, Vector3.zero, Quaternion.identity, radius);
 
     public static TraitLabGizmoShape Capsule(TraitLabGizmoCategory c, string label, Vector3 point0, Vector3 point1, float radius) =>
-        new TraitLabGizmoShape(ShapeKind.Capsule, c, label, point0, point1, Quaternion.identity, radius, 0f, 0f);
-
-    public static TraitLabGizmoShape Sector(TraitLabGizmoCategory c, string label, Vector3 apex, Vector3 forward, float radius, float angle) =>
-        new TraitLabGizmoShape(ShapeKind.Sector, c, label, apex, forward, Quaternion.identity, radius, angle, 0f);
-
-    public static TraitLabGizmoShape Column(TraitLabGizmoCategory c, string label, Vector3 bottomCenter, float radius, float height) =>
-        new TraitLabGizmoShape(ShapeKind.Column, c, label, bottomCenter, Vector3.zero, Quaternion.identity, radius, 0f, height);
-
-    public static TraitLabGizmoShape FromVolume(TraitLabGizmoCategory c, string label, in SkillHitVolume volume) =>
-        volume.IsCircle
-            ? Column(c, label, volume.CircleCenter, volume.Radius, volume.HalfExtents.y * 2f)
-            : Box(c, label, volume.Center, volume.HalfExtents, volume.Rotation);
+        new TraitLabGizmoShape(ShapeKind.Capsule, c, label + NotShapeSuffix, null, default, point0, point1, Quaternion.identity, radius);
 
     /// <summary>판정 앵커(ColliderInfo)의 지금 월드 형상 — 판정이 Overlap 에 넘기는 값과 같은 함수(Get*ColliderInfo). 형태가 없으면 false.</summary>
-    public static bool TryFromAnchor(TraitLabGizmoCategory c, string label, ColliderInfo anchor, Vector3 offset, out TraitLabGizmoShape shape)
+    public static bool TryFromAnchor(TraitLabGizmoCategory c, string label, ColliderInfo anchor, out TraitLabGizmoShape shape)
     {
         shape = default;
         if (anchor == null)
@@ -75,17 +71,17 @@ public readonly struct TraitLabGizmoShape
             case OverlapCollider.Box:
                 BoxColliderInfo box = default;
                 anchor.GetBoxColliderInfo(ref box);
-                shape = Box(c, label, box.center + offset, box.halfExtents, box.orientation);
+                shape = Box(c, label, box.center, box.halfExtents, box.orientation);
                 return true;
             case OverlapCollider.Sphere:
                 SphereColliderInfo sphere = default;
                 anchor.GetSphereColliderInfo(ref sphere);
-                shape = Sphere(c, label, sphere.center + offset, sphere.radius);
+                shape = Sphere(c, label, sphere.center, sphere.radius);
                 return true;
             case OverlapCollider.Capsule:
                 CapsuleColliderInfo capsule = default;
                 anchor.GetCapsuleColliderInfo(ref capsule);
-                shape = Capsule(c, label, capsule.point0 + offset, capsule.point1 + offset, capsule.radius);
+                shape = Capsule(c, label, capsule.point0, capsule.point1, capsule.radius);
                 return true;
             default:
                 return false;
@@ -94,9 +90,11 @@ public readonly struct TraitLabGizmoShape
 }
 
 /// <summary>
-/// 플레이어 한 명의 공격 판정 형상을 모은다(할 일 152) — 지금 위치·바라보는 방향(<see cref="PlayerMovement.CurrentFacing"/>)에서 지금 쓰면 칠 영역.
-/// 🔴 수치·형상은 판정 코드가 쓰는 공용 함수·값에서만 읽는다(프리팹 앵커·SO·<see cref="PlayerTraitModifiers"/>·파생 공격 명세). 여기서 복제하지 않는다.
-/// 특성 파생 공격 명세(<see cref="PlayerTraitEffects.GetDerivedAttacks"/>)는 서버 전용이라 호스트 창에서만 나온다.
+/// 플레이어 한 명의 공격 판정 영역을 모은다(할 일 152·153 6단계) — 지금 위치·바라보는 방향(<see cref="PlayerMovement.CurrentFacing"/>)에서 지금 쓰면 칠 영역.
+/// 🔴 (도형, 포즈) 는 서버 판정이 부르는 바로 그 공용 함수에서만 받는다 — PlayerDefaultAttack.StepArea · AssassinBasicAttack.TryGetHitArea ·
+/// FirstMeleeMainSkill.HoldArea/ShieldDashSampleArea · PaladinTraitRules.QBlastPose · FirstMeleeSubSkill.CounterArea/TraitPushArea ·
+/// AssassinDashStrikeSkill.PathSegment · AssassinCircleStrikeSkill.ResolveStrikeArea · GunnerChargeLaserSkill.ShotArea. 여기서 복제하지 않는다.
+/// 특성 파생 공격 명세(<see cref="PlayerTraitEffects.GetDerivedAttacks"/>)·거너 R 은 서버 전용이라 호스트 창에서만 나온다.
 /// </summary>
 public static class TraitLabAttackShapes
 {
@@ -104,13 +102,20 @@ public static class TraitLabAttackShapes
     static readonly PaladinShieldDashPath ShieldDashPath = new PaladinShieldDashPath();
     static readonly PlayerSkillSlot[] Slots = { PlayerSkillSlot.Main, PlayerSkillSlot.Sub, PlayerSkillSlot.Ultimate, PlayerSkillSlot.Interrupt };
 
+    const TraitLabGizmoCategory B = TraitLabGizmoCategory.Basic;
+    const TraitLabGizmoCategory S = TraitLabGizmoCategory.Skill;
+    const TraitLabGizmoCategory T = TraitLabGizmoCategory.Trait;
+
     public static void Collect(Player player, List<TraitLabGizmoShape> shapes)
     {
         if (player == null)
             return;
 
         Vector3 position = player.transform.position;
-        Vector3 facing = player.TryGetComponent(out PlayerMovement movement) ? movement.CurrentFacing : Flat(player.transform.forward);
+        // 조준/바라보는 방향 = 바닥 평면 단위 벡터(CurrentFacing). 판정 함수들이 받는 방향과 같은 꼴.
+        Vector3 facing = player.TryGetComponent(out PlayerMovement movement)
+            ? movement.CurrentFacing
+            : new AttackShapePose(position, player.transform.forward).Forward;
         player.TryGetComponent(out PlayerTraitEffects traitEffects);
 
         CollectBasic(player, position, facing, traitEffects, shapes);
@@ -122,46 +127,11 @@ public static class TraitLabAttackShapes
 
     static void CollectBasic(Player player, Vector3 position, Vector3 facing, PlayerTraitEffects traitEffects, List<TraitLabGizmoShape> shapes)
     {
-        const TraitLabGizmoCategory B = TraitLabGizmoCategory.Basic;
+        // 가붕이 — 근접(Overlap) 단마다 판정 도형.
+        if (player.TryGetComponent(out DefaultAttackController melee) && melee.isActiveAndEnabled)
+            AddDefaultSteps(melee.AttackSteps, position, facing, shapes);
 
-        // 가붕이 — 단계의 판정 도형(할 일 153 3단계). 도형마다 넓은 질의 상자(직사각형이면 판정 영역 그대로)를 임시로 그린다 — 6단계에서 AttackShapeDrawing 으로 통합.
-        // 여러 단계가 같은 상자면 한 번만 그리고 라벨에 단계를 모은다.
-        if (player.TryGetComponent(out DefaultAttackController melee) && melee.isActiveAndEnabled && melee.AttackSteps != null)
-        {
-            IReadOnlyList<DefaultAttackStep> steps = melee.AttackSteps;
-            var boxes = new List<(Vector3 center, Vector3 half, Quaternion rotation)>();
-            var labels = new List<string>();
-            for (int i = 0; i < steps.Count; i++)
-            {
-                if (steps[i] == null || steps[i].HitType != DefaultAttackHitType.Overlap || steps[i].HitArea == null)
-                    continue;
-
-                AttackShapePose pose = PlayerDefaultAttack.ResolvePose(steps[i], position, facing);
-                foreach (AttackShape shape in steps[i].HitArea.Shapes)
-                {
-                    if (shape == null)
-                        continue;
-
-                    shape.GetBroadBox(pose, out Vector3 center, out Vector3 half, out Quaternion rotation);
-                    int index = boxes.FindIndex(b => (b.center - center).sqrMagnitude < 1e-6f && (b.half - half).sqrMagnitude < 1e-6f
-                        && Quaternion.Angle(b.rotation, rotation) < 0.01f);
-                    if (index < 0)
-                    {
-                        boxes.Add((center, half, rotation));
-                        labels.Add($"평타 {i + 1}");
-                    }
-                    else if (!labels[index].EndsWith($"{i + 1}"))
-                    {
-                        labels[index] += $"·{i + 1}";
-                    }
-                }
-            }
-
-            for (int i = 0; i < boxes.Count; i++)
-                shapes.Add(TraitLabGizmoShape.Box(B, labels[i] + "타", boxes[i].center, boxes[i].half, boxes[i].rotation));
-        }
-
-        // 어쌔신 — 그 타의 앵커 상자를 조준 방향·칼날의 영역 배율로 놓는 판정 함수 그대로.
+        // 어쌔신 — 그 타의 판정 도형(칼날의 영역 배율)·포즈를 판정 함수 그대로.
         if (player.TryGetComponent(out AssassinBasicAttack assassin) && assassin.isActiveAndEnabled)
         {
             bool transformed = player.TryGetComponent(out AssassinState state) && state.IsTransformed;
@@ -169,21 +139,21 @@ public static class TraitLabAttackShapes
             if (!transformed)
             {
                 for (int i = 0; i < normalCount; i++)
-                    AddStrikeBox(assassin, AssassinBasicAttackMode.Normal, i, facing, B, $"평타 {i + 1}타", shapes);
-                AddStrikeBox(assassin, AssassinBasicAttackMode.Enhanced, 0, facing, B, "강타", shapes);
+                    AddAssassinStep(assassin, AssassinBasicAttackMode.Normal, i, facing, B, $"평타 {i + 1}타", shapes);
+                AddAssassinStep(assassin, AssassinBasicAttackMode.Enhanced, 0, facing, B, "강타", shapes);
             }
             else
             {
-                AddStrikeBox(assassin, AssassinBasicAttackMode.Transformed, 0, facing, B, "변신 묶음", shapes);
+                AddAssassinStep(assassin, AssassinBasicAttackMode.Transformed, 0, facing, B, "변신 묶음", shapes);
             }
 
-            // 끝없는 칼날 — 일반 마지막 타·변신 묶음 마지막 판정과 같은 상자에 추가 베기.
+            // 끝없는 칼날 — 일반 마지막 타·변신 묶음 마지막 판정과 같은 도형·포즈에 추가 베기.
             AssassinBasicAttackMode mode = transformed ? AssassinBasicAttackMode.Transformed : AssassinBasicAttackMode.Normal;
             if (traitEffects != null && HasDerived(traitEffects, AssassinBasicAttack.TraitKeyFor(mode), AssassinDerivedAttackKeys.ComboExtra))
-                AddStrikeBox(assassin, mode, transformed ? 0 : normalCount - 1, facing, TraitLabGizmoCategory.Trait, "끝없는 칼날(추가 베기)", shapes);
+                AddAssassinStep(assassin, mode, transformed ? 0 : normalCount - 1, facing, T, "끝없는 칼날", shapes);
         }
 
-        // 거너 — 출발점에서 정면으로 Range 만큼, 반경 BeamWidth/2 SphereCast(벽에서 잘림).
+        // 거너 — 도형 판정 아님: 출발점에서 정면으로 Range 만큼, 반경 BeamWidth/2 SphereCast(벽에서 잘림).
         if (player.TryGetComponent(out GunnerBasicAttack gunner) && gunner.isActiveAndEnabled && gunner.Data != null)
         {
             GunnerBasicAttackData data = gunner.Data;
@@ -196,40 +166,31 @@ public static class TraitLabAttackShapes
 
             if (traitEffects != null &&
                 GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.BasicAttackKey, GunnerTraitRules.BasicExtraDerivedKey, DerivedBuffer) != null)
-                shapes.Add(TraitLabGizmoShape.Capsule(TraitLabGizmoCategory.Trait, "이중 출력(추가 발)", origin, origin + facing * length, radius));
+                shapes.Add(TraitLabGizmoShape.Capsule(T, "이중 출력", origin, origin + facing * length, radius));
         }
     }
 
-    // 할 일 153 — 도형마다 넓은 질의 상자(직사각형이면 판정 영역 그대로)를 임시로 그린다. 6단계에서 AttackShapeDrawing 으로 통합.
-    static void AddBroadBoxes(TraitLabGizmoCategory category, string label, AttackShapeSet area, AttackShapePose pose, List<TraitLabGizmoShape> shapes)
+    /// <summary>가붕이 평타 — 근접(Overlap) 단마다 판정과 같은 <see cref="PlayerDefaultAttack.StepArea"/>.</summary>
+    public static void AddDefaultSteps(IReadOnlyList<DefaultAttackStep> steps, Vector3 position, Vector3 facing, List<TraitLabGizmoShape> shapes)
     {
-        if (area == null)
+        if (steps == null)
             return;
 
-        foreach (AttackShape shape in area.Shapes)
+        for (int i = 0; i < steps.Count; i++)
         {
-            if (shape == null)
+            if (steps[i] == null || steps[i].HitType != DefaultAttackHitType.Overlap)
                 continue;
-            shape.GetBroadBox(pose, out Vector3 center, out Vector3 half, out Quaternion rotation);
-            shapes.Add(TraitLabGizmoShape.Box(category, label, center, half, rotation));
+
+            AttackShapeSet area = PlayerDefaultAttack.StepArea(steps[i], position, facing, out AttackShapePose pose);
+            AddArea(B, $"평타 {i + 1}타", area, pose, shapes);
         }
     }
 
-    static void AddStrikeBox(AssassinBasicAttack attack, AssassinBasicAttackMode mode, int step, Vector3 facing,
+    static void AddAssassinStep(AssassinBasicAttack attack, AssassinBasicAttackMode mode, int step, Vector3 facing,
         TraitLabGizmoCategory category, string label, List<TraitLabGizmoShape> shapes)
     {
-        // 할 일 153 2단계 — 판정 도형(부채꼴)만 임시로 옮겨 그린다. 6단계에서 AttackShapeDrawing 으로 통합.
-        if (!attack.TryGetHitArea(mode, step, facing, out AttackShapeSet area, out AttackShapePose pose))
-            return;
-
-        foreach (AttackShape shape in area.Shapes)
-        {
-            if (shape is AttackSectorShape sector)
-            {
-                AttackShapePose shapePose = sector.ShapePose(pose);
-                shapes.Add(TraitLabGizmoShape.Sector(category, label, shapePose.Position, shapePose.Forward, sector.Range, sector.Angle));
-            }
-        }
+        if (attack.TryGetHitArea(mode, step, facing, out AttackShapeSet area, out AttackShapePose pose))
+            AddArea(category, label, area, pose, shapes);
     }
 
     // ── 스킬 ──
@@ -238,9 +199,6 @@ public static class TraitLabAttackShapes
     {
         if (!player.TryGetComponent(out PlayerSkillController controller))
             return;
-
-        const TraitLabGizmoCategory S = TraitLabGizmoCategory.Skill;
-        const TraitLabGizmoCategory T = TraitLabGizmoCategory.Trait;
 
         for (int s = 0; s < Slots.Length; s++)
         {
@@ -252,66 +210,34 @@ public static class TraitLabAttackShapes
             string slotName = SlotName(slot);
             TraitAttackKey key = TraitAttackKey.ForSkill(slot, controller.IsAlternateSkill(skill));
 
-            // 앵커 판정(가붕이 Q·간파 3종 등) — OverlapHitboxAnchor 와 같은 앵커 월드 형상.
-            if (TraitLabGizmoShape.TryFromAnchor(S, $"{slotName} 판정", skill.HitboxAnchor, Vector3.zero, out TraitLabGizmoShape anchorShape))
+            // 앵커 판정(간파 상자 InterruptAttack 등) — 도형 판정 아님. OverlapHitboxAnchor 와 같은 앵커 월드 형상.
+            if (TraitLabGizmoShape.TryFromAnchor(S, $"{slotName} 판정", skill.HitboxAnchor, out TraitLabGizmoShape anchorShape))
                 shapes.Add(anchorShape);
 
             switch (skill)
             {
-                case FirstMeleeMainSkill paladinQ:
-                    // 판정 도형(할 일 153 5단계) — 넓은 질의 상자(직사각형이면 판정 영역 그대로)를 임시로 그린다(6단계에서 AttackShapeDrawing 으로 통합).
-                    AttackShapeSet qArea = (skill.Data as FirstMeleeMainSkillData)?.HitArea;
-                    AddBroadBoxes(S, $"{slotName} 판정", qArea, FirstMeleeMainSkill.ResolvePose(qArea, position, facing), shapes);
+                case FirstMeleeMainSkill paladinQ when skill.Data is FirstMeleeMainSkillData qData:
+                    AddPaladinQ(qData, position, facing, shapes);
 
-                    // 돌파의 방패 — 같은 도형을 돌진 경로 끝 표본으로 옮긴다(경로 = 판정과 같은 PaladinShieldDashPath).
+                    // 돌파의 방패 — 경로 끝 표본(경로 = 판정과 같은 PaladinShieldDashPath, 모드·거리 = 판정과 같은 ResolveShieldDash).
                     PaladinShieldDashSettings dash = paladinQ.ResolveShieldDash(out bool hasDashTrait);
                     if (PaladinTraitRules.UsesShieldDash(hasDashTrait, dash))
-                    {
-                        ShieldDashPath.Begin(position, facing, dash);
-                        AttackShapePose dashEndPose = FirstMeleeMainSkill.ShieldDashSamplePose(qArea, ShieldDashPath.PointAt(ShieldDashPath.Cap), position.y, ShieldDashPath.Heading);
-                        ShieldDashPath.End();
-                        AddBroadBoxes(T, $"돌파의 방패 끝 {dash.Distance:0.#}m", qArea, dashEndPose, shapes);
-                    }
+                        AddShieldDashEnd(qData, dash, position, facing, shapes);
 
-                    // 진격의 충격 — Q 가 여기서 끝났다면(기준 = 끝 지점 + 정면). 부채꼴 도형만 임시 표시(6단계에서 AttackShapeDrawing 으로 통합).
+                    // 진격의 충격 — Q 가 지금 위치·방향에서 끝났다면(판정과 같은 파생 명세·QBlastPose).
                     if (traitEffects != null)
                     {
                         traitEffects.GetDerivedAttacks(key, DerivedBuffer);
                         for (int i = 0; i < DerivedBuffer.Count; i++)
                         {
-                            TraitDerivedAttack blast = DerivedBuffer[i];
-                            if (blast.Key != PaladinTraitValues.QBlastKey)
-                                continue;
-
-                            AttackShapePose blastPose = PaladinTraitRules.QBlastPose(blast.HitArea, position, facing);
-                            foreach (AttackShape shape in blast.HitArea.Shapes)
-                            {
-                                if (shape is not AttackSectorShape sector)
-                                    continue;
-                                AttackShapePose shapePose = sector.ShapePose(blastPose);
-                                shapes.Add(TraitLabGizmoShape.Sector(T, $"진격의 충격 r{sector.Range:0.#} {sector.Angle:0}°", shapePose.Position, shapePose.Forward, sector.Range, sector.Angle));
-                            }
+                            if (DerivedBuffer[i].Key == PaladinTraitValues.QBlastKey)
+                                AddQBlast(DerivedBuffer[i].HitArea, position, facing, shapes);
                         }
                     }
                     break;
 
                 case FirstMeleeSubSkill paladinE when skill.Data is FirstMeleeSubSkillData eData:
-                    // 반격 판정 도형(할 일 153 5단계) — 부채꼴만 임시 표시(6단계에서 AttackShapeDrawing 으로 통합).
-                    AttackShapePose counterPose = FirstMeleeSubSkill.CounterPose(eData.HitArea, position, facing);
-                    if (eData.HitArea != null)
-                    {
-                        foreach (AttackShape shape in eData.HitArea.Shapes)
-                        {
-                            if (shape is not AttackSectorShape sector)
-                                continue;
-                            AttackShapePose shapePose = sector.ShapePose(counterPose);
-                            shapes.Add(TraitLabGizmoShape.Sector(S, $"E 반격 r{sector.Range:0.#} {sector.Angle:0}°", shapePose.Position, shapePose.Forward, sector.Range, sector.Angle));
-                        }
-                    }
-
-                    float pushRadius = paladinE.TraitPushRadius();
-                    if (pushRadius > 0f)
-                        shapes.Add(TraitLabGizmoShape.Sector(T, $"수호의 파동 r{pushRadius:0.#}", position, facing, pushRadius, 360f));
+                    AddPaladinE(eData, paladinE.TraitPushArea(), position, facing, shapes);
                     break;
 
                 case AssassinShadowReturnSkill:
@@ -319,55 +245,101 @@ public static class TraitLabAttackShapes
                     break;
 
                 case AssassinDashStrikeSkill dashStrike when dashStrike.DashData != null:
-                    AssassinDashStrikeSkillData qData = dashStrike.DashData;
-                    // 도형 임시 표시(할 일 153 — 6단계에서 AttackShapeDrawing 으로 통합): 첫 도형의 넓은 질의 상자 = 직사각형이면 판정 영역 그대로.
-                    AttackShapeSet pathArea = AssassinDashStrikeSkill.PathSegment(qData, position, position, facing, 0f, qData.DashDistance, out AttackShapePose pathPose);
-                    if (pathArea.IsEmpty || pathArea.Shapes[0] == null)
-                        break;
-                    pathArea.Shapes[0].GetBroadBox(pathPose, out Vector3 pathCenter, out Vector3 pathHalf, out Quaternion pathRotation);
-                    shapes.Add(TraitLabGizmoShape.Box(S, $"{slotName} 돌진 경로 {qData.DashDistance:0.#}m", pathCenter, pathHalf, pathRotation));
-                    if (traitEffects != null && HasDerived(traitEffects, key, AssassinDerivedAttackKeys.QTrail))
-                        shapes.Add(TraitLabGizmoShape.Box(T, "추격의 궤적(지나온 길)", pathCenter, pathHalf, pathRotation));
+                    AddAssassinDash(dashStrike.DashData, slotName, position, facing,
+                        traitEffects != null && HasDerived(traitEffects, key, AssassinDerivedAttackKeys.QTrail), shapes);
                     break;
 
                 case AssassinCircleStrikeSkill circle when skill.Data is AssassinCircleStrikeSkillData cData:
-                    if (circle.TryGetGroundHitVolume(position, position + facing * cData.CenterDistance, out SkillHitVolume circleVolume))
-                        shapes.Add(TraitLabGizmoShape.FromVolume(S, $"{slotName} 원형 5타 r{circleVolume.Radius:0.##}", circleVolume));
+                    AddAssassinCircle(cData, circle.RadiusMultiplier(), slotName, position, facing, shapes);
                     break;
 
                 case GunnerChargeLaserSkill laser when skill.Data is GunnerChargeLaserData lData:
-                    Vector3 laserOrigin = GunnerChargeLaserSkill.FireOrigin(position, lData);
-                    float width = laser.EffectiveBeamWidth(lData);
                     player.TryGetComponent(out GunnerBeamAttack laserBeam);
-                    float maxLength = ClippedLength(laserBeam, laserOrigin, facing, lData.RangeAt(1f), lData);
-                    float minLength = ClippedLength(laserBeam, laserOrigin, facing, lData.RangeAt(0f), lData);
-                    SkillHitVolume maxVolume = GunnerChargeLaserSkill.FireVolume(laserOrigin, facing, maxLength, width, lData);
-                    shapes.Add(TraitLabGizmoShape.FromVolume(S, $"{slotName} 최대 충전 {maxLength:0.#}m 폭 {width:0.##}", maxVolume));
-                    shapes.Add(TraitLabGizmoShape.FromVolume(S, $"{slotName} 최소 충전 {minLength:0.#}m",
-                        GunnerChargeLaserSkill.FireVolume(laserOrigin, facing, minLength, width, lData)));
-                    if (traitEffects != null &&
-                        GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.QAttackKey, GunnerTraitRules.QEchoDerivedKey, DerivedBuffer) != null)
-                        shapes.Add(TraitLabGizmoShape.FromVolume(T, "잔류 포격(첫 발 경로 재판정)", maxVolume));
+                    AddGunnerQ(laserBeam, lData, laser.EffectiveBeamWidth(lData), slotName, position, facing,
+                        traitEffects != null &&
+                        GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.QAttackKey, GunnerTraitRules.QEchoDerivedKey, DerivedBuffer) != null,
+                        shapes);
                     break;
             }
         }
     }
 
-    // 거너 R — 떠 있는 추적 레이저마다 실제 피해 구(서버 값). 호스트 창에서만.
+    /// <summary>가붕이 Q — 홀드 틱 판정(<see cref="FirstMeleeMainSkill.HoldArea"/>).</summary>
+    public static void AddPaladinQ(FirstMeleeMainSkillData data, Vector3 position, Vector3 facing, List<TraitLabGizmoShape> shapes)
+    {
+        AttackShapeSet area = FirstMeleeMainSkill.HoldArea(data, position, facing, out AttackShapePose pose);
+        AddArea(S, "Q 판정", area, pose, shapes);
+    }
+
+    /// <summary>돌파의 방패 — 경로 끝 표본(<see cref="FirstMeleeMainSkill.ShieldDashSampleArea"/>).</summary>
+    public static void AddShieldDashEnd(FirstMeleeMainSkillData data, in PaladinShieldDashSettings dash, Vector3 position, Vector3 facing,
+        List<TraitLabGizmoShape> shapes)
+    {
+        ShieldDashPath.Begin(position, facing, dash);
+        AttackShapeSet area = FirstMeleeMainSkill.ShieldDashSampleArea(data, ShieldDashPath.PointAt(ShieldDashPath.Cap), position.y,
+            ShieldDashPath.Heading, out AttackShapePose pose);
+        ShieldDashPath.End();
+        AddArea(T, $"돌파의 방패 끝 {dash.Distance:0.#}m", area, pose, shapes);
+    }
+
+    /// <summary>진격의 충격 — 파생 명세 hitArea + <see cref="PaladinTraitRules.QBlastPose"/>(Q 끝 지점 = 지금 위치).</summary>
+    public static void AddQBlast(AttackShapeSet blastArea, Vector3 qEndPosition, Vector3 heading, List<TraitLabGizmoShape> shapes) =>
+        AddArea(T, "진격의 충격", blastArea, PaladinTraitRules.QBlastPose(blastArea, qEndPosition, heading), shapes);
+
+    /// <summary>가붕이 E — 반격(<see cref="FirstMeleeSubSkill.CounterArea"/>)과 수호의 파동(같은 포즈, 특성 없으면 null).</summary>
+    public static void AddPaladinE(FirstMeleeSubSkillData data, AttackShapeSet pushArea, Vector3 position, Vector3 facing, List<TraitLabGizmoShape> shapes)
+    {
+        AttackShapeSet counter = FirstMeleeSubSkill.CounterArea(data, position, facing, out AttackShapePose pose);
+        AddArea(S, "E 반격", counter, pose, shapes);
+        AddArea(T, "수호의 파동", pushArea, pose, shapes);
+    }
+
+    /// <summary>어쌔신 Q — 돌진 경로 전체(0 ~ dashDistance, <see cref="AssassinDashStrikeSkill.PathSegment"/>). 추격의 궤적 = 같은 경로를 다시 훑는다.</summary>
+    public static void AddAssassinDash(AssassinDashStrikeSkillData data, string slotName, Vector3 position, Vector3 facing, bool hasTrail,
+        List<TraitLabGizmoShape> shapes)
+    {
+        AttackShapeSet area = AssassinDashStrikeSkill.PathSegment(data, position, position, facing, 0f, data.DashDistance, out AttackShapePose pose);
+        AddArea(S, $"{slotName} 돌진 경로 {data.DashDistance:0.#}m", area, pose, shapes);
+        if (hasTrail)
+            AddArea(T, "추격의 궤적", area, pose, shapes);
+    }
+
+    /// <summary>어쌔신 변신 E — 원 중심 = 조준 방향 × 중심 거리(서버의 조준점 없음 경로), 칼날의 영역 반경 배율(<see cref="AssassinCircleStrikeSkill.ResolveStrikeArea"/>).</summary>
+    public static void AddAssassinCircle(AssassinCircleStrikeSkillData data, float radiusMultiplier, string slotName, Vector3 position, Vector3 facing,
+        List<TraitLabGizmoShape> shapes)
+    {
+        Vector3 aimPoint = position + facing * data.CenterDistance;
+        AttackShapeSet area = AssassinCircleStrikeSkill.ResolveStrikeArea(data, position, aimPoint, radiusMultiplier, out AttackShapePose pose);
+        AddArea(S, $"{slotName} 원형 5타", area, pose, shapes);
+    }
+
+    /// <summary>거너 Q — 최대 충전 1발(<see cref="GunnerChargeLaserSkill.ShotArea"/> — 지형 차단 길이·광폭 폭). 잔류 포격 = 첫 발 경로 재판정.</summary>
+    public static void AddGunnerQ(GunnerBeamAttack beam, GunnerChargeLaserData data, float width, string slotName, Vector3 position, Vector3 facing,
+        bool hasEcho, List<TraitLabGizmoShape> shapes)
+    {
+        Vector3 origin = GunnerChargeLaserSkill.FireOrigin(position, data);
+        AttackShapeSet area = GunnerChargeLaserSkill.ShotArea(beam, data, origin, facing, data.RangeAt(1f), width, out AttackShapePose pose, out float length);
+        AddArea(S, $"{slotName} 최대 충전 {length:0.#}m", area, pose, shapes);
+        if (hasEcho)
+            AddArea(T, "잔류 포격", area, pose, shapes);
+    }
+
+    // 거너 R — 떠 있는 추적 레이저마다 실제 피해 구(서버 값, 도형 판정 아님). 호스트 창에서만.
     static void CollectTrackingLasers(Player player, List<TraitLabGizmoShape> shapes)
     {
         GunnerTrackingLaser[] lasers = Object.FindObjectsByType<GunnerTrackingLaser>(FindObjectsSortMode.None);
         for (int i = 0; i < lasers.Length; i++)
         {
             if (lasers[i] != null && lasers[i].ServerCaster == player)
-                shapes.Add(TraitLabGizmoShape.Sphere(TraitLabGizmoCategory.Skill, $"R 추적 레이저 r{lasers[i].ServerDamageRadius:0.#}",
-                    lasers[i].transform.position, lasers[i].ServerDamageRadius));
+                shapes.Add(TraitLabGizmoShape.Sphere(S, "R 추적 레이저", lasers[i].transform.position, lasers[i].ServerDamageRadius));
         }
     }
 
-    // 판정과 같은 지형 차단 길이(데이터 폭으로 잰다 — 광폭 레이저가 사거리를 바꾸지 않게).
-    static float ClippedLength(GunnerBeamAttack beam, Vector3 origin, Vector3 direction, float range, GunnerChargeLaserData data) =>
-        beam != null ? beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers) : range;
+    static void AddArea(TraitLabGizmoCategory category, string label, AttackShapeSet area, in AttackShapePose pose, List<TraitLabGizmoShape> shapes)
+    {
+        if (area != null && !area.IsEmpty)
+            shapes.Add(TraitLabGizmoShape.FromArea(category, label, area, pose));
+    }
 
     static bool HasDerived(PlayerTraitEffects effects, TraitAttackKey key, string derivedKey)
     {
@@ -383,25 +355,19 @@ public static class TraitLabAttackShapes
         PlayerSkillSlot.Interrupt => "간파",
         _ => slot.ToString(),
     };
-
-    static Vector3 Flat(Vector3 v)
-    {
-        v.y = 0f;
-        return v.sqrMagnitude > 0.0001f ? v.normalized : Vector3.forward;
-    }
 }
 
 /// <summary>
-/// 특성 랩 공격 범위 기즈모 그리기(할 일 152) — <see cref="DebugTraitLab"/> 의 OnDrawGizmos 가 부른다. 씬의 모든 플레이어(호스트·클라 무관)를 매번 다시 모아
-/// 획득 특성(배율·각도·반경)이 바뀌면 바로 반영된다. Gizmos 라 Game 뷰는 Gizmos 버튼이 켜져 있어야 보인다.
+/// 특성 랩 공격 범위 기즈모 그리기(할 일 152·153 6단계) — <see cref="DebugTraitLab"/> 의 OnDrawGizmos 가 부른다. 씬의 모든 플레이어(호스트·클라 무관)를 매번 다시 모아
+/// 획득 특성(배율·각도·반경)이 바뀌면 바로 반영된다. 판정 도형은 <see cref="AttackShapeDrawing"/> 만 그린다(바닥 진하게 + 높이 범위 옅게, 도넛 안쪽 고리 포함).
+/// Gizmos 라 Game 뷰는 Gizmos 버튼이 켜져 있어야 보인다.
 /// </summary>
 public sealed class TraitLabAttackGizmos
 {
     static readonly Color BasicColor = new Color(0.25f, 0.85f, 1f);
     static readonly Color SkillColor = new Color(1f, 0.62f, 0.15f);
     static readonly Color TraitColor = new Color(1f, 0.3f, 0.85f);
-    const float GroundLift = 0.05f;
-    const int ArcSegments = 32;
+    const float LabelLift = 0.1f;
 
     public bool Enabled;
     public bool ShowBasic = true;
@@ -409,6 +375,7 @@ public sealed class TraitLabAttackGizmos
     public bool ShowTrait = true;
 
     readonly List<TraitLabGizmoShape> shapes = new List<TraitLabGizmoShape>();
+    readonly List<(Vector3 at, TraitLabGizmoCategory category, string text)> labels = new List<(Vector3, TraitLabGizmoCategory, string)>();
     GUIStyle _labelStyle;
 
     public static Color ColorOf(TraitLabGizmoCategory category) => category switch
@@ -431,6 +398,7 @@ public sealed class TraitLabAttackGizmos
             return;
 
         shapes.Clear();
+        labels.Clear();
         Player[] players = Object.FindObjectsByType<Player>(FindObjectsSortMode.None);
         for (int i = 0; i < players.Length; i++)
             TraitLabAttackShapes.Collect(players[i], shapes);
@@ -445,6 +413,13 @@ public sealed class TraitLabAttackGizmos
 
         Gizmos.matrix = previousMatrix;
         Gizmos.color = previousColor;
+
+        _labelStyle ??= new GUIStyle(EditorStyles.boldLabel);
+        foreach ((Vector3 at, TraitLabGizmoCategory category, string text) in labels)
+        {
+            _labelStyle.normal.textColor = ColorOf(category);
+            Handles.Label(at, text, _labelStyle);
+        }
     }
 
     void DrawShape(in TraitLabGizmoShape shape)
@@ -456,6 +431,11 @@ public sealed class TraitLabAttackGizmos
 
         switch (shape.Kind)
         {
+            case TraitLabGizmoShape.ShapeKind.Area:
+                AttackShapeDrawing.DrawGizmos(shape.Area, shape.Pose, color);
+                labelAt = AreaLabelPoint(shape.Area, shape.Pose);
+                break;
+
             case TraitLabGizmoShape.ShapeKind.Box:
                 Gizmos.matrix = Matrix4x4.TRS(shape.Center, shape.Rotation, Vector3.one);
                 Gizmos.DrawWireCube(Vector3.zero, shape.Extents * 2f);
@@ -468,31 +448,39 @@ public sealed class TraitLabAttackGizmos
                 labelAt = shape.Center + Vector3.up * shape.Radius;
                 break;
 
-            case TraitLabGizmoShape.ShapeKind.Capsule:
+            default: // Capsule
                 DrawCapsule(shape.Center, shape.Extents, shape.Radius);
                 labelAt = shape.Extents + Vector3.up * shape.Radius;
                 break;
-
-            case TraitLabGizmoShape.ShapeKind.Sector:
-                DrawSector(shape.Center + Vector3.up * GroundLift, shape.Extents, shape.Radius, shape.Angle);
-                labelAt = shape.Center + Flat(shape.Extents) * shape.Radius + Vector3.up * GroundLift;
-                break;
-
-            default: // Column
-                DrawSector(shape.Center + Vector3.up * GroundLift, Vector3.forward, shape.Radius, 360f);
-                DrawSector(shape.Center + Vector3.up * shape.Height, Vector3.forward, shape.Radius, 360f);
-                for (int i = 0; i < 4; i++)
-                {
-                    Vector3 rim = shape.Center + Quaternion.Euler(0f, 90f * i, 0f) * Vector3.forward * shape.Radius;
-                    Gizmos.DrawLine(rim, rim + Vector3.up * shape.Height);
-                }
-                labelAt = shape.Center + Vector3.up * shape.Height;
-                break;
         }
 
-        _labelStyle ??= new GUIStyle(EditorStyles.boldLabel);
-        _labelStyle.normal.textColor = color;
-        Handles.Label(labelAt, shape.Label, _labelStyle);
+        AddLabel(labelAt, shape.Category, shape.Label);
+    }
+
+    // 라벨 자리 = 첫 도형의 넓은 질의 상자 윗면 가운데(도형 클래스 함수) — 같은 자리 같은 분류 라벨은 한 줄로 모은다(평타 단이 같은 도형일 때).
+    static Vector3 AreaLabelPoint(AttackShapeSet area, in AttackShapePose pose)
+    {
+        foreach (AttackShape s in area.Shapes)
+        {
+            if (s == null)
+                continue;
+            s.GetBroadBox(pose, out Vector3 center, out Vector3 half, out _);
+            return center + Vector3.up * (half.y + LabelLift);
+        }
+        return pose.Position;
+    }
+
+    void AddLabel(Vector3 at, TraitLabGizmoCategory category, string text)
+    {
+        for (int i = 0; i < labels.Count; i++)
+        {
+            if (labels[i].category == category && (labels[i].at - at).sqrMagnitude < 1e-4f)
+            {
+                labels[i] = (labels[i].at, category, labels[i].text + " · " + text);
+                return;
+            }
+        }
+        labels.Add((at, category, text));
     }
 
     static void DrawCapsule(Vector3 p0, Vector3 p1, float radius)
@@ -509,35 +497,6 @@ public sealed class TraitLabAttackGizmos
         Gizmos.DrawLine(p0 - side, p1 - side);
         Gizmos.DrawLine(p0 + up, p1 + up);
         Gizmos.DrawLine(p0 - up, p1 - up);
-    }
-
-    // 바닥 평면 부채꼴(전체 각도). 360 이상 = 원(변 없음).
-    static void DrawSector(Vector3 apex, Vector3 forward, float radius, float angle)
-    {
-        forward = Flat(forward);
-        float full = Mathf.Clamp(angle, 0f, 360f);
-        bool circle = full >= 360f;
-        float half = full * 0.5f;
-        Vector3 previous = apex + Quaternion.Euler(0f, -half, 0f) * forward * radius;
-        if (!circle)
-            Gizmos.DrawLine(apex, previous);
-
-        for (int i = 1; i <= ArcSegments; i++)
-        {
-            float yaw = -half + full * i / ArcSegments;
-            Vector3 point = apex + Quaternion.Euler(0f, yaw, 0f) * forward * radius;
-            Gizmos.DrawLine(previous, point);
-            previous = point;
-        }
-
-        if (!circle)
-            Gizmos.DrawLine(apex, previous);
-    }
-
-    static Vector3 Flat(Vector3 v)
-    {
-        v.y = 0f;
-        return v.sqrMagnitude > 0.0001f ? v.normalized : Vector3.forward;
     }
 }
 #endif

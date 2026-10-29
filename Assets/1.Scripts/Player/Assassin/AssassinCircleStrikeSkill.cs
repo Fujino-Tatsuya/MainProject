@@ -76,10 +76,10 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
         // 확정 지점은 컨트롤러가 서버 위치 기준으로 재투영해 넘긴다(A4). 없으면 승인 방향 × 중심 거리.
         Vector3 origin = owner.transform.position;
-        Vector3 areaCenter = AreaCenter(origin, HasAimPoint ? AimPoint : origin + direction * data.CenterDistance);
+        Vector3 aimPoint = HasAimPoint ? AimPoint : origin + direction * data.CenterDistance;
+        Vector3 areaCenter = AreaCenter(origin, aimPoint);
         float radiusMultiplier = RadiusMultiplier();
-        serverArea = data.StrikeArea(radiusMultiplier);
-        serverPose = data.StrikePose(origin, areaCenter);
+        serverArea = ResolveStrikeArea(data, origin, aimPoint, radiusMultiplier, out serverPose);
 
         sequence.Begin(data.HitCount);
 
@@ -196,9 +196,20 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
         return true;
     }
 
-    // 칼날의 영역 반경 배율(서버 확정·오너 미리보기 공용 — 특성 수치는 전 피어 같은 값). 원 베기 VFX 크기는 데이터 반경 그대로.
-    private float RadiusMultiplier() =>
+    // 칼날의 영역 반경 배율(서버 확정·오너 미리보기·특성 랩 기즈모 공용 — 특성 수치는 전 피어 같은 값). 원 베기 VFX 크기는 데이터 반경 그대로.
+    public float RadiusMultiplier() =>
         AssassinTraitAreaRules.ScaleRadius(owner != null ? owner.TraitModifiers : null, AssassinTraitAreaRules.CircleStrike, 1f);
+
+    /// <summary>
+    /// 타격 판정 영역·기준 포즈(할 일 153) — 데이터 hitArea × 칼날의 영역 반경 배율, 기준점 = 원 중심(<see cref="AreaCenter"/> — 조준 지점 + 발 높이).
+    /// 서버 확정(<see cref="OnServerStart"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ResolveStrikeArea(AssassinCircleStrikeSkillData data, Vector3 casterPosition, Vector3 aimPoint, float radiusMultiplier,
+        out AttackShapePose pose)
+    {
+        pose = data.StrikePose(casterPosition, AreaCenter(casterPosition, aimPoint));
+        return data.StrikeArea(radiusMultiplier);
+    }
 
     /// <summary>원 중심 = 시전 지점의 수평 위치 + 시전자 발 높이(서버 확정·오너 미리보기 공용).</summary>
     public static Vector3 AreaCenter(Vector3 casterPosition, Vector3 point)

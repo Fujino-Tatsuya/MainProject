@@ -48,6 +48,16 @@ public class PlayerDefaultAttack : BaseAttack
             ? step.HitArea.ResolvePose(casterPosition, direction, casterPosition, direction)
             : new AttackShapePose(casterPosition, direction);
 
+    /// <summary>
+    /// 그 타의 판정 영역(단 데이터 hitArea)·기준 포즈(<see cref="ResolvePose"/>). 서버 판정(<see cref="HitOverlap"/>)과
+    /// 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet StepArea(DefaultAttackStep step, Vector3 casterPosition, Vector3 direction, out AttackShapePose pose)
+    {
+        pose = ResolvePose(step, casterPosition, direction);
+        return step != null ? step.HitArea : null;
+    }
+
     public void PrepareStep(DefaultAttackStep step, int damageSnapshot, Vector3 direction)
     {
         currentStep = step;
@@ -94,7 +104,7 @@ public class PlayerDefaultAttack : BaseAttack
     /// <returns>하나라도 명중했으면 true.</returns>
     private bool HitOverlap()
     {
-        AttackShapeSet area = currentStep.HitArea;
+        AttackShapeSet area = StepArea(currentStep, transform.position, attackDirection, out AttackShapePose pose);
         if (area == null || area.IsEmpty)
         {
             Edit.LogWarning("[Player] PlayerDefaultAttack — 이 타의 판정 도형(hitArea)이 비어 있다.", this);
@@ -110,7 +120,6 @@ public class PlayerDefaultAttack : BaseAttack
         bool onHitBonusTaken = false;
 
         // 판정 도형(할 일 153) — 같은 대상(Unit, 없으면 Hurtbox)은 이 타에서 1회.
-        AttackShapePose pose = ResolvePose(currentStep, transform.position, attackDirection);
         shapeHits.Clear();
         AttackShapeQuery.Collect(area, pose, targetLayer, QueryTriggerInteraction.Collide, hitResults, resolveTarget, hitTargets, shapeHits);
 

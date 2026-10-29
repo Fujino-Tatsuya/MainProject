@@ -106,6 +106,17 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             ? area.ResolvePose(position, heading, position, heading)
             : new AttackShapePose(position, heading);
 
+    /// <summary>
+    /// 홀드 틱 판정 영역·기준 포즈(할 일 153) — 데이터 hitArea, 기준점 = 시전자 발밑 <paramref name="position"/> + 진행 방향.
+    /// 서버 판정(<see cref="OnHoldTick"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet HoldArea(FirstMeleeMainSkillData data, Vector3 position, Vector3 heading, out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = ResolvePose(area, position, heading);
+        return area;
+    }
+
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         base.OnServerStart(direction, target);
@@ -209,7 +220,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         tickTargets.Clear();
         tickHits.Clear();
         tickLandedUnits.Clear();
-        AttackShapeQuery.Collect(data.HitArea, ResolvePose(data.HitArea, owner.transform.position, heading), data.HittableLayers,
+        AttackShapeSet area = HoldArea(data, owner.transform.position, heading, out AttackShapePose pose);
+        AttackShapeQuery.Collect(area, pose, data.HittableLayers,
             QueryTriggerInteraction.Collide, hitResults, ResolveTarget, tickTargets, tickHits);
         bool onHitBonusTaken = false;
 
@@ -427,10 +439,10 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         for (int s = 0; s < dashSamples.Count; s++)
         {
-            AttackShapePose pose = ShieldDashSamplePose(data.HitArea, dashPath.PointAt(dashSamples[s]), current.y, dashPath.Heading);
+            AttackShapeSet area = ShieldDashSampleArea(data, dashPath.PointAt(dashSamples[s]), current.y, dashPath.Heading, out AttackShapePose pose);
             tickTargets.Clear();
             tickHits.Clear();
-            AttackShapeQuery.Collect(data.HitArea, pose, data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, ResolveTarget,
+            AttackShapeQuery.Collect(area, pose, data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, ResolveTarget,
                 tickTargets, tickHits);
 
             for (int i = 0; i < tickHits.Count; i++)
@@ -482,6 +494,18 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     {
         pathPoint.y = casterHeight;
         return ResolvePose(area, pathPoint, dashHeading);
+    }
+
+    /// <summary>
+    /// 돌파의 방패 경로 표본 하나의 판정 영역(= 원래 Q hitArea)·기준 포즈(<see cref="ShieldDashSamplePose"/>).
+    /// 서버 경로 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계 — 경로 끝 표본)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ShieldDashSampleArea(FirstMeleeMainSkillData data, Vector3 pathPoint, float casterHeight, Vector3 dashHeading,
+        out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = ShieldDashSamplePose(area, pathPoint, casterHeight, dashHeading);
+        return area;
     }
 
     // 서버 전용 — 오너가 벽·낭떠러지 전에서 멈춘 실제 거리. 0~돌진 거리만 받아 경로 상한만 줄인다(늘리지 않음).

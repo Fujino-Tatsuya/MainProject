@@ -241,6 +241,19 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         return SkillHitVolume.Box(center, halfExtents, rotation, data.HittableLayers);
     }
 
+    /// <summary>
+    /// 발 하나의 판정 영역·기준 포즈(할 일 153) — 최대 충전 도형을 지형 차단 뒤 길이 <paramref name="length"/>·폭 <paramref name="width"/>(광폭 레이저)로 맞춘 복사본,
+    /// 기준점 = 발사 원점 + 발사 방향. 지형 차단은 데이터 폭으로 잰다(광폭 레이저가 사거리를 바꾸지 않게). <paramref name="beam"/> 이 없으면 차단 없이 <paramref name="range"/>.
+    /// 원래 발·잔류 포격 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ShotArea(GunnerBeamAttack beam, GunnerChargeLaserData data, Vector3 origin, Vector3 direction, float range, float width,
+        out AttackShapePose pose, out float length)
+    {
+        length = beam != null ? beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers) : range;
+        pose = data.FirePose(origin, direction);
+        return data.FireArea(length, width);
+    }
+
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
 
     public override void OnPrimaryPressed(Vector3 direction)
@@ -326,11 +339,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         Vector3 direction = shotDirection;
         Vector3 origin = FireOrigin(owner.transform.position, data);
-        float length = beam.CastLength(origin, direction, shotRange, data.BeamWidth * 0.5f, data.BlockingLayers);
-
-        // 판정 = 최대 충전 도형을 지형 차단 뒤 길이·광폭 폭으로 맞춘 복사본, 기준점 = 발사 원점 + 첫 발 방향(할 일 153).
-        AttackShapeSet area = data.FireArea(length, shotWidth);
-        AttackShapePose pose = data.FirePose(origin, direction);
+        AttackShapeSet area = ShotArea(beam, data, origin, direction, shotRange, shotWidth, out AttackShapePose pose, out float length);
         int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shotDamage, DamageAttackType,
                                          DamageHitPattern, data.TriggersOnHit,
                                          TraitHitFlags.Original, originalHitHook);
@@ -533,9 +542,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         for (int i = 0; i < dueEchoShots.Count; i++)
         {
             GunnerDerivedShot shot = dueEchoShots[i];
-            float length = beam.CastLength(shot.Origin, shot.Direction, shot.Range, data.BeamWidth * 0.5f, data.BlockingLayers);
-            int hitCount = beam.FirePiercing(data.FireArea(length, shot.Width), data.FirePose(shot.Origin, shot.Direction),
-                                             data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
+            AttackShapeSet area = ShotArea(beam, data, shot.Origin, shot.Direction, shot.Range, shot.Width, out AttackShapePose pose, out float length);
+            int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
                                              false, TraitHitFlags.Derived, echoHitHook);
             Edit.Log($"[Gunner/Q] 잔류 포격 — 사거리 {length:0.0}/{shot.Range:0.0}, 폭 {shot.Width:0.##}, 피해 {shot.Damage} ×{hitCount}", this);
         }
