@@ -196,6 +196,8 @@ public static class MonsterInspectorCatalog
         (AttackDetail, "rageDashDamage", "레이지 피해"),
         (AttackDetail, "vulnerableKnockbackDistance", "취약 넉백 거리"),
         (AttackDetail, "vulnerableKnockbackTime", "취약 넉백 시간"),
+        (AttackDetail, "parryRetreatDistance", "간파 성공 후퇴 거리"),
+        (AttackDetail, "parryRetreatTime", "간파 성공 후퇴 시간"),
         (AttackDetail, "wallReboundDistance", "벽 반동 거리"),
         (AttackDetail, "wallReboundTime", "벽 반동 시간"),
 

@@ -491,6 +491,14 @@ public class BossDataSO : MonsterDataSO
              "비우면 왼쪽 하나만 쓴다(기존 동작).")]
     public string hitReactionStateRight = "getowned_R";
 
+    [Tooltip("일반 간파 성공(간파 피격 클립 getowned/_R) 때 **뒤로 물러나는 거리(m)** — 보스 등 쪽. 0 = 제자리(예전 동작).\n" +
+             "클립이 제자리(_InPlace)라 서버가 민다(경석 10-29, 두 발짝). 벽·플레이어에 닿으면 거기서 멈추고 " +
+             "**벽 충돌 보상(제압 칸 소비)은 없다** — 그건 취약 넉백만.")]
+    [Min(0f)] public float parryRetreatDistance = 2f;
+
+    [Tooltip("간파 후퇴 이동 시간(초). 간파 피격 클립(1.42초) 앞부분에 맞춘다.")]
+    [Min(0.01f)] public float parryRetreatTime = 0.5f;
+
     [Tooltip("**제압** 지속 시간(초) — 간파 게이지가 0 이 됐을 때(기획 `Re_C_취약_및_제압_시스템.md` §8, 임시 5초).\n" +
              "필드 이름은 옛 Break 그대로(직렬화 유지). 간파 성공 그로기는 base 의 groggyDuration(1.5초)을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;

@@ -16,6 +16,10 @@ Update this file when a term becomes important enough that future agents or team
 - ▶ 다음 세션: 연출 수정 이어서(경석 피드백 대기) → MPPM 3인 확인 → development 병합. 렌더러 에셋은 안 건드림(연출 중 EnqueuePass).
 - 10-29 최신화: SVN r549 핀 · origin/development(90c619ca, 132 간파 연출 포함) feature 로 머지 · 컴파일 0 · 전투 EditMode 416/0 · feature 푸시(development 미반영). 머지 뒤 수정 2건 — F11 코드 `Tutorial…` → `MapScene…` 이름 변경 반영, 인스펙터 사전에 할 일 105 새 칸 2개(`raidSelfDestructBlastIgnoreInvuln`·`pushNorthDischargeIgnoreInvuln`) 추가(development 단독으로도 이 테스트 1건이 실패한다). ⏳ Play 확인: 간파 성공 막타 때 암전·섬광이 승리 연출 시작(`ServerForceReset` → 디렉터 `ForcedReset`)에 걷히는지.
 
+## ▶▶ 반영 (2026-10-29 · 경석(Claude) · **23호 간파 성공 두 발짝 후퇴**, 브랜치 `feature/SettingsDdol`) — ✅ 구현 · 컴파일 0 · 전투 EditMode 416/0 · ⏳ 경석 Play(미끄러짐 체감 → 거슬리면 뒷걸음 클립 아트 요청)
+- 간파 피격 클립 `Boss_23_ParryHit_InPlace`(이지원 r511)는 루트 이동 0 · 프리팹 `m_ApplyRootMotion: 0` → 서버가 등 쪽(`-forward`)으로 민다. SO `parryRetreatDistance` 2m · `parryRetreatTime` 0.5초(xlsx 열 생기기 전까지 코드 기본값).
+- 대상 = 간파 피격 클립을 트는 그로기(일반·기믹 중 간파)만. 제압·릴레이·구출은 제자리. 취약 넉백 이동(`TickVulnerableKnockback`)을 공유하되 `_kbParryRetreat` 면 **벽에선 멈추기만**(간파 직후 취약이 켜져 있어 그대로면 벽 보상 = 칸 소비가 터진다) · 끝나도 취약·그로기 그대로 · 후퇴 중 다음 적중은 취약 넉백 3m 가 이어받는다.
+
 ## ▶▶ 반영 (2026-10-27 · 경석(Claude) · **23호 제압 게이지 → 제압 칸 3칸**, 브랜치 `feature/SettingsDdol`) — 기준 `Re_C_전투시스템_20261014.md` §6 · ✅ 구현(미커밋) · 컴파일 0 · 전투 EditMode 364/0 · ⏳ 경석 Play(기믹 중 칸 유지)
 - 23호: `float _counterGauge`(100, −20) → `NetworkVariable<int> _suppressSegmentsUsed`(사용한 칸). SO `suppressSegmentCount`=3 · `counterSegmentStep`=1 · `environmentSegmentStep`=1(벽·증기 벤트 둘 다 1칸 — 경석 확정). 0칸 = 제압, 제압 끝 = 다시 꽉 참. 판정 `BossCounterProgress.ResolveSegments`.
 - HUD: HP 바 밑 회색 게이지 `Detection_Fill` → `SuppressSegmentTemplate`(꺼 둠)를 칸 수만큼 복제해 806px 를 나눠 깐다. 찬 칸 = 원본 색, 빈 칸 = `suppressSegmentEmptyColor`, 오른쪽부터 빈다.
