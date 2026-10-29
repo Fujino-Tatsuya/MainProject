@@ -551,6 +551,7 @@ public sealed partial class QABoss103CombatBot
             _counterSkips++;
             Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} reason=idle_{QABoss103Plan.Token(reason)}");
         }
+        EndPnWindow(double.NaN, reason);
         _windowWas = false;
     }
 
@@ -558,6 +559,7 @@ public sealed partial class QABoss103CombatBot
 
     private void TickCounter(Player me, Vector3 myPos, float surface, double now)
     {
+        ObservePylonClear(now);   // 할 일 140-2 — 창 열림 판별보다 먼저(같은 틱에 탑 소멸·창 열림이 같이 보인다)
         bool open = _boss.CounterWindowOpen;
         if (open && !_windowWas)
             OnCounterOpen(me, myPos, surface, now);
@@ -584,6 +586,9 @@ public sealed partial class QABoss103CombatBot
             PressCounter(me, myPos, now, open, true);
             return;
         }
+        // 할 일 140-2 — 북진 창: 걸어서 마감까지 못 닿으면 대쉬 간파.
+        if (_pnWindow && TickPnDash(me, myPos, now))
+            return;
         // 성공 굴림 — 마감까지 조건(사거리·정면·Idle/Move)이 맞을 때 누르고, 거부되면 다시 누른다. 마감이 지나면 마지막으로 1회.
         bool last = now >= _counterDeadline;
         if (last || CounterReady(me, myPos))
@@ -622,13 +627,16 @@ public sealed partial class QABoss103CombatBot
     /// </summary>
     private bool CounterHoldsBot(Player me, Vector3 myPos, double now)
     {
-        if (!_counterPending || !_counterHit || _counterWaitClose)
+        // 할 일 140-2 — 활성 탑이 막 다 사라졌으면(북진 무력화 직전) 창이 열리기 전에도 보스 정면 쪽으로 걷는다.
+        bool pre = !_counterPending && PnPreApproach(now);
+        if (!pre && (!_counterPending || !_counterHit || _counterWaitClose))
             return false;
         StopHold();
         _driver.ReleaseBasic();
         Vector3 bossPos = _boss.transform.position;
         _driver.SetAim(bossPos);
-        if (now < _counterPressAt)
+        // 북진 창은 탑을 부수며 이미 반응했다 — 반응 지연 동안에도 걷는다(누름은 그대로 반응 지연 뒤).
+        if (now < _counterPressAt && !pre && !_pnWindow)
         {
             _input.SetMove(Vector3.zero);
             return true;
@@ -639,23 +647,30 @@ public sealed partial class QABoss103CombatBot
         Vector3 move = Vector3.zero;
         if (!inRange || !front)
         {
-            Vector3 fwd = _boss.transform.forward;
-            fwd.y = 0f;
-            fwd = fwd.sqrMagnitude > 1e-4f ? fwd.normalized : Vector3.forward;
-            Vector3 to = myPos - bossPos;
-            to.y = 0f;
-            // 뒤쪽이면 몸을 뚫지 않게 옆(내 쪽)으로 돌아 들어간다.
-            Vector3 side = Vector3.Cross(Vector3.up, fwd);
-            if (Vector3.Dot(side, to) < 0f)
-                side = -side;
-            Vector3 spotDir = front ? fwd : (fwd + side).normalized;
-            Vector3 spot = bossPos + spotDir * (_bossRadius + CounterStandOff);
-            move = spot - myPos;
+            move = CounterSpot(myPos) - myPos;
             move.y = 0f;
             move = move.sqrMagnitude > 0.04f ? move.normalized : Vector3.zero;
         }
         _input.SetMove(move != Vector3.zero && IsSafeStep(myPos, move) ? move : Vector3.zero);
         return true;
+    }
+
+    /// <summary>간파하러 설 자리 — 보스 정면(정면 밖이면 내 쪽 옆으로 돌아 들어가는 방향) 표면 + <see cref="CounterStandOff"/>.</summary>
+    private Vector3 CounterSpot(Vector3 myPos)
+    {
+        Vector3 bossPos = _boss.transform.position;
+        bool front = CounterFront(myPos, out _, out _);
+        Vector3 fwd = _boss.transform.forward;
+        fwd.y = 0f;
+        fwd = fwd.sqrMagnitude > 1e-4f ? fwd.normalized : Vector3.forward;
+        Vector3 to = myPos - bossPos;
+        to.y = 0f;
+        // 뒤쪽이면 몸을 뚫지 않게 옆(내 쪽)으로 돌아 들어간다.
+        Vector3 side = Vector3.Cross(Vector3.up, fwd);
+        if (Vector3.Dot(side, to) < 0f)
+            side = -side;
+        Vector3 spotDir = front ? fwd : (fwd + side).normalized;
+        return bossPos + spotDir * (_bossRadius + CounterStandOff);
     }
 
     private void OnCounterOpen(Player me, Vector3 myPos, float surface, double now)
@@ -666,25 +681,35 @@ public sealed partial class QABoss103CombatBot
         _counterRetries = 0;
         QABoss103Threat dashThreat = ActiveDashThreat(now);
         _counterIsDash = dashThreat != null;
+        // 할 일 140-2 — 활성 탑 소멸 직후 열린 창 = 북진 무력화 창(닫힘 = 무력화 시간, 포기 거리 = 마감까지 갈 수 있는 거리).
+        double pnCloseAt = BeginPnWindow(me, myPos, surface, now);
+        if (_pnWindow)
+            _counterIsDash = false;
 
         PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
         string skip = null;
         double reach = CounterReach(me, skills);
+        double slack = _pnWindow ? _pnSlack : CounterApproachSlack;
         if (skills == null || skills.GetSkill(PlayerSkillSlot.Interrupt) == null)
             skip = "no_skill";
         else if (!skills.IsCooldownReady(PlayerSkillSlot.Interrupt))
             skip = "cooldown";
-        else if (surface > reach + CounterApproachSlack)
+        else if (surface > reach + slack)
             skip = "range";
         if (skip != null)
         {
             _counterSkips++;
-            Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} reason={skip} surfM={F2(surface)} reachM={F2(reach)}");
+            if (_pnWindow)
+                _pnReason = skip;
+            Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} reason={skip} surfM={F2(surface)} reachM={F2(reach)}" +
+                      (_pnWindow ? $" pushNorth=true slackM={F2(slack)}" : ""));
             return;
         }
 
         _counterHit = QABoss103Counter.RollHit(_counterRng, _profile.InterruptSuccessChance);
-        double closeAt = dashThreat != null
+        _pnRolled = _pnWindow;
+        double closeAt = _pnWindow ? pnCloseAt
+            : dashThreat != null
             ? dashThreat.DetectedAt + QABoss103HitTiming.DashLaunchDelay(dashThreat.LeadSeconds, dashThreat.GrowSeconds)
             : now + _window.EstimateMs() / 1000.0;
         _counterEstMs = (closeAt - now) * 1000.0;
@@ -695,6 +720,14 @@ public sealed partial class QABoss103CombatBot
             _counterPressAt = now + _profile.ReactionMs / 1000.0;
             _counterDeadline = System.Math.Max(_counterPressAt, QABoss103HitTiming.CounterPressDeadline(closeAt));
             _counterPlanMs = _profile.ReactionMs;
+        }
+        else if (_pnWindow)
+        {
+            // 실패 굴림 — 일반 '닫힘 + 150ms' 는 3초 창 밖이다. 창 안 마감으로 당겨 누르고, 누를 때 보스 반대쪽을 겨눠 빗나간다(PressCounter).
+            _counterWaitClose = false;
+            _counterPressAt = QABoss103PushNorthCounter.MissPressAt(now, closeAt, _profile.ReactionMs / 1000.0, QABoss103Counter.LatePressMs / 1000.0);
+            _counterDeadline = _counterPressAt;
+            _counterPlanMs = (_counterPressAt - now) * 1000.0;
         }
         else
         {
@@ -722,6 +755,16 @@ public sealed partial class QABoss103CombatBot
             _counterPressAt = now + QABoss103Counter.LatePressMs / 1000.0;
             _counterPlanMs = (_counterPressAt - _windowOpenAt) * 1000.0;
         }
+        if (_pnWindow)
+        {
+            if (_counterPending && !_pnTried)
+            {
+                _counterPending = false;   // 북진 창은 닫힌 뒤 누르지 않는다(다음 차징이 바로 시작)
+                _counterSkips++;
+                _pnReason = _pnDashAt >= 0.0 ? "closed_during_dash" : "closed_before_press";
+            }
+            EndPnWindow(now, null);
+        }
     }
 
     /// <summary>누른다. <paramref name="final"/> = 거부돼도 이번이 마지막(실패 굴림·마감) — 아니면 거부 시 다음 틱 다시.</summary>
@@ -735,12 +778,19 @@ public sealed partial class QABoss103CombatBot
 
         StopHold();
         _driver.ReleaseBasic();
-        _driver.SetAim(bossPos);
+        // 할 일 140-2 — 북진 창의 실패 굴림은 창 안에서 누르므로 보스 반대쪽을 겨눠(대상 없음) 일부러 빗나간다.
+        bool whiff = _pnWindow && !_counterHit;
+        Vector3 away = myPos - bossPos;
+        away.y = 0f;
+        if (away.sqrMagnitude < 1e-4f)
+            away = -_boss.transform.forward;
+        Vector3 aimAt = whiff ? myPos + away.normalized * 3f : bossPos;
+        _driver.SetAim(aimAt);
         PlayerMovement movement = me.GetComponent<PlayerMovement>();
-        Vector3 face = bossPos - myPos;
+        Vector3 face = aimAt - myPos;
         if (movement != null)
             movement.RotateToward(face, 1000f);
-        bool ok = skills != null && skills.ExecuteTargetedSkill(PlayerSkillSlot.Interrupt, _boss, bossPos, true);
+        bool ok = skills != null && skills.ExecuteTargetedSkill(PlayerSkillSlot.Interrupt, whiff ? null : _boss, aimAt, true);
         if (!ok && !final)
         {
             _counterRetries++;
@@ -748,6 +798,7 @@ public sealed partial class QABoss103CombatBot
         }
         _counterPending = false;
         _counterTries++;
+        NotePnPress(ok, false, now);
 
         NetworkManager nm = NetworkManager.Singleton;
         double serverT = nm != null && nm.IsListening ? nm.ServerTime.Time : -1.0;
@@ -755,7 +806,8 @@ public sealed partial class QABoss103CombatBot
                   $"pressMs={F0((now - _windowOpenAt) * 1000.0)} planMs={F0(_counterPlanMs)} deadlineMs={(_counterHit ? F0((_counterDeadline - _windowOpenAt) * 1000.0) : "na")} " +
                   $"reactMs={F0(_profile.ReactionMs)} windowEstMs={F0(_counterEstMs)} dashWindow={(_counterIsDash ? "true" : "false")} retries={_counterRetries} " +
                   $"windowSamples={_window.Count} openAtPress={(openNow ? "true" : "false")} front={(front ? "true" : "false")} frontDeg={F0(frontDeg)} frontLimit={F0(limit)} " +
-                  $"surfM={F2(surface)} reachM={F2(reach)} inRange={(surface <= reach ? "true" : "false")} state={me.CurrentState} cast={(ok ? "true" : "false")} serverT={F3(serverT)}");
+                  $"surfM={F2(surface)} reachM={F2(reach)} inRange={(surface <= reach ? "true" : "false")} state={me.CurrentState} cast={(ok ? "true" : "false")} serverT={F3(serverT)}" +
+                  (_pnWindow ? $" pushNorth=true whiff={(whiff ? "true" : "false")}" : ""));
         PartCounter(_counterHit, ok, serverT);
     }
 
@@ -792,7 +844,7 @@ public sealed partial class QABoss103CombatBot
     private string EvasionDiag() =>
         $"threats={_threatsSeen} dodgeRolls={_ledger.Dodges} takeRolls={_ledger.Takes} dashes={_dashes} dashRejects={_dashRejects} guards={_guards} walks={_walks} " +
         $"guardRejects={_guardRejects} noCharge={_noCharges} blocked={_blocks} late={_late} lethalNoRoll={_lethalNoRoll} lethalMismatch={_lethalMismatch} " +
-        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips}";
+        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips} {PushNorthDiag()}";
 
     private static string F0(double v) => double.IsNaN(v) ? "na" : v.ToString("F0", CultureInfo.InvariantCulture);
     private static string F2(double v) => double.IsNaN(v) ? "na" : v.ToString("F2", CultureInfo.InvariantCulture);

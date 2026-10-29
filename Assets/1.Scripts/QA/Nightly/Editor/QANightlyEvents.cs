@@ -56,6 +56,8 @@ public static class QANightlyEvents
     public const string Timeout = "timeout";
     /// <summary>할 일 140 — 특성 라운드 진행(기록 전용 <see cref="QANightlyEventRule.Trace"/>).</summary>
     public const string Trait = "trait";
+    /// <summary>할 일 140-2 — 북진 무력화 간파 창 결과(기록 전용, 봇 <c>event=pn_counter</c>). 이름 = <see cref="QABoss103PushNorthCounter.Event"/>.</summary>
+    public const string PushNorthCounter = "pn_counter";
 
     public const int DefaultDetailMax = 160;
     /// <summary>계측 필드가 붙는 줄(재배치·특성 라운드) — 뒤쪽 필드가 잘리지 않게.</summary>
@@ -77,6 +79,7 @@ public static class QANightlyEvents
         new QANightlyEventRule(Timeout, "시간초과 — 30분(run_end Timeout)", false, "event=run_end ", "outcome=Timeout "),
         new QANightlyEventRule(Timeout, "시간초과 — 조기(목숨 0·보스 HP 5분 불변)", false, "event=early_timeout "),
         new QANightlyEventRule(Trait, "특성 라운드 — 라운드·완료·자동 선택·획득 ID(기록 전용)", false, "event=trait_round ") { Trace = true, DetailMax = LongDetailMax },
+        new QANightlyEventRule(PushNorthCounter, "북진 무력화 간파 — 창 열림·거리·시도(대쉬 간파)·결과(기록 전용, 호스트 봇)", false, "event=pn_counter ") { Trace = true, DetailMax = LongDetailMax },
     };
 
     /// <summary>쉼표 목록 → 켤 이벤트 이름(소문자). 비면 null(= 표 전체).</summary>
