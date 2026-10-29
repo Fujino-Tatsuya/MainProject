@@ -5,8 +5,8 @@ using UnityEditor.Animations;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 139-6 단계 3 — 23호 창 길이 어댑터(<see cref="TwentyThreeInterruptWindowLength"/>).
-/// 종류별 길이 = 실제 SO 에셋(No23·No23_A·No23_B) 값, 종류 구별 = 가짜 공개 상태(애니메이터 상태·경과·서버 기믹 플래그).
+/// 할 일 139-6 단계 3·4 — 23호 창 길이 어댑터(<see cref="TwentyThreeInterruptWindowLength"/>).
+/// 종류별 길이 = 실제 SO 에셋(No23·No23_A·No23_Raid·No23_B) 값, 종류 구별·잡기 남은 시간 = 가짜 공개 상태(애니메이터 상태·경과·서버 기믹 플래그).
 /// 실제 애니메이터 구동·복제 bool 도착 시각은 Play 확인.
 /// </summary>
 public sealed class TwentyThreeInterruptWindowLengthTests
@@ -53,7 +53,7 @@ public sealed class TwentyThreeInterruptWindowLengthTests
         };
 
     static float LengthFor(TwentyThreeWindowObservation obs, BossDataSO data) =>
-        TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeInterruptWindowLength.Classify(obs, data), data);
+        TwentyThreeInterruptWindowLength.Resolve(obs, data);
 
     // ─── 종류별 길이 = 실제 SO 에셋 ───
 
@@ -69,10 +69,129 @@ public sealed class TwentyThreeInterruptWindowLengthTests
         Assert.AreEqual(1.5f, TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeWindowKind.RaidChain, data), 1e-6f, "E chainCounterWindow");
         Assert.AreEqual(3f, TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeWindowKind.PushNorth, data), 1e-6f, "F pushNorthStunTime");
 
-        // 단계 4 전 — 잡기·착지는 모름(관측 중앙값).
+        // 잡기는 애니 경과가 필요해 종류만으로는 모름(GrabLength).
         Assert.AreEqual(-1f, TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeWindowKind.Grab, data));
-        Assert.AreEqual(-1f, TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeWindowKind.JumpLanding, data));
         Assert.AreEqual(-1f, TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeWindowKind.Unknown, data));
+    }
+
+    // ─── C 착지 = 콤보 점프 타 landingCounterWindow(값이 한 가지일 때만) ───
+
+    [TestCase("No23")]
+    [TestCase("No23_A")]
+    [TestCase("No23_Raid")]
+    [TestCase("No23_B")]
+    public void 착지_창은_점프_콤보_landingCounterWindow(string name)
+    {
+        BossDataSO data = Load(name);
+        Assert.AreEqual(0.8f, TwentyThreeInterruptWindowLength.LandingWindowLength(data), 1e-6f);
+        Assert.AreEqual(0.8f, TwentyThreeInterruptWindowLength.LengthOf(TwentyThreeWindowKind.JumpLanding, data), 1e-6f);
+        foreach (string s in new[] { "JumpLanding", "Locomotion" })
+            Assert.AreEqual(0.8f, LengthFor(Open(s), data), 1e-6f, s);
+    }
+
+    BossDataSO CopyWithCombos(params BossComboStep[][] combos)
+    {
+        BossDataSO copy = Object.Instantiate(Load("No23"));
+        _created.Add(copy);
+        copy.combos = new BossComboEntry[combos.Length];
+        for (int i = 0; i < combos.Length; i++)
+            copy.combos[i] = new BossComboEntry { steps = combos[i] };
+        return copy;
+    }
+
+    static BossComboStep Step(BossAttackId attack, float landing) =>
+        new BossComboStep { attack = attack, landingCounterWindow = landing };
+
+    [Test]
+    public void 착지_창_값이_둘_이상_다르면_모름_같으면_그_값()
+    {
+        BossDataSO differ = CopyWithCombos(
+            new[] { Step(BossAttackId.Jump, 0f), Step(BossAttackId.Jump, 0.8f) },
+            new[] { Step(BossAttackId.Jump, 1.2f) });
+        Assert.AreEqual(-1f, TwentyThreeInterruptWindowLength.LandingWindowLength(differ));
+        Assert.AreEqual(-1f, LengthFor(Open("JumpLanding"), differ));
+
+        BossDataSO same = CopyWithCombos(
+            new[] { Step(BossAttackId.Jump, 0f), Step(BossAttackId.Jump, 0.8f) },
+            new[] { Step(BossAttackId.Jump, 0.8f) },
+            new[] { Step(BossAttackId.Dash, 2f) });   // 점프가 아닌 타의 값은 보스가 안 쓴다
+        Assert.AreEqual(0.8f, TwentyThreeInterruptWindowLength.LandingWindowLength(same), 1e-6f);
+
+        BossDataSO none = CopyWithCombos(new[] { Step(BossAttackId.Jump, 0f) });
+        Assert.AreEqual(-1f, TwentyThreeInterruptWindowLength.LandingWindowLength(none));
+    }
+
+    // ─── B 잡기 = 열린 뒤 경과 + 지금 클립에서 닫힘까지 남은 시간 ───
+    // No23: catch 1.1 · hold 1.13 · throw 0.65 · slam 3 · speed 1.4 → 붙잡기 끝(≈열림) 뒤 남은 = (1.13 + 2×0.65)/1.4 ≈ 1.736
+
+    const float Speed = 1.4f;
+    const float CatchT = 1.1f / Speed, HoldT = 1.13f / Speed, ThrowT = 0.65f / Speed;
+    const float AfterCatch = HoldT + 2f * ThrowT;
+
+    [Test]
+    public void 잡기_실제_값_붙잡기_뒤_남은_시간()
+    {
+        Assert.AreEqual(1.736f, AfterCatch, 1e-3f);
+        BossDataSO data = Load("No23");
+        Assert.AreEqual(1.4f, data.grabCycleSpeed, 1e-6f);
+        Assert.AreEqual(3, data.grabSlamCount);
+        Assert.AreEqual(1.1f, data.grabCatchDuration, 1e-6f);
+        Assert.AreEqual(1.13f, data.grabHoldDuration, 1e-6f);
+        Assert.AreEqual(0.65f, data.grabThrowDuration, 1e-6f);
+    }
+
+    [Test]
+    public void 잡기_붙잡기_중은_합에서_열릴_때_경과를_뺀다()
+    {
+        BossDataSO data = Load("No23");
+        // Catch 0.78 에서 열려 0.02 지남 → 합(catch+hold+2throw) − 0.78.
+        Assert.AreEqual(CatchT + AfterCatch - 0.78f, LengthFor(Open("Grab", 0.80f, 0.02f), data), 1e-4f);
+        // 붙잡기 구간 끝에 정확히 열렸으면 = 붙잡기 뒤 남은 시간.
+        Assert.AreEqual(AfterCatch, LengthFor(Open("Grab", CatchT, 0f), data), 1e-4f);
+    }
+
+    [Test]
+    public void 잡기_지짐이_중은_지짐이_경과로_역산()
+    {
+        BossDataSO data = Load("No23");
+        // 열림 = Shock 시작(같은 틱).
+        Assert.AreEqual(AfterCatch, LengthFor(Open("Holding", 0.3f, 0.3f), data), 1e-4f);
+        // 열림이 Shock 시작보다 0.01 앞(Catch 끝 직전 OnAttackHit).
+        Assert.AreEqual(AfterCatch + 0.01f, LengthFor(Open("Holding", 0.3f, 0.31f), data), 1e-4f);
+    }
+
+    [Test]
+    public void 잡기_내려치기_중은_지난_타_수를_추정()
+    {
+        BossDataSO data = Load("No23");
+        // 1타 0.1초 — 남은 = 2타 − 0.1.
+        Assert.AreEqual(AfterCatch, LengthFor(Open("Throw", 0.1f, HoldT + 0.1f), data), 1e-4f);
+        // 2타 0.2초 — 남은 = 1타 − 0.2.
+        Assert.AreEqual(AfterCatch, LengthFor(Open("Throw", 0.2f, HoldT + ThrowT + 0.2f), data), 1e-4f);
+        // 열림이 Shock 시작보다 0.1 앞이어도(throw/2 미만) 타 수는 그대로 — 길이에 그 0.1 이 더해진다.
+        Assert.AreEqual(AfterCatch + 0.1f, LengthFor(Open("Throw", 0.2f, HoldT + ThrowT + 0.3f), data), 1e-4f);
+    }
+
+    [Test]
+    public void 잡기_경과를_모르면_모름()
+    {
+        BossDataSO data = Load("No23");
+        foreach (string s in new[] { "Grab", "Holding", "Throw" })
+        {
+            Assert.AreEqual(-1f, LengthFor(Open(s), data), s);
+            Assert.AreEqual(-1f, LengthFor(Open(s, 0.3f, -1f), data), s + " 창 기록 없음");
+            Assert.AreEqual(-1f, LengthFor(Open(s, -1f, 0.3f), data), s + " 자세 정지");
+        }
+    }
+
+    [Test]
+    public void 잡기_1타_데이터는_그_1타_끝에_닫힌다()
+    {
+        BossDataSO data = Object.Instantiate(Load("No23"));
+        _created.Add(data);
+        data.grabSlamCount = 1;
+        Assert.AreEqual(HoldT + ThrowT, LengthFor(Open("Holding", 0.2f, 0.2f), data), 1e-4f);
+        Assert.AreEqual(HoldT + ThrowT, LengthFor(Open("Throw", 0.1f, HoldT + 0.1f), data), 1e-4f);
     }
 
     [Test]
@@ -193,19 +312,13 @@ public sealed class TwentyThreeInterruptWindowLengthTests
     }
 
     [Test]
-    public void 잡기_착지는_종류만_가르고_길이는_모름()
+    public void 잡기_착지_종류_구별()
     {
         BossDataSO data = Load("No23");
         foreach (string s in new[] { "Grab", "Holding", "Throw" })
-        {
             Assert.AreEqual(TwentyThreeWindowKind.Grab, TwentyThreeInterruptWindowLength.Classify(Open(s), data), s);
-            Assert.AreEqual(-1f, LengthFor(Open(s), data), s);
-        }
         foreach (string s in new[] { "JumpLanding", "Locomotion" })
-        {
             Assert.AreEqual(TwentyThreeWindowKind.JumpLanding, TwentyThreeInterruptWindowLength.Classify(Open(s), data), s);
-            Assert.AreEqual(-1f, LengthFor(Open(s), data), s);
-        }
     }
 
     // ─── 프리팹·컨트롤러 배선 — 구별에 쓰는 상태 이름이 실제 0층 상태인가 ───

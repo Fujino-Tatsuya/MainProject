@@ -113,9 +113,15 @@ Idle/Move ──Space──▶ Dash(대시 시작)
     - **D 레이드 릴레이** = 준비 클립 + 데이터가 릴레이(5)만 씀 + (서버 플래그 1 / 클라 열림 시 준비 경과 ≥ (relayPrepare − relayCounterWindow)/2 = 0.45) → `min(relayCounterWindow, relayPrepare)` 0.9 — **정확**(한 프레임 양자화). 간격이 0.3초 미만으로 튜닝되면 클라는 일반 돌진과 못 갈라 모름. `TwentyThree.prefab` 기본 데이터 `No23_A` 가 이 경우.
     - **E 레이드 연쇄** = 같은 방식, 간격 = `chainMarkTime`(1) → `chainCounterWindow` 1.5 — **정확**. 지금 에셋엔 연쇄(6)를 쓰는 데이터가 없다. 릴레이·연쇄를 둘 다 쓰는 데이터면 레이드 쪽은 모름.
     - **F 북진 무력화** = `GroggyStart` + 데이터가 북진(7)을 씀 → `pushNorthStunTime` 3 — **정확**(일반 그로기는 Attack 이탈로 창이 닫혀 겹치지 않는다).
-    - **B 잡기·C 점프 착지** = 종류만 가른다(잡기 = `grabCatchState`/`grabHoldState`/`grabThrowState`, 착지 = `jumpLandingState`/이동 자세) — 길이는 단계 4 전까지 모름(관측 중앙값). 창이 닫혀 있거나 못 가르면 모름.
+    - **C 점프 착지(단계 4)** = `jumpLandingState`(또는 착지 뒤 이동 자세 `locomotionState` 인데 창이 남음) → 보스 SO `combos[].steps[]` 중 **점프 타**의 `landingCounterWindow` 가운데 0 이 아닌 값이 **한 가지뿐이면 그 값**(지금 No23·No23_A·No23_Raid·No23_B 전부 0.8) — **정확**(서버는 그 값만큼 열고 `Time.time` 으로 닫음). 0 아닌 값이 서로 다르게 둘 이상이면 어느 콤보인지 공개 상태로 몰라 **모름**(관측 중앙값), 하나도 없으면 모름. 가중치 0 콤보도 센다(스크립트 선택 `FindJumpTripleCombo` 는 가중치를 안 본다). 서버도 같은 규칙 — 닫힘 시각(`_landingCounterCloseAt`)·이번 타 값은 private.
+    - **B 잡기(단계 4)** = `grabCatchState`/`grabHoldState`/`grabThrowState`(셋이 비었거나 겹치면 모름). 창 = 붙잡은 순간(`Boss_23_grab` OnAttackHit ≈ 붙잡기 구간 끝) ~ **마지막 내려치기 시작**. 서버 단계 길이 = SO 값 ÷ `grabCycleSpeed`(애니도 같은 배속), 닫힘 전 타 수 = max(1, `grabSlamCount` − 1)(서버는 각 타 끝에 남은 타 ≤ 1 이면 닫음 → 1타 데이터는 그 1타 끝). 반환 = **열린 뒤 경과 + 지금 클립에서 닫힘까지 남은 시간**(= Catch 중이면 합 − 열릴 때의 Catch 경과 — 해석기 계약 '이번 열림 전체 길이', 경과 기준 = 이 피어 창 기록과 애니 상태 경과(정규화 × 길이 ÷ `animator.speed`)).
+      - Catch 중: 남은 = (catch + hold + 타 수 × throw)/speed − Catch 경과 — **정확**.
+      - Shock(Holding) 중: 남은 = (hold + 타 수 × throw)/speed − Shock 경과 — **정확**. No23 실제 값(catch 1.1·hold 1.13·throw 0.65·slam 3·speed 1.4) → Shock 시작 뒤 남은 **1.736**.
+      - Throw 중: 타마다 같은 클립을 처음부터 다시 틀어(`ReplayGrabSlamClientRpc` → `Play(…, 0)`) 몇 번째 타인지 애니로 모른다 → 열림 ≈ Shock 시작으로 보고 round((열린 뒤 경과 − hold/speed − 이번 타 경과) ÷ (throw/speed)) 로 지난 타 수 추정 — **근사**(열림과 Shock 시작 차이 + 도착 흔들림이 throw/2 ≈ 0.23초 미만이면 맞음).
+      - 애니메이터 정지(자세 홀드 → 경과 -1)·창 기록 없음(`openElapsed` -1) = 모름. 붙잡힌 플레이어 쓰러짐·성공·중단 같은 조기 닫힘은 그대로 복제 bool 로만 안다.
+    - 창이 닫혀 있거나 못 가르면 모름.
     - 🔴 `TwentyThree.prefab` 의 `MonsterCounterWindow`(1.5)는 23호 전체 창 길이가 아니다 — 중간보스 어댑터는 봇 타입으로 한정해 23호를 맡지 않는다.
-    - 테스트 `Dev/InterruptLab/Editor/TwentyThreeInterruptWindowLengthTests.cs`(실제 에셋 No23·No23_A·No23_B, 가짜 공개 상태, 프리팹 애니메이터·0층 상태 배선). 표: `_lane-artifacts/MainProject-Worktree3/139-5/window-inventory.md` §6.
+    - 테스트 `Dev/InterruptLab/Editor/TwentyThreeInterruptWindowLengthTests.cs`(실제 에셋 No23·No23_A·No23_Raid·No23_B, 가짜 공개 상태(잡기 Catch·Shock·Throw 경과 포함), 프리팹 애니메이터·0층 상태 배선). 표: `_lane-artifacts/MainProject-Worktree3/139-5/window-inventory.md` §6.
   - **경과 시계 = 게임초**: 예측용 창 기록·추정은 `Time.time`(창 타이머·판정까지 남은 시간과 같은 스케일 시간) — 예전엔 기록 = `ServerTime`(실시간)이라 간파 시도 슬로우 중 경과·관측 길이가 부풀었다(139-5). 서버는 지연 판정용 `ServerTime` 기록(`InterruptLagJudge` — 의미 그대로)과 예측용 게임초 기록을 따로 둔다. 오너 클라 경과는 **복제 bool 이 도착한** 로컬 시각 기준이라 한 방향 지연만큼 짧게(남은 창을 길게) 잡힌다.
   - 보정 랩 CSV `window_expected_duration`·`predicted_window_remaining` 은 무기한이면 `inf`(질문 패널 '무기한'). 표본 seq 22(랩 무기한, 경과 0.924·관측 1.243 → 약)는 이제 길이 +∞ → 강(`InterruptCalibrationSample22Tests`).
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
