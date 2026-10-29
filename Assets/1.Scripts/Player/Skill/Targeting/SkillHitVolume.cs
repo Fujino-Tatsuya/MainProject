@@ -8,7 +8,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item><see cref="Box"/>·<see cref="Beam"/> — 회전 직육면체(거너 Q 관통 레이저 미리보기 = 판정 도형의 넓은 질의 상자, <c>GunnerChargeLaserSkill.FireVolume</c>).</item>
 /// <item><see cref="CircleColumn"/> — 발 높이 원기둥. 겹침은 외접 상자로 하고 콜라이더 AABB 가 원에 걸리는지 <see cref="Accepts"/> 로 거른다
-///   (어쌔신 변신 E 원형 5타, <see cref="AssassinCircleStrikeRules.OverlapsCircle"/>).</item>
+///   (어쌔신 변신 E 원형 5타 미리보기 = 판정 도형 원, <c>AssassinCircleStrikeSkill.PreviewVolume</c>, <see cref="AssassinCircleStrikeRules.OverlapsCircle"/>).</item>
 /// </list>
 /// <see cref="Mask"/> 는 그 스킬의 피격 레이어(데이터 hittableLayers) 그대로다. 미리보기는 여기에 적 마스크를 교집합한다.
 /// </summary>

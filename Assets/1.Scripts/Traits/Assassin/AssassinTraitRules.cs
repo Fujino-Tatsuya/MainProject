@@ -268,18 +268,6 @@ public static class AssassinTrailRules
         return start + direction * Mathf.Max(0f, traveled);
     }
 
-    /// <summary>선분을 원래 Q 경로 폭·높이의 상자로 — 중심은 선분 가운데(높이 절반만 올림), 회전은 선분 방향.</summary>
-    public static void Box(Vector3 start, Vector3 end, float width, float height,
-        out Vector3 center, out Vector3 halfExtents, out Quaternion rotation)
-    {
-        Vector3 along = end - start;
-        along.y = 0f;
-        float length = along.magnitude;
-        center = (start + end) * 0.5f + Vector3.up * (Mathf.Max(0f, height) * 0.5f);
-        halfExtents = new Vector3(Mathf.Max(0f, width) * 0.5f, Mathf.Max(0f, height) * 0.5f, length * 0.5f);
-        rotation = length > 1e-6f ? Quaternion.LookRotation(along / length) : Quaternion.identity;
-    }
-
     /// <summary>궤적 지연 — 끝없는 칼날과 같은 공격 가속기를 탄다(명세 §6): 지연 ÷ 공격속도 배율.</summary>
     public static float Delay(float delay, float attackSpeedRate) => AssassinComboExtraRules.Delay(delay, attackSpeedRate);
 }

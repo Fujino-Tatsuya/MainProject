@@ -264,9 +264,17 @@ public sealed class AssassinTraitTier3Tests
         var data = ScriptableObject.CreateInstance<AssassinCircleStrikeSkillData>();
         try
         {
-            SkillHitVolume volume = AssassinCircleStrikeSkill.HitVolume(Vector3.zero, data, radius);
+            float multiplier = set.AreaMultiplier(AssassinTraitAreaRules.CircleStrike, TraitAreaAxis.Radius);
+            SkillHitVolume volume = AssassinCircleStrikeSkill.PreviewVolume(data, Vector3.back, Vector3.zero, multiplier);
             Assert.IsTrue(volume.Accepts(new Bounds(new Vector3(2.4f, 0.5f, 0f), Vector3.one * 0.01f)));
             Assert.IsFalse(volume.Accepts(new Bounds(new Vector3(2.6f, 0.5f, 0f), Vector3.one * 0.01f)));
+
+            // 서버 판정 도형(할 일 153)도 같은 반경 — 칼날의 영역 = 반경(길이) 배율 복사본.
+            AttackShapeSet area = data.StrikeArea(multiplier);
+            AttackShapePose pose = data.StrikePose(Vector3.back, Vector3.zero);
+            Assert.IsTrue(area.Contains(pose, new Vector3(2.4f, 0.5f, 0f)));
+            Assert.IsFalse(area.Contains(pose, new Vector3(2.6f, 0.5f, 0f)));
+            Assert.AreEqual(2f, data.AreaRadius, Eps, "SO 원본 불변");
         }
         finally
         {
@@ -284,9 +292,8 @@ public sealed class AssassinTraitTier3Tests
         var data = ScriptableObject.CreateInstance<AssassinCircleStrikeSkillData>();
         try
         {
-            var so = new UnityEditor.SerializedObject(data);
-            so.FindProperty("aoeRadius").floatValue = 2f;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            // 효과 반경 = 판정 도형 원 radius 기본 2(할 일 153 — 베이스 aoeRadius 대신, AoeRadius 덮어씀).
+            Assert.AreEqual(2f, data.AoeRadius, Eps);
 
             TraitModifierSet owned = SetOf(Area);
             float hit = AssassinTraitAreaRules.ScaleRadius(data.AreaRadius, owned.AreaMultiplier(AssassinTraitAreaRules.CircleStrike, TraitAreaAxis.Radius));

@@ -320,8 +320,11 @@ public static class TraitLabAttackShapes
 
                 case AssassinDashStrikeSkill dashStrike when dashStrike.DashData != null:
                     AssassinDashStrikeSkillData qData = dashStrike.DashData;
-                    AssassinDashStrikeSkill.PathBox(position, facing, 0f, qData.DashDistance, qData,
-                        out Vector3 pathCenter, out Vector3 pathHalf, out Quaternion pathRotation);
+                    // 도형 임시 표시(할 일 153 — 6단계에서 AttackShapeDrawing 으로 통합): 첫 도형의 넓은 질의 상자 = 직사각형이면 판정 영역 그대로.
+                    AttackShapeSet pathArea = AssassinDashStrikeSkill.PathSegment(qData, position, position, facing, 0f, qData.DashDistance, out AttackShapePose pathPose);
+                    if (pathArea.IsEmpty || pathArea.Shapes[0] == null)
+                        break;
+                    pathArea.Shapes[0].GetBroadBox(pathPose, out Vector3 pathCenter, out Vector3 pathHalf, out Quaternion pathRotation);
                     shapes.Add(TraitLabGizmoShape.Box(S, $"{slotName} 돌진 경로 {qData.DashDistance:0.#}m", pathCenter, pathHalf, pathRotation));
                     if (traitEffects != null && HasDerived(traitEffects, key, AssassinDerivedAttackKeys.QTrail))
                         shapes.Add(TraitLabGizmoShape.Box(T, "추격의 궤적(지나온 길)", pathCenter, pathHalf, pathRotation));

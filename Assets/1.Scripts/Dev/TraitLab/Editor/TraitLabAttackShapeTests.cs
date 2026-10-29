@@ -25,20 +25,23 @@ public sealed class TraitLabAttackShapeTests
     }
 
     [Test]
-    public void AssassinDashPathBox_CoversSegment_PathWidthHeight()
+    public void AssassinDashPathSegment_CoversSegment_PathWidthHeight()
     {
         var data = ScriptableObject.CreateInstance<AssassinDashStrikeSkillData>();
         try
         {
             var origin = new Vector3(1f, 0f, 1f);
-            AssassinDashStrikeSkill.PathBox(origin, Vector3.forward, 1f, 4f, data, out Vector3 center, out Vector3 half, out Quaternion rotation);
+            AttackShapeSet area = AssassinDashStrikeSkill.PathSegment(data, origin, origin, Vector3.forward, 1f, 4f, out AttackShapePose pose);
+            area.Shapes[0].GetBroadBox(pose, out Vector3 center, out Vector3 half, out Quaternion rotation);
 
+            Assert.AreEqual(new Vector3(1f, 0f, 2f), pose.Position, "기준점 = 구간 시작");
             Assert.AreEqual(1f, center.x, Eps);
-            Assert.AreEqual(data.PathHeight * 0.5f, center.y, Eps, "높이 절반 올림");
+            Assert.AreEqual(1f, center.y, Eps, "높이 0~2 가운데");
             Assert.AreEqual(1f + 2.5f, center.z, Eps, "구간 [1, 4] 가운데");
-            Assert.AreEqual(data.PathWidth * 0.5f, half.x, Eps);
-            Assert.AreEqual(data.PathHeight * 0.5f, half.y, Eps);
-            Assert.AreEqual(1.5f, half.z, Eps, "구간 길이 절반");
+            // 넓은 질의 상자는 경계 허용 오차(1e-4)만큼 크다.
+            Assert.AreEqual(data.PathWidth * 0.5f, half.x, 1e-3f);
+            Assert.AreEqual(1f, half.y, 1e-3f);
+            Assert.AreEqual(1.5f, half.z, 1e-3f, "구간 길이 절반");
             Assert.AreEqual(1f, Vector3.Dot(rotation * Vector3.forward, Vector3.forward), Eps, "돌진 방향");
         }
         finally

@@ -173,12 +173,14 @@ public sealed class SkillRangeOutlineTests
         Assert.IsNotNull(data, CircleStrikeDataPath);
 
         Vector3 areaCenter = new Vector3(1.5f, 0.2f, 4f);
-        SkillHitVolume v = AssassinCircleStrikeSkill.HitVolume(areaCenter, data);
+        SkillHitVolume v = AssassinCircleStrikeSkill.PreviewVolume(data, areaCenter + Vector3.back * data.CenterDistance, areaCenter, 1f);
 
-        // 리팩터 전 AssassinCircleStrikeSkill.StrikeArea 식
+        // 리팩터 전 AssassinCircleStrikeSkill.StrikeArea 식(반경 aoeRadius 2 · 높이 areaHeight 3 — 할 일 153 에서 판정 도형 원으로 옮김)
         float radius = data.AreaRadius;
-        Vector3 boxCenter = areaCenter + Vector3.up * (data.AreaHeight * 0.5f);
-        var half = new Vector3(radius, data.AreaHeight * 0.5f, radius);
+        const float oldHeight = 3f;
+        Assert.AreEqual(2f, radius, 1e-6f);
+        Vector3 boxCenter = areaCenter + Vector3.up * (oldHeight * 0.5f);
+        var half = new Vector3(radius, oldHeight * 0.5f, radius);
         Assert.That(Vector3.Distance(boxCenter, v.Center), Is.LessThan(1e-5f));
         Assert.That(Vector3.Distance(half, v.HalfExtents), Is.LessThan(1e-5f));
         Assert.AreEqual(Quaternion.identity, v.Rotation);
@@ -205,16 +207,18 @@ public sealed class SkillRangeOutlineTests
 
         // 오너: 고정 거리 투영 → 그 지점의 판정 영역
         Vector3 aimPoint = PlayerGroundPointProjection.ProjectFixedDistance(caster, cursor, data.CastRange, Vector3.forward);
-        SkillHitVolume preview = AssassinCircleStrikeSkill.HitVolume(AssassinCircleStrikeSkill.AreaCenter(caster, aimPoint), data);
+        SkillHitVolume preview = AssassinCircleStrikeSkill.PreviewVolume(data, caster, AssassinCircleStrikeSkill.AreaCenter(caster, aimPoint), 1f);
 
         // 서버: 컨트롤러 재투영(같은 위치) → OnServerStart 의 areaCenter(리팩터 전: AimPoint, y = 시전자 발) → StrikeArea
         Vector3 submitted = PlayerGroundPointProjection.ReprojectServerFixedDistance(caster, aimPoint, data.CastRange, Vector3.forward);
         Vector3 serverCenter = submitted;
         serverCenter.y = caster.y;
-        SkillHitVolume server = AssassinCircleStrikeSkill.HitVolume(serverCenter, data);
+        SkillHitVolume server = AssassinCircleStrikeSkill.PreviewVolume(data, caster, serverCenter, 1f);
 
         AssertSameVolume(server, preview);
         Assert.That(Vector3.Distance(serverCenter, preview.CircleCenter), Is.LessThan(1e-5f));
+        // 서버 판정 포즈(OnServerStart 의 StrikePose)도 같은 중심(할 일 153).
+        Assert.That(Vector3.Distance(serverCenter, data.StrikePose(caster, serverCenter).Position), Is.LessThan(1e-5f));
     }
 
     // ── 같은 입력 → 같은 겹침 결과(실제 물리 질의) ──
