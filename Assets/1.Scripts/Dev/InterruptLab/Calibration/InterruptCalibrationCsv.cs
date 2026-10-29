@@ -49,7 +49,11 @@ public static class InterruptCalibrationCsv
         ("predicted_window_remaining", s => F(s.PredictedWindowRemaining)),
         ("owner_forecast", s => s.OwnerForecast?.ToString() ?? ""),
         ("owner_reason", s => s.OwnerReason?.ToString() ?? ""),
+        ("owner_repredicted", s => B(s.OwnerRepredicted)),
+        ("owner_final_forecast", s => s.OwnerFinalForecast?.ToString() ?? ""),
         ("server_forecast", s => s.ServerForecast?.ToString() ?? ""),
+        ("server_repredicted", s => B(s.ServerRepredicted)),
+        ("server_final_forecast", s => s.ServerFinalForecast?.ToString() ?? ""),
         ("server_succeeded", s => B(s.ServerSucceeded)),
 
         ("actual_window_open", s => B(s.ActualWindowOpen)),

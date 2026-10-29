@@ -439,8 +439,10 @@ public sealed class InterruptCalibrationQuestionPanel : MonoBehaviour
 
         var sb = new StringBuilder();
         sb.Append("오너 예측: ").Append(DescribeForecast(s.OwnerForecast))
-          .Append(" (").Append(s.OwnerReason?.ToString() ?? "-").Append(")\n");
-        sb.Append("서버 예측: ").Append(DescribeForecast(s.ServerForecast)).Append('\n');
+          .Append(" (").Append(s.OwnerReason?.ToString() ?? "-").Append(")")
+          .Append(s.OwnerRepredicted == true ? " → 재예측 " + DescribeForecast(s.OwnerFinalForecast) : "").Append('\n');
+        sb.Append("서버 예측: ").Append(DescribeForecast(s.ServerForecast))
+          .Append(s.ServerRepredicted == true ? " → 재예측 " + DescribeForecast(s.ServerFinalForecast) : "").Append('\n');
         sb.Append("서버 결과: ").Append(s.ServerSucceeded == true ? "성공" : s.ServerSucceeded == false ? "실패" : "-").Append('\n');
         sb.Append("실제 창: ").Append(s.ActualWindowOpen == true ? "열림" : s.ActualWindowOpen == false ? "닫힘" : "-")
           .Append(" · 경과 ").Append(Seconds(s.ActualOpenElapsed))

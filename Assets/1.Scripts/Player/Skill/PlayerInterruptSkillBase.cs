@@ -58,6 +58,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // ── 시도 예측(할 일 132) — 근접·대쉬 공용 DashInterruptPredictor 입력 ──
     private float observedPrepDelay = -1f; // 이 피어에서 관측한 시작 → 첫 Hit(초). 첫 관측 전 = -1
     private Vector3 castDirection;          // [서버] 승인된 시전 방향 — 근접 예측의 공격 방향(오너가 보낸 조준 방향과 같다)
+    // [서버] 대쉬 간파 재예측(할 일 139-2) — 승인 때 창이 닫혀 약이었다. 대시 동안 창이 열리면 강 시도 슬로우로 다시 건다.
+    private bool serverRepredictPending;
+    private float serverPredictSkillStart;  // 승인 예측의 준비 기준점 t0
 
     // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
     [Header("간파 지연 측정")]
@@ -118,6 +121,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         dashAttachArmed = false;
         pendingHit = false;
         pendingEnd = false;
+        serverRepredictPending = false;
         castDirection = direction;
 
         base.OnServerStart(direction, target);
@@ -197,6 +201,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         attachedToDash = false;
+        serverRepredictPending = false;
         bool resolveNow = DashInterruptRules.EvaluateResolveTiming(true, pendingHit) == DashInterruptResolveTiming.ResolveNow;
         pendingHit = false;
         Edit.Log($"[DashInterrupt] 대시 끝 → Skill 전이 — {(resolveNow ? "보류된 Hit 즉시 판정" : "클립 Hit 대기")}", this);
@@ -219,6 +224,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         attachedToDash = false;
         pendingHit = false;
         pendingEnd = false;
+        serverRepredictPending = false;
 
         InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
             InterruptFailReason.EndedBeforeResolve, slowMotion.Abort()));
@@ -299,6 +305,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// <summary>[서버] 승인 시점 시도 예측(시도 슬로우 강·약)을 했다. 계측 전용(할 일 139). 시간 레이어가 없는 씬에선 나지 않는다.</summary>
     public static event System.Action<CalibrationPrediction> CalibrationServerPredicted;
 
+    /// <summary>[오너] 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2). 계측 전용. 올리지 않은 재예측은 알리지 않는다.</summary>
+    public static event System.Action<CalibrationPrediction> CalibrationOwnerRepredicted;
+
+    /// <summary>[서버] 대쉬 간파 재예측이 약 → 강으로 올려 강 시도 슬로우를 다시 걸었다(할 일 139-2). 계측 전용.</summary>
+    public static event System.Action<CalibrationPrediction> CalibrationServerRepredicted;
+
     /// <summary>
     /// [서버] 간파 판정 1회가 끝났다 — 인자 = 그 스킬, 대쉬 간파로 시작했는가, 카운터 창 소비 성공. 계측 전용(할 일 139).
     /// 판정 앵커 누락·판정 전 종료에선 나지 않는다.
@@ -313,6 +325,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         ServerInterruptSucceeded = null;
         CalibrationOwnerPredicted = null;
         CalibrationServerPredicted = null;
+        CalibrationOwnerRepredicted = null;
+        CalibrationServerRepredicted = null;
         CalibrationServerJudged = null;
     }
 
@@ -591,6 +605,43 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             new CalibrationPrediction(this, attachedToDash, 0f, attackDirection, input, prediction, target));
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
             InterruptProductionEvent.Attempt(owner, this, prediction.Forecast)));
+        serverRepredictPending = attachedToDash && DashInterruptPredictor.ShouldRepredictDuringDash(prediction);
+        serverPredictSkillStart = input.SkillStartTime;
+    }
+
+    /// <summary>
+    /// [서버] 대쉬 간파 재예측(할 일 139-2) — 대시 상태가 실려 있는 동안 매 프레임 부른다(지금 서버 대시 속도·남은 시간).
+    /// 승인 때 창이 닫혀 약이었으면 같은 예측기로 서버 창을 다시 보고, 강이 되면 강 시도 슬로우를 다시 건다
+    /// (GlobalTimeScale 은 마지막 발동이 이긴다 — 새 RPC 없이 기존 슬로우 배포로 오너·팀원 화면이 강 시도를 받는다). 강 → 약은 없다.
+    /// </summary>
+    internal void TickServerDashReprediction(float dashSpeed, float dashRemaining)
+    {
+        if (!serverRepredictPending || !attachedToDash)
+            return;
+
+        if (!slowMotion.IsPending || GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null ||
+            HitboxAnchor == null || owner == null)
+        {
+            serverRepredictPending = false;
+            return;
+        }
+
+        DashInterruptPredictInput input = InterruptAttemptPrediction.ForReprediction(
+            BuildPredictInput(false, true, armedDashDirection, dashSpeed, dashRemaining, 0f, out Unit target), serverPredictSkillStart);
+        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(input);
+        if (prediction.Forecast != InterruptAttemptForecast.Strong)
+            return;
+
+        serverRepredictPending = false;
+        uint triggerId = InterruptProductionDirector.ServerAttempt(
+            InterruptProductionEvent.Attempt(owner, this, InterruptAttemptForecast.Strong));
+        if (triggerId == 0)
+            return; // 레이어가 거부했다 — 약 시도 슬로우 번호를 그대로 둬야 판정·종료가 실패 복귀시킬 수 있다
+
+        slowMotion.Started(triggerId);
+        Edit.Log($"[DashInterrupt] 대시 중 재예측 — 약 → 강(서버 시도 슬로우 다시 걸음) · 판정까지 {prediction.PredictedResolveTime - Time.time:F3}s", this);
+        CalibrationServerRepredicted?.Invoke(
+            new CalibrationPrediction(this, true, 0f, armedDashDirection, input, prediction, target));
     }
 
     /// <summary>
@@ -614,6 +665,29 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         prediction = DashInterruptPredictor.Predict(input);
         CalibrationOwnerPredicted?.Invoke(
             new CalibrationPrediction(this, viaDash, pressAge, attackDirection, input, prediction, target));
+        return true;
+    }
+
+    /// <summary>
+    /// [오너] 대쉬 간파 재예측(할 일 139-2) — 누른 순간 창이 닫혀 약이었던 시도를 대시 도중 지금 값(복제 창·남은 대시)으로 다시 예측한다.
+    /// 준비 기준점은 누른 순간(<paramref name="skillStartTime"/>)으로 둔다. 강이면 true — 호출측이 오너 연출을 강으로 올린다.
+    /// </summary>
+    internal bool TryRepredictOwnerDashAttempt(Vector3 attackDirection, float dashSpeed, float dashRemaining, float skillStartTime,
+        out DashInterruptPrediction prediction, out Unit target)
+    {
+        prediction = default;
+        target = null;
+        if (InterruptData == null || HitboxAnchor == null || owner == null)
+            return false;
+
+        DashInterruptPredictInput input = InterruptAttemptPrediction.ForReprediction(
+            BuildPredictInput(true, true, attackDirection, dashSpeed, dashRemaining, 0f, out target), skillStartTime);
+        prediction = DashInterruptPredictor.Predict(input);
+        if (prediction.Forecast != InterruptAttemptForecast.Strong)
+            return false;
+
+        CalibrationOwnerRepredicted?.Invoke(
+            new CalibrationPrediction(this, true, 0f, attackDirection, input, prediction, target));
         return true;
     }
 

@@ -54,7 +54,8 @@ public sealed class InterruptCalibrationTests
                      "cast_time", "cast_pos_x", "dash_dir_x", "dash_speed", "dash_remaining", "skill_start_time", "prep_delay",
                      "has_target_in_range", "target_window_open", "window_open_elapsed", "window_expected_duration",
                      "resolve_pos_x", "target_distance", "target_angle", "predicted_resolve_time", "predicted_window_remaining",
-                     "owner_forecast", "owner_reason", "server_forecast", "server_succeeded",
+                     "owner_forecast", "owner_reason", "owner_repredicted", "owner_final_forecast",
+                     "server_forecast", "server_repredicted", "server_final_forecast", "server_succeeded",
                      "actual_window_open", "actual_open_elapsed", "actual_remaining",
                  })
             CollectionAssert.Contains(header, column);
@@ -139,6 +140,20 @@ public sealed class InterruptCalibrationTests
         Assert.AreEqual("0.25", Cell("predicted_window_remaining"));
         Assert.AreEqual("Weak", Cell("owner_forecast")); // 남은 창 0.25 < 판정까지 0.5
         Assert.AreEqual(nameof(DashInterruptPredictReason.WindowClosesBeforeResolve), Cell("owner_reason"));
+        Assert.AreEqual("false", Cell("owner_repredicted"), "재예측 전 = 없음");
+        Assert.AreEqual("Weak", Cell("owner_final_forecast"), "최종 = 원래 예측");
+        Assert.AreEqual("", Cell("server_repredicted"), "서버 예측 없음 = 빈 칸");
+
+        sample.OwnerRepredicted = true;
+        sample.OwnerFinalForecast = InterruptAttemptForecast.Strong;
+        sample.SetServerPrediction(InterruptAttemptForecast.Weak);
+        cells = Cells(InterruptCalibrationCsv.FormatRow(sample));
+        Assert.AreEqual("Weak", Cell("owner_forecast"), "원래 예측은 그대로");
+        Assert.AreEqual("true", Cell("owner_repredicted"));
+        Assert.AreEqual("Strong", Cell("owner_final_forecast"));
+        Assert.AreEqual("Weak", Cell("server_forecast"));
+        Assert.AreEqual("false", Cell("server_repredicted"));
+        Assert.AreEqual("Weak", Cell("server_final_forecast"));
     }
 
     // ─── 세션 기록 ─────────────────────────────────────────────────────

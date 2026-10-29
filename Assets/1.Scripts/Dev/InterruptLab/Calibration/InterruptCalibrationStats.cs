@@ -72,9 +72,17 @@ public sealed class InterruptCalibrationStats
     public readonly CalibrationAgreement OwnerVsServerForecast =
         new CalibrationAgreement("오너 ↔ 서버 예측", "오너 강", "오너 약", "서버 강", "서버 약");
 
+    /// <summary>오너 최종 예측(대시 중 재예측 반영, 할 일 139-2) ↔ 답 — 위 넷(누른 순간 예측 기준)과 따로 summary 에만 쓴다.</summary>
+    public readonly CalibrationAgreement OwnerFinalVsAnswer =
+        new CalibrationAgreement("오너 최종 예측 ↔ 답", "오너 강", "오너 약", "답 true", "답 false");
+
     readonly Dictionary<DashInterruptPredictReason, int> ownerMismatchReasons = new Dictionary<DashInterruptPredictReason, int>();
 
     public int SampleCount { get; private set; }
+
+    /// <summary>대시 중 재예측이 약 → 강으로 올린 표본 수(오너·서버).</summary>
+    public int OwnerRepredictedCount { get; private set; }
+    public int ServerRepredictedCount { get; private set; }
 
     public IEnumerable<CalibrationAgreement> All
     {
@@ -101,6 +109,11 @@ public sealed class InterruptCalibrationStats
         ServerForecastVsAnswer.Add(server, answer);
         ServerResultVsAnswer.Add(sample.ServerSucceeded, answer);
         OwnerVsServerForecast.Add(owner, server);
+        OwnerFinalVsAnswer.Add(InterruptCalibrationSample.ForecastAsBool(sample.OwnerFinalForecast ?? sample.OwnerForecast), answer);
+        if (sample.OwnerRepredicted == true)
+            OwnerRepredictedCount++;
+        if (sample.ServerRepredicted == true)
+            ServerRepredictedCount++;
 
         if (owner.HasValue && answer.HasValue && owner.Value != answer.Value && sample.OwnerReason.HasValue)
         {
@@ -134,6 +147,13 @@ public sealed class InterruptCalibrationStats
               .Append(a.LeftFalseLabel).Append("·").Append(a.RightTrueLabel).Append(' ').Append(a.LeftFalseRightTrue)
               .Append(InterruptCalibrationCsv.NewLine);
         }
+        sb.Append(InterruptCalibrationCsv.NewLine);
+
+        sb.Append("[대시 중 재예측(약 → 강)]").Append(InterruptCalibrationCsv.NewLine);
+        sb.Append("재예측: 오너 ").Append(OwnerRepredictedCount).Append(" · 서버 ").Append(ServerRepredictedCount)
+          .Append(InterruptCalibrationCsv.NewLine);
+        sb.Append(OwnerFinalVsAnswer.Name).Append(": ").Append(OwnerFinalVsAnswer.FormatRate())
+          .Append(" · 제외 ").Append(OwnerFinalVsAnswer.Excluded).Append(InterruptCalibrationCsv.NewLine);
         sb.Append(InterruptCalibrationCsv.NewLine);
 
         sb.Append("[오너 예측 ↔ 답 불일치의 오너 Reason]").Append(InterruptCalibrationCsv.NewLine);

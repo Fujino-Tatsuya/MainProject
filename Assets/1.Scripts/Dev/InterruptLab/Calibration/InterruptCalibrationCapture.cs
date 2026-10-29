@@ -9,6 +9,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>(a) 오너 입력 순간 — <see cref="PlayerInterruptSkillBase.CalibrationOwnerPredicted"/>: pressAge·예측 입력 전 필드·결과·판정 위치 + 대상 거리·각도.</item>
 /// <item>(b) 서버 예측 — <see cref="PlayerInterruptSkillBase.CalibrationServerPredicted"/>: 시도 슬로우 강/약(대상 없음 = 슬로우 없음).</item>
+/// <item>(a′)(b′) 대시 중 재예측 약 → 강(할 일 139-2) — <see cref="PlayerInterruptSkillBase.CalibrationOwnerRepredicted"/>·<see cref="PlayerInterruptSkillBase.CalibrationServerRepredicted"/>: 재예측 여부·최종 예측 칸.</item>
 /// <item>(c) 서버 판정 — <see cref="PlayerInterruptSkillBase.CalibrationServerJudged"/>: 성공/실패.</item>
 /// <item>(d) 판정 시점 실제 창 — 허수아비 창 모드(<see cref="DebugDummyInterruptWindowMode"/>)의 설정·<see cref="DebugDummyInterruptWindowMode.Actual"/>.</item>
 /// </list>
@@ -44,6 +45,8 @@ public sealed class InterruptCalibrationCapture : MonoBehaviour
         ApplySettings();
         PlayerInterruptSkillBase.CalibrationOwnerPredicted += HandleOwnerPredicted;
         PlayerInterruptSkillBase.CalibrationServerPredicted += HandleServerPredicted;
+        PlayerInterruptSkillBase.CalibrationOwnerRepredicted += HandleOwnerRepredicted;
+        PlayerInterruptSkillBase.CalibrationServerRepredicted += HandleServerRepredicted;
         PlayerInterruptSkillBase.CalibrationServerJudged += HandleServerJudged;
     }
 
@@ -51,6 +54,8 @@ public sealed class InterruptCalibrationCapture : MonoBehaviour
     {
         PlayerInterruptSkillBase.CalibrationOwnerPredicted -= HandleOwnerPredicted;
         PlayerInterruptSkillBase.CalibrationServerPredicted -= HandleServerPredicted;
+        PlayerInterruptSkillBase.CalibrationOwnerRepredicted -= HandleOwnerRepredicted;
+        PlayerInterruptSkillBase.CalibrationServerRepredicted -= HandleServerRepredicted;
         PlayerInterruptSkillBase.CalibrationServerJudged -= HandleServerJudged;
         _pairing.Clear();
     }
@@ -82,6 +87,12 @@ public sealed class InterruptCalibrationCapture : MonoBehaviour
 
     void HandleServerPredicted(PlayerInterruptSkillBase.CalibrationPrediction p) =>
         _pairing.OnServerPredicted(p.ViaDash, p.Prediction.Forecast, Time.time);
+
+    void HandleOwnerRepredicted(PlayerInterruptSkillBase.CalibrationPrediction p) =>
+        _pairing.OnOwnerRepredicted(p.ViaDash, p.Prediction.Forecast, Time.time);
+
+    void HandleServerRepredicted(PlayerInterruptSkillBase.CalibrationPrediction p) =>
+        _pairing.OnServerRepredicted(p.ViaDash, p.Prediction.Forecast, Time.time);
 
     void HandleServerJudged(PlayerInterruptSkillBase skill, bool viaDash, bool succeeded)
     {

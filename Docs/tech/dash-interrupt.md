@@ -87,6 +87,14 @@ Idle/Move ──Space──▶ Dash(대시 시작)
   - 대상 = 오버랩 없이 `InterruptTargetRegistry` 캐시 + `InterruptTargetGeometry`(간파 사거리 · 대상 정면 허용각 — 지금 대쉬 간파 대상은 기존 판정값 그대로, 정면 판정 없으면 180 · **대시 방향**이 대상을 향함). 밖이면 '대상 없음' = 슬로우 없음.
   - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
   - 판정 오버랩은 옮기지 않는다(실제 위치).
+- **예측 규칙 보정(할 일 139-2, §10.2 표본 27개 근거)** — `DashInterruptPredictor`·`InterruptTargetGeometry` 공용 규칙이라 ①③은 근접 간파에도 같이 적용된다, ②는 대쉬 간파만:
+  - **① 틀린 창 길이 추정 버리기**: 창이 지금 열려 있는데 열린 뒤 경과 > 추정 길이(관측 중앙값, `IsWindowEstimateStale`)면 추정이 틀린 것으로 보고 버린다(남은 창 = 모름 -1). 그때 판정까지 남은 시간 ≤ **`StaleWindowMaxTimeToResolve` = 0.4초**면 강(`Success`), 길면 약(`WindowClosesBeforeResolve`). 무기한 허수아비 창(§10.1 ⚠️)의 표본 seq 5·8·15·19·26 이 약 → 강. seq 22 는 경과 0.924 < 추정 1.243 이라 해당 없음(남은 0.319 < 판정까지 0.345 — 약 그대로).
+  - **② 대시 중 재예측(약 → 강만)**: 누른(서버 = 승인) 순간 대상은 범위 안인데 창이 닫혀 약(`WindowClosedNow`, `ShouldRepredictDuringDash`)이었으면, 그 대시 동안 매 프레임 같은 예측기로 다시 본다(`PlayerDashState.Tick` → `PlayerSkillController.TickDashInterruptReprediction`). 입력 = 지금 위치·남은 대시·창, 준비 기준점은 처음 시도의 t0(`InterruptAttemptPrediction.ForReprediction`). 강이 되는 순간 한 번:
+    - 오너 = 복제 창으로 → `InterruptProductionDirector.LocalOwnerUpgrade` → `InterruptOwnerPresentation.UpgradeToStrong`(암전·빛 모임이 늦게 켜짐). 올린 뒤 서버의 약 목적(승인 때 예측)이 늦게 와도 내리지 않는다. 서버 강이 먼저 와 있었어도 켠다.
+    - 서버 = 서버 창으로 → `PlayerInterruptSkillBase.TickServerDashReprediction` 이 **강 시도 슬로우를 다시 건다**(`GlobalTimeScale` 은 마지막 발동이 이긴다 — 기존 슬로우 배포로 전 피어가 받음, 새 RPC 없음). 레이어가 거부하면(0) 약 슬로우 번호를 그대로 둔다.
+    - 강 → 약 내리기 없음. 근접 간파는 재예측하지 않는다. 표본 seq 16(누를 때 닫힘 → 0.04초 뒤 열림 → 서버 성공).
+  - **③ 겹침이면 공격 방향 생략**: 판정 위치 → 대상 표면 수평 거리 ≤ **`InterruptTargetGeometry.OverlapDistance` = 0.05m** 면 (3) 공격 방향 검사를 건너뛴다(판정 오버랩은 방향과 무관하게 닿는다). (2) 대상 정면 허용각은 대상의 실제 간파 규칙이라 그대로 본다. 표본 seq 10(거리 0·각도 133° → 대상 없음이었는데 서버 성공).
+  - 남은 한계(표본 seq 8): ①로 강이 되지만 서버는 실패했다 — 판정 위치에서 대상 표면까지 1.31m·대시 방향과 75° 라, 전방위 사거리(앵커를 어느 방향으로 돌려도 닿는 최대 거리) 안이지만 실제 판정 앵커(전방 상자)는 옆 75° 에서 그 거리까지 닿지 않는다. 각도·거리 규칙을 앵커 모양에 맞추는 것은 표본 1개라 이번에 하지 않았다.
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
 - 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
@@ -206,6 +214,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 "분명 맞췄는데 강 연출이 안 뜬다" 를 잡으려고, 대쉬 간파 한 번마다 **오너 예측(강/약/대상 없음)·서버 예측·서버 판정·판정 시점 실제 창 상태·사람의 판단(성공이어야 했나)** 을 표본 하나로 모아 CSV 로 남기는 씬이다.
 기록만 한다 — 예측식(`DashInterruptPredictor`)·허용치 칸은 고치지 않는다(데이터를 본 뒤 새 할 일). 계획 원본: 할 일 139 계획서(grill 2026-10-29).
+첫 세션 표본(27개)으로 고친 예측 규칙은 §5 '예측 규칙 보정(할 일 139-2)'.
 
 **씬**: `Assets/0.Scenes/Debug/InterruptCalibrationLab.unity` — `DebugInterruptLab` 을 `AssetDatabase.CopyAsset` 으로 복제(새 guid)한 뒤 아래만 바꿨다. **빌드 목록에 없다**(§10.1 과 같이 Dev Boot 가 Play 동안만 넣었다 뺀다).
 
@@ -247,13 +256,16 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 | `cast_time`·`cast_pos_*`·`dash_dir_*`·`dash_speed`·`dash_remaining`·`skill_start_time`·`prep_delay`·`has_target_in_range`·`target_window_open`·`window_open_elapsed`·`window_expected_duration` | 오너 입력 순간 `DashInterruptPredictInput` 필드 그대로(음수 = 예측기 기준 '모름') |
 | `resolve_pos_*`·`target_distance`·`target_angle` | 예상 판정 위치(대시 끝) · 대상 판정 콜라이더 표면까지 수평 거리 · 대시 방향 ↔ 대상 방향 각도(도). 대상 없음이면 가장 가까운 등록 대상으로 잰다 |
 | `predicted_resolve_time`·`predicted_window_remaining` | 예측 판정 시각 · 그때 창 남은 시간 추정 |
-| `owner_forecast`·`owner_reason` | 오너 예측(강/약/대상 없음) · 예측기 Reason |
+| `owner_forecast`·`owner_reason` | 오너 예측(강/약/대상 없음) · 예측기 Reason — **누른 순간 원래 예측** |
+| `owner_repredicted`·`owner_final_forecast` | 대시 중 재예측(§5 ②, 할 일 139-2)이 약 → 강으로 올렸나 · 오너 최종 예측(없으면 원래와 같다) |
 | `server_forecast` | 서버 승인 시점 예측(시도 슬로우 강/약, 대상 없음 = NoTarget) |
+| `server_repredicted`·`server_final_forecast` | 서버 재예측이 강 시도 슬로우를 다시 걸었나 · 서버 최종 시도 슬로우 |
 | `server_succeeded` | 서버 판정 성공/실패 |
 | `actual_window_open`·`actual_open_elapsed`·`actual_remaining` | 판정 시점 실제 허수아비 창(열림 여부 · 열린 뒤 경과 · 실제 남은 시간 — 닫혀 있으면 경과·남은 시간 빈 칸, 무기한이면 남은 시간 빈 칸) |
 | `user_answer` | 사람 답(true = 성공이어야 했음) |
 
-- `summary.txt` — 표본 수, 일치율 4개(+제외 수), 불일치 유형별 개수(예: 오너 강·답 false / 오너 약·답 true), 오너 예측 ↔ 답 불일치의 오너 Reason 별 개수.
+- `summary.txt` — 표본 수, 일치율 4개(+제외 수, 누른 순간 원래 예측 기준), 불일치 유형별 개수(예: 오너 강·답 false / 오너 약·답 true), `[대시 중 재예측(약 → 강)]` 재예측 수(오너·서버)·오너 최종 예측 ↔ 답, 오너 예측 ↔ 답 불일치의 오너 Reason 별 개수.
+- 재예측은 강으로 올린 때만 알린다(`CalibrationOwnerRepredicted`·`CalibrationServerRepredicted`) — 대기 표본에 덧붙고 새 표본을 열지 않는다. 질문 창에는 `→ 재예측 강` 으로 보인다.
   패널이 꺼질 때(씬 나감·Play 정지 포함)·앱 종료·`지금 summary 쓰기` 버튼에서 (다시) 쓴다.
 
 **짝짓기 규칙** (`InterruptCalibrationPairing`)

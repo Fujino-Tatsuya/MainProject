@@ -9,6 +9,7 @@ namespace BeaverLobby.Player.Dash
         NoTargetInRange,          // 예상 판정 위치에서 사거리·각도 안에 간파 대상이 없다(InterruptTargetGeometry)
         WindowClosedNow,          // 대상은 범위 안이지만 지금 간파 창이 닫혀 있다
         WindowClosesBeforeResolve // 창은 열려 있지만 예상 남은 창 시간 < 판정까지 남은 시간
+                                  // (또는 열린 뒤 경과가 추정 길이를 넘어 추정을 버렸고 판정까지 남은 시간이 길다 — 할 일 139-2)
     }
 
     /// <summary>
@@ -83,6 +84,12 @@ namespace BeaverLobby.Player.Dash
     /// </summary>
     public static class DashInterruptPredictor
     {
+        /// <summary>
+        /// 창 길이 추정을 버렸을 때(열린 뒤 경과 &gt; 추정 길이 — 지금 열려 있으니 추정이 틀렸다) 판정까지 남은 시간이 이 초 이하면 성공 예측(할 일 139-2).
+        /// 139 보정 표본 6개(seq 5·8·15·19·22·26)의 판정까지 남은 시간 0.337~0.347초를 덮는다.
+        /// </summary>
+        public const float StaleWindowMaxTimeToResolve = 0.4f;
+
         public static DashInterruptPrediction Predict(in DashInterruptPredictInput input)
         {
             var p = new DashInterruptPrediction();
@@ -92,13 +99,19 @@ namespace BeaverLobby.Player.Dash
             p.PredictedDashEndTime = input.CastTime + dashRemaining;
             p.PredictedNormalHitTime = input.SkillStartTime + Mathf.Max(0f, input.PrepDelay);
             p.PredictedResolveTime = DashInterruptRules.GetResolveTime(p.PredictedDashEndTime, p.PredictedNormalHitTime);
-            p.WindowRemaining = EstimateWindowRemaining(input.WindowOpenElapsed, input.WindowExpectedDuration);
+            bool staleEstimate = input.TargetWindowOpen && IsWindowEstimateStale(input.WindowOpenElapsed, input.WindowExpectedDuration);
+            p.WindowRemaining = staleEstimate ? -1f : EstimateWindowRemaining(input.WindowOpenElapsed, input.WindowExpectedDuration);
+            float timeToResolve = p.TimeToResolve(input.CastTime);
 
             if (!input.HasTargetInRange)
                 p.Reason = DashInterruptPredictReason.NoTargetInRange;
             else if (!input.TargetWindowOpen)
                 p.Reason = DashInterruptPredictReason.WindowClosedNow;
-            else if (p.WindowRemaining >= 0f && p.WindowRemaining < p.TimeToResolve(input.CastTime))
+            else if (staleEstimate)
+                p.Reason = timeToResolve <= StaleWindowMaxTimeToResolve
+                    ? DashInterruptPredictReason.Success
+                    : DashInterruptPredictReason.WindowClosesBeforeResolve;
+            else if (p.WindowRemaining >= 0f && p.WindowRemaining < timeToResolve)
                 p.Reason = DashInterruptPredictReason.WindowClosesBeforeResolve;
             else
                 p.Reason = DashInterruptPredictReason.Success; // 남은 창을 모르면 '열려 있음'만으로 성공 예측
@@ -106,6 +119,20 @@ namespace BeaverLobby.Player.Dash
             p.PredictsSuccess = p.Reason == DashInterruptPredictReason.Success;
             return p;
         }
+
+        /// <summary>
+        /// 열려 있는 창의 길이 추정이 틀렸나 — 열린 뒤 경과가 추정 길이(과거 관측 중앙값)를 이미 넘었다(할 일 139-2).
+        /// 무기한 창(디버그 허수아비)·관측이 적은 창에서 나온다. 둘 중 하나라도 모르면 false.
+        /// </summary>
+        public static bool IsWindowEstimateStale(float openElapsed, float expectedDuration) =>
+            openElapsed >= 0f && expectedDuration >= 0f && openElapsed > expectedDuration;
+
+        /// <summary>
+        /// 대쉬 간파 재예측 대상인가(할 일 139-2) — 누른 순간 대상은 범위 안인데 창이 닫혀 있어 약이었다.
+        /// 대시 동안 창이 열리면 그 순간 다시 예측해 강으로만 올린다(강 → 약 내리기 없음). 근접 간파는 재예측하지 않는다.
+        /// </summary>
+        public static bool ShouldRepredictDuringDash(in DashInterruptPrediction prediction) =>
+            prediction.Reason == DashInterruptPredictReason.WindowClosedNow;
 
         /// <summary>근접 간파 예상 판정 시각 = 시전 시각 + 준비 시간(모름·음수 = 0).</summary>
         public static float GetMeleeResolveTime(float castTime, float prepDelay) => castTime + Mathf.Max(0f, prepDelay);
@@ -135,6 +162,7 @@ namespace BeaverLobby.Player.Dash
     /// (1) 대상 표면까지 수평 거리 ≤ 간파 사거리(판정 앵커 전방위 도달 거리, HUD 강조 사거리와 같은 값)
     /// (2) 대상 정면 허용각 안 — 대상의 기존 간파 정면 판정값(23호 counterFrontAngle 등, 정면 판정 없으면 180)
     /// (3) 공격 방향(근접 = 시전 방향, 대쉬 = 대시 진행 방향)이 대상을 향함 — 허용 반각 = 대상 정면 허용각, 단 정면 반평면(90°) 이하.
+    ///     판정 위치가 대상과 겹치면(표면 거리 ≤ <see cref="OverlapDistance"/>) 판정 오버랩이 방향과 무관하게 닿으므로 건너뛴다(할 일 139-2).
     /// 새 수치 칸은 없다. 셋 중 하나라도 밖이면 '대상 없음'.
     /// </summary>
     public static class InterruptTargetGeometry
@@ -144,6 +172,12 @@ namespace BeaverLobby.Player.Dash
 
         /// <summary>공격 방향이 대상을 '향한다'고 보는 반각 상한 — 시전 정면 반평면.</summary>
         public const float MaxAttackerHalfAngle = 90f;
+
+        /// <summary>
+        /// 판정 위치 → 대상 표면 수평 거리가 이 값(m) 이하면 겹침으로 보고 (3) 공격 방향 검사를 건너뛴다(할 일 139-2, 139 표본 seq 10 — 거리 0·각도 133° 서버 성공).
+        /// (2) 대상 정면 허용각은 대상의 실제 간파 규칙이라 그대로 본다.
+        /// </summary>
+        public const float OverlapDistance = 0.05f;
 
         /// <summary><paramref name="toOther"/> 가 <paramref name="forward"/> 기준 ±<paramref name="halfAngle"/> 안인가(수평). 겹쳐 방향을 못 구하면 안으로 본다.</summary>
         public static bool IsInArc(Vector3 forward, Vector3 toOther, float halfAngle)
@@ -174,7 +208,8 @@ namespace BeaverLobby.Player.Dash
 
             Vector3 toTarget = targetPosition - resolvePosition;
             return IsInArc(targetForward, -toTarget, targetFrontAngle) &&
-                   IsInArc(attackDirection, toTarget, AttackerHalfAngle(targetFrontAngle));
+                   (distanceToSurface <= OverlapDistance ||
+                    IsInArc(attackDirection, toTarget, AttackerHalfAngle(targetFrontAngle)));
         }
     }
 }

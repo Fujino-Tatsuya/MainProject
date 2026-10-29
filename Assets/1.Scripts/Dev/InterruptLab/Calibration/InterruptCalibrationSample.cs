@@ -36,14 +36,22 @@ public sealed class InterruptCalibrationSample
     public float? TargetDistance;
     public float? TargetAngle;
 
-    // 오너 예측 결과
+    // 오너 예측 결과 — 누른 순간(원래 예측). 재예측(할 일 139-2)은 아래 두 칸에 따로 둔다.
     public float? PredictedResolveTime;
     public float? PredictedWindowRemaining; // 음수 = 예측기 기준 '모름'
     public InterruptAttemptForecast? OwnerForecast;
     public DashInterruptPredictReason? OwnerReason;
+    /// <summary>대시 도중 재예측이 오너 예측을 약 → 강으로 올렸다.</summary>
+    public bool? OwnerRepredicted;
+    /// <summary>오너 최종 예측(재예측이 없으면 원래 예측과 같다) — 오너 연출이 마지막으로 따른 값.</summary>
+    public InterruptAttemptForecast? OwnerFinalForecast;
 
-    /// <summary>서버 시도 슬로우 강/약. 대상 없음(슬로우 없음)은 NoTarget.</summary>
+    /// <summary>서버 시도 슬로우 강/약(승인 때). 대상 없음(슬로우 없음)은 NoTarget.</summary>
     public InterruptAttemptForecast? ServerForecast;
+    /// <summary>대시 도중 서버 재예측이 약 → 강 시도 슬로우로 다시 걸었다.</summary>
+    public bool? ServerRepredicted;
+    /// <summary>서버 최종 시도 슬로우(재예측이 없으면 승인 때와 같다).</summary>
+    public InterruptAttemptForecast? ServerFinalForecast;
 
     /// <summary>서버 판정 성공/실패.</summary>
     public bool? ServerSucceeded;
@@ -65,6 +73,16 @@ public sealed class InterruptCalibrationSample
         PredictedWindowRemaining = prediction.WindowRemaining;
         OwnerForecast = prediction.Forecast;
         OwnerReason = prediction.Reason;
+        OwnerRepredicted = false;
+        OwnerFinalForecast = prediction.Forecast;
+    }
+
+    /// <summary>서버 승인 때 예측을 채운다 — 최종 = 승인 때, 재예측 없음.</summary>
+    public void SetServerPrediction(InterruptAttemptForecast forecast)
+    {
+        ServerForecast = forecast;
+        ServerRepredicted = false;
+        ServerFinalForecast = forecast;
     }
 
     /// <summary>강 = true, 약 = false, 대상 없음·값 없음 = null(일치율 분모에서 뺀다).</summary>

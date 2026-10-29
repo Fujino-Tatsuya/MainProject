@@ -224,7 +224,7 @@ public sealed class DebugInterruptLabIsolationTests
     [Test]
     public void 예측_보정_계측_훅은_디버그_폴더_밖에서_구독하지_않는다()
     {
-        var subscribe = new Regex(@"\bCalibration(OwnerPredicted|ServerPredicted|ServerJudged)\s*\+=");
+        var subscribe = new Regex(@"\bCalibration(OwnerPredicted|ServerPredicted|OwnerRepredicted|ServerRepredicted|ServerJudged)\s*\+=");
         string[] subscribers = Directory.GetFiles("Assets", "*.cs", SearchOption.AllDirectories)
             .Select(Normalize)
             .Where(p => !p.StartsWith(LabFolder))
@@ -232,8 +232,8 @@ public sealed class DebugInterruptLabIsolationTests
             .ToArray();
         CollectionAssert.IsEmpty(subscribers);
 
-        // 검색이 실제로 잡는지 — 캡처기는 셋 다 구독한다
+        // 검색이 실제로 잡는지 — 캡처기는 다섯 다 구독한다(재예측 둘 = 할 일 139-2)
         string capture = File.ReadAllText(LabFolder + "Calibration/InterruptCalibrationCapture.cs");
-        Assert.AreEqual(3, subscribe.Matches(capture).Count);
+        Assert.AreEqual(5, subscribe.Matches(capture).Count);
     }
 }

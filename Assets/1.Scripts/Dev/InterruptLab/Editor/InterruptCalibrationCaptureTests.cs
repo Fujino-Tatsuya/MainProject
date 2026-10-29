@@ -202,6 +202,65 @@ public sealed class InterruptCalibrationCaptureTests
     }
 
     [Test]
+    public void 재예측은_대기_표본에_덧붙고_원래_예측을_남긴다()
+    {
+        var pairing = new InterruptCalibrationPairing();
+        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 10f);
+        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 10f);
+        pairing.OnOwnerRepredicted(true, InterruptAttemptForecast.Strong, 10.05f);
+        pairing.OnServerRepredicted(true, InterruptAttemptForecast.Strong, 10.06f);
+
+        Assert.IsTrue(pairing.OnJudged(Judge(true, 10.35f), out InterruptCalibrationCompleted done));
+        InterruptCalibrationSample s = done.Sample;
+        Assert.AreEqual(InterruptAttemptForecast.Weak, s.OwnerForecast, "원래 예측");
+        Assert.AreEqual(DashInterruptPredictReason.WindowClosedNow, s.OwnerReason);
+        Assert.AreEqual(true, s.OwnerRepredicted);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, s.OwnerFinalForecast);
+        Assert.AreEqual(InterruptAttemptForecast.Weak, s.ServerForecast);
+        Assert.AreEqual(true, s.ServerRepredicted);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, s.ServerFinalForecast);
+        Assert.AreEqual(0, pairing.DroppedCount, "재예측은 새 표본을 열지 않는다");
+    }
+
+    [Test]
+    public void 재예측이_없으면_최종은_원래와_같고_짝없는_재예측은_무시한다()
+    {
+        var pairing = new InterruptCalibrationPairing();
+        pairing.OnOwnerRepredicted(true, InterruptAttemptForecast.Strong, 9f);
+        pairing.OnServerRepredicted(true, InterruptAttemptForecast.Strong, 9f);
+        Assert.IsFalse(pairing.HasPending, "대기 표본 없이 온 재예측은 표본을 열지 않는다");
+
+        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
+        pairing.OnServerRepredicted(true, InterruptAttemptForecast.Strong, 10.01f); // 서버 예측이 아직 없다 — 무시
+        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 10.02f);
+        Assert.IsTrue(pairing.OnJudged(Judge(true, 10.35f), out InterruptCalibrationCompleted done));
+        Assert.AreEqual(false, done.Sample.OwnerRepredicted);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, done.Sample.OwnerFinalForecast);
+        Assert.AreEqual(false, done.Sample.ServerRepredicted);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, done.Sample.ServerFinalForecast);
+    }
+
+    [Test]
+    public void 요약에_재예측_수와_오너_최종_예측_일치율()
+    {
+        var stats = new InterruptCalibrationStats();
+        var pairing = new InterruptCalibrationPairing();
+        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 10f);
+        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 10f);
+        pairing.OnOwnerRepredicted(true, InterruptAttemptForecast.Strong, 10.05f);
+        pairing.OnJudged(Judge(true, 10.35f), out InterruptCalibrationCompleted done);
+        done.Sample.UserAnswer = true;
+        stats.Add(done.Sample);
+
+        Assert.AreEqual(1, stats.OwnerRepredictedCount);
+        Assert.AreEqual(0, stats.ServerRepredictedCount);
+        string summary = stats.BuildSummary(null);
+        StringAssert.Contains("오너 예측 ↔ 답: 0/1 (0.0%)", summary, "누른 순간 예측 기준은 그대로");
+        StringAssert.Contains("재예측: 오너 1 · 서버 0", summary);
+        StringAssert.Contains("오너 최종 예측 ↔ 답: 1/1 (100.0%)", summary);
+    }
+
+    [Test]
     public void Clear_는_대기_표본을_버린다()
     {
         var pairing = new InterruptCalibrationPairing();

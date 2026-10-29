@@ -60,6 +60,7 @@ public readonly struct InterruptCalibrationCompleted
 ///       대기 표본 없이 온 판정(예측이 하나도 없었다)은 버린다.</item>
 /// <item><b>판정 누락 = 버림.</b> 대기 표본이 연 뒤 <see cref="PendingTimeout"/>(게임 시간, 기본 3초)이 지나도 판정이 안 오면 버린다(판정 전 종료·넉백 등).
 ///       버린 수는 <see cref="DroppedCount"/>.</item>
+/// <item><b>재예측(할 일 139-2)은 대기 표본에 덧붙는다.</b> 같은 쪽 예측이 이미 붙은 대기 표본의 재예측 여부·최종 예측만 바꾸고 새 표본을 열지 않는다(원래 예측 칸 그대로).</item>
 /// <item><b>대쉬 간파만.</b> 근접 간파(viaDash = false)는 <see cref="IncludeMelee"/> 가 꺼져 있으면 셋 다 무시한다(대기 표본에 영향 없음).</item>
 /// </list>
 /// 시간은 호출측이 넘기는 게임 시간(Time.time) — 시도 슬로우·디버그 배속을 따라 늘어나므로 판정까지 걸리는 시간과 같은 축이다.
@@ -111,8 +112,36 @@ public sealed class InterruptCalibrationPairing
         if (_pending == null || _hasServer)
             Open(now);
 
-        _pending.ServerForecast = forecast;
+        _pending.SetServerPrediction(forecast);
         _hasServer = true;
+    }
+
+    /// <summary>[오너] 대시 도중 재예측이 약 → 강으로 올렸다(할 일 139-2). 오너 예측이 붙은 대기 표본에만 — 원래 예측 칸은 그대로 둔다.</summary>
+    public void OnOwnerRepredicted(bool viaDash, InterruptAttemptForecast forecast, float now)
+    {
+        if (!Accepts(viaDash))
+            return;
+
+        Tick(now);
+        if (_pending == null || !_hasOwner)
+            return;
+
+        _pending.OwnerRepredicted = true;
+        _pending.OwnerFinalForecast = forecast;
+    }
+
+    /// <summary>[서버] 대시 도중 재예측이 약 → 강 시도 슬로우로 다시 걸었다(할 일 139-2). 서버 예측이 붙은 대기 표본에만.</summary>
+    public void OnServerRepredicted(bool viaDash, InterruptAttemptForecast forecast, float now)
+    {
+        if (!Accepts(viaDash))
+            return;
+
+        Tick(now);
+        if (_pending == null || !_hasServer)
+            return;
+
+        _pending.ServerRepredicted = true;
+        _pending.ServerFinalForecast = forecast;
     }
 
     /// <summary>[서버] 판정. 대기 표본이 있으면 닫아 완성 표본을 돌려준다.</summary>
