@@ -14,13 +14,16 @@ public class BossHealthHUD : MonoBehaviour
     [SerializeField] private Image hpFill;
     [Header("제압 칸(전투 시스템 명세 10-14 §6 — 예전 간파 게이지 Detection_Fill 자리)")]
     [Tooltip("HP 바 밑 **제압 칸** 한 칸의 원본(SuppressSegmentTemplate) = 칸 테두리(frame, 바닥). 자신은 꺼 두고 칸 수만큼 복제한다.\n" +
-             "칸 크기 = 이 사각형 크기, 줄 가운데 = 이 사각형 자리. 왼쪽부터 찬 칸, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다.\n" +
+             "줄 폭 고정 N등분(할 일 151, 10-29): 칸 폭 = (줄 폭 − 간격×(N−1)) / N, 정수 픽셀. 칸 높이 = 이 사각형 높이, 줄 가운데 = 이 사각형 자리.\n" +
+             "늘어나도 안 찌그러지게 9-슬라이스(Image Sliced) 스프라이트를 쓴다. 왼쪽부터 찬 칸, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다.\n" +
              "제압 칸이 없는 보스면 칸 줄 전체를 숨긴다.")]
     [SerializeField] private Graphic suppressSegmentTemplate;
     [Tooltip("원본의 **직속 자식** 칸 채움(fill, 위). 남은 칸이면 켜고 빈 칸이면 꺼서 frame 만 보이게 한다.")]
     [SerializeField] private Graphic suppressSegmentFill;
     [Tooltip("칸 사이 간격(px).")]
     [SerializeField, Min(0f)] private float suppressSegmentGap = 8f;
+    [Tooltip("칸 줄 전체 폭(px). 0 = HP 바(hpFill) 폭을 읽어 양끝을 HP 바에 맞춘다(지금 916). 줄 가운데는 원본 자리라 원본 Pos X 를 HP 바와 같게 둔다.")]
+    [SerializeField, Min(0f)] private float suppressRowWidth = 0f;
     [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     [Header("23호 레이드 ④ 자폭 실드(팀장 10-19)")]
@@ -221,8 +224,8 @@ public class BossHealthHUD : MonoBehaviour
     }
 
     // ── 제압 칸 ──────────────────────────────────────────────────────────
-    // 원본(frame + 자식 fill)을 total 개 복제해 원본 자리를 가운데로 가로 한 줄로 깐다. 칸 크기 = 원본 크기(이미지 비율 유지),
-    // 칸 수가 바뀔 때만 다시 만든다. 남은 칸 = fill 켬, 빈 칸 = fill 끔(frame 만).
+    // 원본(frame + 자식 fill)을 total 개 복제해 원본 자리를 가운데로 가로 한 줄로 깐다. 줄 폭 고정(기본 HP 바 폭)을 N등분하고
+    // 칸 폭만 바꾼다(높이는 원본 그대로, 9-슬라이스라 모서리 유지). 칸 수가 바뀔 때만 다시 만든다. 남은 칸 = fill 켬, 빈 칸 = fill 끔(frame 만).
     private void SetSuppressSegments(int total, int remaining)
     {
         if (suppressSegmentTemplate == null) return;
@@ -246,7 +249,7 @@ public class BossHealthHUD : MonoBehaviour
         if (total <= 0) return;
 
         RectTransform src = suppressSegmentTemplate.rectTransform;
-        float cell = src.sizeDelta.x;
+        float rowWidth = SuppressRowWidth();
         int sibling = src.GetSiblingIndex();
         int fillIndex = suppressSegmentFill != null && suppressSegmentFill.transform.parent == src
             ? suppressSegmentFill.transform.GetSiblingIndex() : -1;
@@ -256,14 +259,22 @@ public class BossHealthHUD : MonoBehaviour
             Graphic seg = Instantiate(suppressSegmentTemplate, src.parent, false);
             seg.name = $"SuppressSegment_{i}";
             var rect = seg.rectTransform;
-            rect.anchoredPosition = new Vector2(
-                src.anchoredPosition.x + BossSuppressCellLayout.CellCenterX(i, total, cell, suppressSegmentGap),
-                src.anchoredPosition.y);
+            BossSuppressCellLayout.CellSpan span = BossSuppressCellLayout.PixelCell(i, total, rowWidth, suppressSegmentGap);
+            rect.sizeDelta = new Vector2(span.Width, src.sizeDelta.y);
+            rect.anchoredPosition = new Vector2(src.anchoredPosition.x + span.CenterX, src.anchoredPosition.y);
             rect.SetSiblingIndex(sibling + 1 + i);   // 원본 자리(그리는 순서) 그대로
             seg.gameObject.SetActive(true);
             suppressSegments.Add(seg.gameObject);
             suppressSegmentFills.Add(fillIndex >= 0 ? rect.GetChild(fillIndex).gameObject : null);
         }
+    }
+
+    // 인스펙터 값이 0 이면 HP 바 폭 — HP 바를 늘리면 칸 줄도 따라간다. HP 바도 없으면 원본 한 칸 폭(칸 1개 크기)으로.
+    private float SuppressRowWidth()
+    {
+        if (suppressRowWidth > 0f) return suppressRowWidth;
+        if (hpFill != null) return hpFill.rectTransform.rect.width;
+        return suppressSegmentTemplate.rectTransform.rect.width;
     }
 
     // ── HP 그라데이션 ──────────────────────────────────────────────────────
