@@ -80,6 +80,7 @@ public sealed class QABoss103Recorder : MonoBehaviour
         foreach (KeyValuePair<ulong, QABoss103Character> kv in characters)
             r._slotOf[kv.Key] = (int)kv.Value;
         r._combatServerT = Now;
+        QABoss103StuckProbe.HostReset();
         r.Stats.Begin(r._combatServerT);
         r.Stats.GuardNotifyOn();
         r.Subscribe();
@@ -465,6 +466,12 @@ public sealed class QABoss103Recorder : MonoBehaviour
             if (_assassin[s] != null)
                 Stats.Transform(s, _assassin[s].IsTransformed, now);
         TickPylons(now);
+
+        // 할 일 140 — 끼임 계측: 플레이어마다 구속(23호 잡기·밀기) 전환을 본다. 재배치 줄의 grab= 이 이 기록을 읽는다(같은 realtime 기준).
+        double real = Time.realtimeSinceStartupAsDouble;
+        foreach (Player p in _landed.Keys)
+            if (p != null)
+                QABoss103StuckProbe.HostObserve(p.OwnerClientId, p, real);
     }
 
     private string ReadFightLog()

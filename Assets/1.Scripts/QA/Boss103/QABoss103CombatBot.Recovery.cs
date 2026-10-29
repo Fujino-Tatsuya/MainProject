@@ -14,7 +14,8 @@ using UnityEngine;
 ///   (<see cref="QABoss103Relocator.Request"/> 사유 Wall = 보스 둘레 유효 지점 무작위). 요청하면 2초 옆걸음·6초 대시·20초 재배치 끼임 단계를 처음으로 되돌리고,
 ///   끼임을 보는 중·탈출 직후 2초는 그 단계를 돌리지 않는다(같은 끼임에 두 복구가 겹치지 않게).</item>
 /// </list>
-/// 로그: <c>[QA103] event=qa_f10_revive_request</c> · <c>event=qa_wall_escape_request</c>. 결과는 호스트 <c>event=qa_revive path=f10</c> · <c>event=qa_relocate reason=wall</c>.
+/// 로그: <c>[QA103] event=qa_f10_revive_request</c> · <c>event=qa_wall_escape_request</c>(할 일 140 계측 <c>why</c>=판정 근거 · <c>state</c>·<c>what</c>·<c>ground</c>·<c>grab</c> — <see cref="QABoss103StuckProbe"/>,
+/// 같은 값을 봇 판 파일 <c>wall_escape</c> 줄로도 써 배치 폴더 <c>parts/</c> 에 남긴다). 결과는 호스트 <c>event=qa_revive path=f10</c> · <c>event=qa_relocate reason=wall</c>.
 /// </summary>
 public sealed partial class QABoss103CombatBot
 {
@@ -81,12 +82,41 @@ public sealed partial class QABoss103CombatBot
         bool stuck = InWall(me, myPos, out string what);
         if (!_wall.Tick(now, stuck))
             return false;
+        // 할 일 140 — 요청 전 상태(옮겨지기 전). why = InWall 판정 근거, what = 겹친 콜라이더 전부.
+        string grab = _restraint.Recent(Time.realtimeSinceStartupAsDouble);
+        string state = QABoss103StuckProbe.StateToken(me);
+        string overlaps = QABoss103StuckProbe.Overlaps(me);
+        string ground = QABoss103StuckProbe.Ground(me);
         bool sent = QABoss103Relocator.Request(QABoss103RelocateReason.Wall);
         _stuck.Reset();
         _escalation.Reset();
         _input.SetMove(Vector3.zero);
-        Debug.Log($"{Tag} event=qa_wall_escape_request character={_character} n={_wall.Escapes} sent={(sent ? "true" : "false")} what={QABoss103Plan.Token(what)} pos={Fmt(myPos)}");
+        Debug.Log($"{Tag} event=qa_wall_escape_request character={_character} n={_wall.Escapes} sent={(sent ? "true" : "false")} why={QABoss103Plan.Token(what)} " +
+                  $"state={QABoss103Plan.Token(state)} what={QABoss103Plan.Token(overlaps)} ground={QABoss103Plan.Token(ground)} grab={QABoss103Plan.Token(grab)} pos={Fmt(myPos)}");
+        // 봇 판 파일(배치 폴더 parts/) — 클론 로그는 배치 폴더에 안 남아 같은 값을 여기에도 쓴다(호스트 합치기는 이 종류를 건너뛴다).
+        PartWrite(QABoss103PartFile.Format("wall_escape",
+            "slot", _slot.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "n", _wall.Escapes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "sent", sent ? "true" : "false",
+            "why", what,
+            "state", state,
+            "what", overlaps,
+            "ground", ground,
+            "grab", grab,
+            "pos", Fmt(myPos),
+            "at", System.DateTime.Now.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture)));
         return true;
+    }
+
+    // ── 끼임 계측(할 일 140) ─────────────────────────────────
+
+    private readonly QABoss103RestraintTrace _restraint = new QABoss103RestraintTrace();
+
+    /// <summary>매 프레임 — 내 플레이어 구속 표지(오너도 서버 결정을 같은 상태로 받는다). 읽기만.</summary>
+    private void ObserveRestraint(Player me)
+    {
+        if (me != null)
+            _restraint.Observe(Time.realtimeSinceStartupAsDouble, QABoss103StuckProbe.RestraintLabel(me));
     }
 
     /// <summary>벽 끼임을 보는 중이거나 탈출 직후 — 2초 옆걸음·6초 대시·20초 재배치를 돌리지 않는다.</summary>

@@ -1092,7 +1092,8 @@ public static class QABoss103Csv
 /// <summary>
 /// 봇 판 파일 — 각 봇 인스턴스(호스트·MPPM 클론)가 <c>&lt;출력 폴더&gt;/parts/run&lt;n&gt;_r&lt;retry&gt;_s&lt;자리&gt;.txt</c> 에 한 줄씩 쓰고(즉시 flush),
 /// 호스트가 판 끝에 읽어 합친다. 줄 = <c>종류 key=value …</c>(값에 공백·'=' 없음 — <see cref="QABoss103Plan.Token"/>).
-/// 종류: <c>threat</c>(회피 굴림 1건) · <c>counter</c>(간파 시도 1회) · <c>rule</c>(할 일 119 툴팁 규칙 발동 1회) · <c>done</c>(봇 종료). 판 끝 신호 = 같은 폴더 <c>run&lt;n&gt;_r&lt;retry&gt;_end.txt</c>(호스트가 씀).
+/// 종류: <c>threat</c>(회피 굴림 1건) · <c>counter</c>(간파 시도 1회) · <c>rule</c>(할 일 119 툴팁 규칙 발동 1회) · <c>done</c>(봇 종료)
+/// · <c>wall_escape</c>(할 일 140 벽 끼임 탈출 요청 계측 — 합치기는 건너뛰고 파일에만 남는다). 판 끝 신호 = 같은 폴더 <c>run&lt;n&gt;_r&lt;retry&gt;_end.txt</c>(호스트가 씀).
 /// </summary>
 public static class QABoss103PartFile
 {

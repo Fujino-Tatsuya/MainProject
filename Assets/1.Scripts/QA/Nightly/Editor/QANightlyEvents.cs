@@ -69,7 +69,7 @@ public static class QANightlyEvents
         new QANightlyEventRule(Error, "QA 오류 — QA 발견 Critical", false, "[QA][Critical]["),
         new QANightlyEventRule(Error, "QA 오류 — 판 Error(run_end)", false, "event=run_end ", "outcome=Error "),
         new QANightlyEventRule(Stall, "정체 감시 — Combat 90초 전투 활동 0", false, "event=stall "),
-        new QANightlyEventRule(Stuck, "끼임 — 20초 진척 없음 재배치(호스트)", false, "event=qa_relocate "),
+        new QANightlyEventRule(Stuck, "끼임 — 20초 진척 없음 재배치(호스트)", false, "event=qa_relocate ") { DetailMax = LongDetailMax },
         new QANightlyEventRule(Stuck, "끼임 — 벽 관통·벽 타기(GameplayInvariant 발견)", false, "][GameplayInvariant]"),
         new QANightlyEventRule(Stuck, "끼임 — 이동 불능(Softlock 발견)", false, "][Softlock]"),
         new QANightlyEventRule(Death, "사망(Alive → 그 밖)", false, "event=death "),

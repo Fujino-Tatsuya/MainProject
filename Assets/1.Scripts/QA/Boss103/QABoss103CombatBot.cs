@@ -111,6 +111,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
         }
 
         TickRevive(me);   // 할 일 119 — Soul 이면 싸우지 않는 동안에도 F10 경로 부활 요청
+        ObserveRestraint(me);   // 할 일 140 — 끼임 계측(구속 전환 기록, 읽기만)
         string idle = IdleReason(me);
         if (idle != null)
         {

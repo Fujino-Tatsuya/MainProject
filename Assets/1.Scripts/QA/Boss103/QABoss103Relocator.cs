@@ -18,7 +18,8 @@ public enum QABoss103RelocateReason : byte
 /// 사유 <see cref="QABoss103RelocateReason.Stuck"/>(20초 끼임) = 요청자에게 가장 가까운 지점, <see cref="QABoss103RelocateReason.Wall"/>(벽 속·경계 밖) = 유효 지점 중 무작위(판 시드).
 /// 판(Combat ~ 판정) 동안만 받는다. 게임 코드는 바꾸지 않는다.
 /// <para>클라 → 호스트 = NGO 이름 메시지(<see cref="MessageName"/>, 본문 1바이트 = 사유 — 보낸 사람 = 요청자). 호스트 봇은 메시지 없이 바로 부른다.</para>
-/// 로그: 호스트 <c>[QA103] event=qa_relocate reason=stuck|wall</c>(1회 1줄, 할 일 138-2 순간이동 직전 스크린샷 <c>shot=&lt;파일명&gt;|cooldown</c> — <see cref="QABoss103StuckShot"/>), 봇 <c>event=qa_relocate_request</c>·<c>event=qa_wall_escape_request</c>.
+/// 로그: 호스트 <c>[QA103] event=qa_relocate reason=stuck|wall</c>(1회 1줄, 할 일 138-2 순간이동 직전 스크린샷 <c>shot=&lt;파일명&gt;|cooldown</c> — <see cref="QABoss103StuckShot"/>,
+/// 할 일 140 옮기기 전 계측 <c>state</c>·<c>what</c>·<c>ground</c>·<c>grab</c> — <see cref="QABoss103StuckProbe"/>), 봇 <c>event=qa_relocate_request</c>·<c>event=qa_wall_escape_request</c>.
 /// 성공 수 = run_chars <c>qa_relocates</c>(끼임) · <c>qa_wall_escapes</c>(벽).
 /// </summary>
 public static class QABoss103Relocator
@@ -138,6 +139,9 @@ public static class QABoss103Relocator
         string detail = "";
         string shot = null;
         Vector3 from = po != null ? po.transform.position : Vector3.zero;
+        // 할 일 140 — 옮기기 전 상태(구속·겹친 콜라이더·발밑·직전 2초 잡기 전환). 읽기만.
+        Player probed = po != null ? po.GetComponent<Player>() : null;
+        string probe = QABoss103StuckProbe.Fields(probed, QABoss103StuckProbe.HostGrab(clientId, Time.realtimeSinceStartupAsDouble));
         Vector3 to = from;
         if (reason == null)
         {
@@ -174,7 +178,7 @@ public static class QABoss103Relocator
             Failures++;
         Vector3 bossPos = boss != null ? boss.transform.position : Vector3.zero;
         Debug.Log($"{Tag} event=qa_relocate reason={Token(why)} character={character} client={clientId} ok={(ok ? "true" : "false")}" +
-                  (ok ? "" : $" fail={reason}") +
+                  (ok ? "" : $" fail={reason}") + probe +
                   $" from={QABossStart88.Fmt(from)} to={QABossStart88.Fmt(to)} movedM={QAPartyPlacement88.HorizontalDistance(from, to):F1}" +
                   $" bossDistM={(boss != null ? QAPartyPlacement88.HorizontalDistance(to, bossPos).ToString("F1") : "na")} points={Points.Count}" +
                   (detail.Length > 0 ? $" detail={QABoss103Plan.Token(detail)}" : "") +
