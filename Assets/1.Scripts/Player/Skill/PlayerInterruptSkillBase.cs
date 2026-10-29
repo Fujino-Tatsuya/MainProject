@@ -807,7 +807,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = queryResults[i];
-            if (hit == null || !InterruptOmniRangeModel.IsInReach(pivot, hit.bounds, reach))
+            if (hit == null || !InterruptOmniRangeModel.IsInReach(pivot, hit, reach))
                 continue;
 
             Unit unit = ResolveHitUnit(hit, out _);

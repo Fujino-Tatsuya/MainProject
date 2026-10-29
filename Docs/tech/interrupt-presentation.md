@@ -59,6 +59,7 @@
 - **대상 판정**(할 일 139-3, 새 수치 칸 없음): ① 판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치(근접 = 지금, 대쉬 = 예상 대시 끝)에 놓은 오버랩에 닿음
   (`HitboxAnchorShape` — 서버 `ResolveHit` 과 같은 형상·질의) ② 대상 정면 허용각 안(`InterruptTargetGeometry.FacesAttacker` — 23호 `counterFrontAngle` 등 기존 판정값, 정면 판정 없는 대상 = 180).
   HUD 강조 사거리(전방위 = 돌면 닿는 거리)보다 좁다. 원인·앵커 수치·재현은 [dash-interrupt.md §5](dash-interrupt.md).
+  HUD 강조의 대상까지 거리 = 대상 콜라이더 **실제 표면** 수평 거리(`InterruptOmniRangeModel.HorizontalDistanceToCollider`, 할 일 139-4). 예전 AABB 거리는 대각선에서 최대 0.70m(23호) 짧아 강조가 실제보다 멀리서 켜졌다.
 - **대쉬 간파 예측 시점 = 우클릭을 누른 순간**(`InterruptAttemptPrediction.AtPress` 가 처리 프레임 값을 누른 뒤 경과만큼 되돌림). 대쉬 → 우클릭 순서만([dash-interrupt.md §2.1](dash-interrupt.md)).
 - **대상 캐시** `InterruptTargetRegistry`(서버·클라 같은 규칙): 등록 = 대상 스폰(모든 피어 — 23호 = 보스전 시작 Spawn, 중간보스·스파링 봇 = `MonsterBase`, 허수아비 = `TrainingDummyInterrupt`),
   해제 = 디스폰·사망(MonsterBase Dead)·씬 언로드. 예측 오버랩에 걸린 Unit 중 캐시에 있는 것만 대상이다. 실제 판정(`ResolveHit` 오버랩)은 캐시를 쓰지 않는다.

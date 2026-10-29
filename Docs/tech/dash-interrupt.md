@@ -86,6 +86,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
   - 판정 위치 = **예상 대시 끝** = 시전 위치 + 대시 방향 × 대시 속도 × 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset`), 판정 시각 = max(예상 대시 끝, 평소 Hit).
   - 대상 = **판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치에 놓은 오버랩**(`HitboxAnchorShape` — 서버 `ResolveHit` 의 `OverlapHitboxAnchor` 와 같은 형상 계산·같은 질의, 할 일 139-3)에 걸린 Unit 중 `InterruptTargetRegistry` 캐시에 있는 것(창 소유자) + `InterruptTargetGeometry.FacesAttacker`(대상 정면 허용각 — 기존 판정값 그대로, 정면 판정 없으면 180). 밖이면 '대상 없음' = 슬로우 없음.
   - 오너 HUD 강조 사거리(`HasTargetInOmniRange`)는 '돌면 닿는 거리'(앵커 먼 모서리) 표시라 예측보다 넓다 — 강조가 켜져도 그 방향이면 대상 없음일 수 있다.
+    대상까지 거리는 실제 콜라이더 표면 수평 거리(`InterruptOmniRangeModel.HorizontalDistanceToCollider`, 할 일 139-4 — 아래 AABB 착시).
   - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
   - 판정 오버랩은 옮기지 않는다(실제 위치).
 - **예측 규칙 보정(할 일 139-2, §10.2 표본 27개 근거)** — `DashInterruptPredictor` 공용 규칙이라 ①은 근접 간파에도 같이 적용된다, ②는 대쉬 간파만:
@@ -99,6 +100,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
   - 앵커 값(프리팹 저작값, Armature 직속·회전 0 — 팔라딘 -0.1°): 어쌔신·거너 상자 중심 z 0.9 · 반폭 0.7 · 반길이 0.7 → **정면 도달 1.6m · 옆 0.7m · 전방위 1.746m**. 팔라딘 중심 z 0.9 · 반폭 0.8 · 반길이 0.8 → **정면 1.7m · 옆 0.8m · 전방위 1.879m**. 거리는 플레이어 위치 → 대상 표면.
   - 새 규칙: 지금 앵커 형상을 플레이어 위치 수직축으로 돌려 공격 방향을 향하게 하고(`HitboxAnchorShape.Aimed`) 판정 위치로 옮겨(`Offset`) 서버와 같은 `Overlap` 질의. 걸린 Unit 중 캐시 대상만, 그리고 대상 정면 허용각(23호). 공격 방향 반평면·사거리 비교는 없어졌다. 허용 오차 칸 없음. 판정 동작은 그대로(`OverlapHitboxAnchor` 가 같은 형상 함수를 쓸 뿐).
   - 야간 QA 봇(23호) 로그의 강 예측 surf 1.71~1.74m(봇 reachM 1.75)·표본 seq 8(옆 1.31m·75°) 은 이제 대상 없음.
+  - **AABB 거리 착시(할 일 139-4)** — 예측은 앵커 오버랩이라 영향 없었지만, HUD 강조와 랩 CSV 거리 열(`InterruptTargetRegistry.Entry.TryGetHorizontalDistance`)은 대상 콜라이더 **AABB** 까지 재서 대상이 월드 대각선에 있으면 최대 r(√2−1) 짧았다(23호 캡슐 r 1.7 → 0.70m, 거너 '1.73m' = 실제 2.1~2.4m). 이제 둘 다 `HorizontalDistanceToCollider` — `Collider.ClosestPoint`(질의점 높이 = 대상 AABB 중심 높이, 안이면 0, 트리거 포함). 비볼록 MeshCollider 등 ClosestPoint 미지원은 AABB 표면 근사. 테스트 `Assets/1.Scripts/Player/Editor/InterruptOmniRangeModelTests.cs`.
   - **보정 랩 재현**(§10.2 `InterruptCalibrationLab`, 어쌔신 또는 거너, `includeMelee` 켬 — 근접 간파): ⓐ 허수아비 정면에서 표면 1.6~1.75m(허수아비 중심에서 2.1~2.25m) 떨어져 허수아비 쪽으로 우클릭 · ⓑ 허수아비가 조준 방향과 75° 옆, 표면 1.3m 에서 우클릭. **수정 전 = 강(암전) + 서버 실패, 수정 후 = 대상 없음(연출 없음)**. 대조: 정면 1.5m·옆 75° 0.55m 는 강 + 서버 성공. 팔라딘은 정면 1.7~1.88m 띠가 같은 증상이다.
 - **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.

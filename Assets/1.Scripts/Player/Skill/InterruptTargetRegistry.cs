@@ -50,7 +50,7 @@ public static class InterruptTargetRegistry
                     continue;
 
                 found = true;
-                distance = Mathf.Min(distance, InterruptOmniRangeModel.HorizontalDistanceToBounds(pivot, c.bounds));
+                distance = Mathf.Min(distance, InterruptOmniRangeModel.HorizontalDistanceToCollider(pivot, c));
             }
 
             return found;
