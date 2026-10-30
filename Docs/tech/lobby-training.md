@@ -157,7 +157,8 @@
   - `PointC` (-17.5, 0, 5), 방향 +x — 지정 벽 면까지 2.2m, 간파 넉백 3m 로 닿는다.
   - `DesignatedWall_West` — Wall 레이어 BoxCollider(메시 없음), 중심 (-19.8, 1.1, 5) 크기 (0.2, 2.2, 5.5). 서쪽 아트 벽(`PF_Lobby_Architecture_v015` `SB_WallBay_004/005_body`) 바로 앞에 겹쳐 스윕이 먼저 맞힌다.
     아트 벽 콜라이더를 직접 넣지 않은 이유: SVN 아트가 바뀌면 참조가 조용히 끊긴다. 옮길 땐 아트 벽 면에 붙이고 NavMesh 걷는 면을 침범하지 않게.
-  - `DesignatedWall_West_Marker` = 임시 주황 띠(`MA_Train03DesignatedWall.mat`, 콜라이더 없음) — T33·T34 동안만 켜진다(`LobbySparringLink.WallMarkerVisible`). 158 벽 표식이 대체할 임시 비주얼.
+  - `DesignatedWall_West_Marker` = 벽 활용 표식(`MA_Train03DesignatedWall.mat` = `Lobby/WallTargetMarker`, 콜라이더 없음) — 할 일 173 부터 `LobbyTutorialWallTarget`(`WALL_TRAIN_WEST`)이 T34 동안만 켜고, 성공(T34 끝) 즉시 끈다.
+    아레나 `wallMarkers` 는 비웠다(`LobbySparringLink.WallMarkerVisible` 경로 미사용). 마커 뒷면은 아트 벽 면(x −19.89)에 밀착 — 상세 [lobby-tutorial-ui.md](lobby-tutorial-ui.md) "벽 활용 표식".
 
 ### T50 자유 연습 + 출구 집결
 

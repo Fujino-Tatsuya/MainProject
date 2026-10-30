@@ -89,6 +89,10 @@ public static class LobbyTutorialUiBinding
         return view;
     }
 
+    /// <summary>라커룸 바닥 테두리를 켜는가 — L00(누적 방문) 단계 동안만. 전원 방문하면 단계가 넘어가 꺼진다(할 일 173, 집결 테두리와 같은 규칙).</summary>
+    public static bool LockerAreaVisible(bool available, bool launchCommitted, LobbyTutorialStepKind kind) =>
+        available && !launchCommitted && kind == LobbyTutorialStepKind.LockerVisit;
+
     /// <summary>
     /// 지금 파사드 값으로 목표 패널 서명을 만든다. false = 패널을 숨길 때(진행기 없음·대사·로딩·출격 확정 뒤·늦은 참가자·지시문 없음).
     /// </summary>
@@ -133,6 +137,7 @@ public static class LobbyTutorialUiBinding
 /// <item>목표 패널 = <see cref="LobbyTutorialState.ObjectivePanelVisible"/> + 키 칸·T10 체크·진행 n/N(집결 n/N 은 옛 상단 <c>PartyGatherStatusView</c> 대신 여기 진행 줄로).</item>
 /// <item>대사 = (runId, revision) 이 바뀔 때마다 <see cref="LobbyTutorialUI.ShowDialogue(string,string,string)"/>, 대사 단계를 떠나면 <see cref="LobbyTutorialUI.EndDialogue"/>.</item>
 /// <item>경로 = <see cref="LobbyTutorialState.ActivePathId"/>, 벽 = <see cref="LobbyTutorialState.ActiveTargetWallId"/>(이전 벽 끔 → 새 벽 켬).</item>
+/// <item>라커룸 바닥 테두리 = L00 단계 동안(<see cref="LobbyTutorialUiBinding.LockerAreaVisible"/>).</item>
 /// <item><see cref="LobbyTutorialState.IsAvailable"/> false = 아무것도 그리지 않는다(그려 둔 게 있으면 <see cref="LobbyTutorialUI.ClearAll"/> 한 번).
 /// true 인 동안은 옛 3스텝 안내를 끈다(<see cref="LobbyTutorialUI.SetTutorialActive"/>).</item>
 /// <item>같은 프리팹의 디버그 구동(<see cref="LobbyTutorialUIDebugDriver"/>)이 켜져 있으면 손 떼고 디버그 화면을 둔다.</item>
@@ -156,6 +161,7 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
     private int _dialogueRevision;
     private string _path;
     private string _wall;
+    private bool _locker;
 
     private void Awake()
     {
@@ -200,6 +206,7 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
         ApplyObjective();
         ApplyPath();
         ApplyWall();
+        ApplyLockerArea();
     }
 
     // 대사 먼저 — 대사 패널이 목표 패널 숨김 유예를 시작해야 같은 프레임의 목표 교체가 깜빡이지 않는다.
@@ -272,8 +279,19 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
         _wall = wall;
     }
 
+    private void ApplyLockerArea()
+    {
+        bool locker = LobbyTutorialUiBinding.LockerAreaVisible(LobbyTutorialState.IsAvailable, LobbyTutorialState.LaunchCommitted, LobbyTutorialState.CurrentStep.Kind);
+        if (locker == _locker)
+            return;
+
+        ui.SetLockerArea(locker);
+        _locker = locker;
+    }
+
     private void Forget()
     {
+        _locker = false;
         _drawn = false;
         _objectiveShown = false;
         _objective = default;

@@ -10,8 +10,8 @@ public static class LobbyTutorialWallIds
 
 /// <summary>
 /// 지정 벽 표식 하나(할 일 158 C7, 명세 4.3) — TargetWall ID 로 켜고 끈다. 렌더러만 켜고 끄며 충돌 판정과는 무관(판정은 157 서버).
-/// 표시 조건은 157 계약(TargetWallImpact) 연결 때 <see cref="LobbyTutorialUI.SetWallTarget"/> 로 받는다.
-/// 계약 전 기존 표시(<see cref="LobbySparringLink.WallMarkerVisible"/>)를 쓰는 오브젝트에는 붙이지 않는다(C10 에서 갈아탄다).
+/// 표시 조건은 바인더가 <see cref="LobbyTutorialState.ActiveTargetWallId"/>(T34 행 targetWallId)로 <see cref="LobbyTutorialUI.SetWallTarget"/> 를 부른다 —
+/// 넉백 유효 충돌로 T34 가 끝나면 ID 가 비어 즉시 꺼진다. 씬 = <c>Train03Arena/DesignatedWall_West_Marker</c>(할 일 173 — 아레나 <c>wallMarkers</c> 에서 뺐다, 두 경로가 같이 켜고 끄지 않게).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbyTutorialWallTarget : MonoBehaviour

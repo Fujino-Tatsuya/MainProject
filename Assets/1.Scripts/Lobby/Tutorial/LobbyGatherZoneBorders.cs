@@ -15,13 +15,14 @@ public static class LobbyGatherBorderLayout
     }
 
     /// <summary>
-    /// 내장 Quad(XY 평면 1×1, -Z 를 향함)를 박스 바닥 면에 눕힌다. 위치 = 박스 바닥 중심 + 위로 <paramref name="heightOffset"/>.
-    /// 크기 = 박스 size × lossyScale(XZ). 회전 = 박스 회전 × X 90°(Quad 앞면이 위를 본다).
+    /// 내장 Quad(XY 평면 1×1, -Z 를 향함)를 구역 바닥에 눕힌다. 바닥 = 구역 오브젝트 원점 높이(로컬 y 0) — 씬의 Gather_* 는 원점이 바닥에 있고
+    /// 박스는 바닥 아래로 0.5m 내려가 있어(center.y 1, size.y 3) 박스 바닥 면을 쓰면 테두리가 바닥 밑에 묻힌다(할 일 173).
+    /// 위치 = 박스 XZ 중심 · 원점 높이 + 위로 <paramref name="heightOffset"/>. 크기 = 박스 size × lossyScale(XZ). 회전 = 박스 회전 × X 90°(Quad 앞면이 위를 본다).
     /// </summary>
     public static Placement Compute(Vector3 boxPosition, Quaternion boxRotation, Vector3 lossyScale, Vector3 center, Vector3 size, float heightOffset)
     {
         var scaled = Vector3.Scale(size, Abs(lossyScale));
-        Vector3 localBottom = center - new Vector3(0f, size.y * 0.5f, 0f);
+        Vector3 localBottom = new Vector3(center.x, 0f, center.z);
         Vector3 bottom = boxPosition + boxRotation * Vector3.Scale(localBottom, lossyScale);
         Vector3 up = boxRotation * Vector3.up;
 
@@ -69,18 +70,40 @@ public sealed class LobbyGatherZoneBorders : MonoBehaviour
     [ColorUsage(true, true)]
     [SerializeField] private Color color = new Color(0.35f, 1f, 0.82f, 0.9f);
 
+    [Tooltip("L00 라커룸 누적 방문 영역(씬 Area_Locker 의 BoxCollider) — 바인더가 L00 동안 켠다(SetLockerVisible). 비우면 그리지 않는다.")]
+    [SerializeField] private BoxCollider lockerArea;
+
     private readonly Dictionary<PartyGatherZone, BoxCollider> _boxes = new Dictionary<PartyGatherZone, BoxCollider>();
     private MaterialPropertyBlock _block;
     private bool _warnedPool;
+    private bool _lockerVisible;
 
-    private void OnEnable() => HideFrom(0);
+    /// <summary>씬에 켜진 테두리 묶음(로비 1개). <see cref="LobbyTutorialUI.SetLockerArea"/> 가 찾는다.</summary>
+    public static LobbyGatherZoneBorders Active { get; private set; }
 
-    private void OnDisable() => _boxes.Clear();
+    /// <summary>라커룸 영역 테두리 켜고 끄기 — 집결 구역처럼 그 BoxCollider footprint 를 바닥에 그린다.</summary>
+    public void SetLockerVisible(bool visible) => _lockerVisible = visible;
+
+    private void OnEnable()
+    {
+        Active = this;
+        HideFrom(0);
+    }
+
+    private void OnDisable()
+    {
+        if (Active == this)
+            Active = null;
+        _boxes.Clear();
+    }
 
     private void LateUpdate()
     {
         _block ??= new MaterialPropertyBlock();
         int used = 0;
+        if (_lockerVisible && lockerArea != null)
+            Place(lockerArea, ref used);
+
         IReadOnlyList<PartyGatherZone> zones = PartyGatherZone.Spawned;
         for (int i = 0; i < zones.Count; i++)
         {
@@ -92,42 +115,47 @@ public sealed class LobbyGatherZoneBorders : MonoBehaviour
             if (box == null)
                 continue;
 
-            if (used >= pool.Count)
-            {
-                if (!_warnedPool)
-                {
-                    _warnedPool = true;
-                    Debug.LogWarning($"{Tag} 활성 집결 구역이 테두리 풀({pool.Count}개)보다 많다 — 저작 메뉴로 풀을 늘릴 것.", this);
-                }
-
+            if (!Place(box, ref used))
                 break;
-            }
-
-            MeshRenderer quad = pool[used];
-            if (quad == null)
-            {
-                used++;
-                continue;
-            }
-
-            Transform t = box.transform;
-            LobbyGatherBorderLayout.Placement p = LobbyGatherBorderLayout.Compute(t.position, t.rotation, t.lossyScale, box.center, box.size, heightOffset);
-            Transform q = quad.transform;
-            q.SetPositionAndRotation(p.Position, p.Rotation);
-            q.localScale = DivideByParentScale(q, p.Scale);
-
-            _block.Clear();
-            _block.SetColor(BaseColorId, color);
-            _block.SetVector(SizeId, new Vector4(p.SizeMeters.x, p.SizeMeters.y, 0f, 0f));
-            _block.SetFloat(BorderWidthId, borderWidth);
-            quad.SetPropertyBlock(_block);
-
-            if (!quad.gameObject.activeSelf)
-                quad.gameObject.SetActive(true);
-            used++;
         }
 
         HideFrom(used);
+    }
+
+    // 풀의 다음 Quad 를 박스 footprint 에 놓는다. 풀이 모자라면 false(경고 1회).
+    private bool Place(BoxCollider box, ref int used)
+    {
+        if (used >= pool.Count)
+        {
+            if (!_warnedPool)
+            {
+                _warnedPool = true;
+                Debug.LogWarning($"{Tag} 활성 집결 구역이 테두리 풀({pool.Count}개)보다 많다 — 저작 메뉴로 풀을 늘릴 것.", this);
+            }
+
+            return false;
+        }
+
+        MeshRenderer quad = pool[used];
+        used++;
+        if (quad == null)
+            return true;
+
+        Transform t = box.transform;
+        LobbyGatherBorderLayout.Placement p = LobbyGatherBorderLayout.Compute(t.position, t.rotation, t.lossyScale, box.center, box.size, heightOffset);
+        Transform q = quad.transform;
+        q.SetPositionAndRotation(p.Position, p.Rotation);
+        q.localScale = DivideByParentScale(q, p.Scale);
+
+        _block.Clear();
+        _block.SetColor(BaseColorId, color);
+        _block.SetVector(SizeId, new Vector4(p.SizeMeters.x, p.SizeMeters.y, 0f, 0f));
+        _block.SetFloat(BorderWidthId, borderWidth);
+        quad.SetPropertyBlock(_block);
+
+        if (!quad.gameObject.activeSelf)
+            quad.gameObject.SetActive(true);
+        return true;
     }
 
     private BoxCollider BoxOf(PartyGatherZone zone)

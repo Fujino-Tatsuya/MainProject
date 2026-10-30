@@ -136,6 +136,14 @@ public sealed class LobbyTutorialUI : MonoBehaviour
     /// <summary>지정 벽 표식 켜고 끄기(ID = <see cref="LobbyTutorialWallTarget.WallId"/> — 월드 쪽).</summary>
     public void SetWallTarget(string wallId, bool visible) => LobbyTutorialWallTarget.SetVisible(wallId, visible);
 
+    /// <summary>라커룸 바닥 민트 테두리 켜고 끄기(L00 — <see cref="LobbyGatherZoneBorders.SetLockerVisible"/>, 월드 쪽).</summary>
+    public void SetLockerArea(bool visible)
+    {
+        LobbyGatherZoneBorders borders = LobbyGatherZoneBorders.Active;
+        if (borders != null)
+            borders.SetLockerVisible(visible);
+    }
+
     /// <summary>씬 종료·회차 초기화 — 목표·대사·경로·벽 표식을 유예 없이 전부 끈다(옛 안내 억제도 푼다).</summary>
     public void ClearAll()
     {
@@ -146,6 +154,7 @@ public sealed class LobbyTutorialUI : MonoBehaviour
         SetPath(null);
         SetTutorialActive(false);
         LobbyTutorialWallTarget.HideAll();
+        SetLockerArea(false);
     }
 
     private void HandleLanguageChanged()
