@@ -367,7 +367,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
-    trainingProfile: 0
+    trainingProfile: 1
   - stateId: L30_BriefGather
     kind: 1
     activity: 0

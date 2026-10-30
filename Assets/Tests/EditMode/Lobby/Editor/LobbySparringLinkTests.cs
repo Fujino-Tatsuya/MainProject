@@ -366,7 +366,7 @@ public sealed class LobbySparringLinkTests
         Assert.That(LobbySparringLink.FreePracticeDummyPresent(h.Director.Activity), Is.True, "상대 사망 뒤 허수아비");
         Assert.That(h.Director.Step.kind, Is.EqualTo(LobbyTutorialStepKind.Gather));
         Assert.That(h.Director.Step.gatherPoint, Is.EqualTo(LobbyGatherPoint.TrainEnd));
-        Assert.That(LobbyTutorialRules.HealthFloorFor(h.Director.Step, true), Is.Zero, "T50 = 훈련 보정(체력 하한) 없음");
+        Assert.That(LobbyTutorialRules.HealthFloorFor(h.Director.Step, true), Is.EqualTo(1), "T50 = 훈련 보정 유지 — 출구 확정(→ L30) 때 해제(⑨, 명세 §5 T50)");
         Assert.That(h.Link.EndRound(), Is.True);
         Assert.That(h.Resets, Is.EqualTo(1));
 

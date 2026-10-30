@@ -22,7 +22,7 @@ using UnityEngine.SceneManagement;
 /// <item>단계 안 사건 무전(TRAIN_03_COUNTER/WALL/COMBAT)은 끈다(Q6 A — 명세 §3.3 중복 대사 금지, 문구 키 보존).</item>
 /// <item>정리: 간파 훈련이 아닌 단계로 넘어가거나(T50 등) 진행기 디스폰 때 살아 있는 상대 디스폰·회차 끝. T40 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰한다.</item>
 /// <item>T50 자유 연습(⑧): T50 동안 허수아비 1개(<see cref="LobbyRules"/> 의 TrainingDummy 계열 프리팹 — 사망 없음, 자리 = A/B 위치). 출구 집결 확정(→ L30)의
-/// 단계 변경에서 정리 — 진행기가 그 뒤에 종료 텔레포트한다. 체력 하한은 행 trainingProfile(T50 = None)대로 진행기가 맞춘다.</item>
+/// 단계 변경에서 정리 — 진행기가 그 뒤에 종료 텔레포트한다. 체력 하한은 행 trainingProfile(T50 = Training — 출구 확정(→ L30) 때 풀림, ⑨)대로 진행기가 맞춘다.</item>
 /// </list>
 /// 제압 중 쿨타임 가속은 보류(할 일 91 GrantServer 로 나중 연결, Q13 A — 훈련이 임의 버프를 만들지 않는다) — 여기엔 없다.
 /// </summary>

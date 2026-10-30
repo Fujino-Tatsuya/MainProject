@@ -47,7 +47,7 @@
 | `TRAIN_03_SUPPRESS` | D 제압 진입 | C 완료 보고(제압 시작 순간) → `Train03D/InProgress` |
 | `TRAIN_END` | 훈련 종료 | D 완료 보고 → `TrainEnd/Gathering` |
 | ~~`BRIEF_ROUTE`~~ | 종료 집결 | **재생 안 함**(할 일 111) — 종료 텔레포트가 이미 브리핑 구역 안에 두므로 이동 안내 불필요. 상수·Strings 키·문구 행은 남겨 둠 |
-| `BRIEF_01`~`04` | 브리핑 | 단계 진입 대사 아님 — `LobbyBriefing` 이 `Brief/InProgress` 동안 서버 시간으로 한 줄씩 `ServerPlay`(아래 "브리핑" 절) |
+| ~~`BRIEF_01`~`04`~~ | 브리핑 | **재생 안 함**(할 일 157 ⑨ — 대사 행 `LOBBY_BRIEF_*` 로 대체). 상수·Strings 키·문구 행은 남겨 둠 |
 
 `Lobby → Sortie`(훈련 없이 출격)·`Brief/Gathering`·`Brief/InProgress`·`Brief/Completed`·`Sortie` 진입 대사는 없다(단계가 바뀌면 대기 줄 폐기만).
 
@@ -83,6 +83,12 @@ LobbyRadio.Active.ServerClear()                                           // [�
 - 목표 패널 문구(`훈련장으로 이동하세요` 등)는 이번 범위가 아니다 — 무전 자막만. 예외 = 브리핑 두 줄(T6c, 아래).
 
 ## 브리핑 BRIEF_01 (T6c)
+
+> ⚠ **할 일 157 ⑨(2026-10-30)로 바뀜** — 아래 T6c 흐름(BRIEF_01~04 무전을 한 번에 서버 시간으로 재생·`LobbyBriefingModel`·목표 '작전 설명 중')은 폐기.
+> 지금: L30 중앙 집결 0.3초 → 대사 행 L31~L34(`LOBBY_BRIEF_EVAL`·`_FACTORY`(배경 `BRIEF_BG_FACTORY`)·`_REBELLION`(`BRIEF_BG_REBELLION`)·`_SORTIE`)를
+> 진행기 공용 대사 스케줄러가 한 행씩 서버 시각으로 넘기고 L34 끝에 L40. `LobbyBriefing` 은 묶음(L31~L34) 입력 잠금(`LobbyBriefingLockSession`+장부, 모든 해제 경로)과 카메라만.
+> 목표 패널은 대사 동안 파사드가 숨긴다(`LOBBY_OBJ_BRIEFING` 표시 안 함 — 키 보존). BRIEF_01~04 는 재생 안 함(키 보존). 표시 계약: [handoff-lobby-tutorial-contract.md](handoff-lobby-tutorial-contract.md).
+> 아래 잠금 대상·장부·카메라·복구 설명은 그대로 유효하다.
 
 명세 v0.2 §4(강제 연출 규칙)·§10, PLAN-86 §3.6. 코드: `Assets/1.Scripts/Lobby/LobbyBriefing.cs`(NGO) · `LobbyBriefingRules.cs`
 (순수 — `LobbyBriefingModel`·`LobbyBriefingLockLedger`·`LobbyBriefingRules`·`LobbyObjectiveIds`). 테스트: `Assets/Tests/EditMode/Lobby/Editor/LobbyBriefingTests.cs`.

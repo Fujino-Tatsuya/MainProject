@@ -4,8 +4,9 @@ using UnityEngine;
 /// <summary>
 /// ⚠ 과도기 어댑터 — 158(목표/대사 패널) 병합 시 이 파일째 삭제(할 일 157 Q18, 계약 문서 §5).
 /// [전 피어, 표시 전용] <see cref="LobbyTutorialState"/> 를 읽어 기존 상단 가이드 UI(<see cref="TutorialGuideUI"/>)에 임시로 띄운다:
-/// 목표 = <see cref="TutorialGuideUI.SetObjective"/>(지시문 키 + T10 체크 항목 + 진행 n/N, T21 카운트다운은 '시작까지 {n}' 체크 줄 1개),대사(L11·L21) = <see cref="TutorialGuideUI.ShowSubtitle"/> → 대사 단계가 끝나면 자막 지움.
-/// 옛 왼쪽 뷰(LobbyWeaponCheckView·LobbyTrainingCombatView)엔 의존하지 않는다. 브리핑(입력 잠금 대사 L31~L34)은 옛 <see cref="LobbyBriefing"/> 가 띄우므로 건드리지 않는다.
+/// 목표 = <see cref="TutorialGuideUI.SetObjective"/>(지시문 키 + T10 체크 항목 + 진행 n/N, T21 카운트다운은 '시작까지 {n}' 체크 줄 1개), 대사(L11·L21·브리핑 L31~L34) = <see cref="TutorialGuideUI.ShowSubtitle"/> → 대사 단계가 끝나면 자막 지움.
+/// 브리핑 배경(<see cref="LobbyTutorialDialogueView.BackgroundId"/> — 삽화 리소스 없음, 할 일 157 Q14 A)은 무시한다.
+/// 옛 왼쪽 뷰(LobbyWeaponCheckView·LobbyTrainingCombatView)엔 의존하지 않는다.
 /// 씬 변경 없이 쓰려고 첫 씬 로드 때 숨은 DontDestroyOnLoad 오브젝트로 스스로 생긴다 — 파사드가 없으면(로비 밖) 아무것도 하지 않는다.
 /// 문구 안 <c>{tag:ID}</c>(158 이 색을 칠하는 표기)는 여기서만 평문 <c>[넉백]</c> 등으로 바꿔 띄운다 — 색 없음, 모르는 태그는 그대로(<see cref="PlainTagArgs"/>).
 /// </summary>
@@ -81,15 +82,10 @@ public sealed class LobbyTutorialGuideAdapter : MonoBehaviour
 
     private void ApplyObjective()
     {
-        var step = LobbyTutorialState.CurrentStep;
         var visible = LobbyTutorialState.ObjectivePanelVisible && !string.IsNullOrEmpty(LobbyTutorialState.ObjectiveKey);
         if (!visible)
         {
-            // 브리핑 묶음은 LobbyBriefing 이 목표를 직접 띄운다 — 덮지 않게 지우지 않고 잊기만 한다.
-            if (step.LocksInput)
-                _shownObjective = null;
-            else
-                ClearObjective();
+            ClearObjective();
             return;
         }
 
@@ -136,8 +132,7 @@ public sealed class LobbyTutorialGuideAdapter : MonoBehaviour
     private void ApplyDialogue()
     {
         var dialogue = LobbyTutorialState.Dialogue;
-        var active = LobbyTutorialState.IsDialogueActive && !LobbyTutorialState.CurrentStep.LocksInput
-                     && !string.IsNullOrEmpty(dialogue.DialogueId);
+        var active = LobbyTutorialState.IsDialogueActive && !string.IsNullOrEmpty(dialogue.DialogueId);
         if (!active)
         {
             EndDialogue();

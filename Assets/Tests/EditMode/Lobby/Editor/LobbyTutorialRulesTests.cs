@@ -158,22 +158,15 @@ public sealed class LobbyTutorialRulesTests
     }
 
     [Test]
-    public void 브리핑_잠금_묶음_뒤는_L40_출격_집결()
+    public void 브리핑_마지막_대사_L34_다음은_L40_출격_집결()
     {
+        // ⑨ — 브리핑 4행은 대사 스케줄러가 한 행씩 넘긴다(묶음 건너뛰기 없음). L34 끝의 다음 행 = L40.
         var table = LoadAsset();
-        var after = LobbyTutorialRules.IndexAfterLockedBlock(table.Steps, Index(table, "L31_BriefIntro"));
+        var after = Index(table, "L34_SortieIntro") + 1;
 
         Assert.That(after, Is.EqualTo(Index(table, "L40_SortieGather")));
         Assert.That(LobbyTutorialRules.IndexOfGather(table.Steps, LobbyGatherPoint.Sortie), Is.EqualTo(after));
         Assert.That(LobbyTutorialRules.IndexOfKind(table.Steps, LobbyTutorialStepKind.Loading), Is.EqualTo(Index(table, "L41_Loading")));
-    }
-
-    [Test]
-    public void 잠금_묶음_밖이면_다음_행()
-    {
-        var table = LoadAsset();
-        var t10 = Index(table, "T10_Basic");
-        Assert.That(LobbyTutorialRules.IndexAfterLockedBlock(table.Steps, t10), Is.EqualTo(t10 + 1));
     }
 
     [Test]
@@ -199,7 +192,8 @@ public sealed class LobbyTutorialRulesTests
     [TestCase("T31_Counter", 1)]
     [TestCase("T34_Wall", 1)]
     [TestCase("T40_SuppressKill", 1)]
-    [TestCase("T50_FreePractice", 0)]
+    [TestCase("T50_FreePractice", 1)]   // 명세 §5 T50 — 훈련 전용 보정은 출구 집결 확정(→ L30) 때 정리(⑨)
+    [TestCase("L30_BriefGather", 0)]
     [TestCase("L31_BriefIntro", 0)]
     [TestCase("L40_SortieGather", 0)]
     public void 체력_하한은_훈련장_안_단계만_옛_Train01_부터_Train03D(string stateId, int expected)

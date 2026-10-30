@@ -1,176 +1,66 @@
-using System;
 using System.Collections.Generic;
 
 /// <summary>
 /// 로비 목표 패널 id(할 일 86 T6c) — 문구는 <c>TutorialGuideTexts</c> SO 행(ko 폴백) + Strings 키 <c>Tutorial.Guide.&lt;id&gt;</c>(Export 가 SO 행에서 모은다).
-/// 행 추가 = 메뉴 <c>Tools/UI/로비 무전 문구 추가</c>(무전 행과 함께).
+/// 할 일 157 ⑨부터 아무도 띄우지 않는다(목표는 단계표 키 — 158·과도기 어댑터). 키·문구 행은 보존한다(명세 §3.3 '브리핑 진행 중' 표시 안 함).
 /// </summary>
 public static class LobbyObjectiveIds
 {
-    public const string Briefing = "LOBBY_OBJ_BRIEFING";   // 브리핑 진행 중
-    public const string Sortie = "LOBBY_OBJ_SORTIE";       // 브리핑 끝 — 출격 지점에 집결
+    public const string Briefing = "LOBBY_OBJ_BRIEFING";   // 브리핑 진행 중 — 표시 안 함(키 보존)
+    public const string Sortie = "LOBBY_OBJ_SORTIE";       // 브리핑 끝 — 출격 지점에 집결(옛 표시, 지금은 단계표 LOBBY_OBJ_SORTIE_GATHER)
 
     public static readonly string[] All = { Briefing, Sortie };
 
-    public static bool IsLobbyObjective(string id) => !string.IsNullOrEmpty(id) && Array.IndexOf(All, id) >= 0;
+    public static bool IsLobbyObjective(string id) => !string.IsNullOrEmpty(id) && System.Array.IndexOf(All, id) >= 0;
 }
 
-/// <summary>브리핑 대사 한 줄 — id + 표시 시간(초). 0 이하면 자막 큐 기본값(<see cref="LobbyBriefingRules.DefaultLineSeconds"/>).</summary>
-public readonly struct LobbyBriefingLine
-{
-    public LobbyBriefingLine(string id, float seconds)
-    {
-        Id = id;
-        Seconds = seconds > 0f ? seconds : LobbyBriefingRules.DefaultLineSeconds;
-    }
-
-    public string Id { get; }
-    public float Seconds { get; }
-}
-
-/// <summary>브리핑 표시 규칙(순수) — 목표 패널·카메라. 전 피어가 복제된 진행기 단계로 같은 판정을 한다.</summary>
+/// <summary>브리핑 판정(순수) — 전 피어가 복제된 진행기 단계로 같은 판정을 한다(입력 잠금·카메라).</summary>
 public static class LobbyBriefingRules
 {
-    /// <summary>표시 시간이 비었을 때 — <see cref="TutorialSubtitleQueue.DefaultDurationSeconds"/> 와 같은 값.</summary>
-    public const float DefaultLineSeconds = 6f;
-
-    /// <summary>브리핑 대사(명세 v0.2 §14 순서).</summary>
-    public static readonly string[] LineIds =
-    {
-        LobbyRadioIds.Brief01, LobbyRadioIds.Brief02, LobbyRadioIds.Brief03, LobbyRadioIds.Brief04,
-    };
-
     /// <summary>
-    /// 브리핑 진행 중(조작 제한·카메라·'작전 설명 중') — 입력 잠금 대사 행(L31~L34). 할 일 157 ②: 브리핑은 첫 잠금 행(L31)에서 옛 방식대로
-    /// BRIEF_01~04 를 한 번에 돌리고, 끝나면 진행기가 잠금 묶음 뒤(L40)로 건너뛴다. 대사 행 4개 분해는 커밋 ⑨.
+    /// 브리핑 묶음(입력 잠금·카메라 임시 추적) — 입력 잠금 대사 행(L31~L34) 어디든. 할 일 157 ⑨: 대사 4행은 진행기 공용 대사 스케줄러가 서버 시각으로
+    /// 한 행씩 넘기고, 잠금은 묶음 첫 행 진입 때 걸어 묶음을 떠날 때(L40·회차 초기화) 푼다 — 행이 바뀌어도 풀었다 다시 걸지 않는다.
     /// </summary>
     public static bool IsBriefing(in LobbyTutorialStepView step) =>
         step.IsValid && step.Kind == LobbyTutorialStepKind.Dialogue && step.LocksInput;
-
-    /// <summary>목표 패널 id(없으면 null). 브리핑 중 = '작전 설명 중', 출격 집결(L40) = '출격 지점에 집결'. 그 밖 단계는 비운다.</summary>
-    public static string ObjectiveFor(in LobbyTutorialStepView step)
-    {
-        if (IsBriefing(step))
-            return LobbyObjectiveIds.Briefing;
-        return step.IsValid && step.GatherPointId == LobbyGatherPoint.Sortie ? LobbyObjectiveIds.Sortie : null;
-    }
-
-    /// <summary>브리핑 전체 시간 = 시작 지연 + 대사 표시 시간 합 + 끝 여유.</summary>
-    public static float TotalSeconds(IReadOnlyList<LobbyBriefingLine> lines, float leadSeconds, float tailSeconds)
-    {
-        var total = Math.Max(0f, leadSeconds) + Math.Max(0f, tailSeconds);
-        if (lines == null)
-            return total;
-
-        for (var i = 0; i < lines.Count; i++)
-            total += lines[i].Seconds;
-        return total;
-    }
 }
 
-/// <summary>브리핑 진행 상태. 한 진행기(회차)에 한 번 — Completed·Aborted 뒤엔 다시 시작하지 않는다.</summary>
-public enum LobbyBriefingState : byte
+/// <summary><see cref="LobbyBriefingLockSession.Update"/> 결과.</summary>
+public enum LobbyBriefingLockAction : byte
 {
-    Idle = 0,
-    Running = 1,
-    Completed = 2,
-    Aborted = 3,
+    None = 0,
+    /// <summary>묶음에 들어왔다 — 접속자 전원 잠금(기존 무전 종료).</summary>
+    Begin = 1,
+    /// <summary>묶음을 떠났다(정상 L40·단계 이탈·디스폰) — 장부의 잠금을 전부 푼다.</summary>
+    Release = 2,
 }
 
 /// <summary>
-/// [서버] 브리핑 진행 모델(순수, EditMode 테스트 대상) — 할 일 86 T6c, 명세 v0.2 §4·§10.
-/// <list type="bullet">
-/// <item>시간은 서버가 잰다: 시작 지연 뒤 대사를 순서대로 하나씩 내보내고(앞 줄 표시 시간이 지나면 다음 줄), 마지막 줄 + 끝 여유가 지나면 완료 1회.
-/// 클라 자막 종료 보고에 의존하지 않는다.</item>
-/// <item>중복 시작 무시(Running·Completed·Aborted 에서 <see cref="Start"/> = false). 완료 신호는 <see cref="Tick"/> 이 정확히 한 번 true.</item>
-/// <item>중단(<see cref="Abort"/>) = 진행 중이었을 때만 true — 조작 제한·카메라 해제 신호. 중단 뒤 남은 대사·완료는 나오지 않는다.</item>
-/// <item><see cref="HoldsLock"/> = 조작 제한을 걸고 있어야 하는가(Running 일 때만).</item>
-/// </list>
+/// [서버] 브리핑 잠금 구간(순수, EditMode 테스트 대상) — 할 일 157 ⑨, Q7 A. 단계가 바뀔 때마다 <see cref="Update"/>(지금 행이 브리핑인가)를 부르면
+/// 묶음 진입 1회 Begin, 묶음 안 행 이동(L31→L34)은 None, 묶음 밖으로 나가면 1회 Release. <see cref="End"/> = 디스폰·연결 종료 등 강제 종료(잡고 있었으면 true).
+/// 회차(진행기)당 여러 번 들어와도(회차 초기화 뒤 재진입 등) 매번 짝이 맞는다.
 /// </summary>
-public sealed class LobbyBriefingModel
+public sealed class LobbyBriefingLockSession
 {
-    readonly List<LobbyBriefingLine> _lines = new List<LobbyBriefingLine>();
-    float _lead;
-    float _tail;
-    int _nextLine;
-    float _nextAt;
+    /// <summary>잠금을 잡고 있다(L31~L34 안).</summary>
+    public bool IsHolding { get; private set; }
 
-    public LobbyBriefingState State { get; private set; } = LobbyBriefingState.Idle;
-
-    public bool IsRunning => State == LobbyBriefingState.Running;
-
-    /// <summary>조작 제한(입력 잠금·카메라)을 걸고 있어야 한다.</summary>
-    public bool HoldsLock => State == LobbyBriefingState.Running;
-
-    /// <summary>시작 뒤 지난 시간(초).</summary>
-    public float Elapsed { get; private set; }
-
-    /// <summary>브리핑 전체 시간(초) — <see cref="LobbyBriefingRules.TotalSeconds"/>.</summary>
-    public float TotalSeconds { get; private set; }
-
-    /// <summary>지금까지 내보낸 대사 수.</summary>
-    public int SentCount => _nextLine;
-
-    public IReadOnlyList<LobbyBriefingLine> Lines => _lines;
-
-    /// <summary>시작. Idle 일 때만 true — 진행 중·끝난 뒤 다시 부르면 무시(false).</summary>
-    public bool Start(IReadOnlyList<LobbyBriefingLine> lines, float leadSeconds, float tailSeconds)
+    public LobbyBriefingLockAction Update(bool briefing)
     {
-        if (State != LobbyBriefingState.Idle)
-            return false;
+        if (briefing == IsHolding)
+            return LobbyBriefingLockAction.None;
 
-        _lines.Clear();
-        if (lines != null)
-        {
-            for (var i = 0; i < lines.Count; i++)
-            {
-                if (!string.IsNullOrEmpty(lines[i].Id))
-                    _lines.Add(lines[i]);
-            }
-        }
-
-        _lead = Math.Max(0f, leadSeconds);
-        _tail = Math.Max(0f, tailSeconds);
-        _nextLine = 0;
-        _nextAt = _lead;
-        Elapsed = 0f;
-        TotalSeconds = LobbyBriefingRules.TotalSeconds(_lines, _lead, _tail);
-        State = LobbyBriefingState.Running;
-        return true;
+        IsHolding = briefing;
+        return briefing ? LobbyBriefingLockAction.Begin : LobbyBriefingLockAction.Release;
     }
 
-    /// <summary>
-    /// 시간 진행. <paramref name="dueLines"/> 에 이번에 내보낼 대사 id 를 순서대로 채운다(한 번에 여러 줄도 가능 — 큰 dt).
-    /// 반환 true = 방금 완료(정확히 한 번). 진행 중이 아니면 아무것도 하지 않고 false.
-    /// </summary>
-    public bool Tick(float deltaSeconds, List<string> dueLines)
+    /// <summary>강제 종료(디스폰 등). 잡고 있었으면 true — 호출 쪽이 장부의 잠금을 푼다.</summary>
+    public bool End()
     {
-        dueLines?.Clear();
-        if (State != LobbyBriefingState.Running)
+        if (!IsHolding)
             return false;
 
-        Elapsed += Math.Max(0f, deltaSeconds);
-        while (_nextLine < _lines.Count && Elapsed >= _nextAt)
-        {
-            dueLines?.Add(_lines[_nextLine].Id);
-            _nextAt += _lines[_nextLine].Seconds;
-            _nextLine++;
-        }
-
-        if (_nextLine < _lines.Count || Elapsed < TotalSeconds)
-            return false;
-
-        State = LobbyBriefingState.Completed;
-        return true;
-    }
-
-    /// <summary>중단(단계 이탈·회차 초기화·디스폰). 진행 중이었으면 true — 조작 제한·카메라를 풀어야 한다.</summary>
-    public bool Abort()
-    {
-        if (State != LobbyBriefingState.Running)
-            return false;
-
-        State = LobbyBriefingState.Aborted;
+        IsHolding = false;
         return true;
     }
 }

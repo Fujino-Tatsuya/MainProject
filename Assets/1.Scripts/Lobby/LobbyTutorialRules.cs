@@ -138,18 +138,6 @@ public static class LobbyTutorialRules
     public static int IndexOfKind(IReadOnlyList<LobbyTutorialStep> steps, LobbyTutorialStepKind kind, int from = 0) =>
         FirstIndex(steps, from, s => s.kind == kind);
 
-    /// <summary>입력 잠금 묶음(브리핑 L31~L34) 바로 뒤 행 — <paramref name="index"/> 가 묶음 안이 아니면 index+1.</summary>
-    public static int IndexAfterLockedBlock(IReadOnlyList<LobbyTutorialStep> steps, int index)
-    {
-        if (steps == null)
-            return index + 1;
-
-        var next = index + 1;
-        while (next < steps.Count && steps[next] != null && steps[next].locksInput)
-            next++;
-        return next;
-    }
-
     static int FirstIndex(IReadOnlyList<LobbyTutorialStep> steps, int from, System.Func<LobbyTutorialStep, bool> match)
     {
         if (steps == null)

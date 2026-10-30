@@ -13,12 +13,12 @@ using UnityEngine;
 /// <item>구역: 단계가 바뀔 때마다 지금 행의 집결 지점만 켜고 명단·유지 시간(행 holdSeconds)을 넣는다. 확정은 <see cref="PartyGatherZone.ServerConfirmed"/>.
 /// 출격 = 접속자 전원(자동), 그 밖 = 진행기 참여자(명단 고정 전 = 클리어 플래그 끈 접속자, 뒤 = 고정 명단).</item>
 /// <item>명단 고정 = 첫 집결 행(L10 중앙) 확정. 그 뒤 접속 = 로비 대기(늦은 참가자, 출격 집결 인원엔 포함).</item>
-/// <item>단계 완료: 내용 컴포넌트가 <see cref="ServerReportActivityCompleted"/>(Activity, 시작 때 받은 revision), 브리핑은 <see cref="ServerReportBriefingCompleted"/>.
+/// <item>단계 완료: 내용 컴포넌트가 <see cref="ServerReportActivityCompleted"/>(Activity, 시작 때 받은 revision). 대사 행은 아래 스케줄러, 집결 행은 구역 확정으로만.
 /// 지금 행·revision 이 아니면 무시. 한 프레임 한 전이(같은 프레임 두 번째는 모델이 다음 프레임으로 미룬다).</item>
 /// <item>L00 라커 방문(③): 라커룸 내부 볼륨(<see cref="LobbyAreaVolume"/> <c>Area_Locker</c>)을 서버가 매 프레임 폴링 — 본체 기준점·높이·쓰러짐 규칙은 집결 구역과 같다.
 /// 스폰 완료 참여자 전원이 한 번씩 들어가면(누적, 시작 때 이미 안 = 인정) L10. 볼륨 칸이 비면 오류 로그 1회 후 자동 통과(흐름이 막히지 않게 — 판정 메커니즘은 볼륨 하나).</item>
-/// <item>대사 행(③ — L11·L21, 입력 잠금 아닌 대사): <see cref="LobbyTutorialDialogueClock"/> — 진입 때 길이(<see cref="LobbyTutorialRules.DialogueSeconds"/>, 수치 = <see cref="LobbyRules"/>)를
-/// 스냅샷 timerStart/timerEnd(서버 시각)로 싣고 끝 시각에 다음 행으로 1회. 할 일 157 임시: 브리핑(L31~L34) = 옛 <see cref="LobbyBriefing"/> 가 L31 에서 한 번에 돌고 L40 으로(⑨).</item>
+/// <item>대사 행(③ — L11·L21, ⑨ — 브리핑 L31~L34): <see cref="LobbyTutorialDialogueClock"/> — 진입 때 길이(<see cref="LobbyTutorialRules.DialogueSeconds"/>, 수치 = <see cref="LobbyRules"/>)를
+/// 스냅샷 timerStart/timerEnd(서버 시각)로 싣고 끝 시각에 다음 행으로 1회. 브리핑 묶음의 입력 잠금·카메라는 <see cref="LobbyBriefing"/>(대사마다 집결 재검사 없음).</item>
 /// <item>집결 확정 텔레포트(할 일 111 유지, 157 Q4 B·§10.3 안 A): L20 입구 확정 → 명단 전원 훈련장 안(Train01Start, 바로 L21),
 /// T50 종료 확정 → 로비 중앙(Brief, L30 이 바로 센다). <see cref="LobbyTrainingEndPlacement"/> 자리로 <see cref="PlayerFallRecovery.RelocateServer"/>.
 /// 명세 L20 '문 통과' = 이 텔레포트(문 <c>Door_Training</c> 막힘 유지). Train01Start 는 도착지일 뿐 집결 행이 아니다(재집결 없음).
@@ -411,24 +411,6 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     }
 
     /// <summary>
-    /// [서버] 브리핑(<see cref="LobbyBriefing"/>) 끝 — 지금 행이 입력 잠금 대사 행이고 revision 이 같을 때만 잠금 묶음(L31~L34) 뒤 행(L40)으로(true).
-    /// </summary>
-    public bool ServerReportBriefingCompleted(int revision)
-    {
-        if (!IsServer || _flow == null)
-            return false;
-
-        var step = ServerStep();
-        if (step == null || step.kind != LobbyTutorialStepKind.Dialogue || !step.locksInput || revision != _flow.Revision)
-        {
-            Debug.LogWarning($"{Tag} 브리핑 완료 보고 rev {revision} 무시 — 현재 {ServerDescribe()}.", this);
-            return false;
-        }
-
-        return ServerAdvance(LobbyTutorialRules.IndexAfterLockedBlock(Table.Steps, _flow.StepIndex), "브리핑 완료");
-    }
-
-    /// <summary>
     /// [서버] 튜토리얼 클리어 플래그를 켜고 끈다(<see cref="LobbyTutorialFlow.SetTrainingCleared"/>). 바뀌었으면 true.
     /// 켜서 명단에서 빠지면 구역 명단·체력 하한을 다시 맞추고 <see cref="ServerRosterMemberRemoved"/>, 훈련할 사람이 없어 출격 집결로 넘어가면 <paramref name="skippedToSortie"/>.
     /// </summary>
@@ -540,15 +522,15 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             ServerAdvance(_flow.StepIndex + 1, "스폰 완료 참여자 전원 라커 방문");
     }
 
-    // [서버] 대사 행(할 일 157 ③ — L11·L21) — 진입 revision 마다 길이를 정해 스냅샷 timerStart/timerEnd(서버 시각)로 싣고, 끝 시각에 다음 행으로 1회.
-    // 입력 잠금 행(브리핑 L31~L34)은 LobbyBriefing 이 있으면 그 완료 보고로만 끝난다(⑨에서 이 스케줄러로 옮긴다).
+    // [서버] 대사 행(할 일 157 ③ — L11·L21, ⑨ — 브리핑 L31~L34) — 진입 revision 마다 길이를 정해 스냅샷 timerStart/timerEnd(서버 시각)로 싣고, 끝 시각에 다음 행으로 1회.
+    // 브리핑 4행도 한 행씩 같은 방식(L34 끝 → L40). 입력 잠금은 LobbyBriefing 이 묶음 단위로 건다.
     private void TickDialogueServer()
     {
         if (_flow.CurrentKind != LobbyTutorialStepKind.Dialogue || _flow.HasPendingAdvance)
             return;
 
         var step = ServerStep();
-        if (step == null || (step.locksInput && GetComponent<LobbyBriefing>() != null))
+        if (step == null)
             return;
 
         var now = ServerNow();
@@ -1017,7 +999,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     private bool ServerIsLaunching() =>
         _flow != null && (_flow.LaunchCommitted || _flow.CurrentKind == LobbyTutorialStepKind.Loading);
 
-    // 각 단계 내용은 ServerFlowChanged 구독자(T10 = LobbyTrainingWeaponCheck, T22 = LobbyTrainingCombat, T31~T40 = LobbyTrainingSparring, L31 = LobbyBriefing).
+    // 각 단계 내용은 ServerFlowChanged 구독자(T10 = LobbyTrainingWeaponCheck, T22 = LobbyTrainingCombat, T31~T40 = LobbyTrainingSparring, L31~L34 잠금 = LobbyBriefing).
     private void LogStepContent()
     {
         var step = ServerStep();

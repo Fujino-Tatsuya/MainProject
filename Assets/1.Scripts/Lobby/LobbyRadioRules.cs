@@ -22,7 +22,7 @@ public static class LobbyRadioIds
     public const string Train03Combat = "TRAIN_03_COMBAT";     // 단계 안 사건 — LobbyRadio.ServerPlay(레인 B T5c)
     public const string TrainEnd = "TRAIN_END";
     public const string BriefRoute = "BRIEF_ROUTE";
-    public const string Brief01 = "BRIEF_01";                  // 브리핑 — 재생은 T6c
+    public const string Brief01 = "BRIEF_01";                  // 브리핑 — 재생 안 함(할 일 157 ⑨ = 대사 행 LOBBY_BRIEF_*, 키 보존)
     public const string Brief02 = "BRIEF_02";
     public const string Brief03 = "BRIEF_03";
     public const string Brief04 = "BRIEF_04";
