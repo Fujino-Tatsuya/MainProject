@@ -103,9 +103,6 @@ public class GunnerBeamView : BaseNetworkBehaviour
     // 판정·폭발 시각은 서버(GunnerChargeLaserSkill)가 들고, 여기는 복제 목록(echoBombStates)을 보고 그리기만 한다.
     // 149 후속 4 — 3D 구체는 몸 메시에 묻혀 안 보여서 화면 공간 스프라이트(머리 위 체력바 오버레이 캔버스)로 바꿨다.
     [Header("잔류 포격 에너지 폭탄 VFX")]
-    [Tooltip("미사용(149 후속 4 — 화면 스프라이트로 대체). 옛 3D 구체 프리팹 GunnerEchoBomb_Temp. 에셋·칸 삭제는 따로 정한다")]
-    [SerializeField] private GameObject echoBombPrefab;
-
     [Tooltip("폭탄 스프라이트 — 화면 공간 오버레이라 몸에 가려지지 않는다. 비우면 안 보인다(피해는 그대로). 임시 = ~Others/Sprite/Circle")]
     [DataTableIgnore]
     [SerializeField] private Sprite echoBombSprite;
