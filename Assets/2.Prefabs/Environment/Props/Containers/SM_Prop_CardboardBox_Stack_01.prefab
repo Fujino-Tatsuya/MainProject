@@ -12,6 +12,8 @@ GameObject:
   - component: {fileID: 33401133933257022}
   - component: {fileID: 23087921094886966}
   - component: {fileID: 7828121895202347235}
+  - component: {fileID: 9096465179784115030}
+  - component: {fileID: 2459205494016829974}
   m_Layer: 0
   m_Name: SM_Prop_CardboardBox_Stack_01
   m_TagString: Untagged
@@ -31,7 +33,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1757613138884742550}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &33401133933257022
@@ -112,3 +115,125 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.4121658, y: 1.518359, z: 1.3894898}
   m_Center: {x: 0, y: 0.7591795, z: 0}
+--- !u!114 &9096465179784115030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1602333964237602}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2a252d0daad8e6438c39fa142fe1788, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Breakable
+  hp: 1
+  burstEntry: {fileID: 11400000, guid: a8c47a472fc2afa438432342ac4b6c50, type: 2}
+  pieces:
+  - {fileID: 4740337816766370}
+  pieceStagger: 0.05
+  authoredId: 0
+  onBrokenLocal:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 2459205494016829974}
+        m_TargetAssemblyTypeName: EffectSocketPlayer, Assembly-CSharp
+        m_MethodName: PlayOnce
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  onBrokenServer:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &2459205494016829974
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1602333964237602}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}
+  socket: {fileID: 0}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
+--- !u!1 &1995925140884591668
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1757613138884742550}
+  - component: {fileID: 7452511748803237918}
+  - component: {fileID: 8491344448131598232}
+  m_Layer: 14
+  m_Name: Hurtbox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1757613138884742550
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1995925140884591668}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4740337816766370}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7452511748803237918
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1995925140884591668}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.4121658, y: 1.518359, z: 1.3894898}
+  m_Center: {x: 0, y: 0.7591795, z: 0}
+--- !u!114 &8491344448131598232
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1995925140884591668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ff6f17a7ad346d48ad09109dd1ef5d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
+  ownerUnit: {fileID: 0}
+  attackReceiverSource: {fileID: 9096465179784115030}

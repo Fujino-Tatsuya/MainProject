@@ -4,7 +4,9 @@ using UnityEngine;
 using UnityEngine.Events;
 
 /// <summary>
-/// 플레이어 공격에 부서지는 상자 더미. <b>프롭 프리팹 루트</b>에 붙는다.
+/// 플레이어 공격에 부서지는 프롭(상자 더미·박스·팔레트 등). <b>프롭 프리팹 루트</b>에 붙는다.
+/// 저작은 <c>Tools/Breakables/선택한 프리팹을 파괴 가능하게 만들기</c> — 자식 상자형 더미와
+/// 루트에 메시가 붙은 단일 프롭 두 형태를 모두 처리한다(<c>BreakableAuthoringTool</c>).
 ///
 /// <b>왜 Unit이 아닌가.</b> <see cref="Unit"/>은 <c>NetworkBehaviour</c>라 상자마다 NetworkObject와
 /// NetworkVariable 4개(hp·maxHp·shield·hasShield)가 생긴다. 맵에 상자가 100개면 그게 400개인데,
@@ -21,7 +23,7 @@ using UnityEngine.Events;
 /// (이 레포의 반복 버그 — 호스트에서만 보인다).
 /// </summary>
 [DisallowMultipleComponent]
-public class BreakableCrate : MonoBehaviour, IAttackReceiver
+public class Breakable : MonoBehaviour, IAttackReceiver
 {
     [Header("내구도")]
     [Tooltip("서버에서만 쓰는 값이라 동기화하지 않는다. 0 이하가 되면 부서진다")]
@@ -31,7 +33,7 @@ public class BreakableCrate : MonoBehaviour, IAttackReceiver
     [Tooltip("파편 버스트 엔트리. 아래 pieces 각각의 위치에서 한 번씩 재생된다")]
     [SerializeField] EffectEntry burstEntry;
 
-    [Tooltip("더미를 이루는 상자들. 비워두면 자식 MeshRenderer에서 자동 수집한다")]
+    [Tooltip("버스트를 터뜨릴 자리(더미면 상자들, 단일 프롭이면 루트). 비워두면 자식 MeshRenderer에서 자동 수집한다")]
     [SerializeField] Transform[] pieces;
 
     [Tooltip("상자마다 버스트를 어긋나게 재생하는 간격(초). 0이면 전부 동시에 터진다.\n" +
@@ -39,7 +41,7 @@ public class BreakableCrate : MonoBehaviour, IAttackReceiver
     [SerializeField, Min(0f)] float pieceStagger = 0.05f;
 
     [Header("식별")]
-    [Tooltip("씬에 직접 배치한 상자의 ID. 'Tools > Crates > 씬의 상자에 ID 부여'가 채운다.\n" +
+    [Tooltip("씬에 직접 배치한 상자의 ID. 'Tools > Breakables > 씬의 상자에 ID 부여'가 채운다.\n" +
              "생성 맵의 상자는 MapContentSpawner가 런타임에 부여하므로 0으로 둔다.\n" +
              "두 ID 공간이 겹치지 않도록 저작 ID는 음수, 생성 ID는 양수를 쓴다")]
     [SerializeField] int authoredId;
@@ -55,13 +57,13 @@ public class BreakableCrate : MonoBehaviour, IAttackReceiver
              "연출을 여기 걸면 호스트에서만 보인다 — 이 레포의 반복 버그다.")]
     public UnityEvent<Vector3> onBrokenServer;
 
-    int _crateId;
+    int _breakableId;
     int _hpLeft;
     bool _brokenServer;   // 서버 판정 래치 — 한 프레임에 여러 번 맞아도 RPC는 한 번
     bool _brokenLocal;    // 로컬 연출 래치 — RPC 재전송·호스트 중복 방어
 
     /// <summary>스폰 순번으로 부여된 ID. <see cref="MapContentSpawner"/>가 채운다.</summary>
-    public int CrateId => _crateId;
+    public int BreakableId => _breakableId;
 
     void Awake()
     {
@@ -73,7 +75,7 @@ public class BreakableCrate : MonoBehaviour, IAttackReceiver
         if (authoredId != 0) AssignId(authoredId);
     }
 
-    void OnDestroy() => CrateRegistry.Unregister(this);
+    void OnDestroy() => BreakableRegistry.Unregister(this);
 
     /// <summary>
     /// [<see cref="MapContentSpawner"/>] 스폰 순번 ID 부여 + 등록.
@@ -81,8 +83,8 @@ public class BreakableCrate : MonoBehaviour, IAttackReceiver
     /// </summary>
     public void AssignId(int id)
     {
-        _crateId = id;
-        CrateRegistry.Register(this);
+        _breakableId = id;
+        BreakableRegistry.Register(this);
     }
 
     #region 서버 판정
@@ -112,18 +114,18 @@ public class BreakableCrate : MonoBehaviour, IAttackReceiver
 
         // ID가 없으면 전파할 방법이 없다. 조용히 넘기면 "때려도 안 부서진다"로만 드러나
         // 원인을 찾는 데 오래 걸린다(실제로 겪었다).
-        if (_crateId == 0)
+        if (_breakableId == 0)
         {
             Edit.LogError(
-                $"[Crate] '{name}'에 ID가 없어 파괴를 전파할 수 없다 — 이 피어에서만 부순다.\n" +
+                $"[Breakable] '{name}'에 ID가 없어 파괴를 전파할 수 없다 — 이 피어에서만 부순다.\n" +
                 "생성 맵의 상자는 MapContentSpawner가 부여하고, 씬에 직접 배치한 상자는 " +
-                "'Tools > Crates > 씬의 상자에 ID 부여'를 돌려야 한다.", this);
+                "'Tools > Breakables > 씬의 상자에 ID 부여'를 돌려야 한다.", this);
 
             BreakLocal();
             return true;
         }
 
-        CrateBreakBroadcaster.ServerBreak(_crateId);
+        BreakableBroadcaster.ServerBreak(_breakableId);
         return true;
     }
 

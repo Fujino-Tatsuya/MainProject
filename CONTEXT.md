@@ -12,6 +12,15 @@ Update this file when a term becomes important enough that future agents or team
 - 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
 - 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).
 
+## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate`→`Breakable`**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play(솔로·MPPM) · ⏳ SVN 업로드 · 핸드오프 [handoff-breakable-props.md](Docs/tech/handoff-breakable-props.md)
+- `CardboardBox_Stack_01~03`·`Pallet_01`·`PalletStack_01·02` = 루트 `Breakable` + 자식 `Hurtbox`(EnemyHurtBox 트리거), 프롭별 파편(SVN `50.Art/VFX/Common/Breakable/<프롭>/`) + `FX_Explosion_Basic`. 존 배치분 전부 부서짐.
+- 이름: `Breakable`·`BreakableRegistry`·`BreakableBroadcaster`(RPC `BreakRpc`)·`BreakableAuthoringTool`(`Tools/Breakables/…`, 단일 프롭 모드 추가). guid 유지.
+- 종이박스 더미 3종 파편 = **Blender 손작업**(찢긴 골판지 판·L자 모서리·테이프 덮개 + 팔레트 판자) → `SM_Frag_CardboardBox_Stack_0X.fbx` → `Assets/Effects/모델 파편으로 버스트 프리팹 굽기`(`FragmentBurstFromModel`). 원본 `.blend` = `D:\김민경\유니티\My project\Blender\Breakable_Cardboard.blend`.
+
+## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **팔라딘 베기 소켓 통합 · 가렌 평타 이벤트 타이밍**, 브랜치 `feature/VFX`) — ✅ 커밋 · ⏳ 민경 Play
+- `Paladin_Armature`: 베기 `Slash01~04` 를 `root/VFXSocket`(애니메이션되는 root 본 밑) → 최상위 `VFXSocket` 으로 옮겨 소켓 9개를 한 부모로 통합(월드 위치 보존). root 가 움직일 때 베기 이펙트가 끌려다니던 문제. `Player_Paladin` 에서 `Slash01~04`·`R_WeaponSocket`·`SM_Wep_Sword_03` 각도 재조정.
+- **은희 영역 알림**: `Garen_Default_Attack_1~4.anim` 의 평타 적중(Hit)·콤보창 열림 이벤트 시점을 프레임에 맞춰 조정(민경 확인 — 의도한 변경). 적중 1→0.333 · 2→0.3 · 4→0.267, 3 의 콤보창 열림 0.3→0.233(적중 0.3 보다 앞). 피해 발생 시점이 바뀌므로 평타 체감·콤보 입력창에 영향.
+
 ## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **보스 B 승리 연출(BOSS DOWN)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) ✅ 승인(Q1~Q3 권장안·R1~R6 문서대로) · ✅ 구현 · ✅ 커밋·feature 푸시 · ✅ 10-29 development 병합 · 전투 EditMode 416/0 · ✅ 경석 MPPM(사망 연출 정상) · 기획 원본 `보스_승리연출_v02_프로그래머_전달사양.md`(10-26)
 - 확정(grill): 보스 B 만 · 전원 같은 화면(막타 = 좌측 전경) · 처치 순간부터 조작 잠금 · 3.2초 뒤 32° 유지 → 결과 화면 · 타이포 코드 생성 · 음영 살린 회색조 · 사망 팀원 그대로.
 - 수정 예정: 새 `Map/BossVictory/*` · `Rendering/BossVictory/*` · `TwentyThreeBoss.cs` · `MonsterBase.cs`(사망 보류 훅) · `BossEncounterDirector.cs` · URP 렌더러 에셋.
@@ -86,6 +95,11 @@ Update this file when a term becomes important enough that future agents or team
 - 튜토리얼(은희 영역 혼재) 변경은 [handoff-tutorial-boss-room-1022.md](Docs/tech/handoff-tutorial-boss-room-1022.md) — 재도전 뒤 보스방 안내 정리. 안전 지점 쪽(보스 진입 지점 패드 제외 · 도착 무효 낙사 = 모서리)은 경석 지시로 10-23 원복 — 건드리지 않는다.
 - 경석 확정(10-23): 간파 정면 표시기는 꺼 둔다 · 팔라딘 Q 경직은 간파 그로기 아님 → 정지 조건 None(장판·드론 안 멈춤, 수정함) — [PLAN-boss-ab-test.md](PLAN-boss-ab-test.md) 표 · 강제 개시 부활 규칙 [party-lives-respawn.md](Docs/tech/party-lives-respawn.md).
 - 남은 판단: 북진 송전탑 1/2/4 vs 드론 1/2/3 · 순수 클라 낙사 복귀 강제 보정(`PlayerFallRecovery.cs:141`, 은희 플레이어 영역 — 미수정).
+## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **어쌔신 임시 VFX 제거(백어택·변신 E 원)**, 브랜치 `feature/VFX`) — ✅ 반영·커밋 · ⏳ 민경 Play · 은희 공유 필요
+- `Player_Assassin.prefab` `AssassinSkillView.backAttackHitPrefab` = `Burst_sharp`(은희 A12 임시 VFX, [PLAN-assassin.md](Docs/history/PLANS/PLAN-assassin.md) §A12) → **비움**. 변신 중엔 모든 타격이 강제 백어택(A11)이라 R 변신 좌클릭마다 터지던 것. 비우면 코드가 조용히 건너뛴다(null 안전) — 보스 후방 백어택·Q·E·간파의 백어택 적중 연출도 같이 없어진다. 정식 백어택 연출은 민경이 나중에 이 칸에.
+- 같은 컴포넌트 `circleStrikePrefab` = `Burst_rings`(변신 E 확정 순간 원 중심 1회, A12 임시) → **비움**. 원형 베기 정식 연출 `FX_Assassin_MultiSlashes`(`EffectCatalog.Assassin_E_MultiSlashes`)는 그대로. A12 임시 VFX 5개 중 나머지 3개(변신 루프·강화 준비·Q 궤적)는 이미 민경 정식 연출로 교체돼 있음 — 어쌔신 임시 VFX 정리 끝.
+- 코드도 제거(은희 영역, 연출 경로만): `AssassinSkillView` 필드 `circleStrikePrefab`·`backAttackHitPrefab`·`releaseLifetime` · `ServerBackAttackHit`/`BackAttackHitRpc`(RPC 1개 삭제 — 호스트·클라 같은 빌드) · `PlayOneShot`·`Spawn` / `AssassinHitTargets.NotifyBackAttackHit` 와 호출 5곳(평타 콘·변신 E·Q·간파 `OnInterruptTargetResolved` 오버라이드) / 저작 메뉴 `AssassinShellAuthoring` 의 임시 VFX 채우기. **백어택 판정·배율(`IsBackAttack`·`WithBackAttack`)은 그대로.** 컴파일 오류 0.
+
 ## ▶▶ 작업 세션 (2026-10-29 · 민경(Claude) · **트렌치커버 벤트 연기 — 구멍 9개 랜덤 분출**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 제작(A·B·C 비교 → **B 확정**)·민경 승인 · ✅ MainProject 반입·배선(미커밋) · ⏳ 민경 Play(존) · 핸드오프 [handoff-vent-smoke-vfx.md](Docs/tech/handoff-vent-smoke-vfx.md)
 - `2.Prefabs/Environment/Architecture/Floors/floor_metal_trenchcover.prefab` 에 `SmokeHole_1~9` 소켓(+ `FX_Vent_Smoke_Cel`) · 루트 `VentSmokeEmitter`(신규 `1.Scripts/Effects/VentSmokeEmitter.cs`) 추가. 옛 자식 `FX_Smoke_2` 는 뺀 채(민경 결정). 존 4종에 자동 반영.
 - `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab`: FBX 원본 트렌치커버 12개 → 벤트 프리팹으로 교체(오버라이드 보존, 씬 참조 영향 없음 확인). 연기 높이 처음의 2배(약 4.2m) · 분출 머리 덩어리 `Blast` · 붉은 밑동 · 분출 전 예고 `Leak`(0.45초, `burstDuration` 1.25~2.05)로 재반입.

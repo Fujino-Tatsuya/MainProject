@@ -512,8 +512,6 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
 
             if (unit != null)
                 tickLandedUnits.Add(unit);
-            if (backAttack)
-                AssassinHitTargets.NotifyBackAttackHit(owner, hit, unit, hitContext);
 
             Edit.Log($"[Assassin/Q] 경로 적중 — {target.name} 피해 {attackInfo.damage}{(backAttack ? " (백어택)" : "")} ({from:F2}~{to:F2}m)", this);
         }

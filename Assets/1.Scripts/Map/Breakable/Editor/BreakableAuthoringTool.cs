@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 프롭 프리팹을 <b>파괴 가능한 상자 더미</b>로 만드는 일괄 저작 툴.
+/// 프롭 프리팹을 <b>파괴 가능한 프롭</b>으로 만드는 일괄 저작 툴. 두 형태를 처리한다.
 ///
 /// 손으로 하면 프리팹 6종 × (루트 컴포넌트 2개 + 자식 레이어 14개)라 반복적이고,
 /// <b>하나만 빠뜨려도 그 더미만 반응하지 않는</b> 재현 어려운 버그가 된다.
@@ -12,12 +12,16 @@ using UnityEngine;
 /// (레이어 <c>EnemyHurtBox</c> + <b>트리거</b> 콜라이더 + <c>Hurtbox</c>).
 ///
 /// <list type="bullet">
-/// <item><b>루트</b>: <see cref="BreakableCrate"/> + <c>Hurtbox</c> + 더미 전체를 덮는
+/// <item><b>루트</b>: <see cref="Breakable"/> + <c>Hurtbox</c> + 더미 전체를 덮는
 ///       트리거 BoxCollider + 레이어 <c>EnemyHurtBox</c>.
-///       <c>Hurtbox.attackReceiverSource</c>에 <see cref="BreakableCrate"/>를 <b>명시 배선</b>한다.</item>
+///       <c>Hurtbox.attackReceiverSource</c>에 <see cref="Breakable"/>를 <b>명시 배선</b>한다.</item>
 /// <item><b>자식 상자</b>: 손대지 않는다. 기존 MeshCollider는 플레이어를 막는
 ///       <b>물리 차단</b> 역할이라 레이어를 그대로 둬야 한다.</item>
 /// </list>
+///
+/// <b>단일 프롭</b>(루트에 메시·차단 콜라이더가 붙은 박스 더미 메시·팔레트 등)은 루트를 건드리면
+/// 차단이 깨지므로, 판정을 <b>자식 <c>Hurtbox</c></b>로 내린다 — 레이어 <c>EnemyHurtBox</c> + 메시 바운드
+/// 크기 트리거 + <c>Hurtbox</c>. 루트에는 <see cref="Breakable"/>만 붙고 버스트 자리는 루트 하나다.
 ///
 /// 판정 콜라이더와 차단 콜라이더를 분리하는 것이 요점이다. 하나로 겸하면
 /// 레이어를 <c>EnemyHurtBox</c>로 옮기는 순간 물리 차단이 깨진다.
@@ -25,7 +29,7 @@ using UnityEngine;
 /// 더미 전체가 트리거 하나라 <b>어느 상자를 때려도 한 번만</b> 판정된다 —
 /// 상자마다 Hurtbox를 두면 한 번 휘두를 때 hp가 여러 번 깎인다.
 /// </summary>
-public static class CrateAuthoringTool
+public static class BreakableAuthoringTool
 {
     const string HurtboxLayerName = "EnemyHurtBox";
 
@@ -33,7 +37,7 @@ public static class CrateAuthoringTool
     static readonly string[] CrateMeshHints = { "Crate", "Box" };
 
     /// <summary>
-    /// 열려 있는 씬의 <see cref="BreakableCrate"/>에 <b>저작 ID</b>를 부여한다.
+    /// 열려 있는 씬의 <see cref="Breakable"/>에 <b>저작 ID</b>를 부여한다.
     ///
     /// 생성 맵의 상자는 <c>MapContentSpawner</c>가 스폰 순번으로 ID를 주지만,
     /// <b>씬에 직접 배치한 상자</b>(BossScene 같은 테스트 씬)는 그 경로를 안 탄다.
@@ -42,15 +46,15 @@ public static class CrateAuthoringTool
     /// 두 ID 공간이 충돌하지 않도록 <b>저작 ID는 음수</b>를 쓴다(생성 ID는 양수).
     /// 계층 경로로 정렬해 부여하므로 다시 돌려도 같은 값이 나온다 — 씬 diff가 튀지 않는다.
     /// </summary>
-    [MenuItem("Tools/Crates/씬의 상자에 ID 부여")]
+    [MenuItem("Tools/Breakables/씬의 상자에 ID 부여")]
     static void AssignAuthoredIds()
     {
-        BreakableCrate[] crates = Object.FindObjectsByType<BreakableCrate>(
+        Breakable[] crates = Object.FindObjectsByType<Breakable>(
             FindObjectsInactive.Include, FindObjectsSortMode.None);
 
         if (crates.Length == 0)
         {
-            EditorUtility.DisplayDialog("상자 ID", "열려 있는 씬에 BreakableCrate가 없습니다.", "확인");
+            EditorUtility.DisplayDialog("상자 ID", "열려 있는 씬에 Breakable가 없습니다.", "확인");
             return;
         }
 
@@ -67,7 +71,7 @@ public static class CrateAuthoringTool
         }
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkAllScenesDirty();
-        Debug.Log($"[CrateAuthoring] 씬 상자 {crates.Length}개에 ID(-1 ~ -{crates.Length})를 부여했습니다. 씬을 저장하세요.");
+        Debug.Log($"[BreakableAuthoring] 씬 상자 {crates.Length}개에 ID(-1 ~ -{crates.Length})를 부여했습니다. 씬을 저장하세요.");
     }
 
     static string HierarchyPath(Transform t)
@@ -79,7 +83,7 @@ public static class CrateAuthoringTool
         return $"{t.gameObject.scene.name}/{sb}";
     }
 
-    [MenuItem("Tools/Crates/선택한 프리팹을 파괴 가능하게 만들기")]
+    [MenuItem("Tools/Breakables/선택한 프리팹을 파괴 가능하게 만들기")]
     static void MakeSelectedBreakable()
     {
         GameObject[] targets = Selection.GetFiltered<GameObject>(SelectionMode.Assets);
@@ -92,7 +96,7 @@ public static class CrateAuthoringTool
         int layer = LayerMask.NameToLayer(HurtboxLayerName);
         if (layer < 0)
         {
-            Debug.LogError($"[CrateAuthoring] '{HurtboxLayerName}' 레이어가 없습니다. TagManager를 확인하세요.");
+            Debug.LogError($"[BreakableAuthoring] '{HurtboxLayerName}' 레이어가 없습니다. TagManager를 확인하세요.");
             return;
         }
 
@@ -109,30 +113,34 @@ public static class CrateAuthoringTool
             {
                 PrefabUtility.SaveAsPrefabAsset(root, path);
                 converted++;
-                Debug.Log($"[CrateAuthoring] '{asset.name}' 변환 완료.", asset);
+                Debug.Log($"[BreakableAuthoring] '{asset.name}' 변환 완료.", asset);
             }
             else
             {
-                Debug.LogWarning($"[CrateAuthoring] '{asset.name}'에서 크레이트 메시를 찾지 못해 건너뜁니다.", asset);
+                Debug.LogWarning($"[BreakableAuthoring] '{asset.name}'에서 크레이트 메시를 찾지 못해 건너뜁니다.", asset);
             }
 
             PrefabUtility.UnloadPrefabContents(root);
         }
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[CrateAuthoring] 프리팹 {converted}개 변환.");
+        Debug.Log($"[BreakableAuthoring] 프리팹 {converted}개 변환.");
     }
 
     static bool Convert(GameObject root, int layer)
     {
+        // 루트에 메시가 있으면 단일 프롭이다. 자식 상자 탐색은 루트를 제외하므로 여기서 먼저 가른다.
+        MeshFilter rootMesh = root.GetComponent<MeshFilter>();
+        if (rootMesh != null && rootMesh.sharedMesh != null) return ConvertSingle(root, rootMesh.sharedMesh, layer);
+
         List<Transform> crates = FindCratePieces(root);
         if (crates.Count == 0) return false;
 
         // ── 루트: 파괴 단위 + 피격 판정 ──
         root.layer = layer;
 
-        BreakableCrate crate = root.GetComponent<BreakableCrate>();
-        if (crate == null) crate = root.AddComponent<BreakableCrate>();
+        Breakable crate = root.GetComponent<Breakable>();
+        if (crate == null) crate = root.AddComponent<Breakable>();
 
         // 판정용 트리거. 자식 MeshCollider(물리 차단)와 역할이 다르므로 별개로 둔다.
         // 트리거가 아니면 더미를 두 겹으로 막게 된다.
@@ -155,6 +163,48 @@ public static class CrateAuthoringTool
 
         var hurtboxSo = new SerializedObject(hurtbox);
         hurtboxSo.FindProperty("attackReceiverSource").objectReferenceValue = crate;
+        hurtboxSo.ApplyModifiedPropertiesWithoutUndo();
+
+        return true;
+    }
+
+    const string HurtboxChildName = "Hurtbox";
+
+    /// <summary>
+    /// 단일 프롭 변환. 루트의 레이어·차단 콜라이더는 <b>그대로 둔다</b> — 루트 BoxCollider 를 트리거로
+    /// 바꾸거나 레이어를 옮기면 플레이어가 프롭을 통과한다.
+    /// </summary>
+    static bool ConvertSingle(GameObject root, Mesh mesh, int layer)
+    {
+        Breakable breakable = root.GetComponent<Breakable>();
+        if (breakable == null) breakable = root.AddComponent<Breakable>();
+
+        Transform child = root.transform.Find(HurtboxChildName);
+        if (child == null)
+        {
+            child = new GameObject(HurtboxChildName).transform;
+            child.SetParent(root.transform, false);
+        }
+        child.gameObject.layer = layer;
+
+        // 자식은 루트와 같은 좌표계(로컬 원점·회전·스케일 기본값)라 메시 로컬 바운드를 그대로 쓴다.
+        BoxCollider box = child.GetComponent<BoxCollider>();
+        if (box == null) box = child.gameObject.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.center = mesh.bounds.center;
+        box.size = mesh.bounds.size;
+
+        Hurtbox hurtbox = child.GetComponent<Hurtbox>();
+        if (hurtbox == null) hurtbox = child.gameObject.AddComponent<Hurtbox>();
+
+        var breakableSo = new SerializedObject(breakable);
+        SerializedProperty list = breakableSo.FindProperty("pieces");
+        list.arraySize = 1;
+        list.GetArrayElementAtIndex(0).objectReferenceValue = root.transform;
+        breakableSo.ApplyModifiedPropertiesWithoutUndo();
+
+        var hurtboxSo = new SerializedObject(hurtbox);
+        hurtboxSo.FindProperty("attackReceiverSource").objectReferenceValue = breakable;
         hurtboxSo.ApplyModifiedPropertiesWithoutUndo();
 
         return true;
