@@ -9,7 +9,8 @@ using UnityEngine.InputSystem;
 /// 상호작용 키(설정창 <c>Player/Interact</c>, 기본 F)를 누르면 종류별로 실행한다
 /// (CharacterSelect = <see cref="CharacterSelectPanel.Show"/>(내 캐릭터, 잠금 = <see cref="LobbyTrainingDirector.CharacterChangeBlockFor"/>) → 고르면 <see cref="LobbySession.RequestCharacter"/> — C12).
 /// Ready 종류는 고르지 않는다 — 준비 패드는 출격 집결 구역으로 바뀌었다(할 일 86 PLAN §7-2, 서 있으면 준비).
-/// 판정 권한은 서버다 — 서버가 거리를 다시 본다. 여기 검사는 RPC·프롬프트용이다.
+/// 판정 권한은 서버다 — 서버가 거리(영역)를 다시 본다. 여기 검사는 RPC·프롬프트용이다.
+/// 캐릭터 선택은 반경이 아니라 영역(라커룸 <c>Area_Locker</c>) 안에서 프롬프트·F 가 된다(할 일 161, <see cref="LobbyInteractable.Area"/>). 들어가도 패널은 자동으로 뜨지 않는다.
 /// <list type="bullet">
 /// <item>막힘: UI 모달(결과 패널 등 <see cref="UiInputGateManager"/>) 또는 플레이어 입력 차단 토큰·연출 잠금(브리핑 — <see cref="PlayerEncounterLock"/>)·생명주기(Alive 아님)면 프롬프트를 끄고 F 를 무시한다.
 /// ESC 는 쓰지 않는다 — 결과 패널 > 선택 패널 순서의 ESC 소유(각 패널의 IsEscapeClaimed)와 겹치지 않는다.</item>
@@ -91,7 +92,7 @@ public sealed class LobbyInteractor : MonoBehaviour
                 continue;
 
             _candidateTargets.Add(target);
-            _candidates.Add(new NearestInteractable.Candidate(target.Position, target.Radius, IsUsable(target, session)));
+            _candidates.Add(target.ToCandidate(playerPosition, IsUsable(target, session)));
         }
 
         var index = NearestInteractable.Pick(playerPosition, _candidates);

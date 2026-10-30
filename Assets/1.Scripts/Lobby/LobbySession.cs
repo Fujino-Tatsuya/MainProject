@@ -264,7 +264,7 @@ public sealed class LobbySession : NetworkBehaviour
         CharacterRequestRejected?.Invoke(reason);
     }
 
-    // [서버] 보낸 사람 PlayerObject 가 그 종류 오브젝트(LobbyInteractable) 반경 + 여유 안인가 — 평면 거리. 밖이면 경고하고 거부한다.
+    // [서버] 보낸 사람 PlayerObject 가 그 종류 오브젝트(LobbyInteractable) 사정거리 + 여유 안인가 — 영역이면 박스(footprint 여유), 아니면 평면 반경. 밖이면 경고하고 거부한다.
     private bool IsNearInteractable(LobbyInteractableKind kind, ulong clientId, string action)
     {
         var player = NetworkManager.ConnectedClients.TryGetValue(clientId, out var client) ? client.PlayerObject : null;
@@ -278,7 +278,7 @@ public sealed class LobbySession : NetworkBehaviour
             return true;
 
         Debug.LogWarning(distance < float.MaxValue
-            ? $"{Tag} {action} 거부 client {clientId} — {kind} 오브젝트까지 {distance:F2}m(반경 + 여유 {LobbyInteractable.ServerReachTolerance}m 밖). 서버가 본 위치 {player.transform.position}."
+            ? $"{Tag} {action} 거부 client {clientId} — {kind} 오브젝트까지 {distance:F2}m(반경·영역 + 여유 {LobbyInteractable.ServerReachTolerance}m 밖). 서버가 본 위치 {player.transform.position}."
             : $"{Tag} {action} 거부 client {clientId} — 씬에 {kind} 오브젝트(LobbyInteractable)가 없다.", this);
         return false;
     }

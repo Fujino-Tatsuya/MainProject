@@ -14992,7 +14992,7 @@ Transform:
   m_GameObject: {fileID: 1629143372}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5, y: 0, z: -6}
+  m_LocalPosition: {x: -8.25, y: 0, z: 2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -15013,6 +15013,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyInteractable
   kind: 1
+  area: {fileID: 1190889247}
   rules: {fileID: 11400000, guid: 0dbd9e6003ef6a24e8915fd7e6e30efd, type: 2}
   radiusOverride: 0
   promptView: {fileID: 1170567615}

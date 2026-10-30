@@ -11,29 +11,33 @@ public enum LobbyInteractableKind
     /// </summary>
     Ready = 0,
 
-    /// <summary>F = 캐릭터 선택 패널(<see cref="CharacterSelectPanel"/>, C12). 고르면 서버가 거리를 다시 보고 디스폰 → 같은 자리 새 Variant 로 교체한다.</summary>
+    /// <summary>F = 캐릭터 선택 패널(<see cref="CharacterSelectPanel"/>, C12). 고르면 서버가 거리(영역)를 다시 보고 디스폰 → 같은 자리 새 Variant 로 교체한다.</summary>
     CharacterSelect = 1,
 }
 
 /// <summary>
 /// 로비에 놓는 상호작용 오브젝트 표식(씬 오브젝트, 네트워크 없음) — PLAN-48 §4.6, C10.
-/// 판정은 <see cref="LobbyInteractor"/>(로컬 프롬프트·F)와 <see cref="LobbySession"/>(서버 거리 재검증)이 <see cref="Registry"/> 를 훑어 한다.
-/// 기준점 = 이 Transform 위치(평면 거리). 프롬프트 뷰는 자식 InteractPrompt.prefab 인스턴스다.
+/// 판정은 <see cref="LobbyInteractor"/>(로컬 프롬프트·F)와 <see cref="LobbySession"/>(서버 재검증)이 <see cref="Registry"/> 를 훑어 한다.
+/// 사정거리 = <see cref="area"/>(영역 볼륨)가 있으면 그 박스 안(할 일 161 — 캐릭터 선택 = 라커룸 <c>Area_Locker</c> 와 같은 볼륨),
+/// 없으면 이 Transform 위치 기준 평면 반경. 프롬프트 뷰는 자식 InteractPrompt.prefab 인스턴스다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbyInteractable : MonoBehaviour
 {
-    /// <summary>서버 거리 재검증 여유(m) — 클라가 반경 경계에서 누른 순간 서버 위치가 조금 뒤처진 몫.</summary>
+    /// <summary>서버 재검증 여유(m) — 클라가 반경·영역 경계에서 누른 순간 서버 위치가 조금 뒤처진 몫(영역이면 바닥 footprint 만 넓힌다).</summary>
     public const float ServerReachTolerance = 0.5f;
 
     private static readonly List<LobbyInteractable> registry = new List<LobbyInteractable>();
 
     [SerializeField] private LobbyInteractableKind kind = LobbyInteractableKind.Ready;
 
-    [Tooltip("반경 수치 원본. 비우면 radiusOverride, 그것도 0 이하면 2m.")]
+    [Tooltip("상호작용 영역(할 일 161). 채우면 반경 대신 이 볼륨 박스 안(높이 포함)에서만 프롬프트·F 가 된다. 캐릭터 선택 = Area_Locker.")]
+    [SerializeField] private LobbyAreaVolume area;
+
+    [Tooltip("반경 수치 원본(area 가 비었을 때만). 비우면 radiusOverride, 그것도 0 이하면 2m.")]
     [SerializeField] private LobbyRules rules;
 
-    [Tooltip("0 이하 = LobbyRules.InteractRadius 를 쓴다.")]
+    [Tooltip("0 이하 = LobbyRules.InteractRadius 를 쓴다(area 가 비었을 때만).")]
     [Min(0f)]
     [SerializeField] private float radiusOverride;
 
@@ -51,6 +55,7 @@ public sealed class LobbyInteractable : MonoBehaviour
     public LobbyInteractableKind Kind => kind;
     public InteractPromptView PromptView => promptView;
     public Vector3 Position => transform.position;
+    public LobbyAreaVolume Area => area;
 
     public float Radius
     {
@@ -60,6 +65,25 @@ public sealed class LobbyInteractable : MonoBehaviour
                 return radiusOverride;
             return rules != null ? rules.InteractRadius : FallbackRadius;
         }
+    }
+
+    /// <summary>
+    /// 이 위치가 사정거리 안인가 — 영역이 있으면 박스 안(footprint 만 <paramref name="tolerance"/> 만큼 넓힘, 높이는 엄격),
+    /// 없으면 평면 반경 + 여유. 클라 프롬프트·안내 스텝은 여유 0, 서버 재검증은 <see cref="ServerReachTolerance"/>.
+    /// </summary>
+    public bool IsInReach(Vector3 playerPosition, float tolerance)
+    {
+        return area != null
+            ? area.ContainsPoint(playerPosition, tolerance)
+            : NearestInteractable.IsWithinReach(playerPosition, Position, Radius, tolerance);
+    }
+
+    /// <summary>클라 고르기 후보 — 영역이면 안/밖으로, 반경이면 반경 그대로(<see cref="NearestInteractable.Pick"/>).</summary>
+    public NearestInteractable.Candidate ToCandidate(Vector3 playerPosition, bool usable)
+    {
+        return area != null
+            ? NearestInteractable.Candidate.InArea(Position, area.ContainsPoint(playerPosition), usable)
+            : new NearestInteractable.Candidate(Position, Radius, usable);
     }
 
     /// <summary>프롬프트 문구 키 — 종류(준비는 내 준비 상태)로 정한다.</summary>
@@ -81,7 +105,7 @@ public sealed class LobbyInteractable : MonoBehaviour
             promptLabel.text = text;
     }
 
-    /// <summary>[서버] 이 종류의 켜진 오브젝트 중 하나라도 반경(+여유) 안인가. 오브젝트가 없으면 false.</summary>
+    /// <summary>[서버] 이 종류의 켜진 오브젝트 중 하나라도 사정거리(+여유) 안인가. 오브젝트가 없으면 false. 거리는 로그용 평면 거리(기준점까지).</summary>
     public static bool AnyWithinServerReach(LobbyInteractableKind kind, Vector3 playerPosition, out float nearestDistance)
     {
         nearestDistance = float.MaxValue;
@@ -93,7 +117,7 @@ public sealed class LobbyInteractable : MonoBehaviour
                 continue;
 
             nearestDistance = Mathf.Min(nearestDistance, NearestInteractable.PlanarDistance(playerPosition, target.Position));
-            if (NearestInteractable.IsWithinReach(playerPosition, target.Position, target.Radius, ServerReachTolerance))
+            if (target.IsInReach(playerPosition, ServerReachTolerance))
                 within = true;
         }
 
@@ -113,6 +137,9 @@ public sealed class LobbyInteractable : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
+        if (area != null)
+            return;   // 영역은 LobbyAreaVolume 기즈모가 그린다
+
         Gizmos.color = kind == LobbyInteractableKind.Ready ? Color.green : Color.cyan;
         Gizmos.DrawWireSphere(transform.position, Radius);
     }

@@ -289,7 +289,7 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - **판정**: 전 피어 로컬, **내 화면만**. 매 프레임 복제된 진행기(`LobbyTrainingDirector.Active` 의 단계·하위 상태·훈련 명단·클리어 플래그·출격 카운트다운)와 내 플레이어 위치를 읽는다.
   새 NetworkObject·NetworkVariable·RPC·콜라이더·타이머 없음. 규칙 원본 = `LobbyGuideStepRules`(EditMode `LobbyGuideStepRulesTests`).
 - **완료 조건(기존 것 재사용)**:
-  - ① 캐릭터 = 캐릭터 선택 `LobbyInteractable` 의 **F 반경 안에 한 번 들어감**(프롬프트 뜨는 거리 그대로). **세션 래치** — 로비 리로드(Alt+3)·판 끝 로비 복귀를 넘어 남고, 연결이 끊기면(타이틀로 나감) 지운다.
+  - ① 캐릭터 = 캐릭터 선택 `LobbyInteractable` 의 **F 사정거리 안에 한 번 들어감**(프롬프트 뜨는 범위 그대로 — 할 일 161부터 반경이 아니라 라커룸 `Area_Locker` 박스, `area` 칸). **세션 래치** — 로비 리로드(Alt+3)·판 끝 로비 복귀를 넘어 남고, 연결이 끊기면(타이틀로 나감) 지운다.
     캐릭터를 바꿀 수 없는 상태(훈련 명단 잠금·출격 카운트다운)면 래치와 무관하게 건너뛴다(`LobbyTrainingFlow.CharacterChangeBlock` 재사용).
   - ② 튜토리얼 = 진행기 입구 구역(`LobbyGatherPoint.Entrance` 의 `PartyGatherZone`) **박스 안**이면 끔(집결 대기), 입구 확정(= 훈련 시작, 단계가 Lobby 를 벗어남)이면 끝.
   - ③ 출격 = 진행기 출격 구역 박스 안이면 전부 끔. 출격 확정(Sortie 단계)이면 끝.

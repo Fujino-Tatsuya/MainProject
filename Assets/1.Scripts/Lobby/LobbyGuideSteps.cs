@@ -10,7 +10,7 @@ using UnityEditor;
 /// <list type="bullet">
 /// <item>전 피어 로컬, 내 화면만: 복제된 진행기(<see cref="LobbyTrainingDirector.Active"/> 단계·명단·클리어 플래그)와 내 플레이어 위치를 매 프레임 읽는다.
 /// 새 NetworkObject·NetworkVariable·RPC 없음. 진행기·내 플레이어가 없으면 전부 끔.</item>
-/// <item>완료 조건은 이미 있는 것만 쓴다: 캐릭터 = <see cref="LobbyInteractable"/>(CharacterSelect) F 반경 진입(세션 래치 — 로비 리로드·판 끝 복귀를 넘어 남고, 연결이 끊기면 지움),
+/// <item>완료 조건은 이미 있는 것만 쓴다: 캐릭터 = <see cref="LobbyInteractable"/>(CharacterSelect) F 사정거리 진입 — 영역이면 라커룸 박스, 할 일 161(세션 래치 — 로비 리로드·판 끝 복귀를 넘어 남고, 연결이 끊기면 지움),
 /// 입구·출격 = 진행기의 <see cref="PartyGatherZone"/> 박스(<see cref="PartyGatherZone.ContainsPoint"/>). 새 콜라이더·타이머 없음.</item>
 /// <item>편집 중엔 돌지 않고 세 경로가 다 보인다. 인스펙터 <see cref="editorPreview"/> 로 한 스텝만 보기(씬 보기 숨김 — 씬·프리팹에 저장되지 않음).</item>
 /// </list>
@@ -84,7 +84,7 @@ public sealed class LobbyGuideSteps : MonoBehaviour
         if (!s_characterStepDone && IsNearCharacterSelect(position))
         {
             s_characterStepDone = true;
-            Debug.Log($"[SceneFlow] {Tag} 캐릭터 선택 반경 도착 — 캐릭터 스텝 완료(세션 래치)", this);
+            Debug.Log($"[SceneFlow] {Tag} 캐릭터 선택 사정거리 도착 —캐릭터 스텝 완료(세션 래치)", this);
         }
 
         input.Ready = true;
@@ -108,7 +108,7 @@ public sealed class LobbyGuideSteps : MonoBehaviour
         {
             var target = registry[i];
             if (target != null && target.Kind == LobbyInteractableKind.CharacterSelect
-                && NearestInteractable.IsWithinReach(position, target.Position, target.Radius, 0f))
+                && target.IsInReach(position, 0f))
                 return true;
         }
 

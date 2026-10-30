@@ -87,7 +87,7 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 - 시나리오 시작 씬은 `0.BootStrapScene`. 체크 목록은 PLAN §7(솔로·MPPM 3인·끊김).
 
 ## 7. 알려진 한계 (2026-10-19)
-- **캐릭터 선택(C12)** — 로비의 캐릭터 선택 오브젝트(`Environment/LobbyInteractables/CharacterSelectStation`, 스폰 지점 왼쪽) 앞에서 F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
+- **캐릭터 선택(C12)** — 라커룸 안(`Area_Locker` 박스 = L00 라커 방문과 같은 영역, 표식 `Environment/LobbyInteractables/CharacterSelectStation` 은 라커룸 가운데 — 할 일 161)에 들어가면 F 프롬프트 → F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
   - **훈련 시작(입구 집결 확정) 뒤 판 끝까지는 훈련한 사람은 바꿀 수 없다** — 훈련·브리핑 중 늦게 들어온 사람은 바꿀 수 있다. **출격 집결 카운트다운 중·메인 진입 뒤에는 누구도 못 바꾼다**(패널은 열리지만 잠금 문구, 서버 거부 사유 `TrainingLocked`·`CountdownActive`·`GameStarting`). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
   - 고른 캐릭터는 다음 판 스폰·판 사이·재접속(`playerId`)에 유지된다. 코드: [LobbyInteractor.cs](../../Assets/1.Scripts/Lobby/LobbyInteractor.cs)(패널 연결) · [LobbySession.cs](../../Assets/1.Scripts/Lobby/LobbySession.cs)(`RequestCharacterServerRpc` 검증) · [LobbyPlayerSpawner.cs](../../Assets/1.Scripts/Lobby/LobbyPlayerSpawner.cs)(`TrySwapCharacter`).
 - **증강(특성)은 판 도중 재합류에만 유지된다**(C14). 판 사이(로비로 돌아갔다 다음 판)에는 새로 시작한다. [networking.md "Mid-game rejoin"](networking.md#mid-game-rejoin-c14).
