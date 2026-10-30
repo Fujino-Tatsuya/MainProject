@@ -208,6 +208,8 @@ GameData.xlsx (SVN, 잠금)
 
 여는 태그와 `</style>`을 반드시 짝지어 쓴다. 새 키워드 색이 필요하면 `Tools/UI/스킬 툴팁 구성`이 만드는 `SkillTooltipStyles.asset`에 스타일을 추가하고 문구에서는 그 이름만 사용한다.
 
+같은 스타일은 TMP 기본 시트(`Assets/TextMesh Pro/Resources/Style Sheets/Default Style Sheet.asset`)에도 같은 값으로 정의돼 있어 툴팁 밖 모든 TMP(특성 카드 등)에서 동작한다(할 일 168). 스타일을 추가·변경하면 두 시트를 같이 고친다 — `TmpDefaultStyleSheetTests` 가 두 시트의 값이 다르면 실패한다.
+
 ### 태그 칩 — `tooltip.tags` (할 일 114)
 
 툴팁 이름 아래 칩(넉백·기절 등)은 **수치 시트**(`Paladin`·`Gunner`·`Assassin` 등)의 `tooltip.tags` 행에서 고친다 — `[DataTableText(Localize = false)]` 문자열 칸이라 Strings 시트로 가지 않는다.
