@@ -52,7 +52,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     [Tooltip("훈련장 입구(훈련실 문 앞 복도) — L20 집결. 확정 = 명단 전원 훈련장 안(Train01Start)으로 텔레포트.")]
     [SerializeField] private PartyGatherZone entranceZone;
 
-    [Tooltip("출격(SortieStation 패드 위 — 임시 위치, 최종 배치는 사용자). L40.")]
+    [Tooltip("출격 집결 구역(씬 Gather_Sortie) — L40.")]
     [SerializeField] private PartyGatherZone sortieZone;
 
     [Tooltip("훈련장 안 시작 위치 — L20 텔레포트 도착지.")]

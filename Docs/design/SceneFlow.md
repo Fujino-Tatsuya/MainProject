@@ -64,7 +64,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 | `Management` | `LobbySceneManager` (fade, BGM, result panel open-on-enter only), `LobbySession` (scene `NetworkObject`), `LobbyPlayerSpawner` (server), `PlayerDashValidationManager`, `EffectManager`, `FallBoundarySettings` (backstop at -200), `LobbyInteractor` (local, C10) |
 | `Camera` | `CameraFollowTarget` + `CameraSwitcher` (`CameraTargetSwitcher` builds the main/follow camera rig when the owner player spawns — same as the map) |
 | `UI` | `Canvas` (top player slots `Panel_PlayerSlots` read by `LobbyUIController`, `Button_ShowLastResult`, `Slot_Countdown` (C10 countdown) and empty `Slot_CharacterSelectPanel` for C12, `Fade_Image`), `EventSystem`, `LobbyResultPanel` |
-| `Environment` | `PF_Lobby_Complete_v016` (art prefab, not modified), `Directional Light`, `PlayerSpawnPoints/SpawnPoint_0~2`, `LobbyInteractables/SortieStation` (C10 `ReadyStation` — since 할 일 86 T2c only the pad mesh marking the sortie gather zone) |
+| `Environment` | `PF_Lobby_Complete_v016` (art prefab, not modified), `Directional Light`, `PlayerSpawnPoints/SpawnPoint_0~2` (the sortie gather zone is `Gather_Sortie` `PartyGatherZone`; the old pad mesh `LobbyInteractables/SortieStation` was removed in 할 일 157) |
 | `PostProcessing` | `Global Volume` (the map profile `VP_CombatLevel_Target`) |
 | `Debug` | `HitVFXDebugHUD` |
 
