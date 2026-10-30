@@ -96,6 +96,8 @@ public sealed class LobbyWeaponCheckModel
 {
     readonly List<ulong> _roster = new List<ulong>();
     readonly Dictionary<ulong, int> _masks = new Dictionary<ulong, int>();
+    // 명단에서 빠진 사람의 마지막 마스크(이번 점검 동안) — 재접속 rebind(할 일 157 ⑩)용.
+    readonly Dictionary<ulong, int> _departedMasks = new Dictionary<ulong, int>();
     bool _completionReported;
 
     /// <summary>점검 진행 중(시작 ~ 종료).</summary>
@@ -109,6 +111,7 @@ public sealed class LobbyWeaponCheckModel
     {
         _roster.Clear();
         _masks.Clear();
+        _departedMasks.Clear();
         _completionReported = false;
         if (roster != null)
         {
@@ -131,6 +134,7 @@ public sealed class LobbyWeaponCheckModel
         IsRunning = false;
         _roster.Clear();
         _masks.Clear();
+        _departedMasks.Clear();
         _completionReported = false;
     }
 
@@ -148,13 +152,30 @@ public sealed class LobbyWeaponCheckModel
         return true;
     }
 
-    /// <summary>연결 종료 — 명단·기록에서 뺀다. 명단에 있었으면 true.</summary>
+    /// <summary>연결 종료 — 명단·기록에서 뺀다(마스크는 이번 점검 동안 보관해 <see cref="Rebind"/> 가 되살린다). 명단에 있었으면 true.</summary>
     public bool RemoveClient(ulong clientId)
     {
-        if (!_masks.Remove(clientId))
+        if (!_masks.TryGetValue(clientId, out var mask))
             return false;
 
+        _masks.Remove(clientId);
+        _departedMasks[clientId] = mask;
         _roster.Remove(clientId);
+        return true;
+    }
+
+    /// <summary>
+    /// 같은 사용자 재접속(할 일 157 ⑩) — 이번 점검 중 빠진 <paramref name="previousClientId"/> 의 마스크를 <paramref name="clientId"/> 로 옮겨 명단에 다시 넣는다(뒤에 붙임).
+    /// 진행 중이 아니거나·보관 마스크가 없거나·새 clientId 가 이미 명단이면 false. 다른 사람 마스크는 건드리지 않는다.
+    /// </summary>
+    public bool Rebind(ulong previousClientId, ulong clientId)
+    {
+        if (!IsRunning || _masks.ContainsKey(clientId) || !_departedMasks.TryGetValue(previousClientId, out var mask))
+            return false;
+
+        _departedMasks.Remove(previousClientId);
+        _roster.Add(clientId);
+        _masks[clientId] = mask;
         return true;
     }
 

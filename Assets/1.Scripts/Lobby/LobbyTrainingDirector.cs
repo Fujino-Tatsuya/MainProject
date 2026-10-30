@@ -23,7 +23,8 @@ using UnityEngine;
 /// T50 종료 확정 → 로비 중앙(Brief, L30 이 바로 센다). <see cref="LobbyTrainingEndPlacement"/> 자리로 <see cref="PlayerFallRecovery.RelocateServer"/>.
 /// 명세 L20 '문 통과' = 이 텔레포트(문 <c>Door_Training</c> 막힘 유지). Train01Start 는 도착지일 뿐 집결 행이 아니다(재집결 없음).
 /// 명단 밖(늦은 참가자)은 옮기지 않는다(로비 대기). 실패한 명단 사람은 다음 집결 행(<see cref="LobbyTutorialRules.TeleportRetryLastIndex"/>)까지 주기 틱마다 재시도.</item>
-/// <item>출격 확정(L40) = L41 로딩 + 출격 래치(<see cref="LobbyTutorialFlow.TryCommitLaunch"/>) → <see cref="NetworkSessionLauncher.StartGameLoading"/> 정확히 1회
+/// <item>출격 확정(L40 — 출격 구역 집결, 참여자 = 접속자 전원·늦은 참가자 포함, 유지 0.3초·카운트다운 표시 없음) = L41 로딩 + 출격 래치(<see cref="LobbyTutorialFlow.TryCommitLaunch"/>).
+/// 래치 뒤엔 집결 구역을 전부 끄고 로딩 행 말고 전이를 받지 않는다. → <see cref="NetworkSessionLauncher.StartGameLoading"/> 정확히 1회
 /// (같은 오브젝트에 <see cref="LobbyPodLaunch"/> 가 있으면 포드 연출 끝에). 로딩 흐름의 로비 시작 조건 = <see cref="ServerHasLaunched"/>.
 /// 시연 플래그 <see cref="LobbyRules.AllowInstantSortie"/>(기본 꺼짐)면 명단 고정 전에도 출격 구역이 켜지고 확정하면 훈련을 건너뛴다.</item>
 /// <item>접속 승인: <see cref="NetworkSessionLauncher.LobbyCountdownActiveProvider"/> = 출격 집결 카운트다운 중 또는 출격 확정 뒤.</item>
@@ -34,7 +35,9 @@ using UnityEngine;
 /// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1): 켠 사람은 참여자·명단에서 빠진다. 훈련할 사람이 아무도 없으면 출격 집결(L40)로 건너뛴다.
 /// 서버 세션 정적 장부로 회차를 넘겨 잇고 연결 종료·호스트 셧다운 때 지운다. 훈련 완료 자동 부여는 없앴다(할 일 157 Q3 — 매 회차 L00 부터).
 /// 요청 RPC·멈춤 탈출·리로드는 DEV_HOTKEYS 게이트 partial(<c>LobbyTrainingDirector.Recovery.cs</c>).</item>
-/// <item>판 끝 로비 복귀: 로비 씬이 다시 올라오면 새 진행기 = 새 회차(runId +1, L00 부터).</item>
+/// <item>판 끝 로비 복귀: 로비 씬이 다시 올라오면 새 진행기 = 새 회차(runId +1, L00 부터, 라커 방문·T10 체크·명단 모두 새 모델). 지난 회차의 늦은 보고는 runId·revision 으로 걸러진다.</item>
+/// <item>연결 종료(할 일 157 ⑩): 모델·구역 명단에서 빼고 감소한 N 으로 재평가(N=0 이면 전이 금지). 재접속(새 clientId)은 승인 때 묶인 playerId(<see cref="PlayerIdRegistry"/>)로
+/// 명단·라커 방문을 옮기고 <see cref="ServerClientRebound"/>(T10 마스크), 명단이 훈련장 안이면 훈련장 안으로 텔레포트. 매핑이 없으면 늦은 참가자.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -124,6 +127,8 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
     private readonly List<ulong> _idBuffer = new List<ulong>();
     private readonly List<ulong> _participantBuffer = new List<ulong>();
+    // 접속 때 잡아 둔 재접속 식별 키(PlayerIdRegistry) — 퇴장 콜백 순서와 무관하게 연결 종료 때 쓴다.
+    private readonly Dictionary<ulong, string> _playerKeyByClient = new Dictionary<ulong, string>();
     private float _supportTimer;
 
     // 전 피어(파사드)
@@ -143,6 +148,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
 
     /// <summary>[서버] 클리어 플래그로 이 사람이 훈련 명단에서 빠졌다(연결 종료는 아니다 — 그건 각자 OnClientDisconnectCallback).</summary>
     public event Action<ulong> ServerRosterMemberRemoved;
+
+    /// <summary>[서버] 같은 사용자가 재접속해 기록을 새 clientId 로 옮겼다 — (옛 clientId, 새 clientId). 내용 컴포넌트(T10 체크 마스크)가 자기 기록을 옮긴다(할 일 157 ⑩).</summary>
+    public event Action<ulong, ulong> ServerClientRebound;
 
     // ─── 읽기(전 피어 — 복제 스냅샷 + 단계표) ─────────────────────────────
 
@@ -214,7 +222,8 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     /// <summary>[전 피어] 출격 집결 구역이 켜져 있어야 하는 단계(L40, 또는 시연 즉시 출격 플래그로 명단 고정 전).</summary>
     public bool IsSortieGatherOpen =>
         !IsLaunching && (ActiveGatherPoint == LobbyGatherPoint.Sortie
-                         || (rules != null && rules.AllowInstantSortie && IsSpawned && Snapshot.IsStarted && !IsRosterLocked));
+                         || (IsSpawned && Snapshot.IsStarted
+                             && LobbyTutorialRules.InstantSortieOpen(rules != null && rules.AllowInstantSortie, IsRosterLocked, Snapshot.LaunchCommitted)));
 
     /// <summary>[전 피어] 이 사람이 훈련 명단(L10 확정 때 고정)에 있는가 — 복제 명단.</summary>
     public bool IsInTrainingRoster(ulong clientId) => IsSpawned && trainingRoster.Contains(clientId);
@@ -313,7 +322,10 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
         s_runCounter = s_runCounter >= int.MaxValue - 1 ? 1 : s_runCounter + 1;
         _flow = new LobbyTutorialFlow(table.Kinds(), s_runCounter, ServerNow());
         foreach (var clientId in NetworkManager.ConnectedClientsIds)
+        {
             _flow.AddClient(clientId);
+            RememberPlayerKey(clientId);
+        }
 
         // 지난 진행기(판 끝 로비 복귀·리로드 전)가 남긴 클리어 플래그 — 아직 접속해 있는 사람만 잇는다(명단 고정 전이라 명단 변화 없음).
         foreach (var clientId in ServerClearedStore)
@@ -347,6 +359,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             ClearHealthFloors();
             _resetReservations.Clear();
             _pendingTeleports.Clear();
+            _playerKeyByClient.Clear();
 
             // 호스트 셧다운 = 세션 끝 — 클리어 플래그도 버린다(씬 전환 디스폰이면 다음 진행기가 잇는다).
             if (NetworkManager == null || NetworkManager.ShutdownInProgress || !NetworkManager.IsListening)
@@ -650,11 +663,12 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             return;
         }
 
+        // 래치 뒤엔 모델이 로딩 행 말고 전이를 받지 않는다(확정 뒤 집결·대사·완료 보고 무시). 집결 구역은 전부 끈다(목표·경로·집결 표식 정리 = 스냅샷 LaunchCommitted).
         var loadingIndex = LobbyTutorialRules.IndexOfKind(Table.Steps, LobbyTutorialStepKind.Loading);
         if (loadingIndex > _flow.StepIndex)
             ServerAdvance(loadingIndex, "출격 확정", ignoreParticipants: true);
-        else
-            SyncReplicatedState();
+        _zonesDirty = true;
+        SyncReplicatedState();   // 같은 프레임 전이라 로딩 행이 다음 프레임으로 미뤄져도 LaunchCommitted 는 지금 복제한다
 
         var launcher = NetworkManager.GetComponent<NetworkSessionLauncher>();
         Debug.Log($"[SceneFlow] {Tag} 메인 진입 1회 ({before} → {ServerDescribe()}) hasLauncher={launcher != null}");
@@ -815,9 +829,36 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
 
         // 명단 고정 전 구역은 명시 참여자(클리어 플래그 제외)라 접속을 스스로 더하지 않는다 — 다시 넣는다.
         _zonesDirty = true;
+        var playerKey = RememberPlayerKey(clientId);
+        if (_flow.TryRebind(clientId, playerKey, out var previousClientId))
+        {
+            HandleRebound(previousClientId, clientId, playerKey);
+            return;
+        }
+
         Debug.Log(_flow.IsWaitingLateJoiner(clientId)
             ? $"[SceneFlow] {Tag} 접속 client {clientId} — 명단 고정 뒤({ServerDescribe()})라 로비 대기(출격 집결 인원에만 포함)"
             : $"[SceneFlow] {Tag} 접속 client {clientId} — 접속자 {_flow.Connected.Count}명");
+    }
+
+    // [서버] 같은 사용자 재접속(할 일 157 ⑩, Q-T2 A) — 모델이 명단·라커 방문을 새 clientId 로 옮겼다. 내용 컴포넌트(T10 마스크)에 알리고,
+    // 명단이 훈련장 안에 있는 단계면 훈련장 안으로 옮긴다(문 막힘 — 플레이어 오브젝트가 늦게 서도 재시도 틱이 처리).
+    private void HandleRebound(ulong previousClientId, ulong clientId, string playerKey)
+    {
+        var inRoster = ContainsRoster(clientId);
+        Debug.Log($"[SceneFlow] {Tag} 재접속 '{playerKey}' client {previousClientId} → {clientId} — 기록 이어 감" +
+                  $"(명단 {(inRoster ? "복귀" : _flow.IsRosterLocked ? "밖" : "고정 전")}, 라커 방문 {(_flow.HasVisitedLocker(clientId) ? "유지" : "없음")}) {ServerDescribe()}");
+
+        if (inRoster && Table != null)
+        {
+            var target = LobbyTutorialRules.RebindTeleportTarget(Table.Steps, _flow.StepIndex, out var lastIndex);
+            if (target != LobbyGatherPoint.None)
+                _pendingTeleports[clientId] = new PendingTeleport(target, LobbyGatherPoint.Entrance, lastIndex);
+        }
+
+        SyncReplicatedState();
+        SyncHealthFloors();
+        ServerClientRebound?.Invoke(previousClientId, clientId);
     }
 
     private void HandleClientDisconnected(ulong clientId)
@@ -825,12 +866,27 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
         _resetReservations.Forget(clientId);
         _pendingTeleports.Remove(clientId);
         ServerClearedStore.Remove(clientId);
-        if (_flow == null || !_flow.RemoveClient(clientId))
+        _playerKeyByClient.TryGetValue(clientId, out var playerKey);
+        _playerKeyByClient.Remove(clientId);
+        if (_flow == null || !_flow.RemoveClient(clientId, playerKey))
             return;
 
-        // 구역은 각자 연결 종료를 명단에서 뺀다 — 여기선 모델 명단(+ 복제 명단)만 맞춘다.
+        // 구역은 각자 연결 종료를 명단에서 뺀다 — 여기선 모델 명단(+ 복제 명단)을 맞추고 구역 명단을 다시 넣어 감소한 N 으로 재평가한다
+        // (참여자 0 이면 구역·모델 모두 전이하지 않는다 — 명단이 비면 TrySkipToSortieWhenNobodyTrains 가 출격 집결로).
+        _zonesDirty = true;
         SyncReplicatedState();
-        Debug.Log($"[SceneFlow] {Tag} 퇴장 client {clientId} — 접속자 {_flow.Connected.Count}명, 훈련 명단 {_flow.Roster.Count}명");
+        Debug.Log($"[SceneFlow] {Tag} 퇴장 client {clientId} — 접속자 {_flow.Connected.Count}명, 훈련 명단 {_flow.Roster.Count}명" +
+                  (_flow.HasDepartedRecord(playerKey) ? $", 재접속 대비 '{playerKey}' 기록 보관" : ""));
+    }
+
+    // [서버] 재접속 식별 키(승인 때 PlayerIdRegistry 에 묶인 playerId — playerId 없음·중복 접속은 clientId 가 섞인 키라 재접속과 이어지지 않는다).
+    private string RememberPlayerKey(ulong clientId)
+    {
+        if (!PlayerIdRegistry.Server.TryGetPlayerId(clientId, out var playerKey) || string.IsNullOrEmpty(playerKey))
+            return null;
+
+        _playerKeyByClient[clientId] = playerKey;
+        return playerKey;
     }
 
     // [서버] 캐릭터 교체 완료(새 PlayerObject) — 이번 단계 훈련 보정을 새 플레이어에 바로 다시 건다(할 일 157 §10.2-6). 옛 플레이어 예약은 버린다.
@@ -975,7 +1031,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
         _participantBuffer.AddRange(_flow.Participants);
         ForEachZone((point, zone) =>
         {
-            var active = !_flow.LaunchCommitted && (point == activePoint || (instantSortie && point == LobbyGatherPoint.Sortie));
+            var active = LobbyTutorialRules.IsZoneActive(point, activePoint, instantSortie, _flow.LaunchCommitted);
             if (LobbyTutorialRules.UsesConnectedClients(point))
                 zone.ServerUseConnectedClients();
             else
@@ -994,7 +1050,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     }
 
     private bool IsInstantSortieOpen() =>
-        rules != null && rules.AllowInstantSortie && _flow != null && !_flow.IsRosterLocked && !_flow.LaunchCommitted;
+        _flow != null && LobbyTutorialRules.InstantSortieOpen(rules != null && rules.AllowInstantSortie, _flow.IsRosterLocked, _flow.LaunchCommitted);
 
     private bool ServerIsLaunching() =>
         _flow != null && (_flow.LaunchCommitted || _flow.CurrentKind == LobbyTutorialStepKind.Loading);

@@ -129,6 +129,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
                 GunnerChargeLaserSkill.ServerFired += HandleChargeLaserFiredServer;
                 NetworkManager.OnClientDisconnectCallback += HandleClientDisconnectedServer;
                 _director.ServerRosterMemberRemoved += HandleRosterMemberRemovedServer;
+                _director.ServerClientRebound += HandleClientReboundServer;
             }
 
             if (targetPrefab == null || targetSpots == null)
@@ -151,6 +152,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
             {
                 _director.ServerFlowChanged -= EvaluateServer;
                 _director.ServerRosterMemberRemoved -= HandleRosterMemberRemovedServer;
+                _director.ServerClientRebound -= HandleClientReboundServer;
             }
             PlayerDashController.ServerDashApproved -= HandleDashApprovedServer;
             Player.ServerBasicAttackStarted -= HandleBasicAttackServer;
@@ -306,6 +308,19 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
 
     // 튜토리얼 클리어 플래그(로비 Alt+1)로 훈련 명단에서 빠졌다 — 퇴장과 같이 남은 사람만으로 완료 판정.
     private void HandleRosterMemberRemovedServer(ulong clientId) => RemoveFromRosterServer(clientId, "튜토리얼 클리어로 명단 제외");
+
+    // 같은 사용자 재접속(할 일 157 ⑩) — 퇴장 때 보관한 체크 마스크를 새 clientId 로 옮긴다(이미 한 항목은 다시 안 해도 된다).
+    private void HandleClientReboundServer(ulong previousClientId, ulong clientId)
+    {
+        if (!_model.Rebind(previousClientId, clientId))
+            return;
+
+        SyncEntries();
+        Debug.Log($"[SceneFlow] {Tag} 재접속 client {previousClientId} → {clientId} 체크 마스크 이어 감 — " +
+                  $"{LobbyWeaponCheckRules.CountOf(_model.MaskOf(clientId))}/{LobbyWeaponCheckRules.ItemCount}, 파티 완료 {_model.CompletedCount}/{_model.Roster.Count}");
+        if (_model.TryConsumeAllComplete())
+            _pendingComplete = true;
+    }
 
     private void RemoveFromRosterServer(ulong clientId, string reason)
     {

@@ -88,6 +88,18 @@ public static class LobbyTutorialCountdownDisplay
     public static string DisplayStateId(in LobbyTutorialStepView step, bool zoneCountdownActive) =>
         IsActive(step, zoneCountdownActive) ? step.CountdownStateId : step.StateId;
 
+    /// <summary>
+    /// 옛 집결 상태 표시(<see cref="PartyGatherStatusView"/>)가 보일 남은 초(할 일 157 ⑩) — 튜토리얼 진행 중이면 카운트다운 표시 행(T20)의 활성 구역만,
+    /// 그 밖 구역(유지 0.3초 집결·L40 출격·시연 즉시 출격)은 0 = 카운트다운 표시 없음(Q8 A). 진행기가 없으면 옛 동작(구역 카운트다운 그대로).
+    /// </summary>
+    public static double ZoneStatusCountdownSeconds(bool tutorialAvailable, bool isTutorialActiveZone, double tutorialCountdownSeconds,
+        bool zoneCountdownActive, double zoneRemainingSeconds)
+    {
+        if (tutorialAvailable)
+            return isTutorialActiveZone ? Math.Max(0d, tutorialCountdownSeconds) : 0d;
+        return zoneCountdownActive ? Math.Max(0d, zoneRemainingSeconds) : 0d;
+    }
+
     /// <summary>'시작까지 {n}' 의 n — 남은 초 올림(3초 유지 = 3→2→1), 0 미만은 0.</summary>
     public static int WholeSecondsLeft(double remainingSeconds) =>
         remainingSeconds > 0d ? (int)Math.Ceiling(remainingSeconds) : 0;

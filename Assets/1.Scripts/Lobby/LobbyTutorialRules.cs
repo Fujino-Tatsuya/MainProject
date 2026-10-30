@@ -63,6 +63,36 @@ public static class LobbyTutorialRules
     /// <summary>새 접속을 막아야 하는가 — 출격 집결 카운트다운 중이거나 출격 확정·로딩 뒤. 훈련·브리핑 중은 받는다(로비 대기).</summary>
     public static bool BlocksNewJoins(bool launching, bool sortieCountdownActive) => launching || sortieCountdownActive;
 
+    /// <summary>
+    /// 시연 즉시 출격(Q2 B) 경로가 열려 있는가 — <see cref="LobbyRules.AllowInstantSortie"/> 켬 + 명단 고정 전(L00·L10) + 출격 확정 전.
+    /// 플래그가 꺼져 있으면(기본) 출격은 L40 행으로만 간다. DEV_HOTKEYS 건너뛰기와 별개.
+    /// </summary>
+    public static bool InstantSortieOpen(bool allowInstantSortie, bool rosterLocked, bool launchCommitted) =>
+        allowInstantSortie && !rosterLocked && !launchCommitted;
+
+    /// <summary>
+    /// 이 집결 구역을 켜야 하는가 — 지금 행의 집결 지점, 또는 즉시 출격이 열려 있을 때의 출격 구역. 출격 확정 뒤엔 전부 끈다(목표·집결 표식 정리, 할 일 157 ⑩).
+    /// </summary>
+    public static bool IsZoneActive(LobbyGatherPoint point, LobbyGatherPoint activePoint, bool instantSortieOpen, bool launchCommitted) =>
+        !launchCommitted && point != LobbyGatherPoint.None
+                         && (point == activePoint || (instantSortieOpen && point == LobbyGatherPoint.Sortie));
+
+    /// <summary>
+    /// 재접속으로 명단에 되돌아온 사람을 옮길 구역(할 일 157 ⑩) — 명단이 훈련장 안에 있는 동안(L20 입구 확정 뒤 ~ T50 출구 집결)이면 L20 텔레포트 도착지(Train01Start),
+    /// 아니면 None. 문이 막혀(Q4 B) 로비에 스폰된 사람은 걸어서 훈련장에 못 들어가므로 이게 없으면 다음 훈련 집결이 영구 대기한다. 반환한 구역까지 재시도할 마지막 행 = <paramref name="lastIndex"/>.
+    /// </summary>
+    public static LobbyGatherPoint RebindTeleportTarget(IReadOnlyList<LobbyTutorialStep> steps, int index, out int lastIndex)
+    {
+        lastIndex = -1;
+        var entrance = IndexOfGather(steps, LobbyGatherPoint.Entrance);
+        var trainEnd = entrance >= 0 ? IndexOfGather(steps, LobbyGatherPoint.TrainEnd, entrance + 1) : -1;
+        if (trainEnd < 0 || index <= entrance || index > trainEnd)
+            return LobbyGatherPoint.None;
+
+        lastIndex = trainEnd;
+        return TeleportTargetOnConfirm(LobbyGatherPoint.Entrance);
+    }
+
     /// <summary>이 구역의 참여자가 접속자 전원인가(출격). 아니면 진행기 참여자(명단 고정 전 = 접속자, 뒤 = 명단).</summary>
     public static bool UsesConnectedClients(LobbyGatherPoint point) => point == LobbyGatherPoint.Sortie;
 
