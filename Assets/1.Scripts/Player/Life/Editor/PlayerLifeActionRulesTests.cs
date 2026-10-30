@@ -42,6 +42,28 @@ public sealed class PlayerLifeActionRulesTests
         Assert.IsTrue(PlayerLifeActionRules.AcceptsForcedMotion(false, state), state.ToString());
     }
 
+    // 할 일 186 — 기본 공격 진입. 사망 직전 요청이 서버 사망 뒤 승인돼 StartRpc 가 와도 시체가 Attack 에 들어가지 않아야 한다.
+    [Test]
+    public void Alive_AcceptsAttackEntry()
+    {
+        Assert.IsTrue(PlayerLifeActionRules.AcceptsAttackEntry(true, PlayerLifeState.Alive));
+    }
+
+    [TestCase(PlayerLifeState.DeadPresentation)]
+    [TestCase(PlayerLifeState.Soul)]
+    [TestCase(PlayerLifeState.PermanentDead)]
+    public void NotAlive_RejectsAttackEntry(PlayerLifeState state)
+    {
+        Assert.IsFalse(PlayerLifeActionRules.AcceptsAttackEntry(true, state), state.ToString());
+    }
+
+    [TestCase(PlayerLifeState.Alive)]
+    [TestCase(PlayerLifeState.DeadPresentation)]
+    public void WithoutLifeCycle_AcceptsAttackEntry(PlayerLifeState state)
+    {
+        Assert.IsTrue(PlayerLifeActionRules.AcceptsAttackEntry(false, state), state.ToString());
+    }
+
     // 사망 연출 진입 순간 진행 중 넉백·대시·구속은 Idle 전이로 끊긴다(Exit 가 넉백 속도·대시 이동을 0 으로). 그 전제가 깨지지 않게 묶는다.
     [TestCase(PlayerActionState.Knockback)]
     [TestCase(PlayerActionState.Dash)]
