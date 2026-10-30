@@ -244,19 +244,22 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 |---|---|---|
 | (루트 Image) | 투명 클릭 판정 — `Button`·`TraitCardView` 는 루트 그대로 | 0, 0, 560x413 |
 | `Panel` | `TraitCard_C1_Panel` · 버튼 색 변화 대상(`targetGraphic`) | -2, -2, 564x417 |
-| `CharacterSymbol` | `Trait_<캐릭터>` — `TraitDefinition.Character` 로 카드의 `paladinSymbol`/`gunnerSymbol`/`assassinSymbol` 칸 중 고름(없으면 숨김) | 19, 10, 118x118 |
+| `TraitIcon` | 특성 아이콘(`TraitDefinition.Icon`, 비면 `placeholderIcon` = `Trait_Empty`) — 피드백 1 로 캐릭터 심볼(`Trait_<캐릭터>`) 대신 | 19, 10, 118x118 |
 | `Name` | 서울알림 Heavy 34(자동 축소 24~34), 왼쪽 정렬 한 줄 | 142, 38, 340x40 |
 | `Category` | 서울알림 Medium 17, 한 줄(넘치면 …) | 144, 84, 340x22 |
-| `SkillMask` → `Icon` | `TraitCard_C1_SkillMask` + `Mask`(마스크 그림 숨김), 안에 특성 아이콘 132x132(비면 `placeholderIcon` = `Trait_Empty`) | 45, 182, 136x136 (아이콘 47, 184) |
+| `SkillMask` → `SkillIcon` | `TraitCard_C1_SkillMask` + `Mask`(마스크 그림 숨김), 안에 **강화하는 스킬 아이콘** 132x132(아래 출처 규칙) | 45, 182, 136x136 (아이콘 47, 184) |
 | `SkillFrame` | `TraitCard_C1_SkillFrame` — 프레임·마스크·아이콘 중심 (113, 250) 동일 | 37, 174, 152x152 |
-| `Keycap` | 키캡/마우스 하나 — 스프라이트만 바꿈(비율 유지 38x41 상자 → 키캡 38x40·마우스 30x41) | 94, 335, 38x41 |
+| `Keycap` | 키캡/마우스 하나 — 스프라이트만 바꿈(비율 유지 38x41 상자 → 키캡 38x40·마우스 30x41). 키 입력이 아닌 특성은 숨김 | 94, 335, 38x41 |
 | `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22 | 224, 170, 288x170 |
 
-- 키캡 판정 = `TraitKeycapRule.FromIconName`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): 아이콘 스프라이트 이름을 `_` 로 나눈 토큰 중 `Q`/`E`/`R`/`LMB`/`RMB` 와 **정확히 같은 첫 토큰**의 키. 키 뒤 접미사(`_Q_Change`·`_E_Trans`·`_R_Remove`)도 그 키, 키 토큰이 없으면(`Passive`·`Heat`·`Heat_Remove`·`Passive_Change`) `Keycap_Blank`. 아이콘이 없으면 빈 키캡.
-- 창 폭 = 카드 3장 + 간격 24 + 여백 32×2 = **1792**, 카드 줄 높이 413.
-- 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)` — 카드 템플릿 자식만 다시 만들고(루트 오브젝트·컴포넌트 유지 → 씬 오버라이드 안전) 창 폭·`placeholderIcon` 을 맞춘다. 전체 생성 메뉴도 같은 카드 빌더를 쓴다.
+- 키캡 판정 = `TraitKeycapRule.FromIconName`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): 아이콘 스프라이트 이름을 `_` 로 나눈 토큰 중 `Q`/`E`/`R`/`LMB`/`RMB` 와 **정확히 같은 첫 토큰**의 키. 키 뒤 접미사(`_Q_Change`·`_E_Trans`·`_R_Remove`)도 그 키, 키 토큰이 없으면(`Passive`·`Heat`·`Heat_Remove`·`Passive_Change`) `Blank` = **키캡 숨김**(피드백 1 — `Keycap_Blank` 는 카드에서 안 쓴다). 아이콘이 없으면 `Blank`.
+- 스킬 슬롯 그림 출처(피드백 1) = `TraitCardSkillRule.SourceOf(키캡)`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): Q → `PlayerSkillSlot.Main`, E → `Sub`, R → `Ultimate`, RMB → `Interrupt`, `Blank` → 패시브, LMB → 특성 아이콘 그대로(기본 공격 스킬 아이콘 없음).
+  스킬 아이콘은 전투 HUD 와 같은 경로로 뷰어(`Bind` 의 `viewer` = 로컬 Player)에서 읽는다 — 슬롯 = `PlayerSkillController.GetSkill(슬롯).Data.Tooltip.Icon`(SkillCooldownHUD), 패시브 = `IPlayerPassive as ISkillTooltipSource` → 없으면 `GetComponentInChildren<IPassiveTooltipProvider>(true).PassiveTooltip`(PassiveHUD).
+  어쌔신 변신 특성(`E_Trans`·`R_Trans`·`R_Remove`)도 그 슬롯의 **지금** 스킬 그림. 못 얻으면(뷰어 없음·아이콘 비어 있음 — 예: 간파 슬롯은 툴팁 아이콘이 없다, 지금 RMB 특성은 없음) 특성 아이콘 → `Trait_Empty`. 아이콘 없는 옛 임시 특성은 스킬 조회를 건너뛴다.
+- 창 폭 = 카드 3장 + 간격 24 + 여백 32×2 = **1792**, 카드 줄 높이 413. 창 `Panel` 은 레이아웃만(어두운 판·노란 Outline 없음 — 피드백 1). 배경 흐림은 방식 결정 대기(아직 없음).
+- 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)` — 카드 템플릿 자식만 다시 만들고(루트 오브젝트·컴포넌트 유지 → 씬 오버라이드 안전) 창 폭·`placeholderIcon` 을 맞추고 창 `Panel` 의 `Image`·`Outline` 을 뗀다. 전체 생성 메뉴도 같은 카드 빌더를 쓰고 창 판을 만들지 않는다.
 - 아이콘 연결(데이터 주도) = `Tools/Tutorial/특성 아이콘 연결 (TraitIconMap.csv)` → `TraitIconMapAuthoring.Apply(csv, iconRoot)`. 기본 csv = `Assets/50.Art/UI/HUD/TraitIcon/TraitIconMap.csv`(`icon` 열 = 그 폴더 기준 상대 경로) → 각 `TraitDefinition.icon`. 아트가 csv 를 바꾸면 메뉴를 다시 돌린다. `TraitKeycapTests.ProjectDefinitions_IconsMatchIconMap` 이 어긋남을 잡는다.
-- 아직 안 쓰는 것: csv 의 `inactive_icon`(광란 강화 비활성 아이콘), `Common/Trait_ProcGlow`, `Assassin/Trait_Assassin_Trans`.
+- 아직 안 쓰는 것: csv 의 `inactive_icon`(광란 강화 비활성 아이콘), `Common/Trait_ProcGlow`, `Assassin/Trait_Assassin_Trans`, 캐릭터 심볼 `Trait_<캐릭터>`·`Keycap_Blank`(피드백 1 로 카드에서 뺌).
 
 ### 11.2 설명 템플릿 토큰
 

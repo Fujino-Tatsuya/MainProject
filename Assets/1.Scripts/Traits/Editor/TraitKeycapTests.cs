@@ -34,6 +34,37 @@ public class TraitKeycapTests
         Assert.AreEqual(expected, TraitKeycapRule.FromIconName(iconName));
     }
 
+    [TestCase(TraitKeycap.Q, TraitCardSkillSource.Skill, PlayerSkillSlot.Main)]
+    [TestCase(TraitKeycap.E, TraitCardSkillSource.Skill, PlayerSkillSlot.Sub)]
+    [TestCase(TraitKeycap.R, TraitCardSkillSource.Skill, PlayerSkillSlot.Ultimate)]
+    [TestCase(TraitKeycap.RightMouse, TraitCardSkillSource.Skill, PlayerSkillSlot.Interrupt)]
+    public void SkillSource_KeyToSlot(TraitKeycap key, TraitCardSkillSource expected, PlayerSkillSlot expectedSlot)
+    {
+        Assert.AreEqual(expected, TraitCardSkillRule.SourceOf(key, out PlayerSkillSlot slot));
+        Assert.AreEqual(expectedSlot, slot);
+    }
+
+    [TestCase(TraitKeycap.Blank, TraitCardSkillSource.Passive)]
+    [TestCase(TraitKeycap.LeftMouse, TraitCardSkillSource.TraitIcon)]
+    public void SkillSource_NonSlot(TraitKeycap key, TraitCardSkillSource expected)
+    {
+        Assert.AreEqual(expected, TraitCardSkillRule.SourceOf(key, out _));
+    }
+
+    /// <summary>변신 특성은 일반 스킬 슬롯 그림(E_Trans → Sub, R_Trans·R_Remove → Ultimate), 키 없는 특성은 패시브.</summary>
+    [TestCase("Trait_Assassin_E_Trans", TraitCardSkillSource.Skill, PlayerSkillSlot.Sub)]
+    [TestCase("Trait_Assassin_R_Trans", TraitCardSkillSource.Skill, PlayerSkillSlot.Ultimate)]
+    [TestCase("Trait_Assassin_R_Remove", TraitCardSkillSource.Skill, PlayerSkillSlot.Ultimate)]
+    [TestCase("Trait_Gunner_Heat_Remove", TraitCardSkillSource.Passive, PlayerSkillSlot.Main)]
+    [TestCase("Trait_Paladin_Passive_Change", TraitCardSkillSource.Passive, PlayerSkillSlot.Main)]
+    public void SkillSource_FromIconName(string iconName, TraitCardSkillSource expected, PlayerSkillSlot expectedSlot)
+    {
+        TraitCardSkillSource source = TraitCardSkillRule.SourceOf(TraitKeycapRule.FromIconName(iconName), out PlayerSkillSlot slot);
+        Assert.AreEqual(expected, source);
+        if (source == TraitCardSkillSource.Skill)
+            Assert.AreEqual(expectedSlot, slot);
+    }
+
     [Test]
     public void Parse_ReadsIdAndIconColumns()
     {

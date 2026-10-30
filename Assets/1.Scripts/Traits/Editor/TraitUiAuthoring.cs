@@ -92,7 +92,7 @@ public static class TraitUiAuthoring
             RectTransform panel = NewUi("Panel", window);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
             panel.sizeDelta = new Vector2(1120f, 0f);
-            AddPanel(panel.gameObject);
+            // 창 판·테두리 없음(할 일 165 피드백 1) — 레이아웃만 담는다.
             VerticalLayoutGroup panelLayout = AddVertical(panel.gameObject, 32, 20f);
             panelLayout.childAlignment = TextAnchor.UpperCenter;
             panel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -303,7 +303,7 @@ public static class TraitUiAuthoring
     /// <summary>
     /// 지금 프리팹의 카드 템플릿만 C1 레이아웃으로 바꾼다(할 일 165). <c>CardTemplate</c> 오브젝트·<c>Button</c>·<c>TraitCardView</c> 는 그대로 두고
     /// 자식과 옛 꾸밈(Outline·VerticalLayoutGroup)만 갈아 끼운다 — 창·획득 줄·씬 오버라이드는 유지. 창 패널 폭·카드 줄 높이는 카드 3장에 맞춘다.
-    /// 빈 아이콘(<c>placeholderIcon</c>)은 <c>Trait_Empty</c>. 몇 번 돌려도 같은 결과.
+    /// 빈 아이콘(<c>placeholderIcon</c>)은 <c>Trait_Empty</c>. 창 패널(카드 줄 부모)의 어두운 판·노란 Outline 은 뗀다(피드백 1). 몇 번 돌려도 같은 결과.
     /// </summary>
     [MenuItem("Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)")]
     public static void ApplyCardC1()
@@ -330,7 +330,9 @@ public static class TraitUiAuthoring
 
             TMP_FontAsset medium = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
             BuildCardC1(cardView, medium);
-            FitWindowToCards((RectTransform)cards.parent, cards);
+            var panel = (RectTransform)cards.parent;
+            FitWindowToCards(panel, cards);
+            RemoveWindowPanelDecoration(panel);
 
             viewSo.FindProperty("placeholderIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>(EmptyIconPath);
             viewSo.ApplyModifiedPropertiesWithoutUndo();
@@ -346,7 +348,7 @@ public static class TraitUiAuthoring
 
     /// <summary>
     /// 카드 오브젝트(Image·Button·TraitCardView 가 붙어 있고 자식이 없는 상태)를 C1 레이아웃으로 채운다.
-    /// 그리는 순서 = 카드판 → 심볼 → 이름·분류 → 마스크(안에 아이콘) → 스킬 프레임 → 키캡 → 설명.
+    /// 그리는 순서 = 카드판 → 특성 아이콘 → 이름·분류 → 마스크(안에 스킬 아이콘) → 스킬 프레임 → 키캡 → 설명.
     /// </summary>
     private static void BuildCardC1(TraitCardView cardView, TMP_FontAsset medium)
     {
@@ -370,7 +372,8 @@ public static class TraitUiAuthoring
         colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
         button.colors = colors;
 
-        Image symbol = CardImage("CharacterSymbol", card, null, 19f, 10f, 118f, 118f);
+        Image traitIcon = CardImage("TraitIcon", card, null, 19f, 10f, 118f, 118f);
+        traitIcon.preserveAspect = true;
 
         TMP_Text cardName = CardText("Name", card, heavy != null ? heavy : medium, 34f, 142f, 38f, 340f, 40f,
             TextAlignmentOptions.MidlineLeft, CardNameColor);
@@ -387,12 +390,13 @@ public static class TraitUiAuthoring
         // 스킬 슬롯 — 프레임·마스크·아이콘 중심 (113, 250) 동일. 마스크 136 중 실제 영역 132.
         Image mask = CardImage("SkillMask", card, CardArt("TraitCard_C1_SkillMask"), 45f, 182f, 136f, 136f);
         mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-        Image icon = CardImage("Icon", mask.transform, null, 2f, 2f, 132f, 132f);
-        icon.preserveAspect = true;
+        Image skillIcon = CardImage("SkillIcon", mask.transform, null, 2f, 2f, 132f, 132f);
+        skillIcon.preserveAspect = true;
         CardImage("SkillFrame", card, CardArt("TraitCard_C1_SkillFrame"), 37f, 174f, 152f, 152f);
 
         // 키캡 1곳 — 키캡 38x40(94,335) / 마우스 30x41(98,335) 을 둘 다 담는 38x41 상자, 비율 유지로 각 크기가 된다.
-        Image keycap = CardImage("Keycap", card, CardArt("Keycap_Blank"), 94f, 335f, 38f, 41f);
+        // 스프라이트는 Bind 가 고른다(키 입력 아닌 특성은 숨김). 저작 미리보기는 Q.
+        Image keycap = CardImage("Keycap", card, CardArt("Keycap_Q"), 94f, 335f, 38f, 41f);
         keycap.preserveAspect = true;
 
         TMP_Text cardDescription = CardText("Description", card, medium, 22f, 224f, 170f, 288f, 170f,
@@ -404,16 +408,12 @@ public static class TraitUiAuthoring
 
         var so = new SerializedObject(cardView);
         so.FindProperty("button").objectReferenceValue = button;
-        so.FindProperty("icon").objectReferenceValue = icon;
+        so.FindProperty("traitIcon").objectReferenceValue = traitIcon;
+        so.FindProperty("skillIcon").objectReferenceValue = skillIcon;
         so.FindProperty("displayName").objectReferenceValue = cardName;
         so.FindProperty("category").objectReferenceValue = cardCategory;
         so.FindProperty("description").objectReferenceValue = cardDescription;
-        so.FindProperty("characterSymbol").objectReferenceValue = symbol;
         so.FindProperty("keycap").objectReferenceValue = keycap;
-        so.FindProperty("paladinSymbol").objectReferenceValue = Symbol("Paladin");
-        so.FindProperty("gunnerSymbol").objectReferenceValue = Symbol("Gunner");
-        so.FindProperty("assassinSymbol").objectReferenceValue = Symbol("Assassin");
-        so.FindProperty("keycapBlank").objectReferenceValue = CardArt("Keycap_Blank");
         so.FindProperty("keycapQ").objectReferenceValue = CardArt("Keycap_Q");
         so.FindProperty("keycapE").objectReferenceValue = CardArt("Keycap_E");
         so.FindProperty("keycapR").objectReferenceValue = CardArt("Keycap_R");
@@ -443,8 +443,15 @@ public static class TraitUiAuthoring
 
     private static Sprite CardArt(string name) => AssetDatabase.LoadAssetAtPath<Sprite>(CardArtFolder + name + ".png");
 
-    private static Sprite Symbol(string character) =>
-        AssetDatabase.LoadAssetAtPath<Sprite>($"{TraitIconFolder}{character}/Trait_{character}.png");
+    // 창 패널의 어두운 판(Image)·노란 테두리(Outline)를 뗀다 — 레이아웃(VerticalLayoutGroup·ContentSizeFitter)은 유지.
+    private static void RemoveWindowPanelDecoration(RectTransform panel)
+    {
+        foreach (Outline outline in panel.GetComponents<Outline>())
+            Object.DestroyImmediate(outline);
+        Image background = panel.GetComponent<Image>();
+        if (background != null)
+            Object.DestroyImmediate(background);
+    }
 
     // 배치표 좌표(부모 좌상단 기준 X/Y, y 아래로 +)에 중앙 피벗으로 둔다.
     private static void PlaceTopLeft(RectTransform rect, float x, float y, float width, float height)

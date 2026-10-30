@@ -1,6 +1,6 @@
 using System;
 
-/// <summary>특성 카드 C1 의 키캡 자리 표시(할 일 165). 키캡 4종 + 마우스 표시 2종 중 하나.</summary>
+/// <summary>특성 카드 C1 의 키캡 자리 표시(할 일 165). 키캡 3종 + 마우스 표시 2종, Blank = 키 입력 아님(표시 안 함).</summary>
 public enum TraitKeycap
 {
     Blank,
@@ -15,7 +15,7 @@ public enum TraitKeycap
 /// 특성 아이콘 파일 이름 → 키캡 판정(할 일 165) — 규칙은 여기 한 곳.
 /// 이름을 <c>_</c> 로 나눈 토큰 중 <c>Q</c>/<c>E</c>/<c>R</c>/<c>LMB</c>/<c>RMB</c> 와 정확히 같은 것이 있으면 그 키(왼쪽부터 첫 토큰).
 /// 그래서 <c>Trait_Gunner_Q_Change</c>·<c>Trait_Assassin_E_Trans</c>·<c>Trait_Assassin_R_Remove</c> 처럼 키 뒤에 접미사가 붙어도 그 키다.
-/// 키 토큰이 없으면(<c>Passive</c>·<c>Heat</c>·<c>Heat_Remove</c> 등) 빈 키캡. 대소문자는 구분한다.
+/// 키 토큰이 없으면(<c>Passive</c>·<c>Heat</c>·<c>Heat_Remove</c> 등) <see cref="TraitKeycap.Blank"/> — 카드는 키캡을 숨긴다(피드백 1). 대소문자는 구분한다.
 /// </summary>
 public static class TraitKeycapRule
 {
@@ -47,5 +47,38 @@ public static class TraitKeycapRule
         }
 
         return TraitKeycap.Blank;
+    }
+}
+
+/// <summary>특성 카드 스킬 슬롯 그림의 출처(할 일 165 피드백 1).</summary>
+public enum TraitCardSkillSource
+{
+    /// <summary>스킬 슬롯 스킬(<see cref="PlayerSkillController.GetSkill"/>)의 툴팁 아이콘.</summary>
+    Skill,
+    /// <summary>패시브 툴팁 아이콘(PassiveHUD 와 같은 경로).</summary>
+    Passive,
+    /// <summary>스킬 그림 없음 — 특성 아이콘 그대로(기본 공격 LMB).</summary>
+    TraitIcon,
+}
+
+/// <summary>
+/// 키캡 → 카드 스킬 슬롯 그림 출처(할 일 165 피드백 1) — 규칙은 여기 한 곳.
+/// Q = Main, E = Sub, R = Ultimate, RMB = Interrupt, 키 없음(Blank) = 패시브, LMB = 특성 아이콘(기본 공격 스킬 아이콘 없음).
+/// </summary>
+public static class TraitCardSkillRule
+{
+    /// <param name="slot"><see cref="TraitCardSkillSource.Skill"/> 일 때만 의미가 있다.</param>
+    public static TraitCardSkillSource SourceOf(TraitKeycap key, out PlayerSkillSlot slot)
+    {
+        slot = PlayerSkillSlot.Main;
+        switch (key)
+        {
+            case TraitKeycap.Q: slot = PlayerSkillSlot.Main; return TraitCardSkillSource.Skill;
+            case TraitKeycap.E: slot = PlayerSkillSlot.Sub; return TraitCardSkillSource.Skill;
+            case TraitKeycap.R: slot = PlayerSkillSlot.Ultimate; return TraitCardSkillSource.Skill;
+            case TraitKeycap.RightMouse: slot = PlayerSkillSlot.Interrupt; return TraitCardSkillSource.Skill;
+            case TraitKeycap.Blank: return TraitCardSkillSource.Passive;
+            default: return TraitCardSkillSource.TraitIcon;
+        }
     }
 }
