@@ -9,7 +9,7 @@ using UnityEngine.UI;
 /// 캐릭터 선택 카드 하나(할 일 48.2) — 로스터 엔트리 하나의 초상화·이름. <see cref="CharacterSelectPanel"/> 이 로스터 수만큼 복제한다.
 /// 자리(위·가운데·아래)·크기·이동은 패널이 정하고, 여기는 겉모습만 바꾼다.
 /// - 가운데(포커스) = 초록 큰 카드(card_selected_gap + fill_tint), 위·아래 = card_unselected_top/bottom.
-/// - 금색 테두리(card_selected_ring) = "가운데 자리 강조"(할 일 60) — 알파는 패널이 이동 연출에 맞춰 준다(<see cref="SetRingAlpha"/>).
+/// - 선택 테두리(card_selected — 카드 뒤에 깔려 바깥 흰 띠만 보인다, 할 일 162) = "가운데 자리 강조"(할 일 60) — 알파는 패널이 이동 연출에 맞춰 준다(<see cref="SetRingAlpha"/>).
 /// - 지금 내 캐릭터 = "현재" 표식만.
 /// - 고를 수 없음 = 회색 + "선택 불가".
 /// 클릭은 Button 이 아니라 <see cref="IPointerClickHandler"/> — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 피한다.
@@ -22,7 +22,7 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Image sideBackground;
     [SerializeField] private Sprite sideTopSprite;
     [SerializeField] private Sprite sideBottomSprite;
-    [Tooltip("가운데 자리 강조 금색 테두리(Image). 크기 = RectTransform, 색·스프라이트 = Image 칸 그대로 쓴다(코드는 덮어쓰지 않음). " +
+    [Tooltip("가운데 자리 강조 선택 테두리(Image). 크기 = RectTransform, 색·스프라이트 = Image 칸 그대로 쓴다(코드는 덮어쓰지 않음). " +
              "켜고 끄기·알파(Image 알파에 곱함)는 SetRingAlpha. 고칠 곳 = 패널 프리팹 Content/Cards/Card_Template/Ring_Focus.")]
     [FormerlySerializedAs("currentMarker")]
     [SerializeField] private GameObject focusRing;
@@ -82,7 +82,7 @@ public sealed class CharacterSelectCard : MonoBehaviour, IPointerClickHandler
     /// <summary>
     /// 겉모습. <paramref name="slotOffset"/> = 0 가운데(포커스) · -1 위 · +1 아래(그 밖은 패널이 끈다).
     /// 화면 밖(±2 이상)은 나가는 중인 카드 — 옆 카드 모양. <paramref name="isCurrent"/> = 지금 내 캐릭터("현재" 표식),
-    /// <paramref name="locked"/> = 준비 중(포커스 카드를 바래게). 금색 테두리는 여기서 건드리지 않는다(<see cref="SetRingAlpha"/>).
+    /// <paramref name="locked"/> = 준비 중(포커스 카드를 바래게). 선택 테두리는 여기서 건드리지 않는다(<see cref="SetRingAlpha"/>).
     /// </summary>
     public void SetState(int slotOffset, bool isCurrent, bool locked)
     {

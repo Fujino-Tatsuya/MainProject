@@ -112,7 +112,7 @@ public static class CharacterSelectPanelAuthoring
             BackButton = LoadSprite("back_button.png");
             CardGap = LoadSprite("card_selected_gap.png");
             CardFill = LoadSprite("card_selected_fill_tint.png");
-            CardRing = LoadSprite("card_selected_ring.png");
+            CardRing = LoadSprite("card_selected.png");
             CardTop = LoadSprite("card_unselected_top.png");
             CardBottom = LoadSprite("card_unselected_bottom.png");
             Nameplate = LoadSprite("nameplate_base.png");
@@ -148,9 +148,10 @@ public static class CharacterSelectPanelAuthoring
             // 클릭 영역 — 사각형(아트 텍스처가 Read/Write 꺼짐이라 알파 판정 불가). 자리끼리 겹치지 않는다.
             AddImage(root, null, new Color(0f, 0f, 0f, 0f)).raycastTarget = true;
 
-            // 가운데 자리 강조 — 금색 테두리(카드 실루엣을 조금 크게 뒤에). 알파는 패널 이동 연출이 준다(할 일 60).
-            RectTransform ring = Child(FocusRingName, root.transform, Vector2.zero, CardSize + new Vector2(40f, 32f));
-            AddImage(ring.gameObject, sprites.CardRing, CurrentMarkerColor);
+            // 가운데 자리 강조 — card_selected(흰 띠+검은 선+회색 채움, 654×519)를 카드 뒤에 원래 크기로. 검은 선부터 안쪽은
+            // card_selected_gap 과 픽셀이 겹쳐 가려지고 바깥 흰 띠만 보인다(할 일 162). 알파는 패널 이동 연출이 준다(할 일 60).
+            RectTransform ring = Child(FocusRingName, root.transform, Vector2.zero, CardSize);
+            AddImage(ring.gameObject, sprites.CardRing, Color.white);
             ring.gameObject.SetActive(false);
 
             // 위·아래 카드 바탕(card_unselected_top/bottom, 패널이 0.84 배로 줄여 549×436 원래 크기가 된다)
@@ -373,6 +374,7 @@ public static class CharacterSelectPanelAuthoring
             viewSo.FindProperty("hintText").objectReferenceValue = hintText;
             viewSo.ApplyModifiedPropertiesWithoutUndo();
             EnsureCardTemplate(view);
+            EnsureInfoTabsAndPopup(view, font);
 
             content.gameObject.SetActive(false); // 기본 닫힘 — Show 가 켠다
 
@@ -436,6 +438,186 @@ public static class CharacterSelectPanelAuthoring
         return template;
     }
 
+    // ── 기본/코어 정보 버튼 + "미구현" 팝업(할 일 162) ──────────
+
+    const string TabsBackingName = "InfoTabs_Backing";
+    const string TabsName = "InfoTabs";
+    public const string InfoPopupName = "InfoPopup";
+    public const string InfoPopupText = "미구현"; // 하드코딩(xlsx Strings 동기화 안 함, 사용자 결정 10-30)
+    const string PanelArtDir = "Assets/50.Art/UI/UI_Panel/Sprites/";
+    static readonly Color PopupDimColor = new Color(0f, 0f, 0f, 0.6f);
+    static readonly Color PopupTextColor = new Color(0.16f, 0.16f, 0.16f, 1f);
+
+    // 목업(legacy/00_mock_up.png, 1920×1080 좌상단) 자리 — 알약 몸체 242×112, 뒤 검은 판(knockout) 485×128 은 몸체보다 사방 8px 크고 오른쪽은 위 카드 밑으로 들어간다.
+    static readonly Vector2 BasicTabTopLeft = new Vector2(1363f, 52f);
+    static readonly Vector2 CoreTabTopLeft = new Vector2(1258f, 210f);
+    static readonly Vector2 BasicLabelCenter = new Vector2(1481f, 108f);
+    static readonly Vector2 CoreLabelCenter = new Vector2(1384f, 266f);
+    const float KnockoutInset = 8f;
+
+    // 팝업 목업(01_Popup_no_text.png, 1920×1080) — 몸체 가운데 기준 X 버튼·본문 자리.
+    static readonly Vector2 PopupFrameOffset = new Vector2(0f, -8f);
+    static readonly Vector2 PopupCloseOffset = new Vector2(393.5f, 362f);
+    static readonly Vector2 PopupCrossOffset = new Vector2(3.75f, 0f); // SettingsArtSkin 과 같다
+    static readonly Vector2 PopupTextOffset = new Vector2(1f, -57f);
+    static readonly Vector2 PopupTextSize = new Vector2(860f, 600f);
+
+    [MenuItem("Tools/UI/Authoring/Character Select Info Tabs·Popup (추가·연결)")]
+    public static void AddInfoTabsAndPopup()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogError($"{Tag} Play 중에는 실행하지 않는다 — 먼저 정지할 것.");
+            return;
+        }
+
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+        try
+        {
+            if (EnsureInfoTabsAndPopup(root.GetComponent<CharacterSelectPanel>(), font))
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool success);
+                Debug.Log($"{Tag} 기본/코어 버튼·팝업 연결 {(success ? "성공" : "실패")}: {PanelPath}");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// 오른쪽 위 기본/코어 버튼(tab_* 아트, 비스듬한 알약 계단식)과 둘 다 여는 "미구현" 팝업을 패널 Content 에 놓고 패널 칸에 연결한다.
+    /// 그리기 순서 = 검은 판(InfoTabs_Backing) → 카드 → 알약 버튼(InfoTabs, 카드 위 — 위 카드 사각 클릭 영역보다 먼저 맞는다) → … → 팝업(맨 위).
+    /// 이미 있으면 손대지 않고 연결만 맞춘다(손댄 자리 유지).
+    /// </summary>
+    public static bool EnsureInfoTabsAndPopup(CharacterSelectPanel view, TMP_FontAsset font)
+    {
+        Transform content = view.transform.Find("Content");
+        Transform cards = content != null ? content.Find("Cards") : null;
+        if (cards == null || font == null)
+        {
+            Debug.LogError($"{Tag} Content/Cards 또는 폰트가 없어 기본/코어 버튼을 놓을 수 없다.");
+            return false;
+        }
+
+        // 뒤 검은 판 — 카드 밑
+        if (content.Find(TabsBackingName) == null)
+        {
+            RectTransform backing = NewRect(TabsBackingName, content);
+            Stretch(backing);
+            backing.SetSiblingIndex(cards.GetSiblingIndex());
+            AddKnockout(backing, "Knockout_Basic", "tab_knockout_gibon.png", BasicTabTopLeft);
+            AddKnockout(backing, "Knockout_Core", "tab_knockout_core.png", CoreTabTopLeft);
+        }
+
+        // 알약 버튼 — 카드 위
+        Transform tabs = content.Find(TabsName);
+        if (tabs == null)
+        {
+            RectTransform rect = NewRect(TabsName, content);
+            Stretch(rect);
+            rect.SetSiblingIndex(cards.GetSiblingIndex() + 1);
+            AddTabButton(rect, "Button_Basic", "tab_gibon_body.png", "tab_gibon_label.png", BasicTabTopLeft, BasicLabelCenter);
+            AddTabButton(rect, "Button_Core", "tab_core_body.png", "tab_core_label.png", CoreTabTopLeft, CoreLabelCenter);
+            tabs = rect;
+        }
+
+        Transform popup = content.Find(InfoPopupName);
+        if (popup == null)
+            popup = BuildInfoPopup(content, font);
+        popup.SetAsLastSibling();
+
+        var so = new SerializedObject(view);
+        so.FindProperty("basicInfoButton").objectReferenceValue = tabs.Find("Button_Basic")?.GetComponent<Button>();
+        so.FindProperty("coreInfoButton").objectReferenceValue = tabs.Find("Button_Core")?.GetComponent<Button>();
+        so.FindProperty("infoPopup").objectReferenceValue = popup.gameObject;
+        so.FindProperty("infoPopupCloseButton").objectReferenceValue = popup.Find("Frame/Button_Close")?.GetComponent<Button>();
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
+
+    static void AddKnockout(Transform parent, string name, string file, Vector2 tabTopLeft)
+    {
+        Sprite sprite = LoadSprite(file);
+        RectTransform rect = NewRect(name, parent);
+        Vector2 size = NativeSize(sprite);
+        Place(rect, Right, tabTopLeft.x - KnockoutInset, tabTopLeft.y - KnockoutInset, size.x, size.y);
+        AddImage(rect.gameObject, sprite, Color.white);
+    }
+
+    static void AddTabButton(Transform parent, string name, string bodyFile, string labelFile, Vector2 topLeft, Vector2 labelCenter)
+    {
+        Sprite body = LoadSprite(bodyFile), label = LoadSprite(labelFile);
+        RectTransform rect = NewRect(name, parent);
+        Vector2 size = NativeSize(body);
+        Place(rect, Right, topLeft.x, topLeft.y, size.x, size.y);
+        Image image = AddImage(rect.gameObject, body, Color.white);
+        image.raycastTarget = true;
+        Button button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
+        ApplyPopupButtonTint(button);
+
+        RectTransform labelRect = NewRect("Label", rect);
+        Vector2 labelSize = NativeSize(label);
+        labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        labelRect.pivot = new Vector2(0.5f, 0.5f);
+        labelRect.sizeDelta = labelSize;
+        // 몸체 가운데 기준(목업 좌표는 y 아래로)
+        labelRect.anchoredPosition = new Vector2(labelCenter.x - (topLeft.x + size.x * 0.5f), (topLeft.y + size.y * 0.5f) - labelCenter.y);
+        AddImage(labelRect.gameObject, label, Color.white);
+    }
+
+    /// <summary>설정 창(SettingsArtSkin.Tint)과 같은 버튼 색 전이.</summary>
+    static void ApplyPopupButtonTint(Button button)
+    {
+        button.transition = Selectable.Transition.ColorTint;
+        ColorBlock c = button.colors;
+        c.normalColor = Color.white;
+        c.highlightedColor = ButtonLabelStateColor.ChosenTint;
+        c.selectedColor = ButtonLabelStateColor.ChosenTint;
+        c.pressedColor = ButtonLabelStateColor.PressedTint;
+        c.disabledColor = ButtonLabelStateColor.DisabledTint;
+        c.colorMultiplier = 1f;
+        c.fadeDuration = 0.08f;
+        button.colors = c;
+    }
+
+    /// <summary>어두운 막(뒤 클릭 막기) + 몸체 panel_popup + X(button_close_base + icon_cross_red, 설정 창 조합) + 본문 "미구현". 기본 꺼짐.</summary>
+    static Transform BuildInfoPopup(Transform content, TMP_FontAsset font)
+    {
+        Sprite frameSprite = AssetDatabase.LoadAssetAtPath<Sprite>(PanelArtDir + "Panels/panel_popup.png");
+        Sprite closeSprite = AssetDatabase.LoadAssetAtPath<Sprite>(PanelArtDir + "Buttons/button_close_base.png");
+        Sprite crossSprite = AssetDatabase.LoadAssetAtPath<Sprite>(PanelArtDir + "Icons/icon_cross_red.png");
+        if (frameSprite == null || closeSprite == null || crossSprite == null)
+            Debug.LogError($"{Tag} 팝업 아트를 찾지 못했다({PanelArtDir}Panels/panel_popup·Buttons/button_close_base·Icons/icon_cross_red).");
+
+        RectTransform popup = NewRect(InfoPopupName, content);
+        Stretch(popup);
+        AddImage(popup.gameObject, null, PopupDimColor).raycastTarget = true; // 뒤 카드·버튼 클릭 막기
+
+        RectTransform frame = Child("Frame", popup, PopupFrameOffset, frameSprite != null ? NativeSize(frameSprite) : new Vector2(1030f, 898f));
+        AddImage(frame.gameObject, frameSprite, Color.white).raycastTarget = true;
+
+        RectTransform close = Child("Button_Close", frame, PopupCloseOffset, closeSprite != null ? NativeSize(closeSprite) : new Vector2(187f, 124f));
+        Image closeImage = AddImage(close.gameObject, closeSprite, Color.white);
+        closeImage.raycastTarget = true;
+        Button closeButton = close.gameObject.AddComponent<Button>();
+        closeButton.targetGraphic = closeImage;
+        closeButton.navigation = new Navigation { mode = Navigation.Mode.None };
+        ApplyPopupButtonTint(closeButton);
+        RectTransform cross = Child("Icon", close, PopupCrossOffset, crossSprite != null ? NativeSize(crossSprite) : new Vector2(63f, 63f));
+        AddImage(cross.gameObject, crossSprite, Color.white);
+
+        RectTransform text = Child("Text_Body", frame, PopupTextOffset, PopupTextSize);
+        AddText(text, font, InfoPopupText, 72f, TextAlignmentOptions.Center, PopupTextColor);
+
+        popup.gameObject.SetActive(false);
+        return popup;
+    }
+
     // ── SELECT 셰브론 = 선택 버튼(할 일 109) ──────────────────
 
     /// <summary>
@@ -448,7 +630,10 @@ public static class CharacterSelectPanelAuthoring
         image.raycastTarget = true;
         Button button = chevron.GetComponent<Button>();
         if (button == null)
+        {
             button = chevron.AddComponent<Button>();
+            ApplyChevronHoverTint(button);
+        }
         button.targetGraphic = image;
         // 뒤로가기와 같다 — None 이면 클릭해도 EventSystem 선택이 남지 않아 다음 Enter/Space 가 두 번 먹지 않는다.
         button.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -462,8 +647,24 @@ public static class CharacterSelectPanelAuthoring
 
     // hover 링(할 일 109 후속) — chevron.png 알파 실루엣을 두르는 흰 링을 구운 PNG(생성물 · git). 원본 아트·.meta 는 건드리지 않는다.
     public const string ChevronRingPath = "Assets/2.Prefabs/UI/Textures/CharacterSelectChevronHoverRing.png";
-    public const float ChevronRingThickness = 9f; // 화면 px(1920×1080 기준 캔버스)
+    public const float ChevronRingThickness = 7f; // 화면 px(1920×1080 기준 캔버스) — 할 일 162 에서 9 → 7
     public const float ChevronRingGap = 3f; // 화면 px — 실루엣 가장자리에서 링 안쪽 가장자리까지
+
+    // hover 동안 셰브론 본체만 옅게(할 일 162) — Button Color Tint 의 highlighted 알파. 대상 그래픽 = 셰브론 Image 뿐이라 자식 흰 링은 알파 1 그대로.
+    public const float ChevronHoverAlpha = 0.8f;
+    public const float ChevronHoverFadeSeconds = 0.08f;
+
+    /// <summary>셰브론 Button 색 전이 — highlighted 알파 <see cref="ChevronHoverAlpha"/>, 전이 <see cref="ChevronHoverFadeSeconds"/>초. 새로 붙일 때만 부른다(손댄 값 유지).</summary>
+    public static void ApplyChevronHoverTint(Button button)
+    {
+        button.transition = Selectable.Transition.ColorTint;
+        ColorBlock colors = button.colors;
+        Color highlighted = colors.highlightedColor;
+        highlighted.a = ChevronHoverAlpha;
+        colors.highlightedColor = highlighted;
+        colors.fadeDuration = ChevronHoverFadeSeconds;
+        button.colors = colors;
+    }
 
     /// <summary>
     /// 링 PNG 를 다시 굽고(<see cref="ChevronRingThickness"/>·<see cref="ChevronRingGap"/>, 기준 표시 크기 = 패널 셰브론 rect)
