@@ -19,6 +19,8 @@
 | SELECT 셰브론 삼각형 클릭 영역(할 일 109) | `Assets/1.Scripts/UI/UiTriangleRaycastFilter.cs` — 테스트 `Assets/1.Scripts/UI/Editor/UiTriangleRaycastFilterTests.cs` |
 | 문구 키 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs` (`UiStrings.All` 에 포함) |
 | 저작·미리보기 | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectPanelAuthoring.cs` |
+| 가운데 금색 테두리 0.7배 굽기(할 일 162) | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectFocusRingBaker.cs` → `Assets/2.Prefabs/UI/Textures/CharacterSelectFocusRing.png` |
+| UI 수정 테스트(할 일 162, 실제 프리팹) | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectUiPolishTests.cs` |
 
 ## 붙이는 법
 1. 로비 씬 아무 곳에 `CharacterSelectPanel.prefab` 을 둔다. 루트에 자체 Canvas(Screen Space Overlay, **sortingOrder 190** — 결과 패널 200 아래)와
@@ -56,7 +58,12 @@
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
   카드가 2장이면 다른 카드는 아래, 4장 이상이면 포커스 ±1 만 보인다. 위·아래 카드는 목업처럼 화면 밖으로 일부 잘린다.
 - 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = "현재" 알약 표식만**(포커스 표시인 초록·크기와 따로 보인다).
-  **금색 테두리(`card_selected_ring`, 카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
+  **금색 테두리(카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
+  - **두께 0.7배(할 일 162)**: 스프라이트 = 구운 PNG `Assets/2.Prefabs/UI/Textures/CharacterSelectFocusRing.png`(git, 694×551 = `Ring_Focus` rect 1:1, PPU 100). SVN 원본 `card_selected_ring.png` 는 그대로.
+    원본은 테두리가 아니라 채워진 카드 실루엣이고, 카드 뒤에 크게(694×551) 깔려 카드 검은 테두리(`card_selected_gap` 636×501) 밖 띠만 보인다(옆 ≈23px·위아래 ≈25px).
+    굽기 = 원본 링 그림을 가운데 기준 가로 ≈0.967·세로 ≈0.972 배로 줄여 그대로 다시 그린 것 — 가운데 가로·세로줄의 보이는 띠가 0.7배(23 → 16px)가 되는 배율, 모양·모서리·안티에일리어싱은 원본.
+    rect 크기·위치·색(1, 0.8, 0.25)은 그대로. 메뉴 `Tools/UI/Authoring/Character Select Focus Ring (0.7배 굽기·연결)`(`CharacterSelectFocusRingBaker`, 배율 상수 `ThicknessScale`) —
+    카드 프리팹 `Ring_Focus` 에 연결하고 패널 `Card_Template` 이 덮어쓰고 있으면 같이 맞춘다. 원본 파일 바이트를 직접 읽는다(.meta 무수정). 같은 입력 → 같은 픽셀(EditMode 테스트가 다시 구워 대조).
   잠금 중에는 포커스 카드 초록이 바래고, 왼쪽 아래에 "준비를 해제해야 바꿀 수 있습니다".
 
 ### 카드 이동·확대 연출(할 일 60)
