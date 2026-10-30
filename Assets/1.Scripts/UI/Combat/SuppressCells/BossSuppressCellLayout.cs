@@ -94,7 +94,7 @@ namespace VeyTrace.UI
         // 0.5 는 늘 위로(MathF.Round 기본값은 짝수 쪽이라 칸마다 반올림 방향이 달라진다).
         static float Px(float v) => MathF.Round(v, MidpointRounding.AwayFromZero);
 
-        /// <summary>index 번째 칸이 남은 칸인가(fill 이 보인다). 아니면 frame 만 보인다.</summary>
+        /// <summary>index 번째 칸이 남은 칸인가(fill 칸을 켠다). 아니면 끈다(슬롯 아래칸 바탕이 보인다).</summary>
         public static bool IsFilled(int index, int remaining) => index >= 0 && index < remaining;
     }
 }
