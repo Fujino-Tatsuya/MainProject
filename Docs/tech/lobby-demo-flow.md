@@ -8,19 +8,23 @@
 ```text
 exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → START
   → (호스트) 바로 호스팅 / (클라) 자동 접속 — 접속 버튼 없음
-  → 걷는 로비(3.LobbyScene) → (원하면 캐릭터 선택 오브젝트 앞에서 F → 패널에서 교체) → (원하면 훈련장 입구 집결 → 훈련 → 브리핑)
-  → 접속자 1~3명 전원 출격 집결 구역(스폰 줄 남쪽, 옛 준비 패드 메시 `SortieStation` 위 — 임시 위치) 안에 5초 → 4.MapScene
+  → 걷는 로비(3.LobbyScene) — 로비 튜토리얼(할 일 157):
+     라커룸 방문(캐릭터 교체는 라커룸 안 F, 어느 단계든 가능) → 중앙 집결·소개 대사 → 훈련장 입구 집결(→ 안으로 텔레포트)
+     → 기본 조작·전투·간파·제압·자유 연습 → 출구 집결(→ 중앙으로 텔레포트) → 임무 브리핑(대사 4줄, 조작 잠금)
+  → 접속자 1~3명 전원 출격 집결 구역(`Gather_Sortie`) 안에 0.3초 → 포드 연출 → 4.MapScene
   → 판 끝(클리어·전멸·나가기) → 로비 복귀 + 결과 패널(180초 뒤 자동 닫힘, 닫기·ESC)
-  → 다시 출격 집결 → … (exe 재실행 없이 반복)
+  → 로비 튜토리얼을 **다시 라커 방문(L00)부터** → … (exe 재실행 없이 반복)
 ```
-- **준비 F·준비 n/m·로비 카운트다운 표시는 없다**(할 일 86 T2b, 2026-10-22) — 출격 집결 구역에 서 있으면 준비다. 구역 위 `집결 n/m` + 남은 초가 뜨고, 한 명이 나가거나 인원이 바뀌면 0초부터 다시. 메인 진입은 `LobbyTrainingDirector` 가 출격 확정 때 1회. 훈련 흐름 상세는 T8 문서([lobby-training.md](lobby-training.md) — 지금은 NavMesh 사전 베이크 절만) — 지금은 PLAN `_lane-artifacts/common/86-lobby-training/PLAN-86-lobby-training.md` §3.2·§7.
-- 집결 카운트다운 중에도 공격·스킬·대시·상호작용은 막지 않는다(사용자 결정 2026-10-22). 구역이 여럿 켜져 있으면 `집결 n/m` 표시는 내 캐릭터가 선 구역, 아무 데도 없으면 가장 가까운 구역 것이다(표시용 — 판정은 서버).
-- 훈련은 선택이다. 훈련·브리핑 중에도 새 사람은 접속해 로비에서 기다리고 출격 인원에 들어간다. 단 **브리핑 진행 중(약 23초)에는 접속자 전원(늦게 들어온 사람 포함)의 이동·공격·스킬·대시·F 가 잠기고**, 끝나면 풀리며 출격 집결이 켜진다([lobby-training.md](lobby-training.md) "브리핑"). **출격 집결 카운트다운 중·메인 로딩 시작 뒤에는 접속을 거절**한다(아래 "게임 진행 중").
+- 단계·판정 상세 = [lobby-training.md](lobby-training.md)(단계표 L00~L41·서버 상태·Play 확인), 표시 계약 = [handoff-lobby-tutorial-contract.md](handoff-lobby-tutorial-contract.md).
+- **튜토리얼은 기본 흐름이다**(할 일 157 Q2) — 기본 설정에선 브리핑이 끝나야 출격 집결이 켜진다. 훈련 없이 바로 출격하려면 `LobbyRules.asset` 의 시연 플래그 `allowInstantSortie`(기본 **꺼짐**)를 켠다 — 켜면 중앙 집결 확정 전(L00·L10)에도 출격 구역이 켜진다. QA 는 Alt+1(클리어 플래그, [debug-hotkeys.md](debug-hotkeys.md)).
+- **준비 F·준비 n/m·로비 카운트다운 표시는 없다** — 집결 구역에 서 있으면 준비다. 집결 유지는 0.3초(전투 훈련 시작만 3초 카운트다운)이고, 출격 카운트다운 표시는 없다. 메인 진입은 `LobbyTrainingDirector` 가 출격 확정 때 1회.
+- 집결 중에도 공격·스킬·대시·상호작용은 막지 않는다(사용자 결정 2026-10-22). 집결 인원은 쓰러진 사람을 세지 않는다(판정은 서버).
+- 튜토리얼 도중(중앙 집결 확정 뒤) 접속한 사람은 로비에서 기다리고(목표 패널 없음) 출격 인원에 들어간다. 단 **브리핑 진행 중에는 접속자 전원(늦게 들어온 사람 포함)의 이동·공격·스킬·대시·F 가 잠기고**, 끝나면 풀리며 출격 집결이 켜진다([lobby-training.md](lobby-training.md) §5 브리핑). **출격 집결 카운트다운 중·출격 확정(메인 로딩) 뒤에는 접속을 거절**한다(아래 "게임 진행 중").
 - **호스트·클라 모두 부팅 직후 타이틀을 한 번 거친다**(할 일 70, 2026-10-21). 타이틀 UI·입력은 평소 그대로(SETTING·EXIT 도 그대로)이고, **START 의 시작 연출이 끝나면** 수동 로비 대신 대기 화면 → 호스팅/자동 접속으로 간다. START 를 누르기 전엔 접속을 시도하지 않는다 — 클라 PC 도 **각자 START 를 눌러야** 붙는다.
 - 판 끝 로비 복귀·끊김 뒤 재접속 대기(6.DemoConnectScene)는 **타이틀을 다시 거치지 않는다**(세션 유지·판 도중 재합류를 지키려고). 타이틀은 exe 실행당 한 번뿐이다.
 - 5.ResultScene 은 없다(Build Settings 에서도 뺐다 — 결과는 로비 패널).
-- 판이 끝나도 연결과 고른 캐릭터는 그대로, 로비 훈련 진행은 **처음(Lobby 단계)부터**.
-- 수치(집결 유지 5초 `gatherHoldSeconds`·상호작용 반경 2m) = `Assets/9.ScriptableObject/Lobby/LobbyRules.asset`.
+- 판이 끝나도 연결과 고른 캐릭터는 그대로, 로비 튜토리얼은 **매 회차 라커 방문(L00)부터**(훈련을 끝낸 사람도 — 완료 자동 통과 없음, 할 일 157 Q3).
+- 수치: 집결 유지 = 단계표 `LobbyTutorialSteps.asset` 행 `holdSeconds`(기본 0.3초), 상호작용 반경 2m·시연 플래그 = `Assets/9.ScriptableObject/Lobby/LobbyRules.asset`(옛 `gatherHoldSeconds` 칸은 미사용).
 
 ## 2. 설정 파일 — 모든 PC 에 같은 파일 하나 (호스트 1대 + 클라 최대 2대)
 1. **모든 PC 에 같은 빌드**를 깐다(§3).
@@ -87,8 +91,8 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 - 시나리오 시작 씬은 `0.BootStrapScene`. 체크 목록은 PLAN §7(솔로·MPPM 3인·끊김).
 
 ## 7. 알려진 한계 (2026-10-19)
-- **캐릭터 선택(C12)** — 로비의 캐릭터 선택 오브젝트(`Environment/LobbyInteractables/CharacterSelectStation`, 스폰 지점 왼쪽) 앞에서 F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
-  - **훈련 시작(입구 집결 확정) 뒤 판 끝까지는 훈련한 사람은 바꿀 수 없다** — 훈련·브리핑 중 늦게 들어온 사람은 바꿀 수 있다. **출격 집결 카운트다운 중·메인 진입 뒤에는 누구도 못 바꾼다**(패널은 열리지만 잠금 문구, 서버 거부 사유 `TrainingLocked`·`CountdownActive`·`GameStarting`). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
+- **캐릭터 선택(C12)** — 라커룸 안(`Area_Locker` 박스 = L00 라커 방문과 같은 영역, 표식 `Environment/LobbyInteractables/CharacterSelectStation` 은 라커룸 가운데 — 할 일 161)에 들어가면 F 프롬프트 → F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
+  - **튜토리얼 중 캐릭터 잠금은 없다**(할 일 157 Q1) — 훈련 중에도 라커룸에 가면 바꿀 수 있고, 진행 기록(라커 방문·기본 조작 체크·명단)은 그대로 이어진다. **출격 집결 카운트다운 중·출격 확정(메인 진입) 뒤에만 못 바꾼다**(패널은 열리지만 잠금 문구, 서버 거부 사유 `CountdownActive`·`GameStarting` — 옛 `TrainingLocked` 는 없앴다). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
   - 고른 캐릭터는 다음 판 스폰·판 사이·재접속(`playerId`)에 유지된다. 코드: [LobbyInteractor.cs](../../Assets/1.Scripts/Lobby/LobbyInteractor.cs)(패널 연결) · [LobbySession.cs](../../Assets/1.Scripts/Lobby/LobbySession.cs)(`RequestCharacterServerRpc` 검증) · [LobbyPlayerSpawner.cs](../../Assets/1.Scripts/Lobby/LobbyPlayerSpawner.cs)(`TrySwapCharacter`).
 - **증강(특성)은 판 도중 재합류에만 유지된다**(C14). 판 사이(로비로 돌아갔다 다음 판)에는 새로 시작한다. [networking.md "Mid-game rejoin"](networking.md#mid-game-rejoin-c14).
 - **판 도중 재합류(C14)는 사람이 MPPM·빌드 2대로 아직 확인하지 않았다** — 영혼으로 돌아온 사람은 튜토리얼 밖에서는 기존 부활 규칙(현재 사실상 보스 강제 개시 부활·전멸 리스폰)까지 영혼이다.

@@ -18,7 +18,7 @@ MonoBehaviour:
   description: "\uD328\uC2DC\uBE0C\uB85C \uD68C\uBCF5\uD558\uACE0 \uB0A8\uC740 \uC591\uC73C\uB85C
     {allyRange}m \uC548\uC5D0\uC11C \uB0A8\uC740 \uCCB4\uB825 \uBE44\uC728\uC774
     \uAC00\uC7A5 \uB0AE\uC740 \uC544\uAD70 \uD55C \uBA85\uC744 <style=heal>\uD68C\uBCF5</style>\uD569\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 5047e796ed3a590abe764b150c341111, type: 3}
   effects:
   - rid: 7237886673742725266
   references:

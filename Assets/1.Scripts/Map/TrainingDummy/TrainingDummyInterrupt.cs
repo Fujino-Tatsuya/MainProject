@@ -20,6 +20,25 @@ public readonly struct TrainingDummyInterruptSuccess
 }
 
 /// <summary>
+/// [서버] 허수아비 인터럽트 창 게이트(할 일 139 — 디버그 랩의 주기 창 모드). 걸려 있지 않으면 기존대로 무기한 열림.
+/// 본 게임 허수아비에는 걸지 않는다 — 랩 전용 컴포넌트(<c>DebugDummyInterruptWindowMode</c>)만 건다.
+/// </summary>
+public interface ITrainingDummyWindowGate
+{
+    /// <summary>
+    /// 서버 틱마다 순환 Tick 뒤에 한 번 불린다. 반환 = 회복 중이 아닐 때 창이 열려 있어야 하는가.
+    /// <paramref name="recovering"/> = 인터럽트 성공 후 회복 중(취약·대기) — 이때 반환값은 쓰이지 않는다.
+    /// </summary>
+    bool TickWindowOpen(float deltaTime, bool recovering);
+
+    /// <summary>
+    /// 이 게이트가 여는 열림 하나의 길이(게임초, 할 일 139-6 — 간파 시도 예측의 창 길이). +∞ = 시간으로 닫히지 않음.
+    /// 서버 값이다 — 예측은 서버만 이 값을 쓴다(<see cref="InterruptWindowLengthResolver.ForTrainingDummy"/>).
+    /// </summary>
+    float OpenWindowLength { get; }
+}
+
+/// <summary>
 /// 허수아비 인터럽트(간파) 연습. 프리팹 루트에 붙인다 — 붙어 있지 않으면 인터럽트는 데미지만 들어간다.
 ///
 /// 몬스터 중간보스 카운터 창과 같은 판정(<see cref="CounterWindow"/>, 1회 소비)·같은 시각(노란 베이스 틴트)을 쓴다.
@@ -72,6 +91,7 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
         NetworkVariableWritePermission.Server);
 
     TrainingDummyInterruptCycle _cycle; // 서버 전용
+    ITrainingDummyWindowGate _windowGate; // 서버 전용, 디버그 랩만(할 일 139)
     TrainingDummyHitFlash _flash;
     TrainingDummy _dummy;
 
@@ -98,6 +118,22 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
 
     /// <summary>[서버] 인터럽트 성공. 취약 진입 직후에 한 번 발화한다.</summary>
     public event Action<TrainingDummyInterruptSuccess> ServerInterruptSucceeded;
+
+    /// <summary>
+    /// [서버] 창 게이트(할 일 139, 디버그 랩 전용). null = 기존 동작(무기한 열림).
+    /// 게이트를 떼면 닫아 둔 창을 바로 연다 — 게이트 없이 닫힌 채로 남지 않게.
+    /// 랩 컴포넌트는 OnEnable 에서 모든 피어에 건다 — 클라는 '랩 게이트가 있다'만 쓴다(할 일 139-6 창 길이 해석, 클라 값은 Play 중 변경이 복제되지 않음).
+    /// </summary>
+    public ITrainingDummyWindowGate ServerWindowGate
+    {
+        get => _windowGate;
+        set
+        {
+            _windowGate = value;
+            if (value == null && IsServer && _cycle != null && _cycle.ReleaseHold())
+                ServerApplyCycleState();
+        }
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -170,11 +206,26 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
         if (!IsServer || _cycle == null)
             return;
 
-        if (_cycle.Tick(Time.deltaTime))
+        float deltaTime = Time.deltaTime;
+        bool changed = _cycle.Tick(deltaTime);
+
+        // 게이트는 순환 Tick 뒤에 같은 틱 안에서 적용한다 — 회복이 끝나 열렸다가 게이트가 바로 닫는 경우에도
+        // 복제값은 끝 상태 하나만 쓰여, 창 기록(InterruptLagMonitor)에 길이 0 열림이 남지 않는다.
+        if (_windowGate != null)
         {
-            _state.Value = _cycle.State;
-            ServerRefreshSuperArmor();
+            bool open = _windowGate.TickWindowOpen(deltaTime, _cycle.IsRecovering);
+            if (!_cycle.IsRecovering)
+                changed |= open ? _cycle.ReleaseHold() : _cycle.HoldClosed();
         }
+
+        if (changed)
+            ServerApplyCycleState();
+    }
+
+    void ServerApplyCycleState()
+    {
+        _state.Value = _cycle.State;
+        ServerRefreshSuperArmor();
     }
 
     void OnStateChanged(TrainingDummyInterruptState previous, TrainingDummyInterruptState current)

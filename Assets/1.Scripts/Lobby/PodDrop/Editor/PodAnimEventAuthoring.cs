@@ -82,10 +82,10 @@ public static class PodAnimEventAuthoring
         Add(specs, lobby.launchState, LobbyLaunchFastFrame, PodAnimEventRelay.KindSpeedUp, $"로비 발사 가속 1단계 → ×{lobby.launchFastSpeed:0.##}");
         Add(specs, lobby.launchState, LobbyLaunchFast2Frame, PodAnimEventRelay.KindSpeedUp2, $"로비 발사 가속 2단계 → ×{lobby.launchFastSpeed2:0.##}");
         Add(specs, lobby.launchState, -1, stage, $"로비 발사 끝 → 대기 {lobby.launchEndWaitSeconds:0.##}s · 페이드 {lobby.launchEndFadeSeconds:0.##}s → 로딩");
-        Add(specs, map.wingDeployState, -1, stage, "맵 날개 펴기 끝");
-        Add(specs, map.gearDeployState, -1, stage, "맵 다리 펴기 끝 (둘 다 → 착륙)");
-        Add(specs, map.hatchOpenState, -1, stage, "맵 해치 열기 끝");
-        Add(specs, map.wingFoldState, -1, stage, "맵 날개 접기 끝 (둘 다 → 디졸브 대기)");
+        // 맵 날개 펴기(wingDeployState)는 할 일 150 부터 안 쓴다 — 클립에 남은 이벤트는 그대로 둔다(스펙에서 빼면 저작이 지우지 않는다).
+        Add(specs, map.wingFoldState, -1, stage, "맵 날개 접기 끝");
+        Add(specs, map.gearDeployState, -1, stage, "맵 다리 펴기 끝 (둘 다 → 자유낙하)");
+        Add(specs, map.hatchOpenState, -1, stage, "맵 해치 열기 끝 → 디졸브 대기");
         return specs;
     }
 

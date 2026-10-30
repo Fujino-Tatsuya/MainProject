@@ -10,7 +10,7 @@
 |---|---|
 | 패널 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectPanel.prefab` |
 | 카드 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectCard.prefab` (패널 안 인스턴스 `Card_Template` 의 원본) |
-| **가운데 카드 모양은 어디서 고치나** | **`CharacterSelectPanel.prefab` > `Content/Cards/Card_Template`**(가운데 자리에 놓인 카드 프리팹 인스턴스, 패널 `cardTemplate`). 초상화 `Clip/Image_Portrait` 크기·회전, 금색 테두리 `Ring_Focus` 크기(RectTransform)·색·스프라이트(Image)를 여기서 고치면 런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, `sideScale` 로 줄 뿐). Play 에서 원본 자신은 꺼진다. 자리·배율·테두리 알파는 여전히 패널(`focusedSlot`·`focusScale`·연출)이 정한다 |
+| **가운데 카드 모양은 어디서 고치나** | **`CharacterSelectPanel.prefab` > `Content/Cards/Card_Template`**(가운데 자리에 놓인 카드 프리팹 인스턴스, 패널 `cardTemplate`). 초상화 `Clip/Image_Portrait` 크기·회전, 선택 테두리 `Ring_Focus` 크기(RectTransform)·색·스프라이트(Image)를 여기서 고치면 런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, `sideScale` 로 줄 뿐). Play 에서 원본 자신은 꺼진다. 자리·배율·테두리 알파는 여전히 패널(`focusedSlot`·`focusScale`·연출)이 정한다 |
 | 뷰 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanel.cs` · `CharacterSelectCard.cs` |
 | 규칙(순수) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanelRules.cs` — 테스트 `Editor/CharacterSelectPanelRulesTests.cs` |
 | 카드 이동 연출 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectCardMotion.cs` — 같은 테스트 파일 |
@@ -19,6 +19,7 @@
 | SELECT 셰브론 삼각형 클릭 영역(할 일 109) | `Assets/1.Scripts/UI/UiTriangleRaycastFilter.cs` — 테스트 `Assets/1.Scripts/UI/Editor/UiTriangleRaycastFilterTests.cs` |
 | 문구 키 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs` (`UiStrings.All` 에 포함) |
 | 저작·미리보기 | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectPanelAuthoring.cs` |
+| UI 수정 테스트(할 일 162, 실제 프리팹) | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectUiPolishTests.cs` |
 
 ## 붙이는 법
 1. 로비 씬 아무 곳에 `CharacterSelectPanel.prefab` 을 둔다. 루트에 자체 Canvas(Screen Space Overlay, **sortingOrder 190** — 결과 패널 200 아래)와
@@ -43,10 +44,12 @@
 | `event Action<CharacterSelectCloseReason> Closed` | 닫힐 때 한 번 — `Api`(호출 측 `Hide`)·`Button`(그냥 닫기 — 뒤로가기 또는 지금 캐릭터 재선택)·`Escape`·`Chosen` |
 | `static bool IsEscapeClaimed` | 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 | `void MoveFocus(int)` / `CharacterSelectConfirmResult Confirm()` | 키 입력과 같은 길(테스트·게임패드 연결용) |
+| `void OpenInfoPopup(CharacterSelectInfoTab)` / `void CloseInfoPopup()` / `CharacterSelectInfoTab InfoPopup` | 기본/코어 버튼·팝업 X 와 같은 길(할 일 162) |
 
 ### 선택 확정 규칙(`CharacterSelectPanelRules.Evaluate`, 이 순서)
 | 경우 | 결과 |
 |---|---|
+| 기본/코어 팝업이 열려 있음(할 일 162) | `PopupOpen` — 아무것도 안 함(잠금 강조도 없음). 패널은 열린 채 |
 | 준비 중(잠금) | 거부 — 이벤트 없음, 잠금 문구가 0.6초 붉게 커졌다 돌아온다. 패널은 열린 채 |
 | 로스터 `Available=false` | 거부 — 이벤트 없음. 카드는 회색 + "선택 불가" |
 | 지금 캐릭터(`SameAsCurrent`) | `CharacterChosen` 없이 그냥 닫힘 — 뒤로가기와 같은 `Closed(Button)`(전용 사유 없음, 10-19 결정) |
@@ -56,7 +59,13 @@
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
   카드가 2장이면 다른 카드는 아래, 4장 이상이면 포커스 ±1 만 보인다. 위·아래 카드는 목업처럼 화면 밖으로 일부 잘린다.
 - 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = "현재" 알약 표식만**(포커스 표시인 초록·크기와 따로 보인다).
-  **금색 테두리(`card_selected_ring`, 카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
+  **선택 테두리(카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
+  - **흰 테두리 = `card_selected.png`(할 일 162 후속 — 노란 링 `card_selected_ring` 과 구운 0.7배 링 폐기)**: SVN `Assets/50.Art/UI/char_select/card_selected.png`(654×519, 9-slice 없음)를
+    `Ring_Focus` 에 **원래 크기 654×519(= 카드 rect)·가운데·색 흰색(곱하지 않음)·Simple** 로, **카드 맨 뒤**(Side·Focused·Clip·이름·표식보다 먼저) 깐다.
+    그림 = 바깥 흰 띠(옆 ≈11px·위아래 ≈9px, 실제 불투명 흰 픽셀) + 검은 선 ≈7px + 회색(191) 채움. 검은 선부터 안쪽은 `card_selected_gap`(636×501, 가운데 정렬 = 9px 안쪽)과
+    픽셀이 정확히 겹쳐 가려지고 **gap 밖으로 흰 띠만 보인다** → 참고 시안의 "흰 테두리 + 검은 선" 모양, 채움은 지금처럼 캐릭터 초록(`fill_tint`, 잠금 시 바램)이 그대로 보인다.
+    카드 위에 덮는 안(회색 채움이 초록을 덮음)은 캐릭터 색·잠금 바램이 사라져 고르지 않았다(비교 캡처 `_lane-artifacts/MainProject-Worktree4/162-charselect-ui/option_*`).
+    알파 페이드(`SetRingAlpha`)·가운데에서만 보임·잠금 규칙은 그대로. 저작 메뉴(`CharacterSelectPanelAuthoring`)도 같은 값으로 만든다.
   잠금 중에는 포커스 카드 초록이 바래고, 왼쪽 아래에 "준비를 해제해야 바꿀 수 있습니다".
 
 ### 카드 이동·확대 연출(할 일 60)
@@ -65,7 +74,7 @@
 | 필드 | 기본 | 뜻 |
 |---|---|---|
 | `moveSeconds` | 0.18 | 포커스가 바뀌면 카드가 지금 자리에서 새 자리(`focusedSlot`/`previousSlot`/`nextSlot`·`sideScale`)로 미끄러짐, EaseOutCubic |
-| `ringFadeSeconds` | 0.1 | 금색 테두리 — 이동 시작에 꺼지고(지금 알파에서 선형), 이동이 끝나면 새 가운데 카드에서 켜짐 |
+| `ringFadeSeconds` | 0.1 | 선택 테두리 — 이동 시작에 꺼지고(지금 알파에서 선형), 이동이 끝나면 새 가운데 카드에서 켜짐 |
 | `focusScaleSeconds` | 0.12 | 이동이 끝난 뒤 가운데 카드 확대, EaseOutCubic |
 | `focusScale` | 1.08 | 다 선 가운데 카드 배율. 가운데에서 벗어나는 카드는 이동하면서 옆 크기(`sideScale`)로 돌아간다 |
 
@@ -81,11 +90,23 @@
   - 2·3장 순환에서 위↔아래로 바뀌는 카드는 사라졌다 나타나지 않고 **가운데 카드 뒤로 가로질러** 미끄러진다(가운데 카드가 맨 위에 그려진다).
 - `Show`(열 때)·`SetLocked` 는 애니메이션 없이 바로 정렬 — 테두리 켜짐·확대 상태.
 
-- 왼쪽 아래 이름판 = 포커스된 캐릭터의 원형 초상화·이름. 왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠 — 누르면 선택 확정(할 일 109).
+- 왼쪽 아래 이름판(`Content/Nameplate` — 원형 초상화·이름) = 포커스된 캐릭터의 초상화·이름. 할 일 162 로 잠시 껐다가 **다시 켰다**(`(재생성)` 메뉴도 켜진 채 만든다).
+- **캐릭터 이름(카드 안 글자·이름판)은 언어와 무관한 고정 영어** `Paladin`/`Gunner`/`Assassin`(할 일 162) — 출처는 `CharacterSelectUiStrings.CharacterName` 의 표 하나(플레이어 프리팹 이름 → 영어),
+  표에 없는 캐릭터는 로스터 `DisplayName`(문구 `Character.<프리팹>.Name`)으로 폴백. 로스터·문구는 그대로라 로비 상태 글자·결과창 등 다른 화면은 계속 번역 이름을 쓴다.
+  왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠 — 누르면 선택 확정(할 일 109).
 - 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬를 따라 **오른쪽으로 40px/s**(unscaled) 흐름(방향 = 10-19 결정).
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
   - 일반판 vs `_gamma` 판: 캡처 비교(왼쪽 영역 평균 밝기, 0~255) 목업 30.2 · 일반판 34.1 · `_gamma` 43.2 → **일반판** 사용(프로젝트 = Linear).
-- 목업의 "기본/코어" 탭(스킬 정보 자리)은 데이터가 없어 **배치하지 않았다**(`tab_*` 아트는 그대로 남아 있음).
+- **오른쪽 위 "기본"·"코어" 버튼 + "미구현" 팝업(할 일 162)** — 스킬 정보 데이터가 아직 없어 둘 다 같은 팝업만 띄운다.
+  - 버튼 = `Content/InfoTabs/Button_Basic`·`Button_Core`(아트 `tab_gibon_body`+`tab_gibon_label` = 밝은 알약, `tab_core_body`+`tab_core_label` = 어두운 알약·회색 테두리, 오른쪽 끝이 비스듬히 잘림).
+    자리 = 목업(`legacy/00_mock_up.png`) 그대로, 기본이 위·오른쪽, 코어가 아래·왼쪽인 계단식(오른쪽 앵커). 뒤 검은 판 `tab_knockout_*`(몸체보다 사방 8px 큼)은 `InfoTabs_Backing`.
+  - 그리기 순서 = `InfoTabs_Backing`(검은 판) → `Cards` → `InfoTabs`(버튼) — 버튼이 카드 위라 위 카드의 사각 클릭 영역보다 먼저 맞는다. Button Navigation None·Color Tint(설정 창과 같은 값).
+  - 팝업 = `Content/InfoPopup`(Content 맨 위, 기본 꺼짐): 어두운 막(검정 60%, Raycast Target — 뒤 카드·버튼·셰브론 클릭을 막는다) + `Frame`(`UI_Panel/Sprites/Panels/panel_popup.png`)
+    + `Frame/Button_Close`(`Buttons/button_close_base.png` + 자식 `Icon` = `Icons/icon_cross_red.png` — 설정 창·일시정지 메뉴와 같은 조합) + `Frame/Text_Body` "미구현"(**하드코딩**, xlsx Strings 동기화 안 함).
+  - 닫기 = **X 버튼·ESC**(설정 창 `SettingsBody` 관례 — 막 클릭으로는 닫히지 않는다). 패널을 닫거나(`Hide`·뒤로가기·확정) 다시 열면(`Show`) 팝업도 닫힌다.
+  - 판단은 순수 `CharacterSelectPanelRules` — `InfoPopup`(`CharacterSelectInfoTab` None/Basic/Core)·`OpenInfoPopup`·`CloseInfoPopup`·`Escape`(→ `CharacterSelectEscapeResult` Ignored/ClosedPopup/ClosedPanel).
+    팝업이 열린 동안 `MoveFocus`·`FocusCard` 는 false, `Confirm` 은 `PopupOpen`(이벤트·닫힘 없음).
+  - 다시 만들기 = 메뉴 `Tools/UI/Authoring/Character Select Info Tabs·Popup (추가·연결)`(`CharacterSelectPanelAuthoring.EnsureInfoTabsAndPopup`, 이미 있으면 연결만). `(재생성)` 메뉴도 같이 만든다.
 - 폰트 = `NotoSansKR-VariableFont_wght SDF`(목업 폰트 없음) — 목업보다 얇다. 초상화는 로스터 `Portrait`(지금 HUD 가로 초상화·어쌔신은 임시 jpg).
 
 ## 조작
@@ -96,7 +117,9 @@
 | Enter · 숫자패드 Enter · Space · 가운데 카드 클릭 | 선택 확정(위 규칙) |
 | SELECT 셰브론 클릭(`Content/Chevron` 의 Button, 할 일 109) | Space 와 같은 `Confirm()` — 잠금이면 잠금 문구 강조, 지금 캐릭터면 그냥 닫힘, 이동 중이면 논리 가운데 |
 | 위·아래 카드 클릭 | 그 카드로 포커스 이동 |
-| 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) |
+| 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) — 기본/코어 팝업이 열려 있으면 ESC 는 팝업만 닫는다 |
+| 기본·코어 버튼(할 일 162) | "미구현" 팝업 열기(잠금 중에도 열린다). 팝업이 열린 동안 이동·확정·휠·카드·셰브론 입력은 막힌다 |
+| 팝업 X 버튼 · ESC | 팝업만 닫기(패널 그대로, `Closed` 없음) |
 
 - 키는 `Keyboard.current`·`Mouse.current` 를 직접 읽는다. 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력(이동·공격·F 등)을 막는다.
 - 카드 클릭은 `Button` 이 아니라 `IPointerClickHandler` — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 막는다. 뒤로가기·셰브론 Button 은 Navigation None
@@ -112,15 +135,18 @@
 - **hover 흰 아웃라인**(할 일 109 후속): 셰브론의 `UiHoverOutline` 이 Pointer Enter/Exit(삼각형 필터를 거친 레이캐스트 — hover 판정은 계속 삼각형)로
   자식 `Outline_Hover` 를 켜고 끈다. Button 이 interactable 일 때만(`onlyWhenInteractable`), 비활성화 때 끔.
   - **모양 = chevron.png 실제 알파 실루엣**(왼쪽 둥근 끝 포함)을 두르는 흰 링. `Outline_Hover` = `Image`(스프라이트 `Assets/2.Prefabs/UI/Textures/CharacterSelectChevronHoverRing.png`,
-    흰색, Raycast Target 끔, 기본 꺼짐) — rect 는 셰브론 rect 를 링 여백(13px)만큼 사방으로 늘린 것(앵커 stretch, offset ±13). 링은 셰브론 픽셀과 겹치지 않아 자식으로 위에 그려도 셰브론을 가리지 않는다.
+    흰색, Raycast Target 끔, 기본 꺼짐) — rect 는 셰브론 rect 를 링 여백(11px)만큼 사방으로 늘린 것(앵커 stretch, offset ±11). 링은 셰브론 픽셀과 겹치지 않아 자식으로 위에 그려도 셰브론을 가리지 않는다.
   - **굽기** = 메뉴 `Tools/UI/Authoring/Character Select Chevron Hover Ring (굽기·연결)`(`CharacterSelectPanelAuthoring.BakeAndApplyChevronHoverRing`) —
     `UiSilhouetteRingBaker.Bake(원본 png, 출력 png, 기준 표시 크기, 두께, 간격)` 로 PNG 를 다시 굽고 패널 프리팹 `Outline_Hover` 를 맞춘다. `(재생성)` 메뉴도 같은 구성(링 PNG 가 있으면 그대로 쓰고 없으면 굽는다).
     원본은 `chevron.png` 파일 바이트를 직접 읽는다(SVN 아트 Read/Write 꺼짐 — .meta 무수정). 런타임 생성 없음. 같은 입력 → 같은 픽셀(EditMode 테스트가 다시 구워 비교).
-  - 값 = `CharacterSelectPanelAuthoring.ChevronRingThickness` **9px**·`ChevronRingGap` **3px** — 셰브론 **표시 크기 기준 화면 px**(1920×1080 기준 캔버스, 기준 표시 크기 = 셰브론 rect 190×659).
-    텍스처 px = 화면 px × (원본 텍스처 폭 / 표시 폭) — 지금은 1:1 이라 링 PNG 216×685(원본 190×659 + 사방 13), PPU 100. 실루엣 = 알파 ≥ 128, 링 가장자리 1px 안티에일리어싱.
+  - 값 = `CharacterSelectPanelAuthoring.ChevronRingThickness` **7px**(할 일 162 에서 9 → 7)·`ChevronRingGap` **3px** — 셰브론 **표시 크기 기준 화면 px**(1920×1080 기준 캔버스, 기준 표시 크기 = 셰브론 rect 190×659).
+    텍스처 px = 화면 px × (원본 텍스처 폭 / 표시 폭) — 지금은 1:1 이라 링 PNG 212×681(원본 190×659 + 사방 11), PPU 100. 실루엣 = 알파 ≥ 128, 링 가장자리 1px 안티에일리어싱.
     두께·간격을 바꾸려면 상수를 고치고 굽기 메뉴를 다시 돌린다(테스트가 PNG 와 상수를 대조한다).
   - **잠금(준비 중) 동안은 켜지 않는다** — 패널 `Redraw`(Show·SetLocked 경로)가 `UiHoverOutline.Blocked = Rules.IsLocked` 를 넣는다. hover 중에 잠기면 바로 꺼지고, 풀리면 바로 켜진다.
     Button 은 interactable 그대로라 잠금 중 클릭 = `Confirm()` → Locked → 잠금 문구 강조.
+- **hover 동안 셰브론 본체 알파 1 → 0.8**(할 일 162): 셰브론 Button 의 Color Tint `Highlighted` 알파 0.8(RGB 0.961 그대로)·`Fade Duration` 0.08초 — 인스펙터에서 바로 고친다.
+  Color Tint 대상 = 셰브론 Image 뿐이라 자식 흰 링(`Outline_Hover`)·형제 `SelectBadge` 는 알파 1 그대로. 잠금 규칙은 그대로(잠금 중엔 흰 링만 안 켜지고, Button 색 전이는 interactable 이라 평소처럼 돈다).
+  새로 Button 을 붙일 때(재생성) 값 = `CharacterSelectPanelAuthoring.ChevronHoverAlpha`·`ChevronHoverFadeSeconds`(이미 붙어 있으면 손댄 값 유지).
 
 ### 길게 누르기(키 반복, 할 일 60·60.1)
 판단 = `CharacterSelectKeyRepeat`(순수). 패널은 매 프레임 "뒤로(W·↑·A·←) / 앞으로(S·↓·D·→) 중 하나라도 눌려 있는가"(`isPressed`)와 `Time.unscaledTime` 을 넘기고, 돌려받은 칸(-1·0·+1)만큼 `MoveFocus` 한다.
@@ -140,13 +166,15 @@
 - 반대 방향을 새로 누르면 **즉시 그쪽 1칸 + 대기·가속부터 다시**. 둘 다 누르고 있으면 **나중에 누른 쪽**이 이긴다. 같은 프레임에 둘 다 누르면 뒤로(기존 키 검사 순서).
 - 이기던 키를 떼고 반대쪽이 아직 눌려 있으면 그 방향으로 **대기·가속부터 다시(즉시 1칸 없음)**. 둘 다 떼면 멈춘다. 떼고 다시 누를 때도 가속은 처음부터.
 - **한 프레임 최대 1칸** — 프레임이 길어 간격이 여러 번 지나도 1칸만 가고 밀린 칸은 버린다(다음 칸 = 그 프레임 + 그 시점 간격).
-- 반복 칸마다 카드 이동은 지금처럼 재목표 — 처음 몇 칸(0.25·0.2초 간격)은 이동 0.18초보다 길어 칸 사이에 잠깐 멈춰 보일 수 있고, 간격이 0.18초 아래로 줄면 카드는 계속 미끄러진다. 누르고 있는 동안 금색 테두리는 꺼진 채, 떼고 마지막 이동이 끝나면 켜진다.
+- 반복 칸마다 카드 이동은 지금처럼 재목표 — 처음 몇 칸(0.25·0.2초 간격)은 이동 0.18초보다 길어 칸 사이에 잠깐 멈춰 보일 수 있고, 간격이 0.18초 아래로 줄면 카드는 계속 미끄러진다. 누르고 있는 동안 선택 테두리는 꺼진 채, 떼고 마지막 이동이 끝나면 켜진다.
 - `Show`·닫힘(`Hide`·ESC·확정·뒤로가기)·`LobbyResultPanel.IsEscapeClaimed` 인 프레임에는 반복 상태를 비운다. **그때 눌려 있던 이동 키는 뗐다가 새로 누를 때까지 무시**(열자마자 미끄러지지 않게).
 - 잠금 중에도 반복된다(확정만 막힘). Enter·Space·ESC 가 눌린 프레임에는 이동 키를 보지 않는다 — 같은 프레임에 누른 이동 키는 다음 프레임에 1칸으로 들어간다.
 
 ## ESC
 - 🔴 `LobbyResultPanel.IsEscapeClaimed` 가 true 면(결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫힘) 선택 패널은 **ESC 와 키·휠·카드 클릭을 모두 무시**한다 — 같은 키로 둘이 같이 닫히지 않는다.
 - 반대로 로비에 ESC 를 쓰는 다른 메뉴(일시정지·설정 등)를 붙이면 그쪽은 `CharacterSelectPanel.IsEscapeClaimed` 도 확인해야 한다.
+- 우선순위(할 일 162): 결과 패널(`LobbyResultPanel.IsEscapeClaimed`) → 기본/코어 팝업(팝업만 닫힘) → 선택 패널(닫힘). 팝업을 닫은 프레임도 선택 패널이 ESC 를 쓴 것으로 친다(`IsEscapeClaimed`).
+  `closeWithEscape` 를 꺼도 팝업은 ESC 로 닫힌다. 팝업이 열린 프레임에는 이동 키 반복 상태를 비운다 — 닫은 뒤 눌려 있던 이동 키는 새로 눌러야 움직인다.
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |
@@ -171,11 +199,12 @@
   시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
 - `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
   `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 미끄러짐)를 저장. 콘솔에 대기·간격·램프 값과 1.5초까지의 칸 이동 시각(가속 확인용).
-- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests` + 가운데 카드 원본 `CharacterSelectCardTemplateTests` — `Card_Template` 의 초상화 크기·회전·테두리 크기·색·스프라이트가 런타임 카드에 들어가고 원본은 꺼지는지).
+- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests` + 가운데 카드 원본 `CharacterSelectCardTemplateTests` — `Card_Template` 의 초상화 크기·회전·테두리 크기·색·스프라이트가 런타임 카드에 들어가고 원본은 꺼지는지
+  + UI 수정 `CharacterSelectUiPolishTests`(할 일 162) — 이름판 켜짐·포커스 이동마다 초상화·영어 이름 따라감·카드 이름 영어·모르는 캐릭터 DisplayName 폴백·셰브론 hover 알파·링 7px·선택 테두리 card_selected(원래 크기·흰색·카드 뒤, gap 밖으로 흰 띠만 보이는지 픽셀 대조)·기본/코어 버튼·팝업 연결·X 로 팝업만 닫힘·팝업 뒤 확정·이동 막힘; ESC 우선순위는 `CharacterSelectPanelRulesTests`).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
 - 열린 동안 이동·공격·F 가 막히고 닫으면 풀리는가. 뒤 화면 클릭이 안 먹는가.
-- 키(W/S/A/D/방향키)·휠·카드 클릭으로 포커스가 순환하고, 이름판이 따라 바뀌는가. Enter/Space 한 번에 한 번만 확정되는가.
+- 키(W/S/A/D/방향키)·휠·카드 클릭으로 포커스가 순환하고, 왼쪽 아래 이름판(초상화·영어 이름)이 따라 바뀌는가. Enter/Space 한 번에 한 번만 확정되는가.
 - 다른 캐릭터 확정 → `RequestCharacterServerRpc` 가 한 번 나가고 패널이 닫히는가. 지금 캐릭터 확정 → 요청 없이 닫히는가.
 - 준비 중 열기 → 구경은 되고 확정하면 잠금 문구가 강조되는가. 열린 채 준비 해제(`SetLocked(false)`) → 바로 고를 수 있는가.
 - 결과 패널이 위에 열려 있을 때 ESC 한 번에 결과 패널만 닫히는가(선택 패널은 그대로).
@@ -187,3 +216,9 @@
   누른 채 반대 키 → 즉시 반대로 1칸 후 대기·느린 반복부터, 반대 키만 떼면 대기 뒤 원래 방향으로 느린 반복부터 이어지는가. 떼고 다시 누르면 다시 느리게 시작하는가. W+↑ 같이 눌러도 2칸씩 가지 않는가.
   키를 누른 채 패널을 열면(F) 미끄러지지 않고, 새로 눌러야 움직이는가. 잠금 중에도 반복되는가. 결과 패널이 위에 있으면 반복이 멈추는가.
 - 배경이 슬로모션과 무관하게 천천히 흐르고 가장자리가 비지 않는가(16:9 외 비율 포함).
+- (할 일 162) 오른쪽 위 기본(밝은 알약)·코어(어두운 알약) 버튼이 참고 이미지처럼 계단식으로 위 카드 옆에 붙어 보이는가(16:9 외 비율 포함), 마우스 올림·눌림 색이 바뀌는가.
+  둘 다 누르면 "미구현" 팝업이 뜨고, X 클릭·ESC 로 팝업만 닫히는가(ESC 한 번에 패널까지 닫히지 않는가, 두 번째 ESC 에 패널이 닫히는가).
+  팝업이 열린 동안 Enter/Space·W/S·휠·카드 클릭·SELECT 셰브론 클릭이 먹지 않는가, 뒤로가기 버튼이 눌리지 않는가. 이동 키를 누른 채 팝업을 닫으면 미끄러지지 않는가.
+  팝업이 열린 동안 로비 일시정지 메뉴(ESC)가 같이 열리지 않는가. 잠금(준비) 중에도 팝업이 열리는가.
+- (할 일 162) 왼쪽 아래 이름판(원형 초상화+이름)이 다시 보이고, 카드·이름판 이름이 언어 설정(한국어 포함)과 무관하게 `Paladin`/`Gunner`/`Assassin` 인가. 로비 상태 글자·결과창의 캐릭터 이름은 그대로 번역 이름인가. 가운데 카드 테두리가 노란 링 대신 흰 띠(`card_selected`)로 보이고 초록 채움·초상화·이름은 그대로인가, 이동 중 페이드·확대 연출 중 흰 띠가 카드와 어긋나지 않는가(잠금 중 초록이 바래도 흰 띠는 그대로).
+  SELECT 셰브론에 마우스를 올리면 흰 링(전보다 얇은 7px)이 켜지고 셰브론 본체만 살짝(알파 0.8) 옅어지며 흰 링·SELECT 글자는 옅어지지 않는가. 잠금 중엔 흰 링이 안 켜지는가.

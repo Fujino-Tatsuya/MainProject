@@ -188,20 +188,21 @@ public static class PodDropScheduleView
             : "\n  도착 페이드인     없음 (로딩 화면이 걷히자마자 맵이 보인다)");
         sb.Append("\n  레터박스          진입 때부터 덮임 → 디졸브 시작에 걷힘");
         sb.Append($"\n  카메라 지점       착지점 위 {t.HoverHeight + t.CameraStartHeightOffset:0.##}m 고정 → {t.BrakeAt:0.##}s 부터 포드 추적 → 디졸브 끝에 플레이어");
-        sb.Append($"\n  빠른 낙하         {t.FallAt:0.##} ~ {t.BrakeAt:0.##}s ({t.FallHeight:0.##}m → {t.BrakeHeight:0.##}m, {t.FallEase})");
-        sb.Append($"\n  급감속            {t.BrakeAt:0.##} ~ {t.HoverAt:0.##}s ({t.BrakeHeight:0.##}m → {t.HoverHeight:0.##}m, {t.BrakeEase}) — 날개·다리 펴기 동시 시작");
+        sb.Append($"\n  빠른 낙하         {t.FallAt:0.##} ~ {t.BrakeAt:0.##}s ({t.FallHeight:0.##}m → {t.BrakeHeight:0.##}m, {t.FallEase}) — 날개 펴진 채");
+        sb.Append($"\n  급감속            {t.BrakeAt:0.##} ~ {t.HoverAt:0.##}s ({t.BrakeHeight:0.##}m → {t.HoverHeight:0.##}m, {t.BrakeEase}) — 날개 접기·다리 펴기 동시 시작");
 
         float deploy = MaxEvent(map.DeployStates, out string deployText);
         double deployed = t.BrakeAt + deploy;
-        sb.Append($"\n  날개·다리 펴기    {t.BrakeAt:0.##} ~ ≈{deployed:0.##}s ({deployText})");
+        sb.Append($"\n  날개 접기·다리 펴기 {t.BrakeAt:0.##} ~ ≈{deployed:0.##}s ({deployText})");
 
         double landStart = t.LandStartAt(deployed);
         double touchdown = t.TouchdownAt(deployed);
-        sb.Append($"\n  착륙              ≈{landStart:0.##} ~ {touchdown:0.##}s ({t.HoverHeight:0.##}m → 0(+여유 {map.podGroundClearance:0.###}m), {t.LandSeconds:0.##}s {t.LandEase}, 닿는 순간 이펙트·흔들림)");
+        sb.Append($"\n  자유낙하          ≈{landStart:0.##} ~ {touchdown:0.##}s ({t.HoverHeight:0.##}m → 0(+여유 {map.podGroundClearance:0.###}m), " +
+                  $"추진력 없음 g {t.FreefallGravity:0.##}m/s² √(2h/g) = {t.FreefallSeconds:0.##}s, 착지 {t.TouchdownSpeed:0.#}m/s, 닿는 순간 이펙트·흔들림)");
 
         float open = MaxEvent(map.OpenStates, out string openText);
         double opened = touchdown + open;
-        sb.Append($"\n  해치 열기·날개 접기 ≈{touchdown:0.##} ~ {opened:0.##}s ({openText})");
+        sb.Append($"\n  해치 열기         ≈{touchdown:0.##} ~ {opened:0.##}s ({openText})");
         sb.Append($"\n  디졸브            ≈{t.DissolveAt(opened):0.##} ~ {t.ReleaseAt(opened):0.##}s (열기 끝 {t.DissolveDelaySeconds:0.##}s 뒤 — 시작 순간 플레이어 보임·레터박스 걷히기 시작, 실루엣은 끝까지 끔)");
         sb.Append($"\n  레터박스 걷힘     ≈{t.LetterboxOutAt(opened):0.##} ~ {t.LetterboxOutAt(opened) + t.LetterboxOutSeconds:0.##}s ({t.LetterboxOutEase})");
         sb.Append($"\n  조작 해제         ≈{t.ReleaseAt(opened):0.##}s (디졸브 끝 — 입력·실루엣 복귀, 카메라 플레이어 추적)");

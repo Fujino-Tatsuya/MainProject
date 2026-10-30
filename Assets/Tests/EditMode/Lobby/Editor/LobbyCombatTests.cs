@@ -252,13 +252,14 @@ public sealed class LobbyCombatTests
     // ─── 단계 범위·배치 ────────────────────────────────────────────────
 
     [Test]
-    public void MonstersActive_OnlyTrain02InProgress()
+    public void MonstersActive_OnlyDuringT22Combat()
     {
-        Assert.That(LobbyCombatRules.MonstersActive(LobbyTrainingStage.Train02, LobbyTrainingPhase.InProgress), Is.True);
-        Assert.That(LobbyCombatRules.MonstersActive(LobbyTrainingStage.Train02, LobbyTrainingPhase.Gathering), Is.False);
-        Assert.That(LobbyCombatRules.MonstersActive(LobbyTrainingStage.Train01, LobbyTrainingPhase.InProgress), Is.False);
-        Assert.That(LobbyCombatRules.MonstersActive(LobbyTrainingStage.Train03A, LobbyTrainingPhase.Gathering), Is.False);
-        Assert.That(LobbyCombatRules.MonstersActive(LobbyTrainingStage.Sortie, LobbyTrainingPhase.InProgress), Is.False);
+        // 할 일 157 ②: 단계 = 단계표 Activity. T20 집결 행은 Activity None 이라 시작 전엔 없다.
+        Assert.That(LobbyCombatRules.MonstersActive(LobbyTutorialActivity.Combat), Is.True);
+        Assert.That(LobbyCombatRules.MonstersActive(LobbyTutorialActivity.None), Is.False, "T20 집결 대기·로비");
+        Assert.That(LobbyCombatRules.MonstersActive(LobbyTutorialActivity.BasicCheck), Is.False);
+        Assert.That(LobbyCombatRules.MonstersActive(LobbyTutorialActivity.Counter), Is.False);
+        Assert.That(LobbyCombatRules.MonstersActive(LobbyTutorialActivity.FreePractice), Is.False);
     }
 
     [Test]

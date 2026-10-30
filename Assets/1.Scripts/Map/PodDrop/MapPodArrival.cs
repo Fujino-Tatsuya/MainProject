@@ -9,15 +9,16 @@ using UnityEngine.SceneManagement;
 /// Dev Boot·판 재시작(Alt+0)·재합류·로비 폴백 로딩은 지금과 같다(낙하 스폰·즉시 조작·S0).
 /// <list type="bullet">
 /// <item>복제: 연출 켜짐(맵 씬 스폰 때 서버가 정함) · 착지점 Pose · 시작 시각(서버시간, 로딩 화면이 걷힌 순간 <see cref="GameManager.OnMainGameReady"/>)
-/// · 펴기 끝·열기 끝 시각(서버시간 — 호스트 포드의 클립 이벤트, 할 일 106). 모든 피어가 이 값으로 <see cref="PodDropMapTimeline"/> 을 같이 계산한다. RPC 없음.</item>
+/// · 접기·펴기 끝·열기 끝 시각(서버시간 — 호스트 포드의 클립 이벤트, 할 일 106). 모든 피어가 이 값으로 <see cref="PodDropMapTimeline"/> 을 같이 계산한다
+/// (자유낙하·착지 시각도 접기·펴기 끝 시각 + 같은 공식 — 할 일 150). RPC 없음.</item>
 /// <item>서버: 플레이어를 착지점 좌석에 낙하 없이 스폰(<see cref="TryGetSeatPoseServer"/> — 로딩 흐름이 부른다) → 스폰되는 대로 연출 잠금
 /// (<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단) + 숨김 → 디졸브 시작에 보이기 → 디졸브 끝에 잠금 해제(조작 복귀).
-/// 단계는 호스트 포드 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 확정한다 — 날개·다리 펴기 둘 다 끝 → 착륙, 해치 열기·날개 접기 둘 다 끝 → (지연) → 디졸브.
+/// 단계는 호스트 포드 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 확정한다 — 날개 접기·다리 펴기 둘 다 끝 → 자유낙하, 해치 열기 끝 → (지연) → 디졸브.
 /// 이벤트가 빠진 클립은 끝까지 돈 것으로 대신하고 경고한다. 연출 중 끊긴 사람은 건너뛰고 남은 인원으로 계속. 착지점을 못 찾거나 시작 시각이 오지 않으면 즉시 해제(폴백, 경고 로그).</item>
 /// <item>전 피어(로컬 표시): 레터박스(진입 때부터 덮임 → 디졸브 시작에 걷힘)·UI 숨김(<see cref="PodDropScreenOverlay"/>, 매 프레임 다시 찾음),
 /// 카메라 거리 배율 줌 + 임시 추적(연출 높이 약간 위 고정 지점 → 급감속부터 포드 → 디졸브 끝에 플레이어), 디졸브 끝까지 플레이어 실루엣 끔(<see cref="PlayerSilhouetteTag.SetSuppressed"/>),
-/// 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 빠른 낙하 → 급감속하며 날개·다리 펴기 → 연출 높이(기본 5m)
-/// → 천천히 착륙(이펙트·흔들림) → 해치 열기·날개 접기 → 1초 뒤 디졸브(<see cref="PodDissolve"/>) → 포드 제거. 클립은 1배속 재생(<see cref="PodAnimatorDriver"/>) —
+/// 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 날개 펴진 채 빠른 낙하 → 급감속하며 날개 접기·다리 펴기 → 연출 높이(기본 5m)
+/// → 추진력 없는 자유낙하로 내리꽂힘(이펙트·흔들림) → 해치 열기 → 1초 뒤 디졸브(<see cref="PodDissolve"/>) → 포드 제거. 클립은 1배속 재생(<see cref="PodAnimatorDriver"/>) —
 /// 클라 포드는 재생만 하고 자기 이벤트로 단계를 넘기지 않는다.</item>
 /// <item><see cref="IsArrivalDoneLocal"/> — 착지 연출이 끝났는가(로컬). 존1 S0 안내(<c>TutorialZone1Flow</c>)가 이것을 기다렸다 — 할 일 107 에서 Legacy 로 빠졌다.</item>
 /// </list>
@@ -58,11 +59,11 @@ public sealed class MapPodArrival : NetworkBehaviour
     private readonly NetworkVariable<Quaternion> _landingRotation = new NetworkVariable<Quaternion>(
         Quaternion.identity, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // 날개·다리 펴기가 둘 다 끝난 시각(서버시간, 호스트 포드 클립 이벤트) — 착륙 시작. 0 = 아직.
+    // 날개 접기·다리 펴기가 둘 다 끝난 시각(서버시간, 호스트 포드 클립 이벤트) — 자유낙하 시작. 0 = 아직.
     private readonly NetworkVariable<double> _deployedAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // 해치 열기·날개 접기가 둘 다 끝난 시각(서버시간, 호스트 포드 클립 이벤트) — 디졸브 시작. 0 = 아직.
+    // 해치 열기가 끝난 시각(서버시간, 호스트 포드 클립 이벤트) — 디졸브 지연 시작. 0 = 아직.
     private readonly NetworkVariable<double> _openedAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -182,7 +183,7 @@ public sealed class MapPodArrival : NetworkBehaviour
 
         Debug.Log($"[SceneFlow] {Tag} 연출 켜짐(진입 {entryKind}) — 로딩이 걷히면 시작. 낙하 {_serverTimeline.FallHeight:0.##}m +{_serverTimeline.FallAt:0.##}s, " +
                   $"급감속 {_serverTimeline.BrakeHeight:0.##}m +{_serverTimeline.BrakeAt:0.##}s 에 [{string.Join(",", _deployGate.States)}] → 연출 높이 {_serverTimeline.HoverHeight:0.##}m +{_serverTimeline.HoverAt:0.##}s " +
-                  $"→ 끝 이벤트 → 착륙 {_serverTimeline.LandSeconds:0.##}s → [{string.Join(",", _openGate.States)}] → 끝 이벤트 → 디졸브 +{_serverTimeline.DissolveDelaySeconds:0.##}s → 조작 해제 +{_serverTimeline.ReleaseAfterOpenSeconds:0.##}s");
+                  $"→ 끝 이벤트 → 자유낙하 g {_serverTimeline.FreefallGravity:0.##} {_serverTimeline.FreefallSeconds:0.##}s(착지 {_serverTimeline.TouchdownSpeed:0.#}m/s) → [{string.Join(",", _openGate.States)}] → 끝 이벤트 → 디졸브 +{_serverTimeline.DissolveDelaySeconds:0.##}s → 조작 해제 +{_serverTimeline.ReleaseAfterOpenSeconds:0.##}s");
     }
 
     private void UnsubscribeReady()
@@ -304,10 +305,10 @@ public sealed class MapPodArrival : NetworkBehaviour
 
         if (_deployedAt.Value <= 0d)
         {
-            if (elapsed >= timeline.BrakeAt && GateOpen(_deployGate, "펴기"))
+            if (elapsed >= timeline.BrakeAt && GateOpen(_deployGate, "접기·펴기"))
             {
                 _deployedAt.Value = ServerNow;
-                Debug.Log($"[SceneFlow] {Tag} 날개·다리 펴기 끝 +{elapsed:0.##}s — 착륙 +{timeline.LandStartAt(elapsed):0.##}s 부터 {timeline.LandSeconds:0.##}s");
+                Debug.Log($"[SceneFlow] {Tag} 날개 접기·다리 펴기 끝 +{elapsed:0.##}s — 자유낙하 +{timeline.LandStartAt(elapsed):0.##}s 부터 {timeline.FreefallSeconds:0.##}s, 착지 +{timeline.TouchdownAt(elapsed):0.##}s");
             }
             return;
         }
@@ -315,7 +316,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (_openedAt.Value <= 0d && elapsed >= timeline.TouchdownAt(deployed) && GateOpen(_openGate, "열기"))
         {
             _openedAt.Value = ServerNow;
-            Debug.Log($"[SceneFlow] {Tag} 해치 열기·날개 접기 끝 +{elapsed:0.##}s — 디졸브 +{timeline.DissolveDelaySeconds:0.##}s 뒤, 조작 해제 +{timeline.ReleaseAfterOpenSeconds:0.##}s 뒤");
+            Debug.Log($"[SceneFlow] {Tag} 해치 열기 끝 +{elapsed:0.##}s — 디졸브 +{timeline.DissolveDelaySeconds:0.##}s 뒤, 조작 해제 +{timeline.ReleaseAfterOpenSeconds:0.##}s 뒤");
         }
     }
 
@@ -567,7 +568,8 @@ public sealed class MapPodArrival : NetworkBehaviour
     }
 
     // 착지 애니는 상태마다 자기 마스크 레이어(Gear·Wings·Hatches)에서 1배속으로 돈다 — 겹쳐 돌아도 서로 덮지 않는다.
-    // 급감속 전(빠른 낙하 중)엔 펴기 클립 처음 자세로 멈춰 떨어진다. 펴기는 급감속 시작 순간, 열기·접기는 지면에 닿는 순간 시작(늦게 본 피어는 지난 만큼 건너뛴다).
+    // 급감속 전(빠른 낙하 중)엔 날개 접기·다리 펴기 클립 처음 자세로 멈춰 떨어진다 — 날개 접기 0프레임 = 펴진 날개(DP_WingDeploy 끝과 같은 자세, 할 일 150).
+    // 접기·펴기는 급감속 시작 순간, 해치 열기는 지면에 닿는 순간 시작(늦게 본 피어는 지난 만큼 건너뛴다).
     // 해치는 지면에 닿기 전까지 열기 클립 0프레임에 고정(닫힌 자세) — Hatches 레이어가 비면 베이스 DP_Idle 의 열린 해치가 보인다. 고정 중 이벤트는 버린다.
     private void UpdatePodAnimation(PodDropMapTimeline timeline, bool started, double elapsed, double deployed)
     {
@@ -584,21 +586,19 @@ public sealed class MapPodArrival : NetworkBehaviour
 
         if (!started || elapsed < timeline.BrakeAt)
         {
-            _podAnimator.PoseStart(map.wingDeployState, -1);
+            _podAnimator.PoseStart(map.wingFoldState, -1);
             _podAnimator.PoseStart(map.gearDeployState, -1);
             return;
         }
 
         float sinceBrake = (float)(elapsed - timeline.BrakeAt);
-        _podAnimator.Play(map.wingDeployState, -1, sinceBrake);
+        _podAnimator.Play(map.wingFoldState, -1, sinceBrake);
         _podAnimator.Play(map.gearDeployState, -1, sinceBrake);
 
         if (elapsed < touchdown)
             return;
 
-        float sinceTouchdown = (float)(elapsed - touchdown);
-        _podAnimator.Play(map.hatchOpenState, -1, sinceTouchdown);
-        _podAnimator.Play(map.wingFoldState, -1, sinceTouchdown);
+        _podAnimator.Play(map.hatchOpenState, -1, (float)(elapsed - touchdown));
     }
 
     private void SpawnPod(Vector3 landing)

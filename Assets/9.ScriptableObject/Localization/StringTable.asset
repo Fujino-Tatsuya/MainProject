@@ -925,23 +925,23 @@ MonoBehaviour:
       \uD5A5\uD574."
     en: "Missed \u2014 get closer and face the Spinner Bot."
   - key: Tutorial.Guide.TUT_Z3_EARLY
-    ko: "\uC544\uC9C1\uC785\uB2C8\uB2E4 \u2014 \uB178\uB797\uAC8C \uBE5B\uB0A0 \uB54C\uB9CC
-      \uAC04\uD30C\uB429\uB2C8\uB2E4."
-    en: "Not yet \u2014 you can only interrupt while it glows yellow."
+    ko: "\uC544\uC9C1\uC785\uB2C8\uB2E4 \u2014 \uBCF4\uB77C\uC0C9\uC73C\uB85C \uBE5B\uB0A0
+      \uB54C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4."
+    en: "Not yet \u2014 you can only interrupt while it glows purple."
   - key: Tutorial.Guide.TUT_Z3_FIRST_SUCCESS
     ko: "\uAC04\uD30C \uC131\uACF5! \uACF5\uACA9\uC774 \uB04A\uAE30\uACE0 \uC801\uC774
       \uCDE8\uC57D\uD574\uC9D1\uB2C8\uB2E4."
     en: Interrupted! The attack is cut off and the enemy is vulnerable.
   - key: Tutorial.Guide.TUT_Z3_HINT
-    ko: "\uC694\uB839: \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uBC14\uB85C \uBD99\uC5B4\uC11C
+    ko: "\uC694\uB839: \uBCF4\uB77C\uBE5B\uC774 \uBCF4\uC774\uBA74 \uBC14\uB85C \uBD99\uC5B4\uC11C
       \uC6B0\uD074\uB9AD. \uAC04\uD30C\uB294 \uB2E4\uC2DC \uC4F0\uAE30\uAE4C\uC9C0
       \uBA87 \uCD08 \uAC78\uB9BD\uB2C8\uB2E4."
-    en: 'Tip: when you see the yellow glow, get close and right-click. Interrupt
+    en: 'Tip: when you see the purple glow, get close and right-click. Interrupt
       takes a few seconds to recharge.'
   - key: Tutorial.Guide.TUT_Z3_REAL
-    ko: "\uC5F0\uC2B5 \uB05D. \uC774\uC81C \uC9C4\uC9DC\uC785\uB2C8\uB2E4! \uB178\uB780\uBE5B\uC774
+    ko: "\uC5F0\uC2B5 \uB05D. \uC774\uC81C \uC9C4\uC9DC\uC785\uB2C8\uB2E4! \uBCF4\uB77C\uBE5B\uC774
       \uBCF4\uC774\uBA74 \uC5B8\uC81C\uB4E0 \uAC04\uD30C\uD558\uC138\uC694."
-    en: Practice over. This is the real thing! Interrupt whenever you see the yellow
+    en: Practice over. This is the real thing! Interrupt whenever you see the purple
       glow.
   - key: Tutorial.Guide.TUT_Z3_BOSS
     ko: "[\uC2A4\uD53C\uB108\uBD07] \uC744 \uCC98\uCE58\uD558\uC138\uC694"
@@ -985,8 +985,8 @@ MonoBehaviour:
     ko: "\uC911\uC559 \uC12C\uC758 \uC911\uAC04\uBCF4\uC2A4\uB97C \uCC98\uCE58\uD558\uC138\uC694"
     en: Defeat the mid-boss on the central island
   - key: Tutorial.Guide.TUT_Z4_COUNTER_REMIND
-    ko: "\uB178\uB797\uAC8C \uBE5B\uB098\uBA74 \uAC04\uD30C \uAE30\uD68C\uC785\uB2C8\uB2E4."
-    en: A yellow glow means a chance to interrupt.
+    ko: "\uBCF4\uB77C\uC0C9\uC73C\uB85C \uBE5B\uB098\uBA74 \uAC04\uD30C \uAE30\uD68C\uC785\uB2C8\uB2E4."
+    en: A purple glow means a chance to interrupt.
   - key: Tutorial.Guide.TUT_Z4_ULT
     ko: "<b>R</b> \u2014 \uAD81\uADF9\uAE30\uB97C \uC368 \uBCF4\uC138\uC694."
     en: "<b>R</b> \u2014 Try your Ultimate."
@@ -1014,10 +1014,10 @@ MonoBehaviour:
     en: "Moving to the boss room \u2014 leaving the pad or going down cancels it."
   - key: Tutorial.Guide.TUT_B_BOSS_FRONT_TIP
     ko: "\uC6D0\uD749(23\uD638)\uC740 <b>\uC815\uBA74</b>\uC5D0\uC11C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4
-      \u2014 \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uC55E\uC73C\uB85C \uB3CC\uC544\uAC00
+      \u2014 \uBCF4\uB77C\uBE5B\uC774 \uBCF4\uC774\uBA74 \uC55E\uC73C\uB85C \uB3CC\uC544\uAC00
       \uC6B0\uD074\uB9AD\uD558\uC138\uC694."
     en: "The culprit (No.23) can only be interrupted from the <b>front</b> \u2014
-      when you see the yellow glow, get in front and right-click."
+      when you see the purple glow, get in front and right-click."
   - key: Tutorial.Guide.TUT_Z1_ATTACK_HEAT
     ko: "\uACC4\uC18D \uC3D8\uBA74 \uACFC\uC5F4\uC774 \uC313\uC785\uB2C8\uB2E4. \uAC00\uB4DD
       \uCC28\uBA74 \uC7A0\uC2DC \uACF5\uACA9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
@@ -1117,9 +1117,9 @@ MonoBehaviour:
       \uCD08\uAE30\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
     en: All skill cooldowns have been reset.
   - key: Tutorial.Guide.TUT_Z3_COUNTER_GOAL
-    ko: "\uB178\uB797\uAC8C \uBE5B\uB0A0 \uB54C \uAC00\uAE4C\uC774\uC5D0\uC11C \uC801\uC744
-      \uD5A5\uD574 <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C \uAC04\uD30C\uD558\uC138\uC694."
-    en: When it glows yellow, get close, face the enemy and <b>Right Click</b> to
+    ko: "\uBCF4\uB77C\uC0C9\uC73C\uB85C \uBE5B\uB0A0 \uB54C \uAC00\uAE4C\uC774\uC5D0\uC11C
+      \uC801\uC744 \uD5A5\uD574 <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C \uAC04\uD30C\uD558\uC138\uC694."
+    en: When it glows purple, get close, face the enemy and <b>Right Click</b> to
       interrupt.
   - key: Tutorial.Guide.TUT_Z3_PUSH_INTRO
     ko: "\uC6B0\uD074\uB9AD\uC774 \uB2E4\uC2DC \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.
@@ -1313,6 +1313,641 @@ MonoBehaviour:
   - key: Tutorial.Guide.TUT_Z4_INTRO_RETURN
     ko: "\uC5B4\uC11C \uC6C0\uC9C1\uC5EC."
     en: Get moving.
+  - key: UI.SkillTooltip.Tag.Knockback
+    ko: "\uB109\uBC31"
+    en: "\uB109\uBC31"
+  - key: UI.SkillTooltip.Tag.Stun
+    ko: "\uAE30\uC808"
+    en: "\uAE30\uC808"
+  - key: UI.SkillTooltip.Tag.Vulnerable
+    ko: "\uCDE8\uC57D"
+    en: "\uCDE8\uC57D"
+  - key: UI.SkillTooltip.Tag.Shield
+    ko: "\uBCF4\uD638\uB9C9"
+    en: "\uBCF4\uD638\uB9C9"
+  - key: UI.SkillTooltip.Tag.Heal
+    ko: "\uD68C\uBCF5"
+    en: "\uD68C\uBCF5"
+  - key: UI.SkillTooltip.Tag.Overheat
+    ko: "\uACFC\uC5F4"
+    en: "\uACFC\uC5F4"
+  - key: UI.SkillTooltip.Tag.Unstoppable
+    ko: "\uC800\uC9C0\uBD88\uAC00"
+    en: "\uC800\uC9C0\uBD88\uAC00"
+  - key: UI.SkillTooltip.Tag.Invulnerable
+    ko: "\uBB34\uC801"
+    en: "\uBB34\uC801"
+  - key: UI.StatusEffect.Concussion
+    ko: "\uB1CC\uC9C4\uD0D5"
+    en: Concussion
+  - key: UI.Trait.Card.Category
+    ko: '{category}'
+    en: '{category}'
+  - key: UI.Trait.Help
+    ko: "\uBCF4\uC2A4\uB294 \uCDE8\uC57D\uD560 \uB54C\uB9CC \uBC00\uCE58\uAE30\uC640
+      \uAE30\uC808\uC774 \uC801\uC6A9\uB429\uB2C8\uB2E4."
+    en: Bosses can only be pushed or stunned while Vulnerable.
+  - key: UI.Trait.Conflict.Default
+    ko: "\u2018{traits}\u2019\uC758 \uD6A8\uACFC\uB97C \uBC1B\uC744 \uC218 \uC5C6\uAC8C
+      \uB429\uB2C8\uB2E4. \uC120\uD0DD\uD560\uAE4C\uC694?"
+    en: "\u2018{traits}\u2019 will no longer take effect. Choose this trait?"
+  - key: UI.Trait.Conflict.Confirm
+    ko: "\uD655\uC778"
+    en: Confirm
+  - key: UI.Trait.Conflict.Cancel
+    ko: "\uCDE8\uC18C"
+    en: Cancel
+  - key: UI.Trait.Card.DamageUnknown
+    ko: '-'
+    en: '-'
+  - key: UI.Trait.Conflict.NameSeparator
+    ko: ','
+    en: ','
+  - key: Trait.ASN_1_NORMAL_E_DAMAGE.Name
+    ko: "\uAC15\uD0C0 \uAC15\uD654"
+    en: Empowered Strike
+  - key: Trait.ASN_1_NORMAL_E_DAMAGE.Category
+    ko: "\uC77C\uBC18 E \uAC15\uD654"
+    en: Normal E Upgrade
+  - key: Trait.ASN_1_NORMAL_E_DAMAGE.Desc
+    ko: "\uC77C\uBC18 E\uB85C \uAC15\uD654\uD55C \uAE30\uBCF8 \uACF5\uACA9\uC758
+      \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: Basic attacks empowered by normal E deal {damageIncrease:%} more damage.
+  - key: Trait.ASN_1_Q_COOLDOWN.Name
+    ko: "\uB3CC\uD30C \uAC00\uC18D"
+    en: Breakthrough Haste
+  - key: Trait.ASN_1_Q_COOLDOWN.Category
+    ko: "\uC77C\uBC18 Q \uAC15\uD654"
+    en: Normal Q Upgrade
+  - key: Trait.ASN_1_Q_COOLDOWN.Desc
+    ko: "\uC77C\uBC18 Q \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {cooldownReduction:%}
+      \uAC10\uC18C\uD569\uB2C8\uB2E4."
+    en: Normal Q cooldown reduced by {cooldownReduction:%}.
+  - key: Trait.ASN_1_TRANS_E_DAMAGE.Name
+    ko: "\uAD11\uB780 \uAC15\uD654"
+    en: Frenzy Boost
+  - key: Trait.ASN_1_TRANS_E_DAMAGE.Category
+    ko: "\uBCC0\uC2E0 E \uAC15\uD654"
+    en: Transformed E Upgrade
+  - key: Trait.ASN_1_TRANS_E_DAMAGE.Desc
+    ko: "\uBCC0\uC2E0 E \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: Transformed E damage increased by {damageIncrease:%}.
+  - key: Trait.ASN_2_RELEASE.Name
+    ko: "\uC644\uC804 \uD574\uBC29"
+    en: Full Release
+  - key: Trait.ASN_2_RELEASE.Category
+    ko: "\uBCC0\uC2E0 \uAC15\uD654"
+    en: Transform Upgrade
+  - key: Trait.ASN_2_RELEASE.Desc
+    ko: "\uBCC0\uC2E0 \uC911 \uAE30\uBCF8 \uACF5\uACA9\uACFC Q, E \uD53C\uD574\uAC00
+      {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: While transformed, basic attack, Q, and E damage increased by {damageIncrease:%}.
+  - key: Trait.ASN_2_RESTRAINT.Name
+    ko: "\uC808\uC81C\uB41C \uBD84\uB178"
+    en: Restrained Fury
+  - key: Trait.ASN_2_RESTRAINT.Category
+    ko: "R \uC81C\uAC70 \xB7 \uC77C\uBC18 Q/E \uAC15\uD654"
+    en: "No R \xB7 Normal Q/E Upgrade"
+  - key: Trait.ASN_2_RESTRAINT.Desc
+    ko: "R\uACFC \uBCC0\uC2E0\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.
+      \uB300\uC2E0 \uC77C\uBC18 Q\uC640 E \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD558\uACE0
+      \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {cooldownReduction:%} \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+    en: You can no longer use R or Transform. Instead, normal Q and E deal {damageIncrease:%}
+      more damage and their cooldowns are reduced by {cooldownReduction:%}.
+  - key: Trait.ASN_2_RETURN.Name
+    ko: "\uADF8\uB9BC\uC790 \uD68C\uADC0"
+    en: Shadow Return
+  - key: Trait.ASN_2_RETURN.Category
+    ko: "Q \uBCC0\uACBD \xB7 \uC655\uBCF5 \uACF5\uACA9"
+    en: "Q Change \xB7 Round Trip"
+  - key: Trait.ASN_2_RETURN.Desc
+    ko: "Q \uC0AC\uC6A9 \uD6C4 {returnWindow}\uCD08 \uC548\uC5D0 \uB2E4\uC2DC \uB204\uB974\uBA74
+      \uCC98\uC74C \uC704\uCE58\uB97C \uD5A5\uD574 \uB3CC\uC9C4\uD558\uBA70 \uC6D0\uB798
+      Q \uD53C\uD574\uC758 {returnDamageRatio:%}\uB97C \uC90D\uB2C8\uB2E4. \uB300\uC2E0
+      Q \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {cooldownIncrease:%} \uB298\uC5B4\uB0A9\uB2C8\uB2E4."
+    en: Press Q again within {returnWindow}s to dash back toward your starting point,
+      dealing {returnDamageRatio:%} of the original Q damage. Q cooldown is increased
+      by {cooldownIncrease:%}.
+  - key: Trait.ASN_3_BASIC_CDR.Name
+    ko: "\uC0AC\uB0E5\uC758 \uBC15\uC790"
+    en: Hunter's Rhythm
+  - key: Trait.ASN_3_BASIC_CDR.Category
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 \uC5F0\uACC4"
+    en: Basic Attack Follow-up
+  - key: Trait.ASN_3_BASIC_CDR.Desc
+    ko: "\uAE30\uBCF8 \uACF5\uACA9\uC744 \uB9DE\uD788\uBA74 Q\uC640 E\uC758 \uB0A8\uC740
+      \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 \uAC01\uAC01 {refundSeconds}\uCD08
+      \uC904\uC5B4\uB4ED\uB2C8\uB2E4. {procInterval}\uCD08\uB9C8\uB2E4 \uD55C \uBC88
+      \uBC1C\uB3D9\uD569\uB2C8\uB2E4."
+    en: Basic attack hits reduce the remaining cooldowns of Q and E by {refundSeconds}s
+      each. Triggers once every {procInterval}s.
+  - key: Trait.ASN_3_E_AREA.Name
+    ko: "\uCE7C\uB0A0\uC758 \uC601\uC5ED"
+    en: Blade Domain
+  - key: Trait.ASN_3_E_AREA.Category
+    ko: "E \uAC15\uD654"
+    en: E Upgrade
+  - key: Trait.ASN_3_E_AREA.Desc
+    ko: "\uC77C\uBC18 E \uAC15\uD0C0\uC758 \uACF5\uACA9 \uBC94\uC704\uC640 \uBCC0\uC2E0
+      E\uC758 \uBC18\uACBD\uC774 {areaIncrease:%} \uB298\uC5B4\uB0A9\uB2C8\uB2E4."
+    en: Normal E strike range and Transformed E radius increased by {areaIncrease:%}.
+  - key: Trait.ASN_3_Q_BASIC.Name
+    ko: "\uB3CC\uD30C\uC758 \uC5EC\uC138"
+    en: Breakthrough Momentum
+  - key: Trait.ASN_3_Q_BASIC.Category
+    ko: "Q \uC5F0\uACC4 \uAC15\uD654"
+    en: Q Follow-up Upgrade
+  - key: Trait.ASN_3_Q_BASIC.Desc
+    ko: "Q\uB97C \uB9DE\uD788\uBA74 {buffDuration}\uCD08 \uC548\uC5D0 \uD558\uB294
+      \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC758 \uCCAB \uD0C0\uACA9 \uD53C\uD574\uAC00
+      {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4. \uC77C\uBC18 E \uAC15\uD0C0\uC5D0\uB3C4
+      \uC801\uC6A9\uB429\uB2C8\uB2E4."
+    en: Hitting with Q increases the first hit of your next basic attack within {buffDuration}s
+      by {damageIncrease:%}. Also applies to the normal E strike.
+  - key: Trait.ASN_4_COMBO_EXTRA.Name
+    ko: "\uB05D\uC5C6\uB294 \uCE7C\uB0A0"
+    en: Endless Blades
+  - key: Trait.ASN_4_COMBO_EXTRA.Category
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 \uAC15\uD654"
+    en: Basic Attack Upgrade
+  - key: Trait.ASN_4_COMBO_EXTRA.Desc
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 4\uD0C0\uB97C \uB05D\uAE4C\uC9C0 \uC4F0\uBA74
+      \uB9C8\uC9C0\uB9C9 \uACF5\uACA9 \uBC94\uC704\uC5D0 {dmg}\uC758 \uCD94\uAC00
+      \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uBCC0\uC2E0 \uC911\uC5D0\uB3C4 \uC801\uC6A9\uB429\uB2C8\uB2E4."
+    en: Completing the 4-hit basic attack deals {dmg} additional damage in the last
+      attack's area. Also works while Transformed.
+  - key: Trait.ASN_4_NORMAL_E_PUSH.Name
+    ko: "\uAE09\uC18C \uD30C\uAD34"
+    en: Vital Break
+  - key: Trait.ASN_4_NORMAL_E_PUSH.Category
+    ko: "\uC77C\uBC18 E \uAC15\uD654 \xB7 \uBC00\uCE58\uAE30"
+    en: "Normal E Upgrade \xB7 Knockback"
+  - key: Trait.ASN_4_NORMAL_E_PUSH.Desc
+    ko: "\uC77C\uBC18 E\uB85C \uAC15\uD654\uD55C \uAE30\uBCF8 \uACF5\uACA9\uC774
+      \uC801\uC744 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4. \uBCC0\uC2E0 E\uC5D0\uB294 \uC801\uC6A9\uB418\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Basic attacks empowered by normal E knock enemies back. Does not apply to
+      Transformed E.
+  - key: Trait.ASN_4_Q_TRAIL.Name
+    ko: "\uCD94\uACA9\uC758 \uADA4\uC801"
+    en: Pursuit Trail
+  - key: Trait.ASN_4_Q_TRAIL.Category
+    ko: "Q \uAC15\uD654"
+    en: Q Upgrade
+  - key: Trait.ASN_4_Q_TRAIL.Desc
+    ko: "Q\uB85C \uC9C0\uB098\uC628 \uAE38\uC744 \uD55C \uBC88 \uB354 \uBCA0\uC5B4
+      {dmg}\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uADF8\uB9BC\uC790
+      \uD68C\uADC0\uC758 \uBCF5\uADC0 \uACBD\uB85C\uC5D0\uB3C4 \uC801\uC6A9\uB429\uB2C8\uB2E4."
+    en: Slashes the path traveled by Q once more, dealing {dmg} additional damage.
+      Also applies to the Shadow Return path.
+  - key: Trait.GUN_1_BASIC_DAMAGE.Name
+    ko: "\uCD9C\uB825 \uAC15\uD654"
+    en: Power Boost
+  - key: Trait.GUN_1_BASIC_DAMAGE.Category
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 \uAC15\uD654"
+    en: Basic Attack Boost
+  - key: Trait.GUN_1_BASIC_DAMAGE.Desc
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: Basic attack damage is increased by {damageIncrease:%}.
+  - key: Trait.GUN_1_CHARGE.Name
+    ko: "\uACE0\uC18D \uC9D1\uC18D"
+    en: Rapid Focus
+  - key: Trait.GUN_1_CHARGE.Category
+    ko: "Q \uAC15\uD654"
+    en: Q Boost
+  - key: Trait.GUN_1_CHARGE.Desc
+    ko: "Q\uB97C \uB05D\uAE4C\uC9C0 \uCDA9\uC804\uD558\uB294 \uC2DC\uAC04\uC774 {chargeTimeReduction:%}
+      \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+    en: Time to fully charge Q is reduced by {chargeTimeReduction:%}.
+  - key: Trait.GUN_1_WIDTH.Name
+    ko: "\uAD11\uD3ED \uB808\uC774\uC800"
+    en: Wide Laser
+  - key: Trait.GUN_1_WIDTH.Category
+    ko: "Q \uAC15\uD654"
+    en: Q Boost
+  - key: Trait.GUN_1_WIDTH.Desc
+    ko: "Q \uB808\uC774\uC800\uC758 \uD3ED\uC774 {widthIncrease:%} \uB113\uC5B4\uC9D1\uB2C8\uB2E4."
+    en: Q laser width is increased by {widthIncrease:%}.
+  - key: Trait.GUN_2_COOL_MODE.Name
+    ko: "\uC815\uC628 \uC6B4\uC6A9"
+    en: Cool Operation
+  - key: Trait.GUN_2_COOL_MODE.Category
+    ko: "\uACFC\uC5F4 \uC81C\uAC70"
+    en: No Heat
+  - key: Trait.GUN_2_COOL_MODE.Desc
+    ko: "\uACFC\uC5F4\uACFC \uACFC\uC5F4 \uB2E8\uACC4\uAC00 \uC0AC\uB77C\uC838 \uACC4\uC18D
+      \uC0AC\uACA9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 \uAE30\uBCF8
+      \uACF5\uACA9 \uD53C\uD574\uAC00 {basicDamagePenalty:%} \uAC10\uC18C\uD558\uBA70,
+      Q\uC640 R\uC758 \uACFC\uC5F4 \uBCF4\uB108\uC2A4\uB3C4 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4."
+    en: Heat and Heat levels are removed, so you can fire continuously. However,
+      basic attack damage is reduced by {basicDamagePenalty:%}, and Q and R lose
+      their Heat bonus.
+  - key: Trait.GUN_2_HEAT_SHOT.Name
+    ko: "\uCD95\uC5F4 \uD3EC\uACA9"
+    en: Heat Discharge
+  - key: Trait.GUN_2_HEAT_SHOT.Category
+    ko: "Q \uBCC0\uACBD \xB7 \uACFC\uC5F4 \uC18C\uBAA8"
+    en: "Q Change \xB7 Consumes Heat"
+  - key: Trait.GUN_2_HEAT_SHOT.Desc
+    ko: "Q\uB97C \uBC1C\uC0AC\uD558\uBA74 \uACFC\uC5F4\uC744 \uBAA8\uB450 \uC18C\uBAA8\uD569\uB2C8\uB2E4.
+      \uB9CE\uC774 \uC18C\uBAA8\uD560\uC218\uB85D Q \uD53C\uD574\uAC00 \uC99D\uAC00\uD558\uBA70,
+      \uCD5C\uB300 {maxSpentDamageBonus:%}\uAE4C\uC9C0 \uAC15\uD574\uC9D1\uB2C8\uB2E4."
+    en: Firing Q consumes all Heat. The more Heat consumed, the more damage Q deals,
+      up to {maxSpentDamageBonus:%} more.
+  - key: Trait.GUN_2_OVERDRIVE.Name
+    ko: "\uD55C\uACC4 \uB3CC\uD30C"
+    en: Overdrive
+  - key: Trait.GUN_2_OVERDRIVE.Category
+    ko: "\uACFC\uC5F4 \uAC15\uD654"
+    en: Heat Boost
+  - key: Trait.GUN_2_OVERDRIVE.Desc
+    ko: "\uACFC\uC5F4 \uB2E8\uACC4\uAC00 \uB192\uC744\uC218\uB85D \uAE30\uBCF8 \uACF5\uACA9\uACFC
+      Q, R\uC774 \uB354 \uAC15\uD574\uC9D1\uB2C8\uB2E4. \uB300\uC2E0 \uAE30\uBCF8
+      \uACF5\uACA9\uC758 \uACFC\uC5F4 \uC99D\uAC00\uB7C9\uC774 {heatGainIncrease:%}
+      \uB298\uC5B4\uB0A9\uB2C8\uB2E4."
+    en: The higher your Heat level, the stronger your basic attack, Q, and R. However,
+      basic attacks build {heatGainIncrease:%} more Heat.
+  - key: Trait.GUN_3_PIERCE.Name
+    ko: "\uAD00\uD1B5 \uD0C4\uB3C4"
+    en: Piercing Shot
+  - key: Trait.GUN_3_PIERCE.Category
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 \uAC15\uD654"
+    en: Basic Attack Boost
+  - key: Trait.GUN_3_PIERCE.Desc
+    ko: "\uAE30\uBCF8 \uACF5\uACA9\uC774 \uC801\uC744 \uAD00\uD1B5\uD569\uB2C8\uB2E4.
+      \uB450 \uBC88\uC9F8 \uC801\uBD80\uD130\uB294 \uC6D0\uB798 \uD53C\uD574\uC758
+      {secondaryDamageRatio:%}\uB97C \uC90D\uB2C8\uB2E4."
+    en: Basic attacks pierce enemies. Enemies after the first take {secondaryDamageRatio:%}
+      of the original damage.
+  - key: Trait.GUN_3_Q_PUSH.Name
+    ko: "\uCDA9\uACA9 \uB808\uC774\uC800"
+    en: Impact Laser
+  - key: Trait.GUN_3_Q_PUSH.Category
+    ko: "Q \uAC15\uD654 \xB7 \uBC00\uCE58\uAE30"
+    en: "Q Boost \xB7 Push"
+  - key: Trait.GUN_3_Q_PUSH.Desc
+    ko: "Q\uC5D0 \uB9DE\uC740 \uC801\uC744 \uB808\uC774\uC800\uAC00 \uB098\uC544\uAC00\uB294
+      \uBC29\uD5A5\uC73C\uB85C \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
+    en: Enemies hit by Q are pushed in the direction the laser travels.
+  - key: Trait.GUN_3_VOLLEY.Name
+    ko: "\uC9D1\uC18D \uC5F0\uC0AC"
+    en: Focused Volley
+  - key: Trait.GUN_3_VOLLEY.Category
+    ko: "Q \uBCC0\uACBD \xB7 \uC5F0\uC18D \uD3EC\uACA9"
+    en: "Q Change \xB7 Volley"
+  - key: Trait.GUN_3_VOLLEY.Desc
+    ko: "Q\uAC00 \uBE60\uB974\uAC8C {shotCount}\uBC1C\uC744 \uC5F0\uC18D \uBC1C\uC0AC\uD569\uB2C8\uB2E4.
+      \uD55C \uBC1C\uC740 \uC6D0\uB798 \uD53C\uD574\uC758 {perShotDamageRatio:%},
+      \uBAA8\uB450 \uB9DE\uD788\uBA74 \uCD1D {totalDamageRatio:%}\uC758 \uD53C\uD574\uB97C
+      \uC90D\uB2C8\uB2E4."
+    en: Q rapidly fires {shotCount} shots in a row. Each shot deals {perShotDamageRatio:%}
+      of the original damage, for a total of {totalDamageRatio:%} if all hit.
+  - key: Trait.GUN_4_ECHO_Q.Name
+    ko: "\uC794\uB958 \uD3EC\uACA9"
+    en: Residual Blast
+  - key: Trait.GUN_4_ECHO_Q.Category
+    ko: "Q \uAC15\uD654"
+    en: Q Boost
+  - key: Trait.GUN_4_ECHO_Q.Desc
+    ko: "Q \uACF5\uACA9\uC774 \uB05D\uB09C \uB4A4 \uAC19\uC740 \uBC29\uD5A5\uC73C\uB85C
+      \uB808\uC774\uC800\uB97C \uD55C \uBC88 \uB354 \uC3F4 {dmg}\uC758 \uCD94\uAC00
+      \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+    en: After Q finishes, fire one more laser in the same direction, dealing {dmg}
+      additional damage.
+  - key: Trait.GUN_4_EXTRA_BASIC.Name
+    ko: "\uC774\uC911 \uCD9C\uB825"
+    en: Dual Output
+  - key: Trait.GUN_4_EXTRA_BASIC.Category
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 \uAC15\uD654"
+    en: Basic Attack Boost
+  - key: Trait.GUN_4_EXTRA_BASIC.Desc
+    ko: "\uAE30\uBCF8 \uACF5\uACA9\uC744 {requiredShots}\uBC88 \uBC1C\uC0AC\uD560
+      \uB54C\uB9C8\uB2E4 {dmg}\uC758 \uD53C\uD574\uB97C \uC8FC\uB294 \uCD94\uAC00
+      \uB808\uC774\uC800\uB97C \uC3E9\uB2C8\uB2E4. \uCD94\uAC00 \uB808\uC774\uC800\uB294
+      \uACFC\uC5F4\uC744 \uC62C\uB9AC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Every {requiredShots} basic attacks, fire an extra laser that deals {dmg}
+      damage. The extra laser does not build Heat.
+  - key: Trait.GUN_4_R_FOCUS.Name
+    ko: "\uC9D1\uC911 \uD3EC\uD654"
+    en: Focus Fire
+  - key: Trait.GUN_4_R_FOCUS.Category
+    ko: "R \uC5F0\uACC4 \uAC15\uD654"
+    en: R Synergy
+  - key: Trait.GUN_4_R_FOCUS.Desc
+    ko: "\uC790\uC2E0\uC758 R \uB808\uC774\uC800 \uBC94\uC704 \uC548\uC5D0 \uC788\uB294
+      \uC801\uC5D0\uAC8C \uAE30\uBCF8 \uACF5\uACA9\uACFC Q \uD53C\uD574\uAC00 {damageIncrease:%}
+      \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: Your basic attack and Q deal {damageIncrease:%} more damage to enemies inside
+      your own R laser.
+  - key: Trait.PAL_1_E_COOLDOWN.Name
+    ko: "\uC218\uD638 \uC7AC\uC815\uBE44"
+    en: Guard Refit
+  - key: Trait.PAL_1_E_COOLDOWN.Category
+    ko: "E \uAC15\uD654"
+    en: E Upgrade
+  - key: Trait.PAL_1_E_COOLDOWN.Desc
+    ko: "E \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {cooldownReduction:%}
+      \uAC10\uC18C\uD569\uB2C8\uB2E4."
+    en: E cooldown is reduced by {cooldownReduction:%}.
+  - key: Trait.PAL_1_PASSIVE_HEAL.Name
+    ko: "\uBD88\uAD74\uC758 \uD68C\uBCF5"
+    en: Unyielding Recovery
+  - key: Trait.PAL_1_PASSIVE_HEAL.Category
+    ko: "\uD328\uC2DC\uBE0C \uAC15\uD654"
+    en: Passive Upgrade
+  - key: Trait.PAL_1_PASSIVE_HEAL.Desc
+    ko: "\uD328\uC2DC\uBE0C\uC758 \uCCB4\uB825 <style=heal>\uD68C\uBCF5</style>\uB7C9\uC774
+      {healIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: Your passive's <style=heal>healing</style> is increased by {healIncrease:%}.
+  - key: Trait.PAL_1_Q_DAMAGE.Name
+    ko: "\uC9C4\uACA9 \uAC15\uD654"
+    en: Advance Mastery
+  - key: Trait.PAL_1_Q_DAMAGE.Category
+    ko: "Q \uAC15\uD654"
+    en: Q Upgrade
+  - key: Trait.PAL_1_Q_DAMAGE.Desc
+    ko: "Q \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: Q damage is increased by {damageIncrease:%}.
+  - key: Trait.PAL_2_DASH.Name
+    ko: "\uB3CC\uD30C\uC758 \uBC29\uD328"
+    en: Breakthrough Shield
+  - key: Trait.PAL_2_DASH.Category
+    ko: "Q \uBCC0\uACBD \xB7 \uBC00\uCE58\uAE30"
+    en: "Q Change \xB7 Knockback"
+  - key: Trait.PAL_2_DASH.Desc
+    ko: "Q\uAC00 {dashDistance}m\uB97C \uBE60\uB974\uAC8C \uB3CC\uC9C4\uD558\uBA70
+      {dmg}\uC758 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uC801\uC744 \uB04C\uACE0
+      \uAC00\uC9C0 \uC54A\uACE0 \uD55C \uBC88 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
+    en: Q dashes {dashDistance}m forward, dealing {dmg} damage. Enemies are knocked
+      back once instead of being dragged along.
+  - key: Trait.PAL_2_E_REFUND.Name
+    ko: "\uC218\uD638\uC758 \uC21C\uD658"
+    en: Guard Cycle
+  - key: Trait.PAL_2_E_REFUND.Category
+    ko: "E \uAC15\uD654"
+    en: E Upgrade
+  - key: Trait.PAL_2_E_REFUND.Desc
+    ko: "E\uB85C \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uB0A8\uC740 E \uC7AC\uC0AC\uC6A9
+      \uB300\uAE30\uC2DC\uAC04\uC774 {refundSeconds}\uCD08 \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+    en: Blocking an attack with E reduces E's remaining cooldown by {refundSeconds}s.
+  - key: Trait.PAL_2_SHARE_HEAL.Name
+    ko: "\uB098\uB204\uB294 \uBD88\uAD74"
+    en: Shared Resolve
+  - key: Trait.PAL_2_SHARE_HEAL.Category
+    ko: "\uD328\uC2DC\uBE0C \uBCC0\uACBD \xB7 \uC544\uAD70 \uD68C\uBCF5"
+    en: "Passive Change \xB7 Ally Heal"
+  - key: Trait.PAL_2_SHARE_HEAL.Desc
+    ko: "\uD328\uC2DC\uBE0C\uB85C \uD68C\uBCF5\uD558\uACE0 \uB0A8\uC740 \uC591\uC73C\uB85C
+      {allyRange}m \uC548\uC5D0\uC11C \uB0A8\uC740 \uCCB4\uB825 \uBE44\uC728\uC774
+      \uAC00\uC7A5 \uB0AE\uC740 \uC544\uAD70 \uD55C \uBA85\uC744 <style=heal>\uD68C\uBCF5</style>\uD569\uB2C8\uB2E4."
+    en: Excess passive healing <style=heal>heals</style> the ally within {allyRange}m
+      with the lowest health ratio.
+  - key: Trait.PAL_3_E_SHIELD.Name
+    ko: "\uC218\uD638\uC758 \uC794\uAD11"
+    en: Guard Afterglow
+  - key: Trait.PAL_3_E_SHIELD.Category
+    ko: "E \uAC15\uD654 \xB7 \uBCF4\uD638\uB9C9"
+    en: "E Upgrade \xB7 Shield"
+  - key: Trait.PAL_3_E_SHIELD.Desc
+    ko: "E\uB85C \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uD53C\uD574 \uBB34\uC2DC
+      \uD6A8\uACFC\uAC00 \uB05D\uB09C \uB4A4 \uCD5C\uB300 \uCCB4\uB825\uC758 {shieldMaxHpRatio:%}\uB9CC\uD07C
+      <style=shield>\uBCF4\uD638\uB9C9</style>\uC744 {shieldDuration}\uCD08 \uB3D9\uC548
+      \uC5BB\uC2B5\uB2C8\uB2E4."
+    en: After blocking with E, when the damage immunity ends you gain a <style=shield>shield</style>
+      equal to {shieldMaxHpRatio:%} of max health for {shieldDuration}s.
+  - key: Trait.PAL_3_PASSIVE_CDR.Name
+    ko: "\uBD88\uAD74\uC758 \uC21C\uD658"
+    en: Unyielding Cycle
+  - key: Trait.PAL_3_PASSIVE_CDR.Category
+    ko: "\uD328\uC2DC\uBE0C \uAC15\uD654"
+    en: Passive Upgrade
+  - key: Trait.PAL_3_PASSIVE_CDR.Desc
+    ko: "\uD328\uC2DC\uBE0C\uAC00 \uBC1C\uB3D9\uD558\uBA74 Q\uC640 E \uC911 \uB354
+      \uC624\uB798 \uAE30\uB2E4\uB824\uC57C \uD558\uB294 \uC2A4\uD0AC\uC758 \uB0A8\uC740
+      \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {refundSeconds}\uCD08 \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+    en: When your passive triggers, whichever of Q or E has the longer remaining
+      cooldown is reduced by {refundSeconds}s.
+  - key: Trait.PAL_3_Q_STUN.Name
+    ko: "\uC81C\uC555\uC758 \uC9C4\uACA9"
+    en: Suppressing Advance
+  - key: Trait.PAL_3_Q_STUN.Category
+    ko: "Q \uAC15\uD654 \xB7 \uAE30\uC808"
+    en: "Q Upgrade \xB7 Stun"
+  - key: Trait.PAL_3_Q_STUN.Desc
+    ko: "Q\uB85C \uBC00\uCE5C \uC801\uC744 \uBC00\uCE58\uAE30\uAC00 \uB05D\uB09C
+      \uB4A4 {stunDuration}\uCD08 \uB3D9\uC548 <style=stun>\uAE30\uC808</style>\uC2DC\uD0B5\uB2C8\uB2E4."
+    en: Enemies pushed by Q are <style=stun>stunned</style> for {stunDuration}s after
+      the push ends.
+  - key: Trait.PAL_4_E_PUSH.Name
+    ko: "\uC218\uD638\uC758 \uD30C\uB3D9"
+    en: Guard Wave
+  - key: Trait.PAL_4_E_PUSH.Category
+    ko: "E \uAC15\uD654 \xB7 \uBC00\uCE58\uAE30"
+    en: "E Upgrade \xB7 Knockback"
+  - key: Trait.PAL_4_E_PUSH.Desc
+    ko: "E\uB85C \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uBC18\uACA9\uACFC \uD568\uAED8
+      \uC8FC\uBCC0 {radius}m\uC758 \uC801\uC744 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
+    en: Blocking with E knocks back enemies within {radius}m along with the counterattack.
+  - key: Trait.PAL_4_HEAL_SHIELD.Name
+    ko: "\uBD88\uAD74\uC758 \uAC00\uD638"
+    en: Unyielding Aegis
+  - key: Trait.PAL_4_HEAL_SHIELD.Category
+    ko: "\uD328\uC2DC\uBE0C \uAC15\uD654 \xB7 \uBCF4\uD638\uB9C9"
+    en: "Passive Upgrade \xB7 Shield"
+  - key: Trait.PAL_4_HEAL_SHIELD.Desc
+    ko: "\uD328\uC2DC\uBE0C\uB85C \uCCB4\uB825\uC744 \uD68C\uBCF5\uD55C \uB300\uC0C1\uC5D0\uAC8C
+      \uD68C\uBCF5\uB7C9\uC758 {healToShieldRatio:%}\uB9CC\uD07C <style=shield>\uBCF4\uD638\uB9C9</style>\uC744
+      {shieldDuration}\uCD08 \uB3D9\uC548 \uC90D\uB2C8\uB2E4. \uBCF4\uD638\uB9C9\uC740
+      \uB300\uC0C1 \uCD5C\uB300 \uCCB4\uB825\uC758 {shieldCapMaxHpRatio:%}\uB97C
+      \uB118\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Targets healed by your passive gain a <style=shield>shield</style> equal
+      to {healToShieldRatio:%} of the healing for {shieldDuration}s, up to {shieldCapMaxHpRatio:%}
+      of their max health.
+  - key: Trait.PAL_4_Q_BLAST.Name
+    ko: "\uC9C4\uACA9\uC758 \uCDA9\uACA9"
+    en: Advance Impact
+  - key: Trait.PAL_4_Q_BLAST.Category
+    ko: "Q \uAC15\uD654"
+    en: Q Upgrade
+  - key: Trait.PAL_4_Q_BLAST.Desc
+    ko: "Q\uAC00 \uB05D\uB098\uB294 \uC9C0\uC810 \uC55E\uCABD\uC5D0 \uCDA9\uACA9\uC744
+      \uC77C\uC73C\uCF1C {dmg}\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+    en: When Q ends, a shockwave in front of you deals {dmg} additional damage.
+  - key: Trait.ASN_2_RESTRAINT.Conflict
+    ko: "\uBCC0\uC2E0\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC5B4 \u2018{traits}\u2019\uC758
+      \uD6A8\uACFC\uB97C \uBC1B\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uC120\uD0DD\uD560\uAE4C\uC694?"
+    en: "You can no longer Transform, so \u2018{traits}\u2019 will have no effect.
+      Choose this trait?"
+  - key: Tutorial.Guide.LOBBY_TITLE_CHARACTER
+    ko: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
+    en: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
+  - key: Tutorial.Guide.LOBBY_TITLE_PREP
+    ko: "\uD6C8\uB828 \uC900\uBE44"
+    en: "\uD6C8\uB828 \uC900\uBE44"
+  - key: Tutorial.Guide.LOBBY_TITLE_BASIC
+    ko: "\uAE30\uBCF8 \uC870\uC791 \uD6C8\uB828"
+    en: "\uAE30\uBCF8 \uC870\uC791 \uD6C8\uB828"
+  - key: Tutorial.Guide.LOBBY_TITLE_COMBAT
+    ko: "\uC804\uD22C \uD6C8\uB828"
+    en: "\uC804\uD22C \uD6C8\uB828"
+  - key: Tutorial.Guide.LOBBY_TITLE_COUNTER
+    ko: "\uAC04\uD30C \uD6C8\uB828"
+    en: "\uAC04\uD30C \uD6C8\uB828"
+  - key: Tutorial.Guide.LOBBY_TITLE_SUPPRESS
+    ko: "\uC81C\uC555 \uD6C8\uB828"
+    en: "\uC81C\uC555 \uD6C8\uB828"
+  - key: Tutorial.Guide.LOBBY_TITLE_FREE
+    ko: "\uC790\uC720 \uC5F0\uC2B5"
+    en: "\uC790\uC720 \uC5F0\uC2B5"
+  - key: Tutorial.Guide.LOBBY_TITLE_BRIEF
+    ko: "\uC784\uBB34 \uBE0C\uB9AC\uD551"
+    en: "\uC784\uBB34 \uBE0C\uB9AC\uD551"
+  - key: Tutorial.Guide.LOBBY_TITLE_SORTIE
+    ko: "\uCD9C\uACA9 \uC900\uBE44"
+    en: "\uCD9C\uACA9 \uC900\uBE44"
+  - key: Tutorial.Guide.LOBBY_OBJ_CHARACTER
+    ko: "\uCE90\uB9AD\uD130\uB97C \uC120\uD0DD\uD558\uC138\uC694"
+    en: "\uCE90\uB9AD\uD130\uB97C \uC120\uD0DD\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_CENTRAL
+    ko: "\uC911\uC559\uC5D0 \uBAA8\uC774\uC138\uC694"
+    en: "\uC911\uC559\uC5D0 \uBAA8\uC774\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_TRAINING_HALL
+    ko: "\uD6C8\uB828\uC7A5\uC5D0 \uBAA8\uC774\uC138\uC694"
+    en: "\uD6C8\uB828\uC7A5\uC5D0 \uBAA8\uC774\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_BASIC
+    ko: "\uAE30\uBCF8 \uACF5\uACA9\uACFC \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694"
+    en: "\uAE30\uBCF8 \uACF5\uACA9\uACFC \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_AREA
+    ko: "\uAD6C\uC5ED\uC5D0 \uBAA8\uC774\uC138\uC694"
+    en: "\uAD6C\uC5ED\uC5D0 \uBAA8\uC774\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_COMBAT
+    ko: "\uD6C8\uB828 \uC0C1\uB300\uB97C \uBAA8\uB450 \uCC98\uCE58\uD558\uC138\uC694"
+    en: "\uD6C8\uB828 \uC0C1\uB300\uB97C \uBAA8\uB450 \uCC98\uCE58\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_COUNTER
+    ko: "\uC0C1\uB300\uBC29\uC758 \uBAB8\uC5D0 \uBCF4\uB77C\uBE5B\uC774 \uB098\uD0C0\uB098\uBA74
+      \uC0C1\uB300\uBC29\uC758 \uC815\uBA74\uC5D0\uC11C \uC6B0\uD074\uB9AD \uC2A4\uD0AC\uC744
+      \uC0AC\uC6A9\uD558\uC138\uC694"
+    en: "\uC0C1\uB300\uBC29\uC758 \uBAB8\uC5D0 \uBCF4\uB77C\uBE5B\uC774 \uB098\uD0C0\uB098\uBA74
+      \uC0C1\uB300\uBC29\uC758 \uC815\uBA74\uC5D0\uC11C \uC6B0\uD074\uB9AD \uC2A4\uD0AC\uC744
+      \uC0AC\uC6A9\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_VULN_CC
+    ko: "\uCDE8\uC57D \uC0C1\uD0DC\uC758 \uC0C1\uB300\uC5D0\uAC8C {tag:Knockback}
+      \uB610\uB294 {tag:Stun} \uC18D\uC131\uC774 \uC788\uB294 \uC2A4\uD0AC\uC744
+      \uC0AC\uC6A9\uD558\uC138\uC694"
+    en: "\uCDE8\uC57D \uC0C1\uD0DC\uC758 \uC0C1\uB300\uC5D0\uAC8C {tag:Knockback}
+      \uB610\uB294 {tag:Stun} \uC18D\uC131\uC774 \uC788\uB294 \uC2A4\uD0AC\uC744
+      \uC0AC\uC6A9\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_WALL
+    ko: "{tag:Knockback} \uC18D\uC131\uC774 \uC788\uB294 \uC2A4\uD0AC\uB85C \uC0C1\uB300\uB97C
+      \uD45C\uC2DC\uB41C \uBCBD\uC5D0 \uCDA9\uB3CC\uC2DC\uD0A4\uC138\uC694"
+    en: "{tag:Knockback} \uC18D\uC131\uC774 \uC788\uB294 \uC2A4\uD0AC\uB85C \uC0C1\uB300\uB97C
+      \uD45C\uC2DC\uB41C \uBCBD\uC5D0 \uCDA9\uB3CC\uC2DC\uD0A4\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_SUPPRESS
+    ko: "\uC81C\uC555\uB41C \uC0C1\uB300\uB97C \uCC98\uCE58\uD558\uC138\uC694"
+    en: "\uC81C\uC555\uB41C \uC0C1\uB300\uB97C \uCC98\uCE58\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_FREE
+    ko: "\uC790\uC720\uB86D\uAC8C \uC5F0\uC2B5\uD558\uC138\uC694"
+    en: "\uC790\uC720\uB86D\uAC8C \uC5F0\uC2B5\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_OBJ_SORTIE_GATHER
+    ko: "\uCD9C\uACA9 \uC9C0\uC810\uC5D0 \uBAA8\uC774\uC138\uC694"
+    en: "\uCD9C\uACA9 \uC9C0\uC810\uC5D0 \uBAA8\uC774\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_BODY_VULN_1
+    ko: "\uD0C0\uC774\uBC0D\uC5D0 \uB9DE\uCDB0 \uAC04\uD30C \uC2A4\uD0AC\uB85C \uACF5\uACA9\uC744
+      \uB9C9\uC544\uB0B4\uBA74 \uC0C1\uB300\uBC29\uC740 \uCDE8\uC57D \uC0C1\uD0DC\uAC00
+      \uB429\uB2C8\uB2E4."
+    en: "\uD0C0\uC774\uBC0D\uC5D0 \uB9DE\uCDB0 \uAC04\uD30C \uC2A4\uD0AC\uB85C \uACF5\uACA9\uC744
+      \uB9C9\uC544\uB0B4\uBA74 \uC0C1\uB300\uBC29\uC740 \uCDE8\uC57D \uC0C1\uD0DC\uAC00
+      \uB429\uB2C8\uB2E4."
+  - key: Tutorial.Guide.LOBBY_BODY_VULN_2
+    ko: "\uCDE8\uC57D \uC0C1\uD0DC\uC758 \uC0C1\uB300\uC5D0\uAC8C\uB294 \uBC00\uCE58\uAC70\uB098
+      \uAE30\uC808\uC744 \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    en: "\uCDE8\uC57D \uC0C1\uD0DC\uC758 \uC0C1\uB300\uC5D0\uAC8C\uB294 \uBC00\uCE58\uAC70\uB098
+      \uAE30\uC808\uC744 \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+  - key: Tutorial.Guide.LOBBY_BODY_SUPPRESS
+    ko: "\uAC04\uD30C \uB610\uB294 \uBCBD\uACFC \uCDA9\uB3CC\uC2DC\uCF1C \uC0C1\uB300\uC758
+      {tag:Suppress} \uCE78\uC744 \uBAA8\uB450 \uC18C\uC9C4\uC2DC\uD0A4\uBA74 \uC0C1\uB300\uB294
+      {tag:Suppress} \uC0C1\uD0DC\uC5D0 \uB3CC\uC785\uD558\uBA70, \uCE90\uB9AD\uD130\uC758
+      \uD589\uB3D9\uC774 \uBE68\uB77C\uC9D1\uB2C8\uB2E4."
+    en: "\uAC04\uD30C \uB610\uB294 \uBCBD\uACFC \uCDA9\uB3CC\uC2DC\uCF1C \uC0C1\uB300\uC758
+      {tag:Suppress} \uCE78\uC744 \uBAA8\uB450 \uC18C\uC9C4\uC2DC\uD0A4\uBA74 \uC0C1\uB300\uB294
+      {tag:Suppress} \uC0C1\uD0DC\uC5D0 \uB3CC\uC785\uD558\uBA70, \uCE90\uB9AD\uD130\uC758
+      \uD589\uB3D9\uC774 \uBE68\uB77C\uC9D1\uB2C8\uB2E4."
+  - key: Tutorial.Guide.LOBBY_BODY_FREE_EXIT
+    ko: "\uC5F0\uC2B5\uC744 \uB9C8\uCE58\uB824\uBA74 \uC785\uAD6C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    en: "\uC5F0\uC2B5\uC744 \uB9C8\uCE58\uB824\uBA74 \uC785\uAD6C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+  - key: Tutorial.Guide.LOBBY_CHECK_BASIC_ATTACK
+    ko: "\uAE30\uBCF8 \uACF5\uACA9 (LMB)"
+    en: "\uAE30\uBCF8 \uACF5\uACA9 (LMB)"
+  - key: Tutorial.Guide.LOBBY_CHECK_Q
+    ko: "Q \uC2A4\uD0AC"
+    en: "Q \uC2A4\uD0AC"
+  - key: Tutorial.Guide.LOBBY_CHECK_E
+    ko: "E \uC2A4\uD0AC"
+    en: "E \uC2A4\uD0AC"
+  - key: Tutorial.Guide.LOBBY_CHECK_R
+    ko: "R \uC2A4\uD0AC"
+    en: "R \uC2A4\uD0AC"
+  - key: Tutorial.Guide.LOBBY_CHECK_RMB
+    ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC (RMB)"
+    en: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC (RMB)"
+  - key: Tutorial.Guide.LOBBY_CHECK_DASH
+    ko: "\uB300\uC2DC (Space Bar)"
+    en: "\uB300\uC2DC (Space Bar)"
+  - key: Tutorial.Guide.LOBBY_PROGRESS_GATHER
+    ko: "\uC9D1\uACB0 {n}/{total}"
+    en: "\uC9D1\uACB0 {n}/{total}"
+  - key: Tutorial.Guide.LOBBY_PROGRESS_PARTY_DONE
+    ko: "\uD6C8\uB828 \uC644\uB8CC {n}/{total}"
+    en: "\uD6C8\uB828 \uC644\uB8CC {n}/{total}"
+  - key: Tutorial.Guide.LOBBY_PROGRESS_COUNTDOWN
+    ko: "\uC2DC\uC791\uAE4C\uC9C0 {n}"
+    en: "\uC2DC\uC791\uAE4C\uC9C0 {n}"
+  - key: Tutorial.Guide.LOBBY_SPEAKER_SUPERVISOR
+    ko: "\uAC10\uB3C5\uAD00"
+    en: "\uAC10\uB3C5\uAD00"
+  - key: Tutorial.Guide.LOBBY_DLG_INTRO
+    ko: "\uC774\uBC88\uC5D0 \uC0C8\uB85C \uC628 \uC2E0\uC785\uB4E4\uC778\uAC00? \uC88B\uC544.
+      \uC2E4\uB825 \uC880 \uBCFC\uAE4C. \uD6C8\uB828\uC7A5\uC73C\uB85C \uC640."
+    en: "\uC774\uBC88\uC5D0 \uC0C8\uB85C \uC628 \uC2E0\uC785\uB4E4\uC778\uAC00? \uC88B\uC544.
+      \uC2E4\uB825 \uC880 \uBCFC\uAE4C. \uD6C8\uB828\uC7A5\uC73C\uB85C \uC640."
+  - key: Tutorial.Guide.LOBBY_DLG_TRAINING
+    ko: "\uB2E4 \uBAA8\uC600\uAD70. \uAE30\uBCF8\uAE30\uB294 \uAC16\uCDC4\uB294\uC9C0\uBD80\uD130
+      \uBCFC\uAE4C."
+    en: "\uB2E4 \uBAA8\uC600\uAD70. \uAE30\uBCF8\uAE30\uB294 \uAC16\uCDC4\uB294\uC9C0\uBD80\uD130
+      \uBCFC\uAE4C."
+  - key: Tutorial.Guide.LOBBY_BRIEF_EVAL
+    ko: "\uC2E0\uC785\uCE58\uACE0\uB294 \uC81C\uBC95\uC774\uAD70. \uC88B\uC544. \uC774\uC81C
+      \uC790\uB124\uB4E4\uC774 \uB9E1\uC744 \uC77C\uC744 \uC124\uBA85\uD558\uC9C0."
+    en: "\uC2E0\uC785\uCE58\uACE0\uB294 \uC81C\uBC95\uC774\uAD70. \uC88B\uC544. \uC774\uC81C
+      \uC790\uB124\uB4E4\uC774 \uB9E1\uC744 \uC77C\uC744 \uC124\uBA85\uD558\uC9C0."
+  - key: Tutorial.Guide.LOBBY_BRIEF_FACTORY
+    ko: "\uC774\uBC88 \uBAA9\uC801\uC9C0\uB294 \uC6F0\uC988\uC758 \uC5F0\uAD6C \uC2DC\uC124\uC774\uB2E4.
+      \uC800\uACF3\uC5D0\uC11C \uC2DC\uC791\uB41C \uC5F0\uAD6C\uAC00 \uD6D7\uB0A0
+      \uB300\uADDC\uBAA8 \uAE30\uACC4 \uBC18\uB780\uC73C\uB85C \uC774\uC5B4\uC9C0\uC9C0."
+    en: "\uC774\uBC88 \uBAA9\uC801\uC9C0\uB294 \uC6F0\uC988\uC758 \uC5F0\uAD6C \uC2DC\uC124\uC774\uB2E4.
+      \uC800\uACF3\uC5D0\uC11C \uC2DC\uC791\uB41C \uC5F0\uAD6C\uAC00 \uD6D7\uB0A0
+      \uB300\uADDC\uBAA8 \uAE30\uACC4 \uBC18\uB780\uC73C\uB85C \uC774\uC5B4\uC9C0\uC9C0."
+  - key: Tutorial.Guide.LOBBY_BRIEF_REBELLION
+    ko: "\uC6B0\uB9AC\uB294 \uADF8 \uC77C\uC774 \uBC8C\uC5B4\uC9C0\uAE30 \uC804\uC73C\uB85C
+      \uB4E4\uC5B4\uAC04\uB2E4. \uC774\uBC88\uC5D0\uB294 \uADF8 \uC2DC\uC791\uC744
+      \uB9C9\uB294 \uAC70\uC57C."
+    en: "\uC6B0\uB9AC\uB294 \uADF8 \uC77C\uC774 \uBC8C\uC5B4\uC9C0\uAE30 \uC804\uC73C\uB85C
+      \uB4E4\uC5B4\uAC04\uB2E4. \uC774\uBC88\uC5D0\uB294 \uADF8 \uC2DC\uC791\uC744
+      \uB9C9\uB294 \uAC70\uC57C."
+  - key: Tutorial.Guide.LOBBY_BRIEF_SORTIE
+    ko: "\uC124\uBA85\uC740 \uC5EC\uAE30\uAE4C\uC9C0\uB2E4. \uCD9C\uACA9 \uC9C0\uC810\uC73C\uB85C
+      \uC774\uB3D9\uD574."
+    en: "\uC124\uBA85\uC740 \uC5EC\uAE30\uAE4C\uC9C0\uB2E4. \uCD9C\uACA9 \uC9C0\uC810\uC73C\uB85C
+      \uC774\uB3D9\uD574."
+  - key: UI.Lobby.Tutorial.TagKnockback
+    ko: "[\uB109\uBC31]"
+    en: "[\uB109\uBC31]"
+  - key: UI.Lobby.Tutorial.TagStun
+    ko: "[\uAE30\uC808]"
+    en: "[\uAE30\uC808]"
+  - key: UI.Lobby.Tutorial.TagSuppress
+    ko: "[\uC81C\uC555]"
+    en: "[\uC81C\uC555]"
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218

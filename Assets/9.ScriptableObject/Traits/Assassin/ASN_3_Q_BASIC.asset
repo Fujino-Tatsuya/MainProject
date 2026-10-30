@@ -19,7 +19,7 @@ MonoBehaviour:
     \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC758 \uCCAB \uD0C0\uACA9 \uD53C\uD574\uAC00
     {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4. \uC77C\uBC18 E \uAC15\uD0C0\uC5D0\uB3C4
     \uC801\uC6A9\uB429\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 6dd44a019918585b80667ca2bb0c6356, type: 3}
   effects:
   - rid: 7237886673709695197
   references:

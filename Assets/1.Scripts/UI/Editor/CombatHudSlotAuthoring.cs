@@ -118,6 +118,7 @@ public static class CombatHudSlotAuthoring
         var so = new SerializedObject(hud);
         so.FindProperty("fillImage").objectReferenceValue = fillImage;
         so.FindProperty("group").objectReferenceValue = group;
+        so.FindProperty("bossIcon").objectReferenceValue = skullImage;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // 형제 순서: 틀 → 채움 → 해골.

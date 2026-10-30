@@ -17,7 +17,7 @@ MonoBehaviour:
   category: "Q \uAC15\uD654 \xB7 \uAE30\uC808"
   description: "Q\uB85C \uBC00\uCE5C \uC801\uC744 \uBC00\uCE58\uAE30\uAC00 \uB05D\uB09C
     \uB4A4 {stunDuration}\uCD08 \uB3D9\uC548 <style=stun>\uAE30\uC808</style>\uC2DC\uD0B5\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 828e89bc35e75b83b3a907ee949f4cf2, type: 3}
   effects:
   - rid: 7237886673742725365
   references:

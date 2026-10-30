@@ -323,6 +323,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapSceneStageMarker
   barrierMaterial: {fileID: 2100000, guid: 7b27a57664d778945a9e71ec8a5b3021, type: 2}
+  gateLaserPrefab: {fileID: 3633511578008156578, guid: decdb0b9a27b5f7478fb9478145fc43e, type: 3}
 --- !u!1 &8283673989847625966
 GameObject:
   m_ObjectHideFlags: 0

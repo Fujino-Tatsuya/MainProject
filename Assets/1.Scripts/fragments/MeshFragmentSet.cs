@@ -42,6 +42,20 @@ public class MeshFragmentSet : ScriptableObject
              "— 런타임에 솎아내면 파편이 듬성듬성해질 뿐 크기는 그대로다")]
     [Min(0)] public int maxFragments = 0;
 
+    [Header("선택 (상한이 걸렸을 때)")]
+    [Tooltip("켜면 삼각형을 번호 순이 아니라 면적에 비례해 뽑는다.\n" +
+             "모서리 베벨·테이프 띠 같은 작은 삼각형이 많은 메시(종이박스 더미)에서 끄면 가느다란 띠만 나온다 — " +
+             "켜야 큰 면(판때기)이 뽑힌다")]
+    public bool areaWeighted = false;
+
+    [Tooltip("파편을 뽑을 높이 구간. 메시 바운드 기준 0(바닥)~1(꼭대기).\n" +
+             "예: 팔레트 위에 쌓인 박스만 쪼개려면 (0.2, 1)")]
+    public Vector2 heightRange = new Vector2(0f, 1f);
+
+    [Tooltip("높이 구간 밖에서 따로 뽑을 파편 수. maxFragments 와 별개로 더해진다.\n" +
+             "예: 박스 13 + 밑의 팔레트 나무 3")]
+    [Min(0)] public int outsideRangeFragments = 0;
+
     [Header("버스트 프리팹 굽기")]
     [Tooltip("파편에 쓸 머티리얼. 버스트 프리팹을 구울 때 MeshRenderer에 꽂힌다")]
     public Material fragmentMaterial;

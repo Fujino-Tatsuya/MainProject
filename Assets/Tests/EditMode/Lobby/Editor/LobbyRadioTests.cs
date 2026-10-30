@@ -3,125 +3,53 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 
-/// <summary>로비 무전 — 할 일 86 T6b(단계 → 대사 표, 회차당 1회, 단계 바뀜 = 미재생 폐기, 늦은 클라, 문구 행).</summary>
+/// <summary>
+/// 로비 무전 — 할 일 86 T6b(회차당 1회, 단계 바뀜 = 미재생 폐기, 늦은 클라, 문구 행).
+/// 할 일 157 ②(Q6): 단계 진입 대사는 껐다 — 단계 = 스냅샷 revision, 무전 모델은 단계 번호(미재생 폐기)만 맞춘다. id·문구 행은 남긴다.
+/// </summary>
 public sealed class LobbyRadioTests
 {
-    static readonly List<string> Lines = new List<string>();
-
-    // 진행기 단계 모델을 그대로 돌려 무전 모델에 넣는다 — 실제 전이 순서와 어긋나지 않게.
-    static List<string> Feed(LobbyRadioModel radio, LobbyTrainingFlow flow, List<int> serialChanges = null)
-    {
-        var played = new List<string>();
-        if (radio.OnFlowChanged(flow.Stage, flow.Phase, Lines))
-            serialChanges?.Add(radio.StageSerial);
-        played.AddRange(Lines);
-        return played;
-    }
-
-    static LobbyTrainingFlow CreateFlow()
-    {
-        var flow = new LobbyTrainingFlow();
-        flow.AddClient(0);
-        flow.AddClient(1);
-        return flow;
-    }
-
     [Test]
-    public void 처음_본_상태는_기준만_잡고_대사가_없다()
+    public void 처음_본_단계는_기준만_잡는다()
     {
         var radio = new LobbyRadioModel();
-        Assert.That(radio.OnFlowChanged(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering, Lines), Is.False);
-        Assert.That(Lines, Is.Empty);
+        Assert.That(radio.OnStepChanged(1), Is.False);
         Assert.That(radio.StageSerial, Is.EqualTo(0));
     }
 
     [Test]
-    public void 늦게_구독해도_지금_단계_대사를_다시_틀지_않는다()
+    public void 늦게_구독해도_지난_대사를_틀지_않는다()
     {
         var radio = new LobbyRadioModel();
-        radio.OnFlowChanged(LobbyTrainingStage.Train02, LobbyTrainingPhase.InProgress, Lines);
-        Assert.That(Lines, Is.Empty);
+        radio.OnStepChanged(9);
         Assert.That(radio.HasPlayed(LobbyRadioIds.Train02Start), Is.False);
+        Assert.That(radio.StageSerial, Is.EqualTo(0));
     }
 
     [Test]
-    public void 훈련_전체_진행의_단계_진입_대사가_표_순서대로_한_번씩_나온다()
+    public void 단계가_바뀔_때마다_번호_1씩_진입_대사는_없다()
     {
-        var flow = CreateFlow();
         var radio = new LobbyRadioModel();
-        var all = new List<string>();
         var serials = new List<int>();
-        Feed(radio, flow);
-
-        void Step(bool ok)
+        radio.OnStepChanged(1);
+        for (var revision = 2; revision <= 22; revision++)
         {
-            Assert.That(ok, Is.True);
-            all.AddRange(Feed(radio, flow, serials));
+            if (radio.OnStepChanged(revision))
+                serials.Add(radio.StageSerial);
         }
 
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Entrance));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Train01Start));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Train01));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Train02Start));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Train02));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Train03A));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Train03B));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Train03C));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Train03D));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.TrainEnd));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Brief));
-        Step(flow.ReportStageCompleted(LobbyTrainingStage.Brief));
-        Step(flow.OnGatherConfirmed(LobbyGatherPoint.Sortie));
-
-        CollectionAssert.AreEqual(new[]
-        {
-            LobbyRadioIds.LobbyTrainRoute, LobbyRadioIds.Train01Start, LobbyRadioIds.Train01End, LobbyRadioIds.Train02Start,
-            LobbyRadioIds.Train02End, LobbyRadioIds.Train03Start, LobbyRadioIds.Train03Cc,
-            LobbyRadioIds.Train03Reset, LobbyRadioIds.Train03WallGuide, LobbyRadioIds.Train03Suppress,
-            LobbyRadioIds.TrainEnd,
-        }, all);
-        // 할 일 111 — 종료 텔레포트로 이미 브리핑 구역 안이라 Brief/Gathering 진입 대사(BRIEF_ROUTE)는 없다.
-        Assert.That(LobbyRadioSchedule.LinesOnEnter(LobbyTrainingStage.Brief, LobbyTrainingPhase.Gathering), Is.Empty);
-        Assert.That(radio.HasPlayed(LobbyRadioIds.BriefRoute), Is.False);
-
-        // 단계가 바뀐 전이마다 번호 1씩: Train01·02·03A·03B·03C·03D·TrainEnd·Brief·Sortie = 9번.
-        CollectionAssert.AreEqual(Enumerable.Range(1, 9), serials);
+        CollectionAssert.AreEqual(Enumerable.Range(1, 21), serials);
+        foreach (var id in LobbyRadioIds.All)
+            Assert.That(radio.HasPlayed(id), Is.False, $"{id} — 진입 대사 꺼짐(Q6)");
     }
 
     [Test]
-    public void 훈련_없이_출격하면_대사_없이_단계만_바뀐다()
-    {
-        var flow = CreateFlow();
-        var radio = new LobbyRadioModel();
-        Feed(radio, flow);
-        var serials = new List<int>();
-
-        Assert.That(flow.OnGatherConfirmed(LobbyGatherPoint.Sortie), Is.True);
-        Assert.That(Feed(radio, flow, serials), Is.Empty);
-        CollectionAssert.AreEqual(new[] { 1 }, serials);
-    }
-
-    [Test]
-    public void 하위_상태만_바뀌면_단계_번호는_그대로다()
+    public void 같은_단계_중복_알림은_무시된다()
     {
         var radio = new LobbyRadioModel();
-        radio.OnFlowChanged(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering, Lines);
-        Assert.That(radio.OnFlowChanged(LobbyTrainingStage.Train01, LobbyTrainingPhase.InProgress, Lines), Is.False);
-        CollectionAssert.AreEqual(new[] { LobbyRadioIds.Train01Start }, Lines);
-        Assert.That(radio.StageSerial, Is.EqualTo(0));
-    }
-
-    [Test]
-    public void 같은_상태_중복_알림은_무시된다()
-    {
-        var radio = new LobbyRadioModel();
-        radio.OnFlowChanged(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering, Lines);
-        radio.OnFlowChanged(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering, Lines);
-        Assert.That(radio.OnFlowChanged(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering, Lines), Is.False);
-        Assert.That(Lines, Is.Empty);
+        radio.OnStepChanged(1);
+        radio.OnStepChanged(2);
+        Assert.That(radio.OnStepChanged(2), Is.False);
         Assert.That(radio.StageSerial, Is.EqualTo(1));
     }
 
@@ -136,29 +64,17 @@ public sealed class LobbyRadioTests
     }
 
     [Test]
-    public void 사건으로_먼저_튼_id_는_단계_진입_때_다시_나오지_않는다()
-    {
-        var radio = new LobbyRadioModel();
-        radio.OnFlowChanged(LobbyTrainingStage.Train03C, LobbyTrainingPhase.InProgress, Lines);
-        Assert.That(radio.TryPlay(LobbyRadioIds.Train03Suppress, true), Is.True);
-        radio.OnFlowChanged(LobbyTrainingStage.Train03D, LobbyTrainingPhase.InProgress, Lines);
-        Assert.That(Lines, Is.Empty);
-    }
-
-    [Test]
     public void 새_회차는_다시_틀_수_있고_단계_번호는_계속_오른다()
     {
         var radio = new LobbyRadioModel();
-        radio.OnFlowChanged(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering, Lines);
-        radio.OnFlowChanged(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering, Lines);
+        radio.OnStepChanged(1);
+        radio.OnStepChanged(2);
         radio.TryPlay(LobbyRadioIds.Train03Wall, true);
         var before = radio.StageSerial;
 
         radio.Reset();
         Assert.That(radio.StageSerial, Is.GreaterThan(before));
-        radio.OnFlowChanged(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering, Lines);
-        radio.OnFlowChanged(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering, Lines);
-        CollectionAssert.AreEqual(new[] { LobbyRadioIds.LobbyTrainRoute }, Lines);
+        Assert.That(radio.OnStepChanged(1), Is.False, "새 회차 첫 단계는 기준만");
         Assert.That(radio.TryPlay(LobbyRadioIds.Train03Wall, true), Is.True);
     }
 
@@ -233,15 +149,6 @@ public sealed class LobbyRadioTests
     {
         CollectionAssert.AreEquivalent(LobbyRadioIds.All, TutorialGuideUIAuthoring.LobbyRadioTexts.Select(t => t.id));
         Assert.That(TutorialGuideUIAuthoring.LobbyRadioTexts.All(t => !string.IsNullOrWhiteSpace(t.text) && t.seconds > 0f), Is.True);
-    }
-
-    [Test]
-    public void 단계_진입_대사는_전부_무전_id_다()
-    {
-        foreach (LobbyTrainingStage stage in System.Enum.GetValues(typeof(LobbyTrainingStage)))
-        foreach (LobbyTrainingPhase phase in System.Enum.GetValues(typeof(LobbyTrainingPhase)))
-        foreach (var id in LobbyRadioSchedule.LinesOnEnter(stage, phase))
-            Assert.That(LobbyRadioIds.IsLobbyRadio(id), Is.True, $"{stage}/{phase} → {id}");
     }
 
     [Test]

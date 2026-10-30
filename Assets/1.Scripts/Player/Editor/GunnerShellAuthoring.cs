@@ -201,11 +201,11 @@ public static class GunnerShellAuthoring
                 anchor.transform.SetParent(armature.transform, false);
                 var box = anchor.AddComponent<BoxCollider>();
                 box.isTrigger = true;
-                box.center = new Vector3(0f, 1f, 0.9f);
-                box.size = new Vector3(1.4f, 1.8f, 1.4f);
+                box.center = new Vector3(0f, 1.3f, 0.9f);
+                box.size = new Vector3(1.4f, 2.4f, 1.4f);
                 anchor.AddComponent<ColliderInfo>();
                 PrefabUtility.SaveAsPrefabAsset(armature, ArmaturePath);
-                Debug.Log($"[Gunner] 간파 앵커 추가: {ArmaturePath}/{InterruptAnchorName} (전방 0.9m, 1.4×1.8×1.4)");
+                Debug.Log($"[Gunner] 간파 앵커 추가: {ArmaturePath}/{InterruptAnchorName} (전방 0.9m, 1.4×2.4×1.4)");
             }
         }
         finally

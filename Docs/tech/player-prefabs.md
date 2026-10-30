@@ -72,8 +72,8 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 │                             이동(PlayerMotor/PlayerMovement) · 스킬 · 생명주기 · 상태이상 · HurtBox
 └─ Armature                ← 캐릭터. 이걸 교체해서 플레이 캐릭터를 바꾼다
    ├─ (리그/본 계층)          모델 · Animator · SkinnedMeshRenderer
-   ├─ DefaultAttack/AAC1~4    캐릭터별 평타 히트박스
-   ├─ MainSkill/InterruptAttack  캐릭터별 스킬 히트박스
+   ├─ DefaultAttack           (빈 컨테이너 — 평타 판정은 데이터 SO 의 도형, 할 일 153)
+   ├─ InterruptAttack         간파 판정 상자(가붕이 Q·E 판정은 데이터 SO 의 도형, 할 일 153 5a)
    └─ L/R_WeaponSocket        무기 소켓
 ```
 
@@ -121,8 +121,9 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 | `PlayerMovement.armature` | ✅ | `transform.Find("Armature")` (`PlayerMovement.cs:38`) — 🔴 **자식 이름이 정확히 `Armature` 여야 한다** |
 | `PlayerLandingProtection.blinkVisualRoot` | ✅ | 비면 루트 전체에서 `Renderer` 를 긁는다 (`PlayerLandingProtection.cs:161`) |
 | `PlayerSoulController.soulVisualRoot` | ✅ | `PlayableCharacterVisual.VisualRoot` → `transform.Find("Armature")` → `transform` 순 폴백 (`PlayerSoulController.cs:175`) |
-| `DefaultAttackController.defaultHitbox` | ❌ | **수동 배선 필수.** 평타 판정 히트박스(`ColliderInfo`) |
-| `FirstMeleeMainSkill.hitboxAnchor` · `FirstMeleeInterruptSkill.hitboxAnchor` | ❌ | **수동 배선 필수.** 비면 런타임 에러 (`FirstMeleeInterruptSkill.cs:87`) |
+| ~~`DefaultAttackController.defaultHitbox`~~ | — | 할 일 153 3단계에서 삭제. 평타 판정은 `PlayerDefaultAttackData` 단계별 `hitArea`(도형, [attack-shapes.md](attack-shapes.md)) |
+| ~~`FirstMeleeMainSkill.hitboxAnchor`~~ | — | 할 일 153 5a단계에서 비움·`Armature/MainSkill` 삭제. Q 판정은 `FirstMeleeMainSkillData.hitArea`(도형) |
+| `FirstMeleeInterruptSkill.hitboxAnchor` | ❌ | **수동 배선 필수.** 비면 런타임 에러 (`FirstMeleeInterruptSkill.cs:87`) |
 | `TrailTransform.weaponTrailEffect` (무기 FBX 안) | ❌ | 무기 궤적. Armature 의 `WeaponTrailEffect` 를 가리킨다 |
 | `WeaponTransformRelay.weapon` (`PlayerWaeponSlot` 아래) | ❌ | 무기는 Armature 밖(`PlayerWaeponSlot`)에 있고 소켓만 Armature 안에 있다 |
 
@@ -291,7 +292,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 | `Player.attackDamage` | `5` | `33` | 🟡 위와 같은 커밋 |
 | `Player.moveSpeed` / `defense` | 10 / 25 | 10 / 25 | 동일 |
 | `PlayerDefaultAttack.targetLayer` / `DefaultAttackController.hittableLayers` | `256` | `17408` | ⚪ **둘 다 죽은 데이터다.** 양쪽 프리팹이 같은 `PlayerDefaultAttackData.asset` 을 물고 있고, `Awake` 의 `ApplyData()` 가 SO 값 **`17664`(Enemy+Projectile+EnemyHurtBox)** 로 덮어쓴다 (`DefaultAttackController.cs:123`, `PlayerDefaultAttack.Configure`). 🔴 **인스펙터에 보이는 값과 런타임 값이 다르다** — 이것 자체가 함정이다 |
-| `DefaultAttackController.attackSteps` | `[]` | `[]` | SO 에서 주입된다. 스텝별 `Hitbox` 는 SO 에 없어서 `defaultHitbox` 로 폴백 |
+| `DefaultAttackController.attackSteps` | — | — | 할 일 153 부터 직렬화 안 함 — SO 에서만 주입된다(단계별 판정 도형 `hitArea` 포함) |
 | `Player.animator` · `DefaultAttackController.animator` · `PlayerSkillController.animator` | 배선됨 | **비어 있음** | ⚪ 버그 아님 — §1.4 자동 보정 |
 | `PlayerLandingProtection.blinkVisualRoot` | 배선됨 | **비어 있음** | ⚪ 경미 — 비면 루트 전체 `Renderer` 를 긁어서 Paladin 은 **무기 메시까지 함께** 깜빡인다 |
 | 루트 `NetworkTransform` | **Owner (`AuthorityMode: 1`)** | Owner (`1`) | ✅ 양쪽 동일 |
@@ -417,6 +418,7 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 ✅ **2026-10-02 구현** ([PLAN-character-select.md](../history/PLANS/PLAN-character-select.md)). 아래는 결과 요약.
 
 - 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
+  - 칸 `themeColor`(`[DataTableIgnore]`, 기본 흰색) = 공용 캐릭터 색 — 지금은 특성 카드 기본 공격 슬롯 틴트만 사용(팔라딘 #F2B632 · 거너 #F04FC6 · 어쌔신 #9A62F2, 값은 에셋 데이터).
 - 로비(2026-10-19 C8): `LobbySession.RequestCharacterServerRpc` → 서버가 `LobbyReadyRules`(Ready·카운트다운 중 거부, 교체 쿨다운) + 로스터로 검증 후 `NetworkList<LobbyPlayerEntry>` 로 복제. 기본 0번, 중복 선택 허용. (옛 `Lobby.CharacterRequest`/`Lobby.State` named message 는 퇴역.)
 - Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움). 퇴장 때는 clientId 쪽만 지우고 playerId 의 마지막 선택은 남겨 재접속 때 되살린다. 로비 재진입 때 `LobbySession` 이 이 저장소로 자리를 시드한다.
 - `NetworkLoadingFlowController.ResolvePlayerPrefabForClient(clientId)` = 캐릭터 id → Variant. **이 함수 하나가 (A) 방식의 유일한 분기점이다.**
@@ -617,6 +619,7 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 |------|------|
 | 크기 | **FBX 임포터 Scale Factor(`Assassin.fbx.meta` 첫 `globalScale`) 1 → 1.25 만** 쓴다(SVN). 메시·본 **위치**에 구워지고 본 lossyScale 은 1 이다. humanScale 0.674 → 0.843(아바타 T-pose 도 ×1.25 로 다시 만들어짐) |
 | 🔴 루트 배율 금지 | `Assassin_Armature` 루트에 배율을 걸지 않는다 — `DefaultAttack`·`InterruptAttack`(BoxCollider 판정)과 VFX 기준점이 루트의 자식이라 판정이 같이 커진다 |
+| 평타 판정 도형(할 일 153 2단계 — 144 상자 대체) | 프리팹 상자 없음. `AssassinBasicAttackData` 의 단마다 `hitArea`(`AttackShapeSet`, 기준점 `CasterAim` = 발밑 + 그 타의 조준 방향)에 부채꼴 1개 — 1타 r1.5·90°, 2타 1.5·100°, 3타 1.6·100°, 4타 1.7·120°, 강타·변신 묶음 1.8·120°, 높이 발밑 ±r. 칼날의 영역은 `Scaled(길이, 폭)` = range·angle ×1.25. 144 의 `Armature/DefaultAttack/Normal1~4·Enhanced·Transformed` 상자와 `normalStepHitboxes`·`enhancedHitbox`·`transformedHitbox`·`AssassinStrikeBox` 는 삭제. 단별 `range`·`angle` 은 미사용(xlsx 행 정리 후 삭제). 간파는 그대로 `Armature/InterruptAttack` 앵커. [attack-shapes.md](attack-shapes.md) |
 | 단검 | 손 본에 붙은 단검 **루트** `m_LocalScale` 1 → 1.25(본 lossyScale 이 1 이라 직접 키운다). 쥐는 위치 오프셋은 루트 아래 자식에 있어 루트를 따라 커진다 — **곱하지 않는다**(곱하면 ×1.5625). 게임에서 쓰는 오프셋은 `Player_Assassin.prefab` 이 단검 자식에 덮어쓴 값이고 Armature 쪽 값은 가려져 있다. 저작 `AssassinShellAuthoring` 이 새로 붙이는 단검 = 임포트 배율(`AssassinHairAuthoring.ImportScale`) |
 | 재질 | 몸은 `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat`(§7 5-1 Variant), 슬롯 3개 = `Assassin_HeadNeck` 0·1(Head·Face) · `Assassin_SourceBody` 0. **10-26 단검 L/R은 `FK_Assassin_Dagger_L/R.mat`과 각 전용 BaseColor로 분리**, UV0는 채색용, UV1은 기존 발광용이다([전달 문서](handoff-weapon-basecolors-20261026.md)). 🔸 `Assassin.fbx.meta` 의 재질 remap 이 없는 guid 를 가리켜 몸 FBX 원본 슬롯은 비어 있다 → 슬롯 오버라이드를 Revert 하면 분홍이 된다. ToonLit `3.Materials/Toon/Assassin_Toon.mat` 은 되돌리기용 |
 | 조명 | Flat Kit 은 장면 조명을 그대로 받고 실시간 그림자를 받지 않는다(ToonLit 은 고정광 `_FIXEDLIGHT_ON`·그림자 0.35) — 가붕이·거너와 같다 |
