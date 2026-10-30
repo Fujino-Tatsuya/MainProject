@@ -85,18 +85,23 @@ public sealed class QABoss103PushNorthCounterTests
     [Test]
     public void 결과_줄_형식과_야간_기록_전용_규칙()
     {
+        var probe = new QABoss103CounterShape.Probe { Valid = true, Overlap = true, Backoff = false, BoxMinY = -0.46f, BoxMaxY = 0.54f, YawErrDeg = 3.4f };
         string line = QABoss103PushNorthCounter.FormatLine("[QA103]", "Paladin", 0, "Normal", 123.456, double.NaN, 3.0,
-            8.5, 7.6, 1.8, 23.2, "hit", true, true, "hit", "pressed", 812.4, double.NaN);
+            8.5, 7.6, 6.3, 23.2, "hit", true, true, "hit", "pressed", 812.4, double.NaN, QABoss103CounterShape.Format(probe));
         Assert.AreEqual("[QA103] event=pn_counter bot=Paladin slot=0 tier=Normal openT=123.46 openServerT=na windowMs=3000 distM=8.50 surfM=7.60 " +
-                        "reachM=1.80 slackM=23.20 roll=hit tried=true dash=true result=hit reason=pressed pressMs=812 closeMs=na", line);
-        StringAssert.DoesNotContain("\t", QABoss103PushNorthCounter.FormatLine("[QA103]", "Gunner", 1, "Low", 1, 2, 3, 4, 5, 6, 7, null, false, false, "none", "a b", double.NaN, 1));
+                        "gapM=6.30 slackM=23.20 roll=hit tried=true dash=true result=hit reason=pressed pressMs=812 closeMs=na " +
+                        "overlap=true backoff=false boxMinY=-0.46 boxMaxY=0.54 yawErrDeg=3", line);
+        StringAssert.DoesNotContain("\t", QABoss103PushNorthCounter.FormatLine("[QA103]", "Gunner", 1, "Low", 1, 2, 3, 4, 5, 6, 7, null, false, false, "none", "a b", double.NaN, 1, null));
+        StringAssert.EndsWith("overlap=na backoff=na boxMinY=na boxMaxY=na yawErrDeg=na",
+            QABoss103PushNorthCounter.FormatLine("[QA103]", "Gunner", 1, "Low", 1, 2, 3, 4, 5, 6, 7, "hit", false, false, "none", "out_of_shape", double.NaN, 1, null),
+            "형상 검사 없음 = na 꼬리");
 
         QANightlyEventRule r = QANightlyEvents.Match(line, LogType.Log, null);
         Assert.IsNotNull(r);
         Assert.AreEqual(QANightlyEvents.PushNorthCounter, r.Name);
         Assert.AreEqual(QABoss103PushNorthCounter.Event, QANightlyEvents.PushNorthCounter, "봇 줄 이름과 표 이름이 같다");
         Assert.IsTrue(r.Trace, "기록 전용 — 요약 표·클립 제외");
-        StringAssert.EndsWith("closeMs=na", QANightlyEvents.Detail(line, r.DetailMax), "뒤쪽 필드가 잘리지 않는다");
+        StringAssert.EndsWith("yawErrDeg=3", QANightlyEvents.Detail(line, r.DetailMax), "뒤쪽 필드가 잘리지 않는다");
     }
 
     // ── 할 일 140-4 ──
@@ -118,17 +123,6 @@ public sealed class QABoss103PushNorthCounterTests
     }
 
     [Test]
-    public void 누름_여유는_0_5m_사거리가_작으면_비율()
-    {
-        Assert.AreEqual(0.5, QABoss103PushNorthCounter.PressMargin(1.75), E);
-        Assert.AreEqual(1.25, QABoss103PushNorthCounter.PressDistance(1.75), E, "사거리 1.75 → 실제 표면 1.25m 안에서");
-        Assert.AreEqual(0.3, QABoss103PushNorthCounter.PressMargin(1.0), E, "1m × 0.3");
-        Assert.AreEqual(0.7, QABoss103PushNorthCounter.PressDistance(1.0), E);
-        Assert.AreEqual(0.0, QABoss103PushNorthCounter.PressMargin(0.0), E);
-        Assert.AreEqual(0.0, QABoss103PushNorthCounter.PressDistance(double.NaN), E, "사거리 못 읽음 = 0");
-    }
-
-    [Test]
     public void 정면_한도는_서버_값보다_15도_안쪽_절반보다_좁히지_않는다()
     {
         Assert.AreEqual(75.0, QABoss103PushNorthCounter.FrontLimit(90.0, true), E, "dev No23 = 90");
@@ -138,12 +132,12 @@ public sealed class QABoss103PushNorthCounterTests
     }
 
     [Test]
-    public void 누름_자리는_실제_거리와_좁힌_정면()
+    public void 누름_자리는_여유_형상과_좁힌_정면()
     {
-        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(1.2, 1.75, 70.0, 90.0, true));
-        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(1.73, 1.75, 2.0, 90.0, true), "사거리 끝 2cm = 지난 배치의 누름 자리");
-        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(1.0, 1.75, 80.0, 90.0, true), "정면 한도 75 밖");
-        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(1.0, 1.75, 170.0, 90.0, false), "정면 판정 꺼짐");
+        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(true, 70.0, 90.0, true));
+        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(false, 2.0, 90.0, true), "0.2m 물리면 안 닿는 끝자락 = 지난 배치의 누름 자리");
+        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(true, 80.0, 90.0, true), "정면 한도 75 밖");
+        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(true, 170.0, 90.0, false), "정면 판정 꺼짐");
     }
 
     [Test]
@@ -155,26 +149,36 @@ public sealed class QABoss103PushNorthCounterTests
     }
 
     [Test]
-    public void 누름_판단_자리_멈춤_마감_앞_사거리_마감()
+    public void 누름_판단_자리_마감_앞_형상_마감은_형상이_닿을_때만()
     {
-        const double deadline = 12.6;
-        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true, true, true), "자리 + 멈춤");
-        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true, false, true), "아직 움직이는 중");
-        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, false, true, true), "사거리 안이어도 여유 자리 전엔 기다린다");
-        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false, false, true), "마감 0.4초 앞부터 사거리 안이면");
-        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false, false, false), "사거리 밖은 마감까지 기다린다");
-        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline, deadline, false, false, false), "마감 = 조건 없이 1회(기존 규칙)");
+        const double deadline = 12.6, lead = QABoss103PushNorthCounter.FallbackLeadSeconds;
+        var press = QABoss103PushNorthCounter.PressDecision.Press;
+        var wait = QABoss103PushNorthCounter.PressDecision.Wait;
+        var outOfShape = QABoss103PushNorthCounter.PressDecision.OutOfShape;
+        Assert.AreEqual(press, QABoss103PushNorthCounter.Decide(11.0, deadline, true, true, true, lead), "자리(여유 형상·정면·멈춤)");
+        Assert.AreEqual(wait, QABoss103PushNorthCounter.Decide(11.0, deadline, false, true, true, lead), "지금 닿아도 여유 자리 전엔 기다린다");
+        Assert.AreEqual(press, QABoss103PushNorthCounter.Decide(deadline - 0.3, deadline, false, true, true, lead), "마감 0.4초 앞부터 지금 닿으면");
+        Assert.AreEqual(wait, QABoss103PushNorthCounter.Decide(deadline - 0.3, deadline, false, false, false, lead), "안 닿으면 마감까지 기다린다");
+        Assert.AreEqual(wait, QABoss103PushNorthCounter.Decide(deadline - 0.3, deadline, false, true, true, 0.0), "일반 창 = 마감 앞 단계 없음");
+        Assert.AreEqual(press, QABoss103PushNorthCounter.Decide(deadline, deadline, false, false, true, lead), "마감 = 형상이 닿으면 1회(시전 불가여도 — 거부는 기록)");
+        Assert.AreEqual(outOfShape, QABoss103PushNorthCounter.Decide(deadline, deadline, false, false, false, lead),
+            "마감에 안 닿음 = 누르지 않고 out_of_shape(옛 '조건 없이 1회' 폐기)");
+        Assert.AreEqual("out_of_shape", QABoss103PushNorthCounter.OutOfShapeReason);
     }
 
     [Test]
     public void 서버_판정_줄_형식과_야간_기록_전용_규칙()
     {
+        var probe = new QABoss103CounterShape.Probe { Valid = true, Overlap = false, Backoff = false, BoxMinY = 0.1f, BoxMaxY = 1.9f, YawErrDeg = 41.6f };
         string line = QABoss103PushNorthCounter.FormatServerCastLine("[QA103]", "Gunner", 2, "PnStun", true, 0, false,
-            1.234, -5.678, 3.0, -4.0, 2.43, 1.73, 1.75, 12.4, 90.0, "false", 278.9421);
+            1.234, -5.678, 3.0, -4.0, 2.43, 1.73, 12.4, 90.0, QABoss103CounterShape.Format(probe), 0.834, 278.9421);
         Assert.AreEqual("[QA103] event=pn_server_cast bot=Gunner slot=2 step=PnStun windowOpen=true resolved=0 success=false pos=1.23/-5.68 boss=3.00/-4.00 " +
-                        "trueSurfM=2.43 aabbSurfM=1.73 reachM=1.75 frontDeg=12 frontLimit=90 overlap=false serverT=278.942", line);
-        StringAssert.Contains("step=na", QABoss103PushNorthCounter.FormatServerCastLine("[QA103]", "a b", -1, null, false, 1, true,
-            double.NaN, 0, 0, 0, double.NaN, 0, 0, 0, double.NaN, null, 0));
+                        "trueSurfM=2.43 aabbSurfM=1.73 frontDeg=12 frontLimit=90 overlap=false backoff=false boxMinY=0.10 boxMaxY=1.90 yawErrDeg=42 " +
+                        "gapM=0.83 serverT=278.942", line);
+        string blank = QABoss103PushNorthCounter.FormatServerCastLine("[QA103]", "a b", -1, null, false, 1, true,
+            double.NaN, 0, 0, 0, double.NaN, 0, 0, double.NaN, null, double.NaN, 0);
+        StringAssert.Contains("step=na", blank);
+        StringAssert.Contains("overlap=na backoff=na boxMinY=na boxMaxY=na yawErrDeg=na gapM=na", blank, "앵커 못 읽음 = na");
 
         QANightlyEventRule r = QANightlyEvents.Match(line, LogType.Log, null);
         Assert.IsNotNull(r);
