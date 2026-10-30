@@ -49,7 +49,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c2a252d0daad8e6438c39fa142fe1788, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BreakableCrate
+  m_EditorClassIdentifier: Assembly-CSharp::Breakable
   hp: 1
   burstEntry: {fileID: 11400000, guid: 2fbc4bb6d3c3c6a4b9cbc4cc7c73a276, type: 2}
   pieces:

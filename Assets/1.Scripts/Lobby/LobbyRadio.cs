@@ -4,10 +4,10 @@ using UnityEngine;
 
 /// <summary>
 /// 로비 무전(자막) 재생기(할 일 86 T6b, PLAN §3.6, 명세 v0.2 §4·§14) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
-/// 규칙은 <see cref="LobbyRadioModel"/>(서버)·<see cref="LobbyRadioReceiver"/>(클라)·<see cref="LobbyRadioSchedule"/>(단계 → 대사 표), 여기는 구독·RPC·UI 호출만 한다.
+/// 규칙은 <see cref="LobbyRadioModel"/>(서버)·<see cref="LobbyRadioReceiver"/>(클라), 여기는 구독·RPC·UI 호출만 한다.
 /// <list type="bullet">
-/// <item>서버만 재생을 정한다: <see cref="LobbyTrainingDirector.ServerFlowChanged"/> 구독 → 단계 진입 대사를 ClientRpc 로 전 클라에 id 1회 →
-/// 각 클라 <see cref="TutorialGuideUI.ShowSubtitle"/>. 파티 공통 1회, 클라 로컬 판정 없음.</item>
+/// <item>서버만 재생을 정한다: 대사는 <see cref="ServerPlay"/> 로 ClientRpc 를 전 클라에 id 1회 → 각 클라 <see cref="TutorialGuideUI.ShowSubtitle"/>. 파티 공통 1회, 클라 로컬 판정 없음.
+/// 단계 진입 대사는 할 일 157 ②(Q6)에서 껐다 — <see cref="LobbyTrainingDirector.ServerFlowChanged"/> 구독은 단계 번호(미재생 폐기)만 맞춘다.</item>
 /// <item>큐: 일반 무전은 <see cref="TutorialSubtitleQueue"/> 로 하나씩 순서대로. 단계가 바뀌면 서버가 단계 번호를 올려 보내고 클라는 대기 줄만 버린다
 /// (지금 뜬 줄은 끝까지). 대사는 진행을 막지 않는다 — 진행기는 대사 종료를 기다리지 않는다.</item>
 /// <item>늦게 붙은 클라·재접속은 지난 대사를 받지 않는다(복제 상태 없이 RPC 만).</item>
@@ -23,7 +23,6 @@ public sealed class LobbyRadio : NetworkBehaviour
     // 서버
     private LobbyTrainingDirector _director;
     private LobbyRadioModel _model;
-    private readonly List<string> _lines = new List<string>();
 
     // 클라
     private readonly LobbyRadioReceiver _receiver = new LobbyRadioReceiver();
@@ -115,11 +114,9 @@ public sealed class LobbyRadio : NetworkBehaviour
         if (_model == null || _director == null)
             return;
 
-        if (_model.OnFlowChanged(_director.Stage, _director.Phase, _lines))
+        // 진입 대사 없음(할 일 157 Q6) — 단계가 바뀌면 지난 단계의 미재생 사건 무전만 버린다.
+        if (_model.OnStepChanged(_director.Revision))
             DiscardPendingClientRpc(_model.StageSerial);
-
-        foreach (var id in _lines)
-            SendLine(id);
     }
 
     private void SendLine(string id)

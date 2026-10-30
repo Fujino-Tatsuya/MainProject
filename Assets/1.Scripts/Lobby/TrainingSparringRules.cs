@@ -15,7 +15,7 @@ public readonly struct TrainingSparringGaugeOutcome
 
     /// <summary>다음 게이지(감소가 없으면 그대로).</summary>
     public float NextGauge { get; }
-    /// <summary>게이지가 실제로 줄었다(칸 감소 이벤트·모델 OnWallImpact(reduced)).</summary>
+    /// <summary>게이지가 실제로 줄었다(칸 감소 이벤트).</summary>
     public bool Reduced { get; }
     /// <summary>게이지 0 → 제압.</summary>
     public bool IsSuppress { get; }
@@ -31,16 +31,6 @@ public static class TrainingSparringRules
 {
     /// <summary>처치 방지 중 체력 하한(Unit.HealthFloor). 방지가 아니면 0 = 하한 없음.</summary>
     public static int HealthFloor(bool preventsDeath) => preventsDeath ? 1 : 0;
-
-    /// <summary>
-    /// D 마무리 체력. 지금 체력이 마무리 체력보다 낮으면 그대로(회복하지 않는다), 1~최대 체력으로 자른다.
-    /// </summary>
-    public static int FinishHealth(int currentHealth, int maxHealth, int finishHealth)
-    {
-        int max = Math.Max(1, maxHealth);
-        int target = Math.Min(Math.Max(1, finishHealth), Math.Max(1, currentHealth));
-        return Math.Min(target, max);
-    }
 
     /// <summary>
     /// 간파 성공. 칸 전이 허용(C·D)이면 23호와 같다 — 게이지 감소, 0 이면 제압(breakDuration), 남으면 그로기(groggyDuration).
@@ -100,13 +90,38 @@ public static class TrainingSparringRules
     }
 
     /// <summary>
-    /// 취약 중 팔라딘 Q 경직 길이 — 23호는 남은 취약 시간까지만. B 학습용 취약 유지면 남은 시간이 의미 없어 Q 경직 그대로.
+    /// 취약 중 경직(기절) 길이 — 23호는 남은 취약 시간까지만. 훈련 취약 유지(T31 성공~T34)면 남은 시간이 의미 없어 경직 그대로.
     /// 0.05 이하면 경직 없음(0).
     /// </summary>
     public static float PushStaggerSeconds(float staggerDuration, float vulnerableRemaining, bool holdsVulnerable)
     {
         float stun = holdsVulnerable ? staggerDuration : Mathf.Min(staggerDuration, vulnerableRemaining);
         return stun > 0.05f ? stun : 0f;
+    }
+
+    /// <summary>
+    /// 취약 중 적중이 시도하는 CC 종류(할 일 157 T32 — 사용자 결정 A). 간파 스킬 = 넉백, 넉백 세기 &gt; 0 = 넉백(+ 경직 &gt; 0 이면 기절),
+    /// 넉백 없이 경직만 = 없음(기절로 인정하지 않는다 — 실제 기절은 밀림 뒤 경직·뇌진탕뿐). 실제 적용 여부는 호출측이 따로 보고한다.
+    /// </summary>
+    public static TrainingSparringCrowdControl VulnerableHitCrowdControl(bool interrupt, bool fromPlayer, float knockbackStrength, float staggerDuration)
+    {
+        if (interrupt) return TrainingSparringCrowdControl.Knockback;
+        if (!BossCrowdControlRules.QualifiesPushHit(true, false, fromPlayer, knockbackStrength)) return TrainingSparringCrowdControl.None;
+        return TrainingSparringCrowdControl.Knockback | (staggerDuration > 0f ? TrainingSparringCrowdControl.Stun : TrainingSparringCrowdControl.None);
+    }
+
+    /// <summary>특성 뇌진탕 — 밀림이 끝난 순간 대기 기절을 거는가(23호 ConsumeConcussionAfterPush 순서). 취약이 끝났거나 CC 를 안 받는 중이면 없음.</summary>
+    public static bool StunsOnPushEnd(float pendingConcussion, bool vulnerable, bool acceptsCrowdControl) =>
+        pendingConcussion > 0f && vulnerable && acceptsCrowdControl;
+
+    /// <summary>
+    /// 간파 예고(창) 길이 — T31 훈련 연장(할 일 157 Q11 A)이면 저작 창과 훈련 최소 길이 중 긴 쪽, 아니면 저작 창 그대로.
+    /// 저작 창이 0 이하면 0(간파 없음 — 늘리지 않는다).
+    /// </summary>
+    public static float TrainingWindup(float authoredWindow, float trainingMinimum, bool extend)
+    {
+        if (authoredWindow <= 0f) return 0f;
+        return extend ? Mathf.Max(authoredWindow, trainingMinimum) : authoredWindow;
     }
 
     static float Clamp(float gauge) => Mathf.Clamp(gauge, 0f, BossCounterProgress.GaugeMax);
