@@ -20,7 +20,9 @@ using UnityEngine;
 /// <item>대사 행(③ — L11·L21, 입력 잠금 아닌 대사): <see cref="LobbyTutorialDialogueClock"/> — 진입 때 길이(<see cref="LobbyTutorialRules.DialogueSeconds"/>, 수치 = <see cref="LobbyRules"/>)를
 /// 스냅샷 timerStart/timerEnd(서버 시각)로 싣고 끝 시각에 다음 행으로 1회. 할 일 157 임시: 브리핑(L31~L34) = 옛 <see cref="LobbyBriefing"/> 가 L31 에서 한 번에 돌고 L40 으로(⑨).</item>
 /// <item>집결 확정 텔레포트(할 일 111 유지, 157 Q4 B·§10.3 안 A): L20 입구 확정 → 명단 전원 훈련장 안(Train01Start, 바로 L21),
-/// T50 종료 확정 → 로비 중앙(Brief, L30 이 바로 센다). <see cref="LobbyTrainingEndPlacement"/> 자리로 <see cref="PlayerFallRecovery.RelocateServer"/>.</item>
+/// T50 종료 확정 → 로비 중앙(Brief, L30 이 바로 센다). <see cref="LobbyTrainingEndPlacement"/> 자리로 <see cref="PlayerFallRecovery.RelocateServer"/>.
+/// 명세 L20 '문 통과' = 이 텔레포트(문 <c>Door_Training</c> 막힘 유지). Train01Start 는 도착지일 뿐 집결 행이 아니다(재집결 없음).
+/// 명단 밖(늦은 참가자)은 옮기지 않는다(로비 대기). 실패한 명단 사람은 다음 집결 행(<see cref="LobbyTutorialRules.TeleportRetryLastIndex"/>)까지 주기 틱마다 재시도.</item>
 /// <item>출격 확정(L40) = L41 로딩 + 출격 래치(<see cref="LobbyTutorialFlow.TryCommitLaunch"/>) → <see cref="NetworkSessionLauncher.StartGameLoading"/> 정확히 1회
 /// (같은 오브젝트에 <see cref="LobbyPodLaunch"/> 가 있으면 포드 연출 끝에). 로딩 흐름의 로비 시작 조건 = <see cref="ServerHasLaunched"/>.
 /// 시연 플래그 <see cref="LobbyRules.AllowInstantSortie"/>(기본 꺼짐)면 명단 고정 전에도 출격 구역이 켜지고 확정하면 훈련을 건너뛴다.</item>
@@ -116,6 +118,8 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     private TutorialGuideTextSource _dialogueTextSource;
     private TutorialGuideTextTable _dialogueTextTable;
     private readonly HashSet<LobbyGatherPoint> _warnedNoTeleportZone = new HashSet<LobbyGatherPoint>();
+    private readonly Dictionary<ulong, PendingTeleport> _pendingTeleports = new Dictionary<ulong, PendingTeleport>();
+    private readonly List<ulong> _teleportBuffer = new List<ulong>();
     private Func<bool> _joinBlockedProvider;
     private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
     private readonly List<ulong> _idBuffer = new List<ulong>();
@@ -336,6 +340,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             // 판 끝·씬 전환 — 훈련 보정이 남지 않게 접속자 전원 하한 해제.
             ClearHealthFloors();
             _resetReservations.Clear();
+            _pendingTeleports.Clear();
 
             // 호스트 셧다운 = 세션 끝 — 클리어 플래그도 버린다(씬 전환 디스폰이면 다음 진행기가 잇는다).
             if (NetworkManager == null || NetworkManager.ShutdownInProgress || !NetworkManager.IsListening)
@@ -472,6 +477,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             // 플레이어 오브젝트가 늦게 붙거나 다시 스폰돼도 하한이 맞게 주기적으로도 맞춘다(같은 값이면 아무 일 없음).
             SyncHealthFloors();
             TickResetReservations();
+            TickPendingTeleports();
         }
 
         TickLockerVisitServer();
@@ -637,12 +643,14 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
         if (_flow.StepIndex == lockIndex && _flow.LockRoster())
             Debug.Log($"[SceneFlow] {Tag} 훈련 명단 고정 {_flow.Roster.Count}명 [{string.Join(",", _flow.Roster)}] — 이후 접속은 로비 대기");
 
-        if (!ServerAdvance(_flow.StepIndex + 1, $"{point} 집결 확정"))
+        var confirmIndex = _flow.StepIndex;
+        if (!ServerAdvance(confirmIndex + 1, $"{point} 집결 확정"))
             return;
 
+        // L20 입구 확정 = 이 텔레포트 1회로 훈련장 안(재집결 행 없음 — 다음 행 L21 대사는 다음 프레임 이후 시작·끝 시각으로만 넘어간다).
         var teleportTarget = LobbyTutorialRules.TeleportTargetOnConfirm(point);
         if (teleportTarget != LobbyGatherPoint.None)
-            TeleportRosterInto(teleportTarget, point);
+            TeleportRosterInto(teleportTarget, point, confirmIndex);
     }
 
     // 출격 확정 → L41 로딩 + 래치 → 메인 진입. 래치를 먼저 걸어 로딩 흐름의 로비 시작 조건(ServerHasLaunched)을 통과시키고, 재확정·중복은 무시한다.
@@ -699,7 +707,8 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
 
     // [서버] 집결 확정 텔레포트(L20 입구 → Train01Start, T50 종료 → Brief) — 명단 전원을 대상 구역 박스 안 자리(LobbyTrainingEndPlacement, 명단 순서)로.
     // 이동 = 기존 서버 텔레포트(오너 RPC — 바라보는 방향은 그대로). 높이 = 구역 원점 바닥면(박스 높이 범위 안으로) + 보정. 구역이 없으면 지점마다 경고 1회 후 생략.
-    private void TeleportRosterInto(LobbyGatherPoint target, LobbyGatherPoint confirmed)
+    // 명단 밖(늦은 참가자·클리어 플래그)은 옮기지 않는다 — 로비 대기. 실패한 명단 사람은 다음 집결 행까지 주기 틱마다 다시 옮긴다(TickPendingTeleports).
+    private void TeleportRosterInto(LobbyGatherPoint target, LobbyGatherPoint confirmed, int confirmIndex)
     {
         var zone = ZoneOf(target);
         var box = zone != null ? zone.GetComponent<BoxCollider>() : null;
@@ -711,27 +720,103 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             return;
         }
 
-        // 간격·여백은 월드 m — 박스 크기를 월드로 재고, 고른 자리를 다시 로컬로 나눈다(구역 스케일 대비).
-        var scale = box.transform.lossyScale;
-        var worldSize = new Vector2(box.size.x * Mathf.Abs(scale.x), box.size.z * Mathf.Abs(scale.z));
-        var floorY = Mathf.Clamp(0f, box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
-
+        var lastIndex = LobbyTutorialRules.TeleportRetryLastIndex(Table.Steps, confirmIndex);
         var roster = _flow.Roster;
         for (var i = 0; i < roster.Count; i++)
         {
             var clientId = roster[i];
-            var slot = LobbyTrainingEndPlacement.Slot(i, roster.Count, worldSize,
-                LobbyTrainingEndPlacement.DefaultMargin, LobbyTrainingEndPlacement.DefaultSpacing);
-            var local = new Vector3(
-                box.center.x + (scale.x != 0f ? slot.x / Mathf.Abs(scale.x) : 0f),
-                floorY,
-                box.center.z + (scale.z != 0f ? slot.y / Mathf.Abs(scale.z) : 0f));
-            var point = box.transform.TransformPoint(local);
+            if (TryTeleportInto(box, clientId, i, roster.Count, out var destination))
+            {
+                _pendingTeleports.Remove(clientId);
+                Debug.Log($"[SceneFlow] {Tag} {confirmed} 확정 텔레포트 client {clientId} → {zone.name} 명단 {i + 1}번째 자리 {destination}");
+                continue;
+            }
 
-            var fall = TryGetPlayer(clientId, out var player) ? player.GetComponent<PlayerFallRecovery>() : null;
-            var destination = point + Vector3.up * TeleportClearance;
-            var moved = fall != null && fall.RelocateServer(destination);
-            Debug.Log($"[SceneFlow] {Tag} {confirmed} 확정 텔레포트 client {clientId} → {zone.name} 명단 {i + 1}번째 자리 {destination} moved={moved}");
+            _pendingTeleports[clientId] = new PendingTeleport(target, confirmed, lastIndex);
+            Debug.LogWarning($"{Tag} {confirmed} 확정 텔레포트 실패 client {clientId} → {zone.name}(플레이어 오브젝트 없음·순간이동 거부) — " +
+                             $"#{lastIndex} 행까지 {SupportTickInterval}초마다 다시 옮긴다.", this);
+        }
+    }
+
+    // [서버] 명단 slotIndex 번째 자리로 순간이동. 플레이어 오브젝트·PlayerFallRecovery 가 없거나 거부되면 false.
+    private bool TryTeleportInto(BoxCollider box, ulong clientId, int slotIndex, int slotCount, out Vector3 destination)
+    {
+        // 간격·여백은 월드 m — 박스 크기를 월드로 재고, 고른 자리를 다시 로컬로 나눈다(구역 스케일 대비).
+        var scale = box.transform.lossyScale;
+        var worldSize = new Vector2(box.size.x * Mathf.Abs(scale.x), box.size.z * Mathf.Abs(scale.z));
+        var floorY = Mathf.Clamp(0f, box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
+        var slot = LobbyTrainingEndPlacement.Slot(slotIndex, slotCount, worldSize,
+            LobbyTrainingEndPlacement.DefaultMargin, LobbyTrainingEndPlacement.DefaultSpacing);
+        var local = new Vector3(
+            box.center.x + (scale.x != 0f ? slot.x / Mathf.Abs(scale.x) : 0f),
+            floorY,
+            box.center.z + (scale.z != 0f ? slot.y / Mathf.Abs(scale.z) : 0f));
+        destination = box.transform.TransformPoint(local) + Vector3.up * TeleportClearance;
+
+        var fall = TryGetPlayer(clientId, out var player) ? player.GetComponent<PlayerFallRecovery>() : null;
+        return fall != null && fall.RelocateServer(destination);
+    }
+
+    // [서버] 확정 텔레포트 재시도(주기 틱) — 명단에서 빠졌거나(퇴장·클리어 플래그) 재시도 마지막 행을 지났으면 포기, 이미 대상 구역 안이면(멈춤 탈출 등) 끝.
+    private void TickPendingTeleports()
+    {
+        if (_pendingTeleports.Count == 0)
+            return;
+
+        _teleportBuffer.Clear();
+        _teleportBuffer.AddRange(_pendingTeleports.Keys);
+        foreach (var clientId in _teleportBuffer)
+        {
+            var pending = _pendingTeleports[clientId];
+            var rosterIndex = IndexInRoster(clientId);
+            var zone = ZoneOf(pending.Target);
+            var box = zone != null ? zone.GetComponent<BoxCollider>() : null;
+            if (rosterIndex < 0 || _flow.StepIndex > pending.LastIndex || box == null)
+            {
+                _pendingTeleports.Remove(clientId);
+                Debug.LogWarning($"{Tag} {pending.Confirmed} 확정 텔레포트 재시도 포기 client {clientId} — " +
+                                 $"{(rosterIndex < 0 ? "명단 밖" : box == null ? "구역 없음" : $"#{pending.LastIndex} 행 지남")} ({ServerDescribe()}).", this);
+                continue;
+            }
+
+            if (TryGetPlayer(clientId, out var player) && zone.ContainsPoint(player.transform.position))
+            {
+                _pendingTeleports.Remove(clientId);
+                Debug.Log($"[SceneFlow] {Tag} {pending.Confirmed} 확정 텔레포트 재시도 끝 client {clientId} — 이미 {zone.name} 안");
+                continue;
+            }
+
+            if (!TryTeleportInto(box, clientId, rosterIndex, _flow.Roster.Count, out var destination))
+                continue;
+
+            _pendingTeleports.Remove(clientId);
+            Debug.Log($"[SceneFlow] {Tag} {pending.Confirmed} 확정 텔레포트 재시도 성공 client {clientId} → {zone.name} {destination} ({ServerDescribe()})");
+        }
+    }
+
+    private int IndexInRoster(ulong clientId)
+    {
+        var roster = _flow.Roster;
+        for (var i = 0; i < roster.Count; i++)
+        {
+            if (roster[i] == clientId)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private readonly struct PendingTeleport
+    {
+        public readonly LobbyGatherPoint Target;
+        public readonly LobbyGatherPoint Confirmed;
+        public readonly int LastIndex;
+
+        public PendingTeleport(LobbyGatherPoint target, LobbyGatherPoint confirmed, int lastIndex)
+        {
+            Target = target;
+            Confirmed = confirmed;
+            LastIndex = lastIndex;
         }
     }
 
@@ -750,6 +835,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     private void HandleClientDisconnected(ulong clientId)
     {
         _resetReservations.Forget(clientId);
+        _pendingTeleports.Remove(clientId);
         ServerClearedStore.Remove(clientId);
         if (_flow == null || !_flow.RemoveClient(clientId))
             return;
@@ -863,17 +949,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
         }
     }
 
-    private bool ContainsRoster(ulong clientId)
-    {
-        var roster = _flow.Roster;
-        for (var i = 0; i < roster.Count; i++)
-        {
-            if (roster[i] == clientId)
-                return true;
-        }
-
-        return false;
-    }
+    private bool ContainsRoster(ulong clientId) => IndexInRoster(clientId) >= 0;
 
     /// <summary>[서버] 접속자의 플레이어 컴포넌트.</summary>
     public bool TryGetPlayer(ulong clientId, out Player player)

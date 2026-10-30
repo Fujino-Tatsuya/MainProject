@@ -88,6 +88,57 @@ public sealed class LobbyTutorialRulesTests
     }
 
     [Test]
+    public void 훈련장_안_시작_위치는_텔레포트_도착지일_뿐_집결_행이_아니다()
+    {
+        // 157 커밋 ④(§10.3 A): Train01Start 재집결 단계·구역 활성 없음 — L20 확정 텔레포트가 '문 통과'를 대신한다.
+        var table = LoadAsset();
+        Assert.That(LobbyTutorialRules.IndexOfGather(table.Steps, LobbyGatherPoint.Train01Start), Is.EqualTo(-1));
+        Assert.That(LobbyTutorialRules.IndexOfGather(table.Steps, LobbyGatherPoint.Entrance), Is.EqualTo(Index(table, "L20_TrainingGather")),
+            "입구 집결은 L20 한 번");
+    }
+
+    [Test]
+    public void L21_대사_동안은_표적_미스폰_훈련_판정_시작_안_함()
+    {
+        var table = LoadAsset();
+        var l21 = table[Index(table, "L21_TrainingIntro")];
+
+        Assert.That(l21.activity, Is.EqualTo(LobbyTutorialActivity.None));
+        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(l21.activity), Is.False, "표적·T10 체크는 T10(BasicCheck) 진입 때 시작");
+        Assert.That(l21.checklistKeys.Length, Is.Zero);
+        Assert.That(Index(table, "T10_Basic"), Is.EqualTo(Index(table, "L21_TrainingIntro") + 1), "대사 끝 = T10");
+    }
+
+    [Test]
+    public void L20_확정_뒤_같은_프레임에_L21_을_건너뛰지_않는다()
+    {
+        var table = LoadAsset();
+        var l20 = Index(table, "L20_TrainingGather");
+        var flow = new LobbyTutorialFlow(table.Kinds(), 3);
+        flow.AddClient(0);
+        Assert.That(flow.TryAdvanceTo(3, flow.Revision, l20, 1, 0), Is.EqualTo(LobbyTutorialAdvanceResult.Advanced));
+
+        // 입구 집결 확정 → L21 (텔레포트는 이 전이와 같은 호출에서 한 번)
+        Assert.That(flow.TryAdvance(3, flow.Revision, 10, 1), Is.EqualTo(LobbyTutorialAdvanceResult.Advanced));
+        Assert.That(flow.StepIndex, Is.EqualTo(l20 + 1));
+
+        // 같은 프레임 연쇄(L21 → T10)는 다음 프레임으로 미뤄진다
+        Assert.That(flow.TryAdvance(3, flow.Revision, 10, 1), Is.EqualTo(LobbyTutorialAdvanceResult.Deferred));
+        Assert.That(flow.StepIndex, Is.EqualTo(l20 + 1));
+    }
+
+    [Test]
+    public void 확정_텔레포트_재시도는_다음_집결_행까지()
+    {
+        var table = LoadAsset();
+        Assert.That(LobbyTutorialRules.TeleportRetryLastIndex(table.Steps, Index(table, "L20_TrainingGather")), Is.EqualTo(Index(table, "T20_CombatGather")),
+            "L21·T10·T20 동안 다시 옮긴다(문이 막혀 걸어 못 들어간다)");
+        Assert.That(LobbyTutorialRules.TeleportRetryLastIndex(table.Steps, Index(table, "T50_FreePractice")), Is.EqualTo(Index(table, "L30_BriefGather")));
+        Assert.That(LobbyTutorialRules.TeleportRetryLastIndex(table.Steps, table.Count - 1), Is.EqualTo(table.Count - 1), "뒤에 집결 없음 = 마지막 행");
+        Assert.That(LobbyTutorialRules.TeleportRetryLastIndex(null, 0), Is.EqualTo(-1));
+    }
+
+    [Test]
     public void T50_종료_확정_텔레포트_도착지는_L30_중앙_집결()
     {
         var table = LoadAsset();

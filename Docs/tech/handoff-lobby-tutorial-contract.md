@@ -23,7 +23,7 @@
 | 0 | L00_LockerVisit | LockerVisit | — | 라커 누적 방문(라커룸 내부 볼륨 `Area_Locker` = `LobbyAreaVolume`, 비네트워크 — 158 은 경로 끝점으로 참조 가능). 경로 `PATH_LOCKER` |
 | 1 | L10_CentralGather | Gather | `Brief`(중앙 — 이름 유지. `Central` 개명은 미룸 — 158 코드 호환) | 확정 = 훈련 명단 고정 |
 | 2 | L11_CentralIntro | Dialogue | — | `LOBBY_DLG_INTRO` |
-| 3 | L20_TrainingGather | Gather | **`Entrance`**(문 앞 입구 영역) | **확정: A**(157 PLAN §10.3) — 입구 집결 확정 → 명단 전원 `Gather_Train01Start` 안으로 텔레포트 → 바로 L21(내부 재집결 없음). 활성 집결 테두리 = `Gather_Entrance` |
+| 3 | L20_TrainingGather | Gather | **`Entrance`**(문 앞 입구 영역) | **확정: A**(157 PLAN §10.3) — 입구 집결 확정 → 명단 전원 `Gather_Train01Start` 안으로 텔레포트 → 바로 L21(내부 재집결 없음). 활성 집결 테두리 = `Gather_Entrance`. **명세 §5 L20 의 '문 통과' 문구는 이 텔레포트로 대체**(`Door_Training` 막힘 유지 — Q4 B). `Train01Start` 는 도착지일 뿐 활성 구역이 되지 않는다 |
 | 4 | L21_TrainingIntro | Dialogue | — | `LOBBY_DLG_TRAINING` |
 | 5 | T10_Basic | Activity(BasicCheck) | — | 개인 6항목, 진행 = PartyComplete |
 | 6 | T20_CombatGather | Gather | `Train02Start` | 유지 3초 = 카운트다운 → 표시 상태 T21 |
@@ -104,4 +104,5 @@
 
 - 2026-10-30 커밋 ① — 최초. 파사드 골격·단계표 22행. 진행기 미연결(`IsAvailable == false`).
 - 2026-10-30 커밋 ③ — L00 = 라커 볼륨 `Area_Locker`(서버 폴링, 스폰 완료 참여자 전원 누적 방문). L11·L21 대사 = 서버 스케줄러: 스냅샷 `TimerStartServerTime`/`TimerEndServerTime` 이 실제 값(길이 = 행 dialogueSeconds → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유 — 수치 `LobbyRules`), 끝 시각에 다음 행 1회. 캐릭터 잠금 제거. 과도기 어댑터 추가(§5).
+- 2026-10-30 커밋 ④ — L20/L21 마무리(§10.3 A). 입구 확정 → 명단 전원 텔레포트 1회 → L21 대사 → 대사 끝 T10. 명세 L20 '문 통과' = 텔레포트(문 막힘·종료 텔레포트 그대로). 명단 밖(늦은 참가자)은 옮기지 않음(로비 대기). 텔레포트 실패(플레이어 오브젝트 없음·거부)한 명단 사람은 다음 집결 행(T20)까지 0.25초마다 서버가 재시도. L21 동안 표적·T10 체크 미시작(Activity None). 158 표시 계약 변화 없음.
 - 2026-10-30 커밋 ② — 진행기 연결(스냅샷 NetworkVariable → `Publish`). L20 집결 지점 `Train01Start` → **`Entrance`**(§10.3 A 확정 — ②는 기존 입구 텔레포트(`TeleportRosterInto`)를 그대로 태워 동작, 마무리(대사 중 표적 미스폰 등)는 커밋 ④). 행 칸 `trainingProfile` 추가. `Brief`→`Central` 개명은 미룸. 과도기 어댑터(상단 가이드)는 새 `LOBBY_*` 키가 없어 아직 없음.

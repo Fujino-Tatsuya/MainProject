@@ -80,6 +80,19 @@ public static class LobbyTutorialRules
         }
     }
 
+    /// <summary>
+    /// 확정 텔레포트가 실패한 명단 사람(플레이어 오브젝트 없음·순간이동 거부)을 다시 옮겨 볼 마지막 행 — 확정 행(<paramref name="confirmIndex"/>) 뒤 첫 집결 행
+    /// (L20 → T20, T50 → L30). 문이 막혀(157 Q4 B) 걸어서는 훈련장에 못 들어가므로 그 집결까지는 재시도한다. 뒤에 집결이 없으면 마지막 행, 표가 비면 -1.
+    /// </summary>
+    public static int TeleportRetryLastIndex(IReadOnlyList<LobbyTutorialStep> steps, int confirmIndex)
+    {
+        if (steps == null || steps.Count == 0)
+            return -1;
+
+        var next = FirstIndex(steps, confirmIndex + 1, s => s.kind == LobbyTutorialStepKind.Gather);
+        return next >= 0 ? next : steps.Count - 1;
+    }
+
     /// <summary>체력 하한 — 고정 명단 안 + 행 보정 Training 이면 1, 아니면 0. 늦은 참가자·클리어 플래그는 0.</summary>
     public static int HealthFloorFor(LobbyTutorialStep step, bool inLockedRoster) =>
         inLockedRoster && step != null && step.trainingProfile == LobbyTutorialTrainingProfile.Training
