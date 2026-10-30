@@ -468,6 +468,7 @@ GameObject:
   - component: {fileID: 2830910367309461291}
   - component: {fileID: 511755021851886734}
   - component: {fileID: 5614792454403806020}
+  - component: {fileID: 5792965266574764060}
   m_Layer: 0
   m_Name: LobbyTutorialUI
   m_TagString: Untagged
@@ -558,6 +559,20 @@ MonoBehaviour:
   objectivePanel: {fileID: 3225554159872491028}
   dialoguePanel: {fileID: 5840686416619218370}
   dialogueGraceSeconds: 0.3
+--- !u!114 &5792965266574764060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1834982965055167949}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8a75b4c81754874aa02e8d8d643acf2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyTutorialUiBinder
+  ui: {fileID: 5614792454403806020}
+  debugDriver: {fileID: 3074178413140493301}
 --- !u!1 &1908801536415027795
 GameObject:
   m_ObjectHideFlags: 0

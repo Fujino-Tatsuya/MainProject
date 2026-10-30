@@ -56,8 +56,15 @@ internal static class LobbyTutorialUIAuthoring
 
             // 디버그 구동(C4) — 꺼 둔 채. 켜고 인스펙터 ⋮ 메뉴로 화면 01–27 을 넘긴다.
             var debug = Child(root.transform, "DebugDriver");
-            Ensure<LobbyTutorialUIDebugDriver>(debug.gameObject);
+            var debugDriver = Ensure<LobbyTutorialUIDebugDriver>(debug.gameObject);
             debug.gameObject.SetActive(false);
+
+            // 157 상태 바인더(C10) — 디버그 구동이 켜지면 손을 뗀다.
+            var binder = Ensure<LobbyTutorialUiBinder>(root);
+            var binderSo = new SerializedObject(binder);
+            binderSo.FindProperty("ui").objectReferenceValue = ui;
+            binderSo.FindProperty("debugDriver").objectReferenceValue = debugDriver;
+            binderSo.ApplyModifiedPropertiesWithoutUndo();
 
             DisableRaycasts(root);
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
