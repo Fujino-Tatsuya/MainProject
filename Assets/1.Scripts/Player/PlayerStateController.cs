@@ -31,6 +31,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 
     private IPlayerState currentState;
     private PlayerStateContext context;
+    private PlayerLifeCycleController lifeCycle;
 
     // 연출 잠금(Cinematic) 중에는 상태 전이 자체를 막는다. SetState 경로(대시/넉백/그랩)도 함께 차단한다.
     private bool cinematicLocked;
@@ -58,6 +59,8 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         StatusEffectController statusEffects = GetComponent<StatusEffectController>();
         if (statusEffects == null)
             Debug.LogError("[Player] StatusEffectController가 프리팹에 부착되어 있지 않습니다.", this);
+
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
 
         context = new PlayerStateContext(
             this,
@@ -310,10 +313,20 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         return true;
     }
 
+    /// <summary>
+    /// 사망(생명주기 Alive 아님)이면 강제 이동(넉백·구속)을 받지 않는다(할 일 183). FSM 은 사망해도 Dead 로 가지 않는다.
+    /// 서버 승인과 오너 적용이 둘 다 이 게이트를 지난다 — 사망 연출 진입 때 진행 중 이동은 <see cref="PlayerLifeInputPolicy"/> 의
+    /// Idle 전이가 끊고(넉백·대시·구속 Exit), 그 뒤 늦게 도착한 넉백·구속 RPC 는 여기서 버려 시체가 다시 움직이지 않는다.
+    /// </summary>
+    private bool RejectsForcedMotion =>
+        CurrentState == PlayerActionState.Dead ||
+        !PlayerLifeActionRules.AcceptsForcedMotion(
+            lifeCycle != null, lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive);
+
     // 슈퍼아머 거부는 Unit.Knockback 공통 진입점에서 처리 — 여기서는 사망·연출 잠금만 거부한다
     public bool BeginKnockback(Vector3 direction, float strength)
     {
-        if (CurrentState == PlayerActionState.Dead || cinematicLocked)
+        if (RejectsForcedMotion || cinematicLocked)
             return false;
 
         SetState(new PlayerKnockbackState(context, direction, strength));
@@ -541,7 +554,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     // 서버·오너 양쪽에서 도는 공통 가드. 슈퍼아머 판정은 여기 두지 않는다(TryReceiveRestraint 주석 참고).
     private bool CanReceiveRestraint(RestraintContext restraintContext)
     {
-        return CurrentState != PlayerActionState.Dead &&
+        return !RejectsForcedMotion &&
             CurrentState != PlayerActionState.Restrained &&
             !cinematicLocked;
     }

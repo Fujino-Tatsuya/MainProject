@@ -17,6 +17,14 @@ public enum PlayerLifeState
 public static class PlayerLifeActionRules
 {
     public static bool CanAct(PlayerLifeState state) => state == PlayerLifeState.Alive;
+
+    /// <summary>
+    /// 강제 이동(넉백·구속) 상태에 들어갈 수 있는가(할 일 183). 서버 승인과 오너 적용이 같은 기준을 쓴다 —
+    /// 서버 RPC(넉백·구속)와 생명주기 복제는 도착 순서가 보장되지 않아, 오너가 사망 연출을 먼저 받고 넉백을 나중에 받으면
+    /// 시체가 남은 넉백만큼 미끄러졌다. 생명주기가 없는 테스트 씬은 기존 동작(허용)을 유지한다.
+    /// </summary>
+    public static bool AcceptsForcedMotion(bool hasLifeCycle, PlayerLifeState state) =>
+        !hasLifeCycle || CanAct(state);
 }
 
 /// <summary>
