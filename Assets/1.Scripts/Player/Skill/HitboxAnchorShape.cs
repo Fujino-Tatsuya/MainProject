@@ -91,6 +91,13 @@ public struct HitboxAnchorShape
         return s;
     }
 
+    /// <summary>
+    /// 판정 때 놓일 자리 — <see cref="Aimed"/> 로 공격 방향에 돌린 뒤 <paramref name="pivot"/> → <paramref name="resolvePosition"/> 만큼 옮긴 형상.
+    /// 간파 시도 예측 오버랩과 간파 보정 랩 기즈모가 이 함수 하나로 같은 형상을 얻는다(할 일 156).
+    /// </summary>
+    public HitboxAnchorShape PlacedAt(Vector3 pivot, Vector3 currentForward, Vector3 attackDirection, Vector3 resolvePosition) =>
+        Aimed(pivot, currentForward, attackDirection).Offset(resolvePosition - pivot);
+
     /// <summary>이 형상으로 판정 레이어 오버랩(트리거 포함). results 에 채운 개수, 형상이 없으면 0.</summary>
     public int Overlap(Collider[] results, LayerMask layers)
     {

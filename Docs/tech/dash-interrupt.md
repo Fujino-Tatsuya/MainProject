@@ -252,14 +252,14 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 |---|---|
 | `Plane`·`Directional Light`·`CameraSwitcher`·`PlayerDashValidationManager`·`FloatingDamageSpawner` | 그대로 |
 | `TrainingDummy`(`TrainingDummy.prefab`, (0, 0, 5)) + `DebugDummyInterruptRecovery`·**`DebugDummyInterruptWindowMode`** | 허수아비 **하나만** 남겼다(`_2` 삭제, `_1` 을 가운데로). 창 모드 기본 = 무기한, 주기 0.6s/1.5s |
-| `InterruptCalibrationLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle`·`DebugInterruptTuningPanel`·**`InterruptCalibrationCapture`·`InterruptCalibrationQuestionPanel`** | 랩 오브젝트 이름 변경. 캡처·질문 패널의 `windowMode`(+ 패널 `capture`)는 씬에서 명시 연결 |
+| `InterruptCalibrationLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle`·`DebugInterruptTuningPanel`·**`InterruptCalibrationCapture`·`InterruptCalibrationQuestionPanel`·`InterruptJudgeShapeGizmos`** | 랩 오브젝트 이름 변경. 캡처·질문 패널의 `windowMode`(+ 패널 `capture`)는 씬에서 명시 연결. 판정 범위 기즈모(할 일 156)는 아래 '간파 판정 범위 기즈모' |
 
 보스는 원래 없다. 강·약 연출은 부트 `NetworkManager` 의 `InterruptProductionDirector` 경로 그대로 켜져 있다(튜닝 패널 기본 = 오너 암전만, §10.1).
 격리: `DebugInterruptLabIsolationTests` 가 두 랩 씬을 디버그 씬으로 보고(빌드 목록·다른 씬·프리팹에 디버그 컴포넌트 없음), 이 씬의 허수아비 하나·창 모드 연결도 YAML 로 확인한다.
 
 **진입**: 메인 툴바 Dev Boot 씬 드롭다운 → `InterruptCalibrationLab` → Dev Boot ▶ (솔로 호스트. `DevBootSceneCatalog` 가 `Assets/0.Scenes` 아래를 자동으로 찾아 등록 코드 없음). 씬을 직접 열고 Play 하면 동작하지 않는다(§10.1 과 같음).
 
-**화면** — 왼쪽 아래 `간파 예측 보정(139)` 패널(제목 버튼으로 접기, 너비 320), 오른쪽 위는 §10.1 튜닝 패널(겹치지 않는다). 질문 창은 화면 가운데.
+**화면** — 왼쪽 아래 `간파 예측 보정(139)` 패널(제목 버튼으로 접기, 너비 320), 오른쪽 위는 §10.1 튜닝 패널, 왼쪽 위는 판정 범위 기즈모 패널(할 일 156, 아래)(겹치지 않는다). 질문 창은 화면 가운데.
 - 첫 줄: 표본 수 · 건너뜀(Esc) · 짝 실패 버림 / 대기열 · 넘쳐 버림 · 지금 단계.
 - 일치율 4줄(실시간): 오너 예측 ↔ 답 · 서버 예측 ↔ 답 · 서버 결과 ↔ 답 · 오너 ↔ 서버 예측. 강 = true·약 = false, 서버 성공 = true. 대상 없음·값 없음은 분모에서 뺀다.
 - `기록:` 이번 세션 폴더 · `지금 summary 쓰기` 버튼(표본 0 개면 안 씀).
@@ -308,6 +308,15 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - 열림 → 닫힘 반복, 경계 시각은 바뀐 뒤 단계. 열림 0 = 열리지 않음, 닫힘 0 = 계속 열림. 주기로 바꾸면 열림 처음부터, 도중 길이 변경은 지금 단계 경과 유지.
 - **회복 중엔 주기 시계가 멈춘다** — 간파 성공 → 회복(`DebugDummyInterruptRecovery`, 기본 2초, 취약·보라)이 끝나면 **닫힘 단계 처음부터** 다시 시작한다(성공 직후 잘린 열림이 다시 나오지 않게, 관측 창 길이가 열림 길이로 모인다).
 
+**간파 판정 범위 기즈모(할 일 156)** — `InterruptJudgeShapeGizmos`(랩 오브젝트) + 순수 규칙 `InterruptJudgeShapeGizmoRules`
+- **무엇과 같은 값인가**: 근사 도형이 아니라 시도 예측 오버랩이 질의하는 **바로 그 형상** — 판정 앵커(`HitboxAnchorShape.TryRead`)를 공격 방향으로 돌려 판정 위치에 놓은 것(`HitboxAnchorShape.PlacedAt`). 예측 대상 탐색(`FindPredictTarget`)과 기즈모가 같은 읽기 전용 진입점 `PlayerInterruptSkillBase.TryGetPlacedJudgeShape(판정 위치, 공격 방향)` 하나를 지난다(판정 동작 불변 — 서버 `ResolveHit` 은 여전히 판정 순간 실제 앵커 `OverlapHitboxAnchor`). 판정 위치 = 근접은 시전 위치, 대쉬는 예상 대시 끝(`DashInterruptPrediction.PredictedEndPosition`).
+- **화면**: 왼쪽 위 `간파 판정 범위(156)` 패널(제목 버튼으로 접기). 토글 `상시 미리보기`·`시도 잔상`·`Game 뷰에도 그리기`, `잔상` 길이 슬라이더(0.5~10s, 기본 3s), `잔상 지우기`, 색 범례, `마지막 시도:` 한 줄(출처·근접/대쉬·재예측·예측 결과·대시 거리). 패널 위에 마우스가 있으면 플레이어 입력을 막는다(질문 패널과 같다).
+- **상시 미리보기** — 이 피어의 로컬 플레이어마다 지금 위치·조준 방향(`PlayerSkillController.CurrentAimDirection` = 근접 간파 요청 방향)에 놓은 형상. 색 = 오너 즉시 예측과 같은 대상 탐색(`FindOwnerViewTarget` — 같은 형상·대상 캐시·복제 창·로컬 선착순 장부, 이벤트 없음): **흰색(옅음) = 대상 없음 · 주황 = 대상 있음·창 닫힘 · 하늘색 = 대상 있음·창 열림**. 창 열림 ≠ 강 예측(예측은 준비 시간 뒤 창 남은 시간까지 본다).
+- **시도 잔상** — 계측 훅(`CalibrationOwnerPredicted`·`CalibrationOwnerRepredicted`, 시전자가 로컬이 아니면 `CalibrationServerPredicted`·`CalibrationServerRepredicted`)이 오는 그 프레임에 그 예측의 판정 위치·공격 방향으로 형상을 잡아 남긴다. 대쉬면 시전 위치(누른 순간) → 예상 대시 끝 선도. 색 = 예측 결과: **회색 = 대상 없음 · 노랑 = 약 · 빨강 = 강**. 재예측(약 → 강)은 새 잔상(빨강)으로 하나 더. 실시간으로 옅어지다 사라지고, 보정 질문 창 정지(timeScale 0) 중에는 줄지 않는다. 최대 12개.
+- **그리기**: Scene 뷰 = `OnDrawGizmos`(+ 라벨), Game 뷰 = 메인 카메라 렌더 뒤 GL 선(깊이 무시 — 바닥·몸에 가려지지 않는다, Game 뷰 Gizmos 버튼 무관). 선분 = `AttackShapeDrawing.CollectAnchorSegments`(상자 모서리 12 · 구 원 3 · 캡슐 양끝 구 + 옆선 4, 특성 랩 앵커 기즈모와 같은 모양). 메시·텍스처 생성 없음.
+- **그리지 않는 것**: 전방위 HUD 강조 사거리(`HasTargetInOmniRange`)는 판정이 아니라 넣지 않았다. 판정 순간 실제 앵커(애니메이션으로 움직인 자리)도 그리지 않는다 — 예측이 보는 '지금 앵커를 돌려 옮긴 것'이 기준이다.
+- **한계**: Game 뷰 GL 선은 에디터 Play 전용(선분 함수가 에디터 전용 `AttackShapeDrawing`). 원격 클라 창에서는 자기 시도(오너 훅)만 잔상으로 남고, 호스트 창에서는 남의 시도도 서버 훅으로 남는다. 형상은 훅이 온 프레임의 앵커·시전자 위치로 잡는다(예측과 같은 프레임이라 같은 값). 테스트 `Editor/InterruptJudgeShapeGizmoTests.cs`.
+
 **알려진 한계**
 - **솔로 호스트만**. 캡처·창 모드·정지가 서버와 오너가 같은 피어라는 전제다(클라 창에서는 서버 판정·실제 창 상태가 안 들어온다).
 - **허수아비 하나** 전제 — 창 모드·실제 창 상태는 연결된(없으면 씬에서 처음 찾은) 허수아비 하나만 본다. 허수아비를 늘리면 다른 허수아비 표본의 창 칸이 틀린다.
@@ -335,4 +344,5 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 | `Assets/4.Animations/Player/{Garen,Assassin,Gunner}/*AnimatorController.controller` · `Garen/GarenUpperBody.mask` | `DashInterruptUpper` 레이어·팔라딘 상체 마스크 |
 | `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·`DebugInterruptTuningPanel`(132 §17)·테스트 `Editor/DebugInterruptLabTests.cs`·`Editor/DebugInterruptLabIsolationTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |
 | `Assets/0.Scenes/Debug/InterruptCalibrationLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/Calibration/` · `DebugDummyInterruptWindowMode.cs`·`DummyInterruptWindowSchedule.cs` | 예측 보정 랩(§10.2, 할 일 139) — 캡처·짝짓기·질문 창·기록·주기 창. 테스트 `Editor/InterruptCalibration*Tests.cs`·`DummyInterruptWindowScheduleTests.cs`, 메뉴 `Tools/Tests/간파 랩 EditMode 테스트 실행` |
+| `Assets/1.Scripts/Dev/InterruptLab/InterruptJudgeShapeGizmos.cs`·`InterruptJudgeShapeGizmoRules.cs` | 보정 랩 간파 판정 범위 기즈모(§10.2, 할 일 156) — 형상 = `PlayerInterruptSkillBase.TryGetPlacedJudgeShape`, 선분 = `AttackShapeDrawing.CollectAnchorSegments`. 테스트 `Editor/InterruptJudgeShapeGizmoTests.cs` |
 | 테스트 `Assets/1.Scripts/Player/Dash/Tests/EditMode/DashInterruptRulesTests.cs` · `DashInterruptLayerFadeTests.cs` · `Assets/1.Scripts/Player/Editor/PlayerSkillApprovalRulesTests.cs` · `PlayerInputBufferTests.cs` | 창 경계·0=끔·허용오차·판정 시점·입력 결정·승인 사전조건·가중치 전환·버퍼 기록 시각 |

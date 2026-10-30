@@ -124,6 +124,85 @@ public static class AttackShapeDrawing
         }
     }
 
+    // ── 판정 앵커 형상(상자·구·캡슐 — 도형 판정 아님, 간파 상자 등) ──
+
+    /// <summary>원 하나를 긋는 선분 수(구·캡슐).</summary>
+    public const int AnchorCircleSegments = 32;
+
+    /// <summary>
+    /// 판정 앵커 형상(<see cref="HitboxAnchorShape"/> — 판정 오버랩이 질의하는 값)의 선분을 끝점 쌍으로 <paramref name="segments"/> 에 덧붙인다(할 일 156).
+    /// 상자 = 모서리 12개, 구 = 수평·수직 원 3개, 캡슐 = 양 끝 구 + 옆선 4개(특성 랩 앵커 기즈모와 같은 모양). 호출측이 같은 선분을 Gizmos·GL 로 긋는다.
+    /// </summary>
+    public static void CollectAnchorSegments(in HitboxAnchorShape shape, List<Vector3> segments)
+    {
+        switch (shape.Kind)
+        {
+            case OverlapCollider.Box:
+                AppendBox(shape.Box.center, shape.Box.halfExtents, shape.Box.orientation, segments);
+                break;
+            case OverlapCollider.Sphere:
+                AppendSphere(shape.Sphere.center, shape.Sphere.radius, segments);
+                break;
+            case OverlapCollider.Capsule:
+                AppendCapsule(shape.Capsule.point0, shape.Capsule.point1, shape.Capsule.radius, segments);
+                break;
+        }
+    }
+
+    private static void AppendBox(Vector3 center, Vector3 half, Quaternion rotation, List<Vector3> segments)
+    {
+        Vector3 Corner(int i) => center + rotation * new Vector3(
+            (i & 1) != 0 ? half.x : -half.x, (i & 2) != 0 ? half.y : -half.y, (i & 4) != 0 ? half.z : -half.z);
+
+        // 꼭짓점 번호의 비트 하나만 다른 쌍 = 모서리.
+        for (int i = 0; i < 8; i++)
+        {
+            for (int bit = 1; bit < 8; bit <<= 1)
+            {
+                if ((i & bit) != 0)
+                    continue;
+                segments.Add(Corner(i));
+                segments.Add(Corner(i | bit));
+            }
+        }
+    }
+
+    private static void AppendSphere(Vector3 center, float radius, List<Vector3> segments)
+    {
+        AppendCircle(center, Vector3.right, Vector3.forward, radius, segments);
+        AppendCircle(center, Vector3.right, Vector3.up, radius, segments);
+        AppendCircle(center, Vector3.forward, Vector3.up, radius, segments);
+    }
+
+    private static void AppendCapsule(Vector3 p0, Vector3 p1, float radius, List<Vector3> segments)
+    {
+        AppendSphere(p0, radius, segments);
+        AppendSphere(p1, radius, segments);
+        Vector3 axis = p1 - p0;
+        Vector3 side = axis.sqrMagnitude > 1e-6f ? Vector3.Cross(axis.normalized, Vector3.up) : Vector3.right;
+        if (side.sqrMagnitude < 1e-6f)
+            side = Vector3.right;
+        side = side.normalized * radius;
+        Vector3 up = (axis.sqrMagnitude > 1e-6f ? Vector3.Cross(side, axis.normalized) : Vector3.up).normalized * radius;
+        segments.Add(p0 + side); segments.Add(p1 + side);
+        segments.Add(p0 - side); segments.Add(p1 - side);
+        segments.Add(p0 + up); segments.Add(p1 + up);
+        segments.Add(p0 - up); segments.Add(p1 - up);
+    }
+
+    private static void AppendCircle(Vector3 center, Vector3 axisA, Vector3 axisB, float radius, List<Vector3> segments)
+    {
+        Vector3 previous = center + axisA * radius;
+        for (int i = 1; i <= AnchorCircleSegments; i++)
+        {
+            float angle = i * (2f * Mathf.PI / AnchorCircleSegments);
+            Vector3 next = center + (axisA * Mathf.Cos(angle) + axisB * Mathf.Sin(angle)) * radius;
+            segments.Add(previous);
+            segments.Add(next);
+            previous = next;
+        }
+    }
+
     private static void GizmoLoop(Vector3[] loop)
     {
         for (int i = 0; i < loop.Length; i++)

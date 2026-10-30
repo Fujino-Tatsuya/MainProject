@@ -1929,6 +1929,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             : null;
     }
 
+    /// <summary>[읽기 전용] 조준점 없는 시전이 지금 쓸 방향(근접 간파 요청의 시전 방향과 같은 값). 간파 보정 랩 기즈모(할 일 156)가 읽는다.</summary>
+    public Vector3 CurrentAimDirection => GetCurrentAimDirection();
+
     private Vector3 GetCurrentAimDirection()
     {
         if (aimIndicator != null)
