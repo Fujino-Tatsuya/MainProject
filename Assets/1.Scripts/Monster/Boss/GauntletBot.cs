@@ -401,6 +401,10 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
     // TODO: 어퍼컷 airborne CC — Unit CC 통합 후
     protected virtual void OnUppercutHit() { }
 
+    // 펀치 클립의 바람 루프(Wind_L/Wind_R) — 취약 중 Q 밀림·휴면으로 펀치가 끊기면 짝 StopEffect 가 안 온다(경석 10-30).
+    // Attack 을 벗어나는 순간 MonsterBase 가 각 피어에서 끊기는 클립의 StartEffect 루프를 끈다.
+    protected override bool StopClipLoopsOnAttackExit => true;
+
     // Attack 상태 애니는 PlayAttackAnimClientRpc가 CrossFade로 직접 담당하므로 base의 기본
     // attackTrigger 발동을 건너뛴다. 그 외 상태(Hit/Groggy/Return/Dead)는 base 매핑 유지.
     protected override void PlayStateAnimation(MonsterState s)
