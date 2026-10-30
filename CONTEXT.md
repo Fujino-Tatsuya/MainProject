@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate`→`Breakable`**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play(솔로·MPPM) · ⏳ SVN 업로드 · 핸드오프 [handoff-breakable-props.md](Docs/tech/handoff-breakable-props.md)
+- `CardboardBox_Stack_01~03`·`Pallet_01`·`PalletStack_01·02` = 루트 `Breakable` + 자식 `Hurtbox`(EnemyHurtBox 트리거), 프롭별 파편(SVN `50.Art/VFX/Common/Breakable/<프롭>/`) + `FX_Explosion_Basic`. 존 배치분 전부 부서짐.
+- 이름: `Breakable`·`BreakableRegistry`·`BreakableBroadcaster`(RPC `BreakRpc`)·`BreakableAuthoringTool`(`Tools/Breakables/…`, 단일 프롭 모드 추가). guid 유지.
+- 종이박스 더미 3종 파편 = **Blender 손작업**(찢긴 골판지 판·L자 모서리·테이프 덮개 + 팔레트 판자) → `SM_Frag_CardboardBox_Stack_0X.fbx` → `Assets/Effects/모델 파편으로 버스트 프리팹 굽기`(`FragmentBurstFromModel`). 원본 `.blend` = `D:\김민경\유니티\My project\Blender\Breakable_Cardboard.blend`.
+
 ## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **팔라딘 베기 소켓 통합 · 가렌 평타 이벤트 타이밍**, 브랜치 `feature/VFX`) — ✅ 커밋 · ⏳ 민경 Play
 - `Paladin_Armature`: 베기 `Slash01~04` 를 `root/VFXSocket`(애니메이션되는 root 본 밑) → 최상위 `VFXSocket` 으로 옮겨 소켓 9개를 한 부모로 통합(월드 위치 보존). root 가 움직일 때 베기 이펙트가 끌려다니던 문제. `Player_Paladin` 에서 `Slash01~04`·`R_WeaponSocket`·`SM_Wep_Sword_03` 각도 재조정.
 - **은희 영역 알림**: `Garen_Default_Attack_1~4.anim` 의 평타 적중(Hit)·콤보창 열림 이벤트 시점을 프레임에 맞춰 조정(민경 확인 — 의도한 변경). 적중 1→0.333 · 2→0.3 · 4→0.267, 3 의 콤보창 열림 0.3→0.233(적중 0.3 보다 앞). 피해 발생 시점이 바뀌므로 평타 체감·콤보 입력창에 영향.

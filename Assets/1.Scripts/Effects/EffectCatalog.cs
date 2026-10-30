@@ -223,10 +223,17 @@ public class EffectCatalog : ScriptableObject
 
     // ── 부술 수 있는 오브젝트 ──────────────────────────────────────────
 
-    [Header("오브젝트 — 상자")]
+    [Header("오브젝트 — 부서지는 프롭")]
+    // 에셋은 전부 50.Art/VFX/Common/Breakable/<프롭>/(SVN). 파편은 프롭마다 자기 메시로 굽는다(MeshFragmentSet).
     [field: SerializeField] public EffectEntry Explosion_Basic { get; private set; }
     // 미리 구워 둔 파편 덩어리(FX_Frag_Box_01_Burst). 에셋 이름이 Box 라 Crate 였던 이름을 맞췄다.
     [field: SerializeField] public EffectEntry Frag_Box_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_CardboardBox_Stack_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_CardboardBox_Stack_02 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_CardboardBox_Stack_03 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_Pallet_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_PalletStack_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_PalletStack_02 { get; private set; }
 
     private List<EffectEntry> _all;
     // 피격 이펙트 테스트용 enum
