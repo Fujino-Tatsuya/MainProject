@@ -9,7 +9,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item><c>Run 1 Match</c> = 설정(기준 시드·판 번호)을 호스트·MPPM 클론 루트마다 <see cref="QABoss103Config.FileName"/> 로 쓰고
 ///   시나리오 <see cref="QALobbyScenarios.Boss103Id"/> 를 3인 MPPM 으로 시작한다(<c>QAScenario48Menu.Run</c> 경로 — isPlaying 직접 토글 없음).
-///   🔴 먼저 QA 창 ▸ 공통 ▸ Activate Virtual Players (2,3). 끝나면 QA 창 ▸ 공통 ▸ Stop Active Scenario → 가상 플레이어 비활성 → QA 창 ▸ 48 ▸ Clear Scenario Mode.</item>
+///   🔴 먼저 QA 창 ▸ 가상 플레이어 ▸ 켜기. 끝나면 QA 창 ▸ 시나리오 ▸ 정지 → 가상 플레이어 ▸ 끄기 → 48 로비 데모 ▸ 시나리오 모드 해제.</item>
 /// <item>판 기록 = 호스트 콘솔 <c>[QA103] event=run_end …</c> 1줄 + 48 리포트(<c>C:/UnityProject/QA/48-*/report.md</c>) 항목.</item>
 /// <item>판별 CSV(C4) = <c>C:/UnityProject/QA/103-single-&lt;시각&gt;/</c> runs·run_chars·run_patterns·run_gimmicks.csv + parts/(봇 판 파일).</item>
 /// </list>
@@ -52,13 +52,13 @@ public static class QAScenario103Menu
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning($"{QABoss103Plan.Tag} 이미 Play 중이다 — QA 창(Tools/QA) ▸ 공통 ▸ Stop Active Scenario 로 먼저 정지할 것.");
+            Debug.LogWarning($"{QABoss103Plan.Tag} 이미 Play 중이다 — QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 먼저 정지할 것.");
             return;
         }
         List<string> clones = QANetSim88.CloneRoots();
         if (clones.Count < 2)
         {
-            Debug.LogError($"{QABoss103Plan.Tag} MPPM 클론 폴더(Library/VP/mppm*)가 {clones.Count}개 — 3인 판이라 QA 창(Tools/QA) ▸ 공통 ▸ Activate Virtual Players (2,3) 를 먼저 켤 것.");
+            Debug.LogError($"{QABoss103Plan.Tag} MPPM 클론 폴더(Library/VP/mppm*)가 {clones.Count}개 — 3인 판이라 QA 창(Tools/QA) ▸ 가상 플레이어 ▸ 켜기 를 먼저 켤 것.");
             return;
         }
 

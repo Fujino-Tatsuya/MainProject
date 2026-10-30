@@ -15,7 +15,7 @@ public static class QAFocuslessEditorPump
 
     private static bool _hooked;
 
-    /// <summary>펌프 설정(QA 창 ▸ 48 ▸ Focusless Play Pump 토글).</summary>
+    /// <summary>펌프 설정(QA 창 ▸ 48 로비 데모 ▸ 포커스 없이 Play 토글).</summary>
     public static bool Enabled => EditorPrefs.GetBool(EnabledKey, true);
 
     public static void Toggle()

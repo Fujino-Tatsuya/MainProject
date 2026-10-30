@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// 에디터 전용 QA 자동 부트스트랩. 0.BootStrapScene에서 Play를 누르면 QA 하네스를
 /// 코드로 생성해 붙인다(씬/프리팹 파일 무수정). 빌드에는 포함되지 않는다(#if UNITY_EDITOR).
-/// Play 시간·반복 횟수·자동실행 토글은 QA 창(Tools/QA) ▸ 공통 설정(=QASettings)에서 조정한다.
+/// Play 시간·반복 횟수·자동실행 토글은 QA 창(Tools/QA) ▸ 설정(=QASettings)에서 조정한다.
 /// </summary>
 public static class QAAutoBootstrap
 {

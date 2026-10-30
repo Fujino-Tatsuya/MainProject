@@ -16,7 +16,7 @@
 - 코드: `Assets/1.Scripts/QA/Nightly/Editor/QAObsWebSocket.cs`(프로토콜·클라이언트), `QANightlyHooks.cs`(판 앞뒤 호출).
 - 기본 **꺼짐**. PC 설정 `UserSettings/QANightly.local.json`(gitignore) 또는 환경변수로 켠다(§4). 비밀번호는 레포에 넣지 않는다.
 - OBS 가 없거나 연결·인증에 실패하면 **경고만** 남기고 QA 는 계속 간다(5초 상한, 판마다 다시 시도).
-- 사람·에이전트가 손으로 확인할 때는 QA 창(`Tools ▸ QA`) ▸ Nightly ▸ **Test OBS Connection** 을 쓴다(에이전트는 `Unity_RunCommand` 로 `QAAutomation.NightTestObsConnection();`). 터미널에서 확인하려면 `obs-cmd` 를 보조로 쓸 수 있다(§3.2).
+- 사람·에이전트가 손으로 확인할 때는 QA 창(`Tools ▸ QA`) ▸ 설정 ▸ 야간 준비 ▸ **OBS 확인** 을 쓴다(에이전트는 `Unity_RunCommand` 로 `QAAutomation.NightTestObs();`). 터미널에서 확인하려면 `obs-cmd` 를 보조로 쓸 수 있다(§3.2).
 
 ## 2. 후보 비교
 

@@ -14,7 +14,7 @@
 - Windows 절전·화면 보호기 끄기(녹화가 검게 나오거나 에디터가 느려진다): 설정 → 시스템 → 전원 → 화면·절전 "안 함".
 
 ## 1. 에디터 끄기
-- Unity 가 켜져 있으면 Play 를 먼저 멈춘다(QA 창 `Tools ▸ QA` ▸ 공통 ▸ **Stop Active Scenario**, 에이전트는 `QAAutomation.StopActiveScenario();`). 그 뒤 에디터를 닫는다.
+- Unity 가 켜져 있으면 Play 를 먼저 멈춘다(QA 창 `Tools ▸ QA` ▸ 시나리오 ▸ **정지**, 에이전트는 `QAAutomation.StopActiveScenario();`). 그 뒤 에디터를 닫는다.
 - 에이전트: `taskkill /IM Unity.exe`(**/F 없이** — 저장 확인을 받는다). 닫혔는지 확인:
   - `tasklist /FI "IMAGENAME eq Unity.exe"` 에 프로세스가 없고,
   - `<프로젝트>/Temp/UnityLockfile` 이 지워졌거나 잠겨 있지 않다.
@@ -54,8 +54,8 @@ svn info --show-item last-changed-revision "Assets/50.Art/DataTable~/GameData.xl
      setx QA_OBS_PASSWORD "<OBS 비밀번호>"
      setx QA_OBS_PORT 4455
      ```
-   - 또는 QA 창 ▸ Nightly ▸ **Create Local Settings File**(`QAAutomation.NightCreateLocalSettingsFile();`) → `<프로젝트>/UserSettings/QANightly.local.json` 의 `obsEnabled` 를 `true` 로(비밀번호는 환경변수로).
-4. QA 창 ▸ Nightly ▸ **Test OBS Connection**(`QAAutomation.NightTestObsConnection();`) → 콘솔에 `[QA108/Nightly] OBS 연결 OK` 가 나오면 된다. 실패해도 QA 는 녹화 없이 돈다(경고만).
+   - 또는 QA 창 ▸ 설정 ▸ 야간 준비 ▸ **PC 설정 파일**(`QAAutomation.NightCreateLocalSettings();`) → `<프로젝트>/UserSettings/QANightly.local.json` 의 `obsEnabled` 를 `true` 로(비밀번호는 환경변수로).
+4. QA 창 ▸ 설정 ▸ 야간 준비 ▸ **OBS 확인**(`QAAutomation.NightTestObs();`) → 콘솔에 `[QA108/Nightly] OBS 연결 OK` 가 나오면 된다. 실패해도 QA 는 녹화 없이 돈다(경고만).
 
 ## 5.1 공유 폴더 루트 (팀원 PC 공유 양식 — 할 일 120 후속)
 > 팀원 PC 의 에이전트는 [qa-nightly-agent-guide.md](qa-nightly-agent-guide.md) 한 문서로 이 절차(경로 묻기 → 사전 준비 → 시작 → 완료 감시 → 리포트)를 따른다.
@@ -130,18 +130,18 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 - 0·비움 = 지우지 않음. 실패는 경고만(`⚠ 지난 클립 삭제 실패`).
 
 ## 6. 야간 QA 시작
-메뉴 `Tools ▸ QA` 로 QA 창을 열고 **Nightly** 섹션을 펼친다(QA 메뉴는 창 하나뿐 — 할 일 155).
-1. (확인) **Validate Seed File** → `시드 파일 OK — <이름> · 기준 시드 … · N판`.
-2. (확인) **Status** → 시드·PC 설정(녹화 켜짐/꺼짐·공유 루트)·루프 상태가 콘솔에 나온다.
-3. **Start Night** — 끝. 이후는 무인:
+메뉴 `Tools ▸ QA` 로 QA 창을 연다(QA 메뉴는 창 하나뿐 — 할 일 155). 야간 버튼은 창 맨 위 **야간** 줄에 있다.
+1. (확인) 설정 ▸ 야간 준비 ▸ **시드 확인** → `시드 파일 OK — <이름> · 기준 시드 … · N판`.
+2. (확인) 야간 ▸ **상태** → 시드·PC 설정(녹화 켜짐/꺼짐·공유 루트)·루프 상태가 콘솔에 나온다.
+3. 야간 ▸ **시작** — 끝. 이후는 무인:
    - (시작 1회) 지난 클립 정리 → 공유 날짜 폴더 만들기·OBS 녹화 경로 지정 → 화질 → 리플레이 버퍼 시작·확인(§5.3).
    - 가상 플레이어 2·3 을 켜고(판마다 껐다 켜서 접속 거절 예방) → 판마다 설정 파일을 호스트·클론에 쓰고 → `N108` 3인 Play → 판 기록을 보면 Play 정지 → 로컬 요약 → 다음 판.
    - (끝 1회) 남은 클립 저장·리플레이 버퍼 정지 → OBS 녹화 경로 되돌리기 → `progress.txt` 완료 키(§7.0).
    - 오류 판(심장박동 끊김·시작 8분·Play 진입 실패 등)은 기록 후 다음 판, 끝에서 1회 재실행.
    - 🔴 돌고 있는 동안 스크립트를 고치거나 Refresh 하지 않는다. `isPlaying` 을 직접 만지지 않는다.
-- 에이전트가 MCP 로 시작할 때: `Unity_RunCommand` 에서 `QAAutomation.StartNight();`(확인은 `QAAutomation.NightValidateSeedFile();`·`QAAutomation.NightStatus();`).
-- 중간에 멈추기: QA 창 ▸ Nightly ▸ **Stop After Current Run**(`QAAutomation.StopNightAfterCurrentRun();`) — 지금 판이 끝나면 멈추고 가상 플레이어 비활성·시나리오 모드 해제까지 한다.
-- 에디터가 꺼졌다 켜지면 저절로 이어 가지 않는다 → QA 창 ▸ Nightly ▸ **Resume Last**(`QAAutomation.ResumeNight();`).
+- 에이전트가 MCP 로 시작할 때: `Unity_RunCommand` 에서 `QAAutomation.NightStart();`(확인은 `QAAutomation.NightValidateSeed();`·`QAAutomation.NightLogStatus();`).
+- 중간에 멈추기: QA 창 ▸ 야간 ▸ **현재 판 후 정지**(`QAAutomation.NightStopAfterCurrent();`) — 지금 판이 끝나면 멈추고 가상 플레이어 비활성·시나리오 모드 해제까지 한다.
+- 에디터가 꺼졌다 켜지면 저절로 이어 가지 않는다 → QA 창 ▸ 야간 ▸ **이어하기**(`QAAutomation.NightResume();`).
 
 ## 7. 아침 결과 확인
 0. **완료 표시(기계 판독)** — 배치 폴더 `progress.txt`(key=value 줄). 루프가 정리(클립 저장·OBS 경로 되돌리기)를 다 마친 뒤 아래 키를 **한 번에**(파일 교체) 쓴다. `end` 가 보이면 나머지도 다 있다.
@@ -156,10 +156,10 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
    | `report_name` | 그 날짜 폴더에서 아직 안 쓴 `report-<이름>[-N].md` 제안(쓰기 직전에 다시 확인) |
    - 에디터 재시작으로 루프가 꺼지면 다음 에디터 시작 때 `end=aborted`(사유 "에디터 재시작")가 써진다. 이때는 OBS 정리(버퍼 정지·경로 되돌리기)를 못 했다. `Resume Last` 로 이어 가면 완료 키를 지우고, 다시 끝나면 새로 쓴다.
    - 에디터가 **멈췄거나 죽어서** 다시 켜지지 않으면 `end` 가 안 생긴다 — `updated`(마지막 상태 변경 시각)가 오래 멈춰 있으면 사람에게 알린다(에이전트 가이드 §4).
-1. QA 창 ▸ Nightly ▸ **Status**(`QAAutomation.NightStatus();`) → `멈춤 · … 상태 done`(완료) 또는 `stopped`. 진행 `N/N`·오류 확정 수.
+1. QA 창 ▸ 야간 ▸ **상태**(`QAAutomation.NightLogStatus();`) → `멈춤 · … 상태 done`(완료) 또는 `stopped`. 진행 `N/N`·오류 확정 수.
 2. 로컬 배치 폴더 `C:/UnityProject/QA/N108-<yyyyMMdd_HHmm>-<시드 이름>/`:
    - `nightly-summary.md` — **먼저 이것**: 시드 이름·데이터 출처·GameData.xlsx 리비전·브랜치/커밋·판 결과·녹화 목록.
-   - `report.html` — 103 리포트(머리말에 같은 정보 + 통계·판 목록). QA 창 ▸ Nightly ▸ **Open Report**(`QAAutomation.NightOpenReport();`)로 연다.
+   - `report.html` — 103 리포트(머리말에 같은 정보 + 통계·판 목록). QA 창 ▸ 야간 ▸ **리포트 열기**(`QAAutomation.NightOpenReport();`)로 연다.
    - `batch.txt`(배치 머리) · `runs.csv` 외 CSV · `logs/loop.log`(루프 로그, `⚠` = 녹화·OBS 경고) · `logs/notes.txt`(리포트 루프 메모 — OBS 경고 포함) · `recordings.txt`(판 전체 녹화 때만).
    - 할 일 120 `events.tsv`(이벤트 시각표 원본 — 탭: 판·재실행·이벤트·시각·게임 시각(초)·영상 타임코드(초)·상세) · `clips.txt`(리플레이 클립 — 탭: 판·재실행·경로·이벤트/메모) · `clip-pending.txt`(저장 대기 — 비면 정상).
      `nightly-summary.md` 끝의 **이벤트 시각표** 표 — "영상 타임코드"(`H:MM:SS`)로 그 판 영상을 바로 찾아간다. 같은 이벤트가 5초 안에 반복되면 한 줄(판당 300줄 상한).

@@ -8,9 +8,9 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// MPPM(Play Mode Scenario) 를 툴바 Play 버튼과 같은 경로로 시작한다 — QA 창(Tools/QA) ▸ 공통 버튼과 <see cref="QAAutomation"/> 이 부른다.
+/// MPPM(Play Mode Scenario) 를 툴바 Play 버튼과 같은 경로로 시작한다 — QA 창(Tools/QA) ▸ 맨 위 버튼과 <see cref="QAAutomation"/> 이 부른다.
 /// 🔴 EditorApplication.isPlaying 토글은 가상 플레이어가 안 붙는다(메모리 규칙). 여기서는 MPPM 의
-///    PlayModeManager 진입점을 리플렉션으로 찾아 부른다. 내부 API 라 버전이 바뀌면 QA 창 ▸ 공통 ▸ Dump MPPM API 로 다시 확인할 것.
+///    PlayModeManager 진입점을 리플렉션으로 찾아 부른다. 내부 API 라 버전이 바뀌면 QA 창 ▸ 디버그 ▸ MPPM API 덤프 로 다시 확인할 것.
 /// </summary>
 public static class QAScenarioPlay
 {
@@ -109,7 +109,7 @@ public static class QAScenarioPlay
     /// <summary>
     /// 가상 플레이어 2·3 에 MPPM 태그 <c>Client</c>(<see cref="DemoConnectionConfig.MppmClientTag"/>)를 붙인다 — 없으면 데모 흐름이 안 켜지고
     /// 옛 수동 흐름(타이틀)으로 돈다(lobby-demo-flow.md §6). 48.3 2차에서 태그가 비어 클론이 타이틀로 간 것을 확인했다.
-    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — QA 창 ▸ 공통 ▸ Deactivate 후 Activate.
+    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — QA 창 ▸ 가상 플레이어 ▸ 끄기 후 켜기.
     /// </summary>
     public static void EnsureClientTags()
     {
@@ -201,7 +201,7 @@ public static class QAScenarioPlay
         MethodInfo toggle = managerType?.GetMethod("TogglePlayingShortcut", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         if (toggle == null)
         {
-            Debug.LogError("[QA] PlayModeManager.TogglePlayingShortcut 를 찾지 못했다 — QA 창(Tools/QA) ▸ 공통 ▸ Dump MPPM API 로 확인할 것.");
+            Debug.LogError("[QA] PlayModeManager.TogglePlayingShortcut 를 찾지 못했다 — QA 창(Tools/QA) ▸ 디버그 ▸ MPPM API 덤프 로 확인할 것.");
             return;
         }
 

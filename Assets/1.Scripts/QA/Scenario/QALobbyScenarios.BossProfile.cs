@@ -12,7 +12,7 @@ using UnityEngine.Profiling;
 /// <summary>
 /// 할 일 57.2 — 보스전 실측 프로파일링(P572, 솔로 호스트). 정식 흐름(로비 → 로딩 → 4.MapScene) 뒤 G10 열기 → ForceStartEncounter → Combat 을
 /// 최소 90초(첫 23호 돌진·드론 고정·점프 예고를 다 볼 때까지, 최대 240초) 유지하며 Profiler 바이너리 로그(.raw, 1000프레임씩 나눔)와
-/// 프레임 CSV 를 <c>_lane-artifacts/&lt;repo 폴더&gt;/57.2-profile/run-*</c> 에 남긴다. 분석은 QA 창(Tools/QA) ▸ 57.2 ▸ Analyze Latest Boss Profile.
+/// 프레임 CSV 를 <c>_lane-artifacts/&lt;repo 폴더&gt;/57.2-profile/run-*</c> 에 남긴다. 분석은 QA 창(Tools/QA) ▸ 57.2 프로파일 ▸ 최근 분석.
 /// 보스 코드는 건드리지 않는다 — 예고는 리플렉션으로 관찰만 하고(<see cref="QABossProfileProbe"/>), 관찰한 프레임에 빈 마커 <c>QA57.*</c> 를 찍는다.
 /// 패턴은 기존 Dev 예약(<c>TwentyThreeBoss.DevReserveNextAttack</c> = F11 돌진·F6 점프)으로 앞당기고, 판이 끝나지 않게 체력만 채운다(무적 아님 — 피격 흐름 그대로).
 /// </summary>

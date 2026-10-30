@@ -5,8 +5,8 @@ using UnityEngine;
 /// <summary>
 /// 할 일 48 로비 데모 QA 실행부(QA 창(Tools/QA) ▸ 48 섹션이 부른다) — 시나리오 id 를 EditorPrefs(QASettings.Scenarios)에 넣고 Play Active Scenario 와 같은 경로로 시작한다.
 /// 🔴 isPlaying 을 직접 토글하지 않는다(MPPM 가상 플레이어가 안 붙는다) — QAScenarioPlay.Play 를 쓴다.
-/// MPPM 묶음은 먼저 QA 창 ▸ 공통 ▸ Activate Virtual Players (2,3)(<c>QAAutomation.ActivateVirtualPlayers()</c>)로 가상 플레이어(태그 Client)를 켠 뒤 실행한다.
-/// 끝나면 QA 창 ▸ 48 ▸ Clear Scenario Mode(<c>QAAutomation.ClearScenarioMode()</c>)로 시나리오 모드를 풀어야 평소 Play 에 QA 하네스가 시나리오를 다시 돌리지 않는다.
+/// MPPM 묶음은 먼저 QA 창 ▸ 가상 플레이어 ▸ 켜기(<c>QAAutomation.ActivateVirtualPlayers()</c>)로 가상 플레이어(태그 Client)를 켠 뒤 실행한다.
+/// 끝나면 QA 창 ▸ 48 로비 데모 ▸ 시나리오 모드 해제(<c>QAAutomation.ClearScenarioMode()</c>)로 시나리오 모드를 풀어야 평소 Play 에 QA 하네스가 시나리오를 다시 돌리지 않는다.
 /// </summary>
 public static class QAScenario48Menu
 {
@@ -38,12 +38,12 @@ public static class QAScenario48Menu
 
     public static void RunM8() => Run("M8", 3);
 
-    /// <summary>할 일 57.2 보스전 실측 프로파일(솔로). 분석은 QA 창 ▸ 57.2 ▸ Analyze Latest Boss Profile.</summary>
+    /// <summary>할 일 57.2 보스전 실측 프로파일(솔로). 분석은 QA 창 ▸ 57.2 프로파일 ▸ 최근 분석.</summary>
     public static void RunP572()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning("[QA] 이미 Play 중이다 — QA 창(Tools/QA) ▸ 공통 ▸ Stop Active Scenario 로 먼저 정지할 것.");
+            Debug.LogWarning("[QA] 이미 Play 중이다 — QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 먼저 정지할 것.");
             return;
         }
         QABossProfileAnalyzer.PrepareProfilerForRun();
@@ -156,7 +156,7 @@ public static class QAScenario48Menu
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning("[QA] 이미 Play 중이다 — QA 창(Tools/QA) ▸ 공통 ▸ Stop Active Scenario 로 먼저 정지할 것.");
+            Debug.LogWarning("[QA] 이미 Play 중이다 — QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 먼저 정지할 것.");
             return false;
         }
 

@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// 할 일 88 스위트 정리 감시자(에디터). QA 창(Tools/QA) ▸ 88 실행 버튼(<see cref="QAScenario88Menu"/>)이 <see cref="Arm"/> 하면, 스위트가 어떻게 끝나든(정상·중단·예외·사람이 Play 정지)
-/// <b>Play 정지 → 원격 지연 0·클론 명령 파일 삭제 → 가상 플레이어 비활성 → 시나리오 모드 해제(QA 창 ▸ 48 ▸ Clear Scenario Mode)</b>를 보장한다.
+/// <b>Play 정지 → 원격 지연 0·클론 명령 파일 삭제 → 가상 플레이어 비활성 → 시나리오 모드 해제(QA 창 ▸ 48 로비 데모 ▸ 시나리오 모드 해제)</b>를 보장한다.
 /// <list type="bullet">
 /// <item>호스트 스위트가 끝나면(<see cref="QAInterruptSuite88.Finished"/>) 클론이 <c>end</c> 를 읽을 시간(<see cref="StopDelaySeconds"/>) 뒤 Play 를 멈춘다.</item>
 /// <item>호스트 심장박동(<see cref="QAInterruptSuite88.LastBeat"/>)이 <see cref="StallSeconds"/> 동안 멈추면(예외로 코루틴이 죽었거나 대기에 갇힘) Play 를 멈춘다.</item>

@@ -12,7 +12,7 @@ using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 /// <summary>
-/// 할 일 48 B2 standalone 자동 판정(QA 창(Tools/QA) ▸ 48 Build). 이 러너가 띄운 프로세스만 추적·종료하고 시스템/방화벽 설정은 건드리지 않는다.
+/// 할 일 48 B2 standalone 자동 판정(QA 창(Tools/QA) ▸ 빌드). 이 러너가 띄운 프로세스만 추적·종료하고 시스템/방화벽 설정은 건드리지 않는다.
 /// 결과는 C:/UnityProject/QA/48-&lt;시각&gt;/report.md 와 하위 로그·스크린샷에 남긴다.
 /// </summary>
 public static class QABuild48StandaloneRunner
@@ -39,7 +39,7 @@ public static class QABuild48StandaloneRunner
         }
         if (!RequiredBuildsExist(out string missing))
         {
-            Debug.LogError($"[QA][B2] 빌드가 없다: {missing} — QA 창(Tools/QA) ▸ 48 Build ▸ Build Demo Player (QA artifacts) 먼저 실행");
+            Debug.LogError($"[QA][B2] 빌드가 없다: {missing} — QA 창(Tools/QA) ▸ 빌드 ▸ 데모 빌드 먼저 실행");
             return;
         }
 
@@ -84,7 +84,7 @@ public static class QABuild48StandaloneRunner
         }
         if (!RequiredBuildsExist(out string missing))
         {
-            Debug.LogError($"[QA][B3] 빌드가 없다: {missing} — QA 창(Tools/QA) ▸ 48 Build ▸ Build Demo Player (QA artifacts) 먼저 실행");
+            Debug.LogError($"[QA][B3] 빌드가 없다: {missing} — QA 창(Tools/QA) ▸ 빌드 ▸ 데모 빌드 먼저 실행");
             return;
         }
 

@@ -28,7 +28,7 @@ using UnityEngine;
 public static class QABoss103BatchRunner
 {
     private const string Tag = "[QA103/Batch]";
-    private const string ResumeHint = "QA 창(Tools/QA) ▸ 103 Batch ▸ Resume Last(QAAutomation.Boss103BatchResumeLast())";
+    private const string ResumeHint = "QA 창(Tools/QA) ▸ 103 배치 ▸ 이어하기(QAAutomation.Boss103BatchResume())";
     private static readonly string DirKey = DevBootTarget.ScopedKey("QA.103.Batch.Dir");
     private static readonly string RunningKey = DevBootTarget.ScopedKey("QA.103.Batch.Running");
     private const string LiveSessionKey = "QA.103.Batch.Live";
@@ -82,7 +82,7 @@ public static class QABoss103BatchRunner
     private static string Dir => EditorPrefs.GetString(DirKey, "");
     private static DateTime Now => DateTime.UtcNow;
 
-    // ── 실행(QA 창 ▸ 103 Batch · QAAutomation) ───────────────
+    // ── 실행(QA 창 ▸ 103 배치 · QAAutomation) ────────────────
 
     public static void Start90() =>
         StartBatch(QABoss103Batch.Prefix103, QABoss103Batch.TotalRuns, "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA", null);
@@ -291,12 +291,12 @@ public static class QABoss103BatchRunner
     {
         if (Running)
         {
-            Debug.LogWarning($"{Tag} 이미 돌고 있다({Dir}) — Status 로 확인, 멈추려면 Stop After Current Run.");
+            Debug.LogWarning($"{Tag} 이미 돌고 있다({Dir}) — QA 창 ▸ 103 배치 ▸ 상태 로 확인, 멈추려면 야간 ▸ 현재 판 후 정지.");
             return false;
         }
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning($"{Tag} Play 중이다 — QA 창(Tools/QA) ▸ 공통 ▸ Stop Active Scenario 로 먼저 정지할 것.");
+            Debug.LogWarning($"{Tag} Play 중이다 — QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 먼저 정지할 것.");
             return false;
         }
         return true;

@@ -10,11 +10,11 @@ using UnityEngine;
 /// <item><b>스위트(Q3)</b>: <c>Run Interrupt Lag Suite</c> = 대상 2 × 원격 지연 4(5/35/80/120) × 모드 2(A 스윕·B 사람형) = 16 런,
 ///   <c>Run Single Run (Selected)</c> = 창에서 고른 대상·지연·모드 1 런. 런당 시도 N = <see cref="Attempts"/>(기본 30).
 ///   설정을 <see cref="QAInterruptSuite88.ConfigPath"/> 에 쓰고 시나리오 <c>I88</c> 을 MPPM 으로 시작한다(<c>QAScenario48Menu.Run</c> 경로).
-///   🔴 먼저 QA 창 ▸ 공통 ▸ Activate Virtual Players (2,3). 끝나면(정상·중단·예외) <see cref="QAInterruptSuite88Watcher"/> 가
+///   🔴 먼저 QA 창 ▸ 가상 플레이어 ▸ 켜기. 끝나면(정상·중단·예외) <see cref="QAInterruptSuite88Watcher"/> 가
 ///   Play 정지·가상 플레이어 비활성·원격 지연 0·시나리오 모드 해제를 한다.</item>
 /// <item><b>원격 지연(Q2)</b>: MPPM 가상 플레이어(클론) 루트 <c>Library/VP/mppm*/</c> 에만 <see cref="QANetSim88.FileName"/> 을 써서
 ///   원격 클라만 지연시킨다 — 메인 에디터(호스트)는 지연 0. Play 전·중 어느 때나(클론 하네스가 0.5초마다 다시 읽는다). 원복 = 파일 삭제(= 0).
-///   QA 창 ▸ 48 ▸ Clear Scenario Mode 도 원복한다.</item>
+///   QA 창 ▸ 48 로비 데모 ▸ 시나리오 모드 해제 도 원복한다.</item>
 /// </list>
 /// 리포트 = <c>C:/UnityProject/QA/88-&lt;시각&gt;/report.md</c>.
 /// </summary>
@@ -106,13 +106,13 @@ public static class QAScenario88Menu
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning("[QA88] 이미 Play 중이다 — QA 창(Tools/QA) ▸ 공통 ▸ Stop Active Scenario 로 먼저 정지할 것.");
+            Debug.LogWarning("[QA88] 이미 Play 중이다 — QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 먼저 정지할 것.");
             return;
         }
         List<string> clones = QANetSim88.CloneRoots();
         if (clones.Count == 0)
         {
-            Debug.LogError("[QA88] MPPM 클론 폴더(Library/VP/mppm*)가 없다 — QA 창(Tools/QA) ▸ 공통 ▸ Activate Virtual Players (2,3) 를 먼저 켤 것.");
+            Debug.LogError("[QA88] MPPM 클론 폴더(Library/VP/mppm*)가 없다 — QA 창(Tools/QA) ▸ 가상 플레이어 ▸ 켜기 를 먼저 켤 것.");
             return;
         }
 
@@ -162,7 +162,7 @@ public static class QAScenario88Menu
         int n = QANetSim88.SetRemoteDelayFiles(delayMs);
         Debug.Log(n > 0
             ? $"[QA88] 원격 지연 {Mathf.Min(delayMs, QAInterruptLag88Plan.MaxDelayMs)}ms — 클론 {n}개에 기록(Play 중이면 0.5초 안에 적용)"
-            : "[QA88] MPPM 클론 폴더(Library/VP/mppm*)가 없다 — QA 창(Tools/QA) ▸ 공통 ▸ Activate Virtual Players (2,3) 를 먼저 한 번 켤 것.");
+            : "[QA88] MPPM 클론 폴더(Library/VP/mppm*)가 없다 — QA 창(Tools/QA) ▸ 가상 플레이어 ▸ 켜기 를 먼저 한 번 켤 것.");
         return n;
     }
 
