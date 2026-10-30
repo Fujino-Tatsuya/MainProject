@@ -597,6 +597,7 @@ public class NetworkSessionLauncher : MonoBehaviour
         ServerCharacterSelectionStore.Clear();
         PlayerIdRegistry.Server.Clear();
         NetworkLoadingFlowController.EndMatchRoster("sessionStopped");
+        _recentDisconnects.Clear();
     }
 
     private void HandleClientDisconnected(ulong clientId)
@@ -607,5 +608,58 @@ public class NetworkSessionLauncher : MonoBehaviour
         ServerCharacterSelectionStore.Remove(clientId);
         // clientId 매핑만 지운다 — 재접속하면 새 clientId 로 같은 playerId 를 다시 묶는다(Q4).
         PlayerIdRegistry.Server.RemoveClient(clientId);
+
+        if (_networkManager != null && _networkManager.IsServer)
+        {
+            _recentDisconnects[clientId] = new DisconnectedClientRecord(clientId, Time.frameCount, Time.realtimeSinceStartup);
+        }
+    }
+
+    /// <summary>[서버] 끊김 콜백을 받았는데 아직 지켜보는 clientId — 유령 정리용(할 일 188).</summary>
+    readonly Dictionary<ulong, DisconnectedClientRecord> _recentDisconnects = new();
+    readonly List<ulong> _sweepBuffer = new();
+
+    private void Update()
+    {
+        SweepGhostClients();
+    }
+
+    /// <summary>
+    /// [서버] 끊긴 뒤 NGO 의 늦은 승인으로 <c>ConnectedClientsIds</c> 에 다시 들어간 유령을 치운다 — 판정은 <see cref="GhostClientSweepRule"/>.
+    /// 유령은 transport 매핑이 없어 DisconnectClient 가 끊김 콜백을 다시 부르지 않는다.
+    /// </summary>
+    private void SweepGhostClients()
+    {
+        if (_recentDisconnects.Count == 0)
+            return;
+        if (_networkManager == null || !_networkManager.IsServer || !_networkManager.IsListening)
+        {
+            _recentDisconnects.Clear();
+            return;
+        }
+
+        _sweepBuffer.Clear();
+        _sweepBuffer.AddRange(_recentDisconnects.Keys);
+        var connectedIds = _networkManager.ConnectedClientsIds;
+        foreach (var clientId in _sweepBuffer)
+        {
+            var action = GhostClientSweepRule.Decide(
+                _recentDisconnects[clientId],
+                connectedIds.Contains(clientId),
+                NetworkManager.ServerClientId,
+                Time.frameCount,
+                Time.realtimeSinceStartup);
+            if (action == GhostClientAction.Wait)
+                continue;
+
+            _recentDisconnects.Remove(clientId);
+            if (action == GhostClientAction.Disconnect)
+            {
+                NetworkDiagnosticsLog.LogWarning(
+                    $"{DiagTag}.SweepGhostClients",
+                    $"clientId={clientId} 끊긴 뒤 ConnectedClientsIds 에 남아 DisconnectClient 로 치움 connected={connectedIds.Count}");
+                _networkManager.DisconnectClient(clientId);
+            }
+        }
     }
 }
