@@ -70,6 +70,7 @@ public sealed class GameplayInvariantDetector : IQADetector
     private float _recentFallThresholdSince = -1f;
     private int _playerId;
     private int _previousHealth;
+    private bool _previousServerInvulnerable;
     private bool _hasPreviousHealth;
     private float _playerObservedSince;
     private Vector3 _lastFixedPosition;
@@ -151,8 +152,12 @@ public sealed class GameplayInvariantDetector : IQADetector
         InspectWallPenetration(recorder, player, invalidPosition);
 
         _previousHealth = health;
+        _previousServerInvulnerable = CurrentServerInvulnerable;
         _hasPreviousHealth = true;
     }
+
+    private bool CurrentServerInvulnerable =>
+        _playerInvulnerability != null && _playerInvulnerability.IsServerInvulnerable;
 
     /// <summary>낙사 경계(FallBoundarySettings) 아래로 내려간 시각을 기록한다 — P6/P5 예외 판단용.</summary>
     private void UpdateFallExceptionWindow(Vector3 position, bool invalidPosition)
@@ -352,12 +357,14 @@ public sealed class GameplayInvariantDetector : IQADetector
         PlayerActionState state)
     {
         // 낙사 피해(PlayerFallController.ApplyFallDamage)는 설계상 무적을 우회하므로 예외 처리.
-        bool damagedWhileInvulnerable =
-            _hasPreviousHealth &&
-            _playerInvulnerability != null &&
-            _playerInvulnerability.IsServerInvulnerable &&
-            health < _previousHealth &&
-            !InRecentFallGrace;
+        // 무적이 막 켜진 샘플의 HP 감소는 같은 NGO 틱에 묶여 온 무적 이전 피해다(할 일 184).
+        bool damagedWhileInvulnerable = InvulnerableDamageJudge.IsViolation(
+            _hasPreviousHealth,
+            _previousHealth,
+            health,
+            _previousServerInvulnerable,
+            CurrentServerInvulnerable,
+            InRecentFallGrace);
 
         Evaluate(
             recorder,
@@ -555,6 +562,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         _playerObservedSince = Time.time;
         _lastFixedSampleTime = Time.fixedTime;
         _previousHealth = player.CurrentHealth;
+        _previousServerInvulnerable = false;
         _hasPreviousHealth = true;
     }
 
@@ -570,6 +578,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         _recentFallThresholdSince = -1f;
         _playerId = 0;
         _hasPreviousHealth = false;
+        _previousServerInvulnerable = false;
         _hasFixedPosition = false;
         _lastFixedSampleTime = -1f;
         _worldExitSince = -1f;
