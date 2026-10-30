@@ -132,7 +132,7 @@ public sealed class PodLaunchRulesTests
         CollectionAssert.AreEqual(new[] { E1 }, route.Ground, "합류 = 칸 수 → 공용 경로 없이 문턱으로");
         Assert.AreEqual(3, route.JoinIndex);
         Assert.IsFalse(route.JoinClamped, "칸 수는 범위 안");
-        Assert.AreEqual(Vector3.Distance(Vector3.zero, E1) + Vector3.Distance(E1, Door), PodLaunchRules.WalkLength(Vector3.zero, route), Eps);
+        Assert.AreEqual(H(Vector3.zero, E1) + H(E1, Door) + H(Door, Seat), PodLaunchRules.WalkLength(Vector3.zero, route), Eps);
     }
 
     [Test]
@@ -173,21 +173,94 @@ public sealed class PodLaunchRulesTests
         var shared = new Vector3?[] { A, B };
         PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { E1 }, shared, 1, Door, Seat);
         Vector3 start = new Vector3(10f, 0f, 0f);
-        float expected = Vector3.Distance(start, E1) + Vector3.Distance(E1, B) + Vector3.Distance(B, Door);
-        Assert.AreEqual(expected, PodLaunchRules.WalkLength(start, route), Eps, "시작 → 개인 → 공용[합류..] → 문턱");
-        Assert.AreEqual(expected - Vector3.Distance(B, Door), PodLaunchRules.GroundLength(start, route), Eps);
+        float ground = H(start, E1) + H(E1, B);
+        Assert.AreEqual(ground + H(B, Door) + H(Door, Seat), PodLaunchRules.WalkLength(start, route), Eps, "시작 → 개인 → 공용[합류..] → 문턱 → 좌석");
+        Assert.AreEqual(ground, PodLaunchRules.GroundLength(start, route), Eps);
     }
 
-    // ─── 걸어가는 길이 (C2d — 보행 시간 = 이 길이 ÷ 걷는 속도) ──────────────
+    // ─── 걸어가는 길이 (C2d → 172 — 보행 시간 = 좌석까지 수평 길이 ÷ 걷는 속도) ──────────────
+
+    // 수평(XZ) 거리 — 테스트 쪽 독립 계산.
+    static float H(Vector3 a, Vector3 b) => new Vector2(b.x - a.x, b.z - a.z).magnitude;
 
     [Test]
-    public void WalkLength_StartThroughPathToThreshold_ExcludesSeat()
+    public void WalkLength_StartThroughPathThresholdToSeat_Horizontal()
     {
         PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(new Vector3?[] { A, B, C }, Door, Seat);
-        float expected = Vector3.Distance(Vector3.zero, A) + Vector3.Distance(A, B) + Vector3.Distance(B, C) + Vector3.Distance(C, Door);
-        Assert.AreEqual(expected, PodLaunchRules.WalkLength(Vector3.zero, route), Eps, "걷기 시작 → 경로점 → 문턱(3차원), 좌석 제외");
-        Assert.AreEqual(expected - Vector3.Distance(C, Door), PodLaunchRules.GroundLength(Vector3.zero, route), Eps, "앞 구간 = 마지막 경로점까지");
+        float ground = H(Vector3.zero, A) + H(A, B) + H(B, C);
+        Assert.AreEqual(ground, PodLaunchRules.GroundLength(Vector3.zero, route), Eps, "앞 구간 = 마지막 경로점까지(수평)");
+        Assert.AreEqual(H(C, Door), PodLaunchRules.ApproachLength(Vector3.zero, route), Eps, "문턱 구간(수평)");
+        Assert.AreEqual(H(Door, Seat), PodLaunchRules.SlideLength(Vector3.zero, route), Eps, "미끄러짐(수평)");
+        Assert.AreEqual(ground + H(C, Door) + H(Door, Seat), PodLaunchRules.WalkLength(Vector3.zero, route), Eps, "걷기 시작 → 경로점 → 문턱 → 좌석(수평)");
         Assert.IsTrue(route.HasThreshold);
+    }
+
+    [Test]
+    public void WalkLength_IgnoresHeight()
+    {
+        // 같은 평면 경로에 높이만 다르게 — 계단·문턱·좌석 높이는 길이(= 시간)를 바꾸지 않는다.
+        PodLaunchRules.WalkRoute flat = PodLaunchRules.BuildRoute(new Vector3?[] { new Vector3(3f, 0f, 0f), new Vector3(3f, 0f, 4f) }, new Vector3(5f, 0f, 4f), new Vector3(5f, 0f, 5f));
+        PodLaunchRules.WalkRoute stairs = PodLaunchRules.BuildRoute(new Vector3?[] { new Vector3(3f, 2f, 0f), new Vector3(3f, -1f, 4f) }, new Vector3(5f, 1.5f, 4f), new Vector3(5f, 0.3f, 5f));
+        Assert.AreEqual(3f + 4f + 2f + 1f, PodLaunchRules.WalkLength(Vector3.zero, flat), Eps);
+        Assert.AreEqual(PodLaunchRules.WalkLength(Vector3.zero, flat), PodLaunchRules.WalkLength(Vector3.zero, stairs), Eps);
+        Assert.AreEqual(PodLaunchRules.GroundLength(Vector3.zero, flat), PodLaunchRules.GroundLength(Vector3.zero, stairs), Eps);
+        Assert.AreEqual(PodLaunchRules.SlideLength(Vector3.zero, flat), PodLaunchRules.SlideLength(Vector3.zero, stairs), Eps);
+    }
+
+    [Test]
+    public void Walk_AllSegmentsSameHorizontalSpeed_TotalIsLengthOverSpeed()
+    {
+        // 할 일 172 — 앞 구간(WalkStepAlongPath, 충돌 켬) · 문턱 구간(PointAlong) · 미끄러짐(Lerp) 이 모두 같은 수평 속도이고,
+        // 총 보행 시간 = 좌석까지 수평 길이 ÷ 걷는 속도(오너 LobbyPodLaunch 의 시간 나누기와 같은 계산). 구간 길이·높이 차를 일부러 다르게 둔다.
+        const float speed = 4.5f;
+        const float dt = 0.02f;
+        Vector3 start = new Vector3(0f, 0f, 0f);
+        var ground = new[] { new Vector3(2f, 0f, 0f), new Vector3(5.5f, 1.96f, 0f), new Vector3(6.6f, 1.96f, 0f) }; // 평지 → 계단(높이 1.96) → 평지, 일직선
+        Vector3 door = new Vector3(7.34f, 2.3f, 0f);
+        Vector3 seat = new Vector3(7.64f, 2.1f, 0.25f);
+        PodLaunchRules.WalkRoute route = PodLaunchRules.BuildRoute(System.Array.ConvertAll(ground, p => (Vector3?)p), door, seat);
+
+        float groundLength = PodLaunchRules.GroundLength(start, route);
+        float arriveLength = groundLength + PodLaunchRules.ApproachLength(start, route);
+        float slideLength = PodLaunchRules.SlideLength(start, route);
+        float total = PodDropLobbyTimeline.WalkSecondsFor(PodLaunchRules.WalkLength(start, route), speed);
+        Assert.AreEqual((H(start, ground[2]) + H(ground[2], door) + H(door, seat)) / speed, total, Eps, "총 보행 시간 = 수평 총 길이 ÷ 걷는 속도");
+
+        float groundEnd = total * PodLaunchRules.GroundShare(groundLength, arriveLength - groundLength + slideLength);
+        float arrive = total * PodLaunchRules.GroundShare(arriveLength, slideLength);
+
+        // 구간별 배정 시간 = 구간 수평 길이 ÷ 같은 속도.
+        Assert.AreEqual(groundLength / speed, groundEnd, Eps, "앞 구간");
+        Assert.AreEqual(H(ground[2], door) / speed, arrive - groundEnd, Eps, "문턱 구간");
+        Assert.AreEqual(H(door, seat) / speed, total - arrive, Eps, "미끄러짐");
+
+        // 앞 구간 — 틱마다 수평 변위 ÷ dt (일직선이라 변위 = 경로 진행). 마지막 자투리 틱은 뺀다.
+        Vector3 position = start;
+        int index = 0;
+        double now = 0d;
+        while (groundEnd - now > dt)
+        {
+            Vector3 step = BossElevatorTimeline.WalkStepAlongPath(position, ground, ref index, groundEnd - now, dt);
+            Assert.AreEqual(speed, step.magnitude / dt, 1e-3f, $"앞 구간 t={now:0.00} 수평 속도");
+            position += step;
+            now += dt;
+        }
+
+        // 문턱 구간 · 미끄러짐 — 진행률 → 점, 수평 변위 ÷ dt.
+        AssertHorizontalSpeed(t => PodLaunchRules.PointAlong(ground[2], new[] { door }, t), arrive - groundEnd, dt, speed, "문턱 구간");
+        AssertHorizontalSpeed(t => Vector3.Lerp(door, seat, t), total - arrive, dt, speed, "미끄러짐");
+    }
+
+    static void AssertHorizontalSpeed(System.Func<float, Vector3> pointAt, float duration, float dt, float speed, string label)
+    {
+        int ticks = Mathf.FloorToInt(duration / dt);
+        Assert.Greater(ticks, 0, $"{label} — 틱이 하나는 있어야 한다");
+        for (int i = 0; i < ticks; i++)
+        {
+            Vector3 a = pointAt(i * dt / duration);
+            Vector3 b = pointAt((i + 1) * dt / duration);
+            Assert.AreEqual(speed, H(a, b) / dt, 1e-3f, $"{label} {i}틱 수평 속도");
+        }
     }
 
     [Test]
@@ -203,15 +276,17 @@ public sealed class PodLaunchRulesTests
     public void WalkLength_NoThresholdOrPath()
     {
         PodLaunchRules.WalkRoute noDoor = PodLaunchRules.BuildRoute(new Vector3?[] { A }, null, Seat);
-        Assert.AreEqual(1f, PodLaunchRules.WalkLength(Vector3.zero, noDoor), Eps, "문턱 없음 → 마지막 경로점까지");
+        Assert.AreEqual(0f, PodLaunchRules.ApproachLength(Vector3.zero, noDoor), Eps, "문턱 없음 → 문턱 구간 0");
+        Assert.AreEqual(1f + H(A, Seat), PodLaunchRules.WalkLength(Vector3.zero, noDoor), Eps, "문턱 없음 → 마지막 경로점 → 좌석");
         Assert.IsFalse(noDoor.HasThreshold);
 
         PodLaunchRules.WalkRoute noPath = PodLaunchRules.BuildRoute(new Vector3?[0], Door, Seat);
-        Assert.AreEqual(Vector3.Distance(Vector3.zero, Door), PodLaunchRules.WalkLength(Vector3.zero, noPath), Eps, "경로점 없음 → 곧바로 문턱");
+        Assert.AreEqual(H(Vector3.zero, Door) + H(Door, Seat), PodLaunchRules.WalkLength(Vector3.zero, noPath), Eps, "경로점 없음 → 곧바로 문턱 → 좌석");
         Assert.AreEqual(0f, PodLaunchRules.GroundLength(Vector3.zero, noPath), Eps);
 
         PodLaunchRules.WalkRoute nothing = PodLaunchRules.BuildRoute(new Vector3?[0], null, Seat);
-        Assert.AreEqual(0f, PodLaunchRules.WalkLength(Vector3.zero, nothing), Eps, "둘 다 없음 → 0(미끄러짐만)");
+        Assert.AreEqual(H(Vector3.zero, Seat), PodLaunchRules.WalkLength(Vector3.zero, nothing), Eps, "둘 다 없음 → 걷기 시작 지점 → 좌석 미끄러짐만");
+        Assert.AreEqual(H(Vector3.zero, Seat), PodLaunchRules.SlideLength(Vector3.zero, nothing), Eps);
     }
 
     // ─── 보행 시간 나누기 ────────────────────────────────────────────────
@@ -228,10 +303,19 @@ public sealed class PodLaunchRulesTests
     // ─── 충돌 없는 보간 ──────────────────────────────────────────────────
 
     [Test]
-    public void PathLength3D_CountsHeight()
+    public void PathLengthHorizontal_IgnoresHeight()
     {
         var path = new[] { new Vector3(3f, 4f, 0f), new Vector3(3f, 4f, 2f) };
-        Assert.AreEqual(5f + 2f, PodLaunchRules.PathLength3D(Vector3.zero, path), Eps);
+        Assert.AreEqual(3f + 2f, PodLaunchRules.PathLengthHorizontal(Vector3.zero, path), Eps);
+    }
+
+    [Test]
+    public void PointAlong_HorizontalProgressWithHeight()
+    {
+        // 높이가 다른 두 구간 — 진행률은 수평 길이 기준(1 + 3 = 4m), 높이는 구간 안에서 같이 보간.
+        var path = new[] { new Vector3(1f, 5f, 0f), new Vector3(4f, 5f, 0f) };
+        Assert.AreEqual(new Vector3(1f, 5f, 0f), PodLaunchRules.PointAlong(Vector3.zero, path, 0.25f), "수평 1m = 첫 구간 끝(3차원 길이였다면 못 닿는다)");
+        Assert.AreEqual(new Vector3(2.5f, 5f, 0f), PodLaunchRules.PointAlong(Vector3.zero, path, 0.625f));
     }
 
     [Test]

@@ -34,12 +34,11 @@ public struct PodDropLobbyTimings
     public Ease cameraZoomEase;
 
     [Header("보행 (걷기 시작 지점 → 문턱 → 좌석)")]
-    [Tooltip("걷는 속도(m/s) — 전원 같다. 각자 보행 시간 = 자기 걷기 시작 지점 → 공용 경로점 → 문턱 길이 ÷ 이 값. 경로를 바꿔도 속도는 그대로다(플레이어 평소 이동 5 m/s)")]
+    [Tooltip("걷는 속도(m/s, 수평) — 전원·전 구간 같다. 각자 보행 시간 = 자기 걷기 시작 지점 → 공용 경로점 → 문턱 → 좌석 수평 길이 ÷ 이 값(문턱 → 좌석 미끄러짐도 같은 속도). " +
+             "경로를 바꿔도 속도는 그대로다(플레이어 평소 이동 5 m/s)")]
     [Min(0.1f)] public float walkSpeed;
     [Tooltip("앞사람이 걷기 시작한 순간 → 다음 사람이 걷기 시작(초). 탑승 다리 폭이 0.8m 라 한 줄로 들어간다")]
     [Min(0f)] public float walkInterval;
-    [Tooltip("문턱에 닿은 순간 → 좌석까지 미끄러져 들어가 숨는 시간(초). 포드 실내가 낮아 충돌 없이 보간한다. 문턱이 없으면 마지막 경로점 → 좌석")]
-    [Min(0f)] public float seatSlideSeconds;
 
     [Header("발사대 애니 (Animator 상태 이름 — 1배속, 클립 이벤트가 다음 단계를 연다)")]
     [Tooltip("해치 상태 이름(컨트롤러 Base Layer). 시작 암전 한가운데(순간이동 순간)부터 1배속으로 재생하고, 클립 이벤트(PodClipEvent — 기본 103프레임)에서 그 자세로 멈춘 뒤 탑승한다. " +
@@ -81,7 +80,6 @@ public struct PodDropLobbyTimings
         cameraZoomEase = Ease.InOutSine,
         walkSpeed = 4.5f,
         walkInterval = 0.4f,
-        seatSlideSeconds = 0.4f,
         hatchState = "DP_HatchLobbyOpenClose",
         launchState = "DP_LaunchCycle",
         launchFastSpeed = 6f,
@@ -255,8 +253,6 @@ public sealed class PodDropLobbyTimeline
     public int WalkerCount => _walkSeconds.Length;
     /// <summary>다음 사람이 걷기 시작하는 간격(초).</summary>
     public float WalkInterval { get; }
-    /// <summary>문턱 → 좌석 미끄러짐 시간(초) — 전원 같다.</summary>
-    public float SeatSlideSeconds { get; }
     /// <summary>발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초).</summary>
     public float LaunchEndWaitSeconds { get; }
     /// <summary>끝 페이드 아웃 — 다 검어지기까지(초).</summary>
@@ -264,7 +260,7 @@ public sealed class PodDropLobbyTimeline
     /// <summary>발사 클립 끝 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
     public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds;
 
-    // 슬롯별 보행 시간(초, 걷기 시작 지점 → 문턱) — 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
+    // 슬롯별 보행 시간(초, 걷기 시작 지점 → 좌석) — 수평 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
     private readonly float[] _walkSeconds;
 
     /// <summary>순간이동 시각 = 암전 유지 구간 한가운데 — 각 오너가 자기 걷기 시작 지점으로 순간이동하고, 해치 클립이 처음부터 재생된다. 암전이 없으면 0.</summary>
@@ -276,7 +272,7 @@ public sealed class PodDropLobbyTimeline
     /// <summary>탑승 시작 → 가장 늦게 좌석에 도착(초). 아무도 안 걸으면 0.</summary>
     public float SeatedSeconds { get; }
 
-    /// <param name="walkSeconds">슬롯(보행 순서)별 보행 시간(초, 걷기 시작 지점 → 문턱). 길이 = 걷는 사람 수. 음수·NaN 은 0. 서버가 경로로 계산해 복제한 값을 모든 피어가 같이 쓴다.</param>
+    /// <param name="walkSeconds">슬롯(보행 순서)별 보행 시간(초, 걷기 시작 지점 → 좌석 — 미끄러짐 포함). 길이 = 걷는 사람 수. 음수·NaN 은 0. 서버가 경로로 계산해 복제한 값을 모든 피어가 같이 쓴다.</param>
     public PodDropLobbyTimeline(PodDropLobbyTimings timings, IReadOnlyList<float> walkSeconds)
     {
         LetterboxInSeconds = Mathf.Max(0f, timings.letterboxInSeconds);
@@ -291,7 +287,6 @@ public sealed class PodDropLobbyTimeline
         CameraZoomEase = timings.cameraZoomEase;
 
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
-        SeatSlideSeconds = Mathf.Max(0f, timings.seatSlideSeconds);
         LaunchEndWaitSeconds = Mathf.Max(0f, timings.launchEndWaitSeconds);
         LaunchEndFadeSeconds = Mathf.Max(0f, timings.launchEndFadeSeconds);
         _walkSeconds = new float[walkSeconds != null ? walkSeconds.Count : 0];
@@ -303,7 +298,7 @@ public sealed class PodDropLobbyTimeline
         // 가장 늦게 도착하는 사람 기준(경로 길이가 달라 슬롯 순서와 다를 수 있다).
         SeatedSeconds = 0f;
         for (int slot = 0; slot < WalkerCount; slot++)
-            SeatedSeconds = Mathf.Max(SeatedSeconds, slot * WalkInterval + _walkSeconds[slot] + SeatSlideSeconds);
+            SeatedSeconds = Mathf.Max(SeatedSeconds, slot * WalkInterval + _walkSeconds[slot]);
     }
 
     /// <summary>탑승 시작 시각 = 해치 열림 이벤트와 <see cref="WalkReadyAt"/> 중 늦은 쪽. 이벤트 전이면 +∞.</summary>
@@ -321,16 +316,13 @@ public sealed class PodDropLobbyTimeline
     /// <summary>슬롯(0 = P1)이 걷기 시작하는 경과 시각(초).</summary>
     public double WalkStartAt(int slot, double boardAt) => boardAt + Mathf.Max(0, slot) * WalkInterval;
 
-    /// <summary>슬롯의 보행 시간(초, 걷기 시작 지점 → 문턱). 명단 밖 슬롯은 0.</summary>
+    /// <summary>슬롯의 보행 시간(초, 걷기 시작 지점 → 좌석). 명단 밖 슬롯은 0.</summary>
     public float WalkSecondsOf(int slot) => slot >= 0 && slot < _walkSeconds.Length ? _walkSeconds[slot] : 0f;
 
-    /// <summary>슬롯이 문턱에 닿는 경과 시각(초) — 여기부터 좌석으로 미끄러진다.</summary>
-    public double WalkArriveAt(int slot, double boardAt) => WalkStartAt(slot, boardAt) + WalkSecondsOf(slot);
+    /// <summary>슬롯이 좌석에 도착하는 경과 시각(초) — 이 순간 숨긴다. 구간(앞·문턱·미끄러짐) 나누기는 오너가 수평 길이 비율로 한다.</summary>
+    public double WalkEndAt(int slot, double boardAt) => WalkStartAt(slot, boardAt) + WalkSecondsOf(slot);
 
-    /// <summary>슬롯이 좌석에 도착하는 경과 시각(초) — 이 순간 숨긴다.</summary>
-    public double WalkEndAt(int slot, double boardAt) => WalkArriveAt(slot, boardAt) + SeatSlideSeconds;
-
-    /// <summary>슬롯의 보행 진행률(0 = 걷기 시작 지점, 1 = 문턱). 선형 — 걷는 속도가 일정하다.</summary>
+    /// <summary>슬롯의 보행 진행률(0 = 걷기 시작 지점, 1 = 좌석). 선형 — 걷는 속도가 일정하다.</summary>
     public float WalkProgressAt(int slot, double elapsed, double boardAt) =>
         PodDropTimeline.Progress(elapsed, WalkStartAt(slot, boardAt), WalkSecondsOf(slot));
 
@@ -353,7 +345,7 @@ public sealed class PodDropLobbyTimeline
         return (float)(clip + (from2 - from1) * fastSpeed + (elapsed - from2) * fast2Speed);
     }
 
-    /// <summary>경로 길이(m) ÷ 걷는 속도(m/s) = 보행 시간(초). 길이·속도가 0 이하(또는 NaN)면 0 — 무한·NaN 시간표를 만들지 않는다.</summary>
+    /// <summary>수평 경로 길이(m) ÷ 걷는 속도(m/s) = 보행 시간(초). 길이·속도가 0 이하(또는 NaN)면 0 — 무한·NaN 시간표를 만들지 않는다.</summary>
     public static float WalkSecondsFor(float pathLength, float walkSpeed) =>
         pathLength > 0f && walkSpeed > 0f ? pathLength / walkSpeed : 0f;
 
