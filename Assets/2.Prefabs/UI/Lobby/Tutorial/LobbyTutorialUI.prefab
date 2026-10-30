@@ -882,7 +882,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LobbyTutorialUIDebugDriver
   step: 0
   partySize: 3
-  wallId: Train03West
+  wallId: WALL_TRAIN_WEST
 --- !u!1 &4123345824329805107
 GameObject:
   m_ObjectHideFlags: 0

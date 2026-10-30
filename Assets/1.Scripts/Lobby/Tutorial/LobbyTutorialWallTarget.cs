@@ -2,6 +2,12 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>로비 튜토리얼 지정 벽 ID — 157 단계표 행 칸 targetWallId 와 같은 글자(계약 §1, T34).</summary>
+public static class LobbyTutorialWallIds
+{
+    public const string TrainWest = "WALL_TRAIN_WEST";
+}
+
 /// <summary>
 /// 지정 벽 표식 하나(할 일 158 C7, 명세 4.3) — TargetWall ID 로 켜고 끈다. 렌더러만 켜고 끄며 충돌 판정과는 무관(판정은 157 서버).
 /// 표시 조건은 157 계약(TargetWallImpact) 연결 때 <see cref="LobbyTutorialUI.SetWallTarget"/> 로 받는다.
@@ -12,8 +18,8 @@ public sealed class LobbyTutorialWallTarget : MonoBehaviour
 {
     private static readonly List<LobbyTutorialWallTarget> Registry = new List<LobbyTutorialWallTarget>();
 
-    [Tooltip("TargetWall ID — 157 계약 이름.")]
-    [SerializeField] private string wallId = "Train03West";
+    [Tooltip("TargetWall ID — LobbyTutorialWallIds(= 157 단계표 targetWallId).")]
+    [SerializeField] private string wallId = LobbyTutorialWallIds.TrainWest;
 
     [Tooltip("켜고 끌 렌더러. 비우면 자기와 자식의 렌더러 전부.")]
     [SerializeField] private Renderer[] renderers = Array.Empty<Renderer>();

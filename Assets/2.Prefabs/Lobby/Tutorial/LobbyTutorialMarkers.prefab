@@ -35,7 +35,6 @@ Transform:
   - {fileID: 5611367509343297052}
   - {fileID: 8666934111557848849}
   - {fileID: 5880168499247861645}
-  - {fileID: 7767686574781085219}
   - {fileID: 4488218159462419653}
   m_Father: {fileID: 3264273392430974175}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -780,28 +779,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyTutorialPathSet
   entries:
-  - id: Locker
+  - id: PATH_LOCKER
     paths:
     - {fileID: 4050020091519805125}
-  - id: Central
+  - id: PATH_CENTRAL
     paths:
     - {fileID: 7618511936430735851}
-  - id: TrainingInside
+  - id: PATH_TRAINING_HALL
     paths:
     - {fileID: 2591338064130290158}
-  - id: Combat
+  - id: PATH_COMBAT_AREA
     paths:
     - {fileID: 4100877088170481074}
-  - id: Counter
+  - id: PATH_COUNTER_AREA
     paths:
     - {fileID: 968707508417643711}
-  - id: Exit
+  - id: PATH_TRAINING_EXIT
     paths:
     - {fileID: 2642529856960562211}
-  - id: BriefCentral
-    paths:
-    - {fileID: 2232366185797025165}
-  - id: Sortie
+  - id: PATH_SORTIE
     paths:
     - {fileID: 5440333360097707883}
   legacyGuideRoots: []
@@ -945,7 +941,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_Central
+      value: PATH_CENTRAL
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1018,7 +1014,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_Sortie
+      value: PATH_SORTIE
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1091,7 +1087,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_Locker
+      value: PATH_LOCKER
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1164,7 +1160,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_Combat
+      value: PATH_COMBAT_AREA
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1237,7 +1233,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_TrainingInside
+      value: PATH_TRAINING_HALL
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1310,7 +1306,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_Exit
+      value: PATH_TRAINING_EXIT
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1332,79 +1328,6 @@ MonoBehaviour:
 Transform:
   m_CorrespondingSourceObject: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
   m_PrefabInstance: {fileID: 6758675743639914198}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &7466247002189021048
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 7120860678553168834}
-    m_Modifications:
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 12
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-      propertyPath: m_Name
-      value: Path_BriefCentral
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
---- !u!114 &2232366185797025165 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 8748107177363456757, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-  m_PrefabInstance: {fileID: 7466247002189021048}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b8d32102dfbac2f4dac21333952acc40, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LobbyFloorArrowPath
---- !u!4 &7767686574781085219 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 887541041038133595, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
-  m_PrefabInstance: {fileID: 7466247002189021048}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &8364890367731402314
 PrefabInstance:
@@ -1456,7 +1379,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3563002433724165807, guid: 44a75e7a53cc2cb4497c3bd6493f633a, type: 3}
       propertyPath: m_Name
-      value: Path_Counter
+      value: PATH_COUNTER_AREA
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

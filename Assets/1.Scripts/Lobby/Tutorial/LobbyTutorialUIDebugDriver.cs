@@ -19,7 +19,7 @@ public sealed class LobbyTutorialUIDebugDriver : MonoBehaviour
     [SerializeField, Min(1)] private int partySize = 3;
 
     [Tooltip("화면 17 에서 켤 벽 표식 ID(LobbyTutorialWallTarget).")]
-    [SerializeField] private string wallId = "Train03West";
+    [SerializeField] private string wallId = LobbyTutorialWallIds.TrainWest;
 
     private void OnEnable() => Apply();
 
@@ -104,27 +104,27 @@ public static class LobbyTutorialUIDebugScenes
 {
     private static readonly System.Func<int, LobbyTutorialUIDebugScene>[] Scenes =
     {
-        n => Obj("01–02 L00", S.ChapterCharacterSelect, S.ObjCharacterSelect, null, null, default, "Locker"),
-        n => Obj("03–04 L10", S.ChapterTrainingPrep, S.ObjGatherCentral, null, null, Gather(1, n), "Central"),
+        n => Obj("01–02 L00", S.ChapterCharacterSelect, S.ObjCharacterSelect, null, null, default, LobbyTutorialPathIds.Locker),
+        n => Obj("03–04 L10", S.ChapterTrainingPrep, S.ObjGatherCentral, null, null, Gather(1, n), LobbyTutorialPathIds.Central),
         n => Dlg("05 L11", S.DlgCentralIntro, LobbyTutorialBackground.None),
-        n => Obj("06–07 L20", S.ChapterTrainingPrep, S.ObjGatherTraining, null, null, Gather(2, n), "TrainingInside"),
+        n => Obj("06–07 L20", S.ChapterTrainingPrep, S.ObjGatherTraining, null, null, Gather(2, n), LobbyTutorialPathIds.TrainingHall),
         n => Dlg("08 L21", S.DlgTrainingIntro, LobbyTutorialBackground.None),
         n => Obj("09 T10", S.ChapterBasic, S.ObjBasic, null, BasicChecks(), new LobbyTutorialProgress(LobbyTutorialProgressKind.TrainingDone, 1, n), null),
-        n => Obj("10 T20", S.ChapterCombat, S.ObjGatherZone, null, null, Gather(0, n), "Combat"),
+        n => Obj("10 T20", S.ChapterCombat, S.ObjGatherZone, null, null, Gather(0, n), LobbyTutorialPathIds.CombatArea),
         n => Obj("11 T21", S.ChapterCombat, S.ObjCombatKillAll, null, null, new LobbyTutorialProgress(LobbyTutorialProgressKind.Countdown, 3, 0), null),
         n => Obj("12 T22", S.ChapterCombat, S.ObjCombatKillAll, null, null, default, null),
-        n => Obj("13–14 T30", S.ChapterCounter, S.ObjGatherZone, null, null, Gather(1, n), "Counter"),
+        n => Obj("13–14 T30", S.ChapterCounter, S.ObjGatherZone, null, null, Gather(1, n), LobbyTutorialPathIds.CounterArea),
         n => Obj("15 T31", S.ChapterCounter, S.ObjCounter, null, null, default, null),
         n => Obj("16 T32", S.ChapterCounter, S.ObjVulnerableCC, new[] { S.BodyVulnerableCC1.Key, S.BodyVulnerableCC2.Key }, null, default, null),
         n => Wall(Obj("17 T34", S.ChapterCounter, S.ObjWall, null, null, default, null)),
         n => Obj("18 T40", S.ChapterSuppress, S.ObjSuppressKill, new[] { S.BodySuppress.Key }, null, default, null),
-        n => Obj("19 T50", S.ChapterFreePractice, S.ObjFreePractice, new[] { S.BodyFreePractice.Key }, null, Gather(0, n), "Exit"),
-        n => Obj("20–21 L30", S.ChapterBriefing, S.ObjGatherCentral, null, null, Gather(2, n), "BriefCentral"),
+        n => Obj("19 T50", S.ChapterFreePractice, S.ObjFreePractice, new[] { S.BodyFreePractice.Key }, null, Gather(0, n), LobbyTutorialPathIds.TrainingExit),
+        n => Obj("20–21 L30", S.ChapterBriefing, S.ObjGatherCentral, null, null, Gather(2, n), LobbyTutorialPathIds.Central),
         n => Dlg("22 L31", S.DlgBrief01, LobbyTutorialBackground.None),
         n => Dlg("23 L32", S.DlgBrief02, LobbyTutorialBackground.Factory),
         n => Dlg("24 L33", S.DlgBrief03, LobbyTutorialBackground.Rebellion),
         n => Dlg("25 L34", S.DlgBrief04, LobbyTutorialBackground.None),
-        n => Obj("26–27 L40", S.ChapterSortie, S.ObjGatherSortie, null, null, Gather(1, n), "Sortie"),
+        n => Obj("26–27 L40", S.ChapterSortie, S.ObjGatherSortie, null, null, Gather(1, n), LobbyTutorialPathIds.Sortie),
     };
 
     public static int Count => Scenes.Length;

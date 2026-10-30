@@ -2,19 +2,21 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>로비 튜토리얼 바닥 경로 ID(할 일 158 계획 §1.5). 157 계약이 다른 이름을 정하면 그쪽에 맞춘다.</summary>
+/// <summary>
+/// 로비 튜토리얼 바닥 경로 ID — 157 단계표(<c>LobbyTutorialSteps.asset</c>) 행 칸 pathId 와 같은 글자(계약 handoff-lobby-tutorial-contract.md §1).
+/// L10·L30 은 같은 <see cref="Central"/> 을 쓴다.
+/// </summary>
 public static class LobbyTutorialPathIds
 {
-    public const string Locker = "Locker";
-    public const string Central = "Central";
-    public const string TrainingInside = "TrainingInside";
-    public const string Combat = "Combat";
-    public const string Counter = "Counter";
-    public const string Exit = "Exit";
-    public const string BriefCentral = "BriefCentral";
-    public const string Sortie = "Sortie";
+    public const string Locker = "PATH_LOCKER";               // L00 라커
+    public const string Central = "PATH_CENTRAL";             // L10·L30 중앙
+    public const string TrainingHall = "PATH_TRAINING_HALL";  // L20 훈련장
+    public const string CombatArea = "PATH_COMBAT_AREA";      // T20 전투 구역
+    public const string CounterArea = "PATH_COUNTER_AREA";    // T30 간파 구역
+    public const string TrainingExit = "PATH_TRAINING_EXIT";  // T50 출구
+    public const string Sortie = "PATH_SORTIE";               // L40 출격
 
-    public static readonly IReadOnlyList<string> All = new[] { Locker, Central, TrainingInside, Combat, Counter, Exit, BriefCentral, Sortie };
+    public static readonly IReadOnlyList<string> All = new[] { Locker, Central, TrainingHall, CombatArea, CounterArea, TrainingExit, Sortie };
 }
 
 /// <summary>경로 켜고 끄기 판정(순수). 빈 ID = 아무 경로도 안 켬. 대소문자 구분.</summary>
@@ -43,7 +45,7 @@ public sealed class LobbyTutorialPathSet : MonoBehaviour
     [Serializable]
     public struct Entry
     {
-        [Tooltip("경로 ID — LobbyTutorialPathIds 또는 157 계약 이름.")]
+        [Tooltip("경로 ID — LobbyTutorialPathIds(= 157 단계표 pathId).")]
         public string id;
 
         [Tooltip("이 단계에서 켤 경로들(보통 하나).")]

@@ -77,7 +77,7 @@ internal static class LobbyTutorialMarkersAuthoring
         IReadOnlyList<string> ids = LobbyTutorialPathIds.All;
         for (int i = 0; i < ids.Count; i++)
         {
-            string name = "Path_" + ids[i];
+            string name = ids[i]; // 오브젝트 이름 = 경로 ID(PATH_*)
             Transform found = pathsRoot.Find(name);
             if (found == null)
             {
