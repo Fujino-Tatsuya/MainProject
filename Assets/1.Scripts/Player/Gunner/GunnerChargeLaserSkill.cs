@@ -395,7 +395,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         // 보호막 연출은 안 싣는다 — 받은 아군의 PlayerShieldVfx 가 복제된 보호막 목록을 보고 띄운다.
         // 🔴 연출 폭은 데이터 폭 그대로(광폭 레이저 VFX 폭 반영은 별도 할 일 — 판정만 넓힌다).
         view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth,
-                                     stopped, BuildHitPoints(origin, direction, length));
+                                     stopped, BuildHitPoints(origin, direction, length), BuildEchoTargetIds());
 
         Edit.Log($"[Gunner/Q] 발사 {index + 1}/{volley.ShotCount} — 집중 {shotFactor:0.00}(최대 {chargeMaxTime:0.##}초), 사거리 {length:0.0}/{shotRange:0.0}, " +
                  $"폭 {shotWidth:0.##}, 피해 {shotDamage} ×{hitCount}, 보호막 {shotShield} ×{shielded}, 저장 단계 {shotStage}, 과열 모드 {shotHeatMode}" +
@@ -429,6 +429,26 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             points[i] = new Vector3(onBeam.x, center.y + 1f, onBeam.z);
         }
         return points;
+    }
+
+    /// <summary>
+    /// 잔류 포격 예비 구체를 띄울 대상(할 일 149 후속 3) — 이번 발에 맞은 유닛(폭탄 자리 수집과 같은 조건)의 네트워크 ID. 표시 전용.
+    /// 잔류 포격 파생 공격이 없으면(특성 없음) 빈 배열 — 예비 구체가 안 뜬다. 폭탄이 실제로 붙을지는 여전히 <see cref="ScheduleEcho"/> 가 정한다.
+    /// </summary>
+    private ulong[] BuildEchoTargetIds()
+    {
+        IReadOnlyList<Unit> landed = beam != null ? beam.LastPierceLanded : null;
+        if (landed == null || landed.Count == 0 ||
+            GunnerTraitRules.FindDerived(TraitEffects, GunnerTraitRules.QAttackKey, GunnerTraitRules.QEchoDerivedKey, derivedBuffer) == null)
+            return System.Array.Empty<ulong>();
+
+        var ids = new List<ulong>(landed.Count);
+        for (int i = 0; i < landed.Count; i++)
+        {
+            if (landed[i] != null && landed[i].IsSpawned)
+                ids.Add(landed[i].NetworkObjectId);
+        }
+        return ids.ToArray();
     }
 
     public override void OnEnd(SkillEndReason reason)

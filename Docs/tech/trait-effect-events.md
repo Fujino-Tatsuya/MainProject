@@ -89,7 +89,8 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 
 ## 4. 잔류 포격 임시 구체 교체
 
-붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다 — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombPrefab`(지금 임시 `2.Prefabs/Player/Gunner/GunnerEchoBomb_Temp.prefab`). 이펙트 교체는 이 칸만 바꾸면 된다(폭탄마다 하나 복제, 대상 몸 콜라이더 윗면 가운데를 매 프레임 따라감 — 몸 중심이면 몸 메시 안에 묻혀 안 보인다). 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다. 상세 [tutorial-traits.md §7.1](tutorial-traits.md#71-거너-잔류-포격--몸에-붙는-에너지-폭탄-할-일-149).
+붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다 — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombPrefab`(지금 임시 `2.Prefabs/Player/Gunner/GunnerEchoBomb_Temp.prefab`). 이펙트 교체는 이 칸만 바꾸면 된다(폭탄마다 하나 복제, 대상 몸 콜라이더 윗면 가운데를 매 프레임 따라감 — 몸 중심이면 몸 메시 안에 묻혀 안 보인다). 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다.
+구체는 **Q 가 대상에 맞은 순간** 예비로 먼저 뜨고(`ChargeLaserFiredRpc` 의 맞은 대상 ID 칸, 잔류 포격 특성이 있을 때만), 서버 부착(`Attached`)이 같은 구체를 이어받는다 — 그래서 `Attached` 시점에는 구체가 이미 보이고 있을 수 있다. 부착 안 된 예비 구체는 `echoBombPreviewTimeout` 뒤 사건 없이 조용히 사라진다(`Exploded` 없음). 상세 [tutorial-traits.md §7.1](tutorial-traits.md#71-거너-잔류-포격--몸에-붙는-에너지-폭탄-할-일-149).
 
 ## 5. 동작 규칙 · 알려진 한계
 

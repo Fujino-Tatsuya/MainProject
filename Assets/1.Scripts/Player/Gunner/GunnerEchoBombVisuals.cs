@@ -66,6 +66,8 @@ public static class GunnerEchoBombTargets
 /// <summary>
 /// [전 피어] 잔류 포격 에너지 폭탄 구체 표시(할 일 149) — 폭탄마다 구체 하나를 대상 몸통에 붙여 매 프레임 따라가게 한다(이동·넉백 포함).
 /// 대상이 사라지면 마지막 위치에 남았다가 폭탄이 빠질 때 그 자리를 돌려준다(폭발 연출 위치). 런타임 메시·텍스처 생성 없음 — 프리팹만 복제한다.
+/// Q 적중 순간 예비 구체(<see cref="AddPreview(ulong)"/>)를 먼저 띄우고, 서버 부착(<see cref="Add(int, ulong)"/>)이 같은 대상이면 그 구체를 이어받는다.
+/// 채택 안 된 예비 구체(중단·사망 등 폭탄 없음)는 대기 시간 뒤 폭발 연출 없이 지운다 — 정리 경로는 그것 하나.
 /// </summary>
 public sealed class GunnerEchoBombVisuals
 {
@@ -80,23 +82,47 @@ public sealed class GunnerEchoBombVisuals
         public bool Found;
         // 이 시각(Time.time) 전에는 구체를 띄우지 않는다 — 표시 지연(showDelay). 위치는 그 전에도 따라간다(폭발 연출 위치).
         public float ShowAt;
+        // 예비 구체(Q 적중 순간, 서버 부착 전) — 폭탄 번호가 없다. 서버 부착(Add)이 같은 대상이면 이 구체를 그대로 이어받는다.
+        public bool Preview;
+        // 예비 구체가 이 시각까지 채택되지 않으면 조용히 지운다(같은 대상 재적중마다 늦춘다).
+        public float ExpireAt;
     }
 
     private readonly List<Orb> orbs = new List<Orb>();
     private readonly GameObject prefab;
     private readonly float showDelay;
     private readonly Vector3 offset;
+    private readonly float previewTimeout;
 
-    /// <param name="showDelay">붙은 뒤 구체를 띄우기까지 지연(초) — 표시 전용, 서버 폭발 시각과 무관.</param>
+    /// <param name="showDelay">Q 적중 순간(예비 구체 생성) 뒤 구체를 띄우기까지 지연(초) — 표시 전용, 서버 폭발 시각과 무관.
+    /// 예비 구체 없이 바로 붙은 폭탄(늦은 합류 등)은 받은 순간부터 같은 지연.</param>
     /// <param name="offset">몸 점(<see cref="GunnerEchoBombTargets.BodyPoint"/>)에 더하는 월드 오프셋(m).</param>
-    public GunnerEchoBombVisuals(GameObject prefab, float showDelay = 0f, Vector3 offset = default)
+    /// <param name="previewTimeout">예비 구체가 서버 부착을 기다리는 시간(초) — 지나면 폭발 연출 없이 지운다.</param>
+    public GunnerEchoBombVisuals(GameObject prefab, float showDelay = 0f, Vector3 offset = default, float previewTimeout = 1.5f)
     {
         this.prefab = prefab;
         this.showDelay = Mathf.Max(0f, showDelay);
         this.offset = offset;
+        this.previewTimeout = Mathf.Max(0f, previewTimeout);
     }
 
+    /// <summary>예비 구체 포함 구체 수.</summary>
     public int Count => orbs.Count;
+
+    /// <summary>아직 서버 부착을 못 받은 예비 구체 수.</summary>
+    public int PreviewCount
+    {
+        get
+        {
+            int n = 0;
+            for (int i = 0; i < orbs.Count; i++)
+                if (orbs[i].Preview) n++;
+            return n;
+        }
+    }
+
+    /// <summary>예비 구체가 만료됐는가 — 채택 대기 시간이 지났다.</summary>
+    public static bool IsPreviewExpired(float now, float expireAt) => now >= expireAt;
 
     /// <summary>구체·폭발 연출·Attached 사건이 보는 점 — 몸 점 + 월드 오프셋.</summary>
     public Vector3 PointFor(Unit unit) => OrbPoint(GunnerEchoBombTargets.BodyPoint(unit), offset);
@@ -106,15 +132,58 @@ public sealed class GunnerEchoBombVisuals
     /// <summary>표시 지연이 지났는가 — 지연 0 이면 붙는 즉시.</summary>
     public static bool IsShowTime(float now, float showAt) => now >= showAt;
 
-    /// <summary>폭탄이 붙었다(이 피어가 받은 시각 기준) — 구체는 표시 지연 뒤부터 보인다. 늦은 합류 Sync 도 받은 시각부터 같은 지연.</summary>
-    public void Add(int id, ulong targetId)
+    /// <summary>
+    /// Q 가 그 대상에 맞았다(할 일 149 후속 3) — 서버 부착 전에 예비 구체를 띄운다. 표시 지연은 이 순간부터.
+    /// 그 대상에 미채택 예비 구체가 이미 있으면(같은 시전 재적중·집속 연사) 새로 만들지 않고 만료만 늦춘다.
+    /// </summary>
+    public void AddPreview(ulong targetId) => AddPreview(targetId, Time.time);
+
+    public void AddPreview(ulong targetId, float now)
+    {
+        int index = IndexOfPreview(targetId);
+        if (index >= 0)
+        {
+            orbs[index].ExpireAt = now + previewTimeout;
+            return;
+        }
+
+        var orb = new Orb { TargetId = targetId, ShowAt = now + showDelay, Preview = true, ExpireAt = now + previewTimeout };
+        orbs.Add(orb);
+        Follow(orb);
+    }
+
+    /// <summary>
+    /// 폭탄이 붙었다 — 그 대상의 미채택 예비 구체가 있으면 같은 구체(인스턴스·표시 시각 그대로)를 이 폭탄 번호로 이어받는다.
+    /// 없으면(늦은 합류 Sync 등) 이 피어가 받은 시각부터 표시 지연.
+    /// </summary>
+    public void Add(int id, ulong targetId) => Add(id, targetId, Time.time);
+
+    public void Add(int id, ulong targetId, float now)
     {
         if (IndexOf(id) >= 0)
             return;
 
-        var orb = new Orb { Id = id, TargetId = targetId, ShowAt = Time.time + showDelay };
+        int preview = IndexOfPreview(targetId);
+        if (preview >= 0)
+        {
+            Orb adopted = orbs[preview];
+            adopted.Id = id;
+            adopted.Preview = false;
+            Follow(adopted);
+            return;
+        }
+
+        var orb = new Orb { Id = id, TargetId = targetId, ShowAt = now + showDelay };
         orbs.Add(orb);
         Follow(orb);
+    }
+
+    /// <summary>그 폭탄 구체가 보이기 시작하는(했던) 시각. 모르는 번호면 false.</summary>
+    public bool TryGetShowAt(int id, out float showAt)
+    {
+        int index = IndexOf(id);
+        showAt = index >= 0 ? orbs[index].ShowAt : 0f;
+        return index >= 0;
     }
 
     /// <summary>그 폭탄이 붙은 대상의 네트워크 ID(특성 연출 사건용, 할 일 145). 모르는 번호면 false.</summary>
@@ -149,7 +218,7 @@ public sealed class GunnerEchoBombVisuals
         orbs.Clear();
     }
 
-    /// <summary>복제 목록과 맞춘다(늦은 합류·전체 갱신) — 목록에 없는 구체는 조용히 지우고, 새 항목은 붙인다.</summary>
+    /// <summary>복제 목록과 맞춘다(늦은 합류·전체 갱신) — 목록에 없는 구체는 조용히 지우고, 새 항목은 붙인다. 예비 구체는 목록과 무관(만료가 정리).</summary>
     public void Sync(IReadOnlyList<GunnerEchoBombState> states)
     {
         for (int i = 0; i < states.Count; i++)
@@ -157,7 +226,7 @@ public sealed class GunnerEchoBombVisuals
 
         for (int i = orbs.Count - 1; i >= 0; i--)
         {
-            if (Contains(states, orbs[i].Id))
+            if (orbs[i].Preview || Contains(states, orbs[i].Id))
                 continue;
             DestroyInstance(orbs[i]);
             orbs.RemoveAt(i);
@@ -175,11 +244,23 @@ public sealed class GunnerEchoBombVisuals
         return false;
     }
 
-    /// <summary>매 프레임(LateUpdate) — 대상 몸통 점으로 옮긴다. 대상이 사라졌으면 마지막 위치에 둔다.</summary>
-    public void Tick()
+    /// <summary>매 프레임(LateUpdate) — 대상 몸통 점으로 옮긴다. 대상이 사라졌으면 마지막 위치에 둔다. 채택 시간이 지난 예비 구체는 조용히 지운다.</summary>
+    public void Tick() => Tick(Time.time);
+
+    public void Tick(float now)
     {
-        for (int i = 0; i < orbs.Count; i++)
-            Follow(orbs[i]);
+        for (int i = orbs.Count - 1; i >= 0; i--)
+        {
+            Orb orb = orbs[i];
+            if (orb.Preview && IsPreviewExpired(now, orb.ExpireAt))
+            {
+                DestroyInstance(orb);
+                orbs.RemoveAt(i);
+                continue;
+            }
+
+            Follow(orb);
+        }
     }
 
     private void Follow(Orb orb)
@@ -211,11 +292,23 @@ public sealed class GunnerEchoBombVisuals
         orb.Instance = null;
     }
 
+    // 폭탄 번호로 찾는다 — 예비 구체는 번호가 없어 제외.
     private int IndexOf(int id)
     {
         for (int i = 0; i < orbs.Count; i++)
         {
-            if (orbs[i].Id == id)
+            if (!orbs[i].Preview && orbs[i].Id == id)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private int IndexOfPreview(ulong targetId)
+    {
+        for (int i = 0; i < orbs.Count; i++)
+        {
+            if (orbs[i].Preview && orbs[i].TargetId == targetId)
                 return i;
         }
 

@@ -107,10 +107,18 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [SerializeField] private GameObject echoBombPrefab;
 
     // 연출 정렬 값이라 xlsx 행이 아니다(data-table.md). 서버 피해·폭발 시각(특성 Delay)은 건드리지 않는다.
-    [Tooltip("구체를 띄우기까지 지연(초). 기준 = 이 피어가 폭탄 부착(Q End 이벤트 시점)을 받은 순간. 0 = 즉시. " +
+    [Tooltip("구체를 띄우기까지 지연(초). 기준 = Q 가 대상에 맞은 순간(예비 구체 생성, 집속 연사면 그 대상 첫 적중). 0 = 즉시. " +
+             "서버 부착이 예비 구체를 이어받으면 그 시각을 그대로 쓴다(예비 없이 붙은 폭탄 — 늦은 합류 등 — 은 받은 순간부터). " +
              "표시 전용 — 폭발 시각보다 길면 구체 없이 폭발 연출만 난다")]
     [DataTableIgnore, Min(0f)]
     [SerializeField] private float echoBombShowDelay;
+
+    // 예비 구체 = Q 적중 순간(ChargeLaserFiredRpc) 먼저 띄우는 구체. 서버 부착(Q End 이벤트 = 마지막 발 Gunner_Q_Fire 시작 + 0.4초)이 이어받는다.
+    // 중단·사망으로 폭탄이 안 붙으면 이 시간 뒤 조용히 지운다(유일한 정리 경로). 같은 대상 재적중마다 다시 센다.
+    [Tooltip("예비 구체가 서버 부착을 기다리는 시간(초) — 마지막 적중부터. 지나면 폭발 연출 없이 지운다. " +
+             "정상 부착 = 마지막 발 뒤 Q_fire End 이벤트(0.4초)라 그보다 넉넉하게. 너무 짧으면 부착 때 구체가 새로 생긴다")]
+    [DataTableIgnore, Min(0f)]
+    [SerializeField] private float echoBombPreviewTimeout = 1.5f;
 
     [Tooltip("구체 위치 오프셋(월드 기준, m). 대상 몸 콜라이더 윗면 가운데에 더한다 — 대상이 돌아도 방향이 일정. " +
              "폭발 연출·Attached/Exploded 사건 위치도 같은 점. 판정과 무관")]
@@ -231,7 +239,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
-        echoBombVisuals = new GunnerEchoBombVisuals(echoBombPrefab, echoBombShowDelay, echoBombOffset);
+        echoBombVisuals = new GunnerEchoBombVisuals(echoBombPrefab, echoBombShowDelay, echoBombOffset, echoBombPreviewTimeout);
     }
 
     public override void OnNetworkSpawn()
@@ -550,24 +558,32 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <summary>[서버] Q 발사 — 전 피어에 빔 + 발사 애니메이션.</summary>
     /// <param name="stopped">지형에 막혀 끝났는가(true) / 최대 사거리까지 뻗었는가(false)</param>
     /// <param name="hitPoints">피해를 준 몹마다의 빔 위 지점. 비어 있으면 아무도 못 맞혔다</param>
+    /// <param name="echoTargetIds">잔류 포격 예비 구체를 띄울 맞은 대상 네트워크 ID — 특성(GUN_4_ECHO_Q)이 없으면 빈 배열(서버가 정한다)</param>
     public void ServerChargeLaserFired(Vector3 origin, Vector3 end, float width,
-                                       bool stopped, Vector3[] hitPoints)
+                                       bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
     {
         if (IsNetworkActive)
-            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints);
+            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints, echoTargetIds);
         else
-            PlayChargeLaser(origin, end, width, stopped, hitPoints);
+            PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
     }
 
     // Reliable — 연출뿐 아니라 Focus → Skill 상태 전환도 싣는다(빠지면 그 피어만 집중 상태에 남는다).
     [Rpc(SendTo.ClientsAndHost)]
     private void ChargeLaserFiredRpc(Vector3 origin, Vector3 end, float width,
-                                     bool stopped, Vector3[] hitPoints)
-        => PlayChargeLaser(origin, end, width, stopped, hitPoints);
+                                     bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
+        => PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
 
     private void PlayChargeLaser(Vector3 origin, Vector3 end, float width,
-                                 bool stopped, Vector3[] hitPoints)
+                                 bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
     {
+        // 잔류 포격 예비 구체(할 일 149 후속 3) — 적중 순간 먼저 띄우고, 서버 부착(NetworkList Add)이 같은 구체를 이어받는다.
+        if (echoTargetIds != null)
+        {
+            for (int i = 0; i < echoTargetIds.Length; i++)
+                echoBombVisuals.AddPreview(echoTargetIds[i]);
+        }
+
         // 정신 집중 끝 — 같은 스킬을 유지한 채 Focus → Skill(발사 후 회복). 전 피어가 이 RPC 로 같이 넘어간다.
         stateController?.ChangeSkillPhase(PlayerActionState.Skill);
 
