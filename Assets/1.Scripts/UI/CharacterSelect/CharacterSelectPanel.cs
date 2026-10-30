@@ -14,6 +14,7 @@ using UnityEngine.UI;
 ///
 /// - 열려 있는 동안 <c>content</c> 의 <see cref="UiModalBlocker"/> 가 로컬 플레이어 입력을 막고, 불투명 배경이 뒤 클릭을 막는다.
 /// - 닫기 = 뒤로가기 버튼·ESC. <see cref="LobbyResultPanel.IsEscapeClaimed"/> 면 ESC·키 입력을 무시한다(결과 패널이 위에 있다).
+/// - 기본/코어 버튼(할 일 162) = "미구현" 팝업. 팝업이 열린 동안 ESC 는 팝업만 닫고, 확정·이동·휠·카드 클릭은 막힌다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class CharacterSelectPanel : MonoBehaviour
@@ -33,6 +34,13 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("마우스 확정 — SELECT 셰브론(Content/Chevron)의 Button, Space 와 같은 Confirm(할 일 109). " +
              "Navigation None 이어야 클릭 뒤 EventSystem 선택이 남지 않는다. 클릭 영역 = UiTriangleRaycastFilter.")]
     [SerializeField] private Button confirmButton;
+
+    [Header("기본/코어 정보 버튼 + 팝업 (할 일 162 — 지금은 둘 다 '미구현' 팝업)")]
+    [SerializeField] private Button basicInfoButton;
+    [SerializeField] private Button coreInfoButton;
+    [Tooltip("Content 맨 위 팝업(어두운 막 = 뒤 클릭 막기 + 몸체 + X + 본문). 기본 꺼짐. 닫기 = X 버튼·ESC(설정 창 관례).")]
+    [SerializeField] private GameObject infoPopup;
+    [SerializeField] private Button infoPopupCloseButton;
 
     [Header("Nameplate (포커스된 캐릭터 — 할 일 162 로 프리팹에서 꺼 둠, 칸은 연결된 채)")]
     [SerializeField] private Image nameplatePortrait;
@@ -105,6 +113,9 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     /// <summary>포커스된 카드 index(= 캐릭터 id). 카드가 없으면 -1.</summary>
     public int FocusedCharacterId => Rules.Focus;
 
+    /// <summary>위에 열린 기본/코어 팝업(할 일 162). None = 없음.</summary>
+    public CharacterSelectInfoTab InfoPopup => Rules.InfoPopup;
+
     /// <summary>
     /// 이 프레임 ESC 를 선택 패널이 쓰는가 — 열려 있거나, 이 프레임 ESC 로 닫혔다.
     /// 로비에서 ESC 를 쓰는 다른 메뉴는 이 값이 true 면 무시해야 같은 키로 두 개가 같이 움직이지 않는다.
@@ -130,7 +141,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             backButton.onClick.AddListener(OnBackButton);
         if (confirmButton != null)
             confirmButton.onClick.AddListener(OnConfirmButton);
+        if (basicInfoButton != null)
+            basicInfoButton.onClick.AddListener(OnBasicInfoButton);
+        if (coreInfoButton != null)
+            coreInfoButton.onClick.AddListener(OnCoreInfoButton);
+        if (infoPopupCloseButton != null)
+            infoPopupCloseButton.onClick.AddListener(OnInfoPopupCloseButton);
         HideCardTemplate();
+        ApplyInfoPopup();
 
         if (!Rules.IsOpen && content != null)
             content.SetActive(false);
@@ -142,6 +160,12 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             backButton.onClick.RemoveListener(OnBackButton);
         if (confirmButton != null)
             confirmButton.onClick.RemoveListener(OnConfirmButton);
+        if (basicInfoButton != null)
+            basicInfoButton.onClick.RemoveListener(OnBasicInfoButton);
+        if (coreInfoButton != null)
+            coreInfoButton.onClick.RemoveListener(OnCoreInfoButton);
+        if (infoPopupCloseButton != null)
+            infoPopupCloseButton.onClick.RemoveListener(OnInfoPopupCloseButton);
         foreach (CharacterSelectCard card in _cards)
             if (card != null)
                 card.Clicked -= OnCardClicked;
@@ -166,11 +190,26 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null)
         {
-            if (closeWithEscape && keyboard.escapeKey.wasPressedThisFrame)
+            // 팝업이 열려 있으면 ESC 는 팝업만 닫는다(closeWithEscape 와 무관 — 팝업 닫기 관례).
+            if ((closeWithEscape || Rules.IsPopupOpen) && keyboard.escapeKey.wasPressedThisFrame)
             {
                 s_escapeClaimedFrame = Time.frameCount;
-                if (Rules.HandleEscape(false))
-                    ApplyClosed(CharacterSelectCloseReason.Escape);
+                switch (Rules.Escape(false))
+                {
+                    case CharacterSelectEscapeResult.ClosedPopup:
+                        ApplyInfoPopup();
+                        break;
+                    case CharacterSelectEscapeResult.ClosedPanel:
+                        ApplyClosed(CharacterSelectCloseReason.Escape);
+                        break;
+                }
+                return;
+            }
+
+            // 팝업 뒤 입력(확정·이동·휠)은 막는다 — 닫은 뒤 눌려 있던 이동 키는 새로 누를 때까지 무시.
+            if (Rules.IsPopupOpen)
+            {
+                _keyRepeat.Reset();
                 return;
             }
 
@@ -222,6 +261,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
         if (content != null)
             content.SetActive(true);
+        ApplyInfoPopup(); // 다시 열면 팝업은 닫힌 채
         if (hintText != null)
             hintText.text = CharacterSelectUiStrings.Hint.TextOr(hintText.text);
         Redraw();
@@ -519,10 +559,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     /// <summary>SELECT 셰브론 버튼 — Space 와 같은 Confirm. 키 입력과 같은 조건(열림·결과 패널 위 아님)에서만 받는다.</summary>
     private void OnConfirmButton()
     {
-        // Navigation None 이라 클릭으로 선택되지 않지만, 혹시 남아 있으면 지운다 — 남으면 다음 Enter(Submit) 가 한 번 더 누른다.
-        EventSystem eventSystem = EventSystem.current;
-        if (eventSystem != null && confirmButton != null && eventSystem.currentSelectedGameObject == confirmButton.gameObject)
-            eventSystem.SetSelectedGameObject(null);
+        ClearSelection(confirmButton);
 
         if (!Rules.IsOpen || LobbyResultPanel.IsEscapeClaimed)
             return;
@@ -536,8 +573,50 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             ApplyClosed(CharacterSelectCloseReason.Button);
     }
 
+    // ── 기본/코어 정보 팝업(할 일 162) — 판단은 Rules(OpenInfoPopup·CloseInfoPopup·Escape) ──
+
+    private void OnBasicInfoButton() => OpenInfoPopup(CharacterSelectInfoTab.Basic);
+
+    private void OnCoreInfoButton() => OpenInfoPopup(CharacterSelectInfoTab.Core);
+
+    /// <summary>기본/코어 버튼과 같은 길(테스트·게임패드 연결용). 키 입력과 같은 조건(열림·결과 패널 위 아님)에서만 연다.</summary>
+    public void OpenInfoPopup(CharacterSelectInfoTab tab)
+    {
+        ClearSelection(tab == CharacterSelectInfoTab.Core ? coreInfoButton : basicInfoButton);
+        if (LobbyResultPanel.IsEscapeClaimed || !Rules.OpenInfoPopup(tab))
+            return;
+
+        _keyRepeat.Reset();
+        ApplyInfoPopup();
+    }
+
+    /// <summary>팝업 X 버튼과 같은 길. 팝업만 닫고 패널은 그대로.</summary>
+    public void CloseInfoPopup()
+    {
+        ClearSelection(infoPopupCloseButton);
+        if (Rules.CloseInfoPopup())
+            ApplyInfoPopup();
+    }
+
+    private void OnInfoPopupCloseButton() => CloseInfoPopup();
+
+    private void ApplyInfoPopup()
+    {
+        if (infoPopup != null && infoPopup.activeSelf != Rules.IsPopupOpen)
+            infoPopup.SetActive(Rules.IsPopupOpen);
+    }
+
+    /// <summary>Navigation None 이라 클릭으로 선택되지 않지만, 혹시 남아 있으면 지운다 — 남으면 다음 Enter(Submit) 가 한 번 더 누른다.</summary>
+    private static void ClearSelection(Button button)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem != null && button != null && eventSystem.currentSelectedGameObject == button.gameObject)
+            eventSystem.SetSelectedGameObject(null);
+    }
+
     private void ApplyClosed(CharacterSelectCloseReason reason)
     {
+        ApplyInfoPopup(); // Rules 가 닫히며 팝업도 닫았다
         if (content != null)
             content.SetActive(false); // UiModalBlocker.OnDisable 가 입력 차단을 푼다
         _keyRepeat.Reset();

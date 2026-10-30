@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using TMPro;
 using UnityEditor;
@@ -8,7 +9,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 캐릭터 선택 UI 수정(할 일 162) — 실제 패널 프리팹을 프리뷰 씬에 올려 본다.
-/// 이름판 끔.
+/// 이름판 끔 · 셰브론 hover 링 7px·본체 알파 · 가운데 금색 테두리 0.7배 · 기본/코어 버튼 → "미구현" 팝업(X 로 팝업만 닫힘, 팝업 뒤 확정·이동 막힘).
+/// ESC 는 키보드를 흉내 내지 않고 순수 규칙(CharacterSelectPanelRulesTests)에서 본다.
 /// </summary>
 public sealed class CharacterSelectUiPolishTests
 {
@@ -25,6 +27,8 @@ public sealed class CharacterSelectUiPolishTests
         _scene = EditorSceneManager.NewPreviewScene();
         _instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, _scene);
         _panel = _instance.GetComponent<CharacterSelectPanel>();
+        // EditMode 에서는 Awake 가 돌지 않는다 — 버튼 리스너 연결을 직접 부른다(CharacterSelectConfirmButtonTests 와 같다)
+        typeof(CharacterSelectPanel).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(_panel, null);
     }
 
     [TearDown]
@@ -119,6 +123,91 @@ public sealed class CharacterSelectUiPolishTests
             Object.DestroyImmediate(gap);
             Object.DestroyImmediate(baked);
         }
+    }
+
+    Button Field(string name) => new SerializedObject(_panel).FindProperty(name).objectReferenceValue as Button;
+
+    GameObject Popup => new SerializedObject(_panel).FindProperty("infoPopup").objectReferenceValue as GameObject;
+
+    [Test]
+    public void InfoTabs_Wired_WithTabArt_DrawnAboveCards()
+    {
+        Button basic = Field("basicInfoButton"), core = Field("coreInfoButton");
+        Assert.IsNotNull(basic, "basicInfoButton 연결");
+        Assert.IsNotNull(core, "coreInfoButton 연결");
+        StringAssert.EndsWith("tab_gibon_body.png", AssetDatabase.GetAssetPath(((Image)basic.targetGraphic).sprite));
+        StringAssert.EndsWith("tab_core_body.png", AssetDatabase.GetAssetPath(((Image)core.targetGraphic).sprite));
+        Assert.AreEqual(Navigation.Mode.None, basic.navigation.mode, "클릭 뒤 선택이 남지 않게");
+        Assert.AreEqual(Navigation.Mode.None, core.navigation.mode);
+
+        var basicRect = (RectTransform)basic.transform;
+        var coreRect = (RectTransform)core.transform;
+        Assert.Greater(basicRect.anchoredPosition.y, coreRect.anchoredPosition.y, "기본이 위");
+        Assert.Greater(basicRect.anchoredPosition.x, coreRect.anchoredPosition.x, "계단식 — 기본이 오른쪽");
+
+        Transform cards = _instance.transform.Find("Content/Cards");
+        Assert.Greater(basic.transform.parent.GetSiblingIndex(), cards.GetSiblingIndex(), "버튼이 카드 위(위 카드 클릭 영역보다 먼저)");
+        Assert.Less(_instance.transform.Find("Content/InfoTabs_Backing").GetSiblingIndex(), cards.GetSiblingIndex(), "검은 판은 카드 밑");
+    }
+
+    [Test]
+    public void InfoPopup_Prefab_OffByDefault_TopMost_BlocksClicks_Text()
+    {
+        GameObject popup = Popup;
+        Assert.IsNotNull(popup, "infoPopup 연결");
+        Assert.IsFalse(popup.activeSelf, "기본 꺼짐");
+        Assert.AreEqual(popup.transform.parent.childCount - 1, popup.transform.GetSiblingIndex(), "Content 맨 위");
+        Assert.IsTrue(popup.GetComponent<Image>().raycastTarget, "어두운 막이 뒤 클릭을 막는다");
+
+        StringAssert.EndsWith("panel_popup.png", AssetDatabase.GetAssetPath(popup.transform.Find("Frame").GetComponent<Image>().sprite));
+        Button close = Field("infoPopupCloseButton");
+        Assert.IsNotNull(close, "infoPopupCloseButton 연결");
+        StringAssert.EndsWith("button_close_base.png", AssetDatabase.GetAssetPath(((Image)close.targetGraphic).sprite));
+        StringAssert.EndsWith("icon_cross_red.png", AssetDatabase.GetAssetPath(close.transform.Find("Icon").GetComponent<Image>().sprite));
+        Assert.AreEqual("미구현", popup.GetComponentInChildren<TMP_Text>(true).text, "본문 하드코딩");
+    }
+
+    [Test]
+    public void InfoButtons_OpenPopup_CloseButtonClosesOnlyPopup()
+    {
+        int closed = 0;
+        _panel.Closed += _ => closed++;
+        _panel.Show(0, false);
+
+        Field("basicInfoButton").onClick.Invoke();
+        Assert.IsTrue(Popup.activeSelf, "기본 → 팝업");
+        Assert.AreEqual(CharacterSelectInfoTab.Basic, _panel.InfoPopup);
+
+        Field("infoPopupCloseButton").onClick.Invoke();
+        Assert.IsFalse(Popup.activeSelf, "X → 팝업만 닫힘");
+        Assert.IsTrue(_panel.IsOpen, "패널은 그대로");
+        Assert.AreEqual(0, closed);
+
+        Field("coreInfoButton").onClick.Invoke();
+        Assert.IsTrue(Popup.activeSelf, "코어 → 같은 팝업");
+        Assert.AreEqual(CharacterSelectInfoTab.Core, _panel.InfoPopup);
+    }
+
+    [Test]
+    public void InfoPopup_BlocksConfirmAndMove_ClosedWithPanel()
+    {
+        int chosen = 0;
+        _panel.CharacterChosen += _ => chosen++;
+        _panel.Show(0, false);
+        _panel.MoveFocus(1);
+        _panel.OpenInfoPopup(CharacterSelectInfoTab.Basic);
+
+        Field("confirmButton").onClick.Invoke();
+        Assert.AreEqual(CharacterSelectConfirmResult.PopupOpen, _panel.Confirm(), "팝업 뒤 확정 막힘");
+        _panel.MoveFocus(1);
+        Assert.AreEqual(1, _panel.FocusedCharacterId, "팝업 뒤 이동 막힘");
+        Assert.AreEqual(0, chosen);
+        Assert.IsTrue(_panel.IsOpen);
+
+        _panel.Hide();
+        Assert.IsFalse(Popup.activeSelf, "패널이 닫히면 팝업도 꺼진다");
+        _panel.Show(0, false);
+        Assert.IsFalse(Popup.activeSelf, "다시 열면 팝업은 닫힌 채");
     }
 
     [Test]

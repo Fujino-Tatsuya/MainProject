@@ -45,10 +45,12 @@
 | `event Action<CharacterSelectCloseReason> Closed` | 닫힐 때 한 번 — `Api`(호출 측 `Hide`)·`Button`(그냥 닫기 — 뒤로가기 또는 지금 캐릭터 재선택)·`Escape`·`Chosen` |
 | `static bool IsEscapeClaimed` | 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 | `void MoveFocus(int)` / `CharacterSelectConfirmResult Confirm()` | 키 입력과 같은 길(테스트·게임패드 연결용) |
+| `void OpenInfoPopup(CharacterSelectInfoTab)` / `void CloseInfoPopup()` / `CharacterSelectInfoTab InfoPopup` | 기본/코어 버튼·팝업 X 와 같은 길(할 일 162) |
 
 ### 선택 확정 규칙(`CharacterSelectPanelRules.Evaluate`, 이 순서)
 | 경우 | 결과 |
 |---|---|
+| 기본/코어 팝업이 열려 있음(할 일 162) | `PopupOpen` — 아무것도 안 함(잠금 강조도 없음). 패널은 열린 채 |
 | 준비 중(잠금) | 거부 — 이벤트 없음, 잠금 문구가 0.6초 붉게 커졌다 돌아온다. 패널은 열린 채 |
 | 로스터 `Available=false` | 거부 — 이벤트 없음. 카드는 회색 + "선택 불가" |
 | 지금 캐릭터(`SameAsCurrent`) | `CharacterChosen` 없이 그냥 닫힘 — 뒤로가기와 같은 `Closed(Button)`(전용 사유 없음, 10-19 결정) |
@@ -94,7 +96,16 @@
 - 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬를 따라 **오른쪽으로 40px/s**(unscaled) 흐름(방향 = 10-19 결정).
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
   - 일반판 vs `_gamma` 판: 캡처 비교(왼쪽 영역 평균 밝기, 0~255) 목업 30.2 · 일반판 34.1 · `_gamma` 43.2 → **일반판** 사용(프로젝트 = Linear).
-- 목업의 "기본/코어" 탭(스킬 정보 자리)은 데이터가 없어 **배치하지 않았다**(`tab_*` 아트는 그대로 남아 있음).
+- **오른쪽 위 "기본"·"코어" 버튼 + "미구현" 팝업(할 일 162)** — 스킬 정보 데이터가 아직 없어 둘 다 같은 팝업만 띄운다.
+  - 버튼 = `Content/InfoTabs/Button_Basic`·`Button_Core`(아트 `tab_gibon_body`+`tab_gibon_label` = 밝은 알약, `tab_core_body`+`tab_core_label` = 어두운 알약·회색 테두리, 오른쪽 끝이 비스듬히 잘림).
+    자리 = 목업(`legacy/00_mock_up.png`) 그대로, 기본이 위·오른쪽, 코어가 아래·왼쪽인 계단식(오른쪽 앵커). 뒤 검은 판 `tab_knockout_*`(몸체보다 사방 8px 큼)은 `InfoTabs_Backing`.
+  - 그리기 순서 = `InfoTabs_Backing`(검은 판) → `Cards` → `InfoTabs`(버튼) — 버튼이 카드 위라 위 카드의 사각 클릭 영역보다 먼저 맞는다. Button Navigation None·Color Tint(설정 창과 같은 값).
+  - 팝업 = `Content/InfoPopup`(Content 맨 위, 기본 꺼짐): 어두운 막(검정 60%, Raycast Target — 뒤 카드·버튼·셰브론 클릭을 막는다) + `Frame`(`UI_Panel/Sprites/Panels/panel_popup.png`)
+    + `Frame/Button_Close`(`Buttons/button_close_base.png` + 자식 `Icon` = `Icons/icon_cross_red.png` — 설정 창·일시정지 메뉴와 같은 조합) + `Frame/Text_Body` "미구현"(**하드코딩**, xlsx Strings 동기화 안 함).
+  - 닫기 = **X 버튼·ESC**(설정 창 `SettingsBody` 관례 — 막 클릭으로는 닫히지 않는다). 패널을 닫거나(`Hide`·뒤로가기·확정) 다시 열면(`Show`) 팝업도 닫힌다.
+  - 판단은 순수 `CharacterSelectPanelRules` — `InfoPopup`(`CharacterSelectInfoTab` None/Basic/Core)·`OpenInfoPopup`·`CloseInfoPopup`·`Escape`(→ `CharacterSelectEscapeResult` Ignored/ClosedPopup/ClosedPanel).
+    팝업이 열린 동안 `MoveFocus`·`FocusCard` 는 false, `Confirm` 은 `PopupOpen`(이벤트·닫힘 없음).
+  - 다시 만들기 = 메뉴 `Tools/UI/Authoring/Character Select Info Tabs·Popup (추가·연결)`(`CharacterSelectPanelAuthoring.EnsureInfoTabsAndPopup`, 이미 있으면 연결만). `(재생성)` 메뉴도 같이 만든다.
 - 폰트 = `NotoSansKR-VariableFont_wght SDF`(목업 폰트 없음) — 목업보다 얇다. 초상화는 로스터 `Portrait`(지금 HUD 가로 초상화·어쌔신은 임시 jpg).
 
 ## 조작
@@ -105,7 +116,9 @@
 | Enter · 숫자패드 Enter · Space · 가운데 카드 클릭 | 선택 확정(위 규칙) |
 | SELECT 셰브론 클릭(`Content/Chevron` 의 Button, 할 일 109) | Space 와 같은 `Confirm()` — 잠금이면 잠금 문구 강조, 지금 캐릭터면 그냥 닫힘, 이동 중이면 논리 가운데 |
 | 위·아래 카드 클릭 | 그 카드로 포커스 이동 |
-| 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) |
+| 뒤로가기 버튼 · ESC | 닫기(`Button`·`Escape`) — 기본/코어 팝업이 열려 있으면 ESC 는 팝업만 닫는다 |
+| 기본·코어 버튼(할 일 162) | "미구현" 팝업 열기(잠금 중에도 열린다). 팝업이 열린 동안 이동·확정·휠·카드·셰브론 입력은 막힌다 |
+| 팝업 X 버튼 · ESC | 팝업만 닫기(패널 그대로, `Closed` 없음) |
 
 - 키는 `Keyboard.current`·`Mouse.current` 를 직접 읽는다. 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력(이동·공격·F 등)을 막는다.
 - 카드 클릭은 `Button` 이 아니라 `IPointerClickHandler` — EventSystem 선택이 남아 Enter 가 두 번 먹는 일을 막는다. 뒤로가기·셰브론 Button 은 Navigation None
@@ -159,6 +172,8 @@
 ## ESC
 - 🔴 `LobbyResultPanel.IsEscapeClaimed` 가 true 면(결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫힘) 선택 패널은 **ESC 와 키·휠·카드 클릭을 모두 무시**한다 — 같은 키로 둘이 같이 닫히지 않는다.
 - 반대로 로비에 ESC 를 쓰는 다른 메뉴(일시정지·설정 등)를 붙이면 그쪽은 `CharacterSelectPanel.IsEscapeClaimed` 도 확인해야 한다.
+- 우선순위(할 일 162): 결과 패널(`LobbyResultPanel.IsEscapeClaimed`) → 기본/코어 팝업(팝업만 닫힘) → 선택 패널(닫힘). 팝업을 닫은 프레임도 선택 패널이 ESC 를 쓴 것으로 친다(`IsEscapeClaimed`).
+  `closeWithEscape` 를 꺼도 팝업은 ESC 로 닫힌다. 팝업이 열린 프레임에는 이동 키 반복 상태를 비운다 — 닫은 뒤 눌려 있던 이동 키는 새로 눌러야 움직인다.
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |
@@ -183,7 +198,8 @@
   시계 교체는 에디터 전용 `CharacterSelectPanel.SamplePreviewMotion`(`#if UNITY_EDITOR`).
 - `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
   `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 미끄러짐)를 저장. 콘솔에 대기·간격·램프 값과 1.5초까지의 칸 이동 시각(가속 확인용).
-- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests` + 가운데 카드 원본 `CharacterSelectCardTemplateTests` — `Card_Template` 의 초상화 크기·회전·테두리 크기·색·스프라이트가 런타임 카드에 들어가고 원본은 꺼지는지).
+- 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests` + 가운데 카드 원본 `CharacterSelectCardTemplateTests` — `Card_Template` 의 초상화 크기·회전·테두리 크기·색·스프라이트가 런타임 카드에 들어가고 원본은 꺼지는지
+  + UI 수정 `CharacterSelectUiPolishTests`(할 일 162) — 이름판 끔·셰브론 hover 알파·링 7px·금색 테두리 0.7배 PNG 재굽기 대조·기본/코어 버튼·팝업 연결·X 로 팝업만 닫힘·팝업 뒤 확정·이동 막힘; ESC 우선순위는 `CharacterSelectPanelRulesTests`).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
 - 열린 동안 이동·공격·F 가 막히고 닫으면 풀리는가. 뒤 화면 클릭이 안 먹는가.
@@ -199,3 +215,9 @@
   누른 채 반대 키 → 즉시 반대로 1칸 후 대기·느린 반복부터, 반대 키만 떼면 대기 뒤 원래 방향으로 느린 반복부터 이어지는가. 떼고 다시 누르면 다시 느리게 시작하는가. W+↑ 같이 눌러도 2칸씩 가지 않는가.
   키를 누른 채 패널을 열면(F) 미끄러지지 않고, 새로 눌러야 움직이는가. 잠금 중에도 반복되는가. 결과 패널이 위에 있으면 반복이 멈추는가.
 - 배경이 슬로모션과 무관하게 천천히 흐르고 가장자리가 비지 않는가(16:9 외 비율 포함).
+- (할 일 162) 오른쪽 위 기본(밝은 알약)·코어(어두운 알약) 버튼이 참고 이미지처럼 계단식으로 위 카드 옆에 붙어 보이는가(16:9 외 비율 포함), 마우스 올림·눌림 색이 바뀌는가.
+  둘 다 누르면 "미구현" 팝업이 뜨고, X 클릭·ESC 로 팝업만 닫히는가(ESC 한 번에 패널까지 닫히지 않는가, 두 번째 ESC 에 패널이 닫히는가).
+  팝업이 열린 동안 Enter/Space·W/S·휠·카드 클릭·SELECT 셰브론 클릭이 먹지 않는가, 뒤로가기 버튼이 눌리지 않는가. 이동 키를 누른 채 팝업을 닫으면 미끄러지지 않는가.
+  팝업이 열린 동안 로비 일시정지 메뉴(ESC)가 같이 열리지 않는가. 잠금(준비) 중에도 팝업이 열리는가.
+- (할 일 162) 왼쪽 아래 이름판(원형 초상화+이름)이 보이지 않는가. 가운데 카드 금색 테두리가 전보다 얇고(약 0.7배) 모서리 모양이 그대로인가, 이동·확대 연출 중 어긋나지 않는가.
+  SELECT 셰브론에 마우스를 올리면 흰 링(전보다 얇은 7px)이 켜지고 셰브론 본체만 살짝(알파 0.8) 옅어지며 흰 링·SELECT 글자는 옅어지지 않는가. 잠금 중엔 흰 링이 안 켜지는가.
