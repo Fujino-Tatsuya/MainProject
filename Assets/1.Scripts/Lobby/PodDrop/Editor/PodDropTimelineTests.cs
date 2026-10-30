@@ -6,8 +6,8 @@ using UnityEngine;
 /// <summary>
 /// 포드 강하 순수 시간표(<see cref="PodDropLobbyTimeline"/>·<see cref="PodDropMapTimeline"/>, 할 일 100 C1 → 106)와 클립 묶음 문(<see cref="PodClipGate"/>).
 /// 할 일 106 — 클립은 1배속으로 끝까지 재생하고 단계는 클립 애니 이벤트(서버 확정 시각)가 넘긴다. 시간표는 이벤트 시각을 입력으로 받는다(아직 = +∞).
-/// 기본 수치(로비): 레터박스 인 0.5(같이 순간이동 암전 0.4, 한가운데 0.2 에 순간이동 = 해치 클립 시작), 간격 0.4, 문턱 → 좌석 미끄러짐 0.4, 줌 1.8 → 1.15 / 6초.
-/// 보행 시간은 슬롯마다 받는다(C2d — 경로 길이 ÷ 걷는 속도). 여기선 대부분 3인 각 3초 → 탑승 → 다 앉기 0.8 + 3 + 0.4 = 4.2초.
+/// 기본 수치(로비): 레터박스 인 0.5(같이 순간이동 암전 0.4, 한가운데 0.2 에 순간이동 = 해치 클립 시작), 간격 0.4, 줌 1.8 → 1.15 / 6초.
+/// 보행 시간은 슬롯마다 받는다(C2d — 좌석까지 수평 경로 길이 ÷ 걷는 속도, 할 일 172 부터 미끄러짐 포함). 여기선 대부분 3인 각 3초 → 탑승 → 다 앉기 0.8 + 3 = 3.8초.
 /// 기본 수치(맵, 106 추가 2): 레터박스 처음부터 덮임, 대기 0.3 → 빠른 낙하 0.3 ~ 0.9(30m → 8m, Linear) → 급감속 0.9 ~ 1.7(8m → 5m, OutCubic — 펴기 시작),
 /// 착륙 1.5, 열기 끝 → 1초 → 디졸브 1(레터박스 아웃 0.5 같이 시작), 줌 1.8 → 1 / 2.6초.
 /// </summary>
@@ -16,8 +16,7 @@ public sealed class PodDropTimelineTests
     const float Eps = 1e-4f;
     const int Walkers = 3;
     const float Walk = 3f;
-    const float Slide = 0.4f;
-    const float Seated = 0.8f + Walk + Slide; // 마지막(P3) 출발 +0.4×2, 문턱 +3, 좌석 +0.4
+    const float Seated = 0.8f + Walk; // 마지막(P3) 출발 +0.4×2, 좌석 +3(미끄러짐 포함)
     const double NotYet = PodDropTimeline.NotYet;
 
     static float[] Same(int walkers, float seconds)
@@ -60,8 +59,7 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(2.0d, t.WalkStartAt(0, board), Eps);
         Assert.AreEqual(2.4d, t.WalkStartAt(1, board), Eps);
         Assert.AreEqual(2.8d, t.WalkStartAt(2, board), Eps);
-        Assert.AreEqual(5.8d, t.WalkArriveAt(2, board), Eps, "문턱 도착 = 출발 + 보행 시간");
-        Assert.AreEqual(6.2d, t.WalkEndAt(2, board), Eps, "좌석 도착 = 문턱 + 미끄러짐");
+        Assert.AreEqual(5.8d, t.WalkEndAt(2, board), Eps, "좌석 도착 = 출발 + 보행 시간(미끄러짐 포함)");
         Assert.AreEqual(t.WalkEndAt(2, board), t.LaunchAt(board), Eps, "발사 클립 = 가장 늦게 앉은 순간");
 
         Assert.IsTrue(double.IsPositiveInfinity(t.LaunchAt(NotYet)), "탑승 전 = 발사 없음");
@@ -84,7 +82,7 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Lobby_WalkerCount_ChangesOnlySeated()
     {
-        Assert.AreEqual(Walk + Slide, Lobby(1).SeatedSeconds, Eps, "1인 = 간격 없음");
+        Assert.AreEqual(Walk, Lobby(1).SeatedSeconds, Eps, "1인 = 간격 없음");
         PodDropLobbyTimeline none = Lobby(0);
         Assert.AreEqual(0f, none.SeatedSeconds, Eps, "0인 = 탑승 즉시 발사");
         Assert.AreEqual(3d, none.LaunchAt(3d), Eps);
@@ -94,35 +92,34 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Lobby_DifferentPathLengths_SeatedFollowsLatestArrival()
     {
-        // 경로 9m · 4.5m · 13.5m, 4.5m/s → 2 · 1 · 3초. 출발 0 · 0.4 · 0.8 → 좌석 2.4 · 1.8 · 4.2.
+        // 경로 9m · 4.5m · 13.5m, 4.5m/s → 2 · 1 · 3초. 출발 0 · 0.4 · 0.8 → 좌석 2 · 1.4 · 3.8.
         PodDropLobbyTimings s = PodDropLobbyTimings.Default;
         var t = new PodDropLobbyTimeline(s, new[] { 9f / s.walkSpeed, 4.5f / s.walkSpeed, 13.5f / s.walkSpeed });
-        Assert.AreEqual(2.4d, t.WalkEndAt(0, 0d), Eps);
-        Assert.AreEqual(1.8d, t.WalkEndAt(1, 0d), Eps, "P2 가 P1 보다 먼저 앉는다");
-        Assert.AreEqual(4.2f, t.SeatedSeconds, Eps);
+        Assert.AreEqual(2.0d, t.WalkEndAt(0, 0d), Eps);
+        Assert.AreEqual(1.4d, t.WalkEndAt(1, 0d), Eps, "P2 가 P1 보다 먼저 앉는다");
+        Assert.AreEqual(3.8f, t.SeatedSeconds, Eps);
 
         var first = new PodDropLobbyTimeline(s, new[] { 4f, 1f, 1f });
-        Assert.AreEqual(4f + Slide, first.SeatedSeconds, Eps, "가장 늦게 앉는 사람(P1) 기준");
+        Assert.AreEqual(4f, first.SeatedSeconds, Eps, "가장 늦게 앉는 사람(P1) 기준");
     }
 
     [Test]
     public void Lobby_ZeroOrInvalidWalk_ClampedToZero()
     {
         var zero = new PodDropLobbyTimeline(PodDropLobbyTimings.Default, Same(Walkers, 0f));
-        Assert.AreEqual(zero.WalkStartAt(0, 1d), zero.WalkArriveAt(0, 1d), Eps, "길이 0 = 걷지 않고 곧바로 미끄러짐");
-        Assert.AreEqual(0.8f + Slide, zero.SeatedSeconds, Eps, "마지막 출발 + 미끄러짐");
+        Assert.AreEqual(zero.WalkStartAt(0, 1d), zero.WalkEndAt(0, 1d), Eps, "길이 0 = 걷지 않고 곧바로 앉는다");
+        Assert.AreEqual(0.8f, zero.SeatedSeconds, Eps, "마지막 출발");
 
         var bad = new PodDropLobbyTimeline(PodDropLobbyTimings.Default, new[] { -2f, float.NaN, 3f });
         Assert.AreEqual(0f, bad.WalkSecondsOf(0), Eps, "음수 → 0");
         Assert.AreEqual(0f, bad.WalkSecondsOf(1), Eps, "NaN → 0");
         Assert.AreEqual(0f, bad.WalkSecondsOf(7), Eps, "명단 밖 슬롯 → 0");
-        Assert.AreEqual(0.8f + 3f + Slide, bad.SeatedSeconds, Eps);
+        Assert.AreEqual(0.8f + 3f, bad.SeatedSeconds, Eps);
 
         PodDropLobbyTimings s = PodDropLobbyTimings.Default;
         s.walkInterval = -1f;
-        s.seatSlideSeconds = -1f;
         var clamped = Lobby(s);
-        Assert.AreEqual(Walk, clamped.SeatedSeconds, Eps, "간격·미끄러짐 음수 → 0 → 전원 동시 출발");
+        Assert.AreEqual(Walk, clamped.SeatedSeconds, Eps, "간격 음수 → 0 → 전원 동시 출발");
     }
 
     [Test]

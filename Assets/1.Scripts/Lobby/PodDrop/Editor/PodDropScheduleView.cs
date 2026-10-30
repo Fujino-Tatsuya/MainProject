@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 포드 강하 단계 시각표(읽기 전용, 할 일 100 C2d → 106) — <see cref="PodDropSettings"/>·<see cref="LobbyPodLaunch"/> 인스펙터가 같이 그린다.
 /// 클립 단계는 실제로는 클립 애니 이벤트가 넘긴다 — 여기선 FBX 클립의 PodClipEvent 위치(1배속)로 어림한 시각을 보인다(이벤트가 없으면 클립 끝, <see cref="PodAnimEventAuthoring"/>).
-/// 로비 보행 시간은 열린 씬의 <see cref="LobbyPodLaunch"/> 사람별 경로(걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱) 길이 ÷ 걷는 속도 — 서버가 연출 시작 때 복제하는 값과 같은 계산.
+/// 로비 보행 시간은 열린 씬의 <see cref="LobbyPodLaunch"/> 사람별 경로(걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱 → 좌석) 수평 길이 ÷ 걷는 속도 — 서버가 연출 시작 때 복제하는 값과 같은 계산.
 /// 씬이 안 열려 있으면 보행 부분은 '경로 길이 미지'로 둔다.
 /// </summary>
 public static class PodDropScheduleView
@@ -78,7 +78,7 @@ public static class PodDropScheduleView
         if (!known)
         {
             sb.Append($"\n  걷기              ≈{board:0.##}s ~ ?  — 경로 길이 미지, 로비 씬(3.LobbyScene)을 열면 계산");
-            sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 문턱 → 좌석 미끄러짐 {t.SeatSlideSeconds:0.##}s)");
+            sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 수평 속도 {lobby.walkSpeed:0.##}m/s — 문턱 → 좌석 미끄러짐까지 같은 속도, 출발 간격 {t.WalkInterval:0.##}s)");
             sb.Append(LaunchLine(lobby, "가장 늦게 앉는 순간"));
             sb.Append(EndLines(t, null, null));
             sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
@@ -88,11 +88,11 @@ public static class PodDropScheduleView
         for (int slot = 0; slot < t.WalkerCount; slot++)
         {
             float length = t.WalkSecondsOf(slot) * lobby.walkSpeed;
-            sb.Append($"\n  걷기 P{slot + 1}           ≈{t.WalkStartAt(slot, board):0.##} ~ {t.WalkArriveAt(slot, board):0.##}s ({length:0.##}m) → 미끄러짐 ~ {t.WalkEndAt(slot, board):0.##}s");
+            sb.Append($"\n  걷기 P{slot + 1}           ≈{t.WalkStartAt(slot, board):0.##} ~ {t.WalkEndAt(slot, board):0.##}s (좌석까지 수평 {length:0.##}m, {t.WalkSecondsOf(slot):0.##}s)");
         }
 
         double launchAt = t.LaunchAt(board);
-        sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 미끄러짐 {t.SeatSlideSeconds:0.##}s, 가장 늦게 앉는 사람 ≈{launchAt:0.##}s)");
+        sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 수평 속도 {lobby.walkSpeed:0.##}m/s — 문턱 → 좌석 미끄러짐까지 같은 속도, 출발 간격 {t.WalkInterval:0.##}s, 가장 늦게 앉는 사람 ≈{launchAt:0.##}s)");
         sb.Append(LaunchLine(lobby, $"≈{launchAt:0.##}s"));
         double launchEnd = launchAt + LaunchRealSeconds(lobby, out _);
         sb.Append(EndLines(t, launchEnd, launchAt));
