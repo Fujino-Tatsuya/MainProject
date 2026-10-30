@@ -93,7 +93,7 @@ public sealed class TraitTooltipValueSource : ISkillTooltipValueSource
 /// 특성 카드 설명 = 템플릿(<see cref="TraitDefinition.Description"/>) → <see cref="SkillTooltipFormatter"/>(할 일 125 5/5).
 /// <c>{필드}</c>·<c>{필드:%}</c> 는 <see cref="TraitTooltipValueSource"/>, <c>{dmg}</c> 는 등록부의 특성별 계산식(캐릭터 레인).
 /// 검증(<see cref="Validate"/>)은 Play 없이 돈다 — 풀리지 않는 토큰·계산식 없는 <c>{dmg}</c> = 오류(EditMode <c>TraitTooltipTests</c> 가 프로젝트 정의 전부를 본다).
-/// 할 일 171 — <c>{dmg}</c> 는 평소 퍼센트 글자(<see cref="FormatDamagePercent"/>, '공격력 150%'), Shift 누르는 동안만 계산 숫자
+/// 할 일 171 — <c>{dmg}</c> 는 평소 퍼센트 글자(<see cref="FormatDamagePercent"/>, '공격력의 150%'), Shift 누르는 동안만 계산 숫자
 /// (<see cref="SkillTooltipFormatter.DamageValue"/>, 검 아이콘 + 숫자) — 둘 다 <see cref="NoBreak"/> 로 줄 중간에서 안 끊긴다. 전투 HUD 스킬 툴팁은 이 경로를 쓰지 않는다.
 /// </summary>
 public static class TraitTooltip
@@ -109,7 +109,7 @@ public static class TraitTooltip
         (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
 
     /// <summary>
-    /// 평소 {dmg} — 피해 색 글자 '공격력 150%'(계수 범위 '100~150%', 고정 추가 피해가 있으면 '20 + 공격력 150%').
+    /// 평소 {dmg} — 피해 색 글자 '공격력의 150%'(계수 범위 '100~150%', 고정 추가 피해가 있으면 '20 + 공격력의 150%').
     /// 문구는 <see cref="TraitUiStrings.DamagePercent"/>·<see cref="TraitUiStrings.DamagePercentFlat"/>.
     /// </summary>
     public static string FormatDamagePercent(SkillTooltipDamage damage)
