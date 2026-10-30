@@ -81,6 +81,11 @@ public sealed class GameplayInvariantDetector : IQADetector
     private readonly DeadPlayerJudge _deadPlayerJudge = new DeadPlayerJudge();
     // 구속(23호 잡기) 중·풀린 뒤 유예는 P8 을 보지 않는다(할 일 185).
     private readonly RestrainedWallGraceJudge _restrainedWallGrace = new RestrainedWallGraceJudge();
+    // 큰 순간이동(P5 와 같은 15m 기준) 뒤 유예도 P8 을 보지 않는다(할 일 187 — 클라 반영 1~2틱 과도 겹침).
+    // 스폰·대시·낙사 유예와 무관하게 거리만으로 기록하고, 물리 샘플 사이와 프레임 사이 이동을 둘 다 넣는다.
+    private readonly TeleportWallGraceJudge _teleportWallGrace = new TeleportWallGraceJudge(TeleportDistance);
+    private Vector3 _lastFramePosition;
+    private bool _hasFramePosition;
     private PlayerActionState _timedState;
     private float _timedStateSince;
     private bool _hasTimedState;
@@ -151,7 +156,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         InspectTeleport(recorder, player, state, position, invalidPosition);
         InspectInvulnerabilityDamage(recorder, player, health, state);
         InspectStateDuration(recorder, player, state);
-        InspectWallPenetration(recorder, player, state, invalidPosition);
+        InspectWallPenetration(recorder, player, state, position, invalidPosition);
 
         _previousHealth = health;
         _previousServerInvulnerable = CurrentServerInvulnerable;
@@ -256,6 +261,7 @@ public sealed class GameplayInvariantDetector : IQADetector
             return;
 
         float distance = _hasFixedPosition ? Vector3.Distance(_lastFixedPosition, position) : 0f;
+        _teleportWallGrace.NotifyMove(Time.time, distance);
         bool outsideSpawnGrace = Time.time - _playerObservedSince >= SpawnTeleportGraceSeconds;
         // 낙사 유예 창 안의 순간이동은 안전지점 복귀(스폰 재배치)로 본다 — P6과 같은 근거.
         bool teleported =
@@ -408,13 +414,28 @@ public sealed class GameplayInvariantDetector : IQADetector
     /// <summary>
     /// 플레이어 캡슐이 벽/환경 지오메트리와 실제로 겹치는지(관통) 검사한다.
     /// 구속 중·풀린 뒤 0.5초는 모터가 일부러 벽 밖으로 꺼내지 않으므로 보지 않는다(할 일 185 — RestrainedWallGraceJudge).
+    /// 큰 순간이동 뒤 0.5초도 클라 반영 과도 겹침이라 보지 않는다(할 일 187 — TeleportWallGraceJudge).
     /// </summary>
-    private void InspectWallPenetration(QARecorder recorder, Player player, PlayerActionState state, bool invalidPosition)
+    private void InspectWallPenetration(
+        QARecorder recorder,
+        Player player,
+        PlayerActionState state,
+        Vector3 position,
+        bool invalidPosition)
     {
         Collider penetratedCollider = null;
         bool restrainedGrace = _restrainedWallGrace.Step(Time.time, state);
+        if (!invalidPosition)
+        {
+            // 물리 샘플이 없는 프레임에 위치가 바뀌어도 순간이동을 놓치지 않도록 프레임 간 이동도 넣는다.
+            if (_hasFramePosition)
+                _teleportWallGrace.NotifyMove(Time.time, Vector3.Distance(_lastFramePosition, position));
+            _lastFramePosition = position;
+            _hasFramePosition = true;
+        }
+        bool teleportGrace = _teleportWallGrace.IsSuppressed(Time.time);
 
-        if (!invalidPosition && !restrainedGrace && _playerCapsule != null)
+        if (!invalidPosition && !restrainedGrace && !teleportGrace && _playerCapsule != null)
         {
             Transform t = _playerCapsule.transform;
             Vector3 lossy = t.lossyScale;
@@ -591,6 +612,8 @@ public sealed class GameplayInvariantDetector : IQADetector
         _worldExitSince = -1f;
         _deadPlayerJudge.Reset();
         _restrainedWallGrace.Reset();
+        _teleportWallGrace.Reset();
+        _hasFramePosition = false;
         _hasTimedState = false;
     }
 
