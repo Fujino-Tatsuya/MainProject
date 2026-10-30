@@ -53,6 +53,7 @@
   카드(이름/분류/설명 `{필드}`·`{dmg}`·도움말·2차 상충 확인창) · Strings `Trait.<ID>.*` · 시트 `Traits_Paladin/Gunner/Assassin`(없으면 무시). 캐릭터 레인(126~128)은 `Traits/<캐릭터>/` 파일만 고친다(§11.6).
 - **튜토리얼 QA**: [Docs/tech/tutorial-qa.md](Docs/tech/tutorial-qa.md) — 솔로·MPPM·회귀 Play 체크리스트·알려진 한계·병합 전 확인. 단계별 문서 목록은 [tutorial-director.md](Docs/tech/tutorial-director.md) §10.1.
 - **로비 데모 부스 운영**: [Docs/tech/lobby-demo-flow.md](Docs/tech/lobby-demo-flow.md) — 흐름·모든 PC 공용 `demo-connection.json`(role auto — 이 PC IP = hostAddress 면 호스트, host/client 명시 우선)·같은 빌드 필수·대기 화면 문구·재접속·MPPM `Client` 태그·알려진 한계.
+- **로비 튜토리얼 UI(158)**: [Docs/tech/lobby-tutorial-ui.md](Docs/tech/lobby-tutorial-ui.md) — 입력 API `LobbyTutorialUI.Instance`(목표·대사·경로·벽 표식) · 프리팹 2개와 저작 메뉴 · 별도 Overlay 캔버스(HUD 안 건드림) · 집결 민트 테두리 = `PartyGatherZone` 복제값 · 디버그 구동(화면 01–27) · 아트 `.meta` 원본은 Work4 · 문구 키(시트 행 미추가).
 - **피해 숫자(플로팅 데미지)**: [Docs/tech/floating-damage-design.md](Docs/tech/floating-damage-design.md) — Overlay·이미지 숫자·몸 중심 앵커, 단발/누적·구간·필터·보호막 숫자, 줌과 무관(154 — 넣었다가 뺐음), 대상별 위치 = 프리팹 루트 `FloatingDamageAnchor`.
 - **디버그 단축키**: [Docs/tech/debug-hotkeys.md](Docs/tech/debug-hotkeys.md) — 키 목록·겹침, 릴리스 빌드 포함 심볼 `DEV_HOTKEYS`(Standalone). 정식 릴리스 때 심볼만 지운다.
 - **플레이어 스탯**: [Docs/tech/player-stats.md](Docs/tech/player-stats.md) — 공격력·이동속도·공격속도·방어력·최대 체력 5종 기본%·전체%(+공격력 가하는 피해%) 공식, 서버·클라 같은 종합(`PlayerStats`), 판정은 서버 값, 공격 요청마다 서버 2차 검증(경고만). 새 스탯 추가 절차 §3.

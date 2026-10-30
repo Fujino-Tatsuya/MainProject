@@ -324,6 +324,10 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 전이 원본 = `LobbyTrainingFlow`(`IsPointActive`·`OnGatherConfirmed`·`ReportStageCompleted`). 튜토리얼 클리어(Alt+1)로 명단이 비면 바로 `Brief/Completed` 로 넘어간다.
 
+**로비 튜토리얼 경로 묶음과 함께 쓸 때(할 일 158)**: 새 로비 튜토리얼은 단계별 경로를 `LobbyTutorialMarkers.prefab` 의 `LobbyTutorialPathSet`(같은 `LobbyFloorArrowPath.prefab` 중첩, ID 8개)으로 켠다.
+이 프리팹의 `legacyGuideRoots` 에 씬의 `LobbyGuideSteps` 루트를 넣으면 튜토리얼 경로가 켜진 동안 옛 3스텝 안내를 끄고 빈 ID 면 되돌린다 — 둘이 동시에 안 켜진다.
+`LobbyGuideSteps` 자체는 손대지 않았다. 상세: [lobby-tutorial-ui.md](lobby-tutorial-ui.md).
+
 ## TRAIN_01 무기 점검 — 체크 시점
 
 개인 6항목은 존1 서버 훅을 그대로 재사용해 센다(`LobbyTrainingWeaponCheck` 구독 → `LobbyWeaponCheckRules`/`LobbyWeaponCheckModel` 판정).
