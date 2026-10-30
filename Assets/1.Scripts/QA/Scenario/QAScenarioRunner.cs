@@ -121,7 +121,7 @@ public sealed class QAScenarioRunner : MonoBehaviour
         QABlackboard.ExpectDisconnects = false;
         _status = "완료";
         Finish();
-        Debug.Log($"[QA] 48 시나리오 전부 끝 — 리포트: {_ctx.RunDir}/report.md . QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 정지할 것.");
+        Debug.Log($"[QA] 48 시나리오 전부 끝 — 리포트: {_ctx.RunDir}/report.md . QA 창(Tools/QA) ▸ QA ▸ 정지 로 정지할 것.");
     }
 
     private static IEnumerator Guard(IEnumerator body, Action onDone)

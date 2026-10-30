@@ -7,7 +7,7 @@ using UnityEngine;
 /// <summary>
 /// 할 일 103 3인 보스전 밸런싱(B103, MPPM 호스트 + 가상 2) — 로비에서 자리(clientId 순위)대로 팔라딘·어쌔신·거너를 고르고
 /// 정식 흐름으로 맵에 들어간 뒤, 호스트는 판을 진행·판정하고(<see cref="QABoss103Match.RunHost"/>) 가상 플레이어는 자기 몫 입력만 한다
-/// (<see cref="QABoss103Match.RunClient"/> — 특성 선택·연출 스킵·재선택 팝업 '아니오'). 설정·실행은 QA 창(Tools/QA) ▸ 103 섹션.
+/// (<see cref="QABoss103Match.RunClient"/> — 특성 선택·연출 스킵·재선택 팝업 '아니오'). 103 실행 메뉴는 삭제됨(155) — 야간 시나리오가 이 판 흐름을 그대로 쓴다.
 /// 88 의 체력 채우기·어그로 강제·보스 타이머 정지·QA 슈퍼아머는 쓰지 않는다(밸런스 왜곡).
 /// </summary>
 public static partial class QALobbyScenarios

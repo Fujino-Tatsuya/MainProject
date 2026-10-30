@@ -1,21 +1,16 @@
 #if UNITY_EDITOR
 using System;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// MPPM(Play Mode Scenario) 를 툴바 Play 버튼과 같은 경로로 시작한다 — QA 창(Tools/QA) ▸ 맨 위 버튼과 <see cref="QAAutomation"/> 이 부른다.
+/// MPPM(Play Mode Scenario) 를 툴바 Play 버튼과 같은 경로로 시작한다 — QA 창(Tools/QA) ▸ QA 섹션 버튼·<see cref="QAAutomation"/>·야간 연속 루프가 부른다.
 /// 🔴 EditorApplication.isPlaying 토글은 가상 플레이어가 안 붙는다(메모리 규칙). 여기서는 MPPM 의
-///    PlayModeManager 진입점을 리플렉션으로 찾아 부른다. 내부 API 라 버전이 바뀌면 QA 창 ▸ 디버그 ▸ MPPM API 덤프 로 다시 확인할 것.
+///    PlayModeManager 진입점을 리플렉션으로 찾아 부른다. 내부 API 라 버전이 바뀌면 리플렉션 대상 이름을 다시 확인할 것(MPPM API 덤프 버튼은 삭제됨(155)).
 /// </summary>
 public static class QAScenarioPlay
 {
-    const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-
     const string BootScene = "Assets/0.Scenes/MainFlow/0.BootStrapScene.unity";
 
     static Type FindType(string fullName)
@@ -40,8 +35,8 @@ public static class QAScenarioPlay
         return null;
     }
 
-    /// <summary>활성 Play Mode 설정과 가상 플레이어 수를 콘솔에 남긴다.</summary>
-    public static void Status()
+    /// <summary>활성 Play Mode 설정과 가상 플레이어 수를 콘솔에 남긴다(Play 시작 때).</summary>
+    static void Status()
     {
         Type managerType = FindType("Unity.PlayMode.Editor.PlayModeManager");
         object manager = managerType != null ? GetSingleton(managerType) : null;
@@ -109,7 +104,7 @@ public static class QAScenarioPlay
     /// <summary>
     /// 가상 플레이어 2·3 에 MPPM 태그 <c>Client</c>(<see cref="DemoConnectionConfig.MppmClientTag"/>)를 붙인다 — 없으면 데모 흐름이 안 켜지고
     /// 옛 수동 흐름(타이틀)으로 돈다(lobby-demo-flow.md §6). 48.3 2차에서 태그가 비어 클론이 타이틀로 간 것을 확인했다.
-    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — QA 창 ▸ 가상 플레이어 ▸ 끄기 후 켜기.
+    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — QA 창 ▸ QA ▸ 가상 플레이어 ▸ 끄기 후 켜기.
     /// </summary>
     public static void EnsureClientTags()
     {
@@ -160,20 +155,6 @@ public static class QAScenarioPlay
         }
     }
 
-    /// <summary>가상 플레이어 상태(PlayerState) 로그.</summary>
-    public static void PlayerStates()
-    {
-        Type mppm = FindType("Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode");
-        var sb = new StringBuilder("[QA] 가상 플레이어:");
-        foreach (string prop in new[] { "PlayerOne", "PlayerTwo", "PlayerThree", "PlayerFour" })
-        {
-            object player = mppm?.GetProperty(prop, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
-            object state = player?.GetType().GetProperty("PlayerState", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(player);
-            sb.Append($" {prop}={state}");
-        }
-        Debug.Log(sb.ToString());
-    }
-
     /// <summary>
     /// 0.BootStrapScene 을 열고(저장 안 된 변경이 있으면 중단) 툴바 Play 와 같은 경로로 Play 를 시작한다.
     /// 활성 설정이 Play Mode Scenario 면 가상 플레이어도 함께 뜬다.
@@ -201,7 +182,7 @@ public static class QAScenarioPlay
         MethodInfo toggle = managerType?.GetMethod("TogglePlayingShortcut", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         if (toggle == null)
         {
-            Debug.LogError("[QA] PlayModeManager.TogglePlayingShortcut 를 찾지 못했다 — QA 창(Tools/QA) ▸ 디버그 ▸ MPPM API 덤프 로 확인할 것.");
+            Debug.LogError("[QA] PlayModeManager.TogglePlayingShortcut 를 찾지 못했다 — MPPM 패키지 버전이 바뀌었는지 확인할 것.");
             return;
         }
 
@@ -225,47 +206,6 @@ public static class QAScenarioPlay
         else
             EditorApplication.isPlaying = false;
         Debug.Log("[QA] Play Mode Scenario 정지.");
-    }
-
-    /// <summary>MPPM 관련 내부 API(타입·메서드·속성)를 Logs/qa-mppm-api.txt 로 덤프한다.</summary>
-    public static void Dump()
-    {
-        var sb = new StringBuilder();
-        foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            string an = a.GetName().Name;
-            if (!an.Contains("PlayMode") && !an.Contains("Multiplayer"))
-                continue;
-            Type[] types;
-            try { types = a.GetTypes(); } catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
-            foreach (Type t in types)
-            {
-                bool interesting = t.Name.Contains("PlayModeManager") || t.Name.Contains("PlayModeButton") ||
-                                   t.Name.Contains("Scenario") && t.Name.Contains("Run") || t.Name == "ScenarioConfig" ||
-                                   t.Name.Contains("PlaymodeDropdown");
-                if (!interesting)
-                {
-                    // 가상 플레이어 활성화 후보: Activate/Launch/Open 류 메서드를 가진 타입 이름만.
-                    bool hasActivate = false;
-                    try { hasActivate = t.GetMethods(All).Any(m => m.Name.Contains("Activate") || m.Name.Contains("Launch")); } catch { }
-                    if (hasActivate)
-                        sb.AppendLine($"-- {an} :: {t.FullName} :: " + string.Join(", ",
-                            t.GetMethods(All).Where(m => m.Name.Contains("Activate") || m.Name.Contains("Launch") || m.Name.Contains("Player"))
-                                .Select(m => $"{(m.IsStatic ? "s " : "")}{m.Name}({string.Join(",", m.GetParameters().Select(p => p.ParameterType.Name))})").Distinct()));
-                    continue;
-                }
-                sb.AppendLine($"== {an} :: {t.FullName}");
-                foreach (MethodInfo m in t.GetMethods(All))
-                    sb.AppendLine($"   M {(m.IsStatic ? "static " : "")}{m.ReturnType.Name} {m.Name}({string.Join(", ", m.GetParameters().Select(p => p.ParameterType.Name + " " + p.Name))})");
-                foreach (PropertyInfo p in t.GetProperties(All))
-                    sb.AppendLine($"   P {p.PropertyType.Name} {p.Name}");
-                foreach (FieldInfo f in t.GetFields(All))
-                    sb.AppendLine($"   F {(f.IsStatic ? "static " : "")}{f.FieldType.Name} {f.Name}");
-            }
-        }
-        string path = Path.GetFullPath("Logs/qa-mppm-api.txt");
-        File.WriteAllText(path, sb.ToString());
-        Debug.Log($"[QA] MPPM API 덤프: {path}");
     }
 }
 #endif

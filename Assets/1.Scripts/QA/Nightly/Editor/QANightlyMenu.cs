@@ -6,8 +6,8 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 108 팀원별 야간 QA 실행부(QA 창(Tools/QA) ▸ 야간 · <c>QAAutomation.NightStart()</c> 등이 부른다). 한 판 = 시나리오 <see cref="QALobbyScenarios.Nightly108Id"/>(로비 점검 → 캐릭터 선택·출격 → 맵 → 보스 결과),
-/// 판 반복·오류 판 재실행·리포트는 103 연속 루프(<see cref="QABoss103BatchRunner"/>)를 그대로 쓴다. 팀원별 차이 = 시드 파일(<see cref="QANightlySeed.RelativePath"/>) 하나.
+/// 할 일 108 팀원별 야간 QA 실행부(QA 창(Tools/QA) ▸ 야간 · <c>QAAutomation.StartNight()</c> 등이 부른다). 한 판 = 시나리오 <see cref="QALobbyScenarios.Nightly108Id"/>(로비 점검 → 캐릭터 선택·출격 → 맵 → 보스 결과),
+/// 판 반복·오류 판 재실행·리포트는 연속 루프(<see cref="QABoss103BatchRunner"/> — 103 에서 만든 루프, 103 배치 메뉴는 삭제됨(155))를 그대로 쓴다. 팀원별 차이 = 시드 파일(<see cref="QANightlySeed.RelativePath"/>) 하나.
 /// 녹화·공유 폴더는 PC 설정(<see cref="QANightlyLocalSettings"/>). 실행 절차: Docs/tech/qa-nightly-runbook.md.
 /// </summary>
 public static class QANightlyMenu
@@ -31,7 +31,7 @@ public static class QANightlyMenu
         QANightlyLocalSettings local = QANightlyHooks.LoadLocal();
 
         System.DateTime at = System.DateTime.Now;
-        string dir = $"{QAScenario103Menu.QARoot}/{QANightlyPaths.BatchFolderName(seed.Name, at)}";
+        string dir = $"{QABoss103BatchRunner.QARoot}/{QANightlyPaths.BatchFolderName(seed.Name, at)}";
         if (Directory.Exists(dir))
             dir += at.ToString("ss", CultureInfo.InvariantCulture);
         string toolbarBefore = DataSourcePlayMode.Current.ToString();

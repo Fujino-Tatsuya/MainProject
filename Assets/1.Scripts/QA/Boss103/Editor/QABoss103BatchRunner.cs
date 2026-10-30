@@ -8,11 +8,12 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 103 C6 — 90판 무인 연속 루프(에디터 상태 기계). 할 일 119 C3 — 같은 루프로 30판(<c>Start 30</c>, 폴더 <c>119-…</c>). 판마다 Play 를 새로 시작하고(<c>QAScenario48Menu.Run</c> — 툴바 Play 와 같은 MPPM 경로,
-/// isPlaying 직접 토글 없음) 판 기록(runs.csv 새 행)을 보면 Play 를 멈춘 뒤 다음 판으로 간다.
+/// 무인 연속 루프(에디터 상태 기계) — 할 일 103 C6 에서 만들었고 지금은 할 일 108 야간 QA(<see cref="QANightlyMenu"/>)만 쓴다.
+/// 103 90판·119 30판 시작·폴더 골라 이어하기·비교 기준 메뉴는 삭제됨(155) — 시작은 <c>StartBatch</c>(야간 시작이 부른다).
+/// 판마다 Play 를 새로 시작하고(<c>QAScenario48Menu.Run</c> — 툴바 Play 와 같은 MPPM 경로, isPlaying 직접 토글 없음) 판 기록(runs.csv 새 행)을 보면 Play 를 멈춘 뒤 다음 판으로 간다.
 /// <list type="bullet">
-/// <item>배치 폴더 <c>C:/UnityProject/QA/103-yyyyMMdd_HHmm/</c> — CSV 4종·parts/·hb/(심장박동)·report.html·progress.txt(루프 상태)·batch.txt(배치 머리)·logs/.</item>
-/// <item>상태는 progress.txt 라 Play 진입·정지 도메인 리로드를 넘는다. 에디터를 다시 켜면 자동으로 이어 가지 않는다 — <c>Resume Last</c>.</item>
+/// <item>배치 폴더 <c>C:/UnityProject/QA/&lt;배치&gt;/</c> — CSV 4종·parts/·hb/(심장박동)·report.html·progress.txt(루프 상태)·batch.txt(배치 머리)·logs/.</item>
+/// <item>상태는 progress.txt 라 Play 진입·정지 도메인 리로드를 넘는다. 에디터를 다시 켜면 자동으로 이어 가지 않는다 — QA 창 ▸ 야간 ▸ 이어하기.</item>
 /// <item>다음 판 = runs.csv 로 정한다(<see cref="QABoss103Batch.TryNext"/>) — 끝난 판은 건너뛰고, 90판 뒤 오류 판만 1회 재실행.</item>
 /// <item>판 오류(<see cref="QABoss103Batch.Judge"/> — 심장박동 120초·Combat 전 8분·Combat 30+3분, Play 시작 실패·판 기록 전 정지)는 runs.csv 에 Error 행을 쓰고
 ///   정리 → 10초(연속 3판마다 60초) 뒤 다음 판. C7d: 판 Play 중 클라 접속 거절(<c>NetworkConfig mismatch</c>) 로그를 보면 바로 Error(net_config_mismatch).</item>
@@ -28,7 +29,9 @@ using UnityEngine;
 public static class QABoss103BatchRunner
 {
     private const string Tag = "[QA103/Batch]";
-    private const string ResumeHint = "QA 창(Tools/QA) ▸ 103 배치 ▸ 이어하기(QAAutomation.Boss103BatchResume())";
+    private const string ResumeHint = "QA 창(Tools/QA) ▸ 야간 ▸ 이어하기(QAAutomation.ResumeNight())";
+    /// <summary>QA 리포트 루트(배치 폴더가 생기는 곳).</summary>
+    internal const string QARoot = "C:/UnityProject/QA";
     private static readonly string DirKey = DevBootTarget.ScopedKey("QA.103.Batch.Dir");
     private static readonly string RunningKey = DevBootTarget.ScopedKey("QA.103.Batch.Running");
     private const string LiveSessionKey = "QA.103.Batch.Live";
@@ -82,59 +85,10 @@ public static class QABoss103BatchRunner
     private static string Dir => EditorPrefs.GetString(DirKey, "");
     private static DateTime Now => DateTime.UtcNow;
 
-    // ── 실행(QA 창 ▸ 103 배치 · QAAutomation) ────────────────
-
-    public static void Start90() =>
-        StartBatch(QABoss103Batch.Prefix103, QABoss103Batch.TotalRuns, "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA", null);
+    // ── 실행(야간 QA — QANightlyMenu) ────────────────────────
 
     /// <summary>
-    /// 할 일 119 C3 — 같은 조건 30판(보통→숙련→초보 번갈아 = 단계마다 10판, 기준 시드 103 그대로). 폴더 <c>119-yyyyMMdd_HHmm</c>.
-    /// 리포트는 <see cref="CompareDir"/>(지난 103 90판) 와 단계별 요약을 나란히 보인다.
-    /// </summary>
-    public static void Start30() =>
-        StartBatch(QABoss103Batch.Prefix119, QABoss103Batch.TotalRuns119, "할 일 119 3인 보스전(웰즈&23호 B) QA 봇 2차 — 30판", CompareDir);
-
-    public static void ChooseCompareDir()
-    {
-        string dir = EditorUtility.OpenFolderPanel("119 리포트 비교 기준 배치 폴더(지난 103)", QAScenario103Menu.QARoot, "");
-        if (string.IsNullOrEmpty(dir))
-            return;
-        EditorPrefs.SetString(CompareDirKey, dir.Replace('\\', '/'));
-        Debug.Log($"{Tag} 비교 기준 배치 = {CompareDir} (다음 Start 30 부터 batch.txt compare_dir 로 남는다 — 진행 중 배치는 그 폴더 batch.txt 를 고친다).");
-    }
-
-    private static readonly string CompareDirKey = DevBootTarget.ScopedKey("QA.103.Batch.CompareDir");
-
-    /// <summary>할 일 119 C3 — 비교 기준 배치 폴더(설정값, 기본 <see cref="QABoss103Batch.CompareDirDefault"/>).</summary>
-    public static string CompareDir => EditorPrefs.GetString(CompareDirKey, QABoss103Batch.CompareDirDefault);
-
-    private static void StartBatch(string prefix, int total, string title, string compareDir)
-    {
-        if (!CanStart())
-            return;
-        DateTime at = DateTime.Now;
-        string dir = $"{QAScenario103Menu.QARoot}/{QABoss103Batch.BatchFolderName(at, prefix)}";
-        if (Directory.Exists(dir))
-            dir += at.ToString("ss", CultureInfo.InvariantCulture);
-        var batch = new List<KeyValuePair<string, string>>
-        {
-            KV("title", title),
-            KV("started_at", at.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
-            KV("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture)),
-            KV("total", total.ToString(CultureInfo.InvariantCulture)),
-            KV("data_source_mode", QABoss103Batch.SourceTable),
-            KV("xlsx_svn_rev", QABoss103RunCsv.XlsxRevision()),
-            KV("git_commit", QABoss103RunCsv.GitCommit()),
-            KV("git_branch", QABoss103RunCsv.Shell("git", "rev-parse --abbrev-ref HEAD")),
-            KV("unity_version", Application.unityVersion),
-        };
-        if (!string.IsNullOrEmpty(compareDir))
-            batch.Add(KV("compare_dir", compareDir));
-        StartBatch(dir, batch, QAScenario103Menu.BaseSeed, total, null);
-    }
-
-    /// <summary>
-    /// 새 배치 시작(103 Start 90·119 Start 30·할 일 108 야간 QA 공용). batch.txt 를 쓰고 진행 상태를 처음부터 둔다.
+    /// 새 배치 시작(할 일 108 야간 QA). batch.txt 를 쓰고 진행 상태를 처음부터 둔다.
     /// <paramref name="extraState"/> = 판 설정 키(<c>scenario</c>·<c>tier</c>·<c>order</c>·<c>traitSeed</c>·<c>nightly</c>) — 없으면 103(B103·봇 단계 자동).
     /// </summary>
     internal static bool StartBatch(string dir, List<KeyValuePair<string, string>> batch, int seed, int total, IEnumerable<KeyValuePair<string, string>> extraState)
@@ -173,7 +127,7 @@ public static class QABoss103BatchRunner
         string dir = !string.IsNullOrEmpty(Dir) && Directory.Exists(Dir) && MatchesPattern(Dir, pattern) ? Dir : LatestBatchDir(pattern);
         if (dir == null)
         {
-            Debug.LogWarning($"{Tag} 이어 할 배치 폴더가 없다({QAScenario103Menu.QARoot}/{pattern}).");
+            Debug.LogWarning($"{Tag} 이어 할 배치 폴더가 없다({QARoot}/{pattern}).");
             return false;
         }
         Resume(dir);
@@ -193,26 +147,6 @@ public static class QABoss103BatchRunner
     /// <summary>할 일 108 야간 배치(진행 상태 <c>nightly</c> = 시드 이름).</summary>
     private static bool IsNightlyBatch => Get("nightly").Length > 0;
 
-    public static void ResumeLast()
-    {
-        string dir = Dir;
-        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
-            dir = LatestBatchDir();
-        if (dir == null)
-        {
-            Debug.LogWarning($"{Tag} 이어 할 배치 폴더가 없다({QAScenario103Menu.QARoot}/103-*·119-*).");
-            return;
-        }
-        Resume(dir);
-    }
-
-    public static void ResumeChoose()
-    {
-        string dir = EditorUtility.OpenFolderPanel("이어 할 103 배치 폴더", QAScenario103Menu.QARoot, "");
-        if (!string.IsNullOrEmpty(dir))
-            Resume(dir);
-    }
-
     public static void StopAfterCurrent()
     {
         string dir = ActiveBatchDir();
@@ -223,7 +157,7 @@ public static class QABoss103BatchRunner
         }
         if (!Running)
         {
-            // 루프가 꺼진 채 남은 배치 — 표시만 남긴다(Resume Last 가 stopAfter 를 0 으로 되돌리고 이어 간다).
+            // 루프가 꺼진 채 남은 배치 — 표시만 남긴다(야간 이어하기가 stopAfter 를 0 으로 되돌리고 이어 간다).
             _stateDir = null;
             LoadState(dir);
             Set("stopAfter", "1");
@@ -281,22 +215,16 @@ public static class QABoss103BatchRunner
                   $"재실행 대상 [{string.Join(",", QABoss103Batch.RetryList(attempts, total))}] · 툴바 출처 {DataSourcePlayMode.Current} · 가상 플레이어 {string.Join("/", VpStates())}");
     }
 
-    /// <summary>Start 90·Start 30·Resume Last·Resume (Choose Folder) 버튼을 켤 조건(루프가 안 돈다).</summary>
-    public static bool CanStartBatch => !Running;
-
-    /// <summary>Stop After Current Run 버튼을 켤 조건(돌고 있거나 끝나지 않은 배치가 있다).</summary>
-    public static bool CanStopAfterCurrent => ActiveBatchDir() != null;
-
     private static bool CanStart()
     {
         if (Running)
         {
-            Debug.LogWarning($"{Tag} 이미 돌고 있다({Dir}) — QA 창 ▸ 103 배치 ▸ 상태 로 확인, 멈추려면 야간 ▸ 현재 판 후 정지.");
+            Debug.LogWarning($"{Tag} 이미 돌고 있다({Dir}) — QA 창 ▸ 야간 ▸ 상태 로 확인, 멈추려면 야간 ▸ 현재 판 후 정지.");
             return false;
         }
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning($"{Tag} Play 중이다 — QA 창(Tools/QA) ▸ 시나리오 ▸ 정지 로 먼저 정지할 것.");
+            Debug.LogWarning($"{Tag} Play 중이다 — QA 창(Tools/QA) ▸ QA ▸ 정지 로 먼저 정지할 것.");
             return false;
         }
         return true;
@@ -310,9 +238,9 @@ public static class QABoss103BatchRunner
         _stateDir = null;
         LoadState(dir);
         if (!File.Exists(Path.Combine(dir, QABoss103Batch.BatchFile)))
-            Debug.LogWarning($"{Tag} {dir} 에 batch.txt 가 없다 — 기준 시드 {Get("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture))} 로 이어 간다.");
+            Debug.LogWarning($"{Tag} {dir} 에 batch.txt 가 없다 — 기준 시드 {Get("seed", QABoss103Config.DefaultSeed.ToString(CultureInfo.InvariantCulture))} 로 이어 간다.");
         if (Get("seed").Length == 0)
-            Set("seed", QAScenario103Menu.BaseSeed.ToString(CultureInfo.InvariantCulture));
+            Set("seed", QABoss103Config.DefaultSeed.ToString(CultureInfo.InvariantCulture));
         if (Get("total").Length == 0)
             Set("total", QABoss103Batch.TotalRuns.ToString(CultureInfo.InvariantCulture));
         string was = Get("state");
@@ -338,22 +266,22 @@ public static class QABoss103BatchRunner
     }
 
     /// <summary>
-    /// 가장 최근 배치 폴더. <paramref name="pattern"/> 이 없으면(103 Resume) 103-·119- 배치 중 폴더 이름의 시각이 가장 늦은 것(접두어 순서와 무관),
-    /// 있으면(할 일 108 야간, 예 <c>N108-2*</c>) 그 형식 폴더 중 이름이 가장 늦은 것.
+    /// 가장 최근 배치 폴더. <paramref name="pattern"/> 이 없으면(상태·리포트·정지 표시) 배치 폴더 중 이름의 시각이 가장 늦은 것(접두어 순서와 무관),
+    /// 있으면(할 일 108 야간 이어하기, 예 <c>N108-2*</c>) 그 형식 폴더 중 이름이 가장 늦은 것.
     /// </summary>
     private static string LatestBatchDir(string pattern = null)
     {
-        if (!Directory.Exists(QAScenario103Menu.QARoot))
+        if (!Directory.Exists(QARoot))
             return null;
         string latest = null, latestStamp = null;
         if (!string.IsNullOrEmpty(pattern))
         {
-            foreach (string d in Directory.GetDirectories(QAScenario103Menu.QARoot, pattern))
+            foreach (string d in Directory.GetDirectories(QARoot, pattern))
                 if (latest == null || string.CompareOrdinal(d, latest) > 0)
                     latest = d;
             return latest?.Replace('\\', '/');
         }
-        foreach (string d in Directory.GetDirectories(QAScenario103Menu.QARoot, "*-2*"))
+        foreach (string d in Directory.GetDirectories(QARoot, "*-2*"))
         {
             string stamp = QABoss103Batch.BatchStamp(Path.GetFileName(d));
             if (stamp != null && (latestStamp == null || string.CompareOrdinal(stamp, latestStamp) > 0))
@@ -520,7 +448,7 @@ public static class QABoss103BatchRunner
         }
         QABoss103Config cfg = Config(run, retry);
         DeleteAttemptFiles(cfg);
-        int written = QAScenario103Menu.WriteConfig(cfg);
+        int written = WriteConfig(cfg);
         Set("run", run.ToString(CultureInfo.InvariantCulture));
         Set("retry", retry.ToString(CultureInfo.InvariantCulture));
         Set("keyRows", RowCount(attempts, run, retry).ToString(CultureInfo.InvariantCulture));
@@ -670,7 +598,7 @@ public static class QABoss103BatchRunner
     {
         QAScenarioPlay.DeactivateVirtualPlayers();
         QAScenario48Menu.Clear();
-        QAScenario103Menu.DeleteConfig();
+        DeleteConfig();
         Set("state", string.IsNullOrEmpty(endState) ? "stopped" : endState);
         SetTime("endedAt", Now);
         EditorPrefs.SetBool(RunningKey, false);
@@ -700,14 +628,14 @@ public static class QABoss103BatchRunner
         }
     }
 
-    /// <summary>에디터 재시작으로 루프가 꺼진 배치 — 끝나지 않은 상태면 <c>end=aborted</c> 를 남긴다(에이전트가 무한히 기다리지 않게). Resume Last 가 지운다.</summary>
+    /// <summary>에디터 재시작으로 루프가 꺼진 배치 — 끝나지 않은 상태면 <c>end=aborted</c> 를 남긴다(에이전트가 무한히 기다리지 않게). 야간 이어하기가 지운다.</summary>
     private static void MarkAbortedByRestart()
     {
         try
         {
             if (!LoadState() || !QABoss103Batch.IsActiveState(Get("state")) || Get(QANightlyCompletion.KeyEnd).Length > 0)
                 return;
-            WriteCompletion(QANightlyCompletion.Aborted, $"에디터 재시작 — 루프 정지(상태 {Get("state")}, 판 {Get("run")}). 이어 하려면 Resume Last");
+            WriteCompletion(QANightlyCompletion.Aborted, $"에디터 재시작 — 루프 정지(상태 {Get("state")}, 판 {Get("run")}). 이어 하려면 QA 창 ▸ 야간 ▸ 이어하기");
         }
         catch { /* 표시 실패로 에디터 시작을 막지 않는다 */ }
     }
@@ -736,6 +664,38 @@ public static class QABoss103BatchRunner
         if (QABoss103Plan.TryParseOrder(Get("order"), out QABoss103Character[] order))
             cfg.Order = order;
         return cfg;
+    }
+
+    /// <summary>호스트·클론 루트마다 판 설정 파일(<see cref="QABoss103Config.FileName"/>)을 쓴다. 쓴 수.</summary>
+    private static int WriteConfig(QABoss103Config cfg)
+    {
+        int n = 0;
+        var roots = new List<string> { QANetSim88.OwnRoot };
+        roots.AddRange(QANetSim88.CloneRoots());
+        foreach (string root in roots)
+        {
+            File.WriteAllText(Path.Combine(root, QABoss103Config.FileName), cfg.Format());
+            n++;
+        }
+        return n;
+    }
+
+    /// <summary>호스트·클론 루트의 판 설정 파일을 지운다(시나리오 모드 해제와 함께 — 평소 Play 에 남지 않게). 지운 수.</summary>
+    private static int DeleteConfig()
+    {
+        int n = 0;
+        var roots = new List<string> { QANetSim88.OwnRoot };
+        roots.AddRange(QANetSim88.CloneRoots());
+        foreach (string root in roots)
+        {
+            string path = Path.Combine(root, QABoss103Config.FileName);
+            if (!File.Exists(path))
+                continue;
+            File.Delete(path);
+            n++;
+        }
+        Debug.Log($"{QABoss103Plan.Tag} 설정 파일 {n}개 삭제");
+        return n;
     }
 
     private static List<QABoss103Attempt> Attempts(string dir)
@@ -909,8 +869,6 @@ public static class QABoss103BatchRunner
     }
 
     private static string StateLabel() => $"{Get("state")} · 판 {Get("run")}{(Get("retry") == "1" ? " 재실행" : "")}";
-
-    private static KeyValuePair<string, string> KV(string k, string v) => new KeyValuePair<string, string>(k, v);
 
     private static string Find(List<KeyValuePair<string, string>> list, string key)
     {

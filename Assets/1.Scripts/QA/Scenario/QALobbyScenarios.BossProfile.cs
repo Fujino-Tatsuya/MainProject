@@ -12,7 +12,7 @@ using UnityEngine.Profiling;
 /// <summary>
 /// 할 일 57.2 — 보스전 실측 프로파일링(P572, 솔로 호스트). 정식 흐름(로비 → 로딩 → 4.MapScene) 뒤 G10 열기 → ForceStartEncounter → Combat 을
 /// 최소 90초(첫 23호 돌진·드론 고정·점프 예고를 다 볼 때까지, 최대 240초) 유지하며 Profiler 바이너리 로그(.raw, 1000프레임씩 나눔)와
-/// 프레임 CSV 를 <c>_lane-artifacts/&lt;repo 폴더&gt;/57.2-profile/run-*</c> 에 남긴다. 분석은 QA 창(Tools/QA) ▸ 57.2 프로파일 ▸ 최근 분석.
+/// 프레임 CSV 를 <c>_lane-artifacts/&lt;repo 폴더&gt;/57.2-profile/run-*</c> 에 남긴다. 57.2 실행·분석 메뉴는 삭제됨(155).
 /// 보스 코드는 건드리지 않는다 — 예고는 리플렉션으로 관찰만 하고(<see cref="QABossProfileProbe"/>), 관찰한 프레임에 빈 마커 <c>QA57.*</c> 를 찍는다.
 /// 패턴은 기존 Dev 예약(<c>TwentyThreeBoss.DevReserveNextAttack</c> = F11 돌진·F6 점프)으로 앞당기고, 판이 끝나지 않게 체력만 채운다(무적 아님 — 피격 흐름 그대로).
 /// </summary>
@@ -93,7 +93,7 @@ public static partial class QALobbyScenarios
             float combatSeconds = Time.realtimeSinceStartup - combatStart;
             probe.StopProfiler();
 
-            ctx.Eye("57.2 첫 예고 프레임(관찰)", probe.FirstsSummary() + $" · 전투 {combatSeconds:F0}s, 단계={Phase} — 판정은 QA 창(Tools/QA) ▸ 57.2 분석", ctx.Shot("p572_end"));
+            ctx.Eye("57.2 첫 예고 프레임(관찰)", probe.FirstsSummary() + $" · 전투 {combatSeconds:F0}s, 단계={Phase} — 판정은 프레임 CSV 를 직접 본다(57.2 분석 메뉴 삭제됨(155))", ctx.Shot("p572_end"));
             ctx.Check(probe.Deaths == 0, "판 유지(사망 0)", $"사망 {probe.Deaths} · 체력 채움 {probe.Heals}회");
             ctx.Eye("57.2 산출물", $"{dir} (세그먼트 {probe.Segments}개, 프레임 {probe.Rows}행)");
         }
@@ -115,7 +115,7 @@ public sealed class QABossProfileProbe : MonoBehaviour
 {
     public enum Phase { Lobby = 0, Loading = 1, Map = 2, BossIntro = 3, Combat = 4, Done = 5 }
 
-    /// <summary>프레임 메타데이터 키 — 분석기(QABossProfileAnalyzer)와 같아야 한다. data = { frameCount, phase }.</summary>
+    /// <summary>프레임 메타데이터 키 — 분석기(QABossProfileAnalyzer — 삭제됨(155))와 같았다. data = { frameCount, phase }.</summary>
     public static readonly Guid MetaGuid = new Guid("5b7a2c57-0a72-4f1e-9a57-2c0de57a2b01");
     public const int MetaTag = 572;
     public const int SegmentFrames = 1000;

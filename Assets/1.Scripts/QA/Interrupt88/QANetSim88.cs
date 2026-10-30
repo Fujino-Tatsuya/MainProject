@@ -6,8 +6,8 @@ using UnityEngine;
 /// <summary>
 /// 할 일 88 — 이 인스턴스의 Unity Transport 네트워크 시뮬레이터 지연을 QA 파일로 제어한다(QA 전용, 게임 코드 무수정).
 /// 파일 = 이 인스턴스 프로젝트 루트(MPPM 클론은 <c>Library/VP/mppm*/</c>)의 <see cref="FileName"/>, 내용 = 정수 ms 한 줄.
-/// 메인 에디터(호스트)는 QA 창(Tools/QA) ▸ 88 간파 지연 ▸ 원격 지연 버튼(<c>QAScenario88Menu.SetRemoteDelay</c>)가 <b>클론 루트에만</b> 쓰므로
-/// 원격 클라만 지연된다. 파일이 없으면 0. Play 중에도 <see cref="PollSeconds"/> 마다 다시 읽어 바로 바꾼다.
+/// 메인 에디터(호스트)는 <see cref="SetRemoteDelayFiles"/> 로 <b>클론 루트에만</b> 쓰므로 원격 클라만 지연된다
+/// (88 원격 지연 버튼은 삭제됨(155) — 지금은 Play 중 호스트 스위트만 쓰고, 시나리오 모드 해제가 원복한다). 파일이 없으면 0. Play 중에도 <see cref="PollSeconds"/> 마다 다시 읽어 바로 바꾼다.
 /// 적용 = Multiplayer Tools <see cref="NetworkSimulator"/> 프리셋(<c>UnityTransport.SetDebugSimulatorParameters</c> 는 NGO 2.x 에서 효과 없음).
 /// 시뮬레이터 단계는 송신·수신 모두에 걸린다(ApplyMode.AllPackets) — 지연 X ms 면 이 클라의 RTT 가 대략 2X 늘어난다.
 /// 에디터·Development Build 에서만 실제로 지연된다(<c>UNITY_MP_TOOLS_NETSIM_IMPLEMENTATION_ENABLED</c>).
@@ -33,7 +33,7 @@ public sealed class QANetSim88 : MonoBehaviour
 
     /// <summary>
     /// 메인 에디터 기준 MPPM 클론 루트 목록(이름순). 클론에서 부르면 비어 있다.
-    /// 에디터 메뉴(<c>QAScenario88Menu</c>)와 Play 중 호스트 스위트(<c>QAInterruptSuite88</c>)가 같이 쓴다.
+    /// 에디터 QA 코드(야간 연속 루프·시나리오 모드 해제)와 Play 중 호스트 스위트(<c>QAInterruptSuite88</c>)가 같이 쓴다.
     /// </summary>
     public static List<string> CloneRoots()
     {

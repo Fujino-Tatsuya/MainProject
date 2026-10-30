@@ -18,7 +18,7 @@ using UnityEngine;
 /// → 누르는 클론 <c>run_end</c>(N회) 또는 런 상한 → 클론 <c>idle</c> → 2초 유예(늦은 판정) → 호스트 <c>run_end</c> → 집계·리포트 덮어쓰기.
 /// 런 동안 0.5초마다 <see cref="QABossStart88.KeepAliveServer"/>(파티·대상 체력 유지), 23호는 1초마다 점프 콤보 예약, 매 프레임 <see cref="QABossWatch88"/>(보스 공격·창 진단).</para>
 /// <para>정리(정상·중단·예외): 여기서는 클론 <c>end</c>·원격 지연 0·봇 정지까지. Play 정지·가상 플레이어 비활성·시나리오 모드 해제는
-/// 에디터 감시자(<c>QAInterruptSuite88Watcher</c>)가 <see cref="Finished"/>·<see cref="LastBeat"/> 를 보고 한다.</para>
+/// 에디터 감시자(<c>QAInterruptSuite88Watcher</c>)가 <see cref="Finished"/>·<see cref="LastBeat"/> 를 보고 했다 — 감시자·88 실행 메뉴는 삭제됨(155), 런타임만 남음.</para>
 /// </summary>
 public static class QAInterruptSuite88
 {
@@ -163,7 +163,7 @@ public static class QAInterruptSuite88
         Beat();
         if (!TryReadConfig(out QA88SuiteConfig cfg))
         {
-            ctx.Fail("88 스위트 설정", $"{ConfigPath} 없음·런 0개 — QA 창(Tools/QA) ▸ 88 간파 지연 ▸ 스위트 실행(QAAutomation.Interrupt88RunSuite())로 실행할 것");
+            ctx.Fail("88 스위트 설정", $"{ConfigPath} 없음·런 0개 — 88 스위트 실행 메뉴는 삭제됨(155), 설정 파일을 직접 써야 한다");
             Finished = true;
             yield break;
         }
@@ -289,7 +289,7 @@ public static class QAInterruptSuite88
             _header.Notes.Add("원본 로그 = 스위트 시작 뒤 각 인스턴스 콘솔 전부(tee). `[InterruptLag]` 판정 줄은 호스트 로그에만 있다.");
             if (ready.Count == 0 && !_cfg.HostBot)
             {
-                Abort("준비된 가상 플레이어 없음 — QA 창(Tools/QA) ▸ 가상 플레이어 ▸ 켜기 후 실행할 것");
+                Abort("준비된 가상 플레이어 없음 — QA 창(Tools/QA) ▸ QA ▸ 가상 플레이어 ▸ 켜기 후 실행할 것");
                 _ctx.Fail("88 가상 플레이어 준비", $"{FollowerWaitSeconds:0}초 안에 팔로워 없음(클론 폴더 {_clones.Count}개)");
                 yield break;
             }

@@ -14,7 +14,7 @@
 - Windows 절전·화면 보호기 끄기(녹화가 검게 나오거나 에디터가 느려진다): 설정 → 시스템 → 전원 → 화면·절전 "안 함".
 
 ## 1. 에디터 끄기
-- Unity 가 켜져 있으면 Play 를 먼저 멈춘다(QA 창 `Tools ▸ QA` ▸ 시나리오 ▸ **정지**, 에이전트는 `QAAutomation.StopActiveScenario();`). 그 뒤 에디터를 닫는다.
+- Unity 가 켜져 있으면 Play 를 먼저 멈춘다(QA 창 `Tools ▸ QA` ▸ QA ▸ 시나리오 ▸ **정지**, 에이전트는 `QAAutomation.StopScenario();`). 그 뒤 에디터를 닫는다.
 - 에이전트: `taskkill /IM Unity.exe`(**/F 없이** — 저장 확인을 받는다). 닫혔는지 확인:
   - `tasklist /FI "IMAGENAME eq Unity.exe"` 에 프로세스가 없고,
   - `<프로젝트>/Temp/UnityLockfile` 이 지워졌거나 잠겨 있지 않다.
@@ -54,8 +54,8 @@ svn info --show-item last-changed-revision "Assets/50.Art/DataTable~/GameData.xl
      setx QA_OBS_PASSWORD "<OBS 비밀번호>"
      setx QA_OBS_PORT 4455
      ```
-   - 또는 QA 창 ▸ 설정 ▸ 야간 준비 ▸ **PC 설정 파일**(`QAAutomation.NightCreateLocalSettings();`) → `<프로젝트>/UserSettings/QANightly.local.json` 의 `obsEnabled` 를 `true` 로(비밀번호는 환경변수로).
-4. QA 창 ▸ 설정 ▸ 야간 준비 ▸ **OBS 확인**(`QAAutomation.NightTestObs();`) → 콘솔에 `[QA108/Nightly] OBS 연결 OK` 가 나오면 된다. 실패해도 QA 는 녹화 없이 돈다(경고만).
+   - 또는 QA 창 ▸ 야간 ▸ 설정 ▸ **PC 설정 파일**(`QAAutomation.CreateNightLocalSettings();`) → `<프로젝트>/UserSettings/QANightly.local.json` 의 `obsEnabled` 를 `true` 로(비밀번호는 환경변수로).
+4. QA 창 ▸ 야간 ▸ 설정 ▸ **OBS 확인**(`QAAutomation.TestNightObs();`) → 콘솔에 `[QA108/Nightly] OBS 연결 OK` 가 나오면 된다. 실패해도 QA 는 녹화 없이 돈다(경고만).
 
 ## 5.1 공유 폴더 루트 (팀원 PC 공유 양식 — 할 일 120 후속)
 > 팀원 PC 의 에이전트는 [qa-nightly-agent-guide.md](qa-nightly-agent-guide.md) 한 문서로 이 절차(경로 묻기 → 사전 준비 → 시작 → 완료 감시 → 리포트)를 따른다.
@@ -76,7 +76,7 @@ svn info --show-item last-changed-revision "Assets/50.Art/DataTable~/GameData.xl
 > 화질 값은 비워 두면 **아무것도 바꾸지 않는다**(108 과 같다). 설정 목록 전체: 리서치 문서 §4.
 
 ## 5.2 (선택) 1단계 — 저화질·저비트레이트
-배치 시작(`Start Night`·`Resume Last`) 때 1회, OBS WebSocket 으로 적용한다(로그 `logs/loop.log` 에 `OBS 화질 —`·`OBS 프로필 … =` 줄).
+배치 시작(야간 ▸ **시작**·**이어하기**) 때 1회, OBS WebSocket 으로 적용한다(로그 `logs/loop.log` 에 `OBS 화질 —`·`OBS 프로필 … =` 줄).
 ```
 setx QA_OBS_VIDEO_WIDTH 1280
 setx QA_OBS_VIDEO_HEIGHT 720
@@ -130,8 +130,8 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 - 0·비움 = 지우지 않음. 실패는 경고만(`⚠ 지난 클립 삭제 실패`).
 
 ## 6. 야간 QA 시작
-메뉴 `Tools ▸ QA` 로 QA 창을 연다(QA 메뉴는 창 하나뿐 — 할 일 155). 야간 버튼은 창 맨 위 **야간** 줄에 있다.
-1. (확인) 설정 ▸ 야간 준비 ▸ **시드 확인** → `시드 파일 OK — <이름> · 기준 시드 … · N판`.
+메뉴 `Tools ▸ QA` 로 QA 창을 연다(QA 메뉴는 창 하나뿐 — 할 일 155). 섹션은 **야간**(실행·설정)과 **QA**(시나리오 실행·QA 설정) 두 개뿐이다 — 48·88·103·103 배치·57.2·빌드·디버그 섹션은 삭제됨(155).
+1. (확인) 야간 ▸ 설정 ▸ **시드 확인** → `시드 파일 OK — <이름> · 기준 시드 … · N판`.
 2. (확인) 야간 ▸ **상태** → 시드·PC 설정(녹화 켜짐/꺼짐·공유 루트)·루프 상태가 콘솔에 나온다.
 3. 야간 ▸ **시작** — 끝. 이후는 무인:
    - (시작 1회) 지난 클립 정리 → 공유 날짜 폴더 만들기·OBS 녹화 경로 지정 → 화질 → 리플레이 버퍼 시작·확인(§5.3).
@@ -139,9 +139,9 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
    - (끝 1회) 남은 클립 저장·리플레이 버퍼 정지 → OBS 녹화 경로 되돌리기 → `progress.txt` 완료 키(§7.0).
    - 오류 판(심장박동 끊김·시작 8분·Play 진입 실패 등)은 기록 후 다음 판, 끝에서 1회 재실행.
    - 🔴 돌고 있는 동안 스크립트를 고치거나 Refresh 하지 않는다. `isPlaying` 을 직접 만지지 않는다.
-- 에이전트가 MCP 로 시작할 때: `Unity_RunCommand` 에서 `QAAutomation.NightStart();`(확인은 `QAAutomation.NightValidateSeed();`·`QAAutomation.NightLogStatus();`).
-- 중간에 멈추기: QA 창 ▸ 야간 ▸ **현재 판 후 정지**(`QAAutomation.NightStopAfterCurrent();`) — 지금 판이 끝나면 멈추고 가상 플레이어 비활성·시나리오 모드 해제까지 한다.
-- 에디터가 꺼졌다 켜지면 저절로 이어 가지 않는다 → QA 창 ▸ 야간 ▸ **이어하기**(`QAAutomation.NightResume();`).
+- 에이전트가 MCP 로 시작할 때: `Unity_RunCommand` 에서 `QAAutomation.StartNight();`(확인은 `QAAutomation.ValidateNightSeed();`·`QAAutomation.LogNightStatus();`).
+- 중간에 멈추기: QA 창 ▸ 야간 ▸ **현재 판 후 정지**(`QAAutomation.StopNightAfterCurrentRun();`) — 지금 판이 끝나면 멈추고 가상 플레이어 비활성·시나리오 모드 해제까지 한다.
+- 에디터가 꺼졌다 켜지면 저절로 이어 가지 않는다 → QA 창 ▸ 야간 ▸ **이어하기**(`QAAutomation.ResumeNight();`).
 
 ## 7. 아침 결과 확인
 0. **완료 표시(기계 판독)** — 배치 폴더 `progress.txt`(key=value 줄). 루프가 정리(클립 저장·OBS 경로 되돌리기)를 다 마친 뒤 아래 키를 **한 번에**(파일 교체) 쓴다. `end` 가 보이면 나머지도 다 있다.
@@ -154,12 +154,12 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
    | `nightly_name` | 이름(= 시드 이름) |
    | `runs_done` · `runs_total` · `runs_error` | 첫 실행을 마친 판 수 · 계획 판 수 · 최종 오류 판 수 |
    | `report_name` | 그 날짜 폴더에서 아직 안 쓴 `report-<이름>[-N].md` 제안(쓰기 직전에 다시 확인) |
-   - 에디터 재시작으로 루프가 꺼지면 다음 에디터 시작 때 `end=aborted`(사유 "에디터 재시작")가 써진다. 이때는 OBS 정리(버퍼 정지·경로 되돌리기)를 못 했다. `Resume Last` 로 이어 가면 완료 키를 지우고, 다시 끝나면 새로 쓴다.
+   - 에디터 재시작으로 루프가 꺼지면 다음 에디터 시작 때 `end=aborted`(사유 "에디터 재시작")가 써진다. 이때는 OBS 정리(버퍼 정지·경로 되돌리기)를 못 했다. 야간 ▸ **이어하기** 로 이어 가면 완료 키를 지우고, 다시 끝나면 새로 쓴다.
    - 에디터가 **멈췄거나 죽어서** 다시 켜지지 않으면 `end` 가 안 생긴다 — `updated`(마지막 상태 변경 시각)가 오래 멈춰 있으면 사람에게 알린다(에이전트 가이드 §4).
-1. QA 창 ▸ 야간 ▸ **상태**(`QAAutomation.NightLogStatus();`) → `멈춤 · … 상태 done`(완료) 또는 `stopped`. 진행 `N/N`·오류 확정 수.
+1. QA 창 ▸ 야간 ▸ **상태**(`QAAutomation.LogNightStatus();`) → `멈춤 · … 상태 done`(완료) 또는 `stopped`. 진행 `N/N`·오류 확정 수.
 2. 로컬 배치 폴더 `C:/UnityProject/QA/N108-<yyyyMMdd_HHmm>-<시드 이름>/`:
    - `nightly-summary.md` — **먼저 이것**: 시드 이름·데이터 출처·GameData.xlsx 리비전·브랜치/커밋·판 결과·녹화 목록.
-   - `report.html` — 103 리포트(머리말에 같은 정보 + 통계·판 목록). QA 창 ▸ 야간 ▸ **리포트 열기**(`QAAutomation.NightOpenReport();`)로 연다.
+   - `report.html` — 103 리포트(머리말에 같은 정보 + 통계·판 목록). QA 창 ▸ 야간 ▸ **리포트 열기**(`QAAutomation.OpenNightReport();`)로 연다.
    - `batch.txt`(배치 머리) · `runs.csv` 외 CSV · `logs/loop.log`(루프 로그, `⚠` = 녹화·OBS 경고) · `logs/notes.txt`(리포트 루프 메모 — OBS 경고 포함) · `recordings.txt`(판 전체 녹화 때만).
    - 할 일 120 `events.tsv`(이벤트 시각표 원본 — 탭: 판·재실행·이벤트·시각·게임 시각(초)·영상 타임코드(초)·상세) · `clips.txt`(리플레이 클립 — 탭: 판·재실행·경로·이벤트/메모) · `clip-pending.txt`(저장 대기 — 비면 정상).
      `nightly-summary.md` 끝의 **이벤트 시각표** 표 — "영상 타임코드"(`H:MM:SS`)로 그 판 영상을 바로 찾아간다. 같은 이벤트가 5초 안에 반복되면 한 줄(판당 300줄 상한).
@@ -213,7 +213,7 @@ setx QA_NIGHTLY_VIDEO_KEEP_DAYS 7
 - 자리 순서는 세 캐릭터 1명씩만 된다(같은 캐릭터 2명 불가 — 계측이 캐릭터당 1명 전제).
 - 녹화는 화면 전체 1개 파일/판(1단계). 2단계는 이벤트 클립만(§5.3).
 - 이벤트는 **호스트(메인 에디터) 로그만** 본다 — 가상 플레이어(클론) 프로세스의 에러 로그는 시각표에 안 들어간다(클론 봇의 끼임은 호스트 재배치 `qa_relocate` 로 잡힌다).
-- QA 창 최소화(`QAWindowMinimizePolicy`, 할 일 124)는 **옵션 기본 꺼짐**이고, 야간 QA 배치 중이거나 OBS 녹화(`obsEnabled` — 판 전체·리플레이 버퍼 모두)가 켜져 있으면 옵션과 무관하게 **창을 최소화하지 않는다**(로그 `minimize_skipped reason=nightly|obs`).
+- QA 창 최소화(`QAWindowMinimizer`·`QAWindowMinimizePolicy`, 할 일 116·124)는 삭제됨(155) — 야간 루프는 원래 최소화를 부르지 않았고, 이제 창을 최소화하는 코드가 없다.
 - 게임 시각 = Play 의 `Time.time`(간파 슬로우 등 시간 배율을 탄다). 영상 위치는 "영상 타임코드" 열을 본다.
 - 108 하네스·120 은 작성 시점에 **컴파일·EditMode 테스트·Play 를 이 세션에서 못 돌렸다**(권한 거부) — 첫 실행 전에 `QANightlyTests` 를 돌린다. OBS 실연동(화질 적용·리플레이 저장·이름 바꾸기)도 미검증.
 - 120 후속(공유 양식)은 컴파일·EditMode 까지 확인. **OBS `SetRecordDirectory`·되돌리기·날짜 폴더 옮기기·`GetReplayBufferStatus` 확인은 실연동 미검증** — 첫 밤에 `logs/loop.log` 의 `OBS 녹화 경로 →`·`되돌림`·`리플레이 버퍼 시작·확인(active)` 줄을 본다.
