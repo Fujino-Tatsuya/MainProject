@@ -140,7 +140,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         public bool Active;
         public double Start;          // 어느 연출의 보행인가 — 시작 시각이 바뀌면 버린다
         public int Slot;
-        public float GroundShare;     // 보행 시간 중 충돌을 켠 앞 구간 비율(길이 비율)
+        public float GroundShare;     // 보행 시간 중 충돌을 켠 앞 구간 비율(수평 길이 비율)
+        public float ArriveShare;     // 보행 시간 중 문턱 도착까지 비율(수평 길이 비율) — 나머지가 미끄러짐
         public Vector3 WalkStart;     // 걷기 시작 지점(순간이동 목적지)
         public double TeleportAt;     // 서버시간 — 암전 유지 구간 한가운데
         public bool Teleported;
@@ -151,7 +152,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         public Vector3[] Approach;     // 충돌 없이 걷는 마지막 구간 — 문턱(없으면 비었다)
         public Vector3 Seat;
         public double WalkStartAt;    // 서버시간
-        public double GroundEndAt;    // 보행 시간을 길이 비율로 나눈 앞 구간 끝
+        public double GroundEndAt;    // 보행 시간을 수평 길이 비율로 나눈 앞 구간 끝
         public double ArriveAt;       // 문턱 도착 — 여기부터 좌석으로 미끄러진다
         public double WalkEndAt;      // 좌석 도착
         public bool InApproach;
@@ -266,7 +267,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         Debug.Log($"[SceneFlow] {Tag} 포드 연출 시작 — 참가자 {participants.Count}명 [{string.Join(",", participants)}], " +
                   $"순간이동·해치 클립 +{timeline.TeleportAt:0.##}s(암전 {timeline.BlackoutFadeInSeconds:0.##}/{timeline.BlackoutHoldSeconds:0.##}/{timeline.BlackoutFadeOutSeconds:0.##}s), " +
                   $"탑승은 해치 이벤트 뒤(빨라도 +{timeline.WalkReadyAt:0.##}s, 간격 {timeline.WalkInterval:0.##}s, " +
-                  $"속도 {lobby.walkSpeed:0.##}m/s, 각자 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s + 미끄러짐 {timeline.SeatSlideSeconds:0.##}s → 다 앉기 +{timeline.SeatedSeconds:0.##}s), " +
+                  $"속도 {lobby.walkSpeed:0.##}m/s, 각자 좌석까지 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s → 다 앉기 +{timeline.SeatedSeconds:0.##}s), " +
                   $"발사 클립 '{lobby.launchState}' 끝 이벤트 + 대기 {timeline.LaunchEndWaitSeconds:0.##}s + 페이드 {timeline.LaunchEndFadeSeconds:0.##}s 에 로딩");
         return true;
     }
@@ -614,16 +615,19 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             PodLaunchRules.WalkRoute route = BuildRoute(walkSlot, seat.position);
             WarnRoute(walkSlot, route);
 
-            // 서버가 정한 보행 시간(복제)을 길이 비율로 앞(충돌 켬)·뒤(→ 문턱, 충돌 끔) 구간에 나눈다 — 걷는 속도가 일정하게.
+            // 서버가 정한 보행 시간(복제, 좌석까지)을 수평 길이 비율로 앞(충돌 켬)·문턱(충돌 끔)·미끄러짐 구간에 나눈다 — 모든 구간 수평 속도가 같게(할 일 172).
             Vector3 walkStart = walkSlot.start.position;
             float groundLength = PodLaunchRules.GroundLength(walkStart, route);
+            float arriveLength = groundLength + PodLaunchRules.ApproachLength(walkStart, route);
+            float slideLength = PodLaunchRules.SlideLength(walkStart, route);
 
             _walk = new OwnerWalk
             {
                 Active = true,
                 Start = start,
                 Slot = slot,
-                GroundShare = PodLaunchRules.GroundShare(groundLength, PodLaunchRules.WalkLength(walkStart, route) - groundLength),
+                GroundShare = PodLaunchRules.GroundShare(groundLength, arriveLength - groundLength + slideLength),
+                ArriveShare = PodLaunchRules.GroundShare(arriveLength, slideLength),
                 WalkStart = walkStart,
                 TeleportAt = start + _timeline.TeleportAt,
                 Ground = route.Ground,
@@ -655,8 +659,9 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));
             _walk.Timed = true;
             _walk.WalkStartAt = start + _timeline.WalkStartAt(walkSlotIndex, board);
-            _walk.GroundEndAt = _walk.WalkStartAt + _timeline.WalkSecondsOf(walkSlotIndex) * _walk.GroundShare;
-            _walk.ArriveAt = start + _timeline.WalkArriveAt(walkSlotIndex, board);
+            float walkSeconds = _timeline.WalkSecondsOf(walkSlotIndex);
+            _walk.GroundEndAt = _walk.WalkStartAt + walkSeconds * _walk.GroundShare;
+            _walk.ArriveAt = _walk.WalkStartAt + walkSeconds * _walk.ArriveShare;
             _walk.WalkEndAt = start + _timeline.WalkEndAt(walkSlotIndex, board);
         }
 
@@ -702,7 +707,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             return;
         }
 
-        // 문턱 → 좌석 — 정해진 미끄러짐 시간 동안 충돌 없이 보간.
+        // 문턱 → 좌석 — 충돌 없이 같은 수평 속도로 보간(시간 = 미끄러짐 수평 길이 비율).
         if (now < _walk.WalkEndAt)
         {
             if (!_walk.InSlide)
@@ -780,8 +785,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     }
 
     /// <summary>
-    /// 슬롯별 보행 시간(초) = 자기 걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱 길이 ÷ 걷는 속도. 서버가 시작 때 한 번 계산해 복제한다(좌석은 길이에 들지 않는다).
-    /// 걷기 시작 지점이 없으면 전원 0.
+    /// 슬롯별 보행 시간(초) = 자기 걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱 → 자기 좌석 수평 길이 ÷ 걷는 속도(할 일 172 — 미끄러짐 포함).
+    /// 서버가 시작 때 한 번 계산해 복제한다. 오너는 같은 경로로 이 시간을 구간에 나눈다. 걷기 시작 지점이 없으면 전원 0, 좌석 칸이 비면 미끄러짐 없이 문턱까지.
     /// </summary>
     private float[] WalkSecondsPerSlot(int count, PodDropSettings source)
     {
@@ -793,7 +798,12 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         for (int slot = 0; slot < result.Length; slot++)
         {
             WalkSlot walkSlot = slots[PodLaunchRules.PointIndex(slot, slots.Count)];
-            result[slot] = source.WalkSecondsFor(PodLaunchRules.WalkLength(walkSlot.start.position, BuildRoute(walkSlot, Vector3.zero)));
+            Transform seat = seats.Length > 0 ? seats[PodLaunchRules.PointIndex(slot, seats.Length)] : null;
+            Vector3 walkStart = walkSlot.start.position;
+            PodLaunchRules.WalkRoute route = BuildRoute(walkSlot, seat != null ? seat.position : Vector3.zero);
+            float length = PodLaunchRules.WalkLength(walkStart, route);
+            if (seat == null) length -= PodLaunchRules.SlideLength(walkStart, route); // 그 오너는 걷지 않는다(좌석 없음) — 문턱까지만 센다
+            result[slot] = source.WalkSecondsFor(length);
         }
         return result;
     }

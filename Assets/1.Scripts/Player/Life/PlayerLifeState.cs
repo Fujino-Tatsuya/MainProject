@@ -11,6 +11,15 @@ public enum PlayerLifeState
 }
 
 /// <summary>
+/// 서버 판정(넉백 승인·스킬 승인)이 쓰는 사망 기준(할 일 182). FSM 은 사망해도 Dead 로 가지 않으므로
+/// 사망 여부는 생명주기로만 본다 — Alive 만 행동 가능, 사망 연출·Soul·영구 사망은 거부.
+/// </summary>
+public static class PlayerLifeActionRules
+{
+    public static bool CanAct(PlayerLifeState state) => state == PlayerLifeState.Alive;
+}
+
+/// <summary>
 /// 사망 연출 진입 원인.
 /// FallDeathContext가 확정되기 전까지 Fall 쪽이 사용할 최소 placeholder 계약이다.
 /// </summary>

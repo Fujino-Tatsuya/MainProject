@@ -63,6 +63,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
     private Player player;
     private PlayerStateController stateController;
+    private PlayerLifeCycleController lifeCycle;
     private PlayerInputReader inputReader;
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
@@ -196,6 +197,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         player = GetComponent<Player>();
         stateController = GetComponent<PlayerStateController>();
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
         inputReader = GetComponent<PlayerInputReader>();
         movement = GetComponent<PlayerMovement>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
@@ -1080,6 +1082,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             slot, skillIndex, direction, target, aimPoint, hasAimPoint, false, out _, out _);
     }
 
+    // 사망 = 생명주기 Alive 아님(할 일 182 — FSM 은 사망해도 Dead 로 가지 않는다). 생명주기가 없으면 기존 FSM Dead 판정.
+    private bool IsDead => lifeCycle != null
+        ? !PlayerLifeActionRules.CanAct(lifeCycle.State)
+        : stateController != null && stateController.CurrentState == PlayerActionState.Dead;
+
     // dashInterrupt = 대쉬 간파 승인(할 일 115) — CanUseSkill(Idle/Move) 대신 Dash 상태·창(EvaluateDashInterruptPreconditions).
     // 창: 원격 오너 1차 검증 = 오너가 누른 시각으로 이미 봤다 / 서버(호스트·오프라인 포함) = 서버 대시 경과 ≤ 창 + 허용오차.
     private bool CanApproveSkill(
@@ -1088,7 +1095,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         out PlayerSkillBase skill, out bool isDead)
     {
         skill = GetSkill(slot);
-        isDead = stateController != null && stateController.CurrentState == PlayerActionState.Dead;
+        isDead = IsDead;
         bool assigned = skill != null && skill.Data != null && stateController != null;
         int skillIndex = assigned ? GetSkillIndex(skill) : InvalidSkillIndex;
         float dashElapsed = 0f;
@@ -1696,7 +1703,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (followUps.OpenMask == 0)
             return;
 
-        bool dead = stateController != null && stateController.CurrentState == PlayerActionState.Dead;
+        bool dead = IsDead;
         if (dead || (player != null && player.StatusEffects != null && player.StatusEffects.BlocksSkill))
         {
             followUps.CloseAll(closedFollowUpSources);
