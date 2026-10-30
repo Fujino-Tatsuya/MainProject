@@ -8,22 +8,17 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: MA_Train03DesignatedWall
-  m_Shader: {fileID: 4800000, guid: 650dd9526735d5b46b79224bc6e94025, type: 3}
+  m_Shader: {fileID: 4800000, guid: bfc70f115c3a58641b715bc2349edab3, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _SURFACE_TYPE_TRANSPARENT
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 1
-  m_CustomRenderQueue: 2999
-  stringTagMap:
-    RenderType: Transparent
-  disabledShaderPasses:
-  - DepthOnly
-  - SHADOWCASTER
-  - MOTIONVECTORS
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -91,6 +86,7 @@ Material:
     - _AlphaToMask: 0
     - _Blend: 0
     - _BlendOp: 0
+    - _BorderWidth: 0.12
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
@@ -101,6 +97,7 @@ Material:
     - _DstBlend: 10
     - _DstBlendAlpha: 10
     - _EnvironmentReflections: 1
+    - _FillAlpha: 0.06
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossinessSource: 0
@@ -109,6 +106,8 @@ Material:
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
+    - _PulseMin: 0.7
+    - _PulseSpeed: 0.8
     - _QueueOffset: -1
     - _ReceiveShadows: 1
     - _SampleGI: 0
@@ -120,6 +119,8 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 5
     - _SrcBlendAlpha: 1
+    - _StripeDuty: 0.45
+    - _StripeSpacing: 0.5
     - _Surface: 1
     - _UVSec: 0
     - _WorkflowMode: 1
@@ -127,9 +128,11 @@ Material:
     - _ZWrite: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 0.5, b: 0.1, a: 0.45}
+    - _BorderColor: {r: 1.6, g: 1.2, b: 0.45, a: 1}
     - _Color: {r: 1, g: 0.5, b: 0.09999997, a: 0.45}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _StripeColor: {r: 0.8901961, g: 0.7254902, b: 0.3529412, a: 0.34901962}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &2649428911147719443

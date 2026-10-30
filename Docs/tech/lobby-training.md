@@ -218,11 +218,12 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
   157 은 SO 에 ko 폴백 41행(`LOBBY_TITLE_*`·`LOBBY_OBJ_*`·`LOBBY_BODY_*`·`LOBBY_CHECK_*`·`LOBBY_PROGRESS_*`·`LOBBY_SPEAKER_SUPERVISOR`·`LOBBY_DLG_*`·`LOBBY_BRIEF_*`)을 넣었다.
 - **xlsx Strings 행은 아직 없다** — 157·158 병합 뒤 메인이 최신 development 에서 `GameData.xlsx`(SVN)에 넣는다. 목록(44행 = `Tutorial.Guide.LOBBY_*` 41 + 158 전용 `UI.Lobby.Tutorial.Tag*` 3)은
   레인 산출물 `C:/UnityProject/_lane-artifacts/MainProject-Worktree/157/157-xlsx-strings.md`(레포에 복사하지 않음).
-- `LOBBY_OBJ_VULN_CC`·`LOBBY_OBJ_WALL`·`LOBBY_BODY_SUPPRESS` 3행은 **`{tag:ID}` 표기**(`{tag:Knockback}`·`{tag:Stun}`·`{tag:Suppress}`) — xlsx 도 이 표기로 써야 158 이 색을 입힌다. 과도기 어댑터만 평문 `[넉백]` 등으로 바꿔 띄운다.
+- `LOBBY_OBJ_VULN_CC`·`LOBBY_OBJ_WALL`·`LOBBY_BODY_SUPPRESS` 3행은 **`{tag:ID}` 표기**(`{tag:Knockback}`·`{tag:Stun}`·`{tag:Suppress}`) — xlsx 도 이 표기로 써야 158 이 색을 입힌다.
 
-### 과도기 표시 어댑터 — 158 병합 때 삭제
+### 과도기 표시 어댑터 — 삭제됨(158 C10)
 
-`LobbyTutorialGuideAdapter.cs` 파일 하나(씬·코드 참조 없음, 숨은 DDOL 오브젝트로 스스로 생김) — 파사드를 읽어 기존 상단 `TutorialGuideUI` 에 목표(`SetObjective`)·대사(`ShowSubtitle`)만 띄운다. 158 패널과 겹치지 않게 병합 때 지운다(계약 §5).
+`LobbyTutorialGuideAdapter.cs`(파사드 → 기존 상단 `TutorialGuideUI` 목표·자막)는 158 바인더 `LobbyTutorialUiBinder` 가 들어오면서 지웠다(계약 §5).
+이제 목표·대사·경로·벽 표시는 `LobbyTutorialUI` 한 곳 — [lobby-tutorial-ui.md](lobby-tutorial-ui.md) "157 바인더".
 
 ## 9. 알려진 한계
 
@@ -230,7 +231,7 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - **로딩 타임아웃 정책은 기존 유지**: `NetworkLoadingFlowController` 는 NGO 씬 로드 타임아웃 뒤 시간초과 클라를 빼고 완료한 클라만으로 진행한다(그 사람은 판 도중 재합류로 들어옴). L41 은 이 흐름을 바꾸지 않았다.
 - **브리핑 삽화 리소스 없음**: 157 은 `BackgroundId`(`BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION`)만 낸다. 이미지 납품 전까지 빈 배경(Q14 A).
 - **T32 기절 인정 범위 — 결정: 실제 기절(뇌진탕 포함)만 인정**(사용자 결정 A). 넉백 없이 경직(`staggerDuration`)만 있는 적중은 기절이 아니다 — 상대가 반응하지 않고 T32 도 인정하지 않는다. 판정 `TrainingSparringRules.VulnerableHitCrowdControl`·`StunsOnPushEnd`.
-- **xlsx 미반영**: Strings 시트 행이 들어가기 전엔 SO 폴백 ko 문구가 보인다(en 없음). `{tag:ID}` 3행은 158 이 없으면 표기 그대로/어댑터 평문.
+- **xlsx 미반영**: Strings 시트 행이 들어가기 전엔 SO 폴백 ko 문구가 보인다(en 없음). `{tag:ID}` 3행은 158 목표 패널이 색 태그로 그린다.
 - 경로 키 `PATH_*`·벽 키·삽화 키는 157 이 정한 임시 이름(158 과 맞추면 SO 만 고친다). 중앙 지점 enum 이름은 아직 `Brief`.
 - `Gather_Brief`(중앙)가 스폰 줄 `SpawnPoint_*` 와 겹친다 — L10/L30 중 스폰된 늦은 참가자는 명단 밖이라 무관.
 - 제압 중 쿨타임 가속 없음(Q13 A). 옛 안내 스텝(`LobbyGuideSteps`)은 158 경로가 대체할 때까지 과도기로 남아 있다(아래).
@@ -302,6 +303,8 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
   명단으로 L20 입구 집결 중 = ②(구역 안이면 없음) → 명단 고정 전(L00·L10, 클리어 플래그 꺼짐) = 없음(라커·중앙 경로는 158 몫) → 나머지(클리어 플래그·늦은 참가자·출격 집결) = ③.
   ① 캐릭터 = 라커룸 `Area_Locker` 박스 진입 세션 래치. 158 이 단계별 `PathId` 경로로 대체하면 이 프리팹·규칙을 퇴역한다(시점은 158 과 합의).
 - 편집 모드에선 세 경로가 다 보이고, 인스펙터 `editorPreview` 로 한 스텝만 볼 수 있다(씬 보기 숨김 — 저장 안 됨).
+- **로비 튜토리얼 경로 묶음과 함께 쓸 때(할 일 158)**: 새 로비 튜토리얼은 단계별 경로를 `LobbyTutorialMarkers.prefab` 의 `LobbyTutorialPathSet`(같은 `LobbyFloorArrowPath.prefab` 중첩, 경로 ID `PATH_*`)으로 켠다.
+  이 프리팹의 `legacyGuideRoots` 에 씬의 `LobbyGuideSteps` 루트를 넣으면 튜토리얼 경로가 켜진 동안 옛 3스텝 안내를 끄고 빈 ID 면 되돌린다 — 둘이 동시에 안 켜진다. 상세: [lobby-tutorial-ui.md](lobby-tutorial-ui.md).
 
 ## NavMesh 사전 베이크
 
