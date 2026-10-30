@@ -16,7 +16,9 @@ using UnityEngine.AI;
 ///   Barrier 가 있다. 대시·이동 스킬·넉백도 같은 스윕을 탄다. 이동이 오너 권한이라 각 피어에 콜라이더가 있어야 한다.
 ///   몬스터 = NavMeshObstacle 카브(ZoneBridgeGate 와 같은 설정) — 배리어 큐브와 따로 둔 <c>MonsterBlock_G*</c> 형제 오브젝트. Barrier 는 NavMesh 베이크 수집 레이어(Default·Ground·Wall)가 아니라
 ///   재베이크(다리)에 섞이지 않는다. 벽이 아니라서 벽 충돌 이벤트(<see cref="UnitWallImpacts"/>)도 나지 않는다. Docs/tech/wall-concept.md
-/// · 열기: 플레이어 콜라이더를 즉시 끄고 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
+/// · 시각(할 일 160): 마커의 레이저 프리팹(<see cref="MapGateLaserView"/>)을 큐브 옆 형제로 만들고 큐브 렌더러는 끈다(<see cref="CreateGateLaser"/>).
+///   프리팹 칸이 비면 지금 큐브(반투명)로 폴백 + 경고 한 줄.
+/// · 열기: 플레이어 콜라이더를 즉시 끄고 레이저 빔도 즉시 끈다(발사대는 남음). 큐브 폴백일 때만 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
 ///   카브는 <b>열려도 그대로</b>다(할 일 148 — 복도는 늘 몬스터 출입 금지). 몬스터 이동·넉백·밀치기는 전부 NavMesh 위로만 움직이므로 이 구멍 하나로 막힌다.
 /// · 추락 복구: <see cref="PlayerSafePointTracker.ReturnPointFilter"/> 에 닫힌 배리어 너머 구간 · 그 클라이언트의 뒤 배리어 너머 제외를 건다(서버가 부른다).
 /// · 개인 뒤 배리어: 서버가 판정해 복제한 '지난 배리어' 마스크(<see cref="MapSceneDirector.GetBackBarrierMask"/>)를 <b>로컬 플레이어</b> 값으로 읽어
@@ -41,13 +43,16 @@ public sealed class MapSceneBarriers : MonoBehaviour
         public MapSceneBarrierSpec Spec;
         public GameObject Go;
         public bool Opened;
+        public MapGateLaserView Laser;   // 레이저 시각(할 일 160) — 없으면 큐브가 보인다
         public GameObject BackGo;   // 개인 뒤 배리어(로컬 전용, 처음 켤 때 만든다)
+        public MapGateLaserView BackLaser;
     }
 
     readonly List<Entry> _entries = new List<Entry>();
     MapSceneAreaTracker _areas;
     List<MapSceneBarrierSpec> _specs;
     Material _material;
+    MapGateLaserView _laserPrefab;
     bool _built;
     int _backWanted;   // 켜야 할 뒤 배리어(게이트 비트)
     int _backActive;   // 실제로 켜진 뒤 배리어
@@ -65,6 +70,9 @@ public sealed class MapSceneBarriers : MonoBehaviour
     }
 
     public void SetMaterial(Material material) => _material = material;
+
+    /// <summary>게이트 레이저 프리팹(할 일 160). null 이면 큐브 시각으로 폴백한다.</summary>
+    public void SetLaserPrefab(MapGateLaserView prefab) => _laserPrefab = prefab;
 
     void OnEnable()
     {
@@ -130,6 +138,7 @@ public sealed class MapSceneBarriers : MonoBehaviour
             if ((off & bit) != 0)
             {
                 if (e.BackGo != null) e.BackGo.SetActive(false);
+                if (e.BackLaser != null) e.BackLaser.gameObject.SetActive(false);
                 _backActive &= ~bit;
             }
             else if ((on & bit) != 0)
@@ -140,8 +149,11 @@ public sealed class MapSceneBarriers : MonoBehaviour
                     e.BackGo = CreateBarrierObject(e.Spec, root != null ? root : transform, transform.position.y, DefaultHeight,
                                                    _material, DefaultColor, carve: false);
                     e.BackGo.name = $"BackBarrier_{e.Spec.Gate}";
+                    e.BackLaser = CreateGateLaser(e.Spec, e.BackGo, transform.position.y, DefaultHeight, _laserPrefab);
+                    if (e.BackLaser != null) e.BackLaser.name = $"BackLaser_{e.Spec.Gate}";
                 }
                 e.BackGo.SetActive(true);
+                if (e.BackLaser != null) e.BackLaser.gameObject.SetActive(true);
                 _backActive |= bit;
             }
         }
@@ -171,8 +183,9 @@ public sealed class MapSceneBarriers : MonoBehaviour
         List<MapSceneBarrierSpec> specs = MapSceneBarrierRules.BuildSpecs(
             _areas, MapSceneBarrierRules.DefaultThickness, MapSceneBarrierRules.DefaultSideOverlap, out string specError);
         if (specError != null) Edit.LogWarning($"[Tutorial] 배리어 — {specError}.", this);
-        if (_material == null)
-            Edit.LogWarning("[Tutorial] 배리어 머티리얼이 없다(MapSceneStageMarker.barrierMaterial) — 기본 머티리얼로 보인다.", this);
+        if (_laserPrefab == null)
+            Edit.LogWarning("[Tutorial] 게이트 레이저 프리팹이 없다(MapSceneStageMarker.gateLaserPrefab) — 큐브로 보인다." +
+                            (_material == null ? " 큐브 머티리얼(barrierMaterial)도 없어 기본 머티리얼이다." : ""), this);
 
         var root = new GameObject(RootName).transform;
         root.SetParent(transform, false);
@@ -182,6 +195,7 @@ public sealed class MapSceneBarriers : MonoBehaviour
         foreach (MapSceneBarrierSpec s in specs)
         {
             var e = new Entry { Spec = s, Go = CreateBarrierObject(s, root, transform.position.y, DefaultHeight, _material, DefaultColor) };
+            e.Laser = CreateGateLaser(s, e.Go, transform.position.y, DefaultHeight, _laserPrefab);
             _entries.Add(e);
             // 이미 열린 게이트(늦은 클라·재빌드) — 페이드 없이 바로 끈다
             if (d.IsGateOpen(s.Gate)) { Open(e, fade: false); openedAtBuild++; }
@@ -196,12 +210,27 @@ public sealed class MapSceneBarriers : MonoBehaviour
         e.Opened = true;
         if (e.Go == null) return;
 
-        // 플레이어 막기는 즉시 푼다 — 페이드 중에 걸리면 '열렸는데 막힘'으로 읽힌다.
-        // 몬스터 카브(MonsterBlock_G*)는 형제 오브젝트라 페이드·비활성과 무관하게 남는다(할 일 148).
-        foreach (Collider c in e.Go.GetComponentsInChildren<Collider>()) c.enabled = false;
+        // 레이저(할 일 160)는 연출 없이 즉시 — 늦은 클라·이미 열림과 같은 결과다. 큐브 폴백만 페이드한다.
+        if (e.Laser != null || !fade || !isActiveAndEnabled)
+        {
+            OpenInstant(e.Go, e.Laser);
+            return;
+        }
 
-        if (fade && isActiveAndEnabled) StartCoroutine(FadeOut(e.Go));
-        else e.Go.SetActive(false);
+        // 플레이어 막기는 즉시 푼다 — 페이드 중에 걸리면 '열렸는데 막힘'으로 읽힌다.
+        foreach (Collider c in e.Go.GetComponentsInChildren<Collider>()) c.enabled = false;
+        StartCoroutine(FadeOut(e.Go));
+    }
+
+    /// <summary>
+    /// 페이드 없이 연다 — 배리어 콜라이더를 끄고 비활성, 레이저가 있으면 빔도 끈다(발사대는 남김).
+    /// 몬스터 카브(<c>MonsterBlock_G*</c>)·레이저는 배리어의 형제 오브젝트라 비활성과 무관하게 남는다(할 일 148).
+    /// </summary>
+    public static void OpenInstant(GameObject barrier, MapGateLaserView laser)
+    {
+        foreach (Collider c in barrier.GetComponentsInChildren<Collider>()) c.enabled = false;
+        if (laser != null) laser.Open();
+        barrier.SetActive(false);
     }
 
     static IEnumerator FadeOut(GameObject go)
@@ -277,6 +306,42 @@ public sealed class MapSceneBarriers : MonoBehaviour
         obstacle.carving = true;
         obstacle.carveOnlyStationary = false;
         return go;
+    }
+
+    /// <summary>
+    /// 게이트 레이저 시각(할 일 160) — <paramref name="prefab"/> 이 있으면 배리어 큐브의 렌더러만 끄고 같은 부모 아래 형제로 만들어
+    /// 맞춘다(콜라이더·카브는 큐브 쪽 그대로). 큐브 자식이 아니라 큐브를 비활성해도(열림) 발사대가 남는다. null 이면 아무것도 안 한다(큐브 폴백).
+    /// 폭 = 벽 사이 통로 폭 — 배리어는 양옆 벽 속으로 파고들어(가로 = 복도 너비 + 양옆 0.3m) 그대로 맞추면 발사대가 벽에 묻힌다.
+    /// 게이트 가운데에서 Wall 레이어로 양옆을 재고, 벽이 안 잡히면 배리어 가로 그대로.
+    /// </summary>
+    public static MapGateLaserView CreateGateLaser(MapSceneBarrierSpec spec, GameObject barrier, float baseY, float height,
+                                                   MapGateLaserView prefab)
+    {
+        if (prefab == null || barrier == null) return null;
+        if (barrier.TryGetComponent(out MeshRenderer cubeRenderer)) cubeRenderer.enabled = false;
+
+        spec.Rect.GetWorldBounds(out float minX, out float minZ, out float maxX, out float maxZ);
+        var center = new Vector3((minX + maxX) * 0.5f, baseY, (minZ + maxZ) * 0.5f);
+        Vector3 across = spec.AlongX ? Vector3.forward : Vector3.right;
+        float half = (spec.AlongX ? maxZ - minZ : maxX - minX) * 0.5f;
+        float neg = OpeningSide(center, -across, half, baseY), pos = OpeningSide(center, across, half, baseY);
+
+        Transform parent = barrier.transform.parent;
+        MapGateLaserView laser = Object.Instantiate(prefab, parent, false);
+        laser.name = $"Laser_{spec.Gate}";
+        foreach (Transform t in laser.GetComponentsInChildren<Transform>(true))
+            t.gameObject.hideFlags = parent != null ? parent.gameObject.hideFlags : HideFlags.None;
+        laser.transform.position = center + across * ((pos - neg) * 0.5f);
+        laser.Fit(neg + pos, height, spec.AlongX);
+        return laser;
+    }
+
+    // 게이트 가운데(바닥 + 1m)에서 dir 쪽 벽 안쪽 면까지 거리. 반폭 안에 벽이 없으면 반폭.
+    static float OpeningSide(Vector3 center, Vector3 dir, float half, float baseY)
+    {
+        var origin = new Vector3(center.x, baseY + 1f, center.z);
+        return Physics.Raycast(origin, dir, out RaycastHit hit, half, GameLayers.WallMask, QueryTriggerInteraction.Ignore)
+            ? hit.distance : half;
     }
 
     static void SetColor(Renderer r, MaterialPropertyBlock block, Color c)
