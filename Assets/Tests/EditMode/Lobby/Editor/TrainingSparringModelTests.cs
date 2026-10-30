@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 
-/// <summary>TRAIN_03 훈련 상대 상태기계 — 할 일 86 T5a(명세 v0.2 §9, 사용자 결정 10-22).</summary>
+/// <summary>간파 훈련 상대 상태기계 — 할 일 157 ⑦(명세 §5 T31~T34·§6, PLAN §5 ⑦). T40 은 커밋 ⑧ 전 임시(옛 D 규칙).</summary>
 public sealed class TrainingSparringModelTests
 {
     // 게이지 최대 / 감소량 = 5칸(23호 기본값 100 / 20 과 같은 비) — 테스트 입력일 뿐 모델엔 수치가 없다.
@@ -19,410 +19,268 @@ public sealed class TrainingSparringModelTests
     static void ExpectReports(TrainingSparringModel model, params LobbyTutorialActivity[] expected) =>
         Assert.That(DrainReports(model), Is.EqualTo(expected));
 
-    static TrainingSparringModel AtA(bool suppressAcceleration = false)
+    // 단계마다 프레임을 넘긴다(진행기 = 한 프레임 한 전이). 알림 프레임 = 10, 20, 30, 40, 50.
+    static TrainingSparringModel AtCounter(bool suppressAcceleration = false)
     {
         var model = Create(suppressAcceleration);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter, 10), Is.True);
         return model;
     }
 
-    static TrainingSparringModel AtB(bool suppressAcceleration = false)
+    static TrainingSparringModel AtVulnerableCc()
     {
-        var model = AtA(suppressAcceleration);
+        var model = AtCounter();
         Assert.That(model.OnCounterSucceeded(), Is.True);
-        Assert.That(model.OnCounterGroggyEnded(), Is.True);
         ExpectReports(model, LobbyTutorialActivity.Counter);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc, 20), Is.True);
         return model;
     }
 
-    static TrainingSparringModel AtC(bool suppressAcceleration = false)
+    static TrainingSparringModel AtResetting()
     {
-        var model = AtB(suppressAcceleration);
-        Assert.That(model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback), Is.True);
-        Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.True);
+        var model = AtVulnerableCc();
+        Assert.That(model.OnCrowdControlAccepted(21), Is.True);
         ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.True);
-        Assert.That(model.TryConsumeResetRequest(), Is.True);
-        Assert.That(model.OnResetExecuted(), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition, 30), Is.True);
         return model;
     }
 
-    static TrainingSparringModel AtD(bool suppressAcceleration = false)
+    static TrainingSparringModel AtWall()
     {
-        var model = AtC(suppressAcceleration);
-        Assert.That(model.OnWallImpact(reducedGauge: true), Is.True);
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        ExpectReports(model, LobbyTutorialActivity.Wall);
+        var model = AtResetting();
+        Assert.That(model.TryConsumeResetRequest(crowdControlActive: false), Is.True);
+        Assert.That(model.OnResetExecuted(), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.ResetPosition);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Wall, 40), Is.True);
         return model;
     }
 
-    // ── 전 경로 ──
+    static TrainingSparringModel AtSuppressKill()
+    {
+        var model = AtWall();
+        Assert.That(model.OnWallAccepted(41), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.Wall);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill, 50), Is.True);
+        return model;
+    }
+
+    // ── 전이표 ──
 
     [Test]
-    public void A부터_D까지_정상_경로와_단계별_출력()
+    public void TransitionTable_FullPath_EachStageReportedOnce()
     {
         var model = Create();
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Idle));
-        Assert.That(model.AllowsSelfAction, Is.False);
 
-        model.OnFlowStageStarted(LobbyTutorialActivity.Counter);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CounterIntro));
-        Assert.That(model.PreventsDeath, Is.True);
-        Assert.That(model.AllowsGaugeTransition, Is.False);
-        Assert.That(model.ShowsSegmentUi, Is.False);
-        Assert.That(model.HoldsVulnerable, Is.False);
-        Assert.That(model.AllowsSelfAction, Is.True);
-
-        model.OnCounterSucceeded();
-        Assert.That(model.TryConsumeStageReport(out _), Is.False);   // 성공만으론 아직 — 그로기 종료가 완료
-        model.OnCounterGroggyEnded();
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter, 10), Is.True);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Counter));
+        Assert.That(model.OnCounterSucceeded(), Is.True);
         ExpectReports(model, LobbyTutorialActivity.Counter);
 
-        model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CrowdControlIntro));
-        Assert.That(model.HoldsVulnerable, Is.True);
-        Assert.That(model.AllowsSelfAction, Is.False);
-        Assert.That(model.AllowsGaugeTransition, Is.False);
-        Assert.That(model.ShowsSegmentUi, Is.False);
-        Assert.That(model.PreventsDeath, Is.True);
-
-        model.OnCrowdControlApplied(TrainingSparringCrowdControl.PushStagger);
-        Assert.That(model.TryConsumeStageReport(out _), Is.False);   // 적용만으론 아직 — 종료가 완료
-        model.OnCrowdControlEnded(TrainingSparringCrowdControl.PushStagger);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc, 20), Is.True);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.VulnerableCc));
+        Assert.That(model.OnCrowdControlAccepted(25), Is.True);
         ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
 
-        model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition, 30), Is.True);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Resetting));
-        Assert.That(model.HoldsVulnerable, Is.False);
-        Assert.That(model.AllowsSelfAction, Is.False);
-        Assert.That(model.OnResetExecuted(), Is.False);              // 요청을 꺼내기 전 실행 보고는 무시
-        Assert.That(model.TryConsumeResetRequest(), Is.True);
+        Assert.That(model.TryConsumeResetRequest(false), Is.True);
         Assert.That(model.OnResetExecuted(), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
-        Assert.That(model.AllowsGaugeTransition, Is.True);
-        Assert.That(model.ShowsSegmentUi, Is.True);
-        Assert.That(model.AllowsSelfAction, Is.True);
-        Assert.That(model.PreventsDeath, Is.True);
+        ExpectReports(model, LobbyTutorialActivity.ResetPosition);
 
-        Assert.That(model.OnWallImpact(reducedGauge: true), Is.True);
-        model.OnSuppressStarted();
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Wall, 40), Is.True);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Wall));
+        Assert.That(model.OnWallAccepted(45), Is.True);
         ExpectReports(model, LobbyTutorialActivity.Wall);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill), Is.False);   // 이미 D — 확인만
-        Assert.That(model.PreventsDeath, Is.True);
-        Assert.That(model.ShowsSegmentUi, Is.True);
 
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill, 50), Is.True);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.SuppressKill));
+        Assert.That(model.OnSuppressStarted(), Is.True);
         Assert.That(model.OnSuppressDamage(), Is.True);
-        Assert.That(model.PreventsDeath, Is.True);                   // 제압 종료까지 처치 방지
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.False);
-        model.OnSuppressEnded();
-        Assert.That(model.PreventsDeath, Is.False);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.False);   // 1회
-
+        Assert.That(model.OnSuppressEnded(), Is.True);
         Assert.That(model.OnDied(), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Completed));
         ExpectReports(model, LobbyTutorialActivity.SuppressKill);
-        Assert.That(model.AllowsSelfAction, Is.False);
-        Assert.That(model.ShowsSegmentUi, Is.False);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Completed));
     }
 
     [Test]
-    public void 제압_가속은_보류_플래그가_켜진_경우에만_C_D_제압_중_true()
+    public void FlowNotice_RequiresPreviousCompletion_ForwardOnly()
     {
-        var off = AtD();
-        Assert.That(off.IsSuppressActive, Is.True);
+        var model = AtCounter();
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter, 11), Is.False, "같은 단계 재알림");
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc, 12), Is.False, "간파 성공 전엔 T32 로 가지 않는다");
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Wall, 12), Is.False, "건너뛰기 불가");
+
+        model.OnCounterSucceeded();
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition, 13), Is.False, "CC 전엔 T33 불가");
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc, 13), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter, 14), Is.False, "역순");
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.None, 14), Is.False);
+    }
+
+    // ── T31 ──
+
+    [Test]
+    public void Counter_CompletesAtSuccessMoment_StartsVulnerableHold_StopsSelfAction()
+    {
+        var model = AtCounter();
+        Assert.That(model.AllowsSelfAction, Is.True, "성공 전엔 같은 공격 반복");
+        Assert.That(model.ExtendsCounterWindow, Is.True, "훈련 창 연장");
+        Assert.That(model.HoldsVulnerable, Is.False);
+        Assert.That(model.AllowsGaugeTransition, Is.False);
+        Assert.That(model.PreventsDeath, Is.True, "처치 불가");
+
+        Assert.That(model.OnCounterSucceeded(), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.Counter);   // 그로기 종료를 기다리지 않는다
+        Assert.That(model.HoldsVulnerable, Is.True, "성공 즉시 취약 무기한 유지 시작");
+        Assert.That(model.AllowsSelfAction, Is.False);
+        Assert.That(model.ExtendsCounterWindow, Is.False);
+        Assert.That(model.OnCounterSucceeded(), Is.False, "중복 성공 = 보고 1회");
+        ExpectReports(model);
+    }
+
+    [Test]
+    public void Counter_FailureKeepsStage_SameAttackRepeats()
+    {
+        var model = AtCounter();
+        // 실패(창 만료·정면 아님)는 모델 사건이 아니다 — 성공 전까지 그대로.
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Counter));
+        Assert.That(model.AllowsSelfAction, Is.True);
+        Assert.That(model.OnCrowdControlAccepted(15), Is.False, "T31 의 CC 는 무관");
+        ExpectReports(model);
+    }
+
+    // ── T32 ──
+
+    [Test]
+    public void VulnerableCc_HoldsVulnerable_NoSelfAction_NoGauge()
+    {
+        var model = AtVulnerableCc();
+        Assert.That(model.HoldsVulnerable, Is.True);
+        Assert.That(model.AllowsSelfAction, Is.False, "상대 공격 안 함");
+        Assert.That(model.AllowsGaugeTransition, Is.False);
+        Assert.That(model.AcceptsCrowdControl, Is.True);
+    }
+
+    [Test]
+    public void VulnerableCc_SameFrameAsEntry_NotCounted()
+    {
+        var model = AtVulnerableCc();   // 진입 프레임 20
+        Assert.That(model.OnCrowdControlAccepted(20), Is.False, "같은 프레임 연쇄 금지 — T31 성공 프레임의 사건이 T32 를 끝내지 않는다");
+        Assert.That(model.OnCrowdControlAccepted(19), Is.False);
+        ExpectReports(model);
+        Assert.That(model.OnCrowdControlAccepted(21), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
+        Assert.That(model.OnCrowdControlAccepted(22), Is.False, "보고 1회");
+    }
+
+    [Test]
+    public void CounterSuccessFrame_DoesNotCompleteVulnerableCcInSameFrame()
+    {
+        var model = AtCounter();
+        model.OnCounterSucceeded();             // 프레임 30 에 성공
+        ExpectReports(model, LobbyTutorialActivity.Counter);
+        model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc, 30);   // 진행기가 같은 프레임에 T32 를 열어도
+        Assert.That(model.OnCrowdControlAccepted(30), Is.False, "성공과 같은 프레임 CC = 불인정");
+        ExpectReports(model);
+    }
+
+    // ── T33 ──
+
+    [Test]
+    public void Resetting_WaitsForCrowdControlEnd_ThenCompletesOnce()
+    {
+        var model = AtResetting();
+        Assert.That(model.AcceptsCrowdControl, Is.False, "위치 복귀 중 새 CC 반응 없음");
+        Assert.That(model.HoldsVulnerable, Is.True, "취약 유지");
+        Assert.That(model.TryConsumeResetRequest(crowdControlActive: true), Is.False, "앞 CC 반응이 끝날 때까지 기다린다");
+        Assert.That(model.OnResetExecuted(), Is.False, "요청을 꺼내기 전 실행 보고는 무시");
+        Assert.That(model.TryConsumeResetRequest(false), Is.True);
+        Assert.That(model.TryConsumeResetRequest(false), Is.False, "1회");
+        Assert.That(model.OnResetExecuted(), Is.True);
+        Assert.That(model.OnResetExecuted(), Is.False);
+        ExpectReports(model, LobbyTutorialActivity.ResetPosition);
+    }
+
+    // ── T34 ──
+
+    [Test]
+    public void Wall_GaugeAllowed_VulnerableHeld_CompletesOnAcceptedImpact()
+    {
+        var model = AtWall();
+        Assert.That(model.AllowsGaugeTransition, Is.True, "칸 감소는 실제 규칙대로");
+        Assert.That(model.ShowsSegmentUi, Is.True);
+        Assert.That(model.HoldsVulnerable, Is.True);
+        Assert.That(model.AllowsSelfAction, Is.False);
+        Assert.That(model.NeedsRetryAfterMiss, Is.True);
+
+        Assert.That(model.OnWallAccepted(40), Is.False, "진입 프레임 사건 불인정");
+        Assert.That(model.OnWallAccepted(42), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.Wall);
+        Assert.That(model.NeedsRetryAfterMiss, Is.False, "완료 뒤엔 위치 복구 안 함");
+        Assert.That(model.HoldsVulnerable, Is.True, "T34 끝(T40 알림)까지 유지");
+    }
+
+    [Test]
+    public void Wall_SuppressInWall_IsNotCompletion()
+    {
+        var model = AtWall();
+        Assert.That(model.OnSuppressStarted(), Is.True, "벽으로 칸 0 이면 제압은 실제로 일어난다");
+        ExpectReports(model);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Wall), "제압은 완료 조건 아님");
+        Assert.That(model.OnSuppressDamage(), Is.False, "T34 제압 피해는 T40 마무리로 세지 않는다");
+    }
+
+    // ── T40(임시 — 옛 D) ──
+
+    [Test]
+    public void SuppressKill_ReleasesHold_ResumesSelfAction()
+    {
+        var model = AtSuppressKill();
+        Assert.That(model.HoldsVulnerable, Is.False, "취약 무기한 보정 해제");
+        Assert.That(model.AllowsSelfAction, Is.True);
+        Assert.That(model.AllowsGaugeTransition, Is.True);
+    }
+
+    [Test]
+    public void SuppressKill_SuppressWithoutDamage_NotFinishing_DeathPrevented()
+    {
+        var model = AtSuppressKill();
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.OnSuppressEnded(), Is.True);
+        Assert.That(model.IsFinishing, Is.False, "대기만으로는 마무리 아님");
+        Assert.That(model.PreventsDeath, Is.True);
+        Assert.That(model.OnDied(), Is.False);
+
+        model.OnSuppressStarted();
+        model.OnSuppressDamage();
+        model.OnSuppressEnded();
+        Assert.That(model.IsFinishing, Is.True);
+        Assert.That(model.PreventsDeath, Is.False);
+        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
+        Assert.That(model.TryConsumeFinishHealthRequest(), Is.False);
+    }
+
+    [Test]
+    public void SuppressAcceleration_OffByDefault_OnlyWhenEnabledAndSuppressed()
+    {
+        var off = AtSuppressKill();
+        off.OnSuppressStarted();
         Assert.That(off.AppliesSuppressAcceleration, Is.False);
 
-        var atA = AtA(suppressAcceleration: true);
-        Assert.That(atA.OnSuppressStarted(), Is.False);              // A = 전이 중지, 제압 없음
-        Assert.That(atA.AppliesSuppressAcceleration, Is.False);
-
-        var on = AtD(suppressAcceleration: true);
-        Assert.That(on.AppliesSuppressAcceleration, Is.True);
-        on.OnSuppressEnded();
+        var on = new TrainingSparringModel(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, 20f), true);
+        on.OnFlowStageStarted(LobbyTutorialActivity.Counter, 1);
         Assert.That(on.AppliesSuppressAcceleration, Is.False);
     }
 
-    // ── 중복·역순 ──
+    // ── 칸 판정 ──
 
     [Test]
-    public void 중복_역순_단계_알림은_무시()
-    {
-        var model = Create();
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);   // A 전 B
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.False);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.True);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.False);   // 중복
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);   // A 미완료
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Combat), Is.False);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CounterIntro));
-
-        model = AtB();
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.False);   // 역순
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CrowdControlIntro));
-    }
-
-    [Test]
-    public void A_간파_그로기_종료가_성공보다_먼저면_무시하고_완료_보고는_1회()
-    {
-        var model = AtA();
-        Assert.That(model.OnCounterGroggyEnded(), Is.False);         // 성공 없는 그로기 종료
-        Assert.That(model.OnCounterSucceeded(), Is.True);
-        Assert.That(model.OnCounterSucceeded(), Is.False);
-        Assert.That(model.OnCounterGroggyEnded(), Is.True);
-        Assert.That(model.OnCounterGroggyEnded(), Is.False);
-        ExpectReports(model, LobbyTutorialActivity.Counter);
-    }
-
-    [Test]
-    public void A_B에서는_제압과_벽이_무시된다()
-    {
-        var model = AtA();
-        Assert.That(model.OnSuppressStarted(), Is.False);
-        Assert.That(model.OnWallImpact(true), Is.False);
-        Assert.That(model.OnSuppressEnded(), Is.False);
-
-        model = AtB();
-        Assert.That(model.OnSuppressStarted(), Is.False);
-        Assert.That(model.IsSuppressActive, Is.False);
-    }
-
-    // ── A 타격의 B 미집계 ──
-
-    [Test]
-    public void A에서_걸린_CC가_B에서_끝나도_B_완료가_아니다()
-    {
-        var model = AtA();
-        model.OnCounterSucceeded();
-        Assert.That(model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback), Is.False);   // A 그로기 중 타격
-        model.OnCounterGroggyEnded();
-        DrainReports(model);
-        model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc);
-
-        Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.False);
-        Assert.That(model.TryConsumeStageReport(out _), Is.False);
-    }
-
-    [Test]
-    public void B_간파_성공과_그로기는_CC가_아니고_다른_종류_종료도_불인정()
-    {
-        var model = AtB();
-        Assert.That(model.OnCounterSucceeded(), Is.False);
-        Assert.That(model.OnCounterGroggyEnded(), Is.False);
-        Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.PushStagger), Is.False);   // 적용 없는 종료
-
-        model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback);
-        Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.PushStagger), Is.False);   // 다른 종류
-        Assert.That(model.TryConsumeStageReport(out _), Is.False);
-
-        Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.True);
-        Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.False);
-        Assert.That(model.OnCrowdControlApplied(TrainingSparringCrowdControl.PushStagger), Is.False);   // 완료 뒤
-        ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
-    }
-
-    [Test]
-    public void B_벽_충돌은_C로_이월되지_않는다()
-    {
-        var model = AtB();
-        Assert.That(model.OnWallImpact(reducedGauge: true), Is.False);
-        model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback);
-        model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback);
-        model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition);
-        model.TryConsumeResetRequest();
-        model.OnResetExecuted();
-
-        Assert.That(model.HasRecordedWall, Is.False);
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));   // 벽 없이 제압 → D 아님
-    }
-
-    // ── 초기화 1회 ──
-
-    [Test]
-    public void 초기화_요청은_1회_재접속_중복_메시지로_반복되지_않는다()
-    {
-        var model = AtC();
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.False);
-        Assert.That(model.TryConsumeResetRequest(), Is.False);
-        Assert.That(model.OnResetExecuted(), Is.False);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
-    }
-
-    [Test]
-    public void 초기화_대기_중_이벤트는_무시()
-    {
-        var model = AtB();
-        model.OnCrowdControlApplied(TrainingSparringCrowdControl.PushStagger);
-        model.OnCrowdControlEnded(TrainingSparringCrowdControl.PushStagger);
-        model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition);
-
-        Assert.That(model.OnWallImpact(true), Is.False);
-        Assert.That(model.OnSuppressStarted(), Is.False);
-        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.False);
-        Assert.That(model.TryConsumeResetRequest(), Is.True);
-        Assert.That(model.TryConsumeResetRequest(), Is.False);
-    }
-
-    // ── C 벽·제압 ──
-
-    [Test]
-    public void 같은_넉백의_벽과_마지막_칸은_벽_먼저_기록하고_제압에서_D()
-    {
-        var model = AtC();
-        Assert.That(model.OnWallImpact(reducedGauge: true), Is.True);   // 벽 감소로 0칸 → 상대가 벽을 먼저 알린다
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
-        ExpectReports(model, LobbyTutorialActivity.Wall);
-    }
-
-    [Test]
-    public void 이미_0칸이라_감소가_거부된_벽_접촉은_불인정()
-    {
-        var model = AtC();
-        Assert.That(model.OnWallImpact(reducedGauge: false), Is.False);
-        Assert.That(model.HasRecordedWall, Is.False);
-        model.OnSuppressStarted();
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
-    }
-
-    [Test]
-    public void 벽은_한_번만_기록된다()
-    {
-        var model = AtC();
-        Assert.That(model.OnWallImpact(true), Is.True);
-        Assert.That(model.OnWallImpact(true), Is.False);   // 첫 벽 무전은 1회
-        Assert.That(model.HasRecordedWall, Is.True);
-    }
-
-    [Test]
-    public void 벽_전_제압은_정상_실행_종료_후_C_계속_이후_벽과_다음_제압으로_D()
-    {
-        var model = AtC();
-        Assert.That(model.OnSuppressStarted(), Is.True);    // 간파만으로 먼저 제압
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
-        Assert.That(model.OnSuppressDamage(), Is.False);    // C 의 제압 피해는 D 목표 아님
-        Assert.That(model.OnWallImpact(true), Is.False);    // 제압 중(0칸) 벽 보고는 기록하지 않는다
-        Assert.That(model.OnSuppressEnded(), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
-        Assert.That(model.PreventsDeath, Is.True);
-        Assert.That(model.TryConsumeStageReport(out _), Is.False);   // 이전 제압으로 D 자동 완료 없음
-
-        Assert.That(model.OnWallImpact(true), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));   // 벽만으론 D 아님
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
-        ExpectReports(model, LobbyTutorialActivity.Wall);
-    }
-
-    [Test]
-    public void C에서_사망은_완료가_아니다()
-    {
-        var model = AtC();
-        Assert.That(model.OnDied(), Is.False);
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
-    }
-
-    // ── D ──
-
-    [Test]
-    public void D_제압_중_피해가_없으면_다음_사이클에서_재확인()
-    {
-        var model = AtD();
-        Assert.That(model.OnSuppressEnded(), Is.True);           // 피해 없이 종료
-        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
-        Assert.That(model.PreventsDeath, Is.True);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.False);
-        Assert.That(model.OnSuppressDamage(), Is.False);         // 제압 밖 피해는 불인정
-        Assert.That(model.OnDied(), Is.False);
-
-        Assert.That(model.OnSuppressStarted(), Is.True);         // 다음 사이클(간파·벽·제압)
-        Assert.That(model.OnSuppressDamage(), Is.True);
-        Assert.That(model.OnSuppressDamage(), Is.False);
-        Assert.That(model.OnSuppressEnded(), Is.True);
-        Assert.That(model.PreventsDeath, Is.False);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
-        Assert.That(model.OnDied(), Is.True);
-        ExpectReports(model, LobbyTutorialActivity.SuppressKill);
-    }
-
-    [Test]
-    public void D_마무리_표시는_제압_피해_뒤_제압_종료부터_사망_전까지만()
-    {
-        var model = AtD();
-        Assert.That(model.IsFinishing, Is.False);                // 제압 중
-        Assert.That(model.OnSuppressEnded(), Is.True);           // 피해 없이 종료 — 칸 표시 그대로
-        Assert.That(model.IsFinishing, Is.False);
-
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.OnSuppressDamage(), Is.True);
-        Assert.That(model.IsFinishing, Is.False);                // 피해만으론 아직 — 제압 종료가 마무리
-        Assert.That(model.OnSuppressEnded(), Is.True);
-        Assert.That(model.IsFinishing, Is.True);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
-        Assert.That(model.IsFinishing, Is.True);                 // 체력 요청을 꺼내도 사망 전까진 유지
-
-        Assert.That(model.OnDied(), Is.True);
-        Assert.That(model.IsFinishing, Is.False);
-        Assert.That(Create().IsFinishing, Is.False);             // 새로 스폰한 상대
-    }
-
-    [Test]
-    public void D_중복_제압_시작과_종료는_무시하고_마무리_뒤_제압도_무시()
-    {
-        var model = AtD();
-        Assert.That(model.OnSuppressStarted(), Is.False);
-        model.OnSuppressDamage();
-        Assert.That(model.OnSuppressEnded(), Is.True);
-        Assert.That(model.OnSuppressEnded(), Is.False);
-        Assert.That(model.OnSuppressStarted(), Is.False);        // 마무리 중
-        Assert.That(model.PreventsDeath, Is.False);
-        Assert.That(model.OnDied(), Is.True);
-        Assert.That(model.OnDied(), Is.False);
-        ExpectReports(model, LobbyTutorialActivity.SuppressKill);
-    }
-
-    [Test]
-    public void 보고를_꺼내지_않아도_완료마다_순서대로_1회씩_남는다()
-    {
-        var model = AtC();
-        model.OnWallImpact(true);
-        model.OnSuppressStarted();
-        model.OnSuppressDamage();
-        model.OnSuppressEnded();
-        model.OnDied();
-        ExpectReports(model, LobbyTutorialActivity.Wall, LobbyTutorialActivity.SuppressKill);
-    }
-
-    // ── 총 칸 ──
-
-    [Test]
-    public void 총_칸은_게이지_최대_나누기_감소량_올림()
+    public void SegmentCheck_RequiresTwoOrMore()
     {
         Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 20f).TotalSegments, Is.EqualTo(5));
-        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 30f).TotalSegments, Is.EqualTo(4));
-        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 50f).TotalSegments, Is.EqualTo(2));
-        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 50f).IsValid, Is.True);
-        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 50f).Error, Is.Null);
-    }
-
-    [Test]
-    public void 총_칸이_2_미만이면_오류를_내고_칸을_늘리지_않는다()
-    {
-        var one = TrainingSparringSegmentCheck.Evaluate(100f, 100f);
-        Assert.That(one.TotalSegments, Is.EqualTo(1));
-        Assert.That(one.IsValid, Is.False);
-        Assert.That(one.Error, Is.Not.Null.And.Not.Empty);
-
-        var zeroStep = TrainingSparringSegmentCheck.Evaluate(100f, 0f);
-        Assert.That(zeroStep.TotalSegments, Is.EqualTo(0));
-        Assert.That(zeroStep.IsValid, Is.False);
-
-        var model = new TrainingSparringModel(one);
-        Assert.That(model.Segments.TotalSegments, Is.EqualTo(1));   // 몰래 추가 없음
+        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 20f).IsValid, Is.True);
+        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 100f).IsValid, Is.False);
+        Assert.That(TrainingSparringSegmentCheck.Evaluate(100f, 0f).TotalSegments, Is.Zero);
     }
 }

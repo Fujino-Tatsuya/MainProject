@@ -1781,6 +1781,9 @@ public class Player : Unit
 
     private int serverCastSeq;
 
+    /// <summary>[서버] 이 Player 인스턴스가 마지막으로 낸 시전 ID(아직 없으면 0). 읽기 전용 — 로비 간파 훈련 시전 기준선(할 일 157 ⑦ LobbyCastWindow)이 읽는다.</summary>
+    public int ServerCastSeq => serverCastSeq;
+
     /// <summary>[서버] 이 플레이어의 새 시전 ID(1부터 증가, 0 은 쓰지 않는다). 스킬 승인·여러 판정을 묶는 공격이 시작 때 하나 받는다.</summary>
     public int NextServerCastId()
     {

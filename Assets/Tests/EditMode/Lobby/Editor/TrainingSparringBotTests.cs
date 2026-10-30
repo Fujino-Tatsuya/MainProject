@@ -142,7 +142,16 @@ public sealed class TrainingSparringBotTests
         Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, 0.5f, false), Is.EqualTo(0.5f));
         Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, 3f, false), Is.EqualTo(1.2f));
         Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, 0.01f, false), Is.Zero, "0.05 이하 = 경직 없음");
-        Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, -1f, true), Is.EqualTo(1.2f), "B 학습용 취약 유지 = Q 경직 그대로");
+        Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, -1f, true), Is.EqualTo(1.2f), "훈련 취약 유지 = 경직 그대로");
+    }
+
+    [Test]
+    public void TrainingWindup_ExtendsOnlyInCounterTraining()
+    {
+        Assert.That(TrainingSparringRules.TrainingWindup(0.8f, 2f, true), Is.EqualTo(2f), "T31 = 신호를 보고 입력할 수 있게 늘린다");
+        Assert.That(TrainingSparringRules.TrainingWindup(2.5f, 2f, true), Is.EqualTo(2.5f), "저작 창이 더 길면 그대로");
+        Assert.That(TrainingSparringRules.TrainingWindup(0.8f, 2f, false), Is.EqualTo(0.8f), "T31 밖(T40 등) = 실전 길이");
+        Assert.That(TrainingSparringRules.TrainingWindup(0f, 2f, true), Is.Zero, "간파 없는 공격은 늘리지 않는다");
     }
 
     [Test]

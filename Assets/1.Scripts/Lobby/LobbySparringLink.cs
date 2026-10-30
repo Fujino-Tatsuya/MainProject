@@ -1,13 +1,12 @@
 /// <summary>
-/// [서버] TRAIN_03 진행기 ↔ 훈련 상대 연결 규칙(할 일 86 T5c, PLAN-86 §3.5, 명세 v0.2 §9). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
+/// [서버] 간파 훈련(T31~T40) 진행기 ↔ 훈련 상대 연결 규칙(할 일 86 T5c → 157 ⑦). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
 /// 실행은 <see cref="LobbyTrainingSparring"/> — 여기는 "언제 한 번만 하나"만 정한다.
-/// 할 일 157 ②: 진행기 단계 = 단계표 Activity(T31 Counter ~ T40 SuppressKill). 옛 Train03A~D 와 1:1 이름만 옮겼다(Train03C 진입 = T33 ResetPosition).
 /// <list type="bullet">
-/// <item>회차: 진행기가 T31~T40 에 있는 동안 상대 1개(<see cref="BotPresent"/>). 회차 시작(<see cref="BeginRound"/>)마다 기록을 비운다 — 판 끝 로비 복귀·TRAIN_03 이탈이 회차 끝.</item>
+/// <item>회차: 진행기가 T31~T40 에 있는 동안 상대 1개(<see cref="BotPresent"/>). 회차 시작(<see cref="BeginRound"/>)마다 기록을 비운다 — 판 끝 로비 복귀·간파 훈련 이탈이 회차 끝.</item>
 /// <item>단계 알림: 진행기 T31~T40 이 시작되면 상대에게 1회(<see cref="TryTakeFlowNotice"/>). 앞으로만 — 같은 단계 재알림·역순은 없음.</item>
 /// <item>완료 보고: 상대 모델의 단계 완료를 진행기에 1회(<see cref="TryAcceptReport"/>). 진행기의 지금 단계와 같을 때만 — 어긋남·중복·역순은 무시.</item>
-/// <item>T33 초기화(플레이어 쪽 <see cref="TrainingResetOptions.PracticeReset"/>): 회차당 1회(<see cref="TryConsumePracticeReset"/>).</item>
-/// <item>무전 이벤트: A 첫 간파 성공(TRAIN_03_COUNTER)·C 첫 유효 벽 충돌(TRAIN_03_WALL)·D 첫 마무리 진입(TRAIN_03_COMBAT) — 각각 회차당 1회.</item>
+/// <item>T33 위치 복귀의 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>, Q10 A): 회차당 1회(<see cref="TryConsumePracticeReset"/>).</item>
+/// <item>단계 안 사건 무전(TRAIN_03_COUNTER/WALL/COMBAT)은 없앴다(157 Q6 A — 명세 §3.3 중복 대사 금지, 문구 키는 보존).</item>
 /// </list>
 /// </summary>
 public sealed class LobbySparringLink
@@ -15,9 +14,6 @@ public sealed class LobbySparringLink
     LobbyTutorialActivity _notified = LobbyTutorialActivity.None;
     LobbyTutorialActivity _reported = LobbyTutorialActivity.None;
     bool _practiceResetDone;
-    bool _counterRaised;
-    bool _wallRaised;
-    bool _finishRaised;
 
     /// <summary>회차 진행 중(상대를 스폰한 뒤 ~ 정리 전).</summary>
     public bool IsRoundActive { get; private set; }
@@ -28,7 +24,7 @@ public sealed class LobbySparringLink
     /// <summary>마지막으로 진행기에 보고한 상대 단계 완료(없으면 None).</summary>
     public LobbyTutorialActivity LastReported => _reported;
 
-    /// <summary>TRAIN_03 단계(T31~T40)인가.</summary>
+    /// <summary>간파 훈련 단계(T31~T40)인가.</summary>
     public static bool IsSparringStage(LobbyTutorialActivity activity) => LobbyTutorialRules.IsSparringActivity(activity);
 
     /// <summary>
@@ -38,11 +34,22 @@ public sealed class LobbySparringLink
     public static bool BotPresent(LobbyTutorialActivity activity) => IsSparringStage(activity);
 
     /// <summary>
-    /// [전 피어] 지정 벽 표시(주황 띠, 임시 비주얼)를 켜는가 — 벽 목표가 있는 T33~T40 동안(옛 Train03C·D). T31·T32·T50 이후·로비·진행기 없음(None)은 끈다.
+    /// [전 피어] 지정 벽 표시(주황 띠, 임시 비주얼)를 켜는가 — 벽 목표가 있는 T33(위치 복귀)·T34 동안. T34 완료(지정 벽 충돌) 즉시 끈다 —
+    /// 계약의 <c>ActiveTargetWallId</c> 가 비는 것과 같은 순간(명세 §5 T34). T31·T32·T40 이후·로비·진행기 없음(None)은 끈다.
     /// 클라는 복제 스냅샷의 현재 행 Activity(<see cref="LobbyTrainingDirector.CurrentActivity"/>)로 판정 — 늦게 붙은 클라도 같다.
     /// </summary>
     public static bool WallMarkerVisible(LobbyTutorialActivity activity) =>
-        activity == LobbyTutorialActivity.ResetPosition || activity == LobbyTutorialActivity.Wall || activity == LobbyTutorialActivity.SuppressKill;
+        activity == LobbyTutorialActivity.ResetPosition || activity == LobbyTutorialActivity.Wall;
+
+    /// <summary>
+    /// 이 단계 알림에서 시작할 "새 시전" 판정(<see cref="LobbyCastWindow"/>) — T32 = CC, T34 = 벽, 그 밖 = 없음.
+    /// </summary>
+    public static LobbyCastWindowMode CastWindowModeFor(LobbyTutorialActivity activity) => activity switch
+    {
+        LobbyTutorialActivity.VulnerableCc => LobbyCastWindowMode.CrowdControl,
+        LobbyTutorialActivity.Wall => LobbyCastWindowMode.Wall,
+        _ => LobbyCastWindowMode.None,
+    };
 
     /// <summary>새 회차 — 기록을 비운다. 이미 진행 중이면 false(그대로 — 상대 재사용).</summary>
     public bool BeginRound()
@@ -55,13 +62,10 @@ public sealed class LobbySparringLink
         _notified = LobbyTutorialActivity.None;
         _reported = LobbyTutorialActivity.None;
         _practiceResetDone = false;
-        _counterRaised = false;
-        _wallRaised = false;
-        _finishRaised = false;
         return true;
     }
 
-    /// <summary>회차 끝(TRAIN_03 이탈·진행기 디스폰). 진행 중이 아니었으면 false.</summary>
+    /// <summary>회차 끝(간파 훈련 이탈·진행기 디스폰). 진행 중이 아니었으면 false.</summary>
     public bool EndRound()
     {
         if (!IsRoundActive)
@@ -101,51 +105,13 @@ public sealed class LobbySparringLink
         return true;
     }
 
-    /// <summary>T33 초기화의 플레이어 쪽 리셋 — 회차당 처음 한 번만 true.</summary>
+    /// <summary>T33 위치 복귀의 플레이어 쪽 리셋 — 회차당 처음 한 번만 true.</summary>
     public bool TryConsumePracticeReset()
     {
         if (!IsRoundActive || _practiceResetDone)
             return false;
 
         _practiceResetDone = true;
-        return true;
-    }
-
-    /// <summary>
-    /// 첫 간파 성공 이벤트(TRAIN_03_COUNTER — 명세 §14 "A 첫 간파 성공")를 낼 차례인가. 상대 단계가 A(<see cref="TrainingSparringStage.CounterIntro"/>)일 때의 성공만, 회차당 1회.
-    /// </summary>
-    public bool TryRaiseFirstCounter(TrainingSparringStage sparringStage)
-    {
-        if (!IsRoundActive || _counterRaised || sparringStage != TrainingSparringStage.CounterIntro)
-            return false;
-
-        _counterRaised = true;
-        return true;
-    }
-
-    /// <summary>
-    /// 첫 유효 벽 충돌 이벤트(TRAIN_03_WALL — "C 첫 유효 벽 충돌")를 낼 차례인가. 상대 모델이 C 벽 목표를 기록했으면(<see cref="TrainingSparringModel.HasRecordedWall"/> —
-    /// 칸 감소를 동반한 지정 벽 충돌) 회차당 1회. A/B 의 벽·0칸 접촉·장식 벽은 모델이 기록하지 않으므로 여기 오지 않는다.
-    /// </summary>
-    public bool TryRaiseFirstWall(bool wallRecorded)
-    {
-        if (!IsRoundActive || _wallRaised || !wallRecorded)
-            return false;
-
-        _wallRaised = true;
-        return true;
-    }
-
-    /// <summary>
-    /// 첫 마무리 진입 이벤트(TRAIN_03_COMBAT — "D 제압 중 유효 피해 경험 + 제압 종료")를 낼 차례인가. 상대 모델이 마무리 중이면(<see cref="TrainingSparringModel.IsFinishing"/> —
-    /// 제압 피해 확인 + 제압 종료, 마무리 체력 설정 직후) 회차당 1회. 피해 없이 끝난 제압은 마무리가 아니므로 여기 오지 않는다.
-    /// </summary>
-    public bool TryRaiseFirstFinish(bool finishing)
-    {
-        if (!IsRoundActive || _finishRaised || !finishing)
-            return false;
-
-        _finishRaised = true;
         return true;
     }
 }

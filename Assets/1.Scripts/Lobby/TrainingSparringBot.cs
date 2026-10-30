@@ -13,11 +13,12 @@ using UnityEngine.AI;
 /// 제압 = 그로기 breakDuration, 받는 플레이어 피해 ×suppressDamageMultiplier, 끝나면 게이지 가득. 값은 전부 <see cref="counterRules"/>(23호 데이터).</item>
 /// <item>보스처럼 자동 피격 반응 없음(<see cref="AutoHitReactions"/> = false) — 일반 몬스터 경직·그로기 누적·넉백을 쓰지 않는다.</item>
 /// <item>벽: 넉백·밀림 틱마다 <see cref="UnitWallImpacts.ServerProbe"/>(넉백 1회 = 에피소드 1개) — 결과 콜라이더가 <see cref="designatedWalls"/> 에 있을 때만 유효.</item>
-/// <item>공격: 간파 창(<see cref="MonsterCounterWindow"/> 저작값) 동안 파란 예고 → 채찍(클립 OnAttackHit 이 판정). 이동 없이 제자리에서 돌아본다(앵커 = 배치 위치).</item>
-/// <item>훈련 보정: A/B 칸 전이 중지·칸 UI 숨김, B 학습용 취약 유지·자발 행동 없음, 처치 방지(체력 하한 1), D 마무리 체력.
-/// 실전 전역 규칙·데이터는 건드리지 않는다.</item>
+/// <item>공격: 간파 창(<see cref="MonsterCounterWindow"/> 저작값) 동안 실전과 같은 간파 예고 → 채찍(클립 OnAttackHit 이 판정). 이동 없이 제자리에서 돌아본다(앵커 = 배치 위치).
+/// T31 은 예고·창을 <see cref="trainingCounterWindowSeconds"/> 까지 늘린다(PLAN Q11 A — 신호를 보고 입력해도 성공할 길이, 새 연출 없음).</item>
+/// <item>훈련 보정(할 일 157 ⑦): T31~T33 칸 전이 중지, T31 간파 성공 ~ T34 취약 무기한 유지(매 틱 연장 — 23호·공용 코드 무수정, PLAN Q17)·자발 행동 없음,
+/// T33 위치 복귀(취약·칸 보존, 체력만 복구), T34 빗나간 넉백 위치 복구, 처치 방지(체력 하한 1), T40 마무리 체력. 실전 전역 규칙·데이터는 건드리지 않는다.</item>
 /// </list>
-/// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)은 <see cref="LobbyTrainingSparring"/>(T5c). 이 상대는 서버 C# 이벤트만 낸다.
+/// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)과 "새 시전" 판정(<see cref="LobbyCastWindow"/>)은 <see cref="LobbyTrainingSparring"/>. 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
 [DataTableSheet("Lobby", Order = 0)]
 public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IOverheadHealthBarRule, IInterruptCueSink
@@ -30,6 +31,9 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     [SerializeField] BossDataSO counterRules;
 
     [Header("훈련 데이터")]
+    [Tooltip("T31 간파 창 최소 길이(초) — 저작 창(MonsterCounterWindow)이 이보다 짧으면 예고·창을 이 길이로 늘린다(PLAN Q11 A). 0 = 늘리지 않음. 훈련 상대 전용, 실전 무관.")]
+    [SerializeField, Min(0f), DataTableIgnore] float trainingCounterWindowSeconds = 2f;
+
     [Tooltip("D 마무리 체력 — 제압 중 피해 확인 + 제압 종료 뒤 체력을 이 값으로 낮추고 처치 방지를 푼다(지금 체력이 더 낮으면 그대로). 명세 §9.6: 훈련 데이터, 숫자 미고정 — 임시값.")]
     [SerializeField, Min(1)] int finishHealth = 60;
 
@@ -73,28 +77,29 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     Unit _wallPusher;
 
     float _windupLeft;                 // > 0 = 간파 창(예고) 중 — 채찍 보류
+    float _counterTickScale = 1f;      // 훈련 연장 창: 저작 창 ÷ 예고 길이(창이 예고 끝에 닫히게 창 시간만 느리게 흘린다)
     float _vulnerableUntil = -1f;      // Time.time, < 0 = 취약 아님
     bool _environmentConsumed;         // 이번 취약에서 벽을 이미 썼나(23호 §6.1 최초 1회)
     bool _suppressed;
-    bool _counterGroggy;               // 지금 그로기가 간파 성공 그로기인가(A 완료 = 그 종료)
-    bool _vulnerableStunGroggy;        // 지금 그로기가 취약 중 Q 경직인가
+    bool _vulnerableStunGroggy;        // 지금 그로기가 취약 중 기절(경직)인가
     bool _kbActive, _kbRebound;
     Vector3 _kbDir;
     float _kbLeft, _kbSpeed;
     int _kbFrame = -1;
-    TrainingSparringCrowdControl _ccKind;   // 0 = 진행 중 CC 없음
-    bool _ccKnockback, _ccStun;
+    int _kbEpisode;                    // 넉백 에피소드 번호(1부터) — 벽·끝 사건을 그 넉백을 연 시전과 잇는다
+    float _pendingConcussion;          // 밀림이 끝나면 걸 기절(특성 뇌진탕)
+    bool _ccStun;                      // 기절(경직) 반응 중
     bool _resetting;
     int _interruptSuccessCount;
 
     /// <summary>[서버] 간파 성공(창 소비). 인자 = 공격자 clientId.</summary>
     public event Action<ulong> ServerCounterSucceeded;
-    /// <summary>[서버] 일반 CC 적용 — 취약 넉백 / Q 밀림경직.</summary>
-    public event Action<TrainingSparringCrowdControl> ServerCrowdControlApplied;
-    /// <summary>[서버] 일반 CC 종료(밀림·경직이 모두 끝남).</summary>
-    public event Action<TrainingSparringCrowdControl> ServerCrowdControlEnded;
-    /// <summary>[서버] 지정 벽 유효 충돌(UnitWallImpacts 결과 중 지정 벽만).</summary>
-    public event Action<UnitWallImpact> ServerValidWallImpact;
+    /// <summary>[서버] 취약 중 CC 를 받았다 — (넉백 에피소드(밀림 없으면 0), 종류, 실제 적용). 시전 짝짓기는 <see cref="LobbyCastWindow"/>.</summary>
+    public event Action<int, TrainingSparringCrowdControl, bool> ServerCrowdControlApplied;
+    /// <summary>[서버] 넉백 에피소드가 벽에 닿았다 — (에피소드, 지정 벽인가). 넉백 1회 = 최대 1회.</summary>
+    public event Action<int, bool> ServerWallImpact;
+    /// <summary>[서버] 넉백 에피소드가 끝났다(반동 포함) — 에피소드.</summary>
+    public event Action<int> ServerKnockbackEnded;
     /// <summary>[서버] 칸 감소 — 다음 게이지(0~100).</summary>
     public event Action<float> ServerGaugeReduced;
     public event Action ServerSuppressStarted;
@@ -105,7 +110,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public event Action<bool> ServerSparringDied;
     /// <summary>[서버] 모델 단계 완료(T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring.</summary>
     public event Action<LobbyTutorialActivity> ServerStageCompleted;
-    /// <summary>[서버] B→C 초기화 실행 완료 — 진행기가 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>)을 이어 건다(T5c).</summary>
+    /// <summary>[서버] T33 위치 복귀 실행 완료 — 진행기가 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>)을 이어 건다(Q10 A).</summary>
     public event Action ServerResetExecuted;
 
     /// <summary>[모든 피어] 상대 단계(복제).</summary>
@@ -149,6 +154,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     bool CounterBlockedByState => IsVulnerable || _suppressed;
     bool AllowsGauge => _model != null && _model.AllowsGaugeTransition;
     bool HoldsVulnerable => _model != null && _model.HoldsVulnerable;
+    bool CrowdControlActive => _kbActive || _ccStun;
 
     // 보스 규칙 — 자동 경직·그로기 누적·넉백 없음. 공격 중 회전 잠금(예고와 판정이 어긋나지 않게 — SpinnerBot 과 같다).
     protected override bool AutoHitReactions => false;
@@ -187,7 +193,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         base.OnNetworkDespawn();
     }
 
-    /// <summary>[서버] 씬 배치 주입(T5c — 스폰한 프리팹은 씬 콜라이더를 직렬화로 못 가리킨다). null 이면 그 항목은 그대로.</summary>
+    /// <summary>[서버] 씬 배치 주입(스폰한 프리팹은 씬 콜라이더를 직렬화로 못 가리킨다). null 이면 그 항목은 그대로.</summary>
     public void ServerConfigureArena(Transform cPoint, Collider[] walls)
     {
         if (!IsServer) return;
@@ -196,17 +202,47 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     }
 
     /// <summary>
-    /// [서버] 진행기 단계 시작 알림(T31~T40 Activity). 모델이 받아들이면 true. T33 ResetPosition 이면 초기화 요청을 바로 실행한다(재접속·중복 알림은 모델이 1회로 막는다).
+    /// [서버] 진행기 단계 시작 알림(T31~T40 Activity). 모델이 받아들이면 true. T33 ResetPosition 이면 CC 반응이 끝나는 대로 위치 복귀를 실행한다
+    /// (재접속·중복 알림은 모델이 1회로 막는다). 이 프레임 이하 사건은 이 단계 완료로 세지 않는다.
     /// </summary>
     public bool ServerNotifyFlowStageStarted(LobbyTutorialActivity flowStage)
     {
         if (!IsServer || _model == null) return false;
-        bool accepted = _model.OnFlowStageStarted(flowStage);
+        bool accepted = _model.OnFlowStageStarted(flowStage, Time.frameCount);
         if (!accepted)
             Edit.Log($"{Tag} {name}: 단계 알림 {flowStage} 무시(상대 단계 {_model.Stage})", this);
         TryRunReset();
         SyncModel();
         return accepted;
+    }
+
+    /// <summary>[서버] T32 — 새 시전 CC 인정(<see cref="LobbyCastWindow"/> 통과, 적용 프레임). 모델이 완료로 받으면 true.</summary>
+    public bool ServerAcceptCrowdControl(int eventFrame)
+    {
+        if (!IsServer || _model == null) return false;
+        bool accepted = _model.OnCrowdControlAccepted(eventFrame);
+        SyncModel();
+        return accepted;
+    }
+
+    /// <summary>[서버] T34 — 새 시전 넉백의 지정 벽 충돌 인정. 모델이 완료로 받으면 true.</summary>
+    public bool ServerAcceptWallImpact(int eventFrame)
+    {
+        if (!IsServer || _model == null) return false;
+        bool accepted = _model.OnWallAccepted(eventFrame);
+        SyncModel();
+        return accepted;
+    }
+
+    /// <summary>
+    /// [서버] T34 — 넉백이 지정 벽 인정 없이 끝났다 → C 위치로 복구하고 재시도(취약·칸·체력 그대로). 완료 뒤·새 넉백 중이면 무시(false).
+    /// </summary>
+    public bool ServerRestoreAfterMiss()
+    {
+        if (!IsServer || _model == null || !_model.NeedsRetryAfterMiss || _kbActive || State == MonsterState.Dead) return false;
+        RepositionToResetPoint();
+        Debug.Log($"{Tag} T34 지정 벽 빗나감 — 위치 복구 후 재시도({(resetPoint != null ? resetPoint.name : "제자리")})", this);
+        return true;
     }
     #endregion
 
@@ -221,11 +257,11 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
 
         if (_vulnerableUntil >= 0f)
         {
-            if (HoldsVulnerable) _vulnerableUntil = Time.time + VulnerableSeconds;   // B 학습용 유지 — 만료 연장
+            if (HoldsVulnerable) _vulnerableUntil = Time.time + VulnerableSeconds;   // T31 성공 ~ T34 무기한 유지 — 만료 연장(Q17)
             else if (Time.time >= _vulnerableUntil) EndVulnerable("시간 종료");
         }
         if (HoldsVulnerable && !IsVulnerable && !_suppressed && State != MonsterState.Dead)
-            StartVulnerable("B 학습용 취약 유지");
+            StartVulnerable("훈련 취약 유지");
 
         TryRunReset();
         SyncModel();
@@ -242,7 +278,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         return false;
     }
 
-    // 이동 없음 — 배치 위치(넉백으로 밀린 곳)에서 돌아보고 사거리 안이면 친다. B·시작 전·초기화 중·완료는 가만히 있는다.
+    // 이동 없음 — 배치 위치(넉백으로 밀린 곳)에서 돌아보고 사거리 안이면 친다. T31 성공 뒤~T34·시작 전·완료는 가만히 있는다.
     void TickStandAndAttack()
     {
         HoldAgent();
@@ -296,12 +332,16 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     {
         base.StartAttack();   // StopAgent + FaceTarget + (데이터)슈퍼아머 + Attack
 
-        float windup = Counter != null ? Counter.WindowDuration : 0f;
-        if (windup <= 0f)
+        float window = Counter != null ? Counter.WindowDuration : 0f;
+        if (window <= 0f)
         {
             PlayWhipRpc();
             return;
         }
+
+        // T31 훈련 창 연장(Q11 A) — 예고를 늘리고, 저작 창은 그 예고 끝에 닫히도록 느리게 흘린다(공용 MonsterCounterWindow 무수정).
+        float windup = TrainingSparringRules.TrainingWindup(window, trainingCounterWindowSeconds, _model != null && _model.ExtendsCounterWindow);
+        _counterTickScale = window / windup;
 
         // 창 길이만큼 공격 안전망·슈퍼아머를 늘린다(애니를 보류해도 타이머는 준다 — SpinnerBot 과 같은 규약).
         _windupLeft = windup;
@@ -317,7 +357,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         if (counterOpen)
         {
             Counter.Open();
-            if (Counter.IsOpen) ServerSetCounterWindow(true, Counter.WindowDuration);
+            if (Counter.IsOpen) ServerSetCounterWindow(true, windup);
         }
     }
 
@@ -328,7 +368,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             _windupLeft -= dt;
             _stateTimer -= dt;
             HoldAgent();
-            Counter?.TickAndDetectExpiry(dt);
+            Counter?.TickAndDetectExpiry(dt * _counterTickScale);
             if (_windupLeft <= 0f)
             {
                 CloseCounterWindow();
@@ -344,6 +384,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     void CloseCounterWindow()
     {
         _windupLeft = 0f;
+        _counterTickScale = 1f;
         if (Counter != null && Counter.IsOpen) Counter.Close();
         ServerSetCounterWindow(false);
     }
@@ -379,9 +420,12 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         bool interrupt = attackInfo.isInterruptAttack;
         bool counter = IsServer && interrupt && _windupLeft > 0f && Counter != null && Counter.IsOpen
                        && !CounterBlockedByState && IsCounterFromFront(hitContext);
-        bool vulnerableHit = IsServer && IsVulnerable && interrupt;
-        bool qPushHit = IsServer && IsVulnerable && !interrupt && fromPlayer
-                        && attackInfo.knockbackStrength > 0f && attackInfo.staggerDuration > 0f;
+        // 취약 중 CC(할 일 157 ⑦ — 넉백/기절 태그 스킬 전반을 받는다): 간파 스킬 = 고정 거리 밀림, 넉백 세기 > 0 = 밀림(+ 경직),
+        // 넉백 없이 경직만 = 기절. 23호 QualifiesPushHit 와 같은 조건(경직 > 0 조건 없음). T33 위치 복귀 중엔 새 CC 반응 없음.
+        bool ccOpen = IsServer && IsVulnerable && (_model == null || _model.AcceptsCrowdControl);
+        bool vulnerableHit = ccOpen && interrupt;
+        bool pushHit = ccOpen && BossCrowdControlRules.QualifiesPushHit(true, interrupt, fromPlayer, attackInfo.knockbackStrength);
+        bool stunHit = ccOpen && !interrupt && fromPlayer && attackInfo.knockbackStrength <= 0f && attackInfo.staggerDuration > 0f;
 
         if (IsServer && _suppressed && fromPlayer)
             attackInfo.damage = Mathf.Max(0, Mathf.RoundToInt(attackInfo.damage * SuppressDamageMultiplier));
@@ -409,23 +453,50 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         }
         else if (vulnerableHit)
         {
-            StartKnockback(hitContext, attackInfo, TrainingSparringCrowdControl.VulnerableKnockback);
+            bool pushed = StartKnockback(hitContext, attackInfo);
+            ReportCrowdControl(TrainingSparringCrowdControl.Knockback, pushed);
         }
-        else if (qPushHit)
+        else if (pushHit)
         {
-            StartKnockback(hitContext, attackInfo, TrainingSparringCrowdControl.PushStagger);
-            float stun = TrainingSparringRules.PushStaggerSeconds(attackInfo.staggerDuration, _vulnerableUntil - Time.time, HoldsVulnerable);
-            if (stun > 0f && State != MonsterState.Groggy)
-            {
-                ForceGroggy(stun);
-                _vulnerableStunGroggy = true;
-                _ccStun = true;
-                Debug.Log($"{Tag} 취약 중 팔라딘 Q — 밀림 + 경직 {stun:0.##}초", this);
-            }
+            bool pushed = StartKnockback(hitContext, attackInfo);
+            bool stunned = pushed && TryStartStun(attackInfo.staggerDuration, "밀림 + 경직");
+            if (pushed && attackInfo.concussionDuration > 0f)
+                _pendingConcussion = Mathf.Max(_pendingConcussion, attackInfo.concussionDuration);   // 밀림이 끝나면 기절(뇌진탕)
+            ReportCrowdControl(TrainingSparringCrowdControl.Knockback | (stunned ? TrainingSparringCrowdControl.Stun : 0), pushed);
+        }
+        else if (stunHit)
+        {
+            ReportCrowdControl(TrainingSparringCrowdControl.Stun, TryStartStun(attackInfo.staggerDuration, "기절"));
+        }
+        else if (IsServer && !ccOpen && IsVulnerable && fromPlayer && (interrupt || attackInfo.knockbackStrength > 0f || attackInfo.staggerDuration > 0f))
+        {
+            // T33 위치 복귀 중 — 반응 없이 버린다(면역과 같다 — 인정 안 됨).
+            ReportCrowdControl(attackInfo.knockbackStrength > 0f || interrupt ? TrainingSparringCrowdControl.Knockback : TrainingSparringCrowdControl.Stun, false);
         }
 
         SyncModel();
         return resolved;
+    }
+
+    // 취약 중 기절(경직) — 그로기로 건다. 이미 그로기(간파 성공·제압·다른 경직)면 걸지 않는다(false = 실제 적용 아님).
+    bool TryStartStun(float staggerDuration, string why)
+    {
+        float stun = TrainingSparringRules.PushStaggerSeconds(staggerDuration, _vulnerableUntil - Time.time, HoldsVulnerable);
+        if (stun <= 0f || State == MonsterState.Groggy || State == MonsterState.Dead)
+            return false;
+
+        ForceGroggy(stun);
+        _vulnerableStunGroggy = true;
+        _ccStun = true;
+        Debug.Log($"{Tag} 취약 중 {why} {stun:0.##}초", this);
+        return true;
+    }
+
+    // CC 사건 — 넉백이면 지금 에피소드(이번 적중이 연 것), 기절만이면 0. 거부된 CC(같은 틱 중복·이미 그로기·위치 복귀 중)는 applied=false.
+    void ReportCrowdControl(TrainingSparringCrowdControl kinds, bool applied)
+    {
+        int episode = (kinds & TrainingSparringCrowdControl.Knockback) != 0 && applied ? _kbEpisode : 0;
+        ServerCrowdControlApplied?.Invoke(episode, kinds, applied);
     }
 
     bool IsCounterFromFront(AttackHitContext hitContext)
@@ -436,7 +507,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             counterRules != null ? counterRules.counterFrontAngle : 0f, counterRules == null || counterRules.counterRequiresFront);
     }
 
-    // 간파 성공 — 칸 감소(C·D) + 그로기 + 취약, 0 이면 제압. A/B 는 그로기 + 취약만.
+    // 간파 성공 — 칸 감소(T34·T40) + 그로기 + 취약, 0 이면 제압. T31 은 그로기 + 취약만 — 이 순간 T31 완료, 취약은 T34 끝까지 유지된다.
     void EnterCounterSuccess(ulong attacker)
     {
         CancelAttack();
@@ -456,7 +527,6 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             return;
         }
 
-        _counterGroggy = true;
         ForceGroggy(o.Duration);
         StartVulnerable("간파 성공");
         Debug.Log($"{Tag} 간파 성공 — 게이지 {_gauge.Value:0} · 그로기 {o.Duration:0.##}초 · 단계 {_model.Stage}", this);
@@ -474,8 +544,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     {
         if (_vulnerableStunGroggy && releaseStun && State == MonsterState.Groggy && !_suppressed)
         {
-            Debug.Log($"{Tag} 취약 종료({why}) — Q 경직도 해제", this);
-            DecideNextAfterAction();   // 상태 훅이 경직 플래그·CC 종료를 정리한다
+            Debug.Log($"{Tag} 취약 종료({why}) — 경직도 해제", this);
+            DecideNextAfterAction();   // 상태 훅이 경직 플래그를 정리한다
         }
         if (_vulnerableUntil < 0f) return;
         _vulnerableUntil = -1f;
@@ -489,8 +559,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         CancelAttack();
         _gauge.Value = 0f;
         EndVulnerable("제압 진입", releaseStun: false);   // Q 경직은 제압 그로기가 이어받는다(23호)
-        _counterGroggy = false;
-        if (_vulnerableStunGroggy) { _vulnerableStunGroggy = false; _ccStun = false; CheckCrowdControlEnded(); }
+        if (_vulnerableStunGroggy) { _vulnerableStunGroggy = false; _ccStun = false; }
 
         _suppressed = true;
         _suppressedVisual.Value = true;
@@ -525,10 +594,11 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     }
     #endregion
 
-    #region 넉백·벽 (취약 넉백 / Q 밀림)
-    void StartKnockback(AttackHitContext ctx, AttackInfo info, TrainingSparringCrowdControl kind)
+    #region 넉백·벽 (취약 넉백 / 밀림)
+    // 새 넉백 에피소드를 연다. 같은 틱 두 번째 적중은 피해만(23호 §5.3) — false(실제 적용 아님).
+    bool StartKnockback(AttackHitContext ctx, AttackInfo info)
     {
-        if (_kbFrame == Time.frameCount) return;   // 같은 틱 두 번째 적중은 피해만(23호 §5.3)
+        if (_kbFrame == Time.frameCount) return false;
         _kbFrame = Time.frameCount;
 
         if (State == MonsterState.Attack)
@@ -559,11 +629,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             : ctx.sourceTransform != null ? ctx.sourceTransform.GetComponentInParent<Unit>() : null;
         if (agent != null && agent.enabled && agent.isOnNavMesh) { agent.ResetPath(); agent.velocity = Vector3.zero; }
 
-        _ccKind = kind;
-        _ccKnockback = true;
-        _model.OnCrowdControlApplied(kind);
-        ServerCrowdControlApplied?.Invoke(kind);
-        Debug.Log($"{Tag} {kind} — {KnockbackDistance:0.#}m / {KnockbackTime:0.##}초", this);
+        _kbEpisode++;
+        _pendingConcussion = 0f;
+        Debug.Log($"{Tag} 넉백 #{_kbEpisode} — {KnockbackDistance:0.#}m / {KnockbackTime:0.##}초", this);
+        return true;
     }
 
     void TickKnockback(float dt)
@@ -587,16 +656,17 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         if (_kbLeft <= 0.0001f) FinishKnockback();
     }
 
-    // 반동으로 넘어갔으면 true. 지정 벽이 아니면(장식 벽) 아무것도 하지 않는다 — 에피소드는 이미 썼다(넉백 1회 = 벽 1회).
+    // 반동으로 넘어갔으면 true. 지정 벽이 아니면(장식 벽) 사건만 알리고 아무것도 하지 않는다 — 에피소드는 이미 썼다(넉백 1회 = 벽 1회).
     bool OnWallImpact(UnitWallImpact impact)
     {
         if (!TrainingSparringRules.IsDesignatedWall(impact.Wall, designatedWalls))
         {
             Edit.Log($"{Tag} 지정 벽 아님 '{(impact.Wall != null ? impact.Wall.name : "?")}' — 불인정", this);
+            ServerWallImpact?.Invoke(_kbEpisode, false);
             return false;
         }
 
-        ServerValidWallImpact?.Invoke(impact);
+        ServerWallImpact?.Invoke(_kbEpisode, true);
         if (!IsVulnerable || _environmentConsumed)
         {
             Debug.Log($"{Tag} 지정 벽 충돌 — 취약 아님 또는 이번 취약에서 이미 씀(칸 변화 없음)", this);
@@ -610,8 +680,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             _gauge.Value = o.NextGauge;
             ServerGaugeReduced?.Invoke(o.NextGauge);
         }
-        // 🔴 같은 넉백의 벽 + 마지막 칸이면 벽을 먼저 기록한 뒤 제압(명세 §9.5).
-        _model.OnWallImpact(o.Reduced);
+        // T34 완료는 이 충돌 자체(LobbyCastWindow 가 시전을 확인한 뒤 ServerAcceptWallImpact) — 칸 감소는 조건 아님.
         Debug.Log($"{Tag} 지정 벽 유효 충돌 — 칸 감소 {o.Reduced} · 게이지 {_gauge.Value:0} · 단계 {_model.Stage}", this);
 
         if (!HoldsVulnerable) EndVulnerable("벽 충돌");
@@ -625,7 +694,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         return true;
     }
 
-    // 벽에 부딪힌 넉백만 끝날 때 그로기·취약을 함께 끝낸다(23호 FinishVulnerableKnockback). 벽 아님 = 각자 타이머대로.
+    // 벽에 부딪힌 넉백만 끝날 때 그로기·취약을 함께 끝낸다(23호 FinishVulnerableKnockback, 훈련 유지 중엔 안 끝냄). 벽 아님 = 각자 타이머대로.
     void FinishKnockback()
     {
         bool hitWall = _kbRebound;
@@ -633,7 +702,6 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         _kbRebound = false;
         _wallEpisode.End();
         _wallPusher = null;
-        _ccKnockback = false;
 
         if (hitWall && !_suppressed && State != MonsterState.Dead && !HoldsVulnerable)
         {
@@ -641,16 +709,12 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             if (State == MonsterState.Groggy) DecideNextAfterAction();
         }
 
-        CheckCrowdControlEnded();
-    }
+        // 특성 뇌진탕 — 밀림이 끝나면 기절(23호 ConsumeConcussionAfterPush 와 같은 순서). 취약이 끝났으면 걸지 않는다.
+        if (_pendingConcussion > 0f && IsVulnerable && (_model == null || _model.AcceptsCrowdControl))
+            TryStartStun(_pendingConcussion, "뇌진탕 기절");
+        _pendingConcussion = 0f;
 
-    void CheckCrowdControlEnded()
-    {
-        if (_ccKind == 0 || _ccKnockback || _ccStun) return;
-        TrainingSparringCrowdControl kind = _ccKind;
-        _ccKind = 0;
-        _model.OnCrowdControlEnded(kind);
-        ServerCrowdControlEnded?.Invoke(kind);
+        ServerKnockbackEnded?.Invoke(_kbEpisode);
     }
 
     // 보스 규칙 — Unit.Knockback(방향, 세기) 임펄스로는 밀리지 않는다(밀림은 위 취약 규칙만).
@@ -669,16 +733,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         if (previous == MonsterState.Groggy && next != MonsterState.Groggy)
         {
             if (_suppressed) ExitSuppress(next);
-            if (_counterGroggy)
-            {
-                _counterGroggy = false;
-                _model.OnCounterGroggyEnded();
-            }
             if (_vulnerableStunGroggy)
             {
                 _vulnerableStunGroggy = false;
                 _ccStun = false;
-                CheckCrowdControlEnded();
             }
         }
 
@@ -686,6 +744,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         {
             EndVulnerable("사망", releaseStun: false);
             _kbActive = false;
+            _ccStun = false;
         }
 
         SyncModel();
@@ -701,54 +760,41 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         SyncModel();
     }
 
-    // 처치 방지 — A~D 동안 체력 1 미만으로 내려가지 않는다(Unit.ApplyHealthDamage 의 모든 경로). D 마무리 뒤 해제.
+    // 처치 방지 — T31~T40 동안 체력 1 미만으로 내려가지 않는다(Unit.ApplyHealthDamage 의 모든 경로). T40 마무리 뒤 해제.
     protected override int HealthFloor => TrainingSparringRules.HealthFloor(_model != null && _model.PreventsDeath);
 
     // 초기화 중엔 공격 외 직접·비율 피해도 막는다.
     protected override bool CanApplyHealthDamage(int damage) => !_resetting && base.CanApplyHealthDamage(damage);
     #endregion
 
-    #region B→C 초기화
+    #region T33 위치 복귀 · T34 재시도 위치 복구
+    // T33(명세 §5 T33·T34): 앞 CC 반응(밀림·기절)이 끝나면 상대만 C 위치로. 취약 유지·칸(게이지) 보존·체력만 복구, 잔여 CC·속도 정리.
+    // 플레이어는 옮기지 않는다(쿨·대시 리셋은 진행기 — Q10 A). 투사체는 여기서 지우지 않는다 — T34 시전 기준선이 이전 시전을 거른다.
     void TryRunReset()
     {
-        if (_model == null || !_model.TryConsumeResetRequest()) return;
+        if (_model == null || !_model.TryConsumeResetRequest(CrowdControlActive)) return;
 
         _resetting = true;
         try
         {
-            // 상대 공격·CC·넉백·취약·제압 안전 종료 — 플래그를 먼저 지워 상태 훅이 완료 이벤트를 내지 않게 한다.
             _kbActive = _kbRebound = false;
             _wallEpisode.End();
             _wallPusher = null;
-            _ccKind = 0;
-            _ccKnockback = _ccStun = false;
-            _counterGroggy = false;
+            _pendingConcussion = 0f;
+            _ccStun = false;
             _vulnerableStunGroggy = false;
-            _suppressed = false;
-            _suppressedVisual.Value = false;
-            _suppressEndsAt.Value = 0d;
-            _vulnerableUntil = -1f;
-            _vulnerableVisual.Value = false;
             CancelAttack();
-            status?.ClearAll();
+            status?.ClearAll();   // 속도·잔여 상태이상(취약은 상대 자체 플래그라 남는다)
 
-            // C 위치·방향(플레이어는 옮기지 않는다 — 명세 §9.4).
-            if (agent != null && !agent.enabled) agent.enabled = true;
-            if (resetPoint != null)
-            {
-                Vector3 p = resetPoint.position;
-                if (NavMesh.SamplePosition(p, out NavMeshHit hit, 1f, NavMesh.AllAreas)) p = hit.position;
-                if (agent != null && agent.enabled) agent.Warp(p);
-                else transform.position = p;
-                transform.rotation = Quaternion.Euler(0f, resetPoint.eulerAngles.y, 0f);
-                SetSpawnAnchor(p);
-            }
+            RepositionToResetPoint();
             DecideNextAfterAction();
 
-            Revive();
-            _gauge.Value = BossCounterProgress.GaugeMax;
+            Revive();                     // 체력만 복구
+            _environmentConsumed = false; // T34 지정 벽이 칸을 실제 규칙대로 깎게(T32 중 벽 접촉으로 써 버렸을 수 있다)
+            if (!IsVulnerable && !_suppressed && State != MonsterState.Dead)
+                StartVulnerable("T33 위치 복귀 — 취약 유지");
             _model.OnResetExecuted();
-            Debug.Log($"{Tag} B→C 초기화 — 위치 {(resetPoint != null ? resetPoint.name : "제자리")} · 체력 가득 · 칸 가득 · 단계 {_model.Stage}", this);
+            Debug.Log($"{Tag} T33 위치 복귀 — 위치 {(resetPoint != null ? resetPoint.name : "제자리")} · 체력 가득 · 칸 {RemainingSegments}/{TotalSegments} 보존 · 취약 유지 · 단계 {_model.Stage}", this);
         }
         finally
         {
@@ -756,6 +802,20 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         }
 
         ServerResetExecuted?.Invoke();
+    }
+
+    // C 위치·방향으로 순간 이동하고 앵커를 옮긴다(플레이어는 옮기지 않는다). 위치가 비면 제자리.
+    void RepositionToResetPoint()
+    {
+        if (agent != null && !agent.enabled) agent.enabled = true;
+        if (resetPoint == null) return;
+
+        Vector3 p = resetPoint.position;
+        if (NavMesh.SamplePosition(p, out NavMeshHit hit, 1f, NavMesh.AllAreas)) p = hit.position;
+        if (agent != null && agent.enabled) agent.Warp(p);
+        else transform.position = p;
+        transform.rotation = Quaternion.Euler(0f, resetPoint.eulerAngles.y, 0f);
+        SetSpawnAnchor(p);
     }
     #endregion
 
@@ -836,7 +896,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     {
         get
         {
-            bool finisherSuppress = _stage.Value == TrainingSparringStage.Finisher && _suppressedVisual.Value;
+            bool finisherSuppress = _stage.Value == TrainingSparringStage.SuppressKill && _suppressedVisual.Value;
             bool finishing = !finisherSuppress && _finishPrompt.Value;
             int key = finisherSuppress ? -1 - LobbyUiStrings.CountdownDisplaySeconds(SuppressRemainingSeconds)
                 : finishing ? FinishLabelKey
