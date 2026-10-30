@@ -109,10 +109,10 @@ public static class TraitUiStrings
     public const string FlatToken = "flat";
 
     /// <summary>카드·획득 툴팁 설명 {dmg} 평소 표시(할 일 171) — Shift 누르는 동안만 계산 숫자.</summary>
-    public static readonly UiString DamagePercent = new UiString("UI.Trait.Card.DamagePercent", "공격력의 {percent}", Where + "카드 설명 {dmg} 평소 표시({percent} = 150% 또는 100~150%)(코드)");
+    public static readonly UiString DamagePercent = new UiString("UI.Trait.Card.DamagePercent", "공격력 {percent}", Where + "카드 설명 {dmg} 평소 표시({percent} = 150% 또는 100~150%)(코드)");
 
     /// <summary><see cref="DamagePercent"/> + 고정 추가 피해가 0 이 아닐 때.</summary>
-    public static readonly UiString DamagePercentFlat = new UiString("UI.Trait.Card.DamagePercentFlat", "{flat} + 공격력의 {percent}", Where + "카드 설명 {dmg} 평소 표시 — 고정 추가 피해 있음({flat} = 고정값, {percent} = 계수)(코드)");
+    public static readonly UiString DamagePercentFlat = new UiString("UI.Trait.Card.DamagePercentFlat", "{flat} + 공격력 {percent}", Where + "카드 설명 {dmg} 평소 표시 — 고정 추가 피해 있음({flat} = 고정값, {percent} = 계수)(코드)");
 
     public static readonly IReadOnlyList<UiString> All = new[]
     {

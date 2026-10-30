@@ -93,8 +93,8 @@ public sealed class TraitTooltipValueSource : ISkillTooltipValueSource
 /// 특성 카드 설명 = 템플릿(<see cref="TraitDefinition.Description"/>) → <see cref="SkillTooltipFormatter"/>(할 일 125 5/5).
 /// <c>{필드}</c>·<c>{필드:%}</c> 는 <see cref="TraitTooltipValueSource"/>, <c>{dmg}</c> 는 등록부의 특성별 계산식(캐릭터 레인).
 /// 검증(<see cref="Validate"/>)은 Play 없이 돈다 — 풀리지 않는 토큰·계산식 없는 <c>{dmg}</c> = 오류(EditMode <c>TraitTooltipTests</c> 가 프로젝트 정의 전부를 본다).
-/// 할 일 171 — <c>{dmg}</c> 는 평소 퍼센트 글자(<see cref="FormatDamagePercent"/>, '공격력의 150%'), Shift 누르는 동안만 계산 숫자
-/// (<see cref="SkillTooltipFormatter.DamageValue"/>, 검 아이콘 + 숫자). 전투 HUD 스킬 툴팁은 이 경로를 쓰지 않는다.
+/// 할 일 171 — <c>{dmg}</c> 는 평소 퍼센트 글자(<see cref="FormatDamagePercent"/>, '공격력 150%'), Shift 누르는 동안만 계산 숫자
+/// (<see cref="SkillTooltipFormatter.DamageValue"/>, 검 아이콘 + 숫자) — 둘 다 <see cref="NoBreak"/> 로 줄 중간에서 안 끊긴다. 전투 HUD 스킬 툴팁은 이 경로를 쓰지 않는다.
 /// </summary>
 public static class TraitTooltip
 {
@@ -109,7 +109,7 @@ public static class TraitTooltip
         (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
 
     /// <summary>
-    /// 평소 {dmg} — 피해 색 글자 '공격력의 150%'(계수 범위 '100~150%', 고정 추가 피해가 있으면 '20 + 공격력의 150%').
+    /// 평소 {dmg} — 피해 색 글자 '공격력 150%'(계수 범위 '100~150%', 고정 추가 피해가 있으면 '20 + 공격력 150%').
     /// 문구는 <see cref="TraitUiStrings.DamagePercent"/>·<see cref="TraitUiStrings.DamagePercentFlat"/>.
     /// </summary>
     public static string FormatDamagePercent(SkillTooltipDamage damage)
@@ -141,9 +141,8 @@ public static class TraitTooltip
         bool hasCalculator = registry != null && registry.TryGetDamage(trait.Id, out calculator);
         SkillTooltipDamage damage = hasCalculator && player != null ? calculator(trait, player) : default;
 
-        // 평소(퍼센트)는 포매터에 피해를 넘기지 않아 {dmg} 를 그대로 받고 아래에서 퍼센트 글자로 바꾼다.
-        // Shift 는 계산 숫자만(계산식 없이 — showCalculation false).
-        if (!SkillTooltipFormatter.TryFormat(template, new TraitTooltipValueSource(trait, registry), showValue ? damage : default, false,
+        // 포매터에 피해를 넘기지 않아 {dmg} 를 그대로 받고 아래에서 바꾼다 — 평소 = 퍼센트 글자, Shift = 계산 숫자(계산식 없이).
+        if (!SkillTooltipFormatter.TryFormat(template, new TraitTooltipValueSource(trait, registry), default, false,
                 out text, out bool hasDamage, out error))
             return false;
 
@@ -157,11 +156,17 @@ public static class TraitTooltip
         // 계산할 플레이어가 없으면(로비 미리보기 등) 0 이 아니라 '알 수 없음' 표시.
         if (hasDamage && !damage.HasValue)
             text = text.Replace("{dmg}", TraitUiStrings.DamageUnknown.Text);
-        else if (hasDamage && !showValue)
-            text = text.Replace("{dmg}", FormatDamagePercent(damage));
+        else if (hasDamage)
+            text = text.Replace("{dmg}", NoBreak(showValue ? SkillTooltipFormatter.DamageValue(damage) : FormatDamagePercent(damage)));
 
         return true;
     }
+
+    /// <summary>
+    /// 풀린 {dmg} 표기를 한 덩어리로 — 줄 끝에 걸리면 중간에서 끊지 않고 표기 통째로 다음 줄로(TMP &lt;nobr&gt;).
+    /// 특성 카드·호버 툴팁 전용 — 전투 HUD 스킬 툴팁(<see cref="SkillTooltipFormatter"/> {dmg})은 감싸지 않는다.
+    /// </summary>
+    public static string NoBreak(string text) => $"<nobr>{text}</nobr>";
 
     /// <summary>템플릿 검증 — 문법·풀리지 않는 토큰·계산식 없는 {dmg}.</summary>
     public static bool Validate(TraitDefinition trait, string template, TraitContentRegistry registry, out string error)

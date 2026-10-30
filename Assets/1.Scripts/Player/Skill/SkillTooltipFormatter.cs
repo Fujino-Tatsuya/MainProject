@@ -143,7 +143,7 @@ public static class SkillTooltipFormatter
         return $"<color={DamageColor}><sprite name=\"atk\" color={DamageColor}>{value}</color>";
     }
 
-    /// <summary>피해 색으로 감싼다(아이콘 없음) — 특성 카드 평소 표시 '공격력의 150%' 처럼 문장을 통째로 칠할 때.</summary>
+    /// <summary>피해 색으로 감싼다(아이콘 없음) — 특성 카드 평소 표시 '공격력 150%' 처럼 문장을 통째로 칠할 때.</summary>
     public static string DamageColored(string inner) => $"<color={DamageColor}>{inner}</color>";
 
     /// <summary>계수 → '150%', 범위면 '100~150%'(% 는 끝에 한 번).</summary>
