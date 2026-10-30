@@ -6,7 +6,7 @@ using UnityEngine;
 /// <item>사거리 = 판정 앵커 형상을 플레이어 중심(<c>pivot</c>) 수직축으로 어느 방향으로 돌려도 닿는 최대 수평(XZ) 거리.
 ///       수직축 회전은 XZ 거리를 바꾸지 않으므로, 지금 방향의 월드 형상에서 pivot 으로부터 가장 먼 점까지의 XZ 거리와 같다.
 ///       전방 오프셋(형상 중심까지의 거리)과 크기(반폭·반경)가 함께 들어간다.</item>
-/// <item>대상까지 거리 = pivot 에서 대상 콜라이더 AABB 의 XZ 사각형까지 거리(표면 거리 근사, 안이면 0).
+/// <item>대상까지 거리 = pivot 에서 대상 콜라이더 실제 표면까지 XZ 거리(<see cref="HorizontalDistanceToCollider"/>, 안이면 0, 할 일 139-4).
 ///       판정은 형상이 대상 콜라이더에 닿기만 하면 맞으므로 대상 중심이 아니라 표면 기준이다.</item>
 /// <item>탑다운 바닥 평면 게임이라 수평(XZ)만 본다. 높이는 호출 쪽 후보 질의가 판정 형상의 높이 띠로 거른다.</item>
 /// </list>
@@ -41,19 +41,31 @@ public static class InterruptOmniRangeModel
         return Mathf.Max(HorizontalDistance(pivot, point0), HorizontalDistance(pivot, point1)) + Mathf.Max(0f, radius);
     }
 
-    /// <summary>pivot 에서 대상 AABB 의 XZ 사각형까지 거리. pivot 이 사각형 안이면 0.</summary>
-    public static float HorizontalDistanceToBounds(Vector3 pivot, Bounds targetBounds)
+    /// <summary>
+    /// pivot 에서 대상 콜라이더 실제 표면까지 XZ 거리(할 일 139-4). pivot 이 콜라이더 안이면 0.
+    /// <list type="bullet">
+    /// <item>높이 = 질의점을 콜라이더 AABB 중심 높이로 옮겨 묻는다. 바닥 높이 그대로 물으면 세운 캡슐은 아래 반구로 가서 수평 거리가 커진다.
+    ///       세운 캡슐·Y축만 돈 상자·구는 중심 높이 단면이 가장 넓은 단면이라 수평 표면 거리 그대로다.</item>
+    /// <item>트리거도 그대로 잰다(Hurtbox 가 트리거다). ClosestPoint 를 못 쓰는 콜라이더(비볼록 MeshCollider 등)는
+    ///       AABB 표면으로 근사한다(<c>UnitWallImpacts</c> 와 같은 규칙) — 실제보다 가깝게 나와 강조가 넓은 쪽으로 틀린다.</item>
+    /// </list>
+    /// 이전 AABB XZ 사각형 거리는 대각선에서 최대 r(√2−1) 짧았다(23호 캡슐 r 1.7 → 0.70m).
+    /// </summary>
+    public static float HorizontalDistanceToCollider(Vector3 pivot, Collider target)
     {
-        float dx = Mathf.Max(0f, Mathf.Max(targetBounds.min.x - pivot.x, pivot.x - targetBounds.max.x));
-        float dz = Mathf.Max(0f, Mathf.Max(targetBounds.min.z - pivot.z, pivot.z - targetBounds.max.z));
-        return Mathf.Sqrt(dx * dx + dz * dz);
+        Vector3 probe = new Vector3(pivot.x, target.bounds.center.y, pivot.z);
+        Vector3 closest = SupportsClosestPoint(target) ? target.ClosestPoint(probe) : target.ClosestPointOnBounds(probe);
+        return HorizontalDistance(probe, closest);
     }
 
-    /// <summary>대상 콜라이더가 방향과 상관없이 사거리 안인가 — 표면까지 XZ 거리 ≤ 사거리.</summary>
-    public static bool IsInReach(Vector3 pivot, Bounds targetBounds, float reach)
+    /// <summary>대상 콜라이더가 방향과 상관없이 사거리 안인가 — 실제 표면까지 XZ 거리 ≤ 사거리.</summary>
+    public static bool IsInReach(Vector3 pivot, Collider target, float reach)
     {
-        return reach > 0f && HorizontalDistanceToBounds(pivot, targetBounds) <= reach;
+        return reach > 0f && target != null && HorizontalDistanceToCollider(pivot, target) <= reach;
     }
+
+    private static bool SupportsClosestPoint(Collider c) =>
+        c is BoxCollider || c is SphereCollider || c is CapsuleCollider || (c is MeshCollider mesh && mesh.convex);
 
     private static float HorizontalDistance(Vector3 a, Vector3 b)
     {

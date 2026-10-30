@@ -6,6 +6,7 @@ using UnityEngine;
 /// <summary>
 /// 로비 캐릭터 선택 패널 판단(할 일 48.2) — 첫 포커스·순환 이동·카드 자리·확정(잠금·불가·같은 캐릭터)·ESC·배경 흐름.
 /// 카드 이동 연출(할 일 60) — 이징·단계 전이·이동 중 재목표·테두리 알파·확대·바깥 자리 출입.
+/// 기본/코어 팝업(할 일 162) — 열기·ESC 우선순위(팝업 → 패널)·팝업 뒤 이동·확정 막기.
 /// </summary>
 public sealed class CharacterSelectPanelRulesTests
 {
@@ -177,6 +178,85 @@ public sealed class CharacterSelectPanelRulesTests
         Assert.IsTrue(rules.HandleEscape(false));
         Assert.IsFalse(rules.IsOpen);
         Assert.IsFalse(rules.HandleEscape(false), "닫혀 있을 때 ESC 는 패널이 쓰지 않는다");
+    }
+
+    // ── 기본/코어 팝업(할 일 162) ──
+
+    [Test]
+    public void InfoPopup_OpensOnlyWhilePanelOpen()
+    {
+        var rules = new CharacterSelectPanelRules();
+        Assert.IsFalse(rules.OpenInfoPopup(CharacterSelectInfoTab.Basic), "패널이 닫혀 있으면 열리지 않는다");
+        Assert.IsFalse(rules.IsPopupOpen);
+
+        rules.Open(0, false, AllAvailable);
+        Assert.IsFalse(rules.OpenInfoPopup(CharacterSelectInfoTab.None));
+        Assert.IsTrue(rules.OpenInfoPopup(CharacterSelectInfoTab.Core));
+        Assert.AreEqual(CharacterSelectInfoTab.Core, rules.InfoPopup);
+        Assert.IsTrue(rules.OpenInfoPopup(CharacterSelectInfoTab.Basic), "열린 채 다른 버튼 = 바꾼다");
+        Assert.AreEqual(CharacterSelectInfoTab.Basic, rules.InfoPopup);
+    }
+
+    [Test]
+    public void InfoPopup_Escape_ClosesPopupFirst_ThenPanel()
+    {
+        var rules = Opened(0);
+        rules.OpenInfoPopup(CharacterSelectInfoTab.Basic);
+
+        Assert.AreEqual(CharacterSelectEscapeResult.Ignored, rules.Escape(true), "결과 패널이 ESC 를 쓰면 팝업도 그대로");
+        Assert.IsTrue(rules.IsPopupOpen);
+
+        Assert.AreEqual(CharacterSelectEscapeResult.ClosedPopup, rules.Escape(false), "첫 ESC = 팝업만");
+        Assert.IsFalse(rules.IsPopupOpen);
+        Assert.IsTrue(rules.IsOpen, "패널은 열린 채");
+
+        Assert.AreEqual(CharacterSelectEscapeResult.ClosedPanel, rules.Escape(false), "다음 ESC = 패널");
+        Assert.IsFalse(rules.IsOpen);
+        Assert.AreEqual(CharacterSelectEscapeResult.Ignored, rules.Escape(false));
+    }
+
+    [Test]
+    public void InfoPopup_HandleEscape_FalseWhenOnlyPopupClosed()
+    {
+        var rules = Opened(0);
+        rules.OpenInfoPopup(CharacterSelectInfoTab.Core);
+
+        Assert.IsFalse(rules.HandleEscape(false), "팝업만 닫혔다 — 패널 닫힘(Closed(Escape)) 아님");
+        Assert.IsTrue(rules.IsOpen);
+        Assert.IsTrue(rules.HandleEscape(false));
+    }
+
+    [Test]
+    public void InfoPopup_BlocksFocusAndConfirm_UntilClosed()
+    {
+        var rules = Opened(0);
+        rules.OpenInfoPopup(CharacterSelectInfoTab.Basic);
+
+        Assert.IsFalse(rules.MoveFocus(1), "팝업 뒤 이동 막힘");
+        Assert.IsFalse(rules.FocusCard(2), "팝업 뒤 카드 클릭 막힘");
+        Assert.AreEqual(0, rules.Focus);
+        Assert.AreEqual(CharacterSelectConfirmResult.PopupOpen, rules.Confirm(), "팝업 뒤 확정 막힘");
+        Assert.IsTrue(rules.IsOpen);
+        Assert.IsFalse(CharacterSelectPanelRules.TryGetCloseReason(CharacterSelectConfirmResult.PopupOpen, out _));
+
+        Assert.IsTrue(rules.CloseInfoPopup());
+        Assert.IsFalse(rules.CloseInfoPopup(), "두 번 닫히지 않는다");
+        Assert.IsTrue(rules.MoveFocus(1));
+        Assert.AreEqual(CharacterSelectConfirmResult.Chosen, rules.Confirm());
+    }
+
+    [Test]
+    public void InfoPopup_ClearedByCloseAndReopen()
+    {
+        var rules = Opened(0);
+        rules.OpenInfoPopup(CharacterSelectInfoTab.Basic);
+        Assert.IsTrue(rules.HandleBackButton());
+        Assert.IsFalse(rules.IsPopupOpen, "패널이 닫히면 팝업도 닫힌다");
+
+        rules.Open(0, false, AllAvailable);
+        rules.OpenInfoPopup(CharacterSelectInfoTab.Core);
+        rules.Open(1, true, AllAvailable);
+        Assert.IsFalse(rules.IsPopupOpen, "다시 열면(Show) 팝업은 닫힌 채");
     }
 
     [Test]

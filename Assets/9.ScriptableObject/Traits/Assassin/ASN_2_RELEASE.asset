@@ -17,7 +17,7 @@ MonoBehaviour:
   category: "\uBCC0\uC2E0 \uAC15\uD654"
   description: "\uBCC0\uC2E0 \uC911 \uAE30\uBCF8 \uACF5\uACA9\uACFC Q, E \uD53C\uD574\uAC00
     {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: f6d455a887c15befbe284a5a3397d0e3, type: 3}
   effects:
   - rid: 7237886673709695121
   references:

@@ -4082,27 +4082,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// 고르면 늦은 피어에서 놓친다. ⚠️ EffectAnimEvents(이펙트 공용)는 건드리지 않는다.
     /// </summary>
     [ClientRpc]
-    void StopCutClipLoopsClientRpc()
-    {
-        if (animator == null) return;
-        if (_effects == null && !TryGetComponent(out _effects)) return;
+    void StopCutClipLoopsClientRpc() => StopCurrentClipLoops();
 
-        StopStartedLoops(animator.GetCurrentAnimatorClipInfo(0));
-        if (animator.IsInTransition(0)) StopStartedLoops(animator.GetNextAnimatorClipInfo(0));
-    }
-
-    void StopStartedLoops(AnimatorClipInfo[] clips)
-    {
-        foreach (AnimatorClipInfo info in clips)
-        {
-            if (info.clip == null) continue;
-            foreach (AnimationEvent ev in info.clip.events)
-            {
-                if (ev.functionName == "StartEffect" && !string.IsNullOrEmpty(ev.stringParameter))
-                    _effects.StopEffect(ev.stringParameter);
-            }
-        }
-    }
+    // 공격이 Attack 밖으로 끊기는 경로(취약 넉백·Q 경직·제압·휴면 등)는 상태 콜백에서 각 피어가 끈다(경석 10-30 — 취약 중 훅·어퍼 바람 잔존).
+    // 위 RPC 는 Attack 을 유지한 채 클립만 끊는 경로(즉시 연결·착지 간파 창·차징·레이드) 몫으로 그대로 둔다.
+    protected override bool StopClipLoopsOnAttackExit => true;
 
     /// <summary>
     /// 팔다리 전기 펄스 시작 — 몸통에서 손·발까지 네 갈래가 동시에 흐른다.

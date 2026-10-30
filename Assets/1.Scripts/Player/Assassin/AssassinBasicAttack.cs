@@ -683,6 +683,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         movement.TurnToward(attackDirection);
         player.SetAnimatorMoving(false);
         combatIdle?.NotifyAttackStarted();
+        RaiseBladeDomainFx(mode, stepIndex);
 
         hasPendingClip = turnDelay > 0f;
         if (hasPendingClip)
@@ -692,6 +693,20 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
 
         PlayAttackClip();
+    }
+
+    /// <summary>
+    /// [전 피어] 특성 연출 사건(할 일 145) — 칼날의 영역을 가진 어쌔신의 일반 E 강타 시작(서버 StartServer·클라 StartRpc(NotServer) — 호스트 1번).
+    /// 도형 = 넓어진 강타 판정 도형, 포즈 = 시작 순간 발밑 + 강타 방향(판정은 클립 Hit 순간 위치 — 전진만큼 앞이다). Variant 0.
+    /// </summary>
+    private void RaiseBladeDomainFx(AssassinBasicAttackMode mode, int stepIndex)
+    {
+        if (mode != AssassinBasicAttackMode.Enhanced || !TraitSkillFx.Has(player, TraitFxTrait.AssassinBladeDomain) ||
+            !TryGetHitArea(mode, stepIndex, attackDirection, out AttackShapeSet area, out AttackShapePose pose))
+            return;
+
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.AssassinBladeDomain, TraitFxKind.Activated, player, transform.position,
+            attackDirection, transform.position, shape: area, pose: pose, variant: 0));
     }
 
     private void PlayAttackClip()
@@ -714,6 +729,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         _ => stepIndex,
     };
 
+    /// <summary>그 묶음의 특성 키(피해 배율·범위 배율·파생 공격 공용) — 판정과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.</summary>
+    public static TraitAttackKey TraitKeyFor(AssassinBasicAttackMode mode) => new TraitAttackKey(AttackType.Default, TraitFormOf(mode));
+
     // 특성 피해 배율 키의 형태(할 일 125) — 강타 = Enhanced, 변신 묶음 = Alternate(변신 Q·E 대체 스킬과 같은 구분).
     private static TraitAttackForm TraitFormOf(AssassinBasicAttackMode mode) => mode switch
     {
@@ -730,30 +748,34 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         hitsFired++;
-        var traitKey = new TraitAttackKey(AttackType.Default, TraitFormOf(currentMode));
+        TraitAttackKey traitKey = TraitKeyFor(currentMode);
         // 돌파의 여세 — 이 동작의 첫 판정에서만 소모한다(빗나가도). 같은 판정의 모든 대상이 같은 배율, 변신 묶음 2~4타는 그대로.
         float nextAttackMultiplier = AssassinBasicAttackTraitRules.ConsumesNextAttackBuff(hitsFired)
             ? ConsumeNextAttackBuff(traitKey)
             : 1f;
         int damage = ResolveHitDamage(step.AttackDamageMultiplier, traitKey, nextAttackMultiplier);
-        // 칼날의 영역 — 판정 치수(강타 길이·폭)만 배율. 전진·판정 중심(몸)은 그대로.
-        AssassinTraitAreaRules.ScaleCone(player.TraitModifiers, traitKey, step.Range, step.Angle, out float range, out float angle);
+        if (!TryGetHitArea(currentMode, currentStepIndex, attackDirection, out AttackShapeSet area, out AttackShapePose pose))
+        {
+            Debug.LogError($"[Assassin/평타] {currentMode} {currentStepIndex + 1}타 판정 도형(hitArea)이 비어 있습니다 — 판정 생략.", this);
+            return;
+        }
+
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
         // 급소 파괴 — 대상마다 적중 직전 특성 수정자(밀치기)를 거친다. 강타 키(Default/Enhanced)만 효과가 맞는다(칼날의 영역으로 넓어진 범위 포함).
         bool landed = coneAttack.Fire(
             attackDirection,
-            range,
-            angle,
+            area,
+            pose,
             damage,
             data.TriggersOnHit,
             serverActionCastId,
             traitKey);
 
-        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 범위에 추가 베기 1회 예약.
+        // 끝없는 칼날 — 일반 4타·변신 묶음 마지막 판정을 실행했으면(빗나가도) 같은 도형·포즈에 추가 베기 1회 예약.
         if (AssassinComboExtraRules.Schedules(currentMode, currentStepIndex, NormalStepCount, hitsFired, step.HitCount))
-            ScheduleComboExtra(step, traitKey, range, angle);
+            ScheduleComboExtra(step, traitKey, area, pose);
 
         // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
         if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
@@ -780,11 +802,30 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         return multiplier;
     }
 
-    private int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
+    public int NormalStepCount => data != null && data.NormalSteps != null ? data.NormalSteps.Length : 0;
 
-    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·범위는 지금 값으로 고정(새 조준·이동 없음).
+    /// <summary>
+    /// 그 타의 판정 도형(할 일 153) — 단 데이터 <see cref="AssassinBasicAttackStepData.HitArea"/> 에 칼날의 영역 길이·폭 배율을 바른 것과,
+    /// 기준 포즈(시전자 발밑 + <paramref name="direction"/> — 몸 회전이 아니라 그 타의 조준 방향).
+    /// 서버 판정(<see cref="FireCurrentHit"/>)과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. 단이 없거나 도형이 비면 false.
+    /// </summary>
+    public bool TryGetHitArea(AssassinBasicAttackMode mode, int stepIndex, Vector3 direction, out AttackShapeSet area, out AttackShapePose pose)
+    {
+        area = null;
+        pose = default;
+        if (!TryGetStep(mode, stepIndex, out AssassinBasicAttackStepData step) || step.HitArea == null || step.HitArea.IsEmpty)
+            return false;
+
+        // 칼날의 영역 — 판정 도형 길이·폭만 배율. 전진·판정 기준점(몸)은 그대로.
+        area = AssassinTraitAreaRules.ScaleArea(player != null ? player.TraitModifiers : null, TraitKeyFor(mode), step.HitArea);
+        Vector3 position = transform.position;
+        pose = area.ResolvePose(position, direction, position, direction);
+        return true;
+    }
+
+    // [서버] 끝없는 칼날 예약 — 피해 = 마지막 원래 한 타의 Dref × 비율(다음 공격 강화·4타 합 아님). 위치·방향·도형은 지금 값으로 고정(새 조준·이동 없음).
     // 지연만 공격 가속기를 탄다. VFX 없음(판정만).
-    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, float range, float angle)
+    private void ScheduleComboExtra(AssassinBasicAttackStepData step, TraitAttackKey key, AttackShapeSet area, in AttackShapePose pose)
     {
         traitEffects ??= PlayerTraitEffects.For(this);
         if (traitEffects == null)
@@ -795,7 +836,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         int sourceDref = player.ResolveDamage(step.AttackDamageMultiplier, 0, key);
-        var strike = new ComboExtraStrike(transform.position, attackDirection, range, angle, extra.DamageFrom(sourceDref));
+        var strike = new ComboExtraStrike(area, pose, extra.DamageFrom(sourceDref), ComboExtraFxVariant(currentMode, currentStepIndex));
         float delay = AssassinComboExtraRules.Delay(extra.Delay, AttackSpeedRate);
         pendingComboExtras.Schedule(Time.timeAsDouble, delay, strike);
         Edit.Log($"[Assassin/평타] 끝없는 칼날 예약 — {key}, 기준 {sourceDref} → {strike.Damage}, {delay:F3}초 뒤", this);
@@ -808,10 +849,27 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         {
             if (assassinState != null)
                 coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
-            int landed = coneAttack.FireDerived(strike.Origin, strike.Direction, strike.Range, strike.Angle, strike.Damage);
+            comboExtraFxLanded.Clear();
+            int landed = coneAttack.FireDerived(strike.Area, strike.Pose, strike.Damage, comboExtraFxLanded);
             Edit.Log($"[Assassin/평타] 끝없는 칼날 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
+
+            // 특성 연출 사건(할 일 145) — 추가 베기 판정 순간 1번(빗나가도), 맞은 유닛마다 Hit. 도형은 받는 피어가 Variant(모드·단)로 다시 만든다.
+            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.AssassinEndlessBlade, TraitFxKind.Activated, strike.Pose.Position,
+                strike.Pose.Forward, strike.Pose.Position, strike.Pose, variant: strike.FxVariant);
+            for (int i = 0; i < comboExtraFxLanded.Count; i++)
+            {
+                Unit unit = comboExtraFxLanded[i];
+                if (unit != null)
+                    TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.AssassinEndlessBlade, TraitFxKind.Hit, unit.transform.position,
+                        strike.Pose.Forward, unit.transform.position, target: unit);
+            }
+            comboExtraFxLanded.Clear();
         }
     }
+
+    // 끝없는 칼날 연출 Variant = 모드 × 16 + 단 번호 — 받는 피어가 TryGetHitArea 로 같은 도형을 만든다(TraitSkillFxNetwork).
+    private static int ComboExtraFxVariant(AssassinBasicAttackMode mode, int stepIndex) => (int)mode * 16 + Mathf.Clamp(stepIndex, 0, 15);
+    private readonly System.Collections.Generic.List<Unit> comboExtraFxLanded = new System.Collections.Generic.List<Unit>();
 
     // 사망(살아 있음 → 그 밖)이면 예약을 버린다(명세 §9). 부활 뒤 재개 없음.
     private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
@@ -822,19 +880,17 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private readonly struct ComboExtraStrike
     {
-        public readonly Vector3 Origin;
-        public readonly Vector3 Direction;
-        public readonly float Range;
-        public readonly float Angle;
+        public readonly AttackShapeSet Area;
+        public readonly AttackShapePose Pose;
         public readonly int Damage;
+        public readonly int FxVariant;
 
-        public ComboExtraStrike(Vector3 origin, Vector3 direction, float range, float angle, int damage)
+        public ComboExtraStrike(AttackShapeSet area, AttackShapePose pose, int damage, int fxVariant)
         {
-            Origin = origin;
-            Direction = direction;
-            Range = range;
-            Angle = angle;
+            Area = area;
+            Pose = pose;
             Damage = damage;
+            FxVariant = fxVariant;
         }
     }
 

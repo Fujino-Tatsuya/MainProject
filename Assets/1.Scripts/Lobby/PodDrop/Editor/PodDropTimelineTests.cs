@@ -331,7 +331,10 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(553, PodAnimEventAuthoring.LobbyLaunchFast2Frame);
     }
 
-    // ─── 맵: 빠른 낙하 → 급감속(펴기 시작) → (펴기 이벤트) → 착륙 → (열기 이벤트) → 지연 → 디졸브 → 해제 ───
+    // ─── 맵: 빠른 낙하(날개 펴진 채) → 급감속(접기·펴기 시작) → (접기·펴기 이벤트) → 자유낙하 → (해치 열기 이벤트) → 지연 → 디졸브 → 해제 ───
+
+    // 기본 연출 높이 5m · g 9.81 → √(2·5/9.81).
+    private static readonly float DefaultFreefallSeconds = Mathf.Sqrt(10f / 9.81f);
 
     [Test]
     public void Map_Default_StaticTimes()
@@ -347,8 +350,38 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(2f, t.ReleaseAfterOpenSeconds, Eps, "열기 끝 → 지연 1 + 디졸브 1 = 조작 해제");
         Assert.AreEqual(2f, t.EndAfterOpenSeconds, Eps, "레터박스 아웃 0.5 는 디졸브 안에 끝난다");
         Assert.AreEqual(0.25f, d.podGroundClearance, Eps, "기어 최저점 −0.248m 실측");
-        CollectionAssert.AreEqual(new[] { "DP_WingDeploy", "DP_GearDeploy" }, d.DeployStates);
-        CollectionAssert.AreEqual(new[] { "DP_HatchStageOpen", "DP_WingFold" }, d.OpenStates);
+        // 할 일 150 — 날개는 펴진 채 떨어지다 급감속에 접고(펴기 없음), 착지 순간엔 해치만 연다.
+        CollectionAssert.AreEqual(new[] { "DP_WingFold", "DP_GearDeploy" }, d.DeployStates);
+        CollectionAssert.AreEqual(new[] { "DP_HatchStageOpen" }, d.OpenStates);
+        Assert.AreEqual(9.81f, d.freefallGravity, Eps, "자유낙하 = 실제 중력");
+        Assert.AreEqual(9.81f, t.FreefallGravity, Eps);
+        Assert.AreEqual(DefaultFreefallSeconds, t.FreefallSeconds, Eps, "5m 자유낙하 ≈ 1.01초");
+        Assert.AreEqual(Mathf.Sqrt(2f * 9.81f * 5f), t.TouchdownSpeed, 1e-3f, "착지 속도 √(2gh) ≈ 9.9m/s");
+    }
+
+    [Test]
+    public void Freefall_Static_HeightSpeedSeconds()
+    {
+        Assert.AreEqual(5f, PodDropTimeline.FreefallHeight(5f, 10f, 0f), Eps, "시작 = h");
+        Assert.AreEqual(5f, PodDropTimeline.FreefallHeight(5f, 10f, -1f), Eps, "시작 전 = h");
+        Assert.AreEqual(5f - 0.5f * 10f * 0.25f, PodDropTimeline.FreefallHeight(5f, 10f, 0.5f), Eps, "h − ½·g·t²");
+        Assert.AreEqual(0f, PodDropTimeline.FreefallHeight(5f, 10f, 1f), Eps, "√(2·5/10) = 1초에 지면");
+        Assert.AreEqual(0f, PodDropTimeline.FreefallHeight(5f, 10f, 3f), Eps, "지면 아래로 안 간다");
+        Assert.AreEqual(0f, PodDropTimeline.FreefallHeight(0f, 10f, 0.5f), Eps, "높이 0");
+
+        Assert.AreEqual(0f, PodDropTimeline.FreefallSpeed(10f, 0f), Eps, "추진력 없음 — 속도 0 에서 출발");
+        Assert.AreEqual(5f, PodDropTimeline.FreefallSpeed(10f, 0.5f), Eps, "v = g·t");
+        Assert.AreEqual(1f, PodDropTimeline.FreefallSeconds(5f, 10f), Eps);
+        Assert.AreEqual(0f, PodDropTimeline.FreefallSeconds(0f, 10f), Eps);
+
+        // 가속한다 — 같은 시간 동안 내려온 거리가 뒤로 갈수록 커진다.
+        float first = 5f - PodDropTimeline.FreefallHeight(5f, 10f, 0.25f);
+        float last = PodDropTimeline.FreefallHeight(5f, 10f, 0.75f) - PodDropTimeline.FreefallHeight(5f, 10f, 1f);
+        Assert.Greater(last, first * 3f, "끝 0.25초가 처음 0.25초보다 훨씬 많이 떨어진다(7배)");
+
+        Assert.AreEqual(PodDropTimeline.FallbackGravity, PodDropTimeline.SafeGravity(0f), Eps, "0 이하 → 기본 중력");
+        Assert.AreEqual(PodDropTimeline.FallbackGravity, PodDropTimeline.SafeGravity(float.NaN), Eps);
+        Assert.AreEqual(20f, PodDropTimeline.SafeGravity(20f), Eps);
     }
 
     [Test]
@@ -361,23 +394,62 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(8f, t.PodHeightAt(t.BrakeAt, NotYet), Eps, "급감속 시작 높이");
         Assert.AreEqual(Mathf.Lerp(8f, 5f, Easing.Evaluate(Ease.OutCubic, 0.5f)), t.PodHeightAt(t.BrakeAt + 0.4d, NotYet), Eps, "OutCubic 급감속");
         Assert.AreEqual(5f, t.PodHeightAt(t.HoverAt, NotYet), Eps, "연출 높이");
-        Assert.AreEqual(5f, t.PodHeightAt(100d, NotYet), Eps, "펴기 이벤트 전엔 계속 떠 있다");
+        Assert.AreEqual(5f, t.PodHeightAt(100d, NotYet), Eps, "접기·펴기 이벤트 전엔 계속 떠 있다");
 
         const double deployed = 5d;
-        Assert.AreEqual(5f, t.PodHeightAt(deployed, deployed), Eps, "착륙 시작");
-        Assert.AreEqual(2.5f, t.PodHeightAt(deployed + 0.75d, deployed), Eps, "InOutSine 중간 = 절반");
+        Assert.AreEqual(5f, t.PodHeightAt(deployed, deployed), Eps, "자유낙하 시작");
+        Assert.AreEqual(5f - 0.5f * 9.81f * 0.25f, t.PodHeightAt(deployed + 0.5d, deployed), Eps, "h − ½·g·t²");
+        Assert.AreEqual(deployed + DefaultFreefallSeconds, t.TouchdownAt(deployed), Eps, "착지 = 시작 + √(2h/g)");
         Assert.AreEqual(0f, t.PodHeightAt(t.TouchdownAt(deployed), deployed), Eps, "지면");
         Assert.AreEqual(0f, t.PodHeightAt(100d, deployed), Eps);
     }
 
     [Test]
+    public void Map_Freefall_AcceleratesIntoGround()
+    {
+        // 천천히 내려앉지 않는다 — 처음은 거의 그대로, 끝으로 갈수록 빨라져 세게 닿는다.
+        PodDropMapTimeline t = Map();
+        const double deployed = 5d;
+        double touchdown = t.TouchdownAt(deployed);
+        float half = (float)(touchdown - deployed) * 0.5f;
+        float h = t.PodHeightAt(deployed + half, deployed);
+        Assert.AreEqual(5f * 0.75f, h, 1e-3f, "시간 절반에 높이의 1/4 만 내려왔다");
+
+        float previousDrop = 0f;
+        float previousHeight = 5f;
+        for (int i = 1; i <= 10; i++)
+        {
+            float height = t.PodHeightAt(deployed + (touchdown - deployed) * i / 10d, deployed);
+            float drop = previousHeight - height;
+            Assert.Greater(drop, previousDrop, $"{i}구간 — 매 구간 더 많이 떨어진다(가속)");
+            previousDrop = drop;
+            previousHeight = height;
+        }
+
+        Assert.AreEqual(0f, previousHeight, Eps);
+    }
+
+    [Test]
+    public void Map_Freefall_GravityChangesDuration()
+    {
+        PodDropMapTimings s = PodDropMapTimings.Default;
+        s.freefallGravity = 40f;
+        var hard = new PodDropMapTimeline(s);
+        Assert.AreEqual(0.5f, hard.FreefallSeconds, Eps, "√(2·5/40) = 0.5초");
+        Assert.AreEqual(10d, hard.TouchdownAt(9.5d), Eps);
+
+        s.freefallGravity = 0f;
+        Assert.AreEqual(DefaultFreefallSeconds, new PodDropMapTimeline(s).FreefallSeconds, Eps, "중력 0 → 기본 중력(무한 낙하 없음)");
+    }
+
+    [Test]
     public void Map_EarlyDeployEvent_LandsAfterBrakeEnds()
     {
-        // 펴기 끝 이벤트가 급감속 도중에 와도 연출 높이에 닿은 뒤 착륙한다(높이가 튀지 않는다).
+        // 접기·펴기 끝 이벤트가 급감속 도중에 와도 연출 높이에 닿은 뒤 자유낙하한다(높이가 튀지 않는다).
         PodDropMapTimeline t = Map();
         double early = t.BrakeAt + 0.2d;
         Assert.AreEqual(t.HoverAt, t.LandStartAt(early), Eps);
-        Assert.AreEqual(t.HoverAt + 1.5d, t.TouchdownAt(early), Eps);
+        Assert.AreEqual(t.HoverAt + DefaultFreefallSeconds, t.TouchdownAt(early), Eps);
         Assert.AreEqual(t.PodHeightAt(t.BrakeAt + 0.4d, NotYet), t.PodHeightAt(t.BrakeAt + 0.4d, early), Eps, "급감속은 그대로");
         Assert.AreEqual(5f, t.PodHeightAt(t.HoverAt, early), Eps);
     }
@@ -418,8 +490,8 @@ public sealed class PodDropTimelineTests
     public void Map_EventTimes_DriveTouchdownDissolveRelease()
     {
         PodDropMapTimeline t = Map();
-        Assert.IsTrue(double.IsPositiveInfinity(t.TouchdownAt(NotYet)), "펴기 이벤트 전 = 착륙 없음");
-        Assert.AreEqual(6.5d, t.TouchdownAt(5d), Eps, "착륙 = 펴기 끝 + 1.5");
+        Assert.IsTrue(double.IsPositiveInfinity(t.TouchdownAt(NotYet)), "접기·펴기 이벤트 전 = 착지 없음");
+        Assert.AreEqual(5d + DefaultFreefallSeconds, t.TouchdownAt(5d), Eps, "착지 = 접기·펴기 끝 + √(2h/g)");
 
         const double opened = 8d;
         Assert.AreEqual(9d, t.DissolveAt(opened), Eps, "디졸브 = 열기 끝 + 1초");
@@ -504,15 +576,19 @@ public sealed class PodDropTimelineTests
         s.holdSeconds = -1f;
         s.fallSeconds = -1f;
         s.brakeSeconds = -1f;
-        s.landSeconds = -1f;
+        s.freefallGravity = -1f;
         s.dissolveDelaySeconds = -1f;
         var t = new PodDropMapTimeline(s);
         Assert.AreEqual(0f, t.FallAt, Eps);
         Assert.AreEqual(0f, t.HoverAt, Eps, "낙하·급감속 0 → 곧바로 연출 높이");
         Assert.AreEqual(3d, t.DissolveAt(3d), Eps, "지연 음수 → 0");
         Assert.AreEqual(t.HoverHeight, t.PodHeightAt(0d, NotYet), Eps);
-        Assert.AreEqual(2d, t.TouchdownAt(2d), Eps, "착륙 0 → 펴기 끝 순간 지면");
-        Assert.AreEqual(0f, t.PodHeightAt(2d, 2d), Eps);
+        Assert.AreEqual(2d + DefaultFreefallSeconds, t.TouchdownAt(2d), Eps, "중력 음수 → 기본 중력");
+
+        s.hoverHeight = 0f;
+        var ground = new PodDropMapTimeline(s);
+        Assert.AreEqual(2d, ground.TouchdownAt(2d), Eps, "연출 높이 0 → 접기·펴기 끝 순간 지면");
+        Assert.AreEqual(0f, ground.PodHeightAt(2d, 2d), Eps);
     }
 
     // ─── 클립 묶음 문 ────────────────────────────────────────────────────
@@ -520,9 +596,9 @@ public sealed class PodDropTimelineTests
     [Test]
     public void ClipGate_OpensWhenEveryClipHasEvent()
     {
-        var gate = new PodClipGate(new[] { "DP_WingDeploy", "DP_GearDeploy" });
+        var gate = new PodClipGate(new[] { "DP_WingFold", "DP_GearDeploy" });
         Assert.IsFalse(gate.IsOpen(_ => false, out _), "아무 이벤트도 없다");
-        Assert.IsTrue(gate.Notify("DP_WingDeploy"));
+        Assert.IsTrue(gate.Notify("DP_WingFold"));
         Assert.IsFalse(gate.IsOpen(_ => false, out _), "둘 다 와야 열린다");
         Assert.IsFalse(gate.Notify("DP_HatchStageOpen"), "묶음 밖 클립은 무시");
         Assert.IsTrue(gate.Notify("DP_GearDeploy"));
@@ -533,8 +609,8 @@ public sealed class PodDropTimelineTests
     [Test]
     public void ClipGate_MissingEvent_FallsBackToClipEnd()
     {
-        var gate = new PodClipGate(new[] { "DP_HatchStageOpen", "DP_WingFold" });
-        gate.Notify("DP_HatchStageOpen");
+        var gate = new PodClipGate(new[] { "DP_GearDeploy", "DP_WingFold" });
+        gate.Notify("DP_GearDeploy");
         Assert.IsFalse(gate.IsOpen(s => false, out _), "날개 접기가 아직 돈다");
         Assert.IsTrue(gate.IsOpen(s => s == "DP_WingFold", out List<string> fallbacks), "이벤트가 빠진 클립은 끝까지 돌면 연다");
         CollectionAssert.AreEqual(new[] { "DP_WingFold" }, fallbacks, "경고할 클립");
@@ -592,7 +668,7 @@ public sealed class PodDropTimelineTests
         PodDropMapTimings map = asset.Map;
         PodDropMapTimings m = PodDropMapTimings.Default;
         Assert.AreEqual(m.hoverHeight, map.hoverHeight, Eps);
-        Assert.AreEqual(m.landSeconds, map.landSeconds, Eps);
+        Assert.AreEqual(m.freefallGravity, map.freefallGravity, Eps, "할 일 150 — 새 칸은 기본값(에셋에 없음)");
         // 106 추가 2 — 새 칸은 기본값, 시작 높이는 에셋에서 30 으로 고침.
         Assert.AreEqual(d.launchFastSpeed, asset.Lobby.launchFastSpeed, Eps);
         Assert.AreEqual(d.launchFastSpeed2, asset.Lobby.launchFastSpeed2, Eps, "할 일 121 — 가속 2단계 배율(에셋에도 1)");

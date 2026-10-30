@@ -9,7 +9,8 @@ using UnityEngine;
 /// 20m/s × 4m 를 낸다(루트모션 끔 — Armature Animator applyRootMotion=false). 적·아군은 통과(<see cref="PlayerMotor.PassThroughUnitsOverride"/>),
 /// 벽·지형에 막히면(<c>MovementResolved</c> wasBlocked) 그 자리에서 돌진을 끝내고 실제 이동 거리를 서버에 보고한다.
 ///
-/// 판정 = 서버. 시작 위치·방향·경과 시간으로 경로를 재구성해 매 틱 새로 나아간 구간을 폭 1.2m 상자로 훑는다
+/// 판정 = 서버. 시작 위치·방향·경과 시간으로 경로를 재구성해 매 틱 새로 나아간 구간을 판정 도형(데이터 hitArea — 폭 1.2m 직사각형,
+/// 기준점 = 구간 시작 + 돌진 방향, 할 일 153)으로 훑는다
 /// (가붕이 Q 가 오너 조향을 서버에서 재현하는 것과 같은 정책 — 위치 오차는 판정 허용 범위). 벽 조기 종료는
 /// 오너가 보고한 거리(0~최대 거리로 검증)로 경로 상한을 줄인다. 같은 대상은 사용당 1회, 상자 포함 일반 피해 경로.
 /// 🔸 원격 오너의 보고가 도착하기 전(≈왕복 지연 × 20m/s)만큼은 벽 너머 경로를 이미 훑었을 수 있다 — 호스트 본인은 0.
@@ -34,6 +35,10 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
     private Collider[] hitResults;
     private readonly AssassinDashHitLedger ledger = new AssassinDashHitLedger();
     private readonly List<Unit> tickLandedUnits = new List<Unit>();
+    // 도형 질의(할 일 153) — 질의 하나 안의 1회 키. 구간·단계에 걸친 1회는 적중 장부(activeLedger)가 맡는다.
+    private readonly HashSet<Object> segmentSeen = new HashSet<Object>();
+    private readonly List<AttackShapeHit> shapeHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolveTarget;
 
     private Vector3 dashDirection = Vector3.forward;
 
@@ -332,7 +337,7 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
             return;
 
         Vector3 end = AssassinTrailRules.SegmentEnd(start, direction, traveled);
-        var strike = new TrailStrike(start, end, data.PathWidth, data.PathHeight, trail.DamageFrom(stageDref));
+        var strike = new TrailStrike(start, end, trail.DamageFrom(stageDref));
         float delay = AssassinTrailRules.Delay(trail.Delay, owner.AttackSpeedRate);
         pendingTrails.Schedule(Time.timeAsDouble, delay, strike);
         Edit.Log($"[Assassin/Q] 추격의 궤적 예약 — {traveled:F2}m, 기준 {stageDref} → {strike.Damage}, {delay:F3}초 뒤", this);
@@ -354,50 +359,61 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
         if (hitResults == null || hitResults.Length != data.MaxHitResults)
             hitResults = new Collider[Mathf.Max(1, data.MaxHitResults)];
 
-        AssassinTrailRules.Box(strike.Start, strike.End, strike.Width, strike.Height,
-            out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
-        int count = Physics.OverlapBoxNonAlloc(center, halfExtents, hitResults, rotation, data.HittableLayers, QueryTriggerInteraction.Collide);
-
+        // 원래 Q 경로와 같은 판정 도형 — 지나온 선분 길이에 맞추고 기준점 = 선분 시작 + 선분 방향(할 일 153).
+        Vector3 along = strike.End - strike.Start;
+        along.y = 0f;
         trailTargets.Clear();
-        int landed = 0;
-        for (int i = 0; i < count; i++)
-        {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
+        shapeHits.Clear();
+        resolveTarget ??= ResolveShapeTarget;
+        AttackShapePose pose = data.PathPose(owner.transform.position, strike.Start, along);
+        AttackShapeQuery.Collect(data.PathArea(along.magnitude), pose,
+            data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, resolveTarget, trailTargets, shapeHits);
 
+        // 특성 연출 사건(할 일 145) — 궤적 판정 순간 1번(빗나가도). 시작 → 끝 = 지나온 선분, 도형은 받는 피어가 그 길이로 다시 만든다(Variant = 이 돌진 스킬 순서).
+        Vector3 fxDirection = along.sqrMagnitude > 1e-6f ? along.normalized : owner.transform.forward;
+        TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.AssassinPursuitTrail, TraitFxKind.Activated, strike.Start, fxDirection, strike.End,
+            pose, variant: TrailFxVariant());
+
+        int landed = 0;
+        for (int i = 0; i < shapeHits.Count; i++)
+        {
+            Collider hit = shapeHits[i].Collider;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !trailTargets.Add(target))
-                continue;
 
             AttackInfo attackInfo = new AttackInfo(strike.Damage, DamageAttackType, hitPattern: DamageHitPattern);
             if (assassinState != null)
                 attackInfo = assassinState.WithBackAttack(attackInfo);
             var hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
             bool resolved = hurtbox != null ? hurtbox.ReceiveAttack(attackInfo, hitContext) : unit.ReceiveAttack(attackInfo, hitContext);
-            if (resolved)
-                landed++;
+            if (!resolved)
+                continue;
+            landed++;
+            TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.AssassinPursuitTrail, TraitFxKind.Hit, hit.bounds.center, fxDirection,
+                hit.bounds.center, target: unit);
         }
 
         trailTargets.Clear();
+        shapeHits.Clear();
         Edit.Log($"[Assassin/Q] 추격의 궤적 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
+    }
+
+    // 추격의 궤적 연출 Variant = 플레이어 아래 돌진 스킬(일반·변신 Q·그림자 회귀) 중 이 스킬의 순서 — 전 피어 같은 프리팹이라 받는 피어가 같은 데이터를 찾는다.
+    private int TrailFxVariant()
+    {
+        AssassinDashStrikeSkill[] dashes = owner.GetComponentsInChildren<AssassinDashStrikeSkill>(true);
+        return System.Array.IndexOf(dashes, this);
     }
 
     private readonly struct TrailStrike
     {
         public readonly Vector3 Start;
         public readonly Vector3 End;
-        public readonly float Width;
-        public readonly float Height;
         public readonly int Damage;
 
-        public TrailStrike(Vector3 start, Vector3 end, float width, float height, int damage)
+        public TrailStrike(Vector3 start, Vector3 end, int damage)
         {
             Start = start;
             End = end;
-            Width = width;
-            Height = height;
             Damage = damage;
         }
     }
@@ -444,32 +460,41 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
         SweepSegment(from, target);
     }
 
-    // 이번 틱에 새로 나아간 구간 [from, to] 를 폭 PathWidth 상자로 훑는다(끝점만 보지 않는다).
+    /// <summary>
+    /// 돌진 경로 구간 [<paramref name="from"/>, <paramref name="to"/>](출발점 <paramref name="origin"/> 기준 거리 m)의 판정 영역·기준 포즈(할 일 153) —
+    /// 도형 = 데이터 hitArea 를 구간 길이에 맞춘 복사본, 기준점 = 구간 시작(출발점 + 방향 × from) + 돌진 방향.
+    /// 서버 경로 판정(<see cref="SweepSegment"/>)과 특성 랩 공격 범위 기즈모(할 일 152, 0 ~ DashDistance)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet PathSegment(AssassinDashStrikeSkillData data, Vector3 casterPosition, Vector3 origin, Vector3 direction,
+        float from, float to, out AttackShapePose pose)
+    {
+        pose = data.PathPose(casterPosition, origin + direction * from, direction);
+        return data.PathArea(to - from);
+    }
+
+    // 이번 틱에 새로 나아간 구간 [from, to] 를 판정 도형으로 훑는다(끝점만 보지 않는다).
     private void SweepSegment(float from, float to)
     {
         AssassinDashStrikeSkillData data = DashData;
         if (data == null || owner == null || hitResults == null)
             return;
 
-        float length = to - from;
-        Vector3 center = serverOrigin + dashDirection * (from + length * 0.5f) + Vector3.up * (data.PathHeight * 0.5f);
-        Vector3 halfExtents = new Vector3(data.PathWidth * 0.5f, data.PathHeight * 0.5f, length * 0.5f);
-        int count = Physics.OverlapBoxNonAlloc(
-            center, halfExtents, hitResults, Quaternion.LookRotation(dashDirection),
-            data.HittableLayers, QueryTriggerInteraction.Collide);
+        AttackShapeSet area = PathSegment(data, owner.transform.position, serverOrigin, dashDirection, from, to, out AttackShapePose pose);
+        segmentSeen.Clear();
+        shapeHits.Clear();
+        // 키 = Unit, Unit 이 아닌 대상(상자)은 Hurtbox(가붕이 Q 와 같은 규칙). 시전자 자신은 null.
+        resolveTarget ??= ResolveShapeTarget;
+        AttackShapeQuery.Collect(area, pose, data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, resolveTarget, segmentSeen, shapeHits);
 
         tickLandedUnits.Clear();
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < shapeHits.Count; i++)
         {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
-
+            Collider hit = shapeHits[i].Collider;
+            Object target = shapeHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
 
-            // 상자처럼 Unit 이 아닌 대상은 Hurtbox 를 키로 쓴다(가붕이 Q 와 같은 규칙).
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || activeLedger == null || !activeLedger.TryRegisterTarget(target))
+            // 사용당(그림자 회귀 왕복은 단계마다) 대상 1회 — 구간·틱에 걸친 장부.
+            if (activeLedger == null || !activeLedger.TryRegisterTarget(target))
                 continue;
 
             AttackInfo attackInfo = new AttackInfo(serverStageDref, DamageAttackType, hitPattern: DamageHitPattern);

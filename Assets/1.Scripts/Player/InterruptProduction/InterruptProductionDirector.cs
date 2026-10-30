@@ -470,21 +470,39 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// (줌·슬로우는 서버 시도 슬로우가 처리), 대상 없음도 아무것도 안 켠다(정정1). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
     /// <paramref name="owner"/>·<paramref name="target"/> = 암전에 남길 오너 캐릭터(무기 이펙트 포함 하위 전부)·이번 시도 간파 대상(예측이 고른 캐시 대상).
     /// <paramref name="attackDirection"/> = 근접은 요청에 싣는 시전 방향, 대쉬는 대시 방향 — 적중 섬광 ④ 스미어 방향(할 일 132 §16).
+    /// 새 시도로 받아들였으면 true(인스턴스 없음·대상 없음·중복 입력 = false).
     /// </summary>
-    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast,
+    public static bool LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast,
         GameObject owner, GameObject target, Vector3 attackDirection)
     {
         if (Instance == null)
-            return;
+            return false;
 
         // 받아들일 시도만 대상을 바꾼다 — 태깅은 다음 프레임 암전이 0 → 양수가 될 때(들어옴 램프 첫 값).
         // 대상을 예측보다 먼저 넘긴다: 예측이 같은 호출 안에서 빛 모임을 켜며 KeepInOwnerDim 으로 넣은 루트를 SetSubjects 가 비우지 않게.
         InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
         if (!presentation.Accepts(forecast))
+            return false;
+
+        Instance._ownerDimOutput?.SetSubjects(owner, target);
+        return presentation.Predict(forecast, skill, Time.unscaledTime, attackDirection);
+    }
+
+    /// <summary>
+    /// [오너] 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2) — 결론 전 약 시도면 지금부터 오너 암전·빛 모임을 켠다(늦게 켜지는 것 허용).
+    /// 대상은 <see cref="LocalOwnerAttempt"/> 와 같이 먼저 넘긴다. 강 → 약 내리기는 없다.
+    /// </summary>
+    public static void LocalOwnerUpgrade(GameObject owner, GameObject target)
+    {
+        if (Instance == null)
+            return;
+
+        InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
+        if (!presentation.CanUpgrade)
             return;
 
         Instance._ownerDimOutput?.SetSubjects(owner, target);
-        presentation.Predict(forecast, skill, Time.unscaledTime, attackDirection);
+        presentation.UpgradeToStrong(Time.unscaledTime);
     }
 
     /// <summary>

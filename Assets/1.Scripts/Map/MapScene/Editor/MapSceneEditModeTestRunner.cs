@@ -14,6 +14,8 @@ internal static class MapSceneEditModeTestRunner
         "^MapSceneGateHoldTests$", // 게이트 보류 — 4구역 소개 연출이 끝나야 G7(PLAN-zone4-intro-cinematic)
         "^MapSceneAreaTrackerTests$",
         "^MapSceneBarrierRulesTests$",
+        "^MapSceneBarrierMonsterBlockTests$", // 할 일 148 — 열린 배리어도 몬스터 카브는 남는다(복도 늘 몬스터 출입 금지)
+        "^MapGateLaserViewTests$", // 할 일 160 — 게이트 레이저 시각: 빔 길이 = 폭·줄 수·열림 = 빔·콜라이더 즉시 끔, 발사대·카브 남음
         "^MapSceneBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^MapSceneMonsterLedgerTests$",
         "^MapSceneBossPathRulesTests$",
@@ -30,6 +32,7 @@ internal static class MapSceneEditModeTestRunner
         "^TraitEffectTests$", // 할 일 125 (3/5) 효과 클래스 뼈대 — ①~⑩ 수치(명세 §10 검산)·시전당 1회/간격 거름·되돌리기 장부(재선택·재합류 1회 동작 중복 없음)·HealHp 실제 회복량·밀치기 = AttackInfo 필드만
         "^Trait(Tooltip|SheetBinding|PickConfirm|StringKeys)Tests$", // 할 일 125 (5/5) 카드 설명 토큰·{dmg} 계산식 검증·프로젝트 정의 전체 · Traits_* 시트 바인딩(빈 표 통과·효과 칸 적용/복구) · 2차 상충 확인창·등록부 · Strings 키 규칙
         "^(Paladin|Gunner|Assassin)Trait\\w*Tests$", // 할 일 126~128 캐릭터 레인 픽스처 — 이 줄은 고치지 않는다(이름만 맞추면 자동으로 돈다)
+        "^TraitSkillFxTests$", // 할 일 145 특성 강화 연출 사건 — 특성 종류 ↔ 명세 ID · 구독자 예외 격리 · 공용 RPC 메시지 직렬화
         "^TraitFixedSelectionTests$", // 할 일 125 (1/5) 고정 후보 선택 — 차수 = 획득 수+1·자동 선택 첫 번째·후보 0 = Empty·재선택 1차부터·재합류 해시 복원
         "^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState · 86 T6a SO+Strings 출처
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정

@@ -13,7 +13,8 @@ public enum InterruptWindowState
 
 /// <summary>
 /// 카운터 창 소유자 하나의 열림/닫힘 서버 시각 기록(링버퍼). 순수 C# — 간파 지연 측정 전용(할 일 74 후속).
-/// 판정에는 쓰지 않는다. 시각은 서버 ServerTime(초)이고 기록 순서대로 들어온다고 가정한다.
+/// 판정에는 쓰지 않는다. 시각은 기록 순서대로 들어온다고 가정한다. 시계는 호출측이 고른다 — 지연 판정 기록(<see cref="InterruptLagJudge"/>)은
+/// 서버 ServerTime(실시간), 간파 시도 예측 기록(할 일 139-6)은 게임초(Time.time — 슬로우·배속을 따른다). 한 기록 안에서 섞지 않는다.
 /// </summary>
 public sealed class InterruptWindowHistory
 {
@@ -52,6 +53,20 @@ public sealed class InterruptWindowHistory
 
         _times[index] = serverTime;
         _open[index] = open;
+    }
+
+    /// <summary>
+    /// 관측 기록을 비운다(할 일 139 — 디버그 랩 예측기 관측 초기화). <b>마지막 전이 하나만 남긴다</b> — 지금 창 상태와
+    /// '열린 뒤 경과'는 그대로 읽히고, 완결된 열림이 없어 <see cref="TryGetTypicalOpenDuration"/> 은 다음 열림→닫힘 전까지 false.
+    /// </summary>
+    public void ClearKeepingLatest()
+    {
+        if (_count <= 1)
+            return;
+
+        int latest = (_start + _count - 1) % _times.Length;
+        _start = latest;
+        _count = 1;
     }
 
     /// <summary>
@@ -122,7 +137,14 @@ public sealed class InterruptWindowHistory
     /// 간파 시도 예측(할 일 132)용 창 추정 — <paramref name="now"/> 에 열린 뒤 경과·추정 길이(초). 모르면 -1.
     /// 서버(<see cref="InterruptLagMonitor.EstimateWindow"/>)·오너 클라(<see cref="InterruptWindowReplicaTracker"/>) 공용.
     /// </summary>
-    public void Estimate(double now, bool openNow, out float openElapsed, out float expectedDuration)
+    public void Estimate(double now, bool openNow, out float openElapsed, out float expectedDuration) =>
+        Estimate(now, openNow, InterruptWindowLengthResolver.Unknown, out openElapsed, out expectedDuration);
+
+    /// <summary>
+    /// 위와 같고, 추정 길이는 <paramref name="localLength"/>(로컬로 아는 이번 열림 길이 — <see cref="InterruptWindowLengthResolver"/>,
+    /// 무기한 = +∞)를 먼저 쓴다. 모르면(-1) 관측 중앙값(할 일 139-6). <paramref name="now"/> 는 기록과 같은 시계여야 한다.
+    /// </summary>
+    public void Estimate(double now, bool openNow, float localLength, out float openElapsed, out float expectedDuration)
     {
         openElapsed = -1f;
         expectedDuration = -1f;
@@ -130,6 +152,7 @@ public sealed class InterruptWindowHistory
             openElapsed = (float)(now - since);
         if (TryGetTypicalOpenDuration(out double typical))
             expectedDuration = (float)typical;
+        expectedDuration = InterruptWindowLengthResolver.PreferLocal(localLength, expectedDuration);
     }
 }
 

@@ -523,4 +523,105 @@ public sealed class InterruptOwnerPresentationTests
         Assert.AreEqual(-1f, elapsed);
         Assert.AreEqual(-1f, expected);
     }
+
+    // ─── 대쉬 간파 재예측 약 → 강(할 일 139-2) ───
+
+    [Test]
+    public void 재예측_강_올리기는_약_시도에_암전과_빛_모임을_늦게_켠다()
+    {
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 10f);
+        Assert.IsTrue(_sm.CanUpgrade);
+
+        Assert.IsTrue(_sm.UpgradeToStrong(10.25f));
+        Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
+        Assert.IsTrue(_sm.PredictedStrong);
+        Assert.IsTrue(_sm.AwaitsStrongResult);
+        Assert.IsTrue(_sm.LightGatherActive);
+        Assert.AreEqual(1, _out.GatherStarts);
+        _sm.Tick(10.375f);
+        Assert.AreEqual(1f, _out.Dim, "들어옴 시간 뒤 다 켜짐");
+
+        Assert.IsFalse(_sm.CanUpgrade, "한 번만");
+        Assert.IsFalse(_sm.UpgradeToStrong(10.4f));
+        Assert.AreEqual(1, _out.GatherStarts);
+    }
+
+    [Test]
+    public void 재예측으로_올린_강은_뒤늦은_서버_약_목적으로_걷지_않는다()
+    {
+        // 원격 오너 — 승인 때 서버 약 시도 슬로우 시작이 오너 재예측보다 늦게 도착.
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 10f);
+        _sm.UpgradeToStrong(10.0625f);
+        _sm.ServerStarted(5, SlowMotionPurpose.AttemptWeak, true, 10.125f);
+        _sm.Tick(10.25f);
+
+        Assert.IsFalse(_sm.Mispredicted);
+        Assert.AreEqual(InterruptOwnerPresentationState.AttemptStrong, _sm.State);
+        Assert.AreEqual(5u, _sm.AttemptTriggerId, "실패 복귀는 이 번호로 받는다");
+        Assert.AreEqual(1f, _out.Dim);
+
+        _sm.ServerFailed(5, 10.25f);
+        _sm.Tick(10.5f);
+        Assert.AreEqual(0f, _out.Dim, "서버 실패면 걷는다");
+    }
+
+    [Test]
+    public void 서버_재예측_강이_먼저_와도_오너_재예측이_켠다()
+    {
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 10f);
+        _sm.ServerStarted(5, SlowMotionPurpose.AttemptWeak, true, 10f);
+        _sm.ServerStarted(6, SlowMotionPurpose.Attempt, true, 10.0625f); // 서버 재예측 — 기존 규칙대로 오너는 아직 안 켠다
+        Assert.AreEqual(0f, _out.Dim);
+        Assert.IsTrue(_sm.CanUpgrade);
+
+        Assert.IsTrue(_sm.UpgradeToStrong(10.125f));
+        _sm.Tick(10.25f);
+        Assert.AreEqual(1f, _out.Dim);
+        Assert.AreEqual(6u, _sm.AttemptTriggerId);
+
+        _sm.ServerStarted(7, SlowMotionPurpose.Success, true, 10.3f);
+        Assert.AreEqual(InterruptOwnerPresentationState.Success, _sm.State);
+        Assert.IsTrue(_sm.SuccessDimmed, "강으로 올린 시도의 성공 = 섬광 오버레이 조건");
+    }
+
+    [Test]
+    public void 재예측_올리기는_결론_전_약_시도만()
+    {
+        Assert.IsFalse(_sm.CanUpgrade, "시도 없음");
+        Assert.IsFalse(_sm.UpgradeToStrong(10f));
+        Assert.AreEqual(0, _out.GatherStarts);
+
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        Assert.IsFalse(_sm.CanUpgrade, "이미 강");
+
+        _sm.ForcedReset();
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 11f);
+        _sm.LocalEnded(11.1f);
+        Assert.IsFalse(_sm.UpgradeToStrong(11.2f), "판정 전 종료로 결론난 시도");
+
+        // 새 시도는 올린 기록을 지운다 — 강 예측 뒤 서버 약이면 다시 걷는다.
+        _sm.ForcedReset();
+        _sm.Predict(InterruptAttemptForecast.Weak, null, 12f);
+        _sm.UpgradeToStrong(12f);
+        _sm.ForcedReset();
+        _sm.Predict(InterruptAttemptForecast.Strong, null, 13f);
+        _sm.ServerStarted(9, SlowMotionPurpose.AttemptWeak, true, 13.125f);
+        Assert.IsTrue(_sm.Mispredicted);
+    }
+
+    [Test]
+    public void 재예측_입력은_준비_기준점만_처음_시도로_되돌린다()
+    {
+        // 대시 도중(10.05) 지금 값 — 누른 순간 10.0 의 t0 로 판정 시각 = max(대시 끝 10.2, 10.0 + 0.3) = 10.3.
+        var now = InterruptAttemptPrediction.BuildInput(10.05f, new Vector3(0.5f, 0f, 0f), 0.3f,
+            true, Vector3.right, 10f, 0.15f, true, true, 0f, 1f);
+        DashInterruptPredictInput again = InterruptAttemptPrediction.ForReprediction(now, 10f);
+
+        Assert.AreEqual(10f, again.SkillStartTime, 1e-4f);
+        Assert.AreEqual(now.CastTime, again.CastTime);
+        Assert.AreEqual(now.CastPosition, again.CastPosition);
+        Assert.AreEqual(now.DashRemaining, again.DashRemaining);
+        Assert.AreEqual(10.3f, DashInterruptPredictor.Predict(again).PredictedResolveTime, 1e-4f);
+        Assert.AreEqual(10.35f, DashInterruptPredictor.Predict(now).PredictedResolveTime, 1e-4f, "되돌리지 않으면 늦게 잡힌다");
+    }
 }

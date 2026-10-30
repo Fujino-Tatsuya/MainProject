@@ -689,6 +689,26 @@ public class Player : Unit
         stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
+    /// <summary>
+    /// [서버] 특성 강화 연출 사건(할 일 145) — 서버만 아는 판정(파생 공격·특성 밀치기 적중)을 전 피어 <see cref="TraitSkillFx.Raised"/> 로 낸다.
+    /// 오프라인이면 바로 낸다. 연출 전용 — 판정·피해와 무관하다. 호출은 <see cref="TraitSkillFxNetwork.ServerSend"/>.
+    /// </summary>
+    internal void ServerSendTraitSkillFx(in TraitSkillFxMessage message)
+    {
+        if (!IsNetworkActive)
+        {
+            TraitSkillFxNetwork.Receive(this, message);
+            return;
+        }
+
+        if (IsServer)
+            TraitSkillFxRpc(message);
+    }
+
+    // 특성 공용 연출 RPC 1개 — ClientsAndHost 라 호스트도 이 경로로 1번만 낸다(서버 쪽에서 따로 내지 않는다).
+    [Rpc(SendTo.ClientsAndHost)]
+    private void TraitSkillFxRpc(TraitSkillFxMessage message) => TraitSkillFxNetwork.Receive(this, message);
+
 
     /// <summary>
     /// 🔴 **이 브랜치는 오너 권위 이동이다.** 서버 권위 브랜치와 가르는 단 하나의 스위치.

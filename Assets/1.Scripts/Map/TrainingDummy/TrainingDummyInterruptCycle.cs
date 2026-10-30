@@ -33,6 +33,7 @@ public sealed class TrainingDummyInterruptCycle
     readonly CounterWindow _window = new CounterWindow();
 
     float _remaining;
+    bool _held; // 외부 게이트(ITrainingDummyWindowGate)가 닫아 둔 idle — 시간으로 풀리지 않는다
 
     public TrainingDummyInterruptCycle(float vulnerableSeconds, float idleSeconds)
     {
@@ -48,8 +49,14 @@ public sealed class TrainingDummyInterruptCycle
     /// <summary>CC(넉백·스턴 등)가 들어가는가. 취약일 때만 — 나머지 상태에서 호출측이 슈퍼아머로 막는다.</summary>
     public bool AllowsCrowdControl => State == TrainingDummyInterruptState.Vulnerable;
 
-    /// <summary>현재 상태의 남은 시간(초). 인터럽트 가능 상태는 무기한이라 0.</summary>
-    public float Remaining => IsInterruptible ? 0f : Math.Max(0f, _remaining);
+    /// <summary>외부 게이트가 창을 닫아 둔 idle 인가(<see cref="HoldClosed"/>). 시간으로 풀리지 않는다.</summary>
+    public bool IsHeldClosed => _held;
+
+    /// <summary>인터럽트 성공 후 회복 중(취약, 또는 시간이 흐르는 idle)인가.</summary>
+    public bool IsRecovering => !IsInterruptible && !_held;
+
+    /// <summary>현재 상태의 남은 시간(초). 인터럽트 가능 상태·외부에서 닫아 둔 idle 은 무기한이라 0.</summary>
+    public float Remaining => IsInterruptible || _held ? 0f : Math.Max(0f, _remaining);
 
     /// <summary>
     /// 지금까지 성공한 인터럽트 수. <see cref="Reset"/> 으로도 줄지 않는다 — 한 타격의 전후 비교로
@@ -62,7 +69,35 @@ public sealed class TrainingDummyInterruptCycle
     {
         State = TrainingDummyInterruptState.Interruptible;
         _remaining = 0f;
+        _held = false;
         _window.Open(UnboundedWindow);
+    }
+
+    /// <summary>
+    /// 창을 외부에서 닫는다(디버그 랩 주기 모드, 할 일 139). 인터럽트 가능일 때만 — idle 로 넘어가고
+    /// <see cref="ReleaseHold"/> 전까지 시간으로 풀리지 않는다. <b>상태가 바뀌었으면 true.</b>
+    /// 회복 중에는 아무것도 안 한다 — 회복이 끝난 뒤 게이트가 다시 묻는다.
+    /// </summary>
+    public bool HoldClosed()
+    {
+        if (!IsInterruptible)
+            return false;
+
+        _window.Close();
+        State = TrainingDummyInterruptState.Idle;
+        _remaining = 0f;
+        _held = true;
+        return true;
+    }
+
+    /// <summary>외부에서 닫아 둔 창을 다시 연다. <b>상태가 바뀌었으면 true.</b> 닫아 둔 게 아니면 아무것도 안 한다.</summary>
+    public bool ReleaseHold()
+    {
+        if (!_held)
+            return false;
+
+        Reset();
+        return true;
     }
 
     /// <summary>
@@ -87,7 +122,7 @@ public sealed class TrainingDummyInterruptCycle
     /// <param name="deltaTime">서버 틱 간격. 음수는 0 으로 본다.</param>
     public bool Tick(float deltaTime)
     {
-        if (IsInterruptible)
+        if (IsInterruptible || _held)
             return false;
 
         TrainingDummyInterruptState before = State;

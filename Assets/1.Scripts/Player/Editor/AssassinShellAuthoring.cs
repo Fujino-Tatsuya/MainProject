@@ -1304,7 +1304,7 @@ public static class AssassinShellAuthoring
             EnsureDagger(root.transform, "RightHand", DaggerRightPath, material);
 
             EnsureAnchor(root.transform, "DefaultAttack", new Vector3(0f, 1f, 0.85f), new Vector3(2f, 2f, 1.7f));
-            EnsureAnchor(root.transform, "InterruptAttack", new Vector3(0f, 1f, 0.9f), new Vector3(1.4f, 1.8f, 1.4f));
+            EnsureAnchor(root.transform, "InterruptAttack", new Vector3(0f, 1.3f, 0.9f), new Vector3(1.4f, 2.4f, 1.4f));
 
             Transform vfx = EnsureChild(root.transform, "VFX");
             EnsureChild(vfx, "BasicAttack01");

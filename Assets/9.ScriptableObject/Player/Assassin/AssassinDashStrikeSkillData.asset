@@ -18,6 +18,7 @@ MonoBehaviour:
     description: "TODO \uBC14\uB77C\uBCF4\uB294 \uBC29\uD5A5\uC73C\uB85C \uB3CC\uC9C4\uD558\uBA70
       \uACBD\uB85C\uC758 \uC801\uC5D0\uAC8C {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
     icon: {fileID: 21300000, guid: 785c52d12aaa5d87e247c5d5d2d40533, type: 3}
+    tags: 
   inputType: 0
   cooldownTime: 5
   commitCooldownManually: 0
@@ -44,10 +45,27 @@ MonoBehaviour:
   hoverMarkerDistance: 3
   animatorStateName: Assassin_Q_DashStrike
   snapRotationOnStart: 1
+  followUpIconTint: {r: 1, g: 1, b: 1, a: 1}
   prepareDuration: 0.1
   endDuration: 0.1
   dashDistance: 5
   dashSpeed: 60
-  pathWidth: 1.2
-  pathHeight: 2
+  hitArea:
+    origin: 1
+    shapes:
+    - rid: 7237886701681771181
   maxHitResults: 16
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681771181
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: 0
+        maxHeight: 2
+        length: 5
+        width: 1.2
+        backOffset: 0
