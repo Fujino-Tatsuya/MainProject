@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
-/// <summary>목표 패널 하단 진행 줄 종류(할 일 158). None = 구분선·진행 줄을 끈다.</summary>
+/// <summary>
+/// 목표 패널 하단 진행 줄 종류(할 일 158). None = 구분선·진행 줄을 끈다.
+/// 이름·값 = 157 <c>LobbyTutorialProgressMode</c> 와 같다(계약 §2 — 바인더가 그대로 캐스팅해도 된다).
+/// </summary>
 public enum LobbyTutorialProgressKind
 {
     None = 0,
-    TrainingDone = 1, // 훈련 완료 n/N — 6항목을 마친 파티원 수
-    Gather = 2,       // 집결 n/N — 활성 구역 안 인원
-    Countdown = 3,    // 시작까지 n — 전투 시작 3·2·1
+    Gather = 1,        // 집결 n/N — 활성 구역 안 인원
+    PartyComplete = 2, // 훈련 완료 n/N — 6항목을 마친 파티원 수(T10)
+    Countdown = 3,     // 시작까지 n — 전투 시작 3·2·1(T20 카운트다운 = 표시 상태 T21)
 }
 
 /// <summary>하단 진행 줄 입력. Countdown 은 <see cref="N"/> 만 쓴다.</summary>
@@ -55,12 +58,40 @@ public sealed class LobbyObjectiveView
     public LobbyTutorialProgress Progress;
 }
 
-/// <summary>대사 패널 뒤 전면 삽화(명세 23·24).</summary>
+/// <summary>대사 패널 뒤 전면 삽화(명세 23·24). 157 단계표 backgroundId 글자 ↔ 값 = <see cref="LobbyTutorialBackgroundIds"/>.</summary>
 public enum LobbyTutorialBackground
 {
     None = 0,
     Factory = 1,   // Scene_01 — 로봇 생산 시설
     Rebellion = 2, // Scene_02 — 기계 반란
+}
+
+/// <summary>삽화 ID — 157 단계표 행 칸 backgroundId 와 같은 글자(계약 §1, L32·L33).</summary>
+public static class LobbyTutorialBackgroundIds
+{
+    public const string Factory = "BRIEF_BG_FACTORY";
+    public const string Rebellion = "BRIEF_BG_REBELLION";
+
+    /// <summary>backgroundId → 삽화. 빈 값 = None, 모르는 ID = false(None).</summary>
+    public static bool TryParse(string id, out LobbyTutorialBackground background)
+    {
+        switch (id)
+        {
+            case null:
+            case "":
+                background = LobbyTutorialBackground.None;
+                return true;
+            case Factory:
+                background = LobbyTutorialBackground.Factory;
+                return true;
+            case Rebellion:
+                background = LobbyTutorialBackground.Rebellion;
+                return true;
+            default:
+                background = LobbyTutorialBackground.None;
+                return false;
+        }
+    }
 }
 
 /// <summary>
@@ -80,7 +111,7 @@ public static class LobbyTutorialUiRules
     {
         switch (progress.Kind)
         {
-            case LobbyTutorialProgressKind.TrainingDone:
+            case LobbyTutorialProgressKind.PartyComplete:
             case LobbyTutorialProgressKind.Gather:
                 return progress.Total > 0;
             case LobbyTutorialProgressKind.Countdown:

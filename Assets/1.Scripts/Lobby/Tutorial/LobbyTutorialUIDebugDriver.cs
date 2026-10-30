@@ -109,7 +109,7 @@ public static class LobbyTutorialUIDebugScenes
         n => Dlg("05 L11", S.DlgCentralIntro, LobbyTutorialBackground.None),
         n => Obj("06–07 L20", S.ChapterTrainingPrep, S.ObjGatherTraining, null, null, Gather(2, n), LobbyTutorialPathIds.TrainingHall),
         n => Dlg("08 L21", S.DlgTrainingIntro, LobbyTutorialBackground.None),
-        n => Obj("09 T10", S.ChapterBasic, S.ObjBasic, null, BasicChecks(), new LobbyTutorialProgress(LobbyTutorialProgressKind.TrainingDone, 1, n), null),
+        n => Obj("09 T10", S.ChapterBasic, S.ObjBasic, null, BasicChecks(), new LobbyTutorialProgress(LobbyTutorialProgressKind.PartyComplete, 1, n), null),
         n => Obj("10 T20", S.ChapterCombat, S.ObjGatherZone, null, null, Gather(0, n), LobbyTutorialPathIds.CombatArea),
         n => Obj("11 T21", S.ChapterCombat, S.ObjCombatKillAll, null, null, new LobbyTutorialProgress(LobbyTutorialProgressKind.Countdown, 3, 0), null),
         n => Obj("12 T22", S.ChapterCombat, S.ObjCombatKillAll, null, null, default, null),

@@ -21,7 +21,7 @@ public sealed class LobbyTutorialUiRulesTests
         Assert.That(LobbyTutorialUiRules.ShowProgress(LobbyTutorialProgress.None), Is.False);
         Assert.That(LobbyTutorialUiRules.ShowProgress(new LobbyTutorialProgress(LobbyTutorialProgressKind.Gather, 0, 3)), Is.True);
         Assert.That(LobbyTutorialUiRules.ShowProgress(new LobbyTutorialProgress(LobbyTutorialProgressKind.Gather, 0, 0)), Is.False);
-        Assert.That(LobbyTutorialUiRules.ShowProgress(new LobbyTutorialProgress(LobbyTutorialProgressKind.TrainingDone, 1, 2)), Is.True);
+        Assert.That(LobbyTutorialUiRules.ShowProgress(new LobbyTutorialProgress(LobbyTutorialProgressKind.PartyComplete, 1, 2)), Is.True);
         Assert.That(LobbyTutorialUiRules.ShowProgress(new LobbyTutorialProgress(LobbyTutorialProgressKind.Countdown, 3, 0)), Is.True);
         Assert.That(LobbyTutorialUiRules.ShowProgress(new LobbyTutorialProgress(LobbyTutorialProgressKind.Countdown, 0, 0)), Is.False);
     }
@@ -108,5 +108,35 @@ public sealed class LobbyTutorialUiRulesTests
         Assert.That(LobbyTutorialUiStrings.TryGetTagLabel("Heal", out _), Is.False);
         Assert.That(LobbyTutorialUiStrings.TryGetProgress(LobbyTutorialProgressKind.None, out _), Is.False);
         Assert.That(LobbyTutorialUiStrings.TryGetProgress(LobbyTutorialProgressKind.Countdown, out UiString cd) && cd.Ko.Contains("{n}"), Is.True);
+    }
+
+    // 157 계약(handoff-lobby-tutorial-contract.md) 단계표 칸 값 — 바인더가 그대로 넘긴다.
+    [Test]
+    public void Contract_KeyOfMapsStepTableIds()
+    {
+        Assert.That(LobbyTutorialUiStrings.KeyOf("LOBBY_OBJ_CENTRAL"), Is.EqualTo("Tutorial.Guide.LOBBY_OBJ_CENTRAL"));
+        Assert.That(LobbyTutorialUiStrings.KeyOf("Tutorial.Guide.LOBBY_OBJ_CENTRAL"), Is.EqualTo("Tutorial.Guide.LOBBY_OBJ_CENTRAL"));
+        Assert.That(LobbyTutorialUiStrings.KeyOf(null), Is.Empty);
+        foreach (string id in new[] { "LOBBY_DLG_INTRO", "LOBBY_DLG_TRAINING", "LOBBY_BRIEF_EVAL", "LOBBY_BRIEF_FACTORY", "LOBBY_BRIEF_REBELLION",
+                     "LOBBY_BRIEF_SORTIE", "LOBBY_SPEAKER_SUPERVISOR", "LOBBY_PROGRESS_PARTY_DONE", "LOBBY_CHECK_RMB", "LOBBY_OBJ_SORTIE_GATHER" })
+            Assert.That(LobbyTutorialUiStrings.TryGet(LobbyTutorialUiStrings.KeyOf(id), out _), Is.True, id);
+    }
+
+    [Test]
+    public void Contract_ProgressKindMatchesProgressModeValues()
+    {
+        Assert.That((int)LobbyTutorialProgressKind.Gather, Is.EqualTo(1));
+        Assert.That((int)LobbyTutorialProgressKind.PartyComplete, Is.EqualTo(2));
+        Assert.That((int)LobbyTutorialProgressKind.Countdown, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void Contract_BackgroundIdsParse()
+    {
+        Assert.That(LobbyTutorialBackgroundIds.TryParse("BRIEF_BG_FACTORY", out var f) && f == LobbyTutorialBackground.Factory, Is.True);
+        Assert.That(LobbyTutorialBackgroundIds.TryParse("BRIEF_BG_REBELLION", out var r) && r == LobbyTutorialBackground.Rebellion, Is.True);
+        Assert.That(LobbyTutorialBackgroundIds.TryParse("", out var none) && none == LobbyTutorialBackground.None, Is.True);
+        Assert.That(LobbyTutorialBackgroundIds.TryParse("Factory", out var unknown), Is.False);
+        Assert.That(unknown, Is.EqualTo(LobbyTutorialBackground.None));
     }
 }

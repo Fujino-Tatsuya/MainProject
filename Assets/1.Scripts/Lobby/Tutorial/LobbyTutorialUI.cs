@@ -90,6 +90,17 @@ public sealed class LobbyTutorialUI : MonoBehaviour
             dialoguePanel.Show(speakerKey, lineKey, background);
     }
 
+    /// <summary>
+    /// 157 단계표 값 그대로 받는 대사 — <paramref name="backgroundId"/> = <see cref="LobbyTutorialBackgroundIds"/>(빈 값 = 삽화 없음).
+    /// 모르는 ID 면 경고 후 삽화 없이 띄운다.
+    /// </summary>
+    public void ShowDialogue(string speakerKey, string lineKey, string backgroundId)
+    {
+        if (!LobbyTutorialBackgroundIds.TryParse(backgroundId, out LobbyTutorialBackground background))
+            Debug.LogWarning($"{Tag} 모르는 삽화 ID '{backgroundId}' — 삽화 없이 띄운다.", this);
+        ShowDialogue(speakerKey, lineKey, background);
+    }
+
     /// <summary>대사 패널을 닫는다(삽화도). 목표 패널은 유예 뒤 다시 보인다. 대사 중이 아니면 아무것도 안 한다.</summary>
     public void EndDialogue()
     {
