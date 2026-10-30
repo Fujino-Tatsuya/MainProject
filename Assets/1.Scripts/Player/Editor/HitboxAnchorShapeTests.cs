@@ -4,8 +4,9 @@ using UnityEngine;
 /// <summary>
 /// 할 일 139-3 — 간파 시도 예측의 대상 검사 = 판정 앵커를 공격 방향으로 돌려 판정 위치에 놓은 오버랩(<see cref="HitboxAnchorShape"/>,
 /// 서버 판정 <c>OverlapHitboxAnchor</c> 와 같은 질의). 허수아비(캡슐 r 0.5 · 높이 2)를 진짜 콜라이더로 두고 같은 질의로 본다.
-/// 앵커 값 = 프리팹 저작값: 어쌔신·거너 상자 중심 (0, 1, 0.9) · 반크기 (0.7, 0.9, 0.7) → 정면 도달 1.6 · 옆 0.7 · 전방위 1.746,
-/// 팔라딘 (0, 0.04, 0.9) · (0.8, 0.5, 0.8) → 정면 1.7 · 옆 0.8 · 전방위 1.879. 거리 = 판정 위치 → 허수아비 표면 수평 거리.
+/// 앵커 값 = 프리팹 저작값: 어쌔신·거너 상자 중심 (0, 1.3, 0.9) · 반크기 (0.7, 1.2, 0.7) → 정면 도달 1.6 · 옆 0.7 · 전방위 1.746,
+/// 팔라딘 (0, 1.34, 0.9) · (0.8, 1.2, 0.8) → 정면 1.7 · 옆 0.8 · 전방위 1.879. 높이 띠 = 발 +0.1 ~ +2.5(할 일 163 — 웰즈 & 23호 몸에 맞춤).
+/// 거리 = 판정 위치 → 허수아비 표면 수평 거리.
 /// 이전 규칙(전방위 도달 + 공격 방향 반평면)은 아래 '대상 없음' 경우를 전부 대상 있음으로 봤다.
 /// </summary>
 public sealed class HitboxAnchorShapeTests
@@ -14,10 +15,10 @@ public sealed class HitboxAnchorShapeTests
     // 씬의 다른 콜라이더와 떨어진 곳에서 잰다.
     private static readonly Vector3 Pivot = new Vector3(5000f, 0f, 5000f);
 
-    private static readonly Vector3 GunnerCenter = new Vector3(0f, 1f, 0.9f);
-    private static readonly Vector3 GunnerHalf = new Vector3(0.7f, 0.9f, 0.7f);
-    private static readonly Vector3 PaladinCenter = new Vector3(0f, 0.04f, 0.9f);
-    private static readonly Vector3 PaladinHalf = new Vector3(0.8f, 0.5f, 0.8f);
+    private static readonly Vector3 GunnerCenter = new Vector3(0f, 1.3f, 0.9f);
+    private static readonly Vector3 GunnerHalf = new Vector3(0.7f, 1.2f, 0.7f);
+    private static readonly Vector3 PaladinCenter = new Vector3(0f, 1.34f, 0.9f);
+    private static readonly Vector3 PaladinHalf = new Vector3(0.8f, 1.2f, 0.8f);
 
     private GameObject dummy;
     private CapsuleCollider dummyCollider;
@@ -136,6 +137,21 @@ public sealed class HitboxAnchorShapeTests
         Assert.IsTrue(Hits(PaladinCenter, PaladinHalf, Pivot, Vector3.forward, 75f, 0.55f));
     }
 
+    // ─── 보스 몸(웰즈 & 23호 HurtBox 캡슐 r 1.7 · 높이 5.78, 바닥부터) ───
+
+    [Test]
+    public void 웰즈_23호_가장_넓은_단면_기준_정면_도달_그대로_닿는다()
+    {
+        dummyCollider.radius = 1.7f;
+        dummyCollider.height = 5.78f;
+        dummyCollider.center = new Vector3(0f, 2.89f, 0f);
+        // 표면 거리 = 가장 넓은 단면(r 1.7) 기준. 상자 높이 띠가 y 1.7 위로 걸쳐야 정면 도달이 그대로 나온다(할 일 163 전 팔라딘 = 1.24 까지만).
+        PlaceDummy(Pivot + Vector3.forward * (1.65f + 1.7f));
+        Assert.IsTrue(HitsPlaced(PaladinCenter, PaladinHalf, Pivot, Vector3.forward), "팔라딘 정면 1.65");
+        PlaceDummy(Pivot + Vector3.forward * (1.55f + 1.7f));
+        Assert.IsTrue(HitsPlaced(GunnerCenter, GunnerHalf, Pivot, Vector3.forward), "어쌔신·거너 정면 1.55");
+    }
+
     // ─── 형상 계산 ───
 
     [Test]
@@ -152,7 +168,7 @@ public sealed class HitboxAnchorShapeTests
     {
         HitboxAnchorShape shape = AnchorFacing(Pivot, Vector3.forward, GunnerCenter, GunnerHalf)
             .Aimed(Pivot, Vector3.forward, Vector3.back);
-        Vector3 expected = Pivot + new Vector3(0f, 1f, -0.9f);
+        Vector3 expected = Pivot + new Vector3(0f, 1.3f, -0.9f);
         Assert.That(Vector3.Distance(expected, shape.Box.center), Is.LessThan(1e-4f));
         Assert.That(Vector3.Angle(Vector3.back, shape.Box.orientation * Vector3.forward), Is.LessThan(0.01f));
         Assert.That(Vector3.Angle(Vector3.up, shape.Box.orientation * Vector3.up), Is.LessThan(0.01f));
