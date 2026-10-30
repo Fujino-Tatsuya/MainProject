@@ -64,9 +64,11 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         State = SkillState.Active;
 
         // 과열 단계·피해는 시전 순간 그대로(생성이 Custom0 로 늦어져도 바뀌지 않는다).
-        pendingStage = heat != null ? heat.CaptureStage() : 0;
-        // 툴팁의 최소~최대 계산도 같은 과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
-        pendingDamage = Mathf.RoundToInt(damageSnapshot * data.StageDamageMultiplier(pendingStage));
+        // 2차 과열 모드(할 일 127 3/4): 한계 돌파 = 단계 배율표 교체, 정온 운용 = 0단계(과열 보너스 없음).
+        GunnerHeatTraits heatTraits = heat != null ? heat.Traits : GunnerHeatTraits.From(owner.TraitModifiers);
+        pendingStage = heatTraits.EffectiveStage(heat != null ? heat.CaptureStage() : 0);
+        // 툴팁의 최소~최대 계산도 같은 과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것(GunnerTrackingLaserData).
+        pendingDamage = Mathf.RoundToInt(damageSnapshot * heatTraits.SkillStageScale(pendingStage, data.StageDamageMultiplier(pendingStage)));
         pendingTarget = HasAimPoint ? null : target;
         castTargetPosition = target != null ? target.transform.position : AimPoint;
         laserPending = true;

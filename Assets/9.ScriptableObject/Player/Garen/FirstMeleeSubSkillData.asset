@@ -46,7 +46,25 @@ MonoBehaviour:
   animatorStateName: SubSkillGuard
   snapRotationOnStart: 1
   guardAngle: 180
+  hitArea:
+    origin: 0
+    shapes:
+    - rid: 7237886701681771055
   counterAngle: 120
   counterRange: 3
   shieldAmount: 100
   shieldDuration: 10
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681771055
+      type: {class: AttackSectorShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: -3
+        maxHeight: 3
+        range: 3
+        angle: 120
+        minOffset: 0

@@ -3,7 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// [서버] 제압 가속 버프(할 일 91 T6, PLAN-91 §3.4) — 보스가 제압에 들어가면 살아있는 플레이어 전원에게
-/// 이동속도·공격속도 최종 배율 + 쿨 속도 배율을 이번 제압 길이만큼 건다. 규칙은 <see cref="SuppressHasteRules"/>.
+/// 이동속도·공격속도 최종 배율 + 쿨 속도 배율을 이번 제압 길이만큼 건다. 진입 순간 Q/E/우클릭 남은 쿨도 유효 전체 쿨의 50% 만큼 뺀다(특성 명세 §6).
+/// 규칙은 <see cref="SuppressHasteRules"/>.
 ///   · 23호: <see cref="TwentyThreeBoss.SuppressStarted"/> 를 받아 <see cref="GrantServer"/>.
 ///   · 다른 출처(로비 훈련 상대 등)도 보스 종류와 무관하게 <see cref="GrantServer"/> 를 부르면 된다.
 ///   · 버프 중 Alive 를 벗어나면(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 그 출처 3개를 뺀다.
@@ -123,12 +124,15 @@ public static class SuppressHaste
         private readonly PlayerLifeCycleController life;
         private readonly StatusEffectController effects;
         private readonly PlayerEncounterLock encounterLock;
+        private readonly PlayerSkillController skills;
 
-        private ServerTarget(PlayerLifeCycleController life, StatusEffectController effects, PlayerEncounterLock encounterLock)
+        private ServerTarget(PlayerLifeCycleController life, StatusEffectController effects, PlayerEncounterLock encounterLock,
+            PlayerSkillController skills)
         {
             this.life = life;
             this.effects = effects;
             this.encounterLock = encounterLock;
+            this.skills = skills;
         }
 
         public static ServerTarget From(PlayerLifeCycleController life)
@@ -137,7 +141,19 @@ public static class SuppressHaste
                 return null;
 
             StatusEffectController effects = life.GetComponent<StatusEffectController>();
-            return effects != null ? new ServerTarget(life, effects, life.GetComponent<PlayerEncounterLock>()) : null;
+            return effects != null
+                ? new ServerTarget(life, effects, life.GetComponent<PlayerEncounterLock>(), life.GetComponent<PlayerSkillController>())
+                : null;
+        }
+
+        // 후속 창(어쌔신 그림자 회귀 등)이 열려 있어도 원래 스킬 기준 — 쿨 시작 전이면 보류했다가 시작 때 바른다.
+        public float GetEffectiveCooldownTime(PlayerSkillSlot slot) =>
+            skills != null ? skills.GetEffectiveCooldownTime(skills.GetCooldownOwnerSkill(slot)) : 0f;
+
+        public void ReduceCooldown(PlayerSkillSlot slot, float seconds)
+        {
+            if (skills != null)
+                skills.ReduceCooldownOrHoldServer(skills.GetCooldownOwnerSkill(slot), seconds);
         }
 
         public PlayerLifeState LifeState => life.State;

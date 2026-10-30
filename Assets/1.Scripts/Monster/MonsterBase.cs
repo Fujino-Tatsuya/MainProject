@@ -1641,6 +1641,9 @@ public class MonsterBase : Unit
             // 할 일 32 벽 충돌 — 민 쪽(가능하면). 넉백 진입이 거절됐으면(슈퍼아머 등) 바꾸지 않는다.
             if (_state.Value == MonsterState.Knockback && hitContext.sourceTransform != null)
                 _wallImpactPusher = hitContext.sourceTransform.GetComponentInParent<Unit>();
+            // 뇌진탕(할 일 125) — 실제로 밀린 대상만(명세 제압의 진격: 면역·거부된 밀치기는 기절 자격 없음). 매 히트 재설정.
+            if (attackInfo.concussionDuration > 0f && _state.Value == MonsterState.Knockback)
+                status?.ApplyStatus(StatusEffectType.Concussion, attackInfo.concussionDuration);
         }
 
         // 피격 이펙트는 판정이 아니라 연출이다 — 서버는 위치만 알리고 재생은 각 피어가 로컬로 한다.
@@ -1811,10 +1814,16 @@ public class MonsterBase : Unit
             }
         }
 
-        if (_staggerAfterKnockback > 0f)
+        // 뇌진탕(할 일 125) — 넉백이 끝나는 순간 기절로. 경직·기존 기절과는 큰 값(합산 아님).
+        float concussionStun = status != null ? status.ConsumeConcussionOnKnockbackEnd() : 0f;
+        float stun = Mathf.Max(_staggerAfterKnockback, concussionStun);
+        if (stun > 0f)
         {
-            status?.ApplyStatus(StatusEffectType.Stunned, _staggerAfterKnockback);
-            _stateTimer = _staggerAfterKnockback;
+            if (concussionStun > 0f)
+                status.ExtendStun(stun);
+            else
+                status?.ApplyStatus(StatusEffectType.Stunned, _staggerAfterKnockback);
+            _stateTimer = stun;
             SetState(MonsterState.Hit); // HandleTimedResume이 만료 후 DecideNextAfterAction 호출
         }
         else if (!TryResumeVulnerableGroggy())
@@ -2381,6 +2390,10 @@ public class MonsterBase : Unit
         // 취약 밀림 연쇄는 밀림·경직 안에서만 산다(TryResumeVulnerableGroggy).
         if (next != MonsterState.Knockback && next != MonsterState.Hit)
             _vulnerableGroggyEndsAt = -1f;
+
+        // 뇌진탕 대기는 넉백 안에서만 산다 — 제압·그로기 진입이나 다른 길로 넉백을 벗어나면 취소(정상 종료는 ExitKnockback 이 먼저 소비).
+        if (status != null && MonsterStatusEffect.CancelsPendingConcussion(_state.Value, next))
+            status.CancelConcussion();
 
         _state.Value = next; // 같은 값이면 NGO가 콜백을 발생시키지 않음.
     }

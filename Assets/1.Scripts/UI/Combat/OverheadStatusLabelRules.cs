@@ -13,8 +13,8 @@ public enum OverheadStatusLabel : byte
 
 /// <summary>
 /// 머리 위 이름 라벨을 상태이상 이름으로 바꿀지 판정(할 일 50). MonoBehaviour 밖 순수 계산이라 EditMode 테스트로 고정한다.
-/// 대상 = 차단류 CC 6종(<see cref="StatusEffectImmunityPolicy.BlockedCrowdControl"/>) + 붙잡힘. 겹치면 하나만 —
-/// 붙잡힘 &gt; 에어본 &gt; 기절 &gt; 속박 &gt; 침묵 &gt; 약화 &gt; 둔화. 버프·스탯 배율·슈퍼아머 등은 무시한다.
+/// 대상 = 차단류 CC(<see cref="StatusEffectImmunityPolicy.BlockedCrowdControl"/>) + 붙잡힘. 겹치면 하나만 —
+/// 붙잡힘 &gt; 에어본 &gt; 기절(=뇌진탕) &gt; 속박 &gt; 침묵 &gt; 약화 &gt; 둔화. 버프·스탯 배율·슈퍼아머 등은 무시한다.
 /// 살아 있지 않으면(사망 연출·Soul·영구 사망) 상태이상이 남아 있어도 이름을 띄운다.
 /// </summary>
 public static class OverheadStatusLabelRules
@@ -24,6 +24,7 @@ public static class OverheadStatusLabelRules
     {
         StatusEffectType.Airborne,
         StatusEffectType.Stunned,
+        StatusEffectType.Concussion,   // 뇌진탕(할 일 125) — 표시는 기절과 같다(대기 중에도 Stunned 가 같이 걸려 보통 위에서 먼저 잡힌다)
         StatusEffectType.Rooted,
         StatusEffectType.Silenced,
         StatusEffectType.Debilitated,
@@ -67,6 +68,7 @@ public static class OverheadStatusLabelRules
     {
         StatusEffectType.Airborne => OverheadStatusLabel.Airborne,
         StatusEffectType.Stunned => OverheadStatusLabel.Stunned,
+        StatusEffectType.Concussion => OverheadStatusLabel.Stunned,
         StatusEffectType.Rooted => OverheadStatusLabel.Rooted,
         StatusEffectType.Silenced => OverheadStatusLabel.Silenced,
         StatusEffectType.Debilitated => OverheadStatusLabel.Debilitated,

@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// 간파 연출 디렉터(할 일 118) — 간파 연출의 단일 진입점. NetworkManager.prefab 의 <see cref="GlobalTimeScale"/> 옆에 붙는다.
-/// 104 스위치 10칸(<see cref="InterruptProductionCue"/>)을 들고, 재생 지점은 정적 API 로 묻는다.
+/// 104 스위치 10칸(<see cref="InterruptProductionCue"/>) + A5 피해 숫자 숨김(154)을 들고, 재생 지점은 정적 API 로 묻는다.
 ///
 /// <list type="bullet">
 /// <item>사건이 올 때마다 필드를 읽는다(캐싱 없음) — Play 중 인스펙터에서 바꾸면 다음 사건부터 바로 쓰인다.</item>
@@ -99,6 +99,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
+    [Tooltip("A5 피해 숫자 숨김(할 일 154) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) 동안 이 화면의 피해 숫자 캔버스를 끈다. " +
+             "숫자 생성·수명은 그대로(가리기만). 팀원 화면은 그대로")]
+    [DataTableIgnore, SerializeField] private bool hideDamageNumbers = true;
 
     // 연출 켜기/끄기(할 일 132 §17) — 끈 효과는 그리기만 안 한다. 오너 상태 기계·섬광 시간표·섬광 순간 사건(암전 걷힘 등)은 그대로 돈다.
     // 기본 = 오너 암전만 켬. 팀원 암순응 = 위 A2 칸, 슬로우·줌·히트스톱 = A1·A3·프로필 그대로. 이 피어 값을 쓴다(그릴 때마다 읽음).
@@ -423,6 +426,23 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public static bool OwnerAwaitsStrongResult =>
         Instance != null && Instance._ownerPresentation != null && Instance._ownerPresentation.AwaitsStrongResult;
 
+    /// <summary>A5 칸(할 일 154) — 런타임 값(저장하지 않음, 디버그·테스트).</summary>
+    public bool HideDamageNumbers
+    {
+        get => hideDamageNumbers;
+        set => hideDamageNumbers = value;
+    }
+
+    /// <summary>
+    /// A5 — 이 화면에서 지금 피해 숫자를 숨기는가(<see cref="InterruptProductionRules.ShouldHideDamageNumbers"/>). 피해 숫자 스포너가 매 프레임 읽는다
+    /// (디렉터 → 스포너 한 방향, 디렉터는 스포너를 모른다). 인스턴스가 없으면 false.
+    /// </summary>
+    public static bool DamageNumbersHidden =>
+        Instance != null && InterruptProductionRules.ShouldHideDamageNumbers(Instance.hideDamageNumbers,
+            Instance._ownerPresentation != null ? Instance._ownerPresentation.State : InterruptOwnerPresentationState.None,
+            Instance._ownerPresentation != null ? Instance._ownerPresentation.DimIntensity : 0f,
+            Instance._hitFlash != null && Instance._hitFlash.OverlayActive);
+
     /// <summary>
     /// [각 피어] 시도 — 시전 시작(OnClientPlay, 전 피어)에 스킬이 알린다. 그 스킬의 시도 cue(B1)를 공용 채널로 스킬 자신에 튼다.
     /// 끄는 쪽(OnEnd)은 디렉터를 거치지 않는다.
@@ -450,21 +470,39 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     /// (줌·슬로우는 서버 시도 슬로우가 처리), 대상 없음도 아무것도 안 켠다(정정1). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
     /// <paramref name="owner"/>·<paramref name="target"/> = 암전에 남길 오너 캐릭터(무기 이펙트 포함 하위 전부)·이번 시도 간파 대상(예측이 고른 캐시 대상).
     /// <paramref name="attackDirection"/> = 근접은 요청에 싣는 시전 방향, 대쉬는 대시 방향 — 적중 섬광 ④ 스미어 방향(할 일 132 §16).
+    /// 새 시도로 받아들였으면 true(인스턴스 없음·대상 없음·중복 입력 = false).
     /// </summary>
-    public static void LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast,
+    public static bool LocalOwnerAttempt(PlayerInterruptSkillBase skill, BeaverLobby.Player.Dash.InterruptAttemptForecast forecast,
         GameObject owner, GameObject target, Vector3 attackDirection)
     {
         if (Instance == null)
-            return;
+            return false;
 
         // 받아들일 시도만 대상을 바꾼다 — 태깅은 다음 프레임 암전이 0 → 양수가 될 때(들어옴 램프 첫 값).
         // 대상을 예측보다 먼저 넘긴다: 예측이 같은 호출 안에서 빛 모임을 켜며 KeepInOwnerDim 으로 넣은 루트를 SetSubjects 가 비우지 않게.
         InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
         if (!presentation.Accepts(forecast))
+            return false;
+
+        Instance._ownerDimOutput?.SetSubjects(owner, target);
+        return presentation.Predict(forecast, skill, Time.unscaledTime, attackDirection);
+    }
+
+    /// <summary>
+    /// [오너] 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2) — 결론 전 약 시도면 지금부터 오너 암전·빛 모임을 켠다(늦게 켜지는 것 허용).
+    /// 대상은 <see cref="LocalOwnerAttempt"/> 와 같이 먼저 넘긴다. 강 → 약 내리기는 없다.
+    /// </summary>
+    public static void LocalOwnerUpgrade(GameObject owner, GameObject target)
+    {
+        if (Instance == null)
+            return;
+
+        InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
+        if (!presentation.CanUpgrade)
             return;
 
         Instance._ownerDimOutput?.SetSubjects(owner, target);
-        presentation.Predict(forecast, skill, Time.unscaledTime, attackDirection);
+        presentation.UpgradeToStrong(Time.unscaledTime);
     }
 
     /// <summary>
@@ -524,6 +562,11 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         bool hasViewer = _networkManager != null;
         bool viewerIsCaster = hasViewer && InterruptProductionRules.IsCasterView(casterClientId, _networkManager.LocalClientId);
 
+        // 로컬 선착순(할 일 143-2) — 남의 강 시도·성공이면 그 대상의 이 창을 이 피어에서 닫는다. 이후 내 입력 예측은 약(오너 암전·빛 모임·섬광 없음).
+        // 판정은 서버 장부(InterruptWindowClaims) 그대로 — 여기는 오너 연출만 1차로 막는다.
+        if (hasViewer && !viewerIsCaster)
+            ObserveLocalClaim(triggerId, casterClientId, purpose, targetPosition);
+
         // 오너 연출(할 일 132) — 내 슬로우만(팀원 화면은 시도 단계 무변화). 시도 목적이 예측과 다르면 걷고, 성공이면 성공 단계로.
         if (viewerIsCaster)
             OwnerPresentation.ServerStarted(triggerId, purpose, true, Time.unscaledTime);
@@ -559,8 +602,49 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         LocalSucceeded?.Invoke(e);
     }
 
+    // 슬로우 메시지는 대상을 싣지 않는다(할 일 143-3) — 시전자 플레이어의 간파 스킬이 이 피어의 복제 위치·방향·창으로 대상을 다시 찾는다.
+    private void ObserveLocalClaim(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
+    {
+        if (purpose != SlowMotionPurpose.Attempt && purpose != SlowMotionPurpose.Success)
+            return;
+
+        PlayerInterruptSkillBase skill = FindInterruptSkill(casterClientId);
+        ulong viewer = _networkManager.LocalClientId;
+        if (purpose == SlowMotionPurpose.Attempt)
+        {
+            if (skill != null)
+                InterruptLocalWindowClaims.Local.ObserveAttempt(skill.FindPeerAttemptTargetId(), triggerId, casterClientId, purpose, viewer);
+            return;
+        }
+
+        InterruptLocalWindowClaims.Local.ObserveSuccess(skill != null ? skill.FindPeerSuccessTargetId(targetPosition) : 0,
+            casterClientId, viewer);
+    }
+
+    // 발동자 플레이어의 간파 슬롯 스킬. 찾는 방식은 FindSuccessFxSinks 와 같다(스폰 목록에서 발동자 소유 플레이어 오브젝트).
+    private PlayerInterruptSkillBase FindInterruptSkill(ulong casterClientId)
+    {
+        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
+        if (spawnManager == null)
+            return null;
+
+        foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
+        {
+            if (networkObject == null || !networkObject.IsPlayerObject || networkObject.OwnerClientId != casterClientId)
+                continue;
+
+            PlayerSkillController controller = networkObject.GetComponentInChildren<PlayerSkillController>();
+            if (controller != null)
+                return controller.GetSkill(PlayerSkillSlot.Interrupt) as PlayerInterruptSkillBase;
+        }
+
+        return null;
+    }
+
     private void HandleFailed(uint triggerId)
     {
+        // 강 시도가 빗나갔다(할 일 143-3) — 그 시도가 닫은 창은 다른 강 시도·성공이 없으면 다시 열린다.
+        InterruptLocalWindowClaims.Local.AttemptEnded(triggerId);
         _ownerPresentation?.ServerFailed(triggerId, Time.unscaledTime);
         _peerLightGather.EndTrigger(triggerId);
         FailStage.Local(InterruptProductionEvent.LocalFail(triggerId));
@@ -568,6 +652,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     private void HandleForcedReset(uint triggerId)
     {
+        InterruptLocalWindowClaims.Local.AttemptEnded(triggerId);
         _ownerPresentation?.ForcedReset();
         _peerLightGather.EndAll();
         StopHitFlash();

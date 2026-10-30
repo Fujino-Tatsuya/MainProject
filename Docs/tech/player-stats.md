@@ -82,7 +82,21 @@
   `StatusEffectController.GetStatPercentSum` 이 계산한다. 몬스터·`IStatusEffectFacade` 는 여전히 `GetStatMultiplier` 의 곱을 쓴다.
 - **영구 출처(특성·성장)는 "무엇을 얻었는지"(id)만 복제한다.** 수치는 각 피어가 같은 SO 에서 읽는다.
   `IPlayerStatSource` 를 구현해 `player.Stats.Register(source)` 로 등록한다. 기여가 바뀌면 `Changed` 를 낸다.
-- 튜토리얼 특성은 지금 영구 상태이상 `AttackDamageModifier`·`MoveSpeedModifier`(전체%)로 들어온다.
+- **특성 출처 `PlayerTraitModifiers`(할 일 125 2/5)** — 상태이상을 쓰지 않는 영구 출처. `Player.prefab`(base)에 붙고, 없으면 `Player.Awake` 가 붙여 `Stats.Register` 한다.
+  복제는 서버가 고른 특성 해시 목록뿐이다(`TraitDirector` 획득 행 그대로 — 플레이어 단위 복제 없음). 서버·클라가 같은 SO 를 같은 순수 함수 `TraitModifierSet`(`Assets/1.Scripts/Traits/TraitModifiers.cs`)으로 합성한다.
+  그래서 보스방 입장 디버프 정리(`ClearDebuffsServer`)·연출 잠금과 무관하고, **1 미만 배율(페널티)도 그대로** 남는다(예전 상태이상 경로는 1 로 올렸다).
+  특성 1장은 `ITraitModifierContributor.GetModifiers` 로 `TraitModifier` 를 기여한다. 질의 표면과 합성 규칙은 아래와 같다.
+  - 스탯 5종 기본%·전체%·가하는 피해% → `IPlayerStatSource`. 같은 단계 % 는 **합**한다(§2). 옛 `TraitEffectKind` 는 3/5 에서 폐지 — 스탯 % 는 효과 클래스 `TraitStatEffect`, 공격 계열 배율은 `TraitDamageEffect`([tutorial-traits.md](tutorial-traits.md) §4.1).
+  - 3/5 질의 추가: 범위 배율 `AreaMultiplier(key, axis)`·스킬 수치 덮어쓰기 `ResolveSkillValue(이름, 기본값)`·특성 스위치 `HasTrait(id)`. 회복 배율은 `PlayerTraitEffects.HealServer`(팔라딘 패시브)가 소비한다.
+  - 공격 계열 피해 배율 `DamageMultiplier(TraitAttackKey)`. 키 = 기존 `AttackType`(평타 Default·Q/E/R·우클릭 Skill·가붕이 패시브 추가피해 None) × 형태 `TraitAttackForm`(Normal·Alternate = 대체 슬롯/변신·Enhanced = 강타).
+    서로 다른 특성끼리 **곱**한다. 기준 피해 Dref 에 **한 번만** 곱한다 — `Player.ResolveDamage(계수, 고정값, key)` → `PlayerStatFormula.Snapshot(…, traitMultiplier)` = round(1차 스냅샷 × (1+가하는 피해%) × 특성 배율). 중간 정수화는 없다.
+    소비처는 평타 3종, 가붕이 패시브, `PlayerSkillController` 스킬 승인 스냅샷이다. 차지·과열 후처리는 지금처럼 그 뒤에 곱한다.
+  - 슬롯 쿨 배율 `CooldownMultiplier(slot, form)`(곱, 명세 §6)은 `PlayerSkillController.GetEffectiveCooldownTime` 이 쓴다. 이 값 = 데이터 쿨 × 배율이고, 쿨 시작 3곳·HUD 채움 전체에 들어간다.
+    제압 가속은 여기 곱하지 않는다. 쿨 시계 속도(`CooldownRateModifier`)로 따로 곱해진다. 배율이 바뀌면 서버가 진행률을 보존하고(`PlayerSkillCooldownLedger.Rescale`: 남은/옛 전체×새 전체, 준비·전체 0 은 그대로) 오너에 미러한다.
+  - 회복 배율 `HealMultiplier`(곱)는 질의만 있다. 소비처는 3/5(`HealHp` 실제 회복량)에서 붙인다.
+  - 같은 해시는 한 번만 센다. 잘못된 값(NaN·무한·음수 배율·0 이하 쿨 배율)은 버리고 `[TraitModifiers]` 오류를 남긴다. 빈 목록이면 배율은 전부 1, % 는 전부 0 이다.
+  - 획득 행이 바뀌면(획득·초기화·재합류·디렉터 교체) 다음 LateUpdate 에 다시 합성하고 `Changed` 를 낸다. 서버 검증 유예(§5)도 이때 다시 센다.
+  - 테스트: `TraitModifierSetTests`(맵씬 메뉴)·`PlayerTraitCooldownRescaleTests`(플레이어 메뉴).
 - `Unit.Change*Value(Rpc)` 와 `Initialize` 의 Unit 필드는 플레이어 스탯에 쓰이지 않는다(몬스터 전용). 런타임 변경은 위 출처로 넣는다.
   예외: 체력 상한은 여전히 `Health.MaxHp`(= `Player.maxHp`)다. 최대 체력 % 가 상한을 올리지는 않는다(기존 동작).
 
@@ -113,3 +127,10 @@
 - T5: 공격속도가 처음으로 평타·스킬 재생 속도에 들어간다(§3.1). 지금 공속을 바꾸는 상태이상·특성이 없어 배율 1 — 기존 동작 그대로다.
 - T2~T4·T8: 쿨 속도 배율 소비처 = 쿨 시계(스킬·대시·가붕이 패시브). 배율 1 이면 기존 쿨과 같다 — [suppress-haste.md](suppress-haste.md) §1.1.
 - 이 배율·타입을 거는 제압 가속 버프 전체(발동·대상·지속·데이터·비네팅)는 [suppress-haste.md](suppress-haste.md).
+
+## 8. 바뀐 동작 (2026-10-28, 할 일 125 2/5)
+
+- 특성 배율이 상태이상(출처 `0x54524149…`)에서 `PlayerTraitModifiers` 출처로 옮겨 왔다(§4). `TraitDirector` 는 이제 적중 쿨감 구독만 건다.
+  값은 그대로다(전체% 단계). 다만 1 미만이 1 로 올라가지 않고, 보스방 디버프 정리에 지워지지 않는다.
+- 피해 스냅샷에 특성 공격 계열 배율 칸이 생기고, 스킬 전체 쿨에 특성 슬롯 배율이 들어간다. 지금 풀에 정의가 없어 전부 1 이다 — 기존 수치는 그대로다.
+- 툴팁 `{dmg}`·툴팁 쿨 초에는 아직 특성 배율을 넣지 않는다(5/5 포매터 연결에서). 서버 2차 검증 보고(`PlayerStatReport`)는 스탯 5종·가하는 피해%만 싣는다. 공격 계열 배율은 보고에 없다(같은 해시 목록 → 같은 값).

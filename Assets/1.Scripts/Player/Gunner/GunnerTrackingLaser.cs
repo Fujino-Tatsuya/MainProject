@@ -47,6 +47,52 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
     // 연출(민경 — GunnerTrackingLaserView). 없으면 연출만 빠진다.
     private GunnerTrackingLaserView view;
 
+    // ── 집중 포화(할 일 127 GUN_4_R_FOCUS) — 서버의 활성 R 목록 ─────────────
+    // 기본 공격·Q 가 피해를 넣는 순간 대상 중심이 '자기' R 의 실제 피해 범위(DamageTick 반경) 안인지 묻는다.
+
+    private static readonly List<GunnerTrackingLaser> ActiveLasers = new List<GunnerTrackingLaser>();
+    private static readonly List<GunnerRZone> ZoneBuffer = new List<GunnerRZone>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetActiveLasers() => ActiveLasers.Clear();
+
+    /// <summary>
+    /// [서버] 집중 포화 — 공격자의 활성 R 범위 안 대상이면 피해 × (1 + 보너스), 겹쳐도 1회. 기본 공격·Q(와 그 파생)만, 특성이 없으면 그대로.
+    /// R 생성 전에 쏜 공격도 피해를 넣는 지금 범위 안이면 붙는다(판정 순간 검사).
+    /// </summary>
+    public static void ApplyFocusFire(Player attacker, Unit target, ref AttackInfo info)
+    {
+        if (attacker == null || target == null || !GunnerFocusFireRules.AppliesTo(info.attackType))
+            return;
+
+        float bonus = GunnerTraitRules.FocusFireBonusFor(attacker.TraitModifiers);
+        if (bonus <= 0f)
+            return;
+
+        ZoneBuffer.Clear();
+        for (int i = 0; i < ActiveLasers.Count; i++)
+        {
+            GunnerTrackingLaser laser = ActiveLasers[i];
+            if (laser != null && laser.initialized && laser.caster != null)
+                ZoneBuffer.Add(new GunnerRZone(laser.caster.GetInstanceID(), laser.transform.position, laser.radius));
+        }
+
+        bool inside = GunnerFocusFireRules.IsInsideOwnZone(attacker.GetInstanceID(), target.transform.position, ZoneBuffer);
+        info.damage = GunnerFocusFireRules.Apply(info.damage, GunnerFocusFireRules.Multiplier(info.attackType, bonus, inside));
+    }
+
+    /// <summary>[서버] 시전자(초기화 전 null) — 특성 랩 공격 범위 기즈모(할 일 152)가 레이저 주인을 가른다.</summary>
+    public Player ServerCaster => initialized ? caster : null;
+
+    /// <summary>[서버] 실제 피해 범위 반경(<see cref="DamageTick"/> 구 질의 반경).</summary>
+    public float ServerDamageRadius => radius;
+
+    public override void OnDestroy()
+    {
+        ActiveLasers.Remove(this);
+        base.OnDestroy();
+    }
+
     /// <summary>[서버] 스폰 직후 1회.</summary>
     public void ServerInitialize(Player caster, Unit target, int damagePerTick, GunnerTrackingLaserData data,
                                  AttackType attackType, AttackHitPattern hitPattern)
@@ -70,6 +116,8 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
         nextDamageTime = Time.time;
         nextRetargetTime = Time.time;
         initialized = true;
+        if (!ActiveLasers.Contains(this))
+            ActiveLasers.Add(this);
 
         if (IsSpawned)
         {
@@ -98,6 +146,7 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
     {
         if (IsServer && NetworkManager != null)
             NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
+        ActiveLasers.Remove(this);
         base.OnNetworkDespawn();
     }
 
@@ -233,6 +282,7 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
             return;
 
         initialized = false;
+        ActiveLasers.Remove(this);
         Edit.Log($"[Gunner/R] 추적 레이저 제거 — {reason}", this);
 
         if (NetworkObject != null && NetworkObject.IsSpawned)

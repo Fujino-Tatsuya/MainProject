@@ -7,7 +7,7 @@ using UnityEngine;
 /// 각 캐릭터 Variant 의 <c>VFX</c> 에 붙는다(<see cref="StatusEffectVfxPresenter"/> 가 올라가는 <c>VFX/States</c> 의 부모).
 ///
 /// <b>언제.</b> 내 획득 수가 늘어나는 순간 — 직접 고른 것·자동 선택(출구 열림·보스 타이머·전멸 후 재선택)을 가리지 않는다.
-/// <see cref="TutorialTraitDirector"/> 가 이미 전 피어에 복제하는 획득 목록을 읽기만 한다 — 그쪽 코드(은희)는 건드리지 않고,
+/// <see cref="TraitDirector"/> 가 이미 전 피어에 복제하는 획득 목록을 읽기만 한다 — 그쪽 코드(은희)는 건드리지 않고,
 /// 네트워크도 늘지 않는다. 확정된 목록이 내 화면에 도착하는 순간이라 선택 창이 닫히는 순간과 같다.
 ///
 /// <b>기준값.</b> 연결된 순간의 획득 수를 기준으로 잡는다 — 씬 진입·늦은 접속 때 이미 가진 증강으로 터지지 않게.
@@ -27,7 +27,7 @@ public class TraitAcquiredVfxPresenter : MonoBehaviour
 
     readonly List<int> _acquired = new List<int>();
     NetworkObject _player;
-    TutorialTraitDirector _director;
+    TraitDirector _director;
     int _baseline;
     bool _dirty;
 
@@ -38,7 +38,7 @@ public class TraitAcquiredVfxPresenter : MonoBehaviour
     void Update()
     {
         // 디렉터는 맵 씬에만 있다 — 플레이어보다 늦게 생기거나 씬과 함께 사라진다.
-        TutorialTraitDirector current = TutorialTraitDirector.Instance;
+        TraitDirector current = TraitDirector.Instance;
         if (current != _director) Bind(current);
 
         if (!_dirty || _director == null) return;
@@ -49,7 +49,7 @@ public class TraitAcquiredVfxPresenter : MonoBehaviour
         _baseline = count;
     }
 
-    void Bind(TutorialTraitDirector director)
+    void Bind(TraitDirector director)
     {
         if (_director != null) _director.ClientStateChanged -= OnStateChanged;
         _director = director;

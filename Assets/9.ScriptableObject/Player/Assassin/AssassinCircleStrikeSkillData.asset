@@ -18,6 +18,7 @@ MonoBehaviour:
     description: "TODO \uC9C0\uC815\uD55C \uC6D0 \uBC94\uC704\uC5D0 {dmg} \uD53C\uD574\uB97C
       5\uBC88 \uC90D\uB2C8\uB2E4. \uACF5\uACA9 \uC911 \uBB34\uC801\uC785\uB2C8\uB2E4."
     icon: {fileID: 21300000, guid: 4bb9ddbf8ee4c2c5037e98d8816dde9f, type: 3}
+    tags: 
   inputType: 0
   cooldownTime: 12
   commitCooldownManually: 0
@@ -44,6 +45,23 @@ MonoBehaviour:
   hoverMarkerDistance: 3
   animatorStateName: Assassin_E_CircleStrike_Transformed
   snapRotationOnStart: 1
+  followUpIconTint: {r: 1, g: 1, b: 1, a: 1}
   hitCount: 5
-  areaHeight: 3
+  hitArea:
+    origin: 1
+    shapes:
+    - rid: 7237886701681771182
   maxHitResults: 32
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681771182
+      type: {class: AttackCircleShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: 0
+        maxHeight: 3
+        radius: 2
+        minRadius: 0

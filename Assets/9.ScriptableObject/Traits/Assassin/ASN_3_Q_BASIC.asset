@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c29cc7a6b1d47b046aa92501db8cbe93, type: 3}
+  m_Name: ASN_3_Q_BASIC
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
+  id: ASN_3_Q_BASIC
+  displayName: "\uB3CC\uD30C\uC758 \uC5EC\uC138"
+  category: "Q \uC5F0\uACC4 \uAC15\uD654"
+  description: "Q\uB97C \uB9DE\uD788\uBA74 {buffDuration}\uCD08 \uC548\uC5D0 \uD558\uB294
+    \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC758 \uCCAB \uD0C0\uACA9 \uD53C\uD574\uAC00
+    {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4. \uC77C\uBC18 E \uAC15\uD0C0\uC5D0\uB3C4
+    \uC801\uC6A9\uB429\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673709695197
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673709695197
+      type: {class: TraitNextAttackBuffEffect, ns: , asm: Assembly-CSharp}
+      data:
+        filter:
+          trigger: 0
+          attackTypes: 03000000
+          forms: 
+          requireTriggersOnHit: 0
+          oncePerCast: 1
+          minInterval: 0
+        damageIncrease: 0.3
+        buffDuration: 4
+        consumerAttackTypes: 01000000
+        consumerForms: 

@@ -773,6 +773,7 @@ GameObject:
   - component: {fileID: 519902155721058497}
   - component: {fileID: 755154413323072885}
   - component: {fileID: 3856112276083832082}
+  - component: {fileID: 7998302284108203543}
   - component: {fileID: 3401547853169930430}
   m_Layer: 6
   m_Name: Player
@@ -1479,6 +1480,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InterruptSuccessFx
   casterFx: {fileID: 0}
   targetFx: {fileID: 0}
+--- !u!114 &7998302284108203543
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3da8275d62d47db4d967dcfcfca7b4a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerTraitModifiers
 --- !u!114 &3401547853169930430
 MonoBehaviour:
   m_ObjectHideFlags: 0

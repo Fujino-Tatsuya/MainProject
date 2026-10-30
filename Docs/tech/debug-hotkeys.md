@@ -26,7 +26,7 @@
 | 키 | 기능 | 파일 | 게이트 | 변경 전 릴리스 | 겹침 |
 |---|---|---|---|---|---|
 | F1 | 피격 이펙트 종류 순환 | `Assets/1.Scripts/Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F1 — DebugCharacterCycle |
-| F1 | 캐릭터 순환 팔라딘 → 어쌔신 → 거너(호스트, 같은 자리 재스폰) — **DebugInterruptLab 씬 전용**. [dash-interrupt.md §10.1](dash-interrupt.md) | `Dev/InterruptLab/DebugCharacterCycle.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 115 C6) | ⚠️ F1 — HitVFXDebugHUD(그 HUD 는 이 씬에 없어 실제로는 안 겹침) |
+| F1 | 캐릭터 순환 팔라딘 → 어쌔신 → 거너(호스트, 같은 자리 재스폰) — **DebugInterruptLab·DebugTraitLab 씬 전용**(특성 랩은 바꾸기 직전 보유 특성을 비운다). [dash-interrupt.md §10.1](dash-interrupt.md) · [tutorial-traits.md §13](tutorial-traits.md) | `Dev/InterruptLab/DebugCharacterCycle.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 115 C6 · 135) | ⚠️ F1 — HitVFXDebugHUD(그 HUD 는 이 씬에 없어 실제로는 안 겹침) |
 | F2 | 타격점 계산 방식 순환 | `Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | |
 | F3 | 23호 다음 행동 = 점프·점프·점프 콤보 예약(호스트) — 3번째 착지 간파 창 확인용 | `Dev/DevBossAttackHotkeys.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
@@ -47,6 +47,7 @@
 | Alt+1 | **로비(3.LobbyScene)** 튜토리얼 클리어 플래그 켜기/끄기 — 누른 사람만(서버 확정·복제). 켜면 훈련 명단·훈련 내부 집결에서 빠지고 출격 집결엔 남는다, 끄면 다음 회차부터 다시 훈련. 훈련을 끝까지 해도(종료 집결 확정) 같은 플래그가 켜지므로, 그 뒤 누르면 **끈다**. 규칙 [lobby-training.md](lobby-training.md) "튜토리얼 클리어 플래그" | `Lobby/LobbyRecoveryHotkeys.cs` (자동 생성 — 진행기에 붙음) + `Lobby/LobbyTrainingDirector.Recovery.cs`(RPC) · 표 `Lobby/LobbyRecoveryHotkeyRules.cs` | DEV_HOTKEYS | — (신규, 할 일 112) | Alt+1 — 튜토리얼 스킵(맵 씬만) |
 | Alt+2 | **로비** 멈춤·갇힘 탈출 — 누른 사람만. 서버가 낙하 복구·남은 연출 잠금·진행 중 스킬/공격·디버프를 기존 API 로 풀고 안전 지점(훈련 명단 + 훈련 단계면 그 단계 집결 구역 가운데, 아니면 자기 스폰 지점)으로 옮긴다. 브리핑 중엔 풀지 않고 토스트 | 위와 같음 | DEV_HOTKEYS | — (신규, 할 일 112) | Alt+2 — 튜토리얼 스킵(맵 씬만) |
 | Alt+3 | **로비** 다시 불러오기 — 호스트만(클라는 '호스트만' 토스트, 서버도 거부). 판 끝 로비 복귀와 같은 경로(`NetworkLoadingFlowController.TryLoadSessionSceneSingle`). 출격·씬 전환 중엔 무시 | 위와 같음 | DEV_HOTKEYS | — (신규, 할 일 112) | Alt+3 — 튜토리얼 스킵(맵 씬만) |
+| Y / N / Esc | 간파 예측 보정 질문 답 — Y = 성공이어야 했음(true) · N = 실패여야 했음(false) · Esc = 건너뛰기(기록 안 함). **InterruptCalibrationLab 씬 전용, 질문 창이 떠 있을 때만**(그 밖엔 안 읽음). [dash-interrupt.md §10.2](dash-interrupt.md) | `Dev/InterruptLab/Calibration/InterruptCalibrationQuestionPanel.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 139) | ⚠️ Esc — 게임 메뉴(부트 GameMenu)와 같은 키, 질문 중 같은 프레임 동작은 Play 확인 전 |
 | ~~M~~ | 맵 오버뷰(디버그 맵) 토글 — **꺼짐**(경석 10-22, 쓰지 않음). 인스펙터 `hotkeyEnabled` 로 다시 켠다 | `Map/MapOverviewUI.cs` | 없음 | — | |
 | `[` `]` | 미니맵 크기 프리셋 이전/다음 (슬롯 미부착일 때) | `Map/Minimap/MinimapController.cs` | 없음 | ✓ | ⚠️ `[ ]` — CameraTargetSwitcher |
 | `[` `]` | 관전 대상 이전/다음 (관전 모드일 때) | `Camera/CameraTargetSwitcher.cs` | 없음 | ✓ | ⚠️ `[ ]` — MinimapController |

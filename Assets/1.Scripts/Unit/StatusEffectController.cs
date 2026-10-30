@@ -209,6 +209,22 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         if (StatusEffectImmunityPolicy.ShouldIgnoreApplication(ActiveEffects, type))
             return;
 
+        // 뇌진탕(할 일 125) — 플레이어 쪽엔 넉백 종료 시점이 없어 '넉백 중이 아님' 규칙대로 즉시 기절로 바꾼다.
+        // 같은 출처의 기존 기절과 남은 시간 중 큰 값(합산 아님). 특성 CC 는 아군에 걸지 않는다(명세 §4) — 들어오는 경로 대비만.
+        if (type == StatusEffectType.Concussion)
+        {
+            if (duration <= 0f)
+                return;   // 뇌진탕은 무기한이 없다(ConcussionState 와 같은 거부)
+            int stunIndex = IndexOf(StatusEffectType.Stunned, sourceId);
+            float remaining = stunIndex >= 0 ? GetRemainingTime(stunIndex) : 0f;
+            if (remaining < 0f)
+                return;   // 무기한 기절이 이미 걸려 있다 — 더 길 수 없다
+            duration = ConcussionState.MergeStun(remaining, duration);
+            type = StatusEffectType.Stunned;
+            magnitude = 1f;
+            maxStacks = 1;
+        }
+
         int index = IndexOf(type, sourceId);
 
         int stackCount = 1;

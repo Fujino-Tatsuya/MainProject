@@ -70,6 +70,10 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     [SerializeField] private string animatorStateName = "";
     [SerializeField] private bool snapRotationOnStart = true;
 
+    [Header("후속 시전")]
+    [Tooltip("이 스킬이 후속 스킬로 칸에 올라와 있는 동안 HUD 아이콘에 곱할 색(할 일 128 5a). 흰색 = 변화 없음.")]
+    [SerializeField, DataTableIgnore] private Color followUpIconTint = Color.white;
+
     public PlayerSkillInputType InputType => inputType;
     public float CooldownTime => cooldownTime;
     public bool CommitCooldownManually => commitCooldownManually;
@@ -85,7 +89,8 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public SkillConfirmMode ConfirmMode => confirmMode;
     public float CastRange => castRange;
     public bool FixedDistance => fixedDistance;
-    public float AoeRadius => aoeRadius;
+    // 파생 SO 가 판정 도형 반경으로 덮어쓸 수 있다(어쌔신 변신 E = hitArea 원 radius, 할 일 153).
+    public virtual float AoeRadius => aoeRadius;
     public LayerMask TargetableLayers => targetableLayers;
     public GroundPointOutOfRangeMode GroundPointOutOfRange => groundPointOutOfRange;
     // 파생 SO 가 판정 반경에 맞춰 덮어쓸 수 있다(거너 R = 레이저 radius).
@@ -93,6 +98,7 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public float HoverMarkerDistance => hoverMarkerDistance;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
+    public Color FollowUpIconTint => followUpIconTint;
     public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public Object TooltipValueSource => this;
 

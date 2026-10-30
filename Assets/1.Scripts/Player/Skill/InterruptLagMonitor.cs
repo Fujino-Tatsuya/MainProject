@@ -5,7 +5,8 @@ using UnityEngine;
 /// <summary>
 /// [서버] 간파 지연 측정 기록기(할 일 74 후속 — 측정만, 보정 없음). 판정 결과를 바꾸지 않는다.
 /// <list type="bullet">
-/// <item>카운터 창 소유자(<see cref="IInterruptSlowMotionTarget"/> 구현체)가 창 열림/닫힘 때 <see cref="RecordWindow"/> 를 부른다.</item>
+/// <item>카운터 창 소유자(<see cref="IInterruptSlowMotionTarget"/> 구현체)가 창 열림/닫힘 때 <see cref="RecordWindow"/> 를 부른다
+/// (간파 선착순 장부 <see cref="InterruptWindowClaims"/> 도 이 전이를 받는다 — 할 일 143).</item>
 /// <item>간파 판정(<see cref="PlayerInterruptSkillBase"/>)이 <see cref="ReportJudgement"/> 로 1줄 로그 + 집계.</item>
 /// <item>판 종료(<see cref="SessionStatsTracker"/> 확정·비활성, 앱 종료) 때 <see cref="FlushSummary"/> 가 요약 줄을 찍는다.</item>
 /// </list>
@@ -18,7 +19,11 @@ public static class InterruptLagMonitor
     public const string ReasonSceneEnd = "scene_end";
     public const string ReasonQuit = "quit";
 
+    // 지연 판정용 — 서버 ServerTime(실시간). InterruptLagJudge 의 보정 판정 시각과 같은 시계.
     private static readonly Dictionary<GameObject, InterruptWindowHistory> Histories =
+        new Dictionary<GameObject, InterruptWindowHistory>();
+    // 간파 시도 예측용(할 일 139-6) — 게임초(Time.time). 창 타이머·판정까지 남은 시간과 같은 시계라 슬로우 중 경과가 실시간만큼 늘지 않는다.
+    private static readonly Dictionary<GameObject, InterruptWindowHistory> PredictionHistories =
         new Dictionary<GameObject, InterruptWindowHistory>();
     private static readonly InterruptLagSummary Summary = new InterruptLagSummary();
     private static readonly List<string> Lines = new List<string>();
@@ -27,6 +32,7 @@ public static class InterruptLagMonitor
     private static void ResetStatics()
     {
         Histories.Clear();
+        PredictionHistories.Clear();
         Summary.Clear();
         Application.quitting -= HandleQuitting;
         Application.quitting += HandleQuitting;
@@ -46,19 +52,32 @@ public static class InterruptLagMonitor
         return true;
     }
 
-    /// <summary>[서버] 카운터 창 전이 기록. 키 = 소유자 GameObject(간파가 판정 콜라이더에서 찾는 Unit 과 같은 GameObject).</summary>
+    /// <summary>
+    /// [서버] 카운터 창 전이 기록. 키 = 소유자 GameObject(간파가 판정 콜라이더에서 찾는 Unit 과 같은 GameObject).
+    /// 간파 선착순 장부(<see cref="InterruptWindowClaims"/>, 할 일 143)에도 같은 전이를 넘긴다 — 판정에 쓰이는 유일한 몫이다(장부는 서버 판정만 읽는다).
+    /// </summary>
     public static void RecordWindow(GameObject owner, bool open)
     {
-        if (owner == null || !TryServerNow(out double now))
+        if (owner == null)
             return;
 
-        if (!Histories.TryGetValue(owner, out InterruptWindowHistory history))
+        InterruptWindowClaims.Server.RecordWindow(owner.GetInstanceID(), open);
+        if (!TryServerNow(out double now))
+            return;
+
+        HistoryOf(Histories, owner).Record(now, open);
+        HistoryOf(PredictionHistories, owner).Record(Time.timeAsDouble, open);
+    }
+
+    private static InterruptWindowHistory HistoryOf(Dictionary<GameObject, InterruptWindowHistory> histories, GameObject owner)
+    {
+        if (!histories.TryGetValue(owner, out InterruptWindowHistory history))
         {
             history = new InterruptWindowHistory();
-            Histories.Add(owner, history);
+            histories.Add(owner, history);
         }
 
-        history.Record(now, open);
+        return history;
     }
 
     /// <summary>[서버] 그 소유자의 <paramref name="serverTime"/> 시각 창 상태(기록 기준).</summary>
@@ -68,17 +87,34 @@ public static class InterruptLagMonitor
             : InterruptWindowState.Unknown;
 
     /// <summary>
-    /// [서버] 간파 시도 예측(할 일 132)용 창 추정 — 지금 열린 뒤 경과·추정 길이(초, 서버 시각 기준). 모르면 -1.
+    /// [서버] 간파 시도 예측(할 일 132)용 창 추정 — 지금 열린 뒤 경과·추정 길이(게임초, 할 일 139-6). 모르면 -1, 무기한 길이 = +∞.
+    /// 길이는 로컬로 아는 값(<see cref="InterruptWindowLengthResolver"/>) 우선, 모르면 관측 중앙값.
     /// 예측(연출 강·약)에만 쓰고 판정에는 쓰지 않는다.
     /// </summary>
     public static void EstimateWindow(GameObject owner, bool openNow, out float openElapsed, out float expectedDuration)
     {
         openElapsed = -1f;
         expectedDuration = -1f;
-        if (owner == null || !Histories.TryGetValue(owner, out InterruptWindowHistory history) || !TryServerNow(out double now))
+        if (owner == null || !TryServerNow(out _))
             return;
 
-        history.Estimate(now, openNow, out openElapsed, out expectedDuration);
+        // 경과를 먼저 구한다 — 해석기(23호)가 '열릴 때의 공개 상태'를 경과로 되짚는다.
+        if (PredictionHistories.TryGetValue(owner, out InterruptWindowHistory history))
+            history.Estimate(Time.timeAsDouble, openNow, out openElapsed, out expectedDuration);
+        expectedDuration = InterruptWindowLengthResolver.PreferLocal(
+            InterruptWindowLengthResolver.Resolve(owner, true, openElapsed), expectedDuration);
+    }
+
+    /// <summary>
+    /// [서버] 모든 소유자의 창 관측 기록을 비운다(할 일 139 디버그 랩) — 마지막 전이만 남긴다(<see cref="InterruptWindowHistory.ClearKeepingLatest"/>).
+    /// 진입점은 <see cref="InterruptWindowReplicaTracker.ResetObservations"/>.
+    /// </summary>
+    public static void ResetWindowObservations()
+    {
+        foreach (InterruptWindowHistory history in Histories.Values)
+            history.ClearKeepingLatest();
+        foreach (InterruptWindowHistory history in PredictionHistories.Values)
+            history.ClearKeepingLatest();
     }
 
     /// <summary>[서버] 보낸 클라의 RTT(ms). 호스트 자신 = 0.</summary>
@@ -107,7 +143,7 @@ public static class InterruptLagMonitor
         bool force = reason == ReasonSessionEnd && TryServerNow(out _);
         if (Summary.IsEmpty && !force)
         {
-            Histories.Clear();
+            ClearHistories();
             return;
         }
 
@@ -117,7 +153,13 @@ public static class InterruptLagMonitor
             Debug.Log(line);
 
         Summary.Clear();
+        ClearHistories();
+    }
+
+    private static void ClearHistories()
+    {
         Histories.Clear();
+        PredictionHistories.Clear();
     }
 
     private static void HandleQuitting() => FlushSummary(ReasonQuit);

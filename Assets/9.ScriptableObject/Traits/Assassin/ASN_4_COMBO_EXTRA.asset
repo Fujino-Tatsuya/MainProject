@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c29cc7a6b1d47b046aa92501db8cbe93, type: 3}
+  m_Name: ASN_4_COMBO_EXTRA
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
+  id: ASN_4_COMBO_EXTRA
+  displayName: "끝없는 칼날"
+  category: "기본 공격 강화"
+  description: "기본 공격 4타를 끝까지 쓰면 마지막 공격 범위에 {dmg}의 추가 피해를 줍니다. 변신 중에도 적용됩니다."
+  icon: {fileID: 0}
+  effects:
+  - rid: 7237886673709695200
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886673709695200
+      type: {class: TraitDerivedAttackEffect, ns: , asm: Assembly-CSharp}
+      data:
+        derivedKey: ASN_COMBO_EXTRA
+        sourceAttackTypes: 01000000
+        sourceForms: 0001
+        damageRatio: 0.7
+        delay: 0.08
+        radius: 0
+        forwardOffset: 0
+        requiredCount: 1

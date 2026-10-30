@@ -44,4 +44,7 @@ public sealed class GunnerOverheadTraitGauge : MonoBehaviour, IOverheadTraitGaug
     }
 
     public float MarkerPosition => -1f;
+
+    // 정온 운용(할 일 127 3/4) — 과열이 없으니 머리 위 과열 줄도 숨긴다.
+    public bool Visible => heat == null || heat.HeatEnabled;
 }

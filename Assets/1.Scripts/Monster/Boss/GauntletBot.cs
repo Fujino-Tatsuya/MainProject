@@ -21,8 +21,11 @@ using UnityEngine;
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
 [DataTableSheet("MidBoss", Order = 0)]
-public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
+public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor
 {
+    // 할 일 134 — 취약 밖(공격 밖 평상 포함) 상시 슈퍼아머 = 밀치기·기절·뇌진탕 거부, 취약 = 허용(BossCrowdControlRules).
+    bool IMonsterStateSuperArmor.StateSuperArmor => BossCrowdControlRules.MidBossStateSuperArmor(Rank == MonsterRank.MidBoss, IsMidBossVulnerable);
+
     // 공격 종류. Smash 1종 + 펀치 3종 × L/R = 총 7종.
     enum GauntletAttackId
     {

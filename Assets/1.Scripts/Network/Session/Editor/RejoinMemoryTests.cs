@@ -6,8 +6,8 @@ using NUnit.Framework;
 /// </summary>
 public sealed class RejoinMemoryTests
 {
-    static TutorialTraitRejoinSnapshot Traits(params int[] acquired) =>
-        new TutorialTraitRejoinSnapshot(acquired, 0, false, 0, 0, false, 0, Array.Empty<int>());
+    static TraitRejoinSnapshot Traits(params int[] acquired) =>
+        new TraitRejoinSnapshot(acquired, 0, false, 0, 0, false, 0, Array.Empty<int>());
 
     [Test]
     public void 보관한_특성은_꺼내면_지워진다()

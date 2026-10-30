@@ -8,9 +8,11 @@ using UnityEngine;
 /// 좌클릭 또는 (최대 집중 + 유지시간) 자동 → 현재 조준으로 발사: 사거리·피해는 집중 시간으로 최소→최대 보간,
 /// 지형에서 끊기는 굵은 직선 안의 적·오브젝트에 피해, 아군(시전자 제외)에 보호막(합산) — 전부 대상별 1회.
 /// 쿨타임은 발사 순간부터(수동 커밋). 발사 없이 끝나면(쓰러짐·사망·조작 불가·피격 취소) 쿨타임 없음.
-/// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다.
+/// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다(축열 포격 특성만 첫 발에서 모두 소모).
 /// 발사 후 회복 종료 = 발사 때 GunnerBeamView 가 트는 Gunner_Q_Fire 클립(gunner_skill_Q_fire)의 End 이벤트(서버).
 /// 안 오면 maxActiveDuration 안전망(시전 시작부터).
+/// 집속 연사(할 일 127 4/4) = 첫 발 스냅샷(방향·충전 사거리·폭·피해)으로 간격마다 원래 발을 더 쏜다 — 발마다 같은 발사 연출을 다시 틀어
+/// 회복(End)은 마지막 발 뒤에 온다. 마지막 발 전 End 는 무시한다.
 /// </summary>
 public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 {
@@ -24,11 +26,40 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
     // 서버 런타임
     private float chargeStartTime;
-    private int storedStage;
+    // 시전 스냅샷(할 일 127 3/4) — 시작 순간 과열 단계 + 첫 발 직전 축열 소모. 원래 발 전체·잔류 포격이 같은 값을 쓴다.
+    private readonly GunnerQCastSnapshot castSnapshot = new GunnerQCastSnapshot();
     private Vector3 aim;
     private bool fired;
     private bool statusApplied;
+    private float chargeMaxTime;
     private float ownerChargeStartTime;
+    private float ownerChargeMaxTime;
+
+    // 특성(할 일 127) — 충격 레이저·집중 포화·잔류 포격. 서버에서만 쓴다.
+    // 원래 발 묶음 = 단발 Q 1발, 집속 연사면 N발 — 발마다 같은 시전 ID(밀치기 대상별 1회)·같은 echoPlan 에 AddOriginalShot 한다.
+    private PlayerTraitEffects traitEffects;
+    private GunnerBeamAttack.TargetHitHook originalHitHook;
+    private GunnerBeamAttack.TargetHitHook echoHitHook;
+    private Vector3 hitDirection;
+    private readonly GunnerCastCcGate pushGate = new GunnerCastCcGate();
+    private readonly GunnerEchoPlan echoPlan = new GunnerEchoPlan();
+    private readonly GunnerDelayedShots echoShots = new GunnerDelayedShots();
+    private readonly List<GunnerDerivedShot> dueEchoShots = new List<GunnerDerivedShot>();
+    private readonly List<TraitDerivedAttack> derivedBuffer = new List<TraitDerivedAttack>();
+    private bool lifeSubscribed;
+
+    // 집속 연사(GUN_3_VOLLEY, 할 일 127 4/4) — 원래 발 일정(단발도 1발 일정)·아군 보호막 시전당 1회.
+    // 첫 발에서 정한 방향·충전 사거리·폭·발당 피해·보호막량을 모든 원래 발이 쓴다. 대상·지형·발사 위치는 발마다 새로 잰다.
+    private readonly GunnerVolleySchedule volley = new GunnerVolleySchedule();
+    private readonly GunnerCastShieldGate shieldGate = new GunnerCastShieldGate();
+    private Vector3 shotDirection;
+    private float shotFactor;
+    private float shotRange;
+    private float shotWidth;
+    private int shotDamage;
+    private int shotShield;
+    private int shotStage;
+    private GunnerHeatMode shotHeatMode;
 
     /// <summary>
     /// [서버] Q 를 실제로 <b>발사</b>했다(충전 시작·대시 취소·피격 종료는 안 난다). 튜토리얼 판정 훅(v8 Z1-5 "거너 Q 는 발사까지").
@@ -50,9 +81,30 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     // 공용 대시는 정신 집중만 끊는다(D1). 발사 후 회복(Skill)은 끊지 않는다.
     public override bool CanBeCanceledByDash(PlayerActionState phase) => phase == PlayerActionState.Focus;
 
+    // 집속 연사 — 첫 발부터 마지막 발까지((발수 − 1) × 간격)만큼 안전망을 늘린다. 특성이 없으면 0(원래 동작).
+    public override float SafetyNetExtraSeconds =>
+        GunnerVolleyTraits.From(Traits).ExtraDuration(owner != null ? owner.AttackSpeedRate : 1f);
+
     private GunnerChargeLaserData QData => Data as GunnerChargeLaserData;
     private ulong SourceId => owner != null ? owner.NetworkObjectId : 0;
     private bool HasAuthority => owner != null && (!owner.IsSpawned || owner.IsServer);
+    private PlayerTraitModifiers Traits => owner != null ? owner.TraitModifiers : null;
+
+    // 특성(할 일 127) — 고속 집속 = 최대 충전시간 ×0.75(피해·사거리 끝점·자동 발사 유지시간 그대로),
+    // 광폭 레이저 = 판정 폭 ×1.3(사거리·높이 그대로). 시전 시작(충전시간)·발사(폭) 순간 값으로 쓴다.
+    private float EffectiveMaxChargeTime(GunnerChargeLaserData data) =>
+        GunnerTraitRules.QMaxChargeTimeFor(Traits, data.MaxChargeTime);
+
+    // 발사 판정 폭 — 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
+    public float EffectiveBeamWidth(GunnerChargeLaserData data) =>
+        GunnerTraitRules.QBeamWidthFor(Traits, data.BeamWidth);
+
+    /// <summary>레이저 출발점 = 시전자 위치 + 위로 MuzzleHeight(발사·충전 미리보기·특성 랩 기즈모 공용).</summary>
+    public static Vector3 FireOrigin(Vector3 casterPosition, GunnerChargeLaserData data) =>
+        casterPosition + Vector3.up * data.MuzzleHeight;
+
+    private static float ChargeFactor(GunnerChargeLaserData data, float elapsed, float maxChargeTime) =>
+        data.ChargeFactor(GunnerTraitRules.DataClockElapsed(elapsed, data.MaxChargeTime, maxChargeTime));
 
     public override void Initialize(Player owner, PlayerSkillController controller)
     {
@@ -63,6 +115,39 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         movement = owner.GetComponent<PlayerMovement>();
         lineIndicator = owner.GetComponentInChildren<SkillLineIndicator>(true);
         hoverOutline = owner.GetComponent<PlayerEnemyHoverOutline>();
+        originalHitHook = ApplyOriginalHit;
+        echoHitHook = ApplyEchoHit;
+    }
+
+    private void OnEnable()
+    {
+        if (!lifeSubscribed)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
+            lifeSubscribed = true;
+        }
+    }
+
+    // 씬 종료·비활성 — 예약한 잔류 포격을 버린다(명세 §9).
+    private void OnDisable()
+    {
+        if (lifeSubscribed)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
+            lifeSubscribed = false;
+        }
+
+        echoShots.Clear();
+    }
+
+    // 사망(살아 있음 → 그 밖) — 예약한 잔류 포격 취소·밀치기 승인 기억 정리(공용 밀치기 장부와 같은 시점).
+    private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (owner != null && clientId == owner.OwnerClientId && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
+        {
+            echoShots.Clear();
+            pushGate.Reset();
+        }
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => QData != null && beam != null;
@@ -71,11 +156,17 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     {
         State = SkillState.Charging;
         chargeStartTime = Time.time;
+        chargeMaxTime = EffectiveMaxChargeTime(QData);
         aim = direction;
         fired = false;
+        // 새 시전은 새 묶음 — 이미 예약된 이전 시전의 잔류 포격(echoShots)은 덮어쓰지 않는다.
+        echoPlan.Reset();
+        volley.Reset();
+        shieldGate.Reset();
 
-        // 시전 시작 순간의 단계를 저장 — 과열 중이면 3단계(§5.6)
-        storedStage = heat != null ? heat.CaptureStage() : 0;
+        // 시전 시작 순간의 단계를 저장 — 과열 중이면 3단계(§5.6). 정온 운용이면 0.
+        int storedStage = heat != null ? heat.CaptureStage() : 0;
+        castSnapshot.Begin(storedStage);
 
         StatusEffectController effects = owner.StatusEffects;
         if (effects != null)
@@ -95,7 +186,11 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     {
         ownerChargeStartTime = Time.time;
         if (QData != null)
-            view?.BeginCharge(QData.MaxChargeTime);
+        {
+            // 연출 코드는 그대로 — 충전 완료 시점만 특성 충전시간에 맞춰 넘긴다.
+            ownerChargeMaxTime = EffectiveMaxChargeTime(QData);
+            view?.BeginCharge(ownerChargeMaxTime);
+        }
     }
 
     public override void OnOwnerTick(Vector3 aimDirection)
@@ -116,19 +211,47 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         aimDirection = aimDirection.sqrMagnitude > 0.001f
             ? aimDirection.normalized
             : owner.transform.forward;
-        float factor = data.ChargeFactor(Time.time - ownerChargeStartTime);
+        float factor = ChargeFactor(data, Time.time - ownerChargeStartTime, ownerChargeMaxTime);
         float range = data.RangeAt(factor);
-        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        float width = EffectiveBeamWidth(data);
+        Vector3 origin = FireOrigin(owner.transform.position, data);
+        // 지형 차단은 데이터 폭으로 잰다 — 광폭 레이저가 사거리를 바꾸지 않게(발사와 같은 식).
         float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
-        lineIndicator.ShowCharge(origin, aimDirection, 0f, length, data.BeamWidth);
+        lineIndicator.ShowCharge(origin, aimDirection, 0f, length, width);
         // 지금 쏘면 맞을 적에 외곽선(할 일 58) — 발사(Fire)와 같은 사거리·폭·높이·앵커.
-        hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, data));
+        hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, width, data));
     }
 
-    /// <summary>발사 판정 상자 — <see cref="Fire"/> 의 <see cref="GunnerBeamAttack.FirePiercing"/> 와 같은 인자(오너 미리보기 공용).</summary>
-    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data)
+    /// <summary>
+    /// 발사 판정 상자(오너 미리보기 공용) — <see cref="Fire"/> 와 같은 판정 도형(<see cref="GunnerChargeLaserData.FireArea"/>)·포즈의
+    /// 첫 도형 넓은 질의 상자(직사각형이면 판정 영역 그대로). 폭 = 데이터 폭(특성 없음).
+    /// </summary>
+    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data) =>
+        FireVolume(origin, direction, length, data.BeamWidth, data);
+
+    /// <summary>폭을 따로 받는 판(광폭 레이저 — <see cref="GunnerTraitRules.QBeamWidthFor"/>).</summary>
+    public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, float width, GunnerChargeLaserData data)
     {
-        return SkillHitVolume.Beam(origin, direction, length, data.BeamWidth, data.BeamHeight, data.HittableLayers);
+        AttackShapeSet area = data.FireArea(length, width);
+        AttackShape shape = area.IsEmpty ? null : area.Shapes[0];
+        if (shape == null)
+            return SkillHitVolume.Box(origin, Vector3.zero, Quaternion.identity, data.HittableLayers);
+
+        shape.GetBroadBox(data.FirePose(origin, direction), out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
+        return SkillHitVolume.Box(center, halfExtents, rotation, data.HittableLayers);
+    }
+
+    /// <summary>
+    /// 발 하나의 판정 영역·기준 포즈(할 일 153) — 최대 충전 도형을 지형 차단 뒤 길이 <paramref name="length"/>·폭 <paramref name="width"/>(광폭 레이저)로 맞춘 복사본,
+    /// 기준점 = 발사 원점 + 발사 방향. 지형 차단은 데이터 폭으로 잰다(광폭 레이저가 사거리를 바꾸지 않게). <paramref name="beam"/> 이 없으면 차단 없이 <paramref name="range"/>.
+    /// 원래 발·잔류 포격 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ShotArea(GunnerBeamAttack beam, GunnerChargeLaserData data, Vector3 origin, Vector3 direction, float range, float width,
+        out AttackShapePose pose, out float length)
+    {
+        length = beam != null ? beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers) : range;
+        pose = data.FirePose(origin, direction);
+        return data.FireArea(length, width);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -145,14 +268,18 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         if (data == null)
             return;
 
-        if (State == SkillState.Charging && Time.time >= chargeStartTime + data.MaxChargeTime + data.AutoFireHoldTime)
+        if (State == SkillState.Charging && Time.time >= chargeStartTime + GunnerTraitRules.AutoFireDelay(chargeMaxTime, data.AutoFireHoldTime))
             Fire(aim);
+
+        // 집속 연사 — 시각이 된 원래 발(틱이 늦었으면 같은 틱에 순서대로).
+        while (State == SkillState.Active && volley.TryTakeDue(Time.timeAsDouble, out int index))
+            FireOriginalShot(index);
     }
 
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {
-        // 발사 전(집중 중)에는 Q_Fire 가 재생되지 않는다 — 혹시 와도 무시.
-        if (fired && eventType == SkillAnimationEventType.End)
+        // 발사 전(집중 중)에는 Q_Fire 가 재생되지 않는다 — 혹시 와도 무시. 집속 연사는 남은 발이 있으면 무시(마지막 발 연출의 End 를 기다린다).
+        if (fired && eventType == SkillAnimationEventType.End && !volley.HasPending)
             EndSelf(SkillEndReason.Completed);
     }
 
@@ -168,38 +295,88 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         direction = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
         movement?.RotateImmediately(direction);
 
-        float factor = data.ChargeFactor(Time.time - chargeStartTime);
-        float range = data.RangeAt(factor);
-        // 툴팁의 최소~최대 계산도 같은 집중·과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
-        int damage = Mathf.Max(0, Mathf.RoundToInt(
-            damageSnapshot * data.DamageMultiplierAt(factor) * data.StageDamageMultiplier(storedStage)));
-        int shield = Mathf.Max(0, Mathf.RoundToInt(data.ShieldAmount * data.StageShieldMultiplier(storedStage)));
+        float factor = ChargeFactor(data, Time.time - chargeStartTime, chargeMaxTime);
+        // 축열 포격(할 일 127 3/4) — 첫 발 실제 발사 직전 남은 열을 모두 소모(열 0·과열 해제)하고 그 비율로 Q 피해 보너스.
+        // 소모와 발사 커밋이 같은 서버 호출 안이다(원자). 충전 취소·발사 전 종료는 여기 오지 않아 소모 없음, 빗나가도 소모.
+        GunnerHeatTraits heatTraits = heat != null ? heat.Traits : GunnerHeatTraits.From(Traits);
+        if (!castSnapshot.FirstShotCommitted)
+        {
+            float spent = heatTraits.SpendsHeatOnQ && heat != null ? heat.ServerSpendAll() : 0f;
+            castSnapshot.CommitFirstShot(heatTraits, spent);
+        }
 
-        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
-        float length = beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers);
+        // 툴팁의 최소~최대 계산도 같은 집중·과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것(GunnerChargeLaserData·GunnerTraitTooltip).
+        // 한계 돌파 = 단계 배율표 교체, 정온 운용 = 0단계. 보호막 단계 배율은 원래 표(축열 보너스 없음).
+        // 집속 연사 = 발당 피해 × 발당 배율(충전 정도는 발수가 아니라 각 발 피해·사거리를 정한다). 보호막은 나누지 않는다.
+        GunnerVolleyTraits volleyTraits = GunnerVolleyTraits.From(Traits);
+        int storedStage = heatTraits.EffectiveStage(castSnapshot.StoredStage);
+        shotDamage = castSnapshot.ShotDamage(damageSnapshot, volleyTraits.ShotChargeScale(data.DamageMultiplierAt(factor)),
+            heatTraits.SkillStageScale(storedStage, data.StageDamageMultiplier(storedStage)));
+        shotShield = Mathf.Max(0, Mathf.RoundToInt(data.ShieldAmount * data.StageShieldMultiplier(storedStage)));
+        shotDirection = direction;
+        shotFactor = factor;
+        shotRange = data.RangeAt(factor);
+        shotWidth = EffectiveBeamWidth(data);
+        shotStage = storedStage;
+        shotHeatMode = heatTraits.Mode;
+        hitDirection = direction;
 
-        int hitCount = beam.FirePiercing(origin, direction, length, data.BeamWidth, data.BeamHeight,
-                                         data.HittableLayers, damage, DamageAttackType,
-                                         DamageHitPattern, data.TriggersOnHit);
+        // 공격 가속은 발사 간격에만(충전시간 제외). 단발 Q = 1발 일정.
+        volley.BeginFirstShot(Time.timeAsDouble, volleyTraits.ShotCount,
+            volleyTraits.IntervalAt(owner != null ? owner.AttackSpeedRate : 1f));
+        FireOriginalShot(0);
+    }
 
-        beam.CollectAllies(origin, direction, length, data.BeamWidth, data.BeamHeight, data.AllyLayers, allies);
+    /// <summary>
+    /// [서버] 원래 Q 1발 — 첫 발 스냅샷(방향·충전 사거리·폭·피해·보호막량)으로 지금 위치에서 대상·지형을 새로 판정한다.
+    /// 첫 발(index 0)만 쿨타임 시작·집중 해제·발사 사건. 발사 연출은 단발과 같은 경로를 발마다 그대로 부른다(새 연출 없음).
+    /// </summary>
+    private void FireOriginalShot(int index)
+    {
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || owner == null)
+            return;
+
+        Vector3 direction = shotDirection;
+        Vector3 origin = FireOrigin(owner.transform.position, data);
+        AttackShapeSet area = ShotArea(beam, data, origin, direction, shotRange, shotWidth, out AttackShapePose pose, out float length);
+        int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shotDamage, DamageAttackType,
+                                         DamageHitPattern, data.TriggersOnHit,
+                                         TraitHitFlags.Original, originalHitHook);
+        // 잔류 포격 묶음 — 예정 단일 대상 피해(실제 총 피해·맞힌 수 아님)를 발마다 더하고, 첫 발 위치·방향·최종 충전 사거리·폭을 저장.
+        echoPlan.AddOriginalShot(origin, direction, shotRange, shotWidth, shotDamage);
+
+        // 아군 보호막 — 같은 판정 도형. 같은 아군은 시전당 원래 보호막량 1회(시전자 제외는 CollectAllies).
+        beam.CollectAllies(area, pose, data.AllyLayers, allies);
+        int shielded = 0;
         for (int i = 0; i < allies.Count; i++)
-            allies[i].AddShield(ShieldType.GunnerCharge, SourceId, shield, data.ShieldDuration);
+        {
+            if (!shieldGate.TryGive(allies[i].GetInstanceID()))
+                continue;
+            allies[i].AddShield(ShieldType.GunnerCharge, SourceId, shotShield, data.ShieldDuration);
+            shielded++;
+        }
 
-        controller.CommitCooldownServer(Slot);
-        ClearStatus();
-        ServerFired?.Invoke(owner);
+        if (index == 0)
+        {
+            controller.CommitCooldownServer(Slot);
+            ClearStatus();
+            ServerFired?.Invoke(owner);
+        }
 
         // 🔴 **지형에 막혔는지를 같이 보낸다.** 끝점 좌표만으로는 벽에 맞은 것과
         //    최대 사거리까지 뻗어 허공에서 끝난 것을 구분할 수 없다 —
         //    착탄 연출을 띄울지 말지가 여기서 갈린다(좌클릭의 stopped 와 같은 신호).
-        bool stopped = length < range - 0.01f;
+        bool stopped = length < shotRange - 0.01f;
         // 보호막 연출은 안 싣는다 — 받은 아군의 PlayerShieldVfx 가 복제된 보호막 목록을 보고 띄운다.
+        // 🔴 연출 폭은 데이터 폭 그대로(광폭 레이저 VFX 폭 반영은 별도 할 일 — 판정만 넓힌다).
         view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth,
                                      stopped, BuildHitPoints(origin, direction, length));
 
-        Edit.Log($"[Gunner/Q] 발사 — 집중 {factor:0.00}, 사거리 {length:0.0}/{range:0.0}, 피해 {damage} ×{hitCount}, " +
-                 $"보호막 {shield} ×{allies.Count}, 저장 단계 {storedStage}", this);
+        Edit.Log($"[Gunner/Q] 발사 {index + 1}/{volley.ShotCount} — 집중 {shotFactor:0.00}(최대 {chargeMaxTime:0.##}초), 사거리 {length:0.0}/{shotRange:0.0}, " +
+                 $"폭 {shotWidth:0.##}, 피해 {shotDamage} ×{hitCount}, 보호막 {shotShield} ×{shielded}, 저장 단계 {shotStage}, 과열 모드 {shotHeatMode}" +
+                 (index == 0 && shotHeatMode == GunnerHeatMode.HeatShot ? $", 축열 소모 {castSnapshot.HeatSpentRatio:0.00} ×{castSnapshot.HeatShotScale:0.00}" : "") +
+                 (volley.ShotCount > 1 ? $", 연사 간격 {volley.Interval:0.###}초" : ""), this);
     }
 
     /// <summary>
@@ -254,6 +431,13 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
                 // 쓰러짐·사망·조작 불가·피격 취소 = 쿨타임 없음(수동 커밋이라 자연히 안 돈다 — §6.6)
                 Edit.Log($"[Gunner/Q] 발사 없이 종료({reason}) — 쿨타임 없음", this);
             }
+            else if (volley.HasPending)
+            {
+                // 집속 연사 도중 사망·강제 중단 — 남은 발 취소. 이미 시작한 쿨타임·소모한 열은 돌려주지 않는다. 잔류 포격도 없다.
+                Edit.Log($"[Gunner/Q] 집속 연사 중단({reason}) — {volley.ShotsFired}/{volley.ShotCount}발 뒤 남은 발 취소", this);
+                volley.Cancel();
+            }
+            ScheduleEcho(reason);
             ClearStatus();
         }
 
@@ -272,17 +456,97 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         forward.y = 0f;
         forward = forward.sqrMagnitude > 0.001f ? forward.normalized : owner.transform.forward;
-        Vector3 castOrigin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 castOrigin = FireOrigin(owner.transform.position, data);
         float radius = data.BeamWidth * 0.5f;
         float clippedMin = beam.CastLength(castOrigin, forward, data.MinRange, radius, data.BlockingLayers);
         float clippedMax = beam.CastLength(castOrigin, forward, data.MaxRange, radius, data.BlockingLayers);
         shape = SkillPreviewShapes.ChargeLaser(
             data.MinRange,
             data.MaxRange,
-            data.BeamWidth,
+            EffectiveBeamWidth(data),
             clippedMin,
             clippedMax);
         return true;
+    }
+
+    // ── 특성(할 일 127) ──────────────────────────────────────────────────
+
+    private PlayerTraitEffects TraitEffects
+    {
+        get
+        {
+            if (traitEffects == null && owner != null)
+                traitEffects = PlayerTraitEffects.For(owner);
+            return traitEffects;
+        }
+    }
+
+    // 원래 Q 발 대상 1건 — 집중 포화(자기 R 범위 안이면 피해 배율) → 충격 레이저(밀치기).
+    private void ApplyOriginalHit(Unit target, ref AttackInfo info)
+    {
+        GunnerTrackingLaser.ApplyFocusFire(owner, target, ref info);
+        ApplyImpactPush(target, ref info);
+    }
+
+    // 잔류 포격 대상 1건 — 집중 포화만(파생 = 밀치기·보호막·자원 없음).
+    private void ApplyEchoHit(Unit target, ref AttackInfo info) => GunnerTrackingLaser.ApplyFocusFire(owner, target, ref info);
+
+    /// <summary>
+    /// 충격 레이저(GUN_3_Q_PUSH) — 공용 밀치기 경로(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/> → TraitKnockbackEffect.ApplyCrowdControl)를
+    /// 레이저 진행 방향으로. 시전 전체에서 대상별 유효 승인 1회 — 지금 슈퍼아머(면역)인 대상은 요청하지 않아 같은 시전의 다음 원래 발에서 승인될 수 있다.
+    /// 특성이 없으면 공용 경로가 아무것도 바꾸지 않는다(승인 기록도 없음).
+    /// </summary>
+    private void ApplyImpactPush(Unit target, ref AttackInfo info)
+    {
+        if (target == null || TraitEffects == null)
+            return;
+
+        int castId = ServerCastId;
+        int targetId = target.GetInstanceID();
+        if (!pushGate.ShouldRequest(castId, targetId, target.HasSuperArmor))
+            return;
+
+        float before = info.knockbackStrength * info.knockbackDuration;
+        TraitEffects.ModifyOutgoingAttackServer(GunnerTraitRules.QAttackKey, castId, target, hitDirection, ref info);
+        if (info.knockbackStrength * info.knockbackDuration > before)
+            pushGate.MarkApproved(castId, targetId);
+    }
+
+    // [서버] 잔류 포격(GUN_4_ECHO_Q) — 정상 종료(발사 후 End 이벤트·그 안전망)에서만 지연 뒤 1회 예약. 중단·사망·발사 전 종료면 없음.
+    // 집속 연사는 예정한 원래 발을 모두 쏜 뒤의 정상 종료만(마지막 발 뒤 1회).
+    private void ScheduleEcho(SkillEndReason reason)
+    {
+        TraitDerivedAttack echo = GunnerTraitRules.FindDerived(TraitEffects, GunnerTraitRules.QAttackKey,
+            GunnerTraitRules.QEchoDerivedKey, derivedBuffer);
+        if (echoPlan.TryBuildEcho(fired && volley.AllShotsFired, reason, echo, out GunnerDerivedShot shot))
+        {
+            echoShots.Schedule(Time.timeAsDouble, echo.Delay, shot);
+            Edit.Log($"[Gunner/Q] 잔류 포격 예약 — {echo.Delay:0.##}초 뒤, 피해 {shot.Damage}(예정 합계 {echoPlan.PlannedDamageSum})", this);
+        }
+
+        echoPlan.Reset();
+    }
+
+    // [서버] 예약된 잔류 포격 — 저장한 위치·방향(포즈)·충전 사거리·폭(도형 배율)으로 원래 발과 같은 판정 도형, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
+    // 열 소모·보호막·밀치기·쿨·적중 사건·연쇄 없음(Derived).
+    private void Update()
+    {
+        if (echoShots.Count == 0 || !HasAuthority)
+            return;
+
+        echoShots.CollectDue(Time.timeAsDouble, dueEchoShots);
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || owner.CurrentHealth <= 0)
+            return;
+
+        for (int i = 0; i < dueEchoShots.Count; i++)
+        {
+            GunnerDerivedShot shot = dueEchoShots[i];
+            AttackShapeSet area = ShotArea(beam, data, shot.Origin, shot.Direction, shot.Range, shot.Width, out AttackShapePose pose, out float length);
+            int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
+                                             false, TraitHitFlags.Derived, echoHitHook);
+            Edit.Log($"[Gunner/Q] 잔류 포격 — 사거리 {length:0.0}/{shot.Range:0.0}, 폭 {shot.Width:0.##}, 피해 {shot.Damage} ×{hitCount}", this);
+        }
     }
 
     private void ClearStatus()

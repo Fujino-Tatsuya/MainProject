@@ -84,7 +84,7 @@ public static class DataTableTemplate
                 continue;
             }
 
-            FieldInfo field = ResolveField(type, path);
+            FieldInfo field = DataTableFields.Resolve(asset, path); // [SerializeReference] 원소 안쪽은 실제 값의 타입으로(특성 효과, 할 일 125)
 
             // [Header] 는 내보내지 않는 필드(레이어 마스크 등)에 붙어 있어도 구역을 연다.
             if (field != null && path.IndexOf('.') < 0)
@@ -96,12 +96,12 @@ public static class DataTableTemplate
                 }
             }
 
-            if (field == null || IsExcluded(field) || IsUnderIgnored(type, path))
+            if (field == null || IsExcluded(field) || DataTableFields.IsUnderExcluded(asset, path))
             {
                 continue;
             }
 
-            if (it.propertyType == SerializedPropertyType.Generic)
+            if (it.propertyType == SerializedPropertyType.Generic || it.propertyType == SerializedPropertyType.ManagedReference)
             {
                 enterChildren = true; // 구조체·클래스·배열 안으로
                 continue;
@@ -135,7 +135,7 @@ public static class DataTableTemplate
                     subSection = null;
                 }
 
-                string leafHeader = DataTableFields.Resolve(type, path)?.GetCustomAttribute<HeaderAttribute>()?.header;
+                string leafHeader = field.GetCustomAttribute<HeaderAttribute>()?.header;
                 if (leafHeader != null)
                 {
                     subSection = leafHeader;
@@ -164,6 +164,13 @@ public static class DataTableTemplate
         if (element == null)
         {
             return label;
+        }
+
+        // [SerializeReference] 원소(특성 효과) — 칸마다 클래스가 달라 클래스 이름이 이름표다.
+        if (element.propertyType == SerializedPropertyType.ManagedReference)
+        {
+            string typeName = element.managedReferenceValue?.GetType().Name;
+            return typeName == null ? label : $"{label} · {typeName}";
         }
 
         SerializedProperty child = element.Copy();

@@ -40,6 +40,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     float _singleDuration;
     int _amount;
     Color _styleColor;
+    Vector2 _styleOffset;
     float _displayScaleMultiplier;
     float _displayAlphaMultiplier;
     int _baseMaxHp;
@@ -83,6 +84,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _accumulates = request.hitPattern == AttackHitPattern.Multi;
         _amount = Mathf.Max(0, request.amount);
         _styleColor = style.color;
+        _styleOffset = style.offset;
         _baseColor = style.color;
         _releaseRequested = false;
 
@@ -194,8 +196,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
         float scaleFactor = Mathf.Max(0.0001f, _canvas.scaleFactor);
         Vector2 position = new Vector2(screen.x / scaleFactor, screen.y / scaleFactor);
-        position.x += _scatter.x + ShakeOffset();
-        position.y += _settings.SpawnOffset + _scatter.y + VerticalOffset();
+        position.x += _styleOffset.x + _scatter.x + ShakeOffset();
+        position.y += _settings.SpawnOffset + _styleOffset.y + _scatter.y + VerticalOffset();
 
         Vector2 size = _canvasRect.rect.size;
         Vector2 padding = _settings.ScreenEdgePadding;
@@ -203,7 +205,10 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         position.y = Mathf.Clamp(position.y, padding.y, Mathf.Max(padding.y, size.y - padding.y));
 
         _rect.anchoredPosition = position;
-        _rect.localScale = Vector3.one * CurrentScale();
+        // 해상도 하한(154) — 유지 크기 기준 실제 px 가 하한보다 작으면 같은 배율로 키운다(애니 비율 유지).
+        float minPixel = FloatingDamageMinPixelPolicy.Multiplier(_settings.MinScreenPixelHeight,
+            _digitHeight * _look.holdScale * _displayScaleMultiplier, scaleFactor);
+        _rect.localScale = Vector3.one * (CurrentScale() * minPixel);
         SetAlpha(CurrentAlpha());
     }
 

@@ -42,6 +42,15 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 판정 기준점 (MainSkill/SubSkill/InterruptAttack/UltimateSkill 앵커). E처럼 판정 없는 스킬은 비워도 된다.
     [SerializeField] private ColliderInfo hitboxAnchor;
 
+    // 후속 시전(할 일 128 5a, PlayerSkillFollowUp.cs) — 비우면 기존 동작 그대로.
+    [Header("후속 시전")]
+    [Tooltip("이 스킬을 쓰면 같은 칸이 잠깐 바뀔 후속 스킬(같은 슬롯, 별도 컴포넌트·데이터). 후속을 쓰거나 창이 끝나면 돌아오고 그때 이 스킬 쿨이 시작된다.")]
+    [SerializeField] private PlayerSkillBase followUpSkill;
+    [Tooltip("후속 창 길이(초). 기본 시작 = 이 스킬이 끝났을 때, 스킬이 BeginFollowUpWindow() 로 일찍 열 수 있다.")]
+    [SerializeField, Min(0f)] private float followUpWindowSeconds = 3f;
+    [Tooltip("후속 스킬이 이 스킬의 시전 ID(ServerCastId)를 이어받는가 — 같은 시전의 다른 단계로 묶을 때.")]
+    [SerializeField] private bool followUpInheritsCastId = true;
+
     protected Player owner;
     protected PlayerSkillController controller;
     protected int damageSnapshot;
@@ -56,6 +65,33 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     public bool HasAimPoint { get; private set; }
 
     public abstract PlayerSkillSlot Slot { get; }
+
+    // ── 후속 시전(할 일 128 5a) ──
+
+    /// <summary>이 스킬에 연결된 후속 스킬. 컨트롤러가 Awake 에 등록한다(같은 슬롯, 후속의 후속은 지원 안 함).</summary>
+    public virtual PlayerSkillBase FollowUpSkill => followUpSkill;
+
+    /// <summary>후속 창 길이(초). 시작 시점은 기본 = 이 스킬 종료, 일찍 열려면 <see cref="BeginFollowUpWindow"/>.</summary>
+    public virtual float FollowUpWindowSeconds => followUpWindowSeconds;
+
+    /// <summary>후속 스킬이 이 스킬의 시전 ID 를 이어받는가.</summary>
+    public virtual bool FollowUpInheritsCastId => followUpInheritsCastId;
+
+    /// <summary>
+    /// 이번 시전이 후속을 여는가 — 서버 승인(CanUse 통과 뒤)과 원격 오너 예측에서 같은 값을 본다. 기본 = 후속이 연결돼 있으면 항상.
+    /// 거짓이면 기존대로 승인 때 쿨이 시작된다. 조건을 둘 스킬은 덮는다(서버가 최종 — 오너와 달라도 서버 값이 이긴다).
+    /// </summary>
+    public virtual bool OpensFollowUp(Vector3 direction, Unit target) => FollowUpSkill != null;
+
+    /// <summary>[후속 스킬] 지금 이 스킬을 칸에 올린 원래 스킬. 후속이 아니면 null.</summary>
+    public PlayerSkillBase FollowUpSource => controller != null ? controller.GetFollowUpSource(this) : null;
+
+    /// <summary>[서버] 후속 창을 지금부터 시작한다(예: 첫 돌진 종료). 안 부르면 이 스킬이 끝날 때 시작된다. 이미 시작했으면 무시.</summary>
+    protected void BeginFollowUpWindow()
+    {
+        if (controller != null)
+            controller.BeginFollowUpWindowServer(this);
+    }
 
     // 슬롯은 PlayerSkillController 바인딩과 각 구현의 Slot 계약으로 이미 검증된다.
     // 우클릭 Interrupt는 Q/E/R 슬롯이 아니므로 범용 Skill로 남긴다.
@@ -80,6 +116,10 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
 
     // 이 스킬의 조준 모드(SingleTarget/GroundPoint)를 공용 대시가 취소할 수 있는가. 기본 아니오(조준 중 대시 입력 무시).
     public virtual bool CanCancelAimByDash => false;
+
+    // 기본 공격 이어가기(할 일 146) — 이 스킬이 정상 종료됐을 때 좌클릭이 아직 눌려 있으면 기본 공격을 잇는가(입력 주체 피어가 종료 순간에 묻는다).
+    // 거너는 기본 공격 자체가 홀드 시작이라 필요 없다. 기본 아니오.
+    public virtual bool ResumesBasicAttackOnHold => false;
 
     // 시전 시 들어갈 상태기계 상태(스킬 상태 계열). 기본 Skill, 거너 Q = Focus(발사 시 Skill 로 넘어감).
     public virtual PlayerActionState EntryActionState => PlayerActionState.Skill;
@@ -172,6 +212,17 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
         damageSnapshot = Mathf.Max(0, value);
     }
 
+    /// <summary>
+    /// [서버] 이번 시전의 ID(할 일 125 3/5, 명세 §3 CastId) — 서버 승인 때 컨트롤러가 <see cref="OnServerStart"/> 직전에 넣는다. 0 = 아직 시전 없음.
+    /// 이 스킬을 출처(source)로 낸 적중(Player.RaiseServerAttackLanded)은 이 값으로 묶인다.
+    /// </summary>
+    public int ServerCastId { get; private set; }
+
+    public void SetServerCastId(int castId)
+    {
+        ServerCastId = castId;
+    }
+
     public void SetAimPoint(Vector3 point, bool hasPoint)
     {
         AimPoint = point;
@@ -262,38 +313,13 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     /// <returns>results에 채워진 개수. 앵커/데이터가 없으면 0.</returns>
     protected int OverlapHitboxAnchor(Collider[] results) => OverlapHitboxAnchor(results, Vector3.zero);
 
-    /// <summary>앵커 형상을 월드 <paramref name="offset"/> 만큼 옮겨 질의한다 — 대쉬 간파 시도 예측(예상 대시 끝, 할 일 115).</summary>
+    /// <summary>앵커 형상을 월드 <paramref name="offset"/> 만큼 옮겨 질의한다(<see cref="HitboxAnchorShape"/> — 간파 시도 예측과 같은 형상·질의).</summary>
     protected int OverlapHitboxAnchor(Collider[] results, Vector3 offset)
     {
-        if (hitboxAnchor == null || data == null || results == null)
+        if (data == null || results == null || !HitboxAnchorShape.TryRead(hitboxAnchor, out HitboxAnchorShape shape))
             return 0;
 
-        switch (hitboxAnchor.OverlapCollider)
-        {
-            case OverlapCollider.Box:
-                BoxColliderInfo boxInfo = default;
-                hitboxAnchor.GetBoxColliderInfo(ref boxInfo);
-                return Physics.OverlapBoxNonAlloc(
-                    boxInfo.center + offset, boxInfo.halfExtents, results, boxInfo.orientation,
-                    data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Sphere:
-                SphereColliderInfo sphereInfo = default;
-                hitboxAnchor.GetSphereColliderInfo(ref sphereInfo);
-                return Physics.OverlapSphereNonAlloc(
-                    sphereInfo.center + offset, sphereInfo.radius, results,
-                    data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Capsule:
-                CapsuleColliderInfo capsuleInfo = default;
-                hitboxAnchor.GetCapsuleColliderInfo(ref capsuleInfo);
-                return Physics.OverlapCapsuleNonAlloc(
-                    capsuleInfo.point0 + offset, capsuleInfo.point1 + offset, capsuleInfo.radius, results,
-                    data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            default:
-                return 0;
-        }
+        return shape.Offset(offset).Overlap(results, data.HittableLayers);
     }
 
     /// <summary>
@@ -306,5 +332,17 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
             return hurtboxOwner;
 
         return hit.GetComponentInParent<Unit>();
+    }
+
+    /// <summary>
+    /// 판정 도형 질의(<see cref="AttackShapeQuery"/>, 할 일 153)의
+    /// 1회 피격 키 — <see cref="ResolveHitUnit"/> 의 Unit, 없으면 Hurtbox(상자처럼 Unit 이 아닌 대상). 시전자 자신은 null(대상 아님).
+    /// </summary>
+    protected Object ResolveShapeTarget(Collider hit)
+    {
+        Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+        if (unit != null)
+            return unit == owner ? null : unit;
+        return hurtbox;
     }
 }

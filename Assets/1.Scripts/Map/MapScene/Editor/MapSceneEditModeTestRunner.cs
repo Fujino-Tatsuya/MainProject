@@ -14,17 +14,24 @@ internal static class MapSceneEditModeTestRunner
         "^MapSceneGateHoldTests$", // 게이트 보류 — 4구역 소개 연출이 끝나야 G7(PLAN-zone4-intro-cinematic)
         "^MapSceneAreaTrackerTests$",
         "^MapSceneBarrierRulesTests$",
+        "^MapSceneBarrierMonsterBlockTests$", // 할 일 148 — 열린 배리어도 몬스터 카브는 남는다(복도 늘 몬스터 출입 금지)
         "^MapSceneBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^MapSceneMonsterLedgerTests$",
         "^MapSceneBossPathRulesTests$",
         "^MapSceneDeathRulesTests$", // 사망 규칙(S11) + 부활 지점 — 뒤 배리어 예외(C2)·보스 진입 패드 제외·G10 앞 폴백(C3)
         "^MapSceneSafePointRulesTests$", // 할 일 80 스텝별 고정 안전 지점 — 복귀 구간(카운트다운 = 보스 진입·엘리베이터 대기 = 기존·보스전 = 재합류 모서리)·지금 스텝 구간·기본 위치·점유 = 정적 장애물만·막히면 주변 링·링 실패 시 지점 그대로·복귀 높이
         "^MapSceneBossRetryTests$", // 할 일 30 (2) 전멸 리스폰 — 보스 재도전 되감기(G11 닫기·BossEnter)·뒤 배리어 마스크 재계산(복도4 최전방)
-        "^TutorialTraitSelectionModelTests$", // 특성(T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
-        "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 내 제시 번호(OfferSeq)로 열림·닫힘·닫힌 제시 재표시 금지·다른 사람 재선택에 안 닫힘·획득 토스트·문구
-        "^TutorialTraitDeadlineModelTests$", // 특성 창 교착 방지 게이지(15 후속) — 비율·10초 강조·로컬 감소·재동기화
-        "^TutorialTraitResetModelTests$", // 할 일 30 (3) 전멸 리스폰 뒤 특성 초기화 — 팝업 응답 검증·원복 장부·4라운드 재선택·재전멸·이탈
-        "^TutorialTraitRejoinTests$", // 할 일 48 C14 R4c 판 도중 재합류 — 획득 복원(순서·중복·멱등)·라운드 참가·팝업/재선택 보관·복원
+        "^TraitSelectionModelTests$", // 특성(T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
+        "^TraitWindowModelTests$", // 특성 창(T2) — 내 제시 번호(OfferSeq)로 열림·닫힘·닫힌 제시 재표시 금지·다른 사람 재선택에 안 닫힘·획득 토스트·문구
+        "^TraitDeadlineModelTests$", // 특성 창 교착 방지 게이지(15 후속) — 비율·10초 강조·로컬 감소·재동기화
+        "^TraitResetModelTests$", // 할 일 30 (3) 전멸 리스폰 뒤 특성 초기화 — 팝업 응답 검증·원복 장부·4라운드 재선택·재전멸·이탈
+        "^TraitRejoinTests$", // 할 일 48 C14 R4c 판 도중 재합류 — 획득 복원(순서·중복·멱등)·라운드 참가·팝업/재선택 보관·복원
+        "^TraitCatalogTests$", // 할 일 125 (1/5) 특성 ID 고정 해시·명세 고정표 36개·검증(중복·충돌·모르는 ID)·고정 후보 순서·목록 버전 비교
+        "^TraitModifierSetTests$", // 할 일 125 (2/5) 특성 수치 출처 — 빈 목록 1·배율 곱/스탯 % 합·페널티 유지·형태/슬롯 거름·같은 ID 1회·서버/클라 같은 값·재선택 재합성·Dref
+        "^TraitEffectTests$", // 할 일 125 (3/5) 효과 클래스 뼈대 — ①~⑩ 수치(명세 §10 검산)·시전당 1회/간격 거름·되돌리기 장부(재선택·재합류 1회 동작 중복 없음)·HealHp 실제 회복량·밀치기 = AttackInfo 필드만
+        "^Trait(Tooltip|SheetBinding|PickConfirm|StringKeys)Tests$", // 할 일 125 (5/5) 카드 설명 토큰·{dmg} 계산식 검증·프로젝트 정의 전체 · Traits_* 시트 바인딩(빈 표 통과·효과 칸 적용/복구) · 2차 상충 확인창·등록부 · Strings 키 규칙
+        "^(Paladin|Gunner|Assassin)Trait\\w*Tests$", // 할 일 126~128 캐릭터 레인 픽스처 — 이 줄은 고치지 않는다(이름만 맞추면 자동으로 돈다)
+        "^TraitFixedSelectionTests$", // 할 일 125 (1/5) 고정 후보 선택 — 차수 = 획득 수+1·자동 선택 첫 번째·후보 0 = Empty·재선택 1차부터·재합류 해시 복원
         "^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState · 86 T6a SO+Strings 출처
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
         // 107: 존1~3·스피너 연습·존4 교육 테스트(Zone1Model·Zone2Model·Zone3Rules·SpinnerPractice/ComboModel·Zone4Education)는 Legacy — 'EditMode 전체 실행'에서만 돈다.

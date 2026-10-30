@@ -92,6 +92,14 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         Canvas.willRenderCanvases -= ApplyLayouts;
     }
 
+    // 간파 연출 동안 숨김(A5, 할 일 154) — 캔버스만 끈다. 숫자 생성·수명은 그대로라 끝나면 살아 있는 숫자가 보인다.
+    void LateUpdate()
+    {
+        bool visible = !InterruptProductionDirector.DamageNumbersHidden;
+        if (_canvas != null && _canvas.enabled != visible)
+            _canvas.enabled = visible;
+    }
+
     // 위치는 Canvas 렌더 직전에 반영한다 — 카메라가 LateUpdate 에서 움직인 뒤라 숫자가 월드에서 밀리지 않는다.
     void ApplyLayouts()
     {

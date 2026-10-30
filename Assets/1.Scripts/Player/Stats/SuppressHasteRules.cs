@@ -10,6 +10,12 @@ public interface ISuppressHasteTarget
 
     /// <summary><see cref="StatusEffectController.Remove"/> 와 같은 뜻.</summary>
     bool Remove(StatusEffectType type, ulong sourceId);
+
+    /// <summary><see cref="PlayerSkillController.GetEffectiveCooldownTime(PlayerSkillSlot)"/> 와 같은 뜻(유효 전체 쿨 = 데이터 × 특성 배율).</summary>
+    float GetEffectiveCooldownTime(PlayerSkillSlot slot);
+
+    /// <summary>그 칸 쿨 주인 스킬(<see cref="PlayerSkillController.GetCooldownOwnerSkill"/>)의 남은 쿨을 줄인다(0 아래 없음, 후속 창이면 보류).</summary>
+    void ReduceCooldown(PlayerSkillSlot slot, float seconds);
 }
 
 /// <summary>배율 3개 + 지속 규칙(xlsx <c>SuppressHaste</c> 시트 → <see cref="SuppressHasteData"/>).</summary>
@@ -38,11 +44,38 @@ public readonly struct SuppressHasteValues
 ///   · 지속 = durationOverride &gt; 0 이면 그 값, 0 이면 이번 제압 길이. 0 이하가 나오면 걸지 않는다(상태이상 지속 0 = 수동 해제형이라 영구가 된다).
 ///   · 상태이상 3개, 출처 = 보스, 스택 1 — 같은 출처 재진입은 시간·수치 갱신(<see cref="StatusEffectController.Apply(StatusEffectType, float, float, ulong, int)"/>).
 ///   · Alive 를 벗어나면 그 출처 3개 제거. 부활해도 다시 걸지 않는다. 만료는 상태이상 스윕.
+///   · 진입 쿨 차감(특성 명세 §6, 할 일 133) — 같은 대상의 Q/E/우클릭 남은 쿨에서 각 유효 전체 쿨의 <see cref="EntryCooldownRatio"/> 를 뺀다
+///     (남은 시간의 절반이 아님, 0 아래 없음). R·대시 제외. 제압 진입 1회 = <see cref="Grant"/> 1회라 한 번만.
 /// MonoBehaviour 아님 — EditMode 테스트 대상.
 /// </summary>
 public static class SuppressHasteRules
 {
     public const int MaxStacks = 1;
+
+    /// <summary>제압 진입 때 남은 쿨에서 빼는 유효 전체 쿨의 비율.</summary>
+    public const float EntryCooldownRatio = 0.5f;
+
+    /// <summary>진입 쿨 차감 대상 — Q/E/우클릭. R(<see cref="PlayerSkillSlot.Ultimate"/>)·공용 대시는 제외.</summary>
+    public static readonly PlayerSkillSlot[] EntryCooldownSlots =
+        { PlayerSkillSlot.Main, PlayerSkillSlot.Sub, PlayerSkillSlot.Interrupt };
+
+    /// <summary>진입 차감량(초) = 유효 전체 쿨 × <see cref="EntryCooldownRatio"/>.</summary>
+    public static float EntryCooldownReduction(float effectiveCooldown) =>
+        effectiveCooldown > 0f ? effectiveCooldown * EntryCooldownRatio : 0f;
+
+    /// <summary>대상 1명의 Q/E/우클릭 남은 쿨을 진입 차감만큼 줄인다.</summary>
+    public static void ReduceEntryCooldowns(ISuppressHasteTarget target)
+    {
+        if (target == null)
+            return;
+
+        foreach (PlayerSkillSlot slot in EntryCooldownSlots)
+        {
+            float seconds = EntryCooldownReduction(target.GetEffectiveCooldownTime(slot));
+            if (seconds > 0f)
+                target.ReduceCooldown(slot, seconds);
+        }
+    }
 
     /// <summary>상태이상 HUD 에 아이콘을 보이는 대표 타입. 나머지 둘은 <see cref="IsHudHidden"/>.</summary>
     public const StatusEffectType HudRepresentative = StatusEffectType.CooldownRateModifier;
@@ -71,7 +104,7 @@ public static class SuppressHasteRules
     public static bool IsHudHidden(StatusEffectType type) =>
         type == StatusEffectType.MoveSpeedFinalMultiplier || type == StatusEffectType.AttackSpeedFinalMultiplier;
 
-    /// <summary>살아있는 대상마다 3개를 건다. 건 대상 수를 돌려준다(지속이 0 이하면 0).</summary>
+    /// <summary>살아있는 대상마다 3개를 걸고 진입 쿨 차감을 한다. 건 대상 수를 돌려준다(지속이 0 이하면 0).</summary>
     public static int Grant(IEnumerable<ISuppressHasteTarget> targets, SuppressHasteValues values, ulong sourceId, float suppressDuration)
     {
         if (targets == null || !TryResolveDuration(values.DurationOverride, suppressDuration, out float duration))
@@ -85,6 +118,7 @@ public static class SuppressHasteRules
 
             foreach ((StatusEffectType type, float magnitude) in Effects(values))
                 target.Apply(type, magnitude, duration, sourceId, MaxStacks);
+            ReduceEntryCooldowns(target);
             granted++;
         }
 
