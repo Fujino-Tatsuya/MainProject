@@ -838,6 +838,8 @@ MonoBehaviour:
   keycapR: {fileID: 21300000, guid: 3889a36946725e438fc64a993f39009a, type: 3}
   inputLeftMouse: {fileID: 21300000, guid: fbca656fdf5a5ac988f9f67b3f1d1a02, type: 3}
   inputRightMouse: {fileID: 21300000, guid: cd0f1e40d2ef5abb868ce365552f1a41, type: 3}
+  basicAttackIcon: {fileID: 21300000, guid: 0c118daf3066ac341903f114e0b0d471, type: 3}
+  characterRoster: {fileID: 11400000, guid: 040d4a8d1d7b29e40b40962b65eba5f4, type: 2}
 --- !u!1 &1648728162414106526
 GameObject:
   m_ObjectHideFlags: 0

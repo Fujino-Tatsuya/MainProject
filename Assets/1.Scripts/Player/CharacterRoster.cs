@@ -16,6 +16,9 @@ public class CharacterRoster : ScriptableObject
         [SerializeField] private TutorialCharacter tutorialCharacter;
         [Tooltip("전투 HUD 체력바 채움(포트레잇 합성본, 435×74). 비우면 HUD 프리팹의 기본(거너) 그림.")]
         [SerializeField] private Sprite hudHpFill;
+        [Tooltip("공용 캐릭터 색 — UI 틴트용. 지금은 특성 카드 기본 공격 슬롯 틴트만 쓴다.")]
+        [DataTableIgnore]
+        [SerializeField] private Color themeColor = Color.white;
 
         /// <summary>현재 언어 이름 — Strings 시트 <see cref="NameKey"/>, 행이 없으면 인라인 <c>displayName</c>(ko).</summary>
         public string DisplayName => Loc.Get(NameKey, InlineDisplayName);
@@ -36,6 +39,7 @@ public class CharacterRoster : ScriptableObject
         public bool Available => available;
         public TutorialCharacter TutorialCharacter => tutorialCharacter;
         public Sprite HudHpFill => hudHpFill;
+        public Color ThemeColor => themeColor;
     }
 
     [SerializeField] private Entry[] entries = new Entry[0];

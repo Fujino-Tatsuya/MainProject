@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 /// <summary>특성 카드 C1 의 키캡 자리 표시(할 일 165). 키캡 3종 + 마우스 표시 2종, Blank = 키 입력 아님(표시 안 함).</summary>
 public enum TraitKeycap
@@ -57,13 +58,13 @@ public enum TraitCardSkillSource
     Skill,
     /// <summary>패시브 툴팁 아이콘(PassiveHUD 와 같은 경로).</summary>
     Passive,
-    /// <summary>스킬 그림 없음 — 특성 아이콘 그대로(기본 공격 LMB).</summary>
-    TraitIcon,
+    /// <summary>기본 공격(LMB) — 스킬 데이터가 없어 카드의 기본 공격 아이콘(검)을 보는 사람 캐릭터 색으로 틴트.</summary>
+    BasicAttack,
 }
 
 /// <summary>
 /// 키캡 → 카드 스킬 슬롯 그림 출처(할 일 165 피드백 1) — 규칙은 여기 한 곳.
-/// Q = Main, E = Sub, R = Ultimate, RMB = Interrupt, 키 없음(Blank) = 패시브, LMB = 특성 아이콘(기본 공격 스킬 아이콘 없음).
+/// Q = Main, E = Sub, R = Ultimate, RMB = Interrupt, 키 없음(Blank) = 패시브, LMB = 기본 공격 아이콘(후속 — 검 + 캐릭터 색).
 /// </summary>
 public static class TraitCardSkillRule
 {
@@ -78,7 +79,14 @@ public static class TraitCardSkillRule
             case TraitKeycap.R: slot = PlayerSkillSlot.Ultimate; return TraitCardSkillSource.Skill;
             case TraitKeycap.RightMouse: slot = PlayerSkillSlot.Interrupt; return TraitCardSkillSource.Skill;
             case TraitKeycap.Blank: return TraitCardSkillSource.Passive;
-            default: return TraitCardSkillSource.TraitIcon;
+            default: return TraitCardSkillSource.BasicAttack;
         }
     }
+
+    /// <summary>
+    /// 슬롯 그림 색 — 기본 공격 아이콘만 보는 사람 캐릭터 색(로스터 <see cref="CharacterRoster.Entry.ThemeColor"/>), 못 찾으면 흰색.
+    /// 실제 스킬·패시브 아이콘은 늘 흰색(틴트 없음 — 카드 재사용 때 이전 색이 남지 않게 매번 이 값으로 덮는다).
+    /// </summary>
+    public static Color SlotTint(TraitCardSkillSource source, bool hasViewerColor, Color viewerColor) =>
+        source == TraitCardSkillSource.BasicAttack && hasViewerColor ? viewerColor : Color.white;
 }

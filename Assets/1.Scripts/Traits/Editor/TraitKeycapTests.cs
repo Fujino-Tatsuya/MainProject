@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEngine;
 
 /// <summary>
 /// 할 일 165 — 카드 C1 키캡 판정(<see cref="TraitKeycapRule"/>)·아이콘 맵 파싱(<see cref="TraitIconMapAuthoring.Parse"/>)·프로젝트 정의 아이콘 연결 확인.
@@ -45,10 +46,53 @@ public class TraitKeycapTests
     }
 
     [TestCase(TraitKeycap.Blank, TraitCardSkillSource.Passive)]
-    [TestCase(TraitKeycap.LeftMouse, TraitCardSkillSource.TraitIcon)]
+    [TestCase(TraitKeycap.LeftMouse, TraitCardSkillSource.BasicAttack)]
     public void SkillSource_NonSlot(TraitKeycap key, TraitCardSkillSource expected)
     {
         Assert.AreEqual(expected, TraitCardSkillRule.SourceOf(key, out _));
+    }
+
+    /// <summary>기본 공격 아이콘만 보는 사람 색, 못 찾으면 흰색. 스킬·패시브 슬롯은 색이 있어도 흰색(재사용 시 초기화).</summary>
+    [Test]
+    public void SlotTint_OnlyBasicAttackTakesViewerColor()
+    {
+        var gunner = new Color(0.94f, 0.31f, 0.78f, 1f);
+        Assert.AreEqual(gunner, TraitCardSkillRule.SlotTint(TraitCardSkillSource.BasicAttack, true, gunner));
+        Assert.AreEqual(Color.white, TraitCardSkillRule.SlotTint(TraitCardSkillSource.BasicAttack, false, gunner));
+        Assert.AreEqual(Color.white, TraitCardSkillRule.SlotTint(TraitCardSkillSource.Skill, true, gunner));
+        Assert.AreEqual(Color.white, TraitCardSkillRule.SlotTint(TraitCardSkillSource.Passive, true, gunner));
+    }
+
+    /// <summary>LMB 특성 5개는 기본 공격 아이콘 경로(아이콘 이름의 LMB 토큰).</summary>
+    [TestCase("GUN_1_BASIC_DAMAGE")]
+    [TestCase("GUN_3_PIERCE")]
+    [TestCase("GUN_4_EXTRA_BASIC")]
+    [TestCase("ASN_3_BASIC_CDR")]
+    [TestCase("ASN_4_COMBO_EXTRA")]
+    public void LmbTraits_UseBasicAttackSlot(string traitId)
+    {
+        TraitDefinition definition = null;
+        foreach (string guid in AssetDatabase.FindAssets("t:TraitDefinition", new[] { "Assets/9.ScriptableObject/Traits" }))
+        {
+            var candidate = AssetDatabase.LoadAssetAtPath<TraitDefinition>(AssetDatabase.GUIDToAssetPath(guid));
+            if (candidate != null && candidate.Id == traitId)
+                definition = candidate;
+        }
+
+        Assert.IsNotNull(definition, traitId);
+        Assert.IsNotNull(definition.Icon, traitId);
+        Assert.AreEqual(TraitCardSkillSource.BasicAttack,
+            TraitCardSkillRule.SourceOf(TraitKeycapRule.FromIconName(definition.Icon.name), out _), definition.Icon.name);
+    }
+
+    /// <summary>로스터 세 캐릭터 모두 공용 색이 들어 있다(흰색 기본값 그대로가 아님).</summary>
+    [Test]
+    public void ProjectRoster_ThemeColorsSet()
+    {
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>("Assets/9.ScriptableObject/Player/CharacterRoster.asset");
+        Assert.IsNotNull(roster);
+        foreach (CharacterRoster.Entry entry in roster.Entries)
+            Assert.AreNotEqual(Color.white, entry.ThemeColor, entry.InlineDisplayName);
     }
 
     /// <summary>변신 특성은 일반 스킬 슬롯 그림(E_Trans → Sub, R_Trans·R_Remove → Ultimate), 키 없는 특성은 패시브.</summary>

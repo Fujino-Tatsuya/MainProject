@@ -7,6 +7,7 @@ using UnityEngine.UI;
 /// 특성 선택 창의 카드 1장 — 이름 / 짧은 분류 / 설명 순(명세 §2, 할 일 125 5/5). 클릭하면 특성 ID 해시를 넘긴다.
 /// 할 일 165 — C1 아트: 카드판 · 좌상단 특성 아이콘 · 스킬 프레임+마스크 안 스킬 아이콘 · 키캡 1곳(<see cref="TraitKeycapRule"/>).
 /// 피드백 1 — 스킬 아이콘은 뷰어의 실제 스킬(<see cref="TraitCardSkillRule"/>, 전투 HUD 와 같은 경로), 못 얻으면 특성 아이콘 → 빈 아이콘.
+/// 후속 — LMB(기본 공격) 특성은 기본 공격 아이콘(검)을 보는 사람 캐릭터 색(로스터 themeColor)으로 틴트, 나머지 슬롯은 흰색.
 /// 키 입력이 아닌 특성(<see cref="TraitKeycap.Blank"/>)은 키캡을 숨긴다.
 /// 문구는 Strings 키(<see cref="TraitStringKeys"/>) → 정의 인라인 ko. 설명은 <see cref="TraitTooltip"/> 이 <c>{필드}</c>·<c>{dmg}</c> 를 푼다 —
 /// 실패하면 <see cref="UiStrings.SkillTooltipError"/>(개발용 표시) + 경고(스킬 툴팁과 같은 관례).
@@ -32,6 +33,12 @@ public sealed class TraitCardView : MonoBehaviour
     [SerializeField] private Sprite inputLeftMouse;
     [SerializeField] private Sprite inputRightMouse;
 
+    [Header("기본 공격 슬롯 (할 일 165 후속)")]
+    [Tooltip("LMB 특성의 스킬 슬롯 그림(기본 공격 스킬 아이콘이 없어서) — 보는 사람 캐릭터 색으로 틴트한다.")]
+    [SerializeField] private Sprite basicAttackIcon;
+    [Tooltip("보는 사람 캐릭터 색 출처(Entry.themeColor). 못 찾으면 흰색.")]
+    [SerializeField] private CharacterRoster characterRoster;
+
     private int traitHash = TraitIdHash.None;
     private Action<int> clicked;
 
@@ -53,8 +60,18 @@ public sealed class TraitCardView : MonoBehaviour
         if (skillIcon != null)
         {
             // 아이콘 없는 특성(옛 임시 특성)은 키를 모른다 — 패시브로 오인하지 않게 스킬 조회를 건너뛴다.
-            Sprite skillSprite = trait != null && trait.Icon != null ? SkillIconOf(viewer, key) : null;
+            bool known = trait != null && trait.Icon != null;
+            TraitCardSkillSource source = known ? TraitCardSkillRule.SourceOf(key, out _) : TraitCardSkillSource.Skill;
+            Sprite skillSprite = !known ? null
+                : source == TraitCardSkillSource.BasicAttack ? basicAttackIcon
+                : SkillIconOf(viewer, key);
             skillIcon.sprite = skillSprite != null ? skillSprite : traitSprite;
+            // 색은 Bind 마다 덮는다(카드 재사용 시 이전 색 초기화). 검 그림이 실제로 들어갔을 때만 틴트.
+            if (skillSprite == null)
+                source = TraitCardSkillSource.Skill; // 특성 아이콘으로 떨어졌으면 틴트 없음
+            Color viewerColor = Color.white;
+            bool hasColor = source == TraitCardSkillSource.BasicAttack && TryViewerColor(viewer, out viewerColor);
+            skillIcon.color = TraitCardSkillRule.SlotTint(source, hasColor, viewerColor);
         }
 
         if (displayName != null)
@@ -101,6 +118,16 @@ public sealed class TraitCardView : MonoBehaviour
         }
 
         return source != null ? source.Tooltip.Icon : null;
+    }
+
+    // 보는 사람 캐릭터 색 — NetworkObject.PrefabIdHash → 로스터 칸(SpawnedCharacterRoster/CharacterRosterLookup 경로) → Entry.ThemeColor.
+    private bool TryViewerColor(Player viewer, out Color color)
+    {
+        color = Color.white;
+        if (!SpawnedCharacterRoster.TryGetEntry(viewer, characterRoster, out CharacterRoster.Entry entry))
+            return false;
+        color = entry.ThemeColor;
+        return true;
     }
 
     private Sprite KeycapSpriteOf(TraitKeycap key)

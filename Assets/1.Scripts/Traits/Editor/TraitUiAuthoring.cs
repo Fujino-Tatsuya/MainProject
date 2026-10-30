@@ -14,6 +14,7 @@ using UnityEngine.UI;
 /// <para>
 /// 할 일 165 — 카드 C1 아트는 <see cref="ApplyCardC1"/>(<c>카드 C1 아트 적용</c>)가 지금 프리팹의 카드 템플릿만 다시 만든다. 전체 생성도 같은 카드 빌더를 쓴다.
 /// 배경 블러 A안은 <see cref="ApplyBackdrop"/>(<c>배경 블러 연결</c>)가 창 앞 형제 RawImage 와 설정 에셋만 더한다.
+/// 기본 공격(LMB) 슬롯은 <see cref="ApplyBasicAttackSlot"/>(<c>기본 공격 슬롯 연결</c>)가 카드 템플릿의 검 아이콘·로스터 칸만 잇는다.
 /// </para>
 /// </summary>
 public static class TraitUiAuthoring
@@ -521,6 +522,74 @@ public static class TraitUiAuthoring
         so.FindProperty("inputLeftMouse").objectReferenceValue = CardArt("Input_LMB");
         so.FindProperty("inputRightMouse").objectReferenceValue = CardArt("Input_RMB");
         so.ApplyModifiedPropertiesWithoutUndo();
+        EnsureBasicAttackSlot(cardView);
+    }
+
+    // ── 할 일 165 후속 — 기본 공격(LMB) 슬롯: 검 아이콘 + 보는 사람 캐릭터 색 ──
+    private const string BasicAttackIconPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png";
+    private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿에 <c>basicAttackIcon</c>(검)·<c>characterRoster</c> 칸만 잇는다 — 카드 배치·배경 블러·씬 오버라이드는 그대로.
+    /// 검 PNG 가 Sprite 임포트가 아니면 Sprite(Single)로 바꾼다(guid 유지 — 툴팁 인라인 아틀라스는 PNG 바이트를 직접 읽어 영향 없음). 이미 연결돼 있으면 저장하지 않는다(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 기본 공격 슬롯 연결 (검 아이콘·캐릭터 색)")]
+    public static void ApplyBasicAttackSlot()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var cardView = new SerializedObject(view).FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            if (cardView == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureBasicAttackSlot(cardView))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 기본 공격 슬롯이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 기본 공격 슬롯 연결 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 카드 템플릿의 검 아이콘·로스터 칸. 바꾼 것이 있으면 true.
+    private static bool EnsureBasicAttackSlot(TraitCardView cardView)
+    {
+        if (AssetImporter.GetAtPath(BasicAttackIconPath) is TextureImporter importer &&
+            (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single))
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.SaveAndReimport();
+        }
+
+        var icon = AssetDatabase.LoadAssetAtPath<Sprite>(BasicAttackIconPath);
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
+        if (icon == null || roster == null)
+            Debug.LogError($"[Trait] 기본 공격 슬롯 — 검 스프라이트({BasicAttackIconPath}) 또는 로스터({RosterPath})를 못 찾았다.");
+
+        var so = new SerializedObject(cardView);
+        SerializedProperty iconProp = so.FindProperty("basicAttackIcon");
+        SerializedProperty rosterProp = so.FindProperty("characterRoster");
+        if (iconProp.objectReferenceValue == icon && rosterProp.objectReferenceValue == roster)
+            return false;
+
+        iconProp.objectReferenceValue = icon;
+        rosterProp.objectReferenceValue = roster;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return true;
     }
 
     // 카드 3장(TraitPool = 캐릭터×차수 3후보) + 간격 + 창 여백에 창 폭·카드 줄 높이를 맞춘다.
