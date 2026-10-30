@@ -209,8 +209,9 @@ public sealed class GameplayInvariantDetector : IQADetector
             _playerId,
             true,
             QASeverity.Error,
-            $"사망 플레이어가 행동함: state={state}, 사망 후 이동={result.Moved:F2}m",
-            $"player={Target(player)} life={life} health={health} deadElapsed={result.Elapsed:F2}s");
+            $"사망 플레이어가 행동함: state={state}, 사망 후 수평 이동={result.Moved:F2}m",
+            $"player={Target(player)} life={life} health={health} deadElapsed={result.Elapsed:F2}s " +
+            $"startY={result.StartY:F2} currentY={result.CurrentY:F2}");
     }
 
     private void InspectWorldExit(
