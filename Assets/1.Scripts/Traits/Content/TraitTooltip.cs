@@ -168,6 +168,16 @@ public static class TraitTooltip
     /// </summary>
     public static string NoBreak(string text) => $"<nobr>{text}</nobr>";
 
+    /// <summary>
+    /// 화면 설명 본문 굵게(할 일 171 후속) — 특성 카드·호버 툴팁 공용(<see cref="TraitCardView.DescriptionOf"/>).
+    /// 프리팹 fontStyle·스타일 시트 Normal 은 그대로 두고 문구에만 씌운다 — 전투 HUD 스킬 툴팁은 이 경로를 쓰지 않는다.
+    /// 굵게는 글자 사이를 폰트 boldSpacing(서울알림 Medium = 7 → 0.07em)만큼 벌려 줄바꿈이 단어 중간으로 밀린다 —
+    /// &lt;cspace&gt; 로 같은 만큼 되돌려 자간·줄바꿈은 굵게 전과 같게, 획만 두껍게.
+    /// </summary>
+    public static string Bold(string text) => string.IsNullOrEmpty(text) ? text : $"<b><cspace={BoldSpacingOffset}>{text}</cspace></b>";
+
+    private const string BoldSpacingOffset = "-0.07em";
+
     /// <summary>템플릿 검증 — 문법·풀리지 않는 토큰·계산식 없는 {dmg}.</summary>
     public static bool Validate(TraitDefinition trait, string template, TraitContentRegistry registry, out string error)
     {

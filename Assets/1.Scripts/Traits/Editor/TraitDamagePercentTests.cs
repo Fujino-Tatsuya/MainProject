@@ -164,5 +164,25 @@ public class TraitDamagePercentTests
         Assert.IsTrue(SkillTooltipFormatter.TryFormat("{dmg}", null, single, true, out string singleText, out _, out string e3), e3);
         Assert.AreEqual($"<color={Color}><sprite name=\"atk\" color={Color}>150</color> = (0 + <sprite name=\"atk\" color={Color}>150%)", singleText);
         StringAssert.DoesNotContain("<nobr>", compact + detailed + singleText, "nobr 감싸기는 특성 설명 전용");
+        StringAssert.DoesNotContain("<b>", compact + detailed + singleText, "굵게는 특성 설명 전용");
+    }
+
+    // ── 화면 설명 본문 굵게(171 후속) ──────────────────────────────────
+
+    [Test]
+    public void DescriptionOf_WrapsWholeBodyInBold_SpacingCompensated()
+    {
+        var def = TraitContentTestKit.Make<PaladinTraitDefinition>("PAL_TEST_BOLD", "이름", "분류", "아군을 <style=heal>회복</style>합니다.");
+        created.Add(def);
+        string text = TraitCardView.DescriptionOf(def, null, null, false);
+        Assert.AreEqual("<b><cspace=-0.07em>아군을 <style=heal>회복</style>합니다.</cspace></b>", text);
+        Assert.AreEqual(text, TraitCardView.DescriptionOf(def, null, null, true), "Shift 도 같은 굵게");
+    }
+
+    [Test]
+    public void Bold_Empty_StaysEmpty()
+    {
+        Assert.AreEqual(string.Empty, TraitTooltip.Bold(string.Empty));
+        Assert.IsNull(TraitTooltip.Bold(null));
     }
 }

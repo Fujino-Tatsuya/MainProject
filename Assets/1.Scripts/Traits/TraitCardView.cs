@@ -173,7 +173,7 @@ public sealed class TraitCardView : MonoBehaviour
         }
     }
 
-    /// <summary>카드·획득 툴팁 공용 설명 문구. 실패하면 오류 표시 + 경고.</summary>
+    /// <summary>카드·획득 툴팁 공용 설명 문구 — 본문 굵게(<see cref="TraitTooltip.Bold"/>). 실패하면 오류 표시 + 경고.</summary>
     /// <param name="showValue">{dmg} 계산 숫자(Shift 누르는 동안) / false = 퍼센트 글자.</param>
     public static string DescriptionOf(TraitDefinition trait, Player viewer, UnityEngine.Object context, bool showValue)
     {
@@ -181,7 +181,7 @@ public sealed class TraitCardView : MonoBehaviour
             return string.Empty;
 
         if (TraitTooltip.FormatDescription(trait, viewer, showValue, out string text, out string error))
-            return text;
+            return TraitTooltip.Bold(text);
 
         Debug.LogWarning($"[Trait] '{trait.Id}' 설명 문구 오류 — {error}", context);
         return UiStrings.SkillTooltipError.Format(new System.Collections.Generic.Dictionary<string, string> { ["error"] = error });
