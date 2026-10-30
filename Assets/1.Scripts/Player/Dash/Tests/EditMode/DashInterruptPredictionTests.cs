@@ -85,6 +85,22 @@ namespace BeaverLobby.Player.Dash.EditModeTests
         }
 
         [Test]
+        public void Predict_UnboundedWindowLength_NeverClosesBeforeResolve()
+        {
+            // 할 일 139-6 — 무기한 창(길이 +∞)은 아무리 오래 열려 있어도 남은 창 +∞ · 추정 버리기 없음 → 판정까지 길어도 성공.
+            DashInterruptPrediction p = DashInterruptPredictor.Predict(
+                Input(dashRemaining: 0.2f, prep: 5f, openFor: 100f, expDur: float.PositiveInfinity));
+            Assert.IsTrue(float.IsPositiveInfinity(p.WindowRemaining));
+            Assert.IsFalse(DashInterruptPredictor.IsWindowEstimateStale(100f, float.PositiveInfinity));
+            Assert.AreEqual(DashInterruptPredictReason.Success, p.Reason);
+            Assert.AreEqual(InterruptAttemptForecast.Strong, p.Forecast);
+
+            // 창이 닫혀 있으면 무기한이어도 닫힘이 먼저.
+            Assert.AreEqual(DashInterruptPredictReason.WindowClosedNow,
+                DashInterruptPredictor.Predict(Input(open: false, expDur: float.PositiveInfinity)).Reason);
+        }
+
+        [Test]
         public void WindowRemaining_ClampsAndUnknown()
         {
             Assert.AreEqual(0f, DashInterruptPredictor.EstimateWindowRemaining(0.8f, 0.5f), "이미 지남 = 0");

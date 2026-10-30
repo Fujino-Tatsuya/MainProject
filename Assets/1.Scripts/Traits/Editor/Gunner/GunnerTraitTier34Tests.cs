@@ -252,6 +252,7 @@ public class GunnerTraitTier34Tests
         TraitDerivedAttack extra = Derived("GUN_4_EXTRA_BASIC", GunnerTraitRules.BasicExtraDerivedKey);
         Assert.IsTrue(extra.Matches(GunnerTraitRules.BasicAttackKey));
         Assert.IsFalse(extra.Matches(GunnerTraitRules.QAttackKey), "Q 는 세지 않는다");
+        Assert.IsTrue(extra.HitArea.IsEmpty, "판정 도형 없음 = 원래 기본 공격 레이저 재사용(할 일 153)");
 
         var fired = new List<bool>();
         int damage = 0;
@@ -355,6 +356,7 @@ public class GunnerTraitTier34Tests
         Assert.AreEqual(0.25f, echo.DamageRatio, 1e-6f);
         Assert.AreEqual(0.15f, echo.Delay, 1e-6f);
         Assert.AreEqual(1, echo.Counter.Required, "매 시전 1회");
+        Assert.IsTrue(echo.HitArea.IsEmpty, "판정 도형 없음 = 저장한 Q 레이저(충전 사거리·폭) 재사용(할 일 153)");
     }
 
     [Test]
