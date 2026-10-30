@@ -29,12 +29,14 @@ public enum QAWipeOutcome
 /// 1) 호스트: 게임 집계기(SessionStatsTracker)와 <b>따로</b> 같은 서버 이벤트를 세어(<see cref="Tally"/>)
 ///    확정된 <see cref="SessionResult"/> 와 비교한다 — 이벤트 → 집계 → 페이로드 배선 확인.
 /// 2) 호스트: 경로별로 판을 끝낸다(<see cref="DriveHost"/>). QA 가 넣은 피해·사망은 따로 기록한다.
-/// 3) 모든 피어: 결과 씬에서 <see cref="SessionResult"/> 와 화면 행(PlayerRow_P*)을 덤프하고 서로 맞는지 본다.
+/// 3) 모든 피어: 로비로 돌아와 결과 패널(<see cref="LobbyResultPanel"/>)이 열리면 <see cref="SessionResult"/> 와 패널 행(PlayerRow_P*)을 덤프하고 서로 맞는지 본다.
 ///    피어 간 비교(호스트·클라 값 동일)는 리포트 파일 result-stats.md 끼리 비교한다.
+/// 판 끝 흐름 = 4.MapScene → 3.LobbyScene + 결과 패널(PLAN-48 C7·C13 — 5.ResultScene 은 흐름에서 빠졌다, GameManager.GoToResult).
 /// </summary>
 public sealed class QAResultFlow
 {
-    public const string ResultScene = "5.ResultScene";
+    /// <summary>결과 패널이 열릴 때까지 로비 도착 뒤 기다리는 상한(초) — LobbySceneManager.Start 가 연다.</summary>
+    public const float PanelOpenTimeoutSeconds = 10f;
 
     private const float WipeTimeout = 120f;
     private const float EncounterStartTimeout = 60f;
@@ -67,7 +69,15 @@ public sealed class QAResultFlow
         _tally.Unsubscribe();
     }
 
-    public static bool InResultScene => QAUtil.ActiveSceneName() == ResultScene;
+    /// <summary>판이 끝나 결과를 들고 로비로 돌아왔다(결과 확정 + 로비 씬). 클라는 결과 페이로드가 로비 로드보다 먼저 온다.</summary>
+    public static bool BackInLobbyWithResult => SessionResult.HasValue && QAUtil.ActiveSceneName() == QALobbyFlow.LobbyScene;
+
+    /// <summary>열린 로비 결과 패널(없거나 닫혀 있으면 null).</summary>
+    public static LobbyResultPanel OpenPanel()
+    {
+        LobbyResultPanel panel = UnityEngine.Object.FindFirstObjectByType<LobbyResultPanel>();
+        return panel != null && panel.IsOpen ? panel : null;
+    }
 
     // ── 호스트: 판 끝내기 ─────────────────────────────────────────
 
@@ -166,7 +176,7 @@ public sealed class QAResultFlow
         WipeOutcome = QAWipeOutcome.Timeout;
         try
         {
-        while (Time.time < deadline && !SessionResult.HasValue && !InResultScene)
+        while (Time.time < deadline && !SessionResult.HasValue && !BackInLobbyWithResult)
         {
             if (respawned)
             {
@@ -235,7 +245,7 @@ public sealed class QAResultFlow
             yield return new WaitForSeconds(0.25f);
         }
 
-        if (SessionResult.HasValue || InResultScene)
+        if (SessionResult.HasValue || BackInLobbyWithResult)
             WipeOutcome = QAWipeOutcome.Result;
         else if (respawned)
             WipeOutcome = QAWipeOutcome.Respawned;
@@ -282,7 +292,7 @@ public sealed class QAResultFlow
         float deadline = Time.time + EncounterStartTimeout;
         while (!teleport.ForceStartEncounter(0f))
         {
-            if (Time.time > deadline || InResultScene)
+            if (Time.time > deadline || BackInLobbyWithResult)
             {
                 recorder.Add(QASeverity.Error, "ResultStats", "보스전 강제 개시 실패(ForceStartEncounter 계속 거절)");
                 yield break;
@@ -294,7 +304,7 @@ public sealed class QAResultFlow
         deadline = Time.time + CombatTimeout;
         while (BossEncounterDirector.Instance == null || BossEncounterDirector.Instance.Phase != BossEncounterPhase.Combat)
         {
-            if (Time.time > deadline || InResultScene)
+            if (Time.time > deadline || BackInLobbyWithResult)
             {
                 string phase = BossEncounterDirector.Instance != null ? BossEncounterDirector.Instance.Phase.ToString() : "없음";
                 recorder.Add(QASeverity.Error, "ResultStats", $"보스전 Combat 진입 실패(현재 {phase})");
@@ -316,7 +326,7 @@ public sealed class QAResultFlow
         deadline = Time.time + BossKillTimeout;
         while (boss != null && boss.CurrentHealth > 0)
         {
-            if (Time.time > deadline || InResultScene)
+            if (Time.time > deadline || BackInLobbyWithResult)
             {
                 recorder.Add(QASeverity.Error, "ResultStats",
                     $"보스 격파 실패({BossKillTimeout:F0}초, 남은 HP {(boss != null ? boss.CurrentHealth : -1)})");
@@ -343,7 +353,7 @@ public sealed class QAResultFlow
 
     // ── 모든 피어: 결과 화면 검증 ──────────────────────────────────
 
-    /// <summary>결과 씬이 뜬 뒤 호출. SessionResult·화면 행·(호스트) 독립 집계를 대조해 Dump 를 만든다.</summary>
+    /// <summary>로비로 돌아와 결과 패널이 열린 뒤 호출. SessionResult·패널 행·(호스트) 독립 집계를 대조해 Dump 를 만든다.</summary>
     public void Verify(QARecorder recorder, QAResultPath? expected, bool isHost)
     {
         var sb = new StringBuilder();
@@ -359,7 +369,7 @@ public sealed class QAResultFlow
         sb.AppendLine();
 
         if (!SessionResult.HasValue)
-            recorder.Add(QASeverity.Error, "ResultStats", "결과 씬인데 SessionResult.HasValue=false");
+            recorder.Add(QASeverity.Error, "ResultStats", "로비 결과 단계인데 SessionResult.HasValue=false");
 
         if (expected.HasValue && SessionResult.HasValue && !OutcomeMatches(expected.Value, SessionResult.Outcome))
             recorder.Add(QASeverity.Error, "ResultStats", $"결과 종류 불일치: 기대 {expected.Value}, 실제 {SessionResult.Outcome}");
@@ -430,63 +440,104 @@ public sealed class QAResultFlow
 
     private static void AppendUiComparison(StringBuilder sb, QARecorder recorder, IReadOnlyList<PlayerSessionStats> rows, ulong local)
     {
-        sb.AppendLine("## 화면 행 대조 (PlayerRow_P*)");
+        sb.AppendLine("## 로비 결과 패널 행 대조 (PlayerRow_P* — 순위 순)");
         sb.AppendLine();
 
-        ResultStatsView view = UnityEngine.Object.FindFirstObjectByType<ResultStatsView>();
+        LobbyResultPanel panel = OpenPanel();
+        ResultStatsView view = panel != null ? panel.GetComponentInChildren<ResultStatsView>(true) : null;
         if (view == null)
         {
-            recorder.Add(QASeverity.Error, "ResultStats", "ResultStatsView 없음");
+            recorder.Add(QASeverity.Error, "ResultStats", panel == null ? "로비 결과 패널이 열려 있지 않음" : "로비 결과 패널에 ResultStatsView 없음");
             return;
         }
 
-        sb.AppendLine("| 행 | 슬롯 | 캐릭터 | 데미지 | 처치 | 간파 | 사망 | 나 | 판정 |");
-        sb.AppendLine("|---|---|---|---:|---:|---:|---:|---|---|");
+        // 패널은 행을 순위 순서로 그리고 이름은 슬롯 번호(PlayerRow_P{슬롯})를 단다(ResultStatsView.RebuildRows).
+        // 처치·회복·입은 피해 칸은 패널 프리팹에 없을 수 있다 — 없으면 '(없음)' 으로 적고 비교에서 뺀다.
+        var ranking = new List<LobbyResultRankEntry>();
+        LobbyResultRanking.Rank(rows, panel.ScoreWeights, ranking);
+
+        sb.AppendLine("| 순서 | 행 | 슬롯 | 캐릭터 | 데미지 | 처치 | 간파 | 사망 | 회복 | 입은 피해 | 순위 | 왕관 | 나 | 판정 |");
+        sb.AppendLine("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---|---|---|---|");
         int uiRows = 0;
-        foreach (ResultPlayerRowView rowView in view.GetComponentsInChildren<ResultPlayerRowView>(true))
+        foreach (ResultPlayerRowView rowView in view.GetComponentsInChildren<ResultPlayerRowView>(false))
         {
             if (!rowView.name.StartsWith("PlayerRow_P", StringComparison.Ordinal))
                 continue;
 
-            uiRows++;
-            int index = uiRows - 1;
+            int order = uiRows++;
             Transform t = rowView.transform;
+            int index = ParseRowIndex(rowView.name);
             string slot = Text(t, "Text_Slot");
             string character = Text(t, "Text_Character");
             string damage = Text(t, "Text_Damage");
             string kills = Text(t, "Text_Kills");
             string counters = Text(t, "Text_Counters");
             string deaths = Text(t, "Text_Deaths");
-            Transform marker = t.Find("Marker_Local");
+            string healing = Text(t, "Text_Healing");
+            string taken = Text(t, "Text_DamageTaken");
+            TMP_Text rankLabel = FindDeep(t, "Text_Rank")?.GetComponent<TMP_Text>();
+            string rank = rankLabel != null ? (rankLabel.enabled ? rankLabel.text : "(숨김)") : NoCell;
+            UnityEngine.UI.Image crownImage = FindDeep(t, "Image_Crown")?.GetComponent<UnityEngine.UI.Image>();
+            Transform marker = FindDeep(t, "Marker_Local");
             bool markerOn = marker != null && marker.gameObject.activeSelf;
 
-            bool ok = index < rows.Count;
-            if (ok)
+            var why = new List<string>();
+            if (index < 0 || index >= rows.Count)
+                why.Add("슬롯 번호 범위 밖");
+            else
             {
                 PlayerSessionStats r = rows[index];
-                ok = slot == $"P{index + 1}" && damage == r.Damage.ToString() && kills == r.Kills.ToString() &&
-                     counters == r.Counters.ToString() && deaths == r.Deaths.ToString() &&
-                     markerOn == (r.ClientId == local);
+                if (slot != $"P{index + 1}") why.Add("슬롯");
+                if (!CellMatches(damage, r.Damage)) why.Add("데미지");
+                if (!CellMatches(kills, r.Kills)) why.Add("처치");
+                if (!CellMatches(counters, r.Counters)) why.Add("간파");
+                if (!CellMatches(deaths, r.Deaths)) why.Add("사망");
+                if (!CellMatches(healing, r.Healing)) why.Add("회복");
+                if (!CellMatches(taken, r.DamageTaken)) why.Add("입은 피해");
+                if (markerOn != (r.ClientId == local)) why.Add("나 표시");
+            }
+            if (order < ranking.Count)
+            {
+                LobbyResultRankEntry e = ranking[order];
+                if (e.PlayerIndex != index) why.Add($"순위 순서(기대 P{e.PlayerIndex + 1})");
+                if (crownImage != null && crownImage.enabled != e.Crowned) why.Add("왕관");
+                if (rankLabel != null && !e.Crowned && rank != e.Rank.ToString()) why.Add("순위 숫자");
             }
 
-            sb.AppendLine($"| {rowView.name} | {slot} | {character} | {damage} | {kills} | {counters} | {deaths} | " +
-                          $"{(markerOn ? "●" : "")} | {(ok ? "✅" : "❌")} |");
+            bool ok = why.Count == 0;
+            sb.AppendLine($"| {order + 1} | {rowView.name} | {slot} | {character} | {damage} | {kills} | {counters} | {deaths} | {healing} | {taken} | " +
+                          $"{rank} | {(crownImage != null ? (crownImage.enabled ? "👑" : "") : NoCell)} | {(markerOn ? "●" : "")} | {(ok ? "✅" : "❌ " + string.Join("·", why))} |");
             if (!ok)
-                recorder.Add(QASeverity.Error, "ResultStats", $"화면 행 {rowView.name} 이 SessionResult 와 다름");
+                recorder.Add(QASeverity.Error, "ResultStats", $"결과 패널 행 {rowView.name}(순서 {order + 1}) 이 SessionResult 와 다름: {string.Join(", ", why)}");
         }
         sb.AppendLine();
 
         if (uiRows != rows.Count)
-            recorder.Add(QASeverity.Error, "ResultStats", $"화면 행 수 {uiRows} ≠ SessionResult 행 수 {rows.Count}");
+            recorder.Add(QASeverity.Error, "ResultStats", $"결과 패널 행 수 {uiRows} ≠ SessionResult 행 수 {rows.Count}");
 
-        AppendLayoutCheck(sb, recorder, view);
+        AppendLayoutCheck(sb, recorder, view, panel);
+    }
+
+    private const string NoCell = "(없음)";
+
+    /// <summary>칸이 패널에 없으면(<see cref="NoCell"/>) 비교하지 않는다.</summary>
+    private static bool CellMatches(string cell, int value) => cell == NoCell || cell == value.ToString();
+
+    /// <summary>"PlayerRow_P3" → 2(슬롯 0부터). 못 읽으면 -1.</summary>
+    public static int ParseRowIndex(string rowName)
+    {
+        const string prefix = "PlayerRow_P";
+        if (rowName == null || !rowName.StartsWith(prefix, StringComparison.Ordinal))
+            return -1;
+        return int.TryParse(rowName.Substring(prefix.Length), out int n) && n > 0 ? n - 1 : -1;
     }
 
     /// <summary>
     /// 결과 화면 레이아웃 — 행·열 제목이 화면/패널 안에 있고 서로·버튼과 겹치지 않는지, 글자가 넘치지 않는지.
     /// 패널 = PlayerRows 의 조상 중 켜진 Image 가 있는 첫 오브젝트(없으면 ResultStatsView). 좌표는 화면 픽셀.
+    /// 버튼 겹침은 결과 패널 안 버튼만 본다 — 모달 아래 로비 버튼(다시 보기 등)은 패널에 가려지는 게 정상이다.
     /// </summary>
-    private static void AppendLayoutCheck(StringBuilder sb, QARecorder recorder, ResultStatsView view)
+    private static void AppendLayoutCheck(StringBuilder sb, QARecorder recorder, ResultStatsView view, LobbyResultPanel owner)
     {
         sb.AppendLine("## 레이아웃 검사 (화면 픽셀)");
         sb.AppendLine();
@@ -543,7 +594,7 @@ public sealed class QAResultFlow
                     problems++;
                 }
 
-        foreach (UnityEngine.UI.Button button in UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None))
+        foreach (UnityEngine.UI.Button button in owner.GetComponentsInChildren<UnityEngine.UI.Button>(false))
         {
             Rect br = ScreenRect((RectTransform)button.transform);
             foreach (var box in boxes)
@@ -607,11 +658,20 @@ public sealed class QAResultFlow
         }
     }
 
+    /// <summary>행 안 글자 칸(깊이 무관 — ResultPlayerRowView 의 이름 찾기와 같다). 없거나 꺼져 있으면 <see cref="NoCell"/>.</summary>
     private static string Text(Transform row, string child)
     {
-        Transform t = row.Find(child);
+        Transform t = FindDeep(row, child);
         TMP_Text text = t != null ? t.GetComponent<TMP_Text>() : null;
-        return text != null ? text.text : "(없음)";
+        return text != null && text.gameObject.activeInHierarchy ? text.text : NoCell;
+    }
+
+    private static Transform FindDeep(Transform root, string name)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (t.name == name)
+                return t;
+        return null;
     }
 
     public void Note(string message)

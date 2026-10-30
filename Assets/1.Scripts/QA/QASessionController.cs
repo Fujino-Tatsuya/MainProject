@@ -47,9 +47,9 @@ public sealed class QASessionController : MonoBehaviour
     [Header("결과 화면 경로 모드(QAResultFlow)")]
     [Tooltip("켜면 Play 시간 뒤 호스트가 판을 끝내 결과 화면까지 보낸다. 사이클 1=중도 종료, 2=전멸, 3=클리어.")]
     [SerializeField] private bool resultPaths;
-    [Tooltip("판 종료 강제 시작부터 결과 씬 진입까지 대기 한도(초). 클리어는 텔레포트·연출·사망 클립까지 포함한다.")]
+    [Tooltip("판 종료 강제 시작부터 로비 복귀(결과 확정)까지 대기 한도(초). 클리어는 텔레포트·연출·사망 클립까지 포함한다.")]
     [SerializeField] private float resultWaitTimeout = 300f;
-    [Tooltip("호스트가 결과 검증 뒤 네트워크를 끄기 전 기다리는 시간(초) — 클라가 결과 씬에 들어가 검증할 시간.")]
+    [Tooltip("호스트가 결과 검증 뒤 다음 사이클(출격 집결)로 가기 전 기다리는 시간(초) — 클라가 로비 결과 패널을 검증할 시간.")]
     [SerializeField] private float hostResultLingerSeconds = 12f;
 
     private readonly QAResultFlow _resultFlow = new QAResultFlow();
@@ -130,6 +130,21 @@ public sealed class QASessionController : MonoBehaviour
         _input.SetTarget(player);
         if (player != null)
             Debug.Log("[QA] 플레이어 스폰 감지 — QA 조작 시작.");
+
+        // 48 데모 흐름의 로비는 출격 집결 걸음(스크립트)만 움직인다 — 무작위 AI 는 맵에서만.
+        if (player != null && DemoSessionDirector.IsDemoFlowActive && QAUtil.ActiveSceneName() == lobbyScene)
+            HoldStillInLobby();
+    }
+
+    /// <summary>
+    /// 로비에서 무작위 AI(QAAgent)를 멈추고 서 있게 한다(<see cref="QABlackboard.ScriptedControl"/>). 결과 대기·사이클 사이에
+    /// AI 가 돌아다니다 사물함 방 벤치·벽 틈(-8.4, -3.5)에 끼어 다음 사이클 출격 집결이 시작부터 막혔다(할 일 169 2차, 사이클 2).
+    /// 다음 사이클의 BeginCycle(QABlackboard.Reset)이 풀고, 출격 집결이 다시 잡는다.
+    /// </summary>
+    private void HoldStillInLobby()
+    {
+        QABlackboard.ScriptedControl = true;
+        _input?.SetMove(Vector3.zero);
     }
 
     private IEnumerator RunAll()
@@ -198,6 +213,7 @@ public sealed class QASessionController : MonoBehaviour
     /// <summary>48 데모 흐름: 로비 접속(자동) 대기 → (호스트) 인원 대기 → 출격 집결 구역으로 걸어가 맵 진입까지(할 일 169).</summary>
     private IEnumerator RunDemoLobby()
     {
+        HoldStillInLobby(); // BeginCycle 이 풀었다 — 접속·인원·자리 대기 동안 AI 가 돌아다니지 않게
         yield return WaitOrTimeout(() => QALobbyFlow.IsConnected && QALobbyFlow.HasLocalLobbyPlayer, multiplayerTimeout);
         if (AbortCycle("데모 자동 접속·로비 입장")) yield break;
 
@@ -258,7 +274,8 @@ public sealed class QASessionController : MonoBehaviour
 
     /// <summary>
     /// 결과 화면 경로 모드: Play 시간 동안 평소처럼 돌린 뒤 호스트가 이번 사이클의 경로로 판을 끝내고,
-    /// 모든 피어가 결과 씬에서 SessionResult·화면 행을 검증한다. 클라는 결과 씬이 뜰 때까지 기다리기만 한다.
+    /// 모든 피어가 로비로 돌아와 결과 패널(<see cref="LobbyResultPanel"/>)에서 SessionResult·패널 행을 검증한다.
+    /// 판 끝 = 맵 → 로비 바로(PLAN-48 C7, 5.ResultScene 없음). 클라는 로비 복귀를 기다리기만 한다.
     /// </summary>
     private IEnumerator RunResultPhase()
     {
@@ -272,10 +289,10 @@ public sealed class QASessionController : MonoBehaviour
         {
             // 플레이 중 자연히 결과가 나면(무작위 플레이 전멸 등) 강제 경로는 건너뛴다.
             float endTime = Time.time + sessionDuration;
-            while (Time.time < endTime && !SessionResult.HasValue && !QAResultFlow.InResultScene)
+            while (Time.time < endTime && !SessionResult.HasValue && !QAResultFlow.BackInLobbyWithResult)
                 yield return null;
 
-            if (SessionResult.HasValue || QAResultFlow.InResultScene)
+            if (SessionResult.HasValue || QAResultFlow.BackInLobbyWithResult)
             {
                 _resultFlow.Note($"플레이 중 결과 자연 확정({SessionResult.Outcome}) — 강제 경로 {path} 생략");
                 expected = null;
@@ -285,15 +302,22 @@ public sealed class QASessionController : MonoBehaviour
                 yield return _resultFlow.DriveHost(path, _recorder);
             }
 
-            yield return WaitOrTimeout(() => QAResultFlow.InResultScene, resultWaitTimeout);
+            yield return WaitOrTimeout(() => QAResultFlow.BackInLobbyWithResult, resultWaitTimeout);
         }
         else
         {
-            yield return WaitOrTimeout(() => QAResultFlow.InResultScene, sessionDuration + resultWaitTimeout);
+            yield return WaitOrTimeout(() => QAResultFlow.BackInLobbyWithResult, sessionDuration + resultWaitTimeout);
         }
-        if (AbortCycle("결과 씬 진입")) yield break;
+        if (AbortCycle("판 종료 → 로비 복귀(결과 확정)")) yield break;
 
-        // ResultStatsView.Start 가 행을 복제할 시간.
+        // 로비 AI 가 결과 대기·다음 사이클 사이에 돌아다니다 사물함 방 등에 끼지 않게 붙잡아 둔다(할 일 169 2차 — 사이클 2 끼임 원인).
+        HoldStillInLobby();
+
+        // LobbySceneManager.Start 가 패널을 연다 → ResultStatsView.Apply 가 행을 복제할 시간.
+        yield return WaitOrTimeout(() => QAResultFlow.OpenPanel() != null, QAResultFlow.PanelOpenTimeoutSeconds);
+        if (_timedOut)
+            _recorder.Add(QASeverity.Error, "ResultStats",
+                $"로비 복귀 {QAResultFlow.PanelOpenTimeoutSeconds:F0}초 안에 결과 패널(LobbyResultPanel)이 안 열림 — scene={QAUtil.ActiveSceneName()}");
         yield return new WaitForSeconds(1.5f);
         _resultFlow.Verify(_recorder, expected, host);
         _cycleSummary = $"결과 화면 검증 — 경로 {(host ? path.ToString() : "(호스트 기준)")} → {SessionResult.Outcome}";
@@ -480,9 +504,9 @@ public sealed class QASessionController : MonoBehaviour
 
         if (dir != null && resultPaths)
         {
-            string text = _resultFlow.Dump ?? "# 결과 화면에 도달하지 못함\n\n## 진행 로그\n\n" + _resultFlow.LogText;
+            string text = _resultFlow.Dump ?? "# 로비 결과 패널에 도달하지 못함\n\n## 진행 로그\n\n" + _resultFlow.LogText;
             System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "result-stats.md"), text);
-            if (QAResultFlow.InResultScene)
+            if (QAResultFlow.OpenPanel() != null)
                 ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "result.png"));
         }
 
@@ -509,6 +533,7 @@ public sealed class QASessionController : MonoBehaviour
                 GameManager.GoToResultButton();
             }
             yield return WaitOrTimeout(() => QALobbyFlow.HasLocalLobbyPlayer, resultWaitTimeout);
+            HoldStillInLobby();
             yield return new WaitForSeconds(1f);
             yield break;
         }
