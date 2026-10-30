@@ -15,8 +15,6 @@ public sealed class GameplayInvariantDetector : IQADetector
     private const float PlayerWorldExitSeconds = 1f;
     private const float TeleportDistance = 15f;
     private const float SpawnTeleportGraceSeconds = 0.5f;
-    private const float DeadMovementWindowSeconds = 2f;
-    private const float DeadMovementDistance = 1f;
     private const float BossDespawnGraceSeconds = 5f;
 
     // 스킨만큼 캡슐을 줄여 검사한다 — 벽 스윕이 남기는 정상 접촉 간격(collisionSkin)에서
@@ -78,8 +76,8 @@ public sealed class GameplayInvariantDetector : IQADetector
     private float _lastFixedSampleTime;
     private bool _hasFixedPosition;
     private float _worldExitSince = -1f;
-    private float _deadSince = -1f;
-    private Vector3 _deadStartPosition;
+    // 사망 판정·기준 위치는 DeadPlayerJudge 가 한다(할 일 182 — Soul 정상 이동 오탐).
+    private readonly DeadPlayerJudge _deadPlayerJudge = new DeadPlayerJudge();
     private PlayerActionState _timedState;
     private float _timedStateSince;
     private bool _hasTimedState;
@@ -177,41 +175,35 @@ public sealed class GameplayInvariantDetector : IQADetector
         Vector3 position,
         bool invalidPosition)
     {
-        bool dead = health == 0 || state == PlayerActionState.Dead;
-        if (!dead)
+        bool hasLifeState = _playerLifeCycle != null;
+        PlayerLifeState lifeState = hasLifeState ? _playerLifeCycle.State : PlayerLifeState.Alive;
+        DeadPlayerJudge.Result result = _deadPlayerJudge.Step(new DeadPlayerJudge.Tick
         {
-            _deadSince = -1f;
+            Time = Time.time,
+            HasLifeState = hasLifeState,
+            LifeState = lifeState,
+            Health = health,
+            ActionState = state,
+            Position = position,
+            PositionValid = !invalidPosition,
+        });
+
+        if (!result.Violation)
+        {
             Evaluate(recorder, "P2-DeadPlayerActing", _playerId, false,
                 QASeverity.Error, null, null);
             return;
         }
 
-        if (_deadSince < 0f)
-        {
-            _deadSince = Time.time;
-            _deadStartPosition = position;
-        }
-
-        bool actionState =
-            state == PlayerActionState.Move ||
-            state == PlayerActionState.Attack ||
-            state == PlayerActionState.Skill ||
-            state == PlayerActionState.Dash;
-        float deadElapsed = Time.time - _deadSince;
-        float moved = invalidPosition ? 0f : Vector3.Distance(_deadStartPosition, position);
-        bool movedWhileDying =
-            !invalidPosition &&
-            deadElapsed <= DeadMovementWindowSeconds &&
-            moved > DeadMovementDistance;
-
+        string life = hasLifeState ? lifeState.ToString() : "unknown";
         Evaluate(
             recorder,
             "P2-DeadPlayerActing",
             _playerId,
-            actionState || movedWhileDying,
+            true,
             QASeverity.Error,
-            $"사망 플레이어가 행동함: state={state}, 사망 후 이동={moved:F2}m",
-            $"player={Target(player)} health={health} deadElapsed={deadElapsed:F2}s");
+            $"사망 플레이어가 행동함: state={state}, 사망 후 이동={result.Moved:F2}m",
+            $"player={Target(player)} life={life} health={health} deadElapsed={result.Elapsed:F2}s");
     }
 
     private void InspectWorldExit(
@@ -581,7 +573,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         _hasFixedPosition = false;
         _lastFixedSampleTime = -1f;
         _worldExitSince = -1f;
-        _deadSince = -1f;
+        _deadPlayerJudge.Reset();
         _hasTimedState = false;
     }
 
