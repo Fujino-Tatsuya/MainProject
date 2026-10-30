@@ -365,8 +365,14 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
         trailTargets.Clear();
         shapeHits.Clear();
         resolveTarget ??= ResolveShapeTarget;
-        AttackShapeQuery.Collect(data.PathArea(along.magnitude), data.PathPose(owner.transform.position, strike.Start, along),
+        AttackShapePose pose = data.PathPose(owner.transform.position, strike.Start, along);
+        AttackShapeQuery.Collect(data.PathArea(along.magnitude), pose,
             data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, resolveTarget, trailTargets, shapeHits);
+
+        // 특성 연출 사건(할 일 145) — 궤적 판정 순간 1번(빗나가도). 시작 → 끝 = 지나온 선분, 도형은 받는 피어가 그 길이로 다시 만든다(Variant = 이 돌진 스킬 순서).
+        Vector3 fxDirection = along.sqrMagnitude > 1e-6f ? along.normalized : owner.transform.forward;
+        TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.AssassinPursuitTrail, TraitFxKind.Activated, strike.Start, fxDirection, strike.End,
+            pose, variant: TrailFxVariant());
 
         int landed = 0;
         for (int i = 0; i < shapeHits.Count; i++)
@@ -379,13 +385,23 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
                 attackInfo = assassinState.WithBackAttack(attackInfo);
             var hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
             bool resolved = hurtbox != null ? hurtbox.ReceiveAttack(attackInfo, hitContext) : unit.ReceiveAttack(attackInfo, hitContext);
-            if (resolved)
-                landed++;
+            if (!resolved)
+                continue;
+            landed++;
+            TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.AssassinPursuitTrail, TraitFxKind.Hit, hit.bounds.center, fxDirection,
+                hit.bounds.center, target: unit);
         }
 
         trailTargets.Clear();
         shapeHits.Clear();
         Edit.Log($"[Assassin/Q] 추격의 궤적 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
+    }
+
+    // 추격의 궤적 연출 Variant = 플레이어 아래 돌진 스킬(일반·변신 Q·그림자 회귀) 중 이 스킬의 순서 — 전 피어 같은 프리팹이라 받는 피어가 같은 데이터를 찾는다.
+    private int TrailFxVariant()
+    {
+        AssassinDashStrikeSkill[] dashes = owner.GetComponentsInChildren<AssassinDashStrikeSkill>(true);
+        return System.Array.IndexOf(dashes, this);
     }
 
     private readonly struct TrailStrike

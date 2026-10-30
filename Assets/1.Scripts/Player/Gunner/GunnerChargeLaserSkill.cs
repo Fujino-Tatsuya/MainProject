@@ -43,8 +43,12 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private Vector3 hitDirection;
     private readonly GunnerCastCcGate pushGate = new GunnerCastCcGate();
     private readonly GunnerEchoPlan echoPlan = new GunnerEchoPlan();
-    private readonly GunnerDelayedShots echoShots = new GunnerDelayedShots();
-    private readonly List<GunnerDerivedShot> dueEchoShots = new List<GunnerDerivedShot>();
+    // 잔류 포격 에너지 폭탄(할 일 149) — 맞은 대상마다 1개, 지연 뒤 그 대상에게만 터진다. 표시는 view 의 복제 목록.
+    private readonly GunnerEchoBombs echoBombs = new GunnerEchoBombs();
+    private readonly List<GunnerEchoBomb> plantedBombs = new List<GunnerEchoBomb>();
+    private readonly List<GunnerEchoBomb> dueBombs = new List<GunnerEchoBomb>();
+    private readonly List<GunnerEchoBomb> fizzledBombs = new List<GunnerEchoBomb>();
+    private static readonly System.Predicate<ulong> BombTargetAlive = GunnerEchoBombTargets.IsAlive;
     private readonly List<TraitDerivedAttack> derivedBuffer = new List<TraitDerivedAttack>();
     private bool lifeSubscribed;
 
@@ -84,6 +88,9 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     // 집속 연사 — 첫 발부터 마지막 발까지((발수 − 1) × 간격)만큼 안전망을 늘린다. 특성이 없으면 0(원래 동작).
     public override float SafetyNetExtraSeconds =>
         GunnerVolleyTraits.From(Traits).ExtraDuration(owner != null ? owner.AttackSpeedRate : 1f);
+
+    /// <summary>[서버] 지금 붙어 있는 잔류 포격 폭탄(클라에서는 비어 있다) — 특성 랩 기즈모용.</summary>
+    public IReadOnlyList<GunnerEchoBomb> ServerEchoBombs => echoBombs.Bombs;
 
     private GunnerChargeLaserData QData => Data as GunnerChargeLaserData;
     private ulong SourceId => owner != null ? owner.NetworkObjectId : 0;
@@ -128,7 +135,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         }
     }
 
-    // 씬 종료·비활성 — 예약한 잔류 포격을 버린다(명세 §9).
+    // 씬 종료·비활성 — 붙여 둔 잔류 포격 폭탄을 터뜨리지 않고 버린다(명세 §9).
     private void OnDisable()
     {
         if (lifeSubscribed)
@@ -137,17 +144,28 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             lifeSubscribed = false;
         }
 
-        echoShots.Clear();
+        CancelEchoBombs();
     }
 
-    // 사망(살아 있음 → 그 밖) — 예약한 잔류 포격 취소·밀치기 승인 기억 정리(공용 밀치기 장부와 같은 시점).
+    // 사망(살아 있음 → 그 밖) — 잔류 포격 폭탄 취소(구체도 사라짐)·밀치기 승인 기억 정리(공용 밀치기 장부와 같은 시점).
     private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
     {
         if (owner != null && clientId == owner.OwnerClientId && previous == PlayerLifeState.Alive && current != PlayerLifeState.Alive)
         {
-            echoShots.Clear();
+            CancelEchoBombs();
             pushGate.Reset();
         }
+    }
+
+    // [서버] 폭탄은 서버에만 있다 — 클라에서는 비어 있어 복제 목록을 건드리지 않는다.
+    private void CancelEchoBombs()
+    {
+        if (echoBombs.Count == 0)
+            return;
+
+        echoBombs.Clear();
+        if (view != null)
+            view.ServerClearEchoBombs();
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => QData != null && beam != null;
@@ -244,7 +262,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     /// <summary>
     /// 발 하나의 판정 영역·기준 포즈(할 일 153) — 최대 충전 도형을 지형 차단 뒤 길이 <paramref name="length"/>·폭 <paramref name="width"/>(광폭 레이저)로 맞춘 복사본,
     /// 기준점 = 발사 원점 + 발사 방향. 지형 차단은 데이터 폭으로 잰다(광폭 레이저가 사거리를 바꾸지 않게). <paramref name="beam"/> 이 없으면 차단 없이 <paramref name="range"/>.
-    /// 원래 발·잔류 포격 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// 원래 발 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
     /// </summary>
     public static AttackShapeSet ShotArea(GunnerBeamAttack beam, GunnerChargeLaserData data, Vector3 origin, Vector3 direction, float range, float width,
         out AttackShapePose pose, out float length)
@@ -343,8 +361,14 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shotDamage, DamageAttackType,
                                          DamageHitPattern, data.TriggersOnHit,
                                          TraitHitFlags.Original, originalHitHook);
-        // 잔류 포격 묶음 — 예정 단일 대상 피해(실제 총 피해·맞힌 수 아님)를 발마다 더하고, 첫 발 위치·방향·최종 충전 사거리·폭을 저장.
-        echoPlan.AddOriginalShot(origin, direction, shotRange, shotWidth, shotDamage);
+        // 잔류 포격 묶음 — 예정 단일 대상 피해(실제 총 피해·맞힌 수 아님)를 발마다 더하고, 실제로 맞은 유닛을 시전당 대상별 1번 모은다(폭탄 자리).
+        echoPlan.AddOriginalShot(shotDamage);
+        IReadOnlyList<Unit> landed = beam.LastPierceLanded;
+        for (int i = 0; i < landed.Count; i++)
+        {
+            if (landed[i] != null && landed[i].IsSpawned)
+                echoPlan.AddHitTarget(landed[i].NetworkObjectId);
+        }
 
         // 아군 보호막 — 같은 판정 도형. 같은 아군은 시전당 원래 보호막량 1회(시전자 제외는 CollectAllies).
         beam.CollectAllies(area, pose, data.AllyLayers, allies);
@@ -371,7 +395,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         // 보호막 연출은 안 싣는다 — 받은 아군의 PlayerShieldVfx 가 복제된 보호막 목록을 보고 띄운다.
         // 🔴 연출 폭은 데이터 폭 그대로(광폭 레이저 VFX 폭 반영은 별도 할 일 — 판정만 넓힌다).
         view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth,
-                                     stopped, BuildHitPoints(origin, direction, length));
+                                     stopped, BuildHitPoints(origin, direction, length), BuildEchoTargetIds());
 
         Edit.Log($"[Gunner/Q] 발사 {index + 1}/{volley.ShotCount} — 집중 {shotFactor:0.00}(최대 {chargeMaxTime:0.##}초), 사거리 {length:0.0}/{shotRange:0.0}, " +
                  $"폭 {shotWidth:0.##}, 피해 {shotDamage} ×{hitCount}, 보호막 {shotShield} ×{shielded}, 저장 단계 {shotStage}, 과열 모드 {shotHeatMode}" +
@@ -405,6 +429,26 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             points[i] = new Vector3(onBeam.x, center.y + 1f, onBeam.z);
         }
         return points;
+    }
+
+    /// <summary>
+    /// 잔류 포격 예비 구체를 띄울 대상(할 일 149 후속 3) — 이번 발에 맞은 유닛(폭탄 자리 수집과 같은 조건)의 네트워크 ID. 표시 전용.
+    /// 잔류 포격 파생 공격이 없으면(특성 없음) 빈 배열 — 예비 구체가 안 뜬다. 폭탄이 실제로 붙을지는 여전히 <see cref="ScheduleEcho"/> 가 정한다.
+    /// </summary>
+    private ulong[] BuildEchoTargetIds()
+    {
+        IReadOnlyList<Unit> landed = beam != null ? beam.LastPierceLanded : null;
+        if (landed == null || landed.Count == 0 ||
+            GunnerTraitRules.FindDerived(TraitEffects, GunnerTraitRules.QAttackKey, GunnerTraitRules.QEchoDerivedKey, derivedBuffer) == null)
+            return System.Array.Empty<ulong>();
+
+        var ids = new List<ulong>(landed.Count);
+        for (int i = 0; i < landed.Count; i++)
+        {
+            if (landed[i] != null && landed[i].IsSpawned)
+                ids.Add(landed[i].NetworkObjectId);
+        }
+        return ids.ToArray();
     }
 
     public override void OnEnd(SkillEndReason reason)
@@ -488,7 +532,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         ApplyImpactPush(target, ref info);
     }
 
-    // 잔류 포격 대상 1건 — 집중 포화만(파생 = 밀치기·보호막·자원 없음).
+    // 잔류 포격 폭탄 대상 1건 — 집중 포화만(파생 = 밀치기·보호막·자원 없음).
     private void ApplyEchoHit(Unit target, ref AttackInfo info) => GunnerTrackingLaser.ApplyFocusFire(owner, target, ref info);
 
     /// <summary>
@@ -512,40 +556,46 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             pushGate.MarkApproved(castId, targetId);
     }
 
-    // [서버] 잔류 포격(GUN_4_ECHO_Q) — 정상 종료(발사 후 End 이벤트·그 안전망)에서만 지연 뒤 1회 예약. 중단·사망·발사 전 종료면 없음.
-    // 집속 연사는 예정한 원래 발을 모두 쏜 뒤의 정상 종료만(마지막 발 뒤 1회).
+    // [서버] 잔류 포격(GUN_4_ECHO_Q, 할 일 149) — 정상 종료(발사 후 End 이벤트·그 안전망)에서만, 이번 시전 원래 발에 맞은 대상마다 에너지 폭탄 1개를 붙인다.
+    // 중단·사망·발사 전 종료·아무도 안 맞힘이면 없음. 집속 연사는 예정한 원래 발을 모두 쏜 뒤의 정상 종료만(마지막 발 뒤). 이전 시전 폭탄은 그대로 둔다.
     private void ScheduleEcho(SkillEndReason reason)
     {
         TraitDerivedAttack echo = GunnerTraitRules.FindDerived(TraitEffects, GunnerTraitRules.QAttackKey,
             GunnerTraitRules.QEchoDerivedKey, derivedBuffer);
-        if (echoPlan.TryBuildEcho(fired && volley.AllShotsFired, reason, echo, out GunnerDerivedShot shot))
+        if (echoPlan.TryBuildEcho(fired && volley.AllShotsFired, reason, echo, out int bombDamage))
         {
-            echoShots.Schedule(Time.timeAsDouble, echo.Delay, shot);
-            Edit.Log($"[Gunner/Q] 잔류 포격 예약 — {echo.Delay:0.##}초 뒤, 피해 {shot.Damage}(예정 합계 {echoPlan.PlannedDamageSum})", this);
+            echoBombs.Plant(Time.timeAsDouble, echo.Delay, bombDamage, echoPlan.HitTargets, plantedBombs);
+            for (int i = 0; i < plantedBombs.Count; i++)
+                view?.ServerAttachEchoBomb(plantedBombs[i].Id, plantedBombs[i].TargetId);
+            Edit.Log($"[Gunner/Q] 잔류 포격 폭탄 {plantedBombs.Count}개 — {echo.Delay:0.##}초 뒤, 개당 피해 {bombDamage}(예정 합계 {echoPlan.PlannedDamageSum})", this);
         }
 
         echoPlan.Reset();
     }
 
-    // [서버] 예약된 잔류 포격 — 저장한 위치·방향(포즈)·충전 사거리·폭(도형 배율)으로 원래 발과 같은 판정 도형, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
-    // 열 소모·보호막·밀치기·쿨·적중 사건·연쇄 없음(Derived).
+    // [서버] 잔류 포격 폭탄 — 시각이 되면 붙은 그 대상 하나에게만 피해(도형 질의 없음). 대상이 먼저 죽거나 사라지면 바로 그 자리 빈 폭발(피해 없음).
+    // 열 소모·보호막·밀치기·쿨·적중 사건·연쇄 없음(Derived), 집중 포화만(echoHitHook).
     private void Update()
     {
-        if (echoShots.Count == 0 || !HasAuthority)
+        if (echoBombs.Count == 0 || !HasAuthority)
             return;
 
-        echoShots.CollectDue(Time.timeAsDouble, dueEchoShots);
-        GunnerChargeLaserData data = QData;
-        if (data == null || beam == null || owner.CurrentHealth <= 0)
-            return;
+        echoBombs.Collect(Time.timeAsDouble, BombTargetAlive, dueBombs, fizzledBombs);
 
-        for (int i = 0; i < dueEchoShots.Count; i++)
+        for (int i = 0; i < fizzledBombs.Count; i++)
         {
-            GunnerDerivedShot shot = dueEchoShots[i];
-            AttackShapeSet area = ShotArea(beam, data, shot.Origin, shot.Direction, shot.Range, shot.Width, out AttackShapePose pose, out float length);
-            int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
-                                             false, TraitHitFlags.Derived, echoHitHook);
-            Edit.Log($"[Gunner/Q] 잔류 포격 — 사거리 {length:0.0}/{shot.Range:0.0}, 폭 {shot.Width:0.##}, 피해 {shot.Damage} ×{hitCount}", this);
+            view?.ServerDetonateEchoBomb(fizzledBombs[i].Id);
+            Edit.Log($"[Gunner/Q] 잔류 포격 폭탄 #{fizzledBombs[i].Id} — 대상(net {fizzledBombs[i].TargetId}) 없음, 그 자리 폭발(피해 없음)", this);
+        }
+
+        for (int i = 0; i < dueBombs.Count; i++)
+        {
+            GunnerEchoBomb bomb = dueBombs[i];
+            Unit target = GunnerEchoBombTargets.Find(bomb.TargetId);
+            bool hit = beam != null && owner.CurrentHealth > 0 &&
+                       beam.HitUnit(target, bomb.Damage, DamageAttackType, DamageHitPattern, TraitHitFlags.Derived, echoHitHook);
+            view?.ServerDetonateEchoBomb(bomb.Id);
+            Edit.Log($"[Gunner/Q] 잔류 포격 폭탄 #{bomb.Id} 폭발 — {(target != null ? target.name : "?")}, 피해 {bomb.Damage}{(hit ? "" : " (거절)")}", this);
         }
     }
 

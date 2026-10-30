@@ -166,7 +166,25 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - **끊긴 플레이어의 획득 기록은 모델에서 삭제**된다 — 판 명단 안 사람(데모 흐름)은 §10 재합류로 되돌아온다. 명단 밖은 재접속하면 처음부터.
 - **추락 피해는 무적을 우회**한다 — 선택 중에도 떨어지면 맞는다.
 - 선택 중 무적은 플레이어 오브젝트 기준이다. 미선택 중 오브젝트가 바뀌면(디스폰 후 재스폰) 새 오브젝트엔 토큰이 다시 걸리지 않는다 — 맵씬 흐름엔 그런 경우가 없다.
-- 파생 공격·밀치기·뇌진탕은 판정만 — VFX 는 별도 할 일(계획 §1).
+- 파생 공격·밀치기·뇌진탕은 판정만 — VFX 는 별도 할 일(계획 §1). 예외: 거너 잔류 포격 에너지 폭탄 구체(§7.1).
+- 강화 스킬·추가 공격 연출 이벤트(이펙트 구독용, 할 일 145) → [trait-effect-events.md](trait-effect-events.md).
+
+### 7.1 거너 잔류 포격 = 몸에 붙는 에너지 폭탄 (할 일 149)
+
+- **붙기**: Q 가 정상 종료(End 이벤트·그 안전망)되면 이번 시전 원래 발에 **실제로 맞은 대상마다** 폭탄 1개(`GunnerEchoPlan.AddHitTarget` — 집속 연사로 여러 번 맞혀도 시전당 대상 1개). 아무도 안 맞혔으면 없음, 중단·사망·발사 전 종료면 없음(자격은 예전 그대로). 보스에게도 붙는다. 이전 시전 폭탄은 덮어쓰지 않는다(같은 대상에 둘 붙을 수 있다).
+- **터지기**: 파생 명세 `Delay`(xlsx `Traits_Gunner`, 지금 0.15초) 뒤 **붙은 그 대상 하나에게만** 서버 피해(`GunnerBeamAttack.HitUnit` — 도형 질의 없음). 피해 = 폭탄마다 원래 발 예정 단일 대상 합계 × `DamageRatio`(나누지 않는다), `TraitHitFlags.Derived`·집중 포화만(밀치기·보호막·자원·적중 사건 없음).
+- **대상이 먼저 죽거나 디스폰**되면 시각과 무관하게 바로 그 자리 빈 폭발(표시만, 피해 없음). **사수 사망·씬 종료**면 터뜨리지 않고 취소(구체도 사라짐).
+- **동기화**: 서버 = `GunnerEchoBombs`(순수 규칙, 피해·시각). 복제 = `GunnerBeamView` 의 `NetworkList<GunnerEchoBombState>`(폭탄 번호·대상 NetworkObjectId) — 새 RPC 없음, 늦게 합류한 클라도 붙은 구체가 보인다. 목록 RemoveAt = 폭발 연출, Clear = 조용히 지움.
+- **겉모습**(149 후속 6): **월드 VFX 프리팹 + 깊이 무시 머티리얼** — 폭탄마다 `GunnerBeamView.echoBombVfxPrefab`(Player_Gunner Variant, `[DataTableIgnore]`)을 복제해 대상 몸 콜라이더 윗면 가운데(`GunnerEchoBombTargets.BodyPoint`) + 오프셋을 매 프레임(LateUpdate) 따라가게 한다(이동·넉백). 겉모습·애니·파티클·블룸은 **프리팹 안에서** 꾸민다 — 이펙트 교체 = 이 칸만 바꾼다. 런타임 텍스처·메시 생성 없음(프리팹 복제만).
+  - **ZTest Always 가 필요한 이유**: 붙는 점이 몸 메시 바로 위·안이라 보통 머티리얼(ZTest LessEqual)은 불투명 몸에 묻혀 안 보인다(149 후속 3까지의 3D 구체가 그랬다). 그래서 프리팹 렌더러 머티리얼은 깊이 무시여야 한다. URP 기본 Unlit/Particles Unlit 에는 ZTest 칸이 없어 작은 셰이더 `Effects/OverlayBillboard`(`1.Scripts/Effects/Shaders/EffectOverlayBillboard.shader` — 텍스처 × HDR 색, 블렌드·ZTest 칸, 기본 ZTest Always·ZWrite Off·Transparent 큐, 정점 빌보드)를 뒀다. 파티클을 쓰면 그 머티리얼도 이 셰이더(또는 Depth Test Always 셰이더 그래프)로.
+  - **블룸**: 투명 큐라 후처리 전에 그려져 HDR 색(강도 > 1)이면 Bloom 이 먹는다. 맵씬 Volume `VP_CombatLevel_Toon` 임계값 1.1 — 최대 채널이 1.1 을 넘게. 카메라(`MainCamera.prefab`) HDR·후처리 켬, URP 에셋 HDR 켬.
+  - **부작용**: 깊이를 안 보니 **벽·지형 뒤 대상에도 보인다**. 팀원 휘도 암순응(간파 A2)은 휘도 0.8 아래 픽셀을 낮춰서 어두운 색 구체는 대부분 어두워진다(다른 어두운 색 월드 이펙트와 같은 규칙). 오너 마스크 암전·적중 섬광·시네마틱 덮개는 화면 전체 덮개라 다른 월드 이펙트처럼 덮인다(렌더링 레이어 비트 4 없음 = 남김 아님).
+  - **칸은 비어 있음** — 이펙트 담당이 프리팹을 연결한다. 머티리얼은 `Effects/OverlayBillboard` + ZTest Always 권장(이유: 몸에 묻히지 않게). 비어 있으면 구체 표시만 생략(경고·예외 없음, 서버 판정·피해·폭발 연출은 그대로 — `GunnerEchoBombVisuals` 가 프리팹이 있을 때만 복제). 149 후속 4~5 의 화면 공간 스프라이트(`echoBombSprite`/`Size`/`Color`, `OverheadHealthBarCanvas`)는 블룸·애니를 못 써서 걷어냈다.
+  - Attached·Exploded 사건 위치도 같은 점(오프셋 포함), DebugTraitLab 표식은 오프셋 없는 몸 점.
+  - **예비 구체(149 후속 3)**: 구체는 Q 가 대상에 **맞은 순간** 전 피어에 먼저 뜬다 — 기존 `ChargeLaserFiredRpc` 에 맞은 대상 NetworkObjectId 배열 한 칸(`echoTargetIds`, 새 RPC 없음)을 실어, 받는 피어가 `GunnerEchoBombVisuals.AddPreview` 로 대상마다 1개(같은 대상 재적중·집속 연사 여러 발도 1개). 서버는 잔류 포격 파생 공격이 있을 때만 채운다(특성 없으면 빈 배열 → 예비 구체 없음). 서버 부착(NetworkList Add)이 오면 같은 대상의 미채택 예비 구체를 **같은 인스턴스·같은 표시 시각** 그대로 이어받는다(새로 안 만듦). 그 뒤 폭발·Clear 는 예전과 같다. 채택 안 된 예비 구체(중단·사망 → 폭탄 없음)는 `echoBombPreviewTimeout`(초, 기본 1.5 — 그 대상 마지막 적중부터) 뒤 폭발 연출 없이 지운다 — 정리 경로는 이것 하나. 기본값 근거: 정상 부착 = 마지막 발 `Gunner_Q_Fire`(클립 `gunner_skill_Q_fire` 0.8초·상태 속도 1) 시작 + End 이벤트 0.4초 → 약 4배 여유. End 를 놓쳐 안전망(`maxActiveDuration` 5초, 시전 시작부터)으로 끝나면 1.5초를 넘길 수 있고, 그때는 예비가 먼저 지워지고 부착 때 구체가 새로 뜬다(비정상 경로라 감수). 서버 판정·부착·폭발 시각은 그대로.
+  - 조절 칸(연출 전용, `[DataTableIgnore]` — xlsx 아님): `echoBombShowDelay`(초, 기본 0) = **Q 가 그 대상에 맞은 순간(예비 구체 생성)** 뒤 구체를 띄우기까지 지연. 이어받은 구체는 그 시각 그대로, 예비 없이 붙은 폭탄(늦은 합류 등)은 받은 시각부터 같은 지연. `echoBombPreviewTimeout` = 위 예비 구체 대기 시간. 서버 피해·폭발 시각(`Delay`)은 그대로라 지연이 더 길면 구체 없이 폭발 연출만 난다. `echoBombOffset`(월드 기준 m, 기본 0) = 몸 점에 더하는 오프셋 — 월드 기준이라 대상이 돌아도 위·옆 방향이 일정. 판정과 무관. 폭발 연출 = Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용. 이펙트 교체는 프리팹 칸만 바꾼다.
+- 특성 랩 기즈모 = 붙어 있는 폭탄마다 대상 몸통에 표식 구(호스트 창, '대상 1체·도형 아님'). 테스트 `GunnerTraitTier34Tests`(폭탄 수명·단일 대상·대상 사망), `GunnerEchoBombPreviewTests`(예비 구체 생성·이어받기·만료).
+- 🟨 카드 문구(Strings `Trait.GUN_4_ECHO_Q.*`, xlsx)는 아직 "같은 방향으로 레이저를 한 번 더" — 기획이 xlsx 에서 고친다.
 
 ## 8. 교착 방지 게이지 (할 일 15 후속)
 

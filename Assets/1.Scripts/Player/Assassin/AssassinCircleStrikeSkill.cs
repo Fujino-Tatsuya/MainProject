@@ -104,6 +104,18 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
         direction.y = 0f;
         Vector3 forward = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
         view.BeginCircleStrike(owner.transform.position + forward * data.CenterDistance, data.AreaRadius, data.MaxActiveDuration);
+
+        // 특성 연출 사건(할 일 145) — 칼날의 영역을 가진 변신 E 시작(OnClientPlay — 호스트 1번). Variant 1.
+        // 도형·포즈 = 서버 확정과 같은 식(넓어진 원). 클라 지점은 PlaySkillClientRpc 가 넘긴 서버 지점(없으면 승인 방향 × 중심 거리).
+        if (TraitSkillFx.Has(owner, TraitFxTrait.AssassinBladeDomain))
+        {
+            Vector3 origin = owner.transform.position;
+            Vector3 aimPoint = HasAimPoint ? AimPoint : origin + forward * data.CenterDistance;
+            AttackShapeSet area = ResolveStrikeArea(data, origin, aimPoint, RadiusMultiplier(), out AttackShapePose pose);
+            Vector3 center = AreaCenter(origin, aimPoint);
+            TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.AssassinBladeDomain, TraitFxKind.Activated, owner, center, forward, center,
+                shape: area, pose: pose, variant: 1));
+        }
     }
 
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
