@@ -14,18 +14,14 @@ public static class PaladinTraitRules
         blockedThisCast && reason != SkillEndReason.CasterDied && casterHealth > 0;
 
     /// <summary>
-    /// 수호의 파동(PAL_4_E_PUSH) — 반격 판정 순간 플레이어 위치(<paramref name="origin"/>) 중심 반경 안인가(바닥 평면, 대상 콜라이더 표면 기준 —
-    /// 반격 부채꼴 거리와 같은 기준). 반경 0 이하 = 특성 없음.
+    /// 수호의 파동(PAL_4_E_PUSH) 판정 영역(할 일 153) — 반격 판정 순간 플레이어 발밑 중심 원(반경 = 특성 스킬 수치, 대상 몸이 원과 겹치면 —
+    /// 반격 부채꼴과 같은 규칙). 높이 ±반경(예전 넓은 질의 = 발밑 중심 3D 구). 반경 0 이하 = 특성 없음 = null.
+    /// 반경이 특성 값이라 SO 도형이 아니라 여기서 만든다(xlsx 행 없음 — 수치는 PAL_4_E_PUSH 효과 칸).
     /// </summary>
-    public static bool InsidePushRadius(Vector3 origin, Vector3 closestPoint, float radius)
-    {
-        if (!(radius > 0f))
-            return false;
-
-        Vector3 toTarget = closestPoint - origin;
-        toTarget.y = 0f;
-        return toTarget.sqrMagnitude <= radius * radius;
-    }
+    public static AttackShapeSet EPushArea(float radius) =>
+        radius > 0f
+            ? new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackCircleShape(radius) { MinHeight = -radius, MaxHeight = radius })
+            : null;
 
     /// <summary>
     /// 진격의 충격(PAL_4_Q_BLAST) — Q 가 끝난 사유로 충격을 낼까. 정상 종료(Completed — 지형 안전 정지 포함)·홀드 해제(Released)·
@@ -35,6 +31,15 @@ public static class PaladinTraitRules
     public static bool QBlastFires(SkillEndReason reason, int casterHealth) =>
         casterHealth > 0 &&
         (reason == SkillEndReason.Completed || reason == SkillEndReason.Released || reason == SkillEndReason.MaxDurationReached);
+
+    /// <summary>
+    /// 진격의 충격 판정 기준 포즈(할 일 153) = Q 끝 지점(<paramref name="qEndPosition"/>) + 마지막 진행 방향(<paramref name="heading"/>) — 효과 hitArea 의 기준점 Point.
+    /// 꼭짓점을 앞으로 옮기는 건 도형 칸 forwardOffset. 서버 판정(<see cref="FirstMeleeMainSkill"/>)과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapePose QBlastPose(AttackShapeSet area, Vector3 qEndPosition, Vector3 heading) =>
+        area != null
+            ? area.ResolvePose(qEndPosition, heading, qEndPosition, heading)
+            : new AttackShapePose(qEndPosition, heading);
 
     /// <summary>기본 Q 의 예정 틱 수 = 최대 유지 시간 ÷ 틱 간격(내림). 홀드 틱은 시작 뒤 간격마다 1회라 안전망 padding(&lt; 간격) 안에서는 늘지 않는다.</summary>
     public static int PlannedHoldTicks(float holdDuration, float tickInterval)
@@ -77,6 +82,11 @@ public static class PaladinTraitRules
     /// <see cref="PlayerHoldSkill.OnTick"/>·<see cref="PlayerHoldSkill.OnReleased"/> 는 Charging 일 때만 돌기 때문에 이 값 하나로 옛 루틴이 꺼진다.
     /// </summary>
     public static SkillState QStartState(bool shieldDash) => shieldDash ? SkillState.Active : SkillState.Charging;
+
+    /// <summary>
+    /// Q 가 끝난 뒤 좌클릭 홀드면 기본 공격을 잇는가(할 일 146) — 돌파의 방패 모드일 때만. 원래 Q(홀드 스킬)는 잇지 않는다.
+    /// </summary>
+    public static bool QResumesBasicAttack(bool hasTrait, in PaladinShieldDashSettings settings) => UsesShieldDash(hasTrait, settings);
 
     /// <summary>기본 Q 의 유효 최대 거리(m) = 전진 속도 × 최대 유지 시간.</summary>
     public static float BaseQMaxDistance(float advanceSpeed, float maxActiveDuration) =>

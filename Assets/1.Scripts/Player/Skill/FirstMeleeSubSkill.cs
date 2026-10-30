@@ -78,8 +78,12 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // 키가 Object 인 이유는 FirstMeleeMainSkill.tickTargets 와 같다(Unit 이 아닌 IAttackReceiver 는 Hurtbox 가 키).
     private readonly HashSet<Object> counterTargets = new HashSet<Object>();
     private readonly List<Unit> counterLandedUnits = new List<Unit>();
+    private readonly List<AttackShapeHit> counterHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolveCounterTarget;
     // 수호의 파동(할 일 126) — 반격 부채꼴 밖 반경 안 적에게 피해 없는 밀치기만 걸 때 대상 1회(여러 콜라이더).
-    private readonly HashSet<Unit> traitPushTargets = new HashSet<Unit>();
+    private readonly HashSet<Object> traitPushTargets = new HashSet<Object>();
+    private readonly List<AttackShapeHit> traitPushHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolvePushTarget;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
 
@@ -376,7 +380,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     }
 
     /// <summary>
-    /// [서버] 반격 1회 — 고정 방어 방향 기준 전방 counterAngle·counterRange 안의 대상에게 대상당 1회 피해.
+    /// [서버] 반격 1회 — 판정 도형(데이터 hitArea, 기준점 = <paramref name="origin"/> + 고정 방어 방향, 할 일 153) 안의 대상에게 대상당 1회 피해.
     /// 흐름은 <see cref="FirstMeleeMainSkill"/>.OnHoldTick 과 같다. 방어 성공과 별개라
     /// 막은 공격자가 범위 밖이면 피해가 없다. 반격 연출은 반격 클립 Hit 이벤트(GuardianCounter)가 전 피어에서 낸다.
     /// </summary>
@@ -387,31 +391,24 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             return;
 
         forward.y = 0f;
+        AttackShapeSet counterArea = CounterArea(data, origin, forward, out AttackShapePose pose);
 
-        // 수호의 파동(할 일 126) — 반경 0 = 특성 없음. 반격(전방 부채꼴)보다 넓은 원이라 질의는 둘 중 큰 반경으로 한 번 한다(반격 판정은 부채꼴 검사가 그대로 거른다).
-        float pushRadius = TraitPushRadius();
-        int hitCount = Physics.OverlapSphereNonAlloc(
-            origin, Mathf.Max(data.CounterRange, pushRadius), counterHitResults, data.HittableLayers, QueryTriggerInteraction.Collide);
+        // 수호의 파동(할 일 126) — 반경 0 = 특성 없음.
+        AttackShapeSet pushArea = TraitPushArea();
         counterTargets.Clear();
+        counterHits.Clear();
         counterLandedUnits.Clear();
+        resolveCounterTarget ??= ResolveShapeTarget;
+        if (counterArea != null)
+            AttackShapeQuery.Collect(counterArea, pose, data.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
+                resolveCounterTarget, counterTargets, counterHits);
         bool onHitBonusTaken = false;
 
-        for (int i = 0; i < hitCount; i++)
+        for (int i = 0; i < counterHits.Count; i++)
         {
-            Collider hit = counterHitResults[i];
-            if (hit == null)
-                continue;
-
-            if (!FirstMeleeGuardRules.IsInsideCounterSector(
-                    origin, forward, hit.ClosestPoint(origin), hit.bounds.center, data.CounterRange, data.CounterAngle))
-                continue;
-
+            Collider hit = counterHits[i].Collider;
+            Object target = counterHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-
-            // Unit 이 아닌 대상(파괴 가능한 상자 등)은 hurtbox 를 키로 쓴다 — FirstMeleeMainSkill 과 같은 이유.
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !counterTargets.Add(target))
-                continue;
 
             int resolvedDamage = damageSnapshot;
             // 시체(공격 거절)는 첫 대상 자리를 차지하지 않는다 — 뒤의 살아 있는 첫 Unit 이 보너스를 받는다.
@@ -428,7 +425,8 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 isInterruptAttack: false,
                 hitPattern: DamageHitPattern);
             // 수호의 파동 — 반격 피해 판정 1건에 밀치기를 같이 싣는다(피해는 그대로, 추가 피해 없음).
-            if (IsTraitPushCandidate(unit, hit, origin, pushRadius))
+            // 같은 콜라이더가 밀치기 원에도 겹치면.
+            if (IsTraitPushCandidate(unit) && pushArea != null && AttackShapeQuery.Overlaps(pushArea, pose, hit))
                 ApplyTraitPushServer(unit, origin, ref attackInfo);
             AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
 
@@ -447,22 +445,51 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, counterLandedUnits, this);
 
-        if (pushRadius > 0f)
-            ResolveTraitPushOnlyServer(origin, hitCount, pushRadius);
+        if (pushArea != null)
+            ResolveTraitPushOnlyServer(origin, pose, pushArea);
+    }
+
+    /// <summary>
+    /// 반격 판정 포즈(할 일 153) = 반격 순간 시전자 발밑(<paramref name="origin"/>) + 고정 방어 방향(hitArea CasterAim).
+    /// 수호의 파동 원도 같은 포즈를 쓴다. 서버 판정과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapePose CounterPose(AttackShapeSet area, Vector3 origin, Vector3 guardForward) =>
+        area != null
+            ? area.ResolvePose(origin, guardForward, origin, guardForward)
+            : new AttackShapePose(origin, guardForward);
+
+    /// <summary>
+    /// 반격 판정 영역(데이터 hitArea)·기준 포즈(<see cref="CounterPose"/>) — 수호의 파동 원(<see cref="TraitPushArea"/>)도 이 포즈를 쓴다.
+    /// 서버 반격 판정(<see cref="ResolveCounterHit"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet CounterArea(FirstMeleeSubSkillData data, Vector3 origin, Vector3 guardForward, out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = CounterPose(area, origin, guardForward);
+        return area;
     }
 
     // ── 수호의 파동(PAL_4_E_PUSH, 할 일 126) ──
 
-    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다.
-    private float TraitPushRadius() =>
+    /// <summary>수호의 파동 판정 영역(<see cref="PaladinTraitRules.EPushArea"/> — 반경 = 특성 수치). 특성 없으면 null. 판정·특성 랩 기즈모 공용.</summary>
+    public AttackShapeSet TraitPushArea() => PaladinTraitRules.EPushArea(TraitPushRadius());
+
+    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다. 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
+    public float TraitPushRadius() =>
         owner != null && owner.TraitModifiers != null
             ? owner.TraitModifiers.ResolveSkillValue(PaladinTraitValues.EPushRadiusKey, 0f)
             : 0f;
 
     // 특성 밀치기 대상 = 살아 있는 몬스터만(아군·기믹/환경 오브젝트는 특성 CC 없음 — 명세 §4). 보스 상태는 묻지 않는다 — 수신측 거부 규칙에 맡긴다.
-    private bool IsTraitPushCandidate(Unit unit, Collider hit, Vector3 origin, float pushRadius) =>
-        pushRadius > 0f && unit is MonsterBase && unit != owner && unit.CurrentHealth > 0 &&
-        PaladinTraitRules.InsidePushRadius(origin, hit.ClosestPoint(origin), pushRadius);
+    private bool IsTraitPushCandidate(Unit unit) =>
+        unit is MonsterBase && unit != owner && unit.CurrentHealth > 0;
+
+    // 밀치기만 받는 대상의 1회 키 — 특성 밀치기 대상(살아 있는 몬스터)만, 나머지는 null(대상 아님).
+    private Object ResolvePushTarget(Collider hit)
+    {
+        Unit unit = ResolveHitUnit(hit, out _);
+        return IsTraitPushCandidate(unit) ? unit : null;
+    }
 
     /// <summary>
     /// [서버] 특성 밀치기 연결 한 곳 — 공용 수정자(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/>)가 시전당 대상별 1회로 밀치기를 싣는다.
@@ -480,18 +507,18 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     /// [서버] 반격 부채꼴 밖(또는 반격 거리 밖)이지만 밀치기 반경 안인 적 — 피해 없는 밀치기만 건다(반격 피해·패시브·적중 사건 없음).
     /// 이미 반격 피해와 함께 밀린 대상은 공용 수정자가 이 시전에서 다시 싣지 않아(시전당 대상별 1회) 여기서 건너뛴다.
     /// </summary>
-    private void ResolveTraitPushOnlyServer(Vector3 origin, int hitCount, float pushRadius)
+    private void ResolveTraitPushOnlyServer(Vector3 origin, in AttackShapePose pose, AttackShapeSet pushArea)
     {
         traitPushTargets.Clear();
-        for (int i = 0; i < hitCount; i++)
-        {
-            Collider hit = counterHitResults[i];
-            if (hit == null)
-                continue;
+        traitPushHits.Clear();
+        resolvePushTarget ??= ResolvePushTarget;
+        AttackShapeQuery.Collect(pushArea, pose, SubSkillData.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
+            resolvePushTarget, traitPushTargets, traitPushHits);
 
+        for (int i = 0; i < traitPushHits.Count; i++)
+        {
+            Collider hit = traitPushHits[i].Collider;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            if (!IsTraitPushCandidate(unit, hit, origin, pushRadius) || !traitPushTargets.Add(unit))
-                continue;
 
             AttackInfo pushInfo = new AttackInfo(0, DamageAttackType, isInterruptAttack: false, hitPattern: DamageHitPattern);
             ApplyTraitPushServer(unit, origin, ref pushInfo);

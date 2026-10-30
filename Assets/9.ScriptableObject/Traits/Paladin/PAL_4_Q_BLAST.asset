@@ -31,6 +31,21 @@ MonoBehaviour:
         sourceForms: 
         damageRatio: 0.3
         delay: 0.05
+        hitArea:
+          origin: 1
+          shapes:
+          - rid: 7237886701681770987
         radius: 2
-        forwardOffset: 1
+        forwardOffset: 0
         requiredCount: 1
+    - rid: 7237886701681770987
+      type: {class: AttackSectorShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: -2
+        maxHeight: 2
+        range: 2
+        angle: 90
+        minOffset: 0

@@ -207,37 +207,49 @@ public sealed class AssassinTraitTier3Tests
     }
 
     [Test]
-    public void Area_StrikeCone_DimensionsTimes1_25_NotArea()
+    public void Area_StrikeSector_RangeAndAngleTimes1_25_NotArea()
     {
         TraitModifierSet set = SetOf(Area);
-        const float range = 1.8f, angle = 120f; // 강타 데이터 기본값
-        AssassinTraitAreaRules.ScaleCone(range, angle,
-            set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Length),
-            set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Width),
-            out float scaledRange, out float scaledAngle);
+        float length = set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Length);
+        float width = set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Width);
+        Assert.AreEqual(1.25f, length, Eps, "길이 ×1.25");
+        Assert.AreEqual(1.25f, width, Eps, "폭 ×1.25");
 
-        Assert.AreEqual(2.25f, scaledRange, Eps, "길이 ×1.25");
-        Assert.AreEqual(angle, scaledAngle, Eps, "같은 배율 = 닮은꼴(각도 그대로)");
-        Assert.AreEqual(1.25f, AssassinTraitAreaRules.ConeWidth(scaledRange, scaledAngle) / AssassinTraitAreaRules.ConeWidth(range, angle), Eps, "폭 ×1.25");
-        // 면적은 1.25² — 면적 25% 가 아니다.
-        Assert.AreEqual(1.5625f, scaledRange * scaledRange / (range * range), Eps);
+        // 강타 기본 부채꼴(할 일 153) r1.8·120° → 길이 배율 = range 2.25, 폭 배율 = angle 150°. 꼭짓점(발밑)·높이는 그대로.
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, AssassinBasicAttackStepData.StrikeSector(1.8f, 120f));
+        var scaled = (AttackSectorShape)area.Scaled(length, width).Shapes[0];
+        Assert.AreEqual(2.25f, scaled.Range, Eps);
+        Assert.AreEqual(150f, scaled.Angle, Eps);
+        Assert.AreEqual(0f, scaled.MinOffset, Eps);
+        Assert.AreEqual(1.8f, scaled.MaxHeight, Eps, "높이는 배율 없음");
 
-        // 미보유 = 그대로
-        AssassinTraitAreaRules.ScaleCone(range, angle, 1f, 1f, out float r1, out float a1);
-        Assert.AreEqual(range, r1, Eps);
-        Assert.AreEqual(angle, a1, Eps);
+        var pose = new AttackShapePose(Vector3.zero, Vector3.forward);
+        Assert.IsTrue(scaled.Contains(pose, new Vector3(0f, 0f, 2.2f)));
+        Assert.IsFalse(scaled.Contains(pose, new Vector3(0f, 0f, 2.3f)));
+        Vector3 side = Quaternion.Euler(0f, 72f, 0f) * Vector3.forward * 2f;   // 정면에서 72° — 새 반각 75° 안, 원래 반각 60° 밖
+        Assert.IsTrue(scaled.Contains(pose, side));
+        Assert.IsFalse(area.Contains(pose, side));
+
+        // 원본 SO 값은 그대로(복사본)
+        var original = (AttackSectorShape)area.Shapes[0];
+        Assert.AreEqual(1.8f, original.Range, Eps);
+        Assert.AreEqual(120f, original.Angle, Eps);
     }
 
     [Test]
-    public void Area_ConeRule_WidthOnly_KeepsLength()
+    public void Area_SectorRule_WidthOnly_KeepsRange()
     {
-        AssassinTraitAreaRules.ScaleCone(2f, 90f, 1f, 1.25f, out float range, out float angle);
-        Assert.AreEqual(2f, range, Eps);
-        Assert.AreEqual(1.25f, AssassinTraitAreaRules.ConeWidth(range, angle) / AssassinTraitAreaRules.ConeWidth(2f, 90f), Eps);
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackSectorShape(2f, 100f));
+        var scaled = (AttackSectorShape)area.Scaled(1f, 1.2f).Shapes[0];
+        Assert.AreEqual(2f, scaled.Range, Eps);
+        Assert.AreEqual(120f, scaled.Angle, Eps);
+    }
 
-        AssassinTraitAreaRules.ScaleCone(2f, 200f, 1.25f, 1.25f, out float wideRange, out float wideAngle);
-        Assert.AreEqual(2.5f, wideRange, Eps);
-        Assert.AreEqual(200f, wideAngle, Eps, "180° 이상은 폭 = 지름 — 각도 그대로");
+    [Test]
+    public void Area_ScaleArea_NoTraitSource_ReturnsSameSet()
+    {
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackSectorShape(1.8f, 120f));
+        Assert.AreSame(area, AssassinTraitAreaRules.ScaleArea(null, AssassinTraitAreaRules.EnhancedStrike, area), "특성 출처 없음 = 원본 그대로");
     }
 
     [Test]
@@ -252,9 +264,17 @@ public sealed class AssassinTraitTier3Tests
         var data = ScriptableObject.CreateInstance<AssassinCircleStrikeSkillData>();
         try
         {
-            SkillHitVolume volume = AssassinCircleStrikeSkill.HitVolume(Vector3.zero, data, radius);
+            float multiplier = set.AreaMultiplier(AssassinTraitAreaRules.CircleStrike, TraitAreaAxis.Radius);
+            SkillHitVolume volume = AssassinCircleStrikeSkill.PreviewVolume(data, Vector3.back, Vector3.zero, multiplier);
             Assert.IsTrue(volume.Accepts(new Bounds(new Vector3(2.4f, 0.5f, 0f), Vector3.one * 0.01f)));
             Assert.IsFalse(volume.Accepts(new Bounds(new Vector3(2.6f, 0.5f, 0f), Vector3.one * 0.01f)));
+
+            // 서버 판정 도형(할 일 153)도 같은 반경 — 칼날의 영역 = 반경(길이) 배율 복사본.
+            AttackShapeSet area = data.StrikeArea(multiplier);
+            AttackShapePose pose = data.StrikePose(Vector3.back, Vector3.zero);
+            Assert.IsTrue(area.Contains(pose, new Vector3(2.4f, 0.5f, 0f)));
+            Assert.IsFalse(area.Contains(pose, new Vector3(2.6f, 0.5f, 0f)));
+            Assert.AreEqual(2f, data.AreaRadius, Eps, "SO 원본 불변");
         }
         finally
         {
@@ -272,9 +292,8 @@ public sealed class AssassinTraitTier3Tests
         var data = ScriptableObject.CreateInstance<AssassinCircleStrikeSkillData>();
         try
         {
-            var so = new UnityEditor.SerializedObject(data);
-            so.FindProperty("aoeRadius").floatValue = 2f;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            // 효과 반경 = 판정 도형 원 radius 기본 2(할 일 153 — 베이스 aoeRadius 대신, AoeRadius 덮어씀).
+            Assert.AreEqual(2f, data.AoeRadius, Eps);
 
             TraitModifierSet owned = SetOf(Area);
             float hit = AssassinTraitAreaRules.ScaleRadius(data.AreaRadius, owned.AreaMultiplier(AssassinTraitAreaRules.CircleStrike, TraitAreaAxis.Radius));
