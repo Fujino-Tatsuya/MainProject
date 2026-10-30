@@ -12,7 +12,8 @@ using UnityEngine;
 /// <item><b>벽 끼임 탈출</b>: 매 전투 틱 내 캡슐이 벽/환경(Wall·Env 레이어 — <c>GameplayInvariantDetector</c> P8 과 같은 검사, 스킨 0.03m)에 박혔거나
 ///   보스방 경계(<c>InvisibleBoundaries/Boundary_*</c> 안쪽 면) 밖이면 <see cref="QABoss103WallWatch"/> — 0.25초 이어지면 기다리지 않고 QA 서버 재배치
 ///   (<see cref="QABoss103Relocator.Request"/> 사유 Wall = 보스 둘레 유효 지점 무작위). 요청하면 2초 옆걸음·6초 대시·20초 재배치 끼임 단계를 처음으로 되돌리고,
-///   끼임을 보는 중·탈출 직후 2초는 그 단계를 돌리지 않는다(같은 끼임에 두 복구가 겹치지 않게).</item>
+///   끼임을 보는 중·탈출 직후 2초는 그 단계를 돌리지 않는다(같은 끼임에 두 복구가 겹치지 않게).
+///   구속(23호 잡기) 중·풀린 뒤 0.5초는 벽 속으로 치지 않는다(할 일 185 — <see cref="RestrainedWallGraceJudge"/>, P8 과 같은 판정기).</item>
 /// </list>
 /// 로그: <c>[QA103] event=qa_f10_revive_request</c> · <c>event=qa_wall_escape_request</c>(할 일 140 계측 <c>why</c>=판정 근거 · <c>state</c>·<c>what</c>·<c>ground</c>·<c>grab</c> — <see cref="QABoss103StuckProbe"/>,
 /// 같은 값을 봇 판 파일 <c>wall_escape</c> 줄로도 써 배치 폴더 <c>parts/</c> 에 남긴다). 결과는 호스트 <c>event=qa_revive path=f10</c> · <c>event=qa_relocate reason=wall</c>.
@@ -79,7 +80,11 @@ public sealed partial class QABoss103CombatBot
     /// </summary>
     private bool TickWall(Player me, Vector3 myPos, double now)
     {
-        bool stuck = InWall(me, myPos, out string what);
+        // 할 일 185 — 구속(23호 잡기) 중·풀린 뒤 0.5초는 모터가 일부러 벽 밖으로 꺼내지 않는다(P8 과 같은 판정기).
+        // 그동안은 벽 속으로 치지 않아 잡기 패턴을 끊지 않고, 유예가 지나도 벽 속이면 0.25초 지속부터 다시 센다.
+        bool restrainedGrace = _restrainedWallGrace.Step(Time.realtimeSinceStartupAsDouble, me.CurrentState);
+        string what = null;
+        bool stuck = !restrainedGrace && InWall(me, myPos, out what);
         if (!_wall.Tick(now, stuck))
             return false;
         // 할 일 140 — 요청 전 상태(옮겨지기 전). why = InWall 판정 근거, what = 겹친 콜라이더 전부.
@@ -111,12 +116,17 @@ public sealed partial class QABoss103CombatBot
     // ── 끼임 계측(할 일 140) ─────────────────────────────────
 
     private readonly QABoss103RestraintTrace _restraint = new QABoss103RestraintTrace();
+    private readonly RestrainedWallGraceJudge _restrainedWallGrace = new RestrainedWallGraceJudge();
 
-    /// <summary>매 프레임 — 내 플레이어 구속 표지(오너도 서버 결정을 같은 상태로 받는다). 읽기만.</summary>
+    /// <summary>매 프레임 — 내 플레이어 구속 표지(오너도 서버 결정을 같은 상태로 받는다). 읽기만.
+    /// 벽 탈출 유예 판정기도 여기서 매 프레임 먹인다(전투 틱을 건너뛴 프레임의 구속도 놓치지 않게).</summary>
     private void ObserveRestraint(Player me)
     {
-        if (me != null)
-            _restraint.Observe(Time.realtimeSinceStartupAsDouble, QABoss103StuckProbe.RestraintLabel(me));
+        if (me == null)
+            return;
+        double now = Time.realtimeSinceStartupAsDouble;
+        _restraint.Observe(now, QABoss103StuckProbe.RestraintLabel(me));
+        _restrainedWallGrace.Step(now, me.CurrentState);
     }
 
     /// <summary>벽 끼임을 보는 중이거나 탈출 직후 — 2초 옆걸음·6초 대시·20초 재배치를 돌리지 않는다.</summary>
