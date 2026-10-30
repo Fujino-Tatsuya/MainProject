@@ -14,6 +14,7 @@
 | `ShowObjective(LobbyObjectiveView)` | 목표 패널 내용 교체. 대사 중이면 내용만 바꾸고 대사·유예가 끝난 뒤 보인다 |
 | `HideObjective()` | 목표 패널 끔 |
 | `ShowDialogue(speakerKey, lineKey, background)` | 감독관 대사 한 줄(연속 대사는 다시 부른다). `background` = `None`/`Factory`/`Rebellion` |
+| `ShowDialogue(speakerKey, lineKey, backgroundId)` | 같음 — 157 단계표 `backgroundId` 글자(`BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION`, 빈 값 = 없음) 그대로 |
 | `EndDialogue()` | 대사·삽화 닫기. 목표 패널은 유예(기본 0.3초) 뒤 다시 보인다 |
 | `SetPath(pathId)` | 그 ID 의 바닥 경로만 켬. null·빈 값 = 전부 끔 |
 | `SetWallTarget(wallId, visible)` | 지정 벽 표식 켜고 끔 |
@@ -21,7 +22,21 @@
 
 `LobbyObjectiveView` = `ChapterKey`·`ObjectiveKey`·`BodyKeys[]`·`Checklist[(LabelKey, Done)]`·`Progress(Kind, N, Total)`.
 키는 전부 Strings 키(`LobbyTutorialUiStrings`). 목록에 없는 키는 Strings 시트에서 찾고, 그래도 없으면 키 글자 그대로 보인다(빈 칸 방지).
-진행 `Kind` = `None`(구분선·진행 줄 끔) / `TrainingDone`(훈련 완료 n/N) / `Gather`(집결 n/N) / `Countdown`(시작까지 n). 분모 0·카운트 0 이하는 숨김.
+157 단계표 칸 값(`LOBBY_OBJ_CENTRAL` 등 접두 없는 id)은 `LobbyTutorialUiStrings.KeyOf(id)` 로 `Tutorial.Guide.<id>` 키를 만들어 넘긴다.
+진행 `Kind` = `None`(구분선·진행 줄 끔) / `Gather`(집결 n/N) / `PartyComplete`(훈련 완료 n/N) / `Countdown`(시작까지 n) — 이름·값(0~3) = 157 `LobbyTutorialProgressMode`. 분모 0·카운트 0 이하는 숨김.
+
+### 157 계약 이름 대응 (계약 = 157 `Docs/tech/handoff-lobby-tutorial-contract.md`)
+
+| 158 입력 | 값(= 157 단계표 `LobbyTutorialSteps.asset` 칸) |
+|---|---|
+| 경로 `LobbyTutorialPathIds` | `PATH_LOCKER`(L00)·`PATH_CENTRAL`(L10·L30 공용)·`PATH_TRAINING_HALL`(L20)·`PATH_COMBAT_AREA`(T20)·`PATH_COUNTER_AREA`(T30)·`PATH_TRAINING_EXIT`(T50)·`PATH_SORTIE`(L40) |
+| 벽 `LobbyTutorialWallIds` | `WALL_TRAIN_WEST`(T34) |
+| 삽화 `LobbyTutorialBackgroundIds` | `BRIEF_BG_FACTORY`(L32)·`BRIEF_BG_REBELLION`(L33) |
+| 대사 id | `LOBBY_DLG_INTRO`(L11)·`LOBBY_DLG_TRAINING`(L21)·`LOBBY_BRIEF_EVAL`·`LOBBY_BRIEF_FACTORY`·`LOBBY_BRIEF_REBELLION`·`LOBBY_BRIEF_SORTIE`(L31~L34), 화자 `LOBBY_SPEAKER_SUPERVISOR` |
+| 문구 id | `LOBBY_TITLE_*` 9·`LOBBY_OBJ_*` 12·`LOBBY_BODY_*` 4·`LOBBY_CHECK_*` 6·`LOBBY_PROGRESS_*` 3 |
+| 집결 | 입력 없음 — 테두리는 `PartyGatherZone` 복제값(활성 ∧ 확정 전)만 읽는다. `LobbyGatherPoint` 이름에 의존하지 않는다 |
+
+157 코드(`LobbyTutorialState`)에 컴파일 의존하지 않는다 — 이름·값만 맞췄다. 바인더(C10)는 157 병합 뒤.
 
 집결 테두리는 입력이 따로 없다 — `PartyGatherZone` 복제값(활성 ∧ 확정 전)을 그대로 읽는다.
 
@@ -49,9 +64,9 @@
 
 ### `LobbyTutorialMarkers.prefab`
 
-- 루트 `LobbyTutorialPathSet` — 경로 ID ↔ `LobbyFloorArrowPath` 목록. 자식 `Paths/Path_<ID>` 8개 = 할 일 111 `LobbyFloorArrowPath.prefab` **중첩 인스턴스**
+- 루트 `LobbyTutorialPathSet` — 경로 ID ↔ `LobbyFloorArrowPath` 목록. 자식 `Paths/<경로 ID>` 7개 = 할 일 111 `LobbyFloorArrowPath.prefab` **중첩 인스턴스**
   (모양·셰이더·색 그대로 — 순차 발광 펄스·`_PieceIndex` 같은 셰이더 변경 없음, 승인 결정). 배치 전 구분용으로 2m 씩 벌려 둠 — **경로 점 좌표는 사람이 씬에서 옮긴다**(111 과 같은 굽기).
-  - ID = `LobbyTutorialPathIds`: `Locker`·`Central`·`TrainingInside`·`Combat`·`Counter`·`Exit`·`BriefCentral`·`Sortie`(157 계약이 다른 이름을 정하면 그쪽에 맞춘다).
+  - ID = `LobbyTutorialPathIds` = 157 단계표 `pathId`(위 대응표). L10·L30 은 같은 `PATH_CENTRAL`.
   - 켜질 때 전부 끔. 경로를 켠 동안 `legacyGuideRoots`(씬의 옛 `LobbyGuideSteps` 루트를 넣는다)를 끄고, 빈 ID 면 되돌린다 — 옛 3스텝 안내와 동시에 안 켜진다.
 - 자식 `GatherBorders` = `LobbyGatherZoneBorders` + 꺼 둔 Quad 풀 8개(`M_LobbyGatherBorder`, 셰이더 `Lobby/GatherZoneBorder`).
   매 프레임 `PartyGatherZone.Spawned` 중 **활성 ∧ 확정 전** 구역의 BoxCollider 바닥 면에 테두리를 놓는다(논리 트리거 = 시각 footprint). 폭 0.18m, 띄움 0.02m, 민트(인스펙터).
@@ -68,13 +83,15 @@
 
 `LobbyTutorialUI.prefab` 의 `DebugDriver`(꺼 둠)를 Play 중 켜고 인스펙터 ⋮ 메뉴 `다음 장면`·`이전 장면`·`처음 장면`·`전부 끄기`.
 명세 화면 01–27(21장면)의 목표·대사·삽화·경로 ID·벽 표식(화면 17)을 순서대로 재현한다. 단축키 없음, `UNITY_EDITOR || DEVELOPMENT_BUILD` 에서만 동작.
-`partySize`(기본 3) = 진행 분모, `wallId` = 화면 17 에서 켤 벽 ID.
+`partySize`(기본 3) = 진행 분모, `wallId` = 화면 17 에서 켤 벽 ID(기본 `WALL_TRAIN_WEST`).
 
 ## 문구 키 — `LobbyTutorialUiStrings`
 
-`UI.Lobby.Tutorial.*`(챕터·지시문·설명·체크·진행·태그·이름표) + `Tutorial.Guide.LOBBY_DLG_*`(감독관 대사 6줄). `UiStrings.All` 에 들어가 Export Template 이 키를 모은다.
-**Strings 시트 행은 아직 없다**(ko 가 화면 폴백) — xlsx 행 추가는 SVN 쪽. 대사 키를 TutorialGuideTexts SO 에는 넣지 않았다(지속시간은 157 서버가 정한다).
-157 이 대사 SO 행을 같은 `LOBBY_DLG_*` id 로 만들면 Export 에서 키가 겹칠 수 있다 — 그때 한쪽으로 합친다.
+`Tutorial.Guide.LOBBY_*`(157 계약과 같은 id — 제목·지시문·설명·체크·진행·화자·대사) + 158 전용 `UI.Lobby.Tutorial.Tag*`(`{tag:ID}` 표기 3개).
+`UiStrings.All` 에 들어가 Export Template 이 키를 모은다. **Strings 시트 행은 아직 없다**(ko 가 화면 폴백) — xlsx 행 추가는 SVN 쪽.
+157 은 같은 id 를 `TutorialGuideTexts` SO 에도 둔다(지속시간·어댑터용). Export 는 같은 키를 처음 것만 남기므로 행이 둘 생기지 않는다.
+단 ko 폴백 문구가 다르다 — 158 은 `LOBBY_OBJ_VULN_CC`·`LOBBY_OBJ_WALL`·`LOBBY_BODY_SUPPRESS` 에 `{tag:Knockback}`·`{tag:Stun}`·`{tag:Suppress}` 자리표시자(색 태그),
+157 SO 는 `[넉백]` 같은 평문. 시트 행을 만들 때 `{tag:…}` 쪽으로 맞춰야 색이 나온다.
 
 ## 아트 (SVN `Assets/50.Art/UI/Tutorial/`, r560)
 
