@@ -16,6 +16,10 @@ using UnityEngine.UI;
 /// 배경 블러 A안은 <see cref="ApplyBackdrop"/>(<c>배경 블러 연결</c>)가 창 앞 형제 RawImage 와 설정 에셋만 더한다.
 /// 기본 공격(LMB) 슬롯은 <see cref="ApplyBasicAttackSlot"/>(<c>기본 공격 슬롯 연결</c>)가 카드 템플릿의 검 아이콘·로스터 칸만 잇는다.
 /// </para>
+/// <para>
+/// 할 일 167 — 카드·호버 툴팁 설명의 <c>{dmg}</c> 검 아이콘 sprite asset 은 전체 생성·카드 C1 아트 적용이 함께 넣고,
+/// 지금 프리팹에는 <see cref="ApplyDescriptionSprites"/>(<c>설명 검 아이콘 연결</c>)가 그 칸만 지정한다.
+/// </para>
 /// </summary>
 public static class TraitUiAuthoring
 {
@@ -82,6 +86,7 @@ public static class TraitUiAuthoring
             tooltip.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             TMP_Text tooltipName = NewText("Name", tooltip, font, 22f, FontStyles.Bold, TextAlignmentOptions.TopLeft, AccentColor);
             TMP_Text tooltipDescription = NewText("Description", tooltip, font, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft, Color.white);
+            tooltipDescription.spriteAsset = DescriptionSpriteAsset();
 
             // ── 선택 창(중앙 모달) ──
             RectTransform window = NewUi("Window", root.transform);
@@ -349,6 +354,59 @@ public static class TraitUiAuthoring
         }
     }
 
+    // ── 할 일 167 후속 — 설명의 {dmg} 검 아이콘 ──
+    // SkillTooltipFormatter 의 <sprite name="atk"> 를 담은 스킬 툴팁 sprite asset(SkillTooltipAuthoring 이 만든다). 비면 TMP 가 노란 ? 로 그린다.
+    public const string DescriptionSpriteAssetPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/SkillTooltipAttackSprite.asset";
+
+    private static TMP_SpriteAsset DescriptionSpriteAsset()
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(DescriptionSpriteAssetPath);
+        if (asset == null)
+            Debug.LogError($"[Trait] 설명 sprite asset 이 없다 — {DescriptionSpriteAssetPath} (스킬 툴팁 저작 메뉴로 먼저 만들 것).");
+        return asset;
+    }
+
+    /// <summary>
+    /// 지금 프리팹의 카드 설명(<c>CardTemplate/Description</c>)·획득 아이콘 호버 툴팁 설명(<c>AcquiredTooltip/Description</c>)에
+    /// 검 아이콘 sprite asset 만 지정한다 — 배치·글꼴·씬 오버라이드는 그대로. 이미 지정돼 있으면 저장하지 않는다(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 설명 검 아이콘 연결 ({dmg} sprite asset)")]
+    public static void ApplyDescriptionSprites()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var viewSo = new SerializedObject(view);
+            var cardView = viewSo.FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            var tooltipDescription = viewSo.FindProperty("tooltipDescription").objectReferenceValue as TMP_Text;
+            var cardDescription = cardView != null
+                ? new SerializedObject(cardView).FindProperty("description").objectReferenceValue as TMP_Text
+                : null;
+            TMP_SpriteAsset asset = DescriptionSpriteAsset();
+            if (cardDescription == null || tooltipDescription == null || asset == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 설명/툴팁 설명 칸이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (cardDescription.spriteAsset == asset && tooltipDescription.spriteAsset == asset)
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 설명 검 아이콘이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            cardDescription.spriteAsset = asset;
+            tooltipDescription.spriteAsset = asset;
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 설명 검 아이콘 연결 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
     // ── 할 일 165 후속 — 배경 블러 A안 ──
     private const string BackdropName = "Backdrop";
     private const string BackdropSettingsPath = "Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset";
@@ -512,6 +570,7 @@ public static class TraitUiAuthoring
         cardDescription.enableAutoSizing = true;
         cardDescription.fontSizeMin = 16f;
         cardDescription.fontSizeMax = 22f;
+        cardDescription.spriteAsset = DescriptionSpriteAsset();
 
         var so = new SerializedObject(cardView);
         so.FindProperty("button").objectReferenceValue = button;

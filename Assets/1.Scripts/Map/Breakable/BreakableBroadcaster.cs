@@ -16,9 +16,9 @@ using UnityEngine;
 /// 같은 순서로 같은 상자를 만든다. 그 스폰 순번이 곧 공용 식별자다 — 좌표를 실을 필요가 없다.
 /// </summary>
 [DisallowMultipleComponent]
-public class CrateBreakBroadcaster : NetworkBehaviour
+public class BreakableBroadcaster : NetworkBehaviour
 {
-    static CrateBreakBroadcaster _instance;
+    static BreakableBroadcaster _instance;
 
     // 폴백 경고는 씬당 1회. 원인이 "컴포넌트 하나 없음"이라 상자마다 반복해도 정보가 늘지 않는다.
     static bool _warnedMissing;
@@ -40,17 +40,17 @@ public class CrateBreakBroadcaster : NetworkBehaviour
     /// <summary>
     /// [서버] 상자 파괴를 전 피어에 알린다. 브로드캐스터가 없으면 로컬로만 처리하고 경고한다.
     /// </summary>
-    public static void ServerBreak(int crateId)
+    public static void ServerBreak(int breakableId)
     {
         if (_instance != null && _instance.IsSpawned)
         {
-            _instance.BreakCrateRpc(crateId);
+            _instance.BreakRpc(breakableId);
             return;
         }
 
         // 폴백. 조용히 넘기면 상자가 아예 안 부서지므로 로컬로는 처리한다.
         WarnFallbackOnce();
-        CrateRegistry.BreakLocal(crateId);
+        BreakableRegistry.BreakLocal(breakableId);
     }
 
     /// <summary>
@@ -71,15 +71,15 @@ public class CrateBreakBroadcaster : NetworkBehaviour
         if (!networked)
         {
             // 네트워크 없이 도는 테스트 씬. 의도된 경로라 정보성으로만 남긴다.
-            Edit.Log("[Crate] 네트워크가 없어 상자 파괴를 로컬로만 처리한다(테스트 씬 정상 경로).");
+            Edit.Log("[Breakable] 네트워크가 없어 상자 파괴를 로컬로만 처리한다(테스트 씬 정상 경로).");
             return;
         }
 
         Edit.LogError(
-            "[Crate] 이 씬에 CrateBreakBroadcaster가 없다 — 상자가 서버에서만 부서지고 " +
+            "[Breakable] 이 씬에 BreakableBroadcaster가 없다 — 상자가 서버에서만 부서지고 " +
             "클라이언트에는 멀쩡히 남는다.\n" +
             "MapNetworkSync 오브젝트(NetworkObject가 이미 붙어 있다)에 " +
-            "CrateBreakBroadcaster를 추가할 것.");
+            "BreakableBroadcaster를 추가할 것.");
     }
 
     /// <summary>
@@ -90,5 +90,5 @@ public class CrateBreakBroadcaster : NetworkBehaviour
     /// 이펙트 없이 증발</b>한다. 파괴당 작은 메시지 하나니까 보장받는 쪽이 맞다.
     /// </summary>
     [Rpc(SendTo.ClientsAndHost)]
-    void BreakCrateRpc(int crateId) => CrateRegistry.BreakLocal(crateId);
+    void BreakRpc(int breakableId) => BreakableRegistry.BreakLocal(breakableId);
 }

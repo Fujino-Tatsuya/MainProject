@@ -67,7 +67,7 @@ public class MapContentSpawner : MonoBehaviour
                 idc.SourcePrefab = p.LayoutPrefab;
 
                 // 파괴 가능한 상자 더미에 공용 ID 부여 — 전 피어에서 같은 값이 나온다(아래 주석).
-                AssignCrateIds(zoneGo, p.Slot.SlotID);
+                AssignBreakableIds(zoneGo, p.Slot.SlotID);
 
                 p.Slot.IsFilled = true;
                 visuals++;
@@ -127,11 +127,11 @@ public class MapContentSpawner : MonoBehaviour
     /// 그 상자가 자기 자신을 거부한다. 실제로 겪은 버그다.
     /// 저작 ID(음수)와도 겹치지 않도록 항상 양수로 유지한다.
     /// </summary>
-    private static void AssignCrateIds(GameObject zoneGo, int slotID)
+    private static void AssignBreakableIds(GameObject zoneGo, int slotID)
     {
         // 깊이 우선 순회라 같은 프리팹이면 순서가 같다.
         // includeInactive: true — 꺼진 더미를 건너뛰면 그 뒤 순번이 전부 밀린다.
-        BreakableCrate[] crates = zoneGo.GetComponentsInChildren<BreakableCrate>(true);
+        Breakable[] crates = zoneGo.GetComponentsInChildren<Breakable>(true);
         if (crates.Length == 0) return;
 
         if (slotID < 0 || slotID >= 0x7FFE)
@@ -457,7 +457,7 @@ public class MapContentSpawner : MonoBehaviour
     {
         // 상자 ID는 이번 생성에 종속이다. 남겨두면 같은 ID가 옛 맵의 상자를 가리켜
         // 엉뚱한 상자가 부서진다. 오브젝트를 지우기 전에 먼저 비운다.
-        CrateRegistry.Clear();
+        BreakableRegistry.Clear();
 
         foreach (var netObj in _spawnedNetObjs)
         {
