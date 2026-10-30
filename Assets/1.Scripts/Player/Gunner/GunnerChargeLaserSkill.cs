@@ -95,8 +95,13 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private float EffectiveMaxChargeTime(GunnerChargeLaserData data) =>
         GunnerTraitRules.QMaxChargeTimeFor(Traits, data.MaxChargeTime);
 
-    private float EffectiveBeamWidth(GunnerChargeLaserData data) =>
+    // 발사 판정 폭 — 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
+    public float EffectiveBeamWidth(GunnerChargeLaserData data) =>
         GunnerTraitRules.QBeamWidthFor(Traits, data.BeamWidth);
+
+    /// <summary>레이저 출발점 = 시전자 위치 + 위로 MuzzleHeight(발사·충전 미리보기·특성 랩 기즈모 공용).</summary>
+    public static Vector3 FireOrigin(Vector3 casterPosition, GunnerChargeLaserData data) =>
+        casterPosition + Vector3.up * data.MuzzleHeight;
 
     private static float ChargeFactor(GunnerChargeLaserData data, float elapsed, float maxChargeTime) =>
         data.ChargeFactor(GunnerTraitRules.DataClockElapsed(elapsed, data.MaxChargeTime, maxChargeTime));
@@ -209,7 +214,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         float factor = ChargeFactor(data, Time.time - ownerChargeStartTime, ownerChargeMaxTime);
         float range = data.RangeAt(factor);
         float width = EffectiveBeamWidth(data);
-        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 origin = FireOrigin(owner.transform.position, data);
         // 지형 차단은 데이터 폭으로 잰다 — 광폭 레이저가 사거리를 바꾸지 않게(발사와 같은 식).
         float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
         lineIndicator.ShowCharge(origin, aimDirection, 0f, length, width);
@@ -217,14 +222,36 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         hoverOutline?.ReportSkillHitArea(FireVolume(origin, aimDirection, length, width, data));
     }
 
-    /// <summary>발사 판정 상자 — <see cref="Fire"/> 의 <see cref="GunnerBeamAttack.FirePiercing"/> 와 같은 인자(오너 미리보기 공용). 폭 = 데이터 폭(특성 없음).</summary>
+    /// <summary>
+    /// 발사 판정 상자(오너 미리보기 공용) — <see cref="Fire"/> 와 같은 판정 도형(<see cref="GunnerChargeLaserData.FireArea"/>)·포즈의
+    /// 첫 도형 넓은 질의 상자(직사각형이면 판정 영역 그대로). 폭 = 데이터 폭(특성 없음).
+    /// </summary>
     public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, GunnerChargeLaserData data) =>
         FireVolume(origin, direction, length, data.BeamWidth, data);
 
     /// <summary>폭을 따로 받는 판(광폭 레이저 — <see cref="GunnerTraitRules.QBeamWidthFor"/>).</summary>
     public static SkillHitVolume FireVolume(Vector3 origin, Vector3 direction, float length, float width, GunnerChargeLaserData data)
     {
-        return SkillHitVolume.Beam(origin, direction, length, width, data.BeamHeight, data.HittableLayers);
+        AttackShapeSet area = data.FireArea(length, width);
+        AttackShape shape = area.IsEmpty ? null : area.Shapes[0];
+        if (shape == null)
+            return SkillHitVolume.Box(origin, Vector3.zero, Quaternion.identity, data.HittableLayers);
+
+        shape.GetBroadBox(data.FirePose(origin, direction), out Vector3 center, out Vector3 halfExtents, out Quaternion rotation);
+        return SkillHitVolume.Box(center, halfExtents, rotation, data.HittableLayers);
+    }
+
+    /// <summary>
+    /// 발 하나의 판정 영역·기준 포즈(할 일 153) — 최대 충전 도형을 지형 차단 뒤 길이 <paramref name="length"/>·폭 <paramref name="width"/>(광폭 레이저)로 맞춘 복사본,
+    /// 기준점 = 발사 원점 + 발사 방향. 지형 차단은 데이터 폭으로 잰다(광폭 레이저가 사거리를 바꾸지 않게). <paramref name="beam"/> 이 없으면 차단 없이 <paramref name="range"/>.
+    /// 원래 발·잔류 포격 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ShotArea(GunnerBeamAttack beam, GunnerChargeLaserData data, Vector3 origin, Vector3 direction, float range, float width,
+        out AttackShapePose pose, out float length)
+    {
+        length = beam != null ? beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers) : range;
+        pose = data.FirePose(origin, direction);
+        return data.FireArea(length, width);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -311,18 +338,16 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
             return;
 
         Vector3 direction = shotDirection;
-        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
-        float length = beam.CastLength(origin, direction, shotRange, data.BeamWidth * 0.5f, data.BlockingLayers);
-
-        int hitCount = beam.FirePiercing(origin, direction, length, shotWidth, data.BeamHeight,
-                                         data.HittableLayers, shotDamage, DamageAttackType,
+        Vector3 origin = FireOrigin(owner.transform.position, data);
+        AttackShapeSet area = ShotArea(beam, data, origin, direction, shotRange, shotWidth, out AttackShapePose pose, out float length);
+        int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shotDamage, DamageAttackType,
                                          DamageHitPattern, data.TriggersOnHit,
                                          TraitHitFlags.Original, originalHitHook);
         // 잔류 포격 묶음 — 예정 단일 대상 피해(실제 총 피해·맞힌 수 아님)를 발마다 더하고, 첫 발 위치·방향·최종 충전 사거리·폭을 저장.
         echoPlan.AddOriginalShot(origin, direction, shotRange, shotWidth, shotDamage);
 
-        // 아군 보호막 — 같은 아군은 시전당 원래 보호막량 1회(시전자 제외는 CollectAllies).
-        beam.CollectAllies(origin, direction, length, shotWidth, data.BeamHeight, data.AllyLayers, allies);
+        // 아군 보호막 — 같은 판정 도형. 같은 아군은 시전당 원래 보호막량 1회(시전자 제외는 CollectAllies).
+        beam.CollectAllies(area, pose, data.AllyLayers, allies);
         int shielded = 0;
         for (int i = 0; i < allies.Count; i++)
         {
@@ -431,7 +456,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         forward.y = 0f;
         forward = forward.sqrMagnitude > 0.001f ? forward.normalized : owner.transform.forward;
-        Vector3 castOrigin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 castOrigin = FireOrigin(owner.transform.position, data);
         float radius = data.BeamWidth * 0.5f;
         float clippedMin = beam.CastLength(castOrigin, forward, data.MinRange, radius, data.BlockingLayers);
         float clippedMax = beam.CastLength(castOrigin, forward, data.MaxRange, radius, data.BlockingLayers);
@@ -502,7 +527,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         echoPlan.Reset();
     }
 
-    // [서버] 예약된 잔류 포격 — 저장한 위치·방향·충전 사거리·폭, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
+    // [서버] 예약된 잔류 포격 — 저장한 위치·방향(포즈)·충전 사거리·폭(도형 배율)으로 원래 발과 같은 판정 도형, 지형 차단은 지금 다시 잰다. 판정만(VFX 없음, 할 일 127 범위 밖).
     // 열 소모·보호막·밀치기·쿨·적중 사건·연쇄 없음(Derived).
     private void Update()
     {
@@ -517,9 +542,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         for (int i = 0; i < dueEchoShots.Count; i++)
         {
             GunnerDerivedShot shot = dueEchoShots[i];
-            float length = beam.CastLength(shot.Origin, shot.Direction, shot.Range, data.BeamWidth * 0.5f, data.BlockingLayers);
-            int hitCount = beam.FirePiercing(shot.Origin, shot.Direction, length, shot.Width, data.BeamHeight,
-                                             data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
+            AttackShapeSet area = ShotArea(beam, data, shot.Origin, shot.Direction, shot.Range, shot.Width, out AttackShapePose pose, out float length);
+            int hitCount = beam.FirePiercing(area, pose, data.HittableLayers, shot.Damage, DamageAttackType, DamageHitPattern,
                                              false, TraitHitFlags.Derived, echoHitHook);
             Edit.Log($"[Gunner/Q] 잔류 포격 — 사거리 {length:0.0}/{shot.Range:0.0}, 폭 {shot.Width:0.##}, 피해 {shot.Damage} ×{hitCount}", this);
         }

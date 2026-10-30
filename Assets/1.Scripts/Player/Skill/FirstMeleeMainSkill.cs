@@ -3,11 +3,11 @@ using UnityEngine;
 
 /// <summary>
 /// Q 진격의 방패 — 홀드 동안 방패를 들고 자동 전진하며 마우스 에임 쪽으로 틱당 고정 각도만큼 조향한다.
-/// 서버는 스킬 틱마다 앵커 범위의 적에게 피해 + 진행 방향 넉백(견인)을 적용하고,
+/// 서버는 스킬 틱마다 판정 도형(데이터 hitArea, 할 일 153) 안의 적에게 피해 + 진행 방향 넉백(견인)을 적용하고,
 /// 홀드 동안 시전자에게 슈퍼아머를 부여한다 (Unit.Knockback 공통 검사로 CC 면역).
 ///
 /// 권위 분담(networking.md): 전진·회전은 시뮬레이션 피어가 수행하고 서버 결과를 NetworkTransform이 복제한다.
-/// 서버는 원격 오너의 기존 에임 경로(OnAimUpdated)로 같은 조향을 시뮬레이션해 판정 앵커 방향과
+/// 서버는 원격 오너의 기존 에임 경로(OnAimUpdated)로 같은 조향을 시뮬레이션해 판정 방향과
 /// 넉백 방향을 유지한다 (오차는 표시·판정 허용 범위, 쿨타임 미러와 같은 정책).
 /// </summary>
 public class FirstMeleeMainSkill : PlayerHoldSkill
@@ -35,6 +35,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
     // 피격 대상이다. 그런 대상은 Hurtbox를 키로 쓴다(아래 히트 루프 참조).
     private readonly HashSet<Object> tickTargets = new HashSet<Object>();
+    // 판정 도형(할 일 153) 질의 결과 — 틱·돌진 표본마다 다시 채운다.
+    private readonly List<AttackShapeHit> tickHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolveTarget;
     // 이번 틱에 맞은 Unit (Player.ServerAttackLanded 통지용). Unit 이 아닌 대상(상자 등)은 빠진다.
     private readonly List<Unit> tickLandedUnits = new List<Unit>();
     // 제압의 진격(할 일 126) — 이번 시전에서 뇌진탕을 받은 대상을 지속 밀치기 동안 이어 싣는다(서버).
@@ -43,6 +46,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     private readonly List<TraitDerivedAttack> traitDerivedAttacks = new List<TraitDerivedAttack>();
     private readonly Collider[] traitBlastResults = new Collider[16];
     private readonly HashSet<Object> traitBlastTargets = new HashSet<Object>();
+    private readonly List<AttackShapeHit> traitBlastHits = new List<AttackShapeHit>();
 
     // 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) — Q 모드 변경. 특성이 있으면 홀드·지속 타격·지속 밀치기·조향 대신
     // 입력 순간 방향으로 준비 → 고정 거리 돌진 → 회수. 서버는 경로 장부로 대상당 피해 1회 + 넉백 1회를 낸다.
@@ -71,6 +75,16 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // 전진은 스킬이 직접 수행 — 기본 이동/회전은 잠근다
     public override bool CanMoveWhileActive => false;
 
+    // 돌파의 방패(PAL_2_DASH)면 돌진이 끝난 뒤 좌클릭 홀드로 기본 공격을 잇는다(할 일 146). 특성 보유는 모든 피어가 같은 값으로 읽는다.
+    public override bool ResumesBasicAttackOnHold
+    {
+        get
+        {
+            PaladinShieldDashSettings dash = ResolveShieldDash(out bool hasDashTrait);
+            return PaladinTraitRules.QResumesBasicAttack(hasDashTrait, dash);
+        }
+    }
+
     private FirstMeleeMainSkillData MainSkillData => Data as FirstMeleeMainSkillData;
 
     public override void Initialize(Player owner, PlayerSkillController controller)
@@ -79,6 +93,28 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         movement = owner.GetComponent<PlayerMovement>();
         motor = owner.GetComponent<PlayerMotor>();
         aimIndicator = owner.GetComponent<PlayerAimIndicator>();
+    }
+
+    private System.Func<Collider, Object> ResolveTarget => resolveTarget ??= ResolveShapeTarget;
+
+    /// <summary>
+    /// 틱 판정 포즈(할 일 153) — 기준점 = 시전자 발밑 + 진행 방향(hitArea CasterAim). 돌파의 방패는 <paramref name="position"/> 에
+    /// 경로 표본 지점을 넘긴다. 서버 판정과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapePose ResolvePose(AttackShapeSet area, Vector3 position, Vector3 heading) =>
+        area != null
+            ? area.ResolvePose(position, heading, position, heading)
+            : new AttackShapePose(position, heading);
+
+    /// <summary>
+    /// 홀드 틱 판정 영역·기준 포즈(할 일 153) — 데이터 hitArea, 기준점 = 시전자 발밑 <paramref name="position"/> + 진행 방향.
+    /// 서버 판정(<see cref="OnHoldTick"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet HoldArea(FirstMeleeMainSkillData data, Vector3 position, Vector3 heading, out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = ResolvePose(area, position, heading);
+        return area;
     }
 
     public override void OnServerStart(Vector3 direction, Unit target)
@@ -119,7 +155,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             dashPath.Begin(owner.transform.position, heading, dash);
             dashServerStartTime = Time.time;
             dashOnHitBonusTaken = false;
-            // 서버가 원격 오너를 대리 시뮬레이션하는 경우에도 판정 앵커가 돌진 방향을 보게 한 번 돌린다(이후 조향 없음).
+            // 서버가 원격 오너를 대리 시뮬레이션하는 경우에도 몸이 돌진 방향을 보게 한 번 돌린다(이후 조향 없음). 판정 방향은 경로 방향이다.
             if (owner.IsMotionAuthority && !owner.IsInputSource && movement != null)
                 movement.RotateImmediately(heading);
         }
@@ -161,7 +197,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             return;
         }
 
-        // 서버가 원격 오너의 플레이어를 대리 조향 — 판정 앵커(아마추어 하위)와 넉백 방향을 최신으로 유지
+        // 서버가 원격 오너의 플레이어를 대리 조향 — 판정 도형 방향(heading)과 넉백 방향·몸 회전을 최신으로 유지
         if (State == SkillState.Charging && owner != null &&
             owner.IsMotionAuthority && !owner.IsInputSource)
         {
@@ -177,27 +213,23 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     protected override void OnHoldTick()
     {
         FirstMeleeMainSkillData data = MainSkillData;
-        if (data == null || HitboxAnchor == null || owner == null || isShieldDash)
+        if (data == null || owner == null || isShieldDash || hitResults == null || data.HitArea == null || data.HitArea.IsEmpty)
             return;
 
-        int hitCount = OverlapHitboxAnchor(hitResults);
+        // 판정 도형(할 일 153) — 기준점 = 발밑 + 진행 방향. 같은 대상(Unit, 없으면 Hurtbox — 상자 등)은 이 틱에 1회.
         tickTargets.Clear();
+        tickHits.Clear();
         tickLandedUnits.Clear();
+        AttackShapeSet area = HoldArea(data, owner.transform.position, heading, out AttackShapePose pose);
+        AttackShapeQuery.Collect(area, pose, data.HittableLayers,
+            QueryTriggerInteraction.Collide, hitResults, ResolveTarget, tickTargets, tickHits);
         bool onHitBonusTaken = false;
 
-        for (int i = 0; i < hitCount; i++)
+        for (int i = 0; i < tickHits.Count; i++)
         {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
-
+            Collider hit = tickHits[i].Collider;
+            Object target = tickHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-
-            // 파괴 가능한 상자처럼 Unit이 아닌 대상은 unit이 null이고 hurtbox만 잡힌다.
-            // unit으로 게이트하면 그런 대상이 통째로 걸러진다 — 중복 방지 키를 넓힌다.
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !tickTargets.Add(target))
-                continue;
 
             // 견인: 넉백/경직 값을 AttackInfo에 실어 전달 — 수신측(MonsterBase)이 지속넉백(Knockback 상태,
             // NavMesh 경계 클램프) → 종료 후 Stunned 경직 시퀀스를 처리한다. 슈퍼아머도 수신측이 거른다.
@@ -290,7 +322,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // ── 진격의 충격(PAL_4_Q_BLAST, 할 일 126) ──
 
     /// <summary>
-    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 전방 forwardOffset 지점·반경 radius 판정을 delay 뒤 1회 예약한다.
+    /// [서버] Q 가 끝난 순간 — 파생 공격(⑧) 명세 중 진격의 충격만 골라 효과 hitArea(기준점 = Q 끝 지점 + 마지막 진행 방향) 판정을 delay 뒤 1회 예약한다.
     /// 피해 = DQpacket(<see cref="PaladinTraitRules.QPacketDamage(int,float,float,float)"/> — 이 시전의 틱 Dref 스냅샷 × 예정 틱 수,
     /// 돌파의 방패면 그 × 교체 배율 = 교체 단발 피해) × 파생 배율. 실제 맞힌 틱·적 수와 무관하다.
     /// </summary>
@@ -311,14 +343,15 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             if (attack.Key != PaladinTraitValues.QBlastKey)
                 continue;
 
-            if (attack.Radius <= 0f)
+            if (attack.HitArea.IsEmpty)
             {
-                Debug.LogWarning("[Skill] 진격의 충격 — 반경이 0 이라 판정하지 않습니다(특성 데이터 확인).", this);
+                Debug.LogWarning("[Skill] 진격의 충격 — 판정 도형(hitArea)이 비어 판정하지 않습니다(특성 데이터 확인).", this);
                 continue;
             }
 
-            Vector3 center = owner.transform.position + heading * attack.ForwardOffset;
-            StartCoroutine(RunTraitBlastServer(center, attack.Radius, attack.DamageFrom(packet), attack.Delay, sceneHandle));
+            // 기준점 = Q 끝 지점 + 마지막 진행 방향(효과 hitArea, 기준점 Point — 할 일 153). 지연 동안 움직여도 이 포즈로 고정.
+            AttackShapePose pose = PaladinTraitRules.QBlastPose(attack.HitArea, owner.transform.position, heading);
+            StartCoroutine(RunTraitBlastServer(attack.HitArea, pose, attack.DamageFrom(packet), attack.Delay, sceneHandle));
         }
 
         traitDerivedAttacks.Clear();
@@ -329,7 +362,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     /// 그래서 패시브 추가피해(ServerTakeOnHitBonus)·밀치기 수정자·<see cref="Player.RaiseServerAttackLanded"/> 를 부르지 않는다.
     /// 지형 차단은 원래 Q 판정처럼 없다(같은 레이어 Overlap). 지연 동안 시전자가 죽거나 씬이 바뀌면 취소한다. 이펙트 없음(판정만).
     /// </summary>
-    private System.Collections.IEnumerator RunTraitBlastServer(Vector3 center, float radius, int damage, float delay, int sceneHandle)
+    private System.Collections.IEnumerator RunTraitBlastServer(AttackShapeSet area, AttackShapePose pose, int damage, float delay, int sceneHandle)
     {
         if (delay > 0f)
             yield return new WaitForSeconds(delay);
@@ -337,18 +370,15 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         if (owner == null || !owner.IsServer || owner.CurrentHealth <= 0 || UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle != sceneHandle || Data == null)
             yield break;
 
-        int hitCount = Physics.OverlapSphereNonAlloc(center, radius, traitBlastResults, Data.HittableLayers, QueryTriggerInteraction.Collide);
         traitBlastTargets.Clear();
-        for (int i = 0; i < hitCount; i++)
+        traitBlastHits.Clear();
+        AttackShapeQuery.Collect(area, pose, Data.HittableLayers, QueryTriggerInteraction.Collide, traitBlastResults, ResolveTarget,
+            traitBlastTargets, traitBlastHits);
+        for (int i = 0; i < traitBlastHits.Count; i++)
         {
-            Collider hit = traitBlastResults[i];
-            if (hit == null)
-                continue;
-
+            Collider hit = traitBlastHits[i].Collider;
+            Object target = traitBlastHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !traitBlastTargets.Add(target))
-                continue;
 
             AttackInfo attackInfo = new AttackInfo(damage, DamageAttackType, isInterruptAttack: false, hitPattern: DamageHitPattern);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
@@ -360,12 +390,13 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         }
 
         traitBlastTargets.Clear();
+        traitBlastHits.Clear();
     }
 
     // ── 돌파의 방패(PAL_2_DASH, 할 일 126 4/4) ──
 
-    /// <summary>특성을 골랐는가 + 그 수치(스킬 수치 ⑩). 없으면 default.</summary>
-    private PaladinShieldDashSettings ResolveShieldDash(out bool hasTrait)
+    /// <summary>특성을 골랐는가 + 그 수치(스킬 수치 ⑩). 없으면 default. 특성 랩 공격 범위 기즈모(할 일 152)도 이 값으로 모드·거리를 정한다.</summary>
+    public PaladinShieldDashSettings ResolveShieldDash(out bool hasTrait)
     {
         hasTrait = false;
         if (owner == null || !owner.TryGetComponent(out PlayerTraitModifiers modifiers))
@@ -388,13 +419,14 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     }
 
     /// <summary>
-    /// [서버] 경로 표본마다 원래 Q 판정 앵커 형상(= 기존 Q 공격 폭)을 그 지점으로 옮겨 훑는다. 대상당 1회만 —
+    /// [서버] 경로 표본마다 원래 Q 판정 도형(hitArea = 기존 Q 공격 폭)을 그 지점 + 돌진 방향으로 옮겨 훑는다(할 일 153). 대상당 1회만 —
     /// 피해 = 교체 Q 1회(DQfull × 배율), 넉백 = 이 모드 전용 거리·시간. 특성 밀치기·뇌진탕은 원래 Q 와 같은 한 곳으로 싣는다.
+    /// 표본 지점의 높이는 지금 시전자 높이다(예전 앵커를 바닥 평면으로만 옮기던 것과 같다).
     /// </summary>
     private void SweepShieldDashServer(float target)
     {
         FirstMeleeMainSkillData data = MainSkillData;
-        if (!isShieldDash || data == null || owner == null || HitboxAnchor == null || hitResults == null)
+        if (!isShieldDash || data == null || owner == null || hitResults == null || data.HitArea == null || data.HitArea.IsEmpty)
             return;
 
         dashPath.AdvanceTo(target, dashSamples);
@@ -407,20 +439,21 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         for (int s = 0; s < dashSamples.Count; s++)
         {
-            Vector3 offset = dashPath.PointAt(dashSamples[s]) - current;
-            offset.y = 0f;
-            int hitCount = OverlapHitboxAnchor(hitResults, offset);
+            AttackShapeSet area = ShieldDashSampleArea(data, dashPath.PointAt(dashSamples[s]), current.y, dashPath.Heading, out AttackShapePose pose);
+            tickTargets.Clear();
+            tickHits.Clear();
+            AttackShapeQuery.Collect(area, pose, data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, ResolveTarget,
+                tickTargets, tickHits);
 
-            for (int i = 0; i < hitCount; i++)
+            for (int i = 0; i < tickHits.Count; i++)
             {
-                Collider hit = hitResults[i];
-                if (hit == null)
+                Collider hit = tickHits[i].Collider;
+                Object targetObject = tickHits[i].Target;
+                // 시전 전체 1회는 경로 장부가 센다(표본 사이).
+                if (!dashPath.TryRegisterTarget(targetObject.GetInstanceID()))
                     continue;
 
                 Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-                Object targetObject = unit != null ? (Object)unit : hurtbox;
-                if (targetObject == null || unit == owner || !dashPath.TryRegisterTarget(targetObject.GetInstanceID()))
-                    continue;
 
                 int resolvedDamage = damage;
                 // 패시브 적중 추가피해 — 원래 Q 처럼 살아 있는 첫 Unit 하나(이 모드는 시전 1회 = 1번).
@@ -451,6 +484,28 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         traitConcussionCarry.EndTick();
         if (tickLandedUnits.Count > 0)
             owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, tickLandedUnits, this);
+    }
+
+    /// <summary>
+    /// 돌파의 방패 경로 표본 하나의 판정 포즈(할 일 153) = 표본 지점(바닥 평면) + 시전자 높이 <paramref name="casterHeight"/> + 돌진 방향.
+    /// 서버 판정과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapePose ShieldDashSamplePose(AttackShapeSet area, Vector3 pathPoint, float casterHeight, Vector3 dashHeading)
+    {
+        pathPoint.y = casterHeight;
+        return ResolvePose(area, pathPoint, dashHeading);
+    }
+
+    /// <summary>
+    /// 돌파의 방패 경로 표본 하나의 판정 영역(= 원래 Q hitArea)·기준 포즈(<see cref="ShieldDashSamplePose"/>).
+    /// 서버 경로 판정과 특성 랩 공격 범위 기즈모(할 일 153 6단계 — 경로 끝 표본)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ShieldDashSampleArea(FirstMeleeMainSkillData data, Vector3 pathPoint, float casterHeight, Vector3 dashHeading,
+        out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = ShieldDashSamplePose(area, pathPoint, casterHeight, dashHeading);
+        return area;
     }
 
     // 서버 전용 — 오너가 벽·낭떠러지 전에서 멈춘 실제 거리. 0~돌진 거리만 받아 경로 상한만 줄인다(늘리지 않음).

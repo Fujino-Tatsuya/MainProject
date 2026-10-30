@@ -177,6 +177,18 @@ public sealed class PaladinTraitDashTests
         Assert.AreEqual(SkillState.Active, PaladinTraitRules.QStartState(true));
     }
 
+    // 할 일 146 — 좌클릭 홀드 중 Q 를 쓰면 돌진이 끝난 뒤 기본 공격을 잇는다. 돌파의 방패(PAL_2_DASH)가 있을 때만.
+    [Test]
+    public void Dash_ResumesBasicAttackOnHold_OnlyWithShieldDashTrait()
+    {
+        Assert.IsTrue(PaladinTraitRules.QResumesBasicAttack(true, Dash()), "PAL_2_DASH 보유 = 이어가기");
+        Assert.IsFalse(PaladinTraitRules.QResumesBasicAttack(false, Dash()), "특성 없음 = 원래 Q(홀드) — 이어가기 없음");
+        Assert.IsFalse(PaladinTraitRules.QResumesBasicAttack(true, default), "수치 누락 = 원래 Q 로 돌므로 이어가기 없음");
+
+        Assert.IsTrue(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(PaladinTraitRules.QResumesBasicAttack(true, Dash()), SkillEndReason.Completed),
+            "돌진·회수가 정상으로 끝나면(벽·낭떠러지 안전 정지 포함) 이어가기");
+    }
+
     [Test]
     public void BaseQCooldown_Kept_NoDamageMultiplier()
     {

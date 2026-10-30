@@ -95,6 +95,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     public bool CanStartApprovedAttack => data != null && heat != null && !heat.IsOverheated;
     public GunnerBasicAttackData Data => data;
 
+    /// <summary>
+    /// 한 발의 출발점 — 총구, 비었으면 루트 + 위로 MuzzleHeight. 판정은 여기서 Range·반경 BeamWidth/2 로 훑는다.
+    /// 서버 발사(<see cref="ServerFire"/>)와 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. data 가 있을 때만 부른다.
+    /// </summary>
+    public Vector3 ShotOrigin => muzzle != null
+        ? muzzle.position
+        : transform.position + Vector3.up * data.MuzzleHeight;
+
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
     // 홀드 연사 중에도 언제든 끊는다(할 일 9).
     public bool CanBeCanceledByDash => true;
@@ -499,9 +507,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus, new TraitAttackKey(AttackType.Default));
         int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heatTraits.BasicShotScale(stage, heat.Data)));
 
-        Vector3 origin = muzzle != null
-            ? muzzle.position
-            : transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 origin = ShotOrigin;
         bool hit = FireBeam(origin, direction, damage, data.TriggersOnHit, TraitHitFlags.Original, out Vector3 end);
 
         heat.ServerAddShot(heatTraits.HeatPerShot(data.HeatPerShot)); // 허공이어도 증가(§4.2). 최대치 제한은 모델, 정온 운용이면 증가 없음

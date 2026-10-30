@@ -89,7 +89,8 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public SkillConfirmMode ConfirmMode => confirmMode;
     public float CastRange => castRange;
     public bool FixedDistance => fixedDistance;
-    public float AoeRadius => aoeRadius;
+    // 파생 SO 가 판정 도형 반경으로 덮어쓸 수 있다(어쌔신 변신 E = hitArea 원 radius, 할 일 153).
+    public virtual float AoeRadius => aoeRadius;
     public LayerMask TargetableLayers => targetableLayers;
     public GroundPointOutOfRangeMode GroundPointOutOfRange => groundPointOutOfRange;
     // 파생 SO 가 판정 반경에 맞춰 덮어쓸 수 있다(거너 R = 레이저 radius).

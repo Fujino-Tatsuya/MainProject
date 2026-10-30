@@ -252,7 +252,7 @@ public sealed class AssassinTraitTier4Tests
         TraitDerivedAttack spec = DerivedSpec(Trail, host, AssassinDerivedAttackKeys.QTrail);
         Assert.AreEqual(0.25f, spec.DamageRatio, Eps);
         Assert.AreEqual(0.15f, spec.Delay, Eps);
-        Assert.AreEqual(0f, spec.Radius, Eps, "원래 Q 경로 폭 재사용");
+        Assert.IsTrue(spec.HitArea.IsEmpty, "판정 도형 없음 = 원래 Q 경로 폭 재사용(할 일 153)");
 
         Assert.AreEqual(1, host.DerivedFor(NormalQ).Count, "일반 Q");
         Assert.AreEqual(1, host.DerivedFor(TransformedQ).Count, "변신 Q");
@@ -295,14 +295,25 @@ public sealed class AssassinTraitTier4Tests
         Assert.AreEqual(new Vector3(1f, 0f, 3.5f), end, "실제 이동 1.5m(벽 보고로 줄어든 상한) — 최대 거리 4m 아님");
         Assert.AreEqual(start, AssassinTrailRules.SegmentEnd(start, Vector3.forward, -2f), "음수 거리 = 0");
 
-        AssassinTrailRules.Box(start, end, 1.2f, 2f, out Vector3 center, out Vector3 half, out Quaternion rotation);
-        Assert.AreEqual(1f, center.x, Eps);
-        Assert.AreEqual(1f, center.y, Eps, "높이 절반 올림");
-        Assert.AreEqual(2.75f, center.z, Eps, "선분 가운데");
-        Assert.AreEqual(0.6f, half.x, Eps, "원래 Q 경로 폭 1.2");
-        Assert.AreEqual(1f, half.y, Eps);
-        Assert.AreEqual(0.75f, half.z, Eps, "길이 절반 — 지나온 구간만");
-        Assert.AreEqual(1f, Vector3.Dot(rotation * Vector3.forward, Vector3.forward), Eps, "선분 방향");
+        // 궤적 판정 = 원래 Q 경로 도형을 지나온 선분 길이에 맞춘 것(할 일 153) — 기준점 = 선분 시작 + 선분 방향.
+        var data = ScriptableObject.CreateInstance<AssassinDashStrikeSkillData>();
+        try
+        {
+            AttackShapeSet area = data.PathArea(Vector3.Distance(start, end));
+            AttackShapePose pose = data.PathPose(Vector3.zero, start, end - start);
+            var rect = (AttackRectShape)area.Shapes[0];
+            Assert.AreEqual(1.5f, rect.Length, Eps, "길이 = 지나온 구간만");
+            Assert.AreEqual(1.2f, rect.Width, Eps, "원래 Q 경로 폭 1.2");
+            Assert.AreEqual(start, pose.Position, "기준점 = 선분 시작");
+            Assert.AreEqual(1f, pose.Forward.z, Eps, "선분 방향");
+            Assert.IsTrue(area.Contains(pose, new Vector3(1.55f, 1.9f, 3.45f)), "선분 안(폭 끝·높이 위 근처)");
+            Assert.IsFalse(area.Contains(pose, new Vector3(1f, 1f, 3.6f)), "선분 끝 너머");
+            Assert.IsFalse(area.Contains(pose, new Vector3(1.7f, 1f, 3f)), "폭 밖");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(data);
+        }
     }
 
     [Test]
@@ -330,6 +341,7 @@ public sealed class AssassinTraitTier4Tests
         TraitDerivedAttack spec = DerivedSpec(Combo, host, AssassinDerivedAttackKeys.ComboExtra);
         Assert.AreEqual(0.7f, spec.DamageRatio, Eps);
         Assert.AreEqual(0.08f, spec.Delay, Eps);
+        Assert.IsTrue(spec.HitArea.IsEmpty, "판정 도형 없음 = 마지막 원래 한 타의 도형 재사용(할 일 153)");
 
         Assert.AreEqual(1, host.DerivedFor(NormalBasic).Count, "일반 연계");
         Assert.AreEqual(1, host.DerivedFor(TransformedBasic).Count, "변신 묶음");

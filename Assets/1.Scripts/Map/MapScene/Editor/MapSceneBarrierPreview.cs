@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 튜토리얼 배리어(S3) 배치를 Play 없이 확인한다.
-///  · 미리보기 = 열린 씬의 <see cref="MapSceneStageMarker"/>(4.MapScene Stage1) 기준으로 런타임과 같은 배리어를 씬 루트에 만든다.
+///  · 미리보기 = 열린 씬의 <see cref="MapSceneStageMarker"/>(4.MapScene Stage1) 기준으로 런타임과 같은 배리어(레이저 시각 포함)를 씬 루트에 만든다.
 ///    <c>HideFlags.DontSave</c> — 씬에 저장되지 않는다(씬을 저장하지 말 것). 삭제 메뉴로 지운다.
 ///  · 점검 = 각 배리어 양 끝이 벽 콜라이더에 닿는지(옆 틈 없음) 로그. 마커가 열린 씬에 없으면 StageTutorial 프리팹으로 점검만.
 /// </summary>
@@ -33,6 +33,8 @@ internal static class MapSceneBarrierPreview
             GameObject go = MapSceneBarriers.CreateBarrierObject(s, root.transform, marker.transform.position.y,
                 MapSceneBarriers.DefaultHeight, marker.BarrierMaterial, MapSceneBarriers.DefaultColor);
             go.hideFlags = HideFlags.DontSave;
+            // 할 일 160 — 런타임과 같은 레이저 시각(칸이 비면 큐브 그대로). 부모(root)의 DontSave 를 물려받는다.
+            MapSceneBarriers.CreateGateLaser(s, go, marker.transform.position.y, MapSceneBarriers.DefaultHeight, marker.GateLaserPrefab);
         }
         Report(specs, marker.transform);
         Selection.activeGameObject = root;

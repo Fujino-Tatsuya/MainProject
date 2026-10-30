@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-10-30 · 경석(Claude) · **공격 취소 시 클립 루프 이펙트 잔존 수정**, 브랜치 `feature/SettingsDdol`) — ✅ 구현·커밋 · 컴파일 0 · 전투 EditMode 416/0 · ✅ 경석 Play
+- 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
+- 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).
+
 ## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **보스 B 승리 연출(BOSS DOWN)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) ✅ 승인(Q1~Q3 권장안·R1~R6 문서대로) · ✅ 구현 · ✅ 커밋·feature 푸시 · ✅ 10-29 development 병합 · 전투 EditMode 416/0 · ✅ 경석 MPPM(사망 연출 정상) · 기획 원본 `보스_승리연출_v02_프로그래머_전달사양.md`(10-26)
 - 확정(grill): 보스 B 만 · 전원 같은 화면(막타 = 좌측 전경) · 처치 순간부터 조작 잠금 · 3.2초 뒤 32° 유지 → 결과 화면 · 타이포 코드 생성 · 음영 살린 회색조 · 사망 팀원 그대로.
 - 수정 예정: 새 `Map/BossVictory/*` · `Rendering/BossVictory/*` · `TwentyThreeBoss.cs` · `MonsterBase.cs`(사망 보류 훅) · `BossEncounterDirector.cs` · URP 렌더러 에셋.

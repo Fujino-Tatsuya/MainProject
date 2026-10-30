@@ -59,6 +59,15 @@ public sealed class DummyInterruptWindowSchedule
     /// <summary>회복 중이 아닐 때 창이 열려 있어야 하는가(마지막 Tick 기준).</summary>
     public bool IsOpen => Mode == DummyInterruptWindowMode.Unbounded || IsOpenPhase;
 
+    /// <summary>
+    /// 열림 하나의 길이(게임초, 할 일 139-6 — 간파 시도 예측의 창 길이). 무기한·닫힘 0(계속 열림) = +∞, 열림 0 = 0(열리지 않음), 그 밖 = 열림 길이.
+    /// 주기 모드의 열림은 늘 처음부터 시작한다(모드 전환·회복 뒤 닫힘 처음부터) — 도중 길이 변경만 예외(지금 열림에도 새 길이가 적용된다).
+    /// </summary>
+    public float OpenWindowLength =>
+        Mode == DummyInterruptWindowMode.Unbounded || (ClosedSeconds <= 0f && OpenSeconds > 0f)
+            ? InterruptWindowLengthResolver.Unbounded
+            : OpenSeconds;
+
     /// <summary>모드를 바꾼다. 바뀌면 위상 리셋(주기 = 열림 단계 처음부터).</summary>
     public void SetMode(DummyInterruptWindowMode mode)
     {

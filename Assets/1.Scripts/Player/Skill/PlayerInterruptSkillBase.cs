@@ -824,13 +824,10 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     {
         Unit best = null;
         open = false;
-        if (!HitboxAnchorShape.TryRead(HitboxAnchor, out HitboxAnchorShape shape))
+        if (!TryGetPlacedJudgeShape(resolvePosition, attackDirection, out HitboxAnchorShape shape))
             return null;
 
-        Vector3 pivot = owner.transform.position;
-        int hitCount = shape.Aimed(pivot, HitboxAnchor.transform.forward, attackDirection)
-            .Offset(resolvePosition - pivot)
-            .Overlap(PredictResults(), Data.HittableLayers);
+        int hitCount = shape.Overlap(PredictResults(), Data.HittableLayers);
 
         InterruptTargetRegistry.CopyLiveTo(predictCandidates);
         for (int i = 0; i < hitCount; i++)
@@ -862,6 +859,34 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         predictCandidates.Clear();
         return best;
+    }
+
+    /// <summary>
+    /// 판정 앵커를 공격 방향으로 돌려 판정 위치(<paramref name="resolvePosition"/>)에 놓은 형상 — 시도 예측 오버랩(서버 승인·오너 즉시·재예측)이
+    /// 질의하는 바로 그 형상(<see cref="HitboxAnchorShape.PlacedAt"/>). 읽기 전용 — 간파 보정 랩 기즈모(할 일 156)가 같은 값을 그린다.
+    /// 판정 위치 = 근접은 지금(시전) 위치, 대쉬 간파는 예상 대시 끝(<see cref="DashInterruptPrediction.PredictedEndPosition"/>). 앵커·시전자가 없으면 false.
+    /// </summary>
+    public bool TryGetPlacedJudgeShape(Vector3 resolvePosition, Vector3 attackDirection, out HitboxAnchorShape shape)
+    {
+        shape = default;
+        if (owner == null || !HitboxAnchorShape.TryRead(HitboxAnchor, out HitboxAnchorShape anchorShape))
+            return false;
+
+        shape = anchorShape.PlacedAt(owner.transform.position, HitboxAnchor.transform.forward, attackDirection, resolvePosition);
+        return true;
+    }
+
+    /// <summary>
+    /// [읽기 전용] 오너 즉시 예측과 같은 대상 탐색(같은 형상·같은 대상 캐시·복제 창·로컬 선착순 장부)으로 지금 이 자리에서 고를 대상과 그 창 열림.
+    /// 예측·연출·계측 이벤트는 내지 않는다 — 간파 보정 랩 상시 미리보기(할 일 156) 전용. 데이터·앵커가 없으면 null.
+    /// </summary>
+    public Unit FindOwnerViewTarget(Vector3 resolvePosition, Vector3 attackDirection, out bool open)
+    {
+        open = false;
+        if (InterruptData == null || HitboxAnchor == null || owner == null)
+            return null;
+
+        return FindPredictTarget(resolvePosition, attackDirection, true, out open);
     }
 
     private Collider[] PredictResults()

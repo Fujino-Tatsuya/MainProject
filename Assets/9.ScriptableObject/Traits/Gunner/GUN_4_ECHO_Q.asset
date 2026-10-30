@@ -32,6 +32,7 @@ MonoBehaviour:
         sourceForms: 
         damageRatio: 0.25
         delay: 0.15
-        radius: 0
-        forwardOffset: 0
+        hitArea:
+          origin: 0
+          shapes: []
         requiredCount: 1

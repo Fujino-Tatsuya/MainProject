@@ -2582,8 +2582,6 @@ MonoBehaviour:
   playerDefaultAttack: {fileID: 7301928374650192837}
   tailToMovementBlendSeconds: 0.12
   chainPolicy: 0
-  attackSteps: []
-  defaultHitbox: {fileID: 728051452282005925}
   hittableLayers:
     serializedVersion: 2
     m_Bits: 17408
@@ -2631,7 +2629,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
   data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
-  hitboxAnchor: {fileID: 7099233008318258782}
+  hitboxAnchor: {fileID: 0}
   smashLoop: {fileID: 953834285837352989}
   trailLoop: {fileID: 1118353091802246764}
 --- !u!114 &6769088039121836275
@@ -2944,17 +2942,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5668903939015267363, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
   m_PrefabInstance: {fileID: 5683368051277706446}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &728051452282005925 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4955630649127984491, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
-  m_PrefabInstance: {fileID: 5683368051277706446}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!114 &949514895202568280 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4896041602680355990, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
@@ -3024,17 +3011,6 @@ Transform:
 --- !u!114 &6786142914605788478 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1221135374507219440, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
-  m_PrefabInstance: {fileID: 5683368051277706446}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
---- !u!114 &7099233008318258782 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 3196126298489465488, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
   m_PrefabInstance: {fileID: 5683368051277706446}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}

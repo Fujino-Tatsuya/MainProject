@@ -42,7 +42,7 @@ public static class PodArrivalRules
     /// <param name="spawned">맵 연출 NetworkBehaviour 가 스폰돼 복제 값을 읽을 수 있는가.</param>
     /// <param name="armed">서버가 이번 진입에 연출을 켰는가(복제).</param>
     /// <param name="startAt">시작 시각(서버시간, 0 = 아직).</param>
-    /// <param name="openedAt">해치 열기·날개 접기 끝 이벤트 시각(서버시간, 0 = 아직) — 디졸브 지연 시작.</param>
+    /// <param name="openedAt">해치 열기 끝 이벤트 시각(서버시간, 0 = 아직) — 디졸브 지연 시작.</param>
     /// <param name="endAfterOpen">열기 끝 → 연출 끝(초) = 디졸브 지연 + 디졸브·레터박스 아웃 중 긴 쪽(<see cref="PodDropMapTimeline.EndAfterOpenSeconds"/>).</param>
     public static bool IsArrivalDone(bool spawned, bool armed, double startAt, double openedAt, double now, float endAfterOpen)
     {
@@ -63,8 +63,8 @@ public static class PodArrivalRules
     }
 
     /// <summary>
-    /// 해치를 열기 클립 0프레임(닫힌 자세)에 고정해 둘까(할 일 106) — 연출 시작 전·낙하·급감속(날개/다리 펴기)·착륙 내내 참, 지면에 닿은 순간부터 거짓(열기 재생).
-    /// 고정 안 하면 Hatches 레이어가 PassThrough 라 베이스 DP_Idle 의 열린 해치가 보인다. 펴기 끝이 아직이면 착지 시각은 +∞ 라 계속 고정.
+    /// 해치를 열기 클립 0프레임(닫힌 자세)에 고정해 둘까(할 일 106) — 연출 시작 전·낙하·급감속(날개 접기/다리 펴기)·자유낙하 내내 참, 지면에 닿은 순간부터 거짓(열기 재생).
+    /// 고정 안 하면 Hatches 레이어가 PassThrough 라 베이스 DP_Idle 의 열린 해치가 보인다. 접기·펴기 끝이 아직이면 착지 시각은 +∞ 라 계속 고정.
     /// </summary>
     public static bool ShouldHoldHatchClosed(bool started, double elapsed, double touchdownAt) =>
         !started || elapsed < touchdownAt;

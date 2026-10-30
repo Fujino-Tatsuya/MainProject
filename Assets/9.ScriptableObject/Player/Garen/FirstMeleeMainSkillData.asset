@@ -45,3 +45,21 @@ MonoBehaviour:
   knockbackDuration: 0.25
   staggerDuration: 0.2
   maxHitResults: 16
+  hitArea:
+    origin: 0
+    shapes:
+    - rid: 7237886701681771054
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681771054
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: -0.03
+        minHeight: -0.461
+        maxHeight: 0.539
+        length: 1.8
+        width: 2
+        backOffset: 0.2

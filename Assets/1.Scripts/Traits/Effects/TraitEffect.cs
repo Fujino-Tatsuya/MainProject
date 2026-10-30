@@ -341,21 +341,20 @@ public sealed class TraitDerivedAttack
     public readonly int SourceFormMask;
     public readonly float DamageRatio;
     public readonly float Delay;
-    public readonly float Radius;
-    public readonly float ForwardOffset;
+    /// <summary>판정 도형(할 일 153, 효과 SO 의 칸 그대로 — 고치지 말 것). 비었으면 원래 공격 치수 재사용(스킬이 정한다).</summary>
+    public readonly AttackShapeSet HitArea;
     public readonly TraitShotCounter Counter;
 
     public TraitDerivedAttack(int traitHash, string key, int sourceAttackTypeMask, int sourceFormMask,
-        float damageRatio, float delay, float radius, float forwardOffset, int requiredCount)
+        float damageRatio, float delay, AttackShapeSet hitArea, int requiredCount)
     {
+        HitArea = hitArea ?? new AttackShapeSet();
         TraitHash = traitHash;
         Key = key ?? string.Empty;
         SourceAttackTypeMask = sourceAttackTypeMask;
         SourceFormMask = sourceFormMask;
         DamageRatio = damageRatio;
         Delay = delay;
-        Radius = radius;
-        ForwardOffset = forwardOffset;
         Counter = new TraitShotCounter(requiredCount);
     }
 

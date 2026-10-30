@@ -14,6 +14,7 @@ using UnityEngine;
 /// <item>캐릭터 변경 = <see cref="DebugCharacterCycle"/>(F1 순환과 같은 길). 교체 직전(<see cref="DebugCharacterCycle.ServerSwapping"/>) 보유 특성을 비운다 — F1 도 같다.</item>
 /// <item>배속 = <see cref="DebugTimeScale"/>, 쿨 0 = <see cref="DebugZeroCooldown"/> 켜고 끄기, 허수아비 HP 리셋 = 서버 체력 설정.</item>
 /// <item>호스트 1인 기준. 클라 창은 보유 목록만 보인다(버튼 비활성, 새 RPC 없음).</item>
+/// <item>공격 범위 기즈모(할 일 152·153 6단계, 에디터 전용) = <see cref="TraitLabAttackGizmos"/> — 판정이 쓰는 (도형, 포즈) 를 그대로 받아 <see cref="AttackShapeDrawing"/> 으로만 그린다.</item>
 /// </list>
 /// 게이트 = <c>UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS</c>(Docs/tech/debug-hotkeys.md).
 /// </summary>
@@ -42,6 +43,13 @@ public sealed class DebugTraitLab : MonoBehaviour
     bool _folded;
     Vector2 _scroll;
     string _status = string.Empty;
+
+#if UNITY_EDITOR
+    // 공격 범위 기즈모(할 일 152) — 기본 꺼짐. 에디터 전용(Gizmos·Handles).
+    readonly TraitLabAttackGizmos attackGizmos = new TraitLabAttackGizmos();
+
+    void OnDrawGizmos() => attackGizmos.Draw();
+#endif
 
     void OnEnable()
     {
@@ -193,7 +201,33 @@ public sealed class DebugTraitLab : MonoBehaviour
         if (GUILayout.Button("허수아비 HP 리셋"))
             ResetDummies();
         GUI.enabled = true;
+
+#if UNITY_EDITOR
+        DrawAttackGizmoOptions();
+#endif
     }
+
+#if UNITY_EDITOR
+    // ── 공격 범위 기즈모(할 일 152) ──
+    void DrawAttackGizmoOptions()
+    {
+        GUILayout.Space(6f);
+        attackGizmos.Enabled = GUILayout.Toggle(attackGizmos.Enabled, "공격 범위 기즈모");
+        if (!attackGizmos.Enabled)
+            return;
+
+        GUILayout.BeginHorizontal();
+        attackGizmos.ShowBasic = GUILayout.Toggle(attackGizmos.ShowBasic, GizmoLabel("기본공격", TraitLabGizmoCategory.Basic), RichToggle());
+        attackGizmos.ShowSkill = GUILayout.Toggle(attackGizmos.ShowSkill, GizmoLabel("스킬", TraitLabGizmoCategory.Skill), RichToggle());
+        attackGizmos.ShowTrait = GUILayout.Toggle(attackGizmos.ShowTrait, GizmoLabel("특성 추가 공격", TraitLabGizmoCategory.Trait), RichToggle());
+        GUILayout.EndHorizontal();
+        GUILayout.Label("<size=10>Gizmos 라 Game 뷰에서는 상단 Gizmos 버튼이 켜져 있어야 보입니다. 특성 추가 공격·거너 R 은 호스트 창에서만 나옵니다. " +
+                        "'(도형 아님)' = 판정 도형이 아닌 콜라이더 판정(거너 평타·R·간파 상자).</size>", RichLabel());
+    }
+
+    static string GizmoLabel(string text, TraitLabGizmoCategory category) =>
+        $"<color=#{ColorUtility.ToHtmlStringRGB(TraitLabAttackGizmos.ColorOf(category))}>■</color> {text}";
+#endif
 
     void SwapTo(TutorialCharacter character)
     {
@@ -275,7 +309,10 @@ public sealed class DebugTraitLab : MonoBehaviour
     }
 
     static GUIStyle _richLabel;
+    static GUIStyle _richToggle;
     static GUIStyle _toggleButton;
+
+    static GUIStyle RichToggle() => _richToggle ??= new GUIStyle(GUI.skin.toggle) { richText = true };
 
     static GUIStyle RichLabel() => _richLabel ??= new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true };
 

@@ -19,6 +19,7 @@ MonoBehaviour:
       {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uBC18\uACA9 \uC911\uC5D0\uB294
       \uD53C\uD574\uB97C \uBB34\uC2DC\uD569\uB2C8\uB2E4."
     icon: {fileID: 21300000, guid: 95a8efb689b9bf24a85cfb8a36b366c9, type: 3}
+    tags: 
   inputType: 0
   cooldownTime: 7
   commitCooldownManually: 0
@@ -45,8 +46,26 @@ MonoBehaviour:
   hoverMarkerDistance: 3
   animatorStateName: SubSkillGuard
   snapRotationOnStart: 1
+  followUpIconTint: {r: 1, g: 1, b: 1, a: 1}
   guardAngle: 180
-  counterAngle: 120
-  counterRange: 3
+  guardHoldMaxDuration: 3
+  hitArea:
+    origin: 0
+    shapes:
+    - rid: 7237886701681771055
   shieldAmount: 100
   shieldDuration: 10
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681771055
+      type: {class: AttackSectorShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: -3
+        maxHeight: 3
+        range: 3
+        angle: 120
+        minOffset: 0

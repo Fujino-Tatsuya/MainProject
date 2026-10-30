@@ -13,10 +13,15 @@ internal static class InterruptLabEditModeTestRunner
         "^InterruptCalibrationTests$",
         "^InterruptCalibrationCaptureTests$",
         "^InterruptCalibrationQuestionTests$",
+        "^InterruptCalibrationSample22Tests$",
+        "^InterruptWindowLengthResolverTests$",
+        "^TwentyThreeInterruptWindowLengthTests$",
         "^DebugInterruptLabTests$",
         "^DebugInterruptLabIsolationTests$",
         "^DummyInterruptWindowScheduleTests$",
         "^TrainingDummyInterruptCycleTests$",
+        "^InterruptJudgeShapeGizmoTests$",
+        "^HitboxAnchorShapeTests$",
     };
 
     const string Tag = "[InterruptLabTests]";

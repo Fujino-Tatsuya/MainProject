@@ -13,14 +13,19 @@ public class BossHealthHUD : MonoBehaviour
     [SerializeField] private GameObject barRoot;
     [SerializeField] private Image hpFill;
     [Header("제압 칸(전투 시스템 명세 10-14 §6 — 예전 간파 게이지 Detection_Fill 자리)")]
-    [Tooltip("HP 바 밑 **제압 칸** 한 칸의 원본(SuppressSegmentTemplate) = 칸 테두리(frame, 바닥). 자신은 꺼 두고 칸 수만큼 복제한다.\n" +
-             "칸 크기 = 이 사각형 크기, 줄 가운데 = 이 사각형 자리. 왼쪽부터 찬 칸, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다.\n" +
-             "제압 칸이 없는 보스면 칸 줄 전체를 숨긴다.")]
+    [Tooltip("HP 바 밑 **제압 칸** 한 칸의 원본(SuppressSegmentTemplate) = 칸 채움(fill) 한 장(frame 없음). 자신은 꺼 두고 칸 수만큼 복제한다.\n" +
+             "칸 줄 자리·폭·높이 = 아래 슬롯 이미지 아래칸 영역(할 일 151 후속, 10-30). 칸 폭 = (줄 폭 − 간격×(N−1)) / N, 정수 픽셀.\n" +
+             "이 원본의 크기·자리는 런타임에 덮어쓴다(스프라이트·색·모서리 배율만 쓴다). 슬롯 이미지(suppressRowSlot)의 **직속 자식**·앵커 가운데로 둔다.\n" +
+             "남은 칸 = 복제본 켬, 빈 칸 = 복제본 끔(슬롯 아래칸 어두운 바탕이 보인다). 왼쪽부터 찬 칸, 줄어들면 HP 와 같은 방향(오른쪽부터) 빈 칸이 된다.\n" +
+             "늘어나도 안 찌그러지게 9-슬라이스(Image Sliced) 스프라이트를 쓴다. 제압 칸이 없는 보스면 칸 줄 전체를 숨긴다.")]
     [SerializeField] private Graphic suppressSegmentTemplate;
-    [Tooltip("원본의 **직속 자식** 칸 채움(fill, 위). 남은 칸이면 켜고 빈 칸이면 꺼서 frame 만 보이게 한다.")]
-    [SerializeField] private Graphic suppressSegmentFill;
     [Tooltip("칸 사이 간격(px).")]
     [SerializeField, Min(0f)] private float suppressSegmentGap = 8f;
+    [Tooltip("칸 줄이 겹칠 보스 정보 슬롯 이미지(BossInfoSlot, slot_boss_info). Type Simple·Preserve Aspect 끔(이미지를 사각형에 꽉 늘려 그림)이어야 영역이 맞는다.")]
+    [SerializeField] private Image suppressRowSlot;
+    [Tooltip("슬롯 이미지 **원본 픽셀** 기준 칸 줄 영역(왼쪽 위 원점, X·Y·W·H). 지금 = 아래칸 바깥 테두리 57,45 / 812×16(926×61 이미지).\n" +
+             "슬롯 사각형 크기 ÷ 이미지 픽셀로 늘려 HUD 좌표로 바꾼다 — 슬롯 크기를 바꿔도 칸 줄이 아래칸에 붙어 따라간다.")]
+    [SerializeField] private RectInt suppressRowSlotPixels = new RectInt(57, 45, 812, 16);
     [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     [Header("23호 레이드 ④ 자폭 실드(팀장 10-19)")]
@@ -78,15 +83,16 @@ public class BossHealthHUD : MonoBehaviour
     private TwentyThreeBoss boundGaugeBoss;   // 제압 칸을 가진 보스(23호)일 때만
 
     private readonly List<GameObject> suppressSegments = new List<GameObject>();
-    private readonly List<GameObject> suppressSegmentFills = new List<GameObject>();   // 칸마다 fill(없으면 null)
 
     private void Awake()
     {
         if (suppressSegmentTemplate != null)
         {
             suppressSegmentTemplate.gameObject.SetActive(false);   // 원본은 그리지 않는다 — 복제본만 보인다
-            if (suppressSegmentFill == null || suppressSegmentFill.transform.parent != suppressSegmentTemplate.transform)
-                Debug.LogWarning($"[BossHealthHUD] suppressSegmentFill 이 원본의 직속 자식이 아니다 — 칸이 frame 만 보인다: {name}", this);
+            if (suppressRowSlot == null || suppressRowSlot.sprite == null)
+                Debug.LogWarning($"[BossHealthHUD] suppressRowSlot(슬롯 이미지)이 비어 있어 제압 칸을 그리지 않는다: {name}", this);
+            else if (suppressSegmentTemplate.transform.parent != suppressRowSlot.transform)
+                Debug.LogWarning($"[BossHealthHUD] 제압 칸 원본이 슬롯 이미지의 직속 자식이 아니다 — 칸 줄이 아래칸에서 어긋난다: {name}", this);
         }
 
         if (shieldFill != null)
@@ -221,19 +227,19 @@ public class BossHealthHUD : MonoBehaviour
     }
 
     // ── 제압 칸 ──────────────────────────────────────────────────────────
-    // 원본(frame + 자식 fill)을 total 개 복제해 원본 자리를 가운데로 가로 한 줄로 깐다. 칸 크기 = 원본 크기(이미지 비율 유지),
-    // 칸 수가 바뀔 때만 다시 만든다. 남은 칸 = fill 켬, 빈 칸 = fill 끔(frame 만).
+    // 원본(fill 한 장)을 total 개 복제해 슬롯 이미지 아래칸 영역에 가로 한 줄로 깐다. 영역 폭을 N등분하고 높이·가운데는 영역 그대로
+    // (9-슬라이스라 모서리 유지). 칸 수가 바뀔 때만 다시 만든다. 남은 칸 = 켬, 빈 칸 = 끔(슬롯 아래칸 바탕이 보인다).
     private void SetSuppressSegments(int total, int remaining)
     {
         if (suppressSegmentTemplate == null) return;
         if (suppressSegments.Count != total)
             BuildSuppressSegments(total);
 
-        for (int i = 0; i < suppressSegmentFills.Count; i++)
+        for (int i = 0; i < suppressSegments.Count; i++)
         {
-            GameObject fill = suppressSegmentFills[i];
+            GameObject seg = suppressSegments[i];
             bool filled = BossSuppressCellLayout.IsFilled(i, remaining);
-            if (fill != null && fill.activeSelf != filled) fill.SetActive(filled);
+            if (seg != null && seg.activeSelf != filled) seg.SetActive(filled);
         }
     }
 
@@ -242,28 +248,35 @@ public class BossHealthHUD : MonoBehaviour
         for (int i = 0; i < suppressSegments.Count; i++)
             if (suppressSegments[i] != null) Destroy(suppressSegments[i]);
         suppressSegments.Clear();
-        suppressSegmentFills.Clear();
-        if (total <= 0) return;
+        if (total <= 0 || suppressRowSlot == null || suppressRowSlot.sprite == null) return;
 
         RectTransform src = suppressSegmentTemplate.rectTransform;
-        float cell = src.sizeDelta.x;
+        BossSuppressCellLayout.RowArea row = SuppressRowArea();
         int sibling = src.GetSiblingIndex();
-        int fillIndex = suppressSegmentFill != null && suppressSegmentFill.transform.parent == src
-            ? suppressSegmentFill.transform.GetSiblingIndex() : -1;
 
         for (int i = 0; i < total; i++)
         {
             Graphic seg = Instantiate(suppressSegmentTemplate, src.parent, false);
             seg.name = $"SuppressSegment_{i}";
             var rect = seg.rectTransform;
-            rect.anchoredPosition = new Vector2(
-                src.anchoredPosition.x + BossSuppressCellLayout.CellCenterX(i, total, cell, suppressSegmentGap),
-                src.anchoredPosition.y);
+            BossSuppressCellLayout.CellSpan span = BossSuppressCellLayout.PixelCell(i, total, row.Width, suppressSegmentGap);
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);   // 슬롯 사각형 가운데 기준
+            rect.sizeDelta = new Vector2(span.Width, row.PixelHeight);
+            rect.anchoredPosition = new Vector2(row.CenterX + span.CenterX, row.CenterY);
             rect.SetSiblingIndex(sibling + 1 + i);   // 원본 자리(그리는 순서) 그대로
             seg.gameObject.SetActive(true);
             suppressSegments.Add(seg.gameObject);
-            suppressSegmentFills.Add(fillIndex >= 0 ? rect.GetChild(fillIndex).gameObject : null);
         }
+    }
+
+    // 슬롯 이미지 픽셀 영역 → 슬롯 사각형 가운데 기준 HUD 좌표. 배율 = 슬롯 사각형 크기 ÷ 스프라이트 픽셀(가로·세로 따로).
+    private BossSuppressCellLayout.RowArea SuppressRowArea()
+    {
+        Rect image = suppressRowSlot.sprite.rect;
+        Rect slot = suppressRowSlot.rectTransform.rect;
+        RectInt px = suppressRowSlotPixels;
+        return BossSuppressCellLayout.SlotPixelsToRow(image.width, image.height, slot.width, slot.height,
+            px.x, px.y, px.width, px.height);
     }
 
     // ── HP 그라데이션 ──────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ public sealed class DebugInterruptLabIsolationTests
         typeof(DebugDummyInterruptWindowMode), // 139 허수아비 창 모드
         typeof(InterruptCalibrationCapture), // 139 예측 보정 캡처(랩 씬은 단계 5)
         typeof(InterruptCalibrationQuestionPanel), // 139 질문 창·상시 패널(랩 씬은 단계 5)
+        typeof(InterruptJudgeShapeGizmos), // 156 간파 판정 범위 기즈모(보정 랩)
     };
 
     static string[] DebugScriptGuids()

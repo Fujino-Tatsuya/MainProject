@@ -39,8 +39,8 @@ namespace BeaverLobby.Player.Dash
 
         public bool HasTargetInRange;    // 예상 판정 위치에서 판정 오버랩 안에 간파 대상(창 소유자)이 있다
         public bool TargetWindowOpen;    // 그 대상의 지금 간파 창
-        public float WindowOpenElapsed;  // 창이 열린 뒤 지난 시간. 음수 = 모름
-        public float WindowExpectedDuration; // 창 추정 길이(과거 관측). 음수 = 모름
+        public float WindowOpenElapsed;  // 창이 열린 뒤 지난 시간(게임초). 음수 = 모름
+        public float WindowExpectedDuration; // 창 길이(게임초) — 로컬로 아는 값 우선, 없으면 과거 관측 중앙값(할 일 139-6). 음수 = 모름, +∞ = 무기한(남은 창 +∞)
 
         /// <summary>근접 간파 입력 — 대시 없음, 준비 기준점 = 시전 시각. 판정 시각 = 시전 시각 + 준비 시간.</summary>
         public static DashInterruptPredictInput ForMelee(float castTime, Vector3 castPosition, float prepDelay) =>
@@ -137,7 +137,7 @@ namespace BeaverLobby.Player.Dash
         /// <summary>근접 간파 예상 판정 시각 = 시전 시각 + 준비 시간(모름·음수 = 0).</summary>
         public static float GetMeleeResolveTime(float castTime, float prepDelay) => castTime + Mathf.Max(0f, prepDelay);
 
-        /// <summary>남은 창 시간 = 추정 길이 − 열린 뒤 경과(음수면 0). 둘 중 하나라도 모르면 -1.</summary>
+        /// <summary>남은 창 시간 = 추정 길이 − 열린 뒤 경과(음수면 0). 둘 중 하나라도 모르면 -1. 무기한(+∞) 길이면 +∞ — 창 닫힘으로 약이 나오지 않는다.</summary>
         public static float EstimateWindowRemaining(float openElapsed, float expectedDuration)
         {
             if (openElapsed < 0f || expectedDuration < 0f)

@@ -115,18 +115,26 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 ## 7. 배리어 (S3)
 > 코드: `MapSceneBarrierRules`(순수 — 매핑·모양·진입 가능·추락 후보) · `MapSceneBarriers`(런타임, 모든 피어) · `PlayerSafePointTracker.ReturnPointFilter`(훅).
-> 테스트: `MapSceneBarrierRulesTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/MapScene/5. Preview Barriers`(열린 씬, 저장 안 됨) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
+> 테스트: `MapSceneBarrierRulesTests`·`MapGateLaserViewTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/MapScene/5. Preview Barriers`(열린 씬, 저장 안 됨 — 레이저 시각 포함) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
 
 **8개 = 복도 n 입구(앞 존 쪽)·출구(다음 존 쪽)**: 복도1 G1/G2 · 복도2 G3/G4 · 복도3 G6/G7 · 복도4 G9/G10. G5·G8·G11 은 배리어 없음.
 - 모양 = §6 복도 사각형의 양 끝에서 **복도 안쪽으로** 두께 0.4m(존 사각형을 침범하지 않음), 가로 = 복도 너비 + 양옆 0.3m(복도 벽 안으로 파고듦), 높이 3m.
   2026-10-11 프리팹 점검: 8개 모두 양옆 벽 안쪽 면 ±1.38m, 벽 바깥 면 ±2.63m(배리어 반폭 2.3m — 벽 밖으로 안 나옴).
 - 어디에: Play 중에만 `MapSceneStageMarker.Start` 가 StageTutorial 루트에 `MapSceneBarriers` 를 붙이고, 그것이 루트 아래 `MapSceneBarriers/Barrier_G*` 를 만든다.
-  🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼 참조 한 줄뿐.
+  🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼·레이저 프리팹 참조 두 줄뿐.
+- **시각 = 레이저 게이트(할 일 160, 2026-10-30)**: 마커 칸 `gateLaserPrefab` = `2.Prefabs/Environment/MapScene/MapGateLaser.prefab`(`MapGateLaserView`, 비네트워크, 콜라이더 없음).
+  `MapSceneBarriers.CreateGateLaser` 가 큐브의 **렌더러만 끄고** 레이저를 큐브의 형제(`MapSceneBarriers/Laser_G*`)로 만들어 `Fit(폭, 높이, 진행축)` 한다. 큐브의 Barrier 콜라이더(크기·위치·레이어)·`MonsterBlock_G*` 카브는 그대로.
+  - 프리팹 = 루트 `MapGateLaserView` + `Visual/Posts`(`50.Art/…/Lasers/Env_laser.fbx` — **메시 하나에 양 끝 발사대 둘**이 들어 있다) + `Visual/Beams/Beam`(`Env_laser_lay.fbx` 템플릿, 코드가 줄 수만큼 복제).
+    이펙트 담당은 `Visual` 안만 바꾸고 뷰의 칸 두 개(발사대·빔 템플릿)만 다시 연결하면 된다. 조각 루트는 뷰 축(로컬 X = 폭)과 90° 단위로만 돌릴 것.
+  - 맞춤 = 메시 bounds 로 잰다(FBX 축·피벗 하드코딩 없음): 발사대·빔의 긴 축 = 폭, 발사대는 바닥에 세움(기본 = FBX 높이 그대로 `keepPostHeight`), 빔 줄 수 = (높이 − 위아래 여유) ÷ 간격 + 1, 상한 칸(연출 전용 인스펙터 칸).
+  - 폭 = **벽 사이 통로 폭** — 배리어 가로(복도 너비 + 양옆 0.3m)는 벽 속으로 파고들어 그대로 쓰면 발사대가 벽에 묻힌다. 게이트 가운데(바닥 + 1m)에서 Wall 레이어 레이캐스트로 양옆을 재고, 못 잡으면 배리어 가로 그대로. 지금 8곳 = 2.76m.
+  - 머티리얼 = `3.Materials/Environment/MapScene/MA_MapGateLaser.mat`(셰이더 `50.Art/MapGen/MapObj/material/lay.shadergraph` 재사용 — 텍스처 `ray_basecolor` 가 빨강, 발광 ×4.82). 발사대는 FBX 기본 머티리얼.
+  - 칸이 비면 예전 반투명 큐브(`barrierMaterial`)로 폴백 + 경고 한 줄. 개인 뒤 배리어(`BackBarrier_G*`)도 같은 프리팹(`BackLaser_G*`, 카브 없음).
 
 **언제 · 어떻게 여나**
 - 디렉터가 튜토리얼을 켠 것(`IsTutorialActive`)이 그 피어에서 처음 보일 때 만든다(`StateChanged`). 튜토리얼이 아니면 만들지 않는다.
-- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 콜라이더·카브를 **즉시** 끄고
-  0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만).
+- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 플레이어 콜라이더와 레이저 빔을 **즉시** 끈다
+  (연출 없음, 발사대는 장식으로 남음 — 늦은 클라·이미 열림과 같은 결과, `MapSceneBarriers.OpenInstant`). 큐브 폴백일 때만 0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만). 몬스터 카브는 열려도 끄지 않는다(아래 '막기 — 몬스터').
 
 **막기**
 - 플레이어: **Barrier 레이어**(19 — 할 일 32 로 Wall 에서 분리, [wall-concept.md](wall-concept.md)) 비트리거 BoxCollider. 플레이어 모터 스윕 마스크(`PlayerGameRuleData.obstacleMask` = Default|Ground|Wall|Enemy|Env|Barrier)가 본다.
@@ -135,6 +143,11 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   스윕을 안 타는 것 = 순간이동(`TeleportAuthoritative` — 스폰·추락 복구·보스방 이동)과 23호 잡기/밀기(`PlayerRestrainedState` — 보스방 전용).
   Barrier 는 거너 평타·차지 레이저 차단 레이어에도 있어(할 일 32 에서 추가) 배리어 너머로는 거너 빔이 막힌다. 부활·리스폰 점유 검사(`MapSceneDeathRules`·`PartyWipeRespawner`)도 Wall|Barrier 를 본다.
 - 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Barrier 는 NavMesh 베이크 수집(Default·Ground·Wall)에 안 들어가 다리 재베이크에 섞이지 않는다.
+  **복도는 늘 몬스터 출입 금지(할 일 148)** — 카브는 배리어 큐브와 따로 둔 형제 `MapSceneBarriers/MonsterBlock_G*` 이고 게이트가 열려도 **끄지 않는다**(서버 NavMesh 에만 의미 — 몬스터 이동 권한이 서버).
+  복도 8개 문 모두 끝까지 구멍이 남아 몬스터는 복도로 길을 못 찾고 문 앞에서 멈춘다. 이미 복도 안에 있던 몬스터는 그대로 둔다(쫓아내지 않음 — 복도 안 섬에 갇힌다).
+  넉백·특성 밀치기·Q 견인도 막힌다 — 몬스터 강제 이동 두 경로가 모두 NavMesh 위로만 민다: `MonsterBase.HandleKnockback`(틱마다 `NavMesh.SamplePosition` 0.5m 로 메시 위 점에 고정, 끝 Warp 는 시작 자리에서 `NavMesh.Raycast` 로 같은 섬 확인)·`LinearKnockback`(`NavMesh.Raycast` 로 메시 끝에서 멈춤).
+  플레이어는 NavMesh 를 안 쓰므로(모터 스윕) 영향 없다. 보스방(G10 너머)과 이어진 복도4 출구도 같은 규칙.
+  테스트: `MapSceneBarrierMonsterBlockTests`(큐브를 꺼도 카브가 남고 배리어 자리를 덮는다).
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `MapSceneBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백(존1)은 원래 거르지 않았다 —
   C2 부터는 그 사람의 뒤 배리어 너머면 대체 지점을 쓴다(아래 '뒤 배리어 예외').

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public class PlayerDefaultAttack : BaseAttack
 {
@@ -11,27 +12,26 @@ public class PlayerDefaultAttack : BaseAttack
 
     // 적중 통지는 Player.ServerAttackLanded 하나로 모인다(평타·스킬·투사체 공용). 여기는 판정 1회마다 목록만 넘긴다.
 
-    private readonly HashSet<Unit> damagedUnits = new HashSet<Unit>();
-    private readonly HashSet<Hurtbox> damagedHurtboxes = new HashSet<Hurtbox>();
+    // 이 타에서 이미 맞은 대상(Unit, 없으면 Hurtbox — 상자 등) — 타마다 비운다.
+    private readonly HashSet<Object> hitTargets = new HashSet<Object>();
+    private readonly List<AttackShapeHit> shapeHits = new List<AttackShapeHit>();
     private readonly List<Unit> swingHitBuffer = new List<Unit>();
     private Collider[] hitResults = new Collider[DefaultMaxHitResults];
     private Player owner;
-    private ColliderInfo defaultHitbox;
-    private ColliderInfo hitbox;
+    private System.Func<Collider, Object> resolveTarget;
     private DefaultAttackStep currentStep;
     private Vector3 attackDirection;
 
     private void Awake()
     {
         owner = GetComponent<Player>();
+        resolveTarget = ResolveTarget;
         SetAttackType(AttackType.Default);
         SetHitPattern(AttackHitPattern.Single);
     }
 
-    public void Configure(ColliderInfo defaultHitbox, LayerMask hittableLayers, int maxHitResults = DefaultMaxHitResults)
+    public void Configure(LayerMask hittableLayers, int maxHitResults = DefaultMaxHitResults)
     {
-        this.defaultHitbox = defaultHitbox;
-        hitbox = defaultHitbox;
         SetTargetLayer(hittableLayers);
 
         int resultCount = Mathf.Max(1, maxHitResults);
@@ -39,14 +39,31 @@ public class PlayerDefaultAttack : BaseAttack
             hitResults = new Collider[resultCount];
     }
 
+    /// <summary>
+    /// 그 타의 판정 포즈(할 일 153) — 기준점 = 시전자 발밑 + 그 타의 조준 방향(<see cref="AttackShapeOrigin.CasterAim"/>).
+    /// 판정·특성 랩 공격 범위 기즈모 공용.
+    /// </summary>
+    public static AttackShapePose ResolvePose(DefaultAttackStep step, Vector3 casterPosition, Vector3 direction) =>
+        step != null && step.HitArea != null
+            ? step.HitArea.ResolvePose(casterPosition, direction, casterPosition, direction)
+            : new AttackShapePose(casterPosition, direction);
+
+    /// <summary>
+    /// 그 타의 판정 영역(단 데이터 hitArea)·기준 포즈(<see cref="ResolvePose"/>). 서버 판정(<see cref="HitOverlap"/>)과
+    /// 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet StepArea(DefaultAttackStep step, Vector3 casterPosition, Vector3 direction, out AttackShapePose pose)
+    {
+        pose = ResolvePose(step, casterPosition, direction);
+        return step != null ? step.HitArea : null;
+    }
+
     public void PrepareStep(DefaultAttackStep step, int damageSnapshot, Vector3 direction)
     {
         currentStep = step;
         attackDirection = direction.sqrMagnitude >= 0.001f ? direction.normalized : transform.forward;
-        hitbox = step != null && step.Hitbox != null ? step.Hitbox : defaultHitbox;
         SetDamageSnapshot(damageSnapshot);
-        damagedUnits.Clear();
-        damagedHurtboxes.Clear();
+        hitTargets.Clear();
     }
 
     /// <summary>
@@ -87,9 +104,10 @@ public class PlayerDefaultAttack : BaseAttack
     /// <returns>하나라도 명중했으면 true.</returns>
     private bool HitOverlap()
     {
-        if (hitbox == null)
+        AttackShapeSet area = StepArea(currentStep, transform.position, attackDirection, out AttackShapePose pose);
+        if (area == null || area.IsEmpty)
         {
-            Edit.LogWarning("[Player] PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
+            Edit.LogWarning("[Player] PlayerDefaultAttack — 이 타의 판정 도형(hitArea)이 비어 있다.", this);
             return false;
         }
 
@@ -101,50 +119,36 @@ public class PlayerDefaultAttack : BaseAttack
         bool anyResolved = false;
         bool onHitBonusTaken = false;
 
-        int hitCount = OverlapHitbox(hitbox);
-        for (int i = 0; i < hitCount; i++)
-        {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
+        // 판정 도형(할 일 153) — 같은 대상(Unit, 없으면 Hurtbox)은 이 타에서 1회.
+        shapeHits.Clear();
+        AttackShapeQuery.Collect(area, pose, targetLayer, QueryTriggerInteraction.Collide, hitResults, resolveTarget, hitTargets, shapeHits);
 
+        foreach (AttackShapeHit shapeHit in shapeHits)
+        {
+            Collider hit = shapeHit.Collider;
             if (TryGetHurtbox(hit, out Hurtbox hurtbox))
             {
                 hurtbox.TryGetOwner(out Unit ownerUnit);
-                if (ownerUnit == owner || damagedHurtboxes.Contains(hurtbox))
-                    continue;
-
-                if (ownerUnit != null && damagedUnits.Contains(ownerUnit))
-                    continue;
-
                 int? hurtboxDamage = TakeOverlapOnHitBonus(ownerUnit, ref onHitBonusTaken);
-                bool resolved = TryResolveHit(hurtbox, hit, hurtboxDamage);
-                if (resolved)
-                {
-                    anyResolved = true;
-                    damagedHurtboxes.Add(hurtbox);
+                if (!TryResolveHit(hurtbox, hit, hurtboxDamage))
+                    continue;
 
-                    // Unit이 없는 대상(상자 등)은 중복 방지를 Hurtbox로 하고,
-                    // 적중 통지에서는 빠진다 — 구독자는 Unit 대상만 받는다.
-                    if (ownerUnit != null)
-                    {
-                        damagedUnits.Add(ownerUnit);
-                        swingHitBuffer.Add(ownerUnit);
-                    }
-                }
+                anyResolved = true;
+
+                // Unit이 없는 대상(상자 등)은 적중 통지에서 빠진다 — 구독자는 Unit 대상만 받는다.
+                if (ownerUnit != null)
+                    swingHitBuffer.Add(ownerUnit);
 
                 continue;
             }
 
-            Unit target = hit.GetComponentInParent<Unit>();
-            if (target == null || target == owner || damagedUnits.Contains(target))
+            if (!(shapeHit.Target is Unit target))
                 continue;
 
             int? unitDamage = TakeOverlapOnHitBonus(target, ref onHitBonusTaken);
             if (TryResolveHit(target, unitDamage))
             {
                 anyResolved = true;
-                damagedUnits.Add(target);
                 swingHitBuffer.Add(target);
             }
         }
@@ -155,9 +159,24 @@ public class PlayerDefaultAttack : BaseAttack
         // 진단은 통지와 별개다. swingHitBuffer로 판단하면 Unit이 아닌 대상만 맞췄을 때
         // "전부 걸러졌다"고 거짓 보고한다(상자를 실제로 부수고도 경고가 찍혔다).
         if (!anyResolved)
-            LogEmptySwing(hitCount);
+            LogEmptySwing();
 
         return anyResolved;
+    }
+
+    // 1회 피격 키 — Hurtbox 면 그 주인 Unit(없으면 Hurtbox 자체), 아니면 부모 Unit. 시전자 자신·대상 아님은 null.
+    private Object ResolveTarget(Collider hit)
+    {
+        if (TryGetHurtbox(hit, out Hurtbox hurtbox))
+        {
+            hurtbox.TryGetOwner(out Unit target);
+            if (target == null)
+                return hurtbox;
+            return target == owner ? null : target;
+        }
+
+        Unit unit = hit.GetComponentInParent<Unit>();
+        return unit == null || unit == owner ? null : unit;
     }
 
     // 진단 — "때려도 안 맞는다"의 원인을 로그로 가른다(2026-07-30).
@@ -165,22 +184,19 @@ public class PlayerDefaultAttack : BaseAttack
     // ① 스윙 자체가 없었는지 ② 후보가 0인지 ③ 후보는 있는데 전부 걸러졌는지 구분할 수 없었다.
     // 유효 마스크도 함께 찍는다 — 프리팹은 256(Enemy)이고 SO(17664)가 런타임에 덮는 구조라,
     // ApplyData 가 안 돌면 EnemyHurtBox(14)가 마스크에서 빠져 보스를 못 때린다.
-    private void LogEmptySwing(int hitCount)
+    private void LogEmptySwing()
     {
-        if (hitCount == 0)
+        if (shapeHits.Count == 0)
         {
             Edit.LogWarning(
-                $"[Attack/진단] {name} 스윙 무효 — 히트박스 안 후보 0개, 유효 마스크={targetLayer.value}", this);
+                $"[Attack/진단] {name} 스윙 무효 — 판정 도형 안 대상 0개, 유효 마스크={targetLayer.value}", this);
             return;
         }
 
         var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < hitCount; i++)
+        foreach (AttackShapeHit shapeHit in shapeHits)
         {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
-
+            Collider hit = shapeHit.Collider;
             if (sb.Length > 0)
                 sb.Append(", ");
 
@@ -190,7 +206,7 @@ public class PlayerDefaultAttack : BaseAttack
         }
 
         Edit.LogWarning(
-            $"[Attack/진단] {name} 스윙이 후보 {hitCount}개를 찾았지만 전부 걸러졌다 — " +
+            $"[Attack/진단] {name} 스윙이 대상 {shapeHits.Count}개를 찾았지만 전부 걸러졌다 — " +
             $"유효 마스크={targetLayer.value} / 후보: {sb}", this);
     }
 
@@ -287,46 +303,4 @@ public class PlayerDefaultAttack : BaseAttack
 
         return bonus >= int.MaxValue - damage ? int.MaxValue : damage + bonus;
     }
-
-    private int OverlapHitbox(ColliderInfo hitbox)
-    {
-        switch (hitbox.OverlapCollider)
-        {
-            case OverlapCollider.Box:
-                BoxColliderInfo boxInfo = default;
-                hitbox.GetBoxColliderInfo(ref boxInfo);
-                return Physics.OverlapBoxNonAlloc(
-                    boxInfo.center,
-                    boxInfo.halfExtents,
-                    hitResults,
-                    boxInfo.orientation,
-                    targetLayer,
-                    QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Sphere:
-                SphereColliderInfo sphereInfo = default;
-                hitbox.GetSphereColliderInfo(ref sphereInfo);
-                return Physics.OverlapSphereNonAlloc(
-                    sphereInfo.center,
-                    sphereInfo.radius,
-                    hitResults,
-                    targetLayer,
-                    QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Capsule:
-                CapsuleColliderInfo capsuleInfo = default;
-                hitbox.GetCapsuleColliderInfo(ref capsuleInfo);
-                return Physics.OverlapCapsuleNonAlloc(
-                    capsuleInfo.point0,
-                    capsuleInfo.point1,
-                    capsuleInfo.radius,
-                    hitResults,
-                    targetLayer,
-                    QueryTriggerInteraction.Collide);
-
-            default:
-                return 0;
-        }
-    }
-
 }
