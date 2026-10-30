@@ -151,10 +151,13 @@ public sealed partial class LobbyTrainingDirector
         return true;
     }
 
-    // 훈련 명단 + 훈련 단계면 그 단계 구역 가운데 바닥, 아니면(또는 바닥을 못 찾으면) 자기 스폰 지점.
+    // 고정 명단 + 훈련·브리핑 단계면 그 단계 구역 가운데 바닥(LobbyTutorialRules.RecoveryPointFor), 아니면(또는 바닥을 못 찾으면) 자기 스폰 지점.
     private bool TryGetRecoveryPosition(ulong clientId, out Vector3 position, out string where)
     {
-        var point = LobbyTrainingFlow.RecoveryPointFor(_flow.Stage, _flow.Phase, ContainsRoster(clientId));
+        var table = Table;
+        var point = table != null
+            ? LobbyTutorialRules.RecoveryPointFor(table.Steps, _flow.StepIndex, _flow.IsRosterLocked && ContainsRoster(clientId))
+            : LobbyGatherPoint.None;
         var zone = ZoneOf(point);
         if (zone != null && GroundProbe.TryFindGround(zone.WorldCenter, 0, out var ground, out _))
         {

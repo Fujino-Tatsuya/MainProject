@@ -1,3 +1,52 @@
+# ▶▶▶ 계획 = **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate` → `Breakable` 공용화** (2026-10-30 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play · ⏳ SVN 업로드)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-30). `Map/Breakable/` 코드는 전부 민경(SimJangBounce) 작성 — 다른 담당 영역 아님.
+> 판정은 기존 파이프라인 그대로(서버 판정 → `CrateBreakBroadcaster` RPC → 전 피어 연출). 새 네트워크 코드 없음.
+
+## 사실
+- 대상 6종 `2.Prefabs/Environment/Props/Containers/SM_Prop_{CardboardBox_Stack_01·02·03, Pallet_01, PalletStack_01·02}.prefab` = **오브젝트 1개**(루트에 MeshFilter·MeshRenderer·**차단 BoxCollider(트리거 아님)**, 레이어 Default, 자식 없음). 존 프리팹 `ZoneL/M/S_type*` 11곳에 직접 배치 → 프리팹에 넣으면 맵 전체 반영.
+- `MapContentSpawner.AssignCrateIds` 가 존 안의 `BreakableCrate` 를 전부 찾아 ID 부여 → 프리팹에 붙이기만 하면 생성 맵에서 동작.
+- 현 저작 툴(`CrateAuthoringTool`)은 이름에 Crate/Box 가 든 **자식 메시**만 찾고, **루트 레이어를 EnemyHurtBox 로 옮기고 루트 BoxCollider 를 트리거로** 만든다 → 이 6종에 그대로 쓰면 차단이 깨진다.
+- 파편 = `MeshFragmentSet` Bake(원본 삼각형을 고르게 N개 뽑아 두께 준 삼각기둥) → 버스트 프리팹(`FragmentBurstEffect`, 파편당 Rigidbody+BoxCollider, 월드 레이어만 충돌). Bake 는 원본 FBX 의 Read/Write 필요(SVN `.meta`).
+- 기존: 파편 세트·버스트 = `2.Prefabs/Box/`(git) · 엔트리 `FX_Frag_Box_01_Entry`·`FX_Explosion_Basic(+Entry)` = `50.Art/VFX/Common/Box/`(SVN). `EffectCatalog` 등록은 prewarm 용도(미등록도 재생은 됨).
+- `Crate_01·02` 는 `PF_box2stack`·`PF_box_3stack` 의 부품 — 이번 범위 밖.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| Crate_01·02(Q1) | **제외**(더미 단위로 이미 부서짐) |
+| 파편(Q2) | 프롭마다 자기 FBX 로 Bake — 파편 머티리얼 = 그 프롭의 머티리얼. Bake 뒤 FBX Read/Write 원복(SVN 변경 남기지 않음) |
+| 범위(Q3) | 원본 프리팹에 직접 → **존 배치분 전부 파괴 가능**(부수면 차단 콜라이더도 사라져 길이 열린다) |
+| 이름(Q4) | 전부: `BreakableCrate→Breakable` · `CrateRegistry→BreakableRegistry` · `CrateBreakBroadcaster→BreakableBroadcaster` · `CrateAuthoringTool→BreakableAuthoringTool` · 메뉴 `Tools/Crates/…→Tools/Breakables/…` · `CrateId→BreakableId` · 로그 `[Crate]→[Breakable]` · `MapContentSpawner.AssignCrateIds→AssignBreakableIds` · 주석·현행 문서. `.cs`+`.cs.meta` 함께 옮겨 **guid 유지**, 직렬화 필드명 불변. 스크립트 폴더 `Map/Breakable/` 는 이미 그 이름 |
+| 연출(Q5) | 파편 + `FX_Explosion_Basic`(현 더미와 같은 구성) |
+| 내구도(Q6) | 전부 `hp = 1` |
+| 피격 판정(Q7) | 자식 `Hurtbox` 신설(레이어 EnemyHurtBox · 트리거 BoxCollider = 메시 바운드 · `Hurtbox.attackReceiverSource` = 루트 `Breakable`). 루트 레이어·차단 콜라이더 그대로. 저작 툴을 **루트 메시 단일 프롭**도 처리하게 확장(파편 위치 = 루트) |
+| 파편 수(Q8) | `Pallet_01` 10 · Stack 5종 16 · 두께 0.1 → Play 보고 조정 |
+| 에셋 위치(Q9·Q12) | **전부 SVN** `50.Art/VFX/Common/Breakable/` — 기존 `50.Art/VFX/Common/Box` 를 이름 변경하고, git `2.Prefabs/Box/` 내용도 그리로 옮김(guid 유지). 프롭별 하위 폴더: `Box_01/`(기존 Frag_Box_01 3종), `CardboardBox_Stack_01/` … 각 `Frag_<프롭>.asset`·`FX_Frag_<프롭>_Burst.prefab`·`FX_Frag_<프롭>_Entry.asset` |
+| SVN 이름 변경(Q13) | **민경이 TortoiseSVN Rename**(`Box`→`Breakable`, `Box.meta`→`Breakable.meta`, Unity 끈 채) — 이력 보존. 이후 git→SVN 이동·새 에셋 SVN add 도 민경 |
+| 프리웜(Q10) | 새 엔트리 6개 `EffectCatalog` 필드 등록, `prewarmCount` 4 |
+| 완료(Q11) | 솔로 Play(6종 파괴 + 남은 프롭 통과 불가) + MPPM 2인(클라에도 파괴 보임) — 민경 Play, 체크리스트는 handoff 에 |
+
+## 작업 순서
+1. **(Unity 끈 채 · 민경)** TortoiseSVN 으로 `50.Art/VFX/Common/Box` → `Breakable` 이름 변경 → 알려줌.
+2. **(Unity 끈 채 · Claude)** `2.Prefabs/Box/` 4파일(+meta) → `50.Art/VFX/Common/Breakable/Box_01/` 이동(기존 `FX_Frag_Box_01_Entry` 도 `Box_01/` 로). 스크립트 4개 파일·클래스 이름 변경 + 참조 수정(`MapContentSpawner`·`AssassinHitTargets`·`EffectCatalog` 주석 등). guid 대조.
+3. **(Unity 켬)** 컴파일 0 확인 → `PF_box2stack`·`PF_box_3stack` 참조 정상 확인.
+4. 저작 툴 확장(단일 프롭 모드: 자식 `Hurtbox` 생성) → 6종 변환(`hp 1`, `EffectSocketPlayer`=`FX_Explosion_Basic`, `burstEntry`=각 엔트리).
+5. 6종 `MeshFragmentSet` 생성·Bake(Read/Write 켜고 → Bake → 원복) → 버스트 프리팹 → `EffectEntry`(duration 1, prewarm 4) → `EffectCatalog` 등록.
+6. 검사: 컴파일 0 · 6종 구조(루트 차단 콜라이더 비트리거·레이어 Default / 자식 Hurtbox 배선) · 존 프리팹 인스턴스 오버라이드 이상 없음 · FBX `.meta` `isReadable: 0` 원복 · guid 유지.
+7. 문서: `Docs/tech/handoff-breakable-props.md`(구조·저작 절차·Play 체크리스트·SVN 업로드 목록) · `CONTEXT.md`.
+
+## 완료 조건
+컴파일 0 · 위 검사 통과 · 민경 솔로/MPPM Play 통과 · SVN 업로드·git 커밋 목록 정리.
+
+## 리스크
+- **길이 열림**: 존 레이아웃에서 박스가 막던 곳이 뚫린다(Q3 에서 수용). 몬스터 경로는 NavMesh 재굽기 안 함 — 부서진 자리로 몬스터가 못 지나갈 수 있음(관찰 후 판단).
+- **파편 비용**: 16조각 × 동시 폭발. 프리웜 4 · `maxActiveWarn` 로 관찰.
+- **SVN↔git 경계**: git 프리팹이 SVN 에셋을 참조 — SVN 커밋 누락 시 팀원 쪽 참조 끊김. handoff 에 업로드 목록 명시.
+- 삼각형 샘플링이라 스택 메시에서 파편이 작게 보일 수 있음 → Play 보고 수·두께 조정.
+
+---
+
 # ▶▶▶ 계획 = **트렌치커버 벤트 연기 — 구멍 9개 랜덤 분출·정지 반복** (2026-10-29 · grill 확정 · ✅ 승인 · ✅ MyProject 제작(A·B·C 비교 → **B 확정**) · ✅ MainProject 반입·배선(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-29 — 전부 추천안). 흐름 = 계획 승인 → MyProject 제작 → 승인 → MainProject 연결.

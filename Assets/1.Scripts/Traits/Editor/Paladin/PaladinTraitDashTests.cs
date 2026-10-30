@@ -107,14 +107,14 @@ public sealed class PaladinTraitDashTests
         PaladinTraitDefinition def = Load(PaladinTraitValues.Dash);
         Assert.AreEqual("돌파의 방패", def.InlineDisplayName);
         Assert.AreEqual("Q 변경 · 밀치기", def.InlineCategory);
-        Assert.AreEqual("Q가 {dashDistance}m를 빠르게 돌진하며 {dmg}의 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.",
-            def.InlineDescription, "명세 '문법 원문' 그대로");
+        Assert.AreEqual("Q가 {dashDistance}m를 빠르게 돌진하며 {dmg} 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.",
+            def.InlineDescription, "명세 '문법 원문'에서 {dmg} 뒤 '의'만 뺌(할 일 171 — '공격력의 450% 피해')");
         Assert.AreEqual(1, def.Effects.Count);
         Assert.IsInstanceOf<TraitSkillValueEffect>(def.Effects[0], "공용 스킬 수치 칸(시트 행 effects[0].entries[j].value, 카드 토큰 = 칸 name — 할 일 133)");
 
         Assert.IsTrue(TraitTooltip.Format(def, def.InlineDescription, null, false, TraitContent.Build(), out string text, out string error), error);
         StringAssert.StartsWith("Q가 3m를 빠르게 돌진하며 ", Plain(text));
-        StringAssert.EndsWith("의 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.", Plain(text));
+        StringAssert.EndsWith(" 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.", Plain(text));
         Assert.IsFalse(PaladinTraitValues.DashDamage(def, null).HasValue, "플레이어 없음 = 값 없음(화면 '-')");
     }
 

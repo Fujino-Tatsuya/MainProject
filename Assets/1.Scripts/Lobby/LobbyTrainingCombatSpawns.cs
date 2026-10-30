@@ -25,8 +25,8 @@ public struct LobbyCombatSpawn
 
 /// <summary>
 /// TRAIN_02 스폰 기준점(할 일 86 T4) — 3.LobbyScene 훈련실 중간. 이 Transform 의 <b>위치만</b> 기준점으로 쓴다(회전·스케일 무시).
-/// 구성 = 존2(MapScene 튜토리얼 StageTutorial Slot_1 = ZoneS_typeA.prefab)의 <see cref="ZoneMonsterSpawnSet"/> 를 직접 참조해 그대로 읽는다
-/// (지점·종류·Count·분산 — <see cref="MonsterSpawnPoint.GetSpawnPosition"/>). 데이터를 복사하지 않으므로 존2 구성을 고치면 로비도 따라간다.
+/// 구성 = 로비 전용 <see cref="LobbyCombatSpawnSet"/>(6마리, <see cref="LobbyRules.CombatSpawnSet"/> — 할 일 157 ⑥). 그 칸이 비었을 때만
+/// 옛 방식 — 존2(ZoneS_typeA.prefab)의 <see cref="ZoneMonsterSpawnSet"/> 를 직접 참조해 그대로 읽는다(지점·종류·Count·분산, 9마리).
 /// 훈련실(x 8 m)은 존2 동·서 오프셋(±7.2 m)보다 좁다 → NavMesh 밖 후보는 <see cref="NavMesh.SamplePosition"/> 로 가장 가까운 NavMesh 점에 붙인다.
 /// 좌표는 임시 — 최종 위치는 사용자 배치. Gizmo: 기준점(노랑)·후보(빨강 = NavMesh 밖)·실제 위치(초록).
 /// </summary>
@@ -44,14 +44,37 @@ public sealed class LobbyTrainingCombatSpawns : MonoBehaviour
 
     public ZoneMonsterSpawnSet Source => source;
 
-    /// <summary>스폰 목록을 만든다. <paramref name="result"/> 는 비우고 채운다. 구성이 비었으면 false.</summary>
-    public bool Resolve(List<LobbyCombatSpawn> result)
+    /// <summary>
+    /// 스폰 목록을 만든다. <paramref name="result"/> 는 비우고 채운다. 구성이 비었으면 false.
+    /// <paramref name="set"/>(로비 전용 6마리, 할 일 157 ⑥)에 행이 있으면 그것을, 없으면 옛 존2 구성(<see cref="source"/>)을 쓴다.
+    /// </summary>
+    public bool Resolve(List<LobbyCombatSpawn> result, LobbyCombatSpawnSet set = null)
     {
         result.Clear();
+        var origin = transform.position;
+
+        if (set != null && set.Count > 0)
+        {
+            foreach (var entry in set.Entries)
+            {
+                if (entry == null)
+                    continue;
+
+                result.Add(Snap(origin, new LobbyCombatSpawn
+                {
+                    PointName = entry.pointName,
+                    Prefab = entry.prefab,
+                    Candidate = origin + entry.offset,
+                    Rotation = Quaternion.Euler(0f, entry.yawDegrees, 0f),
+                }));
+            }
+
+            return result.Count > 0;
+        }
+
         if (source == null)
             return false;
 
-        var origin = transform.position;
         var root = source.transform.position;
         foreach (var point in source.ResolveSpawnPoints())
         {
@@ -61,34 +84,38 @@ public sealed class LobbyTrainingCombatSpawns : MonoBehaviour
             var prefab = point.MonsterPrefabOverride != null ? point.MonsterPrefabOverride : source.DefaultMonsterPrefab;
             for (var i = 0; i < point.Count; i++)
             {
-                var spawn = new LobbyCombatSpawn
+                result.Add(Snap(origin, new LobbyCombatSpawn
                 {
                     PointName = point.name,
                     Prefab = prefab,
                     Candidate = LobbyCombatRules.CandidatePosition(origin, root, point.GetSpawnPosition(i)),
                     Rotation = point.transform.rotation,
-                };
-
-                if (NavMesh.SamplePosition(spawn.Candidate, out var hit, Mathf.Max(0.1f, navMeshSnapRadius), NavMesh.AllAreas))
-                {
-                    spawn.Position = hit.position;
-                    spawn.Snapped = LobbyCombatStuckTracker.HorizontalDistance(hit.position, spawn.Candidate) > OnMeshTolerance;
-                }
-                else
-                {
-                    spawn.Position = origin;
-                    spawn.NoNavMesh = true;
-                }
-
-                result.Add(spawn);
+                }));
             }
         }
 
         return result.Count > 0;
     }
 
+    private LobbyCombatSpawn Snap(Vector3 origin, LobbyCombatSpawn spawn)
+    {
+        if (NavMesh.SamplePosition(spawn.Candidate, out var hit, Mathf.Max(0.1f, navMeshSnapRadius), NavMesh.AllAreas))
+        {
+            spawn.Position = hit.position;
+            spawn.Snapped = LobbyCombatStuckTracker.HorizontalDistance(hit.position, spawn.Candidate) > OnMeshTolerance;
+        }
+        else
+        {
+            spawn.Position = origin;
+            spawn.NoNavMesh = true;
+        }
+
+        return spawn;
+    }
+
 #if UNITY_EDITOR
     private readonly List<LobbyCombatSpawn> _gizmoBuffer = new List<LobbyCombatSpawn>();
+    private LobbyTrainingDirector _gizmoDirector;
 
     private void OnDrawGizmos()
     {
@@ -98,7 +125,9 @@ public sealed class LobbyTrainingCombatSpawns : MonoBehaviour
         Gizmos.DrawLine(origin + Vector3.left, origin + Vector3.right);
         Gizmos.DrawLine(origin + Vector3.back, origin + Vector3.forward);
 
-        if (!Resolve(_gizmoBuffer))
+        if (_gizmoDirector == null)
+            _gizmoDirector = FindAnyObjectByType<LobbyTrainingDirector>();
+        if (!Resolve(_gizmoBuffer, _gizmoDirector != null ? _gizmoDirector.CombatSpawnSet : null))
             return;
 
         foreach (var spawn in _gizmoBuffer)

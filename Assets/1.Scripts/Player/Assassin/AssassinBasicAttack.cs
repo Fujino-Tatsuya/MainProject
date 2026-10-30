@@ -683,6 +683,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         movement.TurnToward(attackDirection);
         player.SetAnimatorMoving(false);
         combatIdle?.NotifyAttackStarted();
+        RaiseBladeDomainFx(mode, stepIndex);
 
         hasPendingClip = turnDelay > 0f;
         if (hasPendingClip)
@@ -692,6 +693,20 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
 
         PlayAttackClip();
+    }
+
+    /// <summary>
+    /// [전 피어] 특성 연출 사건(할 일 145) — 칼날의 영역을 가진 어쌔신의 일반 E 강타 시작(서버 StartServer·클라 StartRpc(NotServer) — 호스트 1번).
+    /// 도형 = 넓어진 강타 판정 도형, 포즈 = 시작 순간 발밑 + 강타 방향(판정은 클립 Hit 순간 위치 — 전진만큼 앞이다). Variant 0.
+    /// </summary>
+    private void RaiseBladeDomainFx(AssassinBasicAttackMode mode, int stepIndex)
+    {
+        if (mode != AssassinBasicAttackMode.Enhanced || !TraitSkillFx.Has(player, TraitFxTrait.AssassinBladeDomain) ||
+            !TryGetHitArea(mode, stepIndex, attackDirection, out AttackShapeSet area, out AttackShapePose pose))
+            return;
+
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.AssassinBladeDomain, TraitFxKind.Activated, player, transform.position,
+            attackDirection, transform.position, shape: area, pose: pose, variant: 0));
     }
 
     private void PlayAttackClip()
@@ -821,7 +836,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         int sourceDref = player.ResolveDamage(step.AttackDamageMultiplier, 0, key);
-        var strike = new ComboExtraStrike(area, pose, extra.DamageFrom(sourceDref));
+        var strike = new ComboExtraStrike(area, pose, extra.DamageFrom(sourceDref), ComboExtraFxVariant(currentMode, currentStepIndex));
         float delay = AssassinComboExtraRules.Delay(extra.Delay, AttackSpeedRate);
         pendingComboExtras.Schedule(Time.timeAsDouble, delay, strike);
         Edit.Log($"[Assassin/평타] 끝없는 칼날 예약 — {key}, 기준 {sourceDref} → {strike.Damage}, {delay:F3}초 뒤", this);
@@ -834,10 +849,27 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         {
             if (assassinState != null)
                 coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
-            int landed = coneAttack.FireDerived(strike.Area, strike.Pose, strike.Damage);
+            comboExtraFxLanded.Clear();
+            int landed = coneAttack.FireDerived(strike.Area, strike.Pose, strike.Damage, comboExtraFxLanded);
             Edit.Log($"[Assassin/평타] 끝없는 칼날 판정 — 피해 {strike.Damage}, 적중 {landed}", this);
+
+            // 특성 연출 사건(할 일 145) — 추가 베기 판정 순간 1번(빗나가도), 맞은 유닛마다 Hit. 도형은 받는 피어가 Variant(모드·단)로 다시 만든다.
+            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.AssassinEndlessBlade, TraitFxKind.Activated, strike.Pose.Position,
+                strike.Pose.Forward, strike.Pose.Position, strike.Pose, variant: strike.FxVariant);
+            for (int i = 0; i < comboExtraFxLanded.Count; i++)
+            {
+                Unit unit = comboExtraFxLanded[i];
+                if (unit != null)
+                    TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.AssassinEndlessBlade, TraitFxKind.Hit, unit.transform.position,
+                        strike.Pose.Forward, unit.transform.position, target: unit);
+            }
+            comboExtraFxLanded.Clear();
         }
     }
+
+    // 끝없는 칼날 연출 Variant = 모드 × 16 + 단 번호 — 받는 피어가 TryGetHitArea 로 같은 도형을 만든다(TraitSkillFxNetwork).
+    private static int ComboExtraFxVariant(AssassinBasicAttackMode mode, int stepIndex) => (int)mode * 16 + Mathf.Clamp(stepIndex, 0, 15);
+    private readonly System.Collections.Generic.List<Unit> comboExtraFxLanded = new System.Collections.Generic.List<Unit>();
 
     // 사망(살아 있음 → 그 밖)이면 예약을 버린다(명세 §9). 부활 뒤 재개 없음.
     private void HandleLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
@@ -851,12 +883,14 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         public readonly AttackShapeSet Area;
         public readonly AttackShapePose Pose;
         public readonly int Damage;
+        public readonly int FxVariant;
 
-        public ComboExtraStrike(AttackShapeSet area, AttackShapePose pose, int damage)
+        public ComboExtraStrike(AttackShapeSet area, AttackShapePose pose, int damage, int fxVariant)
         {
             Area = area;
             Pose = pose;
             Damage = damage;
+            FxVariant = fxVariant;
         }
     }
 

@@ -2597,9 +2597,6 @@ MonoBehaviour:
   insightWindup: {fileID: 6282029894871603578}
   insightSlash: {fileID: 5827325434796818791}
   insightSuccess: {fileID: 9014081686492225755}
-  circleStrikePrefab: {fileID: 1475618779179179817, guid: 07799b25da23d9c4d97a417f6f0d0f31, type: 3}
-  backAttackHitPrefab: {fileID: 7634420434017284396, guid: b9ed127bfed05be4db493ca51e744a76, type: 3}
-  releaseLifetime: 2
 --- !u!114 &3845917299268068739
 MonoBehaviour:
   m_ObjectHideFlags: 0

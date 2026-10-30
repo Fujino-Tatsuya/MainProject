@@ -17,7 +17,7 @@ public static partial class TraitContent
         r.Value("GUN_3_VOLLEY", "totalDamageRatio", trait => GunnerTraitTooltip.VolleyTotalRatio(trait));
         r.Value("GUN_4_EXTRA_BASIC", "requiredShots", trait => GunnerTraitTooltip.RequiredCount(trait, GunnerTraitRules.BasicExtraDerivedKey));
 
-        // {dmg} — 이중 출력 = 현재 원래 기본 발 × 0.40(과열 단계별 최소~최대), 잔류 포격 = 현재 Q 원래 발 × 0.25(충전·저장 단계별 최소~최대).
+        // {dmg} — 이중 출력 = 현재 원래 기본 발 × 0.40(과열 단계별 최소~최대), 잔류 포격 = 폭탄 1개 = 현재 Q 원래 발 × 0.25(충전·저장 단계별 최소~최대).
         r.Damage("GUN_4_EXTRA_BASIC", GunnerTraitTooltip.ExtraBasicDamage);
         r.Damage("GUN_4_ECHO_Q", GunnerTraitTooltip.EchoQDamage);
     }
@@ -82,7 +82,8 @@ public static class GunnerTraitTooltip
     }
 
     /// <summary>
-    /// 잔류 포격 {dmg} — 판정식(GunnerChargeLaserSkill.Fire) round(Dref × 충전 배율 × 저장 단계 배율 × 축열 배율)의 원래 발 × 비율.
+    /// 잔류 포격 {dmg} — 에너지 폭탄 1개가 붙은 대상 하나에게 주는 피해(할 일 149 — 맞은 대상마다 1개, 나누지 않는다).
+    /// 판정식(GunnerChargeLaserSkill.Fire) round(Dref × 충전 배율 × 저장 단계 배율 × 축열 배율)의 원래 발 × 비율.
     /// 최소 = 충전 0·0단계·소모 0, 최대 = 최대 충전·도달 가능한 최고 단계(정온 운용 0)·축열 최대 소모(축열 포격만, 한계 돌파 = 교체 표).
     /// 집속 연사를 가졌으면 원래 발 묶음 = 발수 × round(원래 발 × 발당 배율)(판정의 예정 합계와 같은 식, 할 일 127 4/4).
     /// </summary>

@@ -66,7 +66,10 @@ public sealed class PartyGatherStatusView : MonoBehaviour
         if (countdownLabel == null)
             return;
 
-        var remaining = target.IsCountdownActive ? target.CountdownRemainingSeconds : 0d;
+        // 튜토리얼 중엔 카운트다운 표시 행(T20)만 — 유지 0.3초 집결·L40 출격은 표시하지 않는다(할 일 157 Q8 A).
+        var remaining = LobbyTutorialCountdownDisplay.ZoneStatusCountdownSeconds(
+            LobbyTutorialState.IsAvailable, target == LobbyTutorialState.ActiveGatherZone, LobbyTutorialState.CountdownRemainingSeconds,
+            target.IsCountdownActive, target.IsCountdownActive ? target.CountdownRemainingSeconds : 0d);
         var seconds = LobbyUiStrings.CountdownDisplaySeconds(remaining);
         if (seconds == _shownSeconds)
             return;

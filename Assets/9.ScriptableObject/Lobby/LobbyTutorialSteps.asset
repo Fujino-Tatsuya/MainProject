@@ -1,0 +1,532 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec2788568fceb34468acfefc7f705cbd, type: 3}
+  m_Name: LobbyTutorialSteps
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyTutorialStepTable
+  steps:
+  - stateId: L00_LockerVisit
+    kind: 0
+    activity: 0
+    titleKey: LOBBY_TITLE_CHARACTER
+    objectiveKey: LOBBY_OBJ_CHARACTER
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: PATH_LOCKER
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L10_CentralGather
+    kind: 1
+    activity: 0
+    titleKey: LOBBY_TITLE_PREP
+    objectiveKey: LOBBY_OBJ_CENTRAL
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 7
+    holdSeconds: 0.3
+    pathId: PATH_CENTRAL
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L11_CentralIntro
+    kind: 2
+    activity: 0
+    titleKey: LOBBY_TITLE_PREP
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: LOBBY_DLG_INTRO
+    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L20_TrainingGather
+    kind: 1
+    activity: 0
+    titleKey: LOBBY_TITLE_PREP
+    objectiveKey: LOBBY_OBJ_TRAINING_HALL
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 1
+    holdSeconds: 0.3
+    pathId: PATH_TRAINING_HALL
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L21_TrainingIntro
+    kind: 2
+    activity: 0
+    titleKey: LOBBY_TITLE_PREP
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: LOBBY_DLG_TRAINING
+    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T10_Basic
+    kind: 3
+    activity: 1
+    titleKey: LOBBY_TITLE_BASIC
+    objectiveKey: LOBBY_OBJ_BASIC
+    bodyKeys: []
+    checklistKeys:
+    - LOBBY_CHECK_BASIC_ATTACK
+    - LOBBY_CHECK_Q
+    - LOBBY_CHECK_E
+    - LOBBY_CHECK_R
+    - LOBBY_CHECK_RMB
+    - LOBBY_CHECK_DASH
+    progressMode: 2
+    progressKey: LOBBY_PROGRESS_PARTY_DONE
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T20_CombatGather
+    kind: 1
+    activity: 0
+    titleKey: LOBBY_TITLE_COMBAT
+    objectiveKey: LOBBY_OBJ_AREA
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: T21_CombatCountdown
+    countdownObjectiveKey: LOBBY_OBJ_COMBAT
+    countdownProgressKey: LOBBY_PROGRESS_COUNTDOWN
+    gatherPoint: 4
+    holdSeconds: 3
+    pathId: PATH_COMBAT_AREA
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T22_Combat
+    kind: 3
+    activity: 2
+    titleKey: LOBBY_TITLE_COMBAT
+    objectiveKey: LOBBY_OBJ_COMBAT
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T30_CounterGather
+    kind: 1
+    activity: 0
+    titleKey: LOBBY_TITLE_COUNTER
+    objectiveKey: LOBBY_OBJ_AREA
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 5
+    holdSeconds: 0.3
+    pathId: PATH_COUNTER_AREA
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T31_Counter
+    kind: 3
+    activity: 3
+    titleKey: LOBBY_TITLE_COUNTER
+    objectiveKey: LOBBY_OBJ_COUNTER
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T32_VulnerableCC
+    kind: 3
+    activity: 4
+    titleKey: LOBBY_TITLE_COUNTER
+    objectiveKey: LOBBY_OBJ_VULN_CC
+    bodyKeys:
+    - LOBBY_BODY_VULN_1
+    - LOBBY_BODY_VULN_2
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 0000000001000000
+    trainingProfile: 1
+  - stateId: T33_ResetPosition
+    kind: 3
+    activity: 5
+    titleKey: LOBBY_TITLE_COUNTER
+    objectiveKey: LOBBY_OBJ_WALL
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T34_Wall
+    kind: 3
+    activity: 6
+    titleKey: LOBBY_TITLE_COUNTER
+    objectiveKey: LOBBY_OBJ_WALL
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: WALL_TRAIN_WEST
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 00000000
+    trainingProfile: 1
+  - stateId: T40_SuppressKill
+    kind: 3
+    activity: 7
+    titleKey: LOBBY_TITLE_SUPPRESS
+    objectiveKey: LOBBY_OBJ_SUPPRESS
+    bodyKeys:
+    - LOBBY_BODY_SUPPRESS
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: T50_FreePractice
+    kind: 1
+    activity: 8
+    titleKey: LOBBY_TITLE_FREE
+    objectiveKey: LOBBY_OBJ_FREE
+    bodyKeys:
+    - LOBBY_BODY_FREE_EXIT
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 6
+    holdSeconds: 0.3
+    pathId: PATH_TRAINING_EXIT
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 1
+  - stateId: L30_BriefGather
+    kind: 1
+    activity: 0
+    titleKey: LOBBY_TITLE_BRIEF
+    objectiveKey: LOBBY_OBJ_CENTRAL
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 7
+    holdSeconds: 0.3
+    pathId: PATH_CENTRAL
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L31_BriefIntro
+    kind: 2
+    activity: 0
+    titleKey: LOBBY_TITLE_BRIEF
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: LOBBY_BRIEF_EVAL
+    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 1
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L32_BriefFactory
+    kind: 2
+    activity: 0
+    titleKey: LOBBY_TITLE_BRIEF
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: LOBBY_BRIEF_FACTORY
+    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    backgroundId: BRIEF_BG_FACTORY
+    dialogueSeconds: 0
+    locksInput: 1
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L33_BriefRebellion
+    kind: 2
+    activity: 0
+    titleKey: LOBBY_TITLE_BRIEF
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: LOBBY_BRIEF_REBELLION
+    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    backgroundId: BRIEF_BG_REBELLION
+    dialogueSeconds: 0
+    locksInput: 1
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L34_SortieIntro
+    kind: 2
+    activity: 0
+    titleKey: LOBBY_TITLE_BRIEF
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: LOBBY_BRIEF_SORTIE
+    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 1
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L40_SortieGather
+    kind: 1
+    activity: 0
+    titleKey: LOBBY_TITLE_SORTIE
+    objectiveKey: LOBBY_OBJ_SORTIE_GATHER
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 1
+    progressKey: LOBBY_PROGRESS_GATHER
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 2
+    holdSeconds: 0.3
+    pathId: PATH_SORTIE
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  - stateId: L41_Loading
+    kind: 4
+    activity: 0
+    titleKey: LOBBY_TITLE_SORTIE
+    objectiveKey: 
+    bodyKeys: []
+    checklistKeys: []
+    progressMode: 0
+    progressKey: 
+    countdownStateId: 
+    countdownObjectiveKey: 
+    countdownProgressKey: 
+    gatherPoint: 0
+    holdSeconds: 0.3
+    pathId: 
+    targetWallId: 
+    dialogueId: 
+    speakerKey: 
+    backgroundId: 
+    dialogueSeconds: 0
+    locksInput: 0
+    requiredSkillTags: 
+    trainingProfile: 0
+  enforceRequiredSkillTags: 0

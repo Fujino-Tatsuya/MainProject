@@ -102,9 +102,22 @@ public static class TraitUiStrings
     /// <summary>상충 확인창에서 보유 특성 이름 여럿을 잇는 구분자.</summary>
     public static readonly UiString NameSeparator = new UiString("UI.Trait.Conflict.NameSeparator", ", ", Where + "2차 상충 확인창 — 특성 이름 구분자(코드)");
 
+    /// <summary>{percent} — 계수 퍼센트('150%' 또는 '100~150%').</summary>
+    public const string PercentToken = "percent";
+
+    /// <summary>{flat} — 고정 추가 피해('20' 또는 '10~20').</summary>
+    public const string FlatToken = "flat";
+
+    /// <summary>카드·획득 툴팁 설명 {dmg} 평소 표시(할 일 171) — Shift 누르는 동안만 계산 숫자.</summary>
+    public static readonly UiString DamagePercent = new UiString("UI.Trait.Card.DamagePercent", "공격력의 {percent}", Where + "카드 설명 {dmg} 평소 표시({percent} = 150% 또는 100~150%)(코드)");
+
+    /// <summary><see cref="DamagePercent"/> + 고정 추가 피해가 0 이 아닐 때.</summary>
+    public static readonly UiString DamagePercentFlat = new UiString("UI.Trait.Card.DamagePercentFlat", "{flat} + 공격력의 {percent}", Where + "카드 설명 {dmg} 평소 표시 — 고정 추가 피해 있음({flat} = 고정값, {percent} = 계수)(코드)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         CardCategory, Help, ConflictDefault, ConflictConfirm, ConflictCancel, DamageUnknown, NameSeparator,
+        DamagePercent, DamagePercentFlat,
     };
 
     /// <summary>분류 줄 문구. 분류가 비면 빈 문자열(줄을 숨긴다).</summary>

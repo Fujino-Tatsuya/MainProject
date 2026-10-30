@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bace05f4f9ff8b46b6ef9b9b7645674, type: 3}
+  m_Name: LobbyCombatSpawnSet
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyCombatSpawnSet
+  entries:
+  - pointName: Center_MortarBot
+    prefab: {fileID: 6303057502177232290, guid: 1f13e06cd8ea3c14eb063c61e7298d62, type: 3}
+    offset: {x: 0, y: 0, z: 0}
+    yawDegrees: 0
+  - pointName: North_ChompBot
+    prefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+    offset: {x: -1.4, y: 0, z: 7.2}
+    yawDegrees: 169
+  - pointName: North_HumanoidBot
+    prefab: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+    offset: {x: 1.4, y: 0, z: 7.2}
+    yawDegrees: 191
+  - pointName: South_ChompBot
+    prefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+    offset: {x: -1.4, y: 0, z: -7.2}
+    yawDegrees: 11
+  - pointName: South_HumanoidBot
+    prefab: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+    offset: {x: 1.4, y: 0, z: -7.2}
+    yawDegrees: 349
+  - pointName: East_ChompBot
+    prefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+    offset: {x: 7.2, y: 0, z: -1.4}
+    yawDegrees: 281

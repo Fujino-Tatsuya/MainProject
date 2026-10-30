@@ -255,10 +255,8 @@ public static class TraitLabAttackShapes
 
                 case GunnerChargeLaserSkill laser when skill.Data is GunnerChargeLaserData lData:
                     player.TryGetComponent(out GunnerBeamAttack laserBeam);
-                    AddGunnerQ(laserBeam, lData, laser.EffectiveBeamWidth(lData), slotName, position, facing,
-                        traitEffects != null &&
-                        GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.QAttackKey, GunnerTraitRules.QEchoDerivedKey, DerivedBuffer) != null,
-                        shapes);
+                    AddGunnerQ(laserBeam, lData, laser.EffectiveBeamWidth(lData), slotName, position, facing, shapes);
+                    AddGunnerEchoBombs(laser.ServerEchoBombs, shapes);
                     break;
             }
         }
@@ -313,16 +311,31 @@ public static class TraitLabAttackShapes
         AddArea(S, $"{slotName} 원형 5타", area, pose, shapes);
     }
 
-    /// <summary>거너 Q — 최대 충전 1발(<see cref="GunnerChargeLaserSkill.ShotArea"/> — 지형 차단 길이·광폭 폭). 잔류 포격 = 첫 발 경로 재판정.</summary>
+    /// <summary>거너 Q — 최대 충전 1발(<see cref="GunnerChargeLaserSkill.ShotArea"/> — 지형 차단 길이·광폭 폭).</summary>
     public static void AddGunnerQ(GunnerBeamAttack beam, GunnerChargeLaserData data, float width, string slotName, Vector3 position, Vector3 facing,
-        bool hasEcho, List<TraitLabGizmoShape> shapes)
+        List<TraitLabGizmoShape> shapes)
     {
         Vector3 origin = GunnerChargeLaserSkill.FireOrigin(position, data);
         AttackShapeSet area = GunnerChargeLaserSkill.ShotArea(beam, data, origin, facing, data.RangeAt(1f), width, out AttackShapePose pose, out float length);
         AddArea(S, $"{slotName} 최대 충전 {length:0.#}m", area, pose, shapes);
-        if (hasEcho)
-            AddArea(T, "잔류 포격", area, pose, shapes);
     }
+
+    /// <summary>
+    /// 잔류 포격(할 일 149) — 지금 붙어 있는 에너지 폭탄마다 그 대상 몸통 점에 표식 구(서버 값, 호스트 창에서만).
+    /// 폭탄은 범위 판정이 아니라 붙은 대상 하나만 맞는다 — 구 크기는 표식일 뿐이라 라벨에 '(대상 1체·도형 아님)'.
+    /// </summary>
+    public static void AddGunnerEchoBombs(IReadOnlyList<GunnerEchoBomb> bombs, List<TraitLabGizmoShape> shapes)
+    {
+        for (int i = 0; bombs != null && i < bombs.Count; i++)
+        {
+            Unit target = GunnerEchoBombTargets.Find(bombs[i].TargetId);
+            if (target != null)
+                shapes.Add(TraitLabGizmoShape.Sphere(T, $"잔류 포격 폭탄 {bombs[i].Damage} (대상 1체·도형 아님)",
+                    GunnerEchoBombTargets.BodyPoint(target), EchoBombMarkerRadius));
+        }
+    }
+
+    const float EchoBombMarkerRadius = 0.35f;
 
     // 거너 R — 떠 있는 추적 레이저마다 실제 피해 구(서버 값, 도형 판정 아님). 호스트 창에서만.
     static void CollectTrackingLasers(Player player, List<TraitLabGizmoShape> shapes)

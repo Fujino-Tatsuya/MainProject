@@ -12,14 +12,16 @@ public static class SpawnedCharacterRoster
 
     public static bool TryGetEntry(Player player, out CharacterRoster.Entry entry)
     {
-        entry = null;
-        if (player == null || !player.TryGetComponent(out NetworkObject networkObject))
-            return false;
-
         NetworkManager manager = NetworkManager.Singleton;
         NetworkLoadingFlowController flow = manager != null ? manager.GetComponent<NetworkLoadingFlowController>() : null;
-        CharacterRoster roster = flow != null ? flow.CharacterRoster : null;
-        if (roster == null)
+        return TryGetEntry(player, flow != null ? flow.CharacterRoster : null, out entry);
+    }
+
+    /// <summary>호출부가 직렬화 칸으로 든 로스터에서 찾는다(특성 카드 등). 규칙은 위와 같다.</summary>
+    public static bool TryGetEntry(Player player, CharacterRoster roster, out CharacterRoster.Entry entry)
+    {
+        entry = null;
+        if (player == null || roster == null || !player.TryGetComponent(out NetworkObject networkObject))
             return false;
 
         int index = CharacterRosterLookup.FindIndex(networkObject.PrefabIdHash, GetHashes(roster));

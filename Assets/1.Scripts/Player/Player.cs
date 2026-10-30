@@ -689,6 +689,26 @@ public class Player : Unit
         stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
+    /// <summary>
+    /// [서버] 특성 강화 연출 사건(할 일 145) — 서버만 아는 판정(파생 공격·특성 밀치기 적중)을 전 피어 <see cref="TraitSkillFx.Raised"/> 로 낸다.
+    /// 오프라인이면 바로 낸다. 연출 전용 — 판정·피해와 무관하다. 호출은 <see cref="TraitSkillFxNetwork.ServerSend"/>.
+    /// </summary>
+    internal void ServerSendTraitSkillFx(in TraitSkillFxMessage message)
+    {
+        if (!IsNetworkActive)
+        {
+            TraitSkillFxNetwork.Receive(this, message);
+            return;
+        }
+
+        if (IsServer)
+            TraitSkillFxRpc(message);
+    }
+
+    // 특성 공용 연출 RPC 1개 — ClientsAndHost 라 호스트도 이 경로로 1번만 낸다(서버 쪽에서 따로 내지 않는다).
+    [Rpc(SendTo.ClientsAndHost)]
+    private void TraitSkillFxRpc(TraitSkillFxMessage message) => TraitSkillFxNetwork.Receive(this, message);
+
 
     /// <summary>
     /// 🔴 **이 브랜치는 오너 권위 이동이다.** 서버 권위 브랜치와 가르는 단 하나의 스위치.
@@ -1780,6 +1800,9 @@ public class Player : Unit
     }
 
     private int serverCastSeq;
+
+    /// <summary>[서버] 이 Player 인스턴스가 마지막으로 낸 시전 ID(아직 없으면 0). 읽기 전용 — 로비 간파 훈련 시전 기준선(할 일 157 ⑦ LobbyCastWindow)이 읽는다.</summary>
+    public int ServerCastSeq => serverCastSeq;
 
     /// <summary>[서버] 이 플레이어의 새 시전 ID(1부터 증가, 0 은 쓰지 않는다). 스킬 승인·여러 판정을 묶는 공격이 시작 때 하나 받는다.</summary>
     public int NextServerCastId()

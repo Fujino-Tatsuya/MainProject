@@ -15,8 +15,8 @@ public sealed class InterruptJudgeShapeGizmoTests
     const float Eps = 1e-4f;
     static readonly Vector3 Pivot = new Vector3(10f, 0.5f, -4f);
     // 어쌔신·거너 간파 상자 저작값(HitboxAnchorShapeTests 와 같다).
-    static readonly Vector3 GunnerCenter = new Vector3(0f, 1f, 0.9f);
-    static readonly Vector3 GunnerHalf = new Vector3(0.7f, 0.9f, 0.7f);
+    static readonly Vector3 GunnerCenter = new Vector3(0f, 1.3f, 0.9f);
+    static readonly Vector3 GunnerHalf = new Vector3(0.7f, 1.2f, 0.7f);
 
     static HitboxAnchorShape BoxFacing(Vector3 forward)
     {
@@ -31,7 +31,7 @@ public sealed class InterruptJudgeShapeGizmoTests
     {
         // 지금 -X 를 보다가(회전 스냅 전) 조준 +Z 로 시전 — 상자 중심 = 시전 위치 정면 0.9.
         HitboxAnchorShape placed = BoxFacing(Vector3.left).PlacedAt(Pivot, Vector3.left, Vector3.forward, Pivot);
-        Assert.That(Vector3.Distance(Pivot + new Vector3(0f, 1f, 0.9f), placed.Box.center), Is.LessThan(Eps));
+        Assert.That(Vector3.Distance(Pivot + GunnerCenter, placed.Box.center), Is.LessThan(Eps));
         Assert.That(Vector3.Angle(Vector3.forward, placed.Box.orientation * Vector3.forward), Is.LessThan(0.01f));
         Assert.AreEqual(GunnerHalf, placed.Box.halfExtents);
     }

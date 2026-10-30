@@ -51,9 +51,7 @@ public static class AssassinShellAuthoring
     private const string HudPrefabPath = PrefabFolder + "/AssassinHUD.prefab";
     private const string HudInstanceName = "AssassinHUD";
     private const string KrFontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
-    // 🔸 임시 VFX — 프로젝트 공용 파티클. 민경 정식 VFX 로 교체 대상(필드가 비어 있을 때만 채우므로 교체값은 재실행에도 유지).
-    private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
-    private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
+    // 임시 VFX(변신 E 원 Burst_rings · 백어택 Burst_sharp)는 2026-10-30 민경이 필드째 삭제 — 여기서 채우지 않는다.
     // 평타·일반 E 시전의 임시 VFX(10-06 은희 요청)는 정식 VFX 로 바뀌어 여기서 채우지 않는다 — 일반 4타·변신 묶음·강타 = Player_Assassin/VFX/* 의
     // EffectSocketPlayer(민경이 프리팹에서 엔트리·소켓 지정, 2026-10-19·20), 일반 E 차지·오라·날 발광 = Assassin_Armature 의 AssassinEnhanceReadyView.
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
@@ -568,15 +566,11 @@ public static class AssassinShellAuthoring
         GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
         try
         {
-            AssassinSkillView view = EnsureComponent<AssassinSkillView>(root);
-            SerializedObject so = new SerializedObject(view);
-            // 변신 루프는 정식 VFX(EffectCatalog.Assassin_R_BladeVortex)로 바뀌어 여기서 채우지 않는다(2026-10-14 민경).
-            SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
-            SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
-            so.ApplyModifiedPropertiesWithoutUndo();
+            // 연출 칸은 전부 정식 VFX(EffectCatalog·EffectSocketPlayer)라 여기서 채우지 않는다 — 부착만.
+            EnsureComponent<AssassinSkillView>(root);
 
             PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
-            Debug.Log($"{Tag} A12 AssassinSkillView 부착/갱신(임시 VFX — 민경 교체 대상): {VariantPath}");
+            Debug.Log($"{Tag} A12 AssassinSkillView 부착: {VariantPath}");
         }
         finally
         {
@@ -588,23 +582,6 @@ public static class AssassinShellAuthoring
 
         RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
         AssetDatabase.SaveAssets();
-    }
-
-    private static void SetIfEmpty(SerializedObject so, string propertyName, string assetPath)
-    {
-        SerializedProperty property = so.FindProperty(propertyName);
-        if (property == null)
-        {
-            Debug.LogError($"{Tag} {so.targetObject.GetType().Name}.{propertyName} 직렬화 필드가 없다.");
-            return;
-        }
-        if (property.objectReferenceValue != null)
-            return;
-
-        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
-        if (prefab == null)
-            Debug.LogWarning($"{Tag} 임시 VFX 프리팹이 없어 {propertyName} 을 비운다: {assetPath}");
-        property.objectReferenceValue = prefab;
     }
 
     // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다.
@@ -1304,7 +1281,7 @@ public static class AssassinShellAuthoring
             EnsureDagger(root.transform, "RightHand", DaggerRightPath, material);
 
             EnsureAnchor(root.transform, "DefaultAttack", new Vector3(0f, 1f, 0.85f), new Vector3(2f, 2f, 1.7f));
-            EnsureAnchor(root.transform, "InterruptAttack", new Vector3(0f, 1f, 0.9f), new Vector3(1.4f, 1.8f, 1.4f));
+            EnsureAnchor(root.transform, "InterruptAttack", new Vector3(0f, 1.3f, 0.9f), new Vector3(1.4f, 2.4f, 1.4f));
 
             Transform vfx = EnsureChild(root.transform, "VFX");
             EnsureChild(vfx, "BasicAttack01");

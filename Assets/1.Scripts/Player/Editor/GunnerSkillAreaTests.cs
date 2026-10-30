@@ -7,8 +7,8 @@ using UnityEngine;
 /// <summary>
 /// 할 일 153 5b단계 — 거너 Q 충전 레이저 판정 도형. 직사각형(최대 충전 기준, 기준점 = 발사 원점 + 조준 방향)이 예전 발사 상자
 /// (<c>SkillHitVolume.Beam</c>: 발사 원점에서 length · beamWidth · 높이 2 를 원점 높이 중심)와 격자에서 같은지 — 충전 최소/최대·지형 차단 길이·광폭 레이저 ×1.3,
-/// 잔류 포격이 저장한 포즈·도형으로 같은 영역을 재판정하는지, SO 값, 실제 Overlap 수집이 예전 상자 겹침과 같은지(옆면·높이 걸침 포함).
-/// 거너 E(냉각 백스텝)는 피해 판정이 없다.
+/// SO 값, 실제 Overlap 수집이 예전 상자 겹침과 같은지(옆면·높이 걸침 포함).
+/// 거너 E(냉각 백스텝)는 피해 판정이 없다. 잔류 포격은 도형 재판정이 아니라 대상에 붙는 폭탄이다(할 일 149 — GunnerTraitTier34Tests).
 /// </summary>
 public sealed class GunnerSkillAreaTests
 {
@@ -143,37 +143,6 @@ public sealed class GunnerSkillAreaTests
         Assert.AreEqual(-1f, rect.MinHeight, 1e-6f, "높이 그대로");
         Assert.AreEqual(1f, rect.MaxHeight, 1e-6f);
         Assert.AreEqual(1.2f, data.BeamWidth, 1e-6f, "SO 원본 불변");
-    }
-
-    [Test]
-    public void QEcho_ReusesStoredPoseAndShape()
-    {
-        GunnerChargeLaserData data = QData();
-        var def = AssetDatabase.LoadAssetAtPath<GunnerTraitDefinition>(TraitFolder + "GUN_4_ECHO_Q.asset");
-        Assert.IsNotNull(def, "GUN_4_ECHO_Q");
-        TraitDerivedAttackEffect effect = GunnerTraitTooltip.FindDerived(def, GunnerTraitRules.QEchoDerivedKey);
-        Assert.IsNotNull(effect);
-        TraitDerivedAttack echo = effect.CreateRuntime(def.IdHash);
-
-        Vector3 origin = GunnerChargeLaserSkill.FireOrigin(new Vector3(1f, 0f, 2f), data);
-        Vector3 heading = new Vector3(1f, 0f, 1f).normalized;
-        float range = data.RangeAt(0.7f);
-        float width = data.BeamWidth * 1.3f;
-        var plan = new GunnerEchoPlan();
-        plan.AddOriginalShot(origin, heading, range, width, 100);
-        // 집속 연사 둘째 발은 다른 자리에서 쏴도 잔류는 첫 발 포즈·도형.
-        plan.AddOriginalShot(origin + Vector3.right * 3f, Vector3.left, data.RangeAt(0f), data.BeamWidth, 100);
-        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot shot));
-
-        AttackShapePose original = data.FirePose(origin, heading);
-        AttackShapePose echoPose = data.FirePose(shot.Origin, shot.Direction);
-        Assert.That(Vector3.Distance(original.Position, echoPose.Position), Is.LessThan(1e-5f));
-        Assert.That(Vector3.Distance(original.Forward, echoPose.Forward), Is.LessThan(1e-5f));
-
-        var rect = (AttackRectShape)data.FireArea(shot.Range, shot.Width).Shapes[0];
-        Assert.AreEqual(range, rect.Length, 1e-5f, "저장한 충전 사거리(지형 차단 전 — 발사 때 다시 잰다)");
-        Assert.AreEqual(width, rect.Width, 1e-5f, "저장한 광폭 폭");
-        AssertMatchesOldBeam(data, new Vector3(1f, 0f, 2f), heading, shot.Range, shot.Width, "잔류 포격");
     }
 
     // ── 실제 Overlap 수집 ───────────────────────────────────────────────

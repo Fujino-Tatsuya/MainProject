@@ -77,7 +77,7 @@ internal static class PlayerEditModeTestRunner
         "^AttackShapeTests$", // 할 일 153 1/6 — 공격 판정 도형 코어: 4종 경계·도넛·오프셋·배율·높이·최근접 점·지지점·몸 겹침(GJK, PhysX 대조)·합집합 1회·Overlap 수집·데이터 테이블 행
         "^PaladinStrikeAreaTests$", // 할 일 153 3/6 — 가붕이 평타 직사각형 = 예전 AAC1 상자(모서리 안/밖·조준 회전·높이·실제 몸 모서리 걸침)·SO 4타 값·프리팹 옛 상자 없음·간파 상자 남음
         "^PaladinSkillAreaTests$", // 할 일 153 5a/6 — 가붕이 Q 직사각형 = 예전 MainSkill 앵커(모서리·높이·돌진 표본)·E 반격 부채꼴 = 예전 규칙(격자 일치)·수호의 파동 원·SO 값·프리팹 앵커 없음
-        "^GunnerSkillAreaTests$", // 할 일 153 5b/6 — 거너 Q 직사각형 = 예전 발사 상자(충전 최소/최대·지형 차단·광폭 ×1.3 격자 일치)·잔류 포격 저장 포즈·SO 값·옆면·높이 걸침 = 예전 상자 겹침
+        "^GunnerSkillAreaTests$", // 할 일 153 5b/6 — 거너 Q 직사각형 = 예전 발사 상자(충전 최소/최대·지형 차단·광폭 ×1.3 격자 일치)·SO 값·옆면·높이 걸침 = 예전 상자 겹침
         "^AssassinSkillAreaTests$", // 할 일 153 5c/6 — 어쌔신 Q 경로 직사각형 = 예전 구간 상자(격자 일치)·추격의 궤적 재사용·변신 E 원 = 예전 원기둥(칼날의 영역 ×1.25)·SO 값·옆면 걸침·출발점 뒤 몸 = 예전 상자, 변신 E 큰 몸 맞음·AABB 모서리만은 빠짐
     };
 

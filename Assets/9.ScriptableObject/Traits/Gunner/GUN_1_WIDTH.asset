@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "\uAD11\uD3ED \uB808\uC774\uC800"
   category: "Q \uAC15\uD654"
   description: "Q \uB808\uC774\uC800\uC758 \uD3ED\uC774 {widthIncrease:%} \uB113\uC5B4\uC9D1\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: ee8854cf0e3057f4b8aff0efb0a6d872, type: 3}
   effects:
   - rid: 7237886673644683420
   references:

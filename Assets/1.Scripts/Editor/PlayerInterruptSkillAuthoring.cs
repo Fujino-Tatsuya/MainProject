@@ -22,8 +22,9 @@ public static class PlayerInterruptSkillAuthoring
     private const string AnchorName = "InterruptAttack";
 
     // 앵커(BoxCollider)를 새로 만들 때만 쓰는 초기값. Q(MainSkill)의 2×1×2 / center z=0.8 보다 짧은 리치.
-    private static readonly Vector3 DefaultBoxSize = new Vector3(1.6f, 1f, 1.6f);
-    private static readonly Vector3 DefaultBoxCenter = new Vector3(0f, 0f, 0.9f);
+    // 높이 띠 = 발 +0.1 ~ +2.5m — 웰즈 & 23호 HurtBox 가장 넓은 단면(y 1.7~)을 덮는다(할 일 163).
+    private static readonly Vector3 DefaultBoxSize = new Vector3(1.6f, 2.4f, 1.6f);
+    private static readonly Vector3 DefaultBoxCenter = new Vector3(0f, 1.3f, 0.9f);
 
     // 앵커 노드를 가진 프리팹 (판정 앵커 부착 대상)
     private static readonly string[] AnchorPrefabs =

@@ -2693,7 +2693,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fc04965f6814af74c8f1b8c6e1019849, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CrateBreakBroadcaster
+  m_EditorClassIdentifier: Assembly-CSharp::BreakableBroadcaster
   ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &683071049
 GameObject:

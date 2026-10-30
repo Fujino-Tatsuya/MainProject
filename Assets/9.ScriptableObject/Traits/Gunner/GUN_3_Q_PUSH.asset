@@ -17,7 +17,7 @@ MonoBehaviour:
   category: "Q \uAC15\uD654 \xB7 \uBC00\uCE58\uAE30"
   description: "Q\uC5D0 \uB9DE\uC740 \uC801\uC744 \uB808\uC774\uC800\uAC00 \uB098\uC544\uAC00\uB294
     \uBC29\uD5A5\uC73C\uB85C \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: ee8854cf0e3057f4b8aff0efb0a6d872, type: 3}
   effects:
   - rid: 7237886673644683424
   references:

@@ -99,6 +99,35 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [Tooltip("FX_GunnerQVent_Entry. 발사 후 총구 열기·연기")]
     [SerializeField] private EffectSocketPlayer chargeVentPlayer;
 
+    // 잔류 포격(GUN_4_ECHO_Q, 할 일 149) — 원래 발에 맞은 대상 몸에 붙어 따라다니는 에너지 폭탄 구체.
+    // 판정·폭발 시각은 서버(GunnerChargeLaserSkill)가 들고, 여기는 복제 목록(echoBombStates)을 보고 그리기만 한다.
+    // 149 후속 6 — 월드 VFX 프리팹 칸. 지금은 비어 있고 이펙트 담당이 연결한다(블룸·애니·파티클은 프리팹 안에서).
+    // 몸 메시에 묻히지 않게 머티리얼은 Effects/OverlayBillboard + ZTest Always 권장. 비면 표시만 생략.
+    [Header("잔류 포격 에너지 폭탄 VFX")]
+    [Tooltip("비어 있음 — 이펙트 담당이 연결. 폭탄마다 복제해 대상 점을 따라감, 겉모습·애니·블룸은 프리팹 안에서, 비우면 표시만 생략(피해는 그대로). " +
+             "몸에 안 가려지려면 머티리얼은 Effects/OverlayBillboard + ZTest Always 권장")]
+    [DataTableIgnore]
+    [SerializeField] private GameObject echoBombVfxPrefab;
+
+    // 연출 정렬 값이라 xlsx 행이 아니다(data-table.md). 서버 피해·폭발 시각(특성 Delay)은 건드리지 않는다.
+    [Tooltip("구체를 띄우기까지 지연(초). 기준 = Q 가 대상에 맞은 순간(예비 구체 생성, 집속 연사면 그 대상 첫 적중). 0 = 즉시. " +
+             "서버 부착이 예비 구체를 이어받으면 그 시각을 그대로 쓴다(예비 없이 붙은 폭탄 — 늦은 합류 등 — 은 받은 순간부터). " +
+             "표시 전용 — 폭발 시각보다 길면 구체 없이 폭발 연출만 난다")]
+    [DataTableIgnore, Min(0f)]
+    [SerializeField] private float echoBombShowDelay;
+
+    // 예비 구체 = Q 적중 순간(ChargeLaserFiredRpc) 먼저 띄우는 구체. 서버 부착(Q End 이벤트 = 마지막 발 Gunner_Q_Fire 시작 + 0.4초)이 이어받는다.
+    // 중단·사망으로 폭탄이 안 붙으면 이 시간 뒤 조용히 지운다(유일한 정리 경로). 같은 대상 재적중마다 다시 센다.
+    [Tooltip("예비 구체가 서버 부착을 기다리는 시간(초) — 마지막 적중부터. 지나면 폭발 연출 없이 지운다. " +
+             "정상 부착 = 마지막 발 뒤 Q_fire End 이벤트(0.4초)라 그보다 넉넉하게. 너무 짧으면 부착 때 구체가 새로 생긴다")]
+    [DataTableIgnore, Min(0f)]
+    [SerializeField] private float echoBombPreviewTimeout = 1.5f;
+
+    [Tooltip("구체 위치 오프셋(월드 기준, m). 대상 몸 콜라이더 윗면 가운데에 더한다 — 대상이 돌아도 방향이 일정. " +
+             "폭발 연출·Attached/Exploded 사건 위치도 같은 점. 판정과 무관")]
+    [DataTableIgnore]
+    [SerializeField] private Vector3 echoBombOffset;
+
     // 🔴 **집중 발밑 링은 뺐다**(2026-10-06). 감속(×0.5)과 조준 고정은 조작감으로 이미 읽히고,
     //    그 연출의 화살표는 위로 솟아 '모인다'(충전) 기호였다 — 묶여 있다는 신호와 반대였다.
     //    에셋(FX_GunnerFocusRing)도 지웠다(2026-10-07). 되살리려면 SVN 기록에서 꺼낼 것.
@@ -198,12 +227,139 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private PlayerMovement movement;
     private SkillLineIndicator lineIndicator;
 
+    // 잔류 포격 폭탄 — 붙어 있는 폭탄 목록(대상 ID). 늦게 합류한 클라도 지금 붙은 구체를 본다(새 RPC 없음).
+    private readonly NetworkList<GunnerEchoBombState> echoBombStates = new NetworkList<GunnerEchoBombState>(
+        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private GunnerEchoBombVisuals echoBombVisuals;
+
+    // 특성 연출 사건(할 일 145) — 시전자·Q 스킬(광폭 레이저 도형). 처음 쓸 때 찾는다.
+    private Player traitFxPlayer;
+    private GunnerChargeLaserSkill traitFxSkill;
+
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
+        echoBombVisuals = new GunnerEchoBombVisuals(echoBombVfxPrefab, echoBombShowDelay, echoBombOffset, echoBombPreviewTimeout);
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        echoBombStates.OnListChanged += HandleEchoBombsChanged;
+        SyncEchoBombs(); // 늦은 합류 — 초기 목록은 변경 사건 없이 온다
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        echoBombStates.OnListChanged -= HandleEchoBombsChanged;
+        echoBombVisuals.Clear();
+        base.OnNetworkDespawn();
+    }
+
+    public override void OnDestroy()
+    {
+        echoBombVisuals?.Clear();
+        base.OnDestroy();
+    }
+
+    /// <summary>[서버] 잔류 포격 폭탄을 대상에 붙인다 — 전 피어가 대상 몸통에 구체를 띄운다.</summary>
+    public void ServerAttachEchoBomb(int bombId, ulong targetId)
+    {
+        if (IsNetworkActive)
+            echoBombStates.Add(new GunnerEchoBombState(bombId, targetId));
+        else
+            AddEchoBomb(bombId, targetId);
+    }
+
+    /// <summary>[서버] 폭탄이 터졌다(대상에게 피해, 또는 대상이 먼저 사라져 그 자리 빈 폭발) — 전 피어가 구체를 지우고 그 자리에 폭발 연출.</summary>
+    public void ServerDetonateEchoBomb(int bombId)
+    {
+        if (!IsNetworkActive)
+        {
+            PlayEchoBombBurst(bombId);
+            return;
+        }
+
+        for (int i = 0; i < echoBombStates.Count; i++)
+        {
+            if (echoBombStates[i].BombId != bombId)
+                continue;
+            echoBombStates.RemoveAt(i);
+            return;
+        }
+    }
+
+    /// <summary>[서버] 예약 취소(사수 사망·씬 종료) — 터뜨리지 않고 구체만 지운다.</summary>
+    public void ServerClearEchoBombs()
+    {
+        if (IsNetworkActive)
+        {
+            if (echoBombStates.Count > 0)
+                echoBombStates.Clear();
+        }
+        else
+        {
+            echoBombVisuals?.Clear();
+        }
+    }
+
+    // [전 피어] 서버도 자기 변경 사건을 받는다(NetworkList) — 호스트 화면도 같은 경로.
+    private void HandleEchoBombsChanged(NetworkListEvent<GunnerEchoBombState> change)
+    {
+        switch (change.Type)
+        {
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Add:
+                AddEchoBomb(change.Value.BombId, change.Value.TargetId);
+                break;
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Remove:
+            case NetworkListEvent<GunnerEchoBombState>.EventType.RemoveAt:
+                PlayEchoBombBurst(change.Value.BombId);
+                break;
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Clear:
+                echoBombVisuals.Clear();
+                break;
+            default:
+                SyncEchoBombs();
+                break;
+        }
+    }
+
+    private static readonly List<GunnerEchoBombState> EchoBombScratch = new List<GunnerEchoBombState>();
+
+    private void SyncEchoBombs()
+    {
+        EchoBombScratch.Clear();
+        for (int i = 0; i < echoBombStates.Count; i++)
+            EchoBombScratch.Add(echoBombStates[i]);
+        echoBombVisuals.Sync(EchoBombScratch);
+    }
+
+    // 폭발 연출 = Q 몬스터 적중 연출(chargeMonsterHitPlayer)을 구체의 마지막 자리에 한 번. 비어 있으면 구체만 사라진다.
+    // 특성 연출 사건(할 일 145) Exploded — 구체를 한 번이라도 띄운 폭탄만(위치를 안다). 대상이 먼저 사라진 빈 폭발도 같다(Target = null 또는 죽은 유닛).
+    private void PlayEchoBombBurst(int bombId)
+    {
+        bool known = echoBombVisuals.TryGetTargetId(bombId, out ulong targetId);
+        if (!echoBombVisuals.Remove(bombId, out Vector3 position))
+            return;
+
+        PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
+        traitFxPlayer ??= GetComponent<Player>();
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Exploded, traitFxPlayer, position, transform.forward,
+            position, known ? GunnerEchoBombTargets.Find(targetId) : null, variant: bombId));
+    }
+
+    // 붙이기 + 특성 연출 사건(할 일 145) Attached — 변경 사건(전 피어, 서버도 자기 변경을 받는다)·오프라인 직접 경로에서만. 늦은 합류의 초기 목록(Sync)은 내지 않는다.
+    private void AddEchoBomb(int bombId, ulong targetId)
+    {
+        echoBombVisuals.Add(bombId, targetId);
+        Unit target = GunnerEchoBombTargets.Find(targetId);
+        Vector3 position = target != null ? echoBombVisuals.PointFor(target) : transform.position;
+        traitFxPlayer ??= GetComponent<Player>();
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Attached, traitFxPlayer, position, transform.forward,
+            position, target, variant: bombId));
     }
 
     /// <summary>
@@ -405,24 +561,32 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <summary>[서버] Q 발사 — 전 피어에 빔 + 발사 애니메이션.</summary>
     /// <param name="stopped">지형에 막혀 끝났는가(true) / 최대 사거리까지 뻗었는가(false)</param>
     /// <param name="hitPoints">피해를 준 몹마다의 빔 위 지점. 비어 있으면 아무도 못 맞혔다</param>
+    /// <param name="echoTargetIds">잔류 포격 예비 구체를 띄울 맞은 대상 네트워크 ID — 특성(GUN_4_ECHO_Q)이 없으면 빈 배열(서버가 정한다)</param>
     public void ServerChargeLaserFired(Vector3 origin, Vector3 end, float width,
-                                       bool stopped, Vector3[] hitPoints)
+                                       bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
     {
         if (IsNetworkActive)
-            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints);
+            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints, echoTargetIds);
         else
-            PlayChargeLaser(origin, end, width, stopped, hitPoints);
+            PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
     }
 
     // Reliable — 연출뿐 아니라 Focus → Skill 상태 전환도 싣는다(빠지면 그 피어만 집중 상태에 남는다).
     [Rpc(SendTo.ClientsAndHost)]
     private void ChargeLaserFiredRpc(Vector3 origin, Vector3 end, float width,
-                                     bool stopped, Vector3[] hitPoints)
-        => PlayChargeLaser(origin, end, width, stopped, hitPoints);
+                                     bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
+        => PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
 
     private void PlayChargeLaser(Vector3 origin, Vector3 end, float width,
-                                 bool stopped, Vector3[] hitPoints)
+                                 bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
     {
+        // 잔류 포격 예비 구체(할 일 149 후속 3) — 적중 순간 먼저 띄우고, 서버 부착(NetworkList Add)이 같은 구체를 이어받는다.
+        if (echoTargetIds != null)
+        {
+            for (int i = 0; i < echoTargetIds.Length; i++)
+                echoBombVisuals.AddPreview(echoTargetIds[i]);
+        }
+
         // 정신 집중 끝 — 같은 스킬을 유지한 채 Focus → Skill(발사 후 회복). 전 피어가 이 RPC 로 같이 넘어간다.
         stateController?.ChangeSkillPhase(PlayerActionState.Skill);
 
@@ -442,6 +606,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         }
 
         PlayChargeBeam(origin, end, width, stopped, hitPoints);
+        RaiseWideLaserFx(origin, end, hitPoints);
 
         // 빔이 스친 아군의 보호막 연출은 **그 아군의 PlayerShieldVfx** 가 띄운다.
         // 보호막 목록이 이미 전 피어에 복제되므로 여기서 좌표를 실어 보낼 이유가 없다.
@@ -490,6 +655,32 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         for (int i = 0; i < hitPoints.Length; i++)
             PlayAt(chargeMonsterHitPlayer, hitPoints[i], facing);
+    }
+
+    /// <summary>
+    /// [전 피어] 특성 연출 사건(할 일 145) — 광폭 레이저를 가진 거너의 Q 한 발(집속 연사면 발마다). 이 RPC(ClientsAndHost)라 호스트도 1번.
+    /// 도형 = 그 발의 판정 도형(사거리 = 이번 발 길이, 폭 = 특성 폭), 맞은 몬스터마다 빔 위 지점으로 Hit(대상 없음 — 위치만).
+    /// </summary>
+    private void RaiseWideLaserFx(Vector3 origin, Vector3 end, Vector3[] hitPoints)
+    {
+        traitFxPlayer ??= GetComponent<Player>();
+        if (!TraitSkillFx.Has(traitFxPlayer, TraitFxTrait.GunnerWideLaser))
+            return;
+
+        traitFxSkill ??= GetComponentInChildren<GunnerChargeLaserSkill>(true);
+        GunnerChargeLaserData data = traitFxSkill != null ? traitFxSkill.Data as GunnerChargeLaserData : null;
+        Vector3 delta = end - origin;
+        Vector3 direction = new Vector3(delta.x, 0f, delta.z);
+        direction = direction.sqrMagnitude > 1e-6f ? direction.normalized : transform.forward;
+        AttackShapeSet shape = data != null ? data.FireArea(delta.magnitude, traitFxSkill.EffectiveBeamWidth(data)) : null;
+        AttackShapePose pose = data != null ? data.FirePose(origin, direction) : new AttackShapePose(origin, direction);
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerWideLaser, TraitFxKind.Activated, traitFxPlayer, origin, direction, end,
+            shape: shape, pose: pose));
+
+        if (hitPoints == null)
+            return;
+        for (int i = 0; i < hitPoints.Length; i++)
+            TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerWideLaser, TraitFxKind.Hit, traitFxPlayer, hitPoints[i], direction, hitPoints[i]));
     }
 
     private void UpdateChargeBeam()
@@ -956,5 +1147,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
             if (lines[i] != null && lines[i].enabled && Time.time >= hideTimes[i])
                 lines[i].enabled = false;
         }
+
+        // 잔류 포격 구체 — 대상 이동·넉백을 따라간다(대상 움직임 뒤라 LateUpdate).
+        if (echoBombVisuals != null && echoBombVisuals.Count > 0)
+            echoBombVisuals.Tick();
     }
 }

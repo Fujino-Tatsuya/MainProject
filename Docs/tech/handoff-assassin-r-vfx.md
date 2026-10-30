@@ -30,7 +30,7 @@
 
 ## 3-1. 변신 E 원형 5타 루프 (2026-10-15 추가)
 - `AssassinCircleStrikeSkill.OnClientPlay` → `view.BeginCircleStrike(원 중심, AreaRadius, MaxActiveDuration)`, `OnEnd`(완료·중단 공통) → `view.EndCircleStrike()`.
-  원 중심은 기존과 같은 근사(플레이어 + 승인 방향 × CenterDistance). 임시 `Burst_rings` 1회(`circleStrikePrefab`)는 **유지**(민경 결정) — 루프와 함께 터진다.
+  원 중심은 기존과 같은 근사(플레이어 + 승인 방향 × CenterDistance). 임시 `Burst_rings` 1회(`circleStrikePrefab`)는 처음엔 유지했다가 **2026-10-30 필드·코드째 삭제**(민경) — 이제 루프만.
 - `AssassinSkillView`: `PlayCircleStrike` → `BeginCircleStrike`/`EndCircleStrike` + `circleStrikeScaleFactor`(기본 1, 배율 = 원 반경 × 이 값).
   클라에서 종료 RPC 가 막혀 `OnEnd` 가 안 오면 최대 지속 + 1초 뒤 스스로 해제(안전망). 재시작 시 남은 루프를 먼저 해제.
 - 엔트리 `Players/Player3/E_CircleStrike/FX_Assassin_MultiSlashes_Entry` · 카탈로그 `Assassin_E_MultiSlashes`. `outroDuration` 1.1 — Release 가 방출만 멈추고 남은 입자가 제 곡선대로 사라진다(0 이면 즉시 지워져 뚝 끊김).

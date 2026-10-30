@@ -567,8 +567,12 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         for (int i = 0; i < dueExtraShots.Count; i++)
         {
             GunnerDerivedShot shot = dueExtraShots[i];
-            bool hit = FireBeam(shot.Origin, shot.Direction, shot.Damage, false, TraitHitFlags.Derived, out _);
+            bool hit = FireBeam(shot.Origin, shot.Direction, shot.Damage, false, TraitHitFlags.Derived, out Vector3 end);
             Edit.Log($"[Gunner] 이중 출력 추가 레이저 — 피해 {shot.Damage}, 적중 {hit}", this);
+            // 특성 연출 사건(할 일 145) — 추가 레이저 1발(원점 → 끝점: 원래 발 ShotRpc 와 같은 의미). 맞혔으면 끝점에 Hit(대상 없음 — 위치만).
+            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Activated, shot.Origin, shot.Direction, end);
+            if (hit)
+                TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Hit, end, shot.Direction, end);
         }
     }
 

@@ -175,7 +175,10 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         // Motor를 돌리는 오너/서버/오프라인만 전진·조향 채널을 제출한다.
         isLocallySimulating = !shieldDash && owner != null && owner.IsSimulating;
         if (shieldDash)
+        {
             BeginLocalDash(dash);
+            RaiseShieldDashFx(dash);
+        }
 
         // 연출은 권위와 무관하다 — 모든 피어가 각자 켠다.
         // Play 는 이미 재생 중이면 먼저 회수하므로 두 번 불려도 겹치지 않는다.
@@ -374,6 +377,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         traitBlastHits.Clear();
         AttackShapeQuery.Collect(area, pose, Data.HittableLayers, QueryTriggerInteraction.Collide, traitBlastResults, ResolveTarget,
             traitBlastTargets, traitBlastHits);
+        // 특성 연출 사건(할 일 145) — 판정 순간 1번(맞은 대상이 없어도), 그 뒤 맞은 대상마다 Hit.
+        TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinAdvanceImpact, TraitFxKind.Activated, pose.Position, pose.Forward,
+            pose.Position, pose);
         for (int i = 0; i < traitBlastHits.Count; i++)
         {
             Collider hit = traitBlastHits[i].Collider;
@@ -385,8 +391,11 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             bool resolved = hurtbox != null
                 ? hurtbox.ReceiveAttack(attackInfo, hitContext)
                 : unit.ReceiveAttack(attackInfo, hitContext);
-            if (resolved)
-                Edit.Log($"[Skill] 진격의 충격 — {target.name} 추가 피해 {damage}", this);
+            if (!resolved)
+                continue;
+            Edit.Log($"[Skill] 진격의 충격 — {target.name} 추가 피해 {damage}", this);
+            TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinAdvanceImpact, TraitFxKind.Hit, hit.bounds.center, pose.Forward,
+                hit.bounds.center, target: unit);
         }
 
         traitBlastTargets.Clear();
@@ -404,6 +413,21 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         hasTrait = modifiers.HasTrait(PaladinTraitValues.Dash);
         return hasTrait ? PaladinShieldDashSettings.From(modifiers) : default;
+    }
+
+    /// <summary>
+    /// [전 피어] 특성 연출 사건(할 일 145) — 돌진 시작(OnClientPlay = 서버 승인 경로·PlaySkillClientRpc, 호스트 1번).
+    /// 끝점 = 시작 + 방향 × 돌진 거리(벽·낭떠러지 안전 정지 전 값). 도형 = 경로 표본마다 훑는 원래 Q hitArea, 포즈 = 시작 지점.
+    /// </summary>
+    private void RaiseShieldDashFx(PaladinShieldDashSettings dash)
+    {
+        if (owner == null)
+            return;
+
+        Vector3 start = owner.transform.position;
+        AttackShapeSet area = MainSkillData != null ? MainSkillData.HitArea : null;
+        TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.PaladinShieldDash, TraitFxKind.Activated, owner, start, heading,
+            start + heading * dash.Distance, shape: area, pose: ResolvePose(area, start, heading)));
     }
 
     /// <summary>[서버] 경과 시간으로 경로를 늘려 새로 지난 구간을 훑고, 준비 + 이동 + 회수가 끝나면 정상 종료한다.</summary>
@@ -478,6 +502,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                 if (unit != null)
                     tickLandedUnits.Add(unit);
                 Edit.Log($"[Skill] 돌파의 방패 — {targetObject.name} 피해 {attackInfo.damage} + 넉백 {dashPath.Settings.PushDistance}m ({dashSamples[s]:F2}m)", this);
+                // 특성 연출 사건(할 일 145) — 돌진에 맞은 대상마다 1번(경로 장부가 시전당 대상 1회).
+                TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinShieldDash, TraitFxKind.Hit, hit.bounds.center, dashPath.Heading,
+                    hit.bounds.center, target: unit);
             }
         }
 

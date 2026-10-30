@@ -29,11 +29,11 @@ public struct LobbyWeaponCheckEntry : INetworkSerializable, IEquatable<LobbyWeap
 /// TRAIN_01 무기 점검(할 일 86 PLAN §3.3·§7-1, 명세 v0.2 §7) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
 /// 규칙은 <see cref="LobbyWeaponCheckModel"/>·<see cref="LobbyWeaponCheckRules"/>, 여기는 서버 훅 구독·표적 스폰·복제만 한다.
 /// <list type="bullet">
-/// <item>시작 = 진행기가 Train01 진행 중(<see cref="LobbyTrainingSupportRules.Train01TargetsActive"/>)이 되는 순간: 명단 고정·체크 비움 →
+/// <item>시작 = 진행기가 T10(Activity BasicCheck, <see cref="LobbyTrainingSupportRules.Train01TargetsActive"/>)이 되는 순간 — 그 revision 을 기억한다: 명단 고정·체크 비움 →
 /// 표적 3개 스폰(<see cref="targetPrefab"/> @ <see cref="targetSpots"/>) → 훈련 리셋(<see cref="TrainingResetOptions.TrainingStart"/> — 체력·쿨·대시·어쌔신 R 최소 분노).</item>
 /// <item>판정(서버, 존1 훅 재사용 — 존1 코드는 그대로): 대시 <see cref="PlayerDashController.ServerDashApproved"/> · 기본 공격 <see cref="Player.ServerBasicAttackStarted"/> ·
 /// Q·E·R·우클릭 <see cref="PlayerSkillController.ServerSkillUsed"/>(거너 Q 는 <see cref="GunnerChargeLaserSkill.ServerFired"/>). 행동한 플레이어 본인 체크만.</item>
-/// <item>전원 6/6 → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportStageCompleted"/>(Train01) 1회. 시간 초과 자동 완료 없음.</item>
+/// <item>전원 6/6 → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportActivityCompleted"/>(BasicCheck, 시작 revision) 1회. 시간 초과 자동 완료 없음.</item>
 /// <item>단계를 떠나면(완료·그 밖) 표적 디스폰·체크 비움.</item>
 /// <item>복제: 명단별 체크 마스크(NetworkList) — 재접속(새 clientId = 늦은 참가자)·늦게 그린 클라도 지금 상태를 그대로 본다. 파티 완료 인원은 이 목록에서 센다.</item>
 /// </list>
@@ -58,6 +58,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
     private readonly List<NetworkObject> _targets = new List<NetworkObject>();
     private readonly List<Transform> _spotBuffer = new List<Transform>();
     private bool _pendingComplete;
+    private int _runRevision;
 
     /// <summary>스폰된 점검(없으면 null).</summary>
     public static LobbyTrainingWeaponCheck Active { get; private set; }
@@ -65,13 +66,13 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
     /// <summary>[전 피어] 복제 체크가 바뀌었다(시작·체크·완료·정리).</summary>
     public static event Action Changed;
 
-    /// <summary>[전 피어] 점검 진행 중(Train01 진행 중).</summary>
+    /// <summary>[전 피어] 점검 진행 중(T10).</summary>
     public bool IsRunning
     {
         get
         {
             var director = LobbyTrainingDirector.Active;
-            return IsSpawned && director != null && LobbyTrainingSupportRules.Train01TargetsActive(director.Stage, director.Phase);
+            return IsSpawned && director != null && LobbyTrainingSupportRules.Train01TargetsActive(director.CurrentActivity);
         }
     }
 
@@ -128,6 +129,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
                 GunnerChargeLaserSkill.ServerFired += HandleChargeLaserFiredServer;
                 NetworkManager.OnClientDisconnectCallback += HandleClientDisconnectedServer;
                 _director.ServerRosterMemberRemoved += HandleRosterMemberRemovedServer;
+                _director.ServerClientRebound += HandleClientReboundServer;
             }
 
             if (targetPrefab == null || targetSpots == null)
@@ -150,6 +152,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
             {
                 _director.ServerFlowChanged -= EvaluateServer;
                 _director.ServerRosterMemberRemoved -= HandleRosterMemberRemovedServer;
+                _director.ServerClientRebound -= HandleClientReboundServer;
             }
             PlayerDashController.ServerDashApproved -= HandleDashApprovedServer;
             Player.ServerBasicAttackStarted -= HandleBasicAttackServer;
@@ -183,8 +186,8 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
 
         // 훅 콜백(스킬 승인·발사 도중) 안에서 단계를 넘기면 표적이 그 판정 중에 디스폰된다 — 다음 프레임에 보고한다.
         _pendingComplete = false;
-        if (_director != null && _director.ServerReportStageCompleted(LobbyTrainingStage.Train01))
-            Debug.Log($"[SceneFlow] {Tag} 전원 6/6 — TRAIN_01 완료 보고");
+        if (_director != null && _director.ServerReportActivityCompleted(LobbyTutorialActivity.BasicCheck, _runRevision))
+            Debug.Log($"[SceneFlow] {Tag} 전원 6/6 — T10 완료 보고");
     }
 
     // ─── 서버: 시작·정리 ────────────────────────────────────────────────
@@ -194,7 +197,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
         if (_director == null)
             return;
 
-        var active = LobbyTrainingSupportRules.Train01TargetsActive(_director.Stage, _director.Phase);
+        var active = LobbyTrainingSupportRules.Train01TargetsActive(_director.CurrentActivity);
         if (active && !_model.IsRunning)
             BeginServer();
         else if (!active && (_model.IsRunning || _targets.Count > 0))
@@ -203,6 +206,7 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
 
     private void BeginServer()
     {
+        _runRevision = _director.Revision;
         _model.Begin(_director.ServerTrainingRoster);
         _pendingComplete = false;
         SyncEntries();
@@ -304,6 +308,19 @@ public sealed class LobbyTrainingWeaponCheck : NetworkBehaviour
 
     // 튜토리얼 클리어 플래그(로비 Alt+1)로 훈련 명단에서 빠졌다 — 퇴장과 같이 남은 사람만으로 완료 판정.
     private void HandleRosterMemberRemovedServer(ulong clientId) => RemoveFromRosterServer(clientId, "튜토리얼 클리어로 명단 제외");
+
+    // 같은 사용자 재접속(할 일 157 ⑩) — 퇴장 때 보관한 체크 마스크를 새 clientId 로 옮긴다(이미 한 항목은 다시 안 해도 된다).
+    private void HandleClientReboundServer(ulong previousClientId, ulong clientId)
+    {
+        if (!_model.Rebind(previousClientId, clientId))
+            return;
+
+        SyncEntries();
+        Debug.Log($"[SceneFlow] {Tag} 재접속 client {previousClientId} → {clientId} 체크 마스크 이어 감 — " +
+                  $"{LobbyWeaponCheckRules.CountOf(_model.MaskOf(clientId))}/{LobbyWeaponCheckRules.ItemCount}, 파티 완료 {_model.CompletedCount}/{_model.Roster.Count}");
+        if (_model.TryConsumeAllComplete())
+            _pendingComplete = true;
+    }
 
     private void RemoveFromRosterServer(ulong clientId, string reason)
     {

@@ -11,6 +11,15 @@ using UnityEngine.UI;
 /// 할 일 125 5/5 — 카드 분류 줄·창 도움말 줄은 <see cref="AddCategoryAndHelp"/>(<c>분류·도움말 줄 추가</c>)가 <b>지금 프리팹에 빠진 것만</b> 더한다
 /// (배치·글꼴·색 유지, 이미 있으면 저장하지 않음). 상충 확인창은 프리팹이 아니라 런타임 생성(<see cref="TraitSelectionView"/>).
 /// </para>
+/// <para>
+/// 할 일 165 — 카드 C1 아트는 <see cref="ApplyCardC1"/>(<c>카드 C1 아트 적용</c>)가 지금 프리팹의 카드 템플릿만 다시 만든다. 전체 생성도 같은 카드 빌더를 쓴다.
+/// 배경 블러 A안은 <see cref="ApplyBackdrop"/>(<c>배경 블러 연결</c>)가 창 앞 형제 RawImage 와 설정 에셋만 더한다.
+/// 기본 공격(LMB) 슬롯은 <see cref="ApplyBasicAttackSlot"/>(<c>기본 공격 슬롯 연결</c>)가 카드 템플릿의 검 아이콘·로스터 칸만 잇는다.
+/// </para>
+/// <para>
+/// 할 일 167 — 카드·호버 툴팁 설명의 <c>{dmg}</c> 검 아이콘 sprite asset 은 전체 생성·카드 C1 아트 적용이 함께 넣고,
+/// 지금 프리팹에는 <see cref="ApplyDescriptionSprites"/>(<c>설명 검 아이콘 연결</c>)가 그 칸만 지정한다.
+/// </para>
 /// </summary>
 public static class TraitUiAuthoring
 {
@@ -31,7 +40,7 @@ public static class TraitUiAuthoring
     {
         EnsureFolder(Folder);
         TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-        Sprite placeholder = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        Sprite placeholder = AssetDatabase.LoadAssetAtPath<Sprite>(EmptyIconPath);
         TraitTextTable texts = EnsureTextTable();
 
         var root = new GameObject("TraitUI", typeof(RectTransform));
@@ -77,6 +86,7 @@ public static class TraitUiAuthoring
             tooltip.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             TMP_Text tooltipName = NewText("Name", tooltip, font, 22f, FontStyles.Bold, TextAlignmentOptions.TopLeft, AccentColor);
             TMP_Text tooltipDescription = NewText("Description", tooltip, font, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft, Color.white);
+            tooltipDescription.spriteAsset = DescriptionSpriteAsset();
 
             // ── 선택 창(중앙 모달) ──
             RectTransform window = NewUi("Window", root.transform);
@@ -89,7 +99,7 @@ public static class TraitUiAuthoring
             RectTransform panel = NewUi("Panel", window);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
             panel.sizeDelta = new Vector2(1120f, 0f);
-            AddPanel(panel.gameObject);
+            // 창 판·테두리 없음(할 일 165 피드백 1) — 레이아웃만 담는다.
             VerticalLayoutGroup panelLayout = AddVertical(panel.gameObject, 32, 20f);
             panelLayout.childAlignment = TextAnchor.UpperCenter;
             panel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -102,45 +112,18 @@ public static class TraitUiAuthoring
 
             RectTransform cards = NewUi("Cards", panel);
             HorizontalLayoutGroup cardsLayout = cards.gameObject.AddComponent<HorizontalLayoutGroup>();
-            cardsLayout.spacing = 24f;
+            cardsLayout.spacing = CardSpacing;
             cardsLayout.childAlignment = TextAnchor.MiddleCenter;
             cardsLayout.childControlWidth = cardsLayout.childControlHeight = false;
             cardsLayout.childForceExpandWidth = cardsLayout.childForceExpandHeight = false;
-            LayoutElement cardsElement = cards.gameObject.AddComponent<LayoutElement>();
-            cardsElement.preferredHeight = cardsElement.minHeight = 380f;
+            cards.gameObject.AddComponent<LayoutElement>();
 
             RectTransform cardTemplate = NewUi("CardTemplate", cards);
-            cardTemplate.sizeDelta = new Vector2(320f, 380f);
-            Image cardBackground = cardTemplate.gameObject.AddComponent<Image>();
-            cardBackground.color = new Color(0.09f, 0.11f, 0.15f, 1f);
-            Outline cardOutline = cardTemplate.gameObject.AddComponent<Outline>();
-            cardOutline.effectColor = OutlineColor;
-            cardOutline.effectDistance = new Vector2(2f, -2f);
-            Button button = cardTemplate.gameObject.AddComponent<Button>();
-            button.targetGraphic = cardBackground;
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.82f, 0.82f, 0.82f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
-            button.colors = colors;
-            VerticalLayoutGroup cardLayout = AddVertical(cardTemplate.gameObject, 20, 14f);
-            cardLayout.childAlignment = TextAnchor.UpperCenter;
-
-            RectTransform cardIconRect = NewUi("Icon", cardTemplate);
-            Image cardIcon = cardIconRect.gameObject.AddComponent<Image>();
-            cardIcon.raycastTarget = false;
-            cardIcon.preserveAspect = true;
-            LayoutElement cardIconElement = cardIconRect.gameObject.AddComponent<LayoutElement>();
-            cardIconElement.preferredHeight = cardIconElement.minHeight = 104f;
-            TMP_Text cardName = NewText("Name", cardTemplate, font, 26f, FontStyles.Bold, TextAlignmentOptions.Center, AccentColor);
-            TMP_Text cardCategory = NewText(CategoryName, cardTemplate, font, CategorySize, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
-            TMP_Text cardDescription = NewText("Description", cardTemplate, font, 19f, FontStyles.Normal, TextAlignmentOptions.Top, Color.white);
+            cardTemplate.gameObject.AddComponent<Image>();
+            cardTemplate.gameObject.AddComponent<Button>();
             TraitCardView cardView = cardTemplate.gameObject.AddComponent<TraitCardView>();
-            SetRef(cardView, "button", button);
-            SetRef(cardView, "icon", cardIcon);
-            SetRef(cardView, "displayName", cardName);
-            SetRef(cardView, "category", cardCategory);
-            SetRef(cardView, "description", cardDescription);
+            BuildCardC1(cardView, font);
+            FitWindowToCards(panel, cards);
 
             TMP_Text help = NewText(HelpName, panel, font, HelpSize, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
             help.text = TraitUiStrings.Help.Ko;
@@ -216,6 +199,7 @@ public static class TraitUiAuthoring
             so.FindProperty("placeholderIcon").objectReferenceValue = placeholder;
             so.FindProperty("texts").objectReferenceValue = texts;
             so.ApplyModifiedPropertiesWithoutUndo();
+            EnsureBackdrop(view, window);
 
             // 기본 꺼짐 — 창(UiModalBlocker)이 켜진 채 저장되면 씬에 두는 순간 입력이 막힌다.
             cardTemplate.gameObject.SetActive(false);
@@ -307,6 +291,506 @@ public static class TraitUiAuthoring
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    // ── 할 일 165 — 카드 C1 아트 ──
+    // 배치 = 납품 배치표.csv(카드 560x413, 좌상단 기준 X/Y·UI 크기). 스프라이트는 PPU 200(PNG 절반 = UI 크기).
+    private const string CardArtFolder = "Assets/50.Art/UI/TraitCard_C1/Sprites/";
+    private const string TraitIconFolder = "Assets/50.Art/UI/HUD/TraitIcon/";
+    private const string EmptyIconPath = TraitIconFolder + "Common/Trait_Empty.png";
+    private const string HeavyFontPath = "Assets/50.Art/UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset";
+    private static readonly Vector2 CardSize = new Vector2(560f, 413f);
+    private const float CardSpacing = 24f;
+    private const int WindowPadding = 32; // Panel 의 VerticalLayoutGroup 좌우 여백(Build 와 같은 값)
+    private const float DescriptionLineHeight = 34f;
+
+    private static readonly Color CardNameColor = new Color(0.96f, 0.96f, 0.94f, 1f);
+    private static readonly Color CardCategoryColor = new Color(0.80f, 0.81f, 0.80f, 1f);
+    private static readonly Color CardDescriptionColor = new Color(0.16f, 0.17f, 0.18f, 1f);
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿만 C1 레이아웃으로 바꾼다(할 일 165). <c>CardTemplate</c> 오브젝트·<c>Button</c>·<c>TraitCardView</c> 는 그대로 두고
+    /// 자식과 옛 꾸밈(Outline·VerticalLayoutGroup)만 갈아 끼운다 — 창·획득 줄·씬 오버라이드는 유지. 창 패널 폭·카드 줄 높이는 카드 3장에 맞춘다.
+    /// 빈 아이콘(<c>placeholderIcon</c>)은 <c>Trait_Empty</c>. 창 패널(카드 줄 부모)의 어두운 판·노란 Outline 은 뗀다(피드백 1). 몇 번 돌려도 같은 결과.
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)")]
+    public static void ApplyCardC1()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var viewSo = new SerializedObject(view);
+            var cardView = viewSo.FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            var cards = viewSo.FindProperty("cardContainer").objectReferenceValue as RectTransform;
+            if (cardView == null || cards == null || cards.parent == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿/카드 줄이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            for (int i = cardView.transform.childCount - 1; i >= 0; i--)
+                Object.DestroyImmediate(cardView.transform.GetChild(i).gameObject);
+            foreach (Outline outline in cardView.GetComponents<Outline>())
+                Object.DestroyImmediate(outline);
+            foreach (LayoutGroup group in cardView.GetComponents<LayoutGroup>())
+                Object.DestroyImmediate(group);
+
+            TMP_FontAsset medium = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+            BuildCardC1(cardView, medium);
+            var panel = (RectTransform)cards.parent;
+            FitWindowToCards(panel, cards);
+            RemoveWindowPanelDecoration(panel);
+
+            viewSo.FindProperty("placeholderIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>(EmptyIconPath);
+            viewSo.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 카드 C1 아트 적용 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // ── 할 일 167 후속 — 설명의 {dmg} 검 아이콘 ──
+    // SkillTooltipFormatter 의 <sprite name="atk"> 를 담은 스킬 툴팁 sprite asset(SkillTooltipAuthoring 이 만든다). 비면 TMP 가 노란 ? 로 그린다.
+    public const string DescriptionSpriteAssetPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/SkillTooltipAttackSprite.asset";
+
+    private static TMP_SpriteAsset DescriptionSpriteAsset()
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(DescriptionSpriteAssetPath);
+        if (asset == null)
+            Debug.LogError($"[Trait] 설명 sprite asset 이 없다 — {DescriptionSpriteAssetPath} (스킬 툴팁 저작 메뉴로 먼저 만들 것).");
+        return asset;
+    }
+
+    /// <summary>
+    /// 지금 프리팹의 카드 설명(<c>CardTemplate/Description</c>)·획득 아이콘 호버 툴팁 설명(<c>AcquiredTooltip/Description</c>)에
+    /// 검 아이콘 sprite asset 만 지정한다 — 배치·글꼴·씬 오버라이드는 그대로. 이미 지정돼 있으면 저장하지 않는다(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 설명 검 아이콘 연결 ({dmg} sprite asset)")]
+    public static void ApplyDescriptionSprites()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var viewSo = new SerializedObject(view);
+            var cardView = viewSo.FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            var tooltipDescription = viewSo.FindProperty("tooltipDescription").objectReferenceValue as TMP_Text;
+            var cardDescription = cardView != null
+                ? new SerializedObject(cardView).FindProperty("description").objectReferenceValue as TMP_Text
+                : null;
+            TMP_SpriteAsset asset = DescriptionSpriteAsset();
+            if (cardDescription == null || tooltipDescription == null || asset == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 설명/툴팁 설명 칸이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (cardDescription.spriteAsset == asset && tooltipDescription.spriteAsset == asset)
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 설명 검 아이콘이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            cardDescription.spriteAsset = asset;
+            tooltipDescription.spriteAsset = asset;
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 설명 검 아이콘 연결 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // ── 할 일 165 후속 — 배경 블러 A안 ──
+    private const string BackdropName = "Backdrop";
+    private const string BackdropSettingsPath = "Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset";
+    private const string BlurShaderName = "Hidden/Rendering/MaskBlur";
+    private const string SaturationShaderName = "Hidden/Traits/TraitBackdropSaturate";
+
+    /// <summary>
+    /// 지금 프리팹의 선택 창(<c>Window</c>) 바로 앞 형제로 전체화면 RawImage <c>Backdrop</c>(기본 꺼짐)을 두고 <c>backdrop</c>·<c>backdropSettings</c> 칸을 잇는다.
+    /// 설정 에셋이 없으면 기본값(MaskBlurSettings 블러 값 + 셰이더 참조)으로 만든다. 창·카드·씬 오버라이드는 건드리지 않는다. 이미 연결돼 있으면 저장하지 않는다(멱등).
+    /// 창 어둡게 막 알파(프리팹 0.55)는 블러가 없을 때의 값으로 그대로 두고, 블러 위 알파는 설정 칸 <c>dimAlpha</c>(0.25)가 정한다.
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 배경 블러 연결 (창 뒤 RawImage)")]
+    public static void ApplyBackdrop()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var window = new SerializedObject(view).FindProperty("window").objectReferenceValue as GameObject;
+            if (window == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 선택 창(window)이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureBackdrop(view, (RectTransform)window.transform))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 배경 블러가 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 배경 블러 연결 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 창 바로 앞 형제 Backdrop(RawImage, 전체화면, 클릭 통과, 꺼짐) + 설정 에셋 연결. 바꾼 것이 있으면 true.
+    private static bool EnsureBackdrop(TraitSelectionView view, RectTransform window)
+    {
+        bool changed = false;
+        var so = new SerializedObject(view);
+        SerializedProperty backdropProp = so.FindProperty("backdrop");
+        SerializedProperty settingsProp = so.FindProperty("backdropSettings");
+
+        var backdrop = backdropProp.objectReferenceValue as RawImage;
+        if (backdrop == null)
+        {
+            RectTransform rect = NewUi(BackdropName, window.parent);
+            Stretch(rect, 0f);
+            backdrop = rect.gameObject.AddComponent<RawImage>();
+            backdrop.color = Color.white;
+            backdrop.raycastTarget = false;
+            rect.gameObject.SetActive(false);
+            backdropProp.objectReferenceValue = backdrop;
+            changed = true;
+        }
+
+        if (backdrop.transform.parent == window.parent && backdrop.transform.GetSiblingIndex() != window.GetSiblingIndex() - 1)
+        {
+            backdrop.transform.SetSiblingIndex(window.GetSiblingIndex());
+            changed = true;
+        }
+
+        TraitBackdropBlurSettings settings = EnsureBackdropSettings();
+        if (settingsProp.objectReferenceValue != settings)
+        {
+            settingsProp.objectReferenceValue = settings;
+            changed = true;
+        }
+
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return changed;
+    }
+
+    /// <summary>배경 블러 설정 에셋 — 없으면 코드 기본값과 셰이더 참조(블러·채도)로 만든다. 있으면 그대로(튜닝값 보존, 셰이더만 비었으면 채움).</summary>
+    public static TraitBackdropBlurSettings EnsureBackdropSettings()
+    {
+        var settings = AssetDatabase.LoadAssetAtPath<TraitBackdropBlurSettings>(BackdropSettingsPath);
+        if (settings == null)
+        {
+            EnsureFolder(System.IO.Path.GetDirectoryName(BackdropSettingsPath).Replace('\\', '/'));
+            settings = ScriptableObject.CreateInstance<TraitBackdropBlurSettings>();
+            settings.blurShader = Shader.Find(BlurShaderName);
+            settings.saturationShader = Shader.Find(SaturationShaderName);
+            AssetDatabase.CreateAsset(settings, BackdropSettingsPath);
+            AssetDatabase.SaveAssets();
+        }
+        else if (settings.blurShader == null || settings.saturationShader == null)
+        {
+            if (settings.blurShader == null)
+                settings.blurShader = Shader.Find(BlurShaderName);
+            if (settings.saturationShader == null)
+                settings.saturationShader = Shader.Find(SaturationShaderName);
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+        }
+
+        return settings;
+    }
+
+    /// <summary>
+    /// 카드 오브젝트(Image·Button·TraitCardView 가 붙어 있고 자식이 없는 상태)를 C1 레이아웃으로 채운다.
+    /// 그리는 순서 = 카드판 → 특성 아이콘 → 이름·분류 → 마스크(안에 스킬 아이콘) → 스킬 프레임 → 키캡 → 설명.
+    /// </summary>
+    private static void BuildCardC1(TraitCardView cardView, TMP_FontAsset medium)
+    {
+        TMP_FontAsset heavy = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(HeavyFontPath);
+        var card = (RectTransform)cardView.transform;
+        card.sizeDelta = CardSize;
+
+        // 루트 Image = 투명 클릭 판정(카드 전체). 보이는 판은 자식 Panel — 버튼 색 변화는 그쪽에 건다.
+        Image hitArea = card.GetComponent<Image>();
+        hitArea.sprite = null;
+        hitArea.color = new Color(1f, 1f, 1f, 0f);
+        hitArea.raycastTarget = true;
+
+        Image panel = CardImage("Panel", card, CardArt("TraitCard_C1_Panel"), -2f, -2f, 564f, 417f);
+        Button button = card.GetComponent<Button>();
+        button.transition = Selectable.Transition.ColorTint;
+        button.targetGraphic = panel;
+        ColorBlock colors = button.colors;
+        colors.normalColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+        colors.highlightedColor = Color.white;
+        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+        button.colors = colors;
+
+        Image traitIcon = CardImage("TraitIcon", card, null, 19f, 10f, 118f, 118f);
+        traitIcon.preserveAspect = true;
+
+        TMP_Text cardName = CardText("Name", card, heavy != null ? heavy : medium, 34f, 142f, 38f, 340f, 40f,
+            TextAlignmentOptions.MidlineLeft, CardNameColor);
+        cardName.textWrappingMode = TextWrappingModes.NoWrap;
+        cardName.enableAutoSizing = true;
+        cardName.fontSizeMin = 24f;
+        cardName.fontSizeMax = 34f;
+
+        TMP_Text cardCategory = CardText(CategoryName, card, medium, 17f, 144f, 84f, 340f, 22f,
+            TextAlignmentOptions.MidlineLeft, CardCategoryColor);
+        cardCategory.textWrappingMode = TextWrappingModes.NoWrap;
+        cardCategory.overflowMode = TextOverflowModes.Ellipsis;
+
+        // 스킬 슬롯 — 프레임·마스크·아이콘 중심 (113, 250) 동일. 마스크 136 중 실제 영역 132.
+        Image mask = CardImage("SkillMask", card, CardArt("TraitCard_C1_SkillMask"), 45f, 182f, 136f, 136f);
+        mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        Image skillIcon = CardImage("SkillIcon", mask.transform, null, 2f, 2f, 132f, 132f);
+        skillIcon.preserveAspect = true;
+        CardImage("SkillFrame", card, CardArt("TraitCard_C1_SkillFrame"), 37f, 174f, 152f, 152f);
+
+        // 키캡 1곳 — 키캡 38x40(94,335) / 마우스 30x41(98,335) 을 둘 다 담는 38x41 상자, 비율 유지로 각 크기가 된다.
+        // 스프라이트는 Bind 가 고른다(키 입력 아닌 특성은 숨김). 저작 미리보기는 Q.
+        Image keycap = CardImage("Keycap", card, CardArt("Keycap_Q"), 94f, 335f, 38f, 41f);
+        keycap.preserveAspect = true;
+
+        TMP_Text cardDescription = CardText("Description", card, medium, 22f, 224f, 170f, 288f, 170f,
+            TextAlignmentOptions.TopLeft, CardDescriptionColor);
+        cardDescription.lineSpacing = LineSpacingFor(medium, 22f, DescriptionLineHeight);
+        cardDescription.enableAutoSizing = true;
+        cardDescription.fontSizeMin = 16f;
+        cardDescription.fontSizeMax = 22f;
+        cardDescription.spriteAsset = DescriptionSpriteAsset();
+
+        var so = new SerializedObject(cardView);
+        so.FindProperty("button").objectReferenceValue = button;
+        so.FindProperty("traitIcon").objectReferenceValue = traitIcon;
+        so.FindProperty("skillIcon").objectReferenceValue = skillIcon;
+        so.FindProperty("displayName").objectReferenceValue = cardName;
+        so.FindProperty("category").objectReferenceValue = cardCategory;
+        so.FindProperty("description").objectReferenceValue = cardDescription;
+        so.FindProperty("keycap").objectReferenceValue = keycap;
+        so.FindProperty("keycapQ").objectReferenceValue = CardArt("Keycap_Q");
+        so.FindProperty("keycapE").objectReferenceValue = CardArt("Keycap_E");
+        so.FindProperty("keycapR").objectReferenceValue = CardArt("Keycap_R");
+        so.FindProperty("inputLeftMouse").objectReferenceValue = CardArt("Input_LMB");
+        so.FindProperty("inputRightMouse").objectReferenceValue = CardArt("Input_RMB");
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EnsureBasicAttackSlot(cardView);
+        EnsureSkillBackdrop(cardView);
+    }
+
+    // ── 할 일 165 후속 — 기본 공격(LMB) 슬롯: 검 아이콘 + 보는 사람 캐릭터 색 ──
+    private const string BasicAttackIconPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png";
+    private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿에 <c>basicAttackIcon</c>(검)·<c>characterRoster</c> 칸만 잇는다 — 카드 배치·배경 블러·씬 오버라이드는 그대로.
+    /// 검 PNG 가 Sprite 임포트가 아니면 Sprite(Single)로 바꾼다(guid 유지 — 툴팁 인라인 아틀라스는 PNG 바이트를 직접 읽어 영향 없음). 이미 연결돼 있으면 저장하지 않는다(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 기본 공격 슬롯 연결 (검 아이콘·캐릭터 색)")]
+    public static void ApplyBasicAttackSlot()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var cardView = new SerializedObject(view).FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            if (cardView == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureBasicAttackSlot(cardView))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 기본 공격 슬롯이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 기본 공격 슬롯 연결 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 카드 템플릿의 검 아이콘·로스터 칸. 바꾼 것이 있으면 true.
+    private static bool EnsureBasicAttackSlot(TraitCardView cardView)
+    {
+        if (AssetImporter.GetAtPath(BasicAttackIconPath) is TextureImporter importer &&
+            (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single))
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.SaveAndReimport();
+        }
+
+        var icon = AssetDatabase.LoadAssetAtPath<Sprite>(BasicAttackIconPath);
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
+        if (icon == null || roster == null)
+            Debug.LogError($"[Trait] 기본 공격 슬롯 — 검 스프라이트({BasicAttackIconPath}) 또는 로스터({RosterPath})를 못 찾았다.");
+
+        var so = new SerializedObject(cardView);
+        SerializedProperty iconProp = so.FindProperty("basicAttackIcon");
+        SerializedProperty rosterProp = so.FindProperty("characterRoster");
+        if (iconProp.objectReferenceValue == icon && rosterProp.objectReferenceValue == roster)
+            return false;
+
+        iconProp.objectReferenceValue = icon;
+        rosterProp.objectReferenceValue = roster;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
+
+    // ── 할 일 165 후속 — 검 아이콘 뒤 검은 배경 ──
+    private const string SkillBackdropName = "SkillBackdrop";
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿 스킬 마스크 안, <c>SkillIcon</c> 바로 앞 형제로 검은 Image <c>SkillBackdrop</c>(132x132, 꺼짐)를 두고
+    /// <c>skillBackdrop</c> 칸을 잇는다. 마스크 안이라 실제 스킬 아이콘과 같은 둥근 사각형으로 잘린다. 카드 배치·배경 블러·검 연결·씬 오버라이드는 그대로, 이미 있으면 저장 안 함(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 기본 공격 슬롯 검은 배경 (검 아이콘 뒤)")]
+    public static void ApplySkillBackdrop()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var cardView = new SerializedObject(view).FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            if (cardView == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureSkillBackdrop(cardView))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 스킬 슬롯 검은 배경이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 스킬 슬롯 검은 배경 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 카드 템플릿의 SkillIcon 형제 검은 배경 + 칸. 바꾼 것이 있으면 true.
+    private static bool EnsureSkillBackdrop(TraitCardView cardView)
+    {
+        var so = new SerializedObject(cardView);
+        SerializedProperty iconProp = so.FindProperty("skillIcon");
+        SerializedProperty backdropProp = so.FindProperty("skillBackdrop");
+        var skillIcon = iconProp.objectReferenceValue as Image;
+        if (skillIcon == null || skillIcon.transform.parent == null)
+        {
+            Debug.LogError("[Trait] 스킬 슬롯 검은 배경 — 카드 템플릿에 skillIcon(마스크 안)이 없다. 카드 C1 아트 적용 메뉴를 먼저 쓸 것.");
+            return false;
+        }
+
+        Transform mask = skillIcon.transform.parent;
+        Transform existing = mask.Find(SkillBackdropName);
+        Image backdrop = existing != null ? existing.GetComponent<Image>() : null;
+        bool changed = false;
+        if (backdrop == null)
+        {
+            // SkillIcon 과 같은 자리·크기(마스크 136 중 실제 영역 132).
+            backdrop = CardImage(SkillBackdropName, mask, null, 2f, 2f, 132f, 132f);
+            backdrop.color = Color.black;
+            backdrop.gameObject.SetActive(false);
+            changed = true;
+        }
+
+        if (backdrop.transform.GetSiblingIndex() > skillIcon.transform.GetSiblingIndex())
+        {
+            backdrop.transform.SetSiblingIndex(skillIcon.transform.GetSiblingIndex());
+            changed = true;
+        }
+
+        if (backdropProp.objectReferenceValue != backdrop)
+        {
+            backdropProp.objectReferenceValue = backdrop;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            changed = true;
+        }
+        return changed;
+    }
+
+    // 카드 3장(TraitPool = 캐릭터×차수 3후보) + 간격 + 창 여백에 창 폭·카드 줄 높이를 맞춘다.
+    private static void FitWindowToCards(RectTransform panel, RectTransform cards)
+    {
+        panel.sizeDelta = new Vector2(CardSize.x * 3f + CardSpacing * 2f + WindowPadding * 2f, panel.sizeDelta.y);
+        LayoutElement element = cards.GetComponent<LayoutElement>();
+        if (element == null)
+            element = cards.gameObject.AddComponent<LayoutElement>();
+        element.preferredHeight = element.minHeight = CardSize.y;
+    }
+
+    // TMP 줄 간격(em/100) — 글꼴 기본 줄 높이에서 목표 줄 높이(px)까지 더할 값.
+    private static float LineSpacingFor(TMP_FontAsset font, float size, float lineHeight)
+    {
+        if (font == null || font.faceInfo.pointSize <= 0f)
+            return 0f;
+        float natural = font.faceInfo.lineHeight / font.faceInfo.pointSize * size;
+        return (lineHeight - natural) / size * 100f;
+    }
+
+    private static Sprite CardArt(string name) => AssetDatabase.LoadAssetAtPath<Sprite>(CardArtFolder + name + ".png");
+
+    // 창 패널의 어두운 판(Image)·노란 테두리(Outline)를 뗀다 — 레이아웃(VerticalLayoutGroup·ContentSizeFitter)은 유지.
+    private static void RemoveWindowPanelDecoration(RectTransform panel)
+    {
+        foreach (Outline outline in panel.GetComponents<Outline>())
+            Object.DestroyImmediate(outline);
+        Image background = panel.GetComponent<Image>();
+        if (background != null)
+            Object.DestroyImmediate(background);
+    }
+
+    // 배치표 좌표(부모 좌상단 기준 X/Y, y 아래로 +)에 중앙 피벗으로 둔다.
+    private static void PlaceTopLeft(RectTransform rect, float x, float y, float width, float height)
+    {
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(width, height);
+        rect.anchoredPosition = new Vector2(x + width * 0.5f, -(y + height * 0.5f));
+    }
+
+    private static Image CardImage(string name, Transform parent, Sprite sprite, float x, float y, float width, float height)
+    {
+        RectTransform rect = NewUi(name, parent);
+        PlaceTopLeft(rect, x, y, width, height);
+        Image image = rect.gameObject.AddComponent<Image>();
+        image.sprite = sprite;
+        image.type = Image.Type.Simple;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static TMP_Text CardText(string name, Transform parent, TMP_FontAsset font, float size,
+        float x, float y, float width, float height, TextAlignmentOptions alignment, Color color)
+    {
+        TMP_Text text = NewText(name, parent, font, size, FontStyles.Normal, alignment, color);
+        PlaceTopLeft((RectTransform)text.transform, x, y, width, height);
+        return text;
     }
 
     // 옆 글자(source)의 글꼴을 따라 새 TMP 를 만든다. source 가 없으면 기본 글꼴.

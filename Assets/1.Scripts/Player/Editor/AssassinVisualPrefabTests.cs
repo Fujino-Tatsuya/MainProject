@@ -140,7 +140,7 @@ public sealed class AssassinVisualPrefabTests
 
         Assert.That(armature.localScale, Is.EqualTo(Vector3.one), "Armature 루트 배율 1 — 판정 박스가 루트의 자식이다");
         AssertHitbox(armature, "DefaultAttack", new Vector3(2f, 2f, 1.7f), new Vector3(0f, 1f, .85f));
-        AssertHitbox(armature, "InterruptAttack", new Vector3(1.4f, 1.8f, 1.4f), new Vector3(0f, 1f, .9f));
+        AssertHitbox(armature, "InterruptAttack", new Vector3(1.4f, 2.4f, 1.4f), new Vector3(0f, 1.3f, .9f));
         Assert.That(LoadArmature(VariantPath).localScale, Is.EqualTo(Vector3.one), "Player_Assassin 의 Armature 배율 1");
     }
 

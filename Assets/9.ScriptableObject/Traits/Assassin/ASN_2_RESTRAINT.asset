@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: ASN_2_RESTRAINT
   m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
   id: ASN_2_RESTRAINT
-  displayName: "절제된 분노"
-  category: "R 제거 · 일반 Q/E 강화"
-  description: "R과 변신을 사용할 수 없습니다.
-    대신 일반 Q와 E 피해가 {damageIncrease:%} 증가하고
-    재사용 대기시간이 {cooldownReduction:%} 줄어듭니다."
-  icon: {fileID: 0}
+  displayName: "\uC808\uC81C\uB41C \uBD84\uB178"
+  category: "R \uC81C\uAC70 \xB7 \uC77C\uBC18 Q/E \uAC15\uD654"
+  description: "R\uACFC \uBCC0\uC2E0\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.
+    \uB300\uC2E0 \uC77C\uBC18 Q\uC640 E \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD558\uACE0
+    \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {cooldownReduction:%} \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+  icon: {fileID: 21300000, guid: 4dc7e5ec42e55f74a42021cd81da06c6, type: 3}
   effects:
   - rid: 7237886673709695301
   - rid: 7237886673709695302

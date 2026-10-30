@@ -13,10 +13,12 @@ MonoBehaviour:
   m_Name: ASN_4_NORMAL_E_PUSH
   m_EditorClassIdentifier: Assembly-CSharp::AssassinTraitDefinition
   id: ASN_4_NORMAL_E_PUSH
-  displayName: "급소 파괴"
-  category: "일반 E 강화 · 밀치기"
-  description: "일반 E로 강화한 기본 공격이 적을 밀쳐냅니다. 변신 E에는 적용되지 않습니다."
-  icon: {fileID: 0}
+  displayName: "\uAE09\uC18C \uD30C\uAD34"
+  category: "\uC77C\uBC18 E \uAC15\uD654 \xB7 \uBC00\uCE58\uAE30"
+  description: "\uC77C\uBC18 E\uB85C \uAC15\uD654\uD55C \uAE30\uBCF8 \uACF5\uACA9\uC774
+    \uC801\uC744 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4. \uBCC0\uC2E0 E\uC5D0\uB294 \uC801\uC6A9\uB418\uC9C0
+    \uC54A\uC2B5\uB2C8\uB2E4."
+  icon: {fileID: 21300000, guid: 5794548daec55ac292408e96dd888946, type: 3}
   effects:
   - rid: 7237886673709695198
   references:

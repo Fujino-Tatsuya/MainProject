@@ -233,11 +233,19 @@ public sealed class PartyGatherZone : NetworkBehaviour
         if (player == null)
             return default;
 
-        var lifeCycle = player.GetComponent<PlayerLifeCycleController>();
-        var incapacitated = player.CurrentHealth <= 0 || (lifeCycle != null && lifeCycle.State != PlayerLifeState.Alive);
         var state = player.CurrentState;
         var busy = state != PlayerActionState.Idle && state != PlayerActionState.Move;
-        return new PartyGatherMemberState(ContainsPoint(player.transform.position), incapacitated, busy);
+        return new PartyGatherMemberState(ContainsPoint(player.transform.position), IsIncapacitated(player), busy);
+    }
+
+    /// <summary>쓰러짐·사망 = <see cref="PlayerLifeCycleController.State"/> ≠ Alive 또는 체력 0 이하 — 집결·영역 볼륨(<see cref="LobbyAreaVolume"/>) 공용.</summary>
+    public static bool IsIncapacitated(Player player)
+    {
+        if (player == null)
+            return true;
+
+        var lifeCycle = player.GetComponent<PlayerLifeCycleController>();
+        return player.CurrentHealth <= 0 || (lifeCycle != null && lifeCycle.State != PlayerLifeState.Alive);
     }
 
     /// <summary>박스 중심 월드 좌표 — 표시 대상 고르기(가까운 구역)용.</summary>

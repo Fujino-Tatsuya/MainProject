@@ -87,6 +87,9 @@ Idle/Move ──Space──▶ Dash(대시 시작)
   - 대상 = **판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치에 놓은 오버랩**(`HitboxAnchorShape` — 서버 `ResolveHit` 의 `OverlapHitboxAnchor` 와 같은 형상 계산·같은 질의, 할 일 139-3)에 걸린 Unit 중 `InterruptTargetRegistry` 캐시에 있는 것(창 소유자) + `InterruptTargetGeometry.FacesAttacker`(대상 정면 허용각 — 기존 판정값 그대로, 정면 판정 없으면 180). 밖이면 '대상 없음' = 슬로우 없음.
   - 오너 HUD 강조 사거리(`HasTargetInOmniRange`)는 '돌면 닿는 거리'(앵커 먼 모서리) 표시라 예측보다 넓다 — 강조가 켜져도 그 방향이면 대상 없음일 수 있다.
     대상까지 거리는 실제 콜라이더 표면 수평 거리(`InterruptOmniRangeModel.HorizontalDistanceToCollider`, 할 일 139-4 — 아래 AABB 착시).
+  - 판정 앵커 = 각 `<캐릭터>_Armature.prefab` 의 `InterruptAttack` BoxCollider(프리팹이 원본, xlsx 칸 없음). 예측·HUD 강조·서버 판정이 모두 이 상자를 읽는다.
+    팔라딘 1.6×**2.4**×1.6 / 거너·어쌔신 1.4×**2.4**×1.4, 중심 (0, **1.3**, 0.9) → 높이 띠 발 +0.1 ~ +2.5m.
+    웰즈 & 23호 HurtBox(캡슐 r 1.7 · 높이 5.78, 웰즈는 등 위 y 3.5~5.3 으로 같은 캡슐 안)의 가장 넓은 단면(y 1.7~4.08)에 띠가 걸려 정면 도달이 표면 거리 그대로 나온다(할 일 163 — 전엔 팔라딘 띠가 −0.46~+0.54 라 약 0.46m 덜 닿았다).
   - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
   - 판정 오버랩은 옮기지 않는다(실제 위치).
 - **예측 규칙 보정(할 일 139-2, §10.2 표본 27개 근거)** — `DashInterruptPredictor` 공용 규칙이라 ①은 근접 간파에도 같이 적용된다, ②는 대쉬 간파만:

@@ -149,9 +149,9 @@ public sealed class AssassinTraitTier4Tests
         }
 
         StringAssert.StartsWith("Q로 지나온 길을 한 번 더 베어 ", trail);
-        StringAssert.EndsWith("의 추가 피해를 줍니다. 그림자 회귀의 복귀 경로에도 적용됩니다.", trail);
+        StringAssert.EndsWith(" 추가 피해를 줍니다. 그림자 회귀의 복귀 경로에도 적용됩니다.", trail);
         StringAssert.StartsWith("기본 공격 4타를 끝까지 쓰면 마지막 공격 범위에 ", combo);
-        StringAssert.EndsWith("의 추가 피해를 줍니다. 변신 중에도 적용됩니다.", combo);
+        StringAssert.EndsWith(" 추가 피해를 줍니다. 변신 중에도 적용됩니다.", combo);
     }
 
     [Test]

@@ -15,7 +15,7 @@ public sealed class TrainingSparringBotTests
     // 23호 기본 비(100 / 20 = 5칸)와 같은 입력 — 테스트 입력일 뿐 규칙엔 수치가 없다.
     const float Step = 20f;
 
-    // ── 처치 방지·마무리 체력 ──
+    // ── 처치 방지 ──
 
     [Test]
     public void HealthFloor_IsOneWhilePreventingDeath()
@@ -24,16 +24,6 @@ public sealed class TrainingSparringBotTests
         Assert.That(TrainingSparringRules.HealthFloor(false), Is.Zero);
         Assert.That(HealthFloorRules.Clamp(10, -50, TrainingSparringRules.HealthFloor(true)), Is.EqualTo(1), "치명 피해도 1 에서 멈춘다");
         Assert.That(HealthFloorRules.Clamp(10, -50, TrainingSparringRules.HealthFloor(false)), Is.EqualTo(-50), "해제 뒤엔 하한 없음");
-    }
-
-    [Test]
-    public void FinishHealth_LowersButNeverHeals()
-    {
-        Assert.That(TrainingSparringRules.FinishHealth(200, 260, 60), Is.EqualTo(60));
-        Assert.That(TrainingSparringRules.FinishHealth(30, 260, 60), Is.EqualTo(30), "이미 낮으면 그대로 — 회복하지 않는다");
-        Assert.That(TrainingSparringRules.FinishHealth(1, 260, 60), Is.EqualTo(1));
-        Assert.That(TrainingSparringRules.FinishHealth(200, 40, 60), Is.EqualTo(40), "최대 체력으로 자른다");
-        Assert.That(TrainingSparringRules.FinishHealth(200, 260, 0), Is.EqualTo(1), "0 이하 저작 = 1");
     }
 
     // ── 간파 성공 ──
@@ -142,7 +132,50 @@ public sealed class TrainingSparringBotTests
         Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, 0.5f, false), Is.EqualTo(0.5f));
         Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, 3f, false), Is.EqualTo(1.2f));
         Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, 0.01f, false), Is.Zero, "0.05 이하 = 경직 없음");
-        Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, -1f, true), Is.EqualTo(1.2f), "B 학습용 취약 유지 = Q 경직 그대로");
+        Assert.That(TrainingSparringRules.PushStaggerSeconds(1.2f, -1f, true), Is.EqualTo(1.2f), "훈련 취약 유지 = 경직 그대로");
+    }
+
+    // ── T32 기절 인정 범위(사용자 결정 A — 실제 기절(뇌진탕 포함)만) ──
+
+    [Test]
+    public void VulnerableHit_StaggerOnly_IsNotStun()
+    {
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(false, true, 0f, 0.8f), Is.EqualTo(TrainingSparringCrowdControl.None),
+            "넉백 없이 경직만 = 기절 아님(T32 불인정)");
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(false, true, 0f, 0f), Is.EqualTo(TrainingSparringCrowdControl.None));
+    }
+
+    [Test]
+    public void VulnerableHit_KnockbackWithStagger_IsKnockbackAndStun()
+    {
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(false, true, 6f, 0.8f),
+            Is.EqualTo(TrainingSparringCrowdControl.Knockback | TrainingSparringCrowdControl.Stun), "팔라딘 Q = 밀림 + 실제 기절");
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(false, true, 6f, 0f), Is.EqualTo(TrainingSparringCrowdControl.Knockback),
+            "경직 없는 밀치기도 밀린다(기존)");
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(true, true, 0f, 0f), Is.EqualTo(TrainingSparringCrowdControl.Knockback),
+            "간파 스킬 = 고정 거리 밀림");
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(false, false, 6f, 0.8f), Is.EqualTo(TrainingSparringCrowdControl.None),
+            "플레이어 아님 = 반응 없음");
+    }
+
+    [Test]
+    public void Concussion_StunsOnlyAfterPushEnds_WhileVulnerable()
+    {
+        // 뇌진탕 밀치기는 넉백 세기가 있어 밀림으로 받고(인정), 기절은 밀림이 끝날 때 건다.
+        Assert.That(TrainingSparringRules.VulnerableHitCrowdControl(false, true, 6f, 0f), Is.EqualTo(TrainingSparringCrowdControl.Knockback));
+        Assert.That(TrainingSparringRules.StunsOnPushEnd(0.75f, true, true), Is.True, "밀림 끝 = 기절");
+        Assert.That(TrainingSparringRules.StunsOnPushEnd(0.75f, false, true), Is.False, "벽 반동 등으로 취약이 끝났으면 없음");
+        Assert.That(TrainingSparringRules.StunsOnPushEnd(0.75f, true, false), Is.False, "T33 위치 복귀 중 = 없음");
+        Assert.That(TrainingSparringRules.StunsOnPushEnd(0f, true, true), Is.False, "뇌진탕 대기 없음");
+    }
+
+    [Test]
+    public void TrainingWindup_ExtendsOnlyInCounterTraining()
+    {
+        Assert.That(TrainingSparringRules.TrainingWindup(0.8f, 2f, true), Is.EqualTo(2f), "T31 = 신호를 보고 입력할 수 있게 늘린다");
+        Assert.That(TrainingSparringRules.TrainingWindup(2.5f, 2f, true), Is.EqualTo(2.5f), "저작 창이 더 길면 그대로");
+        Assert.That(TrainingSparringRules.TrainingWindup(0.8f, 2f, false), Is.EqualTo(0.8f), "T31 밖(T40 등) = 실전 길이");
+        Assert.That(TrainingSparringRules.TrainingWindup(0f, 2f, true), Is.Zero, "간파 없는 공격은 늘리지 않는다");
     }
 
     [Test]
@@ -186,7 +219,6 @@ public sealed class TrainingSparringBotTests
 
         Assert.That(so.FindProperty("data").objectReferenceValue, Is.Not.Null, "MonsterDataSO(SpinnerBot 데이터)");
         Assert.That(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, rules.counterGaugeStep).IsValid, Is.True, "총 칸 ≥ 2");
-        Assert.That(so.FindProperty("finishHealth").intValue, Is.GreaterThanOrEqualTo(1));
     }
 
     [Test]

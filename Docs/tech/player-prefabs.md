@@ -418,6 +418,7 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 ✅ **2026-10-02 구현** ([PLAN-character-select.md](../history/PLANS/PLAN-character-select.md)). 아래는 결과 요약.
 
 - 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
+  - 칸 `themeColor`(`[DataTableIgnore]`, 기본 흰색) = 공용 캐릭터 색 — 지금은 특성 카드 기본 공격 슬롯 틴트만 사용(팔라딘 #F2B632 · 거너 #F04FC6 · 어쌔신 #9A62F2, 값은 에셋 데이터).
 - 로비(2026-10-19 C8): `LobbySession.RequestCharacterServerRpc` → 서버가 `LobbyReadyRules`(Ready·카운트다운 중 거부, 교체 쿨다운) + 로스터로 검증 후 `NetworkList<LobbyPlayerEntry>` 로 복제. 기본 0번, 중복 선택 허용. (옛 `Lobby.CharacterRequest`/`Lobby.State` named message 는 퇴역.)
 - Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움). 퇴장 때는 clientId 쪽만 지우고 playerId 의 마지막 선택은 남겨 재접속 때 되살린다. 로비 재진입 때 `LobbySession` 이 이 저장소로 자리를 시드한다.
 - `NetworkLoadingFlowController.ResolvePlayerPrefabForClient(clientId)` = 캐릭터 id → Variant. **이 함수 하나가 (A) 방식의 유일한 분기점이다.**

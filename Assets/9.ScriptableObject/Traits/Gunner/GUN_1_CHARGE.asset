@@ -17,7 +17,7 @@ MonoBehaviour:
   category: "Q \uAC15\uD654"
   description: "Q\uB97C \uB05D\uAE4C\uC9C0 \uCDA9\uC804\uD558\uB294 \uC2DC\uAC04\uC774
     {chargeTimeReduction:%} \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: ee8854cf0e3057f4b8aff0efb0a6d872, type: 3}
   effects:
   - rid: 7237886675317424396
   references:
