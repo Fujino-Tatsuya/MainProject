@@ -31,8 +31,12 @@ public sealed class DeadPlayerJudge
         public bool Violation;
         public bool ActionState;
         public bool MovedWhileDying;
+        /// <summary>사망 기준 위치에서의 수평(XZ) 이동 거리 — 수직 낙하는 넣지 않는다(할 일 183).</summary>
         public float Moved;
         public float Elapsed;
+        /// <summary>사망 기준 위치의 y·이번 틱 y — 상세 문구용.</summary>
+        public float StartY;
+        public float CurrentY;
     }
 
     private bool _inDeath;
@@ -82,7 +86,9 @@ public sealed class DeadPlayerJudge
             tick.ActionState == PlayerActionState.Skill ||
             tick.ActionState == PlayerActionState.Dash;
         float elapsed = tick.Time - _deadSince;
-        float moved = tick.PositionValid ? Vector3.Distance(_startPosition, tick.Position) : 0f;
+        // 수평(XZ) 거리만 센다(할 일 183) — 23호 손(루트보다 1.37m 위)에 들린 채 죽은 시체가
+        // 중력으로 바닥에 떨어지는 수직 낙하는 밀림이 아니다.
+        float moved = tick.PositionValid ? HorizontalDistance(_startPosition, tick.Position) : 0f;
         bool movedWhileDying =
             tick.PositionValid &&
             elapsed <= MovementWindowSeconds &&
@@ -96,6 +102,15 @@ public sealed class DeadPlayerJudge
             MovedWhileDying = movedWhileDying,
             Moved = moved,
             Elapsed = elapsed,
+            StartY = _startPosition.y,
+            CurrentY = tick.Position.y,
         };
+    }
+
+    private static float HorizontalDistance(Vector3 a, Vector3 b)
+    {
+        float dx = b.x - a.x;
+        float dz = b.z - a.z;
+        return Mathf.Sqrt(dx * dx + dz * dz);
     }
 }

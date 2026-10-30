@@ -79,6 +79,8 @@ public sealed class GameplayInvariantDetector : IQADetector
     private float _worldExitSince = -1f;
     // 사망 판정·기준 위치는 DeadPlayerJudge 가 한다(할 일 182 — Soul 정상 이동 오탐).
     private readonly DeadPlayerJudge _deadPlayerJudge = new DeadPlayerJudge();
+    // 구속(23호 잡기) 중·풀린 뒤 유예는 P8 을 보지 않는다(할 일 185).
+    private readonly RestrainedWallGraceJudge _restrainedWallGrace = new RestrainedWallGraceJudge();
     private PlayerActionState _timedState;
     private float _timedStateSince;
     private bool _hasTimedState;
@@ -149,7 +151,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         InspectTeleport(recorder, player, state, position, invalidPosition);
         InspectInvulnerabilityDamage(recorder, player, health, state);
         InspectStateDuration(recorder, player, state);
-        InspectWallPenetration(recorder, player, invalidPosition);
+        InspectWallPenetration(recorder, player, state, invalidPosition);
 
         _previousHealth = health;
         _previousServerInvulnerable = CurrentServerInvulnerable;
@@ -207,8 +209,9 @@ public sealed class GameplayInvariantDetector : IQADetector
             _playerId,
             true,
             QASeverity.Error,
-            $"사망 플레이어가 행동함: state={state}, 사망 후 이동={result.Moved:F2}m",
-            $"player={Target(player)} life={life} health={health} deadElapsed={result.Elapsed:F2}s");
+            $"사망 플레이어가 행동함: state={state}, 사망 후 수평 이동={result.Moved:F2}m",
+            $"player={Target(player)} life={life} health={health} deadElapsed={result.Elapsed:F2}s " +
+            $"startY={result.StartY:F2} currentY={result.CurrentY:F2}");
     }
 
     private void InspectWorldExit(
@@ -402,12 +405,16 @@ public sealed class GameplayInvariantDetector : IQADetector
             $"player={Target(player)}");
     }
 
-    /// <summary>플레이어 캡슐이 벽/환경 지오메트리와 실제로 겹치는지(관통) 검사한다.</summary>
-    private void InspectWallPenetration(QARecorder recorder, Player player, bool invalidPosition)
+    /// <summary>
+    /// 플레이어 캡슐이 벽/환경 지오메트리와 실제로 겹치는지(관통) 검사한다.
+    /// 구속 중·풀린 뒤 0.5초는 모터가 일부러 벽 밖으로 꺼내지 않으므로 보지 않는다(할 일 185 — RestrainedWallGraceJudge).
+    /// </summary>
+    private void InspectWallPenetration(QARecorder recorder, Player player, PlayerActionState state, bool invalidPosition)
     {
         Collider penetratedCollider = null;
+        bool restrainedGrace = _restrainedWallGrace.Step(Time.time, state);
 
-        if (!invalidPosition && _playerCapsule != null)
+        if (!invalidPosition && !restrainedGrace && _playerCapsule != null)
         {
             Transform t = _playerCapsule.transform;
             Vector3 lossy = t.lossyScale;
@@ -583,6 +590,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         _lastFixedSampleTime = -1f;
         _worldExitSince = -1f;
         _deadPlayerJudge.Reset();
+        _restrainedWallGrace.Reset();
         _hasTimedState = false;
     }
 

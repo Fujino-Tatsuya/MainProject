@@ -74,6 +74,32 @@ public sealed class DeadPlayerJudgeTests
     }
 
     [Test]
+    public void 사망_연출_중_수직_1_4m_낙하는_세지_않는다()
+    {
+        // 할 일 183 — 23호 손에 들린 채 죽은 시체가 0.45초 동안 바닥으로 떨어진다.
+        Run(0.3f, PlayerLifeState.DeadPresentation, PlayerActionState.Dead, Vector3.zero, health: 0);
+        Run(0.45f, PlayerLifeState.DeadPresentation, PlayerActionState.Dead, Vector3.down * (1.4f / 0.45f), health: 0);
+        DeadPlayerJudge.Result result =
+            Advance(PlayerLifeState.DeadPresentation, PlayerActionState.Dead, Vector3.zero, health: 0);
+
+        Assert.Less(_position.y, -1.35f, "실제로 1.4m 가까이 떨어져야 의미 있는 시나리오다");
+        Assert.AreEqual(0f, result.Moved, 0.0001f);
+        Assert.AreEqual(0f, result.StartY, 0.0001f);
+        Assert.AreEqual(_position.y, result.CurrentY, 0.0001f);
+        Assert.AreEqual(0, _violationEntries);
+    }
+
+    [Test]
+    public void 사망_연출_중_수평_1_2m_밀리면_센다()
+    {
+        Run(0.3f, PlayerLifeState.DeadPresentation, PlayerActionState.Dead, Vector3.zero, health: 0);
+        Run(0.4f, PlayerLifeState.DeadPresentation, PlayerActionState.Dead, Vector3.right * 3f, health: 0);
+
+        Assert.Greater(_position.x, 1.15f, "실제로 1.2m 가까이 밀려야 의미 있는 시나리오다");
+        Assert.AreEqual(1, _violationEntries);
+    }
+
+    [Test]
     public void 생명주기가_없으면_HP_0_기준으로_폴백한다()
     {
         Run(0.5f, null, PlayerActionState.Idle, Vector3.forward * 4f, health: 0);
