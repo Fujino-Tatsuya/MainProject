@@ -4,16 +4,21 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 특성 창 배경 블러 그리기(할 일 165 후속 A안) — 화면 1회 캡처 → 축소 → 가로·세로 블러. 창이 열릴 때 한 번만 부르고 매 프레임에는 부르지 않는다.
 /// 블러는 MaskBlur 셰이더의 0번(가로)·1번(세로) 패스를 그대로 쓴다(<see cref="MaskBlurFeature"/> 와 같은 스텝 = 세기 / 축소 폭).
+/// 끝에 채도 패스(TraitBackdropSaturate, Rec.709 루마)를 1회 더 블릿한다 — 축소 RT 두 장을 맞바꿔 써서 RT 를 더 빌리지 않는다.
 /// 결과는 <see cref="RenderTexture.GetTemporary(int,int)"/> — 쓴 쪽이 <see cref="Release"/> 로 반납한다. 화면 크기 캡처 텍스처는 여기서 바로 반납한다.
 /// </summary>
 public static class TraitBackdropBlur
 {
     private const int HorizontalPass = 0; // MaskBlurDownH
     private const int VerticalPass = 1;   // MaskBlurV
+    private const int SaturationPass = 0; // TraitBackdropSaturate
     private static readonly int IdStep = Shader.PropertyToID("_MaskBlurStep");
+    private static readonly int IdSaturation = Shader.PropertyToID("_Saturation");
 
     private static Material material;
     private static Shader materialShader;
+    private static Material saturationMaterial;
+    private static Shader saturationMaterialShader;
     private static CommandBuffer commands;
 
     /// <summary>
@@ -71,6 +76,15 @@ public static class TraitBackdropBlur
                 Blitter.BlitTexture(commands, scratch, result, blur, VerticalPass);
             }
 
+            // 채도 패스(열 때 1회) — result → scratch 로 그리고 둘을 맞바꿔 RT 를 더 빌리지 않는다. 남는 쪽은 finally 가 반납.
+            if (settings.ShouldSaturate)
+            {
+                Material saturate = SaturationMaterialFor(settings.saturationShader);
+                saturate.SetFloat(IdSaturation, settings.saturation);
+                Blitter.BlitTexture(commands, result, scratch, saturate, SaturationPass);
+                (result, scratch) = (scratch, result);
+            }
+
             Graphics.ExecuteCommandBuffer(commands);
             commands.Clear();
             return result;
@@ -104,5 +118,17 @@ public static class TraitBackdropBlur
         material = CoreUtils.CreateEngineMaterial(shader);
         materialShader = shader;
         return material;
+    }
+
+    private static Material SaturationMaterialFor(Shader shader)
+    {
+        if (saturationMaterial != null && saturationMaterialShader == shader)
+            return saturationMaterial;
+
+        if (saturationMaterial != null)
+            CoreUtils.Destroy(saturationMaterial);
+        saturationMaterial = CoreUtils.CreateEngineMaterial(shader);
+        saturationMaterialShader = shader;
+        return saturationMaterial;
     }
 }

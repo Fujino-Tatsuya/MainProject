@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TraitBackdropBlurSettings
   blurShader: {fileID: 4800000, guid: 361f8b51716b94b42ba09f8c105bdd2e, type: 3}
   blurStrength: 1.42
-  downsampleShift: 1
-  iterations: 1
+  downsampleShift: 2
+  iterations: 3
+  saturationShader: {fileID: 4800000, guid: 8e3db078083ebc64e87f3909d5d75fc1, type: 3}
+  saturation: 0
   dimAlpha: 0.25

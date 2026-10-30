@@ -353,6 +353,7 @@ public static class TraitUiAuthoring
     private const string BackdropName = "Backdrop";
     private const string BackdropSettingsPath = "Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset";
     private const string BlurShaderName = "Hidden/Rendering/MaskBlur";
+    private const string SaturationShaderName = "Hidden/Traits/TraitBackdropSaturate";
 
     /// <summary>
     /// 지금 프리팹의 선택 창(<c>Window</c>) 바로 앞 형제로 전체화면 RawImage <c>Backdrop</c>(기본 꺼짐)을 두고 <c>backdrop</c>·<c>backdropSettings</c> 칸을 잇는다.
@@ -426,7 +427,7 @@ public static class TraitUiAuthoring
         return changed;
     }
 
-    /// <summary>배경 블러 설정 에셋 — 없으면 코드 기본값(= MaskBlurSettings.asset 블러 값)과 셰이더 참조로 만든다. 있으면 그대로(튜닝값 보존, 셰이더만 비었으면 채움).</summary>
+    /// <summary>배경 블러 설정 에셋 — 없으면 코드 기본값과 셰이더 참조(블러·채도)로 만든다. 있으면 그대로(튜닝값 보존, 셰이더만 비었으면 채움).</summary>
     public static TraitBackdropBlurSettings EnsureBackdropSettings()
     {
         var settings = AssetDatabase.LoadAssetAtPath<TraitBackdropBlurSettings>(BackdropSettingsPath);
@@ -435,12 +436,16 @@ public static class TraitUiAuthoring
             EnsureFolder(System.IO.Path.GetDirectoryName(BackdropSettingsPath).Replace('\\', '/'));
             settings = ScriptableObject.CreateInstance<TraitBackdropBlurSettings>();
             settings.blurShader = Shader.Find(BlurShaderName);
+            settings.saturationShader = Shader.Find(SaturationShaderName);
             AssetDatabase.CreateAsset(settings, BackdropSettingsPath);
             AssetDatabase.SaveAssets();
         }
-        else if (settings.blurShader == null)
+        else if (settings.blurShader == null || settings.saturationShader == null)
         {
-            settings.blurShader = Shader.Find(BlurShaderName);
+            if (settings.blurShader == null)
+                settings.blurShader = Shader.Find(BlurShaderName);
+            if (settings.saturationShader == null)
+                settings.saturationShader = Shader.Find(SaturationShaderName);
             EditorUtility.SetDirty(settings);
             AssetDatabase.SaveAssets();
         }
