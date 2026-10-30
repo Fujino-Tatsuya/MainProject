@@ -42,7 +42,7 @@ public sealed class CharacterSelectUiPolishTests
     static readonly string[] EnglishNames = { "Paladin", "Gunner", "Assassin" };
 
     [Test]
-    public void Nameplate_OnInPrefab_FollowsFocus_PortraitAndEnglishName()
+    public void Nameplate_OnInPrefab_FollowsFocus_EnglishNameWithoutPortrait()
     {
         Transform plate = _instance.transform.Find("Content/Nameplate");
         Assert.IsNotNull(plate);
@@ -52,7 +52,8 @@ public sealed class CharacterSelectUiPolishTests
         var portrait = so.FindProperty("nameplatePortrait").objectReferenceValue as Image;
         var name = so.FindProperty("nameplateName").objectReferenceValue as TMP_Text;
         var roster = so.FindProperty("roster").objectReferenceValue as CharacterRoster;
-        Assert.IsNotNull(portrait, "nameplatePortrait 연결");
+        // 이름판 초상화는 빼기로 함(사용자 에디터 수정, 할 일 162 후속) — 연결이 비어 있어야 하고 이름만 포커스를 따른다.
+        Assert.IsNull(portrait, "nameplatePortrait 연결 없음(의도)");
         Assert.IsNotNull(name, "nameplateName 연결");
         Assert.AreEqual(EnglishNames.Length, roster.Count, "로스터 3명(팔라딘·거너·어쌔신 순)");
 
@@ -61,8 +62,6 @@ public sealed class CharacterSelectUiPolishTests
         {
             int focus = step % EnglishNames.Length;
             Assert.AreEqual(focus, _panel.FocusedCharacterId);
-            Assert.AreSame(roster.Entries[focus].Portrait, portrait.sprite, $"{focus}번 초상화");
-            Assert.IsTrue(portrait.enabled);
             Assert.AreEqual(EnglishNames[focus], name.text, $"{focus}번 이름 = 고정 영어");
             _panel.MoveFocus(1);
         }
