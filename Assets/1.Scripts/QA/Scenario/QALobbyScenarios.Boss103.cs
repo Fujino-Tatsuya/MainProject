@@ -122,7 +122,7 @@ public static partial class QALobbyScenarios
     /// 로스터에서 그 캐릭터(<see cref="CharacterRoster.Entry.TutorialCharacter"/>) 칸을 찾아 정식 요청(<see cref="LobbySession.RequestCharacter"/>)으로 바꾼다.
     /// dev 86 로비부터 서버가 캐릭터 선택대(<see cref="LobbyInteractableKind.CharacterSelect"/>) 반경 + 여유 안에서만 받으므로 먼저 걸어간다 —
     /// 자리마다 선택대 둘레 다른 각도(<see cref="QABoss103Plan.ArcAngle"/>, 스폰 쪽을 향한 호). 서버 순간이동은 쓰지 않는다.
-    /// 129-2 — 걸음은 출격과 같은 경유점 경로(<see cref="WalkRoute103"/>, 로그 char_route). 직선은 벽에 막혀 출격 구역 안에 멈출 수 있었다.
+    /// 129-2 — 걸음은 출격과 같은 경유점 경로(<see cref="QASortieGather.WalkRoute"/>, 로그 char_route). 직선은 벽에 막혀 출격 구역 안에 멈출 수 있었다.
     /// </summary>
     private static IEnumerator PickCharacter103(QAScenarioContext ctx, QABoss103Character character, int slot, int count, QAFlag ok, StringBuilder note)
     {
@@ -174,7 +174,7 @@ public static partial class QALobbyScenarios
             // 걷기 → 요청 → 3초 대기. 거부·미반영이면 사유를 남기고 다시 걸어간 뒤 재요청(교체 쿨다운·교체 중 거부 포함).
             for (int attempt = 1; attempt <= CharacterRequestAttempts; attempt++)
             {
-                yield return WalkRoute103(ctx, slot, spot, "char");
+                yield return QASortieGather.WalkRoute(ctx.Input, slot, spot, "char", QABoss103Plan.Tag);
                 float dist = Player.LocalPlayer != null ? NearestInteractable.PlanarDistance(Player.LocalPlayer.transform.position, station.Position) : -1f;
                 int rejectsBefore = rejects;
                 LobbySession.Active?.RequestCharacter(target);
@@ -292,214 +292,29 @@ public static partial class QALobbyScenarios
     }
 
     /// <summary>
-    /// 출격(dev 86 T2b) — 출격 집결 구역(진행기 sortieZone = Gather_Sortie, SortieStation 위)의 긴 축 일렬 자리(<see cref="QABoss103Plan.PadLineOffset"/>)로 걸어가
+    /// 출격(dev 86 T2b) — 공용 출격 집결(<see cref="QASortieGather.Gather"/>, 할 일 169 에서 옮김 — 10분 시나리오와 같은 메커니즘·로그 이벤트 sortie_*).
+    /// 출격 집결 구역(진행기 sortieZone = Gather_Sortie, SortieStation 위)의 긴 축 일렬 자리(<see cref="QABoss103Plan.PadLineOffset"/>)로 걸어가
     /// 그대로 머문다 → 서버 집결 유지 시간(LobbyRules 5초) → 진행기가 메인 진입. 훈련 입구 구역은 지나가지 않는다(Lobby 단계에서 입구 확정 = 훈련 시작 → 출격 꺼짐).
     /// 결과는 내 맵 플레이어가 설 때까지(상한 <see cref="SortieMapTimeoutSeconds"/>). 실패 detail = 집결 n/m·단계.
     /// </summary>
     private static IEnumerator Sortie103(QAScenarioContext ctx, int slot, int count, QAFlag ok, StringBuilder note)
     {
-        ok.Value = false;
-        if (QALobbyFlow.InMapWithPlayer)
-        {
-            ok.Value = true;
+        var result = new QASortieGatherResult();
+        yield return QASortieGather.Gather(ctx.Input, slot, count, SortieMapTimeoutSeconds, result, QABoss103Plan.Tag);
+        ok.Value = result.InMap;
+        note.Append(result.Note);
+        if (ok.Value)
             yield break;
-        }
-
-        float started = Time.realtimeSinceStartup;
-        PartyGatherZone zone = null;
-        yield return ctx.Wait(() => (zone = SortieZone103()) != null && zone.IsSpawned, 30f);
-        if (zone == null || !zone.IsSpawned)
-        {
-            note.Append($"출격 집결 구역 없음 — {LobbyStage103()}");
+        if (result.Failure == QASortieGatherFailure.ZoneMissing || result.Failure == QASortieGatherFailure.ZoneInactive)
             ctx.Fail("103 출격 집결 구역", note.ToString());
-            yield break;
-        }
-
-        Vector3 spot = SortieSpot103(zone, slot, count);
-        bool inside = zone.ContainsPoint(spot);
-        Debug.Log($"{QABoss103Plan.Tag} event=sortie_walk slot={slot} zone={zone.name} center={QABoss103Plan.Token(QABossStart88.Fmt(zone.WorldCenter))} spot={QABoss103Plan.Token(QABossStart88.Fmt(spot))} spotInside={(inside ? "true" : "false")} {LobbyStage103()}");
-
-        // 집결은 상대(다른 인스턴스)를 기다리므로 걸음은 재시도하고, 밀려나면 다시 들어간다.
-        float nextLog = 0f;
-        while (Time.realtimeSinceStartup - started < SortieMapTimeoutSeconds)
-        {
-            if (QALobbyFlow.InMapWithPlayer)
-                break;
-            Player me = Player.LocalPlayer;
-            if (QALobbyFlow.InLobby && me != null && zone != null && zone.IsSpawned && !zone.ContainsPoint(me.transform.position))
-                yield return WalkRoute103(ctx, slot, spot);
-            else
-                yield return null;
-
-            if (Time.realtimeSinceStartup >= nextLog)
-            {
-                nextLog = Time.realtimeSinceStartup + 5f;
-                Debug.Log($"{QABoss103Plan.Tag} event=sortie_wait slot={slot} t={Time.realtimeSinceStartup - started:F0} {SortieState103(zone)}");
-            }
-        }
-
-        QABlackboard.ScriptedControl = false;
-        ok.Value = QALobbyFlow.InMapWithPlayer;
-        note.Append($"{Time.realtimeSinceStartup - started:F0}초 · {SortieState103(zone)} · scene={QAUtil.ActiveSceneName()}");
-        Debug.Log($"{QABoss103Plan.Tag} event=sortie_end slot={slot} ok={(ok.Value ? "true" : "false")} {QABoss103Plan.Token(note.ToString())}");
-        if (!ok.Value)
+        else
             ctx.Fail("맵 진입(출격 집결)", $"{SortieMapTimeoutSeconds:F0}초 안에 맵 플레이어 없음 — {note}", ctx.Shot("map_timeout"));
     }
 
     /// <summary>출격 집결부터 맵 플레이어까지 상한(초) — 다른 인스턴스 걸음·5초 집결·로딩 포함.</summary>
-    private const float SortieMapTimeoutSeconds = 180f;
+    private const float SortieMapTimeoutSeconds = QASortieGather.DefaultMapTimeoutSeconds;
 
-    /// <summary>
-    /// 119 C5 — 지금 자리에서 <paramref name="goal"/> 까지 씬 기준점(<see cref="WalkAnchors103"/>)을 경유해 걷는다(<see cref="QABoss103Plan.WalkRoute"/>).
-    /// 직선이 열려 있으면 직선, 길이 없으면 직선(이전 동작). 경유 걸음이 닿지 못하면 멈추고 호출자 루프가 지금 자리에서 다시 경로를 잡는다.
-    /// <paramref name="label"/> = 로그 이벤트 접두(출격 sortie_route · 129-2 캐릭터 선택대 char_route).
-    /// </summary>
-    private static IEnumerator WalkRoute103(QAScenarioContext ctx, int slot, Vector3 goal, string label = "sortie")
-    {
-        Player me = Player.LocalPlayer;
-        if (me == null)
-            yield break;
-        var nodes = new List<Vector3> { me.transform.position };
-        foreach (Vector3 a in WalkAnchors103())
-            if (Mathf.Abs(a.y - me.transform.position.y) <= WalkAnchorMaxRise)
-                nodes.Add(a);
-        nodes.Add(goal);
-        List<int> route = QABoss103Plan.WalkRoute(nodes.Count, (a, b) => WalkClear103(nodes[a], nodes[b]), (a, b) => PlanarDistance103(nodes[a], nodes[b]));
-
-        var sb = new StringBuilder();
-        if (route != null)
-            foreach (int i in route)
-                sb.Append(sb.Length > 0 ? ">" : "").Append(QABossStart88.Fmt(nodes[i]));
-        Debug.Log($"{QABoss103Plan.Tag} event={label}_route slot={slot} from={QABoss103Plan.Token(QABossStart88.Fmt(nodes[0]))} anchors={nodes.Count - 2} route={(route != null ? QABoss103Plan.Token(sb.ToString()) : "none")}");
-        if (route == null)
-        {
-            yield return QALobbyFlow.WalkTo(ctx.Input, goal, 0.3f, 15f);
-            yield break;
-        }
-        for (int k = 0; k < route.Count; k++)
-        {
-            bool last = k == route.Count - 1;
-            Vector3 p = nodes[route[k]];
-            p.y = me.transform.position.y;
-            yield return QALobbyFlow.WalkTo(ctx.Input, p, last ? 0.3f : 0.5f, 15f);
-            if (!QALobbyFlow.LastWalkArrived)
-            {
-                Debug.Log($"{QABoss103Plan.Tag} event={label}_route_stuck slot={slot} leg={k + 1}/{route.Count} at={QABoss103Plan.Token(Player.LocalPlayer != null ? QABossStart88.Fmt(Player.LocalPlayer.transform.position) : "na")}");
-                yield break;
-            }
-        }
-    }
-
-    /// <summary>경유점으로 쓰는 기준점의 내 발 높이 차 상한(m) — 계단 위(포드 데크) 점은 평면 걸음에서 뺀다.</summary>
-    private const float WalkAnchorMaxRise = 0.5f;
-
-    /// <summary>
-    /// 로비 걸음 경유 기준점 — 스폰 지점·출격 패드(SortieStation)·포드 발사 걷기 시작 지점(walkSlots start·entryPath)·공용 경로점(walkPath).
-    /// 좌표를 하드코딩하지 않고 씬에서 읽는다(레이아웃이 바뀌어도 열린 길을 다시 찾는다).
-    /// </summary>
-    private static List<Vector3> WalkAnchors103()
-    {
-        var list = new List<Vector3>();
-        void Add(Transform t)
-        {
-            if (t != null)
-                list.Add(t.position);
-        }
-        Transform[] spawns = QALobbyFlow.LobbySpawnPoints();
-        if (spawns != null)
-            foreach (Transform t in spawns)
-                Add(t);
-        GameObject station = GameObject.Find("SortieStation");
-        if (station != null)
-            Add(station.transform);
-        LobbyPodLaunch pod = Object.FindFirstObjectByType<LobbyPodLaunch>();
-        if (pod != null)
-        {
-            foreach (LobbyPodLaunch.WalkSlot s in pod.EditorWalkSlots)
-                if (s != null)
-                {
-                    Add(s.start);
-                    if (s.entryPath != null)
-                        foreach (Transform t in s.entryPath)
-                            Add(t);
-                }
-            foreach (Transform t in pod.EditorWalkPath)
-                Add(t);
-        }
-        return list;
-    }
-
-    /// <summary>
-    /// 두 점 사이 평면 걸음이 Wall/Env 에 막히지 않는가 — 무릎 높이 구 캐스트(플레이어 캡슐 반경 0.38 + 여유 → 0.45).
-    /// 출발점이 벽에 붙어 있으면 구가 처음부터 겹쳐 그 벽을 못 보므로(SphereCast 는 시작 겹침을 무시) 그때만 작은 구(0.3)로 본다.
-    /// </summary>
-    private static bool WalkClear103(Vector3 a, Vector3 b)
-    {
-        Vector3 d = b - a;
-        d.y = 0f;
-        float len = d.magnitude;
-        if (len < 0.01f)
-            return true;
-        int mask = LayerMask.GetMask("Wall", "Env");
-        Vector3 origin = new Vector3(a.x, a.y + 0.6f, a.z);
-        float radius = Physics.CheckSphere(origin, WalkCastRadius, mask, QueryTriggerInteraction.Ignore) ? WalkCastRadiusHugging : WalkCastRadius;
-        return !Physics.SphereCast(origin, radius, d / len, out _, len, mask, QueryTriggerInteraction.Ignore);
-    }
-
-    private const float WalkCastRadius = 0.45f;
-    private const float WalkCastRadiusHugging = 0.3f;
-
-    private static float PlanarDistance103(Vector3 a, Vector3 b)
-    {
-        a.y = 0f;
-        b.y = 0f;
-        return Vector3.Distance(a, b);
-    }
-
-    private static readonly System.Reflection.FieldInfo SortieZoneField =
-        typeof(LobbyTrainingDirector).GetField("sortieZone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-
-    /// <summary>진행기의 출격 구역(직렬화 private — 읽기만). 진행기·필드가 없으면 이름 Gather_Sortie 로 찾는다.</summary>
-    private static PartyGatherZone SortieZone103()
-    {
-        LobbyTrainingDirector d = LobbyTrainingDirector.Active;
-        if (d != null && SortieZoneField?.GetValue(d) is PartyGatherZone z && z != null)
-            return z;
-        foreach (PartyGatherZone s in PartyGatherZone.Spawned)
-            if (s != null && s.name == "Gather_Sortie")
-                return s;
-        return null;
-    }
-
-    /// <summary>구역 박스 긴 축 일렬 자리(바닥 높이 = 내 플레이어 높이 — 평면 걸음).</summary>
-    private static Vector3 SortieSpot103(PartyGatherZone zone, int slot, int count)
-    {
-        BoxCollider box = zone.GetComponent<BoxCollider>();
-        Transform t = box.transform;
-        Vector3 half = Vector3.Scale(box.size * 0.5f, t.lossyScale);
-        bool alongX = Mathf.Abs(half.x) >= Mathf.Abs(half.z);
-        float longHalf = alongX ? Mathf.Abs(half.x) : Mathf.Abs(half.z);
-        float off = QABoss103Plan.PadLineOffset(slot, count, longHalf, 1.1f);
-        Vector3 axis = alongX ? t.right : t.forward;
-        Vector3 p = zone.WorldCenter + axis * off;
-        p.y = Player.LocalPlayer != null ? Player.LocalPlayer.transform.position.y : t.position.y;
-        return p;
-    }
-
-    private static string LobbyStage103()
-    {
-        LobbyTrainingDirector d = LobbyTrainingDirector.Active;
-        return d != null ? $"stage={d.Stage}/{d.Phase}" : "stage=na";
-    }
-
-    private static string SortieState103(PartyGatherZone zone)
-    {
-        Player me = Player.LocalPlayer;
-        bool meIn = zone != null && me != null && zone.IsSpawned && zone.ContainsPoint(me.transform.position);
-        return zone != null && zone.IsSpawned
-            ? $"gather={zone.GatheredCount}/{zone.ParticipantCount} active={zone.IsActive} countdown={zone.IsCountdownActive} confirmed={zone.IsConfirmed} meIn={meIn} {LobbyStage103()}"
-            : $"gather=na {LobbyStage103()}";
-    }
+    private static string LobbyStage103() => QASortieGather.Stage();
 
     private static TutorialCharacter ToTutorialCharacter(QABoss103Character c)
     {

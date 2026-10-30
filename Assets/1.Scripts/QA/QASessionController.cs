@@ -164,7 +164,7 @@ public sealed class QASessionController : MonoBehaviour
         _cycleSummary = "중단";
         _cycleFailed = false;
 
-        // 48 데모 흐름: 타이틀·IP 버튼이 없다 — 접속은 DemoSessionDirector 가 설정 파일로 한다. QA 는 걷어서 준비만 한다.
+        // 48 데모 흐름: 타이틀·IP 버튼이 없다 — 접속은 DemoSessionDirector 가 설정 파일로 한다. QA 는 출격 집결 구역까지 걷기만 한다.
         if (DemoSessionDirector.IsDemoFlowActive)
         {
             yield return RunDemoLobby();
@@ -195,7 +195,7 @@ public sealed class QASessionController : MonoBehaviour
         yield return WaitForSessionEnd(endTime);
     }
 
-    /// <summary>48 데모 흐름: 로비 접속(자동) 대기 → (호스트) 인원 대기 → 준비 패드까지 걸어가 F.</summary>
+    /// <summary>48 데모 흐름: 로비 접속(자동) 대기 → (호스트) 인원 대기 → 출격 집결 구역으로 걸어가 맵 진입까지(할 일 169).</summary>
     private IEnumerator RunDemoLobby()
     {
         yield return WaitOrTimeout(() => QALobbyFlow.IsConnected && QALobbyFlow.HasLocalLobbyPlayer, multiplayerTimeout);
@@ -208,15 +208,23 @@ public sealed class QASessionController : MonoBehaviour
             if (AbortCycle($"클라이언트 접속(기대 {expectedPlayers}인)")) yield break;
         }
 
-        // 결과 패널이 열려 있으면 입력이 막힌다 — 닫고 준비.
+        // 결과 패널이 열려 있으면 입력이 막힌다 — 닫고 출격.
         LobbyResultPanel panel = FindFirstObjectByType<LobbyResultPanel>();
         if (panel != null && panel.IsOpen)
             panel.Hide();
 
-        yield return QALobbyFlow.ReadyUp(_input);
-        if (!QALobbyFlow.IsLocalReady())
-            _recorder.Add(QASeverity.Error, "Flow", "로비 준비 실패(패드 걷기·F·RPC 모두) — 카운트다운이 시작되지 않을 수 있음");
-        // 전원 준비 → 카운트다운 끝에 서버가 맵을 로드·스폰한다.
+        yield return GatherForSortie();
+        // 전원 출격 구역 안 5초 → 진행기가 메인(맵)을 로드·스폰한다.
+    }
+
+    private readonly QASortieGatherResult _sortie = new QASortieGatherResult();
+
+    /// <summary>출격 집결 구역으로 걸어가 맵 플레이어가 설 때까지(<see cref="QALobbyFlow.GatherForSortie"/>). 실패면 집결 상태를 근거로 남긴다.</summary>
+    private IEnumerator GatherForSortie()
+    {
+        yield return QALobbyFlow.GatherForSortie(_input, expectedPlayers, _sortie);
+        if (!_sortie.InMap)
+            _recorder.Add(QASeverity.Error, "Flow", $"로비 출격 집결 실패({_sortie.Failure}) — {_sortie.Note}");
     }
 
     /// <summary>옛 흐름(데모 흐름 꺼짐 — Dev 부팅 등): 타이틀 → 로비 → IP 직접 접속.</summary>
@@ -382,8 +390,7 @@ public sealed class QASessionController : MonoBehaviour
             if (AbortCycle($"클라이언트 접속(기대 {expectedPlayers}인)")) yield break;
         }
 
-        // 48(C9): Ready 버튼·호스트 시작 버튼이 없다 — 전원 준비 → LobbySession 카운트다운이 끝나면
-        // 서버가 StartGameLoading 을 스스로 1회 부른다. QA 는 내 준비만 켠다.
+        // Ready 버튼·준비 패드가 없다 — 전원 출격 집결 구역 안 5초 → 진행기가 메인 진입(할 일 169).
         yield return RequestLocalReady();
     }
 
@@ -393,13 +400,13 @@ public sealed class QASessionController : MonoBehaviour
         return nm != null && nm.IsServer && nm.ConnectedClientsList.Count >= expectedPlayers;
     }
 
-    /// <summary>로비에 내 플레이어가 서면 준비 패드까지 걸어가 F(서버가 패드 거리를 다시 본다). 토글이라 이미 준비면 건너뛴다.</summary>
+    /// <summary>로비에 내 플레이어가 서면 출격 집결 구역으로 걸어가 맵 진입까지(할 일 169 — 옛 준비 패드 대체).</summary>
     private IEnumerator RequestLocalReady()
     {
         yield return WaitOrTimeout(() => QALobbyFlow.HasLocalLobbyPlayer, phaseTimeout);
         if (AbortCycle("로비 세션 대기")) yield break;
 
-        yield return QALobbyFlow.ReadyUp(_input);
+        yield return GatherForSortie();
     }
 
     /// <summary>클라이언트 역할(MPPM 가상 플레이어): 호스트에 접속 → ready. 스폰은 공통 단계에서 대기.</summary>
@@ -428,9 +435,9 @@ public sealed class QASessionController : MonoBehaviour
             if (AbortCycle("클라이언트 접속")) yield break;
         }
 
-        Debug.Log("[QA][Client] 접속 완료 → ready");
+        Debug.Log("[QA][Client] 접속 완료 → 출격 집결");
         yield return RequestLocalReady();
-        // 전원 준비 → 카운트다운 끝에 서버가 맵을 로드·스폰 → 공통 4)에서 Player.LocalPlayer 대기.
+        // 전원 출격 구역 안 5초 → 진행기가 맵을 로드·스폰 → 공통 4)에서 Player.LocalPlayer 대기.
     }
 
     /// <summary>MPPM 가상 플레이어(클론)는 --virtual-project-clone 인자를 갖는다. 메인 에디터=호스트.</summary>

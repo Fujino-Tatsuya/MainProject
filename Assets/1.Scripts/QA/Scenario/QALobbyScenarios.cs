@@ -58,7 +58,7 @@ public static partial class QALobbyScenarios
             ctx.Fail("로비·내 플레이어 대기", $"{timeout:F0}초 안에 로비 플레이어 없음 scene={QAUtil.ActiveSceneName()} connected={QALobbyFlow.IsConnected}", ctx.Shot("lobby_timeout"));
     }
 
-    /// <summary>준비 → 카운트다운 → 맵에 내 플레이어가 설 때까지(다른 시나리오의 준비 단계).</summary>
+    /// <summary>출격 집결(할 일 169) → 맵에 내 플레이어가 설 때까지(다른 시나리오의 준비 단계).</summary>
     private static IEnumerator GoToMap(QAScenarioContext ctx, QAFlag ok)
     {
         ok.Value = false;
@@ -93,11 +93,12 @@ public static partial class QALobbyScenarios
             }
         }
 
-        yield return QALobbyFlow.ReadyUp(ctx.Input);
-        yield return ctx.Wait(() => QALobbyFlow.InMapWithPlayer, 120f);
-        ok.Value = !ctx.TimedOut;
+        // 할 일 169 — 준비 패드 대신 출격 집결 구역에 전원 5초 → 진행기가 메인 진입.
+        var sortie = new QASortieGatherResult();
+        yield return QALobbyFlow.GatherForSortie(ctx.Input, ctx.ExpectedPlayers, sortie);
+        ok.Value = sortie.InMap;
         if (!ok.Value)
-            ctx.Fail("맵 진입(준비 단계)", $"준비 뒤 120초 안에 맵 플레이어 없음 ready={QALobbyFlow.IsLocalReady()} scene={QAUtil.ActiveSceneName()}", ctx.Shot("map_timeout"));
+            ctx.Fail("맵 진입(출격 집결)", $"로비 출격 집결 실패({sortie.Failure}) — {sortie.Note}", ctx.Shot("map_timeout"));
     }
 
     /// <summary>결과 패널이 열려 있으면 ESC → 안 닫히면 Hide. itemName 이 있으면 ESC 결과를 항목으로 남긴다.</summary>

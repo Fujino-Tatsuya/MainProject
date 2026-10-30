@@ -8,7 +8,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// 48 걷는 로비 조작 도구(QA 전용) — 게임 코드 무수정, public 진입점·Registry 만 읽는다.
-/// 준비는 서버가 패드 거리를 다시 보므로(LobbySession.ToggleReadyServerRpc) 반드시 패드까지 걸어간 뒤 F 를 누른다.
+/// 맵 진입은 출격 집결 구역으로 걸어가 전원이 머무는 정식 경로(<see cref="GatherForSortie"/>, 할 일 169 — 옛 준비 패드는 로비에 없다).
 /// </summary>
 public static class QALobbyFlow
 {
@@ -188,27 +188,36 @@ public static class QALobbyFlow
         }
     }
 
-    /// <summary>준비 패드까지 걸어가 F → 내 준비가 켜질 때까지. 결과는 <see cref="IsLocalReady"/>·LastInteractViaKey.</summary>
-    public static IEnumerator ReadyUp(QAInputController input)
+    /// <summary>
+    /// 할 일 169 — 옛 준비 패드(ReadyUp) 대신 출격 집결 구역으로 걸어가 맵 플레이어가 설 때까지 머문다(<see cref="QASortieGather.Gather"/>).
+    /// 자리 = 스폰된 플레이어를 OwnerClientId 로 정렬한 내 순번, 인원 = 기대 인원·스폰 인원 중 큰 값(<see cref="QASortieGather.TrySlot"/>).
+    /// 자리를 정하기 전 스폰 인원이 기대 인원에 1초 머물 때까지(상한 30초) 기다려 늦은 접속이 자리를 겹치지 않게 한다.
+    /// </summary>
+    public static IEnumerator GatherForSortie(QAInputController input, int expectedPlayers, QASortieGatherResult result,
+        float timeout = QASortieGather.DefaultMapTimeoutSeconds, string tag = "[QA]")
     {
-        if (!HasLocalLobbyPlayer || IsLocalReady())
-            yield break;
-
-        LobbyInteractable pad = FindInteractable(LobbyInteractableKind.Ready, Player.LocalPlayer.transform.position);
-        if (pad == null)
+        result.Reset();
+        if (InMapWithPlayer)
         {
-            Debug.LogWarning("[QA] 준비 패드(LobbyInteractable Ready)를 찾지 못했다.");
+            result.InMap = true;
             yield break;
         }
 
-        // MPPM 셋이 같은 중심으로 가면 서로 막힌다 — clientId 마다 패드 둘레 다른 자리(반경 절반, 120° 간격).
-        ulong id = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
-        float angle = (id % 3) * 120f * Mathf.Deg2Rad;
-        Vector3 spot = pad.Position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * (pad.Radius * 0.5f);
-        yield return WalkTo(input, spot, 0.3f, 20f);
-        yield return PressInteract(input, IsLocalReady, () => LobbySession.Active?.RequestToggleReady());
-        QABlackboard.ScriptedControl = false;
+        float stable = 0f;
+        float waited = 0f;
+        while (waited < SlotSettleTimeoutSeconds && stable < 1f && !InMapWithPlayer)
+        {
+            stable = SpawnedPlayers().Count >= expectedPlayers ? stable + Time.unscaledDeltaTime : 0f;
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        bool listed = QASortieGather.TryLocalSlot(expectedPlayers, out int slot, out int count);
+        Debug.Log($"{tag} event=sortie_slot slot={slot} count={count} listed={(listed ? "true" : "false")} spawned={SpawnedPlayers().Count} expected={expectedPlayers}");
+        yield return QASortieGather.Gather(input, slot, count, timeout, result, tag);
     }
+
+    private const float SlotSettleTimeoutSeconds = 30f;
 
     /// <summary>
     /// 카메라 추적 확인: 열린 방향으로 1.2초 걷고 카메라 이동량이 플레이어 이동량의 절반 이상인지 본다.

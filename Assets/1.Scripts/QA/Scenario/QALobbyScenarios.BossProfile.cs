@@ -43,11 +43,11 @@ public static partial class QALobbyScenarios
             // 로딩부터 기록 — 예열(로딩 중 1회)과 로딩 히치도 같은 파일에 남긴다.
             probe.StartProfiler();
             probe.SetPhase(QABossProfileProbe.Phase.Loading);
-            yield return QALobbyFlow.ReadyUp(ctx.Input);
-            yield return ctx.Wait(() => QALobbyFlow.InMapWithPlayer, 120f);
-            if (ctx.TimedOut)
+            var sortie = new QASortieGatherResult();
+            yield return QALobbyFlow.GatherForSortie(ctx.Input, 1, sortie); // 할 일 169 — 준비 패드 대신 출격 집결(솔로)
+            if (!sortie.InMap)
             {
-                ctx.Fail("맵 진입", $"120초 안에 맵 플레이어 없음 scene={QAUtil.ActiveSceneName()}", ctx.Shot("p572_map"));
+                ctx.Fail("맵 진입", $"로비 출격 집결 실패({sortie.Failure}) — {sortie.Note}", ctx.Shot("p572_map"));
                 yield break;
             }
             probe.SetPhase(QABossProfileProbe.Phase.Map);
