@@ -579,7 +579,11 @@ public class Player : Unit
             && guard.ServerBlocksKnockback)
             return;
 
-        // 서버가 거부(사망 — 슈퍼아머는 Unit.Knockback에서 선차단)하면 오너에게도 전파하지 않는다
+        // 사망(생명주기 Alive 아님)이면 버린다 — 막타 피해 뒤 따로 오는 넉백이 시체를 밀지 않게(할 일 182). FSM 은 Dead 로 가지 않는다.
+        if (lifeCycle != null && !PlayerLifeActionRules.CanAct(lifeCycle.State))
+            return;
+
+        // 서버가 거부(연출 잠금 등 — 슈퍼아머는 Unit.Knockback에서 선차단)하면 오너에게도 전파하지 않는다
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
             return;
