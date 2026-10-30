@@ -654,6 +654,41 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             TeleportRosterInto(teleportTarget, point, confirmIndex);
     }
 
+    /// <summary>
+    /// [서버] QA 전용(할 일 130·170), qa 브랜치에만 — development 병합 금지. 출격 집결을 기다리지 않고 출격 확정과 같은 경로(<see cref="CommitLaunch"/> —
+    /// L41 로딩 + 래치 + 포드 연출 분기 그대로)로 메인 진입을 1회 내보낸다. 이번 호출로 래치를 걸었으면 true.
+    /// 서버가 아니거나 스폰 전, 이미 출격 확정, 출격으로 넘어갈 수 없는 단계(명단 고정 뒤 훈련 중 — L40 출격 집결 행 전)면 경고하고 false.
+    /// 명단 고정 전(L00·L10)은 시연 즉시 출격과 같이 명단을 고정하고 훈련 없이 출격한다. 게임 흐름에서는 부르지 않는다.
+    /// </summary>
+    public bool ServerLaunchMainForQA()
+    {
+        if (!IsServer || _flow == null || Table == null)
+        {
+            Debug.LogWarning($"{Tag} QA 맵 직행 거절 — 서버가 아니거나 스폰 전.", this);
+            return false;
+        }
+
+        var before = ServerDescribe();
+        if (_flow.LaunchCommitted)
+        {
+            Debug.LogWarning($"{Tag} QA 맵 직행 거절 — 이미 메인 진입을 내보냄({before}).", this);
+            return false;
+        }
+
+        var sortieIndex = LobbyTutorialRules.IndexOfGather(Table.Steps, LobbyGatherPoint.Sortie);
+        var atSortie = sortieIndex >= 0 && _flow.StepIndex == sortieIndex;
+        if (!atSortie && _flow.IsRosterLocked)
+        {
+            Debug.LogWarning($"{Tag} QA 맵 직행 거절 — 지금 출격으로 넘어갈 수 없다(명단 고정 뒤 훈련 중, {before}).", this);
+            return false;
+        }
+
+        _flow.LockRoster();
+        Debug.Log($"[SceneFlow] {Tag} QA 맵 직행 — {before}{(atSortie ? "" : " 훈련 없이")}");
+        CommitLaunch(before);
+        return _flow != null && _flow.LaunchCommitted;
+    }
+
     // 출격 확정 → L41 로딩 + 래치 → 메인 진입. 래치를 먼저 걸어 로딩 흐름의 로비 시작 조건(ServerHasLaunched)을 통과시키고, 재확정·중복은 무시한다.
     private void CommitLaunch(string before)
     {

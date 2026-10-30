@@ -106,6 +106,9 @@ public sealed class QASessionController : MonoBehaviour
 
         Player.LocalPlayerChanged += OnLocalPlayerChanged;
 
+        // 할 일 170 — 로비 진행기가 스폰 때부터 출격 구역을 켜게 미리 켠다(이미 올라온 LobbyRules 만 — 나머지는 출격 집결 시작 때). 복원 = OnDestroy·Play 종료.
+        QAInstantSortie.Enable("session_start");
+
         string plan = repeatCount <= 0 ? "무한 반복" : $"{repeatCount}회 반복";
         string role = IsHostRole() ? "호스트" : "클라이언트(가상 플레이어)";
         Debug.Log($"[QA] 세션 시작 — 역할={role}, {expectedPlayers}인, 사이클당 {sessionDuration:F0}초, {plan}. 부팅부터 자동 진행합니다.");
@@ -595,5 +598,6 @@ public sealed class QASessionController : MonoBehaviour
         Player.LocalPlayerChanged -= OnLocalPlayerChanged;
         if (_running && _recorder != null)
             EndCycle("중단: 오브젝트 파괴");
+        QAInstantSortie.Restore();
     }
 }

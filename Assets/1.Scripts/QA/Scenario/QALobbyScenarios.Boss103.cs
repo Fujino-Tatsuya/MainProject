@@ -293,8 +293,8 @@ public static partial class QALobbyScenarios
 
     /// <summary>
     /// 출격(dev 86 T2b) — 공용 출격 집결(<see cref="QASortieGather.Gather"/>, 할 일 169 에서 옮김 — 10분 시나리오와 같은 메커니즘·로그 이벤트 sortie_*).
-    /// 출격 집결 구역(진행기 sortieZone = Gather_Sortie, SortieStation 위)의 긴 축 일렬 자리(<see cref="QABoss103Plan.PadLineOffset"/>)로 걸어가
-    /// 그대로 머문다 → 서버 집결 유지 시간(LobbyRules 5초) → 진행기가 메인 진입. 훈련 입구 구역은 지나가지 않는다(Lobby 단계에서 입구 확정 = 훈련 시작 → 출격 꺼짐).
+    /// 출격 집결 구역(진행기 GatherZone(Sortie) = Gather_Sortie)의 긴 축 일렬 자리(<see cref="QABoss103Plan.PadLineOffset"/>)로 걸어가
+    /// 그대로 머문다 → 서버 집결 유지 시간(단계표 L40 holdSeconds) → 진행기가 메인 진입. 157 이후엔 QA 시연 즉시 출격(<see cref="QAInstantSortie"/>)으로 L00 에서도 출격 구역이 켜진다.
     /// 결과는 내 맵 플레이어가 설 때까지(상한 <see cref="SortieMapTimeoutSeconds"/>). 실패 detail = 집결 n/m·단계.
     /// </summary>
     private static IEnumerator Sortie103(QAScenarioContext ctx, int slot, int count, QAFlag ok, StringBuilder note)

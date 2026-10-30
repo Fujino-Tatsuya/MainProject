@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
 using UnityEngine;
 
@@ -8,7 +7,8 @@ using UnityEngine;
 /// 할 일 169 — 로비 출격 집결 걷기(QA 전용, 게임 코드 무수정). 103 의 출격(Sortie103)을 <see cref="QAScenarioContext"/> 없이 쓰게 옮긴 것 —
 /// 필요한 건 <see cref="QAInputController"/> 뿐이라 10분 시나리오(<see cref="QASessionController"/>)·시나리오 러너가 같은 경로를 탄다.
 /// 출격 집결 구역(진행기 sortieZone = Gather_Sortie)의 긴 축 일렬 자리(<see cref="QABoss103Plan.PadLineOffset"/>)로 걸어가 머문다
-/// → 전원 박스 안 + 유지 시간(LobbyRules 5초) → 진행기가 메인 진입. 훈련 입구 구역은 지나가지 않는다(Lobby 단계에서 입구 확정 = 훈련 시작 → 출격 꺼짐).
+/// → 전원 박스 안 + 유지 시간(단계표 L40 holdSeconds) → 진행기가 메인 진입. 157(할 일 170) 이후 출격 구역은 L40 전엔 꺼져 있어
+/// 시작 때 <see cref="QAInstantSortie.Enable"/> 로 시연 즉시 출격을 켠다(명단 고정 전 출격 구역 켜짐 → 확정 = 훈련 없이 메인 진입).
 /// 걷기·대기 동안 <see cref="QABlackboard.ScriptedControl"/> 을 켜 두어 AI 가 돌아다니거나 공격(Busy — 카운트다운 시작 거부)하지 않게 하고, 끝에 끈다.
 /// </summary>
 public static class QASortieGather
@@ -62,6 +62,8 @@ public static class QASortieGather
         float started = Time.realtimeSinceStartup;
         QABlackboard.ScriptedControl = true;
         input.SetMove(Vector3.zero);
+        // 할 일 170 — 157 은 회차마다 L00 부터라 출격 구역이 꺼져 있다. QA 동안만 시연 즉시 출격을 켠다(복원 = QAInstantSortie.Restore).
+        QAInstantSortie.Enable("sortie_gather");
         try
         {
             PartyGatherZone zone = null;
@@ -314,9 +316,19 @@ public static class QASortieGather
         if (spawns != null)
             foreach (Transform t in spawns)
                 Add(t);
-        GameObject station = GameObject.Find("SortieStation");
+        GameObject station = GameObject.Find("SortieStation"); // 157 에서 지워졌다 — 옛 씬 호환
         if (station != null)
             Add(station.transform);
+        // 할 일 170 — 157 이 스폰 자리를 입구 홀(z -13)로 옮기고 SortieStation 을 지워 홀 → 출격 구역 사이 경유점이 없어졌다.
+        // 로비 중앙 집결 구역(Gather_Brief, L10 — 입구 홀에서 걸어오는 첫 집결이라 닿는 자리) 중심을 경유점으로 쓴다. L00 동안은 꺼져 있어 지나가도 판정이 없다.
+        LobbyTrainingDirector director = LobbyTrainingDirector.Active;
+        PartyGatherZone brief = director != null ? director.GatherZone(LobbyGatherPoint.Brief) : null;
+        if (brief != null)
+        {
+            Vector3 c = brief.WorldCenter;
+            c.y = brief.transform.position.y;
+            list.Add(c);
+        }
 #if UNITY_EDITOR
         LobbyPodLaunch pod = Object.FindFirstObjectByType<LobbyPodLaunch>();
         if (pod != null)
@@ -553,14 +565,12 @@ public static class QASortieGather
         return Vector3.Distance(a, b);
     }
 
-    private static readonly FieldInfo SortieZoneField =
-        typeof(LobbyTrainingDirector).GetField("sortieZone", BindingFlags.Instance | BindingFlags.NonPublic);
-
-    /// <summary>진행기의 출격 구역(직렬화 private — 읽기만). 진행기·필드가 없으면 이름 Gather_Sortie 로 찾는다.</summary>
+    /// <summary>진행기의 출격 구역(157 public <see cref="LobbyTrainingDirector.GatherZone"/>). 진행기·구역이 없으면 이름 Gather_Sortie 로 찾는다.</summary>
     public static PartyGatherZone FindZone()
     {
         LobbyTrainingDirector d = LobbyTrainingDirector.Active;
-        if (d != null && SortieZoneField?.GetValue(d) is PartyGatherZone z && z != null)
+        PartyGatherZone z = d != null ? d.GatherZone(LobbyGatherPoint.Sortie) : null;
+        if (z != null)
             return z;
         foreach (PartyGatherZone s in PartyGatherZone.Spawned)
             if (s != null && s.name == "Gather_Sortie")
@@ -583,11 +593,17 @@ public static class QASortieGather
         return p;
     }
 
-    /// <summary>진행기 단계(stage=단계/세부, 진행기 없으면 na).</summary>
+    /// <summary>
+    /// 진행기 단계(할 일 170 — 157 행 표기). stage=행 stateId(#번호 rev) · gather=켜진 행 집결 지점 · sortieOpen=출격 구역 열림 ·
+    /// instant=시연 즉시 출격 · launching=출격 확정/로딩. 진행기 없으면 stage=na. 공백 없는 토큰으로 낸다(리포트 파서).
+    /// </summary>
     public static string Stage()
     {
         LobbyTrainingDirector d = LobbyTrainingDirector.Active;
-        return d != null ? $"stage={d.Stage}/{d.Phase}" : "stage=na";
+        if (d == null)
+            return "stage=na";
+        return $"stage={QABoss103Plan.Token(d.DescribeStep())} step={d.CurrentStepIndex} point={d.ActiveGatherPoint} sortieOpen={(d.IsSortieGatherOpen ? "true" : "false")} " +
+               $"instant={(QAInstantSortie.IsOn ? "true" : "false")} launching={(d.IsLaunching ? "true" : "false")}";
     }
 
     /// <summary>집결 n/m·active·countdown·confirmed·meIn·stage — 실패 detail·주기 로그 공용.</summary>
