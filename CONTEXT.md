@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **팔라딘 베기 소켓 통합 · 가렌 평타 이벤트 타이밍**, 브랜치 `feature/VFX`) — ✅ 커밋 · ⏳ 민경 Play
+- `Paladin_Armature`: 베기 `Slash01~04` 를 `root/VFXSocket`(애니메이션되는 root 본 밑) → 최상위 `VFXSocket` 으로 옮겨 소켓 9개를 한 부모로 통합(월드 위치 보존). root 가 움직일 때 베기 이펙트가 끌려다니던 문제. `Player_Paladin` 에서 `Slash01~04`·`R_WeaponSocket`·`SM_Wep_Sword_03` 각도 재조정.
+- **은희 영역 알림**: `Garen_Default_Attack_1~4.anim` 의 평타 적중(Hit)·콤보창 열림 이벤트 시점을 프레임에 맞춰 조정(민경 확인 — 의도한 변경). 적중 1→0.333 · 2→0.3 · 4→0.267, 3 의 콤보창 열림 0.3→0.233(적중 0.3 보다 앞). 피해 발생 시점이 바뀌므로 평타 체감·콤보 입력창에 영향.
+
 ## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **보스 B 승리 연출(BOSS DOWN)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) ✅ 승인(Q1~Q3 권장안·R1~R6 문서대로) · ✅ 구현 · ✅ 커밋·feature 푸시 · ✅ 10-29 development 병합 · 전투 EditMode 416/0 · ✅ 경석 MPPM(사망 연출 정상) · 기획 원본 `보스_승리연출_v02_프로그래머_전달사양.md`(10-26)
 - 확정(grill): 보스 B 만 · 전원 같은 화면(막타 = 좌측 전경) · 처치 순간부터 조작 잠금 · 3.2초 뒤 32° 유지 → 결과 화면 · 타이포 코드 생성 · 음영 살린 회색조 · 사망 팀원 그대로.
 - 수정 예정: 새 `Map/BossVictory/*` · `Rendering/BossVictory/*` · `TwentyThreeBoss.cs` · `MonsterBase.cs`(사망 보류 훅) · `BossEncounterDirector.cs` · URP 렌더러 에셋.
