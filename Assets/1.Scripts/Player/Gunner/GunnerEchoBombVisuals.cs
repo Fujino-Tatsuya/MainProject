@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 잔류 포격 에너지 폭탄 1개의 복제 상태(할 일 149) — <c>GunnerBeamView</c> 의 NetworkList 항목.
@@ -64,8 +65,9 @@ public static class GunnerEchoBombTargets
 }
 
 /// <summary>
-/// [전 피어] 잔류 포격 에너지 폭탄 구체 표시(할 일 149) — 폭탄마다 구체 하나를 대상 몸통에 붙여 매 프레임 따라가게 한다(이동·넉백 포함).
-/// 대상이 사라지면 마지막 위치에 남았다가 폭탄이 빠질 때 그 자리를 돌려준다(폭발 연출 위치). 런타임 메시·텍스처 생성 없음 — 프리팹만 복제한다.
+/// [전 피어] 잔류 포격 에너지 폭탄 구체 표시(할 일 149) — 폭탄마다 화면 공간 스프라이트(Image) 하나가 대상 몸 점을 매 프레임 따라간다(이동·넉백 포함).
+/// 공용 오버레이 <see cref="OverheadHealthBarCanvas"/> 위에 그려 몸 메시에 가려지지 않는다(149 후속 4 — 3D 구체는 몸에 묻혔다). 화면 밖·카메라 뒤면 숨긴다.
+/// 대상이 사라지면 마지막 위치에 남았다가 폭탄이 빠질 때 그 자리를 돌려준다(폭발 연출 위치). 런타임 메시·텍스처 생성 없음 — 에셋 스프라이트만 쓴다.
 /// Q 적중 순간 예비 구체(<see cref="AddPreview(ulong)"/>)를 먼저 띄우고, 서버 부착(<see cref="Add(int, ulong)"/>)이 같은 대상이면 그 구체를 이어받는다.
 /// 채택 안 된 예비 구체(중단·사망 등 폭탄 없음)는 대기 시간 뒤 폭발 연출 없이 지운다 — 정리 경로는 그것 하나.
 /// </summary>
@@ -76,7 +78,7 @@ public sealed class GunnerEchoBombVisuals
         public int Id;
         public ulong TargetId;
         public Unit Target;
-        public GameObject Instance;
+        public Image Instance;
         public Vector3 LastPosition;
         // 한 번이라도 대상을 찾았는가 — 찾은 뒤 사라지면(사망·디스폰) 다시 찾지 않고 마지막 위치에 둔다.
         public bool Found;
@@ -89,18 +91,26 @@ public sealed class GunnerEchoBombVisuals
     }
 
     private readonly List<Orb> orbs = new List<Orb>();
-    private readonly GameObject prefab;
+    private readonly Sprite sprite;
+    private readonly float size;
+    private readonly Color color;
     private readonly float showDelay;
     private readonly Vector3 offset;
     private readonly float previewTimeout;
 
+    /// <param name="sprite">폭탄 스프라이트. null 이면 표시하지 않는다(피해·폭발 연출은 그대로).</param>
     /// <param name="showDelay">Q 적중 순간(예비 구체 생성) 뒤 구체를 띄우기까지 지연(초) — 표시 전용, 서버 폭발 시각과 무관.
     /// 예비 구체 없이 바로 붙은 폭탄(늦은 합류 등)은 받은 순간부터 같은 지연.</param>
     /// <param name="offset">몸 점(<see cref="GunnerEchoBombTargets.BodyPoint"/>)에 더하는 월드 오프셋(m).</param>
     /// <param name="previewTimeout">예비 구체가 서버 부착을 기다리는 시간(초) — 지나면 폭발 연출 없이 지운다.</param>
-    public GunnerEchoBombVisuals(GameObject prefab, float showDelay = 0f, Vector3 offset = default, float previewTimeout = 1.5f)
+    /// <param name="size">스프라이트 한 변 크기(오버레이 캔버스 단위 = 세로 1080 기준 px).</param>
+    /// <param name="color">스프라이트 색(null = 흰색).</param>
+    public GunnerEchoBombVisuals(Sprite sprite, float showDelay = 0f, Vector3 offset = default, float previewTimeout = 1.5f,
+        float size = 40f, Color? color = null)
     {
-        this.prefab = prefab;
+        this.sprite = sprite;
+        this.size = Mathf.Max(0f, size);
+        this.color = color ?? Color.white;
         this.showDelay = Mathf.Max(0f, showDelay);
         this.offset = offset;
         this.previewTimeout = Mathf.Max(0f, previewTimeout);
@@ -244,7 +254,7 @@ public sealed class GunnerEchoBombVisuals
         return false;
     }
 
-    /// <summary>매 프레임(LateUpdate) — 대상 몸통 점으로 옮긴다. 대상이 사라졌으면 마지막 위치에 둔다. 채택 시간이 지난 예비 구체는 조용히 지운다.</summary>
+    /// <summary>매 프레임(LateUpdate) — 대상 몸 점(월드)을 갱신한다. 화면 위치 반영은 <see cref="ApplyScreenPositions"/>. 대상이 사라졌으면 마지막 위치에 둔다. 채택 시간이 지난 예비 구체는 조용히 지운다.</summary>
     public void Tick() => Tick(Time.time);
 
     public void Tick(float now)
@@ -272,12 +282,59 @@ public sealed class GunnerEchoBombVisuals
         {
             orb.Found = true;
             orb.LastPosition = PointFor(orb.Target);
-            if (orb.Instance == null && prefab != null && IsShowTime(Time.time, orb.ShowAt))
-                orb.Instance = UnityEngine.Object.Instantiate(prefab, orb.LastPosition, Quaternion.identity);
+            if (orb.Instance == null && sprite != null && IsShowTime(Time.time, orb.ShowAt))
+                orb.Instance = CreateImage();
         }
+    }
 
-        if (orb.Instance != null)
-            orb.Instance.transform.position = orb.LastPosition;
+    /// <summary>
+    /// Canvas 렌더 직전(<c>Canvas.willRenderCanvases</c>)에 부른다 — 카메라가 LateUpdate 에서 움직인 뒤라 대상에서 밀리지 않는다(머리 위 체력바와 같은 이유).
+    /// 카메라 없음·카메라 뒤·화면 밖은 투명 처리.
+    /// </summary>
+    public void ApplyScreenPositions()
+    {
+        Camera cam = Camera.main;
+        Vector2 screenSize = new Vector2(Screen.width, Screen.height);
+        Vector2 halfExtent = new Vector2(size, size) * 0.5f;
+        for (int i = 0; i < orbs.Count; i++)
+        {
+            Image image = orbs[i].Instance;
+            if (image == null)
+                continue;
+
+            bool visible = false;
+            Canvas canvas = image.canvas;
+            if (cam != null && canvas != null)
+            {
+                visible = OverheadHealthBarScreenPlacement.TryGetCanvasPosition(
+                    cam.WorldToScreenPoint(orbs[i].LastPosition), screenSize, canvas.scaleFactor,
+                    Vector2.zero, halfExtent, out Vector2 position);
+                if (visible)
+                    image.rectTransform.anchoredPosition = position;
+            }
+
+            image.canvasRenderer.SetAlpha(visible ? 1f : 0f);
+        }
+    }
+
+    // 공용 오버레이 캔버스 위 Image 하나(왼쪽 아래 앵커, 가운데 피벗). 첫 배치 전에는 투명 — (0,0) 에서 한 프레임 번쩍이지 않게.
+    private Image CreateImage()
+    {
+        var go = new GameObject("EchoBomb", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        var rect = (RectTransform)go.transform;
+        rect.SetParent(OverheadHealthBarCanvas.Instance.transform, false);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(size, size);
+
+        Image image = go.GetComponent<Image>();
+        image.sprite = sprite;
+        image.color = color;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        image.canvasRenderer.SetAlpha(0f);
+        return image;
     }
 
     private static void DestroyInstance(Orb orb)
@@ -285,9 +342,9 @@ public sealed class GunnerEchoBombVisuals
         if (orb.Instance != null)
         {
             if (Application.isPlaying)
-                UnityEngine.Object.Destroy(orb.Instance);
+                UnityEngine.Object.Destroy(orb.Instance.gameObject);
             else
-                UnityEngine.Object.DestroyImmediate(orb.Instance);
+                UnityEngine.Object.DestroyImmediate(orb.Instance.gameObject);
         }
         orb.Instance = null;
     }
