@@ -17,5 +17,5 @@ MonoBehaviour:
   downsampleShift: 2
   iterations: 3
   saturationShader: {fileID: 4800000, guid: 8e3db078083ebc64e87f3909d5d75fc1, type: 3}
-  saturation: 0
+  saturation: 0.6
   dimAlpha: 0.25
