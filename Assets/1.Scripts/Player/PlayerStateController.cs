@@ -323,6 +323,15 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         !PlayerLifeActionRules.AcceptsForcedMotion(
             lifeCycle != null, lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive);
 
+    /// <summary>
+    /// 사망(생명주기 Alive 아님)이면 기본 공격 상태에 들어가지 않는다(할 일 186). 서버 시작 승인(StartServer)과
+    /// 오너·관찰자의 StartRpc 적용이 둘 다 <see cref="CanEnter"/> 에서 이 게이트를 지난다 — 사망 연출 진입 때
+    /// <see cref="PlayerLifeInputPolicy"/> 가 Idle 로 끊은 뒤 늦게 승인된 시작이 시체를 다시 Attack 에 넣지 않는다.
+    /// </summary>
+    private bool AcceptsAttackEntry =>
+        PlayerLifeActionRules.AcceptsAttackEntry(
+            lifeCycle != null, lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive);
+
     // 슈퍼아머 거부는 Unit.Knockback 공통 진입점에서 처리 — 여기서는 사망·연출 잠금만 거부한다
     public bool BeginKnockback(Vector3 direction, float strength)
     {
@@ -501,9 +510,11 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         return nextState switch
         {
             // 준비 자세에서 연사로 넘어가는 것은 Idle/Move 조건과 무관하다(이미 승인된 같은 공격의 다음 단계).
-            PlayerActionState.Attack => (CanAttack || CurrentState == PlayerActionState.AttackReady) &&
+            PlayerActionState.Attack => AcceptsAttackEntry &&
+                                        (CanAttack || CurrentState == PlayerActionState.AttackReady) &&
                                         context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
-            PlayerActionState.AttackReady => CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
+            PlayerActionState.AttackReady => AcceptsAttackEntry &&
+                                             CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
             PlayerActionState.Focus => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Interrupt => CanInterrupt && PlayerInterruptState.CanStart(context),
             PlayerActionState.Skill => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입

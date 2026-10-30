@@ -25,6 +25,14 @@ public static class PlayerLifeActionRules
     /// </summary>
     public static bool AcceptsForcedMotion(bool hasLifeCycle, PlayerLifeState state) =>
         !hasLifeCycle || CanAct(state);
+
+    /// <summary>
+    /// 기본 공격 상태(Attack·AttackReady)에 들어갈 수 있는가(할 일 186). 서버 시작 승인과 오너의 StartRpc 적용이 같은 기준을 쓴다 —
+    /// 사망 직전 보낸 시작 요청이 서버 사망 뒤 승인되면 StartRpc 가 이미 Idle 로 끊긴 오너를 다시 Attack 에 넣었다.
+    /// 생명주기가 없는 테스트 씬은 기존 동작(허용)을 유지한다.
+    /// </summary>
+    public static bool AcceptsAttackEntry(bool hasLifeCycle, PlayerLifeState state) =>
+        !hasLifeCycle || CanAct(state);
 }
 
 /// <summary>
