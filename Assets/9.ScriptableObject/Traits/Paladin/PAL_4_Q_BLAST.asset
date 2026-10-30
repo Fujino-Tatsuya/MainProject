@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "\uC9C4\uACA9\uC758 \uCDA9\uACA9"
   category: "Q \uAC15\uD654"
   description: "Q\uAC00 \uB05D\uB098\uB294 \uC9C0\uC810 \uC55E\uCABD\uC5D0 \uCDA9\uACA9\uC744
-    \uC77C\uC73C\uCF1C {dmg}\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+    \uC77C\uC73C\uCF1C {dmg} \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
   icon: {fileID: 21300000, guid: 828e89bc35e75b83b3a907ee949f4cf2, type: 3}
   effects:
   - rid: 7237886673742725445

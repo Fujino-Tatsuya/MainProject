@@ -179,10 +179,10 @@ public sealed class PaladinTraitFourthTierTests
         PaladinTraitDefinition def = Load(PaladinTraitValues.QBlast);
         Assert.AreEqual("진격의 충격", def.InlineDisplayName);
         Assert.AreEqual("Q 강화", def.InlineCategory);
-        Assert.AreEqual("Q가 끝나는 지점 앞쪽에 충격을 일으켜 {dmg}의 추가 피해를 줍니다.", def.InlineDescription, "명세 '문법 원문' 그대로");
+        Assert.AreEqual("Q가 끝나는 지점 앞쪽에 충격을 일으켜 {dmg} 추가 피해를 줍니다.", def.InlineDescription, "명세 '문법 원문'에서 {dmg} 뒤 '의'만 뺌(할 일 171 — '공격력의 450% 추가 피해')");
         Assert.IsTrue(TraitTooltip.Format(def, def.InlineDescription, null, false, TraitContent.Build(), out string text, out string error), error);
         StringAssert.StartsWith("Q가 끝나는 지점 앞쪽에 충격을 일으켜 ", Plain(text));
-        StringAssert.EndsWith("의 추가 피해를 줍니다.", Plain(text));
+        StringAssert.EndsWith(" 추가 피해를 줍니다.", Plain(text));
         Assert.IsFalse(PaladinTraitValues.QBlastDamage(def, null).HasValue, "플레이어 없음 = 값 없음(화면 '-')");
     }
 

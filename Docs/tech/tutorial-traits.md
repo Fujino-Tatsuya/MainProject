@@ -277,8 +277,9 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | 표기 | 값 |
 |---|---|
 | `{이름}` · `{이름:%}` · `{이름:0.0}` | `TraitTooltipValueSource` 가 첫 칸을 ① 등록부 별칭 → ② 정의 자신의 필드(`{effects[0].damageIncrease}` 경로 포함) → ③ 효과 목록 안 필드 이름 또는 ⑩ 스킬 수치 칸의 `name`(해석 전 값 — 감소율 0.25 그대로) 순으로 푼다. ③ 은 그 이름을 가진 효과가 **정확히 하나**여야 한다(둘 이상 = 오류 → 경로나 별칭) |
-| `{dmg}` | 특성별 계산식(`TraitContentRegistry.Registrar.Damage` — 캐릭터 레인). 계산식이 없으면 **검증 오류**. 로컬 플레이어가 없으면 `UI.Trait.Card.DamageUnknown`("-") — 0 으로 보이지 않는다 |
-| `<style=heal>` 등 | 스킬 툴팁과 같은 Style Sheet([data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자)) |
+| `{dmg}` | 특성별 계산식(`TraitContentRegistry.Registrar.Damage` — 캐릭터 레인). 계산식이 없으면 **검증 오류**. 로컬 플레이어가 없으면 `UI.Trait.Card.DamageUnknown`("-") — 0 으로 보이지 않는다. **표시(할 일 171)**: 평소 = 피해 색 글자 `공격력의 150%`(설명 ko 는 `{dmg} 피해`·`{dmg} 추가 피해` — `{dmg}` 뒤에 '의' 를 쓰지 않는다 → `공격력의 450% 피해`, Shift `⚔123 피해`. 계수 범위 `100~150%`, 고정 추가 피해가 있으면 `20 + 공격력의 150%`, 검 아이콘 없음 — `TraitTooltip.FormatDamagePercent`), **Shift(왼/오른쪽)를 누르는 동안만** 현재 공격력으로 계산한 숫자(검 아이콘 + 숫자, 계산식 없음 — `SkillTooltipFormatter.DamageValue`). 두 표기 모두 `<nobr>` 로 감싸 줄 끝에서 중간에 끊기지 않고 통째로 다음 줄로 간다(`TraitTooltip.NoBreak`). 카드(`TraitCardView`)·획득 아이콘 호버 툴팁(`TraitSelectionView`)이 매 프레임 Shift 상태를 보고 바뀐 프레임에만 설명을 다시 쓴다. 안내 문구 없음. 전투 HUD 스킬 툴팁은 이 경로가 아니다(평소 숫자·Shift 계산식 그대로 — `TraitDamagePercentTests.SkillTooltip_OutputUnchanged`) |
+| `<style=heal>` 등 | 스킬 툴팁과 같은 Style Sheet([data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자)). 특성 카드·호버 툴팁은 TMP 기본 시트(`TextMesh Pro/Resources/Style Sheets/Default Style Sheet`)로 풀리는데, 거기 **`heal` 만** 같은 색 + 검은 아웃라인 머티리얼 프리셋(`<material="SeoulAlrimTTF-Medium SDF - Heal Outline">`, 파일 `Assets/Fonts/SeoulAlrim/Resources/Fonts & Materials/` — 폰트와 같은 아틀라스, 아웃라인 0.3·FaceDilate 0.3)이다(밝은 카드 위 초록 가독성, 171 후속). 전투 HUD 툴팁 시트 `SkillTooltipStyles` 는 색만. 서울알림 Medium 이 아닌 TMP 에 기본 시트 `heal` 을 쓰면 아틀라스가 달라 글자가 깨지니 쓰지 말 것 |
+| 본문 굵게 | 카드·호버 툴팁 설명 전체를 `TraitTooltip.Bold` 가 `<b><cspace=-0.07em>…</cspace></b>` 로 감싼다(`TraitCardView.DescriptionOf`, 171 후속) — cspace 는 폰트 boldSpacing(7 = 0.07em)을 상쇄해 자간·줄바꿈을 굵게 전과 같게. 프리팹 fontStyle·시트 Normal 은 그대로, 전투 HUD 스킬 툴팁은 굵게 없음 |
 
 - 비율은 0.20 = 20% 로 보관하고 `{x:%}` 로 표시한다. 효과 필드 이름은 명세 제안 이름과 맞춰 두었다(`damageIncrease`·`cooldownChange`·`healIncrease`·`refundSeconds`·`pushDistance`…).
 - 검증 = `TraitTooltip.Validate`/`ValidateDefinition` — 문법·풀리지 않는 토큰·계산식 없는 `{dmg}`·빈 이름. EditMode `TraitTooltipTests.ProjectDefinitions_AllCardTextsResolve` 가 프로젝트 정의 전부를 본다.
@@ -304,6 +305,8 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | `UI.Trait.Conflict.Confirm` · `.Cancel` | 확인창 버튼 | 코드 |
 | `UI.Trait.Conflict.NameSeparator` | 이름 여럿 구분자(", ") | 코드 |
 | `UI.Trait.Card.DamageUnknown` | `{dmg}` 계산 불가 자리("-") | 코드 |
+| `UI.Trait.Card.DamagePercent` | `{dmg}` 평소 표시 `공격력의 {percent}`(`{percent}` = `150%`/`100~150%`, % 포함) | 코드 |
+| `UI.Trait.Card.DamagePercentFlat` | 고정 추가 피해가 있을 때 `{flat} + 공격력의 {percent}` | 코드 |
 
 - 규칙 = `TraitStringKeys`(ID 기준 — 에셋 이름을 바꿔도 번역이 따라간다. ID 에 공백·`.`·`/`·중괄호 금지). 시트에 행이 없으면 인라인 ko — `#키` 를 내지 않는다.
 - Export: `UI.Trait.*` 는 `UiStrings.All`(`TraitUiStrings`), `Trait.<ID>.*` 는 `TraitStringKeyCollector`(에디터 `StringKeyRegistry`)가 새 행으로 붙인다(ko = 인라인, en 빈 칸). 시트 반영은 병합 때 메인.

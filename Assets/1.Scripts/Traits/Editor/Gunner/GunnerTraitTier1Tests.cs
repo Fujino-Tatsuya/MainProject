@@ -91,8 +91,8 @@ public class GunnerTraitTier1Tests
         Assert.AreEqual(expected, text);
     }
 
-    [TestCase("GUN_4_EXTRA_BASIC", "기본 공격을 3번 발사할 때마다 {0}의 피해를 주는 추가 레이저를 쏩니다. 추가 레이저는 과열을 올리지 않습니다.")]
-    [TestCase("GUN_4_ECHO_Q", "Q 공격이 끝난 뒤 같은 방향으로 레이저를 한 번 더 쏴 {0}의 추가 피해를 줍니다.")]
+    [TestCase("GUN_4_EXTRA_BASIC", "기본 공격을 3번 발사할 때마다 {0} 피해를 주는 추가 레이저를 쏩니다. 추가 레이저는 과열을 올리지 않습니다.")]
+    [TestCase("GUN_4_ECHO_Q", "Q 공격이 끝난 뒤 같은 방향으로 레이저를 한 번 더 쏴 {0} 추가 피해를 줍니다.")]
     public void CardText_DamageToken_HasCalculator_AndShowsUnknownWithoutPlayer(string id, string format)
     {
         GunnerTraitDefinition def = Load(id);

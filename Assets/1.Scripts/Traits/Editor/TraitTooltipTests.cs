@@ -96,9 +96,9 @@ public class TraitTooltipTests
     public void Damage_WithoutCalculator_IsValidationError()
     {
         var def = Make<PaladinTraitDefinition>("PAL_2_DASH", "");
-        Assert.IsFalse(TraitTooltip.Validate(def, "{dmg}의 피해", new TraitContentRegistry(), out string error));
+        Assert.IsFalse(TraitTooltip.Validate(def, "{dmg} 피해", new TraitContentRegistry(), out string error));
         StringAssert.Contains("{dmg}", error);
-        Assert.IsFalse(TraitTooltip.Format(def, "{dmg}의 피해", null, false, new TraitContentRegistry(), out _, out _), "표시도 막는다");
+        Assert.IsFalse(TraitTooltip.Format(def, "{dmg} 피해", null, false, new TraitContentRegistry(), out _, out _), "표시도 막는다");
     }
 
     [Test]
@@ -113,10 +113,10 @@ public class TraitTooltipTests
             return default;
         });
 
-        Assert.IsTrue(TraitTooltip.Validate(def, "{dmg}의 피해", registry, out string error), error);
-        string text = Format(def, "{dmg}의 피해", registry);
+        Assert.IsTrue(TraitTooltip.Validate(def, "{dmg} 피해", registry, out string error), error);
+        string text = Format(def, "{dmg} 피해", registry);
         Assert.IsFalse(called, "플레이어가 없으면 계산식을 부르지 않는다");
-        Assert.AreEqual(TraitUiStrings.DamageUnknown.Text + "의 피해", text);
+        Assert.AreEqual(TraitUiStrings.DamageUnknown.Text + " 피해", text);
         StringAssert.DoesNotContain("{dmg}", text);
     }
 

@@ -44,11 +44,31 @@ public sealed class TraitCardView : MonoBehaviour
 
     private int traitHash = TraitIdHash.None;
     private Action<int> clicked;
+    private TraitDefinition boundTrait;
+    private Player boundViewer;
+    private bool shownValue;
 
     private void Awake()
     {
         if (button != null)
             button.onClick.AddListener(HandleClick);
+    }
+
+    // {dmg} — Shift 누르는 동안만 계산 숫자, 떼면 퍼센트(할 일 171). 바뀐 프레임에만 다시 쓴다.
+    private void Update()
+    {
+        if (description == null || boundTrait == null)
+            return;
+
+        bool value = TraitTooltip.IsValueHeld();
+        if (value != shownValue)
+            RefreshDescription(value);
+    }
+
+    private void RefreshDescription(bool showValue)
+    {
+        shownValue = showValue;
+        description.text = DescriptionOf(boundTrait, boundViewer, this, showValue);
     }
 
     /// <param name="viewer">카드를 보는 로컬 플레이어 — 설명 {dmg} 계산용(없으면 '-').</param>
@@ -91,8 +111,10 @@ public sealed class TraitCardView : MonoBehaviour
             category.gameObject.SetActive(line.Length > 0);
         }
 
+        boundTrait = trait;
+        boundViewer = viewer;
         if (description != null)
-            description.text = DescriptionOf(trait, viewer, this);
+            RefreshDescription(TraitTooltip.IsValueHeld());
 
         if (keycap != null)
         {
@@ -151,14 +173,15 @@ public sealed class TraitCardView : MonoBehaviour
         }
     }
 
-    /// <summary>카드·획득 툴팁 공용 설명 문구. 실패하면 오류 표시 + 경고.</summary>
-    public static string DescriptionOf(TraitDefinition trait, Player viewer, UnityEngine.Object context)
+    /// <summary>카드·획득 툴팁 공용 설명 문구 — 본문 굵게(<see cref="TraitTooltip.Bold"/>). 실패하면 오류 표시 + 경고.</summary>
+    /// <param name="showValue">{dmg} 계산 숫자(Shift 누르는 동안) / false = 퍼센트 글자.</param>
+    public static string DescriptionOf(TraitDefinition trait, Player viewer, UnityEngine.Object context, bool showValue)
     {
         if (trait == null)
             return string.Empty;
 
-        if (TraitTooltip.FormatDescription(trait, viewer, false, out string text, out string error))
-            return text;
+        if (TraitTooltip.FormatDescription(trait, viewer, showValue, out string text, out string error))
+            return TraitTooltip.Bold(text);
 
         Debug.LogWarning($"[Trait] '{trait.Id}' 설명 문구 오류 — {error}", context);
         return UiStrings.SkillTooltipError.Format(new System.Collections.Generic.Dictionary<string, string> { ["error"] = error });

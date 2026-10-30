@@ -87,6 +87,8 @@ public sealed class TraitSelectionView : MonoBehaviour
     private float nextRequestAt;
     private float toastHideAt;
     private TraitIconView hoveredIcon;
+    private TraitDefinition hoveredTrait;
+    private bool tooltipShowsValue;
     private int shownDeadlineSeconds = -1;
     private int shownDeadlineDone = -1;
     private int shownDeadlineCount = -1;
@@ -188,6 +190,9 @@ public sealed class TraitSelectionView : MonoBehaviour
             deadline.Tick(Time.unscaledDeltaTime);
             RefreshDeadline(force: false);
         }
+
+        if (hoveredIcon != null && hoveredTrait != null && TraitTooltip.IsValueHeld() != tooltipShowsValue)
+            RefreshTooltipDescription(!tooltipShowsValue);
     }
 
     private void Bind(TraitDirector next)
@@ -712,17 +717,26 @@ public sealed class TraitSelectionView : MonoBehaviour
             if (view == hoveredIcon)
             {
                 hoveredIcon = null;
+                hoveredTrait = null;
                 SetActive(tooltip, false);
             }
             return;
         }
 
         hoveredIcon = view;
+        hoveredTrait = trait;
         if (tooltipName != null)
             tooltipName.text = trait.DisplayName;
-        if (tooltipDescription != null)
-            tooltipDescription.text = TraitCardView.DescriptionOf(trait, LocalPlayer(), this);
+        RefreshTooltipDescription(TraitTooltip.IsValueHeld());
         SetActive(tooltip, true);
+    }
+
+    // 획득 툴팁 {dmg} — 카드와 같이 Shift 누르는 동안만 계산 숫자(할 일 171).
+    private void RefreshTooltipDescription(bool showValue)
+    {
+        tooltipShowsValue = showValue;
+        if (tooltipDescription != null)
+            tooltipDescription.text = TraitCardView.DescriptionOf(hoveredTrait, LocalPlayer(), this, showValue);
     }
 
     // ── 유틸 ───────────────────────────────────────────────────────────────

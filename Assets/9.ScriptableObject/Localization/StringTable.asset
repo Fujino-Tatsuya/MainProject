@@ -1472,8 +1472,8 @@ MonoBehaviour:
     en: Basic Attack Upgrade
   - key: Trait.ASN_4_COMBO_EXTRA.Desc
     ko: "\uAE30\uBCF8 \uACF5\uACA9 4\uD0C0\uB97C \uB05D\uAE4C\uC9C0 \uC4F0\uBA74
-      \uB9C8\uC9C0\uB9C9 \uACF5\uACA9 \uBC94\uC704\uC5D0 {dmg}\uC758 \uCD94\uAC00
-      \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uBCC0\uC2E0 \uC911\uC5D0\uB3C4 \uC801\uC6A9\uB429\uB2C8\uB2E4."
+      \uB9C8\uC9C0\uB9C9 \uACF5\uACA9 \uBC94\uC704\uC5D0 {dmg} \uCD94\uAC00 \uD53C\uD574\uB97C
+      \uC90D\uB2C8\uB2E4. \uBCC0\uC2E0 \uC911\uC5D0\uB3C4 \uC801\uC6A9\uB429\uB2C8\uB2E4."
     en: Completing the 4-hit basic attack deals {dmg} additional damage in the last
       attack's area. Also works while Transformed.
   - key: Trait.ASN_4_NORMAL_E_PUSH.Name
@@ -1496,7 +1496,7 @@ MonoBehaviour:
     en: Q Upgrade
   - key: Trait.ASN_4_Q_TRAIL.Desc
     ko: "Q\uB85C \uC9C0\uB098\uC628 \uAE38\uC744 \uD55C \uBC88 \uB354 \uBCA0\uC5B4
-      {dmg}\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uADF8\uB9BC\uC790
+      {dmg} \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uADF8\uB9BC\uC790
       \uD68C\uADC0\uC758 \uBCF5\uADC0 \uACBD\uB85C\uC5D0\uB3C4 \uC801\uC6A9\uB429\uB2C8\uB2E4."
     en: Slashes the path traveled by Q once more, dealing {dmg} additional damage.
       Also applies to the Shadow Return path.
@@ -1610,8 +1610,8 @@ MonoBehaviour:
     en: Q Boost
   - key: Trait.GUN_4_ECHO_Q.Desc
     ko: "Q \uACF5\uACA9\uC774 \uB05D\uB09C \uB4A4 \uAC19\uC740 \uBC29\uD5A5\uC73C\uB85C
-      \uB808\uC774\uC800\uB97C \uD55C \uBC88 \uB354 \uC3F4 {dmg}\uC758 \uCD94\uAC00
-      \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+      \uB808\uC774\uC800\uB97C \uD55C \uBC88 \uB354 \uC3F4 {dmg} \uCD94\uAC00 \uD53C\uD574\uB97C
+      \uC90D\uB2C8\uB2E4."
     en: After Q finishes, fire one more laser in the same direction, dealing {dmg}
       additional damage.
   - key: Trait.GUN_4_EXTRA_BASIC.Name
@@ -1622,9 +1622,9 @@ MonoBehaviour:
     en: Basic Attack Boost
   - key: Trait.GUN_4_EXTRA_BASIC.Desc
     ko: "\uAE30\uBCF8 \uACF5\uACA9\uC744 {requiredShots}\uBC88 \uBC1C\uC0AC\uD560
-      \uB54C\uB9C8\uB2E4 {dmg}\uC758 \uD53C\uD574\uB97C \uC8FC\uB294 \uCD94\uAC00
-      \uB808\uC774\uC800\uB97C \uC3E9\uB2C8\uB2E4. \uCD94\uAC00 \uB808\uC774\uC800\uB294
-      \uACFC\uC5F4\uC744 \uC62C\uB9AC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+      \uB54C\uB9C8\uB2E4 {dmg} \uD53C\uD574\uB97C \uC8FC\uB294 \uCD94\uAC00 \uB808\uC774\uC800\uB97C
+      \uC3E9\uB2C8\uB2E4. \uCD94\uAC00 \uB808\uC774\uC800\uB294 \uACFC\uC5F4\uC744
+      \uC62C\uB9AC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
     en: Every {requiredShots} basic attacks, fire an extra laser that deals {dmg}
       damage. The extra laser does not build Heat.
   - key: Trait.GUN_4_R_FOCUS.Name
@@ -1676,8 +1676,8 @@ MonoBehaviour:
     en: "Q Change \xB7 Knockback"
   - key: Trait.PAL_2_DASH.Desc
     ko: "Q\uAC00 {dashDistance}m\uB97C \uBE60\uB974\uAC8C \uB3CC\uC9C4\uD558\uBA70
-      {dmg}\uC758 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uC801\uC744 \uB04C\uACE0
-      \uAC00\uC9C0 \uC54A\uACE0 \uD55C \uBC88 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
+      {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uC801\uC744 \uB04C\uACE0 \uAC00\uC9C0
+      \uC54A\uACE0 \uD55C \uBC88 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
     en: Q dashes {dashDistance}m forward, dealing {dmg} damage. Enemies are knocked
       back once instead of being dragged along.
   - key: Trait.PAL_2_E_REFUND.Name
@@ -1771,7 +1771,7 @@ MonoBehaviour:
     en: Q Upgrade
   - key: Trait.PAL_4_Q_BLAST.Desc
     ko: "Q\uAC00 \uB05D\uB098\uB294 \uC9C0\uC810 \uC55E\uCABD\uC5D0 \uCDA9\uACA9\uC744
-      \uC77C\uC73C\uCF1C {dmg}\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+      \uC77C\uC73C\uCF1C {dmg} \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
     en: When Q ends, a shockwave in front of you deals {dmg} additional damage.
   - key: Trait.ASN_2_RESTRAINT.Conflict
     ko: "\uBCC0\uC2E0\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC5B4 \u2018{traits}\u2019\uC758
@@ -1948,6 +1948,12 @@ MonoBehaviour:
   - key: UI.Lobby.Tutorial.TagSuppress
     ko: "[\uC81C\uC555]"
     en: "[\uC81C\uC555]"
+  - key: UI.Trait.Card.DamagePercent
+    ko: "\uACF5\uACA9\uB825\uC758 {percent}"
+    en: '{percent} of ATK'
+  - key: UI.Trait.Card.DamagePercentFlat
+    ko: "{flat} + \uACF5\uACA9\uB825\uC758 {percent}"
+    en: '{flat} + {percent} of ATK'
   errors:
   - key: LOBBY_LAUNCHER_MISSING
     ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218
