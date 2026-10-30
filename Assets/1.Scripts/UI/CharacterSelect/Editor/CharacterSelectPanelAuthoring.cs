@@ -348,7 +348,6 @@ public static class CharacterSelectPanelAuthoring
             plateName.anchoredPosition = new Vector2(355f, -122f);
             plateName.sizeDelta = new Vector2(250f, 80f);
             TMP_Text plateNameText = AddText(plateName, font, "Name", 54f, TextAlignmentOptions.Center, Color.white, ellipsis: true);
-            plate.gameObject.SetActive(false); // 할 일 162 — 화면에서 뺐다(삭제 대신 끔). 패널은 꺼진 채로도 초상화·이름을 넣는다
 
             RectTransform locked = NewRect("Text_Locked", content);
             Place(locked, BottomLeft, 44f, 752f, 1000f, 60f);

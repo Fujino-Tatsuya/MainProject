@@ -42,7 +42,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [SerializeField] private GameObject infoPopup;
     [SerializeField] private Button infoPopupCloseButton;
 
-    [Header("Nameplate (포커스된 캐릭터 — 할 일 162 로 프리팹에서 꺼 둠, 칸은 연결된 채)")]
+    [Header("Nameplate (포커스된 캐릭터 — 이름은 고정 영어, 할 일 162)")]
     [SerializeField] private Image nameplatePortrait;
     [SerializeField] private TMP_Text nameplateName;
 
@@ -369,7 +369,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             CharacterRoster.Entry entry = roster.Entries[i];
             bool available = roster.TryGetAvailableCharacter(i, out _);
             _available.Add(available);
-            _cards[i].Bind(i, entry?.Portrait, entry?.DisplayName, available);
+            _cards[i].Bind(i, entry?.Portrait, CharacterSelectUiStrings.CharacterName(entry), available);
         }
     }
 
@@ -393,7 +393,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             nameplatePortrait.enabled = focused?.Portrait != null;
         }
         if (nameplateName != null)
-            nameplateName.text = focused?.DisplayName ?? string.Empty;
+            nameplateName.text = CharacterSelectUiStrings.CharacterName(focused);
 
         if (lockedText != null)
         {

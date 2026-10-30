@@ -9,7 +9,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 캐릭터 선택 UI 수정(할 일 162) — 실제 패널 프리팹을 프리뷰 씬에 올려 본다.
-/// 이름판 끔 · 셰브론 hover 링 7px·본체 알파 · 가운데 선택 테두리 = card_selected(카드 뒤, 흰 띠만) · 기본/코어 버튼 → "미구현" 팝업(X 로 팝업만 닫힘, 팝업 뒤 확정·이동 막힘).
+/// 이름판(포커스 초상화·고정 영어 이름) · 카드 이름 영어 ·셰브론 hover 링 7px·본체 알파 · 가운데 선택 테두리 = card_selected(카드 뒤, 흰 띠만) · 기본/코어 버튼 → "미구현" 팝업(X 로 팝업만 닫힘, 팝업 뒤 확정·이동 막힘).
 /// ESC 는 키보드를 흉내 내지 않고 순수 규칙(CharacterSelectPanelRulesTests)에서 본다.
 /// </summary>
 public sealed class CharacterSelectUiPolishTests
@@ -39,21 +39,58 @@ public sealed class CharacterSelectUiPolishTests
         EditorSceneManager.ClosePreviewScene(_scene);
     }
 
+    static readonly string[] EnglishNames = { "Paladin", "Gunner", "Assassin" };
+
     [Test]
-    public void Nameplate_OffInPrefab_PanelStillFillsIt()
+    public void Nameplate_OnInPrefab_FollowsFocus_PortraitAndEnglishName()
     {
         Transform plate = _instance.transform.Find("Content/Nameplate");
-        Assert.IsNotNull(plate, "이름판은 지우지 않고 끈다");
-        Assert.IsFalse(plate.gameObject.activeSelf, "이름판 꺼짐");
+        Assert.IsNotNull(plate);
+        Assert.IsTrue(plate.gameObject.activeSelf, "이름판 다시 켬");
 
         var so = new SerializedObject(_panel);
+        var portrait = so.FindProperty("nameplatePortrait").objectReferenceValue as Image;
         var name = so.FindProperty("nameplateName").objectReferenceValue as TMP_Text;
-        Assert.IsNotNull(name, "칸은 연결된 채 — 다시 켜면 바로 쓴다");
+        var roster = so.FindProperty("roster").objectReferenceValue as CharacterRoster;
+        Assert.IsNotNull(portrait, "nameplatePortrait 연결");
+        Assert.IsNotNull(name, "nameplateName 연결");
+        Assert.AreEqual(EnglishNames.Length, roster.Count, "로스터 3명(팔라딘·거너·어쌔신 순)");
 
-        Assert.DoesNotThrow(() => _panel.Show(0, false));
-        _panel.MoveFocus(1);
-        Assert.IsFalse(plate.gameObject.activeSelf, "Show·이동이 이름판을 다시 켜지 않는다");
-        Assert.IsFalse(string.IsNullOrEmpty(name.text), "꺼진 채로도 포커스 이름을 넣는다(오류 없음)");
+        _panel.Show(0, false);
+        for (int step = 0; step <= EnglishNames.Length; step++)
+        {
+            int focus = step % EnglishNames.Length;
+            Assert.AreEqual(focus, _panel.FocusedCharacterId);
+            Assert.AreSame(roster.Entries[focus].Portrait, portrait.sprite, $"{focus}번 초상화");
+            Assert.IsTrue(portrait.enabled);
+            Assert.AreEqual(EnglishNames[focus], name.text, $"{focus}번 이름 = 고정 영어");
+            _panel.MoveFocus(1);
+        }
+    }
+
+    [Test]
+    public void Cards_ShowEnglishNames()
+    {
+        _panel.Show(0, false);
+        var cards = (System.Collections.Generic.List<CharacterSelectCard>)typeof(CharacterSelectPanel)
+            .GetField("_cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_panel);
+        Assert.AreEqual(EnglishNames.Length, cards.Count);
+        for (int i = 0; i < cards.Count; i++)
+        {
+            var nameText = new SerializedObject(cards[i]).FindProperty("nameText").objectReferenceValue as TMP_Text;
+            Assert.AreEqual(EnglishNames[cards[i].Index], nameText.text, $"{i}번 카드 이름 = 고정 영어");
+        }
+    }
+
+    [Test]
+    public void CharacterName_EnglishTable_FallsBackToDisplayName()
+    {
+        Assert.AreEqual(string.Empty, CharacterSelectUiStrings.CharacterName(null));
+
+        var unknown = new CharacterRoster.Entry();
+        typeof(CharacterRoster.Entry).GetField("displayName", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(unknown, "새캐릭터");
+        Assert.AreEqual(unknown.DisplayName, CharacterSelectUiStrings.CharacterName(unknown), "표에 없으면 로스터 DisplayName");
+        Assert.AreEqual("새캐릭터", CharacterSelectUiStrings.CharacterName(unknown));
     }
 
     [Test]
