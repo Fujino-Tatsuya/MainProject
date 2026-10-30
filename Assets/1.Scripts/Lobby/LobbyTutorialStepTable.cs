@@ -26,6 +26,30 @@ public enum LobbyTutorialActivity : byte
     FreePractice = 8,   // T50
 }
 
+/// <summary>
+/// 단계 동안 훈련 명단에 거는 보정 묶음(PLAN §2.3 TrainingOverrideProfile, 커밋 ②). 단계 진입·캐릭터 교체 때 진행기가 다시 맞춘다.
+/// 쿨·대시 리셋은 각 내용 컴포넌트가 시작 순간 1회 건다(<see cref="TrainingResetOptions"/>) — 여기는 단계 내내 유지되는 값만.
+/// </summary>
+public enum LobbyTutorialTrainingProfile : byte
+{
+    None = 0,
+    /// <summary>체력 하한 <see cref="LobbyTrainingSupportRules.TrainingHealthFloor"/>(죽지 않음).</summary>
+    Training = 1,
+}
+
+/// <summary>로비 진행기가 켜고 끄는 집결 구역(씬의 <see cref="PartyGatherZone"/> 하나씩). 값은 단계표 에셋에 저장되므로 바꾸지 않는다.</summary>
+public enum LobbyGatherPoint : byte
+{
+    None = 0,
+    Entrance = 1,       // 훈련장 입구(문 앞) — L20 집결, 확정 = 명단 전원 훈련장 안(Train01Start)으로 텔레포트
+    Sortie = 2,         // 출격 — 메인 진입(옛 Ready 패드 자리)
+    Train01Start = 3,   // 훈련장 안 시작 위치(L20 텔레포트 도착지)
+    Train02Start = 4,
+    Train03Area = 5,
+    TrainEnd = 6,       // 훈련 종료(출구) — T50, 확정 = 명단 전원 중앙(Brief)으로 텔레포트
+    Brief = 7,          // 로비 중앙 — L10·L30 집결(이름은 158 코드 호환을 위해 유지)
+}
+
 /// <summary>목표 패널 하단 진행 줄(158 표시용).</summary>
 public enum LobbyTutorialProgressMode : byte
 {
@@ -88,6 +112,10 @@ public sealed class LobbyTutorialStep
     [Header("판정")]
     [Tooltip("T32·T34 — 인정할 스킬 툴팁 태그. 표의 enforceRequiredSkillTags 가 꺼져 있으면 검사하지 않는다(할 일 157 Q12a).")]
     public SkillTooltipTag[] requiredSkillTags = Array.Empty<SkillTooltipTag>();
+
+    [Header("훈련 보정")]
+    [Tooltip("이 단계 동안 훈련 명단에 거는 보정(체력 하한 등). 늦은 참가자·명단 밖은 받지 않는다.")]
+    public LobbyTutorialTrainingProfile trainingProfile;
 }
 
 /// <summary>

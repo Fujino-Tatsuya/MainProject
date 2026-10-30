@@ -9,10 +9,10 @@ using UnityEngine.SceneManagement;
 /// TRAIN_02 일반 전투(할 일 86 PLAN §3.4, 명세 v0.2 §8) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
 /// 규칙은 <see cref="LobbyCombatLedger"/>·<see cref="LobbyCombatStuckTracker"/>, 여기는 스폰·사망 구독·Warp·복제만 한다. 몬스터 코드·MapScene 존2 는 그대로.
 /// <list type="bullet">
-/// <item>시작 = 진행기가 Train02 진행 중(<see cref="LobbyCombatRules.MonstersActive"/>, Gather_Train02Start 전원 집결 확정 뒤)이 되는 순간:
+/// <item>시작 = 진행기가 T22(Activity Combat, <see cref="LobbyCombatRules.MonstersActive"/>, T20 Gather_Train02Start 전원 집결 확정 뒤)가 되는 순간 — 그 revision 을 기억한다:
 /// 존2 구성(<see cref="LobbyTrainingCombatSpawns"/> — ZoneS_typeA 의 ZoneMonsterSpawnSet 직접 참조) 9마리 스폰 → 훈련 리셋
 /// (<see cref="TrainingResetOptions.CombatStart"/> — 체력·쿨·대시, 분노 재지급 없음). TRAIN_01 표적은 그 단계를 떠날 때 이미 디스폰된다.</item>
-/// <item>판정(서버): <see cref="MonsterDeathEvents.ServerMonsterDied"/> → 장부. 전원 처치 → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportStageCompleted"/>(Train02) 1회.</item>
+/// <item>판정(서버): <see cref="MonsterDeathEvents.ServerMonsterDied"/> → 장부. 전원 처치 → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportActivityCompleted"/>(Combat, 시작 revision) 1회.</item>
 /// <item>끼임 복구: 0.5초마다 <see cref="LobbyCombatStuckTracker"/> — 훈련실 경계(<see cref="roomNavMesh"/> 볼륨) 밖 또는 오래 멈춤 → 초기 위치 Warp. 처치 아님.</item>
 /// <item>단계를 떠나면(완료 뒤 남은 몹 없음·그 밖 이탈)·진행기 디스폰(판 끝·씬 전환) 때 남은 몹 디스폰.</item>
 /// <item>복제: 남은 수·전체 수(NetworkVariable) — <see cref="LobbyTrainingCombatView"/> 가 읽는다.</item>
@@ -45,18 +45,19 @@ public sealed class LobbyTrainingCombat : NetworkBehaviour
     private readonly List<LobbyCombatSpawn> _spawnBuffer = new List<LobbyCombatSpawn>();
     private readonly List<ulong> _idBuffer = new List<ulong>();
     private bool _pendingComplete;
+    private int _runRevision;
     private float _stuckTimer;
 
     /// <summary>스폰된 일반 전투(없으면 null).</summary>
     public static LobbyTrainingCombat Active { get; private set; }
 
-    /// <summary>[전 피어] 일반 전투 진행 중(Train02 진행 중).</summary>
+    /// <summary>[전 피어] 일반 전투 진행 중(T22).</summary>
     public bool IsRunning
     {
         get
         {
             var director = LobbyTrainingDirector.Active;
-            return IsSpawned && director != null && LobbyCombatRules.MonstersActive(director.Stage, director.Phase);
+            return IsSpawned && director != null && LobbyCombatRules.MonstersActive(director.CurrentActivity);
         }
     }
 
@@ -127,8 +128,8 @@ public sealed class LobbyTrainingCombat : NetworkBehaviour
         {
             // 사망 콜백(데미지 판정 도중) 안에서 단계를 넘기지 않는다 — 다음 프레임에 보고한다.
             _pendingComplete = false;
-            if (_director != null && _director.ServerReportStageCompleted(LobbyTrainingStage.Train02))
-                Debug.Log($"[SceneFlow] {Tag} 전원 처치 {_ledger.KilledCount}/{_ledger.Total} — TRAIN_02 완료 보고 (끼임 복구 {_ledger.RecoveryCount}회)");
+            if (_director != null && _director.ServerReportActivityCompleted(LobbyTutorialActivity.Combat, _runRevision))
+                Debug.Log($"[SceneFlow] {Tag} 전원 처치 {_ledger.KilledCount}/{_ledger.Total} — T22 완료 보고 (끼임 복구 {_ledger.RecoveryCount}회)");
         }
 
         if (!_ledger.IsRunning)
@@ -149,15 +150,16 @@ public sealed class LobbyTrainingCombat : NetworkBehaviour
         if (_director == null)
             return;
 
-        var active = LobbyCombatRules.MonstersActive(_director.Stage, _director.Phase);
+        var active = LobbyCombatRules.MonstersActive(_director.CurrentActivity);
         if (active && !_ledger.IsRunning)
             BeginServer();
         else if (!active && (_ledger.IsRunning || _monsters.Count > 0))
-            EndServer($"단계 이탈 → {_director.Stage}/{_director.Phase}");
+            EndServer($"단계 이탈 → {_director.DescribeStep()}");
     }
 
     private void BeginServer()
     {
+        _runRevision = _director.Revision;
         _pendingComplete = false;
         _monsters.Clear();
         _stuck.Clear();

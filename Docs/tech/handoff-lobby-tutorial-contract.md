@@ -11,7 +11,8 @@
   문구 키·집결 지점·경로·벽·대사 ID 는 모든 피어가 같은 단계표 SO(`LobbyTutorialSteps.asset`)에서 `stepIndex` 로 읽는다.
 - 모든 값은 전 피어에서 복제값으로 계산된다 — 늦게 붙은 클라도 같은 결과(이벤트를 놓쳐도 다음 폴링/이벤트 뒤 재조회로 맞는다).
 - **캐릭터 잠금 없음**(사용자 결정 10-30) — 어느 단계든 라커에서 교체 가능. 158 은 교체 때문에 따로 할 일이 없다(파사드 값은 clientId 기준이라 그대로).
-- **커밋 ① 시점엔 아무도 `Publish` 하지 않는다** → `IsAvailable == false`. 진행기 연결은 157 커밋 ②.
+  (과도기: 커밋 ②까지는 옛 훈련 명단 잠금이 남아 있다 — 제거는 157 커밋 ③.)
+- **커밋 ②부터 진행기(`LobbyTrainingDirector`)가 `Publish`·`SetLiveSource` 한다** → 로비에 진행기가 있으면 `IsAvailable == true`. 옛 10단계 모델(`LobbyTrainingFlow`)은 삭제됐다.
 
 ## 1. 단계표 (22행, 행 순서 = 진행 순서)
 
@@ -20,9 +21,9 @@
 | # | StateId | Kind | 집결 지점 | 비고 |
 |---|---|---|---|---|
 | 0 | L00_LockerVisit | LockerVisit | — | 라커 누적 방문. 경로 `PATH_LOCKER` |
-| 1 | L10_CentralGather | Gather | `Brief`(중앙 — ②에서 `Central` 로 개명 예정) | 확정 = 훈련 명단 고정 |
+| 1 | L10_CentralGather | Gather | `Brief`(중앙 — 이름 유지. `Central` 개명은 미룸 — 158 코드 호환) | 확정 = 훈련 명단 고정 |
 | 2 | L11_CentralIntro | Dialogue | — | `LOBBY_DLG_INTRO` |
-| 3 | L20_TrainingGather | Gather | `Train01Start` | ⚠ 처리 방식 미확정(문 막힘 유지 — 입구 집결 + 텔레포트 안 검토 중). 바뀌면 이 표의 지점만 바뀐다 |
+| 3 | L20_TrainingGather | Gather | **`Entrance`**(문 앞 입구 영역) | **확정: A**(157 PLAN §10.3) — 입구 집결 확정 → 명단 전원 `Gather_Train01Start` 안으로 텔레포트 → 바로 L21(내부 재집결 없음). 활성 집결 테두리 = `Gather_Entrance` |
 | 4 | L21_TrainingIntro | Dialogue | — | `LOBBY_DLG_TRAINING` |
 | 5 | T10_Basic | Activity(BasicCheck) | — | 개인 6항목, 진행 = PartyComplete |
 | 6 | T20_CombatGather | Gather | `Train02Start` | 유지 3초 = 카운트다운 → 표시 상태 T21 |
@@ -39,6 +40,7 @@
 | 20 | L40_SortieGather | Gather | `Sortie` | 참여자 = 접속자 전원 |
 | 21 | L41_Loading | Loading | — | 기존 로딩 흐름 |
 
+- 행 칸 `trainingProfile`(None/Training) = 서버 훈련 보정(체력 하한) 적용 행 — L21·T10~T40 = Training. 158 은 읽지 않아도 된다.
 - 158 은 **StateId 문자열로 분기하지 말고** Kind·키 칸을 읽는다(행 추가·순서 조정에 안전). 꼭 필요하면 `DisplayStateId` 비교.
 - 경로 키 `PATH_*`·벽 키 `WALL_TRAIN_WEST`·삽화 키 `BRIEF_BG_*` 는 **157 이 정한 임시 이름**이다. 158 이 다른 이름을 원하면 단계표 SO 만 고치면 된다(코드 무관) — 브릿지로 알려 주면 157 이 반영.
 
@@ -101,3 +103,4 @@
 ## 7. 변경 이력
 
 - 2026-10-30 커밋 ① — 최초. 파사드 골격·단계표 22행. 진행기 미연결(`IsAvailable == false`).
+- 2026-10-30 커밋 ② — 진행기 연결(스냅샷 NetworkVariable → `Publish`). L20 집결 지점 `Train01Start` → **`Entrance`**(§10.3 A 확정 — ②는 기존 입구 텔레포트(`TeleportRosterInto`)를 그대로 태워 동작, 마무리(대사 중 표적 미스폰 등)는 커밋 ④). 행 칸 `trainingProfile` 추가. `Brief`→`Central` 개명은 미룸. 과도기 어댑터(상단 가이드)는 새 `LOBBY_*` 키가 없어 아직 없음.

@@ -35,6 +35,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L10_CentralGather
     kind: 1
     activity: 0
@@ -57,6 +58,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L11_CentralIntro
     kind: 2
     activity: 0
@@ -79,6 +81,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L20_TrainingGather
     kind: 1
     activity: 0
@@ -91,7 +94,7 @@ MonoBehaviour:
     countdownStateId: 
     countdownObjectiveKey: 
     countdownProgressKey: 
-    gatherPoint: 3
+    gatherPoint: 1
     holdSeconds: 0.3
     pathId: PATH_TRAINING_HALL
     targetWallId: 
@@ -101,6 +104,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L21_TrainingIntro
     kind: 2
     activity: 0
@@ -123,6 +127,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T10_Basic
     kind: 3
     activity: 1
@@ -151,6 +156,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T20_CombatGather
     kind: 1
     activity: 0
@@ -173,6 +179,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T22_Combat
     kind: 3
     activity: 2
@@ -195,6 +202,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T30_CounterGather
     kind: 1
     activity: 0
@@ -217,6 +225,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T31_Counter
     kind: 3
     activity: 3
@@ -239,6 +248,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T32_VulnerableCC
     kind: 3
     activity: 4
@@ -263,6 +273,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 0000000001000000
+    trainingProfile: 1
   - stateId: T33_ResetPosition
     kind: 3
     activity: 5
@@ -285,6 +296,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T34_Wall
     kind: 3
     activity: 6
@@ -307,6 +319,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 00000000
+    trainingProfile: 1
   - stateId: T40_SuppressKill
     kind: 3
     activity: 7
@@ -330,6 +343,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 1
   - stateId: T50_FreePractice
     kind: 1
     activity: 8
@@ -353,6 +367,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L30_BriefGather
     kind: 1
     activity: 0
@@ -375,6 +390,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L31_BriefIntro
     kind: 2
     activity: 0
@@ -397,6 +413,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 1
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L32_BriefFactory
     kind: 2
     activity: 0
@@ -419,6 +436,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 1
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L33_BriefRebellion
     kind: 2
     activity: 0
@@ -441,6 +459,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 1
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L34_SortieIntro
     kind: 2
     activity: 0
@@ -463,6 +482,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 1
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L40_SortieGather
     kind: 1
     activity: 0
@@ -485,6 +505,7 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   - stateId: L41_Loading
     kind: 4
     activity: 0
@@ -507,4 +528,5 @@ MonoBehaviour:
     dialogueSeconds: 0
     locksInput: 0
     requiredSkillTags: 
+    trainingProfile: 0
   enforceRequiredSkillTags: 0

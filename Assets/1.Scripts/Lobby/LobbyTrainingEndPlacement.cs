@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 집결 확정 텔레포트 자리(할 일 111) — 대상 집결 구역 박스 바닥 안 격자 자리를 고르는 순수 규칙. 사용 = <see cref="LobbyTrainingDirector"/>(서버).
-/// 처음엔 훈련 종료(→ 브리핑 구역)용이라 이름이 그대로다 — 입구 확정(→ Train01Start)도 같은 규칙을 쓴다(<see cref="LobbyTrainingFlow.TeleportTargetOnConfirm"/>).
+/// 처음엔 훈련 종료(→ 브리핑 구역)용이라 이름이 그대로다 — 입구 확정(→ Train01Start)도 같은 규칙을 쓴다(<see cref="LobbyTutorialRules.TeleportTargetOnConfirm"/>).
 /// <list type="bullet">
 /// <item>좌표 = 박스 중심 기준 XZ(m, 박스 로컬 축). 벽 쪽은 <c>margin</c> 만큼 비운 안쪽 사각형만 쓴다.</item>
 /// <item>한 줄 = 로컬 X 방향으로 <c>spacing</c> 간격, 다 차면 다음 줄(-Z 쪽). 쓰는 줄 묶음과 마지막 줄은 가운데 정렬 — 혼자면 정중앙.</item>

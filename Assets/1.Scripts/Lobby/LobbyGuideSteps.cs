@@ -88,8 +88,10 @@ public sealed class LobbyGuideSteps : MonoBehaviour
         }
 
         input.Ready = true;
-        input.Stage = director.Stage;
-        input.Phase = director.Phase;
+        input.Launching = director.IsLaunching;
+        input.RosterLocked = director.IsRosterLocked;
+        input.EntranceOpen = director.ActiveGatherPoint == LobbyGatherPoint.Entrance;
+        input.SortieOpen = director.IsSortieGatherOpen;
         input.InTrainingRoster = director.IsInTrainingRoster(clientId);
         input.TrainingCleared = director.IsTrainingCleared(clientId);
         input.SortieCountdownActive = director.IsSortieCountdownActive;

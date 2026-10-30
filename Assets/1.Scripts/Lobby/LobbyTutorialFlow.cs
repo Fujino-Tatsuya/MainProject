@@ -19,7 +19,7 @@ public enum LobbyTutorialAdvanceResult : byte
 
 /// <summary>
 /// [서버] 로비 튜토리얼 단계 모델 — 할 일 157 PLAN §2. NGO·MonoBehaviour 의존 없는 순수 상태(EditMode 테스트 대상).
-/// 아직 진행기에 연결하지 않았다(커밋 ②에서 <see cref="LobbyTrainingDirector"/> 가 옛 <see cref="LobbyTrainingFlow"/> 대신 쓴다).
+/// 서버 진행기 <see cref="LobbyTrainingDirector"/> 가 쓴다(커밋 ②부터 — 옛 10단계 모델 대체).
 /// <list type="bullet">
 /// <item>단계 = 단계표 행 번호. 앞으로만, 전이마다 <see cref="Revision"/> +1. 요청은 (runId, revision) 이 지금과 같을 때만 — 이전 회차·이전 단계 콜백·중복 보고를 거른다.</item>
 /// <item>한 프레임 한 전이: 같은 프레임 두 번째 요청은 보관했다가 다음 프레임에 적용. 내용 컴포넌트는 <see cref="AcceptsEvent"/> 로 진입 프레임 이후 사건만 인정한다
@@ -29,6 +29,9 @@ public enum LobbyTutorialAdvanceResult : byte
 /// <item>모든 기록(명단·라커 방문)은 clientId 기준 — 캐릭터 교체(PlayerObject 디스폰·재스폰)로 지워지지 않는다(PLAN §10.2). 연결 종료만 지운다.</item>
 /// <item>라커 방문: LockerVisit 단계 동안 참여자만, 1인 1회 누적(나갔다 와도 유지). 회차 = 모델 인스턴스 — 새 회차는 새 인스턴스.</item>
 /// <item>출격 확정: <see cref="TryCommitLaunch"/> 회차마다 1회.</item>
+/// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1 — <see cref="SetTrainingCleared"/>): 켠 사람은 명단 고정 전 참여자·고정 명단에서 빠지고(늦은 참가자처럼 로비 대기),
+/// 출격 집결(접속자 전원)에는 남는다. 명단 고정 뒤 켜서 명단이 비면 진행기가 출격 집결로 건너뛴다(<see cref="TryAdvanceTo"/> ignoreParticipants).
+/// 끄면 플래그만 지운다 — 이미 고정된 명단엔 다시 넣지 않는다. 플래그 장부는 진행기(서버 세션 정적)가 회차를 넘겨 잇는다.</item>
 /// </list>
 /// </summary>
 public sealed class LobbyTutorialFlow
@@ -39,12 +42,15 @@ public sealed class LobbyTutorialFlow
     readonly List<ulong> _connected = new List<ulong>();
     readonly List<ulong> _roster = new List<ulong>();
     readonly List<ulong> _lockerVisited = new List<ulong>();
+    readonly List<ulong> _cleared = new List<ulong>();
+    readonly List<ulong> _openParticipants = new List<ulong>();
 
     int _lastTransitionFrame = NoFrame;
     bool _hasPending;
     int _pendingRevision;
     int _pendingTarget;
     double _pendingServerTime;
+    bool _pendingIgnoreParticipants;
 
     LobbyTutorialSnapshot _snapshot;
 
@@ -87,8 +93,13 @@ public sealed class LobbyTutorialFlow
     public IReadOnlyList<ulong> Roster => _roster;
     public bool IsRosterLocked { get; private set; }
 
-    /// <summary>지금 판정 대상 — 명단 고정 전 = 접속자(스폰 완료), 뒤 = 고정 명단.</summary>
-    public IReadOnlyList<ulong> Participants => IsRosterLocked ? _roster : _connected;
+    /// <summary>지금 판정 대상 — 명단 고정 전 = 접속자 중 클리어 플래그 끈 사람, 뒤 = 고정 명단.</summary>
+    public IReadOnlyList<ulong> Participants => IsRosterLocked ? _roster : OpenParticipants();
+
+    /// <summary>튜토리얼 클리어 플래그가 켜진 접속자(켠 순서).</summary>
+    public IReadOnlyList<ulong> TrainingCleared => _cleared;
+
+    public bool IsTrainingCleared(ulong clientId) => _cleared.Contains(clientId);
 
     public IReadOnlyList<ulong> LockerVisited => _lockerVisited;
     public bool LaunchCommitted => _snapshot.LaunchCommitted;
@@ -116,18 +127,41 @@ public sealed class LobbyTutorialFlow
         var removed = _connected.Remove(clientId);
         removed |= _roster.Remove(clientId);
         _lockerVisited.Remove(clientId);
+        _cleared.Remove(clientId);
         return removed;
     }
 
-    /// <summary>훈련 명단 고정(L10 확정) — 지금 접속자로. 이미 고정했으면 false.</summary>
+    /// <summary>훈련 명단 고정(L10 확정) — 지금 접속자 중 클리어 플래그 끈 사람으로. 이미 고정했으면 false.</summary>
     public bool LockRoster()
     {
         if (IsRosterLocked)
             return false;
 
         _roster.Clear();
-        _roster.AddRange(_connected);
+        _roster.AddRange(OpenParticipants());
         IsRosterLocked = true;
+        return true;
+    }
+
+    /// <summary>
+    /// 튜토리얼 클리어 플래그를 켜고 끈다(접속자만). 바뀌었으면 true, 같은 값·접속자 아님이면 false.
+    /// 켜면 고정 명단에서 바로 뺀다(<paramref name="leftRoster"/>). 명단이 비었는지(출격 집결 건너뛰기)는 호출 쪽이 본다.
+    /// 끄면 플래그만 지운다 — 이미 고정된 명단엔 다시 넣지 않는다(명단 고정 전이면 다음 고정부터 포함).
+    /// </summary>
+    public bool SetTrainingCleared(ulong clientId, bool cleared, out bool leftRoster)
+    {
+        leftRoster = false;
+        if (!_connected.Contains(clientId) || IsTrainingCleared(clientId) == cleared)
+            return false;
+
+        if (!cleared)
+        {
+            _cleared.Remove(clientId);
+            return true;
+        }
+
+        _cleared.Add(clientId);
+        leftRoster = _roster.Remove(clientId);
         return true;
     }
 
@@ -178,10 +212,12 @@ public sealed class LobbyTutorialFlow
         TryAdvanceTo(runId, revision, _snapshot.StepIndex + 1, frame, serverTime);
 
     /// <summary>
-    /// <paramref name="targetIndex"/> 행으로(앞으로만 — 개발 건너뛰기 등). (runId, revision) 이 지금과 다르면 거부.
+    /// <paramref name="targetIndex"/> 행으로(앞으로만 — 건너뛰기 등). (runId, revision) 이 지금과 다르면 거부.
     /// 이번 프레임에 이미 전이했으면 보관(<see cref="LobbyTutorialAdvanceResult.Deferred"/>) — 보관 중 새 요청은 덮어쓴다.
+    /// <paramref name="ignoreParticipants"/> = 참여자 대신 접속자 수만 본다 — 대상 단계가 접속자 전원 단계(출격 집결·즉시 출격)일 때.
     /// </summary>
-    public LobbyTutorialAdvanceResult TryAdvanceTo(int runId, int revision, int targetIndex, int frame, double serverTime)
+    public LobbyTutorialAdvanceResult TryAdvanceTo(int runId, int revision, int targetIndex, int frame, double serverTime,
+        bool ignoreParticipants = false)
     {
         if (runId != _snapshot.RunId)
             return LobbyTutorialAdvanceResult.StaleRun;
@@ -191,7 +227,7 @@ public sealed class LobbyTutorialFlow
             return LobbyTutorialAdvanceResult.Backward;
         if (targetIndex >= _kinds.Length)
             return LobbyTutorialAdvanceResult.OutOfRange;
-        if (Participants.Count == 0)
+        if ((ignoreParticipants ? _connected.Count : Participants.Count) == 0)
             return LobbyTutorialAdvanceResult.NoParticipants;
 
         if (frame == _lastTransitionFrame)
@@ -200,6 +236,7 @@ public sealed class LobbyTutorialFlow
             _pendingRevision = revision;
             _pendingTarget = targetIndex;
             _pendingServerTime = serverTime;
+            _pendingIgnoreParticipants = ignoreParticipants;
             return LobbyTutorialAdvanceResult.Deferred;
         }
 
@@ -214,7 +251,7 @@ public sealed class LobbyTutorialFlow
             return false;
 
         _hasPending = false;
-        return TryAdvanceTo(_snapshot.RunId, _pendingRevision, _pendingTarget, frame, _pendingServerTime)
+        return TryAdvanceTo(_snapshot.RunId, _pendingRevision, _pendingTarget, frame, _pendingServerTime, _pendingIgnoreParticipants)
             == LobbyTutorialAdvanceResult.Advanced;
     }
 
@@ -249,6 +286,18 @@ public sealed class LobbyTutorialFlow
         _lastTransitionFrame = frame;
         EnteredFrame = frame;
         _hasPending = false;
+    }
+
+    List<ulong> OpenParticipants()
+    {
+        _openParticipants.Clear();
+        foreach (var clientId in _connected)
+        {
+            if (!_cleared.Contains(clientId))
+                _openParticipants.Add(clientId);
+        }
+
+        return _openParticipants;
     }
 
     static bool Contains(IReadOnlyList<ulong> list, ulong clientId)

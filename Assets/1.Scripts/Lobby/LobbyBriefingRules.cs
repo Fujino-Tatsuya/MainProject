@@ -40,22 +40,19 @@ public static class LobbyBriefingRules
         LobbyRadioIds.Brief01, LobbyRadioIds.Brief02, LobbyRadioIds.Brief03, LobbyRadioIds.Brief04,
     };
 
-    /// <summary>브리핑 진행 중(조작 제한·카메라·'작전 설명 중') — Brief/InProgress.</summary>
-    public static bool IsBriefing(LobbyTrainingStage stage, LobbyTrainingPhase phase) =>
-        stage == LobbyTrainingStage.Brief && phase == LobbyTrainingPhase.InProgress;
+    /// <summary>
+    /// 브리핑 진행 중(조작 제한·카메라·'작전 설명 중') — 입력 잠금 대사 행(L31~L34). 할 일 157 ②: 브리핑은 첫 잠금 행(L31)에서 옛 방식대로
+    /// BRIEF_01~04 를 한 번에 돌리고, 끝나면 진행기가 잠금 묶음 뒤(L40)로 건너뛴다. 대사 행 4개 분해는 커밋 ⑨.
+    /// </summary>
+    public static bool IsBriefing(in LobbyTutorialStepView step) =>
+        step.IsValid && step.Kind == LobbyTutorialStepKind.Dialogue && step.LocksInput;
 
-    /// <summary>목표 패널 id(없으면 null). 브리핑 중 = '작전 설명 중', 브리핑 완료 = '출격 지점에 집결'. 그 밖 단계는 비운다.</summary>
-    public static string ObjectiveFor(LobbyTrainingStage stage, LobbyTrainingPhase phase)
+    /// <summary>목표 패널 id(없으면 null). 브리핑 중 = '작전 설명 중', 출격 집결(L40) = '출격 지점에 집결'. 그 밖 단계는 비운다.</summary>
+    public static string ObjectiveFor(in LobbyTutorialStepView step)
     {
-        if (stage != LobbyTrainingStage.Brief)
-            return null;
-
-        switch (phase)
-        {
-            case LobbyTrainingPhase.InProgress: return LobbyObjectiveIds.Briefing;
-            case LobbyTrainingPhase.Completed: return LobbyObjectiveIds.Sortie;
-            default: return null;
-        }
+        if (IsBriefing(step))
+            return LobbyObjectiveIds.Briefing;
+        return step.IsValid && step.GatherPointId == LobbyGatherPoint.Sortie ? LobbyObjectiveIds.Sortie : null;
     }
 
     /// <summary>브리핑 전체 시간 = 시작 지연 + 대사 표시 시간 합 + 끝 여유.</summary>

@@ -8,21 +8,21 @@ public sealed class TrainingSparringModelTests
     static TrainingSparringModel Create(bool suppressAcceleration = false) =>
         new TrainingSparringModel(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, 20f), suppressAcceleration);
 
-    static List<LobbyTrainingStage> DrainReports(TrainingSparringModel model)
+    static List<LobbyTutorialActivity> DrainReports(TrainingSparringModel model)
     {
-        var reports = new List<LobbyTrainingStage>();
+        var reports = new List<LobbyTutorialActivity>();
         while (model.TryConsumeStageReport(out var stage))
             reports.Add(stage);
         return reports;
     }
 
-    static void ExpectReports(TrainingSparringModel model, params LobbyTrainingStage[] expected) =>
+    static void ExpectReports(TrainingSparringModel model, params LobbyTutorialActivity[] expected) =>
         Assert.That(DrainReports(model), Is.EqualTo(expected));
 
     static TrainingSparringModel AtA(bool suppressAcceleration = false)
     {
         var model = Create(suppressAcceleration);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03A), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.True);
         return model;
     }
 
@@ -31,8 +31,8 @@ public sealed class TrainingSparringModelTests
         var model = AtA(suppressAcceleration);
         Assert.That(model.OnCounterSucceeded(), Is.True);
         Assert.That(model.OnCounterGroggyEnded(), Is.True);
-        ExpectReports(model, LobbyTrainingStage.Train03A);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03B), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.Counter);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.True);
         return model;
     }
 
@@ -41,8 +41,8 @@ public sealed class TrainingSparringModelTests
         var model = AtB(suppressAcceleration);
         Assert.That(model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback), Is.True);
         Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.True);
-        ExpectReports(model, LobbyTrainingStage.Train03B);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03C), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.True);
         Assert.That(model.TryConsumeResetRequest(), Is.True);
         Assert.That(model.OnResetExecuted(), Is.True);
         return model;
@@ -53,7 +53,7 @@ public sealed class TrainingSparringModelTests
         var model = AtC(suppressAcceleration);
         Assert.That(model.OnWallImpact(reducedGauge: true), Is.True);
         Assert.That(model.OnSuppressStarted(), Is.True);
-        ExpectReports(model, LobbyTrainingStage.Train03C);
+        ExpectReports(model, LobbyTutorialActivity.Wall);
         return model;
     }
 
@@ -66,7 +66,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Idle));
         Assert.That(model.AllowsSelfAction, Is.False);
 
-        model.OnFlowStageStarted(LobbyTrainingStage.Train03A);
+        model.OnFlowStageStarted(LobbyTutorialActivity.Counter);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CounterIntro));
         Assert.That(model.PreventsDeath, Is.True);
         Assert.That(model.AllowsGaugeTransition, Is.False);
@@ -77,9 +77,9 @@ public sealed class TrainingSparringModelTests
         model.OnCounterSucceeded();
         Assert.That(model.TryConsumeStageReport(out _), Is.False);   // 성공만으론 아직 — 그로기 종료가 완료
         model.OnCounterGroggyEnded();
-        ExpectReports(model, LobbyTrainingStage.Train03A);
+        ExpectReports(model, LobbyTutorialActivity.Counter);
 
-        model.OnFlowStageStarted(LobbyTrainingStage.Train03B);
+        model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CrowdControlIntro));
         Assert.That(model.HoldsVulnerable, Is.True);
         Assert.That(model.AllowsSelfAction, Is.False);
@@ -90,9 +90,9 @@ public sealed class TrainingSparringModelTests
         model.OnCrowdControlApplied(TrainingSparringCrowdControl.PushStagger);
         Assert.That(model.TryConsumeStageReport(out _), Is.False);   // 적용만으론 아직 — 종료가 완료
         model.OnCrowdControlEnded(TrainingSparringCrowdControl.PushStagger);
-        ExpectReports(model, LobbyTrainingStage.Train03B);
+        ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
 
-        model.OnFlowStageStarted(LobbyTrainingStage.Train03C);
+        model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Resetting));
         Assert.That(model.HoldsVulnerable, Is.False);
         Assert.That(model.AllowsSelfAction, Is.False);
@@ -108,8 +108,8 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnWallImpact(reducedGauge: true), Is.True);
         model.OnSuppressStarted();
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
-        ExpectReports(model, LobbyTrainingStage.Train03C);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03D), Is.False);   // 이미 D — 확인만
+        ExpectReports(model, LobbyTutorialActivity.Wall);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill), Is.False);   // 이미 D — 확인만
         Assert.That(model.PreventsDeath, Is.True);
         Assert.That(model.ShowsSegmentUi, Is.True);
 
@@ -123,7 +123,7 @@ public sealed class TrainingSparringModelTests
 
         Assert.That(model.OnDied(), Is.True);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Completed));
-        ExpectReports(model, LobbyTrainingStage.Train03D);
+        ExpectReports(model, LobbyTutorialActivity.SuppressKill);
         Assert.That(model.AllowsSelfAction, Is.False);
         Assert.That(model.ShowsSegmentUi, Is.False);
     }
@@ -151,17 +151,17 @@ public sealed class TrainingSparringModelTests
     public void 중복_역순_단계_알림은_무시()
     {
         var model = Create();
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03B), Is.False);   // A 전 B
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03C), Is.False);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03A), Is.True);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03A), Is.False);   // 중복
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03B), Is.False);   // A 미완료
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train02), Is.False);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);   // A 전 B
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.False);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.False);   // 중복
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);   // A 미완료
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Combat), Is.False);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CounterIntro));
 
         model = AtB();
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03A), Is.False);   // 역순
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03B), Is.False);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter), Is.False);   // 역순
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.CrowdControlIntro));
     }
 
@@ -174,7 +174,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnCounterSucceeded(), Is.False);
         Assert.That(model.OnCounterGroggyEnded(), Is.True);
         Assert.That(model.OnCounterGroggyEnded(), Is.False);
-        ExpectReports(model, LobbyTrainingStage.Train03A);
+        ExpectReports(model, LobbyTutorialActivity.Counter);
     }
 
     [Test]
@@ -200,7 +200,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback), Is.False);   // A 그로기 중 타격
         model.OnCounterGroggyEnded();
         DrainReports(model);
-        model.OnFlowStageStarted(LobbyTrainingStage.Train03B);
+        model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc);
 
         Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.False);
         Assert.That(model.TryConsumeStageReport(out _), Is.False);
@@ -221,7 +221,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.True);
         Assert.That(model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback), Is.False);
         Assert.That(model.OnCrowdControlApplied(TrainingSparringCrowdControl.PushStagger), Is.False);   // 완료 뒤
-        ExpectReports(model, LobbyTrainingStage.Train03B);
+        ExpectReports(model, LobbyTutorialActivity.VulnerableCc);
     }
 
     [Test]
@@ -231,7 +231,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnWallImpact(reducedGauge: true), Is.False);
         model.OnCrowdControlApplied(TrainingSparringCrowdControl.VulnerableKnockback);
         model.OnCrowdControlEnded(TrainingSparringCrowdControl.VulnerableKnockback);
-        model.OnFlowStageStarted(LobbyTrainingStage.Train03C);
+        model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition);
         model.TryConsumeResetRequest();
         model.OnResetExecuted();
 
@@ -246,10 +246,10 @@ public sealed class TrainingSparringModelTests
     public void 초기화_요청은_1회_재접속_중복_메시지로_반복되지_않는다()
     {
         var model = AtC();
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03C), Is.False);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.False);
         Assert.That(model.TryConsumeResetRequest(), Is.False);
         Assert.That(model.OnResetExecuted(), Is.False);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03B), Is.False);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.VulnerableCc), Is.False);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));
     }
 
@@ -259,11 +259,11 @@ public sealed class TrainingSparringModelTests
         var model = AtB();
         model.OnCrowdControlApplied(TrainingSparringCrowdControl.PushStagger);
         model.OnCrowdControlEnded(TrainingSparringCrowdControl.PushStagger);
-        model.OnFlowStageStarted(LobbyTrainingStage.Train03C);
+        model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition);
 
         Assert.That(model.OnWallImpact(true), Is.False);
         Assert.That(model.OnSuppressStarted(), Is.False);
-        Assert.That(model.OnFlowStageStarted(LobbyTrainingStage.Train03C), Is.False);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.ResetPosition), Is.False);
         Assert.That(model.TryConsumeResetRequest(), Is.True);
         Assert.That(model.TryConsumeResetRequest(), Is.False);
     }
@@ -277,7 +277,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnWallImpact(reducedGauge: true), Is.True);   // 벽 감소로 0칸 → 상대가 벽을 먼저 알린다
         Assert.That(model.OnSuppressStarted(), Is.True);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
-        ExpectReports(model, LobbyTrainingStage.Train03C);
+        ExpectReports(model, LobbyTutorialActivity.Wall);
     }
 
     [Test]
@@ -316,7 +316,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.WallAndSuppress));   // 벽만으론 D 아님
         Assert.That(model.OnSuppressStarted(), Is.True);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Finisher));
-        ExpectReports(model, LobbyTrainingStage.Train03C);
+        ExpectReports(model, LobbyTutorialActivity.Wall);
     }
 
     [Test]
@@ -347,7 +347,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.PreventsDeath, Is.False);
         Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
         Assert.That(model.OnDied(), Is.True);
-        ExpectReports(model, LobbyTrainingStage.Train03D);
+        ExpectReports(model, LobbyTutorialActivity.SuppressKill);
     }
 
     [Test]
@@ -383,7 +383,7 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.PreventsDeath, Is.False);
         Assert.That(model.OnDied(), Is.True);
         Assert.That(model.OnDied(), Is.False);
-        ExpectReports(model, LobbyTrainingStage.Train03D);
+        ExpectReports(model, LobbyTutorialActivity.SuppressKill);
     }
 
     [Test]
@@ -395,7 +395,7 @@ public sealed class TrainingSparringModelTests
         model.OnSuppressDamage();
         model.OnSuppressEnded();
         model.OnDied();
-        ExpectReports(model, LobbyTrainingStage.Train03C, LobbyTrainingStage.Train03D);
+        ExpectReports(model, LobbyTutorialActivity.Wall, LobbyTutorialActivity.SuppressKill);
     }
 
     // ── 총 칸 ──

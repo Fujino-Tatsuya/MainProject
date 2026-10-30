@@ -151,12 +151,12 @@ public sealed class LobbyWeaponCheckTests
     }
 
     [Test]
-    public void Targets_OnlyDuringTrain01InProgress()
+    public void Targets_OnlyDuringT10BasicCheck()
     {
-        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTrainingStage.Train01, LobbyTrainingPhase.InProgress), Is.True);
-        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTrainingStage.Train01, LobbyTrainingPhase.Gathering), Is.False, "시작 전");
-        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTrainingStage.Train02, LobbyTrainingPhase.Gathering), Is.False, "완료 뒤");
-        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering), Is.False);
+        // 할 일 157 ②: 단계 = 단계표 Activity. L21 대사·T20 집결(완료 뒤)은 Activity None.
+        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTutorialActivity.BasicCheck), Is.True);
+        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTutorialActivity.None), Is.False, "시작 전·완료 뒤 집결");
+        Assert.That(LobbyTrainingSupportRules.Train01TargetsActive(LobbyTutorialActivity.Combat), Is.False);
     }
 
     // ─── 훈련 리셋 ───────────────────────────────────────────────────────
@@ -227,25 +227,20 @@ public sealed class LobbyWeaponCheckTests
 
     // ─── 훈련 보정 최소 체력 ─────────────────────────────────────────────
 
-    [TestCase(LobbyTrainingStage.Lobby, 0)]
-    [TestCase(LobbyTrainingStage.Train01, 1)]
-    [TestCase(LobbyTrainingStage.Train02, 1)]
-    [TestCase(LobbyTrainingStage.Train03A, 1)]
-    [TestCase(LobbyTrainingStage.Train03B, 1)]
-    [TestCase(LobbyTrainingStage.Train03C, 1)]
-    [TestCase(LobbyTrainingStage.Train03D, 1)]
-    [TestCase(LobbyTrainingStage.TrainEnd, 0)]
-    [TestCase(LobbyTrainingStage.Brief, 0)]
-    [TestCase(LobbyTrainingStage.Sortie, 0)]
-    public void HealthFloor_OnlyDuringTrainingStages(LobbyTrainingStage stage, int expected)
+    // 단계별 범위(행 trainingProfile)는 LobbyTutorialRulesTests(실제 단계표) — 여기는 프로필 규칙만.
+    [TestCase(LobbyTutorialTrainingProfile.None, 0)]
+    [TestCase(LobbyTutorialTrainingProfile.Training, 1)]
+    public void HealthFloor_FollowsRowTrainingProfile(LobbyTutorialTrainingProfile profile, int expected)
     {
-        Assert.That(LobbyTrainingSupportRules.HealthFloorFor(stage, isInTrainingRoster: true), Is.EqualTo(expected));
+        var step = new LobbyTutorialStep { trainingProfile = profile };
+        Assert.That(LobbyTutorialRules.HealthFloorFor(step, inLockedRoster: true), Is.EqualTo(expected));
     }
 
     [Test]
     public void HealthFloor_LateJoinerHasNone()
     {
-        Assert.That(LobbyTrainingSupportRules.HealthFloorFor(LobbyTrainingStage.Train01, isInTrainingRoster: false), Is.Zero);
+        var step = new LobbyTutorialStep { trainingProfile = LobbyTutorialTrainingProfile.Training };
+        Assert.That(LobbyTutorialRules.HealthFloorFor(step, inLockedRoster: false), Is.Zero);
     }
 
     [Test]

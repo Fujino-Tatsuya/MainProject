@@ -164,48 +164,46 @@ public sealed class LobbyBriefingTests
         Assert.That(release, Is.EqualTo(new ulong[] { 1 }));
     }
 
-    [Test]
-    public void 목표_표시는_브리핑_중과_완료_뒤만()
+    static LobbyTutorialStepView View(LobbyTutorialStepTable table, string stateId)
     {
-        Assert.That(LobbyBriefingRules.ObjectiveFor(LobbyTrainingStage.Brief, LobbyTrainingPhase.Gathering), Is.Null);
-        Assert.That(LobbyBriefingRules.ObjectiveFor(LobbyTrainingStage.Brief, LobbyTrainingPhase.InProgress), Is.EqualTo(LobbyObjectiveIds.Briefing));
-        Assert.That(LobbyBriefingRules.ObjectiveFor(LobbyTrainingStage.Brief, LobbyTrainingPhase.Completed), Is.EqualTo(LobbyObjectiveIds.Sortie));
-        Assert.That(LobbyBriefingRules.ObjectiveFor(LobbyTrainingStage.Sortie, LobbyTrainingPhase.Gathering), Is.Null);
-        Assert.That(LobbyBriefingRules.ObjectiveFor(LobbyTrainingStage.Lobby, LobbyTrainingPhase.Gathering), Is.Null);
-        Assert.That(LobbyBriefingRules.ObjectiveFor(LobbyTrainingStage.TrainEnd, LobbyTrainingPhase.InProgress), Is.Null);
+        var index = table.IndexOf(stateId);
+        Assert.That(index, Is.GreaterThanOrEqualTo(0), stateId);
+        return new LobbyTutorialStepView(index, table[index]);
+    }
+
+    static LobbyTutorialStepTable LoadSteps()
+    {
+        var table = AssetDatabase.LoadAssetAtPath<LobbyTutorialStepTable>("Assets/9.ScriptableObject/Lobby/LobbyTutorialSteps.asset");
+        Assert.That(table, Is.Not.Null);
+        return table;
     }
 
     [Test]
-    public void 진행기_흐름에서_브리핑은_집결_확정_뒤에만_시작_상태가_된다()
+    public void 목표_표시는_브리핑_중과_출격_집결만()
     {
-        var flow = new LobbyTrainingFlow();
-        flow.AddClient(0);
-        Assert.That(LobbyBriefingRules.IsBriefing(flow.Stage, flow.Phase), Is.False);
+        var table = LoadSteps();
 
-        // 실제 전이로 Brief 까지 — 입구 → Train01~03D → 종료 집결 → 브리핑 위치 집결.
-        flow.OnGatherConfirmed(LobbyGatherPoint.Entrance);
-        flow.OnGatherConfirmed(LobbyGatherPoint.Train01Start);
-        flow.ReportStageCompleted(LobbyTrainingStage.Train01);
-        flow.OnGatherConfirmed(LobbyGatherPoint.Train02Start);
-        flow.ReportStageCompleted(LobbyTrainingStage.Train02);
-        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
-        flow.ReportStageCompleted(LobbyTrainingStage.Train03A);
-        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
-        flow.ReportStageCompleted(LobbyTrainingStage.Train03B);
-        flow.OnGatherConfirmed(LobbyGatherPoint.Train03Area);
-        flow.ReportStageCompleted(LobbyTrainingStage.Train03C);
-        flow.ReportStageCompleted(LobbyTrainingStage.Train03D);
-        flow.OnGatherConfirmed(LobbyGatherPoint.TrainEnd);
-        Assert.That(flow.Stage, Is.EqualTo(LobbyTrainingStage.Brief));
-        Assert.That(LobbyBriefingRules.IsBriefing(flow.Stage, flow.Phase), Is.False, "Brief/Gathering = 아직 이동 중");
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "L30_BriefGather")), Is.Null, "브리핑 위치 이동 중");
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "L31_BriefIntro")), Is.EqualTo(LobbyObjectiveIds.Briefing));
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "L34_SortieIntro")), Is.EqualTo(LobbyObjectiveIds.Briefing));
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "L40_SortieGather")), Is.EqualTo(LobbyObjectiveIds.Sortie));
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "L41_Loading")), Is.Null);
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "L00_LockerVisit")), Is.Null);
+        Assert.That(LobbyBriefingRules.ObjectiveFor(View(table, "T50_FreePractice")), Is.Null);
+        Assert.That(LobbyBriefingRules.ObjectiveFor(default), Is.Null, "진행기 없음");
+    }
 
-        flow.OnGatherConfirmed(LobbyGatherPoint.Brief);
-        Assert.That(LobbyBriefingRules.IsBriefing(flow.Stage, flow.Phase), Is.True);
+    [Test]
+    public void 브리핑은_입력_잠금_대사_행만_감독관_대사_행은_아님()
+    {
+        var table = LoadSteps();
 
-        Assert.That(flow.ReportStageCompleted(LobbyTrainingStage.Brief), Is.True);
-        Assert.That(LobbyBriefingRules.IsBriefing(flow.Stage, flow.Phase), Is.False);
-        Assert.That(flow.IsPointActive(LobbyGatherPoint.Sortie), Is.True, "브리핑 완료 = 출격 집결 활성");
-        Assert.That(flow.ReportStageCompleted(LobbyTrainingStage.Brief), Is.False, "완료 보고 중복 무시");
+        Assert.That(LobbyBriefingRules.IsBriefing(View(table, "L11_CentralIntro")), Is.False, "잠금 없는 대사");
+        Assert.That(LobbyBriefingRules.IsBriefing(View(table, "L21_TrainingIntro")), Is.False);
+        Assert.That(LobbyBriefingRules.IsBriefing(View(table, "L30_BriefGather")), Is.False, "집결 = 아직 이동 중");
+        Assert.That(LobbyBriefingRules.IsBriefing(View(table, "L31_BriefIntro")), Is.True);
+        Assert.That(LobbyBriefingRules.IsBriefing(View(table, "L40_SortieGather")), Is.False, "브리핑 완료 = 출격 집결");
+        Assert.That(LobbyBriefingRules.IsBriefing(default), Is.False);
     }
 
     [Test]

@@ -195,21 +195,13 @@ public sealed class LobbyWeaponCheckModel
 
 /// <summary>
 /// 로비 훈련 보정 범위(명세 v0.2 §6·§7) — 어느 단계에서 무엇이 켜지는가. Unity·NGO 비의존(EditMode 테스트 대상).
+/// 체력 하한 범위는 단계표 행 <see cref="LobbyTutorialStep.trainingProfile"/>(<see cref="LobbyTutorialRules.HealthFloorFor"/>, 할 일 157 ②).
 /// </summary>
 public static class LobbyTrainingSupportRules
 {
     /// <summary>훈련 보정 최소 체력(1 미만으로 안 내려감).</summary>
     public const int TrainingHealthFloor = 1;
 
-    /// <summary>훈련 단계(Train01~Train03D) — 체력 하한 등 훈련 보정이 켜지는 구간. 종료 집결·브리핑·출격·로비는 아니다.</summary>
-    public static bool IsTrainingStage(LobbyTrainingStage stage) =>
-        stage >= LobbyTrainingStage.Train01 && stage <= LobbyTrainingStage.Train03D;
-
-    /// <summary>이 사람의 체력 하한 — 훈련 명단 안 + 훈련 단계면 1, 아니면 0(없음). 늦은 참가자는 0.</summary>
-    public static int HealthFloorFor(LobbyTrainingStage stage, bool isInTrainingRoster) =>
-        isInTrainingRoster && IsTrainingStage(stage) ? TrainingHealthFloor : 0;
-
-    /// <summary>TRAIN_01 표적 3개가 있어야 하는가 — Train01 진행 중에만(시작 전·완료 뒤에는 디스폰).</summary>
-    public static bool Train01TargetsActive(LobbyTrainingStage stage, LobbyTrainingPhase phase) =>
-        stage == LobbyTrainingStage.Train01 && phase == LobbyTrainingPhase.InProgress;
+    /// <summary>TRAIN_01 표적 3개가 있어야 하는가 — T10 기본 조작 훈련(Activity BasicCheck) 동안만(시작 전·완료 뒤에는 디스폰).</summary>
+    public static bool Train01TargetsActive(LobbyTutorialActivity activity) => activity == LobbyTutorialActivity.BasicCheck;
 }

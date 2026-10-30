@@ -8,12 +8,13 @@ using UnityEngine.SceneManagement;
 /// TRAIN_03 간파·CC·벽·제압(할 일 86 T5c — PLAN §3.5, 명세 v0.2 §9) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
 /// 연결 규칙은 <see cref="LobbySparringLink"/>, 단계·CC 판정은 훈련 상대(<see cref="TrainingSparringBot"/>·<see cref="TrainingSparringModel"/>). 여기는 스폰·구독·보고만 한다.
 /// <list type="bullet">
-/// <item>시작 = 진행기 Train03A 가 진행 중이 되는 순간(시작 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대를 <see cref="LobbyTrainingSparringArena.SpawnPoint"/>(A/B)에 스폰하고
-/// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 Train03A 진행 알림까지 준다. 이미 있으면 재사용.</item>
-/// <item>진행 알림: Train03A~D 가 진행 중이 될 때마다 <see cref="TrainingSparringBot.ServerNotifyFlowStageStarted"/> 1회(앞으로만).
-/// Train03C 알림 = 상대 B→C 초기화(C 위치 재배치) → <see cref="TrainingSparringBot.ServerResetExecuted"/> → 플레이어 리셋(<see cref="TrainingResetOptions.PracticeReset"/>) 회차당 1회.</item>
-/// <item>완료 보고: 상대 <see cref="TrainingSparringBot.ServerStageCompleted"/> → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportStageCompleted"/>(Train03A~D) 1회 —
-/// 피해·사망 판정 도중 단계를 넘기지 않는다. 진행기 단계와 어긋난 보고·중복은 무시(경고).</item>
+/// <item>시작 = 진행기 T31(Counter) 이 시작되는 순간(T30 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대를 <see cref="LobbyTrainingSparringArena.SpawnPoint"/>(A/B)에 스폰하고
+/// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 T31 시작 알림까지 준다. 이미 있으면 재사용.</item>
+/// <item>시작 알림: T31~T40 이 시작될 때마다 <see cref="TrainingSparringBot.ServerNotifyFlowStageStarted"/> 1회(앞으로만) — 그 단계 revision 을 기억한다.
+/// T33(ResetPosition) 알림 = 상대 초기화(C 위치 재배치) → <see cref="TrainingSparringBot.ServerResetExecuted"/> → 플레이어 리셋(<see cref="TrainingResetOptions.PracticeReset"/>) 회차당 1회
+/// → 할 일 157 ② 임시: 초기화 실행 = T33 완료 보고(위치 복귀 규칙 변경은 커밋 ⑦).</item>
+/// <item>완료 보고: 상대 <see cref="TrainingSparringBot.ServerStageCompleted"/> → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportActivityCompleted"/>(Activity, 알림 때 revision) 1회 —
+/// 피해·사망 판정 도중 단계를 넘기지 않는다. 진행기 단계와 어긋난 보고·중복·지난 revision 은 무시(경고).</item>
 /// <item>무전: <see cref="ServerFirstCounterSucceeded"/>(TRAIN_03_COUNTER)·<see cref="ServerFirstValidWallImpact"/>(TRAIN_03_WALL)·<see cref="ServerFinishStarted"/>(TRAIN_03_COMBAT) — 회차당 1회.
 /// 이벤트를 낼 때 여기서 바로 <see cref="LobbyRadio.ServerPlay"/>(LobbyRadioIds) 를 부른다. 단계 진입 대사(START/CC/RESET·WALL_GUIDE/SUPPRESS)는 <see cref="LobbyRadio"/> 쪽.</item>
 /// <item>정리: Train03 이 아닌 단계로 넘어가거나(TrainEnd 등) 진행기 디스폰(판 끝 로비 복귀·씬 전환) 때 살아 있는 상대 디스폰·회차 끝.
@@ -35,7 +36,8 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     // 서버
     private LobbyTrainingDirector _director;
     private readonly LobbySparringLink _link = new LobbySparringLink();
-    private readonly Queue<LobbyTrainingStage> _pendingReports = new Queue<LobbyTrainingStage>();
+    private readonly Queue<LobbyTutorialActivity> _pendingReports = new Queue<LobbyTutorialActivity>();
+    private int _noticeRevision;
     private TrainingSparringBot _bot;
     private bool _pendingFirstCounter;
     private bool _warnedNoRadio;
@@ -166,23 +168,24 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         if (_director == null)
             return;
 
-        var stage = _director.Stage;
-        if (LobbySparringLink.BotPresent(stage, _director.Phase))
+        var activity = _director.CurrentActivity;
+        if (LobbySparringLink.BotPresent(activity))
         {
             if (!_link.IsRoundActive)
                 BeginServer();
             if (_bot == null)
                 return;
 
-            if (_link.TryTakeFlowNotice(stage, _director.Phase, out var notice))
+            if (_link.TryTakeFlowNotice(activity, out var notice))
             {
+                _noticeRevision = _director.Revision;
                 var accepted = _bot.ServerNotifyFlowStageStarted(notice);
-                Debug.Log($"[SceneFlow] {Tag} 진행 알림 {notice} → 상대 {(accepted ? "수락" : "확인만")} (상대 단계 {_bot.SparringStage})");
+                Debug.Log($"[SceneFlow] {Tag} 시작 알림 {notice} rev {_noticeRevision} → 상대 {(accepted ? "수락" : "확인만")} (상대 단계 {_bot.SparringStage})");
             }
         }
         else if (_link.IsRoundActive || _bot != null)
         {
-            EndServer($"단계 이탈 → {stage}/{_director.Phase}");
+            EndServer($"단계 이탈 → {_director.DescribeStep()}");
         }
     }
 
@@ -276,7 +279,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         bot.ServerCounterSucceeded -= HandleBotCounterSucceeded;
     }
 
-    private void HandleBotStageCompleted(LobbyTrainingStage completed) => _pendingReports.Enqueue(completed);
+    private void HandleBotStageCompleted(LobbyTutorialActivity completed) => _pendingReports.Enqueue(completed);
 
     private void HandleBotCounterSucceeded(ulong attacker)
     {
@@ -296,21 +299,23 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         }
 
         _director.ServerResetTrainingRoster(TrainingResetOptions.PracticeReset);
-        Debug.Log($"[SceneFlow] {Tag} B→C 초기화 — 상대 C 위치 재배치 + 훈련 명단 리셋(PracticeReset)");
+        // 할 일 157 ② 임시: T33 위치 복귀 = 초기화 실행으로 끝(입력 대기 없음). 다음 프레임 보고 — 같은 프레임에 T34 를 시작하지 않는다.
+        _pendingReports.Enqueue(LobbyTutorialActivity.ResetPosition);
+        Debug.Log($"[SceneFlow] {Tag} T33 초기화 — 상대 C 위치 재배치 + 훈련 명단 리셋(PracticeReset)");
     }
 
-    private void ReportServer(LobbyTrainingStage completed)
+    private void ReportServer(LobbyTutorialActivity completed)
     {
         if (_director == null)
             return;
 
-        if (!_link.TryAcceptReport(completed, _director.Stage, _director.Phase))
+        if (!_link.TryAcceptReport(completed, _director.CurrentActivity))
         {
-            Debug.LogWarning($"{Tag} 상대 단계 완료 {completed} 무시 — 진행기 {_director.Stage}/{_director.Phase}, 마지막 보고 {_link.LastReported}.", this);
+            Debug.LogWarning($"{Tag} 상대 단계 완료 {completed} 무시 — 진행기 {_director.DescribeStep()}, 마지막 보고 {_link.LastReported}.", this);
             return;
         }
 
-        if (_director.ServerReportStageCompleted(completed))
+        if (_director.ServerReportActivityCompleted(completed, _noticeRevision))
             Debug.Log($"[SceneFlow] {Tag} 상대 단계 완료 {completed} → 진행기 보고");
     }
 }

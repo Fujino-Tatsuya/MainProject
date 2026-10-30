@@ -39,102 +39,41 @@ public static class LobbyRadioIds
 }
 
 /// <summary>
-/// 단계 진입 대사 표(Docs/tech/lobby-training.md "로비 무전" 절). 앞으로만 진행하는 단계라 (단계, 하위 상태) 진입 = 전이 하나와 1:1 이다.
-/// 한 진입에 여러 줄이면 배열 순서대로 큐에 들어간다(B→C = 초기화 안내 → 벽 안내).
-/// </summary>
-public static class LobbyRadioSchedule
-{
-    static readonly string[] None = Array.Empty<string>();
-
-    public static IReadOnlyList<string> LinesOnEnter(LobbyTrainingStage stage, LobbyTrainingPhase phase)
-    {
-        switch (stage)
-        {
-            case LobbyTrainingStage.Train01:
-                // Gathering = 입구 집결 확정 직후(Lobby → Train01) · InProgress = 첫 위치 집결 확정(무기 점검 시작)
-                return phase == LobbyTrainingPhase.Gathering ? new[] { LobbyRadioIds.LobbyTrainRoute }
-                    : phase == LobbyTrainingPhase.InProgress ? new[] { LobbyRadioIds.Train01Start } : None;
-            case LobbyTrainingStage.Train02:
-                // Gathering = Train01 전원 완료 보고 직후 · InProgress = 두 번째 위치 집결 확정(몹 스폰)
-                return phase == LobbyTrainingPhase.Gathering ? new[] { LobbyRadioIds.Train01End }
-                    : phase == LobbyTrainingPhase.InProgress ? new[] { LobbyRadioIds.Train02Start } : None;
-            case LobbyTrainingStage.Train03A:
-                // Gathering = Train02 완료 보고 직후 · InProgress = 세 번째 위치 집결 확정(A 시작)
-                return phase == LobbyTrainingPhase.Gathering ? new[] { LobbyRadioIds.Train02End }
-                    : phase == LobbyTrainingPhase.InProgress ? new[] { LobbyRadioIds.Train03Start } : None;
-            case LobbyTrainingStage.Train03B:
-                return phase == LobbyTrainingPhase.InProgress ? new[] { LobbyRadioIds.Train03Cc } : None;
-            case LobbyTrainingStage.Train03C:
-                // B 완료 뒤 영역 안 확인 = B→C 명시 초기화 순간(명세 §9.4) — 초기화 안내 → C 안내.
-                return phase == LobbyTrainingPhase.InProgress
-                    ? new[] { LobbyRadioIds.Train03Reset, LobbyRadioIds.Train03WallGuide } : None;
-            case LobbyTrainingStage.Train03D:
-                return phase == LobbyTrainingPhase.InProgress ? new[] { LobbyRadioIds.Train03Suppress } : None;
-            case LobbyTrainingStage.TrainEnd:
-                return phase == LobbyTrainingPhase.Gathering ? new[] { LobbyRadioIds.TrainEnd } : None;
-            case LobbyTrainingStage.Brief:
-                // 진입 대사 없음 — 종료 텔레포트로 이미 브리핑 구역 안이라 이동 안내(BRIEF_ROUTE) 불필요(할 일 111, 키·문구는 남김).
-                // 브리핑 본문(BRIEF_01~04)은 T6c.
-                return None;
-            default:
-                return None;
-        }
-    }
-}
-
-/// <summary>
-/// [서버] 로비 무전 재생 결정(순수, EditMode 테스트 대상). 진행기 상태가 바뀔 때마다 <see cref="OnFlowChanged"/> 를 부른다.
+/// [서버] 로비 무전 재생 결정(순수, EditMode 테스트 대상). 진행기 단계가 바뀔 때마다 <see cref="OnStepChanged"/> 를 부른다.
 /// <list type="bullet">
-/// <item>처음 본 상태는 기준만 잡고 대사 없음 — 진행기 스폰 직후(Lobby)·늦게 붙은 구독이 지난 대사를 재생하지 않는다.</item>
-/// <item>단계(<see cref="LobbyTrainingStage"/>)가 바뀌면 <see cref="StageSerial"/> 을 올린다 — 클라는 더 큰 번호를 받으면 이전 단계의 미재생 대사를 버린다.
-/// 하위 상태만 바뀐 건 같은 단계라 버리지 않는다.</item>
-/// <item>같은 id 는 회차당 1회(단계 진입 대사 + <see cref="TryPlay"/> 의 oncePerRound). 새 회차 = <see cref="Reset"/>(판 끝 로비 복귀 = 새 진행기라 새 모델).</item>
+/// <item>단계 진입 대사는 없다 — 할 일 157 ②(Q6): 옛 진입 대사 표(LOBBY_TRAIN_ROUTE·TRAIN_0x_START/END·TRAIN_03_CC/RESET/WALL_GUIDE/SUPPRESS·TRAIN_END)는 껐다.
+/// id·문구 행(<see cref="LobbyRadioIds"/>, TutorialGuideTexts)은 남긴다. 감독관 대사는 단계표 대사 행(커밋 ③·⑨).</item>
+/// <item>처음 본 단계는 기준만 잡는다. 단계(revision)가 바뀌면 <see cref="StageSerial"/> 을 올린다 — 클라는 더 큰 번호를 받으면 이전 단계의 미재생 대사(단계 안 사건 무전)를 버린다.</item>
+/// <item>같은 id 는 회차당 1회(<see cref="TryPlay"/> 의 oncePerRound). 새 회차 = <see cref="Reset"/>(판 끝 로비 복귀 = 새 진행기라 새 모델).</item>
 /// </list>
 /// </summary>
 public sealed class LobbyRadioModel
 {
     readonly HashSet<string> _played = new HashSet<string>(StringComparer.Ordinal);
     bool _hasState;
-    LobbyTrainingStage _stage;
-    LobbyTrainingPhase _phase;
+    int _revision;
 
     /// <summary>단계 번호 — 단계가 바뀔 때마다 1씩. 대사 RPC 에 같이 싣는다.</summary>
     public int StageSerial { get; private set; }
 
     public bool HasPlayed(string id) => !string.IsNullOrEmpty(id) && _played.Contains(id);
 
-    /// <summary>
-    /// 진행기 상태 반영. <paramref name="lines"/> 에 이번에 틀 대사(이미 튼 id 제외)를 순서대로 채운다.
-    /// 반환 true = 단계가 바뀌었다(<see cref="StageSerial"/> 증가 — 미재생 폐기를 보낸다).
-    /// </summary>
-    public bool OnFlowChanged(LobbyTrainingStage stage, LobbyTrainingPhase phase, List<string> lines)
+    /// <summary>진행기 단계 반영(스냅샷 revision). 반환 true = 단계가 바뀌었다(<see cref="StageSerial"/> 증가 — 미재생 폐기를 보낸다). 처음 본 값·같은 값은 false.</summary>
+    public bool OnStepChanged(int revision)
     {
-        lines?.Clear();
         if (!_hasState)
         {
             _hasState = true;
-            _stage = stage;
-            _phase = phase;
+            _revision = revision;
             return false;
         }
 
-        if (stage == _stage && phase == _phase)
+        if (revision == _revision)
             return false;
 
-        var stageChanged = stage != _stage;
-        if (stageChanged)
-            StageSerial++;
-
-        _stage = stage;
-        _phase = phase;
-
-        foreach (var id in LobbyRadioSchedule.LinesOnEnter(stage, phase))
-        {
-            if (_played.Add(id))
-                lines?.Add(id);
-        }
-
-        return stageChanged;
+        _revision = revision;
+        StageSerial++;
+        return true;
     }
 
     /// <summary>단계 안 사건 대사. oncePerRound 면 이번 회차에 이미 튼 id 는 false. 빈 id 는 false.</summary>

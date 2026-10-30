@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-/// <summary>TRAIN_03 훈련 상대 단계(할 일 86 T5a). 진행기 단계(<see cref="LobbyTrainingStage"/>)와 별개 — 상대 쪽 하위 상태다. 복제용이라 byte, 값은 끝에만 추가.</summary>
+/// <summary>TRAIN_03 훈련 상대 단계(할 일 86 T5a). 진행기 단계(<see cref="LobbyTutorialActivity"/>)와 별개 — 상대 쪽 하위 상태다. 복제용이라 byte, 값은 끝에만 추가.</summary>
 public enum TrainingSparringStage : byte
 {
     /// <summary>TRAIN_03 시작 전(진행기가 Train03A 진행을 아직 안 알렸다).</summary>
@@ -72,10 +72,12 @@ public readonly struct TrainingSparringSegmentCheck
 /// 피해 없이 끝난 제압은 다음 사이클(간파·벽·제압)에서 재확인 — 무기한 제압·강제 쿨 반환 없음.</item>
 /// </list>
 /// 이벤트 메서드는 상태가 바뀌었거나 기록했으면 true — 현재 단계에 맞지 않는 이벤트·중복·역순은 무시(false)라 호출측이 로그만 남긴다.
+/// <para>할 일 157 ②: 진행기 단계 = 단계표 Activity. 옛 Train03A→Counter(T31), B→VulnerableCc(T32), C 진입(초기화)→ResetPosition(T33),
+/// C 완료(벽 기록 뒤 제압 진입)→Wall(T34), D→SuppressKill(T40) 로 이름만 옮겼다 — 판정 내용은 커밋 ⑦·⑧에서 바꾼다.</para>
 /// </summary>
 public sealed class TrainingSparringModel
 {
-    readonly Queue<LobbyTrainingStage> _pendingReports = new Queue<LobbyTrainingStage>();
+    readonly Queue<LobbyTutorialActivity> _pendingReports = new Queue<LobbyTutorialActivity>();
     readonly bool _suppressAccelerationEnabled;
 
     bool _counterSucceededInA, _reportedA;
@@ -135,7 +137,7 @@ public sealed class TrainingSparringModel
     public bool AppliesSuppressAcceleration => _suppressAccelerationEnabled && _suppressActive && AllowsGaugeTransition;
 
     /// <summary>진행기에 보낼 단계 완료 보고를 하나 꺼낸다(완료마다 정확히 1회). 없으면 false.</summary>
-    public bool TryConsumeStageReport(out LobbyTrainingStage completed)
+    public bool TryConsumeStageReport(out LobbyTutorialActivity completed)
     {
         if (_pendingReports.Count == 0)
         {
@@ -170,26 +172,26 @@ public sealed class TrainingSparringModel
     // ── 입력 ──
 
     /// <summary>
-    /// 진행기 단계 진행 알림(Train03A~D 가 InProgress 가 된 때). 앞으로만 — 같은 단계·역순·다른 단계는 무시.
-    /// Train03C = 초기화 요청 1회(이미 요청했으면 무시). Train03D = 상대가 제압 시작에서 이미 D 로 넘어갔으면 확인만(false).
+    /// 진행기 단계 시작 알림(T31~T40 Activity 진입). 앞으로만 — 같은 단계·역순·다른 단계는 무시.
+    /// ResetPosition(T33) = 초기화 요청 1회(이미 요청했으면 무시). Wall(T34)·SuppressKill(T40) = 상대가 이미 그 상태라 확인만(false).
     /// </summary>
-    public bool OnFlowStageStarted(LobbyTrainingStage flowStage)
+    public bool OnFlowStageStarted(LobbyTutorialActivity flowStage)
     {
         switch (flowStage)
         {
-            case LobbyTrainingStage.Train03A:
+            case LobbyTutorialActivity.Counter:
                 if (Stage != TrainingSparringStage.Idle) return false;
                 Stage = TrainingSparringStage.CounterIntro;
                 return true;
 
-            case LobbyTrainingStage.Train03B:
+            case LobbyTutorialActivity.VulnerableCc:
                 if (Stage != TrainingSparringStage.CounterIntro || !_reportedA)
                     return false;
                 Stage = TrainingSparringStage.CrowdControlIntro;
                 _pendingCrowdControl = 0;
                 return true;
 
-            case LobbyTrainingStage.Train03C:
+            case LobbyTutorialActivity.ResetPosition:
                 if (Stage != TrainingSparringStage.CrowdControlIntro || _resetRequested) return false;
                 Stage = TrainingSparringStage.Resetting;
                 _resetRequested = true;
@@ -232,7 +234,7 @@ public sealed class TrainingSparringModel
             return false;
 
         _reportedA = true;
-        _pendingReports.Enqueue(LobbyTrainingStage.Train03A);
+        _pendingReports.Enqueue(LobbyTutorialActivity.Counter);
         return true;
     }
 
@@ -255,7 +257,7 @@ public sealed class TrainingSparringModel
 
         _reportedB = true;
         _pendingCrowdControl = 0;
-        _pendingReports.Enqueue(LobbyTrainingStage.Train03B);
+        _pendingReports.Enqueue(LobbyTutorialActivity.VulnerableCc);
         return true;
     }
 
@@ -275,7 +277,7 @@ public sealed class TrainingSparringModel
     }
 
     /// <summary>
-    /// 제압 진입(게이지 0). C 에서 벽을 기록했으면 지금이 D 시작(Train03C 완료 보고 1회). 벽 전이면 정상 제압만(C 계속).
+    /// 제압 진입(게이지 0). C 에서 벽을 기록했으면 지금이 D 시작(Wall 완료 보고 1회). 벽 전이면 정상 제압만(C 계속).
     /// D 에서의 새 제압은 피해 확인을 새로 시작한다. A/B(전이 중지)·마무리 중·중복 시작은 무시.
     /// </summary>
     public bool OnSuppressStarted()
@@ -289,7 +291,7 @@ public sealed class TrainingSparringModel
         if (Stage == TrainingSparringStage.WallAndSuppress && _wallRecorded)
         {
             Stage = TrainingSparringStage.Finisher;
-            _pendingReports.Enqueue(LobbyTrainingStage.Train03C);
+            _pendingReports.Enqueue(LobbyTutorialActivity.Wall);
         }
 
         return true;
@@ -325,14 +327,14 @@ public sealed class TrainingSparringModel
         return true;
     }
 
-    /// <summary>상대 사망. D 마무리(처치 방지 해제 뒤)에서만 완료(Train03D 보고 1회). 그 밖의 사망은 처치 방지 누락 — false(호출측 경고).</summary>
+    /// <summary>상대 사망. D 마무리(처치 방지 해제 뒤)에서만 완료(SuppressKill 보고 1회). 그 밖의 사망은 처치 방지 누락 — false(호출측 경고).</summary>
     public bool OnDied()
     {
         if (Stage != TrainingSparringStage.Finisher || !_finishing)
             return false;
 
         Stage = TrainingSparringStage.Completed;
-        _pendingReports.Enqueue(LobbyTrainingStage.Train03D);
+        _pendingReports.Enqueue(LobbyTutorialActivity.SuppressKill);
         return true;
     }
 

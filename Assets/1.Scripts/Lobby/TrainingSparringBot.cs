@@ -103,8 +103,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public event Action ServerSuppressDamaged;
     /// <summary>[서버] 상대 사망. 인자 = 모델이 완료로 인정했는가(false = 처치 방지 누락).</summary>
     public event Action<bool> ServerSparringDied;
-    /// <summary>[서버] 모델 단계 완료(Train03A~D, 완료마다 1회) — 진행기 보고는 T5c.</summary>
-    public event Action<LobbyTrainingStage> ServerStageCompleted;
+    /// <summary>[서버] 모델 단계 완료(T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring.</summary>
+    public event Action<LobbyTutorialActivity> ServerStageCompleted;
     /// <summary>[서버] B→C 초기화 실행 완료 — 진행기가 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>)을 이어 건다(T5c).</summary>
     public event Action ServerResetExecuted;
 
@@ -155,9 +155,13 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     protected override bool FaceTargetWhileAttacking => false;
 
     #region 수명
+    /// <summary>[모든 피어] 스폰된 훈련 상대(없으면 null) — 로비 튜토리얼 파사드(<see cref="LobbyTutorialState.TrainingTarget"/>)가 읽는다.</summary>
+    public static TrainingSparringBot Current { get; private set; }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        Current = this;
         _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
         ApplyVulnerableTint(_vulnerableVisual.Value);
 
@@ -178,6 +182,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public override void OnNetworkDespawn()
     {
         _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
+        if (Current == this)
+            Current = null;
         base.OnNetworkDespawn();
     }
 
@@ -190,9 +196,9 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     }
 
     /// <summary>
-    /// [서버] 진행기 단계 진행 알림(Train03A~D InProgress). 모델이 받아들이면 true. Train03C 면 초기화 요청을 바로 실행한다(재접속·중복 알림은 모델이 1회로 막는다).
+    /// [서버] 진행기 단계 시작 알림(T31~T40 Activity). 모델이 받아들이면 true. T33 ResetPosition 이면 초기화 요청을 바로 실행한다(재접속·중복 알림은 모델이 1회로 막는다).
     /// </summary>
-    public bool ServerNotifyFlowStageStarted(LobbyTrainingStage flowStage)
+    public bool ServerNotifyFlowStageStarted(LobbyTutorialActivity flowStage)
     {
         if (!IsServer || _model == null) return false;
         bool accepted = _model.OnFlowStageStarted(flowStage);
@@ -758,7 +764,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     {
         if (!IsServer || _model == null) return;
 
-        while (_model.TryConsumeStageReport(out LobbyTrainingStage completed))
+        while (_model.TryConsumeStageReport(out LobbyTutorialActivity completed))
         {
             Debug.Log($"{Tag} 단계 완료 — {completed}", this);
             ServerStageCompleted?.Invoke(completed);

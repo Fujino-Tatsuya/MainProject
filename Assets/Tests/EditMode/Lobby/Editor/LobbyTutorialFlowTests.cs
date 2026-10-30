@@ -237,4 +237,83 @@ public sealed class LobbyTutorialFlowTests
         Assert.That(flow.TryCommitLaunch(), Is.False);
         Assert.That(flow.Snapshot.LaunchCommitted, Is.True);
     }
+
+    // ── 할 일 112 튜토리얼 클리어 플래그(로비 Alt+1) — 157 ② 에서 옛 LobbyTrainingFlowTests 에서 옮김 ──
+
+    [Test]
+    public void 클리어_플래그_켠_사람은_명단_고정_전_참여자와_고정_명단에서_빠진다()
+    {
+        var flow = Create(0, 1);
+
+        Assert.That(flow.SetTrainingCleared(1, true, out var left), Is.True);
+        Assert.That(left, Is.False, "명단 고정 전");
+        Assert.That(flow.Participants, Is.EqualTo(new ulong[] { 0 }));
+
+        flow.LockRoster();
+        Assert.That(flow.Roster, Is.EqualTo(new ulong[] { 0 }));
+        Assert.That(flow.IsWaitingLateJoiner(1), Is.True, "클리어 = 늦은 참가자처럼 로비 대기");
+    }
+
+    [Test]
+    public void 명단_고정_뒤_켜면_즉시_명단에서_빠지고_끄면_이번_명단엔_안_돌아간다()
+    {
+        var flow = Create(0, 1);
+        flow.LockRoster();
+
+        Assert.That(flow.SetTrainingCleared(1, true, out var left), Is.True);
+        Assert.That(left, Is.True);
+        Assert.That(flow.Roster, Is.EqualTo(new ulong[] { 0 }));
+
+        Assert.That(flow.SetTrainingCleared(1, false, out left), Is.True);
+        Assert.That(left, Is.False);
+        Assert.That(flow.Roster, Is.EqualTo(new ulong[] { 0 }), "고정 명단에 다시 넣지 않는다");
+        Assert.That(flow.IsTrainingCleared(1), Is.False);
+    }
+
+    [Test]
+    public void 클리어_플래그_같은_값_재설정과_접속자_아님은_무시_연결_종료면_지운다()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.SetTrainingCleared(9, true, out _), Is.False, "접속자 아님");
+        Assert.That(flow.SetTrainingCleared(0, false, out _), Is.False, "이미 꺼짐");
+        Assert.That(flow.SetTrainingCleared(0, true, out _), Is.True);
+        Assert.That(flow.SetTrainingCleared(0, true, out _), Is.False, "이미 켜짐");
+
+        flow.RemoveClient(0);
+        Assert.That(flow.TrainingCleared, Is.Empty);
+    }
+
+    [Test]
+    public void 전원_클리어면_참여자_0_이라_보통_전이는_막히고_접속자_기준_건너뛰기만_된다()
+    {
+        var flow = Create(0, 1);
+        flow.SetTrainingCleared(0, true, out _);
+        flow.SetTrainingCleared(1, true, out _);
+
+        Assert.That(flow.Participants, Is.Empty);
+        Assert.That(flow.TryAdvance(Run, 1, 10, 0), Is.EqualTo(LobbyTutorialAdvanceResult.NoParticipants));
+        Assert.That(flow.TryAdvanceTo(Run, 1, 4, 10, 0, ignoreParticipants: true), Is.EqualTo(LobbyTutorialAdvanceResult.Advanced));
+        Assert.That(flow.StepIndex, Is.EqualTo(4));
+    }
+
+    [Test]
+    public void 접속자가_없으면_건너뛰기도_막힌다()
+    {
+        var flow = Create();
+
+        Assert.That(flow.TryAdvanceTo(Run, 1, 4, 10, 0, ignoreParticipants: true), Is.EqualTo(LobbyTutorialAdvanceResult.NoParticipants));
+    }
+
+    [Test]
+    public void 미룬_건너뛰기는_접속자_기준을_그대로_가진다()
+    {
+        var flow = Create(0);
+        flow.TryAdvance(Run, 1, 10, 0);                     // 프레임 10 에 전이
+        flow.SetTrainingCleared(0, true, out _);
+
+        Assert.That(flow.TryAdvanceTo(Run, 2, 4, 10, 0, ignoreParticipants: true), Is.EqualTo(LobbyTutorialAdvanceResult.Deferred));
+        Assert.That(flow.Tick(11), Is.True);
+        Assert.That(flow.StepIndex, Is.EqualTo(4));
+    }
 }
