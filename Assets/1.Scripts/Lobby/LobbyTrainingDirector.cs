@@ -149,6 +149,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     /// <summary>[전 피어] 단계표(LobbyRules.stepTable). 없으면 null.</summary>
     public LobbyTutorialStepTable Table => rules != null ? rules.StepTable : null;
 
+    /// <summary>T22 전투 상대 구성(할 일 157 ⑥). 없으면 null — 전투는 옛 존2 구성으로 돌아간다.</summary>
+    public LobbyCombatSpawnSet CombatSpawnSet => rules != null ? rules.CombatSpawnSet : null;
+
     /// <summary>[전 피어] 복제 스냅샷. 스폰 전이면 default(RunId 0).</summary>
     public LobbyTutorialSnapshot Snapshot => IsSpawned ? snapshot.Value : default;
 

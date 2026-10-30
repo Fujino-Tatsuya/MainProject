@@ -23,3 +23,4 @@ MonoBehaviour:
   dialoguePerCharSeconds: 0.08
   dialogueMinSeconds: 3
   dialogueEndPaddingSeconds: 0.5
+  combatSpawnSet: {fileID: 11400000, guid: 9c7de3adae72b874da53ac9ee3fb6bda, type: 2}

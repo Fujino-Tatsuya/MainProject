@@ -50,6 +50,11 @@ public sealed class LobbyRules : ScriptableObject
     [Min(0f)]
     [SerializeField] private float dialogueEndPaddingSeconds = 0.5f;
 
+    [Header("로비 튜토리얼 전투(할 일 157 ⑥)")]
+    [Tooltip("T22 전투 훈련 상대 구성(LobbyCombatSpawnSet, 6마리 — Q9). 기준점은 씬 Train02Spawns. 비면 옛 존2 구성(Train02Spawns 의 source).")]
+    [SerializeField] private LobbyCombatSpawnSet combatSpawnSet;
+
+    public LobbyCombatSpawnSet CombatSpawnSet => combatSpawnSet;
     public TutorialGuideTextTable GuideTexts => guideTexts;
     public float DialogueBaseSeconds => dialogueBaseSeconds;
     public float DialoguePerCharSeconds => dialoguePerCharSeconds;

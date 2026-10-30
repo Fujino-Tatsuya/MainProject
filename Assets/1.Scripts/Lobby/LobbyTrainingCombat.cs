@@ -10,12 +10,12 @@ using UnityEngine.SceneManagement;
 /// 규칙은 <see cref="LobbyCombatLedger"/>·<see cref="LobbyCombatStuckTracker"/>, 여기는 스폰·사망 구독·Warp·복제만 한다. 몬스터 코드·MapScene 존2 는 그대로.
 /// <list type="bullet">
 /// <item>시작 = 진행기가 T22(Activity Combat, <see cref="LobbyCombatRules.MonstersActive"/>, T20 Gather_Train02Start 전원 집결 확정 뒤)가 되는 순간 — 그 revision 을 기억한다:
-/// 존2 구성(<see cref="LobbyTrainingCombatSpawns"/> — ZoneS_typeA 의 ZoneMonsterSpawnSet 직접 참조) 9마리 스폰 → 훈련 리셋
+/// 로비 전용 구성(<see cref="LobbyRules.CombatSpawnSet"/> 6마리, 기준점 <see cref="LobbyTrainingCombatSpawns"/> — 할 일 157 ⑥; 칸이 비면 옛 존2 9마리) 스폰 → 훈련 리셋
 /// (<see cref="TrainingResetOptions.CombatStart"/> — 체력·쿨·대시, 분노 재지급 없음). TRAIN_01 표적은 그 단계를 떠날 때 이미 디스폰된다.</item>
 /// <item>판정(서버): <see cref="MonsterDeathEvents.ServerMonsterDied"/> → 장부. 전원 처치 → 다음 프레임 <see cref="LobbyTrainingDirector.ServerReportActivityCompleted"/>(Combat, 시작 revision) 1회.</item>
 /// <item>끼임 복구: 0.5초마다 <see cref="LobbyCombatStuckTracker"/> — 훈련실 경계(<see cref="roomNavMesh"/> 볼륨) 밖 또는 오래 멈춤 → 초기 위치 Warp. 처치 아님.</item>
 /// <item>단계를 떠나면(완료 뒤 남은 몹 없음·그 밖 이탈)·진행기 디스폰(판 끝·씬 전환) 때 남은 몹 디스폰.</item>
-/// <item>복제: 남은 수·전체 수(NetworkVariable) — <see cref="LobbyTrainingCombatView"/> 가 읽는다.</item>
+/// <item>복제: 남은 수·전체 수(NetworkVariable) — 옛 <see cref="LobbyTrainingCombatView"/> 만 읽는다(158 이 끔). 158 계약·과도기 어댑터엔 노출하지 않는다(명세 T22 '남은 상대 표시 없음').</item>
 /// </list>
 /// NavMesh 는 훈련실 NavMeshSurface 에디터 사전 베이크(Docs/tech/lobby-training.md) — 런타임 베이크 없음.
 /// </summary>
@@ -82,8 +82,9 @@ public sealed class LobbyTrainingCombat : NetworkBehaviour
             return;
         }
 
-        if (spawns == null || spawns.Source == null)
-            Debug.LogWarning($"{Tag} 스폰 구성(LobbyTrainingCombatSpawns·ZoneS_typeA)이 비었다 — TRAIN_02 가 끝나지 않는다.", this);
+        var set = _director.CombatSpawnSet;
+        if (spawns == null || ((set == null || set.Count == 0) && spawns.Source == null))
+            Debug.LogWarning($"{Tag} 스폰 구성(LobbyRules.combatSpawnSet·Train02Spawns)이 비었다 — T22 가 끝나지 않는다.", this);
         if (roomNavMesh == null || roomNavMesh.navMeshData == null)
             Debug.LogWarning($"{Tag} 훈련실 NavMeshSurface/베이크 데이터가 없다 — 몬스터가 움직이지 못한다(Docs/tech/lobby-training.md 재베이크).", this);
 
@@ -166,7 +167,7 @@ public sealed class LobbyTrainingCombat : NetworkBehaviour
 
         var ids = new List<ulong>();
         var now = Time.timeAsDouble;
-        if (spawns != null && spawns.Resolve(_spawnBuffer))
+        if (spawns != null && spawns.Resolve(_spawnBuffer, _director.CombatSpawnSet))
         {
             foreach (var spawn in _spawnBuffer)
             {

@@ -76,6 +76,24 @@ public interface ILobbyTutorialLiveSource
 }
 
 /// <summary>
+/// T20 → T21 표시 규칙(할 일 157 ⑥, 계약 §1) — 순수 함수. 서버 단계는 T20 그대로이고, 활성 집결 구역 카운트다운 동안만 표시 상태가 T21 이 된다.
+/// 한 명이라도 이탈하면 구역이 카운트다운을 취소(<see cref="PartyGatherRules"/>)하므로 표시도 T20 으로 돌아간다.
+/// </summary>
+public static class LobbyTutorialCountdownDisplay
+{
+    /// <summary>행에 카운트다운 표시 상태가 있고 구역 카운트다운이 돌고 있다.</summary>
+    public static bool IsActive(in LobbyTutorialStepView step, bool zoneCountdownActive) =>
+        step.IsValid && !string.IsNullOrEmpty(step.CountdownStateId) && zoneCountdownActive;
+
+    public static string DisplayStateId(in LobbyTutorialStepView step, bool zoneCountdownActive) =>
+        IsActive(step, zoneCountdownActive) ? step.CountdownStateId : step.StateId;
+
+    /// <summary>'시작까지 {n}' 의 n — 남은 초 올림(3초 유지 = 3→2→1), 0 미만은 0.</summary>
+    public static int WholeSecondsLeft(double remainingSeconds) =>
+        remainingSeconds > 0d ? (int)Math.Ceiling(remainingSeconds) : 0;
+}
+
+/// <summary>
 /// [클라·전 피어] 로비 튜토리얼 상태 파사드 — 할 일 157 PLAN §3, 계약 <c>Docs/tech/handoff-lobby-tutorial-contract.md</c>. 158(표시)은 이것만 읽는다.
 /// 생산자(진행기, 커밋 ②)가 스냅샷이 바뀔 때마다 <see cref="Publish"/> 를 부르고, 진행 줄 값이 바뀌면 <see cref="NotifyProgressChanged"/> 를 부른다.
 /// 커밋 ① 시점엔 아무도 Publish 하지 않으므로 <see cref="IsAvailable"/> = false 다(기존 동작 무변경).
@@ -105,7 +123,7 @@ public static class LobbyTutorialState
     public static LobbyTutorialStepView CurrentStep => _current;
 
     /// <summary>활성 집결 구역 카운트다운 중이고 행에 카운트다운 표시 상태가 있으면 그 ID(T21), 아니면 StateId.</summary>
-    public static string DisplayStateId => IsCountdownDisplay ? _current.CountdownStateId : _current.StateId;
+    public static string DisplayStateId => LobbyTutorialCountdownDisplay.DisplayStateId(_current, IsCountdownDisplay);
 
     public static string TitleKey => _current.TitleKey;
     public static string ObjectiveKey => IsCountdownDisplay ? _current.CountdownObjectiveKey : _current.ObjectiveKey;
@@ -175,7 +193,7 @@ public static class LobbyTutorialState
             case LobbyTutorialProgressMode.PartyComplete:
                 return _live != null && _live.TryGetPartyComplete(out n, out total);
             case LobbyTutorialProgressMode.Countdown:
-                n = (int)Math.Ceiling(CountdownRemainingSeconds);
+                n = LobbyTutorialCountdownDisplay.WholeSecondsLeft(CountdownRemainingSeconds);
                 return true;
             default:
                 return false;
@@ -264,7 +282,7 @@ public static class LobbyTutorialState
             if (!IsAvailable || string.IsNullOrEmpty(_current.CountdownStateId))
                 return false;
             var zone = ActiveGatherZone;
-            return zone != null && zone.IsCountdownActive;
+            return LobbyTutorialCountdownDisplay.IsActive(_current, zone != null && zone.IsCountdownActive);
         }
     }
 

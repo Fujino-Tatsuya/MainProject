@@ -92,7 +92,7 @@
 
 - 패널/대사 프리팹·좌상단 배치·상단 파티 UI 제거·경로/테두리/벽 표식 렌더링·`PartyGatherStatusView` 대체 = **158**.
 - 옛 왼쪽 안내 칸(`Slot_WeaponCheck`·`Slot_Train02` — `LobbyWeaponCheckView`·`LobbyTrainingCombatView`)은 158 이 이미 끈다. 157 은 이 뷰에 의존하지 않는다.
-- **과도기 어댑터 — 158 병합 시 삭제**: `Assets/1.Scripts/Lobby/LobbyTutorialGuideAdapter.cs` 파일 하나(커밋 ③, 씬·다른 코드 참조 없음 — 첫 씬 로드 때 숨은 DDOL 오브젝트로 스스로 생김). `LobbyTutorialState` 를 읽어 기존 상단 가이드 UI 에만 띄운다: 목표 = `TutorialGuideUI.SetObjective`(지시문 키·T10 체크·진행 n/N), 대사(L11·L21) = `ShowSubtitle` → 대사 단계 끝에 `ClearSubtitles`. 브리핑(L31~L34)은 옛 `LobbyBriefing` 이 띄우므로 건드리지 않는다. 158 병합 때 이 파일을 지우면 끝(158 패널과 상단 가이드가 겹치지 않게).
+- **과도기 어댑터 — 158 병합 시 삭제**: `Assets/1.Scripts/Lobby/LobbyTutorialGuideAdapter.cs` 파일 하나(커밋 ③, 씬·다른 코드 참조 없음 — 첫 씬 로드 때 숨은 DDOL 오브젝트로 스스로 생김). `LobbyTutorialState` 를 읽어 기존 상단 가이드 UI 에만 띄운다: 목표 = `TutorialGuideUI.SetObjective`(지시문 키·T10 체크·진행 n/N, T21 카운트다운 = '시작까지 {n}' 체크 줄 1개 — 커밋 ⑥), 대사(L11·L21) = `ShowSubtitle` → 대사 단계 끝에 `ClearSubtitles`. 브리핑(L31~L34)은 옛 `LobbyBriefing` 이 띄우므로 건드리지 않는다. 158 병합 때 이 파일을 지우면 끝(158 패널과 상단 가이드가 겹치지 않게).
 - 씬(`3.LobbyScene.unity`) 수정은 157·158 이 같은 날 겹치지 않게 브릿지로 순서를 맞춘다(157 은 커밋 ③에 라커 볼륨 1개만).
 
 ## 6. 캐릭터 교체와 158
@@ -104,6 +104,7 @@
 
 - 2026-10-30 커밋 ① — 최초. 파사드 골격·단계표 22행. 진행기 미연결(`IsAvailable == false`).
 - 2026-10-30 커밋 ③ — L00 = 라커 볼륨 `Area_Locker`(서버 폴링, 스폰 완료 참여자 전원 누적 방문). L11·L21 대사 = 서버 스케줄러: 스냅샷 `TimerStartServerTime`/`TimerEndServerTime` 이 실제 값(길이 = 행 dialogueSeconds → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유 — 수치 `LobbyRules`), 끝 시각에 다음 행 1회. 캐릭터 잠금 제거. 과도기 어댑터 추가(§5).
+- 2026-10-30 커밋 ⑥ — T20~T22. T20 = `Train02Start` 집결, 유지 3초 = 서버 카운트다운 → 그동안 표시 상태 T21(`DisplayStateId`·`ObjectiveKey`=`LOBBY_OBJ_COMBAT`·`ProgressMode` Countdown·`LOBBY_PROGRESS_COUNTDOWN` n = 남은 초 올림 3→2→1). 한 명이라도 이탈 = 구역이 카운트다운 취소 → 표시 T20 복귀, 다시 모이면 처음부터 3초. 판정은 순수 함수 `LobbyTutorialCountdownDisplay`(파사드가 씀, API 무변경). 카운트다운 동안 상대 없음, 확정 → T22 에서 스폰. T22 상대 = 로비 전용 `LobbyCombatSpawnSet.asset` **6마리**(Q9, `LobbyRules.combatSpawnSet` 로 연결 — 씬 무수정, 기준점은 기존 `Train02Spawns`). 완료 = 생성 상대 전원 사망 1회(마지막 사망 중복 수신 무시). **'남은 상대' 수는 계약에 없음**(옛 `LobbyTrainingCombat.Remaining/Total` 복제값은 158 이 끄는 옛 뷰 전용으로만 남김). 과도기 어댑터가 카운트다운 줄을 체크 줄 1개로 표시. 158 표시 계약 API 변화 없음.
 - 2026-10-30 커밋 ⑤ — T10 판정 무변경(기존 `LobbyWeaponCheck` 가 명세 §5 T10 과 일치) — 테스트로만 고정: 순서 자유·완료자 연습 계속·전원 완료 전 다음 단계 없음·변신 Q/E 키별 한 항목·패시브/WASD 없음·캐릭터 교체 뒤 마스크 유지·체크 키 `LOBBY_CHECK_*` 6개가 `LobbyWeaponCheckItem` 값 순서. 158 표시 계약 변화 없음.
 - 2026-10-30 커밋 ④ — L20/L21 마무리(§10.3 A). 입구 확정 → 명단 전원 텔레포트 1회 → L21 대사 → 대사 끝 T10. 명세 L20 '문 통과' = 텔레포트(문 막힘·종료 텔레포트 그대로). 명단 밖(늦은 참가자)은 옮기지 않음(로비 대기). 텔레포트 실패(플레이어 오브젝트 없음·거부)한 명단 사람은 다음 집결 행(T20)까지 0.25초마다 서버가 재시도. L21 동안 표적·T10 체크 미시작(Activity None). 158 표시 계약 변화 없음.
 - 2026-10-30 커밋 ② — 진행기 연결(스냅샷 NetworkVariable → `Publish`). L20 집결 지점 `Train01Start` → **`Entrance`**(§10.3 A 확정 — ②는 기존 입구 텔레포트(`TeleportRosterInto`)를 그대로 태워 동작, 마무리(대사 중 표적 미스폰 등)는 커밋 ④). 행 칸 `trainingProfile` 추가. `Brief`→`Central` 개명은 미룸. 과도기 어댑터(상단 가이드)는 새 `LOBBY_*` 키가 없어 아직 없음.
