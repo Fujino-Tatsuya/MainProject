@@ -15,6 +15,8 @@ using UnityEngine.UI;
 /// - 카드(할 일 125 5/5): 이름 / 분류 줄 / 설명(<see cref="TraitCardView"/>) + 창 아래 도움말 한 줄(<see cref="TraitUiStrings.Help"/>).
 /// - 2차 상충 확인창(할 일 125 5/5, 명세 §2): 고른 특성이 보유 특성의 효과를 없애면 [확인]/[취소] — 규칙 <see cref="TraitPickConfirmModel"/>,
 ///   초기화 팝업과 같이 런타임 생성. 60초 출구 자동 선택은 서버가 첫 후보를 고르므로 확인창이 없다(창이 닫히면 확인창도 보내지 않고 닫힌다).
+/// - 배경 블러(할 일 165 후속 A안): 창이 열릴 때 그 프레임 끝에 화면을 1회 캡처·블러(<see cref="TraitBackdropBlur"/>)해 창 뒤 RawImage 에 깔고 다음 프레임에 창을 보인다.
+///   창이 열린 동안 정지 그림·매 프레임 비용 0, 닫히면 반납(<see cref="TraitBackdropLifetime{T}"/>).
 /// 씬에 하나 두면 된다(별도 캔버스 — CombatHUD 와 무관). 디렉터가 없으면 아무것도 보이지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -56,6 +58,12 @@ public sealed class TraitSelectionView : MonoBehaviour
     [SerializeField] private GameObject tooltip;
     [SerializeField] private TMP_Text tooltipName;
     [SerializeField] private TMP_Text tooltipDescription;
+
+    [Header("배경 블러 (할 일 165 후속 — 창 열 때 1회 캡처)")]
+    [Tooltip("창 바로 뒤(형제) 전체화면 RawImage. 창이 열릴 때 캡처·블러한 정지 그림을 깐다. 비어 있으면 블러 없이 바로 연다.")]
+    [SerializeField] private RawImage backdrop;
+    [Tooltip("블러 세기·축소·반복·어둡게 막 알파. 비었거나 셰이더가 없으면 블러 없이 바로 연다(어둡게 막 = 프리팹 값).")]
+    [SerializeField] private TraitBackdropBlurSettings backdropSettings;
 
     [Header("공용")]
     [Tooltip("문구 테이블(TraitTexts.asset). 비어 있거나 ID 행이 없으면 코드 상수 기본값.")]
@@ -101,6 +109,13 @@ public sealed class TraitSelectionView : MonoBehaviour
     private TMP_Text confirmYesText;
     private TMP_Text confirmNoText;
 
+    // 배경 블러(할 일 165 후속 A안) — 열 때 1회 캡처, 닫힐 때 반납. 수명 규칙은 TraitBackdropLifetime.
+    private readonly TraitBackdropLifetime<RenderTexture> backdropLife = new TraitBackdropLifetime<RenderTexture>(TraitBackdropBlur.Release);
+    private static readonly WaitForEndOfFrame EndOfFrame = new WaitForEndOfFrame();
+    private Coroutine backdropRoutine;
+    private Image windowDim;
+    private float windowDimAlpha;
+
     private static readonly Color PromptPanelColor = new Color(0.035f, 0.045f, 0.065f, 0.97f);
     private static readonly Color PromptOutlineColor = new Color(0.48f, 0.42f, 0.25f, 0.9f);
     private static readonly Color PromptAccentColor = new Color(0.95f, 0.82f, 0.42f, 1f);
@@ -111,9 +126,13 @@ public sealed class TraitSelectionView : MonoBehaviour
             cardTemplate.gameObject.SetActive(false);
         if (iconTemplate != null)
             iconTemplate.gameObject.SetActive(false);
+        windowDim = window != null ? window.GetComponent<Image>() : null;
+        windowDimAlpha = windowDim != null ? windowDim.color.a : 0f;
         BuildResetPrompt();
         BuildConfirmPrompt();
         SetActive(window, false);
+        if (backdrop != null)
+            SetActive(backdrop.gameObject, false);
         SetActive(toast, false);
         SetActive(tooltip, false);
         SetActive(deadlineRoot, false);
@@ -247,7 +266,7 @@ public sealed class TraitSelectionView : MonoBehaviour
         if (helpText != null)
             helpText.text = TraitUiStrings.Help.Text;
         nextRequestAt = 0f;
-        SetActive(window, true);
+        ShowWindow();
     }
 
     private void CloseWindow()
@@ -255,6 +274,85 @@ public sealed class TraitSelectionView : MonoBehaviour
         SetActive(window, false);
         CloseConfirmPrompt(); // 자동 선택·확정으로 창이 닫히면 확인창도 보내지 않고 닫는다
         ClearCards();
+        CloseBackdrop();
+    }
+
+    // ── 배경 블러(할 일 165 후속 A안) ─────────────────────────────────────
+
+    // 블러를 쓸 수 있으면 이번 프레임 끝에 화면을 캡처하고(창은 아직 꺼짐 — 자기 자신이 찍히지 않게) 다음 프레임부터 창을 보인다.
+    private void ShowWindow()
+    {
+        bool canBlur = backdrop != null && backdropSettings != null && backdropSettings.CanBlur && isActiveAndEnabled;
+        if (!canBlur)
+        {
+            ApplyDim(blurred: false);
+            SetActive(window, true);
+            return;
+        }
+
+        int captureTicket = backdropLife.Open();
+        if (captureTicket == 0)
+        {
+            // 열린 채 새 제시(닫힘 없이 다시 열림) — 지난 캡처를 그대로 쓴다. 캡처 대기 중이면 끝날 때 보인다.
+            if (!backdropLife.IsPending)
+                SetActive(window, true);
+            return;
+        }
+
+        backdropRoutine = StartCoroutine(CaptureBackdropThenShow(captureTicket));
+    }
+
+    private System.Collections.IEnumerator CaptureBackdropThenShow(int captureTicket)
+    {
+        yield return EndOfFrame;
+        backdropRoutine = null;
+        if (!backdropLife.IsWaitingFor(captureTicket))
+            yield break;
+
+        RenderTexture blurred = null;
+        try
+        {
+            blurred = TraitBackdropBlur.CaptureScreen(backdropSettings);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogException(e, this); // 캡처 실패 — 블러 없이 연다
+        }
+
+        if (!backdropLife.Complete(captureTicket, blurred))
+            yield break;
+
+        backdrop.texture = blurred;
+        SetActive(backdrop.gameObject, blurred != null);
+        ApplyDim(blurred != null);
+        SetActive(window, true);
+    }
+
+    private void CloseBackdrop()
+    {
+        if (backdropRoutine != null)
+        {
+            StopCoroutine(backdropRoutine);
+            backdropRoutine = null;
+        }
+
+        backdropLife.Close();
+        if (backdrop != null)
+        {
+            backdrop.texture = null;
+            SetActive(backdrop.gameObject, false);
+        }
+    }
+
+    // 블러 위 어둡게 막은 설정 알파(기본 0.25), 블러가 없으면 프리팹 알파(0.55).
+    private void ApplyDim(bool blurred)
+    {
+        if (windowDim == null)
+            return;
+
+        Color color = windowDim.color;
+        color.a = blurred && backdropSettings != null ? backdropSettings.dimAlpha : windowDimAlpha;
+        windowDim.color = color;
     }
 
     private static Player LocalPlayer()

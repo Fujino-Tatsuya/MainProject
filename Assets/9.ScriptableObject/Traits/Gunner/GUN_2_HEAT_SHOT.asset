@@ -19,7 +19,7 @@ MonoBehaviour:
     \uC18C\uBAA8\uD569\uB2C8\uB2E4. \uB9CE\uC774 \uC18C\uBAA8\uD560\uC218\uB85D Q
     \uD53C\uD574\uAC00 \uC99D\uAC00\uD558\uBA70, \uCD5C\uB300 {maxSpentDamageBonus:%}\uAE4C\uC9C0
     \uAC15\uD574\uC9D1\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: b908f4fd779658a2a6033aeea4b8172b, type: 3}
   effects:
   - rid: 7237886675317424398
   references:

@@ -18,7 +18,7 @@ MonoBehaviour:
   description: "Q\uB85C \uC9C0\uB098\uC628 \uAE38\uC744 \uD55C \uBC88 \uB354 \uBCA0\uC5B4
     {dmg}\uC758 \uCD94\uAC00 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uADF8\uB9BC\uC790
     \uD68C\uADC0\uC758 \uBCF5\uADC0 \uACBD\uB85C\uC5D0\uB3C4 \uC801\uC6A9\uB429\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 6dd44a019918585b80667ca2bb0c6356, type: 3}
   effects:
   - rid: 7237886673709695199
   references:

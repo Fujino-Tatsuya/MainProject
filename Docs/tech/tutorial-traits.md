@@ -228,11 +228,49 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 ### 11.1 카드 — 이름 / 분류 / 설명 + 도움말 한 줄
 
-- 카드(`TraitCardView`) = 아이콘 · 이름 · **분류 줄**(`Category`, 이름 바로 아래) · 설명. 배치는 그대로(명세 §2 '이름 / 짧은 분류 / 설명').
+- 카드(`TraitCardView`) = 아이콘 · 이름 · **분류 줄**(`Category`, 이름 바로 아래) · 설명(명세 §2 '이름 / 짧은 분류 / 설명'). 배치는 아래 C1 아트(할 일 165).
 - 창 패널의 카드 줄 아래 **도움말 한 줄**(`Panel/Help`) = `UI.Trait.Help`("보스는 취약할 때만 밀치기와 기절이 적용됩니다.") — CC 공통 안내를 카드마다 반복하지 않는다.
 - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 분류·도움말 줄 추가 (배치 유지)` — 지금 프리팹에 빠진 줄만 더한다(글꼴은 옆 글자에서 복사, 이미 있으면 저장 안 함).
-  전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다).
+  전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다). 카드 아트만 바꿀 땐 아래 §11.1.1 메뉴.
 - 설명 = 템플릿 → `TraitTooltip.FormatDescription`(`SkillTooltipFormatter`). 실패하면 `[오류: …]`(`UI.SkillTooltip.Error`) + 경고 — 스킬 툴팁과 같은 관례. 획득 아이콘 호버 툴팁도 같은 문구.
+
+#### 11.1.1 카드 C1 아트 (할 일 165)
+
+- 아트(SVN, 읽기만) = `Assets/50.Art/UI/TraitCard_C1/Sprites/`(카드판·스킬 프레임·마스크·키캡 4종·마우스 2종, PNG 2배·PPU 200) + 특성 아이콘 `Assets/50.Art/UI/HUD/TraitIcon/<캐릭터>/`.
+  배치 원본 = 납품 `배치표.csv`(카드 560x413, 좌상단 X/Y·UI 크기 — 투명 여백 포함).
+- `CardTemplate`(560x413) 자식 = 그리는 순서대로:
+
+| 오브젝트 | 내용 | 배치(X, Y, 가로x세로) |
+|---|---|---|
+| (루트 Image) | 투명 클릭 판정 — `Button`·`TraitCardView` 는 루트 그대로 | 0, 0, 560x413 |
+| `Panel` | `TraitCard_C1_Panel` · 버튼 색 변화 대상(`targetGraphic`) | -2, -2, 564x417 |
+| `TraitIcon` | 특성 아이콘(`TraitDefinition.Icon`, 비면 `placeholderIcon` = `Trait_Empty`) — 피드백 1 로 캐릭터 심볼(`Trait_<캐릭터>`) 대신 | 19, 10, 118x118 |
+| `Name` | 서울알림 Heavy 34(자동 축소 24~34), 왼쪽 정렬 한 줄 | 142, 38, 340x40 |
+| `Category` | 서울알림 Medium 17, 한 줄(넘치면 …) | 144, 84, 340x22 |
+| `SkillMask` → `SkillIcon` | `TraitCard_C1_SkillMask` + `Mask`(마스크 그림 숨김), 안에 **강화하는 스킬 아이콘** 132x132(아래 출처 규칙) | 45, 182, 136x136 (아이콘 47, 184) |
+| `SkillFrame` | `TraitCard_C1_SkillFrame` — 프레임·마스크·아이콘 중심 (113, 250) 동일 | 37, 174, 152x152 |
+| `Keycap` | 키캡/마우스 하나 — 스프라이트만 바꿈(비율 유지 38x41 상자 → 키캡 38x40·마우스 30x41). 키 입력이 아닌 특성은 숨김 | 94, 335, 38x41 |
+| `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22 | 224, 170, 288x170 |
+
+- 키캡 판정 = `TraitKeycapRule.FromIconName`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): 아이콘 스프라이트 이름을 `_` 로 나눈 토큰 중 `Q`/`E`/`R`/`LMB`/`RMB` 와 **정확히 같은 첫 토큰**의 키. 키 뒤 접미사(`_Q_Change`·`_E_Trans`·`_R_Remove`)도 그 키, 키 토큰이 없으면(`Passive`·`Heat`·`Heat_Remove`·`Passive_Change`) `Blank` = **키캡 숨김**(피드백 1 — `Keycap_Blank` 는 카드에서 안 쓴다). 아이콘이 없으면 `Blank`.
+- 스킬 슬롯 그림 출처(피드백 1) = `TraitCardSkillRule.SourceOf(키캡)`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): Q → `PlayerSkillSlot.Main`, E → `Sub`, R → `Ultimate`, RMB → `Interrupt`, `Blank` → 패시브, LMB → **기본 공격 아이콘**(`BasicAttack` — 카드 칸 `basicAttackIcon` = `Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png`, 흰색 검).
+  기본 공격 아이콘만 `Image.color` = 보는 사람 캐릭터 색 — 뷰어 `NetworkObject.PrefabIdHash` → `CharacterRosterLookup.FindIndex`(`SpawnedCharacterRoster.TryGetEntry(뷰어, 카드 칸 characterRoster)`) → `CharacterRoster.Entry.themeColor`, 못 찾으면 흰색. 다른 슬롯은 늘 흰색이고 `Bind` 마다 색을 덮어 카드 재사용 때 남지 않는다(색 규칙 `TraitCardSkillRule.SlotTint`, 테스트 `TraitKeycapTests`). 칸 연결 메뉴 `특성 선택 UI — 기본 공격 슬롯 연결 (검 아이콘·캐릭터 색)`(멱등, 카드 C1 아트 적용도 같은 함수를 부름).
+  검 그림은 투명 배경이라 `SkillMask` 안 `SkillIcon` 바로 앞 형제 `SkillBackdrop`(검은 Image #000000, 132x132, 틴트 없음 — 카드 칸 `skillBackdrop`)을 깐다. 마스크 안이라 실제 스킬 아이콘(정사각 불투명 그림)과 같은 둥근 사각형으로 잘린다. 켬 = 최종 출처가 `BasicAttack` 일 때만(`TraitCardSkillRule.ShowsBackdrop`, 폴백·다른 슬롯은 끔, `Bind` 마다 덮음). 메뉴 `특성 선택 UI — 기본 공격 슬롯 검은 배경 (검 아이콘 뒤)`(멱등, 카드 C1 아트 적용도 같은 함수를 부름).
+  스킬 아이콘은 전투 HUD 와 같은 경로로 뷰어(`Bind` 의 `viewer` = 로컬 Player)에서 읽는다 — 슬롯 = `PlayerSkillController.GetSkill(슬롯).Data.Tooltip.Icon`(SkillCooldownHUD), 패시브 = `IPlayerPassive as ISkillTooltipSource` → 없으면 `GetComponentInChildren<IPassiveTooltipProvider>(true).PassiveTooltip`(PassiveHUD).
+  어쌔신 변신 특성(`E_Trans`·`R_Trans`·`R_Remove`)도 그 슬롯의 **지금** 스킬 그림. 못 얻으면(뷰어 없음·아이콘 비어 있음 — 예: 간파 슬롯은 툴팁 아이콘이 없다, 지금 RMB 특성은 없음) 특성 아이콘 → `Trait_Empty`. 아이콘 없는 옛 임시 특성은 스킬 조회를 건너뛴다.
+- 창 폭 = 카드 3장 + 간격 24 + 여백 32×2 = **1792**, 카드 줄 높이 413. 창 `Panel` 은 레이아웃만(어두운 판·노란 Outline 없음 — 피드백 1). 배경 흐림은 아래 '배경 블러'.
+- **배경 블러 = 열 때 1회 캡처**(할 일 165 후속 A안): 창이 열리는 프레임 끝(`WaitForEndOfFrame`)에 화면 전체(월드 + Screen Space Overlay HUD)를 `ScreenCapture.CaptureScreenshotIntoRenderTexture` 로 한 번 찍고(창은 아직 꺼져 있어 자기 자신은 안 찍힌다) →
+  축소 복사(`SystemInfo.graphicsUVStartsAtTop` 이면 상하 뒤집기 보정) → MaskBlur 셰이더 0번(가로)·1번(세로) 패스를 `iterations` 번 → 채도 패스 1회(`Hidden/Traits/TraitBackdropSaturate`, `saturation` < 1 일 때만 — 축소 RT 두 장을 맞바꿔 RT 를 더 빌리지 않음)(`TraitBackdropBlur`) → 창 바로 앞 형제 전체화면 RawImage `Backdrop` 에 깔고 **다음 프레임에** 창을 보인다.
+  그 위 어둡게 막(창 루트 `Image`)은 설정 `dimAlpha`(0.25), 블러를 못 쓰면(설정·셰이더 비었음·캡처 실패) 프리팹 값 0.55 로 예전처럼 연다.
+  비용 = 여는 순간 캡처 1회 + 축소 블러 몇 번 + 채도 블릿 1회, **창이 열린 동안 매 프레임 0**. 화면 크기 캡처 RT 는 블러 직후, 축소 블러 RT 는 창이 닫힐 때(비활성·디렉터 해제 포함) 반납 — 수명 규칙 `TraitBackdropLifetime`(테스트 `TraitBackdropLifetimeTests`).
+  한계: 열린 동안 배경은 **정지 그림**(뒤에서 움직이는 적·HUD 변화가 안 보인다), 창이 **1프레임 늦게** 뜬다. 열린 채 새 제시가 오면 다시 찍지 않고 지난 그림을 쓴다.
+  튜닝 = `Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset`(코드 기본값과 같음): 세기 1.42·**축소 1/4(`downsampleShift` 2)·반복 3** — 기준 "HUD 글자 윤곽이 거의 안 읽힐 정도"(반복 2 는 글자 덩어리 모서리가 남아 3 으로; 처음 값 1/2·1회는 `MaskBlurSettings.asset` 에서 옮긴 것) ·
+  **`saturation` 0**(0 = 완전 흑백, 1 = 원색이며 채도 패스 건너뜀, Range 0~1; 루마 = **Rec.709** 가중치 0.2126·0.7152·0.0722, MaskBlur 합성 패스 탈채도와 같은 값) · `dimAlpha` 0.25.
+  블러·채도 셰이더 둘 다 설정 SO 의 직렬화 참조(`blurShader`·`saturationShader`)라 빌드 스트립 안 됨 — 채도 셰이더가 비면 원색 블러. 테스트 `TraitBackdropBlurTests`(흑백·원색·채도 패스 RT 반납). 데이터 테이블 시트 없음(연출 기술 값).
+  프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 배경 블러 연결 (창 뒤 RawImage)` — `Backdrop` 과 설정 칸만 더한다(멱등, 창·카드·씬 오버라이드 유지).
+- 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)` — 카드 템플릿 자식만 다시 만들고(루트 오브젝트·컴포넌트 유지 → 씬 오버라이드 안전) 창 폭·`placeholderIcon` 을 맞추고 창 `Panel` 의 `Image`·`Outline` 을 뗀다. 전체 생성 메뉴도 같은 카드 빌더를 쓰고 창 판을 만들지 않는다.
+- 아이콘 연결(데이터 주도) = `Tools/Tutorial/특성 아이콘 연결 (TraitIconMap.csv)` → `TraitIconMapAuthoring.Apply(csv, iconRoot)`. 기본 csv = `Assets/50.Art/UI/HUD/TraitIcon/TraitIconMap.csv`(`icon` 열 = 그 폴더 기준 상대 경로) → 각 `TraitDefinition.icon`. 아트가 csv 를 바꾸면 메뉴를 다시 돌린다. `TraitKeycapTests.ProjectDefinitions_IconsMatchIconMap` 이 어긋남을 잡는다.
+- 아직 안 쓰는 것: csv 의 `inactive_icon`(광란 강화 비활성 아이콘), `Common/Trait_ProcGlow`, `Assassin/Trait_Assassin_Trans`, 캐릭터 심볼 `Trait_<캐릭터>`·`Keycap_Blank`(피드백 1 로 카드에서 뺌).
 
 ### 11.2 설명 템플릿 토큰
 
