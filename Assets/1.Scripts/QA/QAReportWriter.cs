@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// QA 세션 결과를 로컬 리포트 파일로 남긴다.
 /// 기본 경로: &lt;repo&gt;/Docs/temp/qa-runs/&lt;timestamp&gt;/  (git 비추적, .gitignore 등록됨)
-/// Tools ▸ QA ▸ Settings에서 시스템 절대 경로를 지정하면 그 폴더 아래에 쌓는다.
+/// QA 창(Tools/QA) ▸ 공통 설정에서 시스템 절대 경로를 지정하면 그 폴더 아래에 쌓는다.
 ///   - report.md   : 심각도별 요약 + 발견 타임라인
 ///   - errors.log  : 스택트레이스 포함 원문
 /// 에디터 PlayMode 전제. 빌드에서는 persistentDataPath로 폴백한다.

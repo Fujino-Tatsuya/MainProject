@@ -163,7 +163,7 @@ public static class QAInterruptSuite88
         Beat();
         if (!TryReadConfig(out QA88SuiteConfig cfg))
         {
-            ctx.Fail("88 스위트 설정", $"{ConfigPath} 없음·런 0개 — Tools/QA/88 메뉴로 실행할 것");
+            ctx.Fail("88 스위트 설정", $"{ConfigPath} 없음·런 0개 — QA 창(Tools/QA) ▸ 88 ▸ Run Interrupt Lag Suite(QAAutomation.Interrupt88RunSuite())로 실행할 것");
             Finished = true;
             yield break;
         }
@@ -289,7 +289,7 @@ public static class QAInterruptSuite88
             _header.Notes.Add("원본 로그 = 스위트 시작 뒤 각 인스턴스 콘솔 전부(tee). `[InterruptLag]` 판정 줄은 호스트 로그에만 있다.");
             if (ready.Count == 0 && !_cfg.HostBot)
             {
-                Abort("준비된 가상 플레이어 없음 — Tools/QA/Activate Virtual Players (2,3) 후 실행할 것");
+                Abort("준비된 가상 플레이어 없음 — QA 창(Tools/QA) ▸ 공통 ▸ Activate Virtual Players (2,3) 후 실행할 것");
                 _ctx.Fail("88 가상 플레이어 준비", $"{FollowerWaitSeconds:0}초 안에 팔로워 없음(클론 폴더 {_clones.Count}개)");
                 yield break;
             }

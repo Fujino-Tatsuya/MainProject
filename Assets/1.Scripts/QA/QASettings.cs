@@ -22,7 +22,7 @@ public static class QASettings
 
     /// <summary>
     /// 할 일 48 시나리오 모드(쉼표 구분 id, 예: "S1,S3,S5"). 비어 있지 않으면 부트스트랩이 QASessionController·QAAgent 대신
-    /// QAScenarioRunner 를 붙인다. MPPM 가상 플레이어도 같은 EditorPrefs 를 읽는다. Tools/QA/48 메뉴가 설정·해제한다.
+    /// QAScenarioRunner 를 붙인다. MPPM 가상 플레이어도 같은 EditorPrefs 를 읽는다. QA 창(Tools/QA) ▸ 48 섹션이 설정·해제한다.
     /// </summary>
     public static string Scenarios
     {

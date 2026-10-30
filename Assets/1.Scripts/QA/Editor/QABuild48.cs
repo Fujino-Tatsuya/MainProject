@@ -10,7 +10,7 @@ using UnityEngine;
 /// 할 일 48 빌드 시나리오(B1~B3) 준비 — QA 전용 출력 폴더에 빌드하고 인스턴스 폴더 2개(호스트·클라)를 만든다.
 /// 공용 출력(MainProjectBuilds)은 덮어쓰지 않는다. 출력 = C:/UnityProject/_lane-artifacts/MainProject/build48/.
 /// 빌드 옵션·씬·xlsx 값은 Build/Windows64 Player(MainFlow) 와 같다(DataTableBuild.WithTableValues + 샘플 복사).
-/// exe 실행·프로세스 제어는 에디터 밖(셸)에서 한다 — 이 메뉴는 빌드와 폴더 준비까지만.
+/// exe 실행·프로세스 제어는 에디터 밖(셸)에서 한다 — 여기(QA 창(Tools/QA) ▸ 48 Build)는 빌드와 폴더 준비까지만.
 /// </summary>
 public static class QABuild48
 {
@@ -21,7 +21,6 @@ public static class QABuild48
     public static string MismatchBaseExe => Path.Combine(ArtifactsRoot, "mismatch-base", "MainProject.exe");
     const string NetworkManagerPrefab = "Assets/2.Prefabs/Network/NetworkManager.prefab";
 
-    [MenuItem("Tools/QA/48/Build/Build Demo Player (QA artifacts)", priority = 60)]
     public static void Build()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -99,7 +98,6 @@ public static class QABuild48
     /// base 빌드를 인스턴스 폴더로 복사한다. host = 설정 파일 없음(B1 '파일 없으면 호스트'), client = client 샘플을 이름 바꿔 127.0.0.1 로.
     /// (lobby-demo-flow.md §2 — PC 마다 샘플 하나를 demo-connection.json 으로.)
     /// </summary>
-    [MenuItem("Tools/QA/48/Build/Prepare Host·Client Folders", priority = 61)]
     public static void PrepareInstances()
     {
         string baseDir = Path.GetDirectoryName(BaseExe);

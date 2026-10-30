@@ -6,18 +6,19 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 할 일 108 팀원별 야간 QA 메뉴(<c>Tools/QA/Nightly</c>). 한 판 = 시나리오 <see cref="QALobbyScenarios.Nightly108Id"/>(로비 점검 → 캐릭터 선택·출격 → 맵 → 보스 결과),
+/// 할 일 108 팀원별 야간 QA 실행부(QA 창(Tools/QA) ▸ Nightly 섹션 · <c>QAAutomation.StartNight()</c> 등이 부른다). 한 판 = 시나리오 <see cref="QALobbyScenarios.Nightly108Id"/>(로비 점검 → 캐릭터 선택·출격 → 맵 → 보스 결과),
 /// 판 반복·오류 판 재실행·리포트는 103 연속 루프(<see cref="QABoss103BatchRunner"/>)를 그대로 쓴다. 팀원별 차이 = 시드 파일(<see cref="QANightlySeed.RelativePath"/>) 하나.
 /// 녹화·공유 폴더는 PC 설정(<see cref="QANightlyLocalSettings"/>). 실행 절차: Docs/tech/qa-nightly-runbook.md.
 /// </summary>
 public static class QANightlyMenu
 {
     private const string Tag = "[QA108/Nightly]";
-    private const string Root = "Tools/QA/Nightly/";
 
     public static string SeedPath => Path.Combine(QANetSim88.OwnRoot, QANightlySeed.RelativePath);
 
-    [MenuItem(Root + "Start Night", priority = 0)]
+    /// <summary>Start Night·Resume Last 를 받을 수 있나(연속 루프가 안 돈다).</summary>
+    public static bool CanStart => !QABoss103BatchRunner.IsRunning;
+
     public static void StartNight()
     {
         if (QABoss103BatchRunner.IsRunning)
@@ -64,7 +65,6 @@ public static class QANightlyMenu
         QANightlyHooks.BatchStarting(dir, null);
     }
 
-    [MenuItem(Root + "Resume Last", priority = 1)]
     public static void ResumeLast()
     {
         if (QABoss103BatchRunner.ResumeLatest(QANightlyPaths.BatchPattern) && QABoss103BatchRunner.IsRunning)
@@ -74,10 +74,8 @@ public static class QANightlyMenu
         }
     }
 
-    [MenuItem(Root + "Stop After Current Run", priority = 2)]
     public static void StopAfterCurrent() => QABoss103BatchRunner.StopAfterCurrent();
 
-    [MenuItem(Root + "Status", priority = 3)]
     public static void Status()
     {
         if (TryLoadSeed(out QANightlySeed seed))
@@ -88,23 +86,16 @@ public static class QANightlyMenu
         QABoss103BatchRunner.Status();
     }
 
-    [MenuItem(Root + "Open Report", priority = 4)]
     public static void OpenReport() => QABoss103BatchRunner.OpenReport();
-
-    [MenuItem(Root + "Start Night", true)]
-    [MenuItem(Root + "Resume Last", true)]
-    private static bool CanStartCheck() => !QABoss103BatchRunner.IsRunning;
 
     // ── 설정 ─────────────────────────────────────────────────
 
-    [MenuItem(Root + "Settings/Validate Seed File", priority = 40)]
     public static void ValidateSeed()
     {
         if (TryLoadSeed(out QANightlySeed seed))
             Debug.Log($"{Tag} 시드 파일 OK — {seed.Describe()}");
     }
 
-    [MenuItem(Root + "Settings/Create Local Settings File", priority = 41)]
     public static void CreateLocal()
     {
         string path = Path.Combine(QANetSim88.OwnRoot, QANightlyLocalSettings.RelativePath);
@@ -118,7 +109,6 @@ public static class QANightlyMenu
         Debug.Log($"{Tag} 로컬 설정 파일을 만들었다(gitignore 경로) — {path}");
     }
 
-    [MenuItem(Root + "Settings/Test OBS Connection", priority = 42)]
     public static void TestObs()
     {
         QANightlyLocalSettings s = QANightlyHooks.LoadLocal();

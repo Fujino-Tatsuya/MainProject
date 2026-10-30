@@ -12,22 +12,16 @@ public static class QAFocuslessEditorPump
 {
     /// <summary>QA 전용 키(사용자 전역 설정 아님) — 펌프 없이 비교 실행할 때만 끈다. 기본 켬.</summary>
     public const string EnabledKey = "QA.FocuslessPump";
-    private const string MenuPath = "Tools/QA/48/Focusless Play Pump";
 
     private static bool _hooked;
 
-    [MenuItem(MenuPath, priority = 43)]
-    private static void Toggle()
+    /// <summary>펌프 설정(QA 창 ▸ 48 ▸ Focusless Play Pump 토글).</summary>
+    public static bool Enabled => EditorPrefs.GetBool(EnabledKey, true);
+
+    public static void Toggle()
     {
         EditorPrefs.SetBool(EnabledKey, !EditorPrefs.GetBool(EnabledKey, true));
         UnityEngine.Debug.Log($"[QA] 포커스 없는 Play 펌프 설정 = {EditorPrefs.GetBool(EnabledKey, true)}(다음 Play 부터)");
-    }
-
-    [MenuItem(MenuPath, true)]
-    private static bool ToggleValidate()
-    {
-        Menu.SetChecked(MenuPath, EditorPrefs.GetBool(EnabledKey, true));
-        return true;
     }
 
     static QAFocuslessEditorPump()

@@ -7,7 +7,7 @@ using System.Text;
 /// 103 한 판(<see cref="Boss103Flow"/>)과 같되 할 일 130 부터 로비는 3인 접속 대기 자리로만 쓴다 — 호스트가 자리별 캐릭터를 서버 저장소에 넣고 바로 맵
 /// (로비 데모 점검 <see cref="NightlyLobbySmoke"/>·선택대·출격 집결은 건너뛴다. 점검 코드는 남겨 둔다).
 /// 팀원별 차이(자리 순서·특성 시드·봇 단계·기준 시드)는 설정 파일(<see cref="QABoss103Config"/> 의 <c>order</c>·<c>traitSeed</c>·<c>tier</c>·<c>seed</c>)로만 들어온다.
-/// 실행·연속 루프는 에디터 메뉴 <c>Tools/QA/Nightly</c>.
+/// 실행·연속 루프는 QA 창(Tools/QA) ▸ Nightly 섹션(<c>QAAutomation.StartNight()</c>).
 /// </summary>
 public static partial class QALobbyScenarios
 {

@@ -22,7 +22,6 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class QABossProfileAnalyzer
 {
-    private const string MenuRoot = "Tools/QA/57.2/";
     private const string KeyDeep = "QA572.OrigDeep";
     private const string KeyEditor = "QA572.OrigProfileEditor";
     private const string KeyArmed = "QA572.Armed";
@@ -108,10 +107,8 @@ public static class QABossProfileAnalyzer
     private static int _origFrameCount = -1;
     private static PropertyInfo _frameCountProp;
 
-    [MenuItem(MenuRoot + "Analyze Latest Boss Profile")]
     public static void AnalyzeLatest() => AnalyzeNthFromLatest(0);
 
-    [MenuItem(MenuRoot + "Analyze Previous Boss Profile")]
     public static void AnalyzePrevious() => AnalyzeNthFromLatest(1);
 
     private static void AnalyzeNthFromLatest(int n)

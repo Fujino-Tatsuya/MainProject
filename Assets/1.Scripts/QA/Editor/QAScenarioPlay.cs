@@ -8,9 +8,9 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// MPPM(Play Mode Scenario) 를 툴바 Play 버튼과 같은 경로로 시작한다 — 에이전트가 메뉴로 QA 를 돌리기 위함.
+/// MPPM(Play Mode Scenario) 를 툴바 Play 버튼과 같은 경로로 시작한다 — QA 창(Tools/QA) ▸ 공통 버튼과 <see cref="QAAutomation"/> 이 부른다.
 /// 🔴 EditorApplication.isPlaying 토글은 가상 플레이어가 안 붙는다(메모리 규칙). 여기서는 MPPM 의
-///    PlayModeManager 진입점을 리플렉션으로 찾아 부른다. 내부 API 라 버전이 바뀌면 덤프 메뉴로 다시 확인할 것.
+///    PlayModeManager 진입점을 리플렉션으로 찾아 부른다. 내부 API 라 버전이 바뀌면 QA 창 ▸ 공통 ▸ Dump MPPM API 로 다시 확인할 것.
 /// </summary>
 public static class QAScenarioPlay
 {
@@ -41,7 +41,6 @@ public static class QAScenarioPlay
     }
 
     /// <summary>활성 Play Mode 설정과 가상 플레이어 수를 콘솔에 남긴다.</summary>
-    [MenuItem("Tools/QA/Debug/MPPM Status")]
     public static void Status()
     {
         Type managerType = FindType("Unity.PlayMode.Editor.PlayModeManager");
@@ -66,7 +65,6 @@ public static class QAScenarioPlay
     /// MPPM 창의 Player 2·3 체크박스와 같은 경로(MultiplayerPlaymode.PlayerN.Activate)로 가상 플레이어를 켠다.
     /// 클론 에디터가 뜨는 데 시간이 걸린다 — 켠 뒤 상태 로그(PlayerState)로 Communicative 를 확인하고 Play 할 것.
     /// </summary>
-    [MenuItem("Tools/QA/Activate Virtual Players (2,3)")]
     public static void ActivateVirtualPlayers()
     {
         EnsureClientTags();
@@ -111,9 +109,8 @@ public static class QAScenarioPlay
     /// <summary>
     /// 가상 플레이어 2·3 에 MPPM 태그 <c>Client</c>(<see cref="DemoConnectionConfig.MppmClientTag"/>)를 붙인다 — 없으면 데모 흐름이 안 켜지고
     /// 옛 수동 흐름(타이틀)으로 돈다(lobby-demo-flow.md §6). 48.3 2차에서 태그가 비어 클론이 타이틀로 간 것을 확인했다.
-    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — 메뉴 Deactivate 후 Activate.
+    /// 에디터 로컬 MPPM 설정(Library/VP)이라 git 무관. 이미 켜진 클론은 다시 켜야 태그가 반영된다 — QA 창 ▸ 공통 ▸ Deactivate 후 Activate.
     /// </summary>
-    [MenuItem("Tools/QA/Ensure MPPM Client Tags (2,3)")]
     public static void EnsureClientTags()
     {
         string tag = DemoConnectionConfig.MppmClientTag;
@@ -148,7 +145,6 @@ public static class QAScenarioPlay
     }
 
     /// <summary>가상 플레이어 2·3 을 끈다(태그 반영·정리용). 끝나면 Play 를 먼저 멈출 것.</summary>
-    [MenuItem("Tools/QA/Deactivate Virtual Players (2,3)")]
     public static void DeactivateVirtualPlayers()
     {
         Type mppm = FindType("Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode");
@@ -165,7 +161,6 @@ public static class QAScenarioPlay
     }
 
     /// <summary>가상 플레이어 상태(PlayerState) 로그.</summary>
-    [MenuItem("Tools/QA/Debug/Virtual Player States")]
     public static void PlayerStates()
     {
         Type mppm = FindType("Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode");
@@ -183,7 +178,6 @@ public static class QAScenarioPlay
     /// 0.BootStrapScene 을 열고(저장 안 된 변경이 있으면 중단) 툴바 Play 와 같은 경로로 Play 를 시작한다.
     /// 활성 설정이 Play Mode Scenario 면 가상 플레이어도 함께 뜬다.
     /// </summary>
-    [MenuItem("Tools/QA/Play Active Scenario")]
     public static void Play()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -207,7 +201,7 @@ public static class QAScenarioPlay
         MethodInfo toggle = managerType?.GetMethod("TogglePlayingShortcut", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         if (toggle == null)
         {
-            Debug.LogError("[QA] PlayModeManager.TogglePlayingShortcut 를 찾지 못했다 — Tools/QA/Debug/Dump MPPM API 로 확인할 것.");
+            Debug.LogError("[QA] PlayModeManager.TogglePlayingShortcut 를 찾지 못했다 — QA 창(Tools/QA) ▸ 공통 ▸ Dump MPPM API 로 확인할 것.");
             return;
         }
 
@@ -217,7 +211,6 @@ public static class QAScenarioPlay
     }
 
     /// <summary>Play 중이면 툴바 Stop 과 같은 경로로 멈춘다(가상 플레이어도 함께 정지).</summary>
-    [MenuItem("Tools/QA/Stop Active Scenario")]
     public static void Stop()
     {
         if (!EditorApplication.isPlayingOrWillChangePlaymode)
@@ -234,7 +227,7 @@ public static class QAScenarioPlay
         Debug.Log("[QA] Play Mode Scenario 정지.");
     }
 
-    [MenuItem("Tools/QA/Debug/Dump MPPM API")]
+    /// <summary>MPPM 관련 내부 API(타입·메서드·속성)를 Logs/qa-mppm-api.txt 로 덤프한다.</summary>
     public static void Dump()
     {
         var sb = new StringBuilder();

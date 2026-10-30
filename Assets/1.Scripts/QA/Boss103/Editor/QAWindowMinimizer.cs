@@ -12,7 +12,7 @@ using Debug = UnityEngine.Debug;
 /// 할 일 116 — QA 실행 중 메인 에디터·MPPM 가상 플레이어(클론 에디터) 창을 포커스를 뺏지 않고 최소화한다(사용자 요청).
 /// Win32 <c>ShowWindow(SW_SHOWMINNOACTIVE)</c> — 활성 창을 바꾸지 않는다. 실패해도 예외를 던지지 않는다(배치는 계속).
 /// 클론 찾기 = <c>Unity.exe</c> 중 명령줄에 이 프로젝트의 <c>Library/VP/</c> 가 들어간 프로세스(PowerShell CIM 1회, 상한 8초).
-/// 메뉴 <c>Tools/QA/103/Minimize Windows Now</c> 로 수동 실행.
+/// QA 창(Tools/QA) ▸ 103 ▸ Minimize Windows Now 로 수동 실행.
 /// </summary>
 public static class QAWindowMinimizer
 {
@@ -20,8 +20,7 @@ public static class QAWindowMinimizer
     private const int SwShowMinNoActive = 7;
     private const int QueryTimeoutMs = 8000;
 
-    [MenuItem("Tools/QA/103/Minimize Windows Now", priority = 210)]
-    public static void MinimizeAllMenu()
+    public static void MinimizeAll()
     {
         MinimizeMainEditor("menu");
         MinimizeVirtualPlayers("menu");

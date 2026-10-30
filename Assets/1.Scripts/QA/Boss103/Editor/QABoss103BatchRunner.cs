@@ -28,7 +28,7 @@ using UnityEngine;
 public static class QABoss103BatchRunner
 {
     private const string Tag = "[QA103/Batch]";
-    private const string Root = "Tools/QA/103/Batch/";
+    private const string ResumeHint = "QA 창(Tools/QA) ▸ 103 Batch ▸ Resume Last(QAAutomation.Boss103BatchResumeLast())";
     private static readonly string DirKey = DevBootTarget.ScopedKey("QA.103.Batch.Dir");
     private static readonly string RunningKey = DevBootTarget.ScopedKey("QA.103.Batch.Running");
     private const string LiveSessionKey = "QA.103.Batch.Live";
@@ -59,7 +59,7 @@ public static class QABoss103BatchRunner
             // 에디터 재시작(SessionState 비어 있음) — 사람 없이 저절로 Play 를 시작하지 않는다.
             EditorPrefs.SetBool(RunningKey, false);
             MarkAbortedByRestart();
-            Debug.LogWarning($"{Tag} 에디터를 다시 켜서 연속 루프를 멈춰 두었다 — 이어 하려면 {Root}Resume Last ({Dir}).");
+            Debug.LogWarning($"{Tag} 에디터를 다시 켜서 연속 루프를 멈춰 두었다 — 이어 하려면 {ResumeHint} ({Dir}).");
         }
     }
 
@@ -82,9 +82,8 @@ public static class QABoss103BatchRunner
     private static string Dir => EditorPrefs.GetString(DirKey, "");
     private static DateTime Now => DateTime.UtcNow;
 
-    // ── 메뉴 ─────────────────────────────────────────────────
+    // ── 실행(QA 창 ▸ 103 Batch · QAAutomation) ───────────────
 
-    [MenuItem(Root + "Start 90", priority = 100)]
     public static void Start90() =>
         StartBatch(QABoss103Batch.Prefix103, QABoss103Batch.TotalRuns, "할 일 103 3인 보스전(웰즈&23호 B) 밸런싱 QA", null);
 
@@ -92,11 +91,9 @@ public static class QABoss103BatchRunner
     /// 할 일 119 C3 — 같은 조건 30판(보통→숙련→초보 번갈아 = 단계마다 10판, 기준 시드 103 그대로). 폴더 <c>119-yyyyMMdd_HHmm</c>.
     /// 리포트는 <see cref="CompareDir"/>(지난 103 90판) 와 단계별 요약을 나란히 보인다.
     /// </summary>
-    [MenuItem(Root + "Start 30 (119 — 단계별 10판)", priority = 99)]
     public static void Start30() =>
         StartBatch(QABoss103Batch.Prefix119, QABoss103Batch.TotalRuns119, "할 일 119 3인 보스전(웰즈&23호 B) QA 봇 2차 — 30판", CompareDir);
 
-    [MenuItem(Root + "Compare Folder (119 비교 기준)...", priority = 106)]
     public static void ChooseCompareDir()
     {
         string dir = EditorUtility.OpenFolderPanel("119 리포트 비교 기준 배치 폴더(지난 103)", QAScenario103Menu.QARoot, "");
@@ -196,7 +193,6 @@ public static class QABoss103BatchRunner
     /// <summary>할 일 108 야간 배치(진행 상태 <c>nightly</c> = 시드 이름).</summary>
     private static bool IsNightlyBatch => Get("nightly").Length > 0;
 
-    [MenuItem(Root + "Resume Last", priority = 101)]
     public static void ResumeLast()
     {
         string dir = Dir;
@@ -210,7 +206,6 @@ public static class QABoss103BatchRunner
         Resume(dir);
     }
 
-    [MenuItem(Root + "Resume (Choose Folder)...", priority = 102)]
     public static void ResumeChoose()
     {
         string dir = EditorUtility.OpenFolderPanel("이어 할 103 배치 폴더", QAScenario103Menu.QARoot, "");
@@ -218,7 +213,6 @@ public static class QABoss103BatchRunner
             Resume(dir);
     }
 
-    [MenuItem(Root + "Stop After Current Run", priority = 103)]
     public static void StopAfterCurrent()
     {
         string dir = ActiveBatchDir();
@@ -233,7 +227,7 @@ public static class QABoss103BatchRunner
             _stateDir = null;
             LoadState(dir);
             Set("stopAfter", "1");
-            Log($"루프가 꺼져 있다(상태 {Get("state")}, 판 {Get("run")}) — 멈춤 표시만 남김. 이어 하려면 {Root}Resume Last.");
+            Log($"루프가 꺼져 있다(상태 {Get("state")}, 판 {Get("run")}) — 멈춤 표시만 남김. 이어 하려면 {ResumeHint}.");
             return;
         }
         LoadState();
@@ -256,7 +250,6 @@ public static class QABoss103BatchRunner
         return QABoss103Batch.IsActiveState(kv.TryGetValue("state", out string s) ? s : "") ? dir : null;
     }
 
-    [MenuItem(Root + "Open Report", priority = 104)]
     public static void OpenReport()
     {
         string dir = !string.IsNullOrEmpty(Dir) && Directory.Exists(Dir) ? Dir : LatestBatchDir();
@@ -269,7 +262,6 @@ public static class QABoss103BatchRunner
         Application.OpenURL("file:///" + path.Replace('\\', '/'));
     }
 
-    [MenuItem(Root + "Status", priority = 105)]
     public static void Status()
     {
         string dir = !string.IsNullOrEmpty(Dir) && Directory.Exists(Dir) ? Dir : LatestBatchDir();
@@ -289,14 +281,11 @@ public static class QABoss103BatchRunner
                   $"재실행 대상 [{string.Join(",", QABoss103Batch.RetryList(attempts, total))}] · 툴바 출처 {DataSourcePlayMode.Current} · 가상 플레이어 {string.Join("/", VpStates())}");
     }
 
-    [MenuItem(Root + "Start 90", true)]
-    [MenuItem(Root + "Start 30 (119 — 단계별 10판)", true)]
-    [MenuItem(Root + "Resume Last", true)]
-    [MenuItem(Root + "Resume (Choose Folder)...", true)]
-    private static bool CanStartCheck() => !Running;
+    /// <summary>Start 90·Start 30·Resume Last·Resume (Choose Folder) 버튼을 켤 조건(루프가 안 돈다).</summary>
+    public static bool CanStartBatch => !Running;
 
-    [MenuItem(Root + "Stop After Current Run", true)]
-    private static bool StopCheck() => ActiveBatchDir() != null;
+    /// <summary>Stop After Current Run 버튼을 켤 조건(돌고 있거나 끝나지 않은 배치가 있다).</summary>
+    public static bool CanStopAfterCurrent => ActiveBatchDir() != null;
 
     private static bool CanStart()
     {
@@ -307,7 +296,7 @@ public static class QABoss103BatchRunner
         }
         if (EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            Debug.LogWarning($"{Tag} Play 중이다 — Tools/QA/Stop Active Scenario 로 먼저 정지할 것.");
+            Debug.LogWarning($"{Tag} Play 중이다 — QA 창(Tools/QA) ▸ 공통 ▸ Stop Active Scenario 로 먼저 정지할 것.");
             return false;
         }
         return true;

@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// 할 일 88 — 이 인스턴스의 Unity Transport 네트워크 시뮬레이터 지연을 QA 파일로 제어한다(QA 전용, 게임 코드 무수정).
 /// 파일 = 이 인스턴스 프로젝트 루트(MPPM 클론은 <c>Library/VP/mppm*/</c>)의 <see cref="FileName"/>, 내용 = 정수 ms 한 줄.
-/// 메인 에디터(호스트)는 에디터 메뉴 <c>Tools/QA/88/NetSim/*</c>(<c>QAScenario88Menu.SetRemoteDelay</c>)가 <b>클론 루트에만</b> 쓰므로
+/// 메인 에디터(호스트)는 QA 창(Tools/QA) ▸ 88 ▸ NetSim 버튼(<c>QAScenario88Menu.SetRemoteDelay</c>)가 <b>클론 루트에만</b> 쓰므로
 /// 원격 클라만 지연된다. 파일이 없으면 0. Play 중에도 <see cref="PollSeconds"/> 마다 다시 읽어 바로 바꾼다.
 /// 적용 = Multiplayer Tools <see cref="NetworkSimulator"/> 프리셋(<c>UnityTransport.SetDebugSimulatorParameters</c> 는 NGO 2.x 에서 효과 없음).
 /// 시뮬레이터 단계는 송신·수신 모두에 걸린다(ApplyMode.AllPackets) — 지연 X ms 면 이 클라의 RTT 가 대략 2X 늘어난다.

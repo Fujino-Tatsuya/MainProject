@@ -19,7 +19,7 @@
 2. 받은 경로로 `<Team-Vault>\MainProject-Vault\QA_LogAndVideo` 가 **있는지 확인**한다. 없으면 Syncthing 동기화가 안 된 것 — 사용자에게 알리고 멈춘다(마음대로 만들지 않는다).
 3. 저장 — 둘 중 하나(둘 다 있으면 환경변수가 이긴다):
    - **파일(권장)**: 레포의 `UserSettings/QANightly.local.json`(gitignore 경로 — 커밋되지 않는다).
-     없으면 Unity 메뉴 `Tools/QA/Nightly/Settings/Create Local Settings File` 로 만들거나 아래 서식으로 직접 쓴다. 칸:
+     없으면 `Unity_RunCommand` 로 `QAAutomation.NightCreateLocalSettingsFile();`(사람은 QA 창 `Tools ▸ QA` ▸ Nightly ▸ **Create Local Settings File**)로 만들거나 아래 서식으로 직접 쓴다. 칸:
      ```json
      {
        "obsEnabled": true,
@@ -38,7 +38,7 @@
      (JSON 이라 `\` 는 `\\`. 이미 파일이 있으면 `shareRoot`·`obsEnabled` 만 바꾸고 나머지 칸은 그대로 둔다.)
    - **환경변수**: `setx QA_NIGHTLY_SHARE_ROOT "D:\Team-Vault\MainProject-Vault\QA_LogAndVideo"` 와 `setx QA_NIGHTLY_OBS 1`.
 4. OBS 비밀번호는 파일보다 환경변수 `setx QA_OBS_PASSWORD "<비밀번호>"` 를 권한다(사용자에게 받는다. 대화·로그·커밋에 남기지 않는다).
-5. 확인: Unity 메뉴 `Tools/QA/Nightly/Status` → 콘솔 `PC 설정 — 녹화 리플레이 버퍼(클립만) … 공유 루트 <경로> (공유 모드 — …) · 지금 시작하면 공유 날짜 폴더 <루트>\<MM-dd>`.
+5. 확인: `QAAutomation.NightStatus();`(QA 창 ▸ Nightly ▸ **Status**) → 콘솔 `PC 설정 — 녹화 리플레이 버퍼(클립만) … 공유 루트 <경로> (공유 모드 — …) · 지금 시작하면 공유 날짜 폴더 <루트>\<MM-dd>`.
    - 공유 루트가 있으면 **공유 모드**: 녹화는 리플레이 클립만으로 고정된다(판 전체 녹화 안 함).
 
 ## 2. 사전 준비 (밤마다 시작 전 — 사람 손이 필요한 것은 사용자에게 부탁한다)
@@ -51,11 +51,12 @@
 3. **OBS 설정 창은 닫아 둔다** — 열려 있으면 리플레이 버퍼 시작 요청이 성공만 하고 실제로 안 켜진다.
 4. **OBS 녹화·리플레이 버퍼를 손으로 켜 두지 않는다** — 켜져 있으면 코드가 녹화 경로를 날짜 폴더로 못 바꾼다(그래도 클립은 날짜 폴더로 옮겨지지만 경고가 남는다).
 5. 절전·화면 보호기 끄기, 에디터 끄기 → SVN 업데이트(`--non-interactive --accept postpone`) → GameData.xlsx 리비전 적어 두기 → 에디터 켜기 — 런북 §0~§4 그대로.
-6. 메뉴 `Tools/QA/Nightly/Settings/Test OBS Connection` → `OBS 연결 OK`.
+6. `QAAutomation.NightTestObsConnection();`(QA 창 ▸ Nightly ▸ **Test OBS Connection**) → `OBS 연결 OK`.
 
 ## 3. QA 시작
-1. `Tools/QA/Nightly/Settings/Validate Seed File` → `시드 파일 OK — <이름> …`(이름이 사용자 이름인지 본다).
-2. **`Tools/QA/Nightly/Start Night`**(MCP: `EditorApplication.ExecuteMenuItem("Tools/QA/Nightly/Start Night")`). 나머지는 코드가 자동:
+QA 메뉴는 창 하나(`Tools ▸ QA`)뿐이다(할 일 155). 에이전트는 메뉴 경로 대신 `Unity_RunCommand` 로 `QAAutomation` 진입점을 부른다.
+1. `QAAutomation.NightValidateSeedFile();`(QA 창 ▸ Nightly ▸ **Validate Seed File**) → `시드 파일 OK — <이름> …`(이름이 사용자 이름인지 본다).
+2. **`QAAutomation.StartNight();`**(QA 창 ▸ Nightly ▸ **Start Night**). 나머지는 코드가 자동:
    - 날짜 폴더 `<공유 루트>\<MM-dd>\` 만들기(있으면 그대로) · 지난 내 클립 정리(`videoKeepDays`).
    - OBS 녹화 경로를 날짜 폴더로(`SetRecordDirectory` — 원래 경로는 PC 파일에 보관, 배치 끝에 되돌린다).
    - 리플레이 버퍼 시작 → **실제로 켜졌는지 확인**.

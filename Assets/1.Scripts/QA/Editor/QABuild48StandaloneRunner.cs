@@ -12,19 +12,20 @@ using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 /// <summary>
-/// 할 일 48 B2 standalone 자동 판정. 이 메뉴가 띄운 프로세스만 추적·종료하고 시스템/방화벽 설정은 건드리지 않는다.
+/// 할 일 48 B2 standalone 자동 판정(QA 창(Tools/QA) ▸ 48 Build). 이 러너가 띄운 프로세스만 추적·종료하고 시스템/방화벽 설정은 건드리지 않는다.
 /// 결과는 C:/UnityProject/QA/48-&lt;시각&gt;/report.md 와 하위 로그·스크린샷에 남긴다.
 /// </summary>
 public static class QABuild48StandaloneRunner
 {
-    const string MenuRoot = "Tools/QA/48/Build/";
     const string ConfigMarker = "qa48-standalone";
     static readonly List<LaunchedPlayer> Started = new List<LaunchedPlayer>();
     static bool _running;
     static int _nextPort = 18048;
 
-    [MenuItem(MenuRoot + "Run B2 Rejection Suite", priority = 70)]
-    public static async void RunB2Menu()
+    /// <summary>standalone 스위트가 돌고 있나(B2·B3 버튼 비활성 표시용).</summary>
+    public static bool IsRunning => _running;
+
+    public static async void RunB2()
     {
         if (_running)
         {
@@ -38,7 +39,7 @@ public static class QABuild48StandaloneRunner
         }
         if (!RequiredBuildsExist(out string missing))
         {
-            Debug.LogError($"[QA][B2] 빌드가 없다: {missing} — Build Demo Player (QA artifacts) 먼저 실행");
+            Debug.LogError($"[QA][B2] 빌드가 없다: {missing} — QA 창(Tools/QA) ▸ 48 Build ▸ Build Demo Player (QA artifacts) 먼저 실행");
             return;
         }
 
@@ -69,8 +70,7 @@ public static class QABuild48StandaloneRunner
         }
     }
 
-    [MenuItem(MenuRoot + "Run B3 Recovery Suite", priority = 71)]
-    public static async void RunB3Menu()
+    public static async void RunB3()
     {
         if (_running)
         {
@@ -84,7 +84,7 @@ public static class QABuild48StandaloneRunner
         }
         if (!RequiredBuildsExist(out string missing))
         {
-            Debug.LogError($"[QA][B3] 빌드가 없다: {missing} — Build Demo Player (QA artifacts) 먼저 실행");
+            Debug.LogError($"[QA][B3] 빌드가 없다: {missing} — QA 창(Tools/QA) ▸ 48 Build ▸ Build Demo Player (QA artifacts) 먼저 실행");
             return;
         }
 
