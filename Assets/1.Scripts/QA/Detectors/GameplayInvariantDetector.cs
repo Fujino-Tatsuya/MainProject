@@ -26,18 +26,16 @@ public sealed class GameplayInvariantDetector : IQADetector
     private static readonly LayerMask WallOverlapMask = LayerMask.GetMask("Wall", "Env");
     private readonly Collider[] _wallOverlapBuffer = new Collider[WallOverlapBufferSize];
 
-    // 이 게임엔 점프가 없어 정상적으로는 평지(법선 y≈1) 접지 중 Y가 오르지 않는다 — 그런데도
-    // 오른다면 전진(W)+좌우(A/D) 연타로 벽 모서리에 접선 투영되며 타고 오르는 문제로 의심한다.
+    // 이 게임엔 점프가 없지만 kinematic 모터의 스텝 오프셋·접지 스냅 때문에 평지(법선 y≈1)에서도
+    // 틱마다 mm~cm 씩 Y 가 오른다(할 일 180 — 틱당 0.5mm 판정이 매 판 2~631건 오탐).
+    // 그래서 누적 상승 판정은 WallClimbJudge 가 하고, 여기서는 입력·필터·기록만 맡는다.
     private const float FlatGroundNormalY = 0.999f;
-    private const float WallClimbVerticalEpsilon = 0.0005f;
     // 스폰 직후 맵 생성 지오메트리에 캡슐이 살짝 파묻힌 채 배치되면, 물리가 몇 틱에 걸쳐 지면
     // 위로 밀어올리는 정착(settle) 보정이 일어난다 — 실측 20cm급 단발 보정을 벽타기로 오탐한 사례
     // (QA 재현: 스폰 8.4초 뒤 +200.3mm/tick, P5 스폰 유예(0.5s)보다 한참 뒤라 그걸론 못 거름).
     // 그래서 벽타기 전용으로 더 긴 스폰 유예를 따로 둔다.
     private const float WallClimbSpawnGraceSeconds = 2f;
-    // 실제 모서리 접선 투영 누수는 한 틱에 mm 단위(관측 2.6~34.4mm)만 샌다 — 그보다 훨씬 큰
-    // 단발 상승은 정착/텔레포트 등 다른 메커니즘이므로 벽타기로 보지 않는다.
-    private const float WallClimbMaxPlausibleDelta = 0.05f;
+    // 텔레포트급 단발 상한은 WallClimbJudge.MaxPlausibleDelta(그 틱에서 기준 재설정)로 옮겼다.
     // 재현 3회 전부 씬이 아직 "2.LoadingScene"인 스폰 직후 6~10초 구간에서 mm 단위 오탐이
     // 계속 나왔다 — MapGenerator.Generate가 존/지형 콜라이더를 순차 생성하는 도중이라, 아직
     // 자리 잡는 중인 지오메트리와의 접촉이 벽 슬라이드로 오인된다. 이 씬에서 만든 발견은 실제
@@ -70,6 +68,7 @@ public sealed class GameplayInvariantDetector : IQADetector
     private CapsuleCollider _playerCapsule;
     private PlayerGroundingSensor _playerGrounding;
     private PlayerLifeCycleController _playerLifeCycle;
+    private WallClimbJudge _wallClimbJudge;
     private float _recentFallThresholdSince = -1f;
     private int _playerId;
     private int _previousHealth;
@@ -283,10 +282,10 @@ public sealed class GameplayInvariantDetector : IQADetector
     }
 
     /// <summary>
-    /// 이 게임엔 점프가 없어 평지(법선 y≈1) 접지 중에는 정상적으로 Y가 오르지 않는다. 전진(W)을
-    /// 벽에 대고 좌우(A/D)를 연타하면 PlayerMotionSweep의 접선 투영이 벽 모서리 법선에 걸려
-    /// 미세한 상승을 매 물리 틱 남기는 문제가 있는데, 그 결과를 여기서 잡는다. 스폰 직후 정착
-    /// 보정, 텔레포트급 단발 점프는 별도 유예/상한으로 걸러낸다(둘 다 이 버그의 신호가 아니다).
+    /// 전진(W)을 벽에 대고 좌우(A/D)를 연타하면 PlayerMotionSweep의 접선 투영이 벽 모서리 법선에
+    /// 걸려 캡슐이 벽을 타고 오르는 문제가 있는데, 그 결과를 여기서 잡는다. 판정은 WallClimbJudge
+    /// (기준 높이 대비 StepOffset 초과 누적 상승 + 벽 막힘 + 약 1초 지속)가 한다. 스폰 직후 정착
+    /// 보정·맵 생성 중 접촉은 판정기를 초기화해 아예 보지 않는다(둘 다 이 버그의 신호가 아니다).
     /// </summary>
     private void InspectWallClimb(
         QARecorder recorder,
@@ -294,45 +293,64 @@ public sealed class GameplayInvariantDetector : IQADetector
         PlayerActionState state,
         Vector3 position)
     {
-        float verticalDelta = _hasFixedPosition ? position.y - _lastFixedPosition.y : 0f;
         bool outsideSpawnGrace = Time.time - _playerObservedSince >= WallClimbSpawnGraceSeconds;
         bool duringMapGeneration = QAUtil.ActiveSceneName() == MapGenerationSceneName;
-        bool flatGrounded =
-            _playerGrounding != null &&
-            _playerGrounding.IsGrounded &&
-            _playerGrounding.GroundNormal.y >= FlatGroundNormalY;
-        bool climbing =
-            _hasFixedPosition &&
-            outsideSpawnGrace &&
-            !duringMapGeneration &&
-            flatGrounded &&
-            verticalDelta > WallClimbVerticalEpsilon &&
-            verticalDelta <= WallClimbMaxPlausibleDelta;
+        WallClimbJudge.Result result = default;
+        if (_wallClimbJudge == null || !outsideSpawnGrace || duringMapGeneration)
+        {
+            _wallClimbJudge?.Reset();
+        }
+        else
+        {
+            bool flatGrounded =
+                _playerGrounding != null &&
+                _playerGrounding.IsGrounded &&
+                _playerGrounding.GroundNormal.y >= FlatGroundNormalY;
 
-        // 오탐 제외(할 일 48.3): 벽 타기는 벽에 대고 이동을 넣을 때만 난다 — 이동 의도(이동·대시 상태 또는 QA 이동 지시 0.5초 안)가 없으면 제외.
-        // 48 QA 실측 오탐은 전부 state=Idle·이동 지시 없음: 전멸 강제 중 사망 몸(22건) · 튜토리얼 자동 부활 지점 재배치 직후 착지 보정 ·
-        // 보스 강제 개시 엘리베이터 상승(P5 순간이동 110m 와 같은 시각).
-        bool moveIntent =
-            state == PlayerActionState.Move ||
-            state == PlayerActionState.Dash ||
-            Time.time - QABlackboard.LastMoveIntentTime < 0.5f;
+            // 오탐 제외(할 일 48.3): 벽 타기는 벽에 대고 이동을 넣을 때만 난다 — 이동 의도(이동·대시 상태 또는 QA 이동 지시 0.5초 안)가 없으면 제외.
+            // 48 QA 실측 오탐은 전부 state=Idle·이동 지시 없음: 전멸 강제 중 사망 몸(22건) · 튜토리얼 자동 부활 지점 재배치 직후 착지 보정 ·
+            // 보스 강제 개시 엘리베이터 상승(P5 순간이동 110m 와 같은 시각).
+            bool moveIntent =
+                state == PlayerActionState.Move ||
+                state == PlayerActionState.Dash ||
+                Time.time - QABlackboard.LastMoveIntentTime < 0.5f;
 
+            result = _wallClimbJudge.Step(new WallClimbJudge.Tick
+            {
+                Time = Time.fixedTime,
+                Y = position.y,
+                Grounded = flatGrounded,
+                Blocked = _playerMotor != null && _playerMotor.WasBlockedThisTick,
+                MoveIntent = moveIntent,
+            });
+        }
+
+        string detail = result.Verdict == WallClimbJudge.Verdict.None ? null : WallClimbDetail(player, state, position, result);
         Evaluate(
             recorder,
             "P9-PlayerWallClimb",
             _playerId,
-            climbing && moveIntent,
+            result.Verdict == WallClimbJudge.Verdict.Climb,
             QASeverity.Error,
-            $"평지 접지 중 이상 상승 감지: +{verticalDelta * 1000f:F1}mm/tick — 벽에 대고 이동 연타로 벽 타기 의심",
-            $"player={Target(player)} state={state} position={position}");
+            $"벽에 막힌 채 누적 +{result.ClimbRise:F2}m 상승({result.ClimbSeconds:F1}s, 스텝 {_wallClimbJudge?.StepOffset:F2}m 초과) — 벽에 대고 이동 연타로 벽 타기 의심",
+            detail);
         Evaluate(
             recorder,
             QAKnownNoise.FalsePositivePrefix + "P9-PlayerWallClimb",
             _playerId,
-            climbing && !moveIntent,
+            result.Verdict == WallClimbJudge.Verdict.ClimbWithoutIntent,
             QASeverity.Info,
-            $"P9 오탐 제외: 이동 의도 없음(state={state}) 중 +{verticalDelta * 1000f:F1}mm/tick — 재배치 착지·엘리베이터·사망 몸 위치 보정",
-            $"player={Target(player)} state={state} position={position}");
+            $"P9 오탐 제외: 이동 의도 없음(state={state}) 중 누적 +{result.ClimbRise:F2}m 상승 — 재배치 착지·엘리베이터·사망 몸 위치 보정",
+            detail);
+    }
+
+    private string WallClimbDetail(Player player, PlayerActionState state, Vector3 position, WallClimbJudge.Result result)
+    {
+        Collider ground = _playerGrounding != null ? _playerGrounding.GroundCollider : null;
+        return $"player={Target(player)} state={state} position={position} " +
+               $"baselineY={result.BaselineY:F3} peakY={result.PeakY:F3} climbRise={result.ClimbRise:F3}m " +
+               $"climbSeconds={result.ClimbSeconds:F2}s stepOffset={_wallClimbJudge.StepOffset:F2}m " +
+               $"ground={(ground != null ? ground.name : "<none>")}";
     }
 
     private void InspectInvulnerabilityDamage(
@@ -541,6 +559,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         _playerCapsule = player.GetComponent<CapsuleCollider>();
         _playerGrounding = player.GetComponent<PlayerGroundingSensor>();
         _playerLifeCycle = player.GetComponent<PlayerLifeCycleController>();
+        _wallClimbJudge = _playerMotor != null ? new WallClimbJudge(_playerMotor.StepOffset) : null;
         _playerObservedSince = Time.time;
         _lastFixedSampleTime = Time.fixedTime;
         _previousHealth = player.CurrentHealth;
@@ -555,6 +574,7 @@ public sealed class GameplayInvariantDetector : IQADetector
         _playerCapsule = null;
         _playerGrounding = null;
         _playerLifeCycle = null;
+        _wallClimbJudge = null;
         _recentFallThresholdSince = -1f;
         _playerId = 0;
         _hasPreviousHealth = false;

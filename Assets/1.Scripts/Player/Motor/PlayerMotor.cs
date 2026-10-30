@@ -82,6 +82,7 @@ public sealed class PlayerMotor : MonoBehaviour
     public bool GravityEnabled => simulationState.GravityEnabled;
     public MotorMode Mode => mode;
     public PlayerGameRuleData GameRule => gameRule;
+    public float StepOffset => gameRule != null ? gameRule.StepOffset : DefaultStepOffset;
     public PlayerSimulationState SimulationState => simulationState;
     internal PlayerSimulationState ServerObservationState => serverObservationState;
     internal int MovementDiagnosticTickCount => movementDiagnosticTickCount;
