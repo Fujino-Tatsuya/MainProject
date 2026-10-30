@@ -11,6 +11,9 @@ using UnityEngine.UI;
 /// 할 일 125 5/5 — 카드 분류 줄·창 도움말 줄은 <see cref="AddCategoryAndHelp"/>(<c>분류·도움말 줄 추가</c>)가 <b>지금 프리팹에 빠진 것만</b> 더한다
 /// (배치·글꼴·색 유지, 이미 있으면 저장하지 않음). 상충 확인창은 프리팹이 아니라 런타임 생성(<see cref="TraitSelectionView"/>).
 /// </para>
+/// <para>
+/// 할 일 165 — 카드 C1 아트는 <see cref="ApplyCardC1"/>(<c>카드 C1 아트 적용</c>)가 지금 프리팹의 카드 템플릿만 다시 만든다. 전체 생성도 같은 카드 빌더를 쓴다.
+/// </para>
 /// </summary>
 public static class TraitUiAuthoring
 {
@@ -31,7 +34,7 @@ public static class TraitUiAuthoring
     {
         EnsureFolder(Folder);
         TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-        Sprite placeholder = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        Sprite placeholder = AssetDatabase.LoadAssetAtPath<Sprite>(EmptyIconPath);
         TraitTextTable texts = EnsureTextTable();
 
         var root = new GameObject("TraitUI", typeof(RectTransform));
@@ -102,45 +105,18 @@ public static class TraitUiAuthoring
 
             RectTransform cards = NewUi("Cards", panel);
             HorizontalLayoutGroup cardsLayout = cards.gameObject.AddComponent<HorizontalLayoutGroup>();
-            cardsLayout.spacing = 24f;
+            cardsLayout.spacing = CardSpacing;
             cardsLayout.childAlignment = TextAnchor.MiddleCenter;
             cardsLayout.childControlWidth = cardsLayout.childControlHeight = false;
             cardsLayout.childForceExpandWidth = cardsLayout.childForceExpandHeight = false;
-            LayoutElement cardsElement = cards.gameObject.AddComponent<LayoutElement>();
-            cardsElement.preferredHeight = cardsElement.minHeight = 380f;
+            cards.gameObject.AddComponent<LayoutElement>();
 
             RectTransform cardTemplate = NewUi("CardTemplate", cards);
-            cardTemplate.sizeDelta = new Vector2(320f, 380f);
-            Image cardBackground = cardTemplate.gameObject.AddComponent<Image>();
-            cardBackground.color = new Color(0.09f, 0.11f, 0.15f, 1f);
-            Outline cardOutline = cardTemplate.gameObject.AddComponent<Outline>();
-            cardOutline.effectColor = OutlineColor;
-            cardOutline.effectDistance = new Vector2(2f, -2f);
-            Button button = cardTemplate.gameObject.AddComponent<Button>();
-            button.targetGraphic = cardBackground;
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.82f, 0.82f, 0.82f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
-            button.colors = colors;
-            VerticalLayoutGroup cardLayout = AddVertical(cardTemplate.gameObject, 20, 14f);
-            cardLayout.childAlignment = TextAnchor.UpperCenter;
-
-            RectTransform cardIconRect = NewUi("Icon", cardTemplate);
-            Image cardIcon = cardIconRect.gameObject.AddComponent<Image>();
-            cardIcon.raycastTarget = false;
-            cardIcon.preserveAspect = true;
-            LayoutElement cardIconElement = cardIconRect.gameObject.AddComponent<LayoutElement>();
-            cardIconElement.preferredHeight = cardIconElement.minHeight = 104f;
-            TMP_Text cardName = NewText("Name", cardTemplate, font, 26f, FontStyles.Bold, TextAlignmentOptions.Center, AccentColor);
-            TMP_Text cardCategory = NewText(CategoryName, cardTemplate, font, CategorySize, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
-            TMP_Text cardDescription = NewText("Description", cardTemplate, font, 19f, FontStyles.Normal, TextAlignmentOptions.Top, Color.white);
+            cardTemplate.gameObject.AddComponent<Image>();
+            cardTemplate.gameObject.AddComponent<Button>();
             TraitCardView cardView = cardTemplate.gameObject.AddComponent<TraitCardView>();
-            SetRef(cardView, "button", button);
-            SetRef(cardView, "icon", cardIcon);
-            SetRef(cardView, "displayName", cardName);
-            SetRef(cardView, "category", cardCategory);
-            SetRef(cardView, "description", cardDescription);
+            BuildCardC1(cardView, font);
+            FitWindowToCards(panel, cards);
 
             TMP_Text help = NewText(HelpName, panel, font, HelpSize, FontStyles.Normal, TextAlignmentOptions.Center, SubtleColor);
             help.text = TraitUiStrings.Help.Ko;
@@ -307,6 +283,195 @@ public static class TraitUiAuthoring
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    // ── 할 일 165 — 카드 C1 아트 ──
+    // 배치 = 납품 배치표.csv(카드 560x413, 좌상단 기준 X/Y·UI 크기). 스프라이트는 PPU 200(PNG 절반 = UI 크기).
+    private const string CardArtFolder = "Assets/50.Art/UI/TraitCard_C1/Sprites/";
+    private const string TraitIconFolder = "Assets/50.Art/UI/HUD/TraitIcon/";
+    private const string EmptyIconPath = TraitIconFolder + "Common/Trait_Empty.png";
+    private const string HeavyFontPath = "Assets/50.Art/UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset";
+    private static readonly Vector2 CardSize = new Vector2(560f, 413f);
+    private const float CardSpacing = 24f;
+    private const int WindowPadding = 32; // Panel 의 VerticalLayoutGroup 좌우 여백(Build 와 같은 값)
+    private const float DescriptionLineHeight = 34f;
+
+    private static readonly Color CardNameColor = new Color(0.96f, 0.96f, 0.94f, 1f);
+    private static readonly Color CardCategoryColor = new Color(0.80f, 0.81f, 0.80f, 1f);
+    private static readonly Color CardDescriptionColor = new Color(0.16f, 0.17f, 0.18f, 1f);
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿만 C1 레이아웃으로 바꾼다(할 일 165). <c>CardTemplate</c> 오브젝트·<c>Button</c>·<c>TraitCardView</c> 는 그대로 두고
+    /// 자식과 옛 꾸밈(Outline·VerticalLayoutGroup)만 갈아 끼운다 — 창·획득 줄·씬 오버라이드는 유지. 창 패널 폭·카드 줄 높이는 카드 3장에 맞춘다.
+    /// 빈 아이콘(<c>placeholderIcon</c>)은 <c>Trait_Empty</c>. 몇 번 돌려도 같은 결과.
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)")]
+    public static void ApplyCardC1()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var viewSo = new SerializedObject(view);
+            var cardView = viewSo.FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            var cards = viewSo.FindProperty("cardContainer").objectReferenceValue as RectTransform;
+            if (cardView == null || cards == null || cards.parent == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿/카드 줄이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            for (int i = cardView.transform.childCount - 1; i >= 0; i--)
+                Object.DestroyImmediate(cardView.transform.GetChild(i).gameObject);
+            foreach (Outline outline in cardView.GetComponents<Outline>())
+                Object.DestroyImmediate(outline);
+            foreach (LayoutGroup group in cardView.GetComponents<LayoutGroup>())
+                Object.DestroyImmediate(group);
+
+            TMP_FontAsset medium = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+            BuildCardC1(cardView, medium);
+            FitWindowToCards((RectTransform)cards.parent, cards);
+
+            viewSo.FindProperty("placeholderIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>(EmptyIconPath);
+            viewSo.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 카드 C1 아트 적용 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// 카드 오브젝트(Image·Button·TraitCardView 가 붙어 있고 자식이 없는 상태)를 C1 레이아웃으로 채운다.
+    /// 그리는 순서 = 카드판 → 심볼 → 이름·분류 → 마스크(안에 아이콘) → 스킬 프레임 → 키캡 → 설명.
+    /// </summary>
+    private static void BuildCardC1(TraitCardView cardView, TMP_FontAsset medium)
+    {
+        TMP_FontAsset heavy = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(HeavyFontPath);
+        var card = (RectTransform)cardView.transform;
+        card.sizeDelta = CardSize;
+
+        // 루트 Image = 투명 클릭 판정(카드 전체). 보이는 판은 자식 Panel — 버튼 색 변화는 그쪽에 건다.
+        Image hitArea = card.GetComponent<Image>();
+        hitArea.sprite = null;
+        hitArea.color = new Color(1f, 1f, 1f, 0f);
+        hitArea.raycastTarget = true;
+
+        Image panel = CardImage("Panel", card, CardArt("TraitCard_C1_Panel"), -2f, -2f, 564f, 417f);
+        Button button = card.GetComponent<Button>();
+        button.transition = Selectable.Transition.ColorTint;
+        button.targetGraphic = panel;
+        ColorBlock colors = button.colors;
+        colors.normalColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+        colors.highlightedColor = Color.white;
+        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+        button.colors = colors;
+
+        Image symbol = CardImage("CharacterSymbol", card, null, 19f, 10f, 118f, 118f);
+
+        TMP_Text cardName = CardText("Name", card, heavy != null ? heavy : medium, 34f, 142f, 38f, 340f, 40f,
+            TextAlignmentOptions.MidlineLeft, CardNameColor);
+        cardName.textWrappingMode = TextWrappingModes.NoWrap;
+        cardName.enableAutoSizing = true;
+        cardName.fontSizeMin = 24f;
+        cardName.fontSizeMax = 34f;
+
+        TMP_Text cardCategory = CardText(CategoryName, card, medium, 17f, 144f, 84f, 340f, 22f,
+            TextAlignmentOptions.MidlineLeft, CardCategoryColor);
+        cardCategory.textWrappingMode = TextWrappingModes.NoWrap;
+        cardCategory.overflowMode = TextOverflowModes.Ellipsis;
+
+        // 스킬 슬롯 — 프레임·마스크·아이콘 중심 (113, 250) 동일. 마스크 136 중 실제 영역 132.
+        Image mask = CardImage("SkillMask", card, CardArt("TraitCard_C1_SkillMask"), 45f, 182f, 136f, 136f);
+        mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        Image icon = CardImage("Icon", mask.transform, null, 2f, 2f, 132f, 132f);
+        icon.preserveAspect = true;
+        CardImage("SkillFrame", card, CardArt("TraitCard_C1_SkillFrame"), 37f, 174f, 152f, 152f);
+
+        // 키캡 1곳 — 키캡 38x40(94,335) / 마우스 30x41(98,335) 을 둘 다 담는 38x41 상자, 비율 유지로 각 크기가 된다.
+        Image keycap = CardImage("Keycap", card, CardArt("Keycap_Blank"), 94f, 335f, 38f, 41f);
+        keycap.preserveAspect = true;
+
+        TMP_Text cardDescription = CardText("Description", card, medium, 22f, 224f, 170f, 288f, 170f,
+            TextAlignmentOptions.TopLeft, CardDescriptionColor);
+        cardDescription.lineSpacing = LineSpacingFor(medium, 22f, DescriptionLineHeight);
+        cardDescription.enableAutoSizing = true;
+        cardDescription.fontSizeMin = 16f;
+        cardDescription.fontSizeMax = 22f;
+
+        var so = new SerializedObject(cardView);
+        so.FindProperty("button").objectReferenceValue = button;
+        so.FindProperty("icon").objectReferenceValue = icon;
+        so.FindProperty("displayName").objectReferenceValue = cardName;
+        so.FindProperty("category").objectReferenceValue = cardCategory;
+        so.FindProperty("description").objectReferenceValue = cardDescription;
+        so.FindProperty("characterSymbol").objectReferenceValue = symbol;
+        so.FindProperty("keycap").objectReferenceValue = keycap;
+        so.FindProperty("paladinSymbol").objectReferenceValue = Symbol("Paladin");
+        so.FindProperty("gunnerSymbol").objectReferenceValue = Symbol("Gunner");
+        so.FindProperty("assassinSymbol").objectReferenceValue = Symbol("Assassin");
+        so.FindProperty("keycapBlank").objectReferenceValue = CardArt("Keycap_Blank");
+        so.FindProperty("keycapQ").objectReferenceValue = CardArt("Keycap_Q");
+        so.FindProperty("keycapE").objectReferenceValue = CardArt("Keycap_E");
+        so.FindProperty("keycapR").objectReferenceValue = CardArt("Keycap_R");
+        so.FindProperty("inputLeftMouse").objectReferenceValue = CardArt("Input_LMB");
+        so.FindProperty("inputRightMouse").objectReferenceValue = CardArt("Input_RMB");
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // 카드 3장(TraitPool = 캐릭터×차수 3후보) + 간격 + 창 여백에 창 폭·카드 줄 높이를 맞춘다.
+    private static void FitWindowToCards(RectTransform panel, RectTransform cards)
+    {
+        panel.sizeDelta = new Vector2(CardSize.x * 3f + CardSpacing * 2f + WindowPadding * 2f, panel.sizeDelta.y);
+        LayoutElement element = cards.GetComponent<LayoutElement>();
+        if (element == null)
+            element = cards.gameObject.AddComponent<LayoutElement>();
+        element.preferredHeight = element.minHeight = CardSize.y;
+    }
+
+    // TMP 줄 간격(em/100) — 글꼴 기본 줄 높이에서 목표 줄 높이(px)까지 더할 값.
+    private static float LineSpacingFor(TMP_FontAsset font, float size, float lineHeight)
+    {
+        if (font == null || font.faceInfo.pointSize <= 0f)
+            return 0f;
+        float natural = font.faceInfo.lineHeight / font.faceInfo.pointSize * size;
+        return (lineHeight - natural) / size * 100f;
+    }
+
+    private static Sprite CardArt(string name) => AssetDatabase.LoadAssetAtPath<Sprite>(CardArtFolder + name + ".png");
+
+    private static Sprite Symbol(string character) =>
+        AssetDatabase.LoadAssetAtPath<Sprite>($"{TraitIconFolder}{character}/Trait_{character}.png");
+
+    // 배치표 좌표(부모 좌상단 기준 X/Y, y 아래로 +)에 중앙 피벗으로 둔다.
+    private static void PlaceTopLeft(RectTransform rect, float x, float y, float width, float height)
+    {
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(width, height);
+        rect.anchoredPosition = new Vector2(x + width * 0.5f, -(y + height * 0.5f));
+    }
+
+    private static Image CardImage(string name, Transform parent, Sprite sprite, float x, float y, float width, float height)
+    {
+        RectTransform rect = NewUi(name, parent);
+        PlaceTopLeft(rect, x, y, width, height);
+        Image image = rect.gameObject.AddComponent<Image>();
+        image.sprite = sprite;
+        image.type = Image.Type.Simple;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static TMP_Text CardText(string name, Transform parent, TMP_FontAsset font, float size,
+        float x, float y, float width, float height, TextAlignmentOptions alignment, Color color)
+    {
+        TMP_Text text = NewText(name, parent, font, size, FontStyles.Normal, alignment, color);
+        PlaceTopLeft((RectTransform)text.transform, x, y, width, height);
+        return text;
     }
 
     // 옆 글자(source)의 글꼴을 따라 새 TMP 를 만든다. source 가 없으면 기본 글꼴.

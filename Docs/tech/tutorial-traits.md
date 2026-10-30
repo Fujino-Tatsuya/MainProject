@@ -228,11 +228,35 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 ### 11.1 카드 — 이름 / 분류 / 설명 + 도움말 한 줄
 
-- 카드(`TraitCardView`) = 아이콘 · 이름 · **분류 줄**(`Category`, 이름 바로 아래) · 설명. 배치는 그대로(명세 §2 '이름 / 짧은 분류 / 설명').
+- 카드(`TraitCardView`) = 아이콘 · 이름 · **분류 줄**(`Category`, 이름 바로 아래) · 설명(명세 §2 '이름 / 짧은 분류 / 설명'). 배치는 아래 C1 아트(할 일 165).
 - 창 패널의 카드 줄 아래 **도움말 한 줄**(`Panel/Help`) = `UI.Trait.Help`("보스는 취약할 때만 밀치기와 기절이 적용됩니다.") — CC 공통 안내를 카드마다 반복하지 않는다.
 - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 분류·도움말 줄 추가 (배치 유지)` — 지금 프리팹에 빠진 줄만 더한다(글꼴은 옆 글자에서 복사, 이미 있으면 저장 안 함).
-  전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다).
+  전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다). 카드 아트만 바꿀 땐 아래 §11.1.1 메뉴.
 - 설명 = 템플릿 → `TraitTooltip.FormatDescription`(`SkillTooltipFormatter`). 실패하면 `[오류: …]`(`UI.SkillTooltip.Error`) + 경고 — 스킬 툴팁과 같은 관례. 획득 아이콘 호버 툴팁도 같은 문구.
+
+#### 11.1.1 카드 C1 아트 (할 일 165)
+
+- 아트(SVN, 읽기만) = `Assets/50.Art/UI/TraitCard_C1/Sprites/`(카드판·스킬 프레임·마스크·키캡 4종·마우스 2종, PNG 2배·PPU 200) + 특성 아이콘 `Assets/50.Art/UI/HUD/TraitIcon/<캐릭터>/`.
+  배치 원본 = 납품 `배치표.csv`(카드 560x413, 좌상단 X/Y·UI 크기 — 투명 여백 포함).
+- `CardTemplate`(560x413) 자식 = 그리는 순서대로:
+
+| 오브젝트 | 내용 | 배치(X, Y, 가로x세로) |
+|---|---|---|
+| (루트 Image) | 투명 클릭 판정 — `Button`·`TraitCardView` 는 루트 그대로 | 0, 0, 560x413 |
+| `Panel` | `TraitCard_C1_Panel` · 버튼 색 변화 대상(`targetGraphic`) | -2, -2, 564x417 |
+| `CharacterSymbol` | `Trait_<캐릭터>` — `TraitDefinition.Character` 로 카드의 `paladinSymbol`/`gunnerSymbol`/`assassinSymbol` 칸 중 고름(없으면 숨김) | 19, 10, 118x118 |
+| `Name` | 서울알림 Heavy 34(자동 축소 24~34), 왼쪽 정렬 한 줄 | 142, 38, 340x40 |
+| `Category` | 서울알림 Medium 17, 한 줄(넘치면 …) | 144, 84, 340x22 |
+| `SkillMask` → `Icon` | `TraitCard_C1_SkillMask` + `Mask`(마스크 그림 숨김), 안에 특성 아이콘 132x132(비면 `placeholderIcon` = `Trait_Empty`) | 45, 182, 136x136 (아이콘 47, 184) |
+| `SkillFrame` | `TraitCard_C1_SkillFrame` — 프레임·마스크·아이콘 중심 (113, 250) 동일 | 37, 174, 152x152 |
+| `Keycap` | 키캡/마우스 하나 — 스프라이트만 바꿈(비율 유지 38x41 상자 → 키캡 38x40·마우스 30x41) | 94, 335, 38x41 |
+| `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22 | 224, 170, 288x170 |
+
+- 키캡 판정 = `TraitKeycapRule.FromIconName`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): 아이콘 스프라이트 이름을 `_` 로 나눈 토큰 중 `Q`/`E`/`R`/`LMB`/`RMB` 와 **정확히 같은 첫 토큰**의 키. 키 뒤 접미사(`_Q_Change`·`_E_Trans`·`_R_Remove`)도 그 키, 키 토큰이 없으면(`Passive`·`Heat`·`Heat_Remove`·`Passive_Change`) `Keycap_Blank`. 아이콘이 없으면 빈 키캡.
+- 창 폭 = 카드 3장 + 간격 24 + 여백 32×2 = **1792**, 카드 줄 높이 413.
+- 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)` — 카드 템플릿 자식만 다시 만들고(루트 오브젝트·컴포넌트 유지 → 씬 오버라이드 안전) 창 폭·`placeholderIcon` 을 맞춘다. 전체 생성 메뉴도 같은 카드 빌더를 쓴다.
+- 아이콘 연결(데이터 주도) = `Tools/Tutorial/특성 아이콘 연결 (TraitIconMap.csv)` → `TraitIconMapAuthoring.Apply(csv, iconRoot)`. 기본 csv = `Assets/50.Art/UI/HUD/TraitIcon/TraitIconMap.csv`(`icon` 열 = 그 폴더 기준 상대 경로) → 각 `TraitDefinition.icon`. 아트가 csv 를 바꾸면 메뉴를 다시 돌린다. `TraitKeycapTests.ProjectDefinitions_IconsMatchIconMap` 이 어긋남을 잡는다.
+- 아직 안 쓰는 것: csv 의 `inactive_icon`(광란 강화 비활성 아이콘), `Common/Trait_ProcGlow`, `Assassin/Trait_Assassin_Trans`.
 
 ### 11.2 설명 템플릿 토큰
 
