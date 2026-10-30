@@ -54,6 +54,7 @@
 - **튜토리얼 QA**: [Docs/tech/tutorial-qa.md](Docs/tech/tutorial-qa.md) — 솔로·MPPM·회귀 Play 체크리스트·알려진 한계·병합 전 확인. 단계별 문서 목록은 [tutorial-director.md](Docs/tech/tutorial-director.md) §10.1.
 - **로비 데모 부스 운영**: [Docs/tech/lobby-demo-flow.md](Docs/tech/lobby-demo-flow.md) — 흐름·모든 PC 공용 `demo-connection.json`(role auto — 이 PC IP = hostAddress 면 호스트, host/client 명시 우선)·같은 빌드 필수·대기 화면 문구·재접속·MPPM `Client` 태그·알려진 한계.
 - **피해 숫자(플로팅 데미지)**: [Docs/tech/floating-damage-design.md](Docs/tech/floating-damage-design.md) — Overlay·이미지 숫자·몸 중심 앵커, 단발/누적·구간·필터·보호막 숫자, 줌과 무관(154 — 넣었다가 뺐음), 대상별 위치 = 프리팹 루트 `FloatingDamageAnchor`.
+- **공격 판정 도형(153)**: [Docs/tech/attack-shapes.md](Docs/tech/attack-shapes.md) — 프리팹 콜라이더 대신 코드 도형(부채꼴·원·직사각형·삼각형, 합집합), SO `AttackShapeSet`(`[SerializeReference]`, 행 `hitArea.shapes[i].칸`)·기준점 종류·판정 점(ClosestPoint 바닥 평면+높이)·대상 1회·특성 배율·이관 단계 1~6. 간파 상자(`InterruptAttack`)는 예외.
 - **디버그 단축키**: [Docs/tech/debug-hotkeys.md](Docs/tech/debug-hotkeys.md) — 키 목록·겹침, 릴리스 빌드 포함 심볼 `DEV_HOTKEYS`(Standalone). 정식 릴리스 때 심볼만 지운다.
 - **플레이어 스탯**: [Docs/tech/player-stats.md](Docs/tech/player-stats.md) — 공격력·이동속도·공격속도·방어력·최대 체력 5종 기본%·전체%(+공격력 가하는 피해%) 공식, 서버·클라 같은 종합(`PlayerStats`), 판정은 서버 값, 공격 요청마다 서버 2차 검증(경고만). 새 스탯 추가 절차 §3.
 - **행동 입력 거부 피드백**: [Docs/tech/skill-reject-feedback.md](Docs/tech/skill-reject-feedback.md) — 거부 사유별 선입력 버퍼 처리 표(보관/버림), 오너 전용 이벤트 `CooldownRejected`·`ActionBlockedByEffect`(입력 1회=1회)·사운드 키 지정법(비우면 무음).

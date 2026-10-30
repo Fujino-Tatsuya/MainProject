@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// 팔라딘 E(수호자의 의지) 방향 규칙(PLAN-paladin-counter-e C2, Re:C 변경안 §2·§3). 순수 함수 —
-/// 방어 성공 판정(<see cref="IsInsideGuardArc"/>)과 반격 부채꼴 판정(<see cref="IsInsideCounterSector"/>)을 둔다.
-/// 두 판정 모두 <b>각도는 바닥 평면</b>(y 제거)에서 잰다.
+/// 방어 성공 판정(<see cref="IsInsideGuardArc"/>)을 둔다 — <b>각도는 바닥 평면</b>(y 제거)에서 잰다.
+/// 반격 부채꼴은 공격 판정 도형(<see cref="FirstMeleeSubSkillData.HitArea"/>, 할 일 153)으로 옮겼다.
 /// </summary>
 public static class FirstMeleeGuardRules
 {
@@ -39,36 +39,5 @@ public static class FirstMeleeGuardRules
 
         float halfAngle = Mathf.Clamp(guardAngle, 0f, 360f) * 0.5f;
         return Vector3.Angle(guardForward, toAttacker) <= halfAngle + AngleToleranceDeg;
-    }
-
-    /// <summary>
-    /// 반격 부채꼴 안인가 — AssassinConeAttack.IsInsideCone 과 같은 식을 공개 순수 함수로 옮긴 것
-    /// (차이는 경계 각도 여유 <see cref="AngleToleranceDeg"/> 하나).
-    /// 거리는 대상 콜라이더 표면(<paramref name="closestPoint"/> = <c>Collider.ClosestPoint(origin)</c>)까지,
-    /// 각도는 바닥 평면에서 잰다. 표면이 원점과 겹치면(발밑을 포함하는 콜라이더) <paramref name="boundsCenter"/> 방향으로
-    /// 각도를 다시 재고, 그래도 겹치면 안으로 본다. 경계 포함. <paramref name="angle"/> 은 <b>전체</b> 각도다.
-    ///
-    /// 🔴 이 함수는 거리도 평면으로 재지만, 런타임 브로드페이즈는 <c>Physics.OverlapSphereNonAlloc(origin, range)</c>
-    /// — <b>3D 구</b>다. 그래서 높이 차가 큰 대상은 이 함수에 오기 전에 빠진다(높이 무관한 것은 각도뿐).
-    /// <paramref name="forward"/> 는 평면 방향(y = 0)을 넘긴다.
-    /// </summary>
-    public static bool IsInsideCounterSector(
-        Vector3 origin, Vector3 forward, Vector3 closestPoint, Vector3 boundsCenter, float range, float angle)
-    {
-        Vector3 toTarget = closestPoint - origin;
-        toTarget.y = 0f;
-
-        if (toTarget.sqrMagnitude > range * range)
-            return false;
-
-        // 발밑을 포함하는 콜라이더는 중심 방향으로 한 번 더 판정한다.
-        if (toTarget.sqrMagnitude < PlanarEpsilonSqr)
-        {
-            toTarget = boundsCenter - origin;
-            toTarget.y = 0f;
-        }
-
-        float halfAngle = Mathf.Clamp(angle, 0f, 360f) * 0.5f;
-        return toTarget.sqrMagnitude < PlanarEpsilonSqr || Vector3.Angle(forward, toTarget) <= halfAngle + AngleToleranceDeg;
     }
 }

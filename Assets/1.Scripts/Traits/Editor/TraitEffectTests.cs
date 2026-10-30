@@ -554,8 +554,22 @@ public sealed class TraitEffectTests
         // 명세 §10: 기본 Q 합계 300 × 1.20 × 1.25 = 450 → 추가 135
         int dref = TraitHealRules.RoundHalfUp(300 * 1.2 * 1.25);
         Assert.AreEqual(450, dref);
-        var effect = new TraitDerivedAttackEffect("PAL_Q_BLAST", 0.3f, new[] { AttackType.SkillQ }, radius: 2f, forwardOffset: 1f);
-        Assert.AreEqual(135, effect.CreateRuntime(1).DamageFrom(dref));
+        var area = new AttackShapeSet(AttackShapeOrigin.Point, new AttackSectorShape(2f, 90f));
+        var effect = new TraitDerivedAttackEffect("PAL_Q_BLAST", 0.3f, new[] { AttackType.SkillQ }, hitArea: area);
+        TraitDerivedAttack spec = effect.CreateRuntime(1);
+        Assert.AreEqual(135, spec.DamageFrom(dref));
+        Assert.AreSame(area, spec.HitArea, "런타임 명세 = 효과 칸 도형 그대로");
+    }
+
+    [Test]
+    public void Derived_HitArea_DefaultEmpty_InvalidShapeIsValidationError()
+    {
+        Assert.IsTrue(new TraitDerivedAttackEffect("X", 0.3f).CreateRuntime(1).HitArea.IsEmpty, "기본 = 비움(원래 공격 치수 재사용)");
+
+        var errors = new List<string>();
+        new TraitDerivedAttackEffect("X", 0.3f, hitArea: new AttackShapeSet(AttackShapeOrigin.Point, new AttackSectorShape(1f, 90f, minOffset: 2f)))
+            .Validate(errors);
+        Assert.IsTrue(errors.Exists(e => e.Contains("hitArea") && e.Contains("minOffset")), string.Join("\n", errors));
     }
 
     [Test]

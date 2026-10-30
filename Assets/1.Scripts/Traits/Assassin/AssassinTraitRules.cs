@@ -7,42 +7,28 @@ using UnityEngine;
 /// </summary>
 public static class AssassinTraitAreaRules
 {
-    /// <summary>일반 E 강타(강화한 기본 공격) — 부채꼴 길이·폭.</summary>
+    /// <summary>일반 E 강타(강화한 기본 공격) — 판정 도형 길이·폭.</summary>
     public static readonly TraitAttackKey EnhancedStrike = new TraitAttackKey(AttackType.Default, TraitAttackForm.Enhanced);
 
     /// <summary>변신 E 원형 5타 — 원 반경.</summary>
     public static readonly TraitAttackKey CircleStrike = new TraitAttackKey(AttackType.SkillE, TraitAttackForm.Alternate);
 
+    /// <summary>그 공격 키의 길이(Length 축)·폭(Width 축) 배율. 특성 출처가 없으면 둘 다 1, 음수는 0.</summary>
+    public static void AreaScale(PlayerTraitModifiers modifiers, TraitAttackKey key, out float lengthMultiplier, out float widthMultiplier)
+    {
+        lengthMultiplier = modifiers != null ? Mathf.Max(0f, modifiers.AreaMultiplier(key, TraitAreaAxis.Length)) : 1f;
+        widthMultiplier = modifiers != null ? Mathf.Max(0f, modifiers.AreaMultiplier(key, TraitAreaAxis.Width)) : 1f;
+    }
+
     /// <summary>
-    /// 부채꼴 판정의 치수 배율. 길이 = 사거리 × <paramref name="lengthMultiplier"/>, 폭 = 끝 현 길이(<see cref="ConeWidth"/>) × <paramref name="widthMultiplier"/>.
-    /// 두 배율이 같으면 각도는 그대로(닮은꼴 확대 — 사거리만 늘려도 폭이 같은 비율로 는다). 다르면 폭이 맞게 각도를 고친다(180° 이상은 폭 = 지름이라 그대로).
+    /// 평타 판정 도형(할 일 153)에 길이·폭 배율을 바른 <b>복사본</b> — 부채꼴이면 range × 길이, angle × 폭(<see cref="AttackShape.Scaled"/>).
+    /// 기준점(몸 발밑)은 그대로라 꼭짓점은 안 움직인다. 배율이 둘 다 1 이면 원본을 그대로 돌려준다(SO 를 고치지 않으므로 공유해도 된다).
     /// </summary>
-    public static void ScaleCone(float range, float angle, float lengthMultiplier, float widthMultiplier,
-        out float scaledRange, out float scaledAngle)
+    public static AttackShapeSet ScaleArea(PlayerTraitModifiers modifiers, TraitAttackKey key, AttackShapeSet area)
     {
-        lengthMultiplier = Mathf.Max(0f, lengthMultiplier);
-        widthMultiplier = Mathf.Max(0f, widthMultiplier);
-        scaledRange = range * lengthMultiplier;
-        scaledAngle = angle;
-        if (lengthMultiplier <= 0f || Mathf.Approximately(lengthMultiplier, widthMultiplier) || angle >= 180f)
-            return;
-
-        float halfSin = Mathf.Sin(angle * 0.5f * Mathf.Deg2Rad) * widthMultiplier / lengthMultiplier;
-        scaledAngle = 2f * Mathf.Asin(Mathf.Clamp01(halfSin)) * Mathf.Rad2Deg;
+        AreaScale(modifiers, key, out float length, out float width);
+        return area == null || (length == 1f && width == 1f) ? area : area.Scaled(length, width);
     }
-
-    /// <summary>스킬 판정용 — 그 공격 키의 길이·폭 배율로 <see cref="ScaleCone(float,float,float,float,out float,out float)"/>. 특성 출처가 없으면 그대로.</summary>
-    public static void ScaleCone(PlayerTraitModifiers modifiers, TraitAttackKey key, float range, float angle,
-        out float scaledRange, out float scaledAngle)
-    {
-        float length = modifiers != null ? modifiers.AreaMultiplier(key, TraitAreaAxis.Length) : 1f;
-        float width = modifiers != null ? modifiers.AreaMultiplier(key, TraitAreaAxis.Width) : 1f;
-        ScaleCone(range, angle, length, width, out scaledRange, out scaledAngle);
-    }
-
-    /// <summary>부채꼴 끝의 폭(현 길이) — 180° 미만 = 2r·sin(θ/2), 이상 = 지름 2r.</summary>
-    public static float ConeWidth(float range, float angle) =>
-        angle >= 180f ? 2f * range : 2f * range * Mathf.Sin(angle * 0.5f * Mathf.Deg2Rad);
 
     /// <summary>원 반경 × 배율(0 미만 배율은 0).</summary>
     public static float ScaleRadius(float radius, float multiplier) => radius * Mathf.Max(0f, multiplier);
@@ -280,18 +266,6 @@ public static class AssassinTrailRules
         direction.y = 0f;
         direction = direction.sqrMagnitude > 1e-6f ? direction.normalized : Vector3.zero;
         return start + direction * Mathf.Max(0f, traveled);
-    }
-
-    /// <summary>선분을 원래 Q 경로 폭·높이의 상자로 — 중심은 선분 가운데(높이 절반만 올림), 회전은 선분 방향.</summary>
-    public static void Box(Vector3 start, Vector3 end, float width, float height,
-        out Vector3 center, out Vector3 halfExtents, out Quaternion rotation)
-    {
-        Vector3 along = end - start;
-        along.y = 0f;
-        float length = along.magnitude;
-        center = (start + end) * 0.5f + Vector3.up * (Mathf.Max(0f, height) * 0.5f);
-        halfExtents = new Vector3(Mathf.Max(0f, width) * 0.5f, Mathf.Max(0f, height) * 0.5f, length * 0.5f);
-        rotation = length > 1e-6f ? Quaternion.LookRotation(along / length) : Quaternion.identity;
     }
 
     /// <summary>궤적 지연 — 끝없는 칼날과 같은 공격 가속기를 탄다(명세 §6): 지연 ÷ 공격속도 배율.</summary>

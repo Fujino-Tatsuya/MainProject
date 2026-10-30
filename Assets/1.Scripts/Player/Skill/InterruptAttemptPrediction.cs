@@ -52,4 +52,14 @@ public static class InterruptAttemptPrediction
             input.WindowOpenElapsed = Mathf.Max(0f, input.WindowOpenElapsed - pressAge);
         return input;
     }
+
+    /// <summary>
+    /// 대쉬 간파 재예측 입력(할 일 139-2) — 대시 도중 지금 값(위치·남은 대시·창)으로 만든 입력의 준비 기준점만 처음 시도의 t0
+    /// (오너 = 누른 순간, 서버 = 승인 순간)로 되돌린다. 판정 시각 = max(예상 대시 끝, 처음 t0 + 평소 준비)라 시도 하나에서 같다.
+    /// </summary>
+    public static DashInterruptPredictInput ForReprediction(DashInterruptPredictInput input, float skillStartTime)
+    {
+        input.SkillStartTime = skillStartTime;
+        return input;
+    }
 }

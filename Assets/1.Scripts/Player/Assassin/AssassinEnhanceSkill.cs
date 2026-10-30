@@ -29,6 +29,9 @@ public sealed class AssassinEnhanceSkill : PlayerInstantSkill
     // Buff 는 상체 레이어에서 재생하고 하체는 0층의 Idle/Run 을 그대로 따른다.
     public override bool CanMoveWhileActive => true;
 
+    // 좌클릭 홀드 중 E — Buff 가 끝난 뒤 아직 누르고 있으면 기본 공격(= 강타)을 잇는다(할 일 146, 거너 E 와 같은 동작).
+    public override bool ResumesBasicAttackOnHold => true;
+
     public override void Initialize(Player owner, PlayerSkillController controller)
     {
         base.Initialize(owner, controller);

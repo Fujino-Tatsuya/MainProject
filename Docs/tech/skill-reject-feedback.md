@@ -43,6 +43,7 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 | 항목 | 속성 | 동작 |
 |---|---|---|
 | 홀드 시작 | `StartsOnHold` | Idle/Move 에서 좌클릭을 누르고 있기만 해도 평타를 시작한다(스킬이 끝났는데 계속 누르고 있으면 평타가 이어진다). 누른 입력(평타·스킬·인터럽트)을 다 본 뒤 맨 마지막에 봐서 버퍼에 남은 스킬을 앞지르지 않는다. 과열·공격 차단 효과·스킬 실행/요청 중이면 피드백 없이 건너뛴다. |
+| 스킬 뒤 이어가기(할 일 146) | `PlayerSkillBase.ResumesBasicAttackOnHold` | 홀드 시작이 아닌 캐릭터도 이 스킬이 **정상 종료(완료·홀드 해제)** 된 직후 Idle/Move 첫 틱 **한 번**은 홀드 시작과 같은 장치(`TryStartAttackOnHold`)를 탄다 — 좌클릭을 아직 누르고 있으면 평타가 이어지고, 뗐으면 사라진다. 어쌔신 일반 E(`AssassinEnhanceSkill`) = 항상(이어지는 평타 = 강타), 어쌔신 변신 E(`AssassinCircleStrikeSkill`, 원형 5타) = 항상(5타 완료 뒤), 가붕이 Q = 돌파의 방패(PAL_2_DASH)일 때만(`PaladinTraitRules.QResumesBasicAttack`). 대시·피격·사망·안전망 종료는 잇지 않는다. 입력 주체 피어가 종료 경로(`EndActiveSkillServer`·`EndSkillClientRpc`)에서 기록하고 `TakeBasicAttackResume` 로 가져간다. 새 타이머·SO 칸 없음 |
 | 공격 뒤 스킬 예약 | `ReservesSkillAfterAttack` | 평타(AttackReady·Attack) 중 Q·E·R·우클릭 스킬 입력은 평타를 **끊지 않는다**. 현재 발(준비 중이면 첫 발)은 끝까지 가고, 다음 발은 잇지 않는다 — 홀드·창 예약을 무시하고 뗀 것처럼 발사 + `ShotRecovery` 뒤 정상 종료(`FinishWithoutChaining`). 끝나 Idle/Move 로 돌아온 첫 틱에 예약한 스킬을 다른 입력보다 먼저 기존 경로로 요청한다. |
 | 예약 규칙 | `PlayerSkillReservation` | 선입력 버퍼와 따로 들고 **만료가 없다**(현재 발 남은 간격 + ShotRecovery 가 0.2초보다 길 수 있음). 마지막에 누른 스킬 1개만(다른 스킬이 덮음), 같은 스킬 연타는 1번. 차단 효과·쿨타임 거부는 누른 순간 §0 표대로 버림·이벤트이고 예약하지 않으므로 평타는 계속 이어진다. 사용 조건(`TryUse`)은 실제 시전 때 본다. 대시·넉백·구속·사망·연출로 공격이 끊기면 예약을 버린다. Idle/Move 에서 요청 응답 대기(바쁨)면 기다리고, 그 밖의 거부(행동 불능 CC 포함)는 예약을 버린다. |
 
