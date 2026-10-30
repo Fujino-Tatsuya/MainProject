@@ -32,22 +32,4 @@ public static class AssassinHitTargets
     /// </summary>
     public static bool IsBackAttack(Unit unit, AttackInfo attackInfo, AttackHitContext hitContext) =>
         unit is MonsterBase monster && monster.IsBackAttackHit(attackInfo, hitContext);
-
-    /// <summary>[서버] 백어택 적중 연출 — 공격자 쪽 몸통 표면(높이는 콜라이더 중심)에 1회.</summary>
-    public static void NotifyBackAttackHit(Component owner, Collider hit, Unit unit, AttackHitContext hitContext)
-    {
-        Vector3 point;
-        if (hit != null)
-        {
-            Bounds bounds = hit.bounds;
-            point = bounds.ClosestPoint(BackAttackRules.ResolveAttackerPosition(hitContext));
-            point.y = bounds.center.y;
-        }
-        else
-        {
-            point = unit != null ? unit.transform.position : hitContext.sourcePosition;
-        }
-
-        AssassinSkillView.Play(owner, view => view.ServerBackAttackHit(point));
-    }
 }

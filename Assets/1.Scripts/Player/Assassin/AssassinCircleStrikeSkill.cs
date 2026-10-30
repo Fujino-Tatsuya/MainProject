@@ -163,8 +163,6 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
             if (unit != null)
                 strikeLandedUnits.Add(unit);
-            if (backAttack)
-                AssassinHitTargets.NotifyBackAttackHit(owner, hit, unit, hitContext);
 
             Edit.Log($"[Assassin/E변신] {sequence.StrikesDone}타 적중 — {target.name} 피해 {attackInfo.damage}{(backAttack ? " (백어택)" : "")}", this);
         }
