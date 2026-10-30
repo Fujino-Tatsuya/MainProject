@@ -81,6 +81,12 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
         info.damage = GunnerFocusFireRules.Apply(info.damage, GunnerFocusFireRules.Multiplier(info.attackType, bonus, inside));
     }
 
+    /// <summary>[서버] 시전자(초기화 전 null) — 특성 랩 공격 범위 기즈모(할 일 152)가 레이저 주인을 가른다.</summary>
+    public Player ServerCaster => initialized ? caster : null;
+
+    /// <summary>[서버] 실제 피해 범위 반경(<see cref="DamageTick"/> 구 질의 반경).</summary>
+    public float ServerDamageRadius => radius;
+
     public override void OnDestroy()
     {
         ActiveLasers.Remove(this);

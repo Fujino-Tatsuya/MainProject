@@ -95,6 +95,11 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // 간파 준비 시간 관측(할 일 132). 시작 시각·Hit 은 이 피어 기준(서버 = 승인, 원격 오너 = PlaySkillClientRpc 수신).
     private float activeStartTime;
     private bool activeHitEventSeen;                  // 이 피어 애니메이터에서 실행 중 스킬의 Hit 이벤트가 이미 왔다
+    // [오너] 대쉬 간파 재예측(할 일 139-2) — 누른 순간 창이 닫혀 약이었던 시도. 그 대시(ownerRepredictDash) 동안만 다시 본다.
+    private PlayerInterruptSkillBase ownerRepredictSkill;
+    private PlayerDashState ownerRepredictDash;
+    private Vector3 ownerRepredictDirection;
+    private float ownerRepredictSkillStart;            // 누른 순간(준비 기준점 t0)
     // 상태가 다시 시작됐다고 볼 안전망 연장 폭. 같은 재생 안에서는 매 틱 계산값이 거의 같아 이보다 작다.
     private const float ClipRestartSlack = 0.05f;
     // 클립 길이를 못 구해 타이머 안전망으로 대체한 경고는 스킬당 1회.
@@ -109,8 +114,30 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // [오너] ReportsHeldInput 스킬에 마지막으로 보낸 누름 상태. 시전마다 첫 틱에 한 번은 보낸다(hasReportedHeld).
     private bool hasReportedHeld;
     private bool lastReportedHeld;
+    // [입력 주체] 기본 공격 이어가기(할 일 146) — 이어가기를 허락한 스킬이 정상 종료됐다. 다음 Idle/Move 한 번이 가져간다.
+    private bool basicAttackResumeArmed;
 
     public PlayerSkillBase ActiveSkill => activeSkill;
+
+    /// <summary>
+    /// [입력 주체] 기본 공격 이어가기(할 일 146)를 가져간다 — 직전 스킬이 이어가기를 허락하고 정상 종료됐으면 true, 한 번 읽으면 사라진다.
+    /// Idle/Move 의 행동 입력 처리가 매 틱 맨 앞에서 부른다(그 틱에 좌클릭을 누르고 있으면 홀드 시작처럼 기본 공격을 시작).
+    /// </summary>
+    public bool TakeBasicAttackResume()
+    {
+        bool armed = basicAttackResumeArmed;
+        basicAttackResumeArmed = false;
+        return armed;
+    }
+
+    // 스킬 종료 경로(서버 정상 종료·원격 오너 종료 RPC)에서 — 입력 주체 피어만 기록한다. 강제 종료(HandleSkillStateExit)는 부르지 않는다.
+    private void ArmBasicAttackResume(PlayerSkillBase skill, SkillEndReason reason)
+    {
+        if (player == null || !player.IsInputSource || skill == null)
+            return;
+
+        basicAttackResumeArmed = PlayerBasicAttackInputRules.ArmsResumeAfterSkill(skill.ResumesBasicAttackOnHold, reason);
+    }
     public bool IsSkillActive => activeSkill != null;
     // 전 피어 — 실행 중(관찰자는 PlaySkillClientRpc~EndSkillClientRpc) 스킬이 공격속도를 타면 Animator.speed = 배율(할 일 91 T5).
     public bool ScalesAnimatorWithAttackSpeed => activeSkill != null && activeSkill.ScalesWithAttackSpeed;
@@ -516,7 +543,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         PlayerDashState dashState = stateController != null ? stateController.ActiveDash : null;
         PredictOwnerInterrupt(skill, dashState != null, direction,
             dashState != null ? dashState.Speed : 0f, dashState != null ? dashState.Remaining : 0f,
-            pressTime >= 0f ? Mathf.Max(0f, Time.time - pressTime) : 0f);
+            pressTime >= 0f ? Mathf.Max(0f, Time.time - pressTime) : 0f, dashState);
         RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
             player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
@@ -525,9 +552,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // [오너] 간파 입력 순간 즉시 예측(할 일 132) → 오너 연출 상태 기계(강 = 암전·빛 모임). 간파 슬롯의 간파 스킬만, 네트워크 세션에서만
     // (오프라인은 서버 슬로우가 없어 결론이 오지 않는다). 판정·슬로우에는 영향 없다.
     // attackDirection = 근접은 요청에 싣는 시전 방향(서버 승인 예측과 같은 값), 대쉬는 대시 방향. pressAge = 대쉬 간파 우클릭을 누른 뒤 지난 시간.
+    // dash = 대쉬 간파의 지금 대시 상태 — 누른 순간 창이 닫혀 약이면 그 대시 동안 재예측한다(할 일 139-2).
     private void PredictOwnerInterrupt(PlayerSkillBase skill, bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining,
-        float pressAge)
+        float pressAge, PlayerDashState dash = null)
     {
+        ownerRepredictSkill = null;
+        ownerRepredictDash = null;
         if (!IsNetworkActive || !IsOwner || !(skill is PlayerInterruptSkillBase interrupt) || !IsInterruptSkillInSlot(skill))
             return;
 
@@ -537,9 +567,44 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             Edit.Log($"[InterruptOwner] 입력 순간 예측 — {prediction.Forecast} · {prediction.Reason}" +
                      $"{(viaDash ? $" · 대쉬(누른 뒤 {pressAge:F3}s)" : string.Empty)} · 판정까지 {prediction.PredictedResolveTime - Time.time:F3}s · 창 남음 {prediction.WindowRemaining:F3}s", this);
             // 오너 암전에 남길 것 = 내 캐릭터 하위 전부(몸·무기·하위에 붙은 무기 이펙트) + 이번 시도 대상.
-            InterruptProductionDirector.LocalOwnerAttempt(interrupt, prediction.Forecast,
+            bool accepted = InterruptProductionDirector.LocalOwnerAttempt(interrupt, prediction.Forecast,
                 player != null ? player.gameObject : null, target != null ? target.gameObject : null, attackDirection);
+            if (accepted && viaDash && dash != null && DashInterruptPredictor.ShouldRepredictDuringDash(prediction))
+            {
+                ownerRepredictSkill = interrupt;
+                ownerRepredictDash = dash;
+                ownerRepredictDirection = attackDirection;
+                ownerRepredictSkillStart = Time.time - pressAge;
+            }
         }
+    }
+
+    /// <summary>
+    /// [오너·서버] 대쉬 간파 재예측(할 일 139-2) — 대시 상태가 매 프레임 부른다. 누른(승인) 순간 창이 닫혀 약이었으면 같은 예측기로 다시 보고
+    /// 강이 되는 순간 한 번 올린다(강 → 약 없음). 오너 = 복제 창 → 오너 연출(암전·빛 모임), 서버 = 서버 창 → 강 시도 슬로우. 각자 자기 관측, 새 RPC 없음.
+    /// </summary>
+    internal void TickDashInterruptReprediction(PlayerDashState dash)
+    {
+        if (ownerRepredictSkill != null)
+        {
+            if (ownerRepredictDash != dash || !IsOwner)
+            {
+                ownerRepredictSkill = null;
+                ownerRepredictDash = null;
+            }
+            else if (ownerRepredictSkill.TryRepredictOwnerDashAttempt(ownerRepredictDirection, dash.Speed, dash.Remaining,
+                         ownerRepredictSkillStart, out DashInterruptPrediction prediction, out Unit target))
+            {
+                Edit.Log($"[InterruptOwner] 대시 중 재예측 — 약 → 강 · {prediction.Reason} · 판정까지 {prediction.PredictedResolveTime - Time.time:F3}s · 창 남음 {prediction.WindowRemaining:F3}s", this);
+                InterruptProductionDirector.LocalOwnerUpgrade(
+                    player != null ? player.gameObject : null, target != null ? target.gameObject : null);
+                ownerRepredictSkill = null;
+                ownerRepredictDash = null;
+            }
+        }
+
+        if (IsServer && dash.AttachedSkill is PlayerInterruptSkillBase attached)
+            attached.TickServerDashReprediction(dash.Speed, dash.Remaining);
     }
 
     private bool IsInterruptSkillInSlot(PlayerSkillBase skill) =>
@@ -662,6 +727,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         Edit.Log($"[Skill] {skill.Slot} 종료 ({reason})", this);
 
         skill.OnEnd(reason);
+        ArmBasicAttackResume(skill, reason);
 
         if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
@@ -1470,6 +1536,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             activeSkill = null;
             activeEndFallbackTime = 0f;
             skill.OnEnd(reason);
+            ArmBasicAttackResume(skill, reason);
 
             // 원격 오너가 아직 대시에 싣고 있었다(할 일 115) — 0층은 대시 포즈라 상체 레이어만 내린다.
             if (DetachFromDash(skill))
@@ -1861,6 +1928,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             ? networkObject.GetComponent<Unit>()
             : null;
     }
+
+    /// <summary>[읽기 전용] 조준점 없는 시전이 지금 쓸 방향(근접 간파 요청의 시전 방향과 같은 값). 간파 보정 랩 기즈모(할 일 156)가 읽는다.</summary>
+    public Vector3 CurrentAimDirection => GetCurrentAimDirection();
 
     private Vector3 GetCurrentAimDirection()
     {

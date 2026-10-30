@@ -716,6 +716,8 @@ public abstract class PlayerStateBase : IPlayerState
         // 만료까지 남겨 다음 틱에 다시 시도하고, 나머지 거부는 그 입력을 바로 버린다 — PlayerActionAttempt:
         // 자원 부족(쿨타임·충전 없음·과열) / 차단 효과(침묵·속박·약화 — 피드백 이벤트) / 그 밖(CanUse·빈 슬롯·비접지).
         bool dashRequested = Context.Input.DashPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Dash);
+        // 기본 공격 이어가기(할 일 146) — 스킬이 끝나 돌아온 첫 Idle/Move 틱 한 번만. 다른 행동이 먼저 시작돼도 이 틱에 사라진다.
+        bool resumeBasicAttack = Context.Skills != null && Context.Skills.TakeBasicAttackResume();
 
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
         // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
@@ -785,7 +787,7 @@ public abstract class PlayerStateBase : IPlayerState
                 return false;
         }
 
-        if (TryStartAttackOnHold())
+        if (TryStartAttackOnHold(resumeBasicAttack))
         {
             Context.Input.ClearInputBufferOnActionStarted(PlayerBufferedInput.Attack);
             return true;
@@ -797,12 +799,13 @@ public abstract class PlayerStateBase : IPlayerState
     // 홀드 시작(할 일 44) — 홀드 연사 캐릭터(거너)는 누른 프레임이 아니어도 좌클릭을 누르고 있으면 시작한다.
     // 스킬이 끝났는데 계속 누르고 있으면 평타가 다시 이어진다. 누른 입력(평타·스킬·인터럽트)을 다 본 뒤 마지막에 봐서
     // 버퍼에 남은 스킬 입력을 앞지르지 않는다. 매 프레임 조건이라 거부(과열·차단 효과·요청 중)는 버퍼·피드백 없이 건너뛴다.
-    private bool TryStartAttackOnHold()
+    // 이어가기(할 일 146) — 홀드 시작이 아닌 캐릭터도 이어가기를 허락한 스킬(어쌔신 E·돌파의 방패 Q)이 막 끝난 틱 한 번은 같은 장치를 탄다.
+    private bool TryStartAttackOnHold(bool resumeAfterSkill)
     {
         IPlayerBasicAttack attack = Context.DefaultAttack;
         return attack != null &&
             PlayerBasicAttackInputRules.ShouldStartOnHold(
-                attack.StartsOnHold, Context.Input.AttackHeld, Context.StatusEffects.BlocksAttack,
+                attack.StartsOnHold || resumeAfterSkill, Context.Input.AttackHeld, Context.StatusEffects.BlocksAttack,
                 Context.Skills != null && Context.Skills.IsBusy) &&
             attack.TryStart();
     }
@@ -1568,6 +1571,8 @@ public sealed class PlayerDashState : PlayerStateBase
         // 구간 속도(할 일 92-5) — 끝나는 프레임에도 먼저 쓰고, 이어지는 Exit 가 기본값 1 로 되돌린다.
         Context.Dash?.TickDodgeSpeed();
         TickDashInterruptInput();
+        // 대쉬 간파 재예측(할 일 139-2) — 누를 때 창이 닫혀 약이었으면 창이 열리는 순간 강으로(오너 연출·서버 시도 슬로우 각자).
+        Context.Skills?.TickDashInterruptReprediction(this);
         if (Time.time < endTime)
             return;
 

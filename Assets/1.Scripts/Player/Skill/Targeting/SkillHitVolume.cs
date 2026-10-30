@@ -6,9 +6,9 @@ using UnityEngine;
 ///
 /// 모양 둘:
 /// <list type="bullet">
-/// <item><see cref="Beam"/> — 시작점에서 방향으로 뻗은 직육면체(거너 Q 관통 레이저, <see cref="GunnerBeamAttack.FirePiercing"/>).</item>
+/// <item><see cref="Box"/>·<see cref="Beam"/> — 회전 직육면체(거너 Q 관통 레이저 미리보기 = 판정 도형의 넓은 질의 상자, <c>GunnerChargeLaserSkill.FireVolume</c>).</item>
 /// <item><see cref="CircleColumn"/> — 발 높이 원기둥. 겹침은 외접 상자로 하고 콜라이더 AABB 가 원에 걸리는지 <see cref="Accepts"/> 로 거른다
-///   (어쌔신 변신 E 원형 5타, <see cref="AssassinCircleStrikeRules.OverlapsCircle"/>).</item>
+///   (어쌔신 변신 E 원형 5타 미리보기 = 판정 도형 원, <c>AssassinCircleStrikeSkill.PreviewVolume</c>, <see cref="AssassinCircleStrikeRules.OverlapsCircle"/>).</item>
 /// </list>
 /// <see cref="Mask"/> 는 그 스킬의 피격 레이어(데이터 hittableLayers) 그대로다. 미리보기는 여기에 적 마스크를 교집합한다.
 /// </summary>
@@ -46,6 +46,10 @@ public readonly struct SkillHitVolume
         var halfExtents = new Vector3(width * 0.5f, height * 0.5f, length * 0.5f);
         return new SkillHitVolume(center, halfExtents, Quaternion.LookRotation(direction), false, Vector3.zero, 0f, mask);
     }
+
+    /// <summary>회전 상자 그대로(판정 도형의 넓은 질의 상자 — <see cref="AttackShape.GetBroadBox"/>).</summary>
+    public static SkillHitVolume Box(Vector3 center, Vector3 halfExtents, Quaternion rotation, int mask) =>
+        new SkillHitVolume(center, halfExtents, rotation, false, Vector3.zero, 0f, mask);
 
     /// <summary>발 높이 <paramref name="center"/> 에서 위로 <paramref name="height"/> 인 반경 <paramref name="radius"/> 원기둥.</summary>
     public static SkillHitVolume CircleColumn(Vector3 center, float radius, float height, int mask)
