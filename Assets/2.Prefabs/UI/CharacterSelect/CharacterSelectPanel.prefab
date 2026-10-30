@@ -1655,7 +1655,7 @@ MonoBehaviour:
   coreInfoButton: {fileID: 2042100657808525878}
   infoPopup: {fileID: 4617545043773595055}
   infoPopupCloseButton: {fileID: 2566624576825864245}
-  nameplatePortrait: {fileID: 2816666081188558494}
+  nameplatePortrait: {fileID: 0}
   nameplateName: {fileID: 103775641927378669}
   lockedText: {fileID: 6705437246068123017}
   hintText: {fileID: 1955543145673999821}
@@ -2256,7 +2256,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 103, y: -109}
+  m_AnchoredPosition: {x: 108.8, y: -109}
   m_SizeDelta: {x: 160, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6179324590048437456
@@ -2280,7 +2280,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.16, g: 0.16, b: 0.16, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -3079,6 +3079,10 @@ PrefabInstance:
     - target: {fileID: 3703424971611988497, guid: 773d8a5fd9d82a443868c37cef542e47, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3895078497317525261, guid: 773d8a5fd9d82a443868c37cef542e47, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
       objectReference: {fileID: 0}
     - target: {fileID: 5103994108708253439, guid: 773d8a5fd9d82a443868c37cef542e47, type: 3}
       propertyPath: m_IsActive
