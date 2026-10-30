@@ -112,7 +112,7 @@ public static class CharacterSelectPanelAuthoring
             BackButton = LoadSprite("back_button.png");
             CardGap = LoadSprite("card_selected_gap.png");
             CardFill = LoadSprite("card_selected_fill_tint.png");
-            CardRing = LoadSprite("card_selected_ring.png");
+            CardRing = LoadSprite("card_selected.png");
             CardTop = LoadSprite("card_unselected_top.png");
             CardBottom = LoadSprite("card_unselected_bottom.png");
             Nameplate = LoadSprite("nameplate_base.png");
@@ -148,9 +148,10 @@ public static class CharacterSelectPanelAuthoring
             // 클릭 영역 — 사각형(아트 텍스처가 Read/Write 꺼짐이라 알파 판정 불가). 자리끼리 겹치지 않는다.
             AddImage(root, null, new Color(0f, 0f, 0f, 0f)).raycastTarget = true;
 
-            // 가운데 자리 강조 — 금색 테두리(카드 실루엣을 조금 크게 뒤에). 알파는 패널 이동 연출이 준다(할 일 60).
-            RectTransform ring = Child(FocusRingName, root.transform, Vector2.zero, CardSize + new Vector2(40f, 32f));
-            AddImage(ring.gameObject, sprites.CardRing, CurrentMarkerColor);
+            // 가운데 자리 강조 — card_selected(흰 띠+검은 선+회색 채움, 654×519)를 카드 뒤에 원래 크기로. 검은 선부터 안쪽은
+            // card_selected_gap 과 픽셀이 겹쳐 가려지고 바깥 흰 띠만 보인다(할 일 162). 알파는 패널 이동 연출이 준다(할 일 60).
+            RectTransform ring = Child(FocusRingName, root.transform, Vector2.zero, CardSize);
+            AddImage(ring.gameObject, sprites.CardRing, Color.white);
             ring.gameObject.SetActive(false);
 
             // 위·아래 카드 바탕(card_unselected_top/bottom, 패널이 0.84 배로 줄여 549×436 원래 크기가 된다)

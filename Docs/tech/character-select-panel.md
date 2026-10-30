@@ -10,7 +10,7 @@
 |---|---|
 | 패널 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectPanel.prefab` |
 | 카드 프리팹 | `Assets/2.Prefabs/UI/CharacterSelect/CharacterSelectCard.prefab` (패널 안 인스턴스 `Card_Template` 의 원본) |
-| **가운데 카드 모양은 어디서 고치나** | **`CharacterSelectPanel.prefab` > `Content/Cards/Card_Template`**(가운데 자리에 놓인 카드 프리팹 인스턴스, 패널 `cardTemplate`). 초상화 `Clip/Image_Portrait` 크기·회전, 금색 테두리 `Ring_Focus` 크기(RectTransform)·색·스프라이트(Image)를 여기서 고치면 런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, `sideScale` 로 줄 뿐). Play 에서 원본 자신은 꺼진다. 자리·배율·테두리 알파는 여전히 패널(`focusedSlot`·`focusScale`·연출)이 정한다 |
+| **가운데 카드 모양은 어디서 고치나** | **`CharacterSelectPanel.prefab` > `Content/Cards/Card_Template`**(가운데 자리에 놓인 카드 프리팹 인스턴스, 패널 `cardTemplate`). 초상화 `Clip/Image_Portrait` 크기·회전, 선택 테두리 `Ring_Focus` 크기(RectTransform)·색·스프라이트(Image)를 여기서 고치면 런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, `sideScale` 로 줄 뿐). Play 에서 원본 자신은 꺼진다. 자리·배율·테두리 알파는 여전히 패널(`focusedSlot`·`focusScale`·연출)이 정한다 |
 | 뷰 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanel.cs` · `CharacterSelectCard.cs` |
 | 규칙(순수) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectPanelRules.cs` — 테스트 `Editor/CharacterSelectPanelRulesTests.cs` |
 | 카드 이동 연출 규칙(순수, 할 일 60) | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectCardMotion.cs` — 같은 테스트 파일 |
@@ -19,7 +19,6 @@
 | SELECT 셰브론 삼각형 클릭 영역(할 일 109) | `Assets/1.Scripts/UI/UiTriangleRaycastFilter.cs` — 테스트 `Assets/1.Scripts/UI/Editor/UiTriangleRaycastFilterTests.cs` |
 | 문구 키 | `Assets/1.Scripts/UI/CharacterSelect/CharacterSelectUiStrings.cs` (`UiStrings.All` 에 포함) |
 | 저작·미리보기 | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectPanelAuthoring.cs` |
-| 가운데 금색 테두리 0.7배 굽기(할 일 162) | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectFocusRingBaker.cs` → `Assets/2.Prefabs/UI/Textures/CharacterSelectFocusRing.png` |
 | UI 수정 테스트(할 일 162, 실제 프리팹) | `Assets/1.Scripts/UI/CharacterSelect/Editor/CharacterSelectUiPolishTests.cs` |
 
 ## 붙이는 법
@@ -60,12 +59,13 @@
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
   카드가 2장이면 다른 카드는 아래, 4장 이상이면 포커스 ±1 만 보인다. 위·아래 카드는 목업처럼 화면 밖으로 일부 잘린다.
 - 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = "현재" 알약 표식만**(포커스 표시인 초록·크기와 따로 보인다).
-  **금색 테두리(카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
-  - **두께 0.7배(할 일 162)**: 스프라이트 = 구운 PNG `Assets/2.Prefabs/UI/Textures/CharacterSelectFocusRing.png`(git, 694×551 = `Ring_Focus` rect 1:1, PPU 100). SVN 원본 `card_selected_ring.png` 는 그대로.
-    원본은 테두리가 아니라 채워진 카드 실루엣이고, 카드 뒤에 크게(694×551) 깔려 카드 검은 테두리(`card_selected_gap` 636×501) 밖 띠만 보인다(옆 ≈23px·위아래 ≈25px).
-    굽기 = 원본 링 그림을 가운데 기준 가로 ≈0.967·세로 ≈0.972 배로 줄여 그대로 다시 그린 것 — 가운데 가로·세로줄의 보이는 띠가 0.7배(23 → 16px)가 되는 배율, 모양·모서리·안티에일리어싱은 원본.
-    rect 크기·위치·색(1, 0.8, 0.25)은 그대로. 메뉴 `Tools/UI/Authoring/Character Select Focus Ring (0.7배 굽기·연결)`(`CharacterSelectFocusRingBaker`, 배율 상수 `ThicknessScale`) —
-    카드 프리팹 `Ring_Focus` 에 연결하고 패널 `Card_Template` 이 덮어쓰고 있으면 같이 맞춘다. 원본 파일 바이트를 직접 읽는다(.meta 무수정). 같은 입력 → 같은 픽셀(EditMode 테스트가 다시 구워 대조).
+  **선택 테두리(카드의 `focusRing`/`Ring_Focus`) = 가운데 자리 강조**(할 일 60, 사용자 결정 (a)) — 지금 캐릭터와 상관없다.
+  - **흰 테두리 = `card_selected.png`(할 일 162 후속 — 노란 링 `card_selected_ring` 과 구운 0.7배 링 폐기)**: SVN `Assets/50.Art/UI/char_select/card_selected.png`(654×519, 9-slice 없음)를
+    `Ring_Focus` 에 **원래 크기 654×519(= 카드 rect)·가운데·색 흰색(곱하지 않음)·Simple** 로, **카드 맨 뒤**(Side·Focused·Clip·이름·표식보다 먼저) 깐다.
+    그림 = 바깥 흰 띠(옆 ≈11px·위아래 ≈9px, 실제 불투명 흰 픽셀) + 검은 선 ≈7px + 회색(191) 채움. 검은 선부터 안쪽은 `card_selected_gap`(636×501, 가운데 정렬 = 9px 안쪽)과
+    픽셀이 정확히 겹쳐 가려지고 **gap 밖으로 흰 띠만 보인다** → 참고 시안의 "흰 테두리 + 검은 선" 모양, 채움은 지금처럼 캐릭터 초록(`fill_tint`, 잠금 시 바램)이 그대로 보인다.
+    카드 위에 덮는 안(회색 채움이 초록을 덮음)은 캐릭터 색·잠금 바램이 사라져 고르지 않았다(비교 캡처 `_lane-artifacts/MainProject-Worktree4/162-charselect-ui/option_*`).
+    알파 페이드(`SetRingAlpha`)·가운데에서만 보임·잠금 규칙은 그대로. 저작 메뉴(`CharacterSelectPanelAuthoring`)도 같은 값으로 만든다.
   잠금 중에는 포커스 카드 초록이 바래고, 왼쪽 아래에 "준비를 해제해야 바꿀 수 있습니다".
 
 ### 카드 이동·확대 연출(할 일 60)
@@ -74,7 +74,7 @@
 | 필드 | 기본 | 뜻 |
 |---|---|---|
 | `moveSeconds` | 0.18 | 포커스가 바뀌면 카드가 지금 자리에서 새 자리(`focusedSlot`/`previousSlot`/`nextSlot`·`sideScale`)로 미끄러짐, EaseOutCubic |
-| `ringFadeSeconds` | 0.1 | 금색 테두리 — 이동 시작에 꺼지고(지금 알파에서 선형), 이동이 끝나면 새 가운데 카드에서 켜짐 |
+| `ringFadeSeconds` | 0.1 | 선택 테두리 — 이동 시작에 꺼지고(지금 알파에서 선형), 이동이 끝나면 새 가운데 카드에서 켜짐 |
 | `focusScaleSeconds` | 0.12 | 이동이 끝난 뒤 가운데 카드 확대, EaseOutCubic |
 | `focusScale` | 1.08 | 다 선 가운데 카드 배율. 가운데에서 벗어나는 카드는 이동하면서 옆 크기(`sideScale`)로 돌아간다 |
 
@@ -165,7 +165,7 @@
 - 반대 방향을 새로 누르면 **즉시 그쪽 1칸 + 대기·가속부터 다시**. 둘 다 누르고 있으면 **나중에 누른 쪽**이 이긴다. 같은 프레임에 둘 다 누르면 뒤로(기존 키 검사 순서).
 - 이기던 키를 떼고 반대쪽이 아직 눌려 있으면 그 방향으로 **대기·가속부터 다시(즉시 1칸 없음)**. 둘 다 떼면 멈춘다. 떼고 다시 누를 때도 가속은 처음부터.
 - **한 프레임 최대 1칸** — 프레임이 길어 간격이 여러 번 지나도 1칸만 가고 밀린 칸은 버린다(다음 칸 = 그 프레임 + 그 시점 간격).
-- 반복 칸마다 카드 이동은 지금처럼 재목표 — 처음 몇 칸(0.25·0.2초 간격)은 이동 0.18초보다 길어 칸 사이에 잠깐 멈춰 보일 수 있고, 간격이 0.18초 아래로 줄면 카드는 계속 미끄러진다. 누르고 있는 동안 금색 테두리는 꺼진 채, 떼고 마지막 이동이 끝나면 켜진다.
+- 반복 칸마다 카드 이동은 지금처럼 재목표 — 처음 몇 칸(0.25·0.2초 간격)은 이동 0.18초보다 길어 칸 사이에 잠깐 멈춰 보일 수 있고, 간격이 0.18초 아래로 줄면 카드는 계속 미끄러진다. 누르고 있는 동안 선택 테두리는 꺼진 채, 떼고 마지막 이동이 끝나면 켜진다.
 - `Show`·닫힘(`Hide`·ESC·확정·뒤로가기)·`LobbyResultPanel.IsEscapeClaimed` 인 프레임에는 반복 상태를 비운다. **그때 눌려 있던 이동 키는 뗐다가 새로 누를 때까지 무시**(열자마자 미끄러지지 않게).
 - 잠금 중에도 반복된다(확정만 막힘). Enter·Space·ESC 가 눌린 프레임에는 이동 키를 보지 않는다 — 같은 프레임에 누른 이동 키는 다음 프레임에 1칸으로 들어간다.
 
@@ -199,7 +199,7 @@
 - `Tools/UI/Preview/Character Select Panel 길게 누르기 캡처` — 같은 폴더에 앞으로 키를 시각 0 부터 누른 것으로 치고 60fps 로 `CharacterSelectKeyRepeat` 를 돌려
   `CharacterSelect_hold_0_0.35s.png` · `_1_0.45s.png` · `_2_0.55s.png`(반복 칸 재목표 직후 미끄러짐)를 저장. 콘솔에 대기·간격·램프 값과 1.5초까지의 칸 이동 시각(가속 확인용).
 - 테스트: `Tools/Tests/캐릭터 선택 패널 EditMode 테스트 실행`(`CharacterSelectPanelRulesTests` + 셰브론 버튼 `CharacterSelectConfirmButtonTests` — 실제 프리팹을 프리뷰 씬에 올려 클릭 + 삼각형 판정 `UiTriangleRaycastFilterTests` + 가운데 카드 원본 `CharacterSelectCardTemplateTests` — `Card_Template` 의 초상화 크기·회전·테두리 크기·색·스프라이트가 런타임 카드에 들어가고 원본은 꺼지는지
-  + UI 수정 `CharacterSelectUiPolishTests`(할 일 162) — 이름판 끔·셰브론 hover 알파·링 7px·금색 테두리 0.7배 PNG 재굽기 대조·기본/코어 버튼·팝업 연결·X 로 팝업만 닫힘·팝업 뒤 확정·이동 막힘; ESC 우선순위는 `CharacterSelectPanelRulesTests`).
+  + UI 수정 `CharacterSelectUiPolishTests`(할 일 162) — 이름판 끔·셰브론 hover 알파·링 7px·선택 테두리 card_selected(원래 크기·흰색·카드 뒤, gap 밖으로 흰 띠만 보이는지 픽셀 대조)·기본/코어 버튼·팝업 연결·X 로 팝업만 닫힘·팝업 뒤 확정·이동 막힘; ESC 우선순위는 `CharacterSelectPanelRulesTests`).
 
 ## ⏳ 사람 Play 확인 (C12 연결 뒤)
 - 열린 동안 이동·공격·F 가 막히고 닫으면 풀리는가. 뒤 화면 클릭이 안 먹는가.
@@ -219,5 +219,5 @@
   둘 다 누르면 "미구현" 팝업이 뜨고, X 클릭·ESC 로 팝업만 닫히는가(ESC 한 번에 패널까지 닫히지 않는가, 두 번째 ESC 에 패널이 닫히는가).
   팝업이 열린 동안 Enter/Space·W/S·휠·카드 클릭·SELECT 셰브론 클릭이 먹지 않는가, 뒤로가기 버튼이 눌리지 않는가. 이동 키를 누른 채 팝업을 닫으면 미끄러지지 않는가.
   팝업이 열린 동안 로비 일시정지 메뉴(ESC)가 같이 열리지 않는가. 잠금(준비) 중에도 팝업이 열리는가.
-- (할 일 162) 왼쪽 아래 이름판(원형 초상화+이름)이 보이지 않는가. 가운데 카드 금색 테두리가 전보다 얇고(약 0.7배) 모서리 모양이 그대로인가, 이동·확대 연출 중 어긋나지 않는가.
+- (할 일 162) 왼쪽 아래 이름판(원형 초상화+이름)이 보이지 않는가. 가운데 카드 테두리가 노란 링 대신 흰 띠(`card_selected`)로 보이고 초록 채움·초상화·이름은 그대로인가, 이동 중 페이드·확대 연출 중 흰 띠가 카드와 어긋나지 않는가(잠금 중 초록이 바래도 흰 띠는 그대로).
   SELECT 셰브론에 마우스를 올리면 흰 링(전보다 얇은 7px)이 켜지고 셰브론 본체만 살짝(알파 0.8) 옅어지며 흰 링·SELECT 글자는 옅어지지 않는가. 잠금 중엔 흰 링이 안 켜지는가.

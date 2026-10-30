@@ -25,7 +25,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("카드 원본 — cardTemplate 이 비었을 때만 쓴다.")]
     [SerializeField] private CharacterSelectCard cardPrefab;
     [Tooltip("가운데 카드 모양 원본(Content/Cards/Card_Template — 카드 프리팹 인스턴스, 가운데 자리에 놓여 있다). " +
-             "초상화(Clip/Image_Portrait) 크기·회전, 금색 테두리(Ring_Focus) 크기·색·스프라이트를 여기서 고치면 " +
+             "초상화(Clip/Image_Portrait) 크기·회전, 선택 테두리(Ring_Focus) 크기·색·스프라이트를 여기서 고치면 " +
              "런타임 카드가 이걸 로스터 수만큼 복제한다(옆 카드도 같은 원본, 배율만 작다). 자신은 열 때 꺼진다. 비면 cardPrefab.")]
     [SerializeField] private CharacterSelectCard cardTemplate;
     [Tooltip("카드 부모(화면 가운데 기준). 카드는 런타임에 로스터 수만큼 복제한다 — cardTemplate 말고 디자인용 카드를 두지 말 것.")]
