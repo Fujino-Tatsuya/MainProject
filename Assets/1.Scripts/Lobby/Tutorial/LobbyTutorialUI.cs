@@ -7,6 +7,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>CombatHUD·TutorialGuideUI 와 별도 Overlay 캔버스(sortingOrder 50). GraphicRaycaster 없음 — 클릭을 막지 않는다.</item>
 /// <item>대사 중 + 대사 끝 뒤 유예(<see cref="dialogueGraceSeconds"/>) 동안 목표 패널을 숨긴다(<see cref="LobbyDialogueObjectiveGate"/>).</item>
+/// <item>바닥 경로·벽 표식은 월드 쪽 컴포넌트로 넘긴다 — 157 바인더가 부를 입력 API 를 이 파사드 한 곳에 모으려는 것.</item>
 /// </list>
 /// 상세: Docs/tech/lobby-tutorial-ui.md
 /// </summary>
@@ -100,13 +101,27 @@ public sealed class LobbyTutorialUI : MonoBehaviour
             dialoguePanel.Hide();
     }
 
-    /// <summary>씬 종료·회차 초기화 — 유예 없이 전부 끈다.</summary>
+    /// <summary>
+    /// 지금 단계의 바닥 경로 하나만 켠다(<see cref="LobbyTutorialPathSet"/> — 월드 쪽). null·빈 값 = 전부 끔.
+    /// 입력 API 를 이 파사드 한 곳에 모으려고 넘겨 준다.
+    /// </summary>
+    public void SetPath(string pathId)
+    {
+        LobbyTutorialPathSet set = LobbyTutorialPathSet.Active;
+        if (set != null)
+            set.SetPath(pathId);
+        else if (!string.IsNullOrEmpty(pathId))
+            Debug.LogWarning($"{Tag} 경로 '{pathId}' 를 켜려 했지만 씬에 켜진 LobbyTutorialPathSet 이 없다.", this);
+    }
+
+    /// <summary>씬 종료·회차 초기화 — 목표·대사·경로를 유예 없이 전부 끈다.</summary>
     public void ClearAll()
     {
         HideObjective();
         Gate.Reset();
         if (dialoguePanel != null)
             dialoguePanel.Hide(immediate: true);
+        SetPath(null);
     }
 
     private void HandleLanguageChanged()
