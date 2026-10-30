@@ -21,6 +21,12 @@ public static class NearestInteractable
         public Vector3 Position { get; }
         public float Radius { get; }
         public bool Usable { get; }
+
+        /// <summary>
+        /// 영역형 후보(할 일 161) — 반경 대신 안/밖을 이미 판정해 넘긴다. 안이면 반경 무한(거리 비교만), 밖이면 반경 음수(<see cref="Pick"/> 가 건너뜀).
+        /// </summary>
+        public static Candidate InArea(Vector3 position, bool inside, bool usable)
+            => new Candidate(position, inside ? float.PositiveInfinity : -1f, usable);
     }
 
     /// <summary>
@@ -41,7 +47,7 @@ public static class NearestInteractable
                 continue;
 
             var sqr = PlanarSqrDistance(playerPosition, candidate.Position);
-            if (sqr > candidate.Radius * candidate.Radius || sqr >= bestSqr)
+            if ((!float.IsPositiveInfinity(candidate.Radius) && sqr > candidate.Radius * candidate.Radius) || sqr >= bestSqr)
                 continue;
 
             best = i;

@@ -230,11 +230,10 @@ public sealed class LobbyCombatStuckTracker
     }
 }
 
-/// <summary>TRAIN_02 단계 범위 — 몬스터가 있어야 하는가(Train02 진행 중에만).</summary>
+/// <summary>TRAIN_02 단계 범위 — 몬스터가 있어야 하는가(T22 전투 훈련, Activity Combat 동안만).</summary>
 public static class LobbyCombatRules
 {
-    public static bool MonstersActive(LobbyTrainingStage stage, LobbyTrainingPhase phase) =>
-        stage == LobbyTrainingStage.Train02 && phase == LobbyTrainingPhase.InProgress;
+    public static bool MonstersActive(LobbyTutorialActivity activity) => activity == LobbyTutorialActivity.Combat;
 
     /// <summary>
     /// 구성 지점 오프셋 → 로비 후보 위치. 회전·스케일 없이 기준점 + (지점 위치 − 구성 원점) 그대로 — 존2 배치 모양을 바꾸지 않는다.
