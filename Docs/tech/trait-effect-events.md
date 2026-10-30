@@ -69,7 +69,7 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 | | | Hit | 밀치기가 실린 대상마다(반격 피해와 함께·밀치기만 둘 다) | 공용 RPC | Pos = 콜라이더 중심, Dir = 밀리는 방향, Target |
 | 광폭 레이저 `GUN_1_WIDTH` | `GunnerWideLaser` | Activated | Q 한 발 발사(집속 연사면 발마다) | 전 피어 경로(`GunnerBeamView.ChargeLaserFiredRpc`) | Pos = 발사 원점(총구 높이), End = 빔 끝, Shape = 그 발의 판정 도형(길이 = 이번 발, 폭 = 특성 폭) |
 | | | Hit | 그 발이 피해를 준 몬스터마다(최대 8) | 전 피어 경로(같은 RPC) | Pos = 빔 위 적중 지점. **Target 없음**(기존 RPC 가 지점만 싣는다) |
-| 잔류 포격 `GUN_4_ECHO_Q` | `GunnerEchoBomb` | Attached | 폭탄이 대상에 붙음(Q 정상 종료 뒤, 맞은 대상마다) | 전 피어 경로(`GunnerBeamView` NetworkList Add) | Pos = 대상 몸 중심, Target, Variant = 폭탄 번호 |
+| 잔류 포격 `GUN_4_ECHO_Q` | `GunnerEchoBomb` | Attached | 폭탄이 대상에 붙음(Q 정상 종료 뒤, 맞은 대상마다) | 전 피어 경로(`GunnerBeamView` NetworkList Add) | Pos = 대상 몸 콜라이더 윗면 가운데(`GunnerEchoBombTargets.BodyPoint`), Target, Variant = 폭탄 번호 |
 | | | Exploded | 폭탄이 터짐(피해) 또는 대상이 먼저 사라진 **빈 폭발** | 전 피어 경로(NetworkList RemoveAt) | Pos = 구체 마지막 자리, Target(빈 폭발이면 null 또는 죽은 유닛), Variant = 폭탄 번호 |
 | 이중 출력 `GUN_4_EXTRA_BASIC` | `GunnerDualOutput` | Activated | 추가 레이저 1발 판정 순간 | 공용 RPC | Pos = 발사 원점, Dir, End = 원래 평타 ShotRpc 와 같은 끝점(명중점·지형·최대 사거리). **Shape 없음**(굵은 직선 — 도형 아님) |
 | | | Hit | 추가 레이저가 맞혔을 때 1번 | 공용 RPC | Pos = 끝점. **Target 없음**. 관통 탄도와 함께면 끝점은 벽/최대 사거리(맞은 지점 아님) |
@@ -89,7 +89,7 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 
 ## 4. 잔류 포격 임시 구체 교체
 
-붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다 — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombPrefab`(지금 임시 `2.Prefabs/Player/Gunner/GunnerEchoBomb_Temp.prefab`). 이펙트 교체는 이 칸만 바꾸면 된다(폭탄마다 하나 복제, 대상 몸 중심을 매 프레임 따라감). 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다. 상세 [tutorial-traits.md §7.1](tutorial-traits.md#71-거너-잔류-포격--몸에-붙는-에너지-폭탄-할-일-149).
+붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다 — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombPrefab`(지금 임시 `2.Prefabs/Player/Gunner/GunnerEchoBomb_Temp.prefab`). 이펙트 교체는 이 칸만 바꾸면 된다(폭탄마다 하나 복제, 대상 몸 콜라이더 윗면 가운데를 매 프레임 따라감 — 몸 중심이면 몸 메시 안에 묻혀 안 보인다). 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다. 상세 [tutorial-traits.md §7.1](tutorial-traits.md#71-거너-잔류-포격--몸에-붙는-에너지-폭탄-할-일-149).
 
 ## 5. 동작 규칙 · 알려진 한계
 

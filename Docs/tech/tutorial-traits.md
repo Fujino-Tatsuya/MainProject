@@ -175,7 +175,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - **터지기**: 파생 명세 `Delay`(xlsx `Traits_Gunner`, 지금 0.15초) 뒤 **붙은 그 대상 하나에게만** 서버 피해(`GunnerBeamAttack.HitUnit` — 도형 질의 없음). 피해 = 폭탄마다 원래 발 예정 단일 대상 합계 × `DamageRatio`(나누지 않는다), `TraitHitFlags.Derived`·집중 포화만(밀치기·보호막·자원·적중 사건 없음).
 - **대상이 먼저 죽거나 디스폰**되면 시각과 무관하게 바로 그 자리 빈 폭발(표시만, 피해 없음). **사수 사망·씬 종료**면 터뜨리지 않고 취소(구체도 사라짐).
 - **동기화**: 서버 = `GunnerEchoBombs`(순수 규칙, 피해·시각). 복제 = `GunnerBeamView` 의 `NetworkList<GunnerEchoBombState>`(폭탄 번호·대상 NetworkObjectId) — 새 RPC 없음, 늦게 합류한 클라도 붙은 구체가 보인다. 목록 RemoveAt = 폭발 연출, Clear = 조용히 지움.
-- **겉모습**: `GunnerBeamView.echoBombPrefab`(Player_Gunner Variant) 한 칸 — 임시 `2.Prefabs/Player/Gunner/GunnerEchoBomb_Temp.prefab`(기본 Sphere + `Emissive.mat`). 구체는 대상 몸 중심(`BossPatternTargets.BodyCenter`)을 매 프레임 따라간다(이동·넉백). 폭발 연출 = Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용. 이펙트 교체는 프리팹 칸만 바꾼다.
+- **겉모습**: `GunnerBeamView.echoBombPrefab`(Player_Gunner Variant) 한 칸 — 임시 `2.Prefabs/Player/Gunner/GunnerEchoBomb_Temp.prefab`(기본 Sphere + `Emissive.mat`). 구체는 대상 몸 콜라이더 윗면 가운데(`GunnerEchoBombTargets.BodyPoint` — 몸 중심이면 몸 메시 안에 묻혀 안 보였다)를 매 프레임 따라간다(이동·넉백). Attached·Exploded 사건 위치와 DebugTraitLab 표식도 같은 점. 폭발 연출 = Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용. 이펙트 교체는 프리팹 칸만 바꾼다.
 - 특성 랩 기즈모 = 붙어 있는 폭탄마다 대상 몸통에 표식 구(호스트 창, '대상 1체·도형 아님'). 테스트 `GunnerTraitTier34Tests`(폭탄 수명·단일 대상·대상 사망).
 - 🟨 카드 문구(Strings `Trait.GUN_4_ECHO_Q.*`, xlsx)는 아직 "같은 방향으로 레이저를 한 번 더" — 기획이 xlsx 에서 고친다.
 

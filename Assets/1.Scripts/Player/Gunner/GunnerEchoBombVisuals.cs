@@ -48,8 +48,19 @@ public static class GunnerEchoBombTargets
         return unit != null && unit.IsSpawned && unit.CurrentHealth > 0;
     }
 
-    /// <summary>구체가 붙는 몸통 점 — 기존 몸 중심 기준(<see cref="BossPatternTargets.BodyCenter"/>: 캡슐 콜라이더 중심, 없으면 발 + 1m).</summary>
-    public static Vector3 BodyPoint(Unit unit) => BossPatternTargets.BodyCenter(unit.transform);
+    /// <summary>
+    /// 구체가 붙는 점 — 몸 콜라이더(캡슐 우선) bounds 의 윗면 가운데, 없으면 발 + 1m.
+    /// 몸 중심(<see cref="BossPatternTargets.BodyCenter"/>)에 두면 작은 구체가 불투명한 몸 메시 안에 묻혀 안 보인다 — 탑다운 카메라에서 보이는 머리 위 표면에 붙인다.
+    /// </summary>
+    public static Vector3 BodyPoint(Unit unit)
+    {
+        Collider body = unit.GetComponent<CapsuleCollider>();
+        if (body == null) body = unit.GetComponentInChildren<Collider>();
+        if (body == null) return unit.transform.position + Vector3.up;
+
+        Bounds bounds = body.bounds;
+        return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+    }
 }
 
 /// <summary>
