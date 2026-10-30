@@ -36,11 +36,11 @@ MonoBehaviour:
   <Ultimate_SwordStick>k__BackingField: {fileID: 11400000, guid: 5fd657a97e78a6149b7b97ee99dafbbb, type: 2}
   <Ultimate_TargetFloor>k__BackingField: {fileID: 11400000, guid: e1de5968507b07640a38c8d75341dc58, type: 2}
   <Ultimate_Strike>k__BackingField: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
+  <Assassin_R_BladeVortex>k__BackingField: {fileID: 11400000, guid: 431b57f705084510a2c34ee8a4c2c887, type: 2}
+  <Assassin_E_MultiSlashes>k__BackingField: {fileID: 11400000, guid: 2f4f9adcbad34c538e23cd1b03faf201, type: 2}
   <Assassin_Q_PierceLine>k__BackingField: {fileID: 11400000, guid: 236457abd41f407b9451008b80b26592, type: 2}
   <Assassin_Q_PierceBurst>k__BackingField: {fileID: 11400000, guid: 366e55861d2f4129b6309dcaa5517677, type: 2}
   <Assassin_Q_StormSlash>k__BackingField: {fileID: 11400000, guid: 1091d72097064b11812b86a97e520d97, type: 2}
-  <Assassin_E_MultiSlashes>k__BackingField: {fileID: 11400000, guid: 2f4f9adcbad34c538e23cd1b03faf201, type: 2}
-  <Assassin_R_BladeVortex>k__BackingField: {fileID: 11400000, guid: 431b57f705084510a2c34ee8a4c2c887, type: 2}
   <Assassin_LClick_Slash>k__BackingField: {fileID: 11400000, guid: 53fefa5a6dca4c40bfe6ef5215a839cc, type: 2}
   <Assassin_LClick_Success>k__BackingField: {fileID: 11400000, guid: 2e7e68d5d7104a2db7930ed1a59fbda6, type: 2}
   <Assassin_LClick_Transformed>k__BackingField: {fileID: 11400000, guid: 75b7e091f7db4d638ea9e732dfbbd6bb, type: 2}
@@ -85,3 +85,9 @@ MonoBehaviour:
   <Rage_Shield>k__BackingField: {fileID: 11400000, guid: c201e9a39f93a3c46a80851faf12f0c6, type: 2}
   <Explosion_Basic>k__BackingField: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}
   <Frag_Box_01>k__BackingField: {fileID: 11400000, guid: 2fbc4bb6d3c3c6a4b9cbc4cc7c73a276, type: 2}
+  <Frag_CardboardBox_Stack_01>k__BackingField: {fileID: 11400000, guid: a8c47a472fc2afa438432342ac4b6c50, type: 2}
+  <Frag_CardboardBox_Stack_02>k__BackingField: {fileID: 11400000, guid: 6d2f608c476cbe2468ff3a6e5dc240af, type: 2}
+  <Frag_CardboardBox_Stack_03>k__BackingField: {fileID: 11400000, guid: f270988aba57bda4ba8244a29064941a, type: 2}
+  <Frag_Pallet_01>k__BackingField: {fileID: 11400000, guid: 6562e38d2f9a2254aac6b33c891b2d2f, type: 2}
+  <Frag_PalletStack_01>k__BackingField: {fileID: 11400000, guid: 2aa1067b96a167647805faf80bfb940c, type: 2}
+  <Frag_PalletStack_02>k__BackingField: {fileID: 11400000, guid: 32d8fc202b14f154b991e94cf77c3fab, type: 2}
