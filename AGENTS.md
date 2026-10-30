@@ -52,6 +52,7 @@
 - **특성 선택(36개 구조, 할 일 125)**: [Docs/tech/tutorial-traits.md](Docs/tech/tutorial-traits.md) — ID 해시·캐릭터×차수 고정 후보·목록 버전 · 수치 출처 `PlayerTraitModifiers`(`HasTrait` = 모드 변경 스위치) · 효과 10종·장부·CastId · 밀치기 `AttackInfo` 경로 한 곳·뇌진탕 ·
   카드(이름/분류/설명 `{필드}`·`{dmg}`·도움말·2차 상충 확인창) · Strings `Trait.<ID>.*` · 시트 `Traits_Paladin/Gunner/Assassin`(없으면 무시). 캐릭터 레인(126~128)은 `Traits/<캐릭터>/` 파일만 고친다(§11.6).
 - **튜토리얼 QA**: [Docs/tech/tutorial-qa.md](Docs/tech/tutorial-qa.md) — 솔로·MPPM·회귀 Play 체크리스트·알려진 한계·병합 전 확인. 단계별 문서 목록은 [tutorial-director.md](Docs/tech/tutorial-director.md) §10.1.
+- **로비 튜토리얼(157)**: [Docs/tech/lobby-training.md](Docs/tech/lobby-training.md)(흐름 L00~L41·서버 상태·Play 확인) + [handoff-lobby-tutorial-contract.md](Docs/tech/handoff-lobby-tutorial-contract.md)(158 표시 계약) — 단계표 SO `LobbyTutorialSteps.asset` = 진행 원본, 판정은 서버·표시는 전 피어(스냅샷 1개), 캐릭터 잠금 없음, 매 회차 L00 부터.
 - **로비 데모 부스 운영**: [Docs/tech/lobby-demo-flow.md](Docs/tech/lobby-demo-flow.md) — 흐름·모든 PC 공용 `demo-connection.json`(role auto — 이 PC IP = hostAddress 면 호스트, host/client 명시 우선)·같은 빌드 필수·대기 화면 문구·재접속·MPPM `Client` 태그·알려진 한계.
 - **피해 숫자(플로팅 데미지)**: [Docs/tech/floating-damage-design.md](Docs/tech/floating-damage-design.md) — Overlay·이미지 숫자·몸 중심 앵커, 단발/누적·구간·필터·보호막 숫자, 줌과 무관(154 — 넣었다가 뺐음), 대상별 위치 = 프리팹 루트 `FloatingDamageAnchor`.
 - **디버그 단축키**: [Docs/tech/debug-hotkeys.md](Docs/tech/debug-hotkeys.md) — 키 목록·겹침, 릴리스 빌드 포함 심볼 `DEV_HOTKEYS`(Standalone). 정식 릴리스 때 심볼만 지운다.
