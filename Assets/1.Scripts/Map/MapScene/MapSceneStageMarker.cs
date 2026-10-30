@@ -18,7 +18,11 @@ public sealed class MapSceneStageMarker : MonoBehaviour
     [Tooltip("튜토리얼 배리어(S3) 머티리얼 — 반투명 기존 머티리얼 재사용(색은 코드가 PropertyBlock 으로 입힌다).")]
     [SerializeField] private Material barrierMaterial;
 
+    [Tooltip("튜토리얼 배리어 시각 = 레이저 게이트 프리팹(할 일 160). 비우면 위 머티리얼의 반투명 큐브로 보인다.")]
+    [SerializeField] private MapGateLaserView gateLaserPrefab;
+
     public Material BarrierMaterial => barrierMaterial;
+    public MapGateLaserView GateLaserPrefab => gateLaserPrefab;
 
     /// <summary>지금 켜진 스테이지가 튜토리얼인가. 씬 로드 직후(OnEnable 뒤)부터 유효 — 맵 생성 이벤트 시점엔 확정돼 있다.</summary>
     public static bool IsActive => s_active != null;
@@ -51,7 +55,11 @@ public sealed class MapSceneStageMarker : MonoBehaviour
     {
         if (!Application.isPlaying) return;
         if (GetComponent<MapSceneBarriers>() == null)
-            gameObject.AddComponent<MapSceneBarriers>().SetMaterial(barrierMaterial);
+        {
+            var barriers = gameObject.AddComponent<MapSceneBarriers>();
+            barriers.SetMaterial(barrierMaterial);
+            barriers.SetLaserPrefab(gateLaserPrefab);
+        }
         if (GetComponent<MapSceneElevatorDoor>() == null)
             gameObject.AddComponent<MapSceneElevatorDoor>();
     }

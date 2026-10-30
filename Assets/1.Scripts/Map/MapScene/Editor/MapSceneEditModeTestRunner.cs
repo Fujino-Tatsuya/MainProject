@@ -15,6 +15,7 @@ internal static class MapSceneEditModeTestRunner
         "^MapSceneAreaTrackerTests$",
         "^MapSceneBarrierRulesTests$",
         "^MapSceneBarrierMonsterBlockTests$", // 할 일 148 — 열린 배리어도 몬스터 카브는 남는다(복도 늘 몬스터 출입 금지)
+        "^MapGateLaserViewTests$", // 할 일 160 — 게이트 레이저 시각: 빔 길이 = 폭·줄 수·열림 = 빔·콜라이더 즉시 끔, 발사대·카브 남음
         "^MapSceneBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^MapSceneMonsterLedgerTests$",
         "^MapSceneBossPathRulesTests$",
