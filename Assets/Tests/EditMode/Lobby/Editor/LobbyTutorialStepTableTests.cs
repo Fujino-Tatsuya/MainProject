@@ -101,6 +101,19 @@ public sealed class LobbyTutorialStepTableTests
     }
 
     [Test]
+    public void T10_체크_문구_키는_PLAN_6_LOBBY_CHECK_를_항목_값_순서로()
+    {
+        var table = LoadAsset();
+        var t10 = table[table.IndexOf("T10_Basic")];
+
+        Assert.That(t10.checklistKeys, Is.EqualTo(new[]
+        {
+            "LOBBY_CHECK_BASIC_ATTACK", "LOBBY_CHECK_Q", "LOBBY_CHECK_E", "LOBBY_CHECK_R", "LOBBY_CHECK_RMB", "LOBBY_CHECK_DASH",
+        }));
+        Assert.That(t10.progressKey, Is.EqualTo("LOBBY_PROGRESS_PARTY_DONE"), "하단 '훈련 완료 n/N'");
+    }
+
+    [Test]
     public void 태그_검사는_기본_꺼짐이고_T32_T34_에_태그가_있다()
     {
         var table = LoadAsset();

@@ -123,6 +123,80 @@ public sealed class LobbyWeaponCheckTests
         Assert.That(model.Roster.Count, Is.EqualTo(1));
     }
 
+    // ─── 할 일 157 ⑤ — 명세 §5 T10 고정 ───────────────────────────────────
+
+    [Test]
+    public void T10_순서_자유()
+    {
+        var model = Started(1);
+        var reversed = (LobbyWeaponCheckItem[])LobbyWeaponCheckRules.DisplayOrder.Clone();
+        System.Array.Reverse(reversed);
+        foreach (var item in reversed)
+            model.Report(1, item);
+
+        Assert.That(LobbyWeaponCheckRules.IsComplete(model.MaskOf(1)), Is.True);
+    }
+
+    [Test]
+    public void T10_완료자는_연습을_계속해도_기록_그대로_다음_단계는_전원_완료_때만()
+    {
+        var model = Started(1, 2);
+        CompleteAll(model, 1);
+
+        foreach (var item in LobbyWeaponCheckRules.DisplayOrder)
+            Assert.That(model.Report(1, item), Is.False, "완료 뒤 행동은 새 체크 없음(막지도 않음)");
+        Assert.That(model.IsRunning, Is.True, "완료자 연습 중에도 진행 중");
+        Assert.That(model.MaskOf(1), Is.EqualTo(LobbyWeaponCheckRules.FullMask));
+        Assert.That(model.CompletedCount, Is.EqualTo(1), "하단 '훈련 완료 n/N' 의 n");
+        Assert.That(model.TryConsumeAllComplete(), Is.False, "전원 완료 전 다음 단계 안 열림");
+    }
+
+    [Test]
+    public void T10_캐릭터_교체_뒤에도_체크_마스크_유지()
+    {
+        // PLAN §10.2-4: 교체 = 같은 clientId 의 PlayerObject 디스폰·재스폰 — 장부는 clientId 키라 교체 경로는 모델을 부르지 않는다(연결 종료·클리어 플래그만 RemoveClient).
+        var model = Started(1);
+        model.Report(1, LobbyWeaponCheckItem.BasicAttack);
+        model.Report(1, LobbyWeaponCheckItem.SkillQ);
+
+        // (교체) 새 캐릭터의 행동도 같은 clientId 로 온다
+        Assert.That(model.Report(1, LobbyWeaponCheckItem.SkillQ), Is.False, "이미 끝낸 항목은 다시 할 필요 없음");
+        Assert.That(model.Report(1, LobbyWeaponCheckItem.SkillE), Is.True);
+        Assert.That(LobbyWeaponCheckRules.CountOf(model.MaskOf(1)), Is.EqualTo(3));
+        Assert.That(model.IsInRoster(1), Is.True);
+    }
+
+    [TestCase(PlayerSkillSlot.Main)]
+    [TestCase(PlayerSkillSlot.Sub)]
+    public void T10_변신_Q_E_는_키별_한_항목(PlayerSkillSlot slot)
+    {
+        // 변신 스킬(alternateSkills)은 같은 PlayerSkillSlot 으로 승인된다 → 일반·변신이 같은 항목.
+        var model = Started(1);
+        Assert.That(LobbyWeaponCheckRules.TryGetApprovalItem(slot, false, out var normal), Is.True);
+        Assert.That(model.Report(1, normal), Is.True);
+        Assert.That(LobbyWeaponCheckRules.TryGetApprovalItem(slot, false, out var transformed), Is.True);
+        Assert.That(model.Report(1, transformed), Is.False);
+        Assert.That(LobbyWeaponCheckRules.CountOf(model.MaskOf(1)), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void T10_항목은_6개뿐_패시브_WASD_없음()
+    {
+        Assert.That(System.Enum.GetValues(typeof(LobbyWeaponCheckItem)).Length, Is.EqualTo(6));
+
+        var model = Started(1);
+        Assert.That(model.Report(1, (LobbyWeaponCheckItem)6), Is.False, "표에 없는 항목(패시브·이동 등)은 기록되지 않는다");
+        Assert.That(model.MaskOf(1), Is.Zero);
+    }
+
+    [Test]
+    public void T10_표시_순서는_항목_값_순서()
+    {
+        // 체크리스트 키 i 번째 = (LobbyWeaponCheckItem)i 비트(계약 문서 §2 TryGetLocalChecklist).
+        for (var i = 0; i < LobbyWeaponCheckRules.DisplayOrder.Length; i++)
+            Assert.That((int)LobbyWeaponCheckRules.DisplayOrder[i], Is.EqualTo(i));
+    }
+
     // ─── 판정 규칙 ───────────────────────────────────────────────────────
 
     [TestCase(PlayerSkillSlot.Main, LobbyWeaponCheckItem.SkillQ)]
