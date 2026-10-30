@@ -34,7 +34,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
              "Navigation None 이어야 클릭 뒤 EventSystem 선택이 남지 않는다. 클릭 영역 = UiTriangleRaycastFilter.")]
     [SerializeField] private Button confirmButton;
 
-    [Header("Nameplate (포커스된 캐릭터)")]
+    [Header("Nameplate (포커스된 캐릭터 — 할 일 162 로 프리팹에서 꺼 둠, 칸은 연결된 채)")]
     [SerializeField] private Image nameplatePortrait;
     [SerializeField] private TMP_Text nameplateName;
 

@@ -15,7 +15,8 @@ internal static class CharacterSelectEditModeTestRunner
         "^CharacterSelectConfirmButtonTests", // SELECT 셰브론 클릭 = Confirm(할 일 109, 실제 프리팹)
         "^UiTriangleRaycastFilterTests", // 셰브론 삼각형 클릭 영역 판정(할 일 109)
         "^CharacterSelectChevronHoverOutlineTests", // 셰브론 hover 흰 아웃라인(할 일 109 후속, 실제 프리팹)
-        "^CharacterSelectCardTemplateTests" // 가운데 카드 원본 Card_Template → 런타임 카드(할 일 109 후속, 실제 프리팹)
+        "^CharacterSelectCardTemplateTests", // 가운데 카드 원본 Card_Template → 런타임 카드(할 일 109 후속, 실제 프리팹)
+        "^CharacterSelectUiPolishTests" // UI 수정(할 일 162) — 이름판 끔·셰브론 hover·가운데 링·기본/코어 팝업(실제 프리팹)
     };
 
     const string Tag = "[CharacterSelectTests]";
