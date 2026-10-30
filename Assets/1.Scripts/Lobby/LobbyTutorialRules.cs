@@ -12,18 +12,52 @@ public static class LobbyTutorialRules
 
     /// <summary>
     /// 캐릭터 변경을 막는 진행기 쪽 사유(없으면 None) — 서버 RPC 검증과 클라 패널 잠금이 같이 쓴다.
-    /// 출격 확정·로딩 = GameStarting, 출격 집결 카운트다운 중 = CountdownActive, 고정 명단 안 = TrainingLocked.
-    /// (명단 잠금은 커밋 ③에서 없앤다 — 할 일 157 Q1. ②는 옛 동작 유지 — 잠금 시점만 L10 확정으로 당겨졌다.)
+    /// 출격 확정·로딩 = GameStarting, 출격 집결 카운트다운 중 = CountdownActive. 그 밖 어느 단계든 교체 가능
+    /// (훈련 명단 잠금 없음 — 할 일 157 Q1, 커밋 ③. 기록은 clientId 기준이라 교체로 지워지지 않는다 — PLAN §10.2).
     /// </summary>
-    public static LobbyCharacterChangeReject CharacterChangeBlock(bool launching, bool inLockedRoster, bool sortieCountdownActive)
+    public static LobbyCharacterChangeReject CharacterChangeBlock(bool launching, bool sortieCountdownActive)
     {
         if (launching)
             return LobbyCharacterChangeReject.GameStarting;
         if (sortieCountdownActive)
             return LobbyCharacterChangeReject.CountdownActive;
-        if (inLockedRoster)
-            return LobbyCharacterChangeReject.TrainingLocked;
         return LobbyCharacterChangeReject.None;
+    }
+
+    /// <summary>
+    /// 대사 단계 길이(초, 할 일 157 Q5) — 행 <paramref name="rowSeconds"/> &gt; 0 이면 그 값, 아니면 문구 표 <paramref name="tableSeconds"/> &gt; 0 이면 그 값,
+    /// 아니면 글자 수 규칙 max(<paramref name="minSeconds"/>, <paramref name="baseSeconds"/> + 글자 수 × <paramref name="perCharSeconds"/>).
+    /// 어느 쪽이든 끝 여유 <paramref name="endPaddingSeconds"/> 를 더한다. 글자 수 = 공백 제외(<see cref="CountDialogueChars"/>). 음수 입력은 0.
+    /// </summary>
+    public static double DialogueSeconds(float rowSeconds, float tableSeconds, string text,
+        float baseSeconds, float perCharSeconds, float minSeconds, float endPaddingSeconds)
+    {
+        double body;
+        if (rowSeconds > 0f)
+            body = rowSeconds;
+        else if (tableSeconds > 0f)
+            body = tableSeconds;
+        else
+            body = System.Math.Max(System.Math.Max(0f, minSeconds),
+                System.Math.Max(0f, baseSeconds) + CountDialogueChars(text) * (double)System.Math.Max(0f, perCharSeconds));
+
+        return body + System.Math.Max(0f, endPaddingSeconds);
+    }
+
+    /// <summary>대사 글자 수 — 공백·줄바꿈 제외. null = 0.</summary>
+    public static int CountDialogueChars(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return 0;
+
+        var count = 0;
+        foreach (var c in text)
+        {
+            if (!char.IsWhiteSpace(c))
+                count++;
+        }
+
+        return count;
     }
 
     /// <summary>새 접속을 막아야 하는가 — 출격 집결 카운트다운 중이거나 출격 확정·로딩 뒤. 훈련·브리핑 중은 받는다(로비 대기).</summary>
@@ -115,5 +149,49 @@ public static class LobbyTutorialRules
         }
 
         return -1;
+    }
+}
+
+/// <summary><see cref="LobbyTutorialDialogueClock.Tick"/> 결과.</summary>
+public enum LobbyTutorialDialogueAction : byte
+{
+    None = 0,
+    /// <summary>새 대사 단계(revision) — 호출 쪽이 길이를 정해 스냅샷 timerStart/timerEnd 를 싣는다.</summary>
+    Start = 1,
+    /// <summary>끝 시각 도달 — 호출 쪽이 다음 행으로 전이를 요청하고, 받아들여졌으면 <see cref="LobbyTutorialDialogueClock.MarkEnded"/>.</summary>
+    End = 2,
+}
+
+/// <summary>
+/// [서버] 대사 단계 스케줄러(할 일 157 ③) — 순수 상태(EditMode 테스트 대상). 대사 행 revision 마다 시작 1회 → 끝 시각에 전이 1회.
+/// 같은 revision 재진입·반복 없음. 전이 요청이 거부되면(참여자 0 등) <see cref="MarkEnded"/> 를 부르지 않아 다음 틱에 다시 End 를 낸다
+/// (모델이 revision 으로 중복 전이를 막으므로 전이는 최대 1회).
+/// </summary>
+public sealed class LobbyTutorialDialogueClock
+{
+    int _revision;
+    bool _started;
+    bool _ended;
+
+    public bool HasEnded => _ended;
+
+    public LobbyTutorialDialogueAction Tick(int revision, double now, double endServerTime)
+    {
+        if (!_started || revision != _revision)
+        {
+            _revision = revision;
+            _started = true;
+            _ended = false;
+            return LobbyTutorialDialogueAction.Start;
+        }
+
+        return !_ended && now >= endServerTime ? LobbyTutorialDialogueAction.End : LobbyTutorialDialogueAction.None;
+    }
+
+    /// <summary>이번 revision 의 끝 전이가 받아들여졌다 — 같은 revision 동안 다시 End 를 내지 않는다.</summary>
+    public void MarkEnded(int revision)
+    {
+        if (_started && revision == _revision)
+            _ended = true;
     }
 }

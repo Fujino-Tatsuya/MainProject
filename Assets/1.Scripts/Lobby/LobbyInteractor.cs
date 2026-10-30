@@ -147,7 +147,7 @@ public sealed class LobbyInteractor : MonoBehaviour
             session.RequestCharacter(characterId);
     }
 
-    // 서버 RPC 의 진행기 거부(LobbyTrainingDirector.CharacterChangeBlockFor)를 패널 잠금으로 미리 보여 준다. 늦은 참가자는 잠기지 않는다.
+    // 서버 RPC 의 진행기 거부(LobbyTrainingDirector.CharacterChangeBlockFor)를 패널 잠금으로 미리 보여 준다(출격 카운트다운·출격 확정 뒤만 — 훈련 명단 잠금 없음, 157 ③).
     private static bool IsCharacterLocked(LobbySession session)
     {
         var training = LobbyTrainingDirector.Active;

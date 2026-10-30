@@ -92,10 +92,18 @@ public sealed class LobbyGuideStepRulesTests
     [Test]
     public void SortieGather_Roster_ShowsSortie_EvenWithoutCharacterStep()
     {
-        // 훈련 명단은 캐릭터가 잠겨 있다(②) — 캐릭터 스텝을 건너뛴다.
+        // 훈련 명단은 L00 라커 방문을 이미 마쳤다 — 캐릭터 잠금이 없어도(③) 캐릭터 스텝을 다시 켜지 않는다.
         var input = Training(inRoster: true, characterDone: false);
         input.SortieOpen = true;
         Assert.That(LobbyGuideStepRules.Evaluate(input), Is.EqualTo(LobbyGuideStep.Sortie));
+    }
+
+    [Test]
+    public void EntranceGather_Roster_DoesNotReopenCharacterStep_WithoutLock()
+    {
+        var input = Training(inRoster: true, characterDone: false);
+        input.EntranceOpen = true;
+        Assert.That(LobbyGuideStepRules.Evaluate(input), Is.EqualTo(LobbyGuideStep.Tutorial));
     }
 
     [Test]

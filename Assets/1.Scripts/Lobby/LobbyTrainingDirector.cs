@@ -15,15 +15,17 @@ using UnityEngine;
 /// <item>명단 고정 = 첫 집결 행(L10 중앙) 확정. 그 뒤 접속 = 로비 대기(늦은 참가자, 출격 집결 인원엔 포함).</item>
 /// <item>단계 완료: 내용 컴포넌트가 <see cref="ServerReportActivityCompleted"/>(Activity, 시작 때 받은 revision), 브리핑은 <see cref="ServerReportBriefingCompleted"/>.
 /// 지금 행·revision 이 아니면 무시. 한 프레임 한 전이(같은 프레임 두 번째는 모델이 다음 프레임으로 미룬다).</item>
-/// <item>할 일 157 ② 임시 처리(내용 커밋 전까지 흐름이 막히지 않게): L00 라커 방문 = 캐릭터 선택 상호작용 반경 도착(라커 볼륨은 ③, 선택 오브젝트가 없으면 즉시 통과),
-/// 대사 행(L11·L21) = 행 dialogueSeconds(지금 0) 뒤 자동 통과(대사 스케줄러는 ③), 브리핑(L31~L34) = 옛 <see cref="LobbyBriefing"/> 가 L31 에서 한 번에 돌고 L40 으로.</item>
+/// <item>L00 라커 방문(③): 라커룸 내부 볼륨(<see cref="LobbyAreaVolume"/> <c>Area_Locker</c>)을 서버가 매 프레임 폴링 — 본체 기준점·높이·쓰러짐 규칙은 집결 구역과 같다.
+/// 스폰 완료 참여자 전원이 한 번씩 들어가면(누적, 시작 때 이미 안 = 인정) L10. 볼륨 칸이 비면 오류 로그 1회 후 자동 통과(흐름이 막히지 않게 — 판정 메커니즘은 볼륨 하나).</item>
+/// <item>대사 행(③ — L11·L21, 입력 잠금 아닌 대사): <see cref="LobbyTutorialDialogueClock"/> — 진입 때 길이(<see cref="LobbyTutorialRules.DialogueSeconds"/>, 수치 = <see cref="LobbyRules"/>)를
+/// 스냅샷 timerStart/timerEnd(서버 시각)로 싣고 끝 시각에 다음 행으로 1회. 할 일 157 임시: 브리핑(L31~L34) = 옛 <see cref="LobbyBriefing"/> 가 L31 에서 한 번에 돌고 L40 으로(⑨).</item>
 /// <item>집결 확정 텔레포트(할 일 111 유지, 157 Q4 B·§10.3 안 A): L20 입구 확정 → 명단 전원 훈련장 안(Train01Start, 바로 L21),
 /// T50 종료 확정 → 로비 중앙(Brief, L30 이 바로 센다). <see cref="LobbyTrainingEndPlacement"/> 자리로 <see cref="PlayerFallRecovery.RelocateServer"/>.</item>
 /// <item>출격 확정(L40) = L41 로딩 + 출격 래치(<see cref="LobbyTutorialFlow.TryCommitLaunch"/>) → <see cref="NetworkSessionLauncher.StartGameLoading"/> 정확히 1회
 /// (같은 오브젝트에 <see cref="LobbyPodLaunch"/> 가 있으면 포드 연출 끝에). 로딩 흐름의 로비 시작 조건 = <see cref="ServerHasLaunched"/>.
 /// 시연 플래그 <see cref="LobbyRules.AllowInstantSortie"/>(기본 꺼짐)면 명단 고정 전에도 출격 구역이 켜지고 확정하면 훈련을 건너뛴다.</item>
 /// <item>접속 승인: <see cref="NetworkSessionLauncher.LobbyCountdownActiveProvider"/> = 출격 집결 카운트다운 중 또는 출격 확정 뒤.</item>
-/// <item>캐릭터 잠금: <see cref="CharacterChangeBlockFor"/> — 고정 명단 안이면 TrainingLocked(②는 옛 동작 유지, 해제는 커밋 ③ Q1).</item>
+/// <item>캐릭터 교체: <see cref="CharacterChangeBlockFor"/> — 출격 집결 카운트다운·출격 확정 뒤만 거부. 훈련 명단 잠금 없음(할 일 157 Q1, ③) — 기록은 clientId 기준.</item>
 /// <item>훈련 보정: 행 <see cref="LobbyTutorialStep.trainingProfile"/> = Training 동안 고정 명단 체력 하한 1 — 단계 전이·0.25초 주기·캐릭터 교체 완료
 /// (<see cref="LobbyPlayerSpawner.ServerCharacterSwapped"/>) 때 다시 맞추고 진행기 디스폰 때 0.</item>
 /// <item>훈련 리셋(공용): <see cref="ServerResetTrainingRoster"/> — 명단 전원 <see cref="TrainingPlayerReset"/> + 진행 중 행동 예약 + 오너 대시 예측 짝(복제 일련번호).</item>
@@ -61,11 +63,15 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     [Tooltip("로비 중앙 — L10·L30 집결.")]
     [SerializeField] private PartyGatherZone briefZone;
 
+    [Header("영역 볼륨")]
+    [Tooltip("라커룸 내부(Area_Locker) — L00 누적 방문 판정. 비면 L00 을 자동 통과한다(오류 로그).")]
+    [SerializeField] private LobbyAreaVolume lockerArea;
+
     // 🔴 NetworkVariable 구성은 빌드마다 같아야 한다(이 오브젝트 동기화) — 릴리스·DEV_HOTKEYS 빌드 모두 같은 칸.
     private readonly NetworkVariable<LobbyTutorialSnapshot> snapshot = new NetworkVariable<LobbyTutorialSnapshot>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // 훈련 명단 복제 — 클라가 자기 캐릭터 잠금(명단 안 = 잠김, 늦은 참가자 = 허용)·늦은 참가자 여부를 본다.
+    // 훈련 명단 복제 — 클라가 늦은 참가자 여부·훈련 리셋 대상(대시 예측)을 본다.
     private readonly NetworkList<ulong> trainingRoster = new NetworkList<ulong>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -105,7 +111,10 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     private LobbyTutorialFlow _flow;
     private bool _zonesDirty;
     private bool _loggedWaitingZones;
-    private int _timerRevision;
+    private readonly LobbyTutorialDialogueClock _dialogueClock = new LobbyTutorialDialogueClock();
+    private bool _warnedNoLockerArea;
+    private TutorialGuideTextSource _dialogueTextSource;
+    private TutorialGuideTextTable _dialogueTextTable;
     private readonly HashSet<LobbyGatherPoint> _warnedNoTeleportZone = new HashSet<LobbyGatherPoint>();
     private Func<bool> _joinBlockedProvider;
     private readonly TrainingResetReservations _resetReservations = new TrainingResetReservations();
@@ -203,7 +212,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     /// <summary>[전 피어] 튜토리얼 클리어 플래그가 켜져 있는가 — 복제 목록.</summary>
     public bool IsTrainingCleared(ulong clientId) => IsSpawned && trainingCleared.Contains(clientId);
 
-    /// <summary>[전 피어] 출격 집결 카운트다운 중 — 접속 승인·캐릭터 잠금이 본다(입력은 막지 않는다).</summary>
+    /// <summary>[전 피어] 출격 집결 카운트다운 중 — 접속 승인·캐릭터 교체 거부가 본다(입력은 막지 않는다).</summary>
     public bool IsSortieCountdownActive => sortieZone != null && sortieZone.IsCountdownActive;
 
     /// <summary>[서버] 출격 확정으로 메인 진입을 내보냈다 — NetworkLoadingFlowController 의 로비 시작 조건.</summary>
@@ -212,7 +221,8 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     /// <summary>[전 피어] 이 사람의 캐릭터 변경을 막는 진행기 사유(없으면 None) — 서버 RPC 검증·클라 패널 잠금 공용.</summary>
     public LobbyCharacterChangeReject CharacterChangeBlockFor(ulong clientId)
     {
-        return LobbyTutorialRules.CharacterChangeBlock(IsLaunching, IsRosterLocked && IsInTrainingRoster(clientId), IsSortieCountdownActive);
+        // 사람마다 다르지 않다(명단 잠금 없음 — 할 일 157 Q1) — 시그니처는 서버 RPC·클라 패널 호출 호환으로 유지.
+        return LobbyTutorialRules.CharacterChangeBlock(IsLaunching, IsSortieCountdownActive);
     }
 
     /// <summary>[서버] 훈련 참여 명단(L10 확정 때 고정). 서버가 아니면 빈 목록.</summary>
@@ -462,9 +472,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             // 플레이어 오브젝트가 늦게 붙거나 다시 스폰돼도 하한이 맞게 주기적으로도 맞춘다(같은 값이면 아무 일 없음).
             SyncHealthFloors();
             TickResetReservations();
-            TickLockerVisitServer();
         }
 
+        TickLockerVisitServer();
         TrySkipToSortieWhenNobodyTrains();
         TickDialogueServer();
 
@@ -489,36 +499,37 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
         ApplyZones();
     }
 
-    // 할 일 157 ② 임시 — L00 라커 방문 = 캐릭터 선택 상호작용 반경 도착(서버 위치 판정, 1인 1회 누적). 라커 볼륨 판정은 커밋 ③.
-    // 캐릭터 선택 오브젝트가 씬에 없으면 참여자 전원 방문으로 보고 바로 넘긴다(흐름이 막히지 않게).
+    // [서버] L00 라커 방문(할 일 157 ③) — 매 프레임 라커 볼륨 폴링. 스폰 완료 참여자만 판정·완료 조건(로딩 중 접속자는 세지 않는다).
+    // 방문은 1인 1회 누적(나갔다 와도 유지, 캐릭터 교체해도 clientId 라 유지). 볼륨 칸이 비면 오류 1회 후 자동 통과.
     private void TickLockerVisitServer()
     {
         if (_flow.CurrentKind != LobbyTutorialStepKind.LockerVisit || _flow.HasPendingAdvance)
             return;
 
-        var hasStation = false;
-        var registry = LobbyInteractable.Registry;
-        for (var i = 0; i < registry.Count && !hasStation; i++)
-            hasStation = registry[i] != null && registry[i].Kind == LobbyInteractableKind.CharacterSelect;
+        if (lockerArea == null && !_warnedNoLockerArea)
+        {
+            _warnedNoLockerArea = true;
+            Debug.LogError($"{Tag} 라커 볼륨(lockerArea — Area_Locker)이 비었다 — L00 라커 방문을 판정하지 못해 스폰 완료 참여자를 자동 방문 처리한다.", this);
+        }
 
         _participantBuffer.Clear();
         _participantBuffer.AddRange(_flow.Participants);
         foreach (var clientId in _participantBuffer)
         {
-            var visited = !hasStation
-                || (TryGetPlayer(clientId, out var player)
-                    && LobbyInteractable.AnyWithinServerReach(LobbyInteractableKind.CharacterSelect, player.transform.position, out _));
-            if (visited && _flow.MarkLockerVisited(clientId))
-                Debug.Log($"[SceneFlow] {Tag} 라커 방문(임시 — {(hasStation ? "캐릭터 선택 반경" : "선택 오브젝트 없음, 자동")}) client {clientId} " +
+            if (!TryGetPlayer(clientId, out var player) || _flow.HasVisitedLocker(clientId))
+                continue;
+
+            if ((lockerArea == null || lockerArea.CountsPlayer(player)) && _flow.MarkLockerVisited(clientId))
+                Debug.Log($"[SceneFlow] {Tag} 라커 방문{(lockerArea == null ? "(볼륨 없음 — 자동)" : "")} client {clientId} " +
                           $"[{string.Join(",", _flow.LockerVisited)}]");
         }
 
-        if (_flow.AllParticipantsVisitedLocker())
-            ServerAdvance(_flow.StepIndex + 1, "전원 라커 방문");
+        if (_flow.AllSpawnedParticipantsVisitedLocker(clientId => TryGetPlayer(clientId, out _)))
+            ServerAdvance(_flow.StepIndex + 1, "스폰 완료 참여자 전원 라커 방문");
     }
 
-    // 할 일 157 ② 임시 — 대사 행: 행 dialogueSeconds(0 이하 = 0) 뒤 자동 통과. 시각은 스냅샷에 싣는다(158 대사 패널). 길이 규칙·감독관 대사는 커밋 ③.
-    // 입력 잠금 행(브리핑)은 LobbyBriefing 이 있으면 그 완료 보고로만 끝난다.
+    // [서버] 대사 행(할 일 157 ③ — L11·L21) — 진입 revision 마다 길이를 정해 스냅샷 timerStart/timerEnd(서버 시각)로 싣고, 끝 시각에 다음 행으로 1회.
+    // 입력 잠금 행(브리핑 L31~L34)은 LobbyBriefing 이 있으면 그 완료 보고로만 끝난다(⑨에서 이 스케줄러로 옮긴다).
     private void TickDialogueServer()
     {
         if (_flow.CurrentKind != LobbyTutorialStepKind.Dialogue || _flow.HasPendingAdvance)
@@ -529,18 +540,48 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             return;
 
         var now = ServerNow();
-        if (_timerRevision != _flow.Revision)
+        var revision = _flow.Revision;
+        switch (_dialogueClock.Tick(revision, now, _flow.Snapshot.TimerEndServerTime))
         {
-            _timerRevision = _flow.Revision;
-            var seconds = Math.Max(0d, step.dialogueSeconds);
-            _flow.SetTimer(_flow.Revision, now, now + seconds);
-            SyncReplicatedState();
-            Debug.Log($"[SceneFlow] {Tag} 대사 {step.dialogueId} 시작(임시 자동 통과 {seconds:0.##}초) — {ServerDescribe()}");
-            return;
+            case LobbyTutorialDialogueAction.Start:
+            {
+                var seconds = ServerDialogueSeconds(step, out var source);
+                _flow.SetTimer(revision, now, now + seconds);
+                SyncReplicatedState();
+                Debug.Log($"[SceneFlow] {Tag} 대사 {step.dialogueId} 시작 {seconds:0.##}초({source}) — {ServerDescribe()}");
+                break;
+            }
+            case LobbyTutorialDialogueAction.End:
+                if (ServerAdvance(_flow.StepIndex + 1, $"대사 {step.dialogueId} 끝"))
+                    _dialogueClock.MarkEnded(revision);
+                break;
+        }
+    }
+
+    // [서버] 대사 길이 — 행 dialogueSeconds → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유(LobbyRules 수치).
+    private double ServerDialogueSeconds(LobbyTutorialStep step, out string source)
+    {
+        var table = rules != null ? rules.GuideTexts : null;
+        if (_dialogueTextSource == null || _dialogueTextTable != table)
+        {
+            _dialogueTextTable = table;
+            _dialogueTextSource = new TutorialGuideTextSource(table);
         }
 
-        if (now >= _flow.Snapshot.TimerEndServerTime)
-            ServerAdvance(_flow.StepIndex + 1, $"대사 {step.dialogueId} 끝");
+        TutorialGuideTextRow row = null;
+        var hasRow = !string.IsNullOrEmpty(step.dialogueId) && _dialogueTextSource.TryGetRow(step.dialogueId, out row);
+        var tableSeconds = hasRow ? row.DurationSeconds : 0f;
+        var text = hasRow ? row.Text : null;
+        source = step.dialogueSeconds > 0f ? "행 dialogueSeconds"
+            : tableSeconds > 0f ? "문구 표 durationSeconds"
+            : hasRow ? $"글자 수 {LobbyTutorialRules.CountDialogueChars(text)}"
+            : "문구 없음 — 최소";
+
+        if (rules == null)
+            return LobbyTutorialRules.DialogueSeconds(step.dialogueSeconds, tableSeconds, text, 2f, 0.08f, 3f, 0.5f);
+
+        return LobbyTutorialRules.DialogueSeconds(step.dialogueSeconds, tableSeconds, text,
+            rules.DialogueBaseSeconds, rules.DialoguePerCharSeconds, rules.DialogueMinSeconds, rules.DialogueEndPaddingSeconds);
     }
 
     // 훈련할 사람이 없다(전원 클리어 플래그·명단 전원 퇴장) — 출격 집결(L40)로 건너뛴다. 접속자가 없으면 그대로(참여자 0 전이 금지).

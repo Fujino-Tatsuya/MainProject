@@ -26,12 +26,12 @@ public sealed class LobbyTutorialRulesTests
     // ── 캐릭터 잠금·접속 차단 ──
 
     [Test]
-    public void 캐릭터_변경_사유_우선순위_출격_카운트다운_명단()
+    public void 캐릭터_변경_사유_우선순위_출격_카운트다운()
     {
-        Assert.That(LobbyTutorialRules.CharacterChangeBlock(false, false, false), Is.EqualTo(LobbyCharacterChangeReject.None));
-        Assert.That(LobbyTutorialRules.CharacterChangeBlock(false, true, false), Is.EqualTo(LobbyCharacterChangeReject.TrainingLocked));
-        Assert.That(LobbyTutorialRules.CharacterChangeBlock(false, true, true), Is.EqualTo(LobbyCharacterChangeReject.CountdownActive));
-        Assert.That(LobbyTutorialRules.CharacterChangeBlock(true, false, true), Is.EqualTo(LobbyCharacterChangeReject.GameStarting), "명단 밖도");
+        // 훈련 명단 잠금 없음(157 Q1, 커밋 ③)
+        Assert.That(LobbyTutorialRules.CharacterChangeBlock(false, false), Is.EqualTo(LobbyCharacterChangeReject.None));
+        Assert.That(LobbyTutorialRules.CharacterChangeBlock(false, true), Is.EqualTo(LobbyCharacterChangeReject.CountdownActive));
+        Assert.That(LobbyTutorialRules.CharacterChangeBlock(true, true), Is.EqualTo(LobbyCharacterChangeReject.GameStarting));
     }
 
     [Test]

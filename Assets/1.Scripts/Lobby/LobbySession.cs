@@ -11,7 +11,7 @@ using UnityEngine;
 /// <item>시드: 스폰 때 접속자마다 <see cref="ServerCharacterSelectionStore"/> 의 선택으로 자리를 만들고, 없는 사람만 0번 — 판 뒤 로비 재진입에 캐릭터가 유지된다.</item>
 /// <item>접속·퇴장: 서버 콜백으로 자리를 더하고 뺀다.</item>
 /// <item>게임 시작·접속 승인은 여기 없다(할 일 86 T2b): 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 StartGameLoading 1회·승인 제공자를 맡는다.</item>
-/// <item>캐릭터 잠금: 요청마다 <see cref="LobbyTrainingDirector.CharacterChangeBlockFor"/>(훈련 명단 안·출격 카운트다운·출격 단계)로도 거부한다.</item>
+/// <item>캐릭터 잠금: 요청마다 <see cref="LobbyTrainingDirector.CharacterChangeBlockFor"/>(출격 카운트다운·출격 단계 — 훈련 명단 잠금은 할 일 157 ③에서 없앴다)로도 거부한다.</item>
 /// </list>
 /// ⚠ 준비 토글(<see cref="RequestToggleReady"/>)·<see cref="IsCountdownActive"/> 는 qa/LobbyDemo 하네스 호환으로만 남겼다 — 씬에 Ready 오브젝트가 없어
 /// 서버 거리 재검증에서 늘 거부되고, 준비 카운트다운은 더 이상 게임을 시작하지 않는다(PLAN-86 §7-2 Ready 패드 = 출격 집결).

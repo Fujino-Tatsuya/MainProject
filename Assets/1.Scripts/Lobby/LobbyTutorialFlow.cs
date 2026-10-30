@@ -27,7 +27,8 @@ public enum LobbyTutorialAdvanceResult : byte
 /// <item>참여자: 명단 고정 전(L00·L10) = 스폰 완료 접속자(<see cref="AddClient"/> 는 PlayerObject 가 선 뒤 부른다), <see cref="LockRoster"/> 뒤 = 고정 명단.
 /// 참여자 0 이면 전이하지 않는다.</item>
 /// <item>모든 기록(명단·라커 방문)은 clientId 기준 — 캐릭터 교체(PlayerObject 디스폰·재스폰)로 지워지지 않는다(PLAN §10.2). 연결 종료만 지운다.</item>
-/// <item>라커 방문: LockerVisit 단계 동안 참여자만, 1인 1회 누적(나갔다 와도 유지). 회차 = 모델 인스턴스 — 새 회차는 새 인스턴스.</item>
+/// <item>라커 방문: LockerVisit 단계 동안 참여자만, 1인 1회 누적(나갔다 와도 유지). 회차 = 모델 인스턴스 — 새 회차는 새 인스턴스.
+/// 완료 = 스폰 완료 참여자 전원 방문(<see cref="AllSpawnedParticipantsVisitedLocker"/>, 커밋 ③).</item>
 /// <item>출격 확정: <see cref="TryCommitLaunch"/> 회차마다 1회.</item>
 /// <item>튜토리얼 클리어 플래그(할 일 112, 로비 Alt+1 — <see cref="SetTrainingCleared"/>): 켠 사람은 명단 고정 전 참여자·고정 명단에서 빠지고(늦은 참가자처럼 로비 대기),
 /// 출격 집결(접속자 전원)에는 남는다. 명단 고정 뒤 켜서 명단이 비면 진행기가 출격 집결로 건너뛴다(<see cref="TryAdvanceTo"/> ignoreParticipants).
@@ -195,6 +196,29 @@ public sealed class LobbyTutorialFlow
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 스폰 완료(PlayerObject 있음) 참여자 전원이 방문했는가(할 일 157 ③ — L00 참여자 = 스폰 완료 접속자).
+    /// 로딩 중(아직 스폰 전) 접속자는 세지 않는다. 스폰 완료 참여자가 0 이면 false(N=0 전이 금지).
+    /// </summary>
+    public bool AllSpawnedParticipantsVisitedLocker(Predicate<ulong> isSpawned)
+    {
+        if (isSpawned == null)
+            return AllParticipantsVisitedLocker();
+
+        var counted = 0;
+        foreach (var clientId in Participants)
+        {
+            if (!isSpawned(clientId))
+                continue;
+
+            counted++;
+            if (!_lockerVisited.Contains(clientId))
+                return false;
+        }
+
+        return counted > 0;
     }
 
     // ── 사건 검증 ──

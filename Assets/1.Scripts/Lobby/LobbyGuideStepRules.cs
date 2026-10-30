@@ -40,7 +40,8 @@ public struct LobbyGuideStepInput
 /// <list type="number">
 /// <item>준비 안 됨(진행기·내 플레이어 없음) · 출격 확정 · 출격 구역 안 → None.</item>
 /// <item>명단으로 훈련 중(명단 고정 뒤, 입구·출격 집결이 아닌 단계) → None — 훈련 안 집결 구역이 안내한다.</item>
-/// <item>캐릭터 스텝 안 끝남 + 지금 캐릭터를 바꿀 수 있음(<see cref="LobbyTutorialRules.CharacterChangeBlock"/> = None) → CharacterSelect.</item>
+/// <item>명단 밖 + 캐릭터 스텝 안 끝남 + 지금 캐릭터를 바꿀 수 있음(<see cref="LobbyTutorialRules.CharacterChangeBlock"/> = None) → CharacterSelect.
+/// (157 ③에서 훈련 명단 캐릭터 잠금은 없앴지만 명단은 L00 라커 방문을 이미 마쳤으므로 이 경로를 다시 켜지 않는다.)</item>
 /// <item>명단으로 입구 집결(L20) 중 → 입구 구역 안이면 None(집결 대기), 아니면 Tutorial.</item>
 /// <item>명단 고정 전(L00·L10) + 클리어 플래그 꺼짐 → None(라커·중앙 경로는 158).</item>
 /// <item>나머지(클리어 플래그, 늦은 참가자, 출격 집결) → Sortie.</item>
@@ -57,8 +58,8 @@ public static class LobbyGuideStepRules
         if (training && !input.SortieOpen && !input.EntranceOpen)
             return LobbyGuideStep.None;
 
-        if (!input.CharacterStepDone && LobbyTutorialRules.CharacterChangeBlock(
-                input.Launching, training, input.SortieCountdownActive) == LobbyCharacterChangeReject.None)
+        if (!input.CharacterStepDone && !training && LobbyTutorialRules.CharacterChangeBlock(
+                input.Launching, input.SortieCountdownActive) == LobbyCharacterChangeReject.None)
             return LobbyGuideStep.CharacterSelect;
 
         if (training && input.EntranceOpen)

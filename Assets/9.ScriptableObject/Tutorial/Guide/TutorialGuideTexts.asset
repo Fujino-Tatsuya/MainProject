@@ -590,3 +590,167 @@ MonoBehaviour:
     text: "23\ud638. \ubd84\uc1c4\ud574\ub77c."
     durationSeconds: 0
     sfx: {fileID: 0}
+  - id: LOBBY_TITLE_CHARACTER
+    text: "\uCE90\uB9AD\uD130 \uC120\uD0DD"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_PREP
+    text: "\uD6C8\uB828 \uC900\uBE44"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_BASIC
+    text: "\uAE30\uBCF8 \uC870\uC791 \uD6C8\uB828"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_COMBAT
+    text: "\uC804\uD22C \uD6C8\uB828"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_COUNTER
+    text: "\uAC04\uD30C \uD6C8\uB828"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_SUPPRESS
+    text: "\uC81C\uC555 \uD6C8\uB828"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_FREE
+    text: "\uC790\uC720 \uC5F0\uC2B5"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_BRIEF
+    text: "\uC784\uBB34 \uBE0C\uB9AC\uD551"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_TITLE_SORTIE
+    text: "\uCD9C\uACA9 \uC900\uBE44"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_CHARACTER
+    text: "\uCE90\uB9AD\uD130\uB97C \uC120\uD0DD\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_CENTRAL
+    text: "\uC911\uC559\uC5D0 \uBAA8\uC774\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_TRAINING_HALL
+    text: "\uD6C8\uB828\uC7A5\uC5D0 \uBAA8\uC774\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_BASIC
+    text: "\uAE30\uBCF8 \uACF5\uACA9\uACFC \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_AREA
+    text: "\uAD6C\uC5ED\uC5D0 \uBAA8\uC774\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_COMBAT
+    text: "\uD6C8\uB828 \uC0C1\uB300\uB97C \uBAA8\uB450 \uCC98\uCE58\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_COUNTER
+    text: "\uC0C1\uB300\uBC29\uC758 \uBAB8\uC5D0 \uBCF4\uB77C\uBE5B\uC774 \uB098\uD0C0\uB098\uBA74 \uC0C1\uB300\uBC29\uC758 \uC815\uBA74\uC5D0\uC11C \uC6B0\uD074\uB9AD \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_VULN_CC
+    text: "\uCDE8\uC57D \uC0C1\uD0DC\uC758 \uC0C1\uB300\uC5D0\uAC8C [\uB109\uBC31] \uB610\uB294 [\uAE30\uC808] \uC18D\uC131\uC774 \uC788\uB294 \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_WALL
+    text: "[\uB109\uBC31] \uC18D\uC131\uC774 \uC788\uB294 \uC2A4\uD0AC\uB85C \uC0C1\uB300\uB97C \uD45C\uC2DC\uB41C \uBCBD\uC5D0 \uCDA9\uB3CC\uC2DC\uD0A4\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_SUPPRESS
+    text: "\uC81C\uC555\uB41C \uC0C1\uB300\uB97C \uCC98\uCE58\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_FREE
+    text: "\uC790\uC720\uB86D\uAC8C \uC5F0\uC2B5\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_OBJ_SORTIE_GATHER
+    text: "\uCD9C\uACA9 \uC9C0\uC810\uC5D0 \uBAA8\uC774\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BODY_VULN_1
+    text: "\uD0C0\uC774\uBC0D\uC5D0 \uB9DE\uCDB0 \uAC04\uD30C \uC2A4\uD0AC\uB85C \uACF5\uACA9\uC744 \uB9C9\uC544\uB0B4\uBA74 \uC0C1\uB300\uBC29\uC740 \uCDE8\uC57D \uC0C1\uD0DC\uAC00 \uB429\uB2C8\uB2E4."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BODY_VULN_2
+    text: "\uCDE8\uC57D \uC0C1\uD0DC\uC758 \uC0C1\uB300\uC5D0\uAC8C\uB294 \uBC00\uCE58\uAC70\uB098 \uAE30\uC808\uC744 \uC801\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BODY_SUPPRESS
+    text: "\uAC04\uD30C \uB610\uB294 \uBCBD\uACFC \uCDA9\uB3CC\uC2DC\uCF1C \uC0C1\uB300\uC758 [\uC81C\uC555] \uCE78\uC744 \uBAA8\uB450 \uC18C\uC9C4\uC2DC\uD0A4\uBA74 \uC0C1\uB300\uB294 [\uC81C\uC555] \uC0C1\uD0DC\uC5D0 \uB3CC\uC785\uD558\uBA70, \uCE90\uB9AD\uD130\uC758 \uD589\uB3D9\uC774 \uBE68\uB77C\uC9D1\uB2C8\uB2E4."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BODY_FREE_EXIT
+    text: "\uC5F0\uC2B5\uC744 \uB9C8\uCE58\uB824\uBA74 \uC785\uAD6C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_CHECK_BASIC_ATTACK
+    text: "\uAE30\uBCF8 \uACF5\uACA9 (LMB)"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_CHECK_Q
+    text: "Q \uC2A4\uD0AC"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_CHECK_E
+    text: "E \uC2A4\uD0AC"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_CHECK_R
+    text: "R \uC2A4\uD0AC"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_CHECK_RMB
+    text: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC (RMB)"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_CHECK_DASH
+    text: "\uB300\uC2DC (Space Bar)"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_PROGRESS_GATHER
+    text: "\uC9D1\uACB0 {n}/{total}"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_PROGRESS_PARTY_DONE
+    text: "\uD6C8\uB828 \uC644\uB8CC {n}/{total}"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_PROGRESS_COUNTDOWN
+    text: "\uC2DC\uC791\uAE4C\uC9C0 {n}"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_SPEAKER_SUPERVISOR
+    text: "\uAC10\uB3C5\uAD00"
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_DLG_INTRO
+    text: "\uC774\uBC88\uC5D0 \uC0C8\uB85C \uC628 \uC2E0\uC785\uB4E4\uC778\uAC00? \uC88B\uC544. \uC2E4\uB825 \uC880 \uBCFC\uAE4C. \uD6C8\uB828\uC7A5\uC73C\uB85C \uC640."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_DLG_TRAINING
+    text: "\uB2E4 \uBAA8\uC600\uAD70. \uAE30\uBCF8\uAE30\uB294 \uAC16\uCDC4\uB294\uC9C0\uBD80\uD130 \uBCFC\uAE4C."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BRIEF_EVAL
+    text: "\uC2E0\uC785\uCE58\uACE0\uB294 \uC81C\uBC95\uC774\uAD70. \uC88B\uC544. \uC774\uC81C \uC790\uB124\uB4E4\uC774 \uB9E1\uC744 \uC77C\uC744 \uC124\uBA85\uD558\uC9C0."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BRIEF_FACTORY
+    text: "\uC774\uBC88 \uBAA9\uC801\uC9C0\uB294 \uC6F0\uC988\uC758 \uC5F0\uAD6C \uC2DC\uC124\uC774\uB2E4. \uC800\uACF3\uC5D0\uC11C \uC2DC\uC791\uB41C \uC5F0\uAD6C\uAC00 \uD6D7\uB0A0 \uB300\uADDC\uBAA8 \uAE30\uACC4 \uBC18\uB780\uC73C\uB85C \uC774\uC5B4\uC9C0\uC9C0."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BRIEF_REBELLION
+    text: "\uC6B0\uB9AC\uB294 \uADF8 \uC77C\uC774 \uBC8C\uC5B4\uC9C0\uAE30 \uC804\uC73C\uB85C \uB4E4\uC5B4\uAC04\uB2E4. \uC774\uBC88\uC5D0\uB294 \uADF8 \uC2DC\uC791\uC744 \uB9C9\uB294 \uAC70\uC57C."
+    durationSeconds: 0
+    sfx: {fileID: 0}
+  - id: LOBBY_BRIEF_SORTIE
+    text: "\uC124\uBA85\uC740 \uC5EC\uAE30\uAE4C\uC9C0\uB2E4. \uCD9C\uACA9 \uC9C0\uC810\uC73C\uB85C \uC774\uB3D9\uD574."
+    durationSeconds: 0
+    sfx: {fileID: 0}

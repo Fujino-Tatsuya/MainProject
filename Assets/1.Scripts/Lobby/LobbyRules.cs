@@ -30,6 +30,32 @@ public sealed class LobbyRules : ScriptableObject
     [Tooltip("시연용 — 훈련 없이 즉시 출격(Q2 B). 켜면 명단 고정 전(L00·L10)에도 출격 집결 구역이 켜지고, 확정하면 훈련을 건너뛰고 바로 메인 진입. 기본 꺼짐. DEV_HOTKEYS Alt+1 과 별개.")]
     [SerializeField] private bool allowInstantSortie;
 
+    [Header("로비 튜토리얼 대사 길이(할 일 157 Q5) — 행 dialogueSeconds > 0 → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유")]
+    [Tooltip("대사 문구·표시 시간 출처(TutorialGuideTexts). 서버가 대사 단계 길이를 정할 때 읽는다(Strings 시트 문구 우선, 없으면 SO). 비면 글자 수 0 으로 본다.")]
+    [SerializeField] private TutorialGuideTextTable guideTexts;
+
+    [Tooltip("글자 수 규칙 기본 초.")]
+    [Min(0f)]
+    [SerializeField] private float dialogueBaseSeconds = 2f;
+
+    [Tooltip("글자 수 규칙 — 글자(공백 제외)당 초.")]
+    [Min(0f)]
+    [SerializeField] private float dialoguePerCharSeconds = 0.08f;
+
+    [Tooltip("글자 수 규칙 최소 초.")]
+    [Min(0f)]
+    [SerializeField] private float dialogueMinSeconds = 3f;
+
+    [Tooltip("대사 끝 여유(초) — 어느 출처든 더한다.")]
+    [Min(0f)]
+    [SerializeField] private float dialogueEndPaddingSeconds = 0.5f;
+
+    public TutorialGuideTextTable GuideTexts => guideTexts;
+    public float DialogueBaseSeconds => dialogueBaseSeconds;
+    public float DialoguePerCharSeconds => dialoguePerCharSeconds;
+    public float DialogueMinSeconds => dialogueMinSeconds;
+    public float DialogueEndPaddingSeconds => dialogueEndPaddingSeconds;
+
     public float CountdownSeconds => countdownSeconds;
     public float GatherHoldSeconds => gatherHoldSeconds;
     public LobbyTutorialStepTable StepTable => stepTable;

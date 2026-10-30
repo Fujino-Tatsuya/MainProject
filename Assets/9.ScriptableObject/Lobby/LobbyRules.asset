@@ -18,3 +18,8 @@ MonoBehaviour:
   gatherHoldSeconds: 3
   stepTable: {fileID: 11400000, guid: a27123c96ec094f44a9bf0ffcdb5d090, type: 2}
   allowInstantSortie: 0
+  guideTexts: {fileID: 11400000, guid: d7687a8e06602774caf926fc613dd8de, type: 2}
+  dialogueBaseSeconds: 2
+  dialoguePerCharSeconds: 0.08
+  dialogueMinSeconds: 3
+  dialogueEndPaddingSeconds: 0.5

@@ -11,7 +11,7 @@
   문구 키·집결 지점·경로·벽·대사 ID 는 모든 피어가 같은 단계표 SO(`LobbyTutorialSteps.asset`)에서 `stepIndex` 로 읽는다.
 - 모든 값은 전 피어에서 복제값으로 계산된다 — 늦게 붙은 클라도 같은 결과(이벤트를 놓쳐도 다음 폴링/이벤트 뒤 재조회로 맞는다).
 - **캐릭터 잠금 없음**(사용자 결정 10-30) — 어느 단계든 라커에서 교체 가능. 158 은 교체 때문에 따로 할 일이 없다(파사드 값은 clientId 기준이라 그대로).
-  (과도기: 커밋 ②까지는 옛 훈련 명단 잠금이 남아 있다 — 제거는 157 커밋 ③.)
+  (커밋 ③에서 옛 훈련 명단 잠금 `TrainingLocked` 제거 완료 — 남은 교체 거부는 출격 집결 카운트다운·출격 확정 뒤뿐.)
 - **커밋 ②부터 진행기(`LobbyTrainingDirector`)가 `Publish`·`SetLiveSource` 한다** → 로비에 진행기가 있으면 `IsAvailable == true`. 옛 10단계 모델(`LobbyTrainingFlow`)은 삭제됐다.
 
 ## 1. 단계표 (22행, 행 순서 = 진행 순서)
@@ -20,7 +20,7 @@
 
 | # | StateId | Kind | 집결 지점 | 비고 |
 |---|---|---|---|---|
-| 0 | L00_LockerVisit | LockerVisit | — | 라커 누적 방문. 경로 `PATH_LOCKER` |
+| 0 | L00_LockerVisit | LockerVisit | — | 라커 누적 방문(라커룸 내부 볼륨 `Area_Locker` = `LobbyAreaVolume`, 비네트워크 — 158 은 경로 끝점으로 참조 가능). 경로 `PATH_LOCKER` |
 | 1 | L10_CentralGather | Gather | `Brief`(중앙 — 이름 유지. `Central` 개명은 미룸 — 158 코드 호환) | 확정 = 훈련 명단 고정 |
 | 2 | L11_CentralIntro | Dialogue | — | `LOBBY_DLG_INTRO` |
 | 3 | L20_TrainingGather | Gather | **`Entrance`**(문 앞 입구 영역) | **확정: A**(157 PLAN §10.3) — 입구 집결 확정 → 명단 전원 `Gather_Train01Start` 안으로 텔레포트 → 바로 L21(내부 재집결 없음). 활성 집결 테두리 = `Gather_Entrance` |
@@ -86,13 +86,13 @@
 
 - 전부 `Tutorial.Guide.<id>` — 158 은 `TutorialGuideTextSource` 로 해석(시트 우선, SO 폴백, 기존 경로).
 - id 목록·ko 문구 = 157 PLAN §6(제목 `LOBBY_TITLE_*` 9 · 지시문 `LOBBY_OBJ_*` 12 · 보조 `LOBBY_BODY_*` 4 · 체크 `LOBBY_CHECK_*` 6 · 진행 `LOBBY_PROGRESS_*` 3 · 화자/대사 `LOBBY_SPEAKER_SUPERVISOR`·`LOBBY_DLG_*` 2·`LOBBY_BRIEF_*` 4).
-  xlsx Strings·`TutorialGuideTexts.asset` 행 추가는 157 후속 커밋/사람 작업 — 키가 아직 없으면 해석 실패 → 158 은 id 를 그대로 보이지 말고 빈칸 처리 권장.
+  커밋 ③: `TutorialGuideTexts.asset` 에 §6 ko 폴백 41행 추가(durationSeconds 0). xlsx Strings 행 추가는 메인/사람 작업 — 시트 행이 없으면 SO 폴백 문구가 보인다.
 
 ## 5. 경계 — 157 이 하지 않는 것
 
 - 패널/대사 프리팹·좌상단 배치·상단 파티 UI 제거·경로/테두리/벽 표식 렌더링·`PartyGatherStatusView` 대체 = **158**.
 - 옛 왼쪽 안내 칸(`Slot_WeaponCheck`·`Slot_Train02` — `LobbyWeaponCheckView`·`LobbyTrainingCombatView`)은 158 이 이미 끈다. 157 은 이 뷰에 의존하지 않는다.
-- **과도기 어댑터**(157 커밋 ②~⑨, 158 병합 전 Play 검증용): 157 이 기존 상단 가이드 UI(`TutorialGuideUI.SetObjective`)에만 `LobbyTutorialState` 값을 임시로 띄운다. 158 병합 때 157 이 삭제(또는 158 이 끈다 — 병합 시 브릿지로 합의).
+- **과도기 어댑터 — 158 병합 시 삭제**: `Assets/1.Scripts/Lobby/LobbyTutorialGuideAdapter.cs` 파일 하나(커밋 ③, 씬·다른 코드 참조 없음 — 첫 씬 로드 때 숨은 DDOL 오브젝트로 스스로 생김). `LobbyTutorialState` 를 읽어 기존 상단 가이드 UI 에만 띄운다: 목표 = `TutorialGuideUI.SetObjective`(지시문 키·T10 체크·진행 n/N), 대사(L11·L21) = `ShowSubtitle` → 대사 단계 끝에 `ClearSubtitles`. 브리핑(L31~L34)은 옛 `LobbyBriefing` 이 띄우므로 건드리지 않는다. 158 병합 때 이 파일을 지우면 끝(158 패널과 상단 가이드가 겹치지 않게).
 - 씬(`3.LobbyScene.unity`) 수정은 157·158 이 같은 날 겹치지 않게 브릿지로 순서를 맞춘다(157 은 커밋 ③에 라커 볼륨 1개만).
 
 ## 6. 캐릭터 교체와 158
@@ -103,4 +103,5 @@
 ## 7. 변경 이력
 
 - 2026-10-30 커밋 ① — 최초. 파사드 골격·단계표 22행. 진행기 미연결(`IsAvailable == false`).
+- 2026-10-30 커밋 ③ — L00 = 라커 볼륨 `Area_Locker`(서버 폴링, 스폰 완료 참여자 전원 누적 방문). L11·L21 대사 = 서버 스케줄러: 스냅샷 `TimerStartServerTime`/`TimerEndServerTime` 이 실제 값(길이 = 행 dialogueSeconds → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유 — 수치 `LobbyRules`), 끝 시각에 다음 행 1회. 캐릭터 잠금 제거. 과도기 어댑터 추가(§5).
 - 2026-10-30 커밋 ② — 진행기 연결(스냅샷 NetworkVariable → `Publish`). L20 집결 지점 `Train01Start` → **`Entrance`**(§10.3 A 확정 — ②는 기존 입구 텔레포트(`TeleportRosterInto`)를 그대로 태워 동작, 마무리(대사 중 표적 미스폰 등)는 커밋 ④). 행 칸 `trainingProfile` 추가. `Brief`→`Central` 개명은 미룸. 과도기 어댑터(상단 가이드)는 새 `LOBBY_*` 키가 없어 아직 없음.
