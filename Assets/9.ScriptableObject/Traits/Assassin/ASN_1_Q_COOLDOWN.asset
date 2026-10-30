@@ -17,7 +17,7 @@ MonoBehaviour:
   category: "\uC77C\uBC18 Q \uAC15\uD654"
   description: "\uC77C\uBC18 Q \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774
     {cooldownReduction:%} \uAC10\uC18C\uD569\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 6dd44a019918585b80667ca2bb0c6356, type: 3}
   effects:
   - rid: 7237886673709695120
   references:

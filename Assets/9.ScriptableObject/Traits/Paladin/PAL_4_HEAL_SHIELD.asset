@@ -20,7 +20,7 @@ MonoBehaviour:
     {shieldDuration}\uCD08 \uB3D9\uC548 \uC90D\uB2C8\uB2E4. \uBCF4\uD638\uB9C9\uC740
     \uB300\uC0C1 \uCD5C\uB300 \uCCB4\uB825\uC758 {shieldCapMaxHpRatio:%}\uB97C \uB118\uC9C0
     \uC54A\uC2B5\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 70624957c70255b9bf86bf89fb4e032d, type: 3}
   effects:
   - rid: 7237886673742725446
   references:
