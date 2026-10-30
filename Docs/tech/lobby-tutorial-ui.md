@@ -29,12 +29,12 @@
 
 | 158 입력 | 값(= 157 단계표 `LobbyTutorialSteps.asset` 칸) |
 |---|---|
-| 경로 `LobbyTutorialPathIds` | `PATH_LOCKER`(L00)·`PATH_CENTRAL`(L10·L30 공용)·`PATH_TRAINING_HALL`(L20)·`PATH_COMBAT_AREA`(T20)·`PATH_COUNTER_AREA`(T30)·`PATH_TRAINING_EXIT`(T50)·`PATH_SORTIE`(L40) |
+| 경로 `LobbyTutorialPathIds` | `PATH_LOCKER`(L00)·`PATH_CENTRAL`(L10·L30 공용)·`PATH_TRAINING_HALL`(L20 — 끝점 = 훈련장 문 앞 입구 `Gather_Entrance`, `Train01Start` 아님)·`PATH_COMBAT_AREA`(T20)·`PATH_COUNTER_AREA`(T30)·`PATH_TRAINING_EXIT`(T50)·`PATH_SORTIE`(L40) |
 | 벽 `LobbyTutorialWallIds` | `WALL_TRAIN_WEST`(T34) |
 | 삽화 `LobbyTutorialBackgroundIds` | `BRIEF_BG_FACTORY`(L32)·`BRIEF_BG_REBELLION`(L33) |
 | 대사 id | `LOBBY_DLG_INTRO`(L11)·`LOBBY_DLG_TRAINING`(L21)·`LOBBY_BRIEF_EVAL`·`LOBBY_BRIEF_FACTORY`·`LOBBY_BRIEF_REBELLION`·`LOBBY_BRIEF_SORTIE`(L31~L34), 화자 `LOBBY_SPEAKER_SUPERVISOR` |
 | 문구 id | `LOBBY_TITLE_*` 9·`LOBBY_OBJ_*` 12·`LOBBY_BODY_*` 4·`LOBBY_CHECK_*` 6·`LOBBY_PROGRESS_*` 3 |
-| 집결 | 입력 없음 — 테두리는 `PartyGatherZone` 복제값(활성 ∧ 확정 전)만 읽는다. `LobbyGatherPoint` 이름에 의존하지 않는다 |
+| 집결 | 입력 없음 — 테두리는 `PartyGatherZone` 복제값(활성 ∧ 확정 전)만 읽는다. `LobbyGatherPoint` 이름에 의존하지 않는다(L20 활성 구역 = `Entrance` — 확정 뒤 명단 전원 `Train01Start` 로 텔레포트, 내부 재집결 없음. 계약 198d483a) |
 
 157 코드(`LobbyTutorialState`)에 컴파일 의존하지 않는다 — 이름·값만 맞췄다. 바인더(C10)는 157 병합 뒤.
 

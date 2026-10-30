@@ -10,7 +10,7 @@ public static class LobbyTutorialPathIds
 {
     public const string Locker = "PATH_LOCKER";               // L00 라커
     public const string Central = "PATH_CENTRAL";             // L10·L30 중앙
-    public const string TrainingHall = "PATH_TRAINING_HALL";  // L20 훈련장
+    public const string TrainingHall = "PATH_TRAINING_HALL";  // L20 훈련장 문 앞 입구(Gather_Entrance — Train01Start 는 텔레포트 도착지)
     public const string CombatArea = "PATH_COMBAT_AREA";      // T20 전투 구역
     public const string CounterArea = "PATH_COUNTER_AREA";    // T30 간파 구역
     public const string TrainingExit = "PATH_TRAINING_EXIT";  // T50 출구
