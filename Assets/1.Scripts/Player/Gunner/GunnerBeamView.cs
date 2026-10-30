@@ -101,19 +101,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     // 잔류 포격(GUN_4_ECHO_Q, 할 일 149) — 원래 발에 맞은 대상 몸에 붙어 따라다니는 에너지 폭탄 구체.
     // 판정·폭발 시각은 서버(GunnerChargeLaserSkill)가 들고, 여기는 복제 목록(echoBombStates)을 보고 그리기만 한다.
-    // 149 후속 4 — 3D 구체는 몸 메시에 묻혀 안 보여서 화면 공간 스프라이트(머리 위 체력바 오버레이 캔버스)로 바꿨다.
+    // 149 후속 6 — 월드 VFX 프리팹(블룸·애니·파티클을 이펙트 담당이 꾸밈). 몸 메시에 묻히지 않게 머티리얼은 ZTest Always.
     [Header("잔류 포격 에너지 폭탄 VFX")]
-    [Tooltip("폭탄 스프라이트 — 화면 공간 오버레이라 몸에 가려지지 않는다. 비우면 안 보인다(피해는 그대로). 임시 = ~Others/Sprite/Circle")]
+    [Tooltip("폭탄마다 복제해 대상 점을 따라감, 겉모습·애니·블룸은 프리팹 안에서, 비우면 안 보임(피해는 그대로). " +
+             "몸에 안 가려지려면 머티리얼이 ZTest Always 여야 한다. 임시 = GunnerEchoBombVfx_Temp")]
     [DataTableIgnore]
-    [SerializeField] private Sprite echoBombSprite;
-
-    [Tooltip("폭탄 스프라이트 한 변 크기 — 캔버스 단위(세로 1080 기준 px). 카메라 거리와 무관하게 일정")]
-    [DataTableIgnore, Min(0f)]
-    [SerializeField] private float echoBombSize = 40f;
-
-    [Tooltip("폭탄 스프라이트 색(곱하기)")]
-    [DataTableIgnore]
-    [SerializeField] private Color echoBombColor = new Color(0.294f, 0f, 0.51f, 1f);
+    [SerializeField] private GameObject echoBombVfxPrefab;
 
     // 연출 정렬 값이라 xlsx 행이 아니다(data-table.md). 서버 피해·폭발 시각(특성 Delay)은 건드리지 않는다.
     [Tooltip("구체를 띄우기까지 지연(초). 기준 = Q 가 대상에 맞은 순간(예비 구체 생성, 집속 연사면 그 대상 첫 적중). 0 = 즉시. " +
@@ -248,19 +241,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
-        echoBombVisuals = new GunnerEchoBombVisuals(echoBombSprite, echoBombShowDelay, echoBombOffset, echoBombPreviewTimeout,
-            echoBombSize, echoBombColor);
-    }
-
-    private void OnEnable() => Canvas.willRenderCanvases += ApplyEchoBombScreenPositions;
-
-    private void OnDisable() => Canvas.willRenderCanvases -= ApplyEchoBombScreenPositions;
-
-    // 잔류 포격 구체 화면 위치 — 카메라 LateUpdate 뒤(UnitOverheadHealthBar 와 같은 시점).
-    private void ApplyEchoBombScreenPositions()
-    {
-        if (echoBombVisuals != null && echoBombVisuals.Count > 0)
-            echoBombVisuals.ApplyScreenPositions();
+        echoBombVisuals = new GunnerEchoBombVisuals(echoBombVfxPrefab, echoBombShowDelay, echoBombOffset, echoBombPreviewTimeout);
     }
 
     public override void OnNetworkSpawn()

@@ -513,10 +513,10 @@ public class GunnerTraitTier34Tests
     public void EchoBombVisuals_UnknownTarget_NoOrb_RemoveReportsNoPosition()
     {
         // 네트워크 없는 EditMode — 대상 못 찾음 = 구체를 띄우지 않고, 빠질 때 폭발 위치도 없다.
-        var sprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f));
+        var prefab = new GameObject("EchoBombVfxPrefab");
         try
         {
-            var visuals = new GunnerEchoBombVisuals(sprite);
+            var visuals = new GunnerEchoBombVisuals(prefab);
             visuals.Add(1, 123UL);
             visuals.Add(1, 123UL);
             Assert.AreEqual(1, visuals.Count, "같은 폭탄 번호는 한 번");
@@ -532,7 +532,7 @@ public class GunnerTraitTier34Tests
         }
         finally
         {
-            Object.DestroyImmediate(sprite);
+            Object.DestroyImmediate(prefab);
         }
     }
 
