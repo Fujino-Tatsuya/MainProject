@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 간파 훈련 T31~T40(할 일 86 T5c → 157 ⑦ — PLAN §5 ⑦, 명세 §5 T30~T34·§6) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
+/// 간파 훈련 T31~T40·T50 허수아비(할 일 86 T5c → 157 ⑦·⑧ — PLAN §5 ⑦·⑧, 명세 §5 T30~T50·§6) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
 /// 연결 규칙은 <see cref="LobbySparringLink"/>, 단계 판정은 훈련 상대(<see cref="TrainingSparringBot"/>·<see cref="TrainingSparringModel"/>),
 /// T32·T34 "새 시전" 판정은 <see cref="LobbyCastWindow"/>. 여기는 스폰·구독·짝짓기 입력·보고만 한다.
 /// <list type="bullet">
@@ -13,7 +13,7 @@ using UnityEngine.SceneManagement;
 /// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 T31 시작 알림까지 준다. 이미 있으면 재사용.</item>
 /// <item>시작 알림: T31~T40 이 시작될 때마다 <see cref="TrainingSparringBot.ServerNotifyFlowStageStarted"/> 1회(앞으로만) — 그 단계 revision 을 기억한다.
 /// T32·T34 알림이면 판정 창을 열고 그 순간 접속자별 시전 기준선(Player 인스턴스, <see cref="Player.ServerCastSeq"/>)을 잡는다.</item>
-/// <item>짝짓기 입력: 접속자 Player 의 <see cref="Player.ServerAttackLanded"/>(대상에 이 상대가 있을 때)·상대의 간파 성공·CC·벽·넉백 끝을 프레임 번호와 함께 창에 넣고,
+/// <item>짝짓기 입력: 접속자 Player 의 <see cref="Player.ServerAttackLanded"/>(대상에 이 상대가 있을 때)·상대의 CC·벽·넉백 끝을 프레임 번호와 함께 창에 넣고,
 /// 다음 프레임 이후 <see cref="LobbyCastWindow.Resolve"/> → 상대에 인정(<see cref="TrainingSparringBot.ServerAcceptCrowdControl"/>·<see cref="TrainingSparringBot.ServerAcceptWallImpact"/>)
 /// 또는 T34 재시도(<see cref="TrainingSparringBot.ServerRestoreAfterMiss"/>). Player 구독은 교체(새 인스턴스)를 따라 매 프레임 맞춘다.</item>
 /// <item>T33: 상대가 CC 반응이 끝난 뒤 위치 복귀를 실행하면(<see cref="TrainingSparringBot.ServerResetExecuted"/>) 플레이어 쪽 <see cref="TrainingResetOptions.PracticeReset"/> 회차당 1회(Q10 A).</item>
@@ -21,8 +21,10 @@ using UnityEngine.SceneManagement;
 /// 피해·사망 판정 도중 단계를 넘기지 않는다. 진행기 단계와 어긋난 보고·중복·지난 revision 은 무시(경고).</item>
 /// <item>단계 안 사건 무전(TRAIN_03_COUNTER/WALL/COMBAT)은 끈다(Q6 A — 명세 §3.3 중복 대사 금지, 문구 키 보존).</item>
 /// <item>정리: 간파 훈련이 아닌 단계로 넘어가거나(T50 등) 진행기 디스폰 때 살아 있는 상대 디스폰·회차 끝. T40 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰한다.</item>
+/// <item>T50 자유 연습(⑧): T50 동안 허수아비 1개(<see cref="LobbyRules"/> 의 TrainingDummy 계열 프리팹 — 사망 없음, 자리 = A/B 위치). 출구 집결 확정(→ L30)의
+/// 단계 변경에서 정리 — 진행기가 그 뒤에 종료 텔레포트한다. 체력 하한은 행 trainingProfile(T50 = None)대로 진행기가 맞춘다.</item>
 /// </list>
-/// 제압 중 쿨타임 가속은 보류(할 일 91 GrantServer 로 나중 연결) — 여기엔 없다. 마무리 체력은 상대 프리팹 finishHealth(임시 60).
+/// 제압 중 쿨타임 가속은 보류(할 일 91 GrantServer 로 나중 연결, Q13 A — 훈련이 임의 버프를 만들지 않는다) — 여기엔 없다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbyTrainingSparring : NetworkBehaviour
@@ -45,6 +47,8 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     private readonly List<SkillTooltipTag> _sourceTags = new List<SkillTooltipTag>();
     private int _noticeRevision;
     private TrainingSparringBot _bot;
+    private NetworkObject _dummy;
+    private bool _warnedNoDummyPrefab;
 
     // 구독한 Player 인스턴스와 그 핸들러 — 교체(새 인스턴스)·연결 종료 때 풀어 준다.
     private readonly struct PlayerHook
@@ -97,6 +101,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
 
             if (_link.IsRoundActive || _bot != null)
                 EndServer("진행기 디스폰");
+            DespawnDummyServer("진행기 디스폰");
             UnhookAllPlayers();
             _director = null;
         }
@@ -154,6 +159,56 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         {
             EndServer($"단계 이탈 → {_director.DescribeStep()}");
         }
+
+        // T50 자유 연습 허수아비 — 훈련 상대 정리 뒤에 스폰, T50 을 떠나면(출구 집결 확정 → L30) 종료 텔레포트 전에 정리.
+        if (LobbySparringLink.FreePracticeDummyPresent(activity))
+        {
+            if (_dummy == null || !_dummy.IsSpawned)
+                _dummy = SpawnDummyServer();
+        }
+        else if (_dummy != null)
+        {
+            DespawnDummyServer($"단계 이탈 → {_director.DescribeStep()}");
+        }
+    }
+
+    // T50 허수아비 1개 — 기존 TrainingDummy 계열(사망 없음·피해 숫자·회복). 자리 = Train03Arena A/B 위치(씬 무수정), 없으면 진행기 위치.
+    private NetworkObject SpawnDummyServer()
+    {
+        var prefab = _director.FreePracticeDummyPrefab;
+        if (prefab == null || prefab.GetComponent<NetworkObject>() == null)
+        {
+            if (!_warnedNoDummyPrefab)
+            {
+                _warnedNoDummyPrefab = true;
+                Debug.LogWarning($"{Tag} 자유 연습 허수아비 프리팹(LobbyRules.freePracticeDummyPrefab)이 비었거나 NetworkObject 가 없다 — 허수아비 없이 출구 집결만 한다.", this);
+            }
+
+            return null;
+        }
+
+        var point = arena != null ? arena.SpawnPoint : null;
+        var position = point != null ? point.position : transform.position;
+        var rotation = point != null ? Quaternion.Euler(0f, point.eulerAngles.y, 0f) : Quaternion.identity;
+        var go = Instantiate(prefab, position, rotation);
+        SceneManager.MoveGameObjectToScene(go, gameObject.scene);
+        go.name = $"{prefab.name}_FreePractice";
+        var no = go.GetComponent<NetworkObject>();
+        no.Spawn(true);
+        Debug.Log($"[SceneFlow] {Tag} T50 자유 연습 허수아비 스폰 — {go.name} @ {position}");
+        return no;
+    }
+
+    private void DespawnDummyServer(string reason)
+    {
+        if (_dummy == null)
+            return;
+
+        var despawned = _dummy.IsSpawned;
+        if (despawned)
+            _dummy.Despawn(true);
+        _dummy = null;
+        Debug.Log($"[SceneFlow] {Tag} T50 자유 연습 허수아비 정리({reason}) — 디스폰 {despawned}");
     }
 
     private void BeginServer()
@@ -363,7 +418,6 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     {
         bot.ServerStageCompleted += HandleBotStageCompleted;
         bot.ServerResetExecuted += HandleBotResetExecuted;
-        bot.ServerCounterSucceeded += HandleBotCounterSucceeded;
         bot.ServerCrowdControlApplied += HandleBotCrowdControlApplied;
         bot.ServerWallImpact += HandleBotWallImpact;
         bot.ServerKnockbackEnded += HandleBotKnockbackEnded;
@@ -373,15 +427,12 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     {
         bot.ServerStageCompleted -= HandleBotStageCompleted;
         bot.ServerResetExecuted -= HandleBotResetExecuted;
-        bot.ServerCounterSucceeded -= HandleBotCounterSucceeded;
         bot.ServerCrowdControlApplied -= HandleBotCrowdControlApplied;
         bot.ServerWallImpact -= HandleBotWallImpact;
         bot.ServerKnockbackEnded -= HandleBotKnockbackEnded;
     }
 
     private void HandleBotStageCompleted(LobbyTutorialActivity completed) => _pendingReports.Enqueue(completed);
-
-    private void HandleBotCounterSucceeded(ulong attacker) => _castWindow.RecordCounterSuccess(Time.frameCount, attacker);
 
     private void HandleBotCrowdControlApplied(int episode, TrainingSparringCrowdControl kinds, bool applied) =>
         _castWindow.RecordCrowdControl(Time.frameCount, episode, kinds, applied);

@@ -17,7 +17,7 @@ public enum TrainingSparringStage : byte
     Resetting = 3,
     /// <summary>T34 벽 — 지정 벽 유효 넉백 충돌 자체(새 시전) = 완료. 칸 감소는 실제 규칙대로 일어나되 조건 아님. 빗나간 넉백 = 위치 복구 후 재시도.</summary>
     Wall = 4,
-    /// <summary>T40 제압·처치 — 커밋 ⑧ 전까지 옛 D 규칙: 제압 중 유효 피해 + 제압 종료 → 처치 방지 해제 → 사망 = 완료.</summary>
+    /// <summary>T40 제압·처치 — 남은 칸 보존. 칸 0 이면 즉시 제압, 남았으면 패턴 재개 → 간파/벽으로 소진 → 제압. 제압은 처치할 때까지 유지, 제압 중 사망 = 완료.</summary>
     SuppressKill = 5,
     /// <summary>T40 완료(상대 처치).</summary>
     Completed = 6,
@@ -63,7 +63,7 @@ public readonly struct TrainingSparringSegmentCheck
 }
 
 /// <summary>
-/// [서버] 간파 훈련 상대 상태기계 — 할 일 157 ⑦(PLAN §5 ⑦, 명세 §5 T30~T34·§6). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
+/// [서버] 간파 훈련 상대 상태기계 — 할 일 157 ⑦·⑧(PLAN §5 ⑦·⑧, 명세 §5 T30~T40·§6). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
 /// <para>시간은 갖지 않는다 — 그로기·취약·제압 시간은 23호 데이터로 상대가 잰다. "새 시전인가"는 여기서 보지 않는다 —
 /// <see cref="LobbyCastWindow"/> 가 거른 뒤 <see cref="OnCrowdControlAccepted"/>·<see cref="OnWallAccepted"/> 로 들어온다.</para>
 /// <list type="bullet">
@@ -71,7 +71,9 @@ public readonly struct TrainingSparringSegmentCheck
 /// <item>T32 VulnerableCc: 취약 유지·자발 행동 없음. 걸러진 CC 1회 = 완료(적용 순간 — 반응 종료는 T33 이 기다린다). 진입 프레임 이하 사건 불인정(같은 프레임 연쇄 금지).</item>
 /// <item>T33 Resetting: 초기화 요청 1회 — 상대가 CC 반응이 끝난 뒤에만 꺼내 실행(<see cref="TryConsumeResetRequest"/>)하고 <see cref="OnResetExecuted"/> = 완료. 이 동안 새 CC 반응 없음.</item>
 /// <item>T34 Wall: 걸러진 지정 벽 충돌 1회 = 완료. 칸 감소·제압은 실제 규칙(완료 조건 아님). 완료 전 빗나간 넉백은 <see cref="NeedsRetryAfterMiss"/> → 상대가 위치 복구.</item>
-/// <item>T40 SuppressKill(커밋 ⑧ 전 임시 = 옛 D): 취약 유지 해제·자발 행동 재개. 제압 중 유효 피해 + 제압 종료 → 처치 방지 해제·마무리 체력 요청 1회 → 사망 = 완료.</item>
+/// <item>T40 SuppressKill(⑧): 칸(게이지) 보존. 진입 때 칸 0·제압 아님이면 즉시 제압(<see cref="ShouldSuppressOnEntry"/>), 남았으면 취약 무기한 보정 해제·자발 행동 재개 →
+/// 실제 규칙(간파·벽)으로 칸 소진 → 제압. 제압 전엔 처치 방지, 제압 중엔 공격 대기·사망 허용. 제압은 지속시간으로 끝나지 않는다(<see cref="HoldsSuppress"/> — 상대가 매 틱 연장, Q17 A).
+/// 사망 = 완료(마지막 타격 귀속 검사 없음). 옛 D 의 '제압 중 피해 → 제압 종료 → 마무리 체력' 단계는 없앴다.</item>
 /// </list>
 /// 이벤트 메서드는 상태가 바뀌었거나 기록했으면 true — 현재 단계에 맞지 않는 이벤트·중복·역순은 무시(false)라 호출측이 로그만 남긴다.
 /// </summary>
@@ -88,9 +90,6 @@ public sealed class TrainingSparringModel
     bool _resetRequested, _resetConsumed, _resetReported;
     bool _wallReported;
     bool _suppressActive;
-    bool _damagedDuringSuppress;
-    bool _finishing;                    // T40: 제압 피해 확인 + 제압 종료 — 처치 방지 해제됨
-    bool _finishHealthRequested, _finishHealthConsumed;
 
     /// <param name="segments">총 칸 판정(<see cref="TrainingSparringSegmentCheck.Evaluate"/>). 오류여도 진행은 그대로 — 호출측이 <see cref="TrainingSparringSegmentCheck.Error"/> 를 로그한다.</param>
     /// <param name="suppressAccelerationEnabled">
@@ -118,8 +117,17 @@ public sealed class TrainingSparringModel
 
     // ── 출력 ──
 
-    /// <summary>처치 방지 — 완료 전까지 체력이 0 이 되지 않게 한다. T40 에서 제압 피해 확인 + 제압 종료 뒤에만 해제.</summary>
-    public bool PreventsDeath => Stage != TrainingSparringStage.Completed && !_finishing;
+    /// <summary>처치 방지 — 완료 전까지 체력이 0 이 되지 않게 한다. T40 제압 중에만 해제(제압 진입 = 사망 허용).</summary>
+    public bool PreventsDeath => Stage != TrainingSparringStage.Completed && !IsKillable;
+
+    /// <summary>T40 제압 중 — 처치 가능(사망 = 완료).</summary>
+    public bool IsKillable => Stage == TrainingSparringStage.SuppressKill && _suppressActive;
+
+    /// <summary>
+    /// 제압 무기한 유지 — T34·T40 제압 중. 제압 지속시간이 끝나도 풀지 않는다(상대가 매 틱 연장, PLAN Q17 A — 23호·공용 코드 무수정).
+    /// T34 의 제압(지정 벽으로 칸 0)도 T40 이 이어받을 때까지 잡아 둔다.
+    /// </summary>
+    public bool HoldsSuppress => _suppressActive && AllowsGaugeTransition;
 
     /// <summary>간파·벽의 칸 감소와 제압 전이를 허용 — T34·T40. T31~T33 은 중지(간파 성공·CC 중 벽이 칸을 미리 깎지 않게).</summary>
     public bool AllowsGaugeTransition => Stage == TrainingSparringStage.Wall || Stage == TrainingSparringStage.SuppressKill;
@@ -135,12 +143,9 @@ public sealed class TrainingSparringModel
     /// <summary>칸 UI(중간보스 체력바 재사용) 표시 — T34·T40.</summary>
     public bool ShowsSegmentUi => Stage == TrainingSparringStage.Wall || Stage == TrainingSparringStage.SuppressKill;
 
-    /// <summary>T40 마무리 중 — 제압 피해 확인 + 제압 종료 뒤 사망 전까지. 바 이름이 칸 대신 '마무리하세요'.</summary>
-    public bool IsFinishing => Stage == TrainingSparringStage.SuppressKill && _finishing;
-
-    /// <summary>자발 공격·이동 허용 — T31 간파 성공 전(간파 가능한 같은 공격 반복)·T40. T32~T34·시작 전·완료는 없음.</summary>
+    /// <summary>자발 공격·이동 허용 — T31 간파 성공 전(간파 가능한 같은 공격 반복)·T40 제압 전(패턴 재개). T32~T34·T40 제압 중(공격 대기)·시작 전·완료는 없음.</summary>
     public bool AllowsSelfAction => (Stage == TrainingSparringStage.Counter && !_counterReported)
-        || Stage == TrainingSparringStage.SuppressKill;
+        || (Stage == TrainingSparringStage.SuppressKill && !_suppressActive);
 
     /// <summary>훈련 간파 창 연장(PLAN Q11 A) — T31 간파 성공 전에만. 신호(기존 간파 예고)를 보고 입력해도 성공할 길이를 상대가 보장한다.</summary>
     public bool ExtendsCounterWindow => Stage == TrainingSparringStage.Counter && !_counterReported;
@@ -176,15 +181,12 @@ public sealed class TrainingSparringModel
         return true;
     }
 
-    /// <summary>마무리 체력(훈련 데이터) 적용 요청 — T40 에서 제압 피해 확인 + 제압 종료 뒤 처음 한 번만 true.</summary>
-    public bool TryConsumeFinishHealthRequest()
-    {
-        if (!_finishHealthRequested || _finishHealthConsumed)
-            return false;
-
-        _finishHealthConsumed = true;
-        return true;
-    }
+    /// <summary>
+    /// T40 진입 때 바로 제압할지 — 벽 충돌로 남은 칸이 0 인데 아직 제압이 아니면 true(명세 T40 '0칸이면 즉시 제압').
+    /// 보통은 T34 의 그 벽 충돌이 이미 제압을 걸어 두어(<see cref="HoldsSuppress"/>) false 다.
+    /// </summary>
+    public bool ShouldSuppressOnEntry(int remainingSegments) =>
+        Stage == TrainingSparringStage.SuppressKill && !_suppressActive && remainingSegments <= 0;
 
     // ── 입력 ──
 
@@ -219,8 +221,7 @@ public sealed class TrainingSparringModel
 
             case LobbyTutorialActivity.SuppressKill:
                 if (Stage != TrainingSparringStage.Wall || !_wallReported) return false;
-                Enter(TrainingSparringStage.SuppressKill, frame);
-                _damagedDuringSuppress = false;
+                Enter(TrainingSparringStage.SuppressKill, frame);   // 칸·T34 에서 걸린 제압은 그대로 이어받는다
                 return true;
 
             default:
@@ -277,30 +278,18 @@ public sealed class TrainingSparringModel
         return true;
     }
 
-    /// <summary>제압 진입(게이지 0). T34·T40 에서만 — T34 의 제압은 완료 조건이 아니다(T40 이 이어받는다). 마무리 중·중복 시작은 무시.</summary>
+    /// <summary>제압 진입(게이지 0). T34·T40 에서만 — T34 의 제압은 완료 조건이 아니다(T40 이 이어받는다). 중복 시작은 무시.</summary>
     public bool OnSuppressStarted()
     {
-        if (!AllowsGaugeTransition || _suppressActive || _finishing)
+        if (!AllowsGaugeTransition || _suppressActive)
             return false;
 
         _suppressActive = true;
-        _damagedDuringSuppress = false;
-        return true;
-    }
-
-    /// <summary>제압 중 유효 피해(실제로 체력에 들어간 플레이어 피해). T40 의 제압 중에만 기록 — 처음이면 true.</summary>
-    public bool OnSuppressDamage()
-    {
-        if (Stage != TrainingSparringStage.SuppressKill || !_suppressActive || _damagedDuringSuppress)
-            return false;
-
-        _damagedDuringSuppress = true;
         return true;
     }
 
     /// <summary>
-    /// 제압 종료(게이지 가득 복원은 상대 몫). T40 에서 이번 제압 중 피해가 있었으면 마무리 — 처치 방지 해제·마무리 체력 요청 1회.
-    /// 피해가 없었으면 T40 유지(다음 제압에서 재확인).
+    /// 제압 종료(게이지 가득 복원은 상대 몫). T34·T40 제압은 <see cref="HoldsSuppress"/> 라 보통 오지 않는다 — 와도(외부 해제) 제압 전으로 돌아가 처치 방지·패턴 재개.
     /// </summary>
     public bool OnSuppressEnded()
     {
@@ -308,20 +297,13 @@ public sealed class TrainingSparringModel
             return false;
 
         _suppressActive = false;
-        if (Stage == TrainingSparringStage.SuppressKill && _damagedDuringSuppress)
-        {
-            _finishing = true;
-            _finishHealthRequested = true;
-        }
-
-        _damagedDuringSuppress = false;
         return true;
     }
 
-    /// <summary>상대 사망. T40 마무리(처치 방지 해제 뒤)에서만 완료(SuppressKill 보고 1회). 그 밖의 사망은 처치 방지 누락 — false(호출측 경고).</summary>
+    /// <summary>상대 사망. T40 제압 중(처치 방지 해제)에서만 완료(SuppressKill 보고 1회) — 누가 마지막에 쳤는지는 보지 않는다. 그 밖의 사망은 처치 방지 누락 — false(호출측 경고).</summary>
     public bool OnDied()
     {
-        if (Stage != TrainingSparringStage.SuppressKill || !_finishing)
+        if (!IsKillable)
             return false;
 
         Stage = TrainingSparringStage.Completed;

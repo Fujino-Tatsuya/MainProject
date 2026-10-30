@@ -152,6 +152,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     /// <summary>T22 전투 상대 구성(할 일 157 ⑥). 없으면 null — 전투는 옛 존2 구성으로 돌아간다.</summary>
     public LobbyCombatSpawnSet CombatSpawnSet => rules != null ? rules.CombatSpawnSet : null;
 
+    /// <summary>T50 자유 연습 허수아비 프리팹(할 일 157 ⑧). 없으면 null — 허수아비 없이 출구 집결만.</summary>
+    public GameObject FreePracticeDummyPrefab => rules != null ? rules.FreePracticeDummyPrefab : null;
+
     /// <summary>[전 피어] 복제 스냅샷. 스폰 전이면 default(RunId 0).</summary>
     public LobbyTutorialSnapshot Snapshot => IsSpawned ? snapshot.Value : default;
 

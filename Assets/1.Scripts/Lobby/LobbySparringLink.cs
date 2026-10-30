@@ -34,6 +34,12 @@ public sealed class LobbySparringLink
     public static bool BotPresent(LobbyTutorialActivity activity) => IsSparringStage(activity);
 
     /// <summary>
+    /// T50 자유 연습 허수아비(무제한 체력 — <c>TrainingDummy</c>, 사망 없음)가 있어야 하는가 — T50 동안만(157 ⑧, 명세 §5 T50).
+    /// T40 처치 보고로 T50 이 시작되면 스폰, 출구 집결 확정(→ L30)이면 정리. 이후 단계는 다시 T50 이 되지 않아 재입장해도 생기지 않는다.
+    /// </summary>
+    public static bool FreePracticeDummyPresent(LobbyTutorialActivity activity) => activity == LobbyTutorialActivity.FreePractice;
+
+    /// <summary>
     /// [전 피어] 지정 벽 표시(주황 띠, 임시 비주얼)를 켜는가 — 벽 목표가 있는 T33(위치 복귀)·T34 동안. T34 완료(지정 벽 충돌) 즉시 끈다 —
     /// 계약의 <c>ActiveTargetWallId</c> 가 비는 것과 같은 순간(명세 §5 T34). T31·T32·T40 이후·로비·진행기 없음(None)은 끈다.
     /// 클라는 복제 스냅샷의 현재 행 Activity(<see cref="LobbyTrainingDirector.CurrentActivity"/>)로 판정 — 늦게 붙은 클라도 같다.

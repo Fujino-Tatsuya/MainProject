@@ -15,7 +15,7 @@ public sealed class TrainingSparringBotTests
     // 23호 기본 비(100 / 20 = 5칸)와 같은 입력 — 테스트 입력일 뿐 규칙엔 수치가 없다.
     const float Step = 20f;
 
-    // ── 처치 방지·마무리 체력 ──
+    // ── 처치 방지 ──
 
     [Test]
     public void HealthFloor_IsOneWhilePreventingDeath()
@@ -24,16 +24,6 @@ public sealed class TrainingSparringBotTests
         Assert.That(TrainingSparringRules.HealthFloor(false), Is.Zero);
         Assert.That(HealthFloorRules.Clamp(10, -50, TrainingSparringRules.HealthFloor(true)), Is.EqualTo(1), "치명 피해도 1 에서 멈춘다");
         Assert.That(HealthFloorRules.Clamp(10, -50, TrainingSparringRules.HealthFloor(false)), Is.EqualTo(-50), "해제 뒤엔 하한 없음");
-    }
-
-    [Test]
-    public void FinishHealth_LowersButNeverHeals()
-    {
-        Assert.That(TrainingSparringRules.FinishHealth(200, 260, 60), Is.EqualTo(60));
-        Assert.That(TrainingSparringRules.FinishHealth(30, 260, 60), Is.EqualTo(30), "이미 낮으면 그대로 — 회복하지 않는다");
-        Assert.That(TrainingSparringRules.FinishHealth(1, 260, 60), Is.EqualTo(1));
-        Assert.That(TrainingSparringRules.FinishHealth(200, 40, 60), Is.EqualTo(40), "최대 체력으로 자른다");
-        Assert.That(TrainingSparringRules.FinishHealth(200, 260, 0), Is.EqualTo(1), "0 이하 저작 = 1");
     }
 
     // ── 간파 성공 ──
@@ -195,7 +185,6 @@ public sealed class TrainingSparringBotTests
 
         Assert.That(so.FindProperty("data").objectReferenceValue, Is.Not.Null, "MonsterDataSO(SpinnerBot 데이터)");
         Assert.That(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, rules.counterGaugeStep).IsValid, Is.True, "총 칸 ≥ 2");
-        Assert.That(so.FindProperty("finishHealth").intValue, Is.GreaterThanOrEqualTo(1));
     }
 
     [Test]

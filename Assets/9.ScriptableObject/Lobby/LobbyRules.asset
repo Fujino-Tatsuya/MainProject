@@ -24,3 +24,4 @@ MonoBehaviour:
   dialogueMinSeconds: 3
   dialogueEndPaddingSeconds: 0.5
   combatSpawnSet: {fileID: 11400000, guid: 9c7de3adae72b874da53ac9ee3fb6bda, type: 2}
+  freePracticeDummyPrefab: {fileID: 1499259539980126395, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}

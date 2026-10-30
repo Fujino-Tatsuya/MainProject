@@ -60,31 +60,18 @@ public sealed class LobbyCastWindowTests
     }
 
     [Test]
-    public void Cc_AutoInterruptKnockback_NotAccepted()
+    public void Cc_AutoInterruptKnockback_NotAccepted_ByBaselineOnly()
     {
+        // 간파 성공은 T31 에서만 난다 — 그 시전(5)은 승인 때 ID 를 받아 T32 진입 기준선(5) 이하다. 따로 '간파 성공 시전' 기록 없이 기준선만으로 걸러진다(⑧).
         var w = Open(LobbyCastWindowMode.CrowdControl);
-        // 간파 성공(시전 9) — 같은 프레임 그 공격자의 적중 시전이 '간파 성공 시전'이 된다.
-        w.RecordCounterSuccess(101, Host);
-        w.RecordLanded(101, Host, HostPlayer, 9, true);
-        // 같은 시전이 다음 프레임에 딸려 민 넉백(시전 9 > 기준선 5 지만 불인정).
-        w.RecordLanded(103, Host, HostPlayer, 9, true);
+        w.RecordLanded(103, Host, HostPlayer, 5, true);   // 간파 시전의 딸린 넉백(다음 프레임)
         w.RecordCrowdControl(103, 1, TrainingSparringCrowdControl.Knockback, true);
         Assert.That(w.Resolve(104).CrowdControlAccepted, Is.False, "간파 성공에 딸린 자동 넉백 = 별도 CC 아님");
 
         // 같은 사람의 새 시전은 인정.
-        w.RecordLanded(105, Host, HostPlayer, 10, true);
+        w.RecordLanded(105, Host, HostPlayer, 6, true);
         w.RecordCrowdControl(105, 2, TrainingSparringCrowdControl.Knockback, true);
         Assert.That(w.Resolve(106).CrowdControlAccepted, Is.True);
-    }
-
-    [Test]
-    public void Cc_AutoInterruptKnockback_SameFrameAsSuccess_NotAccepted()
-    {
-        var w = Open(LobbyCastWindowMode.CrowdControl);
-        w.RecordCounterSuccess(101, Host);
-        w.RecordLanded(101, Host, HostPlayer, 9, true);
-        w.RecordCrowdControl(101, 1, TrainingSparringCrowdControl.Knockback, true);
-        Assert.That(w.Resolve(102).CrowdControlAccepted, Is.False);
     }
 
     [Test]
@@ -109,8 +96,7 @@ public sealed class LobbyCastWindowTests
     public void Cc_OtherPlayer_Accepted()
     {
         var w = Open(LobbyCastWindowMode.CrowdControl);
-        // 간파는 호스트가, CC 는 게스트가.
-        w.RecordCounterSuccess(90, Host);
+        // 간파는 호스트가(진입 전), CC 는 게스트가.
         w.RecordLanded(90, Host, HostPlayer, 5, true);
         w.RecordLanded(101, Guest, GuestPlayer, 4, true);
         w.RecordCrowdControl(101, 0, TrainingSparringCrowdControl.Stun, true);
@@ -156,7 +142,7 @@ public sealed class LobbyCastWindowTests
     }
 
     [Test]
-    public void ModeNone_OnlyTracksCounterCasts()
+    public void ModeNone_NothingAccepted()
     {
         var w = new LobbyCastWindow();
         w.Reset();   // T31 — 판정 없음

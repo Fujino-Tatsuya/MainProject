@@ -292,14 +292,13 @@ public sealed class LobbySparringLinkTests
         Assert.That(model.ExtendsCounterWindow, Is.True);
         h.CastSeq = 1;
         model.OnCounterSucceeded();
-        w.RecordCounterSuccess(h.Director.Frame, Host);
         w.RecordLanded(h.Director.Frame, Host, HostPlayer, 1, true);
         var t31Frame = h.Director.Frame;
         Assert.That(h.Pump(t31Frame + 1), Is.EqualTo(new[] { LobbyTutorialActivity.Counter }), "그로기 종료를 기다리지 않는다");
         Assert.That(h.Director.StateId, Is.EqualTo("T32_VulnerableCC"));
         Assert.That(model.HoldsVulnerable, Is.True);
 
-        // T32: 간파 성공 시전의 딸린 넉백(같은 시전 1) — 불인정
+        // T32: 간파 성공 시전의 딸린 넉백(같은 시전 1) — 진입 기준선(1)만으로 불인정(⑧ — 따로 거르는 장치 없음)
         var f = h.Director.Frame;
         w.RecordLanded(f + 1, Host, HostPlayer, 1, true);
         w.RecordCrowdControl(f + 1, 1, TrainingSparringCrowdControl.Knockback, true);
@@ -354,20 +353,78 @@ public sealed class LobbySparringLinkTests
         Assert.That(h.Director.Step.targetWallId, Is.Empty, "T34 완료 = 활성 벽 ID 비움(TargetWallCleared)");
         Assert.That(model.HoldsVulnerable, Is.False, "T40 = 취약 무기한 보정 해제");
 
-        // T40(임시 — 커밋 ⑧ 전 옛 D): 피해 없는 제압 = 마무리 아님 → 다음 제압 피해 → 제압 종료 → 마무리 → 처치
+        // T40: 칸이 남았다 → 패턴 재개, 제압 전 사망 방지 → 칸 소진 = 제압(무기한) → 대기만으론 완료 없음 → 처치 = 완료
+        Assert.That(model.AllowsSelfAction, Is.True);
+        Assert.That(model.PreventsDeath, Is.True);
         Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.OnSuppressEnded(), Is.True);
-        Assert.That(model.IsFinishing, Is.False);
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        model.OnSuppressDamage();
-        model.OnSuppressEnded();
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
+        Assert.That(model.HoldsSuppress, Is.True);
+        Assert.That(h.Pump(h.Director.Frame + 1), Is.Empty, "제압 대기만으로 완료 안 됨");
         Assert.That(model.OnDied(), Is.True);
         Assert.That(h.Pump(h.Director.Frame + 1), Is.EqualTo(new[] { LobbyTutorialActivity.SuppressKill }));
         Assert.That(h.Director.StateId, Is.EqualTo("T50_FreePractice"));
-        Assert.That(LobbySparringLink.BotPresent(h.Director.Activity), Is.False, "자유 연습(출구 집결) = 정리");
+        Assert.That(LobbySparringLink.BotPresent(h.Director.Activity), Is.False, "자유 연습(출구 집결) = 훈련 상대 정리");
+        Assert.That(LobbySparringLink.FreePracticeDummyPresent(h.Director.Activity), Is.True, "상대 사망 뒤 허수아비");
+        Assert.That(h.Director.Step.kind, Is.EqualTo(LobbyTutorialStepKind.Gather));
+        Assert.That(h.Director.Step.gatherPoint, Is.EqualTo(LobbyGatherPoint.TrainEnd));
+        Assert.That(LobbyTutorialRules.HealthFloorFor(h.Director.Step, true), Is.Zero, "T50 = 훈련 보정(체력 하한) 없음");
         Assert.That(h.Link.EndRound(), Is.True);
         Assert.That(h.Resets, Is.EqualTo(1));
+
+        // T50: 출구 집결 확정 1회 = L30 + 종료 텔레포트(중앙). 허수아비·상대 없음.
+        var t50Revision = h.Director.Flow.Revision;
+        h.Director.Advance();
+        Assert.That(h.Director.StateId, Is.EqualTo("L30_BriefGather"));
+        Assert.That(LobbyTutorialRules.TeleportTargetOnConfirm(LobbyGatherPoint.TrainEnd), Is.EqualTo(LobbyGatherPoint.Brief));
+        Assert.That(LobbySparringLink.FreePracticeDummyPresent(h.Director.Activity), Is.False, "확정 = 허수아비 정리");
+        Assert.That(LobbySparringLink.BotPresent(h.Director.Activity), Is.False);
+        Assert.That(h.Director.Flow.TryAdvance(3, t50Revision, h.Director.Frame + 5, 0), Is.Not.EqualTo(LobbyTutorialAdvanceResult.Advanced),
+            "지난 T50 revision 의 두 번째 확정 = 무시(확정 1회)");
+        Assert.That(h.Director.StateId, Is.EqualTo("L30_BriefGather"));
+    }
+
+    [Test]
+    public void FreePracticeDummy_OnlyT50()
+    {
+        Assert.That(LobbySparringLink.FreePracticeDummyPresent(LobbyTutorialActivity.FreePractice), Is.True);
+        Assert.That(LobbySparringLink.FreePracticeDummyPresent(LobbyTutorialActivity.SuppressKill), Is.False, "T40 상대 사망 전엔 없음");
+        Assert.That(LobbySparringLink.FreePracticeDummyPresent(LobbyTutorialActivity.None), Is.False, "L30 이후·로비");
+        Assert.That(LobbySparringLink.FreePracticeDummyPresent(LobbyTutorialActivity.Counter), Is.False);
+    }
+
+    [Test]
+    public void AfterTrainEnd_NoRowRestartsTraining_ReentryDoesNothing()
+    {
+        // 출구 확정 뒤 행들에 훈련 내용·출구 집결이 다시 나오지 않는다 — 훈련실을 다시 드나들어도 상대·허수아비·출구 구역이 켜지지 않는다.
+        var table = AssetDatabase.LoadAssetAtPath<LobbyTutorialStepTable>("Assets/9.ScriptableObject/Lobby/LobbyTutorialSteps.asset");
+        Assert.That(table, Is.Not.Null);
+        var t50 = table.IndexOf("T50_FreePractice");
+        Assert.That(t50, Is.GreaterThan(0));
+        for (var i = t50 + 1; i < table.Count; i++)
+        {
+            var step = table[i];
+            Assert.That(LobbySparringLink.BotPresent(step.activity), Is.False, step.stateId);
+            Assert.That(LobbySparringLink.FreePracticeDummyPresent(step.activity), Is.False, step.stateId);
+            Assert.That(step.gatherPoint, Is.Not.EqualTo(LobbyGatherPoint.TrainEnd), step.stateId);
+            Assert.That(step.trainingProfile, Is.EqualTo(LobbyTutorialTrainingProfile.None), step.stateId);
+        }
+    }
+
+    [Test]
+    public void FreePracticeDummyPrefab_IsDeathlessTrainingDummy_Registered()
+    {
+        var rules = AssetDatabase.LoadAssetAtPath<LobbyRules>("Assets/9.ScriptableObject/Lobby/LobbyRules.asset");
+        Assert.That(rules, Is.Not.Null);
+        var prefab = rules.FreePracticeDummyPrefab;
+        Assert.That(prefab, Is.Not.Null, "LobbyRules.freePracticeDummyPrefab");
+        Assert.That(prefab.GetComponent<TrainingDummy>(), Is.Not.Null, "사망 없는 TrainingDummy 계열(숫자 무한 HP 아님)");
+        Assert.That(prefab.GetComponent<Unity.Netcode.NetworkObject>(), Is.Not.Null);
+
+        var list = AssetDatabase.LoadAssetAtPath<Unity.Netcode.NetworkPrefabsList>("Assets/DefaultNetworkPrefabs.asset");
+        Assert.That(list, Is.Not.Null);
+        var registered = false;
+        foreach (var entry in list.PrefabList)
+            registered |= entry.Prefab == prefab;
+        Assert.That(registered, Is.True, "NetworkPrefabs 등록");
     }
 
     [Test]

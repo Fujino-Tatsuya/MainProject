@@ -33,16 +33,6 @@ public static class TrainingSparringRules
     public static int HealthFloor(bool preventsDeath) => preventsDeath ? 1 : 0;
 
     /// <summary>
-    /// D 마무리 체력. 지금 체력이 마무리 체력보다 낮으면 그대로(회복하지 않는다), 1~최대 체력으로 자른다.
-    /// </summary>
-    public static int FinishHealth(int currentHealth, int maxHealth, int finishHealth)
-    {
-        int max = Math.Max(1, maxHealth);
-        int target = Math.Min(Math.Max(1, finishHealth), Math.Max(1, currentHealth));
-        return Math.Min(target, max);
-    }
-
-    /// <summary>
     /// 간파 성공. 칸 전이 허용(C·D)이면 23호와 같다 — 게이지 감소, 0 이면 제압(breakDuration), 남으면 그로기(groggyDuration).
     /// 허용 안 함(A/B)이면 게이지·제압 없이 그로기만(취약은 호출측이 그로기와 같이 건다).
     /// </summary>

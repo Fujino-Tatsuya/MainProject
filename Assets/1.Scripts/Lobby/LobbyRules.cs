@@ -54,7 +54,13 @@ public sealed class LobbyRules : ScriptableObject
     [Tooltip("T22 전투 훈련 상대 구성(LobbyCombatSpawnSet, 6마리 — Q9). 기준점은 씬 Train02Spawns. 비면 옛 존2 구성(Train02Spawns 의 source).")]
     [SerializeField] private LobbyCombatSpawnSet combatSpawnSet;
 
+    [Header("로비 튜토리얼 자유 연습(할 일 157 ⑧)")]
+    [Tooltip("T50 자유 연습 허수아비 프리팹 — 사망 없는 TrainingDummy 계열(TrainingDummy_Tutorial, T10 표적과 같은 것). NetworkPrefabs 에 등록돼 있어야 한다. " +
+             "자리는 씬 Train03Arena 의 A/B 위치. 비면 허수아비 없이 출구 집결만 한다(경고).")]
+    [SerializeField] private GameObject freePracticeDummyPrefab;
+
     public LobbyCombatSpawnSet CombatSpawnSet => combatSpawnSet;
+    public GameObject FreePracticeDummyPrefab => freePracticeDummyPrefab;
     public TutorialGuideTextTable GuideTexts => guideTexts;
     public float DialogueBaseSeconds => dialogueBaseSeconds;
     public float DialoguePerCharSeconds => dialoguePerCharSeconds;

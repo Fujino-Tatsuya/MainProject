@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 
-/// <summary>간파 훈련 상대 상태기계 — 할 일 157 ⑦(명세 §5 T31~T34·§6, PLAN §5 ⑦). T40 은 커밋 ⑧ 전 임시(옛 D 규칙).</summary>
+/// <summary>간파 훈련 상대 상태기계 — 할 일 157 ⑦·⑧(명세 §5 T31~T40·§6·§10 수용 기준 9, PLAN §5 ⑦·⑧).</summary>
 public sealed class TrainingSparringModelTests
 {
     // 게이지 최대 / 감소량 = 5칸(23호 기본값 100 / 20 과 같은 비) — 테스트 입력일 뿐 모델엔 수치가 없다.
@@ -96,8 +96,6 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill, 50), Is.True);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.SuppressKill));
         Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.OnSuppressDamage(), Is.True);
-        Assert.That(model.OnSuppressEnded(), Is.True);
         Assert.That(model.OnDied(), Is.True);
         ExpectReports(model, LobbyTutorialActivity.SuppressKill);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Completed));
@@ -228,37 +226,96 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.OnSuppressStarted(), Is.True, "벽으로 칸 0 이면 제압은 실제로 일어난다");
         ExpectReports(model);
         Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Wall), "제압은 완료 조건 아님");
-        Assert.That(model.OnSuppressDamage(), Is.False, "T34 제압 피해는 T40 마무리로 세지 않는다");
-    }
-
-    // ── T40(임시 — 옛 D) ──
-
-    [Test]
-    public void SuppressKill_ReleasesHold_ResumesSelfAction()
-    {
-        var model = AtSuppressKill();
-        Assert.That(model.HoldsVulnerable, Is.False, "취약 무기한 보정 해제");
-        Assert.That(model.AllowsSelfAction, Is.True);
-        Assert.That(model.AllowsGaugeTransition, Is.True);
-    }
-
-    [Test]
-    public void SuppressKill_SuppressWithoutDamage_NotFinishing_DeathPrevented()
-    {
-        var model = AtSuppressKill();
-        Assert.That(model.OnSuppressStarted(), Is.True);
-        Assert.That(model.OnSuppressEnded(), Is.True);
-        Assert.That(model.IsFinishing, Is.False, "대기만으로는 마무리 아님");
-        Assert.That(model.PreventsDeath, Is.True);
+        Assert.That(model.HoldsSuppress, Is.True, "T40 이 이어받을 때까지 제압 유지");
+        Assert.That(model.PreventsDeath, Is.True, "T34 제압 중엔 처치 불가");
         Assert.That(model.OnDied(), Is.False);
+    }
 
-        model.OnSuppressStarted();
-        model.OnSuppressDamage();
-        model.OnSuppressEnded();
-        Assert.That(model.IsFinishing, Is.True);
+    // ── T40 ──
+
+    [Test]
+    public void SuppressKill_SegmentsZero_SuppressesImmediately_KillableAtOnce()
+    {
+        // T34 의 벽 충돌이 마지막 칸을 깎아 제압을 걸었다 → T40 은 그 제압을 그대로 이어받는다(즉시 제압 표시 → 처치 단계).
+        var model = AtWall();
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.OnWallAccepted(41), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.Wall);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill, 50), Is.True);
+
+        Assert.That(model.IsSuppressActive, Is.True);
+        Assert.That(model.ShouldSuppressOnEntry(0), Is.False, "이미 제압 중 — 다시 걸지 않는다");
+        Assert.That(model.IsKillable, Is.True);
+        Assert.That(model.PreventsDeath, Is.False, "제압 진입 = 사망 허용");
+        Assert.That(model.AllowsSelfAction, Is.False, "제압 중 공격 대기");
+        Assert.That(model.HoldsSuppress, Is.True, "제압 무기한");
+    }
+
+    [Test]
+    public void SuppressKill_SegmentsZeroWithoutSuppress_RequestsImmediateSuppress()
+    {
+        var model = AtSuppressKill();
+        Assert.That(model.ShouldSuppressOnEntry(0), Is.True, "칸 0 이면 즉시 제압");
+        Assert.That(model.ShouldSuppressOnEntry(2), Is.False, "남은 칸이 있으면 패턴 재개");
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.ShouldSuppressOnEntry(0), Is.False);
+        Assert.That(model.IsKillable, Is.True);
+    }
+
+    [Test]
+    public void SuppressKill_SegmentsRemain_ReleasesHold_ResumesPattern_DeathPrevented()
+    {
+        var model = AtSuppressKill();   // T34 벽 충돌 뒤 칸이 남았다(제압 아님)
+        Assert.That(model.HoldsVulnerable, Is.False, "취약 무기한 보정 해제");
+        Assert.That(model.AllowsSelfAction, Is.True, "간파 창·공격 패턴 재개");
+        Assert.That(model.AllowsGaugeTransition, Is.True, "간파·벽으로 남은 칸 소진");
+        Assert.That(model.ShowsSegmentUi, Is.True, "칸 보존·표시");
+        Assert.That(model.PreventsDeath, Is.True, "제압 전 처치 불가(체력 하한)");
+        Assert.That(model.OnDied(), Is.False, "제압 전 사망은 완료 아님(처치 방지 누락)");
+        ExpectReports(model);
+
+        // 남은 칸 소진 → 제압 = 공격 대기·사망 허용 → 사망 = 완료(마지막 타격 귀속 검사 없음)
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.AllowsSelfAction, Is.False);
         Assert.That(model.PreventsDeath, Is.False);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.True);
-        Assert.That(model.TryConsumeFinishHealthRequest(), Is.False);
+        Assert.That(model.OnDied(), Is.True);
+        ExpectReports(model, LobbyTutorialActivity.SuppressKill);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.Completed));
+        Assert.That(model.OnDied(), Is.False, "보고 1회");
+        ExpectReports(model);
+    }
+
+    [Test]
+    public void SuppressKill_WaitingOnly_NeverCompletes_SuppressIndefinite()
+    {
+        var model = AtSuppressKill();
+        model.OnSuppressStarted();
+        // 처치하지 않고 기다리기만 — 제압은 지속시간으로 끝나지 않는다(상대가 매 틱 연장), 완료 보고 없음.
+        Assert.That(model.HoldsSuppress, Is.True);
+        Assert.That(model.IsKillable, Is.True);
+        ExpectReports(model);
+        Assert.That(model.Stage, Is.EqualTo(TrainingSparringStage.SuppressKill), "대기만으로 완료 안 됨");
+    }
+
+    [Test]
+    public void SuppressKill_ExternalSuppressEnd_BackToPrevention()
+    {
+        // 무기한이라 보통 오지 않지만, 외부에서 제압이 풀리면 제압 전으로 — 처치 방지·패턴 재개(옛 '마무리 체력' 단계 없음).
+        var model = AtSuppressKill();
+        model.OnSuppressStarted();
+        Assert.That(model.OnSuppressEnded(), Is.True);
+        Assert.That(model.PreventsDeath, Is.True);
+        Assert.That(model.AllowsSelfAction, Is.True);
+        Assert.That(model.HoldsSuppress, Is.False);
+        Assert.That(model.OnDied(), Is.False);
+    }
+
+    [Test]
+    public void Suppress_NotHeldBeforeWall()
+    {
+        var model = AtVulnerableCc();
+        Assert.That(model.OnSuppressStarted(), Is.False, "T31~T33 은 칸 전이 중지 — 제압 없음");
+        Assert.That(model.HoldsSuppress, Is.False);
     }
 
     [Test]

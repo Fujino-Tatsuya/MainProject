@@ -16,7 +16,8 @@ using UnityEngine.AI;
 /// <item>공격: 간파 창(<see cref="MonsterCounterWindow"/> 저작값) 동안 실전과 같은 간파 예고 → 채찍(클립 OnAttackHit 이 판정). 이동 없이 제자리에서 돌아본다(앵커 = 배치 위치).
 /// T31 은 예고·창을 <see cref="trainingCounterWindowSeconds"/> 까지 늘린다(PLAN Q11 A — 신호를 보고 입력해도 성공할 길이, 새 연출 없음).</item>
 /// <item>훈련 보정(할 일 157 ⑦): T31~T33 칸 전이 중지, T31 간파 성공 ~ T34 취약 무기한 유지(매 틱 연장 — 23호·공용 코드 무수정, PLAN Q17)·자발 행동 없음,
-/// T33 위치 복귀(취약·칸 보존, 체력만 복구), T34 빗나간 넉백 위치 복구, 처치 방지(체력 하한 1), T40 마무리 체력. 실전 전역 규칙·데이터는 건드리지 않는다.</item>
+/// T33 위치 복귀(취약·칸 보존, 체력만 복구), T34 빗나간 넉백 위치 복구, 처치 방지(체력 하한 1 — T40 제압 중에만 해제),
+/// T34·T40 제압 무기한(그로기 타이머 매 틱 연장 — Q17 A), T40 진입 때 칸 0 이면 즉시 제압(⑧). 실전 전역 규칙·데이터는 건드리지 않는다.</item>
 /// </list>
 /// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)과 "새 시전" 판정(<see cref="LobbyCastWindow"/>)은 <see cref="LobbyTrainingSparring"/>. 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
@@ -33,9 +34,6 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     [Header("훈련 데이터")]
     [Tooltip("T31 간파 창 최소 길이(초) — 저작 창(MonsterCounterWindow)이 이보다 짧으면 예고·창을 이 길이로 늘린다(PLAN Q11 A). 0 = 늘리지 않음. 훈련 상대 전용, 실전 무관.")]
     [SerializeField, Min(0f), DataTableIgnore] float trainingCounterWindowSeconds = 2f;
-
-    [Tooltip("D 마무리 체력 — 제압 중 피해 확인 + 제압 종료 뒤 체력을 이 값으로 낮추고 처치 방지를 푼다(지금 체력이 더 낮으면 그대로). 명세 §9.6: 훈련 데이터, 숫자 미고정 — 임시값.")]
-    [SerializeField, Min(1)] int finishHealth = 60;
 
     [Header("배치 (씬 — T5c)")]
     [Tooltip("유효 충돌로 인정하는 지정 벽(Wall 레이어 콜라이더). 비면 어떤 벽도 인정하지 않는다(장식 벽 불인정).")]
@@ -62,12 +60,9 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     readonly NetworkVariable<bool> _suppressedVisual = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    // 제압이 끝나는 서버 시각(NetworkManager.ServerTime) — D 남은 시간 표시. 제압 아니면 0.
+    // 제압이 끝나는 서버 시각(NetworkManager.ServerTime) — 남은 시간 표시. 제압 아님·무기한 제압(T34·T40)이면 0.
     readonly NetworkVariable<double> _suppressEndsAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    // D 마무리 안내 — 모델 IsFinishing ∧ 제압 아님. 스폰·초기화·사망·제압 중엔 false(SyncModel 이 모델에서 다시 만든다).
-    readonly NetworkVariable<bool> _finishPrompt = new NetworkVariable<bool>(
-        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // ── 서버 런타임 ──
     TrainingSparringModel _model;
@@ -92,8 +87,6 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     bool _resetting;
     int _interruptSuccessCount;
 
-    /// <summary>[서버] 간파 성공(창 소비). 인자 = 공격자 clientId.</summary>
-    public event Action<ulong> ServerCounterSucceeded;
     /// <summary>[서버] 취약 중 CC 를 받았다 — (넉백 에피소드(밀림 없으면 0), 종류, 실제 적용). 시전 짝짓기는 <see cref="LobbyCastWindow"/>.</summary>
     public event Action<int, TrainingSparringCrowdControl, bool> ServerCrowdControlApplied;
     /// <summary>[서버] 넉백 에피소드가 벽에 닿았다 — (에피소드, 지정 벽인가). 넉백 1회 = 최대 1회.</summary>
@@ -104,8 +97,6 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public event Action<float> ServerGaugeReduced;
     public event Action ServerSuppressStarted;
     public event Action ServerSuppressEnded;
-    /// <summary>[서버] 제압 중 플레이어 유효 피해(받아들여진 피해 &gt; 0).</summary>
-    public event Action ServerSuppressDamaged;
     /// <summary>[서버] 상대 사망. 인자 = 모델이 완료로 인정했는가(false = 처치 방지 누락).</summary>
     public event Action<bool> ServerSparringDied;
     /// <summary>[서버] 모델 단계 완료(T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring.</summary>
@@ -121,13 +112,11 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public bool ShowsSegmentUi => _segmentUi.Value;
     public bool IsVulnerableVisual => _vulnerableVisual.Value;
     public bool IsSuppressedVisual => _suppressedVisual.Value;
-    /// <summary>[모든 피어] D 마무리 안내 표시(복제) — 바 이름이 칸 대신 '마무리하세요'.</summary>
-    public bool ShowsFinishPrompt => _finishPrompt.Value;
     /// <summary>[모든 피어] 총 칸(23호 데이터 — 게이지 최대 / counterGaugeStep).</summary>
     public int TotalSegments => TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, CounterStep).TotalSegments;
     /// <summary>[모든 피어] 남은 칸.</summary>
     public int RemainingSegments => TrainingSparringRules.SegmentsRemaining(_gauge.Value, CounterStep);
-    /// <summary>[모든 피어] 남은 제압 시간(초). 제압 아니면 0.</summary>
+    /// <summary>[모든 피어] 남은 제압 시간(초). 제압 아님·무기한 제압이면 0.</summary>
     public double SuppressRemainingSeconds =>
         _suppressedVisual.Value && NetworkManager != null ? Math.Max(0d, _suppressEndsAt.Value - NetworkManager.ServerTime.Time) : 0d;
 
@@ -211,6 +200,9 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         bool accepted = _model.OnFlowStageStarted(flowStage, Time.frameCount);
         if (!accepted)
             Edit.Log($"{Tag} {name}: 단계 알림 {flowStage} 무시(상대 단계 {_model.Stage})", this);
+        // T40: 벽 충돌로 남은 칸이 0 인데 제압이 아니면 바로 제압(보통은 T34 그 충돌이 이미 걸어 두었다 — 그 제압은 무기한으로 이어진다).
+        if (_model.ShouldSuppressOnEntry(RemainingSegments) && State != MonsterState.Dead)
+            EnterSuppress("T40 남은 칸 0");
         TryRunReset();
         SyncModel();
         return accepted;
@@ -262,6 +254,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         }
         if (HoldsVulnerable && !IsVulnerable && !_suppressed && State != MonsterState.Dead)
             StartVulnerable("훈련 취약 유지");
+
+        // T34·T40 제압 무기한(Q17 A) — 제압 그로기가 지속시간으로 끝나지 않게 타이머를 연장한다(처치할 때까지).
+        if (_suppressed && _model.HoldsSuppress && State == MonsterState.Groggy)
+            _stateTimer = Mathf.Max(_stateTimer, BreakSeconds);
 
         TryRunReset();
         SyncModel();
@@ -437,18 +433,12 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             return resolved;
         }
 
-        if (_suppressed && fromPlayer && attackInfo.damage > 0)
-        {
-            _model.OnSuppressDamage();
-            ServerSuppressDamaged?.Invoke();
-        }
-
         if (counter && Counter.TryConsumeInterrupt())
         {
             _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 ReceiveAttack 안에서 올린다(플레이어가 전후 비교)
             ulong attacker = GetAttackerClientId(hitContext);
             CombatStatsEvents.RaiseServerCounterSucceeded(this, attacker);   // 결과 화면 통계 + 플레이어 성공 장부
-            EnterCounterSuccess(attacker);
+            EnterCounterSuccess();
             PlayInterruptFlashRpc();
         }
         else if (vulnerableHit)
@@ -508,11 +498,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     }
 
     // 간파 성공 — 칸 감소(T34·T40) + 그로기 + 취약, 0 이면 제압. T31 은 그로기 + 취약만 — 이 순간 T31 완료, 취약은 T34 끝까지 유지된다.
-    void EnterCounterSuccess(ulong attacker)
+    void EnterCounterSuccess()
     {
         CancelAttack();
         _model.OnCounterSucceeded();
-        ServerCounterSucceeded?.Invoke(attacker);
 
         TrainingSparringGaugeOutcome o = TrainingSparringRules.ResolveCounter(_gauge.Value, CounterStep, GroggySeconds, BreakSeconds, AllowsGauge);
         if (o.Reduced)
@@ -563,14 +552,17 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
 
         _suppressed = true;
         _suppressedVisual.Value = true;
-        _suppressEndsAt.Value = NetworkManager != null ? NetworkManager.ServerTime.Time + BreakSeconds : 0d;
-        ForceGroggy(BreakSeconds);
         _model.OnSuppressStarted();
+        // T34·T40 은 무기한(처치할 때까지 — 남은 시간 표시 없음), 그 밖(실전 규칙)은 breakDuration.
+        bool indefinite = _model.HoldsSuppress;
+        _suppressEndsAt.Value = !indefinite && NetworkManager != null ? NetworkManager.ServerTime.Time + BreakSeconds : 0d;
+        ForceGroggy(BreakSeconds);
         ServerSuppressStarted?.Invoke();
-        Debug.Log($"{Tag} 제압 진입({reason}) — {BreakSeconds:0.#}초 · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##} · 단계 {_model.Stage}", this);
+        Debug.Log($"{Tag} 제압 진입({reason}) — {(indefinite ? "처치할 때까지" : $"{BreakSeconds:0.#}초")} · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##} · " +
+                  $"처치 {(_model.IsKillable ? "허용" : "방지")} · 단계 {_model.Stage}", this);
     }
 
-    // 그로기를 벗어나면 제압 종료 — 게이지 가득(사망이면 복원 없음). D 마무리 체력 요청이 있으면 지금 적용한다.
+    // 그로기를 벗어나면 제압 종료 — 게이지 가득(사망이면 복원 없음). T34·T40 은 무기한이라 보통 오지 않는다.
     void ExitSuppress(MonsterState next)
     {
         _suppressed = false;
@@ -581,16 +573,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         _gauge.Value = BossCounterProgress.GaugeMax;
         _model.OnSuppressEnded();
         ServerSuppressEnded?.Invoke();
-        if (_model.TryConsumeFinishHealthRequest())
-        {
-            int hp = TrainingSparringRules.FinishHealth(CurrentHealth, FinalMaxHp, finishHealth);
-            SetCurrentHealthOnServer(hp);
-            Debug.Log($"{Tag} 마무리 — 체력 {hp}(훈련 데이터 {finishHealth}) · 처치 방지 해제", this);
-        }
-        else
-        {
-            Debug.Log($"{Tag} 제압 종료 — 게이지 가득 · 단계 {_model.Stage}", this);
-        }
+        Debug.Log($"{Tag} 제압 종료 — 게이지 가득 · 단계 {_model.Stage}", this);
     }
     #endregion
 
@@ -760,7 +743,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         SyncModel();
     }
 
-    // 처치 방지 — T31~T40 동안 체력 1 미만으로 내려가지 않는다(Unit.ApplyHealthDamage 의 모든 경로). T40 마무리 뒤 해제.
+    // 처치 방지 — T31~T40 동안 체력 1 미만으로 내려가지 않는다(Unit.ApplyHealthDamage 의 모든 경로). T40 제압 중에만 해제.
     protected override int HealthFloor => TrainingSparringRules.HealthFloor(_model != null && _model.PreventsDeath);
 
     // 초기화 중엔 공격 외 직접·비율 피해도 막는다.
@@ -832,8 +815,6 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
 
         if (_stage.Value != _model.Stage) _stage.Value = _model.Stage;
         if (_segmentUi.Value != _model.ShowsSegmentUi) _segmentUi.Value = _model.ShowsSegmentUi;
-        bool finishPrompt = _model.IsFinishing && !_suppressed;
-        if (_finishPrompt.Value != finishPrompt) _finishPrompt.Value = finishPrompt;
     }
     #endregion
 
@@ -888,24 +869,19 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     bool IOverheadHealthBarRule.ShouldShow => _segmentUi.Value && CurrentHealth > 0;
     Color IOverheadHealthBarRule.FillColor => barFillColor;
 
-    // 캐시 키: 칸 = 0 이상, 제압 안내 = -1 - 남은 초(-1 이하), 마무리 = 아래 고정값(초기값 int.MinValue 와도 다름).
-    const int FinishLabelKey = int.MinValue + 1;
-
-    // 바 이름 자리 = 칸 "n/m", D 제압 중엔 '제압된 상대를 공격하세요' + 남은 초, D 마무리 중엔 '마무리하세요'(칸 없음 — 임시, 명세 §9.6). 바뀔 때만 다시 만든다.
+    // 캐시 키: 칸 = 0 이상, 제압 안내 = -1 - 남은 초(-1 이하).
+    // 바 이름 자리 = 칸 "n/m", T40 제압 중엔 '제압된 상대를 공격하세요'(무기한이라 남은 초 없음 — 임시, 명세 §9.6). 바뀔 때만 다시 만든다.
     string IOverheadHealthBarRule.Label
     {
         get
         {
             bool finisherSuppress = _stage.Value == TrainingSparringStage.SuppressKill && _suppressedVisual.Value;
-            bool finishing = !finisherSuppress && _finishPrompt.Value;
             int key = finisherSuppress ? -1 - LobbyUiStrings.CountdownDisplaySeconds(SuppressRemainingSeconds)
-                : finishing ? FinishLabelKey
                 : RemainingSegments * 1000 + TotalSegments;
             if (key != _labelKey || _label == null)
             {
                 _labelKey = key;
                 _label = finisherSuppress ? LobbyUiStrings.FormatTrain03SuppressAttack(SuppressRemainingSeconds)
-                    : finishing ? LobbyUiStrings.Train03Finish.Text
                     : LobbyUiStrings.FormatTrain03Segments(RemainingSegments, TotalSegments);
             }
             return _label;
