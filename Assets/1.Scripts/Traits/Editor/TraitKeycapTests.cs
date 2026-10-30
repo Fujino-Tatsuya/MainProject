@@ -63,6 +63,23 @@ public class TraitKeycapTests
         Assert.AreEqual(Color.white, TraitCardSkillRule.SlotTint(TraitCardSkillSource.Passive, true, gunner));
     }
 
+    /// <summary>검은 배경은 기본 공격(검) 슬롯만 — 스킬·패시브(폴백 포함)는 끈다.</summary>
+    [TestCase(TraitCardSkillSource.BasicAttack, true)]
+    [TestCase(TraitCardSkillSource.Skill, false)]
+    [TestCase(TraitCardSkillSource.Passive, false)]
+    public void ShowsBackdrop_OnlyBasicAttack(TraitCardSkillSource source, bool expected)
+    {
+        Assert.AreEqual(expected, TraitCardSkillRule.ShowsBackdrop(source));
+    }
+
+    /// <summary>LMB 키 → 기본 공격 출처 → 배경 켬. 같은 규칙 결과를 그대로 쓴다.</summary>
+    [Test]
+    public void ShowsBackdrop_LeftMouseKeyOn_QKeyOff()
+    {
+        Assert.IsTrue(TraitCardSkillRule.ShowsBackdrop(TraitCardSkillRule.SourceOf(TraitKeycap.LeftMouse, out _)));
+        Assert.IsFalse(TraitCardSkillRule.ShowsBackdrop(TraitCardSkillRule.SourceOf(TraitKeycap.Q, out _)));
+    }
+
     /// <summary>LMB 특성 5개는 기본 공격 아이콘 경로(아이콘 이름의 LMB 토큰).</summary>
     [TestCase("GUN_1_BASIC_DAMAGE")]
     [TestCase("GUN_3_PIERCE")]

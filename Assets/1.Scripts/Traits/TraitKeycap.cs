@@ -89,4 +89,10 @@ public static class TraitCardSkillRule
     /// </summary>
     public static Color SlotTint(TraitCardSkillSource source, bool hasViewerColor, Color viewerColor) =>
         source == TraitCardSkillSource.BasicAttack && hasViewerColor ? viewerColor : Color.white;
+
+    /// <summary>
+    /// 슬롯 아이콘 뒤 검은 배경을 켤지 — 기본 공격 아이콘(검)은 투명 배경이라 실제 스킬 아이콘처럼 어두운 판을 깐다.
+    /// 실제 스킬·패시브 아이콘은 자체 배경이 있어 끈다. 인자는 <see cref="SlotTint"/> 와 같은 최종 출처(폴백이면 Skill).
+    /// </summary>
+    public static bool ShowsBackdrop(TraitCardSkillSource source) => source == TraitCardSkillSource.BasicAttack;
 }

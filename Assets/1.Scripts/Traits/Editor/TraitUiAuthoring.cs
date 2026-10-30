@@ -528,6 +528,7 @@ public static class TraitUiAuthoring
         so.FindProperty("inputRightMouse").objectReferenceValue = CardArt("Input_RMB");
         so.ApplyModifiedPropertiesWithoutUndo();
         EnsureBasicAttackSlot(cardView);
+        EnsureSkillBackdrop(cardView);
     }
 
     // ── 할 일 165 후속 — 기본 공격(LMB) 슬롯: 검 아이콘 + 보는 사람 캐릭터 색 ──
@@ -595,6 +596,83 @@ public static class TraitUiAuthoring
         rosterProp.objectReferenceValue = roster;
         so.ApplyModifiedPropertiesWithoutUndo();
         return true;
+    }
+
+    // ── 할 일 165 후속 — 검 아이콘 뒤 검은 배경 ──
+    private const string SkillBackdropName = "SkillBackdrop";
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿 스킬 마스크 안, <c>SkillIcon</c> 바로 앞 형제로 검은 Image <c>SkillBackdrop</c>(132x132, 꺼짐)를 두고
+    /// <c>skillBackdrop</c> 칸을 잇는다. 마스크 안이라 실제 스킬 아이콘과 같은 둥근 사각형으로 잘린다. 카드 배치·배경 블러·검 연결·씬 오버라이드는 그대로, 이미 있으면 저장 안 함(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 기본 공격 슬롯 검은 배경 (검 아이콘 뒤)")]
+    public static void ApplySkillBackdrop()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var cardView = new SerializedObject(view).FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            if (cardView == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureSkillBackdrop(cardView))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 스킬 슬롯 검은 배경이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 스킬 슬롯 검은 배경 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 카드 템플릿의 SkillIcon 형제 검은 배경 + 칸. 바꾼 것이 있으면 true.
+    private static bool EnsureSkillBackdrop(TraitCardView cardView)
+    {
+        var so = new SerializedObject(cardView);
+        SerializedProperty iconProp = so.FindProperty("skillIcon");
+        SerializedProperty backdropProp = so.FindProperty("skillBackdrop");
+        var skillIcon = iconProp.objectReferenceValue as Image;
+        if (skillIcon == null || skillIcon.transform.parent == null)
+        {
+            Debug.LogError("[Trait] 스킬 슬롯 검은 배경 — 카드 템플릿에 skillIcon(마스크 안)이 없다. 카드 C1 아트 적용 메뉴를 먼저 쓸 것.");
+            return false;
+        }
+
+        Transform mask = skillIcon.transform.parent;
+        Transform existing = mask.Find(SkillBackdropName);
+        Image backdrop = existing != null ? existing.GetComponent<Image>() : null;
+        bool changed = false;
+        if (backdrop == null)
+        {
+            // SkillIcon 과 같은 자리·크기(마스크 136 중 실제 영역 132).
+            backdrop = CardImage(SkillBackdropName, mask, null, 2f, 2f, 132f, 132f);
+            backdrop.color = Color.black;
+            backdrop.gameObject.SetActive(false);
+            changed = true;
+        }
+
+        if (backdrop.transform.GetSiblingIndex() > skillIcon.transform.GetSiblingIndex())
+        {
+            backdrop.transform.SetSiblingIndex(skillIcon.transform.GetSiblingIndex());
+            changed = true;
+        }
+
+        if (backdropProp.objectReferenceValue != backdrop)
+        {
+            backdropProp.objectReferenceValue = backdrop;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            changed = true;
+        }
+        return changed;
     }
 
     // 카드 3장(TraitPool = 캐릭터×차수 3후보) + 간격 + 창 여백에 창 폭·카드 줄 높이를 맞춘다.
