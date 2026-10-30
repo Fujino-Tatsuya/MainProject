@@ -1363,6 +1363,12 @@ MonoBehaviour:
   - key: UI.Trait.Conflict.NameSeparator
     ko: ','
     en: ','
+  - key: UI.Trait.Card.DamagePercent
+    ko: "공격력의 {percent}"
+    en: '{percent} of ATK'
+  - key: UI.Trait.Card.DamagePercentFlat
+    ko: "{flat} + 공격력의 {percent}"
+    en: '{flat} + {percent} of ATK'
   - key: Trait.ASN_1_NORMAL_E_DAMAGE.Name
     ko: "\uAC15\uD0C0 \uAC15\uD654"
     en: Empowered Strike

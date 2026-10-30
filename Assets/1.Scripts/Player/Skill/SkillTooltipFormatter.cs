@@ -127,8 +127,7 @@ public static class SkillTooltipFormatter
 
     private static string FormatDamage(SkillTooltipDamage damage, bool showCalculation)
     {
-        string value = damage.IsRange ? $"{damage.Minimum}~{damage.Maximum}" : damage.Minimum.ToString(CultureInfo.InvariantCulture);
-        string colored = $"<color={DamageColor}><sprite name=\"atk\" color={DamageColor}>{value}</color>";
+        string colored = DamageValue(damage);
         if (!showCalculation)
             return colored;
 
@@ -137,7 +136,26 @@ public static class SkillTooltipFormatter
         return $"{colored} = ({flat} + <sprite name=\"atk\" color={DamageColor}>{coefficient})";
     }
 
-    private static string FormatRange(int minimum, int maximum) =>
+    /// <summary>계산된 피해 숫자 — 피해 색 + 검 아이콘 + 숫자(범위면 최소~최대). 스킬 툴팁 {dmg} 의 앞부분과 같은 문자열.</summary>
+    public static string DamageValue(SkillTooltipDamage damage)
+    {
+        string value = damage.IsRange ? $"{damage.Minimum}~{damage.Maximum}" : damage.Minimum.ToString(CultureInfo.InvariantCulture);
+        return $"<color={DamageColor}><sprite name=\"atk\" color={DamageColor}>{value}</color>";
+    }
+
+    /// <summary>피해 색으로 감싼다(아이콘 없음) — 특성 카드 평소 표시 '공격력의 150%' 처럼 문장을 통째로 칠할 때.</summary>
+    public static string DamageColored(string inner) => $"<color={DamageColor}>{inner}</color>";
+
+    /// <summary>계수 → '150%', 범위면 '100~150%'(% 는 끝에 한 번).</summary>
+    public static string FormatCoefficientPercent(float minimum, float maximum)
+    {
+        string min = (minimum * 100f).ToString("0.#", CultureInfo.InvariantCulture);
+        string max = (maximum * 100f).ToString("0.#", CultureInfo.InvariantCulture);
+        return (MathfApproximately(minimum, maximum) ? min : min + "~" + max) + "%";
+    }
+
+    /// <summary>정수 범위 → '20', 범위면 '10~20'.</summary>
+    public static string FormatRange(int minimum, int maximum) =>
         minimum == maximum
             ? minimum.ToString(CultureInfo.InvariantCulture)
             : $"{minimum.ToString(CultureInfo.InvariantCulture)}~{maximum.ToString(CultureInfo.InvariantCulture)}";

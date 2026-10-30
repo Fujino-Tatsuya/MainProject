@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// 특성 카드 툴팁 값 소스(할 일 125 5/5, 명세 §8 TraitTooltipValueSource) — 설명 템플릿의 <c>{이름}</c> 첫 칸을 이 순서로 푼다.
@@ -92,15 +93,41 @@ public sealed class TraitTooltipValueSource : ISkillTooltipValueSource
 /// 특성 카드 설명 = 템플릿(<see cref="TraitDefinition.Description"/>) → <see cref="SkillTooltipFormatter"/>(할 일 125 5/5).
 /// <c>{필드}</c>·<c>{필드:%}</c> 는 <see cref="TraitTooltipValueSource"/>, <c>{dmg}</c> 는 등록부의 특성별 계산식(캐릭터 레인).
 /// 검증(<see cref="Validate"/>)은 Play 없이 돈다 — 풀리지 않는 토큰·계산식 없는 <c>{dmg}</c> = 오류(EditMode <c>TraitTooltipTests</c> 가 프로젝트 정의 전부를 본다).
+/// 할 일 171 — <c>{dmg}</c> 는 평소 퍼센트 글자(<see cref="FormatDamagePercent"/>, '공격력의 150%'), Shift 누르는 동안만 계산 숫자
+/// (<see cref="SkillTooltipFormatter.DamageValue"/>, 검 아이콘 + 숫자). 전투 HUD 스킬 툴팁은 이 경로를 쓰지 않는다.
 /// </summary>
 public static class TraitTooltip
 {
     /// <summary>화면 설명. 실패하면 false + 오류(화면은 <see cref="UiStrings.SkillTooltipError"/>).</summary>
-    public static bool FormatDescription(TraitDefinition trait, Player player, bool showCalculation, out string text, out string error) =>
-        Format(trait, trait != null ? trait.Description : null, player, showCalculation, TraitContent.Registry, out text, out error);
+    /// <param name="showValue">true = {dmg} 계산 숫자(Shift 누르는 동안), false = 퍼센트 글자(평소).</param>
+    public static bool FormatDescription(TraitDefinition trait, Player player, bool showValue, out string text, out string error) =>
+        Format(trait, trait != null ? trait.Description : null, player, showValue, TraitContent.Registry, out text, out error);
+
+    /// <summary>특성 설명 {dmg} 를 계산 숫자로 볼 입력(Shift 왼/오른쪽)을 누르고 있는가 — 스킬 툴팁(SkillTooltipView)과 같은 판정.</summary>
+    public static bool IsValueHeld() =>
+        Keyboard.current != null &&
+        (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+
+    /// <summary>
+    /// 평소 {dmg} — 피해 색 글자 '공격력의 150%'(계수 범위 '100~150%', 고정 추가 피해가 있으면 '20 + 공격력의 150%').
+    /// 문구는 <see cref="TraitUiStrings.DamagePercent"/>·<see cref="TraitUiStrings.DamagePercentFlat"/>.
+    /// </summary>
+    public static string FormatDamagePercent(SkillTooltipDamage damage)
+    {
+        var args = new Dictionary<string, string>
+        {
+            [TraitUiStrings.PercentToken] = SkillTooltipFormatter.FormatCoefficientPercent(damage.MinimumCoefficient, damage.MaximumCoefficient),
+        };
+        bool hasFlat = damage.MinimumFlatBonus != 0 || damage.MaximumFlatBonus != 0;
+        if (hasFlat)
+            args[TraitUiStrings.FlatToken] = SkillTooltipFormatter.FormatRange(damage.MinimumFlatBonus, damage.MaximumFlatBonus);
+
+        UiString line = hasFlat ? TraitUiStrings.DamagePercentFlat : TraitUiStrings.DamagePercent;
+        return SkillTooltipFormatter.DamageColored(line.Format(args));
+    }
 
     /// <summary>템플릿 하나를 푼다(등록부를 바꿔 끼울 수 있는 순수 판 — 테스트용).</summary>
-    public static bool Format(TraitDefinition trait, string template, Player player, bool showCalculation,
+    public static bool Format(TraitDefinition trait, string template, Player player, bool showValue,
         TraitContentRegistry registry, out string text, out string error)
     {
         text = string.Empty;
@@ -114,7 +141,9 @@ public static class TraitTooltip
         bool hasCalculator = registry != null && registry.TryGetDamage(trait.Id, out calculator);
         SkillTooltipDamage damage = hasCalculator && player != null ? calculator(trait, player) : default;
 
-        if (!SkillTooltipFormatter.TryFormat(template, new TraitTooltipValueSource(trait, registry), damage, showCalculation,
+        // 평소(퍼센트)는 포매터에 피해를 넘기지 않아 {dmg} 를 그대로 받고 아래에서 퍼센트 글자로 바꾼다.
+        // Shift 는 계산 숫자만(계산식 없이 — showCalculation false).
+        if (!SkillTooltipFormatter.TryFormat(template, new TraitTooltipValueSource(trait, registry), showValue ? damage : default, false,
                 out text, out bool hasDamage, out error))
             return false;
 
@@ -128,6 +157,8 @@ public static class TraitTooltip
         // 계산할 플레이어가 없으면(로비 미리보기 등) 0 이 아니라 '알 수 없음' 표시.
         if (hasDamage && !damage.HasValue)
             text = text.Replace("{dmg}", TraitUiStrings.DamageUnknown.Text);
+        else if (hasDamage && !showValue)
+            text = text.Replace("{dmg}", FormatDamagePercent(damage));
 
         return true;
     }
