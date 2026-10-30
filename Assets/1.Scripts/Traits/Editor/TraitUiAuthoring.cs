@@ -13,6 +13,7 @@ using UnityEngine.UI;
 /// </para>
 /// <para>
 /// 할 일 165 — 카드 C1 아트는 <see cref="ApplyCardC1"/>(<c>카드 C1 아트 적용</c>)가 지금 프리팹의 카드 템플릿만 다시 만든다. 전체 생성도 같은 카드 빌더를 쓴다.
+/// 배경 블러 A안은 <see cref="ApplyBackdrop"/>(<c>배경 블러 연결</c>)가 창 앞 형제 RawImage 와 설정 에셋만 더한다.
 /// </para>
 /// </summary>
 public static class TraitUiAuthoring
@@ -192,6 +193,7 @@ public static class TraitUiAuthoring
             so.FindProperty("placeholderIcon").objectReferenceValue = placeholder;
             so.FindProperty("texts").objectReferenceValue = texts;
             so.ApplyModifiedPropertiesWithoutUndo();
+            EnsureBackdrop(view, window);
 
             // 기본 꺼짐 — 창(UiModalBlocker)이 켜진 채 저장되면 씬에 두는 순간 입력이 막힌다.
             cardTemplate.gameObject.SetActive(false);
@@ -344,6 +346,105 @@ public static class TraitUiAuthoring
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    // ── 할 일 165 후속 — 배경 블러 A안 ──
+    private const string BackdropName = "Backdrop";
+    private const string BackdropSettingsPath = "Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset";
+    private const string BlurShaderName = "Hidden/Rendering/MaskBlur";
+
+    /// <summary>
+    /// 지금 프리팹의 선택 창(<c>Window</c>) 바로 앞 형제로 전체화면 RawImage <c>Backdrop</c>(기본 꺼짐)을 두고 <c>backdrop</c>·<c>backdropSettings</c> 칸을 잇는다.
+    /// 설정 에셋이 없으면 기본값(MaskBlurSettings 블러 값 + 셰이더 참조)으로 만든다. 창·카드·씬 오버라이드는 건드리지 않는다. 이미 연결돼 있으면 저장하지 않는다(멱등).
+    /// 창 어둡게 막 알파(프리팹 0.55)는 블러가 없을 때의 값으로 그대로 두고, 블러 위 알파는 설정 칸 <c>dimAlpha</c>(0.25)가 정한다.
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 배경 블러 연결 (창 뒤 RawImage)")]
+    public static void ApplyBackdrop()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var window = new SerializedObject(view).FindProperty("window").objectReferenceValue as GameObject;
+            if (window == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 선택 창(window)이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureBackdrop(view, (RectTransform)window.transform))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 배경 블러가 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 배경 블러 연결 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 창 바로 앞 형제 Backdrop(RawImage, 전체화면, 클릭 통과, 꺼짐) + 설정 에셋 연결. 바꾼 것이 있으면 true.
+    private static bool EnsureBackdrop(TraitSelectionView view, RectTransform window)
+    {
+        bool changed = false;
+        var so = new SerializedObject(view);
+        SerializedProperty backdropProp = so.FindProperty("backdrop");
+        SerializedProperty settingsProp = so.FindProperty("backdropSettings");
+
+        var backdrop = backdropProp.objectReferenceValue as RawImage;
+        if (backdrop == null)
+        {
+            RectTransform rect = NewUi(BackdropName, window.parent);
+            Stretch(rect, 0f);
+            backdrop = rect.gameObject.AddComponent<RawImage>();
+            backdrop.color = Color.white;
+            backdrop.raycastTarget = false;
+            rect.gameObject.SetActive(false);
+            backdropProp.objectReferenceValue = backdrop;
+            changed = true;
+        }
+
+        if (backdrop.transform.parent == window.parent && backdrop.transform.GetSiblingIndex() != window.GetSiblingIndex() - 1)
+        {
+            backdrop.transform.SetSiblingIndex(window.GetSiblingIndex());
+            changed = true;
+        }
+
+        TraitBackdropBlurSettings settings = EnsureBackdropSettings();
+        if (settingsProp.objectReferenceValue != settings)
+        {
+            settingsProp.objectReferenceValue = settings;
+            changed = true;
+        }
+
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return changed;
+    }
+
+    /// <summary>배경 블러 설정 에셋 — 없으면 코드 기본값(= MaskBlurSettings.asset 블러 값)과 셰이더 참조로 만든다. 있으면 그대로(튜닝값 보존, 셰이더만 비었으면 채움).</summary>
+    public static TraitBackdropBlurSettings EnsureBackdropSettings()
+    {
+        var settings = AssetDatabase.LoadAssetAtPath<TraitBackdropBlurSettings>(BackdropSettingsPath);
+        if (settings == null)
+        {
+            EnsureFolder(System.IO.Path.GetDirectoryName(BackdropSettingsPath).Replace('\\', '/'));
+            settings = ScriptableObject.CreateInstance<TraitBackdropBlurSettings>();
+            settings.blurShader = Shader.Find(BlurShaderName);
+            AssetDatabase.CreateAsset(settings, BackdropSettingsPath);
+            AssetDatabase.SaveAssets();
+        }
+        else if (settings.blurShader == null)
+        {
+            settings.blurShader = Shader.Find(BlurShaderName);
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+        }
+
+        return settings;
     }
 
     /// <summary>

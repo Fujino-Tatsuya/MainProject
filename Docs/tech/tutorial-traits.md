@@ -256,7 +256,14 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - 스킬 슬롯 그림 출처(피드백 1) = `TraitCardSkillRule.SourceOf(키캡)`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): Q → `PlayerSkillSlot.Main`, E → `Sub`, R → `Ultimate`, RMB → `Interrupt`, `Blank` → 패시브, LMB → 특성 아이콘 그대로(기본 공격 스킬 아이콘 없음).
   스킬 아이콘은 전투 HUD 와 같은 경로로 뷰어(`Bind` 의 `viewer` = 로컬 Player)에서 읽는다 — 슬롯 = `PlayerSkillController.GetSkill(슬롯).Data.Tooltip.Icon`(SkillCooldownHUD), 패시브 = `IPlayerPassive as ISkillTooltipSource` → 없으면 `GetComponentInChildren<IPassiveTooltipProvider>(true).PassiveTooltip`(PassiveHUD).
   어쌔신 변신 특성(`E_Trans`·`R_Trans`·`R_Remove`)도 그 슬롯의 **지금** 스킬 그림. 못 얻으면(뷰어 없음·아이콘 비어 있음 — 예: 간파 슬롯은 툴팁 아이콘이 없다, 지금 RMB 특성은 없음) 특성 아이콘 → `Trait_Empty`. 아이콘 없는 옛 임시 특성은 스킬 조회를 건너뛴다.
-- 창 폭 = 카드 3장 + 간격 24 + 여백 32×2 = **1792**, 카드 줄 높이 413. 창 `Panel` 은 레이아웃만(어두운 판·노란 Outline 없음 — 피드백 1). 배경 흐림은 방식 결정 대기(아직 없음).
+- 창 폭 = 카드 3장 + 간격 24 + 여백 32×2 = **1792**, 카드 줄 높이 413. 창 `Panel` 은 레이아웃만(어두운 판·노란 Outline 없음 — 피드백 1). 배경 흐림은 아래 '배경 블러'.
+- **배경 블러 = 열 때 1회 캡처**(할 일 165 후속 A안): 창이 열리는 프레임 끝(`WaitForEndOfFrame`)에 화면 전체(월드 + Screen Space Overlay HUD)를 `ScreenCapture.CaptureScreenshotIntoRenderTexture` 로 한 번 찍고(창은 아직 꺼져 있어 자기 자신은 안 찍힌다) →
+  축소 복사(`SystemInfo.graphicsUVStartsAtTop` 이면 상하 뒤집기 보정) → MaskBlur 셰이더 0번(가로)·1번(세로) 패스를 `iterations` 번(`TraitBackdropBlur`) → 창 바로 앞 형제 전체화면 RawImage `Backdrop` 에 깔고 **다음 프레임에** 창을 보인다.
+  그 위 어둡게 막(창 루트 `Image`)은 설정 `dimAlpha`(0.25), 블러를 못 쓰면(설정·셰이더 비었음·캡처 실패) 프리팹 값 0.55 로 예전처럼 연다.
+  비용 = 여는 순간 캡처 1회 + 축소 블러 몇 번, **창이 열린 동안 매 프레임 0**. 화면 크기 캡처 RT 는 블러 직후, 축소 블러 RT 는 창이 닫힐 때(비활성·디렉터 해제 포함) 반납 — 수명 규칙 `TraitBackdropLifetime`(테스트 `TraitBackdropLifetimeTests`).
+  한계: 열린 동안 배경은 **정지 그림**(뒤에서 움직이는 적·HUD 변화가 안 보인다), 창이 **1프레임 늦게** 뜬다. 열린 채 새 제시가 오면 다시 찍지 않고 지난 그림을 쓴다.
+  튜닝 = `Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset`(세기 1.42·축소 1/2·반복 1 — 기본값은 `Assets/99.Settings/MaskBlurSettings.asset` 블러 값, 셰이더는 직렬화 참조라 빌드 스트립 안 됨). 데이터 테이블 시트 없음(연출 기술 값).
+  프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 배경 블러 연결 (창 뒤 RawImage)` — `Backdrop` 과 설정 칸만 더한다(멱등, 창·카드·씬 오버라이드 유지).
 - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 카드 C1 아트 적용 (카드만 교체)` — 카드 템플릿 자식만 다시 만들고(루트 오브젝트·컴포넌트 유지 → 씬 오버라이드 안전) 창 폭·`placeholderIcon` 을 맞추고 창 `Panel` 의 `Image`·`Outline` 을 뗀다. 전체 생성 메뉴도 같은 카드 빌더를 쓰고 창 판을 만들지 않는다.
 - 아이콘 연결(데이터 주도) = `Tools/Tutorial/특성 아이콘 연결 (TraitIconMap.csv)` → `TraitIconMapAuthoring.Apply(csv, iconRoot)`. 기본 csv = `Assets/50.Art/UI/HUD/TraitIcon/TraitIconMap.csv`(`icon` 열 = 그 폴더 기준 상대 경로) → 각 `TraitDefinition.icon`. 아트가 csv 를 바꾸면 메뉴를 다시 돌린다. `TraitKeycapTests.ProjectDefinitions_IconsMatchIconMap` 이 어긋남을 잡는다.
 - 아직 안 쓰는 것: csv 의 `inactive_icon`(광란 강화 비활성 아이콘), `Common/Trait_ProcGlow`, `Assassin/Trait_Assassin_Trans`, 캐릭터 심볼 `Trait_<캐릭터>`·`Keycap_Blank`(피드백 1 로 카드에서 뺌).

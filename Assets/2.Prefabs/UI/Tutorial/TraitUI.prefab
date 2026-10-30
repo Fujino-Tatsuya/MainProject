@@ -838,6 +838,78 @@ MonoBehaviour:
   keycapR: {fileID: 21300000, guid: 3889a36946725e438fc64a993f39009a, type: 3}
   inputLeftMouse: {fileID: 21300000, guid: fbca656fdf5a5ac988f9f67b3f1d1a02, type: 3}
   inputRightMouse: {fileID: 21300000, guid: cd0f1e40d2ef5abb868ce365552f1a41, type: 3}
+--- !u!1 &1648728162414106526
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1312451292798698774}
+  - component: {fileID: 6455009929182539039}
+  - component: {fileID: 4504276973183067833}
+  m_Layer: 5
+  m_Name: Backdrop
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1312451292798698774
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1648728162414106526}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2838142648059100130}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &6455009929182539039
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1648728162414106526}
+  m_CullTransparentMesh: 1
+--- !u!114 &4504276973183067833
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1648728162414106526}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RawImage
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Texture: {fileID: 0}
+  m_UVRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
 --- !u!1 &2047764302983522703
 GameObject:
   m_ObjectHideFlags: 0
@@ -2102,6 +2174,7 @@ RectTransform:
   m_Children:
   - {fileID: 1287217271849199130}
   - {fileID: 4726249698376222143}
+  - {fileID: 1312451292798698774}
   - {fileID: 2988619925709566184}
   - {fileID: 6703482955844923754}
   m_Father: {fileID: 0}
@@ -2211,6 +2284,8 @@ MonoBehaviour:
   tooltip: {fileID: 4559036892113255017}
   tooltipName: {fileID: 902067480872474199}
   tooltipDescription: {fileID: 6495544317894355609}
+  backdrop: {fileID: 4504276973183067833}
+  backdropSettings: {fileID: 11400000, guid: 1b9148d4fecf0654980d1b6e0230620e, type: 2}
   texts: {fileID: 11400000, guid: d627a1a2780b77844b362dca6091b069, type: 2}
   placeholderIcon: {fileID: 21300000, guid: 4ea6c66ac22e520cb9e860eed24cbd1b, type: 3}
 --- !u!1 &4943032505396108700
