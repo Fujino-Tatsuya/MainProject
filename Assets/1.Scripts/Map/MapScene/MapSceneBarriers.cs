@@ -14,9 +14,10 @@ using UnityEngine.AI;
 /// · 모양 = S2 구간(<see cref="MapSceneAreaLayout"/>)의 복도 사각형 양 끝(<see cref="MapSceneBarrierRules.BuildSpecs"/>).
 /// · 막기: 플레이어 = <b>Barrier 레이어</b>(할 일 32 — 전에는 Wall) 비트리거 BoxCollider — 플레이어 모터 스윕 마스크(PlayerGameRuleData.obstacleMask)에
 ///   Barrier 가 있다. 대시·이동 스킬·넉백도 같은 스윕을 탄다. 이동이 오너 권한이라 각 피어에 콜라이더가 있어야 한다.
-///   몬스터 = NavMeshObstacle 카브(ZoneBridgeGate 와 같은 설정). Barrier 는 NavMesh 베이크 수집 레이어(Default·Ground·Wall)가 아니라
+///   몬스터 = NavMeshObstacle 카브(ZoneBridgeGate 와 같은 설정) — 배리어 큐브와 따로 둔 <c>MonsterBlock_G*</c> 형제 오브젝트. Barrier 는 NavMesh 베이크 수집 레이어(Default·Ground·Wall)가 아니라
 ///   재베이크(다리)에 섞이지 않는다. 벽이 아니라서 벽 충돌 이벤트(<see cref="UnitWallImpacts"/>)도 나지 않는다. Docs/tech/wall-concept.md
-/// · 열기: 콜라이더·카브를 즉시 끄고 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
+/// · 열기: 플레이어 콜라이더를 즉시 끄고 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
+///   카브는 <b>열려도 그대로</b>다(할 일 148 — 복도는 늘 몬스터 출입 금지). 몬스터 이동·넉백·밀치기는 전부 NavMesh 위로만 움직이므로 이 구멍 하나로 막힌다.
 /// · 추락 복구: <see cref="PlayerSafePointTracker.ReturnPointFilter"/> 에 닫힌 배리어 너머 구간 · 그 클라이언트의 뒤 배리어 너머 제외를 건다(서버가 부른다).
 /// · 개인 뒤 배리어: 서버가 판정해 복제한 '지난 배리어' 마스크(<see cref="MapSceneDirector.GetBackBarrierMask"/>)를 <b>로컬 플레이어</b> 값으로 읽어
 ///   같은 자리에 Barrier 콜라이더(카브 없음 — 몬스터는 안 막음)를 이 피어에서만 켠다. 이동이 오너 권한·오너 로컬 스윕이라 남의 플레이어엔 영향 없다.
@@ -195,9 +196,9 @@ public sealed class MapSceneBarriers : MonoBehaviour
         e.Opened = true;
         if (e.Go == null) return;
 
-        // 막기는 즉시 푼다 — 페이드 중에 걸리면 '열렸는데 막힘'으로 읽힌다.
+        // 플레이어 막기는 즉시 푼다 — 페이드 중에 걸리면 '열렸는데 막힘'으로 읽힌다.
+        // 몬스터 카브(MonsterBlock_G*)는 형제 오브젝트라 페이드·비활성과 무관하게 남는다(할 일 148).
         foreach (Collider c in e.Go.GetComponentsInChildren<Collider>()) c.enabled = false;
-        foreach (NavMeshObstacle o in e.Go.GetComponentsInChildren<NavMeshObstacle>()) o.enabled = false;
 
         if (fade && isActiveAndEnabled) StartCoroutine(FadeOut(e.Go));
         else e.Go.SetActive(false);
@@ -239,8 +240,10 @@ public sealed class MapSceneBarriers : MonoBehaviour
     // ─── 생성(런타임·에디터 미리보기 공용) ─────────────────────────────────
 
     /// <summary>
-    /// 배리어 오브젝트 하나 — Barrier 레이어 큐브(BoxCollider 비트리거) + 카브 NavMeshObstacle + 반투명 머티리얼(색은 PropertyBlock).
-    /// 바닥 높이 <paramref name="baseY"/> 에서 <paramref name="height"/> 만큼. <paramref name="carve"/> = false 면 NavMeshObstacle 없음(개인 뒤 배리어).
+    /// 배리어 오브젝트 하나 — Barrier 레이어 큐브(BoxCollider 비트리거) + 반투명 머티리얼(색은 PropertyBlock).
+    /// 바닥 높이 <paramref name="baseY"/> 에서 <paramref name="height"/> 만큼. <paramref name="carve"/> = true 면 같은 부모 아래에
+    /// 카브 NavMeshObstacle 형제(<c>MonsterBlock_G*</c>)도 만든다 — 큐브를 페이드·비활성해도 몬스터는 계속 막힌다(할 일 148).
+    /// false 면 NavMeshObstacle 없음(개인 뒤 배리어).
     /// </summary>
     public static GameObject CreateBarrierObject(MapSceneBarrierSpec spec, Transform parent, float baseY, float height,
                                                  Material material, Color color, bool carve = true)
@@ -262,11 +265,15 @@ public sealed class MapSceneBarriers : MonoBehaviour
         SetColor(r, new MaterialPropertyBlock(), color);
         if (!carve) return go;
 
-        var obstacle = go.AddComponent<NavMeshObstacle>();
+        // 큐브의 자식이 아니라 형제 — 열 때 큐브의 높이 페이드(스케일)·비활성이 카브까지 끄지 않게.
+        var block = new GameObject($"MonsterBlock_{spec.Gate}") { layer = GameLayers.BarrierLayer, hideFlags = parent.gameObject.hideFlags };
+        block.transform.SetParent(parent, false);
+        block.transform.SetPositionAndRotation(go.transform.position, Quaternion.identity);
+        var obstacle = block.AddComponent<NavMeshObstacle>();
         obstacle.shape = NavMeshObstacleShape.Box;
         obstacle.center = Vector3.zero;
-        // 로컬 크기(스케일 곱) — 위아래로 넉넉히 부풀려 NavMesh 표면을 확실히 파낸다(ZoneBridgeGate 와 같은 이유).
-        obstacle.size = new Vector3(1f, 1f + CarveVerticalPadding / Mathf.Max(0.01f, height), 1f);
+        // 위아래로 넉넉히 부풀려 NavMesh 표면을 확실히 파낸다(ZoneBridgeGate 와 같은 이유).
+        obstacle.size = new Vector3(maxX - minX, height + CarveVerticalPadding, maxZ - minZ);
         obstacle.carving = true;
         obstacle.carveOnlyStationary = false;
         return go;

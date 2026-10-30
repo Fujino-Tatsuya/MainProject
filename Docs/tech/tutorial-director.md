@@ -125,8 +125,8 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 **언제 · 어떻게 여나**
 - 디렉터가 튜토리얼을 켠 것(`IsTutorialActive`)이 그 피어에서 처음 보일 때 만든다(`StateChanged`). 튜토리얼이 아니면 만들지 않는다.
-- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 콜라이더·카브를 **즉시** 끄고
-  0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만).
+- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 플레이어 콜라이더를 **즉시** 끄고
+  0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만). 몬스터 카브는 열려도 끄지 않는다(아래 '막기 — 몬스터').
 
 **막기**
 - 플레이어: **Barrier 레이어**(19 — 할 일 32 로 Wall 에서 분리, [wall-concept.md](wall-concept.md)) 비트리거 BoxCollider. 플레이어 모터 스윕 마스크(`PlayerGameRuleData.obstacleMask` = Default|Ground|Wall|Enemy|Env|Barrier)가 본다.
@@ -135,6 +135,11 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   스윕을 안 타는 것 = 순간이동(`TeleportAuthoritative` — 스폰·추락 복구·보스방 이동)과 23호 잡기/밀기(`PlayerRestrainedState` — 보스방 전용).
   Barrier 는 거너 평타·차지 레이저 차단 레이어에도 있어(할 일 32 에서 추가) 배리어 너머로는 거너 빔이 막힌다. 부활·리스폰 점유 검사(`MapSceneDeathRules`·`PartyWipeRespawner`)도 Wall|Barrier 를 본다.
 - 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Barrier 는 NavMesh 베이크 수집(Default·Ground·Wall)에 안 들어가 다리 재베이크에 섞이지 않는다.
+  **복도는 늘 몬스터 출입 금지(할 일 148)** — 카브는 배리어 큐브와 따로 둔 형제 `MapSceneBarriers/MonsterBlock_G*` 이고 게이트가 열려도 **끄지 않는다**(서버 NavMesh 에만 의미 — 몬스터 이동 권한이 서버).
+  복도 8개 문 모두 끝까지 구멍이 남아 몬스터는 복도로 길을 못 찾고 문 앞에서 멈춘다. 이미 복도 안에 있던 몬스터는 그대로 둔다(쫓아내지 않음 — 복도 안 섬에 갇힌다).
+  넉백·특성 밀치기·Q 견인도 막힌다 — 몬스터 강제 이동 두 경로가 모두 NavMesh 위로만 민다: `MonsterBase.HandleKnockback`(틱마다 `NavMesh.SamplePosition` 0.5m 로 메시 위 점에 고정, 끝 Warp 는 시작 자리에서 `NavMesh.Raycast` 로 같은 섬 확인)·`LinearKnockback`(`NavMesh.Raycast` 로 메시 끝에서 멈춤).
+  플레이어는 NavMesh 를 안 쓰므로(모터 스윕) 영향 없다. 보스방(G10 너머)과 이어진 복도4 출구도 같은 규칙.
+  테스트: `MapSceneBarrierMonsterBlockTests`(큐브를 꺼도 카브가 남고 배리어 자리를 덮는다).
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `MapSceneBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백(존1)은 원래 거르지 않았다 —
   C2 부터는 그 사람의 뒤 배리어 너머면 대체 지점을 쓴다(아래 '뒤 배리어 예외').
