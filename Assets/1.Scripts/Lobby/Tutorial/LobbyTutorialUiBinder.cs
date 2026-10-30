@@ -133,7 +133,8 @@ public static class LobbyTutorialUiBinding
 /// <item>목표 패널 = <see cref="LobbyTutorialState.ObjectivePanelVisible"/> + 키 칸·T10 체크·진행 n/N(집결 n/N 은 옛 상단 <c>PartyGatherStatusView</c> 대신 여기 진행 줄로).</item>
 /// <item>대사 = (runId, revision) 이 바뀔 때마다 <see cref="LobbyTutorialUI.ShowDialogue(string,string,string)"/>, 대사 단계를 떠나면 <see cref="LobbyTutorialUI.EndDialogue"/>.</item>
 /// <item>경로 = <see cref="LobbyTutorialState.ActivePathId"/>, 벽 = <see cref="LobbyTutorialState.ActiveTargetWallId"/>(이전 벽 끔 → 새 벽 켬).</item>
-/// <item><see cref="LobbyTutorialState.IsAvailable"/> false = 아무것도 그리지 않는다(그려 둔 게 있으면 <see cref="LobbyTutorialUI.ClearAll"/> 한 번).</item>
+/// <item><see cref="LobbyTutorialState.IsAvailable"/> false = 아무것도 그리지 않는다(그려 둔 게 있으면 <see cref="LobbyTutorialUI.ClearAll"/> 한 번).
+/// true 인 동안은 옛 3스텝 안내를 끈다(<see cref="LobbyTutorialUI.SetTutorialActive"/>).</item>
 /// <item>같은 프리팹의 디버그 구동(<see cref="LobbyTutorialUIDebugDriver"/>)이 켜져 있으면 손 떼고 디버그 화면을 둔다.</item>
 /// </list>
 /// 로컬 플레이어 Transform 을 캐시하지 않는다 — 캐릭터 교체(계약 §6)에 따로 할 일 없음.
@@ -168,8 +169,15 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
 
     private void Update()
     {
-        if (ui == null || (debugDriver != null && debugDriver.isActiveAndEnabled))
+        if (ui == null)
             return;
+
+        // 디버그 구동 중엔 손 뗌 — 기억을 비워 두면 디버그를 끈 다음 프레임에 지금 상태로 전부 다시 그린다.
+        if (debugDriver != null && debugDriver.isActiveAndEnabled)
+        {
+            Forget();
+            return;
+        }
 
         if (!LobbyTutorialState.IsAvailable)
         {
@@ -182,7 +190,12 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
             return;
         }
 
-        _drawn = true;
+        if (!_drawn)
+        {
+            ui.SetTutorialActive(true); // 경로 없는 단계에도 옛 3스텝 안내(LobbyGuideSteps)를 끈다.
+            _drawn = true;
+        }
+
         ApplyDialogue();
         ApplyObjective();
         ApplyPath();

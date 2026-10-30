@@ -22,6 +22,14 @@ public sealed class LobbyTutorialUiPathSetTests
     }
 
     [Test]
+    public void SuppressLegacy_WhileTutorialActiveEvenWithoutPath()
+    {
+        Assert.That(LobbyTutorialPathRules.SuppressLegacy(true, false), Is.True, "대사·훈련 단계(경로 없음)에도 옛 안내 끔");
+        Assert.That(LobbyTutorialPathRules.SuppressLegacy(false, true), Is.True);
+        Assert.That(LobbyTutorialPathRules.SuppressLegacy(false, false), Is.False, "진행기 없는 로비 = 옛 안내 그대로");
+    }
+
+    [Test]
     public void PathIds_UniqueAndNonEmpty()
     {
         var ids = LobbyTutorialPathIds.All;

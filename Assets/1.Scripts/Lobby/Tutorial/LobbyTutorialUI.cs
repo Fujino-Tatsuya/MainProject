@@ -125,10 +125,18 @@ public sealed class LobbyTutorialUI : MonoBehaviour
             Debug.LogWarning($"{Tag} 경로 '{pathId}' 를 켜려 했지만 씬에 켜진 LobbyTutorialPathSet 이 없다.", this);
     }
 
+    /// <summary>튜토리얼 진행 중 표시 — 경로가 없는 단계에도 옛 3스텝 안내를 끈다(<see cref="LobbyTutorialPathSet.SetTutorialActive"/>).</summary>
+    public void SetTutorialActive(bool active)
+    {
+        LobbyTutorialPathSet set = LobbyTutorialPathSet.Active;
+        if (set != null)
+            set.SetTutorialActive(active);
+    }
+
     /// <summary>지정 벽 표식 켜고 끄기(ID = <see cref="LobbyTutorialWallTarget.WallId"/> — 월드 쪽).</summary>
     public void SetWallTarget(string wallId, bool visible) => LobbyTutorialWallTarget.SetVisible(wallId, visible);
 
-    /// <summary>씬 종료·회차 초기화 — 목표·대사·경로·벽 표식을 유예 없이 전부 끈다.</summary>
+    /// <summary>씬 종료·회차 초기화 — 목표·대사·경로·벽 표식을 유예 없이 전부 끈다(옛 안내 억제도 푼다).</summary>
     public void ClearAll()
     {
         HideObjective();
@@ -136,6 +144,7 @@ public sealed class LobbyTutorialUI : MonoBehaviour
         if (dialoguePanel != null)
             dialoguePanel.Hide(immediate: true);
         SetPath(null);
+        SetTutorialActive(false);
         LobbyTutorialWallTarget.HideAll();
     }
 

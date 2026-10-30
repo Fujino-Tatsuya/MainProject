@@ -24,6 +24,9 @@ public static class LobbyTutorialPathRules
 {
     public static bool ShouldShow(string entryId, string currentId) =>
         !string.IsNullOrEmpty(currentId) && string.Equals(entryId, currentId, StringComparison.Ordinal);
+
+    /// <summary>옛 3스텝 안내를 끌까 — 튜토리얼 진행 중이거나(경로 없는 대사·훈련 단계 포함) 튜토리얼 경로가 하나라도 켜져 있으면.</summary>
+    public static bool SuppressLegacy(bool tutorialActive, bool anyPathShown) => tutorialActive || anyPathShown;
 }
 
 /// <summary>
@@ -31,8 +34,8 @@ public static class LobbyTutorialPathRules
 /// <see cref="SetPath"/> 가 그 ID 의 경로 오브젝트만 켜고 나머지는 끈다. 화살표 모양·셰이더·색은 111 그대로(바꾸지 않음).
 /// <list type="bullet">
 /// <item>전 피어 로컬 표시. 어떤 ID 를 켤지는 157 상태를 읽은 바인더가 <see cref="LobbyTutorialUI.SetPath"/> 로 넘긴다.</item>
-/// <item>옛 3스텝 안내(<see cref="LobbyGuideSteps"/>)와 동시에 켜지지 않게, 경로를 켜는 동안 <see cref="legacyGuideRoots"/> 를 끈다(계획 Q1).
-/// 경로를 전부 끄면(빈 ID) 되돌린다. 튜토리얼이 끝난 뒤 옛 안내를 아예 끌지는 157 흐름이 정한다.</item>
+/// <item>옛 3스텝 안내(<see cref="LobbyGuideSteps"/>)와 동시에 켜지지 않게, 경로를 켜는 동안 + 튜토리얼 진행 중(<see cref="SetTutorialActive"/>) <see cref="legacyGuideRoots"/> 를 끈다(계획 Q1).
+/// 둘 다 풀리면 되돌린다(157 진행기가 없는 로비 = 옛 안내 그대로).</item>
 /// <item>켜질 때 전부 끈다. 회차 초기화·완료 정리는 <see cref="SetPath"/>(null).</item>
 /// </list>
 /// 상세: Docs/tech/lobby-tutorial-ui.md
@@ -61,8 +64,20 @@ public sealed class LobbyTutorialPathSet : MonoBehaviour
 
     private readonly List<GameObject> _suppressed = new List<GameObject>();
     private string _current;
+    private bool _tutorialActive;
+    private bool _anyShown;
 
     public string Current => _current;
+
+    /// <summary>
+    /// 튜토리얼 진행 중 = 경로가 없는 단계(대사·훈련 내용)에도 옛 안내를 계속 끈다. 바인더가 157 상태가 있는 동안 true 로 둔다.
+    /// false 로 돌리면 경로도 꺼져 있을 때 옛 안내를 되살린다.
+    /// </summary>
+    public void SetTutorialActive(bool active)
+    {
+        _tutorialActive = active;
+        SetLegacySuppressed(LobbyTutorialPathRules.SuppressLegacy(_tutorialActive, _anyShown));
+    }
     public IReadOnlyList<Entry> Entries => entries;
 
     private void OnEnable()
@@ -77,6 +92,8 @@ public sealed class LobbyTutorialPathSet : MonoBehaviour
     private void OnDisable()
     {
         _current = null;
+        _tutorialActive = false;
+        _anyShown = false;
         _suppressed.Clear();
         if (Active == this)
             Active = null;
@@ -122,7 +139,8 @@ public sealed class LobbyTutorialPathSet : MonoBehaviour
         if (!known)
             Debug.LogWarning($"{Tag} 모르는 경로 ID '{pathId}' — 전부 끈다.", this);
 
-        SetLegacySuppressed(show.Count > 0);
+        _anyShown = show.Count > 0;
+        SetLegacySuppressed(LobbyTutorialPathRules.SuppressLegacy(_tutorialActive, _anyShown));
     }
 
     private void SetLegacySuppressed(bool suppressed)
