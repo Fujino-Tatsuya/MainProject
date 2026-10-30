@@ -136,16 +136,10 @@ public struct PodDropMapTimings
     [Min(0f)] public float brakeSeconds;
     [Tooltip("급감속 이징(진행도 → 내려온 비율). Out 계열 = 처음 빠르고 끝에서 멈춘다")]
     public Ease brakeEase;
-    [Tooltip("안 쓴다(할 일 150) — 날개는 처음부터 펴진 채(날개 접기 클립 0프레임) 떨어지고 펴는 동작은 없다. xlsx 행 정리 전까지 남겨 둔다")]
-    public string wingDeployState;
     [Tooltip("급감속 시작 순간 같이 재생하는 다리 펴기 상태(Gear 레이어). 비우면 생략. 날개 접기와 둘 다 끝 클립 이벤트(PodClipEvent)가 와야(그리고 연출 높이에 닿아야) 자유낙하한다")]
     public string gearDeployState;
 
     [Header("자유낙하 착륙 → 해치 열기")]
-    [Tooltip("안 쓴다(할 일 150) — 연출 높이 → 지면은 추진력 없는 자유낙하(중력 가속도 칸)로 바뀌었다. xlsx 행 정리 전까지 남겨 둔다")]
-    [Min(0f)] public float landSeconds;
-    [Tooltip("안 쓴다(할 일 150) — 자유낙하로 바뀌었다(위 칸과 같음)")]
-    public Ease landEase;
     [Tooltip("자유낙하 중력 가속도(m/s²) — 날개 접기·다리 펴기 끝 이벤트 뒤 연출 높이에서 추진력 없이 떨어진다. 높이 = h − ½·g·t², 낙하 시간 = √(2h/g). " +
              "클수록 짧고 세게 내리꽂힌다(9.81 = 실제 중력, 연출 높이 5m 면 약 1.01초·착지 속도 약 9.9m/s)")]
     [Min(0.1f)] public float freefallGravity;
@@ -207,10 +201,7 @@ public struct PodDropMapTimings
         brakeDistance = 3f,
         brakeSeconds = 0.8f,
         brakeEase = Ease.OutCubic,
-        wingDeployState = "DP_WingDeploy",
         gearDeployState = "DP_GearDeploy",
-        landSeconds = 1.5f,
-        landEase = Ease.InOutSine,
         freefallGravity = 9.81f,
         impactEffectScale = 1.5f,
         shakeAmplitude = 0.6f,

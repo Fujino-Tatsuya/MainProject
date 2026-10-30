@@ -440,11 +440,6 @@ public sealed class PodDropTimelineTests
 
         s.freefallGravity = 0f;
         Assert.AreEqual(DefaultFreefallSeconds, new PodDropMapTimeline(s).FreefallSeconds, Eps, "중력 0 → 기본 중력(무한 낙하 없음)");
-
-        s = PodDropMapTimings.Default;
-        s.landSeconds = 99f;
-        s.landEase = Ease.Linear;
-        Assert.AreEqual(DefaultFreefallSeconds, new PodDropMapTimeline(s).FreefallSeconds, Eps, "옛 착륙 시간·이징 칸은 안 쓴다");
     }
 
     [Test]

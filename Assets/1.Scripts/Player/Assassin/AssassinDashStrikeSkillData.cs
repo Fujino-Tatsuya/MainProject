@@ -25,11 +25,6 @@ public class AssassinDashStrikeSkillData : PlayerSkillData
     [Tooltip("경로 판정 영역(할 일 153) — 기준점 = 경로 구간 시작 + 돌진 방향(Point). 첫 직사각형 length = 기준 길이(돌진 거리와 같게 둔다 — " +
              "매 틱 구간마다 구간 길이로 맞춘다), width = 경로 폭, 높이 = 구간 시작(발) 높이 기준. 추격의 궤적도 같은 도형(지나온 선분 길이).")]
     [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet(AttackShapeOrigin.Point, PathRect());
-    // 미사용(할 일 153 — hitArea 로 옮김) — 병합 Export 때 제거. 지금 지우면 xlsx 행이 남아 테이블 Play·빌드가 오류를 낸다.
-#pragma warning disable CS0414
-    [Tooltip("미사용 — hitArea.shapes[0].width 로 옮김, 병합 Export 때 제거")]
-    [SerializeField, Min(0f)] private float pathWidth = 1.2f;
-#pragma warning restore CS0414
     [SerializeField, Min(1), DataTableIgnore] private int maxHitResults = 16;
 
     public float DashDistance => dashDistance;
@@ -60,7 +55,7 @@ public class AssassinDashStrikeSkillData : PlayerSkillData
         hitArea.ResolvePose(casterPosition, direction, segmentStart, direction);
 
     /// <summary>
-    /// 기본 판정 도형(할 일 153) — 예전 경로 상자(<c>AssassinDashStrikeSkill.PathBox</c>: 구간 시작 → 끝, 폭 pathWidth 1.2 · 높이 pathHeight 2 를 발 높이부터 위로)를 옮긴 값.
+    /// 기본 판정 도형(할 일 153) — 예전 경로 상자(<c>AssassinDashStrikeSkill.PathBox</c>: 구간 시작 → 끝, 폭 1.2 · 높이 2 를 발 높이부터 위로)를 옮긴 값.
     /// length 5 = 기준 길이(SO 돌진 거리), 뒤 0, 높이 = 발 기준 0~2.
     /// </summary>
     public static AttackRectShape PathRect() =>
