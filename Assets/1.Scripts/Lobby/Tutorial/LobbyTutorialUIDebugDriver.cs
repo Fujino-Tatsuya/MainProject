@@ -78,11 +78,12 @@ public sealed class LobbyTutorialUIDebugDriver : MonoBehaviour
         ApplyWorld(ui, scene);
     }
 
-    // 바닥 경로·벽 표식 — 대사 장면은 경로를 끈다(명세 L30: 브리핑 중 목표·경로 숨김).
+    // 바닥 경로·벽 표식·라커룸 테두리(L00 = 라커 경로 장면) — 대사 장면은 경로를 끈다(명세 L30: 브리핑 중 목표·경로 숨김).
     private void ApplyWorld(LobbyTutorialUI ui, LobbyTutorialUIDebugScene scene)
     {
         ui.SetPath(scene.PathId);
         ui.SetWallTarget(wallId, scene.WallVisible);
+        ui.SetLockerArea(scene.PathId == LobbyTutorialPathIds.Locker);
     }
 #endif
 }

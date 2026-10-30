@@ -68,6 +68,15 @@ public sealed class LobbyTutorialUiBinderTests
     }
 
     [Test]
+    public void 라커룸_테두리는_L00_동안만()
+    {
+        Assert.That(LobbyTutorialUiBinding.LockerAreaVisible(true, false, LobbyTutorialStepKind.LockerVisit), Is.True);
+        Assert.That(LobbyTutorialUiBinding.LockerAreaVisible(true, false, LobbyTutorialStepKind.Gather), Is.False, "전원 방문 → L10 이면 끔");
+        Assert.That(LobbyTutorialUiBinding.LockerAreaVisible(false, false, LobbyTutorialStepKind.LockerVisit), Is.False, "진행기 없음");
+        Assert.That(LobbyTutorialUiBinding.LockerAreaVisible(true, true, LobbyTutorialStepKind.LockerVisit), Is.False, "출격 확정 뒤");
+    }
+
+    [Test]
     public void 단계표_id_는_Strings_키로_체크는_비트_순서대로()
     {
         var view = LobbyTutorialUiBinding.BuildObjective("LOBBY_TITLE_BASIC", "LOBBY_OBJ_BASIC", null,

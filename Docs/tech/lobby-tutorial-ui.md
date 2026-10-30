@@ -19,6 +19,7 @@
 | `EndDialogue()` | 대사·삽화 닫기. 목표 패널은 유예(기본 0.3초) 뒤 다시 보인다 |
 | `SetPath(pathId)` | 그 ID 의 바닥 경로만 켬. null·빈 값 = 전부 끔 |
 | `SetWallTarget(wallId, visible)` | 지정 벽 표식 켜고 끔 |
+| `SetLockerArea(visible)` | L00 라커룸 영역 바닥 민트 테두리 켜고 끔(173) |
 | `SetTutorialActive(active)` | 튜토리얼 진행 중 — 경로 없는 단계(대사·훈련)에도 옛 3스텝 안내(`LobbyGuideSteps`)를 끈다 |
 | `ClearAll()` | 씬 종료·회차 초기화 — 유예 없이 전부 끔(옛 안내 억제도 푼다) |
 
@@ -55,35 +56,39 @@
 | `IsDialogueActive` + `Dialogue` | (runId, revision) 이 바뀔 때마다 `ShowDialogue(화자, 대사, BackgroundId)` — 연속 대사(L31→L34)는 끄지 않고 다시 부름. 대사 단계를 떠나면 `EndDialogue` |
 | `ActivePathId` | 바뀌면 `SetPath` (빈 값 = 전부 끔) |
 | `ActiveTargetWallId` | 바뀌면 이전 벽 `SetWallTarget(false)` → 새 벽 `SetWallTarget(true)` |
+| `CurrentStep.Kind == LockerVisit`(∧ 출격 확정 전) | 바뀌면 `SetLockerArea` — L00 동안 라커룸 테두리, 전원 방문 → L10 이면 꺼짐(`LobbyTutorialUiBinding.LockerAreaVisible`) |
 
 - 단계표 칸 값(접두 없는 id)은 `LobbyTutorialUiStrings.KeyOf` 로 `Tutorial.Guide.<id>` 키. 화자 칸이 비면 `LOBBY_SPEAKER_SUPERVISOR`.
 - 목표 패널은 서명(`LobbyObjectiveSignature` = runId·revision·지시문 id·진행 모드·체크 마스크·n/N)이 같으면 다시 그리지 않는다(매 프레임 할당 없음).
 - 같은 프리팹의 `DebugDriver` 가 켜져 있으면 바인더가 손을 뗀다(로비 Play 중 디버그 화면 확인 가능).
 - 로컬 플레이어 Transform 을 캐시하지 않는다 — 캐릭터 교체(계약 §6) 때 할 일 없음.
 - 순수 매핑 = `LobbyTutorialUiBinding`(EditMode `LobbyTutorialUiBinderTests`).
-- **벽 표식 한계**: `LobbyTutorialWallTarget` 은 아직 씬 어디에도 안 붙어 있어 `SetWallTarget` 은 지금 아무것도 켜지 않는다. 씬의 `DesignatedWall_West_Marker` 는 157 의 기존 `LobbySparringLink.WallMarkerVisible`(T33·T34)로 계속 켜진다.
-  `LobbyTraining/*` 는 157 영역이라 C8 에서 손대지 않았다 — 갈아타려면 그 마커에 `LobbyTutorialWallTarget`(`WALL_TRAIN_WEST`)을 붙이고 `WallMarkerVisible` 쪽 표시를 끄는 작업을 157 과 맞춘다.
+- **벽 표식(173)**: 씬 `LobbyTraining/Train03Arena/DesignatedWall_West_Marker` 에 `LobbyTutorialWallTarget`(`WALL_TRAIN_WEST`)을 붙이고 아레나 `wallMarkers` 에서 뺐다 —
+  표시 = 바인더 `ActiveTargetWallId`(T34 행만 값이 있음) 한 길. 넉백 유효 충돌로 T34 가 끝나는 순간 ID 가 비어 꺼진다(명세 4.3 "성공 즉시 종료"). 옛 `LobbySparringLink.WallMarkerVisible`(T33·T34)은 마커가 비어 이제 아무것도 켜지 않는다(코드는 157 영역이라 그대로).
 
 ## 로비 씬 연결 (C8, `Assets/0.Scenes/MainFlow/3.LobbyScene.unity`)
 
 | 변경 | 대상 |
 |---|---|
 | 추가 | 루트 `LobbyTutorialUI` 인스턴스(바인더 포함, 오버라이드 = 루트 RectTransform·이름만) |
-| 추가 | 루트 `LobbyTutorialMarkers` 인스턴스 — `legacyGuideRoots` = 씬 `LobbyGuideSteps` 루트, 경로 7개 점 + 구운 조각 |
+| 추가 | 루트 `LobbyTutorialMarkers` 인스턴스 — `legacyGuideRoots` = 씬 `LobbyGuideSteps` 루트, `GatherBorders.lockerArea` = 씬 `Area_Locker` BoxCollider(173), 경로 7개 점 + 구운 조각 |
 | 비활성(삭제 아님) | `UI/Canvas/Panel_PlayerSlots`(상단 파티 슬롯) · `Slot_GatherStatus`(상단 집결 n/N) · `Slot_WeaponCheck`(왼쪽 무기 점검) · `Slot_Train02`(남은 상대) |
-| 무수정 | `Gather_*`·`LobbyTraining/*`·`Area_Locker`·루트 `TutorialGuideUI`·`LobbyGuideSteps`·NavMesh |
+| 173 수정 | `Train03Arena/DesignatedWall_West_Marker` — 켬(렌더러는 `LobbyTutorialWallTarget` 이 끄고 켬)·x −19.67 → −19.855(실제 벽면 x −19.89 에 밀착)·아레나 `wallMarkers` 비움 |
+| 무수정 | `Gather_*`·`Area_Locker`·루트 `TutorialGuideUI`·`LobbyGuideSteps`·NavMesh |
 
-**경로 점 = 임시 배치**(실제 목표 오브젝트 위치 기준, 경유지 1개씩, 월드 XZ). 벽·문을 피하는 웨이포인트는 사람이 Scene 뷰에서 다듬는다(점을 옮기면 자동 다시 굽기 — 111 과 같음).
+**경로 점(173 정리)** — 월드 XZ, 바닥 축을 따르는 각진 구간. 로비 쪽은 NavMesh 가 없어(훈련장만 구움) 바닥 Raycast(y 0)와 플레이어 크기 CapsuleCast(반지름 0.25, 높이 0.4–1.5)로
+가구·벽에 안 걸리는지 확인했다(`Door_Locker` = 근접 자동문이라 통과로 본다). 158 임시 배치는 라커·중앙·출격 경로가 중앙 콘솔 책상(`Control_R1/R2_*`)을 뚫고 지나갔다 —
+책상 서쪽 통로(x −2.8, 111 옛 안내 경로가 쓰던 길)로 돌렸다. 점을 옮기면 자동 다시 굽기(111 과 같음).
 
-| 경로 | 시작 → 경유 → 끝 | 끝 기준 |
-|---|---|---|
-| `PATH_LOCKER` | (4.04,−11.5) 입구 홀 스폰 → (4.04,2) → (−6.5,2) | 라커룸 문(−4.5,2) 안 `Area_Locker` |
-| `PATH_CENTRAL` | (−6.5,2) → (1.61,2) → (1.61,−5.16) | `Gather_Brief`(중앙) 중심 |
-| `PATH_TRAINING_HALL` | (1.61,−6) → (−4.5,−6) → (−10.25,−6) | **`Gather_Entrance`**(훈련장 문 앞) 중심 |
-| `PATH_COMBAT_AREA` | (−14.5,−5.5) → (−16,−5.5) → (−16,0) | `Gather_Train02Start` |
-| `PATH_COUNTER_AREA` | (−16,1.5) → (−16,3) → (−16,5) | `Gather_Train03Area` |
-| `PATH_TRAINING_EXIT` | (−16,2.5) → (−16,−6) → (−13.75,−6) | `Gather_TrainEnd`(출구) |
-| `PATH_SORTIE` | (1.81,−3.5) → (1.81,1) → (1.81,5.5) | `Gather_Sortie` 남쪽 가장자리(포드 밑을 피함) |
+| 경로 | 화면 | 점 | 끝 기준 |
+|---|---|---|---|
+| `PATH_LOCKER` | 01–02 | (4.5,−11.5) 입구 홀 스폰 → (4.5,−5) → (−2.8,−5) → (−2.8,2) → (−6.5,2) | 라커룸 문(−4.5,2) 안 `Area_Locker` |
+| `PATH_CENTRAL` | 03–04 · 20–21 | (−6.5,2) → (−2.8,2) → (−2.8,−5.16) → (1.61,−5.16) | `Gather_Brief`(중앙) 중심. L30 은 출구 확정 텔레포트로 이미 중앙이라 같은 경로를 다시 켜도 짧게만 보인다 |
+| `PATH_TRAINING_HALL` | 06–07 | (1.61,−6) → (−4.5,−6) → (−10.25,−6) | **`Gather_Entrance`**(훈련장 문 앞) 중심 |
+| `PATH_COMBAT_AREA` | 10 | (−14.5,−5.5) → (−16,−5.5) → (−16,0) | `Gather_Train02Start` |
+| `PATH_COUNTER_AREA` | 13–14 | (−16,1.5) → (−16,3) → (−16,5) | `Gather_Train03Area` |
+| `PATH_TRAINING_EXIT` | 19 | (−16,2.5) → (−16,−6) → (−13.75,−6) | `Gather_TrainEnd`(출구) |
+| `PATH_SORTIE` | 26–27 | (1.61,−3.4) → (−2.8,−3.4) → (−2.8,3) → (1.7,3) → (1.7,4.6) | `Gather_Sortie` 남쪽 안, 진단 포드 둘 사이·발사대(`Floor_1`, z 4.93~) 바로 앞 |
 
 - 에디터에서 씬을 열면 레이아웃·TMP 가 인스턴스에 구동 값 오버라이드(`m_TextStyleHashCode`·자식 RectTransform 앵커 0)를 다시 만들 수 있다 — 저장 전 diff 에서 빼면 된다(동작 무관).
 
@@ -116,20 +121,23 @@
   - ID = `LobbyTutorialPathIds` = 157 단계표 `pathId`(위 대응표). L10·L30 은 같은 `PATH_CENTRAL`.
   - 켜질 때 전부 끔. 경로를 켠 동안 + 튜토리얼 진행 중(`SetTutorialActive`) `legacyGuideRoots`(씬의 옛 `LobbyGuideSteps` 루트)를 끄고, 둘 다 풀리면 되돌린다 — 옛 3스텝 안내와 동시에 안 켜진다(157 진행기가 없는 로비 = 옛 안내 그대로). 판정 = `LobbyTutorialPathRules.SuppressLegacy`.
 - 자식 `GatherBorders` = `LobbyGatherZoneBorders` + 꺼 둔 Quad 풀 8개(`M_LobbyGatherBorder`, 셰이더 `Lobby/GatherZoneBorder`).
-  매 프레임 `PartyGatherZone.Spawned` 중 **활성 ∧ 확정 전** 구역의 BoxCollider 바닥 면에 테두리를 놓는다(논리 트리거 = 시각 footprint). 폭 0.18m, 띄움 0.02m, 민트(인스펙터).
+  매 프레임 `PartyGatherZone.Spawned` 중 **활성 ∧ 확정 전** 구역의 BoxCollider footprint(XZ)에 테두리를 놓는다(논리 트리거 = 시각 footprint). 폭 0.18m, 띄움 0.02m, 민트(인스펙터).
+  L00 동안은 `lockerArea`(씬 `Area_Locker`)도 같은 규칙으로 그린다(`SetLockerArea`).
   씬의 `Gather_*` 는 손대지 않는다. 런타임 오브젝트·메시 생성 없음. 숫자·카운트다운 없음. 배치 규칙 = `LobbyGatherBorderLayout`(EditMode).
+  - **높이 = 구역 오브젝트 원점(로컬 y 0)**, 박스 바닥 면이 아니다(173). 씬의 `Gather_*`·`Area_Locker` 는 원점이 바닥(y 0)이고 박스가 center.y 1·size.y 3 이라 바닥 아래 0.5m 까지 내려간다 —
+    158 은 박스 바닥 면 + 0.02 = y −0.48 에 놓아 **테두리가 바닥 밑에 묻혀 Play 에서 안 보였다**(풀·셰이더·머티리얼·활성 조건은 정상이었다).
 
 ### 벽 활용 표식
 
 - 셰이더 `Lobby/WallTargetMarker` — 판(큐브)의 가장 얇은 축을 두께로 보고 나머지 두 축(m)으로 금색 빛 테두리(약한 맥동) + 낮은 밝기 사선 줄무늬. 텍스처 없음.
-- `Assets/3.Materials/Lobby/MA_Train03DesignatedWall.mat` 의 **셰이더·색만 교체**(guid `2325cf83…` 유지) — 씬의 `DesignatedWall_West_Marker` 는 그대로, 표시 조건도 기존 `LobbySparringLink.WallMarkerVisible`.
-- `LobbyTutorialWallTarget`(TargetWall ID 로 렌더러 켜고 끔)은 바인더가 `ActiveTargetWallId` 로 부르지만 **아직 어디에도 안 붙어 있다**(위 "벽 표식 한계" — 마커는 157 영역 `LobbyTraining/*`).
-- 큐브가 벽에서 떠 보이면 위치·두께 조정은 씬(사용자/157).
+- `Assets/3.Materials/Lobby/MA_Train03DesignatedWall.mat` 의 **셰이더·색만 교체**(guid `2325cf83…` 유지).
+- 씬 `DesignatedWall_West_Marker` 에 `LobbyTutorialWallTarget`(`WALL_TRAIN_WEST`) — 바인더가 `ActiveTargetWallId`(T34)로 켜고 끈다(173, 위 "벽 표식").
+- 위치(173): 판정용 `DesignatedWall_West` 콜라이더 앞면(x −19.70)이 실제 벽 메시 면(x −19.89)보다 0.19m 앞에 있어, 콜라이더에 붙어 있던 마커가 벽에서 떠 보였다 → 마커 뒷면을 벽 메시 면 5mm 앞(x −19.885)으로 옮겼다. 판정 콜라이더는 그대로.
 
 ## 디버그 구동 — `LobbyTutorialUIDebugDriver`
 
 `LobbyTutorialUI.prefab` 의 `DebugDriver`(꺼 둠)를 Play 중 켜고 인스펙터 ⋮ 메뉴 `다음 장면`·`이전 장면`·`처음 장면`·`전부 끄기`. 켜져 있는 동안 바인더는 손을 뗀다(끄면 다음 프레임에 157 상태로 전부 다시 그린다).
-명세 화면 01–27(21장면)의 목표·대사·삽화·경로 ID·벽 표식(화면 17)을 순서대로 재현한다. 단축키 없음, `UNITY_EDITOR || DEVELOPMENT_BUILD` 에서만 동작.
+명세 화면 01–27(21장면)의 목표·대사·삽화·경로 ID·벽 표식(화면 17)·라커룸 테두리(라커 경로 장면)를 순서대로 재현한다. 단축키 없음, `UNITY_EDITOR || DEVELOPMENT_BUILD` 에서만 동작.
 `partySize`(기본 3) = 진행 분모, `wallId` = 화면 17 에서 켤 벽 ID(기본 `WALL_TRAIN_WEST`).
 
 ## 문구 키 — `LobbyTutorialUiStrings`
