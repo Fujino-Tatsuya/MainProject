@@ -54,6 +54,11 @@ internal static class LobbyTutorialUIAuthoring
             so.FindProperty("dialoguePanel").objectReferenceValue = dialogue;
             so.ApplyModifiedPropertiesWithoutUndo();
 
+            // 디버그 구동(C4) — 꺼 둔 채. 켜고 인스펙터 ⋮ 메뉴로 화면 01–27 을 넘긴다.
+            var debug = Child(root.transform, "DebugDriver");
+            Ensure<LobbyTutorialUIDebugDriver>(debug.gameObject);
+            debug.gameObject.SetActive(false);
+
             DisableRaycasts(root);
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Debug.Log($"[LobbyTutorialUIAuthoring] {(exists ? "갱신" : "생성")}: {PrefabPath}");
