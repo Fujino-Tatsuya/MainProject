@@ -30,7 +30,7 @@ public enum TrainingSparringCrowdControl : byte
     None = 0,
     /// <summary>취약 중 밀림 — 간파 스킬 적중(23호 고정 거리) 또는 넉백 세기가 있는 공격.</summary>
     Knockback = 1,
-    /// <summary>취약 중 기절(경직) — 공격의 staggerDuration(밀림 뒤 또는 단독).</summary>
+    /// <summary>취약 중 기절 — 밀림 뒤 경직(staggerDuration). 넉백 없는 경직 단독은 기절이 아니다(할 일 157 T32 결정 A).</summary>
     Stun = 2,
 }
 

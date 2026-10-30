@@ -100,6 +100,21 @@ public static class TrainingSparringRules
     }
 
     /// <summary>
+    /// 취약 중 적중이 시도하는 CC 종류(할 일 157 T32 — 사용자 결정 A). 간파 스킬 = 넉백, 넉백 세기 &gt; 0 = 넉백(+ 경직 &gt; 0 이면 기절),
+    /// 넉백 없이 경직만 = 없음(기절로 인정하지 않는다 — 실제 기절은 밀림 뒤 경직·뇌진탕뿐). 실제 적용 여부는 호출측이 따로 보고한다.
+    /// </summary>
+    public static TrainingSparringCrowdControl VulnerableHitCrowdControl(bool interrupt, bool fromPlayer, float knockbackStrength, float staggerDuration)
+    {
+        if (interrupt) return TrainingSparringCrowdControl.Knockback;
+        if (!BossCrowdControlRules.QualifiesPushHit(true, false, fromPlayer, knockbackStrength)) return TrainingSparringCrowdControl.None;
+        return TrainingSparringCrowdControl.Knockback | (staggerDuration > 0f ? TrainingSparringCrowdControl.Stun : TrainingSparringCrowdControl.None);
+    }
+
+    /// <summary>특성 뇌진탕 — 밀림이 끝난 순간 대기 기절을 거는가(23호 ConsumeConcussionAfterPush 순서). 취약이 끝났거나 CC 를 안 받는 중이면 없음.</summary>
+    public static bool StunsOnPushEnd(float pendingConcussion, bool vulnerable, bool acceptsCrowdControl) =>
+        pendingConcussion > 0f && vulnerable && acceptsCrowdControl;
+
+    /// <summary>
     /// 간파 예고(창) 길이 — T31 훈련 연장(할 일 157 Q11 A)이면 저작 창과 훈련 최소 길이 중 긴 쪽, 아니면 저작 창 그대로.
     /// 저작 창이 0 이하면 0(간파 없음 — 늘리지 않는다).
     /// </summary>

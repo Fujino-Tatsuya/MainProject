@@ -416,12 +416,13 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         bool interrupt = attackInfo.isInterruptAttack;
         bool counter = IsServer && interrupt && _windupLeft > 0f && Counter != null && Counter.IsOpen
                        && !CounterBlockedByState && IsCounterFromFront(hitContext);
-        // 취약 중 CC(할 일 157 ⑦ — 넉백/기절 태그 스킬 전반을 받는다): 간파 스킬 = 고정 거리 밀림, 넉백 세기 > 0 = 밀림(+ 경직),
-        // 넉백 없이 경직만 = 기절. 23호 QualifiesPushHit 와 같은 조건(경직 > 0 조건 없음). T33 위치 복귀 중엔 새 CC 반응 없음.
+        // 취약 중 CC(할 일 157 ⑦): 간파 스킬 = 고정 거리 밀림, 넉백 세기 > 0 = 밀림(+ 경직 = 기절, 뇌진탕 = 밀림 끝 기절).
+        // 넉백 없이 경직만 = 반응 없음(T32 결정 A — 실제 기절만 인정). T33 위치 복귀 중엔 새 CC 반응 없음.
         bool ccOpen = IsServer && IsVulnerable && (_model == null || _model.AcceptsCrowdControl);
+        TrainingSparringCrowdControl ccKinds = TrainingSparringRules.VulnerableHitCrowdControl(
+            interrupt, fromPlayer, attackInfo.knockbackStrength, attackInfo.staggerDuration);
         bool vulnerableHit = ccOpen && interrupt;
-        bool pushHit = ccOpen && BossCrowdControlRules.QualifiesPushHit(true, interrupt, fromPlayer, attackInfo.knockbackStrength);
-        bool stunHit = ccOpen && !interrupt && fromPlayer && attackInfo.knockbackStrength <= 0f && attackInfo.staggerDuration > 0f;
+        bool pushHit = ccOpen && !interrupt && ccKinds != TrainingSparringCrowdControl.None;
 
         if (IsServer && _suppressed && fromPlayer)
             attackInfo.damage = Mathf.Max(0, Mathf.RoundToInt(attackInfo.damage * SuppressDamageMultiplier));
@@ -454,14 +455,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
                 _pendingConcussion = Mathf.Max(_pendingConcussion, attackInfo.concussionDuration);   // 밀림이 끝나면 기절(뇌진탕)
             ReportCrowdControl(TrainingSparringCrowdControl.Knockback | (stunned ? TrainingSparringCrowdControl.Stun : 0), pushed);
         }
-        else if (stunHit)
-        {
-            ReportCrowdControl(TrainingSparringCrowdControl.Stun, TryStartStun(attackInfo.staggerDuration, "기절"));
-        }
-        else if (IsServer && !ccOpen && IsVulnerable && fromPlayer && (interrupt || attackInfo.knockbackStrength > 0f || attackInfo.staggerDuration > 0f))
+        else if (IsServer && !ccOpen && IsVulnerable && fromPlayer && ccKinds != TrainingSparringCrowdControl.None)
         {
             // T33 위치 복귀 중 — 반응 없이 버린다(면역과 같다 — 인정 안 됨).
-            ReportCrowdControl(attackInfo.knockbackStrength > 0f || interrupt ? TrainingSparringCrowdControl.Knockback : TrainingSparringCrowdControl.Stun, false);
+            ReportCrowdControl(TrainingSparringCrowdControl.Knockback, false);
         }
 
         SyncModel();
@@ -693,7 +690,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         }
 
         // 특성 뇌진탕 — 밀림이 끝나면 기절(23호 ConsumeConcussionAfterPush 와 같은 순서). 취약이 끝났으면 걸지 않는다.
-        if (_pendingConcussion > 0f && IsVulnerable && (_model == null || _model.AcceptsCrowdControl))
+        if (TrainingSparringRules.StunsOnPushEnd(_pendingConcussion, IsVulnerable, _model == null || _model.AcceptsCrowdControl))
             TryStartStun(_pendingConcussion, "뇌진탕 기절");
         _pendingConcussion = 0f;
 
