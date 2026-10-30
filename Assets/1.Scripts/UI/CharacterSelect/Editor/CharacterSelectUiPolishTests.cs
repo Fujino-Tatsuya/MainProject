@@ -51,4 +51,26 @@ public sealed class CharacterSelectUiPolishTests
         Assert.IsFalse(plate.gameObject.activeSelf, "Show·이동이 이름판을 다시 켜지 않는다");
         Assert.IsFalse(string.IsNullOrEmpty(name.text), "꺼진 채로도 포커스 이름을 넣는다(오류 없음)");
     }
+
+    [Test]
+    public void Chevron_HoverTint_DimsBodyOnly_OutlineStaysOpaque()
+    {
+        var button = new SerializedObject(_panel).FindProperty("confirmButton").objectReferenceValue as Button;
+        Assert.IsNotNull(button);
+        Assert.AreEqual(Selectable.Transition.ColorTint, button.transition);
+        Assert.AreEqual(CharacterSelectPanelAuthoring.ChevronHoverAlpha, button.colors.highlightedColor.a, 0.001f, "hover 동안 본체 알파");
+        Assert.AreEqual(CharacterSelectPanelAuthoring.ChevronHoverFadeSeconds, button.colors.fadeDuration, 0.001f, "전이 시간");
+        Assert.AreEqual(1f, button.colors.normalColor.a, 0.001f, "평소 알파 1");
+
+        var outline = button.GetComponent<UiHoverOutline>().Outline;
+        Assert.AreNotSame(button.targetGraphic, outline, "Color Tint 대상은 셰브론 본체 Image 뿐");
+        Assert.AreEqual(1f, outline.color.a, 0.001f, "흰 아웃라인 알파 1 유지");
+    }
+
+    [Test]
+    public void Chevron_Ring_ThicknessIs7px()
+    {
+        Assert.AreEqual(7f, CharacterSelectPanelAuthoring.ChevronRingThickness, "링 두께(화면 px) — PNG 대조는 CharacterSelectChevronHoverOutlineTests");
+        Assert.AreEqual(3f, CharacterSelectPanelAuthoring.ChevronRingGap, "간격은 그대로");
+    }
 }

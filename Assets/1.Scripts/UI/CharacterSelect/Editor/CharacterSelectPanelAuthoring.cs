@@ -449,7 +449,10 @@ public static class CharacterSelectPanelAuthoring
         image.raycastTarget = true;
         Button button = chevron.GetComponent<Button>();
         if (button == null)
+        {
             button = chevron.AddComponent<Button>();
+            ApplyChevronHoverTint(button);
+        }
         button.targetGraphic = image;
         // 뒤로가기와 같다 — None 이면 클릭해도 EventSystem 선택이 남지 않아 다음 Enter/Space 가 두 번 먹지 않는다.
         button.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -463,8 +466,24 @@ public static class CharacterSelectPanelAuthoring
 
     // hover 링(할 일 109 후속) — chevron.png 알파 실루엣을 두르는 흰 링을 구운 PNG(생성물 · git). 원본 아트·.meta 는 건드리지 않는다.
     public const string ChevronRingPath = "Assets/2.Prefabs/UI/Textures/CharacterSelectChevronHoverRing.png";
-    public const float ChevronRingThickness = 9f; // 화면 px(1920×1080 기준 캔버스)
+    public const float ChevronRingThickness = 7f; // 화면 px(1920×1080 기준 캔버스) — 할 일 162 에서 9 → 7
     public const float ChevronRingGap = 3f; // 화면 px — 실루엣 가장자리에서 링 안쪽 가장자리까지
+
+    // hover 동안 셰브론 본체만 옅게(할 일 162) — Button Color Tint 의 highlighted 알파. 대상 그래픽 = 셰브론 Image 뿐이라 자식 흰 링은 알파 1 그대로.
+    public const float ChevronHoverAlpha = 0.8f;
+    public const float ChevronHoverFadeSeconds = 0.08f;
+
+    /// <summary>셰브론 Button 색 전이 — highlighted 알파 <see cref="ChevronHoverAlpha"/>, 전이 <see cref="ChevronHoverFadeSeconds"/>초. 새로 붙일 때만 부른다(손댄 값 유지).</summary>
+    public static void ApplyChevronHoverTint(Button button)
+    {
+        button.transition = Selectable.Transition.ColorTint;
+        ColorBlock colors = button.colors;
+        Color highlighted = colors.highlightedColor;
+        highlighted.a = ChevronHoverAlpha;
+        colors.highlightedColor = highlighted;
+        colors.fadeDuration = ChevronHoverFadeSeconds;
+        button.colors = colors;
+    }
 
     /// <summary>
     /// 링 PNG 를 다시 굽고(<see cref="ChevronRingThickness"/>·<see cref="ChevronRingGap"/>, 기준 표시 크기 = 패널 셰브론 rect)
