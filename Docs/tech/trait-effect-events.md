@@ -87,10 +87,10 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 - **사건형 보조**(수호의 순환·불굴의 순환·사냥의 박자 쿨 환급, 수호의 잔광·불굴의 가호 보호막, 나누는 불굴, 돌파의 여세): 보호막은 받는 쪽 `PlayerShieldVfx` 가 복제 목록으로 띄운다. 나머지는 눈에 보이는 공격이 아니다.
 - **밀치기·뇌진탕만 붙는 특성**(제압의 진격·충격 레이저·급소 파괴): 원래 공격 적중 연출 + 대상 넉백·기절 표시로 보인다 — 이번 범위에서 따로 사건을 두지 않았다. 필요하면 수호의 파동 Hit 처럼 공용 RPC 로 더한다.
 
-## 4. 잔류 포격 임시 구체 교체
+## 4. 잔류 포격 구체 프리팹 칸
 
-붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다(149 후속 6) — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombVfxPrefab`(지금 임시 `2.Prefabs/Player/Gunner/GunnerEchoBombVfx_Temp.prefab`). 폭탄마다 복제해 대상 몸 콜라이더 윗면 가운데 + `echoBombOffset` 를 매 프레임 따라간다. **이펙트 교체 = 이 칸에 새 프리팹** — 겉모습·애니·파티클·블룸(HDR 색 > 1, 맵씬 Bloom 임계값 1.1)은 프리팹 안에서 꾸민다.
-🔴 프리팹 렌더러 머티리얼은 **ZTest Always(깊이 무시)** 여야 한다 — 붙는 점이 몸 메시 바로 위·안이라 보통 머티리얼은 몸에 묻혀 안 보인다. URP 기본 Unlit/Particles Unlit 은 ZTest 칸이 없으니 `Effects/OverlayBillboard`(`1.Scripts/Effects/Shaders/EffectOverlayBillboard.shader`, 텍스처 × HDR 색·블렌드·ZTest 칸, 정점 빌보드) 또는 Depth Test Always 셰이더 그래프를 쓴다. 대신 벽·지형 뒤 대상에도 보인다. 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다.
+붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다(149 후속 6) — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombVfxPrefab`. **칸은 지금 비어 있다 — 이펙트 담당이 프리팹을 연결한다. 비어 있으면 구체 표시만 생략**(경고 없음, 서버 판정·피해·폭발 연출은 그대로). 폭탄마다 복제해 대상 몸 콜라이더 윗면 가운데 + `echoBombOffset` 를 매 프레임 따라간다. **이펙트 교체 = 이 칸에 새 프리팹** — 겉모습·애니·파티클·블룸(HDR 색 > 1, 맵씬 Bloom 임계값 1.1)은 프리팹 안에서 꾸민다.
+🔴 프리팹 렌더러 머티리얼은 **`Effects/OverlayBillboard` + ZTest Always(깊이 무시)** 권장 — 붙는 점이 몸 메시 바로 위·안이라 보통 머티리얼은 몸에 묻혀 안 보인다. URP 기본 Unlit/Particles Unlit 은 ZTest 칸이 없으니 `Effects/OverlayBillboard`(`1.Scripts/Effects/Shaders/EffectOverlayBillboard.shader`, 텍스처 × HDR 색·블렌드·ZTest 칸, 정점 빌보드) 또는 Depth Test Always 셰이더 그래프를 쓴다. 대신 벽·지형 뒤 대상에도 보인다. 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다.
 구체는 **Q 가 대상에 맞은 순간** 예비로 먼저 뜨고(`ChargeLaserFiredRpc` 의 맞은 대상 ID 칸, 잔류 포격 특성이 있을 때만), 서버 부착(`Attached`)이 같은 구체를 이어받는다 — 그래서 `Attached` 시점에는 구체가 이미 보이고 있을 수 있다. 부착 안 된 예비 구체는 `echoBombPreviewTimeout` 뒤 사건 없이 조용히 사라진다(`Exploded` 없음). 상세 [tutorial-traits.md §7.1](tutorial-traits.md#71-거너-잔류-포격--몸에-붙는-에너지-폭탄-할-일-149).
 
 ## 5. 동작 규칙 · 알려진 한계

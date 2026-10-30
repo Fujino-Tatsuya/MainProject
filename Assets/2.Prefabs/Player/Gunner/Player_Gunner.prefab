@@ -6116,7 +6116,7 @@ MonoBehaviour:
   chargeEndPlayer: {fileID: 4940442617651707173}
   chargeMonsterHitPlayer: {fileID: 2971052868576544898}
   chargeVentPlayer: {fileID: 1812556281934503046}
-  echoBombVfxPrefab: {fileID: 987620272610436658, guid: 048f639c9d63bf943a3cb4daf34b400c, type: 3}
+  echoBombVfxPrefab: {fileID: 0}
   ultCastPlayer: {fileID: 2713656083110433769}
   frostBlastPlayer: {fileID: 5466470429164739916}
   frostTrailPlayer: {fileID: 4392323114275172735}
