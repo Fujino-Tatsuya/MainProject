@@ -106,6 +106,17 @@ public class GunnerBeamView : BaseNetworkBehaviour
              "임시 = GunnerEchoBomb_Temp(기본 Sphere + Emissive.mat)")]
     [SerializeField] private GameObject echoBombPrefab;
 
+    // 연출 정렬 값이라 xlsx 행이 아니다(data-table.md). 서버 피해·폭발 시각(특성 Delay)은 건드리지 않는다.
+    [Tooltip("구체를 띄우기까지 지연(초). 기준 = 이 피어가 폭탄 부착(Q End 이벤트 시점)을 받은 순간. 0 = 즉시. " +
+             "표시 전용 — 폭발 시각보다 길면 구체 없이 폭발 연출만 난다")]
+    [DataTableIgnore, Min(0f)]
+    [SerializeField] private float echoBombShowDelay;
+
+    [Tooltip("구체 위치 오프셋(월드 기준, m). 대상 몸 콜라이더 윗면 가운데에 더한다 — 대상이 돌아도 방향이 일정. " +
+             "폭발 연출·Attached/Exploded 사건 위치도 같은 점. 판정과 무관")]
+    [DataTableIgnore]
+    [SerializeField] private Vector3 echoBombOffset;
+
     // 🔴 **집중 발밑 링은 뺐다**(2026-10-06). 감속(×0.5)과 조준 고정은 조작감으로 이미 읽히고,
     //    그 연출의 화살표는 위로 솟아 '모인다'(충전) 기호였다 — 묶여 있다는 신호와 반대였다.
     //    에셋(FX_GunnerFocusRing)도 지웠다(2026-10-07). 되살리려면 SVN 기록에서 꺼낼 것.
@@ -220,7 +231,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
-        echoBombVisuals = new GunnerEchoBombVisuals(echoBombPrefab);
+        echoBombVisuals = new GunnerEchoBombVisuals(echoBombPrefab, echoBombShowDelay, echoBombOffset);
     }
 
     public override void OnNetworkSpawn()
@@ -334,7 +345,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     {
         echoBombVisuals.Add(bombId, targetId);
         Unit target = GunnerEchoBombTargets.Find(targetId);
-        Vector3 position = target != null ? GunnerEchoBombTargets.BodyPoint(target) : transform.position;
+        Vector3 position = target != null ? echoBombVisuals.PointFor(target) : transform.position;
         traitFxPlayer ??= GetComponent<Player>();
         TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Attached, traitFxPlayer, position, transform.forward,
             position, target, variant: bombId));

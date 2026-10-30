@@ -78,24 +78,41 @@ public sealed class GunnerEchoBombVisuals
         public Vector3 LastPosition;
         // 한 번이라도 대상을 찾았는가 — 찾은 뒤 사라지면(사망·디스폰) 다시 찾지 않고 마지막 위치에 둔다.
         public bool Found;
+        // 이 시각(Time.time) 전에는 구체를 띄우지 않는다 — 표시 지연(showDelay). 위치는 그 전에도 따라간다(폭발 연출 위치).
+        public float ShowAt;
     }
 
     private readonly List<Orb> orbs = new List<Orb>();
     private readonly GameObject prefab;
+    private readonly float showDelay;
+    private readonly Vector3 offset;
 
-    public GunnerEchoBombVisuals(GameObject prefab)
+    /// <param name="showDelay">붙은 뒤 구체를 띄우기까지 지연(초) — 표시 전용, 서버 폭발 시각과 무관.</param>
+    /// <param name="offset">몸 점(<see cref="GunnerEchoBombTargets.BodyPoint"/>)에 더하는 월드 오프셋(m).</param>
+    public GunnerEchoBombVisuals(GameObject prefab, float showDelay = 0f, Vector3 offset = default)
     {
         this.prefab = prefab;
+        this.showDelay = Mathf.Max(0f, showDelay);
+        this.offset = offset;
     }
 
     public int Count => orbs.Count;
 
+    /// <summary>구체·폭발 연출·Attached 사건이 보는 점 — 몸 점 + 월드 오프셋.</summary>
+    public Vector3 PointFor(Unit unit) => OrbPoint(GunnerEchoBombTargets.BodyPoint(unit), offset);
+
+    public static Vector3 OrbPoint(Vector3 bodyPoint, Vector3 offset) => bodyPoint + offset;
+
+    /// <summary>표시 지연이 지났는가 — 지연 0 이면 붙는 즉시.</summary>
+    public static bool IsShowTime(float now, float showAt) => now >= showAt;
+
+    /// <summary>폭탄이 붙었다(이 피어가 받은 시각 기준) — 구체는 표시 지연 뒤부터 보인다. 늦은 합류 Sync 도 받은 시각부터 같은 지연.</summary>
     public void Add(int id, ulong targetId)
     {
         if (IndexOf(id) >= 0)
             return;
 
-        var orb = new Orb { Id = id, TargetId = targetId };
+        var orb = new Orb { Id = id, TargetId = targetId, ShowAt = Time.time + showDelay };
         orbs.Add(orb);
         Follow(orb);
     }
@@ -173,8 +190,8 @@ public sealed class GunnerEchoBombVisuals
         if (orb.Target != null && orb.Target.IsSpawned)
         {
             orb.Found = true;
-            orb.LastPosition = GunnerEchoBombTargets.BodyPoint(orb.Target);
-            if (orb.Instance == null && prefab != null)
+            orb.LastPosition = PointFor(orb.Target);
+            if (orb.Instance == null && prefab != null && IsShowTime(Time.time, orb.ShowAt))
                 orb.Instance = UnityEngine.Object.Instantiate(prefab, orb.LastPosition, Quaternion.identity);
         }
 

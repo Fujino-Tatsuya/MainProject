@@ -537,6 +537,19 @@ public class GunnerTraitTier34Tests
     }
 
     [Test]
+    public void EchoBombVisuals_ShowDelayAndOffset_PureRules()
+    {
+        // 대상 Unit 은 스폰된 NetworkObject 가 필요해 EditMode 에서 못 만든다 — Follow 가 쓰는 순수 규칙만 본다.
+        Assert.IsTrue(GunnerEchoBombVisuals.IsShowTime(1f, 1f), "지연 0 = 붙는 그 프레임에 보인다");
+        Assert.IsFalse(GunnerEchoBombVisuals.IsShowTime(1.09f, 1.1f), "지연 전에는 구체 없음");
+        Assert.IsTrue(GunnerEchoBombVisuals.IsShowTime(1.2f, 1.1f));
+
+        var body = new Vector3(1f, 2f, 3f);
+        Assert.AreEqual(body, GunnerEchoBombVisuals.OrbPoint(body, Vector3.zero), "기본 오프셋 0 = 몸 점 그대로");
+        Assert.AreEqual(new Vector3(1f, 2.5f, 2.8f), GunnerEchoBombVisuals.OrbPoint(body, new Vector3(0f, 0.5f, -0.2f)), "월드 오프셋을 더한다");
+    }
+
+    [Test]
     public void Echo_TooltipFormula_MatchesRuntimeDamage()
     {
         // {dmg} = 현재 Q 원래 발 × 0.25(GunnerTraitTooltip.EchoQDamage) — 단발 Q 의 예정 합계 = 원래 발 1발.
