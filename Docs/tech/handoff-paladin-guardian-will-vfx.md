@@ -29,7 +29,7 @@
 
 ## 2. 연출(민경 영역, 참고)
 - 색: 방어 단계 흰빛·옅은 금빛 / 반격 단계 진한 금빛 · 반격(Counter)만 둘의 중간색(10-26 — 반격 불티는 전용 재질 `M_GuardianWill_CounterSpark`).
-- Ignite(원샷) 방패 점화 섬광 + 발밑 빛 고리 · Barrier(루프) A 반원 빛 벽(정면 180° · 반지름 1.2m · 높이 1.6m) + B 휜 방패 투영 + C 바닥 반원 문양 · Release(원샷) 결계가 빛 조각으로 흩어짐 · Block(원샷) 방패 앞 섬광 + 결계 금색 번쩍·깨짐 · Aura(루프) 몸 금빛 오라(반격 중 피해 무시 표시) · Charge(루프) 검에 금빛 모임 · Counter(원샷) 반격 클립 실제 검 궤적 금빛 베기 호 + 바닥 120° · 3m 부채꼴 충격파(데이터 counterAngle·counterRange 와 같은 범위).
+- Ignite(원샷) 방패 점화 섬광 + 발밑 빛 고리 · Barrier(루프) A 반원 빛 벽(정면 180° · 반지름 1.2m · 높이 1.6m) + B 휜 방패 투영 + C 바닥 반원 문양 · Release(원샷) 결계가 빛 조각으로 흩어짐 · Block(원샷) 방패 앞 섬광 + 결계 금색 번쩍·깨짐 · Aura(루프) 몸 금빛 오라(반격 중 피해 무시 표시) · Charge(루프) 검에 금빛 모임 · Counter(원샷) 반격 클립 실제 검 궤적 금빛 베기 호 + 바닥 120° · 3m 부채꼴 충격파(데이터 `FirstMeleeSubSkillData.hitArea` 부채꼴 — 옛 counterAngle·counterRange — 와 같은 범위).
 - 엔트리 outro: Barrier 0.05초(끄는 순간의 사라짐은 Release·Block 원샷이 맡음) · Aura 0.25초 ×2 · Charge 0.1초 ×5.
 - 에셋(🔴 SVN add):
   - `50.Art/VFX/Common/Players/Player1/ESkill/FX_GuardianWill_{Ignite,Barrier,Release,Block,Aura,Charge,Counter}.prefab` + `_Entry.asset` 7개

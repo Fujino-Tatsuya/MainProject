@@ -202,8 +202,8 @@ public sealed class PaladinSkillAreaTests
         Assert.IsNotNull(e, EDataPath);
         AssertSameShape(FirstMeleeSubSkillData.CounterSector(), e.HitArea, "E");
         var sector = (AttackSectorShape)e.HitArea.Shapes[0];
-        Assert.AreEqual(e.CounterRange, sector.Range, 1e-4f, "E range = 예전 counterRange(미사용 칸)");
-        Assert.AreEqual(e.CounterAngle, sector.Angle, 1e-4f, "E angle = 예전 counterAngle(미사용 칸)");
+        Assert.AreEqual(3f, sector.Range, 1e-4f, "E range = 예전 반격 사거리 3");
+        Assert.AreEqual(120f, sector.Angle, 1e-4f, "E angle = 예전 반격 각도 120");
     }
 
     static void AssertSameShape(AttackShape expected, AttackShapeSet area, string label)

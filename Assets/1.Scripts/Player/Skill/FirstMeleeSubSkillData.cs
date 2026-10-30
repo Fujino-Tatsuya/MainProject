@@ -25,13 +25,8 @@ public class FirstMeleeSubSkillData : PlayerSkillData
     [SerializeField, Min(0f)] private float guardHoldMaxDuration = 3f;
 
     [Header("수호자의 의지 — 반격")]
-    [Tooltip("반격 판정 영역(할 일 153) — 기준점 = 반격 순간 시전자 발밑 + 고정 방어 방향(CasterAim). 예전 counterRange 3·counterAngle 120 부채꼴이 기본.")]
+    [Tooltip("반격 판정 영역(할 일 153) — 기준점 = 반격 순간 시전자 발밑 + 고정 방어 방향(CasterAim). 예전 반격 부채꼴(사거리 3·각도 120)이 기본.")]
     [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet(AttackShapeOrigin.CasterAim, CounterSector());
-    // 미사용(할 일 153 — hitArea 로 옮김) — 병합 Export 때 제거. 지금 지우면 xlsx 행이 남아 테이블 Play·빌드가 오류를 낸다.
-    [Tooltip("미사용 — hitArea 로 옮김, 병합 Export 때 제거")]
-    [SerializeField, Range(0f, 360f)] private float counterAngle = 120f;
-    [Tooltip("미사용 — hitArea 로 옮김, 병합 Export 때 제거")]
-    [SerializeField, Min(0f)] private float counterRange = 3f;
 
     [Header("구 보호막 (미사용)")]
     // 미사용 — 병합 Export 때 제거. 지금 지우면 xlsx 열이 남아 테이블 Play·빌드가 오류를 낸다.
@@ -43,15 +38,12 @@ public class FirstMeleeSubSkillData : PlayerSkillData
     public float GuardAngle => guardAngle;
     public float GuardHoldMaxDuration => guardHoldMaxDuration;
     public AttackShapeSet HitArea => hitArea;
-    // 미사용 — 판정은 HitArea. 병합 Export 때 칸과 함께 제거.
-    public float CounterAngle => counterAngle;
-    public float CounterRange => counterRange;
 
     public int ShieldAmount => shieldAmount;
     public float ShieldDuration => shieldDuration;
 
     /// <summary>
-    /// 반격 기본 판정 도형(할 일 153) — 예전 반격 부채꼴(counterRange 3·counterAngle 120, 대상 콜라이더 표면 기준·바닥 평면 각도)을 옮긴 값.
+    /// 반격 기본 판정 도형(할 일 153) — 예전 반격 부채꼴(사거리 3·각도 120, 대상 콜라이더 표면 기준·바닥 평면 각도)을 옮긴 값.
     /// 높이 ±3: 예전 넓은 질의가 발밑 중심 반경 3 m 의 3D 구라 그보다 높거나 낮은 대상은 못 맞았다(원통으로 근사 — 모서리만 조금 넓다).
     /// </summary>
     public static AttackSectorShape CounterSector() =>

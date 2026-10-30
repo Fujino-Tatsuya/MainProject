@@ -389,13 +389,6 @@ public sealed class TraitDerivedAttackEffect : TraitEffect
     [SerializeField] private float delay;
     [Tooltip("판정 도형(할 일 153). 비우면 원래 공격 치수 재사용(이중 출력·잔류 포격·추격의 궤적·끝없는 칼날). 진격의 충격 = Point(Q 끝 지점 + 마지막 진행 방향) 부채꼴.")]
     [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet();
-    // ⚠️ 미사용(할 일 153 4/6 — 판정은 hitArea). GameData.xlsx Traits_Paladin/Gunner/Assassin 시트에 effects[0].radius·forwardOffset 행이 있어
-    //    지우면 테이블 모드가 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
-    [Tooltip("미사용 — 판정은 hitArea(할 일 153). 시트 행 정리 뒤 지운다.")]
-    [Min(0f)]
-    [SerializeField] private float radius;
-    [Tooltip("미사용 — 판정은 hitArea(할 일 153). 시트 행 정리 뒤 지운다.")]
-    [SerializeField] private float forwardOffset;
     [Tooltip("원래 공격 N번마다 1회(이중 출력 3). 1 = 매번.")]
     [Min(1)]
     [SerializeField] private int requiredCount = 1;

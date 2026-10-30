@@ -35,8 +35,6 @@ MonoBehaviour:
           origin: 1
           shapes:
           - rid: 7237886701681770987
-        radius: 2
-        forwardOffset: 0
         requiredCount: 1
     - rid: 7237886701681770987
       type: {class: AttackSectorShape, ns: , asm: Assembly-CSharp}

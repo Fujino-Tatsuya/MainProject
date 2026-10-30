@@ -54,7 +54,6 @@ MonoBehaviour:
     origin: 1
     shapes:
     - rid: 7237886701681771181
-  pathWidth: 1.2
   maxHitResults: 16
   references:
     version: 2

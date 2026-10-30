@@ -25,7 +25,7 @@
 ## 데이터 칸
 
 - 새 칸: `PodDropSettings.freefallGravity`(m/s², 기본 9.81). 에셋엔 아직 없어 코드 기본값으로 읽힌다.
-- 안 쓰게 된 칸(지우지 않음, xlsx 행 정리 대상): `PodDropSettings.landSeconds`, `PodDropSettings.landEase`, `PodDropSettings.wingDeployState`.
+- 안 쓰게 된 칸 `PodDropSettings.landSeconds`·`landEase`·`wingDeployState` 는 2026-10-30 삭제(병합 Export 로 Lobby `map.landSeconds` 행도 제거) — 대체 칸 = `freefallGravity`(착륙)·`wingFoldState`(날개).
 
 ## 코드
 

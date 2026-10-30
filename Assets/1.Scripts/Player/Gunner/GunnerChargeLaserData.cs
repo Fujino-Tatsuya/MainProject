@@ -27,15 +27,6 @@ public class GunnerChargeLaserData : PlayerSkillData
     [Tooltip("판정 영역(할 일 153) — 최대 충전 기준. 기준점 = 발사 원점(FireOrigin, 발밑 + 위로 muzzleHeight) + 조준 방향(Point). " +
              "첫 직사각형 length = 최대 충전 사거리, width = 판정 폭(높이는 발사 원점 기준). 충전·지형 차단은 길이 배율, 광폭 레이저는 폭 배율(AttackShapeSet.Scaled).")]
     [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet(AttackShapeOrigin.Point, BeamRect());
-    // 미사용(할 일 153 — hitArea 로 옮김) — 병합 Export 때 제거. 지금 지우면 xlsx 행이 남아 테이블 Play·빌드가 오류를 낸다.
-#pragma warning disable CS0414
-    [Tooltip("미사용 — hitArea.shapes[0].length 로 옮김, 병합 Export 때 제거")]
-    [SerializeField, Min(0.1f)] private float maxRange = 16f;
-    [Tooltip("미사용 — hitArea.shapes[0].width 로 옮김, 병합 Export 때 제거")]
-    [SerializeField, Min(0.05f)] private float beamWidth = 1.2f;
-    [Tooltip("미사용 — hitArea.shapes[0].minHeight/maxHeight 로 옮김, 병합 Export 때 제거")]
-    [SerializeField, Min(0.05f)] private float beamHeight = 2f;
-#pragma warning restore CS0414
     [SerializeField, DataTableIgnore] private float muzzleHeight = 1.0f;
     [Tooltip("지형 마스크 — 비트리거 콜라이더에 닿으면 그 지점에서 레이저가 끝난다. 기본값 = Default·Wall·Env·Barrier(할 일 32).")]
     [SerializeField] private LayerMask blockingLayers = 1050753;
@@ -78,7 +69,8 @@ public class GunnerChargeLaserData : PlayerSkillData
     public float ChargeFactor(float elapsed) =>
         Mathf.Clamp01(chargeCurve != null ? chargeCurve.Evaluate(Mathf.Clamp01(elapsed / maxChargeTime)) : elapsed / maxChargeTime);
 
-    public float RangeAt(float factor) => Mathf.Lerp(minRange, maxRange, factor);
+    /// <summary>충전 사거리 — 최소 충전 사거리 → 최대 충전 사거리(<see cref="MaxRange"/> = 판정 도형 length) 보간.</summary>
+    public float RangeAt(float factor) => Mathf.Lerp(minRange, MaxRange, factor);
     public float DamageMultiplierAt(float factor) => Mathf.Lerp(minDamageMultiplier, maxDamageMultiplier, factor);
     public float StageDamageMultiplier(int stage) => Pick(stageDamageMultipliers, stage);
     public float StageShieldMultiplier(int stage) => Pick(stageShieldMultipliers, stage);
@@ -109,7 +101,7 @@ public class GunnerChargeLaserData : PlayerSkillData
         hitArea.ResolvePose(fireOrigin - Vector3.up * muzzleHeight, direction, fireOrigin, direction);
 
     /// <summary>
-    /// 기본 판정 도형(할 일 153) — 예전 발사 상자(SkillHitVolume.Beam: 발사 원점에서 maxRange 16 · beamWidth 1.2 · 높이 beamHeight 2 를 원점 높이 중심)를 옮긴 값.
+    /// 기본 판정 도형(할 일 153) — 예전 발사 상자(SkillHitVolume.Beam: 발사 원점에서 사거리 16 · 폭 1.2 · 높이 2 를 원점 높이 중심)를 옮긴 값.
     /// 뒤 0, 높이 = 발사 원점 기준 ±1.
     /// </summary>
     public static AttackRectShape BeamRect() =>
