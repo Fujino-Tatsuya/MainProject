@@ -2625,6 +2625,12 @@ public class MonsterBase : Unit
     /// </summary>
     public bool IsMidBossVulnerable => Rank == MonsterRank.MidBoss && _vulnerable.Value;
 
+    /// <summary>
+    /// 머리 위 상태이상 이펙트(기절 별) 자리를 공용 높이(머리 뼈 위 0.4m + 표 offset)보다 더 올리는 몹별 값(m).
+    /// 기본 0 — 머리가 큰 모델만 덮어쓴다(<see cref="MonsterStatusEffectVfxPresenter"/>).
+    /// </summary>
+    public virtual float StatusVfxOverheadExtraHeight => 0f;
+
     // 중간보스 취약 색 — 23호 BossDataSO.vulnerableTint 기본값과 같은 색(팀장 10-26: 보스처럼 취약이 보여야 한다).
     static readonly Color MidBossVulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);
     bool _vulnerableTintApplied;
