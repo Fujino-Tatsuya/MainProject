@@ -233,6 +233,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 분류·도움말 줄 추가 (배치 유지)` — 지금 프리팹에 빠진 줄만 더한다(글꼴은 옆 글자에서 복사, 이미 있으면 저장 안 함).
   전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다). 카드 아트만 바꿀 땐 아래 §11.1.1 메뉴.
 - 설명 = 템플릿 → `TraitTooltip.FormatDescription`(`SkillTooltipFormatter`). 실패하면 `[오류: …]`(`UI.SkillTooltip.Error`) + 경고 — 스킬 툴팁과 같은 관례. 획득 아이콘 호버 툴팁도 같은 문구.
+- 획득 아이콘 호버 툴팁(`AcquiredTooltip`, 폭 380 · `ContentSizeFitter` 로 높이가 글자에 맞음 · 여백 14 상하 같음)의 `Name`·`Description` = `MidlineLeft`(할 일 177). 글자 칸 높이 = 글자 높이라 `Left`(Middle)는 `TopLeft` 와 똑같이 보여서, 글자 모양 기준 Midline 으로 상자 안 세로 가운데에 놓는다. 레이아웃(childAlignment UpperLeft·여백)은 그대로.
 
 #### 11.1.1 카드 C1 아트 (할 일 165)
 
@@ -250,7 +251,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | `SkillMask` → `SkillIcon` | `TraitCard_C1_SkillMask` + `Mask`(마스크 그림 숨김), 안에 **강화하는 스킬 아이콘** 132x132(아래 출처 규칙) | 45, 182, 136x136 (아이콘 47, 184) |
 | `SkillFrame` | `TraitCard_C1_SkillFrame` — 프레임·마스크·아이콘 중심 (113, 250) 동일 | 37, 174, 152x152 |
 | `Keycap` | 키캡/마우스 하나 — 스프라이트만 바꿈(비율 유지 38x41 상자 → 키캡 38x40·마우스 30x41). 키 입력이 아닌 특성은 숨김 | 94, 335, 38x41 |
-| `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22 | 224, 170, 288x170 |
+| `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22, 왼쪽·**세로 가운데**(`Left` = Middle, 할 일 177) | 224, 170, 288x170 |
 
 - 키캡 판정 = `TraitKeycapRule.FromIconName`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): 아이콘 스프라이트 이름을 `_` 로 나눈 토큰 중 `Q`/`E`/`R`/`LMB`/`RMB` 와 **정확히 같은 첫 토큰**의 키. 키 뒤 접미사(`_Q_Change`·`_E_Trans`·`_R_Remove`)도 그 키, 키 토큰이 없으면(`Passive`·`Heat`·`Heat_Remove`·`Passive_Change`) `Blank` = **키캡 숨김**(피드백 1 — `Keycap_Blank` 는 카드에서 안 쓴다). 아이콘이 없으면 `Blank`.
 - 스킬 슬롯 그림 출처(피드백 1) = `TraitCardSkillRule.SourceOf(키캡)`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): Q → `PlayerSkillSlot.Main`, E → `Sub`, R → `Ultimate`, RMB → `Interrupt`, `Blank` → 패시브, LMB → **기본 공격 아이콘**(`BasicAttack` — 카드 칸 `basicAttackIcon` = `Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png`, 흰색 검).
