@@ -5,7 +5,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 특성 디버그 랩 OnGUI 패널(DebugTraitLab 씬에만 둔다, 할 일 135) — 특성 넣기/빼기·캐릭터 변경·배속·쿨 0·허수아비 HP 리셋.
+/// 특성 디버그 랩 OnGUI 패널(DebugTraitLab 씬에만 둔다, 할 일 135) — 특성 넣기/빼기·캐릭터 변경·배속·쿨 0·허수아비 HP 리셋·플레이어 체력 조절.
 ///
 /// 특성은 디버그 우회 없이 정식 서버 경로다 — 고친 보유 목록을 <see cref="TraitDirector.ReplaceAcquiredServer"/> 로 보내면
 /// 디렉터가 획득 행·이벤트 효과 장부를 맞추고, 수치형은 각 피어의 <see cref="PlayerTraitModifiers"/> 가 획득 행으로 다시 합성한다(실게임과 같은 결과).
@@ -13,6 +13,8 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>캐릭터 변경 = <see cref="DebugCharacterCycle"/>(F1 순환과 같은 길). 교체 직전(<see cref="DebugCharacterCycle.ServerSwapping"/>) 보유 특성을 비운다 — F1 도 같다.</item>
 /// <item>배속 = <see cref="DebugTimeScale"/>, 쿨 0 = <see cref="DebugZeroCooldown"/> 켜고 끄기, 허수아비 HP 리셋 = 서버 체력 설정.</item>
+/// <item>플레이어 체력(2026-11-02 민경 — 나누는 불굴 확인용) = 씬의 플레이어마다 10%·30%·50%·만피·−10% (서버 체력 설정, 피해·회복 경로 아님).
+/// 받을 아군 = 씬의 <see cref="DebugAllyDummy"/>(나누는 불굴 후보에 개발 전용으로 낀다). Dev Boot 는 MPPM 클론도 호스트로 띄워 클라가 붙지 않는다.</item>
 /// <item>호스트 1인 기준. 클라 창은 보유 목록만 보인다(버튼 비활성, 새 RPC 없음).</item>
 /// <item>공격 범위 기즈모(할 일 152·153 6단계, 에디터 전용) = <see cref="TraitLabAttackGizmos"/> — 판정이 쓰는 (도형, 포즈) 를 그대로 받아 <see cref="AttackShapeDrawing"/> 으로만 그린다.</item>
 /// </list>
@@ -39,6 +41,7 @@ public sealed class DebugTraitLab : MonoBehaviour
     readonly List<(string chosen, string disabled)> conflictScratch = new List<(string, string)>();
     readonly StringBuilder text = new StringBuilder();
     readonly System.Random random = new System.Random();
+    readonly List<Unit> healthTargets = new List<Unit>();
 
     bool _folded;
     Vector2 _scroll;
@@ -91,6 +94,12 @@ public sealed class DebugTraitLab : MonoBehaviour
         }
 
         model.Sync(idScratch);
+
+        healthTargets.Clear();
+        healthTargets.AddRange(FindObjectsByType<Player>(FindObjectsSortMode.None));
+        healthTargets.Sort((a, b) => a.OwnerClientId.CompareTo(b.OwnerClientId));
+        healthTargets.AddRange(FindObjectsByType<DebugAllyDummy>(FindObjectsSortMode.None));
+        healthTargets.RemoveAll(u => u == null || !u.IsSpawned);
     }
 
     void OnGUI()
@@ -202,6 +211,8 @@ public sealed class DebugTraitLab : MonoBehaviour
             ResetDummies();
         GUI.enabled = true;
 
+        DrawPlayerHealth(host);
+
 #if UNITY_EDITOR
         DrawAttackGizmoOptions();
 #endif
@@ -257,6 +268,51 @@ public sealed class DebugTraitLab : MonoBehaviour
         bool ok = director.ReplaceAcquiredServer(networkManager.LocalClientId, hashScratch);
         _status = ok ? what : $"{what} 실패 — 콘솔 확인";
         Debug.Log($"{Tag} {_status} → 보유 {owned.Count}개 [{string.Join(", ", owned)}]", this);
+    }
+
+    // ── 플레이어 체력(나누는 불굴 확인용) ──
+    static readonly float[] HealthPresets = { 0.1f, 0.3f, 0.5f, 1f };
+
+    void DrawPlayerHealth(bool host)
+    {
+        GUILayout.Space(6f);
+        GUILayout.Label("플레이어 체력 <size=10>(아군 허수아비 = 나누는 불굴 받는 쪽)</size>", RichLabel());
+        if (healthTargets.Count == 0)
+        {
+            GUILayout.Label("대상 없음");
+            return;
+        }
+
+        GUI.enabled = host;
+        foreach (Unit unit in healthTargets)
+        {
+            GUILayout.Label($"{HealthTargetName(unit)}  {unit.CurrentHealth}/{unit.MaxHp}");
+            GUILayout.BeginHorizontal();
+            foreach (float preset in HealthPresets)
+            {
+                if (GUILayout.Button(preset >= 1f ? "만피" : $"{preset * 100f:0}%"))
+                    SetHealth(unit, Mathf.CeilToInt(unit.MaxHp * preset));
+            }
+            if (GUILayout.Button("−10%"))
+                SetHealth(unit, unit.CurrentHealth - Mathf.CeilToInt(unit.MaxHp * 0.1f));
+            GUILayout.EndHorizontal();
+        }
+        GUI.enabled = true;
+    }
+
+    static string HealthTargetName(Unit unit)
+    {
+        if (unit is Player player)
+            return $"{(player == Player.LocalPlayer ? "나" : $"클라 {player.OwnerClientId}")} · {CharacterName(TutorialLocalPlayerInfo.ResolveCharacter(player))}";
+        return $"아군 허수아비 · {unit.name}";
+    }
+
+    void SetHealth(Unit unit, int health)
+    {
+        // 0 은 사망 래치만 걸고 쓰러짐 흐름을 타지 않는다 — 최소 1.
+        int target = Mathf.Clamp(health, 1, unit.MaxHp);
+        unit.SetCurrentHealthOnServer(target);
+        _status = $"'{unit.name}' 체력 → {target}/{unit.MaxHp}";
     }
 
     void ResetDummies()

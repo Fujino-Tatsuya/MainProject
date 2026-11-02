@@ -435,6 +435,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3875643611873376656}
   - component: {fileID: 4897057866995958984}
+  - component: {fileID: 3602905504512632501}
   m_Layer: 6
   m_Name: States
   m_TagString: Untagged
@@ -473,6 +474,20 @@ MonoBehaviour:
   overhead: {fileID: 2464597730469195352}
   body: {fileID: 0}
   feet: {fileID: 0}
+--- !u!114 &3602905504512632501
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4396835014023420626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7267f27c60f6d654aabdcb6960cf273b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerOneShotVfxPresenter
+  set: {fileID: 11400000, guid: dfa674f404f5dcf46a9657f73ef731a8, type: 2}
+  anchors: {fileID: 4897057866995958984}
 --- !u!1 &4792439027021553161
 GameObject:
   m_ObjectHideFlags: 0
@@ -810,8 +825,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
-  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
-  scale: 1
 --- !u!1 &6154974025966435614
 GameObject:
   m_ObjectHideFlags: 0
@@ -6117,6 +6130,9 @@ MonoBehaviour:
   chargeMonsterHitPlayer: {fileID: 2971052868576544898}
   chargeVentPlayer: {fileID: 1812556281934503046}
   echoBombVfxPrefab: {fileID: 0}
+  echoBombShowDelay: 0
+  echoBombPreviewTimeout: 1.5
+  echoBombOffset: {x: 0, y: 0, z: 0}
   ultCastPlayer: {fileID: 2713656083110433769}
   frostBlastPlayer: {fileID: 5466470429164739916}
   frostTrailPlayer: {fileID: 4392323114275172735}
@@ -6140,6 +6156,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerChargeLaserSkill
   data: {fileID: 11400000, guid: 55be3b26a86e5a246a966cd414eb6a91, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &99821651607719020
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6154,6 +6173,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerCoolBackstepSkill
   data: {fileID: 11400000, guid: 17aee94c5ce066b4b9c25de5d6e31de6, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &6691715782565875710
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6168,6 +6190,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerInterruptSkill
   data: {fileID: 11400000, guid: e60875766cf84e644a1f0b7dae235261, type: 2}
   hitboxAnchor: {fileID: 3988724667065146670}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
   lagCompensationCapMs: 100
 --- !u!114 &3214493021041571807
 MonoBehaviour:
@@ -6183,6 +6208,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerTrackingLaserSkill
   data: {fileID: 11400000, guid: 9c68330020ec71f48bef805a9fe0dda6, type: 2}
   hitboxAnchor: {fileID: 0}
+  followUpSkill: {fileID: 0}
+  followUpWindowSeconds: 3
+  followUpInheritsCastId: 1
 --- !u!114 &2281950900938951541
 MonoBehaviour:
   m_ObjectHideFlags: 0

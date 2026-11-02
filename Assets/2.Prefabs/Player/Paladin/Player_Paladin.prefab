@@ -150,56 +150,6 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
---- !u!1 &1156962283159754769
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 4830813599550484495}
-  - component: {fileID: 2585398134090246682}
-  m_Layer: 6
-  m_Name: Heal
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &4830813599550484495
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1156962283159754769}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 5490914321695818411}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2585398134090246682
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1156962283159754769}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
-  effect: {fileID: 11400000, guid: 80e8dc1a2f6cf4a4a98e73f6d842d14b, type: 2}
-  socket: {fileID: 6690313834017925644}
-  offset: {x: 0, y: 0, z: 0}
-  scale: 1
-  safetyTimeout: 5
 --- !u!1 &1221522927322542396
 GameObject:
   m_ObjectHideFlags: 0
@@ -1051,8 +1001,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 4830813599550484495}
+  m_Children: []
   m_Father: {fileID: 219519478881073421}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3244756538833987195
@@ -1065,6 +1014,7 @@ GameObject:
   m_Component:
   - component: {fileID: 219519478881073421}
   - component: {fileID: 5437724345990262166}
+  - component: {fileID: 4294334092229944457}
   m_Layer: 6
   m_Name: VFX
   m_TagString: Untagged
@@ -1107,8 +1057,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
-  effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
-  scale: 1
+--- !u!114 &4294334092229944457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3244756538833987195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a385d008d7f520342b7b6bd987ac3eb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PaladinShareHealVfx
+  sourceSwirl: {fileID: 11400000, guid: ecbb8637477210245b42b141cad3c183, type: 2}
+  sourceSwirlOffset: {x: 0, y: 0, z: 0}
+  sourceSwirlScale: 1
+  ribbon: {fileID: 11400000, guid: dfb75a2a530b7f14eb9df80679c3c7e0, type: 2}
 --- !u!1 &3442890603742201715
 GameObject:
   m_ObjectHideFlags: 0
@@ -2034,6 +1998,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2388949476267549546}
   - component: {fileID: 7668978312619558656}
+  - component: {fileID: 3025462880220691710}
   m_Layer: 6
   m_Name: States
   m_TagString: Untagged
@@ -2072,6 +2037,20 @@ MonoBehaviour:
   overhead: {fileID: 5487098805794614413}
   body: {fileID: 0}
   feet: {fileID: 0}
+--- !u!114 &3025462880220691710
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7583570667378339134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7267f27c60f6d654aabdcb6960cf273b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerOneShotVfxPresenter
+  set: {fileID: 11400000, guid: dfa674f404f5dcf46a9657f73ef731a8, type: 2}
+  anchors: {fileID: 7668978312619558656}
 --- !u!1 &7630356137226478081
 GameObject:
   m_ObjectHideFlags: 0
@@ -2805,7 +2784,6 @@ MonoBehaviour:
   bonusFlatDamage: 0
   healPercent: 5
   bladeGlow: {fileID: 3893365542549293267}
-  healBurst: {fileID: 2585398134090246682}
   additionalHit: {fileID: 11400000, guid: 5a7eb665bae34056bf858aa2c020be51, type: 2}
   additionalHitScale: 1
   additionalHitReferenceHeight: 2

@@ -45,9 +45,13 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry DoubleSlash_Miss { get; private set; }
 
     [Header("플레이어 — 불굴의 의지(패시브)")]
-    // Heal 은 시전자에게 1회, BonusHit 은 처음 맞은 적 1명에게 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.
+    // Heal 은 시전자에게 1회(실제로 회복했을 때만), BonusHit 은 처음 맞은 적 1명에게 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.
+    // Heal 엔트리는 플레이어 공용(Shared/Heal) — 재생은 PlayerOneShotVfxSet 의 Heal 줄이 한다(여기는 프리웜용 등록).
     [field: SerializeField] public EffectEntry Passive_Heal { get; private set; }
     [field: SerializeField] public EffectEntry Passive_BonusHit { get; private set; }
+    // 나누는 불굴(PAL_2_SHARE_HEAL) — 팔라딘 출발 소용돌이 + 아군으로 날아가는 리본(PaladinShareHealVfx).
+    [field: SerializeField] public EffectEntry ShareHeal_Swirl { get; private set; }
+    [field: SerializeField] public EffectEntry ShareHeal_Ribbon { get; private set; }
 
     [Header("플레이어 — 방패 돌진(Q)")]
     [field: SerializeField] public EffectEntry ShieldDash_Trail { get; private set; }

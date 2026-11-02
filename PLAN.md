@@ -1,4 +1,50 @@
-# ▶▶▶ 계획 = **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate` → `Breakable` 공용화** (2026-10-30 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play · ⏳ SVN 업로드)
+# ▶▶▶ 계획 = **나누는 불굴 전이 VFX + 플레이어 공용 원샷 이펙트 표(힐·레벨업)** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 초판 GIF ✅ 승인 · 임시 파일 정리) · ✅ 커밋 · ⏳ 민경 MPPM Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02). 참고 영상 `Downloads/ability_0012_P1.webm`(알리스타 E — 시전자 소용돌이 + 곡선 리본이 아군에게 흘러감).
+> ⚠️ 은희 담당 파일을 조금 고친다: `PlayerTraitEffects.ShareOverflow`(사건 1줄)·`TraitSkillFx.cs`(enum 끝에 1개)·`FirstMeleePassive`(RPC 칸 1개·`healBurst` → 공용 호출). 리뷰 대신 `Docs/tech/handoff-shared-heal-vfx.md` 로 공유.
+
+## 사실
+- 힐 이펙트: `FirstMeleePassive`(불굴의 의지) 발동 → 서버 `HealServer` → `ProcVfxRpc`(ClientsAndHost) → `healBurst.PlayOnce()` = 팔라딘 `VFX/PassiveSkill/Heal` 의 `EffectSocketPlayer`(엔트리 `FX_Heal_Entry`). 실제 회복량과 무관하게 발동마다 재생.
+- 레벨업: 각 Variant `VFX` 의 `TraitAcquiredVfxPresenter` 가 `TraitDirector` 복제 획득 수 증가를 감시 → 본인 화면만 `PlayLooping`+즉시 `Release`(몸 추종 원샷). 엔트리 칸을 직접 든다.
+- 나누는 불굴(`PAL_2_SHARE_HEAL`): 서버 `PlayerTraitEffects.ShareOverflow` 가 12m 안 체력 비율 최저 아군을 골라 `HealHp` — **클라에 알리는 신호 없음**.
+- 특성 연출 공용 경로(145): `TraitSkillFxNetwork.ServerSend` → `Player.TraitSkillFxRpc` → `TraitSkillFx.Raised`. 현재 VFX 구독자 없음.
+- 자연 회복도 서버 `HealHp` 를 부른다 → 체력 증가 감지로 힐을 띄우면 안 된다.
+- 에셋(민경 SVN 이동 완료, guid 유지): `50.Art/VFX/Common/Players/Shared/Heal/FX_Heal(_Entry)` · `Shared/States/Level_up(_Entry)`·`FX_Faint(_Entry)`.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 공용 구조(Q1→C) | 플레이어 공용 **원샷 이펙트 표** SO `PlayerOneShotVfxSet`(`9.ScriptableObject/Effects/PlayerOneShotVfxSet.asset`) + 재생기 `PlayerOneShotVfxPresenter`. 상태이상 표와는 **별도 에셋**(Q12) |
+| 종류 키(Q9) | enum `PlayerOneShotVfx { Heal, LevelUp }` |
+| 표 한 줄(Q10) | 종류 · 엔트리 · 자리(머리 위/몸/발밑) · 오프셋 · 배율 · 따라가기 여부. 힐·레벨업 둘 다 따라가기 켬. '본인만 보기'는 표가 아니라 **계기**(언제 재생할지 정하는 쪽 코드)가 거른다 |
+| 배치(Q11) | 3개 Variant `VFX/States` 에 `PlayerOneShotVfxPresenter`(자리는 옆 `StatusEffectVfxPresenter` 의 자리를 읽음) · API `Play(PlayerOneShotVfx)` 하나. `TraitAcquiredVfxPresenter` = 획득 감시만 남기고 `Play(LevelUp)` 호출(엔트리·배율 칸 삭제). 팔라딘 `VFX/PassiveSkill/Heal` 소켓·`healBurst` 칸 삭제 |
+| 힐 발생원(Q2) | 명시적 회복만 — 불굴의 의지(팔라딘 본인) · 나누는 불굴(받는 아군). 자연 회복·훈련 리셋은 안 냄 |
+| 본인 힐 조건(Q7) | 팔라딘 **실제 회복 > 0 일 때만** — `ProcVfxRpc` 에 `selfHealed` 칸 추가 |
+| 전이 신호(Q3) | `TraitFxTrait.PaladinShareHeal`(끝에 추가 = 9) · `Kind = Hit` · Pos = 팔라딘 몸 · Target = 아군. `ShareOverflow` 에서 실제 회복 > 0 일 때 `ServerSend` |
+| 전이 연출(Q4·Q15) | 팔라딘 몸통 출발 소용돌이(0.4초, 따라감) + 리본 3가닥(Trail 유도 입자, 가닥마다 좌우·위로 휨 무작위) → 움직이는 아군 몸을 매 프레임 추적. 수치 전부 인스펙터. 초판 GIF 로 보여주고 조정 |
+| 색(Q5) | 기존 `FX_Heal` 색 계열 |
+| 도착 시간(Q6·Q13) | 고정 시간 `travelSeconds`(기본 0.4, 리본 스크립트 칸). 도착 순간 리본이 알림 → 아군 `Play(Heal)`. 체력바는 서버 즉시 |
+| 비행 중 아군 소실(Q14) | 쓰러짐·끊김·연출 숨김 → 리본 그 자리에서 흩어짐, 아군 힐 생략 |
+| 에셋 위치(Q8) | 공용 힐 = `Shared/Heal/`(이동 완료). 전이 리본·소용돌이 = `50.Art/VFX/Common/Players/Player1/PassiveSkill/ShareHeal/` |
+| 보는 사람 | 힐·전이 = 전 피어 / 레벨업 = 본인만(기존 그대로) |
+
+## 작업 순서
+1. 코드: `PlayerOneShotVfx`·`PlayerOneShotVfxSet`·`PlayerOneShotVfxPresenter` 신설 · `StatusEffectVfxPresenter` 자리 읽기 공개 · `TraitAcquiredVfxPresenter` 계기 전용화.
+2. 코드: `TraitFxTrait.PaladinShareHeal` · `ShareOverflow` 사건 발송 · `FirstMeleePassive` `selfHealed` + 공용 `Play(Heal)` · 전이 리스너 `PaladinShareHealVfx`(팔라딘 Variant `VFX`, `TraitSkillFx.Raised` 구독, 시전자 = 내 플레이어만) · 리본 스크립트 `HealTransferRibbon`(추적·`travelSeconds`·도착 콜백·대상 소실 처리).
+3. 에셋: `PlayerOneShotVfxSet.asset`(Heal = `FX_Heal_Entry`, LevelUp = `Level_up_Entry` — 현재 배율·위치 그대로 옮김) · 3 Variant 배선 · 팔라딘 Heal 소켓 삭제 · 리본·소용돌이 프리팹+엔트리 제작 · `EffectCatalog` 등록(프리웜).
+4. 검사: 컴파일 0 · 3 Variant 배선(Presenter·set·자리) · 끊긴 참조 없음 · 레벨업 배율·위치 변화 없음.
+5. 초판 GIF → 조정.
+6. 문서: `Docs/tech/handoff-shared-heal-vfx.md`(구조·새 원샷 추가법·Play 체크리스트·은희 파일 변경점) · `trait-effect-events.md` 표·§3.1 · `CONTEXT.md`.
+
+## 완료 조건(Q16)
+- MPPM 2인: 팔라딘 만피 발동 → 소용돌이+리본+아군 힐, 팔라딘 힐 없음 / 팔라딘 피 깎인 상태 → 양쪽 힐. 호스트·클라 화면 동일.
+- 레벨업 회귀: 고른 본인만, 몸 추종.
+- 자연 회복으로 힐 이펙트 안 남.
+- 컴파일 0 · 위 검사 통과 · 문서 갱신.
+
+---
+
+# 계획(이전) = **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate` → `Breakable` 공용화** (2026-10-30 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play · ⏳ SVN 업로드)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-30). `Map/Breakable/` 코드는 전부 민경(SimJangBounce) 작성 — 다른 담당 영역 아님.
 > 판정은 기존 파이프라인 그대로(서버 판정 → `CrateBreakBroadcaster` RPC → 전 피어 연출). 새 네트워크 코드 없음.

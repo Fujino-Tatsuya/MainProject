@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fee33c3484651e44698f17c349bedeaf, type: 3}
+  m_Name: PlayerOneShotVfxSet
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerOneShotVfxSet
+  rows:
+  - kind: 0
+    effect: {fileID: 11400000, guid: 80e8dc1a2f6cf4a4a98e73f6d842d14b, type: 2}
+    anchor: 2
+    offset: {x: 0, y: 0, z: 0}
+    scale: 1
+    follow: 1
+  - kind: 1
+    effect: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
+    anchor: 2
+    offset: {x: 0, y: 0, z: 0}
+    scale: 1
+    follow: 1

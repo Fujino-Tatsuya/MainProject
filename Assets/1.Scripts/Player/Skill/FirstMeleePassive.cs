@@ -48,9 +48,6 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     [Tooltip("버프 보유 중 칼날을 빛낸다. 칼의 MaterialFadeEffect 를 물린다.\n비워두면 연출만 빠진다")]
     [SerializeField] private MaterialFadeEffect bladeGlow;
 
-    [Tooltip("발동 순간 시전자에게 한 번 터뜨릴 회복 연출. 프리팹의 'VFX/PassiveSkill/Heal' 을 물린다. 비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer healBurst;
-
     [Tooltip("추가 피해를 맞은 대상에게 한 번 터뜨릴 연출. FX_Paladin_Smite_Entry 를 물린다. 소켓이 아니라 엔트리인 이유는 붙을 자리가 '그때 맞은 남'이라서다")]
     [SerializeField] private EffectEntry additionalHit;
 
@@ -217,10 +214,9 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
 
         // 특성 회복 경로(할 일 125 3/5) — 특성 없으면 회복 배율 1·전달 없음이라 예전 HealHp 와 같다.
         int healAmount = Mathf.RoundToInt(owner.MaxHp * (healPercent / 100f));
-        if (healAmount > 0)
-            PlayerTraitEffects.For(owner).HealServer(healAmount);
+        int healed = healAmount > 0 ? PlayerTraitEffects.For(owner).HealServer(healAmount) : 0;
 
-        ServerPlayProcVfx(target);
+        ServerPlayProcVfx(target, healed > 0);
 
         Edit.Log($"[Passive] 불굴의 의지 발동 — {target.name}의 원래 공격에 추가피해 {bonusDamage} 합산, 회복 {healPercent}%({healAmount})", this);
         return bonusDamage;
@@ -240,7 +236,8 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     // ── 발동 연출 ───────────────────────────────────────────────────
 
     /// <summary>
-    /// [서버] 발동 순간의 연출을 전 피어에 뿌린다 — 시전자 회복 1회 + 대상에게 추가 피해 1회.
+    /// [서버] 발동 순간의 연출을 전 피어에 뿌린다 — 시전자 회복 1회(실제로 회복했을 때만 — 만피면 전부 나누는 불굴로 넘어가므로) + 대상에게 추가 피해 1회.
+    /// 회복 연출은 플레이어 공용 원샷 표의 <see cref="PlayerOneShotVfx.Heal"/>(2026-11-02 — 옛 'VFX/PassiveSkill/Heal' 소켓 대체).
     ///
     /// <b>창구가 필요 없다.</b> 이 컴포넌트 자체가 NetworkBehaviour라 RPC를 직접 단다
     /// (스킬들이 PlayerSkillVfx를 거치는 것은 부모 PlayerSkillBase가 MonoBehaviour이기 때문이다).
@@ -250,22 +247,24 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     /// (MonsterBase.PlayHitVFXRpc가 공격자 위치 하나만 보내는 것과 같은 이유다).
     /// 각 피어가 자기 쪽 몹에서 위치를 다시 뽑으면 언제나 그 몹 위다.
     /// </summary>
-    private void ServerPlayProcVfx(Unit target)
+    private void ServerPlayProcVfx(Unit target, bool selfHealed)
     {
         NetworkObjectReference targetRef = default;
         bool hasTarget = target != null && target.NetworkObject != null && target.NetworkObject.IsSpawned;
         if (hasTarget)
             targetRef = target.NetworkObject;
 
-        ProcVfxRpc(targetRef, hasTarget);
+        ProcVfxRpc(targetRef, hasTarget, selfHealed);
     }
 
     // 쿨다운 주기당 한 번뿐인 클라이맥스라 Reliable 이다 — 유실되면 발동했다는 사실이 통째로 안 보인다.
     // (난타 중 한 발씩 빠져도 되는 피격 파문 계열과 갈리는 지점)
     [Rpc(SendTo.ClientsAndHost)]
-    private void ProcVfxRpc(NetworkObjectReference target, bool hasTarget)
+    private void ProcVfxRpc(NetworkObjectReference target, bool hasTarget, bool selfHealed)
     {
-        healBurst?.PlayOnce();
+        PlayerOneShotVfxPresenter oneShots = selfHealed ? PlayerOneShotVfxPresenter.For(owner) : null;
+        if (oneShots != null)
+            oneShots.Play(PlayerOneShotVfx.Heal);
 
         if (hasTarget && target.TryGet(out NetworkObject targetObject))
             PlayAdditionalHitLocal(targetObject.transform);

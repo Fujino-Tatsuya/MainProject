@@ -26,6 +26,8 @@ public enum TraitFxTrait : byte
     AssassinEndlessBlade = 7,
     /// <summary>추격의 궤적(ASN_4_Q_TRAIL) — Q 돌진이 지나온 선분 추가 판정.</summary>
     AssassinPursuitTrail = 8,
+    /// <summary>나누는 불굴(PAL_2_SHARE_HEAL) — 초과 회복이 아군 1명에게 전달됨(2026-11-02 민경, 전이 리본 연출).</summary>
+    PaladinShareHeal = 9,
 }
 
 /// <summary>특성 강화 연출 사건 종류(할 일 145). ⚠️ 끝에만 추가한다(네트워크 byte).</summary>
@@ -131,6 +133,7 @@ public static class TraitSkillFx
         TraitFxTrait.AssassinBladeDomain => "ASN_3_E_AREA",
         TraitFxTrait.AssassinEndlessBlade => "ASN_4_COMBO_EXTRA",
         TraitFxTrait.AssassinPursuitTrail => "ASN_4_Q_TRAIL",
+        TraitFxTrait.PaladinShareHeal => "PAL_2_SHARE_HEAL",
         _ => string.Empty,
     };
 
