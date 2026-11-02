@@ -380,13 +380,16 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G11)`(보스방 도착 — `MapSceneDeathRulesModel.IsLifeChargedAt(mask)`, 단계 기준, 위치 무관).
   G11 전(존1~복도4·패드 대기·타이머 만료 강제 이동 중 — **G8 타이머 시작 뒤 포함**)은 목숨 수와 무관하게 Soul(훅), 부활 시 차감 없음.
   G11 뒤는 기존 규칙(공용 목숨 0 → PermanentDead → 전멸이면 PartyWipeWatcher — 공용 0 의 갇힌 Soul 도 탈락으로 센다, party-lives-respawn.md §2). 10-12 이전 기준은 G8 이었다 — G8 은 타이머 시작·존4 기상 용도로만 남는다.
-  G11 은 도착과 같은 순간 열리고 사망 규칙도 도착·Finished 로 끝나므로, 실제로 튜토리얼 규칙 아래 차감이 일어나는 경로는 없다(G11 뒤 사망 = 일반 규칙).
+  **보스방 도착(또는 Finished) 뒤 사망 = 3초 뒤 그 자리에서 자동 부활 + 무적 2초 + 공용 목숨 1개 차감**(2026-11-02, [PLAN-auto-revive.md](../../PLAN-auto-revive.md) — `MapSceneDeathRulesModel.RecordBossRoomDeath`).
+  키 입력 없음(F10 은 디버그로 그대로). 목숨 0 이면 사망 목적지가 PermanentDead(관전)라 부활하지 않는다 → 전원이면 전멸 리스폰(party-lives-respawn.md §3).
+  이전엔 도착 뒤 자동 부활이 없어 F10 없이는 못 살아났고, 목숨이 남은 채 전원 Soul 이면 전멸 판정도 안 나는 정지 상태였다.
+  '그 자리' 와 '즉시' 는 분리돼 있다(`Pending.InPlace`·`Immediate`) — 보스방 기록은 그 자리지만 3초 대기를 지킨다. 추락 사망은 몸이 먼저 보스방 모서리로 옮겨져(§12) 거기서 부활.
 - 부활 지점 = **지금 단계 구간**(디렉터 `Step` 의 구간 — 열린 배리어로 들어갈 수 있는 가장 앞 구간을 넘지 않음, 아래 S12 항목)(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
   1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
   안전한 곳이 없으면 몬스터에서 가장 먼 후보, 후보가 없으면 그 자리.
 - 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시'(Soul 이 되는 대로). 이동 중 사망도 같다.
   부활 자리 = 카운트다운이 아직 켜져 있으면 **보스 진입 고정 지점**(§12 — `MapSceneSafePoints.TryResolveFixedPoint(BossEnter)`, 할 일 80 2026-10-22), 지점이 없거나
-  카운트다운이 끝난 뒤(엘리베이터 연출 잠금 보류 → 도착 뒤)면 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
+  카운트다운이 끝난 뒤(엘리베이터 연출 잠금 보류 → 도착 뒤)면 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 위 보스방 규칙(3초 뒤 그 자리·1개 차감).
 - 연출 잠금(`PlayerEncounterLock`) 중이면 보류 + 경고 1회, 풀리면 다음 프레임 부활(사망 연출 해소도 잠금 해제 뒤 진행).
 - 추락 생존 복구는 그대로. 추락 사망은 기존대로 안전지점에 Soul 로 옮겨진 뒤 같은 규칙으로 부활.
 - '지금 단계 구간'(부활 지점의 기준 구간) = **디렉터 `Step` 의 구간**(S12 — `MapSceneRevivePointRules.StepArea`·`ResolveStageArea(step, mask)`).
