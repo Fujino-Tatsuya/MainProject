@@ -365,6 +365,21 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         return true;
     }
 
+    /// <summary>
+    /// [서버] 피해 판정 선착순(할 일 192 5a) — 이 시전자의 이 시전(<paramref name="castStartLocalTime"/> = 서버 로컬 게임초 Time.time)이
+    /// 다른 사람이 이미 승인받은 <paramref name="target"/> 의 창에 늦게 들어갔는가(<see cref="InterruptClaimLedger.PreemptsCast"/>).
+    /// true 면 간파 스킬이 그 피해의 간파 표식을 뗀다(피해만). 세션·서버가 아니면 false.
+    /// </summary>
+    public bool ServerPreemptsCast(Unit target, Player caster, float castStartLocalTime)
+    {
+        if (!IsServerActive || target == null || caster == null || !caster.IsSpawned)
+            return false;
+
+        ulong targetId = InterruptWindowReplicaTracker.TargetIdOf(target.gameObject);
+        return targetId != 0 &&
+               _claimServer.Ledger.PreemptsCast(targetId, caster.NetworkObjectId, ToServerTime(castStartLocalTime), ServerNow);
+    }
+
     /// <summary>시전자(NetworkObjectId)의 등록된 플레이어. 없으면 false.</summary>
     public bool TryGetPlayer(ulong actorId, out Player player)
     {
@@ -390,7 +405,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
                 if (logWindows)
                     Edit.Log($"[InterruptManager] 오너 예측 — {prediction.Forecast} {prediction.FailReason} · 대상 {prediction.TargetId} · 판정까지 {prediction.JudgeTime - now:0.###}s", this);
                 OwnerPredicted?.Invoke(pending.Cast, prediction);
-                CueRouter.Predicted(BuildOwnerCue(pending.ActorId, prediction, pending.Cast.AttackDirection));
+                CueRouter.Predicted(BuildOwnerCue(pending.ActorId, prediction, pending.Cast.AttackDirection, pending.ViaDash));
             }
 
             if (now < pending.Attempt.JudgeTime)
@@ -409,14 +424,14 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
             if (logWindows)
                 Edit.Log($"[InterruptManager] 오너 판정 — {result.Outcome} {result.FailReason} · 대상 {result.TargetId} · 창 #{result.WindowId}", this);
             OwnerJudged?.Invoke(pending.ActorId, result);
-            CueRouter.Judged(BuildOwnerCue(pending.ActorId, result, pending.Cast.AttackDirection));
+            CueRouter.Judged(BuildOwnerCue(pending.ActorId, result, pending.Cast.AttackDirection, pending.ViaDash));
             if (result.IsSuccess)
                 SubmitClaim(InterruptClaim.FromJudge(pending.ActorId, pending.ViaDash, result));
         }
     }
 
     // cue 한 건 — 오너 캐릭터·간파 스킬·결과 대상(지금 등록 정보)·섬광 기준 위치(대상, 없으면 시전자).
-    InterruptOwnerCue BuildOwnerCue(ulong actorId, in InterruptJudgeResult result, Vector3 attackDirection)
+    InterruptOwnerCue BuildOwnerCue(ulong actorId, in InterruptJudgeResult result, Vector3 attackDirection, bool viaDash)
     {
         _actors.TryGetValue(actorId, out ActorTrack actor);
         Unit target = result.TargetId != 0 && _targets.TryGetValue(result.TargetId, out TargetTrack track) ? track.Unit : null;
@@ -430,6 +445,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
             Skill = actor != null && actor.Skills != null ? actor.Skills.GetSkill(PlayerSkillSlot.Interrupt) as PlayerInterruptSkillBase : null,
             AttackDirection = attackDirection,
             FlashPosition = target != null ? target.transform.position : player != null ? player.transform.position : Vector3.zero,
+            ViaDash = viaDash,
         };
     }
 
@@ -480,7 +496,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
                      $" · 대상 {claim.TargetId} · 창 #{claim.WindowId}→#{verdict.WindowId} · 판정 시각 {now - claim.JudgeTime:0.###}s 전", this);
 
         if (owns && actor.Skills != null && actor.Skills.GetSkill(PlayerSkillSlot.Interrupt) is PlayerInterruptSkillBase skill)
-            skill.ServerOnClaimVerdict(verdict.Approved, verdict.IsFirst, targetUnit);
+            skill.ServerOnClaimVerdict(verdict.Approved, verdict.IsFirst, targetUnit, claim.ViaDash);
 
         ServerClaimProcessed?.Invoke(verdict);
 

@@ -29,8 +29,12 @@ public interface IPlayerInterruptSkillData
 /// (오너 예측과 같은 <see cref="InterruptManager.Predict"/> 를 서버 이력·서버 창 시간표로)로 예측하고, 대상 없음 = 슬로우 없음 / 성공 예측 = 강 / 실패 예측 = 약 시도 슬로우를 건다.
 /// 판정에서 그 인터럽트가 하나도 성공하지 않거나 판정 전에 스킬이 끝나면 실패 복귀시킨다. (옛 DashInterruptPredictor·대시 중 재예측은 삭제.)
 ///
-/// 간파 선착순(할 일 143): 판정(ResolveHit)이 대상마다 <see cref="InterruptWindowClaims"/> 를 묻는다 — 다른 플레이어가 먼저 성공시킨 창이면
-/// 간파 표식 없이 피해만 주고(대상 반응 없음), 판정 사건에 선점됨을 실어 디렉터가 시도 슬로우를 실패 복귀로 정리한다. 근접·대쉬·캐릭터 공통.
+/// 간파 선착순(할 일 191 D8 → 192 5a): 성공 선착순·동시 성공은 <see cref="InterruptManager"/> 의 신고 승인 장부(<see cref="InterruptClaimLedger"/>)가 정한다.
+/// 판정(ResolveHit)은 대상마다 같은 장부에 묻는다(<see cref="InterruptManager.ServerPreemptsCast"/>) — 다른 플레이어가 이미 승인받은 창에 늦게 들어간 피해면
+/// 간파 표식 없이 피해만 주고(대상 반응 없음 — 보스 효과는 창마다 한 번), 판정 사건에 선점됨을 실어 디렉터가 시도 슬로우를 실패 복귀로 정리한다. 근접·대쉬·캐릭터 공통.
+/// 옛 143 장부(<see cref="InterruptWindowClaims"/>)는 오프라인(매니저·세션 없음) 판정에만 남았고, 143-2 로컬 장부(<see cref="InterruptLocalWindowClaims"/>)는
+/// 피어 대상 재탐색·보정 랩 미리보기에서만 쓴다(예측·판정은 매니저).
+/// 연출 단계(할 일 192): 성공 사건에 근접/대쉬 종류를 싣는다 — 세션 = 신고의 대쉬 칸, 오프라인 = 시전 시작의 대쉬 여부.
 /// </summary>
 public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
@@ -64,6 +68,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private bool dashAttachArmed;       // 다음 OnServerStart 가 대쉬 간파다(컨트롤러가 승인 직전에 건다)
     private Vector3 armedDashDirection;
     private bool attachedToDash;        // 지금 대시에 실려 있다
+    private bool castViaDash;           // 이 시전이 대쉬 간파로 시작했다(대시 끝에도 남는다) — 오프라인 성공 사건 종류(할 일 192)
     private bool pendingHit;            // 대시 중 Hit 이 왔다 — 대시 끝에 즉시 판정
     private bool pendingEnd;            // 판정 전에 End 가 왔다 — 판정 뒤로 미룬다
 
@@ -154,6 +159,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         attachedToDash = dashAttachArmed;
+        castViaDash = dashAttachArmed;
         dashAttachArmed = false;
         pendingHit = false;
         pendingEnd = false;
@@ -391,10 +397,13 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             // 슬로우 모션 판별과 간파 성공 판정(허수아비)이 같은 비교를 쓴다.
             IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
 
-            // 간파 선착순(할 일 143) — 다른 사람이 먼저 성공시킨 창이면 간파 표식을 빼고 피해만 준다.
+            // 간파 선착순 — 다른 사람이 먼저 성공시킨 창이면 간파 표식을 빼고 피해만 준다.
             // 대상은 표식이 없으면 카운터·취약 넉백·그로기 등 간파 반응을 아예 보지 않는다(보스 코드 무수정).
-            bool preempted = slowTarget != null && InterruptWindowClaims.Server.Evaluate(
-                unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) == InterruptClaimVerdict.Preempted;
+            // 세션 중 = 매니저 승인 장부(할 일 191 D8 → 192 5a: 늦게 맞은 피해가 방금 든 취약에 넉백을 한 번 더 내지 않게), 오프라인 = 143 장부.
+            bool preempted = slowTarget != null && (judgedByClaim
+                ? InterruptManager.Instance.ServerPreemptsCast(unit, owner, serverCastStartTime)
+                : InterruptWindowClaims.Server.Evaluate(
+                    unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) == InterruptClaimVerdict.Preempted);
             if (preempted)
             {
                 anyPreempted = true;
@@ -460,7 +469,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount, resolvePreempted));
         if (interruptSucceeded && !judgedByClaim)
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
-                hasSuccessTargetPosition, successTargetPosition));
+                hasSuccessTargetPosition, successTargetPosition, InterruptPresentationTierRules.VariantOf(castViaDash)));
         ReportLag(lagHit);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
@@ -482,16 +491,14 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// 승인이면 판정(Hit)을 기다리지 않고 지금 성공 기록(<see cref="ServerInterruptSucceeded"/>)을 내고, 첫 승인(<paramref name="first"/>)이면 성공 슬로우 사건도 낸다
     /// (전역 슬로우는 한 번 — 동시 성공자 화면은 각자 오너 판정 cue 로 섬광, 4단계). 판정 전이면 그 대상 피해에 간파 표식을 빼고 판정을 성공으로 정리하게 기록한다.
     /// 거부는 여기서 할 일이 없다 — 판정이 빗나감으로 정리하고, 오너 화면은 매니저 거부 cue 가 끈다.
+    /// <paramref name="viaDash"/> = 신고의 대쉬 간파 칸(191 경로) — 성공 사건 종류(할 일 192)로 슬로우 Start 이벤트에 실린다.
     /// </summary>
-    internal void ServerOnClaimVerdict(bool approved, bool first, Unit target)
+    internal void ServerOnClaimVerdict(bool approved, bool first, Unit target, bool viaDash = false)
     {
         if (!approved)
             return;
 
-        // 서버 예측의 선착순 장부(할 일 143)도 승인으로 채운다 — 남의 창을 닫힌 것처럼 예측·피해만 주게.
-        if (target != null && owner != null)
-            InterruptWindowClaims.Server.Claim(target.gameObject.GetInstanceID(), owner.GetInstanceID(), Time.time);
-
+        // 피해 판정 선착순은 매니저 승인 장부가 직접 답한다(할 일 192 5a) — 143 장부는 세션 중 읽지 않아 여기서 채우지 않는다.
         if (!hasResolvedHit)
         {
             verdictApproved = true;
@@ -500,7 +507,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (first)
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
-                target != null, target != null ? target.transform.position : Vector3.zero));
+                target != null, target != null ? target.transform.position : Vector3.zero,
+                InterruptPresentationTierRules.VariantOf(viaDash)));
         ServerInterruptSucceeded?.Invoke(owner, this);
     }
 

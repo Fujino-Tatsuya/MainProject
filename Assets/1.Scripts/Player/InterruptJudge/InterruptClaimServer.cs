@@ -181,6 +181,25 @@ public sealed class InterruptClaimLedger
         return order;
     }
 
+    /// <summary>
+    /// [서버] 피해 판정의 선착순(할 일 192 5a — 옛 143 장부 대신 이 장부로) — 이 시전(<paramref name="castStartTime"/> = 시전 시작 서버 시각)이
+    /// 다른 사람이 이미 승인받은 그 대상의 창에 늦게 들어갔는가. 그 창의 승인 목록에 내가 없고, 내 시전이 첫 승인 이전(같은 시각 포함)에 시작했으면 true
+    /// → 호출측이 피해의 간파 표식을 떼서 대상 효과(23호·스파링 봇 취약 넉백 등)가 창마다 한 번만 나게 한다.
+    /// 첫 승인 뒤에 새로 시작한 시전은 false(143 과 같은 '닫힌 뒤 새 시전' 규칙 — 취약 중 간파 넉백은 그대로). 보관 시간(1초) 밖 기록은 정리된다.
+    /// </summary>
+    public bool PreemptsCast(ulong targetId, ulong actorId, double castStartTime, double now)
+    {
+        Prune(now);
+        for (int i = 0; i < _entries.Count; i++)
+        {
+            Entry entry = _entries[i];
+            if (entry.TargetId == targetId && !entry.Approved.Contains(actorId) && castStartTime <= entry.FirstTime + 1e-9)
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>창의 승인된 시전자(첫 승인이 [0]). 없으면 빈 목록.</summary>
     public IReadOnlyList<ulong> ApprovedActors(ulong targetId, uint windowId) =>
         Find(targetId, windowId)?.Approved ?? Empty;

@@ -95,6 +95,8 @@ public sealed class GlobalTimeScale : MonoBehaviour
     /// 마지막 슬로우가 제압 간파 성공인가(할 일 179) — <see cref="Started"/> 구독자가 그 호출 안에서 읽는다(이벤트 인자는 그대로 둔다).
     /// </summary>
     public bool CurrentSuppressInterrupt => _session.CurrentSuppressInterrupt;
+    /// <summary>마지막 슬로우가 대쉬 간파 성공인가(할 일 192) — 읽는 법은 <see cref="CurrentSuppressInterrupt"/> 와 같다.</summary>
+    public bool CurrentDashInterrupt => _session.CurrentDashInterrupt;
 
     private bool IsSessionRunning =>
         _networkManager != null && _networkManager.IsListening && _clock != null && _clock.IsRunning;
@@ -174,11 +176,12 @@ public sealed class GlobalTimeScale : MonoBehaviour
     /// (서버 아님·세션 미가동·컷신 잠금·씬 전환 중). 진행 중이면 마지막 것이 이긴다(D6).
     /// <paramref name="targetPosition"/> = 연출 기준 월드 위치(이벤트에 실어 전 피어에 보낸다, 선택).
     /// <paramref name="hitStopOn"/> = 히트스톱을 실을지(간파 연출 디렉터 A1 칸 — 이 레이어는 스위치를 모른다).
-    /// <paramref name="suppressInterrupt"/> = 제압 간파 성공 표식(할 일 179) — 실어 보내기만 한다.
+    /// <paramref name="suppressInterrupt"/>·<paramref name="dashInterrupt"/> = 제압 간파(할 일 179)·대쉬 간파(192) 성공 표식 — 실어 보내기만 한다.
     /// </summary>
     public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId,
                             SlowMotionPurpose purpose = SlowMotionPurpose.Attempt,
-                            Vector3 targetPosition = default, bool hitStopOn = true, bool suppressInterrupt = false)
+                            Vector3 targetPosition = default, bool hitStopOn = true, bool suppressInterrupt = false,
+                            bool dashInterrupt = false)
     {
         if (profile == null || !IsServerActive)
         {
@@ -197,7 +200,8 @@ public sealed class GlobalTimeScale : MonoBehaviour
             triggerId = ++_lastIssuedTriggerId; // uint 한 바퀴 — 0 은 "없음"이라 건너뛴다
         }
 
-        ServerPublish(CreateStartEvent(triggerId, Now, triggerClientId, profile, purpose, targetPosition, hitStopOn, suppressInterrupt));
+        ServerPublish(CreateStartEvent(triggerId, Now, triggerClientId, profile, purpose, targetPosition, hitStopOn, suppressInterrupt,
+            dashInterrupt));
         return triggerId;
     }
 
@@ -207,9 +211,10 @@ public sealed class GlobalTimeScale : MonoBehaviour
     /// </summary>
     public static SlowMotionEvent CreateStartEvent(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
                                                    SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn,
-                                                   bool suppressInterrupt = false)
+                                                   bool suppressInterrupt = false, bool dashInterrupt = false)
     {
-        var e = SlowMotionEvent.CreateStart(triggerId, time, triggerClientId, profile, purpose, targetPosition, suppressInterrupt);
+        var e = SlowMotionEvent.CreateStart(triggerId, time, triggerClientId, profile, purpose, targetPosition, suppressInterrupt,
+            dashInterrupt);
         e.HitStopDuration = InterruptProductionRules.SelectHitStopDuration(hitStopOn, e.HitStopDuration);
         return e;
     }

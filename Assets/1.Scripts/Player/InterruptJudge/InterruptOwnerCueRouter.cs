@@ -32,6 +32,8 @@ public struct InterruptOwnerCue
     public Vector3 AttackDirection;
     /// <summary>섬광 기준 위치(대상 위치, 없으면 시전자 위치).</summary>
     public Vector3 FlashPosition;
+    /// <summary>대쉬 간파인가(할 일 192 — 연출 단계 일반/대쉬).</summary>
+    public bool ViaDash;
 
     public InterruptAttemptForecast Forecast => Result.Forecast;
 }

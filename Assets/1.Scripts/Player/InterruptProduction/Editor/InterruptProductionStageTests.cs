@@ -31,13 +31,15 @@ public sealed class InterruptProductionStageTests
             new List<(SlowMotionProfile, ulong, SlowMotionPurpose, Vector3, bool)>();
         public readonly List<uint> Fails = new List<uint>();
         public readonly List<bool> SuppressFlags = new List<bool>();
+        public readonly List<bool> DashFlags = new List<bool>();
         public uint NextId = 7;
 
         public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn,
-            bool suppressInterrupt = false)
+            bool suppressInterrupt = false, bool dashInterrupt = false)
         {
             Calls.Add("Start:" + purpose);
             SuppressFlags.Add(suppressInterrupt);
+            DashFlags.Add(dashInterrupt);
             Starts.Add((profile, triggerClientId, purpose, targetPosition, hitStopOn));
             return NextId;
         }

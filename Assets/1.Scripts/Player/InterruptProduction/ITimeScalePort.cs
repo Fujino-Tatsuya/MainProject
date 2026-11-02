@@ -6,9 +6,12 @@ using UnityEngine;
 /// </summary>
 public interface ITimeScalePort
 {
-    /// <summary><see cref="GlobalTimeScale.ServerStart"/> — 발동 번호, 거부 시 0. <paramref name="suppressInterrupt"/> = 제압 간파 성공(할 일 179).</summary>
+    /// <summary>
+    /// <see cref="GlobalTimeScale.ServerStart"/> — 발동 번호, 거부 시 0. <paramref name="suppressInterrupt"/> = 제압 간파 성공(할 일 179),
+    /// <paramref name="dashInterrupt"/> = 대쉬 간파 성공(할 일 192).
+    /// </summary>
     uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn,
-        bool suppressInterrupt = false);
+        bool suppressInterrupt = false, bool dashInterrupt = false);
 
     /// <summary><see cref="GlobalTimeScale.ServerFail"/> — 현재 발동 번호일 때만 실패 복귀.</summary>
     void ServerFail(uint triggerId);
@@ -21,11 +24,11 @@ public interface ITimeScalePort
 public sealed class GlobalTimeScalePort : ITimeScalePort
 {
     public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition,
-        bool hitStopOn, bool suppressInterrupt = false)
+        bool hitStopOn, bool suppressInterrupt = false, bool dashInterrupt = false)
     {
         GlobalTimeScale timeScale = GlobalTimeScale.Instance;
         return timeScale != null
-            ? timeScale.ServerStart(profile, triggerClientId, purpose, targetPosition, hitStopOn, suppressInterrupt)
+            ? timeScale.ServerStart(profile, triggerClientId, purpose, targetPosition, hitStopOn, suppressInterrupt, dashInterrupt)
             : 0;
     }
 

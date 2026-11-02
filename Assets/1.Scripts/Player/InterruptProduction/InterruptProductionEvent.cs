@@ -64,14 +64,20 @@ public readonly struct InterruptProductionEvent
     /// (<see cref="InterruptProductionDirector.ServerMarkSuppressInterrupt"/>)으로, 피어는 슬로우 Start 이벤트 칸으로 채운다.
     /// </summary>
     public readonly bool SuppressInterrupt;
+    /// <summary>
+    /// [성공] 사건 종류(할 일 192) — 근접 / 대쉬(대시에 실린 간파). 서버는 신고(<see cref="InterruptClaim.ViaDash"/>, 191 경로)·
+    /// 오프라인은 시전 시작의 대쉬 여부로, 피어는 슬로우 Start 이벤트 칸(<see cref="SlowMotionEvent.DashInterrupt"/>)으로 채운다.
+    /// </summary>
+    public readonly InterruptVariant Variant;
 
     private InterruptProductionEvent(InterruptProductionPhase phase, ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
         uint attemptTriggerId = 0, InterruptAttemptForecast forecast = InterruptAttemptForecast.NoTarget, bool landed = false, bool succeeded = false, int resolvedCount = 0,
         Vector3 targetPosition = default, bool hasTarget = false, Vector3 casterPosition = default,
         InterruptFailReason failReason = InterruptFailReason.None, uint triggerId = 0, bool preempted = false,
-        bool suppressInterrupt = false)
+        bool suppressInterrupt = false, InterruptVariant variant = InterruptVariant.Normal)
     {
         SuppressInterrupt = suppressInterrupt;
+        Variant = variant;
         Phase = phase;
         CasterClientId = casterClientId;
         Caster = caster;
@@ -112,15 +118,16 @@ public readonly struct InterruptProductionEvent
             attemptTriggerId: attemptTriggerId, landed: landed, succeeded: succeeded, resolvedCount: resolvedCount,
             preempted: preempted);
 
-    /// <summary>[서버] 성공 — 판정과 같은 호출 안, 판정 사건 바로 뒤.</summary>
-    public static InterruptProductionEvent Success(Player caster, PlayerInterruptSkillBase skill, bool hasTarget, Vector3 targetPosition) =>
+    /// <summary>[서버] 성공 — 판정과 같은 호출 안, 판정 사건 바로 뒤(세션 중엔 승인 순간). <paramref name="variant"/> = 근접/대쉬(할 일 192).</summary>
+    public static InterruptProductionEvent Success(Player caster, PlayerInterruptSkillBase skill, bool hasTarget, Vector3 targetPosition,
+        InterruptVariant variant = InterruptVariant.Normal) =>
         Success(ClientIdOf(caster), caster, skill, hasTarget, targetPosition,
-            caster != null ? caster.transform.position : default);
+            caster != null ? caster.transform.position : default, variant);
 
     public static InterruptProductionEvent Success(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill,
-        bool hasTarget, Vector3 targetPosition, Vector3 casterPosition) =>
+        bool hasTarget, Vector3 targetPosition, Vector3 casterPosition, InterruptVariant variant = InterruptVariant.Normal) =>
         new InterruptProductionEvent(InterruptProductionPhase.Success, casterClientId, caster, skill,
-            succeeded: true, targetPosition: targetPosition, hasTarget: hasTarget, casterPosition: casterPosition);
+            succeeded: true, targetPosition: targetPosition, hasTarget: hasTarget, casterPosition: casterPosition, variant: variant);
 
     /// <summary>[서버] 실패 — 판정 전 종료·앵커 누락. 빗나감은 판정 사건이 처리한다.</summary>
     public static InterruptProductionEvent Fail(Player caster, PlayerInterruptSkillBase skill, InterruptFailReason reason, uint attemptTriggerId) =>
@@ -134,14 +141,18 @@ public readonly struct InterruptProductionEvent
     /// <summary>같은 사건에 제압 간파 칸만 바꾼 사본(할 일 179).</summary>
     public InterruptProductionEvent WithSuppressInterrupt(bool suppressInterrupt) =>
         new InterruptProductionEvent(Phase, CasterClientId, Caster, Skill, AttemptTriggerId, Forecast, Landed, Succeeded, ResolvedCount,
-            TargetPosition, HasTarget, CasterPosition, FailReason, TriggerId, Preempted, suppressInterrupt);
+            TargetPosition, HasTarget, CasterPosition, FailReason, TriggerId, Preempted, suppressInterrupt, Variant);
+
+    /// <summary>이 사건의 연출 단계(할 일 192) — 성공 사건이면 제압/대쉬/일반, 그 밖은 실패.</summary>
+    public InterruptPresentationTier Tier =>
+        InterruptPresentationTierRules.Select(Phase == InterruptProductionPhase.Success, Variant, SuppressInterrupt);
 
     /// <summary>[각 피어] 슬로우 Started(Success) 로 받은 성공 — 시전자 객체는 비어 있다(필요하면 받는 쪽이 찾는다).</summary>
     public static InterruptProductionEvent LocalSuccess(uint triggerId, ulong casterClientId, Vector3 targetPosition,
-        bool suppressInterrupt = false) =>
+        bool suppressInterrupt = false, InterruptVariant variant = InterruptVariant.Normal) =>
         new InterruptProductionEvent(InterruptProductionPhase.Success, casterClientId, null, null,
             succeeded: true, targetPosition: targetPosition, hasTarget: true, triggerId: triggerId,
-            suppressInterrupt: suppressInterrupt);
+            suppressInterrupt: suppressInterrupt, variant: variant);
 
     /// <summary>[각 피어] 시도 — 시전 시작(OnClientPlay). 예측은 서버만 알아 비어 있다.</summary>
     public static InterruptProductionEvent LocalAttempt(Player caster, PlayerInterruptSkillBase skill) =>

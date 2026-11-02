@@ -53,6 +53,9 @@ public sealed class SlowMotionSession
     /// <summary>마지막으로 시작된 슬로우가 제압 간파 성공인가(<see cref="SlowMotionEvent.SuppressInterrupt"/>, 할 일 179). 끝난 뒤에도 값은 남는다.</summary>
     public bool CurrentSuppressInterrupt { get; private set; }
 
+    /// <summary>마지막으로 시작된 슬로우가 대쉬 간파 성공인가(<see cref="SlowMotionEvent.DashInterrupt"/>, 할 일 192). 끝난 뒤에도 값은 남는다.</summary>
+    public bool CurrentDashInterrupt { get; private set; }
+
     public SlowMotionApplyResult Apply(in SlowMotionEvent e)
     {
         if (double.IsNaN(e.Time) || e.Time < _lastEventTime)
@@ -70,6 +73,7 @@ public sealed class SlowMotionSession
                 CurrentPurpose = e.Purpose;
                 CurrentTargetPosition = e.TargetPosition;
                 CurrentSuppressInterrupt = e.SuppressInterrupt;
+                CurrentDashInterrupt = e.DashInterrupt;
                 var profile = e.ToProfile();
                 CurrentProfileScale = profile.ClampedScale;
                 _timeline.Start(e.Time, profile);
@@ -113,6 +117,7 @@ public sealed class SlowMotionSession
         CurrentProfileScale = 1f;
         CurrentTargetPosition = Vector3.zero;
         CurrentSuppressInterrupt = false;
+        CurrentDashInterrupt = false;
     }
 
     public float ScaleAt(double t) => _timeline.ScaleAt(t);
