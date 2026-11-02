@@ -119,4 +119,121 @@ public sealed class DebugSuppressInterruptRepro
         InterruptProductionDirector.ServerMarkSuppressInterrupt();
         MarkedCount++;
     }
+
+    /// <summary>
+    /// 오너 시도 암전 예측도 맞춘다(할 일 192) — 켜져 있으면 허수아비를 제압 대상으로 예측(<see cref="InterruptProductionDirector.DebugSuppressForecastOverride"/>).
+    /// 매 프레임 부른다. 끄면 덮어쓰기를 지운다.
+    /// </summary>
+    public void SyncForecast()
+    {
+        InterruptProductionDirector.DebugSuppressForecastOverride = Enabled ? IsDummy : null;
+    }
+
+    private static readonly System.Func<GameObject, bool> IsDummy =
+        target => target != null && target.GetComponentInChildren<TrainingDummyInterrupt>() != null;
+}
+
+/// <summary>
+/// 간파 연출 단계 재현(할 일 192) — 랩 버튼 하나로 이 화면에서 실패/근접/대쉬/제압 단계 연출을 돌려 본다(서버·슬로우·판정 없음 — 오너 연출만).
+/// 시도(예측) → <see cref="ResolveDelay"/> 초(실제 시간) 뒤 결론. 시전자 = 내 플레이어, 대상 = 가장 가까운 간파 대상(허수아비 등).
+/// 슬로우가 없어 줌은 안 보인다 — 줌·슬로우·팀원 화면은 실제 간파로 본다.
+/// </summary>
+public sealed class DebugInterruptTierPreview
+{
+    /// <summary>시도 → 결론 사이(초, 실제 시간).</summary>
+    public const float ResolveDelay = 0.4f;
+
+    public static readonly InterruptPresentationTier[] All =
+    {
+        InterruptPresentationTier.Fail, InterruptPresentationTier.Normal, InterruptPresentationTier.Dash, InterruptPresentationTier.Suppress,
+    };
+
+    private readonly List<InterruptTargetRegistry.Entry> _targets = new List<InterruptTargetRegistry.Entry>();
+    private bool _pending;
+    private float _resolveAt;
+    private InterruptPresentationTier _tier;
+    private Vector3 _flashPosition;
+
+    /// <summary>마지막 재현 결과 문구(실패 이유 포함).</summary>
+    public string Status { get; private set; } = "";
+
+    public static string Label(InterruptPresentationTier tier) => tier switch
+    {
+        InterruptPresentationTier.Fail => "실패",
+        InterruptPresentationTier.Normal => "간파(근접)",
+        InterruptPresentationTier.Dash => "대쉬 간파",
+        _ => "제압 간파",
+    };
+
+    /// <summary>재현 시작. 디렉터·내 플레이어가 없거나 앞 시도가 아직 결론 전이면 false.</summary>
+    public bool Begin(InterruptProductionDirector director, InterruptPresentationTier tier, float now)
+    {
+        if (director == null || _pending)
+            return false;
+
+        NetworkObject playerObject = NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null
+            ? NetworkManager.Singleton.LocalClient.PlayerObject
+            : null;
+        if (playerObject == null)
+        {
+            Status = "내 플레이어 없음(호스트·클라 접속 후)";
+            return false;
+        }
+
+        PlayerSkillController skills = playerObject.GetComponentInChildren<PlayerSkillController>();
+        PlayerInterruptSkillBase skill = skills != null ? skills.GetSkill(PlayerSkillSlot.Interrupt) as PlayerInterruptSkillBase : null;
+        Unit target = FindNearestTarget(playerObject.transform.position);
+        Vector3 ownerPosition = playerObject.transform.position;
+        _flashPosition = target != null ? target.transform.position : ownerPosition;
+        Vector3 direction = _flashPosition - ownerPosition;
+        direction.y = 0f;
+
+        if (!director.DebugPreviewAttempt(tier, skill, playerObject.gameObject, target != null ? target.gameObject : null,
+                direction.sqrMagnitude > 0.0001f ? direction.normalized : playerObject.transform.forward))
+        {
+            Status = "앞 간파 연출이 아직 진행 중";
+            return false;
+        }
+
+        _tier = tier;
+        _pending = true;
+        _resolveAt = now + ResolveDelay;
+        Status = $"재현: {Label(tier)}" + (target != null ? $" → {target.name}" : " (대상 없음 — 시전자 위치)");
+        return true;
+    }
+
+    /// <summary>매 프레임(실제 시간) — 결론 시각이 되면 결론.</summary>
+    public void Tick(InterruptProductionDirector director, float now)
+    {
+        if (!_pending || now < _resolveAt)
+            return;
+
+        _pending = false;
+        if (director != null)
+            director.DebugPreviewResolve(_tier, _flashPosition);
+    }
+
+    private Unit FindNearestTarget(Vector3 position)
+    {
+        InterruptTargetRegistry.CopyLiveTo(_targets);
+        Unit best = null;
+        float bestSqr = float.MaxValue;
+        for (int i = 0; i < _targets.Count; i++)
+        {
+            Unit unit = _targets[i].Unit;
+            if (unit == null)
+                continue;
+
+            Vector3 d = unit.transform.position - position;
+            float sqr = d.x * d.x + d.z * d.z;
+            if (sqr < bestSqr)
+            {
+                best = unit;
+                bestSqr = sqr;
+            }
+        }
+
+        _targets.Clear();
+        return best;
+    }
 }
