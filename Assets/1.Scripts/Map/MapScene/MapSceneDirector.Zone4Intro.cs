@@ -7,20 +7,21 @@ using UnityEngine;
 // 복제 값을 여기(partial)에 두면 씬·프리팹을 고치지 않는다(런타임에 붙인 컴포넌트는 NetworkVariable 을 가질 수 없다).
 public sealed partial class MapSceneDirector
 {
-    public enum Zone4IntroPhase : byte
+    /// <summary>소개 연출 단계 — 2구역(<see cref="Zone2Intro"/>)·4구역(<see cref="Zone4Intro"/>) 공용.</summary>
+    public enum IntroPhase : byte
     {
         /// <summary>시작 전(또는 이 판에 연출 없음).</summary>
         None,
         /// <summary>연출 중 — 샷·대사 진행, 복귀 블렌드 포함.</summary>
         Running,
-        /// <summary>복귀가 끝났다(G7 열림). 복귀 뒤 무전("어서 움직여.") 표시는 이 상태에서도 시각으로 계속된다.</summary>
+        /// <summary>복귀가 끝났다(그 구역 입구 게이트 열림 — 2구역 G2 · 4구역 G7). 4구역 복귀 뒤 무전("어서 움직여.") 표시는 이 상태에서도 시각으로 계속된다.</summary>
         Done,
     }
 
     /// <summary>4구역 소개 연출 복제 상태 — 모든 피어가 이 값과 연출 데이터(SO)만으로 같은 화면을 그린다.</summary>
     public struct Zone4IntroState : INetworkSerializable, IEquatable<Zone4IntroState>
     {
-        public Zone4IntroPhase Phase;
+        public IntroPhase Phase;
         /// <summary>연출 회차 — 시작마다 +1. 스킵 표·로컬 홀드 게이지가 이 값으로 "어느 연출의 것인가"를 맞춘다.</summary>
         public int Sequence;
         /// <summary>연출 시작 ServerTime.</summary>

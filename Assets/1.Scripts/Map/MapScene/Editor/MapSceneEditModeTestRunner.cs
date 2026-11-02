@@ -12,6 +12,8 @@ internal static class MapSceneEditModeTestRunner
     {
         "^MapSceneFlowModelTests$",
         "^MapSceneGateHoldTests$", // 게이트 보류 — 4구역 소개 연출이 끝나야 G7(PLAN-zone4-intro-cinematic)
+        "^MapSceneRadioRulesTests$", // 메인 1~4구역 무전(PLAN-main-radio-zone1-4) — 판마다 1회·소개 중 숨김/폐기·존3 거리·2구역 구도·경고가 복귀 전에 끝남
+        "^CinematicRulesTests$", // 연출 공용 규칙 — 줄 나누기·조각 스케줄·샷 타임라인·구도(2·4구역 공용)
         "^MapSceneAreaTrackerTests$",
         "^MapSceneBarrierRulesTests$",
         "^MapSceneBarrierMonsterBlockTests$", // 할 일 148 — 열린 배리어도 몬스터 카브는 남는다(복도 늘 몬스터 출입 금지)
