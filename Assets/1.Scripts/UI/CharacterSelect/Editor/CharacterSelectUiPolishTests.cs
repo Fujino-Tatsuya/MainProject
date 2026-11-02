@@ -174,13 +174,19 @@ public sealed class CharacterSelectUiPolishTests
     GameObject Popup => new SerializedObject(_panel).FindProperty("infoPopup").objectReferenceValue as GameObject;
 
     [Test]
-    public void InfoTabs_Wired_WithTabArt_DrawnAboveCards()
+    public void InfoTabs_Wired_BothCoreShape_DrawnAboveCards()
     {
         Button basic = Field("basicInfoButton"), core = Field("coreInfoButton");
         Assert.IsNotNull(basic, "basicInfoButton 연결");
         Assert.IsNotNull(core, "coreInfoButton 연결");
-        StringAssert.EndsWith("tab_gibon_body.png", AssetDatabase.GetAssetPath(((Image)basic.targetGraphic).sprite));
+        // 할 일 178: 기본도 코어 모양(코어 몸체 + 임시 TMP 글자 "기본", 클릭은 몸체만)
+        StringAssert.EndsWith("tab_core_body.png", AssetDatabase.GetAssetPath(((Image)basic.targetGraphic).sprite));
         StringAssert.EndsWith("tab_core_body.png", AssetDatabase.GetAssetPath(((Image)core.targetGraphic).sprite));
+        var basicLabel = basic.transform.Find("Label").GetComponent<TMP_Text>();
+        Assert.IsNotNull(basicLabel, "기본 글자 = TMP");
+        Assert.AreEqual("기본", basicLabel.text);
+        Assert.IsFalse(basicLabel.raycastTarget);
+        Assert.IsNull(basic.transform.Find("Label").GetComponent<Image>(), "검은 글자 아트(tab_gibon_label)는 안 쓴다");
         Assert.AreEqual(Navigation.Mode.None, basic.navigation.mode, "클릭 뒤 선택이 남지 않게");
         Assert.AreEqual(Navigation.Mode.None, core.navigation.mode);
 
