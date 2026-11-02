@@ -58,12 +58,15 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
             return;
         }
 
+        // 제압 가속 중인 공격자의 피해는 Multi 여부와 무관하게 대상별 숫자 하나로 합친다(할 일 174). 상태이상은 복제값이라 전 피어 같다.
+        FloatingDamageAccumulation accumulation = FloatingDamageAccumulationPolicy.Resolve(
+            request.hitPattern, SuppressHastePresence.IsActiveForClient(request.attackerClientId));
         bool canAccumulate = FloatingDamageAccumulationPolicy.TryCreateKey(
             request.attackerClientId,
             request.attackType,
             request.target.GetInstanceID(),
             request.kind,
-            request.hitPattern,
+            accumulation,
             out FloatingDamageAccumulationKey key);
 
         FloatingDamageTier tier = settings.ClassifyTier(request.amount, request.target.MaxHp, request.target.Rank);
@@ -78,7 +81,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         _livePopups.Add(popup);
         if (canAccumulate)
             _activeByKey[key] = popup;
-        popup.Initialize(request, settings, style, tier, ResolveAnchor(request.target),
+        popup.Initialize(request, accumulation, settings, style, tier, ResolveAnchor(request.target),
             _canvas, _emphasisGate, ReleasePopup);
     }
 

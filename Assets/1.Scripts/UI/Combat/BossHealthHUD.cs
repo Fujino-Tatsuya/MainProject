@@ -157,6 +157,9 @@ public class BossHealthHUD : MonoBehaviour
         if (hpFill != null)
             hpFill.fillAmount = intro.Red;
 
+        // 제압 동안 잔상(흰 칸)을 멈춘다 — 제압 중 깎인 양이 쌓여 보이고, 끝나면 평소처럼 머문 뒤 내려간다(할 일 174).
+        // 제압 여부 = 이 보스가 건 제압 가속이 플레이어에게 남아 있는가(상태이상 복제값 — 보스의 제압 플래그는 서버 전용이다).
+        delayed.SetFrozen(boss.IsSpawned && SuppressHastePresence.IsActiveFromSource(boss.NetworkObjectId), boss.CurrentHealth);
         delayed.Tick(Time.deltaTime, boss.CurrentHealth, maxHp);
         // 차오르는 동안: 흰 구간(오버레이) = 빨강 뒤에서 앞서 달린다 · 잔상 바는 빨강 뒤에 숨긴다(회색이 흰색 너머로 비치지 않게).
         if (intro.Active)

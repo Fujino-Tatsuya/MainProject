@@ -1,6 +1,6 @@
 # 플로팅 데미지(피해 숫자) — 실제 동작 기준 설계
 
-갱신 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
+갱신 2026-11-02 (할 일 174 — 제압 가속 합산 §3.1), 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
 
 **출처** — 기획 「Re:C 데미지 숫자 표기 v0.2」(§3 구간 · §4 위치 · §5 흐름, 수치는 임시값)
 + 은희 결정(2026-10-01: 누적 숫자는 대상을 따라감 · 누적 구간은 합계로 판정)
@@ -15,7 +15,7 @@
 | 그리는 곳 | 스포너가 직접 만드는 **Screen Space Overlay** Canvas(`FloatingDamageCanvas`, 1920×1080 기준 · 높이 맞춤 · 정렬 50). Canvas 단위 = 기획 px |
 | 글자 | TMP 아님 — **이미지 숫자**(`FloatingDamageDigitSet` 스프라이트, 외곽선 색도 DigitSet). 굵은 변형 스프라이트 없음 → 기획의 "높음 = 한 단계 굵게"는 표현 안 함 |
 | 생성점 | 대상의 **몸 중심**(§2) 을 화면에 투영 + 픽셀 오프셋 합산 |
-| 흐름 | 단발 = 뜨고 떨어지며 사라짐 / 누적(Multi) = 한 숫자에 합산하다 사라짐(§3) |
+| 흐름 | 단발 = 뜨고 떨어지며 사라짐 / 누적(Multi) = 한 숫자에 합산하다 사라짐(§3) / 제압 가속 중 = 공격자·대상별 하나로 전부 합산(§3.1) |
 | 크기·색 | 피해 강도 3구간(낮음/중간/높음) — 대상 등급별 %(§4) |
 | 줌 | **카메라 줌과 무관** — 크기·픽셀 오프셋 고정(§7: 넣었다가 뺐음, 154) |
 | 해상도 | 높이 맞춤 + 실제 px 하한 16(§4, 154) |
@@ -79,7 +79,23 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 | 값 갱신 연출 | — | 펀치 ×1.05 / 0.06s(OutQuad), 간격 0.1s 안이면 값만 갱신 |
 
 **누적 키** = 공격자 clientId + 공격 종류(`AttackType`) + 대상(InstanceID) + 숫자 종류(`PopupKind`). **Multi 만** 키를 만든다
-(`FloatingDamageAccumulationPolicy`). 보호막 숫자와 HP 숫자는 종류가 달라 따로 누적된다.
+(`FloatingDamageAccumulationPolicy`). 보호막 숫자와 HP 숫자는 종류가 달라 따로 누적된다. 예외 — 제압 가속 중(§3.1).
+
+### 3.1 제압 가속 합산 (할 일 174)
+공격자 플레이어에게 **제압 가속**이 켜져 있으면(`SuppressHastePresence.IsActiveForClient` — 상태이상 복제값이라 전 피어 같다)
+그 공격자의 피해는 **단발·Multi·공격 종류 무관** 대상별 숫자 하나로 합친다(`FloatingDamageAccumulation.SuppressHaste`).
+
+| | 동작 |
+|---|---|
+| 키 | 공격자 + 대상 + 숫자 종류 + 제압 표지(공격 종류 안 봄). 같은 공격자·대상의 Multi 키와 겹치지 않는다 |
+| 갱신 | Multi 와 같다 — 값 즉시 갱신 + 펀치(`updatePunchScale`·`updatePunchDuration`·간격 `updatePunchMinInterval`), 합계로 구간 판정 |
+| 유지 | 공격자의 가속이 켜진 동안은 타격이 끊겨도 **사라지지 않는다**(`HeldLastHitAt` 이 마지막 타격 시각을 지금으로 붙잡음) |
+| 끝 | 가속이 끝난 순간부터 평소처럼 `accumulateHold` 0.5s 유지 → 0.25s 하강·흐려짐 = 마지막 합계를 보여 주고 사라진다 |
+| 끝 직후 타격 | 가속이 꺼진 뒤 타격은 평소 규칙(단발/Multi)으로 새 숫자 |
+
+- 보호막 숫자는 HP 숫자와 색·위치가 달라 **따로** 합산한다(숫자 종류는 키에 남김).
+- 판정은 스포너 `Submit` 한 곳(훈련 더미 경로도 같이 탄다). 몬스터가 공격자(`ulong.MaxValue`)면 해당 없음.
+- 가속 중 쓰러지면 서버가 버프를 빼므로 그 공격자 숫자도 그때부터 사라지기 시작한다.
 
 시간은 `Time.deltaTime` — **슬로우·히트스톱 때 숫자도 느려진다**(그대로 유지 — 154 결정 5).
 
@@ -171,7 +187,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 | `FloatingDamagePopup` | 숫자 1개의 시간 함수(상승·유지·하강·페이드·펀치·흔들림) |
 | `FloatingDamagePresenter` | Unit 이벤트 → 필터 → Submit |
 | `FloatingDamageSettings` | 수치 SO + 표시 필터·스타일·구간·모양 · 해상도 하한 규칙 `FloatingDamageMinPixelPolicy` |
-| `FloatingDamageTier` / `FloatingDamageAccumulationPolicy` | 구간 판정·강조 간격 / 누적 키 |
+| `FloatingDamageTier` / `FloatingDamageAccumulationPolicy` | 구간 판정·강조 간격 / 누적 방식(`FloatingDamageAccumulation`)·누적 키·제압 가속 유지 |
 | `FloatingDamageDigitSet` / `FloatingDamageNumberView` | 이미지 글꼴 / 글자 Image |
 | `FloatingDamageAnchor` | 대상별 생성점(§2-3) |
 
