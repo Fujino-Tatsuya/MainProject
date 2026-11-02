@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// A5 전투 표시 숨김(할 일 154 → 179 후속 2) — 구간 = 오너 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) + 제압 간파 섬광(모든 피어).
 /// 오너 상태 기계 + 섬광 진행기 + 제압 섬광 진행기를 디렉터처럼 묶어 규칙(<see cref="InterruptProductionRules.ShouldHideCombatUi"/>)을 본다.
-/// 약 시도·대상 없음·남의 일반 간파·칸 끔은 안 숨김. 끝·강제 리셋이면 복원. 표시 쪽(체력바 플레이어만·조준 쿼드 렌더러). 프리팹 기본값 켬.
+/// 약 시도·대상 없음·남의 일반 간파·칸 끔은 안 숨김. 끝·강제 리셋이면 복원. 표시 쪽(머리 위 체력바 플레이어·몬스터 모두 — 179 후속 4·조준 쿼드 렌더러). 프리팹 기본값 켬.
 /// 파일 이름은 옛 이름(154) 그대로 둔다.
 /// </summary>
 public sealed class InterruptDamageNumberHideTests
@@ -307,11 +307,27 @@ public sealed class InterruptDamageNumberHideTests
     // ---- 표시 쪽(머리 위 체력바·조준 표시) ----
 
     [Test]
-    public void 머리_위_체력바는_플레이어만_숨긴다()
+    public void 머리_위_체력바는_플레이어_몬스터_모두_숨기고_끝나면_복원한다()
     {
-        Assert.IsTrue(UnitOverheadHealthBar.HiddenByInterrupt(true, true), "플레이어 바");
-        Assert.IsFalse(UnitOverheadHealthBar.HiddenByInterrupt(false, true), "몬스터 바는 그대로");
-        Assert.IsFalse(UnitOverheadHealthBar.HiddenByInterrupt(true, false), "연출 끝 — 복원");
+        // 179 후속 4 — 유닛 종류를 보지 않는다(플레이어·몬스터·보스 머리 위 바 같은 규칙).
+        Assert.IsTrue(UnitOverheadHealthBar.HiddenByInterrupt(true), "숨김 구간 — 플레이어·몬스터 바 숨김");
+        Assert.IsFalse(UnitOverheadHealthBar.HiddenByInterrupt(false), "연출 끝 — 복원");
+    }
+
+    [Test]
+    public void 몬스터_머리_위_체력바도_구간_동안_숨고_끝나면_복원된다()
+    {
+        // 피해 숫자·플레이어 바와 같은 값(CombatUiHidden 규칙)을 읽는다 — 같은 구간에 숨고 끝나면 복원.
+        Assert.IsFalse(UnitOverheadHealthBar.HiddenByInterrupt(Hidden), "시작 전");
+
+        _owner.Predict(InterruptAttemptForecast.Strong, null, 10f);
+        _owner.ServerStarted(1, SlowMotionPurpose.Attempt, true, 10f);
+        Tick(10.25f, 110);
+        Assert.IsTrue(UnitOverheadHealthBar.HiddenByInterrupt(Hidden), "강 시도 암전 — 몬스터 바 숨김");
+
+        _owner.ForcedReset();
+        _flash.ForcedReset();
+        Assert.IsFalse(UnitOverheadHealthBar.HiddenByInterrupt(Hidden), "끝 — 복원");
     }
 
     [Test]

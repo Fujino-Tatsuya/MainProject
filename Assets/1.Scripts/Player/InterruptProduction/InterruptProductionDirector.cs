@@ -103,8 +103,8 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
-    [Tooltip("A5 전투 표시 숨김(할 일 154 → 179 후속 2) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) + 제압 간파 섬광 시퀀스(팀원 화면 포함) 동안 " +
-             "이 화면의 피해 숫자(보스 포함)·플레이어 머리 위 체력바·오너 조준 표시를 숨긴다. 생성·수명·게이지 값은 그대로(가리기만), 끝나면 그대로 보인다")]
+    [Tooltip("A5 전투 표시 숨김(할 일 154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) + 제압 간파 섬광 시퀀스(팀원 화면 포함) 동안 " +
+             "이 화면의 피해 숫자(보스 포함)·플레이어·몬스터·보스 머리 위 체력바·오너 조준 표시를 숨긴다(화면 고정 보스 HP 바는 그대로). 생성·수명·게이지 값은 그대로(가리기만), 끝나면 그대로 보인다")]
     [DataTableIgnore, SerializeField, FormerlySerializedAs("hideDamageNumbers")] private bool hideCombatUi = true;
 
     // 연출 켜기/끄기(할 일 132 §17) — 끈 효과는 그리기만 안 한다. 오너 상태 기계·섬광 시간표·섬광 순간 사건(암전 걷힘 등)은 그대로 돈다.
@@ -518,7 +518,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
 
     /// <summary>
     /// A5 — 이 화면에서 지금 전투 표시를 숨기는가(<see cref="InterruptProductionRules.ShouldHideCombatUi"/>).
-    /// 읽는 곳 = 피해 숫자 스포너(캔버스)·플레이어 머리 위 체력바·오너 조준 표시, 매 프레임(디렉터 → 표시 한 방향, 디렉터는 그들을 모른다).
+    /// 읽는 곳 = 피해 숫자 스포너(캔버스)·머리 위 체력바(플레이어·몬스터·보스)·오너 조준 표시, 매 프레임(디렉터 → 표시 한 방향, 디렉터는 그들을 모른다).
     /// 상태에서 바로 나오는 값이라 따로 복원할 것이 없다 — 연출 끝·실패·강제 리셋·디렉터 꺼짐(인스턴스 없음 = false)이면 다음 프레임에 보인다.
     /// 숨긴 렌더러는 그려지지 않으므로 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 남지 않는다.
     /// </summary>

@@ -150,11 +150,11 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 - enum 은 SO·PlayerPrefs 에 정수로 저장 — **끝에만 추가**.
 - **로컬 플레이어가 받은 피해는 띄우지 않는다**(Presenter·Spawner 양쪽에서 거름). 자기 피격은 HUD·HitFlash 담당.
 - 공격자가 플레이어가 아닌 피해도 "로컬 공격 아님" → 팀원 스타일.
-- **간파 중 숨김(154 → 179 후속 2)** — 간파 연출 디렉터 A5 `hideCombatUi`(옛 이름 `hideDamageNumbers`, 기본 켬)가 켜져 있으면, **내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝**
+- **간파 중 숨김(154 → 179 후속 2·4)** — 간파 연출 디렉터 A5 `hideCombatUi`(옛 이름 `hideDamageNumbers`, 기본 켬)가 켜져 있으면, **내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝**
   (실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) + **제압 간파 섬광 시퀀스가 이 화면에서 도는 동안(팀원 화면 포함)** `FloatingDamageCanvas` 의 Canvas 를 끈다(`enabled = false`, 보스 숫자 포함 전부).
   숫자 생성·수명·누적은 그대로 돌아 끝나면 살아 있는 숫자가 보인다. 약 시도·대상 없음·팀원 화면의 일반 간파는 숨기지 않는다.
   스포너 `LateUpdate` 가 `InterruptProductionDirector.CombatUiHidden` 을 읽는다(디렉터는 스포너를 모름). 규칙 = `InterruptProductionRules.ShouldHideCombatUi`
-  — 같은 값으로 플레이어 머리 위 체력바·오너 조준 표시도 숨는다. [interrupt-presentation.md §6.4](interrupt-presentation.md#64-스위치프로필-위치) A5.
+  — 같은 값으로 머리 위 체력바(플레이어·몬스터·보스 — 179 후속 4, 화면 고정 보스 HP 바는 그대로)·오너 조준 표시도 숨는다. [interrupt-presentation.md §6.4](interrupt-presentation.md#64-스위치프로필-위치) A5.
 
 ## 6. 보호막 숫자 · 데이터 경로
 
