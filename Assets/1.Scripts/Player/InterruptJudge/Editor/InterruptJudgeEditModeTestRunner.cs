@@ -13,12 +13,18 @@ internal static class InterruptJudgeEditModeTestRunner
     public const string FailuresKey = "InterruptJudgeTests.LastFailures";
     public const string ClassesKey = "InterruptJudgeTests.LastClasses";
 
-    // 새 매니저·검증 + 간파 스킬·대상(23호 게이트·중간보스 창·스파링 봇·허수아비)·대쉬 간파·선착순 장부.
+    // 새 매니저·검증·오너 연출 cue + 간파 스킬·대상(23호 게이트·중간보스 창·스파링 봇·허수아비)·대쉬 간파·선착순 장부.
     static readonly string[] Fixtures =
     {
         "^InterruptClaimServerTests$",
         "^InterruptJudgeCalculatorTests$",
         "^InterruptManagerSnapshotTests$",
+        // 4단계 — 오너 연출 cue + cue 가 거치는 디렉터 쪽 상태 기계·섬광·프리팹
+        "^InterruptOwnerJudgeCueTests$",
+        "^InterruptOwnerPresentationTests$",
+        "^InterruptHitFlashTests$",
+        "^InterruptDamageNumberHideTests$",
+        "^InterruptProductionPrefabTests$",
         "^BeaverLobby\\.Player\\.Dash\\.EditModeTests\\.DashInterrupt\\w*Tests$",
         "^BeaverLobby\\.Player\\.Dash\\.EditModeTests\\.InterruptTargetGeometryTests$",
         "^InterruptTargetRegistryTests$",

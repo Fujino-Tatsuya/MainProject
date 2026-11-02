@@ -73,12 +73,32 @@
 - **효과 나눔(D9)**: 첫 승인만 `ServerApplyInterruptSuccessEffect`(창 소비·그로기·제압 칸·섬광 — 서버 창이 이미 닫혔어도 준다), 승인마다 `ServerRecordInterruptSuccess`(결과 화면 통계 `CombatStatsEvents.ServerCounterSucceeded`)와
   시전자 간파 스킬의 `ServerInterruptSucceeded`(특성·튜토리얼 훅). 대상: 23호·SpinnerBot·GauntletBot·WallBot·스파링 봇·허수아비(허수아비는 통계 없음).
 - **세션 중 대상은 피격으로 성공을 정하지 않는다**(`InterruptManager.ServerVerifiesClaims`). 오프라인(세션·매니저 없음)은 기존 피격 판정 그대로.
-- **서버 간파 스킬 판정(ResolveHit)**: 앵커 오버랩은 피해만. 신고 결과가 아직이면 RTT + 0.1초(`verdictWaitPadding`)까지 기다린 뒤 연출 사건·판정 1회 사건을 낸다(End 도 그때까지 미룬다). 결과가 늦게 오면 성공 기록만 남긴다.
-  이미 승인된 대상에게는 이 피해에 간파 표식을 싣지 않는다(방금 든 취약에 간파 넉백이 또 들어가지 않게).
+- **서버 간파 스킬 판정(ResolveHit)**: 앵커 오버랩은 피해만. 신고 결과를 **기다리지 않는다**(4단계에서 3단계 RTT+0.1초 대기 삭제) — 그때까지 승인이 없으면 시도 슬로우를 빗나감으로 정리한다.
+  승인은 오는 순간(`ServerOnClaimVerdict`) 성공 기록을 내고, **첫 승인이면 성공 슬로우 사건**(전역 슬로우는 한 번 — 동시 성공자는 각자 오너 판정 cue 로 섬광)을 낸다.
+  판정 전에 이미 승인된 대상에게는 이 피해에 간파 표식을 싣지 않는다(방금 든 취약에 간파 넉백이 또 들어가지 않게).
 - **결과 배포**: 승인 = 같은 창 승인 목록 전체를 모든 피어에(`ApprovalReceived`), 거부 = 그 오너에게 이유와 함께(`RejectionReceived` — 범위·각도·창 닫힘·선착순·서버 거부). 연출 cue 연결은 4단계.
 - **데이터 테이블 칸**(`SlowMotion` 시트, 대상 `NetworkManager`, 타입 `InterruptManager` Order 3): `verifyTimeSlack`(0.033)·`verifyDistanceSlack`(0.2)·`verifyAngleSlack`(5)·`simultaneousSeconds`(0.05). 병합 Export 전까지 프리팹 값.
 - 테스트: `InterruptClaimServerTests`, 메뉴 `Tools/Tests/간파 판정·검증 EditMode 테스트 실행`.
 - 한계: 오너 권한 이동이라 서버 이력의 시전자 위치가 보간 지연만큼 늦다 — 시각 여유 안에서만 따라잡는다(대쉬 간파 끝에서 거부가 늘 수 있음, D12 QA 비율로 판단). QA 봇 간파(164)는 이 브랜치에 없어 5단계.
+
+## 2.6 연출 cue (4단계)
+
+- 오너 연출은 매니저 cue 로만 움직인다: `InterruptOwnerCueRouter`(매니저 안 순수 판단) → 디렉터 `IInterruptOwnerCueSink`(`InterruptProductionDirector.OwnerJudgeCues.cs`, 재생 = `InterruptOwnerJudgeCuePlayer`).
+  옛 오너 즉시 예측(`PlayerSkillController.PredictOwnerInterrupt` — 예측기·복제 창·대시 중 재예측)은 호출을 끊었다(삭제 5단계). 서버 시도 슬로우 강·약은 아직 옛 예측기.
+
+| cue | 보내는 때 | 디렉터가 하는 일 |
+|---|---|---|
+| 시도(대상 없음/약/강) | 누른 프레임 LateUpdate — 누른 시각 표본으로 `Predict` | 기존 `LocalOwnerAttempt`(강 = 오너 암전·빛 모임). 이 시도는 내 서버 시도 슬로우 목적으로 걷지 않는다(D4) |
+| 판정 성공 | 판정 시각 표본이 쌓인 LateUpdate — `Judge` 성공, **신고보다 먼저** | 서버를 기다리지 않고 성공 단계(강이었으면 섬광 오버레이 ②~⑥, 약·대상 없음이면 섬광 순간만). 뒤이어 오는 내 서버 성공 슬로우 Started 는 한 번 삼킨다(두 번 안 터짐) |
+| 판정 실패 → 종료 | 같은 때 `Judge` 실패 | 결론 전 시도 걷기(0.2초). 약이면 걷을 것이 없다 |
+| 서버 거부 → 종료 | 거부 수신(그 시전자·대상·창 id 가 판정 성공 상태일 때만) | 이미 튼 성공 섬광까지 즉시 끔(상태 기계 리셋·섬광 진행기 리셋·월드 섬광 정지) |
+| CC 끊김 → 종료(D5) | 판정 전 간파 스킬이 정상 완료 아닌 이유(넉백·끌기·잡기 = `Cancelled`·사망·대시·안전망)로 끝남 | 대기 판정 버림 + 걷기. 일반 피해는 스킬을 끊지 않아 해당 없음. 판정 전 정상 완료(End)는 판정을 기다린다 |
+| 판정 버림 → 종료 | 판정 시각이 이력(1초) 밖 | 걷기 |
+| 승인 목록 | 승인 배포 수신(내가 목록에 있고 같은 창일 때) | D10 `keepCoSucceededBright`(기본 켬)면 나 말고 함께 성공한 캐릭터를 이번 암전에 남김(오너·보스는 시도 때부터). 내가 첫 승인자가 아니면 내 서버 성공 슬로우는 안 온다 |
+
+- 구경하는 팀원 화면은 기존 규칙(첫 승인의 서버 성공 슬로우 → 월드 섬광). 동시 성공자의 두 번째 섬광은 그 본인 화면에만 나온다.
+- 한계: 원격 클라는 암전이 섬광 순간(6프레임)에 꺼진 뒤 승인이 도착하는 일이 많아 D10 이 눈에 띄는 건 주로 호스트·저지연. 슬로우(전역)는 서버 승인 시점이라 원격 오너 화면에선 섬광보다 RTT/2 늦게 들어온다.
+- 테스트: `InterruptOwnerJudgeCueTests`(같은 메뉴).
 
 ## 3. 알려진 한계 (1단계)
 

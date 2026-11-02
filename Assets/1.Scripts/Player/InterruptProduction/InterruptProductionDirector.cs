@@ -19,7 +19,7 @@ using UnityEngine.Rendering;
 /// </summary>
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
-public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
+public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
     IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings
 {
     public static InterruptProductionDirector Instance { get; private set; }
@@ -568,7 +568,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             ObserveLocalClaim(triggerId, casterClientId, purpose, targetPosition);
 
         // 오너 연출(할 일 132) — 내 슬로우만(팀원 화면은 시도 단계 무변화). 시도 목적이 예측과 다르면 걷고, 성공이면 성공 단계로.
-        if (viewerIsCaster)
+        // 오너 판정 cue(할 일 191)가 이미 처리한 내 슬로우면 본인 화면 오너 연출·섬광 예약을 건너뛴다(OwnerJudgeCues.cs).
+        bool ownerCueHandled = viewerIsCaster && OwnerJudgeCueHandles(purpose);
+        if (viewerIsCaster && !ownerCueHandled)
             OwnerPresentation.ServerStarted(triggerId, purpose, true, Time.unscaledTime);
 
         // 빛 모임(할 일 132 단계 4) — 남의 강 시도면 이 화면에 튼다(본인 화면은 입력 순간 예측이 이미 켰다). 성공이면 그 발동자 것을 끈다.
@@ -591,12 +593,13 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         // 섬광 순간(②③④ 프레임 뒤 = ⑤ 시작) = 모든 피어 월드 섬광·라이트 + 암순응.
         float now = InterruptEffectTime.Now(HitFlash.Clock);
         int frame = Time.frameCount;
-        bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
+        bool ownerOverlay = !ownerCueHandled && InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
             viewerIsCaster && OwnerPresentation.SuccessDimmed);
         // ④ 스미어 방향 = 이번 강 시도의 공격 방향(오너 상태 — 입력 순간 예측이 받은 시전/대시 방향).
         if (ownerOverlay)
             HitFlash.BeginOwnerOverlay(FlashPoint(targetPosition), OwnerPresentation.AttackDirection, now, frame);
-        HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), frame);
+        if (!ownerCueHandled)
+            HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), frame);
 
         SuccessStage.LocalStarted(purpose, e, FindSuccessFxSinks(casterClientId));
         LocalSucceeded?.Invoke(e);

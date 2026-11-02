@@ -502,8 +502,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             PredictFollowUp(slot, skill, direction, sentTarget);
 
         isRequestingSkill = true;
-        // 오너 즉시 예측(할 일 132) — 요청보다 먼저(호스트는 이 RPC 안에서 서버 시도 슬로우가 바로 난다).
-        PredictOwnerInterrupt(skill, false, direction, 0f, 0f, 0f);
+        // 오너 예측·판정(할 일 191) — 매니저가 이 프레임 샘플 뒤 예측해 시도 cue(암전·빛 모임)를 내고, Hit 시각에 판정해 결과 cue·신고를 낸다.
+        // 옛 즉시 예측(PredictOwnerInterrupt — DashInterruptPredictor·복제 창)은 4단계에서 호출을 끊었다(삭제 5단계).
         BeginOwnerInterruptJudge(skill, false, direction, Time.time);
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
         RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
@@ -542,17 +542,16 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return false;
 
         isRequestingSkill = true;
-        // 오너 즉시 예측(할 일 132 정정1) — 우클릭을 누른 순간 기준 예상 대시 끝·판정 시각 max(대시 끝, 평소 Hit). 요청보다 먼저(호스트는 RPC 안에서 서버 슬로우).
+        // 오너 예측·판정(할 일 191) — 우클릭을 누른 순간 표본으로 예상 대시 끝·판정 시각 max(대시 끝, Hit)을 매니저가 계산해 cue 를 낸다.
+        // 옛 즉시 예측·대시 중 재예측(PredictOwnerInterrupt)은 4단계에서 호출을 끊었다(삭제 5단계).
         PlayerDashState dashState = stateController != null ? stateController.ActiveDash : null;
-        PredictOwnerInterrupt(skill, dashState != null, direction,
-            dashState != null ? dashState.Speed : 0f, dashState != null ? dashState.Remaining : 0f,
-            pressTime >= 0f ? Mathf.Max(0f, Time.time - pressTime) : 0f, dashState);
         BeginOwnerInterruptJudge(skill, dashState != null, direction, pressTime >= 0f ? Mathf.Min(pressTime, Time.time) : Time.time);
         RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
             player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
     }
 
+    // 🔸 할 일 191 4단계부터 호출 없음 — 오너 연출은 InterruptManager cue 로만 움직인다. 5단계에서 예측기와 함께 지운다.
     // [오너] 간파 입력 순간 즉시 예측(할 일 132) → 오너 연출 상태 기계(강 = 암전·빛 모임). 간파 슬롯의 간파 스킬만, 네트워크 세션에서만
     // (오프라인은 서버 슬로우가 없어 결론이 오지 않는다). 판정·슬로우에는 영향 없다.
     // attackDirection = 근접은 요청에 싣는 시전 방향(서버 승인 예측과 같은 값), 대쉬는 대시 방향. pressAge = 대쉬 간파 우클릭을 누른 뒤 지난 시간.
