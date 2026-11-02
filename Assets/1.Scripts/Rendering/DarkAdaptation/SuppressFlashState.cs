@@ -35,6 +35,15 @@ public struct SuppressFlashParams
     public Color Dark;
     public Color Mid;
     public Color Light;
+    // 179 후속 3(레퍼런스 B) — A 는 전부 0(셰이더가 그 경로를 건너뛴다).
+    /// <summary>x = 블룸 명암(0/1), y = 실루엣 밝기 낮춤, z = 색수차 고르게, w = 없음.</summary>
+    public Vector4 Extra;
+    /// <summary>xy = 방향 블러 방향(화면 높이 단위 단위벡터), z = 방향 블러 길이(화면 높이), w = 없음.</summary>
+    public Vector4 Direction;
+    /// <summary>xy = 흔들림 밀림(UV), z = 블룸 세기, w = 블룸 반지름(화면 높이).</summary>
+    public Vector4 Shake;
+    /// <summary>블룸 색(선형).</summary>
+    public Color Bloom;
 }
 
 /// <summary>제압 간파 섬광 렌더 상태(할 일 179) — <see cref="Material"/> 이 있고 <see cref="Active"/> 일 때만 렌더 기능이 패스를 넣는다(평소 비용 0).</summary>

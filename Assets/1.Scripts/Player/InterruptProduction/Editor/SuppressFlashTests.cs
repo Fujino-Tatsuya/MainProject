@@ -439,6 +439,219 @@ public sealed class SuppressFlashTests
         Assert.AreEqual(0u, BossVictoryRender.AllMask & SuppressFlashMaskLayers.Mask, "보스 처치 연출 비트 4·5·6");
     }
 
+    // ---- 레퍼런스 B(179 후속 3) ----
+
+    private const float FrameB = 1f / 60f;
+    private const string SequenceBPath = "Assets/5.VFX/Interrupt/SuppressFlash/SuppressFlashSequence_B.asset";
+
+    private static float AtB(int frame) => (frame + 0.5f) * FrameB;
+
+    private SuppressFlashSequence CreateReference()
+    {
+        var b = ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        _objects.Add(b);
+        b.ResetToReference();
+        return b;
+    }
+
+    [Test]
+    public void B는_60fps_홀드1_5컷_22프레임_컷마다_길이가_다르다()
+    {
+        SuppressFlashSequence b = CreateReference();
+        Assert.AreEqual(60f, b.frameRate);
+        Assert.AreEqual(1, b.holdFrames);
+        Assert.AreEqual(22, b.TotalFrames);
+
+        int[] lengths = { 1, 5, 6, 2, 8 };
+        SuppressFlashTone[] tones =
+        {
+            SuppressFlashTone.Return, SuppressFlashTone.Positive, SuppressFlashTone.Bloom, SuppressFlashTone.Negative, SuppressFlashTone.Return,
+        };
+        Assert.AreEqual(5, b.cuts.Count);
+        for (int i = 0; i < 5; i++)
+        {
+            Assert.AreEqual(lengths[i], b.cuts[i].frames, $"B 컷 {i + 1} 길이");
+            Assert.AreEqual(tones[i], b.cuts[i].tone, $"B 컷 {i + 1} 명암");
+            Assert.AreEqual(0f, b.cuts[i].letterbox, "B 는 레터박스 없음");
+        }
+
+        Assert.AreEqual(Color.black, b.cuts[1].dark, "③ 흑백 두 색");
+        Assert.AreEqual(Color.white, b.cuts[1].mid);
+        Assert.AreEqual(Color.white, b.cuts[1].light);
+    }
+
+    [Test]
+    public void B_컷_전환은_60fps_프레임마다()
+    {
+        SuppressFlashSequence b = CreateReference();
+        int[] expected = { 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
+        for (int f = 0; f < expected.Length; f++)
+        {
+            SuppressFlashFrame frame = SuppressFlashRules.Evaluate(b, AtB(f), false);
+            Assert.IsTrue(frame.Active, $"B 프레임 {f}");
+            Assert.AreEqual(expected[f], frame.CutIndex, $"B 프레임 {f} 컷");
+        }
+
+        Assert.IsFalse(SuppressFlashRules.Evaluate(b, AtB(22), false).Active, "22 프레임(0.367초)에 끝");
+    }
+
+    [Test]
+    public void B_컷별_모양_궤적_실루엣_블룸_반전_복귀()
+    {
+        SuppressFlashSequence b = CreateReference();
+
+        SuppressFlashFrame trail = SuppressFlashRules.Evaluate(b, AtB(0), false);
+        Assert.AreEqual(1f, trail.ReturnBlend, 1e-5f, "② 원래 색에서 시작");
+        Assert.AreEqual(1f, trail.AberrationUniform, "② 고른 색수차 = 빨강·파랑 궤적");
+        Assert.Greater(trail.DirectionalBlur, 0f);
+        Assert.Greater(trail.Shake, 0f, "② 흔들림");
+
+        SuppressFlashFrame silhouette = SuppressFlashRules.Evaluate(b, AtB(3), false);
+        Assert.IsTrue(silhouette.Invert, "③ 흰 바탕·검은 실루엣 = 뒤집기");
+        Assert.AreEqual(1f, silhouette.DirectionalBlur, "③ 강한 방향 블러");
+        Assert.AreEqual(0f, silhouette.Bloom);
+
+        SuppressFlashFrame bloom = SuppressFlashRules.Evaluate(b, AtB(8), false);
+        Assert.AreEqual(SuppressFlashTone.Bloom, bloom.Tone);
+        Assert.IsFalse(bloom.Invert);
+        Assert.Greater(bloom.Bloom, 0f, "④ 컬러 블룸");
+        Assert.Greater(bloom.StarSize, 0f, "④ 스파이크 별");
+
+        SuppressFlashFrame negative = SuppressFlashRules.Evaluate(b, AtB(12), false);
+        Assert.IsFalse(negative.Invert, "⑤ 검은 바탕");
+        Assert.AreEqual(0.25f, negative.SilhouetteDim, 1e-5f, "⑤ 밝은 회색 실루엣");
+
+        SuppressFlashFrame first = SuppressFlashRules.Evaluate(b, AtB(14), false);
+        SuppressFlashFrame last = SuppressFlashRules.Evaluate(b, AtB(21), false);
+        Assert.AreEqual(1f, first.ReturnBlend, 1e-5f, "⑥ 첫 프레임부터 원래 색");
+        Assert.AreEqual(1f, first.Aberration, 1e-5f, "⑥ 첫 프레임 강한 색수차");
+        Assert.AreEqual(1f, first.AberrationUniform);
+        Assert.Less(last.Aberration, 0.2f, "⑥ 가라앉음");
+    }
+
+    [Test]
+    public void B_섬광_줄이기는_반전_끔_블룸_흔들림_줄임()
+    {
+        SuppressFlashSequence b = CreateReference();
+        b.reducedContrast = 0.4f;
+        Assert.IsFalse(SuppressFlashRules.Evaluate(b, AtB(3), true).Invert);
+        Assert.AreEqual(b.cuts[2].bloom * 0.4f, SuppressFlashRules.Evaluate(b, AtB(8), true).Bloom, 1e-5f);
+        Assert.AreEqual(b.cuts[0].shake * 0.4f, SuppressFlashRules.Evaluate(b, AtB(0), true).Shake, 1e-5f);
+    }
+
+    [Test]
+    public void A_컷은_새_칸이_0이라_셰이더_B_경로를_건너뛴다()
+    {
+        foreach (SuppressFlashCut cut in _sequence.cuts)
+        {
+            Assert.AreEqual(0f, cut.directionalBlur);
+            Assert.AreEqual(0f, cut.shake);
+            Assert.AreEqual(0f, cut.silhouetteDim);
+            Assert.AreEqual(0f, cut.returnStart);
+            Assert.AreEqual(0f, cut.aberrationUniform);
+            Assert.AreEqual(0f, cut.bloom);
+        }
+
+        for (int f = 0; f < 15; f++)
+        {
+            SuppressFlashFrame frame = SuppressFlashRules.Evaluate(_sequence, At(f), false);
+            SuppressFlashParams p = SuppressFlashScreenOutput.Build(frame, _sequence, new Vector2(0.5f, 0.5f), 1.7f, f, new Vector2(0f, 1f));
+            Assert.AreEqual(Vector4.zero, p.Extra, $"A 프레임 {f} 블룸·실루엣 밝기·고른 색수차 0");
+            Assert.AreEqual(0f, p.Direction.z, "방향 블러 길이 0");
+            Assert.AreEqual(0f, p.Shake.x);
+            Assert.AreEqual(0f, p.Shake.y);
+            Assert.AreEqual(0f, p.Shake.z, "블룸 0");
+        }
+    }
+
+    [Test]
+    public void B_셰이더_파라미터_블룸_방향_흔들림()
+    {
+        SuppressFlashSequence b = CreateReference();
+        SuppressFlashParams bloom = SuppressFlashScreenOutput.Build(SuppressFlashRules.Evaluate(b, AtB(8), false), b, new Vector2(0.5f, 0.5f), 2f, 3);
+        Assert.AreEqual(1f, bloom.Extra.x, "블룸 명암");
+        Assert.AreEqual(b.cuts[2].bloom, bloom.Shake.z, 1e-5f);
+        Assert.AreEqual(b.bloomRadius, bloom.Shake.w, 1e-5f);
+        Assert.AreEqual(b.bloomColor.linear, bloom.Bloom);
+
+        SuppressFlashParams silhouette = SuppressFlashScreenOutput.Build(SuppressFlashRules.Evaluate(b, AtB(3), false), b,
+            new Vector2(0.5f, 0.5f), 2f, 3, new Vector2(0f, -1f));
+        Assert.AreEqual(new Vector4(0f, -1f, b.directionalBlurLength, 0f), silhouette.Direction);
+        Assert.AreEqual(1f, SuppressFlashScreenOutput.Build(SuppressFlashRules.Evaluate(b, AtB(3), false), b,
+            new Vector2(0.5f, 0.5f), 2f, 3).Direction.x, "방향이 없으면 오른쪽");
+
+        SuppressFlashParams trail = SuppressFlashScreenOutput.Build(SuppressFlashRules.Evaluate(b, AtB(0), false), b, new Vector2(0.5f, 0.5f), 2f, 3);
+        float shakeHeight = new Vector2(trail.Shake.x * 2f, trail.Shake.y).magnitude;
+        Assert.AreEqual(b.shakeScale * b.cuts[0].shake, shakeHeight, 1e-5f, "흔들림 폭(가로는 화면비로 나눔)");
+    }
+
+    [Test]
+    public void 방향_블러_방향은_시전자에서_적중점_화면비_보정()
+    {
+        Vector2 d = SuppressFlashScreenOutput.AttackDirection(new Vector2(0.4f, 0.5f), new Vector2(0.5f, 0.5f), 2f);
+        Assert.AreEqual(1f, d.x, 1e-5f);
+        Vector2 diagonal = SuppressFlashScreenOutput.AttackDirection(new Vector2(0.5f, 0.5f), new Vector2(0.6f, 0.7f), 2f);
+        Assert.AreEqual(new Vector2(0.2f, 0.2f).normalized.x, diagonal.x, 1e-5f, "가로 × 화면비");
+        Assert.AreEqual(Vector2.right, SuppressFlashScreenOutput.AttackDirection(Vector2.one * 0.5f, Vector2.one * 0.5f, 1.7f), "겹치면 오른쪽");
+    }
+
+    [Test]
+    public void 진행기는_시작_순간_고른_시퀀스를_끝까지_쓴다()
+    {
+        SuppressFlashSequence b = CreateReference();
+        SuppressFlashSequence selected = _sequence;
+        var player = new SuppressFlashPlayer(() => selected, () => false, new FakeOutput());
+
+        player.Begin(0f, Vector3.zero, null);
+        Assert.AreSame(_sequence, player.Playing);
+        selected = b; // 재생 중 A → B 전환
+        player.Tick(At(4));
+        Assert.AreSame(_sequence, player.Playing, "도는 시퀀스는 끝까지 A");
+        Assert.AreEqual(2, player.Current.CutIndex, "A 시간표(24fps·2프레임 컷)");
+
+        player.Begin(1f, Vector3.zero, null);
+        Assert.AreSame(b, player.Playing, "다음 성공부터 B");
+        player.Tick(1f + AtB(3));
+        Assert.AreEqual(1, player.Current.CutIndex, "B 시간표(60fps)");
+    }
+
+    [Test]
+    public void 디렉터_선택_A_B_고른_쪽이_비면_일반_섬광()
+    {
+        InterruptProductionDirector director = CreateDirectorWithSequence();
+        Assert.AreEqual(SuppressFlashVariant.A, director.SuppressFlashVariant, "기본 = A");
+        Assert.AreSame(_sequence, director.SelectedSuppressFlashSequence);
+
+        director.SuppressFlashVariant = SuppressFlashVariant.B;
+        Assert.IsNull(director.SelectedSuppressFlashSequence, "B 가 비면 A 로 대신하지 않는다");
+        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "고른 쪽이 비면 일반 섬광");
+
+        SuppressFlashSequence b = CreateReference();
+        var so = new SerializedObject(director);
+        so.FindProperty("suppressFlashSequenceB").objectReferenceValue = b;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.AreSame(b, director.SelectedSuppressFlashSequence);
+        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true));
+        Assert.AreSame(b, director.SuppressFlash.Begin(0f, Vector3.zero, null) ? director.SuppressFlash.Playing : null,
+            "진행기는 디렉터 선택을 읽는다");
+        director.SuppressFlash.Stop();
+
+        Assert.AreSame(_sequence, SuppressFlashRules.Select(SuppressFlashVariant.A, _sequence, b));
+        Assert.AreSame(b, SuppressFlashRules.Select(SuppressFlashVariant.B, _sequence, b));
+    }
+
+    [Test]
+    public void B_에셋은_레퍼런스_값()
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<SuppressFlashSequence>(SequenceBPath);
+        Assert.IsNotNull(asset, SequenceBPath);
+        Assert.AreEqual(60f, asset.frameRate);
+        Assert.AreEqual(1, asset.holdFrames);
+        Assert.AreEqual(5, asset.cuts.Count);
+        Assert.AreEqual(22, asset.TotalFrames);
+        Assert.AreEqual(SuppressFlashTone.Bloom, asset.cuts[2].tone);
+    }
+
     // ---- 에셋·프리팹 연결 ----
 
     [Test]
@@ -464,6 +677,8 @@ public sealed class SuppressFlashTests
         Assert.IsTrue(director.SuppressFlashEnabled);
         Assert.AreEqual(AssetDatabase.LoadAssetAtPath<SuppressFlashSequence>(SequencePath), director.SuppressFlashSequence);
         Assert.AreEqual(AssetDatabase.LoadAssetAtPath<Material>(MaterialPath), director.SuppressFlashMaterial);
+        Assert.AreEqual(AssetDatabase.LoadAssetAtPath<SuppressFlashSequence>(SequenceBPath), director.SuppressFlashSequenceB, "B 연결(179 후속 3)");
+        Assert.AreEqual(SuppressFlashVariant.A, director.SuppressFlashVariant, "선택 기본 = A");
 
         var serialized = new SerializedObject(director);
         Assert.IsFalse(serialized.FindProperty("reduceFlash").boolValue, "섬광 줄이기 기본 끔");

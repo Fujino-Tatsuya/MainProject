@@ -1,0 +1,133 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d487a4927727fdb46bd673218b828849, type: 3}
+  m_Name: SuppressFlashSequence_B
+  m_EditorClassIdentifier: Assembly-CSharp::SuppressFlashSequence
+  frameRate: 60
+  holdFrames: 1
+  cuts:
+  - frames: 1
+    tone: 2
+    cross: 0
+    starSize: 0
+    speedLines: 0
+    aberration: 1.2
+    aberrationEnd: 1.2
+    hatching: 0
+    letterbox: 0
+    letterboxEnd: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+    directionalBlur: 0.5
+    shake: 1
+    silhouetteDim: 0
+    returnStart: 1
+    aberrationUniform: 1
+    bloom: 0
+  - frames: 5
+    tone: 1
+    cross: 0
+    starSize: 0
+    speedLines: 0
+    aberration: 0
+    aberrationEnd: 0
+    hatching: 0
+    letterbox: 0
+    letterboxEnd: 0
+    dark: {r: 0, g: 0, b: 0, a: 1}
+    mid: {r: 1, g: 1, b: 1, a: 1}
+    light: {r: 1, g: 1, b: 1, a: 1}
+    directionalBlur: 1
+    shake: 0.4
+    silhouetteDim: 0
+    returnStart: 0
+    aberrationUniform: 0
+    bloom: 0
+  - frames: 6
+    tone: 3
+    cross: 0
+    starSize: 1.4
+    speedLines: 0.7
+    aberration: 0.8
+    aberrationEnd: 0.3
+    hatching: 0
+    letterbox: 0
+    letterboxEnd: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+    directionalBlur: 0
+    shake: 0
+    silhouetteDim: 0
+    returnStart: 0
+    aberrationUniform: 0
+    bloom: 1.2
+  - frames: 2
+    tone: 0
+    cross: 0
+    starSize: 0.8
+    speedLines: 0.3
+    aberration: 0.2
+    aberrationEnd: 0.2
+    hatching: 0
+    letterbox: 0
+    letterboxEnd: 0
+    dark: {r: 0, g: 0, b: 0, a: 1}
+    mid: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+    light: {r: 1, g: 1, b: 1, a: 1}
+    directionalBlur: 0
+    shake: 0
+    silhouetteDim: 0.25
+    returnStart: 0
+    aberrationUniform: 0
+    bloom: 0
+  - frames: 8
+    tone: 2
+    cross: 0
+    starSize: 0
+    speedLines: 0
+    aberration: 1
+    aberrationEnd: 0
+    hatching: 0
+    letterbox: 0
+    letterboxEnd: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+    directionalBlur: 0
+    shake: 0
+    silhouetteDim: 0
+    returnStart: 1
+    aberrationUniform: 1
+    bloom: 0
+  crossWidth: 0.07
+  crossTaper: 1.6
+  crossRoughness: 0.45
+  crossMinWidth: 0.008
+  gridCell: 0.32
+  gridStarRadius: 0.12
+  starRadius: 0.2
+  starSpikes: 11
+  speedLineCount: 72
+  radialBlur: 0.45
+  darkThreshold: 0.3
+  lightThreshold: 0.85
+  sceneExposure: 0.9
+  hatchPeriodPixels: 12
+  aberrationScale: 0.03
+  letterboxHeight: 0.11
+  reducedContrast: 0.45
+  directionalBlurLength: 0.12
+  shakeScale: 0.015
+  bloomColor: {r: 1, g: 0.23529412, b: 0.8235294, a: 1}
+  bloomRadius: 0.32

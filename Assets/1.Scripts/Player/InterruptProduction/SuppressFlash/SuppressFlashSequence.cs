@@ -2,12 +2,23 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>제압 간파 섬광 컷의 명암(할 일 179). 네거티브 = 어두운 바탕·흰 섬광·흰 실루엣, 포지티브 = 그 3단 뒤집기, 복귀 = 원래 색으로 가라앉음.</summary>
+/// <summary>
+/// 제압 간파 섬광 컷의 명암(할 일 179). 네거티브 = 어두운 바탕·흰 섬광·흰 실루엣, 포지티브 = 그 3단 뒤집기, 복귀 = 원래 색으로 가라앉음,
+/// 블룸 = 원래 색 화면 위 적중점 컬러 블룸·별·방사 블러(179 후속 3, 레퍼런스 B 의 적중 섬광 컷 — 3단 색을 쓰지 않는다).
+/// </summary>
 public enum SuppressFlashTone
 {
     Negative,
     Positive,
     Return,
+    Bloom,
+}
+
+/// <summary>제압 섬광 시퀀스 선택(179 후속 3) — A = 오늘 제작(보라 컷), B = 레퍼런스(포트폴리오). 디렉터 칸.</summary>
+public enum SuppressFlashVariant
+{
+    A,
+    B,
 }
 
 /// <summary>컷의 십자 빛기둥 종류(할 일 179).</summary>
@@ -58,6 +69,20 @@ public sealed class SuppressFlashCut
     [Tooltip("3단 색 — 밝은 색(#ECE9F6)")]
     public Color light = DefaultLight;
 
+    // 179 후속 3(레퍼런스 B) 칸 — 전부 기본 0 = 효과 없음이라 A 컷(이 칸이 없던 에셋 포함)은 예전 그림 그대로.
+    [Tooltip("방향 블러 [0, 1] — 화면·실루엣을 공격 방향(시전자 → 적중점, 화면 투영)으로 끌어 번진다. 길이 = 시퀀스 '방향 블러 길이' × 이 값. 0 = 없음")]
+    [Range(0f, 1f)] public float directionalBlur;
+    [Tooltip("화면 흔들림 — 시퀀스 '흔들림 폭' × 이 값만큼 화면을 컷마다 다른 방향으로 민다(후처리 안 — 카메라는 그대로). 0 = 없음")]
+    [Min(0f)] public float shake;
+    [Tooltip("실루엣 밝기 낮춤 [0, 1] — 0 = 흰 실루엣(A), 0.25 = 밝은 회색(3단 경계와 함께 본다)")]
+    [Range(0f, 1f)] public float silhouetteDim;
+    [Tooltip("복귀 컷 시작 섞기 [0, 1] — 0 = 3단 색에서 시작(A), 1 = 첫 프레임부터 원래 색(색수차만 남김)")]
+    [Range(0f, 1f)] public float returnStart;
+    [Tooltip("색수차를 화면 전체에 고르게 [0, 1] — 0 = 가장자리만(A), 1 = 가운데도 같은 세기(캐릭터 외곽 RGB 갈라짐)")]
+    [Range(0f, 1f)] public float aberrationUniform;
+    [Tooltip("컬러 블룸 세기(블룸 명암 컷만) — 시퀀스 '블룸 색'·'블룸 반지름'. 0 = 없음")]
+    [Min(0f)] public float bloom;
+
     public SuppressFlashCut() { }
 
     public SuppressFlashCut(int frames, SuppressFlashTone tone, SuppressFlashCross cross, float starSize, float speedLines,
@@ -73,6 +98,15 @@ public sealed class SuppressFlashCut
         this.hatching = hatching;
         this.letterbox = letterbox;
         this.letterboxEnd = letterboxEnd;
+    }
+
+    /// <summary>3단 색을 한 번에 바꾼다(레퍼런스 B 의 흑백 컷용). 자기 자신을 돌려준다.</summary>
+    public SuppressFlashCut WithColors(Color dark, Color mid, Color light)
+    {
+        this.dark = dark;
+        this.mid = mid;
+        this.light = light;
+        return this;
     }
 }
 
@@ -131,8 +165,21 @@ public sealed class SuppressFlashSequence : ScriptableObject
     [Range(0f, 0.4f)] public float letterboxHeight = 0.11f;
 
     [Header("섬광 줄이기(옵션 켬일 때)")]
-    [Tooltip("섬광 줄이기 — 반전을 끄고 이 대비로 낮춘다 [0, 1](1 = 그대로)")]
+    [Tooltip("섬광 줄이기 — 반전을 끄고 이 대비로 낮춘다 [0, 1](1 = 그대로). 블룸·흔들림도 이 비율로 줄인다")]
     [Range(0f, 1f)] public float reducedContrast = 0.45f;
+
+    // 179 후속 3(레퍼런스 B) — 컷의 방향 블러·흔들림·블룸 칸이 0 이면 쓰이지 않는다(A 는 안 씀).
+    [Header("레퍼런스 B 칸 — 컷 칸이 0 이면 안 쓰임")]
+    [Tooltip("방향 블러 1 일 때 끌리는 길이(화면 높이 비율)")]
+    [Min(0f)] public float directionalBlurLength = 0.12f;
+    [Tooltip("흔들림 1 일 때 화면 밀림(화면 높이 비율)")]
+    [Min(0f)] public float shakeScale = 0.015f;
+    [Tooltip("블룸 명암 컷의 적중점 블룸 색(마젠타)")]
+    public Color bloomColor = DefaultBloomColor;
+    [Tooltip("블룸 1 의 블룸 반지름(화면 높이) — 각도마다 조금씩 달라 완벽한 원이 아니다")]
+    [Min(0.01f)] public float bloomRadius = 0.32f;
+
+    public static readonly Color DefaultBloomColor = new Color32(0xFF, 0x3C, 0xD2, 0xFF);
 
     /// <summary>프레임 단위 전체 길이.</summary>
     public int TotalFrames => SuppressFlashRules.TotalFrames(cuts);
@@ -144,6 +191,64 @@ public sealed class SuppressFlashSequence : ScriptableObject
         holdFrames = 2;
         cuts = CreateSpecCuts();
     }
+
+    /// <summary>
+    /// 레퍼런스 B(포트폴리오 5.40~6.08초, 60fps 프레임 분석 — 179 후속 3) 값으로 바꾼다. 60fps·홀드 1 = 컷마다 길이가 다르다.
+    /// 예비 동작(약 0.1초)은 기존 강 시도 연출이 맡아 뺐다. 3단 경계·바탕 밝기도 B 흑백 컷에 맞춘다.
+    /// </summary>
+    [ContextMenu("레퍼런스 B 값으로")]
+    public void ResetToReference()
+    {
+        frameRate = 60f;
+        holdFrames = 1;
+        cuts = CreateReferenceCuts();
+        darkThreshold = 0.3f;
+        lightThreshold = 0.85f;
+        sceneExposure = 0.9f;
+        radialBlur = 0.45f;
+        aberrationScale = 0.03f;
+        directionalBlurLength = 0.12f;
+        shakeScale = 0.015f;
+        bloomColor = DefaultBloomColor;
+        bloomRadius = 0.32f;
+    }
+
+    [ContextMenu("사양 A 값으로")]
+    private void ResetToSpecMenu() => ResetToSpec();
+
+    public static readonly Color ReferenceGray = new Color(0.72f, 0.72f, 0.72f, 1f);
+
+    /// <summary>
+    /// 레퍼런스 B 5컷(22프레임 = 0.367초, 60fps):
+    /// ② 적중 직전 1 — 원래 색·빨강/파랑 궤적(고른 색수차 + 방향 블러)·흔들림 /
+    /// ③ 화이트아웃 실루엣 5 — 흰 바탕·검은 실루엣·밝은 이펙트도 검정(흑백 두 색, 뒤집기)·강한 방향 블러 /
+    /// ④ 적중 섬광 6 — 원래 색 위 마젠타 블룸·스파이크 별·방사 블러·가장자리 색수차 /
+    /// ⑤ 흑백 반전 2 — 검은 바탕·흰 이펙트·밝은 회색 실루엣 /
+    /// ⑥ 복귀 8 — 첫 프레임부터 원래 색, 캐릭터 외곽 RGB 색수차 1 → 0.
+    /// </summary>
+    public static List<SuppressFlashCut> CreateReferenceCuts() => new List<SuppressFlashCut>
+    {
+        new SuppressFlashCut(1, SuppressFlashTone.Return, SuppressFlashCross.None, 0f, 0f, 1.2f, 1.2f, false, 0f, 0f)
+        {
+            returnStart = 1f, aberrationUniform = 1f, directionalBlur = 0.5f, shake = 1f,
+        },
+        new SuppressFlashCut(5, SuppressFlashTone.Positive, SuppressFlashCross.None, 0f, 0f, 0f, 0f, false, 0f, 0f)
+        {
+            directionalBlur = 1f, shake = 0.4f,
+        }.WithColors(Color.black, Color.white, Color.white),
+        new SuppressFlashCut(6, SuppressFlashTone.Bloom, SuppressFlashCross.None, 1.4f, 0.7f, 0.8f, 0.3f, false, 0f, 0f)
+        {
+            bloom = 1.2f,
+        },
+        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.None, 0.8f, 0.3f, 0.2f, 0.2f, false, 0f, 0f)
+        {
+            silhouetteDim = 0.25f,
+        }.WithColors(Color.black, ReferenceGray, Color.white),
+        new SuppressFlashCut(8, SuppressFlashTone.Return, SuppressFlashCross.None, 0f, 0f, 1f, 0f, false, 0f, 0f)
+        {
+            returnStart = 1f, aberrationUniform = 1f,
+        },
+    };
 
     /// <summary>사양 표 7컷. 레터박스 = 1컷에 밀려 들어오고 7컷에 빠진다.</summary>
     public static List<SuppressFlashCut> CreateSpecCuts() => new List<SuppressFlashCut>
