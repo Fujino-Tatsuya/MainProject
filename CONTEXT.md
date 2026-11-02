@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-02 · 경석(Claude) · **메인 1~4구역 무전 + 2구역 적 소개 연출**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-main-radio-zone1-4.md](PLAN-main-radio-zone1-4.md) ✅ 승인 · ✅ 구현·커밋 · ✅ development 병합 · xlsx SVN r574(핀 574) · 컴파일 0 · 맵씬 EditMode 904/1(실패 1 = `TraitPickConfirmTests` 기존 — 암살자 확인창 문구가 테스트 기대값과 다름, 무관) · ⏳ Play·MPPM · 핸드오프 [handoff-main-radio-zone1-4.md](Docs/tech/handoff-main-radio-zone1-4.md)
+- 결과: 1구역 도착·2구역 클리어·3구역 상대(스피너봇 14m)·3구역 클리어·다리 연결·문 개방(G9) 무전 = 무전 캡슐, 판마다 1회. 2구역 = 4구역식 소개 연출(G2 보류 → 적 무리 샷 → 경고 → 복귀 끝 G2·존2 즉시 기상). 옛 자막 `TUT_Z4_BRIDGE`·`TUT_Z4_CLEAR`·`TUT_Z4_GO_BOSS` 호출 삭제. 연출 잠금은 다른 계통이 잠근 사람을 건드리지 않게 바뀜(4구역 포함).
+- 11-02 경석 Play 반영: 1구역 무전 = 포드 착지 끝(조작 복귀) 1초 뒤 · 2구역 카메라 쪽 벽 가림은 그대로 둔다(투명화·벽 숨김 시도 후 전부 뺐다 — 벽 투명화 `WallOcclusionDriver` 는 MapGenerator 프리팹에서 꺼져 있고 Stage1 벽만 대상). 시간 = xlsx `Cinematic`(2구역)·`Radio` 시트, 문구 = `Strings` 7행(en 초안 검수 필요).
+
 ## ▶▶ 반영 (2026-10-30 · 경석(Claude) · **공격 취소 시 클립 루프 이펙트 잔존 수정**, 브랜치 `feature/SettingsDdol`) — ✅ 구현·커밋 · 컴파일 0 · 전투 EditMode 416/0 · ✅ 경석 Play
 - 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
 - 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).

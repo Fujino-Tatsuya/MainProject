@@ -68,7 +68,7 @@ public sealed class MapSceneZone4IntroPresentation : MonoBehaviour
             ? _director.Zone4Intro
             : MapSceneDirector.Zone4IntroState.Empty;
 
-        if (state.Phase == MapSceneDirector.Zone4IntroPhase.None)
+        if (state.Phase == MapSceneDirector.IntroPhase.None)
         {
             if (_overlay != null) Idle();
             return;
@@ -81,7 +81,7 @@ public sealed class MapSceneZone4IntroPresentation : MonoBehaviour
         NetworkManager nm = NetworkManager.Singleton;
         double now = nm != null ? nm.ServerTime.Time : 0d;
         float t = state.Elapsed(now);
-        bool running = state.Phase == MapSceneDirector.Zone4IntroPhase.Running;
+        bool running = state.Phase == MapSceneDirector.IntroPhase.Running;
         bool returning = running && state.IsReturning(now);
         bool wantCinematic = running && !returning;
 

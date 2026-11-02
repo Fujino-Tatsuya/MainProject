@@ -71,6 +71,16 @@ public static class TutorialGuideIds
     public const string Z4IntroBridge = "TUT_Z4_INTRO_BRIDGE";
     public const string Z4IntroReturn = "TUT_Z4_INTRO_RETURN";
 
+    // 메인 1~4구역 무전(PLAN-main-radio-zone1-4 · 기획 명세 §5 MAIN_Z0*·Z04_*). 무전 캡슐로 나온다 — 시간은 MapSceneRadioData(xlsx Radio 시트),
+    // 2구역 경고만 MapSceneZone2IntroData(xlsx Cinematic 시트).
+    public const string MainZ1Enter = "TUT_MAIN_Z01_ENTER";
+    public const string MainZ2Enter = "TUT_MAIN_Z02_ENTER";
+    public const string MainZ2Clear = "TUT_MAIN_Z02_CLEAR";
+    public const string MainZ3Enemy = "TUT_MAIN_Z03_ENEMY";
+    public const string MainZ3Clear = "TUT_MAIN_Z03_CLEAR";
+    public const string Z4BridgeOpen = "TUT_Z4_BRIDGE_OPEN";
+    public const string Z4ExitOpen = "TUT_Z4_EXIT_OPEN";
+
     public const string BPadWarn = "TUT_B_PAD_WARN";
     public const string BPadCount = "TUT_B_PAD_COUNT";
     /// <summary>23호 정면 ±60° 에서만 간파 1줄(D19).</summary>
@@ -91,6 +101,7 @@ public static class TutorialGuideIds
         Z3PushIntro, Z3PushGoal, Z3PushHint, Z3WallSuccess, Z3Return, Z3Hint, Z3Real, Z3Boss,
         Z4Lore, Z4TimerHint, Z4Start, Z4PanelIntro, Z4PanelGoal, Z4PanelFirst, Z4Bridge, Z4Midboss,
         Z4CounterRemind, Z4Ult, Z4Ult + "_ASSASSIN", Z4Clear, Z4GoBoss,
+        MainZ1Enter, MainZ2Enter, MainZ2Clear, MainZ3Enemy, MainZ3Clear, Z4BridgeOpen, Z4ExitOpen,
         BPadWarn, BPadCount, BBossFrontTip,
     };
 }
