@@ -21,15 +21,8 @@
 public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 {
     [Header("연출")]
-    [Tooltip("조준 연출(낙뢰 + 칼날 전기) 전파 창구. 플레이어 루트의 PaladinSkillView 를 물린다. 비워두면 연출만 빠진다")]
+    [Tooltip("팔라딘 연출 창구(조준 낙뢰·칼날 전기·대상 표식·마무리 낙뢰·슈퍼아머 오버레이·칼 꽂기 배율). 플레이어 루트의 PaladinSkillView 를 물린다. 비워두면 연출만 빠진다")]
     [SerializeField] private PaladinSkillView skillView;
-
-    [Tooltip("슈퍼아머 구간 동안 몸에 덮을 오버레이. 'Paladin_Armature/tripo_part_0' 의 DissolveOverlay 를 물린다. 비워두면 연출만 빠진다")]
-    [SerializeField] private DissolveOverlay superArmorOverlay;
-
-    [Tooltip("클립 이벤트 PlayEffect(\"Stick\") 가 부르는 칼 꽂기 소켓('VFX/UltimateSkill/SwordStick', id Stick). 데이터의 이펙트 배율을 여기 넣는다.\n" +
-             "비워두면 Stick 만 저작 속도로 나온다")]
-    [SerializeField] private EffectSocketPlayer stickVfx;
 
     // Garen_Ultimate_Skill 상태 전용 속도 파라미터. 평타의 AttackSpeed 와 섞이지 않게 따로 둔다.
     private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
@@ -118,7 +111,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 RPC 가 필요 없다. 슈퍼아머를 거는 것은 OnServerStart(서버 전용)지만,
         //    그 '구간'은 스킬이 활성인 동안 그 자체라 OnClientPlay~OnEnd 로 정확히 같은 창을 그린다.
         //    두 콜백 모두 전 피어에서 돈다.
-        superArmorOverlay?.Show();
+        skillView?.ShowSuperArmor();
 
         // 🔴 여기도 전 피어다(서버는 TryStartSkillServer, 클라는 PlaySkillClientRpc → PlaySkillPresentation).
         //    방금 CrossFade 한 같은 프레임이라 첫 프레임부터 이 속도로 돈다. 원격 피어도 각자 같은 값을 넣는다.
@@ -128,7 +121,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             animator.SetFloat(UltimateSpeedHash, AnimationSpeed);
 
         // Stick 은 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.
-        stickVfx?.SetPlayRate(VfxPlayRate);
+        skillView?.SetStickPlayRate(VfxPlayRate);
     }
 
     /// <summary>[오너] R 을 눌러 조준에 들어갔다. 낙뢰를 바로 떨어뜨리고, 이어서 칼날에 전기가 흐른다.</summary>
@@ -220,7 +213,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);
 
         // 🔴 종료 사유를 가리지 않는다 — 취소·사망·안전망 만료 어느 쪽으로 끝나도 오버레이가 남지 않는다.
-        superArmorOverlay?.Hide();
+        skillView?.HideSuperArmor();
     }
 
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.

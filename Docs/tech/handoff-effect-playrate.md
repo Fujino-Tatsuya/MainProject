@@ -45,7 +45,7 @@
 | 칼 낙뢰·칼날 전기(소켓) | `PaladinSkillView.PlayUltimateLocal` → `EffectSocketPlayer.SetPlayRate` |
 | 발밑 표식 | `PaladinSkillView.PlayTargetFloorLocal` → `PlayLooping(..., playRate)` |
 | 마무리 낙뢰(하늘 칼) | `PaladinSkillView.PlayTargetStrikeLocal` → `PlayRecallable(..., playRate)` |
-| 칼 꽂기 Stick(클립 이벤트) | `FirstMeleeUltimateSkill.OnClientPlay` → `stickVfx.SetPlayRate` |
+| 칼 꽂기 Stick(클립 이벤트) | `FirstMeleeUltimateSkill.OnClientPlay` → `PaladinSkillView.SetStickPlayRate` |
 
 마무리 낙뢰는 클립 `Garen_Ultimate_Skill` 의 **Custom0 이벤트**(클립 1.2초 = 애니 배율 1.2 로 실제 1.0초, Stick 과 같은 시각)에
 서버가 시전당 1회 쏘고, End 이벤트(Completed)로 끝나지 않으면(대상 소실·사망·안전망 종료) 걷힌다. 시각을 바꾸려면 클립에서 Custom0 을 옮긴다(데이터 필드 없음).

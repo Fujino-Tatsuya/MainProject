@@ -2565,12 +2565,7 @@ MonoBehaviour:
   bonusDamageMultiplier: 1
   bonusFlatDamage: 0
   healPercent: 5
-  bladeGlow: {fileID: 3893365542549293267}
-  additionalHit: {fileID: 11400000, guid: 5a7eb665bae34056bf858aa2c020be51, type: 2}
-  additionalHitScale: 1
-  additionalHitReferenceHeight: 2
-  additionalHitMaxSizeScale: 3
-  additionalHitFallbackOffset: {x: 0, y: 1, z: 0}
+  skillView: {fileID: 1628016293793551911}
 --- !u!114 &6603939282142901413
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2588,8 +2583,7 @@ MonoBehaviour:
   followUpSkill: {fileID: 0}
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
-  smashLoop: {fileID: 953834285837352989}
-  trailLoop: {fileID: 1118353091802246764}
+  skillView: {fileID: 1628016293793551911}
 --- !u!114 &6769088039121836275
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2608,10 +2602,6 @@ MonoBehaviour:
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
   skillView: {fileID: 1628016293793551911}
-  shieldGlow: {fileID: 1486249918430601143}
-  barrierLoop: {fileID: 5963700053205124945}
-  auraLoop: {fileID: 8300681501280536780}
-  chargeLoop: {fileID: 7662951034962002183}
 --- !u!114 &7880437001582685089
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2630,8 +2620,6 @@ MonoBehaviour:
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
   skillView: {fileID: 1628016293793551911}
-  superArmorOverlay: {fileID: 949514895202568280}
-  stickVfx: {fileID: 2581342685191034331}
 --- !u!114 &183473686508495034
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2650,9 +2638,6 @@ MonoBehaviour:
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
   lagCompensationCapMs: 100
-  shieldGlow: {fileID: 1486249918430601143}
-  glowLoop: {fileID: 3678982283790920023}
-  chargeLoop: {fileID: 4103582282502557237}
   skillView: {fileID: 1628016293793551911}
 --- !u!114 &1140297743786010553
 MonoBehaviour:
@@ -2841,13 +2826,29 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PaladinSkillView
   ShowTopMostFoldoutHeaderGroup: 1
+  shieldGlow: {fileID: 1486249918430601143}
+  smashLoop: {fileID: 953834285837352989}
+  trailLoop: {fileID: 1118353091802246764}
+  guardBarrierLoop: {fileID: 5963700053205124945}
+  guardAuraLoop: {fileID: 8300681501280536780}
+  guardChargeLoop: {fileID: 7662951034962002183}
+  interruptGlowLoop: {fileID: 3678982283790920023}
+  interruptChargeLoop: {fileID: 4103582282502557237}
+  interruptWave: {fileID: 1856814881585661691}
+  superArmorOverlay: {fileID: 949514895202568280}
+  stickVfx: {fileID: 2581342685191034331}
   swordLightning: {fileID: 637245590219463161}
   swordElectric: {fileID: 211863627403201684}
   targetFloor: {fileID: 11400000, guid: e1de5968507b07640a38c8d75341dc58, type: 2}
   targetFloorScale: 1
   targetStrike: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
   targetStrikeScale: 1
-  interruptWave: {fileID: 1856814881585661691}
+  bladeGlow: {fileID: 3893365542549293267}
+  passiveHit: {fileID: 11400000, guid: 5a7eb665bae34056bf858aa2c020be51, type: 2}
+  passiveHitScale: 1
+  passiveHitReferenceHeight: 2
+  passiveHitMaxSizeScale: 3
+  passiveHitFallbackOffset: {x: 0, y: 1, z: 0}
   shareHealSwirl: {fileID: 11400000, guid: ecbb8637477210245b42b141cad3c183, type: 2}
   shareHealSwirlOffset: {x: 0, y: 0, z: 0}
   shareHealSwirlScale: 1

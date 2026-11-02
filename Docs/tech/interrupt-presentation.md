@@ -547,7 +547,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | A2 | `darkAdaptation` | 꺼짐(§17) | 성공 섬광 순간 화면 휘도 암순응(팀원 others · 오버레이 없던 본인 self) — 튜닝 패널 '팀원 암순응' | 섬광 순간 개인/공용 채널 → `InterruptDarkAdaptation.Play` |
 | A3 | `ownerZoom` | **켬** | 내가 일으킨 슬로우(강·약·성공) 동안 카메라 줌 | `CameraTargetSwitcher` → `Director.OwnerZoomFactor` — 꺼지면 배율 1 |
 | A4 | `successFxSlot` | **켬** | 공용 성공 이펙트 칸(§2.4, base·Variant 칸은 지금 비어 있음) | 성공 단계 공용 채널 → `InterruptSuccessFx`(sink) |
-| B1 | `paladinShieldGlow` | 꺼짐 | 팔라딘 간파 시도 방패 발광·루프 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 스킬(sink). `OnEnd` 끄기·회수는 늘 돈다 |
+| B1 | `paladinShieldGlow` | 꺼짐 | 팔라딘 간파 시도 방패 발광·루프 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 스킬(sink) → `PaladinSkillView.BeginInterruptGlow`. `OnEnd` 끄기·회수(`EndInterruptVfx`)는 늘 돈다 |
 | B2 | `paladinShieldCharge` | 꺼짐 | 팔라딘 방패 기 모으기(클립 `Garen_Parry` 의 `ShieldCharge`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |
 | B3 | `paladinWave` | 꺼짐 | 팔라딘 성공 충격파 | `PaladinSkillView.PlayInterruptWave`(RPC·오프라인, 2026-11-02 PlayerShieldVfx → PaladinSkillView) → `Director.PlayCue(PaladinWave, …, this)` |
 | C1 | `assassinInsightAttempt` | 꺼짐 | 어쌔신 기 모으기·튀기기·올려치기(클립 `Attack_Up_01`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |

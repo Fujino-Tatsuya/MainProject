@@ -47,6 +47,19 @@
 - 레거시 `Paladin_VFX.prefab` 의 `PlayerSkillVfx` 는 `PlayerDashVfx` 가 되고 옛 R 칸 값은 무시된다(스폰 안 됨).
 - 확인: 팔라딘 R(칼 낙뢰·전기 → 대상 표식 → 마무리 낙뢰, 조준 취소 시 걷힘) · 3캐릭터 대시 잔상(호스트·클라 화면) · E 반격 자세 · 간파 충격파(B3) · 나누는 불굴 리본.
 
+### 2단계 — 스킬 5종의 연출 칸도 `PaladinSkillView` 로 (2026-11-02, 커밋 1개 · 동작 무변경)
+스킬은 "언제"(콜백·판정)만, `PaladinSkillView` 는 "무엇"(소켓·엔트리)만. 스킬에는 `skillView` 칸 하나만 남는다(Main·Passive 에 새로 추가).
+| 스킬 | 옮긴 칸 → View 칸 | 스킬이 부르는 것 |
+|---|---|---|
+| Main | `smashLoop`·`trailLoop` → 같은 이름 | `OnClientPlay` `BeginSmashHold` / `OnEnd` `EndSmashHold` |
+| Sub | `shieldGlow` → `shieldGlow` · `barrierLoop`·`auraLoop`·`chargeLoop` → `guardBarrierLoop`·`guardAuraLoop`·`guardChargeLoop` | `OnClientPlay` `BeginGuardVfx` / `OnEnd` `EndGuardVfx` |
+| Interrupt | `shieldGlow`(Sub 와 같은 컴포넌트 → 한 칸) · `glowLoop`·`chargeLoop` → `interruptGlowLoop`·`interruptChargeLoop` | B1 `PlayCue`(디렉터가 스킬을 sink 로 되부름 — 메서드는 스킬에 남김) → `BeginInterruptGlow` / `OnEnd` `EndInterruptVfx` |
+| Ultimate | `superArmorOverlay`·`stickVfx` → 같은 이름 | `ShowSuperArmor`·`HideSuperArmor`·`SetStickPlayRate` |
+| Passive | `bladeGlow` → 같은 이름 · `additionalHit*` 5칸 → `passiveHit*` · `ProcVfxRpc` → `PassiveProcRpc` | 버프 엣지 `SetBladeGlow(bool)` · 발동 `ServerPlayPassiveProc(target, healed > 0)` |
+- **은희 영역**: `FirstMelee*` 5개는 연출 호출만 바뀌었다. 판정·타이밍·데이터 무변경. 패시브의 데이터 테이블 열(`[DataTableIgnore]` 연출 배율)은 원래 시트에 없던 칸이라 시트 영향 없음.
+- 프리팹: 값을 그대로 옮겼다(점검 스크립트로 27칸·스킬 5개 `skillView` 확인). 레거시 프리팹(`Paladin_VFX`·`Legacy/Paladin`)은 칸이 비게 된다(스폰 안 됨).
+- 확인할 것(Play): 방패 스매시 루프·궤적 / E 방패 발광·결계·오라·기 모으기 + E 해제·대시로 끊을 때 전부 꺼짐 / 우클릭 방패 발광·루프·기 모으기·충격파 / R 슈퍼아머 오버레이·칼 꽂기 속도 / 패시브 칼날 발광·발동 추가 피해 연출·자기 힐.
+
 ## DebugTraitLab
 - 아군 허수아비 `AllyDummy` 에도 `PlayerShieldVfx` + `VFX/States/StatusEffectVfxPresenter`(몸 = `VFX/Body` y 1) — 불굴의 가호가 아군에게 걸리면 금색이 보인다.
 - 확인한 것(Play): 수호의 잔광 채널 → 팔라딘 금색, 불굴의 가호 채널 → 아군 허수아비 금색, 거너 Q 채널 → 흰색 판정 · 두 배리어 재생 핸들 정상.

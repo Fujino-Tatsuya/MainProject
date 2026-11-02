@@ -11,14 +11,17 @@ using UnityEngine;
 /// 팔라딘 스킬(<c>FirstMelee*Skill</c>)의 부모 <c>PlayerSkillBase</c> 는 MonoBehaviour 라 RPC 를 달 수 없다.
 /// 그래서 <b>한 피어만 아는 사실</b>을 전 피어 화면에 퍼뜨려야 하는 팔라딘 연출을 여기 모은다.
 /// <list type="bullet">
-/// <item>최후의 심판(R) — 칼 낙뢰·칼날 전기(오너 → 서버 → 나머지), 대상 표식·마무리 낙뢰(서버 → 전 피어).
-///       <see cref="FirstMeleeUltimateSkill"/> 가 부른다. (옛 <c>PlayerSkillVfx</c> 에서 옮김)</item>
-/// <item>수호자의 의지(E) 반격·해제 자세 전환 — <see cref="FirstMeleeSubSkill"/>. (옛 <c>PaladinGuardRelay</c>)</item>
-/// <item>단죄의 방패(우클릭) 적중 충격파 — <see cref="FirstMeleeInterruptSkill"/>, 간파 연출 디렉터 B3 칸. (옛 <c>PaladinGuardRelay</c>)</item>
-/// <item>나누는 불굴(PAL_2_SHARE_HEAL) 전이 — 특성 연출 이벤트를 받아 재생. (옛 <c>PaladinShareHealVfx</c>)</item>
+/// 2026-11-02 — 스킬 5종(<c>FirstMelee*</c>)의 연출 칸도 전부 여기로 모았다. <b>스킬은 "언제"(콜백·판정)만, 여기는 "무엇"(소켓·엔트리)만</b> —
+/// 스킬은 소켓을 모르고 아래 순간 단위 메서드만 부른다. 연출을 바꾸거나 이펙트를 갈아 끼울 땐 이 컴포넌트만 보면 된다.
+/// <list type="bullet">
+/// <item>방패 스매시(Main) 홀드 루프 — <see cref="BeginSmashHold"/>/<see cref="EndSmashHold"/>(전 피어 콜백이라 RPC 없음).</item>
+/// <item>수호자의 의지(E) — 방패 발광·끊김 회수(<see cref="BeginGuardVfx"/>/<see cref="EndGuardVfx"/>), 반격·해제 자세 전환(서버 → 전 피어).</item>
+/// <item>단죄의 방패(우클릭) — 방패 발광·루프(B1, <see cref="BeginInterruptGlow"/>)·회수(<see cref="EndInterruptVfx"/>), 적중 충격파(B3, 서버 → 전 피어).</item>
+/// <item>최후의 심판(R) — 칼 낙뢰·칼날 전기(오너 → 서버 → 나머지), 대상 표식·마무리 낙뢰(서버 → 전 피어), 슈퍼아머 오버레이·칼 꽂기 배율.</item>
+/// <item>불굴의 의지(패시브) — 칼날 발광(<see cref="SetBladeGlow"/>), 발동 연출(서버 → 전 피어, <see cref="ServerPlayPassiveProc"/>).</item>
+/// <item>나누는 불굴(PAL_2_SHARE_HEAL) 전이 — 특성 연출 이벤트를 받아 재생.</item>
 /// </list>
-/// 여기 없는 팔라딘 연출: 스킬 소켓 루프(스킬이 OnClientPlay/OnEnd 로 직접 켜고 끔)·클립 이벤트 소켓(<see cref="EffectAnimEvents"/>)·
-/// 불굴의 의지 발동 연출(<c>FirstMeleePassive</c> 가 NetworkBehaviour 라 RPC 를 직접 단다).
+/// 여기 없는 팔라딘 연출: 클립 이벤트 소켓(<see cref="EffectAnimEvents"/> — E 결계·오라 켜기, 평타 베기 등).
 /// 대시 잔상은 전 캐릭터 공용 <see cref="PlayerDashVfx"/>.
 /// </summary>
 [DisallowMultipleComponent]
@@ -46,7 +49,55 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     // 결정한 피어(오너·서버)의 값을 모두가 쓴다 — 피어마다 자기 데이터를 읽게 하면 한쪽만 튜닝했을 때 화면끼리 속도가 갈린다.
     // 배율은 파트 delay 에도 걸린다(전기 0.45초 → 1.2배면 실제 0.375초). 낙뢰도 같이 빨라지니 순서는 그대로다.
 
+    [Header("방패 — 수호자의 의지(E)·단죄의 방패(우클릭) 공용")]
+    [Tooltip("방패 메쉬 문양 발광(머티리얼 페이드). 방패의 MaterialFadeEffect 를 물린다. E 내내, 우클릭은 B1 칸이 켜져 있을 때 켠다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private MaterialFadeEffect shieldGlow;
+
+    [Header("방패 스매시(Main)")]
+    [Tooltip("홀드 동안 재생할 루프 연출. 프리팹의 'Smash' EffectSocketPlayer 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer smashLoop;
+
+    [Tooltip("홀드 동안 재생할 궤적 루프. 프리팹의 'Trail' EffectSocketPlayer 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer trailLoop;
+
+    // E 의 상태 클립별 연출(점화·결계·해제·막아냄·오라·기 모으기·반격)은 Garen_E_* 클립 이벤트가 전 피어에서 켜고 끈다.
+    // 여기 세 칸은 클립 Stop 이벤트가 안 오는 끊김(경직·사망·안전망)의 회수용 — 끄기만 한다.
+    [Header("수호자의 의지(E) — 끊김 회수")]
+    [Tooltip("방어 결계 루프(소켓 이펙트, Id 'GuardianBarrier') — 'VFX/GuardianWill/Barrier'. 끊겼을 때 끄기만 한다")]
+    [SerializeField] private EffectSocketPlayer guardBarrierLoop;
+
+    [Tooltip("반격 금빛 오라 루프(소켓 이펙트, Id 'GuardianAura') — 'VFX/GuardianWill/Aura'. 끊겼을 때 끄기만 한다")]
+    [SerializeField] private EffectSocketPlayer guardAuraLoop;
+
+    [Tooltip("반격 전 검 기 모으기 루프(소켓 이펙트, Id 'GuardianCharge') — 'VFX/GuardianWill/Charge'. 끊겼을 때 끄기만 한다")]
+    [SerializeField] private EffectSocketPlayer guardChargeLoop;
+
+    [Header("단죄의 방패(우클릭)")]
+    [Tooltip("강타 동안 재생할 루프 연출(소켓 이펙트). 프리팹의 'VFX/ShieldInterrupt/ShieldGlow' 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer interruptGlowLoop;
+
+    // 판정 전 방패 기 모으기(2026-10-26 민경 — handoff-paladin-interrupt-vfx). 켜고 끄는 것은 Garen_Parry 클립 이벤트
+    // (0초 StartEffect · Hit 시각 StopEffect "ShieldCharge")가 전 피어에서 한다. 여기는 판정 전에 끊긴 경우의 회수만.
+    [Tooltip("판정 전 방패 기 모으기(소켓 이펙트, Id 'ShieldCharge'). 프리팹의 'VFX/ShieldInterrupt/ShieldCharge' 를 물린다.\n" +
+             "켜고 끄기는 클립 이벤트가 하고, 여기서는 스킬이 판정 전에 끝났을 때 끄기만 한다. 비워두면 회수만 빠진다")]
+    [SerializeField] private EffectSocketPlayer interruptChargeLoop;
+
+    [Tooltip("단죄의 방패가 적중했을 때 한 번 터뜨릴 충격파. 프리팹의 'ShieldWave' 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer interruptWave;
+
     [Header("최후의 심판(R)")]
+    [Tooltip("슈퍼아머 구간 동안 몸에 덮을 오버레이. 'Paladin_Armature/tripo_part_0' 의 DissolveOverlay 를 물린다. 비워두면 연출만 빠진다")]
+    [SerializeField] private DissolveOverlay superArmorOverlay;
+
+    [Tooltip("클립 이벤트 PlayEffect(\"Stick\") 가 부르는 칼 꽂기 소켓('VFX/UltimateSkill/SwordStick', id Stick). 데이터의 이펙트 배율을 여기 넣는다.\n" +
+             "비워두면 Stick 만 저작 속도로 나온다")]
+    [SerializeField] private EffectSocketPlayer stickVfx;
+
     [Tooltip("조준 순간 칼에 내리꽂히는 낙뢰. 프리팹의 'VFX/UltimateSkill/SwordLighting' 을 물린다. 비워두면 연출만 빠진다")]
     [SerializeField] private EffectSocketPlayer swordLightning;
 
@@ -68,10 +119,24 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     [Tooltip("낙뢰 배율")]
     [SerializeField, Min(0.01f)] private float targetStrikeScale = 1f;
 
-    [Header("단죄의 방패(우클릭)")]
-    [Tooltip("단죄의 방패가 적중했을 때 한 번 터뜨릴 충격파. 프리팹의 'ShieldWave' 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer interruptWave;
+    [Header("불굴의 의지(패시브)")]
+    [Tooltip("버프 보유 중 칼날을 빛낸다. 칼의 MaterialFadeEffect 를 물린다.\n비워두면 연출만 빠진다")]
+    [SerializeField] private MaterialFadeEffect bladeGlow;
+
+    [Tooltip("추가 피해를 맞은 대상에게 한 번 터뜨릴 연출. FX_Paladin_Smite_Entry 를 물린다. 소켓이 아니라 엔트리인 이유는 붙을 자리가 '그때 맞은 남'이라서다")]
+    [SerializeField] private EffectEntry passiveHit;
+
+    [Tooltip("추가 피해 연출 배율")]
+    [SerializeField, Min(0.01f)] private float passiveHitScale = 1f;
+
+    [Tooltip("이 몸통 높이(미터)까지는 배율 1. 더 큰 대상(엘리트·보스)은 몸통 높이 ÷ 이 값만큼 연출을 키운다. 잡몹 히트박스 높이 2m 기준")]
+    [SerializeField, Min(0.01f)] private float passiveHitReferenceHeight = 2f;
+
+    [Tooltip("몸통 크기로 키우는 배율의 상한")]
+    [SerializeField, Min(1f)] private float passiveHitMaxSizeScale = 3f;
+
+    [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
+    [SerializeField] private Vector3 passiveHitFallbackOffset = new Vector3(0f, 1f, 0f);
 
     [Header("나누는 불굴(특성 PAL_2_SHARE_HEAL)")]
     [Tooltip("출발 소용돌이 — 팔라딘 몸을 엔트리 길이만큼 따라간다. 비우면 생략")]
@@ -313,6 +378,161 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         //    같이 돈다(2026-09-30 반려 사유). 회전만 빼는 옵션은 EffectManager 에 없다.
         _targetFloorHandle = EffectManager.Instance.PlayLooping(
             targetFloor, _targetPosition, Quaternion.identity, targetFloorScale, 0f, playRate);
+    }
+
+    /// <summary>[전 피어] R 시전 창(OnClientPlay~OnEnd) 동안 슈퍼아머 오버레이. 슈퍼아머 구간 = 스킬 활성 구간이라 RPC 가 필요 없다.</summary>
+    public void ShowSuperArmor() => superArmorOverlay?.Show();
+
+    /// <summary>[전 피어] 종료 사유를 가리지 않고 부른다 — 오버레이가 남지 않는다.</summary>
+    public void HideSuperArmor() => superArmorOverlay?.Hide();
+
+    /// <summary>[전 피어] 칼 꽂기(Stick)는 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.</summary>
+    public void SetStickPlayRate(float playRate) => stickVfx?.SetPlayRate(playRate);
+
+    // ═════════════════════════════════════════════════════════════════
+    //  방패 스매시(Main) 홀드 루프
+    // ═════════════════════════════════════════════════════════════════
+    // RPC 가 필요 없다 — 스킬의 OnClientPlay·OnEnd 가 둘 다 전 피어에서 돈다.
+
+    /// <summary>[전 피어] 홀드 시작. Play 는 이미 재생 중이면 먼저 회수하므로 두 번 불려도 겹치지 않는다.</summary>
+    public void BeginSmashHold()
+    {
+        smashLoop?.Play();
+        trailLoop?.Play();
+    }
+
+    /// <summary>[전 피어] 종료 사유를 가리지 않고 부른다 — 루프가 남는 경로가 없다(재생 중이 아니면 no-op).</summary>
+    public void EndSmashHold()
+    {
+        smashLoop?.Stop();
+        trailLoop?.Stop();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  수호자의 의지(E) 방패 발광·끊김 회수
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>[전 피어] E 시작 — 방패 발광. 단계별 연출은 클립 이벤트 몫이다.</summary>
+    public void BeginGuardVfx() => shieldGlow?.FadeIn();
+
+    /// <summary>
+    /// [전 피어] E 종료(사유 무관) — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).
+    /// 소켓 safetyTimeout 은 이 경로가 실패했을 때의 그물이다.
+    /// </summary>
+    public void EndGuardVfx()
+    {
+        shieldGlow?.FadeOut();
+        guardBarrierLoop?.Stop();
+        guardAuraLoop?.Stop();
+        guardChargeLoop?.Stop();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  단죄의 방패(우클릭) 방패 발광·루프
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// [각 피어] B1 방패 발광·루프. 간파 연출 디렉터가 칸을 확인한 뒤 스킬(<see cref="FirstMeleeInterruptSkill"/>, 시도 사건의 sink)을
+    /// 되부르고, 스킬이 여기로 넘긴다. Play 는 이미 재생 중이면 먼저 회수하므로 연타로 두 번 불려도 겹치지 않는다.
+    /// </summary>
+    public void BeginInterruptGlow()
+    {
+        shieldGlow?.FadeIn();
+        interruptGlowLoop?.Play();
+    }
+
+    /// <summary>
+    /// [전 피어] 우클릭 종료(사유 무관). 루프는 반드시 회수한다 — 핸들을 버리면 풀 인스턴스가 영영 안 돌아온다.
+    /// 판정 전에 끊기면(경직·사망·취소) 클립의 기 모으기 Stop 이벤트가 안 오므로 그것도 여기서 끈다.
+    /// </summary>
+    public void EndInterruptVfx()
+    {
+        shieldGlow?.FadeOut();
+        interruptGlowLoop?.Stop();
+        interruptChargeLoop?.Stop();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  불굴의 의지(패시브) 칼날 발광·발동 연출
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>[전 피어] 칼날 발광 = 버프 보유. 패시브가 복제된 버프의 엣지에서 부른다. FadeIn/FadeOut 은 이미 그 상태면 no-op.</summary>
+    public void SetBladeGlow(bool charged)
+    {
+        if (bladeGlow == null)
+            return;
+
+        if (charged) bladeGlow.FadeIn();
+        else bladeGlow.FadeOut();
+    }
+
+    /// <summary>
+    /// [서버] 발동 순간의 연출을 전 피어에 뿌린다 — 시전자 회복 1회(실제로 회복했을 때만 — 만피면 전부 나누는 불굴로 넘어가므로) + 대상에게 추가 피해 1회.
+    /// 회복 연출은 플레이어 공용 원샷 표의 <see cref="PlayerOneShotVfx.Heal"/>. (2026-11-02 — <c>FirstMeleePassive</c> 에서 옮김)
+    ///
+    /// <b>좌표가 아니라 대상을 보낸다.</b> 클라의 몹은 NetworkTransform 보간 때문에 서버보다 뒤에
+    /// 그려진다 — 서버가 잰 월드 좌표를 그대로 재생하면 이펙트가 몸에서 떨어져 허공에 뜬다
+    /// (MonsterBase.PlayHitVFXRpc가 공격자 위치 하나만 보내는 것과 같은 이유다).
+    /// 각 피어가 자기 쪽 몹에서 위치를 다시 뽑으면 언제나 그 몹 위다.
+    /// </summary>
+    public void ServerPlayPassiveProc(Unit target, bool selfHealed)
+    {
+        NetworkObjectReference targetRef = default;
+        bool hasTarget = target != null && target.NetworkObject != null && target.NetworkObject.IsSpawned;
+        if (hasTarget)
+            targetRef = target.NetworkObject;
+
+        // 패시브는 스폰된 상태에서만 발동한다(서버 판정) — 옛 경로와 같이 오프라인 분기는 두지 않는다.
+        PassiveProcRpc(targetRef, hasTarget, selfHealed);
+    }
+
+    // 쿨다운 주기당 한 번뿐인 클라이맥스라 Reliable 이다 — 유실되면 발동했다는 사실이 통째로 안 보인다.
+    // (난타 중 한 발씩 빠져도 되는 피격 파문 계열과 갈리는 지점)
+    [Rpc(SendTo.ClientsAndHost)]
+    private void PassiveProcRpc(NetworkObjectReference target, bool hasTarget, bool selfHealed)
+    {
+        PlayerOneShotVfxPresenter oneShots = selfHealed ? PlayerOneShotVfxPresenter.For(this) : null;
+        if (oneShots != null)
+            oneShots.Play(PlayerOneShotVfx.Heal);
+
+        if (hasTarget && target.TryGet(out NetworkObject targetObject))
+            PlayPassiveHitLocal(targetObject.transform);
+    }
+
+    /// <summary>
+    /// 대상 한 명에게 추가 피해 연출을 찍는다.
+    ///
+    /// 타격점이 아니라 <b>몸통 중심</b>에 둔다. 접촉점은 기본 피격 이펙트가 이미 쓰고 있어서,
+    /// 같은 자리에 겹치면 "한 대 더"가 아니라 "한 대가 밝아졌다"로 읽힌다.
+    /// 중심은 SkinnedMeshRenderer의 월드 바운즈에서 뽑는다 — 몹 덩치에 맞춰 알아서 따라간다.
+    ///
+    /// 회전 = 시전자 → 대상 수평 방향(+Z = 때린 방향). 관통·등 뒤 불티가 이 방향을 쓴다.
+    /// 인스턴스의 <see cref="SiphonMotes"/> 에 시전자를 넘겨 빛 알갱이가 팔라딘에게 흘러들게 한다.
+    /// </summary>
+    private void PlayPassiveHitLocal(Transform target)
+    {
+        if (target == null || passiveHit == null || EffectManager.Instance == null) return;
+
+        SkinnedMeshRenderer body = target.GetComponentInChildren<SkinnedMeshRenderer>();
+        Vector3 position = body != null
+            ? body.bounds.center
+            : target.position + passiveHitFallbackOffset;
+
+        // 덩치 큰 대상에게 잡몹 크기 그대로 찍으면 몸통에 비해 초라해 보인다 — 몸통 높이에 비례해 키운다(잡몹은 1).
+        float sizeScale = body != null
+            ? Mathf.Clamp(body.bounds.size.y / passiveHitReferenceHeight, 1f, passiveHitMaxSizeScale)
+            : 1f;
+
+        Vector3 direction = position - transform.position;
+        direction.y = 0f;
+        Quaternion rotation = direction.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(direction) : Quaternion.identity;
+
+        EffectHandle handle = EffectManager.Instance.PlayRecallable(passiveHit, position, rotation, passiveHitScale * sizeScale);
+        EffectManager.Instance.GetInstances(handle, InstanceBuffer);
+        foreach (GameObject instance in InstanceBuffer)
+            foreach (SiphonMotes motes in instance.GetComponentsInChildren<SiphonMotes>(true))
+                motes.SetTarget(transform);
+        InstanceBuffer.Clear();
     }
 
     // ═════════════════════════════════════════════════════════════════

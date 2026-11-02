@@ -1,4 +1,40 @@
-# ▶▶▶ 계획 = **보호막 VFX 공용화(금색 HolyShield·흰색 AllyShield) + 수호의 잔광·불굴의 가호 금색 연결** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 랩에서 색 판정·재생 확인) · ✅ 커밋 · ⏳ 민경 Play)
+# ▶▶▶ 계획 = **팔라딘 스킬 연출 칸을 `PaladinSkillView` 로 모으기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 27칸 값 확인 · 랩 Play 호출 스모크) · ✅ 커밋 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02, 전부 추천안). 거너 `GunnerBeamView`·어쌔신 `AssassinSkillView` 와 같은 구조 —
+> 스킬은 "언제", View 는 "무엇". ⚠️ `FirstMelee*` 5개는 **은희 영역** — 판정·타이밍·데이터는 안 건드리고 연출 호출만 View 로 돌린다. 공유 = `Docs/tech/handoff-shield-vfx.md` 「통합」 이어 쓰기.
+
+## 사실 (코드 확인)
+| 스킬 | 연출 칸 (프리팹 값) | 켜는 곳 / 끄는 곳 |
+|---|---|---|
+| Main | `smashLoop`·`trailLoop` | `OnClientPlay` Play / `OnEnd` Stop |
+| Sub | `shieldGlow`·`barrierLoop`·`auraLoop`·`chargeLoop`(GuardianCharge) | 발광 FadeIn(방어 성공 경로) · 루프 3개는 클립 이벤트가 켬 / `OnEnd` FadeOut+Stop 3 |
+| Interrupt | `shieldGlow`·`glowLoop`·`chargeLoop`(ShieldCharge) | B1 cue(디렉터가 `e.Skill` 을 sink 로 되부름) FadeIn+Play / `OnEnd` FadeOut+Stop 2 |
+| Ultimate | `superArmorOverlay`·`stickVfx` | 슈퍼아머 Show/Hide · Stick `SetPlayRate`(재생은 클립 이벤트) |
+| Passive | `bladeGlow`·`additionalHit`+배율 4칸 · `ProcVfxRpc` | 버프 보유 엣지 FadeIn/Out · 발동 RPC(자기 힐 원샷 + 대상 추가 피해 연출·SiphonMotes) |
+- Sub·Interrupt `shieldGlow` = **같은 MaterialFadeEffect**(fileID 1486249918430601143) → 한 칸. `chargeLoop` 둘은 서로 다른 소켓 → 두 칸.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 범위(Q1) | 5개 스킬 `[Header("연출")]` 칸 전부 + **패시브 발동 RPC 도 View 로**(패시브는 `skillView.ServerPlayPassiveProc(target, healed)` 한 줄) |
+| 모양(Q2) | View 에 순간 단위 메서드 — 스킬은 소켓을 모른다. 예: `BeginSmashHold/EndSmashHold` · `GuardShieldGlow/EndGuardVfx` · `BeginInterruptGlow/EndInterruptVfx` · `SetStickPlayRate`·`ShowSuperArmor/HideSuperArmor` · `SetBladeGlow(bool)` |
+| 방패 발광(Q3) | 칸 하나 `shieldGlow` |
+| 간파 B1 | 디렉터는 그대로(`e.Skill` 이 sink). 스킬의 `IInterruptCueSink.PlayCue` 는 남기되 본문은 `skillView.BeginInterruptGlow()` 한 줄 — 디렉터 코드 무변경 |
+| 커밋(Q4) | 커밋 1개 · 동작 무변경 · handoff 갱신 · Play 확인 |
+
+## 작업 순서
+1. 코드: `PaladinSkillView` 에 칸·메서드(+ 패시브 발동 RPC·추가 피해 연출 이동) · 5개 스킬의 칸 삭제 → View 호출로 교체(Main·Passive 에는 `skillView` 칸 추가).
+2. 프리팹: `Player_Paladin.prefab` YAML 로 값 이동(위 표의 fileID·엔트리 그대로) · 스킬 `skillView` 연결. 점검 스크립트로 칸 값·참조 확인 후 삭제.
+3. 검사: 컴파일 0 · DebugTraitLab Play 스모크(스폰·호출 에러 없음).
+4. 문서: `handoff-shield-vfx.md` 「통합」 · `handoff-paladin-interrupt-vfx.md`·`interrupt-presentation.md` B1 줄 · `CONTEXT.md`.
+
+## 완료 조건 (민경 Play)
+- 평타 홀드 스매시·궤적 / E 방어 결계·반격 오라·기 모으기·방패 발광 + E 해제·대시로 끊을 때 전부 꺼짐 / 우클릭 방패 발광·루프·기 모으기 + 충격파 /
+  R 슈퍼아머 오버레이·칼 꽂기 속도·낙뢰·표식 / 패시브 칼날 발광·발동 시 추가 피해 연출·자기 힐. 컴파일 0.
+
+---
+
+# 계획(이전) = **보호막 VFX 공용화(금색 HolyShield·흰색 AllyShield) + 수호의 잔광·불굴의 가호 금색 연결** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 랩에서 색 판정·재생 확인) · ✅ 커밋 · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02). 기획 `Re_C_특성_기획서_20261016.html` — 수호의 잔광 `PAL_3_E_SHIELD`(E 막기 → 피해 무시 끝난 뒤 최대 체력 10% · 4초, 본인) · 불굴의 가호 `PAL_4_HEAL_SHIELD`(회복받은 대상 = 본인·아군, 회복량 75% · 상한 10% · 4초).
 > ⚠️ `PlayerShieldVfx`(은희 작성 컴포넌트) 재작성 — 판정·보호막 수치는 안 건드림. 공유 = `Docs/tech/handoff-shield-vfx.md`.
