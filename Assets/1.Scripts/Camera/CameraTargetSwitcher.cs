@@ -47,6 +47,10 @@ public class CameraTargetSwitcher : MonoBehaviour
     private Vector3 basePlayerFollowOffset;
     private readonly SlowMotionOwnerZoom ownerSlowZoom = new();
     private float appliedZoomMultiplier = 1f;
+    // 제압 가속 3타 줌인(할 일 174). 수치는 SuppressHasteData 시트 칸 — 이 컴포넌트의 테이블 칸이 아니다.
+    private readonly SuppressHasteHitZoom suppressHasteHitZoom = new();
+    private SuppressHasteData suppressHasteData;
+    private bool suppressHasteDataLoaded;
     // 연출 카메라 거리 배율(로비 포드 강하 — 할 일 100). 슬로우 줌 배율과 곱한다. 1 = 평소.
     private float cinematicDistanceMultiplier = 1f;
     private Quaternion fixedCameraRotation;
@@ -337,7 +341,11 @@ public class CameraTargetSwitcher : MonoBehaviour
         }
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
-        float multiplier = ownerSlowZoom.Step(input, Time.unscaledDeltaTime) * cinematicDistanceMultiplier;
+        float slowMultiplier = ownerSlowZoom.Step(input, Time.unscaledDeltaTime);
+        // 제압 가속 3타 줌인 — 슬로우 줌이 걸린 프레임엔 건너뛴다(1). 두 줌이 동시에 1 이 아닌 경우는 없다(suppress-haste.md §2.2).
+        float hitZoomMultiplier = suppressHasteHitZoom.Step(IsLocalSuppressHasteActive(), slowMultiplier != 1f,
+            Time.unscaledDeltaTime, LoadHitZoomValues());
+        float multiplier = slowMultiplier * hitZoomMultiplier * cinematicDistanceMultiplier;
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
         if (multiplier == appliedZoomMultiplier)
@@ -348,6 +356,33 @@ public class CameraTargetSwitcher : MonoBehaviour
         // 원래 오프셋에서 다시 계산한다 — 복귀가 끝나면(배율 1) 정확히 원래 값으로 돌아온다.
         playerCameraFollow.FollowOffset = basePlayerFollowOffset * multiplier;
         appliedZoomMultiplier = multiplier;
+    }
+
+    /// <summary>
+    /// [로컬] 내가 보스에게 맞힌 타격 1회(<see cref="UnitCameraFeedbackReporter"/> 가 서버 확정 피해 RPC 마다 부른다).
+    /// 제압 가속 중이면 세어 N타마다 짧게 줌인한다(할 일 174). 낙하 뷰·관전 중엔 세지 않는다.
+    /// </summary>
+    public void ReportLocalBossHit()
+    {
+        if (IsInFallView || IsSpectatorMode)
+        {
+            return;
+        }
+
+        suppressHasteHitZoom.RegisterHit(IsLocalSuppressHasteActive(), LoadHitZoomValues().EveryHits);
+    }
+
+    private static bool IsLocalSuppressHasteActive() => SuppressHastePresence.IsActive(Player.LocalPlayer);
+
+    private SuppressHasteHitZoomValues LoadHitZoomValues()
+    {
+        if (!suppressHasteDataLoaded)
+        {
+            suppressHasteData = Resources.Load<SuppressHasteData>(SuppressHasteData.ResourcesPath);
+            suppressHasteDataLoaded = true;
+        }
+
+        return suppressHasteData != null ? suppressHasteData.HitZoomValues : SuppressHasteHitZoomValues.Default;
     }
 
     /// <summary>

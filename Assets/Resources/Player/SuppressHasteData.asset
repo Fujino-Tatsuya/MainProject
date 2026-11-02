@@ -18,3 +18,8 @@ MonoBehaviour:
   durationOverride: 0
   vignetteFadeIn: 0.2
   vignetteFadeOut: 0.3
+  hitZoomEveryHits: 3
+  hitZoomFactor: 0.9
+  hitZoomInSeconds: 0.04
+  hitZoomHoldSeconds: 0.11
+  hitZoomReturnSeconds: 0.12

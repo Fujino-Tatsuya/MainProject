@@ -17,6 +17,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerStatFormulaTests$", // 할 일 83·91 — 스탯 종합 공식·출처·검증 보고(특성 출처 연결 회귀 확인용으로 여기서도 돈다)
         "^CooldownClockTests$", // 할 일 91 T2 — 쿨 시계 적분: 배율 1·중간 변경·0·슬로우·원천 역행·교체
         "^CooldownRateWiringTests$", // 할 일 91 T8 — 쿨 배율 = CooldownRateModifier 곱(없음 1·곱·스택), 배율 2 스킬·대시·패시브 절반, 중간 해제 2→1
+        "^SuppressHastePresentationTests$", // 할 일 174 — 제압 가속 연출: 3타 줌인 셈·리셋·펄스·슬로우 줌 중 건너뜀, 보스 체력바 잔상 멈춤/해제
         "^PassiveCooldownSyncTests$", // 할 일 91 T4 — 가붕이 패시브 내부 쿨: 남은 초 도장·피어 환산·늦은 참가·배율 2·피격 감소
         "^DashCooldownClockSyncTests$", // 할 일 91 T3 — 대시 응답 = 남은 초, 오너 자기 쿨 시계 환산·서버/오너 남은 시간 일치·강제 초기화
         "^PlayerGroundPointProjectionTests$", // PLAN-assassin A4 — 고정 거리 조준·서버 재투영
