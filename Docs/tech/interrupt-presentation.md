@@ -7,6 +7,7 @@
 > 🔹 §17 튜닝 도구(2026-10-28): 디렉터에 **효과별 켜기/끄기 칸 9개**(기본 = **오너 암전만 켬**, 팀원 암순응 = A2 칸 → 기본 끔) — 끈 효과는 그리기만 안 하고 상태 기계·시간표·섬광 순간은 그대로.
 > ②③④ 길이 = **렌더 프레임 수**(기본 2·2·2, 섬광 순간 = 6 프레임째), ⑤⑥ = 초. DebugInterruptLab 씬 OnGUI **튜닝 패널** — [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
 > 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
+> 🔹 할 일 179(2026-11-02, 브랜치 `feature/SuppressInterruptFlash`): **제압 간파**(제압 칸 마지막 1칸 간파) 성공은 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(모든 피어, 컷 SO·후처리 뒤 셰이더 1패스, 암전은 오너만, 섬광 줄이기 옵션) — [§7](#7-제압-간파-애니메이션-섬광-할-일-179).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
 > 🔹 스위치 11칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 피해 숫자 숨김(154) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
@@ -603,7 +604,71 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 할 일 154: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬).
 격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`), 앵커 형상 대상 검사는 `HitboxAnchorShapeTests`(Assembly-CSharp-Editor).
 
-## 7. 이후 확장
+## 7. 제압 간파 애니메이션 섬광 (할 일 179)
+
+> 사양: `_lane-artifacts/common/179-suppress-interrupt-flash/SPEC.md`(2026-11-02 grill 확정, 레포 밖). 레퍼런스 = `_lane-artifacts/references/interrupt/user-ref-2026-11-02-flash/`(참고만, 텍스처로 쓰지 않음).
+
+**제압 간파** = 23호 제압 칸이 1칸 남았을 때 성공한 간파(그 간파로 제압 진입). 이때만 일반 성공 섬광 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(보라 3단 단색 · 네거/포지 교대 · 십자 빛기둥 + 스파이크 별 · 집중선 · 색수차 · 레터박스, 약 0.6초)를 튼다. 일반 간파는 §0 그대로.
+
+### 7.1 누가 보나
+
+| | 오너(제압 간파 성공자) | 다른 플레이어 |
+|---|---|---|
+| 132 마스크 암전(강 시도) | O — 시퀀스 첫 프레임에 걷힌다 | X |
+| 섬광 시퀀스 | O | O(각자 화면, 기준점 = 자기 카메라의 보스 적중점 화면 좌표) |
+| 월드 섬광(`showWorldFlash`·`showHitLight` 칸) | 시퀀스 첫 프레임 | 시퀀스 첫 프레임 |
+| 암순응(A2) | X | X — 시퀀스가 화면을 통째로 3단 색으로 바꾼다 |
+| A5 피해 숫자 숨김 | 시퀀스 끝까지 | 그대로 |
+
+### 7.2 흐름 — 새 RPC 없음
+
+1. [서버] 23호 `EnterCounterSuccess` 의 칸 0 분기가 `InterruptProductionDirector.ServerMarkSuppressInterrupt()` (표식 1줄 — 판정 무수정).
+2. [서버] 같은 판정 호출의 `ServerSuccess` 가 표식을 소비(`SuppressInterruptMark`, **같은 프레임만** 유효) → 사건 `SuppressInterrupt` → 성공 슬로우 `ServerStart(…, suppressInterrupt)`.
+3. 슬로우 Start 이벤트(`SlowMotionEvent.SuppressInterrupt`, +1바이트, 기존 named message)로 전 피어에 간다 → `GlobalTimeScale.CurrentSuppressInterrupt`.
+4. [각 피어] 디렉터 `HandleStarted(Success)` 가 `SuppressFlashRules.ShouldPlay`(성공 ∧ 표식 ∧ `suppressFlash` 칸 ∧ 컷 데이터 있음)면 `BeginSuppressFlash`, 아니면 일반 ②~⑥.
+5. `SuppressFlashPlayer`(순수 로직)가 매 프레임 `Time.unscaledTime` 으로 진행 → `SuppressFlashScreenOutput` → `SuppressFlashState` → `DarkAdaptationFeature` 의 `SuppressFlashPass`.
+
+슬로우가 거부되면(컷신 잠금·씬 전환) 일반 섬광처럼 시퀀스도 없다. 성공 relay(B3·C2)는 표식이 실린 사건을 받지만 지금은 쓰지 않는다.
+
+### 7.3 컷 데이터 — `SuppressFlashSequence`(`Assets/5.VFX/Interrupt/SuppressFlash/SuppressFlashSequence.asset`)
+
+- 재생: `frameRate` 24 × `holdFrames` 2 = **초당 12장**, 실제 시간(슬로우·히트스톱 무관). 컷 안 시작→끝 값도 홀드 단위 계단.
+- 컷 칸: `frames`·`tone`(Negative/Positive/Return)·`cross`(None/Single/Grid)·`starSize`·`speedLines`·`aberration`→`aberrationEnd`·`hatching`·`letterbox`→`letterboxEnd`·3단 색 `dark`/`mid`/`light`(#1C1930·#7D77A0·#ECE9F6).
+- 기본값 = 사양 표 7컷(2·2·2·2·2·2·3 = 15프레임 = 0.625초). 레터박스 = 1컷 0.6 → 2~6컷 1 → 7컷 1→0. 인스펙터 메뉴 Reset = 사양 표.
+- 모양 칸(화면 높이 단위): 빛기둥 굵기·가늘어짐·울퉁불퉁·최소 굵기, 격자 칸·격자 별, 별 반지름·스파이크 수, 집중선 수, 방사 블러, 3단 경계, 바탕 밝기, 빗금 간격(px), 색수차 배율, 레터박스 높이, 섬광 줄이기 대비.
+- **Play 중 SO 값을 바꾸면 다음 렌더 프레임부터** 반영(진행기가 프레임마다 읽는다).
+
+### 7.4 디렉터 칸 — `NetworkManager.prefab › InterruptProductionDirector` "성공 — 제압 간파 섬광"
+
+| 칸 | 기본 | 뜻 |
+|---|---|---|
+| `suppressFlash` | 켬 | 제압 간파 프로필. 끄면 제압 간파도 일반 섬광 |
+| `suppressFlashSequence` | 위 에셋 | 비면 일반 섬광 |
+| `suppressFlashMaterial` | `M_SuppressFlash.mat` | `Hidden/Rendering/SuppressFlash`. 비면 그리지 않음(시간표·암전 걷힘은 돈다) |
+| `reduceFlash` | 끔 | **섬광 줄이기** 기본값 — 켜면 반전 끔(포지티브도 네거 바탕) + 대비 `reducedContrast` |
+
+섬광 줄이기 실제 값 = PlayerPrefs `Interrupt.ReduceFlash`(0/1)가 있으면 그것, 없으면 칸. `Director.ReduceFlash` setter 가 둘 다 쓴다. **설정 UI 는 없다** — 나중에 설정 화면이 이 프로퍼티를 쓰면 된다.
+
+### 7.5 렌더 — 셰이더 절차 생성만
+
+- `DarkAdaptationFeature` 에 패스 추가(렌더러 에셋 수정 없음 — 재질은 디렉터 칸에서 `SuppressFlashState` 로 온다). **후처리 뒤**(`AfterRenderingPostProcessing`)라 톤매핑이 3단 색을 바꾸지 않는다. HUD(오버레이 캔버스)는 그 위에 그대로 보인다.
+- 실루엣 마스크: 대상 렌더러에 **렌더링 레이어 비트 7**(`SuppressFlashMaskLayers`)을 132 태거(`InterruptOwnerMaskTagger(mask)`)로 붙이고 덮어쓰기 재질(패스 1)로 R8 RT 에 흰색 칠 — 깊이 판정 없음(벽 뒤도 납작 실루엣). 오너 암전 비트 4 와 나눠 서로 원복이 지우지 않는다.
+- 합성(패스 0): 방사 블러 흑백 → 네거 바탕 + 쐐기 집중선 + 울퉁불퉁 십자(최소 굵기 아래는 지움) + 칸마다 길이·핵이 다른 스파이크 별(원·고리 아님) + 흰 실루엣 → 포지티브는 통째 뒤집기 → 대비 → 3단 색 → 빗금(실루엣 안 사선) → 복귀 섞기 → 가장자리 색수차(셰이더 안 RGB 분리) → 레터박스(검정).
+- 대상 목록: 발동자 플레이어 오브젝트 + 적중점 6m 안 가장 가까운 간파 대상(`InterruptTargetRegistry`). 191 동시 성공자는 `CollectSuppressSubjects` 목록에 더하면 된다.
+
+### 7.6 알려진 한계
+
+- 색수차는 132 ⑤ Volume 을 재사용하지 않고 셰이더 안에서 만든다 — ⑤ 는 후처리(톤매핑 전)라 3단 색 양자화가 무지개를 지우기 때문.
+- HUD·피해 숫자(팀원 화면)는 시퀀스 위에 보인다. 레터박스는 월드만 덮는다.
+- 렌더링 레이어 Everything 인 렌더러(일부 VFX)는 비트 7 을 이미 갖고 있어 실루엣으로 칠해진다. 태깅 뒤 생긴 렌더러는 빠진다.
+- 표식은 23호 칸 판정만 낸다 — 훈련 스파링 봇(`TrainingSparringBot`)·기믹 보상 제압·구출 제압은 일반 섬광.
+- 시퀀스 중 새 일반 성공 섬광이 오면 둘 다 그려질 수 있다(시퀀스는 카메라 컬러, ②③④ 는 오버레이 캔버스).
+
+### 7.7 테스트
+
+`Tools/Tests/슬로우 모션 EditMode 테스트 실행` 의 `SuppressFlashTests` — 사양 표 기본값·24fps 프레임 내림·2프레임 홀드·컷 전환/끝·포지티브 뒤집기·섬광 줄이기·복귀 계단·진행기(실제 시간·멈춤·재시작·SO/옵션 Play 중 반영)·프로필 선택·서버 표식 같은 프레임만·사건 사본·Start 이벤트 플래그 직렬화/세션·셰이더 파라미터·비트 7 태깅/원복·에셋·프리팹 연결.
+
+## 8. 이후 확장
 
 - ~~암순응 셰이더에 흑백 실루엣·반전 모드~~ → 132 마스크 암전 모드·섬광 오버레이 흰 반전으로 구현(§0).
 - ~~주변 입자가 한 점으로 모이는 효과 + 피격 대상 충격파~~ → 132 빛 모임·월드 섬광으로 구현(§0.7). 손그림으로 바꿀 땐 덮어쓸 텍스처 칸.
