@@ -35,8 +35,8 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
 
     // 🔴 적중 충격파만 창구가 다르다. ResolveHit 은 서버에서만 도는데(OnTick=TickServer,
     //    애니 이벤트=HandleAnimationEvent 의 IsServer 게이트) 이 클래스는 MonoBehaviour 라 RPC 를 못 단다.
-    [Tooltip("적중 충격파 전파 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
-    [SerializeField] private PlayerShieldVfx shieldVfx;
+    [Tooltip("적중 충격파 전파 창구. 플레이어 루트의 PaladinGuardRelay 를 물린다.\n비워두면 연출만 빠진다")]
+    [SerializeField] private PaladinGuardRelay guardRelay;
 
     public override void OnClientPlay(Vector3 direction)
     {
@@ -106,13 +106,13 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
 
     // 충격파 = 간파 성공(카운터 창 소비) 때만(2026-10-26 민경). 예전엔 적중 1건 이상이면 터졌다.
     // 성공은 디렉터 성공 단계가 판정 1회에 한 번(여러 대상이 성공해도) 시전자의 relay 를 부른다 — 서버에서만 난다(할 일 118).
-    // 전송로(PlayerShieldVfx.InterruptWaveRpc)는 그대로, B3 칸은 받는 피어에서 디렉터가 본다.
+    // 전송로(PaladinGuardRelay.InterruptWaveRpc)는 그대로, B3 칸은 받는 피어에서 디렉터가 본다.
     void IInterruptSuccessRelay.ServerRelaySuccess(in InterruptProductionEvent e)
     {
         // 🔴 시전자 아래 relay 를 다 부르므로 자기 시전만(대체 슬롯 포함). 꺼진 컴포넌트는 옛 OnEnable 구독처럼 빠진다.
         if (e.Skill != this || !isActiveAndEnabled)
             return;
 
-        shieldVfx?.ServerInterruptWave();
+        guardRelay?.ServerInterruptWave();
     }
 }

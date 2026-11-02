@@ -13,14 +13,24 @@
 
 에셋(SVN, 민경 이동 완료): `50.Art/VFX/Common/Players/Shared/Shield/` — `FX_HolyShield(_Break)(_Entry)` · `FX_AllyShield(_Break)(_Entry)`·`_Barrier`·`_Motes`.
 
-## `PlayerShieldVfx` (은희·민경 공동 — 보호막 부분만 고침)
+## `PlayerShieldVfx` (민경 작성 · 보호막 전용)
 - 받는 쪽이 주인 — 복제된 보호막 목록(`Unit.ShieldInstance` type·sourceId)을 매 프레임 보고 배리어 하나(금색 우선)를 켜고 끈다. 시작·종료 RPC 없음.
 - 루프 핸들을 직접 든다(`EffectManager.PlayLooping` → 걷힐 때 `Release`, 파괴 시 `ReleaseImmediate`). 옛 소켓 safetyTimeout 15초 제약 없음.
 - 깨짐 = 서버 `ServerShieldEnded`(Depleted, 마지막 하나) → `BreakBurstRpc(holy)` → 몸 자리에 원샷. 색 판정 = `PlayerShieldVfxSet.IsHoly`.
 - 피격 파문 = 지금 배리어 핸들의 인스턴스에 `ShieldRippleEffect.AddHit`(기존과 같음).
-- 단죄의 방패 충격파(`interruptWave`)·반격 자세 RPC(`ServerPlayGuardCounterPose`)는 **안 건드림**.
+- 단죄의 방패 충격파·반격 자세 RPC 는 아래 `PaladinGuardRelay` 로 분리.
 - 삭제: `PlayLocal()`·`ServerEnd(bool)`(오프라인 전용, 호출하는 곳 없었음).
 - **새 금색 보호막 특성 추가** = SO `holyTraitIds` 에 특성 ID 한 줄.
+
+## 분리 — `PaladinGuardRelay` (2026-11-02, 별도 커밋 · 동작 무변경)
+`PlayerShieldVfx` 에 붙어 있던 **팔라딘 전용** 두 가지를 새 NetworkBehaviour `Player/Skill/PaladinGuardRelay.cs`(`Player_Paladin` 루트에만)로 옮겼다 — 보호막 연출이 모든 캐릭터에 붙으면서 팔라딘 코드가 거너·어쌔신에 딸려 가지 않게.
+| 옮긴 것 | 쓰는 곳(칸 이름 `shieldVfx` → `guardRelay`) |
+|---|---|
+| `ServerPlayGuardCounterPose` + `GuardCounterPoseRpc`(반격·해제 자세 전 피어 CrossFade) | `FirstMeleeSubSkill.guardRelay` |
+| `ServerInterruptWave` + `InterruptWaveRpc` + `IInterruptCueSink`(B3 충격파, `interruptWave` = `ShieldWave` 소켓) | `FirstMeleeInterruptSkill.guardRelay` · 간파 연출 디렉터는 sink 를 인자로 받으므로 변경 없음 |
+- **은희 영역**(반격 자세·간파 충격파) — 코드는 줄 단위로 그대로 옮겼다. 확인: E 방어 → 반격 자세, E 재입력 해제, 대시로 E 끊기, 간파 성공 충격파(B3 켰을 때).
+- 덤: `PlayerShieldVfx.OnDestroy` 가 `NetworkBehaviour.OnDestroy` 를 가리던 경고(CS0114)를 `override` + `base.OnDestroy()` 로 고침.
+- 레거시 보관 프리팹(`Player/Legacy/Paladin`·`Player/Paladin/Paladin_VFX`)은 스폰되지 않아 손대지 않았다(그쪽 스킬 칸은 비어 있게 됨).
 
 ## DebugTraitLab
 - 아군 허수아비 `AllyDummy` 에도 `PlayerShieldVfx` + `VFX/States/StatusEffectVfxPresenter`(몸 = `VFX/Body` y 1) — 불굴의 가호가 아군에게 걸리면 금색이 보인다.

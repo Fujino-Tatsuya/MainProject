@@ -2224,7 +2224,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2456265857858466963, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 913233600
+      value: 799714977
       objectReference: {fileID: 0}
     - target: {fileID: 3401547853169930430, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: socket
@@ -2461,6 +2461,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4616517997317681720}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1628016293793551911}
     - targetCorrespondingSourceObject: {fileID: 8229189883948102995, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2600760496483148764}
@@ -2621,7 +2624,7 @@ MonoBehaviour:
   followUpSkill: {fileID: 0}
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
-  shieldVfx: {fileID: 1140297743786010553}
+  guardRelay: {fileID: 1628016293793551911}
   shieldGlow: {fileID: 1486249918430601143}
   barrierLoop: {fileID: 5963700053205124945}
   auraLoop: {fileID: 8300681501280536780}
@@ -2667,7 +2670,7 @@ MonoBehaviour:
   shieldGlow: {fileID: 1486249918430601143}
   glowLoop: {fileID: 3678982283790920023}
   chargeLoop: {fileID: 4103582282502557237}
-  shieldVfx: {fileID: 1140297743786010553}
+  guardRelay: {fileID: 1628016293793551911}
 --- !u!114 &1140297743786010553
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2684,7 +2687,6 @@ MonoBehaviour:
   set: {fileID: 11400000, guid: b4a04545aa372a9488c603f10c37d0ab, type: 2}
   anchors: {fileID: 7668978312619558656}
   minHitDistance: 0.15
-  interruptWave: {fileID: 1856814881585661691}
 --- !u!114 &2933743684354559062
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2849,6 +2851,20 @@ MonoBehaviour:
   passive: {fileID: 0}
   chargingColor: {r: 0.95, g: 0.95, b: 0.95, a: 1}
   chargedColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+--- !u!114 &1628016293793551911
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94c6bb8a29442c746b7703e21302d8e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PaladinGuardRelay
+  ShowTopMostFoldoutHeaderGroup: 1
+  interruptWave: {fileID: 1856814881585661691}
 --- !u!1001 &5683368051277706446
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -5,8 +5,9 @@ using UnityEngine;
 
 /// <summary>
 /// 보호막 연출 창구. <b>보호막 연출의 주인은 보호막을 받은 쪽</b>이라는 것이 이 컴포넌트의 전제다 —
-/// 누가 걸어 줬든(자기 E, 거너 Q, 앞으로 생길 무엇이든) 배리어를 띄우고 걷는 것은 여기다.
-/// 단죄의 방패 적중 충격파도 같이 맡는다.
+/// 누가 걸어 줬든(팔라딘 특성, 거너 Q, 앞으로 생길 무엇이든) 배리어를 띄우고 걷는 것은 여기다.
+/// 모든 캐릭터 Variant 루트에 붙는다. (팔라딘 전용 단죄의 방패 충격파·반격 자세 전환은 2026-11-02
+/// <see cref="PaladinGuardRelay"/> 로 분리했다.)
 ///
 /// <b>왜 시전자가 안 하나.</b> 세 가지가 전부 어긋난다.
 /// <list type="number">
@@ -38,7 +39,7 @@ using UnityEngine;
 /// 루프 핸들은 이 컴포넌트가 직접 들고, 보호막이 걷힐 때 해제한다(타이머·safetyTimeout 없음).
 /// </summary>
 [DisallowMultipleComponent]
-public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
+public class PlayerShieldVfx : BaseNetworkBehaviour
 {
     /// <summary>지금 띄워야 할 배리어. 셋 중 하나뿐이다 — 두 겹으로 띄우지 않는다.</summary>
     private enum Barrier
@@ -60,17 +61,11 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
              "장판 한가운데서 맞으면 방향이 서지 않는다 — 엉뚱한 쪽에 띄우는 것보다 안 띄우는 게 낫다")]
     [SerializeField, Min(0f)] private float minHitDistance = 0.15f;
 
-    [Tooltip("단죄의 방패(우클릭)가 적중했을 때 한 번 터뜨릴 충격파. 프리팹의 'ShieldWave' 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer interruptWave;
-
     // 풀 인스턴스를 담아 둘 수 없으므로(반납되면 다른 연출에 재대출된다) 매번 다시 받는다.
     // 리스트만 재사용해 할당을 없앤다.
     private readonly List<GameObject> _instances = new List<GameObject>();
 
     private Unit _unit;
-    private Animator _animator;
-    private PlayerStateController _stateController;
     private Barrier _shown;
     private EffectHandle _barrierHandle;
     private bool _subscribed;
@@ -93,12 +88,14 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
         _subscribed = true;
     }
 
-    private void OnDestroy()
+    // 🔴 override + base 호출 — 예전엔 private OnDestroy 가 NetworkBehaviour.OnDestroy 를 가려(CS0114) NGO 정리가 안 불렸다.
+    public override void OnDestroy()
     {
         if (_subscribed && _unit != null)
             _unit.ServerShieldEnded -= OnServerShieldEnded;
         // 디스폰·씬 언로드 — 따라갈 대상이 사라지므로 아웃트로 없이 바로 반납한다.
         ReleaseBarrier(immediate: true);
+        base.OnDestroy();
     }
 
     // 🔴 여기서 _shown 을 안 지우면 다시 켜졌을 때 "이미 띄워 뒀다"고 판단해 영영 안 나온다.
@@ -259,89 +256,5 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
 
             ripple.AddHit(center + direction.normalized);
         }
-    }
-
-    /// <summary>
-    /// [서버] 단죄의 방패가 적중했다. 충격파를 전 피어에 한 번 터뜨린다.
-    ///
-    /// <b>왜 스킬이 직접 못 하나.</b> 적중 판정(<c>FirstMeleeInterruptSkill.ResolveHit</c>)은
-    /// <b>서버에서만</b> 돈다 — <c>OnTick</c>은 <c>TickServer</c>가, 애니메이션 이벤트는
-    /// <c>PlayerSkillController.HandleAnimationEvent</c>의 <c>if (IsNetworkActive &amp;&amp; !IsServer) return;</c>가
-    /// 각각 막는다. 거기서 바로 재생하면 <b>호스트에서만 보인다</b>.
-    /// 그리고 스킬의 부모 <c>PlayerSkillBase</c>는 MonoBehaviour라 RPC를 달 수 없다.
-    /// </summary>
-    public void ServerInterruptWave()
-    {
-        if (!IsNetworkActive)
-        {
-            PlayInterruptWave();
-            return;
-        }
-
-        if (!IsServer) return;
-
-        InterruptWaveRpc();
-    }
-
-    // 원샷이라 Unreliable 이다. 한 발 유실되면 충격파 한 번이 안 뜰 뿐 상태가 어긋나지 않는다.
-    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    private void InterruptWaveRpc() => PlayInterruptWave();
-
-    // 간파 연출 디렉터(할 일 118) — B3 칸은 피어마다 자기 값. 켜져 있으면 디렉터가 PlayCue 로 돌려 부른다.
-    private void PlayInterruptWave() =>
-        InterruptProductionDirector.PlayCue(InterruptProductionCue.PaladinWave,
-            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success, IsSpawned ? OwnerClientId : 0), this);
-
-    // [각 피어] B3 충격파 원샷.
-    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
-    {
-        if (cue == InterruptProductionCue.PaladinWave)
-            interruptWave?.PlayOnce();
-    }
-
-    /// <summary>
-    /// [서버] 수호자의 의지(E) 방어 성공 — 반격 자세 상태로 <b>전 피어(오너 포함)</b>에서 CrossFade 한다.
-    /// 방어중 E 재입력 해제(해제 상태 SubSkillGuardEnd, 할 일 94)도 같은 창구를 쓴다.
-    ///
-    /// <b>왜 서버만 하면 안 되나.</b> 반격 판정·종료는 반격 클립의 Hit·End 이벤트로 정해지는데,
-    /// 스킬 이벤트는 서버 애니메이터에서만 처리된다. 플레이어에는 오너 권한 NetworkAnimator 가 있어
-    /// 서버만 바꾸면 오너 동기가 상태를 방어 자세로 되돌린다 — 그러면 Hit·End 가 안 온다.
-    /// 그래서 시작 상태와 같은 길을 탄다(<c>PlayerSkillController</c>: 서버 PlaySkillPresentation →
-    /// PlaySkillClientRpc 의 비서버 피어 CrossFadeInFixedTime). 스킬 부모는 MonoBehaviour 라 RPC 를 여기 둔다.
-    /// </summary>
-    public void ServerPlayGuardCounterPose(int stateHash, float fadeSeconds)
-    {
-        if (IsNetworkActive && !IsServer) return;
-
-        // 서버(오프라인 포함)는 바로 바꾼다 — 판정 이벤트가 이 애니메이터에서 난다.
-        PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
-
-        if (IsNetworkActive)
-            GuardCounterPoseRpc(stateHash, fadeSeconds);
-    }
-
-    // 상태 전환이라 Reliable 이다 — 유실되면 그 피어 화면이 방어 자세에 남는다(오너면 동기로 서버까지 되돌린다).
-    // 이 피어가 이미 E 를 떠났으면(오너가 대시로 먼저 끊음, 할 일 95) 늦게 온 자세를 틀지 않는다 — 대시·이동 중에 반격·해제 자세가
-    // 다시 켜지면 오너 권한 NetworkAnimator 가 그대로 전 피어로 퍼뜨린다. 관찰자도 PlaySkillClientRpc~EndSkillClientRpc 동안 스킬 상태다.
-    [Rpc(SendTo.NotServer, Delivery = RpcDelivery.Reliable)]
-    private void GuardCounterPoseRpc(int stateHash, float fadeSeconds)
-    {
-        if (_stateController == null)
-            _stateController = GetComponent<PlayerStateController>();
-
-        if (_stateController != null && !_stateController.IsInSkillState)
-            return;
-
-        PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
-    }
-
-    private void PlayGuardCounterPoseLocal(int stateHash, float fadeSeconds)
-    {
-        // Player·PlayerSkillController 와 같은 해석(미지정이면 자식의 첫 Animator).
-        if (_animator == null)
-            _animator = GetComponentInChildren<Animator>();
-
-        if (_animator != null)
-            _animator.CrossFadeInFixedTime(stateHash, fadeSeconds);
     }
 }
