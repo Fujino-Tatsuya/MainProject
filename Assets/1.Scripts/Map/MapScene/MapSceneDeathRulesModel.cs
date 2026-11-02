@@ -27,7 +27,7 @@ public struct MapSceneReviveOrder
 {
     /// <summary>파티 공용 목숨 1개 차감(G11 뒤 사망 — MultiGameRule 공용 풀, 할 일 30).</summary>
     public bool ConsumeLife;
-    /// <summary>그 자리에서 부활(보스방 이동 중) — 안전 지점으로 옮기지 않는다.</summary>
+    /// <summary>그 자리에서 부활(보스방 이동 중·보스방 도착 뒤) — 안전 지점으로 옮기지 않는다.</summary>
     public bool InPlace;
     /// <summary>연출 잠금으로 한 번 이상 보류됐었다(해제 로그용).</summary>
     public bool WasBlocked;
@@ -47,6 +47,8 @@ public struct MapSceneReviveOrder
 ///  · 부활은 Soul 에서만 된다. 시각이 지났어도 사망 연출 중이면 Soul 을 기다린다.
 ///  · 연출 잠금 중이면 보류한다(첫 보류만 알림 — 로그 1회). 풀리면 다음 판정에서 부활.
 ///  · Alive(다른 경로로 부활 — 예: 강제 개시 부활)·PermanentDead 가 보이면 기록을 버린다.
+///  · 보스방 도착 뒤 사망(<see cref="RecordBossRoomDeath"/>)은 같은 대기(3초) 뒤 그 자리에서 1개 차감 부활.
+///    공용 목숨이 0 이면 사망 목적지가 PermanentDead 라 기록이 버려진다(기존 규칙 — 전멸 리스폰).
 /// </summary>
 public sealed class MapSceneDeathRulesModel
 {
@@ -57,6 +59,8 @@ public sealed class MapSceneDeathRulesModel
         public double DueAt;
         public bool Free;
         public bool InPlace;
+        /// <summary>대기 없이 바로(보스방 이동 중). 보스방 도착 뒤 기록은 그 자리지만 대기는 지킨다.</summary>
+        public bool Immediate;
         public bool Blocked;
     }
 
@@ -104,6 +108,22 @@ public sealed class MapSceneDeathRulesModel
             DueAt = now + ReviveDelaySeconds,
             Free = !bossRoomReached,
             InPlace = IsMoveInProgress,
+            Immediate = IsMoveInProgress,
+        };
+    }
+
+    /// <summary>
+    /// 보스방 도착(G11) 뒤 사망 기록 — <see cref="ReviveDelaySeconds"/> 뒤 그 자리에서 목숨 1개 차감 부활.
+    /// 같은 client 가 다시 죽으면 새 기록으로 덮는다.
+    /// </summary>
+    public void RecordBossRoomDeath(ulong clientId, double now)
+    {
+        _pending[clientId] = new Pending
+        {
+            DueAt = now + ReviveDelaySeconds,
+            Free = false,
+            InPlace = true,
+            Immediate = false,
         };
     }
 
@@ -128,8 +148,9 @@ public sealed class MapSceneDeathRulesModel
         foreach (ulong id in PendingIds)
         {
             Pending p = _pending[id];
-            if (p.InPlace) continue;
+            if (p.InPlace && p.Immediate) continue;
             p.InPlace = true;
+            p.Immediate = true;
             _pending[id] = p;
             n++;
         }
@@ -163,7 +184,7 @@ public sealed class MapSceneDeathRulesModel
             return MapSceneReviveVerdict.Dropped;
         }
 
-        if (!p.InPlace && now < p.DueAt) return MapSceneReviveVerdict.Waiting;
+        if (!p.Immediate && now < p.DueAt) return MapSceneReviveVerdict.Waiting;
 
         if (cinematicLocked)
         {
