@@ -30,6 +30,18 @@ public struct InterruptActorSample : IInterruptSampleLerp<InterruptActorSample>
     /// <summary>이 표본 시각 기준 남은 대시 시간(초).</summary>
     public float DashRemaining;
 
+    /// <summary>시전자 OwnerClientId — 창 지목자 비교(할 일 191 2단계).</summary>
+    public ulong ClientId;
+
+    /// <summary>간파 상자(우클릭 간파 스킬의 판정 앵커 <c>InterruptAttack</c>)를 읽었다. 우클릭이 간파 스킬이 아니면(팔라딘 E 대체 등) false.</summary>
+    public bool HasHitbox;
+    /// <summary>간파 상자 월드 형상을 <see cref="Position"/> 기준으로 옮긴 것(<see cref="HitboxAnchorShape"/>, 시전자 위치 = 원점).</summary>
+    public HitboxAnchorShape Hitbox;
+    /// <summary>간파 상자 앵커의 수평 정면 — 공격 방향으로 돌릴 기준(<see cref="HitboxAnchorShape.Aimed"/>).</summary>
+    public Vector3 HitboxForward;
+    /// <summary>간파 판정 레이어(스킬 데이터 HittableLayers).</summary>
+    public int HitLayers;
+
     public InterruptActorSample LerpTo(in InterruptActorSample next, float t)
     {
         InterruptActorSample s = this;
@@ -54,6 +66,8 @@ public struct InterruptTargetSample : IInterruptSampleLerp<InterruptTargetSample
     public bool BlockedByState;
     /// <summary>레이드 기믹 지목자 clientId(지금 열린 창의 지목자). 없음 = <see cref="InterruptWindowRecord.NoDesignee"/>.</summary>
     public ulong DesignatedClientId;
+    /// <summary>정면 허용 반각(도) — 기존 판정과 같은 값(<see cref="InterruptTargetRegistry.Entry.FrontAngle"/>, 정면 판정 없음 = 180).</summary>
+    public float FrontAngle;
 
     public InterruptTargetSample LerpTo(in InterruptTargetSample next, float t)
     {

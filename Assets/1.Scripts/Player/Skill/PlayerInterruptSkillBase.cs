@@ -63,6 +63,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     // ── 시도 예측(할 일 132) — 근접·대쉬 공용 DashInterruptPredictor 입력 ──
     private float observedPrepDelay = -1f; // 이 피어에서 관측한 시작 → 첫 Hit(초). 첫 관측 전 = -1
+    private float clipHitSeconds = -1f;     // 간파 상태 클립 Hit 이벤트 시각(상태 속도 1 기준, 할 일 191). 첫 Hit 전 = -1
     private Vector3 castDirection;          // [서버] 승인된 시전 방향 — 근접 예측의 공격 방향(오너가 보낸 조준 방향과 같다)
     // [서버] 대쉬 간파 재예측(할 일 139-2) — 승인 때 창이 닫혀 약이었다. 대시 동안 창이 열리면 강 시도 슬로우로 다시 건다.
     private bool serverRepredictPending;
@@ -118,6 +119,43 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     {
         if (delay > 0f)
             observedPrepDelay = delay;
+        ReadClipHitTime();
+    }
+
+    // 지금(첫 Hit — 상태가 재생 중) 간파 상태 클립의 Hit 이벤트 시각을 읽어 둔다(할 일 191 판정 Hit 지연). 런타임 컨트롤러는 재생 중일 때만 클립을 알려 준다.
+    private void ReadClipHitTime()
+    {
+        if (owner == null || Data == null || string.IsNullOrEmpty(Data.AnimatorStateName))
+            return;
+
+        Animator animator = owner.GetComponentInChildren<Animator>();
+        if (InterruptHitDelay.TryReadPlayingStateHitTime(animator, Animator.StringToHash(Data.AnimatorStateName), out float seconds))
+            clipHitSeconds = seconds;
+    }
+
+    /// <summary>
+    /// [각 피어] 누름 → 판정(Hit) 지연(할 일 191 §3.1 ② 근접) — 아직 판정에 쓰지 않는다(연결은 3·4단계).
+    /// 이벤트 방식 = 클립 Hit 이벤트 시각(상태 속도 1 기준) ÷ 지금 애니 속도(<see cref="PlayerAttackSpeedRules.AnimatorSpeed"/> — 공격속도 배율, 바뀐 직후도 이 순간 값).
+    /// 클립 시각은 이 상태를 한 번 재생할 때(첫 Hit) 읽는다 — 그 전에는 데이터 HitDelay 를 클립 시각 근사로 쓴다(기존 예측 순서와 같음).
+    /// 타이머 방식 = 데이터 HitDelay(공속 무관). 데이터가 없으면 false.
+    /// </summary>
+    public bool TryGetJudgeHitDelay(out float seconds)
+    {
+        seconds = 0f;
+        IPlayerInterruptSkillData data = InterruptData;
+        if (data == null)
+            return false;
+
+        if (!EndsOnClipEvent)
+        {
+            seconds = Mathf.Max(0f, data.HitDelay);
+            return true;
+        }
+
+        float clipSeconds = clipHitSeconds >= 0f ? clipHitSeconds : Mathf.Max(0f, data.HitDelay);
+        float playbackSpeed = PlayerAttackSpeedRules.AnimatorSpeed(ScalesWithAttackSpeed, owner != null ? owner.AttackSpeedRate : 1f);
+        seconds = InterruptHitDelay.FromClip(clipSeconds, playbackSpeed);
+        return true;
     }
 
     public override void OnServerStart(Vector3 direction, Unit target)

@@ -5,7 +5,8 @@ using UnityEngine;
 
 /// <summary>
 /// 간파의 단일 진입점(할 일 191, PLAN §3.1) — 모든 피어에 하나, <c>NetworkManager.prefab</c> 에 붙는다.
-/// <b>1단계(지금)</b>: 판정 데이터만 모은다 — 기존 예측·판정 경로(DashInterruptPredictor·InterruptWindowReplicaTracker·서버 ResolveHit)는 이 값을 읽지 않는다.
+/// <b>1~2단계(지금)</b>: 판정 데이터를 모으고 예측·판정 함수(<see cref="Predict"/>·<see cref="Judge(in InterruptJudgeAttempt)"/> = <see cref="InterruptJudgeCalculator"/>)를 둔다 —
+/// 아직 스킬에 연결하지 않아 기존 예측·판정 경로(DashInterruptPredictor·InterruptWindowReplicaTracker·서버 ResolveHit)는 그대로다.
 /// <list type="bullet">
 /// <item><b>세계 스냅샷</b>: 등록된 플레이어(<see cref="RegisterPlayer"/> — Player 스폰)와 간파 대상(<see cref="InterruptTargetRegistry"/> 그대로)을
 ///       매 프레임 LateUpdate 에서 샘플해 약 1초 이력(<see cref="InterruptSampleHistory{T}"/>)에 쌓는다. 클라는 보는 값, 서버는 실제 값.</item>
@@ -19,7 +20,7 @@ using UnityEngine;
 [DefaultExecutionOrder(200)]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NetworkManager))]
-public sealed class InterruptManager : MonoBehaviour
+public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
 {
     public static InterruptManager Instance { get; private set; }
 
@@ -59,6 +60,8 @@ public sealed class InterruptManager : MonoBehaviour
         public Player Player;
         public PlayerStateController States;
         public PlayerLifeCycleController Life;
+        public PlayerSkillController Skills;
+        public PlayerMotor Motor;
         public readonly InterruptSampleHistory<InterruptActorSample> History =
             new InterruptSampleHistory<InterruptActorSample>(HistoryCapacity, HistorySeconds);
         public bool Seen;
@@ -79,6 +82,8 @@ public sealed class InterruptManager : MonoBehaviour
     readonly Dictionary<ulong, TargetTrack> _targets = new Dictionary<ulong, TargetTrack>();
     readonly List<InterruptTargetRegistry.Entry> _targetBuffer = new List<InterruptTargetRegistry.Entry>();
     readonly List<ulong> _removeBuffer = new List<ulong>();
+    readonly List<ulong> _targetIds = new List<ulong>();
+    readonly Collider[] _overlapBuffer = new Collider[16];
     readonly List<InterruptWindowRecord> _recordBuffer = new List<InterruptWindowRecord>();
 
     NetworkManager _networkManager;
@@ -122,6 +127,85 @@ public sealed class InterruptManager : MonoBehaviour
     /// <summary>대상의 가장 최근 창.</summary>
     public bool TryGetLatestWindow(ulong targetId, out InterruptWindowRecord record) =>
         _schedule.TryGetLatest(targetId, out record);
+
+    // ---- 예측·판정(2단계 — 아직 스킬에 연결하지 않는다. 연결 3·4단계) ----
+
+    /// <summary>
+    /// [각 피어] 누르는 순간 예측 — <see cref="InterruptJudgeCalculator.Predict"/>(같은 순수 계산). 클라는 허용 오차 0.
+    /// 결과의 <see cref="InterruptJudgeResult.Forecast"/> = 대상 없음/약/강.
+    /// </summary>
+    public InterruptJudgeResult Predict(in InterruptCastRequest cast) =>
+        InterruptJudgeCalculator.Predict(this, cast, InterruptJudgeTolerance.Zero);
+
+    /// <summary>[각 피어] Hit 타이밍 판정 — <see cref="InterruptJudgeCalculator.Judge"/>. 서버 검증(3단계)은 허용 오차를 넣은 오버로드로 서버 이력에서 다시 돌린다.</summary>
+    public InterruptJudgeResult Judge(in InterruptJudgeAttempt attempt) =>
+        InterruptJudgeCalculator.Judge(this, attempt, InterruptJudgeTolerance.Zero);
+
+    public InterruptJudgeResult Judge(in InterruptJudgeAttempt attempt, in InterruptJudgeTolerance tolerance) =>
+        InterruptJudgeCalculator.Judge(this, attempt, tolerance);
+
+    /// <summary>
+    /// 시전자·근접/대쉬·조준 방향·누른 로컬 게임초로 예측 입력을 만든다 — Hit 지연 = 우클릭 간파 스킬의 <see cref="PlayerInterruptSkillBase.TryGetJudgeHitDelay"/>.
+    /// 우클릭이 간파 스킬이 아니거나 데이터가 없으면 false.
+    /// </summary>
+    public bool TryBuildCastRequest(Player caster, bool viaDash, Vector3 attackDirection, float pressLocalTime, out InterruptCastRequest cast)
+    {
+        cast = default;
+        PlayerSkillController skills = caster != null ? caster.GetComponent<PlayerSkillController>() : null;
+        if (skills == null || !(skills.GetSkill(PlayerSkillSlot.Interrupt) is PlayerInterruptSkillBase skill) ||
+            !skill.TryGetJudgeHitDelay(out float hitDelay))
+            return false;
+
+        cast = new InterruptCastRequest
+        {
+            ActorId = caster.NetworkObjectId,
+            ViaDash = viaDash,
+            PressTime = ToServerTime(pressLocalTime),
+            AttackDirection = attackDirection,
+            HitDelay = hitDelay,
+        };
+        return true;
+    }
+
+    // ---- IInterruptJudgeWorld ----
+
+    int IInterruptJudgeWorld.TargetCount => _targetIds.Count;
+
+    ulong IInterruptJudgeWorld.GetTargetId(int index) => _targetIds[index];
+
+    bool IInterruptJudgeWorld.TryGetLatestWindowOpenedBy(ulong targetId, double time, out InterruptWindowRecord record) =>
+        _schedule.TryGetLatestOpenedBy(targetId, time, out record);
+
+    // 대상의 지금 콜라이더로 질의한다 — 대상이 targetPosition 에 있었다고 보고 상자를 (지금 위치 − 그 위치)만큼 옮긴다(수평 회전 대칭 몸통 가정).
+    // 걸린 콜라이더의 피해 수신 Unit(ResolveHitUnit — 기존 판정과 같은 해석)이 그 대상이면 닿은 것.
+    bool IInterruptJudgeWorld.ShapeHitsTarget(ulong targetId, in HitboxAnchorShape shape, Vector3 targetPosition, int layers)
+    {
+        if (!_targets.TryGetValue(targetId, out TargetTrack track) || track.Unit == null)
+            return false;
+
+        int count = shape.Offset(track.Unit.transform.position - targetPosition).Overlap(_overlapBuffer, layers);
+        for (int i = 0; i < count; i++)
+        {
+            Collider hit = _overlapBuffer[i];
+            if (hit != null && PlayerSkillBase.ResolveHitUnit(hit, out _) == track.Unit)
+                return true;
+        }
+
+        return false;
+    }
+
+    // 대시 경로 = 시전자 모터의 PredictDashPath(실제 대시 이동과 같은 스윕·유닛 막힘 검사). 모터가 없으면 직선.
+    PlayerDashPathResult IInterruptJudgeWorld.SimulateDash(ulong actorId, Vector3 start, Vector3 direction, float speed, float remaining)
+    {
+        if (_actors.TryGetValue(actorId, out ActorTrack track) && track.Motor != null)
+            return track.Motor.PredictDashPath(start, direction, speed, remaining);
+
+        return new PlayerDashPathResult
+        {
+            End = start + InterruptSampleMath.Planar(direction) * (Mathf.Max(0f, speed) * Mathf.Max(0f, remaining)),
+            Duration = Mathf.Max(0f, remaining),
+        };
+    }
 
     // ---- 서버 알림(보스·허수아비) ----
 
@@ -246,6 +330,7 @@ public sealed class InterruptManager : MonoBehaviour
         _schedule.Clear();
         _actors.Clear();
         _targets.Clear();
+        _targetIds.Clear();
         _hasState = false;
     }
 
@@ -276,6 +361,8 @@ public sealed class InterruptManager : MonoBehaviour
                     Player = player,
                     States = player.GetComponent<PlayerStateController>(),
                     Life = player.GetComponent<PlayerLifeCycleController>(),
+                    Skills = player.GetComponent<PlayerSkillController>(),
+                    Motor = player.GetComponent<PlayerMotor>(),
                 };
                 _actors[id] = track;
             }
@@ -297,7 +384,18 @@ public sealed class InterruptManager : MonoBehaviour
             Forward = InterruptSampleMath.Planar(t.forward),
             Alive = track.Life == null || track.Life.State == PlayerLifeState.Alive,
             CrowdControlled = state == PlayerActionState.Knockback || state == PlayerActionState.Restrained,
+            ClientId = track.Player.OwnerClientId,
         };
+
+        // 간파 상자 = 우클릭 간파 스킬의 판정 앵커(InterruptAttack) 지금 형상 그대로 — 기존 예측·서버 판정이 읽는 같은 값(HitboxAnchorShape.TryRead).
+        if (track.Skills != null && track.Skills.GetSkill(PlayerSkillSlot.Interrupt) is PlayerInterruptSkillBase skill &&
+            skill.HitboxAnchor != null && HitboxAnchorShape.TryRead(skill.HitboxAnchor, out HitboxAnchorShape hitbox))
+        {
+            s.HasHitbox = true;
+            s.Hitbox = hitbox.Offset(-s.Position);
+            s.HitboxForward = InterruptSampleMath.Planar(skill.HitboxAnchor.transform.forward);
+            s.HitLayers = skill.Data != null ? skill.Data.HittableLayers.value : 0;
+        }
 
         PlayerDashState dash = track.States != null ? track.States.ActiveDash : null;
         if (dash != null)
@@ -345,6 +443,7 @@ public sealed class InterruptManager : MonoBehaviour
                 DesignatedClientId = _schedule.TryGetWindowAt(id, now, out InterruptWindowRecord window)
                     ? window.DesignatedClientId
                     : InterruptWindowRecord.NoDesignee,
+                FrontAngle = _targetBuffer[i].FrontAngle,
             };
             track.History.Add(now, s);
         }
@@ -362,6 +461,9 @@ public sealed class InterruptManager : MonoBehaviour
             _schedule.Forget(_removeBuffer[i]);
         }
         _removeBuffer.Clear();
+
+        _targetIds.Clear();
+        _targetIds.AddRange(_targets.Keys);
     }
 
     void PruneUnseen(Dictionary<ulong, ActorTrack> tracks)

@@ -192,6 +192,24 @@ public sealed class InterruptWindowSchedule
         return false;
     }
 
+    /// <summary><paramref name="time"/> 이전(같은 시각 포함)에 열린 창 중 가장 늦게 열린 것(열림·닫힘 무관) — 판정의 창 닫힘/창 없음 구분.</summary>
+    public bool TryGetLatestOpenedBy(ulong targetId, double time, out InterruptWindowRecord record)
+    {
+        record = default;
+        if (!_byTarget.TryGetValue(targetId, out List<InterruptWindowRecord> list))
+            return false;
+
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (list[i].OpenTime > time)
+                continue;
+            record = list[i];
+            return true;
+        }
+
+        return false;
+    }
+
     /// <summary>대상의 가장 최근 창(열림·닫힘 무관).</summary>
     public bool TryGetLatest(ulong targetId, out InterruptWindowRecord record)
     {
