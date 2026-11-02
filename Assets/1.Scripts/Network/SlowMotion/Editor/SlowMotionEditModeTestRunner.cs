@@ -30,6 +30,7 @@ internal static class SlowMotionEditModeTestRunner
         "^InterruptHitFlashTests$",                // 적중 섬광 ②~⑥ 시간표·섬광 순간·오너/팀원 분기·Volume 복구·텍스처 칸·프리팹·렌더러(할 일 132 §15)
         "^InterruptPresentationEffectTests$",      // 연출 켜기/끄기 칸 — 기본 암전만·그리기만 끔·섬광 순간 정상(할 일 132 §17)
         "^DebugInterruptLabTests$",                // 디버그 배속 합성·허수아비 회복·튜닝 패널(할 일 115 C5, 132 §17)
+        "^SuppressFlashTests$",                    // 제압 간파 섬광 시간표·컷 전환·섬광 줄이기·서버 표식·Start 플래그·비트 7·에셋(할 일 179)
     };
 
     const string Tag = "[SlowMotionTests]";

@@ -6265,6 +6265,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (outcome.IsSuppress)
         {
+            InterruptProductionDirector.ServerMarkSuppressInterrupt();   // 제압 간파 섬광 표식(할 일 179) — 연출만, 같은 프레임 성공 사건이 소비
             EnterSuppress("간파 성공", fromSegments: true);
             return;
         }

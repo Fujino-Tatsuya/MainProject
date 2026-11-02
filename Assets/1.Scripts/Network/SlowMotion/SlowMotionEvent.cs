@@ -28,9 +28,9 @@ public enum SlowMotionPurpose : byte
 /// </summary>
 public struct SlowMotionEvent
 {
-    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 7×4 + 대상 위치 3×4.</summary>
+    /// <summary>직렬화 크기(바이트). kind 1 + purpose 1 + id 4 + t 8 + clientId 8 + 프로필 7×4 + 대상 위치 3×4 + 제압 간파 1(할 일 179).</summary>
     public const int SerializedSize =
-        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 7 + sizeof(float) * 3;
+        sizeof(byte) + sizeof(byte) + sizeof(uint) + sizeof(double) + sizeof(ulong) + sizeof(float) * 7 + sizeof(float) * 3 + sizeof(byte);
 
     public SlowMotionEventKind Kind;
     /// <summary>슬로우 목적. Start 에서만 의미가 있고 Fail·Reset 은 <see cref="SlowMotionPurpose.Attempt"/> 고정.</summary>
@@ -56,9 +56,15 @@ public struct SlowMotionEvent
     /// </summary>
     public Vector3 TargetPosition;
 
+    /// <summary>
+    /// 제압 간파(할 일 179) — 간파 성공(<see cref="SlowMotionPurpose.Success"/>)이 제압 칸 마지막 1칸을 깎아 제압에 들어갔다.
+    /// 연출 디렉터가 일반 성공 섬광 대신 제압 간파 섬광을 고른다. 서버만 정해 실어 보낸다(새 RPC 없음). Start 에서만 의미.
+    /// </summary>
+    public bool SuppressInterrupt;
+
     public static SlowMotionEvent CreateStart(uint triggerId, double time, ulong triggerClientId, SlowMotionProfile profile,
                                               SlowMotionPurpose purpose = SlowMotionPurpose.Attempt,
-                                              Vector3 targetPosition = default) =>
+                                              Vector3 targetPosition = default, bool suppressInterrupt = false) =>
         new SlowMotionEvent
         {
             Kind = SlowMotionEventKind.Start,
@@ -67,6 +73,7 @@ public struct SlowMotionEvent
             Time = time,
             TriggerClientId = triggerClientId,
             TargetPosition = targetPosition,
+            SuppressInterrupt = suppressInterrupt,
             Scale = profile.scale,
             EnterDuration = profile.enterDuration,
             HoldDuration = profile.holdDuration,
@@ -112,6 +119,7 @@ public struct SlowMotionEvent
         writer.WriteValueSafe(TargetPosition.x);
         writer.WriteValueSafe(TargetPosition.y);
         writer.WriteValueSafe(TargetPosition.z);
+        writer.WriteValueSafe(SuppressInterrupt ? (byte)1 : (byte)0);
     }
 
     public static SlowMotionEvent Read(FastBufferReader reader)
@@ -131,6 +139,7 @@ public struct SlowMotionEvent
         reader.ReadValueSafe(out float targetX);
         reader.ReadValueSafe(out float targetY);
         reader.ReadValueSafe(out float targetZ);
+        reader.ReadValueSafe(out byte suppressInterrupt);
 
         return new SlowMotionEvent
         {
@@ -140,6 +149,7 @@ public struct SlowMotionEvent
             Time = time,
             TriggerClientId = triggerClientId,
             TargetPosition = new Vector3(targetX, targetY, targetZ),
+            SuppressInterrupt = suppressInterrupt != 0,
             Scale = scale,
             EnterDuration = enter,
             HoldDuration = hold,
