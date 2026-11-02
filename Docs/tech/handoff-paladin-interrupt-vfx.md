@@ -7,7 +7,7 @@
 - `1.Scripts/Player/Skill/FirstMeleeInterruptSkill.cs`
   - **충격파 조건 변경**: 예전 `OnInterruptResolutionCompleted` 의 `resolvedCount > 0`(적중 1건 이상) 호출을 지우고,
     부모의 정적 이벤트 `PlayerInterruptSkillBase.ServerInterruptSucceeded` 를 `OnEnable`/`OnDisable` 에서 구독해
-    **자기 시전(`skill == this`)이 간파 성공(카운터 창 소비)일 때만** `PaladinGuardRelay.ServerInterruptWave()`(2026-11-02 PlayerShieldVfx 에서 분리). 판정 1회에 한 번(여러 대상 성공해도 1회).
+    **자기 시전(`skill == this`)이 간파 성공(카운터 창 소비)일 때만** `PaladinSkillView.ServerInterruptWave()`(2026-11-02 PlayerShieldVfx → PaladinGuardRelay → PaladinSkillView). 판정 1회에 한 번(여러 대상 성공해도 1회).
     → 간파 창 없는 대상·일반 몹·상자를 때리면 이제 충격파가 안 나온다(의도).
   - 새 칸 `chargeLoop`(EffectSocketPlayer) — `OnEnd` 에서 `Stop()`. 판정 전에 끊긴 경우(경직·사망·취소) 기 모으기 회수용. 켜고 끄기는 아래 클립 이벤트가 한다.
   - `PlayerInterruptSkillBase`(부모)는 무변경. ~~E 반격(`FirstMeleeSubSkill`)의 `ServerInterruptWave` 호출도 그대로.~~

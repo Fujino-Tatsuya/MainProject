@@ -49,7 +49,7 @@ public class EffectCatalog : ScriptableObject
     // Heal 엔트리는 플레이어 공용(Shared/Heal) — 재생은 PlayerOneShotVfxSet 의 Heal 줄이 한다(여기는 프리웜용 등록).
     [field: SerializeField] public EffectEntry Passive_Heal { get; private set; }
     [field: SerializeField] public EffectEntry Passive_BonusHit { get; private set; }
-    // 나누는 불굴(PAL_2_SHARE_HEAL) — 팔라딘 출발 소용돌이 + 아군으로 날아가는 리본(PaladinShareHealVfx).
+    // 나누는 불굴(PAL_2_SHARE_HEAL) — 팔라딘 출발 소용돌이 + 아군으로 날아가는 리본(PaladinSkillView).
     [field: SerializeField] public EffectEntry ShareHeal_Swirl { get; private set; }
     [field: SerializeField] public EffectEntry ShareHeal_Ribbon { get; private set; }
 
@@ -78,7 +78,7 @@ public class EffectCatalog : ScriptableObject
 
     [Header("플레이어 — 최후의 심판(R)")]
     // 조준 진입 시 SwordLightning + SwordElectric, 시전 확정 시 TargetFloor, 채널 완주 시 Strike.
-    // TargetFloor / Strike 는 소켓이 아니라 PlayerSkillVfx 가 엔트리를 직접 들고 재생한다 —
+    // TargetFloor / Strike 는 소켓이 아니라 PaladinSkillView 가 엔트리를 직접 들고 재생한다 —
     // 붙을 자리가 내 몸이 아니라 "그때 지목된 남"이라 프리팹에 미리 못 박을 수 없다.
     [field: SerializeField] public EffectEntry Ultimate_SwordLightning { get; private set; }
     [field: SerializeField] public EffectEntry Ultimate_SwordElectric { get; private set; }

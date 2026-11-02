@@ -91,7 +91,7 @@
 - 시전 임시 연출 삭제: `Player_Assassin` 의 `enhanceCastPrefab`(공용 `Burst/Flash_star`)가 아직 채워져 E 시전마다 나오고 있었다 → `AssassinSkillView.enhanceCastPrefab`·`PlayEnhanceCast`·`PlayAttached`(호출자 없어짐), `AssassinEnhanceSkill.OnClientPlay` 의 호출(상체 레이어 처리는 그대로), `AssassinShellAuthoring` 의 `EnhanceCastVfxPath`·`SetIfEmpty` 삭제(메뉴 재실행으로 되살아나지 않게).
 
 ## 3-8. 대쉬 잔상 (2026-10-20 추가)
-- `Player_Assassin` 루트(Player.prefab 인스턴스 루트에 추가 컴포넌트)에 **`PlayerSkillVfx`**(최후의 심판 칸은 전부 비움 → 대쉬 잔상 RPC 경로만 동작, 거너와 같은 구성) + `DashAfterimage` + `DashSpeedLines`. **코드 무변경.**
+- `Player_Assassin` 루트(Player.prefab 인스턴스 루트에 추가 컴포넌트)에 **`PlayerSkillVfx`**(2026-11-02 → `PlayerDashVfx` 로 이름 변경 · 대쉬 잔상 전용) + `DashAfterimage` + `DashSpeedLines`. **코드 무변경.**
   - `PlayerSkillVfx` 는 NetworkBehaviour 라 어쌔신 NetworkObject 의 behaviour 목록이 하나 늘어난다(모든 피어가 같은 프리팹이라 문제없음 — 팔라딘·거너 선례).
   - `DashAfterimage`: modelRoot = `Armature`(몸·머리카락·양손 단검, VFX 제외), 재질 `50.Art/VFX/Common/Players/Dash/FX_AssassinDashAfterimage.mat`, spawnInterval 0 · 수명 0.2 · 최대 80 · safetyTimeout 2(팔라딘·거너 값).
   - `DashSpeedLines`: searchRoot = `Armature`, 이름 힌트 head·hand·foot, 재질 `FX_AssassinDashSpeedLine.mat`.

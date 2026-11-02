@@ -30,7 +30,7 @@
 ## 나누는 불굴 전이
 ```
 서버 ShareOverflow → TraitSkillFxRpc → TraitSkillFx.Raised(PaladinShareHeal, Hit)
-  → Player_Paladin VFX 의 PaladinShareHealVfx (시전자 = 이 팔라딘인 것만)
+  → Player_Paladin 루트의 PaladinSkillView (2026-11-02 옛 PaladinShareHealVfx 흡수) (시전자 = 이 팔라딘인 것만)
      ① FX_ShareHeal_Swirl  팔라딘 몸 따라가는 소용돌이(0.95초)
      ② FX_ShareHeal_Ribbon 리본 3가닥(HealTransferRibbon) → 움직이는 아군 추적
      ③ 도착 순간 아군 Play(Heal)

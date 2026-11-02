@@ -240,7 +240,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     /// 회복 연출은 플레이어 공용 원샷 표의 <see cref="PlayerOneShotVfx.Heal"/>(2026-11-02 — 옛 'VFX/PassiveSkill/Heal' 소켓 대체).
     ///
     /// <b>창구가 필요 없다.</b> 이 컴포넌트 자체가 NetworkBehaviour라 RPC를 직접 단다
-    /// (스킬들이 PlayerSkillVfx를 거치는 것은 부모 PlayerSkillBase가 MonoBehaviour이기 때문이다).
+    /// (스킬들이 PaladinSkillView를 거치는 것은 부모 PlayerSkillBase가 MonoBehaviour이기 때문이다).
     ///
     /// <b>좌표가 아니라 대상을 보낸다.</b> 클라의 몹은 NetworkTransform 보간 때문에 서버보다 뒤에
     /// 그려진다 — 서버가 잰 월드 좌표를 그대로 재생하면 이펙트가 몸에서 떨어져 허공에 뜬다

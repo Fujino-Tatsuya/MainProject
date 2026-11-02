@@ -15,6 +15,7 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-11-02 · 민경(Claude) · **보호막 VFX 공용화 + 수호의 잔광·불굴의 가호 금색**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 · ✅ 커밋 · ⏳ 민경 Play · ⏳ SVN(`Shared/Shield/` 이동분) · 핸드오프 [handoff-shield-vfx.md](Docs/tech/handoff-shield-vfx.md)
 - 공용 SO `PlayerShieldVfxSet`(금색·흰색 엔트리 · 몸 자리 · 배율 0.5 · 금색 특성 ID 목록) · `PlayerShieldVfx` 소켓 4칸 → SO + 핸들 재생 · 3 Variant 옛 쉴드 소켓 삭제 · 어쌔신에 `PlayerShieldVfx` 추가 · `StatusEffectVfxPresenter.body` 채움(팔라딘 Middle, 거너·어쌔신 `VFX/Body`).
 - 별도 커밋: 팔라딘 전용 반격 자세·간파 충격파 RPC → 새 `PaladinGuardRelay`(`Player_Paladin` 루트, `FirstMeleeSubSkill`/`FirstMeleeInterruptSkill` 칸 `guardRelay`) — **은희 영역 이동(동작 무변경)**, [handoff-shield-vfx.md](Docs/tech/handoff-shield-vfx.md) 「분리」.
+- 별도 커밋: 팔라딘 전용 연출 창구 통합 — `PaladinGuardRelay` → **`PaladinSkillView`**(guid 유지) 가 `PlayerSkillVfx` 의 R 연출과 `PaladinShareHealVfx`(삭제)까지 흡수 · `PlayerSkillVfx` → **`PlayerDashVfx`**(대시 잔상만, 3캐릭터, guid 유지) · 스킬 칸 `guardRelay`/`skillVfx` → `skillView`. 동작 무변경, [handoff-shield-vfx.md](Docs/tech/handoff-shield-vfx.md) 「통합」.
 - ⚠️ 기본 E 는 보호막을 안 준다(코드 확인) — 금색은 특성(수호의 잔광·불굴의 가호)으로만 뜬다.
 
 ## ▶▶ 작업 세션 (2026-11-02 · 민경(Claude) · **나누는 불굴 전이 VFX + 플레이어 공용 원샷 이펙트 표(힐·레벨업)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(컴파일 0 · 배선 완료 · 초판 GIF ✅ 민경 승인 · 임시 파일 정리) · ✅ 커밋 · ⏳ 민경 MPPM Play · ⏳ SVN 업로드 · 핸드오프 [handoff-shared-heal-vfx.md](Docs/tech/handoff-shared-heal-vfx.md)

@@ -910,7 +910,6 @@ GameObject:
   m_Component:
   - component: {fileID: 219519478881073421}
   - component: {fileID: 5437724345990262166}
-  - component: {fileID: 4294334092229944457}
   m_Layer: 6
   m_Name: VFX
   m_TagString: Untagged
@@ -953,22 +952,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 291aad7dc2864a8cbacf5ef83f2782c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TraitAcquiredVfxPresenter
---- !u!114 &4294334092229944457
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3244756538833987195}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a385d008d7f520342b7b6bd987ac3eb7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PaladinShareHealVfx
-  sourceSwirl: {fileID: 11400000, guid: ecbb8637477210245b42b141cad3c183, type: 2}
-  sourceSwirlOffset: {x: 0, y: 0, z: 0}
-  sourceSwirlScale: 1
-  ribbon: {fileID: 11400000, guid: dfb75a2a530b7f14eb9df80679c3c7e0, type: 2}
 --- !u!1 &3442890603742201715
 GameObject:
   m_ObjectHideFlags: 0
@@ -2624,7 +2607,7 @@ MonoBehaviour:
   followUpSkill: {fileID: 0}
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
-  guardRelay: {fileID: 1628016293793551911}
+  skillView: {fileID: 1628016293793551911}
   shieldGlow: {fileID: 1486249918430601143}
   barrierLoop: {fileID: 5963700053205124945}
   auraLoop: {fileID: 8300681501280536780}
@@ -2646,7 +2629,7 @@ MonoBehaviour:
   followUpSkill: {fileID: 0}
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
-  skillVfx: {fileID: 6735174628152974569}
+  skillView: {fileID: 1628016293793551911}
   superArmorOverlay: {fileID: 949514895202568280}
   stickVfx: {fileID: 2581342685191034331}
 --- !u!114 &183473686508495034
@@ -2670,7 +2653,7 @@ MonoBehaviour:
   shieldGlow: {fileID: 1486249918430601143}
   glowLoop: {fileID: 3678982283790920023}
   chargeLoop: {fileID: 4103582282502557237}
-  guardRelay: {fileID: 1628016293793551911}
+  skillView: {fileID: 1628016293793551911}
 --- !u!114 &1140297743786010553
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2712,14 +2695,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5224ebf497674f95ae11b2874d37c9fb, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkillVfx
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDashVfx
   ShowTopMostFoldoutHeaderGroup: 1
-  swordLightning: {fileID: 637245590219463161}
-  swordElectric: {fileID: 211863627403201684}
-  targetFloor: {fileID: 11400000, guid: e1de5968507b07640a38c8d75341dc58, type: 2}
-  targetFloorScale: 1
-  targetStrike: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
-  targetStrikeScale: 1
 --- !u!114 &7301928374650192901
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2862,9 +2839,19 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 94c6bb8a29442c746b7703e21302d8e2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PaladinGuardRelay
+  m_EditorClassIdentifier: Assembly-CSharp::PaladinSkillView
   ShowTopMostFoldoutHeaderGroup: 1
+  swordLightning: {fileID: 637245590219463161}
+  swordElectric: {fileID: 211863627403201684}
+  targetFloor: {fileID: 11400000, guid: e1de5968507b07640a38c8d75341dc58, type: 2}
+  targetFloorScale: 1
+  targetStrike: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
+  targetStrikeScale: 1
   interruptWave: {fileID: 1856814881585661691}
+  shareHealSwirl: {fileID: 11400000, guid: ecbb8637477210245b42b141cad3c183, type: 2}
+  shareHealSwirlOffset: {x: 0, y: 0, z: 0}
+  shareHealSwirlScale: 1
+  shareHealRibbon: {fileID: 11400000, guid: dfb75a2a530b7f14eb9df80679c3c7e0, type: 2}
 --- !u!1001 &5683368051277706446
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -79,7 +79,7 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 | | | Hit | 맞은 유닛마다 | 공용 RPC | Pos = 유닛 위치, Target |
 | 추격의 궤적 `ASN_4_Q_TRAIL` | `AssassinPursuitTrail` | Activated | 궤적 판정 순간(빗나가도) | 공용 RPC | Pos = 선분 시작, End = 선분 끝, Shape = 지나온 길이로 맞춘 Q 경로 도형, Pose = 판정 포즈, Variant = 돌진 스킬 순서(내부용) |
 | | | Hit | 맞은 대상마다 | 공용 RPC | Pos = 콜라이더 중심, Target |
-| 나누는 불굴 `PAL_2_SHARE_HEAL` | `PaladinShareHeal` | Hit | 초과 회복이 아군 1명에게 실제로 들어감(실제 회복 > 0, 2026-11-02 민경) | 공용 RPC(`PlayerTraitEffects.ShareOverflow`) | Pos = 팔라딘 위치, Dir = 팔라딘 정면, End = 아군 위치(서버 시점), Target = 받은 아군. 구독 = `PaladinShareHealVfx`(전이 리본 → 도착 시 아군 공용 힐) |
+| 나누는 불굴 `PAL_2_SHARE_HEAL` | `PaladinShareHeal` | Hit | 초과 회복이 아군 1명에게 실제로 들어감(실제 회복 > 0, 2026-11-02 민경) | 공용 RPC(`PlayerTraitEffects.ShareOverflow`) | Pos = 팔라딘 위치, Dir = 팔라딘 정면, End = 아군 위치(서버 시점), Target = 받은 아군. 구독 = `PaladinSkillView`(Player_Paladin 루트)(전이 리본 → 도착 시 아군 공용 힐) |
 
 ### 3.1 이벤트가 없는 특성(전수 확인 결과)
 

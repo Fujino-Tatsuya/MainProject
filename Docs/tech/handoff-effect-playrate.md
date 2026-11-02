@@ -42,9 +42,9 @@
 
 | 이펙트 | 부르는 곳 |
 |---|---|
-| 칼 낙뢰·칼날 전기(소켓) | `PlayerSkillVfx.PlayLocal` → `EffectSocketPlayer.SetPlayRate` |
-| 발밑 표식 | `PlayerSkillVfx.PlayTargetFloorLocal` → `PlayLooping(..., playRate)` |
-| 마무리 낙뢰(하늘 칼) | `PlayerSkillVfx.PlayTargetStrikeLocal` → `PlayRecallable(..., playRate)` |
+| 칼 낙뢰·칼날 전기(소켓) | `PaladinSkillView.PlayUltimateLocal` → `EffectSocketPlayer.SetPlayRate` |
+| 발밑 표식 | `PaladinSkillView.PlayTargetFloorLocal` → `PlayLooping(..., playRate)` |
+| 마무리 낙뢰(하늘 칼) | `PaladinSkillView.PlayTargetStrikeLocal` → `PlayRecallable(..., playRate)` |
 | 칼 꽂기 Stick(클립 이벤트) | `FirstMeleeUltimateSkill.OnClientPlay` → `stickVfx.SetPlayRate` |
 
 마무리 낙뢰는 클립 `Garen_Ultimate_Skill` 의 **Custom0 이벤트**(클립 1.2초 = 애니 배율 1.2 로 실제 1.0초, Stick 과 같은 시각)에

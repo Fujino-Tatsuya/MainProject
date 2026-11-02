@@ -32,6 +32,21 @@
 - 덤: `PlayerShieldVfx.OnDestroy` 가 `NetworkBehaviour.OnDestroy` 를 가리던 경고(CS0114)를 `override` + `base.OnDestroy()` 로 고침.
 - 레거시 보관 프리팹(`Player/Legacy/Paladin`·`Player/Paladin/Paladin_VFX`)은 스폰되지 않아 손대지 않았다(그쪽 스킬 칸은 비어 있게 됨).
 
+## 통합 — `PaladinSkillView` · `PlayerDashVfx` (2026-11-02, 별도 커밋 · 동작 무변경)
+거너 `GunnerBeamView`·어쌔신 `AssassinSkillView` 처럼 팔라딘 전용 연출 창구를 하나로 모았다.
+| 전 | 후 |
+|---|---|
+| `Player/Skill/PaladinGuardRelay.cs`(반격 자세·충격파) | **`Player/Skill/PaladinSkillView.cs`** — 파일 이름만 바꿔 guid 유지(스킬 칸 참조 그대로). 아래 둘도 흡수 |
+| `PlayerSkillVfx` 의 최후의 심판 연출(칼 낙뢰·칼날 전기·대상 표식·마무리 낙뢰, RPC 4쌍) | `PaladinSkillView` 로 코드 그대로 이동. `FirstMeleeUltimateSkill.skillVfx` → `skillView` |
+| `Effects/PaladinShareHealVfx.cs`(`Player_Paladin/VFX`, 나누는 불굴 전이) | `PaladinSkillView` 로 이동(칸 `shareHealSwirl`·`shareHealRibbon` …). 스크립트·컴포넌트 삭제 |
+| `PlayerSkillVfx`(3 캐릭터 루트 — 남은 일은 대시 잔상뿐) | **`PlayerDashVfx`** 로 이름 변경(guid 유지 → 3 프리팹 참조 그대로). 대시 잔상 코드만 남김 |
+- 칸 이름: `FirstMeleeSubSkill`·`FirstMeleeInterruptSkill` 의 `guardRelay` → `skillView`(같은 컴포넌트).
+- **은희 영역**(`FirstMelee*Skill` 칸 이름·궁극기 RPC 위치) — 동작은 줄 단위로 그대로.
+- 그대로 둔 것: `FirstMeleePassive` 의 발동 연출 RPC(자체가 NetworkBehaviour 라 창구 불필요) · 스킬 소켓 루프·클립 이벤트 소켓.
+- SVN 에디터 도구 `50.Art/VFX/Scripts/Editor/GunnerDashSetup.cs`·`GunnerBackstepSetup.cs` 도 `PlayerDashVfx` 로 바꿨다(SVN 커밋 필요).
+- 레거시 `Paladin_VFX.prefab` 의 `PlayerSkillVfx` 는 `PlayerDashVfx` 가 되고 옛 R 칸 값은 무시된다(스폰 안 됨).
+- 확인: 팔라딘 R(칼 낙뢰·전기 → 대상 표식 → 마무리 낙뢰, 조준 취소 시 걷힘) · 3캐릭터 대시 잔상(호스트·클라 화면) · E 반격 자세 · 간파 충격파(B3) · 나누는 불굴 리본.
+
 ## DebugTraitLab
 - 아군 허수아비 `AllyDummy` 에도 `PlayerShieldVfx` + `VFX/States/StatusEffectVfxPresenter`(몸 = `VFX/Body` y 1) — 불굴의 가호가 아군에게 걸리면 금색이 보인다.
 - 확인한 것(Play): 수호의 잔광 채널 → 팔라딘 금색, 불굴의 가호 채널 → 아군 허수아비 금색, 거너 Q 채널 → 흰색 판정 · 두 배리어 재생 핸들 정상.
