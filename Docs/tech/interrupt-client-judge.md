@@ -131,6 +131,9 @@ InterruptManager (서버)  InterruptClaimServer.Process
 - 그때까지 승인이 없으면 시도 슬로우를 빗나감으로 정리한다.
 - 승인이 오는 순간(`ServerOnClaimVerdict`) 성공 기록, **첫 승인이면 성공 슬로우 사건**(전역 슬로우는 한 번).
 - 이번 시전이 이미 승인된 대상에는 그 피해에 간파 표식을 싣지 않는다(방금 든 취약에 간파 넉백이 또 들어가지 않게).
+  - **192(5a)부터 판단 원본 = 매니저 장부**: 세션 중에는 `InterruptManager.ServerPreemptsCast` → `InterruptClaimLedger.PreemptsCast`(그 대상 창을 이 시전자 아닌 누군가가 이미 승인받았고, 이 시전 시작이 첫 승인 시각 이하)로 정한다. 늦게 도착해 거절된 피해도 표식이 빠져 보스 취약 넉백이 두 번 들어가지 않는다.
+  - `ServerOnClaimVerdict` 에서 143 장부(`InterruptWindowClaims.Server.Claim`) 기록은 지웠다. 143 장부는 **오프라인(세션 없음) 경로 전용**이다. 143-2 로컬 장부는 피어 재조준·랩 미리보기용으로만 남아 있다.
+- 승인 사건에는 대시로 실린 간파 여부(`claim.ViaDash`)가 실려 성공 사건 종류 `Variant = Dash` 가 된다. 연출 단계는 [interrupt-presentation.md §8](interrupt-presentation.md#8-간파-연출-4단계-할-일-192)을 본다.
 
 ### 5.4 서버 시도 슬로우 경로
 

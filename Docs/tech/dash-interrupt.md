@@ -81,7 +81,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - 원격 오너의 서버 대시는 대시 요청 도착 때 시작하므로 서버 기준 경과가 오너 경과와 비슷하다 — 허용오차(기본 0.1초)는 그 차이를 받는다.
 - 호스트 오너·오프라인은 같은 프레임에 `StartSkillServer` 로 바로 승인된다.
 
-## 5. 118 디렉터 사건 연결 — 새 경로 없음
+## 5. 118 디렉터 사건 연결 — 새 RPC 없음(192 부터 사건 종류 Dash)
 
 > 🔹 **할 일 191(2026-11-02)부터 예측·판정·성공 권한은 `InterruptManager` 다** — 단일 원본 [interrupt-client-judge.md](interrupt-client-judge.md).
 > 아래는 대쉬 간파에 해당하는 요약이다. 옛 예측기(`DashInterruptPredictor`)·창 길이 추정·0.4초 규칙·대시 중 재예측은 **삭제됐다**(그 문서 §10).
@@ -102,7 +102,10 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - **창 길이 = 서버 창 시간표**(할 일 191) — 옛 139-6 창 길이 해석기(`InterruptWindowLengthResolver`·`TwentyThreeInterruptWindowLength`·관측 중앙값)는 삭제됐다. 보스·허수아비가 창 열림 때 닫힘 예정을 알리고 서버가 배포한다. 여닫는 곳 목록은 [interrupt-client-judge.md §9](interrupt-client-judge.md#9-창-여닫는-곳-목록-1단계).
 - **성공**: 서버 승인 순간(`ServerOnClaimVerdict`) 기록, 첫 승인이면 성공 슬로우 사건. 선착순/동시(0.05초)는 매니저 장부가 서버 도착 기준으로 정한다([interrupt-client-judge.md §5](interrupt-client-judge.md#5-서버-검증-interruptclaimserver--interruptclaimvalidator)).
 - **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로. 오너 쪽은 판정 전 끊김(`SkillCut`)으로 대기 판정을 버리고 연출을 바로 끝낸다(D5).
-- 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
+- **사건 종류 `Variant`(Normal/Dash, 할 일 192)**: 대쉬 간파 성공은 `Dash` 로 실린다 — 세션 = 신고의 `ViaDash`(191 경로) → `ServerOnClaimVerdict`, 오프라인 = 시전 시작의 대쉬 여부.
+  피어 전달은 슬로우 Start 이벤트의 179 표식 바이트 비트 1(새 RPC·크기 변화 없음). 디렉터가 단계(실패/간파/대쉬 간파/제압 간파)를 고른다 —
+  지금 대쉬 간파 단계는 일반 간파와 같은 연출(암전 없음 · 강한 줌 · 섬광 ②~⑥, 암순응·블룸 섬광은 Q5 보류). 제압이면 근접·대쉬 무관 제압 간파. 상세 [interrupt-presentation.md §8](interrupt-presentation.md#8-간파-연출-4단계-할-일-192).
+- 시도 슬로우 프로필·cue 는 대쉬도 일반 간파와 같다(Q2 — 슬로우 그대로).
 - 캐릭터 이펙트(클립 이벤트)는 같은 클립을 상체 레이어에서 트므로 같이 나온다(§6 이벤트 중복 방지 참고).
 
 ## 6. 마스킹 애니메이션 — `DashInterruptUpper` 레이어
