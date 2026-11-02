@@ -59,7 +59,7 @@ public interface ITrainingDummyWindowGate
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TrainingDummy))]
 [DataTableSheet("Map", Order = 0)]
-public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptJudgeTarget
+public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptJudgeTarget, IInterruptClaimTarget
 {
     [Header("순환")]
     [SerializeField, Min(0f), FormerlySerializedAs("groggyDuration")]
@@ -118,6 +118,15 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
 
     // 간파 판정 스냅샷(할 일 191) — 취약 중엔 간파가 데미지만 들어간다(창 닫힘과 같은 뜻).
     bool IInterruptJudgeTarget.InterruptBlockedByState => IsVulnerable;
+
+    // 간파 신고 승인(할 일 191) — 성공 효과 = 피격 경로와 같은 ServerTryInterrupt(창이 이미 닫혔으면 아무 일 없음 — 허수아비 창은 성공으로만 닫힌다).
+    // 개인 통계는 없다 — SessionStatsTracker 가 허수아비를 집계에서 뺀다.
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) => IsServer && _cycle != null;
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster) =>
+        ServerTryInterrupt(casterClientId, caster);
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) { }
 
     /// <summary>[서버] 인터럽트 성공. 취약 진입 직후에 한 번 발화한다.</summary>
     public event Action<TrainingDummyInterruptSuccess> ServerInterruptSucceeded;

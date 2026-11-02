@@ -504,6 +504,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         isRequestingSkill = true;
         // 오너 즉시 예측(할 일 132) — 요청보다 먼저(호스트는 이 RPC 안에서 서버 시도 슬로우가 바로 난다).
         PredictOwnerInterrupt(skill, false, direction, 0f, 0f, 0f);
+        BeginOwnerInterruptJudge(skill, false, direction, Time.time);
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
         RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
             NetworkManager.ServerTime.Time, false);
@@ -546,6 +547,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         PredictOwnerInterrupt(skill, dashState != null, direction,
             dashState != null ? dashState.Speed : 0f, dashState != null ? dashState.Remaining : 0f,
             pressTime >= 0f ? Mathf.Max(0f, Time.time - pressTime) : 0f, dashState);
+        BeginOwnerInterruptJudge(skill, dashState != null, direction, pressTime >= 0f ? Mathf.Min(pressTime, Time.time) : Time.time);
         RequestUseSkillRpc(PlayerSkillSlot.Interrupt, skillIndex, direction, default, Vector3.zero, false,
             player.CreateStatReport(), NetworkManager.ServerTime.Time, true);
         return true;
@@ -579,6 +581,16 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                 ownerRepredictSkillStart = Time.time - pressAge;
             }
         }
+    }
+
+    // [오너] 간파 성공 판정 → 서버 신고(할 일 191 3단계) — 누른 순간을 매니저에 넘기면 판정 시각에 같은 함수로 판정해 성공일 때만 신고한다.
+    // 호스트 오너도 같은 경로(서버 처리 직접 호출). 간파 슬롯의 간파 스킬만, 네트워크 세션에서만(오프라인은 기존 피격 판정).
+    private void BeginOwnerInterruptJudge(PlayerSkillBase skill, bool viaDash, Vector3 attackDirection, float pressLocalTime)
+    {
+        if (!IsNetworkActive || !IsOwner || !IsInterruptSkillInSlot(skill) || InterruptManager.Instance == null)
+            return;
+
+        InterruptManager.Instance.BeginOwnerJudge(player, viaDash, attackDirection, pressLocalTime);
     }
 
     /// <summary>
@@ -1580,6 +1592,8 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
 
         // 시전 거부 — 입력 순간 켠 오너 간파 연출(할 일 132)이 있으면 걷는다(결론난 시도·다른 스킬이면 아무것도 안 한다).
         InterruptProductionDirector.LocalOwnerEnded();
+        // 시전이 없으니 간파 성공 판정·신고도 없다(할 일 191).
+        InterruptManager.Instance?.CancelOwnerJudge(player);
     }
 
     // ── 후속 시전(할 일 128 5a) — 규칙·순수 상태는 PlayerSkillFollowUp.cs ──

@@ -13,6 +13,10 @@ public interface IPlayerInterruptSkillData
 /// <summary>
 /// 플레이어 간파 공용 베이스. 앵커 오버랩을 한 번만 판정하고, 모든 피해에 간파 공격 표식을 싣는다.
 ///
+/// 간파 성공 권한(할 일 191 3단계): 세션 중엔 오너 클라가 Hit 타이밍에 판정해 성공이면 신고하고, 서버 <see cref="InterruptManager"/> 가 검증·선착순/동시·
+/// 대상 효과 1회를 정한다. 서버 판정(ResolveHit)은 앵커 오버랩으로 피해만 주고, 성공 여부는 신고 결과(<see cref="ServerOnClaimVerdict"/>)를 기다려 마무리한다.
+/// 오프라인(매니저·세션 없음)은 기존대로 대상이 피격 안에서 성공을 정한다.
+///
 /// 판정·종료 시점(PLAN-anim-event-timing P0-2) — 캐릭터마다 둘 중 하나만 쓴다(<see cref="PlayerSkillBase.EndsOnClipEvent"/>):
 /// - 이벤트 방식(RequiredAnimationEvents 에 <see cref="HitAndEndEvents"/> 를 선언): 상태 클립의 Hit 이벤트가 판정, End 이벤트가 종료.
 ///   HitDelay·SkillDuration·MaxActiveDuration 은 쓰지 않는다. 이벤트가 안 오면(애니메이터 꺼짐 등) 컨트롤러 안전망
@@ -50,6 +54,19 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private Vector3 successTargetPosition;
     // 간파 선착순(할 일 143, 서버) — 이 시전의 서버 시작 시각. 다른 사람이 먼저 성공시킨 창이면 이 시각으로 '같은 창 시도'를 가린다.
     private float serverCastStartTime;
+
+    // ── 서버 검증 결과(할 일 191 3단계) — 세션 중엔 성공 = 오너 신고 승인(InterruptManager). 판정(Hit)은 피해만 주고 결과를 기다린다 ──
+    private bool serverCastOpen;          // OnServerStart ~ 판정 마무리 — 이 사이에 온 결과는 이번 시전 것
+    private bool verdictReceived;
+    private bool verdictApproved;
+    private Unit verdictTarget;
+    private bool awaitingVerdict;         // 판정(피해)은 끝났고 신고 결과를 기다린다
+    private float verdictDeadline;
+    private bool judgedByClaim;           // 이번 판정이 신고 검증 경로(세션 중)인가
+    private int pendingResolvedCount;
+    private LagHit pendingLagHit;
+    private bool pendingInterruptLanded;
+    private bool pendingAnyPreempted;
 
     // ── 대쉬 간파(할 일 115, 서버) — 대시에 실린 동안 Hit 은 보류, 대시 끝(Skill 전이)에 판정 ──
     private bool dashAttachArmed;       // 다음 OnServerStart 가 대쉬 간파다(컨트롤러가 승인 직전에 건다)
@@ -168,6 +185,11 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         serverRepredictPending = false;
         castDirection = direction;
         serverCastStartTime = Time.time;
+        serverCastOpen = true;
+        verdictReceived = false;
+        verdictApproved = false;
+        verdictTarget = null;
+        awaitingVerdict = false;
 
         base.OnServerStart(direction, target);
         slowMotion.Begin();
@@ -194,6 +216,10 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     public override void OnTick()
     {
+        // 신고 결과 대기 시간이 지났다 — 신고 없음(오너 판정 실패·유실) = 실패로 마무리한다(할 일 191).
+        if (awaitingVerdict && Time.time >= verdictDeadline)
+            FinishJudgement(true);
+
         // 이벤트 방식은 Hit·End 이벤트만 본다 — 타이머를 겹쳐 두지 않는다(안전망 = 컨트롤러, 상태 클립 길이 + padding).
         if (EndsOnClipEvent)
             return;
@@ -201,8 +227,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (!hasResolvedHit && Time.time >= hitTime)
             ResolveHit();
 
-        // 같은 프레임에 판정과 종료가 겹치면 판정을 먼저 처리한다.
-        if (Time.time >= endTime)
+        // 같은 프레임에 판정과 종료가 겹치면 판정을 먼저 처리한다. 신고 결과를 기다리는 동안은 끝내지 않는다.
+        if (Time.time >= endTime && !awaitingVerdict)
             EndSelf(SkillEndReason.Completed);
     }
 
@@ -223,16 +249,16 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             }
         }
 
-        if (eventType == SkillAnimationEventType.End && (attachedToDash || pendingEnd || pendingHit))
+        if (eventType == SkillAnimationEventType.End && (attachedToDash || pendingEnd || pendingHit || awaitingVerdict))
         {
-            // 판정 전 End 는 판정 뒤로 미룬다 — 대시 끝 판정(또는 다음 Hit) 직후 끝낸다.
+            // 판정 전 End 는 판정 뒤로 미룬다 — 대시 끝 판정(또는 다음 Hit)·신고 결과(할 일 191) 직후 끝낸다.
             pendingEnd = true;
             return;
         }
 
         base.OnAnimationEvent(eventType);
 
-        if (eventType == SkillAnimationEventType.Hit && pendingEnd && hasResolvedHit)
+        if (eventType == SkillAnimationEventType.Hit && pendingEnd && hasResolvedHit && !awaitingVerdict)
             EndDeferred();
     }
 
@@ -253,7 +279,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (resolveNow)
             ResolveHit();
 
-        if (pendingEnd && hasResolvedHit)
+        if (pendingEnd && hasResolvedHit && !awaitingVerdict)
             EndDeferred();
     }
 
@@ -270,6 +296,14 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         pendingHit = false;
         pendingEnd = false;
         serverRepredictPending = false;
+
+        // 신고 결과를 기다리다 끝났다(안전망·강제 종료) — 받은 결과(없으면 실패)로 마무리한다(할 일 191).
+        if (awaitingVerdict)
+            FinishJudgement(false);
+        serverCastOpen = false;
+        // 판정 전에 끊겼다(넉백·잡기·사망 등, D5) — 오너 판정·신고를 버린다.
+        if (reason != SkillEndReason.Completed && owner != null && owner.IsInputSource && InterruptManager.Instance != null)
+            InterruptManager.Instance.CancelOwnerJudge(owner);
 
         InterruptProductionDirector.ServerFail(InterruptProductionEvent.Fail(owner, this,
             InterruptFailReason.EndedBeforeResolve, slowMotion.Abort()));
@@ -315,6 +349,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// 허수아비 인터럽트 성공). 여러 대상이 성공해도 시전당 1회. 인자 = 시전자, 그 간파 스킬 인스턴스(대체 슬롯 포함).
     /// 같은 판정 안에서 <see cref="ServerInterruptResolved"/> 보다 먼저 난다. 시전자 쿨 감소는 없다(할 일 90 에서 제거).
     /// 선착순에서 밀린 두 번째 이후 성공자(할 일 143)에게는 나지 않는다 — 창을 소비하지 않았다(피해·<see cref="ServerInterruptResolved"/> 는 그대로).
+    /// 세션 중(할 일 191)엔 성공 = 오너 신고 승인 — 첫 승인과 동시 성공자(D8) 모두 각자 난다(개인 기록). 대상 효과는 첫 승인만(매니저).
     /// </summary>
     public static event System.Action<Player, PlayerInterruptSkillBase> ServerInterruptSucceeded;
 
@@ -400,6 +435,10 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
         }
 
+        // 할 일 191 — 세션 중엔 성공을 대상 피격이 아니라 오너 신고 승인(InterruptManager)으로 정한다. 이 판정은 피해만 주고 결과를 기다린다.
+        // 오프라인(매니저·세션 없음)은 기존대로 대상이 피격 안에서 정한 성공을 전후 비교로 잡는다.
+        judgedByClaim = InterruptManager.ServerVerifiesClaims;
+
         int hitCount = OverlapHitboxAnchor(hitResults);
         hitTargets.Clear();
         landedUnits.Clear();
@@ -447,8 +486,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                 Edit.Log($"[InterruptFirstCome] {unit.name} 창은 다른 플레이어가 먼저 성공 — {owner.name} 는 피해만", this);
             }
 
+            // 이번 시전 신고가 이미 승인된 대상(할 일 191) — 성공 효과는 승인 때 났다. 이 피해에 간파 표식을 다시 싣지 않는다
+            // (방금 든 취약에 간파 넉백이 또 들어가지 않게 — 기존 '같은 피격 안 성공'과 같은 결과).
+            bool alreadyApproved = judgedByClaim && verdictApproved && unit != null && unit == verdictTarget;
+
             AttackInfo attackInfo = DecorateAttackInfo(new AttackInfo(resolvedDamage, DamageAttackType,
-                isInterruptAttack: !preempted, hitPattern: DamageHitPattern));
+                isInterruptAttack: !preempted && !alreadyApproved, hitPattern: DamageHitPattern));
             AttackHitContext hitContext =
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
@@ -460,7 +503,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
             bool resolved = ReceiveListeningForCounter(hurtbox, unit, attackInfo, hitContext);
 
-            bool counterSucceeded = slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore;
+            bool counterSucceeded = !judgedByClaim && slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore;
             if (counterSucceeded)
             {
                 interruptSucceeded = true;
@@ -483,9 +526,75 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             OnInterruptTargetResolved(target, attackInfo);
         }
 
+        pendingResolvedCount = resolvedCount;
+        pendingLagHit = lagHit;
+        pendingInterruptLanded = interruptLanded;
+        pendingAnyPreempted = anyPreempted;
+
+        // 신고 결과가 아직이면 기다린다 — 오너 판정과 서버 Hit 은 거의 같은 때라 순서가 갈린다. 대기 상한 = 그 클라 RTT + 여유.
+        if (judgedByClaim && !verdictReceived)
+        {
+            awaitingVerdict = true;
+            verdictDeadline = Time.time + InterruptManager.ServerVerdictWaitSeconds(owner.OwnerClientId);
+            return;
+        }
+
+        FinishJudgement(true);
+    }
+
+    /// <summary>
+    /// [서버] 그 시전자의 간파 신고 결과(할 일 191 — <see cref="InterruptManager"/>). 대상 성공 효과·개인 통계는 매니저가 이미 처리했다.
+    /// 이번 시전 판정이 결과를 기다리면 지금 마무리한다(연출 사건·<see cref="ServerInterruptSucceeded"/>·판정 1회 사건).
+    /// 판정을 이미 마무리한 뒤 온 승인이면 성공 기록(<see cref="ServerInterruptSucceeded"/>)만 늦게 남긴다 — 연출 연결은 4단계.
+    /// </summary>
+    internal void ServerOnClaimVerdict(bool approved, Unit target)
+    {
+        // 서버 예측의 선착순 장부(할 일 143)도 승인으로 채운다 — 남의 창을 닫힌 것처럼 예측·피해만 주게.
+        if (approved && target != null && owner != null)
+            InterruptWindowClaims.Server.Claim(target.gameObject.GetInstanceID(), owner.GetInstanceID(), Time.time);
+
+        if (!serverCastOpen)
+        {
+            if (approved)
+            {
+                Edit.Log($"[InterruptVerify] {(owner != null ? owner.name : name)} 승인이 판정 마무리 뒤 도착 — 성공 기록만 남긴다", this);
+                ServerInterruptSucceeded?.Invoke(owner, this);
+            }
+            return;
+        }
+
+        if (verdictReceived && verdictApproved)
+            return;
+
+        verdictReceived = true;
+        verdictApproved = approved;
+        verdictTarget = approved ? target : null;
+        if (awaitingVerdict)
+            FinishJudgement(true);
+    }
+
+    // 판정 마무리 — 성공 여부를 정해 연출 사건·판정 1회 사건을 낸다. 피해는 ResolveHit 이 이미 줬다.
+    // allowDeferredEnd = 판정 뒤로 미뤘던 End 를 여기서 처리해도 되는가(OnEnd 안에서는 false).
+    private void FinishJudgement(bool allowDeferredEnd)
+    {
+        awaitingVerdict = false;
+        serverCastOpen = false;
+
+        int resolvedCount = pendingResolvedCount;
+        LagHit lagHit = pendingLagHit;
+        bool interruptLanded = pendingInterruptLanded;
+        if (judgedByClaim && verdictApproved)
+        {
+            interruptSucceeded = true;
+            RecordSuccessTarget(verdictTarget);
+            interruptLanded = slowMotion.IsPending;
+            if (verdictTarget != null)
+                lagHit.Observe(verdictTarget, lagHit.OpenAtHit, lagHit.CorrectedWindow, true);
+        }
+
         // 간파 연출 사건(할 일 118) — 판정 → 성공 순서로 디렉터에 알린다(빗나감·선점 실패 복귀 → 성공 슬로우 재시작).
         // 선점(할 일 143) = 밀린 창이 있고 이 판정에 성공이 하나도 없다 — 성공 사건이 없으니 성공 연출(A1~A4·섬광·relay)도 없다.
-        bool resolvePreempted = anyPreempted && !interruptSucceeded;
+        bool resolvePreempted = pendingAnyPreempted && !interruptSucceeded;
         InterruptProductionDirector.ServerResolve(InterruptProductionEvent.Resolve(owner, this,
             slowMotion.Resolve(interruptLanded), interruptLanded, interruptSucceeded, resolvedCount, resolvePreempted));
         if (interruptSucceeded)
@@ -501,11 +610,15 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (CompleteBeforeAttackLanded)
             CompleteResolution(resolvedCount);
 
-        owner.RaiseServerAttackLanded(
-            DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
+        if (owner != null)
+            owner.RaiseServerAttackLanded(
+                DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
 
         if (!CompleteBeforeAttackLanded)
             CompleteResolution(resolvedCount);
+
+        if (allowDeferredEnd && pendingEnd && hasResolvedHit)
+            EndDeferred();
     }
 
     // ── 간파 지연 측정 (서버, 측정만) ──

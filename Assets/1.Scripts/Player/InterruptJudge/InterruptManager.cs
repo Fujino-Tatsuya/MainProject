@@ -5,8 +5,9 @@ using UnityEngine;
 
 /// <summary>
 /// 간파의 단일 진입점(할 일 191, PLAN §3.1) — 모든 피어에 하나, <c>NetworkManager.prefab</c> 에 붙는다.
-/// <b>1~2단계(지금)</b>: 판정 데이터를 모으고 예측·판정 함수(<see cref="Predict"/>·<see cref="Judge(in InterruptJudgeAttempt)"/> = <see cref="InterruptJudgeCalculator"/>)를 둔다 —
-/// 아직 스킬에 연결하지 않아 기존 예측·판정 경로(DashInterruptPredictor·InterruptWindowReplicaTracker·서버 ResolveHit)는 그대로다.
+/// 판정 데이터를 모으고 예측·판정 함수(<see cref="Predict"/>·<see cref="Judge(in InterruptJudgeAttempt)"/> = <see cref="InterruptJudgeCalculator"/>)를 둔다.
+/// <b>3단계</b>: 간파 성공은 오너 클라 판정 → 서버 검증으로 정한다(<see cref="BeginOwnerJudge"/> → 신고 → <see cref="InterruptClaimServer"/>).
+/// 예측·연출(DashInterruptPredictor·InterruptWindowReplicaTracker)은 아직 기존 경로다(4·5단계).
 /// <list type="bullet">
 /// <item><b>세계 스냅샷</b>: 등록된 플레이어(<see cref="RegisterPlayer"/> — Player 스폰)와 간파 대상(<see cref="InterruptTargetRegistry"/> 그대로)을
 ///       매 프레임 LateUpdate 에서 샘플해 약 1초 이력(<see cref="InterruptSampleHistory{T}"/>)에 쌓는다. 클라는 보는 값, 서버는 실제 값.</item>
@@ -20,6 +21,7 @@ using UnityEngine;
 [DefaultExecutionOrder(200)]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NetworkManager))]
+[DataTableSheet("SlowMotion", Order = 3)]
 public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
 {
     public static InterruptManager Instance { get; private set; }
@@ -31,10 +33,72 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
     const int HistoryCapacity = 96;
 
     const string WindowMessageName = "InterruptManager.Window";
+    const string ClaimMessageName = "InterruptManager.Claim";
+    const string ApprovalMessageName = "InterruptManager.Approval";
+    const string RejectMessageName = "InterruptManager.Reject";
 
+    [DataTableIgnore]
     [SerializeField]
     [Tooltip("창 시간표 열림·닫힘을 콘솔에 남긴다(에디터 전용 로그). 할 일 191 Play 확인용.")]
     bool logWindows;
+
+    [Header("서버 검증 허용 오차 (할 일 191 D11)")]
+    [SerializeField, Min(0f)]
+    [Tooltip("시각 여유(초) — 그 클라 측정 지연(RTT) 절반에 더한다. 창 열림·닫힘(조기 닫힘 포함)과 위치 표본 시각에 쓴다.")]
+    float verifyTimeSlack = 0.033f;
+
+    [SerializeField, Min(0f)]
+    [Tooltip("거리 여유(m) — 간파 상자 수평 반폭·반길이(구·캡슐 반지름)를 이만큼 키워 검증한다.")]
+    float verifyDistanceSlack = 0.2f;
+
+    [SerializeField, Min(0f)]
+    [Tooltip("정면 각도 여유(도) — 대상 정면 허용 반각에 더한다(23호 정면 판정 등).")]
+    float verifyAngleSlack = 5f;
+
+    [Header("동시 성공 (할 일 191 D8)")]
+    [SerializeField, Min(0f)]
+    [Tooltip("창의 첫 승인 뒤 이 시간(초) 안에 도착한 승인 = 동시 성공(연출·성공 기록만, 보스 효과 없음). 그 뒤는 선착순 패배.")]
+    float simultaneousSeconds = 0.05f;
+
+    [DataTableIgnore]
+    [SerializeField, Min(0f)]
+    [Tooltip("서버 간파 판정(Hit)이 오너 신고를 기다리는 여유(초) — 그 클라 RTT 에 더한다. 넘기면 신고 없음 = 실패로 마무리한다.")]
+    float verdictWaitPadding = 0.1f;
+
+    // ---- 검증 결과 이벤트(연출 연결은 4단계) ----
+
+    /// <summary>[서버] 신고 하나를 처리했다(승인·거부 모두).</summary>
+    public static event System.Action<InterruptClaimOutcome> ServerClaimProcessed;
+
+    /// <summary>[모든 피어] 승인 배포를 받았다(호스트는 직접). 같은 창의 동시 성공자 전체가 실린다.</summary>
+    public static event System.Action<InterruptClaimApproval> ApprovalReceived;
+
+    /// <summary>[오너] 내 신고가 거부됐다(호스트 오너는 직접).</summary>
+    public static event System.Action<InterruptClaimRejection> RejectionReceived;
+
+    /// <summary>[오너] Hit 타이밍 판정을 했다(시전자 NetworkObjectId, 결과). 성공이면 바로 신고를 보낸다 — 실패는 여기서 끝.</summary>
+    public static event System.Action<ulong, InterruptJudgeResult> OwnerJudged;
+
+    /// <summary>[서버] 세션 중이라 간파 성공을 신고 검증으로 정한다 — 대상은 피격으로 성공을 정하지 않는다. 오프라인·매니저 없음 = false(기존 피격 판정).</summary>
+    public static bool ServerVerifiesClaims => Instance != null && Instance.IsServerActive;
+
+    /// <summary>[서버] 간파 판정(Hit)이 그 시전자의 신고를 기다릴 최대 시간(초) = RTT + 여유. 매니저가 없으면 0.</summary>
+    public static float ServerVerdictWaitSeconds(ulong clientId)
+    {
+        InterruptManager manager = Instance;
+        if (manager == null)
+            return 0f;
+        return (float)(InterruptLagMonitor.RttMs(clientId) / 1000.0) + manager.verdictWaitPadding;
+    }
+
+    /// <summary>지금 검증 수치.</summary>
+    public InterruptVerifySettings VerifySettings => new InterruptVerifySettings
+    {
+        TimeSlack = verifyTimeSlack,
+        DistanceSlack = verifyDistanceSlack,
+        AngleSlack = verifyAngleSlack,
+        SimultaneousSeconds = simultaneousSeconds,
+    };
 
     // ---- 플레이어 등록(정적 — 매니저보다 플레이어가 먼저 스폰될 수 있다) ----
 
@@ -51,7 +115,14 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
     public static void UnregisterPlayer(Player player) => s_players.Remove(player);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => s_players.Clear();
+    static void ResetStatics()
+    {
+        s_players.Clear();
+        ServerClaimProcessed = null;
+        ApprovalReceived = null;
+        RejectionReceived = null;
+        OwnerJudged = null;
+    }
 
     // ---- 상태 ----
 
@@ -85,6 +156,19 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
     readonly List<ulong> _targetIds = new List<ulong>();
     readonly Collider[] _overlapBuffer = new Collider[16];
     readonly List<InterruptWindowRecord> _recordBuffer = new List<InterruptWindowRecord>();
+    readonly InterruptClaimServer _claimServer = new InterruptClaimServer();
+
+    // [오너] Hit 타이밍 판정 대기 — 누른 순간 예측으로 판정 시각을 잡고, 그 시각 표본이 쌓이면 판정한다.
+    sealed class OwnerJudge
+    {
+        public ulong ActorId;
+        public bool ViaDash;
+        public InterruptCastRequest Cast;
+        public bool Predicted;
+        public InterruptJudgeAttempt Attempt;
+    }
+
+    readonly List<OwnerJudge> _ownerJudges = new List<OwnerJudge>(2);
 
     NetworkManager _networkManager;
     NetworkClock _networkClock;
@@ -128,7 +212,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
     public bool TryGetLatestWindow(ulong targetId, out InterruptWindowRecord record) =>
         _schedule.TryGetLatest(targetId, out record);
 
-    // ---- 예측·판정(2단계 — 아직 스킬에 연결하지 않는다. 연결 3·4단계) ----
+    // ---- 예측·판정(2단계) — 판정은 오너 신고(3단계 BeginOwnerJudge)에 쓴다. 예측의 연출 연결은 4단계 ----
 
     /// <summary>
     /// [각 피어] 누르는 순간 예측 — <see cref="InterruptJudgeCalculator.Predict"/>(같은 순수 계산). 클라는 허용 오차 0.
@@ -165,6 +249,227 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
             HitDelay = hitDelay,
         };
         return true;
+    }
+
+    // ---- 오너 판정 → 신고(3단계, PLAN §3 "Hit 타이밍: 같은 함수로 판정 → 성공이면 1회 전송") ----
+
+    /// <summary>
+    /// [오너] 간파를 눌렀다 — 다음 샘플 뒤 누른 시각 표본으로 예측해 판정 시각(근접 = 누름 + Hit 지연, 대쉬 = max(대시 끝, Hit))을 잡고,
+    /// 그 시각 표본이 쌓이면 같은 함수로 판정한다. 성공이면 서버에 1회 신고, 실패면 보내지 않는다. 호스트 오너도 같은 경로(직접 호출).
+    /// 같은 시전자의 대기 판정이 있으면 바꾼다. <paramref name="pressLocalTime"/> = 누른 로컬 게임초(Time.time).
+    /// </summary>
+    public void BeginOwnerJudge(Player caster, bool viaDash, Vector3 attackDirection, float pressLocalTime)
+    {
+        if (!IsSessionRunning || caster == null || !caster.IsSpawned ||
+            !TryBuildCastRequest(caster, viaDash, attackDirection, pressLocalTime, out InterruptCastRequest cast))
+            return;
+
+        CancelOwnerJudge(caster);
+        _ownerJudges.Add(new OwnerJudge { ActorId = caster.NetworkObjectId, ViaDash = viaDash, Cast = cast });
+    }
+
+    /// <summary>[오너] 대기 중인 판정을 버린다 — 서버가 시전을 거부했거나 판정 전에 스킬이 끊겼다(D5).</summary>
+    public void CancelOwnerJudge(Player caster)
+    {
+        if (caster == null)
+            return;
+
+        ulong id = caster.NetworkObjectId;
+        for (int i = _ownerJudges.Count - 1; i >= 0; i--)
+            if (_ownerJudges[i].ActorId == id)
+                _ownerJudges.RemoveAt(i);
+    }
+
+    // LateUpdate 샘플 직후 — 표본이 누른 시각·판정 시각까지 쌓였으면 예측·판정한다. 이력 밖으로 밀린 대기는 버린다.
+    void TickOwnerJudges(double now)
+    {
+        for (int i = _ownerJudges.Count - 1; i >= 0; i--)
+        {
+            OwnerJudge pending = _ownerJudges[i];
+            if (!pending.Predicted)
+            {
+                if (now < pending.Cast.PressTime)
+                    continue;
+
+                InterruptJudgeResult prediction = Predict(pending.Cast);
+                pending.Attempt = InterruptJudgeAttempt.FromPrediction(pending.ActorId, prediction);
+                pending.Predicted = true;
+            }
+
+            if (now < pending.Attempt.JudgeTime)
+            {
+                if (pending.Attempt.JudgeTime - now > HistorySeconds)
+                    _ownerJudges.RemoveAt(i);
+                continue;
+            }
+
+            _ownerJudges.RemoveAt(i);
+            InterruptJudgeResult result = Judge(pending.Attempt);
+            if (logWindows)
+                Edit.Log($"[InterruptManager] 오너 판정 — {result.Outcome} {result.FailReason} · 대상 {result.TargetId} · 창 #{result.WindowId}", this);
+            OwnerJudged?.Invoke(pending.ActorId, result);
+            if (result.IsSuccess)
+                SubmitClaim(InterruptClaim.FromJudge(pending.ActorId, pending.ViaDash, result));
+        }
+    }
+
+    // 호스트 = 서버 처리 직접 호출, 원격 클라 = 서버로 named message.
+    void SubmitClaim(in InterruptClaim claim)
+    {
+        if (_networkManager.IsServer)
+        {
+            ServerReceiveClaim(_networkManager.LocalClientId, claim);
+            return;
+        }
+
+        CustomMessagingManager messaging = _networkManager.CustomMessagingManager;
+        if (messaging == null)
+            return;
+
+        using (var writer = new FastBufferWriter(InterruptClaim.SerializedSize, Allocator.Temp))
+        {
+            claim.Write(writer);
+            messaging.SendNamedMessage(ClaimMessageName, NetworkManager.ServerClientId, writer, NetworkDelivery.Reliable);
+        }
+    }
+
+    // ---- 서버 검증(3단계, PLAN §3.1 ③) ----
+
+    /// <summary>
+    /// [서버] 신고 처리 — <see cref="InterruptClaimServer.Process"/>(소유 확인 → 검증 → 대상 규칙 → 선착순/동시 → 첫 승인만 대상 효과·승인마다 개인 기록),
+    /// 그 시전자의 간파 스킬에 결과를 넘기고(<see cref="PlayerInterruptSkillBase.ServerOnClaimVerdict"/>), 승인은 모든 피어·거부는 그 오너에게 보낸다.
+    /// </summary>
+    void ServerReceiveClaim(ulong senderClientId, in InterruptClaim claim)
+    {
+        SampleClock();
+        double now = ServerNow;
+
+        _actors.TryGetValue(claim.ActorId, out ActorTrack actor);
+        bool owns = actor != null && actor.Player != null && actor.Player.OwnerClientId == senderClientId;
+        Unit targetUnit = _targets.TryGetValue(claim.TargetId, out TargetTrack target) ? target.Unit : null;
+        IInterruptClaimTarget claimTarget = targetUnit != null
+            ? targetUnit as IInterruptClaimTarget ?? targetUnit.GetComponent<IInterruptClaimTarget>()
+            : null;
+
+        InterruptClaimOutcome verdict = _claimServer.Process(this, claim, senderClientId, owns,
+            InterruptClaimServer.HalfLagSeconds(InterruptLagMonitor.RttMs(senderClientId)), now, VerifySettings, claimTarget,
+            owns ? actor.Player : null);
+
+        if (logWindows || !verdict.Approved)
+            Edit.Log($"[InterruptManager] 신고 client {senderClientId} — {(verdict.Approved ? (verdict.IsFirst ? "승인(첫)" : "승인(동시)") : $"거부 {verdict.RejectReason}/{verdict.JudgeFailReason}")}" +
+                     $" · 대상 {claim.TargetId} · 창 #{claim.WindowId}→#{verdict.WindowId} · 판정 시각 {now - claim.JudgeTime:0.###}s 전", this);
+
+        if (owns && actor.Skills != null && actor.Skills.GetSkill(PlayerSkillSlot.Interrupt) is PlayerInterruptSkillBase skill)
+            skill.ServerOnClaimVerdict(verdict.Approved, targetUnit);
+
+        ServerClaimProcessed?.Invoke(verdict);
+
+        if (verdict.Approved)
+            ServerPublishApproval(claim.TargetId, verdict.WindowId, claim.ActorId);
+        else
+            ServerSendRejection(senderClientId, new InterruptClaimRejection(claim.ActorId, claim.TargetId, claim.WindowId,
+                verdict.RejectReason, verdict.JudgeFailReason));
+    }
+
+    void ServerPublishApproval(ulong targetId, uint windowId, ulong newActorId)
+    {
+        IReadOnlyList<ulong> approved = _claimServer.Ledger.ApprovedActors(targetId, windowId);
+        ulong first = approved.Count > 0 ? approved[0] : newActorId;
+        ApprovalReceived?.Invoke(new InterruptClaimApproval(targetId, windowId, first, newActorId, approved));
+
+        CustomMessagingManager messaging = _networkManager.CustomMessagingManager;
+        if (messaging == null)
+            return;
+
+        int count = Mathf.Min(approved.Count, byte.MaxValue);
+        int size = sizeof(ulong) * 3 + sizeof(uint) + sizeof(byte) + sizeof(ulong) * count;
+        IReadOnlyList<ulong> clients = _networkManager.ConnectedClientsIds;
+        for (int c = 0; c < clients.Count; c++)
+        {
+            if (clients[c] == _networkManager.LocalClientId)
+                continue;   // 호스트는 위에서 직접 알렸다
+
+            using (var writer = new FastBufferWriter(size, Allocator.Temp))
+            {
+                writer.WriteValueSafe(targetId);
+                writer.WriteValueSafe(windowId);
+                writer.WriteValueSafe(first);
+                writer.WriteValueSafe(newActorId);
+                writer.WriteValueSafe((byte)count);
+                for (int i = 0; i < count; i++)
+                    writer.WriteValueSafe(approved[i]);
+                messaging.SendNamedMessage(ApprovalMessageName, clients[c], writer, NetworkDelivery.Reliable);
+            }
+        }
+    }
+
+    void ServerSendRejection(ulong clientId, in InterruptClaimRejection rejection)
+    {
+        if (clientId == _networkManager.LocalClientId)
+        {
+            RejectionReceived?.Invoke(rejection);
+            return;
+        }
+
+        CustomMessagingManager messaging = _networkManager.CustomMessagingManager;
+        if (messaging == null)
+            return;
+
+        using (var writer = new FastBufferWriter(sizeof(ulong) * 2 + sizeof(uint) + sizeof(byte) * 2, Allocator.Temp))
+        {
+            writer.WriteValueSafe(rejection.ActorId);
+            writer.WriteValueSafe(rejection.TargetId);
+            writer.WriteValueSafe(rejection.WindowId);
+            writer.WriteValueSafe((byte)rejection.Reason);
+            writer.WriteValueSafe((byte)rejection.JudgeFailReason);
+            messaging.SendNamedMessage(RejectMessageName, clientId, writer, NetworkDelivery.Reliable);
+        }
+    }
+
+    void HandleClaimMessage(ulong senderClientId, FastBufferReader reader)
+    {
+        if (!_networkManager.IsServer)
+            return;
+
+        ServerReceiveClaim(senderClientId, InterruptClaim.Read(reader));
+    }
+
+    void HandleApprovalMessage(ulong senderClientId, FastBufferReader reader)
+    {
+        if (senderClientId != NetworkManager.ServerClientId || _networkManager.IsServer)
+            return;
+
+        reader.ReadValueSafe(out ulong targetId);
+        reader.ReadValueSafe(out uint windowId);
+        reader.ReadValueSafe(out ulong first);
+        reader.ReadValueSafe(out ulong newActor);
+        reader.ReadValueSafe(out byte count);
+        var approved = new List<ulong>(count);
+        for (int i = 0; i < count; i++)
+        {
+            reader.ReadValueSafe(out ulong id);
+            approved.Add(id);
+        }
+
+        if (logWindows)
+            Edit.Log($"[InterruptManager] 승인 수신 — 대상 {targetId} · 창 #{windowId} · 승인 {count}명", this);
+        ApprovalReceived?.Invoke(new InterruptClaimApproval(targetId, windowId, first, newActor, approved));
+    }
+
+    void HandleRejectMessage(ulong senderClientId, FastBufferReader reader)
+    {
+        if (senderClientId != NetworkManager.ServerClientId || _networkManager.IsServer)
+            return;
+
+        reader.ReadValueSafe(out ulong actorId);
+        reader.ReadValueSafe(out ulong targetId);
+        reader.ReadValueSafe(out uint windowId);
+        reader.ReadValueSafe(out byte reason);
+        reader.ReadValueSafe(out byte judgeReason);
+        var rejection = new InterruptClaimRejection(actorId, targetId, windowId,
+            (InterruptClaimRejectReason)reason, (InterruptJudgeFailReason)judgeReason);
+        Edit.Log($"[InterruptManager] 내 간파 신고 거부 — {rejection.Reason}/{rejection.JudgeFailReason} · 대상 {targetId} · 창 #{windowId}", this);
+        RejectionReceived?.Invoke(rejection);
     }
 
     // ---- IInterruptJudgeWorld ----
@@ -315,6 +620,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         double now = ServerNow;
         SamplePlayers(now);
         SampleTargets(now);
+        TickOwnerJudges(now);
     }
 
     void SampleClock()
@@ -331,6 +637,8 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         _actors.Clear();
         _targets.Clear();
         _targetIds.Clear();
+        _claimServer.Clear();
+        _ownerJudges.Clear();
         _hasState = false;
     }
 
@@ -487,6 +795,9 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
 
         UnregisterHandlers();
         messaging.RegisterNamedMessageHandler(WindowMessageName, HandleWindowMessage);
+        messaging.RegisterNamedMessageHandler(ClaimMessageName, HandleClaimMessage);
+        messaging.RegisterNamedMessageHandler(ApprovalMessageName, HandleApprovalMessage);
+        messaging.RegisterNamedMessageHandler(RejectMessageName, HandleRejectMessage);
         _registeredMessaging = messaging;
 
         if (_networkManager.IsServer)
@@ -501,6 +812,9 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         if (_registeredMessaging != null)
         {
             _registeredMessaging.UnregisterNamedMessageHandler(WindowMessageName);
+            _registeredMessaging.UnregisterNamedMessageHandler(ClaimMessageName);
+            _registeredMessaging.UnregisterNamedMessageHandler(ApprovalMessageName);
+            _registeredMessaging.UnregisterNamedMessageHandler(RejectMessageName);
             _registeredMessaging = null;
         }
 

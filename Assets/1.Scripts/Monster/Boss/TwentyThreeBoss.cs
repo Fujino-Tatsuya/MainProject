@@ -15,7 +15,7 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptClaimTarget
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -6005,7 +6005,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         // 🔴 조건은 base 호출 **전에** 스냅샷한다. base 가 사망·상태를 바꿀 수 있어서,
         //    뒤에서 읽으면 이미 닫힌 창을 보게 된다.
+        // 세션 중엔 간파 성공을 피격으로 정하지 않는다 — 오너 신고를 InterruptManager 가 검증해 IInterruptClaimTarget 으로 넘긴다(할 일 191).
         bool counter = IsServer
+                       && !InterruptManager.ServerVerifiesClaims
                        && _counterWindow.Value
                        && !CounterBlockedByState          // 취약·제압 중 간파 실패(기획 간파 §8)
                        && IsInterruptAttack(attackInfo)
@@ -6029,7 +6031,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
         // 인터럽트 히트에서만 돌므로 조용하다. 취약·제압 중에는 실패가 정상이라 찍지 않는다.
-        if (IsInterruptAttack(attackInfo) && !counter && !CounterBlockedByState)
+        if (IsInterruptAttack(attackInfo) && !counter && !CounterBlockedByState && !InterruptManager.ServerVerifiesClaims)
         {
             Debug.LogWarning(
                 $"[23호] 인터럽트가 카운터로 성립하지 않았다 — " +
@@ -6074,18 +6076,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (counter && resolved && State != MonsterState.Dead)
         {
-            _fightCounters++;
-            _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 ReceiveAttack 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
-            EnterCounterSuccess();
-            // 간파 피격 클립을 트는 그로기일 때만 두 발짝 뒤로(경석 10-29) — 제압·기믹 처리(릴레이·구출 등)는 그 자리.
-            if (_parryHitGroggy.Value && State == MonsterState.Groggy)
-                StartParryRetreat();
+            ApplyCounterSuccessEffect();
             CombatStatsEvents.RaiseServerCounterSucceeded(this, GetAttackerClientId(hitContext)); // 결과 화면 통계(판정 무관)
-
-            // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
-            //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
-            //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
-            PlayInterruptFlashRpc();
         }
         else if (vulnerableHit && resolved && State != MonsterState.Dead)
         {
@@ -6111,6 +6103,38 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         return resolved;
     }
+
+    // [서버] 간파 성공의 보스 효과(할 일 191 D9 — 창마다 1회). 오프라인 피격 판정과 세션 신고 승인이 같은 처리를 쓴다.
+    // 결과 화면 통계(시전자 개인 기록)는 여기 없다 — 호출측이 시전자마다 올린다.
+    void ApplyCounterSuccessEffect()
+    {
+        _fightCounters++;
+        _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별(오프라인) — 피격 경로에선 이 ReceiveAttack 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
+        EnterCounterSuccess();
+        // 간파 피격 클립을 트는 그로기일 때만 두 발짝 뒤로(경석 10-29) — 제압·기믹 처리(릴레이·구출 등)는 그 자리.
+        if (_parryHitGroggy.Value && State == MonsterState.Groggy)
+            StartParryRetreat();
+
+        // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
+        //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
+        //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
+        PlayInterruptFlashRpc();
+    }
+
+    // ─── 간파 신고 승인(할 일 191 — InterruptManager 가 검증한 뒤 부른다) ───
+    // 범위·정면각·창·간파 불가·지목자는 매니저가 판정 시각 이력으로 이미 봤다. 여기는 그 뒤 바뀔 수 있는 대상 규칙만 본다.
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) =>
+        IsServer && State != MonsterState.Dead && RaidGimmickAcceptsCounter(casterClientId);   // 릴레이 잠금 · 밀어내기 1회 · 연쇄 지목자
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster)
+    {
+        if (!IsServer || State == MonsterState.Dead) return;
+        _raidCounterClientId = casterClientId;   // 기믹 처리(OnRaidGimmickCounter)가 읽는다
+        ApplyCounterSuccessEffect();
+    }
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) =>
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, casterClientId);   // 결과 화면 통계 — 동시 성공자 각자
 
     /// <summary>
     /// [전 피어] 카운터 성공 섬광.

@@ -62,6 +62,24 @@
 
 스폰 시작 상태 + `OnStateChanged`(서버)에서 알린다. 무기한 창이라 **길이 모름**, 닫힘은 간파 성공(조기 아님 — 길이 모름 닫힘)·디버그 랩 게이트. ✅
 
+## 2.5 클라 판정 → 서버 검증 (3단계)
+
+- **오너**: 누를 때 `PlayerSkillController` → `InterruptManager.BeginOwnerJudge`. 다음 샘플 뒤 누른 시각 표본으로 `Predict` 해 판정 시각(근접 = 누름 + Hit 지연, 대쉬 = max(대시 끝, Hit))을 잡고,
+  그 시각 표본이 쌓이면 `Judge`. 성공이면 신고(`InterruptClaim` — 판정 시각·대상·창 id·공격 방향·내 위치) 1회, 실패면 안 보낸다(`OwnerJudged` 이벤트만). 시전 거부·강제 종료면 대기 판정을 버린다.
+- **전송 경로**: 매니저 named message(`InterruptManager.Claim` / `.Approval` / `.Reject`) — 프리팹에 NetworkObject 가 없어 1단계 창 시간표와 같은 방식. 호스트 오너는 서버 처리를 직접 부른다.
+- **서버 검증**(`InterruptClaimServer.Process`): 소유 확인 → `InterruptClaimValidator`(같은 `Judge` 를 서버 이력으로, 허용 오차 = 시각 RTT/2 + 여유 · 거리 · 각도. 창은 판정 시각 ± 시각 여유 — 조기 닫힘도 닫힘 + 여유까지 인정,
+  위치·대상 표본은 판정 시각 ± 시각 여유 안 한 칸이라도 성공이면 통과) → 첫 승인 후보만 대상 규칙(`IInterruptClaimTarget.ServerAcceptsInterruptClaim` — 사망·23호 기믹) →
+  창마다 장부(`InterruptClaimLedger`, 서버 도착 시각 기준 첫 승인 + 동시 인정 시간 안 = 동시, 경계 포함, 그 뒤 = 선착순 패배).
+- **효과 나눔(D9)**: 첫 승인만 `ServerApplyInterruptSuccessEffect`(창 소비·그로기·제압 칸·섬광 — 서버 창이 이미 닫혔어도 준다), 승인마다 `ServerRecordInterruptSuccess`(결과 화면 통계 `CombatStatsEvents.ServerCounterSucceeded`)와
+  시전자 간파 스킬의 `ServerInterruptSucceeded`(특성·튜토리얼 훅). 대상: 23호·SpinnerBot·GauntletBot·WallBot·스파링 봇·허수아비(허수아비는 통계 없음).
+- **세션 중 대상은 피격으로 성공을 정하지 않는다**(`InterruptManager.ServerVerifiesClaims`). 오프라인(세션·매니저 없음)은 기존 피격 판정 그대로.
+- **서버 간파 스킬 판정(ResolveHit)**: 앵커 오버랩은 피해만. 신고 결과가 아직이면 RTT + 0.1초(`verdictWaitPadding`)까지 기다린 뒤 연출 사건·판정 1회 사건을 낸다(End 도 그때까지 미룬다). 결과가 늦게 오면 성공 기록만 남긴다.
+  이미 승인된 대상에게는 이 피해에 간파 표식을 싣지 않는다(방금 든 취약에 간파 넉백이 또 들어가지 않게).
+- **결과 배포**: 승인 = 같은 창 승인 목록 전체를 모든 피어에(`ApprovalReceived`), 거부 = 그 오너에게 이유와 함께(`RejectionReceived` — 범위·각도·창 닫힘·선착순·서버 거부). 연출 cue 연결은 4단계.
+- **데이터 테이블 칸**(`SlowMotion` 시트, 대상 `NetworkManager`, 타입 `InterruptManager` Order 3): `verifyTimeSlack`(0.033)·`verifyDistanceSlack`(0.2)·`verifyAngleSlack`(5)·`simultaneousSeconds`(0.05). 병합 Export 전까지 프리팹 값.
+- 테스트: `InterruptClaimServerTests`, 메뉴 `Tools/Tests/간파 판정·검증 EditMode 테스트 실행`.
+- 한계: 오너 권한 이동이라 서버 이력의 시전자 위치가 보간 지연만큼 늦다 — 시각 여유 안에서만 따라잡는다(대쉬 간파 끝에서 거부가 늘 수 있음, D12 QA 비율로 판단). QA 봇 간파(164)는 이 브랜치에 없어 5단계.
+
 ## 3. 알려진 한계 (1단계)
 
 - 닫힘 예정은 게임초 길이 기준 — 서버 슬로우 중에 열린 창도 `GameNow` 도메인이라 맞는다. 다만 슬로우가 끼면 실제 닫힘이 조금 어긋날 수 있어 닫힘은 항상 배포한다.

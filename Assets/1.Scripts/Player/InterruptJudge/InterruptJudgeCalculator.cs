@@ -79,6 +79,11 @@ public struct InterruptJudgeAttempt
     public Vector3 AttackDirection;
     /// <summary>예측이 고른 대상(0 = 없음). 성공 대상이 없으면 이 대상의 실패 이유를 낸다.</summary>
     public ulong TargetId;
+    /// <summary>
+    /// 시전자·대상 표본을 읽을 시각 = 판정 시각 + 이 값(초, 기본 0). 창은 늘 판정 시각으로 본다.
+    /// 서버 검증(3단계)이 시각 허용 오차 안에서 표본 시각만 옮겨 다시 돌릴 때 쓴다(<see cref="InterruptClaimValidator"/>).
+    /// </summary>
+    public double SampleOffset;
 
     /// <summary>예측 결과로 판정 입력을 만든다 — 같은 판정 시각·공격 방향·대상.</summary>
     public static InterruptJudgeAttempt FromPrediction(ulong actorId, in InterruptJudgeResult prediction) =>
@@ -206,12 +211,13 @@ public static class InterruptJudgeCalculator
             DashEndTime = attempt.JudgeTime,
         };
 
-        if (world == null || !world.TryGetActorAt(attempt.ActorId, attempt.JudgeTime, out InterruptActorSample actor))
+        double sampleTime = attempt.JudgeTime + attempt.SampleOffset;
+        if (world == null || !world.TryGetActorAt(attempt.ActorId, sampleTime, out InterruptActorSample actor))
             return result;
 
         result.ResolvePosition = actor.Position;
         result.AttackDirection = AttackDirectionOr(attempt.AttackDirection, actor.Forward);
-        Evaluate(world, actor, attempt.JudgeTime, attempt.TargetId, tolerance, ref result);
+        Evaluate(world, actor, sampleTime, attempt.TargetId, tolerance, ref result);
         return result;
     }
 
