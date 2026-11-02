@@ -20,7 +20,7 @@ using UnityEngine.Serialization;
 /// </summary>
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
-public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
+public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
     IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings
 {
     public static InterruptProductionDirector Instance { get; private set; }
@@ -575,23 +575,6 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     }
 
     /// <summary>
-    /// [오너] 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2) — 결론 전 약 시도면 지금부터 오너 암전·빛 모임을 켠다(늦게 켜지는 것 허용).
-    /// 대상은 <see cref="LocalOwnerAttempt"/> 와 같이 먼저 넘긴다. 강 → 약 내리기는 없다.
-    /// </summary>
-    public static void LocalOwnerUpgrade(GameObject owner, GameObject target)
-    {
-        if (Instance == null)
-            return;
-
-        InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
-        if (!presentation.CanUpgrade)
-            return;
-
-        Instance._ownerDimOutput?.SetSubjects(owner, target);
-        presentation.UpgradeToStrong(Time.unscaledTime);
-    }
-
-    /// <summary>
     /// [오너] 이번 오너 암전에 함께 남길 루트(빛 모임 VFX 등, 단계 4). 암전이 걷히면 빠진다 — 시도마다 다시 부른다.
     /// 렌더링 레이어 비트 4 를 그 순간 루트 아래 렌더러에 붙인다(<see cref="InterruptOwnerMaskTagger"/>).
     /// </summary>
@@ -654,7 +637,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             ObserveLocalClaim(triggerId, casterClientId, purpose, targetPosition);
 
         // 오너 연출(할 일 132) — 내 슬로우만(팀원 화면은 시도 단계 무변화). 시도 목적이 예측과 다르면 걷고, 성공이면 성공 단계로.
-        if (viewerIsCaster)
+        // 오너 판정 cue(할 일 191)가 이미 처리한 내 슬로우면 본인 화면 오너 연출·섬광 예약을 건너뛴다(OwnerJudgeCues.cs).
+        bool ownerCueHandled = viewerIsCaster && OwnerJudgeCueHandles(purpose);
+        if (viewerIsCaster && !ownerCueHandled)
             OwnerPresentation.ServerStarted(triggerId, purpose, true, Time.unscaledTime);
 
         // 빛 모임(할 일 132 단계 4) — 남의 강 시도면 이 화면에 튼다(본인 화면은 입력 순간 예측이 이미 켰다). 성공이면 그 발동자 것을 끈다.
@@ -685,12 +670,13 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
             // 섬광 순간(②③④ 프레임 뒤 = ⑤ 시작) = 모든 피어 월드 섬광·라이트 + 암순응.
             float now = InterruptEffectTime.Now(HitFlash.Clock);
             int frame = Time.frameCount;
-            bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
+            bool ownerOverlay = !ownerCueHandled && InterruptHitFlashRules.ShouldPlayOwnerOverlay(purpose, viewerIsCaster,
                 viewerIsCaster && OwnerPresentation.SuccessDimmed);
             // ④ 스미어 방향 = 이번 강 시도의 공격 방향(오너 상태 — 입력 순간 예측이 받은 시전/대시 방향).
             if (ownerOverlay)
                 HitFlash.BeginOwnerOverlay(FlashPoint(targetPosition), OwnerPresentation.AttackDirection, now, frame);
-            HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), frame);
+            if (!ownerCueHandled)
+                HitFlash.ScheduleFlash(new InterruptHitFlashMoment(e, viewerIsCaster, ownerOverlay), frame);
         }
 
         SuccessStage.LocalStarted(purpose, e, FindSuccessFxSinks(casterClientId));

@@ -15,8 +15,9 @@ using UnityEditor;
 /// <list type="bullet">
 /// <item><b>상시 미리보기.</b> 이 피어의 로컬 플레이어(<see cref="Player.IsInputSource"/>)마다 지금 위치·조준 방향(<see cref="PlayerSkillController.CurrentAimDirection"/>
 ///       = 근접 간파 요청 방향)의 형상. 색 = 오너 예측과 같은 대상 탐색(<see cref="PlayerInterruptSkillBase.FindOwnerViewTarget"/>)의 대상 없음 / 창 닫힘 / 창 열림.</item>
-/// <item><b>시도 잔상.</b> 계측 훅(<see cref="PlayerInterruptSkillBase.CalibrationOwnerPredicted"/> 등)이 오는 그 프레임에 그 예측의 판정 위치
-///       (<see cref="DashInterruptPrediction.PredictedEndPosition"/> — 근접 = 시전 위치, 대쉬 = 예상 대시 끝)·공격 방향으로 형상을 잡아 몇 초 남긴다.
+/// <item><b>시도 잔상.</b> 새 예측 이벤트(할 일 191 — <see cref="InterruptManager.OwnerPredicted"/>·<see cref="InterruptManager.ServerAttemptPredicted"/>)가 오는 그 프레임에
+///       그 예측의 판정 위치(<see cref="InterruptJudgeResult.ResolvePosition"/> — 근접 = 시전 위치, 대쉬 = 예상 대시 끝)·공격 방향으로
+///       누른 시각 시전자 표본의 간파 상자(<see cref="InterruptJudgeCalculator.PlaceHitbox"/>)를 놓아 몇 초 남긴다.
 ///       대쉬면 시전 위치 → 예상 대시 끝 선도. 색 = 예측 결과(대상 없음/약/강). 서버 예측은 시전자가 이 피어 로컬이 아닐 때만(호스트에서 남의 시도) 남긴다.</item>
 /// <item><b>그리기.</b> Scene 뷰 = OnDrawGizmos, Game 뷰 = 메인 카메라 렌더 뒤 GL 선(Gizmos 버튼 무관). 선분은 매 프레임 같은 리스트를 다시 채운다(메시·텍스처 생성 없음).</item>
 /// </list>
@@ -56,7 +57,6 @@ public sealed class InterruptJudgeShapeGizmos : MonoBehaviour
         public Vector3 CastPosition;
         public Vector3 ResolvePosition;
         public bool ViaDash;
-        public bool Repredicted;
         public InterruptAttemptForecast Forecast;
         public string Source;
         public float Age;
@@ -85,19 +85,15 @@ public sealed class InterruptJudgeShapeGizmos : MonoBehaviour
 
     void OnEnable()
     {
-        PlayerInterruptSkillBase.CalibrationOwnerPredicted += HandleOwnerPredicted;
-        PlayerInterruptSkillBase.CalibrationOwnerRepredicted += HandleOwnerRepredicted;
-        PlayerInterruptSkillBase.CalibrationServerPredicted += HandleServerPredicted;
-        PlayerInterruptSkillBase.CalibrationServerRepredicted += HandleServerRepredicted;
+        InterruptManager.OwnerPredicted += HandleOwnerPredicted;
+        InterruptManager.ServerAttemptPredicted += HandleServerAttemptPredicted;
         RenderPipelineManager.endCameraRendering += HandleEndCameraRendering;
     }
 
     void OnDisable()
     {
-        PlayerInterruptSkillBase.CalibrationOwnerPredicted -= HandleOwnerPredicted;
-        PlayerInterruptSkillBase.CalibrationOwnerRepredicted -= HandleOwnerRepredicted;
-        PlayerInterruptSkillBase.CalibrationServerPredicted -= HandleServerPredicted;
-        PlayerInterruptSkillBase.CalibrationServerRepredicted -= HandleServerRepredicted;
+        InterruptManager.OwnerPredicted -= HandleOwnerPredicted;
+        InterruptManager.ServerAttemptPredicted -= HandleServerAttemptPredicted;
         RenderPipelineManager.endCameraRendering -= HandleEndCameraRendering;
         SetHoverGate(false);
         _afterimages.Clear();
@@ -111,41 +107,36 @@ public sealed class InterruptJudgeShapeGizmos : MonoBehaviour
 
     // ─── 시도 잔상 ──────────────────────────────────────────────────────
 
-    void HandleOwnerPredicted(PlayerInterruptSkillBase.CalibrationPrediction p) => Record(p, "오너", false);
-    void HandleOwnerRepredicted(PlayerInterruptSkillBase.CalibrationPrediction p) => Record(p, "오너", true);
+    void HandleOwnerPredicted(InterruptCastRequest cast, InterruptJudgeResult prediction) => Record(cast, prediction, "오너");
 
-    // 호스트에서 내 시도는 오너 훅이 이미 남겼다 — 서버 훅은 남(원격 클라)의 시도만.
-    void HandleServerPredicted(PlayerInterruptSkillBase.CalibrationPrediction p)
+    // 호스트에서 내 시도는 오너 예측이 이미 남겼다 — 서버 시도 슬로우 예측은 남(원격 클라)의 시도만.
+    void HandleServerAttemptPredicted(InterruptCastRequest cast, InterruptJudgeResult prediction)
     {
-        if (!IsLocalCaster(p.Skill))
-            Record(p, "서버", false);
+        InterruptManager manager = InterruptManager.Instance;
+        if (manager != null && manager.TryGetPlayer(cast.ActorId, out Player player) && player != null && player.IsInputSource)
+            return;
+        Record(cast, prediction, "서버");
     }
 
-    void HandleServerRepredicted(PlayerInterruptSkillBase.CalibrationPrediction p)
-    {
-        if (!IsLocalCaster(p.Skill))
-            Record(p, "서버", true);
-    }
-
-    static bool IsLocalCaster(PlayerInterruptSkillBase skill)
-    {
-        Player player = skill != null ? skill.GetComponentInParent<Player>() : null;
-        return player != null && player.IsInputSource;
-    }
-
-    // 훅은 예측과 같은 프레임에 온다 — 같은 판정 위치·공격 방향·시전자 위치로 예측 오버랩과 같은 형상을 잡는다.
-    void Record(in PlayerInterruptSkillBase.CalibrationPrediction p, string source, bool repredicted)
+    // 예측과 같은 프레임에 온다 — 예측이 쓴 그 시전자 표본(누른 시각)·판정 위치·공격 방향으로 같은 형상을 잡는다.
+    void Record(in InterruptCastRequest cast, in InterruptJudgeResult prediction, string source)
     {
         var a = new Afterimage
         {
-            CastPosition = p.Input.CastPosition,
-            ResolvePosition = p.Prediction.PredictedEndPosition,
-            ViaDash = p.ViaDash,
-            Repredicted = repredicted,
-            Forecast = p.Prediction.Forecast,
+            CastPosition = prediction.ResolvePosition,
+            ResolvePosition = prediction.ResolvePosition,
+            ViaDash = cast.ViaDash,
+            Forecast = prediction.Forecast,
             Source = source,
         };
-        a.HasShape = p.Skill != null && p.Skill.TryGetPlacedJudgeShape(a.ResolvePosition, p.AttackDirection, out a.Shape);
+        InterruptManager manager = InterruptManager.Instance;
+        if (manager != null && manager.TryGetActorAt(cast.ActorId, cast.PressTime, out InterruptActorSample sample))
+        {
+            a.CastPosition = sample.Position;
+            a.HasShape = sample.HasHitbox;
+            if (a.HasShape)
+                a.Shape = InterruptJudgeCalculator.PlaceHitbox(sample, prediction.AttackDirection, prediction.ResolvePosition, 0f);
+        }
 
         if (_afterimages.Count >= InterruptJudgeShapeGizmoRules.MaxAfterimages)
             _afterimages.RemoveAt(0);
@@ -154,7 +145,7 @@ public sealed class InterruptJudgeShapeGizmos : MonoBehaviour
     }
 
     static string Describe(in Afterimage a) =>
-        $"{a.Source} {(a.ViaDash ? "대쉬" : "근접")}{(a.Repredicted ? " 재예측" : "")} · " +
+        $"{a.Source} {(a.ViaDash ? "대쉬" : "근접")} · " +
         $"{InterruptJudgeShapeGizmoRules.DescribeForecast(a.Forecast)}" +
         (a.ViaDash ? $" · 대시 {Flat(a.ResolvePosition - a.CastPosition).magnitude:0.00}m" : "");
 

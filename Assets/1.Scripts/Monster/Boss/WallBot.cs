@@ -30,7 +30,7 @@ using UnityEngine.AI;
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
 [DataTableSheet("MidBoss", Order = 2)]
-public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor
+public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor, IInterruptClaimTarget
 {
     // 할 일 134 — 취약 밖(공격 밖 평상 포함) 상시 슈퍼아머 = 밀치기·기절·뇌진탕 거부, 취약 = 허용(BossCrowdControlRules).
     bool IMonsterStateSuperArmor.StateSuperArmor => BossCrowdControlRules.MidBossStateSuperArmor(Rank == MonsterRank.MidBoss, IsMidBossVulnerable);
@@ -338,12 +338,28 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindow
         base.TakeDamage(attackInfo);
 
         if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
+        if (InterruptManager.ServerVerifiesClaims) return;   // 세션 중 성공 = 신고 승인(IInterruptClaimTarget, 할 일 191)
         if (!Counter.TryConsumeInterrupt()) return;
 
         _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 TakeDamage 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
+
+    // ─── 간파 신고 승인(할 일 191) — 창이 이미 닫혔어도(조기 닫힘 + 허용 오차) 효과를 준다(D7) ───
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) =>
+        IsServer && State != MonsterState.Dead && Counter != null;
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster)
+    {
+        if (!IsServer || Counter == null) return;
+        Counter.TryConsumeInterrupt();   // 열려 있으면 소비(닫힘 알림), 닫혔으면 그대로
+        _interruptSuccessCount++;
+        CounterSucceeded();
+    }
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) =>
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, casterClientId);
 
     // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
     int _interruptSuccessCount;   // 누적만 한다 — 값 자체가 아니라 타격 전후 비교용

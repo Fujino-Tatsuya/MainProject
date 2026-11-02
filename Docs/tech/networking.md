@@ -6,6 +6,10 @@
 - **Player**: movement, input, and animation are owner-authoritative.
 - **Server/Host**: every system except player-owned movement, input, and animation is authoritative on the host.
 - Anti-cheat is unnecessary for cooperative PvE, so this split keeps player response fast while keeping the network model simple.
+- **예외 — 간파 성공(할 일 191)**: 오너 클라가 자기 화면 기준으로 Hit 타이밍에 **1차 판정**하고, 서버가 **2차 검증**한다(같은 판정 함수를 서버 이력으로 + 허용 오차).
+  - 경로 = `InterruptManager`(`NetworkManager.prefab`, 모든 피어) named message `InterruptManager.Claim`(오너 → 서버 신고) / `.Approval`(승인 목록 → 전 피어) / `.Reject`(거부 → 그 오너). 창 시간표는 `.Window`.
+  - 프리팹에 NetworkObject 가 없어 RPC 대신 named message 를 쓴다(`GlobalTimeScale` 과 같음).
+  - 선착순/동시(첫 승인 + 0.05초)·보스 효과 1회·피해는 여전히 서버가 정한다. 상세 [interrupt-client-judge.md](interrupt-client-judge.md).
 
 ## Lobby Demo (target, 2026-10-19)
 > Status: **implementation in progress** on `feature/LobbyDemo` (PLAN-48 v2, commits C1~C13). The code may still differ from this section until those commits land.

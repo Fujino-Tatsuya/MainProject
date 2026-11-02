@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 2312403450460863167}
   - component: {fileID: 127159849850635136}
   - component: {fileID: 1635166641757817886}
+  - component: {fileID: 4191191191191191191}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -295,3 +296,16 @@ MonoBehaviour:
   suppressFlashSequenceB: {fileID: 11400000, guid: 3a1bc7e8e4b29634fb97ac3c91ba0cc1, type: 2}
   suppressFlashMaterial: {fileID: 2100000, guid: 5903fe22bc43ce7448fbc80af146a40b, type: 2}
   reduceFlash: 0
+--- !u!114 &4191191191191191191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73c53e5bba5a22a43987d64f66ff1b4a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptManager
+  logWindows: 0

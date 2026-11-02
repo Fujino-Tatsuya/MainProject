@@ -27,6 +27,7 @@
 ## 4. 코어 설계 원칙 (요약)
 - **UnitBase = 공통(기본 상태 + 스탯)만.** 이동/어빌리티/상태이상/스탯은 **컴포넌트로 조립**(상속 최소).
 - **네트워크 권한**: 플레이어 이동/스킬 = **클라(오너) 권한** / 보스·데미지·상태이상·장판 = **서버(호스트) 권한**.
+  - 예외: **간파 성공 = 클라(오너) 1차 판정, 서버 2차 검증** — [Docs/tech/interrupt-client-judge.md](Docs/tech/interrupt-client-judge.md).
 - **데이터 주도**: 스킬/빌드/보스 패턴은 ScriptableObject로 (머지 충돌·튜닝 편의).
 - 상세: [Docs/tech/architecture.md](Docs/tech/architecture.md), [Docs/tech/networking.md](Docs/tech/networking.md)
 
@@ -62,10 +63,11 @@
 - **플레이어 스탯**: [Docs/tech/player-stats.md](Docs/tech/player-stats.md) — 공격력·이동속도·공격속도·방어력·최대 체력 5종 기본%·전체%(+공격력 가하는 피해%) 공식, 서버·클라 같은 종합(`PlayerStats`), 판정은 서버 값, 공격 요청마다 서버 2차 검증(경고만). 새 스탯 추가 절차 §3.
 - **행동 입력 거부 피드백**: [Docs/tech/skill-reject-feedback.md](Docs/tech/skill-reject-feedback.md) — 거부 사유별 선입력 버퍼 처리 표(보관/버림), 오너 전용 이벤트 `CooldownRejected`·`ActionBlockedByEffect`(입력 1회=1회)·사운드 키 지정법(비우면 무음).
 - **간파 연출 디렉터**: [Docs/tech/interrupt-presentation.md §6](Docs/tech/interrupt-presentation.md) — `NetworkManager.prefab` 의 `InterruptProductionDirector` 가 단일 진입점. 간파 스킬은 사건 4개(시도·판정·성공·실패)만 알리고, 스위치 12칸(A5 = 간파 암전·섬광 중 피해 숫자·머리 위 체력바(플레이어·몬스터·보스)·조준 표시 숨김, 154·179 후속 2·4 · A6 = 제압 간파 섬광 시퀀스, 179)·시도/성공 슬로우 프로필·개인/공용 채널은 디렉터가 든다. 새 간파 연출은 `GlobalTimeScale.Started` 직접 구독 말고 디렉터 cue(`IInterruptCueSink`)로.
-- **간파 연출(132)**: [Docs/tech/interrupt-presentation.md](Docs/tech/interrupt-presentation.md) §0 — 예측 3상태(대상 없음/약/강, 근접·대쉬 공용·대상 캐시) → 강 = 오너 마스크 암전(비트 4·HUD 덮개)+빛 모임, 성공 = 히트스톱·적중 섬광 ②~⑥(스타버스트 렌즈 플레어·화이트아웃·스미어 → 섬광 순간 0.133s → 색수차 블러·가라앉음, 끝 0.433s)·팀원 암순응. 스위치 A1~A4 켬·B/C/E 꺼짐, 수치·누가 보나·덮어쓸 텍스처 칸·알려진 제약.
+- **간파 클라 판정(191)**: [Docs/tech/interrupt-client-judge.md](Docs/tech/interrupt-client-judge.md) — `InterruptManager`(`NetworkManager.prefab`)가 세계 스냅샷·창 시간표·예측/판정 순수 함수(근접 = 누름 + Hit 지연, 대쉬 = max(대시 끝, Hit))를 들고, 오너가 Hit 타이밍에 판정 → 신고 → 서버 검증(허용 오차 `SlowMotion` 시트)·선착순/동시 0.05초·보스 효과 1회. 연출 cue·D10 암전 제외·QA 기록(`QA/191interrupt-…`)·23호 창 여닫는 곳·알려진 한계. QA 봇 간파는 할 일 193.
+- **간파 연출(132)**: [Docs/tech/interrupt-presentation.md](Docs/tech/interrupt-presentation.md) §0 — 예측 3상태(대상 없음/약/강 — 191부터 `InterruptManager.Predict`, 결론은 오너 판정 cue) → 강 = 오너 마스크 암전(비트 4·HUD 덮개)+빛 모임, 성공 = 히트스톱·적중 섬광 ②~⑥(스타버스트 렌즈 플레어·화이트아웃·스미어 → 섬광 순간 0.133s → 색수차 블러·가라앉음, 끝 0.433s)·팀원 암순응. 스위치 A1~A4 켬·B/C/E 꺼짐, 수치·누가 보나·덮어쓸 텍스처 칸·알려진 제약.
   **제압 간파(179, §7)** = 제압 칸 마지막 1칸 간파 성공은 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어·암전은 오너만) — 컷 SO `SuppressFlashSequence`·후처리 뒤 셰이더 1패스(비트 7 실루엣)·표식은 슬로우 Start 이벤트 1바이트(새 RPC 없음)·섬광 줄이기 = PlayerPrefs `Interrupt.ReduceFlash`.
   레퍼런스 B 시퀀스(60fps 5컷)·디렉터 A/B 선택·DebugInterruptLab 전환 버튼은 §7.8(179 후속 3).
-- **대쉬 간파**: [Docs/tech/dash-interrupt.md](Docs/tech/dash-interrupt.md) — 대시 시작 후 창(기본 0.1초) 안 우클릭만 소비(창 밖은 기존 선입력 버퍼), 대시에 간파가 실려 대시 끝에 Skill 전이·판정(판정 시각 = max(대시 끝, 평소 Hit)), RPC 플래그 `dashInterrupt`(새 RPC 없음)·서버 창+허용오차, 상체 레이어 `DashInterruptUpper`, `PlayerDashData` 칸 3개·알려진 한계.
+- **대쉬 간파**: [Docs/tech/dash-interrupt.md](Docs/tech/dash-interrupt.md) — 대시 시작 후 창(기본 0.1초) 안 우클릭만 소비(창 밖은 기존 선입력 버퍼), 대시에 간파가 실려 대시 끝에 Skill 전이·판정(판정 시각 = max(대시 끝, 평소 Hit) — 191부터 판정은 `InterruptManager`, 대시 끝 = 공용 스윕), RPC 플래그 `dashInterrupt`(새 RPC 없음)·서버 창+허용오차, 상체 레이어 `DashInterruptUpper`, `PlayerDashData` 칸 3개·알려진 한계.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조

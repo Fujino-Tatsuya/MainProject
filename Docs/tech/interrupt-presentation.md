@@ -8,6 +8,8 @@
 > ②③④ 길이 = **렌더 프레임 수**(기본 2·2·2, 섬광 순간 = 6 프레임째), ⑤⑥ = 초. DebugInterruptLab 씬 OnGUI **튜닝 패널** — [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
 > 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
 > 🔹 할 일 179(2026-11-02, 브랜치 `feature/SuppressInterruptFlash`): **제압 간파**(제압 칸 마지막 1칸 간파) 성공은 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(모든 피어, 컷 SO·후처리 뒤 셰이더 1패스, 암전은 오너만, 섬광 줄이기 옵션) — [§7](#7-제압-간파-애니메이션-섬광-할-일-179).
+> 🔹 **할 일 191(2026-11-02)**: 예측 입력이 **`InterruptManager.Predict`**(누른 시각 표본)로 바뀌고, 성공은 **오너 클라 판정 → 서버 검증**이다. 오너 연출은 매니저의 **오너 판정 cue**(시도·판정 성공/실패·서버 거부·CC 끊김·승인 목록)로 움직인다.
+> 옛 예측기·약 → 강 올리기(`LocalOwnerUpgrade`)는 삭제. 단일 원본 [interrupt-client-judge.md](interrupt-client-judge.md) — 이 문서는 [§0.2](#02-흐름)·[§6.2](#62-사건-흐름) 에 요약.
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
 > 🔹 스위치 12칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 전투 표시 숨김(154·179 후속 2)·A6 제압 간파 섬광 시퀀스(179) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
@@ -25,27 +27,32 @@
 | 시도 · **대상 없음** | 사거리·각도 안 간파 대상 없음 | **아무것도 없음**(슬로우·줌·암전·빛 모임 없음 — 132 이전 '예측 빗나감'과 같음) |
 | 시도 · **약**(실패 예측) | 대상은 있지만 창이 닫혀 있음 / 판정 시각 전에 창이 닫힐 것 | 약 슬로우(`interruptWeakProfile`)·약 줌만 |
 | 시도 · **강**(성공 예측) | 판정 시각까지 창이 버틸 것 | 강 슬로우(`interruptProfile`)·강 줌 + **오너 암전** + **빛 모임** |
-| 성공(서버 확정) | 카운터 창 소비 | 히트스톱(A1) 시작 = ② 스타버스트 → ③ 화이트아웃 → ④ 스미어 → **섬광 순간**(오너 암전 즉시 끔·월드 섬광·팀원 암순응) = ⑤ 색수차 블러 → ⑥ 가라앉음 · 성공 슬로우 |
-| 실패(서버 확정) | 판정 빗나감·판정 전 종료·거부 | 슬로우 실패 복귀 + 오너 암전 0.2초에 걷음·빛 모임 정지. 섬광 없음 |
-| 선점(서버 확정, 할 일 143) | 다른 플레이어가 먼저 성공시킨 창 | 피해만 — 실패와 같은 정리(섬광·성공 연출 없음) · [§0.10](#010-선착순-한-명-할-일-143) |
+| 성공(오너 판정 → 서버 승인, 191) | 오너 화면 = 판정 성공 즉시(서버 안 기다림), 전역 슬로우·팀원 화면 = 첫 승인 | 히트스톱(A1) 시작 = ② 스타버스트 → ③ 화이트아웃 → ④ 스미어 → **섬광 순간**(오너 암전 즉시 끔·월드 섬광·팀원 암순응) = ⑤ 색수차 블러 → ⑥ 가라앉음 · 성공 슬로우 |
+| 실패 | 오너 판정 실패·CC 끊김·판정 버림·시전 거부 | 슬로우 실패 복귀 + 오너 암전 0.2초에 걷음·빛 모임 정지. 섬광 없음 |
+| 서버 거부(191) | 판정 성공했지만 서버 검증 실패 | 이미 튼 성공 섬광까지 즉시 끔 |
+| 선착순 패배(191) | 첫 승인 뒤 0.05초 넘어 도착 | 서버 거부와 같음. 0.05초 안이면 **동시 성공** — 각자 섬광·성공 기록, 보스 효과 1회 · [interrupt-client-judge.md §5](interrupt-client-judge.md#5-서버-검증-interruptclaimserver--interruptclaimvalidator) |
 
 ### 0.2 흐름
 
 ```
 간파 입력(오너 — 근접 Cast / 대쉬 TryUseDashInterrupt)
-  ├─ [오너 클라] 즉시 예측(PlayerInterruptSkillBase.TryPredictOwnerAttempt — 요청 RPC 보다 먼저)
-  │     대상 = InterruptTargetRegistry 캐시(오버랩 없음) · 창 = IInterruptWindowReplica 복제값 + InterruptWindowReplicaTracker
-  │     → Director.LocalOwnerAttempt(forecast) → 오너 연출 상태 기계 InterruptOwnerPresentation
+  ├─ [오너 클라] InterruptManager.BeginOwnerJudge (할 일 191)
+  │     다음 LateUpdate: 누른 시각 표본으로 Predict → 시도 cue → Director.LocalOwnerAttempt(forecast) → 오너 상태 기계 InterruptOwnerPresentation
   │        강 = 오너 암전 0→1(ownerDimInDuration 0.1s, 실시간) + 빛 모임 시작 / 약·대상 없음 = 아무것도 안 켬
+  │     판정 시각 표본이 쌓인 LateUpdate: Judge
+  │        성공 → 판정 성공 cue(서버 안 기다림 — 성공 단계·섬광) → 신고(Claim) 1회
+  │        실패 → 종료 cue(걷기 0.2s) / 판정 전 CC 끊김·판정 버림 → 종료 cue
+  │     서버 결과: 거부 → 종료 cue(섬광까지 즉시 끔) / 승인 목록 → D10 함께 성공자 암전 제외
   │
-  └─ 요청 RPC ─▶ [서버] 승인 → OnServerStart → 같은 예측(InterruptAttemptPrediction.BuildInput — 창 값 출처만 서버)
+  └─ 요청 RPC ─▶ [서버] 승인 → OnServerStart → InterruptManager.TryPredictServerAttempt(같은 Predict, 서버 이력·창 시간표)
         → Director.ServerAttempt → 대상 없음 = 슬로우 없음(발동 번호 0) / 약 = AttemptWeak / 강 = Attempt
-        → 판정(ResolveHit) → ServerResolve(빗나감 = ServerFail) → 성공이면 ServerSuccess(성공 슬로우 + A1)
+        → 판정(ResolveHit = 피해만) → 그때까지 승인 없으면 ServerFail
+        → 신고 승인(ServerOnClaimVerdict) — 첫 승인이면 ServerSuccess(성공 슬로우 + A1)
         │
         ▼ 각 피어 GlobalTimeScale.Started/Failed/ForcedReset — 유일한 구독자 = 디렉터
-  [오너 화면]   ServerStarted(purpose)
-                 · 서버 목적 ≠ 예측(예: 오너 강 ↔ 서버 약) → '예측 빗나감' = 실패처럼 걷기(ownerDimOutDuration 0.2s) · 빛 모임 정지
-                 · Success → 성공 단계: 오너 암전 유지 → 섬광 순간에 즉시 끔(램프 없음)
+  [오너 화면]   cue 경로가 시도를 몰면 내 서버 시도 슬로우 목적으로 걷지 않는다(D4 — 결론은 오너 판정)
+                 · 내 서버 Success Started → 판정 성공 cue 로 이미 튼 섬광이라 한 번 삼킨다(두 번 안 터짐)
+                 · 성공 단계: 오너 암전 유지 → 섬광 순간에 즉시 끔(램프 없음)
                Failed(발동 번호) / 판정 전 종료(LocalOwnerEnded) → 걷기 · 오너 애니 Hit 이벤트 → 빛 모임 정지
   [팀원 화면]   남의 강 시도(Attempt) → 발동자 소켓에서 빛 모임 → 발동자 Hit(PeerCasterHit)·실패·성공·리셋에 정지
                시도 단계에 그 외 변화 없음
@@ -56,18 +63,19 @@
                  A4 성공 이펙트 칸은 Started 즉시(§2.4)
 ```
 
-- **예측 함수 하나**(`DashInterruptPredictor`, `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs`) — 근접·대쉬 공용.
-  판정 시각 = 근접 `지금 + 준비 시간`, 대쉬 `max(예상 대시 끝, 평소 Hit)`. 준비 시간 = 이 피어 관측값 > 데이터 HitDelay > 모름(0).
-  남은 창 = 창 추정 길이(과거 관측) − 열린 뒤 경과. **모르면 '열려 있음'만으로 강**.
-- **대상 판정**(할 일 139-3, 새 수치 칸 없음): ① 판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치(근접 = 지금, 대쉬 = 예상 대시 끝)에 놓은 오버랩에 닿음
-  (`HitboxAnchorShape` — 서버 `ResolveHit` 과 같은 형상·질의) ② 대상 정면 허용각 안(`InterruptTargetGeometry.FacesAttacker` — 23호 `counterFrontAngle` 등 기존 판정값, 정면 판정 없는 대상 = 180).
+- **예측·판정 함수 하나**(할 일 191 — `InterruptManager.Predict`/`Judge` = `InterruptJudgeCalculator`) — 근접·대쉬 공용, 예측과 판정이 같은 계산.
+  판정 시각 = 근접 `누른 시각 + Hit 지연`, 대쉬 `max(실제 대시 끝, 누른 시각 + Hit 지연)`. Hit 지연 = 클립 Hit 이벤트 시각 ÷ 지금 애니 속도. 대시 끝 = 공용 스윕 `PlayerDashPath`.
+  창 = 서버 창 시간표(닫힘 예정·조기·늦은 닫힘). 옛 창 길이 추정·0.4초 규칙은 삭제.
+- **대상 판정**(새 수치 칸 없음): ① 판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치(근접 = 그 자리, 대쉬 = 대시 끝)에 놓은 형상에 닿음
+  ② 대상 정면 허용각 안(`InterruptTargetGeometry.FacesAttacker` — 23호 `counterFrontAngle` 등 기존 판정값, 정면 판정 없는 대상 = 180).
   HUD 강조 사거리(전방위 = 돌면 닿는 거리)보다 좁다. 원인·앵커 수치·재현은 [dash-interrupt.md §5](dash-interrupt.md).
   HUD 강조의 대상까지 거리 = 대상 콜라이더 **실제 표면** 수평 거리(`InterruptOmniRangeModel.HorizontalDistanceToCollider`, 할 일 139-4). 예전 AABB 거리는 대각선에서 최대 0.70m(23호) 짧아 강조가 실제보다 멀리서 켜졌다.
-- **대쉬 간파 예측 시점 = 우클릭을 누른 순간**(`InterruptAttemptPrediction.AtPress` 가 처리 프레임 값을 누른 뒤 경과만큼 되돌림). 대쉬 → 우클릭 순서만([dash-interrupt.md §2.1](dash-interrupt.md)).
+- **예측 시점 = 우클릭을 누른 순간**(매니저 이력의 누른 시각 표본). 대쉬 → 우클릭 순서만([dash-interrupt.md §2.1](dash-interrupt.md)).
 - **대상 캐시** `InterruptTargetRegistry`(서버·클라 같은 규칙): 등록 = 대상 스폰(모든 피어 — 23호 = 보스전 시작 Spawn, 중간보스·스파링 봇 = `MonsterBase`, 허수아비 = `TrainingDummyInterrupt`),
-  해제 = 디스폰·사망(MonsterBase Dead)·씬 언로드. 예측 오버랩에 걸린 Unit 중 캐시에 있는 것만 대상이다. 실제 판정(`ResolveHit` 오버랩)은 캐시를 쓰지 않는다.
-- **서버가 슬로우 강·약을 정한다**(`Time.timeScale` 은 전 피어 공용). 오너 클라 예측은 암전·빛 모임만 켠다 — 서버 결과가 다르면 실패 규칙으로 걷는다.
-  오너가 약·대상 없음으로 봤는데 서버가 강이면 오너 화면은 암전·빛 모임 없이 강 슬로우·줌만 받는다(뒤늦게 켜지 않는다).
+  해제 = 디스폰·사망(MonsterBase Dead)·씬 언로드. 매니저는 이 캐시의 대상을 샘플한다. 서버 피해(`ResolveHit` 오버랩)는 캐시를 쓰지 않는다.
+- **서버가 슬로우 강·약을 정한다**(`Time.timeScale` 은 전 피어 공용). 오너 연출(암전·빛 모임·섬광)의 결론은 **오너 판정**이다 — 서버 시도 슬로우 목적이 달라도 걷지 않는다(D4).
+  오너가 약·대상 없음으로 봤는데 서버가 강이면 오너 화면은 암전·빛 모임 없이 강 슬로우·줌만 받는다(뒤늦게 켜지 않는다 — 약 → 강 올리기 `LocalOwnerUpgrade` 는 191 에서 삭제).
+- **D10 `keepCoSucceededBright`**(디렉터, 기본 켬): 승인 목록을 받으면 함께 성공한 캐릭터도 내 암전에서 밝게 남긴다. 원격 클라는 승인이 섬광 순간 뒤에 오는 일이 많아 주로 호스트·저지연에서 보인다.
 
 ### 0.3 누가 보나
 
@@ -233,13 +241,9 @@
 
 ### 0.8 알려진 제약 (132)
 
-- **오너 예측은 근사.** 클라는 창 복제값(`IInterruptWindowReplica`)과 도착 시각 기록만 본다 — 23호 취약·제압 차단, 스파링 봇 준비 남은 시간 등은 서버만 안다. 그래서 오너 강 ↔ 서버 약이 갈릴 수 있고, 그때 오너 화면은 0.2초 걷기로 정리된다.
-  같은 틱 '다시 열기'(닫힘 → 열림)는 복제로 '열림 유지'로만 보인다.
-- **오너 강 ↔ 서버 대상 없음이면 스킬 끝까지 남는다.** 서버가 대상 없음으로 보면 시도 슬로우가 없어(발동 번호 0) 예측 빗나감·실패 이벤트가 오지 않는다 —
-  오너 암전은 간파 스킬 `OnEnd`(`LocalOwnerEnded`)에서 0.2초 걷기로 정리된다(빛 모임은 Hit 에서 먼저 멈춘다).
-- **창 길이를 모르면 강.** 첫 창(과거 관측 없음)은 '열려 있음'만으로 성공 예측한다 — 첫 시도는 강이 잘 나온다.
-  창 추정 길이 = 그 대상의 지난 '열림 → 닫힘' 길이 중앙값이라, 무기한 창(DebugInterruptLab 허수아비)은 '지난번 기다린 시간'이 길이가 된다 — 더 오래 기다리면 약([dash-interrupt.md §10.1](dash-interrupt.md)).
-- **대쉬 예측은 직선.** 예상 대시 끝 = 방향 × 속도 × 남은 시간. 유닛·벽에 막히면 실제 판정 위치보다 멀다.
+- ~~오너 예측은 근사(창 복제값·관측 중앙값)~~ · ~~창 길이를 모르면 강~~ · ~~대쉬 예측은 직선~~ — **할 일 191 에서 해소.** 예측은 서버 창 시간표·공용 대시 스윕을 쓰고, 결론은 같은 함수의 오너 판정이다.
+  남은 어긋남(보스 이동·창 시간표 변경·CC)은 QA 기록 `mismatch_reason` 으로 본다. 한계 목록은 [interrupt-client-judge.md §12](interrupt-client-judge.md#12-알려진-한계).
+- **클라는 23호 제압 복제값이 없다**(취약만 안다) — 제압 중엔 창이 안 열려 판정 영향 없음.
 - **태깅은 그 순간 한 번.** 암전이 켜진 뒤 오너·대상 아래 새로 생긴 렌더러(새 이펙트)는 비트 4 가 없어 덮인다.
 - **렌더링 레이어 Everything 인 렌더러는 늘 남는다.** SVN `Assets/50.Art` VFX 26파일·75곳을 Everything → 1 로 바꿨다(SVN 커밋 대기). 커밋 전 다른 워크트리·팀원 화면에선 보스 이펙트 등이 암전 위로 비친다.
 - **잔상 비트는 SVN 커밋 뒤부터.** `DashAfterimage.cs` 한 줄이 SVN 에 들어가기 전에는 잔상이 암전에 덮인다. 🔴 SVN 을 git 보다 먼저 커밋한다(메인이 병합 직전).
@@ -285,6 +289,11 @@
 시간상: 빛 모임 라이트는 암전 동안 켜져 있어 오너·무기 주변만 밝히고(덮인 바닥은 안 보임), 적중 지점 라이트는 섬광 순간(= 암전 걷힘)에 켜져 걷힌 월드 전체를 비춘다.
 
 ### 0.10 선착순 한 명 (할 일 143)
+
+> 🔹 **할 일 191 로 세션 중 선착순은 `InterruptManager` 장부(`InterruptClaimLedger`)가 정한다** — 서버 도착 기준 첫 승인 + **0.05초 안 = 동시 성공**(각자 연출·성공 기록, 보스 효과 1회), 그 뒤 = 거부.
+> 아래 143 규칙 중 바뀐 것: ① 143 서버 장부(`InterruptWindowClaims`)는 피격으로 성공이 날 때만 기록한다 — 세션 중엔 피격으로 성공이 안 나므로 사실상 오프라인 경로 전용이다.
+> ② 오너 예측은 매니저 `Predict` 라 로컬 장부(143-2)를 읽지 않는다 — 로컬 장부는 디렉터 피어 대상 재탐색·랩 미리보기에만 남았다. ③ '두 번째는 피해만'은 `ResolveHit` 의 '이미 승인된 대상엔 간파 표식 빼기'가 맡는다.
+> 상세 [interrupt-client-judge.md §5](interrupt-client-judge.md#5-서버-검증-interruptclaimserver--interruptclaimvalidator).
 
 보스 간파 창 하나에 여러 플레이어가 간파를 넣으면 **서버에서 먼저 성공 판정된 1명만** 지금처럼 처리한다(넉백·보스 반응·132 연출 전부).
 두 번째 이후 = **피해만** — 간파로 생기는 대상 반응(카운터 그로기·칸 감소·취약 넉백·기믹 처리)도, 연출(A1 히트스톱·성공 슬로우·A3 줌·A4·오너 암전·적중 섬광·A2 암순응·B3·C2·E1)도 없다.
@@ -510,12 +519,15 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 | 사건 | [서버] 누가 알리나 → 디렉터가 하는 일 | [각 피어] 디렉터가 하는 일 |
 |---|---|---|
-| 시도 | `TryStartSkillServer` → `ServerAttempt(예측 3상태)` → 대상 없음 = 없음 / 약 = `interruptWeakProfile`(`AttemptWeak`) / 강 = `interruptProfile`(`Attempt`), 발동 번호 반환 | [오너] 입력 순간 `LocalOwnerAttempt`(오너 암전·빛 모임, §0.2) · `OnClientPlay` → `LocalAttempt` → B1(꺼짐) · 클립 이벤트 B2·C1 은 `AllowsAnimEffect(id)` · 남의 강 시도 = 팀원 빛 모임 |
-| 판정 | `ResolveHit` 끝 → `ServerResolve` → 빗나가거나 **선점됨**(`Preempted`, 할 일 143 — 남이 먼저 성공시킨 창, 피해만)이면 시도 슬로우 `ServerFail` | [오너] 애니 Hit → `LocalOwnerHit`(빛 모임 끝) · 팀원 `PeerCasterHit` · 선점 = `Failed` 로 오너 암전 걷기([§0.10](#010-선착순-한-명-할-일-143)) |
-| 성공 | 판정 바로 뒤 `ServerSuccess` — 그 창의 **첫 성공자만**(선점된 대상은 표식 없이 수신돼 성공이 안 난다, §0.10) → 성공 슬로우(`interruptSuccessProfile`, A1 칸 = `hitStopOn`) → 시전자 아래 `IInterruptSuccessRelay` 마다 1회 | `Started(Success)` → A4 즉시 · 적중 섬광 진행기 → 섬광 순간 월드 섬광·A2 · RPC 수신부(B3·C2·E1, 꺼짐)가 `PlayCue` |
+| 시도 | `TryStartSkillServer` → `ServerAttempt(예측 3상태)`(191: 예측 = `InterruptManager.TryPredictServerAttempt`) → 대상 없음 = 없음 / 약 = `interruptWeakProfile`(`AttemptWeak`) / 강 = `interruptProfile`(`Attempt`), 발동 번호 반환 | [오너] 매니저 시도 cue → `LocalOwnerAttempt`(오너 암전·빛 모임, §0.2) · `OnClientPlay` → `LocalAttempt` → B1(꺼짐) · 클립 이벤트 B2·C1 은 `AllowsAnimEffect(id)` · 남의 강 시도 = 팀원 빛 모임 |
+| 판정 | `ResolveHit` 끝(피해만) → `ServerResolve` → 그때까지 승인이 없거나 **선점됨**이면 시도 슬로우 `ServerFail` | [오너] 매니저 판정 cue(성공 = 섬광 즉시 / 실패 = 걷기) · 애니 Hit → `LocalOwnerHit`(빛 모임 끝) · 팀원 `PeerCasterHit` |
+| 성공 | 신고 승인 순간(`ServerOnClaimVerdict`) — 그 창의 **첫 승인만** `ServerSuccess` → 성공 슬로우(`interruptSuccessProfile`, A1 칸 = `hitStopOn`) → 시전자 아래 `IInterruptSuccessRelay` 마다 1회. 동시 승인자는 슬로우 없음 | `Started(Success)` → A4 즉시 · 적중 섬광 진행기 → 섬광 순간 월드 섬광·A2 · RPC 수신부(B3·C2·E1, 꺼짐)가 `PlayCue`. 내 오너 판정 성공 뒤 오는 내 Success 는 한 번 삼킨다 |
+| 서버 결과(191) | 승인 목록 전 피어 / 거부 그 오너(named message) | [오너] 거부 = 종료 cue(섬광 즉시 끔) · 승인 목록 = D10 함께 성공자 암전 제외 |
 | 실패 | 판정 전 종료(`OnEnd`)·앵커 누락 → `ServerFail` → 시도 슬로우 실패 복귀 | `Failed` → 오너 암전 걷기·빛 모임 정지(실패 단계 자체 연출 없음) · [오너] `OnEnd`·거부 → `LocalOwnerEnded` |
 
-- 대쉬 간파(할 일 115)도 같은 사건 4개를 쓴다. 예측 판정 위치는 예상 대시 끝, 예측 시점은 우클릭 누른 순간 — [dash-interrupt.md §5](dash-interrupt.md#5-118-디렉터-사건-연결--새-경로-없음).
+- 대쉬 간파(할 일 115)도 같은 사건 4개를 쓴다. 판정 위치는 실제 대시 끝(공용 스윕), 예측 시점은 우클릭 누른 순간 — [dash-interrupt.md §5](dash-interrupt.md#5-118-디렉터-사건-연결--새-경로-없음).
+- **오너 판정 cue(할 일 191)** — 매니저 `InterruptOwnerCueRouter` → 디렉터 `IInterruptOwnerCueSink`(`InterruptProductionDirector.OwnerJudgeCues.cs`, 재생 `InterruptOwnerJudgeCuePlayer`). cue = 시도 · 판정 성공 · 판정 실패 · 서버 거부 · CC 끊김 · 판정 버림 · 승인 목록. 표는 [interrupt-client-judge.md §6](interrupt-client-judge.md#6-연출-cue-4단계).
+  D10 스위치 `keepCoSucceededBright`(기본 켬, `[DataTableIgnore]`, 각 피어 값)는 `[Header("동시 성공 — 개인")]` 아래.
 - 호출 순서는 옛 코드와 한 줄씩 같다: 빗나감 Fail → 성공 Start → `ReportLag`. 캐릭터 relay 는 성공 Start 바로 뒤라 옛 정적 이벤트 구독보다 `ReportLag` 한 줄 앞이다(같은 프레임·같은 RPC 순서, 화면 차이 없음).
 - 정적 `PlayerInterruptSkillBase.ServerInterruptSucceeded/Resolved` 는 **로직용으로 남아 있다**(튜토리얼·통계). 연출 구독자(팔라딘·어쌔신)만 relay 로 옮겼다.
 - 슬로우가 거부돼도(컷신 잠금·씬 전환) relay·섬광 RPC 는 그대로 나간다 — 전송로를 바꾸지 않았다(설계 Q1-a). 그래서 그때 A2·A4 만 빠지고 B3·C2·E1 은 나온다(지금과 같음).
@@ -603,7 +615,8 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 `InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1·A3·A4 켬) ·
 `InterruptPresentationEffectTests`(§17 효과 칸 기본값·프리팹·그리기만 끔·섬광 순간 정상) · `DebugInterruptLabTests`(튜닝 패널 줄·배속 버튼).
 할 일 154·179 후속 2·4: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬 · 제압 섬광 팀원 화면 숨김·끝 복원·강제 종료 복원·일반 강제 리셋 복원·머리 위 체력바 플레이어·몬스터 모두 숨김·끝 복원·조준 쿼드 렌더러 끔/켬).
-격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`), 앵커 형상 대상 검사는 `HitboxAnchorShapeTests`(Assembly-CSharp-Editor).
+격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 대상 정면 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `InterruptTargetGeometryTests`), 앵커 형상 대상 검사는 `HitboxAnchorShapeTests`(Assembly-CSharp-Editor).
+할 일 191: 예측·판정·검증·오너 판정 cue 는 `Tools/Tests/간파 판정·검증 EditMode 테스트 실행`(`InterruptOwnerJudgeCueTests` 등, [interrupt-client-judge.md §11](interrupt-client-judge.md#11-테스트)). 옛 `DashInterruptPredictionTests` 는 삭제.
 
 ## 7. 제압 간파 애니메이션 섬광 (할 일 179)
 
@@ -688,4 +701,4 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 - ~~암순응 셰이더에 흑백 실루엣·반전 모드~~ → 132 마스크 암전 모드·섬광 오버레이 흰 반전으로 구현(§0).
 - ~~주변 입자가 한 점으로 모이는 효과 + 피격 대상 충격파~~ → 132 빛 모임·월드 섬광으로 구현(§0.7). 손그림으로 바꿀 땐 덮어쓸 텍스처 칸.
 - 115 대쉬 간파: 사건 `Variant`(Normal/Dash) 칸은 만들지 않았다(일반 간파와 같은 프로필·cue, [dash-interrupt.md](dash-interrupt.md)) — 다른 프로필·cue 가 필요해지면 그때 이 칸을 더한다.
-  117 성공 예측 연출은 132 의 오너 즉시 예측(§0.2)으로 대신했다.
+  117 성공 예측 연출은 132 의 오너 즉시 예측(§0.2)으로 대신했다 — 191 부터는 매니저 시도 cue.

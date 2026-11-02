@@ -121,6 +121,8 @@ public sealed class TrainingDummy : Unit
     {
         if (!IsServer || !attackInfo.isInterruptAttack || _interrupt == null)
             return;
+        if (InterruptManager.ServerVerifiesClaims)
+            return;   // 세션 중 성공 = 신고 승인(TrainingDummyInterrupt 의 IInterruptClaimTarget, 할 일 191)
 
         _interrupt.ServerTryInterrupt(attackerClientId, sourceUnit);
     }
