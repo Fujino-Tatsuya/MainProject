@@ -37,7 +37,7 @@ public readonly struct InterruptProductionEvent
     public readonly PlayerInterruptSkillBase Skill;
     /// <summary>[판정·실패] 시도 슬로우 발동 번호. 0 = 실패 복귀할 시도 슬로우 없음.</summary>
     public readonly uint AttemptTriggerId;
-    /// <summary>[시도·서버] 승인 시 예측(DashInterruptPredictor) — 대상 없음 = 슬로우 없음, 약·강 = 약·강 시도 슬로우(할 일 132 정정1). 예측 계산은 스킬이 한다.</summary>
+    /// <summary>[시도·서버] 승인 시 예측(InterruptManager.TryPredictServerAttempt, 할 일 191) — 대상 없음 = 슬로우 없음, 약·강 = 약·강 시도 슬로우(할 일 132 정정1).</summary>
     public readonly InterruptAttemptForecast Forecast;
     /// <summary>[판정] 예측 대기 중 카운터 성공이 났는가.</summary>
     public readonly bool Landed;

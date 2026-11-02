@@ -6,8 +6,8 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 간파 예측 보정 씬(할 일 139) 단계 1 — 표본 CSV 직렬화·세션 기록·일치율 집계의 순수 규칙.
-/// 파일 테스트는 임시 폴더에 쓰고 끝나면 지운다.
+/// 간파 보정 랩(할 일 139 → 191 5단계 '예측 vs 판정 vs 서버') — 표본 CSV 직렬화·세션 기록·일치율 집계의 순수 규칙.
+/// 표본 = QA 기록 한 줄(<see cref="InterruptQaRecord"/>) + 허수아비 창·대상 거리·사람 답. 파일 테스트는 임시 폴더에 쓰고 끝나면 지운다.
 /// </summary>
 public sealed class InterruptCalibrationTests
 {
@@ -26,22 +26,42 @@ public sealed class InterruptCalibrationTests
             Directory.Delete(tempRoot, true);
     }
 
-    static InterruptCalibrationSample Sample(InterruptAttemptForecast? owner, InterruptAttemptForecast? server, bool? serverSucceeded,
-        DashInterruptPredictReason? reason = null) =>
-        new InterruptCalibrationSample
+    static InterruptJudgeResult Result(InterruptJudgeOutcome outcome, InterruptJudgeFailReason reason = InterruptJudgeFailReason.None) =>
+        new InterruptJudgeResult { Outcome = outcome, FailReason = reason, TargetId = 7, WindowId = 3, JudgeTime = 10.5, ResolvePosition = new Vector3(1f, 0f, 4f) };
+
+    static InterruptJudgeResult ForForecast(InterruptAttemptForecast forecast, InterruptJudgeFailReason reason = InterruptJudgeFailReason.None) =>
+        forecast == InterruptAttemptForecast.Strong ? Result(InterruptJudgeOutcome.Success)
+        : forecast == InterruptAttemptForecast.Weak ? Result(InterruptJudgeOutcome.Failure, reason == InterruptJudgeFailReason.None ? InterruptJudgeFailReason.WindowClosed : reason)
+        : Result(InterruptJudgeOutcome.NoTarget, InterruptJudgeFailReason.OutOfRange);
+
+    // 예측 → 판정 → 서버까지 닫힌 QA 기록 한 줄.
+    static InterruptQaRecord Record(InterruptAttemptForecast forecast, InterruptQaJudge judge, InterruptQaServer server,
+        InterruptJudgeFailReason predictReason = InterruptJudgeFailReason.None, InterruptJudgeFailReason judgeReason = InterruptJudgeFailReason.None)
+    {
+        InterruptJudgeOutcome outcome = judge == InterruptQaJudge.Success ? InterruptJudgeOutcome.Success
+            : judge == InterruptQaJudge.Failure ? InterruptJudgeOutcome.Failure : InterruptJudgeOutcome.NoTarget;
+        return new InterruptQaRecord
         {
-            OwnerForecast = owner,
-            OwnerReason = reason,
-            ServerForecast = server,
-            ServerSucceeded = serverSucceeded,
+            ActorId = 11,
+            Character = "Paladin",
+            ViaDash = true,
+            PressTime = 10.0,
+            HasPrediction = true,
+            Prediction = ForForecast(forecast, predictReason),
+            Judge = judge,
+            JudgeResult = Result(outcome, judgeReason),
+            Server = server,
         };
+    }
+
+    static InterruptCalibrationSample Sample(InterruptQaRecord record) => new InterruptCalibrationSample { Record = record };
 
     static string[] Cells(string row) => row.Split(',');
 
     // ─── CSV ───────────────────────────────────────────────────────────
 
     [Test]
-    public void 헤더는_사양_열을_모두_담는다()
+    public void 헤더는_랩_칸과_QA_기록_열을_모두_담는다()
     {
         string[] header = Cells(InterruptCalibrationCsv.Header);
         Assert.AreEqual(InterruptCalibrationCsv.ColumnCount, header.Length);
@@ -50,15 +70,17 @@ public sealed class InterruptCalibrationTests
         Assert.AreEqual("user_answer", header[header.Length - 1]);
         foreach (string column in new[]
                  {
-                     "real_time", "window_mode", "window_open_len", "window_closed_len", "press_age",
-                     "cast_time", "cast_pos_x", "dash_dir_x", "dash_speed", "dash_remaining", "skill_start_time", "prep_delay",
-                     "has_target_in_range", "target_window_open", "window_open_elapsed", "window_expected_duration",
-                     "resolve_pos_x", "target_distance", "target_angle", "predicted_resolve_time", "predicted_window_remaining",
-                     "owner_forecast", "owner_reason", "owner_repredicted", "owner_final_forecast",
-                     "server_forecast", "server_repredicted", "server_final_forecast", "server_succeeded",
-                     "actual_window_open", "actual_open_elapsed", "actual_remaining",
+                     "real_time", "window_mode", "window_open_len", "window_closed_len",
+                     "qa_seq", "caster_id", "character", "mode", "press_time", "judge_time", "window_id",
+                     "prediction", "prediction_reason", "judge", "judge_reason", "server", "server_reason", "server_attempt",
+                     "predict_judge_match", "final_success", "mismatch_reason",
+                     "target_distance", "target_angle", "actual_window_open", "actual_open_elapsed", "actual_remaining",
                  })
             CollectionAssert.Contains(header, column);
+
+        // 옛 예측식 칸(139 — 대시 속도·준비 지연·예측 창 남음·오너/서버 재예측)은 없다.
+        foreach (string removed in new[] { "press_age", "dash_speed", "prep_delay", "predicted_window_remaining", "owner_forecast", "server_forecast", "owner_repredicted" })
+            CollectionAssert.DoesNotContain(header, removed);
     }
 
     [Test]
@@ -79,12 +101,12 @@ public sealed class InterruptCalibrationTests
         try
         {
             System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE"); // 소수점 = 쉼표
-            var sample = new InterruptCalibrationSample { RealTime = 1.5f, PressAge = 0.125f, UserAnswer = true, WindowMode = CalibrationWindowMode.Periodic };
+            var sample = new InterruptCalibrationSample { RealTime = 1.5f, TargetDistance = 0.125f, UserAnswer = true, WindowMode = CalibrationWindowMode.Periodic };
             string[] header = Cells(InterruptCalibrationCsv.Header);
             string[] cells = Cells(InterruptCalibrationCsv.FormatRow(sample));
             Assert.AreEqual(header.Length, cells.Length);
             Assert.AreEqual("1.5", cells[Array.IndexOf(header, "real_time")]);
-            Assert.AreEqual("0.125", cells[Array.IndexOf(header, "press_age")]);
+            Assert.AreEqual("0.125", cells[Array.IndexOf(header, "target_distance")]);
             Assert.AreEqual("true", cells[Array.IndexOf(header, "user_answer")]);
             Assert.AreEqual("Periodic", cells[Array.IndexOf(header, "window_mode")]);
         }
@@ -105,55 +127,34 @@ public sealed class InterruptCalibrationTests
     }
 
     [Test]
-    public void 오너_예측_입력과_결과가_칸에_들어간다()
+    public void QA_기록_예측_판정_서버가_칸에_들어간다()
     {
-        var input = new DashInterruptPredictInput
-        {
-            CastTime = 10f,
-            CastPosition = new Vector3(1f, 0f, 2f),
-            DashDirection = Vector3.forward,
-            DashSpeed = 8f,
-            DashRemaining = 0.25f,
-            SkillStartTime = 10f,
-            PrepDelay = 0.5f,
-            HasTargetInRange = true,
-            TargetWindowOpen = true,
-            WindowOpenElapsed = 0.25f,
-            WindowExpectedDuration = 0.5f,
-        };
-        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(input);
-        var sample = new InterruptCalibrationSample();
-        sample.SetOwnerPrediction(input, prediction);
+        InterruptQaRecord record = Record(InterruptAttemptForecast.Weak, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst,
+            predictReason: InterruptJudgeFailReason.WindowClosed);
+        record.Seq = 5;
+        record.ServerAttempt = InterruptAttemptForecast.Strong;
+        var sample = Sample(record);
+        sample.ActualWindowOpen = true;
+        sample.ActualRemaining = float.PositiveInfinity;
 
         string[] header = Cells(InterruptCalibrationCsv.Header);
         string[] cells = Cells(InterruptCalibrationCsv.FormatRow(sample));
         string Cell(string name) => cells[Array.IndexOf(header, name)];
 
-        Assert.AreEqual("10", Cell("cast_time"));
-        Assert.AreEqual("2", Cell("cast_pos_z"));
-        Assert.AreEqual("8", Cell("dash_speed"));
-        Assert.AreEqual("0.5", Cell("prep_delay"));
-        Assert.AreEqual("true", Cell("has_target_in_range"));
-        Assert.AreEqual("0.5", Cell("window_expected_duration"));
-        Assert.AreEqual("4", Cell("resolve_pos_z")); // 2 + 8 × 0.25
-        Assert.AreEqual("10.5", Cell("predicted_resolve_time")); // max(10.25, 10 + 0.5)
-        Assert.AreEqual("0.25", Cell("predicted_window_remaining"));
-        Assert.AreEqual("Weak", Cell("owner_forecast")); // 남은 창 0.25 < 판정까지 0.5
-        Assert.AreEqual(nameof(DashInterruptPredictReason.WindowClosesBeforeResolve), Cell("owner_reason"));
-        Assert.AreEqual("false", Cell("owner_repredicted"), "재예측 전 = 없음");
-        Assert.AreEqual("Weak", Cell("owner_final_forecast"), "최종 = 원래 예측");
-        Assert.AreEqual("", Cell("server_repredicted"), "서버 예측 없음 = 빈 칸");
-
-        sample.OwnerRepredicted = true;
-        sample.OwnerFinalForecast = InterruptAttemptForecast.Strong;
-        sample.SetServerPrediction(InterruptAttemptForecast.Weak);
-        cells = Cells(InterruptCalibrationCsv.FormatRow(sample));
-        Assert.AreEqual("Weak", Cell("owner_forecast"), "원래 예측은 그대로");
-        Assert.AreEqual("true", Cell("owner_repredicted"));
-        Assert.AreEqual("Strong", Cell("owner_final_forecast"));
-        Assert.AreEqual("Weak", Cell("server_forecast"));
-        Assert.AreEqual("false", Cell("server_repredicted"));
-        Assert.AreEqual("Weak", Cell("server_final_forecast"));
+        Assert.AreEqual(header.Length, cells.Length);
+        Assert.AreEqual("5", Cell("qa_seq"));
+        Assert.AreEqual("dash", Cell("mode"));
+        Assert.AreEqual("Paladin", Cell("character"));
+        Assert.AreEqual("Weak", Cell("prediction"));
+        Assert.AreEqual("WindowClosed", Cell("prediction_reason"));
+        Assert.AreEqual("Success", Cell("judge"));
+        Assert.AreEqual("ApprovedFirst", Cell("server"));
+        Assert.AreEqual("Strong", Cell("server_attempt"));
+        Assert.AreEqual("false", Cell("predict_judge_match"));
+        Assert.AreEqual("true", Cell("final_success"));
+        Assert.AreEqual(nameof(InterruptQaMismatch.WindowChanged), Cell("mismatch_reason"));
+        Assert.AreEqual("true", Cell("actual_window_open"));
+        Assert.AreEqual("inf", Cell("actual_remaining"));
     }
 
     // ─── 세션 기록 ─────────────────────────────────────────────────────
@@ -172,7 +173,7 @@ public sealed class InterruptCalibrationTests
     public void 표본마다_즉시_한_줄_덧붙이고_파일은_UTF8_BOM_헤더_1줄()
     {
         var recorder = new InterruptCalibrationRecorder(tempRoot, new DateTime(2026, 10, 29, 9, 0, 0));
-        recorder.Commit(Sample(InterruptAttemptForecast.Strong, InterruptAttemptForecast.Strong, true), true);
+        recorder.Commit(Sample(Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst)), true);
 
         byte[] bytes = File.ReadAllBytes(recorder.SamplesPath);
         Assert.GreaterOrEqual(bytes.Length, 3);
@@ -182,7 +183,7 @@ public sealed class InterruptCalibrationTests
         Assert.AreEqual(2, lines.Length);
         Assert.AreEqual(InterruptCalibrationCsv.Header, lines[0]);
 
-        recorder.Commit(Sample(InterruptAttemptForecast.Weak, InterruptAttemptForecast.Weak, false), false);
+        recorder.Commit(Sample(Record(InterruptAttemptForecast.Weak, InterruptQaJudge.Failure, InterruptQaServer.NotClaimed)), false);
         lines = File.ReadAllLines(recorder.SamplesPath, Encoding.UTF8);
         Assert.AreEqual(3, lines.Length);
         Assert.AreEqual("1", Cells(lines[1])[0]);
@@ -202,8 +203,8 @@ public sealed class InterruptCalibrationTests
     public void 건너뛴_표본은_seq_와_일치율에_들어가지_않는다()
     {
         var recorder = new InterruptCalibrationRecorder(tempRoot, new DateTime(2026, 10, 29, 9, 0, 0));
-        var skipped = Sample(InterruptAttemptForecast.Strong, InterruptAttemptForecast.Strong, true); // Esc — Commit 안 함
-        var answered = Sample(InterruptAttemptForecast.Strong, InterruptAttemptForecast.Strong, true);
+        var skipped = Sample(Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst)); // Esc — Commit 안 함
+        var answered = Sample(Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst));
         recorder.Commit(answered, true);
 
         Assert.AreEqual(1, recorder.Count);
@@ -214,19 +215,21 @@ public sealed class InterruptCalibrationTests
     }
 
     [Test]
-    public void summary_파일은_표본_수와_일치율을_쓴다()
+    public void summary_파일은_표본_수와_일치율과_어긋난_이유를_쓴다()
     {
         var recorder = new InterruptCalibrationRecorder(tempRoot, new DateTime(2026, 10, 29, 9, 0, 0));
-        recorder.Commit(Sample(InterruptAttemptForecast.Weak, InterruptAttemptForecast.Weak, true, DashInterruptPredictReason.WindowClosesBeforeResolve), true);
+        recorder.Commit(Sample(Record(InterruptAttemptForecast.Weak, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst,
+            predictReason: InterruptJudgeFailReason.WindowClosed)), true);
         string path = recorder.WriteSummary();
 
         Assert.AreEqual(recorder.SummaryPath, path);
         string text = File.ReadAllText(path, Encoding.UTF8);
         StringAssert.Contains("표본 수: 1", text);
-        StringAssert.Contains("오너 예측 ↔ 답: 0/1 (0.0%)", text);
+        StringAssert.Contains("예측 ↔ 답: 0/1 (0.0%)", text);
+        StringAssert.Contains("오너 판정 ↔ 답: 1/1 (100.0%)", text);
         StringAssert.Contains("서버 결과 ↔ 답: 1/1 (100.0%)", text);
-        StringAssert.Contains("오너 약·답 true 1", text);
-        StringAssert.Contains("WindowClosesBeforeResolve: 1", text);
+        StringAssert.Contains("예측 약·답 true 1", text);
+        StringAssert.Contains("창 시간표 변경(WindowChanged): 1", text);
     }
 
     // ─── 일치율 ────────────────────────────────────────────────────────
@@ -235,58 +238,65 @@ public sealed class InterruptCalibrationTests
     public void 대상_없음과_값_없음은_분모에서_뺀다()
     {
         var stats = new InterruptCalibrationStats();
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.NoTarget, ServerForecast = InterruptAttemptForecast.Strong, UserAnswer = true });
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.Strong, UserAnswer = true }); // 서버 값 없음
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.Weak, ServerForecast = InterruptAttemptForecast.NoTarget, ServerSucceeded = false, UserAnswer = false });
+        // 예측 대상 없음 · 판정 대상 없음 · 신고 안 함
+        stats.Add(new InterruptCalibrationSample { Record = Record(InterruptAttemptForecast.NoTarget, InterruptQaJudge.NoTarget, InterruptQaServer.NotClaimed), UserAnswer = false });
+        // 강 · 성공 · 서버 응답 없음(값 없음)
+        stats.Add(new InterruptCalibrationSample { Record = Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Success, InterruptQaServer.NoResponse), UserAnswer = true });
+        // 기록 없음
+        stats.Add(new InterruptCalibrationSample { UserAnswer = true });
 
         Assert.AreEqual(3, stats.SampleCount);
 
-        Assert.AreEqual(2, stats.OwnerVsAnswer.Total);
-        Assert.AreEqual(1, stats.OwnerVsAnswer.Excluded);
-        Assert.AreEqual(1f, stats.OwnerVsAnswer.Rate.Value, 1e-6f);
+        Assert.AreEqual(1, stats.ForecastVsAnswer.Total);
+        Assert.AreEqual(2, stats.ForecastVsAnswer.Excluded);
+        Assert.AreEqual(1f, stats.ForecastVsAnswer.Rate.Value, 1e-6f);
 
-        Assert.AreEqual(1, stats.ServerForecastVsAnswer.Total);
-        Assert.AreEqual(2, stats.ServerForecastVsAnswer.Excluded);
+        Assert.AreEqual(1, stats.JudgeVsAnswer.Total);
+        Assert.AreEqual(2, stats.JudgeVsAnswer.Excluded);
 
-        Assert.AreEqual(1, stats.ServerResultVsAnswer.Total);
-        Assert.AreEqual(1, stats.ServerResultVsAnswer.Matched);
+        Assert.AreEqual(1, stats.ServerVsAnswer.Total); // 신고 안 함 = false, 응답 없음 = 제외
+        Assert.AreEqual(1, stats.ServerVsAnswer.Matched);
 
-        Assert.AreEqual(0, stats.OwnerVsServerForecast.Total); // 짝이 다 비었다
-        Assert.AreEqual(3, stats.OwnerVsServerForecast.Excluded);
-        Assert.IsNull(stats.OwnerVsServerForecast.Rate);
-        Assert.AreEqual("0/0 (-)", stats.OwnerVsServerForecast.FormatRate());
+        var empty = new InterruptCalibrationStats();
+        Assert.IsNull(empty.ForecastVsJudge.Rate);
+        Assert.AreEqual("0/0 (-)", empty.ForecastVsJudge.FormatRate());
     }
 
     [Test]
-    public void 불일치는_유형별로_센다()
+    public void 불일치는_유형별로_세고_어긋난_이유를_모은다()
     {
         var stats = new InterruptCalibrationStats();
-        // 증상: 오너 약인데 답 true (2번), 오너 강인데 답 false (1번), 일치 1번
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.Weak, OwnerReason = DashInterruptPredictReason.WindowClosesBeforeResolve, ServerForecast = InterruptAttemptForecast.Strong, ServerSucceeded = true, UserAnswer = true });
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.Weak, OwnerReason = DashInterruptPredictReason.WindowClosedNow, ServerForecast = InterruptAttemptForecast.Weak, ServerSucceeded = true, UserAnswer = true });
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.Strong, OwnerReason = DashInterruptPredictReason.Success, ServerForecast = InterruptAttemptForecast.Strong, ServerSucceeded = false, UserAnswer = false });
-        stats.Add(new InterruptCalibrationSample { OwnerForecast = InterruptAttemptForecast.Strong, OwnerReason = DashInterruptPredictReason.Success, ServerForecast = InterruptAttemptForecast.Strong, ServerSucceeded = true, UserAnswer = true });
+        // 약(창 닫힘) → 판정 성공 → 승인 · 답 true : 예측만 틀림(창 시간표 변경)
+        stats.Add(new InterruptCalibrationSample { Record = Record(InterruptAttemptForecast.Weak, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst, InterruptJudgeFailReason.WindowClosed), UserAnswer = true });
+        // 강 → 판정 실패(범위) · 답 false : 예측만 틀림(범위)
+        stats.Add(new InterruptCalibrationSample { Record = Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Failure, InterruptQaServer.NotClaimed, judgeReason: InterruptJudgeFailReason.OutOfRange), UserAnswer = false });
+        // 강 → 판정 성공 → 선착순 거부 · 답 true
+        InterruptQaRecord firstCome = Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Success, InterruptQaServer.Rejected);
+        firstCome.RejectReason = InterruptClaimRejectReason.FirstComeLost;
+        stats.Add(new InterruptCalibrationSample { Record = firstCome, UserAnswer = true });
+        // 강 → 성공 → 승인 · 답 true : 전부 일치
+        stats.Add(new InterruptCalibrationSample { Record = Record(InterruptAttemptForecast.Strong, InterruptQaJudge.Success, InterruptQaServer.ApprovedFirst), UserAnswer = true });
 
-        Assert.AreEqual(1, stats.OwnerVsAnswer.Matched);
-        Assert.AreEqual(1, stats.OwnerVsAnswer.LeftTrueRightFalse);
-        Assert.AreEqual(2, stats.OwnerVsAnswer.LeftFalseRightTrue);
-        Assert.AreEqual(0.25f, stats.OwnerVsAnswer.Rate.Value, 1e-6f);
+        Assert.AreEqual(2, stats.ForecastVsAnswer.Matched);
+        Assert.AreEqual(1, stats.ForecastVsAnswer.LeftTrueRightFalse);
+        Assert.AreEqual(1, stats.ForecastVsAnswer.LeftFalseRightTrue);
 
-        Assert.AreEqual(1, stats.ServerForecastVsAnswer.LeftTrueRightFalse);
-        Assert.AreEqual(1, stats.ServerForecastVsAnswer.LeftFalseRightTrue);
+        Assert.AreEqual(4, stats.JudgeVsAnswer.Matched);
 
-        Assert.AreEqual(4, stats.ServerResultVsAnswer.Matched);
+        Assert.AreEqual(3, stats.ServerVsAnswer.Matched);
+        Assert.AreEqual(1, stats.ServerVsAnswer.LeftFalseRightTrue); // 서버 아님·답 true(선착순)
 
-        Assert.AreEqual(1, stats.OwnerVsServerForecast.LeftFalseRightTrue); // 오너 약·서버 강
-        Assert.AreEqual(0, stats.OwnerVsServerForecast.LeftTrueRightFalse);
+        Assert.AreEqual(1, stats.ForecastVsJudge.LeftFalseRightTrue); // 약·성공
+        Assert.AreEqual(1, stats.ForecastVsJudge.LeftTrueRightFalse); // 강·실패
 
-        Assert.AreEqual(1, stats.OwnerMismatchReasons[DashInterruptPredictReason.WindowClosesBeforeResolve]);
-        Assert.AreEqual(1, stats.OwnerMismatchReasons[DashInterruptPredictReason.WindowClosedNow]);
-        Assert.AreEqual(1, stats.OwnerMismatchReasons[DashInterruptPredictReason.Success]);
+        Assert.AreEqual(1, stats.MismatchReasons[InterruptQaMismatch.WindowChanged]);
+        Assert.AreEqual(1, stats.MismatchReasons[InterruptQaMismatch.Range]);
+        Assert.AreEqual(1, stats.MismatchReasons[InterruptQaMismatch.FirstCome]);
+        Assert.IsFalse(stats.MismatchReasons.ContainsKey(InterruptQaMismatch.None));
 
         string summary = stats.BuildSummary(null);
-        StringAssert.Contains("오너 예측 ↔ 답: 1/4 (25.0%)", summary);
-        StringAssert.Contains("오너 강·답 false 1 / 오너 약·답 true 2", summary);
-        StringAssert.Contains("오너 ↔ 서버 예측: 오너 강·서버 약 0 / 오너 약·서버 강 1", summary);
+        StringAssert.Contains("예측 ↔ 답: 2/4 (50.0%)", summary);
+        StringAssert.Contains("예측 ↔ 오너 판정: 예측 강·판정 실패 1 / 예측 약·판정 성공 1", summary);
+        StringAssert.Contains("선착순(FirstCome): 1", summary);
     }
 }

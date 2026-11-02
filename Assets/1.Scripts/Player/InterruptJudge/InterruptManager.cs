@@ -3,12 +3,24 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
+/// <summary>[오너] 판정 전에 대기 판정을 버린 이유(할 일 191 D12 QA 기록).</summary>
+public enum InterruptOwnerJudgeAbandon : byte
+{
+    /// <summary>판정 전 간파 스킬이 정상 완료 아닌 이유로 끝났다(넉백·끌기·잡기·사망·대시 — D5).</summary>
+    SkillCut = 0,
+    /// <summary>서버가 시전을 거부했다.</summary>
+    CastRejected = 1,
+    /// <summary>판정 시각이 이력(1초) 밖이다.</summary>
+    OutOfHistory = 2,
+}
+
 /// <summary>
 /// 간파의 단일 진입점(할 일 191, PLAN §3.1) — 모든 피어에 하나, <c>NetworkManager.prefab</c> 에 붙는다.
 /// 판정 데이터를 모으고 예측·판정 함수(<see cref="Predict"/>·<see cref="Judge(in InterruptJudgeAttempt)"/> = <see cref="InterruptJudgeCalculator"/>)를 둔다.
 /// <b>3단계</b>: 간파 성공은 오너 클라 판정 → 서버 검증으로 정한다(<see cref="BeginOwnerJudge"/> → 신고 → <see cref="InterruptClaimServer"/>).
 /// <b>4단계</b>: 오너 연출은 이 매니저의 예측·판정·서버 결과 cue 로만 움직인다(<see cref="InterruptOwnerCueRouter"/> → 디렉터 <see cref="IInterruptOwnerCueSink"/>).
-/// 옛 예측기(DashInterruptPredictor·InterruptWindowReplicaTracker)는 오너 연출 호출이 끊겼고 서버 시도 슬로우 강·약에만 남았다(삭제 5단계).
+/// <b>5단계</b>: 서버 시도 슬로우 강·약도 같은 <see cref="Predict"/> 를 서버 이력으로 돌린다(<see cref="TryPredictServerAttempt"/>) — 옛 예측기(DashInterruptPredictor·창 추정)는 삭제.
+/// 간파마다 QA 기록 한 줄(<see cref="InterruptQaRecorder"/> — 예측·판정·서버 결과·어긋난 이유)을 남긴다(D12).
 /// <list type="bullet">
 /// <item><b>세계 스냅샷</b>: 등록된 플레이어(<see cref="RegisterPlayer"/> — Player 스폰)와 간파 대상(<see cref="InterruptTargetRegistry"/> 그대로)을
 ///       매 프레임 LateUpdate 에서 샘플해 약 1초 이력(<see cref="InterruptSampleHistory{T}"/>)에 쌓는다. 클라는 보는 값, 서버는 실제 값.</item>
@@ -43,6 +55,12 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
     [Tooltip("창 시간표 열림·닫힘을 콘솔에 남긴다(에디터 전용 로그). 할 일 191 Play 확인용.")]
     bool logWindows;
 
+    [DataTableIgnore]
+    [SerializeField]
+    [Tooltip("간파 QA 기록(할 일 191 D12)을 파일로 남긴다 — C:/UnityProject/QA/191interrupt-<시각>-<host|client><id>/interrupts.csv·summary.txt. " +
+             "에디터·개발 빌드만(릴리스 빌드는 꺼짐). 끄면 파일만 안 쓰고 기록 이벤트(보정 랩)는 그대로.")]
+    bool qaRecordFile = true;
+
     [Header("서버 검증 허용 오차 (할 일 191 D11)")]
     [SerializeField, Min(0f)]
     [Tooltip("시각 여유(초) — 그 클라 측정 지연(RTT) 절반에 더한다. 창 열림·닫힘(조기 닫힘 포함)과 위치 표본 시각에 쓴다.")]
@@ -74,6 +92,15 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
 
     /// <summary>[오너] Hit 타이밍 판정을 했다(시전자 NetworkObjectId, 결과). 성공이면 바로 신고를 보낸다 — 실패는 여기서 끝.</summary>
     public static event System.Action<ulong, InterruptJudgeResult> OwnerJudged;
+
+    /// <summary>[오너] 누른 순간 예측을 했다(예측 입력, 결과) — 시도 cue 와 같은 때(QA 기록·보정 랩·기즈모).</summary>
+    public static event System.Action<InterruptCastRequest, InterruptJudgeResult> OwnerPredicted;
+
+    /// <summary>[오너] 판정 전에 대기 판정을 버렸다(시전자, 이유, 스킬 종료 사유 — 끊김일 때만 뜻이 있다).</summary>
+    public static event System.Action<ulong, InterruptOwnerJudgeAbandon, SkillEndReason> OwnerJudgeAbandoned;
+
+    /// <summary>[서버] 시도 슬로우 강·약 예측을 했다(<see cref="TryPredictServerAttempt"/> — 예측 입력, 결과).</summary>
+    public static event System.Action<InterruptCastRequest, InterruptJudgeResult> ServerAttemptPredicted;
 
     /// <summary>[서버] 세션 중이라 간파 성공을 신고 검증으로 정한다 — 대상은 피격으로 성공을 정하지 않는다. 오프라인·매니저 없음 = false(기존 피격 판정).</summary>
     public static bool ServerVerifiesClaims => Instance != null && Instance.IsServerActive;
@@ -109,6 +136,9 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         ApprovalReceived = null;
         RejectionReceived = null;
         OwnerJudged = null;
+        OwnerPredicted = null;
+        OwnerJudgeAbandoned = null;
+        ServerAttemptPredicted = null;
     }
 
     // ---- 상태 ----
@@ -165,6 +195,15 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
 
     /// <summary>오너 연출 cue 받는 쪽을 바꾼다(테스트·디버그). null = 디렉터.</summary>
     public void SetOwnerCueSink(IInterruptOwnerCueSink sink) => _cueSinkOverride = sink;
+
+    // [각 피어] QA 기록(D12) — 세션마다 시작·끝. 매니저 이벤트를 구독하는 기록기 하나.
+    InterruptQaRecorder _qaRecorder;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    bool QaFileEnabled => qaRecordFile;
+#else
+    bool QaFileEnabled => false;
+#endif
 
     NetworkManager _networkManager;
     NetworkClock _networkClock;
@@ -270,7 +309,8 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         if (caster == null)
             return;
 
-        RemoveOwnerJudges(caster.NetworkObjectId);
+        if (RemoveOwnerJudges(caster.NetworkObjectId))
+            OwnerJudgeAbandoned?.Invoke(caster.NetworkObjectId, InterruptOwnerJudgeAbandon.CastRejected, SkillEndReason.Completed);
         CueRouter.Forget(caster.NetworkObjectId);
     }
 
@@ -284,16 +324,52 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
             return false;
 
         ulong id = caster.NetworkObjectId;
-        if (InterruptOwnerCueRouter.EndsBeforeJudge(reason))
-            RemoveOwnerJudges(id);
+        if (InterruptOwnerCueRouter.EndsBeforeJudge(reason) && RemoveOwnerJudges(id))
+            OwnerJudgeAbandoned?.Invoke(id, InterruptOwnerJudgeAbandon.SkillCut, reason);
         return CueRouter.SkillEnded(id, reason);
     }
 
-    void RemoveOwnerJudges(ulong actorId)
+    // 지운 대기 판정이 있었으면 true.
+    bool RemoveOwnerJudges(ulong actorId)
     {
+        bool removed = false;
         for (int i = _ownerJudges.Count - 1; i >= 0; i--)
-            if (_ownerJudges[i].ActorId == actorId)
-                _ownerJudges.RemoveAt(i);
+        {
+            if (_ownerJudges[i].ActorId != actorId)
+                continue;
+            _ownerJudges.RemoveAt(i);
+            removed = true;
+        }
+        return removed;
+    }
+
+    /// <summary>
+    /// [서버] 시도 슬로우 강·약(할 일 191 5단계 — 옛 예측기 대체). 승인 순간 서버 이력의 가장 최근 시전자 표본을 누른 시각으로 보고 같은 <see cref="Predict"/> 를 돌린다
+    /// (근접 = 그 자리 + Hit 지연, 대쉬 = 서버 대시를 같은 충돌 검사로 굴린 끝). 창은 서버 창 시간표 — 선착순으로 이미 소비된 창은 조기 닫힘이라 약.
+    /// 오너 예측을 신고·요청에 싣지 않는 이유: 요청 RPC 는 누른 프레임에 나가고 오너 예측은 그 프레임 LateUpdate 샘플 뒤라 실을 수 없다(새 RPC·지연 없이 서버가 같은 함수를 쓴다 — PLAN §3.1 ③과 같은 방식).
+    /// 세션·서버가 아니거나 시전자 이력이 아직 없으면 false.
+    /// </summary>
+    public bool TryPredictServerAttempt(Player caster, bool viaDash, Vector3 attackDirection, out InterruptJudgeResult prediction)
+    {
+        prediction = default;
+        if (!IsServerActive || caster == null || !caster.IsSpawned ||
+            !_actors.TryGetValue(caster.NetworkObjectId, out ActorTrack track) || !track.History.TryGetLatest(out double latest, out _) ||
+            !TryBuildCastRequest(caster, viaDash, attackDirection, Time.time, out InterruptCastRequest cast))
+            return false;
+
+        cast.PressTime = latest;
+        prediction = Predict(cast);
+        if (logWindows)
+            Edit.Log($"[InterruptManager] 서버 시도 예측 — {prediction.Forecast} {prediction.FailReason} · 대상 {prediction.TargetId} · 창 #{prediction.WindowId}", this);
+        ServerAttemptPredicted?.Invoke(cast, prediction);
+        return true;
+    }
+
+    /// <summary>시전자(NetworkObjectId)의 등록된 플레이어. 없으면 false.</summary>
+    public bool TryGetPlayer(ulong actorId, out Player player)
+    {
+        player = _actors.TryGetValue(actorId, out ActorTrack track) ? track.Player : null;
+        return player != null;
     }
 
     // LateUpdate 샘플 직후 — 표본이 누른 시각·판정 시각까지 쌓였으면 예측·판정한다. 이력 밖으로 밀린 대기는 버린다.
@@ -313,6 +389,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
                 pending.Predicted = true;
                 if (logWindows)
                     Edit.Log($"[InterruptManager] 오너 예측 — {prediction.Forecast} {prediction.FailReason} · 대상 {prediction.TargetId} · 판정까지 {prediction.JudgeTime - now:0.###}s", this);
+                OwnerPredicted?.Invoke(pending.Cast, prediction);
                 CueRouter.Predicted(BuildOwnerCue(pending.ActorId, prediction, pending.Cast.AttackDirection));
             }
 
@@ -321,6 +398,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
                 if (pending.Attempt.JudgeTime - now > HistorySeconds)
                 {
                     _ownerJudges.RemoveAt(i);
+                    OwnerJudgeAbandoned?.Invoke(pending.ActorId, InterruptOwnerJudgeAbandon.OutOfHistory, SkillEndReason.Completed);
                     CueRouter.Dropped(pending.ActorId);
                 }
                 continue;
@@ -633,7 +711,14 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         Instance = this;
         _networkManager = GetComponent<NetworkManager>();
         _networkClock = GetComponent<NetworkClock>();
+        _qaRecorder = new InterruptQaRecorder(DescribeActor, () => ServerNow);
     }
+
+    // QA 기록 칸 — 시전자 오너 clientId·캐릭터 이름(프리팹 이름).
+    (ulong ClientId, string Character) DescribeActor(ulong actorId) =>
+        TryGetPlayer(actorId, out Player player)
+            ? (player.OwnerClientId, InterruptQaRules.CharacterOf(player.gameObject.name))
+            : (0UL, "-");
 
     void OnDisable()
     {
@@ -664,11 +749,14 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         EnsureHandlersRegistered();
         SampleClock();
         _hasState = true;
+        if (_qaRecorder != null && !_qaRecorder.IsActive)
+            _qaRecorder.Begin(_networkManager.IsServer, _networkManager.LocalClientId, QaFileEnabled, null, System.DateTime.Now);
 
         double now = ServerNow;
         SamplePlayers(now);
         SampleTargets(now);
         TickOwnerJudges(now);
+        _qaRecorder?.Tick(now);
     }
 
     void SampleClock()
@@ -680,6 +768,7 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
 
     void ResetState()
     {
+        _qaRecorder?.End();   // 열린 줄 닫기·summary — 시계를 비우기 전에
         _clock.Reset();
         _schedule.Clear();
         _actors.Clear();

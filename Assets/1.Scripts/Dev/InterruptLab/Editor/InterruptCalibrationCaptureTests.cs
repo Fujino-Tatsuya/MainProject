@@ -3,79 +3,92 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 간파 예측 보정 씬(할 일 139) 단계 3 — 시도 한 번 = 표본 하나 짝짓기(<see cref="InterruptCalibrationPairing"/>)와
-/// 판정 시점 실제 창 상태(<see cref="DummyInterruptWindowActual"/>)의 순수 규칙.
+/// 간파 보정 랩(할 일 139 → 191 5단계 재연결) — QA 기록 한 줄(<see cref="InterruptQaTracker"/>) + 판정 순간 캡처 = 표본 하나 짝짓기
+/// (<see cref="InterruptCalibrationPairing"/>)와 판정 시점 실제 창 상태(<see cref="DummyInterruptWindowActual"/>)의 순수 규칙.
 /// </summary>
 public sealed class InterruptCalibrationCaptureTests
 {
     const float Eps = 1e-4f;
+    const ulong Actor = 11;
+    const ulong Target = 7;
+    const uint Window = 3;
 
-    static InterruptCalibrationOwnerCapture Owner(InterruptAttemptForecast forecast, bool viaDash = true, float pressAge = 0.05f)
-    {
-        var prediction = new DashInterruptPrediction
-        {
-            PredictedEndPosition = new Vector3(1f, 0f, 2f),
-            PredictedResolveTime = 10.4f,
-            WindowRemaining = 0.3f,
-            PredictsSuccess = forecast == InterruptAttemptForecast.Strong,
-            Reason = forecast == InterruptAttemptForecast.Strong ? DashInterruptPredictReason.Success
-                : forecast == InterruptAttemptForecast.Weak ? DashInterruptPredictReason.WindowClosedNow
-                : DashInterruptPredictReason.NoTargetInRange,
-        };
-        return new InterruptCalibrationOwnerCapture
-        {
-            ViaDash = viaDash,
-            PressAge = pressAge,
-            Input = new DashInterruptPredictInput { CastTime = 10f, DashRemaining = 0.2f, WindowOpenElapsed = -1f, WindowExpectedDuration = -1f },
-            Prediction = prediction,
-            TargetDistance = 1.5f,
-            TargetAngle = 12f,
-        };
-    }
+    static InterruptJudgeResult Result(InterruptJudgeOutcome outcome, InterruptJudgeFailReason reason = InterruptJudgeFailReason.None) =>
+        new InterruptJudgeResult { Outcome = outcome, FailReason = reason, TargetId = Target, WindowId = Window, JudgeTime = 10.4 };
 
-    static InterruptCalibrationJudgeCapture Judge(bool succeeded, float time, bool viaDash = true) =>
+    static InterruptCalibrationJudgeCapture Capture(float time, bool open) =>
         new InterruptCalibrationJudgeCapture
         {
-            ViaDash = viaDash,
-            Succeeded = succeeded,
             Time = time,
             RealTime = time + 100f,
             WindowMode = CalibrationWindowMode.Periodic,
             WindowOpenLength = 0.6f,
             WindowClosedLength = 1.5f,
-            ActualWindowOpen = succeeded,
-            ActualOpenElapsed = succeeded ? 0.2f : (float?)null,
-            ActualRemaining = succeeded ? 0.4f : (float?)null,
+            ActualWindowOpen = open,
+            ActualOpenElapsed = open ? 0.2f : (float?)null,
+            ActualRemaining = open ? 0.4f : (float?)null,
+            TargetDistance = 1.5f,
+            TargetAngle = 12f,
         };
+
+    // 매니저 이벤트 순서 그대로: 예측 → (판정 순간 캡처) → 판정 → 서버.
+    sealed class Rig
+    {
+        public readonly InterruptQaTracker Tracker = new InterruptQaTracker();
+        public readonly InterruptCalibrationPairing Pairing = new InterruptCalibrationPairing();
+        public InterruptCalibrationCompleted? Last;
+        public int Samples;
+
+        public Rig()
+        {
+            Tracker.Completed += r =>
+            {
+                if (Pairing.OnRecord(r, out InterruptCalibrationCompleted done))
+                {
+                    Last = done;
+                    Samples++;
+                }
+            };
+        }
+
+        public void Press(InterruptJudgeOutcome predicted, bool viaDash = true, ulong actor = Actor, double at = 10.0) =>
+            Tracker.Predicted(actor, 1, "Paladin", viaDash, at, Result(predicted,
+                predicted == InterruptJudgeOutcome.Failure ? InterruptJudgeFailReason.WindowClosed : InterruptJudgeFailReason.None), at);
+
+        public void Judge(InterruptJudgeOutcome judged, bool open, ulong actor = Actor, InterruptJudgeFailReason reason = InterruptJudgeFailReason.None)
+        {
+            Pairing.NoteJudged(actor, Capture(10.4f, open));
+            Tracker.Judged(actor, Result(judged, reason), 10.4);
+        }
+
+        public void Approve(params ulong[] actors) =>
+            Tracker.Approved(new InterruptClaimApproval(Target, Window, actors[0], actors[actors.Length - 1], actors));
+    }
 
     // ─── 짝짓기 ────────────────────────────────────────────────────────
 
     [Test]
-    public void 정상_짝_오너_서버_판정이_표본_하나가_된다()
+    public void 강_예측_판정_성공_승인이_표본_하나가_된다()
     {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 10f);
-        Assert.IsTrue(pairing.HasPending);
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.Success);
+        rig.Judge(InterruptJudgeOutcome.Success, open: true);
+        Assert.AreEqual(0, rig.Samples, "판정 성공은 서버 결과까지 기다린다");
 
-        Assert.IsTrue(pairing.OnJudged(Judge(true, 10.4f), out InterruptCalibrationCompleted done));
-        Assert.IsFalse(pairing.HasPending);
-        Assert.AreEqual(0, pairing.DroppedCount);
-
+        rig.Approve(Actor);
+        Assert.AreEqual(1, rig.Samples);
+        InterruptCalibrationCompleted done = rig.Last.Value;
         InterruptCalibrationSample s = done.Sample;
+
         Assert.IsTrue(done.Succeeded);
         Assert.AreEqual(10.4f, done.JudgeTime, Eps);
         Assert.AreEqual(110.4f, done.JudgeRealTime, Eps);
         Assert.AreEqual(110.4f, s.RealTime.Value, Eps);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, s.OwnerForecast);
-        Assert.AreEqual(DashInterruptPredictReason.Success, s.OwnerReason);
-        Assert.AreEqual(InterruptAttemptForecast.Weak, s.ServerForecast);
+        Assert.AreEqual(InterruptAttemptForecast.Strong, s.Forecast);
+        Assert.AreEqual(true, s.JudgedSuccess);
         Assert.AreEqual(true, s.ServerSucceeded);
-        Assert.AreEqual(0.05f, s.PressAge.Value, Eps);
-        Assert.AreEqual(0.2f, s.PredictInput.Value.DashRemaining, Eps);
-        Assert.AreEqual(new Vector3(1f, 0f, 2f), s.ResolvePosition.Value);
-        Assert.AreEqual(10.4f, s.PredictedResolveTime.Value, Eps);
-        Assert.AreEqual(0.3f, s.PredictedWindowRemaining.Value, Eps);
+        Assert.AreEqual(InterruptQaServer.ApprovedFirst, s.Record.Server);
+        Assert.AreEqual(InterruptQaMismatch.None, s.Record.Mismatch);
         Assert.AreEqual(1.5f, s.TargetDistance.Value, Eps);
         Assert.AreEqual(12f, s.TargetAngle.Value, Eps);
         Assert.AreEqual(CalibrationWindowMode.Periodic, s.WindowMode);
@@ -86,191 +99,125 @@ public sealed class InterruptCalibrationCaptureTests
         Assert.AreEqual(0.4f, s.ActualRemaining.Value, Eps);
         Assert.IsNull(s.UserAnswer, "답은 질문 창이 Commit 때 채운다");
         Assert.AreEqual(0, s.Seq);
+        Assert.AreEqual(0, rig.Pairing.DroppedCount);
     }
 
     [Test]
-    public void 순서가_뒤바뀌어도_서버_예측_뒤_오너_예측이_같은_표본에_붙는다()
+    public void 약_예측_판정_실패는_서버를_기다리지_않고_신고_안_함으로_완성된다()
+    {
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.Failure);
+        rig.Judge(InterruptJudgeOutcome.Failure, open: false, reason: InterruptJudgeFailReason.WindowClosed);
+
+        Assert.AreEqual(1, rig.Samples);
+        InterruptCalibrationSample s = rig.Last.Value.Sample;
+        Assert.IsFalse(rig.Last.Value.Succeeded);
+        Assert.AreEqual(InterruptAttemptForecast.Weak, s.Forecast);
+        Assert.AreEqual(false, s.JudgedSuccess);
+        Assert.AreEqual(false, s.ServerSucceeded);
+        Assert.AreEqual(InterruptQaServer.NotClaimed, s.Record.Server);
+        Assert.AreEqual(false, s.ActualWindowOpen);
+        Assert.IsNull(s.ActualRemaining);
+    }
+
+    [Test]
+    public void 판정_성공_뒤_거부면_서버_실패_표본이고_어긋난_이유가_남는다()
+    {
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.Success);
+        rig.Judge(InterruptJudgeOutcome.Success, open: true);
+        rig.Tracker.Rejected(new InterruptClaimRejection(Actor, Target, Window, InterruptClaimRejectReason.FirstComeLost, InterruptJudgeFailReason.None));
+
+        Assert.AreEqual(1, rig.Samples);
+        InterruptCalibrationSample s = rig.Last.Value.Sample;
+        Assert.IsFalse(rig.Last.Value.Succeeded);
+        Assert.AreEqual(true, s.JudgedSuccess);
+        Assert.AreEqual(false, s.ServerSucceeded);
+        Assert.AreEqual(InterruptQaMismatch.FirstCome, s.Record.Mismatch);
+    }
+
+    [Test]
+    public void 판정_전에_끝난_시도는_표본이_아니고_버림_수로_센다()
+    {
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.Success);
+        rig.Tracker.Abandoned(Actor, InterruptQaJudge.Cut, nameof(SkillEndReason.Cancelled));
+        Assert.AreEqual(0, rig.Samples);
+        Assert.AreEqual(1, rig.Pairing.DroppedCount);
+
+        // 판정이 빠진 채 다음 시도가 오면 앞 줄은 '교체'로 버려진다
+        rig.Press(InterruptJudgeOutcome.Success, at: 11.0);
+        rig.Press(InterruptJudgeOutcome.Failure, at: 11.2);
+        Assert.AreEqual(2, rig.Pairing.DroppedCount);
+
+        rig.Judge(InterruptJudgeOutcome.Failure, open: false);
+        Assert.AreEqual(1, rig.Samples);
+        Assert.AreEqual(InterruptAttemptForecast.Weak, rig.Last.Value.Sample.Forecast);
+    }
+
+    [Test]
+    public void 판정_순간_캡처가_없으면_랩_칸을_비운_채_완성된다()
+    {
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.NoTarget);
+        rig.Tracker.Judged(Actor, Result(InterruptJudgeOutcome.NoTarget, InterruptJudgeFailReason.OutOfRange), 10.4); // NoteJudged 없음
+
+        Assert.AreEqual(1, rig.Samples);
+        InterruptCalibrationSample s = rig.Last.Value.Sample;
+        Assert.AreEqual(InterruptAttemptForecast.NoTarget, s.Forecast);
+        Assert.IsNull(s.JudgedSuccess, "판정 대상 없음 = 일치율 분모 밖");
+        Assert.IsNull(s.RealTime);
+        Assert.IsNull(s.WindowMode);
+        Assert.IsNull(s.TargetDistance);
+    }
+
+    [Test]
+    public void 근접_간파는_기본으로_무시하고_버림_수에도_안_든다()
+    {
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.Success, viaDash: false);
+        rig.Judge(InterruptJudgeOutcome.Failure, open: false);
+        Assert.AreEqual(0, rig.Samples);
+        Assert.AreEqual(0, rig.Pairing.DroppedCount);
+
+        rig.Pairing.IncludeMelee = true;
+        rig.Press(InterruptJudgeOutcome.Failure, viaDash: false, at: 11.0);
+        rig.Judge(InterruptJudgeOutcome.Failure, open: false);
+        Assert.AreEqual(1, rig.Samples, "근접 플래그를 켜면 근접 간파도 표본");
+    }
+
+    [Test]
+    public void 시전자가_다르면_캡처와_줄이_섞이지_않는다()
+    {
+        var rig = new Rig();
+        rig.Press(InterruptJudgeOutcome.Success, actor: 11);
+        rig.Press(InterruptJudgeOutcome.Success, actor: 12);
+        rig.Judge(InterruptJudgeOutcome.Success, open: true, actor: 11);
+        rig.Judge(InterruptJudgeOutcome.Success, open: true, actor: 12);
+        rig.Approve(11, 12);
+
+        Assert.AreEqual(2, rig.Samples);
+        Assert.AreEqual(12UL, rig.Last.Value.Sample.Record.ActorId);
+        Assert.AreEqual(InterruptQaServer.ApprovedSimultaneous, rig.Last.Value.Sample.Record.Server);
+        Assert.AreEqual(0, rig.Pairing.DroppedCount);
+    }
+
+    [Test]
+    public void Clear_는_판정_캡처를_버린다()
     {
         var pairing = new InterruptCalibrationPairing();
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 10f);
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 10.01f);
-
-        Assert.IsTrue(pairing.OnJudged(Judge(false, 10.5f), out InterruptCalibrationCompleted done));
-        Assert.AreEqual(InterruptAttemptForecast.Weak, done.Sample.OwnerForecast);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, done.Sample.ServerForecast);
-        Assert.AreEqual(false, done.Sample.ServerSucceeded);
-        Assert.AreEqual(0, pairing.DroppedCount);
-    }
-
-    [Test]
-    public void 판정이_안_오면_대기_시간_뒤_버린다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 10f);
-
-        pairing.Tick(10f + InterruptCalibrationPairing.DefaultPendingTimeout);
-        Assert.IsTrue(pairing.HasPending, "경계 시각까지는 기다린다");
-
-        pairing.Tick(10f + InterruptCalibrationPairing.DefaultPendingTimeout + 0.01f);
-        Assert.IsFalse(pairing.HasPending);
-        Assert.AreEqual(1, pairing.DroppedCount);
-
-        // 늦게 온 판정은 대기 표본이 없어 버린다
-        Assert.IsFalse(pairing.OnJudged(Judge(true, 14f), out _));
-        Assert.AreEqual(2, pairing.DroppedCount);
-    }
-
-    [Test]
-    public void 판정이_빠진_채_다음_시도가_오면_앞_표본을_버리고_새로_연다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 10f);
-        // 판정 전 종료 — 판정 없음
-
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 11f);
-        Assert.AreEqual(1, pairing.DroppedCount);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 11f);
-
-        Assert.IsTrue(pairing.OnJudged(Judge(false, 11.4f), out InterruptCalibrationCompleted done));
-        Assert.AreEqual(InterruptAttemptForecast.Weak, done.Sample.OwnerForecast);
-        Assert.AreEqual(InterruptAttemptForecast.Weak, done.Sample.ServerForecast);
-        Assert.AreEqual(1, pairing.DroppedCount);
-    }
-
-    [Test]
-    public void 오너_예측이_빠진_판정은_오너_칸을_비운_채_완성된다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.NoTarget, 10f);
-
-        Assert.IsTrue(pairing.OnJudged(Judge(false, 10.3f), out InterruptCalibrationCompleted done));
-        Assert.IsNull(done.Sample.OwnerForecast);
-        Assert.IsNull(done.Sample.PredictInput);
-        Assert.IsNull(done.Sample.PressAge);
-        Assert.AreEqual(InterruptAttemptForecast.NoTarget, done.Sample.ServerForecast);
-    }
-
-    [Test]
-    public void 근접_간파는_기본으로_무시하고_대기_표본도_건드리지_않는다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong, viaDash: false), 10f);
-        pairing.OnServerPredicted(false, InterruptAttemptForecast.Strong, 10f);
-        Assert.IsFalse(pairing.HasPending);
-        Assert.IsFalse(pairing.OnJudged(Judge(true, 10.3f, viaDash: false), out _));
-        Assert.AreEqual(0, pairing.DroppedCount, "무시한 근접 판정은 버림 수에도 안 든다");
-
-        // 대쉬 시도 사이에 근접 사건이 끼어도 대쉬 표본은 그대로
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 11f);
-        pairing.OnServerPredicted(false, InterruptAttemptForecast.Weak, 11f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 11f);
-        Assert.IsTrue(pairing.OnJudged(Judge(true, 11.3f), out InterruptCalibrationCompleted done));
-        Assert.AreEqual(InterruptAttemptForecast.Strong, done.Sample.ServerForecast);
-        Assert.AreEqual(0, pairing.DroppedCount);
-    }
-
-    [Test]
-    public void 근접_플래그를_켜면_근접_간파도_짝짓는다()
-    {
-        var pairing = new InterruptCalibrationPairing { IncludeMelee = true };
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak, viaDash: false, pressAge: 0f), 10f);
-        pairing.OnServerPredicted(false, InterruptAttemptForecast.Weak, 10f);
-        Assert.IsTrue(pairing.OnJudged(Judge(false, 10.3f, viaDash: false), out InterruptCalibrationCompleted done));
-        Assert.AreEqual(InterruptAttemptForecast.Weak, done.Sample.OwnerForecast);
-    }
-
-    [Test]
-    public void 연속_두_번은_표본_두_개로_섞이지_않는다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 10f);
-        Assert.IsTrue(pairing.OnJudged(Judge(true, 10.4f), out InterruptCalibrationCompleted first));
-
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 10.5f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 10.5f);
-        Assert.IsTrue(pairing.OnJudged(Judge(false, 10.9f), out InterruptCalibrationCompleted second));
-
-        Assert.AreNotSame(first.Sample, second.Sample);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, first.Sample.OwnerForecast);
-        Assert.AreEqual(true, first.Sample.ServerSucceeded);
-        Assert.AreEqual(InterruptAttemptForecast.Weak, second.Sample.OwnerForecast);
-        Assert.AreEqual(false, second.Sample.ServerSucceeded);
-        Assert.AreEqual(0, pairing.DroppedCount);
-    }
-
-    [Test]
-    public void 재예측은_대기_표본에_덧붙고_원래_예측을_남긴다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 10f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 10f);
-        pairing.OnOwnerRepredicted(true, InterruptAttemptForecast.Strong, 10.05f);
-        pairing.OnServerRepredicted(true, InterruptAttemptForecast.Strong, 10.06f);
-
-        Assert.IsTrue(pairing.OnJudged(Judge(true, 10.35f), out InterruptCalibrationCompleted done));
-        InterruptCalibrationSample s = done.Sample;
-        Assert.AreEqual(InterruptAttemptForecast.Weak, s.OwnerForecast, "원래 예측");
-        Assert.AreEqual(DashInterruptPredictReason.WindowClosedNow, s.OwnerReason);
-        Assert.AreEqual(true, s.OwnerRepredicted);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, s.OwnerFinalForecast);
-        Assert.AreEqual(InterruptAttemptForecast.Weak, s.ServerForecast);
-        Assert.AreEqual(true, s.ServerRepredicted);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, s.ServerFinalForecast);
-        Assert.AreEqual(0, pairing.DroppedCount, "재예측은 새 표본을 열지 않는다");
-    }
-
-    [Test]
-    public void 재예측이_없으면_최종은_원래와_같고_짝없는_재예측은_무시한다()
-    {
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerRepredicted(true, InterruptAttemptForecast.Strong, 9f);
-        pairing.OnServerRepredicted(true, InterruptAttemptForecast.Strong, 9f);
-        Assert.IsFalse(pairing.HasPending, "대기 표본 없이 온 재예측은 표본을 열지 않는다");
-
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
-        pairing.OnServerRepredicted(true, InterruptAttemptForecast.Strong, 10.01f); // 서버 예측이 아직 없다 — 무시
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Strong, 10.02f);
-        Assert.IsTrue(pairing.OnJudged(Judge(true, 10.35f), out InterruptCalibrationCompleted done));
-        Assert.AreEqual(false, done.Sample.OwnerRepredicted);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, done.Sample.OwnerFinalForecast);
-        Assert.AreEqual(false, done.Sample.ServerRepredicted);
-        Assert.AreEqual(InterruptAttemptForecast.Strong, done.Sample.ServerFinalForecast);
-    }
-
-    [Test]
-    public void 요약에_재예측_수와_오너_최종_예측_일치율()
-    {
-        var stats = new InterruptCalibrationStats();
-        var pairing = new InterruptCalibrationPairing();
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Weak), 10f);
-        pairing.OnServerPredicted(true, InterruptAttemptForecast.Weak, 10f);
-        pairing.OnOwnerRepredicted(true, InterruptAttemptForecast.Strong, 10.05f);
-        pairing.OnJudged(Judge(true, 10.35f), out InterruptCalibrationCompleted done);
-        done.Sample.UserAnswer = true;
-        stats.Add(done.Sample);
-
-        Assert.AreEqual(1, stats.OwnerRepredictedCount);
-        Assert.AreEqual(0, stats.ServerRepredictedCount);
-        string summary = stats.BuildSummary(null);
-        StringAssert.Contains("오너 예측 ↔ 답: 0/1 (0.0%)", summary, "누른 순간 예측 기준은 그대로");
-        StringAssert.Contains("재예측: 오너 1 · 서버 0", summary);
-        StringAssert.Contains("오너 최종 예측 ↔ 답: 1/1 (100.0%)", summary);
-    }
-
-    [Test]
-    public void Clear_는_대기_표본을_버린다()
-    {
-        var pairing = new InterruptCalibrationPairing();
+        pairing.NoteJudged(Actor, Capture(10.4f, true));
         pairing.Clear();
-        Assert.AreEqual(0, pairing.DroppedCount);
 
-        pairing.OnOwnerPredicted(Owner(InterruptAttemptForecast.Strong), 10f);
-        pairing.Clear();
-        Assert.IsFalse(pairing.HasPending);
-        Assert.AreEqual(1, pairing.DroppedCount);
+        var record = new InterruptQaRecord
+        {
+            ActorId = Actor, ViaDash = true, HasPrediction = true,
+            Prediction = Result(InterruptJudgeOutcome.Failure), Judge = InterruptQaJudge.Failure,
+            JudgeResult = Result(InterruptJudgeOutcome.Failure), Server = InterruptQaServer.NotClaimed,
+        };
+        Assert.IsTrue(pairing.OnRecord(record, out InterruptCalibrationCompleted done));
+        Assert.IsNull(done.Sample.ActualWindowOpen, "지운 캡처는 붙지 않는다");
+        Assert.AreEqual(0, pairing.DroppedCount);
     }
 
     [Test]

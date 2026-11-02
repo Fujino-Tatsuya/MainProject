@@ -25,10 +25,9 @@ public interface IPlayerInterruptSkillData
 /// - 타이머 방식(선언 없음 — 이벤트를 아직 안 심은 캐릭터): HitDelay·SkillDuration 타이머와 Hit·End 이벤트 중 먼저 온 쪽.
 ///   안전망 = MaxActiveDuration + padding. 클립에 Hit·End 를 심으면 그 캐릭터에서 선언을 켜고, 셋 다 켜지면 타이머 경로를 지운다.
 ///
-/// 인터럽트 슬로우 모션(PLAN-interrupt-slowmo S3 → 할 일 132 정정1 → 139-3): 승인 시점에 판정 앵커를 공격 방향·판정 위치에 놓은
-/// 오버랩(<see cref="HitboxAnchorShape"/> — ResolveHit 과 같은 형상·질의)에 걸린 예측 대상 캐시(<see cref="InterruptTargetRegistry"/>) 대상과 창을 모아
-/// <see cref="DashInterruptPredictor"/>(근접·대쉬 공용)로 예측하고, 대상 없음 = 슬로우 없음 / 성공 예측 = 강 / 실패 예측 = 약 시도 슬로우를 건다.
-/// 판정에서 그 인터럽트가 하나도 성공하지 않거나 판정 전에 스킬이 끝나면 실패 복귀시킨다.
+/// 인터럽트 슬로우 모션(PLAN-interrupt-slowmo S3 → 할 일 132 정정1 → 191 5단계): 승인 시점에 <see cref="InterruptManager.TryPredictServerAttempt"/>
+/// (오너 예측과 같은 <see cref="InterruptManager.Predict"/> 를 서버 이력·서버 창 시간표로)로 예측하고, 대상 없음 = 슬로우 없음 / 성공 예측 = 강 / 실패 예측 = 약 시도 슬로우를 건다.
+/// 판정에서 그 인터럽트가 하나도 성공하지 않거나 판정 전에 스킬이 끝나면 실패 복귀시킨다. (옛 DashInterruptPredictor·대시 중 재예측은 삭제.)
 ///
 /// 간파 선착순(할 일 143): 판정(ResolveHit)이 대상마다 <see cref="InterruptWindowClaims"/> 를 묻는다 — 다른 플레이어가 먼저 성공시킨 창이면
 /// 간파 표식 없이 피해만 주고(대상 반응 없음), 판정 사건에 선점됨을 실어 디렉터가 시도 슬로우를 실패 복귀로 정리한다. 근접·대쉬·캐릭터 공통.
@@ -37,8 +36,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
     private Collider[] hitResults;
     private Collider[] queryResults; // 오너 HUD 질의 전용(HasTargetInOmniRange)
-    private Collider[] predictResults; // 시도 예측 오버랩 전용(FindPredictTarget) — 판정 버퍼(hitResults)와 따로
-    // 시도 예측 대상 후보(할 일 132 정정1) — InterruptTargetRegistry 캐시 사본. 예측 오버랩에 걸린 Unit 중 여기 있는 것(창 소유자)만 대상이다.
+    private Collider[] predictResults; // 피어 대상 재탐색·랩 미리보기 오버랩 전용(FindPredictTarget) — 판정 버퍼(hitResults)와 따로
+    // 대상 후보(할 일 132 정정1) — InterruptTargetRegistry 캐시 사본. 오버랩에 걸린 Unit 중 여기 있는 것(창 소유자)만 대상이다.
     private static readonly List<InterruptTargetRegistry.Entry> predictCandidates = new List<InterruptTargetRegistry.Entry>();
     // 상자처럼 Unit이 아닌 IAttackReceiver도 있으므로 Hurtbox까지 중복 방지 키로 쓴다.
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
@@ -64,20 +63,13 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // ── 대쉬 간파(할 일 115, 서버) — 대시에 실린 동안 Hit 은 보류, 대시 끝(Skill 전이)에 판정 ──
     private bool dashAttachArmed;       // 다음 OnServerStart 가 대쉬 간파다(컨트롤러가 승인 직전에 건다)
     private Vector3 armedDashDirection;
-    private float armedDashSpeed;
-    private float armedDashRemaining;
     private bool attachedToDash;        // 지금 대시에 실려 있다
-    private bool castViaDash;           // 이번 시전이 대쉬 간파로 시작했다(판정 때 attachedToDash 는 이미 내려가 있다) — 계측 전용
     private bool pendingHit;            // 대시 중 Hit 이 왔다 — 대시 끝에 즉시 판정
     private bool pendingEnd;            // 판정 전에 End 가 왔다 — 판정 뒤로 미룬다
 
-    // ── 시도 예측(할 일 132) — 근접·대쉬 공용 DashInterruptPredictor 입력 ──
-    private float observedPrepDelay = -1f; // 이 피어에서 관측한 시작 → 첫 Hit(초). 첫 관측 전 = -1
-    private float clipHitSeconds = -1f;     // 간파 상태 클립 Hit 이벤트 시각(상태 속도 1 기준, 할 일 191). 첫 Hit 전 = -1
-    private Vector3 castDirection;          // [서버] 승인된 시전 방향 — 근접 예측의 공격 방향(오너가 보낸 조준 방향과 같다)
-    // [서버] 대쉬 간파 재예측(할 일 139-2) — 승인 때 창이 닫혀 약이었다. 대시 동안 창이 열리면 강 시도 슬로우로 다시 건다.
-    private bool serverRepredictPending;
-    private float serverPredictSkillStart;  // 승인 예측의 준비 기준점 t0
+    // ── 예측·판정 입력(할 일 191) ──
+    private float clipHitSeconds = -1f;     // 간파 상태 클립 Hit 이벤트 시각(상태 속도 1 기준). 첫 Hit 전 = -1
+    private Vector3 castDirection;          // [서버] 승인된 시전 방향 — 근접 시도 예측의 공격 방향(오너가 보낸 조준 방향과 같다)
 
     // ── 간파 지연 측정(할 일 74 후속 — 측정만, 판정은 안 바꾼다. Docs/tech/networking.md "Interrupt lag measurement") ──
     [Header("간파 지연 측정")]
@@ -112,25 +104,16 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     /// <summary>
     /// [서버] 다음 <see cref="OnServerStart"/> 를 대쉬 간파로 시작한다(할 일 115) — 컨트롤러가 승인 직전에 부른다.
-    /// 대시 방향·속도·서버 남은 대시 시간으로 시도 예측의 위치(예상 대시 끝)와 판정 시각(max(대시 끝, 평소 Hit))을 잡는다.
+    /// 시도 예측은 대시 방향을 공격 방향으로, 서버 이력의 대시(시작·속도·남은 시간)로 대시 끝·판정 시각(max(대시 끝, Hit))을 잡는다(할 일 191).
     /// </summary>
-    internal void ArmDashAttach(Vector3 dashDirection, float dashSpeed, float dashRemaining)
+    internal void ArmDashAttach(Vector3 dashDirection)
     {
         dashAttachArmed = true;
         armedDashDirection = dashDirection;
-        armedDashSpeed = dashSpeed;
-        armedDashRemaining = dashRemaining;
     }
 
-    /// <summary>
-    /// [각 피어] 이 시전에서 시작 → 첫 Hit 이벤트까지 걸린 시간(컨트롤러가 첫 Hit 에 넘긴다). 다음 시도 예측의 평소 준비 시간이 된다(할 일 132).
-    /// </summary>
-    internal void NotePrepObserved(float delay)
-    {
-        if (delay > 0f)
-            observedPrepDelay = delay;
-        ReadClipHitTime();
-    }
+    /// <summary>[각 피어] 이 시전의 첫 Hit 이벤트(컨트롤러가 넘긴다) — 클립 Hit 시각을 읽어 다음 예측·판정의 Hit 지연에 쓴다(할 일 191).</summary>
+    internal void NoteFirstHit() => ReadClipHitTime();
 
     // 지금(첫 Hit — 상태가 재생 중) 간파 상태 클립의 Hit 이벤트 시각을 읽어 둔다(할 일 191 판정 Hit 지연). 런타임 컨트롤러는 재생 중일 때만 클립을 알려 준다.
     private void ReadClipHitTime()
@@ -171,11 +154,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         attachedToDash = dashAttachArmed;
-        castViaDash = dashAttachArmed;
         dashAttachArmed = false;
         pendingHit = false;
         pendingEnd = false;
-        serverRepredictPending = false;
         castDirection = direction;
         serverCastStartTime = Time.time;
         verdictApproved = false;
@@ -258,7 +239,6 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             return;
 
         attachedToDash = false;
-        serverRepredictPending = false;
         bool resolveNow = DashInterruptRules.EvaluateResolveTiming(true, pendingHit) == DashInterruptResolveTiming.ResolveNow;
         pendingHit = false;
         Edit.Log($"[DashInterrupt] 대시 끝 → Skill 전이 — {(resolveNow ? "보류된 Hit 즉시 판정" : "클립 Hit 대기")}", this);
@@ -281,7 +261,6 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         attachedToDash = false;
         pendingHit = false;
         pendingEnd = false;
-        serverRepredictPending = false;
 
         // [오너] 판정 전에 넉백·끌기·잡기·사망·대시로 끊겼으면(D5) 매니저가 판정·신고를 버리고 즉시 종료 cue 를 낸다(할 일 191 4단계).
         // 이 시전을 매니저 cue 가 맡고 있으면 결론도 cue 가 낸다 — 판정 전 정상 완료(End)여도 기존 걷기를 하지 않는다.
@@ -336,50 +315,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// </summary>
     public static event System.Action<Player, PlayerInterruptSkillBase> ServerInterruptSucceeded;
 
-    // ── 예측 보정 계측(할 일 139) — 디버그 랩(InterruptCalibrationLab) 전용 읽기 훅. 판정·연출·타이밍은 바꾸지 않는다 ──
-    // 구독자가 없으면 null 검사 하나뿐이다. 랩 폴더 밖에서 구독하지 않는다(DebugInterruptLabIsolationTests).
-
-    /// <summary>시도 예측 한 번의 입력·결과(계측 전용). <see cref="Target"/> = 예측이 고른 대상(대상 없음이면 null).</summary>
-    public readonly struct CalibrationPrediction
-    {
-        public CalibrationPrediction(PlayerInterruptSkillBase skill, bool viaDash, float pressAge, Vector3 attackDirection,
-            in DashInterruptPredictInput input, in DashInterruptPrediction prediction, Unit target)
-        {
-            Skill = skill;
-            ViaDash = viaDash;
-            PressAge = pressAge;
-            AttackDirection = attackDirection;
-            Input = input;
-            Prediction = prediction;
-            Target = target;
-        }
-
-        public PlayerInterruptSkillBase Skill { get; }
-        public bool ViaDash { get; }
-        public float PressAge { get; }
-        public Vector3 AttackDirection { get; }
-        public DashInterruptPredictInput Input { get; }
-        public DashInterruptPrediction Prediction { get; }
-        public Unit Target { get; }
-    }
-
-    /// <summary>[오너] 입력 순간 즉시 예측(<see cref="TryPredictOwnerAttempt"/>)을 했다. 계측 전용(할 일 139).</summary>
-    public static event System.Action<CalibrationPrediction> CalibrationOwnerPredicted;
-
-    /// <summary>[서버] 승인 시점 시도 예측(시도 슬로우 강·약)을 했다. 계측 전용(할 일 139). 시간 레이어가 없는 씬에선 나지 않는다.</summary>
-    public static event System.Action<CalibrationPrediction> CalibrationServerPredicted;
-
-    /// <summary>[오너] 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2). 계측 전용. 올리지 않은 재예측은 알리지 않는다.</summary>
-    public static event System.Action<CalibrationPrediction> CalibrationOwnerRepredicted;
-
-    /// <summary>[서버] 대쉬 간파 재예측이 약 → 강으로 올려 강 시도 슬로우를 다시 걸었다(할 일 139-2). 계측 전용.</summary>
-    public static event System.Action<CalibrationPrediction> CalibrationServerRepredicted;
-
-    /// <summary>
-    /// [서버] 간파 판정 1회가 끝났다 — 인자 = 그 스킬, 대쉬 간파로 시작했는가, 카운터 창 소비 성공. 계측 전용(할 일 139).
-    /// 판정 앵커 누락·판정 전 종료에선 나지 않는다.
-    /// </summary>
-    public static event System.Action<PlayerInterruptSkillBase, bool, bool> CalibrationServerJudged;
+    // 예측 보정 계측 훅(할 일 139 — 오너·서버 예측·재예측·서버 판정)은 할 일 191 5단계에서 삭제했다.
+    // 보정 랩은 InterruptManager 예측·판정·서버 결과 이벤트와 QA 기록(InterruptQaRecorder.RecordCompleted)을 받는다.
 
     // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -387,11 +324,6 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     {
         ServerInterruptResolved = null;
         ServerInterruptSucceeded = null;
-        CalibrationOwnerPredicted = null;
-        CalibrationServerPredicted = null;
-        CalibrationOwnerRepredicted = null;
-        CalibrationServerRepredicted = null;
-        CalibrationServerJudged = null;
     }
 
     private void CompleteResolution(int resolvedCount)
@@ -530,7 +462,6 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             InterruptProductionDirector.ServerSuccess(InterruptProductionEvent.Success(owner, this,
                 hasSuccessTargetPosition, successTargetPosition));
         ReportLag(lagHit);
-        CalibrationServerJudged?.Invoke(this, castViaDash, interruptSucceeded);
 
         // 판정 1회 = 시전 1회라 여러 대상이 성공해도 한 번만 알린다.
         if (interruptSucceeded && !judgedByClaim)
@@ -719,60 +650,25 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     // ── 인터럽트 슬로우 모션 (서버) ──
 
-    // 승인 시점 예측(D1·D2 → 할 일 132 정정1 → 139-3): 판정 앵커 오버랩에 걸린 예측 대상 캐시(InterruptTargetRegistry) 대상과 창을 모아
-    // 공용 예측기(DashInterruptPredictor)에 넘긴다. 대상 없음 = 슬로우 없음, 성공 예측 = 강, 실패 예측 = 약(디렉터 시도 단계가 고른다).
+    // 승인 시점 예측(D1·D2 → 할 일 132 정정1 → 191 5단계): 오너 예측과 같은 InterruptManager.Predict 를 서버 이력·서버 창 시간표로 돌린다
+    // (TryPredictServerAttempt). 대상 없음 = 슬로우 없음, 성공 예측 = 강, 실패 예측 = 약(디렉터 시도 단계가 고른다). 시전자 이력이 아직 없으면 대상 없음.
     // 공격 방향 = 근접은 승인된 시전 방향, 대쉬는 대시 방향. 시간 레이어가 없는 씬(오프라인 테스트)은 건너뛴다.
     private void TryStartSlowMotion()
     {
-        if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || HitboxAnchor == null || owner == null)
+        if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || owner == null)
             return;
 
         Vector3 attackDirection = attachedToDash ? armedDashDirection : castDirection;
-        DashInterruptPredictInput input = BuildPredictInput(false, attachedToDash,
-            attackDirection, armedDashSpeed, armedDashRemaining, 0f, out Unit target);
-        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(input);
-        CalibrationServerPredicted?.Invoke(
-            new CalibrationPrediction(this, attachedToDash, 0f, attackDirection, input, prediction, target));
+        InterruptJudgeResult prediction = default;
+        bool predicted = InterruptManager.Instance != null &&
+                         InterruptManager.Instance.TryPredictServerAttempt(owner, attachedToDash, attackDirection, out prediction);
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
-            InterruptProductionEvent.Attempt(owner, this, prediction.Forecast)));
-        serverRepredictPending = attachedToDash && DashInterruptPredictor.ShouldRepredictDuringDash(prediction);
-        serverPredictSkillStart = input.SkillStartTime;
+            InterruptProductionEvent.Attempt(owner, this, SelectServerAttemptForecast(predicted, prediction))));
     }
 
-    /// <summary>
-    /// [서버] 대쉬 간파 재예측(할 일 139-2) — 대시 상태가 실려 있는 동안 매 프레임 부른다(지금 서버 대시 속도·남은 시간).
-    /// 승인 때 창이 닫혀 약이었으면 같은 예측기로 서버 창을 다시 보고, 강이 되면 강 시도 슬로우를 다시 건다
-    /// (GlobalTimeScale 은 마지막 발동이 이긴다 — 새 RPC 없이 기존 슬로우 배포로 오너·팀원 화면이 강 시도를 받는다). 강 → 약은 없다.
-    /// </summary>
-    internal void TickServerDashReprediction(float dashSpeed, float dashRemaining)
-    {
-        if (!serverRepredictPending || !attachedToDash)
-            return;
-
-        if (!slowMotion.IsPending || GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null ||
-            HitboxAnchor == null || owner == null)
-        {
-            serverRepredictPending = false;
-            return;
-        }
-
-        DashInterruptPredictInput input = InterruptAttemptPrediction.ForReprediction(
-            BuildPredictInput(false, true, armedDashDirection, dashSpeed, dashRemaining, 0f, out Unit target), serverPredictSkillStart);
-        DashInterruptPrediction prediction = DashInterruptPredictor.Predict(input);
-        if (prediction.Forecast != InterruptAttemptForecast.Strong)
-            return;
-
-        serverRepredictPending = false;
-        uint triggerId = InterruptProductionDirector.ServerAttempt(
-            InterruptProductionEvent.Attempt(owner, this, InterruptAttemptForecast.Strong));
-        if (triggerId == 0)
-            return; // 레이어가 거부했다 — 약 시도 슬로우 번호를 그대로 둬야 판정·종료가 실패 복귀시킬 수 있다
-
-        slowMotion.Started(triggerId);
-        Edit.Log($"[DashInterrupt] 대시 중 재예측 — 약 → 강(서버 시도 슬로우 다시 걸음) · 판정까지 {prediction.PredictedResolveTime - Time.time:F3}s", this);
-        CalibrationServerRepredicted?.Invoke(
-            new CalibrationPrediction(this, true, 0f, armedDashDirection, input, prediction, target));
-    }
+    /// <summary>서버 시도 슬로우 강·약 — 매니저 예측이 됐으면 그 결과의 3상태, 못 했으면(매니저·이력 없음) 대상 없음(슬로우 없음).</summary>
+    public static InterruptAttemptForecast SelectServerAttemptForecast(bool predicted, in InterruptJudgeResult prediction) =>
+        predicted ? prediction.Forecast : InterruptAttemptForecast.NoTarget;
 
     /// <summary>
     /// [각 피어] 이 스킬 시전자(남)의 강 시도 슬로우를 받은 순간 — 그 시도의 대상 NetworkObjectId 를 이 피어에서 다시 찾는다(할 일 143-3).
@@ -787,7 +683,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         Vector3 position = owner.transform.position;
         if (HitboxAnchor != null)
         {
-            Unit target = FindPredictTarget(position, owner.transform.forward, true, out bool open, applyLocalClaims: false);
+            Unit target = FindPredictTarget(position, owner.transform.forward, out bool open, applyLocalClaims: false);
             if (target != null && open)
                 return TargetObjectIdOf(target);
         }
@@ -848,82 +744,12 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         return TargetObjectIdOf(best);
     }
 
-    /// <summary>
-    /// [오너] 간파 입력 순간 즉시 예측(할 일 132 정정1) — 서버 승인 예측과 같은 대상 캐시·같은 판정 앵커 오버랩·같은 예측기, 창은 복제값
-    /// (<see cref="IInterruptWindowReplica"/>·<see cref="InterruptWindowReplicaTracker"/>)으로 본다. 결과는 오너 연출(암전·빛 모임)에만 쓴다.
-    /// <paramref name="attackDirection"/> = 근접은 요청에 싣는 시전(조준) 방향 — 서버 승인 예측도 같은 값을 받는다(회전 스냅 전 바라보는 방향이 아니라
-    /// 판정 때 앵커가 향할 방향). 대쉬는 대시 방향. <paramref name="pressAge"/> = 대쉬 간파 우클릭을 누른 뒤 지난 시간 — 예측을 누른 순간으로 되돌린다.
-    /// <paramref name="target"/> = 예측이 고른 간파 대상(대상 없음이면 null) — 오너 암전에 남긴다(할 일 132 단계 3).
-    /// 데이터·앵커가 없으면 false.
-    /// </summary>
-    internal bool TryPredictOwnerAttempt(bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining, float pressAge,
-        out DashInterruptPrediction prediction, out Unit target)
-    {
-        prediction = default;
-        target = null;
-        if (InterruptData == null || HitboxAnchor == null || owner == null)
-            return false;
-
-        DashInterruptPredictInput input = BuildPredictInput(true, viaDash, attackDirection, dashSpeed, dashRemaining, pressAge,
-            out target);
-        prediction = DashInterruptPredictor.Predict(input);
-        CalibrationOwnerPredicted?.Invoke(
-            new CalibrationPrediction(this, viaDash, pressAge, attackDirection, input, prediction, target));
-        return true;
-    }
-
-    /// <summary>
-    /// [오너] 대쉬 간파 재예측(할 일 139-2) — 누른 순간 창이 닫혀 약이었던 시도를 대시 도중 지금 값(복제 창·남은 대시)으로 다시 예측한다.
-    /// 준비 기준점은 누른 순간(<paramref name="skillStartTime"/>)으로 둔다. 강이면 true — 호출측이 오너 연출을 강으로 올린다.
-    /// </summary>
-    internal bool TryRepredictOwnerDashAttempt(Vector3 attackDirection, float dashSpeed, float dashRemaining, float skillStartTime,
-        out DashInterruptPrediction prediction, out Unit target)
-    {
-        prediction = default;
-        target = null;
-        if (InterruptData == null || HitboxAnchor == null || owner == null)
-            return false;
-
-        DashInterruptPredictInput input = InterruptAttemptPrediction.ForReprediction(
-            BuildPredictInput(true, true, attackDirection, dashSpeed, dashRemaining, 0f, out target), skillStartTime);
-        prediction = DashInterruptPredictor.Predict(input);
-        if (prediction.Forecast != InterruptAttemptForecast.Strong)
-            return false;
-
-        CalibrationOwnerRepredicted?.Invoke(
-            new CalibrationPrediction(this, true, 0f, attackDirection, input, prediction, target));
-        return true;
-    }
-
-    // 근접 = 지금 위치·판정 시각 지금 + 준비 시간. 대쉬 간파 = 예상 대시 끝 위치(할 일 115 §10 Q2)·판정 시각 max(대시 끝, 평소 Hit).
-    // ownerView = 오너 클라 즉시 예측(창 = 복제값), 아니면 서버 승인 예측(창 = 서버 값). 예상 대시 끝은 누른 순간으로 되돌려도 같아 대상 탐색은 지금 값으로 한다.
-    private DashInterruptPredictInput BuildPredictInput(bool ownerView,
-        bool viaDash, Vector3 attackDirection, float dashSpeed, float dashRemaining, float pressAge, out Unit target)
-    {
-        IPlayerInterruptSkillData data = InterruptData;
-        float prepDelay = DashInterruptPredictor.EstimatePrepDelay(observedPrepDelay, data != null, data != null ? data.HitDelay : 0f);
-        Vector3 castPosition = owner.transform.position;
-        Vector3 resolvePosition = castPosition + InterruptAttemptPrediction.PredictOffset(viaDash, attackDirection, dashSpeed, dashRemaining);
-        target = FindPredictTarget(resolvePosition, attackDirection, ownerView, out bool open);
-        GameObject targetObject = target != null ? target.gameObject : null;
-        float openElapsed, expectedDuration;
-        if (ownerView)
-            InterruptWindowReplicaTracker.Estimate(targetObject, open, out openElapsed, out expectedDuration);
-        else
-            InterruptLagMonitor.EstimateWindow(targetObject, open, out openElapsed, out expectedDuration);
-
-        DashInterruptPredictInput input = InterruptAttemptPrediction.BuildInput(Time.time, castPosition, prepDelay,
-            viaDash, attackDirection, dashSpeed, dashRemaining, target != null, open, openElapsed, expectedDuration);
-        return viaDash ? InterruptAttemptPrediction.AtPress(input, pressAge) : input;
-    }
-
-    // 판정 앵커가 판정 때 놓일 자리에서 닿는 간파 대상(창 소유자 = 캐시에 있는 Unit) — 지금 창이 열린 대상을 우선한다. 없으면 null.
+    // 판정 앵커가 판정 때 놓일 자리에서 닿는 간파 대상(창 소유자 = 캐시에 있는 Unit) — 지금 복제 창이 열린 대상을 우선한다. 없으면 null.
     // 형상 = 지금 앵커 형상을 공격 방향으로 돌려(앵커는 Armature 직속·회전 0 이라 앵커 정면 = 바라보는 방향) 판정 위치로 옮긴 것,
     // 질의 = 서버 판정과 같은 오버랩(HitboxAnchorShape, 할 일 139-3). 대상 정면 허용각만 따로 본다(23호 정면 판정).
-    // 대상이 정해진 뒤 창 판단에 선착순 장부를 넣는다(할 일 143) — 대상 검사(139) → 창 닫힘이면 약 순서.
-    // applyLocalClaims = 오너 창 판단에 로컬 선착순 장부를 넣는가(피어 대상 재탐색은 넣지 않는다 — 할 일 143-3).
-    private Unit FindPredictTarget(Vector3 resolvePosition, Vector3 attackDirection, bool ownerView, out bool open,
-        bool applyLocalClaims = true)
+    // 피어 대상 재탐색(할 일 143-3)·보정 랩 미리보기(할 일 156) 전용 — 예측·판정은 InterruptManager(할 일 191).
+    // applyLocalClaims = 창 판단에 로컬 선착순 장부(할 일 143-2)를 넣는가(피어 대상 재탐색은 넣지 않는다).
+    private Unit FindPredictTarget(Vector3 resolvePosition, Vector3 attackDirection, out bool open, bool applyLocalClaims = true)
     {
         Unit best = null;
         open = false;
@@ -945,14 +771,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             if (!InterruptTargetGeometry.FacesAttacker(resolvePosition, t.position, t.forward, entry.FrontAngle))
                 continue;
 
-            // 서버는 선착순 장부도 본다(할 일 143) — 남이 먼저 성공시킨 창은 닫힌 것처럼 예측(강 시도 슬로우 없음).
-            // 오너는 로컬 선착순 장부(할 일 143-2)를 본다 — 남의 강 시도·성공을 이미 받은 창은 닫힌 것처럼 예측(약 — 오너 암전·빛 모임·섬광 없음).
-            // 근접·대쉬 간파, 모든 캐릭터가 이 한 곳을 지난다(§0.10).
-            bool unitOpen = ownerView
-                ? entry.Replica != null && entry.Replica.ReplicatedWindowOpen &&
-                  !(applyLocalClaims && InterruptLocalWindowClaims.Local.IsClosed(TargetObjectIdOf(unit)))
-                : entry.Target.ServerIsInterruptible && InterruptWindowClaims.Server.Evaluate(
-                    unit.gameObject.GetInstanceID(), owner.GetInstanceID(), serverCastStartTime) != InterruptClaimVerdict.Preempted;
+            // 복제 창 + 로컬 선착순 장부(할 일 143-2) — 남의 강 시도·성공을 이미 받은 창은 닫힌 것으로 본다.
+            bool unitOpen = entry.Replica != null && entry.Replica.ReplicatedWindowOpen &&
+                            !(applyLocalClaims && InterruptLocalWindowClaims.Local.IsClosed(TargetObjectIdOf(unit)));
             if (best == null || (unitOpen && !open))
             {
                 best = unit;
@@ -965,9 +786,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     }
 
     /// <summary>
-    /// 판정 앵커를 공격 방향으로 돌려 판정 위치(<paramref name="resolvePosition"/>)에 놓은 형상 — 시도 예측 오버랩(서버 승인·오너 즉시·재예측)이
-    /// 질의하는 바로 그 형상(<see cref="HitboxAnchorShape.PlacedAt"/>). 읽기 전용 — 간파 보정 랩 기즈모(할 일 156)가 같은 값을 그린다.
-    /// 판정 위치 = 근접은 지금(시전) 위치, 대쉬 간파는 예상 대시 끝(<see cref="DashInterruptPrediction.PredictedEndPosition"/>). 앵커·시전자가 없으면 false.
+    /// 판정 앵커를 공격 방향으로 돌려 판정 위치(<paramref name="resolvePosition"/>)에 놓은 형상 — 피어 대상 재탐색·랩 미리보기 오버랩이
+    /// 질의하는 바로 그 형상(<see cref="HitboxAnchorShape.PlacedAt"/>, 매니저 예측의 <see cref="InterruptJudgeCalculator.PlaceHitbox"/> 와 같은 회전·이동).
+    /// 읽기 전용 — 간파 보정 랩 기즈모(할 일 156)가 같은 값을 그린다. 앵커·시전자가 없으면 false.
     /// </summary>
     public bool TryGetPlacedJudgeShape(Vector3 resolvePosition, Vector3 attackDirection, out HitboxAnchorShape shape)
     {
@@ -980,7 +801,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     }
 
     /// <summary>
-    /// [읽기 전용] 오너 즉시 예측과 같은 대상 탐색(같은 형상·같은 대상 캐시·복제 창·로컬 선착순 장부)으로 지금 이 자리에서 고를 대상과 그 창 열림.
+    /// [읽기 전용] 판정 앵커 형상·대상 캐시·복제 창·로컬 선착순 장부로 지금 이 자리에서 고를 대상과 그 창 열림(예측 아님 — 창 열림 ≠ 강).
     /// 예측·연출·계측 이벤트는 내지 않는다 — 간파 보정 랩 상시 미리보기(할 일 156) 전용. 데이터·앵커가 없으면 null.
     /// </summary>
     public Unit FindOwnerViewTarget(Vector3 resolvePosition, Vector3 attackDirection, out bool open)
@@ -989,7 +810,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         if (InterruptData == null || HitboxAnchor == null || owner == null)
             return null;
 
-        return FindPredictTarget(resolvePosition, attackDirection, true, out open);
+        return FindPredictTarget(resolvePosition, attackDirection, out open);
     }
 
     private Collider[] PredictResults()

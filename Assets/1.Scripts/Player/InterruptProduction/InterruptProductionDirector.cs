@@ -489,23 +489,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     }
 
     /// <summary>
-    /// [오너] 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2) — 결론 전 약 시도면 지금부터 오너 암전·빛 모임을 켠다(늦게 켜지는 것 허용).
-    /// 대상은 <see cref="LocalOwnerAttempt"/> 와 같이 먼저 넘긴다. 강 → 약 내리기는 없다.
-    /// </summary>
-    public static void LocalOwnerUpgrade(GameObject owner, GameObject target)
-    {
-        if (Instance == null)
-            return;
-
-        InterruptOwnerPresentation presentation = Instance.OwnerPresentation;
-        if (!presentation.CanUpgrade)
-            return;
-
-        Instance._ownerDimOutput?.SetSubjects(owner, target);
-        presentation.UpgradeToStrong(Time.unscaledTime);
-    }
-
-    /// <summary>
     /// [오너] 이번 오너 암전에 함께 남길 루트(빛 모임 VFX 등, 단계 4). 암전이 걷히면 빠진다 — 시도마다 다시 부른다.
     /// 렌더링 레이어 비트 4 를 그 순간 루트 아래 렌더러에 붙인다(<see cref="InterruptOwnerMaskTagger"/>).
     /// </summary>

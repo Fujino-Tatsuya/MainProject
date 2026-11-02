@@ -123,7 +123,7 @@ public struct InterruptJudgeResult
     public bool IsSuccess => Outcome == InterruptJudgeOutcome.Success;
 
     /// <summary>
-    /// 연출 3상태 — 기존 <see cref="DashInterruptPrediction.Forecast"/> 와 같은 뜻: 대상 없음 = 상자·정면각 안에 대상 없음,
+    /// 연출 3상태 — 기존 <see cref="BeaverLobby.Player.Dash.InterruptAttemptForecast"/> 와 같은 뜻: 대상 없음 = 상자·정면각 안에 대상 없음,
     /// 약 = 대상은 있는데 실패(창 닫힘 등), 강 = 성공. 예측(Predict)은 대상을 지목하지 않아 범위·각도 실패가 곧 대상 없음이다.
     /// </summary>
     public InterruptAttemptForecast Forecast =>
