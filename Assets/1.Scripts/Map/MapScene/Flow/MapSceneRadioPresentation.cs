@@ -58,6 +58,18 @@ public sealed class MapSceneRadioPresentation : MonoBehaviour
         _showing = _caption.Show(id, (float)(now - state.StartServerTime), timing.chunkSeconds, timing.gapSeconds);
     }
 
+    /// <summary>
+    /// 무전 한 줄의 전체 길이(초) — 화면에 그리는 것과 같은 조각 나누기(<c>|</c>·최대 폭)와 데이터 시간.
+    /// 서버(호스트 피어)가 "무전이 끝난 뒤" 를 잴 때 쓴다(G1 개방). 문구를 아직 못 읽으면(안내 UI·글꼴 전) false.
+    /// </summary>
+    public bool TryGetLineSeconds(string id, out float seconds)
+    {
+        MapSceneRadioLineTiming timing = MapSceneRadioData.Load().TimingOf(id);
+        _caption ??= new MapSceneRadioCaptionDriver("MapSceneRadio");
+        seconds = _caption.TotalSeconds(id, timing.chunkSeconds, timing.gapSeconds);
+        return seconds >= 0f;
+    }
+
     // 2·4구역 소개 — 지금 도는가 + 시작한 적 있는 소개의 시작 시각.
     private bool CollectIntros(out int count)
     {

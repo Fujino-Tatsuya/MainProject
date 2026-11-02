@@ -96,6 +96,13 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
              "23호 훅과 같은 비율(폭 4.1m 에 ±1.07m ≈ 26%) — 판정 박스 폭 3.6m 기준 0.95m. 0 = 정면 가운데.")]
     [DataTableIgnore] float sideLateralOffset = 0.95f;
 
+    [SerializeField, Min(0f)]
+    [Tooltip("기절 별(머리 위 상태이상 이펙트)을 공용 높이보다 더 올리는 값(m). 큰 머리에 별이 묻혀서(경석 11-02 Play) 건틀렛봇만 올린다.\n" +
+             "Play 중 바꾸면 바로 반영된다.")]
+    [DataTableIgnore] float stunVfxExtraHeight = 0.5f;
+
+    public override float StatusVfxOverheadExtraHeight => stunVfxExtraHeight;
+
     [Header("애니메이션 — CrossFade 대상 상태명(컨트롤러 상태명과 일치해야 함)")]
     [SerializeField]
     [Tooltip("스매시 진입 상태명. 이 상태의 exit-time 전이가 Smash 상태로 자동 이어진다(컨트롤러 확인 완료).")]

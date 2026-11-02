@@ -10,8 +10,9 @@ using UnityEngine;
 /// 붙는 곳: 디렉터가 튜토리얼을 켠 것이 그 피어에서 보이는 순간 디렉터 GameObject 에 런타임으로 붙는다(모든 피어 — 씬·프리팹 저장 없음).
 ///
 /// 서버(디렉터 Commit 안 — 게이트·진입 이벤트 — 에서 다시 Commit 하지 않게 실행은 다음 Update 로 미룬다):
-///  · 활성 순간 G1(존1 → 복도1)을 바로 연다 → 단계 Corridor1. 1구역 도착 무전 <c>TUT_MAIN_Z01_ENTER</c> 은 <b>로딩이 걷히고 포드 착지 연출이 끝난 뒤</b>
+///  · 1구역 도착 무전 <c>TUT_MAIN_Z01_ENTER</c> 은 <b>로딩이 걷히고 포드 착지 연출이 끝난 뒤</b>
 ///    (조작 복귀 — <see cref="MapPodArrival.IsArrivalDoneLocal"/> ∧ <see cref="GameManager.IsMainGameReady"/>) + 무전 데이터 지연. G1 순간에 틀었더니 착지 연출 중에 끝나 안 보였다(경석 11-02).
+///    G1(존1 → 복도1)은 <b>그 무전의 마지막 조각이 끝난 뒤</b> 연다 → 단계 Corridor1(경석 11-02 — 활성 순간 열면 대사를 안 듣고 지나간다).
 ///  · 존2 파티 첫 진입 → 단계 Zone2. 2구역 소개 연출이 켜진 판이면 기상은 <see cref="MapSceneZone2IntroFlow"/> 몫(G2 가 열리는 순간 = 연출 복귀 끝),
 ///    끈 판이면 <see cref="Zone2WakeDelaySeconds"/> 뒤 존2 기상(예전 그대로). G3 는 존 장부(전멸)가 연다.
 ///  · G4 열림 ∧ 존3 파티 첫 진입 → 존3 핵심 몬스터(스피너봇 — 없으면 전부) 기상 · 단계 Zone3Fight · G5 요청. G6 은 존 장부(처치)가 연다.
@@ -42,6 +43,9 @@ public sealed class MapSceneZoneFlow : MonoBehaviour
     private double _zone1RadioPendingSince = -1d;   // G1 을 연 시각 — 착지 연출이 끝나길 기다리는 중
     /// <summary>착지 신호가 끝내 안 오면(연출 고장) 이만큼 뒤엔 그냥 낸다(초).</summary>
     private const double Zone1RadioGiveUpSeconds = 30d;
+    private bool _g1WaitingRadio;   // 도착 무전을 틀었고 그 끝을 기다려 G1 을 연다
+    /// <summary>무전 길이를 못 재면(문구·글꼴 없음) 무전 시작부터 이만큼 뒤엔 그냥 G1 을 연다(초).</summary>
+    private const double G1RadioGiveUpSeconds = 15d;
     private float _nextSightCheckAt;
     private readonly List<MonsterBase> _sightBuffer = new List<MonsterBase>();
     private const float SightCheckInterval = 0.2f;
@@ -87,7 +91,7 @@ public sealed class MapSceneZoneFlow : MonoBehaviour
             TryStartZone3();
         }
         MapSceneDirector.StepChanged += HandleStepChanged;
-        Edit.Log($"[Tutorial] 맵씬 존 진행 켜짐 (서버:{_isServer}) — 존1~3 교육 없음(G1 즉시 · 존2 기상 · 존3 기상+G5).", this);
+        Edit.Log($"[Tutorial] 맵씬 존 진행 켜짐 (서버:{_isServer}) — 존1~3 교육 없음(G1 = 도착 무전 뒤 ·존2 기상 · 존3 기상+G5).", this);
     }
 
     private void OnDisable()
@@ -105,12 +109,11 @@ public sealed class MapSceneZoneFlow : MonoBehaviour
         if (_pendingG1)
         {
             _pendingG1 = false;
-            if (!_director.IsGateOpen(MapSceneGate.G1_Corridor1Entry) && _director.TryOpenGateServer(MapSceneGate.G1_Corridor1Entry))
-                Edit.Log("[Tutorial] 존1 검사 없음 — G1 바로 열림.", this);
-            _zone1RadioPendingSince = _nm.ServerTime.Time;   // 도착 무전은 착지 연출이 끝난 뒤(아래)
+            _zone1RadioPendingSince = _nm.ServerTime.Time;   // 도착 무전은 착지 연출이 끝난 뒤(아래) — G1 은 그 무전이 끝난 뒤
         }
 
         if (_zone1RadioPendingSince >= 0d) TickZone1Radio();
+        if (_g1WaitingRadio) TickG1AfterRadio();
 
         if (_pendingCorridor1Step)
         {
@@ -171,8 +174,36 @@ public sealed class MapSceneZoneFlow : MonoBehaviour
         bool giveUp = _nm.ServerTime.Time - _zone1RadioPendingSince >= Zone1RadioGiveUpSeconds;
         if (!ready && !giveUp) return;
         _zone1RadioPendingSince = -1d;
-        _director.PlayRadioServer(TutorialGuideIds.MainZ1Enter);
+        _g1WaitingRadio = _director.PlayRadioServer(TutorialGuideIds.MainZ1Enter);
         if (!ready) Edit.LogWarning($"[Tutorial] 착지 연출 끝 신호가 {Zone1RadioGiveUpSeconds:0}초 동안 안 왔다 — 1구역 도착 무전을 그냥 낸다.", this);
+        if (!_g1WaitingRadio) OpenG1("도착 무전을 못 틀었다(이미 튼 판)");
+    }
+
+    // G1(존1 → 복도1)은 1구역 도착 무전의 마지막 조각이 꺼진 뒤 연다(경석 11-02 Play — 무전 중에 열려 대사를 안 듣고 지나갔다).
+    // 길이 = 호스트 표시와 같은 조각 나누기 × 데이터 시간(MapSceneRadioData) — 하드코딩 없음. 늦게 붙은·재접속 클라는 게이트 복제 값을 따른다.
+    private void TickG1AfterRadio()
+    {
+        if (_director.IsGateOpen(MapSceneGate.G1_Corridor1Entry))
+        {
+            _g1WaitingRadio = false;   // 구간 스킵·디버그가 먼저 열었다
+            return;
+        }
+        double start = _director.Radio.StartServerTime;
+        double now = _nm.ServerTime.Time;
+        var radio = GetComponent<MapSceneRadioPresentation>();
+        if (radio != null && radio.TryGetLineSeconds(TutorialGuideIds.MainZ1Enter, out float seconds))
+        {
+            if (now >= start + seconds) OpenG1($"도착 무전 끝({seconds:0.##}초)");
+        }
+        else if (now - start >= G1RadioGiveUpSeconds)
+            OpenG1($"도착 무전 길이를 {G1RadioGiveUpSeconds:0}초 동안 못 쟀다 — 그냥 연다");
+    }
+
+    private void OpenG1(string why)
+    {
+        _g1WaitingRadio = false;
+        if (!_director.IsGateOpen(MapSceneGate.G1_Corridor1Entry) && _director.TryOpenGateServer(MapSceneGate.G1_Corridor1Entry))
+            Edit.Log($"[Tutorial] 존1 검사 없음 — G1 열림: {why}.", this);
     }
 
     private void HandleZoneClearedServer(MapSceneArea zone)
