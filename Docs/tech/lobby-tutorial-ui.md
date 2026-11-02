@@ -90,7 +90,12 @@
 | `PATH_TRAINING_EXIT` | 19 | (−16,2.5) → (−16,−6) → (−13.75,−6) | `Gather_TrainEnd`(출구) |
 | `PATH_SORTIE` | 26–27 | (1.61,−3.4) → (−2.8,−3.4) → (−2.8,3) → (1.7,3) → (1.7,4.6) | `Gather_Sortie` 남쪽 안, 진단 포드 둘 사이·발사대(`Floor_1`, z 4.93~) 바로 앞 |
 
-- 에디터에서 씬을 열면 레이아웃·TMP 가 인스턴스에 구동 값 오버라이드(`m_TextStyleHashCode`·자식 RectTransform 앵커 0)를 다시 만들 수 있다 — 저장 전 diff 에서 빼면 된다(동작 무관).
+- **씬 오버라이드 재발(할 일 181, 해결)** — 원인: 저작 메뉴가 레이아웃·TMP 갱신 없이 프리팹을 저장해, 프리팹에 `ObjectivePanel`(VerticalLayoutGroup) 자식 6개의
+  RectTransform 레이아웃 전 기본값(앵커 0.5·크기 200×50 등)과 TMP `m_TextStyleHashCode: 0` 이 들어 있었다. 씬이 올라와 캔버스가 한 번 갱신되면 UGUI 가 drive 칸을
+  (저장 시 0 으로) 잡고 TMP 가 해시를 Normal(-1183493901)로 바꿔 쓴다. 씬을 dirty 로 만들지는 않으므로 **열기만 하면 diff 없음** — 다른 계기로 씬이 저장될 때 함께 기록됐다
+  (단독·Additive 열기, 에디터 시작 자동 로드 모두 같은 원인).
+  대책: `LobbyTutorialUIAuthoring` 이 저장 직전 `NormalizeBeforeSave`(레이아웃 그룹마다 `LayoutRebuilder.ForceRebuildLayoutImmediate` + TMP `ForceMeshUpdate`)로
+  정규화된 값을 프리팹에 넣는다. 새 UI 저작 메뉴가 레이아웃 그룹·TMP 를 쓰면 같은 처리를 할 것.
 
 ## 프리팹 · 저작 메뉴
 
