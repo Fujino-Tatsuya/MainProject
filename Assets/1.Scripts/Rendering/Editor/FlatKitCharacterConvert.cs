@@ -31,6 +31,8 @@ public static class FlatKitCharacterConvert
         ("Assets/2.Prefabs/Monster/Boss/Wells.prefab", "Boss"),
         ("Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab", "Boss"),
         ("Assets/2.Prefabs/Monster/Boss/TwentyThree_Solo.prefab", "Boss"),
+        // 웰즈 자폭 드론(할 일 175). 원본 = SVN DRONE_Mat(URP Lit) — 래퍼 프리팹의 Model 슬롯 오버라이드만 갈아 끼운다.
+        ("Assets/2.Prefabs/Monster/Boss/WellsDrone.prefab", "Boss"),
         // 플레이어(6단계). 실제 스폰 = Player_Paladin(Player.prefab Variant), 몸체 = Paladin_Armature(중첩 — 먼저 바꿔야 물려받는다).
         // Paladin_VFX = 이펙트 작업용 보관본 — 같은 룩이어야 이펙트 작업 화면이 인게임과 같다. 구 Paladin 은 Player/Legacy/ (스폰 안 됨).
         ("Assets/2.Prefabs/Player/Paladin/Paladin_Armature.prefab", "Player"),
