@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(GlobalTimeScale))]
 [DataTableSheet("SlowMotion", Order = 2)]
-public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdaptationOutput
+public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdaptationOutput, ISuppressDarkAdaptOutput
 {
     [Tooltip("간파 성공 발동자 본인 화면의 암순응 강도 [0, 1]")]
     [SerializeField, Range(0f, 1f)] private float selfIntensity = 1f;
@@ -82,6 +82,33 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
     /// <summary>즉시 0(강제 리셋·세션 종료).</summary>
     public void Stop() => StopEffect();
 
+    // ---- 제압 암순응(할 일 192 Q7) — 제압 간파 섬광 진행기가 부른다. 모든 화면 같은 값(Q8 공용) ----
+
+    /// <summary>컷 방식 — 곡선을 멈추고 이 어둡힘을 그대로 붙잡는다. 임계·원형 칸은 이 컴포넌트 값.</summary>
+    public void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition)
+    {
+        if (!isActiveAndEnabled)
+            return;
+
+        _model.Stop();
+        SetTrigger(casterClientId, targetPosition);
+        PushState(InterruptDarkAdaptationModel.SanitizeIntensity(darkness));
+    }
+
+    /// <summary>부드럽게 방식 — 기존 곡선을 본인 강도로(모든 화면).</summary>
+    public void PlayDarkAdaptSmooth(ulong casterClientId, Vector3 targetPosition) => Play(true, casterClientId, targetPosition);
+
+    /// <summary>컷 끝·강제 리셋 — 즉시 0.</summary>
+    public void ClearDarkAdapt() => StopEffect();
+
+    private void SetTrigger(ulong casterClientId, Vector3 targetPosition)
+    {
+        if (_triggerClientId != casterClientId)
+            _triggerPlayer = null;
+        _triggerClientId = casterClientId;
+        _targetPosition = targetPosition;
+    }
+
     private void LateUpdate()
     {
         if (!_model.IsPlaying)
@@ -97,9 +124,11 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
         PushState();
     }
 
-    private void PushState()
+    private void PushState() => PushState(_model.Value);
+
+    private void PushState(float intensity)
     {
-        DarkAdaptationState.Intensity = _model.Value;
+        DarkAdaptationState.Intensity = intensity;
         DarkAdaptationState.LuminanceThreshold = InterruptDarkAdaptationModel.SanitizeDuration(luminanceThreshold);
         DarkAdaptationState.ThresholdSoftness = InterruptDarkAdaptationModel.SanitizeDuration(thresholdSoftness);
         DarkAdaptationState.MaxDarken = InterruptDarkAdaptationModel.SanitizeIntensity(maxDarken);

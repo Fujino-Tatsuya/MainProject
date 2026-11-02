@@ -111,6 +111,28 @@ public sealed class SuppressFlashCut
 }
 
 /// <summary>
+/// 제압 간파 암순응 컷 한 장(할 일 192 Q7) — 섬광 시퀀스가 끝난(복귀 컷 뒤) 다음에 차례로 끊어 보인다. 마지막 컷 뒤 = 원래 색.
+/// 어둡힘은 암순응 렌더(<see cref="InterruptDarkAdaptation"/> — 밝은 빛·이펙트는 남고 어두운 픽셀만 낮춤)의 강도 [0, 1].
+/// 길이는 초(실제 시간) — 시퀀스 프레임 속도(A 24 / B 60)와 무관하게 같은 길이로 보인다.
+/// </summary>
+[Serializable]
+public sealed class SuppressDarkAdaptCut
+{
+    [Tooltip("컷 길이(초, 실제 시간)")]
+    [Min(0.01f)] public float duration = 0.15f;
+    [Tooltip("어둡힘 [0, 1] — 1 = 암순응 최대(어두움), 0.5 = 중간. 0 = 원래 색")]
+    [Range(0f, 1f)] public float darkness = 1f;
+
+    public SuppressDarkAdaptCut() { }
+
+    public SuppressDarkAdaptCut(float duration, float darkness)
+    {
+        this.duration = duration;
+        this.darkness = darkness;
+    }
+}
+
+/// <summary>
 /// 제압 간파 '애니메이션 섬광' 컷 데이터(할 일 179) — 디렉터(<see cref="InterruptProductionDirector"/>)가 재생 때마다 읽는다(캐싱 없음):
 /// Play 중 인스펙터에서 값을 바꾸면 그 다음 렌더 프레임부터 쓰인다. 기본값 = 사양 표(<see cref="ResetToSpec"/>).
 /// 그림은 전부 셰이더 절차 생성(SuppressFlash.shader) — 텍스처 칸 없음.
@@ -127,6 +149,10 @@ public sealed class SuppressFlashSequence : ScriptableObject
 
     [Header("컷")]
     public List<SuppressFlashCut> cuts = CreateSpecCuts();
+
+    [Header("제압 암순응 컷(할 일 192) — 복귀 컷 뒤, 디렉터 '제압 암순응 = 컷'일 때")]
+    [Tooltip("어두움 → 중간 → (끝 = 원래 색). 각 컷은 초 단위·어둡힘 강도. 비우면 컷 암순응 없음(부드럽게 모드는 이 칸을 안 쓴다)")]
+    public List<SuppressDarkAdaptCut> darkAdaptCuts = CreateDarkAdaptCuts();
 
     [Header("모양 — 화면 높이 단위")]
     [Tooltip("십자 빛기둥 중심 굵기(반폭)")]
@@ -190,7 +216,15 @@ public sealed class SuppressFlashSequence : ScriptableObject
         frameRate = 24f;
         holdFrames = 2;
         cuts = CreateSpecCuts();
+        darkAdaptCuts = CreateDarkAdaptCuts();
     }
+
+    /// <summary>제압 암순응 기본 2컷(할 일 192 Q7) — 어두움 0.15초 → 중간 0.15초 → 원래 색.</summary>
+    public static List<SuppressDarkAdaptCut> CreateDarkAdaptCuts() => new List<SuppressDarkAdaptCut>
+    {
+        new SuppressDarkAdaptCut(0.15f, 1f),
+        new SuppressDarkAdaptCut(0.15f, 0.5f),
+    };
 
     /// <summary>
     /// 레퍼런스 B(포트폴리오 5.40~6.08초, 60fps 프레임 분석 — 179 후속 3) 값으로 바꾼다. 60fps·홀드 1 = 컷마다 길이가 다르다.
@@ -202,6 +236,7 @@ public sealed class SuppressFlashSequence : ScriptableObject
         frameRate = 60f;
         holdFrames = 1;
         cuts = CreateReferenceCuts();
+        darkAdaptCuts = CreateDarkAdaptCuts();
         darkThreshold = 0.3f;
         lightThreshold = 0.85f;
         sceneExposure = 0.9f;

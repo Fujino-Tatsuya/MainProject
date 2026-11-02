@@ -40,6 +40,9 @@ public sealed class InterruptOwnerJudgeCuePlayer
     /// <summary>마지막 로컬 성공의 발동 번호(0 = 없음).</summary>
     public uint LocalSuccessTriggerId { get; private set; }
 
+    /// <summary>마지막 로컬 성공이 ②~⑥ 대신 제압 간파 섬광 시퀀스를 틀었다(할 일 192 — 제압 간파 예측). 디렉터가 시퀀스를 시작했다.</summary>
+    public bool LocalSuccessPlayedSuppress { get; private set; }
+
     /// <summary>[오너] 시도 cue 를 받았다(받아들였든 아니든 — 대상 없음이어도 이 시전은 cue 경로).</summary>
     public void Attempted()
     {
@@ -49,16 +52,22 @@ public sealed class InterruptOwnerJudgeCuePlayer
 
     /// <summary>
     /// [오너] 판정 성공 — 서버 결과를 기다리지 않고 성공 단계로. <paramref name="now"/> = 실시간, <paramref name="effectNow"/>·<paramref name="frame"/> = 섬광 진행기 시계·렌더 프레임.
-    /// 강 시도였으면(오너 암전 상태) 섬광 오버레이 ②~⑥, 약·대상 없음이면 섬광 순간만(월드 섬광·self 암순응) — 서버 성공과 같은 규칙.
+    /// 강 시도였으면 섬광 오버레이 ②~⑥, 약·대상 없음이면 섬광 순간만(월드 섬광·self 암순응) — 서버 성공과 같은 규칙.
+    /// <paramref name="suppressSequence"/> = 제압 간파 섬광 시퀀스를 틀 성공(할 일 192 — 예측 단계 제압) — ②~⑥·섬광 순간을 예약하지 않는다
+    /// (시퀀스 시작과 암전 걷기는 디렉터가 돌려받은 발동 번호로 한다). 로컬 발동 번호를 돌려준다.
     /// </summary>
-    public void JudgeSucceeded(ulong localClientId, Vector3 flashPoint, Vector3 eventPosition, float now, float effectNow, int frame)
+    public uint JudgeSucceeded(ulong localClientId, Vector3 flashPoint, Vector3 eventPosition, float now, float effectNow, int frame,
+        bool suppressSequence = false)
     {
         InterruptOwnerPresentation presentation = _presentation();
         uint triggerId = LocalTriggerBase | (++_localTriggerSeq & ~LocalTriggerBase);
 
         presentation.ServerStarted(triggerId, SlowMotionPurpose.Success, true, now);
         LocalSuccessTriggerId = triggerId;
+        LocalSuccessPlayedSuppress = suppressSequence;
         SuccessPending = true;
+        if (suppressSequence)
+            return triggerId;
 
         InterruptHitFlashSequencer flash = _flash();
         bool ownerOverlay = InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, true, presentation.SuccessDimmed);
@@ -66,6 +75,7 @@ public sealed class InterruptOwnerJudgeCuePlayer
             flash.BeginOwnerOverlay(flashPoint, presentation.AttackDirection, effectNow, frame);
         flash.ScheduleFlash(new InterruptHitFlashMoment(
             InterruptProductionEvent.LocalSuccess(triggerId, localClientId, eventPosition), true, ownerOverlay), frame);
+        return triggerId;
     }
 
     /// <summary>[오너] 즉시 종료 cue. 서버 거부면 성공 섬광까지 끄고, 나머지는 결론 전 시도를 걷는다.</summary>
@@ -140,5 +150,6 @@ public sealed class InterruptOwnerJudgeCuePlayer
     {
         DrivesAttempt = false;
         SuccessPending = false;
+        LocalSuccessPlayedSuppress = false;
     }
 }

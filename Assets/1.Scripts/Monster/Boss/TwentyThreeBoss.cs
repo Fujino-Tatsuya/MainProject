@@ -15,7 +15,8 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptClaimTarget
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptClaimTarget,
+    IInterruptSuppressForecast
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -7062,6 +7063,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     /// <summary>남은 제압 칸 0~<see cref="SuppressSegmentTotal"/>(전 피어 — 복제값). HUD 칸 줄이 읽는다.</summary>
     public int SuppressSegmentsRemaining => Mathf.Clamp(SuppressSegmentTotal - _suppressSegmentsUsed.Value, 0, SuppressSegmentTotal);
+
+    /// <summary>
+    /// [각 피어] 지금 간파가 성공하면 제압에 들어갈 것으로 보이는가(할 일 192 — 오너 시도 암전 예측). 간파 성공의 칸 분기(<see cref="BossCounterProgress.ResolveSegments"/>)와
+    /// 같은 계산을 복제된 남은 칸으로 한다. 기믹 중(칸 유지)은 서버만 안다 — 클라는 기믹 중 마지막 칸이면 제압으로 잘못 볼 수 있다(서버 표식이 바로잡는다).
+    /// </summary>
+    public bool WouldSuppressOnInterrupt =>
+        !IsInGimmick && SuppressSegmentsRemaining > 0 &&
+        BossCounterProgress.ResolveSegments(SuppressSegmentsRemaining, SuppressSegmentTotal,
+            _boss != null ? _boss.counterSegmentStep : 1, 0f, 0f).IsSuppress;
 
     /// <summary>[서버] 남은 칸을 사용한 칸으로 바꿔 복제한다.</summary>
     void SetSuppressSegmentsRemaining(int remaining) =>

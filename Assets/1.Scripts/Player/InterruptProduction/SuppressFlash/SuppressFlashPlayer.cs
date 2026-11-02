@@ -148,6 +148,38 @@ public static class SuppressFlashRules
         cutFrames <= 0 ? 0f : Mathf.Clamp01(SteppedFrame(frameInCut, holdFrames) / (float)cutFrames);
 
     /// <summary>
+    /// 제압 암순응 컷(할 일 192 Q7) — 시퀀스가 끝난 뒤 경과 실제 시간(초)이 든 컷과 그 어둡힘. 끝을 지났거나 컷이 없으면 false(= 원래 색).
+    /// 컷 길이 0 이하는 0.01초로 본다(저작 실수의 안전망). null 컷은 건너뛴다.
+    /// </summary>
+    public static bool TryEvaluateDarkAdapt(IReadOnlyList<SuppressDarkAdaptCut> cuts, float elapsedSeconds, out int cutIndex, out float darkness)
+    {
+        cutIndex = -1;
+        darkness = 0f;
+        if (cuts == null || float.IsNaN(elapsedSeconds) || elapsedSeconds < 0f)
+            return false;
+
+        float start = 0f;
+        for (int i = 0; i < cuts.Count; i++)
+        {
+            SuppressDarkAdaptCut cut = cuts[i];
+            if (cut == null)
+                continue;
+
+            float end = start + Mathf.Max(0.01f, cut.duration);
+            if (elapsedSeconds < end)
+            {
+                cutIndex = i;
+                darkness = Mathf.Clamp01(cut.darkness);
+                return true;
+            }
+
+            start = end;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// 경과 실제 시간의 모양. 끝났거나 컷이 없으면 <see cref="SuppressFlashFrame.Inactive"/>.
     /// 섬광 줄이기 = 반전 끔(포지티브도 뒤집지 않음) + 대비를 <see cref="SuppressFlashSequence.reducedContrast"/> 로.
     /// </summary>
@@ -221,28 +253,70 @@ public interface ISuppressFlashOutput
 }
 
 /// <summary>
+/// 제압 암순응 출력(할 일 192 Q7) — 렌더 출력은 <see cref="InterruptDarkAdaptation"/>, 테스트는 가짜. 모든 피어 같은 값(Q8 공용).
+/// </summary>
+public interface ISuppressDarkAdaptOutput
+{
+    /// <summary>컷 방식 — 이 어둡힘을 그대로 붙잡는다(곡선 없음). 컷이 바뀔 때마다 부른다.</summary>
+    void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition);
+
+    /// <summary>부드럽게 방식 — 기존 암순응 곡선을 한 번 튼다(본인 강도, 모든 화면).</summary>
+    void PlayDarkAdaptSmooth(ulong casterClientId, Vector3 targetPosition);
+
+    /// <summary>즉시 0(컷 끝·강제 리셋).</summary>
+    void ClearDarkAdapt();
+}
+
+/// <summary>
 /// 제압 간파 섬광 진행기(할 일 179) — 순수 로직(MonoBehaviour 아님). 디렉터가 공용 성공 사건에서 <see cref="Begin"/>, 매 프레임 실제 시간으로 <see cref="Tick"/>.
 /// 컷 데이터(어느 SO 인가)는 <see cref="Begin"/> 순간 공급자에서 한 번 골라 끝까지 쓴다(A/B 선택을 재생 중에 바꿔도 다음 성공부터, 179 후속 3).
 /// 그 SO 의 값·섬광 줄이기는 Tick 마다 읽는다 — Play 중 SO 값을 바꾸면 다음 렌더 프레임부터 그 값.
 /// 새 성공이 오면 처음부터 다시 튼다.
+/// 시퀀스가 끝나면 제압 암순응(할 일 192 Q7)으로 이어진다 — 컷 = 그 SO 의 암순응 컷을 실제 시간으로 끊어서, 부드럽게 = 기존 암순응 곡선 한 번.
+/// 방식은 <see cref="Begin"/> 순간 받은 값을 끝까지 쓴다.
 /// </summary>
 public sealed class SuppressFlashPlayer
 {
     private readonly Func<SuppressFlashSequence> _sequence;
     private readonly Func<bool> _reduceFlash;
     private ISuppressFlashOutput _output;
+    private ISuppressDarkAdaptOutput _darkAdaptOutput;
     private SuppressFlashSequence _playing;
     private float _startTime;
     private Vector3 _worldCenter;
+    private SuppressDarkAdaptMode _darkAdaptMode;
+    private ulong _casterClientId;
+    private Vector3 _targetPosition;
+    private float _darkAdaptStart;
 
-    public SuppressFlashPlayer(Func<SuppressFlashSequence> sequence, Func<bool> reduceFlash, ISuppressFlashOutput output)
+    public SuppressFlashPlayer(Func<SuppressFlashSequence> sequence, Func<bool> reduceFlash, ISuppressFlashOutput output,
+        ISuppressDarkAdaptOutput darkAdaptOutput = null)
     {
         _sequence = sequence;
         _reduceFlash = reduceFlash;
         _output = output;
+        _darkAdaptOutput = darkAdaptOutput;
     }
 
+    /// <summary>섬광 시퀀스가 도는 중(암순응 컷 제외 — A5 전투 표시 숨김·179 테스트가 보는 구간).</summary>
     public bool IsPlaying { get; private set; }
+
+    /// <summary>제압 암순응 컷이 도는 중(할 일 192 — 시퀀스 끝 뒤, 컷 방식만).</summary>
+    public bool DarkAdaptActive { get; private set; }
+
+    /// <summary>지금 암순응 컷 번호(없으면 -1).</summary>
+    public int DarkAdaptCutIndex { get; private set; } = -1;
+
+    /// <summary>마지막 재생의 암순응 방식.</summary>
+    public SuppressDarkAdaptMode DarkAdaptMode => _darkAdaptMode;
+
+    /// <summary>암순응 출력 교체(테스트·디버그). 돌던 컷은 옛 출력에서 걷는다.</summary>
+    public void SetDarkAdaptOutput(ISuppressDarkAdaptOutput output)
+    {
+        if (DarkAdaptActive)
+            _darkAdaptOutput?.ClearDarkAdapt();
+        _darkAdaptOutput = output;
+    }
     /// <summary>지금(마지막) 재생에 고른 컷 데이터.</summary>
     public SuppressFlashSequence Playing => _playing;
     /// <summary>마지막으로 출력에 넘긴 모양(멈춤 = 비활성).</summary>
@@ -257,48 +331,106 @@ public sealed class SuppressFlashPlayer
 
     /// <summary>
     /// 재생 시작 — <paramref name="now"/> = 실제 시간(Time.unscaledTime). 컷 데이터가 없으면 false(아무것도 안 그림).
+    /// <paramref name="darkAdaptMode"/>·<paramref name="casterClientId"/>·<paramref name="targetPosition"/> = 시퀀스 뒤 제압 암순응(할 일 192).
     /// </summary>
-    public bool Begin(float now, Vector3 worldCenter, IReadOnlyList<GameObject> subjects)
+    public bool Begin(float now, Vector3 worldCenter, IReadOnlyList<GameObject> subjects,
+        SuppressDarkAdaptMode darkAdaptMode = SuppressDarkAdaptMode.Cut, ulong casterClientId = 0, Vector3 targetPosition = default)
     {
         SuppressFlashSequence sequence = _sequence?.Invoke();
         if (sequence == null)
             return false;
 
+        StopDarkAdapt();
         _playing = sequence;
         _startTime = now;
         _worldCenter = worldCenter;
+        _darkAdaptMode = darkAdaptMode;
+        _casterClientId = casterClientId;
+        _targetPosition = targetPosition;
         IsPlaying = true;
         _output?.SetSubjects(subjects);
         Tick(now);
-        return IsPlaying;
+        return IsPlaying || DarkAdaptActive;
     }
 
-    /// <summary>매 프레임 — 실제 시간. 끝을 지나면 출력을 걷고 멈춘다.</summary>
+    /// <summary>매 프레임 — 실제 시간. 시퀀스 끝을 지나면 출력을 걷고 제압 암순응으로, 암순응 컷 끝이면 원래 색.</summary>
     public void Tick(float now)
     {
-        if (!IsPlaying)
-            return;
-
-        SuppressFlashSequence sequence = _playing;
-        bool reduce = _reduceFlash != null && _reduceFlash();
-        SuppressFlashFrame frame = SuppressFlashRules.Evaluate(sequence, now - _startTime, reduce);
-        if (!frame.Active)
+        if (IsPlaying)
         {
-            Stop();
-            return;
+            SuppressFlashSequence sequence = _playing;
+            bool reduce = _reduceFlash != null && _reduceFlash();
+            SuppressFlashFrame frame = SuppressFlashRules.Evaluate(sequence, now - _startTime, reduce);
+            if (frame.Active)
+            {
+                Current = frame;
+                _output?.Show(frame, _worldCenter, sequence);
+                return;
+            }
+
+            // 시퀀스 끝 = 복귀 컷 끝 → 제압 암순응. 끝난 순간 시각은 프레임 수로 정확히 잡는다(프레임 지연과 무관하게 컷 길이 그대로).
+            float sequenceEnd = _startTime + SuppressFlashRules.TotalFrames(sequence != null ? sequence.cuts : null) /
+                Mathf.Max(1f, sequence != null ? sequence.frameRate : 1f);
+            EndFlash();
+            BeginDarkAdapt(Mathf.Min(now, sequenceEnd));
         }
 
-        Current = frame;
-        _output?.Show(frame, _worldCenter, sequence);
+        if (DarkAdaptActive)
+            TickDarkAdapt(now);
     }
 
-    /// <summary>즉시 멈춤(끝·강제 리셋·디렉터 꺼짐).</summary>
+    /// <summary>즉시 멈춤(끝·강제 리셋·디렉터 꺼짐) — 암순응 컷도 걷는다.</summary>
     public void Stop()
+    {
+        EndFlash();
+        StopDarkAdapt();
+    }
+
+    private void EndFlash()
     {
         bool was = IsPlaying || Current.Active;
         IsPlaying = false;
         Current = SuppressFlashFrame.Inactive;
         if (was)
             _output?.Hide();
+    }
+
+    private void BeginDarkAdapt(float start)
+    {
+        if (_darkAdaptMode == SuppressDarkAdaptMode.Smooth)
+        {
+            _darkAdaptOutput?.PlayDarkAdaptSmooth(_casterClientId, _targetPosition);
+            return;
+        }
+
+        _darkAdaptStart = start;
+        DarkAdaptActive = true;
+        DarkAdaptCutIndex = -1;
+    }
+
+    private void TickDarkAdapt(float now)
+    {
+        List<SuppressDarkAdaptCut> cuts = _playing != null ? _playing.darkAdaptCuts : null;
+        if (!SuppressFlashRules.TryEvaluateDarkAdapt(cuts, now - _darkAdaptStart, out int index, out float darkness))
+        {
+            StopDarkAdapt();
+            return;
+        }
+
+        if (index == DarkAdaptCutIndex)
+            return;
+
+        DarkAdaptCutIndex = index;
+        _darkAdaptOutput?.ShowDarkAdaptCut(darkness, _casterClientId, _targetPosition);
+    }
+
+    private void StopDarkAdapt()
+    {
+        if (!DarkAdaptActive)
+            return;
+
+        DarkAdaptActive = false;
+        DarkAdaptCutIndex = -1;
+        _darkAdaptOutput?.ClearDarkAdapt();
     }
 }
