@@ -245,4 +245,63 @@ public sealed class DebugInterruptLabTests
             UnityEngine.Object.DestroyImmediate(go);
         }
     }
+
+    // ---- 제압 간파 섬광 A/B/끔 버튼(179 후속 3) ----
+
+    [Test]
+    public void 제압_섬광_버튼은_A6와_시퀀스_선택을_바꾼다()
+    {
+        var go = new UnityEngine.GameObject("Director");
+        var a = UnityEngine.ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        var b = UnityEngine.ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            var so = new UnityEditor.SerializedObject(director);
+            so.FindProperty("suppressFlashSequence").objectReferenceValue = a;
+            so.FindProperty("suppressFlashSequenceB").objectReferenceValue = b;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            Assert.AreEqual(DebugSuppressFlashMode.A, DebugSuppressFlashModes.Current(director), "기본 = A6 켬 + A");
+            Assert.AreSame(a, director.SelectedSuppressFlashSequence);
+
+            DebugSuppressFlashModes.Apply(director, DebugSuppressFlashMode.B);
+            Assert.AreEqual(DebugSuppressFlashMode.B, DebugSuppressFlashModes.Current(director));
+            Assert.IsTrue(director.SuppressFlashEnabled);
+            Assert.AreSame(b, director.SelectedSuppressFlashSequence);
+            Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true));
+
+            DebugSuppressFlashModes.Apply(director, DebugSuppressFlashMode.Off);
+            Assert.AreEqual(DebugSuppressFlashMode.Off, DebugSuppressFlashModes.Current(director));
+            Assert.IsFalse(director.SuppressFlashEnabled, "끔 = A6 끔");
+            Assert.AreEqual(SuppressFlashVariant.B, director.SuppressFlashVariant, "끔은 시퀀스 선택을 그대로 둔다");
+            Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "끔 = 일반 간파 연출");
+
+            DebugSuppressFlashModes.Apply(director, DebugSuppressFlashMode.A);
+            Assert.AreEqual(DebugSuppressFlashMode.A, DebugSuppressFlashModes.Current(director));
+            Assert.IsTrue(director.SuppressFlashEnabled, "A = A6 다시 켬");
+            Assert.AreSame(a, director.SelectedSuppressFlashSequence);
+
+            Assert.AreEqual(DebugSuppressFlashMode.Off, DebugSuppressFlashModes.Current(null), "디렉터가 없으면 끔");
+            Assert.AreEqual(3, DebugSuppressFlashModes.All.Length);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+            UnityEngine.Object.DestroyImmediate(a);
+            UnityEngine.Object.DestroyImmediate(b);
+        }
+    }
+
+    [Test]
+    public void 제압_간파_재현은_꺼져_있으면_허수아비가_없어도_무해()
+    {
+        var repro = new DebugSuppressInterruptRepro();
+        Assert.IsFalse(repro.Enabled, "기본 끔 — 랩의 일반 간파 튜닝을 바꾸지 않는다");
+        repro.Refresh();
+        repro.Tick(0f);
+        Assert.AreEqual(0, repro.MarkedCount);
+        repro.Dispose();
+        Assert.AreEqual(0, repro.DummyCount);
+    }
 }

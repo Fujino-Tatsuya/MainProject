@@ -9,6 +9,7 @@ using UnityEngine;
 ///       <see cref="InterruptProductionDirector.Set"/>). 프리팹·씬에 저장하지 않는다 — Play 를 끝내면 원래 값.</item>
 /// <item>배속은 같은 오브젝트의 <see cref="DebugTimeScale"/> 슬라이더 값을 쓴다 — 0.05~2, 성공 후 1배속 복귀 규칙도 그 컴포넌트 그대로.</item>
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
+/// <item>제압 간파 섬광 A/B/끔 버튼 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressFlashModes"/>·<see cref="DebugSuppressInterruptRepro"/>).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -80,8 +81,13 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     [SerializeField, Min(160f)] float width = 240f;
 
     DebugTimeScale _timeScale;
+    readonly DebugSuppressInterruptRepro _suppressRepro = new DebugSuppressInterruptRepro();
 
     void Awake() => TryGetComponent(out _timeScale);
+
+    void Update() => _suppressRepro.Tick(Time.unscaledTime);
+
+    void OnDestroy() => _suppressRepro.Dispose();
 
     void OnGUI()
     {
@@ -94,6 +100,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         if (expanded)
         {
             DrawEffects();
+            DrawSuppressFlash();
             DrawSpeed();
         }
 
@@ -124,6 +131,35 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         if (GUILayout.Button("암전만"))
             SetDefaults(director);
         GUILayout.EndHorizontal();
+    }
+
+    // 제압 간파 섬광 전환(179 후속 3) — 버튼 3개(A6 + 시퀀스 A/B) + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).
+    // A·B 를 누르면 재현도 켠다(허수아비엔 제압 칸이 없어 그대로는 시퀀스가 안 나온다). 끔은 재현을 건드리지 않는다.
+    void DrawSuppressFlash()
+    {
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
+        if (director == null)
+            return;
+
+        GUILayout.Space(6f);
+        DebugSuppressFlashMode current = DebugSuppressFlashModes.Current(director);
+        GUILayout.Label($"제압 간파 섬광 — 지금: {DebugSuppressFlashModes.Label(current)}");
+        foreach (DebugSuppressFlashMode mode in DebugSuppressFlashModes.All)
+        {
+            string label = (mode == current ? "● " : "○ ") + DebugSuppressFlashModes.Label(mode);
+            if (!GUILayout.Button(label))
+                continue;
+
+            DebugSuppressFlashModes.Apply(director, mode);
+            if (mode != DebugSuppressFlashMode.Off)
+                _suppressRepro.Enabled = true;
+        }
+
+        _suppressRepro.Enabled = GUILayout.Toggle(_suppressRepro.Enabled, "허수아비 간파 = 제압 간파(제압 직전)");
+        if (_suppressRepro.Enabled && !DebugSuppressInterruptRepro.IsServer)
+            GUILayout.Label("  ※ 호스트 화면에서만 효과(표식은 서버)");
+        else if (_suppressRepro.Enabled)
+            GUILayout.Label($"  허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
     }
 
     void DrawSpeed()
