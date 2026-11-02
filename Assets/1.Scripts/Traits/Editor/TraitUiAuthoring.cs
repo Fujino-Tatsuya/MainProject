@@ -84,8 +84,9 @@ public static class TraitUiAuthoring
             VerticalLayoutGroup tooltipLayout = AddVertical(tooltip.gameObject, 14, 6f);
             tooltipLayout.childAlignment = TextAnchor.UpperLeft;
             tooltip.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            TMP_Text tooltipName = NewText("Name", tooltip, font, 22f, FontStyles.Bold, TextAlignmentOptions.TopLeft, AccentColor);
-            TMP_Text tooltipDescription = NewText("Description", tooltip, font, 18f, FontStyles.Normal, TextAlignmentOptions.TopLeft, Color.white);
+            // 글자 칸 높이 = 글자 높이라 Middle 은 Top 과 같다 — Midline(글자 모양 기준)으로 세로 가운데(할 일 177).
+            TMP_Text tooltipName = NewText("Name", tooltip, font, 22f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft, AccentColor);
+            TMP_Text tooltipDescription = NewText("Description", tooltip, font, 18f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft, Color.white);
             tooltipDescription.spriteAsset = DescriptionSpriteAsset();
 
             // ── 선택 창(중앙 모달) ──
@@ -565,7 +566,7 @@ public static class TraitUiAuthoring
         keycap.preserveAspect = true;
 
         TMP_Text cardDescription = CardText("Description", card, medium, 22f, 224f, 170f, 288f, 170f,
-            TextAlignmentOptions.TopLeft, CardDescriptionColor);
+            TextAlignmentOptions.Left, CardDescriptionColor); // 고정 상자 안 세로 가운데(할 일 177)
         cardDescription.lineSpacing = LineSpacingFor(medium, 22f, DescriptionLineHeight);
         cardDescription.enableAutoSizing = true;
         cardDescription.fontSizeMin = 16f;
