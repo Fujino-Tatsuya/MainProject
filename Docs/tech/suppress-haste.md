@@ -91,11 +91,11 @@
 |---|---|---|
 | `hitZoomEveryHits` | 3 | 몇 타마다 |
 | `hitZoomFactor` | 0.9 | 카메라 거리 배율(1 = 줌 없음, 하한 0.1) |
-| `hitZoomInSeconds` | 0.04 | 1 → 배율 (실시간 초) |
-| `hitZoomHoldSeconds` | 0.11 | 배율 유지 — 들어감 + 유지 = 0.15초 뒤 복귀 시작 |
-| `hitZoomReturnSeconds` | 0.12 | 배율 → 1 |
+| `hitZoomInSeconds` | 0.02 | 1 → 배율 (실시간 초) |
+| `hitZoomHoldSeconds` | 0.11 | 배율 유지 — 들어감 + 유지 = 0.13초 뒤 복귀 시작 |
+| `hitZoomReturnSeconds` | 0.06 | 배율 → 1 |
 
-- 🟨 0.04/0.11/0.12 는 임시값 — 사용자 튜닝. 새 칸이라 병합 Export 전까지는 SO 값으로 돈다([data-table.md](data-table.md) §3).
+- 🟨 0.02/0.11/0.06 은 임시값 — 사용자 튜닝(Play 피드백으로 들어감·복귀를 0.04/0.12 에서 절반으로). 새 칸이라 병합 Export 전까지는 SO 값으로 돈다([data-table.md](data-table.md) §3).
 
 ### 2.3 보스 체력바 흰 칸(잔상) 멈춤
 - `BossHealthHUD` 가 매 프레임 `DelayedHealthBar.SetFrozen(제압 중, 체력)` → 멈춘 동안 잔상은 내려가지 않아 제압 중 깎인 양이 흰 칸으로 쌓인다.

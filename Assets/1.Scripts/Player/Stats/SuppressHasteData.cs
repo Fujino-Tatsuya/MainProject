@@ -34,11 +34,11 @@ public sealed class SuppressHasteData : ScriptableObject
     [Tooltip("줌인 때 카메라 거리 배율(0.9 = 10% 가까이). 1 = 줌 없음.")]
     [SerializeField, Range(SuppressHasteHitZoom.MinZoomFactor, 1f)] private float hitZoomFactor = 0.9f;
     [Tooltip("1 → 배율까지 들어가는 실시간(초).")]
-    [SerializeField, Min(0f)] private float hitZoomInSeconds = 0.04f;
+    [SerializeField, Min(0f)] private float hitZoomInSeconds = 0.02f;
     [Tooltip("배율에 머무는 실시간(초).")]
     [SerializeField, Min(0f)] private float hitZoomHoldSeconds = 0.11f;
     [Tooltip("배율 → 1 로 돌아오는 실시간(초).")]
-    [SerializeField, Min(0f)] private float hitZoomReturnSeconds = 0.12f;
+    [SerializeField, Min(0f)] private float hitZoomReturnSeconds = 0.06f;
 
     public float VignetteFadeIn => vignetteFadeIn;
     public float VignetteFadeOut => vignetteFadeOut;
