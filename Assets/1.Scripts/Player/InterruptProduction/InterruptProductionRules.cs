@@ -102,17 +102,21 @@ public static class InterruptProductionRules
     }
 
     /// <summary>
-    /// A5 — 이 화면(오너)에서 지금 피해 숫자를 숨기는가(할 일 154). 구간 = 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·예측 빗나감이면 암전 걷기 끝).
-    /// 오너 상태 기계·섬광 진행기는 본인 시도만 타므로 팀원 화면은 늘 false. 약 시도·대상 없음은 암전이 없어 false.
+    /// A5 — 이 화면에서 지금 전투 표시(피해 숫자·플레이어 머리 위 체력바·오너 조준 표시)를 숨기는가(할 일 154 → 179 후속 2).
+    /// 구간 = 오너 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·예측 빗나감이면 암전 걷기 끝) + 제압 간파 섬광 시퀀스가 이 화면에서 도는 동안.
+    /// 오너 상태 기계·섬광 진행기는 본인 시도만 타므로 일반 간파(132)는 팀원 화면에서 늘 false(팀원 화면엔 암전·②~⑥ 이 없다).
+    /// 제압 간파 섬광은 모든 피어가 트므로 팀원 화면도 숨긴다. 약 시도·대상 없음은 암전이 없어 false.
     /// <list type="bullet">
     /// <item><paramref name="ownerState"/> = 강 시도 중 — 입력 프레임은 램프 첫 값이 0 이라 상태로 본다.</item>
     /// <item><paramref name="ownerDim"/> &gt; 0 — 상태 기계 암전 값(효과 칸으로 덮개를 꺼도 값은 돈다). 성공~섬광 순간·실패 걷기 동안.</item>
     /// <item><paramref name="hitFlashOverlayActive"/> — 오너 섬광 ②~⑥ 이 도는 동안(섬광 순간에 암전이 0 이 된 뒤 ⑤⑥ 끝까지).</item>
+    /// <item><paramref name="suppressFlashPlaying"/> — 제압 간파 섬광 진행기가 이 화면에서 도는 동안(본인·팀원 공통).</item>
     /// </list>
     /// </summary>
-    public static bool ShouldHideDamageNumbers(bool switchOn, InterruptOwnerPresentationState ownerState, float ownerDim,
-        bool hitFlashOverlayActive) =>
-        switchOn && (ownerState == InterruptOwnerPresentationState.AttemptStrong || ownerDim > 0f || hitFlashOverlayActive);
+    public static bool ShouldHideCombatUi(bool switchOn, InterruptOwnerPresentationState ownerState, float ownerDim,
+        bool hitFlashOverlayActive, bool suppressFlashPlaying) =>
+        switchOn && (ownerState == InterruptOwnerPresentationState.AttemptStrong || ownerDim > 0f || hitFlashOverlayActive ||
+                     suppressFlashPlaying);
 
     /// <summary>이 화면이 간파한 본인인가 — 개인 채널 기준.</summary>
     public static bool IsCasterView(ulong casterClientId, ulong localClientId) => casterClientId == localClientId;

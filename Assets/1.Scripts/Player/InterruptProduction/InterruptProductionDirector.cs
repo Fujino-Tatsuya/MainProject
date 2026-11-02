@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// 간파 연출 디렉터(할 일 118) — 간파 연출의 단일 진입점. NetworkManager.prefab 의 <see cref="GlobalTimeScale"/> 옆에 붙는다.
-/// 104 스위치 10칸(<see cref="InterruptProductionCue"/>) + A5 피해 숫자 숨김(154)을 들고, 재생 지점은 정적 API 로 묻는다.
+/// 104 스위치 10칸(<see cref="InterruptProductionCue"/>) + A5 전투 표시 숨김(154·179 후속 2)을 들고, 재생 지점은 정적 API 로 묻는다.
 ///
 /// <list type="bullet">
 /// <item>사건이 올 때마다 필드를 읽는다(캐싱 없음) — Play 중 인스펙터에서 바꾸면 다음 사건부터 바로 쓰인다.</item>
@@ -102,9 +103,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
-    [Tooltip("A5 피해 숫자 숨김(할 일 154) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) 동안 이 화면의 피해 숫자 캔버스를 끈다. " +
-             "숫자 생성·수명은 그대로(가리기만). 팀원 화면은 그대로")]
-    [DataTableIgnore, SerializeField] private bool hideDamageNumbers = true;
+    [Tooltip("A5 전투 표시 숨김(할 일 154 → 179 후속 2) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) + 제압 간파 섬광 시퀀스(팀원 화면 포함) 동안 " +
+             "이 화면의 피해 숫자(보스 포함)·플레이어 머리 위 체력바·오너 조준 표시를 숨긴다. 생성·수명·게이지 값은 그대로(가리기만), 끝나면 그대로 보인다")]
+    [DataTableIgnore, SerializeField, FormerlySerializedAs("hideDamageNumbers")] private bool hideCombatUi = true;
 
     // 연출 켜기/끄기(할 일 132 §17) — 끈 효과는 그리기만 안 한다. 오너 상태 기계·섬광 시간표·섬광 순간 사건(암전 걷힘 등)은 그대로 돈다.
     // 기본 = 오너 암전만 켬. 팀원 암순응 = 위 A2 칸, 슬로우·줌·히트스톱 = A1·A3·프로필 그대로. 이 피어 값을 쓴다(그릴 때마다 읽음).
@@ -308,7 +309,6 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     // 제압 간파 섬광(할 일 179) — 출력은 Awake 에서 만든다(없으면 시간표만 돈다). 서버 표식은 같은 프레임 성공 사건이 소비한다.
     private SuppressFlashScreenOutput _suppressFlashOutput;
     private SuppressFlashPlayer _suppressFlash;
-    private bool _suppressFlashOwnerView;
     private readonly SuppressInterruptMark _suppressMark = new SuppressInterruptMark();
     private readonly List<GameObject> _suppressSubjects = new List<GameObject>();
     private readonly List<InterruptTargetRegistry.Entry> _targetBuffer = new List<InterruptTargetRegistry.Entry>();
@@ -490,23 +490,25 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public static bool OwnerAwaitsStrongResult =>
         Instance != null && Instance._ownerPresentation != null && Instance._ownerPresentation.AwaitsStrongResult;
 
-    /// <summary>A5 칸(할 일 154) — 런타임 값(저장하지 않음, 디버그·테스트).</summary>
-    public bool HideDamageNumbers
+    /// <summary>A5 칸(할 일 154 → 179 후속 2) — 런타임 값(저장하지 않음, 디버그·테스트).</summary>
+    public bool HideCombatUi
     {
-        get => hideDamageNumbers;
-        set => hideDamageNumbers = value;
+        get => hideCombatUi;
+        set => hideCombatUi = value;
     }
 
     /// <summary>
-    /// A5 — 이 화면에서 지금 피해 숫자를 숨기는가(<see cref="InterruptProductionRules.ShouldHideDamageNumbers"/>). 피해 숫자 스포너가 매 프레임 읽는다
-    /// (디렉터 → 스포너 한 방향, 디렉터는 스포너를 모른다). 인스턴스가 없으면 false.
+    /// A5 — 이 화면에서 지금 전투 표시를 숨기는가(<see cref="InterruptProductionRules.ShouldHideCombatUi"/>).
+    /// 읽는 곳 = 피해 숫자 스포너(캔버스)·플레이어 머리 위 체력바·오너 조준 표시, 매 프레임(디렉터 → 표시 한 방향, 디렉터는 그들을 모른다).
+    /// 상태에서 바로 나오는 값이라 따로 복원할 것이 없다 — 연출 끝·실패·강제 리셋·디렉터 꺼짐(인스턴스 없음 = false)이면 다음 프레임에 보인다.
+    /// 숨긴 렌더러는 그려지지 않으므로 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 남지 않는다.
     /// </summary>
-    public static bool DamageNumbersHidden =>
-        Instance != null && InterruptProductionRules.ShouldHideDamageNumbers(Instance.hideDamageNumbers,
+    public static bool CombatUiHidden =>
+        Instance != null && InterruptProductionRules.ShouldHideCombatUi(Instance.hideCombatUi,
             Instance._ownerPresentation != null ? Instance._ownerPresentation.State : InterruptOwnerPresentationState.None,
             Instance._ownerPresentation != null ? Instance._ownerPresentation.DimIntensity : 0f,
-            (Instance._hitFlash != null && Instance._hitFlash.OverlayActive) ||
-            (Instance._suppressFlashOwnerView && Instance._suppressFlash != null && Instance._suppressFlash.IsPlaying));
+            Instance._hitFlash != null && Instance._hitFlash.OverlayActive,
+            Instance._suppressFlash != null && Instance._suppressFlash.IsPlaying);
 
     /// <summary>
     /// [각 피어] 시도 — 시전 시작(OnClientPlay, 전 피어)에 스킬이 알린다. 그 스킬의 시도 cue(B1)를 공용 채널로 스킬 자신에 튼다.
@@ -752,7 +754,6 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     {
         Vector3 point = FlashPoint(e.TargetPosition);
         CollectSuppressSubjects(e.CasterClientId, e.TargetPosition, _suppressSubjects);
-        _suppressFlashOwnerView = viewerIsCaster;
         SuppressFlash.Begin(Time.unscaledTime, point, _suppressSubjects);
 
         if (viewerIsCaster)

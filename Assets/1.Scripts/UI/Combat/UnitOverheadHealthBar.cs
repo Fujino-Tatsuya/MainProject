@@ -159,9 +159,15 @@ public class UnitOverheadHealthBar : MonoBehaviour
             Destroy(barRoot);
     }
 
+    /// <summary>
+    /// 간파 암전·섬광 동안 숨기는가(A5, 할 일 179 후속 2) — 플레이어 바만. 몬스터 바는 그대로.
+    /// </summary>
+    public static bool HiddenByInterrupt(bool isPlayer, bool combatUiHidden) => isPlayer && combatUiHidden;
+
     private void LateUpdate()
     {
-        bool shouldShow = unit != null && (rule == null || rule.ShouldShow);
+        bool shouldShow = unit != null && (rule == null || rule.ShouldShow) &&
+                          !HiddenByInterrupt(unit is Player, InterruptProductionDirector.CombatUiHidden);
         if (barRoot != null && barRoot.activeSelf != shouldShow)
             barRoot.SetActive(shouldShow);
         if (label != null && !shouldShow && label.gameObject.activeSelf)

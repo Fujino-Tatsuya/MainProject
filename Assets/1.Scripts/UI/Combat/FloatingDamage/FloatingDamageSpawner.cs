@@ -95,10 +95,10 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         Canvas.willRenderCanvases -= ApplyLayouts;
     }
 
-    // 간파 연출 동안 숨김(A5, 할 일 154) — 캔버스만 끈다. 숫자 생성·수명은 그대로라 끝나면 살아 있는 숫자가 보인다.
+    // 간파 연출 동안 숨김(A5, 할 일 154·179 후속 2) — 캔버스만 끈다. 숫자 생성·수명은 그대로라 끝나면 살아 있는 숫자가 보인다.
     void LateUpdate()
     {
-        bool visible = !InterruptProductionDirector.DamageNumbersHidden;
+        bool visible = !InterruptProductionDirector.CombatUiHidden;
         if (_canvas != null && _canvas.enabled != visible)
             _canvas.enabled = visible;
     }

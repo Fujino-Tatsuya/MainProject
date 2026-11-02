@@ -9,7 +9,7 @@
 > 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
 > 🔹 할 일 179(2026-11-02, 브랜치 `feature/SuppressInterruptFlash`): **제압 간파**(제압 칸 마지막 1칸 간파) 성공은 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(모든 피어, 컷 SO·후처리 뒤 셰이더 1패스, 암전은 오너만, 섬광 줄이기 옵션) — [§7](#7-제압-간파-애니메이션-섬광-할-일-179).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
-> 🔹 스위치 12칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 피해 숫자 숨김(154)·A6 제압 간파 섬광 시퀀스(179) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
+> 🔹 스위치 12칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 전투 표시 숨김(154·179 후속 2)·A6 제압 간파 섬광 시퀀스(179) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
@@ -488,7 +488,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 ### 6.1 구조
 
 - **디렉터 = `NetworkManager.prefab` 루트의 MonoBehaviour 1개**(`GlobalTimeScale`·`InterruptDarkAdaptation` 옆). 코드 `Assets/1.Scripts/Player/InterruptProduction/`.
-  스위치 12칸(cue 10 + A5 피해 숫자 숨김 + A6 제압 간파 섬광 시퀀스) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
+  스위치 12칸(cue 10 + A5 전투 표시 숨김 + A6 제압 간파 섬광 시퀀스) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
 - 간파 스킬(`PlayerInterruptSkillBase`)은 **사건 4개(시도·판정·성공·실패)만 알린다** — 슬로우 시작·실패·성공 재시작 코드는 스킬에 없다.
   판정·피해·카운터 창·그로기·통계는 그대로 스킬·대상(서버) 소관이고, 디렉터는 재생 여부와 슬로우 호출만 한다.
 - 단계마다 클래스가 따로 — `InterruptAttemptStage`·`InterruptResolveStage`·`InterruptSuccessStage`·`InterruptFailStage`.
@@ -554,7 +554,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | C1 | `assassinInsightAttempt` | 꺼짐 | 어쌔신 기 모으기·튀기기·올려치기(클립 `Attack_Up_01`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |
 | C2 | `assassinInsightSuccess` | 꺼짐 | 어쌔신 간파 성공 이펙트 | `AssassinSkillView.TryPlayInsightSuccess`(대기·올려치기 프레임 맞추기는 View) → `Director.PlayCue(AssassinInsightSuccess, …, this)` |
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |
-| A5 | `hideDamageNumbers` | **켬**(코드 기본값 — 프리팹에 저장 안 됨) | 피해 숫자 숨김(154) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 동안 **본인 화면만** 피해 숫자 캔버스 끔. 숫자 생성·수명은 그대로 | `FloatingDamageSpawner.LateUpdate` → `Director.DamageNumbersHidden` = `InterruptProductionRules.ShouldHideDamageNumbers(칸, 오너 상태 기계 State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive)`. cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideDamageNumbers` |
+| A5 | `hideCombatUi`(옛 `hideDamageNumbers` — `FormerlySerializedAs`, 프리팹 줄 그대로) | **켬** | 전투 표시 숨김(154 → 179 후속 2) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) + **제압 간파 섬광 시퀀스 동안(모든 피어)** 이 화면의 **피해 숫자 캔버스(보스 포함)·플레이어 머리 위 체력바(몬스터 바는 그대로)·오너 조준 표시 쿼드(렌더러만 끔)** 를 숨긴다. 생성·수명·게이지 값은 그대로. 숨긴 조준 쿼드는 그려지지 않아 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 안 남는다(전에는 플레이어 루트 태깅으로 비트를 받아 흰 사각형 실루엣). 일반 간파의 팀원 화면은 그대로(암전·②~⑥ 없음) | 상태에서 바로 읽는 값(pull) — `FloatingDamageSpawner`·`UnitOverheadHealthBar`·`PlayerAimIndicator` 의 `LateUpdate` → `Director.CombatUiHidden` = `InterruptProductionRules.ShouldHideCombatUi(칸, State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive ∨ 제압 섬광 IsPlaying)`. 따로 복원할 상태가 없어 끝·실패·강제 리셋·디렉터 꺼짐이면 다음 프레임에 보인다(조준 쿼드는 컴포넌트 OnDisable 에도 켬). cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideCombatUi` |
 | A6 | `suppressFlash`("성공 — 공용") | **켬** | 제압 간파 섬광 시퀀스(179, [§7](#7-제압-간파-애니메이션-섬광-할-일-179)) — 켜면 제압 간파 성공 때 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). **끄면 제압 간파도 일반 간파와 같은 연출**(②~⑥·오너 암전 규칙 그대로). 표식 전달(슬로우 Start 이벤트 1바이트)은 칸과 무관하게 돈다. 섬광 줄이기(`reduceFlash`)와 독립 | 성공 `HandleStarted` 시작 순간 `Director.PlaysSuppressFlash(목적, 표식)` = `SuppressFlashRules.ShouldPlay(…, 칸, 컷 데이터 있음)` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashEnabled` |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
@@ -602,7 +602,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 할 일 132 추가(같은 슬로우 모션 메뉴): `InterruptOwnerPresentationTests`(상태 기계) · `InterruptTargetRegistryTests`(캐시) · `InterruptOwnerDimTests`(마스크 암전·비트 4) ·
 `InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1·A3·A4 켬) ·
 `InterruptPresentationEffectTests`(§17 효과 칸 기본값·프리팹·그리기만 끔·섬광 순간 정상) · `DebugInterruptLabTests`(튜닝 패널 줄·배속 버튼).
-할 일 154: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬).
+할 일 154·179 후속 2: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬 · 제압 섬광 팀원 화면 숨김·끝 복원·강제 종료 복원·일반 강제 리셋 복원·체력바 플레이어만·조준 쿼드 렌더러 끔/켬).
 격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 예측기·대상 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `DashInterruptPredictionTests`·`InterruptTargetGeometryTests`), 앵커 형상 대상 검사는 `HitboxAnchorShapeTests`(Assembly-CSharp-Editor).
 
 ## 7. 제압 간파 애니메이션 섬광 (할 일 179)
@@ -619,7 +619,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | 섬광 시퀀스 | O | O(각자 화면, 기준점 = 자기 카메라의 보스 적중점 화면 좌표) |
 | 월드 섬광(`showWorldFlash`·`showHitLight` 칸) | 시퀀스 첫 프레임 | 시퀀스 첫 프레임 |
 | 암순응(A2) | X | X — 시퀀스가 화면을 통째로 3단 색으로 바꾼다 |
-| A5 피해 숫자 숨김 | 시퀀스 끝까지 | 그대로 |
+| A5 전투 표시 숨김(피해 숫자·플레이어 체력바·조준 표시) | 시퀀스 끝까지 | 시퀀스 끝까지(179 후속 2) |
 
 ### 7.2 흐름 — 새 RPC 없음
 
