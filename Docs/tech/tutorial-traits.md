@@ -345,7 +345,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 - **진입** = 툴바 Dev Boot 드롭다운 → `DebugTraitLab` → Play. 빌드 목록에 없다(Dev Boot 가 Play 동안만 넣고 뺀다 — DebugInterruptLab 과 같다). 호스트 1인 기준.
 - **씬** = 원점 스폰 · 허수아비 일렬 3개(z 5·7·9, 관통·연사) + 따로 1개(6, 0, 4) · `TraitDirector.prefab`(4.MapScene 과 같은 프리팹) · 카메라·대시 검증·피해 숫자.
-- **아군 허수아비** `AllyDummy`(-4, 0, 2) = `DebugAllyDummy`(거너 모델 · 최대 1000 · 시작 50% · 안 맞음·자연 회복 없음) + `VFX/States/PlayerOneShotVfxPresenter`. 스폰 때 `PlayerTraitEffects.DevShareRecipients`(개발 빌드 전용)에 등록돼 **나누는 불굴 후보**에 낀다 — 1인 랩에서 전이 리본·아군 힐 확인용. Dev Boot 는 MPPM 클론도 호스트로 띄워 클라가 이 랩에 붙지 않는다.
+- **아군 허수아비** `AllyDummy`(-4, 0, 2) = `DebugAllyDummy`(거너 모델 · 최대 1000 · 시작 50% · 안 맞음·자연 회복 없음) + `VFX/States/PlayerOneShotVfxPresenter`·`StatusEffectVfxPresenter`(몸 = `VFX/Body`) + `PlayerShieldVfx`(보호막 배리어). 스폰 때 `PlayerTraitEffects.DevShareRecipients`(개발 빌드 전용)에 등록돼 **나누는 불굴 후보**에 낀다 — 1인 랩에서 전이 리본·아군 힐 확인용. Dev Boot 는 MPPM 클론도 호스트로 띄워 클라가 이 랩에 붙지 않는다.
 - **왼쪽 OnGUI 패널**(`Dev/TraitLab/DebugTraitLab.cs`):
   - 캐릭터 = 팔라딘·거너·어쌔신 버튼 또는 **F1** 순환(`DebugCharacterCycle`, 같은 자리 재스폰). 바꾸기 직전 보유 특성을 비운다.
   - 지금 캐릭터 12개를 1~4차로 나열 — 버튼 = 넣기/빼기(■ 보유). **차수당 하나**(실게임과 같다): 같은 차수 다른 것을 넣으면 기존 것을 뺀다. `규칙 무시` 를 켜면 같은 차수 동시 보유.

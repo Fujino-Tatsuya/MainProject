@@ -12,6 +12,10 @@ Update this file when a term becomes important enough that future agents or team
 - 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
 - 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).
 
+## ▶▶ 작업 세션 (2026-11-02 · 민경(Claude) · **보호막 VFX 공용화 + 수호의 잔광·불굴의 가호 금색**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 · ✅ 커밋 · ⏳ 민경 Play · ⏳ SVN(`Shared/Shield/` 이동분) · 핸드오프 [handoff-shield-vfx.md](Docs/tech/handoff-shield-vfx.md)
+- 공용 SO `PlayerShieldVfxSet`(금색·흰색 엔트리 · 몸 자리 · 배율 0.5 · 금색 특성 ID 목록) · `PlayerShieldVfx` 소켓 4칸 → SO + 핸들 재생 · 3 Variant 옛 쉴드 소켓 삭제 · 어쌔신에 `PlayerShieldVfx` 추가 · `StatusEffectVfxPresenter.body` 채움(팔라딘 Middle, 거너·어쌔신 `VFX/Body`).
+- ⚠️ 기본 E 는 보호막을 안 준다(코드 확인) — 금색은 특성(수호의 잔광·불굴의 가호)으로만 뜬다.
+
 ## ▶▶ 작업 세션 (2026-11-02 · 민경(Claude) · **나누는 불굴 전이 VFX + 플레이어 공용 원샷 이펙트 표(힐·레벨업)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(컴파일 0 · 배선 완료 · 초판 GIF ✅ 민경 승인 · 임시 파일 정리) · ✅ 커밋 · ⏳ 민경 MPPM Play · ⏳ SVN 업로드 · 핸드오프 [handoff-shared-heal-vfx.md](Docs/tech/handoff-shared-heal-vfx.md)
 - DebugTraitLab 1인 확인: 패널 `플레이어 체력`(10/30/50%·만피·−10%) + 아군 허수아비 `AllyDummy`(`Dev/TraitLab/DebugAllyDummy`) — `PlayerTraitEffects.DevShareRecipients`(개발 빌드 전용)로 나누는 불굴 후보에 낀다. Dev Boot 는 MPPM 클론도 호스트라 클라가 랩에 안 붙는다.
 - 수정: 새 `Effects/PlayerOneShotVfxSet`·`PlayerOneShotVfxPresenter`·`HealTransferRibbon`·`PaladinShareHealVfx` · `StatusEffectVfxPresenter`·`TraitAcquiredVfxPresenter` · **은희 영역** `PlayerTraitEffects.ShareOverflow`(사건 발송)·`TraitSkillFx.cs`(enum `PaladinShareHeal = 9`)·`FirstMeleePassive`(`healBurst` 삭제·`ProcVfxRpc` `selfHealed`) · `Player_Paladin/Gunner/Assassin.prefab` · 새 SO `9.ScriptableObject/Effects/PlayerOneShotVfxSet.asset` · SVN `Players/Player1/PassiveSkill/ShareHeal/`.

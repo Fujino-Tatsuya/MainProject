@@ -1,4 +1,41 @@
-# ▶▶▶ 계획 = **나누는 불굴 전이 VFX + 플레이어 공용 원샷 이펙트 표(힐·레벨업)** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 초판 GIF ✅ 승인 · 임시 파일 정리) · ✅ 커밋 · ⏳ 민경 MPPM Play)
+# ▶▶▶ 계획 = **보호막 VFX 공용화(금색 HolyShield·흰색 AllyShield) + 수호의 잔광·불굴의 가호 금색 연결** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 랩에서 색 판정·재생 확인) · ✅ 커밋 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02). 기획 `Re_C_특성_기획서_20261016.html` — 수호의 잔광 `PAL_3_E_SHIELD`(E 막기 → 피해 무시 끝난 뒤 최대 체력 10% · 4초, 본인) · 불굴의 가호 `PAL_4_HEAL_SHIELD`(회복받은 대상 = 본인·아군, 회복량 75% · 상한 10% · 4초).
+> ⚠️ `PlayerShieldVfx`(은희 작성 컴포넌트) 재작성 — 판정·보호막 수치는 안 건드림. 공유 = `Docs/tech/handoff-shield-vfx.md`.
+
+## 사실
+- 보호막 연출 = 받는 쪽 `PlayerShieldVfx` 가 복제 목록(`Unit.ShieldInstance`: type·sourceId)으로 배리어 켜고 끔, 깨짐(Depleted)만 RPC. 지금 판정: `ShieldType.HolyShield` = 금색, 나머지 = 흰색, 금색 우선, 배리어 하나.
+- **기본 E 는 더 이상 보호막을 안 준다**(코드에 `ShieldType.HolyShield` 거는 곳 없음) → 금색은 현재 한 번도 안 뜸. 특성 보호막 = `ShieldType.Trait` + sourceId = 특성 해시 → 지금 흰색으로 뜸.
+- 소켓: 팔라딘 = 금색·흰색 4종(자리 `Paladin_Armature/VFXSocket/Middle` y 0.777, 배율 0.5) · 거너 = 흰색 2종(자리 `VFX/AllyShield` 자기 위치 y 1, 배율 0.5) · **어쌔신 = `PlayerShieldVfx` 없음**(받은 보호막이 안 보임).
+- 에셋(민경 SVN 이동 완료, guid 유지): `50.Art/VFX/Common/Players/Shared/Shield/` — `FX_HolyShield(_Break)(_Entry)` · `FX_AllyShield(_Break)(_Entry)`·`_Barrier`·`_Motes`.
+- `FirstMeleeSubSkill.barrierLoop` = 별도 `FX_GuardianWill_Barrier`(E 방어 연출) — 이번 범위 밖, 그대로.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 구조(Q1) | SO `PlayerShieldVfxSet`(`9.ScriptableObject/Effects/`) = 금색 루프·깨짐 / 흰색 루프·깨짐 엔트리 + 자리·오프셋·배율. `PlayerShieldVfx` 는 소켓 칸 4개 대신 SO 를 읽어 `EffectManager` 로 직접 재생(루프 핸들 보유, 파문은 핸들 `GetInstances`). 4개 소켓 오브젝트 삭제(팔라딘·거너) |
+| 금색 판정(Q2) | SO 의 '금색 특성 보호막 ID' 목록 = `PAL_3_E_SHIELD`·`PAL_4_HEAL_SHIELD` + `ShieldType.HolyShield`. 나머지(거너 Q·기타 특성) 흰색 |
+| 섞임(Q3) | 배리어 하나 · 금색 우선(금색 깨지고 흰색 남으면 흰색으로) · 깨짐 = 마지막 보호막 소진 때 1번, 그 보호막의 색 |
+| 어쌔신(Q4) | `PlayerShieldVfx` 추가 |
+| 위치(Q5) | `StatusEffectVfxPresenter` 의 빈 '몸' 자리 채움 — 팔라딘 = `VFXSocket/Middle`, 거너·어쌔신 = `VFX/Body` 새로(거너 y 1 = 지금 쉴드 높이, 어쌔신 y 1 시작 → Play 보고 조정). 쉴드 = 자리 몸 · 배율 0.5 공통 |
+| 에셋(Q6) | `Shared/Shield/`(이동 완료) |
+| 오프라인 경로 | `PlayLocal`·`ServerEnd`(VFXScene·싱글) 유지 — 금색 재생 |
+
+## 작업 순서
+1. 코드: `PlayerShieldVfxSet` 신설 · `PlayerShieldVfx` 재작성(SO 판정·핸들 재생·파문·깨짐 RPC 색 판정 `IsHoly(shield)`).
+2. 에셋: SO 생성(엔트리 4 · ID 2 · 자리 몸 · 배율 0.5) · 3 Variant 배선(`PlayerShieldVfx.set`, 어쌔신 컴포넌트 추가, 몸 자리) · 소켓 4종 삭제 · `EffectCatalog` 확인.
+3. 검사: 컴파일 0 · 끊긴 참조 없음 · DebugTraitLab 에서 수호의 잔광(E 막기)·불굴의 가호(아군 허수아비 포함) 금색 / 거너 Q 흰색 확인(가능한 범위 GIF).
+4. 문서: `handoff-shield-vfx.md` · `trait-effect-events.md` §3.1 보호막 줄 · `CONTEXT.md`.
+
+## 완료 조건
+- 수호의 잔광: E 로 막은 뒤 피해 무시가 끝나면 팔라딘에 금색 배리어 4초, 깨지면 금색 깨짐.
+- 불굴의 가호: 팔라딘·회복받은 아군(거너·어쌔신 포함)에 금색.
+- 거너 Q: 흰색 그대로. 섞이면 금색 우선.
+- 어쌔신도 보호막 배리어가 보임. 컴파일 0.
+
+---
+
+# 계획(이전) = **나누는 불굴 전이 VFX + 플레이어 공용 원샷 이펙트 표(힐·레벨업)** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 초판 GIF ✅ 승인 · 임시 파일 정리) · ✅ 커밋 · ⏳ 민경 MPPM Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02). 참고 영상 `Downloads/ability_0012_P1.webm`(알리스타 E — 시전자 소용돌이 + 곡선 리본이 아군에게 흘러감).
 > ⚠️ 은희 담당 파일을 조금 고친다: `PlayerTraitEffects.ShareOverflow`(사건 1줄)·`TraitSkillFx.cs`(enum 끝에 1개)·`FirstMeleePassive`(RPC 칸 1개·`healBurst` → 공용 호출). 리뷰 대신 `Docs/tech/handoff-shared-heal-vfx.md` 로 공유.

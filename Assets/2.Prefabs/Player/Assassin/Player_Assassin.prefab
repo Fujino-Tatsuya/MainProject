@@ -69,6 +69,7 @@ Transform:
   - {fileID: 556908709352398307}
   - {fileID: 2424715890174433038}
   - {fileID: 379797949299454427}
+  - {fileID: 603590530541735863}
   m_Father: {fileID: 7816451711114395826}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3380059220795825168
@@ -454,6 +455,37 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
+--- !u!1 &4971159237286033390
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 603590530541735863}
+  m_Layer: 0
+  m_Name: Body
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &603590530541735863
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4971159237286033390}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3024030988266647831}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5215238344059841779
 GameObject:
   m_ObjectHideFlags: 0
@@ -801,7 +833,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StatusEffectVfxPresenter
   set: {fileID: 11400000, guid: 29fa7e0b9acd423fa7cbc7418d62cf23, type: 2}
   overhead: {fileID: 5462570182326765153}
-  body: {fileID: 0}
+  body: {fileID: 603590530541735863}
   feet: {fileID: 0}
 --- !u!114 &2231219912021110837
 MonoBehaviour:
@@ -2397,6 +2429,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5134222589396270654}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4151097706825655324}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &768617275354264640 stripped
 GameObject:
@@ -2788,6 +2823,23 @@ MonoBehaviour:
   followUpSkill: {fileID: 0}
   followUpWindowSeconds: 3
   followUpInheritsCastId: 1
+--- !u!114 &4151097706825655324
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d88b00b61fc48b304012b00d7abe7a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerShieldVfx
+  ShowTopMostFoldoutHeaderGroup: 1
+  set: {fileID: 11400000, guid: b4a04545aa372a9488c603f10c37d0ab, type: 2}
+  anchors: {fileID: 2474702213139810254}
+  minHitDistance: 0.15
+  interruptWave: {fileID: 0}
 --- !u!4 &7816451711114395826 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

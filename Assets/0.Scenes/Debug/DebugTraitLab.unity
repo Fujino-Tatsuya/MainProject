@@ -195,6 +195,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1295571116}
+  - {fileID: 1222583897}
   m_Father: {fileID: 744144888}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &133614491
@@ -408,6 +409,10 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 265333081
       objectReference: {fileID: 0}
+    - target: {fileID: 3820161729998004241, guid: 2af66ff9d34090a4fa76e6dc8b80f3bd, type: 3}
+      propertyPath: InScenePlacedSourceGlobalObjectIdHash
+      value: 2915808659
+      objectReference: {fileID: 0}
     - target: {fileID: 9030762955870730236, guid: 2af66ff9d34090a4fa76e6dc8b80f3bd, type: 3}
       propertyPath: m_Name
       value: TraitDirector
@@ -485,6 +490,7 @@ GameObject:
   - component: {fileID: 744144888}
   - component: {fileID: 744144887}
   - component: {fileID: 744144889}
+  - component: {fileID: 744144890}
   m_Layer: 0
   m_Name: AllyDummy
   m_TagString: Untagged
@@ -511,7 +517,7 @@ MonoBehaviour:
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
+  SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
@@ -549,6 +555,23 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 1000
   startHealthRatio: 0.5
+--- !u!114 &744144890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744144886}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d88b00b61fc48b304012b00d7abe7a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerShieldVfx
+  ShowTopMostFoldoutHeaderGroup: 1
+  set: {fileID: 11400000, guid: b4a04545aa372a9488c603f10c37d0ab, type: 2}
+  anchors: {fileID: 1295571118}
+  minHitDistance: 0.15
+  interruptWave: {fileID: 0}
 --- !u!1 &790037148
 GameObject:
   m_ObjectHideFlags: 0
@@ -778,6 +801,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1222583896
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1222583897}
+  m_Layer: 0
+  m_Name: Body
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1222583897
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1222583896}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 131114320}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1295571115
 GameObject:
   m_ObjectHideFlags: 0
@@ -788,6 +842,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1295571116}
   - component: {fileID: 1295571117}
+  - component: {fileID: 1295571118}
   m_Layer: 0
   m_Name: States
   m_TagString: Untagged
@@ -823,7 +878,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerOneShotVfxPresenter
   set: {fileID: 11400000, guid: dfa674f404f5dcf46a9657f73ef731a8, type: 2}
-  anchors: {fileID: 0}
+  anchors: {fileID: 1295571118}
+--- !u!114 &1295571118
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1295571115}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fee7e730493246bc87e643cf6ad5ac86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StatusEffectVfxPresenter
+  set: {fileID: 11400000, guid: 29fa7e0b9acd423fa7cbc7418d62cf23, type: 2}
+  overhead: {fileID: 0}
+  body: {fileID: 1222583897}
+  feet: {fileID: 0}
 --- !u!1 &1301137648
 GameObject:
   m_ObjectHideFlags: 0
