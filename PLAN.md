@@ -1,4 +1,41 @@
-# ▶▶▶ 계획 = **팔라딘 스킬 연출 칸을 `PaladinSkillView` 로 모으기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 27칸 값 확인 · 랩 Play 호출 스모크) · ✅ 커밋 · ⏳ 민경 Play)
+# ▶▶▶ 계획 = **수호의 파동(PAL_4_E_PUSH) VFX — 바람 링 + 밀린 적마다 바람 줄기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **적별 줄기(Push) 뺌, 링만** · ✅ MainProject 연결(컴파일 0 · 랩에서 반격 순간 링 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-guard-wave-vfx.md](Docs/tech/handoff-guard-wave-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02, 전부 추천안). 기획 `Re_C_특성_기획서_20261016.html` — E 로 막으면 반격과 함께 주변 radius 3m 밀치기(pushDistance 2 · pushDuration 0.25).
+> **1단계 = MyProject 제작 + 테스트 씬 → 민경이 직접 Play 확인·승인. 2단계(승인 뒤) = MainProject import·연결.** 코드는 연출 구독만 — 판정·밀치기 무변경.
+
+## 사실 (코드 확인)
+- 사건은 이미 나간다(할 일 145, `FirstMeleeSubSkill`): `TraitFxTrait.PaladinGuardWave`
+  - **Activated** — 반격 판정 순간 1번(밀린 대상 없어도) · Pos = 발밑 · Dir = 방어 방향 · Shape = 밀치기 원(반경 = 특성 수치 `PAL_E_PUSH_RADIUS`)
+  - **Hit** — 밀린 대상마다 · Pos = 콜라이더 중심 · Dir = 밀리는 방향 · Target
+- 구독하는 곳 없음. 같은 순간 반격 클립 Hit(0.433s)에 `GuardianCounter`(금빛 반격 베기·불티, 상체 높이)가 이미 나온다.
+- MyProject 에 포드 착지 바람 링(`PodWindRingVfxBuilder` — 링 메시·마스크 침식·왜곡 고리·줄기, 회색 먼지 ~1초)이 있다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 구성(Q1) | **링(Activated) + 밀린 적마다 바람 줄기(Hit)** — 바닥 균열·먼지는 보고 부족하면 |
+| 크기(Q2) | 반경 1m 저작 · 재생 배율 = 판정 원 반경(수치가 바뀌어도 판정과 일치) · **약 0.25초에 3m 끝 도달**(밀치기 시간과 같다) |
+| 색(Q3) | **흰 바람 + 옅은 금빛 테두리**(진한 금빛 반격 불티와 구분, 같은 세트) |
+| 모양(Q4) | **바닥에 납작한 링(주인공) + 무릎 높이 얇은 바람 벽** — 상체 반격 베기와 안 겹침 |
+| 적별(Q5) | **따라가지 않는 원샷** — 적 발밑, 밀리는 방향을 향해 |
+| 기반(Q8) | 포드 링 **기법 재사용, 새 에셋**(포드 링 무변경) |
+| 제작(Q6) | MyProject 빌드 메뉴 `Tools/VFX/Guard Wave (팔라딘 수호의 파동) 빌드` → `Export/Player1/ESkill/GuardWave/` · MainProject `50.Art/VFX/Common/Players/Player1/ESkill/GuardWave/`(SVN) |
+| 확인(Q7) | **MyProject 테스트 씬** `Scenes/GuardWavePreview.unity` — 민경이 Play 로 직접 확인(GIF 아님) |
+| 테스트 씬(Q9~Q11) | 실제 팔라딘 + `Garen_E_GuardCounter` 재생, 0.433s 에 기존 `GuardianCounter` + 파동 · **Space = 1회, 자동 반복 켜기/끄기** · 허수아비 1.5m·2.5m(안 — 2m/0.25s 가짜 밀치기 + 적별 줄기)·3.5m(밖 — 그대로) · 회차마다 원위치 · **3m 경계 가이드 켜고 끄기** |
+
+## 작업 순서
+1. MyProject: 빌더(링 메시·결 침식·왜곡·낮은 바람 벽 / 적별 줄기 원샷) → `FX_GuardWave_Ring`·`FX_GuardWave_Push` 프리팹 + 재질·텍스처 · 테스트 씬·테스터 스크립트.
+2. ⏸ 민경 Play 확인 → 수정 반복 → **승인**.
+3. MainProject(승인 뒤): 에셋 import(SVN 경로) · 엔트리 2개 · `EffectCatalog` · `PaladinSkillView` 가 `TraitSkillFx.Raised` 의 `PaladinGuardWave` 를 받아 Activated = 링(Pos·반경 배율), Hit = 줄기(Pos 바닥·Dir 방향) · DebugTraitLab 에서 `PAL_4_E_PUSH` + 플레이어 피격 패널로 확인.
+4. 문서: handoff · `trait-effect-events.md` 수호의 파동 구독 칸 · `CONTEXT.md`.
+
+## 완료 조건
+- 테스트 씬: 링이 0.25초쯤 3m 경계에 닿고, 안쪽 허수아비만 밀리며 줄기가 난다 · 반격 베기와 함께 봐도 뭉개지지 않는다(민경 승인).
+- MainProject: E 방어 성공 → 반격 순간 링 · 밀린 적마다 줄기 · 밀린 적 없어도 링 · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **팔라딘 스킬 연출 칸을 `PaladinSkillView` 로 모으기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 27칸 값 확인 · 랩 Play 호출 스모크) · ✅ 커밋 · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02, 전부 추천안). 거너 `GunnerBeamView`·어쌔신 `AssassinSkillView` 와 같은 구조 —
 > 스킬은 "언제", View 는 "무엇". ⚠️ `FirstMelee*` 5개는 **은희 영역** — 판정·타이밍·데이터는 안 건드리고 연출 호출만 View 로 돌린다. 공유 = `Docs/tech/handoff-shield-vfx.md` 「통합」 이어 쓰기.

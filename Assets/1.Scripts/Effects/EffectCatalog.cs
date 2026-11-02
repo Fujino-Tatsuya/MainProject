@@ -63,6 +63,8 @@ public class EffectCatalog : ScriptableObject
     // PlayerShieldVfx 가 ShieldEndReason.Depleted 일 때만 Break 를 퍼뜨린다.
     [field: SerializeField] public EffectEntry HolyShield_Barrier { get; private set; }
     [field: SerializeField] public EffectEntry HolyShield_Break { get; private set; }
+    // 수호의 파동(PAL_4_E_PUSH) — 반격 판정 순간 발밑에서 퍼지는 바람 링(PaladinSkillView, 배율 = 밀치기 반경).
+    [field: SerializeField] public EffectEntry GuardWave_Ring { get; private set; }
 
     [Header("플레이어 — 남이 걸어 준 보호막(거너 Q 등)")]
     // 위와 같은 물건의 흰색 판. 색만 출처를 말한다 — 금색 = 자기 E, 흰색 = 남이 걸어 준 것.

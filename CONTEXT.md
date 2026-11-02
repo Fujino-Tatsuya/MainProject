@@ -12,6 +12,9 @@ Update this file when a term becomes important enough that future agents or team
 - 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
 - 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).
 
+## ▶▶ 작업 세션 (2026-11-02 · 민경(Claude) · **수호의 파동(PAL_4_E_PUSH) 바람 링 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 연결 · ⏳ 민경 Play · ⏳ SVN(`Player1/ESkill/GuardWave/`) · 핸드오프 [handoff-guard-wave-vfx.md](Docs/tech/handoff-guard-wave-vfx.md)
+- `PaladinSkillView` 가 `PaladinGuardWave` Activated 를 받아 발밑에 `FX_GuardWave_Ring`(배율 = 판정 원 반경). 적별 연출 없음(민경 결정). 판정·밀치기 무변경. 원본 = MyProject `GuardWaveVfxBuilder`(금빛 테 메시는 손 수정 — 재빌드 시 덮어씀).
+
 ## ▶▶ 작업 세션 (2026-11-02 · 민경(Claude) · **보호막 VFX 공용화 + 수호의 잔광·불굴의 가호 금색**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 · ✅ 커밋 · ⏳ 민경 Play · ⏳ SVN(`Shared/Shield/` 이동분) · 핸드오프 [handoff-shield-vfx.md](Docs/tech/handoff-shield-vfx.md)
 - 공용 SO `PlayerShieldVfxSet`(금색·흰색 엔트리 · 몸 자리 · 배율 0.5 · 금색 특성 ID 목록) · `PlayerShieldVfx` 소켓 4칸 → SO + 핸들 재생 · 3 Variant 옛 쉴드 소켓 삭제 · 어쌔신에 `PlayerShieldVfx` 추가 · `StatusEffectVfxPresenter.body` 채움(팔라딘 Middle, 거너·어쌔신 `VFX/Body`).
 - 별도 커밋: 팔라딘 전용 반격 자세·간파 충격파 RPC → 새 `PaladinGuardRelay`(`Player_Paladin` 루트, `FirstMeleeSubSkill`/`FirstMeleeInterruptSkill` 칸 `guardRelay`) — **은희 영역 이동(동작 무변경)**, [handoff-shield-vfx.md](Docs/tech/handoff-shield-vfx.md) 「분리」.

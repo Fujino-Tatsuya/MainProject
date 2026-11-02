@@ -20,6 +20,7 @@ using UnityEngine;
 /// <item>최후의 심판(R) — 칼 낙뢰·칼날 전기(오너 → 서버 → 나머지), 대상 표식·마무리 낙뢰(서버 → 전 피어), 슈퍼아머 오버레이·칼 꽂기 배율.</item>
 /// <item>불굴의 의지(패시브) — 칼날 발광(<see cref="SetBladeGlow"/>), 발동 연출(서버 → 전 피어, <see cref="ServerPlayPassiveProc"/>).</item>
 /// <item>나누는 불굴(PAL_2_SHARE_HEAL) 전이 — 특성 연출 이벤트를 받아 재생.</item>
+/// <item>수호의 파동(PAL_4_E_PUSH) 바람 링 — 특성 연출 이벤트(Activated)를 받아 발밑에 재생, 배율 = 밀치기 반경.</item>
 /// </list>
 /// 여기 없는 팔라딘 연출: 클립 이벤트 소켓(<see cref="EffectAnimEvents"/> — E 결계·오라 켜기, 평타 베기 등).
 /// 대시 잔상은 전 캐릭터 공용 <see cref="PlayerDashVfx"/>.
@@ -137,6 +138,10 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
     [SerializeField] private Vector3 passiveHitFallbackOffset = new Vector3(0f, 1f, 0f);
+
+    [Header("수호의 파동(특성 PAL_4_E_PUSH)")]
+    [Tooltip("반격 판정 순간 발밑에서 퍼지는 바람 링. FX_GuardWave_Ring_Entry 를 물린다. 반경 1m 저작 — 배율 = 밀치기 판정 원 반경. 비우면 생략")]
+    [SerializeField] private EffectEntry guardWaveRing;
 
     [Header("나누는 불굴(특성 PAL_2_SHARE_HEAL)")]
     [Tooltip("출발 소용돌이 — 팔라딘 몸을 엔트리 길이만큼 따라간다. 비우면 생략")]
@@ -639,12 +644,51 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     private void HandleTraitFx(TraitFxEvent e)
     {
-        if (e.Trait != TraitFxTrait.PaladinShareHeal || e.Kind != TraitFxKind.Hit) return;
-        if (_player == null || e.Caster != _player || e.Target == null) return;
+        if (_player == null || e.Caster != _player) return;
+
+        if (e.Trait == TraitFxTrait.PaladinGuardWave && e.Kind == TraitFxKind.Activated)
+        {
+            PlayGuardWave(e);
+            return;
+        }
+
+        if (e.Trait != TraitFxTrait.PaladinShareHeal || e.Kind != TraitFxKind.Hit || e.Target == null) return;
         if (!EffectManager.TryGet(out EffectManager effects, this)) return;
 
         PlayShareHealSwirl(effects);
         LaunchShareHealRibbon(effects, e.Target);
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  수호의 파동(PAL_4_E_PUSH) 바람 링
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // 반격 판정 순간 1번(밀린 적이 없어도) 특성 연출 공용 경로로 Activated 사건이 전 피어에 난다(FirstMeleeSubSkill.ResolveCounterHit → Player.TraitSkillFxRpc).
+    // Pos = 반격 위치(발밑), Shape = 밀치기 판정 원 — 받는 피어가 같은 특성 수치로 다시 만든 것이라 반경이 판정과 같다.
+    // 링은 반경 1m 로 저작했으니 배율 = 그 반경(수치가 바뀌어도 링 끝 = 판정 끝). 0.25초쯤 끝에 닿는다(밀치기 시간과 같다).
+    // 밀린 적마다의 Hit 사건은 연출을 두지 않는다(2026-11-02 민경 — 링만).
+
+    private void PlayGuardWave(in TraitFxEvent e)
+    {
+        if (guardWaveRing == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        float radius = GuardWaveRadius(e.Shape);
+        if (radius <= 0f) return;
+
+        effects.Play(guardWaveRing, e.Position, Quaternion.identity, radius);
+    }
+
+    // 판정 원(AttackCircleShape)의 반경. 도형이 없으면(정의를 못 찾은 피어 등) 0 — 링을 내지 않는다.
+    private static float GuardWaveRadius(AttackShapeSet shape)
+    {
+        if (shape == null || shape.IsEmpty) return 0f;
+
+        for (int i = 0; i < shape.Shapes.Count; i++)
+        {
+            if (shape.Shapes[i] is AttackCircleShape circle)
+                return circle.Radius;
+        }
+        return 0f;
     }
 
     private void PlayShareHealSwirl(EffectManager effects)

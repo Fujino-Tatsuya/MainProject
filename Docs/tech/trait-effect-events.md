@@ -65,7 +65,7 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 | | | Hit | 추가 피해가 들어간 대상마다 | 공용 RPC | Pos = 맞은 콜라이더 중심, Target |
 | 돌파의 방패 `PAL_2_DASH` | `PaladinShieldDash` | Activated | Q 시작(돌진 준비 시작) | 전 피어 경로(`FirstMeleeMainSkill.OnClientPlay`) | Pos = 시작 위치, Dir = 돌진 방향, End = 시작 + 방향 × 돌진 거리(안전 정지 전 값), Shape = 경로 표본마다 훑는 원래 Q hitArea(Pose = 시작 지점) |
 | | | Hit | 돌진에 맞은 대상마다(시전당 대상 1회) | 공용 RPC | Pos = 콜라이더 중심, Dir = 돌진 방향, Target |
-| 수호의 파동 `PAL_4_E_PUSH` | `PaladinGuardWave` | Activated | E 반격 판정 순간(보장 반격 포함, 밀린 대상 없어도) | 공용 RPC | Pos = 반격 위치, Dir = 방어 방향, Shape = 밀치기 원(`FirstMeleeSubSkill.TraitPushArea`, 반경 = 특성 수치) |
+| 수호의 파동 `PAL_4_E_PUSH` | `PaladinGuardWave` | Activated | E 반격 판정 순간(보장 반격 포함, 밀린 대상 없어도) | 공용 RPC | Pos = 반격 위치, Dir = 방어 방향, Shape = 밀치기 원(`FirstMeleeSubSkill.TraitPushArea`, 반경 = 특성 수치). 구독 = `PaladinSkillView` — 발밑 바람 링 `FX_GuardWave_Ring`(배율 = 원 반경, 2026-11-02 민경). Hit 은 연출 없음 |
 | | | Hit | 밀치기가 실린 대상마다(반격 피해와 함께·밀치기만 둘 다) | 공용 RPC | Pos = 콜라이더 중심, Dir = 밀리는 방향, Target |
 | 광폭 레이저 `GUN_1_WIDTH` | `GunnerWideLaser` | Activated | Q 한 발 발사(집속 연사면 발마다) | 전 피어 경로(`GunnerBeamView.ChargeLaserFiredRpc`) | Pos = 발사 원점(총구 높이), End = 빔 끝, Shape = 그 발의 판정 도형(길이 = 이번 발, 폭 = 특성 폭) |
 | | | Hit | 그 발이 피해를 준 몬스터마다(최대 8) | 전 피어 경로(같은 RPC) | Pos = 빔 위 적중 지점. **Target 없음**(기존 RPC 가 지점만 싣는다) |

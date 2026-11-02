@@ -29,6 +29,7 @@ MonoBehaviour:
   <ShieldDash_Smash>k__BackingField: {fileID: 11400000, guid: 58171c03394ee484fbd7b211a9ee6f42, type: 2}
   <HolyShield_Barrier>k__BackingField: {fileID: 11400000, guid: 55589f8e8b5bf68db05c619dd5ab540a, type: 2}
   <HolyShield_Break>k__BackingField: {fileID: 11400000, guid: 5d9491b166e58d4dcce879b6919626d2, type: 2}
+  <GuardWave_Ring>k__BackingField: {fileID: 11400000, guid: 6b46c053860744f3ab1e3b8324f725fe, type: 2}
   <AllyShield_Barrier>k__BackingField: {fileID: 11400000, guid: 2d87b4f0c6e94a15933ad8e7b1420c6f, type: 2}
   <AllyShield_Break>k__BackingField: {fileID: 11400000, guid: 846ec0b35a1d47f29b70e4d1c83f5a27, type: 2}
   <ShieldInterrupt_Glow>k__BackingField: {fileID: 11400000, guid: 5e95d0d8127eb044d81df1ccc25ac1af, type: 2}
