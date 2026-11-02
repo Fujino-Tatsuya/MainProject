@@ -95,6 +95,9 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [Tooltip("A2 암순응(= 팀원 암순응 켜기/끄기, 할 일 132 §17) — 섬광 순간 화면의 어두운 픽셀을 잠깐 낮춘다(InterruptDarkAdaptation). " +
              "다른 화면 = 약하게, 본인 화면 = 오너 화면 섬광이 안 돈 성공(약 예측)만 강하게")]
     [DataTableIgnore, SerializeField] private bool darkAdaptation;
+    [Tooltip("A6 제압 간파 섬광 시퀀스(할 일 179) — 켜면 제압 간파 성공 때 일반 성공 섬광 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). " +
+             "끄면 제압 간파도 일반 간파와 같은 연출(②~⑥·오너 암전 규칙 그대로). 성공 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 섬광 줄이기와 독립")]
+    [DataTableIgnore, SerializeField] private bool suppressFlash = true;
 
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
@@ -178,8 +181,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     // 제압 간파 섬광(할 일 179) — 제압 칸 마지막 1칸을 깎은 간파 성공이면 위 적중 섬광 ②~⑥ 대신 이 시퀀스를 모든 피어가 각자 화면에서 튼다.
     // 오너 암전(132)은 그대로 오너만(시퀀스 시작 순간 걷힌다). 이 피어 값을 쓴다(사건마다·프레임마다 읽음). 문서: interrupt-presentation.md §7.
     [Header("성공 — 제압 간파 섬광(할 일 179)")]
-    [Tooltip("제압 간파 프로필 — 켜면 제압 간파 성공 때 일반 성공 섬광 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). 끄면 일반 간파와 같은 연출")]
-    [DataTableIgnore, SerializeField] private bool suppressFlash = true;
+    // 켜기/끄기 = 위 "성공 — 공용" 의 A6 칸(suppressFlash).
     [Tooltip("컷 데이터(SuppressFlashSequence) — 컷마다 길이·명암·십자·별·집중선·색수차·빗금·3단 색. Play 중 바꾸면 다음 렌더 프레임부터. 비면 일반 섬광")]
     [DataTableIgnore, SerializeField] private SuppressFlashSequence suppressFlashSequence;
     [Tooltip("전체 화면 패스 재질(Hidden/Rendering/SuppressFlash). 비면 그리지 않는다(시간표는 돈다)")]
@@ -217,12 +219,18 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     public VolumeProfile HitFlashAberrationProfile => hitFlashAberrationProfile;
     public VolumeProfile HitFlashBloomProfile => hitFlashBloomProfile;
 
-    /// <summary>제압 간파 프로필 칸(할 일 179) — 런타임 값(저장하지 않음, 디버그·테스트).</summary>
+    /// <summary>A6 제압 간파 섬광 시퀀스 칸(할 일 179) — 런타임 값(저장하지 않음, 디버그·테스트). Play 중 바꾸면 다음 성공부터.</summary>
     public bool SuppressFlashEnabled
     {
         get => suppressFlash;
         set => suppressFlash = value;
     }
+
+    /// <summary>
+    /// 이번 성공이 제압 간파 섬광 시퀀스인가(아니면 일반 ②~⑥). 성공 시작 순간 A6 칸·컷 데이터를 읽는다 — 섬광 줄이기와 무관.
+    /// </summary>
+    public bool PlaysSuppressFlash(SlowMotionPurpose purpose, bool suppressInterrupt) =>
+        SuppressFlashRules.ShouldPlay(purpose, suppressInterrupt, suppressFlash, suppressFlashSequence != null);
 
     public SuppressFlashSequence SuppressFlashSequence => suppressFlashSequence;
     public Material SuppressFlashMaterial => suppressFlashMaterial;
@@ -645,7 +653,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
         bool suppressInterrupt = _timeScale != null && _timeScale.CurrentSuppressInterrupt;
         var e = InterruptProductionEvent.LocalSuccess(triggerId, casterClientId, targetPosition, suppressInterrupt);
 
-        if (SuppressFlashRules.ShouldPlay(purpose, suppressInterrupt, suppressFlash, suppressFlashSequence != null))
+        if (PlaysSuppressFlash(purpose, suppressInterrupt))
         {
             BeginSuppressFlash(e, viewerIsCaster);
         }

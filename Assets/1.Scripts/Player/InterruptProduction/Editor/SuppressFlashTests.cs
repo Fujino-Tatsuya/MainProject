@@ -8,7 +8,7 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// 제압 간파 섬광(할 일 179) — 사양 표 기본값, 실제 시간 → 프레임(24) → 컷·2프레임 홀드 계단, 컷 전환·종료, 섬광 줄이기(반전 끔·대비),
-/// SO 값 Play 중 반영, 디렉터 프로필 선택, 서버 표식(같은 프레임만), 슬로우 Start 이벤트 플래그 직렬화, 실루엣 비트 7 태깅·원복, 에셋·프리팹 연결.
+/// SO 값 Play 중 반영, 디렉터 프로필 선택(A6 칸 켬/끔·섬광 줄이기와 독립),서버 표식(같은 프레임만), 슬로우 Start 이벤트 플래그 직렬화, 실루엣 비트 7 태깅·원복, 에셋·프리팹 연결.
 /// </summary>
 public sealed class SuppressFlashTests
 {
@@ -268,6 +268,66 @@ public sealed class SuppressFlashTests
     [TestCase(SlowMotionPurpose.Attempt, true, true, true, ExpectedResult = false)]
     public bool 제압_간파_프로필_선택(SlowMotionPurpose purpose, bool suppress, bool enabled, bool hasSequence) =>
         SuppressFlashRules.ShouldPlay(purpose, suppress, enabled, hasSequence);
+
+    // ---- A6 제압 간파 섬광 시퀀스 칸 ----
+
+    private InterruptProductionDirector CreateDirectorWithSequence()
+    {
+        var go = new GameObject("Director");
+        _objects.Add(go);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        var so = new SerializedObject(director);
+        so.FindProperty("suppressFlashSequence").objectReferenceValue = _sequence;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return director;
+    }
+
+    [Test]
+    public void A6_켬이면_제압_간파는_시퀀스_끔이면_일반_섬광()
+    {
+        InterruptProductionDirector director = CreateDirectorWithSequence();
+        Assert.IsTrue(director.SuppressFlashEnabled, "코드 기본값 켬");
+        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "켬 = 시퀀스");
+        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, false), "일반 간파는 늘 ②~⑥");
+
+        director.SuppressFlashEnabled = false;
+        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "끔 = ②~⑥ 경로");
+        // ②~⑥ 경로의 오너 화면 섬광 조건은 제압 표식을 보지 않는다 — 일반 간파와 같은 흐름(강 시도 암전 켜짐이면 오버레이).
+        Assert.IsTrue(InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, true, true));
+        Assert.IsFalse(InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, false, true), "팀원 화면은 오버레이 없음");
+
+        director.SuppressFlashEnabled = true;
+        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "Play 중 다시 켜면 다음 성공부터 시퀀스");
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void A6_칸과_섬광_줄이기는_서로_독립(bool suppressFlash, bool reduceFlash)
+    {
+        InterruptProductionDirector director = CreateDirectorWithSequence();
+        var so = new SerializedObject(director);
+        so.FindProperty("reduceFlash").boolValue = reduceFlash;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        director.SuppressFlashEnabled = suppressFlash;
+        Assert.AreEqual(suppressFlash, director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "섬광 줄이기는 시퀀스 선택을 바꾸지 않는다");
+
+        so.Update();
+        Assert.AreEqual(reduceFlash, so.FindProperty("reduceFlash").boolValue, "A6 칸은 섬광 줄이기 칸을 바꾸지 않는다");
+        Assert.AreEqual(suppressFlash, so.FindProperty("suppressFlash").boolValue);
+    }
+
+    [Test]
+    public void A6_칸_켬이어도_컷_데이터가_없으면_일반_섬광()
+    {
+        var go = new GameObject("Director");
+        _objects.Add(go);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        Assert.IsTrue(director.SuppressFlashEnabled);
+        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true));
+    }
 
     [Test]
     public void 서버_표식은_같은_프레임에_한_번만()

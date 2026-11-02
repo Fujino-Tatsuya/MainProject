@@ -9,7 +9,7 @@
 > 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
 > 🔹 할 일 179(2026-11-02, 브랜치 `feature/SuppressInterruptFlash`): **제압 간파**(제압 칸 마지막 1칸 간파) 성공은 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(모든 피어, 컷 SO·후처리 뒤 셰이더 1패스, 암전은 오너만, 섬광 줄이기 옵션) — [§7](#7-제압-간파-애니메이션-섬광-할-일-179).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
-> 🔹 스위치 11칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 피해 숫자 숨김(154) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
+> 🔹 스위치 12칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 피해 숫자 숨김(154)·A6 제압 간파 섬광 시퀀스(179) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
@@ -488,7 +488,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 ### 6.1 구조
 
 - **디렉터 = `NetworkManager.prefab` 루트의 MonoBehaviour 1개**(`GlobalTimeScale`·`InterruptDarkAdaptation` 옆). 코드 `Assets/1.Scripts/Player/InterruptProduction/`.
-  스위치 11칸(cue 10 + A5 피해 숫자 숨김) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
+  스위치 12칸(cue 10 + A5 피해 숫자 숨김 + A6 제압 간파 섬광 시퀀스) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
 - 간파 스킬(`PlayerInterruptSkillBase`)은 **사건 4개(시도·판정·성공·실패)만 알린다** — 슬로우 시작·실패·성공 재시작 코드는 스킬에 없다.
   판정·피해·카운터 창·그로기·통계는 그대로 스킬·대상(서버) 소관이고, 디렉터는 재생 여부와 슬로우 호출만 한다.
 - 단계마다 클래스가 따로 — `InterruptAttemptStage`·`InterruptResolveStage`·`InterruptSuccessStage`·`InterruptFailStage`.
@@ -555,6 +555,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | C2 | `assassinInsightSuccess` | 꺼짐 | 어쌔신 간파 성공 이펙트 | `AssassinSkillView.TryPlayInsightSuccess`(대기·올려치기 프레임 맞추기는 View) → `Director.PlayCue(AssassinInsightSuccess, …, this)` |
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |
 | A5 | `hideDamageNumbers` | **켬**(코드 기본값 — 프리팹에 저장 안 됨) | 피해 숫자 숨김(154) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 동안 **본인 화면만** 피해 숫자 캔버스 끔. 숫자 생성·수명은 그대로 | `FloatingDamageSpawner.LateUpdate` → `Director.DamageNumbersHidden` = `InterruptProductionRules.ShouldHideDamageNumbers(칸, 오너 상태 기계 State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive)`. cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideDamageNumbers` |
+| A6 | `suppressFlash`("성공 — 공용") | **켬** | 제압 간파 섬광 시퀀스(179, [§7](#7-제압-간파-애니메이션-섬광-할-일-179)) — 켜면 제압 간파 성공 때 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). **끄면 제압 간파도 일반 간파와 같은 연출**(②~⑥·오너 암전 규칙 그대로). 표식 전달(슬로우 Start 이벤트 1바이트)은 칸과 무관하게 돈다. 섬광 줄이기(`reduceFlash`)와 독립 | 성공 `HandleStarted` 시작 순간 `Director.PlaysSuppressFlash(목적, 표식)` = `SuppressFlashRules.ShouldPlay(…, 칸, 컷 데이터 있음)` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashEnabled` |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
 
@@ -570,7 +571,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 - **사건이 올 때마다 디렉터 필드를 읽는다(캐싱 없음).** Play 중 Hierarchy `DontDestroyOnLoad › NetworkManager › InterruptProductionDirector` 에서 바꾸면 다음 간파부터 바로 쓰인다.
   프리팹 에셋을 고치면 Play 중 인스턴스엔 안 닿는다(Unity 기본).
 - **슬로우 프로필·히트스톱(A1) = 호스트(서버) 인스턴스 값만.** 서버가 사건 순간 값을 이벤트에 실어 보내고 전 피어가 같은 닫힌 식으로 재생한다 — 클라 값은 무시. MPPM 에서는 호스트 에디터에서 바꾼다.
-- **나머지 10칸(A5 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
+- **나머지 11칸(A5·A6 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
   줌 배율·오너 암전·섬광 칸(§0.5)도 각 피어 값이다.
 - 테이블 모드 Play 는 시작 때 프로필이 xlsx 값으로 덮인 뒤, 그 이후 인스펙터 변경은 Play 끝날 때까지 산다([data-table.md](data-table.md) §6).
 
@@ -625,7 +626,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 1. [서버] 23호 `EnterCounterSuccess` 의 칸 0 분기가 `InterruptProductionDirector.ServerMarkSuppressInterrupt()` (표식 1줄 — 판정 무수정).
 2. [서버] 같은 판정 호출의 `ServerSuccess` 가 표식을 소비(`SuppressInterruptMark`, **같은 프레임만** 유효) → 사건 `SuppressInterrupt` → 성공 슬로우 `ServerStart(…, suppressInterrupt)`.
 3. 슬로우 Start 이벤트(`SlowMotionEvent.SuppressInterrupt`, +1바이트, 기존 named message)로 전 피어에 간다 → `GlobalTimeScale.CurrentSuppressInterrupt`.
-4. [각 피어] 디렉터 `HandleStarted(Success)` 가 `SuppressFlashRules.ShouldPlay`(성공 ∧ 표식 ∧ `suppressFlash` 칸 ∧ 컷 데이터 있음)면 `BeginSuppressFlash`, 아니면 일반 ②~⑥.
+4. [각 피어] 디렉터 `HandleStarted(Success)` 가 `PlaysSuppressFlash` = `SuppressFlashRules.ShouldPlay`(성공 ∧ 표식 ∧ A6 `suppressFlash` 칸 ∧ 컷 데이터 있음)면 `BeginSuppressFlash`, 아니면 일반 ②~⑥.
 5. `SuppressFlashPlayer`(순수 로직)가 매 프레임 `Time.unscaledTime` 으로 진행 → `SuppressFlashScreenOutput` → `SuppressFlashState` → `DarkAdaptationFeature` 의 `SuppressFlashPass`.
 
 슬로우가 거부되면(컷신 잠금·씬 전환) 일반 섬광처럼 시퀀스도 없다. 성공 relay(B3·C2)는 표식이 실린 사건을 받지만 지금은 쓰지 않는다.
@@ -640,14 +641,17 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 ### 7.4 디렉터 칸 — `NetworkManager.prefab › InterruptProductionDirector` "성공 — 제압 간파 섬광"
 
+켜기/끄기 스위치는 다른 스위치와 같은 자리("성공 — 공용")의 **A6 `suppressFlash`**(§6.4). 끄면 제압 간파 성공도 일반 간파 흐름 그대로 —
+②~⑥ 오버레이(내 성공 ∧ 오너 암전 켜짐), 섬광 순간 암전 걷힘·월드 섬광·암순응(A2), A5 는 ⑥ 끝까지. Play 중 바꾸면 **다음 성공부터**(성공 시작 순간 읽음).
+
 | 칸 | 기본 | 뜻 |
 |---|---|---|
-| `suppressFlash` | 켬 | 제압 간파 프로필. 끄면 제압 간파도 일반 섬광 |
+| `suppressFlash`(A6, "성공 — 공용") | 켬 | 제압 간파 섬광 시퀀스. 끄면 제압 간파도 일반 섬광. 섬광 줄이기와 독립 |
 | `suppressFlashSequence` | 위 에셋 | 비면 일반 섬광 |
 | `suppressFlashMaterial` | `M_SuppressFlash.mat` | `Hidden/Rendering/SuppressFlash`. 비면 그리지 않음(시간표·암전 걷힘은 돈다) |
 | `reduceFlash` | 끔 | **섬광 줄이기** 기본값 — 켜면 반전 끔(포지티브도 네거 바탕) + 대비 `reducedContrast` |
 
-섬광 줄이기 실제 값 = PlayerPrefs `Interrupt.ReduceFlash`(0/1)가 있으면 그것, 없으면 칸. `Director.ReduceFlash` setter 가 둘 다 쓴다. **설정 UI 는 없다** — 나중에 설정 화면이 이 프로퍼티를 쓰면 된다.
+섬광 줄이기 실제 값 = PlayerPrefs `Interrupt.ReduceFlash`(0/1)가 있으면 그것, 없으면 칸(A6 와 독립 — A6 꺼짐이면 시퀀스가 안 도니 쓰이지 않을 뿐). `Director.ReduceFlash` setter 가 둘 다 쓴다. **설정 UI 는 없다** — 나중에 설정 화면이 이 프로퍼티를 쓰면 된다.
 
 ### 7.5 렌더 — 셰이더 절차 생성만
 
@@ -666,7 +670,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 ### 7.7 테스트
 
-`Tools/Tests/슬로우 모션 EditMode 테스트 실행` 의 `SuppressFlashTests` — 사양 표 기본값·24fps 프레임 내림·2프레임 홀드·컷 전환/끝·포지티브 뒤집기·섬광 줄이기·복귀 계단·진행기(실제 시간·멈춤·재시작·SO/옵션 Play 중 반영)·프로필 선택·서버 표식 같은 프레임만·사건 사본·Start 이벤트 플래그 직렬화/세션·셰이더 파라미터·비트 7 태깅/원복·에셋·프리팹 연결.
+`Tools/Tests/슬로우 모션 EditMode 테스트 실행` 의 `SuppressFlashTests` — 사양 표 기본값·24fps 프레임 내림·2프레임 홀드·컷 전환/끝·포지티브 뒤집기·섬광 줄이기·복귀 계단·진행기(실제 시간·멈춤·재시작·SO/옵션 Play 중 반영)·프로필 선택·A6 켬(시퀀스)/끔(②~⑥)·Play 중 다시 켜기·섬광 줄이기와 독립·컷 데이터 없음·서버 표식 같은 프레임만·사건 사본·Start 이벤트 플래그 직렬화/세션·셰이더 파라미터·비트 7 태깅/원복·에셋·프리팹 연결.
 
 ## 8. 이후 확장
 
