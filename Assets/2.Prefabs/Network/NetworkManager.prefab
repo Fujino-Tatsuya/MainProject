@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 2312403450460863167}
   - component: {fileID: 127159849850635136}
   - component: {fileID: 1635166641757817886}
+  - component: {fileID: 4191191191191191191}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -274,3 +275,16 @@ MonoBehaviour:
   hitFlashAberrationProfile: {fileID: 11400000, guid: 6288be39943ea2a4091062599015e694, type: 2}
   hitFlashBloomProfile: {fileID: 11400000, guid: 6f297671c6ab2794ca393a95b93e9294, type: 2}
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}
+--- !u!114 &4191191191191191191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73c53e5bba5a22a43987d64f66ff1b4a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptManager
+  logWindows: 0

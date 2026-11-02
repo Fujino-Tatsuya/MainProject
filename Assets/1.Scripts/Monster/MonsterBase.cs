@@ -15,7 +15,7 @@ using static EffectCatalog;
 //   (오너→서버 직접 데미지 RPC 미사용.)
 // - 자산(NavMesh/Animator/디졸브)이 없어도 컴파일되고 예외로 죽지 않도록 전부 널가드.
 [RequireComponent(typeof(NetworkObject))]
-public class MonsterBase : Unit
+public class MonsterBase : Unit, IInterruptJudgeTarget
 {
     [Header("데이터")]
     [SerializeField] protected MonsterDataSO data;
@@ -275,6 +275,12 @@ public class MonsterBase : Unit
     /// 표시(<c>_counterVisual</c>)와 달리 조기 소등이 없다.
     /// </summary>
     protected bool CounterJudgeWindowReplica => _counterJudgeWindow.Value;
+
+    /// <summary>
+    /// [모든 피어] 간파 판정 스냅샷(할 일 191 <see cref="InterruptManager"/>)의 간파 불가 상태. 기본 = 중간보스 취약 복제값.
+    /// 23호·스파링 봇은 자기 취약·제압 규칙으로 덮는다.
+    /// </summary>
+    public virtual bool InterruptBlockedByState => _vulnerable.Value;
 
     /// <summary>[서버] <c>MonsterCounterWindow</c> 가 열고 닫을 때 부른다(할 일 132). 스폰 전·클라에선 아무것도 안 한다.</summary>
     internal void ServerReplicateCounterWindow(bool open)

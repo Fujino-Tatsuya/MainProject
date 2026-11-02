@@ -59,7 +59,7 @@ public interface ITrainingDummyWindowGate
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TrainingDummy))]
 [DataTableSheet("Map", Order = 0)]
-public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
+public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptJudgeTarget
 {
     [Header("순환")]
     [SerializeField, Min(0f), FormerlySerializedAs("groggyDuration")]
@@ -116,6 +116,9 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
     // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 창 복제값(_state). 이미 복제되던 값이라 전송 추가 없음.
     bool IInterruptWindowReplica.ReplicatedWindowOpen => IsInterruptible;
 
+    // 간파 판정 스냅샷(할 일 191) — 취약 중엔 간파가 데미지만 들어간다(창 닫힘과 같은 뜻).
+    bool IInterruptJudgeTarget.InterruptBlockedByState => IsVulnerable;
+
     /// <summary>[서버] 인터럽트 성공. 취약 진입 직후에 한 번 발화한다.</summary>
     public event Action<TrainingDummyInterruptSuccess> ServerInterruptSucceeded;
 
@@ -147,6 +150,7 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
             _state.Value = _cycle.State;
             ServerRefreshSuperArmor();
             InterruptLagMonitor.RecordWindow(gameObject, IsInterruptible);   // 간파 지연 측정 — 시작 상태(이후는 OnStateChanged)
+            InterruptManager.ServerReportWindow(gameObject, IsInterruptible);   // 간파 창 시간표(할 일 191) — 무기한 창이라 길이 모름
         }
 
         _state.OnValueChanged += OnStateChanged;
@@ -233,6 +237,8 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
         ApplyTint(current);
         // 간파 지연 측정(측정만) — 서버에서만 기록된다(RecordWindow 가 거른다).
         InterruptLagMonitor.RecordWindow(gameObject, current == TrainingDummyInterruptState.Interruptible);
+        // 간파 창 시간표(할 일 191) — 서버에서만 기록·배포된다(ServerReportWindow 가 거른다). 무기한 창이라 길이 모름.
+        InterruptManager.ServerReportWindow(gameObject, current == TrainingDummyInterruptState.Interruptible);
         // 오너 클라 간파 시도 예측용 창 기록(할 일 132) — 클라에서만 기록된다(Record 가 거른다).
         InterruptWindowReplicaTracker.Record(gameObject, current == TrainingDummyInterruptState.Interruptible);
     }

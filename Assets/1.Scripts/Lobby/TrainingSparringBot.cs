@@ -141,6 +141,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
 
     bool IsVulnerable => _vulnerableUntil >= 0f && !_suppressed;
     bool CounterBlockedByState => IsVulnerable || _suppressed;
+
+    /// <summary>간파 판정 스냅샷(할 일 191) — 서버 = 판정 원본, 클라 = 취약·제압 복제값.</summary>
+    public override bool InterruptBlockedByState =>
+        IsServer ? CounterBlockedByState : _vulnerableVisual.Value || _suppressedVisual.Value;
     bool AllowsGauge => _model != null && _model.AllowsGaugeTransition;
     bool HoldsVulnerable => _model != null && _model.HoldsVulnerable;
     bool CrowdControlActive => _kbActive || _ccStun;
@@ -352,7 +356,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
                                 palette: counterOpen ? BossAttackConeTelegraph.Palette.Interrupt : BossAttackConeTelegraph.Palette.Attack);
         if (counterOpen)
         {
-            Counter.Open();
+            Counter.Open(windup);   // 판정 타이머는 저작 길이 그대로(느리게 흘린다) — 시간표(할 일 191)에는 실제 닫힘인 예고 길이로 알린다
             if (Counter.IsOpen) ServerSetCounterWindow(true, windup);
         }
     }

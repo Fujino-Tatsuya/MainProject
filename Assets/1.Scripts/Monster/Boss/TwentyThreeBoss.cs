@@ -102,6 +102,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     readonly BossCounterWindupGate _counterWindup = new BossCounterWindupGate();
     bool _warnedCounterTimerBeforeAnimation;
     float _counterWindupStartedAt;   // 진단용 — 준비 신호가 실제로 몇 초 만에 오는지 재려고 둔다
+    float _attackStartedAt = -1f;    // [서버] 지금 공격의 StartAttack 시각(Time.time) — 간파 창 시간표(할 일 191) 알림용
 
     // 자세 홀드는 **각 피어의 로컬 상태**다(애니메이터는 복제되지 않는다).
     // 서버가 RPC 로 걸고 풀며, 아래 두 값은 그 피어에서만 의미가 있다.
@@ -1547,6 +1548,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         BossAttackEntry e = EntryFor(CurrentAttackSlot);
         _currentEntry = e;
+        _attackStartedAt = Time.time;   // 간파 창 시간표(할 일 191)의 공격 시작 시각
 
         // 즉시 연결의 후속 타인가 — ConsumeCombo 가 세운 표시를 이 공격 몫으로 옮긴다(CounterWindowDuration 이 base 전에 읽는다).
         _chainedAttack = _chainNextPending;
@@ -6410,6 +6412,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// <summary>취약·제압 중엔 간파 창·판정이 없다(기획 간파 §5.2 · §8).</summary>
     bool CounterBlockedByState => IsVulnerable || _suppressed;
 
+    /// <summary>간파 판정 스냅샷(할 일 191) — 서버 = 판정 원본, 클라 = 취약 복제값(제압은 복제값이 없다 — 제압 중엔 창이 안 열린다).</summary>
+    public override bool InterruptBlockedByState => IsServer ? CounterBlockedByState : _vulnerableVisual.Value;
+
     // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
     // _fightCounters 는 전투마다 0 으로 돌아가 쓰지 않는다 — 전후 비교 도중 리셋이 끼면 "실패"로 읽힌다.
     int _interruptSuccessCount;
@@ -7067,9 +7072,37 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
 
-        if (_counterWindow.Value == open) return;
+        if (_counterWindow.Value == open)
+        {
+            // 열린 채 새 길이로 다시 열림(착지 창 도중 다음 콤보 타가 창을 여는 경우 등) — 복제값은 그대로지만 시간표는 새 창이다.
+            if (open && windowDuration > 0f) ReportCounterWindowToManager(true, windowDuration);
+            return;
+        }
         _counterWindow.Value = open;
         InterruptLagMonitor.RecordWindow(gameObject, open);   // 간파 지연 측정(측정만)
+        ReportCounterWindowToManager(open, windowDuration);
+    }
+
+    /// <summary>
+    /// [서버] 간파 창 시간표(할 일 191 <see cref="InterruptManager"/>) 알림 — 23호 창은 전부 <see cref="SetCounterWindow"/> 한 곳을 지나므로 여기 하나로 전 경로가 연결된다
+    /// (목록: Docs/tech/interrupt-client-judge.md '창 여닫는 곳 목록'). 데이터만 모은다 — 판정·연출 무영향.
+    /// 닫힘 예정 = 열 때 넘긴 길이(돌진 게이트 = 타이머 값, 애니 Hit 이 늦으면 실제 닫힘(TryReleaseCounterAttack) 때 늦은 닫힘으로 갱신 배포된다).
+    /// 길이를 안 넘긴 열림(잡기 붙잡은 뒤)은 길이 모름. 공격 시작 = 공격 상태면 StartAttack 시각, 기믹 창이면 열림 시각.
+    /// 지목자 = 연쇄 간파 기믹의 지목 대상(릴레이 명단·밀어내기는 지목자 없음).
+    /// </summary>
+    void ReportCounterWindowToManager(bool open, float windowDuration)
+    {
+        if (!open)
+        {
+            InterruptManager.ServerReportWindow(gameObject, false);
+            return;
+        }
+
+        ulong designee = _raidGimmick == RaidGimmick.Chain && _chainTarget != null
+            ? _chainTarget.OwnerClientId
+            : InterruptWindowRecord.NoDesignee;
+        float attackStart = State == MonsterState.Attack && !RaidGimmickActive ? _attackStartedAt : -1f;
+        InterruptManager.ServerReportWindow(gameObject, true, windowDuration, designee, attackStart);
     }
 
     /// <summary>

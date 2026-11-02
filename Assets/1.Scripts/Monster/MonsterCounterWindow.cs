@@ -65,8 +65,15 @@ public class MonsterCounterWindow : MonoBehaviour
     public bool IsOpen => _window.IsOpen;
 
     /// <summary>저작된 길이로 창을 연다. 길이가 0 이면 열리지 않는다(카운터 없음).</summary>
-    public void Open()
+    public void Open() => Open(WindowDuration);
+
+    /// <summary>
+    /// 저작된 길이로 창을 열되, 간파 창 시간표(할 일 191 <see cref="InterruptManager"/>)에는 <paramref name="scheduledSeconds"/> 를 닫힘 예정 길이로 알린다.
+    /// 타이머를 느리게 흘리는 호출측(스파링 봇 훈련 창 연장)용 — 판정 타이머는 그대로 저작 길이다.
+    /// </summary>
+    public void Open(float scheduledSeconds)
     {
+        _scheduledSeconds = scheduledSeconds;
         bool wasOpen = _window.IsOpen;
         _window.Open(WindowDuration);
         if (wasOpen) RecordTransition(false);   // 다시 열기 = 닫힘 → 열림
@@ -104,5 +111,8 @@ public class MonsterCounterWindow : MonoBehaviour
         InterruptLagMonitor.RecordWindow(gameObject, open);
         if (_owner == null) _owner = GetComponent<MonsterBase>();
         if (_owner != null) _owner.ServerReplicateCounterWindow(open);
+        InterruptManager.ServerReportWindow(gameObject, open, open ? _scheduledSeconds : -1f);   // 간파 창 시간표(할 일 191) — 서버만
     }
+
+    float _scheduledSeconds = -1f;   // 이번 열림의 닫힘 예정 길이(초) — 시간표 알림용
 }
