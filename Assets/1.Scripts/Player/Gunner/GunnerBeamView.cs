@@ -101,13 +101,21 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     // 잔류 포격(GUN_4_ECHO_Q, 할 일 149) — 원래 발에 맞은 대상 몸에 붙어 따라다니는 에너지 폭탄 구체.
     // 판정·폭발 시각은 서버(GunnerChargeLaserSkill)가 들고, 여기는 복제 목록(echoBombStates)을 보고 그리기만 한다.
-    // 149 후속 6 — 월드 VFX 프리팹 칸. 지금은 비어 있고 이펙트 담당이 연결한다(블룸·애니·파티클은 프리팹 안에서).
-    // 몸 메시에 묻히지 않게 머티리얼은 Effects/OverlayBillboard + ZTest Always 권장. 비면 표시만 생략.
+    // 149 후속 6 — 월드 VFX 프리팹 칸. 11-03 민경: FX_EchoBomb_Orb 연결(IntegratedEffect ZTest Always — 몸 가운데여도 안 묻힌다).
+    // 서버 부착 순간 자식 Arm(폭발 직전 고조)을 켠다(GunnerEchoBombVisuals.ArmChildName). 비면 표시만 생략.
     [Header("잔류 포격 에너지 폭탄 VFX")]
-    [Tooltip("비어 있음 — 이펙트 담당이 연결. 폭탄마다 복제해 대상 점을 따라감, 겉모습·애니·블룸은 프리팹 안에서, 비우면 표시만 생략(피해는 그대로). " +
-             "몸에 안 가려지려면 머티리얼은 Effects/OverlayBillboard + ZTest Always 권장")]
+    [Tooltip("폭탄마다 복제해 대상 몸 가운데를 따라감(FX_EchoBomb_Orb). 서버 부착 순간 자식 'Arm' 을 켠다. 겉모습·애니·블룸은 프리팹 안에서, 비우면 표시만 생략(피해는 그대로). " +
+             "몸에 안 가려지려면 머티리얼은 깊이 무시(ZTest Always)")]
     [DataTableIgnore]
     [SerializeField] private GameObject echoBombVfxPrefab;
+
+    [Tooltip("폭탄이 터질 때(피해) — 구체 마지막 자리 원샷(FX_EchoBomb_Burst). 비면 Q 몬스터 적중 연출로 대신")]
+    [DataTableIgnore]
+    [SerializeField] private EffectEntry echoBombBurst;
+
+    [Tooltip("빈 폭발(대상이 먼저 죽거나 사라짐, 피해 없음) — FX_EchoBomb_Fizzle(작고 흐리게). 비면 위 폭발로 대신")]
+    [DataTableIgnore]
+    [SerializeField] private EffectEntry echoBombFizzle;
 
     // 연출 정렬 값이라 xlsx 행이 아니다(data-table.md). 서버 피해·폭발 시각(특성 Delay)은 건드리지 않는다.
     [Tooltip("구체를 띄우기까지 지연(초). 기준 = Q 가 대상에 맞은 순간(예비 구체 생성, 집속 연사면 그 대상 첫 적중). 0 = 즉시. " +
@@ -123,7 +131,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [DataTableIgnore, Min(0f)]
     [SerializeField] private float echoBombPreviewTimeout = 1.5f;
 
-    [Tooltip("구체 위치 오프셋(월드 기준, m). 대상 몸 콜라이더 윗면 가운데에 더한다 — 대상이 돌아도 방향이 일정. " +
+    [Tooltip("구체 위치 오프셋(월드 기준, m). 대상 몸 콜라이더 가운데에 더한다 — 대상이 돌아도 방향이 일정. " +
              "폭발 연출·Attached/Exploded 사건 위치도 같은 점. 판정과 무관")]
     [DataTableIgnore]
     [SerializeField] private Vector3 echoBombOffset;
@@ -164,6 +172,33 @@ public class GunnerBeamView : BaseNetworkBehaviour
     //    E 는 Dash 가 아니라 Skill 상태라 PlayerDashVfx 가 켜 주지 않으므로 여기서 직접 부른다.
     [Tooltip("E 백스텝 전용 잔상(EBackstepAfterimage). 비워도 잔상만 빠진다")]
     [SerializeField] private DashAfterimage backstepAfterimage;
+
+    // ── 한계 돌파(GUN_2_OVERDRIVE) 과열 색 ───────────────────────────────
+    // 2026-11-03 민경 grill(PLAN.md 「한계 돌파 VFX」). 한계 돌파를 가진 거너의 기본 공격·Q·R 공격 이펙트를
+    // 피해에 쓴 과열 단계 색으로 칠한다(EffectSocketPlayer.SetTint — 색상 교체, 밝기 유지). 0단계·특성 없음 = 원래 색.
+    // 단계 = 피해와 같은 단계: 기본 공격 = 그 발(ShotRpc 인자), Q 발사 = 시전 시작 저장 단계(ChargeLaserFiredRpc 인자),
+    // Q 충전·R 시전 = 시전 순간 각 피어가 복제된 과열로 계산(LocalOverdriveStage — 서버의 저장 단계와 같은 순간·같은 값).
+    // E·간파·잔류 포격 폭발은 칠하지 않는다(소켓 색은 남으므로 공유 소켓은 재생 직전마다 정한다).
+    // ── 이중 출력(GUN_4_EXTRA_BASIC) 추가 레이저 ─────────────────────────
+    // 2026-11-03 민경 grill(PLAN.md 「이중 출력 VFX」). 서버 추가 발 판정 순간 특성 연출 사건(TraitSkillFx — GunnerDualOutput)을 받아 낸다(RPC 없음 — 공용 사건 RPC).
+    // Activated = 기존 평타 빔·착탄(같은 엔트리를 소켓 없이 따로 — FireExtraBasicBeam) + 총구 섬광 + 나선 빔(+Z 1m 저작 → 축별 배율 Z 를 0 → 길이로, 평타 빔과 같은 beamTravelDuration 동안 날아간다)
+    //             + 멈춤 불티(끝점이 사거리보다 짧을 때 — 평타 착탄과 같은 규칙).
+    //             멈춤 불티·Hit 착탄은 빔이 닿을 때(beamTravelDuration 뒤).
+    // Hit = 기존 평타 몬스터 적중 + 이중 출력 적중 섬광. 허공(최대 사거리)이면 착탄 없음.
+    // 사건 Variant = 한계 돌파 색 단계(원래 세 번째 발 피해 단계) — 평타와 같은 색으로 칠한다.
+    [Header("이중 출력 추가 레이저")]
+    [Tooltip("나선 빔(+Z 1m). FX_DualOutput_Beam_Entry")]
+    [SerializeField] private EffectEntry dualBeam;
+    [Tooltip("총구 섬광. FX_DualOutput_Muzzle_Entry")]
+    [SerializeField] private EffectEntry dualMuzzle;
+    [Tooltip("몬스터 적중(사건 Hit). FX_DualOutput_Hit_Entry")]
+    [SerializeField] private EffectEntry dualHit;
+    [Tooltip("벽·지형에 멈춤. FX_DualOutput_Stop_Entry")]
+    [SerializeField] private EffectEntry dualStop;
+
+    [Header("한계 돌파 과열 색")]
+    [Tooltip("과열 단계별 색 표. 9.ScriptableObject/Effects/GunnerOverdriveVfxColors. 비우면 색을 바꾸지 않는다")]
+    [SerializeField] private GunnerOverdriveVfxColors overdriveColors;
 
 
     // 🔴 Q 빔도 좌클릭과 **같은 1m 규약**이다. 값을 따로 두는 건 프리팹을 갈아끼울 때를 위한 여지일 뿐.
@@ -217,6 +252,48 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private float chargeStartTime;
     private float chargeMaxTime = 1.2f;
     private bool chargeFullPlayed;
+    private EffectTint chargeTint;   // 이번 집중의 색 — 충전 루프·완료 알림·과충전이 같이 쓴다
+    private EffectTint impactTint;   // 날아가는 기본 공격 빔이 닿을 때 낼 착탄 색(그 발의 색)
+    private GunnerHeat heat;
+    private GunnerBasicAttack basicAttackForRange;   // 이중 출력 멈춤 판단용 사거리
+
+    // 이중 출력 — 날아가는 나선 빔(총구 → 끝점, 평타 빔과 같은 beamTravelDuration)과 닿을 때 낼 착탄.
+    private struct DualFlight
+    {
+        public EffectHandle Handle;
+        public float FireTime;
+        public Vector3 FullScale;   // 다 닿았을 때 인스턴스 localScale(z = 빔 길이)
+        public float AppearDelay;   // 평타 빔 몸통이 처음 보이는 시각(초) — 그 전엔 숨긴다
+    }
+
+    private float basicBodyAppearDelay = -1f;   // 평타 빔 엔트리에서 한 번 읽는다(BasicBodyAppearDelay)
+
+    private struct DualImpact
+    {
+        public float At;
+        public EffectEntry Entry;
+        public Vector3 Position;
+        public Quaternion Rotation;
+        public EffectTint Tint;
+        public bool BasicMonsterHit;   // 기존 평타 몬스터 적중도 같이
+    }
+
+    // 이중 출력 추가 발의 **기본 공격 빔** — 평타 빔 소켓(루프 하나)을 다시 쏘면 세 번째 발 빔이 한 프레임 만에 지워져서(11-03 확인)
+    // 같은 엔트리를 소켓 없이 따로 낸다(발사 순간 원점·방향 고정, 길이·날아감은 평타 빔과 같은 규칙).
+    private EffectHandle extraBeamHandle;
+    private float extraBeamFireTime;
+    private float extraBeamStopAt = -1f;
+    private float extraBeamLength;
+    private Vector3 extraBeamEnd;
+    private Vector3 extraBeamDelta;
+    private bool extraBeamPendingImpact;
+    private bool extraBeamStopped;
+    private float extraBeamWidth;
+    private EffectTint extraBeamTint;
+
+    private readonly List<DualFlight> dualFlights = new List<DualFlight>();
+    private readonly List<DualImpact> dualImpacts = new List<DualImpact>();
+    private readonly List<GameObject> dualInstances = new List<GameObject>();
 
     public bool IsCharging => charging;
 
@@ -241,6 +318,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         animator = GetComponentInChildren<Animator>();
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
+        heat = GetComponent<GunnerHeat>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
         echoBombVisuals = new GunnerEchoBombVisuals(echoBombVfxPrefab, echoBombShowDelay, echoBombOffset, echoBombPreviewTimeout);
     }
@@ -266,20 +344,23 @@ public class GunnerBeamView : BaseNetworkBehaviour
     }
 
     /// <summary>[서버] 잔류 포격 폭탄을 대상에 붙인다 — 전 피어가 대상 몸통에 구체를 띄운다.</summary>
-    public void ServerAttachEchoBomb(int bombId, ulong targetId)
+    /// <param name="overdriveStage">그 Q 시전의 한계 돌파 색 단계(연출만, 0 = 원래 색).</param>
+    public void ServerAttachEchoBomb(int bombId, ulong targetId, int overdriveStage = 0)
     {
+        byte stage = (byte)Mathf.Clamp(overdriveStage, 0, byte.MaxValue);
         if (IsNetworkActive)
-            echoBombStates.Add(new GunnerEchoBombState(bombId, targetId));
+            echoBombStates.Add(new GunnerEchoBombState(bombId, targetId, stage));
         else
-            AddEchoBomb(bombId, targetId);
+            AddEchoBomb(bombId, targetId, stage);
     }
 
     /// <summary>[서버] 폭탄이 터졌다(대상에게 피해, 또는 대상이 먼저 사라져 그 자리 빈 폭발) — 전 피어가 구체를 지우고 그 자리에 폭발 연출.</summary>
-    public void ServerDetonateEchoBomb(int bombId)
+    /// <param name="fizzled">빈 폭발(피해 없음) — 작고 흐린 폭발로 구분한다(연출만).</param>
+    public void ServerDetonateEchoBomb(int bombId, bool fizzled = false)
     {
         if (!IsNetworkActive)
         {
-            PlayEchoBombBurst(bombId);
+            PlayEchoBombBurst(bombId, fizzled);
             return;
         }
 
@@ -287,6 +368,13 @@ public class GunnerBeamView : BaseNetworkBehaviour
         {
             if (echoBombStates[i].BombId != bombId)
                 continue;
+            // 빈 폭발 표시를 먼저 실어 두고 뺀다 — RemoveAt 사건의 Value 가 이 값이라 전 피어가 구분한다(새 RPC 없음).
+            if (fizzled)
+            {
+                GunnerEchoBombState state = echoBombStates[i];
+                state.Fizzled = true;
+                echoBombStates[i] = state;
+            }
             echoBombStates.RemoveAt(i);
             return;
         }
@@ -312,12 +400,14 @@ public class GunnerBeamView : BaseNetworkBehaviour
         switch (change.Type)
         {
             case NetworkListEvent<GunnerEchoBombState>.EventType.Add:
-                AddEchoBomb(change.Value.BombId, change.Value.TargetId);
+                AddEchoBomb(change.Value.BombId, change.Value.TargetId, change.Value.Stage);
                 break;
             case NetworkListEvent<GunnerEchoBombState>.EventType.Remove:
             case NetworkListEvent<GunnerEchoBombState>.EventType.RemoveAt:
-                PlayEchoBombBurst(change.Value.BombId);
+                PlayEchoBombBurst(change.Value.BombId, change.Value.Fizzled);
                 break;
+            case NetworkListEvent<GunnerEchoBombState>.EventType.Value:
+                break;   // 빈 폭발 표시(바로 뒤 RemoveAt 이 읽는다) — 구체는 그대로
             case NetworkListEvent<GunnerEchoBombState>.EventType.Clear:
                 echoBombVisuals.Clear();
                 break;
@@ -334,27 +424,38 @@ public class GunnerBeamView : BaseNetworkBehaviour
         EchoBombScratch.Clear();
         for (int i = 0; i < echoBombStates.Count; i++)
             EchoBombScratch.Add(echoBombStates[i]);
-        echoBombVisuals.Sync(EchoBombScratch);
+        echoBombVisuals.Sync(EchoBombScratch, OverdriveTint);
     }
 
-    // 폭발 연출 = Q 몬스터 적중 연출(chargeMonsterHitPlayer)을 구체의 마지막 자리에 한 번. 비어 있으면 구체만 사라진다.
+    // 폭발 연출 = FX_EchoBomb_Burst(빈 폭발이면 FX_EchoBomb_Fizzle — 작고 흐리게)를 구체의 마지막 자리에 한 번, 구체와 같은 한계 돌파 색(11-03 민경).
+    // 칸이 비면 예전처럼 Q 몬스터 적중 연출(chargeMonsterHitPlayer, 원래 색).
     // 특성 연출 사건(할 일 145) Exploded — 구체를 한 번이라도 띄운 폭탄만(위치를 안다). 대상이 먼저 사라진 빈 폭발도 같다(Target = null 또는 죽은 유닛).
-    private void PlayEchoBombBurst(int bombId)
+    private void PlayEchoBombBurst(int bombId, bool fizzled = false)
     {
         bool known = echoBombVisuals.TryGetTargetId(bombId, out ulong targetId);
+        echoBombVisuals.TryGetTint(bombId, out EffectTint tint);
         if (!echoBombVisuals.Remove(bombId, out Vector3 position))
             return;
 
-        PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
+        EffectEntry burst = fizzled && echoBombFizzle != null ? echoBombFizzle : echoBombBurst;
+        if (burst != null && EffectManager.TryGet(out EffectManager effects, this))
+        {
+            PlayDual(effects, burst, position, Quaternion.identity, Vector3.one, tint);
+        }
+        else
+        {
+            Tint(chargeMonsterHitPlayer, EffectTint.None);   // Q 적중 소켓을 나눠 쓴다 — 폭발은 원래 색
+            PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
+        }
         traitFxPlayer ??= GetComponent<Player>();
         TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Exploded, traitFxPlayer, position, transform.forward,
             position, known ? GunnerEchoBombTargets.Find(targetId) : null, variant: bombId));
     }
 
     // 붙이기 + 특성 연출 사건(할 일 145) Attached — 변경 사건(전 피어, 서버도 자기 변경을 받는다)·오프라인 직접 경로에서만. 늦은 합류의 초기 목록(Sync)은 내지 않는다.
-    private void AddEchoBomb(int bombId, ulong targetId)
+    private void AddEchoBomb(int bombId, ulong targetId, int overdriveStage = 0)
     {
-        echoBombVisuals.Add(bombId, targetId);
+        echoBombVisuals.Add(bombId, targetId, OverdriveTint(overdriveStage));
         Unit target = GunnerEchoBombTargets.Find(targetId);
         Vector3 position = target != null ? echoBombVisuals.PointFor(target) : transform.position;
         traitFxPlayer ??= GetComponent<Player>();
@@ -378,10 +479,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
         chargeStartTime = Time.time;
         chargeFullPlayed = false;
         charging = true;
+        chargeTint = OverdriveTint(LocalOverdriveStage());
 
         if (chargeLoopPlayer != null)
         {
             FaceForward(chargeLoopPlayer);
+            chargeLoopPlayer.SetTint(chargeTint);
             chargeLoopPlayer.Play();
         }
     }
@@ -450,6 +553,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             return;
 
         FaceForward(ultCastPlayer);
+        ultCastPlayer.SetTint(OverdriveTint(LocalOverdriveStage()));
         ultCastPlayer.PlayOnce();
     }
 
@@ -533,12 +637,14 @@ public class GunnerBeamView : BaseNetworkBehaviour
             if (chargeFullPlayer != null)
             {
                 FaceForward(chargeFullPlayer);
+                chargeFullPlayer.SetTint(chargeTint);
                 chargeFullPlayer.PlayOnce();
             }
 
             if (overchargePlayer != null)
             {
                 FaceForward(overchargePlayer);
+                overchargePlayer.SetTint(chargeTint);
                 overchargePlayer.Play();
             }
         }
@@ -562,29 +668,32 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <param name="stopped">지형에 막혀 끝났는가(true) / 최대 사거리까지 뻗었는가(false)</param>
     /// <param name="hitPoints">피해를 준 몹마다의 빔 위 지점. 비어 있으면 아무도 못 맞혔다</param>
     /// <param name="echoTargetIds">잔류 포격 예비 구체를 띄울 맞은 대상 네트워크 ID — 특성(GUN_4_ECHO_Q)이 없으면 빈 배열(서버가 정한다)</param>
+    /// <param name="overdriveStage">한계 돌파 색 단계 = 이 발 피해에 쓴 시전 시작 저장 단계(한계 돌파가 아니면 0). 연출 색만 — 판정 무관</param>
     public void ServerChargeLaserFired(Vector3 origin, Vector3 end, float width,
-                                       bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
+                                       bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds, int overdriveStage = 0)
     {
+        byte stage = (byte)Mathf.Clamp(overdriveStage, 0, 255);
         if (IsNetworkActive)
-            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints, echoTargetIds);
+            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints, echoTargetIds, stage);
         else
-            PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
+            PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds, stage);
     }
 
     // Reliable — 연출뿐 아니라 Focus → Skill 상태 전환도 싣는다(빠지면 그 피어만 집중 상태에 남는다).
     [Rpc(SendTo.ClientsAndHost)]
     private void ChargeLaserFiredRpc(Vector3 origin, Vector3 end, float width,
-                                     bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
-        => PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
+                                     bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds, byte overdriveStage)
+        => PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds, overdriveStage);
 
     private void PlayChargeLaser(Vector3 origin, Vector3 end, float width,
-                                 bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
+                                 bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds, byte overdriveStage)
     {
+        EffectTint tint = OverdriveTint(overdriveStage);
         // 잔류 포격 예비 구체(할 일 149 후속 3) — 적중 순간 먼저 띄우고, 서버 부착(NetworkList Add)이 같은 구체를 이어받는다.
         if (echoTargetIds != null)
         {
             for (int i = 0; i < echoTargetIds.Length; i++)
-                echoBombVisuals.AddPreview(echoTargetIds[i]);
+                echoBombVisuals.AddPreview(echoTargetIds[i], OverdriveTint(overdriveStage));
         }
 
         // 정신 집중 끝 — 같은 스킬을 유지한 채 Focus → Skill(발사 후 회복). 전 피어가 이 RPC 로 같이 넘어간다.
@@ -602,9 +711,13 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (chargeVentPlayer != null)
         {
             FaceForward(chargeVentPlayer);
+            chargeVentPlayer.SetTint(tint);
             chargeVentPlayer.PlayOnce();   // 지연은 엔트리의 part delay 가 준다
         }
 
+        Tint(chargeBeamPlayer, tint);
+        Tint(chargeEndPlayer, tint);
+        Tint(chargeMonsterHitPlayer, tint);
         PlayChargeBeam(origin, end, width, stopped, hitPoints);
         RaiseWideLaserFx(origin, end, hitPoints);
 
@@ -750,7 +863,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <inheritdoc cref="ShowBasicShot(Vector3, Vector3, bool, float)"/>
     /// <param name="stopped">빔이 뭔가에 멈췄나(벽·바닥·몬스터 공통). 공통 착탄 연출을 켠다.</param>
     /// <param name="damagedUnit">몬스터에 피해를 줬나. 공통 착탄 **위에** 한 겹 더 얹는다.</param>
-    public void ShowBasicShot(Vector3 origin, Vector3 end, bool stopped, bool damagedUnit, float width)
+    /// <param name="overdriveStage">한계 돌파 색 단계 = 이 발 피해에 쓴 단계(서버가 ShotRpc 로 준다, 한계 돌파가 아니면 0).</param>
+    public void ShowBasicShot(Vector3 origin, Vector3 end, bool stopped, bool damagedUnit, float width, int overdriveStage = 0)
     {
         if (basicBeamPlayer == null)
         {
@@ -780,6 +894,11 @@ public class GunnerBeamView : BaseNetworkBehaviour
         //    조준(회전)과 길이는 아래 UpdateBeam 이 **매 프레임** 다시 잡는다.
         // 앞 발이 아직 안 닿았으면(속도를 아주 낮춘 경우) 그 착탄을 지금 낸다 — 덮어써서 잃지 않게.
         if (pendingImpact) ArriveBeam();
+
+        // 이 발의 색 — 앞 발 착탄(바로 위 ArriveBeam)은 앞 발 색으로 이미 났다.
+        EffectTint tint = OverdriveTint(overdriveStage);
+        basicBeamPlayer.SetTint(tint);
+        impactTint = tint;
 
         beamEnd = end;
         beamFireTime = Time.time;
@@ -829,6 +948,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
         // 몬스터에 피해를 줬으면 지금처럼 쏜 사람 쪽(캡슐이라 normal 이 거의 같고, 연출이 그 방향 기준이다).
         Quaternion facing = Quaternion.LookRotation(-delta);
         Quaternion impactFacing = damagedUnit ? facing : SurfaceFacing(end, delta, width, facing);
+        Tint(basicHitPlayer, impactTint);
+        Tint(monsterHitPlayer, impactTint);
         PlayAt(basicHitPlayer, end, impactFacing);
         if (damagedUnit) PlayAt(monsterHitPlayer, end, facing);
     }
@@ -863,13 +984,21 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (basicBeamPlayer == null || distance <= 0f)
             return;
 
+        ApplyTravelInstances(basicBeamPlayer.GetInstances(BeamInstances), distance, beamFireTime, beamTravelTime);
+    }
+
+    // BeamInstances[0..count) 에 날아가는 길이를 건다 — 소켓 빔과 이중 출력 추가 발 빔이 같이 쓴다.
+    private void ApplyTravelInstances(int count, float distance, float fireTime, float travelTime)
+    {
+        if (distance <= 0f)
+            return;
+
         bool travelling = beamTravelDuration > 0f;
-        float elapsed = Time.time - beamFireTime;
-        bool beforeArrival = travelling && elapsed < beamTravelTime;
-        float length = travelling && beamTravelTime > 0f ? distance * Mathf.Clamp01(elapsed / beamTravelTime) : distance;
+        float elapsed = Time.time - fireTime;
+        bool beforeArrival = travelling && elapsed < travelTime;
+        float length = travelling && travelTime > 0f ? distance * Mathf.Clamp01(elapsed / travelTime) : distance;
         float sizeY = beamUnitLength > 0.01f ? length / beamUnitLength : length;
 
-        int count = basicBeamPlayer.GetInstances(BeamInstances);
         for (int i = 0; i < count; i++)
         {
             BeamInstances[i].GetComponentsInChildren(true, BeamSystems);
@@ -922,6 +1051,222 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     // 소켓을 그 자리에 찍고 원샷. 비어 있으면 조용한 no-op 이다 —
     // 아직 안 만든 연출(몬스터 적중) 때문에 호출부가 지저분해지지 않게.
+    // ── 이중 출력 추가 레이저 ──
+
+    private void OnEnable() => TraitSkillFx.Raised += HandleTraitFx;
+
+    private void OnDisable() => TraitSkillFx.Raised -= HandleTraitFx;
+
+    // [전 피어] 특성 연출 사건 — 이 거너의 이중 출력 추가 발만.
+    private void HandleTraitFx(TraitFxEvent e)
+    {
+        if (e.Trait != TraitFxTrait.GunnerDualOutput) return;
+        traitFxPlayer ??= GetComponent<Player>();
+        if (e.Caster != traitFxPlayer || !EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectTint tint = OverdriveTint(e.Variant);
+
+        if (e.Kind == TraitFxKind.Hit)
+        {
+            Vector3 back = -e.Direction;
+            back.y = 0f;
+            Quaternion toShooter = back.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(back) : Quaternion.identity;
+            // 기존 평타 몬스터 적중도 같이(11-03 민경 — 추가 발도 평타 연출 위에 이중 출력이 얹힌다). 빔이 닿을 때.
+            QueueDualImpact(dualHit, e.Position, toShooter, tint, basicMonsterHit: true);
+            return;
+        }
+
+        if (e.Kind != TraitFxKind.Activated) return;
+
+        Vector3 delta = e.EndPosition - e.Position;
+        float length = delta.magnitude;
+        if (length < 0.01f) return;
+
+        // 멈춤 = 끝점이 사거리보다 짧다(유닛이든 벽이든 — GunnerBasicAttack.ShowBeam 과 같은 판단).
+        basicAttackForRange ??= GetComponent<GunnerBasicAttack>();
+        GunnerBasicAttackData basicData = basicAttackForRange != null ? basicAttackForRange.Data : null;
+        bool stopped = basicData == null || length < basicData.Range - 0.01f;
+
+        // 🔴 기존 평타 빔·착탄을 같은 경로로 같이 낸다(11-03 민경) — 이중 출력 나선이 그 둘레를 감는다.
+        //    ShowBasicShot(빔 소켓 재사용) 금지 — 0.05초 전 세 번째 발 빔을 지워 버린다. 따로 낸다. 몬스터 적중은 Hit 사건에서(위).
+        FireExtraBasicBeam(effects, e.Position, e.EndPosition, stopped, basicData != null ? basicData.BeamWidth : 0.6f, tint);
+
+        Vector3 dir = delta / length;
+        Quaternion facing = Quaternion.LookRotation(dir);
+        PlayDual(effects, dualMuzzle, e.Position, facing, Vector3.one, tint);
+        FireDualBeam(effects, e.Position, facing, length, tint);
+        if (stopped)
+            QueueDualImpact(dualStop, e.EndPosition, Quaternion.LookRotation(-dir), tint, basicMonsterHit: false);
+    }
+
+    // 추가 발의 기본 공격 빔 — 평타 빔 엔트리를 원점에 원샷으로, 끝점까지 날아가 beamHoldDuration 뒤 회수. 착탄도 평타와 같다.
+    private void FireExtraBasicBeam(EffectManager effects, Vector3 origin, Vector3 end, bool stopped, float width, in EffectTint tint)
+    {
+        EffectEntry entry = basicBeamPlayer != null ? basicBeamPlayer.Effect : null;
+        Vector3 delta = end - origin;
+        float distance = delta.magnitude;
+        if (entry == null || distance < 0.01f) return;
+
+        if (extraBeamStopAt >= 0f) FinishExtraBeam(effects);   // 앞 추가 발이 아직이면 착탄 내고 정리
+
+        float travel = Mathf.Max(0f, beamTravelDuration);
+        extraBeamHandle = effects.PlayRecallable(entry, origin, Quaternion.LookRotation(delta), 1f, travel + beamHoldDuration + 0.5f);
+        if (tint.IsSet) effects.SetTint(extraBeamHandle, tint);
+        extraBeamFireTime = Time.time;
+        extraBeamStopAt = Time.time + travel + beamHoldDuration;
+        extraBeamLength = distance;
+        extraBeamEnd = end;
+        extraBeamDelta = delta;
+        extraBeamPendingImpact = true;
+        extraBeamStopped = stopped;
+        extraBeamWidth = width;
+        extraBeamTint = tint;
+        UpdateExtraBeam(effects);   // 쏜 프레임에 길이를 걸어야 첫 입자부터 맞는다(StretchBeam 주석)
+    }
+
+    private void UpdateExtraBeam(EffectManager effects)
+    {
+        float travel = Mathf.Max(0f, beamTravelDuration);
+        int count = effects.GetInstances(extraBeamHandle, BeamInstances);
+        StretchInstances(count, beamUnitLength > 0.01f ? extraBeamLength / beamUnitLength : 1f, extraBeamLength);
+        ApplyTravelInstances(count, extraBeamLength, extraBeamFireTime, travel);
+        if (extraBeamPendingImpact && Time.time - extraBeamFireTime >= travel) ArriveExtraBeam();
+    }
+
+    private void ArriveExtraBeam()
+    {
+        extraBeamPendingImpact = false;
+        if (!extraBeamStopped || basicHitPlayer == null) return;
+        Vector3 delta = extraBeamDelta;
+        Quaternion facing = Quaternion.LookRotation(-delta);
+        Tint(basicHitPlayer, extraBeamTint);
+        PlayAt(basicHitPlayer, extraBeamEnd, SurfaceFacing(extraBeamEnd, delta, extraBeamWidth, facing));
+    }
+
+    private void FinishExtraBeam(EffectManager effects)
+    {
+        if (extraBeamPendingImpact) ArriveExtraBeam();
+        effects.Release(extraBeamHandle);
+        extraBeamHandle = EffectHandle.None;
+        extraBeamStopAt = -1f;
+    }
+
+    // 나선 빔 — 평타 빔과 **같은 박자로** 총구에서 끝점까지 날아간다(11-03 민경). +Z 1m 저작이라 인스턴스 z 배율을 0 → 길이로 키운다.
+    // 🔴 평타 빔 몸통(LaserCore·Beam ray)은 버스트가 0.05초에 나와서 그때 이미 길이의 83%(0.05/0.06)다 — 나선도 그 전엔 숨기고
+    //    같은 진행도(경과 / beamTravelDuration)를 쓴다. 0초부터 키우면 나선만 먼저·느리게 날아가 보였다.
+    private void FireDualBeam(EffectManager effects, Vector3 origin, Quaternion facing, float length, in EffectTint tint)
+    {
+        if (dualBeam == null) return;
+        EffectHandle handle = effects.PlayRecallable(dualBeam, origin, facing, new Vector3(1f, 1f, length));
+        if (tint.IsSet) effects.SetTint(handle, tint);
+        if (beamTravelDuration <= 0f) return;
+
+        Vector3 full = effects.GetInstances(handle, dualInstances) > 0 ? dualInstances[0].transform.localScale : new Vector3(1f, 1f, length);
+        var flight = new DualFlight { Handle = handle, FireTime = Time.time, FullScale = full, AppearDelay = BasicBodyAppearDelay(effects) };
+        SetDualBeamScale(effects, flight, 0f);
+        dualFlights.Add(flight);
+    }
+
+    private void SetDualBeamScale(EffectManager effects, in DualFlight flight, float elapsed)
+    {
+        Vector3 scale = elapsed < flight.AppearDelay
+            ? new Vector3(0.0001f, 0.0001f, 0.0001f)
+            : new Vector3(flight.FullScale.x, flight.FullScale.y,
+                          Mathf.Max(0.001f, flight.FullScale.z * Mathf.Clamp01(elapsed / beamTravelDuration)));
+        int count = effects.GetInstances(flight.Handle, dualInstances);
+        for (int i = 0; i < count; i++)
+            dualInstances[i].transform.localScale = scale;
+    }
+
+    // 평타 빔 몸통(size3D 켜진 시스템)이 처음 나오는 시각 = startDelay + 첫 버스트 시각 중 가장 이른 것. 엔트리에서 한 번 읽는다.
+    private float BasicBodyAppearDelay(EffectManager effects)
+    {
+        if (basicBodyAppearDelay >= 0f) return basicBodyAppearDelay;
+        if (!extraBeamHandle.IsSet || effects.GetInstances(extraBeamHandle, BeamInstances) == 0) return 0f;
+
+        float delay = float.MaxValue;
+        BeamInstances[0].GetComponentsInChildren(true, BeamSystems);
+        for (int k = 0; k < BeamSystems.Count; k++)
+        {
+            ParticleSystem ps = BeamSystems[k];
+            if (!ps.main.startSize3D) continue;
+            ParticleSystem.EmissionModule emission = ps.emission;
+            float burst = emission.burstCount > 0 ? emission.GetBurst(0).time : 0f;
+            delay = Mathf.Min(delay, ps.main.startDelay.constant + burst);
+        }
+        basicBodyAppearDelay = delay == float.MaxValue ? 0f : delay;
+        return basicBodyAppearDelay;
+    }
+
+    // 착탄은 빔이 끝점에 닿을 때(평타 착탄과 같은 박자).
+    private void QueueDualImpact(EffectEntry entry, Vector3 position, Quaternion rotation, in EffectTint tint, bool basicMonsterHit)
+    {
+        var impact = new DualImpact
+        {
+            At = Time.time + Mathf.Max(0f, beamTravelDuration), Entry = entry, Position = position,
+            Rotation = rotation, Tint = tint, BasicMonsterHit = basicMonsterHit,
+        };
+        if (beamTravelDuration <= 0f) PlayDualImpact(impact);
+        else dualImpacts.Add(impact);
+    }
+
+    private void PlayDualImpact(in DualImpact impact)
+    {
+        if (impact.BasicMonsterHit)
+        {
+            Tint(monsterHitPlayer, impact.Tint);
+            PlayAt(monsterHitPlayer, impact.Position, impact.Rotation);
+        }
+        if (EffectManager.TryGet(out EffectManager effects, this))
+            PlayDual(effects, impact.Entry, impact.Position, impact.Rotation, Vector3.one, impact.Tint);
+    }
+
+    // [LateUpdate] 날아가는 나선 빔 길이 + 닿은 착탄.
+    private void TickDualOutput()
+    {
+        if (dualFlights.Count > 0 && EffectManager.TryGet(out EffectManager effects, this))
+        {
+            for (int i = dualFlights.Count - 1; i >= 0; i--)
+            {
+                float elapsed = Time.time - dualFlights[i].FireTime;
+                SetDualBeamScale(effects, dualFlights[i], elapsed);
+                if (elapsed >= Mathf.Max(beamTravelDuration, dualFlights[i].AppearDelay)) dualFlights.RemoveAt(i);
+            }
+        }
+
+        for (int i = dualImpacts.Count - 1; i >= 0; i--)
+        {
+            if (Time.time < dualImpacts[i].At) continue;
+            DualImpact impact = dualImpacts[i];
+            dualImpacts.RemoveAt(i);
+            PlayDualImpact(impact);
+        }
+    }
+
+    // 원샷 — 축별 배율(빔 길이), 색이 있으면 칠한다.
+    private static void PlayDual(EffectManager effects, EffectEntry entry, Vector3 position, Quaternion rotation, Vector3 axisScale, in EffectTint tint)
+    {
+        if (entry == null) return;
+        EffectHandle handle = effects.PlayRecallable(entry, position, rotation, axisScale);
+        if (tint.IsSet) effects.SetTint(handle, tint);
+    }
+
+    // ── 한계 돌파 과열 색 ──
+
+    // 단계 색(0·표 없음 = 원래 색).
+    private EffectTint OverdriveTint(int stage) =>
+        overdriveColors != null ? overdriveColors.TintFor(stage) : EffectTint.None;
+
+    // [각 피어] 시전 순간 연출(Q 충전·R 시전)의 단계 — 한계 돌파일 때만 지금 단계(= 서버가 같은 순간 저장하는 CaptureStage).
+    // 과열 상태는 NetworkVariable 로 전 피어에 복제되고 단계는 각 피어가 같은 시계로 계산한다(GunnerHeat).
+    private int LocalOverdriveStage() =>
+        heat != null && heat.Traits.Mode == GunnerHeatMode.Overdrive ? heat.CaptureStage() : 0;
+
+    private static void Tint(EffectSocketPlayer player, in EffectTint tint)
+    {
+        if (player != null) player.SetTint(tint);
+    }
+
     private static void PlayAt(EffectSocketPlayer player, Vector3 position, Quaternion rotation)
     {
         if (player == null) return;
@@ -1016,7 +1361,15 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (sizeMultiplier <= 0f || player == null)
             return;
 
-        int count = player.GetInstances(BeamInstances);
+        StretchInstances(player.GetInstances(BeamInstances), sizeMultiplier, length);
+    }
+
+    // BeamInstances[0..count) 의 몸통을 늘인다 — 소켓 빔과 이중 출력 추가 발 빔(소켓 없는 원샷)이 같이 쓴다.
+    private void StretchInstances(int count, float sizeMultiplier, float length)
+    {
+        if (sizeMultiplier <= 0f)
+            return;
+
         for (int i = 0; i < count; i++)
         {
             GameObject instance = BeamInstances[i];
@@ -1146,6 +1499,15 @@ public class GunnerBeamView : BaseNetworkBehaviour
         {
             if (lines[i] != null && lines[i].enabled && Time.time >= hideTimes[i])
                 lines[i].enabled = false;
+        }
+
+        if (dualFlights.Count > 0 || dualImpacts.Count > 0)
+            TickDualOutput();
+
+        if (extraBeamStopAt >= 0f && EffectManager.TryGet(out EffectManager extraEffects, this))
+        {
+            if (Time.time < extraBeamStopAt) UpdateExtraBeam(extraEffects);
+            else FinishExtraBeam(extraEffects);
         }
 
         // 잔류 포격 구체 — 대상 이동·넉백을 따라간다(대상 움직임 뒤라 LateUpdate).

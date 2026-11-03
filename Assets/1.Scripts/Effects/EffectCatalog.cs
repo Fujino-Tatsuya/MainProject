@@ -56,6 +56,8 @@ public class EffectCatalog : ScriptableObject
     [Header("플레이어 — 방패 돌진(Q)")]
     [field: SerializeField] public EffectEntry ShieldDash_Trail { get; private set; }
     [field: SerializeField] public EffectEntry ShieldDash_Smash { get; private set; }
+    // 진격의 충격(PAL_4_Q_BLAST) — Q 끝 지점 앞 부채꼴 충격(PaladinSkillView, 배율 = 판정 부채꼴 range).
+    [field: SerializeField] public EffectEntry QBlast { get; private set; }
 
     [Header("플레이어 — 수호자의 의지(E)")]
     // Barrier 는 보호막이 떠 있는 동안의 루프, Break 는 피해로 깨질 때만 나가는 원샷이다.
@@ -139,6 +141,18 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Gunner_R_Zone { get; private set; }
     [field: SerializeField] public EffectEntry Gunner_R_Lock { get; private set; }
     [field: SerializeField] public EffectEntry Gunner_R_Strike { get; private set; }
+
+    [Header("플레이어 — 거너 이중 출력(GUN_4_EXTRA_BASIC)")]
+    // 기본 공격 3발마다 추가 레이저 — 총구 섬광 · 나선 빔(축별 배율 Z = 길이) · 멈춤 불티 · 몬스터 적중. GunnerBeamView 가 특성 연출 사건으로 낸다(여기는 프리웜용 등록).
+    [field: SerializeField] public EffectEntry Gunner_DualOutput_Beam { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_DualOutput_Muzzle { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_DualOutput_Hit { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_DualOutput_Stop { get; private set; }
+
+    [Header("플레이어 — 거너 잔류 포격(GUN_4_ECHO_Q)")]
+    // 몸에 붙은 폭탄이 터질 때 — 폭발 · 빈 폭발(대상이 먼저 사라짐). 구체 자체는 GunnerBeamView.echoBombVfxPrefab(복제). 여기는 프리웜용 등록.
+    [field: SerializeField] public EffectEntry Gunner_EchoBomb_Burst { get; private set; }
+    [field: SerializeField] public EffectEntry Gunner_EchoBomb_Fizzle { get; private set; }
 
     [Header("플레이어 — 상태이상(공용)")]
     // 상태 → 이펙트 표는 PlayerStatusEffectVfxSet(SO)가 들고, StatusEffectVfxPresenter 가 루프로 켜고 끈다. 여기는 prewarm 등록만(2026-10-20 민경).

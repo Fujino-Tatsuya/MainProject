@@ -21,6 +21,7 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
     private bool laserPending;
     private int pendingDamage;
     private int pendingStage;
+    private int pendingOverdriveStage;   // 한계 돌파 과열 색(연출만) — 한계 돌파가 아니면 0
     private Unit pendingTarget;
     private Vector3 castTargetPosition;
 
@@ -67,6 +68,7 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         // 2차 과열 모드(할 일 127 3/4): 한계 돌파 = 단계 배율표 교체, 정온 운용 = 0단계(과열 보너스 없음).
         GunnerHeatTraits heatTraits = heat != null ? heat.Traits : GunnerHeatTraits.From(owner.TraitModifiers);
         pendingStage = heatTraits.EffectiveStage(heat != null ? heat.CaptureStage() : 0);
+        pendingOverdriveStage = heatTraits.Mode == GunnerHeatMode.Overdrive ? pendingStage : 0;
         // 툴팁의 최소~최대 계산도 같은 과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것(GunnerTrackingLaserData).
         pendingDamage = Mathf.RoundToInt(damageSnapshot * heatTraits.SkillStageScale(pendingStage, data.StageDamageMultiplier(pendingStage)));
         pendingTarget = HasAimPoint ? null : target;
@@ -129,6 +131,11 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
             Destroy(instance);
             return;
         }
+
+        // 한계 돌파 과열 색(2026-11-03 민경) — 스폰 전에 써서 스폰 메시지에 같이 실린다(첫 피해·낙뢰가 스폰과 같은 프레임이라).
+        GunnerTrackingLaserView laserView = instance.GetComponent<GunnerTrackingLaserView>();
+        if (laserView != null)
+            laserView.ServerSetOverdriveStage(pendingOverdriveStage);
 
         if (owner.IsSpawned)
             networkObject.Spawn(true); // destroyWithScene — 씬 전환 시 함께 제거(§9.6)

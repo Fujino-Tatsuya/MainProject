@@ -174,3 +174,4 @@ MonoBehaviour:
   lockScaleMax: 3
   fallbackBodyRadius: 0.5
   strikeScale: 1
+  overdriveColors: {fileID: 11400000, guid: 04c5f7c72031487c923d4ee6481d5e20, type: 2}
