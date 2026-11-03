@@ -261,7 +261,7 @@ public sealed class InterruptCameraCenterTrackerTests
             director.CameraCenterEnabled = false;
             ((IInterruptOwnerCueSink)director).OwnerAttempt(StrongCue(target));
             Assert.AreEqual(InterruptCameraCenterState.Idle, director.CameraCenterState);
-            Assert.AreEqual(Vector3.zero, director.StepCameraCenter(follow.transform, false, 1f));
+            Assert.AreEqual(Vector3.zero, director.StepCameraCenter(follow.transform.position, false, 1f));
         }
         finally
         {
@@ -284,10 +284,10 @@ public sealed class InterruptCameraCenterTrackerTests
             Assert.IsTrue(director.CameraCenterEnabled);
             ((IInterruptOwnerCueSink)director).OwnerAttempt(StrongCue(target));
             Assert.AreEqual(InterruptCameraCenterState.Centering, director.CameraCenterState);
-            director.StepCameraCenter(follow.transform, false, Time.unscaledTime);
-            Near(new Vector3(3f, 0f, 0f), director.StepCameraCenter(follow.transform, false, Time.unscaledTime + 10f));
+            director.StepCameraCenter(follow.transform.position, false, Time.unscaledTime);
+            Near(new Vector3(3f, 0f, 0f), director.StepCameraCenter(follow.transform.position, false, Time.unscaledTime + 10f));
 
-            Assert.AreEqual(Vector3.zero, director.StepCameraCenter(follow.transform, true, Time.unscaledTime + 10f));
+            Assert.AreEqual(Vector3.zero, director.StepCameraCenter(follow.transform.position, true, Time.unscaledTime + 10f));
             Assert.AreEqual(InterruptCameraCenterState.Idle, director.CameraCenterState, "연출 뒤 평소 중심 그대로");
         }
         finally
@@ -309,7 +309,7 @@ public sealed class InterruptCameraCenterTrackerTests
             var director = go.AddComponent<InterruptProductionDirector>();
             ((IInterruptOwnerCueSink)director).OwnerAttempt(StrongCue(target));
             Object.DestroyImmediate(target);
-            director.StepCameraCenter(follow.transform, false, Time.unscaledTime);
+            director.StepCameraCenter(follow.transform.position, false, Time.unscaledTime);
             Assert.AreEqual(InterruptCameraCenterState.Returning, director.CameraCenterState);
         }
         finally

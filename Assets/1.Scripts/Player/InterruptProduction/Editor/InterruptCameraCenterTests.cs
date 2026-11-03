@@ -132,7 +132,94 @@ public sealed class InterruptCameraCenterTests
             InterruptCameraCenterRules.SuccessReturnDelay(success), 1e-5f);
     }
 
-    // ---- 5. 칸 기본값 ----
+    // ---- 5. 기준점 = 카메라가 따라간 지점(196 후속) ----
+
+    private static readonly Vector3 FollowOffset = new Vector3(0f, 12f, -9f);
+
+    // 화면 중심(수평) = 따라간 지점 + 이번 이동량(y 0) — 카메라 스위처·트래커와 같은 계산.
+    private static Vector3 ScreenCenterAfterShift(Vector3 followed, float ratio, out Vector3 shift)
+    {
+        shift = InterruptCameraCenterRules.CenterToward(followed, Target, ratio) - followed;
+        shift.y = 0f;
+        return followed + shift;
+    }
+
+    [Test]
+    public void 기준점은_vcam_위치에서_적용_중_오프셋을_뺀_지점()
+    {
+        var followed = new Vector3(1.5f, 0.3f, -2f);
+        float zoom = 0.85f;
+        var shift = new Vector3(0.7f, 0f, 0.4f);
+        Vector3 raw = followed + FollowOffset * zoom + shift;
+        Assert.That(Vector3.Distance(followed, InterruptCameraCenterRules.FollowedPoint(raw, FollowOffset, zoom, shift)), Is.LessThan(1e-5f));
+        Assert.That(Vector3.Distance(followed, InterruptCameraCenterRules.FollowedPoint(followed + FollowOffset, FollowOffset, 1f, Vector3.zero)),
+            Is.LessThan(1e-5f), "평소(배율 1·이동량 0)");
+    }
+
+    [Test]
+    public void 뒤처져도_비율_1이면_대상이_화면_정중앙()
+    {
+        var player = new Vector3(2f, 0f, 1f);
+        var followed = new Vector3(0.5f, 0f, -0.5f); // 감쇠로 뒤처진 지점 ≠ 플레이어 실제 위치
+        Assert.AreNotEqual(player, followed);
+        Vector3 raw = followed + FollowOffset * 0.85f + new Vector3(1f, 0f, 1f);
+        Vector3 basePoint = InterruptCameraCenterRules.FollowedPoint(raw, FollowOffset, 0.85f, new Vector3(1f, 0f, 1f));
+
+        Vector3 center = ScreenCenterAfterShift(basePoint, 1f, out Vector3 shift);
+        Assert.AreEqual(0f, shift.y);
+        Assert.That(Vector2.Distance(new Vector2(Target.x, Target.z), new Vector2(center.x, center.z)), Is.LessThan(1e-5f));
+    }
+
+    [Test]
+    public void 뒤처져도_비율_반이면_따라간_지점과_대상의_정중간()
+    {
+        var followed = new Vector3(-1f, 0f, 3f);
+        Vector3 raw = followed + FollowOffset * 1.2f + new Vector3(-0.5f, 0f, 0.25f);
+        Vector3 basePoint = InterruptCameraCenterRules.FollowedPoint(raw, FollowOffset, 1.2f, new Vector3(-0.5f, 0f, 0.25f));
+
+        Vector3 center = ScreenCenterAfterShift(basePoint, 0.5f, out Vector3 shift);
+        Assert.AreEqual(0f, shift.y);
+        Vector3 mid = (followed + Target) * 0.5f;
+        Assert.That(Vector2.Distance(new Vector2(mid.x, mid.z), new Vector2(center.x, center.z)), Is.LessThan(1e-5f));
+    }
+
+    [Test]
+    public void 기준점에_높이_차가_있어도_이동량_y는_0()
+    {
+        var followed = new Vector3(0f, 1.7f, 0f);
+        Vector3 raw = followed + FollowOffset;
+        Vector3 basePoint = InterruptCameraCenterRules.FollowedPoint(raw, FollowOffset, 1f, Vector3.zero);
+        ScreenCenterAfterShift(basePoint, 1f, out Vector3 shift);
+        Assert.AreEqual(0f, shift.y);
+    }
+
+    [Test]
+    public void 디렉터_기준점_없으면_취소()
+    {
+        var go = new GameObject("InterruptCameraCenterTests.Director");
+        var target = new GameObject("Target");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            director.CameraCenterEnabled = true;
+            var cue = new InterruptOwnerCue
+            {
+                Result = new InterruptJudgeResult { Outcome = InterruptJudgeOutcome.Success },
+                Target = target,
+            };
+            ((IInterruptOwnerCueSink)director).OwnerAttempt(cue);
+            Assert.AreEqual(InterruptCameraCenterState.Centering, director.CameraCenterState);
+            Assert.AreEqual(Vector3.zero, director.StepCameraCenter(null, false, Time.unscaledTime));
+            Assert.AreEqual(InterruptCameraCenterState.Idle, director.CameraCenterState);
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+            Object.DestroyImmediate(target);
+        }
+    }
+
+    // ---- 6. 칸 기본값 ----
 
     [Test]
     public void 슬로우_SO_카메라_중심_칸_기본값()

@@ -79,6 +79,14 @@ public static class InterruptCameraCenterRules
     public static bool Applies(InterruptAttemptForecast forecast, bool switchOn, bool isOwner) =>
         switchOn && isOwner && (forecast == InterruptAttemptForecast.Strong || forecast == InterruptAttemptForecast.Weak);
 
+    /// <summary>
+    /// 평소 중심 = 카메라가 실제로 따라간 지점(196 후속) — 플레이어 실제 위치가 아니다. 팔로우 감쇠(PositionDamping)가 있어 이동 중·대쉬·
+    /// 슬로우(감쇠도 느려짐) 때 카메라가 플레이어보다 뒤처지므로, 플레이어 기준으로 옮기면 뒤처짐만큼 대상에서 빗나간다.
+    /// 따라간 지점 = vcam 위치(State.RawPosition) − 지금 적용 중인 팔로우 오프셋(원래 오프셋 × 줌 배율 + 중심 이동량, World Space 바인딩).
+    /// </summary>
+    public static Vector3 FollowedPoint(Vector3 cameraRawPosition, Vector3 baseFollowOffset, float appliedZoomMultiplier, Vector3 appliedCenterShift) =>
+        cameraRawPosition - (baseFollowOffset * appliedZoomMultiplier + appliedCenterShift);
+
     /// <summary>평소 중심과 대상 위치 사이 비율 보간. 비율은 [0, 1]로 자르고 NaN 은 0(그대로).</summary>
     public static Vector3 CenterToward(Vector3 baseCenter, Vector3 targetPosition, float ratio) =>
         Vector3.Lerp(baseCenter, targetPosition, ClampRatio(ratio));

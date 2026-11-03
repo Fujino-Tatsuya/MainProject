@@ -355,7 +355,7 @@ public class CameraTargetSwitcher : MonoBehaviour
         float multiplier = slowMultiplier * hitZoomMultiplier * cinematicDistanceMultiplier;
         // 간파 카메라 대상 중심(할 일 196) — 줌과 독립으로 중심만 옮긴다(오프셋은 World Space 바인딩이라 월드 이동량을 그대로 더한다).
         // 다른 연출이 카메라를 잡고 있으면(연출 vcam·낙하 뷰·관전·임시 추적) 디렉터가 진행 중인 이동을 버리고 0 을 준다.
-        Vector3 centerShift = InterruptProductionDirector.OwnerCameraCenterShift(GetCurrentTarget(),
+        Vector3 centerShift = InterruptProductionDirector.OwnerCameraCenterShift(GetCameraFollowedPoint(),
             IsInCinematic || IsInFallView || IsSpectatorMode || HasTemporaryFollow);
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다(이동량도 Equals = 정확 비교).
@@ -723,6 +723,25 @@ public class CameraTargetSwitcher : MonoBehaviour
         }
 
         return cameraFollowTargets[currentTargetIndex];
+    }
+
+    // 간파 카메라 대상 중심의 기준점(196 후속) = 플레이어 vcam 이 감쇠로 실제 따라간 지점(직전 프레임에 넣은 오프셋을 뺀다).
+    // 추적 대상이 없으면 null(디렉터가 취소). vcam·팔로우가 아직 없으면 추적 대상 위치로 대신한다.
+    private Vector3? GetCameraFollowedPoint()
+    {
+        Transform target = GetCurrentTarget();
+        if (target == null)
+        {
+            return null;
+        }
+
+        if (playerCamera == null || playerCameraFollow == null)
+        {
+            return target.position;
+        }
+
+        return InterruptCameraCenterRules.FollowedPoint(playerCamera.State.RawPosition, basePlayerFollowOffset,
+            appliedZoomMultiplier, appliedCenterShift);
     }
 
     private void CacheFixedCameraRotation()

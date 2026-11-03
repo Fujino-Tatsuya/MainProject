@@ -894,10 +894,11 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - **시작**: 매니저 오너 시도 cue — 근접 = 누른 순간, 대쉬 = 대시에 실린 순간(`ArmDashAttach`). 강·약 예측 모두, 대상 없음 = 그대로. 대상 = 예측이 고른 캐시 대상 — 움직이면 따라가고 사라지면(파괴·비활성) 복귀. 새 시도는 지금 이동량에서 이전 상태를 대체한다.
 - **복귀**: 판정 실패·서버 거부·CC 끊김(`CrowdControl`)·판정 버림(`JudgeDropped`)·강제 리셋·cue 없는 종료(시전 거부 등) = **그 순간**. 판정 성공 = **내 성공 슬로우가 복귀(Exit) 구간에 들어가는 순간**까지 유지 — 이 화면에 내 성공 슬로우가 안 보이면(거부·잠금) 성공 프로필 시간표 `SuccessReturnDelay`(히트스톱 + 진입 + 유지) 뒤.
 - **오프셋 방식**: 오너 줌과 같은 경로 — `FollowOffset`(World Space) = 기본 오프셋 × 줌 배율 + 이동량. 이동량은 수평(XZ)만, 복귀가 끝나면 정확히 0 → 원래 오프셋.
+- **기준점(196 후속)**: 이동량 = (대상 − **카메라가 실제로 따라간 지점**) × 비율. 따라간 지점 = 플레이어 vcam `State.RawPosition` − 직전에 넣은 오프셋(기본 × 줌 배율 + 이동량) — `InterruptCameraCenterRules.FollowedPoint`. 플레이어 실제 위치를 쓰면 팔로우 감쇠(PositionDamping 1, 슬로우 때 감쇠도 느려짐)로 뒤처진 만큼 이동·대쉬 간파 때 대상에서 빗나가고 슬로우가 풀릴 때 중심이 쓸려 갔다.
 - **다른 카메라 연출과 충돌**: `cameraBusy` = 연출 vcam(`IsInCinematic`) ∨ 낙하 뷰 ∨ 관전 ∨ 임시 추적(`HasTemporaryFollow`)이면 진행 중인 이동을 **즉시 버리고 0**(그 연출이 끝나도 되살리지 않는다). 추적 대상이 없을 때도 같다.
 - **데이터 테이블**: SO ④ 칸 3개는 `SlowMotion` 시트(대상 열 `InterruptSlowMotionSettings`)의 **새 행 후보** — 행이 없으면 SO 값으로 돈다. development 병합 때 병합 Export 한 번(버려진 값 0 확인).
 - 랩: 튜닝 패널 효과 줄 밑 **"카메라 대상 중심 (196)"** 토글 — 이 피어 런타임 값만, 다음 간파부터. '전부 켬'·'암전만' 은 건드리지 않는다.
-- 테스트: `InterruptCameraCenterTests`(복귀 시점표·비율·스위치·오너·SO 기본값) · `InterruptCameraCenterTrackerTests`(이동·유지·복귀·대체·소실) · 랩 토글 `DebugInterruptLabTests`.
+- 테스트: `InterruptCameraCenterTests`(복귀 시점표·비율·기준점·스위치·오너·SO 기본값) · `InterruptCameraCenterTrackerTests`(이동·유지·복귀·대체·소실) · 랩 토글 `DebugInterruptLabTests`.
 
 **알려진 한계**
 - 시네마틱 블렌드로 들어가는 첫 프레임에 이동량이 0 으로 꺼지면서 화면이 한 번 튈 수 있다.

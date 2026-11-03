@@ -14,20 +14,21 @@ public sealed partial class InterruptProductionDirector
 
     /// <summary>
     /// [오너] 카메라 대상 중심 이동량(할 일 196) — 카메라가 매 프레임 묻고 플레이어 vcam 팔로우 오프셋에 더한다(월드, 수평).
-    /// <paramref name="followTarget"/> = 지금 카메라 추적 대상(평소 중심). <paramref name="cameraBusy"/> = 다른 연출이 카메라를 잡고 있음
+    /// <paramref name="followPoint"/> = 평소 중심 = 카메라가 실제로 따라간 지점(<see cref="InterruptCameraCenterRules.FollowedPoint"/>, 196 후속),
+    /// 추적 대상이 없으면 null. <paramref name="cameraBusy"/> = 다른 연출이 카메라를 잡고 있음
     /// (연출 vcam·낙하 뷰·관전·임시 추적) — 그러면 진행 중인 중심 이동을 즉시 버리고 0(그 연출 뒤엔 평소 중심 그대로).
     /// 인스턴스가 없으면 0.
     /// </summary>
-    public static Vector3 OwnerCameraCenterShift(Transform followTarget, bool cameraBusy) =>
-        Instance != null ? Instance.StepCameraCenter(followTarget, cameraBusy, Time.unscaledTime) : Vector3.zero;
+    public static Vector3 OwnerCameraCenterShift(Vector3? followPoint, bool cameraBusy) =>
+        Instance != null ? Instance.StepCameraCenter(followPoint, cameraBusy, Time.unscaledTime) : Vector3.zero;
 
     /// <summary>[테스트] 이 인스턴스 기준 <see cref="OwnerCameraCenterShift"/>.</summary>
-    public Vector3 StepCameraCenter(Transform followTarget, bool cameraBusy, float now)
+    public Vector3 StepCameraCenter(Vector3? followPoint, bool cameraBusy, float now)
     {
         if (_cameraCenter.State == InterruptCameraCenterState.Idle)
             return Vector3.zero;
 
-        if (cameraBusy || followTarget == null)
+        if (cameraBusy || !followPoint.HasValue)
         {
             CancelCameraCenter();
             return Vector3.zero;
@@ -35,7 +36,7 @@ public sealed partial class InterruptProductionDirector
 
         Transform target = _cameraCenterTarget;
         bool alive = target != null && target.gameObject.activeInHierarchy;
-        return _cameraCenter.Step(now, followTarget.position, alive, alive ? target.position : Vector3.zero);
+        return _cameraCenter.Step(now, followPoint.Value, alive, alive ? target.position : Vector3.zero);
     }
 
     // 시도 cue(근접 = 누른 순간, 대쉬 = 대시에 실린 순간) — 오너 cue 경로만 부르므로 늘 오너. 새 시도가 이전 상태를 대체한다.
