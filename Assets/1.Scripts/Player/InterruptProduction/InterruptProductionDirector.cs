@@ -389,7 +389,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     /// <summary>적중 라이트 연출 진행기(V1·V2) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
     public InterruptHitLightPlayer HitLight => _hitLight ??=
-        new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared);
+        new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared,
+            new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)));
 
     private InterruptHitLightFx EnsureHitLightFx()
     {
@@ -457,7 +458,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerGate?.Sync(); // 오너 암전 칸을 Play 중에 바꾸면 바로(§17)
         _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock), Time.frameCount);
         _suppressFlash?.Tick(Time.unscaledTime); // 제압 간파 섬광 = 실제 시간(슬로우·히트스톱 무관, 할 일 179)
-        _hitLight?.Tick(Time.unscaledTime); // 적중 라이트 연출 = 실제 시간(할 일 194 Q8)
+        _hitLight?.Tick(Time.unscaledTime, Time.frameCount); // 적중 라이트 연출 = 실제 시간(할 일 194 Q8), V2 화이트아웃 = 렌더 프레임 수
     }
 
     private void OnDisable()
@@ -994,7 +995,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             ViewerIsCaster = viewerIsCaster,
             Look = look,
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
-        }, Time.unscaledTime);
+        }, Time.unscaledTime, Time.frameCount);
     }
 
     // 빛 모임 — 발동자 소유의 켜진 InterruptLightGatherSocket(Player.prefab base 루트). 찾는 방식은 FindSuccessFxSinks 와 같다.

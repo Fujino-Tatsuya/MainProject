@@ -311,6 +311,90 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash));
     }
 
+    // ---- 단계 6 — V2 화이트아웃 ----
+
+    private sealed class FakeOverlay : IInterruptHitFlashOverlayOutput
+    {
+        public readonly List<InterruptHitFlashStage> Shown = new List<InterruptHitFlashStage>();
+        public int Hides;
+
+        public void Show(InterruptHitFlashStage stage, float progress, Vector3 worldCenter, Vector3 worldDirection) => Shown.Add(stage);
+        public void Hide() => Hides++;
+    }
+
+    [Test]
+    public void V2_화이트아웃은_본인_화면에_3프레임_뒤_숨긴다()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        Assert.AreEqual(3, look.WhiteoutFrames, "기본 3프레임(Q12)");
+        var overlay = new FakeOverlay();
+        var player = new InterruptHitLightPlayer(() => look, () => null, null, null, overlay);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLightWhiteout, ViewerIsCaster = true }, 0f, 100);
+        player.Tick(0.016f, 101);
+        player.Tick(0.033f, 102);
+        Assert.AreEqual(3, overlay.Shown.Count);
+        Assert.IsTrue(overlay.Shown.TrueForAll(s => s == InterruptHitFlashStage.Whiteout), "③ 그림 재사용");
+        Assert.IsTrue(player.WhiteoutShown);
+        Assert.AreEqual(0, overlay.Hides);
+
+        player.Tick(0.05f, 103);
+        Assert.AreEqual(3, overlay.Shown.Count);
+        Assert.AreEqual(1, overlay.Hides);
+        Assert.IsFalse(player.WhiteoutShown);
+
+        player.Tick(1f, 160);
+        Assert.IsFalse(player.IsPlaying);
+        Assert.AreEqual(1, overlay.Hides, "숨김은 한 번");
+    }
+
+    [TestCase(InterruptSuccessLook.HitLightWhiteout, false)] // 팀원 화면
+    [TestCase(InterruptSuccessLook.HitLight, true)]          // V1
+    public void 화이트아웃_없는_경우(InterruptSuccessLook successLook, bool viewerIsCaster)
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var overlay = new FakeOverlay();
+        var player = new InterruptHitLightPlayer(() => look, () => null, null, null, overlay);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest { Look = successLook, ViewerIsCaster = viewerIsCaster }, 0f, 1);
+        player.Tick(0.016f, 2);
+
+        Assert.AreEqual(0, overlay.Shown.Count);
+        Assert.AreEqual(0, overlay.Hides);
+    }
+
+    [Test]
+    public void 강제_리셋은_화이트아웃을_바로_숨긴다()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var overlay = new FakeOverlay();
+        var player = new InterruptHitLightPlayer(() => look, () => null, null, null, overlay);
+        _players.Add(player);
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLightWhiteout, ViewerIsCaster = true }, 0f, 1);
+
+        player.Stop();
+
+        Assert.AreEqual(1, overlay.Hides);
+        Assert.IsFalse(player.WhiteoutShown);
+    }
+
+    [Test]
+    public void 화이트아웃_전용_칸은_3번만_켜고_재질은_디렉터_값()
+    {
+        var go = new GameObject("Director");
+        _objects.Add(go);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        var settings = new InterruptHitLightWhiteoutSettings(director);
+
+        Assert.IsTrue(settings.IsEffectOn(InterruptPresentationEffect.Whiteout), "V0 ③ 칸이 꺼져 있어도 그린다");
+        Assert.IsFalse(settings.IsEffectOn(InterruptPresentationEffect.Starburst));
+        Assert.IsFalse(settings.IsEffectOn(InterruptPresentationEffect.Smear));
+        Assert.IsTrue(InterruptPresentationEffectRules.StageVisible(settings, InterruptHitFlashStage.Whiteout));
+        Assert.AreEqual(director.HitFlashBlurStrength, settings.HitFlashBlurStrength);
+    }
+
     // ---- 단계 4 — 불꽃·메시 파편 ----
 
     private static ParticleSystem PrefabSystem(string child)

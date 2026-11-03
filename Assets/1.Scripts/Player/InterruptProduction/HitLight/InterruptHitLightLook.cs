@@ -51,7 +51,12 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [Tooltip("낮춤 곡선 — 가로 = 진행(0~1), 세로 = 낮춤 비율 대비 배율. 끝에서 0 이 되게")]
     [SerializeField] private AnimationCurve sceneDimCurve = Decay();
 
+    [Header("V2 화이트아웃(본인 화면)")]
+    [Tooltip("V2 적중 화이트아웃 길이(렌더 프레임 수) — 기존 ③ 화이트아웃 그림을 재사용(③ 칸과 무관하게 그린다). 0 = 없음")]
+    [SerializeField, Min(0)] private int whiteoutFrames = 3;
+
     public Color LightColor => lightColor;
+    public int WhiteoutFrames => whiteoutFrames;
     public float LightIntensity => lightIntensity;
     public float LightRange => lightRange;
     public LightShadows LightShadows => lightShadows;
