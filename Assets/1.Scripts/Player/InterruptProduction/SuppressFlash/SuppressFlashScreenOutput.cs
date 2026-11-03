@@ -5,7 +5,8 @@ using UnityEngine;
 /// <summary>
 /// 제압 간파 섬광 렌더 출력(할 일 179) — <see cref="SuppressFlashPlayer"/> 의 <see cref="ISuppressFlashOutput"/>.
 /// <list type="bullet">
-/// <item>시작: 실루엣 대상 렌더러에 렌더링 레이어 비트 7(<see cref="SuppressFlashMaskLayers"/>)을 붙인다 — 132 암전 태거를 다른 비트로 재사용.</item>
+/// <item>시작: 실루엣 대상 렌더러에 렌더링 레이어 비트 7(<see cref="SuppressFlashMaskLayers"/>)을 붙인다 — 132 암전 태거를 다른 비트로 재사용.
+///       A7 대상 내부만이면 넘겨받은 루트가 간파 대상뿐이라 같은 비트 7 마스크가 곧 '그릴 범위'가 된다(새 비트 없음).</item>
 /// <item>매 프레임: 적중점을 이 화면 카메라(Camera.main)로 뷰포트에 투영하고 컷 모양 + 시퀀스 모양 칸을 <see cref="SuppressFlashState"/> 에 쓴다.
 ///       렌더 기능(<see cref="DarkAdaptationFeature"/>)의 전체 화면 패스 1개가 그린다.</item>
 /// <item>끝: 비트 원복·상태 끔.</item>
@@ -26,9 +27,13 @@ public sealed class SuppressFlashScreenOutput : ISuppressFlashOutput
     /// <summary>지금 비트를 붙인 렌더러 수.</summary>
     public int TaggedCount => _tagger.Count;
 
-    public void SetSubjects(IReadOnlyList<GameObject> subjects)
+    /// <summary>이번 재생의 그리는 범위(A7).</summary>
+    public SuppressFlashMaskMode MaskMode { get; private set; }
+
+    public void SetSubjects(IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode)
     {
         _tagger.RestoreAll();
+        MaskMode = mode;
         _seedBase = (_seedBase + 17) % 997; // 재생마다 별·집중선 모양이 조금씩 달라지게
         if (subjects == null)
             return;
@@ -53,7 +58,7 @@ public sealed class SuppressFlashScreenOutput : ISuppressFlashOutput
         float aspect = camera != null ? Mathf.Max(1e-4f, camera.aspect) : 16f / 9f;
 
         SuppressFlashState.Material = material;
-        SuppressFlashState.Params = Build(frame, sequence, center, aspect, _seedBase + frame.CutIndex * 7 + 1);
+        SuppressFlashState.Params = Build(frame, sequence, center, aspect, _seedBase + frame.CutIndex * 7 + 1, MaskMode);
         SuppressFlashState.Active = true;
     }
 
@@ -64,10 +69,12 @@ public sealed class SuppressFlashScreenOutput : ISuppressFlashOutput
     }
 
     /// <summary>컷 모양 + 시퀀스 칸 → 셰이더 파라미터(순수 — 테스트용으로 공개).</summary>
-    public static SuppressFlashParams Build(in SuppressFlashFrame frame, SuppressFlashSequence s, Vector2 center, float aspect, int seed)
+    public static SuppressFlashParams Build(in SuppressFlashFrame frame, SuppressFlashSequence s, Vector2 center, float aspect, int seed,
+        SuppressFlashMaskMode mode = SuppressFlashMaskMode.FullScreen)
     {
         return new SuppressFlashParams
         {
+            Mask = new Vector4(mode == SuppressFlashMaskMode.TargetInterior ? 1f : 0f, 0f, 0f, 0f),
             Center = new Vector4(center.x, center.y, aspect, seed),
             Tone = new Vector4(frame.Invert ? 1f : 0f, frame.Contrast, frame.ReturnBlend, frame.Hatching ? 1f : 0f),
             Fx = new Vector4(s.starRadius * frame.StarSize, frame.SpeedLines, s.aberrationScale * frame.Aberration,

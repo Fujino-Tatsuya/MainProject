@@ -109,6 +109,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("A6 제압 간파 섬광 시퀀스(할 일 179) — 켜면 제압 간파 성공 때 일반 성공 섬광 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). " +
              "끄면 제압 간파도 일반 간파와 같은 연출(②~⑥·오너 암전 규칙 그대로). 성공 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 섬광 줄이기와 독립")]
     [DataTableIgnore, SerializeField] private bool suppressFlash = true;
+    [Tooltip("A7 섬광 = 대상 내부만(179/192 후속) — 켜면 제압 간파 섬광 시퀀스를 간파 대상(보스·허수아비) 실루엣 안에만 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). " +
+             "레터박스는 그대로. 끄면 전체 화면. 재생 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 이 화면에서 대상을 못 찾으면 전체 화면")]
+    [DataTableIgnore, SerializeField] private bool suppressFlashTargetOnly;
 
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
@@ -249,6 +252,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         set => suppressFlash = value;
     }
 
+    /// <summary>A7 섬광 = 대상 내부만(179/192 후속) — 런타임 값(저장하지 않음, 디버그·테스트). Play 중 바꾸면 다음 재생부터.</summary>
+    public bool SuppressFlashTargetOnly
+    {
+        get => suppressFlashTargetOnly;
+        set => suppressFlashTargetOnly = value;
+    }
+
     /// <summary>
     /// 이번 성공이 제압 간파 섬광 시퀀스인가(아니면 일반 ②~⑥). 성공 시작 순간 A6 칸·컷 데이터를 읽는다 — 섬광 줄이기와 무관.
     /// </summary>
@@ -361,6 +371,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     private SuppressFlashPlayer _suppressFlash;
     private readonly SuppressInterruptMark _suppressMark = new SuppressInterruptMark();
     private readonly List<GameObject> _suppressSubjects = new List<GameObject>();
+    private readonly List<GameObject> _suppressTargets = new List<GameObject>();
+    private readonly List<GameObject> _suppressMaskRoots = new List<GameObject>();
     private readonly List<InterruptTargetRegistry.Entry> _targetBuffer = new List<InterruptTargetRegistry.Entry>();
 
     /// <summary>제압 간파 섬광 진행기 — 공용 성공 사건(제압 간파)에 시작, 매 프레임 실제 시간으로 진행.</summary>
@@ -827,12 +839,14 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     // 제압 간파 섬광 시작(할 일 179, 모든 피어) — 시퀀스 첫 프레임이 섬광 순간을 대신한다: 오너 암전 걷힘(본인 화면)·월드 섬광(모든 피어).
     // 시퀀스 중엔 암순응을 틀지 않는다(화면을 통째로 3단 색으로 바꾼다). 시퀀스가 끝나면 제압 암순응 컷(할 일 192 Q7 — 진행기가 이어 튼다, 모든 피어).
-    // 실루엣 = 마스크 대상 목록(지금은 오너 + 간파 대상).
+    // 실루엣 = 마스크 대상 목록(지금은 오너 + 간파 대상). A7 대상 내부만이면 마스크 = 간파 대상만(그 안에만 그린다).
     private void BeginSuppressFlash(in InterruptProductionEvent e, bool viewerIsCaster)
     {
         Vector3 point = FlashPoint(e.TargetPosition);
-        CollectSuppressSubjects(e.CasterClientId, e.TargetPosition, _suppressSubjects);
-        SuppressFlash.Begin(Time.unscaledTime, point, _suppressSubjects, e.CasterClientId, e.TargetPosition);
+        CollectSuppressSubjects(e.CasterClientId, e.TargetPosition, _suppressSubjects, _suppressTargets);
+        SuppressFlashMaskMode mode = SuppressFlashRules.SelectMaskMode(suppressFlashTargetOnly, _suppressTargets.Count > 0);
+        SuppressFlashRules.SelectMaskRoots(mode, _suppressSubjects, _suppressTargets, _suppressMaskRoots);
+        SuppressFlash.Begin(Time.unscaledTime, point, _suppressMaskRoots, e.CasterClientId, e.TargetPosition, mode);
 
         // 오너 암전 걷기 — 지금 성공 단계의 발동 번호(서버 성공 = 슬로우 번호, 오너 판정 cue = 로컬 번호)로.
         if (viewerIsCaster && _ownerPresentation != null)
@@ -843,10 +857,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>
     /// 제압 간파 섬광 실루엣 대상(할 일 179) — 발동자 플레이어 오브젝트 + 적중점에 가장 가까운 간파 대상(등록 캐시).
     /// 191(간파 동시 성공) 이후 동시 성공자는 이 목록에 더하면 된다 — 출력은 목록만 받는다.
+    /// <paramref name="targets"/> = 그중 간파 대상만(A7 대상 내부만 마스크) — 동시 성공자는 여기에 넣지 않는다.
     /// </summary>
-    private void CollectSuppressSubjects(ulong casterClientId, Vector3 targetPosition, List<GameObject> results)
+    private void CollectSuppressSubjects(ulong casterClientId, Vector3 targetPosition, List<GameObject> results,
+        List<GameObject> targets)
     {
         results.Clear();
+        targets.Clear();
         NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
         if (spawnManager != null)
         {
@@ -876,7 +893,10 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
         _targetBuffer.Clear();
         if (nearest != null)
+        {
             results.Add(nearest.gameObject);
+            targets.Add(nearest.gameObject);
+        }
     }
 
     // 성공 기준 위치(판정 순간 대상 위치)에서 이 피어의 대상까지 허용 거리 — 복제 지연으로 조금 어긋나도 찾는다.

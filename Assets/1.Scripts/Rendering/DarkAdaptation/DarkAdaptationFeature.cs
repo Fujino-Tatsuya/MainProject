@@ -142,6 +142,7 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
 
     // 제압 간파 섬광(할 일 179) — ① 비트 7 렌더러를 덮어쓰기 재질(패스 1)로 실루엣 마스크 RT 에 흰색 칠(깊이 없음)
     // ② 카메라 컬러(후처리 뒤) + 마스크 → 3단 색 합성(패스 0)으로 교체. 마스크는 그래프 전역 텍스처로 넘긴다.
+    //    A7 대상 내부만(179/192 후속)이면 같은 마스크(간파 대상만 태깅)를 '그릴 범위'로 쓴다 — 패스는 그대로, _SFMask.x 만 다르다.
     private sealed class SuppressFlashPass : ScriptableRenderPass
     {
         private static readonly Vector4 FullScreenScaleBias = new Vector4(1f, 1f, 0f, 0f);
@@ -153,6 +154,7 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
         private static readonly int IdShape = Shader.PropertyToID("_SFShape");
         private static readonly int IdLook = Shader.PropertyToID("_SFLook");
         private static readonly int IdThresholds = Shader.PropertyToID("_SFThresholds");
+        private static readonly int IdMaskMode = Shader.PropertyToID("_SFMask");
         private static readonly int IdDark = Shader.PropertyToID("_SFDark");
         private static readonly int IdMid = Shader.PropertyToID("_SFMid");
         private static readonly int IdLight = Shader.PropertyToID("_SFLight");
@@ -256,6 +258,7 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
                     d.material.SetVector(IdShape, p.Shape);
                     d.material.SetVector(IdLook, p.Look);
                     d.material.SetVector(IdThresholds, p.Thresholds);
+                    d.material.SetVector(IdMaskMode, p.Mask);
                     d.material.SetColor(IdDark, p.Dark);
                     d.material.SetColor(IdMid, p.Mid);
                     d.material.SetColor(IdLight, p.Light);

@@ -4,7 +4,8 @@ using UnityEngine;
 /// 제압 간파 섬광 실루엣(할 일 179)의 렌더링 레이어 비트 7 — 132 오너 암전 남김(비트 4)과 같은 방식(<see cref="InterruptOwnerMaskTagger"/>)을 다른 비트로 쓴다.
 /// 오너 화면에서 암전 원복(비트 4)과 섬광 실루엣이 서로의 비트를 지우지 않게 나눴다.
 /// 비트 배치: <see cref="InterruptOwnerMaskLayers"/> 표 + 4·5·6 = 보스 처치 연출(BossVictoryRender, 그 연출 동안만) / <b>7 = 제압 간파 섬광 실루엣</b> / 8 = Ground.
-/// ⚠️ 렌더링 레이어가 Everything 인 렌더러(일부 VFX)는 이 비트도 이미 갖고 있어 실루엣에 같이 칠해진다.
+/// ⚠️ 렌더링 레이어가 Everything 인 렌더러(일부 VFX)는 이 비트도 이미 갖고 있어 실루엣에 같이 칠해진다(A7 대상 내부만이면 그 VFX 자리에도 섬광이 그려진다).
+/// A7 대상 내부만(179/192 후속)도 같은 비트를 쓴다 — 그때는 간파 대상만 태깅해 이 마스크가 곧 '그릴 범위'.
 /// </summary>
 public static class SuppressFlashMaskLayers
 {
@@ -32,6 +33,8 @@ public struct SuppressFlashParams
     public Vector4 Look;
     /// <summary>x = 짙은|중간 경계, y = 중간|밝은 경계.</summary>
     public Vector4 Thresholds;
+    /// <summary>x = 대상 내부만(0/1, 179/192 후속 A7) — 1 이면 마스크(비트 7) 안에만 그리고 실루엣 흰 칠·빗금은 끈다. 바깥 = 원래 화면, 레터박스는 그대로.</summary>
+    public Vector4 Mask;
     public Color Dark;
     public Color Mid;
     public Color Light;

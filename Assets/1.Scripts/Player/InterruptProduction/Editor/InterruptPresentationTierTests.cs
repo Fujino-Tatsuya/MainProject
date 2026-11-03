@@ -257,7 +257,7 @@ public sealed class InterruptPresentationTierTests
     private sealed class FakeFlashOutput : ISuppressFlashOutput
     {
         public int Hides;
-        public void SetSubjects(IReadOnlyList<GameObject> subjects) { }
+        public void SetSubjects(IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode) { }
         public void Show(in SuppressFlashFrame frame, Vector3 worldCenter, SuppressFlashSequence sequence) { }
         public void Hide() => Hides++;
     }

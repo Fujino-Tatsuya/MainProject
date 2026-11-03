@@ -68,6 +68,32 @@ public static class SuppressFlashRules
     public static bool ShouldPlay(SlowMotionPurpose purpose, bool suppressInterrupt, bool enabled, bool hasSequence) =>
         purpose == SlowMotionPurpose.Success && suppressInterrupt && enabled && hasSequence;
 
+    /// <summary>
+    /// 그리는 범위(179/192 후속 A7) — A7 켬이고 이 화면에서 간파 대상을 찾았으면 대상 내부만, 아니면 전체 화면.
+    /// 대상을 못 찾았는데 내부만으로 두면 마스크가 비어 아무것도 안 보이니 전체 화면으로 돌아간다.
+    /// </summary>
+    public static SuppressFlashMaskMode SelectMaskMode(bool targetOnly, bool hasTarget) =>
+        targetOnly && hasTarget ? SuppressFlashMaskMode.TargetInterior : SuppressFlashMaskMode.FullScreen;
+
+    /// <summary>
+    /// 마스크(비트 7)를 붙일 루트 — 전체 화면 = 실루엣 대상 전부(오너·간파 대상·동시 성공자), 대상 내부만 = 간파 대상만.
+    /// <paramref name="results"/> 는 비우고 채운다.
+    /// </summary>
+    public static void SelectMaskRoots(SuppressFlashMaskMode mode, IReadOnlyList<GameObject> subjects,
+        IReadOnlyList<GameObject> targets, List<GameObject> results)
+    {
+        results.Clear();
+        IReadOnlyList<GameObject> source = mode == SuppressFlashMaskMode.TargetInterior ? targets : subjects;
+        if (source == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            if (source[i] != null)
+                results.Add(source[i]);
+        }
+    }
+
     public static int TotalFrames(IReadOnlyList<SuppressFlashCut> cuts)
     {
         if (cuts == null)
@@ -210,13 +236,23 @@ public sealed class SuppressInterruptMark
     }
 }
 
+/// <summary>제압 간파 섬광을 그리는 범위(179/192 후속 A7).</summary>
+public enum SuppressFlashMaskMode
+{
+    /// <summary>전체 화면(기본) — 마스크 대상은 흰 실루엣으로 칠한다.</summary>
+    FullScreen,
+    /// <summary>간파 대상 실루엣 안에만 — 바깥은 원래 화면, 실루엣 흰 칠·빗금은 안 한다(마스크 자체가 실루엣). 레터박스는 그대로.</summary>
+    TargetInterior,
+}
+
 /// <summary>제압 간파 섬광 화면 출력(할 일 179) — 렌더 출력은 <see cref="SuppressFlashScreenOutput"/>, 테스트는 가짜.</summary>
 public interface ISuppressFlashOutput
 {
     /// <summary>
-    /// 실루엣 대상(오너·간파 대상, 191 이후 동시 성공자) — 재생 시작에 한 번 넘긴다. 목록은 그 순간 복사한다.
+    /// 마스크 대상 + 그리는 범위 — 재생 시작에 한 번 넘긴다. 목록은 그 순간 복사한다.
+    /// 전체 화면 = 실루엣 대상(오너·간파 대상, 191 이후 동시 성공자), 대상 내부만(A7) = 간파 대상만(<see cref="SuppressFlashRules.SelectMaskRoots"/>).
     /// </summary>
-    void SetSubjects(IReadOnlyList<GameObject> subjects);
+    void SetSubjects(IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode);
 
     /// <summary>이 렌더 프레임 모양. <paramref name="worldCenter"/> = 적중점(각 화면이 자기 카메라로 화면 좌표를 구한다).</summary>
     void Show(in SuppressFlashFrame frame, Vector3 worldCenter, SuppressFlashSequence sequence);
@@ -294,12 +330,17 @@ public sealed class SuppressFlashPlayer
         _output = output;
     }
 
+    /// <summary>지금(마지막) 재생의 그리는 범위(A7) — 시작 순간 정해 끝까지.</summary>
+    public SuppressFlashMaskMode MaskMode { get; private set; }
+
     /// <summary>
     /// 재생 시작 — <paramref name="now"/> = 실제 시간(Time.unscaledTime). 컷 데이터가 없으면 false(아무것도 안 그림).
+    /// <paramref name="subjects"/> = 마스크 루트(<paramref name="maskMode"/> 에 맞게 고른 것).
     /// <paramref name="casterClientId"/>·<paramref name="targetPosition"/> = 시퀀스 뒤 제압 암순응(할 일 192).
     /// </summary>
     public bool Begin(float now, Vector3 worldCenter, IReadOnlyList<GameObject> subjects,
-        ulong casterClientId = 0, Vector3 targetPosition = default)
+        ulong casterClientId = 0, Vector3 targetPosition = default,
+        SuppressFlashMaskMode maskMode = SuppressFlashMaskMode.FullScreen)
     {
         SuppressFlashSequence sequence = _sequence?.Invoke();
         if (sequence == null)
@@ -311,8 +352,9 @@ public sealed class SuppressFlashPlayer
         _worldCenter = worldCenter;
         _casterClientId = casterClientId;
         _targetPosition = targetPosition;
+        MaskMode = maskMode;
         IsPlaying = true;
-        _output?.SetSubjects(subjects);
+        _output?.SetSubjects(subjects, maskMode);
         Tick(now);
         return IsPlaying || DarkAdaptActive;
     }

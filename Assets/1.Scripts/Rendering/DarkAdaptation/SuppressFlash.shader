@@ -7,6 +7,8 @@
 //  🔴 완벽한 원·고리·가는 선 금지(132 결과가 레퍼런스와 달랐던 이유) — 별 핵도 칸마다 반지름이 달라 다각형으로 끊기고,
 //     빛기둥은 최소 굵기 아래로 가늘어지면 지운다.
 //  패스 1(SilhouetteMask) = 비트 7 렌더러를 덮어쓰기 재질로 흰색 칠(실루엣 마스크 RT).
+//  A7 대상 내부만(_SFMask.x = 1, 179/192 후속) = 간파 대상만 비트 7 이라 마스크 RT = 그릴 범위. 안은 위 순서 그대로(실루엣 흰 칠·빗금만 끔),
+//     바깥은 원래 화면, 레터박스는 그대로.
 // ----------------------------------------------------------------------------
 Shader "Hidden/Rendering/SuppressFlash"
 {
@@ -35,6 +37,7 @@ Shader "Hidden/Rendering/SuppressFlash"
             float4 _SFShape;      // x=스파이크 수, y=격자 칸, z=격자 별 반지름, w=최소 굵기
             float4 _SFLook;       // x=방사 블러, y=바탕 밝기, z=빗금 간격(px), w=집중선 수
             float4 _SFThresholds; // x=짙은|중간, y=중간|밝은
+            float4 _SFMask;       // x=대상 내부만(0/1, A7) — 1 = 마스크 안에만 그림·실루엣 흰 칠/빗금 끔
             float4 _SFDark;
             float4 _SFMid;
             float4 _SFLight;
@@ -154,9 +157,9 @@ Shader "Hidden/Rendering/SuppressFlash"
 
                 v = max(v, Star(p, _SFFx.x, max(5.0, _SFShape.x), seed));
 
-                // 실루엣 — 네거티브에서 흰색(뒤집으면 짙은색).
+                // 실루엣 — 네거티브에서 흰색(뒤집으면 짙은색). 대상 내부만(A7)이면 마스크가 곧 그릴 범위라 칠하지 않는다.
                 float sil = SAMPLE_TEXTURE2D(_SuppressFlashMask, sampler_LinearClamp, uv).r;
-                sil = step(0.5, sil);
+                sil = step(0.5, sil) * (1.0 - step(0.5, _SFMask.x));
                 v = lerp(v, 1.0, sil);
 
                 if (_SFTone.x > 0.5)
@@ -191,7 +194,14 @@ Shader "Hidden/Rendering/SuppressFlash"
 
                 float3 col;
                 float spread = _SFFx.z;
-                if (spread > 1e-5)
+                bool outside = _SFMask.x > 0.5 &&
+                    SAMPLE_TEXTURE2D(_SuppressFlashMask, sampler_PointClamp, uv).r < 0.5;
+                if (outside)
+                {
+                    // 대상 내부만(A7) — 바깥은 원래 화면(오너 암전 덮개는 이 뒤 UI 캔버스라 그대로 덮인다).
+                    col = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_PointClamp, uv).rgb;
+                }
+                else if (spread > 1e-5)
                 {
                     // 가장자리 색수차 — 화면 가운데는 0, 가장자리로 갈수록 R·B 가 적중점 반대/쪽으로 갈라진다.
                     float2 fromMid = (uv - 0.5) * 2.0;
@@ -207,7 +217,7 @@ Shader "Hidden/Rendering/SuppressFlash"
                     col = Shade(uv, pixel);
                 }
 
-                // 레터박스 — 위아래 검은 띠(들어온 정도만큼).
+                // 레터박스 — 위아래 검은 띠(들어온 정도만큼). 화면 UI 성격이라 대상 내부만(A7)이어도 그대로.
                 float bar = _SFFx.w;
                 if (uv.y < bar || uv.y > 1.0 - bar)
                     col = 0;

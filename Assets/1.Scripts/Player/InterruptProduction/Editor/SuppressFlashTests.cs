@@ -22,10 +22,12 @@ public sealed class SuppressFlashTests
     {
         public readonly List<SuppressFlashFrame> Shown = new List<SuppressFlashFrame>();
         public readonly List<GameObject> Subjects = new List<GameObject>();
+        public SuppressFlashMaskMode Mode;
         public int Hides;
 
-        public void SetSubjects(IReadOnlyList<GameObject> subjects)
+        public void SetSubjects(IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode)
         {
+            Mode = mode;
             Subjects.Clear();
             if (subjects != null)
                 Subjects.AddRange(subjects);
@@ -405,6 +407,95 @@ public sealed class SuppressFlashTests
         Assert.AreEqual(_sequence.aberrationScale * 0.5f, p.Fx.z, 1e-5f);
         Assert.AreEqual(_sequence.letterboxHeight, p.Fx.w, 1e-5f);
         Assert.AreEqual(frame.Dark.linear, p.Dark, "선형 색");
+        Assert.AreEqual(0f, p.Mask.x, "기본 = 전체 화면");
+
+        SuppressFlashParams interior = SuppressFlashScreenOutput.Build(frame, _sequence, new Vector2(0.3f, 0.6f), 1.5f, 9,
+            SuppressFlashMaskMode.TargetInterior);
+        Assert.AreEqual(1f, interior.Mask.x, "A7 대상 내부만");
+        Assert.AreEqual(p.Fx, interior.Fx, "레터박스·별·색수차 값은 그대로");
+    }
+
+    // ---- A7 섬광 = 대상 내부만(179/192 후속) ----
+
+    [TestCase(false, false, SuppressFlashMaskMode.FullScreen)]
+    [TestCase(false, true, SuppressFlashMaskMode.FullScreen)]
+    [TestCase(true, false, SuppressFlashMaskMode.FullScreen)]
+    [TestCase(true, true, SuppressFlashMaskMode.TargetInterior)]
+    public void A7_켬이고_대상을_찾았을_때만_대상_내부(bool targetOnly, bool hasTarget, SuppressFlashMaskMode expected)
+    {
+        Assert.AreEqual(expected, SuppressFlashRules.SelectMaskMode(targetOnly, hasTarget));
+    }
+
+    [Test]
+    public void 마스크_루트는_전체_화면이면_실루엣_대상_전부_대상_내부면_간파_대상만()
+    {
+        var caster = new GameObject("Caster");
+        var target = new GameObject("Target");
+        _objects.Add(caster);
+        _objects.Add(target);
+        var subjects = new List<GameObject> { caster, target };
+        var targets = new List<GameObject> { target };
+        var roots = new List<GameObject> { caster }; // 이전 값은 비운다
+
+        SuppressFlashRules.SelectMaskRoots(SuppressFlashMaskMode.FullScreen, subjects, targets, roots);
+        CollectionAssert.AreEqual(new[] { caster, target }, roots);
+
+        SuppressFlashRules.SelectMaskRoots(SuppressFlashMaskMode.TargetInterior, subjects, targets, roots);
+        CollectionAssert.AreEqual(new[] { target }, roots, "오너(동시 성공자 포함)는 내부 마스크에 넣지 않는다");
+
+        SuppressFlashRules.SelectMaskRoots(SuppressFlashMaskMode.TargetInterior, subjects, null, roots);
+        Assert.AreEqual(0, roots.Count);
+    }
+
+    [Test]
+    public void 진행기는_시작_순간_그리는_범위를_출력에_넘긴다()
+    {
+        var output = new FakeOutput();
+        var player = new SuppressFlashPlayer(() => _sequence, () => false, output);
+
+        player.Begin(0f, Vector3.zero, null);
+        Assert.AreEqual(SuppressFlashMaskMode.FullScreen, output.Mode, "기본 = 전체 화면");
+        Assert.AreEqual(SuppressFlashMaskMode.FullScreen, player.MaskMode);
+
+        player.Begin(1f, Vector3.zero, null, 0, Vector3.zero, SuppressFlashMaskMode.TargetInterior);
+        Assert.AreEqual(SuppressFlashMaskMode.TargetInterior, output.Mode);
+        Assert.AreEqual(SuppressFlashMaskMode.TargetInterior, player.MaskMode);
+    }
+
+    [Test]
+    public void 화면_출력은_대상_내부면_넘겨받은_루트만_비트_7()
+    {
+        var caster = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        var target = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        _objects.Add(caster);
+        _objects.Add(target);
+        var subjects = new List<GameObject> { caster, target };
+        var targets = new List<GameObject> { target };
+        var roots = new List<GameObject>();
+
+        var output = new SuppressFlashScreenOutput(() => null);
+        SuppressFlashRules.SelectMaskRoots(SuppressFlashMaskMode.TargetInterior, subjects, targets, roots);
+        output.SetSubjects(roots, SuppressFlashMaskMode.TargetInterior);
+        Assert.AreEqual(SuppressFlashMaskMode.TargetInterior, output.MaskMode);
+        Assert.AreEqual(1, output.TaggedCount);
+        Assert.AreEqual(0u, caster.GetComponent<Renderer>().renderingLayerMask & SuppressFlashMaskLayers.Mask);
+        Assert.AreNotEqual(0u, target.GetComponent<Renderer>().renderingLayerMask & SuppressFlashMaskLayers.Mask);
+
+        output.Hide();
+        Assert.AreEqual(0u, target.GetComponent<Renderer>().renderingLayerMask & SuppressFlashMaskLayers.Mask, "끝 = 원복");
+    }
+
+    [Test]
+    public void A7_칸_기본_끔_런타임_값만_바꾼다()
+    {
+        InterruptProductionDirector director = CreateDirectorWithSequence();
+        Assert.IsFalse(director.SuppressFlashTargetOnly, "기본 = 전체 화면");
+        director.SuppressFlashTargetOnly = true;
+        Assert.IsTrue(director.SuppressFlashTargetOnly);
+        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "A7 은 시퀀스 선택(A6)을 바꾸지 않는다");
+        var so = new SerializedObject(director);
+        Assert.IsTrue(so.FindProperty("suppressFlashTargetOnly").boolValue);
+        Assert.IsTrue(so.FindProperty("suppressFlash").boolValue);
     }
 
     [Test]
@@ -482,6 +573,7 @@ public sealed class SuppressFlashTests
         var director = prefab.GetComponent<InterruptProductionDirector>();
         Assert.IsNotNull(director);
         Assert.IsTrue(director.SuppressFlashEnabled);
+        Assert.IsFalse(director.SuppressFlashTargetOnly, "A7 대상 내부만 기본 끔(전체 화면)");
         Assert.AreEqual(AssetDatabase.LoadAssetAtPath<SuppressFlashSequence>(SequencePath), director.SuppressFlashSequence);
         Assert.AreEqual(AssetDatabase.LoadAssetAtPath<Material>(MaterialPath), director.SuppressFlashMaterial);
 

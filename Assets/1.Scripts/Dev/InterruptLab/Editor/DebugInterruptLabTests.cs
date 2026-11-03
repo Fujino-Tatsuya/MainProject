@@ -278,6 +278,14 @@ public sealed class DebugInterruptLabTests
     }
 
     [Test]
+    public void A7_섬광_범위_버튼은_상태를_표시한다()
+    {
+        Assert.AreNotEqual(DebugInterruptTuningPanel.TargetOnlyLabel(true), DebugInterruptTuningPanel.TargetOnlyLabel(false));
+        StringAssert.Contains("대상 내부만", DebugInterruptTuningPanel.TargetOnlyLabel(true));
+        StringAssert.Contains("전체 화면", DebugInterruptTuningPanel.TargetOnlyLabel(false));
+    }
+
+    [Test]
     public void 제압_간파_재현은_꺼져_있으면_허수아비가_없어도_무해()
     {
         var repro = new DebugSuppressInterruptRepro();

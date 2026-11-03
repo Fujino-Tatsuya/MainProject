@@ -197,7 +197,7 @@ public sealed class InterruptDamageNumberHideTests
 
     private sealed class NullSuppressOutput : ISuppressFlashOutput
     {
-        public void SetSubjects(System.Collections.Generic.IReadOnlyList<GameObject> subjects) { }
+        public void SetSubjects(System.Collections.Generic.IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode) { }
         public void Show(in SuppressFlashFrame frame, Vector3 worldCenter, SuppressFlashSequence sequence) { }
         public void Hide() { }
     }
