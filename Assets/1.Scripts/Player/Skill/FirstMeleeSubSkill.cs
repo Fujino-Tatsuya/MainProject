@@ -18,25 +18,13 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 {
-    // 반격 자세 전환 창구(PlayerShieldVfx.ServerPlayGuardCounterPose). 예전 임시 반격 충격파(ServerInterruptWave)는
+    // 반격 자세 전환 창구(PaladinSkillView.ServerPlayGuardCounterPose). 예전 임시 반격 충격파(ServerInterruptWave)는
     // 2026-10-26 민경 연출(handoff-paladin-guardian-will-vfx)로 바꾸면서 뺐다 — 우클릭 충격파는 그대로다.
     [Header("연출")]
-    [Tooltip("반격 자세 전환 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 반격 자세로 못 넘어가 안전망이 E 를 끝낸다")]
-    [SerializeField] private PlayerShieldVfx shieldVfx;
-
     // 상태 클립별 연출(점화·결계·해제·막아냄·오라·기 모으기·반격)은 Garen_E_* 클립 이벤트가 전 피어에서 켜고 끈다.
-    // 여기는 방패 문양 발광과, 클립 Stop 이벤트가 안 오는 끊김(경직·사망·안전망)의 루프 회수만 한다. 비워두면 그 부분만 빠진다.
-    [Tooltip("방패 메쉬 문양 발광(머티리얼 페이드) — 우클릭과 같은 방패의 MaterialFadeEffect 를 물린다. E 내내 켠다")]
-    [SerializeField] private MaterialFadeEffect shieldGlow;
-
-    [Tooltip("방어 결계 루프(소켓 이펙트, Id 'GuardianBarrier') — 'VFX/GuardianWill/Barrier'. 끊겼을 때 끄기만 한다")]
-    [SerializeField] private EffectSocketPlayer barrierLoop;
-
-    [Tooltip("반격 금빛 오라 루프(소켓 이펙트, Id 'GuardianAura') — 'VFX/GuardianWill/Aura'. 끊겼을 때 끄기만 한다")]
-    [SerializeField] private EffectSocketPlayer auraLoop;
-
-    [Tooltip("반격 전 검 기 모으기 루프(소켓 이펙트, Id 'GuardianCharge') — 'VFX/GuardianWill/Charge'. 끊겼을 때 끄기만 한다")]
-    [SerializeField] private EffectSocketPlayer chargeLoop;
+    // 방패 문양 발광과, 클립 Stop 이벤트가 안 오는 끊김(경직·사망·안전망)의 루프 회수는 창구(BeginGuardVfx/EndGuardVfx)가 한다.
+    [Tooltip("반격 자세 전환·E 연출 창구. 플레이어 루트의 PaladinSkillView 를 물린다.\n비워두면 반격 자세로 못 넘어가 안전망이 E 를 끝낸다")]
+    [SerializeField] private PaladinSkillView skillView;
 
     // 방어 성공 시 CrossFade 할 반격 자세 상태(PlayerAnimatorController Base Layer). 시작 상태(SubSkillGuard)는 데이터의
     // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
@@ -123,7 +111,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     {
         base.Initialize(owner, controller);
         inputReader = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
-        // PlayerSkillController·PlayerShieldVfx 와 같은 해석(자식의 첫 Animator).
+        // PlayerSkillController·PaladinSkillView 와 같은 해석(자식의 첫 Animator).
         animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
     }
 
@@ -134,23 +122,23 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     /// [서버] E 재입력. 지금 서버 애니메이터가 방어중(SubSkillGuardIdle, 전이 중 아님)이면 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다.
     /// 원격 오너가 방어중으로 보고 눌렀어도 서버가 아직 준비 중이거나 이미 해제로 넘어가는 중이면 조용히 무시한다(서버 판정이 기준).
     /// 받는 즉시 방어 창이 닫힌다(할 일 95 — 모델이 Releasing 으로 넘어가 Custom1 은 무시). E 종료는 해제 클립 End 가 한다 — 타이머를 따로 두지 않는다.
-    /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PlayerShieldVfx.ServerPlayGuardCounterPose"/>).
+    /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PaladinSkillView.ServerPlayGuardCounterPose"/>).
     /// </summary>
     public override void OnSkillRePressed()
     {
         if (!IsServerPeer)
             return;
 
-        if (shieldVfx == null)
+        if (skillView == null)
         {
-            Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 E 재입력 해제를 전 피어로 보낼 수 없습니다. 무시합니다.", this);
+            Debug.LogWarning("[Skill] 수호자의 의지 — skillView 가 비어 있어 E 재입력 해제를 전 피어로 보낼 수 없습니다. 무시합니다.", this);
             return;
         }
 
         if (!model.TryRequestRelease(IsAnimatorInGuardHold()))
             return;
 
-        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
+        skillView.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
         Edit.Log("[Skill] 수호자의 의지 — E 재입력: 방어중 → 해제", this);
     }
 
@@ -204,14 +192,14 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             model.OnReleaseEntered();
 
         FirstMeleeSubSkillData data = SubSkillData;
-        if (data == null || shieldVfx == null || !model.HoldMode)
+        if (data == null || skillView == null || !model.HoldMode)
             return;
 
         GuardHoldRelease release = model.TickHold(IsAnimatorInGuardHold(), Time.time, data.GuardHoldMaxDuration);
         if (release == GuardHoldRelease.None)
             return;
 
-        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
+        skillView.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
         Edit.Log(release == GuardHoldRelease.KeyReleased
             ? "[Skill] 수호자의 의지 — 홀드: E 뗌 → 해제"
             : $"[Skill] 수호자의 의지 — 홀드: 최대 유지 {data.GuardHoldMaxDuration:0.##}s → 해제", this);
@@ -262,9 +250,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     public override void OnClientPlay(Vector3 direction)
     {
         // 방어 자세 애니(SubSkillGuard)는 컨트롤러가 시작 상태로 전 피어에서 재생한다. 반격 자세는 방어 성공 때
-        // PlayerShieldVfx.ServerPlayGuardCounterPose 가 전 피어로 퍼뜨린다. 단계별 연출은 클립 이벤트 몫 — 여기는 방패 발광만.
-        shieldGlow?.FadeIn();
-        // PlayerShieldVfx.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
+        // PaladinSkillView.ServerPlayGuardCounterPose 가 전 피어로 퍼뜨린다. 단계별 연출은 클립 이벤트 몫 — 여기는 방패 발광만.
+        skillView?.BeginGuardVfx();
+        // PaladinSkillView.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
 
         // 조작 방식은 오너 설정이다 — 오너(호스트·오프라인 포함)만 정하고, 홀드면 방어중 자동 해제 전이를 막는다.
         ownerHoldMode = owner != null && owner.IsInputSource && UserInputConfig.GuardSkillHold;
@@ -343,10 +331,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         // 🔴 종료 사유를 가리지 않는다 — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).
         //    소켓 safetyTimeout 은 이 경로가 실패했을 때의 그물이다.
-        shieldGlow?.FadeOut();
-        barrierLoop?.Stop();
-        auraLoop?.Stop();
-        chargeLoop?.Stop();
+        skillView?.EndGuardVfx();
         // 홀드 방식 정리 — 다음 시전(탭 방식일 수 있다)의 방어중 자동 해제를 막지 않게 오너·서버에서 내린다(관찰자는 동기로 따라온다).
         if (ownerHoldMode || IsServerPeer)
             SetGuardHoldParam(false);
@@ -575,10 +560,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         {
             // 반격 판정·종료는 반격 클립의 Hit·End 가 정한다 — 전 피어에서 그 상태로 넘긴다(오너 권한 NetworkAnimator).
             // 연출 창구가 비어 있으면 Hit·End 가 안 와 안전망(maxActiveDuration)이 끝내고, OnEnd 가 보장 반격을 낸다.
-            if (shieldVfx != null)
-                shieldVfx.ServerPlayGuardCounterPose(CounterStateHash, CounterCrossFadeSeconds);
+            if (skillView != null)
+                skillView.ServerPlayGuardCounterPose(CounterStateHash, CounterCrossFadeSeconds);
             else
-                Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 반격 자세로 넘어가지 못합니다. 안전망이 E 를 끝냅니다.", this);
+                Debug.LogWarning("[Skill] 수호자의 의지 — skillView 가 비어 있어 반격 자세로 넘어가지 못합니다. 안전망이 E 를 끝냅니다.", this);
 
             Vector3 toAttacker = attackerPos - playerPos;
             toAttacker.y = 0f;

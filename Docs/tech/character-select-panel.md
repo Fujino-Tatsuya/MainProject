@@ -98,7 +98,9 @@
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
   - 일반판 vs `_gamma` 판: 캡처 비교(왼쪽 영역 평균 밝기, 0~255) 목업 30.2 · 일반판 34.1 · `_gamma` 43.2 → **일반판** 사용(프로젝트 = Linear).
 - **오른쪽 위 "기본"·"코어" 버튼 + "미구현" 팝업(할 일 162)** — 스킬 정보 데이터가 아직 없어 둘 다 같은 팝업만 띄운다.
-  - 버튼 = `Content/InfoTabs/Button_Basic`·`Button_Core`(아트 `tab_gibon_body`+`tab_gibon_label` = 밝은 알약, `tab_core_body`+`tab_core_label` = 어두운 알약·회색 테두리, 오른쪽 끝이 비스듬히 잘림).
+  - 버튼 = `Content/InfoTabs/Button_Basic`·`Button_Core` — **둘 다 코어 모양**(`tab_core_body` = 어두운 알약·둥근 회색 테두리, 오른쪽 끝이 비스듬히 잘림, 할 일 178).
+    코어 글자 = 아트 `tab_core_label`. 기본 글자 = **TMP "기본" 임시**(서울알림체 Heavy 46, 회색 0.58 ≈ 코어 글자 색, 코어 글자 칸과 같은 80×41·몸체 기준 +5px, Raycast Target 끔) —
+    기본 전용 아트 `tab_gibon_body`(밝은 알약)·`tab_gibon_label`(검은 글자라 어두운 바탕에서 안 보임)은 쓰지 않는다. **추후 아트 교체 예정**, 선택 상태 구분(어느 탭이 켜졌는지)은 아직 없다.
     자리 = 목업(`legacy/00_mock_up.png`) 그대로, 기본이 위·오른쪽, 코어가 아래·왼쪽인 계단식(오른쪽 앵커). 뒤 검은 판 `tab_knockout_*`(몸체보다 사방 8px 큼)은 `InfoTabs_Backing`.
   - 그리기 순서 = `InfoTabs_Backing`(검은 판) → `Cards` → `InfoTabs`(버튼) — 버튼이 카드 위라 위 카드의 사각 클릭 영역보다 먼저 맞는다. Button Navigation None·Color Tint(설정 창과 같은 값).
   - 팝업 = `Content/InfoPopup`(Content 맨 위, 기본 꺼짐): 어두운 막(검정 60%, Raycast Target — 뒤 카드·버튼·셰브론 클릭을 막는다) + `Frame`(`UI_Panel/Sprites/Panels/panel_popup.png`)

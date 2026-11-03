@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -44,27 +43,10 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     [FormerlySerializedAs("minHealPercent")]
     [SerializeField, Min(0)] private int healPercent = 5;
 
+    // 칼날 발광·발동 연출(추가 피해·자기 힐)의 칸과 RPC 는 팔라딘 연출 창구가 든다(2026-11-02).
     [Header("연출")]
-    [Tooltip("버프 보유 중 칼날을 빛낸다. 칼의 MaterialFadeEffect 를 물린다.\n비워두면 연출만 빠진다")]
-    [SerializeField] private MaterialFadeEffect bladeGlow;
-
-    [Tooltip("발동 순간 시전자에게 한 번 터뜨릴 회복 연출. 프리팹의 'VFX/PassiveSkill/Heal' 을 물린다. 비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer healBurst;
-
-    [Tooltip("추가 피해를 맞은 대상에게 한 번 터뜨릴 연출. FX_Paladin_Smite_Entry 를 물린다. 소켓이 아니라 엔트리인 이유는 붙을 자리가 '그때 맞은 남'이라서다")]
-    [SerializeField] private EffectEntry additionalHit;
-
-    [Tooltip("추가 피해 연출 배율")]
-    [DataTableIgnore] [SerializeField, Min(0.01f)] private float additionalHitScale = 1f;
-
-    [Tooltip("이 몸통 높이(미터)까지는 배율 1. 더 큰 대상(엘리트·보스)은 몸통 높이 ÷ 이 값만큼 연출을 키운다. 잡몹 히트박스 높이 2m 기준")]
-    [DataTableIgnore] [SerializeField, Min(0.01f)] private float additionalHitReferenceHeight = 2f;
-
-    [Tooltip("몸통 크기로 키우는 배율의 상한")]
-    [DataTableIgnore] [SerializeField, Min(1f)] private float additionalHitMaxSizeScale = 3f;
-
-    [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
-    [SerializeField] private Vector3 additionalHitFallbackOffset = new Vector3(0f, 1f, 0f);
+    [Tooltip("팔라딘 연출 창구(칼날 발광·발동 연출). 플레이어 루트의 PaladinSkillView 를 물린다. 비워두면 연출만 빠진다")]
+    [SerializeField] private PaladinSkillView skillView;
 
     // 쿨 복제값(남은 초 + 적은 서버 시각). 서버만 쓰고 전 피어가 읽는다 — 원격 플레이어의 머리 위 특성 게이지도 그린다.
     // 서버가 끝 시각을 바꿀 때(소모·피격 감소·스폰)만 다시 적는다.
@@ -180,18 +162,8 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
         if (appliedGlow != charged)
         {
             appliedGlow = charged;
-            ApplyBladeGlow(charged);
+            skillView?.SetBladeGlow(charged);
         }
-    }
-
-    // FadeIn/FadeOut 은 이미 그 상태면 조용한 no-op 이라 중복 호출을 걱정하지 않아도 된다.
-    private void ApplyBladeGlow(bool charged)
-    {
-        if (bladeGlow == null)
-            return;
-
-        if (charged) bladeGlow.FadeIn();
-        else bladeGlow.FadeOut();
     }
 
     // ── 서버 판정 ───────────────────────────────────────────────────
@@ -217,10 +189,10 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
 
         // 특성 회복 경로(할 일 125 3/5) — 특성 없으면 회복 배율 1·전달 없음이라 예전 HealHp 와 같다.
         int healAmount = Mathf.RoundToInt(owner.MaxHp * (healPercent / 100f));
-        if (healAmount > 0)
-            PlayerTraitEffects.For(owner).HealServer(healAmount);
+        int healed = healAmount > 0 ? PlayerTraitEffects.For(owner).HealServer(healAmount) : 0;
 
-        ServerPlayProcVfx(target);
+        // 발동 연출(대상 추가 피해 + 실제로 회복했을 때만 자기 힐)은 창구가 전 피어에 뿌린다.
+        skillView?.ServerPlayPassiveProc(target, healed > 0);
 
         Edit.Log($"[Passive] 불굴의 의지 발동 — {target.name}의 원래 공격에 추가피해 {bonusDamage} 합산, 회복 {healPercent}%({healAmount})", this);
         return bonusDamage;
@@ -236,76 +208,4 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
         if (readyAt > now)
             SetReadyAtServer(PassiveCooldownSync.Reduce(readyAt, now, hitCooldownReduction));
     }
-
-    // ── 발동 연출 ───────────────────────────────────────────────────
-
-    /// <summary>
-    /// [서버] 발동 순간의 연출을 전 피어에 뿌린다 — 시전자 회복 1회 + 대상에게 추가 피해 1회.
-    ///
-    /// <b>창구가 필요 없다.</b> 이 컴포넌트 자체가 NetworkBehaviour라 RPC를 직접 단다
-    /// (스킬들이 PlayerSkillVfx를 거치는 것은 부모 PlayerSkillBase가 MonoBehaviour이기 때문이다).
-    ///
-    /// <b>좌표가 아니라 대상을 보낸다.</b> 클라의 몹은 NetworkTransform 보간 때문에 서버보다 뒤에
-    /// 그려진다 — 서버가 잰 월드 좌표를 그대로 재생하면 이펙트가 몸에서 떨어져 허공에 뜬다
-    /// (MonsterBase.PlayHitVFXRpc가 공격자 위치 하나만 보내는 것과 같은 이유다).
-    /// 각 피어가 자기 쪽 몹에서 위치를 다시 뽑으면 언제나 그 몹 위다.
-    /// </summary>
-    private void ServerPlayProcVfx(Unit target)
-    {
-        NetworkObjectReference targetRef = default;
-        bool hasTarget = target != null && target.NetworkObject != null && target.NetworkObject.IsSpawned;
-        if (hasTarget)
-            targetRef = target.NetworkObject;
-
-        ProcVfxRpc(targetRef, hasTarget);
-    }
-
-    // 쿨다운 주기당 한 번뿐인 클라이맥스라 Reliable 이다 — 유실되면 발동했다는 사실이 통째로 안 보인다.
-    // (난타 중 한 발씩 빠져도 되는 피격 파문 계열과 갈리는 지점)
-    [Rpc(SendTo.ClientsAndHost)]
-    private void ProcVfxRpc(NetworkObjectReference target, bool hasTarget)
-    {
-        healBurst?.PlayOnce();
-
-        if (hasTarget && target.TryGet(out NetworkObject targetObject))
-            PlayAdditionalHitLocal(targetObject.transform);
-    }
-
-    /// <summary>
-    /// 대상 한 명에게 추가 피해 연출을 찍는다.
-    ///
-    /// 타격점이 아니라 <b>몸통 중심</b>에 둔다. 접촉점은 기본 피격 이펙트가 이미 쓰고 있어서,
-    /// 같은 자리에 겹치면 "한 대 더"가 아니라 "한 대가 밝아졌다"로 읽힌다.
-    /// 중심은 SkinnedMeshRenderer의 월드 바운즈에서 뽑는다 — 몹 덩치에 맞춰 알아서 따라간다.
-    ///
-    /// 회전 = 시전자 → 대상 수평 방향(+Z = 때린 방향). 관통·등 뒤 불티가 이 방향을 쓴다.
-    /// 인스턴스의 <see cref="SiphonMotes"/> 에 시전자를 넘겨 빛 알갱이가 팔라딘에게 흘러들게 한다.
-    /// </summary>
-    private void PlayAdditionalHitLocal(Transform target)
-    {
-        if (target == null || additionalHit == null || EffectManager.Instance == null) return;
-
-        SkinnedMeshRenderer body = target.GetComponentInChildren<SkinnedMeshRenderer>();
-        Vector3 position = body != null
-            ? body.bounds.center
-            : target.position + additionalHitFallbackOffset;
-
-        // 덩치 큰 대상에게 잡몹 크기 그대로 찍으면 몸통에 비해 초라해 보인다 — 몸통 높이에 비례해 키운다(잡몹은 1).
-        float sizeScale = body != null
-            ? Mathf.Clamp(body.bounds.size.y / additionalHitReferenceHeight, 1f, additionalHitMaxSizeScale)
-            : 1f;
-
-        Vector3 direction = position - transform.position;
-        direction.y = 0f;
-        Quaternion rotation = direction.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(direction) : Quaternion.identity;
-
-        EffectHandle handle = EffectManager.Instance.PlayRecallable(additionalHit, position, rotation, additionalHitScale * sizeScale);
-        EffectManager.Instance.GetInstances(handle, InstanceBuffer);
-        foreach (GameObject instance in InstanceBuffer)
-            foreach (SiphonMotes motes in instance.GetComponentsInChildren<SiphonMotes>(true))
-                motes.SetTarget(transform);
-        InstanceBuffer.Clear();
-    }
-
-    private static readonly List<GameObject> InstanceBuffer = new List<GameObject>();
 }

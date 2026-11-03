@@ -1,4 +1,160 @@
-# ▶▶▶ 계획 = **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate` → `Breakable` 공용화** (2026-10-30 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play · ⏳ SVN 업로드)
+# ▶▶▶ 계획 = **수호의 파동(PAL_4_E_PUSH) VFX — 바람 링 + 밀린 적마다 바람 줄기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **적별 줄기(Push) 뺌, 링만** · ✅ MainProject 연결(컴파일 0 · 랩에서 반격 순간 링 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-guard-wave-vfx.md](Docs/tech/handoff-guard-wave-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02, 전부 추천안). 기획 `Re_C_특성_기획서_20261016.html` — E 로 막으면 반격과 함께 주변 radius 3m 밀치기(pushDistance 2 · pushDuration 0.25).
+> **1단계 = MyProject 제작 + 테스트 씬 → 민경이 직접 Play 확인·승인. 2단계(승인 뒤) = MainProject import·연결.** 코드는 연출 구독만 — 판정·밀치기 무변경.
+
+## 사실 (코드 확인)
+- 사건은 이미 나간다(할 일 145, `FirstMeleeSubSkill`): `TraitFxTrait.PaladinGuardWave`
+  - **Activated** — 반격 판정 순간 1번(밀린 대상 없어도) · Pos = 발밑 · Dir = 방어 방향 · Shape = 밀치기 원(반경 = 특성 수치 `PAL_E_PUSH_RADIUS`)
+  - **Hit** — 밀린 대상마다 · Pos = 콜라이더 중심 · Dir = 밀리는 방향 · Target
+- 구독하는 곳 없음. 같은 순간 반격 클립 Hit(0.433s)에 `GuardianCounter`(금빛 반격 베기·불티, 상체 높이)가 이미 나온다.
+- MyProject 에 포드 착지 바람 링(`PodWindRingVfxBuilder` — 링 메시·마스크 침식·왜곡 고리·줄기, 회색 먼지 ~1초)이 있다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 구성(Q1) | **링(Activated) + 밀린 적마다 바람 줄기(Hit)** — 바닥 균열·먼지는 보고 부족하면 |
+| 크기(Q2) | 반경 1m 저작 · 재생 배율 = 판정 원 반경(수치가 바뀌어도 판정과 일치) · **약 0.25초에 3m 끝 도달**(밀치기 시간과 같다) |
+| 색(Q3) | **흰 바람 + 옅은 금빛 테두리**(진한 금빛 반격 불티와 구분, 같은 세트) |
+| 모양(Q4) | **바닥에 납작한 링(주인공) + 무릎 높이 얇은 바람 벽** — 상체 반격 베기와 안 겹침 |
+| 적별(Q5) | **따라가지 않는 원샷** — 적 발밑, 밀리는 방향을 향해 |
+| 기반(Q8) | 포드 링 **기법 재사용, 새 에셋**(포드 링 무변경) |
+| 제작(Q6) | MyProject 빌드 메뉴 `Tools/VFX/Guard Wave (팔라딘 수호의 파동) 빌드` → `Export/Player1/ESkill/GuardWave/` · MainProject `50.Art/VFX/Common/Players/Player1/ESkill/GuardWave/`(SVN) |
+| 확인(Q7) | **MyProject 테스트 씬** `Scenes/GuardWavePreview.unity` — 민경이 Play 로 직접 확인(GIF 아님) |
+| 테스트 씬(Q9~Q11) | 실제 팔라딘 + `Garen_E_GuardCounter` 재생, 0.433s 에 기존 `GuardianCounter` + 파동 · **Space = 1회, 자동 반복 켜기/끄기** · 허수아비 1.5m·2.5m(안 — 2m/0.25s 가짜 밀치기 + 적별 줄기)·3.5m(밖 — 그대로) · 회차마다 원위치 · **3m 경계 가이드 켜고 끄기** |
+
+## 작업 순서
+1. MyProject: 빌더(링 메시·결 침식·왜곡·낮은 바람 벽 / 적별 줄기 원샷) → `FX_GuardWave_Ring`·`FX_GuardWave_Push` 프리팹 + 재질·텍스처 · 테스트 씬·테스터 스크립트.
+2. ⏸ 민경 Play 확인 → 수정 반복 → **승인**.
+3. MainProject(승인 뒤): 에셋 import(SVN 경로) · 엔트리 2개 · `EffectCatalog` · `PaladinSkillView` 가 `TraitSkillFx.Raised` 의 `PaladinGuardWave` 를 받아 Activated = 링(Pos·반경 배율), Hit = 줄기(Pos 바닥·Dir 방향) · DebugTraitLab 에서 `PAL_4_E_PUSH` + 플레이어 피격 패널로 확인.
+4. 문서: handoff · `trait-effect-events.md` 수호의 파동 구독 칸 · `CONTEXT.md`.
+
+## 완료 조건
+- 테스트 씬: 링이 0.25초쯤 3m 경계에 닿고, 안쪽 허수아비만 밀리며 줄기가 난다 · 반격 베기와 함께 봐도 뭉개지지 않는다(민경 승인).
+- MainProject: E 방어 성공 → 반격 순간 링 · 밀린 적마다 줄기 · 밀린 적 없어도 링 · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **팔라딘 스킬 연출 칸을 `PaladinSkillView` 로 모으기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 27칸 값 확인 · 랩 Play 호출 스모크) · ✅ 커밋 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02, 전부 추천안). 거너 `GunnerBeamView`·어쌔신 `AssassinSkillView` 와 같은 구조 —
+> 스킬은 "언제", View 는 "무엇". ⚠️ `FirstMelee*` 5개는 **은희 영역** — 판정·타이밍·데이터는 안 건드리고 연출 호출만 View 로 돌린다. 공유 = `Docs/tech/handoff-shield-vfx.md` 「통합」 이어 쓰기.
+
+## 사실 (코드 확인)
+| 스킬 | 연출 칸 (프리팹 값) | 켜는 곳 / 끄는 곳 |
+|---|---|---|
+| Main | `smashLoop`·`trailLoop` | `OnClientPlay` Play / `OnEnd` Stop |
+| Sub | `shieldGlow`·`barrierLoop`·`auraLoop`·`chargeLoop`(GuardianCharge) | 발광 FadeIn(방어 성공 경로) · 루프 3개는 클립 이벤트가 켬 / `OnEnd` FadeOut+Stop 3 |
+| Interrupt | `shieldGlow`·`glowLoop`·`chargeLoop`(ShieldCharge) | B1 cue(디렉터가 `e.Skill` 을 sink 로 되부름) FadeIn+Play / `OnEnd` FadeOut+Stop 2 |
+| Ultimate | `superArmorOverlay`·`stickVfx` | 슈퍼아머 Show/Hide · Stick `SetPlayRate`(재생은 클립 이벤트) |
+| Passive | `bladeGlow`·`additionalHit`+배율 4칸 · `ProcVfxRpc` | 버프 보유 엣지 FadeIn/Out · 발동 RPC(자기 힐 원샷 + 대상 추가 피해 연출·SiphonMotes) |
+- Sub·Interrupt `shieldGlow` = **같은 MaterialFadeEffect**(fileID 1486249918430601143) → 한 칸. `chargeLoop` 둘은 서로 다른 소켓 → 두 칸.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 범위(Q1) | 5개 스킬 `[Header("연출")]` 칸 전부 + **패시브 발동 RPC 도 View 로**(패시브는 `skillView.ServerPlayPassiveProc(target, healed)` 한 줄) |
+| 모양(Q2) | View 에 순간 단위 메서드 — 스킬은 소켓을 모른다. 예: `BeginSmashHold/EndSmashHold` · `GuardShieldGlow/EndGuardVfx` · `BeginInterruptGlow/EndInterruptVfx` · `SetStickPlayRate`·`ShowSuperArmor/HideSuperArmor` · `SetBladeGlow(bool)` |
+| 방패 발광(Q3) | 칸 하나 `shieldGlow` |
+| 간파 B1 | 디렉터는 그대로(`e.Skill` 이 sink). 스킬의 `IInterruptCueSink.PlayCue` 는 남기되 본문은 `skillView.BeginInterruptGlow()` 한 줄 — 디렉터 코드 무변경 |
+| 커밋(Q4) | 커밋 1개 · 동작 무변경 · handoff 갱신 · Play 확인 |
+
+## 작업 순서
+1. 코드: `PaladinSkillView` 에 칸·메서드(+ 패시브 발동 RPC·추가 피해 연출 이동) · 5개 스킬의 칸 삭제 → View 호출로 교체(Main·Passive 에는 `skillView` 칸 추가).
+2. 프리팹: `Player_Paladin.prefab` YAML 로 값 이동(위 표의 fileID·엔트리 그대로) · 스킬 `skillView` 연결. 점검 스크립트로 칸 값·참조 확인 후 삭제.
+3. 검사: 컴파일 0 · DebugTraitLab Play 스모크(스폰·호출 에러 없음).
+4. 문서: `handoff-shield-vfx.md` 「통합」 · `handoff-paladin-interrupt-vfx.md`·`interrupt-presentation.md` B1 줄 · `CONTEXT.md`.
+
+## 완료 조건 (민경 Play)
+- 평타 홀드 스매시·궤적 / E 방어 결계·반격 오라·기 모으기·방패 발광 + E 해제·대시로 끊을 때 전부 꺼짐 / 우클릭 방패 발광·루프·기 모으기 + 충격파 /
+  R 슈퍼아머 오버레이·칼 꽂기 속도·낙뢰·표식 / 패시브 칼날 발광·발동 시 추가 피해 연출·자기 힐. 컴파일 0.
+
+---
+
+# 계획(이전) = **보호막 VFX 공용화(금색 HolyShield·흰색 AllyShield) + 수호의 잔광·불굴의 가호 금색 연결** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 랩에서 색 판정·재생 확인) · ✅ 커밋 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02). 기획 `Re_C_특성_기획서_20261016.html` — 수호의 잔광 `PAL_3_E_SHIELD`(E 막기 → 피해 무시 끝난 뒤 최대 체력 10% · 4초, 본인) · 불굴의 가호 `PAL_4_HEAL_SHIELD`(회복받은 대상 = 본인·아군, 회복량 75% · 상한 10% · 4초).
+> ⚠️ `PlayerShieldVfx`(은희 작성 컴포넌트) 재작성 — 판정·보호막 수치는 안 건드림. 공유 = `Docs/tech/handoff-shield-vfx.md`.
+
+## 사실
+- 보호막 연출 = 받는 쪽 `PlayerShieldVfx` 가 복제 목록(`Unit.ShieldInstance`: type·sourceId)으로 배리어 켜고 끔, 깨짐(Depleted)만 RPC. 지금 판정: `ShieldType.HolyShield` = 금색, 나머지 = 흰색, 금색 우선, 배리어 하나.
+- **기본 E 는 더 이상 보호막을 안 준다**(코드에 `ShieldType.HolyShield` 거는 곳 없음) → 금색은 현재 한 번도 안 뜸. 특성 보호막 = `ShieldType.Trait` + sourceId = 특성 해시 → 지금 흰색으로 뜸.
+- 소켓: 팔라딘 = 금색·흰색 4종(자리 `Paladin_Armature/VFXSocket/Middle` y 0.777, 배율 0.5) · 거너 = 흰색 2종(자리 `VFX/AllyShield` 자기 위치 y 1, 배율 0.5) · **어쌔신 = `PlayerShieldVfx` 없음**(받은 보호막이 안 보임).
+- 에셋(민경 SVN 이동 완료, guid 유지): `50.Art/VFX/Common/Players/Shared/Shield/` — `FX_HolyShield(_Break)(_Entry)` · `FX_AllyShield(_Break)(_Entry)`·`_Barrier`·`_Motes`.
+- `FirstMeleeSubSkill.barrierLoop` = 별도 `FX_GuardianWill_Barrier`(E 방어 연출) — 이번 범위 밖, 그대로.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 구조(Q1) | SO `PlayerShieldVfxSet`(`9.ScriptableObject/Effects/`) = 금색 루프·깨짐 / 흰색 루프·깨짐 엔트리 + 자리·오프셋·배율. `PlayerShieldVfx` 는 소켓 칸 4개 대신 SO 를 읽어 `EffectManager` 로 직접 재생(루프 핸들 보유, 파문은 핸들 `GetInstances`). 4개 소켓 오브젝트 삭제(팔라딘·거너) |
+| 금색 판정(Q2) | SO 의 '금색 특성 보호막 ID' 목록 = `PAL_3_E_SHIELD`·`PAL_4_HEAL_SHIELD` + `ShieldType.HolyShield`. 나머지(거너 Q·기타 특성) 흰색 |
+| 섞임(Q3) | 배리어 하나 · 금색 우선(금색 깨지고 흰색 남으면 흰색으로) · 깨짐 = 마지막 보호막 소진 때 1번, 그 보호막의 색 |
+| 어쌔신(Q4) | `PlayerShieldVfx` 추가 |
+| 위치(Q5) | `StatusEffectVfxPresenter` 의 빈 '몸' 자리 채움 — 팔라딘 = `VFXSocket/Middle`, 거너·어쌔신 = `VFX/Body` 새로(거너 y 1 = 지금 쉴드 높이, 어쌔신 y 1 시작 → Play 보고 조정). 쉴드 = 자리 몸 · 배율 0.5 공통 |
+| 에셋(Q6) | `Shared/Shield/`(이동 완료) |
+| 오프라인 경로 | `PlayLocal`·`ServerEnd`(VFXScene·싱글) 유지 — 금색 재생 |
+
+## 작업 순서
+1. 코드: `PlayerShieldVfxSet` 신설 · `PlayerShieldVfx` 재작성(SO 판정·핸들 재생·파문·깨짐 RPC 색 판정 `IsHoly(shield)`).
+2. 에셋: SO 생성(엔트리 4 · ID 2 · 자리 몸 · 배율 0.5) · 3 Variant 배선(`PlayerShieldVfx.set`, 어쌔신 컴포넌트 추가, 몸 자리) · 소켓 4종 삭제 · `EffectCatalog` 확인.
+3. 검사: 컴파일 0 · 끊긴 참조 없음 · DebugTraitLab 에서 수호의 잔광(E 막기)·불굴의 가호(아군 허수아비 포함) 금색 / 거너 Q 흰색 확인(가능한 범위 GIF).
+4. 문서: `handoff-shield-vfx.md` · `trait-effect-events.md` §3.1 보호막 줄 · `CONTEXT.md`.
+
+## 완료 조건
+- 수호의 잔광: E 로 막은 뒤 피해 무시가 끝나면 팔라딘에 금색 배리어 4초, 깨지면 금색 깨짐.
+- 불굴의 가호: 팔라딘·회복받은 아군(거너·어쌔신 포함)에 금색.
+- 거너 Q: 흰색 그대로. 섞이면 금색 우선.
+- 어쌔신도 보호막 배리어가 보임. 컴파일 0.
+
+---
+
+# 계획(이전) = **나누는 불굴 전이 VFX + 플레이어 공용 원샷 이펙트 표(힐·레벨업)** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 · 초판 GIF ✅ 승인 · 임시 파일 정리) · ✅ 커밋 · ⏳ 민경 MPPM Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02). 참고 영상 `Downloads/ability_0012_P1.webm`(알리스타 E — 시전자 소용돌이 + 곡선 리본이 아군에게 흘러감).
+> ⚠️ 은희 담당 파일을 조금 고친다: `PlayerTraitEffects.ShareOverflow`(사건 1줄)·`TraitSkillFx.cs`(enum 끝에 1개)·`FirstMeleePassive`(RPC 칸 1개·`healBurst` → 공용 호출). 리뷰 대신 `Docs/tech/handoff-shared-heal-vfx.md` 로 공유.
+
+## 사실
+- 힐 이펙트: `FirstMeleePassive`(불굴의 의지) 발동 → 서버 `HealServer` → `ProcVfxRpc`(ClientsAndHost) → `healBurst.PlayOnce()` = 팔라딘 `VFX/PassiveSkill/Heal` 의 `EffectSocketPlayer`(엔트리 `FX_Heal_Entry`). 실제 회복량과 무관하게 발동마다 재생.
+- 레벨업: 각 Variant `VFX` 의 `TraitAcquiredVfxPresenter` 가 `TraitDirector` 복제 획득 수 증가를 감시 → 본인 화면만 `PlayLooping`+즉시 `Release`(몸 추종 원샷). 엔트리 칸을 직접 든다.
+- 나누는 불굴(`PAL_2_SHARE_HEAL`): 서버 `PlayerTraitEffects.ShareOverflow` 가 12m 안 체력 비율 최저 아군을 골라 `HealHp` — **클라에 알리는 신호 없음**.
+- 특성 연출 공용 경로(145): `TraitSkillFxNetwork.ServerSend` → `Player.TraitSkillFxRpc` → `TraitSkillFx.Raised`. 현재 VFX 구독자 없음.
+- 자연 회복도 서버 `HealHp` 를 부른다 → 체력 증가 감지로 힐을 띄우면 안 된다.
+- 에셋(민경 SVN 이동 완료, guid 유지): `50.Art/VFX/Common/Players/Shared/Heal/FX_Heal(_Entry)` · `Shared/States/Level_up(_Entry)`·`FX_Faint(_Entry)`.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 공용 구조(Q1→C) | 플레이어 공용 **원샷 이펙트 표** SO `PlayerOneShotVfxSet`(`9.ScriptableObject/Effects/PlayerOneShotVfxSet.asset`) + 재생기 `PlayerOneShotVfxPresenter`. 상태이상 표와는 **별도 에셋**(Q12) |
+| 종류 키(Q9) | enum `PlayerOneShotVfx { Heal, LevelUp }` |
+| 표 한 줄(Q10) | 종류 · 엔트리 · 자리(머리 위/몸/발밑) · 오프셋 · 배율 · 따라가기 여부. 힐·레벨업 둘 다 따라가기 켬. '본인만 보기'는 표가 아니라 **계기**(언제 재생할지 정하는 쪽 코드)가 거른다 |
+| 배치(Q11) | 3개 Variant `VFX/States` 에 `PlayerOneShotVfxPresenter`(자리는 옆 `StatusEffectVfxPresenter` 의 자리를 읽음) · API `Play(PlayerOneShotVfx)` 하나. `TraitAcquiredVfxPresenter` = 획득 감시만 남기고 `Play(LevelUp)` 호출(엔트리·배율 칸 삭제). 팔라딘 `VFX/PassiveSkill/Heal` 소켓·`healBurst` 칸 삭제 |
+| 힐 발생원(Q2) | 명시적 회복만 — 불굴의 의지(팔라딘 본인) · 나누는 불굴(받는 아군). 자연 회복·훈련 리셋은 안 냄 |
+| 본인 힐 조건(Q7) | 팔라딘 **실제 회복 > 0 일 때만** — `ProcVfxRpc` 에 `selfHealed` 칸 추가 |
+| 전이 신호(Q3) | `TraitFxTrait.PaladinShareHeal`(끝에 추가 = 9) · `Kind = Hit` · Pos = 팔라딘 몸 · Target = 아군. `ShareOverflow` 에서 실제 회복 > 0 일 때 `ServerSend` |
+| 전이 연출(Q4·Q15) | 팔라딘 몸통 출발 소용돌이(0.4초, 따라감) + 리본 3가닥(Trail 유도 입자, 가닥마다 좌우·위로 휨 무작위) → 움직이는 아군 몸을 매 프레임 추적. 수치 전부 인스펙터. 초판 GIF 로 보여주고 조정 |
+| 색(Q5) | 기존 `FX_Heal` 색 계열 |
+| 도착 시간(Q6·Q13) | 고정 시간 `travelSeconds`(기본 0.4, 리본 스크립트 칸). 도착 순간 리본이 알림 → 아군 `Play(Heal)`. 체력바는 서버 즉시 |
+| 비행 중 아군 소실(Q14) | 쓰러짐·끊김·연출 숨김 → 리본 그 자리에서 흩어짐, 아군 힐 생략 |
+| 에셋 위치(Q8) | 공용 힐 = `Shared/Heal/`(이동 완료). 전이 리본·소용돌이 = `50.Art/VFX/Common/Players/Player1/PassiveSkill/ShareHeal/` |
+| 보는 사람 | 힐·전이 = 전 피어 / 레벨업 = 본인만(기존 그대로) |
+
+## 작업 순서
+1. 코드: `PlayerOneShotVfx`·`PlayerOneShotVfxSet`·`PlayerOneShotVfxPresenter` 신설 · `StatusEffectVfxPresenter` 자리 읽기 공개 · `TraitAcquiredVfxPresenter` 계기 전용화.
+2. 코드: `TraitFxTrait.PaladinShareHeal` · `ShareOverflow` 사건 발송 · `FirstMeleePassive` `selfHealed` + 공용 `Play(Heal)` · 전이 리스너 `PaladinShareHealVfx`(팔라딘 Variant `VFX`, `TraitSkillFx.Raised` 구독, 시전자 = 내 플레이어만) · 리본 스크립트 `HealTransferRibbon`(추적·`travelSeconds`·도착 콜백·대상 소실 처리).
+3. 에셋: `PlayerOneShotVfxSet.asset`(Heal = `FX_Heal_Entry`, LevelUp = `Level_up_Entry` — 현재 배율·위치 그대로 옮김) · 3 Variant 배선 · 팔라딘 Heal 소켓 삭제 · 리본·소용돌이 프리팹+엔트리 제작 · `EffectCatalog` 등록(프리웜).
+4. 검사: 컴파일 0 · 3 Variant 배선(Presenter·set·자리) · 끊긴 참조 없음 · 레벨업 배율·위치 변화 없음.
+5. 초판 GIF → 조정.
+6. 문서: `Docs/tech/handoff-shared-heal-vfx.md`(구조·새 원샷 추가법·Play 체크리스트·은희 파일 변경점) · `trait-effect-events.md` 표·§3.1 · `CONTEXT.md`.
+
+## 완료 조건(Q16)
+- MPPM 2인: 팔라딘 만피 발동 → 소용돌이+리본+아군 힐, 팔라딘 힐 없음 / 팔라딘 피 깎인 상태 → 양쪽 힐. 호스트·클라 화면 동일.
+- 레벨업 회귀: 고른 본인만, 몸 추종.
+- 자연 회복으로 힐 이펙트 안 남.
+- 컴파일 0 · 위 검사 통과 · 문서 갱신.
+
+---
+
+# 계획(이전) = **컨테이너 프롭 6종 파괴 연출 + `BreakableCrate` → `Breakable` 공용화** (2026-10-30 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 배선 검사 통과, 미커밋) · ⏳ 민경 Play · ⏳ SVN 업로드)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-30). `Map/Breakable/` 코드는 전부 민경(SimJangBounce) 작성 — 다른 담당 영역 아님.
 > 판정은 기존 파이프라인 그대로(서버 판정 → `CrateBreakBroadcaster` RPC → 전 피어 연출). 새 네트워크 코드 없음.

@@ -5,8 +5,9 @@ using UnityEngine;
 
 /// <summary>
 /// 보호막 연출 창구. <b>보호막 연출의 주인은 보호막을 받은 쪽</b>이라는 것이 이 컴포넌트의 전제다 —
-/// 누가 걸어 줬든(자기 E, 거너 Q, 앞으로 생길 무엇이든) 배리어를 띄우고 걷는 것은 여기다.
-/// 단죄의 방패 적중 충격파도 같이 맡는다.
+/// 누가 걸어 줬든(팔라딘 특성, 거너 Q, 앞으로 생길 무엇이든) 배리어를 띄우고 걷는 것은 여기다.
+/// 모든 캐릭터 Variant 루트에 붙는다. (팔라딘 전용 단죄의 방패 충격파·반격 자세 전환은 2026-11-02
+/// <see cref="PaladinSkillView"/> 로 분리했다.)
 ///
 /// <b>왜 시전자가 안 하나.</b> 세 가지가 전부 어긋난다.
 /// <list type="number">
@@ -30,15 +31,15 @@ using UnityEngine;
 /// <b>사라졌다</b>까지만 알 수 있고 <b>왜</b>는 서버만 안다. 그래서 파괴 연출만 전 피어로 퍼뜨린다.
 /// 피격 파문도 같은 이유다 — 공격 판정이 서버 전용 스코프라 방향을 클라가 알 길이 없다.
 ///
-/// <b>색은 출처로 가른다</b>(2026-10-06, 민경 지정).
-/// <c>HolyShield</c>(자기 E) = 금색 / 그 외 전부 = 흰색. 둘 다 걸려 있으면 <b>금색이 이긴다</b> —
-/// 자기 핵심 스킬을 남의 연출이 덮으면 안 된다. 배리어는 어느 쪽이든 <b>언제나 하나</b>다.
-///
-/// ⚠️ 소켓의 safetyTimeout 은 <b>보호막 지속시간보다 길어야 한다</b> — 짧으면 배리어가 도중에
-/// 강제 회수된다. 팔라딘 10초 / 거너 5초 기준으로 15초를 쓴다.
+/// <b>색은 출처로 가른다</b>(2026-10-06 민경 지정 · 2026-11-02 공용 표로 이관).
+/// 팔라딘 고유 보호막(수호의 잔광·불굴의 가호, 옛 E) = 금색 / 그 외(거너 Q 등) = 흰색 — 판정은
+/// <see cref="PlayerShieldVfxSet.IsHoly"/>. 둘 다 걸려 있으면 <b>금색이 이긴다</b>. 배리어는 어느 쪽이든 <b>언제나 하나</b>다.
+/// 엔트리·자리·배율은 공용 표(<see cref="PlayerShieldVfxSet"/>), 실제 위치는 캐릭터마다
+/// <see cref="StatusEffectVfxPresenter"/> 의 '몸' 자리 — 그래서 모든 캐릭터가 두 색을 다 띄울 수 있다.
+/// 루프 핸들은 이 컴포넌트가 직접 들고, 보호막이 걷힐 때 해제한다(타이머·safetyTimeout 없음).
 /// </summary>
 [DisallowMultipleComponent]
-public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
+public class PlayerShieldVfx : BaseNetworkBehaviour
 {
     /// <summary>지금 띄워야 할 배리어. 셋 중 하나뿐이다 — 두 겹으로 띄우지 않는다.</summary>
     private enum Barrier
@@ -48,40 +49,25 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
         Ally,   // 남이 걸어 준 보호막 — 흰색
     }
 
-    [Header("자기 보호막 (수호자의 의지 · 금색)")]
-    [Tooltip("보호막이 떠 있는 동안 재생할 루프. 프리팹의 'HolyShield' EffectSocketPlayer 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer barrierLoop;
+    [Header("보호막 (플레이어 공용 표)")]
+    [Tooltip("금색·흰색 배리어·깨짐 엔트리와 자리·배율(플레이어 공용 PlayerShieldVfxSet). 비워두면 보호막 연출이 빠진다")]
+    [SerializeField] private PlayerShieldVfxSet set;
 
-    [Tooltip("보호막이 피해로 깨질 때 한 번 재생할 파괴 연출. 프리팹의 'HolyShield_Break' 를 물린다.\n" +
-             "비워두면 깨지는 순간에도 조용히 걷히기만 한다")]
-    [SerializeField] private EffectSocketPlayer breakBurst;
-
-    [Header("남이 걸어 준 보호막 (거너 Q 등 · 흰색)")]
-    [Tooltip("FX_AllyShield_Entry 를 문 EffectSocketPlayer. 프리팹의 'AllyShield' 를 물린다.\n" +
-             "비워두면 남이 준 보호막에는 배리어가 안 뜬다")]
-    [SerializeField] private EffectSocketPlayer allyBarrierLoop;
-
-    [Tooltip("FX_AllyShield_Break_Entry. 프리팹의 'AllyShield_Break' 를 물린다")]
-    [SerializeField] private EffectSocketPlayer allyBreakBurst;
+    [Tooltip("붙는 자리를 빌려 올 상태이상 Presenter(VFX/States). 비우면 자식에서 찾는다")]
+    [SerializeField] private StatusEffectVfxPresenter anchors;
 
     [Header("공통")]
     [Tooltip("공격 지점이 배리어 중심에서 이만큼도 떨어져 있지 않으면 파문을 건너뛴다(미터).\n" +
              "장판 한가운데서 맞으면 방향이 서지 않는다 — 엉뚱한 쪽에 띄우는 것보다 안 띄우는 게 낫다")]
     [SerializeField, Min(0f)] private float minHitDistance = 0.15f;
 
-    [Tooltip("단죄의 방패(우클릭)가 적중했을 때 한 번 터뜨릴 충격파. 프리팹의 'ShieldWave' 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer interruptWave;
-
     // 풀 인스턴스를 담아 둘 수 없으므로(반납되면 다른 연출에 재대출된다) 매번 다시 받는다.
     // 리스트만 재사용해 할당을 없앤다.
     private readonly List<GameObject> _instances = new List<GameObject>();
 
     private Unit _unit;
-    private Animator _animator;
-    private PlayerStateController _stateController;
     private Barrier _shown;
+    private EffectHandle _barrierHandle;
     private bool _subscribed;
 
     private void Awake()
@@ -94,20 +80,30 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
             return;
         }
 
+        if (anchors == null)
+            anchors = GetComponentInChildren<StatusEffectVfxPresenter>(true);
+
         // 🔴 스폰 전에도 건다. 이벤트는 순수 C# 이고 서버 판정은 핸들러 안에서 한다.
         _unit.ServerShieldEnded += OnServerShieldEnded;
         _subscribed = true;
     }
 
-    private void OnDestroy()
+    // 🔴 override + base 호출 — 예전엔 private OnDestroy 가 NetworkBehaviour.OnDestroy 를 가려(CS0114) NGO 정리가 안 불렸다.
+    public override void OnDestroy()
     {
         if (_subscribed && _unit != null)
             _unit.ServerShieldEnded -= OnServerShieldEnded;
+        // 디스폰·씬 언로드 — 따라갈 대상이 사라지므로 아웃트로 없이 바로 반납한다.
+        ReleaseBarrier(immediate: true);
+        base.OnDestroy();
     }
 
-    // 🔴 소켓은 OnDisable 에서 스스로 회수한다. 여기서 _shown 을 안 지우면
-    //    다시 켜졌을 때 "이미 띄워 뒀다"고 판단해 영영 안 나온다.
-    private void OnDisable() => _shown = Barrier.None;
+    // 🔴 여기서 _shown 을 안 지우면 다시 켜졌을 때 "이미 띄워 뒀다"고 판단해 영영 안 나온다.
+    private void OnDisable()
+    {
+        ReleaseBarrier(immediate: false);
+        _shown = Barrier.None;
+    }
 
     /// <summary>
     /// 복제된 보호막 목록을 보고 배리어를 맞춘다.
@@ -117,8 +113,8 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
     private void LateUpdate()
     {
         // 오프라인(VFXScene·싱글 테스트)에서는 복제 목록이 채워지지 않는다
-        // (Unit.UpdateNetworkShield 가 !IsSpawned 에서 빠져나간다). 그쪽은 PlayLocal 이 맡는다.
-        if (!IsNetworkActive || _unit == null)
+        // (Unit.UpdateNetworkShield 가 !IsSpawned 에서 빠져나간다).
+        if (!IsNetworkActive || _unit == null || set == null)
             return;
 
         Barrier want = Resolve();
@@ -134,67 +130,45 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
         if (count == 0)
             return Barrier.None;
 
-        // 자기 E 가 하나라도 섞여 있으면 금색이 이긴다.
-        Barrier want = Barrier.Ally;
+        // 금색 보호막이 하나라도 섞여 있으면 금색이 이긴다.
         for (int i = 0; i < count; i++)
         {
-            if (_unit.GetShieldInstance(i).type != ShieldType.HolyShield) continue;
-
-            want = Barrier.Holy;
-            break;
+            if (set.IsHoly(_unit.GetShieldInstance(i)))
+                return Barrier.Holy;
         }
-
-        // 🔴 그 색 소켓이 비어 있으면 다른 쪽으로 떨어뜨린다. 거너 프리팹에는 금색 소켓이 없다 —
-        //    팔라딘 E 는 자기 자신만 씌우므로 지금은 닿지 않는 길이지만, 닿았을 때
-        //    "보호막은 있는데 아무것도 안 뜬다"보다는 색이 틀린 쪽이 낫다.
-        if (want == Barrier.Holy && barrierLoop == null && allyBarrierLoop != null) return Barrier.Ally;
-        if (want == Barrier.Ally && allyBarrierLoop == null && barrierLoop != null) return Barrier.Holy;
-
-        return want;
+        return Barrier.Ally;
     }
 
     private void Show(Barrier want)
     {
-        // 색이 바뀌는 경우(흰색 중에 자기 E 를 씀) 옛 배리어는 아웃트로로 걷히고 새것이 올라온다.
-        if (_shown == Barrier.Holy) barrierLoop?.Stop();
-        else if (_shown == Barrier.Ally) allyBarrierLoop?.Stop();
-
-        if (want == Barrier.Holy) barrierLoop?.Play();
-        else if (want == Barrier.Ally) allyBarrierLoop?.Play();
-
+        // 색이 바뀌는 경우(흰색 중에 금색이 걸림) 옛 배리어는 아웃트로로 걷히고 새것이 올라온다.
+        ReleaseBarrier(immediate: false);
         _shown = want;
+
+        if (want == Barrier.None || !EffectManager.TryGet(out EffectManager effects, this))
+            return;
+
+        EffectEntry loop = set.Loop(want == Barrier.Holy);
+        if (loop != null)
+            _barrierHandle = effects.PlayLooping(loop, ResolveAnchor(), set.offset, set.scale);
     }
 
-    /// <summary>
-    /// [오프라인 전용] 배리어를 띄운다.
-    ///
-    /// 🔴 <b>네트워크가 붙어 있으면 아무 일도 하지 않는다.</b> 그때는 복제된 보호막 목록이
-    /// 유일한 근거이고, 여기서 또 켜면 목록이 아직 도착하지 않은 피어에서
-    /// "켰다가 한 프레임 뒤 껐다가 다시 켜는" 깜빡임이 난다.
-    /// 스킬 쪽(<see cref="FirstMeleeSubSkill.OnClientPlay"/>)이 계속 불러도 안전하다.
-    /// </summary>
-    public void PlayLocal()
+    private void ReleaseBarrier(bool immediate)
     {
-        if (IsNetworkActive) return;
-
-        barrierLoop?.Play();
-        _shown = Barrier.Holy;
+        if (_barrierHandle.IsSet && EffectManager.Instance != null)
+        {
+            if (immediate)
+                EffectManager.Instance.ReleaseImmediate(_barrierHandle);
+            else
+                EffectManager.Instance.Release(_barrierHandle);
+        }
+        _barrierHandle = EffectHandle.None;
     }
 
-    /// <summary>
-    /// [오프라인 전용] 배리어를 걷는다.
-    ///
-    /// 🔴 <b>네트워크가 붙어 있으면 아무 일도 하지 않는다.</b> 걷는 것은 복제 목록이,
-    /// 파괴 연출은 <see cref="OnServerShieldEnded"/> 가 맡는다.
-    /// </summary>
-    /// <param name="broken">피해로 소진돼 깨진 것이면 true, 시간 만료·사망이면 false.</param>
-    public void ServerEnd(bool broken)
+    private Transform ResolveAnchor()
     {
-        if (IsNetworkActive) return;
-
-        barrierLoop?.Stop();
-        _shown = Barrier.None;
-        if (broken) breakBurst?.PlayOnce();
+        Transform anchor = anchors != null ? anchors.GetAnchor(set.anchor) : null;
+        return anchor != null ? anchor : transform;
     }
 
     /// <summary>
@@ -212,7 +186,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
         if (!IsServer || reason != ShieldEndReason.Depleted) return;
         if (_unit == null || _unit.ShieldInstanceCount > 0) return;
 
-        BreakBurstRpc(shield.type == ShieldType.HolyShield);
+        BreakBurstRpc(set != null && set.IsHoly(shield));
     }
 
     // 원샷이라 Unreliable 이다. 한 발 유실되면 파괴 연출 한 번이 안 뜰 뿐 상태가 어긋나지 않는다 —
@@ -220,11 +194,12 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     private void BreakBurstRpc(bool holy)
     {
-        // 배리어와 같은 폴백 규칙 — 그 색이 없으면 있는 쪽으로.
-        EffectSocketPlayer burst = holy ? breakBurst : allyBreakBurst;
-        if (burst == null) burst = holy ? allyBreakBurst : breakBurst;
+        EffectEntry burst = set != null ? set.Break(holy) : null;
+        if (burst == null || !EffectManager.TryGet(out EffectManager effects, this))
+            return;
 
-        burst?.PlayOnce();
+        Transform anchor = ResolveAnchor();
+        effects.Play(burst, anchor.position + set.offset, anchor.rotation, set.scale);
     }
 
     /// <summary>
@@ -253,17 +228,11 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     private void HitShieldVfxRpc(Vector3 sourceWorldPosition) => HitLocal(sourceWorldPosition);
 
-    // 어느 색이 떠 있는지는 여기서 따지지 않는다 — 안 뜬 쪽은 인스턴스가 0이라 조용히 넘어간다.
+    // 지금 떠 있는 배리어(색 무관)에만 띄운다 — 없으면 인스턴스가 0이라 조용히 넘어간다.
     private void HitLocal(Vector3 sourceWorldPosition)
     {
-        Ripple(barrierLoop, sourceWorldPosition);
-        Ripple(allyBarrierLoop, sourceWorldPosition);
-    }
-
-    private void Ripple(EffectSocketPlayer player, Vector3 sourceWorldPosition)
-    {
-        if (player == null) return;
-        if (player.GetInstances(_instances) == 0) return;
+        if (!_barrierHandle.IsSet || EffectManager.Instance == null) return;
+        if (EffectManager.Instance.GetInstances(_barrierHandle, _instances) == 0) return;
 
         for (int i = 0; i < _instances.Count; i++)
         {
@@ -287,89 +256,5 @@ public class PlayerShieldVfx : BaseNetworkBehaviour, IInterruptCueSink
 
             ripple.AddHit(center + direction.normalized);
         }
-    }
-
-    /// <summary>
-    /// [서버] 단죄의 방패가 적중했다. 충격파를 전 피어에 한 번 터뜨린다.
-    ///
-    /// <b>왜 스킬이 직접 못 하나.</b> 적중 판정(<c>FirstMeleeInterruptSkill.ResolveHit</c>)은
-    /// <b>서버에서만</b> 돈다 — <c>OnTick</c>은 <c>TickServer</c>가, 애니메이션 이벤트는
-    /// <c>PlayerSkillController.HandleAnimationEvent</c>의 <c>if (IsNetworkActive &amp;&amp; !IsServer) return;</c>가
-    /// 각각 막는다. 거기서 바로 재생하면 <b>호스트에서만 보인다</b>.
-    /// 그리고 스킬의 부모 <c>PlayerSkillBase</c>는 MonoBehaviour라 RPC를 달 수 없다.
-    /// </summary>
-    public void ServerInterruptWave()
-    {
-        if (!IsNetworkActive)
-        {
-            PlayInterruptWave();
-            return;
-        }
-
-        if (!IsServer) return;
-
-        InterruptWaveRpc();
-    }
-
-    // 원샷이라 Unreliable 이다. 한 발 유실되면 충격파 한 번이 안 뜰 뿐 상태가 어긋나지 않는다.
-    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    private void InterruptWaveRpc() => PlayInterruptWave();
-
-    // 간파 연출 디렉터(할 일 118) — B3 칸은 피어마다 자기 값. 켜져 있으면 디렉터가 PlayCue 로 돌려 부른다.
-    private void PlayInterruptWave() =>
-        InterruptProductionDirector.PlayCue(InterruptProductionCue.PaladinWave,
-            InterruptProductionEvent.LocalCue(InterruptProductionPhase.Success, IsSpawned ? OwnerClientId : 0), this);
-
-    // [각 피어] B3 충격파 원샷.
-    void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
-    {
-        if (cue == InterruptProductionCue.PaladinWave)
-            interruptWave?.PlayOnce();
-    }
-
-    /// <summary>
-    /// [서버] 수호자의 의지(E) 방어 성공 — 반격 자세 상태로 <b>전 피어(오너 포함)</b>에서 CrossFade 한다.
-    /// 방어중 E 재입력 해제(해제 상태 SubSkillGuardEnd, 할 일 94)도 같은 창구를 쓴다.
-    ///
-    /// <b>왜 서버만 하면 안 되나.</b> 반격 판정·종료는 반격 클립의 Hit·End 이벤트로 정해지는데,
-    /// 스킬 이벤트는 서버 애니메이터에서만 처리된다. 플레이어에는 오너 권한 NetworkAnimator 가 있어
-    /// 서버만 바꾸면 오너 동기가 상태를 방어 자세로 되돌린다 — 그러면 Hit·End 가 안 온다.
-    /// 그래서 시작 상태와 같은 길을 탄다(<c>PlayerSkillController</c>: 서버 PlaySkillPresentation →
-    /// PlaySkillClientRpc 의 비서버 피어 CrossFadeInFixedTime). 스킬 부모는 MonoBehaviour 라 RPC 를 여기 둔다.
-    /// </summary>
-    public void ServerPlayGuardCounterPose(int stateHash, float fadeSeconds)
-    {
-        if (IsNetworkActive && !IsServer) return;
-
-        // 서버(오프라인 포함)는 바로 바꾼다 — 판정 이벤트가 이 애니메이터에서 난다.
-        PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
-
-        if (IsNetworkActive)
-            GuardCounterPoseRpc(stateHash, fadeSeconds);
-    }
-
-    // 상태 전환이라 Reliable 이다 — 유실되면 그 피어 화면이 방어 자세에 남는다(오너면 동기로 서버까지 되돌린다).
-    // 이 피어가 이미 E 를 떠났으면(오너가 대시로 먼저 끊음, 할 일 95) 늦게 온 자세를 틀지 않는다 — 대시·이동 중에 반격·해제 자세가
-    // 다시 켜지면 오너 권한 NetworkAnimator 가 그대로 전 피어로 퍼뜨린다. 관찰자도 PlaySkillClientRpc~EndSkillClientRpc 동안 스킬 상태다.
-    [Rpc(SendTo.NotServer, Delivery = RpcDelivery.Reliable)]
-    private void GuardCounterPoseRpc(int stateHash, float fadeSeconds)
-    {
-        if (_stateController == null)
-            _stateController = GetComponent<PlayerStateController>();
-
-        if (_stateController != null && !_stateController.IsInSkillState)
-            return;
-
-        PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
-    }
-
-    private void PlayGuardCounterPoseLocal(int stateHash, float fadeSeconds)
-    {
-        // Player·PlayerSkillController 와 같은 해석(미지정이면 자식의 첫 Animator).
-        if (_animator == null)
-            _animator = GetComponentInChildren<Animator>();
-
-        if (_animator != null)
-            _animator.CrossFadeInFixedTime(stateHash, fadeSeconds);
     }
 }

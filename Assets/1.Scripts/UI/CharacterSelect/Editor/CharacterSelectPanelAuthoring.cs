@@ -451,9 +451,17 @@ public static class CharacterSelectPanelAuthoring
     // 목업(legacy/00_mock_up.png, 1920×1080 좌상단) 자리 — 알약 몸체 242×112, 뒤 검은 판(knockout) 485×128 은 몸체보다 사방 8px 크고 오른쪽은 위 카드 밑으로 들어간다.
     static readonly Vector2 BasicTabTopLeft = new Vector2(1363f, 52f);
     static readonly Vector2 CoreTabTopLeft = new Vector2(1258f, 210f);
-    static readonly Vector2 BasicLabelCenter = new Vector2(1481f, 108f);
+    // 할 일 178: 기본도 코어 몸체(tab_core_body)를 쓰므로 글자 자리도 코어와 같은 몸체 기준 오프셋(+5, 0)으로 맞춘다.
+    static readonly Vector2 BasicLabelCenter = new Vector2(1489f, 108f);
     static readonly Vector2 CoreLabelCenter = new Vector2(1384f, 266f);
     const float KnockoutInset = 8f;
+
+    // 할 일 178(임시, 추후 아트 교체 예정): 기본 글자 이미지(tab_gibon_label)는 검정이라 코어 몸체 위에서 안 보여 TMP 로 쓴다 — 코어 글자 색(≈148 회색).
+    // 굵기는 코어 글자 아트에 맞춰 서울알림체 Heavy(설정창 아트 서체). NotoSansKR Bold 는 너무 얇았다.
+    const string BasicTabText = "기본";
+    const string BasicTabFontPath = "Assets/50.Art/UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset";
+    const float BasicTabTextSize = 46f;
+    static readonly Color TabLabelColor = new Color(0.58f, 0.58f, 0.58f, 1f);
 
     // 팝업 목업(01_Popup_no_text.png, 1920×1080) — 몸체 가운데 기준 X 버튼·본문 자리.
     static readonly Vector2 PopupFrameOffset = new Vector2(0f, -8f);
@@ -519,8 +527,13 @@ public static class CharacterSelectPanelAuthoring
             RectTransform rect = NewRect(TabsName, content);
             Stretch(rect);
             rect.SetSiblingIndex(cards.GetSiblingIndex() + 1);
-            AddTabButton(rect, "Button_Basic", "tab_gibon_body.png", "tab_gibon_label.png", BasicTabTopLeft, BasicLabelCenter);
-            AddTabButton(rect, "Button_Core", "tab_core_body.png", "tab_core_label.png", CoreTabTopLeft, CoreLabelCenter);
+            Sprite coreLabel = LoadSprite("tab_core_label.png");
+            RectTransform basicLabelRect = AddTabButton(rect, "Button_Basic", "tab_core_body.png", NativeSize(coreLabel), BasicTabTopLeft, BasicLabelCenter);
+            var tabFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(BasicTabFontPath);
+            AddText(basicLabelRect, tabFont != null ? tabFont : font, BasicTabText, BasicTabTextSize, TextAlignmentOptions.Center, TabLabelColor)
+                .fontStyle = FontStyles.Normal; // Heavy 자체가 굵다
+            RectTransform coreLabelRect = AddTabButton(rect, "Button_Core", "tab_core_body.png", NativeSize(coreLabel), CoreTabTopLeft, CoreLabelCenter);
+            AddImage(coreLabelRect.gameObject, coreLabel, Color.white);
             tabs = rect;
         }
 
@@ -547,9 +560,10 @@ public static class CharacterSelectPanelAuthoring
         AddImage(rect.gameObject, sprite, Color.white);
     }
 
-    static void AddTabButton(Transform parent, string name, string bodyFile, string labelFile, Vector2 topLeft, Vector2 labelCenter)
+    /// <summary>알약 몸체 버튼 + 빈 "Label" 자리를 만든다. 글자(이미지/TMP)는 호출부가 Label 에 붙인다.</summary>
+    static RectTransform AddTabButton(Transform parent, string name, string bodyFile, Vector2 labelSize, Vector2 topLeft, Vector2 labelCenter)
     {
-        Sprite body = LoadSprite(bodyFile), label = LoadSprite(labelFile);
+        Sprite body = LoadSprite(bodyFile);
         RectTransform rect = NewRect(name, parent);
         Vector2 size = NativeSize(body);
         Place(rect, Right, topLeft.x, topLeft.y, size.x, size.y);
@@ -561,13 +575,12 @@ public static class CharacterSelectPanelAuthoring
         ApplyPopupButtonTint(button);
 
         RectTransform labelRect = NewRect("Label", rect);
-        Vector2 labelSize = NativeSize(label);
         labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0.5f);
         labelRect.pivot = new Vector2(0.5f, 0.5f);
         labelRect.sizeDelta = labelSize;
         // 몸체 가운데 기준(목업 좌표는 y 아래로)
         labelRect.anchoredPosition = new Vector2(labelCenter.x - (topLeft.x + size.x * 0.5f), (topLeft.y + size.y * 0.5f) - labelCenter.y);
-        AddImage(labelRect.gameObject, label, Color.white);
+        return labelRect;
     }
 
     /// <summary>설정 창(SettingsArtSkin.Tint)과 같은 버튼 색 전이.</summary>
