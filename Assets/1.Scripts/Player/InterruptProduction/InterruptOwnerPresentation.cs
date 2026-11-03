@@ -29,7 +29,6 @@ public interface IInterruptOwnerPresentationSettings
 /// <list type="bullet">
 /// <item>입력 순간 오너 예측(<see cref="Predict"/>): 강 = 오너 암전 + 빛 모임, 약 = 아무것도 안 켠다(줌·슬로우는 서버 슬로우가 처리), 대상 없음 = 시도로 치지 않는다.</item>
 /// <item>내 시도 슬로우가 시작되면(<see cref="ServerStarted"/>) 목적(Attempt = 강 / AttemptWeak = 약)이 예측과 다르면 걷는다.</item>
-/// <item>대쉬 간파 재예측(<see cref="UpgradeToStrong"/>, 할 일 139-2): 약 시도를 대시 도중 강으로 올린다 — 그 뒤 서버 약 목적으로는 내리지 않는다.</item>
 /// <item>내 시도 슬로우 실패 복귀(<see cref="ServerFailed"/>)·판정 전 종료·거부(<see cref="LocalEnded"/>)면 걷는다.</item>
 /// <item>내 성공 슬로우(<see cref="ServerStarted"/> Success)면 암전 유지로 성공 단계 — 적중 섬광 진행기의 섬광 순간(<see cref="SuccessFlashMoment"/>)에 즉시 끈다.
 /// 그 순간 암전이 켜져 있었는지(<see cref="SuccessDimmed"/>)로 디렉터가 섬광 오버레이를 튼다.</item>
@@ -52,8 +51,8 @@ public sealed class InterruptOwnerPresentation
     private float _pushedDim;
 
     private bool _strongStanding;   // 이 시도가 강으로 남아 있다(예측 강 ∧ 서버 목적이 어긋나지 않음) — 실패 직후 같은 판정 성공이면 암전을 되살린다
-    private bool _upgraded;         // 이 시도를 대쉬 간파 재예측이 약 → 강으로 올렸다(할 일 139-2) — 서버의 약 목적으로 다시 내리지 않는다
     private bool _awaitingFlash;    // 성공 암전이 섬광 순간을 기다린다
+    private bool _dims;             // 이 강 시도가 암전·빛 모임을 켠다(할 일 192 Q1 — 제압 간파로 예측됐을 때만)
     private PlayerInterruptSkillBase _skill;
 
     public InterruptOwnerPresentation(IInterruptOwnerPresentationSettings settings,
@@ -75,8 +74,14 @@ public sealed class InterruptOwnerPresentation
     public float DimIntensity => _pushedDim;
     public bool LightGatherActive { get; private set; }
 
-    /// <summary>마지막 서버 확정 성공에 들어선 순간 암전이 켜져 있었다(강 시도) — 적중 섬광 오버레이 조건. 새 시도·리셋에 false.</summary>
+    /// <summary>
+    /// 마지막 서버 확정 성공이 강 시도의 성공이다 — 적중 섬광 오버레이 조건. 새 시도·리셋에 false.
+    /// 할 일 192 부터 강 시도라도 암전을 안 켤 수 있다(일반·대쉬 간파) — 이 값은 암전 여부가 아니라 '강으로 남은 시도의 성공'이다(<see cref="AttemptDims"/> 와 별개).
+    /// </summary>
     public bool SuccessDimmed { get; private set; }
+
+    /// <summary>이번 강 시도가 오너 암전·빛 모임을 켰다(할 일 192 Q1 — 제압 간파 예측만). 약·대상 없음은 false.</summary>
+    public bool AttemptDims => _dims;
 
     /// <summary>
     /// 이번 시도의 공격 방향(월드) — 입력 순간 예측이 받은 값(근접 = 요청에 싣는 시전 방향, 대쉬 = 대시 방향). 0 = 모름.
@@ -114,9 +119,10 @@ public sealed class InterruptOwnerPresentation
     /// <summary>
     /// [오너] 간파 입력 순간 예측. 대상 없음이면 아무것도 켜지 않고 상태도 그대로(false, 할 일 132 정정1).
     /// 시도가 아직 결론나지 않았으면 중복 입력으로 보고 무시한다(false). <paramref name="attackDirection"/> = <see cref="AttackDirection"/>.
+    /// <paramref name="dims"/> = 강 예측일 때 암전·빛 모임을 켜는가(할 일 192 Q1 — 디렉터가 예측 단계로 정한다, 기본 켬). 꺼도 강 상태(줌 붙잡기·섬광 오버레이 조건)는 그대로.
     /// </summary>
     public bool Predict(BeaverLobby.Player.Dash.InterruptAttemptForecast forecast, PlayerInterruptSkillBase skill, float now,
-        Vector3 attackDirection = default)
+        Vector3 attackDirection = default, bool dims = true)
     {
         if (!Accepts(forecast))
             return false;
@@ -129,12 +135,12 @@ public sealed class InterruptOwnerPresentation
         Mispredicted = false;
         AttemptTriggerId = 0;
         _strongStanding = predictsSuccess;
-        _upgraded = false;
+        _dims = predictsSuccess && dims;
         _awaitingFlash = false;
         SuccessDimmed = false;
         State = predictsSuccess ? InterruptOwnerPresentationState.AttemptStrong : InterruptOwnerPresentationState.AttemptWeak;
 
-        if (predictsSuccess)
+        if (_dims)
         {
             RampTo(1f, _settings.OwnerDimInDuration, now);
             SetGather(true);
@@ -145,30 +151,6 @@ public sealed class InterruptOwnerPresentation
             SetGather(false);
         }
 
-        Push(now);
-        return true;
-    }
-
-    /// <summary>결론 전 시도이고 오너 예측이 아직 약이다 — <see cref="UpgradeToStrong"/> 이 받아들인다.</summary>
-    public bool CanUpgrade => IsAttempt(State) && !PredictedStrong;
-
-    /// <summary>
-    /// [오너] 대쉬 간파 재예측(할 일 139-2) — 약 시도가 대시 도중 강으로 올라갔다. 지금부터 암전·빛 모임을 켠다(늦게 켜지는 것 허용).
-    /// 서버 시도 목적이 먼저 강으로 와 있었어도(서버 재예측이 먼저) 켠다. 이후 서버의 약 목적(승인 때 예측)은 이 강을 내리지 않는다.
-    /// 받아들이면 true.
-    /// </summary>
-    public bool UpgradeToStrong(float now)
-    {
-        if (!CanUpgrade)
-            return false;
-
-        PredictedStrong = true;
-        Mispredicted = false;
-        _strongStanding = true;
-        _upgraded = true;
-        State = InterruptOwnerPresentationState.AttemptStrong;
-        RampTo(1f, _settings.OwnerDimInDuration, now);
-        SetGather(true);
         Push(now);
         return true;
     }
@@ -193,10 +175,6 @@ public sealed class InterruptOwnerPresentation
 
         AttemptTriggerId = triggerId;
         bool serverStrong = purpose == SlowMotionPurpose.Attempt;
-        // 재예측으로 올린 강은 서버의 약(승인 때 예측 — 재예측보다 오래된 관측)으로 내리지 않는다(할 일 139-2, 강 → 약 없음).
-        if (_upgraded && !serverStrong)
-            return;
-
         State = serverStrong ? InterruptOwnerPresentationState.AttemptStrong : InterruptOwnerPresentationState.AttemptWeak;
         if (serverStrong == PredictedStrong)
             return;
@@ -259,7 +237,7 @@ public sealed class InterruptOwnerPresentation
         _awaitingFlash = false;
         SuccessDimmed = false;
         _strongStanding = false;
-        _upgraded = false;
+        _dims = false;
         AttemptTriggerId = 0;
         State = InterruptOwnerPresentationState.None;
         PushValue(0f);
@@ -283,9 +261,11 @@ public sealed class InterruptOwnerPresentation
     {
         // 같은 판정에서 실패 복귀가 성공 바로 앞에 한 번 날 수 있다(예측 대기 밖 성공) — 강이 살아 있으면 암전을 되살린다.
         // 약 시도의 성공은 끌 암전이 없다(섬광 오버레이도 없다).
-        bool dimmed = _strongStanding;
+        // 암전 없이 강으로 남은 시도(일반·대쉬 간파, 할 일 192)는 섬광 오버레이 조건만 남기고 암전은 켜지 않는다.
+        bool strong = _strongStanding;
+        bool dimmed = strong && _dims;
         State = InterruptOwnerPresentationState.Success;
-        SuccessDimmed = dimmed;
+        SuccessDimmed = strong;
         SuccessTriggerId = triggerId;
         _awaitingFlash = dimmed;
         SetGather(false);

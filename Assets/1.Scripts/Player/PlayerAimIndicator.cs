@@ -29,6 +29,7 @@ public class PlayerAimIndicator : NetworkBehaviour
     private const float FootRayLength = 3f;
 
     private PlayerDashController dash;
+    private MeshRenderer indicatorRenderer;
     private Material indicatorMaterial; // 인스턴스 — 프리팹 애셋 오염 금지
     private Color indicatorBaseColor;
     private bool? lastDashDimmed;
@@ -54,6 +55,12 @@ public class PlayerAimIndicator : NetworkBehaviour
 
         dash = GetComponent<PlayerDashController>();
         CacheIndicatorMaterial();
+    }
+
+    // 간파 숨김 중에 꺼져도 쿼드가 꺼진 채 남지 않게.
+    private void OnDisable()
+    {
+        ApplyInterruptHide(indicatorRenderer, false);
     }
 
     public override void OnDestroy()
@@ -87,12 +94,27 @@ public class PlayerAimIndicator : NetworkBehaviour
         if (IsNetworkActive && !IsOwner)
             return;
 
+        ApplyInterruptHide(indicatorRenderer, InterruptProductionDirector.CombatUiHidden);
         PlaceIndicator();
+    }
+
+    /// <summary>
+    /// 간파 암전·섬광 동안 쿼드를 숨긴다(A5, 할 일 179 후속 2). 렌더러만 끄므로 꺼진 동안 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도
+    /// 그려지지 않는다 — 플레이어 루트를 태깅하면 이 쿼드도 비트를 받아 흰 사각형 실루엣이 됐다. 조준·배치 계산은 그대로 돈다.
+    /// </summary>
+    public static void ApplyInterruptHide(Renderer quad, bool hidden)
+    {
+        if (quad != null && quad.enabled == hidden)
+            quad.enabled = !hidden;
     }
 
     private void CacheIndicatorMaterial()
     {
-        if (indicator == null || !indicator.TryGetComponent(out MeshRenderer quad) || quad.sharedMaterial == null)
+        if (indicator == null || !indicator.TryGetComponent(out MeshRenderer quad))
+            return;
+
+        indicatorRenderer = quad;
+        if (quad.sharedMaterial == null)
             return;
 
         indicatorMaterial = new Material(quad.sharedMaterial);

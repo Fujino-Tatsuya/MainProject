@@ -2,7 +2,7 @@ using BeaverLobby.Player.Dash;
 using NUnit.Framework;
 
 /// <summary>
-/// 간파 예측 보정 씬(할 일 139) 단계 4 — 질문 흐름(<see cref="InterruptCalibrationQuestionFlow"/>: 대기 → 정지 조건·답·대기열)과
+/// 간파 보정 랩(할 일 139 단계 4 → 191 5단계) — 질문 흐름(<see cref="InterruptCalibrationQuestionFlow"/>: 대기 → 정지 조건·답·대기열)과
 /// 정지 배율 보관(<see cref="CalibrationTimePause"/>)·질문 창 문구의 순수 규칙.
 /// </summary>
 public sealed class InterruptCalibrationQuestionTests
@@ -11,7 +11,7 @@ public sealed class InterruptCalibrationQuestionTests
 
     static InterruptCalibrationCompleted Completed(float judgeRealTime, bool succeeded = true, int tag = 0)
     {
-        var sample = new InterruptCalibrationSample { ServerSucceeded = succeeded, PressAge = tag };
+        var sample = new InterruptCalibrationSample { TargetDistance = tag }; // tag = 대기열 순서 표시(값 자체는 의미 없음)
         return new InterruptCalibrationCompleted(sample, succeeded, judgeRealTime - 100f, judgeRealTime);
     }
 
@@ -150,7 +150,7 @@ public sealed class InterruptCalibrationQuestionTests
         Assert.IsTrue(flow.Answer(CalibrationAnswer.ShouldFail, out _));
         Assert.AreEqual(CalibrationQuestionPhase.Waiting, flow.Phase);
         Assert.AreEqual(0, flow.QueuedCount);
-        Assert.AreEqual(2f, flow.Current.Sample.PressAge.Value, Eps);
+        Assert.AreEqual(2f, flow.Current.Sample.TargetDistance.Value, Eps);
 
         // 판정이 이미 오래전 — 평소 상태면 바로 묻는다
         Assert.IsTrue(flow.Tick(30f, true));
@@ -168,7 +168,7 @@ public sealed class InterruptCalibrationQuestionTests
         for (int expected = 1; expected <= 3; expected++)
         {
             Assert.IsTrue(flow.Tick(20f, true));
-            Assert.AreEqual(expected, flow.Current.Sample.PressAge.Value, Eps);
+            Assert.AreEqual(expected, flow.Current.Sample.TargetDistance.Value, Eps);
             Assert.IsTrue(flow.Answer(CalibrationAnswer.ShouldSucceed, out _));
         }
 
@@ -189,7 +189,7 @@ public sealed class InterruptCalibrationQuestionTests
         Assert.AreEqual(1, flow.OverflowDroppedCount);
 
         flow.Answer(CalibrationAnswer.Skip, out _);
-        Assert.AreEqual(1f, flow.Current.Sample.PressAge.Value, Eps, "앞에 선 표본이 남는다");
+        Assert.AreEqual(1f, flow.Current.Sample.TargetDistance.Value, Eps, "앞에 선 표본이 남는다");
     }
 
     [Test]
@@ -254,31 +254,41 @@ public sealed class InterruptCalibrationQuestionTests
     // ─── 문구 ──────────────────────────────────────────────────────────
 
     [Test]
-    public void 질문_창_요약은_예측_결과_실제_창을_보인다()
+    public void 질문_창_요약은_예측_판정_서버_어긋남_실제_창을_보인다()
     {
+        var record = new InterruptQaRecord
+        {
+            ViaDash = true,
+            PressTime = 10.0,
+            HasPrediction = true,
+            Prediction = new InterruptJudgeResult { Outcome = InterruptJudgeOutcome.Failure, FailReason = InterruptJudgeFailReason.WindowClosed },
+            Judge = InterruptQaJudge.Success,
+            JudgeResult = new InterruptJudgeResult { Outcome = InterruptJudgeOutcome.Success, JudgeTime = 10.35 },
+            Server = InterruptQaServer.ApprovedFirst,
+            ServerAttempt = InterruptAttemptForecast.Strong,
+        };
         var s = new InterruptCalibrationSample
         {
-            OwnerForecast = InterruptAttemptForecast.Weak,
-            OwnerReason = DashInterruptPredictReason.WindowClosesBeforeResolve,
-            ServerForecast = InterruptAttemptForecast.Strong,
-            ServerSucceeded = true,
+            Record = record,
             ActualWindowOpen = true,
             ActualOpenElapsed = 0.25f,
             ActualRemaining = null,
         };
         string text = InterruptCalibrationQuestionPanel.DescribeSample(s);
 
-        StringAssert.Contains("오너 예측: 약 (WindowClosesBeforeResolve)", text);
-        StringAssert.Contains("서버 예측: 강", text);
-        StringAssert.Contains("서버 결과: 성공", text);
+        StringAssert.Contains("예측: 약 (WindowClosed) · 서버 시도 슬로우 강", text);
+        StringAssert.Contains("오너 판정: 성공 (-)", text);
+        StringAssert.Contains("서버 결과: 승인", text);
+        StringAssert.Contains("어긋남: 창 시간표 변경", text);
         StringAssert.Contains("실제 창: 열림 · 경과 0.250s · 남음 -", text);
+        StringAssert.Contains("판정까지 0.350s", text);
     }
 
     [Test]
     public void 값_없는_표본_요약은_빈_칸_표시()
     {
         string text = InterruptCalibrationQuestionPanel.DescribeSample(new InterruptCalibrationSample());
-        StringAssert.Contains("오너 예측: - (-)", text);
+        StringAssert.Contains("예측: - (-)", text);
         StringAssert.Contains("서버 결과: -", text);
         Assert.AreEqual("-", InterruptCalibrationQuestionPanel.DescribeSample(null));
         Assert.AreEqual("대상 없음", InterruptCalibrationQuestionPanel.DescribeForecast(InterruptAttemptForecast.NoTarget));

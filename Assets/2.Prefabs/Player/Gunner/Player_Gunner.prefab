@@ -5795,6 +5795,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8020166898015606970, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
   m_PrefabInstance: {fileID: 4164306706429407243}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &7098681112950429116 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6577791197332317623, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
+  m_PrefabInstance: {fileID: 4164306706429407243}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &8113218494813838305 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5286495743266417642, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
@@ -6160,6 +6165,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1722392471722992986}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7145913582891525314}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &1006850121594653262 stripped
 GameObject:
@@ -6512,6 +6520,20 @@ MonoBehaviour:
   hotColor: {r: 1, g: 0.15, b: 0.1, a: 1}
   overheatBlinkColor: {r: 1, g: 1, b: 1, a: 1}
   overheatBlinkPeriod: 0.4
+--- !u!114 &7145913582891525314
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1006850121594653262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5feab8bea9f7ac4ab279120142da2d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerWeaponAnchor
+  rightWeapon: {fileID: 7098681112950429116}
+  localOffset: {x: 0, y: 0, z: 0}
 --- !u!4 &7722051468864962236 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

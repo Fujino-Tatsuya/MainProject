@@ -10,13 +10,12 @@ using UnityEngine;
 /// <item>발동자 본인 화면은 <see cref="selfIntensity"/>, 다른 사람 화면은 <see cref="othersIntensity"/>.</item>
 /// <item>곡선은 실시간(unscaled) — 슬로우 배율과 무관하게 같은 길이로 보인다.</item>
 /// <item>강제 리셋·세션 종료·비활성화면 즉시 0.</item>
-/// <item>원형 중심 = <see cref="revealCenter"/>(기본 Target = 신호의 대상 위치, Caster = 발동자 추적, Midpoint = 중간).
-///       매 프레임 메인 카메라 뷰포트로 바꾼다. 못 찾거나 카메라 뒤면 원형 끔.</item>
+/// <item>화면 전체에 고르게 건다 — 대상 주변을 살리는 원(옛 revealCenter·revealRadius·revealSoftness)은 11-03 삭제.</item>
 /// </list>
 /// </summary>
 [RequireComponent(typeof(GlobalTimeScale))]
 [DataTableSheet("SlowMotion", Order = 2)]
-public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdaptationOutput
+public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdaptationOutput, ISuppressDarkAdaptOutput
 {
     [Tooltip("간파 성공 발동자 본인 화면의 암순응 강도 [0, 1]")]
     [SerializeField, Range(0f, 1f)] private float selfIntensity = 1f;
@@ -34,19 +33,10 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
     [SerializeField, Min(0f)] private float thresholdSoftness = 0.3f;
     [Tooltip("강도 1 에서 어두운 픽셀을 낮추는 최대 비율 [0, 1]")]
     [SerializeField, Range(0f, 1f)] private float maxDarken = 0.85f;
-    [Tooltip("살리는 원의 중심 — Target = 카운터 창을 소비한 대상 위치, Caster = 발동자 플레이어 추적, Midpoint = 둘의 중간(시전자 못 찾으면 대상)")]
-    [SerializeField] private RevealCenterMode revealCenter = RevealCenterMode.Target;
-    [Tooltip("중심 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔")]
-    [SerializeField, Min(0f)] private float revealRadius = 0.18f;
-    [Tooltip("원 가장자리 부드러움(화면 높이 비율)")]
-    [SerializeField, Min(0f)] private float revealSoftness = 0.1f;
 
     private readonly InterruptDarkAdaptationModel _model = new InterruptDarkAdaptationModel();
 
     private NetworkManager _networkManager;
-    private ulong _triggerClientId;
-    private Transform _triggerPlayer;
-    private Vector3 _targetPosition;
 
     private void Awake()
     {
@@ -62,7 +52,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
     /// 간파 성공 암순응을 튼다(디렉터가 부른다 — 칸·성공 여부는 이미 걸렀다). 본인 화면이면 self 강도, 아니면 others 강도.
     /// 수치는 부르는 순간 필드에서 읽는다.
     /// </summary>
-    public void Play(bool viewerIsCaster, ulong casterClientId, Vector3 targetPosition)
+    public void Play(bool viewerIsCaster)
     {
         // 꺼진 컴포넌트는 LateUpdate 가 안 돌아 강도가 남는다 — 옛 구독(OnEnable 동안만)과 같게 무시한다.
         if (!isActiveAndEnabled || _networkManager == null)
@@ -70,17 +60,26 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
 
         float peak = InterruptDarkAdaptationModel.SelectIntensity(viewerIsCaster, selfIntensity, othersIntensity);
         _model.Play(peak, fadeInDuration, holdDuration, fadeOutDuration);
-
-        if (_triggerClientId != casterClientId)
-            _triggerPlayer = null;
-        _triggerClientId = casterClientId;
-        _targetPosition = targetPosition;
-
         PushState();
     }
 
     /// <summary>즉시 0(강제 리셋·세션 종료).</summary>
     public void Stop() => StopEffect();
+
+    // ---- 제압 암순응(할 일 192 Q7) — 제압 간파 섬광 진행기가 부른다. 모든 화면 같은 값(Q8 공용) ----
+
+    /// <summary>제압 암순응 컷 — 곡선을 멈추고 이 어둡힘을 그대로 붙잡는다. 임계 칸은 이 컴포넌트 값.</summary>
+    public void ShowDarkAdaptCut(float darkness)
+    {
+        if (!isActiveAndEnabled)
+            return;
+
+        _model.Stop();
+        PushState(InterruptDarkAdaptationModel.SanitizeIntensity(darkness));
+    }
+
+    /// <summary>컷 끝·강제 리셋 — 즉시 0.</summary>
+    public void ClearDarkAdapt() => StopEffect();
 
     private void LateUpdate()
     {
@@ -97,75 +96,19 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
         PushState();
     }
 
-    private void PushState()
+    private void PushState() => PushState(_model.Value);
+
+    private void PushState(float intensity)
     {
-        DarkAdaptationState.Intensity = _model.Value;
+        DarkAdaptationState.Intensity = intensity;
         DarkAdaptationState.LuminanceThreshold = InterruptDarkAdaptationModel.SanitizeDuration(luminanceThreshold);
         DarkAdaptationState.ThresholdSoftness = InterruptDarkAdaptationModel.SanitizeDuration(thresholdSoftness);
         DarkAdaptationState.MaxDarken = InterruptDarkAdaptationModel.SanitizeIntensity(maxDarken);
-        DarkAdaptationState.RevealSoftness = InterruptDarkAdaptationModel.SanitizeDuration(revealSoftness);
-
-        float radius = InterruptDarkAdaptationModel.SanitizeRadius(revealRadius);
-        if (radius > 0f && TryGetRevealViewport(out Vector2 viewport))
-        {
-            DarkAdaptationState.RevealCenter = viewport;
-            DarkAdaptationState.RevealRadius = radius;
-        }
-        else
-        {
-            DarkAdaptationState.RevealRadius = 0f;
-        }
-    }
-
-    private bool TryGetRevealViewport(out Vector2 viewport)
-    {
-        viewport = default;
-
-        Camera camera = Camera.main;
-        if (camera == null)
-            return false;
-
-        // Target 모드는 시전자를 찾지 않는다.
-        Transform player = revealCenter != RevealCenterMode.Target ? FindTriggerPlayer() : null;
-        bool hasCaster = player != null;
-        if (!InterruptDarkAdaptationModel.TrySelectRevealCenter(revealCenter, _targetPosition, hasCaster,
-                hasCaster ? player.position : default, out Vector3 center))
-            return false;
-
-        Vector3 point = camera.WorldToViewportPoint(center);
-        if (point.z <= 0f || float.IsNaN(point.x) || float.IsNaN(point.y))
-            return false;
-
-        viewport = new Vector2(point.x, point.y);
-        return true;
-    }
-
-    // SpawnManager.GetPlayerNetworkObject 는 클라에서 남의 것을 찾으면 에러를 찍는다 — 스폰 목록에서 직접 찾는다.
-    private Transform FindTriggerPlayer()
-    {
-        if (_triggerPlayer != null)
-            return _triggerPlayer;
-
-        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
-        if (spawnManager == null)
-            return null;
-
-        foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
-        {
-            if (networkObject != null && networkObject.IsPlayerObject && networkObject.OwnerClientId == _triggerClientId)
-            {
-                _triggerPlayer = networkObject.transform;
-                break;
-            }
-        }
-
-        return _triggerPlayer;
     }
 
     private void StopEffect()
     {
         _model.Stop();
-        _triggerPlayer = null;
         DarkAdaptationState.Clear();
     }
 }

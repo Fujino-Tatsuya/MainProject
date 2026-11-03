@@ -44,6 +44,13 @@ public sealed class InterruptOwnerMaskTagger
     private readonly List<Tagged> _tagged = new List<Tagged>();
     private readonly HashSet<Renderer> _taggedSet = new HashSet<Renderer>();
     private readonly List<Renderer> _buffer = new List<Renderer>();
+    private readonly uint _mask;
+
+    /// <param name="mask">붙일 렌더링 레이어 비트 — 기본 = 오너 암전 비트 4. 제압 간파 섬광 실루엣(할 일 179)은 <see cref="SuppressFlashMaskLayers.Mask"/>.</param>
+    public InterruptOwnerMaskTagger(uint mask = InterruptOwnerMaskLayers.Mask)
+    {
+        _mask = mask;
+    }
 
     /// <summary>지금 비트를 붙여 둔 렌더러 수.</summary>
     public int Count => _tagged.Count;
@@ -63,8 +70,8 @@ public sealed class InterruptOwnerMaskTagger
                 continue;
 
             uint mask = r.renderingLayerMask;
-            _tagged.Add(new Tagged { Renderer = r, HadBit = InterruptOwnerMaskLayers.Has(mask) });
-            r.renderingLayerMask = InterruptOwnerMaskLayers.Add(mask);
+            _tagged.Add(new Tagged { Renderer = r, HadBit = (mask & _mask) != 0 });
+            r.renderingLayerMask = mask | _mask;
             added++;
         }
 
@@ -79,7 +86,7 @@ public sealed class InterruptOwnerMaskTagger
         {
             Renderer r = _tagged[i].Renderer;
             if (r != null)
-                r.renderingLayerMask = InterruptOwnerMaskLayers.Restore(r.renderingLayerMask, _tagged[i].HadBit);
+                r.renderingLayerMask = _tagged[i].HadBit ? r.renderingLayerMask : r.renderingLayerMask & ~_mask;
         }
 
         _tagged.Clear();

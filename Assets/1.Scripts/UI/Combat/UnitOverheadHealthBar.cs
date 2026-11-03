@@ -159,9 +159,16 @@ public class UnitOverheadHealthBar : MonoBehaviour
             Destroy(barRoot);
     }
 
+    /// <summary>
+    /// 간파 암전·섬광 동안 숨기는가(A5, 할 일 179 후속 2·4) — 플레이어·몬스터·보스 머리 위 바 모두.
+    /// 화면 고정 보스 HP 바(BossHealthHUD)는 이 컴포넌트가 아니라 해당 없음.
+    /// </summary>
+    public static bool HiddenByInterrupt(bool combatUiHidden) => combatUiHidden;
+
     private void LateUpdate()
     {
-        bool shouldShow = unit != null && (rule == null || rule.ShouldShow);
+        bool shouldShow = unit != null && (rule == null || rule.ShouldShow) &&
+                          !HiddenByInterrupt(InterruptProductionDirector.CombatUiHidden);
         if (barRoot != null && barRoot.activeSelf != shouldShow)
             barRoot.SetActive(shouldShow);
         if (label != null && !shouldShow && label.gameObject.activeSelf)

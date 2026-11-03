@@ -286,9 +286,9 @@ public sealed class SlowMotionSessionTests
     // ─── 직렬화 ───────────────────────────────────────────────────────
 
     [Test]
-    public void 이벤트_크기는_목적_칸과_히트스톱_칸과_대상_위치를_포함한다()
+    public void 이벤트_크기는_목적_칸과_히트스톱_칸과_대상_위치와_제압_간파_칸을_포함한다()
     {
-        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7 + 4 * 3, SlowMotionEvent.SerializedSize);
+        Assert.AreEqual(1 + 1 + 4 + 8 + 8 + 4 * 7 + 4 * 3 + 1, SlowMotionEvent.SerializedSize);
     }
 
     [Test]
