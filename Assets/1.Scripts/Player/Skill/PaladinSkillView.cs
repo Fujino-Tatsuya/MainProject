@@ -20,6 +20,7 @@ using UnityEngine;
 /// <item>최후의 심판(R) — 칼 낙뢰·칼날 전기(오너 → 서버 → 나머지), 대상 표식·마무리 낙뢰(서버 → 전 피어), 슈퍼아머 오버레이·칼 꽂기 배율.</item>
 /// <item>불굴의 의지(패시브) — 칼날 발광(<see cref="SetBladeGlow"/>), 발동 연출(서버 → 전 피어, <see cref="ServerPlayPassiveProc"/>).</item>
 /// <item>나누는 불굴(PAL_2_SHARE_HEAL) 전이 — 특성 연출 이벤트를 받아 재생.</item>
+/// <item>진격의 충격(PAL_4_Q_BLAST) 부채꼴 충격 — 특성 연출 이벤트(Activated)를 받아 Q 끝 지점 앞에 재생, 배율 = 부채꼴 range.</item>
 /// <item>수호의 파동(PAL_4_E_PUSH) 바람 링 — 특성 연출 이벤트(Activated)를 받아 발밑에 재생, 배율 = 밀치기 반경.</item>
 /// </list>
 /// 여기 없는 팔라딘 연출: 클립 이벤트 소켓(<see cref="EffectAnimEvents"/> — E 결계·오라 켜기, 평타 베기 등).
@@ -138,6 +139,10 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
     [SerializeField] private Vector3 passiveHitFallbackOffset = new Vector3(0f, 1f, 0f);
+
+    [Header("진격의 충격(특성 PAL_4_Q_BLAST)")]
+    [Tooltip("Q 끝 지점 앞 부채꼴 충격. FX_QBlast_Entry 를 물린다. 부채꼴 길이 1 저작 — 배율 = 판정 부채꼴 range. 비우면 생략")]
+    [SerializeField] private EffectEntry qBlast;
 
     [Header("수호의 파동(특성 PAL_4_E_PUSH)")]
     [Tooltip("반격 판정 순간 발밑에서 퍼지는 바람 링. FX_GuardWave_Ring_Entry 를 물린다. 반경 1m 저작 — 배율 = 밀치기 판정 원 반경. 비우면 생략")]
@@ -652,6 +657,12 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
             return;
         }
 
+        if (e.Trait == TraitFxTrait.PaladinAdvanceImpact && e.Kind == TraitFxKind.Activated)
+        {
+            PlayQBlast(e);
+            return;
+        }
+
         if (e.Trait != TraitFxTrait.PaladinShareHeal || e.Kind != TraitFxKind.Hit || e.Target == null) return;
         if (!EffectManager.TryGet(out EffectManager effects, this)) return;
 
@@ -676,6 +687,46 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         if (radius <= 0f) return;
 
         effects.Play(guardWaveRing, e.Position, Quaternion.identity, radius);
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  진격의 충격(PAL_4_Q_BLAST) 부채꼴 충격
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // Q 가 정상 종료·홀드 해제·최대 시간 도달로 끝나면 파생 지연(0.05초) 뒤 서버 판정 순간 1번(맞은 적 없어도) Activated 사건이 전 피어에 난다
+    // (FirstMeleeMainSkill.RunTraitBlastServer → Player.TraitSkillFxRpc). 돌파의 방패 종료도 같다. Pose = Q 끝 지점·마지막 진행 방향,
+    // Shape = 특성 정의의 파생 hitArea(받는 피어가 같은 SO 에서 다시 읽음). 연출은 그 부채꼴(AttackSectorShape)의 꼭짓점·방향에
+    // 길이 1 로 저작한 FX_QBlast 를 range 배율로 놓는다 — 도형 칸 forwardOffset·sideOffset·yawOffset 도 ShapePose 로 반영한다.
+    // 각도(90°)는 저작 고정. 맞은 적마다의 Hit 사건은 연출 없음(2026-11-03 민경 — 범위 연출만).
+    // ⚠️ 판정 데이터(90° 부채꼴 range 2) ≠ 기획서(전방 1m 중심 반경 2m 원) — 데이터가 원으로 바뀌면 연출 모양도 다시 맞춘다.
+
+    private void PlayQBlast(in TraitFxEvent e)
+    {
+        if (qBlast == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
+        if (!TryGetSector(e.Shape, out AttackSectorShape sector) || sector.Range <= 0f) return;
+
+        AttackShapePose pose = sector.ShapePose(e.Pose);
+        Vector3 forward = pose.Forward;
+        forward.y = 0f;
+        Quaternion rotation = forward.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(forward.normalized) : Quaternion.identity;
+
+        effects.Play(qBlast, pose.Position, rotation, sector.Range);
+    }
+
+    private static bool TryGetSector(AttackShapeSet shape, out AttackSectorShape sector)
+    {
+        sector = null;
+        if (shape == null || shape.IsEmpty) return false;
+
+        for (int i = 0; i < shape.Shapes.Count; i++)
+        {
+            if (shape.Shapes[i] is AttackSectorShape found)
+            {
+                sector = found;
+                return true;
+            }
+        }
+        return false;
     }
 
     // 판정 원(AttackCircleShape)의 반경. 도형이 없으면(정의를 못 찾은 피어 등) 0 — 링을 내지 않는다.

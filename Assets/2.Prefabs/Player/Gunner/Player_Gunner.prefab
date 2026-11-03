@@ -6259,7 +6259,9 @@ MonoBehaviour:
   chargeEndPlayer: {fileID: 4940442617651707173}
   chargeMonsterHitPlayer: {fileID: 2971052868576544898}
   chargeVentPlayer: {fileID: 1812556281934503046}
-  echoBombVfxPrefab: {fileID: 0}
+  echoBombVfxPrefab: {fileID: 6621107640721460582, guid: 4e2d6e595f7fb40459a9c426dce6b53f, type: 3}
+  echoBombBurst: {fileID: 11400000, guid: 9d4ad0b88b244a39ae8efb58bc46a14c, type: 2}
+  echoBombFizzle: {fileID: 11400000, guid: 41b4b839380045d6960724a3f5aa27b4, type: 2}
   echoBombShowDelay: 0
   echoBombPreviewTimeout: 1.5
   echoBombOffset: {x: 0, y: 0, z: 0}
@@ -6268,6 +6270,11 @@ MonoBehaviour:
   frostTrailPlayer: {fileID: 4392323114275172735}
   coolVentPlayer: {fileID: 2407615172941079978}
   backstepAfterimage: {fileID: 8579010982694634124}
+  dualBeam: {fileID: 11400000, guid: 30fbc03577a3476eab4be8c1a2e36a21, type: 2}
+  dualMuzzle: {fileID: 11400000, guid: e5fdb8fbf66542248dad8a3d547fdf7d, type: 2}
+  dualHit: {fileID: 11400000, guid: e4358fa845374a3c8594b66030d28396, type: 2}
+  dualStop: {fileID: 11400000, guid: 71c282e9e24d487d9b46cf58fc9ce424, type: 2}
+  overdriveColors: {fileID: 11400000, guid: 04c5f7c72031487c923d4ee6481d5e20, type: 2}
   chargeBeamUnitLength: 1
   chargeBeamHoldDuration: 0.5
   chargeScaleRange: {x: 0.25, y: 1}

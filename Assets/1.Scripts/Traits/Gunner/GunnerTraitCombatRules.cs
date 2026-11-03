@@ -194,14 +194,17 @@ public readonly struct GunnerDerivedShot
     /// <summary>판정 폭.</summary>
     public readonly float Width;
     public readonly int Damage;
+    /// <summary>한계 돌파 색 단계(연출만 — 이 발을 낳은 원래 발의 피해 단계, 한계 돌파가 아니면 0). 이중 출력 특성 사건 Variant 로 실린다.</summary>
+    public readonly int OverdriveStage;
 
-    public GunnerDerivedShot(Vector3 origin, Vector3 direction, float range, float width, int damage)
+    public GunnerDerivedShot(Vector3 origin, Vector3 direction, float range, float width, int damage, int overdriveStage = 0)
     {
         Origin = origin;
         Direction = direction;
         Range = range;
         Width = width;
         Damage = damage;
+        OverdriveStage = overdriveStage;
     }
 }
 

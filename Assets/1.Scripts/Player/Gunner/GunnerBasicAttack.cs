@@ -513,11 +513,13 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         heat.ServerAddShot(heatTraits.HeatPerShot(data.HeatPerShot)); // 허공이어도 증가(§4.2). 최대치 제한은 모델, 정온 운용이면 증가 없음
         lastShotTime = now;
         player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 발 발사(적중 무관)
-        CommitShotForTraits(origin, direction, damage);
+        // 한계 돌파 과열 색(2026-11-03 민경) — 이 발 피해에 쓴 단계(증가 전)를 연출에 같이 싣는다. 한계 돌파가 아니면 0(원래 색). 판정 무관.
+        byte overdriveStage = heatTraits.Mode == GunnerHeatMode.Overdrive ? (byte)Mathf.Clamp(stage, 0, 255) : (byte)0;
+        CommitShotForTraits(origin, direction, damage, overdriveStage);
         if (IsNetworkActive)
-            ShotRpc(origin, end, hit);
+            ShotRpc(origin, end, hit, overdriveStage);
         else
-            PlayShot(origin, end, hit);
+            PlayShot(origin, end, hit, overdriveStage);
         return true;
     }
 
@@ -538,7 +540,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private void ApplyFocusFire(Unit target, ref AttackInfo info) => GunnerTrackingLaser.ApplyFocusFire(player, target, ref info);
 
     // 원래 기본 공격 발사 커밋(빗나가도) — 특성 사건 BasicAttackFired + 이중 출력 발수. 취소된 공격·Q·추가 발은 여기를 지나지 않는다.
-    private void CommitShotForTraits(Vector3 origin, Vector3 direction, int shotDamage)
+    private void CommitShotForTraits(Vector3 origin, Vector3 direction, int shotDamage, int overdriveStage)
     {
         if (traitEffects == null)
             traitEffects = PlayerTraitEffects.For(player);
@@ -551,10 +553,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         TraitDerivedAttack extra = GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.BasicAttackKey,
             GunnerTraitRules.BasicExtraDerivedKey, derivedBuffer);
         if (GunnerDualOutputRules.CountOriginalShot(extra, shotDamage, AttackSpeedRate, out int extraDamage, out float delay))
-            extraShots.Schedule(Time.timeAsDouble, delay, new GunnerDerivedShot(origin, direction, data.Range, data.BeamWidth, extraDamage));
+            extraShots.Schedule(Time.timeAsDouble, delay, new GunnerDerivedShot(origin, direction, data.Range, data.BeamWidth, extraDamage, overdriveStage));
     }
 
-    // [서버] 예약된 추가 레이저 — 판정만(VFX 없음, 할 일 127 범위 밖). 과열·패시브·쿨·발수·특성 사건 없음, 행동 잠금 없음.
+    // [서버] 예약된 추가 레이저 — 판정 + 특성 연출 사건(연출은 GunnerBeamView 가 사건을 받아 낸다, 2026-11-03 민경). 과열·패시브·쿨·발수 없음, 행동 잠금 없음.
+    // 사건 Variant = 한계 돌파 색 단계(원래 세 번째 발의 피해 단계, 아니면 0).
     private void TickExtraShotsServer()
     {
         if (extraShots.Count == 0)
@@ -570,9 +573,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
             bool hit = FireBeam(shot.Origin, shot.Direction, shot.Damage, false, TraitHitFlags.Derived, out Vector3 end);
             Edit.Log($"[Gunner] 이중 출력 추가 레이저 — 피해 {shot.Damage}, 적중 {hit}", this);
             // 특성 연출 사건(할 일 145) — 추가 레이저 1발(원점 → 끝점: 원래 발 ShotRpc 와 같은 의미). 맞혔으면 끝점에 Hit(대상 없음 — 위치만).
-            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Activated, shot.Origin, shot.Direction, end);
+            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Activated, shot.Origin, shot.Direction, end,
+                variant: shot.OverdriveStage);
             if (hit)
-                TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Hit, end, shot.Direction, end);
+                TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Hit, end, shot.Direction, end,
+                    variant: shot.OverdriveStage);
         }
     }
 
@@ -655,7 +660,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private void EndRpc() => EndLocal();
 
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    private void ShotRpc(Vector3 origin, Vector3 end, bool hit) => PlayShot(origin, end, hit);
+    private void ShotRpc(Vector3 origin, Vector3 end, bool hit, byte overdriveStage) => PlayShot(origin, end, hit, overdriveStage);
 
     private void BeginRuntime(Vector3 direction)
     {
@@ -729,11 +734,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         movement?.ReleaseFacingLock(this);
     }
 
-    private void PlayShot(Vector3 origin, Vector3 end, bool hit)
+    private void PlayShot(Vector3 origin, Vector3 end, bool hit, byte overdriveStage)
     {
         // 회전 잠금 해제는 여기서 하지 않는다 — 오너 시계(ShotLockTail)로만 푼다(서버 왕복 없음, 2026-10-13).
         PlayFireAnimation();
-        ShowBeam(origin, end, hit);
+        ShowBeam(origin, end, hit, overdriveStage);
     }
 
     // 상체 레이어에서 발사 클립을 매 발 처음부터. 클립이 발사 간격보다 길면 그만큼 빨리 재생해 다음 발 전에 끝나게 한다.
@@ -793,13 +798,13 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     /// 착탄 판단은 <b>빔이 사거리 끝까지 못 갔는가</b>로 한다 — 유닛이든 벽이든 똑같이 잡힌다.
     /// 아무것도 안 맞으면 <c>Fire</c> 가 <c>end = origin + dir * range</c> 를 그대로 두므로 거리가 딱 사거리다.
     /// </summary>
-    private void ShowBeam(Vector3 origin, Vector3 end, bool hit)
+    private void ShowBeam(Vector3 origin, Vector3 end, bool hit, byte overdriveStage)
     {
         if (beamView == null || data == null)
             return;
 
         bool stopped = hit || Vector3.Distance(origin, end) < data.Range - 0.01f;
-        beamView.ShowBasicShot(origin, end, stopped, hit, data.BeamWidth);
+        beamView.ShowBasicShot(origin, end, stopped, hit, data.BeamWidth, overdriveStage);
     }
 
     // 준비 자세 → 공격. 상태기계는 오너·서버만 틱하므로 원격 프록시도 넘어가도록 Update 에서 각 피어가 시간으로 전환한다
