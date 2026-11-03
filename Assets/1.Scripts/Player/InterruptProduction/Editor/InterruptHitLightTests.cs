@@ -942,7 +942,7 @@ public sealed class InterruptHitLightTests
         Assert.IsNull(v1.GradeProfile, "V1·V2 는 색 보정 없음");
 
         // V3 시작값.
-        Assert.AreEqual(4f, v3.LightIntensity, 1e-4f);
+        Assert.AreEqual(2f, v3.LightIntensity, 1e-4f);
         Assert.AreEqual(3f, v3.LightRange, 1e-4f);
         Assert.Greater(v3.SunDimDepth, v1.SunDimDepth, "V3 가 더 어둡다");
         Assert.Greater(v3.AmbientDimDepth, v1.AmbientDimDepth);
@@ -950,8 +950,8 @@ public sealed class InterruptHitLightTests
         Assert.AreNotSame(v1.BloomProfile, v3.BloomProfile, "V3 전용 블룸");
 
         Assert.IsTrue(v3.BloomProfile.TryGet(out UnityEngine.Rendering.Universal.Bloom bloom));
-        Assert.AreEqual(1.5f, bloom.threshold.value, 1e-4f);
-        Assert.AreEqual(1.5f, bloom.intensity.value, 1e-4f);
+        Assert.AreEqual(2f, bloom.threshold.value, 1e-4f);
+        Assert.AreEqual(0.6f, bloom.intensity.value, 1e-4f);
         Assert.IsNotNull(v3.GradeProfile);
         Assert.IsTrue(v3.GradeProfile.TryGet(out UnityEngine.Rendering.Universal.ColorAdjustments color));
         Assert.IsTrue(color.saturation.overrideState);

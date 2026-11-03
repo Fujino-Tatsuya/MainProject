@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: InterruptHitLightLook_V3
   m_EditorClassIdentifier: Assembly-CSharp::InterruptHitLightLook
   lightColor: {r: 1, g: 0.6, b: 0.3, a: 1}
-  lightIntensity: 4
+  lightIntensity: 2
   lightRange: 3
   lightShadows: 0
   lightDuration: 0.9

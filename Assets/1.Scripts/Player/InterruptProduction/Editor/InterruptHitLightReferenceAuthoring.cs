@@ -55,9 +55,9 @@ internal static class InterruptHitLightReferenceAuthoring
         var so = new SerializedObject(look);
         if (create)
         {
-            // 라이트 — 맞닿은 캐릭터 가장자리·발밑만 주황으로 물들 만큼(세기 ~4, 반경 ~3).
+            // 라이트 — 맞닿은 캐릭터 가장자리·발밑만 주황으로 물들 만큼(세기 ~2, 반경 ~3 — 11-03 "라이트가 너무 쎄" 로 4→2).
             so.FindProperty("lightColor").colorValue = new Color(1f, 0.6f, 0.3f, 1f);
-            so.FindProperty("lightIntensity").floatValue = 4f;
+            so.FindProperty("lightIntensity").floatValue = 2f;
             so.FindProperty("lightRange").floatValue = 3f;
             // 암순응 나 — 주변을 더 어둡게(V1 0.85/0.7).
             so.FindProperty("sunDimDepth").floatValue = 0.95f;
@@ -76,25 +76,26 @@ internal static class InterruptHitLightReferenceAuthoring
         return look;
     }
 
-    // 블룸 — 중심(HDR 1.5 넘는 픽셀)만 번진다. V1 프로필(threshold 0.8 · intensity 6)은 그대로.
+    // 블룸 — 중심(HDR 2 넘는 픽셀)만 약하게 번진다(11-03 "블룸이 너무 쎄" 로 threshold 1.5→2 · intensity 1.5→0.6).
+    // V1 프로필(threshold 0.8 · intensity 6)은 그대로.
     static VolumeProfile EnsureBloomProfile() =>
         EnsureProfile(BloomProfilePath, profile =>
         {
             Bloom bloom = profile.Add<Bloom>(true);
-            bloom.threshold.Override(1.5f);
-            bloom.intensity.Override(1.5f);
+            bloom.threshold.Override(2f);
+            bloom.intensity.Override(0.6f);
             bloom.scatter.Override(0.6f);
             bloom.tint.Override(new Color(1f, 0.86f, 0.72f, 1f));
         });
 
-    // 색 보정 — 채도 낮춤 + 약한 보랏빛 색 필터 + 노출 살짝 낮춤. 가중치 곡선은 Look 의 grade 칸.
+    // 색 보정 — 채도 낮춤 + 약한 보랏빛 색 필터 + 노출 낮춤(11-03 −0.3→−0.7). 가중치 곡선은 Look 의 grade 칸.
     static VolumeProfile EnsureGradeProfile() =>
         EnsureProfile(GradeProfilePath, profile =>
         {
             ColorAdjustments color = profile.Add<ColorAdjustments>(true);
             color.saturation.Override(-35f);
             color.colorFilter.Override(new Color(0.84f, 0.78f, 1f, 1f));
-            color.postExposure.Override(-0.3f);
+            color.postExposure.Override(-0.7f);
         });
 
     static VolumeProfile EnsureProfile(string path, System.Action<VolumeProfile> fill)
