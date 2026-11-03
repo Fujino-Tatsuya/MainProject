@@ -19,14 +19,10 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     //      시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
     //      종료 → 서버는 EndActiveSkillServer 가, 클라는 EndSkillClientRpc 가 OnEnd 를 부른다
     //    서버 전용 스코프에서 재생해 호스트에만 보이던 사고(보스 연출 선례)가 여기선 구조적으로 안 난다.
+    //    소켓(스매시·궤적)은 팔라딘 연출 창구가 든다(2026-11-02 — PaladinSkillView).
     [Header("연출")]
-    [Tooltip("홀드 동안 재생할 루프 연출. 프리팹의 'Smash' EffectSocketPlayer 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer smashLoop;
-
-    [Tooltip("홀드 동안 재생할 궤적 루프. 프리팹의 'Trail' EffectSocketPlayer 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer trailLoop;
+    [Tooltip("팔라딘 연출 창구. 플레이어 루트의 PaladinSkillView 를 물린다. 비워두면 연출만 빠진다")]
+    [SerializeField] private PaladinSkillView skillView;
 
     private PlayerMovement movement;
     private PlayerMotor motor;
@@ -182,8 +178,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         // 연출은 권위와 무관하다 — 모든 피어가 각자 켠다.
         // Play 는 이미 재생 중이면 먼저 회수하므로 두 번 불려도 겹치지 않는다.
-        smashLoop?.Play();
-        trailLoop?.Play();
+        skillView?.BeginSmashHold();
     }
 
     public override void OnAimUpdated(Vector3 direction)
@@ -314,8 +309,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         // 🔴 종료 사유를 가리지 않는다. 취소·사망·안전망 만료 어느 쪽으로 끝나도 여기를 지나므로
         //    루프가 남는 경로가 없다. (Stop 은 재생 중이 아니면 조용한 no-op 이다)
-        smashLoop?.Stop();
-        trailLoop?.Stop();
+        skillView?.EndSmashHold();
 
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)

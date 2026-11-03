@@ -461,7 +461,7 @@ xlsx: 강·성공은 기존 열, **약 `interruptWeakProfile.*` 는 반영 예�
    - `targetFx` 소켓은 루트가 아닌 **빈 자식 오브젝트**에 둔다 — 재생 순간 그 트랜스폼을 대상 위치로 잠깐 옮겼다 되돌린다.
 4. Play — 간파 성공 시 모든 화면에서 한 번 재생된다. 원샷이라 소켓·대상을 따라가지 않고 재생 순간 위치에 찍힌다.
 
-캐릭터별 기존 성공 연출(가붕이 `PlayerShieldVfx` 충격파 B3, 어쌔신 `AssassinSkillView` 성공 소켓 C2)은 코드가 그대로지만 132 단계 6 부터 **스위치가 꺼져** 나오지 않는다(새 적중 섬광이 대신).
+캐릭터별 기존 성공 연출(가붕이 `PaladinSkillView` 충격파 B3, 어쌔신 `AssassinSkillView` 성공 소켓 C2)은 코드가 그대로지만 132 단계 6 부터 **스위치가 꺼져** 나오지 않는다(새 적중 섬광이 대신).
 A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 프레임 + 0.3초)과 겹쳐 보이면 칸을 비운다.
 빛 모임·적중 섬광 텍스처 바꾸기는 §0.7·[handoff-interrupt-132-vfx.md](handoff-interrupt-132-vfx.md).
 
@@ -547,9 +547,9 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | A2 | `darkAdaptation` | 꺼짐(§17) | 성공 섬광 순간 화면 휘도 암순응(팀원 others · 오버레이 없던 본인 self) — 튜닝 패널 '팀원 암순응' | 섬광 순간 개인/공용 채널 → `InterruptDarkAdaptation.Play` |
 | A3 | `ownerZoom` | **켬** | 내가 일으킨 슬로우(강·약·성공) 동안 카메라 줌 | `CameraTargetSwitcher` → `Director.OwnerZoomFactor` — 꺼지면 배율 1 |
 | A4 | `successFxSlot` | **켬** | 공용 성공 이펙트 칸(§2.4, base·Variant 칸은 지금 비어 있음) | 성공 단계 공용 채널 → `InterruptSuccessFx`(sink) |
-| B1 | `paladinShieldGlow` | 꺼짐 | 팔라딘 간파 시도 방패 발광·루프 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 스킬(sink). `OnEnd` 끄기·회수는 늘 돈다 |
+| B1 | `paladinShieldGlow` | 꺼짐 | 팔라딘 간파 시도 방패 발광·루프 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 스킬(sink) → `PaladinSkillView.BeginInterruptGlow`. `OnEnd` 끄기·회수(`EndInterruptVfx`)는 늘 돈다 |
 | B2 | `paladinShieldCharge` | 꺼짐 | 팔라딘 방패 기 모으기(클립 `Garen_Parry` 의 `ShieldCharge`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |
-| B3 | `paladinWave` | 꺼짐 | 팔라딘 성공 충격파 | `PlayerShieldVfx.PlayInterruptWave`(RPC·오프라인) → `Director.PlayCue(PaladinWave, …, this)` |
+| B3 | `paladinWave` | 꺼짐 | 팔라딘 성공 충격파 | `PaladinSkillView.PlayInterruptWave`(RPC·오프라인, 2026-11-02 PlayerShieldVfx → PaladinSkillView) → `Director.PlayCue(PaladinWave, …, this)` |
 | C1 | `assassinInsightAttempt` | 꺼짐 | 어쌔신 기 모으기·튀기기·올려치기(클립 `Attack_Up_01`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |
 | C2 | `assassinInsightSuccess` | 꺼짐 | 어쌔신 간파 성공 이펙트 | `AssassinSkillView.TryPlayInsightSuccess`(대기·올려치기 프레임 맞추기는 View) → `Director.PlayCue(AssassinInsightSuccess, …, this)` |
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |

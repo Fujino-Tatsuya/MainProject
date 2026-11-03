@@ -161,7 +161,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     // 🔴 **E 전용 DashAfterimage 다**(자식 EBackstepAfterimage). 스페이스 대쉬와는 컴포넌트 타입만
     //    같고 머티리얼이 다르며(옅은 하늘색) 속도선을 쓰지 않는다 — DashAfterimage 가
     //    DisallowMultipleComponent 라 루트가 아니라 자식에 따로 세웠다.
-    //    E 는 Dash 가 아니라 Skill 상태라 PlayerSkillVfx 가 켜 주지 않으므로 여기서 직접 부른다.
+    //    E 는 Dash 가 아니라 Skill 상태라 PlayerDashVfx 가 켜 주지 않으므로 여기서 직접 부른다.
     [Tooltip("E 백스텝 전용 잔상(EBackstepAfterimage). 비워도 잔상만 빠진다")]
     [SerializeField] private DashAfterimage backstepAfterimage;
 
