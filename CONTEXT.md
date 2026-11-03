@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-03 · 경석(Claude) · **미커밋 정리 + development 받기**, 브랜치 `feature/SettingsDdol`) — ✅
+- 커밋: 사운드 문서 `70d170cc` · 로비 연습봇 사거리 밖 타깃 교체 `0157c12e` · 보스 등장 워크인 보정(RPC 가 회차 복제보다 먼저 와도 보관 + 정지 자리 스냅) `300856e4` — 둘 다 ⏳ MPPM 미확인 · development 27커밋 병합(AGENTS.md 인덱스 양쪽 유지) · SVN r579·핀 579.
+- 미커밋 유지: 아래 현지화·글꼴 작업(⏳ Play) — 🔴 커밋 전 `TraitWindowModelTests.TextTable_DefaultsMatchConstants…` 고칠 것(시트 행이 에셋보다 우선하게 바뀌어 '에셋 값 우선' 기대가 깨짐). 개발 도구 4개·`raid-23-phases.html` 은 의도적 미추적.
+- EditMode 5388 중 실패 6 = 위 1 + 기존 5(가드 애니 `PlayEffect/StopEffect` 수신자 없음 3 · `TraitPickConfirm` 문구 · 대시 슬롯 크기 111≠100). SVN `UI_Panel/asset_manifest.json.meta` 는 원본 json 없이 올라가 있어(r466) Unity 가 열 때마다 지운다 — 무해, 지원 확인 필요.
+
 ## ▶▶ 작업 세션 (2026-11-02 · 경석(Claude) · **현지화 누락 연결 + 글꼴 서울알림체 통일**, 브랜치 `feature/SettingsDdol` 작업 트리) — ✅ 구현(미커밋) · xlsx SVN r576 + Strings 수정(미커밋) · Heavy 글꼴(SVN, 미커밋) · ⏳ 경석 Play(영어 전환·HUD 글꼴·외곽선) · 핸드오프 [handoff-localization-fonts.md](Docs/tech/handoff-localization-fonts.md)
 - 규칙: 화면 글꼴 = 서울알림 Heavy(설정·ESC·타이틀 Press·특성 이름·보스 타이포) / 그 밖 Medium — [localization.md §10](Docs/tech/localization.md#10-글꼴--서울알림체-static-아틀라스).
 
