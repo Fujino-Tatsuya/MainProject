@@ -12,6 +12,7 @@ using UnityEngine;
 /// <item>제압 간파 섬광 A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>)
 ///       + A7 섬광 범위 버튼(전체 화면 ↔ 대상 내부만, 179/192 후속).</item>
 /// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
+/// <item>카메라 대상 중심 토글(할 일 196) — 효과 줄 밑 한 줄. '전부 켬'·'암전만' 은 건드리지 않는다(A6 처럼 따로 둔 스위치).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -72,6 +73,9 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         new Row("성공 이펙트 (A4)", InterruptProductionCue.SuccessFxSlot),
     };
 
+    /// <summary>카메라 대상 중심 토글 글자(할 일 196).</summary>
+    public const string CameraCenterLabel = "카메라 대상 중심 (196)";
+
     /// <summary>배속 버튼 — 끝값 + 인스펙터 프리셋.</summary>
     public static readonly float[] SpeedButtons =
         { DebugTimeScale.MinScale, 0.1f, 0.25f, 0.5f, 1f, DebugTimeScale.MaxScale };
@@ -113,6 +117,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         if (expanded)
         {
             DrawEffects();
+            DrawCameraCenter();
             DrawTiers();
             DrawSuppressFlash();
             DrawSpeed();
@@ -145,6 +150,20 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         if (GUILayout.Button("암전만"))
             SetDefaults(director);
         GUILayout.EndHorizontal();
+    }
+
+    // 카메라 대상 중심(할 일 196) — 이 피어 디렉터 런타임 값만, 다음 간파부터(진행 중인 이동은 그대로 끝난다). 저장 안 함.
+    void DrawCameraCenter()
+    {
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
+        if (director == null)
+            return;
+
+        GUILayout.Space(6f);
+        bool on = director.CameraCenterEnabled;
+        bool next = GUILayout.Toggle(on, CameraCenterLabel);
+        if (next != on)
+            director.CameraCenterEnabled = next;
     }
 
     // 간파 연출 4단계(할 일 192) — 지금 단계 표시 + 단계 재현 버튼 4개(이 화면만, 슬로우·줌 없음).
