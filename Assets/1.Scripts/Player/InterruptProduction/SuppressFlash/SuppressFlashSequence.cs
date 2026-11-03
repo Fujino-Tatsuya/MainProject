@@ -22,7 +22,7 @@ public enum SuppressFlashCross
 
 /// <summary>
 /// 제압 간파 섬광 컷 한 장(할 일 179) — 사양 SPEC.md "컷 구성" 표의 한 줄.
-/// 시작/끝 칸(색수차·레터박스)은 컷 안에서 홀드 단위로 계단식으로 넘어간다(같은 값이면 고정).
+/// 시작/끝 칸(색수차)은 컷 안에서 홀드 단위로 계단식으로 넘어간다(같은 값이면 고정).
 /// </summary>
 [Serializable]
 public sealed class SuppressFlashCut
@@ -47,10 +47,6 @@ public sealed class SuppressFlashCut
     [Min(0f)] public float aberrationEnd = 0.2f;
     [Tooltip("포지티브 실루엣 안 빗금")]
     public bool hatching;
-    [Tooltip("레터박스 들어온 정도 — 컷 시작 [0, 1]")]
-    [Range(0f, 1f)] public float letterbox = 1f;
-    [Tooltip("레터박스 들어온 정도 — 컷 끝(같으면 고정)")]
-    [Range(0f, 1f)] public float letterboxEnd = 1f;
     [Tooltip("3단 색 — 짙은 색(#1C1930)")]
     public Color dark = DefaultDark;
     [Tooltip("3단 색 — 중간 색(#7D77A0)")]
@@ -61,7 +57,7 @@ public sealed class SuppressFlashCut
     public SuppressFlashCut() { }
 
     public SuppressFlashCut(int frames, SuppressFlashTone tone, SuppressFlashCross cross, float starSize, float speedLines,
-        float aberration, float aberrationEnd, bool hatching, float letterbox, float letterboxEnd)
+        float aberration, float aberrationEnd, bool hatching)
     {
         this.frames = frames;
         this.tone = tone;
@@ -71,8 +67,6 @@ public sealed class SuppressFlashCut
         this.aberration = aberration;
         this.aberrationEnd = aberrationEnd;
         this.hatching = hatching;
-        this.letterbox = letterbox;
-        this.letterboxEnd = letterboxEnd;
     }
 }
 
@@ -153,8 +147,6 @@ public sealed class SuppressFlashSequence : ScriptableObject
     [Min(2f)] public float hatchPeriodPixels = 12f;
     [Tooltip("색수차 1 일 때 화면 가장자리 최대 번짐(화면 높이 비율)")]
     [Min(0f)] public float aberrationScale = 0.025f;
-    [Tooltip("레터박스 띠 하나의 높이(화면 높이 비율)")]
-    [Range(0f, 0.4f)] public float letterboxHeight = 0.11f;
 
     [Header("섬광 줄이기(옵션 켬일 때)")]
     [Tooltip("섬광 줄이기 — 반전을 끄고 이 대비로 낮춘다 [0, 1](1 = 그대로)")]
@@ -179,16 +171,16 @@ public sealed class SuppressFlashSequence : ScriptableObject
         new SuppressDarkAdaptCut(0.15f, 0.5f),
     };
 
-    /// <summary>사양 표 7컷. 레터박스 = 1컷에 밀려 들어오고 7컷에 빠진다.</summary>
+    /// <summary>사양 표 7컷(레터박스·비네팅은 179 후속 11-03 삭제).</summary>
     public static List<SuppressFlashCut> CreateSpecCuts() => new List<SuppressFlashCut>
     {
-        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.Single, 1.0f, 0.5f, 0.2f, 0.2f, false, 0.6f, 0.6f),
-        new SuppressFlashCut(2, SuppressFlashTone.Positive, SuppressFlashCross.Grid, 0.45f, 0.2f, 0.5f, 0.5f, true, 1f, 1f),
-        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.Single, 1.25f, 1.0f, 0.3f, 0.3f, false, 1f, 1f),
-        new SuppressFlashCut(2, SuppressFlashTone.Positive, SuppressFlashCross.Single, 0.7f, 0.6f, 1.0f, 1.0f, true, 1f, 1f),
-        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.Single, 1.9f, 1.0f, 0.4f, 0.4f, false, 1f, 1f),
-        new SuppressFlashCut(2, SuppressFlashTone.Positive, SuppressFlashCross.None, 0f, 0.15f, 0.6f, 0.6f, true, 1f, 1f),
-        new SuppressFlashCut(3, SuppressFlashTone.Return, SuppressFlashCross.None, 0f, 0f, 0.8f, 0f, false, 1f, 0f),
+        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.Single, 1.0f, 0.5f, 0.2f, 0.2f, false),
+        new SuppressFlashCut(2, SuppressFlashTone.Positive, SuppressFlashCross.Grid, 0.45f, 0.2f, 0.5f, 0.5f, true),
+        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.Single, 1.25f, 1.0f, 0.3f, 0.3f, false),
+        new SuppressFlashCut(2, SuppressFlashTone.Positive, SuppressFlashCross.Single, 0.7f, 0.6f, 1.0f, 1.0f, true),
+        new SuppressFlashCut(2, SuppressFlashTone.Negative, SuppressFlashCross.Single, 1.9f, 1.0f, 0.4f, 0.4f, false),
+        new SuppressFlashCut(2, SuppressFlashTone.Positive, SuppressFlashCross.None, 0f, 0.15f, 0.6f, 0.6f, true),
+        new SuppressFlashCut(3, SuppressFlashTone.Return, SuppressFlashCross.None, 0f, 0f, 0.8f, 0f, false),
     };
 
     private void Reset() => ResetToSpec();

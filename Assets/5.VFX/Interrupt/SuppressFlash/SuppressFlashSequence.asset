@@ -23,8 +23,6 @@ MonoBehaviour:
     aberration: 0.2
     aberrationEnd: 0.2
     hatching: 0
-    letterbox: 0.6
-    letterboxEnd: 0.6
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -36,8 +34,6 @@ MonoBehaviour:
     aberration: 0.5
     aberrationEnd: 0.5
     hatching: 1
-    letterbox: 1
-    letterboxEnd: 1
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -49,8 +45,6 @@ MonoBehaviour:
     aberration: 0.3
     aberrationEnd: 0.3
     hatching: 0
-    letterbox: 1
-    letterboxEnd: 1
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -62,8 +56,6 @@ MonoBehaviour:
     aberration: 1
     aberrationEnd: 1
     hatching: 1
-    letterbox: 1
-    letterboxEnd: 1
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -75,8 +67,6 @@ MonoBehaviour:
     aberration: 0.4
     aberrationEnd: 0.4
     hatching: 0
-    letterbox: 1
-    letterboxEnd: 1
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -88,8 +78,6 @@ MonoBehaviour:
     aberration: 0.6
     aberrationEnd: 0.6
     hatching: 1
-    letterbox: 1
-    letterboxEnd: 1
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -101,8 +89,6 @@ MonoBehaviour:
     aberration: 0.8
     aberrationEnd: 0
     hatching: 0
-    letterbox: 1
-    letterboxEnd: 0
     dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
     mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
     light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
@@ -121,5 +107,4 @@ MonoBehaviour:
   sceneExposure: 0.8
   hatchPeriodPixels: 12
   aberrationScale: 0.025
-  letterboxHeight: 0.11
   reducedContrast: 0.45

@@ -21,7 +21,6 @@ public readonly struct SuppressFlashFrame
     public readonly float SpeedLines;
     public readonly float Aberration;
     public readonly bool Hatching;
-    public readonly float Letterbox;
     /// <summary>원래 색으로 돌아간 정도 [0, 1] — 복귀 컷만 양수.</summary>
     public readonly float ReturnBlend;
     /// <summary>3단 색 대비 [0, 1] — 1 = 그대로, 섬광 줄이기면 시퀀스의 낮춘 대비.</summary>
@@ -31,7 +30,7 @@ public readonly struct SuppressFlashFrame
     public readonly Color Light;
 
     public SuppressFlashFrame(int cutIndex, SuppressFlashTone tone, bool invert, SuppressFlashCross cross, float starSize,
-        float speedLines, float aberration, bool hatching, float letterbox, float returnBlend, float contrast,
+        float speedLines, float aberration, bool hatching, float returnBlend, float contrast,
         Color dark, Color mid, Color light)
     {
         Active = true;
@@ -43,7 +42,6 @@ public readonly struct SuppressFlashFrame
         SpeedLines = speedLines;
         Aberration = aberration;
         Hatching = hatching;
-        Letterbox = letterbox;
         ReturnBlend = returnBlend;
         Contrast = contrast;
         Dark = dark;
@@ -210,7 +208,6 @@ public static class SuppressFlashRules
             Mathf.Clamp01(cut.speedLines),
             Mathf.Max(0f, Mathf.Lerp(cut.aberration, cut.aberrationEnd, progress)),
             cut.hatching,
-            Mathf.Clamp01(Mathf.Lerp(cut.letterbox, cut.letterboxEnd, progress)),
             isReturn ? progress : 0f,
             reduceFlash ? Mathf.Clamp01(sequence.reducedContrast) : 1f,
             cut.dark, cut.mid, cut.light);
@@ -241,7 +238,7 @@ public enum SuppressFlashMaskMode
 {
     /// <summary>전체 화면(기본) — 마스크 대상은 흰 실루엣으로 칠한다.</summary>
     FullScreen,
-    /// <summary>간파 대상 실루엣 안에만 — 바깥은 원래 화면, 실루엣 흰 칠·빗금은 안 한다(마스크 자체가 실루엣). 레터박스는 그대로.</summary>
+    /// <summary>간파 대상 실루엣 안에만 — 바깥은 원래 화면, 실루엣 흰 칠·빗금은 안 한다(마스크 자체가 실루엣).</summary>
     TargetInterior,
 }
 

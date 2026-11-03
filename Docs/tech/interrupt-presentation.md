@@ -569,7 +569,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |
 | A5 | `hideCombatUi`(옛 `hideDamageNumbers` — `FormerlySerializedAs`, 프리팹 줄 그대로) | **켬** | 전투 표시 숨김(154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) + **제압 간파 섬광 시퀀스 동안(모든 피어)** 이 화면의 **피해 숫자 캔버스(보스 포함)·머리 위 체력바(플레이어·몬스터·보스 모두 — 179 후속 4. 화면 고정 보스 HP 바 `BossHealthHUD` 는 그대로)·오너 조준 표시 쿼드(렌더러만 끔)** 를 숨긴다. 생성·수명·게이지 값은 그대로. 숨긴 조준 쿼드는 그려지지 않아 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 안 남는다(전에는 플레이어 루트 태깅으로 비트를 받아 흰 사각형 실루엣). 일반 간파의 팀원 화면은 그대로(암전·②~⑥ 없음) | 상태에서 바로 읽는 값(pull) — `FloatingDamageSpawner`·`UnitOverheadHealthBar`·`PlayerAimIndicator` 의 `LateUpdate` → `Director.CombatUiHidden` = `InterruptProductionRules.ShouldHideCombatUi(칸, State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive ∨ 제압 섬광 IsPlaying)`. 따로 복원할 상태가 없어 끝·실패·강제 리셋·디렉터 꺼짐이면 다음 프레임에 보인다(조준 쿼드는 컴포넌트 OnDisable 에도 켬). cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideCombatUi` |
 | A6 | `suppressFlash`("성공 — 공용") | **켬** | 제압 간파 섬광 시퀀스(179, [§7](#7-제압-간파-애니메이션-섬광-할-일-179)) — 켜면 제압 간파 성공 때 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). **끄면 제압 간파도 일반 간파와 같은 연출**(②~⑥·오너 암전 규칙 그대로). 표식 전달(슬로우 Start 이벤트 1바이트)은 칸과 무관하게 돈다. 섬광 줄이기(`reduceFlash`)와 독립 | 성공 `HandleStarted` 시작 순간 `Director.PlaysSuppressFlash(목적, 표식)` = `SuppressFlashRules.ShouldPlay(…, 칸, 컷 데이터 있음)` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashEnabled` |
-| A7 | `suppressFlashTargetOnly`("성공 — 공용") | 꺼짐 | 섬광 = 대상 내부만(179/192 후속, [§7.5](#75-렌더--셰이더-절차-생성만)) — 켜면 제압 간파 섬광 시퀀스를 **간파 대상(보스·허수아비) 실루엣 안에만** 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). 레터박스는 그대로. 끄면 전체 화면(지금까지). 이 화면에서 대상을 못 찾으면 전체 화면 | `BeginSuppressFlash` 재생 시작 순간 `SuppressFlashRules.SelectMaskMode(칸, 대상 찾음)` → 마스크 루트 `SelectMaskRoots` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashTargetOnly` |
+| A7 | `suppressFlashTargetOnly`("성공 — 공용") | 꺼짐 | 섬광 = 대상 내부만(179/192 후속, [§7.5](#75-렌더--셰이더-절차-생성만)) — 켜면 제압 간파 섬광 시퀀스를 **간파 대상(보스·허수아비) 실루엣 안에만** 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). 끄면 전체 화면(지금까지). 이 화면에서 대상을 못 찾으면 전체 화면 | `BeginSuppressFlash` 재생 시작 순간 `SuppressFlashRules.SelectMaskMode(칸, 대상 찾음)` → 마스크 루트 `SelectMaskRoots` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashTargetOnly` |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
 
@@ -624,7 +624,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 > 사양: `_lane-artifacts/common/179-suppress-interrupt-flash/SPEC.md`(2026-11-02 grill 확정, 레포 밖). 레퍼런스 = `_lane-artifacts/references/interrupt/user-ref-2026-11-02-flash/`(참고만, 텍스처로 쓰지 않음).
 
-**제압 간파** = 23호 제압 칸이 1칸 남았을 때 성공한 간파(그 간파로 제압 진입). 이때만 일반 성공 섬광 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(보라 3단 단색 · 네거/포지 교대 · 십자 빛기둥 + 스파이크 별 · 집중선 · 색수차 · 레터박스, 약 0.6초)를 튼다. 일반 간파는 §0 그대로.
+**제압 간파** = 23호 제압 칸이 1칸 남았을 때 성공한 간파(그 간파로 제압 진입). 이때만 일반 성공 섬광 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(보라 3단 단색 · 네거/포지 교대 · 십자 빛기둥 + 스파이크 별 · 집중선 · 색수차, 약 0.6초 — 레터박스·비네팅 없음, 11-03 삭제)를 튼다. 일반 간파는 §0 그대로.
 
 ### 7.1 누가 보나
 
@@ -649,9 +649,9 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 ### 7.3 컷 데이터 — `SuppressFlashSequence`(`Assets/5.VFX/Interrupt/SuppressFlash/SuppressFlashSequence.asset`)
 
 - 재생: `frameRate` 24 × `holdFrames` 2 = **초당 12장**, 실제 시간(슬로우·히트스톱 무관). 컷 안 시작→끝 값도 홀드 단위 계단.
-- 컷 칸: `frames`·`tone`(Negative/Positive/Return)·`cross`(None/Single/Grid)·`starSize`·`speedLines`·`aberration`→`aberrationEnd`·`hatching`·`letterbox`→`letterboxEnd`·3단 색 `dark`/`mid`/`light`(#1C1930·#7D77A0·#ECE9F6).
-- 기본값 = 사양 표 7컷(2·2·2·2·2·2·3 = 15프레임 = 0.625초). 레터박스 = 1컷 0.6 → 2~6컷 1 → 7컷 1→0. 인스펙터 메뉴 Reset = 사양 표.
-- 모양 칸(화면 높이 단위): 빛기둥 굵기·가늘어짐·울퉁불퉁·최소 굵기, 격자 칸·격자 별, 별 반지름·스파이크 수, 집중선 수, 방사 블러, 3단 경계, 바탕 밝기, 빗금 간격(px), 색수차 배율, 레터박스 높이, 섬광 줄이기 대비.
+- 컷 칸: `frames`·`tone`(Negative/Positive/Return)·`cross`(None/Single/Grid)·`starSize`·`speedLines`·`aberration`→`aberrationEnd`·`hatching`·3단 색 `dark`/`mid`/`light`(#1C1930·#7D77A0·#ECE9F6).
+- 기본값 = 사양 표 7컷(2·2·2·2·2·2·3 = 15프레임 = 0.625초). 레터박스 칸(`letterbox`·`letterboxEnd`·`letterboxHeight`)은 11-03 삭제(사용자 요청 — 옵션 아님). 인스펙터 메뉴 Reset = 사양 표.
+- 모양 칸(화면 높이 단위): 빛기둥 굵기·가늘어짐·울퉁불퉁·최소 굵기, 격자 칸·격자 별, 별 반지름·스파이크 수, 집중선 수, 방사 블러, 3단 경계, 바탕 밝기, 빗금 간격(px), 색수차 배율, 섬광 줄이기 대비.
 - **Play 중 SO 값을 바꾸면 다음 렌더 프레임부터** 반영(진행기가 프레임마다 읽는다).
 
 ### 7.4 디렉터 칸 — `NetworkManager.prefab › InterruptProductionDirector` "성공 — 제압 간파 섬광"
@@ -673,18 +673,19 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 - `DarkAdaptationFeature` 에 패스 추가(렌더러 에셋 수정 없음 — 재질은 디렉터 칸에서 `SuppressFlashState` 로 온다). **후처리 뒤**(`AfterRenderingPostProcessing`)라 톤매핑이 3단 색을 바꾸지 않는다. HUD(오버레이 캔버스)는 그 위에 그대로 보인다.
 - 실루엣 마스크: 대상 렌더러에 **렌더링 레이어 비트 7**(`SuppressFlashMaskLayers`)을 132 태거(`InterruptOwnerMaskTagger(mask)`)로 붙이고 덮어쓰기 재질(패스 1)로 R8 RT 에 흰색 칠 — 깊이 판정 없음(벽 뒤도 납작 실루엣). 오너 암전 비트 4 와 나눠 서로 원복이 지우지 않는다.
-- 합성(패스 0): 방사 블러 흑백 → 네거 바탕 + 쐐기 집중선 + 울퉁불퉁 십자(최소 굵기 아래는 지움) + 칸마다 길이·핵이 다른 스파이크 별(원·고리 아님) + 흰 실루엣 → 포지티브는 통째 뒤집기 → 대비 → 3단 색 → 빗금(실루엣 안 사선) → 복귀 섞기 → 가장자리 색수차(셰이더 안 RGB 분리) → 레터박스(검정).
+- 합성(패스 0): 방사 블러 흑백 → 네거 바탕 + 쐐기 집중선 + 울퉁불퉁 십자(최소 굵기 아래는 지움) + 칸마다 길이·핵이 다른 스파이크 별(원·고리 아님) + 흰 실루엣 → 포지티브는 통째 뒤집기 → 대비 → 3단 색 → 빗금(실루엣 안 사선) → 복귀 섞기 → 가장자리 색수차(셰이더 안 RGB 분리). 레터박스·비네팅(가장자리 어둡게)은 없다(11-03 삭제 — `_SFFx.w` 는 미사용 0).
 - 대상 목록: 발동자 플레이어 오브젝트 + 적중점 6m 안 가장 가까운 간파 대상(`InterruptTargetRegistry`). 191 동시 성공자는 `CollectSuppressSubjects` 목록에 더하면 된다.
   같은 함수가 간파 대상만 따로(`targets`) 모은다 — 동시 성공자는 거기에 넣지 않는다.
 - **A7 섬광 = 대상 내부만(179/192 후속, 기본 끔)** — 새 렌더링 레이어 비트 없이 **비트 7 을 그대로** 쓴다: 켬이면 마스크 루트를 간파 대상만으로 골라(`SuppressFlashRules.SelectMaskRoots`) 비트 7 마스크 RT 가 곧 '그릴 범위'가 된다.
-  합성 패스는 같고 `_SFMask.x = 1`(`SuppressFlashParams.Mask`)만 다르다 — 마스크 밖 픽셀은 원래 화면(카메라 컬러 그대로 — 오너 암전 덮개는 그 위 UI 캔버스라 그대로 덮인다), 안은 위 합성 순서 그대로(색 반전·3단 색·십자·별·집중선·색수차). 마스크 자체가 실루엣이라 **흰 실루엣 칠·빗금은 끈다**(켜 두면 안이 통째로 한 색이 된다). 레터박스는 화면 UI 성격이라 그대로.
+  합성 패스는 같고 `_SFMask.x = 1`(`SuppressFlashParams.Mask`)만 다르다 — 마스크 밖 픽셀은 원래 화면(카메라 컬러 그대로 — 오너 암전 덮개는 그 위 UI 캔버스라 그대로 덮인다), 안은 위 합성 순서 그대로(색 반전·3단 색·십자·별·집중선·색수차). 마스크 자체가 실루엣이라 **흰 실루엣 칠·빗금은 끈다**(켜 두면 안이 통째로 한 색이 된다).
   대상을 못 찾으면(`SelectMaskMode` — 6m 안 대상 없음) 전체 화면으로 돌아간다(마스크가 비면 아무것도 안 보이므로). 바뀐 칸은 재생 시작 순간만 읽는다.
   비트 사용처 확인(2026-11-03): 0 조명 · 1 데칼 · 2·3 벽 뒤 실루엣 · 4 오너 암전(132) · 4·5·6 보스 처치 연출(그 연출 동안만) · 7 제압 섬광 · 8 Ground — A7 은 비트를 늘리지 않는다. 조준 표시 쿼드는 A5 가 렌더러를 꺼서 원래 비트 7 에 안 남고, A7 켬이면 플레이어 루트를 아예 태깅하지 않는다.
 
 ### 7.6 알려진 한계
 
 - 색수차는 132 ⑤ Volume 을 재사용하지 않고 셰이더 안에서 만든다 — ⑤ 는 후처리(톤매핑 전)라 3단 색 양자화가 무지개를 지우기 때문.
-- HUD·피해 숫자(팀원 화면)는 시퀀스 위에 보인다. 레터박스는 월드만 덮는다.
+- HUD·피해 숫자(팀원 화면)는 시퀀스 위에 보인다.
+- 시퀀스 뒤 제압 암순응 컷은 일반 암순응 렌더(`InterruptDarkAdaptation`)를 쓰므로 대상 주변 원형 살림(`revealRadius`) 밖이 어둡게 보인다 — 비네팅이 아니라 암순응 원이다(그대로 둔다).
 - 렌더링 레이어 Everything 인 렌더러(일부 VFX)는 비트 7 을 이미 갖고 있어 실루엣으로 칠해진다(A7 켬이면 그 VFX 자리에도 섬광이 그려진다). 태깅 뒤 생긴 렌더러는 빠진다.
 - A7 대상 내부 마스크도 깊이 판정이 없다 — 벽·기둥 뒤에 가려진 대상 부분에도 섬광이 그려진다. 가장자리는 마스크 픽셀 경계 그대로(부드럽게 하지 않음).
 - 표식은 23호 칸 판정만 낸다 — 훈련 스파링 봇(`TrainingSparringBot`)·기믹 보상 제압·구출 제압은 일반 섬광.

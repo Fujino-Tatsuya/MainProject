@@ -100,7 +100,6 @@ public sealed class SuppressFlashTests
         }
 
         Assert.AreEqual(0f, _sequence.cuts[6].aberrationEnd, "7컷 색수차 0.8→0");
-        Assert.AreEqual(0f, _sequence.cuts[6].letterboxEnd, "7컷 레터박스 빠짐");
     }
 
     // ---- 시간표 ----
@@ -166,7 +165,7 @@ public sealed class SuppressFlashTests
     }
 
     [Test]
-    public void 복귀_컷은_홀드_계단으로_색수차_감소_원래_색_섞기_레터박스_빠짐()
+    public void 복귀_컷은_홀드_계단으로_색수차_감소_원래_색_섞기()
     {
         SuppressFlashFrame first = SuppressFlashRules.Evaluate(_sequence, At(12), false);
         SuppressFlashFrame second = SuppressFlashRules.Evaluate(_sequence, At(13), false);
@@ -174,11 +173,9 @@ public sealed class SuppressFlashTests
 
         Assert.AreEqual(0.8f, first.Aberration, 1e-5f);
         Assert.AreEqual(0f, first.ReturnBlend, 1e-5f);
-        Assert.AreEqual(1f, first.Letterbox, 1e-5f);
         Assert.AreEqual(first.Aberration, second.Aberration, 1e-5f, "2프레임 홀드 — 같은 그림");
         Assert.AreEqual(0.8f / 3f, third.Aberration, 1e-4f, "3번째 프레임 = 진행 2/3");
         Assert.AreEqual(2f / 3f, third.ReturnBlend, 1e-4f);
-        Assert.AreEqual(1f / 3f, third.Letterbox, 1e-4f);
         Assert.AreEqual(0f, SuppressFlashRules.Evaluate(_sequence, At(4), false).ReturnBlend, "복귀 외 컷은 0");
     }
 
@@ -405,14 +402,14 @@ public sealed class SuppressFlashTests
         Assert.AreEqual((float)SuppressFlashCross.Grid, p.Cross.x);
         Assert.AreEqual(_sequence.starRadius * 0.45f, p.Fx.x, 1e-5f);
         Assert.AreEqual(_sequence.aberrationScale * 0.5f, p.Fx.z, 1e-5f);
-        Assert.AreEqual(_sequence.letterboxHeight, p.Fx.w, 1e-5f);
+        Assert.AreEqual(0f, p.Fx.w, "레터박스 없음(179 후속 11-03 삭제)");
         Assert.AreEqual(frame.Dark.linear, p.Dark, "선형 색");
         Assert.AreEqual(0f, p.Mask.x, "기본 = 전체 화면");
 
         SuppressFlashParams interior = SuppressFlashScreenOutput.Build(frame, _sequence, new Vector2(0.3f, 0.6f), 1.5f, 9,
             SuppressFlashMaskMode.TargetInterior);
         Assert.AreEqual(1f, interior.Mask.x, "A7 대상 내부만");
-        Assert.AreEqual(p.Fx, interior.Fx, "레터박스·별·색수차 값은 그대로");
+        Assert.AreEqual(p.Fx, interior.Fx, "별·색수차 값은 그대로");
     }
 
     // ---- A7 섬광 = 대상 내부만(179/192 후속) ----
