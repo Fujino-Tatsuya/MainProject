@@ -12,7 +12,8 @@
 > 옛 예측기·약 → 강 올리기(`LocalOwnerUpgrade`)는 삭제. 단일 원본 [interrupt-client-judge.md](interrupt-client-judge.md) — 이 문서는 [§0.2](#02-흐름)·[§6.2](#62-사건-흐름) 에 요약.
 > 🔹 **할 일 192(2026-11-02, 브랜치 `feature/InterruptTierPresentation`)**: 간파 연출을 **4단계(실패 / 간파 / 대쉬 간파 / 제압 간파)** 로 나눴다 — **오너 암전·빛 모임은 제압 간파만**, 일반·대쉬 간파는 암전 없이 강한 줌 + 기존 섬광, 제압 = 암전 + 섬광 시퀀스 + **제압 암순응 컷**. 단계표·누가 보나·스위치 [§8](#8-간파-연출-4단계-할-일-192).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
-> 🔹 스위치 13칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 전투 표시 숨김(154·179 후속 2)·A6 제압 간파 섬광 시퀀스(179) = 켬**, **A2 암순응·A7 섬광 = 대상 내부만(179/192 후속) = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
+> 🔹 **할 일 196(2026-11-03, 브랜치 `feature/InterruptCameraCenter`)**: 내 간파 클릭 즉시 **카메라 중심을 간파 대상 쪽으로**(오너만, 줌과 독립) — 실패 = 즉시 복귀, 성공 = 성공 슬로우 복귀 구간에 복귀 — [§10](#10-카메라-대상-중심-할-일-196).
+> 🔹 스위치 14칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 전투 표시 숨김(154·179 후속 2)·A6 제압 간파 섬광 시퀀스(179)·카메라 대상 중심(196) = 켬**, **A2 암순응·A7 섬광 = 대상 내부만(179/192 후속) = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
@@ -489,7 +490,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 ### 6.1 구조
 
 - **디렉터 = `NetworkManager.prefab` 루트의 MonoBehaviour 1개**(`GlobalTimeScale`·`InterruptDarkAdaptation` 옆). 코드 `Assets/1.Scripts/Player/InterruptProduction/`.
-  스위치 13칸(cue 10 + A5 전투 표시 숨김 + A6 제압 간파 섬광 시퀀스 + A7 섬광 = 대상 내부만) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
+  스위치 14칸(cue 10 + A5 전투 표시 숨김 + A6 제압 간파 섬광 시퀀스 + A7 섬광 = 대상 내부만 + 카메라 대상 중심(196)) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
 - 간파 스킬(`PlayerInterruptSkillBase`)은 **사건 4개(시도·판정·성공·실패)만 알린다** — 슬로우 시작·실패·성공 재시작 코드는 스킬에 없다.
   판정·피해·카운터 창·그로기·통계는 그대로 스킬·대상(서버) 소관이고, 디렉터는 재생 여부와 슬로우 호출만 한다.
 - 단계마다 클래스가 따로 — `InterruptAttemptStage`·`InterruptResolveStage`·`InterruptSuccessStage`·`InterruptFailStage`.
@@ -530,6 +531,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 |---|---|---|---|
 | 시도(강·약)·성공 슬로우 · 히트스톱 | — · A1 | 서버 타임라인(전 피어 공용) | 채널을 거치지 않는다. `Time.timeScale` 은 피어 전역이라 개인 슬로우는 불가 |
 | 오너 줌 | A3 | 개인 | 카메라가 매 프레임 `Director.OwnerZoomFactor(목적, 성공 배율)`·`Director.OwnerAwaitsStrongResult` 질의 → `SlowMotionOwnerZoom`(시도~성공 줌 한 번). 내 슬로우인지는 카메라가 본다 |
+| 카메라 대상 중심(196) | `cameraCenter` | 개인 | 카메라가 매 프레임 `Director.OwnerCameraCenterShift(추적 대상, cameraBusy)` 질의 — 오너 cue 로만 시작하므로 늘 내 간파([§10](#10-카메라-대상-중심-할-일-196)) |
 | 오너 암전 · 섬광 오버레이 | 효과 칸 `show*`(§0.6) | 개인(오너 상태 기계) | §0.3 |
 | 빛 모임 · 월드 섬광 · 적중 지점 라이트 | 효과 칸 `show*`(§0.6) | 오너 = 입력 순간 예측 / 팀원·모두 = 슬로우 이벤트 | §0.3 |
 | 암순응 self 강도 | A2 | 개인 | 발동자 == `LocalClientId` ∧ 섬광 오버레이 안 돎(약 시도 성공), 섬광 순간 |
@@ -560,6 +562,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | A5 | `hideCombatUi`(옛 `hideDamageNumbers` — `FormerlySerializedAs`, 프리팹 줄 그대로) | **켬** | 전투 표시 숨김(154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) + **제압 간파 섬광 시퀀스 동안(모든 피어)** 이 화면의 **피해 숫자 캔버스(보스 포함)·머리 위 체력바(플레이어·몬스터·보스 모두 — 179 후속 4. 화면 고정 보스 HP 바 `BossHealthHUD` 는 그대로)·오너 조준 표시 쿼드(렌더러만 끔)** 를 숨긴다. 생성·수명·게이지 값은 그대로. 숨긴 조준 쿼드는 그려지지 않아 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 안 남는다(전에는 플레이어 루트 태깅으로 비트를 받아 흰 사각형 실루엣). 일반 간파의 팀원 화면은 그대로(암전·②~⑥ 없음) | 상태에서 바로 읽는 값(pull) — `FloatingDamageSpawner`·`UnitOverheadHealthBar`·`PlayerAimIndicator` 의 `LateUpdate` → `Director.CombatUiHidden` = `InterruptProductionRules.ShouldHideCombatUi(칸, State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive ∨ 제압 섬광 IsPlaying)`. 따로 복원할 상태가 없어 끝·실패·강제 리셋·디렉터 꺼짐이면 다음 프레임에 보인다(조준 쿼드는 컴포넌트 OnDisable 에도 켬). cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideCombatUi` |
 | A6 | `suppressFlash`("성공 — 공용") | **켬** | 제압 간파 섬광 시퀀스(179, [§7](#7-제압-간파-애니메이션-섬광-할-일-179)) — 켜면 제압 간파 성공 때 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). **끄면 제압 간파도 일반 간파와 같은 연출**(②~⑥·오너 암전 규칙 그대로). 표식 전달(슬로우 Start 이벤트 1바이트)은 칸과 무관하게 돈다. 섬광 줄이기(`reduceFlash`)와 독립 | 성공 `HandleStarted` 시작 순간 `Director.PlaysSuppressFlash(목적, 표식)` = `SuppressFlashRules.ShouldPlay(…, 칸, 컷 데이터 있음)` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashEnabled` |
 | A7 | `suppressFlashTargetOnly`("성공 — 공용") | 꺼짐 | 섬광 = 대상 내부만(179/192 후속, [§7.5](#75-렌더--셰이더-절차-생성만)) — 켜면 제압 간파 섬광 시퀀스를 **간파 대상(보스·허수아비) 실루엣 안에만** 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). 끄면 전체 화면(지금까지). 이 화면에서 대상을 못 찾으면 전체 화면 | `BeginSuppressFlash` 재생 시작 순간 `SuppressFlashRules.SelectMaskMode(칸, 대상 찾음)` → 마스크 루트 `SelectMaskRoots` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashTargetOnly` |
+| — | `cameraCenter`("성공 — 개인") | **켬**(코드 기본값) | 카메라 대상 중심(196, [§10](#10-카메라-대상-중심-할-일-196)) — 내 간파 클릭 즉시 카메라 중심을 간파 대상 쪽으로. 줌(A3)과 독립. 끄면 기존과 같음 | 시도 cue 순간 읽음(진행 중 이동은 끝까지) → `CameraTargetSwitcher` 가 `Director.OwnerCameraCenterShift` 로 이동량을 묻는다. cue 아님 — 런타임 값은 `director.CameraCenterEnabled` |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
 
@@ -575,7 +578,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 - **사건이 올 때마다 디렉터 필드를 읽는다(캐싱 없음).** Play 중 Hierarchy `DontDestroyOnLoad › NetworkManager › InterruptProductionDirector` 에서 바꾸면 다음 간파부터 바로 쓰인다.
   프리팹 에셋을 고치면 Play 중 인스턴스엔 안 닿는다(Unity 기본).
 - **슬로우 프로필·히트스톱(A1) = 호스트(서버) 인스턴스 값만.** 서버가 사건 순간 값을 이벤트에 실어 보내고 전 피어가 같은 닫힌 식으로 재생한다 — 클라 값은 무시. MPPM 에서는 호스트 에디터에서 바꾼다.
-- **나머지 12칸(A5·A6·A7 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
+- **나머지 13칸(A5·A6·A7·카메라 대상 중심 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
   줌 배율·오너 암전·섬광 칸(§0.5)도 각 피어 값이다.
 - 테이블 모드 Play 는 시작 때 프로필이 xlsx 값으로 덮인 뒤, 그 이후 인스펙터 변경은 Play 끝날 때까지 산다([data-table.md](data-table.md) §6).
 
@@ -875,7 +878,32 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
   - 구역 `#■ InterruptProductionDirector`·`#■ CameraTargetSwitcher` 는 사라진다(두 타입 모두 테이블 칸이 없어 `[DataTableSheet]` 를 뺐다).
 - **🔴 병합 ~ Export 사이 경고**: xlsx 에 옛 행이 남아 있는 동안 **테이블 모드 Play·빌드는 시작 전에 오류로 멈춘다**(`NetworkManager` 의 `interruptProfile.*` 등 = "어디에도 필드가 없다", `CameraSwitcher` 열 = "대상 없음", `revealRadius`·`revealSoftness` = "필드가 없다"). 인스펙터 모드 Play 는 영향 없음. 그래서 병합과 Export 를 같은 날 붙여서 한다.
 
-## 10. 이후 확장
+## 10. 카메라 대상 중심 (할 일 196)
+
+> 계획서: `_lane-artifacts/MainProject-WorkTree/196/PLAN.md`(레포 밖). 코드: `InterruptCameraCenterRules`(순수 규칙)·`InterruptCameraCenterTracker`(상태 기계, 실제 시간)·`InterruptProductionDirector.CameraCenter.cs`·`CameraTargetSwitcher`.
+
+내 간파(근접·대쉬) 클릭 즉시 카메라 중심을 **간파 대상 쪽으로** 짧게 옮긴다. 줌(A3)은 그대로 — 중심만 옮긴다. **오너 화면만**(팀원 화면 그대로).
+
+| 칸 | 위치 | 기본값 | 뜻 |
+|---|---|---|---|
+| `cameraCenter` | 디렉터 "성공 — 개인" | 켬 | 켜기/끄기(bool, 테이블 밖). 시도 cue 순간 읽는다 |
+| `cameraCenterMoveDuration` | 슬로우 SO ④ | 0.08 | 대상 쪽으로 옮기는 시간(초, 실제 시간) |
+| `cameraCenterRatio` | 슬로우 SO ④ | 1 | 옮기는 비율(0~1, 1 = 대상이 화면 중심) |
+| `cameraCenterReturnDuration` | 슬로우 SO ④ | 0.25 | 평소 중심으로 돌아오는 시간(초, 실제 시간) |
+
+- **시작**: 매니저 오너 시도 cue — 근접 = 누른 순간, 대쉬 = 대시에 실린 순간(`ArmDashAttach`). 강·약 예측 모두, 대상 없음 = 그대로. 대상 = 예측이 고른 캐시 대상 — 움직이면 따라가고 사라지면(파괴·비활성) 복귀. 새 시도는 지금 이동량에서 이전 상태를 대체한다.
+- **복귀**: 판정 실패·서버 거부·CC 끊김(`CrowdControl`)·판정 버림(`JudgeDropped`)·강제 리셋·cue 없는 종료(시전 거부 등) = **그 순간**. 판정 성공 = **내 성공 슬로우가 복귀(Exit) 구간에 들어가는 순간**까지 유지 — 이 화면에 내 성공 슬로우가 안 보이면(거부·잠금) 성공 프로필 시간표 `SuccessReturnDelay`(히트스톱 + 진입 + 유지) 뒤.
+- **오프셋 방식**: 오너 줌과 같은 경로 — `FollowOffset`(World Space) = 기본 오프셋 × 줌 배율 + 이동량. 이동량은 수평(XZ)만, 복귀가 끝나면 정확히 0 → 원래 오프셋.
+- **다른 카메라 연출과 충돌**: `cameraBusy` = 연출 vcam(`IsInCinematic`) ∨ 낙하 뷰 ∨ 관전 ∨ 임시 추적(`HasTemporaryFollow`)이면 진행 중인 이동을 **즉시 버리고 0**(그 연출이 끝나도 되살리지 않는다). 추적 대상이 없을 때도 같다.
+- **데이터 테이블**: SO ④ 칸 3개는 `SlowMotion` 시트(대상 열 `InterruptSlowMotionSettings`)의 **새 행 후보** — 행이 없으면 SO 값으로 돈다. development 병합 때 병합 Export 한 번(버려진 값 0 확인).
+- 랩: 튜닝 패널 효과 줄 밑 **"카메라 대상 중심 (196)"** 토글 — 이 피어 런타임 값만, 다음 간파부터. '전부 켬'·'암전만' 은 건드리지 않는다.
+- 테스트: `InterruptCameraCenterTests`(복귀 시점표·비율·스위치·오너·SO 기본값) · `InterruptCameraCenterTrackerTests`(이동·유지·복귀·대체·소실) · 랩 토글 `DebugInterruptLabTests`.
+
+**알려진 한계**
+- 시네마틱 블렌드로 들어가는 첫 프레임에 이동량이 0 으로 꺼지면서 화면이 한 번 튈 수 있다.
+- Cinemachine 위치 감쇠 때문에 빠르게 움직이는 대상은 화면 중심보다 조금 뒤처진다.
+
+## 11. 이후 확장
 
 - ~~암순응 셰이더에 흑백 실루엣·반전 모드~~ → 132 마스크 암전 모드·섬광 오버레이 흰 반전으로 구현(§0).
 - ~~주변 입자가 한 점으로 모이는 효과 + 피격 대상 충격파~~ → 132 빛 모임·월드 섬광으로 구현(§0.7). 손그림으로 바꿀 땐 덮어쓸 텍스처 칸.
