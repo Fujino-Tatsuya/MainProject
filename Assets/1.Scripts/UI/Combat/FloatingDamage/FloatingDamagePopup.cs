@@ -13,6 +13,8 @@ using UnityEngine;
 /// - 단발(<see cref="AttackHitPattern.Single"/>): 상승 → 최고점에서 하강하며 끝 0.25s 동안 흐려짐 → 제거.
 /// - 누적(<see cref="AttackHitPattern.Multi"/>): 상승 후 유지. 타격마다 값 갱신 + 펀치.
 ///   마지막 타격 후 유지 → 하강하며 흐려짐. 흐려지는 중에 맞아도 누적한다(유지로 복귀).
+/// - 제압 가속 합산(<see cref="FloatingDamageAccumulation.SuppressHaste"/>, 할 일 174): 누적과 같되 공격자의 가속이 켜진 동안은
+///   유지에 머물고, 가속이 끝난 순간부터 유지 → 흐려짐.
 ///
 /// 숫자는 이미지 글꼴(<see cref="FloatingDamageDigitSet"/>)로 그린다 — 글자 Image 는 <see cref="FloatingDamageNumberView"/> 가 만든다.
 /// </summary>
@@ -35,6 +37,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     Vector3 _anchorWorld;
     Vector2 _scatter;
     bool _accumulates;
+    bool _suppressHasteKey;          // 제압 가속 합산 숫자(할 일 174)
+    bool _holdsWhileSuppressHaste;   // 공격자의 가속이 끝날 때까지 사라지지 않게 붙잡는 중
     FloatingDamageTier _tier;
     FloatingDamageTierLook _look;
     float _singleDuration;
@@ -66,6 +70,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
     public void Initialize(
         FloatingPopupRequest request,
+        FloatingDamageAccumulation accumulation,
         FloatingDamageSettings settings,
         FloatingPopupStyle style,
         FloatingDamageTier tier,
@@ -81,7 +86,9 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _emphasisGate = emphasisGate;
         _release = release;
         _anchorWorld = anchorWorld;
-        _accumulates = request.hitPattern == AttackHitPattern.Multi;
+        _accumulates = accumulation != FloatingDamageAccumulation.None;
+        _suppressHasteKey = accumulation == FloatingDamageAccumulation.SuppressHaste;
+        _holdsWhileSuppressHaste = _suppressHasteKey;
         _amount = Mathf.Max(0, request.amount);
         _styleColor = style.color;
         _styleOffset = style.offset;
@@ -139,6 +146,9 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
         _amount += amount;
         _lastHitAt = _elapsed;
+        // 흐려지는 중 다음 제압 가속의 타격이 같은 키로 들어오면 다시 붙잡는다(제압 가속 키는 가속 중에만 만들어진다).
+        if (_suppressHasteKey)
+            _holdsWhileSuppressHaste = true;
         RefreshText();
 
         // 누적 숫자의 크기·색은 **누적 합계**로 판정한다(은희 2026-10-01 — 기획 §5 "개별 타격 기준"과 다름).
@@ -171,6 +181,15 @@ public sealed class FloatingDamagePopup : MonoBehaviour
             return;
 
         _elapsed += Time.deltaTime;
+        // 제압 가속 합산: 가속 동안은 마지막 타격 시각을 지금으로 붙잡고, 끝나면 마지막 합계를 평소처럼 유지 → 흐려짐.
+        if (_holdsWhileSuppressHaste)
+        {
+            bool hasteActive = SuppressHastePresence.IsActiveForClient(_request.attackerClientId);
+            _lastHitAt = FloatingDamageAccumulationPolicy.HeldLastHitAt(_lastHitAt, _elapsed, hasteActive);
+            if (!hasteActive)
+                _holdsWhileSuppressHaste = false;
+        }
+
         if (_elapsed >= EndTime())
             RequestRelease();
     }

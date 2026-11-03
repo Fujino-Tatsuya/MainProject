@@ -15,8 +15,12 @@ MonoBehaviour:
   tooltip:
     displayName: "\uCDA9\uC804 \uB808\uC774\uC800"
     subtitle: "Q \uC2A4\uD0AC"
-    description: "TODO \uC9D1\uC911\uB3C4\uC640 \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C {dmg} \uD53C\uD574\uB97C \uC8FC\uACE0, <style=shield><sprite name=\"shield\" color=#74C7EC>{shieldAmount}</style>\uC758 \uBCF4\uD638\uB9C9\uC744 {shieldDuration:0.0}\uCD08 \uB3D9\uC548 \uC5BB\uC2B5\uB2C8\uB2E4."
+    description: "TODO \uC9D1\uC911\uB3C4\uC640 \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C
+      {dmg} \uD53C\uD574\uB97C \uC8FC\uACE0, <style=shield><sprite name=\"shield\"
+      color=#74C7EC>{shieldAmount}</style>\uC758 \uBCF4\uD638\uB9C9\uC744 {shieldDuration:0.0}\uCD08
+      \uB3D9\uC548 \uC5BB\uC2B5\uB2C8\uB2E4."
     icon: {fileID: 21300000, guid: c8405826296d97049a61ac711f7d2111, type: 3}
+    tags: 
   inputType: 0
   cooldownTime: 6
   commitCooldownManually: 1
@@ -33,11 +37,17 @@ MonoBehaviour:
   targetingMode: 0
   confirmMode: 0
   castRange: 8
+  fixedDistance: 0
+  aoeRadius: 0
   targetableLayers:
     serializedVersion: 2
     m_Bits: 0
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
   animatorStateName: Gunner_Q_Start
   snapRotationOnStart: 1
+  followUpIconTint: {r: 1, g: 1, b: 1, a: 1}
   maxChargeTime: 1.2
   autoFireHoldTime: 0.8
   chargeCurve:
@@ -66,9 +76,10 @@ MonoBehaviour:
     m_RotationOrder: 4
   chargeMoveSpeedMultiplier: 0.5
   minRange: 6
-  maxRange: 16
-  beamWidth: 1.2
-  beamHeight: 2
+  hitArea:
+    origin: 1
+    shapes:
+    - rid: 7237886715379581121
   muzzleHeight: 1
   blockingLayers:
     serializedVersion: 2
@@ -91,3 +102,17 @@ MonoBehaviour:
   - 1.3
   - 1.5
   fireRecovery: 0.4
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886715379581121
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: -1
+        maxHeight: 1
+        length: 16
+        width: 1.2
+        backOffset: 0

@@ -59,6 +59,7 @@
 | | **`public bool StartTimerServer(float limitSecondsOverride = 0f)`** (서버, Idle 일 때만) — 지금부터 시작. 덮어쓴 제한시간은 `_limitOverride`(NetworkVariable&lt;float&gt;, 0 = 인스펙터)로 복제 |
 | | `LimitSeconds` = 덮어쓰기 &gt; 0 ? 그 값 : 인스펙터 값. `Fill01`·`StartTimer` 가 이걸 쓴다(클라 게이지도 같은 길이). 자동 시작은 덮어쓰지 않아 기존 값 그대로 |
 | `UI/Combat/BossTimerHUD.cs` | `available` 에 `&& !MapSceneBossPath.ShouldHideTimerHud(timer.State)` — 튜토리얼 · Idle · 디렉터 '타이머 HUD 표시' 꺼짐일 때만 알파 0 |
+| | (할 일 166, 튜토리얼 무관) 해골 아이콘(`BossIcon`) 점멸 — Running 동안만 매 프레임 `Time.deltaTime` 으로 위상 누적, 주기 = Lerp(시작 10초, 최소 0.2초, EaseInExpo(1 − 남은/제한)), 알파 1↔최저 0.25 를 0.5−0.5cos 로 오감(`Image.color.a` 만). Running 아님·위젯 숨김이면 알파 1·위상 0. 칸 비면 자식 `BossIcon` 이름으로 찾음. 테스트 `BossTimerIconBlinkTests` |
 | `Map/BossEnterTrigger.cs` | `Push` 가 `PadOccupied(_inside.Count > 0, MapSceneBossPath.IsBossPadEnabled)` 를 보낸다(잠긴 패드 = 비어 있음). `Update` 가 잠금 변화(G10)를 보면 다시 `Push` — 이미 서 있던 사람으로 카운트다운 시작 |
 | `Map/BossEnterZoneVisual.cs` | 잠긴 동안 범위 테두리(LineRenderer)를 끈다 — 디렉터 복제 게이트라 모든 피어·늦은 클라 같은 값 |
 

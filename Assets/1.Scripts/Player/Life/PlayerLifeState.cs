@@ -11,6 +11,31 @@ public enum PlayerLifeState
 }
 
 /// <summary>
+/// 서버 판정(넉백 승인·스킬 승인)이 쓰는 사망 기준(할 일 182). FSM 은 사망해도 Dead 로 가지 않으므로
+/// 사망 여부는 생명주기로만 본다 — Alive 만 행동 가능, 사망 연출·Soul·영구 사망은 거부.
+/// </summary>
+public static class PlayerLifeActionRules
+{
+    public static bool CanAct(PlayerLifeState state) => state == PlayerLifeState.Alive;
+
+    /// <summary>
+    /// 강제 이동(넉백·구속) 상태에 들어갈 수 있는가(할 일 183). 서버 승인과 오너 적용이 같은 기준을 쓴다 —
+    /// 서버 RPC(넉백·구속)와 생명주기 복제는 도착 순서가 보장되지 않아, 오너가 사망 연출을 먼저 받고 넉백을 나중에 받으면
+    /// 시체가 남은 넉백만큼 미끄러졌다. 생명주기가 없는 테스트 씬은 기존 동작(허용)을 유지한다.
+    /// </summary>
+    public static bool AcceptsForcedMotion(bool hasLifeCycle, PlayerLifeState state) =>
+        !hasLifeCycle || CanAct(state);
+
+    /// <summary>
+    /// 기본 공격 상태(Attack·AttackReady)에 들어갈 수 있는가(할 일 186). 서버 시작 승인과 오너의 StartRpc 적용이 같은 기준을 쓴다 —
+    /// 사망 직전 보낸 시작 요청이 서버 사망 뒤 승인되면 StartRpc 가 이미 Idle 로 끊긴 오너를 다시 Attack 에 넣었다.
+    /// 생명주기가 없는 테스트 씬은 기존 동작(허용)을 유지한다.
+    /// </summary>
+    public static bool AcceptsAttackEntry(bool hasLifeCycle, PlayerLifeState state) =>
+        !hasLifeCycle || CanAct(state);
+}
+
+/// <summary>
 /// 사망 연출 진입 원인.
 /// FallDeathContext가 확정되기 전까지 Fall 쪽이 사용할 최소 placeholder 계약이다.
 /// </summary>

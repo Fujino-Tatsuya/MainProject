@@ -34,12 +34,11 @@ public struct PodDropLobbyTimings
     public Ease cameraZoomEase;
 
     [Header("보행 (걷기 시작 지점 → 문턱 → 좌석)")]
-    [Tooltip("걷는 속도(m/s) — 전원 같다. 각자 보행 시간 = 자기 걷기 시작 지점 → 공용 경로점 → 문턱 길이 ÷ 이 값. 경로를 바꿔도 속도는 그대로다(플레이어 평소 이동 5 m/s)")]
+    [Tooltip("걷는 속도(m/s, 수평) — 전원·전 구간 같다. 각자 보행 시간 = 자기 걷기 시작 지점 → 공용 경로점 → 문턱 → 좌석 수평 길이 ÷ 이 값(문턱 → 좌석 미끄러짐도 같은 속도). " +
+             "경로를 바꿔도 속도는 그대로다(플레이어 평소 이동 5 m/s)")]
     [Min(0.1f)] public float walkSpeed;
     [Tooltip("앞사람이 걷기 시작한 순간 → 다음 사람이 걷기 시작(초). 탑승 다리 폭이 0.8m 라 한 줄로 들어간다")]
     [Min(0f)] public float walkInterval;
-    [Tooltip("문턱에 닿은 순간 → 좌석까지 미끄러져 들어가 숨는 시간(초). 포드 실내가 낮아 충돌 없이 보간한다. 문턱이 없으면 마지막 경로점 → 좌석")]
-    [Min(0f)] public float seatSlideSeconds;
 
     [Header("발사대 애니 (Animator 상태 이름 — 1배속, 클립 이벤트가 다음 단계를 연다)")]
     [Tooltip("해치 상태 이름(컨트롤러 Base Layer). 시작 암전 한가운데(순간이동 순간)부터 1배속으로 재생하고, 클립 이벤트(PodClipEvent — 기본 103프레임)에서 그 자세로 멈춘 뒤 탑승한다. " +
@@ -81,7 +80,6 @@ public struct PodDropLobbyTimings
         cameraZoomEase = Ease.InOutSine,
         walkSpeed = 4.5f,
         walkInterval = 0.4f,
-        seatSlideSeconds = 0.4f,
         hatchState = "DP_HatchLobbyOpenClose",
         launchState = "DP_LaunchCycle",
         launchFastSpeed = 6f,
@@ -121,44 +119,42 @@ public struct PodDropMapTimings
     [Tooltip("카메라 시작 지점 높이 — 착지점 위 (날개·다리 연출 높이 + 이 값) m 를 보고 시작한다. 급감속이 시작되면 포드를 따라가고, 착지 뒤 조작이 돌아오는 순간 플레이어로 넘어간다")]
     public float cameraStartHeightOffset;
 
-    [Header("빠른 낙하 → 급감속 (날개·다리 펴기)")]
+    [Header("빠른 낙하 → 급감속 (날개 접기·다리 펴기)")]
     [Tooltip("착지점 기준 낙하 시작 높이(m)")]
     [Min(0f)] public float fallHeight;
-    [Tooltip("날개·다리 연출 높이 — 착지점 위(m). 급감속이 끝나는 높이이고, 펴기 끝 이벤트가 아직이면 여기서 기다렸다 착륙한다")]
+    [Tooltip("날개·다리 연출 높이 — 착지점 위(m). 급감속이 끝나는 높이이고, 날개 접기·다리 펴기 끝 이벤트가 아직이면 여기서 기다렸다 자유낙하한다")]
     [Min(0f)] public float hoverHeight;
     [Tooltip("낙하 시작 → 급감속 시작(초). 빠르게 떨어진다")]
     [Min(0f)] public float fallSeconds;
     [Tooltip("빠른 낙하 이징(진행도 → 떨어진 비율). 기본 Linear = 일정한 빠른 속도(Out 계열이면 급감속 전에 이미 느려진다)")]
     public Ease fallEase;
-    [Tooltip("급감속 시작 높이 — 날개·다리 연출 높이 위(m). 여기서 날개·다리 펴기 클립을 1배속으로 재생하며 감속한다")]
+    [Tooltip("급감속 시작 높이 — 날개·다리 연출 높이 위(m). 여기서 날개 접기·다리 펴기 클립을 1배속으로 재생하며 감속한다")]
     [Min(0f)] public float brakeDistance;
     [Tooltip("급감속 시작 → 날개·다리 연출 높이 도착(초)")]
     [Min(0f)] public float brakeSeconds;
     [Tooltip("급감속 이징(진행도 → 내려온 비율). Out 계열 = 처음 빠르고 끝에서 멈춘다")]
     public Ease brakeEase;
-    [Tooltip("급감속 시작 순간 같이 재생하는 날개 펴기 상태(Wings 레이어). 비우면 생략")]
-    public string wingDeployState;
-    [Tooltip("급감속 시작 순간 같이 재생하는 다리 펴기 상태(Gear 레이어). 비우면 생략. 둘 다 끝 클립 이벤트(PodClipEvent)가 와야(그리고 연출 높이에 닿아야) 착륙한다")]
+    [Tooltip("급감속 시작 순간 같이 재생하는 다리 펴기 상태(Gear 레이어). 비우면 생략. 날개 접기와 둘 다 끝 클립 이벤트(PodClipEvent)가 와야(그리고 연출 높이에 닿아야) 자유낙하한다")]
     public string gearDeployState;
 
-    [Header("착륙 → 해치 열기 · 날개 접기")]
-    [Tooltip("날개·다리 연출 높이 → 지면(초). 천천히 내려앉는다")]
-    [Min(0f)] public float landSeconds;
-    [Tooltip("착륙 이징(진행도 → 내려온 비율)")]
-    public Ease landEase;
+    [Header("자유낙하 착륙 → 해치 열기")]
+    [Tooltip("자유낙하 중력 가속도(m/s²) — 날개 접기·다리 펴기 끝 이벤트 뒤 연출 높이에서 추진력 없이 떨어진다. 높이 = h − ½·g·t², 낙하 시간 = √(2h/g). " +
+             "클수록 짧고 세게 내리꽂힌다(9.81 = 실제 중력, 연출 높이 5m 면 약 1.01초·착지 속도 약 9.9m/s)")]
+    [Min(0.1f)] public float freefallGravity;
     [Tooltip("착륙 땅 갈라짐 이펙트 크기 배율(23호 등장 착지 FX_Ground_Crash 기본 1.5)")]
     [Min(0f)] public float impactEffectScale;
     [Tooltip("착륙 카메라 흔들림 세기(0 = 없음)")]
     [Min(0f)] public float shakeAmplitude;
     [Tooltip("착륙 카메라 흔들림 시간(초)")]
     [Min(0f)] public float shakeDuration;
-    [Tooltip("착륙 순간 같이 재생하는 해치 열기 상태(Hatches 레이어). 비우면 생략")]
+    [Tooltip("착륙 순간 재생하는 해치 열기 상태(Hatches 레이어). 비우면 생략. 끝 클립 이벤트(PodClipEvent)가 오면 디졸브 대기가 시작된다")]
     public string hatchOpenState;
-    [Tooltip("착륙 순간 같이 재생하는 날개 접기 상태(Wings 레이어). 비우면 생략. 둘 다 끝 클립 이벤트(PodClipEvent)가 오면 디졸브 대기가 시작된다")]
+    [Tooltip("급감속 시작 순간 같이 재생하는 날개 접기 상태(Wings 레이어). 0프레임 = 펴진 자세라 빠른 낙하 동안 이 자세로 멈춰 있다(할 일 150). 비우면 생략. " +
+             "다리 펴기와 둘 다 끝 클립 이벤트(PodClipEvent)가 와야 자유낙하한다")]
     public string wingFoldState;
 
     [Header("디졸브 · 레터박스 아웃 → 해제")]
-    [Tooltip("해치 열기·날개 접기 끝 이벤트 → 디졸브 시작(초)")]
+    [Tooltip("해치 열기 끝 이벤트 → 디졸브 시작(초)")]
     [Min(0f)] public float dissolveDelaySeconds;
     [Tooltip("포드가 디졸브로 사라지는 시간(초). 시작 순간 플레이어가 보이고(실루엣은 아직 안 그림), 끝나는 순간 조작·실루엣이 돌아오고 카메라가 플레이어로 넘어간다")]
     [Min(0f)] public float dissolveSeconds;
@@ -203,10 +199,8 @@ public struct PodDropMapTimings
         brakeDistance = 3f,
         brakeSeconds = 0.8f,
         brakeEase = Ease.OutCubic,
-        wingDeployState = "DP_WingDeploy",
         gearDeployState = "DP_GearDeploy",
-        landSeconds = 1.5f,
-        landEase = Ease.InOutSine,
+        freefallGravity = 9.81f,
         impactEffectScale = 1.5f,
         shakeAmplitude = 0.6f,
         shakeDuration = 0.35f,
@@ -226,11 +220,11 @@ public struct PodDropMapTimings
         podGroundClearance = 0.25f,
     };
 
-    /// <summary>급감속 시작 순간 같이 재생하는 상태(날개 · 다리 — 비운 칸 포함).</summary>
-    public string[] DeployStates => new[] { wingDeployState, gearDeployState };
+    /// <summary>급감속 시작 순간 같이 재생하는 상태(날개 접기 · 다리 펴기 — 비운 칸 포함). 둘 다 끝 이벤트 → 자유낙하(할 일 150).</summary>
+    public string[] DeployStates => new[] { wingFoldState, gearDeployState };
 
-    /// <summary>착륙 순간 같이 재생하는 상태(해치 · 날개 접기 — 비운 칸 포함).</summary>
-    public string[] OpenStates => new[] { hatchOpenState, wingFoldState };
+    /// <summary>착륙 순간 재생하는 상태(해치 열기 — 비운 칸 포함). 끝 이벤트 → 디졸브 대기.</summary>
+    public string[] OpenStates => new[] { hatchOpenState };
 }
 
 /// <summary>
@@ -259,8 +253,6 @@ public sealed class PodDropLobbyTimeline
     public int WalkerCount => _walkSeconds.Length;
     /// <summary>다음 사람이 걷기 시작하는 간격(초).</summary>
     public float WalkInterval { get; }
-    /// <summary>문턱 → 좌석 미끄러짐 시간(초) — 전원 같다.</summary>
-    public float SeatSlideSeconds { get; }
     /// <summary>발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초).</summary>
     public float LaunchEndWaitSeconds { get; }
     /// <summary>끝 페이드 아웃 — 다 검어지기까지(초).</summary>
@@ -268,7 +260,7 @@ public sealed class PodDropLobbyTimeline
     /// <summary>발사 클립 끝 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
     public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds;
 
-    // 슬롯별 보행 시간(초, 걷기 시작 지점 → 문턱) — 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
+    // 슬롯별 보행 시간(초, 걷기 시작 지점 → 좌석) — 수평 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
     private readonly float[] _walkSeconds;
 
     /// <summary>순간이동 시각 = 암전 유지 구간 한가운데 — 각 오너가 자기 걷기 시작 지점으로 순간이동하고, 해치 클립이 처음부터 재생된다. 암전이 없으면 0.</summary>
@@ -280,7 +272,7 @@ public sealed class PodDropLobbyTimeline
     /// <summary>탑승 시작 → 가장 늦게 좌석에 도착(초). 아무도 안 걸으면 0.</summary>
     public float SeatedSeconds { get; }
 
-    /// <param name="walkSeconds">슬롯(보행 순서)별 보행 시간(초, 걷기 시작 지점 → 문턱). 길이 = 걷는 사람 수. 음수·NaN 은 0. 서버가 경로로 계산해 복제한 값을 모든 피어가 같이 쓴다.</param>
+    /// <param name="walkSeconds">슬롯(보행 순서)별 보행 시간(초, 걷기 시작 지점 → 좌석 — 미끄러짐 포함). 길이 = 걷는 사람 수. 음수·NaN 은 0. 서버가 경로로 계산해 복제한 값을 모든 피어가 같이 쓴다.</param>
     public PodDropLobbyTimeline(PodDropLobbyTimings timings, IReadOnlyList<float> walkSeconds)
     {
         LetterboxInSeconds = Mathf.Max(0f, timings.letterboxInSeconds);
@@ -295,7 +287,6 @@ public sealed class PodDropLobbyTimeline
         CameraZoomEase = timings.cameraZoomEase;
 
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
-        SeatSlideSeconds = Mathf.Max(0f, timings.seatSlideSeconds);
         LaunchEndWaitSeconds = Mathf.Max(0f, timings.launchEndWaitSeconds);
         LaunchEndFadeSeconds = Mathf.Max(0f, timings.launchEndFadeSeconds);
         _walkSeconds = new float[walkSeconds != null ? walkSeconds.Count : 0];
@@ -307,7 +298,7 @@ public sealed class PodDropLobbyTimeline
         // 가장 늦게 도착하는 사람 기준(경로 길이가 달라 슬롯 순서와 다를 수 있다).
         SeatedSeconds = 0f;
         for (int slot = 0; slot < WalkerCount; slot++)
-            SeatedSeconds = Mathf.Max(SeatedSeconds, slot * WalkInterval + _walkSeconds[slot] + SeatSlideSeconds);
+            SeatedSeconds = Mathf.Max(SeatedSeconds, slot * WalkInterval + _walkSeconds[slot]);
     }
 
     /// <summary>탑승 시작 시각 = 해치 열림 이벤트와 <see cref="WalkReadyAt"/> 중 늦은 쪽. 이벤트 전이면 +∞.</summary>
@@ -325,16 +316,13 @@ public sealed class PodDropLobbyTimeline
     /// <summary>슬롯(0 = P1)이 걷기 시작하는 경과 시각(초).</summary>
     public double WalkStartAt(int slot, double boardAt) => boardAt + Mathf.Max(0, slot) * WalkInterval;
 
-    /// <summary>슬롯의 보행 시간(초, 걷기 시작 지점 → 문턱). 명단 밖 슬롯은 0.</summary>
+    /// <summary>슬롯의 보행 시간(초, 걷기 시작 지점 → 좌석). 명단 밖 슬롯은 0.</summary>
     public float WalkSecondsOf(int slot) => slot >= 0 && slot < _walkSeconds.Length ? _walkSeconds[slot] : 0f;
 
-    /// <summary>슬롯이 문턱에 닿는 경과 시각(초) — 여기부터 좌석으로 미끄러진다.</summary>
-    public double WalkArriveAt(int slot, double boardAt) => WalkStartAt(slot, boardAt) + WalkSecondsOf(slot);
+    /// <summary>슬롯이 좌석에 도착하는 경과 시각(초) — 이 순간 숨긴다. 구간(앞·문턱·미끄러짐) 나누기는 오너가 수평 길이 비율로 한다.</summary>
+    public double WalkEndAt(int slot, double boardAt) => WalkStartAt(slot, boardAt) + WalkSecondsOf(slot);
 
-    /// <summary>슬롯이 좌석에 도착하는 경과 시각(초) — 이 순간 숨긴다.</summary>
-    public double WalkEndAt(int slot, double boardAt) => WalkArriveAt(slot, boardAt) + SeatSlideSeconds;
-
-    /// <summary>슬롯의 보행 진행률(0 = 걷기 시작 지점, 1 = 문턱). 선형 — 걷는 속도가 일정하다.</summary>
+    /// <summary>슬롯의 보행 진행률(0 = 걷기 시작 지점, 1 = 좌석). 선형 — 걷는 속도가 일정하다.</summary>
     public float WalkProgressAt(int slot, double elapsed, double boardAt) =>
         PodDropTimeline.Progress(elapsed, WalkStartAt(slot, boardAt), WalkSecondsOf(slot));
 
@@ -357,7 +345,7 @@ public sealed class PodDropLobbyTimeline
         return (float)(clip + (from2 - from1) * fastSpeed + (elapsed - from2) * fast2Speed);
     }
 
-    /// <summary>경로 길이(m) ÷ 걷는 속도(m/s) = 보행 시간(초). 길이·속도가 0 이하(또는 NaN)면 0 — 무한·NaN 시간표를 만들지 않는다.</summary>
+    /// <summary>수평 경로 길이(m) ÷ 걷는 속도(m/s) = 보행 시간(초). 길이·속도가 0 이하(또는 NaN)면 0 — 무한·NaN 시간표를 만들지 않는다.</summary>
     public static float WalkSecondsFor(float pathLength, float walkSpeed) =>
         pathLength > 0f && walkSpeed > 0f ? pathLength / walkSpeed : 0f;
 
@@ -401,9 +389,9 @@ public sealed class PodDropLobbyTimeline
 /// <summary>
 /// 맵 포드 착지 연출의 순수 시간표(할 일 100 C3 → 106) — 경과 시간 → 레터박스 알파·카메라 거리·포드 높이·디졸브 값.
 /// 경과 시간은 로딩 화면이 걷힌 시각 기준(음수 = 시작 전 — 로딩 화면 아래). 레터박스는 처음부터 덮여 있다(106 추가 2).
-/// 대기 → 빠른 낙하 → 급감속(날개·다리 펴기 시작) → 연출 높이 도착까지는 시각이 정해져 있고,
-/// 그 뒤는 서버가 받은 클립 이벤트 시각(펴기 끝 <c>deployedAt</c>, 열기 끝 <c>openedAt</c>)을 넣어 계산한다. 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
-/// 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·실루엣·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·튜토리얼(<see cref="EndAt"/>).
+/// 대기 → 빠른 낙하(날개 펴진 채) → 급감속(날개 접기·다리 펴기 시작) → 연출 높이 도착까지는 시각이 정해져 있고,
+/// 그 뒤는 서버가 받은 클립 이벤트 시각(접기·펴기 끝 <c>deployedAt</c>, 해치 열기 끝 <c>openedAt</c>)을 넣어 계산한다. 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
+/// 접기·펴기 끝 → 추진력 없는 자유낙하(<see cref="PodDropTimeline.FreefallHeight"/>, 할 일 150) → 착지(해치 열기) → 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·실루엣·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·튜토리얼(<see cref="EndAt"/>).
 /// </summary>
 public sealed class PodDropMapTimeline
 {
@@ -427,8 +415,10 @@ public sealed class PodDropMapTimeline
     public Ease FallEase { get; }
     public float BrakeSeconds { get; }
     public Ease BrakeEase { get; }
-    public float LandSeconds { get; }
-    public Ease LandEase { get; }
+    /// <summary>자유낙하 중력 가속도(m/s², 0 보다 크다).</summary>
+    public float FreefallGravity { get; }
+    /// <summary>연출 높이 → 지면 자유낙하 시간(초) = √(2h/g). 연출 높이 0 이면 0.</summary>
+    public float FreefallSeconds { get; }
     public float DissolveDelaySeconds { get; }
     public float DissolveSeconds { get; }
     public float LetterboxOutSeconds { get; }
@@ -436,9 +426,9 @@ public sealed class PodDropMapTimeline
 
     /// <summary>낙하 시작 = 대기 끝.</summary>
     public float FallAt { get; }
-    /// <summary>급감속 시작 = 날개·다리 펴기 클립 시작 = 카메라가 포드를 따라가기 시작.</summary>
+    /// <summary>급감속 시작 = 날개 접기·다리 펴기 클립 시작 = 카메라가 포드를 따라가기 시작.</summary>
     public float BrakeAt { get; }
-    /// <summary>날개·다리 연출 높이 도착(급감속 끝) — 펴기 끝 이벤트가 이보다 일찍 와도 착륙은 여기부터.</summary>
+    /// <summary>날개·다리 연출 높이 도착(급감속 끝) — 접기·펴기 끝 이벤트가 이보다 일찍 와도 자유낙하는 여기부터.</summary>
     public float HoverAt { get; }
     /// <summary>열기 끝 이벤트 → 조작·실루엣·카메라 해제(초) = 디졸브 지연 + 디졸브.</summary>
     public float ReleaseAfterOpenSeconds => DissolveDelaySeconds + DissolveSeconds;
@@ -463,8 +453,8 @@ public sealed class PodDropMapTimeline
         FallEase = timings.fallEase;
         BrakeSeconds = Mathf.Max(0f, timings.brakeSeconds);
         BrakeEase = timings.brakeEase;
-        LandSeconds = Mathf.Max(0f, timings.landSeconds);
-        LandEase = timings.landEase;
+        FreefallGravity = PodDropTimeline.SafeGravity(timings.freefallGravity);
+        FreefallSeconds = PodDropTimeline.FreefallSeconds(HoverHeight, FreefallGravity);
         DissolveDelaySeconds = Mathf.Max(0f, timings.dissolveDelaySeconds);
         DissolveSeconds = Mathf.Max(0f, timings.dissolveSeconds);
         LetterboxOutSeconds = Mathf.Max(0f, timings.letterboxOutSeconds);
@@ -475,11 +465,14 @@ public sealed class PodDropMapTimeline
         HoverAt = BrakeAt + BrakeSeconds;
     }
 
-    /// <summary>착륙 시작 = 펴기 끝 이벤트와 연출 높이 도착 중 늦은 쪽. 이벤트 전이면 +∞.</summary>
+    /// <summary>자유낙하 시작 = 접기·펴기 끝 이벤트와 연출 높이 도착 중 늦은 쪽(속도 0 에서 떨어진다). 이벤트 전이면 +∞.</summary>
     public double LandStartAt(double deployedAt) => Math.Max(deployedAt, HoverAt);
 
-    /// <summary>지면에 닿는 시각 = 착륙 시작 + 착륙 시간. 착지 이펙트·흔들림, 해치 열기·날개 접기 클립 시작. 이벤트 전이면 +∞.</summary>
-    public double TouchdownAt(double deployedAt) => LandStartAt(deployedAt) + LandSeconds;
+    /// <summary>지면에 닿는 시각 = 자유낙하 시작 + √(2h/g). 착지 이펙트·흔들림, 해치 열기 클립 시작. 이벤트 전이면 +∞.</summary>
+    public double TouchdownAt(double deployedAt) => LandStartAt(deployedAt) + FreefallSeconds;
+
+    /// <summary>착지 순간 속도(m/s) = g·√(2h/g) = √(2gh). 시각표·로그용.</summary>
+    public float TouchdownSpeed => PodDropTimeline.FreefallSpeed(FreefallGravity, FreefallSeconds);
 
     /// <summary>디졸브 시작 = 열기 끝 이벤트 + 지연 = 플레이어가 보이고(실루엣은 아직) 레터박스가 걷히기 시작하는 시각.</summary>
     public double DissolveAt(double openedAt) => openedAt + DissolveDelaySeconds;
@@ -518,7 +511,7 @@ public sealed class PodDropMapTimeline
 
     /// <summary>
     /// 포드 높이(착지점 기준, m — 착지 여유 높이는 호출자가 더한다). 낙하 전 <see cref="FallHeight"/> → 빠른 낙하(<see cref="FallEase"/>) → <see cref="BrakeHeight"/>
-    /// → 급감속(<see cref="BrakeEase"/>) → <see cref="HoverHeight"/>(펴기 끝 이벤트가 아직이면 여기서 기다림) → 착륙(<see cref="LandEase"/>) → 0.
+    /// → 급감속(<see cref="BrakeEase"/>) → <see cref="HoverHeight"/>(접기·펴기 끝 이벤트가 아직이면 여기서 기다림) → 추진력 없는 자유낙하(h − ½·g·t²) → 0.
     /// </summary>
     public float PodHeightAt(double elapsed, double deployedAt)
     {
@@ -527,7 +520,7 @@ public sealed class PodDropMapTimeline
         double landStart = LandStartAt(deployedAt);
         if (elapsed < landStart)
             return Mathf.LerpUnclamped(BrakeHeight, HoverHeight, Easing.Evaluate(BrakeEase, PodDropTimeline.Progress(elapsed, BrakeAt, BrakeSeconds)));
-        return HoverHeight * (1f - Easing.Evaluate(LandEase, PodDropTimeline.Progress(elapsed, landStart, LandSeconds)));
+        return PodDropTimeline.FreefallHeight(HoverHeight, FreefallGravity, (float)(elapsed - landStart));
     }
 
     /// <summary>
@@ -563,4 +556,29 @@ public static class PodDropTimeline
     /// <summary><paramref name="delay"/> 까지 <paramref name="from"/> 유지 → 그로부터 <paramref name="seconds"/> 뒤 <paramref name="to"/>(이징), 그 뒤 유지.</summary>
     public static float CameraDistance(double elapsed, float from, float to, float delay, float seconds, Ease ease) =>
         Mathf.LerpUnclamped(from, to, Easing.Evaluate(ease, Progress(elapsed, delay, seconds)));
+
+    /// <summary>중력 칸이 0 이하·NaN 일 때 쓰는 값(m/s²) — 무한 낙하 시간을 만들지 않는다.</summary>
+    public const float FallbackGravity = 9.81f;
+
+    /// <summary>중력 가속도 정리 — 0 보다 크면 그대로, 아니면(NaN 포함) <see cref="FallbackGravity"/>.</summary>
+    public static float SafeGravity(float gravity) => gravity > 0f ? gravity : FallbackGravity;
+
+    /// <summary>
+    /// 추진력 없는 자유낙하 높이(m, 할 일 150) — 높이 <paramref name="height"/> 에서 속도 0 으로 떨어져 <paramref name="secondsIn"/> 초 뒤 = h − ½·g·t², 0 아래로는 안 간다.
+    /// 시작 전(t ≤ 0)은 h. 중력은 <see cref="SafeGravity"/> 로 정리한다.
+    /// </summary>
+    public static float FreefallHeight(float height, float gravity, float secondsIn)
+    {
+        if (height <= 0f) return 0f;
+        if (!(secondsIn > 0f)) return height;
+        return Mathf.Max(0f, height - 0.5f * SafeGravity(gravity) * secondsIn * secondsIn);
+    }
+
+    /// <summary>자유낙하 속도(m/s, 아래 +) = g·t. 시작 전(t ≤ 0)은 0.</summary>
+    public static float FreefallSpeed(float gravity, float secondsIn) =>
+        secondsIn > 0f ? SafeGravity(gravity) * secondsIn : 0f;
+
+    /// <summary>높이 <paramref name="height"/> 에서 지면까지 자유낙하 시간(초) = √(2h/g). 높이 0 이하면 0.</summary>
+    public static float FreefallSeconds(float height, float gravity) =>
+        height > 0f ? Mathf.Sqrt(2f * height / SafeGravity(gravity)) : 0f;
 }

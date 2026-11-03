@@ -17,26 +17,13 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
     // 🔴 여기는 RPC 가 필요 없다 — OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
     //    시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
     //    종료 → 서버는 EndActiveSkillServer 가, 클라는 EndSkillClientRpc 가 OnEnd 를 부른다
-    //    (FirstMeleeMainSkill 의 smashLoop/trailLoop 와 같은 구조다)
+    //    (FirstMeleeMainSkill 의 스매시 루프와 같은 구조다)
+    // 연출 칸(방패 발광·루프·기 모으기)은 팔라딘 연출 창구가 든다(2026-11-02).
+    // 🔴 적중 충격파만 경로가 다르다. ResolveHit 은 서버에서만 도는데(OnTick=TickServer,
+    //    애니 이벤트=HandleAnimationEvent 의 IsServer 게이트) 이 클래스는 MonoBehaviour 라 RPC 를 못 단다 — 창구가 전 피어로 보낸다.
     [Header("연출")]
-    [Tooltip("방패 메쉬 문양 발광(머티리얼 페이드). 방패의 MaterialFadeEffect 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private MaterialFadeEffect shieldGlow;
-
-    [Tooltip("강타 동안 재생할 루프 연출(소켓 이펙트). 프리팹의 'VFX/ShieldInterrupt/ShieldGlow' 를 물린다.\n" +
-             "비워두면 연출만 빠진다")]
-    [SerializeField] private EffectSocketPlayer glowLoop;
-
-    // 판정 전 방패 기 모으기(2026-10-26 민경 — handoff-paladin-interrupt-vfx). 켜고 끄는 것은 Garen_Parry 클립 이벤트
-    // (0초 StartEffect · Hit 시각 StopEffect "ShieldCharge")가 전 피어에서 한다. 여기는 판정 전에 끊긴 경우의 회수만.
-    [Tooltip("판정 전 방패 기 모으기(소켓 이펙트, Id 'ShieldCharge'). 프리팹의 'VFX/ShieldInterrupt/ShieldCharge' 를 물린다.\n" +
-             "켜고 끄기는 클립 이벤트가 하고, 여기서는 스킬이 판정 전에 끝났을 때 끄기만 한다. 비워두면 회수만 빠진다")]
-    [SerializeField] private EffectSocketPlayer chargeLoop;
-
-    // 🔴 적중 충격파만 창구가 다르다. ResolveHit 은 서버에서만 도는데(OnTick=TickServer,
-    //    애니 이벤트=HandleAnimationEvent 의 IsServer 게이트) 이 클래스는 MonoBehaviour 라 RPC 를 못 단다.
-    [Tooltip("적중 충격파 전파 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
-    [SerializeField] private PlayerShieldVfx shieldVfx;
+    [Tooltip("팔라딘 연출 창구(방패 발광·루프·기 모으기·적중 충격파). 플레이어 루트의 PaladinSkillView 를 물린다.\n비워두면 연출만 빠진다")]
+    [SerializeField] private PaladinSkillView skillView;
 
     public override void OnClientPlay(Vector3 direction)
     {
@@ -45,16 +32,14 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
         InterruptProductionDirector.LocalAttempt(InterruptProductionEvent.LocalAttempt(owner, this));
     }
 
-    // [각 피어] B1 방패 발광·루프 — 디렉터가 칸을 확인한 뒤 부른다.
+    // [각 피어] B1 방패 발광·루프 — 디렉터가 칸을 확인한 뒤 부른다. 디렉터는 시도 사건의 스킬(e.Skill)을 sink 로 되부르므로
+    // 이 메서드는 여기 남기고 재생은 창구에 넘긴다.
     void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
     {
         if (cue != InterruptProductionCue.PaladinShieldGlow)
             return;
 
-        shieldGlow?.FadeIn();
-
-        // Play 는 이미 재생 중이면 먼저 회수하므로 연타로 두 번 불려도 겹치지 않는다.
-        glowLoop?.Play();
+        skillView?.BeginInterruptGlow();
     }
 
     public override void OnEnd(SkillEndReason reason)
@@ -62,15 +47,8 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
         base.OnEnd(reason);
 
         // 🔴 종료 사유를 가리지 않는다. 취소·사망·안전망 만료 어느 쪽으로 끝나도 여기를 지나므로
-        //    연출이 켜진 채 남는 경로가 없다. (둘 다 꺼져 있으면 조용한 no-op 이다)
-        shieldGlow?.FadeOut();
-
-        // 🔴 루프는 반드시 회수한다 — 핸들을 버리면 풀 인스턴스가 영영 안 돌아온다.
-        //    소켓의 safetyTimeout(5s)은 이 경로가 실패했을 때를 위한 그물이지 정상 경로가 아니다.
-        glowLoop?.Stop();
-
-        // 판정 전에 끊기면(경직·사망·취소) 클립의 Stop 이벤트가 안 온다. 이미 꺼져 있으면 조용한 no-op 이다.
-        chargeLoop?.Stop();
+        //    연출이 켜진 채 남는 경로가 없다. (발광·루프·기 모으기 회수 — 이미 꺼져 있으면 조용한 no-op 이다)
+        skillView?.EndInterruptVfx();
     }
 
     protected override void OnMissingInterruptData()
@@ -106,13 +84,13 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
 
     // 충격파 = 간파 성공(카운터 창 소비) 때만(2026-10-26 민경). 예전엔 적중 1건 이상이면 터졌다.
     // 성공은 디렉터 성공 단계가 판정 1회에 한 번(여러 대상이 성공해도) 시전자의 relay 를 부른다 — 서버에서만 난다(할 일 118).
-    // 전송로(PlayerShieldVfx.InterruptWaveRpc)는 그대로, B3 칸은 받는 피어에서 디렉터가 본다.
+    // 전송로(PaladinSkillView.InterruptWaveRpc)는 그대로, B3 칸은 받는 피어에서 디렉터가 본다.
     void IInterruptSuccessRelay.ServerRelaySuccess(in InterruptProductionEvent e)
     {
         // 🔴 시전자 아래 relay 를 다 부르므로 자기 시전만(대체 슬롯 포함). 꺼진 컴포넌트는 옛 OnEnable 구독처럼 빠진다.
         if (e.Skill != this || !isActiveAndEnabled)
             return;
 
-        shieldVfx?.ServerInterruptWave();
+        skillView?.ServerInterruptWave();
     }
 }

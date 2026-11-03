@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 2312403450460863167}
   - component: {fileID: 127159849850635136}
   - component: {fileID: 1635166641757817886}
+  - component: {fileID: 4191191191191191191}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -208,9 +209,6 @@ MonoBehaviour:
   luminanceThreshold: 0.8
   thresholdSoftness: 0.3
   maxDarken: 0.85
-  revealCenter: 0
-  revealRadius: 0.18
-  revealSoftness: 0.1
 --- !u!114 &1635166641757817886
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -223,42 +221,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ab37a11b6cc003408c3db1a95379847, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptProductionDirector
-  interruptProfile:
-    scale: 0.15
-    hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.5
-    exitDuration: 0.25
-    failExitDuration: 0.1
-  interruptWeakProfile:
-    scale: 0.5
-    hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.2
-    exitDuration: 0.25
-    failExitDuration: 0.1
-  interruptZoomFactor: 0.7
-  interruptWeakZoomFactor: 0.93
+  keepCoSucceededBright: 1
+  slowMotionSettings: {fileID: 11400000, guid: 311d260bdd940f441b0c2cd45d1afe7f, type: 2}
   paladinShieldGlow: 0
   paladinShieldCharge: 0
   assassinInsightAttempt: 0
-  interruptSuccessProfile:
-    scale: 0.25
-    hitStopDuration: 0.05
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 1.2
-    exitDuration: 0.4
-    failExitDuration: 0.1
   hitStop: 1
   successFxSlot: 1
   paladinWave: 0
   assassinInsightSuccess: 0
   targetFlash: 0
   darkAdaptation: 0
+  suppressFlash: 1
+  suppressFlashTargetOnly: 0
   ownerZoom: 1
+  hideCombatUi: 1
   showOwnerDim: 1
   showLightGather: 0
   showStarburst: 0
@@ -268,9 +245,66 @@ MonoBehaviour:
   showSettle: 0
   showWorldFlash: 0
   showHitLight: 0
+  ownerDimInDuration: 0.1
+  ownerDimOutDuration: 0.2
+  ownerDimColor: {r: 0, g: 0, b: 0, a: 1}
+  ownerDimOpacity: 1
   hitFlashTimeBase: 0
+  hitFlashStarburstFrames: 2
+  hitFlashWhiteoutFrames: 2
+  hitFlashSmearFrames: 2
+  hitFlashAberrationDuration: 0.1
+  hitFlashSettleDuration: 0.2
   hitFlashOverlayMaterial: {fileID: 2100000, guid: 4349f51186ca1d04dbc37ba5986e7e28, type: 2}
   hitFlashLensFlare: {fileID: 11400000, guid: fcf746276f0103f49bd87368ddf37519, type: 2}
+  hitFlashFlareIntensity: 1
+  hitFlashFlareScale: 1
+  hitFlashBlurStrength: 0.6
   hitFlashAberrationProfile: {fileID: 11400000, guid: 6288be39943ea2a4091062599015e694, type: 2}
   hitFlashBloomProfile: {fileID: 11400000, guid: 6f297671c6ab2794ca393a95b93e9294, type: 2}
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}
+  hitFlashWorldScale: 1
+  hitFlashHeightOffset: 1
+  suppressFlashSequence: {fileID: 11400000, guid: b8afdaadf21203446b47d2397f53d7ae, type: 2}
+  suppressFlashMaterial: {fileID: 2100000, guid: 5903fe22bc43ce7448fbc80af146a40b, type: 2}
+  reduceFlash: 0
+  hitLightLook: {fileID: 11400000, guid: 5d7ab4161f2c71748bb9fe1336f1be9b, type: 2}
+  hitLightVfx: {fileID: 4308608783583396743, guid: 2209f576fb558f24485d5e1da46740f0, type: 3}
+  hitLightLookReference: {fileID: 11400000, guid: 53628f711ee79cc4aaafda6dabce0400, type: 2}
+  hitLightVfxReference: {fileID: 7590261245222885139, guid: 0c17b0169f787034e9c0c5f64412a828, type: 3}
+  normalTier:
+    ownerDim: 0
+    flash: 4
+    darkAdapt: 1
+    hitLightOrigin: 2
+    sequenceHitLight: 0
+  dashTier:
+    ownerDim: 0
+    flash: 4
+    darkAdapt: 1
+    hitLightOrigin: 2
+    sequenceHitLight: 0
+  suppressTier:
+    ownerDim: 1
+    flash: 1
+    darkAdapt: 0
+    hitLightOrigin: 2
+    sequenceHitLight: 4
+--- !u!114 &4191191191191191191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73c53e5bba5a22a43987d64f66ff1b4a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptManager
+  logWindows: 0
+  qaRecordFile: 1
+  verifyTimeSlack: 0.033
+  verifyDistanceSlack: 0.2
+  verifyAngleSlack: 5
+  simultaneousSeconds: 0.05

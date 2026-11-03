@@ -105,61 +105,14 @@ public class MeshFragmentSetEditor : Editor
             return;
         }
 
-        var root = new GameObject($"FX_{set.name}_Burst");
-        var burst = root.AddComponent<FragmentBurstEffect>();
-
-        var pieces = new Transform[set.fragments.Length];
-
-        for (int i = 0; i < set.fragments.Length; i++)
+        var pieces = new List<BurstPiece>(set.fragments.Length);
+        foreach (MeshFragmentSet.Fragment fragment in set.fragments)
         {
-            MeshFragmentSet.Fragment fragment = set.fragments[i];
             if (fragment == null || fragment.mesh == null) continue;
-
-            var go = new GameObject($"fragment_{i:D3}");
-            go.transform.SetParent(root.transform, false);
-
             // 원본 메시에서의 제자리. 여기가 파편의 "rest pose"이고,
             // FragmentBurstEffect가 반납할 때마다 이 좌표로 되돌린다.
-            go.transform.localPosition = fragment.center;
-
-            go.layer = FragmentLayer;
-
-            go.AddComponent<MeshFilter>().sharedMesh = fragment.mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterial = set.fragmentMaterial;
-
-            // 파편이 바닥·벽에 막히도록 콜라이더를 단다. 메시 바운드 크기의 박스면 충분하다 —
-            // 디브리 크기에서 볼록 MeshCollider 의 정확도 차이는 안 보이고 비용만 는다.
-            // 바운드 중심이 원점이 아니다 — 파편은 원본 메시에서 잘라낸 조각이라 보통 치우쳐 있다.
-            // center 를 0 으로 두면 콜라이더가 메시에서 어긋나 허공에서 막히거나 바닥에 파묻힌다.
-            var box = go.AddComponent<BoxCollider>();
-            box.center = fragment.mesh.bounds.center;
-            box.size = fragment.mesh.bounds.size;
-
-            // 🔴 여기가 핵심이다. 콜라이더를 그냥 달면 파편이 플레이어를 밀고, 파편 흩어짐은
-            //    피어마다 다르므로 그 결과가 갈려 디싱크가 된다(FragmentBurstEffect 주석 참조).
-            //    그래서 월드 지오메트리만 남기고 게임플레이 레이어를 전부 제외한다.
-            //    레이어 충돌 매트릭스(ProjectSettings)는 팀 공용이라 건드리지 않는다.
-            box.excludeLayers = ~FragmentCollisionMask;
-
-            var rb = go.AddComponent<Rigidbody>();
-            rb.mass = set.fragmentMass;
-            rb.linearDamping = set.linearDamping;
-            rb.angularDamping = set.angularDamping;
-            rb.isKinematic = true;   // 대출 전까지 잠들어 있는다
-
-            // 파편은 작고 빠르다. Discrete 로 두면 얇은 바닥을 그냥 통과한다(터널링).
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-
-            pieces[i] = go.transform;
+            pieces.Add(new BurstPiece { mesh = fragment.mesh, position = fragment.center, rotation = Quaternion.identity });
         }
-
-        // 자동 수집에 맡기지 않고 명시적으로 넣어둔다 — 순서가 곧 rest pose 배열의 순서다.
-        var so = new SerializedObject(burst);
-        SerializedProperty list = so.FindProperty("fragments");
-        list.arraySize = pieces.Length;
-        for (int i = 0; i < pieces.Length; i++)
-            list.GetArrayElementAtIndex(i).objectReferenceValue = pieces[i];
-        so.ApplyModifiedPropertiesWithoutUndo();
 
         string dir = System.IO.Path.GetDirectoryName(setPath).Replace('\\', '/');
         string prefabPath = AssetDatabase.GenerateUniqueAssetPath($"{dir}/FX_{set.name}_Burst.prefab");
@@ -171,14 +124,93 @@ public class MeshFragmentSetEditor : Editor
             if (!string.IsNullOrEmpty(existing)) prefabPath = existing;
         }
 
-        GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-        DestroyImmediate(root);
-
-        set.burstPrefab = saved;
+        set.burstPrefab = SaveBurstPrefab(prefabPath, $"FX_{set.name}_Burst", pieces,
+            set.fragmentMaterial, set.fragmentMass, set.linearDamping, set.angularDamping);
         EditorUtility.SetDirty(set);
         AssetDatabase.SaveAssets();
+    }
 
-        Debug.Log($"[MeshFragmentSet] 버스트 프리팹을 구웠습니다 — {prefabPath} (파편 {pieces.Length}개)", saved);
+    /// <summary>버스트 프리팹 파편 하나. 위치·회전은 버스트 루트 기준 rest pose.</summary>
+    public struct BurstPiece
+    {
+        public Mesh mesh;
+        public Vector3 position;
+        public Quaternion rotation;
+    }
+
+    /// <summary>
+    /// 파편 목록으로 버스트 프리팹을 굽는다. <see cref="MeshFragmentSet"/> 경로와
+    /// 모델(FBX) 파편 경로(<see cref="FragmentBurstFromModel"/>)가 함께 쓴다.
+    ///
+    /// <b>이미 있는 프리팹을 덮어쓸 때는 <see cref="FragmentBurstEffect"/> 튜닝(폭발력·반경 등)을 이어받는다</b> —
+    /// 예전에는 다시 구울 때마다 기본값(1·3)으로 돌아가 손으로 다시 넣어야 했다.
+    /// </summary>
+    public static GameObject SaveBurstPrefab(string prefabPath, string rootName, IList<BurstPiece> pieces,
+        Material material, float mass, float linearDamping, float angularDamping)
+    {
+        var root = new GameObject(rootName);
+        var burst = root.AddComponent<FragmentBurstEffect>();
+
+        var previous = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        FragmentBurstEffect previousBurst = previous != null ? previous.GetComponent<FragmentBurstEffect>() : null;
+        if (previousBurst != null) EditorUtility.CopySerialized(previousBurst, burst);
+
+        var transforms = new Transform[pieces.Count];
+
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            BurstPiece piece = pieces[i];
+
+            var go = new GameObject($"fragment_{i:D3}");
+            go.transform.SetParent(root.transform, false);
+            go.transform.localPosition = piece.position;
+            go.transform.localRotation = piece.rotation;
+
+            go.layer = FragmentLayer;
+
+            go.AddComponent<MeshFilter>().sharedMesh = piece.mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = material;
+
+            // 파편이 바닥·벽에 막히도록 콜라이더를 단다. 메시 바운드 크기의 박스면 충분하다 —
+            // 디브리 크기에서 볼록 MeshCollider 의 정확도 차이는 안 보이고 비용만 는다.
+            // 바운드 중심이 원점이 아니다 — 파편은 원본 메시에서 잘라낸 조각이라 보통 치우쳐 있다.
+            // center 를 0 으로 두면 콜라이더가 메시에서 어긋나 허공에서 막히거나 바닥에 파묻힌다.
+            var box = go.AddComponent<BoxCollider>();
+            box.center = piece.mesh.bounds.center;
+            box.size = piece.mesh.bounds.size;
+
+            // 🔴 여기가 핵심이다. 콜라이더를 그냥 달면 파편이 플레이어를 밀고, 파편 흩어짐은
+            //    피어마다 다르므로 그 결과가 갈려 디싱크가 된다(FragmentBurstEffect 주석 참조).
+            //    그래서 월드 지오메트리만 남기고 게임플레이 레이어를 전부 제외한다.
+            //    레이어 충돌 매트릭스(ProjectSettings)는 팀 공용이라 건드리지 않는다.
+            box.excludeLayers = ~FragmentCollisionMask;
+
+            var rb = go.AddComponent<Rigidbody>();
+            rb.mass = mass;
+            rb.linearDamping = linearDamping;
+            rb.angularDamping = angularDamping;
+            rb.isKinematic = true;   // 대출 전까지 잠들어 있는다
+
+            // 파편은 작고 빠르다. Discrete 로 두면 얇은 바닥을 그냥 통과한다(터널링).
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+            transforms[i] = go.transform;
+        }
+
+        // 자동 수집에 맡기지 않고 명시적으로 넣어둔다 — 순서가 곧 rest pose 배열의 순서다.
+        var so = new SerializedObject(burst);
+        SerializedProperty list = so.FindProperty("fragments");
+        list.arraySize = transforms.Length;
+        for (int i = 0; i < transforms.Length; i++)
+            list.GetArrayElementAtIndex(i).objectReferenceValue = transforms[i];
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        Object.DestroyImmediate(root);
+
+        Debug.Log($"[MeshFragmentSet] 버스트 프리팹을 구웠습니다 — {prefabPath} (파편 {transforms.Length}개" +
+                  (previousBurst != null ? ", 기존 튜닝 유지)" : ")"), saved);
+        return saved;
     }
 
     static void Bake(MeshFragmentSet set)
@@ -210,17 +242,27 @@ public class MeshFragmentSetEditor : Editor
         }
 
         int triangleCount = triangles.Length / 3;
-        int limit = set.maxFragments > 0 ? Mathf.Min(set.maxFragments, triangleCount) : triangleCount;
 
-        // 상한이 걸리면 앞에서부터 자르지 않는다 — 메시의 삼각형 순서는 대개 한쪽 면에 몰려 있어서
-        // 앞부분만 쓰면 파편이 한쪽에서만 나온다. 고르게 건너뛰며 뽑는다.
-        float stride = (float)triangleCount / limit;
-
-        List<MeshFragmentSet.Fragment> baked = new List<MeshFragmentSet.Fragment>(limit);
-
-        for (int f = 0; f < limit; f++)
+        // 높이 구간 안/밖으로 나눈다. 기본 (0, 1)이면 전부 안이라 예전과 같다.
+        Bounds bounds = source.bounds;
+        float minY = bounds.min.y + bounds.size.y * set.heightRange.x;
+        float maxY = bounds.min.y + bounds.size.y * set.heightRange.y;
+        var inside = new List<int>(triangleCount);
+        var outside = new List<int>();
+        for (int t = 0; t < triangleCount; t++)
         {
-            int t = Mathf.Min(triangleCount - 1, Mathf.FloorToInt(f * stride));
+            float y = (vertices[triangles[t * 3]].y + vertices[triangles[t * 3 + 1]].y + vertices[triangles[t * 3 + 2]].y) / 3f;
+            (y >= minY && y <= maxY ? inside : outside).Add(t);
+        }
+
+        List<int> picked = Pick(inside, set.maxFragments, set.areaWeighted, vertices, triangles);
+        if (set.outsideRangeFragments > 0)
+            picked.AddRange(Pick(outside, set.outsideRangeFragments, set.areaWeighted, vertices, triangles));
+
+        List<MeshFragmentSet.Fragment> baked = new List<MeshFragmentSet.Fragment>(picked.Count);
+
+        foreach (int t in picked)
+        {
             int i0 = triangles[t * 3 + 0];
             int i1 = triangles[t * 3 + 1];
             int i2 = triangles[t * 3 + 2];
@@ -260,6 +302,56 @@ public class MeshFragmentSetEditor : Editor
         AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
 
         Debug.Log($"[MeshFragmentSet] '{set.name}': '{source.name}'에서 파편 {baked.Count}개를 구웠습니다.", set);
+    }
+
+    /// <summary>
+    /// 후보 삼각형에서 <paramref name="limit"/>개를 고른다(0이면 전부).
+    ///
+    /// <b>앞에서부터 자르지 않는다</b> — 메시의 삼각형 순서는 대개 한쪽 면에 몰려 있어서
+    /// 앞부분만 쓰면 파편이 한쪽에서만 나온다. 번호 순(기본)이든 면적 비례든 전체에 고르게 건너뛰며 뽑는다.
+    /// 면적 비례는 누적 면적을 N등분한 지점의 삼각형을 집는다 — 큰 면은 여러 번 걸리므로
+    /// 이미 고른 것은 다음 미사용 삼각형으로 넘긴다.
+    /// </summary>
+    static List<int> Pick(List<int> candidates, int limit, bool areaWeighted, Vector3[] vertices, int[] triangles)
+    {
+        int count = limit > 0 ? Mathf.Min(limit, candidates.Count) : candidates.Count;
+        var result = new List<int>(count);
+        if (count == 0) return result;
+
+        if (!areaWeighted)
+        {
+            float stride = (float)candidates.Count / count;
+            for (int f = 0; f < count; f++)
+                result.Add(candidates[Mathf.Min(candidates.Count - 1, Mathf.FloorToInt(f * stride))]);
+            return result;
+        }
+
+        var cumulative = new float[candidates.Count];
+        float total = 0f;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            int t = candidates[i];
+            Vector3 v0 = vertices[triangles[t * 3]];
+            total += Vector3.Cross(vertices[triangles[t * 3 + 1]] - v0, vertices[triangles[t * 3 + 2]] - v0).magnitude * 0.5f;
+            cumulative[i] = total;
+        }
+
+        var used = new bool[candidates.Count];
+        for (int f = 0; f < count; f++)
+        {
+            float target = (f + 0.5f) / count * total;
+            int i = System.Array.BinarySearch(cumulative, target);
+            if (i < 0) i = ~i;
+            i = Mathf.Min(i, candidates.Count - 1);
+
+            // 이미 고른 큰 면이면 가장 가까운 미사용 후보로 넘긴다.
+            for (int step = 0; step < candidates.Count && used[i]; step++)
+                i = (i + 1) % candidates.Count;
+
+            used[i] = true;
+            result.Add(candidates[i]);
+        }
+        return result;
     }
 
     /// <summary>

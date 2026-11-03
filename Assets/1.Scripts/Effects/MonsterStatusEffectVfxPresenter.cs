@@ -69,7 +69,7 @@ public sealed class MonsterStatusEffectVfxPresenter : MonoBehaviour
         // (스폰된 NetworkObject 를 껐다 켜서 순서를 미루면 NetworkBehaviour 전부가 OnDisable 을 탄다 — 쓰지 말 것.)
         var presenter = monster.gameObject.AddComponent<MonsterStatusEffectVfxPresenter>();
         presenter.Bind(monster, status, set,
-            CreateAnchor(monster.transform, "StatusVfx_Overhead", headY),
+            CreateAnchor(monster.transform, "StatusVfx_Overhead", headY + monster.StatusVfxOverheadExtraHeight),
             CreateAnchor(monster.transform, "StatusVfx_Body", (monster.transform.position.y + headY) * 0.5f),
             FindHeadBone(monster.transform), headY - monster.transform.position.y);
         return presenter;
@@ -110,6 +110,7 @@ public sealed class MonsterStatusEffectVfxPresenter : MonoBehaviour
         if (_headBone == null || _overhead == null) return;
         Vector3 head = _headBone.position;
         float y = Mathf.Max(head.y + HeadTopPad, transform.position.y + _minHeadHeight);
+        if (_monster != null) y += _monster.StatusVfxOverheadExtraHeight;   // 몹별 추가 높이(GauntletBot — 큰 머리에 묻힘)
         _overhead.position = new Vector3(head.x, y, head.z);
     }
 

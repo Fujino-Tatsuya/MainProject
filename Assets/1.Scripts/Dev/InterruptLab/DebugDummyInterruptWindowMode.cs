@@ -76,6 +76,8 @@ public sealed class DebugDummyInterruptWindowMode : MonoBehaviour, ITrainingDumm
         return open;
     }
 
+    float ITrainingDummyWindowGate.OpenWindowLength => Schedule.OpenWindowLength;
+
 #if UNITY_EDITOR
     // Play 중 인스펙터 변경도 바로 적용한다(Play 밖에선 Schedule 이 첫 사용 때 직렬화 값으로 만들어진다).
     void OnValidate()

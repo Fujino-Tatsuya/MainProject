@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19b0171354ad3ca43925c872f67d757f, type: 3}
+  m_Name: PlayerShieldVfxSet
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerShieldVfxSet
+  holyLoop: {fileID: 11400000, guid: 55589f8e8b5bf68db05c619dd5ab540a, type: 2}
+  holyBreak: {fileID: 11400000, guid: 5d9491b166e58d4dcce879b6919626d2, type: 2}
+  allyLoop: {fileID: 11400000, guid: 2d87b4f0c6e94a15933ad8e7b1420c6f, type: 2}
+  allyBreak: {fileID: 11400000, guid: 846ec0b35a1d47f29b70e4d1c83f5a27, type: 2}
+  anchor: 1
+  offset: {x: 0, y: 0, z: 0}
+  scale: 0.5
+  holyTraitIds:
+  - PAL_3_E_SHIELD
+  - PAL_4_HEAL_SHIELD

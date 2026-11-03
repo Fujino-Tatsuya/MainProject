@@ -41,8 +41,7 @@ public enum LobbyCharacterChangeReject
     TooFar,
     /// <summary>[서버 판정, 규칙 밖] 디스폰 → 새 Variant 스폰이 실패했다(PlayerObject·프리팹 없음 등) — LobbySession.</summary>
     SwapFailed,
-    /// <summary>[진행기 판정, 규칙 밖] 훈련 시작(입구 집결 확정) 뒤 판 끝까지 — 훈련 명단 안 사람. <see cref="LobbyTrainingFlow.CharacterChangeBlock"/>.</summary>
-    TrainingLocked,
+    // (TrainingLocked — 훈련 명단 캐릭터 잠금은 할 일 157 커밋 ③ Q1 로 없앴다.)
 }
 
 /// <summary>

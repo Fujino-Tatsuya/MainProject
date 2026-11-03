@@ -16,3 +16,12 @@ MonoBehaviour:
   interactRadius: 2
   characterSwapCooldownSeconds: 0.5
   gatherHoldSeconds: 3
+  stepTable: {fileID: 11400000, guid: a27123c96ec094f44a9bf0ffcdb5d090, type: 2}
+  allowInstantSortie: 0
+  guideTexts: {fileID: 11400000, guid: d7687a8e06602774caf926fc613dd8de, type: 2}
+  dialogueBaseSeconds: 2
+  dialoguePerCharSeconds: 0.08
+  dialogueMinSeconds: 3
+  dialogueEndPaddingSeconds: 0.5
+  combatSpawnSet: {fileID: 11400000, guid: 9c7de3adae72b874da53ac9ee3fb6bda, type: 2}
+  freePracticeDummyPrefab: {fileID: 1499259539980126395, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}

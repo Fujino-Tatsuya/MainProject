@@ -33,18 +33,6 @@ public sealed class AssassinInterruptSkill : PlayerInterruptSkillBase
         return state != null ? state.WithBackAttack(attackInfo) : attackInfo;
     }
 
-    // 백어택 적중 연출. 베이스가 수신 전 판정 지점을 주지 않아 수신 직후 같은 입력으로 묻는다 —
-    // 위치 판정은 피해 전후 대상 자세가 같고, 변신 강제는 위치와 무관하다.
-    protected override void OnInterruptTargetResolved(Object target, AttackInfo attackInfo)
-    {
-        if (!(target is Unit unit) || owner == null)
-            return;
-
-        AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, null, owner);
-        if (AssassinHitTargets.IsBackAttack(unit, attackInfo, hitContext))
-            AssassinHitTargets.NotifyBackAttackHit(owner, null, unit, hitContext);
-    }
-
     private AssassinState AssassinStateComponent
     {
         get

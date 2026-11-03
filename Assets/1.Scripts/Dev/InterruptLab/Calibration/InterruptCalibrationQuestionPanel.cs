@@ -304,7 +304,7 @@ public sealed class InterruptCalibrationQuestionPanel : MonoBehaviour
         GUILayout.BeginArea(_panelRect);
         GUILayout.BeginVertical(GUI.skin.box);
 
-        if (GUILayout.Button(expanded ? "▼ 간파 예측 보정(139)" : "▶ 간파 예측 보정(139)"))
+        if (GUILayout.Button(expanded ? "▼ 간파 예측·판정·서버 보정(191)" : "▶ 간파 예측·판정·서버 보정(191)"))
             expanded = !expanded;
 
         if (expanded)
@@ -321,7 +321,7 @@ public sealed class InterruptCalibrationQuestionPanel : MonoBehaviour
     void DrawStats()
     {
         int dropped = capture != null ? capture.DroppedCount : 0;
-        GUILayout.Label($"표본 {_recorder.Count} · 건너뜀 {_flow.SkippedCount} · 짝 실패 버림 {dropped}");
+        GUILayout.Label($"표본 {_recorder.Count} · 건너뜀 {_flow.SkippedCount} · 판정 전 끝남 {dropped}");
         GUILayout.Label($"대기열 {_flow.QueuedCount} · 넘쳐 버림 {_flow.OverflowDroppedCount} · {DescribePhase(_flow.Phase)}");
         foreach (CalibrationAgreement a in _recorder.Stats.All)
             GUILayout.Label($"{a.Name}: {a.FormatRate()}");
@@ -363,12 +363,6 @@ public sealed class InterruptCalibrationQuestionPanel : MonoBehaviour
             float closed = LengthRow("닫힘", windowMode.ClosedSeconds);
             if (!Mathf.Approximately(open, windowMode.OpenSeconds) || !Mathf.Approximately(closed, windowMode.ClosedSeconds))
                 windowMode.SetDurations(open, closed);
-        }
-
-        if (GUILayout.Button("예측기 관측 기록 초기화"))
-        {
-            InterruptWindowReplicaTracker.ResetObservations();
-            Debug.Log($"{Tag} 예측기 관측 기록 초기화", this);
         }
     }
 
@@ -431,29 +425,35 @@ public sealed class InterruptCalibrationQuestionPanel : MonoBehaviour
         _ => "-",
     };
 
-    /// <summary>질문 창 표본 요약 — 오너 예측+Reason, 서버 예측, 서버 결과, 판정 시점 실제 창 상태.</summary>
+    /// <summary>질문 창 표본 요약 — 예측(+이유)·오너 판정(+이유)·서버 결과(+이유)·어긋난 이유·판정 시점 실제 창 상태.</summary>
     public static string DescribeSample(InterruptCalibrationSample s)
     {
         if (s == null)
             return "-";
 
+        InterruptQaRecord r = s.Record;
         var sb = new StringBuilder();
-        sb.Append("오너 예측: ").Append(DescribeForecast(s.OwnerForecast))
-          .Append(" (").Append(s.OwnerReason?.ToString() ?? "-").Append(")")
-          .Append(s.OwnerRepredicted == true ? " → 재예측 " + DescribeForecast(s.OwnerFinalForecast) : "").Append('\n');
-        sb.Append("서버 예측: ").Append(DescribeForecast(s.ServerForecast))
-          .Append(s.ServerRepredicted == true ? " → 재예측 " + DescribeForecast(s.ServerFinalForecast) : "").Append('\n');
-        sb.Append("서버 결과: ").Append(s.ServerSucceeded == true ? "성공" : s.ServerSucceeded == false ? "실패" : "-").Append('\n');
+        sb.Append("예측: ").Append(DescribeForecast(s.Forecast))
+          .Append(" (").Append(r != null && r.HasPrediction ? Reason(r.Prediction.FailReason) : "-").Append(")")
+          .Append(r != null && r.ServerAttempt.HasValue ? " · 서버 시도 슬로우 " + DescribeForecast(r.ServerAttempt) : "").Append('\n');
+        sb.Append("오너 판정: ").Append(r != null ? InterruptQaRules.Label(r.Judge) : "-")
+          .Append(" (").Append(r != null ? Reason(r.JudgeResult.FailReason) : "-").Append(")").Append('\n');
+        sb.Append("서버 결과: ").Append(r != null ? InterruptQaRules.Label(r.Server) : "-")
+          .Append(r != null && r.Server == InterruptQaServer.Rejected ? " (" + r.RejectReason + ")" : "").Append('\n');
+        sb.Append("어긋남: ").Append(r != null ? InterruptQaRules.Label(r.Mismatch) : "-").Append('\n');
         sb.Append("실제 창: ").Append(s.ActualWindowOpen == true ? "열림" : s.ActualWindowOpen == false ? "닫힘" : "-")
           .Append(" · 경과 ").Append(Seconds(s.ActualOpenElapsed))
           .Append(" · 남음 ").Append(Seconds(s.ActualRemaining)).Append('\n');
-        sb.Append("예측 창 남음 ").Append(Seconds(s.PredictedWindowRemaining))
-          .Append(" · 대시→우클릭 ").Append(Seconds(s.PressAge))
+        sb.Append("판정까지 ").Append(r != null ? Seconds((float)(r.JudgeTime - r.PressTime)) : "-")
           .Append(" · 대상 ").Append(s.TargetDistance.HasValue ? s.TargetDistance.Value.ToString("0.00", CultureInfo.InvariantCulture) + "m" : "-");
         return sb.ToString();
     }
 
+    static string Reason(InterruptJudgeFailReason reason) => reason == InterruptJudgeFailReason.None ? "-" : reason.ToString();
+
     static string Seconds(float? value) =>
-        value.HasValue ? value.Value.ToString("0.000", CultureInfo.InvariantCulture) + "s" : "-";
+        !value.HasValue ? "-"
+        : float.IsPositiveInfinity(value.Value) ? "무기한"
+        : value.Value.ToString("0.000", CultureInfo.InvariantCulture) + "s";
 }
 #endif

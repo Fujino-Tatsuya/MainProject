@@ -117,6 +117,9 @@ public sealed class StatusEffectVfxPresenter : MonoBehaviour
         shownRows[slot] = row;
     }
 
+    /// <summary>자리 트랜스폼(머리 위·몸이 비면 null, 발밑이 비면 플레이어 루트). 원샷 재생기(<see cref="PlayerOneShotVfxPresenter"/>)도 이 자리를 쓴다.</summary>
+    public Transform GetAnchor(StatusEffectVfxSet.Anchor anchor) => ResolveAnchor(anchor);
+
     private Transform ResolveAnchor(StatusEffectVfxSet.Anchor anchor)
     {
         switch (anchor)

@@ -15,7 +15,7 @@ using static EffectCatalog;
 //   (오너→서버 직접 데미지 RPC 미사용.)
 // - 자산(NavMesh/Animator/디졸브)이 없어도 컴파일되고 예외로 죽지 않도록 전부 널가드.
 [RequireComponent(typeof(NetworkObject))]
-public class MonsterBase : Unit
+public class MonsterBase : Unit, IInterruptJudgeTarget
 {
     [Header("데이터")]
     [SerializeField] protected MonsterDataSO data;
@@ -275,6 +275,12 @@ public class MonsterBase : Unit
     /// 표시(<c>_counterVisual</c>)와 달리 조기 소등이 없다.
     /// </summary>
     protected bool CounterJudgeWindowReplica => _counterJudgeWindow.Value;
+
+    /// <summary>
+    /// [모든 피어] 간파 판정 스냅샷(할 일 191 <see cref="InterruptManager"/>)의 간파 불가 상태. 기본 = 중간보스 취약 복제값.
+    /// 23호·스파링 봇은 자기 취약·제압 규칙으로 덮는다.
+    /// </summary>
+    public virtual bool InterruptBlockedByState => _vulnerable.Value;
 
     /// <summary>[서버] <c>MonsterCounterWindow</c> 가 열고 닫을 때 부른다(할 일 132). 스폰 전·클라에선 아무것도 안 한다.</summary>
     internal void ServerReplicateCounterWindow(bool open)
@@ -2411,6 +2417,12 @@ public class MonsterBase : Unit
     #region 애니메이션(상태→Animator 매핑 단일 지점)
     void OnStateChanged(MonsterState previous, MonsterState next)
     {
+        // 🔴 공격이 끊기면 그 클립의 StartEffect 루프를 끈다(경석 10-30 — 취약 중 간파·Q 밀림으로 훅·펀치가 끊기면
+        //    짝 StopEffect 가 안 와 바람 루프가 safetyTimeout 5초까지 남았다). 애니메이터를 바꾸기 **전**이라야
+        //    지금 클립이 끊기는 공격 클립이다 — 아래 ResetToLocomotion·PlayStateAnimation 보다 먼저 둔다.
+        if (previous == MonsterState.Attack && next != MonsterState.Attack && StopClipLoopsOnAttackExit)
+            StopCurrentClipLoops();
+
         // 자세를 붙잡는 상태는 Groggy 하나뿐이다(그로기 클립이 없는 몹의 표현).
         // 그 밖으로 나가면 무조건 푼다 — 해제를 개별 경로에 맡기면 하나만 빠져도 몹이 영구히 얼어붙는다.
         // 🔴 대기 중인 "클립 끝에서 잡기" 예약도 함께 취소한다. 홀드만 풀면 예약이 살아남아
@@ -2477,6 +2489,46 @@ public class MonsterBase : Unit
     }
 
     bool _hitReactionFrozen;   // 이 피어에서 밀림·경직 자세 정지를 걸어 둔 상태인가(피어 로컬)
+
+    /// <summary>
+    /// Attack 을 벗어날 때 공격 클립의 <c>StartEffect</c> 루프를 끌지. 기본 false — 클립 루프를 쓰는 몹만 켠다(23호·건틀릿).
+    /// 일반 몹은 클립 루프가 없어 영향이 없지만, 켤 몹을 명시해 범위를 좁힌다.
+    /// </summary>
+    protected virtual bool StopClipLoopsOnAttackExit => false;
+
+    EffectAnimEvents _clipEffects;
+
+    /// <summary>
+    /// [이 피어] 지금 재생 중인 클립(전이 중이면 다음 클립도)이 <c>StartEffect</c> 로 켜는 루프를 전부 끈다.
+    /// 클립 이벤트 목록을 런타임에 읽으므로 이펙트 id 를 박지 않는다. 꺼진 루프를 끄는 것은 무해하다
+    /// (켜지기 전에 끊긴 경우도 같이 끈다 — 피어마다 클립 진행이 조금씩 달라 "켜진 것만" 고르면 늦은 피어에서 놓친다).
+    /// </summary>
+    protected void StopCurrentClipLoops()
+    {
+        if (animator == null) return;
+        if (_clipEffects == null)
+        {
+            _clipEffects = animator.GetComponent<EffectAnimEvents>();
+            if (_clipEffects == null) _clipEffects = GetComponentInChildren<EffectAnimEvents>(true);
+            if (_clipEffects == null) return;
+        }
+
+        StopStartedLoops(animator.GetCurrentAnimatorClipInfo(0));
+        if (animator.IsInTransition(0)) StopStartedLoops(animator.GetNextAnimatorClipInfo(0));
+    }
+
+    void StopStartedLoops(AnimatorClipInfo[] clips)
+    {
+        foreach (AnimatorClipInfo info in clips)
+        {
+            if (info.clip == null) continue;
+            foreach (AnimationEvent ev in info.clip.events)
+            {
+                if (ev.functionName == "StartEffect" && !string.IsNullOrEmpty(ev.stringParameter))
+                    _clipEffects.StopEffect(ev.stringParameter);
+            }
+        }
+    }
 
     // 피격 상태는 hitTrigger 와 같은 이름으로 둔다(ChompBot·MortarBot "Hit"). HumanoidBot 은 파라미터만 있고 상태가 없다.
     bool HasHitAnimatorState()
@@ -2578,6 +2630,12 @@ public class MonsterBase : Unit
     /// 머리 위 기절 이펙트는 이 값이 아니라 그로기·Q 경직 때만이다(<c>MonsterStatusEffectVfxPresenter</c>).
     /// </summary>
     public bool IsMidBossVulnerable => Rank == MonsterRank.MidBoss && _vulnerable.Value;
+
+    /// <summary>
+    /// 머리 위 상태이상 이펙트(기절 별) 자리를 공용 높이(머리 뼈 위 0.4m + 표 offset)보다 더 올리는 몹별 값(m).
+    /// 기본 0 — 머리가 큰 모델만 덮어쓴다(<see cref="MonsterStatusEffectVfxPresenter"/>).
+    /// </summary>
+    public virtual float StatusVfxOverheadExtraHeight => 0f;
 
     // 중간보스 취약 색 — 23호 BossDataSO.vulnerableTint 기본값과 같은 색(팀장 10-26: 보스처럼 취약이 보여야 한다).
     static readonly Color MidBossVulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);

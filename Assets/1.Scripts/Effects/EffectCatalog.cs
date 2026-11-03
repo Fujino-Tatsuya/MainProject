@@ -45,9 +45,13 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry DoubleSlash_Miss { get; private set; }
 
     [Header("플레이어 — 불굴의 의지(패시브)")]
-    // Heal 은 시전자에게 1회, BonusHit 은 처음 맞은 적 1명에게 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.
+    // Heal 은 시전자에게 1회(실제로 회복했을 때만), BonusHit 은 처음 맞은 적 1명에게 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.
+    // Heal 엔트리는 플레이어 공용(Shared/Heal) — 재생은 PlayerOneShotVfxSet 의 Heal 줄이 한다(여기는 프리웜용 등록).
     [field: SerializeField] public EffectEntry Passive_Heal { get; private set; }
     [field: SerializeField] public EffectEntry Passive_BonusHit { get; private set; }
+    // 나누는 불굴(PAL_2_SHARE_HEAL) — 팔라딘 출발 소용돌이 + 아군으로 날아가는 리본(PaladinSkillView).
+    [field: SerializeField] public EffectEntry ShareHeal_Swirl { get; private set; }
+    [field: SerializeField] public EffectEntry ShareHeal_Ribbon { get; private set; }
 
     [Header("플레이어 — 방패 돌진(Q)")]
     [field: SerializeField] public EffectEntry ShieldDash_Trail { get; private set; }
@@ -59,6 +63,8 @@ public class EffectCatalog : ScriptableObject
     // PlayerShieldVfx 가 ShieldEndReason.Depleted 일 때만 Break 를 퍼뜨린다.
     [field: SerializeField] public EffectEntry HolyShield_Barrier { get; private set; }
     [field: SerializeField] public EffectEntry HolyShield_Break { get; private set; }
+    // 수호의 파동(PAL_4_E_PUSH) — 반격 판정 순간 발밑에서 퍼지는 바람 링(PaladinSkillView, 배율 = 밀치기 반경).
+    [field: SerializeField] public EffectEntry GuardWave_Ring { get; private set; }
 
     [Header("플레이어 — 남이 걸어 준 보호막(거너 Q 등)")]
     // 위와 같은 물건의 흰색 판. 색만 출처를 말한다 — 금색 = 자기 E, 흰색 = 남이 걸어 준 것.
@@ -74,7 +80,7 @@ public class EffectCatalog : ScriptableObject
 
     [Header("플레이어 — 최후의 심판(R)")]
     // 조준 진입 시 SwordLightning + SwordElectric, 시전 확정 시 TargetFloor, 채널 완주 시 Strike.
-    // TargetFloor / Strike 는 소켓이 아니라 PlayerSkillVfx 가 엔트리를 직접 들고 재생한다 —
+    // TargetFloor / Strike 는 소켓이 아니라 PaladinSkillView 가 엔트리를 직접 들고 재생한다 —
     // 붙을 자리가 내 몸이 아니라 "그때 지목된 남"이라 프리팹에 미리 못 박을 수 없다.
     [field: SerializeField] public EffectEntry Ultimate_SwordLightning { get; private set; }
     [field: SerializeField] public EffectEntry Ultimate_SwordElectric { get; private set; }
@@ -223,10 +229,17 @@ public class EffectCatalog : ScriptableObject
 
     // ── 부술 수 있는 오브젝트 ──────────────────────────────────────────
 
-    [Header("오브젝트 — 상자")]
+    [Header("오브젝트 — 부서지는 프롭")]
+    // 에셋은 전부 50.Art/VFX/Common/Breakable/<프롭>/(SVN). 파편은 프롭마다 자기 메시로 굽는다(MeshFragmentSet).
     [field: SerializeField] public EffectEntry Explosion_Basic { get; private set; }
     // 미리 구워 둔 파편 덩어리(FX_Frag_Box_01_Burst). 에셋 이름이 Box 라 Crate 였던 이름을 맞췄다.
     [field: SerializeField] public EffectEntry Frag_Box_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_CardboardBox_Stack_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_CardboardBox_Stack_02 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_CardboardBox_Stack_03 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_Pallet_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_PalletStack_01 { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_PalletStack_02 { get; private set; }
 
     private List<EffectEntry> _all;
     // 피격 이펙트 테스트용 enum

@@ -13,8 +13,16 @@ public sealed class AssassinBasicAttackStepData
 {
     [DataTableIgnore] [SerializeField] private AnimationClip clip;
     [SerializeField] private float attackDamageMultiplier = 1f;
+    [Tooltip("판정 영역(할 일 153) — 기준점 = 시전자 발밑 + 이 타의 조준 방향(CasterAim). 칼날의 영역(강타)은 길이·폭 배율 복사본(AttackShapeSet.Scaled).")]
+    [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet();
+    // ⚠️ 미사용 2칸(할 일 144·153) — 판정 모양은 위 hitArea(도형)다.
+    //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
+#pragma warning disable CS0414
+    [Tooltip("⚠️ 미사용 — 판정 범위는 hitArea(도형)다.")]
     [SerializeField, Min(0.1f)] private float range = 1.5f;
+    [Tooltip("⚠️ 미사용 — 판정 범위는 hitArea(도형)다.")]
     [SerializeField, Range(1f, 360f)] private float angle = 90f;
+#pragma warning restore CS0414
     // ⚠️ 미사용 3칸(PLAN-anim-event-timing P2-1) — 재생 속도는 Animator 상태 speed, 예약 창은 클립 ComboWindowOpen/Close 이벤트로 옮겼다.
     //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 "필드 없음"으로 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
 #pragma warning disable CS0414
@@ -30,8 +38,7 @@ public sealed class AssassinBasicAttackStepData
 
     public AnimationClip Clip => clip;
     public float AttackDamageMultiplier => attackDamageMultiplier;
-    public float Range => range;
-    public float Angle => angle;
+    public AttackShapeSet HitArea => hitArea;
     // 필드가 생기기 전 직렬화된 스텝은 0 으로 읽힐 수 있다 — 최소 1타.
     public int HitCount => Mathf.Max(1, hitCount);
     // 안전망(End 이벤트가 안 올 때) 기준 길이 = 클립 원래 길이. 평타 상태 speed 가 1 이상이라 실제 재생보다 길다.
@@ -49,6 +56,7 @@ public sealed class AssassinBasicAttackStepData
         this.attackDamageMultiplier = attackDamageMultiplier;
         this.range = range;
         this.angle = angle;
+        hitArea = new AttackShapeSet(AttackShapeOrigin.CasterAim, StrikeSector(range, angle));
         this.playbackSpeed = playbackSpeed;
         this.hitCount = hitCount;
         this.comboWindowOpen = comboWindowOpen;
@@ -56,6 +64,13 @@ public sealed class AssassinBasicAttackStepData
     }
 
     public bool IsPlayable => clip != null && clip.length > 0f;
+
+    /// <summary>
+    /// 평타 기본 판정 도형(할 일 153) — 예전 코드 부채꼴(반경 <paramref name="range"/>, 전체 각 <paramref name="angle"/>) 그대로, 꼭짓점 = 발밑.
+    /// 높이 = 발밑 ±range: 예전 질의(OverlapSphere 반경 range)는 위아래로 range 까지 닿았다 — 그 구를 감싸는 원기둥이라 예전에 맞던 대상은 다 맞는다.
+    /// </summary>
+    public static AttackSectorShape StrikeSector(float range, float angle) =>
+        new AttackSectorShape(range, angle) { MinHeight = -range, MaxHeight = range };
 }
 
 /// <summary>어쌔신 일반·강타·변신 평타와 전투 대기 수치(character_assassin.md §5·§6·§8.2, 구현 결정).</summary>

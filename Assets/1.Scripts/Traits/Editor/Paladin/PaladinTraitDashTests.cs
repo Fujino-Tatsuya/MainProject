@@ -107,14 +107,14 @@ public sealed class PaladinTraitDashTests
         PaladinTraitDefinition def = Load(PaladinTraitValues.Dash);
         Assert.AreEqual("돌파의 방패", def.InlineDisplayName);
         Assert.AreEqual("Q 변경 · 밀치기", def.InlineCategory);
-        Assert.AreEqual("Q가 {dashDistance}m를 빠르게 돌진하며 {dmg}의 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.",
-            def.InlineDescription, "명세 '문법 원문' 그대로");
+        Assert.AreEqual("Q가 {dashDistance}m를 빠르게 돌진하며 {dmg} 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.",
+            def.InlineDescription, "명세 '문법 원문'에서 {dmg} 뒤 '의'만 뺌(할 일 171 — '공격력의 450% 피해')");
         Assert.AreEqual(1, def.Effects.Count);
         Assert.IsInstanceOf<TraitSkillValueEffect>(def.Effects[0], "공용 스킬 수치 칸(시트 행 effects[0].entries[j].value, 카드 토큰 = 칸 name — 할 일 133)");
 
         Assert.IsTrue(TraitTooltip.Format(def, def.InlineDescription, null, false, TraitContent.Build(), out string text, out string error), error);
         StringAssert.StartsWith("Q가 3m를 빠르게 돌진하며 ", Plain(text));
-        StringAssert.EndsWith("의 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.", Plain(text));
+        StringAssert.EndsWith(" 피해를 줍니다. 적을 끌고 가지 않고 한 번 밀쳐냅니다.", Plain(text));
         Assert.IsFalse(PaladinTraitValues.DashDamage(def, null).HasValue, "플레이어 없음 = 값 없음(화면 '-')");
     }
 
@@ -175,6 +175,18 @@ public sealed class PaladinTraitDashTests
         Assert.AreEqual(SkillState.Charging, PaladinTraitRules.QStartState(false), "원래 Q = 홀드");
         Assert.AreNotEqual(SkillState.Charging, PaladinTraitRules.QStartState(true), "돌진 = 홀드 아님 → 지속 타격·지속 밀치기·홀드 해제 없음");
         Assert.AreEqual(SkillState.Active, PaladinTraitRules.QStartState(true));
+    }
+
+    // 할 일 146 — 좌클릭 홀드 중 Q 를 쓰면 돌진이 끝난 뒤 기본 공격을 잇는다. 돌파의 방패(PAL_2_DASH)가 있을 때만.
+    [Test]
+    public void Dash_ResumesBasicAttackOnHold_OnlyWithShieldDashTrait()
+    {
+        Assert.IsTrue(PaladinTraitRules.QResumesBasicAttack(true, Dash()), "PAL_2_DASH 보유 = 이어가기");
+        Assert.IsFalse(PaladinTraitRules.QResumesBasicAttack(false, Dash()), "특성 없음 = 원래 Q(홀드) — 이어가기 없음");
+        Assert.IsFalse(PaladinTraitRules.QResumesBasicAttack(true, default), "수치 누락 = 원래 Q 로 돌므로 이어가기 없음");
+
+        Assert.IsTrue(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(PaladinTraitRules.QResumesBasicAttack(true, Dash()), SkillEndReason.Completed),
+            "돌진·회수가 정상으로 끝나면(벽·낭떠러지 안전 정지 포함) 이어가기");
     }
 
     [Test]

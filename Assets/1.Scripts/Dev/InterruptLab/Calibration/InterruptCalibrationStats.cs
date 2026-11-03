@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using BeaverLobby.Player.Dash;
 
 /// <summary>
 /// 두 값(왼쪽·오른쪽)의 일치 집계. 둘 중 하나라도 값이 없으면(대상 없음 포함) 분모에서 빼고 <see cref="Excluded"/> 로 센다.
@@ -58,67 +57,55 @@ public sealed class CalibrationAgreement
 }
 
 /// <summary>
-/// 간파 예측 보정 일치율(할 일 139 '기록' 절) — 기록된 표본(사용자 답 있음)만 넣는다.
-/// 강 = true · 약 = false, 서버 결과 성공 = true · 실패 = false. 대상 없음·값 없음은 그 일치율의 분모에서 뺀다.
+/// 간파 보정 일치율(할 일 139 → 191 5단계 '예측 vs 판정 vs 서버') — 기록된 표본(사용자 답 있음)만 넣는다.
+/// 강 = true · 약 = false, 판정·서버 성공 = true · 실패 = false. 대상 없음·값 없음은 그 일치율의 분모에서 뺀다.
 /// </summary>
 public sealed class InterruptCalibrationStats
 {
-    public readonly CalibrationAgreement OwnerVsAnswer =
-        new CalibrationAgreement("오너 예측 ↔ 답", "오너 강", "오너 약", "답 true", "답 false");
-    public readonly CalibrationAgreement ServerForecastVsAnswer =
-        new CalibrationAgreement("서버 예측 ↔ 답", "서버 강", "서버 약", "답 true", "답 false");
-    public readonly CalibrationAgreement ServerResultVsAnswer =
-        new CalibrationAgreement("서버 결과 ↔ 답", "서버 성공", "서버 실패", "답 true", "답 false");
-    public readonly CalibrationAgreement OwnerVsServerForecast =
-        new CalibrationAgreement("오너 ↔ 서버 예측", "오너 강", "오너 약", "서버 강", "서버 약");
+    public readonly CalibrationAgreement ForecastVsAnswer =
+        new CalibrationAgreement("예측 ↔ 답", "예측 강", "예측 약", "답 true", "답 false");
+    public readonly CalibrationAgreement JudgeVsAnswer =
+        new CalibrationAgreement("오너 판정 ↔ 답", "판정 성공", "판정 실패", "답 true", "답 false");
+    public readonly CalibrationAgreement ServerVsAnswer =
+        new CalibrationAgreement("서버 결과 ↔ 답", "서버 승인", "서버 아님", "답 true", "답 false");
+    public readonly CalibrationAgreement ForecastVsJudge =
+        new CalibrationAgreement("예측 ↔ 오너 판정", "예측 강", "예측 약", "판정 성공", "판정 실패");
 
-    /// <summary>오너 최종 예측(대시 중 재예측 반영, 할 일 139-2) ↔ 답 — 위 넷(누른 순간 예측 기준)과 따로 summary 에만 쓴다.</summary>
-    public readonly CalibrationAgreement OwnerFinalVsAnswer =
-        new CalibrationAgreement("오너 최종 예측 ↔ 답", "오너 강", "오너 약", "답 true", "답 false");
-
-    readonly Dictionary<DashInterruptPredictReason, int> ownerMismatchReasons = new Dictionary<DashInterruptPredictReason, int>();
+    readonly Dictionary<InterruptQaMismatch, int> mismatchReasons = new Dictionary<InterruptQaMismatch, int>();
 
     public int SampleCount { get; private set; }
-
-    /// <summary>대시 중 재예측이 약 → 강으로 올린 표본 수(오너·서버).</summary>
-    public int OwnerRepredictedCount { get; private set; }
-    public int ServerRepredictedCount { get; private set; }
 
     public IEnumerable<CalibrationAgreement> All
     {
         get
         {
-            yield return OwnerVsAnswer;
-            yield return ServerForecastVsAnswer;
-            yield return ServerResultVsAnswer;
-            yield return OwnerVsServerForecast;
+            yield return ForecastVsAnswer;
+            yield return JudgeVsAnswer;
+            yield return ServerVsAnswer;
+            yield return ForecastVsJudge;
         }
     }
 
-    /// <summary>오너 예측 ↔ 답 불일치 표본의 오너 Reason 별 개수.</summary>
-    public IReadOnlyDictionary<DashInterruptPredictReason, int> OwnerMismatchReasons => ownerMismatchReasons;
+    /// <summary>어긋난 이유(QA 기록 — 예측·판정·서버 중 처음 어긋난 단계)별 개수. 일치는 세지 않는다.</summary>
+    public IReadOnlyDictionary<InterruptQaMismatch, int> MismatchReasons => mismatchReasons;
 
     public void Add(InterruptCalibrationSample sample)
     {
         SampleCount++;
-        bool? owner = InterruptCalibrationSample.ForecastAsBool(sample.OwnerForecast);
-        bool? server = InterruptCalibrationSample.ForecastAsBool(sample.ServerForecast);
+        bool? forecast = InterruptCalibrationSample.ForecastAsBool(sample.Forecast);
+        bool? judged = sample.JudgedSuccess;
         bool? answer = sample.UserAnswer;
 
-        OwnerVsAnswer.Add(owner, answer);
-        ServerForecastVsAnswer.Add(server, answer);
-        ServerResultVsAnswer.Add(sample.ServerSucceeded, answer);
-        OwnerVsServerForecast.Add(owner, server);
-        OwnerFinalVsAnswer.Add(InterruptCalibrationSample.ForecastAsBool(sample.OwnerFinalForecast ?? sample.OwnerForecast), answer);
-        if (sample.OwnerRepredicted == true)
-            OwnerRepredictedCount++;
-        if (sample.ServerRepredicted == true)
-            ServerRepredictedCount++;
+        ForecastVsAnswer.Add(forecast, answer);
+        JudgeVsAnswer.Add(judged, answer);
+        ServerVsAnswer.Add(sample.ServerSucceeded, answer);
+        ForecastVsJudge.Add(forecast, judged);
 
-        if (owner.HasValue && answer.HasValue && owner.Value != answer.Value && sample.OwnerReason.HasValue)
+        InterruptQaMismatch mismatch = sample.Record != null ? sample.Record.Mismatch : InterruptQaMismatch.None;
+        if (mismatch != InterruptQaMismatch.None)
         {
-            ownerMismatchReasons.TryGetValue(sample.OwnerReason.Value, out int count);
-            ownerMismatchReasons[sample.OwnerReason.Value] = count + 1;
+            mismatchReasons.TryGetValue(mismatch, out int count);
+            mismatchReasons[mismatch] = count + 1;
         }
     }
 
@@ -126,11 +113,11 @@ public sealed class InterruptCalibrationStats
     public string BuildSummary(string sessionLabel)
     {
         var sb = new StringBuilder();
-        sb.Append("간파 예측 보정(139) 요약").Append(InterruptCalibrationCsv.NewLine);
+        sb.Append("간파 보정(139 → 191 예측·판정·서버) 요약").Append(InterruptCalibrationCsv.NewLine);
         if (!string.IsNullOrEmpty(sessionLabel))
             sb.Append("세션: ").Append(sessionLabel).Append(InterruptCalibrationCsv.NewLine);
         sb.Append("표본 수: ").Append(SampleCount).Append(InterruptCalibrationCsv.NewLine);
-        sb.Append("매핑: 강=true·약=false, 서버 성공=true·실패=false. 대상 없음·값 없음은 분모에서 제외.").Append(InterruptCalibrationCsv.NewLine);
+        sb.Append("매핑: 강=true·약=false, 판정·서버 성공=true·실패=false. 대상 없음·값 없음은 분모에서 제외.").Append(InterruptCalibrationCsv.NewLine);
         sb.Append(InterruptCalibrationCsv.NewLine);
 
         sb.Append("[일치율]").Append(InterruptCalibrationCsv.NewLine);
@@ -149,20 +136,13 @@ public sealed class InterruptCalibrationStats
         }
         sb.Append(InterruptCalibrationCsv.NewLine);
 
-        sb.Append("[대시 중 재예측(약 → 강)]").Append(InterruptCalibrationCsv.NewLine);
-        sb.Append("재예측: 오너 ").Append(OwnerRepredictedCount).Append(" · 서버 ").Append(ServerRepredictedCount)
-          .Append(InterruptCalibrationCsv.NewLine);
-        sb.Append(OwnerFinalVsAnswer.Name).Append(": ").Append(OwnerFinalVsAnswer.FormatRate())
-          .Append(" · 제외 ").Append(OwnerFinalVsAnswer.Excluded).Append(InterruptCalibrationCsv.NewLine);
-        sb.Append(InterruptCalibrationCsv.NewLine);
-
-        sb.Append("[오너 예측 ↔ 답 불일치의 오너 Reason]").Append(InterruptCalibrationCsv.NewLine);
-        if (ownerMismatchReasons.Count == 0)
+        sb.Append("[어긋난 이유(QA 기록)]").Append(InterruptCalibrationCsv.NewLine);
+        if (mismatchReasons.Count == 0)
             sb.Append("없음").Append(InterruptCalibrationCsv.NewLine);
-        foreach (DashInterruptPredictReason reason in System.Enum.GetValues(typeof(DashInterruptPredictReason)))
+        foreach (InterruptQaMismatch reason in System.Enum.GetValues(typeof(InterruptQaMismatch)))
         {
-            if (ownerMismatchReasons.TryGetValue(reason, out int count))
-                sb.Append(reason).Append(": ").Append(count).Append(InterruptCalibrationCsv.NewLine);
+            if (mismatchReasons.TryGetValue(reason, out int count))
+                sb.Append(InterruptQaRules.Label(reason)).Append('(').Append(reason).Append("): ").Append(count).Append(InterruptCalibrationCsv.NewLine);
         }
         return sb.ToString();
     }

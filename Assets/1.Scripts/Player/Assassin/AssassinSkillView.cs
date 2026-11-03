@@ -12,7 +12,7 @@ using UnityEngine;
 /// - Q 돌진 궤적 · 변신 E 원: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
 ///   (일반 E 시전 임시 연출 Flash_star 는 2026-10-20 삭제 — 차지·오라·날 발광은 AssassinEnhanceReadyView.)
 ///   🔹 변신 E 원 = 정식 VFX <c>EffectCatalog.Assassin_E_MultiSlashes</c> 루프(2026-10-15 민경) — 확정 시 원 중심에서
-///   배율 = 원 반경으로 켜고, 스킬 OnEnd(5타 완료·중단 공통)에서 Release 한다. 확정 순간 1회 <c>circleStrikePrefab</c> 도 그대로 낸다.
+///   배율 = 원 반경으로 켜고, 스킬 OnEnd(5타 완료·중단 공통)에서 Release 한다. (확정 순간 임시 1회 Burst_rings 는 2026-10-30 삭제.)
 ///   🔹 변신 Q 돌진 = 정식 VFX <c>EffectCatalog.Assassin_Q_StormSlash</c> 루프(2026-10-15 민경) — 플레이어 루트를 따라가며
 ///   지나간 자리에 자국을 남긴다(입자 World + Rate over Distance).
 ///   🔹 일반 Q 돌진 = 정식 VFX <c>Assassin_Q_PierceLine</c>·<c>Assassin_Q_PierceBurst</c>(2026-10-16 민경) — 시작점을 기억했다가
@@ -29,8 +29,7 @@ using UnityEngine;
 ///   이벤트가 <c>Player_Assassin/VFX/RightClick/*</c> 소켓에서 직접 재생한다. 여기 남은 것: 간파 성공 = [서버]
 ///   간파 연출 디렉터 성공 단계의 relay(<see cref="IInterruptSuccessRelay"/>, 할 일 118) → 전 피어 "성공 대기" → 올려치기 소켓 id 가
 ///   재생되는 순간 디렉터에 C2 칸을 묻고 <c>insightSuccess</c> 원샷(알림이 더 늦으면 받는 즉시), 기 모으기 안전 정지 <see cref="EndInterrupt"/>(스킬 OnEnd).
-/// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
-/// 프리팹이 비어 있으면 해당 연출만 빠진다.
+/// - 백어택 적중 연출 없음 — 임시 Burst_sharp 와 그 RPC 는 2026-10-30 삭제(민경). 정식 연출을 붙일 땐 판정(<see cref="AssassinHitTargets.IsBackAttack"/>) 쪽에서 다시 연결한다.
 /// </summary>
 [RequireComponent(typeof(AssassinState))]
 public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessRelay, IInterruptCueSink
@@ -72,13 +71,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     [SerializeField] private EffectSocketPlayer insightSlash;
     [Tooltip("간파 성공 — 서버 판정 → RPC → 올려치기와 함께 원샷. id 비워 둠(코드 전용). 엔트리 = Assassin_RClick_Success.")]
     [SerializeField] private EffectSocketPlayer insightSuccess;
-
-    [Header("1회·스킬 동안")]
-    [Tooltip("변신 E 확정 순간 원 중심에 1회(Multi Slashes 루프와 함께).")]
-    [SerializeField] private GameObject circleStrikePrefab;
-    [SerializeField] private GameObject backAttackHitPrefab;
-    [Tooltip("1회 연출·꺼진 루프가 남은 입자를 흘리고 사라지기까지(초).")]
-    [SerializeField, Min(0.1f)] private float releaseLifetime = 2f;
 
     private AssassinState state;
     private EffectHandle transformLoop;
@@ -226,7 +218,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     public void BeginCircleStrike(Vector3 center, float radius, float maxDuration)
     {
         EndCircleStrike();   // 재진입 — 남은 루프는 먼저 걷는다
-        PlayOneShot(circleStrikePrefab, center);
         if (!EffectManager.TryGet(out EffectManager effects, this))
             return;
 
@@ -287,18 +278,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     }
 
     // ── 서버 판정 → 전 피어 ──
-
-    /// <summary>[서버] 백어택 적중 지점 — 전 피어에 1회 연출(A11 판정이 호출).</summary>
-    public void ServerBackAttackHit(Vector3 position)
-    {
-        if (IsNetworkActive)
-            BackAttackHitRpc(position);
-        else
-            PlayBackAttackHit(position);
-    }
-
-    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    private void BackAttackHitRpc(Vector3 position) => PlayBackAttackHit(position);
 
     /// <summary>
     /// [서버] 일반 평타 <paramref name="stepIndex"/> 타가 무언가를 맞혔다 — 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹쳐 낸다.
@@ -372,18 +351,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
             insightSuccess.PlayOnce();
     }
 
-    private void PlayBackAttackHit(Vector3 position) => PlayOneShot(backAttackHitPrefab, position);
-
-    // 1회 연출은 방출을 끊지 않는다(버스트가 첫 업데이트 전에 잘린다) — 수명 뒤 파괴만.
-    private void PlayOneShot(GameObject prefab, Vector3 position)
-    {
-        GameObject instance = Spawn(prefab, null);
-        if (instance == null)
-            return;
-        instance.transform.position = position;
-        Destroy(instance, releaseLifetime);
-    }
-
     // ── 루프 ──
 
     // 변신 루프 — 켜면 차오르고(프리팹이 0.5초 안에 스스로 채운다), 끄면 엔트리의 outro 로 흩어진다
@@ -414,27 +381,5 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
         if (state == null)
             return;
         HandleTransformChanged(state.IsTransformed);
-    }
-
-    private static GameObject Spawn(GameObject prefab, Transform parent)
-    {
-        if (prefab == null)
-            return null;
-
-        GameObject instance = parent != null ? Instantiate(prefab, parent, false) : Instantiate(prefab);
-        instance.name = prefab.name + "(임시)";
-
-        // 빌려 쓰는 프리팹 중 루트 위치가 0 이 아닌 것이 있다(CharacterCirclePurple —씬 배치값이 저장됨).
-        // 붙일 때 그 값이 소켓 기준 오프셋이 되어 원이 몇 m 떨어져 생긴다 — 위치는 소켓이 정한다.
-        if (parent != null)
-            instance.transform.localPosition = Vector3.zero;
-
-        // 빌려 쓰는 프리팹 중 playOnAwake 가 꺼진 것이 있다(가붕이 FX_SingleSlash_* — 원래 쓰는 쪽이 Play() 를 직접 부름).
-        foreach (ParticleSystem particle in instance.GetComponentsInChildren<ParticleSystem>())
-        {
-            if (!particle.isPlaying)
-                particle.Play(false);
-        }
-        return instance;
     }
 }

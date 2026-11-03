@@ -391,7 +391,10 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
                     ui.SetObjective(exit == 4 ? GoPadId : NextId);
             }
         }
-        Render();
+        // 🔴 서버(호스트)는 이 이벤트가 디렉터 Commit 안 — 복제 게이트 값(IsGateOpen)을 쓰기 **전에** 난다. 여기서 그리면 출구가 아직 닫힌 것으로 보여
+        //    방금 지운 "특성 선택 완료 — 동료를 기다립니다"(TUT_C_WAIT)를 다시 쓰고, 그 뒤엔 진행 중 복도가 없어 영영 안 지워졌다(경석 11-02 Play·빌드).
+        //    값이 반영되면 StateChanged → Render 가 다시 그린다. 클라는 값 반영 뒤에 이 이벤트를 받으므로 바로 그려도 된다.
+        if (_director.IsGateOpen(gate)) Render();
     }
 
     // ─── 목표 패널(모든 피어 — 로컬 플레이어 기준) ──────────────────────────────

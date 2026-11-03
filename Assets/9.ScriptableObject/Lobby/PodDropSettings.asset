@@ -26,7 +26,6 @@ MonoBehaviour:
     cameraZoomEase: 3
     walkSpeed: 4.5
     walkInterval: 0.4
-    seatSlideSeconds: 0.4
     hatchCloseSeconds: 0
     descendSeconds: 2
     descendDepth: 10

@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "\uCD9C\uB825 \uAC15\uD654"
   category: "\uAE30\uBCF8 \uACF5\uACA9 \uAC15\uD654"
   description: "\uAE30\uBCF8 \uACF5\uACA9 \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 865732a5f38e5973a2d1a67cf76c0731, type: 3}
   effects:
   - rid: 7237886673644683418
   references:

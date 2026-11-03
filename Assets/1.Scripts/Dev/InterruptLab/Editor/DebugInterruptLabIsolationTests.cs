@@ -30,6 +30,7 @@ public sealed class DebugInterruptLabIsolationTests
         typeof(DebugDummyInterruptWindowMode), // 139 허수아비 창 모드
         typeof(InterruptCalibrationCapture), // 139 예측 보정 캡처(랩 씬은 단계 5)
         typeof(InterruptCalibrationQuestionPanel), // 139 질문 창·상시 패널(랩 씬은 단계 5)
+        typeof(InterruptJudgeShapeGizmos), // 156 간파 판정 범위 기즈모(보정 랩)
     };
 
     static string[] DebugScriptGuids()
@@ -221,21 +222,23 @@ public sealed class DebugInterruptLabIsolationTests
         Assert.IsTrue(assign.IsMatch(File.ReadAllText(LabFolder + "DebugDummyInterruptWindowMode.cs")));
     }
 
-    // ─── (f) 예측 보정 계측 훅(139 단계 3) ─────────────────────────────
+    // ─── (f) 예측 보정 계측 — 할 일 191 5단계 재연결 ─────────────────────
 
     [Test]
-    public void 예측_보정_계측_훅은_디버그_폴더_밖에서_구독하지_않는다()
+    public void 옛_예측_보정_계측_훅은_어디에도_남지_않고_캡처기는_새_경로를_구독한다()
     {
-        var subscribe = new Regex(@"\bCalibration(OwnerPredicted|ServerPredicted|OwnerRepredicted|ServerRepredicted|ServerJudged)\s*\+=");
-        string[] subscribers = Directory.GetFiles("Assets", "*.cs", SearchOption.AllDirectories)
+        // 옛 예측기 계측 훅(139 — CalibrationOwnerPredicted 등)은 예측기와 함께 삭제됐다. 이름이 다시 생기면 옛 경로가 되살아난 것.
+        var oldHook = new Regex(@"\bCalibration(OwnerPredicted|ServerPredicted|OwnerRepredicted|ServerRepredicted|ServerJudged)\b");
+        string[] users = Directory.GetFiles("Assets", "*.cs", SearchOption.AllDirectories)
             .Select(Normalize)
-            .Where(p => !p.StartsWith(LabFolder))
-            .Where(p => subscribe.IsMatch(File.ReadAllText(p)))
+            .Where(p => !p.EndsWith("DebugInterruptLabIsolationTests.cs"))
+            .Where(p => oldHook.IsMatch(File.ReadAllText(p)))
             .ToArray();
-        CollectionAssert.IsEmpty(subscribers);
+        CollectionAssert.IsEmpty(users);
 
-        // 검색이 실제로 잡는지 — 캡처기는 다섯 다 구독한다(재예측 둘 = 할 일 139-2)
+        // 캡처기 = 매니저 오너 판정(판정 순간 창 상태) + QA 기록 한 줄(예측·판정·서버 결과).
         string capture = File.ReadAllText(LabFolder + "Calibration/InterruptCalibrationCapture.cs");
-        Assert.AreEqual(5, subscribe.Matches(capture).Count);
+        StringAssert.IsMatch(@"InterruptManager\.OwnerJudged\s*\+=", capture);
+        StringAssert.IsMatch(@"InterruptQaRecorder\.RecordCompleted\s*\+=", capture);
     }
 }

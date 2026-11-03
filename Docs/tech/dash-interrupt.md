@@ -3,6 +3,7 @@
 > 할 일 115(2026-10-27, 브랜치 `feature/DashInterrupt`). 구현 커밋 C1 `07a85d46` · C2a `f0f56ee2` · C2b `a5af6d8b`. C4(우클릭 → 대시 전환)는 할 일 132 정정2(2026-10-28, 사용자 지시)로 폐기 — §2.1.
 > 설계안: `_lane-artifacts/MainProject-Worktree2/115/115-설계안.md`(레포 밖, §10·§11·§12 확정 절이 우선). 문서와 코드가 다르면 코드가 기준이다.
 > 연출 디렉터는 [interrupt-presentation.md §6](interrupt-presentation.md#6-간파-연출-디렉터--interruptproductiondirector-할-일-118), 입력 거부 피드백은 [skill-reject-feedback.md](skill-reject-feedback.md).
+> 🔹 할 일 191(2026-11-02): 예측·판정·성공 권한이 **`InterruptManager`(오너 클라 1차 판정 · 서버 2차 검증)** 로 옮겨졌다 — 단일 원본 [interrupt-client-judge.md](interrupt-client-judge.md). 입력 창·상태 흐름·애니 레이어(§1~§4·§6·§7)는 그대로다.
 
 **한 줄 정의**: **대시 → 우클릭 순서로만**, 대시 시작 후 짧은 창(기본 0.1초) 안에 우클릭을 누르면(§1·§2) 대시는 그대로 진행하면서(이동·무적·충돌 그대로) 상체만 간파 준비 자세를 취하고, **대시가 끝나는 지점·대시 방향**에서 간파를 판정한다.
 
@@ -60,7 +61,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 ## 3. 위치·방향·비용·무적
 
-- **위치·방향**: 판정은 기존처럼 플레이어 자식 `HitboxAnchor` 오버랩 — 대시 끝 위치·대시 방향이 자연히 기준이 된다. 승인 방향 = 서버 대시 상태의 방향(`PlayerDashState.Direction`), 조준 방향 회전 스냅·고정 거리 조준 재투영 없음.
+- **위치·방향**: 판정 위치 = 공용 스윕(`PlayerDashPath`)으로 구한 실제 대시 끝, 방향 = 대시 방향(할 일 191 — [interrupt-client-judge.md §3](interrupt-client-judge.md#3-예측판정--같은-순수-함수-interruptjudgecalculator)). 서버 피해는 여전히 플레이어 자식 `HitboxAnchor` 오버랩. 승인 방향 = 서버 대시 상태의 방향(`PlayerDashState.Direction`), 조준 방향 회전 스냅·고정 거리 조준 재투영 없음.
 - **비용**: 대시 1충전(대시 자체) + 간파 쿨타임(승인 순간 시작). 대쉬 간파용 추가 자원은 없다.
 - **무적**: 대시 구간만. 서버 = 대시 승인 때 남은 대시 시간만큼 토큰, 오너 예측 = 상태가 Dash 인 동안. Skill 로 넘어간 뒤 간파 판정 구간에는 무적이 없다.
 
@@ -80,32 +81,31 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - 원격 오너의 서버 대시는 대시 요청 도착 때 시작하므로 서버 기준 경과가 오너 경과와 비슷하다 — 허용오차(기본 0.1초)는 그 차이를 받는다.
 - 호스트 오너·오프라인은 같은 프레임에 `StartSkillServer` 로 바로 승인된다.
 
-## 5. 118 디렉터 사건 연결 — 새 경로 없음
+## 5. 118 디렉터 사건 연결 — 새 RPC 없음(192 부터 사건 종류 Dash)
 
-- **시도**: 승인 순간 `OnServerStart` → `ServerAttempt(예측 3상태)` 그대로. 예측은 근접·대쉬 공용 `DashInterruptPredictor`(할 일 132 — [interrupt-presentation.md §0.2](interrupt-presentation.md#02-흐름)):
-  - 판정 위치 = **예상 대시 끝** = 시전 위치 + 대시 방향 × 대시 속도 × 남은 대시 시간(`DashInterruptRules.GetPredictedEndOffset`), 판정 시각 = max(예상 대시 끝, 평소 Hit).
-  - 대상 = **판정 앵커를 공격 방향(근접 = 시전 방향, 대쉬 = 대시 방향)으로 돌려 판정 위치에 놓은 오버랩**(`HitboxAnchorShape` — 서버 `ResolveHit` 의 `OverlapHitboxAnchor` 와 같은 형상 계산·같은 질의, 할 일 139-3)에 걸린 Unit 중 `InterruptTargetRegistry` 캐시에 있는 것(창 소유자) + `InterruptTargetGeometry.FacesAttacker`(대상 정면 허용각 — 기존 판정값 그대로, 정면 판정 없으면 180). 밖이면 '대상 없음' = 슬로우 없음.
-  - 오너 HUD 강조 사거리(`HasTargetInOmniRange`)는 '돌면 닿는 거리'(앵커 먼 모서리) 표시라 예측보다 넓다 — 강조가 켜져도 그 방향이면 대상 없음일 수 있다.
-    대상까지 거리는 실제 콜라이더 표면 수평 거리(`InterruptOmniRangeModel.HorizontalDistanceToCollider`, 할 일 139-4 — 아래 AABB 착시).
-  - 서버 = 승인 시점 값(`ArmDashAttach` 가 방향·속도·서버 남은 시간). **오너 클라 = 우클릭을 누른 순간**으로 되돌린 같은 입력(`InterruptAttemptPrediction.AtPress`) — 강이면 그 자리에서 오너 암전·빛 모임.
-  - 판정 오버랩은 옮기지 않는다(실제 위치).
-- **예측 규칙 보정(할 일 139-2, §10.2 표본 27개 근거)** — `DashInterruptPredictor` 공용 규칙이라 ①은 근접 간파에도 같이 적용된다, ②는 대쉬 간파만:
-  - **① 틀린 창 길이 추정 버리기**: 창이 지금 열려 있는데 열린 뒤 경과 > 추정 길이(관측 중앙값, `IsWindowEstimateStale`)면 추정이 틀린 것으로 보고 버린다(남은 창 = 모름 -1). 그때 판정까지 남은 시간 ≤ **`StaleWindowMaxTimeToResolve` = 0.4초**면 강(`Success`), 길면 약(`WindowClosesBeforeResolve`). 무기한 허수아비 창(§10.1 ⚠️)의 표본 seq 5·8·15·19·26 이 약 → 강. seq 22 는 경과 0.924 < 추정 1.243 이라 해당 없음(남은 0.319 < 판정까지 0.345 — 약 그대로).
-  - **② 대시 중 재예측(약 → 강만)**: 누른(서버 = 승인) 순간 대상은 범위 안인데 창이 닫혀 약(`WindowClosedNow`, `ShouldRepredictDuringDash`)이었으면, 그 대시 동안 매 프레임 같은 예측기로 다시 본다(`PlayerDashState.Tick` → `PlayerSkillController.TickDashInterruptReprediction`). 입력 = 지금 위치·남은 대시·창, 준비 기준점은 처음 시도의 t0(`InterruptAttemptPrediction.ForReprediction`). 강이 되는 순간 한 번:
-    - 오너 = 복제 창으로 → `InterruptProductionDirector.LocalOwnerUpgrade` → `InterruptOwnerPresentation.UpgradeToStrong`(암전·빛 모임이 늦게 켜짐). 올린 뒤 서버의 약 목적(승인 때 예측)이 늦게 와도 내리지 않는다. 서버 강이 먼저 와 있었어도 켠다.
-    - 서버 = 서버 창으로 → `PlayerInterruptSkillBase.TickServerDashReprediction` 이 **강 시도 슬로우를 다시 건다**(`GlobalTimeScale` 은 마지막 발동이 이긴다 — 기존 슬로우 배포로 전 피어가 받음, 새 RPC 없음). 레이어가 거부하면(0) 약 슬로우 번호를 그대로 둔다.
-    - 강 → 약 내리기 없음. 근접 간파는 재예측하지 않는다. 표본 seq 16(누를 때 닫힘 → 0.04초 뒤 열림 → 서버 성공).
-  - ~~③ 겹침이면 공격 방향 생략~~(`OverlapDistance` 0.05m) — **할 일 139-3 에서 없앴다**. 아래 앵커 형상 검사가 seq 10(거리 0·각도 133° · 서버 성공)을 그대로 대상 있음으로 본다(상자 가까운 면이 겹친 허수아비 캡슐에 닿는다).
-- **예측 사거리 = 판정 앵커 실제 모양(할 일 139-3)** — 원인: 예전 대상 검사는 **전방위 사거리**(앵커를 어느 방향으로 돌려도 닿는 최대 거리 = 상자 먼 모서리) + 공격 방향 반평면(±90°)이라, 실제 판정(공격 방향에 놓인 상자)보다 정면은 모서리까지·옆은 반평면 끝까지 넓었다 → 예측 강 + 서버 실패.
-  - 앵커 값(프리팹 저작값, Armature 직속·회전 0 — 팔라딘 -0.1°): 어쌔신·거너 상자 중심 z 0.9 · 반폭 0.7 · 반길이 0.7 → **정면 도달 1.6m · 옆 0.7m · 전방위 1.746m**. 팔라딘 중심 z 0.9 · 반폭 0.8 · 반길이 0.8 → **정면 1.7m · 옆 0.8m · 전방위 1.879m**. 거리는 플레이어 위치 → 대상 표면.
-  - 새 규칙: 지금 앵커 형상을 플레이어 위치 수직축으로 돌려 공격 방향을 향하게 하고(`HitboxAnchorShape.Aimed`) 판정 위치로 옮겨(`Offset`) 서버와 같은 `Overlap` 질의. 걸린 Unit 중 캐시 대상만, 그리고 대상 정면 허용각(23호). 공격 방향 반평면·사거리 비교는 없어졌다. 허용 오차 칸 없음. 판정 동작은 그대로(`OverlapHitboxAnchor` 가 같은 형상 함수를 쓸 뿐).
-  - 야간 QA 봇(23호) 로그의 강 예측 surf 1.71~1.74m(봇 reachM 1.75)·표본 seq 8(옆 1.31m·75°) 은 이제 대상 없음.
-  - **AABB 거리 착시(할 일 139-4)** — 예측은 앵커 오버랩이라 영향 없었지만, HUD 강조와 랩 CSV 거리 열(`InterruptTargetRegistry.Entry.TryGetHorizontalDistance`)은 대상 콜라이더 **AABB** 까지 재서 대상이 월드 대각선에 있으면 최대 r(√2−1) 짧았다(23호 캡슐 r 1.7 → 0.70m, 거너 '1.73m' = 실제 2.1~2.4m). 이제 둘 다 `HorizontalDistanceToCollider` — `Collider.ClosestPoint`(질의점 높이 = 대상 AABB 중심 높이, 안이면 0, 트리거 포함). 비볼록 MeshCollider 등 ClosestPoint 미지원은 AABB 표면 근사. 테스트 `Assets/1.Scripts/Player/Editor/InterruptOmniRangeModelTests.cs`.
-  - **보정 랩 재현**(§10.2 `InterruptCalibrationLab`, 어쌔신 또는 거너, `includeMelee` 켬 — 근접 간파): ⓐ 허수아비 정면에서 표면 1.6~1.75m(허수아비 중심에서 2.1~2.25m) 떨어져 허수아비 쪽으로 우클릭 · ⓑ 허수아비가 조준 방향과 75° 옆, 표면 1.3m 에서 우클릭. **수정 전 = 강(암전) + 서버 실패, 수정 후 = 대상 없음(연출 없음)**. 대조: 정면 1.5m·옆 75° 0.55m 는 강 + 서버 성공. 팔라딘은 정면 1.7~1.88m 띠가 같은 증상이다.
-- **판정·성공**: 대시 끝(또는 그 뒤 클립 Hit)의 `ResolveHit` 안 `ServerResolve`/`ServerSuccess` 그대로.
-  선착순 한 명(할 일 143)도 같은 `ResolveHit` 에서 거른다 — 같은 창 판정 기준 시각 = 승인(`OnServerStart`) 순간([interrupt-presentation.md §0.10](interrupt-presentation.md#010-선착순-한-명-할-일-143)).
-- **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로.
-- 사건에 `Variant`(Normal/Dash) 칸은 **만들지 않았다** — 대쉬 간파도 일반 간파와 같은 프로필·cue 를 쓴다.
+> 🔹 **할 일 191(2026-11-02)부터 예측·판정·성공 권한은 `InterruptManager` 다** — 단일 원본 [interrupt-client-judge.md](interrupt-client-judge.md).
+> 아래는 대쉬 간파에 해당하는 요약이다. 옛 예측기(`DashInterruptPredictor`)·창 길이 추정·0.4초 규칙·대시 중 재예측은 **삭제됐다**(그 문서 §10).
+
+- **판정 = 오너 클라 1차, 서버 2차 검증**: 오너가 누른 시각 표본으로 `InterruptManager.Predict` → 판정 시각 표본이 쌓이면 `Judge` → 성공이면 신고 1회 → 서버가 같은 `Judge` 를 자기 이력으로 다시 돌려 승인·거부([interrupt-client-judge.md §4·§5](interrupt-client-judge.md#4-오너-판정-흐름)).
+- **판정 시각 = max(실제 대시 끝, 누른 시각 + Hit 지연)**. Hit 지연 = 클립 Hit 이벤트 시각 ÷ 지금 애니 속도.
+- **대시 끝 = 공용 스윕 `PlayerDashPath`** — `PlayerMotor` 의 실제 대시 이동과 같은 충돌 검사라, 벽·유닛에 막히면 막힌 자리에서 판정한다. 예전 '남은 대시 시간 × 속도 직선' 예측의 오발동(막힌 대시에서 강)이 없어졌다.
+- **시도 슬로우**: 승인 순간 `OnServerStart` → `InterruptManager.TryPredictServerAttempt`(같은 `Predict`, 서버 이력·서버 창 시간표) → `ServerAttempt(예측 3상태)`. 한 번 정한 강·약은 대시 중 다시 보지 않는다.
+- **오너 연출**: 매니저 시도 cue(누른 순간 예측) → 판정 cue(성공/실패) — [interrupt-presentation.md §0.2](interrupt-presentation.md#02-흐름).
+- 대상 = 판정 앵커를 공격 방향(대쉬 = 대시 방향)으로 돌려 판정 위치에 놓은 형상에 닿는 등록 대상 + 대상 정면 허용각(`InterruptTargetGeometry.FacesAttacker` — 기존 판정값, 정면 판정 없으면 180).
+  - 오너 HUD 강조 사거리(`HasTargetInOmniRange`)는 '돌면 닿는 거리'(앵커 먼 모서리) 표시라 판정보다 넓다 — 강조가 켜져도 그 방향이면 대상 없음일 수 있다.
+    대상까지 거리는 실제 콜라이더 표면 수평 거리(`InterruptOmniRangeModel.HorizontalDistanceToCollider`, 할 일 139-4).
+  - 판정 앵커 = 각 `<캐릭터>_Armature.prefab` 의 `InterruptAttack` BoxCollider(프리팹이 원본, xlsx 칸 없음). 예측·판정·HUD 강조·서버 피해가 모두 이 상자를 읽는다.
+    팔라딘 1.6×**2.4**×1.6 / 거너·어쌔신 1.4×**2.4**×1.4, 중심 (0, **1.3**, 0.9) → 높이 띠 발 +0.1 ~ +2.5m. 정면 도달 팔라딘 1.7m · 거너·어쌔신 1.6m(플레이어 위치 → 대상 표면).
+    웰즈 & 23호 HurtBox(캡슐 r 1.7 · 높이 5.78)의 가장 넓은 단면(y 1.7~4.08)에 띠가 걸려 정면 도달이 표면 거리 그대로 나온다(할 일 163).
+- 서버 `ResolveHit` 의 앵커 오버랩은 **피해만** 준다. 세션 중 성공은 신고 승인으로만 정해진다.
+- **AABB 거리 착시(할 일 139-4)** — HUD 강조와 랩 CSV 거리 열은 대상 콜라이더 **실제 표면**(`HorizontalDistanceToCollider` — `Collider.ClosestPoint`, 질의점 높이 = 대상 AABB 중심 높이, 안이면 0)까지 잰다. 예전 AABB 거리는 대각선에서 최대 r(√2−1) 짧았다(23호 0.70m). 테스트 `Assets/1.Scripts/Player/Editor/InterruptOmniRangeModelTests.cs`.
+- **창 길이 = 서버 창 시간표**(할 일 191) — 옛 139-6 창 길이 해석기(`InterruptWindowLengthResolver`·`TwentyThreeInterruptWindowLength`·관측 중앙값)는 삭제됐다. 보스·허수아비가 창 열림 때 닫힘 예정을 알리고 서버가 배포한다. 여닫는 곳 목록은 [interrupt-client-judge.md §9](interrupt-client-judge.md#9-창-여닫는-곳-목록-1단계).
+- **성공**: 서버 승인 순간(`ServerOnClaimVerdict`) 기록, 첫 승인이면 성공 슬로우 사건. 선착순/동시(0.05초)는 매니저 장부가 서버 도착 기준으로 정한다([interrupt-client-judge.md §5](interrupt-client-judge.md#5-서버-검증-interruptclaimserver--interruptclaimvalidator)).
+- **실패**: 대시 중 끊김 → `OnEnd` → `ServerFail(EndedBeforeResolve)` 그대로. 오너 쪽은 판정 전 끊김(`SkillCut`)으로 대기 판정을 버리고 연출을 바로 끝낸다(D5).
+- **사건 종류 `Variant`(Normal/Dash, 할 일 192)**: 대쉬 간파 성공은 `Dash` 로 실린다 — 세션 = 신고의 `ViaDash`(191 경로) → `ServerOnClaimVerdict`, 오프라인 = 시전 시작의 대쉬 여부.
+  피어 전달은 슬로우 Start 이벤트의 179 표식 바이트 비트 1(새 RPC·크기 변화 없음). 디렉터가 단계(실패/간파/대쉬 간파/제압 간파)를 고른다 —
+  지금 대쉬 간파 단계는 일반 간파와 같은 연출(암전 없음 · 강한 줌 · 섬광 ②~⑥, 암순응·블룸 섬광은 Q5 보류). 제압이면 근접·대쉬 무관 제압 간파. 상세 [interrupt-presentation.md §8](interrupt-presentation.md#8-간파-연출-4단계-할-일-192).
+- 시도 cue·목적(강/약)·줌은 대쉬도 일반 간파와 같다(Q2). 시도 슬로우 **프로필**만 194 후속 2(2026-11-03)부터 대쉬 전용 `interruptDashProfile`(강)·`interruptDashWeakProfile`(약) — SO `InterruptSlowMotionSettings` ① 칸, 처음 값 = 근접 강·약 복사(동작 같음). 서버 시도 사건 `Variant` 로 고른다(새 RPC 없음) — [interrupt-presentation.md §9.8](interrupt-presentation.md#98-슬로우-3단계-so--interruptslowmotionsettings-194-후속-2-2026-11-03).
 - 캐릭터 이펙트(클립 이벤트)는 같은 클립을 상체 레이어에서 트므로 같이 나온다(§6 이벤트 중복 방지 참고).
 
 ## 6. 마스킹 애니메이션 — `DashInterruptUpper` 레이어
@@ -139,7 +139,8 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 - **원격 오너: 서버 대시가 더 짧다.** 서버 대시는 요청 도착 때 시작하되 길이 = 지연을 뺀 남은 시간(`RemainingServerDuration`)이라, 서버가 오너 화면의 대시 끝보다 **먼저** Skill 로 넘어가 판정할 수 있다. 판정 위치는 서버가 가진 오너 복제 위치라, 그 순간 복제 위치가 아직 대시 끝에 닿지 않았을 수 있다(일반 간파와 같은 수준의 위치 오차 + 대시 이동분).
 - 원격 오너에서 `PlaySkillClientRpc` 가 오너 대시 끝 뒤에 오면 오너는 일반 Skill 로 0층 전신 클립을 처음부터 튼다 — 서버 판정 시각과 화면 클립 시각이 어긋날 수 있다.
-- 시도 예측 오프셋은 남은 대시 시간 기준 직선 이동이다 — 대시가 유닛·벽에 막히면 예측이 실제 판정 위치보다 멀다(강 시도 슬로우·오너 암전 오발동 → 실패 복귀 가능).
+- ~~시도 예측 오프셋은 남은 대시 시간 기준 직선 이동~~ — 할 일 191 에서 공용 스윕(`PlayerDashPath`)으로 바뀌어 막힌 대시도 실제 끝을 쓴다.
+- 서버 검증의 시전자 위치는 오너 복제 이력이라 보간 지연만큼 늦다 — 대쉬 간파 끝에서 거부가 늘 수 있다(시각 여유 안에서만 따라잡음, [interrupt-client-judge.md §12](interrupt-client-judge.md#12-알려진-한계)).
 - `PlayerDashData.dashInterruptBlend` 의 툴팁은 "Dodge → 간파 준비 클립 크로스페이드" 라고 적혀 있지만 실제 용도는 **상체 레이어 가중치 전환 시간 + 인수인계 0층 CrossFade 시간**이다(§6).
 - 이벤트 중복·레이어 블렌드 모양·관찰자 화면은 Play/MPPM 확인 전이다.
 
@@ -173,7 +174,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 **132 연출 확인**(할 일 132 단계 6 점검 — 씬 변경 없음): 간파 연출 디렉터·암전 렌더 기능·빛 모임 소켓은 부트의 `NetworkManager`·플레이어 프리팹·`PC_Renderer` 에서 오고,
 허수아비 두 개가 스폰 때 `InterruptTargetRegistry` 에 등록된다(`TrainingDummyInterrupt`, 정면 판정 없음 = 180). 허수아비가 **노랑(인터럽트 가능)** 일 때 사거리 안에서 그쪽으로 우클릭 = 강(암전·빛 모임 → 성공 섬광),
 노랑이 아닐 때 = 약(약 슬로우·줌만), 허수아비와 먼 곳·등진 방향 = 대상 없음(아무것도 없음). 23호는 이 씬에 없다 — 정면 허용각 확인은 보스 씬에서.
-⚠️ 이 씬의 허수아비 창은 무기한(`DebugDummyInterruptRecovery`)이라 창 '추정 길이' = 지난번 노랑이 된 뒤 간파까지 기다린 시간(중앙값)이 된다 — 그보다 오래 기다렸다 누르면 창이 열려 있어도 **약**으로 예측될 수 있다(예측 규칙대로의 동작, 보스 창은 길이가 정해져 있어 해당 없음).
+이 씬의 허수아비 창은 무기한(`DebugDummyInterruptRecovery`)이라 창 시간표에 **길이 모름**으로 올라간다 — 열려 있는 동안은 오래 기다렸다 눌러도 강이다(할 일 191 전의 '관측 중앙값 → 약' 증상은 없어졌다).
 
 **씬에 둔 것** (부트에서 오는 NetworkManager·`GlobalTimeScale`·간파 연출 디렉터·GameManager·EffectManager·EventSystem·GameMenu 는 두지 않는다 — `TrainingDummy.unity` 와 같은 구성)
 
@@ -220,9 +221,11 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 ## 10.2 예측 보정 랩(139) — `InterruptCalibrationLab`
 
-"분명 맞췄는데 강 연출이 안 뜬다" 를 잡으려고, 대쉬 간파 한 번마다 **오너 예측(강/약/대상 없음)·서버 예측·서버 판정·판정 시점 실제 창 상태·사람의 판단(성공이어야 했나)** 을 표본 하나로 모아 CSV 로 남기는 씬이다.
-기록만 한다 — 예측식(`DashInterruptPredictor`)·허용치 칸은 고치지 않는다(데이터를 본 뒤 새 할 일). 계획 원본: 할 일 139 계획서(grill 2026-10-29).
-첫 세션 표본(27개)으로 고친 예측 규칙은 §5 '예측 규칙 보정(할 일 139-2)'.
+> 🔹 **할 일 191 5단계에서 용도가 바뀌었다 — "예측 vs 판정 vs 서버" 기록.** 옛 139 계측 훅(오너·서버 예측·재예측·서버 판정)은 예측기와 함께 삭제됐다.
+> 표본 = 간파 QA 기록 한 줄(예측·오너 판정·서버 결과·어긋난 이유, [interrupt-client-judge.md §7·§8](interrupt-client-judge.md#8-보정-랩-용도-변경-interruptcalibrationlab-5단계)) + 판정 순간 허수아비 창 상태 + 사람의 판단. 씬·질문 창·Y/N/Esc 흐름은 그대로다.
+
+간파 한 번마다 **예측(강/약/대상 없음)·오너 판정·서버 결과·판정 시점 실제 창 상태·사람의 판단(성공이어야 했나)** 을 표본 하나로 모아 CSV 로 남기는 씬이다.
+기록만 한다 — 판정식·허용치 칸은 고치지 않는다(데이터를 본 뒤 새 할 일). 계획 원본: 할 일 139 계획서(grill 2026-10-29) → 할 일 191 PLAN §3.4.
 
 **씬**: `Assets/0.Scenes/Debug/InterruptCalibrationLab.unity` — `DebugInterruptLab` 을 `AssetDatabase.CopyAsset` 으로 복제(새 guid)한 뒤 아래만 바꿨다. **빌드 목록에 없다**(§10.1 과 같이 Dev Boot 가 Play 동안만 넣었다 뺀다).
 
@@ -230,23 +233,22 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 |---|---|
 | `Plane`·`Directional Light`·`CameraSwitcher`·`PlayerDashValidationManager`·`FloatingDamageSpawner` | 그대로 |
 | `TrainingDummy`(`TrainingDummy.prefab`, (0, 0, 5)) + `DebugDummyInterruptRecovery`·**`DebugDummyInterruptWindowMode`** | 허수아비 **하나만** 남겼다(`_2` 삭제, `_1` 을 가운데로). 창 모드 기본 = 무기한, 주기 0.6s/1.5s |
-| `InterruptCalibrationLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle`·`DebugInterruptTuningPanel`·**`InterruptCalibrationCapture`·`InterruptCalibrationQuestionPanel`** | 랩 오브젝트 이름 변경. 캡처·질문 패널의 `windowMode`(+ 패널 `capture`)는 씬에서 명시 연결 |
+| `InterruptCalibrationLab` + `DebugTimeScale`·`DebugZeroCooldown`·`DebugCharacterCycle`·`DebugInterruptTuningPanel`·**`InterruptCalibrationCapture`·`InterruptCalibrationQuestionPanel`·`InterruptJudgeShapeGizmos`** | 랩 오브젝트 이름 변경. 캡처·질문 패널의 `windowMode`(+ 패널 `capture`)는 씬에서 명시 연결. 판정 범위 기즈모(할 일 156)는 아래 '간파 판정 범위 기즈모' |
 
 보스는 원래 없다. 강·약 연출은 부트 `NetworkManager` 의 `InterruptProductionDirector` 경로 그대로 켜져 있다(튜닝 패널 기본 = 오너 암전만, §10.1).
 격리: `DebugInterruptLabIsolationTests` 가 두 랩 씬을 디버그 씬으로 보고(빌드 목록·다른 씬·프리팹에 디버그 컴포넌트 없음), 이 씬의 허수아비 하나·창 모드 연결도 YAML 로 확인한다.
 
 **진입**: 메인 툴바 Dev Boot 씬 드롭다운 → `InterruptCalibrationLab` → Dev Boot ▶ (솔로 호스트. `DevBootSceneCatalog` 가 `Assets/0.Scenes` 아래를 자동으로 찾아 등록 코드 없음). 씬을 직접 열고 Play 하면 동작하지 않는다(§10.1 과 같음).
 
-**화면** — 왼쪽 아래 `간파 예측 보정(139)` 패널(제목 버튼으로 접기, 너비 320), 오른쪽 위는 §10.1 튜닝 패널(겹치지 않는다). 질문 창은 화면 가운데.
+**화면** — 왼쪽 아래 `간파 예측·판정·서버 보정(191)` 패널(제목 버튼으로 접기, 너비 320), 오른쪽 위는 §10.1 튜닝 패널, 왼쪽 위는 판정 범위 기즈모 패널(할 일 156, 아래)(겹치지 않는다). 질문 창은 화면 가운데.
 - 첫 줄: 표본 수 · 건너뜀(Esc) · 짝 실패 버림 / 대기열 · 넘쳐 버림 · 지금 단계.
-- 일치율 4줄(실시간): 오너 예측 ↔ 답 · 서버 예측 ↔ 답 · 서버 결과 ↔ 답 · 오너 ↔ 서버 예측. 강 = true·약 = false, 서버 성공 = true. 대상 없음·값 없음은 분모에서 뺀다.
+- 일치율 4줄(실시간): 예측 ↔ 답 · 오너 판정 ↔ 답 · 서버 결과 ↔ 답 · 예측 ↔ 판정. 강 = true·약 = false, 판정·서버 성공 = true. 대상 없음·값 없음은 분모에서 뺀다.
 - `기록:` 이번 세션 폴더 · `지금 summary 쓰기` 버튼(표본 0 개면 안 씀).
 - `허수아비 창:` `무기한`/`주기` 토글 · `열림`/`닫힘` 길이(슬라이더 0~3s, 0.05 단위, ± 버튼 — 키보드 입력 칸 없음) — Play 중 바로 적용.
-- `예측기 관측 기록 초기화` — 예측기가 쌓은 창 길이 관측(중앙값의 재료, `InterruptWindowReplicaTracker`)을 지운다. 모드·길이를 바꾼 뒤 누르면 지난 모드의 관측이 섞이지 않는다.
 - 패널 위에 마우스가 있는 동안은 플레이어 입력(이동·대시·간파·스킬)을 막는다(`UiInputGateManager`).
 
 **질문 흐름** (`InterruptCalibrationQuestionPanel` + 순수 `InterruptCalibrationQuestionFlow`)
-1. 서버 판정 = 표본 완성 → 질문 대기열.
+1. QA 기록 줄이 닫힘(서버 결과까지 옴 · 신고 안 함 · 응답 없음) = 표본 완성 → 질문 대기열.
 2. 판정 + **0.5초(실시간)** 가 지나고 `GlobalTimeScale` 가 평소(슬로우·히트스톱·실패 복귀 끝, `IsActive = false`)면 시간을 멈추고 묻는다. 평소로 안 돌아와도 판정 + 3초(실시간)면 그냥 묻는다.
    `waitDebugNormalSpeedHold`(기본 끔)를 켜면 §10.1 '성공 후 1배속' 이 끝날 때까지도 기다린다.
 3. 정지 = `Time.timeScale` 기억 → 0(가장 늦은 LateUpdate 에서 덮어씀) + 솔로 호스트면 `NetworkClock.Pause`. 재개 = 기억한 배율로 돌리고 시계 재개, 그 뒤엔 `GlobalTimeScale` 이 평소대로 쓴다.
@@ -260,36 +262,37 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 |---|---|
 | `seq`·`real_time` | 기록 번호(1부터) · 판정 실시간(`realtimeSinceStartup`) |
 | `window_mode`·`window_open_len`·`window_closed_len` | 판정 때 허수아비 창 모드(Unbounded/Periodic)·주기 길이 |
-| `press_age` | 대시 입력 → 우클릭 간격(초) |
-| `cast_time`·`cast_pos_*`·`dash_dir_*`·`dash_speed`·`dash_remaining`·`skill_start_time`·`prep_delay`·`has_target_in_range`·`target_window_open`·`window_open_elapsed`·`window_expected_duration` | 오너 입력 순간 `DashInterruptPredictInput` 필드 그대로(음수 = 예측기 기준 '모름') |
-| `resolve_pos_*`·`target_distance`·`target_angle` | 예상 판정 위치(대시 끝) · 대상 판정 콜라이더 표면까지 수평 거리 · 대시 방향 ↔ 대상 방향 각도(도). 대상 없음이면 가장 가까운 등록 대상으로 잰다 |
-| `predicted_resolve_time`·`predicted_window_remaining` | 예측 판정 시각 · 그때 창 남은 시간 추정 |
-| `owner_forecast`·`owner_reason` | 오너 예측(강/약/대상 없음) · 예측기 Reason — **누른 순간 원래 예측** |
-| `owner_repredicted`·`owner_final_forecast` | 대시 중 재예측(§5 ②, 할 일 139-2)이 약 → 강으로 올렸나 · 오너 최종 예측(없으면 원래와 같다) |
-| `server_forecast` | 서버 승인 시점 예측(시도 슬로우 강/약, 대상 없음 = NoTarget) |
-| `server_repredicted`·`server_final_forecast` | 서버 재예측이 강 시도 슬로우를 다시 걸었나 · 서버 최종 시도 슬로우 |
-| `server_succeeded` | 서버 판정 성공/실패 |
+| QA 열 전부(`qa_seq` … `resolve_z`) | 간파 QA 기록 한 줄 그대로 — 예측·오너 판정·서버 결과·어긋난 이유·판정 시각 등. 열 뜻은 [interrupt-client-judge.md §7](interrupt-client-judge.md#7-qa-기록-d12-5단계) |
+| `target_distance`·`target_angle` | 판정 위치 → 대상 판정 콜라이더 표면까지 수평 거리 · 공격 방향 ↔ 대상 방향 각도(도). 대상 없음이면 가장 가까운 등록 대상으로 잰다 |
 | `actual_window_open`·`actual_open_elapsed`·`actual_remaining` | 판정 시점 실제 허수아비 창(열림 여부 · 열린 뒤 경과 · 실제 남은 시간 — 닫혀 있으면 경과·남은 시간 빈 칸, 무기한이면 남은 시간 빈 칸) |
 | `user_answer` | 사람 답(true = 성공이어야 했음) |
 
-- `summary.txt` — 표본 수, 일치율 4개(+제외 수, 누른 순간 원래 예측 기준), 불일치 유형별 개수(예: 오너 강·답 false / 오너 약·답 true), `[대시 중 재예측(약 → 강)]` 재예측 수(오너·서버)·오너 최종 예측 ↔ 답, 오너 예측 ↔ 답 불일치의 오너 Reason 별 개수.
-- 재예측은 강으로 올린 때만 알린다(`CalibrationOwnerRepredicted`·`CalibrationServerRepredicted`) — 대기 표본에 덧붙고 새 표본을 열지 않는다. 질문 창에는 `→ 재예측 강` 으로 보인다.
+- `summary.txt` — 표본 수, 일치율 4개(+제외 수), 불일치 유형별 개수(예: 예측 강·답 false / 예측 약·답 true), 어긋난 이유(QA `mismatch_reason`)별 개수.
   패널이 꺼질 때(씬 나감·Play 정지 포함)·앱 종료·`지금 summary 쓰기` 버튼에서 (다시) 쓴다.
 
 **짝짓기 규칙** (`InterruptCalibrationPairing`)
-- 오너 요청에 시전 번호가 없어 **대기 표본은 하나**만 둔다. 오너 예측·서버 예측은 들어온 순서와 무관하게 그 표본에 붙고, 서버 판정이 오면 닫혀 질문으로 간다(빠진 쪽 칸은 빈 칸).
-- 같은 쪽(오너 또는 서버) 예측이 또 오면 앞 표본은 판정 누락으로 버리고 새로 연다. 대기 표본 없이 온 판정도 버린다.
-- 대기 표본이 열리고 **3초(게임 시간)** 안에 판정이 안 오면 버린다(판정 전 종료·넉백 등). 버린 수 = 패널 `짝 실패 버림`.
+- **시도 식별 = QA 기록 한 줄**(할 일 191). 예측·판정·서버 결과의 짝짓기는 QA 추적기(`InterruptQaTracker`)가 시전자 id·창 id 로 한다 — 옛 '대기 표본 하나' 규칙은 없앴다.
+- 판정 순간 캡처(`InterruptManager.OwnerJudged`)는 시전자별로 들고 있다가 그 시전자의 기록 줄이 닫히면 붙여 표본을 만든다. 실제 창 상태는 판정 순간 값이다.
+- **판정까지 간 줄만 표본**. 판정 전 종료(끊김·버림·시전 거부)는 버리고 패널 `짝 실패 버림` 으로 센다.
 - 대쉬 간파만 기록한다. 근접 간파는 `InterruptCalibrationCapture.includeMelee`(기본 끔)를 켜면 같은 구조로 들어온다.
 
 **주기 창 규칙** (`DummyInterruptWindowSchedule`, 서버 `deltaTime` = 디버그 배속·슬로우를 따른다)
 - 열림 → 닫힘 반복, 경계 시각은 바뀐 뒤 단계. 열림 0 = 열리지 않음, 닫힘 0 = 계속 열림. 주기로 바꾸면 열림 처음부터, 도중 길이 변경은 지금 단계 경과 유지.
 - **회복 중엔 주기 시계가 멈춘다** — 간파 성공 → 회복(`DebugDummyInterruptRecovery`, 기본 2초, 취약·보라)이 끝나면 **닫힘 단계 처음부터** 다시 시작한다(성공 직후 잘린 열림이 다시 나오지 않게, 관측 창 길이가 열림 길이로 모인다).
 
+**간파 판정 범위 기즈모(할 일 156)** — `InterruptJudgeShapeGizmos`(랩 오브젝트) + 순수 규칙 `InterruptJudgeShapeGizmoRules`
+- **무엇과 같은 값인가**: 근사 도형이 아니라 판정 앵커(`HitboxAnchorShape.TryRead`)를 공격 방향으로 돌려 판정 위치에 놓은 것(`HitboxAnchorShape.PlacedAt` — 매니저 예측·판정의 `InterruptJudgeCalculator.PlaceHitbox` 와 같은 회전·이동). 기즈모는 읽기 전용 진입점 `PlayerInterruptSkillBase.TryGetPlacedJudgeShape(판정 위치, 공격 방향)` 를 지난다. 판정 위치 = 근접은 시전 위치, 대쉬는 예측이 낸 대시 끝(공용 스윕).
+- **화면**: 왼쪽 위 `간파 판정 범위(156)` 패널(제목 버튼으로 접기). 토글 `상시 미리보기`·`시도 잔상`·`Game 뷰에도 그리기`, `잔상` 길이 슬라이더(0.5~10s, 기본 3s), `잔상 지우기`, 색 범례, `마지막 시도:` 한 줄(출처·근접/대쉬·예측 결과·대시 거리). 패널 위에 마우스가 있으면 플레이어 입력을 막는다(질문 패널과 같다).
+- **상시 미리보기** — 이 피어의 로컬 플레이어마다 지금 위치·조준 방향(`PlayerSkillController.CurrentAimDirection` = 근접 간파 요청 방향)에 놓은 형상. 색 = 미리보기 전용 대상 탐색(`FindOwnerViewTarget` — 같은 형상·대상 캐시·복제 창·로컬 선착순 장부, 이벤트 없음. 매니저 예측과는 창 출처가 달라 근사다): **흰색(옅음) = 대상 없음 · 주황 = 대상 있음·창 닫힘 · 하늘색 = 대상 있음·창 열림**. 창 열림 ≠ 강 예측(예측은 준비 시간 뒤 창 남은 시간까지 본다).
+- **시도 잔상** — 예측 이벤트(할 일 191 — 오너 `InterruptManager.OwnerPredicted`, 시전자가 로컬이 아니면 서버 `InterruptManager.ServerAttemptPredicted`)가 오는 그 프레임에 그 예측의 판정 위치·공격 방향으로 형상을 잡아 남긴다. 대쉬면 시전 위치(누른 순간) → 예측 대시 끝 선도. 색 = 예측 결과: **회색 = 대상 없음 · 노랑 = 약 · 빨강 = 강**. 재예측은 없어졌다. 실시간으로 옅어지다 사라지고, 보정 질문 창 정지(timeScale 0) 중에는 줄지 않는다. 최대 12개.
+- **그리기**: Scene 뷰 = `OnDrawGizmos`(+ 라벨), Game 뷰 = 메인 카메라 렌더 뒤 GL 선(깊이 무시 — 바닥·몸에 가려지지 않는다, Game 뷰 Gizmos 버튼 무관). 선분 = `AttackShapeDrawing.CollectAnchorSegments`(상자 모서리 12 · 구 원 3 · 캡슐 양끝 구 + 옆선 4, 특성 랩 앵커 기즈모와 같은 모양). 메시·텍스처 생성 없음.
+- **그리지 않는 것**: 전방위 HUD 강조 사거리(`HasTargetInOmniRange`)는 판정이 아니라 넣지 않았다. 판정 순간 실제 앵커(애니메이션으로 움직인 자리)도 그리지 않는다 — 예측이 보는 '지금 앵커를 돌려 옮긴 것'이 기준이다.
+- **한계**: Game 뷰 GL 선은 에디터 Play 전용(선분 함수가 에디터 전용 `AttackShapeDrawing`). 원격 클라 창에서는 자기 시도(오너 훅)만 잔상으로 남고, 호스트 창에서는 남의 시도도 서버 훅으로 남는다. 형상은 훅이 온 프레임의 앵커·시전자 위치로 잡는다(예측과 같은 프레임이라 같은 값). 테스트 `Editor/InterruptJudgeShapeGizmoTests.cs`.
+
 **알려진 한계**
 - **솔로 호스트만**. 캡처·창 모드·정지가 서버와 오너가 같은 피어라는 전제다(클라 창에서는 서버 판정·실제 창 상태가 안 들어온다).
 - **허수아비 하나** 전제 — 창 모드·실제 창 상태는 연결된(없으면 씬에서 처음 찾은) 허수아비 하나만 본다. 허수아비를 늘리면 다른 허수아비 표본의 창 칸이 틀린다.
-- 무기한 모드에서는 창 추정 길이 = 지난번 기다린 시간이라(§10.1 ⚠️) '약' 이 나오는 것이 예측 규칙대로다 — 증상 재현용. 주기 모드 표본과 섞어 보지 말 것(`window_mode` 열로 나눈다).
+- 무기한 모드 창은 창 시간표에 '길이 모름'으로 올라간다 — 열려 있으면 강이다. 주기 모드 표본과는 `window_mode` 열로 나눠 본다.
 - Esc 는 질문 중에만 이 패널이 쓴다. 부트의 게임 메뉴가 같은 프레임에 Esc 를 받는지는 Play 확인 전이다.
 
 ## 11. 범위 밖
@@ -301,16 +304,19 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 | 파일 | 내용 |
 |---|---|
 | `Assets/1.Scripts/Player/Dash/DashInterruptRules.cs` | 순수 규칙 — 창 판정·입력 결정·서버 승인 창·판정 시점·max·예상 대시 끝 오프셋 |
-| `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs` · `Assets/1.Scripts/Player/Skill/InterruptAttemptPrediction.cs` · `InterruptTargetRegistry.cs` | 할 일 132 — 근접·대쉬 공용 예측기·대상 정면 판정(`InterruptTargetGeometry`)·예측 입력 구성(`AtPress`)·대상 캐시 |
+| `Assets/1.Scripts/Player/InterruptJudge/` | 할 일 191 — `InterruptManager`·`InterruptJudgeCalculator`(예측·판정)·`InterruptClaimServer`(검증)·QA 기록. [interrupt-client-judge.md](interrupt-client-judge.md) |
+| `Assets/1.Scripts/Player/Motor/PlayerDashPath.cs` | 대시 경로 공용 스윕 — 실제 이동(`PlayerMotor`)과 판정이 같은 충돌 검사 |
+| `Assets/1.Scripts/Player/Dash/DashInterruptPrediction.cs` · `Assets/1.Scripts/Player/Skill/InterruptTargetRegistry.cs` | 예측 3상태 enum(`InterruptAttemptForecast`)·대상 정면 판정(`InterruptTargetGeometry`)·대상 캐시. 옛 예측기는 191 에서 삭제 |
 | `Assets/1.Scripts/Player/Dash/DashInterruptLayerFade.cs` | 상체 레이어 가중치 전환·인수인계 정규화 시각 |
 | `Assets/1.Scripts/Player/Dash/PlayerDashData.cs` · `Assets/9.ScriptableObject/Player/PlayerDashData.asset` | SO 칸 3개 |
 | `Assets/1.Scripts/Player/PlayerDashController.cs` | 상체 레이어 시작·인수인계·취소, `PlayDodgeEnd(keepBasePose)`, 창·허용오차 조회 |
 | `Assets/1.Scripts/Player/PlayerStateController.cs` | `PlayerDashState` 창 입력·부착/분리·대시 끝 Skill 전이·강제 종료, `BeginSkillFromDash`·`AttachDashInterrupt`·`ActiveDash` |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillController.cs` | `TryUseDashInterrupt`, RPC 2개 플래그, 승인 분기, `HandleDashInterruptAborted`·`CompleteDashInterruptHandOff`, `PlayerSkillApprovalRules.EvaluateDashInterruptPreconditions`·`PlayerSkillApproval.DashWindow` |
-| `Assets/1.Scripts/Player/Skill/PlayerInterruptSkillBase.cs` | Hit 보류·End 연기·`OnDashHandOff`·시도 예측 오프셋 |
+| `Assets/1.Scripts/Player/Skill/PlayerInterruptSkillBase.cs` | Hit 보류·End 연기·`OnDashHandOff`·판정 Hit 지연(`TryGetJudgeHitDelay`)·서버 시도 슬로우 |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillBase.cs` · `HitboxAnchorShape.cs` | `OverlapHitboxAnchor(results, offset)` · 판정 앵커 형상(읽기·돌리기·옮기기·오버랩) — 판정·시도 예측 공용(할 일 139-3), 테스트 `Assets/1.Scripts/Player/Editor/HitboxAnchorShapeTests.cs` |
 | `Assets/1.Scripts/Player/PlayerInputBuffer.cs` · `PlayerInputReader.cs` | `TryGetRecordedTime` · `TryGetPressTime` |
 | `Assets/4.Animations/Player/{Garen,Assassin,Gunner}/*AnimatorController.controller` · `Garen/GarenUpperBody.mask` | `DashInterruptUpper` 레이어·팔라딘 상체 마스크 |
 | `Assets/0.Scenes/Debug/DebugInterruptLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/` | 디버그 씬(§10.1) — `DebugTimeScale`(+ `Editor/DebugTimeScaleEditor`)·`DebugDummyInterruptRecovery`·`DebugInterruptTuningPanel`(132 §17)·테스트 `Editor/DebugInterruptLabTests.cs`·`Editor/DebugInterruptLabIsolationTests.cs`. 기본 배속은 `Network/SlowMotion/GlobalTimeScale.cs` 의 `BaseScale` |
 | `Assets/0.Scenes/Debug/InterruptCalibrationLab.unity` · `Assets/1.Scripts/Dev/InterruptLab/Calibration/` · `DebugDummyInterruptWindowMode.cs`·`DummyInterruptWindowSchedule.cs` | 예측 보정 랩(§10.2, 할 일 139) — 캡처·짝짓기·질문 창·기록·주기 창. 테스트 `Editor/InterruptCalibration*Tests.cs`·`DummyInterruptWindowScheduleTests.cs`, 메뉴 `Tools/Tests/간파 랩 EditMode 테스트 실행` |
+| `Assets/1.Scripts/Dev/InterruptLab/InterruptJudgeShapeGizmos.cs`·`InterruptJudgeShapeGizmoRules.cs` | 보정 랩 간파 판정 범위 기즈모(§10.2, 할 일 156) — 형상 = `PlayerInterruptSkillBase.TryGetPlacedJudgeShape`, 선분 = `AttackShapeDrawing.CollectAnchorSegments`. 테스트 `Editor/InterruptJudgeShapeGizmoTests.cs` |
 | 테스트 `Assets/1.Scripts/Player/Dash/Tests/EditMode/DashInterruptRulesTests.cs` · `DashInterruptLayerFadeTests.cs` · `Assets/1.Scripts/Player/Editor/PlayerSkillApprovalRulesTests.cs` · `PlayerInputBufferTests.cs` | 창 경계·0=끔·허용오차·판정 시점·입력 결정·승인 사전조건·가중치 전환·버퍼 기록 시각 |

@@ -45,6 +45,7 @@ Gauntlet·Spinner·WallBot 의 공격 슈퍼아머 부여 4곳이 이 값을 본
 - 🔴 몬스터에 기절을 거는 곳은 지금 **팔라딘 Q 밀림·경직**과 **고정 터렛 경직**뿐이다. 평타 경직(Hit 0.4초)은 상태이상을 안 건다 → 평타마다 별이 뜨지 않는다.
 - **중간보스 간파 성공 그로기**는 상태이상이 아니라 FSM 상태(Groggy)라서, Presenter 가 `rank: MidBoss` ∧ `Groggy` 이면 기절 줄을 켠 것으로 본다.
   그 뒤 이어지는 **취약 8초**(`IsMidBossVulnerable`)는 하늘색으로만 보이고 별은 안 띄운다(팀장 10-26 — 별은 실제로 멈춰 있을 때만). 규칙: [monster-aggro-hitreact.md](monster-aggro-hitreact.md) §2.0
+- 🔴 4차(경석 11-02 Play): 그래도 GauntletBot 은 큰 머리에 별이 묻혔다 → 몹별 추가 높이 `MonsterBase.StatusVfxOverheadExtraHeight`(기본 0) 신설, `GauntletBot.stunVfxExtraHeight` = **0.5m**(인스펙터, Play 중 즉시 반영). 다른 몹은 그대로.
 - 크기·높이가 몬스터에 안 맞으면 `Resources/MonsterStatusEffectVfxSet.asset` 의 `offset`·`scale` 만 고치면 된다.
 
 ## 3. 영향 범위

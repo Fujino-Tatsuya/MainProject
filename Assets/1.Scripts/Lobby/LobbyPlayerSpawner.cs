@@ -183,8 +183,15 @@ public sealed class LobbyPlayerSpawner : MonoBehaviour
         }
 
         Debug.Log($"[SceneFlow] {Tag} client {clientId} 캐릭터 교체 {oldName} → {result.Prefab.name} pos={pose.position}");
+        ServerCharacterSwapped?.Invoke(clientId);
         return true;
     }
+
+    /// <summary>
+    /// [서버] 캐릭터 교체로 새 PlayerObject 가 섰다(같은 clientId) — 로비 진행기가 단계 동안의 훈련 보정(체력 하한 등)을 새 플레이어에 다시 건다(할 일 157 §10.2-6).
+    /// 교체 스폰 실패 뒤 스폰 지점 재스폰은 부르지 않는다(그 경로는 주기 갱신이 맞춘다).
+    /// </summary>
+    public static event System.Action<ulong> ServerCharacterSwapped;
 
     /// <summary>[서버] 이 사람 자리(스폰 지점)의 위치 — 추락 복귀와 같은 곳(로비 Alt+2 멈춤 탈출이 쓴다). 자리가 없으면 false.</summary>
     public bool TryGetSpawnPosition(ulong clientId, out Vector3 position)

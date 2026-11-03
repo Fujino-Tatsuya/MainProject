@@ -19,7 +19,7 @@ public sealed class InterruptSharedChannel
         if (darkAdaptation == null || !_settings.Get(InterruptProductionCue.DarkAdaptation))
             return;
 
-        darkAdaptation.Play(false, e.CasterClientId, e.TargetPosition);
+        darkAdaptation.Play(false);
     }
 
     /// <summary>칸이 켜져 있으면 sink 마다 cue 를 튼다. 꺼져 있으면 아무도 부르지 않는다.</summary>

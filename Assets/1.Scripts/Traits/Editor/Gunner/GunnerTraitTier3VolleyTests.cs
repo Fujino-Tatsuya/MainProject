@@ -217,9 +217,10 @@ public class GunnerTraitTier3VolleyTests
         var schedule = new GunnerVolleySchedule();
         var plan = new GunnerEchoPlan();
         schedule.BeginFirstShot(0d, 5, 0.15f);
-        plan.AddOriginalShot(Vector3.zero, Vector3.forward, 10f, 1.2f, 84);
+        plan.AddOriginalShot(84);
+        plan.AddHitTarget(1UL);
         Assert.IsTrue(schedule.TryTakeDue(0.15d, out _));
-        plan.AddOriginalShot(Vector3.zero, Vector3.forward, 10f, 1.2f, 84);
+        plan.AddOriginalShot(84);
 
         // 2발 뒤 사망·강제 중단(OnEnd) — 남은 발 취소.
         Assert.IsTrue(schedule.HasPending);
@@ -308,22 +309,24 @@ public class GunnerTraitTier3VolleyTests
         var schedule = new GunnerVolleySchedule();
         var plan = new GunnerEchoPlan();
         schedule.BeginFirstShot(0d, v.ShotCount, v.IntervalAt(1f));
-        plan.AddOriginalShot(new Vector3(1f, 1f, 0f), Vector3.right, 12f, 1.56f, perShot);
+        plan.AddOriginalShot(perShot);
+        plan.AddHitTarget(5UL);
 
         // 마지막 발 전 정상 종료 이벤트는 스킬이 무시한다(HasPending) — 여기서는 잔류 포격 자격도 없다.
         Assert.IsFalse(plan.TryBuildEcho(schedule.AllShotsFired, SkillEndReason.Completed, echo, out _));
         echo.Counter.Reset();
 
         while (schedule.TryTakeDue(1d, out _))
-            plan.AddOriginalShot(new Vector3(9f, 1f, 9f), Vector3.left, 3f, 9f, perShot);
+        {
+            plan.AddOriginalShot(perShot);
+            plan.AddHitTarget(5UL); // 같은 적을 매 발 맞혀도
+        }
 
         Assert.AreEqual(84, perShot);
         Assert.AreEqual(420, plan.PlannedDamageSum, "5발 예정 단일 대상 피해 합(맞힌 수 무관)");
-        Assert.IsTrue(plan.TryBuildEcho(schedule.AllShotsFired, SkillEndReason.Completed, echo, out GunnerDerivedShot shot));
-        Assert.AreEqual(105, shot.Damage, "420 × 0.25");
-        Assert.AreEqual(Vector3.right, shot.Direction, "첫 발 방향");
-        Assert.AreEqual(12f, shot.Range, "첫 발 최종 충전 사거리");
-        Assert.AreEqual(1.56f, shot.Width, 1e-6f);
+        Assert.AreEqual(1, plan.HitTargets.Count, "시전당 대상 1개 = 폭탄 1개");
+        Assert.IsTrue(plan.TryBuildEcho(schedule.AllShotsFired, SkillEndReason.Completed, echo, out int damage));
+        Assert.AreEqual(105, damage, "420 × 0.25");
     }
 
     [Test]
@@ -339,12 +342,13 @@ public class GunnerTraitTier3VolleyTests
             cast.CommitFirstShot(GunnerHeatTraits.None, 0f);
             var plan = new GunnerEchoPlan();
             for (int i = 0; i < v.ShotCount; i++)
-                plan.AddOriginalShot(Vector3.zero, Vector3.forward, 10f, 1.2f, cast.ShotDamage(dref, v.ShotChargeScale(1f), 1f));
+                plan.AddOriginalShot(cast.ShotDamage(dref, v.ShotChargeScale(1f), 1f));
+            plan.AddHitTarget(1UL);
             echo.Counter.Reset();
-            plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot shot);
+            plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int damage);
 
             SkillTooltipDamage tooltip = GunnerTraitTooltip.DerivedDamage(dref, 1f, 0, 1f, 1f, echo.DamageRatio, v.ShotCount, v.PerShotDamageRatio);
-            Assert.AreEqual(shot.Damage, tooltip.Minimum, "dref " + dref);
+            Assert.AreEqual(damage, tooltip.Minimum, "dref " + dref);
             Assert.AreEqual(1f * v.TotalDamageRatio * echo.DamageRatio, tooltip.MinimumCoefficient, 1e-5f, "계수 = 1.40 × 0.25");
         }
     }

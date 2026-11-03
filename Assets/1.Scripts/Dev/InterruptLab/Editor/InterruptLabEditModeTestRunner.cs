@@ -17,6 +17,8 @@ internal static class InterruptLabEditModeTestRunner
         "^DebugInterruptLabIsolationTests$",
         "^DummyInterruptWindowScheduleTests$",
         "^TrainingDummyInterruptCycleTests$",
+        "^InterruptJudgeShapeGizmoTests$",
+        "^HitboxAnchorShapeTests$",
     };
 
     const string Tag = "[InterruptLabTests]";

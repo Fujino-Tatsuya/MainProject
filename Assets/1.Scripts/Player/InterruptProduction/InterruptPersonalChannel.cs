@@ -17,7 +17,7 @@ public sealed class InterruptPersonalChannel
         if (darkAdaptation == null || !_settings.Get(InterruptProductionCue.DarkAdaptation))
             return;
 
-        darkAdaptation.Play(true, e.CasterClientId, e.TargetPosition);
+        darkAdaptation.Play(true);
     }
 
     /// <summary>A3 — 오너 줌 배율(카메라가 매 프레임 묻는다). 칸이 꺼져 있으면 1. 내 슬로우인지는 카메라가 따로 본다.</summary>

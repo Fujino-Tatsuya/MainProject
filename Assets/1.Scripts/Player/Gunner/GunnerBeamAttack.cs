@@ -179,10 +179,12 @@ public class GunnerBeamAttack : BaseAttack
 
     // ── 관통 판정(거너 Q) ─────────────────────────────────────────────────
 
-    private readonly Collider[] boxHits = new Collider[64];
-    private readonly HashSet<Unit> pierceUnits = new HashSet<Unit>();
-    private readonly HashSet<Hurtbox> pierceHurtboxes = new HashSet<Hurtbox>();
+    private readonly Collider[] areaHits = new Collider[64];
+    private readonly HashSet<UnityEngine.Object> areaSeen = new HashSet<UnityEngine.Object>();
+    private readonly List<AttackShapeHit> shapeHits = new List<AttackShapeHit>();
     private readonly List<Unit> pierceLanded = new List<Unit>();
+    private Func<Collider, UnityEngine.Object> resolvePierceTarget;
+    private Func<Collider, UnityEngine.Object> resolveAlly;
 
     /// <summary>
     /// 직전 <see cref="FirePiercing"/> 에서 <b>실제로 피해가 들어간</b> 유닛들(중복 없음).
@@ -211,12 +213,13 @@ public class GunnerBeamAttack : BaseAttack
     }
 
     /// <summary>
-    /// [서버] 직육면체(시작점→length) 안의 모든 유효 대상에게 1회씩 피해(관통). 적·공격 가능한 오브젝트 모두.
+    /// [서버] 판정 도형(<paramref name="area"/> — 충전·지형 차단·광폭을 바른 복사본, 할 일 153) 안의 모든 유효 대상에게 1회씩 피해(관통).
+    /// 적·공격 가능한 오브젝트 모두. 질의 = <see cref="AttackShapeQuery.Collect"/>(대상 키 = Unit, 없으면 Hurtbox — 자기 자신·시체 제외).
     /// </summary>
     /// <returns>맞힌 대상 수(Unit 이 아닌 오브젝트 포함)</returns>
     /// <param name="flags">원래 공격 = Original, 파생 공격(잔류 포격) = Derived(적중 사건·적중 시 추가 피해 없음)</param>
     /// <param name="hook">대상별 수정(집중 포화·충격 레이저). 없으면 null</param>
-    public int FirePiercing(Vector3 origin, Vector3 direction, float length, float width, float height,
+    public int FirePiercing(AttackShapeSet area, in AttackShapePose pose,
                             LayerMask hittable, int damageSnapshot, AttackType type,
                             AttackHitPattern pattern, bool triggersOnHit,
                             TraitHitFlags flags = TraitHitFlags.Original, TargetHitHook hook = null)
@@ -228,48 +231,26 @@ public class GunnerBeamAttack : BaseAttack
         SetAttackType(type);
         SetHitPattern(pattern);
         SetDamageSnapshot(damageSnapshot);
-        pierceUnits.Clear();
-        pierceHurtboxes.Clear();
         pierceLanded.Clear();
 
-        int count = OverlapBeamBox(origin, direction, length, width, height, hittable, QueryTriggerInteraction.Collide);
+        resolvePierceTarget ??= ResolvePierceTarget;
+        CollectArea(area, pose, hittable, resolvePierceTarget);
         int resolved = 0;
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < shapeHits.Count; i++)
         {
-            Collider col = boxHits[i];
-            if (col == null || (owner != null && col.transform.IsChildOf(owner.transform)))
-                continue;
+            Collider col = shapeHits[i].Collider;
+            Hurtbox hurtbox = shapeHits[i].Target as Hurtbox;
+            Unit target = shapeHits[i].Target as Unit;
+            // 키가 Unit 이어도 히트박스로 맞았으면 히트박스 경로(맞은 콜라이더 문맥 포함) — 예전과 같은 수신 경로.
+            if (hurtbox == null && TryGetHurtbox(col, out Hurtbox unitHurtbox))
+                hurtbox = unitHurtbox;
 
-            if (TryGetHurtbox(col, out Hurtbox hurtbox))
-            {
-                hurtbox.TryGetOwner(out Unit ownerUnit);
-                if (ownerUnit == owner || pierceHurtboxes.Contains(hurtbox) ||
-                    (ownerUnit != null && (pierceUnits.Contains(ownerUnit) || ownerUnit.CurrentHealth <= 0)))
-                    continue;
-
-                if (!ResolveTarget(hurtbox, col, ownerUnit, damageSnapshot, triggersOnHit, flags, hook))
-                    continue;
-
-                resolved++;
-                pierceHurtboxes.Add(hurtbox);
-                if (ownerUnit != null && pierceUnits.Add(ownerUnit))
-                    pierceLanded.Add(ownerUnit);
-                continue;
-            }
-
-            if (!IsInTargetLayer(col))
-                continue;
-
-            Unit target = col.GetComponentInParent<Unit>();
-            if (target == null || target == owner || target.CurrentHealth <= 0 || pierceUnits.Contains(target))
-                continue;
-
-            if (!ResolveTarget(null, null, target, damageSnapshot, triggersOnHit, flags, hook))
+            if (!ResolveTarget(hurtbox, hurtbox != null ? col : null, target, damageSnapshot, triggersOnHit, flags, hook))
                 continue;
 
             resolved++;
-            pierceUnits.Add(target);
-            pierceLanded.Add(target);
+            if (target != null)
+                pierceLanded.Add(target);
         }
 
         if (owner != null && pierceLanded.Count > 0 && (flags & TraitHitFlags.CanProcTraits) != 0)
@@ -278,26 +259,73 @@ public class GunnerBeamAttack : BaseAttack
         return resolved;
     }
 
-    /// <summary>같은 직육면체 안의 살아 있는 아군 플레이어(시전자 제외)를 모은다 — 보호막 대상.</summary>
-    public void CollectAllies(Vector3 origin, Vector3 direction, float length, float width, float height,
-                              LayerMask allyLayers, List<Player> result)
+    /// <summary>
+    /// [서버] 정해진 유닛 하나에게 1회(잔류 포격 에너지 폭탄, 할 일 149) — 도형 질의 없이 그 대상만. 자기 자신·시체는 거른다.
+    /// 수신 경로·대상별 수정(hook)·파생 플래그는 <see cref="FirePiercing"/> 과 같다.
+    /// </summary>
+    public bool HitUnit(Unit target, int damageSnapshot, AttackType type, AttackHitPattern pattern,
+                        TraitHitFlags flags = TraitHitFlags.Original, TargetHitHook hook = null)
     {
-        result.Clear();
-        int count = OverlapBeamBox(origin, direction, length, width, height, allyLayers, QueryTriggerInteraction.Collide);
-        for (int i = 0; i < count; i++)
-        {
-            Player ally = boxHits[i] != null ? boxHits[i].GetComponentInParent<Player>() : null;
-            if (ally == null || ally == owner || ally.CurrentHealth <= 0 || result.Contains(ally))
-                continue;
-            result.Add(ally);
-        }
+        if (!IsServer || target == null || target == owner || target.CurrentHealth <= 0)
+            return false;
+
+        SetAttackType(type);
+        SetHitPattern(pattern);
+        SetDamageSnapshot(damageSnapshot);
+        if (!ResolveTarget(null, null, target, damageSnapshot, false, flags, hook))
+            return false;
+
+        landedBuffer.Clear();
+        landedBuffer.Add(target);
+        if ((flags & TraitHitFlags.CanProcTraits) != 0)
+            RaiseLanded(false);
+        return true;
     }
 
-    // 상자 기하는 SkillHitVolume.Beam 한 곳 — 오너의 스킬 범위 외곽선(할 일 58)도 같은 값으로 맞을 적을 고른다.
-    private int OverlapBeamBox(Vector3 origin, Vector3 direction, float length, float width, float height,
-                               LayerMask mask, QueryTriggerInteraction triggers)
+    /// <summary>같은 판정 도형 안의 살아 있는 아군 플레이어(시전자 제외)를 모은다 — 보호막 대상(아군별 1회).</summary>
+    public void CollectAllies(AttackShapeSet area, in AttackShapePose pose, LayerMask allyLayers, List<Player> result)
     {
-        return SkillHitVolume.Beam(origin, direction, length, width, height, mask).Overlap(boxHits, mask, triggers);
+        result.Clear();
+        resolveAlly ??= ResolveAlly;
+        CollectArea(area, pose, allyLayers, resolveAlly);
+        for (int i = 0; i < shapeHits.Count; i++)
+            result.Add((Player)shapeHits[i].Target);
+    }
+
+    // 도형 질의 한 번 — 같은 대상은 이 질의 안에서 1회. 질의마다 새로 센다.
+    private void CollectArea(AttackShapeSet area, in AttackShapePose pose, LayerMask mask, Func<Collider, UnityEngine.Object> resolve)
+    {
+        areaSeen.Clear();
+        shapeHits.Clear();
+        AttackShapeQuery.Collect(area, pose, mask, QueryTriggerInteraction.Collide, areaHits, resolve, areaSeen, shapeHits);
+    }
+
+    // 1회 피격 키 — 히트박스면 그 주인 Unit(없으면 히트박스 자체), 아니면 부모 Unit. 자기 몸·시체·대상 아님은 null(예전 FirePiercing 과 같은 거름).
+    private UnityEngine.Object ResolvePierceTarget(Collider col)
+    {
+        if (owner != null && col.transform.IsChildOf(owner.transform))
+            return null;
+
+        if (TryGetHurtbox(col, out Hurtbox hurtbox))
+        {
+            hurtbox.TryGetOwner(out Unit hurtboxOwner);
+            if (hurtboxOwner == null)
+                return hurtbox;
+            return hurtboxOwner == owner || hurtboxOwner.CurrentHealth <= 0 ? null : hurtboxOwner;
+        }
+
+        if (!IsInTargetLayer(col))
+            return null;
+
+        Unit unit = col.GetComponentInParent<Unit>();
+        return unit == null || unit == owner || unit.CurrentHealth <= 0 ? null : unit;
+    }
+
+    // 보호막 키 — 살아 있는 다른 플레이어만.
+    private UnityEngine.Object ResolveAlly(Collider col)
+    {
+        Player ally = col.GetComponentInParent<Player>();
+        return ally == null || ally == owner || ally.CurrentHealth <= 0 ? null : ally;
     }
 
     private bool TryHit(Collider col, bool triggersOnHit, TraitHitFlags flags, TargetHitHook hook)

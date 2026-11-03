@@ -34,11 +34,11 @@ public sealed class LobbyTrainingSparringArena : MonoBehaviour
 
     private void Awake() => ApplyMarkers(false);
 
-    // 전 피어 — 진행기 복제 단계를 읽는다(늦게 붙은 클라도 같음). 진행기가 없으면(디스폰·판 끝) Lobby 로 읽혀 꺼진다.
+    // 전 피어 — 진행기 복제 스냅샷의 현재 행을 읽는다(늦게 붙은 클라도 같음). 진행기가 없으면(디스폰·판 끝) None 으로 읽혀 꺼진다.
     private void Update()
     {
         var director = LobbyTrainingDirector.Active;
-        var visible = LobbySparringLink.WallMarkerVisible(director != null ? director.Stage : LobbyTrainingStage.Lobby);
+        var visible = LobbySparringLink.WallMarkerVisible(director != null ? director.CurrentActivity : LobbyTutorialActivity.None);
         if (visible != _markersVisible)
             ApplyMarkers(visible);
     }

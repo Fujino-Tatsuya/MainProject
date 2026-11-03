@@ -18,25 +18,13 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 {
-    // 반격 자세 전환 창구(PlayerShieldVfx.ServerPlayGuardCounterPose). 예전 임시 반격 충격파(ServerInterruptWave)는
+    // 반격 자세 전환 창구(PaladinSkillView.ServerPlayGuardCounterPose). 예전 임시 반격 충격파(ServerInterruptWave)는
     // 2026-10-26 민경 연출(handoff-paladin-guardian-will-vfx)로 바꾸면서 뺐다 — 우클릭 충격파는 그대로다.
     [Header("연출")]
-    [Tooltip("반격 자세 전환 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 반격 자세로 못 넘어가 안전망이 E 를 끝낸다")]
-    [SerializeField] private PlayerShieldVfx shieldVfx;
-
     // 상태 클립별 연출(점화·결계·해제·막아냄·오라·기 모으기·반격)은 Garen_E_* 클립 이벤트가 전 피어에서 켜고 끈다.
-    // 여기는 방패 문양 발광과, 클립 Stop 이벤트가 안 오는 끊김(경직·사망·안전망)의 루프 회수만 한다. 비워두면 그 부분만 빠진다.
-    [Tooltip("방패 메쉬 문양 발광(머티리얼 페이드) — 우클릭과 같은 방패의 MaterialFadeEffect 를 물린다. E 내내 켠다")]
-    [SerializeField] private MaterialFadeEffect shieldGlow;
-
-    [Tooltip("방어 결계 루프(소켓 이펙트, Id 'GuardianBarrier') — 'VFX/GuardianWill/Barrier'. 끊겼을 때 끄기만 한다")]
-    [SerializeField] private EffectSocketPlayer barrierLoop;
-
-    [Tooltip("반격 금빛 오라 루프(소켓 이펙트, Id 'GuardianAura') — 'VFX/GuardianWill/Aura'. 끊겼을 때 끄기만 한다")]
-    [SerializeField] private EffectSocketPlayer auraLoop;
-
-    [Tooltip("반격 전 검 기 모으기 루프(소켓 이펙트, Id 'GuardianCharge') — 'VFX/GuardianWill/Charge'. 끊겼을 때 끄기만 한다")]
-    [SerializeField] private EffectSocketPlayer chargeLoop;
+    // 방패 문양 발광과, 클립 Stop 이벤트가 안 오는 끊김(경직·사망·안전망)의 루프 회수는 창구(BeginGuardVfx/EndGuardVfx)가 한다.
+    [Tooltip("반격 자세 전환·E 연출 창구. 플레이어 루트의 PaladinSkillView 를 물린다.\n비워두면 반격 자세로 못 넘어가 안전망이 E 를 끝낸다")]
+    [SerializeField] private PaladinSkillView skillView;
 
     // 방어 성공 시 CrossFade 할 반격 자세 상태(PlayerAnimatorController Base Layer). 시작 상태(SubSkillGuard)는 데이터의
     // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
@@ -78,8 +66,12 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // 키가 Object 인 이유는 FirstMeleeMainSkill.tickTargets 와 같다(Unit 이 아닌 IAttackReceiver 는 Hurtbox 가 키).
     private readonly HashSet<Object> counterTargets = new HashSet<Object>();
     private readonly List<Unit> counterLandedUnits = new List<Unit>();
+    private readonly List<AttackShapeHit> counterHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolveCounterTarget;
     // 수호의 파동(할 일 126) — 반격 부채꼴 밖 반경 안 적에게 피해 없는 밀치기만 걸 때 대상 1회(여러 콜라이더).
-    private readonly HashSet<Unit> traitPushTargets = new HashSet<Unit>();
+    private readonly HashSet<Object> traitPushTargets = new HashSet<Object>();
+    private readonly List<AttackShapeHit> traitPushHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolvePushTarget;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
 
@@ -119,7 +111,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     {
         base.Initialize(owner, controller);
         inputReader = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
-        // PlayerSkillController·PlayerShieldVfx 와 같은 해석(자식의 첫 Animator).
+        // PlayerSkillController·PaladinSkillView 와 같은 해석(자식의 첫 Animator).
         animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
     }
 
@@ -130,23 +122,23 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     /// [서버] E 재입력. 지금 서버 애니메이터가 방어중(SubSkillGuardIdle, 전이 중 아님)이면 해제 상태(SubSkillGuardEnd)로 전 피어 CrossFade 한다.
     /// 원격 오너가 방어중으로 보고 눌렀어도 서버가 아직 준비 중이거나 이미 해제로 넘어가는 중이면 조용히 무시한다(서버 판정이 기준).
     /// 받는 즉시 방어 창이 닫힌다(할 일 95 — 모델이 Releasing 으로 넘어가 Custom1 은 무시). E 종료는 해제 클립 End 가 한다 — 타이머를 따로 두지 않는다.
-    /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PlayerShieldVfx.ServerPlayGuardCounterPose"/>).
+    /// 전 피어로 퍼뜨리는 이유는 반격 자세와 같다(오너 권한 NetworkAnimator — <see cref="PaladinSkillView.ServerPlayGuardCounterPose"/>).
     /// </summary>
     public override void OnSkillRePressed()
     {
         if (!IsServerPeer)
             return;
 
-        if (shieldVfx == null)
+        if (skillView == null)
         {
-            Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 E 재입력 해제를 전 피어로 보낼 수 없습니다. 무시합니다.", this);
+            Debug.LogWarning("[Skill] 수호자의 의지 — skillView 가 비어 있어 E 재입력 해제를 전 피어로 보낼 수 없습니다. 무시합니다.", this);
             return;
         }
 
         if (!model.TryRequestRelease(IsAnimatorInGuardHold()))
             return;
 
-        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
+        skillView.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
         Edit.Log("[Skill] 수호자의 의지 — E 재입력: 방어중 → 해제", this);
     }
 
@@ -200,14 +192,14 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             model.OnReleaseEntered();
 
         FirstMeleeSubSkillData data = SubSkillData;
-        if (data == null || shieldVfx == null || !model.HoldMode)
+        if (data == null || skillView == null || !model.HoldMode)
             return;
 
         GuardHoldRelease release = model.TickHold(IsAnimatorInGuardHold(), Time.time, data.GuardHoldMaxDuration);
         if (release == GuardHoldRelease.None)
             return;
 
-        shieldVfx.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
+        skillView.ServerPlayGuardCounterPose(GuardEndStateHash, CounterCrossFadeSeconds);
         Edit.Log(release == GuardHoldRelease.KeyReleased
             ? "[Skill] 수호자의 의지 — 홀드: E 뗌 → 해제"
             : $"[Skill] 수호자의 의지 — 홀드: 최대 유지 {data.GuardHoldMaxDuration:0.##}s → 해제", this);
@@ -258,9 +250,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     public override void OnClientPlay(Vector3 direction)
     {
         // 방어 자세 애니(SubSkillGuard)는 컨트롤러가 시작 상태로 전 피어에서 재생한다. 반격 자세는 방어 성공 때
-        // PlayerShieldVfx.ServerPlayGuardCounterPose 가 전 피어로 퍼뜨린다. 단계별 연출은 클립 이벤트 몫 — 여기는 방패 발광만.
-        shieldGlow?.FadeIn();
-        // PlayerShieldVfx.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
+        // PaladinSkillView.ServerPlayGuardCounterPose 가 전 피어로 퍼뜨린다. 단계별 연출은 클립 이벤트 몫 — 여기는 방패 발광만.
+        skillView?.BeginGuardVfx();
+        // PaladinSkillView.ServerPlayGuardCounterPose 가, 반격 연출은 ServerInterruptWave 가 전 피어로 퍼뜨린다.
 
         // 조작 방식은 오너 설정이다 — 오너(호스트·오프라인 포함)만 정하고, 홀드면 방어중 자동 해제 전이를 막는다.
         ownerHoldMode = owner != null && owner.IsInputSource && UserInputConfig.GuardSkillHold;
@@ -339,10 +331,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         // 🔴 종료 사유를 가리지 않는다 — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).
         //    소켓 safetyTimeout 은 이 경로가 실패했을 때의 그물이다.
-        shieldGlow?.FadeOut();
-        barrierLoop?.Stop();
-        auraLoop?.Stop();
-        chargeLoop?.Stop();
+        skillView?.EndGuardVfx();
         // 홀드 방식 정리 — 다음 시전(탭 방식일 수 있다)의 방어중 자동 해제를 막지 않게 오너·서버에서 내린다(관찰자는 동기로 따라온다).
         if (ownerHoldMode || IsServerPeer)
             SetGuardHoldParam(false);
@@ -376,7 +365,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     }
 
     /// <summary>
-    /// [서버] 반격 1회 — 고정 방어 방향 기준 전방 counterAngle·counterRange 안의 대상에게 대상당 1회 피해.
+    /// [서버] 반격 1회 — 판정 도형(데이터 hitArea, 기준점 = <paramref name="origin"/> + 고정 방어 방향, 할 일 153) 안의 대상에게 대상당 1회 피해.
     /// 흐름은 <see cref="FirstMeleeMainSkill"/>.OnHoldTick 과 같다. 방어 성공과 별개라
     /// 막은 공격자가 범위 밖이면 피해가 없다. 반격 연출은 반격 클립 Hit 이벤트(GuardianCounter)가 전 피어에서 낸다.
     /// </summary>
@@ -387,31 +376,27 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             return;
 
         forward.y = 0f;
+        AttackShapeSet counterArea = CounterArea(data, origin, forward, out AttackShapePose pose);
 
-        // 수호의 파동(할 일 126) — 반경 0 = 특성 없음. 반격(전방 부채꼴)보다 넓은 원이라 질의는 둘 중 큰 반경으로 한 번 한다(반격 판정은 부채꼴 검사가 그대로 거른다).
-        float pushRadius = TraitPushRadius();
-        int hitCount = Physics.OverlapSphereNonAlloc(
-            origin, Mathf.Max(data.CounterRange, pushRadius), counterHitResults, data.HittableLayers, QueryTriggerInteraction.Collide);
+        // 수호의 파동(할 일 126) — 반경 0 = 특성 없음.
+        AttackShapeSet pushArea = TraitPushArea();
         counterTargets.Clear();
+        counterHits.Clear();
         counterLandedUnits.Clear();
+        resolveCounterTarget ??= ResolveShapeTarget;
+        if (counterArea != null)
+            AttackShapeQuery.Collect(counterArea, pose, data.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
+                resolveCounterTarget, counterTargets, counterHits);
         bool onHitBonusTaken = false;
+        // 특성 연출 사건(할 일 145) — 반격 순간 1번(밀린 대상이 없어도). 원 도형·포즈 = 아래 밀치기 판정과 같다.
+        if (pushArea != null)
+            TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinGuardWave, TraitFxKind.Activated, origin, pose.Forward, origin, pose);
 
-        for (int i = 0; i < hitCount; i++)
+        for (int i = 0; i < counterHits.Count; i++)
         {
-            Collider hit = counterHitResults[i];
-            if (hit == null)
-                continue;
-
-            if (!FirstMeleeGuardRules.IsInsideCounterSector(
-                    origin, forward, hit.ClosestPoint(origin), hit.bounds.center, data.CounterRange, data.CounterAngle))
-                continue;
-
+            Collider hit = counterHits[i].Collider;
+            Object target = counterHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-
-            // Unit 이 아닌 대상(파괴 가능한 상자 등)은 hurtbox 를 키로 쓴다 — FirstMeleeMainSkill 과 같은 이유.
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !counterTargets.Add(target))
-                continue;
 
             int resolvedDamage = damageSnapshot;
             // 시체(공격 거절)는 첫 대상 자리를 차지하지 않는다 — 뒤의 살아 있는 첫 Unit 이 보너스를 받는다.
@@ -428,8 +413,13 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
                 isInterruptAttack: false,
                 hitPattern: DamageHitPattern);
             // 수호의 파동 — 반격 피해 판정 1건에 밀치기를 같이 싣는다(피해는 그대로, 추가 피해 없음).
-            if (IsTraitPushCandidate(unit, hit, origin, pushRadius))
+            // 같은 콜라이더가 밀치기 원에도 겹치면.
+            bool pushed = false;
+            if (IsTraitPushCandidate(unit) && pushArea != null && AttackShapeQuery.Overlaps(pushArea, pose, hit))
+            {
                 ApplyTraitPushServer(unit, origin, ref attackInfo);
+                pushed = attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f;
+            }
             AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
 
             bool resolved = hurtbox != null
@@ -439,6 +429,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             if (!resolved)
                 continue;
 
+            if (pushed)
+                SendGuardWaveHit(origin, hit, unit);
+
             if (unit != null)
                 counterLandedUnits.Add(unit);
 
@@ -447,22 +440,51 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, counterLandedUnits, this);
 
-        if (pushRadius > 0f)
-            ResolveTraitPushOnlyServer(origin, hitCount, pushRadius);
+        if (pushArea != null)
+            ResolveTraitPushOnlyServer(origin, pose, pushArea);
+    }
+
+    /// <summary>
+    /// 반격 판정 포즈(할 일 153) = 반격 순간 시전자 발밑(<paramref name="origin"/>) + 고정 방어 방향(hitArea CasterAim).
+    /// 수호의 파동 원도 같은 포즈를 쓴다. 서버 판정과 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapePose CounterPose(AttackShapeSet area, Vector3 origin, Vector3 guardForward) =>
+        area != null
+            ? area.ResolvePose(origin, guardForward, origin, guardForward)
+            : new AttackShapePose(origin, guardForward);
+
+    /// <summary>
+    /// 반격 판정 영역(데이터 hitArea)·기준 포즈(<see cref="CounterPose"/>) — 수호의 파동 원(<see cref="TraitPushArea"/>)도 이 포즈를 쓴다.
+    /// 서버 반격 판정(<see cref="ResolveCounterHit"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet CounterArea(FirstMeleeSubSkillData data, Vector3 origin, Vector3 guardForward, out AttackShapePose pose)
+    {
+        AttackShapeSet area = data != null ? data.HitArea : null;
+        pose = CounterPose(area, origin, guardForward);
+        return area;
     }
 
     // ── 수호의 파동(PAL_4_E_PUSH, 할 일 126) ──
 
-    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다.
-    private float TraitPushRadius() =>
+    /// <summary>수호의 파동 판정 영역(<see cref="PaladinTraitRules.EPushArea"/> — 반경 = 특성 수치). 특성 없으면 null. 판정·특성 랩 기즈모 공용.</summary>
+    public AttackShapeSet TraitPushArea() => PaladinTraitRules.EPushArea(TraitPushRadius());
+
+    // 반경(m) = 스킬 수치 효과(⑩). 특성이 없으면 0 — 이 E 에는 특성 CC 가 없다. 특성 랩 공격 범위 기즈모(할 일 152)도 이 값을 읽는다.
+    public float TraitPushRadius() =>
         owner != null && owner.TraitModifiers != null
             ? owner.TraitModifiers.ResolveSkillValue(PaladinTraitValues.EPushRadiusKey, 0f)
             : 0f;
 
     // 특성 밀치기 대상 = 살아 있는 몬스터만(아군·기믹/환경 오브젝트는 특성 CC 없음 — 명세 §4). 보스 상태는 묻지 않는다 — 수신측 거부 규칙에 맡긴다.
-    private bool IsTraitPushCandidate(Unit unit, Collider hit, Vector3 origin, float pushRadius) =>
-        pushRadius > 0f && unit is MonsterBase && unit != owner && unit.CurrentHealth > 0 &&
-        PaladinTraitRules.InsidePushRadius(origin, hit.ClosestPoint(origin), pushRadius);
+    private bool IsTraitPushCandidate(Unit unit) =>
+        unit is MonsterBase && unit != owner && unit.CurrentHealth > 0;
+
+    // 밀치기만 받는 대상의 1회 키 — 특성 밀치기 대상(살아 있는 몬스터)만, 나머지는 null(대상 아님).
+    private Object ResolvePushTarget(Collider hit)
+    {
+        Unit unit = ResolveHitUnit(hit, out _);
+        return IsTraitPushCandidate(unit) ? unit : null;
+    }
 
     /// <summary>
     /// [서버] 특성 밀치기 연결 한 곳 — 공용 수정자(<see cref="PlayerTraitEffects.ModifyOutgoingAttackServer"/>)가 시전당 대상별 1회로 밀치기를 싣는다.
@@ -480,18 +502,18 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     /// [서버] 반격 부채꼴 밖(또는 반격 거리 밖)이지만 밀치기 반경 안인 적 — 피해 없는 밀치기만 건다(반격 피해·패시브·적중 사건 없음).
     /// 이미 반격 피해와 함께 밀린 대상은 공용 수정자가 이 시전에서 다시 싣지 않아(시전당 대상별 1회) 여기서 건너뛴다.
     /// </summary>
-    private void ResolveTraitPushOnlyServer(Vector3 origin, int hitCount, float pushRadius)
+    private void ResolveTraitPushOnlyServer(Vector3 origin, in AttackShapePose pose, AttackShapeSet pushArea)
     {
         traitPushTargets.Clear();
-        for (int i = 0; i < hitCount; i++)
-        {
-            Collider hit = counterHitResults[i];
-            if (hit == null)
-                continue;
+        traitPushHits.Clear();
+        resolvePushTarget ??= ResolvePushTarget;
+        AttackShapeQuery.Collect(pushArea, pose, SubSkillData.HittableLayers, QueryTriggerInteraction.Collide, counterHitResults,
+            resolvePushTarget, traitPushTargets, traitPushHits);
 
+        for (int i = 0; i < traitPushHits.Count; i++)
+        {
+            Collider hit = traitPushHits[i].Collider;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            if (!IsTraitPushCandidate(unit, hit, origin, pushRadius) || !traitPushTargets.Add(unit))
-                continue;
 
             AttackInfo pushInfo = new AttackInfo(0, DamageAttackType, isInterruptAttack: false, hitPattern: DamageHitPattern);
             ApplyTraitPushServer(unit, origin, ref pushInfo);
@@ -502,9 +524,20 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             bool resolved = hurtbox != null
                 ? hurtbox.ReceiveAttack(pushInfo, hitContext)
                 : unit.ReceiveAttack(pushInfo, hitContext);
-            if (resolved)
-                Edit.Log($"[Skill] 수호의 파동 — {unit.name} 밀치기(피해 없음)", this);
+            if (!resolved)
+                continue;
+            Edit.Log($"[Skill] 수호의 파동 — {unit.name} 밀치기(피해 없음)", this);
+            SendGuardWaveHit(origin, hit, unit);
         }
+    }
+
+    // [서버] 특성 연출 사건(할 일 145) — 수호의 파동 밀치기가 실린 대상마다 1번(반격 피해와 함께 밀렸든 밀치기만 받았든). 방향 = 밀치는 방향.
+    private void SendGuardWaveHit(Vector3 origin, Collider hit, Unit unit)
+    {
+        Vector3 direction = unit.transform.position - origin;
+        direction.y = 0f;
+        TraitSkillFxNetwork.ServerSend(owner, TraitFxTrait.PaladinGuardWave, TraitFxKind.Hit, hit.bounds.center,
+            direction.sqrMagnitude > 1e-6f ? direction.normalized : owner.transform.forward, hit.bounds.center, target: unit);
     }
 
     // ── IPlayerIncomingAttackGuard (서버) ──
@@ -527,10 +560,10 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         {
             // 반격 판정·종료는 반격 클립의 Hit·End 가 정한다 — 전 피어에서 그 상태로 넘긴다(오너 권한 NetworkAnimator).
             // 연출 창구가 비어 있으면 Hit·End 가 안 와 안전망(maxActiveDuration)이 끝내고, OnEnd 가 보장 반격을 낸다.
-            if (shieldVfx != null)
-                shieldVfx.ServerPlayGuardCounterPose(CounterStateHash, CounterCrossFadeSeconds);
+            if (skillView != null)
+                skillView.ServerPlayGuardCounterPose(CounterStateHash, CounterCrossFadeSeconds);
             else
-                Debug.LogWarning("[Skill] 수호자의 의지 — shieldVfx 가 비어 있어 반격 자세로 넘어가지 못합니다. 안전망이 E 를 끝냅니다.", this);
+                Debug.LogWarning("[Skill] 수호자의 의지 — skillView 가 비어 있어 반격 자세로 넘어가지 못합니다. 안전망이 E 를 끝냅니다.", this);
 
             Vector3 toAttacker = attackerPos - playerPos;
             toAttacker.y = 0f;

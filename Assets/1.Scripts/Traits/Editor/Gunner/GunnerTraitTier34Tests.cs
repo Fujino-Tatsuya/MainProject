@@ -252,6 +252,7 @@ public class GunnerTraitTier34Tests
         TraitDerivedAttack extra = Derived("GUN_4_EXTRA_BASIC", GunnerTraitRules.BasicExtraDerivedKey);
         Assert.IsTrue(extra.Matches(GunnerTraitRules.BasicAttackKey));
         Assert.IsFalse(extra.Matches(GunnerTraitRules.QAttackKey), "Q 는 세지 않는다");
+        Assert.IsTrue(extra.HitArea.IsEmpty, "판정 도형 없음 = 원래 기본 공격 레이저 재사용(할 일 153)");
 
         var fired = new List<bool>();
         int damage = 0;
@@ -341,9 +342,44 @@ public class GunnerTraitTier34Tests
         TraitDerivedAttack echo = Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey);
         var plan = new GunnerEchoPlan();
         if (fired)
-            plan.AddOriginalShot(Vector3.up, Vector3.forward, 12f, 1.56f, 300);
+        {
+            plan.AddOriginalShot(300);
+            plan.AddHitTarget(11UL);
+        }
 
         Assert.AreEqual(expected, plan.TryBuildEcho(fired, reason, echo, out _));
+    }
+
+    [Test]
+    public void Echo_NoHitTarget_NoBomb_CounterUntouched()
+    {
+        // 아무도 안 맞혔으면 폭탄 없음(정상 종료여도).
+        TraitDerivedAttack echo = Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey);
+        var plan = new GunnerEchoPlan();
+        plan.AddOriginalShot(300);
+        Assert.IsFalse(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out _));
+
+        plan.AddHitTarget(5UL);
+        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int damage), "빈 시전이 카운터를 쓰지 않았다");
+        Assert.AreEqual(75, damage);
+    }
+
+    [Test]
+    public void Echo_SameTargetHitManyTimes_OneEntryPerCast()
+    {
+        // 집속 연사로 같은 적을 5번 맞혀도 시전당 대상 1개.
+        var plan = new GunnerEchoPlan();
+        for (int shot = 0; shot < 5; shot++)
+        {
+            plan.AddOriginalShot(84);
+            plan.AddHitTarget(7UL);
+            if (shot >= 2)
+                plan.AddHitTarget(9UL); // 3번째 발부터 들어온 적
+        }
+
+        CollectionAssert.AreEqual(new[] { 7UL, 9UL }, plan.HitTargets.ToArray());
+        plan.Reset();
+        Assert.AreEqual(0, plan.HitTargets.Count, "새 시전은 새 묶음");
     }
 
     [Test]
@@ -355,60 +391,162 @@ public class GunnerTraitTier34Tests
         Assert.AreEqual(0.25f, echo.DamageRatio, 1e-6f);
         Assert.AreEqual(0.15f, echo.Delay, 1e-6f);
         Assert.AreEqual(1, echo.Counter.Required, "매 시전 1회");
+        Assert.IsTrue(echo.HitArea.IsEmpty, "판정 도형 없음 — 폭탄은 붙은 대상 하나만 맞는다(할 일 149)");
     }
 
     [Test]
-    public void Echo_UsesPlannedSingleTargetSum_AndFirstShotGeometry()
+    public void Echo_UsesPlannedSingleTargetSum_PerBomb()
     {
         TraitDerivedAttack echo = Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey);
         var plan = new GunnerEchoPlan();
-        // 단발 Q — 원래 발 300(맞힌 적이 0명이든 3명이든 같은 값).
-        plan.AddOriginalShot(new Vector3(1f, 1f, 0f), Vector3.right, 12f, 1.56f, 300);
-        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot shot));
-        Assert.AreEqual(75, shot.Damage, "300 × 0.25 — 실제 총 피해·맞힌 수 아님");
-        Assert.AreEqual(new Vector3(1f, 1f, 0f), shot.Origin);
-        Assert.AreEqual(Vector3.right, shot.Direction);
-        Assert.AreEqual(12f, shot.Range, "최종 충전 사거리(지형 차단 전) — 지형은 발사 때 다시 잰다");
-        Assert.AreEqual(1.56f, shot.Width, 1e-6f, "광폭 반영 폭");
+        // 단발 Q — 원래 발 300. 3명을 맞혀도 폭탄마다 같은 값(나누지 않는다).
+        plan.AddOriginalShot(300);
+        plan.AddHitTarget(1UL);
+        plan.AddHitTarget(2UL);
+        plan.AddHitTarget(3UL);
+        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int damage));
+        Assert.AreEqual(75, damage, "300 × 0.25 — 실제 총 피해·맞힌 수 아님");
     }
 
     [Test]
-    public void Echo_BundleOfOriginalShots_SumsPlanned_KeepsFirstShot_FiresOnce()
+    public void Echo_BundleOfOriginalShots_SumsPlanned_FiresOnce()
     {
-        // 4/4 집속 연사 대비 — 같은 시전 원래 발 5발(84씩)은 합계 420 × 0.25 = 105, 1회.
+        // 집속 연사 — 같은 시전 원래 발 5발(84씩)은 합계 420 × 0.25 = 105, 1회.
         TraitDerivedAttack echo = Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey);
         var plan = new GunnerEchoPlan();
-        plan.AddOriginalShot(Vector3.zero, Vector3.forward, 10f, 1.2f, 84);
-        for (int i = 1; i < 5; i++)
-            plan.AddOriginalShot(Vector3.one * i, Vector3.left, 99f, 9f, 84);
+        for (int i = 0; i < 5; i++)
+            plan.AddOriginalShot(84);
+        plan.AddHitTarget(4UL);
 
         Assert.AreEqual(420, plan.PlannedDamageSum);
-        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot shot));
-        Assert.AreEqual(105, shot.Damage);
-        Assert.AreEqual(Vector3.forward, shot.Direction, "첫 발 방향");
-        Assert.AreEqual(10f, shot.Range);
+        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int damage));
+        Assert.AreEqual(105, damage);
     }
 
     [Test]
-    public void Echo_NewCast_DoesNotOverwritePendingEcho()
+    public void Echo_NewCast_DoesNotOverwritePendingBombs()
     {
         TraitDerivedAttack echo = Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey);
         var plan = new GunnerEchoPlan();
-        var queue = new GunnerDelayedShots();
+        var bombs = new GunnerEchoBombs();
+        var planted = new List<GunnerEchoBomb>();
 
-        plan.AddOriginalShot(Vector3.zero, Vector3.forward, 10f, 1.2f, 200);
-        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot first));
-        queue.Schedule(1.0, echo.Delay, first);
+        plan.AddOriginalShot(200);
+        plan.AddHitTarget(7UL);
+        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int first));
+        bombs.Plant(1.0, echo.Delay, first, plan.HitTargets, planted);
 
-        plan.Reset(); // 새 시전
-        plan.AddOriginalShot(Vector3.zero, Vector3.back, 6f, 1.2f, 400);
-        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot second));
-        queue.Schedule(1.05, echo.Delay, second);
+        plan.Reset(); // 새 시전 — 같은 대상에 하나 더
+        plan.AddOriginalShot(400);
+        plan.AddHitTarget(7UL);
+        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int second));
+        bombs.Plant(1.05, echo.Delay, second, plan.HitTargets, planted);
+        Assert.AreEqual(2, bombs.Count, "같은 대상이어도 이전 시전 폭탄을 덮어쓰지 않는다");
 
-        var due = new List<GunnerDerivedShot>();
-        queue.CollectDue(2.0, due);
-        CollectionAssert.AreEqual(new[] { 50, 100 }, due.Select(s => s.Damage).ToArray());
-        Assert.AreEqual(Vector3.forward, due[0].Direction, "이전 예약은 이전 시전 스냅샷 그대로");
+        var due = new List<GunnerEchoBomb>();
+        var fizzled = new List<GunnerEchoBomb>();
+        bombs.Collect(2.0, _ => true, due, fizzled);
+        CollectionAssert.AreEqual(new[] { 50, 100 }, due.Select(b => b.Damage).ToArray(), "이전 폭탄은 이전 시전 피해 그대로");
+        Assert.AreNotEqual(due[0].Id, due[1].Id, "폭탄 번호로 구분");
+    }
+
+    // ── 잔류 포격 에너지 폭탄 수명(할 일 149) ───────────────────────────
+
+    [Test]
+    public void EchoBombs_OnePerTarget_DetonateAfterDelay_OnlyThatTarget()
+    {
+        var bombs = new GunnerEchoBombs();
+        var planted = new List<GunnerEchoBomb>();
+        var due = new List<GunnerEchoBomb>();
+        var fizzled = new List<GunnerEchoBomb>();
+
+        bombs.Plant(10.0, 0.15f, 75, new[] { 3UL, 4UL, 3UL }, planted);
+        CollectionAssert.AreEqual(new[] { 3UL, 4UL }, planted.Select(b => b.TargetId).ToArray(), "대상마다 1개");
+
+        bombs.Collect(10.1, _ => true, due, fizzled);
+        Assert.AreEqual(0, due.Count, "지연 전엔 안 터진다");
+        Assert.AreEqual(2, bombs.Count);
+
+        bombs.Collect(10.16, _ => true, due, fizzled);
+        CollectionAssert.AreEqual(new[] { 3UL, 4UL }, due.Select(b => b.TargetId).ToArray(), "폭탄마다 붙은 대상 하나");
+        Assert.IsTrue(due.All(b => b.Damage == 75));
+        Assert.AreEqual(0, fizzled.Count);
+        Assert.AreEqual(0, bombs.Count, "터지면 사라진다");
+    }
+
+    [Test]
+    public void EchoBombs_TargetDiesFirst_FizzlesImmediately_NoDamageTarget()
+    {
+        var bombs = new GunnerEchoBombs();
+        var planted = new List<GunnerEchoBomb>();
+        var due = new List<GunnerEchoBomb>();
+        var fizzled = new List<GunnerEchoBomb>();
+        bombs.Plant(0.0, 0.15f, 75, new[] { 1UL, 2UL }, planted);
+
+        // 0.05초에 대상 1 사망·디스폰 — 시각 전이어도 바로 그 자리 빈 폭발, 대상 2 는 그대로.
+        bombs.Collect(0.05, id => id != 1UL, due, fizzled);
+        Assert.AreEqual(0, due.Count);
+        CollectionAssert.AreEqual(new[] { 1UL }, fizzled.Select(b => b.TargetId).ToArray());
+        Assert.AreEqual(1, bombs.Count);
+
+        bombs.Collect(0.2, _ => true, due, fizzled);
+        CollectionAssert.AreEqual(new[] { 2UL }, due.Select(b => b.TargetId).ToArray());
+        Assert.AreEqual(0, fizzled.Count);
+    }
+
+    [Test]
+    public void EchoBombs_Clear_CancelsWithoutDetonation()
+    {
+        // 사수 사망·씬 종료 — 터지지 않고 사라진다.
+        var bombs = new GunnerEchoBombs();
+        var planted = new List<GunnerEchoBomb>();
+        var due = new List<GunnerEchoBomb>();
+        var fizzled = new List<GunnerEchoBomb>();
+        bombs.Plant(0.0, 0.15f, 75, new[] { 1UL }, planted);
+        bombs.Clear();
+        bombs.Collect(99.0, _ => false, due, fizzled);
+        Assert.AreEqual(0, due.Count);
+        Assert.AreEqual(0, fizzled.Count);
+    }
+
+    [Test]
+    public void EchoBombVisuals_UnknownTarget_NoOrb_RemoveReportsNoPosition()
+    {
+        // 네트워크 없는 EditMode — 대상 못 찾음 = 구체를 띄우지 않고, 빠질 때 폭발 위치도 없다.
+        var prefab = new GameObject("EchoBombVfxPrefab");
+        try
+        {
+            var visuals = new GunnerEchoBombVisuals(prefab);
+            visuals.Add(1, 123UL);
+            visuals.Add(1, 123UL);
+            Assert.AreEqual(1, visuals.Count, "같은 폭탄 번호는 한 번");
+            Assert.IsFalse(visuals.Remove(1, out _));
+            Assert.AreEqual(0, visuals.Count);
+
+            visuals.Sync(new[] { new GunnerEchoBombState(2, 5UL), new GunnerEchoBombState(3, 6UL) });
+            Assert.AreEqual(2, visuals.Count, "늦은 합류 — 목록 그대로");
+            visuals.Sync(new[] { new GunnerEchoBombState(3, 6UL) });
+            Assert.AreEqual(1, visuals.Count, "목록에서 빠진 건 조용히 지운다");
+            visuals.Clear();
+            Assert.AreEqual(0, visuals.Count);
+        }
+        finally
+        {
+            Object.DestroyImmediate(prefab);
+        }
+    }
+
+    [Test]
+    public void EchoBombVisuals_ShowDelayAndOffset_PureRules()
+    {
+        // 대상 Unit 은 스폰된 NetworkObject 가 필요해 EditMode 에서 못 만든다 — Follow 가 쓰는 순수 규칙만 본다.
+        Assert.IsTrue(GunnerEchoBombVisuals.IsShowTime(1f, 1f), "지연 0 = 붙는 그 프레임에 보인다");
+        Assert.IsFalse(GunnerEchoBombVisuals.IsShowTime(1.09f, 1.1f), "지연 전에는 구체 없음");
+        Assert.IsTrue(GunnerEchoBombVisuals.IsShowTime(1.2f, 1.1f));
+
+        var body = new Vector3(1f, 2f, 3f);
+        Assert.AreEqual(body, GunnerEchoBombVisuals.OrbPoint(body, Vector3.zero), "기본 오프셋 0 = 몸 점 그대로");
+        Assert.AreEqual(new Vector3(1f, 2.5f, 2.8f), GunnerEchoBombVisuals.OrbPoint(body, new Vector3(0f, 0.5f, -0.2f)), "월드 오프셋을 더한다");
     }
 
     [Test]
@@ -419,10 +557,11 @@ public class GunnerTraitTier34Tests
         foreach (int planned in new[] { 1, 99, 300, 517 })
         {
             var plan = new GunnerEchoPlan();
-            plan.AddOriginalShot(Vector3.zero, Vector3.forward, 10f, 1.2f, planned);
-            plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out GunnerDerivedShot shot);
+            plan.AddOriginalShot(planned);
+            plan.AddHitTarget(1UL);
+            plan.TryBuildEcho(true, SkillEndReason.Completed, echo, out int damage);
             SkillTooltipDamage tooltip = GunnerTraitTooltip.DerivedDamage(planned, 1f, 0, 1f, 1f, echo.DamageRatio);
-            Assert.AreEqual(tooltip.Minimum, shot.Damage, "planned " + planned);
+            Assert.AreEqual(tooltip.Minimum, damage, "planned " + planned);
         }
     }
 

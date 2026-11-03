@@ -17,7 +17,7 @@ MonoBehaviour:
   category: "\uD328\uC2DC\uBE0C \uAC15\uD654"
   description: "\uD328\uC2DC\uBE0C\uC758 \uCCB4\uB825 <style=heal>\uD68C\uBCF5</style>\uB7C9\uC774
     {healIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 70624957c70255b9bf86bf89fb4e032d, type: 3}
   effects:
   - rid: 7237886673742725264
   references:

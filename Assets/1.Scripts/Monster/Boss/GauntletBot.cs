@@ -21,7 +21,7 @@ using UnityEngine;
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
 [DataTableSheet("MidBoss", Order = 0)]
-public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor
+public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor, IInterruptClaimTarget
 {
     // 할 일 134 — 취약 밖(공격 밖 평상 포함) 상시 슈퍼아머 = 밀치기·기절·뇌진탕 거부, 취약 = 허용(BossCrowdControlRules).
     bool IMonsterStateSuperArmor.StateSuperArmor => BossCrowdControlRules.MidBossStateSuperArmor(Rank == MonsterRank.MidBoss, IsMidBossVulnerable);
@@ -95,6 +95,13 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
     [Tooltip("좌/우 펀치의 판정·예고를 몸 기준 옆으로 미는 거리(m). 왼손 = 왼쪽, 오른손 = 오른쪽.\n" +
              "23호 훅과 같은 비율(폭 4.1m 에 ±1.07m ≈ 26%) — 판정 박스 폭 3.6m 기준 0.95m. 0 = 정면 가운데.")]
     [DataTableIgnore] float sideLateralOffset = 0.95f;
+
+    [SerializeField, Min(0f)]
+    [Tooltip("기절 별(머리 위 상태이상 이펙트)을 공용 높이보다 더 올리는 값(m). 큰 머리에 별이 묻혀서(경석 11-02 Play) 건틀렛봇만 올린다.\n" +
+             "Play 중 바꾸면 바로 반영된다.")]
+    [DataTableIgnore] float stunVfxExtraHeight = 0.5f;
+
+    public override float StatusVfxOverheadExtraHeight => stunVfxExtraHeight;
 
     [Header("애니메이션 — CrossFade 대상 상태명(컨트롤러 상태명과 일치해야 함)")]
     [SerializeField]
@@ -238,6 +245,7 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
         base.TakeDamage(attackInfo);
 
         if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
+        if (InterruptManager.ServerVerifiesClaims) return;   // 세션 중 성공 = 신고 승인(IInterruptClaimTarget, 할 일 191)
         if (!Counter.TryConsumeInterrupt())
         {
             Edit.Log($"[Gauntlet] 인터럽트 적중 — 창 밖이라 무효(공격 {_currentAttack}, 상태 {State})", this);
@@ -249,6 +257,22 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
+
+    // ─── 간파 신고 승인(할 일 191) — 창이 이미 닫혔어도(조기 닫힘 + 허용 오차) 효과를 준다(D7) ───
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) =>
+        IsServer && State != MonsterState.Dead && Counter != null;
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster)
+    {
+        if (!IsServer || Counter == null) return;
+        Edit.Log("[Gauntlet] 카운터 성공(신고 승인) — 스매시 취소, 그로기", this);
+        Counter.TryConsumeInterrupt();   // 열려 있으면 소비(닫힘 알림), 닫혔으면 그대로
+        _interruptSuccessCount++;
+        CounterSucceeded();
+    }
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) =>
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, casterClientId);
 
     // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
     int _interruptSuccessCount;   // 누적만 한다 — 값 자체가 아니라 타격 전후 비교용
@@ -403,6 +427,10 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
     // 어퍼컷(Punch03) 히트 훅 — airborne CC는 은희의 Unit 상태이상 인터페이스 통합 후 연결.
     // TODO: 어퍼컷 airborne CC — Unit CC 통합 후
     protected virtual void OnUppercutHit() { }
+
+    // 펀치 클립의 바람 루프(Wind_L/Wind_R) — 취약 중 Q 밀림·휴면으로 펀치가 끊기면 짝 StopEffect 가 안 온다(경석 10-30).
+    // Attack 을 벗어나는 순간 MonsterBase 가 각 피어에서 끊기는 클립의 StartEffect 루프를 끈다.
+    protected override bool StopClipLoopsOnAttackExit => true;
 
     // Attack 상태 애니는 PlayAttackAnimClientRpc가 CrossFade로 직접 담당하므로 base의 기본
     // attackTrigger 발동을 건너뛴다. 그 외 상태(Hit/Groggy/Return/Dead)는 base 매핑 유지.

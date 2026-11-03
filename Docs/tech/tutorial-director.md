@@ -3,7 +3,7 @@
 > **🟪 할 일 107 (2026-10-27) — 맵씬 튜토리얼 정리.** 교육은 로비 훈련([lobby-training.md](lobby-training.md))이 맡고, 맵씬(`4.MapScene`)은 **메인 스테이지**다.
 > - **빠진 것 → Legacy(코드 보관, 런타임 연결 끊음)**: 존1 체크리스트(`TutorialZone1Flow/Model`·허수아비 `TutorialZone1Dummies`)·존2 안내(`TutorialZone2Flow/Model`)·존3 스피너 연습(`TutorialZone3Flow/Guide/Rules`·`SpinnerPractice` 전부·`SpinnerBot_Tutorial.prefab` 네트워크 등록 해제)·복도1 쿨 초기화(`TutorialCorridor1CooldownFlow`)·존4 교육(`TutorialZone4EducationFlow/Guide/Display` — 장치 설명·첫 패널·패널 n/4·중간보스 간파 리마인드·강조).
 >   위치: `Assets/1.Scripts/Map/Tutorial/Legacy/`(+`Editor/`) · `Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/`. `RuntimeInitializeOnLoadMethod` 부착을 지웠으니 맵씬에서 돌지 않는다. 디렉터의 존1 오너 보고 API(`ReportLocalCheck`·`ReportLocalMoveDistance`)도 지웠다.
-> - **대신 도는 것**: `MapSceneZoneFlow`(최소 진행 — 할 일 86 PLAN `_lane-artifacts/common/86-lobby-training/PLAN-86-lobby-training.md` §3.7 "G1·G5 검사 제거, 구역은 전투·클리어 조건만") — 활성 즉시 **G1** → Corridor1 · 존2 첫 진입 → 4초 뒤 기상(G3 = 전멸) · G4 + 존3 첫 진입 → 핵심(스피너봇) 기상 · Zone3Fight · **G5** 요청(G6 = 처치). 존 목표 줄·존 자막은 없다(복도 "다음 구역으로"가 남으면 지운다).
+> - **대신 도는 것**: `MapSceneZoneFlow`(최소 진행 — 할 일 86 PLAN `_lane-artifacts/common/86-lobby-training/PLAN-86-lobby-training.md` §3.7 "G1·G5 검사 제거, 구역은 전투·클리어 조건만") — **G1** = 1구역 도착 무전(`TUT_MAIN_Z01_ENTER`)이 끝난 뒤(11-02 — 무전 길이 = 호스트 캡슐 조각 수 × `MainRadioLines` 시간, 못 재면 무전 시작 15초 뒤) → Corridor1 · 존2 첫 진입 → 4초 뒤 기상(G3 = 전멸) · G4 + 존3 첫 진입 → 핵심(스피너봇) 기상 · Zone3Fight · **G5** 요청(G6 = 처치). 존 목표 줄·존 자막은 없다(복도 "다음 구역으로"가 남으면 지운다).
 > - **남은 것 → 이름만 MapScene…**: 코드 `Assets/1.Scripts/Map/MapScene/`(+`Flow/`·`Editor/`), 프리팹 `Assets/2.Prefabs/Managers/MapSceneDirector.prefab`(GUID·`GlobalObjectIdHash` 그대로), 씬 오브젝트 `MapSceneDirector`·`MapSceneSafePoints`, 연출 데이터 `Assets/Resources/MapScene/Zone4IntroCinematic.asset`.
 >   존4 = `MapSceneBossApproachGuide`(서버 — 설정 자막→G8·기상·다리·클리어/보스방/만료/패드/23호 팁) + `MapSceneBossApproachView`(모든 피어 — 보스방 목표·미니맵 강조·도착 정리). **특성 라운드를 여는 곳은 `MapSceneTraitCorridorFlow` 하나**(이름만 바뀜).
 >   이름 대응표 전체: 커밋 메시지·`_lane-artifacts/MainProject-Worktree2/107/rename-map.txt`. 메뉴 `Tools/Tutorial/Debug/*` → `Tools/MapScene/Debug/*`, `Tools/Map/Authoring/Tutorial/*` → `Tools/Map/Authoring/MapScene/*`, 테스트 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`.
@@ -115,18 +115,26 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 ## 7. 배리어 (S3)
 > 코드: `MapSceneBarrierRules`(순수 — 매핑·모양·진입 가능·추락 후보) · `MapSceneBarriers`(런타임, 모든 피어) · `PlayerSafePointTracker.ReturnPointFilter`(훅).
-> 테스트: `MapSceneBarrierRulesTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/MapScene/5. Preview Barriers`(열린 씬, 저장 안 됨) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
+> 테스트: `MapSceneBarrierRulesTests`·`MapGateLaserViewTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/MapScene/5. Preview Barriers`(열린 씬, 저장 안 됨 — 레이저 시각 포함) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
 
 **8개 = 복도 n 입구(앞 존 쪽)·출구(다음 존 쪽)**: 복도1 G1/G2 · 복도2 G3/G4 · 복도3 G6/G7 · 복도4 G9/G10. G5·G8·G11 은 배리어 없음.
 - 모양 = §6 복도 사각형의 양 끝에서 **복도 안쪽으로** 두께 0.4m(존 사각형을 침범하지 않음), 가로 = 복도 너비 + 양옆 0.3m(복도 벽 안으로 파고듦), 높이 3m.
   2026-10-11 프리팹 점검: 8개 모두 양옆 벽 안쪽 면 ±1.38m, 벽 바깥 면 ±2.63m(배리어 반폭 2.3m — 벽 밖으로 안 나옴).
 - 어디에: Play 중에만 `MapSceneStageMarker.Start` 가 StageTutorial 루트에 `MapSceneBarriers` 를 붙이고, 그것이 루트 아래 `MapSceneBarriers/Barrier_G*` 를 만든다.
-  🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼 참조 한 줄뿐.
+  🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼·레이저 프리팹 참조 두 줄뿐.
+- **시각 = 레이저 게이트(할 일 160, 2026-10-30)**: 마커 칸 `gateLaserPrefab` = `2.Prefabs/Environment/MapScene/MapGateLaser.prefab`(`MapGateLaserView`, 비네트워크, 콜라이더 없음).
+  `MapSceneBarriers.CreateGateLaser` 가 큐브의 **렌더러만 끄고** 레이저를 큐브의 형제(`MapSceneBarriers/Laser_G*`)로 만들어 `Fit(폭, 높이, 진행축)` 한다. 큐브의 Barrier 콜라이더(크기·위치·레이어)·`MonsterBlock_G*` 카브는 그대로.
+  - 프리팹 = 루트 `MapGateLaserView` + `Visual/Posts`(`50.Art/…/Lasers/Env_laser.fbx` — **메시 하나에 양 끝 발사대 둘**이 들어 있다) + `Visual/Beams/Beam`(`Env_laser_lay.fbx` 템플릿, 코드가 줄 수만큼 복제).
+    이펙트 담당은 `Visual` 안만 바꾸고 뷰의 칸 두 개(발사대·빔 템플릿)만 다시 연결하면 된다. 조각 루트는 뷰 축(로컬 X = 폭)과 90° 단위로만 돌릴 것.
+  - 맞춤 = 메시 bounds 로 잰다(FBX 축·피벗 하드코딩 없음): 발사대·빔의 긴 축 = 폭, 발사대는 바닥에 세움(기본 = FBX 높이 그대로 `keepPostHeight`), 빔 줄 수 = (높이 − 위아래 여유) ÷ 간격 + 1, 상한 칸(연출 전용 인스펙터 칸).
+  - 폭 = **벽 사이 통로 폭** — 배리어 가로(복도 너비 + 양옆 0.3m)는 벽 속으로 파고들어 그대로 쓰면 발사대가 벽에 묻힌다. 게이트 가운데(바닥 + 1m)에서 Wall 레이어 레이캐스트로 양옆을 재고, 못 잡으면 배리어 가로 그대로. 지금 8곳 = 2.76m.
+  - 머티리얼 = `3.Materials/Environment/MapScene/MA_MapGateLaser.mat`(셰이더 `50.Art/MapGen/MapObj/material/lay.shadergraph` 재사용 — 텍스처 `ray_basecolor` 가 빨강, 발광 ×4.82). 발사대는 FBX 기본 머티리얼.
+  - 칸이 비면 예전 반투명 큐브(`barrierMaterial`)로 폴백 + 경고 한 줄. 개인 뒤 배리어(`BackBarrier_G*`)도 같은 프리팹(`BackLaser_G*`, 카브 없음).
 
 **언제 · 어떻게 여나**
 - 디렉터가 튜토리얼을 켠 것(`IsTutorialActive`)이 그 피어에서 처음 보일 때 만든다(`StateChanged`). 튜토리얼이 아니면 만들지 않는다.
-- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 콜라이더·카브를 **즉시** 끄고
-  0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만).
+- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 플레이어 콜라이더와 레이저 빔을 **즉시** 끈다
+  (연출 없음, 발사대는 장식으로 남음 — 늦은 클라·이미 열림과 같은 결과, `MapSceneBarriers.OpenInstant`). 큐브 폴백일 때만 0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만). 몬스터 카브는 열려도 끄지 않는다(아래 '막기 — 몬스터').
 
 **막기**
 - 플레이어: **Barrier 레이어**(19 — 할 일 32 로 Wall 에서 분리, [wall-concept.md](wall-concept.md)) 비트리거 BoxCollider. 플레이어 모터 스윕 마스크(`PlayerGameRuleData.obstacleMask` = Default|Ground|Wall|Enemy|Env|Barrier)가 본다.
@@ -135,6 +143,11 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   스윕을 안 타는 것 = 순간이동(`TeleportAuthoritative` — 스폰·추락 복구·보스방 이동)과 23호 잡기/밀기(`PlayerRestrainedState` — 보스방 전용).
   Barrier 는 거너 평타·차지 레이저 차단 레이어에도 있어(할 일 32 에서 추가) 배리어 너머로는 거너 빔이 막힌다. 부활·리스폰 점유 검사(`MapSceneDeathRules`·`PartyWipeRespawner`)도 Wall|Barrier 를 본다.
 - 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Barrier 는 NavMesh 베이크 수집(Default·Ground·Wall)에 안 들어가 다리 재베이크에 섞이지 않는다.
+  **복도는 늘 몬스터 출입 금지(할 일 148)** — 카브는 배리어 큐브와 따로 둔 형제 `MapSceneBarriers/MonsterBlock_G*` 이고 게이트가 열려도 **끄지 않는다**(서버 NavMesh 에만 의미 — 몬스터 이동 권한이 서버).
+  복도 8개 문 모두 끝까지 구멍이 남아 몬스터는 복도로 길을 못 찾고 문 앞에서 멈춘다. 이미 복도 안에 있던 몬스터는 그대로 둔다(쫓아내지 않음 — 복도 안 섬에 갇힌다).
+  넉백·특성 밀치기·Q 견인도 막힌다 — 몬스터 강제 이동 두 경로가 모두 NavMesh 위로만 민다: `MonsterBase.HandleKnockback`(틱마다 `NavMesh.SamplePosition` 0.5m 로 메시 위 점에 고정, 끝 Warp 는 시작 자리에서 `NavMesh.Raycast` 로 같은 섬 확인)·`LinearKnockback`(`NavMesh.Raycast` 로 메시 끝에서 멈춤).
+  플레이어는 NavMesh 를 안 쓰므로(모터 스윕) 영향 없다. 보스방(G10 너머)과 이어진 복도4 출구도 같은 규칙.
+  테스트: `MapSceneBarrierMonsterBlockTests`(큐브를 꺼도 카브가 남고 배리어 자리를 덮는다).
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `MapSceneBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백(존1)은 원래 거르지 않았다 —
   C2 부터는 그 사람의 뒤 배리어 너머면 대체 지점을 쓴다(아래 '뒤 배리어 예외').
@@ -367,13 +380,16 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G11)`(보스방 도착 — `MapSceneDeathRulesModel.IsLifeChargedAt(mask)`, 단계 기준, 위치 무관).
   G11 전(존1~복도4·패드 대기·타이머 만료 강제 이동 중 — **G8 타이머 시작 뒤 포함**)은 목숨 수와 무관하게 Soul(훅), 부활 시 차감 없음.
   G11 뒤는 기존 규칙(공용 목숨 0 → PermanentDead → 전멸이면 PartyWipeWatcher — 공용 0 의 갇힌 Soul 도 탈락으로 센다, party-lives-respawn.md §2). 10-12 이전 기준은 G8 이었다 — G8 은 타이머 시작·존4 기상 용도로만 남는다.
-  G11 은 도착과 같은 순간 열리고 사망 규칙도 도착·Finished 로 끝나므로, 실제로 튜토리얼 규칙 아래 차감이 일어나는 경로는 없다(G11 뒤 사망 = 일반 규칙).
+  **보스방 도착(또는 Finished) 뒤 사망 = 3초 뒤 그 자리에서 자동 부활 + 무적 2초 + 공용 목숨 1개 차감**(2026-11-02, [PLAN-auto-revive.md](../../PLAN-auto-revive.md) — `MapSceneDeathRulesModel.RecordBossRoomDeath`).
+  키 입력 없음(F10 은 디버그로 그대로). 목숨 0 이면 사망 목적지가 PermanentDead(관전)라 부활하지 않는다 → 전원이면 전멸 리스폰(party-lives-respawn.md §3).
+  이전엔 도착 뒤 자동 부활이 없어 F10 없이는 못 살아났고, 목숨이 남은 채 전원 Soul 이면 전멸 판정도 안 나는 정지 상태였다.
+  '그 자리' 와 '즉시' 는 분리돼 있다(`Pending.InPlace`·`Immediate`) — 보스방 기록은 그 자리지만 3초 대기를 지킨다. 추락 사망은 몸이 먼저 보스방 모서리로 옮겨져(§12) 거기서 부활.
 - 부활 지점 = **지금 단계 구간**(디렉터 `Step` 의 구간 — 열린 배리어로 들어갈 수 있는 가장 앞 구간을 넘지 않음, 아래 S12 항목)(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
   1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
   안전한 곳이 없으면 몬스터에서 가장 먼 후보, 후보가 없으면 그 자리.
 - 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시'(Soul 이 되는 대로). 이동 중 사망도 같다.
   부활 자리 = 카운트다운이 아직 켜져 있으면 **보스 진입 고정 지점**(§12 — `MapSceneSafePoints.TryResolveFixedPoint(BossEnter)`, 할 일 80 2026-10-22), 지점이 없거나
-  카운트다운이 끝난 뒤(엘리베이터 연출 잠금 보류 → 도착 뒤)면 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
+  카운트다운이 끝난 뒤(엘리베이터 연출 잠금 보류 → 도착 뒤)면 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 위 보스방 규칙(3초 뒤 그 자리·1개 차감).
 - 연출 잠금(`PlayerEncounterLock`) 중이면 보류 + 경고 1회, 풀리면 다음 프레임 부활(사망 연출 해소도 잠금 해제 뒤 진행).
 - 추락 생존 복구는 그대로. 추락 사망은 기존대로 안전지점에 Soul 로 옮겨진 뒤 같은 규칙으로 부활.
 - '지금 단계 구간'(부활 지점의 기준 구간) = **디렉터 `Step` 의 구간**(S12 — `MapSceneRevivePointRules.StepArea`·`ResolveStageArea(step, mask)`).

@@ -31,6 +31,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 
     private IPlayerState currentState;
     private PlayerStateContext context;
+    private PlayerLifeCycleController lifeCycle;
 
     // 연출 잠금(Cinematic) 중에는 상태 전이 자체를 막는다. SetState 경로(대시/넉백/그랩)도 함께 차단한다.
     private bool cinematicLocked;
@@ -58,6 +59,8 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         StatusEffectController statusEffects = GetComponent<StatusEffectController>();
         if (statusEffects == null)
             Debug.LogError("[Player] StatusEffectController가 프리팹에 부착되어 있지 않습니다.", this);
+
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
 
         context = new PlayerStateContext(
             this,
@@ -310,10 +313,29 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         return true;
     }
 
+    /// <summary>
+    /// 사망(생명주기 Alive 아님)이면 강제 이동(넉백·구속)을 받지 않는다(할 일 183). FSM 은 사망해도 Dead 로 가지 않는다.
+    /// 서버 승인과 오너 적용이 둘 다 이 게이트를 지난다 — 사망 연출 진입 때 진행 중 이동은 <see cref="PlayerLifeInputPolicy"/> 의
+    /// Idle 전이가 끊고(넉백·대시·구속 Exit), 그 뒤 늦게 도착한 넉백·구속 RPC 는 여기서 버려 시체가 다시 움직이지 않는다.
+    /// </summary>
+    private bool RejectsForcedMotion =>
+        CurrentState == PlayerActionState.Dead ||
+        !PlayerLifeActionRules.AcceptsForcedMotion(
+            lifeCycle != null, lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive);
+
+    /// <summary>
+    /// 사망(생명주기 Alive 아님)이면 기본 공격 상태에 들어가지 않는다(할 일 186). 서버 시작 승인(StartServer)과
+    /// 오너·관찰자의 StartRpc 적용이 둘 다 <see cref="CanEnter"/> 에서 이 게이트를 지난다 — 사망 연출 진입 때
+    /// <see cref="PlayerLifeInputPolicy"/> 가 Idle 로 끊은 뒤 늦게 승인된 시작이 시체를 다시 Attack 에 넣지 않는다.
+    /// </summary>
+    private bool AcceptsAttackEntry =>
+        PlayerLifeActionRules.AcceptsAttackEntry(
+            lifeCycle != null, lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive);
+
     // 슈퍼아머 거부는 Unit.Knockback 공통 진입점에서 처리 — 여기서는 사망·연출 잠금만 거부한다
     public bool BeginKnockback(Vector3 direction, float strength)
     {
-        if (CurrentState == PlayerActionState.Dead || cinematicLocked)
+        if (RejectsForcedMotion || cinematicLocked)
             return false;
 
         SetState(new PlayerKnockbackState(context, direction, strength));
@@ -488,9 +510,11 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         return nextState switch
         {
             // 준비 자세에서 연사로 넘어가는 것은 Idle/Move 조건과 무관하다(이미 승인된 같은 공격의 다음 단계).
-            PlayerActionState.Attack => (CanAttack || CurrentState == PlayerActionState.AttackReady) &&
+            PlayerActionState.Attack => AcceptsAttackEntry &&
+                                        (CanAttack || CurrentState == PlayerActionState.AttackReady) &&
                                         context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
-            PlayerActionState.AttackReady => CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
+            PlayerActionState.AttackReady => AcceptsAttackEntry &&
+                                             CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
             PlayerActionState.Focus => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Interrupt => CanInterrupt && PlayerInterruptState.CanStart(context),
             PlayerActionState.Skill => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
@@ -541,7 +565,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     // 서버·오너 양쪽에서 도는 공통 가드. 슈퍼아머 판정은 여기 두지 않는다(TryReceiveRestraint 주석 참고).
     private bool CanReceiveRestraint(RestraintContext restraintContext)
     {
-        return CurrentState != PlayerActionState.Dead &&
+        return !RejectsForcedMotion &&
             CurrentState != PlayerActionState.Restrained &&
             !cinematicLocked;
     }
@@ -716,6 +740,8 @@ public abstract class PlayerStateBase : IPlayerState
         // 만료까지 남겨 다음 틱에 다시 시도하고, 나머지 거부는 그 입력을 바로 버린다 — PlayerActionAttempt:
         // 자원 부족(쿨타임·충전 없음·과열) / 차단 효과(침묵·속박·약화 — 피드백 이벤트) / 그 밖(CanUse·빈 슬롯·비접지).
         bool dashRequested = Context.Input.DashPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Dash);
+        // 기본 공격 이어가기(할 일 146) — 스킬이 끝나 돌아온 첫 Idle/Move 틱 한 번만. 다른 행동이 먼저 시작돼도 이 틱에 사라진다.
+        bool resumeBasicAttack = Context.Skills != null && Context.Skills.TakeBasicAttackResume();
 
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
         // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
@@ -785,7 +811,7 @@ public abstract class PlayerStateBase : IPlayerState
                 return false;
         }
 
-        if (TryStartAttackOnHold())
+        if (TryStartAttackOnHold(resumeBasicAttack))
         {
             Context.Input.ClearInputBufferOnActionStarted(PlayerBufferedInput.Attack);
             return true;
@@ -797,12 +823,13 @@ public abstract class PlayerStateBase : IPlayerState
     // 홀드 시작(할 일 44) — 홀드 연사 캐릭터(거너)는 누른 프레임이 아니어도 좌클릭을 누르고 있으면 시작한다.
     // 스킬이 끝났는데 계속 누르고 있으면 평타가 다시 이어진다. 누른 입력(평타·스킬·인터럽트)을 다 본 뒤 마지막에 봐서
     // 버퍼에 남은 스킬 입력을 앞지르지 않는다. 매 프레임 조건이라 거부(과열·차단 효과·요청 중)는 버퍼·피드백 없이 건너뛴다.
-    private bool TryStartAttackOnHold()
+    // 이어가기(할 일 146) — 홀드 시작이 아닌 캐릭터도 이어가기를 허락한 스킬(어쌔신 E·돌파의 방패 Q)이 막 끝난 틱 한 번은 같은 장치를 탄다.
+    private bool TryStartAttackOnHold(bool resumeAfterSkill)
     {
         IPlayerBasicAttack attack = Context.DefaultAttack;
         return attack != null &&
             PlayerBasicAttackInputRules.ShouldStartOnHold(
-                attack.StartsOnHold, Context.Input.AttackHeld, Context.StatusEffects.BlocksAttack,
+                attack.StartsOnHold || resumeAfterSkill, Context.Input.AttackHeld, Context.StatusEffects.BlocksAttack,
                 Context.Skills != null && Context.Skills.IsBusy) &&
             attack.TryStart();
     }
@@ -1568,8 +1595,6 @@ public sealed class PlayerDashState : PlayerStateBase
         // 구간 속도(할 일 92-5) — 끝나는 프레임에도 먼저 쓰고, 이어지는 Exit 가 기본값 1 로 되돌린다.
         Context.Dash?.TickDodgeSpeed();
         TickDashInterruptInput();
-        // 대쉬 간파 재예측(할 일 139-2) — 누를 때 창이 닫혀 약이었으면 창이 열리는 순간 강으로(오너 연출·서버 시도 슬로우 각자).
-        Context.Skills?.TickDashInterruptReprediction(this);
         if (Time.time < endTime)
             return;
 

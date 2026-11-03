@@ -15,6 +15,8 @@ using UnityEngine.Rendering;
 // 재질 = URP Lit · 베이스 컬러 + 노멀만(팀장 10-16: 드론은 찰나라 이머시브·오클루전 불필요).
 // 몬스터·23호 재질이 전부 URP Lit 이라 톤도 맞다(Flat Kit 은 몬스터에 안 쓴다).
 // 다시 눌러도 같은 결과(재질·프리팹은 있으면 갱신, guid 유지).
+// 🔴 11-02(할 일 175): 드론도 Flat Kit 으로 바꿨다 — 프리팹 슬롯은 FK_DRONE_Mat(FlatKitCharacterConvert)이다.
+//    이 메뉴를 다시 누르면 프리팹이 DRONE_Mat(URP Lit)으로 되돌아가니, 누른 뒤엔 Flat Kit 변환 메뉴를 다시 돌린다.
 public static class WellsDroneAuthoring
 {
     const string FbxPath = "Assets/50.Art/Char/Drone/Models/DRONE.fbx";

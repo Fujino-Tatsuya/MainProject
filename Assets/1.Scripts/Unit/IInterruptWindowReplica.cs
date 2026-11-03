@@ -1,11 +1,11 @@
 using BeaverLobby.Player.Dash;
 
 /// <summary>
-/// 간파 대상의 카운터 창 **복제값**(할 일 132) — 오너 클라가 간파 입력 순간 성공을 예측(연출 강·약)할 때 읽는다.
-/// 판정은 여전히 서버(<see cref="IInterruptSlowMotionTarget.ServerIsInterruptible"/>)가 하고, 이 값은 읽기만 한다.
+/// 간파 대상의 카운터 창 **복제값**(할 일 132) — 피어 화면 대상 재탐색(할 일 143-3)·보정 랩 미리보기가 읽는다.
+/// 예측·판정은 이 값이 아니라 <see cref="InterruptManager"/> 창 시간표를 본다(할 일 191).
 ///
 /// <see cref="IInterruptSlowMotionTarget"/> 와 같은 GameObject 에 붙인다. 구현체는 복제값이 바뀔 때
-/// <see cref="InterruptWindowReplicaTracker.Record"/> 를 불러 클라 쪽 열림 시각 기록을 남긴다(열린 뒤 경과·추정 길이용).
+/// <see cref="InterruptWindowReplicaTracker.Record"/> 를 불러 로컬 선착순 장부를 초기화한다.
 /// 예측 대상 캐시(<see cref="InterruptTargetRegistry"/>)에는 스폰 때 등록하고 디스폰·사망 때 뺀다.
 /// </summary>
 public interface IInterruptWindowReplica

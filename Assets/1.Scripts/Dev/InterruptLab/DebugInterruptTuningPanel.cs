@@ -9,6 +9,9 @@ using UnityEngine;
 ///       <see cref="InterruptProductionDirector.Set"/>). 프리팹·씬에 저장하지 않는다 — Play 를 끝내면 원래 값.</item>
 /// <item>배속은 같은 오브젝트의 <see cref="DebugTimeScale"/> 슬라이더 값을 쓴다 — 0.05~2, 성공 후 1배속 복귀 규칙도 그 컴포넌트 그대로.</item>
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
+/// <item>제압 간파 섬광 A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>)
+///       + A7 섬광 범위 버튼(전체 화면 ↔ 대상 내부만, 179/192 후속).</item>
+/// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -80,8 +83,24 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     [SerializeField, Min(160f)] float width = 240f;
 
     DebugTimeScale _timeScale;
+    readonly DebugSuppressInterruptRepro _suppressRepro = new DebugSuppressInterruptRepro();
+    readonly DebugInterruptTierPreview _tierPreview = new DebugInterruptTierPreview();
 
     void Awake() => TryGetComponent(out _timeScale);
+
+    void Update()
+    {
+        float now = Time.unscaledTime;
+        _suppressRepro.Tick(now);
+        _suppressRepro.SyncForecast();
+        _tierPreview.Tick(InterruptProductionDirector.Instance, now);
+    }
+
+    void OnDestroy()
+    {
+        _suppressRepro.Dispose();
+        InterruptProductionDirector.DebugSuppressForecastOverride = null;
+    }
 
     void OnGUI()
     {
@@ -94,6 +113,8 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         if (expanded)
         {
             DrawEffects();
+            DrawTiers();
+            DrawSuppressFlash();
             DrawSpeed();
         }
 
@@ -125,6 +146,116 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             SetDefaults(director);
         GUILayout.EndHorizontal();
     }
+
+    // 간파 연출 4단계(할 일 192) — 지금 단계 표시 + 단계 재현 버튼 4개(이 화면만, 슬로우·줌 없음).
+    void DrawTiers()
+    {
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
+        if (director == null)
+            return;
+
+        GUILayout.Space(6f);
+        GUILayout.Label($"간파 단계 — 내 마지막: {DebugInterruptTierPreview.Label(director.LastOwnerTier)}" +
+                        $" · 받은 성공: {DebugInterruptTierPreview.Label(director.LastSuccessTier)}");
+
+        GUILayout.BeginHorizontal();
+        foreach (InterruptPresentationTier tier in DebugInterruptTierPreview.All)
+        {
+            if (GUILayout.Button(DebugInterruptTierPreview.Label(tier)))
+                _tierPreview.Begin(director, tier, Time.unscaledTime);
+        }
+
+        GUILayout.EndHorizontal();
+        if (!string.IsNullOrEmpty(_tierPreview.Status))
+            GUILayout.Label("  " + _tierPreview.Status);
+
+        DrawTierVersions(director);
+    }
+
+    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계마다 V0/V1/V2·암순응 가/나·월드 이펙트 위치 무기/대상(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
+    // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
+    void DrawTierVersions(InterruptProductionDirector director)
+    {
+        foreach (InterruptPresentationTier tier in DebugInterruptTierPreview.VersionTiers)
+        {
+            InterruptTierProfile profile = director.TierProfile(tier);
+            if (profile == null)
+                continue;
+
+            GUILayout.Label($"{DebugInterruptTierPreview.Label(tier)} 버전 — 실제 {DebugInterruptTierPreview.LookLabel(director.SuccessLook(tier))}");
+            GUILayout.BeginHorizontal();
+            foreach (InterruptTierFlash flash in DebugInterruptTierPreview.Versions)
+            {
+                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.VersionLabel(flash), profile.flash == flash);
+                if (GUILayout.Button(label))
+                    SelectVersion(profile, flash);
+            }
+
+            foreach (InterruptDarkAdaptMode mode in DebugInterruptTierPreview.DarkAdaptModes)
+            {
+                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.DarkAdaptLabel(mode), profile.darkAdapt == mode);
+                if (GUILayout.Button(label))
+                    profile.darkAdapt = mode;
+            }
+
+            foreach (InterruptHitLightOrigin origin in DebugInterruptTierPreview.Origins)
+            {
+                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.OriginLabel(origin), profile.hitLightOrigin == origin);
+                if (GUILayout.Button(label))
+                    profile.hitLightOrigin = origin;
+            }
+
+            if (GUILayout.Button("재생"))
+                _tierPreview.Begin(director, tier, Time.unscaledTime);
+            GUILayout.EndHorizontal();
+        }
+    }
+
+    /// <summary>버전 버튼 — 섬광 종류를 바꾸고, V3 면 암순응도 그 기본(나)으로 맞춘다(194 후속, 누른 뒤 가로 다시 고를 수 있다).</summary>
+    public static void SelectVersion(InterruptTierProfile profile, InterruptTierFlash flash)
+    {
+        if (profile == null)
+            return;
+
+        profile.flash = flash;
+        InterruptDarkAdaptMode? darkAdapt = InterruptPresentationTierRules.DefaultDarkAdapt(flash);
+        if (darkAdapt.HasValue)
+            profile.darkAdapt = darkAdapt.Value;
+    }
+
+    // 제압 간파 섬광(179 후속 3) — A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).
+    // A6 를 켜면 재현도 켠다(허수아비엔 제압 칸이 없어 그대로는 시퀀스가 안 나온다). 끔은 재현을 건드리지 않는다.
+    void DrawSuppressFlash()
+    {
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
+        if (director == null)
+            return;
+
+        GUILayout.Space(6f);
+        bool on = director.SuppressFlashEnabled;
+        bool next = GUILayout.Toggle(on, "제압 간파 섬광 (A6)");
+        if (next != on)
+        {
+            director.SuppressFlashEnabled = next;
+            if (next)
+                _suppressRepro.Enabled = true;
+        }
+
+        // A7 섬광 = 대상 내부만(179/192 후속) — 이 피어 런타임 값만, 다음 재생부터.
+        bool targetOnly = director.SuppressFlashTargetOnly;
+        if (GUILayout.Button(TargetOnlyLabel(targetOnly)))
+            director.SuppressFlashTargetOnly = !targetOnly;
+
+        _suppressRepro.Enabled = GUILayout.Toggle(_suppressRepro.Enabled, "허수아비 간파 = 제압 간파(제압 직전)");
+        if (_suppressRepro.Enabled && !DebugSuppressInterruptRepro.IsServer)
+            GUILayout.Label("  ※ 호스트 화면에서만 효과(표식은 서버)");
+        else if (_suppressRepro.Enabled)
+            GUILayout.Label($"  허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
+    }
+
+    /// <summary>A7 버튼 글자 — 지금 상태 표시(누르면 반대로).</summary>
+    public static string TargetOnlyLabel(bool targetOnly) =>
+        targetOnly ? "섬광 범위 (A7): 대상 내부만" : "섬광 범위 (A7): 전체 화면";
 
     void DrawSpeed()
     {

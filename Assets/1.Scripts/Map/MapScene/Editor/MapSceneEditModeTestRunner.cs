@@ -12,8 +12,12 @@ internal static class MapSceneEditModeTestRunner
     {
         "^MapSceneFlowModelTests$",
         "^MapSceneGateHoldTests$", // 게이트 보류 — 4구역 소개 연출이 끝나야 G7(PLAN-zone4-intro-cinematic)
+        "^MapSceneRadioRulesTests$", // 메인 1~4구역 무전(PLAN-main-radio-zone1-4) — 판마다 1회·소개 중 숨김/폐기·존3 거리·2구역 구도·경고가 복귀 전에 끝남
+        "^CinematicRulesTests$", // 연출 공용 규칙 — 줄 나누기·조각 스케줄·샷 타임라인·구도(2·4구역 공용)
         "^MapSceneAreaTrackerTests$",
         "^MapSceneBarrierRulesTests$",
+        "^MapSceneBarrierMonsterBlockTests$", // 할 일 148 — 열린 배리어도 몬스터 카브는 남는다(복도 늘 몬스터 출입 금지)
+        "^MapGateLaserViewTests$", // 할 일 160 — 게이트 레이저 시각: 빔 길이 = 폭·줄 수·열림 = 빔·콜라이더 즉시 끔, 발사대·카브 남음
         "^MapSceneBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^MapSceneMonsterLedgerTests$",
         "^MapSceneBossPathRulesTests$",
@@ -30,6 +34,9 @@ internal static class MapSceneEditModeTestRunner
         "^TraitEffectTests$", // 할 일 125 (3/5) 효과 클래스 뼈대 — ①~⑩ 수치(명세 §10 검산)·시전당 1회/간격 거름·되돌리기 장부(재선택·재합류 1회 동작 중복 없음)·HealHp 실제 회복량·밀치기 = AttackInfo 필드만
         "^Trait(Tooltip|SheetBinding|PickConfirm|StringKeys)Tests$", // 할 일 125 (5/5) 카드 설명 토큰·{dmg} 계산식 검증·프로젝트 정의 전체 · Traits_* 시트 바인딩(빈 표 통과·효과 칸 적용/복구) · 2차 상충 확인창·등록부 · Strings 키 규칙
         "^(Paladin|Gunner|Assassin)Trait\\w*Tests$", // 할 일 126~128 캐릭터 레인 픽스처 — 이 줄은 고치지 않는다(이름만 맞추면 자동으로 돈다)
+        "^TraitSkillFxTests$", // 할 일 145 특성 강화 연출 사건 — 특성 종류 ↔ 명세 ID · 구독자 예외 격리 · 공용 RPC 메시지 직렬화
+        "^TraitCardFontCoverageTests$", // 할 일 167 카드 이름(Heavy)·분류·설명(Medium) 글꼴에 특성 문구 글자 누락 0
+        "^TraitDescriptionSpriteTests$", // 할 일 167 후속 카드·호버 툴팁 설명의 {dmg} 검 아이콘 sprite asset 지정·이름(atk) 있음 = 노란 ? 없음
         "^TraitFixedSelectionTests$", // 할 일 125 (1/5) 고정 후보 선택 — 차수 = 획득 수+1·자동 선택 첫 번째·후보 0 = Empty·재선택 1차부터·재합류 해시 복원
         "^TutorialGuide(Text|TextSource|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState · 86 T6a SO+Strings 출처
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
@@ -39,6 +46,7 @@ internal static class MapSceneEditModeTestRunner
         "^MapSceneBossApproachRulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·다리·만료·패드·도착 팁·보스방 목표/미니맵 강조
         "^LobbyRadioTests$", // 로비 무전(할 일 86 T6b) — 단계 → 대사 표·회차당 1회·단계 바뀜 = 대기 줄 폐기·늦은 클라·자막 큐 ClearPending·문구 행
         "^LobbyBriefingTests$", // 로비 브리핑(할 일 86 T6c) — 대사 순서·서버 시간·완료 1회·중복 시작 무시·중단 해제 신호·잠금 장부·목표 표시·문구 행
+        "^LobbyTutorialUi\\w*Tests$", // 로비 튜토리얼 UI(할 일 158) — 패널 폭·진행 줄·체크 완료 표시·태그 치환·대사 중 목표 숨김 유예·문구 키 · 경로 묶음·집결 테두리 배치
         "^MapSceneSkipPlanTests$", // 구간 스킵 Alt+1~0(할 일 34) — 단축키 매핑·뒤로 거부(Alt+0 처음부터 예외)·재시작 재진입 거부·목적 구간 → 게이트·체크·처치·자동 획득 계획
     };
 

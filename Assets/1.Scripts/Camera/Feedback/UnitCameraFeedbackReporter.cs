@@ -21,6 +21,7 @@ public sealed class UnitCameraFeedbackReporter : MonoBehaviour
 
         _unit.ClientDamagedAmount += HandleReplicatedDamage;
         _unit.ClientDamagedAttributed += HandleAttributedDamage;
+        _unit.ClientHitAttributed += HandleAttributedHit;
     }
 
     void OnDisable()
@@ -30,6 +31,7 @@ public sealed class UnitCameraFeedbackReporter : MonoBehaviour
 
         _unit.ClientDamagedAmount -= HandleReplicatedDamage;
         _unit.ClientDamagedAttributed -= HandleAttributedDamage;
+        _unit.ClientHitAttributed -= HandleAttributedHit;
     }
 
     void HandleReplicatedDamage(int amount, DamageChannel channel)
@@ -46,6 +48,15 @@ public sealed class UnitCameraFeedbackReporter : MonoBehaviour
             return;
 
         CameraFeedback.Instance?.ReportLocalPlayerDealtDamage();
+    }
+
+    // 제압 가속 3타 줌인(할 일 174) — 내가 보스에게 맞힌 타격 1회(서버 확정 RPC 1개 = 1타). 가속 여부·셈은 카메라가 본다.
+    void HandleAttributedHit(ulong attackerClientId)
+    {
+        if (_unit.Rank != MonsterRank.Boss || !IsLocalAttacker(attackerClientId))
+            return;
+
+        CameraTargetSwitcher.Active?.ReportLocalBossHit();
     }
 
     bool IsLocalPlayerTarget()

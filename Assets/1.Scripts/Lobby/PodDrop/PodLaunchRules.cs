@@ -113,60 +113,76 @@ public static class PodLaunchRules
         return new WalkRoute(ground.ToArray(), source.ToArray(), interior, skipped, entryCount, join, join != joinIndex);
     }
 
-    /// <summary>충돌을 켠 채 걷는 앞 구간 길이(m) — 걷기 시작 지점 → 개인 경로점 → 공용 경로점 끝.</summary>
-    public static float GroundLength(Vector3 walkStart, WalkRoute route) => PathLength3D(walkStart, route.Ground);
+    // 보행 길이는 모두 수평(XZ) 길이다(할 일 172) — 앞 구간 이동(BossElevatorTimeline.WalkStepAlongPath)이 남은 수평 길이 ÷ 남은 시간으로 걷기 때문에
+    // 시간 계산도 같은 기준이어야 계단·문턱·좌석 높이 차와 무관하게 모든 구간 수평 속도가 걷는 속도와 같다.
+
+    /// <summary>충돌을 켠 채 걷는 앞 구간 수평 길이(m) — 걷기 시작 지점 → 개인 경로점 → 공용 경로점 끝.</summary>
+    public static float GroundLength(Vector3 walkStart, WalkRoute route) => PathLengthHorizontal(walkStart, route.Ground);
+
+    /// <summary>충돌 없이 걷는 마지막 경로점(없으면 걷기 시작 지점) → 문턱 수평 길이(m). 문턱이 없으면 0.</summary>
+    public static float ApproachLength(Vector3 walkStart, WalkRoute route) =>
+        route.HasThreshold ? HorizontalDistance(GroundEnd(walkStart, route), route.Interior[0]) : 0f;
+
+    /// <summary>좌석으로 미끄러져 들어가는 수평 길이(m) — 문턱(없으면 마지막 경로점, 그것도 없으면 걷기 시작 지점) → 좌석.</summary>
+    public static float SlideLength(Vector3 walkStart, WalkRoute route) =>
+        HorizontalDistance(route.HasThreshold ? route.Interior[0] : GroundEnd(walkStart, route), route.Interior[route.Interior.Length - 1]);
 
     /// <summary>
-    /// 걸어가는 길이(m) — 걷기 시작 지점 → 개인 경로점 → 공용 경로점 → 문턱(3차원, 계단 높이 포함). 이 길이 ÷ 걷는 속도 = 그 사람 보행 시간.
-    /// 문턱 → 좌석 미끄러짐은 들지 않는다(따로 정한 시간).
+    /// 걸어가는 수평 길이(m) — 걷기 시작 지점 → 개인 경로점 → 공용 경로점 → 문턱 → 좌석(앞 구간 + 문턱 구간 + 미끄러짐).
+    /// 이 길이 ÷ 걷는 속도 = 그 사람 보행 시간(좌석 도착까지, 할 일 172 — 미끄러짐도 같은 속도).
     /// </summary>
-    public static float WalkLength(Vector3 walkStart, WalkRoute route)
-    {
-        float length = GroundLength(walkStart, route);
-        if (route.HasThreshold)
-            length += Vector3.Distance(route.Ground.Length > 0 ? route.Ground[route.Ground.Length - 1] : walkStart, route.Interior[0]);
-        return length;
-    }
+    public static float WalkLength(Vector3 walkStart, WalkRoute route) =>
+        GroundLength(walkStart, route) + ApproachLength(walkStart, route) + SlideLength(walkStart, route);
 
     /// <summary>
-    /// 한 사람 보행 시간 중 충돌을 켠 채 걷는 앞 구간(웨이포인트까지)의 비율(0~1). 걷는 속도가 일정하도록 길이 비율로 나눈다.
-    /// 뒤 구간(마지막 경로점 → 문턱)은 충돌 없이 보간한다. 둘 다 0 이면 1(앞 구간에 다 준다 — 보간할 거리가 없다).
+    /// 보행 시간 중 앞쪽 <paramref name="headLength"/> 구간의 비율(0~1). 걷는 속도가 일정하도록 길이 비율로 나눈다.
+    /// 앞 구간 끝(= 앞 길이 ÷ (앞 + 뒤 길이))·문턱 도착(= 앞 + 문턱 구간 ÷ 전체)에 쓴다. 둘 다 0 이면 1(앞 구간에 다 준다 — 나눌 거리가 없다).
     /// </summary>
-    public static float GroundShare(float groundLength, float interiorLength)
+    public static float GroundShare(float headLength, float tailLength)
     {
-        groundLength = Mathf.Max(0f, groundLength);
-        interiorLength = Mathf.Max(0f, interiorLength);
-        float total = groundLength + interiorLength;
-        return total > 0f ? groundLength / total : 1f;
+        headLength = Mathf.Max(0f, headLength);
+        tailLength = Mathf.Max(0f, tailLength);
+        float total = headLength + tailLength;
+        return total > 0f ? headLength / total : 1f;
     }
 
-    /// <summary><paramref name="from"/> → <paramref name="path"/> 의 점들을 잇는 꺾은선의 3차원 길이(m). 높이 차(문턱·좌석)도 센다.</summary>
-    public static float PathLength3D(Vector3 from, IReadOnlyList<Vector3> path)
+    /// <summary>두 점의 수평(XZ) 거리(m) — 높이 차는 세지 않는다.</summary>
+    public static float HorizontalDistance(Vector3 a, Vector3 b)
+    {
+        float dx = b.x - a.x, dz = b.z - a.z;
+        return Mathf.Sqrt(dx * dx + dz * dz);
+    }
+
+    /// <summary><paramref name="from"/> → <paramref name="path"/> 의 점들을 잇는 꺾은선의 수평(XZ) 길이(m). 높이 차는 세지 않는다.</summary>
+    public static float PathLengthHorizontal(Vector3 from, IReadOnlyList<Vector3> path)
     {
         float length = 0f;
         Vector3 cursor = from;
         for (int i = 0; i < path.Count; i++)
         {
-            length += Vector3.Distance(cursor, path[i]);
+            length += HorizontalDistance(cursor, path[i]);
             cursor = path[i];
         }
 
         return length;
     }
 
+    private static Vector3 GroundEnd(Vector3 walkStart, WalkRoute route) =>
+        route.Ground.Length > 0 ? route.Ground[route.Ground.Length - 1] : walkStart;
+
     /// <summary>
-    /// 꺾은선(<paramref name="from"/> → <paramref name="path"/>) 위 진행률 <paramref name="t"/>(0~1, 길이 기준 — 등속)의 점.
+    /// 꺾은선(<paramref name="from"/> → <paramref name="path"/>) 위 진행률 <paramref name="t"/>(0~1, 수평 길이 기준 — 수평 등속)의 점. 높이는 구간 안에서 같이 보간한다.
     /// 충돌을 무시하고 포드 안으로 보간할 때 쓴다. 점이 없으면 <paramref name="from"/>.
     /// </summary>
     public static Vector3 PointAlong(Vector3 from, IReadOnlyList<Vector3> path, float t)
     {
         if (path.Count == 0) return from;
 
-        float remaining = PathLength3D(from, path) * Mathf.Clamp01(t);
+        float remaining = PathLengthHorizontal(from, path) * Mathf.Clamp01(t);
         Vector3 cursor = from;
         for (int i = 0; i < path.Count; i++)
         {
-            float segment = Vector3.Distance(cursor, path[i]);
+            float segment = HorizontalDistance(cursor, path[i]);
             if (remaining <= segment)
                 return segment > 0f ? Vector3.Lerp(cursor, path[i], remaining / segment) : path[i];
 

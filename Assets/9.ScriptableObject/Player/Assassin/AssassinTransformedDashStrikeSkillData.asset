@@ -19,6 +19,7 @@ MonoBehaviour:
       {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uC801\uC911 \uC2DC \uCFE8\uD0C0\uC784\uC774
       \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
     icon: {fileID: 21300000, guid: 1273ea929293ddf7a0ce79a14c532983, type: 3}
+    tags: 
   inputType: 0
   cooldownTime: 3
   commitCooldownManually: 0
@@ -45,11 +46,28 @@ MonoBehaviour:
   hoverMarkerDistance: 3
   animatorStateName: Assassin_Q_DashStrike_Transformed
   snapRotationOnStart: 1
+  followUpIconTint: {r: 1, g: 1, b: 1, a: 1}
   prepareDuration: 0.1
   endDuration: 0.1
   dashDistance: 5
   dashSpeed: 60
-  pathWidth: 1.2
-  pathHeight: 2
+  hitArea:
+    origin: 1
+    shapes:
+    - rid: 7237886701681771180
   maxHitResults: 16
   hitCooldownReduction: 1.5
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681771180
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: 0
+        minHeight: 0
+        maxHeight: 2
+        length: 5
+        width: 1.2
+        backOffset: 0

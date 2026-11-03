@@ -16,10 +16,14 @@ public sealed class InterruptProductionStageTests
         public SlowMotionProfile Attempt = new SlowMotionProfile { scale = 0.15f };
         public SlowMotionProfile Weak = new SlowMotionProfile { scale = 0.5f };
         public SlowMotionProfile Success = new SlowMotionProfile { scale = 0.25f, hitStopDuration = 0.05f };
+        public SlowMotionProfile DashAttempt = new SlowMotionProfile { scale = 0.16f };
+        public SlowMotionProfile DashWeak = new SlowMotionProfile { scale = 0.51f };
         public readonly HashSet<InterruptProductionCue> On = new HashSet<InterruptProductionCue>();
 
         public SlowMotionProfile InterruptProfile => Attempt;
         public SlowMotionProfile InterruptWeakProfile => Weak;
+        public SlowMotionProfile InterruptDashProfile => DashAttempt;
+        public SlowMotionProfile InterruptDashWeakProfile => DashWeak;
         public SlowMotionProfile InterruptSuccessProfile => Success;
         public bool Get(InterruptProductionCue cue) => On.Contains(cue);
     }
@@ -30,11 +34,16 @@ public sealed class InterruptProductionStageTests
         public readonly List<(SlowMotionProfile profile, ulong clientId, SlowMotionPurpose purpose, Vector3 position, bool hitStopOn)> Starts =
             new List<(SlowMotionProfile, ulong, SlowMotionPurpose, Vector3, bool)>();
         public readonly List<uint> Fails = new List<uint>();
+        public readonly List<bool> SuppressFlags = new List<bool>();
+        public readonly List<bool> DashFlags = new List<bool>();
         public uint NextId = 7;
 
-        public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn)
+        public uint ServerStart(SlowMotionProfile profile, ulong triggerClientId, SlowMotionPurpose purpose, Vector3 targetPosition, bool hitStopOn,
+            bool suppressInterrupt = false, bool dashInterrupt = false)
         {
             Calls.Add("Start:" + purpose);
+            SuppressFlags.Add(suppressInterrupt);
+            DashFlags.Add(dashInterrupt);
             Starts.Add((profile, triggerClientId, purpose, targetPosition, hitStopOn));
             return NextId;
         }
@@ -115,6 +124,25 @@ public sealed class InterruptProductionStageTests
         Assert.AreEqual(Caster, _port.Starts[0].clientId);
         Assert.AreEqual(SlowMotionPurpose.Attempt, _port.Starts[0].purpose);
         Assert.AreEqual(Vector3.zero, _port.Starts[0].position);
+    }
+
+    // ②-대쉬 대쉬 간파 시도 → 대쉬 전용 강·약 프로필, 목적은 근접과 같다(194 후속 2)
+    [TestCase(InterruptAttemptForecast.Strong, SlowMotionPurpose.Attempt)]
+    [TestCase(InterruptAttemptForecast.Weak, SlowMotionPurpose.AttemptWeak)]
+    public void 대쉬_간파_시도는_대쉬_프로필로_목적은_그대로(InterruptAttemptForecast forecast, SlowMotionPurpose purpose)
+    {
+        _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, forecast, InterruptVariant.Dash));
+        Assert.AreEqual(1, _port.Starts.Count);
+        Assert.AreSame(forecast == InterruptAttemptForecast.Strong ? _settings.DashAttempt : _settings.DashWeak, _port.Starts[0].profile);
+        Assert.AreEqual(purpose, _port.Starts[0].purpose);
+        Assert.IsFalse(_port.DashFlags[0], "시도 Start 에는 대쉬 표식을 싣지 않는다(새 바이트 없음)");
+    }
+
+    [Test]
+    public void 대쉬_간파_시도도_대상_없음이면_슬로우_없음()
+    {
+        Assert.AreEqual(0u, _attempt.Server(InterruptProductionEvent.Attempt(Caster, null, null, InterruptAttemptForecast.NoTarget, InterruptVariant.Dash)));
+        Assert.AreEqual(0, _port.Starts.Count);
     }
 
     [Test]

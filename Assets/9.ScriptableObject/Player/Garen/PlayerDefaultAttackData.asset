@@ -26,7 +26,10 @@ MonoBehaviour:
     rotationType: 1
     trackRotationSpeed: 12
     hitType: 0
-    hitbox: {fileID: 0}
+    hitArea:
+      origin: 0
+      shapes:
+      - rid: 7237886701681770831
     projectilePrefab: {fileID: 0}
     projectileSpeed: 12
     raycastRange: 20
@@ -41,7 +44,10 @@ MonoBehaviour:
     rotationType: 1
     trackRotationSpeed: 12
     hitType: 0
-    hitbox: {fileID: 0}
+    hitArea:
+      origin: 0
+      shapes:
+      - rid: 7237886701681770832
     projectilePrefab: {fileID: 0}
     projectileSpeed: 12
     raycastRange: 20
@@ -56,7 +62,10 @@ MonoBehaviour:
     rotationType: 1
     trackRotationSpeed: 12
     hitType: 0
-    hitbox: {fileID: 0}
+    hitArea:
+      origin: 0
+      shapes:
+      - rid: 7237886701681770833
     projectilePrefab: {fileID: 0}
     projectileSpeed: 12
     raycastRange: 20
@@ -71,7 +80,10 @@ MonoBehaviour:
     rotationType: 1
     trackRotationSpeed: 12
     hitType: 0
-    hitbox: {fileID: 0}
+    hitArea:
+      origin: 0
+      shapes:
+      - rid: 7237886701681770834
     projectilePrefab: {fileID: 0}
     projectileSpeed: 12
     raycastRange: 20
@@ -79,3 +91,50 @@ MonoBehaviour:
     flatDamageBonus: 0
     loopBackEntryTime: 0
     triggersOnHit: 1
+  references:
+    version: 2
+    RefIds:
+    - rid: 7237886701681770831
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: -0.03
+        minHeight: 0
+        maxHeight: 2.039
+        length: 1.55
+        width: 2.6
+        backOffset: 0.55
+    - rid: 7237886701681770832
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: -0.03
+        minHeight: 0
+        maxHeight: 2.039
+        length: 1.55
+        width: 2.6
+        backOffset: 0.55
+    - rid: 7237886701681770833
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: -0.03
+        minHeight: 0
+        maxHeight: 2.039
+        length: 1.55
+        width: 2.6
+        backOffset: 0.55
+    - rid: 7237886701681770834
+      type: {class: AttackRectShape, ns: , asm: Assembly-CSharp}
+      data:
+        forwardOffset: 0
+        sideOffset: 0
+        yawOffset: -0.03
+        minHeight: 0
+        maxHeight: 2.039
+        length: 1.55
+        width: 2.6
+        backOffset: 0.55

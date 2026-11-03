@@ -3,18 +3,17 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 로비 브리핑 BRIEF_01(할 일 86 T6c, PLAN §3.6, 명세 v0.2 §4·§10) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
-/// 규칙은 <see cref="LobbyBriefingModel"/>·<see cref="LobbyBriefingLockLedger"/>·<see cref="LobbyBriefingRules"/>, 여기는 구독·잠금 호출·UI·카메라만 한다.
+/// 로비 임무 브리핑 잠금·카메라(할 일 86 T6c → 할 일 157 ⑨, 명세 §5 L30–L34·Q7 A) — <see cref="LobbyTrainingDirector"/> 와 같은 오브젝트(씬 상주 NetworkObject)에 붙는다.
+/// 규칙은 <see cref="LobbyBriefingLockSession"/>·<see cref="LobbyBriefingLockLedger"/>·<see cref="LobbyBriefingRules"/>, 여기는 구독·잠금 호출·카메라만 한다.
 /// <list type="bullet">
-/// <item>시작(서버) = 진행기가 Brief/InProgress(브리핑 위치 전원 5초 집결 확정)가 되는 순간: <see cref="LobbyRadio.ServerClear"/>(기존 무전 종료) →
-/// 접속자 전원 잠금 → BRIEF_01~04 를 앞 줄 표시 시간이 지날 때마다 하나씩 <see cref="LobbyRadio.ServerPlay"/>.</item>
-/// <item>시간은 서버가 잰다 = 시작 지연 + 대사 표시 시간 합(<c>TutorialGuideTexts</c> SO 행) + 끝 여유. 클라 자막 종료 보고에 의존하지 않는다.
-/// 끝나면 잠금 해제 → <see cref="LobbyTrainingDirector.ServerReportStageCompleted"/>(Brief) 1회 → 출격 집결 활성. 대표 상호작용·개인 건너뛰기 없음.</item>
-/// <item>조작 제한 = 보스 등장 연출 잠금 재사용(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — FSM Cinematic·대시·입력 정책·무적).
-/// 대상 = 접속자 전원(늦은 참가자 포함), 브리핑 중 새로 생긴 플레이어 오브젝트도 0.25초 주기로 잠근다. 이미 다른 계통이 잠근 사람은 건드리지 않는다(장부).</item>
+/// <item>대사 4행(L31 평가 → L32 생산 시설 → L33 반란 → L34 출격 안내)은 진행기 공용 대사 스케줄러가 서버 시각으로 한 행씩 넘긴다(여기는 시간을 재지 않는다).
+/// 옛 무전 BRIEF_01~04 는 더 재생하지 않는다(키 보존). 목표 패널 숨김·대사·배경 ID 는 파사드(<see cref="LobbyTutorialState"/>)가 단계표로 낸다.</item>
+/// <item>잠금(서버) = 묶음 첫 행(L31) 진입 때 <see cref="LobbyRadio.ServerClear"/>(기존 무전 종료) → 접속자 전원(늦은 참가자 포함) 잠금, 묶음 안 행 이동은 그대로,
+/// 묶음 밖(L34 끝 → L40·회차 초기화)으로 나가면 해제. 브리핑 중 새로 생긴 플레이어 오브젝트도 0.25초 주기로 잠근다. 이미 다른 계통이 잠근 사람은 건드리지 않는다(장부).</item>
+/// <item>조작 제한 = 보스 등장 연출 잠금 재사용(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — FSM Cinematic·대시·입력 정책·무적).</item>
 /// <item>복구: 정상 완료·단계 이탈(회차 초기화)·디스폰(판 끝·씬 언로드·호스트 셧다운) 모두 장부의 잠금을 푼다. 접속 끊긴 사람은 장부에서만 뺀다.</item>
-/// <item>표시(전 피어, 복제된 진행기 단계로): 목표 패널 '작전 설명 중' → 끝나면 '출격 지점에 집결'. 카메라 = <see cref="CameraTargetSwitcher.SetTemporaryFollow"/>
-/// (보스 엘리베이터 연출 API)로 <see cref="cameraFocus"/> 를 따라가고, 브리핑이 끝나거나 이 컴포넌트가 사라지면 <see cref="CameraTargetSwitcher.ClearTemporaryFollow"/>.</item>
+/// <item>카메라(전 피어, 복제된 진행기 단계로): 묶음 동안 <see cref="CameraTargetSwitcher.SetTemporaryFollow"/>(보스 엘리베이터 연출 API)로 <see cref="cameraFocus"/> 를 따라가고,
+/// 묶음을 떠나거나 이 컴포넌트가 사라지면 <see cref="CameraTargetSwitcher.ClearTemporaryFollow"/>.</item>
 /// </list>
 /// 실전 초기화(명세 §10)는 하지 않는다 — 로비 플레이어는 메인 진입 때 디스폰되고 MapScene 이 새로 스폰한다. 상세: Docs/tech/lobby-training.md "브리핑".
 /// </summary>
@@ -24,58 +23,41 @@ public sealed class LobbyBriefing : NetworkBehaviour
     private const string Tag = "[LobbyTraining/Brief]";
     private const float LockTickInterval = 0.25f;
 
-    [Tooltip("브리핑 대사 표시 시간을 읽는다(BRIEF_01~04 행). 비우거나 행이 없으면 줄마다 6초.")]
-    [SerializeField] private TutorialGuideTextTable textTable;
-
-    [Tooltip("첫 대사 전 지연(초) — 무전 종료가 클라에 닿은 뒤 첫 줄이 뜨게.")]
-    [SerializeField, Min(0f)] private float leadSeconds = 0.5f;
-
-    [Tooltip("마지막 대사가 끝난 뒤 여유(초) — 자막 페이드·RPC 지연. 이 시간이 지나야 조작이 풀리고 출격 집결이 켜진다.")]
-    [SerializeField, Min(0f)] private float tailSeconds = 1f;
-
     [Tooltip("브리핑 동안 카메라가 따라갈 지점(브리핑 위치). 비우면 카메라는 건드리지 않는다.")]
     [SerializeField] private Transform cameraFocus;
 
     // 서버
     private LobbyTrainingDirector _director;
-    private LobbyBriefingModel _model;
+    private readonly LobbyBriefingLockSession _session = new LobbyBriefingLockSession();
     private readonly LobbyBriefingLockLedger _locks = new LobbyBriefingLockLedger();
-    private readonly List<LobbyBriefingLine> _lineBuffer = new List<LobbyBriefingLine>();
-    private readonly List<string> _dueLines = new List<string>();
     private readonly List<ulong> _idBuffer = new List<ulong>();
     private float _lockTimer;
 
-    // 전 피어(표시)
-    private string _shownObjective;
+    // 전 피어(카메라)
     private bool _wantCamera;
     private CameraTargetSwitcher _heldCamera;
-    private bool _warnedNoUi;
 
-    /// <summary>[서버] 브리핑 진행 중(잠금을 걸고 있다).</summary>
-    public bool ServerIsRunning => _model != null && _model.IsRunning;
+    /// <summary>[서버] 브리핑 묶음(L31~L34) 안이라 잠금을 걸고 있다.</summary>
+    public bool ServerIsRunning => IsServer && _session.IsHolding;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        LobbyTrainingDirector.StageChanged += HandleStageChanged;
+        LobbyTrainingDirector.StepChanged += HandleStepChanged;
 
         var director = GetComponent<LobbyTrainingDirector>();
         if (director != null && director.IsSpawned)
-            HandleStageChanged(director.Stage, director.Phase);
+            HandleStepChanged();
 
         if (!IsServer)
             return;
 
-        _model = new LobbyBriefingModel();
         _director = director;
         if (_director == null)
         {
-            Debug.LogError($"{Tag} 같은 오브젝트에 LobbyTrainingDirector 가 없다 — 브리핑이 시작되지 않는다.", this);
+            Debug.LogError($"{Tag} 같은 오브젝트에 LobbyTrainingDirector 가 없다 — 브리핑 잠금이 걸리지 않는다.", this);
             return;
         }
-
-        if (textTable == null)
-            Debug.LogWarning($"{Tag} TutorialGuideTexts 가 비었다 — 브리핑 대사마다 {LobbyBriefingRules.DefaultLineSeconds}초로 잰다.", this);
 
         _director.ServerFlowChanged += HandleFlowChangedServer;
         NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
@@ -85,7 +67,7 @@ public sealed class LobbyBriefing : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        LobbyTrainingDirector.StageChanged -= HandleStageChanged;
+        LobbyTrainingDirector.StepChanged -= HandleStepChanged;
 
         if (IsServer)
         {
@@ -95,11 +77,10 @@ public sealed class LobbyBriefing : NetworkBehaviour
                 NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
 
             // 판 끝·씬 언로드·호스트 셧다운 — 남은 잠금을 푼다(이미 디스폰된 플레이어는 잠금도 함께 사라졌다).
-            if (_model != null && _model.Abort())
+            if (_session.End())
                 Debug.Log($"[SceneFlow] {Tag} 브리핑 중단 — 진행기 디스폰");
             ReleaseLocks("진행기 디스폰");
             _director = null;
-            _model = null;
         }
 
         ClearPresentation();
@@ -108,7 +89,7 @@ public sealed class LobbyBriefing : NetworkBehaviour
 
     public override void OnDestroy()
     {
-        LobbyTrainingDirector.StageChanged -= HandleStageChanged;
+        LobbyTrainingDirector.StepChanged -= HandleStepChanged;
         ClearPresentation();
         base.OnDestroy();
     }
@@ -122,21 +103,8 @@ public sealed class LobbyBriefing : NetworkBehaviour
         if (_wantCamera && _heldCamera == null)
             HoldCamera();
 
-        if (!IsServer || _model == null || !_model.IsRunning)
+        if (!IsServer || !_session.IsHolding)
             return;
-
-        var completed = _model.Tick(Time.unscaledDeltaTime, _dueLines);
-        foreach (var id in _dueLines)
-            PlayLine(id);
-
-        if (completed)
-        {
-            Debug.Log($"[SceneFlow] {Tag} 브리핑 끝 — {_model.TotalSeconds:0.0}초, 대사 {_model.SentCount}줄");
-            ReleaseLocks("브리핑 완료");
-            if (_director != null)
-                _director.ServerReportStageCompleted(LobbyTrainingStage.Brief);
-            return;
-        }
 
         _lockTimer -= Time.unscaledDeltaTime;
         if (_lockTimer <= 0f)
@@ -151,53 +119,30 @@ public sealed class LobbyBriefing : NetworkBehaviour
 
     private void HandleFlowChangedServer()
     {
-        if (_model == null || _director == null)
+        if (_director == null)
             return;
 
-        var briefing = LobbyBriefingRules.IsBriefing(_director.Stage, _director.Phase);
-        if (briefing && _model.State == LobbyBriefingState.Idle)
+        switch (_session.Update(LobbyBriefingRules.IsBriefing(_director.CurrentView)))
         {
-            BeginServer();
-            return;
-        }
-
-        // 진행 중에 단계가 바뀌었다(회차 초기화 등 — 정상 완료는 Update 가 먼저 모델을 끝낸다) — 잠금만 풀고 끝낸다.
-        if (!briefing && _model.Abort())
-        {
-            Debug.LogWarning($"{Tag} 브리핑 중단 — 진행기 {_director.Stage}/{_director.Phase}로 바뀜, 조작 제한 해제.", this);
-            ReleaseLocks("단계 이탈");
+            case LobbyBriefingLockAction.Begin:
+                BeginServer();
+                break;
+            case LobbyBriefingLockAction.Release:
+                ReleaseLocks($"브리핑 묶음 이탈 → {_director.DescribeStep()}");
+                break;
         }
     }
 
     private void BeginServer()
     {
-        _lineBuffer.Clear();
-        foreach (var id in LobbyBriefingRules.LineIds)
-        {
-            var seconds = textTable != null && textTable.TryGetRow(id, out var row) ? row.DurationSeconds : 0f;
-            _lineBuffer.Add(new LobbyBriefingLine(id, seconds));
-        }
-
-        if (!_model.Start(_lineBuffer, leadSeconds, tailSeconds))
-            return;
-
-        // 명세 §4 — 브리핑이 시작되면 재생 중·대기 중인 기존 무전(TRAIN_END 등)을 끈다.
+        // 명세 §4 — 브리핑이 시작되면 재생 중·대기 중인 기존 무전(TRAIN_END 등)을 끈다. 브리핑 대사는 무전이 아니라 대사 행(파사드)이다.
         var radio = LobbyRadio.Active;
         if (radio != null)
             radio.ServerClear();
-        else
-            Debug.LogWarning($"{Tag} LobbyRadio 가 없다 — 기존 무전 종료·브리핑 대사 없이 시간만 잰다.", this);
 
         _lockTimer = LockTickInterval;
         LockConnected();
-        Debug.Log($"[SceneFlow] {Tag} 브리핑 시작 — {_model.TotalSeconds:0.0}초(지연 {leadSeconds}·대사 {_model.Lines.Count}줄·여유 {tailSeconds}), 잠금 {_locks.Count}명");
-    }
-
-    private void PlayLine(string id)
-    {
-        var radio = LobbyRadio.Active;
-        if (radio != null)
-            radio.ServerPlay(id);
+        Debug.Log($"[SceneFlow] {Tag} 브리핑 시작 — {_director.DescribeStep()}, 잠금 {_locks.Count}명");
     }
 
     // 접속자 전원(훈련 명단 밖 늦은 참가자 포함) — 플레이어 오브젝트가 있는 사람만, 이미 잠근 사람·다른 계통이 잠근 사람은 건너뛴다.
@@ -257,43 +202,18 @@ public sealed class LobbyBriefing : NetworkBehaviour
             Debug.Log($"[SceneFlow] {Tag} 브리핑 중 퇴장 client {clientId} — 잠금 장부에서 뺌, 남은 {_locks.Count}명으로 계속");
     }
 
-    // ---------------- 전 피어(표시) ----------------
+    // ---------------- 전 피어(카메라) ----------------
 
-    private void HandleStageChanged(LobbyTrainingStage stage, LobbyTrainingPhase phase)
+    private void HandleStepChanged()
     {
-        ApplyObjective(LobbyBriefingRules.ObjectiveFor(stage, phase));
+        var director = LobbyTrainingDirector.Active;
+        var step = director != null ? director.CurrentView : default;
 
-        _wantCamera = cameraFocus != null && LobbyBriefingRules.IsBriefing(stage, phase);
+        _wantCamera = cameraFocus != null && LobbyBriefingRules.IsBriefing(step);
         if (_wantCamera)
             HoldCamera();
         else
             ReleaseCamera();
-    }
-
-    // 목표 패널은 이 컴포넌트가 띄운 것만 지운다(로비의 다른 목표가 생겨도 덮지 않게).
-    private void ApplyObjective(string id)
-    {
-        if (id == _shownObjective)
-            return;
-
-        var ui = TutorialGuideUI.Instance;
-        if (ui == null)
-        {
-            if (id != null && !_warnedNoUi)
-            {
-                _warnedNoUi = true;
-                Debug.LogWarning($"{Tag} 목표 {id} — 씬에 TutorialGuideUI 가 없어 띄우지 않는다(3.LobbyScene 배치 확인).", this);
-            }
-
-            _shownObjective = null;
-            return;
-        }
-
-        if (id != null)
-            ui.SetObjective(id);
-        else if (_shownObjective != null)
-            ui.SetObjective(null);
-        _shownObjective = id;
     }
 
     private void HoldCamera()
@@ -322,10 +242,5 @@ public sealed class LobbyBriefing : NetworkBehaviour
     {
         _wantCamera = false;
         ReleaseCamera();
-        if (_shownObjective != null)
-        {
-            TutorialGuideUI.Instance?.SetObjective(null);
-            _shownObjective = null;
-        }
     }
 }

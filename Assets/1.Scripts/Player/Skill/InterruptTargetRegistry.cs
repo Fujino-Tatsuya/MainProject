@@ -55,6 +55,35 @@ public static class InterruptTargetRegistry
 
             return found;
         }
+
+        /// <summary>
+        /// 켜진 콜라이더 표면 중 <paramref name="from"/> 에 가장 가까운 점(간파 적중 라이트 틈 수직, 194 후속 — 연출용).
+        /// 몸(트리거 아님) 콜라이더를 먼저 보고, 없으면 트리거까지 본다. 켜진 콜라이더가 없으면 false.
+        /// </summary>
+        public bool TryGetClosestSurfacePoint(Vector3 from, out Vector3 point) =>
+            TryGetClosestSurfacePoint(from, false, out point) || TryGetClosestSurfacePoint(from, true, out point);
+
+        private bool TryGetClosestSurfacePoint(Vector3 from, bool triggers, out Vector3 point)
+        {
+            point = default;
+            float best = float.MaxValue;
+            for (int i = 0; i < _colliders.Length; i++)
+            {
+                Collider c = _colliders[i];
+                if (c == null || !c.enabled || !c.gameObject.activeInHierarchy || c.isTrigger != triggers)
+                    continue;
+
+                Vector3 candidate = AttackShapeQuery.ClosestPoint(c, from);
+                float distance = (candidate - from).sqrMagnitude;
+                if (distance < best)
+                {
+                    best = distance;
+                    point = candidate;
+                }
+            }
+
+            return best < float.MaxValue;
+        }
     }
 
     private static readonly List<Entry> s_entries = new List<Entry>();

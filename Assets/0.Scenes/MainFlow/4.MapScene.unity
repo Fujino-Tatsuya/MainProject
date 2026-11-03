@@ -330,14 +330,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2141664684}
     m_Modifications:
-    - target: {fileID: 496844997193450849, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
-      propertyPath: m_Layer
-      value: 14
-      objectReference: {fileID: 0}
-    - target: {fileID: 505404483568650883, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
-      propertyPath: m_Layer
-      value: 14
-      objectReference: {fileID: 0}
     - target: {fileID: 885060816906195001, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0.669
@@ -361,10 +353,6 @@ PrefabInstance:
     - target: {fileID: 3404462435022388304, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_Name
       value: bossroom
-      objectReference: {fileID: 0}
-    - target: {fileID: 4619234605682112456, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
-      propertyPath: m_Layer
-      value: 14
       objectReference: {fileID: 0}
     - target: {fileID: 4627039947633231218, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: GlobalObjectIdHash
@@ -441,10 +429,6 @@ PrefabInstance:
     - target: {fileID: 7069906824164445699, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0.669
-      objectReference: {fileID: 0}
-    - target: {fileID: 7590406370858292409, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
-      propertyPath: m_Layer
-      value: 14
       objectReference: {fileID: 0}
     - target: {fileID: 8212091248684035610, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: GlobalObjectIdHash

@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 포드 강하 단계 시각표(읽기 전용, 할 일 100 C2d → 106) — <see cref="PodDropSettings"/>·<see cref="LobbyPodLaunch"/> 인스펙터가 같이 그린다.
 /// 클립 단계는 실제로는 클립 애니 이벤트가 넘긴다 — 여기선 FBX 클립의 PodClipEvent 위치(1배속)로 어림한 시각을 보인다(이벤트가 없으면 클립 끝, <see cref="PodAnimEventAuthoring"/>).
-/// 로비 보행 시간은 열린 씬의 <see cref="LobbyPodLaunch"/> 사람별 경로(걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱) 길이 ÷ 걷는 속도 — 서버가 연출 시작 때 복제하는 값과 같은 계산.
+/// 로비 보행 시간은 열린 씬의 <see cref="LobbyPodLaunch"/> 사람별 경로(걷기 시작 지점 → 개인 경로점 → 공용 경로점(합류 이후) → 문턱 → 좌석) 수평 길이 ÷ 걷는 속도 — 서버가 연출 시작 때 복제하는 값과 같은 계산.
 /// 씬이 안 열려 있으면 보행 부분은 '경로 길이 미지'로 둔다.
 /// </summary>
 public static class PodDropScheduleView
@@ -78,7 +78,7 @@ public static class PodDropScheduleView
         if (!known)
         {
             sb.Append($"\n  걷기              ≈{board:0.##}s ~ ?  — 경로 길이 미지, 로비 씬(3.LobbyScene)을 열면 계산");
-            sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 문턱 → 좌석 미끄러짐 {t.SeatSlideSeconds:0.##}s)");
+            sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 수평 속도 {lobby.walkSpeed:0.##}m/s — 문턱 → 좌석 미끄러짐까지 같은 속도, 출발 간격 {t.WalkInterval:0.##}s)");
             sb.Append(LaunchLine(lobby, "가장 늦게 앉는 순간"));
             sb.Append(EndLines(t, null, null));
             sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
@@ -88,11 +88,11 @@ public static class PodDropScheduleView
         for (int slot = 0; slot < t.WalkerCount; slot++)
         {
             float length = t.WalkSecondsOf(slot) * lobby.walkSpeed;
-            sb.Append($"\n  걷기 P{slot + 1}           ≈{t.WalkStartAt(slot, board):0.##} ~ {t.WalkArriveAt(slot, board):0.##}s ({length:0.##}m) → 미끄러짐 ~ {t.WalkEndAt(slot, board):0.##}s");
+            sb.Append($"\n  걷기 P{slot + 1}           ≈{t.WalkStartAt(slot, board):0.##} ~ {t.WalkEndAt(slot, board):0.##}s (좌석까지 수평 {length:0.##}m, {t.WalkSecondsOf(slot):0.##}s)");
         }
 
         double launchAt = t.LaunchAt(board);
-        sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 속도 {lobby.walkSpeed:0.##}m/s, 출발 간격 {t.WalkInterval:0.##}s, 미끄러짐 {t.SeatSlideSeconds:0.##}s, 가장 늦게 앉는 사람 ≈{launchAt:0.##}s)");
+        sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 수평 속도 {lobby.walkSpeed:0.##}m/s — 문턱 → 좌석 미끄러짐까지 같은 속도, 출발 간격 {t.WalkInterval:0.##}s, 가장 늦게 앉는 사람 ≈{launchAt:0.##}s)");
         sb.Append(LaunchLine(lobby, $"≈{launchAt:0.##}s"));
         double launchEnd = launchAt + LaunchRealSeconds(lobby, out _);
         sb.Append(EndLines(t, launchEnd, launchAt));
@@ -188,20 +188,21 @@ public static class PodDropScheduleView
             : "\n  도착 페이드인     없음 (로딩 화면이 걷히자마자 맵이 보인다)");
         sb.Append("\n  레터박스          진입 때부터 덮임 → 디졸브 시작에 걷힘");
         sb.Append($"\n  카메라 지점       착지점 위 {t.HoverHeight + t.CameraStartHeightOffset:0.##}m 고정 → {t.BrakeAt:0.##}s 부터 포드 추적 → 디졸브 끝에 플레이어");
-        sb.Append($"\n  빠른 낙하         {t.FallAt:0.##} ~ {t.BrakeAt:0.##}s ({t.FallHeight:0.##}m → {t.BrakeHeight:0.##}m, {t.FallEase})");
-        sb.Append($"\n  급감속            {t.BrakeAt:0.##} ~ {t.HoverAt:0.##}s ({t.BrakeHeight:0.##}m → {t.HoverHeight:0.##}m, {t.BrakeEase}) — 날개·다리 펴기 동시 시작");
+        sb.Append($"\n  빠른 낙하         {t.FallAt:0.##} ~ {t.BrakeAt:0.##}s ({t.FallHeight:0.##}m → {t.BrakeHeight:0.##}m, {t.FallEase}) — 날개 펴진 채");
+        sb.Append($"\n  급감속            {t.BrakeAt:0.##} ~ {t.HoverAt:0.##}s ({t.BrakeHeight:0.##}m → {t.HoverHeight:0.##}m, {t.BrakeEase}) — 날개 접기·다리 펴기 동시 시작");
 
         float deploy = MaxEvent(map.DeployStates, out string deployText);
         double deployed = t.BrakeAt + deploy;
-        sb.Append($"\n  날개·다리 펴기    {t.BrakeAt:0.##} ~ ≈{deployed:0.##}s ({deployText})");
+        sb.Append($"\n  날개 접기·다리 펴기 {t.BrakeAt:0.##} ~ ≈{deployed:0.##}s ({deployText})");
 
         double landStart = t.LandStartAt(deployed);
         double touchdown = t.TouchdownAt(deployed);
-        sb.Append($"\n  착륙              ≈{landStart:0.##} ~ {touchdown:0.##}s ({t.HoverHeight:0.##}m → 0(+여유 {map.podGroundClearance:0.###}m), {t.LandSeconds:0.##}s {t.LandEase}, 닿는 순간 이펙트·흔들림)");
+        sb.Append($"\n  자유낙하          ≈{landStart:0.##} ~ {touchdown:0.##}s ({t.HoverHeight:0.##}m → 0(+여유 {map.podGroundClearance:0.###}m), " +
+                  $"추진력 없음 g {t.FreefallGravity:0.##}m/s² √(2h/g) = {t.FreefallSeconds:0.##}s, 착지 {t.TouchdownSpeed:0.#}m/s, 닿는 순간 이펙트·흔들림)");
 
         float open = MaxEvent(map.OpenStates, out string openText);
         double opened = touchdown + open;
-        sb.Append($"\n  해치 열기·날개 접기 ≈{touchdown:0.##} ~ {opened:0.##}s ({openText})");
+        sb.Append($"\n  해치 열기         ≈{touchdown:0.##} ~ {opened:0.##}s ({openText})");
         sb.Append($"\n  디졸브            ≈{t.DissolveAt(opened):0.##} ~ {t.ReleaseAt(opened):0.##}s (열기 끝 {t.DissolveDelaySeconds:0.##}s 뒤 — 시작 순간 플레이어 보임·레터박스 걷히기 시작, 실루엣은 끝까지 끔)");
         sb.Append($"\n  레터박스 걷힘     ≈{t.LetterboxOutAt(opened):0.##} ~ {t.LetterboxOutAt(opened) + t.LetterboxOutSeconds:0.##}s ({t.LetterboxOutEase})");
         sb.Append($"\n  조작 해제         ≈{t.ReleaseAt(opened):0.##}s (디졸브 끝 — 입력·실루엣 복귀, 카메라 플레이어 추적)");

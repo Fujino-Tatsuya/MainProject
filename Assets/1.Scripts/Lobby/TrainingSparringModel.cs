@@ -1,32 +1,37 @@
 using System;
 using System.Collections.Generic;
 
-/// <summary>TRAIN_03 훈련 상대 단계(할 일 86 T5a). 진행기 단계(<see cref="LobbyTrainingStage"/>)와 별개 — 상대 쪽 하위 상태다. 복제용이라 byte, 값은 끝에만 추가.</summary>
+/// <summary>
+/// 간파 훈련 상대 하위 단계(할 일 157 ⑦ — 명세 §5 T31~T40). 진행기 단계(<see cref="LobbyTutorialActivity"/>)를 따라가는 상대 쪽 상태다.
+/// 복제용이라 byte, 숫자는 옛 A~D(86) 와 같은 자리 — 값은 끝에만 추가.
+/// </summary>
 public enum TrainingSparringStage : byte
 {
-    /// <summary>TRAIN_03 시작 전(진행기가 Train03A 진행을 아직 안 알렸다).</summary>
+    /// <summary>T31 시작 전(진행기가 Counter 를 아직 안 알렸다).</summary>
     Idle = 0,
-    /// <summary>A 간파 소개 — 처치 불가·칸 전이 중지·칸 UI 숨김. 간파 성공 그로기가 끝나면 완료.</summary>
-    CounterIntro = 1,
-    /// <summary>B 취약 상태의 일반 CC — 학습용 취약 유지·자발 행동 없음. 유효 CC 1회 적용→종료면 완료.</summary>
-    CrowdControlIntro = 2,
-    /// <summary>B→C 명시 초기화 대기 — 상대가 <see cref="TrainingSparringModel.TryConsumeResetRequest"/> 로 받아 실행하고 <see cref="TrainingSparringModel.OnResetExecuted"/> 로 알린다.</summary>
+    /// <summary>T31 간파 — 처치 불가·칸 전이 중지·칸 UI 숨김. 간파 창을 늘린 같은 공격 반복. 간파 성공 순간 완료 + 취약 무기한 유지 시작.</summary>
+    Counter = 1,
+    /// <summary>T32 취약 중 CC — 취약 유지·자발 행동 없음. 단계 진입 뒤 새 시전의 넉백/기절 실제 적용 1회(판정은 <see cref="LobbyCastWindow"/>) = 완료.</summary>
+    VulnerableCc = 2,
+    /// <summary>T33 위치 복귀 — 앞 CC 반응이 끝나면 상대만 C 위치로(취약·칸 보존, 체력만 복구). 실행 = 완료. 이 동안 새 CC 반응 없음.</summary>
     Resetting = 3,
-    /// <summary>C 벽 활용·제압 — 실제 칸 규칙. 지정 벽 유효 충돌 기록 뒤 제압 진입 = D.</summary>
-    WallAndSuppress = 4,
-    /// <summary>D 집중 공격·마무리 — 제압 중 유효 피해 + 제압 종료 → 마무리 체력·처치 방지 해제 → 사망 = 완료.</summary>
-    Finisher = 5,
-    /// <summary>TRAIN_03 완료(상대 처치).</summary>
+    /// <summary>T34 벽 — 지정 벽 유효 넉백 충돌 자체(새 시전) = 완료. 칸 감소는 실제 규칙대로 일어나되 조건 아님. 빗나간 넉백 = 위치 복구 후 재시도.</summary>
+    Wall = 4,
+    /// <summary>T40 제압·처치 — 남은 칸 보존. 칸 0 이면 즉시 제압, 남았으면 패턴 재개 → 간파/벽으로 소진 → 제압. 제압은 처치할 때까지 유지, 제압 중 사망 = 완료.</summary>
+    SuppressKill = 5,
+    /// <summary>T40 완료(상대 처치).</summary>
     Completed = 6,
 }
 
-/// <summary>B 에서 인정하는 일반 CC 종류(사용자 10-22). 간파 성공 그로기·넉백은 CC 가 아니다(이벤트 자체가 따로).</summary>
+/// <summary>상대가 실제로 적용한 CC 종류(비트). 팔라딘 Q 처럼 밀림 + 경직이면 둘 다. 간파 성공 그로기는 CC 가 아니다.</summary>
+[Flags]
 public enum TrainingSparringCrowdControl : byte
 {
-    /// <summary>취약 중 우클릭(간파 스킬) 적중 넉백 — 23호 vulnerableKnockbackDistance/Time, 방향 무관.</summary>
-    VulnerableKnockback = 1,
-    /// <summary>취약 중 팔라딘 Q — 밀림 + 경직.</summary>
-    PushStagger = 2,
+    None = 0,
+    /// <summary>취약 중 밀림 — 간파 스킬 적중(23호 고정 거리) 또는 넉백 세기가 있는 공격.</summary>
+    Knockback = 1,
+    /// <summary>취약 중 기절 — 밀림 뒤 경직(staggerDuration). 넉백 없는 경직 단독은 기절이 아니다(할 일 157 T32 결정 A).</summary>
+    Stun = 2,
 }
 
 /// <summary>총 칸 판정 결과(명세 §9.5 [확인]). 2 미만이면 벽 보상을 배울 수 없다 — 칸을 몰래 늘리지 않고 오류만 낸다.</summary>
@@ -58,39 +63,37 @@ public readonly struct TrainingSparringSegmentCheck
 }
 
 /// <summary>
-/// [서버] TRAIN_03 훈련 상대 상태기계 — 할 일 86 PLAN §3.5·§7, 명세 v0.2 §6(훈련 보정)·§9. NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
-/// <para>시간은 갖지 않는다 — 그로기·취약·제압 시간은 23호 데이터(groggyDuration·vulnerableDuration·breakDuration)로 상대가 재고,
-/// 여기엔 "시작·끝" 이벤트만 들어온다. 게이지 값도 상대가 <see cref="BossCounterProgress"/> 로 갖는다 — 여기는 칸 감소가 있었는지만 받는다.</para>
+/// [서버] 간파 훈련 상대 상태기계 — 할 일 157 ⑦·⑧(PLAN §5 ⑦·⑧, 명세 §5 T30~T40·§6). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
+/// <para>시간은 갖지 않는다 — 그로기·취약·제압 시간은 23호 데이터로 상대가 잰다. "새 시전인가"는 여기서 보지 않는다 —
+/// <see cref="LobbyCastWindow"/> 가 거른 뒤 <see cref="OnCrowdControlAccepted"/>·<see cref="OnWallAccepted"/> 로 들어온다.</para>
 /// <list type="bullet">
-/// <item>A: 처치 불가·칸 전이 중지·칸 UI 숨김. 간파 성공 1회 → 그 그로기 종료 = 완료(보고 1회). 간파 성공 자체엔 넉백 없음.</item>
-/// <item>B: 학습용 취약 유지·자발 공격/이동 없음. 유효 일반 CC(취약 넉백 / Q 밀림경직) 가 B 에서 적용되고 끝나면 완료.
-/// A 에서 걸린 CC·간파 성공 그로기는 제외. B 의 벽 충돌은 C 로 이월하지 않는다.</item>
-/// <item>B→C 초기화: 진행기가 Train03C 진행을 알리면 1회만 요청(재접속·중복 메시지로 반복 안 됨). 실행 보고 뒤 보정 제거·칸 UI 켬.</item>
-/// <item>C: 칸 감소를 동반한 지정 벽 유효 충돌 1회 기록 → 그 뒤 제압 진입 = D(보고 1회). 같은 넉백의 벽+마지막 칸은 상대가 벽을 먼저 알린다.
-/// 이미 0칸이라 감소가 거부된 접촉은 불인정. 벽 목표 전 제압은 정상 실행·종료 후 C 계속. D 전까지 처치 불가.</item>
-/// <item>D: 제압 시작 순간 진입. 제압 종료까지 처치 방지. 제압 중 유효 피해 1회 + 제압 종료 → 마무리 체력 요청(1회)·처치 방지 해제 → 사망 = 완료(보고 1회).
-/// 피해 없이 끝난 제압은 다음 사이클(간파·벽·제압)에서 재확인 — 무기한 제압·강제 쿨 반환 없음.</item>
+/// <item>T31 Counter: 처치 불가·칸 전이 중지. 간파 성공 = 그 순간 완료(보고 1회, 그로기 종료를 기다리지 않음) + 취약 무기한 유지 시작 + 자발 행동 멈춤.</item>
+/// <item>T32 VulnerableCc: 취약 유지·자발 행동 없음. 걸러진 CC 1회 = 완료(적용 순간 — 반응 종료는 T33 이 기다린다). 진입 프레임 이하 사건 불인정(같은 프레임 연쇄 금지).</item>
+/// <item>T33 Resetting: 초기화 요청 1회 — 상대가 CC 반응이 끝난 뒤에만 꺼내 실행(<see cref="TryConsumeResetRequest"/>)하고 <see cref="OnResetExecuted"/> = 완료. 이 동안 새 CC 반응 없음.</item>
+/// <item>T34 Wall: 걸러진 지정 벽 충돌 1회 = 완료. 칸 감소·제압은 실제 규칙(완료 조건 아님). 완료 전 빗나간 넉백은 <see cref="NeedsRetryAfterMiss"/> → 상대가 위치 복구.</item>
+/// <item>T40 SuppressKill(⑧): 칸(게이지) 보존. 진입 때 칸 0·제압 아님이면 즉시 제압(<see cref="ShouldSuppressOnEntry"/>), 남았으면 취약 무기한 보정 해제·자발 행동 재개 →
+/// 실제 규칙(간파·벽)으로 칸 소진 → 제압. 제압 전엔 처치 방지, 제압 중엔 공격 대기·사망 허용. 제압은 지속시간으로 끝나지 않는다(<see cref="HoldsSuppress"/> — 상대가 매 틱 연장, Q17 A).
+/// 사망 = 완료(마지막 타격 귀속 검사 없음). 옛 D 의 '제압 중 피해 → 제압 종료 → 마무리 체력' 단계는 없앴다.</item>
 /// </list>
 /// 이벤트 메서드는 상태가 바뀌었거나 기록했으면 true — 현재 단계에 맞지 않는 이벤트·중복·역순은 무시(false)라 호출측이 로그만 남긴다.
 /// </summary>
 public sealed class TrainingSparringModel
 {
-    readonly Queue<LobbyTrainingStage> _pendingReports = new Queue<LobbyTrainingStage>();
+    const int NoFrame = int.MinValue;
+
+    readonly Queue<LobbyTutorialActivity> _pendingReports = new Queue<LobbyTutorialActivity>();
     readonly bool _suppressAccelerationEnabled;
 
-    bool _counterSucceededInA, _reportedA;
-    bool _reportedB;
-    int _pendingCrowdControl;          // B 에서 적용된 CC 종류 비트(1 << kind)
-    bool _resetRequested, _resetConsumed;
-    bool _wallRecorded;
+    int _stageFrame = NoFrame;
+    bool _counterReported;
+    bool _ccReported;
+    bool _resetRequested, _resetConsumed, _resetReported;
+    bool _wallReported;
     bool _suppressActive;
-    bool _damagedDuringSuppress;
-    bool _finishing;                    // D: 제압 피해 확인 + 제압 종료 — 처치 방지 해제됨
-    bool _finishHealthRequested, _finishHealthConsumed;
 
     /// <param name="segments">총 칸 판정(<see cref="TrainingSparringSegmentCheck.Evaluate"/>). 오류여도 진행은 그대로 — 호출측이 <see cref="TrainingSparringSegmentCheck.Error"/> 를 로그한다.</param>
     /// <param name="suppressAccelerationEnabled">
-    /// 제압 중 쿨타임 가속(명세 §9.5·§9.6). 🔴 보류(사용자 10-22 확인 중) — 실전 코드에 없다. 지금은 false 로 만들고,
+    /// 제압 중 쿨타임 가속(명세 §9.5·§9.6). 🔴 보류 — 실전 코드에 없다. 지금은 false 로 만들고,
     /// 실전 규칙이 생기면 그 데이터 값으로 켠다. 켜도 모델은 <see cref="AppliesSuppressAcceleration"/> 만 낸다(적용은 상대·플레이어 쪽).
     /// </param>
     public TrainingSparringModel(TrainingSparringSegmentCheck segments, bool suppressAccelerationEnabled = false)
@@ -103,39 +106,58 @@ public sealed class TrainingSparringModel
 
     public TrainingSparringSegmentCheck Segments { get; }
 
-    /// <summary>C 에서 지정 벽 유효 충돌을 기록했다(D 진입 조건의 앞 절반).</summary>
-    public bool HasRecordedWall => _wallRecorded;
+    /// <summary>T31 간파 성공을 기록했다(= Counter 보고함).</summary>
+    public bool HasCounterSucceeded => _counterReported;
+
+    /// <summary>T34 지정 벽 충돌을 인정했다(= Wall 보고함).</summary>
+    public bool IsWallReported => _wallReported;
 
     /// <summary>지금 제압 중인가(상대가 알린 시작·종료 사이).</summary>
     public bool IsSuppressActive => _suppressActive;
 
     // ── 출력 ──
 
-    /// <summary>처치 방지 — A~D 동안 체력이 0 이 되지 않게 한다. D 에서 제압 피해 확인 + 제압 종료 뒤에만 해제.</summary>
-    public bool PreventsDeath => Stage != TrainingSparringStage.Completed && !_finishing;
+    /// <summary>처치 방지 — 완료 전까지 체력이 0 이 되지 않게 한다. T40 제압 중에만 해제(제압 진입 = 사망 허용).</summary>
+    public bool PreventsDeath => Stage != TrainingSparringStage.Completed && !IsKillable;
 
-    /// <summary>간파·벽의 칸 감소와 제압 전이를 허용 — C·D(실제 규칙). A/B 는 중지(첫 성공의 벽/칸이 C/D 를 미리 완료하지 않게).</summary>
-    public bool AllowsGaugeTransition => Stage == TrainingSparringStage.WallAndSuppress || Stage == TrainingSparringStage.Finisher;
+    /// <summary>T40 제압 중 — 처치 가능(사망 = 완료).</summary>
+    public bool IsKillable => Stage == TrainingSparringStage.SuppressKill && _suppressActive;
 
-    /// <summary>B 학습용 취약 유지 — 취약 시간이 끝나도 풀지 않는다. 일반 CC 반응은 정상(영구 경직 금지).</summary>
-    public bool HoldsVulnerable => Stage == TrainingSparringStage.CrowdControlIntro;
+    /// <summary>
+    /// 제압 무기한 유지 — T34·T40 제압 중. 제압 지속시간이 끝나도 풀지 않는다(상대가 매 틱 연장, PLAN Q17 A — 23호·공용 코드 무수정).
+    /// T34 의 제압(지정 벽으로 칸 0)도 T40 이 이어받을 때까지 잡아 둔다.
+    /// </summary>
+    public bool HoldsSuppress => _suppressActive && AllowsGaugeTransition;
 
-    /// <summary>칸 UI(중간보스 체력바 재사용) 표시 — 초기화 뒤 C·D.</summary>
-    public bool ShowsSegmentUi => Stage == TrainingSparringStage.WallAndSuppress || Stage == TrainingSparringStage.Finisher;
+    /// <summary>간파·벽의 칸 감소와 제압 전이를 허용 — T34·T40. T31~T33 은 중지(간파 성공·CC 중 벽이 칸을 미리 깎지 않게).</summary>
+    public bool AllowsGaugeTransition => Stage == TrainingSparringStage.Wall || Stage == TrainingSparringStage.SuppressKill;
 
-    /// <summary>D 마무리 중 — 제압 피해 확인 + 제압 종료 뒤 사망 전까지. 바 이름이 칸 대신 '마무리하세요'(할 일 86 T5c 후속).</summary>
-    public bool IsFinishing => Stage == TrainingSparringStage.Finisher && _finishing;
+    /// <summary>취약 무기한 유지 — T31 간파 성공부터 T34 끝(T40 알림)까지. 취약 시간이 끝나도 풀지 않는다(상대가 매 틱 연장, PLAN Q17).</summary>
+    public bool HoldsVulnerable => _counterReported
+        && (Stage == TrainingSparringStage.Counter || Stage == TrainingSparringStage.VulnerableCc
+            || Stage == TrainingSparringStage.Resetting || Stage == TrainingSparringStage.Wall);
 
-    /// <summary>자발 공격·이동 허용 — A(간파 가능한 직접 공격 반복)·C·D. B·초기화 중·시작 전·완료는 없음.</summary>
-    public bool AllowsSelfAction => Stage == TrainingSparringStage.CounterIntro
-        || Stage == TrainingSparringStage.WallAndSuppress
-        || Stage == TrainingSparringStage.Finisher;
+    /// <summary>새 CC 반응을 받는가 — T33 위치 복귀 중엔 받지 않는다(잔여 CC 정리, 명세 T33).</summary>
+    public bool AcceptsCrowdControl => Stage != TrainingSparringStage.Resetting;
 
-    /// <summary>제압 중 쿨타임 가속을 적용할지 — 🔴 보류 플래그. 생성자에서 켠 경우에만 C·D 제압 중 true.</summary>
+    /// <summary>칸 UI(중간보스 체력바 재사용) 표시 — T34·T40.</summary>
+    public bool ShowsSegmentUi => Stage == TrainingSparringStage.Wall || Stage == TrainingSparringStage.SuppressKill;
+
+    /// <summary>자발 공격·이동 허용 — T31 간파 성공 전(간파 가능한 같은 공격 반복)·T40 제압 전(패턴 재개). T32~T34·T40 제압 중(공격 대기)·시작 전·완료는 없음.</summary>
+    public bool AllowsSelfAction => (Stage == TrainingSparringStage.Counter && !_counterReported)
+        || (Stage == TrainingSparringStage.SuppressKill && !_suppressActive);
+
+    /// <summary>훈련 간파 창 연장(PLAN Q11 A) — T31 간파 성공 전에만. 신호(기존 간파 예고)를 보고 입력해도 성공할 길이를 상대가 보장한다.</summary>
+    public bool ExtendsCounterWindow => Stage == TrainingSparringStage.Counter && !_counterReported;
+
+    /// <summary>제압 중 쿨타임 가속을 적용할지 — 🔴 보류 플래그. 생성자에서 켠 경우에만 T34·T40 제압 중 true.</summary>
     public bool AppliesSuppressAcceleration => _suppressAccelerationEnabled && _suppressActive && AllowsGaugeTransition;
 
+    /// <summary>T34 완료 전 넉백이 지정 벽을 못 맞히고 끝났으면 위치 복구 후 재시도(명세 T34).</summary>
+    public bool NeedsRetryAfterMiss => Stage == TrainingSparringStage.Wall && !_wallReported;
+
     /// <summary>진행기에 보낼 단계 완료 보고를 하나 꺼낸다(완료마다 정확히 1회). 없으면 false.</summary>
-    public bool TryConsumeStageReport(out LobbyTrainingStage completed)
+    public bool TryConsumeStageReport(out LobbyTutorialActivity completed)
     {
         if (_pendingReports.Count == 0)
         {
@@ -147,52 +169,59 @@ public sealed class TrainingSparringModel
         return true;
     }
 
-    /// <summary>B→C 초기화 실행 요청 — 회차마다 처음 한 번만 true.</summary>
-    public bool TryConsumeResetRequest()
+    /// <summary>
+    /// T33 초기화 실행 요청 — 회차마다 처음 한 번만 true. 앞 CC 반응(밀림·기절)이 남아 있으면 기다린다(false, 다음 틱 재시도).
+    /// </summary>
+    public bool TryConsumeResetRequest(bool crowdControlActive)
     {
-        if (!_resetRequested || _resetConsumed)
+        if (!_resetRequested || _resetConsumed || crowdControlActive)
             return false;
 
         _resetConsumed = true;
         return true;
     }
 
-    /// <summary>마무리 체력(훈련 데이터) 적용 요청 — D 에서 제압 피해 확인 + 제압 종료 뒤 처음 한 번만 true.</summary>
-    public bool TryConsumeFinishHealthRequest()
-    {
-        if (!_finishHealthRequested || _finishHealthConsumed)
-            return false;
-
-        _finishHealthConsumed = true;
-        return true;
-    }
+    /// <summary>
+    /// T40 진입 때 바로 제압할지 — 벽 충돌로 남은 칸이 0 인데 아직 제압이 아니면 true(명세 T40 '0칸이면 즉시 제압').
+    /// 보통은 T34 의 그 벽 충돌이 이미 제압을 걸어 두어(<see cref="HoldsSuppress"/>) false 다.
+    /// </summary>
+    public bool ShouldSuppressOnEntry(int remainingSegments) =>
+        Stage == TrainingSparringStage.SuppressKill && !_suppressActive && remainingSegments <= 0;
 
     // ── 입력 ──
 
     /// <summary>
-    /// 진행기 단계 진행 알림(Train03A~D 가 InProgress 가 된 때). 앞으로만 — 같은 단계·역순·다른 단계는 무시.
-    /// Train03C = 초기화 요청 1회(이미 요청했으면 무시). Train03D = 상대가 제압 시작에서 이미 D 로 넘어갔으면 확인만(false).
+    /// 진행기 단계 시작 알림(T31~T40 Activity, <paramref name="frame"/> = 알린 프레임). 앞으로만 — 앞 단계를 끝내지 않았거나 같은 단계·역순은 무시.
+    /// 이 프레임 이하의 사건은 이 단계의 완료로 세지 않는다(한 프레임 연쇄 금지 — 명세 §6 끝).
     /// </summary>
-    public bool OnFlowStageStarted(LobbyTrainingStage flowStage)
+    public bool OnFlowStageStarted(LobbyTutorialActivity flowStage, int frame)
     {
         switch (flowStage)
         {
-            case LobbyTrainingStage.Train03A:
+            case LobbyTutorialActivity.Counter:
                 if (Stage != TrainingSparringStage.Idle) return false;
-                Stage = TrainingSparringStage.CounterIntro;
+                Enter(TrainingSparringStage.Counter, frame);
                 return true;
 
-            case LobbyTrainingStage.Train03B:
-                if (Stage != TrainingSparringStage.CounterIntro || !_reportedA)
-                    return false;
-                Stage = TrainingSparringStage.CrowdControlIntro;
-                _pendingCrowdControl = 0;
+            case LobbyTutorialActivity.VulnerableCc:
+                if (Stage != TrainingSparringStage.Counter || !_counterReported) return false;
+                Enter(TrainingSparringStage.VulnerableCc, frame);
                 return true;
 
-            case LobbyTrainingStage.Train03C:
-                if (Stage != TrainingSparringStage.CrowdControlIntro || _resetRequested) return false;
-                Stage = TrainingSparringStage.Resetting;
+            case LobbyTutorialActivity.ResetPosition:
+                if (Stage != TrainingSparringStage.VulnerableCc || !_ccReported) return false;
+                Enter(TrainingSparringStage.Resetting, frame);
                 _resetRequested = true;
+                return true;
+
+            case LobbyTutorialActivity.Wall:
+                if (Stage != TrainingSparringStage.Resetting || !_resetReported) return false;
+                Enter(TrainingSparringStage.Wall, frame);
+                return true;
+
+            case LobbyTutorialActivity.SuppressKill:
+                if (Stage != TrainingSparringStage.Wall || !_wallReported) return false;
+                Enter(TrainingSparringStage.SuppressKill, frame);   // 칸·T34 에서 걸린 제압은 그대로 이어받는다
                 return true;
 
             default:
@@ -201,113 +230,66 @@ public sealed class TrainingSparringModel
     }
 
     /// <summary>
-    /// 초기화를 실행했다(상대 공격·CC 안전 종료, 위치·체력·취약·제압 리셋, C 위치 재배치, 칸 가득). C 시작 — 보정 제거·칸 UI 켬.
-    /// 요청을 꺼낸 뒤에만 받는다.
+    /// 지정 상대의 실제 간파 성공(창 소비). T31 에서 처음이면 그 순간 완료(보고 1회) — 그로기 종료를 기다리지 않는다.
+    /// 그 밖 단계의 간파는 상대가 실제 규칙대로 처리하고 모델은 무관.
     /// </summary>
-    public bool OnResetExecuted()
-    {
-        if (Stage != TrainingSparringStage.Resetting || !_resetConsumed)
-            return false;
-
-        Stage = TrainingSparringStage.WallAndSuppress;
-        _wallRecorded = false;
-        _suppressActive = false;
-        return true;
-    }
-
-    /// <summary>간파 성공(게이지가 남아 그로기·취약 진입). A 에서만 기록 — 나머지 단계에선 상대가 실제 규칙대로 처리하고 모델은 무관.</summary>
     public bool OnCounterSucceeded()
     {
-        if (Stage != TrainingSparringStage.CounterIntro || _counterSucceededInA)
+        if (Stage != TrainingSparringStage.Counter || _counterReported)
             return false;
 
-        _counterSucceededInA = true;
-        return true;
-    }
-
-    /// <summary>간파 성공 그로기 종료. A 에서 성공을 기록한 뒤면 A 완료(보고 1회). 성공 전 그로기 종료·중복은 무시.</summary>
-    public bool OnCounterGroggyEnded()
-    {
-        if (Stage != TrainingSparringStage.CounterIntro || !_counterSucceededInA || _reportedA)
-            return false;
-
-        _reportedA = true;
-        _pendingReports.Enqueue(LobbyTrainingStage.Train03A);
-        return true;
-    }
-
-    /// <summary>일반 CC 가 적용됐다(면역 등으로 거부된 공격은 상대가 부르지 않는다). B 에서만 기록.</summary>
-    public bool OnCrowdControlApplied(TrainingSparringCrowdControl kind)
-    {
-        if (Stage != TrainingSparringStage.CrowdControlIntro || _reportedB || !IsDefined(kind))
-            return false;
-
-        _pendingCrowdControl |= Bit(kind);
-        return true;
-    }
-
-    /// <summary>일반 CC 가 끝났다. B 에서 적용된 같은 종류면 B 완료(보고 1회). A 에서 걸린 CC 의 종료·적용 없는 종료는 무시.</summary>
-    public bool OnCrowdControlEnded(TrainingSparringCrowdControl kind)
-    {
-        if (Stage != TrainingSparringStage.CrowdControlIntro || _reportedB || !IsDefined(kind)
-            || (_pendingCrowdControl & Bit(kind)) == 0)
-            return false;
-
-        _reportedB = true;
-        _pendingCrowdControl = 0;
-        _pendingReports.Enqueue(LobbyTrainingStage.Train03B);
+        _counterReported = true;
+        _pendingReports.Enqueue(LobbyTutorialActivity.Counter);
         return true;
     }
 
     /// <summary>
-    /// 지정 벽 유효 충돌(<c>UnitWallImpacts</c> 경로, 넉백 1회당 최대 1회는 상대가 보장). C 에서 칸 감소를 동반했을 때만 벽 목표 기록 —
-    /// 이번 호출이 처음 기록이면 true(첫 벽 무전용). 이미 0칸이라 감소가 거부된 접촉·제압 중·A/B/D 의 충돌은 무시.
-    /// 같은 넉백의 마지막 칸이면 상대는 이걸 <see cref="OnSuppressStarted"/> 보다 먼저 부른다.
+    /// 새 시전의 CC 실제 적용(<see cref="LobbyCastWindow"/> 통과, <paramref name="eventFrame"/> = 적용 프레임). T32 에서 진입 프레임 뒤 처음이면 완료(보고 1회).
     /// </summary>
-    public bool OnWallImpact(bool reducedGauge)
+    public bool OnCrowdControlAccepted(int eventFrame)
     {
-        // 제압 중엔 게이지가 0 이라 감소가 있을 수 없다 — 들어오면 상대 쪽 오류라 기록하지 않는다.
-        if (Stage != TrainingSparringStage.WallAndSuppress || !reducedGauge || _wallRecorded || _suppressActive)
+        if (Stage != TrainingSparringStage.VulnerableCc || _ccReported || !IsAfterEntry(eventFrame))
             return false;
 
-        _wallRecorded = true;
+        _ccReported = true;
+        _pendingReports.Enqueue(LobbyTutorialActivity.VulnerableCc);
         return true;
     }
 
-    /// <summary>
-    /// 제압 진입(게이지 0). C 에서 벽을 기록했으면 지금이 D 시작(Train03C 완료 보고 1회). 벽 전이면 정상 제압만(C 계속).
-    /// D 에서의 새 제압은 피해 확인을 새로 시작한다. A/B(전이 중지)·마무리 중·중복 시작은 무시.
-    /// </summary>
+    /// <summary>T33 초기화를 실행했다(CC 반응 끝 → 상대만 C 위치, 취약·칸 보존, 체력 복구, 잔여 CC 정리). 요청을 꺼낸 뒤 1회 = 완료(보고).</summary>
+    public bool OnResetExecuted()
+    {
+        if (Stage != TrainingSparringStage.Resetting || !_resetConsumed || _resetReported)
+            return false;
+
+        _resetReported = true;
+        _pendingReports.Enqueue(LobbyTutorialActivity.ResetPosition);
+        return true;
+    }
+
+    /// <summary>새 시전 넉백의 지정 벽 유효 충돌(<see cref="LobbyCastWindow"/> 통과). T34 에서 진입 프레임 뒤 처음이면 완료(보고 1회).</summary>
+    public bool OnWallAccepted(int eventFrame)
+    {
+        if (Stage != TrainingSparringStage.Wall || _wallReported || !IsAfterEntry(eventFrame))
+            return false;
+
+        _wallReported = true;
+        _pendingReports.Enqueue(LobbyTutorialActivity.Wall);
+        return true;
+    }
+
+    /// <summary>제압 진입(게이지 0). T34·T40 에서만 — T34 의 제압은 완료 조건이 아니다(T40 이 이어받는다). 중복 시작은 무시.</summary>
     public bool OnSuppressStarted()
     {
-        if (!AllowsGaugeTransition || _suppressActive || _finishing)
+        if (!AllowsGaugeTransition || _suppressActive)
             return false;
 
         _suppressActive = true;
-        _damagedDuringSuppress = false;
-
-        if (Stage == TrainingSparringStage.WallAndSuppress && _wallRecorded)
-        {
-            Stage = TrainingSparringStage.Finisher;
-            _pendingReports.Enqueue(LobbyTrainingStage.Train03C);
-        }
-
-        return true;
-    }
-
-    /// <summary>제압 중 유효 피해(실제로 체력에 들어간 플레이어 피해). D 의 제압 중에만 기록 — 처음이면 true.</summary>
-    public bool OnSuppressDamage()
-    {
-        if (Stage != TrainingSparringStage.Finisher || !_suppressActive || _damagedDuringSuppress)
-            return false;
-
-        _damagedDuringSuppress = true;
         return true;
     }
 
     /// <summary>
-    /// 제압 종료(게이지 가득 복원은 상대 몫). D 에서 이번 제압 중 피해가 있었으면 마무리 — 처치 방지 해제·마무리 체력 요청 1회.
-    /// 피해가 없었으면 D 유지(다음 제압에서 재확인). C 에선 정상 종료만.
+    /// 제압 종료(게이지 가득 복원은 상대 몫). T34·T40 제압은 <see cref="HoldsSuppress"/> 라 보통 오지 않는다 — 와도(외부 해제) 제압 전으로 돌아가 처치 방지·패턴 재개.
     /// </summary>
     public bool OnSuppressEnded()
     {
@@ -315,29 +297,25 @@ public sealed class TrainingSparringModel
             return false;
 
         _suppressActive = false;
-        if (Stage == TrainingSparringStage.Finisher && _damagedDuringSuppress)
-        {
-            _finishing = true;
-            _finishHealthRequested = true;
-        }
-
-        _damagedDuringSuppress = false;
         return true;
     }
 
-    /// <summary>상대 사망. D 마무리(처치 방지 해제 뒤)에서만 완료(Train03D 보고 1회). 그 밖의 사망은 처치 방지 누락 — false(호출측 경고).</summary>
+    /// <summary>상대 사망. T40 제압 중(처치 방지 해제)에서만 완료(SuppressKill 보고 1회) — 누가 마지막에 쳤는지는 보지 않는다. 그 밖의 사망은 처치 방지 누락 — false(호출측 경고).</summary>
     public bool OnDied()
     {
-        if (Stage != TrainingSparringStage.Finisher || !_finishing)
+        if (!IsKillable)
             return false;
 
         Stage = TrainingSparringStage.Completed;
-        _pendingReports.Enqueue(LobbyTrainingStage.Train03D);
+        _pendingReports.Enqueue(LobbyTutorialActivity.SuppressKill);
         return true;
     }
 
-    static bool IsDefined(TrainingSparringCrowdControl kind) =>
-        kind == TrainingSparringCrowdControl.VulnerableKnockback || kind == TrainingSparringCrowdControl.PushStagger;
+    void Enter(TrainingSparringStage stage, int frame)
+    {
+        Stage = stage;
+        _stageFrame = frame;
+    }
 
-    static int Bit(TrainingSparringCrowdControl kind) => 1 << (int)kind;
+    bool IsAfterEntry(int eventFrame) => _stageFrame == NoFrame || eventFrame > _stageFrame;
 }

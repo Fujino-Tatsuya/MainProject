@@ -37,6 +37,8 @@
   구성원은 씬 탐색이 아니라 등록식 목록 `PlayerLifeCycleController.Active`(OnEnable 등록·OnDisable 해제, `ActiveRegistry<T>`)를 0.25초마다 순회하고, 규칙도 `MultiGameRule.Current`(같은 등록 방식)로 읽는다(할 일 69 — `FindObjectsByType` 1회 8 ms 실측).
   `MultiGameRule` 이 없거나 스폰 전이면 예전 규칙(전원 PermanentDead). 2단계 리스폰이 Soul 도 전원 살리므로 갇힌 Soul 은 전멸 리스폰으로 풀린다(D1 유지).
 - 튜토리얼 G11 뒤 자동 부활이 풀 0 으로 거부되면 경고 로그 후 Soul 로 남는다(`MapSceneDeathRules.Revive`).
+- **보스방 자동 부활(2026-11-02, [PLAN-auto-revive.md](../../PLAN-auto-revive.md))**: 튜토리얼 보스방 도착 뒤 사망도 3초 뒤 그 자리에서 차감 부활한다(키 입력 없음 — 전엔 F10 뿐).
+  목숨이 남은 채 전원 Soul 이면 `IsStillInPlay` 가 전멸로 안 세서 멈추던 경우가 이것으로 풀린다. 목숨 0 이후는 위 규칙 그대로(관전 → 전멸 리스폰). 절차 맵은 해당 없음(F10 만).
 - **보스 강제 개시 부활**(`BossTeleportManager.ReviveSoulsForForcedStart`) — 제한시간 만료 → 경고 카운트다운 → **보스방으로 강제 이동하기 직전**에, 그 순간 Soul 인 사람을 전부 되살린다(팀장 확정 2026-09-20).
   이유: Soul 만 보스방에 도착하면 디렉터가 참가자를 못 잡아 보스가 아예 안 뜬다. 패드로 들어가는 정상 이동에는 없다(만료 강제 이동만).
   - 차감: Soul 마다 공용 풀에서 1개씩 쓴다 — 풀이 모자라면 `ConnectedClientsList` 순회 앞쪽만 산다(못 산 사람은 Soul 그대로 이동).

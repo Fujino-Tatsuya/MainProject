@@ -762,6 +762,12 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// </summary>
     public event Action<DamageDealtInfo> ClientDamagedAttributed;
 
+    /// <summary>
+    /// 같은 RPC 를 타격 1회로 한 번만 알린다(보호막+체력을 함께 깎아도 1회) — 인자 = 공격자 clientId.
+    /// 타수를 세는 연출(제압 가속 3타 줌인, 할 일 174)용. <see cref="ClientDamagedAttributed"/> 다음에 낸다.
+    /// </summary>
+    public event Action<ulong> ClientHitAttributed;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -827,6 +833,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
             ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
                 hpDamage, DamageChannel.Hp, attackerClientId,
                 resolvedAttackType, resolvedHitPattern));
+
+        if (shieldDamage > 0 || hpDamage > 0)
+            ClientHitAttributed?.Invoke(attackerClientId);
     }
     #endregion
 

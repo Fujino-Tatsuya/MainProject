@@ -4,7 +4,8 @@ using UnityEngine;
 /// <summary>
 /// 어쌔신 변신 E 원형 5타 — 변신 중 Sub 슬롯 대체 스킬(alternateSkills[Sub], character_assassin.md §9, PLAN-assassin A9).
 ///
-/// 조준 = 공용 GroundPoint + 고정 거리(A4): 원 중심이 플레이어에서 castRange(1.5m) 떨어져 마우스 방향으로 돈다, 효과 반경 aoeRadius(2m).
+/// 조준 = 공용 GroundPoint + 고정 거리(A4): 원 중심이 플레이어에서 castRange(1.5m) 떨어져 마우스 방향으로 돈다, 효과 반경 = 데이터 hitArea 원 radius(2m).
+/// 판정 = 판정 도형(할 일 153) — 기준점 = 원 중심(지면 조준점, 발 높이), <see cref="AttackShapeQuery.Collect"/>, 칼날의 영역 = 반경 배율 복사본.
 /// 조준 중 이동 가능·무적 없음·쿨 없음. 조준 중 변신이 끝나면(만료·R 해제) <see cref="AssassinState"/> 가 오너 조준을 취소한다(한 곳).
 ///
 /// 확정(좌클릭) = 서버 승인 = 공격 시작: 쿨 12초 시작(자동 커밋), 플레이어 위치·원 중심(서버 재투영 지점)을 고정한다.
@@ -22,11 +23,14 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
     private Collider[] hitResults;
     private readonly AssassinCircleStrikeSequence sequence = new AssassinCircleStrikeSequence();
     private readonly List<Unit> strikeLandedUnits = new List<Unit>();
+    // 도형 질의(할 일 153) — 질의 하나 안의 1회 키. 타마다 1회는 sequence 가 맡는다.
+    private readonly HashSet<Object> strikeSeen = new HashSet<Object>();
+    private readonly List<AttackShapeHit> shapeHits = new List<AttackShapeHit>();
+    private System.Func<Collider, Object> resolveTarget;
 
-    // 서버 — 확정 순간 고정한 원 중심(높이 = 플레이어 발)
-    private Vector3 areaCenter;
-    // 서버 — 확정 순간 고정한 판정 반경(데이터 반경 × 칼날의 영역 반경 배율). 5타 모두 이 값.
-    private float areaRadius;
+    // 서버 — 확정 순간 고정한 판정 영역(데이터 hitArea × 칼날의 영역 반경 배율)·기준 포즈(원 중심, 높이 = 플레이어 발). 5타 모두 이 값.
+    private AttackShapeSet serverArea;
+    private AttackShapePose serverPose;
     private bool hasInvulnerability;
 
     private static readonly SkillAnimationEventType[] RequiredEvents =
@@ -34,6 +38,10 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
     public override bool CanMoveWhileActive => false;
+
+    // 좌클릭 홀드 중 변신 E — 5타가 끝난 뒤 아직 누르고 있으면 기본 공격을 잇는다(할 일 146, 어쌔신 일반 E 와 같은 규칙).
+    public override bool ResumesBasicAttackOnHold => true;
+
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
 
     private AssassinCircleStrikeSkillData StrikeData => Data as AssassinCircleStrikeSkillData;
@@ -68,8 +76,10 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
         // 확정 지점은 컨트롤러가 서버 위치 기준으로 재투영해 넘긴다(A4). 없으면 승인 방향 × 중심 거리.
         Vector3 origin = owner.transform.position;
-        areaCenter = AreaCenter(origin, HasAimPoint ? AimPoint : origin + direction * data.CenterDistance);
-        areaRadius = ScaledRadius(data);
+        Vector3 aimPoint = HasAimPoint ? AimPoint : origin + direction * data.CenterDistance;
+        Vector3 areaCenter = AreaCenter(origin, aimPoint);
+        float radiusMultiplier = RadiusMultiplier();
+        serverArea = ResolveStrikeArea(data, origin, aimPoint, radiusMultiplier, out serverPose);
 
         sequence.Begin(data.HitCount);
 
@@ -80,7 +90,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
             hasInvulnerability = true;
         }
 
-        Edit.Log($"[Assassin/E변신] 공격 시작 — 중심 {areaCenter}, 반경 {areaRadius:F2}m, {data.HitCount}타, 피해 {damageSnapshot}/타", this);
+        Edit.Log($"[Assassin/E변신] 공격 시작 — 중심 {areaCenter}, 반경 {data.AreaRadius * radiusMultiplier:F2}m, {data.HitCount}타, 피해 {damageSnapshot}/타", this);
     }
 
     // 전 피어 — 원 루프 연출(Multi Slashes). 클라는 서버 재투영 지점을 모르므로 승인 방향 × 중심 거리로 근사한다
@@ -94,6 +104,18 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
         direction.y = 0f;
         Vector3 forward = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
         view.BeginCircleStrike(owner.transform.position + forward * data.CenterDistance, data.AreaRadius, data.MaxActiveDuration);
+
+        // 특성 연출 사건(할 일 145) — 칼날의 영역을 가진 변신 E 시작(OnClientPlay — 호스트 1번). Variant 1.
+        // 도형·포즈 = 서버 확정과 같은 식(넓어진 원). 클라 지점은 PlaySkillClientRpc 가 넘긴 서버 지점(없으면 승인 방향 × 중심 거리).
+        if (TraitSkillFx.Has(owner, TraitFxTrait.AssassinBladeDomain))
+        {
+            Vector3 origin = owner.transform.position;
+            Vector3 aimPoint = HasAimPoint ? AimPoint : origin + forward * data.CenterDistance;
+            AttackShapeSet area = ResolveStrikeArea(data, origin, aimPoint, RadiusMultiplier(), out AttackShapePose pose);
+            Vector3 center = AreaCenter(origin, aimPoint);
+            TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.AssassinBladeDomain, TraitFxKind.Activated, owner, center, forward, center,
+                shape: area, pose: pose, variant: 1));
+        }
     }
 
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
@@ -128,24 +150,23 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
     private void StrikeArea()
     {
         AssassinCircleStrikeSkillData data = StrikeData;
-        if (data == null || owner == null || hitResults == null)
+        if (data == null || owner == null || hitResults == null || serverArea == null)
             return;
 
-        SkillHitVolume area = HitVolume(areaCenter, data, areaRadius);
-        int count = area.Overlap(hitResults, area.Mask, QueryTriggerInteraction.Collide);
+        strikeSeen.Clear();
+        shapeHits.Clear();
+        // 키 = Unit, Unit 이 아닌 대상(상자)은 Hurtbox(Q 와 같은 규칙). 시전자 자신은 null.
+        resolveTarget ??= ResolveShapeTarget;
+        AttackShapeQuery.Collect(serverArea, serverPose, data.HittableLayers, QueryTriggerInteraction.Collide, hitResults, resolveTarget, strikeSeen, shapeHits);
 
         strikeLandedUnits.Clear();
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < shapeHits.Count; i++)
         {
-            Collider hit = hitResults[i];
-            if (hit == null || !area.Accepts(hit.bounds))
-                continue;
-
+            Collider hit = shapeHits[i].Collider;
+            Object target = shapeHits[i].Target;
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
 
-            // 상자처럼 Unit 이 아닌 대상은 Hurtbox 를 키로 쓴다(Q 와 같은 규칙).
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !sequence.TryRegisterTarget(target))
+            if (!sequence.TryRegisterTarget(target))
                 continue;
 
             AttackInfo attackInfo = new AttackInfo(damageSnapshot, DamageAttackType, hitPattern: DamageHitPattern);
@@ -163,8 +184,6 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
 
             if (unit != null)
                 strikeLandedUnits.Add(unit);
-            if (backAttack)
-                AssassinHitTargets.NotifyBackAttackHit(owner, hit, unit, hitContext);
 
             Edit.Log($"[Assassin/E변신] {sequence.StrikesDone}타 적중 — {target.name} 피해 {attackInfo.damage}{(backAttack ? " (백어택)" : "")}", this);
         }
@@ -183,13 +202,24 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
             return false;
         }
 
-        volume = HitVolume(AreaCenter(casterPosition, aimPoint), data, ScaledRadius(data));
+        volume = PreviewVolume(data, casterPosition, AreaCenter(casterPosition, aimPoint), RadiusMultiplier());
         return true;
     }
 
-    // 판정 반경 = 데이터 반경 × 칼날의 영역 반경 배율(서버 확정·오너 미리보기 공용 — 특성 수치는 전 피어 같은 값). 원 베기 VFX 크기는 데이터 반경 그대로.
-    private float ScaledRadius(AssassinCircleStrikeSkillData data) =>
-        AssassinTraitAreaRules.ScaleRadius(owner != null ? owner.TraitModifiers : null, AssassinTraitAreaRules.CircleStrike, data.AreaRadius);
+    // 칼날의 영역 반경 배율(서버 확정·오너 미리보기·특성 랩 기즈모 공용 — 특성 수치는 전 피어 같은 값). 원 베기 VFX 크기는 데이터 반경 그대로.
+    public float RadiusMultiplier() =>
+        AssassinTraitAreaRules.ScaleRadius(owner != null ? owner.TraitModifiers : null, AssassinTraitAreaRules.CircleStrike, 1f);
+
+    /// <summary>
+    /// 타격 판정 영역·기준 포즈(할 일 153) — 데이터 hitArea × 칼날의 영역 반경 배율, 기준점 = 원 중심(<see cref="AreaCenter"/> — 조준 지점 + 발 높이).
+    /// 서버 확정(<see cref="OnServerStart"/>)과 특성 랩 공격 범위 기즈모(할 일 153 6단계)가 같이 쓴다.
+    /// </summary>
+    public static AttackShapeSet ResolveStrikeArea(AssassinCircleStrikeSkillData data, Vector3 casterPosition, Vector3 aimPoint, float radiusMultiplier,
+        out AttackShapePose pose)
+    {
+        pose = data.StrikePose(casterPosition, AreaCenter(casterPosition, aimPoint));
+        return data.StrikeArea(radiusMultiplier);
+    }
 
     /// <summary>원 중심 = 시전 지점의 수평 위치 + 시전자 발 높이(서버 확정·오너 미리보기 공용).</summary>
     public static Vector3 AreaCenter(Vector3 casterPosition, Vector3 point)
@@ -198,14 +228,26 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase, ISkillGroundHit
         return point;
     }
 
-    /// <summary>판정 원기둥(서버 타격·오너 미리보기 공용) — 반경 aoeRadius, 높이 areaHeight, 피격 레이어 hittableLayers.</summary>
-    public static SkillHitVolume HitVolume(Vector3 areaCenter, AssassinCircleStrikeSkillData data) =>
-        HitVolume(areaCenter, data, data.AreaRadius);
-
-    /// <summary>위와 같고 반경을 직접 준다(특성 반경 배율을 바른 값).</summary>
-    public static SkillHitVolume HitVolume(Vector3 areaCenter, AssassinCircleStrikeSkillData data, float radius)
+    /// <summary>
+    /// 오너 미리보기 영역(스킬 범위 외곽선, 할 일 58) — 서버 타격과 같은 판정 도형(<see cref="AssassinCircleStrikeSkillData.StrikeArea"/>)·포즈의 첫 도형.
+    /// 원이면 그 원기둥(도형 높이 범위), 아니면 넓은 질의 상자. 외곽선 후보 거름은 콜라이더 AABB(서버 판정 점보다 약간 넓다).
+    /// </summary>
+    public static SkillHitVolume PreviewVolume(AssassinCircleStrikeSkillData data, Vector3 casterPosition, Vector3 areaCenter, float radiusMultiplier)
     {
-        return SkillHitVolume.CircleColumn(areaCenter, radius, data.AreaHeight, data.HittableLayers);
+        AttackShapeSet area = data.StrikeArea(radiusMultiplier);
+        AttackShape shape = area.IsEmpty ? null : area.Shapes[0];
+        AttackShapePose pose = data.StrikePose(casterPosition, areaCenter);
+        if (shape is AttackCircleShape circle)
+        {
+            Vector3 center = circle.ShapePose(pose).Position + Vector3.up * circle.MinHeight;
+            return SkillHitVolume.CircleColumn(center, circle.Radius, circle.MaxHeight - circle.MinHeight, data.HittableLayers);
+        }
+
+        if (shape == null)
+            return SkillHitVolume.Box(areaCenter, Vector3.zero, Quaternion.identity, data.HittableLayers);
+
+        shape.GetBroadBox(pose, out Vector3 boxCenter, out Vector3 halfExtents, out Quaternion rotation);
+        return SkillHitVolume.Box(boxCenter, halfExtents, rotation, data.HittableLayers);
     }
 
     private void RemoveInvulnerability()

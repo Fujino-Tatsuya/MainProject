@@ -184,14 +184,14 @@ public sealed class GunnerCastCcGate
     }
 }
 
-/// <summary>예약된 파생 레이저 1발(이중 출력·잔류 포격) — 위치·방향·사거리·폭·피해를 예약 때 고정하고 대상·지형은 발사 때 새로 판정한다.</summary>
+/// <summary>예약된 파생 레이저 1발(이중 출력) — 위치·방향·사거리·폭·피해를 예약 때 고정하고 대상·지형은 발사 때 새로 판정한다.</summary>
 public readonly struct GunnerDerivedShot
 {
     public readonly Vector3 Origin;
     public readonly Vector3 Direction;
-    /// <summary>지형 차단 전 사거리(잔류 포격 = 최종 충전 사거리, 이중 출력 = 기본 공격 사거리).</summary>
+    /// <summary>지형 차단 전 사거리(이중 출력 = 기본 공격 사거리).</summary>
     public readonly float Range;
-    /// <summary>판정 폭(잔류 포격 = 광폭 반영 폭).</summary>
+    /// <summary>판정 폭.</summary>
     public readonly float Width;
     public readonly int Damage;
 
@@ -206,7 +206,7 @@ public readonly struct GunnerDerivedShot
 }
 
 /// <summary>
-/// [서버] 지연 발사 예약 — 새 예약이 기존 예약을 덮어쓰지 않는다(잔류 포격). 사망·씬 종료면 <see cref="Clear"/>(명세 §9).
+/// [서버] 지연 발사 예약(이중 출력) — 새 예약이 기존 예약을 덮어쓰지 않는다. 사망·씬 종료면 <see cref="Clear"/>(명세 §9).
 /// </summary>
 public sealed class GunnerDelayedShots
 {
@@ -268,42 +268,43 @@ public static class GunnerDualOutputRules
 }
 
 /// <summary>
-/// 잔류 포격(GUN_4_ECHO_Q) — Q 시전 1회의 원래 발 묶음. 피해 = 원래 발마다의 <b>예정 단일 대상 피해 합계</b> × 비율(실제 총 피해·맞힌 수 아님).
-/// 첫 발의 위치·방향·최종 충전 사거리·폭을 저장해 재사용한다. 정상 종료에서만 1회(집속 연사도 마지막 원래 발 뒤 1회 — 4/4 에서 발마다 <see cref="AddOriginalShot"/>).
+/// 잔류 포격(GUN_4_ECHO_Q, 할 일 149) — Q 시전 1회의 원래 발 묶음. 원래 발에 맞은 대상마다 에너지 폭탄 1개(<see cref="GunnerEchoBombs"/>).
+/// 폭탄 1개 피해 = 원래 발마다의 <b>예정 단일 대상 피해 합계</b> × 비율(실제 총 피해·맞힌 수 아님) — 붙은 그 대상 하나에게만.
+/// 정상 종료에서만(집속 연사도 마지막 원래 발 뒤 — 발마다 <see cref="AddOriginalShot"/>·<see cref="AddHitTarget"/>). 아무도 안 맞혔으면 없음.
 /// </summary>
 public sealed class GunnerEchoPlan
 {
+    private readonly List<ulong> hitTargets = new List<ulong>();
+
     public bool HasShot { get; private set; }
     public int PlannedDamageSum { get; private set; }
-    public Vector3 Origin { get; private set; }
-    public Vector3 Direction { get; private set; }
-    public float Range { get; private set; }
-    public float Width { get; private set; }
+
+    /// <summary>이번 시전 원래 발에 맞은 대상(네트워크 ID, 중복 없음, 처음 맞은 순서).</summary>
+    public IReadOnlyList<ulong> HitTargets => hitTargets;
 
     public void Reset()
     {
         HasShot = false;
         PlannedDamageSum = 0;
-        Origin = default;
-        Direction = default;
-        Range = 0f;
-        Width = 0f;
+        hitTargets.Clear();
     }
 
-    /// <summary>원래 발 1발 — 첫 발이면 위치·방향·사거리·폭을 저장하고, 예정 단일 대상 피해를 더한다.</summary>
-    public void AddOriginalShot(Vector3 origin, Vector3 direction, float range, float width, int plannedSingleTargetDamage)
+    /// <summary>원래 발 1발 — 예정 단일 대상 피해를 더한다.</summary>
+    public void AddOriginalShot(int plannedSingleTargetDamage)
     {
-        if (!HasShot)
-        {
-            HasShot = true;
-            Origin = origin;
-            Direction = direction;
-            Range = range;
-            Width = width;
-        }
-
+        HasShot = true;
         long sum = (long)PlannedDamageSum + Mathf.Max(0, plannedSingleTargetDamage);
         PlannedDamageSum = sum >= int.MaxValue ? int.MaxValue : (int)sum;
+    }
+
+    /// <summary>원래 발에 맞은 대상 1개 — 집속 연사로 같은 대상을 여러 번 맞혀도 시전당 1번만 남는다(새로 넣었으면 true).</summary>
+    public bool AddHitTarget(ulong targetId)
+    {
+        if (hitTargets.Contains(targetId))
+            return false;
+
+        hitTargets.Add(targetId);
+        return true;
     }
 
     /// <summary>
@@ -313,14 +314,99 @@ public sealed class GunnerEchoPlan
     public static bool IsNormalEnd(bool fired, SkillEndReason reason) =>
         fired && (reason == SkillEndReason.Completed || reason == SkillEndReason.MaxDurationReached);
 
-    /// <summary>정상 종료면 예약할 잔류 포격 1발. 아니면 false(이 시전은 잔류 없음).</summary>
-    public bool TryBuildEcho(bool fired, SkillEndReason reason, TraitDerivedAttack derived, out GunnerDerivedShot shot)
+    /// <summary>정상 종료이고 맞힌 대상이 있으면 폭탄 1개 피해(<see cref="HitTargets"/> 마다 하나씩 심는다). 아니면 false(이 시전은 잔류 없음).</summary>
+    public bool TryBuildEcho(bool fired, SkillEndReason reason, TraitDerivedAttack derived, out int bombDamage)
     {
-        shot = default;
-        if (!HasShot || derived == null || !IsNormalEnd(fired, reason) || !derived.Counter.Tick())
+        bombDamage = 0;
+        if (!HasShot || hitTargets.Count == 0 || derived == null || !IsNormalEnd(fired, reason) || !derived.Counter.Tick())
             return false;
 
-        shot = new GunnerDerivedShot(Origin, Direction, Range, Width, derived.DamageFrom(PlannedDamageSum));
+        bombDamage = derived.DamageFrom(PlannedDamageSum);
         return true;
+    }
+}
+
+/// <summary>대상 몸에 붙은 잔류 포격 에너지 폭탄 1개 — 서버가 들고, 복제는 <see cref="Id"/>·<see cref="TargetId"/> 만(<c>GunnerBeamView</c>).</summary>
+public readonly struct GunnerEchoBomb
+{
+    /// <summary>폭탄 번호(사수 하나 안에서 유일) — 같은 대상에 이전 시전 폭탄이 같이 붙어 있어도 구분한다.</summary>
+    public readonly int Id;
+    /// <summary>붙은 대상의 네트워크 ID.</summary>
+    public readonly ulong TargetId;
+    public readonly double DueTime;
+    public readonly int Damage;
+
+    public GunnerEchoBomb(int id, ulong targetId, double dueTime, int damage)
+    {
+        Id = id;
+        TargetId = targetId;
+        DueTime = dueTime;
+        Damage = damage;
+    }
+}
+
+/// <summary>
+/// [서버] 잔류 포격 에너지 폭탄들(할 일 149) — 시전마다 맞은 대상마다 1개를 심고, 지연이 지나면 그 대상에게만 터진다.
+/// 새 시전이 이전 폭탄을 덮어쓰지 않는다(같은 대상에 둘 붙을 수 있다). 대상이 먼저 죽거나 사라지면 시각과 무관하게 바로 '빈 폭발'(피해 대상 없음).
+/// 사수 사망·씬 종료면 <see cref="Clear"/>(명세 §9 — 터지지 않고 사라진다).
+/// </summary>
+public sealed class GunnerEchoBombs
+{
+    private readonly List<GunnerEchoBomb> bombs = new List<GunnerEchoBomb>();
+    private int nextId;
+
+    public int Count => bombs.Count;
+    public IReadOnlyList<GunnerEchoBomb> Bombs => bombs;
+
+    /// <summary>대상마다 1개 심는다(목록 안 중복 대상은 한 번). 심은 폭탄을 <paramref name="planted"/> 에 담는다.</summary>
+    public void Plant(double now, float delay, int damage, IReadOnlyList<ulong> targets, List<GunnerEchoBomb> planted)
+    {
+        planted.Clear();
+        double due = now + Math.Max(0f, delay);
+        for (int i = 0; targets != null && i < targets.Count; i++)
+        {
+            if (IndexOf(planted, targets[i]) >= 0)
+                continue;
+
+            var bomb = new GunnerEchoBomb(++nextId, targets[i], due, Mathf.Max(0, damage));
+            bombs.Add(bomb);
+            planted.Add(bomb);
+        }
+    }
+
+    /// <summary>
+    /// 꺼낼 폭탄을 심은 순서대로 나눈다 — 대상이 살아 있고 시각이 됐으면 <paramref name="detonated"/>(피해),
+    /// 대상이 죽었거나 사라졌으면 시각과 무관하게 <paramref name="fizzled"/>(그 자리 폭발, 피해 없음). 나머지는 남는다.
+    /// </summary>
+    public void Collect(double now, Predicate<ulong> targetAlive, List<GunnerEchoBomb> detonated, List<GunnerEchoBomb> fizzled)
+    {
+        detonated.Clear();
+        fizzled.Clear();
+        for (int i = 0; i < bombs.Count;)
+        {
+            GunnerEchoBomb bomb = bombs[i];
+            bool alive = targetAlive != null && targetAlive(bomb.TargetId);
+            if (alive && bomb.DueTime > now)
+            {
+                i++;
+                continue;
+            }
+
+            (alive ? detonated : fizzled).Add(bomb);
+            bombs.RemoveAt(i);
+        }
+    }
+
+    public void Clear() => bombs.Clear();
+
+    private static int IndexOf(List<GunnerEchoBomb> list, ulong targetId)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i].TargetId == targetId)
+                return i;
+        }
+
+        return -1;
     }
 }

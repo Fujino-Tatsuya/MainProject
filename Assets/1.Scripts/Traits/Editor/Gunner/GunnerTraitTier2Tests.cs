@@ -239,10 +239,11 @@ public class GunnerTraitTier2Tests
         // 잔류 포격은 같은 피해 스냅샷(예정 합계에 축열 보너스 포함).
         int shot = cast.ShotDamage(100, 1.5f, 1f); // 240
         var plan = new GunnerEchoPlan();
-        plan.AddOriginalShot(Vector3.zero, Vector3.forward, 12f, 1.2f, shot);
-        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey), out GunnerDerivedShot echo));
+        plan.AddOriginalShot(shot);
+        plan.AddHitTarget(1UL);
+        Assert.IsTrue(plan.TryBuildEcho(true, SkillEndReason.Completed, Derived("GUN_4_ECHO_Q", GunnerTraitRules.QEchoDerivedKey), out int echo));
         Assert.AreEqual(240, shot);
-        Assert.AreEqual(60, echo.Damage, "240 × 0.25");
+        Assert.AreEqual(60, echo, "240 × 0.25");
     }
 
     [Test]
