@@ -105,7 +105,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - **사건 종류 `Variant`(Normal/Dash, 할 일 192)**: 대쉬 간파 성공은 `Dash` 로 실린다 — 세션 = 신고의 `ViaDash`(191 경로) → `ServerOnClaimVerdict`, 오프라인 = 시전 시작의 대쉬 여부.
   피어 전달은 슬로우 Start 이벤트의 179 표식 바이트 비트 1(새 RPC·크기 변화 없음). 디렉터가 단계(실패/간파/대쉬 간파/제압 간파)를 고른다 —
   지금 대쉬 간파 단계는 일반 간파와 같은 연출(암전 없음 · 강한 줌 · 섬광 ②~⑥, 암순응·블룸 섬광은 Q5 보류). 제압이면 근접·대쉬 무관 제압 간파. 상세 [interrupt-presentation.md §8](interrupt-presentation.md#8-간파-연출-4단계-할-일-192).
-- 시도 슬로우 프로필·cue 는 대쉬도 일반 간파와 같다(Q2 — 슬로우 그대로).
+- 시도 cue·목적(강/약)·줌은 대쉬도 일반 간파와 같다(Q2). 시도 슬로우 **프로필**만 194 후속 2(2026-11-03)부터 대쉬 전용 `interruptDashProfile`(강)·`interruptDashWeakProfile`(약) — SO `InterruptSlowMotionSettings` ① 칸, 처음 값 = 근접 강·약 복사(동작 같음). 서버 시도 사건 `Variant` 로 고른다(새 RPC 없음) — [interrupt-presentation.md §9.8](interrupt-presentation.md#98-슬로우-3단계-so--interruptslowmotionsettings-194-후속-2-2026-11-03).
 - 캐릭터 이펙트(클립 이벤트)는 같은 클립을 상체 레이어에서 트므로 같이 나온다(§6 이벤트 중복 방지 참고).
 
 ## 6. 마스킹 애니메이션 — `DashInterruptUpper` 레이어

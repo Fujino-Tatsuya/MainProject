@@ -65,8 +65,9 @@ public readonly struct InterruptProductionEvent
     /// </summary>
     public readonly bool SuppressInterrupt;
     /// <summary>
-    /// [성공] 사건 종류(할 일 192) — 근접 / 대쉬(대시에 실린 간파). 서버는 신고(<see cref="InterruptClaim.ViaDash"/>, 191 경로)·
+    /// [성공·서버 시도] 사건 종류(할 일 192) — 근접 / 대쉬(대시에 실린 간파). 서버는 신고(<see cref="InterruptClaim.ViaDash"/>, 191 경로)·
     /// 오프라인은 시전 시작의 대쉬 여부로, 피어는 슬로우 Start 이벤트 칸(<see cref="SlowMotionEvent.DashInterrupt"/>)으로 채운다.
+    /// 서버 시도는 대시에 실렸는가로 채워 시도 슬로우 프로필만 고른다(194 후속 2 — 시도 Start 이벤트에는 싣지 않는다, 새 바이트 없음).
     /// </summary>
     public readonly InterruptVariant Variant;
 
@@ -100,12 +101,14 @@ public readonly struct InterruptProductionEvent
 
     private static ulong ClientIdOf(Player caster) => caster != null ? caster.OwnerClientId : 0;
 
-    /// <summary>[서버] 시도 — 스킬 승인 직후.</summary>
-    public static InterruptProductionEvent Attempt(Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
-        Attempt(ClientIdOf(caster), caster, skill, forecast);
+    /// <summary>[서버] 시도 — 스킬 승인 직후. <paramref name="variant"/> = 근접/대쉬(대시에 실린 간파) — 시도 슬로우 프로필을 고른다(194 후속 2).</summary>
+    public static InterruptProductionEvent Attempt(Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast,
+        InterruptVariant variant = InterruptVariant.Normal) =>
+        Attempt(ClientIdOf(caster), caster, skill, forecast, variant);
 
-    public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast) =>
-        new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, forecast: forecast);
+    public static InterruptProductionEvent Attempt(ulong casterClientId, Player caster, PlayerInterruptSkillBase skill, InterruptAttemptForecast forecast,
+        InterruptVariant variant = InterruptVariant.Normal) =>
+        new InterruptProductionEvent(InterruptProductionPhase.Attempt, casterClientId, caster, skill, forecast: forecast, variant: variant);
 
     /// <summary>[서버] 판정 끝. <paramref name="preempted"/> = 선착순에서 밀려 피해만 줬다(할 일 143).</summary>
     public static InterruptProductionEvent Resolve(Player caster, PlayerInterruptSkillBase skill, uint attemptTriggerId,

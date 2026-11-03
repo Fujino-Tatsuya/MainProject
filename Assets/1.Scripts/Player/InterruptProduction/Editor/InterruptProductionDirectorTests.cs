@@ -118,8 +118,11 @@ public sealed class InterruptProductionDirectorTests
     public void 시도_목적별_프로필_선택()
     {
         var settings = new InterruptProductionStageTests.FakeSettings();
-        Assert.AreSame(settings.Attempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, settings));
-        Assert.AreSame(settings.Weak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, settings));
+        Assert.AreSame(settings.Attempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Normal, settings));
+        Assert.AreSame(settings.Weak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Normal, settings));
+        // 대쉬 간파 시도 = 대쉬 전용(194 후속 2)
+        Assert.AreSame(settings.DashAttempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Dash, settings));
+        Assert.AreSame(settings.DashWeak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Dash, settings));
     }
 
     [TestCase(SlowMotionPurpose.Attempt, 0.7f)]
@@ -135,9 +138,10 @@ public sealed class InterruptProductionDirectorTests
     [Test]
     public void 새_디렉터_줌_배율_기본값_강_0_7_약_0_93()
     {
-        var so = new SerializedObject(CreateDirector());
-        Assert.AreEqual(0.7f, so.FindProperty("interruptZoomFactor").floatValue, 1e-6f);
-        Assert.AreEqual(0.93f, so.FindProperty("interruptWeakZoomFactor").floatValue, 1e-6f);
+        // 194 후속 2 — 줌 칸은 슬로우 SO 로 옮겼다. SO 가 빈 새 디렉터는 코드 기본값 인스턴스를 읽는다.
+        var director = CreateDirector();
+        Assert.AreEqual(0.7f, director.SlowMotion.InterruptZoomFactor, 1e-6f);
+        Assert.AreEqual(0.93f, director.SlowMotion.InterruptWeakZoomFactor, 1e-6f);
     }
 
     // ─── A1 히트스톱 ───

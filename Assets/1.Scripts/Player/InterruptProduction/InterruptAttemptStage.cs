@@ -3,6 +3,7 @@ using UnityEngine;
 /// <summary>
 /// 간파 연출 — 시도 단계(할 일 118). [서버] 간파 대상이 있으면 시도 슬로우를 건다(전 피어 공용 타임라인) —
 /// 성공 예측 = 강(<see cref="IInterruptProductionSettings.InterruptProfile"/>), 실패 예측 = 약(<see cref="IInterruptProductionSettings.InterruptWeakProfile"/>, 할 일 132).
+/// 대쉬 간파 시도면 대쉬 전용 강·약(<see cref="IInterruptProductionSettings.InterruptDashProfile"/>, 194 후속 2).
 /// 대상 없음 예측이면 슬로우 없음(할 일 132 정정1).
 /// [각 피어] 시전 시작(OnClientPlay)에 캐릭터 시도 cue(팔라딘 방패 발광 B1)를 공용 채널로 튼다.
 /// 클립 이벤트 시도 연출(B2·C1)은 <see cref="InterruptProductionDirector.AllowsAnimEffect"/> 가 따로 묻는다.
@@ -26,7 +27,7 @@ public sealed class InterruptAttemptStage
         if (!InterruptProductionRules.TrySelectAttemptPurpose(e.Forecast, out SlowMotionPurpose purpose))
             return 0;
 
-        SlowMotionProfile profile = InterruptProductionRules.SelectAttemptProfile(purpose, _settings);
+        SlowMotionProfile profile = InterruptProductionRules.SelectAttemptProfile(purpose, e.Variant, _settings);
 
         // 히트스톱 칸은 시도 슬로우에도 지금처럼 넘긴다(시도 프로필 hitStopDuration 기본 0 — 동작 동일).
         return _timeScale.ServerStart(profile, e.CasterClientId, purpose, default(Vector3),

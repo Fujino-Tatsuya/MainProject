@@ -83,9 +83,17 @@ public static class InterruptProductionRules
     /// </summary>
     public static bool ResolveFailsAttempt(bool landed, bool preempted) => !landed || preempted;
 
-    /// <summary>시도 목적에 맞는 슬로우 프로필 — 약이면 약 프로필, 그 밖은 강(옛 시도) 프로필.</summary>
-    public static SlowMotionProfile SelectAttemptProfile(SlowMotionPurpose purpose, IInterruptProductionSettings settings) =>
-        purpose == SlowMotionPurpose.AttemptWeak ? settings.InterruptWeakProfile : settings.InterruptProfile;
+    /// <summary>
+    /// 시도 목적·종류에 맞는 슬로우 프로필 — 약이면 약 프로필, 그 밖은 강(옛 시도) 프로필.
+    /// 대쉬 간파 시도(<see cref="InterruptVariant.Dash"/>)면 대쉬 전용 강·약 프로필(194 후속 2). 목적(Attempt/AttemptWeak)은 근접과 같다.
+    /// </summary>
+    public static SlowMotionProfile SelectAttemptProfile(SlowMotionPurpose purpose, InterruptVariant variant, IInterruptProductionSettings settings)
+    {
+        bool weak = purpose == SlowMotionPurpose.AttemptWeak;
+        if (variant == InterruptVariant.Dash)
+            return weak ? settings.InterruptDashWeakProfile : settings.InterruptDashProfile;
+        return weak ? settings.InterruptWeakProfile : settings.InterruptProfile;
+    }
 
     /// <summary>
     /// 지금 재생 중인 슬로우 목적별 오너 줌 배율(할 일 132) — 강 시도 / 약 시도 / 성공(카메라 <c>slowMotionZoomFactor</c>).

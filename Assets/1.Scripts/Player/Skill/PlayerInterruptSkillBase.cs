@@ -660,7 +660,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     // 승인 시점 예측(D1·D2 → 할 일 132 정정1 → 191 5단계): 오너 예측과 같은 InterruptManager.Predict 를 서버 이력·서버 창 시간표로 돌린다
     // (TryPredictServerAttempt). 대상 없음 = 슬로우 없음, 성공 예측 = 강, 실패 예측 = 약(디렉터 시도 단계가 고른다). 시전자 이력이 아직 없으면 대상 없음.
-    // 공격 방향 = 근접은 승인된 시전 방향, 대쉬는 대시 방향. 시간 레이어가 없는 씬(오프라인 테스트)은 건너뛴다.
+    // 공격 방향 = 근접은 승인된 시전 방향, 대쉬는 대시 방향(시도 슬로우도 대쉬 전용 프로필, 194 후속 2). 시간 레이어가 없는 씬(오프라인 테스트)은 건너뛴다.
     private void TryStartSlowMotion()
     {
         if (GlobalTimeScale.Instance == null || InterruptProductionDirector.Instance == null || owner == null)
@@ -671,7 +671,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         bool predicted = InterruptManager.Instance != null &&
                          InterruptManager.Instance.TryPredictServerAttempt(owner, attachedToDash, attackDirection, out prediction);
         slowMotion.Started(InterruptProductionDirector.ServerAttempt(
-            InterruptProductionEvent.Attempt(owner, this, SelectServerAttemptForecast(predicted, prediction))));
+            InterruptProductionEvent.Attempt(owner, this, SelectServerAttemptForecast(predicted, prediction),
+                InterruptPresentationTierRules.VariantOf(attachedToDash))));
     }
 
     /// <summary>서버 시도 슬로우 강·약 — 매니저 예측이 됐으면 그 결과의 3상태, 못 했으면(매니저·이력 없음) 대상 없음(슬로우 없음).</summary>

@@ -18,6 +18,7 @@ public sealed class InterruptProductionLiveReadTests
 
     private GameObject _go;
     private InterruptProductionDirector _director;
+    private InterruptSlowMotionSettings _slowMotion;
     private InterruptProductionStageTests.FakeTimeScale _port;
     private InterruptAttemptStage _attempt;
     private InterruptSuccessStage _success;
@@ -27,6 +28,11 @@ public sealed class InterruptProductionLiveReadTests
     {
         _go = new GameObject("Director");
         _director = _go.AddComponent<InterruptProductionDirector>();
+        // 슬로우 프로필은 디렉터가 참조하는 SO 칸(194 후속 2) — SO 값을 바꾸면 다음 사건에 바로 쓰인다.
+        _slowMotion = ScriptableObject.CreateInstance<InterruptSlowMotionSettings>();
+        var directorSo = new SerializedObject(_director);
+        directorSo.FindProperty("slowMotionSettings").objectReferenceValue = _slowMotion;
+        directorSo.ApplyModifiedPropertiesWithoutUndo();
         _port = new InterruptProductionStageTests.FakeTimeScale();
         // 단계는 디렉터가 만드는 것과 같게 설정 = 디렉터, 시간 = 포트로 만든다(만든 뒤 필드를 바꾼다).
         _attempt = new InterruptAttemptStage(_director, _port);
@@ -38,6 +44,8 @@ public sealed class InterruptProductionLiveReadTests
     {
         if (_go != null)
             Object.DestroyImmediate(_go);
+        if (_slowMotion != null)
+            Object.DestroyImmediate(_slowMotion);
     }
 
     private void Set(string path, bool value)
@@ -47,9 +55,10 @@ public sealed class InterruptProductionLiveReadTests
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
+    // 슬로우 SO 칸
     private void Set(string path, float value)
     {
-        var so = new SerializedObject(_director);
+        var so = new SerializedObject(_slowMotion);
         so.FindProperty(path).floatValue = value;
         so.ApplyModifiedPropertiesWithoutUndo();
     }
@@ -89,6 +98,16 @@ public sealed class InterruptProductionLiveReadTests
         Set("interruptProfile.scale", 0.5f);
         _attempt.Server(InterruptProductionEvent.Attempt(1, null, null, BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong));
         Assert.AreEqual(0.5f, _port.Starts[0].profile.scale);
+    }
+
+    [Test]
+    public void 대쉬_시도_프로필_값을_바꾸면_다음_대쉬_시도에_바로_쓰인다()
+    {
+        Set("interruptDashProfile.holdDuration", 0.9f);
+        _attempt.Server(InterruptProductionEvent.Attempt(1, null, null, BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong, InterruptVariant.Dash));
+        _attempt.Server(InterruptProductionEvent.Attempt(1, null, null, BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong));
+        Assert.AreEqual(0.9f, _port.Starts[0].profile.holdDuration);
+        Assert.AreEqual(0.5f, _port.Starts[1].profile.holdDuration, "근접 시도는 간파 준비 강 그대로");
     }
 
     [Test]

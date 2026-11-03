@@ -140,14 +140,14 @@
 **칸을 스케일로 바꾸면** ⑤⑥ 만 성공 슬로우(유지 0.25)를 따라 길이 × 약 4 로 늘어난다 — ②③④·섬광 순간 프레임은 그대로
 (EditMode `칸을_스케일로_바꾸면_색수차_가라앉음만_성공_슬로우를_따라_늘어나고_섬광_순간_프레임은_그대로`).
 
-### 0.5 새 수치 칸 — 전부 `NetworkManager.prefab › InterruptProductionDirector`
+### 0.5 새 수치 칸 — `NetworkManager.prefab › InterruptProductionDirector` (슬로우·줌 4칸은 194 후속 2 부터 SO `InterruptSlowMotionSettings`, [§9.8](#98-슬로우-3단계-so--interruptslowmotionsettings-194-후속-2-2026-11-03))
 
 | 칸 | 기본 | 누구 값 | xlsx |
 |---|---|---|---|
-| `interruptProfile.*`(강) | scale 0.15 · hold 0.5 · enter 0.05 · exit 0.25 · failExit 0.1 · hitStop 0/0.02 | 서버 | 기존 열(옛 시도 자리) — xlsx 값이 132 이전(0.3·0.35)이면 🟨 **메인이 xlsx 갱신 필요** |
-| `interruptWeakProfile.*`(약) | scale 0.5 · hold 0.2 · enter 0.05 · exit 0.25 · failExit 0.1 · hitStop 0/0.02 | 서버 | 🟨 **반영 예정**(메인 — 열이 없는 동안 프리팹 값) |
-| `interruptZoomFactor`(강 줌) | 0.7 | 각 피어 | 🟨 **반영 예정** |
-| `interruptWeakZoomFactor`(약 줌) | 0.93 | 각 피어 | 🟨 **반영 예정** |
+| `interruptProfile.*`(강) — SO | scale 0.15 · hold 0.5 · enter 0.05 · exit 0.25 · failExit 0.1 · hitStop 0/0.02 | 서버 | 열 있음(옛 대상 `NetworkManager` → 병합 Export 로 `InterruptSlowMotionSettings`, §9.8) |
+| `interruptWeakProfile.*`(약) — SO | scale 0.5 · hold 0.2 · enter 0.05 · exit 0.25 · failExit 0.1 · hitStop 0/0.02 | 서버 | 〃 |
+| `interruptZoomFactor`(강 줌) — SO | 0.7 | 각 피어 | 〃 |
+| `interruptWeakZoomFactor`(약 줌) — SO | 0.93 | 각 피어 | 〃 |
 | `ownerDimInDuration` · `ownerDimOutDuration` | 0.1 · 0.2 | 각 피어 | `[DataTableIgnore]` — 프리팹이 원본 |
 | `ownerDimColor` · `ownerDimOpacity` | 검정 · 1(100%) — 예: 남색 0.9 | 각 피어 | `[DataTableIgnore]`(색은 테이블 열 아님) |
 | `show*` 연출 켜기/끄기 9칸(§0.6) | `showOwnerDim` 켬, 나머지 8칸 끔 | 각 피어 | `[DataTableIgnore]` — 프리팹이 원본 |
@@ -368,9 +368,9 @@
 
 ## 2. 수치 (기본값 = `NetworkManager.prefab`)
 
-### 2.1 슬로우 프로필 — `InterruptProductionDirector` (시트 `SlowMotion`, Order 0)
+### 2.1 슬로우 프로필 — SO `InterruptSlowMotionSettings` (시트 `SlowMotion`, Order 0)
 
-> 할 일 118 C2 에서 `GlobalTimeScale` 에서 디렉터로 옮겼다. 필드 이름(`interruptProfile`·`interruptSuccessProfile`)과 대상(`NetworkManager`)이 같아 xlsx 행은 그대로 묶인다.
+> 할 일 118 C2 에서 `GlobalTimeScale` 에서 디렉터로 옮겼다. 194 후속 2(2026-11-03)에서 디렉터 → SO `InterruptSlowMotionSettings` 로 다시 옮겼다(필드 이름 그대로, 대상 열만 바뀜 — 병합 Export 절차 [§9.8](#98-슬로우-3단계-so--interruptslowmotionsettings-194-후속-2-2026-11-03)). 대쉬 간파 시도 전용 `interruptDashProfile`·`interruptDashWeakProfile`(처음 값 = 아래 강·약)이 같은 SO 에 있다.
 > 할 일 132: `interruptProfile` = **강** 시도(옛 시도 자리 그대로), 새 `interruptWeakProfile` = **약** 시도.
 > **서버(호스트) 인스턴스 값만 쓰인다** — 서버가 사건 순간 값을 이벤트에 실어 보낸다.
 
@@ -385,15 +385,15 @@
 | `failExitDuration` | 0.1 | 0.1 | 0.1 | 실패 복귀 실시간 초(성공 슬로우는 Fail 을 받지 않는다) |
 
 곡선은 고정(닫힌 식) — 피어마다 같은 `LostTimeUntil` 을 내야 해서 AnimationCurve 를 쓰지 않는다(`SlowMotionProfile` 주석).
-xlsx: 강·성공은 기존 열, **약 `interruptWeakProfile.*` 는 반영 예정**(§0.5).
+xlsx: 강·약·성공 모두 열 있음(2026-11-03 확인, 옛 대상 `NetworkManager`).
 
-### 2.2 오너 줌 — `CameraTargetSwitcher`·디렉터 (시트 `SlowMotion`)
+### 2.2 오너 줌 — SO `InterruptSlowMotionSettings` (시트 `SlowMotion`, 194 후속 2)
 
 | 필드 | 위치 | 기본 | 의미 |
 |---|---|---|---|
-| `slowMotionZoomFactor` | `CameraTargetSwitcher`(Order 1) | 0.85 | 내가 일으킨 **성공** 슬로우 유지 단계 카메라 거리 배율 [0.1, 1] |
-| `interruptZoomFactor` | 디렉터(Order 0) | 0.7 | 내가 일으킨 **강** 시도 슬로우 배율 — 🟨 xlsx 반영 예정 |
-| `interruptWeakZoomFactor` | 디렉터(Order 0) | 0.93 | 내가 일으킨 **약** 시도 슬로우 배율 — 🟨 xlsx 반영 예정 |
+| `slowMotionZoomFactor` | SO(옛 `CameraTargetSwitcher`, 카메라는 SO 참조) | 0.85 | 내가 일으킨 **성공** 슬로우 유지 단계 카메라 거리 배율 [0.1, 1] |
+| `interruptZoomFactor` | SO(옛 디렉터) | 0.7 | 내가 일으킨 **강** 시도 슬로우 배율(근접·대쉬 공통) |
+| `interruptWeakZoomFactor` | SO(옛 디렉터) | 0.93 | 내가 일으킨 **약** 시도 슬로우 배율(근접·대쉬 공통) |
 
 - 슬로우 목적(`Attempt`/`AttemptWeak`/`Success`)으로 배율을 고른다(`InterruptProductionRules.SelectOwnerZoomFactor`). 줌 깊이는 지금 재생 중인 프로필 배율 기준. A3 꺼짐 = 배율 1.
 - **줌 한 번(10-28 수정)** — `SlowMotionOwnerZoom`(순수 모델, 카메라가 매 프레임 질의해 넣는다): 내 간파 한 건(시도 → 이어진 내 성공 = 발동 번호 사슬)을 한 줌 세션으로 본다.
@@ -546,8 +546,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 | 칸 | 필드 | 프리팹 | 무엇이 언제 | 재생 지점 → 디렉터 |
 |---|---|---|---|---|
-| — | `interruptProfile` · `interruptWeakProfile` | — | 강·약 시도 슬로우 모양 | 시도 단계 `ServerStart` (xlsx `SlowMotion`, §2.1) |
-| — | `interruptSuccessProfile` | — | 성공 슬로우 모양 | 성공 단계 `ServerStart` (xlsx `SlowMotion`, §2.1) |
+| — | `slowMotionSettings` → SO `InterruptSlowMotionSettings` | 연결 | 슬로우 3단계 수치(194 후속 2, [§9.8](#98-슬로우-3단계-so--interruptslowmotionsettings-194-후속-2-2026-11-03)) — 대쉬 간파 시도·근접 간파 시도 강/약 프로필·시도 줌·성공 프로필·성공 줌. 옛 디렉터 칸 `interruptProfile`·`interruptWeakProfile`·`interruptZoomFactor`·`interruptWeakZoomFactor`·`interruptSuccessProfile` 는 이 SO 로 옮겼다 | 시도·성공 단계 `ServerStart`, 카메라 줌 (xlsx `SlowMotion` — 대상 열 `InterruptSlowMotionSettings`) |
 | A1 | `hitStop` | **켬** | 성공 슬로우 맨 앞 정지(섬광 ② 가 같은 순간 시작) | 성공 단계가 `GlobalTimeScale.ServerStart(…, hitStopOn)` 로 넘긴다 — 꺼지면 이벤트의 `hitStopDuration` 0 |
 | A2 | `darkAdaptation` | 꺼짐(§17) | 성공 섬광 순간 화면 휘도 암순응(팀원 others · 오버레이 없던 본인 self) — 튜닝 패널 '팀원 암순응' | 섬광 순간 개인/공용 채널 → `InterruptDarkAdaptation.Play` |
 | A3 | `ownerZoom` | **켬** | 내가 일으킨 슬로우(강·약·성공) 동안 카메라 줌 | `CameraTargetSwitcher` → `Director.OwnerZoomFactor` — 꺼지면 배율 1 |
@@ -844,6 +843,37 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
   나는 `SceneLightDim` 배율 곱, V3 색 보정·블룸은 진행기 전용 Volume, 시퀀스는 후처리 뒤 셰이더 1패스 — 출력이 서로 달라 겹쳐도 복구 순서가 엮이지 않는다.
   (V3 0.9초 곡선은 시퀀스 0.625초 + 암순응 컷 0.3초와 거의 같이 끝난다 — 겹친 화면은 Play 로 확인.)
 - 랩 버전 버튼 줄은 일반·대쉬만이다 — 제압의 더하는 버전은 인스펙터 `suppressTier.sequenceHitLight` 로 바꾼다.
+
+### 9.8 슬로우 3단계 SO — `InterruptSlowMotionSettings` (194 후속 2, 2026-11-03)
+
+에셋 `Assets/5.VFX/Interrupt/HitLight/V3/InterruptSlowMotionSettings.asset` 하나에서 간파 슬로우를 단계별로 고친다. 디렉터(`NetworkManager.prefab`)·카메라(`CameraSwitcher.prefab › CameraTargetSwitcher`)는 같은 에셋을 참조(`slowMotionSettings`)만 하고 사건마다·프레임마다 읽는다(캐싱 없음 — Play 중 SO 를 바꾸면 다음 사건부터. SO 에셋 변경은 Play 끝나도 남는다). 참조가 비면 코드 기본값(`InterruptSlowMotionSettings.OrDefault`).
+
+| 단계(인스펙터 머리글) | 칸 | 처음 값 | 쓰는 쪽 |
+|---|---|---|---|
+| ① 대쉬 간파 시도 | `interruptDashProfile.*` 7(강) · `interruptDashWeakProfile.*` 7(약) | ② 강·약 복사(0.15/0/0.02/0.05/0.5/0.25/0.1 · 0.5/0/0.02/0.05/0.2/0.25/0.1) | 서버(Start 이벤트에 실림) |
+| ② 간파 준비(근접 간파 시도) | `interruptProfile.*` 7(강) · `interruptWeakProfile.*` 7(약) · `interruptZoomFactor` 0.7 · `interruptWeakZoomFactor` 0.93 | 이관 전 프리팹 값 그대로 | 프로필 = 서버 / 줌 = 각 피어(A3), **줌은 ① 대쉬 시도도 같이 쓴다** |
+| ③ 간파 적중(성공) | `interruptSuccessProfile.*` 7(히트스톱 `hitStopDuration` 0.05·`hitStopScale` 0.02 포함) · `slowMotionZoomFactor` 0.85 | 이관 전 프리팹 값 그대로 | 프로필 = 서버 / 줌 = 각 피어(A3) |
+
+- 스위치 A1 `hitStop`·A3 `ownerZoom` 은 디렉터에 남았다(bool, 테이블 밖).
+- **대쉬 시도 고르기**: 서버 시도 사건 `InterruptProductionEvent.Attempt(…, variant)` 에 대시에 실렸는가(`attachedToDash`)를 싣고 `InterruptProductionRules.SelectAttemptProfile(purpose, variant, settings)` 가 고른다. 목적(`Attempt`/`AttemptWeak`)은 근접과 같아 창 장부·오너 강약·빛 모임·줌이 그대로다. 새 RPC·바이트 없음 — 시도 Start 이벤트의 대쉬 비트는 여전히 성공에만 실린다(시도 슬로우는 프로필 7칸이 이미 실려 간다).
+- 동작 변화 0: 처음 값 = 이관 전 값(대쉬 = 복사). EditMode `InterruptProductionPrefabTests`(SO 값 = 옛 프리팹 값·프리팹 디렉터가 고르는 프로필 동일)·`InterruptProductionStageTests`(대쉬 시도 → 대쉬 프로필, 근접 → 기존)로 고정.
+- 대쉬 간파는 대시 남은 시간이 유지(hold) 구간을 먹는다(조사 `194-followup2-slowmo-dash-attempt.md` §2) — ① hold 를 따로 튜닝하는 자리. 체감은 🟧 Play 로 확인.
+
+#### 🔴 데이터 테이블 — 이 브랜치 development 병합 당일 병합 Export 필수
+
+칸을 SO 로 옮겨 xlsx `SlowMotion` 시트의 **대상 열이 바뀐다**(`NetworkManager`·`CameraSwitcher` → `InterruptSlowMotionSettings`). 필드 이름은 그대로라 값 의미는 같다. **xlsx 는 이 브랜치에서 고치지 않았다.**
+
+- **절차**: 이 브랜치를 development 에 병합한 **당일**, Main 이 **최신 dev 워크트리**에서 SVN update(`GameData.xlsx`) → `Tools/Data/Export Template` **병합** → 보고의 "버려진 값" 이 아래 목록과 정확히 같은지 확인 → SVN 커밋([data-table.md §4](data-table.md)). 다른 레인은 그 사이 xlsx Export 금지.
+- **버려질 행(의도) — 2026-11-03 xlsx(이 워크트리) 를 읽어 센 것, 합계 26행**
+  - `NetworkManager` 열(구역 `#■ InterruptProductionDirector`, A4~A27): `interruptProfile.*` 7(A4~A10) · `interruptWeakProfile.*` 7(A11~A17) · `interruptZoomFactor`(A18) · `interruptWeakZoomFactor`(A19) · `interruptSuccessProfile.*` 7(A21~A27) = **23**
+  - `CameraSwitcher` 열(구역 `#■ CameraTargetSwitcher`): `slowMotionZoomFactor`(A31) = **1**
+  - `NetworkManager` 열(구역 `#■ InterruptDarkAdaptation`): `revealRadius`(A43) · `revealSoftness`(A44) = **2** (2026-11-03 코드에서 삭제된 칸, 같은 Export 에서 함께 정리)
+  - 값은 버려져도 SO 처음 값이 같은 숫자라 손실 없음(Export 직후 새 열 값 = 위 값과 같아야 한다 — 다르면 멈추고 확인).
+- **새로 생길 행 — 합계 42행**
+  - `InterruptSlowMotionSettings` 열(새 구역 `#■ InterruptSlowMotionSettings`, Order 0, 머리글 ①②③ 메모 행 별도): `interruptDashProfile.*` 7 · `interruptDashWeakProfile.*` 7(대쉬 14 — 새 칸) · `interruptProfile.*` 7 · `interruptWeakProfile.*` 7 · `interruptZoomFactor` · `interruptWeakZoomFactor` · `interruptSuccessProfile.*` 7 · `slowMotionZoomFactor` = **38**(옮긴 24 + 대쉬 14 — 에셋 직렬화 float 칸 38개로 확인)
+  - `NetworkManager` 열(구역 `#■ InterruptManager`, Order 3): 191 서버 검증 허용 오차·동시 성공 `verifyTimeSlack` 0.033 · `verifyDistanceSlack` 0.2 · `verifyAngleSlack` 5 · `simultaneousSeconds` 0.05 = **4** (지금 xlsx 에 이 구역이 아직 없다 — 행이 없어 프리팹 값으로 돌던 칸이 이번 Export 로 생긴다)
+  - 구역 `#■ InterruptProductionDirector`·`#■ CameraTargetSwitcher` 는 사라진다(두 타입 모두 테이블 칸이 없어 `[DataTableSheet]` 를 뺐다).
+- **🔴 병합 ~ Export 사이 경고**: xlsx 에 옛 행이 남아 있는 동안 **테이블 모드 Play·빌드는 시작 전에 오류로 멈춘다**(`NetworkManager` 의 `interruptProfile.*` 등 = "어디에도 필드가 없다", `CameraSwitcher` 열 = "대상 없음", `revealRadius`·`revealSoftness` = "필드가 없다"). 인스펙터 모드 Play 는 영향 없음. 그래서 병합과 Export 를 같은 날 붙여서 한다.
 
 ## 10. 이후 확장
 

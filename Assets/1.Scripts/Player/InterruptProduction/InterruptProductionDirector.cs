@@ -13,13 +13,12 @@ using UnityEngine.Serialization;
 /// <item>피어마다 자기 인스턴스 값을 읽는다(동기화 없음). 단 히트스톱은 서버가 이벤트를 만들 때만 보므로 서버 값이 전 피어에 간다.</item>
 /// <item>인스턴스가 없으면(EditMode·NetworkManager 없는 씬) 전부 꺼짐.</item>
 /// <item>판정·피해·카운터 창에는 손대지 않는다 — 연출 재생 여부만 정한다.</item>
-/// <item>시도·성공 슬로우 프로필도 여기 둔다(옛 GlobalTimeScale 필드, 이름 그대로 — xlsx SlowMotion 시트 행이 그대로 묶인다).
-///       서버 인스턴스 값만 쓰인다(서버가 이벤트에 실어 보낸다). 스위치 bool 은 테이블에 내지 않는다(프리팹이 원본).</item>
+/// <item>시도·성공 슬로우 프로필·시도 줌 배율은 SO <see cref="InterruptSlowMotionSettings"/> 가 든다(194 후속 2 — 필드 이름 그대로, 테이블 대상 열 = 그 에셋).
+///       디렉터는 참조만 들고 사건마다 읽는다. 서버 인스턴스 값만 쓰인다(서버가 이벤트에 실어 보낸다). 스위치 bool 은 테이블에 내지 않는다(프리팹이 원본).</item>
 /// </list>
 /// 문서: Docs/tech/interrupt-presentation.md.
 /// </summary>
 [DisallowMultipleComponent]
-[DataTableSheet("SlowMotion", Order = 0)]
 public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
     IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings, IInterruptHitLightScene
 {
@@ -45,35 +44,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// </summary>
     public static System.Func<GameObject, bool> DebugSuppressForecastOverride;
 
-    // 필드 이름은 옛 GlobalTimeScale 과 글자까지 같게 둔다 — 데이터 테이블 경로(NetworkManager.interruptProfile.scale 등)가 그대로 묶인다.
-    // 강 = 옛 시도 프로필 자리(interruptProfile) 그대로, 약은 새 칸(할 일 132) — 옛 xlsx 행이 강 프로필에 그대로 묶인다.
+    // 슬로우 3단계 수치(194 후속 2) — ① 대쉬 간파 시도 · ② 간파 준비 · ③ 간파 적중. 옛 이 자리 칸을 이름 그대로 옮겼다(테이블 대상 열 = SO 에셋).
+    // 비면 코드 기본값(InterruptSlowMotionSettings.OrDefault).
+    [Header("슬로우 3단계 수치(194 후속 2)")]
+    [Tooltip("슬로우 SO(InterruptSlowMotionSettings) — 대쉬 간파 시도·간파 준비 강/약 프로필·시도 줌·간파 적중 프로필. 사건마다 읽는다. 비면 코드 기본값")]
+    [DataTableIgnore, SerializeField] private InterruptSlowMotionSettings slowMotionSettings;
+
     [Header("시도 — 공용")]
-    [Tooltip("간파 시도 슬로우 모양 — 성공 예측(강). 서버 값만 쓴다. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
-    [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile
-    {
-        scale = 0.15f,
-        hitStopDuration = 0f,
-        hitStopScale = 0.02f,
-        enterDuration = 0.05f,
-        holdDuration = 0.5f,
-        exitDuration = 0.25f,
-        failExitDuration = 0.1f,
-    };
-    [Tooltip("간파 시도 슬로우 모양 — 실패 예측(약). 서버 값만 쓴다(할 일 132)")]
-    [SerializeField] private SlowMotionProfile interruptWeakProfile = new SlowMotionProfile
-    {
-        scale = 0.5f,
-        hitStopDuration = 0f,
-        hitStopScale = 0.02f,
-        enterDuration = 0.05f,
-        holdDuration = 0.2f,
-        exitDuration = 0.25f,
-        failExitDuration = 0.1f,
-    };
-    [Tooltip("내가 일으킨 강 시도 슬로우의 유지 단계 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음. 이 피어 값을 쓴다(A3 칸이 켜져야 쓰인다)")]
-    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float interruptZoomFactor = 0.7f;
-    [Tooltip("내가 일으킨 약 시도 슬로우의 유지 단계 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음. 이 피어 값을 쓴다(A3 칸이 켜져야 쓰인다)")]
-    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float interruptWeakZoomFactor = 0.93f;
     [Tooltip("B1 방패 발광·루프 — 간파 시도(우클릭) 시작에 shieldGlow FadeIn·glowLoop Play. 끄는 쪽은 늘 돈다")]
     [DataTableIgnore, SerializeField] private bool paladinShieldGlow;
     [Tooltip("B2 방패 기 모으기 — 간파 시도 클립(Garen_Parry) 이벤트의 ShieldCharge 이펙트")]
@@ -82,17 +59,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [DataTableIgnore, SerializeField] private bool assassinInsightAttempt;
 
     [Header("성공 — 공용")]
-    [Tooltip("간파 성공(카운터 창 소비) 시 다시 거는 슬로우 모양. 맨 앞 히트스톱 뒤 그 배율에서 진입한다(할 일 87). 서버 값만 쓴다")]
-    [SerializeField] private SlowMotionProfile interruptSuccessProfile = new SlowMotionProfile
-    {
-        scale = 0.25f,
-        hitStopDuration = 0.05f,
-        hitStopScale = 0.02f,
-        enterDuration = 0.05f,
-        holdDuration = 1.2f,
-        exitDuration = 0.4f,
-        failExitDuration = 0.1f,
-    };
     [Tooltip("A1 히트스톱 — 간파 성공 슬로우 맨 앞의 짧은 정지. 서버 값만 쓴다(끄면 hitStopDuration 0 으로 전 피어에 실린다)")]
     [DataTableIgnore, SerializeField] private bool hitStop;
     [Tooltip("A4 성공 이펙트 칸 — 간파 성공 때 Player 의 InterruptSuccessFx casterFx·targetFx 원샷")]
@@ -234,12 +200,19 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>섬광 줄이기 저장 키(PlayerPrefs, 0/1). 새 설정 UI 는 없다 — 나중에 설정 화면이 이 키(<see cref="ReduceFlash"/>)를 쓰면 된다.</summary>
     public const string ReduceFlashPrefsKey = "Interrupt.ReduceFlash";
 
+    /// <summary>슬로우 3단계 수치 SO(194 후속 2) — 비면 코드 기본값 인스턴스. 사건마다 읽는다.</summary>
+    public InterruptSlowMotionSettings SlowMotion => InterruptSlowMotionSettings.OrDefault(slowMotionSettings);
+
     /// <summary>시도 슬로우 프로필(강) — 사건 순간 이 객체를 넘기면 이벤트가 그 순간 값을 복사한다(캐싱 아님).</summary>
-    public SlowMotionProfile InterruptProfile => interruptProfile;
+    public SlowMotionProfile InterruptProfile => SlowMotion.InterruptProfile;
     /// <summary>시도 슬로우 프로필(약).</summary>
-    public SlowMotionProfile InterruptWeakProfile => interruptWeakProfile;
+    public SlowMotionProfile InterruptWeakProfile => SlowMotion.InterruptWeakProfile;
+    /// <summary>대쉬 간파 시도 슬로우 프로필(강, 194 후속 2).</summary>
+    public SlowMotionProfile InterruptDashProfile => SlowMotion.InterruptDashProfile;
+    /// <summary>대쉬 간파 시도 슬로우 프로필(약, 194 후속 2).</summary>
+    public SlowMotionProfile InterruptDashWeakProfile => SlowMotion.InterruptDashWeakProfile;
     /// <summary>성공 슬로우 프로필.</summary>
-    public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
+    public SlowMotionProfile InterruptSuccessProfile => SlowMotion.InterruptSuccessProfile;
 
     public float OwnerDimInDuration => ownerDimInDuration;
     public float OwnerDimOutDuration => ownerDimOutDuration;
@@ -653,13 +626,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     public static bool AllowsAnimEffect(string id) => InterruptProductionRules.AllowsAnimEffect(Instance, id);
 
     /// <summary>
-    /// A3 — 개인 채널 오너 줌 배율(카메라가 매 프레임 묻는다). 지금 슬로우 목적으로 강·약 시도(이 디렉터 칸)·성공(<paramref name="successZoomFactor"/>)
+    /// A3 — 개인 채널 오너 줌 배율(카메라가 매 프레임 묻는다). 지금 슬로우 목적으로 강·약 시도(슬로우 SO 칸)·성공(<paramref name="successZoomFactor"/>)
     /// 배율을 고른다(할 일 132). 칸이 꺼져 있거나 인스턴스가 없으면 1.
     /// </summary>
     public static float OwnerZoomFactor(SlowMotionPurpose purpose, float successZoomFactor) =>
         Instance != null
             ? Instance.SuccessStage.OwnerZoomFactor(InterruptProductionRules.SelectOwnerZoomFactor(
-                purpose, Instance.interruptZoomFactor, Instance.interruptWeakZoomFactor, successZoomFactor))
+                purpose, Instance.SlowMotion.InterruptZoomFactor, Instance.SlowMotion.InterruptWeakZoomFactor, successZoomFactor))
             : 1f;
 
     /// <summary>

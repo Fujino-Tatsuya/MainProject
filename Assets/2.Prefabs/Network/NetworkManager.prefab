@@ -222,35 +222,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptProductionDirector
   keepCoSucceededBright: 1
-  interruptProfile:
-    scale: 0.15
-    hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.5
-    exitDuration: 0.25
-    failExitDuration: 0.1
-  interruptWeakProfile:
-    scale: 0.5
-    hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.2
-    exitDuration: 0.25
-    failExitDuration: 0.1
-  interruptZoomFactor: 0.7
-  interruptWeakZoomFactor: 0.93
+  slowMotionSettings: {fileID: 11400000, guid: 311d260bdd940f441b0c2cd45d1afe7f, type: 2}
   paladinShieldGlow: 0
   paladinShieldCharge: 0
   assassinInsightAttempt: 0
-  interruptSuccessProfile:
-    scale: 0.25
-    hitStopDuration: 0.05
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 1.2
-    exitDuration: 0.4
-    failExitDuration: 0.1
   hitStop: 1
   successFxSlot: 1
   paladinWave: 0
