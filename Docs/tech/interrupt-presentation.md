@@ -751,7 +751,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 레이드 구출 성공(③ 새 가족)의 제압은 179 와 같이 제압 간파 표식을 내지 않는다(제압 칸 경로만).
 - ~~Q4·Q5 섬광(포인트라이트·환경광 끄기 / 암순응·블룸)은 미구현~~ → 194 적중 라이트 연출 V1·V2(§9).
 
-## 9. 적중 라이트 연출 V1·V2 (할 일 194)
+## 9. 적중 라이트 연출 V1·V2·V3 (할 일 194)
 
 > 계획: `_lane-artifacts/Work2/194/PLAN.md`(승인 2026-11-03). 레퍼런스 = ZZZ 컷신 0234(참고만 — 프레임을 텍스처로 쓰지 않는다).
 > 코드: `InterruptPresentationTier.cs`(버전 칸·선택 함수) · `HitLight/`(`InterruptHitLightLook` SO · `InterruptHitLightFx` 월드 이펙트 · `InterruptHitLightPlayer` 진행기 · `InterruptHitLightWhiteoutSettings`) ·
@@ -764,6 +764,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | **V0** | `HitFlash` | 기존 적중 섬광 ②~⑥ + 섬광 순간 월드 섬광·라이트·A2 암순응(§0) — 효과 칸(§17)을 따른다 | 오너 화면 ②~⑥, 모든 피어 월드 섬광 |
 | **V1** | `HitLight` | 성공 순간 바로: 적중 포인트 라이트 + 암순응(가/나) + 블룸 + 불꽃 + 메시 파편 + 빛줄기 | **모든 피어**(암순응 가는 본인 1·팀원 0.35) |
 | **V2** | `HitLightWhiteout` | V1 + 적중 화이트아웃 3프레임(기존 ③ 그림 재사용, ③ 칸과 무관) | V1 + 화이트아웃은 **본인 화면만** |
+| **V3** | `HitLightReference` | 레퍼런스 맞춤(194 후속) — 전용 SO·프리팹(`InterruptHitLightLook_V3`·`FX_InterruptHitLight_V3`): 암순응 **나** 기본(태양광 −95%·환경광 −90%) + 채도 낮춤 색 보정 Volume + 약한 라이트(4·반경 3) + 중심만 번지는 블룸 + 작은 중심 점·가로 빛줄 + 가늘고 많은 불꽃 + 작은 빛줄기, 화이트아웃 없음 (§9.6) | **모든 피어** |
 | (제압) | `SuppressSequence` | §7 섬광 시퀀스 — 버전 선택 대상 아님 | 모든 피어 |
 
 - 기본 = **일반 V1 · 대쉬 V2 · 암순응 가**(코드 기본값 = 프리팹 값). 디렉터 칸 `hitLightLook`(SO)·`hitLightVfx`(프리팹) 중 하나라도 비면 V1·V2 는 **V0 로 돌아간다**(`SelectSuccessLook`).
@@ -794,7 +795,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 ### 9.4 DebugInterruptLab 버튼 (튜닝 패널 "간파 단계" 아래)
 
-- `간파(근접) 버전 — 실제 V?` / `대쉬 간파 버전 — 실제 V?` 줄마다 `V0`·`V1`·`V2`·`가 화면`·`나 씬 조명`·`위치 무기`·`위치 대상`·`재생`. 지금 값은 `[ ]` 로 표시, **실제** = 데이터 없음으로 V0 로 돌아간 것까지 반영.
+- `간파(근접) 버전 — 실제 V?` / `대쉬 간파 버전 — 실제 V?` 줄마다 `V0`·`V1`·`V2`·`V3`·`가 화면`·`나 씬 조명`·`위치 무기`·`위치 대상`·`재생`. 지금 값은 `[ ]` 로 표시, **실제** = 데이터 없음으로 V0 로 돌아간 것까지 반영.
 - 이 피어 런타임 값만(저장 안 함), 다음 성공부터. `재생` = §8.5 단계 재현과 같은 경로(이 화면만, 슬로우·줌 없음).
 - 랩 블룸: 씬에 카메라·Volume 은 없고 `CameraSwitcher` 가 런타임에 `MainCamera.prefab`(후처리 켬 · Volume 마스크 Default)을 만든다 — 진행기의 블룸 Volume(Default 레이어)이 걸린다. 정적 구성 확인만 했고 화면 확인은 Play 필요.
 
@@ -805,6 +806,27 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 파편 바닥 충돌은 월드 콜라이더 전체와 부딪힌다(플레이어 캡슐 포함) — 개수가 적어 비용은 작다.
 - V2 화이트아웃은 A5 전투 표시 숨김 구간에 들지 않는다(3프레임).
 - 데이터 테이블(xlsx)에는 내지 않았다 — SO 가 원본.
+
+### 9.6 V3 레퍼런스 맞춤 (194 후속, 2026-11-03)
+
+- 왜: V1·V2 는 블룸(threshold 0.8·intensity 6)·라이트(20·반경 8)가 세서 바닥까지 하얗게 날아가고 화면이 뿌옇다. 레퍼런스 2:34 적중 프레임(f30·f34)은 주변이 어둡고 보랏빛으로 채도가 낮고, 작고 강한 중심 점 + 가로 얇은 빛줄 + 맞닿은 가장자리만 주황 + 가늘고 긴 주황 불꽃.
+- **V1·V2 값은 그대로**(버전 보존) — V3 는 같은 형식의 별도 SO·프리팹·Volume 프로필. 디렉터 칸 `hitLightLookReference`·`hitLightVfxReference`, 둘 중 하나라도 비면 V3 → V0. 저작 메뉴 `Tools/Interrupt/적중 라이트 V3 레퍼런스 에셋 만들기 (194)`(SO·프로필·재질은 있으면 값 유지, 메시·프리팹은 같은 guid 로 다시 짓는다).
+- 기본값은 안 바꿨다(일반 V1·대쉬 V2) — 사용자가 랩에서 비교 후 결정. 랩 `V3` 버튼은 그 단계 암순응을 **나** 로 함께 맞춘다(`DefaultDarkAdapt`, 누른 뒤 가로 바꿀 수 있음).
+
+| 요소 | V3 시작값 | 칸 |
+|---|---|---|
+| 암순응 나 | 태양광 −95% · 환경광 −90% · 0.9초 곡선 | `InterruptHitLightLook_V3` `sunDimDepth`·`ambientDimDepth` |
+| 색 보정(신규 칸) | `VP_InterruptHitLight_V3_Grade` = ColorAdjustments 채도 −35 · 색 필터 (0.84, 0.78, 1) 보랏빛 · 노출 −0.3, 가중치 1 → 0.9초 곡선(블룸과 같은 방식의 이 피어 전용 전역 Volume) | SO `gradeProfile`·`gradeDuration`·`gradeCurve` (V1·V2 는 비어 있음 = 없음) |
+| 포인트 라이트 | 주황 (1, 0.6, 0.3) · 세기 4 · 반경 3 | SO `light*` |
+| 블룸 | `VP_InterruptHitLight_V3_Bloom` threshold 1.5 · intensity 1.5 · scatter 0.6 · 따뜻한 틴트 | SO `bloomProfile` |
+| 중심 점 `Core` | 넓은 날개 16개 메시(에셋 `Mesh_InterruptHitLight_Core`) 크기 0.45 · HDR 중심 16 · 0.35초 | 재질 `M_InterruptHitLight_Core`(셰이더 `InterruptHitLightRays` 재사용) |
+| 가로 빛줄 `Streak` | 좌우 날개 2개 얇은 메시(에셋 `Mesh_InterruptHitLight_Streak`) 크기 2.6 · 회전 0(늘 화면 가로) · 0.22초 | 재질 `M_InterruptHitLight_Streak` |
+| 불꽃 `Sparks` | 55~70개 · 크기 0.025~0.045 · 속도 9~18 · lengthScale 4 · 중력 0.4 · 재질 HDR 7 | 재질 `M_InterruptHitLight_Spark_V3` |
+| 빛줄기 `Rays` | V1 메시·재질 그대로, 크기 0.8~1.2 · 알파 0.4 | 프리팹 파티클 |
+| 파편 `Debris` | V1 과 같음 | 프리팹 파티클 |
+| 화이트아웃 | 없음(0) | SO `whiteoutFrames` |
+
+- 4.MapScene(보스방 포함, 같은 씬) 기준: 태양광 0.75(실시간)·환경광 Trilight·전역 Volume `VP_CombatLevel_Toon`(노출 +0.25·채도 +8·대비 12·블룸 threshold 1.1/intensity 0.35·Neutral 톤매핑·비네트 0.22). V3 색 보정은 우선순위가 높아 가중치 1 에서 노출·채도·색 필터를 덮고(대비는 맵 값 유지), V3 블룸 threshold 1.5 는 맵(1.1)보다 높아 HDR 이펙트만 번진다. 랩(흰 체크 바닥·태양광 1·Volume 없음)보다 맵이 원래 어두워 V3 는 더 어둡게 보일 수 있다 — Play 로 확인.
 
 ## 10. 이후 확장
 

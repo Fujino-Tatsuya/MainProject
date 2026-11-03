@@ -295,18 +295,23 @@ MonoBehaviour:
   reduceFlash: 0
   hitLightLook: {fileID: 11400000, guid: 5d7ab4161f2c71748bb9fe1336f1be9b, type: 2}
   hitLightVfx: {fileID: 4308608783583396743, guid: 2209f576fb558f24485d5e1da46740f0, type: 3}
+  hitLightLookReference: {fileID: 11400000, guid: 53628f711ee79cc4aaafda6dabce0400, type: 2}
+  hitLightVfxReference: {fileID: 7590261245222885139, guid: 0c17b0169f787034e9c0c5f64412a828, type: 3}
   normalTier:
     ownerDim: 0
     flash: 2
     darkAdapt: 0
+    hitLightOrigin: 0
   dashTier:
     ownerDim: 0
     flash: 3
     darkAdapt: 0
+    hitLightOrigin: 0
   suppressTier:
     ownerDim: 1
     flash: 1
     darkAdapt: 0
+    hitLightOrigin: 0
 --- !u!114 &4191191191191191191
 MonoBehaviour:
   m_ObjectHideFlags: 0
