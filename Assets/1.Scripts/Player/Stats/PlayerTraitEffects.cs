@@ -32,7 +32,18 @@ public sealed class PlayerTraitEffects : MonoBehaviour, ITraitEffectHost
     private readonly List<TraitDerivedAttack> derivedAttacks = new List<TraitDerivedAttack>();
     private readonly List<TraitOverflowShare> overflowShares = new List<TraitOverflowShare>();
     private readonly List<TraitHealCandidate> healCandidates = new List<TraitHealCandidate>();
-    private readonly List<Player> healCandidatePlayers = new List<Player>();
+    private readonly List<Unit> healCandidateUnits = new List<Unit>();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    /// <summary>
+    /// [개발 전용] 나누는 불굴 후보에 더할 유닛(2026-11-02 민경 — DebugTraitLab 아군 허수아비 <c>DebugAllyDummy</c> 가 스폰 때 등록).
+    /// 실게임 후보는 접속한 클라의 플레이어뿐이라 1인 랩에서는 전달 대상이 없다. 릴리스 빌드에는 이 목록이 없다.
+    /// </summary>
+    public static readonly List<Unit> DevShareRecipients = new List<Unit>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetDevShareRecipients() => DevShareRecipients.Clear();
+#endif
 
     /// <summary>[서버] 특성 사건.</summary>
     public event Action<TraitTriggerEvent> Triggered;
@@ -190,7 +201,7 @@ public sealed class PlayerTraitEffects : MonoBehaviour, ITraitEffectHost
             return;
 
         healCandidates.Clear();
-        healCandidatePlayers.Clear();
+        healCandidateUnits.Clear();
         Vector3 origin = transform.position;
         foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
         {
@@ -203,18 +214,36 @@ public sealed class PlayerTraitEffects : MonoBehaviour, ITraitEffectHost
                 other.TryGetComponent(out PlayerEncounterLock encounterLock) && encounterLock.IsCinematicHidden);
             healCandidates.Add(new TraitHealCandidate(other.OwnerClientId, other.CurrentHealth, other.MaxHp,
                 (other.transform.position - origin).sqrMagnitude, eligible));
-            healCandidatePlayers.Add(other);
+            healCandidateUnits.Add(other);
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        // 랩 아군 허수아비 — 플레이어 뒤 순번(동률이면 플레이어가 먼저).
+        for (int i = 0; i < DevShareRecipients.Count; i++)
+        {
+            Unit extra = DevShareRecipients[i];
+            if (extra == null || !extra.IsSpawned)
+                continue;
+            healCandidates.Add(new TraitHealCandidate(ulong.MaxValue - (ulong)i, extra.CurrentHealth, extra.MaxHp,
+                (extra.transform.position - origin).sqrMagnitude, extra.isActiveAndEnabled));
+            healCandidateUnits.Add(extra);
+        }
+#endif
 
         int pick = TraitHealRules.PickOverflowRecipient(healCandidates, share.Range);
         if (pick < 0)
             return;
 
-        Player ally = healCandidatePlayers[pick];
+        Unit ally = healCandidateUnits[pick];
         int healed = ally.HealHp(transfer, true, player.OwnerClientId);
         Edit.Log($"{Tag} '{name}' 초과 회복 {overflow} → '{ally.name}' {transfer} 요청, 실제 {healed}.", this);
         if (healed > 0)
+        {
             RaiseServer(new TraitTriggerEvent(TraitTrigger.Healed, AttackType.None, TraitAttackForm.Normal, 0, false, 0, ally, healed));
+            // 전이 리본 연출(2026-11-02 민경) — 판정과 무관, 전 피어가 팔라딘 → 아군 리본 + 도착 시 아군 힐을 그린다.
+            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.PaladinShareHeal, TraitFxKind.Hit, origin, transform.forward,
+                ally.transform.position, target: ally);
+        }
     }
 
     // ── ITraitEffectHost ────────────────────────────────────────────────

@@ -86,7 +86,7 @@ public sealed class InterruptProductionDirector : MonoBehaviour, IInterruptProdu
     [DataTableIgnore, SerializeField] private bool hitStop;
     [Tooltip("A4 성공 이펙트 칸 — 간파 성공 때 Player 의 InterruptSuccessFx casterFx·targetFx 원샷")]
     [DataTableIgnore, SerializeField] private bool successFxSlot;
-    [Tooltip("B3 충격파 — 간파 성공(방패 적중) 때 PlayerShieldVfx.interruptWave 원샷")]
+    [Tooltip("B3 충격파 — 간파 성공(방패 적중) 때 PaladinSkillView.interruptWave 원샷")]
     [DataTableIgnore, SerializeField] private bool paladinWave;
     [Tooltip("C2 간파 성공 이펙트 — 간파 성공 때 올려치기 프레임에 AssassinSkillView.insightSuccess 원샷(C1 을 꺼도 같은 프레임에 나온다)")]
     [DataTableIgnore, SerializeField] private bool assassinInsightSuccess;

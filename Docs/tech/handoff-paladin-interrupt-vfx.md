@@ -1,13 +1,14 @@
 # handoff — 팔라딘 우클릭(단죄의 방패) 연출: 충격파는 간파 성공 때만 · 판정 전 방패 기 모으기
 
 > 2026-10-26 · 민경(Claude) · 브랜치 `feature/VFX` · 계획 [PLAN.md](../../PLAN.md) 「팔라딘 우클릭(단죄의 방패) 연출」
+> ⚠️ **2026-11-02 이후: 아래 스킬의 연출 칸·메서드는 `PaladinSkillView`(Player_Paladin 루트)로 옮겨졌다** — [handoff-shield-vfx.md](handoff-shield-vfx.md) 「통합」. 이 문서는 당시 기록이다.
 > **은희 님 영역 변경 = 연출 배선만.** 판정·피해·카운터 창·슬로우·네트워크는 그대로다.
 
 ## 1. 은희 영역 변경
 - `1.Scripts/Player/Skill/FirstMeleeInterruptSkill.cs`
   - **충격파 조건 변경**: 예전 `OnInterruptResolutionCompleted` 의 `resolvedCount > 0`(적중 1건 이상) 호출을 지우고,
     부모의 정적 이벤트 `PlayerInterruptSkillBase.ServerInterruptSucceeded` 를 `OnEnable`/`OnDisable` 에서 구독해
-    **자기 시전(`skill == this`)이 간파 성공(카운터 창 소비)일 때만** `PlayerShieldVfx.ServerInterruptWave()`. 판정 1회에 한 번(여러 대상 성공해도 1회).
+    **자기 시전(`skill == this`)이 간파 성공(카운터 창 소비)일 때만** `PaladinSkillView.ServerInterruptWave()`(2026-11-02 PlayerShieldVfx → PaladinGuardRelay → PaladinSkillView). 판정 1회에 한 번(여러 대상 성공해도 1회).
     → 간파 창 없는 대상·일반 몹·상자를 때리면 이제 충격파가 안 나온다(의도).
   - 새 칸 `chargeLoop`(EffectSocketPlayer) — `OnEnd` 에서 `Stop()`. 판정 전에 끊긴 경우(경직·사망·취소) 기 모으기 회수용. 켜고 끄기는 아래 클립 이벤트가 한다.
   - `PlayerInterruptSkillBase`(부모)는 무변경. ~~E 반격(`FirstMeleeSubSkill`)의 `ServerInterruptWave` 호출도 그대로.~~

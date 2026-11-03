@@ -65,7 +65,7 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 | | | Hit | 추가 피해가 들어간 대상마다 | 공용 RPC | Pos = 맞은 콜라이더 중심, Target |
 | 돌파의 방패 `PAL_2_DASH` | `PaladinShieldDash` | Activated | Q 시작(돌진 준비 시작) | 전 피어 경로(`FirstMeleeMainSkill.OnClientPlay`) | Pos = 시작 위치, Dir = 돌진 방향, End = 시작 + 방향 × 돌진 거리(안전 정지 전 값), Shape = 경로 표본마다 훑는 원래 Q hitArea(Pose = 시작 지점) |
 | | | Hit | 돌진에 맞은 대상마다(시전당 대상 1회) | 공용 RPC | Pos = 콜라이더 중심, Dir = 돌진 방향, Target |
-| 수호의 파동 `PAL_4_E_PUSH` | `PaladinGuardWave` | Activated | E 반격 판정 순간(보장 반격 포함, 밀린 대상 없어도) | 공용 RPC | Pos = 반격 위치, Dir = 방어 방향, Shape = 밀치기 원(`FirstMeleeSubSkill.TraitPushArea`, 반경 = 특성 수치) |
+| 수호의 파동 `PAL_4_E_PUSH` | `PaladinGuardWave` | Activated | E 반격 판정 순간(보장 반격 포함, 밀린 대상 없어도) | 공용 RPC | Pos = 반격 위치, Dir = 방어 방향, Shape = 밀치기 원(`FirstMeleeSubSkill.TraitPushArea`, 반경 = 특성 수치). 구독 = `PaladinSkillView` — 발밑 바람 링 `FX_GuardWave_Ring`(배율 = 원 반경, 2026-11-02 민경). Hit 은 연출 없음 |
 | | | Hit | 밀치기가 실린 대상마다(반격 피해와 함께·밀치기만 둘 다) | 공용 RPC | Pos = 콜라이더 중심, Dir = 밀리는 방향, Target |
 | 광폭 레이저 `GUN_1_WIDTH` | `GunnerWideLaser` | Activated | Q 한 발 발사(집속 연사면 발마다) | 전 피어 경로(`GunnerBeamView.ChargeLaserFiredRpc`) | Pos = 발사 원점(총구 높이), End = 빔 끝, Shape = 그 발의 판정 도형(길이 = 이번 발, 폭 = 특성 폭) |
 | | | Hit | 그 발이 피해를 준 몬스터마다(최대 8) | 전 피어 경로(같은 RPC) | Pos = 빔 위 적중 지점. **Target 없음**(기존 RPC 가 지점만 싣는다) |
@@ -79,12 +79,13 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 | | | Hit | 맞은 유닛마다 | 공용 RPC | Pos = 유닛 위치, Target |
 | 추격의 궤적 `ASN_4_Q_TRAIL` | `AssassinPursuitTrail` | Activated | 궤적 판정 순간(빗나가도) | 공용 RPC | Pos = 선분 시작, End = 선분 끝, Shape = 지나온 길이로 맞춘 Q 경로 도형, Pose = 판정 포즈, Variant = 돌진 스킬 순서(내부용) |
 | | | Hit | 맞은 대상마다 | 공용 RPC | Pos = 콜라이더 중심, Target |
+| 나누는 불굴 `PAL_2_SHARE_HEAL` | `PaladinShareHeal` | Hit | 초과 회복이 아군 1명에게 실제로 들어감(실제 회복 > 0, 2026-11-02 민경) | 공용 RPC(`PlayerTraitEffects.ShareOverflow`) | Pos = 팔라딘 위치, Dir = 팔라딘 정면, End = 아군 위치(서버 시점), Target = 받은 아군. 구독 = `PaladinSkillView`(Player_Paladin 루트)(전이 리본 → 도착 시 아군 공용 힐) |
 
 ### 3.1 이벤트가 없는 특성(전수 확인 결과)
 
 - **수치만 바꾸는 특성**(피해·쿨·회복·스탯·스킬 수치 — 진격 강화·수호 재정비·불굴의 회복·고속 집속·출력 강화·집중 포화·광란/강타 강화·완전 해방·돌파 가속 등): 기존 스킬 연출 그대로라 사건 없음.
 - **모드 변경**(한계 돌파·축열 포격·정온 운용·집속 연사·관통 탄도·그림자 회귀·절제된 분노): 바뀐 동작이 원래 스킬 연출 경로(발수·과열 표시 등)를 그대로 탄다. 집속 연사는 발마다 Q 발사 연출이 이미 나고, 광폭 레이저와 함께면 발마다 위 Activated 가 난다.
-- **사건형 보조**(수호의 순환·불굴의 순환·사냥의 박자 쿨 환급, 수호의 잔광·불굴의 가호 보호막, 나누는 불굴, 돌파의 여세): 보호막은 받는 쪽 `PlayerShieldVfx` 가 복제 목록으로 띄운다. 나머지는 눈에 보이는 공격이 아니다.
+- **사건형 보조**(수호의 순환·불굴의 순환·사냥의 박자 쿨 환급, 수호의 잔광·불굴의 가호 보호막, 돌파의 여세): 보호막은 받는 쪽 `PlayerShieldVfx` 가 복제 목록으로 띄운다 — 수호의 잔광·불굴의 가호는 금색(`PlayerShieldVfxSet.holyTraitIds`, 2026-11-02 [handoff-shield-vfx.md](handoff-shield-vfx.md)), 그 외 흰색. 나머지는 눈에 보이는 공격이 아니다.
 - **밀치기·뇌진탕만 붙는 특성**(제압의 진격·충격 레이저·급소 파괴): 원래 공격 적중 연출 + 대상 넉백·기절 표시로 보인다 — 이번 범위에서 따로 사건을 두지 않았다. 필요하면 수호의 파동 Hit 처럼 공용 RPC 로 더한다.
 
 ## 4. 잔류 포격 구체 프리팹 칸

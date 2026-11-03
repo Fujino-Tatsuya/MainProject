@@ -26,7 +26,7 @@
 
 | 연출 | 칸 | 바뀐 점 |
 |---|---|---|
-| 팔라딘 방패 발광·루프 | B1 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 디렉터가 칸을 보고 스킬의 `PlayCue` 로 `shieldGlow.FadeIn`·`glowLoop.Play`. `OnEnd` 의 끄기·회수 그대로 |
+| 팔라딘 방패 발광·루프 | B1 | `FirstMeleeInterruptSkill.OnClientPlay` → `Director.LocalAttempt` → 디렉터가 칸을 보고 스킬의 `PlayCue` → `PaladinSkillView.BeginInterruptGlow`(방패 발광·루프). `OnEnd` → `EndInterruptVfx`(끄기·회수, 2026-11-02 창구로 이동) |
 | 팔라딘 충격파 | B3 | 서버: 정적 `ServerInterruptSucceeded` 구독 → 디렉터 성공 단계가 스킬의 relay(`IInterruptSuccessRelay`)를 부른다 → 기존 `PlayerShieldVfx.ServerInterruptWave`·`InterruptWaveRpc`. 각 피어: `PlayInterruptWave` → `Director.PlayCue(PaladinWave, …, this)` → `interruptWave.PlayOnce` |
 | 어쌔신 간파 성공 | C2 | 서버: 정적 구독 → `AssassinSkillView` 의 relay → 기존 `InterruptSucceededRpc`. 각 피어: 성공 대기 ∧ 올려치기 프레임 맞추기는 View 에 그대로, 재생만 `Director.PlayCue(AssassinInsightSuccess, …, this)` |
 

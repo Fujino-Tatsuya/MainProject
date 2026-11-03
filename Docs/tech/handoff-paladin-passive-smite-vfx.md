@@ -1,6 +1,7 @@
 # 핸드오프 — 팔라딘 패시브(불굴의 의지) 추가 피해 VFX `FX_Paladin_Smite` (2026-10-28 · 민경(Claude) → 은희)
 
 > 계획·결정 원본: [PLAN.md](../../PLAN.md) 맨 위 "성광 낙인". 판정·피해·회복·쿨·RPC 는 **안 바꿨다** — 연출 배선만.
+> ⚠️ **2026-11-02 이후: 아래 스킬의 연출 칸·메서드는 `PaladinSkillView`(Player_Paladin 루트)로 옮겨졌다** — [handoff-shield-vfx.md](handoff-shield-vfx.md) 「통합」. 이 문서는 당시 기록이다.
 
 ## 1. 은희 영역에서 바뀐 것
 | 파일 | 변경 |

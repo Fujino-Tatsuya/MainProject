@@ -13,25 +13,28 @@ using UnityEngine;
 /// <b>기준값.</b> 연결된 순간의 획득 수를 기준으로 잡는다 — 씬 진입·늦은 접속 때 이미 가진 증강으로 터지지 않게.
 /// 전멸로 줄어들면 기준도 같이 내려가서 재선택 때 다시 터진다.
 ///
-/// <b>몸을 따라간다.</b> 원샷 연출이지만 <see cref="EffectManager.PlayLooping"/> 로 플레이어 루트를 추종시키고 곧바로 해제한다 —
-/// 레벨업 프리팹엔 루프 시스템이 없어 해제해도 끊기지 않고, 엔트리 outroDuration 동안 계속 따라간다.
-/// (일반 원샷 <c>Play</c> 는 위치 고정이라 선택 직후 걸어가면 뒤에 남는다.)
+/// <b>계기만 맡는다(2026-11-02).</b> 무엇을 어디에 띄울지는 플레이어 공용 원샷 표(<see cref="PlayerOneShotVfxSet"/>)의
+/// <see cref="PlayerOneShotVfx.LevelUp"/> 줄이 정하고, 재생은 <see cref="PlayerOneShotVfxPresenter"/>(<c>VFX/States</c>)가 한다 —
+/// 여기는 "언제·누구 화면에" 만 가린다.
 /// </summary>
 [DisallowMultipleComponent]
 public class TraitAcquiredVfxPresenter : MonoBehaviour
 {
-    [Tooltip("증강 획득 연출. Level_up_Entry — outroDuration 이 연출 길이보다 길어야 끝까지 따라간다")]
-    [SerializeField] EffectEntry effect;
-
-    [SerializeField, Min(0.01f)] float scale = 1f;
-
     readonly List<int> _acquired = new List<int>();
     NetworkObject _player;
     TraitDirector _director;
     int _baseline;
     bool _dirty;
 
-    void Awake() => _player = GetComponentInParent<NetworkObject>();
+    PlayerOneShotVfxPresenter _presenter;
+
+    void Awake()
+    {
+        _player = GetComponentInParent<NetworkObject>();
+        _presenter = GetComponentInChildren<PlayerOneShotVfxPresenter>(true);
+        if (_presenter == null)
+            Edit.LogWarning($"[TraitAcquiredVfxPresenter] '{name}' 아래에 PlayerOneShotVfxPresenter 가 없다 — 레벨업 연출이 나오지 않는다.", this);
+    }
 
     void OnDisable() => Bind(null);
 
@@ -74,9 +77,6 @@ public class TraitAcquiredVfxPresenter : MonoBehaviour
 
     void Play()
     {
-        if (effect == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
-
-        EffectHandle handle = effects.PlayLooping(effect, _player.transform, Vector3.zero, scale);
-        effects.Release(handle);
+        if (_presenter != null) _presenter.Play(PlayerOneShotVfx.LevelUp);
     }
 }
