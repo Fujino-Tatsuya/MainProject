@@ -167,15 +167,8 @@ public sealed class InterruptHitLightTests
     {
         public readonly List<float> Shown = new List<float>();
         public int Clears;
-        public ulong Caster;
-        public Vector3 Target;
 
-        public void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition)
-        {
-            Shown.Add(darkness);
-            Caster = casterClientId;
-            Target = targetPosition;
-        }
+        public void ShowDarkAdaptCut(float darkness) => Shown.Add(darkness);
 
         public void ClearDarkAdapt() => Clears++;
     }
@@ -205,12 +198,10 @@ public sealed class InterruptHitLightTests
 
         player.Begin(new InterruptHitLightRequest
         {
-            ViewerIsCaster = false, CasterClientId = 7, TargetPosition = Vector3.right, Look = InterruptSuccessLook.HitLight,
+            ViewerIsCaster = false, Look = InterruptSuccessLook.HitLight,
             DarkAdapt = InterruptDarkAdaptMode.ScreenPass,
         }, 0f);
         Assert.AreEqual(0.35f, dark.Shown[0], 1e-4f, "팀원 화면 = 약하게");
-        Assert.AreEqual(7ul, dark.Caster);
-        Assert.AreEqual(Vector3.right, dark.Target);
 
         player.Tick(0.45f);
         Assert.Less(dark.Shown[dark.Shown.Count - 1], 0.35f, "부드럽게 복귀");

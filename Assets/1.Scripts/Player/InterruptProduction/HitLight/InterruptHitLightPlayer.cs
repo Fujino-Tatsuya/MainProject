@@ -7,9 +7,6 @@ public struct InterruptHitLightRequest
 {
     /// <summary>섬광 중심(대상 위치 + 높이).</summary>
     public Vector3 Point;
-    /// <summary>판정 순간 대상 위치(암순응 원형 중심).</summary>
-    public Vector3 TargetPosition;
-    public ulong CasterClientId;
     /// <summary>이 화면이 발동자 본인인가.</summary>
     public bool ViewerIsCaster;
     public InterruptSuccessLook Look;
@@ -155,7 +152,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
         float darkness = InterruptEffectLight.Pulse(look.DarkAdaptCurve, peak, elapsed, look.DarkAdaptDuration);
         if (darkness > 0f)
         {
-            output.ShowDarkAdaptCut(darkness, _request.CasterClientId, _request.TargetPosition);
+            output.ShowDarkAdaptCut(darkness);
             _darkAdaptShown = output;
         }
         else if (_darkAdaptShown != null)

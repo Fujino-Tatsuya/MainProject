@@ -990,8 +990,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         HitLight.Begin(new InterruptHitLightRequest
         {
             Point = FlashPoint(e.TargetPosition),
-            TargetPosition = e.TargetPosition,
-            CasterClientId = e.CasterClientId,
             ViewerIsCaster = viewerIsCaster,
             Look = look,
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
