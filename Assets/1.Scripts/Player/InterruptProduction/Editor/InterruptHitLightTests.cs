@@ -289,6 +289,9 @@ public sealed class InterruptHitLightTests
         var go = new GameObject("Director");
         _objects.Add(go);
         var director = go.AddComponent<InterruptProductionDirector>();
+        // 기본은 V3(11-03) — V1·V2 데이터 규칙을 보려고 단계 버전을 V1·V2 로(랩 버튼과 같은 런타임 값).
+        director.TierProfile(InterruptPresentationTier.Normal).flash = InterruptTierFlash.HitLight;
+        director.TierProfile(InterruptPresentationTier.Dash).flash = InterruptTierFlash.HitLightWhiteout;
         Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Normal), "둘 다 없음 = V0");
 
         var so = new SerializedObject(director);
@@ -790,8 +793,8 @@ public sealed class InterruptHitLightTests
         Assert.IsNotNull(so.FindProperty("hitLightLook").objectReferenceValue, "hitLightLook");
         Assert.IsNotNull(so.FindProperty("hitLightVfx").objectReferenceValue, "hitLightVfx");
         Assert.IsNotNull(director.HitLightLook.BloomProfile, "간파 전용 블룸 프로필");
-        Assert.AreEqual(InterruptSuccessLook.HitLight, director.SuccessLook(InterruptPresentationTier.Normal), "기본 일반 = V1");
-        Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash), "기본 대쉬 = V2");
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Normal), "기본 일반 = V3(11-03)");
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Dash), "기본 대쉬 = V3(11-03)");
     }
 
     // ---- 194 후속 — V3 레퍼런스 맞춤 ----
@@ -837,7 +840,7 @@ public sealed class InterruptHitLightTests
         so.ApplyModifiedPropertiesWithoutUndo();
         director.TierProfile(InterruptPresentationTier.Normal).flash = InterruptTierFlash.HitLightReference;
         Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Normal), "V3 칸 비면 V0");
-        Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash), "대쉬 V2 그대로");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Dash), "대쉬 기본 V3 — V3 칸 비면 V0(V1·V2 칸으로 대신하지 않음)");
 
         so.Update(); // 위에서 런타임으로 바꾼 단계 값을 읽어 둔다(Apply 가 되돌리지 않게)
         so.FindProperty("hitLightLookReference").objectReferenceValue = v3Look;
@@ -997,7 +1000,7 @@ public sealed class InterruptHitLightTests
     }
 
     [Test]
-    public void NetworkManager_프리팹_디렉터에_V3_가_이어져_있고_기본은_V1_V2_그대로()
+    public void NetworkManager_프리팹_디렉터에_V3_가_이어져_있고_일반_대쉬_제압_기본이_V3()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/Network/NetworkManager.prefab");
         var director = prefab.GetComponent<InterruptProductionDirector>();
@@ -1006,7 +1009,41 @@ public sealed class InterruptHitLightTests
             AssetDatabase.GetAssetPath(so.FindProperty("hitLightLookReference").objectReferenceValue));
         Assert.AreEqual(InterruptHitLightReferenceAuthoring.PrefabPath,
             AssetDatabase.GetAssetPath(so.FindProperty("hitLightVfxReference").objectReferenceValue));
-        Assert.AreEqual(InterruptTierFlash.HitLight, director.TierProfile(InterruptPresentationTier.Normal).flash, "기본 일반 = V1(사용자 비교 후 결정)");
-        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, director.TierProfile(InterruptPresentationTier.Dash).flash, "기본 대쉬 = V2");
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Normal).flash, "기본 일반 = V3(11-03 사용자 결정)");
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Dash).flash, "기본 대쉬 = V3");
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Normal).darkAdapt, "V3 암순응 = 나");
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Dash).darkAdapt, "V3 암순응 = 나");
+
+        // 제압 = 섬광 시퀀스 그대로 + V3 적중 라이트를 더한다(대체 아님).
+        Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash);
+        Assert.AreEqual(InterruptSuccessLook.SuppressSequence, director.SuccessLook(InterruptPresentationTier.Suppress), "제압 시퀀스 유지");
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SequenceHitLight(InterruptPresentationTier.Suppress), "제압 + V3");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Normal), "일반은 더하지 않음(본 섬광이 V3)");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Fail), "실패 = 연출 없음");
+    }
+
+    [Test]
+    public void 디렉터_제압_V3_는_시퀀스가_틀고_V3_데이터가_있을_때만()
+    {
+        var go = new GameObject("Director");
+        _objects.Add(go);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        _objects.Add(sequence);
+        var so = new SerializedObject(director);
+        so.FindProperty("suppressFlashSequence").objectReferenceValue = sequence;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Suppress), "V3 칸 비면 더하지 않음");
+
+        so.FindProperty("hitLightLookReference").objectReferenceValue = CreateLook(false);
+        so.FindProperty("hitLightVfxReference").objectReferenceValue = CreateFx();
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.AreEqual(InterruptSuccessLook.SuppressSequence, director.SuccessLook(InterruptPresentationTier.Suppress));
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SequenceHitLight(InterruptPresentationTier.Suppress));
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Normal), "코드 기본 일반 = V3");
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Dash), "코드 기본 대쉬 = V3");
+
+        director.SuppressFlashEnabled = false;
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Suppress), "A6 끔 = 시퀀스 없음 → 더하지 않음(②~⑥)");
     }
 }

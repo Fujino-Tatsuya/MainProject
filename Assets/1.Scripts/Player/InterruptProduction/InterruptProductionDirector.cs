@@ -221,12 +221,15 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
     // 실패 = 단계 설정 없음(약 예측 = 약한 줌만, 강 예측의 판정 실패 = 그 순간 연출 종료 — 191 D4).
     [Header("간파 연출 단계(할 일 192)")]
-    [Tooltip("간파(근접) 성공 — Q1 암전 없음, 섬광 기본 = V1 적중 라이트 연출·암순응 가(할 일 194 Q12)")]
-    [DataTableIgnore, SerializeField] private InterruptTierProfile normalTier = new InterruptTierProfile(false, InterruptTierFlash.HitLight);
-    [Tooltip("대쉬 간파 성공 — Q1 암전 없음, 섬광 기본 = V2 적중 라이트 연출 + 화이트아웃·암순응 가(할 일 194 Q12)")]
-    [DataTableIgnore, SerializeField] private InterruptTierProfile dashTier = new InterruptTierProfile(false, InterruptTierFlash.HitLightWhiteout);
-    [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 오너 암전 + 섬광 시퀀스 + 강한 줌 + 제압 암순응")]
-    [DataTableIgnore, SerializeField] private InterruptTierProfile suppressTier = new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence);
+    [Tooltip("간파(근접) 성공 — Q1 암전 없음, 섬광 기본 = V3 레퍼런스 맞춤·암순응 나(194 후속, 11-03 — V0~V2 는 랩 버튼으로)")]
+    [DataTableIgnore, SerializeField] private InterruptTierProfile normalTier =
+        new InterruptTierProfile(false, InterruptTierFlash.HitLightReference, InterruptDarkAdaptMode.SceneLight);
+    [Tooltip("대쉬 간파 성공 — Q1 암전 없음, 섬광 기본 = V3 레퍼런스 맞춤·암순응 나(194 후속, 11-03 — V0~V2 는 랩 버튼으로)")]
+    [DataTableIgnore, SerializeField] private InterruptTierProfile dashTier =
+        new InterruptTierProfile(false, InterruptTierFlash.HitLightReference, InterruptDarkAdaptMode.SceneLight);
+    [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 오너 암전 + 섬광 시퀀스 + 강한 줌 + 제압 암순응, 시퀀스에 V3 적중 라이트를 더한다(194 후속, 11-03)")]
+    [DataTableIgnore, SerializeField] private InterruptTierProfile suppressTier = new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence,
+        InterruptDarkAdaptMode.ScreenPass, InterruptTierFlash.HitLightReference);
 
     /// <summary>섬광 줄이기 저장 키(PlayerPrefs, 0/1). 새 설정 UI 는 없다 — 나중에 설정 화면이 이 키(<see cref="ReduceFlash"/>)를 쓰면 된다.</summary>
     public const string ReduceFlashPrefsKey = "Interrupt.ReduceFlash";
@@ -286,6 +289,10 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     public InterruptSuccessLook SuccessLook(InterruptPresentationTier tier) =>
         InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), suppressFlash, suppressFlashSequence != null, HasHitLight,
             HasHitLightReference);
+
+    /// <summary>이 단계의 섬광 시퀀스에 더하는 적중 라이트(194 후속 — 제압 간파 V3). 더하지 않으면 <see cref="InterruptSuccessLook.HitFlash"/>.</summary>
+    public InterruptSuccessLook SequenceHitLight(InterruptPresentationTier tier) =>
+        InterruptPresentationTierRules.SelectSequenceHitLight(SuccessLook(tier), TierProfile(tier), HasHitLight, HasHitLightReference);
 
     // 적중 라이트 연출(V1·V2)을 틀 수 있는가 — 수치 SO·월드 이펙트 프리팹 둘 다 있어야 한다.
     private bool HasHitLight => hitLightLook != null && hitLightVfx != null;
@@ -968,6 +975,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         if (viewerIsCaster && _ownerPresentation != null)
             _ownerPresentation.SuccessFlashMoment(_ownerPresentation.SuccessTriggerId, Time.unscaledTime);
         PlayWorldFlash(point);
+
+        // 194 후속 — 시퀀스에 적중 라이트(기본 V3)를 더한다(대체 아님). 암순응은 늘 나 — 가는 시퀀스 뒤 제압 암순응 컷과 같은 화면 패스라
+        // 먼저 끝나는 쪽이 다른 쪽을 지운다. 나(씬 조명 배율)·색 보정 Volume 은 시퀀스·암순응 컷과 출력이 달라 복구 순서가 엮이지 않는다.
+        InterruptSuccessLook layered = SequenceHitLight(e.Tier);
+        if (layered != InterruptSuccessLook.HitFlash)
+            BeginHitLight(e, viewerIsCaster, layered, InterruptPresentationTierRules.SequenceHitLightDarkAdapt);
     }
 
     /// <summary>
@@ -1057,7 +1070,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     // 적중 라이트 연출 시작(할 일 194, 모든 피어) — 성공 순간이 곧 섬광 순간이다: 오너 성공 단계를 끝내고(본인 화면, 암전 없는 단계라 덮개는 이미 0)
     // 단계 칸 hitLightOrigin(틈 수직 기본 / 무기 / 대상) 위치·방향에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면 — 적중 지점 기준).
-    private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look)
+    // darkAdapt 를 주면 단계 칸 대신 그 방식(시퀀스에 더한 적중 라이트 = 늘 나).
+    private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look,
+        InterruptDarkAdaptMode? darkAdapt = null)
     {
         if (viewerIsCaster && _ownerPresentation != null)
             _ownerPresentation.SuccessFlashMoment(_ownerPresentation.SuccessTriggerId, Time.unscaledTime);
@@ -1070,7 +1085,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             Origin = profile != null ? profile.hitLightOrigin : InterruptHitLightOrigin.Gap,
             ViewerIsCaster = viewerIsCaster,
             Look = look,
-            DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
+            DarkAdapt = darkAdapt ?? (profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass),
         }, Time.unscaledTime, Time.frameCount);
     }
 

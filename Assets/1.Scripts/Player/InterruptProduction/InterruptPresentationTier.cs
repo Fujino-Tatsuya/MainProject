@@ -97,15 +97,20 @@ public sealed class InterruptTierProfile
     public InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass;
     [Tooltip("V1·V2·V3 월드 이펙트 발생 위치(할 일 194 후속) — 시전자 오른손 무기(못 찾으면 대상) / 대상 적중점 / 틈 수직(기본 — 무기와 대상 표면 사이, 빛줄기·불꽃이 시전자→대상 축에 수직으로). 성공 순간 위치·방향에 남고 따라다니지 않는다")]
     public InterruptHitLightOrigin hitLightOrigin = InterruptHitLightOrigin.Gap;
+    [Tooltip("섬광 시퀀스와 함께 트는 적중 라이트(194 후속 — 더하기, 대체 아님). V1·V2·V3 만 쓰고 그 밖은 더하지 않는다. 시퀀스가 실제로 틀 때만. " +
+             "암순응은 늘 나(씬 조명) — 시퀀스 뒤 제압 암순응 컷과 같은 화면 패스를 나눠 쓰지 않게(위 암순응 칸은 무시)")]
+    public InterruptTierFlash sequenceHitLight = InterruptTierFlash.HitFlash;
 
     public InterruptTierProfile() { }
 
     public InterruptTierProfile(bool ownerDim, InterruptTierFlash flash,
-        InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass)
+        InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass,
+        InterruptTierFlash sequenceHitLight = InterruptTierFlash.HitFlash)
     {
         this.ownerDim = ownerDim;
         this.flash = flash;
         this.darkAdapt = darkAdapt;
+        this.sequenceHitLight = sequenceHitLight;
     }
 }
 
@@ -171,6 +176,35 @@ public static class InterruptPresentationTierRules
                 return InterruptSuccessLook.HitFlash;
         }
     }
+
+    /// <summary>
+    /// 섬광 시퀀스에 더하는 적중 라이트(194 후속 — 제압 간파에도 V3). 이번 섬광이 실제로 시퀀스이고 단계 칸
+    /// <see cref="InterruptTierProfile.sequenceHitLight"/> 가 V1·V2·V3 이고 그 데이터·프리팹이 있을 때만 — 아니면 <see cref="InterruptSuccessLook.HitFlash"/>(= 더하지 않음).
+    /// </summary>
+    public static InterruptSuccessLook SelectSequenceHitLight(InterruptSuccessLook look, InterruptTierProfile tier, bool hasHitLight,
+        bool hasHitLightReference)
+    {
+        if (look != InterruptSuccessLook.SuppressSequence || tier == null)
+            return InterruptSuccessLook.HitFlash;
+
+        switch (tier.sequenceHitLight)
+        {
+            case InterruptTierFlash.HitLight:
+                return hasHitLight ? InterruptSuccessLook.HitLight : InterruptSuccessLook.HitFlash;
+            case InterruptTierFlash.HitLightWhiteout:
+                return hasHitLight ? InterruptSuccessLook.HitLightWhiteout : InterruptSuccessLook.HitFlash;
+            case InterruptTierFlash.HitLightReference:
+                return hasHitLightReference ? InterruptSuccessLook.HitLightReference : InterruptSuccessLook.HitFlash;
+            default:
+                return InterruptSuccessLook.HitFlash;
+        }
+    }
+
+    /// <summary>
+    /// 시퀀스에 더한 적중 라이트의 암순응 — 늘 나(씬 조명). 가(화면 패스)는 제압 암순응 컷과 같은 출력이라 한쪽이 끝날 때 다른 쪽을 지운다.
+    /// 나는 <see cref="SceneLightDim"/> 배율 곱이라 시퀀스·암순응 컷과 복구 순서가 엮이지 않는다.
+    /// </summary>
+    public const InterruptDarkAdaptMode SequenceHitLightDarkAdapt = InterruptDarkAdaptMode.SceneLight;
 
     /// <summary>적중 라이트 연출(V1·V2·V3)인가 — ②~⑥ 진행기·섬광 순간 예약 대신 성공 순간 바로 튼다.</summary>
     public static bool UsesHitLight(InterruptSuccessLook look) =>

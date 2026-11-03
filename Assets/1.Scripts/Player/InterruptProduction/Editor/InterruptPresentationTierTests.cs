@@ -137,11 +137,39 @@ public sealed class InterruptPresentationTierTests
         Assert.IsFalse(director.TierProfile(InterruptPresentationTier.Normal).ownerDim, "Q1 일반 = 암전 없음");
         Assert.IsFalse(director.TierProfile(InterruptPresentationTier.Dash).ownerDim, "Q1 대쉬 = 암전 없음");
         Assert.IsTrue(director.TierProfile(InterruptPresentationTier.Suppress).ownerDim, "Q1 제압 = 오너 암전");
-        Assert.AreEqual(InterruptTierFlash.HitLight, director.TierProfile(InterruptPresentationTier.Normal).flash, "194 Q12 일반 = V1");
-        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, director.TierProfile(InterruptPresentationTier.Dash).flash, "194 Q12 대쉬 = V2");
-        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, director.TierProfile(InterruptPresentationTier.Normal).darkAdapt, "194 Q12 암순응 = 가");
-        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, director.TierProfile(InterruptPresentationTier.Dash).darkAdapt, "194 Q12 암순응 = 가");
-        Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash);
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Normal).flash, "194 후속 일반 = V3");
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Dash).flash, "194 후속 대쉬 = V3");
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Normal).darkAdapt, "V3 암순응 = 나");
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Dash).darkAdapt, "V3 암순응 = 나");
+        Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash, "제압 = 시퀀스 유지");
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Suppress).sequenceHitLight,
+            "제압 = 시퀀스 + V3");
+        Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Normal).sequenceHitLight);
+        Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Dash).sequenceHitLight);
+    }
+
+    // ---- 194 후속. 섬광 시퀀스에 더하는 적중 라이트(제압 V3) ----
+
+    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLightReference, true, true, ExpectedResult = InterruptSuccessLook.HitLightReference)]
+    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLightReference, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)] // V3 데이터 없음
+    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLight, true, false, ExpectedResult = InterruptSuccessLook.HitLight)]
+    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLightWhiteout, false, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitFlash, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]        // 더하지 않음
+    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.SuppressSequence, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    [TestCase(InterruptSuccessLook.HitFlash, InterruptTierFlash.HitLightReference, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]      // 시퀀스가 안 틀면(A6 끔·컷 없음) 더하지 않음
+    [TestCase(InterruptSuccessLook.HitLightReference, InterruptTierFlash.HitLightReference, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    public InterruptSuccessLook 시퀀스에_더하는_적중_라이트는_시퀀스일_때만(InterruptSuccessLook look, InterruptTierFlash layer, bool hasHitLight,
+        bool hasReference) =>
+        InterruptPresentationTierRules.SelectSequenceHitLight(look,
+            new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence, InterruptDarkAdaptMode.ScreenPass, layer), hasHitLight, hasReference);
+
+    [Test]
+    public void 시퀀스에_더한_적중_라이트_암순응은_나()
+    {
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, InterruptPresentationTierRules.SequenceHitLightDarkAdapt,
+            "가(화면 패스)는 제압 암순응 컷과 같은 출력이라 쓰지 않는다");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash,
+            InterruptPresentationTierRules.SelectSequenceHitLight(InterruptSuccessLook.SuppressSequence, null, true, true), "설정 없음 = 더하지 않음");
     }
 
     // ---- 194. 단계 × 버전 선택표 ----

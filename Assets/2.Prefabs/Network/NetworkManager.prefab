@@ -299,19 +299,22 @@ MonoBehaviour:
   hitLightVfxReference: {fileID: 7590261245222885139, guid: 0c17b0169f787034e9c0c5f64412a828, type: 3}
   normalTier:
     ownerDim: 0
-    flash: 2
-    darkAdapt: 0
+    flash: 4
+    darkAdapt: 1
     hitLightOrigin: 2
+    sequenceHitLight: 0
   dashTier:
     ownerDim: 0
-    flash: 3
-    darkAdapt: 0
+    flash: 4
+    darkAdapt: 1
     hitLightOrigin: 2
+    sequenceHitLight: 0
   suppressTier:
     ownerDim: 1
     flash: 1
     darkAdapt: 0
     hitLightOrigin: 2
+    sequenceHitLight: 4
 --- !u!114 &4191191191191191191
 MonoBehaviour:
   m_ObjectHideFlags: 0
