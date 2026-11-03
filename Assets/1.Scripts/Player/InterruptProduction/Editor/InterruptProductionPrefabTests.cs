@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// 간파 연출 디렉터 프리팹 배치(할 일 118 C2) → 슬로우 3단계 SO 이관(194 후속 2).
-/// 슬로우 프로필·줌이 SO(<see cref="InterruptSlowMotionSettings"/>)로 옮겨져 값이 옛 프리팹 값 그대로이고(동작 변화 0),
+/// 슬로우 프로필·줌이 SO(<see cref="InterruptSlowMotionSettings"/>)로 옮겨져 디렉터가 SO 의 맞는 칸을 고르고(코드 기본값 = 이관 당시 값, 에셋 값은 튜닝값),
 /// 디렉터·GlobalTimeScale·CameraTargetSwitcher 에 같은 경로가 남지 않아(데이터 테이블 바인딩 모호 방지) 옛 스위치 타입·Missing Script 가 없다.
 /// </summary>
 public sealed class InterruptProductionPrefabTests
@@ -60,12 +60,35 @@ public sealed class InterruptProductionPrefabTests
         Assert.AreEqual(0.85f, so.FindProperty("slowMotionZoomFactor").floatValue, 1e-6f);
     }
 
-    [Test]
-    public void 슬로우_SO_값이_옛_프리팹_값이다()
+    // 에셋 값은 튜닝값이라 숫자를 단언하지 않는다(11-03 사용자 지시 중립값 — 배율 1·시간 0·줌 1).
+    // 대신 저장된 값이 정리(Clamped*) 범위 안이라 타임라인·줌에 그대로 들어간다는 것만 본다.
+    private static void AssertProfileInRange(SlowMotionProfile profile, string name)
     {
-        AssertMigratedValues(new SerializedObject(LoadSettings()));
+        Assert.IsNotNull(profile, name);
+        Assert.AreEqual(profile.ClampedScale, profile.scale, 1e-6f, name + ".scale");
+        Assert.AreEqual(profile.ClampedHitStopDuration, profile.hitStopDuration, 1e-6f, name + ".hitStopDuration");
+        Assert.AreEqual(profile.ClampedHitStopScale, profile.hitStopScale, 1e-6f, name + ".hitStopScale");
+        Assert.AreEqual(profile.ClampedEnterDuration, profile.enterDuration, 1e-6f, name + ".enterDuration");
+        Assert.AreEqual(profile.ClampedHoldDuration, profile.holdDuration, 1e-6f, name + ".holdDuration");
+        Assert.AreEqual(profile.ClampedExitDuration, profile.exitDuration, 1e-6f, name + ".exitDuration");
+        Assert.AreEqual(profile.ClampedFailExitDuration, profile.failExitDuration, 1e-6f, name + ".failExitDuration");
     }
 
+    [Test]
+    public void 슬로우_SO_값이_정리_범위_안이다()
+    {
+        InterruptSlowMotionSettings settings = LoadSettings();
+        AssertProfileInRange(settings.InterruptDashProfile, "interruptDashProfile");
+        AssertProfileInRange(settings.InterruptDashWeakProfile, "interruptDashWeakProfile");
+        AssertProfileInRange(settings.InterruptProfile, "interruptProfile");
+        AssertProfileInRange(settings.InterruptWeakProfile, "interruptWeakProfile");
+        AssertProfileInRange(settings.InterruptSuccessProfile, "interruptSuccessProfile");
+        Assert.AreEqual(SlowMotionCameraZoom.ClampZoomFactor(settings.InterruptZoomFactor), settings.InterruptZoomFactor, 1e-6f);
+        Assert.AreEqual(SlowMotionCameraZoom.ClampZoomFactor(settings.InterruptWeakZoomFactor), settings.InterruptWeakZoomFactor, 1e-6f);
+        Assert.AreEqual(SlowMotionCameraZoom.ClampZoomFactor(settings.SlowMotionZoomFactor), settings.SlowMotionZoomFactor, 1e-6f);
+    }
+
+    // 코드 기본값(새 SO)은 이관 당시 값(= xlsx SlowMotion 시트 값) 그대로다 — 에셋 튜닝과 별개.
     [Test]
     public void 새_슬로우_SO_기본값도_같다()
     {
@@ -94,27 +117,21 @@ public sealed class InterruptProductionPrefabTests
         Assert.AreSame(settings, new SerializedObject(camera).FindProperty("slowMotionSettings").objectReferenceValue);
     }
 
-    // 동작 변화 0 — 디렉터 프리팹이 고르는 시도·성공 프로필 값이 이관 전과 같다(대쉬 시도 = 근접 강·약과 같은 값).
+    // 디렉터 프리팹이 시도·성공마다 SO 의 맞는 칸을 고른다(대쉬 시도 → 대쉬 강·약 칸, 근접 → 근접 강·약 칸). 값은 SO 튜닝값이라 단언하지 않는다.
     [Test]
-    public void 프리팹_디렉터가_고르는_프로필_값이_이관_전과_같다()
+    public void 프리팹_디렉터가_슬로우_SO_의_맞는_프로필_칸을_고른다()
     {
         var director = LoadPrefab().GetComponent<InterruptProductionDirector>();
-        foreach (InterruptVariant variant in new[] { InterruptVariant.Normal, InterruptVariant.Dash })
-        {
-            SlowMotionProfile strong = InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, variant, director);
-            SlowMotionProfile weak = InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, variant, director);
-            Assert.AreEqual(0.15f, strong.scale, 1e-6f, variant + " 강 scale");
-            Assert.AreEqual(0.5f, strong.holdDuration, 1e-6f, variant + " 강 hold");
-            Assert.AreEqual(0.5f, weak.scale, 1e-6f, variant + " 약 scale");
-            Assert.AreEqual(0.2f, weak.holdDuration, 1e-6f, variant + " 약 hold");
-        }
-
-        Assert.AreSame(director.SlowMotion.InterruptDashProfile,
-            InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Dash, director));
-        Assert.AreSame(director.SlowMotion.InterruptProfile,
-            InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Normal, director));
-        Assert.AreEqual(1.2f, director.InterruptSuccessProfile.holdDuration, 1e-6f);
-        Assert.AreEqual(0.05f, director.InterruptSuccessProfile.hitStopDuration, 1e-6f);
+        InterruptSlowMotionSettings settings = director.SlowMotion;
+        Assert.AreSame(settings.InterruptDashProfile,
+            InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Dash, director), "대쉬 강");
+        Assert.AreSame(settings.InterruptDashWeakProfile,
+            InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Dash, director), "대쉬 약");
+        Assert.AreSame(settings.InterruptProfile,
+            InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Normal, director), "근접 강");
+        Assert.AreSame(settings.InterruptWeakProfile,
+            InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Normal, director), "근접 약");
+        Assert.AreSame(settings.InterruptSuccessProfile, director.InterruptSuccessProfile, "성공");
     }
 
     [Test]

@@ -13,45 +13,45 @@ MonoBehaviour:
   m_Name: InterruptSlowMotionSettings
   m_EditorClassIdentifier: Assembly-CSharp::InterruptSlowMotionSettings
   interruptDashProfile:
-    scale: 0.15
+    scale: 1
     hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.5
-    exitDuration: 0.25
-    failExitDuration: 0.1
+    hitStopScale: 1
+    enterDuration: 0
+    holdDuration: 0
+    exitDuration: 0
+    failExitDuration: 0
   interruptDashWeakProfile:
-    scale: 0.5
+    scale: 1
     hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.2
-    exitDuration: 0.25
-    failExitDuration: 0.1
+    hitStopScale: 1
+    enterDuration: 0
+    holdDuration: 0
+    exitDuration: 0
+    failExitDuration: 0
   interruptProfile:
-    scale: 0.15
+    scale: 1
     hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.5
-    exitDuration: 0.25
-    failExitDuration: 0.1
+    hitStopScale: 1
+    enterDuration: 0
+    holdDuration: 0
+    exitDuration: 0
+    failExitDuration: 0
   interruptWeakProfile:
-    scale: 0.5
+    scale: 1
     hitStopDuration: 0
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 0.2
-    exitDuration: 0.25
-    failExitDuration: 0.1
-  interruptZoomFactor: 0.7
-  interruptWeakZoomFactor: 0.93
+    hitStopScale: 1
+    enterDuration: 0
+    holdDuration: 0
+    exitDuration: 0
+    failExitDuration: 0
+  interruptZoomFactor: 1
+  interruptWeakZoomFactor: 1
   interruptSuccessProfile:
-    scale: 0.25
-    hitStopDuration: 0.05
-    hitStopScale: 0.02
-    enterDuration: 0.05
-    holdDuration: 1.2
-    exitDuration: 0.4
-    failExitDuration: 0.1
-  slowMotionZoomFactor: 0.85
+    scale: 1
+    hitStopDuration: 0
+    hitStopScale: 1
+    enterDuration: 0
+    holdDuration: 0
+    exitDuration: 0
+    failExitDuration: 0
+  slowMotionZoomFactor: 1

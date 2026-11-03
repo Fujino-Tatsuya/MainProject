@@ -119,7 +119,8 @@ public sealed class InterruptPresentationEffectTests
         Assert.IsTrue(director.Get(InterruptProductionCue.HitStop), "A1 히트스톱 그대로");
         Assert.IsTrue(director.Get(InterruptProductionCue.OwnerZoom), "A3 오너 줌 그대로");
         Assert.IsTrue(director.Get(InterruptProductionCue.SuccessFxSlot), "A4 성공 이펙트 칸 켬 그대로");
-        Assert.Greater(director.InterruptSuccessProfile.hitStopDuration, 0f, "성공 히트스톱 프로필 그대로");
+        // 성공 프로필 값은 SO 튜닝값이라 단언하지 않는다(11-03 중립값) — 디렉터가 SO 의 성공 프로필을 고르는지만 본다.
+        Assert.AreSame(director.SlowMotion.InterruptSuccessProfile, director.InterruptSuccessProfile, "성공 프로필 = 슬로우 SO 칸");
     }
 
     [Test]
