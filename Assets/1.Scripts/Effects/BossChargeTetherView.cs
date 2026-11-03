@@ -95,9 +95,7 @@ public class BossChargeTetherView : MonoBehaviour
     float _lightFrom;       // 꺼지기 시작할 때의 밝기
     BossElectricFloor _floor;   // 보스 루트에 실행 중 붙는다(TwentyThreeBoss) — 처음 쓸 때 찾는다
     float _floorBrightness = 1f;
-    Light _sun;                 // 씬의 Directional Light — 차징이 처음 시작될 때 찾는다
-    float _sunIntensity;        // 원래 밝기(끄기 시작할 때 저장)
-    float _sunLevel = 1f;       // 0 = 꺼짐 · 1 = 원래
+    float _sunLevel = 1f;       // 0 = 꺼짐 · 1 = 원래 (SceneLightDim 배율)
 
     void Awake()
     {
@@ -195,33 +193,19 @@ public class BossChargeTetherView : MonoBehaviour
     }
 
     // 맵 해 — 차징 구슬 재생 중엔 sunFadeTime 에 걸쳐 0 까지 낮춰 끄고, 끝나면 원래 밝기로 돌린다(전 피어 각자, 네트워크 없음).
+    // 원래 밝기 저장·복구는 SceneLightDim 이 한다(할 일 194 — 간파 적중 암순응 나와 배율 곱으로 겹쳐 복구 순서가 꼬이지 않게).
     void UpdateSun()
     {
         bool charging = sunOffWhileCharging && chargeBall != null && chargeBall.IsPlaying;
-        if (charging && _sunLevel >= 1f)
-        {
-            if (_sun == null) _sun = FindSun();
-            if (_sun != null) _sunIntensity = _sun.intensity;   // 매 차징 시작 때 원래 값을 다시 읽는다
-        }
-        if (_sun == null) return;
         float level = Mathf.MoveTowards(_sunLevel, charging ? 0f : 1f, Time.deltaTime / sunFadeTime);
         if (Mathf.Approximately(level, _sunLevel) && level >= 1f) return;
         _sunLevel = level;
-        _sun.intensity = _sunIntensity * level;
-        _sun.enabled = level > 0f;
-    }
-
-    static Light FindSun()
-    {
-        if (RenderSettings.sun != null && RenderSettings.sun.type == LightType.Directional) return RenderSettings.sun;
-        foreach (Light l in FindObjectsByType<Light>(FindObjectsSortMode.None))
-            if (l.type == LightType.Directional && l.isActiveAndEnabled) return l;
-        return null;
+        SceneLightDim.Shared.SetSun(this, level);
     }
 
     void RestoreSun()
     {
-        if (_sun != null && _sunLevel < 1f) { _sun.intensity = _sunIntensity; _sun.enabled = true; }
+        if (_sunLevel < 1f) SceneLightDim.Shared.SetSun(this, 1f);
         _sunLevel = 1f;
     }
 

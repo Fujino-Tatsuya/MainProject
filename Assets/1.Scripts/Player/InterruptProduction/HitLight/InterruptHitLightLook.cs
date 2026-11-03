@@ -31,6 +31,26 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [Tooltip("블룸 가중치 곡선 — 가로 = 진행(0~1), 세로 = 가중치 [0, 1]")]
     [SerializeField] private AnimationCurve bloomCurve = Decay();
 
+    [Header("암순응 가 — 화면 패스(어두운 픽셀만, 라이트·이펙트는 남음)")]
+    [Tooltip("발동자 본인 화면 최대 어둡힘 [0, 1](Q9 — 오너 1)")]
+    [SerializeField, Range(0f, 1f)] private float darkAdaptSelf = 1f;
+    [Tooltip("팀원 화면 최대 어둡힘 [0, 1](Q9 — 타인 0.35)")]
+    [SerializeField, Range(0f, 1f)] private float darkAdaptOthers = 0.35f;
+    [Tooltip("적중 순간 어두워졌다가 원래로 돌아오는 시간(초, 실시간, Q5)")]
+    [SerializeField, Min(0f)] private float darkAdaptDuration = 0.9f;
+    [Tooltip("어둡힘 곡선 — 가로 = 진행(0~1), 세로 = 최대 어둡힘 대비 배율. 끝에서 0 이 되게")]
+    [SerializeField] private AnimationCurve darkAdaptCurve = Decay();
+
+    [Header("암순응 나 — 태양광·환경광 낮춤(모든 화면 같은 세기)")]
+    [Tooltip("태양광(Directional Light)을 적중 순간 이 비율만큼 낮춘다 [0, 1] — 1 = 완전히 끔")]
+    [SerializeField, Range(0f, 1f)] private float sunDimDepth = 0.85f;
+    [Tooltip("환경광을 적중 순간 이 비율만큼 낮춘다 [0, 1]")]
+    [SerializeField, Range(0f, 1f)] private float ambientDimDepth = 0.7f;
+    [Tooltip("낮췄다가 원래로 돌아오는 시간(초, 실시간)")]
+    [SerializeField, Min(0f)] private float sceneDimDuration = 0.9f;
+    [Tooltip("낮춤 곡선 — 가로 = 진행(0~1), 세로 = 낮춤 비율 대비 배율. 끝에서 0 이 되게")]
+    [SerializeField] private AnimationCurve sceneDimCurve = Decay();
+
     public Color LightColor => lightColor;
     public float LightIntensity => lightIntensity;
     public float LightRange => lightRange;
@@ -41,6 +61,16 @@ public sealed class InterruptHitLightLook : ScriptableObject
     public VolumeProfile BloomProfile => bloomProfile;
     public float BloomDuration => bloomDuration;
     public AnimationCurve BloomCurve => bloomCurve;
+
+    public float DarkAdaptSelf => darkAdaptSelf;
+    public float DarkAdaptOthers => darkAdaptOthers;
+    public float DarkAdaptDuration => darkAdaptDuration;
+    public AnimationCurve DarkAdaptCurve => darkAdaptCurve;
+
+    public float SunDimDepth => sunDimDepth;
+    public float AmbientDimDepth => ambientDimDepth;
+    public float SceneDimDuration => sceneDimDuration;
+    public AnimationCurve SceneDimCurve => sceneDimCurve;
 
     /// <summary>적중 순간 1 → 끝 0 으로 부드럽게 줄어드는 기본 곡선(Q5 — 약 0.9초에 걸쳐 복귀).</summary>
     public static AnimationCurve Decay() =>

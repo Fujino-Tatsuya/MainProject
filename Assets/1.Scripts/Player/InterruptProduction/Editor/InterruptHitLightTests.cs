@@ -161,6 +161,127 @@ public sealed class InterruptHitLightTests
         Assert.IsFalse(fx.LightActive);
     }
 
+    // ---- 단계 3 — 암순응 가(화면 패스)·나(씬 조명) ----
+
+    private sealed class FakeDarkAdapt : ISuppressDarkAdaptOutput
+    {
+        public readonly List<float> Shown = new List<float>();
+        public int Clears;
+        public ulong Caster;
+        public Vector3 Target;
+
+        public void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition)
+        {
+            Shown.Add(darkness);
+            Caster = casterClientId;
+            Target = targetPosition;
+        }
+
+        public void ClearDarkAdapt() => Clears++;
+    }
+
+    private sealed class FakeSceneTarget : ISceneLightTarget
+    {
+        public Light Sun;
+        public Light FindSun() => Sun;
+        public SphericalHarmonicsL2 AmbientProbe { get; set; }
+    }
+
+    [TestCase(true, ExpectedResult = 1f)]
+    [TestCase(false, ExpectedResult = 0.35f)]
+    public float 암순응_가_최대는_본인_1_팀원_0점35(bool viewerIsCaster)
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        return InterruptHitLightRules.DarkAdaptPeak(viewerIsCaster, look.DarkAdaptSelf, look.DarkAdaptOthers);
+    }
+
+    [Test]
+    public void 암순응_가는_적중_순간_어두워졌다가_0점9초에_걷힌다()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var dark = new FakeDarkAdapt();
+        var player = new InterruptHitLightPlayer(() => look, () => null, () => dark);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest
+        {
+            ViewerIsCaster = false, CasterClientId = 7, TargetPosition = Vector3.right, Look = InterruptSuccessLook.HitLight,
+            DarkAdapt = InterruptDarkAdaptMode.ScreenPass,
+        }, 0f);
+        Assert.AreEqual(0.35f, dark.Shown[0], 1e-4f, "팀원 화면 = 약하게");
+        Assert.AreEqual(7ul, dark.Caster);
+        Assert.AreEqual(Vector3.right, dark.Target);
+
+        player.Tick(0.45f);
+        Assert.Less(dark.Shown[dark.Shown.Count - 1], 0.35f, "부드럽게 복귀");
+        Assert.AreEqual(0, dark.Clears);
+
+        player.Tick(1f);
+        Assert.AreEqual(1, dark.Clears, "끝나면 0");
+        Assert.IsFalse(player.IsPlaying);
+    }
+
+    [Test]
+    public void 암순응_나는_태양광_환경광을_낮췄다가_원래로()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var go = new GameObject("Sun");
+        _objects.Add(go);
+        Light sun = go.AddComponent<Light>();
+        sun.type = LightType.Directional;
+        sun.intensity = 1f;
+        var probe = new SphericalHarmonicsL2();
+        probe.AddAmbientLight(Color.white);
+        var target = new FakeSceneTarget { Sun = sun, AmbientProbe = probe };
+        float ambient = probe[0, 0];
+        var dim = new SceneLightDim(target);
+        var dark = new FakeDarkAdapt();
+        var player = new InterruptHitLightPlayer(() => look, () => null, () => dark, dim);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLight, DarkAdapt = InterruptDarkAdaptMode.SceneLight }, 0f);
+        Assert.AreEqual(1f - look.SunDimDepth, sun.intensity, 1e-4f, "적중 순간 최대로 낮춤");
+        Assert.AreEqual(ambient * (1f - look.AmbientDimDepth), target.AmbientProbe[0, 0], 1e-4f);
+        Assert.AreEqual(0, dark.Shown.Count, "나는 화면 패스를 쓰지 않는다");
+
+        player.Tick(0.45f);
+        Assert.Greater(sun.intensity, 1f - look.SunDimDepth);
+        Assert.Less(sun.intensity, 1f);
+
+        player.Tick(1f);
+        Assert.AreEqual(1f, sun.intensity, 1e-5f);
+        Assert.AreEqual(ambient, target.AmbientProbe[0, 0], 1e-5f);
+        Assert.AreEqual(1f, dim.SunFactor);
+    }
+
+    [Test]
+    public void 강제_리셋은_암순응_가_나를_바로_걷는다()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var dark = new FakeDarkAdapt();
+        var go = new GameObject("Sun");
+        _objects.Add(go);
+        Light sun = go.AddComponent<Light>();
+        sun.intensity = 1f;
+        var dim = new SceneLightDim(new FakeSceneTarget { Sun = sun });
+        var player = new InterruptHitLightPlayer(() => look, () => null, () => dark, dim);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLight, ViewerIsCaster = true }, 0f);
+        player.Stop();
+        Assert.AreEqual(1, dark.Clears);
+
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLight, DarkAdapt = InterruptDarkAdaptMode.SceneLight }, 0f);
+        player.Stop();
+        Assert.AreEqual(1f, sun.intensity, 1e-5f);
+    }
+
+    [TestCase(0.85f, 1f, ExpectedResult = 0.15f)]
+    [TestCase(0.85f, 0f, ExpectedResult = 1f)]
+    [TestCase(2f, 1f, ExpectedResult = 0f)]
+    public float 암순응_나_배율(float depth, float envelope) =>
+        Mathf.Round(InterruptHitLightRules.DimFactor(depth, envelope) * 1000f) / 1000f;
+
     [Test]
     public void 진행기_길이는_가장_긴_곡선()
     {

@@ -388,7 +388,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     private InterruptHitLightFx _hitLightFx;
 
     /// <summary>적중 라이트 연출 진행기(V1·V2) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
-    public InterruptHitLightPlayer HitLight => _hitLight ??= new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx);
+    public InterruptHitLightPlayer HitLight => _hitLight ??=
+        new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared);
 
     private InterruptHitLightFx EnsureHitLightFx()
     {
