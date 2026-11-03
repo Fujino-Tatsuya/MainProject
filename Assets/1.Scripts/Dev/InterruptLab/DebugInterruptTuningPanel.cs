@@ -168,6 +168,40 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         GUILayout.EndHorizontal();
         if (!string.IsNullOrEmpty(_tierPreview.Status))
             GUILayout.Label("  " + _tierPreview.Status);
+
+        DrawTierVersions(director);
+    }
+
+    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계마다 V0/V1/V2·암순응 가/나(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
+    // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
+    void DrawTierVersions(InterruptProductionDirector director)
+    {
+        foreach (InterruptPresentationTier tier in DebugInterruptTierPreview.VersionTiers)
+        {
+            InterruptTierProfile profile = director.TierProfile(tier);
+            if (profile == null)
+                continue;
+
+            GUILayout.Label($"{DebugInterruptTierPreview.Label(tier)} 버전 — 실제 {DebugInterruptTierPreview.LookLabel(director.SuccessLook(tier))}");
+            GUILayout.BeginHorizontal();
+            foreach (InterruptTierFlash flash in DebugInterruptTierPreview.Versions)
+            {
+                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.VersionLabel(flash), profile.flash == flash);
+                if (GUILayout.Button(label))
+                    profile.flash = flash;
+            }
+
+            foreach (InterruptDarkAdaptMode mode in DebugInterruptTierPreview.DarkAdaptModes)
+            {
+                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.DarkAdaptLabel(mode), profile.darkAdapt == mode);
+                if (GUILayout.Button(label))
+                    profile.darkAdapt = mode;
+            }
+
+            if (GUILayout.Button("재생"))
+                _tierPreview.Begin(director, tier, Time.unscaledTime);
+            GUILayout.EndHorizontal();
+        }
     }
 
     // 제압 간파 섬광(179 후속 3) — A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).

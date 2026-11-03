@@ -117,6 +117,38 @@ public sealed class DebugInterruptTierPreview
         _ => "제압 간파",
     };
 
+    // ---- 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계별 V0/V1/V2·암순응 가/나 ----
+
+    /// <summary>버전을 고를 수 있는 단계(제압은 시퀀스 고정).</summary>
+    public static readonly InterruptPresentationTier[] VersionTiers = { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash };
+
+    /// <summary>버튼 순서 = V0 / V1 / V2.</summary>
+    public static readonly InterruptTierFlash[] Versions =
+        { InterruptTierFlash.HitFlash, InterruptTierFlash.HitLight, InterruptTierFlash.HitLightWhiteout };
+
+    public static readonly InterruptDarkAdaptMode[] DarkAdaptModes = { InterruptDarkAdaptMode.ScreenPass, InterruptDarkAdaptMode.SceneLight };
+
+    public static string VersionLabel(InterruptTierFlash flash) => flash switch
+    {
+        InterruptTierFlash.HitFlash => "V0",
+        InterruptTierFlash.HitLight => "V1",
+        InterruptTierFlash.HitLightWhiteout => "V2",
+        _ => "시퀀스",
+    };
+
+    public static string LookLabel(InterruptSuccessLook look) => look switch
+    {
+        InterruptSuccessLook.HitFlash => "V0",
+        InterruptSuccessLook.HitLight => "V1",
+        InterruptSuccessLook.HitLightWhiteout => "V2",
+        _ => "시퀀스",
+    };
+
+    public static string DarkAdaptLabel(InterruptDarkAdaptMode mode) => mode == InterruptDarkAdaptMode.SceneLight ? "나 씬 조명" : "가 화면";
+
+    /// <summary>선택된 버튼 글자 — 지금 값이면 [ ] 로 감싼다.</summary>
+    public static string Selected(string label, bool selected) => selected ? $"[{label}]" : label;
+
     /// <summary>재현 시작. 디렉터·내 플레이어가 없거나 앞 시도가 아직 결론 전이면 false.</summary>
     public bool Begin(InterruptProductionDirector director, InterruptPresentationTier tier, float now)
     {

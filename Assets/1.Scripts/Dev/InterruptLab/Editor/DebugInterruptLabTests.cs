@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using UnityEditor;
+using UnityEngine;
 
 /// <summary>
 /// 간파 제작용 디버그 씬(할 일 115 C5)의 순수 규칙 — 배속 합성(<see cref="GlobalTimeScale"/>)과
@@ -295,5 +297,49 @@ public sealed class DebugInterruptLabTests
         Assert.AreEqual(0, repro.MarkedCount);
         repro.Dispose();
         Assert.AreEqual(0, repro.DummyCount);
+    }
+
+    // ---- 194 — 적중 라이트 연출 버전 버튼 ----
+
+    [Test]
+    public void 버전_버튼은_일반_대쉬_단계에_V0_V1_V2와_암순응_가_나()
+    {
+        CollectionAssert.AreEqual(new[] { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash },
+            DebugInterruptTierPreview.VersionTiers, "제압은 시퀀스 고정");
+        CollectionAssert.AreEqual(new[] { "V0", "V1", "V2" },
+            System.Array.ConvertAll(DebugInterruptTierPreview.Versions, DebugInterruptTierPreview.VersionLabel));
+        Assert.AreEqual(2, DebugInterruptTierPreview.DarkAdaptModes.Length);
+        StringAssert.StartsWith("가", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.ScreenPass));
+        StringAssert.StartsWith("나", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.SceneLight));
+        Assert.AreEqual("[V1]", DebugInterruptTierPreview.Selected("V1", true));
+        Assert.AreEqual("V1", DebugInterruptTierPreview.Selected("V1", false));
+    }
+
+    [Test]
+    public void 버전_버튼으로_바꾼_단계_값이_다음_성공의_섬광을_고른다()
+    {
+        var go = new GameObject("Director");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            var so = new SerializedObject(director);
+            so.FindProperty("hitLightLook").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>("Assets/5.VFX/Interrupt/HitLight/InterruptHitLightLook.asset");
+            so.FindProperty("hitLightVfx").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<InterruptHitLightFx>("Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab");
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 패널 버튼과 같은 일 — 단계 설정 값을 바꾼다(런타임 값만).
+            director.TierProfile(InterruptPresentationTier.Normal).flash = InterruptTierFlash.HitLightWhiteout;
+            director.TierProfile(InterruptPresentationTier.Dash).flash = InterruptTierFlash.HitFlash;
+
+            Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Normal));
+            Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Dash));
+            Assert.AreEqual("V2", DebugInterruptTierPreview.LookLabel(director.SuccessLook(InterruptPresentationTier.Normal)));
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
     }
 }
