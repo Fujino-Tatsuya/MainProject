@@ -12,13 +12,15 @@ using UnityEngine.Rendering.Universal;
 /// </summary>
 internal static class InterruptHitLightReferenceAuthoring
 {
-    const string Folder = InterruptHitLightAuthoring.Folder;
+    // V3 전용 에셋은 V3/ 하위 폴더. 가로 빛줄 메시는 V1 프리팹(틈 수직 gapRaysMesh)도 써서 상위 공용 폴더에 둔다.
+    const string SharedFolder = InterruptHitLightAuthoring.Folder;
+    public const string Folder = SharedFolder + "/V3";
     public const string LookPath = Folder + "/InterruptHitLightLook_V3.asset";
     public const string PrefabPath = Folder + "/FX_InterruptHitLight_V3.prefab";
     public const string BloomProfilePath = Folder + "/VP_InterruptHitLight_V3_Bloom.asset";
     public const string GradeProfilePath = Folder + "/VP_InterruptHitLight_V3_Grade.asset";
     public const string CoreMeshPath = Folder + "/Mesh_InterruptHitLight_Core.asset";
-    public const string StreakMeshPath = Folder + "/Mesh_InterruptHitLight_Streak.asset";
+    public const string StreakMeshPath = SharedFolder + "/Mesh_InterruptHitLight_Streak.asset";
     const string CoreMaterialPath = Folder + "/M_InterruptHitLight_Core.mat";
     const string StreakMaterialPath = Folder + "/M_InterruptHitLight_Streak.mat";
     const string SparkMaterialPath = Folder + "/M_InterruptHitLight_Spark_V3.mat";

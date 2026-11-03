@@ -814,6 +814,9 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 왜: V1·V2 는 블룸(threshold 0.8·intensity 6)·라이트(20·반경 8)가 세서 바닥까지 하얗게 날아가고 화면이 뿌옇다. 레퍼런스 2:34 적중 프레임(f30·f34)은 주변이 어둡고 보랏빛으로 채도가 낮고, 작고 강한 중심 점 + 가로 얇은 빛줄 + 맞닿은 가장자리만 주황 + 가늘고 긴 주황 불꽃.
 - **V1·V2 값은 그대로**(버전 보존) — V3 는 같은 형식의 별도 SO·프리팹·Volume 프로필. 디렉터 칸 `hitLightLookReference`·`hitLightVfxReference`, 둘 중 하나라도 비면 V3 → V0. 저작 메뉴 `Tools/Interrupt/적중 라이트 V3 레퍼런스 에셋 만들기 (194)`(SO·프로필·재질은 있으면 값 유지, 메시·프리팹은 같은 guid 로 다시 짓는다).
 - 기본값: 처음엔 안 바꿨다가(일반 V1·대쉬 V2) 사용자가 랩 비교 뒤 **11-03 일반·대쉬·제압 모두 V3** 로 결정(§9.1·§9.7). 랩 `V3` 버튼은 그 단계 암순응을 **나** 로 함께 맞춘다(`DefaultDarkAdapt`, 누른 뒤 가로 바꿀 수 있음).
+- **에셋 위치(11-03 정리)**: V3 전용은 `Assets/5.VFX/Interrupt/HitLight/V3/` — `InterruptHitLightLook_V3`·`VP_InterruptHitLight_V3_Bloom`·`VP_InterruptHitLight_V3_Grade`·`FX_InterruptHitLight_V3`·`M_InterruptHitLight_Core`·`M_InterruptHitLight_Streak`·`M_InterruptHitLight_Spark_V3`·`Mesh_InterruptHitLight_Core`.
+  V1 과 함께 쓰는 것은 상위 `HitLight/` 에 남는다 — `Mesh_InterruptHitLight_Streak`(V1 틈 수직 `gapRaysMesh`)·`Mesh/M_InterruptHitLight_Rays`·`Mesh/M_InterruptHitLight_Debris`·셰이더 `InterruptHitLightRays`. 경로 상수 = `InterruptHitLightReferenceAuthoring`.
+- 아래 표는 **시작값**이다. 현재 값은 사용자가 에디터에서 직접 튜닝한 값(11-03 `3a95c486` — 라이트 10·반경 100·그림자, 블룸 threshold 0.19·intensity 5, 노출 −5·대비 55·채도 40·색 필터 흰색)이고, 테스트는 V3 절대값을 단언하지 않는다.
 
 | 요소 | V3 시작값 | 칸 |
 |---|---|---|

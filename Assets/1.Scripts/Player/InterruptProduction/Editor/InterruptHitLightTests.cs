@@ -944,22 +944,12 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(3, v1.WhiteoutFrames);
         Assert.IsNull(v1.GradeProfile, "V1·V2 는 색 보정 없음");
 
-        // V3 시작값.
-        Assert.AreEqual(2f, v3.LightIntensity, 1e-4f);
-        Assert.AreEqual(3f, v3.LightRange, 1e-4f);
-        Assert.Greater(v3.SunDimDepth, v1.SunDimDepth, "V3 가 더 어둡다");
-        Assert.Greater(v3.AmbientDimDepth, v1.AmbientDimDepth);
-        Assert.AreEqual(0, v3.WhiteoutFrames);
+        // V3 는 사용자가 튜닝하는 값이라 절대값을 단언하지 않는다 — 전용 객체인지만 본다.
+        Assert.IsNotNull(v3.BloomProfile, "V3 전용 블룸");
         Assert.AreNotSame(v1.BloomProfile, v3.BloomProfile, "V3 전용 블룸");
-
-        Assert.IsTrue(v3.BloomProfile.TryGet(out UnityEngine.Rendering.Universal.Bloom bloom));
-        Assert.AreEqual(2f, bloom.threshold.value, 1e-4f);
-        Assert.AreEqual(0.6f, bloom.intensity.value, 1e-4f);
-        Assert.IsNotNull(v3.GradeProfile);
-        Assert.IsTrue(v3.GradeProfile.TryGet(out UnityEngine.Rendering.Universal.ColorAdjustments color));
-        Assert.IsTrue(color.saturation.overrideState);
-        Assert.Less(color.saturation.value, 0f, "채도 낮춤");
-        Assert.Greater(color.colorFilter.value.b, color.colorFilter.value.g, "보랏빛 색 필터");
+        Assert.IsTrue(v3.BloomProfile.TryGet(out UnityEngine.Rendering.Universal.Bloom _));
+        Assert.IsNotNull(v3.GradeProfile, "V3 전용 색 보정");
+        Assert.IsTrue(v3.GradeProfile.TryGet(out UnityEngine.Rendering.Universal.ColorAdjustments _));
     }
 
     [Test]

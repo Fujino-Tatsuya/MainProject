@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 적중 라이트 연출 월드 이펙트 루트(V1·V2·V3, 할 일 194) — <c>Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab</c>(V3 는 <c>_V3</c>).
+/// 적중 라이트 연출 월드 이펙트 루트(V1·V2·V3, 할 일 194) — <c>Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab</c>(V3 는 <c>V3/FX_InterruptHitLight_V3.prefab</c>).
 /// 적중 지점 포인트 라이트(따뜻한 흰주황, 실시간 곡선) + 자식 파티클(불꽃·메시 파편·빛줄기, V3 는 + 중심 점·가로 빛줄). 모든 피어가 성공 순간 각자 튼다.
 /// <list type="bullet">
 /// <item>디렉터가 첫 재생 때 한 번 만들어 재사용한다(재생마다 생성 없음). 라이트도 첫 재생 때 자식으로 한 번 만든다.</item>
