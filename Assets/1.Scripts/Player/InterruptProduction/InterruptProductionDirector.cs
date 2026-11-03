@@ -204,6 +204,14 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [DataTableIgnore, SerializeField] private bool reduceFlash;
     // 제압 암순응(할 일 192 Q7) = 섬광 시퀀스 복귀 뒤 컷 데이터의 '암순응 컷'(어두움 → 중간 → 원래 색)을 끊어서. 모든 피어 공용(Q8). 부드럽게 방식은 11-03 삭제.
 
+    // 적중 라이트 연출(할 일 194) — 단계 설정이 V1·V2 면 ②~⑥ 대신 성공 순간 바로 튼다(모든 피어, 실시간). 둘 중 하나라도 비면 V0 로 돌아간다.
+    // 이 피어 값을 쓴다(사건마다·프레임마다 읽음). 문서: interrupt-presentation.md §9.
+    [Header("성공 — 적중 라이트(할 일 194)")]
+    [Tooltip("수치 SO(InterruptHitLightLook) — 라이트·블룸·암순응·화이트아웃. 비면 V1·V2 대신 V0")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightLook hitLightLook;
+    [Tooltip("월드 이펙트 프리팹(FX_InterruptHitLight — 라이트·불꽃·파편·빛줄기). 첫 재생 때 한 번 만들어 재사용. 비면 V1·V2 대신 V0")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightFx hitLightVfx;
+
     // 간파 연출 4단계(할 일 192) — 실패 / 간파 / 대쉬 간파 / 제압 간파. 단계는 성공 사건(슬로우 Start 이벤트의 제압·대쉬 칸)으로 고르고,
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
     // 실패 = 단계 설정 없음(약 예측 = 약한 줌만, 강 예측의 판정 실패 = 그 순간 연출 종료 — 191 D4).
@@ -273,8 +281,10 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     public InterruptSuccessLook SuccessLook(InterruptPresentationTier tier) =>
         InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), suppressFlash, suppressFlashSequence != null, HasHitLight);
 
-    // 적중 라이트 연출(V1·V2)을 틀 수 있는가 — 단계 2 에서 연출 데이터·프리팹을 잇는다. 그 전까지는 V0 로 돌아간다.
-    private bool HasHitLight => false;
+    // 적중 라이트 연출(V1·V2)을 틀 수 있는가 — 수치 SO·월드 이펙트 프리팹 둘 다 있어야 한다.
+    private bool HasHitLight => hitLightLook != null && hitLightVfx != null;
+
+    public InterruptHitLightLook HitLightLook => hitLightLook;
 
     /// <summary>단계 설정(할 일 192). 실패는 설정이 없다(null).</summary>
     public InterruptTierProfile TierProfile(InterruptPresentationTier tier)
@@ -373,6 +383,24 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     public InterruptHitFlashSequencer HitFlash =>
         _hitFlash ??= new InterruptHitFlashSequencer(this, _hitFlashOverlay, HandleHitFlashMoment);
 
+    // 적중 라이트 연출(할 일 194) — 진행기는 처음 쓸 때, 월드 이펙트는 첫 재생 때 한 번 만든다.
+    private InterruptHitLightPlayer _hitLight;
+    private InterruptHitLightFx _hitLightFx;
+
+    /// <summary>적중 라이트 연출 진행기(V1·V2) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
+    public InterruptHitLightPlayer HitLight => _hitLight ??= new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx);
+
+    private InterruptHitLightFx EnsureHitLightFx()
+    {
+        if (_hitLightFx == null && hitLightVfx != null)
+        {
+            _hitLightFx = Instantiate(hitLightVfx, transform);
+            _hitLightFx.name = hitLightVfx.name;
+        }
+
+        return _hitLightFx;
+    }
+
     // 제압 간파 섬광(할 일 179) — 출력은 Awake 에서 만든다(없으면 시간표만 돈다). 서버 표식은 같은 프레임 성공 사건이 소비한다.
     private SuppressFlashScreenOutput _suppressFlashOutput;
     private SuppressFlashPlayer _suppressFlash;
@@ -428,6 +456,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerGate?.Sync(); // 오너 암전 칸을 Play 중에 바꾸면 바로(§17)
         _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock), Time.frameCount);
         _suppressFlash?.Tick(Time.unscaledTime); // 제압 간파 섬광 = 실제 시간(슬로우·히트스톱 무관, 할 일 179)
+        _hitLight?.Tick(Time.unscaledTime); // 적중 라이트 연출 = 실제 시간(할 일 194 Q8)
     }
 
     private void OnDisable()
@@ -455,6 +484,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _hitFlashOverlay = null;
         _suppressFlash?.Stop();
         _suppressFlashOutput?.Hide();
+        _hitLight?.Dispose();
+        _hitLight = null;
 
         if (Instance == this)
             Instance = null;
@@ -744,15 +775,22 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         if (viewerIsCaster)
             LastOwnerTier = tier;
 
-        // 오너 판정 cue(191)가 판정 순간 이미 섬광을 틀었다 — 제압 예측이었으면 시퀀스, 아니면 ②~⑥(OwnerJudgeCues.cs).
-        bool playsSequence = PlaysSuppressFlash(purpose, tier);
+        // 오너 판정 cue(191)가 판정 순간 이미 섬광을 틀었다 — 예측 단계의 섬광(시퀀스 / 적중 라이트 / ②~⑥, OwnerJudgeCues.cs).
+        InterruptSuccessLook look = SuccessLook(tier);
+        bool playsSequence = look == InterruptSuccessLook.SuppressSequence;
         bool ownerPlayedSequence = ownerCueHandled && _ownerJudgeCues != null && _ownerJudgeCues.LocalSuccessPlayedSuppress;
         if (InterruptPresentationTierRules.StartsSuppressSequenceOnServerSuccess(playsSequence, ownerCueHandled, ownerPlayedSequence))
         {
-            // 예측은 제압 아님 → 서버는 제압: 판정 순간 튼 ②~⑥ 를 걷고 시퀀스로(두 섬광이 겹치지 않게).
+            // 예측은 제압 아님 → 서버는 제압: 판정 순간 튼 ②~⑥·적중 라이트를 걷고 시퀀스로(두 섬광이 겹치지 않게).
             if (ownerCueHandled)
                 StopHitFlash();
             BeginSuppressFlash(e, viewerIsCaster);
+        }
+        else if (InterruptPresentationTierRules.UsesHitLight(look))
+        {
+            // 적중 라이트 연출(할 일 194, V1·V2) — 성공 순간 바로(섬광 순간 예약 없음). 본인 화면은 판정 cue 가 이미 틀었으면 건너뛴다.
+            if (!ownerCueHandled)
+                BeginHitLight(e, viewerIsCaster, look);
         }
         else if (!playsSequence)
         {
@@ -929,12 +967,33 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _hitFlashWorld.Play(position, hitFlashWorldScale, showWorldFlash, showHitLight);
     }
 
-    // 강제 리셋·꺼짐 — 오너 화면 효과 즉시 복구(오버레이·플레어·블러·Volume 가중치), 남은 섬광 순간 취소, 월드 섬광 지움.
+    // 강제 리셋·꺼짐·서버 거부 — 오너 화면 효과 즉시 복구(오버레이·플레어·블러·Volume 가중치), 남은 섬광 순간 취소, 월드 섬광 지움.
+    // 적중 라이트 연출(V1·V2, 할 일 194)도 같이 끈다 — 성공 섬광을 끄는 곳이 이 한 곳이다.
     private void StopHitFlash()
     {
         _hitFlash?.ForcedReset();
         if (_hitFlashWorld != null)
             _hitFlashWorld.Stop();
+        _hitLight?.Stop();
+    }
+
+    // 적중 라이트 연출 시작(할 일 194, 모든 피어) — 성공 순간이 곧 섬광 순간이다: 오너 성공 단계를 끝내고(본인 화면, 암전 없는 단계라 덮개는 이미 0)
+    // 적중 지점에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면).
+    private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look)
+    {
+        if (viewerIsCaster && _ownerPresentation != null)
+            _ownerPresentation.SuccessFlashMoment(_ownerPresentation.SuccessTriggerId, Time.unscaledTime);
+
+        InterruptTierProfile profile = TierProfile(e.Tier);
+        HitLight.Begin(new InterruptHitLightRequest
+        {
+            Point = FlashPoint(e.TargetPosition),
+            TargetPosition = e.TargetPosition,
+            CasterClientId = e.CasterClientId,
+            ViewerIsCaster = viewerIsCaster,
+            Look = look,
+            DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
+        }, Time.unscaledTime);
     }
 
     // 빛 모임 — 발동자 소유의 켜진 InterruptLightGatherSocket(Player.prefab base 루트). 찾는 방식은 FindSuccessFxSinks 와 같다.

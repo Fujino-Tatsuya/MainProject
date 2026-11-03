@@ -44,13 +44,21 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
             Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, look, variant);
         LastOwnerTier = _ownerPredictedTier;
         if (look == InterruptSuccessLook.SuppressSequence)
-            BeginSuppressFlash(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, true, variant), true);    }
+            BeginSuppressFlash(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, true, variant), true);
+        else if (InterruptPresentationTierRules.UsesHitLight(look))
+            BeginHitLight(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, false, variant), true, look);
+    }
 
     void IInterruptOwnerCueSink.OwnerEnded(InterruptOwnerEndReason reason)
     {
         // 서버 거부는 이미 튼 제압 섬광 시퀀스까지 끈다(②~⑥ 와 같은 규칙). 판정 실패·끊김은 결론 전 시도만 걷는다(Q3 — 그 순간 종료).
         if (reason == InterruptOwnerEndReason.ServerRejected && _ownerJudgeCues != null && _ownerJudgeCues.LocalSuccessPlayedSuppress)
-            _suppressFlash?.Stop();        OwnerJudgeCues.Ended(reason, Time.unscaledTime);
+            _suppressFlash?.Stop();
+        // 적중 라이트 연출(할 일 194)도 같다 — 판정 순간 성공 단계를 이미 끝냈으므로 상태 기계의 거부 처리가 끄지 못한다.
+        if (reason == InterruptOwnerEndReason.ServerRejected && _ownerJudgeCues != null &&
+            InterruptPresentationTierRules.UsesHitLight(_ownerJudgeCues.LocalSuccessLook))
+            _hitLight?.Stop();
+        OwnerJudgeCues.Ended(reason, Time.unscaledTime);
         LastOwnerTier = InterruptPresentationTier.Fail;
     }
 

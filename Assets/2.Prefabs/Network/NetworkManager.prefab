@@ -224,6 +224,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ab37a11b6cc003408c3db1a95379847, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptProductionDirector
+  keepCoSucceededBright: 1
   interruptProfile:
     scale: 0.15
     hitStopDuration: 0
@@ -259,8 +260,10 @@ MonoBehaviour:
   assassinInsightSuccess: 0
   targetFlash: 0
   darkAdaptation: 0
+  suppressFlash: 1
+  suppressFlashTargetOnly: 0
   ownerZoom: 1
-  hideDamageNumbers: 1
+  hideCombatUi: 1
   showOwnerDim: 1
   showLightGather: 0
   showStarburst: 0
@@ -290,10 +293,23 @@ MonoBehaviour:
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}
   hitFlashWorldScale: 1
   hitFlashHeightOffset: 1
-  suppressFlash: 1
   suppressFlashSequence: {fileID: 11400000, guid: b8afdaadf21203446b47d2397f53d7ae, type: 2}
   suppressFlashMaterial: {fileID: 2100000, guid: 5903fe22bc43ce7448fbc80af146a40b, type: 2}
   reduceFlash: 0
+  hitLightLook: {fileID: 11400000, guid: 5d7ab4161f2c71748bb9fe1336f1be9b, type: 2}
+  hitLightVfx: {fileID: 4308608783583396743, guid: 2209f576fb558f24485d5e1da46740f0, type: 3}
+  normalTier:
+    ownerDim: 0
+    flash: 2
+    darkAdapt: 0
+  dashTier:
+    ownerDim: 0
+    flash: 3
+    darkAdapt: 0
+  suppressTier:
+    ownerDim: 1
+    flash: 1
+    darkAdapt: 0
 --- !u!114 &4191191191191191191
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -307,3 +323,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptManager
   logWindows: 0
+  qaRecordFile: 1
+  verifyTimeSlack: 0.033
+  verifyDistanceSlack: 0.2
+  verifyAngleSlack: 5
+  simultaneousSeconds: 0.05
