@@ -9,7 +9,7 @@ using UnityEngine;
 ///       <see cref="InterruptProductionDirector.Set"/>). 프리팹·씬에 저장하지 않는다 — Play 를 끝내면 원래 값.</item>
 /// <item>배속은 같은 오브젝트의 <see cref="DebugTimeScale"/> 슬라이더 값을 쓴다 — 0.05~2, 성공 후 1배속 복귀 규칙도 그 컴포넌트 그대로.</item>
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
-/// <item>제압 간파 섬광 A/B/끔 버튼 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressFlashModes"/>·<see cref="DebugSuppressInterruptRepro"/>).</item>
+/// <item>제압 간파 섬광 A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>).</item>
 /// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>), 제압 암순응 컷/부드럽게 전환.</item>
 /// </list>
 /// </summary>
@@ -178,8 +178,8 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         GUILayout.EndHorizontal();
     }
 
-    // 제압 간파 섬광 전환(179 후속 3) — 버튼 3개(A6 + 시퀀스 A/B) + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).
-    // A·B 를 누르면 재현도 켠다(허수아비엔 제압 칸이 없어 그대로는 시퀀스가 안 나온다). 끔은 재현을 건드리지 않는다.
+    // 제압 간파 섬광(179 후속 3) — A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).
+    // A6 를 켜면 재현도 켠다(허수아비엔 제압 칸이 없어 그대로는 시퀀스가 안 나온다). 끔은 재현을 건드리지 않는다.
     void DrawSuppressFlash()
     {
         InterruptProductionDirector director = InterruptProductionDirector.Instance;
@@ -187,16 +187,12 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             return;
 
         GUILayout.Space(6f);
-        DebugSuppressFlashMode current = DebugSuppressFlashModes.Current(director);
-        GUILayout.Label($"제압 간파 섬광 — 지금: {DebugSuppressFlashModes.Label(current)}");
-        foreach (DebugSuppressFlashMode mode in DebugSuppressFlashModes.All)
+        bool on = director.SuppressFlashEnabled;
+        bool next = GUILayout.Toggle(on, "제압 간파 섬광 (A6)");
+        if (next != on)
         {
-            string label = (mode == current ? "● " : "○ ") + DebugSuppressFlashModes.Label(mode);
-            if (!GUILayout.Button(label))
-                continue;
-
-            DebugSuppressFlashModes.Apply(director, mode);
-            if (mode != DebugSuppressFlashMode.Off)
+            director.SuppressFlashEnabled = next;
+            if (next)
                 _suppressRepro.Enabled = true;
         }
 

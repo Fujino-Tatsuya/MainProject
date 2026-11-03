@@ -29,22 +29,10 @@ public readonly struct SuppressFlashFrame
     public readonly Color Dark;
     public readonly Color Mid;
     public readonly Color Light;
-    // 179 후속 3(레퍼런스 B) — A 컷은 전부 0.
-    /// <summary>방향 블러 [0, 1].</summary>
-    public readonly float DirectionalBlur;
-    /// <summary>화면 흔들림(섬광 줄이기면 대비 비율로 줄임).</summary>
-    public readonly float Shake;
-    /// <summary>실루엣 밝기 낮춤 [0, 1].</summary>
-    public readonly float SilhouetteDim;
-    /// <summary>색수차 고르게 [0, 1](0 = 가장자리만).</summary>
-    public readonly float AberrationUniform;
-    /// <summary>컬러 블룸 세기 — 블룸 명암 컷만 양수(섬광 줄이기면 대비 비율로 줄임).</summary>
-    public readonly float Bloom;
 
     public SuppressFlashFrame(int cutIndex, SuppressFlashTone tone, bool invert, SuppressFlashCross cross, float starSize,
         float speedLines, float aberration, bool hatching, float letterbox, float returnBlend, float contrast,
-        Color dark, Color mid, Color light,
-        float directionalBlur = 0f, float shake = 0f, float silhouetteDim = 0f, float aberrationUniform = 0f, float bloom = 0f)
+        Color dark, Color mid, Color light)
     {
         Active = true;
         CutIndex = cutIndex;
@@ -61,11 +49,6 @@ public readonly struct SuppressFlashFrame
         Dark = dark;
         Mid = mid;
         Light = light;
-        DirectionalBlur = directionalBlur;
-        Shake = shake;
-        SilhouetteDim = silhouetteDim;
-        AberrationUniform = aberrationUniform;
-        Bloom = bloom;
     }
 }
 
@@ -84,10 +67,6 @@ public static class SuppressFlashRules
     /// </summary>
     public static bool ShouldPlay(SlowMotionPurpose purpose, bool suppressInterrupt, bool enabled, bool hasSequence) =>
         purpose == SlowMotionPurpose.Success && suppressInterrupt && enabled && hasSequence;
-
-    /// <summary>디렉터 '제압 섬광 시퀀스 선택'(179 후속 3) — A/B 중 고른 쪽 컷 데이터(비었으면 null = 일반 섬광, 다른 쪽으로 대신하지 않는다).</summary>
-    public static SuppressFlashSequence Select(SuppressFlashVariant variant, SuppressFlashSequence a, SuppressFlashSequence b) =>
-        variant == SuppressFlashVariant.B ? b : a;
 
     public static int TotalFrames(IReadOnlyList<SuppressFlashCut> cuts)
     {
@@ -195,7 +174,6 @@ public static class SuppressFlashRules
         SuppressFlashCut cut = sequence.cuts[cutIndex];
         float progress = CutProgress(frameInCut, FramesOf(cut), sequence.holdFrames);
         bool isReturn = cut.tone == SuppressFlashTone.Return;
-        float calm = reduceFlash ? Mathf.Clamp01(sequence.reducedContrast) : 1f;
 
         return new SuppressFlashFrame(
             cutIndex,
@@ -207,14 +185,9 @@ public static class SuppressFlashRules
             Mathf.Max(0f, Mathf.Lerp(cut.aberration, cut.aberrationEnd, progress)),
             cut.hatching,
             Mathf.Clamp01(Mathf.Lerp(cut.letterbox, cut.letterboxEnd, progress)),
-            isReturn ? Mathf.Lerp(Mathf.Clamp01(cut.returnStart), 1f, progress) : 0f,
-            calm,
-            cut.dark, cut.mid, cut.light,
-            Mathf.Clamp01(cut.directionalBlur),
-            Mathf.Max(0f, cut.shake) * calm,
-            Mathf.Clamp01(cut.silhouetteDim),
-            Mathf.Clamp01(cut.aberrationUniform),
-            cut.tone == SuppressFlashTone.Bloom ? Mathf.Max(0f, cut.bloom) * calm : 0f);
+            isReturn ? progress : 0f,
+            reduceFlash ? Mathf.Clamp01(sequence.reducedContrast) : 1f,
+            cut.dark, cut.mid, cut.light);
     }
 }
 
@@ -269,7 +242,7 @@ public interface ISuppressDarkAdaptOutput
 
 /// <summary>
 /// 제압 간파 섬광 진행기(할 일 179) — 순수 로직(MonoBehaviour 아님). 디렉터가 공용 성공 사건에서 <see cref="Begin"/>, 매 프레임 실제 시간으로 <see cref="Tick"/>.
-/// 컷 데이터(어느 SO 인가)는 <see cref="Begin"/> 순간 공급자에서 한 번 골라 끝까지 쓴다(A/B 선택을 재생 중에 바꿔도 다음 성공부터, 179 후속 3).
+/// 컷 데이터(어느 SO 인가)는 <see cref="Begin"/> 순간 공급자에서 한 번 골라 끝까지 쓴다(재생 중에 칸을 바꿔도 다음 성공부터).
 /// 그 SO 의 값·섬광 줄이기는 Tick 마다 읽는다 — Play 중 SO 값을 바꾸면 다음 렌더 프레임부터 그 값.
 /// 새 성공이 오면 처음부터 다시 튼다.
 /// 시퀀스가 끝나면 제압 암순응(할 일 192 Q7)으로 이어진다 — 컷 = 그 SO 의 암순응 컷을 실제 시간으로 끊어서, 부드럽게 = 기존 암순응 곡선 한 번.

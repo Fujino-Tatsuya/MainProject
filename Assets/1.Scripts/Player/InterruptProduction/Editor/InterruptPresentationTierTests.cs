@@ -281,9 +281,6 @@ public sealed class InterruptPresentationTierTests
         Assert.AreEqual(2, sequence.darkAdaptCuts.Count);
         Assert.AreEqual(1f, sequence.darkAdaptCuts[0].darkness);
         Assert.AreEqual(0.5f, sequence.darkAdaptCuts[1].darkness);
-
-        sequence.ResetToReference();
-        Assert.AreEqual(2, sequence.darkAdaptCuts.Count, "B 도 같은 암순응 컷(초 단위라 프레임 속도 무관)");
     }
 
     [Test]

@@ -2,54 +2,6 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
-/// <summary>DebugInterruptLab 의 제압 간파 섬광 전환 버튼 3개(179 후속 3).</summary>
-public enum DebugSuppressFlashMode
-{
-    /// <summary>A6 켬 + 시퀀스 A(오늘 제작, 보라 컷).</summary>
-    A,
-    /// <summary>A6 켬 + 시퀀스 B(레퍼런스, 포트폴리오).</summary>
-    B,
-    /// <summary>A6 끔 — 제압 간파도 일반 간파 연출(②~⑥). 시퀀스 선택은 그대로 둔다.</summary>
-    Off,
-}
-
-/// <summary>
-/// 제압 간파 섬광 전환(179 후속 3) — 디렉터의 A6 칸·시퀀스 선택(A/B) 런타임 값만 바꾼다(프리팹·씬 저장 없음, 이 피어만).
-/// </summary>
-public static class DebugSuppressFlashModes
-{
-    public static readonly DebugSuppressFlashMode[] All = { DebugSuppressFlashMode.A, DebugSuppressFlashMode.B, DebugSuppressFlashMode.Off };
-
-    public static DebugSuppressFlashMode Current(InterruptProductionDirector director)
-    {
-        if (director == null || !director.SuppressFlashEnabled)
-            return DebugSuppressFlashMode.Off;
-        return director.SuppressFlashVariant == SuppressFlashVariant.B ? DebugSuppressFlashMode.B : DebugSuppressFlashMode.A;
-    }
-
-    public static void Apply(InterruptProductionDirector director, DebugSuppressFlashMode mode)
-    {
-        if (director == null)
-            return;
-
-        if (mode == DebugSuppressFlashMode.Off)
-        {
-            director.SuppressFlashEnabled = false;
-            return;
-        }
-
-        director.SuppressFlashEnabled = true;
-        director.SuppressFlashVariant = mode == DebugSuppressFlashMode.B ? SuppressFlashVariant.B : SuppressFlashVariant.A;
-    }
-
-    public static string Label(DebugSuppressFlashMode mode) => mode switch
-    {
-        DebugSuppressFlashMode.A => "A: 오늘 제작(보라 컷)",
-        DebugSuppressFlashMode.B => "B: 레퍼런스(포트폴리오)",
-        _ => "끔(일반 간파 연출)",
-    };
-}
-
 /// <summary>
 /// [서버] 허수아비 간파 = 제압 간파 재현(179 후속 3) — 랩 대상(허수아비)은 제압 칸이 없어 제압 간파 표식이 나오지 않는다.
 /// 켜 두면 허수아비의 서버 간파 성공(<see cref="TrainingDummyInterrupt.ServerInterruptSucceeded"/> — 같은 판정 호출 안, 성공 사건 바로 앞)에서

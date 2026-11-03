@@ -67,7 +67,7 @@
 - **간파 연출 4단계(192)**: [Docs/tech/interrupt-presentation.md §8](Docs/tech/interrupt-presentation.md) — 실패/간파/대쉬 간파/제압 간파. 순수 선택 함수 `InterruptPresentationTierRules`·사건 `Variant`(Normal/Dash)·슬로우 사건 1바이트 플래그(bit0 제압·bit1 대쉬, 새 RPC 없음). 오너 암전은 제압만(시도 때 `IInterruptSuppressForecast` 로 예측), 제압 = 섬광 시퀀스 + 암순응 컷(SO `darkAdaptCuts`)/부드럽게(디렉터 스위치). 랩 단계 버튼 §8.5.
 - **간파 연출(132)**: [Docs/tech/interrupt-presentation.md](Docs/tech/interrupt-presentation.md) §0 — 예측 3상태(대상 없음/약/강 — 191부터 `InterruptManager.Predict`, 결론은 오너 판정 cue) → 강 = 오너 마스크 암전(비트 4·HUD 덮개)+빛 모임, 성공 = 히트스톱·적중 섬광 ②~⑥(스타버스트 렌즈 플레어·화이트아웃·스미어 → 섬광 순간 0.133s → 색수차 블러·가라앉음, 끝 0.433s)·팀원 암순응. 스위치 A1~A4 켬·B/C/E 꺼짐, 수치·누가 보나·덮어쓸 텍스처 칸·알려진 제약.
   **제압 간파(179, §7)** = 제압 칸 마지막 1칸 간파 성공은 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어·암전은 오너만) — 컷 SO `SuppressFlashSequence`·후처리 뒤 셰이더 1패스(비트 7 실루엣)·표식은 슬로우 Start 이벤트 1바이트(새 RPC 없음)·섬광 줄이기 = PlayerPrefs `Interrupt.ReduceFlash`.
-  레퍼런스 B 시퀀스(60fps 5컷)·디렉터 A/B 선택·DebugInterruptLab 전환 버튼은 §7.8(179 후속 3).
+  섬광은 보라·흰색 7컷 하나(레퍼런스 B 는 11-03 폐기)·끄기는 A6 스위치, DebugInterruptLab A6 토글은 §7.8(179 후속 3).
 - **대쉬 간파**: [Docs/tech/dash-interrupt.md](Docs/tech/dash-interrupt.md) — 대시 시작 후 창(기본 0.1초) 안 우클릭만 소비(창 밖은 기존 선입력 버퍼), 대시에 간파가 실려 대시 끝에 Skill 전이·판정(판정 시각 = max(대시 끝, 평소 Hit) — 191부터 판정은 `InterruptManager`, 대시 끝 = 공용 스윕), RPC 플래그 `dashInterrupt`(새 RPC 없음)·서버 창+허용오차, 상체 레이어 `DashInterruptUpper`, `PlayerDashData` 칸 3개·알려진 한계.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).

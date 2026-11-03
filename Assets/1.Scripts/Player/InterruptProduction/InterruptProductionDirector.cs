@@ -193,13 +193,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     // 오너 암전(132)은 그대로 오너만(시퀀스 시작 순간 걷힌다). 이 피어 값을 쓴다(사건마다·프레임마다 읽음). 문서: interrupt-presentation.md §7.
     [Header("성공 — 제압 간파 섬광(할 일 179)")]
     // 켜기/끄기 = 위 "성공 — 공용" 의 A6 칸(suppressFlash).
-    [Tooltip("제압 섬광 시퀀스 선택(179 후속 3) — A = 오늘 제작(보라 컷, 아래 '컷 데이터') / B = 레퍼런스(포트폴리오, '컷 데이터 B'). " +
-             "성공 시작 순간 읽는다 — 도는 시퀀스는 끝까지, 다음 제압 간파부터 반영. 고른 쪽이 비면 일반 섬광")]
-    [DataTableIgnore, SerializeField] private SuppressFlashVariant suppressFlashVariant = SuppressFlashVariant.A;
     [Tooltip("컷 데이터(SuppressFlashSequence) — 컷마다 길이·명암·십자·별·집중선·색수차·빗금·3단 색. Play 중 바꾸면 다음 렌더 프레임부터. 비면 일반 섬광")]
     [DataTableIgnore, SerializeField] private SuppressFlashSequence suppressFlashSequence;
-    [Tooltip("컷 데이터 B(179 후속 3, 레퍼런스 = 포트폴리오 60fps 분석) — 선택이 B 일 때 쓴다. 같은 셰이더·같은 진행기")]
-    [DataTableIgnore, SerializeField] private SuppressFlashSequence suppressFlashSequenceB;
     [Tooltip("전체 화면 패스 재질(Hidden/Rendering/SuppressFlash). 비면 그리지 않는다(시간표는 돈다)")]
     [DataTableIgnore, SerializeField] private Material suppressFlashMaterial;
     [Tooltip("섬광 줄이기 기본값 — 켜면 반전 끔 + 대비 낮춤. PlayerPrefs '" + ReduceFlashPrefsKey + "' 가 있으면 그 값이 이긴다")]
@@ -216,7 +211,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [DataTableIgnore, SerializeField] private InterruptTierProfile normalTier = new InterruptTierProfile(false, InterruptTierFlash.HitFlash);
     [Tooltip("대쉬 간파 성공 — Q1 암전 없음, 섬광 = 기존 ②~⑥(Q5 암순응·블룸 섬광 보류 자리)")]
     [DataTableIgnore, SerializeField] private InterruptTierProfile dashTier = new InterruptTierProfile(false, InterruptTierFlash.HitFlash);
-    [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 오너 암전 + 섬광 시퀀스(A/B) + 강한 줌 + 제압 암순응")]
+    [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 오너 암전 + 섬광 시퀀스 + 강한 줌 + 제압 암순응")]
     [DataTableIgnore, SerializeField] private InterruptTierProfile suppressTier = new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence);
 
     /// <summary>섬광 줄이기 저장 키(PlayerPrefs, 0/1). 새 설정 UI 는 없다 — 나중에 설정 화면이 이 키(<see cref="ReduceFlash"/>)를 쓰면 된다.</summary>
@@ -264,7 +259,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     /// <summary>이 단계의 성공이 제압 간파 섬광 시퀀스인가(할 일 192) — 단계 설정·A6 칸·컷 데이터.</summary>
     public bool PlaysSuppressFlash(SlowMotionPurpose purpose, InterruptPresentationTier tier) =>
-        InterruptPresentationTierRules.PlaysSuppressSequence(purpose, TierProfile(tier), suppressFlash, SelectedSuppressFlashSequence != null);
+        InterruptPresentationTierRules.PlaysSuppressSequence(purpose, TierProfile(tier), suppressFlash, suppressFlashSequence != null);
 
     /// <summary>단계 설정(할 일 192). 실패는 설정이 없다(null).</summary>
     public InterruptTierProfile TierProfile(InterruptPresentationTier tier)
@@ -297,21 +292,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     // [오너] 입력 순간 예측한 성공 단계 — 판정 성공 때 섬광 종류를 고른다(서버 표식보다 먼저라서).
     private InterruptPresentationTier _ownerPredictedTier = InterruptPresentationTier.Normal;
 
-    /// <summary>제압 섬광 시퀀스 선택(179 후속 3) — 런타임 값(저장하지 않음, 디버그·테스트). Play 중 바꾸면 다음 제압 간파부터.</summary>
-    public SuppressFlashVariant SuppressFlashVariant
-    {
-        get => suppressFlashVariant;
-        set => suppressFlashVariant = value;
-    }
-
-    /// <summary>선택(A/B)에 맞는 컷 데이터 — 성공 시작 순간 진행기가 이것을 골라 끝까지 쓴다.</summary>
-    public SuppressFlashSequence SelectedSuppressFlashSequence =>
-        SuppressFlashRules.Select(suppressFlashVariant, suppressFlashSequence, suppressFlashSequenceB);
-
-    /// <summary>컷 데이터 A(오늘 제작, 보라 컷).</summary>
     public SuppressFlashSequence SuppressFlashSequence => suppressFlashSequence;
-    /// <summary>컷 데이터 B(레퍼런스, 포트폴리오).</summary>
-    public SuppressFlashSequence SuppressFlashSequenceB => suppressFlashSequenceB;
     public Material SuppressFlashMaterial => suppressFlashMaterial;
 
     /// <summary>
@@ -391,9 +372,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     private readonly List<GameObject> _suppressSubjects = new List<GameObject>();
     private readonly List<InterruptTargetRegistry.Entry> _targetBuffer = new List<InterruptTargetRegistry.Entry>();
 
-    /// <summary>제압 간파 섬광 진행기 — 공용 성공 사건(제압 간파)에 시작(그 순간 A/B 선택을 읽는다), 매 프레임 실제 시간으로 진행.</summary>
+    /// <summary>제압 간파 섬광 진행기 — 공용 성공 사건(제압 간파)에 시작, 매 프레임 실제 시간으로 진행.</summary>
     public SuppressFlashPlayer SuppressFlash =>
-        _suppressFlash ??= new SuppressFlashPlayer(() => SelectedSuppressFlashSequence, () => ReduceFlash, _suppressFlashOutput,
+        _suppressFlash ??= new SuppressFlashPlayer(() => suppressFlashSequence, () => ReduceFlash, _suppressFlashOutput,
             _darkAdaptation);
 
     // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.

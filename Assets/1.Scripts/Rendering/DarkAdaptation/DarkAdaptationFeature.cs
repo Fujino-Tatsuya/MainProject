@@ -156,10 +156,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
         private static readonly int IdDark = Shader.PropertyToID("_SFDark");
         private static readonly int IdMid = Shader.PropertyToID("_SFMid");
         private static readonly int IdLight = Shader.PropertyToID("_SFLight");
-        private static readonly int IdExtra = Shader.PropertyToID("_SFExtra");
-        private static readonly int IdDirection = Shader.PropertyToID("_SFDir");
-        private static readonly int IdShake = Shader.PropertyToID("_SFShake");
-        private static readonly int IdBloom = Shader.PropertyToID("_SFBloom");
 
         private static readonly List<ShaderTagId> ShaderTags = new()
         {
@@ -263,10 +259,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
                     d.material.SetColor(IdDark, p.Dark);
                     d.material.SetColor(IdMid, p.Mid);
                     d.material.SetColor(IdLight, p.Light);
-                    d.material.SetVector(IdExtra, p.Extra);
-                    d.material.SetVector(IdDirection, p.Direction);
-                    d.material.SetVector(IdShake, p.Shake);
-                    d.material.SetColor(IdBloom, p.Bloom);
                     Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, 0);
                 });
             }

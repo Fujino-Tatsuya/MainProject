@@ -291,9 +291,7 @@ MonoBehaviour:
   hitFlashWorldScale: 1
   hitFlashHeightOffset: 1
   suppressFlash: 1
-  suppressFlashVariant: 0
   suppressFlashSequence: {fileID: 11400000, guid: b8afdaadf21203446b47d2397f53d7ae, type: 2}
-  suppressFlashSequenceB: {fileID: 11400000, guid: 3a1bc7e8e4b29634fb97ac3c91ba0cc1, type: 2}
   suppressFlashMaterial: {fileID: 2100000, guid: 5903fe22bc43ce7448fbc80af146a40b, type: 2}
   reduceFlash: 0
 --- !u!114 &4191191191191191191
