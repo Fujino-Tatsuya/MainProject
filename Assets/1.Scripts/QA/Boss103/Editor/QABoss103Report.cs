@@ -615,6 +615,17 @@ pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);pad
         Line(sb, "성공률(시도 기록이 있는 판)", sums, s => Pct(s.CounterRate, 1));
         foreach (QABoss103Character ch in Chars)
             Line(sb, $"{CharLabel(ch)} 시도 / 성공 /판", c, g => $"{Num(AvgChars(c, g, ch, "counter_tries"), 2)} / {Num(AvgChars(c, g, ch, "counter_success"), 2)}");
+        // 할 일 193 — 간파 신고 경로(오너 판정 → 서버 검증, 191 QA 기록). 합계(판 파일이 있는 판).
+        Line(sb, "신고 경로 시도 / 오너 판정 성공", c, g => $"{Num(SumChars(c, g, null, "claim_attempts"), 0)} / {Num(SumChars(c, g, null, "claim_judge_success"), 0)}");
+        Line(sb, "승인 첫 / 동시 / 거부 / 응답 없음", c, g =>
+            $"{Num(SumChars(c, g, null, "claim_approved_first"), 0)} / {Num(SumChars(c, g, null, "claim_approved_simul"), 0)} / " +
+            $"{Num(SumChars(c, g, null, "claim_rejected"), 0)} / {Num(SumChars(c, g, null, "claim_no_response"), 0)}");
+        Line(sb, "거부 사유 범위 / 각도 / 창 닫힘 / 선착순 / 그 밖", c, g =>
+            string.Join(" / ", Array.ConvertAll(QABoss103ClaimTally.RejectTokens, t => Num(SumChars(c, g, null, "claim_reject_" + t), 0))));
+        foreach (QABoss103Character ch in Chars)
+            Line(sb, $"{CharLabel(ch)} 신고 시도 / 승인 / 거부", c, g =>
+                $"{Num(SumChars(c, g, ch, "claim_attempts"), 0)} / {Num(SumChars(c, g, ch, "claim_approved_first") + SumChars(c, g, ch, "claim_approved_simul"), 0)} / " +
+                $"{Num(SumChars(c, g, ch, "claim_rejected"), 0)}");
 
         Sec(sb, "13. 제압", cols);
         Line(sb, "제압 횟수/판", sums, s => Num(s.SuppressAvg, 2));

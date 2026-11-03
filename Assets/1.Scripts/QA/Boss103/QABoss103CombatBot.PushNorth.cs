@@ -9,8 +9,9 @@ using UnityEngine;
 /// <c>QABoss103CombatBot.Evasion.cs</c>. 보스·탑은 읽기만 한다(클라 = 탑 몸 콜라이더, 호스트 = 탑 상태·보스 기믹 값).
 /// <list type="bullet">
 /// <item>활성 탑이 모두 사라지면(창이 열리기 전이라도) <see cref="QABoss103PushNorthCounter.LinkSeconds"/> 동안 보스 정면 자리로 걷는다.</item>
-/// <item>그 뒤 열린 창 = 북진 창: 닫힘·마감·포기 거리를 무력화 시간에 맞추고, 반응 지연 동안에도 걷는다. 실패 굴림은 창 안에서 보스 반대쪽을 겨눠 누른다.</item>
-/// <item>마감까지 걸어서 못 닿고 대시 한 번 거리 안이면 대쉬 간파(대시 → 창 안 <see cref="PlayerSkillController.TryUseDashInterrupt"/>).</item>
+/// <item>그 뒤 열린 창 = 북진 창: 닫힘(창 시간표 닫힘 예정)·마감·포기 거리를 맞추고, 반응 지연 동안에도 걷는다. 실패 굴림은 창 안에서 보스 반대쪽을 겨눠 누른다.</item>
+/// <item>성공 굴림 누름 = 예측(<see cref="InterruptManager.Predict"/>) 강 + 멈춤(할 일 193 — 봇 전용 누름 자리 판정 삭제).</item>
+/// <item>마감까지 걸어서 못 닿고 대시 한 번 거리 안이면 대쉬 간파(대시 → 창 안 대쉬 간파 예측이 강이면 <see cref="PlayerSkillController.TryUseDashInterrupt"/>).</item>
 /// <item>창마다 1줄 <c>[QA103] event=pn_counter</c> — 야간 QA events.tsv 기록 전용.</item>
 /// </list>
 /// </summary>
@@ -62,7 +63,7 @@ public sealed partial class QABoss103CombatBot
 
     /// <summary>① 활성 탑이 막 다 사라졌고 창은 아직 — 보스 쪽으로 미리 걷는다.</summary>
     private bool PnPreApproach(double now) =>
-        !_windowWas && _pylonsClearedAt >= 0.0 && now - _pylonsClearedAt <= QABoss103PushNorthCounter.LinkSeconds && !HostSaysNotPushNorth();
+        !_watch.IsOpen && _pylonsClearedAt >= 0.0 && now - _pylonsClearedAt <= QABoss103PushNorthCounter.LinkSeconds && !HostSaysNotPushNorth();
 
     private double PnStunSeconds() =>
         BossDataField != null && BossDataField.GetValue(_boss) is BossDataSO data ? data.pushNorthStunTime : QABoss103PushNorthCounter.DefaultStunSeconds;
@@ -84,8 +85,11 @@ public sealed partial class QABoss103CombatBot
             : QABoss103PushNorthCounter.FallbackDashReach;
     }
 
-    /// <summary>창 열림 때 — 북진 창이면 상태를 잡고 예상 닫힘을 돌려준다(아니면 NaN).</summary>
-    private double BeginPnWindow(Player me, Vector3 myPos, float surface, double now)
+    /// <summary>
+    /// 창 열림 때 — 북진 창이면 상태를 잡고 닫힘을 돌려준다(아니면 NaN). 할 일 193 — 닫힘 = 창 시간표의 닫힘 예정(<paramref name="scheduledCloseAt"/>, 봇 실시간),
+    /// 길이 모름(+∞)일 때만 탑 소멸 + 무력화 시간으로 계산한다.
+    /// </summary>
+    private double BeginPnWindow(Player me, Vector3 myPos, float surface, double now, double scheduledCloseAt)
     {
         _pnWindow = QABoss103PushNorthCounter.IsPushNorthWindow(now, _pylonsClearedAt) && !HostSaysNotPushNorth();
         double clearedAt = _pylonsClearedAt;
@@ -99,7 +103,7 @@ public sealed partial class QABoss103CombatBot
         _pnJudgeAt = double.NaN;
         _pnStillTicks = 0;
         _pnStillSince = -1.0;
-        _pnCloseAt = QABoss103PushNorthCounter.CloseAt(now, clearedAt, PnStunSeconds());
+        _pnCloseAt = double.IsInfinity(scheduledCloseAt) ? QABoss103PushNorthCounter.CloseAt(now, clearedAt, PnStunSeconds()) : scheduledCloseAt;
         _pnOpenGameT = Time.timeAsDouble;
         NetworkManager nm = NetworkManager.Singleton;
         _pnOpenServerT = nm != null && nm.IsListening ? nm.ServerTime.Time : double.NaN;
@@ -144,11 +148,21 @@ public sealed partial class QABoss103CombatBot
             {
                 _pnDashAt = -1.0;
                 _pnDashGaveUp = true;   // 창을 놓쳤다 — 다시 대시하지 않고 일반 누름으로
-                Debug.Log($"{Tag} event=pn_dash_interrupt bot={_character} slot={_slot} ok=false reason=window_passed state={me.CurrentState}");
+                Debug.Log($"{Tag} event=pn_dash_interrupt bot={_character} slot={_slot} ok=false reason=window_passed state={me.CurrentState} " +
+                          $"predict={QABoss103InterruptPress.Token(_lastPredict)}");
                 return false;
             }
             if (me.CurrentState != PlayerActionState.Dash)
                 return true;   // 대시 상태로 넘어가길 기다린다
+            // 할 일 193 — 대쉬 간파 예측(실제 대시 끝 = 공용 스윕, 판정 시각 = max(대시 끝, Hit))이 강일 때만 누른다. 아니면 창 안에서 다음 틱 다시 —
+            // 창을 넘기면 위 window_passed 로 일반 누름에 넘긴다.
+            if (!TryPredictCounter(me, true, _pnDashDir, out InterruptJudgeResult dashPredict) ||
+                dashPredict.Outcome != InterruptJudgeOutcome.Success)
+            {
+                _lastPredict = dashPredict;
+                return true;
+            }
+            _lastPredict = dashPredict;
             if (!skills.TryUseDashInterrupt(_pnDashDir))
                 return true;   // 다음 틱 다시(창 안)
             _pnDashAt = -1.0;
@@ -158,7 +172,7 @@ public sealed partial class QABoss103CombatBot
             double serverT = nm != null && nm.IsListening ? nm.ServerTime.Time : -1.0;
             Debug.Log($"{Tag} event=counter_try bot={_character} slot={_slot} tier={_profile.Tier} window={_counterWindows} roll=hit " +
                       $"pressMs={F0((now - _windowOpenAt) * 1000.0)} deadlineMs={F0((_counterDeadline - _windowOpenAt) * 1000.0)} dashInterrupt=true pushNorth=true " +
-                      $"surfM={F2(SurfaceDistance(myPos, _boss.transform.position))} reachM={F2(CounterReach(me, skills))} cast=true serverT={F3(serverT)}");
+                      $"predict={QABoss103InterruptPress.Token(_lastPredict)} windowId={_watch.Current.WindowId} surfM={F2(SurfaceDistance(myPos, _boss.transform.position))} reachM={F2(CounterReach(me, skills))} cast=true serverT={F3(serverT)}");
             PartCounter(true, true, serverT);
             NotePnPress(true, true, now);
             return true;
@@ -204,14 +218,6 @@ public sealed partial class QABoss103CombatBot
     private float TrueSurfaceDistance(Vector3 myPos) =>
         _boss == null ? float.NaN : SurfaceDistance(myPos, _boss.transform.position);
 
-    /// <summary>북진 누름 자리 — 실제 표면 거리 ≤ 사거리 − 여유 + 정면각 ≤ 서버 한도 − 여유(<see cref="QABoss103PushNorthCounter.InPressSpot"/>).</summary>
-    private bool PnInPressSpot(Vector3 myPos, double reach)
-    {
-        CounterFront(myPos, out double frontDeg, out float limit);
-        bool requiresFront = !(BossDataField != null && BossDataField.GetValue(_boss) is BossDataSO data) || data.counterRequiresFront;
-        return QABoss103PushNorthCounter.InPressSpot(TrueSurfaceDistance(myPos), reach, frontDeg, limit, requiresFront);
-    }
-
     /// <summary>북진 누름 자리로 걸어갈 표면 거리 — 기본 <see cref="CounterStandOff"/>, 누름 거리가 짧으면 그 절반.</summary>
     private static float PnStandOff(double reach) =>
         Mathf.Min(CounterStandOff, (float)(QABoss103PushNorthCounter.PressDistance(reach) * 0.5));
@@ -230,15 +236,14 @@ public sealed partial class QABoss103CombatBot
             _pnStillSince = now;
     }
 
-    /// <summary>북진 성공 굴림 — 지금 누를까(<see cref="QABoss103PushNorthCounter.ShouldPress"/>). 시전 가능 상태가 아니면 마감 전엔 기다린다.</summary>
-    private bool PnShouldPress(Player me, Vector3 myPos, double now)
+    /// <summary>
+    /// 북진 성공 굴림 — 예측 강 + 시전 가능(호출측 <see cref="QABoss103InterruptPress.Decide"/> = Press)일 때 지금 누를까(<see cref="QABoss103PushNorthCounter.ShouldPress"/> —
+    /// 멈춤 충분, 또는 마감 앞).
+    /// </summary>
+    private bool PnShouldPress(double now)
     {
-        PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
-        bool castable = skills != null && !skills.IsBusy &&
-                        (me.CurrentState == PlayerActionState.Idle || me.CurrentState == PlayerActionState.Move);
-        bool spot = castable && PnInPressSpot(myPos, CounterReach(me, skills));
         bool settled = QABoss103PushNorthCounter.IsSettled(_pnStillTicks, _pnStillSince >= 0.0 ? now - _pnStillSince : 0.0);
-        return QABoss103PushNorthCounter.ShouldPress(now, _counterDeadline, spot, settled, castable && CounterReady(me, myPos));
+        return QABoss103PushNorthCounter.ShouldPress(now, _counterDeadline, settled);
     }
 
     /// <summary>북진 성공 굴림을 눌렀고(대쉬 간파 아님) 판정 + 잠깐 전이다 — 멈춰 있는다.</summary>

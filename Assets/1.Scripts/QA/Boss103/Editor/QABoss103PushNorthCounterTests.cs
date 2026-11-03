@@ -129,24 +129,6 @@ public sealed class QABoss103PushNorthCounterTests
     }
 
     [Test]
-    public void 정면_한도는_서버_값보다_15도_안쪽_절반보다_좁히지_않는다()
-    {
-        Assert.AreEqual(75.0, QABoss103PushNorthCounter.FrontLimit(90.0, true), E, "dev No23 = 90");
-        Assert.AreEqual(45.0, QABoss103PushNorthCounter.FrontLimit(60.0, true), E, "코드 기본 60");
-        Assert.AreEqual(10.0, QABoss103PushNorthCounter.FrontLimit(20.0, true), E, "20 − 15 = 5 < 절반 10");
-        Assert.AreEqual(180.0, QABoss103PushNorthCounter.FrontLimit(90.0, false), E, "정면 판정 꺼짐");
-    }
-
-    [Test]
-    public void 누름_자리는_실제_거리와_좁힌_정면()
-    {
-        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(1.2, 1.75, 70.0, 90.0, true));
-        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(1.73, 1.75, 2.0, 90.0, true), "사거리 끝 2cm = 지난 배치의 누름 자리");
-        Assert.IsFalse(QABoss103PushNorthCounter.InPressSpot(1.0, 1.75, 80.0, 90.0, true), "정면 한도 75 밖");
-        Assert.IsTrue(QABoss103PushNorthCounter.InPressSpot(1.0, 1.75, 170.0, 90.0, false), "정면 판정 꺼짐");
-    }
-
-    [Test]
     public void 멈춤은_틱과_시간_둘_다()
     {
         Assert.IsTrue(QABoss103PushNorthCounter.IsSettled(2, 0.1));
@@ -155,15 +137,14 @@ public sealed class QABoss103PushNorthCounterTests
     }
 
     [Test]
-    public void 누름_판단_자리_멈춤_마감_앞_사거리_마감()
+    public void 누름_판단_예측_강이면_멈춤_또는_마감_앞()
     {
+        // 할 일 193 — 호출 전제 = 예측 강 + 시전 가능. 봇 전용 누름 자리·사거리 판정은 없다.
         const double deadline = 12.6;
-        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true, true, true), "자리 + 멈춤");
-        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true, false, true), "아직 움직이는 중");
-        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, false, true, true), "사거리 안이어도 여유 자리 전엔 기다린다");
-        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false, false, true), "마감 0.4초 앞부터 사거리 안이면");
-        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false, false, false), "사거리 밖은 마감까지 기다린다");
-        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline, deadline, false, false, false), "마감 = 조건 없이 1회(기존 규칙)");
+        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, true), "멈춤 충분");
+        Assert.IsFalse(QABoss103PushNorthCounter.ShouldPress(11.0, deadline, false), "아직 움직이는 중");
+        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline - 0.3, deadline, false), "마감 0.4초 앞부터는 멈추지 못했어도");
+        Assert.IsTrue(QABoss103PushNorthCounter.ShouldPress(deadline + 1.0, deadline, false), "마감 뒤도(예측이 창 닫힘이면 호출측이 포기)");
     }
 
     [Test]

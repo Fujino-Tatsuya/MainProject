@@ -93,7 +93,10 @@ public static class QABoss103RunCsv
                 stats.Finish();
                 foreach (QABoss103CharStats c in stats.Chars)
                     Debug.Log($"{Tag} event=bot_fidelity run={cfg.Run} retry={cfg.Retry} character={c.Character} part={(c.PartPresent ? "true" : "false")} " +
-                              $"dodgeRolls={c.DodgeRolls} dodgeSuccess={c.DodgeSuccess} counterHitRolls={c.CounterHitRolls} counterHitSuccess={c.CounterHitSuccess}");
+                              $"dodgeRolls={c.DodgeRolls} dodgeSuccess={c.DodgeSuccess} counterHitRolls={c.CounterHitRolls} counterHitSuccess={c.CounterHitSuccess} " +
+                              // 할 일 193 — 간파 신고 경로(191 QA 기록 → 판 파일 claim)
+                              $"claims={c.Claims.Attempts} claimJudgeOk={c.Claims.JudgeSuccess} approvedFirst={c.Claims.ApprovedFirst} " +
+                              $"approvedSimul={c.Claims.ApprovedSimultaneous} rejected={c.Claims.Rejected} {c.Claims.RejectSummary()} noResponse={c.Claims.NoResponse}");
             }
 
             QABoss103RunMeta meta = Meta(cfg, rec, bossHpPct, startedAt);

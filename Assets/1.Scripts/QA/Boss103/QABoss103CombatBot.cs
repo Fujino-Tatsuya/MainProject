@@ -547,6 +547,7 @@ public sealed partial class QABoss103CombatBot : MonoBehaviour
 
     private void OnDestroy()
     {
+        InterruptQaRecorder.RecordCompleted -= OnInterruptQaRecord;
         StopHold();
         ReleaseGuard();
         _sensor.Unbind();
