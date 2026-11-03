@@ -38,21 +38,19 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
     void IInterruptOwnerCueSink.OwnerJudgeSucceeded(in InterruptOwnerCue cue)
     {
         ulong viewer = _networkManager != null ? _networkManager.LocalClientId : 0;
-        bool suppressSequence = PlaysSuppressFlash(SlowMotionPurpose.Success, _ownerPredictedTier);
+        InterruptSuccessLook look = SuccessLook(_ownerPredictedTier);
+        InterruptVariant variant = InterruptPresentationTierRules.VariantOf(cue.ViaDash);
         uint triggerId = OwnerJudgeCues.JudgeSucceeded(viewer, FlashPoint(cue.FlashPosition), cue.FlashPosition,
-            Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, suppressSequence);
+            Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, look, variant);
         LastOwnerTier = _ownerPredictedTier;
-        if (suppressSequence)
-            BeginSuppressFlash(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, true,
-                InterruptPresentationTierRules.VariantOf(cue.ViaDash)), true);
-    }
+        if (look == InterruptSuccessLook.SuppressSequence)
+            BeginSuppressFlash(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, true, variant), true);    }
 
     void IInterruptOwnerCueSink.OwnerEnded(InterruptOwnerEndReason reason)
     {
         // 서버 거부는 이미 튼 제압 섬광 시퀀스까지 끈다(②~⑥ 와 같은 규칙). 판정 실패·끊김은 결론 전 시도만 걷는다(Q3 — 그 순간 종료).
         if (reason == InterruptOwnerEndReason.ServerRejected && _ownerJudgeCues != null && _ownerJudgeCues.LocalSuccessPlayedSuppress)
-            _suppressFlash?.Stop();
-        OwnerJudgeCues.Ended(reason, Time.unscaledTime);
+            _suppressFlash?.Stop();        OwnerJudgeCues.Ended(reason, Time.unscaledTime);
         LastOwnerTier = InterruptPresentationTier.Fail;
     }
 

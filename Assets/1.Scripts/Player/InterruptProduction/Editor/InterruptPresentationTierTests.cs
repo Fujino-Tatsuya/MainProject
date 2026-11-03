@@ -137,9 +137,84 @@ public sealed class InterruptPresentationTierTests
         Assert.IsFalse(director.TierProfile(InterruptPresentationTier.Normal).ownerDim, "Q1 일반 = 암전 없음");
         Assert.IsFalse(director.TierProfile(InterruptPresentationTier.Dash).ownerDim, "Q1 대쉬 = 암전 없음");
         Assert.IsTrue(director.TierProfile(InterruptPresentationTier.Suppress).ownerDim, "Q1 제압 = 오너 암전");
-        Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Normal).flash, "Q4 보류 = ②~⑥");
-        Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Dash).flash, "Q5 보류 = ②~⑥");
+        Assert.AreEqual(InterruptTierFlash.HitLight, director.TierProfile(InterruptPresentationTier.Normal).flash, "194 Q12 일반 = V1");
+        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, director.TierProfile(InterruptPresentationTier.Dash).flash, "194 Q12 대쉬 = V2");
+        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, director.TierProfile(InterruptPresentationTier.Normal).darkAdapt, "194 Q12 암순응 = 가");
+        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, director.TierProfile(InterruptPresentationTier.Dash).darkAdapt, "194 Q12 암순응 = 가");
         Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash);
+    }
+
+    // ---- 194. 단계 × 버전 선택표 ----
+
+    [TestCase(InterruptTierFlash.HitFlash, true, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    [TestCase(InterruptTierFlash.HitLight, true, true, true, ExpectedResult = InterruptSuccessLook.HitLight)]
+    [TestCase(InterruptTierFlash.HitLight, true, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)]   // 연출 없음 → V0
+    [TestCase(InterruptTierFlash.HitLightWhiteout, false, false, true, ExpectedResult = InterruptSuccessLook.HitLightWhiteout)]
+    [TestCase(InterruptTierFlash.HitLightWhiteout, true, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    [TestCase(InterruptTierFlash.SuppressSequence, true, true, false, ExpectedResult = InterruptSuccessLook.SuppressSequence)]
+    [TestCase(InterruptTierFlash.SuppressSequence, false, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)] // A6 끔
+    [TestCase(InterruptTierFlash.SuppressSequence, true, false, true, ExpectedResult = InterruptSuccessLook.HitFlash)] // 컷 없음
+    public InterruptSuccessLook 버전_선택표(InterruptTierFlash flash, bool suppressOn, bool hasSequence, bool hasHitLight) =>
+        InterruptPresentationTierRules.SelectSuccessLook(new InterruptTierProfile(false, flash), suppressOn, hasSequence, hasHitLight);
+
+    [Test]
+    public void 설정이_없으면_V0()
+    {
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, InterruptPresentationTierRules.SelectSuccessLook(null, true, true, true));
+    }
+
+    [TestCase(InterruptSuccessLook.HitLightWhiteout, true, 3, ExpectedResult = 3)]
+    [TestCase(InterruptSuccessLook.HitLightWhiteout, false, 3, ExpectedResult = 0)] // 팀원 화면 = 화이트아웃 없음
+    [TestCase(InterruptSuccessLook.HitLight, true, 3, ExpectedResult = 0)]
+    [TestCase(InterruptSuccessLook.HitLightWhiteout, true, -1, ExpectedResult = 0)]
+    public int V2_화이트아웃은_본인_화면만(InterruptSuccessLook look, bool viewerIsCaster, int frames) =>
+        InterruptPresentationTierRules.WhiteoutFrames(look, viewerIsCaster, frames);
+
+    [TestCase(InterruptSuccessLook.HitLight, ExpectedResult = true)]
+    [TestCase(InterruptSuccessLook.HitLightWhiteout, ExpectedResult = true)]
+    [TestCase(InterruptSuccessLook.HitFlash, ExpectedResult = false)]
+    [TestCase(InterruptSuccessLook.SuppressSequence, ExpectedResult = false)]
+    public bool 적중_라이트_버전(InterruptSuccessLook look) => InterruptPresentationTierRules.UsesHitLight(look);
+
+    [Test]
+    public void 판정_성공_V0_섬광_순간_사건은_대쉬_종류를_싣는다()
+    {
+        // 194 — 오너 판정 cue 경로가 LocalSuccess 에 종류를 안 실어 대쉬가 일반 단계로 계산되던 것.
+        var sm = new InterruptOwnerPresentation(new Timing());
+        sm.Predict(InterruptAttemptForecast.Strong, null, 0f, Vector3.forward, dims: false);
+        var moments = new List<InterruptHitFlashMoment>();
+        var flash = new InterruptHitFlashSequencer(null, null, moments.Add);
+        var cues = new InterruptOwnerJudgeCuePlayer(() => sm, () => flash, null);
+        cues.Attempted();
+
+        cues.JudgeSucceeded(1, Vector3.up, Vector3.zero, 0.1f, 0.1f, 1, InterruptSuccessLook.HitFlash, InterruptVariant.Dash);
+        flash.Tick(1f, 100);
+
+        Assert.AreEqual(1, moments.Count);
+        Assert.AreEqual(InterruptVariant.Dash, moments[0].Event.Variant);
+        Assert.AreEqual(InterruptPresentationTier.Dash, moments[0].Event.Tier);
+    }
+
+    [Test]
+    public void 판정_성공이_적중_라이트면_섬광_예약_없이_로컬_발동_번호를_돌려준다()
+    {
+        var sm = new InterruptOwnerPresentation(new Timing());
+        sm.Predict(InterruptAttemptForecast.Strong, null, 0f, Vector3.forward, dims: false);
+        int flashAsked = 0;
+        var cues = new InterruptOwnerJudgeCuePlayer(() => sm, () =>
+        {
+            flashAsked++;
+            return null;
+        }, null);
+        cues.Attempted();
+
+        uint id = cues.JudgeSucceeded(1, Vector3.up, Vector3.zero, 0.1f, 0.1f, 1, InterruptSuccessLook.HitLight, InterruptVariant.Normal);
+
+        Assert.AreNotEqual(0u, id);
+        Assert.AreEqual(0, flashAsked, "②~⑥ 진행기를 건드리지 않는다");
+        Assert.IsFalse(cues.LocalSuccessPlayedSuppress);
+        Assert.AreEqual(InterruptSuccessLook.HitLight, cues.LocalSuccessLook);
+        Assert.IsTrue(cues.ConsumeServerStarted(SlowMotionPurpose.Success), "뒤이은 내 서버 성공은 한 번 삼킨다");
     }
 
     [Test]
@@ -215,7 +290,7 @@ public sealed class InterruptPresentationTierTests
         }, null);
         cues.Attempted();
 
-        uint id = cues.JudgeSucceeded(1, Vector3.up, Vector3.zero, 0.1f, 0.1f, 1, suppressSequence: true);
+        uint id = cues.JudgeSucceeded(1, Vector3.up, Vector3.zero, 0.1f, 0.1f, 1, InterruptSuccessLook.SuppressSequence);
 
         Assert.AreNotEqual(0u, id);
         Assert.AreEqual(id, sm.SuccessTriggerId);

@@ -208,10 +208,10 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
     // 실패 = 단계 설정 없음(약 예측 = 약한 줌만, 강 예측의 판정 실패 = 그 순간 연출 종료 — 191 D4).
     [Header("간파 연출 단계(할 일 192)")]
-    [Tooltip("간파(근접) 성공 — Q1 암전 없음, 섬광 = 기존 ②~⑥(Q4 포인트라이트 섬광 보류 자리)")]
-    [DataTableIgnore, SerializeField] private InterruptTierProfile normalTier = new InterruptTierProfile(false, InterruptTierFlash.HitFlash);
-    [Tooltip("대쉬 간파 성공 — Q1 암전 없음, 섬광 = 기존 ②~⑥(Q5 암순응·블룸 섬광 보류 자리)")]
-    [DataTableIgnore, SerializeField] private InterruptTierProfile dashTier = new InterruptTierProfile(false, InterruptTierFlash.HitFlash);
+    [Tooltip("간파(근접) 성공 — Q1 암전 없음, 섬광 기본 = V1 적중 라이트 연출·암순응 가(할 일 194 Q12)")]
+    [DataTableIgnore, SerializeField] private InterruptTierProfile normalTier = new InterruptTierProfile(false, InterruptTierFlash.HitLight);
+    [Tooltip("대쉬 간파 성공 — Q1 암전 없음, 섬광 기본 = V2 적중 라이트 연출 + 화이트아웃·암순응 가(할 일 194 Q12)")]
+    [DataTableIgnore, SerializeField] private InterruptTierProfile dashTier = new InterruptTierProfile(false, InterruptTierFlash.HitLightWhiteout);
     [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 오너 암전 + 섬광 시퀀스 + 강한 줌 + 제압 암순응")]
     [DataTableIgnore, SerializeField] private InterruptTierProfile suppressTier = new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence);
 
@@ -268,6 +268,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>이 단계의 성공이 제압 간파 섬광 시퀀스인가(할 일 192) — 단계 설정·A6 칸·컷 데이터.</summary>
     public bool PlaysSuppressFlash(SlowMotionPurpose purpose, InterruptPresentationTier tier) =>
         InterruptPresentationTierRules.PlaysSuppressSequence(purpose, TierProfile(tier), suppressFlash, suppressFlashSequence != null);
+
+    /// <summary>이 단계의 성공에서 트는 섬광(할 일 194) — 단계 설정·A6 칸·컷 데이터·적중 라이트 연출 유무. 사건마다 읽는다.</summary>
+    public InterruptSuccessLook SuccessLook(InterruptPresentationTier tier) =>
+        InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), suppressFlash, suppressFlashSequence != null, HasHitLight);
+
+    // 적중 라이트 연출(V1·V2)을 틀 수 있는가 — 단계 2 에서 연출 데이터·프리팹을 잇는다. 그 전까지는 V0 로 돌아간다.
+    private bool HasHitLight => false;
 
     /// <summary>단계 설정(할 일 192). 실패는 설정이 없다(null).</summary>
     public InterruptTierProfile TierProfile(InterruptPresentationTier tier)
