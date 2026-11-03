@@ -2698,6 +2698,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 6690313834017925644}
+  extraRoots:
+  - {fileID: 5308830710108680609}
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720127, type: 2}
   speedLines: {fileID: 7301928374650192902}
