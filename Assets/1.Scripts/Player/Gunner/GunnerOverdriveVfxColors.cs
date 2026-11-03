@@ -11,11 +11,11 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "GunnerOverdriveVfxColors", menuName = "Effects/Gunner Overdrive Vfx Colors")]
 public sealed class GunnerOverdriveVfxColors : ScriptableObject
 {
-    [Tooltip("과열 1단계 — 주황")]
+    [Tooltip("과열 1단계")]
     [SerializeField] private Color stage1 = new Color(1f, 0.5f, 0.1f);
-    [Tooltip("과열 2단계 — 주홍")]
+    [Tooltip("과열 2단계")]
     [SerializeField] private Color stage2 = new Color(1f, 0.28f, 0.06f);
-    [Tooltip("과열 3단계 — 진홍")]
+    [Tooltip("과열 3단계")]
     [SerializeField] private Color stage3 = new Color(0.9f, 0.05f, 0.08f);
     [Tooltip("원래 채도에 곱하는 값(1 = 그대로). 흰 심은 이 값과 무관하게 흰 채로 남는다")]
     [SerializeField, Min(0f)] private float saturation = 1f;
