@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: InterruptHitLightLook_V3
   m_EditorClassIdentifier: Assembly-CSharp::InterruptHitLightLook
   lightColor: {r: 1, g: 0.6, b: 0.3, a: 1}
-  lightIntensity: 2
-  lightRange: 3
-  lightShadows: 0
+  lightIntensity: 10
+  lightRange: 100
+  lightShadows: 2
   lightDuration: 0.9
   lightCurve:
     serializedVersion: 2
@@ -193,3 +193,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   whiteoutFrames: 0
+  gapRaySpread: 20
+  gapRayCount: 5
+  gapSparkSpread: 30
+  gapStreakAxis: 0
