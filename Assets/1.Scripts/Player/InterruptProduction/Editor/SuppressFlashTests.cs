@@ -454,7 +454,7 @@ public sealed class SuppressFlashTests
         Assert.AreEqual(SuppressFlashMaskMode.FullScreen, output.Mode, "기본 = 전체 화면");
         Assert.AreEqual(SuppressFlashMaskMode.FullScreen, player.MaskMode);
 
-        player.Begin(1f, Vector3.zero, null, 0, Vector3.zero, SuppressFlashMaskMode.TargetInterior);
+        player.Begin(1f, Vector3.zero, null, SuppressFlashMaskMode.TargetInterior);
         Assert.AreEqual(SuppressFlashMaskMode.TargetInterior, output.Mode);
         Assert.AreEqual(SuppressFlashMaskMode.TargetInterior, player.MaskMode);
     }

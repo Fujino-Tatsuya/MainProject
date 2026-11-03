@@ -893,7 +893,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         CollectSuppressSubjects(e.CasterClientId, e.TargetPosition, _suppressSubjects, _suppressTargets);
         SuppressFlashMaskMode mode = SuppressFlashRules.SelectMaskMode(suppressFlashTargetOnly, _suppressTargets.Count > 0);
         SuppressFlashRules.SelectMaskRoots(mode, _suppressSubjects, _suppressTargets, _suppressMaskRoots);
-        SuppressFlash.Begin(Time.unscaledTime, point, _suppressMaskRoots, e.CasterClientId, e.TargetPosition, mode);
+        SuppressFlash.Begin(Time.unscaledTime, point, _suppressMaskRoots, mode);
 
         // 오너 암전 걷기 — 지금 성공 단계의 발동 번호(서버 성공 = 슬로우 번호, 오너 판정 cue = 로컬 번호)로.
         if (viewerIsCaster && _ownerPresentation != null)

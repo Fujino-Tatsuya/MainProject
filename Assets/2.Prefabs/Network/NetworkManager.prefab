@@ -209,9 +209,6 @@ MonoBehaviour:
   luminanceThreshold: 0.8
   thresholdSoftness: 0.3
   maxDarken: 0.85
-  revealCenter: 0
-  revealRadius: 0.18
-  revealSoftness: 0.1
 --- !u!114 &1635166641757817886
 MonoBehaviour:
   m_ObjectHideFlags: 0

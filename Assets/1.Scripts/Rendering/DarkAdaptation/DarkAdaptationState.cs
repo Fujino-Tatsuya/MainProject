@@ -14,12 +14,6 @@ public static class DarkAdaptationState
     public static float ThresholdSoftness = 0.3f;
     /// <summary>강도 1 에서 어두운 픽셀을 낮추는 최대 비율 [0, 1].</summary>
     public static float MaxDarken = 0.85f;
-    /// <summary>원형 중심(뷰포트 0~1).</summary>
-    public static Vector2 RevealCenter = new Vector2(0.5f, 0.5f);
-    /// <summary>원형 반경(화면 높이 비율). 0 = 원형 끔.</summary>
-    public static float RevealRadius;
-    /// <summary>원형 가장자리 부드러움(화면 높이 비율).</summary>
-    public static float RevealSoftness = 0.1f;
 
     // ---- 마스크 암전(오너, 할 일 132) — InterruptOwnerDimOutput 이 쓴다 ----
 
@@ -35,7 +29,6 @@ public static class DarkAdaptationState
     public static void Clear()
     {
         Intensity = 0f;
-        RevealRadius = 0f;
     }
 
     public static void ClearMask()

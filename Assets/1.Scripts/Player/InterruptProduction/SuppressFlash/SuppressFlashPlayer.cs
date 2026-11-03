@@ -264,7 +264,7 @@ public interface ISuppressFlashOutput
 public interface ISuppressDarkAdaptOutput
 {
     /// <summary>이 어둡힘을 그대로 붙잡는다(곡선 없음). 컷이 바뀔 때마다 부른다.</summary>
-    void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition);
+    void ShowDarkAdaptCut(float darkness);
 
     /// <summary>즉시 0(컷 끝·강제 리셋).</summary>
     void ClearDarkAdapt();
@@ -286,8 +286,6 @@ public sealed class SuppressFlashPlayer
     private SuppressFlashSequence _playing;
     private float _startTime;
     private Vector3 _worldCenter;
-    private ulong _casterClientId;
-    private Vector3 _targetPosition;
     private float _darkAdaptStart;
 
     public SuppressFlashPlayer(Func<SuppressFlashSequence> sequence, Func<bool> reduceFlash, ISuppressFlashOutput output,
@@ -333,10 +331,8 @@ public sealed class SuppressFlashPlayer
     /// <summary>
     /// 재생 시작 — <paramref name="now"/> = 실제 시간(Time.unscaledTime). 컷 데이터가 없으면 false(아무것도 안 그림).
     /// <paramref name="subjects"/> = 마스크 루트(<paramref name="maskMode"/> 에 맞게 고른 것).
-    /// <paramref name="casterClientId"/>·<paramref name="targetPosition"/> = 시퀀스 뒤 제압 암순응(할 일 192).
     /// </summary>
     public bool Begin(float now, Vector3 worldCenter, IReadOnlyList<GameObject> subjects,
-        ulong casterClientId = 0, Vector3 targetPosition = default,
         SuppressFlashMaskMode maskMode = SuppressFlashMaskMode.FullScreen)
     {
         SuppressFlashSequence sequence = _sequence?.Invoke();
@@ -347,8 +343,6 @@ public sealed class SuppressFlashPlayer
         _playing = sequence;
         _startTime = now;
         _worldCenter = worldCenter;
-        _casterClientId = casterClientId;
-        _targetPosition = targetPosition;
         MaskMode = maskMode;
         IsPlaying = true;
         _output?.SetSubjects(subjects, maskMode);
@@ -418,7 +412,7 @@ public sealed class SuppressFlashPlayer
             return;
 
         DarkAdaptCutIndex = index;
-        _darkAdaptOutput?.ShowDarkAdaptCut(darkness, _casterClientId, _targetPosition);
+        _darkAdaptOutput?.ShowDarkAdaptCut(darkness);
     }
 
     private void StopDarkAdapt()

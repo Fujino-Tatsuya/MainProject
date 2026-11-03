@@ -341,7 +341,7 @@ public sealed class InterruptPresentationTierTests
     {
         public readonly List<float> Cuts = new List<float>();
         public int Clears;
-        public void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition) => Cuts.Add(darkness);
+        public void ShowDarkAdaptCut(float darkness) => Cuts.Add(darkness);
         public void ClearDarkAdapt() => Clears++;
     }
 
@@ -381,7 +381,7 @@ public sealed class InterruptPresentationTierTests
         var dark = new FakeDarkAdapt();
         var player = new SuppressFlashPlayer(() => sequence, () => false, flash, dark);
 
-        player.Begin(0f, Vector3.zero, null, 4, Vector3.one);
+        player.Begin(0f, Vector3.zero, null);
         player.Tick(end - 0.01f);
         Assert.IsTrue(player.IsPlaying);
         Assert.IsFalse(player.DarkAdaptActive);
