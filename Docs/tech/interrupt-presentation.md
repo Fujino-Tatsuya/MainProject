@@ -859,7 +859,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 동작 변화 0: 처음 값 = 이관 전 값(대쉬 = 복사). EditMode `InterruptProductionPrefabTests`(SO 값 = 옛 프리팹 값·프리팹 디렉터가 고르는 프로필 동일)·`InterruptProductionStageTests`(대쉬 시도 → 대쉬 프로필, 근접 → 기존)로 고정.
 - 대쉬 간파는 대시 남은 시간이 유지(hold) 구간을 먹는다(조사 `194-followup2-slowmo-dash-attempt.md` §2) — ① hold 를 따로 튜닝하는 자리. 체감은 🟧 Play 로 확인.
 
-#### 🔴 데이터 테이블 — 이 브랜치 development 병합 당일 병합 Export 필수
+#### ✅ 데이터 테이블 — 병합 Export 완료(SVN r580, 2026-11-03 — 버려진 값 26·새 42, 아래 목록과 정확히 같음)
 
 칸을 SO 로 옮겨 xlsx `SlowMotion` 시트의 **대상 열이 바뀐다**(`NetworkManager`·`CameraSwitcher` → `InterruptSlowMotionSettings`). 필드 이름은 그대로라 값 의미는 같다. **xlsx 는 이 브랜치에서 고치지 않았다.**
 
