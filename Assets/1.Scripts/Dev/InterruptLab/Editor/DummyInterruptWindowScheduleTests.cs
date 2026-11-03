@@ -2,7 +2,7 @@ using NUnit.Framework;
 
 /// <summary>
 /// 할 일 139 단계 2 — 랩 허수아비 창 모드(<see cref="DummyInterruptWindowSchedule"/>)·순환 게이트 훅
-/// (<see cref="TrainingDummyInterruptCycle.HoldClosed"/>)·예측기 관측 초기화(<see cref="InterruptWindowHistory.ClearKeepingLatest"/>).
+/// (<see cref="TrainingDummyInterruptCycle.HoldClosed"/>)·열림 길이(창 시간표 닫힘 예정, 할 일 191 5단계 — 옛 예측기 관측 초기화는 삭제).
 /// 길이는 2 진수로 딱 떨어지는 값을 쓴다(0.5/1.5/0.25).
 /// </summary>
 public sealed class DummyInterruptWindowScheduleTests
@@ -311,81 +311,14 @@ public sealed class DummyInterruptWindowScheduleTests
         Assert.IsTrue(c.IsInterruptible);
     }
 
-    // ─── 예측기 관측 초기화 ────────────────────────────────────────────
-
-    static InterruptWindowHistory OpenedAndClosedTwice()
-    {
-        var h = new InterruptWindowHistory();
-        h.Record(1.0, true);
-        h.Record(1.5, false);
-        h.Record(3.0, true);
-        h.Record(3.5, false);
-        h.Record(5.0, true); // 지금 열림
-        return h;
-    }
+    // ─── 창 길이(할 일 191 5단계 — 매니저 창 시간표의 닫힘 예정) ──────────
 
     [Test]
-    public void 초기화하면_추정_길이를_모른다()
+    public void 열림_길이는_무기한_닫힘0이면_무한이고_주기면_열림_길이()
     {
-        InterruptWindowHistory h = OpenedAndClosedTwice();
-        Assert.IsTrue(h.TryGetTypicalOpenDuration(out double before));
-        Assert.AreEqual(0.5, before, 1e-9);
-
-        h.ClearKeepingLatest();
-        Assert.IsFalse(h.TryGetTypicalOpenDuration(out _));
-        h.Estimate(5.25, true, out float elapsed, out float expected);
-        Assert.AreEqual(-1f, expected, Eps);
-        Assert.AreEqual(0.25f, elapsed, Eps); // 지금 열림·경과는 남는다
-    }
-
-    [Test]
-    public void 초기화_뒤_마지막_전이만_남는다()
-    {
-        InterruptWindowHistory h = OpenedAndClosedTwice();
-        h.ClearKeepingLatest();
-        Assert.AreEqual(1, h.Count);
-        Assert.AreEqual(InterruptWindowState.Open, h.StateAt(5.0));
-        Assert.AreEqual(InterruptWindowState.Unknown, h.StateAt(4.0)); // 지운 구간은 추측하지 않는다
-    }
-
-    [Test]
-    public void 초기화_뒤_새_관측으로만_추정한다()
-    {
-        InterruptWindowHistory h = OpenedAndClosedTwice();
-        h.ClearKeepingLatest();
-        h.Record(5.25, false);
-        h.Record(7.0, true);
-        h.Record(8.0, false);
-        Assert.IsTrue(h.TryGetTypicalOpenDuration(out double typical));
-        Assert.AreEqual(0.625, typical, 1e-9); // (0.25 + 1.0) / 2 — 지우기 전 0.5 들은 빠짐
-    }
-
-    [Test]
-    public void 링버퍼가_돈_뒤에도_초기화는_마지막_전이를_남긴다()
-    {
-        var h = new InterruptWindowHistory(4);
-        for (int i = 0; i < 9; i++)
-            h.Record(i, i % 2 == 0); // 마지막 = 8, 열림
-        h.ClearKeepingLatest();
-        Assert.AreEqual(1, h.Count);
-        Assert.AreEqual(InterruptWindowState.Open, h.StateAt(8.5));
-        h.Record(9.5, false);
-        Assert.IsTrue(h.TryGetTypicalOpenDuration(out double typical));
-        Assert.AreEqual(1.5, typical, 1e-9);
-    }
-
-    [Test]
-    public void 빈_기록_초기화는_아무것도_안_한다()
-    {
-        var h = new InterruptWindowHistory();
-        h.ClearKeepingLatest();
-        Assert.AreEqual(0, h.Count);
-        Assert.IsFalse(h.TryGetTypicalOpenDuration(out _));
-    }
-
-    [Test]
-    public void 전역_초기화_진입점은_세션_없이도_안전()
-    {
-        Assert.DoesNotThrow(InterruptWindowReplicaTracker.ResetObservations);
+        Assert.IsTrue(float.IsPositiveInfinity(new DummyInterruptWindowSchedule().OpenWindowLength));
+        Assert.IsTrue(float.IsPositiveInfinity(Periodic(0.5f, 0f).OpenWindowLength));
+        Assert.AreEqual(0.5f, Periodic(0.5f, 1.5f).OpenWindowLength, Eps);
+        Assert.AreEqual(0f, Periodic(0f, 1.5f).OpenWindowLength, Eps);
     }
 }

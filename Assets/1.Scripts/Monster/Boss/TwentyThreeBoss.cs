@@ -15,7 +15,8 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
+public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptClaimTarget,
+    IInterruptSuppressForecast
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -102,6 +103,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     readonly BossCounterWindupGate _counterWindup = new BossCounterWindupGate();
     bool _warnedCounterTimerBeforeAnimation;
     float _counterWindupStartedAt;   // 진단용 — 준비 신호가 실제로 몇 초 만에 오는지 재려고 둔다
+    float _attackStartedAt = -1f;    // [서버] 지금 공격의 StartAttack 시각(Time.time) — 간파 창 시간표(할 일 191) 알림용
 
     // 자세 홀드는 **각 피어의 로컬 상태**다(애니메이터는 복제되지 않는다).
     // 서버가 RPC 로 걸고 풀며, 아래 두 값은 그 피어에서만 의미가 있다.
@@ -1547,6 +1549,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         BossAttackEntry e = EntryFor(CurrentAttackSlot);
         _currentEntry = e;
+        _attackStartedAt = Time.time;   // 간파 창 시간표(할 일 191)의 공격 시작 시각
 
         // 즉시 연결의 후속 타인가 — ConsumeCombo 가 세운 표시를 이 공격 몫으로 옮긴다(CounterWindowDuration 이 base 전에 읽는다).
         _chainedAttack = _chainNextPending;
@@ -6003,7 +6006,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         // 🔴 조건은 base 호출 **전에** 스냅샷한다. base 가 사망·상태를 바꿀 수 있어서,
         //    뒤에서 읽으면 이미 닫힌 창을 보게 된다.
+        // 세션 중엔 간파 성공을 피격으로 정하지 않는다 — 오너 신고를 InterruptManager 가 검증해 IInterruptClaimTarget 으로 넘긴다(할 일 191).
         bool counter = IsServer
+                       && !InterruptManager.ServerVerifiesClaims
                        && _counterWindow.Value
                        && !CounterBlockedByState          // 취약·제압 중 간파 실패(기획 간파 §8)
                        && IsInterruptAttack(attackInfo)
@@ -6027,7 +6032,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
         // 인터럽트 히트에서만 돌므로 조용하다. 취약·제압 중에는 실패가 정상이라 찍지 않는다.
-        if (IsInterruptAttack(attackInfo) && !counter && !CounterBlockedByState)
+        if (IsInterruptAttack(attackInfo) && !counter && !CounterBlockedByState && !InterruptManager.ServerVerifiesClaims)
         {
             Debug.LogWarning(
                 $"[23호] 인터럽트가 카운터로 성립하지 않았다 — " +
@@ -6072,18 +6077,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (counter && resolved && State != MonsterState.Dead)
         {
-            _fightCounters++;
-            _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 ReceiveAttack 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
-            EnterCounterSuccess();
-            // 간파 피격 클립을 트는 그로기일 때만 두 발짝 뒤로(경석 10-29) — 제압·기믹 처리(릴레이·구출 등)는 그 자리.
-            if (_parryHitGroggy.Value && State == MonsterState.Groggy)
-                StartParryRetreat();
+            ApplyCounterSuccessEffect();
             CombatStatsEvents.RaiseServerCounterSucceeded(this, GetAttackerClientId(hitContext)); // 결과 화면 통계(판정 무관)
-
-            // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
-            //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
-            //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
-            PlayInterruptFlashRpc();
         }
         else if (vulnerableHit && resolved && State != MonsterState.Dead)
         {
@@ -6109,6 +6104,38 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         return resolved;
     }
+
+    // [서버] 간파 성공의 보스 효과(할 일 191 D9 — 창마다 1회). 오프라인 피격 판정과 세션 신고 승인이 같은 처리를 쓴다.
+    // 결과 화면 통계(시전자 개인 기록)는 여기 없다 — 호출측이 시전자마다 올린다.
+    void ApplyCounterSuccessEffect()
+    {
+        _fightCounters++;
+        _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별(오프라인) — 피격 경로에선 이 ReceiveAttack 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
+        EnterCounterSuccess();
+        // 간파 피격 클립을 트는 그로기일 때만 두 발짝 뒤로(경석 10-29) — 제압·기믹 처리(릴레이·구출 등)는 그 자리.
+        if (_parryHitGroggy.Value && State == MonsterState.Groggy)
+            StartParryRetreat();
+
+        // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
+        //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
+        //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
+        PlayInterruptFlashRpc();
+    }
+
+    // ─── 간파 신고 승인(할 일 191 — InterruptManager 가 검증한 뒤 부른다) ───
+    // 범위·정면각·창·간파 불가·지목자는 매니저가 판정 시각 이력으로 이미 봤다. 여기는 그 뒤 바뀔 수 있는 대상 규칙만 본다.
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) =>
+        IsServer && State != MonsterState.Dead && RaidGimmickAcceptsCounter(casterClientId);   // 릴레이 잠금 · 밀어내기 1회 · 연쇄 지목자
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster)
+    {
+        if (!IsServer || State == MonsterState.Dead) return;
+        _raidCounterClientId = casterClientId;   // 기믹 처리(OnRaidGimmickCounter)가 읽는다
+        ApplyCounterSuccessEffect();
+    }
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) =>
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, casterClientId);   // 결과 화면 통계 — 동시 성공자 각자
 
     /// <summary>
     /// [전 피어] 카운터 성공 섬광.
@@ -6265,6 +6292,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (outcome.IsSuppress)
         {
+            InterruptProductionDirector.ServerMarkSuppressInterrupt();   // 제압 간파 섬광 표식(할 일 179) — 연출만, 같은 프레임 성공 사건이 소비
             EnterSuppress("간파 성공", fromSegments: true);
             return;
         }
@@ -6409,6 +6437,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     /// <summary>취약·제압 중엔 간파 창·판정이 없다(기획 간파 §5.2 · §8).</summary>
     bool CounterBlockedByState => IsVulnerable || _suppressed;
+
+    /// <summary>간파 판정 스냅샷(할 일 191) — 서버 = 판정 원본, 클라 = 취약 복제값(제압은 복제값이 없다 — 제압 중엔 창이 안 열린다).</summary>
+    public override bool InterruptBlockedByState => IsServer ? CounterBlockedByState : _vulnerableVisual.Value;
 
     // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
     // _fightCounters 는 전투마다 0 으로 돌아가 쓰지 않는다 — 전후 비교 도중 리셋이 끼면 "실패"로 읽힌다.
@@ -7033,6 +7064,15 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// <summary>남은 제압 칸 0~<see cref="SuppressSegmentTotal"/>(전 피어 — 복제값). HUD 칸 줄이 읽는다.</summary>
     public int SuppressSegmentsRemaining => Mathf.Clamp(SuppressSegmentTotal - _suppressSegmentsUsed.Value, 0, SuppressSegmentTotal);
 
+    /// <summary>
+    /// [각 피어] 지금 간파가 성공하면 제압에 들어갈 것으로 보이는가(할 일 192 — 오너 시도 암전 예측). 간파 성공의 칸 분기(<see cref="BossCounterProgress.ResolveSegments"/>)와
+    /// 같은 계산을 복제된 남은 칸으로 한다. 기믹 중(칸 유지)은 서버만 안다 — 클라는 기믹 중 마지막 칸이면 제압으로 잘못 볼 수 있다(서버 표식이 바로잡는다).
+    /// </summary>
+    public bool WouldSuppressOnInterrupt =>
+        !IsInGimmick && SuppressSegmentsRemaining > 0 &&
+        BossCounterProgress.ResolveSegments(SuppressSegmentsRemaining, SuppressSegmentTotal,
+            _boss != null ? _boss.counterSegmentStep : 1, 0f, 0f).IsSuppress;
+
     /// <summary>[서버] 남은 칸을 사용한 칸으로 바꿔 복제한다.</summary>
     void SetSuppressSegmentsRemaining(int remaining) =>
         _suppressSegmentsUsed.Value = SuppressSegmentTotal - Mathf.Clamp(remaining, 0, SuppressSegmentTotal);
@@ -7067,9 +7107,37 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
 
-        if (_counterWindow.Value == open) return;
+        if (_counterWindow.Value == open)
+        {
+            // 열린 채 새 길이로 다시 열림(착지 창 도중 다음 콤보 타가 창을 여는 경우 등) — 복제값은 그대로지만 시간표는 새 창이다.
+            if (open && windowDuration > 0f) ReportCounterWindowToManager(true, windowDuration);
+            return;
+        }
         _counterWindow.Value = open;
         InterruptLagMonitor.RecordWindow(gameObject, open);   // 간파 지연 측정(측정만)
+        ReportCounterWindowToManager(open, windowDuration);
+    }
+
+    /// <summary>
+    /// [서버] 간파 창 시간표(할 일 191 <see cref="InterruptManager"/>) 알림 — 23호 창은 전부 <see cref="SetCounterWindow"/> 한 곳을 지나므로 여기 하나로 전 경로가 연결된다
+    /// (목록: Docs/tech/interrupt-client-judge.md '창 여닫는 곳 목록'). 데이터만 모은다 — 판정·연출 무영향.
+    /// 닫힘 예정 = 열 때 넘긴 길이(돌진 게이트 = 타이머 값, 애니 Hit 이 늦으면 실제 닫힘(TryReleaseCounterAttack) 때 늦은 닫힘으로 갱신 배포된다).
+    /// 길이를 안 넘긴 열림(잡기 붙잡은 뒤)은 길이 모름. 공격 시작 = 공격 상태면 StartAttack 시각, 기믹 창이면 열림 시각.
+    /// 지목자 = 연쇄 간파 기믹의 지목 대상(릴레이 명단·밀어내기는 지목자 없음).
+    /// </summary>
+    void ReportCounterWindowToManager(bool open, float windowDuration)
+    {
+        if (!open)
+        {
+            InterruptManager.ServerReportWindow(gameObject, false);
+            return;
+        }
+
+        ulong designee = _raidGimmick == RaidGimmick.Chain && _chainTarget != null
+            ? _chainTarget.OwnerClientId
+            : InterruptWindowRecord.NoDesignee;
+        float attackStart = State == MonsterState.Attack && !RaidGimmickActive ? _attackStartedAt : -1f;
+        InterruptManager.ServerReportWindow(gameObject, true, windowDuration, designee, attackStart);
     }
 
     /// <summary>

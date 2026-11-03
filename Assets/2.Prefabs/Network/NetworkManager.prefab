@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 2312403450460863167}
   - component: {fileID: 127159849850635136}
   - component: {fileID: 1635166641757817886}
+  - component: {fileID: 4191191191191191191}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -259,6 +260,7 @@ MonoBehaviour:
   targetFlash: 0
   darkAdaptation: 0
   ownerZoom: 1
+  hideDamageNumbers: 1
   showOwnerDim: 1
   showLightGather: 0
   showStarburst: 0
@@ -268,9 +270,40 @@ MonoBehaviour:
   showSettle: 0
   showWorldFlash: 0
   showHitLight: 0
+  ownerDimInDuration: 0.1
+  ownerDimOutDuration: 0.2
+  ownerDimColor: {r: 0, g: 0, b: 0, a: 1}
+  ownerDimOpacity: 1
   hitFlashTimeBase: 0
+  hitFlashStarburstFrames: 2
+  hitFlashWhiteoutFrames: 2
+  hitFlashSmearFrames: 2
+  hitFlashAberrationDuration: 0.1
+  hitFlashSettleDuration: 0.2
   hitFlashOverlayMaterial: {fileID: 2100000, guid: 4349f51186ca1d04dbc37ba5986e7e28, type: 2}
   hitFlashLensFlare: {fileID: 11400000, guid: fcf746276f0103f49bd87368ddf37519, type: 2}
+  hitFlashFlareIntensity: 1
+  hitFlashFlareScale: 1
+  hitFlashBlurStrength: 0.6
   hitFlashAberrationProfile: {fileID: 11400000, guid: 6288be39943ea2a4091062599015e694, type: 2}
   hitFlashBloomProfile: {fileID: 11400000, guid: 6f297671c6ab2794ca393a95b93e9294, type: 2}
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}
+  hitFlashWorldScale: 1
+  hitFlashHeightOffset: 1
+  suppressFlash: 1
+  suppressFlashSequence: {fileID: 11400000, guid: b8afdaadf21203446b47d2397f53d7ae, type: 2}
+  suppressFlashMaterial: {fileID: 2100000, guid: 5903fe22bc43ce7448fbc80af146a40b, type: 2}
+  reduceFlash: 0
+--- !u!114 &4191191191191191191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73c53e5bba5a22a43987d64f66ff1b4a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptManager
+  logWindows: 0

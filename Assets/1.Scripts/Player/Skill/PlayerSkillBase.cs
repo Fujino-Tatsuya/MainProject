@@ -325,7 +325,7 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     /// <summary>
     /// 히트 콜라이더에서 피해 수신자를 해석한다. Hurtbox가 있으면 그쪽이 우선(소유 Unit 반환).
     /// </summary>
-    protected static Unit ResolveHitUnit(Collider hit, out Hurtbox hurtbox)
+    protected internal static Unit ResolveHitUnit(Collider hit, out Hurtbox hurtbox)
     {
         hurtbox = hit.GetComponentInParent<Hurtbox>();
         if (hurtbox != null && hurtbox.TryGetOwner(out Unit hurtboxOwner))
