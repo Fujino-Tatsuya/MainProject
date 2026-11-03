@@ -179,6 +179,15 @@ public sealed class TrainingSparringBotTests
     }
 
     [Test]
+    public void InRangeTargetSwitch_OnlyWhenCurrentOutOfRangeAndCandidateInRange()
+    {
+        Assert.That(TrainingSparringRules.ShouldSwitchToInRangeTarget(true, 6f, 1.5f, 2f), Is.True, "멀리 선 타깃 대신 옆에서 치는 사람을 친다(멀티 T40 정지)");
+        Assert.That(TrainingSparringRules.ShouldSwitchToInRangeTarget(true, 1.8f, 1f, 2f), Is.False, "사거리 안 타깃은 유지");
+        Assert.That(TrainingSparringRules.ShouldSwitchToInRangeTarget(true, 6f, 4f, 2f), Is.False, "사거리 안 후보가 없으면 유지");
+        Assert.That(TrainingSparringRules.ShouldSwitchToInRangeTarget(false, float.MaxValue, 1f, 2f), Is.True, "무효 타깃은 교체");
+    }
+
+    [Test]
     public void SuppressText_ShowsRemainingSeconds()
     {
         Assert.That(LobbyUiStrings.FormatTrain03Segments(3, 5), Does.Contain("3").And.Contain("5"));
