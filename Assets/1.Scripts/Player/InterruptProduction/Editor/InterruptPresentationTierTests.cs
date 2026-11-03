@@ -140,7 +140,6 @@ public sealed class InterruptPresentationTierTests
         Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Normal).flash, "Q4 보류 = ②~⑥");
         Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Dash).flash, "Q5 보류 = ②~⑥");
         Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash);
-        Assert.AreEqual(SuppressDarkAdaptMode.Cut, director.SuppressDarkAdaptMode, "Q7 기본 = 컷");
     }
 
     [Test]
@@ -266,10 +265,8 @@ public sealed class InterruptPresentationTierTests
     private sealed class FakeDarkAdapt : ISuppressDarkAdaptOutput
     {
         public readonly List<float> Cuts = new List<float>();
-        public int Smooth;
         public int Clears;
         public void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition) => Cuts.Add(darkness);
-        public void PlayDarkAdaptSmooth(ulong casterClientId, Vector3 targetPosition) => Smooth++;
         public void ClearDarkAdapt() => Clears++;
     }
 
@@ -300,7 +297,7 @@ public sealed class InterruptPresentationTierTests
     }
 
     [Test]
-    public void 컷_방식은_시퀀스_끝_뒤_어두움_중간_원래_색으로_끊어_진행()
+    public void 제압_암순응은_시퀀스_끝_뒤_어두움_중간_원래_색으로_끊어_진행()
     {
         var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
         _objects.Add(sequence);
@@ -309,7 +306,7 @@ public sealed class InterruptPresentationTierTests
         var dark = new FakeDarkAdapt();
         var player = new SuppressFlashPlayer(() => sequence, () => false, flash, dark);
 
-        player.Begin(0f, Vector3.zero, null, SuppressDarkAdaptMode.Cut, 4, Vector3.one);
+        player.Begin(0f, Vector3.zero, null, 4, Vector3.one);
         player.Tick(end - 0.01f);
         Assert.IsTrue(player.IsPlaying);
         Assert.IsFalse(player.DarkAdaptActive);
@@ -332,26 +329,6 @@ public sealed class InterruptPresentationTierTests
         player.Tick(end + 0.31f);
         Assert.IsFalse(player.DarkAdaptActive, "원래 색");
         Assert.AreEqual(1, dark.Clears);
-        Assert.AreEqual(0, dark.Smooth);
-    }
-
-    [Test]
-    public void 부드럽게_방식은_시퀀스_끝에_곡선을_한_번_튼다()
-    {
-        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        _objects.Add(sequence);
-        float end = sequence.TotalFrames / sequence.frameRate;
-        var dark = new FakeDarkAdapt();
-        var player = new SuppressFlashPlayer(() => sequence, () => false, new FakeFlashOutput(), dark);
-
-        player.Begin(0f, Vector3.zero, null, SuppressDarkAdaptMode.Smooth);
-        player.Tick(end + 0.05f);
-        player.Tick(end + 0.5f);
-
-        Assert.AreEqual(1, dark.Smooth);
-        Assert.AreEqual(0, dark.Cuts.Count);
-        Assert.IsFalse(player.DarkAdaptActive);
-        Assert.AreEqual(SuppressDarkAdaptMode.Smooth, player.DarkAdaptMode);
     }
 
     [Test]

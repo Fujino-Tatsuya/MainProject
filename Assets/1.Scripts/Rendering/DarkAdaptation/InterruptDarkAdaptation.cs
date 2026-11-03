@@ -84,7 +84,7 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
 
     // ---- 제압 암순응(할 일 192 Q7) — 제압 간파 섬광 진행기가 부른다. 모든 화면 같은 값(Q8 공용) ----
 
-    /// <summary>컷 방식 — 곡선을 멈추고 이 어둡힘을 그대로 붙잡는다. 임계·원형 칸은 이 컴포넌트 값.</summary>
+    /// <summary>제압 암순응 컷 — 곡선을 멈추고 이 어둡힘을 그대로 붙잡는다. 임계·원형 칸은 이 컴포넌트 값.</summary>
     public void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition)
     {
         if (!isActiveAndEnabled)
@@ -94,9 +94,6 @@ public sealed class InterruptDarkAdaptation : MonoBehaviour, IInterruptDarkAdapt
         SetTrigger(casterClientId, targetPosition);
         PushState(InterruptDarkAdaptationModel.SanitizeIntensity(darkness));
     }
-
-    /// <summary>부드럽게 방식 — 기존 곡선을 본인 강도로(모든 화면).</summary>
-    public void PlayDarkAdaptSmooth(ulong casterClientId, Vector3 targetPosition) => Play(true, casterClientId, targetPosition);
 
     /// <summary>컷 끝·강제 리셋 — 즉시 0.</summary>
     public void ClearDarkAdapt() => StopEffect();

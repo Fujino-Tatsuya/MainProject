@@ -10,7 +10,7 @@ using UnityEngine;
 /// <item>배속은 같은 오브젝트의 <see cref="DebugTimeScale"/> 슬라이더 값을 쓴다 — 0.05~2, 성공 후 1배속 복귀 규칙도 그 컴포넌트 그대로.</item>
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
 /// <item>제압 간파 섬광 A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>).</item>
-/// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>), 제압 암순응 컷/부드럽게 전환.</item>
+/// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -146,7 +146,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         GUILayout.EndHorizontal();
     }
 
-    // 간파 연출 4단계(할 일 192) — 지금 단계 표시 + 단계 재현 버튼 4개(이 화면만, 슬로우·줌 없음) + 제압 암순응 컷/부드럽게 전환.
+    // 간파 연출 4단계(할 일 192) — 지금 단계 표시 + 단계 재현 버튼 4개(이 화면만, 슬로우·줌 없음).
     void DrawTiers()
     {
         InterruptProductionDirector director = InterruptProductionDirector.Instance;
@@ -167,15 +167,6 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         GUILayout.EndHorizontal();
         if (!string.IsNullOrEmpty(_tierPreview.Status))
             GUILayout.Label("  " + _tierPreview.Status);
-
-        SuppressDarkAdaptMode adapt = director.SuppressDarkAdaptMode;
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("제압 암순응");
-        if (GUILayout.Button((adapt == SuppressDarkAdaptMode.Cut ? "● " : "○ ") + "컷"))
-            director.SuppressDarkAdaptMode = SuppressDarkAdaptMode.Cut;
-        if (GUILayout.Button((adapt == SuppressDarkAdaptMode.Smooth ? "● " : "○ ") + "부드럽게"))
-            director.SuppressDarkAdaptMode = SuppressDarkAdaptMode.Smooth;
-        GUILayout.EndHorizontal();
     }
 
     // 제압 간파 섬광(179 후속 3) — A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).

@@ -116,8 +116,8 @@ public sealed class SuppressFlashSequence : ScriptableObject
     [Header("컷")]
     public List<SuppressFlashCut> cuts = CreateSpecCuts();
 
-    [Header("제압 암순응 컷(할 일 192) — 복귀 컷 뒤, 디렉터 '제압 암순응 = 컷'일 때")]
-    [Tooltip("어두움 → 중간 → (끝 = 원래 색). 각 컷은 초 단위·어둡힘 강도. 비우면 컷 암순응 없음(부드럽게 모드는 이 칸을 안 쓴다)")]
+    [Header("제압 암순응 컷(할 일 192) — 복귀 컷 뒤")]
+    [Tooltip("어두움 → 중간 → (끝 = 원래 색). 각 컷은 초 단위·어둡힘 강도. 비우면 제압 암순응 없음")]
     public List<SuppressDarkAdaptCut> darkAdaptCuts = CreateDarkAdaptCuts();
 
     [Header("모양 — 화면 높이 단위")]

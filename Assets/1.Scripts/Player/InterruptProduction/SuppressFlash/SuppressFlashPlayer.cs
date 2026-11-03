@@ -230,11 +230,8 @@ public interface ISuppressFlashOutput
 /// </summary>
 public interface ISuppressDarkAdaptOutput
 {
-    /// <summary>컷 방식 — 이 어둡힘을 그대로 붙잡는다(곡선 없음). 컷이 바뀔 때마다 부른다.</summary>
+    /// <summary>이 어둡힘을 그대로 붙잡는다(곡선 없음). 컷이 바뀔 때마다 부른다.</summary>
     void ShowDarkAdaptCut(float darkness, ulong casterClientId, Vector3 targetPosition);
-
-    /// <summary>부드럽게 방식 — 기존 암순응 곡선을 한 번 튼다(본인 강도, 모든 화면).</summary>
-    void PlayDarkAdaptSmooth(ulong casterClientId, Vector3 targetPosition);
 
     /// <summary>즉시 0(컷 끝·강제 리셋).</summary>
     void ClearDarkAdapt();
@@ -245,8 +242,7 @@ public interface ISuppressDarkAdaptOutput
 /// 컷 데이터(어느 SO 인가)는 <see cref="Begin"/> 순간 공급자에서 한 번 골라 끝까지 쓴다(재생 중에 칸을 바꿔도 다음 성공부터).
 /// 그 SO 의 값·섬광 줄이기는 Tick 마다 읽는다 — Play 중 SO 값을 바꾸면 다음 렌더 프레임부터 그 값.
 /// 새 성공이 오면 처음부터 다시 튼다.
-/// 시퀀스가 끝나면 제압 암순응(할 일 192 Q7)으로 이어진다 — 컷 = 그 SO 의 암순응 컷을 실제 시간으로 끊어서, 부드럽게 = 기존 암순응 곡선 한 번.
-/// 방식은 <see cref="Begin"/> 순간 받은 값을 끝까지 쓴다.
+/// 시퀀스가 끝나면 제압 암순응(할 일 192 Q7)으로 이어진다 — 그 SO 의 암순응 컷을 실제 시간으로 끊어서(컷 방식만, 부드럽게 방식은 11-03 삭제).
 /// </summary>
 public sealed class SuppressFlashPlayer
 {
@@ -257,7 +253,6 @@ public sealed class SuppressFlashPlayer
     private SuppressFlashSequence _playing;
     private float _startTime;
     private Vector3 _worldCenter;
-    private SuppressDarkAdaptMode _darkAdaptMode;
     private ulong _casterClientId;
     private Vector3 _targetPosition;
     private float _darkAdaptStart;
@@ -274,14 +269,11 @@ public sealed class SuppressFlashPlayer
     /// <summary>섬광 시퀀스가 도는 중(암순응 컷 제외 — A5 전투 표시 숨김·179 테스트가 보는 구간).</summary>
     public bool IsPlaying { get; private set; }
 
-    /// <summary>제압 암순응 컷이 도는 중(할 일 192 — 시퀀스 끝 뒤, 컷 방식만).</summary>
+    /// <summary>제압 암순응 컷이 도는 중(할 일 192 — 시퀀스 끝 뒤).</summary>
     public bool DarkAdaptActive { get; private set; }
 
     /// <summary>지금 암순응 컷 번호(없으면 -1).</summary>
     public int DarkAdaptCutIndex { get; private set; } = -1;
-
-    /// <summary>마지막 재생의 암순응 방식.</summary>
-    public SuppressDarkAdaptMode DarkAdaptMode => _darkAdaptMode;
 
     /// <summary>암순응 출력 교체(테스트·디버그). 돌던 컷은 옛 출력에서 걷는다.</summary>
     public void SetDarkAdaptOutput(ISuppressDarkAdaptOutput output)
@@ -304,10 +296,10 @@ public sealed class SuppressFlashPlayer
 
     /// <summary>
     /// 재생 시작 — <paramref name="now"/> = 실제 시간(Time.unscaledTime). 컷 데이터가 없으면 false(아무것도 안 그림).
-    /// <paramref name="darkAdaptMode"/>·<paramref name="casterClientId"/>·<paramref name="targetPosition"/> = 시퀀스 뒤 제압 암순응(할 일 192).
+    /// <paramref name="casterClientId"/>·<paramref name="targetPosition"/> = 시퀀스 뒤 제압 암순응(할 일 192).
     /// </summary>
     public bool Begin(float now, Vector3 worldCenter, IReadOnlyList<GameObject> subjects,
-        SuppressDarkAdaptMode darkAdaptMode = SuppressDarkAdaptMode.Cut, ulong casterClientId = 0, Vector3 targetPosition = default)
+        ulong casterClientId = 0, Vector3 targetPosition = default)
     {
         SuppressFlashSequence sequence = _sequence?.Invoke();
         if (sequence == null)
@@ -317,7 +309,6 @@ public sealed class SuppressFlashPlayer
         _playing = sequence;
         _startTime = now;
         _worldCenter = worldCenter;
-        _darkAdaptMode = darkAdaptMode;
         _casterClientId = casterClientId;
         _targetPosition = targetPosition;
         IsPlaying = true;
@@ -370,12 +361,6 @@ public sealed class SuppressFlashPlayer
 
     private void BeginDarkAdapt(float start)
     {
-        if (_darkAdaptMode == SuppressDarkAdaptMode.Smooth)
-        {
-            _darkAdaptOutput?.PlayDarkAdaptSmooth(_casterClientId, _targetPosition);
-            return;
-        }
-
         _darkAdaptStart = start;
         DarkAdaptActive = true;
         DarkAdaptCutIndex = -1;

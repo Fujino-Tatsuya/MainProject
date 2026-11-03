@@ -199,9 +199,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [DataTableIgnore, SerializeField] private Material suppressFlashMaterial;
     [Tooltip("섬광 줄이기 기본값 — 켜면 반전 끔 + 대비 낮춤. PlayerPrefs '" + ReduceFlashPrefsKey + "' 가 있으면 그 값이 이긴다")]
     [DataTableIgnore, SerializeField] private bool reduceFlash;
-    [Tooltip("제압 암순응(할 일 192 Q7) — 컷 = 섬광 시퀀스 복귀 뒤 컷 데이터의 '암순응 컷'(어두움 → 중간 → 원래 색)을 끊어서 / " +
-             "부드럽게 = 기존 암순응 곡선(A2 수치, 모든 화면 본인 강도). 시퀀스 시작 순간 읽는다. 모든 피어 공용(Q8)")]
-    [DataTableIgnore, SerializeField] private SuppressDarkAdaptMode suppressDarkAdaptMode = SuppressDarkAdaptMode.Cut;
+    // 제압 암순응(할 일 192 Q7) = 섬광 시퀀스 복귀 뒤 컷 데이터의 '암순응 컷'(어두움 → 중간 → 원래 색)을 끊어서. 모든 피어 공용(Q8). 부드럽게 방식은 11-03 삭제.
 
     // 간파 연출 4단계(할 일 192) — 실패 / 간파 / 대쉬 간파 / 제압 간파. 단계는 성공 사건(슬로우 Start 이벤트의 제압·대쉬 칸)으로 고르고,
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
@@ -271,13 +269,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             case InterruptPresentationTier.Suppress: return suppressTier;
             default: return null;
         }
-    }
-
-    /// <summary>제압 암순응 방식(할 일 192 Q7) — 런타임 값(저장하지 않음, 디버그·테스트). 다음 제압 간파부터.</summary>
-    public SuppressDarkAdaptMode SuppressDarkAdaptMode
-    {
-        get => suppressDarkAdaptMode;
-        set => suppressDarkAdaptMode = value;
     }
 
     /// <summary>
@@ -835,13 +826,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     }
 
     // 제압 간파 섬광 시작(할 일 179, 모든 피어) — 시퀀스 첫 프레임이 섬광 순간을 대신한다: 오너 암전 걷힘(본인 화면)·월드 섬광(모든 피어).
-    // 시퀀스 중엔 암순응을 틀지 않는다(화면을 통째로 3단 색으로 바꾼다). 시퀀스가 끝나면 제압 암순응(할 일 192 Q7, 컷/부드럽게 — 진행기가 이어 튼다, 모든 피어).
+    // 시퀀스 중엔 암순응을 틀지 않는다(화면을 통째로 3단 색으로 바꾼다). 시퀀스가 끝나면 제압 암순응 컷(할 일 192 Q7 — 진행기가 이어 튼다, 모든 피어).
     // 실루엣 = 마스크 대상 목록(지금은 오너 + 간파 대상).
     private void BeginSuppressFlash(in InterruptProductionEvent e, bool viewerIsCaster)
     {
         Vector3 point = FlashPoint(e.TargetPosition);
         CollectSuppressSubjects(e.CasterClientId, e.TargetPosition, _suppressSubjects);
-        SuppressFlash.Begin(Time.unscaledTime, point, _suppressSubjects, suppressDarkAdaptMode, e.CasterClientId, e.TargetPosition);
+        SuppressFlash.Begin(Time.unscaledTime, point, _suppressSubjects, e.CasterClientId, e.TargetPosition);
 
         // 오너 암전 걷기 — 지금 성공 단계의 발동 번호(서버 성공 = 슬로우 번호, 오너 판정 cue = 로컬 번호)로.
         if (viewerIsCaster && _ownerPresentation != null)

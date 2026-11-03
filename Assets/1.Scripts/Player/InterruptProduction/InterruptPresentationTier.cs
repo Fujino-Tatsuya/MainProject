@@ -33,13 +33,6 @@ public enum InterruptTierFlash : byte
     SuppressSequence = 1,
 }
 
-/// <summary>제압 간파 암순응 방식(할 일 192 Q7) — 컷(어두움 → 중간 → 원래 색, SO 컷 데이터) / 부드럽게(기존 암순응 곡선).</summary>
-public enum SuppressDarkAdaptMode : byte
-{
-    Cut = 0,
-    Smooth = 1,
-}
-
 /// <summary>
 /// 단계 하나의 설정 묶음(할 일 192 §3) — 디렉터 칸. 줌 세기는 지금처럼 슬로우 목적(강·약 시도·성공)이 고른다(Q2 — 슬로우 그대로).
 /// </summary>
