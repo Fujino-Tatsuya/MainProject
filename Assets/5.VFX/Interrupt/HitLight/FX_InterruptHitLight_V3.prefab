@@ -14749,6 +14749,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fb47fdd77f35d74d89277679f93aa5a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InterruptHitLightFx
+  gapRaysMesh: {fileID: 4300000, guid: ebdfe93c2f19d21488c3bc44d16fad0e, type: 2}
 --- !u!1 &6862394785238136119
 GameObject:
   m_ObjectHideFlags: 0

@@ -21,7 +21,7 @@ using UnityEngine.Serialization;
 [DisallowMultipleComponent]
 [DataTableSheet("SlowMotion", Order = 0)]
 public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
-    IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings
+    IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings, IInterruptHitLightScene
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
@@ -405,11 +405,19 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>적중 라이트 연출 진행기(V1·V2·V3) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
     public InterruptHitLightPlayer HitLight => _hitLight ??=
         new InterruptHitLightPlayer(HitLightLookFor, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared,
-            new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)), FindCasterWeaponPoint);
+            new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)), FindCasterWeaponPoint, this);
 
     // 194 후속 — 시전자 플레이어(이 피어에 스폰된 것)의 Variant 루트 PlayerWeaponAnchor 오른손 무기 위치. 못 찾으면 null(대상으로 대체).
-    // 찾는 방식은 FindLightGatherSocket 과 같다(스폰 목록에서 직접 — 성공은 드물어 매번 찾는다).
     private Vector3? FindCasterWeaponPoint(ulong casterClientId)
+    {
+        NetworkObject caster = FindCasterPlayerObject(casterClientId);
+        return caster != null && caster.TryGetComponent(out PlayerWeaponAnchor anchor) && anchor.TryGetRightWeaponPoint(out Vector3 point)
+            ? point
+            : null;
+    }
+
+    // 시전자 플레이어 오브젝트 — 찾는 방식은 FindLightGatherSocket 과 같다(스폰 목록에서 직접 — 성공은 드물어 매번 찾는다).
+    private NetworkObject FindCasterPlayerObject(ulong casterClientId)
     {
         NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
         if (spawnManager == null)
@@ -417,15 +425,34 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
         foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
         {
-            if (networkObject == null || !networkObject.IsPlayerObject || networkObject.OwnerClientId != casterClientId)
-                continue;
-
-            if (networkObject.TryGetComponent(out PlayerWeaponAnchor anchor) && anchor.TryGetRightWeaponPoint(out Vector3 point))
-                return point;
-            return null;
+            if (networkObject != null && networkObject.IsPlayerObject && networkObject.OwnerClientId == casterClientId)
+                return networkObject;
         }
 
         return null;
+    }
+
+    // 틈 수직(194 후속) — 무기 앵커가 없으면 시전자 중심 = 발밑 + 섬광 높이(대상 적중점과 같은 높이).
+    bool IInterruptHitLightScene.TryGetCasterCenter(ulong casterClientId, out Vector3 center)
+    {
+        NetworkObject caster = FindCasterPlayerObject(casterClientId);
+        center = caster != null ? FlashPoint(caster.transform.position) : default;
+        return caster != null;
+    }
+
+    // 틈 수직 — 적중점 근처 간파 대상(제압 섬광 실루엣과 같은 찾기)의 시전자 쪽 몸 표면.
+    bool IInterruptHitLightScene.TryGetTargetSurface(Vector3 targetPoint, Vector3 from, out Vector3 surface)
+    {
+        InterruptTargetRegistry.Entry entry = FindNearestTarget(targetPoint);
+        surface = default;
+        return entry != null && entry.TryGetClosestSurfacePoint(from, out surface);
+    }
+
+    bool IInterruptHitLightScene.TryGetViewForward(out Vector3 forward)
+    {
+        Camera camera = Camera.main;
+        forward = camera != null ? camera.transform.forward : default;
+        return camera != null;
     }
 
     // V3 는 전용 프리팹 인스턴스(194 후속), 그 밖은 V1·V2 공용 인스턴스.
@@ -966,8 +993,19 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             }
         }
 
+        InterruptTargetRegistry.Entry nearest = FindNearestTarget(targetPosition);
+        if (nearest != null)
+        {
+            results.Add(nearest.Unit.gameObject);
+            targets.Add(nearest.Unit.gameObject);
+        }
+    }
+
+    // 성공 기준 위치에 가장 가까운 등록 간파 대상(수평 거리, 허용 반경 안). 없으면 null.
+    private InterruptTargetRegistry.Entry FindNearestTarget(Vector3 targetPosition)
+    {
         InterruptTargetRegistry.CopyLiveTo(_targetBuffer);
-        Unit nearest = null;
+        InterruptTargetRegistry.Entry nearest = null;
         float best = SuppressFlashTargetSearchRadius * SuppressFlashTargetSearchRadius;
         for (int i = 0; i < _targetBuffer.Count; i++)
         {
@@ -976,16 +1014,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             if (delta.sqrMagnitude <= best)
             {
                 best = delta.sqrMagnitude;
-                nearest = _targetBuffer[i].Unit;
+                nearest = _targetBuffer[i];
             }
         }
 
         _targetBuffer.Clear();
-        if (nearest != null)
-        {
-            results.Add(nearest.gameObject);
-            targets.Add(nearest.gameObject);
-        }
+        return nearest;
     }
 
     // 성공 기준 위치(판정 순간 대상 위치)에서 이 피어의 대상까지 허용 거리 — 복제 지연으로 조금 어긋나도 찾는다.
@@ -1022,7 +1056,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     }
 
     // 적중 라이트 연출 시작(할 일 194, 모든 피어) — 성공 순간이 곧 섬광 순간이다: 오너 성공 단계를 끝내고(본인 화면, 암전 없는 단계라 덮개는 이미 0)
-    // 시전자 오른손 무기(단계 칸 hitLightOrigin — 못 찾으면 적중 지점)에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면 — 적중 지점 기준).
+    // 단계 칸 hitLightOrigin(틈 수직 기본 / 무기 / 대상) 위치·방향에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면 — 적중 지점 기준).
     private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look)
     {
         if (viewerIsCaster && _ownerPresentation != null)
@@ -1033,7 +1067,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         {
             Point = FlashPoint(e.TargetPosition),
             CasterClientId = e.CasterClientId,
-            Origin = profile != null ? profile.hitLightOrigin : InterruptHitLightOrigin.CasterWeapon,
+            Origin = profile != null ? profile.hitLightOrigin : InterruptHitLightOrigin.Gap,
             ViewerIsCaster = viewerIsCaster,
             Look = look,
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,

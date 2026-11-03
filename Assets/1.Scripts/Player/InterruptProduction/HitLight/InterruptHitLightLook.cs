@@ -63,6 +63,16 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [Tooltip("V2 적중 화이트아웃 길이(렌더 프레임 수) — 기존 ③ 화이트아웃 그림을 재사용(③ 칸과 무관하게 그린다). 0 = 없음")]
     [SerializeField, Min(0)] private int whiteoutFrames = 3;
 
+    [Header("틈 수직 방향(발생 위치 = 틈 수직일 때만, 194 후속)")]
+    [Tooltip("빛줄기 부채 퍼짐 반각(도) — 수직선에서 화면상 ± 이만큼 안에서 양쪽으로 뻗는다. 0 = 한 줄")]
+    [SerializeField, Range(0f, 90f)] private float gapRaySpread = 20f;
+    [Tooltip("빛줄기 줄 수(한 줄 = 양쪽으로 뻗는 날개 2개)")]
+    [SerializeField, Range(1, 16)] private int gapRayCount = 5;
+    [Tooltip("불꽃 퍼짐 반각(도) — 수직선 양쪽 방향 중심의 원뿔 안으로 튄다. 90 = 수직선 반구 전체")]
+    [SerializeField, Range(0f, 90f)] private float gapSparkSpread = 30f;
+    [Tooltip("가로 빛줄(V3) 방향 — 수직선(기본) / 시전자→대상 축. 둘 다 화면에서 그 각도로 보이게 카메라 쪽으로 기울인다")]
+    [SerializeField] private InterruptHitLightStreakAxis gapStreakAxis = InterruptHitLightStreakAxis.Perpendicular;
+
     public Color LightColor => lightColor;
     public int WhiteoutFrames => whiteoutFrames;
     public float LightIntensity => lightIntensity;
@@ -89,7 +99,21 @@ public sealed class InterruptHitLightLook : ScriptableObject
     public float SceneDimDuration => sceneDimDuration;
     public AnimationCurve SceneDimCurve => sceneDimCurve;
 
+    public float GapRaySpread => gapRaySpread;
+    public int GapRayCount => gapRayCount;
+    public float GapSparkSpread => gapSparkSpread;
+    public InterruptHitLightStreakAxis GapStreakAxis => gapStreakAxis;
+
     /// <summary>적중 순간 1 → 끝 0 으로 부드럽게 줄어드는 기본 곡선(Q5 — 약 0.9초에 걸쳐 복귀).</summary>
     public static AnimationCurve Decay() =>
         new AnimationCurve(new Keyframe(0f, 1f, 0f, -1.8f), new Keyframe(0.4f, 0.35f, -0.9f, -0.9f), new Keyframe(1f, 0f, -0.15f, 0f));
+}
+
+/// <summary>틈 수직 모드에서 가로 빛줄(V3 Streak)을 놓는 선(194 후속). 값은 직렬화되므로 순서를 바꾸지 않는다.</summary>
+public enum InterruptHitLightStreakAxis : byte
+{
+    /// <summary>시전자→대상 축에 수직인 선(빛줄기와 같은 선).</summary>
+    Perpendicular = 0,
+    /// <summary>시전자→대상 축(레퍼런스 ZZZ 컷신은 무기 맞부딪힘 축을 따라 가로로 뻗는다).</summary>
+    CasterToTarget = 1,
 }

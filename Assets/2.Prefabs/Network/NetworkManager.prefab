@@ -301,17 +301,17 @@ MonoBehaviour:
     ownerDim: 0
     flash: 2
     darkAdapt: 0
-    hitLightOrigin: 0
+    hitLightOrigin: 2
   dashTier:
     ownerDim: 0
     flash: 3
     darkAdapt: 0
-    hitLightOrigin: 0
+    hitLightOrigin: 2
   suppressTier:
     ownerDim: 1
     flash: 1
     darkAdapt: 0
-    hitLightOrigin: 0
+    hitLightOrigin: 2
 --- !u!114 &4191191191191191191
 MonoBehaviour:
   m_ObjectHideFlags: 0

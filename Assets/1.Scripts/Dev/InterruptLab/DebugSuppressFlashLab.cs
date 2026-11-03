@@ -148,10 +148,16 @@ public sealed class DebugInterruptTierPreview
 
     public static string DarkAdaptLabel(InterruptDarkAdaptMode mode) => mode == InterruptDarkAdaptMode.SceneLight ? "나 씬 조명" : "가 화면";
 
-    /// <summary>월드 이펙트 발생 위치 버튼 순서(194 후속) = 오른손 무기 / 대상.</summary>
-    public static readonly InterruptHitLightOrigin[] Origins = { InterruptHitLightOrigin.CasterWeapon, InterruptHitLightOrigin.Target };
+    /// <summary>월드 이펙트 발생 위치 버튼 순서(194 후속) = 틈 수직(기본) / 오른손 무기 / 대상.</summary>
+    public static readonly InterruptHitLightOrigin[] Origins =
+        { InterruptHitLightOrigin.Gap, InterruptHitLightOrigin.CasterWeapon, InterruptHitLightOrigin.Target };
 
-    public static string OriginLabel(InterruptHitLightOrigin origin) => origin == InterruptHitLightOrigin.Target ? "위치 대상" : "위치 무기";
+    public static string OriginLabel(InterruptHitLightOrigin origin) => origin switch
+    {
+        InterruptHitLightOrigin.Target => "위치 대상",
+        InterruptHitLightOrigin.Gap => "위치 틈",
+        _ => "위치 무기",
+    };
 
     /// <summary>선택된 버튼 글자 — 지금 값이면 [ ] 로 감싼다.</summary>
     public static string Selected(string label, bool selected) => selected ? $"[{label}]" : label;

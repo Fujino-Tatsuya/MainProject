@@ -51,13 +51,21 @@ public enum InterruptDarkAdaptMode : byte
     SceneLight = 1,
 }
 
-/// <summary>V1·V2 월드 이펙트(라이트·불꽃·파편·빛줄기) 발생 위치(할 일 194 후속). 화면 섬광·화이트아웃·제압 섬광 기준점은 늘 대상이다.</summary>
+/// <summary>
+/// V1·V2·V3 월드 이펙트(라이트·불꽃·파편·빛줄기·중심 점·가로 빛줄) 발생 위치(할 일 194 후속). 화면 섬광·화이트아웃·제압 섬광 기준점은 늘 대상이다.
+/// 값은 직렬화되므로(NetworkManager.prefab 단계 칸) 순서를 바꾸지 않는다 — 새 방식은 뒤에 붙인다.
+/// </summary>
 public enum InterruptHitLightOrigin : byte
 {
-    /// <summary>기본 — 시전자 오른손 무기(<see cref="PlayerWeaponAnchor"/>). 못 찾으면 대상 적중점.</summary>
+    /// <summary>시전자 오른손 무기(<see cref="PlayerWeaponAnchor"/>). 못 찾으면 대상 적중점. 방향 없음(V1·V2 처음 모습).</summary>
     CasterWeapon = 0,
-    /// <summary>대상 적중점(대상 위치 + 높이) — 194 처음 방식.</summary>
+    /// <summary>대상 적중점(대상 위치 + 높이) — 194 처음 방식. 방향 없음.</summary>
     Target = 1,
+    /// <summary>
+    /// 기본(11-03) — 틈 수직: 무기(없으면 시전자 중심)와 대상 몸 표면(못 구하면 대상 적중점) 사이 중간점. 빛줄기·불꽃·가로 빛줄은
+    /// 시전자→대상 축(바닥 평면)에 수직인 선을 따라 양쪽으로, 화면에서 그 각도로 보이게 카메라 쪽으로 기울인다(<see cref="InterruptHitLightRules.Place"/>).
+    /// </summary>
+    Gap = 2,
 }
 
 /// <summary>이번 성공에서 실제로 트는 섬광(할 일 194) — 단계 설정 + 칸·데이터 유무로 <see cref="InterruptPresentationTierRules.SelectSuccessLook"/> 가 고른다.</summary>
@@ -87,8 +95,8 @@ public sealed class InterruptTierProfile
     public InterruptTierFlash flash = InterruptTierFlash.HitFlash;
     [Tooltip("V1·V2 의 암순응 방식(할 일 194 Q9) — 가 = 화면 패스(어두운 픽셀만) / 나 = 태양광·환경광 낮춤. V0·시퀀스에는 쓰지 않는다")]
     public InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass;
-    [Tooltip("V1·V2 월드 이펙트 발생 위치(할 일 194 후속) — 시전자 오른손 무기(못 찾으면 대상) / 대상 적중점. 성공 순간 위치에 남고 따라다니지 않는다")]
-    public InterruptHitLightOrigin hitLightOrigin = InterruptHitLightOrigin.CasterWeapon;
+    [Tooltip("V1·V2·V3 월드 이펙트 발생 위치(할 일 194 후속) — 시전자 오른손 무기(못 찾으면 대상) / 대상 적중점 / 틈 수직(기본 — 무기와 대상 표면 사이, 빛줄기·불꽃이 시전자→대상 축에 수직으로). 성공 순간 위치·방향에 남고 따라다니지 않는다")]
+    public InterruptHitLightOrigin hitLightOrigin = InterruptHitLightOrigin.Gap;
 
     public InterruptTierProfile() { }
 

@@ -768,7 +768,8 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | (제압) | `SuppressSequence` | §7 섬광 시퀀스 — 버전 선택 대상 아님 | 모든 피어 |
 
 - 기본 = **일반 V1 · 대쉬 V2 · 암순응 가**(코드 기본값 = 프리팹 값). 디렉터 칸 `hitLightLook`(SO)·`hitLightVfx`(프리팹) 중 하나라도 비면 V1·V2 는 **V0 로 돌아간다**(`SelectSuccessLook`).
-- **발생 위치**(194 후속, 단계 칸 `hitLightOrigin`) — 월드 이펙트(라이트·불꽃·파편·빛줄기)는 기본 **시전자 오른손 무기**(Variant 루트 `PlayerWeaponAnchor.rightWeapon` = 팔라딘 `R_WeaponSocket` · 거너 `rig/artillery/LaserGun` · 암살자 `Dagger_Weapon_R`, 무기 로컬 `localOffset` 으로 칼끝 쪽 조정)의 성공 순간 위치에 남는다(따라가지 않음, 모든 피어가 자기 화면의 그 캐릭터 위치). 사건의 시전자(`CasterClientId`)로 찾고, 못 찾으면(앵커 없음·랩 가상 시전자) **대상 적중점**. `대상` 선택 = 194 처음 방식. 화이트아웃·V0 섬광·제압 섬광 기준점은 늘 대상.
+- **틈 수직(기본, 194 후속 11-03)** — `hitLightOrigin = Gap`(enum 값 2를 뒤에 추가, 무기 0·대상 1 은 그대로·NetworkManager.prefab 단계 칸 값 2). 위치 = 오른손 무기(없으면 시전자 중심 = 발밑 + 섬광 높이)와 대상 몸 표면(등록 대상 콜라이더 `ClosestPoint`, 몸 → 트리거 순, 못 구하면 대상 적중점)의 중간점. 방향 = 시전자→대상 축(바닥 평면)의 수직선 — `Rays` 는 날개 2개 메시(`gapRaysMesh` = `Mesh_InterruptHitLight_Streak`)를 SO `gapRaySpread`(±20°)·`gapRayCount`(5) 부채로 양쪽, `Sparks` 는 수직선 양쪽 원뿔(`gapSparkSpread` 30°), V3 `Streak` 은 `gapStreakAxis`(수직선 기본 / 축 — 레퍼런스는 축 쪽) — 납작한 것은 렌더 정렬 Local + 카메라 쪽 기울임(`InterruptHitLightRules.ViewTilted`)이라 화면에서 늘 그 선 각도. `Core`·`Debris`·라이트는 위치만. 성공 순간 한 번 계산해 고정, 시전자를 못 찾거나 축이 없으면 방향 없음(처음 모습). 순수 함수 `InterruptHitLightRules.Place`·`ViewTilted`·`SparkDirection`, 프리팹 값은 재생 때만 바꾸고 무기·대상 모드는 처음 읽은 값으로 되돌린다.
+- **발생 위치 무기·대상**(194 후속, 단계 칸 `hitLightOrigin`) — 월드 이펙트(라이트·불꽃·파편·빛줄기)는 **시전자 오른손 무기**(Variant 루트 `PlayerWeaponAnchor.rightWeapon` = 팔라딘 `R_WeaponSocket` · 거너 `rig/artillery/LaserGun` · 암살자 `Dagger_Weapon_R`, 무기 로컬 `localOffset` 으로 칼끝 쪽 조정)의 성공 순간 위치에 남는다(따라가지 않음, 모든 피어가 자기 화면의 그 캐릭터 위치). 사건의 시전자(`CasterClientId`)로 찾고, 못 찾으면(앵커 없음·랩 가상 시전자) **대상 적중점**. `대상` 선택 = 194 처음 방식. 화이트아웃·V0 섬광·제압 섬광 기준점은 늘 대상.
 - 전부 **실시간**(unscaled, Q8) — 슬로우·히트스톱 중에도 같은 빠르기. 줌은 지금처럼 오너만(슬로우 목적).
 - 섬광 순간 예약이 없다 — 성공 순간이 곧 섬광 순간(오너 성공 단계도 그때 끝낸다). 서버 거부·강제 리셋·제압 전환이면 즉시 끈다(`StopHitFlash` 한 곳).
 
@@ -795,7 +796,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 ### 9.4 DebugInterruptLab 버튼 (튜닝 패널 "간파 단계" 아래)
 
-- `간파(근접) 버전 — 실제 V?` / `대쉬 간파 버전 — 실제 V?` 줄마다 `V0`·`V1`·`V2`·`V3`·`가 화면`·`나 씬 조명`·`위치 무기`·`위치 대상`·`재생`. 지금 값은 `[ ]` 로 표시, **실제** = 데이터 없음으로 V0 로 돌아간 것까지 반영.
+- `간파(근접) 버전 — 실제 V?` / `대쉬 간파 버전 — 실제 V?` 줄마다 `V0`·`V1`·`V2`·`V3`·`가 화면`·`나 씬 조명`·`위치 틈`·`위치 무기`·`위치 대상`·`재생`. 지금 값은 `[ ]` 로 표시, **실제** = 데이터 없음으로 V0 로 돌아간 것까지 반영.
 - 이 피어 런타임 값만(저장 안 함), 다음 성공부터. `재생` = §8.5 단계 재현과 같은 경로(이 화면만, 슬로우·줌 없음).
 - 랩 블룸: 씬에 카메라·Volume 은 없고 `CameraSwitcher` 가 런타임에 `MainCamera.prefab`(후처리 켬 · Volume 마스크 Default)을 만든다 — 진행기의 블룸 Volume(Default 레이어)이 걸린다. 정적 구성 확인만 했고 화면 확인은 Play 필요.
 

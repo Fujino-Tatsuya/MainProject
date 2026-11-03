@@ -9,12 +9,59 @@ public struct InterruptHitLightRequest
     public Vector3 Point;
     /// <summary>시전자(간파한 플레이어) — 월드 이펙트를 그 오른손 무기에서 낼 때 찾는다(194 후속).</summary>
     public ulong CasterClientId;
-    /// <summary>월드 이펙트 발생 위치 — 시전자 오른손 무기(기본) / 대상.</summary>
+    /// <summary>월드 이펙트 발생 위치 — 시전자 오른손 무기 / 대상 / 틈 수직(기본).</summary>
     public InterruptHitLightOrigin Origin;
     /// <summary>이 화면이 발동자 본인인가.</summary>
     public bool ViewerIsCaster;
     public InterruptSuccessLook Look;
     public InterruptDarkAdaptMode DarkAdapt;
+}
+
+/// <summary>
+/// 월드 이펙트를 놓는 곳(194 후속) — 위치 + (틈 수직이면) 시전자→대상 축·그 수직선·카메라 시선. 성공 순간 한 번 계산해 고정한다.
+/// 방향이 없으면(무기·대상 모드, 대체 경로) 이펙트는 V1·V2 처음 모습 그대로다.
+/// </summary>
+public readonly struct InterruptHitLightPlacement
+{
+    public readonly Vector3 Position;
+    /// <summary>축·수직선이 있다(틈 수직이고 시전자·대상 위치가 겹치지 않음).</summary>
+    public readonly bool HasDirection;
+    /// <summary>시전자 → 대상(바닥 평면 단위 벡터).</summary>
+    public readonly Vector3 Axis;
+    /// <summary>축에 수직인 바닥 선(단위 벡터 — 부호는 의미 없다, 양쪽으로 뻗는다).</summary>
+    public readonly Vector3 Perpendicular;
+    /// <summary>카메라 시선(단위 벡터) — 납작한 이펙트를 이쪽으로 기울인다.</summary>
+    public readonly Vector3 ViewForward;
+
+    private InterruptHitLightPlacement(Vector3 position, bool hasDirection, Vector3 axis, Vector3 perpendicular, Vector3 viewForward)
+    {
+        Position = position;
+        HasDirection = hasDirection;
+        Axis = axis;
+        Perpendicular = perpendicular;
+        ViewForward = viewForward;
+    }
+
+    /// <summary>위치만(방향 없음).</summary>
+    public static InterruptHitLightPlacement At(Vector3 position) =>
+        new InterruptHitLightPlacement(position, false, Vector3.zero, Vector3.zero, Vector3.zero);
+
+    /// <summary>위치 + 방향 — <paramref name="axis"/>·<paramref name="viewForward"/> 는 단위 벡터, 축은 바닥 평면.</summary>
+    public static InterruptHitLightPlacement Directed(Vector3 position, Vector3 axis, Vector3 viewForward) =>
+        new InterruptHitLightPlacement(position, true, axis, InterruptHitLightRules.FlatPerpendicular(axis), viewForward);
+}
+
+/// <summary>
+/// 틈 수직 위치 계산에 쓰는 이 피어 화면의 정보(194 후속) — 디렉터가 구현한다. 모든 피어가 자기 화면의 시전자·대상으로 같은 계산을 한다(새 RPC 없음).
+/// </summary>
+public interface IInterruptHitLightScene
+{
+    /// <summary>시전자 몸 중심(무기 앵커가 없을 때 대체). 시전자를 못 찾으면 false.</summary>
+    bool TryGetCasterCenter(ulong casterClientId, out Vector3 center);
+    /// <summary><paramref name="targetPoint"/> 근처 간파 대상 몸 표면 중 <paramref name="from"/> 에 가장 가까운 점(시전자 쪽 표면). 못 구하면 false.</summary>
+    bool TryGetTargetSurface(Vector3 targetPoint, Vector3 from, out Vector3 surface);
+    /// <summary>이 화면 카메라 시선. 카메라가 없으면 false.</summary>
+    bool TryGetViewForward(out Vector3 forward);
 }
 
 /// <summary>
@@ -37,6 +84,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
     private readonly SceneLightDim _sceneDim;
     private readonly IInterruptHitFlashOverlayOutput _whiteout;
     private readonly Func<ulong, Vector3?> _casterWeapon;
+    private readonly IInterruptHitLightScene _scene;
 
     private GameObject _root;
     private Volume _bloomVolume;
@@ -54,20 +102,21 @@ public sealed class InterruptHitLightPlayer : IDisposable
     /// <param name="darkAdapt">암순응 가 출력(<see cref="InterruptDarkAdaptation"/>). null 이면 가 없음.</param>
     /// <param name="sceneDim">암순응 나 창구. null 이면 나 없음.</param>
     /// <param name="whiteout">V2 화이트아웃 출력(③ 그림만 그리는 적중 섬광 오버레이). null 이면 화이트아웃 없음.</param>
-    /// <param name="casterWeapon">시전자 → 지금 오른손 무기 위치(없으면 null). null 이면 월드 이펙트는 늘 대상 적중점.</param>
+    /// <param name="casterWeapon">시전자 → 지금 오른손 무기 위치(없으면 null). null 이면 월드 이펙트는 늘 대상 적중점(틈 수직이면 시전자 중심과의 틈).</param>
+    /// <param name="scene">틈 수직 계산용 시전자 중심·대상 표면·카메라 시선(194 후속). null 이면 틈 수직은 무기와 대상 적중점 사이, 시선은 수직 아래.</param>
     public InterruptHitLightPlayer(Func<InterruptHitLightLook> look, Func<InterruptHitLightFx> fx,
         Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
-        Func<ulong, Vector3?> casterWeapon = null)
+        Func<ulong, Vector3?> casterWeapon = null, IInterruptHitLightScene scene = null)
         : this(look != null ? _ => look() : (Func<InterruptSuccessLook, InterruptHitLightLook>)null,
             fx != null ? _ => fx() : (Func<InterruptSuccessLook, InterruptHitLightFx>)null,
-            darkAdapt, sceneDim, whiteout, casterWeapon)
+            darkAdapt, sceneDim, whiteout, casterWeapon, scene)
     {
     }
 
     /// <summary>버전별 데이터·월드 이펙트(194 후속 — V3 는 전용 SO·프리팹). 인자 = 이번 요청의 <see cref="InterruptHitLightRequest.Look"/>.</summary>
     public InterruptHitLightPlayer(Func<InterruptSuccessLook, InterruptHitLightLook> look, Func<InterruptSuccessLook, InterruptHitLightFx> fx,
         Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
-        Func<ulong, Vector3?> casterWeapon = null)
+        Func<ulong, Vector3?> casterWeapon = null, IInterruptHitLightScene scene = null)
     {
         _look = look;
         _fx = fx;
@@ -75,10 +124,13 @@ public sealed class InterruptHitLightPlayer : IDisposable
         _sceneDim = sceneDim;
         _whiteout = whiteout;
         _casterWeapon = casterWeapon;
+        _scene = scene;
     }
 
     /// <summary>마지막 연출의 월드 이펙트 위치 — 확인용.</summary>
-    public Vector3 FxPoint { get; private set; }
+    public Vector3 FxPoint => Placement.Position;
+    /// <summary>마지막 연출의 월드 이펙트 위치·방향 — 확인용.</summary>
+    public InterruptHitLightPlacement Placement { get; private set; }
 
     /// <summary>지금 화이트아웃을 그리고 있다 — 확인용.</summary>
     public bool WhiteoutShown => _whiteoutShown;
@@ -103,18 +155,35 @@ public sealed class InterruptHitLightPlayer : IDisposable
         _whiteoutFrames = look != null ? InterruptPresentationTierRules.WhiteoutFrames(request.Look, request.ViewerIsCaster, look.WhiteoutFrames) : 0;
         IsPlaying = true;
 
-        // 무기 위치는 이 순간 한 번만 읽는다 — 이펙트는 월드에 남고 시전자를 따라가지 않는다.
-        Vector3? weapon = request.Origin == InterruptHitLightOrigin.CasterWeapon ? _casterWeapon?.Invoke(request.CasterClientId) : null;
-        FxPoint = InterruptHitLightRules.FxPoint(request.Origin, request.Point, weapon);
+        // 위치·방향은 이 순간 한 번만 계산한다 — 이펙트는 월드에 남고 시전자를 따라가지 않는다.
+        Placement = ResolvePlacement(request);
         InterruptHitLightFx fx = _fx?.Invoke(request.Look);
         // 버전이 바뀌어 다른 인스턴스를 틀면 앞 것은 지운다(같은 인스턴스는 Play 가 다시 튼다).
         if (_playedFx != null && _playedFx != fx)
             _playedFx.Stop();
         _playedFx = fx;
         if (fx != null)
-            fx.Play(FxPoint, look);
+            fx.Play(Placement, look);
 
         Tick(now, frame);
+    }
+
+    // 이 피어 화면의 시전자·대상으로 위치·방향을 구한다. 대상 모드는 무기를 찾지 않고, 틈 수직만 시전자 중심·대상 표면·시선을 묻는다.
+    private InterruptHitLightPlacement ResolvePlacement(in InterruptHitLightRequest request)
+    {
+        Vector3? weapon = request.Origin != InterruptHitLightOrigin.Target ? _casterWeapon?.Invoke(request.CasterClientId) : null;
+        if (request.Origin != InterruptHitLightOrigin.Gap)
+            return InterruptHitLightRules.Place(request.Origin, request.Point, weapon, null, null, Vector3.down);
+
+        Vector3? center = null;
+        if (!weapon.HasValue && _scene != null && _scene.TryGetCasterCenter(request.CasterClientId, out Vector3 c))
+            center = c;
+        Vector3? casterSide = weapon ?? center;
+        Vector3? surface = null;
+        if (casterSide.HasValue && _scene != null && _scene.TryGetTargetSurface(request.Point, casterSide.Value, out Vector3 s))
+            surface = s;
+        Vector3 view = _scene != null && _scene.TryGetViewForward(out Vector3 f) ? f : Vector3.down;
+        return InterruptHitLightRules.Place(request.Origin, request.Point, weapon, center, surface, view);
     }
 
     /// <summary>매 프레임 — <paramref name="now"/> = 실시간, <paramref name="frame"/> = 렌더 프레임(화이트아웃).</summary>
@@ -316,6 +385,74 @@ public static class InterruptHitLightRules
     /// <summary>월드 이펙트 위치(194 후속) — 무기 선택이고 무기 위치가 있으면 무기, 아니면(대상 선택·무기 못 찾음) 대상 적중점.</summary>
     public static Vector3 FxPoint(InterruptHitLightOrigin origin, Vector3 targetPoint, Vector3? weaponPoint) =>
         origin == InterruptHitLightOrigin.CasterWeapon && weaponPoint.HasValue ? weaponPoint.Value : targetPoint;
+
+    private const float MinSqr = 1e-6f;
+
+    /// <summary>
+    /// 월드 이펙트 위치·방향(194 후속). 무기·대상 모드 = <see cref="FxPoint"/> 위치만.
+    /// 틈 수직 = (무기, 없으면 시전자 중심)과 (대상 표면, 없으면 대상 적중점)의 중간점 + 축(시전자 쪽 → 대상 적중점, 바닥 평면).
+    /// 시전자를 못 찾으면 대상 적중점·방향 없음, 시전자·대상이 겹쳐 축이 없으면 중간점·방향 없음.
+    /// </summary>
+    public static InterruptHitLightPlacement Place(InterruptHitLightOrigin origin, Vector3 targetPoint, Vector3? weaponPoint,
+        Vector3? casterCenter, Vector3? targetSurface, Vector3 viewForward)
+    {
+        if (origin != InterruptHitLightOrigin.Gap)
+            return InterruptHitLightPlacement.At(FxPoint(origin, targetPoint, weaponPoint));
+
+        Vector3? casterSide = weaponPoint ?? casterCenter;
+        if (!casterSide.HasValue)
+            return InterruptHitLightPlacement.At(targetPoint);
+
+        Vector3 position = GapPoint(casterSide.Value, targetSurface ?? targetPoint);
+        Vector3 axis = Flat(targetPoint - casterSide.Value);
+        if (axis.sqrMagnitude < MinSqr)
+            return InterruptHitLightPlacement.At(position);
+
+        Vector3 view = viewForward.sqrMagnitude < MinSqr ? Vector3.down : viewForward.normalized;
+        return InterruptHitLightPlacement.Directed(position, axis.normalized, view);
+    }
+
+    /// <summary>틈 — 시전자 쪽 점과 대상 쪽 점의 중간.</summary>
+    public static Vector3 GapPoint(Vector3 casterSide, Vector3 targetSide) => (casterSide + targetSide) * 0.5f;
+
+    /// <summary>바닥 평면의 축에 수직인 바닥 선(단위 벡터). 축이 없으면 0.</summary>
+    public static Vector3 FlatPerpendicular(Vector3 axis)
+    {
+        Vector3 perpendicular = Vector3.Cross(Vector3.up, Flat(axis));
+        return perpendicular.sqrMagnitude < MinSqr ? Vector3.zero : perpendicular.normalized;
+    }
+
+    /// <summary>
+    /// 납작한 이펙트(빛줄기·가로 빛줄) 회전 — 로컬 Z = 카메라 시선(면이 화면을 향함), 로컬 X = <paramref name="line"/> 을 시선에 수직인 면에 투영한 방향.
+    /// 바닥 선을 카메라 쪽으로 기울인 것이라 화면에서 늘 그 선 각도로 보인다(탑다운에서 납작해지지 않는다). 선이 시선과 평행하면 화면 가로.
+    /// </summary>
+    public static Quaternion ViewTilted(Vector3 line, Vector3 viewForward)
+    {
+        Vector3 forward = viewForward.sqrMagnitude < MinSqr ? Vector3.down : viewForward.normalized;
+        Vector3 x = Vector3.ProjectOnPlane(line, forward);
+        if (x.sqrMagnitude < MinSqr)
+        {
+            x = Vector3.ProjectOnPlane(Vector3.right, forward);
+            if (x.sqrMagnitude < MinSqr)
+                x = Vector3.ProjectOnPlane(Vector3.forward, forward);
+        }
+
+        x.Normalize();
+        return Quaternion.LookRotation(forward, Vector3.Cross(forward, x));
+    }
+
+    /// <summary>
+    /// 틈 수직 불꽃 한 알의 방향 — 수직선 한쪽(<paramref name="positiveSide"/>)을 중심으로 반각 <paramref name="spreadDegrees"/> 원뿔 안.
+    /// <paramref name="tilt01"/>·<paramref name="twist01"/> = [0, 1] 난수(기울기 비율·원뿔 둘레 각).
+    /// </summary>
+    public static Vector3 SparkDirection(Vector3 perpendicular, bool positiveSide, float spreadDegrees, float tilt01, float twist01)
+    {
+        Vector3 side = positiveSide ? perpendicular : -perpendicular;
+        Vector3 tilted = Quaternion.AngleAxis(Mathf.Clamp01(tilt01) * Mathf.Clamp(spreadDegrees, 0f, 90f), Vector3.up) * side;
+        return Quaternion.AngleAxis(Mathf.Clamp01(twist01) * 360f, side) * tilted;
+    }
+
+    private static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
     /// <summary>암순응 나 배율 — 1 − 낮춤 비율 × 곡선 값. [0, 1].</summary>
     public static float DimFactor(float depth, float envelope) =>

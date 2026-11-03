@@ -376,14 +376,222 @@ public sealed class InterruptHitLightTests
     }
 
     [Test]
-    public void 단계_발생_위치_기본은_오른손_무기()
+    public void 단계_발생_위치_기본은_틈_수직_직렬화_값은_그대로()
     {
-        Assert.AreEqual(InterruptHitLightOrigin.CasterWeapon, new InterruptTierProfile().hitLightOrigin);
+        Assert.AreEqual(0, (int)InterruptHitLightOrigin.CasterWeapon, "직렬화 값 — 순서 바꾸지 않는다");
+        Assert.AreEqual(1, (int)InterruptHitLightOrigin.Target);
+        Assert.AreEqual(2, (int)InterruptHitLightOrigin.Gap);
+        Assert.AreEqual(InterruptHitLightOrigin.Gap, new InterruptTierProfile().hitLightOrigin);
         var go = new GameObject("Director");
         _objects.Add(go);
         var director = go.AddComponent<InterruptProductionDirector>();
-        Assert.AreEqual(InterruptHitLightOrigin.CasterWeapon, director.TierProfile(InterruptPresentationTier.Normal).hitLightOrigin);
-        Assert.AreEqual(InterruptHitLightOrigin.CasterWeapon, director.TierProfile(InterruptPresentationTier.Dash).hitLightOrigin);
+        Assert.AreEqual(InterruptHitLightOrigin.Gap, director.TierProfile(InterruptPresentationTier.Normal).hitLightOrigin);
+        Assert.AreEqual(InterruptHitLightOrigin.Gap, director.TierProfile(InterruptPresentationTier.Dash).hitLightOrigin);
+    }
+
+    [Test]
+    public void NetworkManager_프리팹_단계_위치는_틈_수직()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/Network/NetworkManager.prefab");
+        Assert.IsNotNull(prefab);
+        var director = prefab.GetComponentInChildren<InterruptProductionDirector>(true);
+        Assert.IsNotNull(director);
+        Assert.AreEqual(InterruptHitLightOrigin.Gap, director.TierProfile(InterruptPresentationTier.Normal).hitLightOrigin);
+        Assert.AreEqual(InterruptHitLightOrigin.Gap, director.TierProfile(InterruptPresentationTier.Dash).hitLightOrigin);
+    }
+
+    // ---- 194 후속 — 틈 수직: 무기와 대상 표면 사이, 시전자→대상 축에 수직 ----
+
+    private static readonly Vector3 TopDownView = new Vector3(0f, -0.8f, 0.6f); // 탑다운 카메라(앞으로 기울어짐)
+
+    [Test]
+    public void 틈_위치는_무기와_대상_표면의_중간점()
+    {
+        Vector3 surface = new Vector3(4f, 1.3f, 0.5f);
+        InterruptHitLightPlacement p = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, WeaponPoint, null, surface, TopDownView);
+        AssertVector((WeaponPoint + surface) * 0.5f, p.Position);
+        Assert.IsTrue(p.HasDirection);
+    }
+
+    [Test]
+    public void 틈_대체_무기_없으면_시전자_중심_표면_없으면_대상_시전자_없으면_대상_방향_없음()
+    {
+        Vector3 center = new Vector3(0f, 1f, 0f);
+        InterruptHitLightPlacement noWeapon = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, null, center, null, TopDownView);
+        AssertVector((center + TargetPoint) * 0.5f, noWeapon.Position, "무기 없음 = 시전자 중심, 표면 없음 = 대상 적중점");
+        Assert.IsTrue(noWeapon.HasDirection);
+
+        InterruptHitLightPlacement weaponWins = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, WeaponPoint, center, null, TopDownView);
+        AssertVector((WeaponPoint + TargetPoint) * 0.5f, weaponWins.Position, "무기가 있으면 중심은 안 쓴다");
+
+        InterruptHitLightPlacement noCaster = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, null, null, null, TopDownView);
+        AssertVector(TargetPoint, noCaster.Position, "시전자 못 찾음 = 대상 적중점");
+        Assert.IsFalse(noCaster.HasDirection, "방향 없음 = V1·V2 처음 모습");
+
+        InterruptHitLightPlacement overlap = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, TargetPoint + Vector3.up, null, null, TopDownView);
+        Assert.IsFalse(overlap.HasDirection, "시전자·대상이 바닥에서 겹치면 축 없음");
+
+        Assert.IsFalse(InterruptHitLightRules.Place(InterruptHitLightOrigin.CasterWeapon, TargetPoint, WeaponPoint, center, null, TopDownView).HasDirection,
+            "무기 모드 = 방향 없음");
+        Assert.IsFalse(InterruptHitLightRules.Place(InterruptHitLightOrigin.Target, TargetPoint, WeaponPoint, center, null, TopDownView).HasDirection,
+            "대상 모드 = 방향 없음");
+    }
+
+    [Test]
+    public void 틈_방향은_바닥_평면에서_시전자_대상_축에_수직()
+    {
+        InterruptHitLightPlacement p = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, WeaponPoint, null, null, TopDownView);
+        Vector3 expectedAxis = new Vector3(TargetPoint.x - WeaponPoint.x, 0f, TargetPoint.z - WeaponPoint.z).normalized;
+        AssertVector(expectedAxis, p.Axis, "축 = 시전자 쪽 → 대상, 높이 무시");
+        Assert.AreEqual(1f, p.Perpendicular.magnitude, 1e-4f);
+        Assert.AreEqual(0f, p.Perpendicular.y, 1e-5f, "수직선은 바닥 평면");
+        Assert.AreEqual(0f, Vector3.Dot(p.Perpendicular, p.Axis), 1e-5f, "축에 수직");
+        Assert.AreEqual(1f, Mathf.Abs(InterruptHitLightRules.FlatPerpendicular(Vector3.back).x), 1e-5f, "축 = 앞뒤 → 수직선 = 좌우");
+        Assert.AreEqual(Vector3.zero, InterruptHitLightRules.FlatPerpendicular(Vector3.up), "축 없음 = 0");
+    }
+
+    [Test]
+    public void 카메라_기울기_면은_화면을_향하고_화면에서_수직선_각도로_보인다()
+    {
+        Vector3 view = TopDownView.normalized;
+        Vector3 line = new Vector3(1f, 0f, 1f).normalized;
+        Quaternion rotation = InterruptHitLightRules.ViewTilted(line, view);
+        AssertVector(view, rotation * Vector3.forward, "로컬 Z = 시선(면이 카메라를 향한다)");
+        Vector3 x = rotation * Vector3.right;
+        Assert.AreEqual(0f, Vector3.Dot(x, view), 1e-5f, "로컬 X 는 화면 면 안");
+        // 화면 면에 투영했을 때 같은 방향 = 화면에서 그 각도로 보인다.
+        AssertVector(Vector3.ProjectOnPlane(line, view).normalized, x, "로컬 X = 수직선의 화면 투영");
+        Assert.Greater(Vector3.Dot(x, line), 0.5f, "바닥 선을 카메라 쪽으로 기울인 것");
+
+        Quaternion straightDown = InterruptHitLightRules.ViewTilted(Vector3.right, Vector3.down);
+        AssertVector(Vector3.right, straightDown * Vector3.right, "수직 아래 시선 = 바닥 선 그대로");
+
+        Quaternion parallel = InterruptHitLightRules.ViewTilted(Vector3.down, Vector3.down);
+        Assert.AreEqual(0f, Vector3.Dot(parallel * Vector3.right, Vector3.down), 1e-5f, "선이 시선과 평행해도 화면 면 안(대체)");
+        AssertVector(Vector3.down, InterruptHitLightRules.ViewTilted(line, Vector3.zero) * Vector3.forward, "시선 없음 = 수직 아래");
+    }
+
+    [Test]
+    public void 틈_불꽃_방향은_수직선_양쪽_퍼짐_원뿔_안()
+    {
+        Vector3 perpendicular = Vector3.right;
+        for (int i = 0; i <= 10; i++)
+        {
+            float u = i / 10f;
+            Vector3 plus = InterruptHitLightRules.SparkDirection(perpendicular, true, 30f, u, 1f - u);
+            Vector3 minus = InterruptHitLightRules.SparkDirection(perpendicular, false, 30f, 1f - u, u);
+            Assert.LessOrEqual(Vector3.Angle(plus, perpendicular), 30.01f);
+            Assert.LessOrEqual(Vector3.Angle(minus, -perpendicular), 30.01f);
+            Assert.AreEqual(1f, plus.magnitude, 1e-4f);
+        }
+
+        AssertVector(perpendicular, InterruptHitLightRules.SparkDirection(perpendicular, true, 0f, 0.7f, 0.3f), "퍼짐 0 = 수직선");
+    }
+
+    [Test]
+    public void 틈_모드는_무기를_찾고_없으면_시전자_중심_대상_표면을_묻고_한_번만_계산()
+    {
+        InterruptHitLightFx fx = CreateFx();
+        var scene = new FakeScene { Center = new Vector3(0f, 1f, 0f), Surface = new Vector3(4.5f, 1.2f, 0f), View = TopDownView };
+        var player = new InterruptHitLightPlayer(() => CreateLook(false), () => fx, casterWeapon: _ => null, scene: scene);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest
+        {
+            Point = TargetPoint, CasterClientId = 7, Origin = InterruptHitLightOrigin.Gap, Look = InterruptSuccessLook.HitLight,
+        }, 0f);
+
+        Assert.AreEqual(7ul, scene.AskedCaster);
+        AssertVector(scene.Center, scene.AskedFrom, "대상 표면은 시전자 쪽 점에서 가장 가까운 곳");
+        AssertVector((scene.Center + scene.Surface) * 0.5f, player.FxPoint);
+        AssertVector(player.FxPoint, fx.transform.position);
+        Assert.IsTrue(player.Placement.HasDirection);
+
+        scene.Center = Vector3.zero;
+        player.Tick(0.3f);
+        Assert.AreEqual(1, scene.Calls, "성공 순간 한 번만");
+    }
+
+    [Test]
+    public void 틈_재생은_빛줄기_가로빛줄을_기울이고_무기_모드는_프리팹_값으로_되돌린다()
+    {
+        InterruptHitLightFx fx = CreateFx();
+        ParticleSystem rays = AddSystem(fx, InterruptHitLightFx.RaysName, ParticleSystemRenderMode.Mesh);
+        ParticleSystem streak = AddSystem(fx, InterruptHitLightFx.StreakName, ParticleSystemRenderMode.Mesh);
+        ParticleSystem sparks = AddSystem(fx, InterruptHitLightFx.SparksName, ParticleSystemRenderMode.Stretch);
+        InterruptHitLightLook look = CreateLook(false);
+
+        InterruptHitLightPlacement placement = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, WeaponPoint, null, null, TopDownView);
+        fx.Play(placement, look);
+        Assert.AreEqual(ParticleSystemRenderSpace.Local, rays.GetComponent<ParticleSystemRenderer>().alignment);
+        Assert.AreEqual(ParticleSystemRenderSpace.Local, streak.GetComponent<ParticleSystemRenderer>().alignment);
+        AssertVector(InterruptHitLightRules.ViewTilted(placement.Perpendicular, placement.ViewForward) * Vector3.right, rays.transform.right);
+        AssertVector(InterruptHitLightRules.ViewTilted(placement.Perpendicular, placement.ViewForward) * Vector3.right, streak.transform.right,
+            "가로 빛줄 기본 = 수직선");
+        Assert.AreEqual(look.GapRayCount, rays.particleCount, "빛줄기 줄 수만큼 직접 방출");
+        Assert.IsFalse(rays.emission.enabled);
+        Assert.IsFalse(sparks.emission.enabled);
+        Assert.Greater(sparks.particleCount, 0);
+
+        fx.Play(WeaponPoint, look);
+        Assert.AreEqual(ParticleSystemRenderSpace.View, rays.GetComponent<ParticleSystemRenderer>().alignment, "무기 모드 = 처음 모습");
+        Assert.AreEqual(ParticleSystemRenderSpace.View, streak.GetComponent<ParticleSystemRenderer>().alignment);
+        Assert.AreEqual(Quaternion.identity, rays.transform.localRotation);
+        Assert.IsTrue(rays.emission.enabled);
+        Assert.IsTrue(sparks.emission.enabled);
+    }
+
+    private ParticleSystem AddSystem(InterruptHitLightFx fx, string name, ParticleSystemRenderMode mode)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(fx.transform, false);
+        ParticleSystem system = go.AddComponent<ParticleSystem>();
+        system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        ParticleSystem.MainModule main = system.main;
+        main.playOnAwake = false;
+        main.loop = false;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        system.emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 6) });
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        renderer.renderMode = mode;
+        renderer.alignment = ParticleSystemRenderSpace.View;
+        return system;
+    }
+
+    private static void AssertVector(Vector3 expected, Vector3 actual, string message = null)
+    {
+        Assert.Less((expected - actual).magnitude, 1e-4f, $"{message} expected {expected} actual {actual}");
+    }
+
+    private sealed class FakeScene : IInterruptHitLightScene
+    {
+        public Vector3 Center;
+        public Vector3 Surface;
+        public Vector3 View;
+        public ulong AskedCaster;
+        public Vector3 AskedFrom;
+        public int Calls;
+
+        public bool TryGetCasterCenter(ulong casterClientId, out Vector3 center)
+        {
+            Calls++;
+            AskedCaster = casterClientId;
+            center = Center;
+            return true;
+        }
+
+        public bool TryGetTargetSurface(Vector3 targetPoint, Vector3 from, out Vector3 surface)
+        {
+            AskedFrom = from;
+            surface = Surface;
+            return true;
+        }
+
+        public bool TryGetViewForward(out Vector3 forward)
+        {
+            forward = View;
+            return true;
+        }
     }
 
     [Test]
