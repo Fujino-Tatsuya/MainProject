@@ -2849,6 +2849,7 @@ MonoBehaviour:
   passiveHitReferenceHeight: 2
   passiveHitMaxSizeScale: 3
   passiveHitFallbackOffset: {x: 0, y: 1, z: 0}
+  qBlast: {fileID: 11400000, guid: b155a509ddbf4c41b7f227a70a2dfb31, type: 2}
   guardWaveRing: {fileID: 11400000, guid: 6b46c053860744f3ab1e3b8324f725fe, type: 2}
   shareHealSwirl: {fileID: 11400000, guid: ecbb8637477210245b42b141cad3c183, type: 2}
   shareHealSwirlOffset: {x: 0, y: 0, z: 0}

@@ -56,6 +56,8 @@ public class EffectCatalog : ScriptableObject
     [Header("플레이어 — 방패 돌진(Q)")]
     [field: SerializeField] public EffectEntry ShieldDash_Trail { get; private set; }
     [field: SerializeField] public EffectEntry ShieldDash_Smash { get; private set; }
+    // 진격의 충격(PAL_4_Q_BLAST) — Q 끝 지점 앞 부채꼴 충격(PaladinSkillView, 배율 = 판정 부채꼴 range).
+    [field: SerializeField] public EffectEntry QBlast { get; private set; }
 
     [Header("플레이어 — 수호자의 의지(E)")]
     // Barrier 는 보호막이 떠 있는 동안의 루프, Break 는 피해로 깨질 때만 나가는 원샷이다.

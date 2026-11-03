@@ -1,4 +1,36 @@
-# ▶▶▶ 계획 = **수호의 파동(PAL_4_E_PUSH) VFX — 바람 링 + 밀린 적마다 바람 줄기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **적별 줄기(Push) 뺌, 링만** · ✅ MainProject 연결(컴파일 0 · 랩에서 반격 순간 링 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-guard-wave-vfx.md](Docs/tech/handoff-guard-wave-vfx.md))
+# ▶▶▶ 계획 = **진격의 충격(PAL_4_Q_BLAST) VFX — 부채꼴 충격파 + 착탄 섬광 + 흙먼지·파편 + 일렁임** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **균열 레이어 뺌** · ✅ MainProject 연결(컴파일 0 · 랩에서 Q 종료 → 끝 지점 충격 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-q-blast-vfx.md](Docs/tech/handoff-q-blast-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안). 기획 `Re_C_특성_기획서_20261016.html` — Q 가 끝나는 지점 앞쪽에 충격(추가 피해).
+> **1단계 = MyProject 제작 + 테스트 씬 → 민경 Play 확인·승인. 2단계(승인 뒤) = MainProject import·연결.** 판정·피해 코드 무변경 — 연출 구독만.
+
+## 사실 (코드 확인)
+- `FirstMeleeMainSkill.OnEnd` → `QBlastFires`(Completed·Released·MaxDurationReached, 살아 있을 때) → `delay`(0.05초) 뒤 서버 판정 1회. 돌파의 방패(Q 대시)로 끝나도 같다. 빗나가도 난다.
+- 사건 `TraitFxTrait.PaladinAdvanceImpact`(이미 나감, 구독 없음): **Activated** 판정 순간 1번 · Pos/Dir = Q 끝 지점·마지막 진행 방향 · Shape = 특성 파생 hitArea / **Hit** 추가 피해 대상마다.
+- ⚠️ **기획서 ≠ 데이터**: 기획 "전방 1m 중심 반경 2m 원" / `PAL_4_Q_BLAST.asset` hitArea = **Q 끝 지점에서 앞으로 90° 부채꼴, range 2m**(forwardOffset 0). 은희 영역 — 고치지 않고 handoff 에 알린다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 모양(Q1) | **실제 판정 데이터(부채꼴)** — 사건 도형의 `AttackSectorShape.Range` 로 배율(각도 90° 는 저작 고정). 데이터가 원으로 바뀌면 그때 모양 맞춤 |
+| 레이어(Q2) | **A 착탄 섬광 + B 부채꼴 충격파(주인공, 바닥을 앞으로 쓸며 range 끝까지) + C 흙먼지·돌 파편·짧은 바닥 균열 + D 공기 일렁임** · E 적별 표시 없음(보고 필요하면) |
+| 색(Q3) | **진한 금빛 충격(섬광·충격파) + 갈색 흙먼지·파편** — 수호의 파동(흰 바람)과 구분 |
+| 속도(Q4) | **충격파 ~0.15초에 끝 도달 · 전체 ~0.6초**(먼지만 조금 더) |
+| 테스트(Q5) | MyProject `Scenes/QBlastPreview.unity` — 팔라딘 정면 정지 + 2m·90° 부채꼴 가이드 + 허수아비(안 2 · 밖 1) · 키로 터뜨림·반복·시점·배속 |
+| 제작·경로 | 빌드 메뉴 `Tools/VFX/Q Blast (팔라딘 진격의 충격) 빌드` → `Export/Player1/QSkill/QBlast/` · MainProject `50.Art/VFX/Common/Players/Player1/QSkill/QBlast/`(SVN) |
+
+## 작업 순서
+1. MyProject: 빌더(부채꼴 메시 range 1 저작 → 배율 = range) → `FX_QBlast` 프리팹·재질·텍스처 · 테스트 씬·테스터.
+2. ⏸ 민경 Play 확인 → 수정 → **승인**.
+3. MainProject(승인 뒤): 에셋 import · 엔트리 · `EffectCatalog` · `PaladinSkillView` 가 `PaladinAdvanceImpact` Activated 를 받아 Pos·Dir(회전)·Range(배율)로 재생 · DebugTraitLab 확인.
+4. 문서: handoff(기획≠데이터 알림 포함) · `trait-effect-events.md` 구독 칸 · `CONTEXT.md`.
+
+## 완료 조건
+- 테스트 씬: 충격파가 부채꼴 가이드 끝에 맞게 닿고, 금빛 충격 + 흙먼지로 "내리찍은 충격"이 읽힌다(민경 승인).
+- MainProject: Q 정상 종료 0.05초 뒤 끝 지점 앞쪽에 재생, 방향 = 마지막 진행 방향 · 돌파의 방패 종료도 동일 · 강제 중단 땐 없음 · 컴파일 0.
+
+---
+
+# 계획(이전) = **수호의 파동(PAL_4_E_PUSH) VFX — 바람 링 + 밀린 적마다 바람 줄기** (2026-11-02 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **적별 줄기(Push) 뺌, 링만** · ✅ MainProject 연결(컴파일 0 · 랩에서 반격 순간 링 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-guard-wave-vfx.md](Docs/tech/handoff-guard-wave-vfx.md))
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-02, 전부 추천안). 기획 `Re_C_특성_기획서_20261016.html` — E 로 막으면 반격과 함께 주변 radius 3m 밀치기(pushDistance 2 · pushDuration 0.25).
 > **1단계 = MyProject 제작 + 테스트 씬 → 민경이 직접 Play 확인·승인. 2단계(승인 뒤) = MainProject import·연결.** 코드는 연출 구독만 — 판정·밀치기 무변경.
