@@ -55,6 +55,16 @@ public sealed class InterruptSlowMotionSettings : ScriptableObject
              "시도에서 이어진 성공은 둘 중 더 깊은 쪽(강 0.7 → 성공은 0.7 유지). 이 피어 값을 쓴다(A3 칸이 켜져야 쓰인다)")]
     [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = DefaultSlowMotionZoomFactor;
 
+    // ④ 카메라 대상 중심(할 일 196) — 간파 클릭 즉시 오너 화면 카메라 중심을 간파 대상 쪽으로(강·약 예측, 대상 없음 = 그대로). 줌(위 배율)은 그대로, 중심만.
+    // 켜기/끄기 = 디렉터 칸(cameraCenter). 이 피어 값을 쓴다(오너 화면만). 시간은 실제 시간(슬로우·히트스톱 무관).
+    [Header("④ 카메라 대상 중심 (할 일 196)")]
+    [Tooltip("간파 클릭 순간 카메라 중심이 대상 쪽으로 옮겨 가는 시간(초, 실제 시간). 0 = 순간 이동")]
+    [SerializeField, Min(0f)] private float cameraCenterMoveDuration = 0.08f;
+    [Tooltip("대상 쪽 이동 비율 [0, 1] — 1 = 대상이 화면 정중앙, 0.5 = 평소 중심과 대상 사이 절반, 0 = 옮기지 않음")]
+    [SerializeField, Range(0f, 1f)] private float cameraCenterRatio = 1f;
+    [Tooltip("평소 중심으로 돌아가는 시간(초, 실제 시간). 판정 실패·서버 거부 = 그 순간, 성공 = 적중 슬로우 복귀 구간 시작에 맞춰 시작. 0 = 순간 복귀")]
+    [SerializeField, Min(0f)] private float cameraCenterReturnDuration = 0.25f;
+
     public SlowMotionProfile InterruptDashProfile => interruptDashProfile;
     public SlowMotionProfile InterruptDashWeakProfile => interruptDashWeakProfile;
     public SlowMotionProfile InterruptProfile => interruptProfile;
@@ -63,6 +73,9 @@ public sealed class InterruptSlowMotionSettings : ScriptableObject
     public float InterruptWeakZoomFactor => interruptWeakZoomFactor;
     public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
     public float SlowMotionZoomFactor => slowMotionZoomFactor;
+    public float CameraCenterMoveDuration => cameraCenterMoveDuration;
+    public float CameraCenterRatio => cameraCenterRatio;
+    public float CameraCenterReturnDuration => cameraCenterReturnDuration;
 
     private static SlowMotionProfile StrongAttemptDefaults() => new SlowMotionProfile
     {
