@@ -6,7 +6,7 @@ using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
 // 간파 암전 렌더 기능 — 한 기능에 모드 2개(할 일 87 C3 → 132).
-//  · 휘도 암순응(팀원·A2): 휘도 임계보다 어두운 픽셀만 낮추고, 시전자 주변은 원형으로 살린다.
+//  · 휘도 암순응(팀원·A2): 휘도 임계보다 어두운 픽셀만 화면 전체에서 고르게 낮춘다(대상 주변 원은 11-03 삭제).
 //    후처리 전(HDR)에 돌아 임계를 HDR 휘도로 보고, 남긴 밝은 픽셀에서 Bloom 이 그대로 나온다.
 //  · 마스크 암전(오너): 렌더링 레이어 비트 4(InterruptOwnerMaskLayers)를 가진 렌더러만 투명 검정 위에 다시 그려 '남김 레이어'를 만들고,
 //    그 덮개 알파(1 − 남김)를 DarkAdaptationState.MaskCoverTarget 에 쓴다. 실제 덮기는 HUD 위 최상위 오버레이 캔버스(InterruptOwnerHudCover)가
@@ -555,8 +555,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
     {
         private static readonly Vector4 FullScreenScaleBias = new Vector4(1f, 1f, 0f, 0f);
         private static readonly int IdParams = Shader.PropertyToID("_DarkAdaptParams");
-        private static readonly int IdReveal = Shader.PropertyToID("_DarkAdaptReveal");
-        private static readonly int IdAspect = Shader.PropertyToID("_DarkAdaptAspect");
 
         private Material _material;
 
@@ -565,8 +563,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
             public Material material;
             public TextureHandle source;
             public Vector4 parameters;
-            public Vector4 reveal;
-            public float aspect;
         }
 
         public DarkAdaptationPass()
@@ -596,9 +592,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
             if (!source.IsValid())
                 return;
 
-            RenderTextureDescriptor cameraDescriptor = frameData.Get<UniversalCameraData>().cameraTargetDescriptor;
-            float aspect = Mathf.Max(1, cameraDescriptor.width) / (float)Mathf.Max(1, cameraDescriptor.height);
-
             TextureDesc descriptor = renderGraph.GetTextureDesc(source);
             descriptor.name = "_CameraColorDarkAdaptation";
             descriptor.clearBuffer = false;
@@ -614,13 +607,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
                     Mathf.Max(0f, DarkAdaptationState.LuminanceThreshold),
                     Mathf.Max(0f, DarkAdaptationState.ThresholdSoftness),
                     Mathf.Clamp01(DarkAdaptationState.MaxDarken));
-                // xy=원형 중심(뷰포트), z=반경(화면 높이 비율, 0=끔), w=가장자리 부드러움 — 화면비는 셰이더가 _DarkAdaptAspect 로 보정
-                data.reveal = new Vector4(
-                    DarkAdaptationState.RevealCenter.x,
-                    DarkAdaptationState.RevealCenter.y,
-                    Mathf.Max(0f, DarkAdaptationState.RevealRadius),
-                    Mathf.Max(0f, DarkAdaptationState.RevealSoftness));
-                data.aspect = aspect;
 
                 builder.UseTexture(source, AccessFlags.Read);
                 builder.SetRenderAttachment(destination, 0, AccessFlags.Write);
@@ -628,8 +614,6 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
                 {
                     // 다른 카메라의 설정과 섞이지 않도록 기록해 둔 값을 실행 직전에 전달한다.
                     d.material.SetVector(IdParams, d.parameters);
-                    d.material.SetVector(IdReveal, d.reveal);
-                    d.material.SetFloat(IdAspect, d.aspect);
                     Blitter.BlitTexture(context.cmd, d.source, FullScreenScaleBias, d.material, 0);
                 });
             }

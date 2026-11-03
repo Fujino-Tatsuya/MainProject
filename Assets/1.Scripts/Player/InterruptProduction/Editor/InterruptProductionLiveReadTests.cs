@@ -12,7 +12,7 @@ public sealed class InterruptProductionLiveReadTests
     private sealed class FakeDarkAdaptation : IInterruptDarkAdaptationOutput
     {
         public int Plays;
-        public void Play(bool viewerIsCaster, ulong casterClientId, Vector3 targetPosition) => Plays++;
+        public void Play(bool viewerIsCaster) => Plays++;
         public void Stop() { }
     }
 

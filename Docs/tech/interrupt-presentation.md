@@ -416,25 +416,16 @@ xlsx: 강·성공은 기존 열, **약 `interruptWeakProfile.*` 는 반영 예�
 | `luminanceThreshold` | 0.8 | 이 HDR 휘도보다 어두운 픽셀만 낮춘다(빛 이펙트·발광은 남는다) |
 | `thresholdSoftness` | 0.3 | 임계 아래로 부드럽게 섞는 휘도 폭 |
 | `maxDarken` | 0.85 | 강도 1 에서 어두운 픽셀을 낮추는 최대 비율 [0, 1] |
-| `revealCenter` | Target | 원 중심 기준(열거 — **데이터 테이블 열 아님**, 인스펙터·`NetworkManager.prefab` 에서 고른다). Target = 대상 위치 · Caster = 발동자 추적 · Midpoint = 둘의 중간 |
-| `revealRadius` | 0.18 | 중심 주변을 살리는 원 반경(화면 높이 비율). 0 = 원형 끔 |
-| `revealSoftness` | 0.1 | 원 가장자리 부드러움(화면 높이 비율) |
+
+**화면 전체에 고르게.** 대상 주변을 살리는 원(옛 `revealCenter`·`revealRadius` 0.18·`revealSoftness` 0.1)은 **2026-11-03 삭제**(옵션 아님) —
+사용자가 '비네팅'으로 본 것이 이 원 밖 어둡힘이었다. 이제 휘도 임계만으로 밝은 픽셀을 남긴다. A2 팀원 암순응·제압 암순응 컷(§8) 둘 다 같은 패스라 둘 다 원이 없다.
+xlsx `SlowMotion` 시트의 `revealRadius`·`revealSoftness` 행(A43·A44)은 병합 Export 때 "코드에 없어 버려졌다" 2개로 빠진다 — 그 전 테이블 Play 는 "필드가 없다" 오류.
 
 **언제.** 할 일 132 단계 5 부터 성공 `Started` 즉시가 아니라 **적중 섬광 순간**(②③④ 뒤 = ⑤ 시작, 기본 성공 Started 6 프레임째)에 튼다. §17 부터 A2 기본 꺼짐.
 
 **본인/타인.** `Started` 의 발동자 clientId 가 이 피어의 `LocalClientId` 면 `selfIntensity`(디렉터 개인 채널), 아니면 `othersIntensity`(공용 채널).
 단 본인 화면에서 섬광 오버레이가 돌았으면(강 시도 성공) self 암순응은 생략한다 — 마스크 암전·섬광이 대신한다(`InterruptHitFlashRules.SelectDarkAdaptation`).
-`InterruptDarkAdaptation` 은 구독하지 않는 수동 실행자다 — 디렉터가 `Play(viewerIsCaster, …)`·`Stop()` 을 부른다.
-
-**원형 중심**(`InterruptDarkAdaptationModel.TrySelectRevealCenter`) — 매 프레임 메인 카메라 뷰포트로 바꾼다(카메라 뒤면 원형 끔).
-
-| `revealCenter` | 중심 | 시전자를 못 찾으면 |
-|---|---|---|
-| `Target`(기본) | 신호의 대상 위치(고정 월드 좌표) | 상관없음 |
-| `Caster` | 발동자 플레이어 오브젝트(매 프레임 추적, C3 동작) | 원형 끔 |
-| `Midpoint` | 대상과 시전자의 중간 | 대상 |
-
-> 데이터 테이블은 enum 을 템플릿에 넣지 않는다([data-table.md §8](data-table.md)) — `revealCenter` 는 xlsx 열이 없다.
+`InterruptDarkAdaptation` 은 구독하지 않는 수동 실행자다 — 디렉터가 `Play(viewerIsCaster)`·`Stop()` 을 부른다(원이 없어 시전자·대상 위치는 받지 않는다).
 
 ### 2.4 성공 이펙트 칸 — `InterruptSuccessFx` (Player.prefab base 루트)
 
@@ -486,8 +477,8 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
   화면상 차이는 없지만 `Failed` 이벤트가 성공 직전에 한 번 난다 — 디렉터 실패 단계(`InterruptFailStage.Local`, 지금 연출 없음)에 연출을 붙일 땐 같은 판정의 성공과 묶어 걸러야 한다.
 - **임계값은 톤매핑 전 HDR 기준.** `luminanceThreshold` 는 화면에 보이는 최종 밝기가 아니라 후처리 전 HDR 휘도다.
   노출·톤매핑 설정을 바꾸면 같은 값이 다르게 보인다.
-- **대상 위치는 판정 순간 값.** 클라 화면의 대상은 보간 지연만큼 뒤에 있을 수 있어 `targetFx`·Target 원형이 살짝 어긋나 보일 수 있다.
-- 사람이 MPPM 으로 확인할 것: 본인/타인 강도 차이, 원형 중심이 `revealCenter` 대로(기본 = 맞은 대상) 잡히는지,
+- **대상 위치는 판정 순간 값.** 클라 화면의 대상은 보간 지연만큼 뒤에 있을 수 있어 `targetFx` 가 살짝 어긋나 보일 수 있다.
+- 사람이 MPPM 으로 확인할 것: 본인/타인 강도 차이, 암순응이 화면 전체에 고르게(대상 주변 밝은 원 없이) 걸리는지,
   `casterFx`·`targetFx` 를 넣은 뒤 전 화면에서 각각 시전자·대상 위치에 재생되는지. 132 체계 제약은 [§0.8](#08-알려진-제약-132).
 
 ## 6. 간파 연출 디렉터 — `InterruptProductionDirector` (할 일 118)
@@ -685,7 +676,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 
 - 색수차는 132 ⑤ Volume 을 재사용하지 않고 셰이더 안에서 만든다 — ⑤ 는 후처리(톤매핑 전)라 3단 색 양자화가 무지개를 지우기 때문.
 - HUD·피해 숫자(팀원 화면)는 시퀀스 위에 보인다.
-- 시퀀스 뒤 제압 암순응 컷은 일반 암순응 렌더(`InterruptDarkAdaptation`)를 쓰므로 대상 주변 원형 살림(`revealRadius`) 밖이 어둡게 보인다 — 비네팅이 아니라 암순응 원이다(그대로 둔다).
+- 시퀀스 뒤 제압 암순응 컷은 일반 암순응 렌더(`InterruptDarkAdaptation`)를 쓴다 — 화면 전체에 고르게 어두워진다. 예전엔 대상 주변 원(`revealRadius` 0.18) 밖만 어두워 비네팅처럼 보였는데 2026-11-03 원을 삭제했다(§2.3).
 - 렌더링 레이어 Everything 인 렌더러(일부 VFX)는 비트 7 을 이미 갖고 있어 실루엣으로 칠해진다(A7 켬이면 그 VFX 자리에도 섬광이 그려진다). 태깅 뒤 생긴 렌더러는 빠진다.
 - A7 대상 내부 마스크도 깊이 판정이 없다 — 벽·기둥 뒤에 가려진 대상 부분에도 섬광이 그려진다. 가장자리는 마스크 픽셀 경계 그대로(부드럽게 하지 않음).
 - 표식은 23호 칸 판정만 낸다 — 훈련 스파링 봇(`TrainingSparringBot`)·기믹 보상 제압·구출 제압은 일반 섬광.
@@ -744,7 +735,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 ### 8.4 제압 암순응 컷 (Q7) — `SuppressFlashSequence.darkAdaptCuts`
 
 - 섬광 시퀀스 **복귀 컷 뒤**에 이어서 컷마다 `duration`(초, 실제 시간 — 시퀀스 프레임 속도 무관)·`darkness`(암순응 렌더 강도 [0, 1])를 그대로 붙잡는다. 기본 = **어두움 1.0 · 0.15초 → 중간 0.5 · 0.15초 → 원래 색**. 비우면 컷 암순응 없음.
-- 렌더 = 기존 암순응(`InterruptDarkAdaptation` — 밝은 빛·이펙트는 남고 어두운 픽셀만 낮춤, 임계·원형 칸은 그 컴포넌트). 곡선(A2 팀원 암순응)은 멈추고 값만 붙잡는다(`ShowDarkAdaptCut`) — A2 칸·곡선 수치와는 무관.
+- 렌더 = 기존 암순응(`InterruptDarkAdaptation` — 밝은 빛·이펙트는 남고 어두운 픽셀만 화면 전체에서 고르게 낮춤 — 대상 주변 원 없음(11-03 삭제), 임계 칸은 그 컴포넌트). 곡선(A2 팀원 암순응)은 멈추고 값만 붙잡는다(`ShowDarkAdaptCut`) — A2 칸·곡선 수치와는 무관.
 - 모든 피어 같은 값(Q8 공용). 강제 리셋·새 제압 간파면 즉시 걷는다.
 
 ### 8.5 DebugInterruptLab 버튼 (튜닝 패널 "간파 단계")
