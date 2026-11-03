@@ -165,6 +165,16 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [Tooltip("E 백스텝 전용 잔상(EBackstepAfterimage). 비워도 잔상만 빠진다")]
     [SerializeField] private DashAfterimage backstepAfterimage;
 
+    // ── 한계 돌파(GUN_2_OVERDRIVE) 과열 색 ───────────────────────────────
+    // 2026-11-03 민경 grill(PLAN.md 「한계 돌파 VFX」). 한계 돌파를 가진 거너의 기본 공격·Q·R 공격 이펙트를
+    // 피해에 쓴 과열 단계 색으로 칠한다(EffectSocketPlayer.SetTint — 색상 교체, 밝기 유지). 0단계·특성 없음 = 원래 색.
+    // 단계 = 피해와 같은 단계: 기본 공격 = 그 발(ShotRpc 인자), Q 발사 = 시전 시작 저장 단계(ChargeLaserFiredRpc 인자),
+    // Q 충전·R 시전 = 시전 순간 각 피어가 복제된 과열로 계산(LocalOverdriveStage — 서버의 저장 단계와 같은 순간·같은 값).
+    // E·간파·잔류 포격 폭발은 칠하지 않는다(소켓 색은 남으므로 공유 소켓은 재생 직전마다 정한다).
+    [Header("한계 돌파 과열 색")]
+    [Tooltip("과열 단계별 색 표. 9.ScriptableObject/Effects/GunnerOverdriveVfxColors. 비우면 색을 바꾸지 않는다")]
+    [SerializeField] private GunnerOverdriveVfxColors overdriveColors;
+
 
     // 🔴 Q 빔도 좌클릭과 **같은 1m 규약**이다. 값을 따로 두는 건 프리팹을 갈아끼울 때를 위한 여지일 뿐.
     //    (규약: Stretched 는 lengthScale 1, 이동형은 lifetime 1 — 그래야 "값 1 = 1m" 이 성립한다.
@@ -217,6 +227,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private float chargeStartTime;
     private float chargeMaxTime = 1.2f;
     private bool chargeFullPlayed;
+    private EffectTint chargeTint;   // 이번 집중의 색 — 충전 루프·완료 알림·과충전이 같이 쓴다
+    private EffectTint impactTint;   // 날아가는 기본 공격 빔이 닿을 때 낼 착탄 색(그 발의 색)
+    private GunnerHeat heat;
 
     public bool IsCharging => charging;
 
@@ -241,6 +254,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         animator = GetComponentInChildren<Animator>();
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
+        heat = GetComponent<GunnerHeat>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
         echoBombVisuals = new GunnerEchoBombVisuals(echoBombVfxPrefab, echoBombShowDelay, echoBombOffset, echoBombPreviewTimeout);
     }
@@ -345,6 +359,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (!echoBombVisuals.Remove(bombId, out Vector3 position))
             return;
 
+        Tint(chargeMonsterHitPlayer, EffectTint.None);   // Q 적중 소켓을 나눠 쓴다 — 폭발은 원래 색
         PlayAt(chargeMonsterHitPlayer, position, Quaternion.identity);
         traitFxPlayer ??= GetComponent<Player>();
         TraitSkillFx.Raise(new TraitFxEvent(TraitFxTrait.GunnerEchoBomb, TraitFxKind.Exploded, traitFxPlayer, position, transform.forward,
@@ -378,10 +393,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
         chargeStartTime = Time.time;
         chargeFullPlayed = false;
         charging = true;
+        chargeTint = OverdriveTint(LocalOverdriveStage());
 
         if (chargeLoopPlayer != null)
         {
             FaceForward(chargeLoopPlayer);
+            chargeLoopPlayer.SetTint(chargeTint);
             chargeLoopPlayer.Play();
         }
     }
@@ -450,6 +467,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             return;
 
         FaceForward(ultCastPlayer);
+        ultCastPlayer.SetTint(OverdriveTint(LocalOverdriveStage()));
         ultCastPlayer.PlayOnce();
     }
 
@@ -533,12 +551,14 @@ public class GunnerBeamView : BaseNetworkBehaviour
             if (chargeFullPlayer != null)
             {
                 FaceForward(chargeFullPlayer);
+                chargeFullPlayer.SetTint(chargeTint);
                 chargeFullPlayer.PlayOnce();
             }
 
             if (overchargePlayer != null)
             {
                 FaceForward(overchargePlayer);
+                overchargePlayer.SetTint(chargeTint);
                 overchargePlayer.Play();
             }
         }
@@ -562,24 +582,27 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <param name="stopped">지형에 막혀 끝났는가(true) / 최대 사거리까지 뻗었는가(false)</param>
     /// <param name="hitPoints">피해를 준 몹마다의 빔 위 지점. 비어 있으면 아무도 못 맞혔다</param>
     /// <param name="echoTargetIds">잔류 포격 예비 구체를 띄울 맞은 대상 네트워크 ID — 특성(GUN_4_ECHO_Q)이 없으면 빈 배열(서버가 정한다)</param>
+    /// <param name="overdriveStage">한계 돌파 색 단계 = 이 발 피해에 쓴 시전 시작 저장 단계(한계 돌파가 아니면 0). 연출 색만 — 판정 무관</param>
     public void ServerChargeLaserFired(Vector3 origin, Vector3 end, float width,
-                                       bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
+                                       bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds, int overdriveStage = 0)
     {
+        byte stage = (byte)Mathf.Clamp(overdriveStage, 0, 255);
         if (IsNetworkActive)
-            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints, echoTargetIds);
+            ChargeLaserFiredRpc(origin, end, width, stopped, hitPoints, echoTargetIds, stage);
         else
-            PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
+            PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds, stage);
     }
 
     // Reliable — 연출뿐 아니라 Focus → Skill 상태 전환도 싣는다(빠지면 그 피어만 집중 상태에 남는다).
     [Rpc(SendTo.ClientsAndHost)]
     private void ChargeLaserFiredRpc(Vector3 origin, Vector3 end, float width,
-                                     bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
-        => PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds);
+                                     bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds, byte overdriveStage)
+        => PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds, overdriveStage);
 
     private void PlayChargeLaser(Vector3 origin, Vector3 end, float width,
-                                 bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds)
+                                 bool stopped, Vector3[] hitPoints, ulong[] echoTargetIds, byte overdriveStage)
     {
+        EffectTint tint = OverdriveTint(overdriveStage);
         // 잔류 포격 예비 구체(할 일 149 후속 3) — 적중 순간 먼저 띄우고, 서버 부착(NetworkList Add)이 같은 구체를 이어받는다.
         if (echoTargetIds != null)
         {
@@ -602,9 +625,13 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (chargeVentPlayer != null)
         {
             FaceForward(chargeVentPlayer);
+            chargeVentPlayer.SetTint(tint);
             chargeVentPlayer.PlayOnce();   // 지연은 엔트리의 part delay 가 준다
         }
 
+        Tint(chargeBeamPlayer, tint);
+        Tint(chargeEndPlayer, tint);
+        Tint(chargeMonsterHitPlayer, tint);
         PlayChargeBeam(origin, end, width, stopped, hitPoints);
         RaiseWideLaserFx(origin, end, hitPoints);
 
@@ -750,7 +777,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <inheritdoc cref="ShowBasicShot(Vector3, Vector3, bool, float)"/>
     /// <param name="stopped">빔이 뭔가에 멈췄나(벽·바닥·몬스터 공통). 공통 착탄 연출을 켠다.</param>
     /// <param name="damagedUnit">몬스터에 피해를 줬나. 공통 착탄 **위에** 한 겹 더 얹는다.</param>
-    public void ShowBasicShot(Vector3 origin, Vector3 end, bool stopped, bool damagedUnit, float width)
+    /// <param name="overdriveStage">한계 돌파 색 단계 = 이 발 피해에 쓴 단계(서버가 ShotRpc 로 준다, 한계 돌파가 아니면 0).</param>
+    public void ShowBasicShot(Vector3 origin, Vector3 end, bool stopped, bool damagedUnit, float width, int overdriveStage = 0)
     {
         if (basicBeamPlayer == null)
         {
@@ -780,6 +808,11 @@ public class GunnerBeamView : BaseNetworkBehaviour
         //    조준(회전)과 길이는 아래 UpdateBeam 이 **매 프레임** 다시 잡는다.
         // 앞 발이 아직 안 닿았으면(속도를 아주 낮춘 경우) 그 착탄을 지금 낸다 — 덮어써서 잃지 않게.
         if (pendingImpact) ArriveBeam();
+
+        // 이 발의 색 — 앞 발 착탄(바로 위 ArriveBeam)은 앞 발 색으로 이미 났다.
+        EffectTint tint = OverdriveTint(overdriveStage);
+        basicBeamPlayer.SetTint(tint);
+        impactTint = tint;
 
         beamEnd = end;
         beamFireTime = Time.time;
@@ -829,6 +862,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
         // 몬스터에 피해를 줬으면 지금처럼 쏜 사람 쪽(캡슐이라 normal 이 거의 같고, 연출이 그 방향 기준이다).
         Quaternion facing = Quaternion.LookRotation(-delta);
         Quaternion impactFacing = damagedUnit ? facing : SurfaceFacing(end, delta, width, facing);
+        Tint(basicHitPlayer, impactTint);
+        Tint(monsterHitPlayer, impactTint);
         PlayAt(basicHitPlayer, end, impactFacing);
         if (damagedUnit) PlayAt(monsterHitPlayer, end, facing);
     }
@@ -922,6 +957,22 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     // 소켓을 그 자리에 찍고 원샷. 비어 있으면 조용한 no-op 이다 —
     // 아직 안 만든 연출(몬스터 적중) 때문에 호출부가 지저분해지지 않게.
+    // ── 한계 돌파 과열 색 ──
+
+    // 단계 색(0·표 없음 = 원래 색).
+    private EffectTint OverdriveTint(int stage) =>
+        overdriveColors != null ? overdriveColors.TintFor(stage) : EffectTint.None;
+
+    // [각 피어] 시전 순간 연출(Q 충전·R 시전)의 단계 — 한계 돌파일 때만 지금 단계(= 서버가 같은 순간 저장하는 CaptureStage).
+    // 과열 상태는 NetworkVariable 로 전 피어에 복제되고 단계는 각 피어가 같은 시계로 계산한다(GunnerHeat).
+    private int LocalOverdriveStage() =>
+        heat != null && heat.Traits.Mode == GunnerHeatMode.Overdrive ? heat.CaptureStage() : 0;
+
+    private static void Tint(EffectSocketPlayer player, in EffectTint tint)
+    {
+        if (player != null) player.SetTint(tint);
+    }
+
     private static void PlayAt(EffectSocketPlayer player, Vector3 position, Quaternion rotation)
     {
         if (player == null) return;

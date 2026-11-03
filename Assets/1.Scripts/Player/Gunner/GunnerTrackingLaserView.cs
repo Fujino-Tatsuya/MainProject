@@ -54,6 +54,15 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
     [Header("레이저")]
     [SerializeField, Min(0.01f)] private float strikeScale = 1f;
 
+    // 한계 돌파 과열 색(2026-11-03 민경 — PLAN.md 「한계 돌파 VFX」). 장판·낙뢰를 시전 시작 저장 단계 색으로 칠한다(조준 표식은 원래 주황 그대로).
+    // 클라는 이 레이저의 시전자·단계를 모르므로 서버가 스폰 전에 단계를 써 둔다(netOverdriveStage — 스폰 메시지에 같이 실린다).
+    [Header("한계 돌파 과열 색")]
+    [Tooltip("과열 단계별 색 표. 9.ScriptableObject/Effects/GunnerOverdriveVfxColors. 비우면 색을 바꾸지 않는다")]
+    [SerializeField] private GunnerOverdriveVfxColors overdriveColors;
+
+    private readonly NetworkVariable<byte> netOverdriveStage = new NetworkVariable<byte>();
+    private int localOverdriveStage;
+
     private readonly NetworkVariable<float> netRadius = new NetworkVariable<float>();
     private readonly NetworkVariable<float> netInterval = new NetworkVariable<float>();
     private readonly NetworkVariable<int> netEnemyMask = new NetworkVariable<int>();
@@ -82,6 +91,8 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
     private float Radius => IsSpawned ? netRadius.Value : localRadius;
     private float Interval => IsSpawned ? netInterval.Value : localInterval;
     private int EnemyMask => IsSpawned ? netEnemyMask.Value : localEnemyMask;
+    private EffectTint OverdriveTint =>
+        overdriveColors != null ? overdriveColors.TintFor(IsSpawned ? netOverdriveStage.Value : localOverdriveStage) : EffectTint.None;
 
     private void OnEnable() => phaseStart = Time.time;
 
@@ -123,6 +134,18 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// [서버] 한계 돌파 색 단계(= 시전 시작 저장 단계, 한계 돌파가 아니면 0). <b>스폰 전에</b> 부른다 — 초기값으로 스폰 메시지에 실려
+    /// 스폰과 같은 프레임의 첫 낙뢰(StrikeRpc)보다 먼저 클라에 닿는다. 연출 색만 — 판정 무관.
+    /// </summary>
+    public void ServerSetOverdriveStage(int stage)
+    {
+        byte value = (byte)Mathf.Clamp(stage, 0, 255);
+        localOverdriveStage = value;
+        if (!IsSpawned || IsServer)
+            netOverdriveStage.Value = value;
+    }
+
     /// <summary>[서버] 피해를 준 순간. 실제로 맞은 적의 위치마다 레이저를 꽂으라고 전 피어에 알린다.</summary>
     public void ServerStrike(List<Unit> landed)
     {
@@ -151,8 +174,19 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
         phaseStart = Time.time;   // 원이 0 이 되는 순간 = 지금
         if (strikeEffect == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
 
+        EffectTint tint = OverdriveTint;
         for (int i = 0; i < positions.Length; i++)
-            effects.Play(strikeEffect, positions[i], Quaternion.identity, strikeScale);
+        {
+            if (!tint.IsSet)
+            {
+                effects.Play(strikeEffect, positions[i], Quaternion.identity, strikeScale);
+                continue;
+            }
+
+            // 색 지정 재생은 핸들이 있어야 한다 — 수명·반납은 Play 와 같다.
+            EffectHandle strike = effects.PlayRecallable(strikeEffect, positions[i], Quaternion.identity, strikeScale);
+            effects.SetTint(strike, tint);
+        }
     }
 
     #endregion
@@ -171,7 +205,10 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
         if (zoneEffect == null) return;
 
         if (!zone.IsSet)
+        {
             zone = effects.PlayLooping(zoneEffect, transform.position, Quaternion.identity, Radius * 2f);
+            effects.SetTint(zone, OverdriveTint);
+        }
 
         effects.GetInstances(zone, instances);
         for (int i = 0; i < instances.Count; i++)

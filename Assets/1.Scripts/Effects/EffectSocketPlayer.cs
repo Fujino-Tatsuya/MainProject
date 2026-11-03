@@ -90,6 +90,34 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     /// </summary>
     public void SetPlayRate(float value) => _playRate = value > 0f ? value : 1f;
 
+    // 런타임 전용 — 색 지정 재생(2026-11-03 민경, EffectManager.SetTint). 직렬화하지 않는다.
+    EffectTint _tint;
+
+    /// <summary>
+    /// 다음 재생부터 이 색으로 칠한다(<see cref="EffectTint"/> — 색상 교체, 밝기·알파 유지). <see cref="EffectTint.None"/> = 원래 색.
+    /// <see cref="SetScale"/>·<see cref="SetPlayRate"/> 와 같은 이유로 <b>코드가</b> 정한다 — 값은 바꿀 때까지 남으므로
+    /// 여러 연출이 같은 소켓을 나눠 쓰면 재생 직전마다 정해 줄 것. 재생 중인 루프에는 즉시 반영된다.
+    /// </summary>
+    public void SetTint(in EffectTint tint)
+    {
+        _tint = tint;
+        if (_handle.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.SetTint(_handle, _tint);
+    }
+
+    // 원샷 — 색이 있으면 핸들을 받아 칠한다(수명·반납은 Play 와 같다). 색이 없으면 예전 그대로.
+    void PlayOneShot(Vector3 position, Quaternion rotation)
+    {
+        if (!_tint.IsSet)
+        {
+            EffectManager.Instance.Play(effect, position, rotation, scale, 0f, _playRate);
+            return;
+        }
+
+        EffectHandle handle = EffectManager.Instance.PlayRecallable(effect, position, rotation, scale, 0f, _playRate);
+        EffectManager.Instance.SetTint(handle, _tint);
+    }
+
     /// <summary>
     /// [애니메이션 이벤트] 재생 시작. 이미 재생 중이면 먼저 회수하고 새로 시작한다
     /// (같은 공격이 연속으로 들어와 시작이 두 번 불리는 경우).
@@ -107,6 +135,7 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
 
         Transform follow = socket != null ? socket : transform;
         _handle = EffectManager.Instance.PlayLooping(effect, follow, offset, scale, 0f, _playRate);
+        if (_tint.IsSet) EffectManager.Instance.SetTint(_handle, _tint);
         _elapsed = 0f;
     }
 
@@ -130,7 +159,7 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
         if (EffectManager.Instance == null) return;
 
         Transform from = socket != null ? socket : transform;
-        EffectManager.Instance.Play(effect, from.position + offset, from.rotation, scale, 0f, _playRate);
+        PlayOneShot(from.position + offset, from.rotation);
     }
 
     /// <summary>
@@ -158,7 +187,7 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
 
         var info = new EffectHitPoint.HitPointInfo(surface.bounds.center, surface, surface.transform);
         Pose pose = EffectHitPoint.Resolve(EffectHitPoint.HitPointMode.CameraDir, info);
-        EffectManager.Instance.Play(effect, pose.position, pose.rotation, scale, 0f, _playRate);
+        PlayOneShot(pose.position, pose.rotation);
     }
 
     /// <summary>

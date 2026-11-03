@@ -394,8 +394,10 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         bool stopped = length < shotRange - 0.01f;
         // 보호막 연출은 안 싣는다 — 받은 아군의 PlayerShieldVfx 가 복제된 보호막 목록을 보고 띄운다.
         // 🔴 연출 폭은 데이터 폭 그대로(광폭 레이저 VFX 폭 반영은 별도 할 일 — 판정만 넓힌다).
+        // 한계 돌파 과열 색(2026-11-03 민경) — 이 발 피해에 쓴 시전 시작 저장 단계. 한계 돌파가 아니면 0(원래 색). 연출 색만.
+        int overdriveStage = shotHeatMode == GunnerHeatMode.Overdrive ? shotStage : 0;
         view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth,
-                                     stopped, BuildHitPoints(origin, direction, length), BuildEchoTargetIds());
+                                     stopped, BuildHitPoints(origin, direction, length), BuildEchoTargetIds(), overdriveStage);
 
         Edit.Log($"[Gunner/Q] 발사 {index + 1}/{volley.ShotCount} — 집중 {shotFactor:0.00}(최대 {chargeMaxTime:0.##}초), 사거리 {length:0.0}/{shotRange:0.0}, " +
                  $"폭 {shotWidth:0.##}, 피해 {shotDamage} ×{hitCount}, 보호막 {shotShield} ×{shielded}, 저장 단계 {shotStage}, 과열 모드 {shotHeatMode}" +

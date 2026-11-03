@@ -6260,6 +6260,7 @@ MonoBehaviour:
   frostTrailPlayer: {fileID: 4392323114275172735}
   coolVentPlayer: {fileID: 2407615172941079978}
   backstepAfterimage: {fileID: 8579010982694634124}
+  overdriveColors: {fileID: 11400000, guid: 04c5f7c72031487c923d4ee6481d5e20, type: 2}
   chargeBeamUnitLength: 1
   chargeBeamHoldDuration: 0.5
   chargeScaleRange: {x: 0.25, y: 1}

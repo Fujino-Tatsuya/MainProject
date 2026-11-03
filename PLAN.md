@@ -1,4 +1,39 @@
-# ▶▶▶ 계획 = **진격의 충격(PAL_4_Q_BLAST) VFX — 부채꼴 충격파 + 착탄 섬광 + 흙먼지·파편 + 일렁임** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **균열 레이어 뺌** · ✅ MainProject 연결(컴파일 0 · 랩에서 Q 종료 → 끝 지점 충격 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-q-blast-vfx.md](Docs/tech/handoff-q-blast-vfx.md))
+# ▶▶▶ 계획 = **한계 돌파(GUN_2_OVERDRIVE) VFX — 과열 단계별로 거너 기본 공격·Q·R 이펙트 색을 따뜻한 색으로** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 랩에서 기본 공격·Q·R 단계 색 + 반납 후 복구 확인) · ⏳ 민경 Play · 핸드오프 [handoff-overdrive-vfx.md](Docs/tech/handoff-overdrive-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안). 기획: 과열 단계가 높을수록 기본 공격·Q·R 강화(피해 단계 배율표 교체), Q/R 은 시전 시작 단계 저장.
+> **새 에셋 없음 — MyProject 단계 없음.** 코드 + 색 표 SO. ⚠️ 은희 영역(거너 스킬·RPC)에 단계 인자 추가 → handoff.
+
+## 사실 (조사)
+- 거너 이펙트는 R 대상 표식(이미 주황)만 빼고 **전부 파랑·청록**. 색 출처 = 대부분 **파티클 startColor·Color over Lifetime**(기본 공격·Q 빔·적중·R 영역), Q 충전·R 낙뢰는 **재질 `_TintColor`**(IntegratedEffect). → 곱하기 틴트 불가(파랑 × 빨강 ≈ 검정).
+- 과열 상태는 전 피어 복제(`GunnerHeat.state` NetworkVariable)지만 **피해에 쓴 단계는 서버에만**: 기본 공격 `ServerFire` 의 발사 전 단계, Q `castSnapshot`/`shotStage`, R `pendingStage`. `ShotRpc`·`ChargeLaserFiredRpc` 에 단계 없음, R 레이저(`GunnerTrackingLaser`) 는 클라에서 시전자·단계를 모른다.
+- 이펙트 시스템에 색 API 없음 · 풀 재사용(색이 다음 재생에 남는다) · `PlayOnce` 는 핸들 없음.
+- 특성 확인 = `heat.Traits.Mode == GunnerHeatMode.Overdrive`(전 피어 같은 값, `TraitDirector` NetworkList).
+- 기존 단계 색: 게이지 노랑/주황/빨강 · 총 테두리 빛 연두노랑/주황/빨강.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방식(Q1·Q6) | 복제 프리팹 없음 — **런타임 색상 교체**: 원래 색의 밝기·알파는 그대로, 색상(hue)·채도만 단계 색으로(startColor · 그라디언트 키 · 재질 `_TintColor` 는 MaterialPropertyBlock). 거의 검은 심은 그대로 어둡다 |
+| 조건(Q2) | **한계 돌파 보유 시만**. 0단계 = 원래 색 |
+| 기준 단계(Q3) | 피해와 같은 단계 — 기본 공격 = 그 발 발사 순간, Q·R = 시전 시작 저장 단계 |
+| 색(Q4·Q7) | **1 주황 → 2 주홍 → 3 진홍** — 단계마다 정해진 색으로 교체(섞지 않음 — 보라 경유 방지). 값은 SO |
+| 범위(Q5·Q10) | 기본 공격(빔·끝·적중) · Q(충전·충전 완료·과충전·배기·빔·끝·적중) · R(시전·영역·낙뢰). **R 대상 표식 제외**. E·간파·보호막·게이지 제외 |
+| 단계 전달(Q8) | **정확하게** — 서버가 쓴 단계를 `ShotRpc`·`ChargeLaserFiredRpc` 에 byte 1개, R 레이저에 복제 값 1개. Q 충전·R 시전(시작 순간 연출)은 전 피어가 같은 복제 과열로 계산 |
+| 위치(Q9) | **이펙트 공용 기능** — `EffectManager`·`EffectSocketPlayer` 에 "색 지정 재생"(원샷 포함) + 풀 반납·재사용 시 원래 색 자동 복구 |
+
+## 작업 순서
+1. 공용: 색 교체 컴포넌트(인스턴스 원래 색 기억·적용·복구) + `EffectManager`/`EffectSocketPlayer` 색 지정 재생 API · 풀 반납 시 복구.
+2. 색 표 SO(`GunnerOverdriveVfxColors` — 단계 1~3 색) · 거너: `GunnerBeamView`(기본 공격·Q)·`GunnerTrackingLaserView`(R) 가 단계 색으로 재생.
+3. 은희 영역: `ShotRpc`·`ChargeLaserFiredRpc` 단계 인자 · `GunnerTrackingLaser(View)` 단계 복제 값 · 서버가 피해에 쓴 단계를 그대로 싣는다(판정·피해 무변경).
+4. 검사: 컴파일 0 · DebugTraitLab 거너 + 한계 돌파 → 단계별 색 로그/화면 · 특성 없을 때 원래 색 · 풀 재사용 후 원래 색 복구.
+5. 문서: handoff(은희 — RPC 인자) · `CONTEXT.md`.
+
+## 완료 조건
+- 한계 돌파 보유 시 단계 1/2/3 에 기본 공격·Q·R 이펙트가 주황/주홍/진홍, 0단계·미보유는 원래 파랑 · 호스트·클라 같은 색 · 풀 재사용으로 색이 새지 않음 · 컴파일 0.
+
+---
+
+# 계획(이전) = **진격의 충격(PAL_4_Q_BLAST) VFX — 부채꼴 충격파 + 착탄 섬광 + 흙먼지·파편 + 일렁임** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 — **균열 레이어 뺌** · ✅ MainProject 연결(컴파일 0 · 랩에서 Q 종료 → 끝 지점 충격 생성 확인) · ⏳ 민경 Play · 핸드오프 [handoff-q-blast-vfx.md](Docs/tech/handoff-q-blast-vfx.md))
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안). 기획 `Re_C_특성_기획서_20261016.html` — Q 가 끝나는 지점 앞쪽에 충격(추가 피해).
 > **1단계 = MyProject 제작 + 테스트 씬 → 민경 Play 확인·승인. 2단계(승인 뒤) = MainProject import·연결.** 판정·피해 코드 무변경 — 연출 구독만.

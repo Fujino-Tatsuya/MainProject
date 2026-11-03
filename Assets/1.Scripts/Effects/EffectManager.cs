@@ -362,6 +362,25 @@ public class EffectManager : MonoBehaviour
         return new EffectHandle(active.slot, active.generation);
     }
 
+    /// <summary>
+    /// <b>색 지정 재생</b> — 재생 중인 이펙트를 이 색으로 칠한다(2026-11-03 민경, 한계 돌파 과열 단계).
+    /// 곱하기가 아니라 색상 교체다(<see cref="EffectTint"/> — 밝기·알파는 원본 그대로). 이미 나온 파트는 지금 칠하고,
+    /// 이후 터지는 파트(delay·outro)도 같은 색으로 나온다. <see cref="EffectTint.None"/> 이면 원래 색으로 되돌린다.
+    /// 반납 때 저작 색으로 자동 복구되므로(풀 오염 없음) 호출자가 되돌릴 필요는 없다.
+    ///
+    /// 핸들이 필요하다 — 원샷도 칠하려면 <see cref="PlayRecallable"/> 로 재생한다(수명·반납은 <see cref="Play(EffectEntry, Vector3, Quaternion, float, float, float)"/>와 같다).
+    /// 재생한 그 프레임에 부르면 입자가 방출되기 전이라 첫 입자부터 이 색이다. 반납된 핸들이면 조용한 no-op.
+    /// </summary>
+    public void SetTint(EffectHandle handle, in EffectTint tint)
+    {
+        if (!TryResolve(handle, out ActiveEffect active)) return;
+        if (active.tint.SameAs(tint)) return;
+
+        active.tint = tint;
+        for (int i = 0; i < active.instances.Count; i++)
+            EffectRecolor.Apply(active.instances[i].go, tint);
+    }
+
     #endregion
 
     #region 해제
@@ -594,6 +613,8 @@ public class EffectManager : MonoBehaviour
         {
             GameObject instance = _pool.Rent(part.prefab, active.axisScale * active.scale);
             instance.transform.SetPositionAndRotation(worldPosition, active.rotation);
+            // 켜기 전에 칠한다 — 입자는 켜진 뒤 첫 시뮬레이션에서 방출되며 그때의 시작색을 읽는다.
+            if (active.tint.IsSet) EffectRecolor.Apply(instance, active.tint);
             instance.SetActive(true);
 
             IEffectSystem driver = DriverOf(instance);
@@ -623,6 +644,9 @@ public class EffectManager : MonoBehaviour
             if (instance == null) continue;
 
             DriverOf(instance)?.ResetForPool(instance);
+            // 색 지정 재생으로 칠한 색을 저작 색으로 — 풀 키가 프리팹이라 다음 대출자(다른 플레이어·색 없는 재생)가 그대로 물려받는다.
+            EffectRecolor recolor = instance.GetComponent<EffectRecolor>();
+            if (recolor != null) recolor.Restore();
             _pool.Return(instance);
         }
 
@@ -637,6 +661,7 @@ public class EffectManager : MonoBehaviour
         active.playRate = 1f;
         active.scale = 1f;
         active.axisScale = Vector3.one;
+        active.tint = EffectTint.None;
         active.driverDuration = 0f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
@@ -842,6 +867,7 @@ public class EffectManager : MonoBehaviour
         public float playRate = 1f;
         public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
         public Vector3 axisScale = Vector3.one;   // 축별 배율(원샷 오버로드 전용). localScale 에만 곱한다
+        public EffectTint tint;                   // 색 지정 재생(SetTint). None = 원래 색. 이후 터지는 파트(delay·outro)에도 같이 칠한다
 
         // 드라이버에게 넘길 시간(초). 루프 전용이다 — 원샷은 남은 수명(life)을 그대로 쓴다.
         // 루프는 수명이 외부 이벤트(Release)로 정해지므로 "얼마나 살지"와 "파트가 얼마 동안 움직일지"가
