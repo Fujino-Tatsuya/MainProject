@@ -52,6 +52,8 @@ public class CameraTargetSwitcher : MonoBehaviour
     private Vector3 basePlayerFollowOffset;
     private readonly SlowMotionOwnerZoom ownerSlowZoom = new();
     private float appliedZoomMultiplier = 1f;
+    // 간파 카메라 대상 중심 이동량(할 일 196, 월드) — 0 = 평소.
+    private Vector3 appliedCenterShift;
     // 제압 가속 3타 줌인(할 일 174). 수치는 SuppressHasteData 시트 칸 — 이 컴포넌트의 테이블 칸이 아니다.
     private readonly SuppressHasteHitZoom suppressHasteHitZoom = new();
     private SuppressHasteData suppressHasteData;
@@ -351,16 +353,21 @@ public class CameraTargetSwitcher : MonoBehaviour
         float hitZoomMultiplier = suppressHasteHitZoom.Step(IsLocalSuppressHasteActive(), slowMultiplier != 1f,
             Time.unscaledDeltaTime, LoadHitZoomValues());
         float multiplier = slowMultiplier * hitZoomMultiplier * cinematicDistanceMultiplier;
+        // 간파 카메라 대상 중심(할 일 196) — 줌과 독립으로 중심만 옮긴다(오프셋은 World Space 바인딩이라 월드 이동량을 그대로 더한다).
+        // 다른 연출이 카메라를 잡고 있으면(연출 vcam·낙하 뷰·관전·임시 추적) 디렉터가 진행 중인 이동을 버리고 0 을 준다.
+        Vector3 centerShift = InterruptProductionDirector.OwnerCameraCenterShift(GetCurrentTarget(),
+            IsInCinematic || IsInFallView || IsSpectatorMode || HasTemporaryFollow);
 
-        // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
-        if (multiplier == appliedZoomMultiplier)
+        // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다(이동량도 Equals = 정확 비교).
+        if (multiplier == appliedZoomMultiplier && centerShift.Equals(appliedCenterShift))
         {
             return;
         }
 
-        // 원래 오프셋에서 다시 계산한다 — 복귀가 끝나면(배율 1) 정확히 원래 값으로 돌아온다.
-        playerCameraFollow.FollowOffset = basePlayerFollowOffset * multiplier;
+        // 원래 오프셋에서 다시 계산한다 — 복귀가 끝나면(배율 1·이동량 0) 정확히 원래 값으로 돌아온다.
+        playerCameraFollow.FollowOffset = basePlayerFollowOffset * multiplier + centerShift;
         appliedZoomMultiplier = multiplier;
+        appliedCenterShift = centerShift;
     }
 
     /// <summary>

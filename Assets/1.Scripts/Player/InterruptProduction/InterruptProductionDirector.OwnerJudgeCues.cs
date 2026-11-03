@@ -30,6 +30,7 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
     bool IInterruptOwnerCueSink.OwnerAttempt(in InterruptOwnerCue cue)
     {
         OwnerJudgeCues.Attempted();
+        BeginCameraCenter(cue.Forecast, cue.Target, Time.unscaledTime); // 196 — 받아들임과 무관하게 이 시전이 카메라 상태를 대체
         return LocalOwnerAttempt(cue.Skill, cue.Forecast, cue.Owner, cue.Target, cue.AttackDirection, cue.ViaDash);
     }
 
@@ -43,6 +44,7 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
         uint triggerId = OwnerJudgeCues.JudgeSucceeded(viewer, FlashPoint(cue.FlashPosition), cue.FlashPosition,
             Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, look, variant);
         LastOwnerTier = _ownerPredictedTier;
+        CameraCenterSucceeded(Time.unscaledTime);
         if (look == InterruptSuccessLook.SuppressSequence)
             BeginSuppressFlash(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, true, variant), true);
         else if (InterruptPresentationTierRules.UsesHitLight(look))
@@ -60,6 +62,7 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
             (InterruptPresentationTierRules.UsesHitLight(_ownerJudgeCues.LocalSuccessLook) || _ownerJudgeCues.LocalSuccessPlayedSuppress))
             _hitLight?.Stop();
         OwnerJudgeCues.Ended(reason, Time.unscaledTime);
+        CameraCenterReturn(Time.unscaledTime); // 196 — 판정 실패·서버 거부·끊김·판정 버림 = 그 순간 복귀
         LastOwnerTier = InterruptPresentationTier.Fail;
     }
 

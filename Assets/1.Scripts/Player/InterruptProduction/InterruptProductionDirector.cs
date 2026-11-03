@@ -518,6 +518,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock), Time.frameCount);
         _suppressFlash?.Tick(Time.unscaledTime); // 제압 간파 섬광 = 실제 시간(슬로우·히트스톱 무관, 할 일 179)
         _hitLight?.Tick(Time.unscaledTime, Time.frameCount); // 적중 라이트 연출 = 실제 시간(할 일 194 Q8), V2 화이트아웃 = 렌더 프레임 수
+        TickCameraCenter(Time.unscaledTime); // 카메라 대상 중심 성공 복귀(할 일 196) = 내 성공 슬로우 복귀 구간
     }
 
     private void OnDisable()
@@ -526,6 +527,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _peerLightGather.EndAll();
         StopHitFlash();
         _suppressFlash?.Stop();
+        CancelCameraCenter();
 
         if (ReferenceEquals(_timeScale, null))
             return;
@@ -775,8 +777,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>[오너] 판정 전 종료·서버 거부 — 결론이 없으면 실패처럼 걷는다.</summary>
     public static void LocalOwnerEnded()
     {
-        if (Instance != null)
-            Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
+        if (Instance == null)
+            return;
+
+        Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
+        // 카메라 대상 중심(할 일 196) — cue 없는 종료(시전 거부 등)도 복귀. 성공 슬로우 복귀를 기다리는 중이면 그대로 둔다.
+        Instance._cameraCenter.ReturnUnlessSucceeded(Time.unscaledTime);
     }
 
     /// <summary>
@@ -928,6 +934,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _peerLightGather.EndAll();
         StopHitFlash();
         _suppressFlash?.Stop();
+        CameraCenterReturn(Time.unscaledTime); // 할 일 196
         SuccessStage.LocalForcedReset(_darkAdaptation);
     }
 

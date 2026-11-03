@@ -96,5 +96,14 @@ public static class InterruptCameraCenterRules
     public static InterruptCameraCenterPhase SuccessPhaseAt(float elapsed, SlowMotionProfile successProfile) =>
         elapsed >= SuccessReturnDelay(successProfile) ? InterruptCameraCenterPhase.SuccessSlowExit : InterruptCameraCenterPhase.SuccessSlow;
 
+    /// <summary>
+    /// 이 화면에서 돌고 있는 성공 슬로우 단계 → 카메라 단계(단계 2) — 히트스톱·진입·유지 = 유지, 복귀(실패 복귀 포함)·끝남 = 복귀 구간.
+    /// 서버가 실제로 건 프로필(히트스톱 칸 A1 반영)을 따르므로 시간표(<see cref="SuccessPhaseAt"/>)보다 이쪽을 먼저 쓴다.
+    /// </summary>
+    public static InterruptCameraCenterPhase SuccessPhaseOf(SlowMotionPhase slowPhase) =>
+        slowPhase == SlowMotionPhase.HitStop || slowPhase == SlowMotionPhase.Enter || slowPhase == SlowMotionPhase.Hold
+            ? InterruptCameraCenterPhase.SuccessSlow
+            : InterruptCameraCenterPhase.SuccessSlowExit;
+
     private static float ClampRatio(float ratio) => float.IsNaN(ratio) ? 0f : Mathf.Clamp01(ratio);
 }
