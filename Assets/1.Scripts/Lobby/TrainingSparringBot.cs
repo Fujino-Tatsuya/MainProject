@@ -284,9 +284,17 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             return;
         }
 
-        Transform target = Target;
-        if (!MonsterTargeting.IsAttackable(target)) target = FindNearestPlayer();
-        if (target != null) AdoptTarget(target);
+        // 사거리 밖 타깃을 물고 있으면 사거리 안 최근접으로 갈아탄다 — 이동이 없어 그대로 두면 멀티에서 영원히 안 친다(base TrySwitchToInRangeTarget 은 이 틱에서 안 돈다).
+        Transform current = Target;
+        bool currentValid = MonsterTargeting.IsAttackable(current);
+        float currentDist = currentValid ? Vector3.Distance(transform.position, current.position) : float.MaxValue;
+        if (!currentValid || currentDist > data.attackRange)
+        {
+            Transform nearest = FindNearestPlayer();
+            float nearestDist = nearest != null ? Vector3.Distance(transform.position, nearest.position) : float.MaxValue;
+            if (!currentValid || TrainingSparringRules.ShouldSwitchToInRangeTarget(currentValid, currentDist, nearestDist, data.attackRange))
+                AdoptTarget(nearest);
+        }
         if (Target == null) return;
 
         FaceTarget();

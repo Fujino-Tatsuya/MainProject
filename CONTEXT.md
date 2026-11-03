@@ -8,6 +8,14 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-03 · 경석(Claude) · **미커밋 정리 + development 받기**, 브랜치 `feature/SettingsDdol`) — ✅
+- 커밋: 사운드 문서 `70d170cc` · 로비 연습봇 사거리 밖 타깃 교체 `0157c12e` · 보스 등장 워크인 보정(RPC 가 회차 복제보다 먼저 와도 보관 + 정지 자리 스냅) `300856e4` — 둘 다 ⏳ MPPM 미확인 · development 27커밋 병합(AGENTS.md 인덱스 양쪽 유지) · SVN r579·핀 579.
+- 미커밋 유지: 아래 현지화·글꼴 작업(⏳ Play) — 🔴 커밋 전 `TraitWindowModelTests.TextTable_DefaultsMatchConstants…` 고칠 것(시트 행이 에셋보다 우선하게 바뀌어 '에셋 값 우선' 기대가 깨짐). 개발 도구 4개·`raid-23-phases.html` 은 의도적 미추적.
+- EditMode 5388 중 실패 6 = 위 1 + 기존 5(가드 애니 `PlayEffect/StopEffect` 수신자 없음 3 · `TraitPickConfirm` 문구 · 대시 슬롯 크기 111≠100). SVN `UI_Panel/asset_manifest.json.meta` 는 원본 json 없이 올라가 있어(r466) Unity 가 열 때마다 지운다 — 무해, 지원 확인 필요.
+
+## ▶▶ 작업 세션 (2026-11-02 · 경석(Claude) · **현지화 누락 연결 + 글꼴 서울알림체 통일**, 브랜치 `feature/SettingsDdol` 작업 트리) — ✅ 구현(미커밋) · xlsx SVN r576 + Strings 수정(미커밋) · Heavy 글꼴(SVN, 미커밋) · ⏳ 경석 Play(영어 전환·HUD 글꼴·외곽선) · 핸드오프 [handoff-localization-fonts.md](Docs/tech/handoff-localization-fonts.md)
+- 규칙: 화면 글꼴 = 서울알림 Heavy(설정·ESC·타이틀 Press·특성 이름·보스 타이포) / 그 밖 Medium — [localization.md §10](Docs/tech/localization.md#10-글꼴--서울알림체-static-아틀라스).
+
 ## ▶▶ 작업 세션 (2026-11-02 · 경석(Claude) · **메인 1~4구역 무전 + 2구역 적 소개 연출**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-main-radio-zone1-4.md](PLAN-main-radio-zone1-4.md) ✅ 승인 · ✅ 구현·커밋 · ✅ development 병합 · xlsx SVN r574(핀 574) · 컴파일 0 · 맵씬 EditMode 904/1(실패 1 = `TraitPickConfirmTests` 기존 — 암살자 확인창 문구가 테스트 기대값과 다름, 무관) · ⏳ Play·MPPM · 핸드오프 [handoff-main-radio-zone1-4.md](Docs/tech/handoff-main-radio-zone1-4.md)
 - 결과: 1구역 도착·2구역 클리어·3구역 상대(스피너봇 14m)·3구역 클리어·다리 연결·문 개방(G9) 무전 = 무전 캡슐, 판마다 1회. 2구역 = 4구역식 소개 연출(G2 보류 → 적 무리 샷 → 경고 → 복귀 끝 G2·존2 즉시 기상). 옛 자막 `TUT_Z4_BRIDGE`·`TUT_Z4_CLEAR`·`TUT_Z4_GO_BOSS` 호출 삭제. 연출 잠금은 다른 계통이 잠근 사람을 건드리지 않게 바뀜(4구역 포함).
 - 11-02 경석 Play 반영: 1구역 무전 = 포드 착지 끝(조작 복귀) 1초 뒤 · 2구역 카메라 쪽 벽 가림은 그대로 둔다(투명화·벽 숨김 시도 후 전부 뺐다 — 벽 투명화 `WallOcclusionDriver` 는 MapGenerator 프리팹에서 꺼져 있고 Stage1 벽만 대상). 시간 = xlsx `Cinematic`(2구역)·`Radio` 시트, 문구 = `Strings` 7행(en 초안 검수 필요).
@@ -38,6 +46,15 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-30 · 민경(Claude) · **팔라딘 베기 소켓 통합 · 가렌 평타 이벤트 타이밍**, 브랜치 `feature/VFX`) — ✅ 커밋 · ⏳ 민경 Play
 - `Paladin_Armature`: 베기 `Slash01~04` 를 `root/VFXSocket`(애니메이션되는 root 본 밑) → 최상위 `VFXSocket` 으로 옮겨 소켓 9개를 한 부모로 통합(월드 위치 보존). root 가 움직일 때 베기 이펙트가 끌려다니던 문제. `Player_Paladin` 에서 `Slash01~04`·`R_WeaponSocket`·`SM_Wep_Sword_03` 각도 재조정.
 - **은희 영역 알림**: `Garen_Default_Attack_1~4.anim` 의 평타 적중(Hit)·콤보창 열림 이벤트 시점을 프레임에 맞춰 조정(민경 확인 — 의도한 변경). 적중 1→0.333 · 2→0.3 · 4→0.267, 3 의 콤보창 열림 0.3→0.233(적중 0.3 보다 앞). 피해 발생 시점이 바뀌므로 평타 체감·콤보 입력창에 영향.
+
+## ▶▶ 작업 세션 (2026-11-03 · 경석(Claude) · **GDC 효과음 후보 정리·선별**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-gdc-sfx-curation.md](PLAN-gdc-sfx-curation.md) ✅ 승인(Q1~Q5 권장안) · 진행 중
+- Antigravity 가 GDC 묶음에서 뽑다 끊긴 후보 163개(SVN `4_Resources/Sound/SFX/GDC_Studio_Master_Samples`, 미등록)를 명세 키에 연결·채점 + GDC 원본(1~3/5, wav 277개)에서 빈 키 검색. 보고서의 `00_확정_사운드/` 는 실제로 없음. 수정 예정 = 저장소 밖 `playvideo/sfx_review` 만(코드·xlsx·에셋 무변경).
+- 11-03 결과: 연결표 163(높음 99) → 기존 후보 평균 76점, 70점 이상 키 61. GDC 원본(`C:\Sound` 276개 → 덩어리 1242) 키별 상위 10 검색 — ⚠️ 신뢰도 낮음(정답 13개 중 상위 10 안 4). 빈칸: 기존 70+ 61 · 기존 70 미만 18 · GDC 검색만 264 · 없음 30 → `playvideo/sfx_review/gdc/coverage.md`. 로컬 검수 페이지 `gdc/board.html`. ⏳ 경석 점수 → 4~5점 `00_선정/` 복사.
+
+## ▶▶ 작업 세션 (2026-10-30 · 경석(Claude) · **사운드 명세 문서**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-sound-spec.md](PLAN-sound-spec.md) ✅ 승인(Q1~Q3 권장안) · ✅ 작성(미커밋) · ⏳ 경석 검토
+- 결과: [Docs/design/sound-spec/](Docs/design/sound-spec/README.md) 8개 파일 353행(분량 때문에 단일 파일 대신 폴더 — 계획 리스크 항목대로). `AGENTS.md` §6 인덱스 한 줄. 코드·xlsx·에셋 무변경.
+- 다음: SVN r473 받기(Unity 끈 뒤) → 기존 클립 매칭 행부터 xlsx `Sound` 등록 → 녹화 체크리스트(README §6) R1~R4·R7·R8 우선. 코드 훅 필요 목록 = README §7.
+- 10-30 이어서: 영상→효과음 AI(Sonilo)는 탑다운·아군 이펙트 때문에 동기·분리가 안 맞아 **텍스트→효과음 키별 생성**으로 전환. 경석이 약 460개 생성 예정 → **1차 자동 검수 도구**(계획 [PLAN-sfx-review.md](PLAN-sfx-review.md) ✅ 승인) = 저장소 밖 `C:\Users\user\Projects\playvideo\sfx_review\`(CLAP+수치 100점, 기준점 60, 기준 아래 10% 표본, HTML 검수 → `calibrate.py` 로 경석 점수에 가중치 맞춤). 기존 SVN 효과음 14개로 실행 확인. ✅ 1회차 실행 — `playvideo/sound_clips/AI_Sound` 465개, 기준점 70 → 검수 대상 226 · 기준 아래 174 · 탈락 65(전부 본체 길이 6배 초과). 명세 README §5.1 「제작 규칙」 추가(외부 조사 문서에서 쓸 것만). 팀 검수 보드: claude.ai 아티팩트(조직 계정 제한으로 경석 개인용) + **GitHub Pages** https://seoki2000.github.io/sfx-review/ (공개 저장소 Seoki2000/sfx-review, 이름 입력·점수 JSON 내보내기 → `merge_ratings.py`). ⏳ 팀원 점수 → `calibrate.py`.
 
 ## ▶▶ 작업 세션 (2026-10-27 · 경석(Claude) · **보스 B 승리 연출(BOSS DOWN)**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) ✅ 승인(Q1~Q3 권장안·R1~R6 문서대로) · ✅ 구현 · ✅ 커밋·feature 푸시 · ✅ 10-29 development 병합 · 전투 EditMode 416/0 · ✅ 경석 MPPM(사망 연출 정상) · 기획 원본 `보스_승리연출_v02_프로그래머_전달사양.md`(10-26)
 - 확정(grill): 보스 B 만 · 전원 같은 화면(막타 = 좌측 전경) · 처치 순간부터 조작 잠금 · 3.2초 뒤 32° 유지 → 결과 화면 · 타이포 코드 생성 · 음영 살린 회색조 · 사망 팀원 그대로.

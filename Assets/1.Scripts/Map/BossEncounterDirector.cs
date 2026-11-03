@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -931,6 +932,10 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     {
         if (!_motion.Active) return;
 
+        // 🔴 RPC 가 회차·단계 복제보다 먼저 올 수 있다 — NGO 는 RPC 를 매 프레임, NetworkVariable 은 틱(30Hz)에만 보낸다.
+        //    예전엔 불일치면 바로 지워서 원격 오너가 출발점(화면 아래 밖)에 남았다(2026-11-03 좌측 자리 증상). 새 회차 지시면 복제를 기다린다.
+        if (_motion.Sequence > introSequence.Value) return;
+
         // 회차가 바뀌었거나(재도전·새 연출) 연출이 끝났으면(전투·스킵·중단) 그 자리에서 멈춘다.
         if (_motion.Sequence != introSequence.Value || !IsCinematicPhase(phase.Value))
         {
@@ -975,6 +980,18 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         {
             if (player != null) player.SetAnimatorMoving(false);
             motor.PassThroughUnitsOverride = false;
+            // 늦게 출발했거나(지시·복제 지연) 막혀서 정지 자리에 못 닿았으면 그 자리로 옮긴다 — 출발점은 연출 화면 아래 밖이다.
+            // 높이는 지금 바닥 그대로(정지 자리 높이 = 서버가 본 도착 높이라 접지 뒤와 다를 수 있다). 엘리베이터 WalkNeedsSnap 과 같은 기준.
+            Vector3 position = motor.SimulationState.Position;
+            if (BossElevatorTimeline.WalkNeedsSnap(now, endAt, _motion.Path[0] - position))
+            {
+                Vector3 snap = new Vector3(_motion.Path[0].x, position.y, _motion.Path[0].z);
+                Edit.LogWarning($"[BossEncounter] 등장 워크인이 정지 자리에 못 닿았다(남은 수평 {Vector3.ProjectOnPlane(_motion.Path[0] - position, Vector3.up).magnitude:0.##}m) — " +
+                                $"{position} → {snap} 로 옮긴다.", this);
+                motor.TeleportAuthoritative(snap);
+                if (po.TryGetComponent(out NetworkTransform netTransform))
+                    netTransform.Teleport(snap, po.transform.rotation, po.transform.localScale);
+            }
             _motion = default;
             return;
         }

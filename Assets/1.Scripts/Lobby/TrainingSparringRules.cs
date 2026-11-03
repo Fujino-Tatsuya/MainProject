@@ -124,5 +124,12 @@ public static class TrainingSparringRules
         return extend ? Mathf.Max(authoredWindow, trainingMinimum) : authoredWindow;
     }
 
+    /// <summary>
+    /// 지금 타깃을 버리고 사거리 안 최근접으로 갈아탈지 — 이 상대는 움직이지 않아 사거리 밖 타깃을 물고 있으면 영원히 안 친다(멀티 T40 정지, 11-02).
+    /// 타깃이 무효이거나 사거리 밖이고, 사거리 안 후보가 있을 때만 true. 후보가 없으면 지금 타깃을 그대로 바라본다.
+    /// </summary>
+    public static bool ShouldSwitchToInRangeTarget(bool targetAttackable, float targetDistance, float candidateDistance, float attackRange) =>
+        (!targetAttackable || targetDistance > attackRange) && candidateDistance <= attackRange;
+
     static float Clamp(float gauge) => Mathf.Clamp(gauge, 0f, BossCounterProgress.GaugeMax);
 }
