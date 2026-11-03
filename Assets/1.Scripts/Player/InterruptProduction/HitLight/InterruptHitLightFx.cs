@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// <summary>
 /// 적중 라이트 연출 월드 이펙트 루트(V1·V2·V3, 할 일 194) — <c>Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab</c>(V3 는 <c>V3/FX_InterruptHitLight_V3.prefab</c>).
@@ -11,6 +12,8 @@ using UnityEngine;
 /// <c>Rays</c> = 수직선 따라 양쪽 부채(<see cref="gapRaysMesh"/> 날개 2개 메시를 ±퍼짐 각으로 여러 줄, 정렬 Local + 카메라 쪽 기울임) ·
 /// <c>Streak</c> = 수직선(또는 축) 방향으로 기울임 · <c>Sparks</c> = 수직선 양쪽 원뿔로 직접 방출. 그 밖(<c>Core</c>·<c>Debris</c>·라이트)은 위치만.
 /// 방향 없는 재생(무기·대상 모드)은 처음 읽어 둔 프리팹 값(정렬·메시·방출·회전)으로 되돌려 V1·V2 처음 모습 그대로다. 프리팹 값은 바꾸지 않는다.</item>
+/// <item>빛줄기 공간 = 화면(<see cref="InterruptHitLightRaySpace.Screen"/>, V3)이면 <c>Rays</c> 만 렌즈 연출 — 로컬 시뮬레이션 입자를 시스템째 게임 카메라 근평면 앞 화면 점에 놓고
+/// (월드 원점·선은 성공 순간 고정, 화면 투영은 카메라 렌더마다), 화면 비율 크기·깊이 무시 재질(<see cref="InterruptHitLightLook.RayScreenMaterial"/>). 화면 밖·카메라 뒤면 렌더러를 끈다.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -28,26 +31,43 @@ public sealed class InterruptHitLightFx : MonoBehaviour
     [Tooltip("틈 수직 빛줄기 메시 — 양쪽으로 뻗는 날개 2개(Mesh_InterruptHitLight_Streak). 비면 원래 빛줄기 메시를 기울여 쓴다")]
     [SerializeField] private Mesh gapRaysMesh;
 
+    private static readonly int IntensityId = Shader.PropertyToID("_Intensity");
+
     private ParticleSystem[] _systems;
     private SystemDefaults[] _defaults;
     private Light _light;
     private InterruptHitLightLook _look;
     private float _lightElapsed = -1f;
+    private MaterialPropertyBlock _rayBlock;
 
-    // 처음 읽은 프리팹 값 — 틈 수직이 바꾸는 칸만.
+    // 화면(렌즈) 빛줄기 — 월드 원점·선은 성공 순간 고정, 화면 투영은 카메라 렌더마다 다시 한다.
+    private ParticleSystem _screenRays;
+    private Vector3 _screenRayOrigin;
+    private Vector3 _screenRayLine;
+    private float _screenRaySize;
+
+    // 처음 읽은 프리팹 값 — 틈 수직·화면 빛줄기가 바꾸는 칸만.
     private struct SystemDefaults
     {
         public ParticleSystemRenderer Renderer;
         public ParticleSystemRenderSpace Alignment;
         public Mesh Mesh;
+        public Material Material;
+        public bool RendererEnabled;
         public bool Emission;
         public Quaternion LocalRotation;
+        public Vector3 LocalPosition;
+        public Vector3 LocalScale;
+        public ParticleSystemSimulationSpace SimulationSpace;
+        public bool StartSize3D;
     }
 
     /// <summary>적중 지점 라이트(첫 재생 전 null) — 확인용.</summary>
     public Light HitLight => _light;
     /// <summary>라이트가 아직 꺼지는 중이다.</summary>
     public bool LightActive => _lightElapsed >= 0f;
+    /// <summary>화면(렌즈) 빛줄기를 카메라에 맞춰 따라가는 중이다 — 확인용.</summary>
+    public bool ScreenRaysActive => _screenRays != null;
 
     /// <summary>성공 순간 재생(방향 없음) — <paramref name="position"/> = 섬광 중심, <paramref name="scale"/> = 루트 스케일.</summary>
     public void Play(Vector3 position, InterruptHitLightLook look, float scale = 1f) =>
@@ -86,7 +106,49 @@ public sealed class InterruptHitLightFx : MonoBehaviour
                     _systems[i].Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
+        _screenRays = null;
         StopLight();
+    }
+
+    private void OnEnable() => RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
+
+    private void OnDisable() => RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
+
+    // 카메라가 움직인 뒤(시네머신 LateUpdate 포함) 그 프레임 게임 카메라 기준으로 화면 위치를 다시 잡는다.
+    private void OnBeginCameraRendering(ScriptableRenderContext context, Camera camera)
+    {
+        if (_screenRays != null && camera == Camera.main)
+            UpdateScreenRays(camera);
+    }
+
+    /// <summary>
+    /// 화면(렌즈) 빛줄기를 <paramref name="camera"/> 에 맞춘다 — 고정된 월드 원점을 그 카메라로 투영한 화면 점·카메라 정면·화면 비율 크기.
+    /// 원점이 화면 밖·카메라 뒤(또는 카메라 없음)면 렌더러를 끈다. 입자가 다 사라지면 따라가기를 멈춘다. 테스트는 직접 부른다.
+    /// </summary>
+    public void UpdateScreenRays(Camera camera)
+    {
+        if (_screenRays == null)
+            return;
+
+        if (!_screenRays.IsAlive(false))
+        {
+            _screenRays = null;
+            return;
+        }
+
+        var renderer = _screenRays.GetComponent<ParticleSystemRenderer>();
+        bool visible = InterruptHitLightRules.ScreenRayPose(camera, _screenRayOrigin, _screenRayLine, _screenRaySize,
+            out Vector3 position, out Quaternion rotation, out float worldPerUnit);
+        if (renderer != null)
+            renderer.enabled = visible;
+        if (!visible)
+            return;
+
+        Transform t = _screenRays.transform;
+        t.SetPositionAndRotation(position, rotation);
+        // 부모(연출 루트) 스케일은 균일 — 그만큼 나눠 월드 배율을 맞춘다(스케일 모드 Hierarchy).
+        float parentScale = t.parent != null ? Mathf.Max(1e-4f, t.parent.lossyScale.x) : 1f;
+        t.localScale = Vector3.one * (worldPerUnit / parentScale);
     }
 
     private void Update() => Tick(Time.unscaledDeltaTime);
@@ -111,6 +173,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
     private void PlayParticles(in InterruptHitLightPlacement placement, InterruptHitLightLook look)
     {
         EnsureSystems();
+        _screenRays = null;
         for (int i = 0; i < _systems.Length; i++)
         {
             ParticleSystem system = _systems[i];
@@ -118,6 +181,13 @@ public sealed class InterruptHitLightFx : MonoBehaviour
             ParticleSystem.MainModule main = system.main;
             main.useUnscaledTime = true;
             system.Clear(false);
+
+            bool rays = system.gameObject.name == RaysName;
+            if (rays && look != null && look.RaySpace == InterruptHitLightRaySpace.Screen)
+            {
+                PlayScreenRays(system, _defaults[i].Renderer, placement, look);
+                continue;
+            }
 
             if (!placement.HasDirection)
             {
@@ -168,6 +238,59 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         }
     }
 
+    // 화면(렌즈) 빛줄기 — 입자는 로컬 원점에 머물고(로컬 시뮬레이션), 시스템 자체를 카메라 근평면 앞 화면 점에 놓는다(UpdateScreenRays).
+    // 방향이 있으면 틈 수직처럼 날개 2개 메시를 화면상 수직선 ±퍼짐 각으로 여러 줄(길이 배율 = 3D 크기 X), 없으면 프리팹 메시·버스트 그대로 화면 가로 기준.
+    private void PlayScreenRays(ParticleSystem system, ParticleSystemRenderer renderer, in InterruptHitLightPlacement placement, InterruptHitLightLook look)
+    {
+        ParticleSystem.MainModule main = system.main;
+        main.simulationSpace = ParticleSystemSimulationSpace.Local;
+        if (renderer != null)
+        {
+            renderer.alignment = ParticleSystemRenderSpace.Local;
+            if (look.RayScreenMaterial != null)
+            {
+                renderer.sharedMaterial = look.RayScreenMaterial;
+                _rayBlock ??= new MaterialPropertyBlock();
+                _rayBlock.Clear();
+                _rayBlock.SetFloat(IntensityId, look.RayScreenBrightness);
+                renderer.SetPropertyBlock(_rayBlock);
+            }
+        }
+
+        if (placement.HasDirection)
+            EmitScreenRays(system, renderer, look);
+        else
+            system.Play(false);
+
+        _screenRays = system;
+        _screenRayOrigin = placement.Position;
+        _screenRayLine = placement.HasDirection ? placement.Perpendicular : Vector3.zero;
+        _screenRaySize = look.RayScreenSize;
+        UpdateScreenRays(Camera.main); // 첫 렌더 전에 한 번 — 카메라가 없으면 숨겨 두고 렌더 때 다시 잡는다
+    }
+
+    private void EmitScreenRays(ParticleSystem system, ParticleSystemRenderer renderer, InterruptHitLightLook look)
+    {
+        if (renderer != null && gapRaysMesh != null)
+            renderer.mesh = gapRaysMesh;
+        ParticleSystem.MainModule main = system.main;
+        ParticleSystem.MinMaxCurve startSize = main.startSize; // 3D 로 바꾸기 전에 프리팹 크기 범위를 읽는다
+        main.startSize3D = true;
+        ParticleSystem.EmissionModule emission = system.emission;
+        emission.enabled = false;
+        system.Play(false);
+
+        float length = look.RayScreenLength;
+        var emit = new ParticleSystem.EmitParams { position = Vector3.zero, applyShapeToPosition = false };
+        for (int i = 0; i < look.GapRayCount; i++)
+        {
+            float size = startSize.Evaluate(0f, Random.value);
+            emit.startSize3D = new Vector3(size * length, size, size);
+            emit.rotation = Random.Range(-look.GapRaySpread, look.GapRaySpread); // 로컬 Z(= 카메라 시선) 둘레 — 화면상 각도
+            system.Emit(emit, 1);
+        }
+    }
+
     // 가로 빛줄(V3) — 화면 가로 대신 수직선(또는 축)을 카메라 쪽으로 기울인 방향. 프리팹 버스트 그대로.
     private static void PlayGapStreak(ParticleSystem system, ParticleSystemRenderer renderer, in InterruptHitLightPlacement placement, InterruptHitLightLook look)
     {
@@ -214,8 +337,14 @@ public sealed class InterruptHitLightFx : MonoBehaviour
                 Renderer = renderer,
                 Alignment = renderer != null ? renderer.alignment : ParticleSystemRenderSpace.View,
                 Mesh = renderer != null ? renderer.mesh : null,
+                Material = renderer != null ? renderer.sharedMaterial : null,
+                RendererEnabled = renderer == null || renderer.enabled,
                 Emission = _systems[i].emission.enabled,
                 LocalRotation = _systems[i].transform.localRotation,
+                LocalPosition = _systems[i].transform.localPosition,
+                LocalScale = _systems[i].transform.localScale,
+                SimulationSpace = _systems[i].main.simulationSpace,
+                StartSize3D = _systems[i].main.startSize3D,
             };
         }
     }
@@ -226,11 +355,19 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         {
             defaults.Renderer.alignment = defaults.Alignment;
             defaults.Renderer.mesh = defaults.Mesh;
+            defaults.Renderer.sharedMaterial = defaults.Material;
+            defaults.Renderer.enabled = defaults.RendererEnabled;
+            defaults.Renderer.SetPropertyBlock(null);
         }
 
         ParticleSystem.EmissionModule emission = system.emission;
         emission.enabled = defaults.Emission;
+        ParticleSystem.MainModule main = system.main;
+        main.simulationSpace = defaults.SimulationSpace;
+        main.startSize3D = defaults.StartSize3D;
+        system.transform.localPosition = defaults.LocalPosition;
         system.transform.localRotation = defaults.LocalRotation;
+        system.transform.localScale = defaults.LocalScale;
     }
 
     private void StopLight()

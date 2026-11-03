@@ -828,6 +828,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | 가로 빛줄 `Streak` | 좌우 날개 2개 얇은 메시(에셋 `Mesh_InterruptHitLight_Streak`) 크기 2.6 · 회전 0(늘 화면 가로) · 0.22초 | 재질 `M_InterruptHitLight_Streak` |
 | 불꽃 `Sparks` | 55~70개 · 크기 0.025~0.045 · 속도 9~18 · lengthScale 4 · 중력 0.4 · 재질 HDR 7 | 재질 `M_InterruptHitLight_Spark_V3` |
 | 빛줄기 `Rays` | V1 메시·재질 그대로, 크기 0.8~1.2 · 알파 0.4 | 프리팹 파티클 |
+| 빛줄기 공간(11-03 렌즈 연출) | **V3 = 화면**: 틈 원점을 게임 카메라로 투영한 화면 점에 카메라 정면·깊이 무시(ZTest Always·Overlay 큐)·화면 높이 비율 크기로 그린다(카메라 거리·줌 무관, 원점이 화면 밖·카메라 뒤면 안 그림). 월드 원점·방향은 성공 순간 고정, 화면 투영은 카메라 렌더마다(`beginCameraRendering`, `Camera.main` 만). 크기 = 프리팹 Start Size × `rayScreenSize`(화면 높이 비율 — 0.05 면 Start Size 8 = 중심~날개 끝 화면 높이 40%) · 길이 = `rayScreenLength`(줄 방향만) · 밝기 = `rayScreenBrightness`(재질 `_Intensity`). V1·V2 = 월드 그대로. 불꽃·파편·라이트·중심 점·가로 빛줄은 늘 월드 | SO `raySpace`·`rayScreenSize`·`rayScreenLength`·`rayScreenBrightness`·`rayScreenMaterial`(V3 `M_InterruptHitLight_Rays_Screen`, 셰이더 V3 `InterruptHitLightRaysScreen` = V1 셰이더 복제 + ZTest Always·`_Intensity`) |
 | 파편 `Debris` | V1 과 같음 | 프리팹 파티클 |
 | 화이트아웃 | 없음(0) | SO `whiteoutFrames` |
 

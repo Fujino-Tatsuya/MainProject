@@ -452,6 +452,50 @@ public static class InterruptHitLightRules
         return Quaternion.AngleAxis(Mathf.Clamp01(twist01) * 360f, side) * tilted;
     }
 
+    /// <summary>화면 빛줄기를 놓는 깊이 — 카메라 근평면 바로 앞(이만큼 더). 깊이 무시 재질이라 값은 보이는 모습에 영향 없다.</summary>
+    public const float ScreenRayDepthPadding = 0.05f;
+
+    /// <summary>
+    /// 화면(렌즈) 빛줄기 자세(194 후속) — <paramref name="origin"/>(월드 적중점)을 <paramref name="camera"/> 로 투영한 화면 점에, 카메라 근평면 바로 앞·카메라 정면으로 놓는다.
+    /// 로컬 X = <paramref name="line"/> 을 화면에 투영한 방향(없거나 시선과 평행하면 화면 가로). <paramref name="worldPerUnit"/> = 메시 1 단위가 화면 높이 × <paramref name="screenSize"/> 가 되는 월드 배율
+    /// — 그 깊이의 화면 높이(원근 = 2·깊이·tan(FOV/2), 직교 = 2·orthographicSize)로 정하므로 카메라 거리·줌과 무관하게 같은 화면 크기다.
+    /// 원점이 카메라 뒤·근평면 안·화면 밖이면 false(그리지 않는다).
+    /// </summary>
+    public static bool ScreenRayPose(Camera camera, Vector3 origin, Vector3 line, float screenSize,
+        out Vector3 position, out Quaternion rotation, out float worldPerUnit)
+    {
+        position = default;
+        rotation = Quaternion.identity;
+        worldPerUnit = 0f;
+        if (camera == null)
+            return false;
+
+        Vector3 viewport = camera.WorldToViewportPoint(origin);
+        if (viewport.z <= camera.nearClipPlane || viewport.x < 0f || viewport.x > 1f || viewport.y < 0f || viewport.y > 1f)
+            return false;
+
+        float depth = camera.nearClipPlane + ScreenRayDepthPadding;
+        position = camera.ViewportToWorldPoint(new Vector3(viewport.x, viewport.y, depth));
+        float screenHeight = camera.orthographic
+            ? 2f * camera.orthographicSize
+            : 2f * depth * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        worldPerUnit = Mathf.Max(0f, screenSize) * screenHeight;
+
+        float angle = 0f;
+        if (line.sqrMagnitude >= MinSqr)
+        {
+            // 원점 근처 짧은 선분을 화면으로 투영한 방향(픽셀 — 가로세로 비가 반영된다).
+            Vector3 a = camera.WorldToScreenPoint(origin);
+            Vector3 b = camera.WorldToScreenPoint(origin + line.normalized * (0.1f * viewport.z));
+            Vector2 d = new Vector2(b.x - a.x, b.y - a.y);
+            if (d.sqrMagnitude >= MinSqr)
+                angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+        }
+
+        rotation = camera.transform.rotation * Quaternion.AngleAxis(angle, Vector3.forward);
+        return true;
+    }
+
     private static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
     /// <summary>암순응 나 배율 — 1 − 낮춤 비율 × 곡선 값. [0, 1].</summary>

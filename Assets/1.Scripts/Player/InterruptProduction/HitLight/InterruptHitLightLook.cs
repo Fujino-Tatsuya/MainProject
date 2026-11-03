@@ -73,6 +73,18 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [Tooltip("가로 빛줄(V3) 방향 — 수직선(기본) / 시전자→대상 축. 둘 다 화면에서 그 각도로 보이게 카메라 쪽으로 기울인다")]
     [SerializeField] private InterruptHitLightStreakAxis gapStreakAxis = InterruptHitLightStreakAxis.Perpendicular;
 
+    [Header("빛줄기 공간(194 후속 — 렌즈 연출)")]
+    [Tooltip("빛줄기(Rays)를 그리는 곳 — 월드(V1·V2, 기본) / 화면(V3 — 렌즈 플레어처럼 적중점의 화면 위치에 카메라 정면·깊이 무시·화면 비율 크기). 불꽃·파편·라이트·중심 점·가로 빛줄은 늘 월드")]
+    [SerializeField] private InterruptHitLightRaySpace raySpace = InterruptHitLightRaySpace.World;
+    [Tooltip("화면 빛줄기 크기 — 파티클 Start Size 1 당 중심~날개 끝 길이(화면 높이 비율). 예: Start Size 8 × 0.05 = 화면 높이의 40%. 카메라 거리·줌과 무관")]
+    [SerializeField, Min(0f)] private float rayScreenSize = 0.05f;
+    [Tooltip("화면 빛줄기 길이 배율 — 줄 방향만 늘인다(굵기 그대로). 1 = Start Size 그대로")]
+    [SerializeField, Min(0.01f)] private float rayScreenLength = 1f;
+    [Tooltip("화면 빛줄기 밝기 배율(HDR — 1 을 넘으면 블룸이 더 먹는다). 화면 전용 재질(_Intensity)이 있을 때만")]
+    [SerializeField, Min(0f)] private float rayScreenBrightness = 1f;
+    [Tooltip("화면 빛줄기 재질 — 깊이 무시·맨 위(M_InterruptHitLight_Rays_Screen). 비면 프리팹 재질 그대로(바닥·캐릭터에 가려질 수 있다)")]
+    [SerializeField] private Material rayScreenMaterial;
+
     public Color LightColor => lightColor;
     public int WhiteoutFrames => whiteoutFrames;
     public float LightIntensity => lightIntensity;
@@ -104,6 +116,12 @@ public sealed class InterruptHitLightLook : ScriptableObject
     public float GapSparkSpread => gapSparkSpread;
     public InterruptHitLightStreakAxis GapStreakAxis => gapStreakAxis;
 
+    public InterruptHitLightRaySpace RaySpace => raySpace;
+    public float RayScreenSize => rayScreenSize;
+    public float RayScreenLength => rayScreenLength;
+    public float RayScreenBrightness => rayScreenBrightness;
+    public Material RayScreenMaterial => rayScreenMaterial;
+
     /// <summary>적중 순간 1 → 끝 0 으로 부드럽게 줄어드는 기본 곡선(Q5 — 약 0.9초에 걸쳐 복귀).</summary>
     public static AnimationCurve Decay() =>
         new AnimationCurve(new Keyframe(0f, 1f, 0f, -1.8f), new Keyframe(0.4f, 0.35f, -0.9f, -0.9f), new Keyframe(1f, 0f, -0.15f, 0f));
@@ -116,4 +134,13 @@ public enum InterruptHitLightStreakAxis : byte
     Perpendicular = 0,
     /// <summary>시전자→대상 축(레퍼런스 ZZZ 컷신은 무기 맞부딪힘 축을 따라 가로로 뻗는다).</summary>
     CasterToTarget = 1,
+}
+
+/// <summary>빛줄기(Rays)를 그리는 공간(194 후속). 값은 직렬화되므로 순서를 바꾸지 않는다.</summary>
+public enum InterruptHitLightRaySpace : byte
+{
+    /// <summary>월드 — 적중점에 놓인 파티클(V1·V2 처음 모습, 틈 수직이면 카메라 쪽 기울임).</summary>
+    World = 0,
+    /// <summary>화면(렌즈) — 적중점을 카메라로 투영한 화면 점, 카메라 정면·깊이 무시·화면 비율 크기. 원점이 화면 밖·카메라 뒤면 안 그린다.</summary>
+    Screen = 1,
 }

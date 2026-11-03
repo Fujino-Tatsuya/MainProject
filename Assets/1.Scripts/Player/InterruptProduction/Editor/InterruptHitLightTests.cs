@@ -544,6 +544,169 @@ public sealed class InterruptHitLightTests
         Assert.IsTrue(sparks.emission.enabled);
     }
 
+    private Camera CreateCamera(Vector3 position, Vector3 lookAt, bool orthographic = false, float fovOrSize = 40f)
+    {
+        var go = new GameObject("TestCamera");
+        _objects.Add(go);
+        Camera camera = go.AddComponent<Camera>();
+        camera.enabled = false; // 렌더하지 않는다 — 투영 계산만
+        go.transform.position = position;
+        go.transform.LookAt(lookAt);
+        camera.orthographic = orthographic;
+        if (orthographic)
+            camera.orthographicSize = fovOrSize;
+        else
+            camera.fieldOfView = fovOrSize;
+        return camera;
+    }
+
+    private InterruptHitLightLook CreateScreenLook(float screenSize = 0.05f, float length = 1f)
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var so = new SerializedObject(look);
+        so.FindProperty("raySpace").enumValueIndex = (int)InterruptHitLightRaySpace.Screen;
+        so.FindProperty("rayScreenSize").floatValue = screenSize;
+        so.FindProperty("rayScreenLength").floatValue = length;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return look;
+    }
+
+    // 메시 1 단위(로컬 X)가 화면에서 차지하는 길이 — 화면 높이 비율.
+    private static float ScreenFraction(Camera camera, Vector3 position, Quaternion rotation, float worldPerUnit)
+    {
+        Vector3 a = camera.WorldToScreenPoint(position);
+        Vector3 b = camera.WorldToScreenPoint(position + rotation * Vector3.right * worldPerUnit);
+        return new Vector2(b.x - a.x, b.y - a.y).magnitude / camera.pixelHeight;
+    }
+
+    [Test]
+    public void 화면_빛줄기_자세는_적중점의_화면_위치에_카메라_정면_근평면_앞()
+    {
+        Camera camera = CreateCamera(new Vector3(0f, 12f, -8f), Vector3.zero);
+        var origin = new Vector3(1.5f, 1f, 0.5f);
+
+        Assert.IsTrue(InterruptHitLightRules.ScreenRayPose(camera, origin, Vector3.right, 0.05f, out Vector3 position, out Quaternion rotation, out _));
+        Vector3 expected = camera.WorldToViewportPoint(origin);
+        Vector3 actual = camera.WorldToViewportPoint(position);
+        Assert.AreEqual(expected.x, actual.x, 1e-3f, "같은 화면 점");
+        Assert.AreEqual(expected.y, actual.y, 1e-3f, "같은 화면 점");
+        Assert.AreEqual(camera.nearClipPlane + InterruptHitLightRules.ScreenRayDepthPadding, actual.z, 1e-3f, "근평면 바로 앞");
+        AssertVector(camera.transform.forward, rotation * Vector3.forward, "카메라 정면(면이 화면을 향함)");
+    }
+
+    [Test]
+    public void 화면_빛줄기_크기는_카메라_거리_FOV_직교_크기와_무관()
+    {
+        var origin = new Vector3(0f, 1f, 0f);
+        foreach (Camera camera in new[]
+                 {
+                     CreateCamera(new Vector3(0f, 8f, -5f), origin, false, 40f),
+                     CreateCamera(new Vector3(0f, 30f, -20f), origin, false, 40f),
+                     CreateCamera(new Vector3(0f, 12f, -8f), origin, false, 20f),
+                     CreateCamera(new Vector3(0f, 12f, -8f), origin, true, 5f),
+                     CreateCamera(new Vector3(0f, 12f, -8f), origin, true, 15f),
+                 })
+        {
+            Assert.IsTrue(InterruptHitLightRules.ScreenRayPose(camera, origin, Vector3.right, 0.05f, out Vector3 position, out Quaternion rotation, out float worldPerUnit));
+            Assert.AreEqual(0.05f, ScreenFraction(camera, position, rotation, worldPerUnit), 1e-3f,
+                $"화면 높이의 5% — {(camera.orthographic ? "직교 " + camera.orthographicSize : "원근 " + camera.fieldOfView)} 거리 {camera.transform.position.magnitude}");
+        }
+    }
+
+    [Test]
+    public void 화면_빛줄기_방향은_선을_화면에_투영한_방향()
+    {
+        Camera camera = CreateCamera(new Vector3(3f, 14f, -9f), Vector3.zero);
+        var origin = new Vector3(0.5f, 1f, 0f);
+        Vector3 line = new Vector3(1f, 0f, 1f).normalized;
+
+        Assert.IsTrue(InterruptHitLightRules.ScreenRayPose(camera, origin, line, 0.05f, out Vector3 position, out Quaternion rotation, out float worldPerUnit));
+        Vector3 a = camera.WorldToScreenPoint(origin);
+        Vector3 b = camera.WorldToScreenPoint(origin + line * 0.2f);
+        Vector2 expected = new Vector2(b.x - a.x, b.y - a.y).normalized;
+        Vector3 p = camera.WorldToScreenPoint(position);
+        Vector3 q = camera.WorldToScreenPoint(position + rotation * Vector3.right * worldPerUnit);
+        Vector2 actual = new Vector2(q.x - p.x, q.y - p.y).normalized;
+        Assert.Greater(Vector2.Dot(expected, actual), 0.999f, $"expected {expected} actual {actual}");
+
+        Assert.IsTrue(InterruptHitLightRules.ScreenRayPose(camera, origin, Vector3.zero, 0.05f, out _, out Quaternion flat, out _));
+        AssertVector(camera.transform.right, flat * Vector3.right, "선 없음 = 화면 가로");
+    }
+
+    [Test]
+    public void 화면_빛줄기는_원점이_화면_밖이나_카메라_뒤면_그리지_않는다()
+    {
+        Camera camera = CreateCamera(new Vector3(0f, 12f, -8f), Vector3.zero);
+        Assert.IsFalse(InterruptHitLightRules.ScreenRayPose(camera, new Vector3(0f, 12f, -20f), Vector3.right, 0.05f, out _, out _, out _), "카메라 뒤");
+        Assert.IsFalse(InterruptHitLightRules.ScreenRayPose(camera, new Vector3(500f, 0f, 0f), Vector3.right, 0.05f, out _, out _, out _), "화면 밖");
+        Assert.IsFalse(InterruptHitLightRules.ScreenRayPose(null, Vector3.zero, Vector3.right, 0.05f, out _, out _, out _), "카메라 없음");
+    }
+
+    [Test]
+    public void 화면_모드_재생은_빛줄기만_카메라에_붙이고_화면_밖이면_끄고_월드_모드는_그대로()
+    {
+        InterruptHitLightFx fx = CreateFx();
+        ParticleSystem rays = AddSystem(fx, InterruptHitLightFx.RaysName, ParticleSystemRenderMode.Mesh);
+        ParticleSystem streak = AddSystem(fx, InterruptHitLightFx.StreakName, ParticleSystemRenderMode.Mesh);
+        var raysRenderer = rays.GetComponent<ParticleSystemRenderer>();
+        Material prefabMaterial = raysRenderer.sharedMaterial;
+        InterruptHitLightLook look = CreateScreenLook(0.05f, 2f);
+        Camera camera = CreateCamera(new Vector3(0f, 12f, -8f), TargetPoint);
+
+        InterruptHitLightPlacement placement = InterruptHitLightRules.Place(InterruptHitLightOrigin.Gap, TargetPoint, WeaponPoint, null, null, camera.transform.forward);
+        fx.Play(placement, look, 2f);
+        fx.UpdateScreenRays(camera);
+        Assert.IsTrue(fx.ScreenRaysActive);
+        Assert.AreEqual(ParticleSystemSimulationSpace.Local, rays.main.simulationSpace, "입자는 시스템을 따라간다");
+        Assert.AreEqual(look.GapRayCount, rays.particleCount, "줄 수 그대로");
+        Assert.IsTrue(raysRenderer.enabled);
+        Assert.IsTrue(InterruptHitLightRules.ScreenRayPose(camera, placement.Position, placement.Perpendicular, 0.05f, out Vector3 position, out Quaternion rotation, out float worldPerUnit));
+        AssertVector(position, rays.transform.position, "화면 점·근평면 앞");
+        AssertVector(rotation * Vector3.right, rays.transform.right, "화면상 수직선 방향");
+        Assert.AreEqual(worldPerUnit, rays.transform.lossyScale.x, 1e-4f, "루트 스케일과 무관한 화면 배율");
+        var particles = new ParticleSystem.Particle[rays.particleCount];
+        rays.GetParticles(particles);
+        Assert.AreEqual(particles[0].startSize3D.y * 2f, particles[0].startSize3D.x, 1e-4f, "길이 배율 = 줄 방향(X)만");
+        AssertVector(Vector3.zero, particles[0].position, "입자는 로컬 원점");
+        Assert.AreEqual(ParticleSystemSimulationSpace.World, streak.main.simulationSpace, "가로 빛줄은 월드 그대로");
+        AssertVector(InterruptHitLightRules.ViewTilted(placement.Perpendicular, placement.ViewForward) * Vector3.right, streak.transform.right);
+
+        // 카메라가 움직이면 같은 월드 원점의 새 화면 위치로.
+        camera.transform.position += new Vector3(3f, 0f, 0f);
+        fx.UpdateScreenRays(camera);
+        Assert.IsTrue(InterruptHitLightRules.ScreenRayPose(camera, placement.Position, placement.Perpendicular, 0.05f, out Vector3 moved, out _, out _));
+        AssertVector(moved, rays.transform.position, "카메라 이동 — 투영 위치만 따라감");
+
+        camera.transform.position += new Vector3(800f, 0f, 0f);
+        fx.UpdateScreenRays(camera);
+        Assert.IsFalse(raysRenderer.enabled, "원점이 화면 밖 — 안 그림");
+
+        // 월드 모드(V1·V2)로 다시 틀면 프리팹 값 그대로.
+        fx.Play(placement, CreateLook(false));
+        Assert.IsFalse(fx.ScreenRaysActive);
+        Assert.IsTrue(raysRenderer.enabled);
+        Assert.AreEqual(ParticleSystemSimulationSpace.World, rays.main.simulationSpace);
+        Assert.IsFalse(rays.main.startSize3D);
+        Assert.AreSame(prefabMaterial, raysRenderer.sharedMaterial);
+        AssertVector(Vector3.one, rays.transform.localScale);
+        AssertVector(Vector3.zero, rays.transform.localPosition);
+        AssertVector(InterruptHitLightRules.ViewTilted(placement.Perpendicular, placement.ViewForward) * Vector3.right, rays.transform.right, "월드 틈 수직 그대로");
+    }
+
+    [Test]
+    public void 빛줄기_공간_기본은_월드_V3_에셋은_화면_깊이_무시_재질()
+    {
+        Assert.AreEqual(InterruptHitLightRaySpace.World, CreateLook(false).RaySpace, "코드 기본 = 월드(V1·V2 에셋)");
+        var v1 = AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>(InterruptHitLightAuthoring.LookPath);
+        Assert.AreEqual(InterruptHitLightRaySpace.World, v1.RaySpace, "V1·V2 = 월드");
+        var v3 = AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>(InterruptHitLightReferenceAuthoring.LookPath);
+        Assert.AreEqual(InterruptHitLightRaySpace.Screen, v3.RaySpace, "V3 = 화면");
+        Assert.IsNotNull(v3.RayScreenMaterial);
+        Assert.AreEqual("BeaverLobby/VFX/InterruptHitLightRaysScreen", v3.RayScreenMaterial.shader.name);
+        Assert.AreNotEqual(AssetDatabase.GetAssetPath(PrefabSystem("Rays").GetComponent<ParticleSystemRenderer>().sharedMaterial),
+            AssetDatabase.GetAssetPath(v3.RayScreenMaterial), "V1 공유 재질은 그대로");
+    }
+
     private ParticleSystem AddSystem(InterruptHitLightFx fx, string name, ParticleSystemRenderMode mode)
     {
         var go = new GameObject(name);
@@ -983,9 +1146,8 @@ public sealed class InterruptHitLightTests
         Assert.Greater(v3Sparks.GetComponent<ParticleSystemRenderer>().lengthScale, v1Sparks.GetComponent<ParticleSystemRenderer>().lengthScale, "더 길게");
         Assert.Greater(v3Sparks.emission.GetBurst(0).minCount, v1Sparks.emission.GetBurst(0).maxCount, "더 많이");
 
-        ParticleSystem v1Rays = PrefabSystem("Rays");
+        // 빛줄기 크기는 사용자 튜닝값(194 후속 화면 공간 — Start Size 가 화면 비율 배율)이라 단언하지 않는다.
         ParticleSystem v3Rays = prefab.transform.Find("Rays").GetComponent<ParticleSystem>();
-        Assert.Less(v3Rays.main.startSize.constantMax, v1Rays.main.startSize.constantMin, "빛줄기는 보조로 작게");
         Assert.Less(v3Rays.main.startColor.color.a, 1f, "알파 낮춤");
     }
 

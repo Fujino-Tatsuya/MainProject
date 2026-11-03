@@ -197,3 +197,8 @@ MonoBehaviour:
   gapRayCount: 5
   gapSparkSpread: 30
   gapStreakAxis: 0
+  raySpace: 1
+  rayScreenSize: 0.05
+  rayScreenLength: 1
+  rayScreenBrightness: 1
+  rayScreenMaterial: {fileID: 2100000, guid: d04c16b45e7636a4fbad39483f445774, type: 2}
