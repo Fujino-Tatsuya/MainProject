@@ -311,6 +311,45 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash));
     }
 
+    // ---- 단계 4 — 불꽃·메시 파편 ----
+
+    private static ParticleSystem PrefabSystem(string child)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(InterruptHitLightAuthoring.PrefabPath);
+        Assert.IsNotNull(prefab, InterruptHitLightAuthoring.PrefabPath);
+        Transform t = prefab.transform.Find(child);
+        Assert.IsNotNull(t, child);
+        var system = t.GetComponent<ParticleSystem>();
+        Assert.IsNotNull(system, child);
+        Assert.IsFalse(system.main.playOnAwake, child + " — 디렉터가 성공 순간 튼다");
+        Assert.IsFalse(system.main.loop, child);
+        Assert.IsTrue(system.main.useUnscaledTime, child + " — Q8 실시간");
+        Assert.IsNotNull(t.GetComponent<ParticleSystemRenderer>().sharedMaterial, child + " 재질");
+        return system;
+    }
+
+    [Test]
+    public void 프리팹_불꽃은_늘어난_빌보드_버스트()
+    {
+        ParticleSystem sparks = PrefabSystem("Sparks");
+        Assert.AreEqual(ParticleSystemRenderMode.Stretch, sparks.GetComponent<ParticleSystemRenderer>().renderMode);
+        Assert.Greater(sparks.emission.burstCount, 0);
+        Assert.Greater(sparks.main.gravityModifier.constant, 0f);
+    }
+
+    [Test]
+    public void 프리팹_파편은_메시_에셋_중력_바닥_충돌()
+    {
+        ParticleSystem debris = PrefabSystem("Debris");
+        var renderer = debris.GetComponent<ParticleSystemRenderer>();
+        Assert.AreEqual(ParticleSystemRenderMode.Mesh, renderer.renderMode);
+        Assert.IsNotNull(renderer.mesh);
+        Assert.AreEqual(InterruptHitLightAuthoring.DebrisMeshPath, AssetDatabase.GetAssetPath(renderer.mesh), "파편 메시는 에셋(런타임 생성 금지)");
+        Assert.IsTrue(debris.collision.enabled);
+        Assert.Greater(debris.main.gravityModifier.constant, 0f);
+        Assert.LessOrEqual(debris.emission.GetBurst(0).maxCount, 12, "파편은 몇 개만");
+    }
+
     [Test]
     public void NetworkManager_프리팹_디렉터에_적중_라이트가_이어져_있다()
     {
