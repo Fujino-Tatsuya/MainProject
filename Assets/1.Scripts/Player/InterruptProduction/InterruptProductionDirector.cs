@@ -110,7 +110,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
              "끄면 제압 간파도 일반 간파와 같은 연출(②~⑥·오너 암전 규칙 그대로). 성공 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 섬광 줄이기와 독립")]
     [DataTableIgnore, SerializeField] private bool suppressFlash = true;
     [Tooltip("A7 섬광 = 대상 내부만(179/192 후속) — 켜면 제압 간파 섬광 시퀀스를 간파 대상(보스·허수아비) 실루엣 안에만 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). " +
-             "레터박스는 그대로. 끄면 전체 화면. 재생 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 이 화면에서 대상을 못 찾으면 전체 화면")]
+             "끄면 전체 화면. 재생 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 이 화면에서 대상을 못 찾으면 전체 화면")]
     [DataTableIgnore, SerializeField] private bool suppressFlashTargetOnly;
 
     [Header("성공 — 개인")]

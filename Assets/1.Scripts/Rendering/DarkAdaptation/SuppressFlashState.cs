@@ -23,7 +23,7 @@ public struct SuppressFlashParams
     public Vector4 Center;
     /// <summary>x = 3단 뒤집기(0/1), y = 대비, z = 복귀 정도, w = 빗금(0/1).</summary>
     public Vector4 Tone;
-    /// <summary>x = 별 반지름(화면 높이), y = 집중선 세기, z = 색수차 번짐(화면 높이), w = 레터박스 띠 높이(화면 높이, 들어온 정도 반영).</summary>
+    /// <summary>x = 별 반지름(화면 높이), y = 집중선 세기, z = 색수차 번짐(화면 높이), w = 미사용(0 — 레터박스는 179 후속 11-03 삭제).</summary>
     public Vector4 Fx;
     /// <summary>x = 십자 종류(0 없음·1 단일·2 격자), y = 중심 굵기, z = 가늘어짐, w = 울퉁불퉁함.</summary>
     public Vector4 Cross;
@@ -33,7 +33,7 @@ public struct SuppressFlashParams
     public Vector4 Look;
     /// <summary>x = 짙은|중간 경계, y = 중간|밝은 경계.</summary>
     public Vector4 Thresholds;
-    /// <summary>x = 대상 내부만(0/1, 179/192 후속 A7) — 1 이면 마스크(비트 7) 안에만 그리고 실루엣 흰 칠·빗금은 끈다. 바깥 = 원래 화면, 레터박스는 그대로.</summary>
+    /// <summary>x = 대상 내부만(0/1, 179/192 후속 A7) — 1 이면 마스크(비트 7) 안에만 그리고 실루엣 흰 칠·빗금은 끈다. 바깥 = 원래 화면.</summary>
     public Vector4 Mask;
     public Color Dark;
     public Color Mid;
