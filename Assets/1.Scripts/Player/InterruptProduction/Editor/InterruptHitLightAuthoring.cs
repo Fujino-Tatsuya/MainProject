@@ -55,11 +55,14 @@ internal static class InterruptHitLightAuthoring
         Mesh debrisMesh = EnsureDebrisMesh();
         Material sparkMaterial = EnsureSparkMaterial();
         Material debrisMaterial = EnsureDebrisMaterial();
+        Mesh raysMesh = EnsureRaysMesh();
+        Material raysMaterial = EnsureMaterial(RaysMaterialPath, RaysShaderName);
 
         var root = new GameObject("FX_InterruptHitLight");
         try
         {
             root.AddComponent<InterruptHitLightFx>();
+            BuildRays(root.transform, raysMesh, raysMaterial);
             BuildSparks(root.transform, sparkMaterial);
             BuildDebris(root.transform, debrisMesh, debrisMaterial);
             return PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
@@ -68,6 +71,107 @@ internal static class InterruptHitLightAuthoring
         {
             Object.DestroyImmediate(root);
         }
+    }
+
+    // ---- 단계 5 — 빛줄기: 끝이 가늘어지는 날개 메시 + 가산 셰이더, 파티클 메시 모드·카메라 정렬·회전 무작위 ----
+
+    public const string RaysMeshPath = Folder + "/Mesh_InterruptHitLight_Rays.asset";
+    public const string RaysMaterialPath = Folder + "/M_InterruptHitLight_Rays.mat";
+    const string RaysShaderName = "BeaverLobby/VFX/InterruptHitLightRays";
+    public const int RayBladeCount = 10;
+
+    static void BuildRays(Transform parent, Mesh mesh, Material material)
+    {
+        ParticleSystem system = NewSystem(parent, "Rays");
+        ParticleSystem.MainModule main = system.main;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.28f, 0.38f);
+        main.startSpeed = 0f;
+        main.startSize = new ParticleSystem.MinMaxCurve(1.4f, 2.1f);
+        main.startRotation3D = false;
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f); // 회전 무작위(화면 축)
+        main.startColor = Color.white;
+        main.maxParticles = 4;
+
+        system.emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 2) });
+
+        ParticleSystem.ShapeModule shape = system.shape;
+        shape.enabled = false; // 적중 지점 한 점
+
+        // 길이(크기) — 적중 순간 짧게 튀어나와 커지며, 알파 — 바로 최대 → 사라짐.
+        ParticleSystem.SizeOverLifetimeModule size = system.sizeOverLifetime;
+        size.enabled = true;
+        size.size = new ParticleSystem.MinMaxCurve(1f,
+            new AnimationCurve(new Keyframe(0f, 0.35f, 0f, 6f), new Keyframe(0.25f, 1f, 1f, 1f), new Keyframe(1f, 1.15f)));
+
+        ParticleSystem.ColorOverLifetimeModule color = system.colorOverLifetime;
+        color.enabled = true;
+        var fade = new Gradient();
+        fade.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.3f), new GradientAlphaKey(0f, 1f) });
+        color.color = fade;
+
+        var renderer = system.GetComponent<ParticleSystemRenderer>();
+        renderer.renderMode = ParticleSystemRenderMode.Mesh;
+        renderer.mesh = mesh;
+        renderer.alignment = ParticleSystemRenderSpace.View; // 카메라 정렬 — 메시 XY 평면이 화면을 향한다
+        renderer.sharedMaterial = material;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+    }
+
+    // 날개 RayBladeCount 개 — 중심에서 XY 평면으로 뻗고 끝이 가늘어진다. 길이·폭·각도는 정해진 흔들림(다시 만들어도 같다).
+    // UV.x = 날개 번호 + 가로(0~1), UV.y = 중심 0 → 끝 1 (셰이더 InterruptHitLightRays).
+    static Mesh EnsureRaysMesh()
+    {
+        var vertices = new Vector3[RayBladeCount * 4];
+        var uvs = new Vector2[RayBladeCount * 4];
+        var triangles = new int[RayBladeCount * 6];
+        var random = new System.Random(194);
+        for (int i = 0; i < RayBladeCount; i++)
+        {
+            float angle = (i + (float)random.NextDouble() * 0.5f - 0.25f) * Mathf.PI * 2f / RayBladeCount;
+            float length = 0.55f + (float)random.NextDouble() * 0.45f;
+            float baseHalf = 0.05f + (float)random.NextDouble() * 0.03f;
+            const float tipHalf = 0.006f;
+            const float baseRadius = 0.03f;
+
+            var dir = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+            var side = new Vector3(-dir.y, dir.x, 0f);
+            int v = i * 4;
+            vertices[v] = dir * baseRadius - side * baseHalf;
+            vertices[v + 1] = dir * baseRadius + side * baseHalf;
+            vertices[v + 2] = dir * length - side * tipHalf;
+            vertices[v + 3] = dir * length + side * tipHalf;
+            uvs[v] = new Vector2(i, 0f);
+            uvs[v + 1] = new Vector2(i + 0.999f, 0f);
+            uvs[v + 2] = new Vector2(i, 1f);
+            uvs[v + 3] = new Vector2(i + 0.999f, 1f);
+
+            int t = i * 6;
+            triangles[t] = v;
+            triangles[t + 1] = v + 2;
+            triangles[t + 2] = v + 1;
+            triangles[t + 3] = v + 1;
+            triangles[t + 4] = v + 2;
+            triangles[t + 5] = v + 3;
+        }
+
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(RaysMeshPath);
+        bool create = mesh == null;
+        if (create)
+            mesh = new Mesh();
+        mesh.Clear();
+        mesh.name = "Mesh_InterruptHitLight_Rays";
+        mesh.vertices = vertices;
+        mesh.uv = uvs;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        if (create)
+            AssetDatabase.CreateAsset(mesh, RaysMeshPath);
+        else
+            EditorUtility.SetDirty(mesh);
+        return mesh;
     }
 
     // ---- 단계 4 — 쇳조각: 늘어난 불꽃(스트레치 빌보드, 주황) + 작은 메시 파편(중력·바닥 충돌) ----

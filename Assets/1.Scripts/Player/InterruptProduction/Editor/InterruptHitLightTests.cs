@@ -350,6 +350,32 @@ public sealed class InterruptHitLightTests
         Assert.LessOrEqual(debris.emission.GetBurst(0).maxCount, 12, "파편은 몇 개만");
     }
 
+    // ---- 단계 5 — 빛줄기 ----
+
+    [Test]
+    public void 프리팹_빛줄기는_날개_메시_에셋_카메라_정렬_회전_무작위()
+    {
+        ParticleSystem rays = PrefabSystem("Rays");
+        var renderer = rays.GetComponent<ParticleSystemRenderer>();
+        Assert.AreEqual(ParticleSystemRenderMode.Mesh, renderer.renderMode);
+        Assert.AreEqual(ParticleSystemRenderSpace.View, renderer.alignment, "카메라 정렬");
+        Assert.AreEqual(InterruptHitLightAuthoring.RaysMeshPath, AssetDatabase.GetAssetPath(renderer.mesh), "빛줄기 메시는 에셋");
+        Assert.AreEqual("BeaverLobby/VFX/InterruptHitLightRays", renderer.sharedMaterial.shader.name);
+        Assert.AreNotEqual(rays.main.startRotation.constantMin, rays.main.startRotation.constantMax, "회전 무작위");
+        Assert.IsTrue(rays.sizeOverLifetime.enabled, "길이 시간 변화");
+        Assert.IsTrue(rays.colorOverLifetime.enabled, "알파 시간 변화");
+    }
+
+    [Test]
+    public void 빛줄기_메시는_날개_8에서_12개()
+    {
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(InterruptHitLightAuthoring.RaysMeshPath);
+        Assert.IsNotNull(mesh);
+        int blades = mesh.vertexCount / 4;
+        Assert.That(blades, Is.InRange(8, 12));
+        Assert.AreEqual(blades * 6, mesh.triangles.Length);
+    }
+
     [Test]
     public void NetworkManager_프리팹_디렉터에_적중_라이트가_이어져_있다()
     {
