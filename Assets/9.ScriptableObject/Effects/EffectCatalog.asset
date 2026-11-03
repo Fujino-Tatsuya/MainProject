@@ -58,6 +58,12 @@ MonoBehaviour:
   <Gunner_R_Zone>k__BackingField: {fileID: 11400000, guid: 60e49b7edb0b496495a0742bdb1a8414, type: 2}
   <Gunner_R_Lock>k__BackingField: {fileID: 11400000, guid: e271ef022f104452a88fe7e53e7dccc1, type: 2}
   <Gunner_R_Strike>k__BackingField: {fileID: 11400000, guid: cf886c3930344214963ed0f67ae4900d, type: 2}
+  <Gunner_DualOutput_Beam>k__BackingField: {fileID: 11400000, guid: 30fbc03577a3476eab4be8c1a2e36a21, type: 2}
+  <Gunner_DualOutput_Muzzle>k__BackingField: {fileID: 11400000, guid: e5fdb8fbf66542248dad8a3d547fdf7d, type: 2}
+  <Gunner_DualOutput_Hit>k__BackingField: {fileID: 11400000, guid: e4358fa845374a3c8594b66030d28396, type: 2}
+  <Gunner_DualOutput_Stop>k__BackingField: {fileID: 11400000, guid: 71c282e9e24d487d9b46cf58fc9ce424, type: 2}
+  <Gunner_EchoBomb_Burst>k__BackingField: {fileID: 11400000, guid: 9d4ad0b88b244a39ae8efb58bc46a14c, type: 2}
+  <Gunner_EchoBomb_Fizzle>k__BackingField: {fileID: 11400000, guid: 41b4b839380045d6960724a3f5aa27b4, type: 2}
   <Player_Faint>k__BackingField: {fileID: 11400000, guid: 9b8944d0493549069d6e1e57ca0bbc96, type: 2}
   <Player_TraitAcquired>k__BackingField: {fileID: 11400000, guid: a461c8d6930447088145d44f53681e70, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}

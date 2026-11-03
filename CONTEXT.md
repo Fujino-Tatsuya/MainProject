@@ -16,6 +16,12 @@ Update this file when a term becomes important enough that future agents or team
 - 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
 - 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).
 
+## ▶▶ 작업 세션 (2026-11-03 · 민경(Claude) · **잔류 포격(GUN_4_ECHO_Q) 에너지 폭탄 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 확인 · ✅ 연결(실험실 로그 확인) · ⏳ 민경 Play(실제 Q·MPPM) · ⏳ SVN(`Player2/Q_ChargeLaser/EchoBomb/`) · 핸드오프 [handoff-echo-bomb-vfx.md](Docs/tech/handoff-echo-bomb-vfx.md)
+- 수정 파일: `GunnerEchoBombVisuals.cs`(상태 칸 Stage·Fizzled, BodyPoint = 가운데) · `GunnerBeamView.cs` · `GunnerChargeLaserSkill.cs`(은희 영역 — 연출 인자만) · `EffectCatalog` · `Player_Gunner.prefab`.
+
+## ▶▶ 작업 세션 (2026-11-03 · 민경(Claude) · **이중 출력(GUN_4_EXTRA_BASIC) 추가 레이저 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 연결 · ⏳ 민경 Play · ⏳ SVN(`Player2/LeftClick_BasicAttack/DualOutput/`) · 핸드오프 [handoff-dual-output-vfx.md](Docs/tech/handoff-dual-output-vfx.md)
+- `GunnerBeamView` 가 `GunnerDualOutput` Activated/Hit 를 받아 섬광·나선 빔(축별 배율 Z = 길이)·멈춤 불티·적중. 사건 Variant = 한계 돌파 단계(**은희 영역** `CommitShotForTraits`·`GunnerDerivedShot.OverdriveStage` 연출 인자). 판정 무변경.
+
 ## ▶▶ 작업 세션 (2026-11-03 · 민경(Claude) · **한계 돌파(GUN_2_OVERDRIVE) 과열 단계 색 + 공용 색 지정 재생**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 · ⏳ 민경 Play · 핸드오프 [handoff-overdrive-vfx.md](Docs/tech/handoff-overdrive-vfx.md)
 - 공용: `EffectTint`(색상만 교체) · `EffectManager.SetTint` · `EffectSocketPlayer.SetTint` · `EffectRecolor`(반납 때 자동 복구). 거너 기본 공격·Q·R 이펙트를 피해 단계 색(1 주황·2 주홍·3 진홍, SO `GunnerOverdriveVfxColors`)으로.
 - **은희 영역 연출 인자 추가**: `ShotRpc`·`ChargeLaserFiredRpc` 에 byte 단계, R 레이저 뷰 `netOverdriveStage`(스폰 전 설정). 판정·피해 무변경.

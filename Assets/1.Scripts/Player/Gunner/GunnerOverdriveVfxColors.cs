@@ -19,18 +19,15 @@ public sealed class GunnerOverdriveVfxColors : ScriptableObject
     [SerializeField] private Color stage3 = new Color(0.9f, 0.05f, 0.08f);
     [Tooltip("원래 채도에 곱하는 값(1 = 그대로). 흰 심은 이 값과 무관하게 흰 채로 남는다")]
     [SerializeField, Min(0f)] private float saturation = 1f;
-    [Tooltip("휘도 보정(0~1) — 빨강·주황은 같은 밝기 값이어도 파랑보다 2~3배 밝아 보여(가산 원판은 더 커 보이고 블룸도 번진다) 원래 파랑의 휘도 쪽으로 이만큼 당긴다.\n" +
-             "0 = 보정 없음(밝기 값 유지) · 1 = 원래와 같은 휘도(빨강이 꽤 어두워진다)")]
-    [SerializeField, Range(0f, 1f)] private float lumaMatch = 0.7f;
 
     /// <summary>단계(1~3)의 색. 0 이하 = 원래 색(<see cref="EffectTint.None"/>).</summary>
     public EffectTint TintFor(int stage)
     {
         switch (stage)
         {
-            case 1: return EffectTint.FromColor(stage1, saturation, lumaMatch);
-            case 2: return EffectTint.FromColor(stage2, saturation, lumaMatch);
-            case >= 3: return EffectTint.FromColor(stage3, saturation, lumaMatch);
+            case 1: return EffectTint.FromColor(stage1, saturation);
+            case 2: return EffectTint.FromColor(stage2, saturation);
+            case >= 3: return EffectTint.FromColor(stage3, saturation);
             default: return EffectTint.None;
         }
     }

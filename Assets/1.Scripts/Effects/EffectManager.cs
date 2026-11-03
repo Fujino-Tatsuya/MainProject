@@ -244,6 +244,11 @@ public class EffectManager : MonoBehaviour
                      float durationOverride = 0f)
         => PlayOneShot(entry, position, rotation, 1f, SanitizeAxisScale(entry, axisScale), durationOverride, 1f);
 
+    /// <summary>축별 배율 원샷 + 핸들(<see cref="SetTint"/> 로 칠하거나 도중에 걷을 때). 수명·반납은 위 축별 <c>Play</c> 와 같다.</summary>
+    public EffectHandle PlayRecallable(EffectEntry entry, Vector3 position, Quaternion rotation, Vector3 axisScale,
+                                       float durationOverride = 0f)
+        => PlayOneShot(entry, position, rotation, 1f, SanitizeAxisScale(entry, axisScale), durationOverride, 1f);
+
     /// <summary>
     /// 원샷인데 <b>도중에 걷을 수 있어야 하는</b> 경우용 — 핸들을 돌려준다. 수명·반납은 <see cref="Play(EffectEntry, Vector3, Quaternion, float, float, float)"/>와
     /// 똑같이 스스로 끝나므로 핸들을 버려도 풀이 새지 않는다(루프 핸들과 다른 점). 수명이 끝난 뒤의 핸들은

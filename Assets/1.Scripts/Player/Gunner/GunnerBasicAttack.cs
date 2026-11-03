@@ -513,9 +513,9 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         heat.ServerAddShot(heatTraits.HeatPerShot(data.HeatPerShot)); // 허공이어도 증가(§4.2). 최대치 제한은 모델, 정온 운용이면 증가 없음
         lastShotTime = now;
         player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 발 발사(적중 무관)
-        CommitShotForTraits(origin, direction, damage);
         // 한계 돌파 과열 색(2026-11-03 민경) — 이 발 피해에 쓴 단계(증가 전)를 연출에 같이 싣는다. 한계 돌파가 아니면 0(원래 색). 판정 무관.
         byte overdriveStage = heatTraits.Mode == GunnerHeatMode.Overdrive ? (byte)Mathf.Clamp(stage, 0, 255) : (byte)0;
+        CommitShotForTraits(origin, direction, damage, overdriveStage);
         if (IsNetworkActive)
             ShotRpc(origin, end, hit, overdriveStage);
         else
@@ -540,7 +540,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private void ApplyFocusFire(Unit target, ref AttackInfo info) => GunnerTrackingLaser.ApplyFocusFire(player, target, ref info);
 
     // 원래 기본 공격 발사 커밋(빗나가도) — 특성 사건 BasicAttackFired + 이중 출력 발수. 취소된 공격·Q·추가 발은 여기를 지나지 않는다.
-    private void CommitShotForTraits(Vector3 origin, Vector3 direction, int shotDamage)
+    private void CommitShotForTraits(Vector3 origin, Vector3 direction, int shotDamage, int overdriveStage)
     {
         if (traitEffects == null)
             traitEffects = PlayerTraitEffects.For(player);
@@ -553,10 +553,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         TraitDerivedAttack extra = GunnerTraitRules.FindDerived(traitEffects, GunnerTraitRules.BasicAttackKey,
             GunnerTraitRules.BasicExtraDerivedKey, derivedBuffer);
         if (GunnerDualOutputRules.CountOriginalShot(extra, shotDamage, AttackSpeedRate, out int extraDamage, out float delay))
-            extraShots.Schedule(Time.timeAsDouble, delay, new GunnerDerivedShot(origin, direction, data.Range, data.BeamWidth, extraDamage));
+            extraShots.Schedule(Time.timeAsDouble, delay, new GunnerDerivedShot(origin, direction, data.Range, data.BeamWidth, extraDamage, overdriveStage));
     }
 
-    // [서버] 예약된 추가 레이저 — 판정만(VFX 없음, 할 일 127 범위 밖). 과열·패시브·쿨·발수·특성 사건 없음, 행동 잠금 없음.
+    // [서버] 예약된 추가 레이저 — 판정 + 특성 연출 사건(연출은 GunnerBeamView 가 사건을 받아 낸다, 2026-11-03 민경). 과열·패시브·쿨·발수 없음, 행동 잠금 없음.
+    // 사건 Variant = 한계 돌파 색 단계(원래 세 번째 발의 피해 단계, 아니면 0).
     private void TickExtraShotsServer()
     {
         if (extraShots.Count == 0)
@@ -572,9 +573,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
             bool hit = FireBeam(shot.Origin, shot.Direction, shot.Damage, false, TraitHitFlags.Derived, out Vector3 end);
             Edit.Log($"[Gunner] 이중 출력 추가 레이저 — 피해 {shot.Damage}, 적중 {hit}", this);
             // 특성 연출 사건(할 일 145) — 추가 레이저 1발(원점 → 끝점: 원래 발 ShotRpc 와 같은 의미). 맞혔으면 끝점에 Hit(대상 없음 — 위치만).
-            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Activated, shot.Origin, shot.Direction, end);
+            TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Activated, shot.Origin, shot.Direction, end,
+                variant: shot.OverdriveStage);
             if (hit)
-                TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Hit, end, shot.Direction, end);
+                TraitSkillFxNetwork.ServerSend(player, TraitFxTrait.GunnerDualOutput, TraitFxKind.Hit, end, shot.Direction, end,
+                    variant: shot.OverdriveStage);
         }
     }
 

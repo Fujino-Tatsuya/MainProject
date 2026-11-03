@@ -11,20 +11,27 @@ public struct GunnerEchoBombState : INetworkSerializable, IEquatable<GunnerEchoB
 {
     public int BombId;
     public ulong TargetId;
+    // 연출만(11-03 민경 — 잔류 포격 VFX): 그 Q 시전의 한계 돌파 색 단계(0 = 원래 색) · 빈 폭발(대상이 먼저 사라짐 — 빠지기 직전 서버가 켠다).
+    public byte Stage;
+    public bool Fizzled;
 
-    public GunnerEchoBombState(int bombId, ulong targetId)
+    public GunnerEchoBombState(int bombId, ulong targetId, byte stage = 0)
     {
         BombId = bombId;
         TargetId = targetId;
+        Stage = stage;
+        Fizzled = false;
     }
 
     public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
     {
         s.SerializeValue(ref BombId);
         s.SerializeValue(ref TargetId);
+        s.SerializeValue(ref Stage);
+        s.SerializeValue(ref Fizzled);
     }
 
-    public bool Equals(GunnerEchoBombState o) => BombId == o.BombId && TargetId == o.TargetId;
+    public bool Equals(GunnerEchoBombState o) => BombId == o.BombId && TargetId == o.TargetId && Stage == o.Stage && Fizzled == o.Fizzled;
 }
 
 /// <summary>잔류 포격 폭탄 대상 찾기 — 서버(피해·생존 확인)와 클라(구체 위치)가 같은 함수를 쓴다.</summary>
@@ -49,8 +56,8 @@ public static class GunnerEchoBombTargets
     }
 
     /// <summary>
-    /// 구체가 붙는 점 — 몸 콜라이더(캡슐 우선) bounds 의 윗면 가운데, 없으면 발 + 1m.
-    /// 몸 중심(<see cref="BossPatternTargets.BodyCenter"/>)에 두면 작은 구체가 불투명한 몸 메시 안에 묻혀 안 보인다 — 탑다운 카메라에서 보이는 머리 위 표면에 붙인다.
+    /// 구체가 붙는 점 — 몸 콜라이더(캡슐 우선) bounds 가운데, 없으면 발 + 1m. 표시 전용(판정 무관).
+    /// 🔴 11-03 민경: 윗면 가운데 → <b>몸 가운데</b>. 구체 VFX(<c>FX_EchoBomb_Orb</c>)가 ZTest Always 라 몸 메시 안이어도 묻히지 않는다.
     /// </summary>
     public static Vector3 BodyPoint(Unit unit)
     {
@@ -58,8 +65,7 @@ public static class GunnerEchoBombTargets
         if (body == null) body = unit.GetComponentInChildren<Collider>();
         if (body == null) return unit.transform.position + Vector3.up;
 
-        Bounds bounds = body.bounds;
-        return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+        return body.bounds.center;
     }
 }
 
@@ -87,7 +93,12 @@ public sealed class GunnerEchoBombVisuals
         public bool Preview;
         // 예비 구체가 이 시각까지 채택되지 않으면 조용히 지운다(같은 대상 재적중마다 늦춘다).
         public float ExpireAt;
+        // 한계 돌파 색(그 Q 시전의 단계) — 인스턴스를 만들 때·바뀔 때 칠한다. None = 원래 색.
+        public EffectTint Tint;
     }
+
+    // 🔴 서버 부착(Add) 순간 켜는 프리팹 자식 이름 — 폭발 직전 고조(FX_EchoBomb_Orb, 11-03 민경). 예비 구체에서는 꺼 둔다.
+    public const string ArmChildName = "Arm";
 
     private readonly List<Orb> orbs = new List<Orb>();
     private readonly GameObject prefab;
@@ -140,7 +151,12 @@ public sealed class GunnerEchoBombVisuals
     /// </summary>
     public void AddPreview(ulong targetId) => AddPreview(targetId, Time.time);
 
-    public void AddPreview(ulong targetId, float now)
+    /// <param name="tint">그 Q 발의 한계 돌파 색(<see cref="EffectTint.None"/> = 원래 색).</param>
+    public void AddPreview(ulong targetId, in EffectTint tint) => AddPreview(targetId, Time.time, tint);
+
+    public void AddPreview(ulong targetId, float now) => AddPreview(targetId, now, EffectTint.None);
+
+    public void AddPreview(ulong targetId, float now, in EffectTint tint)
     {
         int index = IndexOfPreview(targetId);
         if (index >= 0)
@@ -149,7 +165,7 @@ public sealed class GunnerEchoBombVisuals
             return;
         }
 
-        var orb = new Orb { TargetId = targetId, ShowAt = now + showDelay, Preview = true, ExpireAt = now + previewTimeout };
+        var orb = new Orb { TargetId = targetId, ShowAt = now + showDelay, Preview = true, ExpireAt = now + previewTimeout, Tint = tint };
         orbs.Add(orb);
         Follow(orb);
     }
@@ -160,7 +176,12 @@ public sealed class GunnerEchoBombVisuals
     /// </summary>
     public void Add(int id, ulong targetId) => Add(id, targetId, Time.time);
 
-    public void Add(int id, ulong targetId, float now)
+    /// <param name="tint">그 Q 시전의 한계 돌파 색 — 이어받은 예비 구체도 이 색으로 다시 칠한다.</param>
+    public void Add(int id, ulong targetId, in EffectTint tint) => Add(id, targetId, Time.time, tint);
+
+    public void Add(int id, ulong targetId, float now) => Add(id, targetId, now, EffectTint.None);
+
+    public void Add(int id, ulong targetId, float now, in EffectTint tint)
     {
         if (IndexOf(id) >= 0)
             return;
@@ -171,11 +192,13 @@ public sealed class GunnerEchoBombVisuals
             Orb adopted = orbs[preview];
             adopted.Id = id;
             adopted.Preview = false;
+            adopted.Tint = tint;
+            ApplyLook(adopted);   // 이미 떠 있으면 지금 고조(Arm)·색
             Follow(adopted);
             return;
         }
 
-        var orb = new Orb { Id = id, TargetId = targetId, ShowAt = now + showDelay };
+        var orb = new Orb { Id = id, TargetId = targetId, ShowAt = now + showDelay, Tint = tint };
         orbs.Add(orb);
         Follow(orb);
     }
@@ -185,6 +208,14 @@ public sealed class GunnerEchoBombVisuals
     {
         int index = IndexOf(id);
         showAt = index >= 0 ? orbs[index].ShowAt : 0f;
+        return index >= 0;
+    }
+
+    /// <summary>그 폭탄 구체의 한계 돌파 색(폭발 연출이 같은 색을 쓴다). 모르는 번호면 false.</summary>
+    public bool TryGetTint(int id, out EffectTint tint)
+    {
+        int index = IndexOf(id);
+        tint = index >= 0 ? orbs[index].Tint : EffectTint.None;
         return index >= 0;
     }
 
@@ -221,10 +252,11 @@ public sealed class GunnerEchoBombVisuals
     }
 
     /// <summary>복제 목록과 맞춘다(늦은 합류·전체 갱신) — 목록에 없는 구체는 조용히 지우고, 새 항목은 붙인다. 예비 구체는 목록과 무관(만료가 정리).</summary>
-    public void Sync(IReadOnlyList<GunnerEchoBombState> states)
+    /// <param name="tintForStage">한계 돌파 단계 → 색(없으면 원래 색).</param>
+    public void Sync(IReadOnlyList<GunnerEchoBombState> states, Func<int, EffectTint> tintForStage = null)
     {
         for (int i = 0; i < states.Count; i++)
-            Add(states[i].BombId, states[i].TargetId);
+            Add(states[i].BombId, states[i].TargetId, tintForStage != null ? tintForStage(states[i].Stage) : EffectTint.None);
 
         for (int i = orbs.Count - 1; i >= 0; i--)
         {
@@ -275,11 +307,26 @@ public sealed class GunnerEchoBombVisuals
             orb.Found = true;
             orb.LastPosition = PointFor(orb.Target);
             if (orb.Instance == null && prefab != null && IsShowTime(Time.time, orb.ShowAt))
+            {
                 orb.Instance = UnityEngine.Object.Instantiate(prefab, orb.LastPosition, Quaternion.identity);
+                ApplyLook(orb);
+            }
         }
 
         if (orb.Instance != null)
             orb.Instance.transform.position = orb.LastPosition;
+    }
+
+    // 겉모습 — 서버 부착 뒤면 고조 자식(Arm) 켜기, 한계 돌파 색. 인스턴스가 아직 없으면 만들 때 다시 부른다.
+    private static void ApplyLook(Orb orb)
+    {
+        if (orb.Instance == null)
+            return;
+
+        Transform arm = orb.Instance.transform.Find(ArmChildName);
+        if (arm != null && arm.gameObject.activeSelf == orb.Preview)
+            arm.gameObject.SetActive(!orb.Preview);
+        EffectRecolor.Apply(orb.Instance, orb.Tint);
     }
 
     private static void DestroyInstance(Orb orb)

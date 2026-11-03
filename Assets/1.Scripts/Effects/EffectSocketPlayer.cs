@@ -34,6 +34,9 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     [Tooltip("재생할 이펙트 엔트리. 비어 있으면 이 컴포넌트는 아무 일도 하지 않는다")]
     [SerializeField] EffectEntry effect;
 
+    /// <summary>재생할 이펙트 엔트리 — 같은 연출을 소켓 없이 따로 한 번 더 낼 때(거너 이중 출력 추가 발 빔).</summary>
+    public EffectEntry Effect => effect;
+
     [Header("어디서")]
     [Tooltip("따라다닐 트랜스폼(손 소켓 등). 비워두면 이 오브젝트 자신을 따라간다.\n" +
              "SetParent를 쓰지 않으므로 대상의 scale이 이펙트에 곱해지지 않는다")]

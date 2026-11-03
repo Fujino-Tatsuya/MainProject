@@ -95,7 +95,13 @@ public sealed class EffectRecolor : MonoBehaviour
                 foreach (int property in ColorProps)
                 {
                     if (!shared[i].HasProperty(property)) continue;
-                    _materials.Add(new MaterialColor { renderer = renderer, materialIndex = i, property = property, original = shared[i].GetColor(property) });
+                    // 🔴 무채색(흰·회색 — HDR 흰 _Color 16 등)은 색상을 바꿔도 그대로라 **블록을 아예 걸지 않는다**(11-03).
+                    //    같은 값이라도 MaterialPropertyBlock 을 걸면 이 파티클 셰이더들이 원래와 다르게 그려졌다
+                    //    (원래 색과 같은 색상으로 칠해도 심이 더 밝고 글로우가 짙어지던 원인 — Play 측정: 블록 건 쪽만 밝았다).
+                    Color original = shared[i].GetColor(property);
+                    Color.RGBToHSV(original, out _, out float saturation, out _);
+                    if (saturation < 0.001f) continue;
+                    _materials.Add(new MaterialColor { renderer = renderer, materialIndex = i, property = property, original = original });
                 }
             }
         }
@@ -189,7 +195,9 @@ public sealed class EffectRecolor : MonoBehaviour
         if (source == null) return null;
         GradientColorKey[] keys = source.colorKeys;
         for (int i = 0; i < keys.Length; i++) keys[i].color = tint.Apply(keys[i].color);
-        var result = new Gradient { mode = source.mode };
+        // 🔴 colorSpace 도 복사한다(11-03) — 새 Gradient 는 Uninitialized 라 감마로 저작한 키를 선형 값처럼 읽어
+        //    중간 밝기 키가 2~3배 밝아졌다(원래 색과 같은 색상으로 칠해도 심·글로우가 더 밝고 짙게 나오던 원인).
+        var result = new Gradient { mode = source.mode, colorSpace = source.colorSpace };
         result.SetKeys(keys, source.alphaKeys);
         return result;
     }

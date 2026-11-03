@@ -69,10 +69,10 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 | | | Hit | 밀치기가 실린 대상마다(반격 피해와 함께·밀치기만 둘 다) | 공용 RPC | Pos = 콜라이더 중심, Dir = 밀리는 방향, Target |
 | 광폭 레이저 `GUN_1_WIDTH` | `GunnerWideLaser` | Activated | Q 한 발 발사(집속 연사면 발마다) | 전 피어 경로(`GunnerBeamView.ChargeLaserFiredRpc`) | Pos = 발사 원점(총구 높이), End = 빔 끝, Shape = 그 발의 판정 도형(길이 = 이번 발, 폭 = 특성 폭) |
 | | | Hit | 그 발이 피해를 준 몬스터마다(최대 8) | 전 피어 경로(같은 RPC) | Pos = 빔 위 적중 지점. **Target 없음**(기존 RPC 가 지점만 싣는다) |
-| 잔류 포격 `GUN_4_ECHO_Q` | `GunnerEchoBomb` | Attached | 폭탄이 대상에 붙음(Q 정상 종료 뒤, 맞은 대상마다) | 전 피어 경로(`GunnerBeamView` NetworkList Add) | Pos = 대상 몸 콜라이더 윗면 가운데(`GunnerEchoBombTargets.BodyPoint`), Target, Variant = 폭탄 번호 |
+| 잔류 포격 `GUN_4_ECHO_Q` | `GunnerEchoBomb` | Attached | 폭탄이 대상에 붙음(Q 정상 종료 뒤, 맞은 대상마다) | 전 피어 경로(`GunnerBeamView` NetworkList Add) | Pos = 대상 몸 콜라이더 가운데(`GunnerEchoBombTargets.BodyPoint`, 11-03 윗면 → 가운데), Target, Variant = 폭탄 번호 |
 | | | Exploded | 폭탄이 터짐(피해) 또는 대상이 먼저 사라진 **빈 폭발** | 전 피어 경로(NetworkList RemoveAt) | Pos = 구체 마지막 자리, Target(빈 폭발이면 null 또는 죽은 유닛), Variant = 폭탄 번호 |
-| 이중 출력 `GUN_4_EXTRA_BASIC` | `GunnerDualOutput` | Activated | 추가 레이저 1발 판정 순간 | 공용 RPC | Pos = 발사 원점, Dir, End = 원래 평타 ShotRpc 와 같은 끝점(명중점·지형·최대 사거리). **Shape 없음**(굵은 직선 — 도형 아님) |
-| | | Hit | 추가 레이저가 맞혔을 때 1번 | 공용 RPC | Pos = 끝점. **Target 없음**. 관통 탄도와 함께면 끝점은 벽/최대 사거리(맞은 지점 아님) |
+| 이중 출력 `GUN_4_EXTRA_BASIC` | `GunnerDualOutput` | Activated | 추가 레이저 1발 판정 순간 | 공용 RPC | Pos = 발사 원점, Dir, End = 원래 평타 ShotRpc 와 같은 끝점(명중점·지형·최대 사거리). **Shape 없음**(굵은 직선 — 도형 아님). **Variant = 한계 돌파 색 단계**. 구독 = `GunnerBeamView` — 기존 평타 빔·착탄(동시) + 총구 섬광·나선 빔(Z 배율 0 → 길이로 날아감)·멈춤 불티(2026-11-03 민경) |
+| | | Hit | 추가 레이저가 맞혔을 때 1번 | 공용 RPC | Pos = 끝점. **Target 없음**. 구독 = `GunnerBeamView` 평타 몬스터 적중 + 적중 섬광(Variant 단계 색). 관통 탄도와 함께면 끝점은 벽/최대 사거리(맞은 지점 아님) |
 | 칼날의 영역 `ASN_3_E_AREA` | `AssassinBladeDomain` | Activated | 일반 E 강타 시작 — **Variant 0** | 전 피어 경로(`AssassinBasicAttack` StartServer·StartRpc) | Pos = 시작 발밑, Dir = 강타 방향, Shape = 넓어진 강타 도형(Pose = 시작 순간 — 실제 판정은 클립 Hit 순간 위치, 전진만큼 앞) |
 | | | Activated | 변신 E 원 베기 시작 — **Variant 1** | 전 피어 경로(`AssassinCircleStrikeSkill.OnClientPlay`) | Pos = 원 중심, Shape = 넓어진 원(서버 확정과 같은 식) |
 | 끝없는 칼날 `ASN_4_COMBO_EXTRA` | `AssassinEndlessBlade` | Activated | 추가 베기 판정 순간(빗나가도) | 공용 RPC | Pos/Dir = 판정 포즈(예약 때 발밑·조준), Shape = 그 타 판정 도형(칼날의 영역 배율 포함), Variant = 모드 × 16 + 단 번호 |
@@ -90,8 +90,8 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 
 ## 4. 잔류 포격 구체 프리팹 칸
 
-붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다(149 후속 6) — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombVfxPrefab`. **칸은 지금 비어 있다 — 이펙트 담당이 프리팹을 연결한다. 비어 있으면 구체 표시만 생략**(경고 없음, 서버 판정·피해·폭발 연출은 그대로). 폭탄마다 복제해 대상 몸 콜라이더 윗면 가운데 + `echoBombOffset` 를 매 프레임 따라간다. **이펙트 교체 = 이 칸에 새 프리팹** — 겉모습·애니·파티클·블룸(HDR 색 > 1, 맵씬 Bloom 임계값 1.1)은 프리팹 안에서 꾸민다.
-🔴 프리팹 렌더러 머티리얼은 **`Effects/OverlayBillboard` + ZTest Always(깊이 무시)** 권장 — 붙는 점이 몸 메시 바로 위·안이라 보통 머티리얼은 몸에 묻혀 안 보인다. URP 기본 Unlit/Particles Unlit 은 ZTest 칸이 없으니 `Effects/OverlayBillboard`(`1.Scripts/Effects/Shaders/EffectOverlayBillboard.shader`, 텍스처 × HDR 색·블렌드·ZTest 칸, 정점 빌보드) 또는 Depth Test Always 셰이더 그래프를 쓴다. 대신 벽·지형 뒤 대상에도 보인다. 폭발 연출은 지금 Q 몬스터 적중 연출(`chargeMonsterHitPlayer`) 재사용 — 따로 만들려면 `Exploded` 를 구독한다.
+붙어 있는 동안의 구체는 이벤트가 아니라 **프리팹 칸**이 그린다(149 후속 6) — `Player_Gunner` Variant 의 `GunnerBeamView.echoBombVfxPrefab`. **연결됨(11-03 민경): `FX_EchoBomb_Orb`** — 서버 부착 순간 자식 `Arm`(고조)을 켜고, 폭발은 `echoBombBurst`(`FX_EchoBomb_Burst`)·빈 폭발은 `echoBombFizzle`(`FX_EchoBomb_Fizzle`), 그 Q 시전의 한계 돌파 단계 색(상태 칸 `Stage`). 상세 [handoff-echo-bomb-vfx.md](handoff-echo-bomb-vfx.md). 비어 있으면 구체 표시만 생략(경고 없음, 서버 판정·피해·폭발 연출은 그대로). 폭탄마다 복제해 대상 몸 콜라이더 **가운데**(11-03 — 윗면에서 변경) + `echoBombOffset` 를 매 프레임 따라간다. **이펙트 교체 = 이 칸에 새 프리팹** — 겉모습·애니·파티클·블룸(HDR 색 > 1, 맵씬 Bloom 임계값 1.1)은 프리팹 안에서 꾸민다.
+🔴 프리팹 렌더러 머티리얼은 **`Effects/OverlayBillboard` + ZTest Always(깊이 무시)** 권장 — 붙는 점이 몸 메시 바로 위·안이라 보통 머티리얼은 몸에 묻혀 안 보인다. URP 기본 Unlit/Particles Unlit 은 ZTest 칸이 없으니 `Effects/OverlayBillboard`(`1.Scripts/Effects/Shaders/EffectOverlayBillboard.shader`, 텍스처 × HDR 색·블렌드·ZTest 칸, 정점 빌보드) 또는 Depth Test Always 셰이더 그래프를 쓴다. 대신 벽·지형 뒤 대상에도 보인다. 폭발 연출은 전용 엔트리(칸이 비면 Q 몬스터 적중 `chargeMonsterHitPlayer`). 깊이 무시는 `Shader_IntegratedEffect` 의 `_ZTest2 = Always` 로도 된다(새 셰이더 불필요).
 구체는 **Q 가 대상에 맞은 순간** 예비로 먼저 뜨고(`ChargeLaserFiredRpc` 의 맞은 대상 ID 칸, 잔류 포격 특성이 있을 때만), 서버 부착(`Attached`)이 같은 구체를 이어받는다 — 그래서 `Attached` 시점에는 구체가 이미 보이고 있을 수 있다. 부착 안 된 예비 구체는 `echoBombPreviewTimeout` 뒤 사건 없이 조용히 사라진다(`Exploded` 없음). 상세 [tutorial-traits.md §7.1](tutorial-traits.md#71-거너-잔류-포격--몸에-붙는-에너지-폭탄-할-일-149).
 
 ## 5. 동작 규칙 · 알려진 한계

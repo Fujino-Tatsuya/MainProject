@@ -568,7 +568,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         {
             echoBombs.Plant(Time.timeAsDouble, echo.Delay, bombDamage, echoPlan.HitTargets, plantedBombs);
             for (int i = 0; i < plantedBombs.Count; i++)
-                view?.ServerAttachEchoBomb(plantedBombs[i].Id, plantedBombs[i].TargetId);
+                view?.ServerAttachEchoBomb(plantedBombs[i].Id, plantedBombs[i].TargetId,
+                                           shotHeatMode == GunnerHeatMode.Overdrive ? shotStage : 0);   // 연출만 — 이 시전 한계 돌파 색(11-03 민경)
             Edit.Log($"[Gunner/Q] 잔류 포격 폭탄 {plantedBombs.Count}개 — {echo.Delay:0.##}초 뒤, 개당 피해 {bombDamage}(예정 합계 {echoPlan.PlannedDamageSum})", this);
         }
 
@@ -586,7 +587,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         for (int i = 0; i < fizzledBombs.Count; i++)
         {
-            view?.ServerDetonateEchoBomb(fizzledBombs[i].Id);
+            view?.ServerDetonateEchoBomb(fizzledBombs[i].Id, fizzled: true);
             Edit.Log($"[Gunner/Q] 잔류 포격 폭탄 #{fizzledBombs[i].Id} — 대상(net {fizzledBombs[i].TargetId}) 없음, 그 자리 폭발(피해 없음)", this);
         }
 

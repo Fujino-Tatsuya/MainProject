@@ -1,4 +1,74 @@
-# ▶▶▶ 계획 = **한계 돌파(GUN_2_OVERDRIVE) VFX — 과열 단계별로 거너 기본 공격·Q·R 이펙트 색을 따뜻한 색으로** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 랩에서 기본 공격·Q·R 단계 색 + 반납 후 복구 확인) · ⏳ 민경 Play · 핸드오프 [handoff-overdrive-vfx.md](Docs/tech/handoff-overdrive-vfx.md))
+# ▶▶▶ 계획 = **잔류 포격(GUN_4_ECHO_Q) VFX — 몸에 붙는 에너지 폭탄 구체 + 전용 폭발** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 확인 · ✅ MainProject 연결 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안).
+> **1단계 = MyProject 제작 + 미리보기 씬 → 민경 확인·승인. 2단계 = MainProject import·연결.** 판정·피해 무변경.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 기획 문구: "Q 가 끝난 뒤 같은 방향으로 레이저를 한 번 더 쏴 추가 피해"(echoDamageRatio 0.25 · delay 0.15).
+- **구현(할 일 149)**: 레이저 재발사가 아니라 **Q 원래 발에 맞은 대상마다 몸에 에너지 폭탄** → Q 정상 종료 뒤 0.15초에 **그 대상 하나에만** 피해. 대상이 먼저 죽으면 그 자리 빈 폭발(피해 없음), 사수 사망·씬 종료면 조용히 취소.
+- 구체: Q 적중 순간 **예비 구체**(전 피어) → 서버 부착(`Attached`, NetworkList Add)이 이어받음 → `Exploded`(RemoveAt). 표시 시간 ≈ Q 단발 0.5초 / 집속 연사 1초+.
+- 지금: 구체 칸 `GunnerBeamView.echoBombVfxPrefab` **비어 있음(안 보임)** · 폭발 = Q 몬스터 적중 재사용(원래 색 강제).
+- 몸 위에 붙어 보통 재질은 묻힌다 → **깊이 무시(ZTest Always)** 필요. 기존 `Effects/OverlayBillboard` 는 **쿼드 1장 전용**(정점 빌보드가 오브젝트 원점 기준이라 파티클에 쓰면 한 점에 뭉친다).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 컨셉(Q1) | **구현대로 몸에 붙는 에너지 폭탄**(툴팁의 "레이저" 문구 어긋남은 기획에 알림) |
+| 구체(Q2) | Core(시안·파랑 빛 구 ~0.35m + 흰 심) · Ring(기울어진 궤도 링 1~2) · Charge-in(빨려드는 입자) · 고조 = 예비 단계는 잔잔히 숨쉬기, **서버 부착 순간부터 짧게 확 밝아짐**(폭발 0.15초 전) |
+| 폭발(Q3) | **전용 폭발**(섬광·충격 링·파편 불티, 1~1.5m, 단일 대상) — `Exploded` 구독. **빈 폭발 = 같은 프리팹 작게·흐리게** |
+| 한계 돌파(Q4) | **그 Q 시전의 단계 색** — 복제 상태(`GunnerEchoBombState`)에 단계 칸 + 사건 Variant 대신 별도 전달(⚠️ 은희 영역 서버 코드 → handoff) |
+| 크기(Q5) | **고정 크기**(대상 크기 무관) |
+| 위치 | **몸 콜라이더 가운데**(11-03 민경 — 기존 윗면 가운데에서 변경, `GunnerEchoBombTargets.BodyPoint` 수정 · 표시 전용이라 판정 무관) |
+| 셰이더 | **기존 `Shader_IntegratedEffect` 의 `_ZTest2` = Always**(새 셰이더 없음 — 작업 중 확인, 이중 출력 등과 같은 셰이더). 색은 파티클 색으로 저작, 재질 `_TintColor` 는 무채색 HDR 세기만(색 지정 재생의 블록 문제 회피) |
+| 작업(Q6) | 이중 출력과 같은 방식 — MyProject 빌더 → 미리보기 씬 → 승인 → SVN `Player2/Q_ChargeLaser/EchoBomb/` |
+
+## 작업 순서
+1. MyProject: 빌더(구체 `FX_EchoBomb_Orb` · 고조 `FX_EchoBomb_Arm` · 폭발 `FX_EchoBomb_Burst`) · 미리보기 씬(허수아비에 Q 적중 → 예비 구체 → 부착 → 0.15초 뒤 폭발 / 빈 폭발).
+2. ⏸ 민경 확인 → 수정 → **승인**.
+3. MainProject: import · 엔트리·`EffectCatalog` · `echoBombVfxPrefab` 연결 · `GunnerBeamView` 폭발(전용·빈 폭발 배율)·부착 고조 · 단계 색(상태 칸 추가).
+4. 문서: handoff(은희) · `trait-effect-events.md` §4 · `tutorial-traits.md` §7.1 · `CONTEXT.md`.
+
+## 완료 조건
+- 미리보기: 구체가 몸에 안 묻히고 붙어 따라감 · 부착 뒤 고조 → 폭발 · 빈 폭발 구분(민경 승인).
+- MainProject: Q 적중 → 구체 → 폭발 · 호스트·클라 같은 화면 · 한계 돌파 단계 색 · 컴파일 0.
+
+---
+
+# 계획(이전) = **이중 출력(GUN_4_EXTRA_BASIC) VFX — 이중 나선 추가 레이저 + 총구 섬광 + 끝점 착탄** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인 · ✅ MainProject 연결(컴파일 0 · 랩에서 3발마다 섬광+빔 생성·단계 색 확인) · ⏳ 민경 Play · 핸드오프 [handoff-dual-output-vfx.md](Docs/tech/handoff-dual-output-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안). 기획: 기본 공격 3발마다 세 번째 발 피해 × 0.4 추가 레이저(0.05초 뒤, 과열 없음).
+> **1단계 = MyProject 제작 + 테스트 씬 → 민경 Play 확인·승인. 2단계 = MainProject import·연결.** 판정 무변경.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 로직 전부 일치: 원래 발 발사 커밋만 셈(빗나가도 +1, 취소·Q·추가 발 제외) · 세 번째 발 피해 × 0.4(데이터 requiredCount 3·damageRatio 0.4·delay 0.05) · 지연 = 공격 속도 반영 · 사망 시 취소·카운터 초기화 · 같은 방향·사거리·폭·관통 정책 · 과열·패시브·쿨 없음(파생 판정).
+- **VFX 없음**(`GunnerBasicAttack.TickExtraShotsServer` 주석 "VFX 없음"). 사건은 이미 나간다(할 일 145): `TraitFxTrait.GunnerDualOutput` **Activated**(판정 순간 · Pos = 원점 · Dir · End = 끝점) / **Hit**(유닛 적중 시 끝점, 대상 없음). 구독 없음.
+- 기본 공격: 사거리 14m · 폭 0.6m · 파란 빔(날아감) + `FX_LaserEnd`(멈춤) + `FX_LaserHit`(몬스터) · 한계 돌파 단계 색.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 모양(Q1) | 새 빔 — **두 가닥이 꼬여 나가는 이중 나선 + 가운데 밝은 심**. +Z 1m 저작 · 재생 축별 배율 Z = 실제 길이 |
+| 색(Q2) | 거너 청록 계열 + **더 밝은 흰빛 심**(모양으로 구분) |
+| 방식(Q3) | 판정 순간 **끝까지 즉시** 뻗고 나선이 0.2~0.3초에 풀리며 사라짐 |
+| 레이어(Q4) | 총구 섬광(작고 밝게) · 나선 빔(주인공) · 끝점 착탄(Hit = 적중 섬광 / 사거리보다 짧게 멈춤 = 작은 불티 / 허공 = 없음) |
+| 예고(Q5) | 1/3·2/3 예고 표시 **안 함**(카운터 복제 필요 — 다음 작업으로) |
+| 한계 돌파(Q6) | 함께 가지면 **단계 색** — 단계는 기존 사건의 Variant 칸으로(새 RPC 없음, 서버가 세 번째 발 단계를 싣는다) |
+| 테스트(Q7) | MyProject `Scenes/DualOutputPreview.unity` — 거너 자리에서 기본 빔(기존 프리팹) 3발 → 0.05초 뒤 추가 레이저 박자 재현 · 허수아비(적중)·벽(멈춤)·허공(최대 사거리) · Space 1회 · R 반복 |
+| 제작·경로 | 빌드 메뉴 `Tools/VFX/Dual Output (거너 이중 출력) 빌드` → `Export/Player2/DualOutput/` · MainProject `50.Art/VFX/Common/Players/Player2/LeftClick_BasicAttack/DualOutput/`(SVN) |
+
+## 작업 순서
+1. MyProject: 빌더(나선 메시·심·섬광·착탄 2종) → `FX_DualOutput_Beam`·`_Muzzle`·`_Hit`·`_Stop` · 테스트 씬·테스터.
+2. ⏸ 민경 Play 확인 → 수정 → **승인**.
+3. MainProject(승인 뒤): import · 엔트리 · `EffectCatalog` · `GunnerBeamView` 가 `TraitSkillFx.Raised`(GunnerDualOutput) 를 받아 재생(Activated = 섬광+빔+멈춤 불티, Hit = 적중) · 서버 Activated/Hit 에 한계 돌파 단계 Variant · 한계 돌파 색(SetTint) · DebugTraitLab 확인.
+4. 문서: handoff · `trait-effect-events.md` 구독 칸 · `CONTEXT.md`.
+
+## 완료 조건
+- 테스트 씬: 평타 3발 뒤 나선 빔이 즉시 끝점까지 · 적중/멈춤/허공 착탄 구분 · 평타와 모양으로 구분(민경 승인).
+- MainProject: 3발마다 추가 레이저 연출 · 호스트·클라 같은 화면 · 한계 돌파 단계 색 · 컴파일 0.
+
+---
+
+# 계획(이전) = **한계 돌파(GUN_2_OVERDRIVE) VFX — 과열 단계별로 거너 기본 공격·Q·R 이펙트 색을 따뜻한 색으로** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 랩에서 기본 공격·Q·R 단계 색 + 반납 후 복구 확인) · ⏳ 민경 Play · 핸드오프 [handoff-overdrive-vfx.md](Docs/tech/handoff-overdrive-vfx.md))
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안). 기획: 과열 단계가 높을수록 기본 공격·Q·R 강화(피해 단계 배율표 교체), Q/R 은 시전 시작 단계 저장.
 > **새 에셋 없음 — MyProject 단계 없음.** 코드 + 색 표 SO. ⚠️ 은희 영역(거너 스킬·RPC)에 단계 인자 추가 → handoff.
