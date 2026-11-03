@@ -36,6 +36,8 @@ public enum InterruptTierFlash : byte
     HitLight = 2,
     /// <summary>V2 — V1 + 적중 화이트아웃 몇 프레임(할 일 194, 오너 화면). 연출 데이터·프리팹이 없으면 <see cref="HitFlash"/> 로 돌아간다.</summary>
     HitLightWhiteout = 3,
+    /// <summary>V3 — 레퍼런스 맞춤 적중 라이트 연출(194 후속 — 어둡고 채도 낮은 주변 + 작은 중심 점·가로 빛줄 + 가는 불꽃). V3 전용 데이터·프리팹이 없으면 <see cref="HitFlash"/> 로 돌아간다.</summary>
+    HitLightReference = 4,
 }
 
 /// <summary>
@@ -69,6 +71,8 @@ public enum InterruptSuccessLook : byte
     HitLight = 2,
     /// <summary>V2 — 적중 라이트 연출 + 화이트아웃.</summary>
     HitLightWhiteout = 3,
+    /// <summary>V3 — 레퍼런스 맞춤 적중 라이트 연출(V3 전용 데이터·프리팹, 화이트아웃 없음).</summary>
+    HitLightReference = 4,
 }
 
 /// <summary>
@@ -79,7 +83,7 @@ public sealed class InterruptTierProfile
 {
     [Tooltip("이 단계로 예측된 강 시도에서 오너 암전(+빛 모임)을 켠다(Q1 — 기본은 제압 간파만)")]
     public bool ownerDim;
-    [Tooltip("성공 섬광 종류 — V0 적중 섬광 ②~⑥ / 제압 간파 섬광 시퀀스 / V1 적중 라이트 연출 / V2 V1 + 화이트아웃(할 일 194)")]
+    [Tooltip("성공 섬광 종류 — V0 적중 섬광 ②~⑥ / 제압 간파 섬광 시퀀스 / V1 적중 라이트 연출 / V2 V1 + 화이트아웃(할 일 194) / V3 레퍼런스 맞춤(194 후속 — 암순응 나 권장)")]
     public InterruptTierFlash flash = InterruptTierFlash.HitFlash;
     [Tooltip("V1·V2 의 암순응 방식(할 일 194 Q9) — 가 = 화면 패스(어두운 픽셀만) / 나 = 태양광·환경광 낮춤. V0·시퀀스에는 쓰지 않는다")]
     public InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass;
@@ -136,9 +140,11 @@ public static class InterruptPresentationTierRules
 
     /// <summary>
     /// 이번 성공에서 트는 섬광(할 일 194 — 단계 × 버전 선택표). 설정이 없으면 V0.
-    /// 시퀀스 = A6 칸이 켜져 있고 컷 데이터가 있을 때만, V1·V2 = 적중 라이트 연출(데이터·프리팹)이 있을 때만 — 아니면 V0 로 돌아간다.
+    /// 시퀀스 = A6 칸이 켜져 있고 컷 데이터가 있을 때만, V1·V2 = 적중 라이트 연출(데이터·프리팹)이 있을 때만,
+    /// V3 = V3 전용 데이터·프리팹(<paramref name="hasHitLightReference"/>)이 있을 때만 — 아니면 V0 로 돌아간다.
     /// </summary>
-    public static InterruptSuccessLook SelectSuccessLook(InterruptTierProfile tier, bool suppressFlashOn, bool hasSequence, bool hasHitLight)
+    public static InterruptSuccessLook SelectSuccessLook(InterruptTierProfile tier, bool suppressFlashOn, bool hasSequence, bool hasHitLight,
+        bool hasHitLightReference = false)
     {
         if (tier == null)
             return InterruptSuccessLook.HitFlash;
@@ -151,14 +157,26 @@ public static class InterruptPresentationTierRules
                 return hasHitLight ? InterruptSuccessLook.HitLight : InterruptSuccessLook.HitFlash;
             case InterruptTierFlash.HitLightWhiteout:
                 return hasHitLight ? InterruptSuccessLook.HitLightWhiteout : InterruptSuccessLook.HitFlash;
+            case InterruptTierFlash.HitLightReference:
+                return hasHitLightReference ? InterruptSuccessLook.HitLightReference : InterruptSuccessLook.HitFlash;
             default:
                 return InterruptSuccessLook.HitFlash;
         }
     }
 
-    /// <summary>적중 라이트 연출(V1·V2)인가 — ②~⑥ 진행기·섬광 순간 예약 대신 성공 순간 바로 튼다.</summary>
+    /// <summary>적중 라이트 연출(V1·V2·V3)인가 — ②~⑥ 진행기·섬광 순간 예약 대신 성공 순간 바로 튼다.</summary>
     public static bool UsesHitLight(InterruptSuccessLook look) =>
-        look == InterruptSuccessLook.HitLight || look == InterruptSuccessLook.HitLightWhiteout;
+        look == InterruptSuccessLook.HitLight || look == InterruptSuccessLook.HitLightWhiteout || look == InterruptSuccessLook.HitLightReference;
+
+    /// <summary>V3 전용 데이터·프리팹을 쓰는가(194 후속) — 아니면 V1·V2 데이터·프리팹.</summary>
+    public static bool UsesReferenceLook(InterruptSuccessLook look) => look == InterruptSuccessLook.HitLightReference;
+
+    /// <summary>
+    /// 버전 버튼을 눌렀을 때 함께 맞추는 암순응 방식(194 후속) — V3 는 나(씬 조명)가 기본, 그 밖은 null(지금 값 유지).
+    /// 단계 칸 <see cref="InterruptTierProfile.darkAdapt"/> 를 바꿀 뿐이라 누른 뒤 가로 다시 고를 수 있다.
+    /// </summary>
+    public static InterruptDarkAdaptMode? DefaultDarkAdapt(InterruptTierFlash flash) =>
+        flash == InterruptTierFlash.HitLightReference ? InterruptDarkAdaptMode.SceneLight : (InterruptDarkAdaptMode?)null;
 
     /// <summary>V2 화이트아웃 프레임 수 — V2 이고 이 화면이 발동자 본인일 때만(화면 효과는 오너만, ②~⑥ 와 같다). 그 밖은 0.</summary>
     public static int WhiteoutFrames(InterruptSuccessLook look, bool viewerIsCaster, int frames) =>

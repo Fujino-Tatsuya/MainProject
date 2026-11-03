@@ -211,6 +211,11 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [DataTableIgnore, SerializeField] private InterruptHitLightLook hitLightLook;
     [Tooltip("월드 이펙트 프리팹(FX_InterruptHitLight — 라이트·불꽃·파편·빛줄기). 첫 재생 때 한 번 만들어 재사용. 비면 V1·V2 대신 V0")]
     [DataTableIgnore, SerializeField] private InterruptHitLightFx hitLightVfx;
+    // V3 레퍼런스 맞춤(194 후속) — V1·V2 값을 건드리지 않게 SO·프리팹을 따로 든다. 저작 메뉴 'Tools/Interrupt/적중 라이트 V3 레퍼런스 에셋 만들기 (194)'.
+    [Tooltip("V3 수치 SO(InterruptHitLightLook_V3) — 어두운 암순응 나·채도 낮춤 색 보정·약한 라이트·중심만 번지는 블룸. 비면 V3 대신 V0")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightLook hitLightLookReference;
+    [Tooltip("V3 월드 이펙트 프리팹(FX_InterruptHitLight_V3 — 중심 점·가로 빛줄·가는 불꽃·작은 빛줄기). 비면 V3 대신 V0")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightFx hitLightVfxReference;
 
     // 간파 연출 4단계(할 일 192) — 실패 / 간파 / 대쉬 간파 / 제압 간파. 단계는 성공 사건(슬로우 Start 이벤트의 제압·대쉬 칸)으로 고르고,
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
@@ -279,12 +284,21 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     /// <summary>이 단계의 성공에서 트는 섬광(할 일 194) — 단계 설정·A6 칸·컷 데이터·적중 라이트 연출 유무. 사건마다 읽는다.</summary>
     public InterruptSuccessLook SuccessLook(InterruptPresentationTier tier) =>
-        InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), suppressFlash, suppressFlashSequence != null, HasHitLight);
+        InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), suppressFlash, suppressFlashSequence != null, HasHitLight,
+            HasHitLightReference);
 
     // 적중 라이트 연출(V1·V2)을 틀 수 있는가 — 수치 SO·월드 이펙트 프리팹 둘 다 있어야 한다.
     private bool HasHitLight => hitLightLook != null && hitLightVfx != null;
+    // V3 — 전용 SO·프리팹 둘 다 있어야 한다.
+    private bool HasHitLightReference => hitLightLookReference != null && hitLightVfxReference != null;
 
     public InterruptHitLightLook HitLightLook => hitLightLook;
+    /// <summary>V3 수치 SO(194 후속) — 확인용.</summary>
+    public InterruptHitLightLook HitLightLookReference => hitLightLookReference;
+
+    /// <summary>이 섬광 종류가 읽는 수치 SO — V3 는 전용, 그 밖은 V1·V2 공용.</summary>
+    public InterruptHitLightLook HitLightLookFor(InterruptSuccessLook look) =>
+        InterruptPresentationTierRules.UsesReferenceLook(look) ? hitLightLookReference : hitLightLook;
 
     /// <summary>단계 설정(할 일 192). 실패는 설정이 없다(null).</summary>
     public InterruptTierProfile TierProfile(InterruptPresentationTier tier)
@@ -386,10 +400,11 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     // 적중 라이트 연출(할 일 194) — 진행기는 처음 쓸 때, 월드 이펙트는 첫 재생 때 한 번 만든다.
     private InterruptHitLightPlayer _hitLight;
     private InterruptHitLightFx _hitLightFx;
+    private InterruptHitLightFx _hitLightFxReference;
 
-    /// <summary>적중 라이트 연출 진행기(V1·V2) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
+    /// <summary>적중 라이트 연출 진행기(V1·V2·V3) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
     public InterruptHitLightPlayer HitLight => _hitLight ??=
-        new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared,
+        new InterruptHitLightPlayer(HitLightLookFor, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared,
             new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)), FindCasterWeaponPoint);
 
     // 194 후속 — 시전자 플레이어(이 피어에 스폰된 것)의 Variant 루트 PlayerWeaponAnchor 오른손 무기 위치. 못 찾으면 null(대상으로 대체).
@@ -413,15 +428,21 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         return null;
     }
 
-    private InterruptHitLightFx EnsureHitLightFx()
+    // V3 는 전용 프리팹 인스턴스(194 후속), 그 밖은 V1·V2 공용 인스턴스.
+    private InterruptHitLightFx EnsureHitLightFx(InterruptSuccessLook look) =>
+        InterruptPresentationTierRules.UsesReferenceLook(look)
+            ? EnsureFx(ref _hitLightFxReference, hitLightVfxReference)
+            : EnsureFx(ref _hitLightFx, hitLightVfx);
+
+    private InterruptHitLightFx EnsureFx(ref InterruptHitLightFx instance, InterruptHitLightFx prefab)
     {
-        if (_hitLightFx == null && hitLightVfx != null)
+        if (instance == null && prefab != null)
         {
-            _hitLightFx = Instantiate(hitLightVfx, transform);
-            _hitLightFx.name = hitLightVfx.name;
+            instance = Instantiate(prefab, transform);
+            instance.name = prefab.name;
         }
 
-        return _hitLightFx;
+        return instance;
     }
 
     // 제압 간파 섬광(할 일 179) — 출력은 Awake 에서 만든다(없으면 시간표만 돈다). 서버 표식은 같은 프레임 성공 사건이 소비한다.

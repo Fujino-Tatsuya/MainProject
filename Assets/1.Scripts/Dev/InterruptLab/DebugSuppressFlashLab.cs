@@ -122,9 +122,9 @@ public sealed class DebugInterruptTierPreview
     /// <summary>버전을 고를 수 있는 단계(제압은 시퀀스 고정).</summary>
     public static readonly InterruptPresentationTier[] VersionTiers = { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash };
 
-    /// <summary>버튼 순서 = V0 / V1 / V2.</summary>
+    /// <summary>버튼 순서 = V0 / V1 / V2 / V3(194 후속 레퍼런스 맞춤).</summary>
     public static readonly InterruptTierFlash[] Versions =
-        { InterruptTierFlash.HitFlash, InterruptTierFlash.HitLight, InterruptTierFlash.HitLightWhiteout };
+        { InterruptTierFlash.HitFlash, InterruptTierFlash.HitLight, InterruptTierFlash.HitLightWhiteout, InterruptTierFlash.HitLightReference };
 
     public static readonly InterruptDarkAdaptMode[] DarkAdaptModes = { InterruptDarkAdaptMode.ScreenPass, InterruptDarkAdaptMode.SceneLight };
 
@@ -133,6 +133,7 @@ public sealed class DebugInterruptTierPreview
         InterruptTierFlash.HitFlash => "V0",
         InterruptTierFlash.HitLight => "V1",
         InterruptTierFlash.HitLightWhiteout => "V2",
+        InterruptTierFlash.HitLightReference => "V3",
         _ => "시퀀스",
     };
 
@@ -141,6 +142,7 @@ public sealed class DebugInterruptTierPreview
         InterruptSuccessLook.HitFlash => "V0",
         InterruptSuccessLook.HitLight => "V1",
         InterruptSuccessLook.HitLightWhiteout => "V2",
+        InterruptSuccessLook.HitLightReference => "V3",
         _ => "시퀀스",
     };
 

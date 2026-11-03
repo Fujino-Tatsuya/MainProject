@@ -21,7 +21,8 @@ public struct InterruptHitLightRequest
 /// 적중 라이트 연출 진행기(V1·V2, 할 일 194) — 성공 순간 시작해 매 프레임 실시간으로 진행한다(Q8). 값은 들지 않고 <see cref="InterruptHitLightLook"/> 을 프레임마다 읽는다.
 /// <list type="bullet">
 /// <item>월드 이펙트(<see cref="InterruptHitLightFx"/> — 라이트·불꽃·파편·빛줄기): 모든 피어. 시작 순간 한 번 튼다 — 위치 = 그 순간 시전자 오른손 무기(못 찾으면 대상), 따라다니지 않는다.</item>
-/// <item>블룸: 이 출력 소유의 전역 Volume(우선순위 <see cref="InterruptHitFlashOverlay.VolumePriority"/>) 가중치만 곡선대로 — 모든 피어.</item>
+/// <item>블룸·색 보정(V3 채도·색 필터): 이 출력 소유의 전역 Volume 2개(우선순위 <see cref="InterruptHitFlashOverlay.VolumePriority"/>) 가중치만 곡선대로 — 모든 피어.</item>
+/// <item>데이터·월드 이펙트는 요청의 섬광 종류로 고른다 — V3 는 전용 SO·프리팹(194 후속), V1·V2 는 공용.</item>
 /// <item>암순응 가(화면 패스): 기존 <see cref="InterruptDarkAdaptation"/> 에 프레임마다 어둡힘을 넣는다(본인 화면 강·팀원 화면 약, Q9).</item>
 /// <item>암순응 나(씬 조명): <see cref="SceneLightDim"/> 에 태양광·환경광 배율을 넣는다 — 23호 차징의 태양광 끄기와 배율 곱이라 복구 순서가 꼬이지 않는다.</item>
 /// <item>V2 화이트아웃: 본인 화면만, 기존 ③ 화이트아웃 그림을 렌더 프레임 수만큼(<see cref="InterruptHitLightLook.WhiteoutFrames"/>).</item>
@@ -30,8 +31,8 @@ public struct InterruptHitLightRequest
 /// </summary>
 public sealed class InterruptHitLightPlayer : IDisposable
 {
-    private readonly Func<InterruptHitLightLook> _look;
-    private readonly Func<InterruptHitLightFx> _fx;
+    private readonly Func<InterruptSuccessLook, InterruptHitLightLook> _look;
+    private readonly Func<InterruptSuccessLook, InterruptHitLightFx> _fx;
     private readonly Func<ISuppressDarkAdaptOutput> _darkAdapt;
     private readonly SceneLightDim _sceneDim;
     private readonly IInterruptHitFlashOverlayOutput _whiteout;
@@ -39,6 +40,8 @@ public sealed class InterruptHitLightPlayer : IDisposable
 
     private GameObject _root;
     private Volume _bloomVolume;
+    private Volume _gradeVolume;
+    private InterruptHitLightFx _playedFx; // 마지막으로 튼 월드 이펙트(V1·V2 와 V3 는 인스턴스가 다르다)
     private float _startTime;
     private InterruptHitLightRequest _request;
     private ISuppressDarkAdaptOutput _darkAdaptShown; // 어둡힘을 넣은 출력(끝에 0 으로) — 없으면 null
@@ -53,6 +56,16 @@ public sealed class InterruptHitLightPlayer : IDisposable
     /// <param name="whiteout">V2 화이트아웃 출력(③ 그림만 그리는 적중 섬광 오버레이). null 이면 화이트아웃 없음.</param>
     /// <param name="casterWeapon">시전자 → 지금 오른손 무기 위치(없으면 null). null 이면 월드 이펙트는 늘 대상 적중점.</param>
     public InterruptHitLightPlayer(Func<InterruptHitLightLook> look, Func<InterruptHitLightFx> fx,
+        Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
+        Func<ulong, Vector3?> casterWeapon = null)
+        : this(look != null ? _ => look() : (Func<InterruptSuccessLook, InterruptHitLightLook>)null,
+            fx != null ? _ => fx() : (Func<InterruptSuccessLook, InterruptHitLightFx>)null,
+            darkAdapt, sceneDim, whiteout, casterWeapon)
+    {
+    }
+
+    /// <summary>버전별 데이터·월드 이펙트(194 후속 — V3 는 전용 SO·프리팹). 인자 = 이번 요청의 <see cref="InterruptHitLightRequest.Look"/>.</summary>
+    public InterruptHitLightPlayer(Func<InterruptSuccessLook, InterruptHitLightLook> look, Func<InterruptSuccessLook, InterruptHitLightFx> fx,
         Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
         Func<ulong, Vector3?> casterWeapon = null)
     {
@@ -75,11 +88,13 @@ public sealed class InterruptHitLightPlayer : IDisposable
     public InterruptHitLightRequest Request => _request;
     /// <summary>지금 블룸 Volume 가중치(꺼짐 = 0) — 확인용.</summary>
     public float BloomWeight => _bloomVolume != null && _bloomVolume.enabled ? _bloomVolume.weight : 0f;
+    /// <summary>지금 색 보정(채도) Volume 가중치(꺼짐 = 0) — 확인용.</summary>
+    public float GradeWeight => _gradeVolume != null && _gradeVolume.enabled ? _gradeVolume.weight : 0f;
 
     /// <summary>성공 순간 시작(<paramref name="now"/> = 실시간, <paramref name="frame"/> = 렌더 프레임). 돌던 연출은 새 것으로 바뀐다.</summary>
     public void Begin(in InterruptHitLightRequest request, float now, int frame = 0)
     {
-        InterruptHitLightLook look = _look?.Invoke();
+        InterruptHitLightLook look = _look?.Invoke(request.Look);
         // 앞 연출의 암순응 방식이 다를 수 있다 — 넣어 둔 것을 먼저 걷는다(곧바로 새 값이 들어간다).
         ReleaseDarkAdapt();
         _request = request;
@@ -91,7 +106,11 @@ public sealed class InterruptHitLightPlayer : IDisposable
         // 무기 위치는 이 순간 한 번만 읽는다 — 이펙트는 월드에 남고 시전자를 따라가지 않는다.
         Vector3? weapon = request.Origin == InterruptHitLightOrigin.CasterWeapon ? _casterWeapon?.Invoke(request.CasterClientId) : null;
         FxPoint = InterruptHitLightRules.FxPoint(request.Origin, request.Point, weapon);
-        InterruptHitLightFx fx = _fx?.Invoke();
+        InterruptHitLightFx fx = _fx?.Invoke(request.Look);
+        // 버전이 바뀌어 다른 인스턴스를 틀면 앞 것은 지운다(같은 인스턴스는 Play 가 다시 튼다).
+        if (_playedFx != null && _playedFx != fx)
+            _playedFx.Stop();
+        _playedFx = fx;
         if (fx != null)
             fx.Play(FxPoint, look);
 
@@ -104,10 +123,11 @@ public sealed class InterruptHitLightPlayer : IDisposable
         if (!IsPlaying)
             return;
 
-        InterruptHitLightLook look = _look?.Invoke();
+        InterruptHitLightLook look = _look?.Invoke(_request.Look);
         float elapsed = now - _startTime;
         float bloom = look != null ? InterruptEffectLight.Pulse(look.BloomCurve, 1f, elapsed, look.BloomDuration) : 0f;
-        ApplyBloom(look, bloom);
+        _bloomVolume = ApplyVolume(_bloomVolume, "Bloom", look != null ? look.BloomProfile : null, bloom);
+        _gradeVolume = ApplyVolume(_gradeVolume, "Grade", look != null ? look.GradeProfile : null, InterruptHitLightRules.GradeWeight(look, elapsed));
         ApplyDarkAdapt(look, elapsed);
         ApplyWhiteout(frame);
 
@@ -191,9 +211,8 @@ public sealed class InterruptHitLightPlayer : IDisposable
     /// <summary>강제 리셋·서버 거부 — 월드 이펙트·화면 효과 즉시 끔.</summary>
     public void Stop()
     {
-        InterruptHitLightFx fx = _fx?.Invoke();
-        if (fx != null)
-            fx.Stop();
+        if (_playedFx != null)
+            _playedFx.Stop();
         Finish();
     }
 
@@ -211,39 +230,43 @@ public sealed class InterruptHitLightPlayer : IDisposable
 
         _root = null;
         _bloomVolume = null;
+        _gradeVolume = null;
+        _playedFx = null;
     }
 
     private void Finish()
     {
         IsPlaying = false;
         SetWeight(_bloomVolume, 0f);
+        SetWeight(_gradeVolume, 0f);
         ReleaseDarkAdapt();
         HideWhiteout();
         _whiteoutFrames = 0;
     }
 
-    private void ApplyBloom(InterruptHitLightLook look, float weight)
+    // 블룸·색 보정 Volume — 프로필이 있고 가중치가 있으면 처음 한 번 만들고 가중치만 움직인다.
+    private Volume ApplyVolume(Volume volume, string name, VolumeProfile profile, float weight)
     {
-        VolumeProfile profile = look != null ? look.BloomProfile : null;
         if (profile == null || weight <= 0f)
         {
-            SetWeight(_bloomVolume, 0f);
-            return;
+            SetWeight(volume, 0f);
+            return volume;
         }
 
-        if (_bloomVolume == null)
+        if (volume == null)
         {
             EnsureRoot();
-            var volumeObject = new GameObject("Bloom");
+            var volumeObject = new GameObject(name);
             volumeObject.transform.SetParent(_root.transform, false);
-            _bloomVolume = volumeObject.AddComponent<Volume>();
-            _bloomVolume.isGlobal = true;
-            _bloomVolume.priority = InterruptHitFlashOverlay.VolumePriority;
+            volume = volumeObject.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = InterruptHitFlashOverlay.VolumePriority;
         }
 
         // sharedProfile — 에셋을 복제·수정하지 않는다(가중치만).
-        _bloomVolume.sharedProfile = profile;
-        SetWeight(_bloomVolume, weight);
+        volume.sharedProfile = profile;
+        SetWeight(volume, weight);
+        return volume;
     }
 
     private void EnsureRoot()
@@ -275,11 +298,16 @@ public static class InterruptHitLightRules
     public static bool Finished(InterruptHitLightLook look, float elapsed) =>
         look == null || elapsed >= Duration(look);
 
-    /// <summary>진행기 길이 — 곡선 길이 중 가장 긴 것.</summary>
+    /// <summary>진행기 길이 — 곡선 길이 중 가장 긴 것. 색 보정은 프로필이 있을 때만 센다(V1·V2 는 비어 있다).</summary>
     public static float Duration(InterruptHitLightLook look) =>
         look == null
             ? 0f
-            : Mathf.Max(Mathf.Max(look.LightDuration, look.BloomDuration), Mathf.Max(look.DarkAdaptDuration, look.SceneDimDuration));
+            : Mathf.Max(Mathf.Max(Mathf.Max(look.LightDuration, look.BloomDuration), Mathf.Max(look.DarkAdaptDuration, look.SceneDimDuration)),
+                look.GradeProfile != null ? look.GradeDuration : 0f);
+
+    /// <summary>색 보정(채도) Volume 가중치(194 후속 V3) — 프로필이 있으면 곡선대로 [0, 1], 없거나 끝이면 0.</summary>
+    public static float GradeWeight(InterruptHitLightLook look, float elapsed) =>
+        look != null && look.GradeProfile != null ? Mathf.Clamp01(InterruptEffectLight.Pulse(look.GradeCurve, 1f, elapsed, look.GradeDuration)) : 0f;
 
     /// <summary>암순응 가 최대 어둡힘 — 본인 화면 = self, 팀원 화면 = others(Q9).</summary>
     public static float DarkAdaptPeak(bool viewerIsCaster, float self, float others) =>

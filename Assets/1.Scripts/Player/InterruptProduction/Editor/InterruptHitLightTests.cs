@@ -585,4 +585,220 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(InterruptSuccessLook.HitLight, director.SuccessLook(InterruptPresentationTier.Normal), "기본 일반 = V1");
         Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash), "기본 대쉬 = V2");
     }
+
+    // ---- 194 후속 — V3 레퍼런스 맞춤 ----
+
+    [TestCase(true, true, InterruptSuccessLook.HitLightReference)]
+    [TestCase(true, false, InterruptSuccessLook.HitLightReference)]
+    [TestCase(false, true, InterruptSuccessLook.HitFlash)] // V1·V2 데이터만 있으면 V3 대신 V0
+    [TestCase(false, false, InterruptSuccessLook.HitFlash)]
+    public void V3_선택표는_V3_전용_데이터가_있을_때만(bool hasReference, bool hasHitLight, InterruptSuccessLook expected)
+    {
+        var tier = new InterruptTierProfile(false, InterruptTierFlash.HitLightReference);
+        Assert.AreEqual(expected, InterruptPresentationTierRules.SelectSuccessLook(tier, true, true, hasHitLight, hasReference));
+    }
+
+    [Test]
+    public void V3_는_적중_라이트_경로_화이트아웃_없음_암순응_기본_나()
+    {
+        Assert.IsTrue(InterruptPresentationTierRules.UsesHitLight(InterruptSuccessLook.HitLightReference));
+        Assert.IsTrue(InterruptPresentationTierRules.UsesReferenceLook(InterruptSuccessLook.HitLightReference));
+        Assert.IsFalse(InterruptPresentationTierRules.UsesReferenceLook(InterruptSuccessLook.HitLight));
+        Assert.IsFalse(InterruptPresentationTierRules.UsesReferenceLook(InterruptSuccessLook.HitLightWhiteout));
+        Assert.AreEqual(0, InterruptPresentationTierRules.WhiteoutFrames(InterruptSuccessLook.HitLightReference, true, 3));
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, InterruptPresentationTierRules.DefaultDarkAdapt(InterruptTierFlash.HitLightReference));
+        Assert.IsNull(InterruptPresentationTierRules.DefaultDarkAdapt(InterruptTierFlash.HitLight));
+        Assert.AreEqual(4, (int)InterruptTierFlash.HitLightReference, "직렬화 값 — 순서 고정");
+        Assert.AreEqual(4, (int)InterruptSuccessLook.HitLightReference);
+        // V1 선택은 V3 칸 유무와 무관하다.
+        var v1 = new InterruptTierProfile(false, InterruptTierFlash.HitLight);
+        Assert.AreEqual(InterruptSuccessLook.HitLight, InterruptPresentationTierRules.SelectSuccessLook(v1, true, true, true, false));
+    }
+
+    [Test]
+    public void 디렉터_V3_는_전용_SO_프리팹을_쓰고_V1_V2_칸과_독립()
+    {
+        var go = new GameObject("Director");
+        _objects.Add(go);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        InterruptHitLightLook v1Look = CreateLook(false);
+        InterruptHitLightLook v3Look = CreateLook(false);
+        var so = new SerializedObject(director);
+        so.FindProperty("hitLightLook").objectReferenceValue = v1Look;
+        so.FindProperty("hitLightVfx").objectReferenceValue = CreateFx();
+        so.ApplyModifiedPropertiesWithoutUndo();
+        director.TierProfile(InterruptPresentationTier.Normal).flash = InterruptTierFlash.HitLightReference;
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Normal), "V3 칸 비면 V0");
+        Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash), "대쉬 V2 그대로");
+
+        so.Update(); // 위에서 런타임으로 바꾼 단계 값을 읽어 둔다(Apply 가 되돌리지 않게)
+        so.FindProperty("hitLightLookReference").objectReferenceValue = v3Look;
+        so.FindProperty("hitLightVfxReference").objectReferenceValue = CreateFx();
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Normal));
+        Assert.AreSame(v3Look, director.HitLightLookFor(InterruptSuccessLook.HitLightReference));
+        Assert.AreSame(v1Look, director.HitLightLookFor(InterruptSuccessLook.HitLight));
+        Assert.AreSame(v1Look, director.HitLightLookFor(InterruptSuccessLook.HitLightWhiteout));
+    }
+
+    [Test]
+    public void 진행기는_요청_종류로_데이터_이펙트를_고르고_바뀌면_앞_이펙트를_끈다()
+    {
+        InterruptHitLightLook v1Look = CreateLook(false);
+        InterruptHitLightLook v3Look = CreateLook(false);
+        var so = new SerializedObject(v3Look);
+        so.FindProperty("lightIntensity").floatValue = 4f;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        InterruptHitLightFx v1Fx = CreateFx();
+        InterruptHitLightFx v3Fx = CreateFx();
+        var player = new InterruptHitLightPlayer(
+            look => InterruptPresentationTierRules.UsesReferenceLook(look) ? v3Look : v1Look,
+            look => InterruptPresentationTierRules.UsesReferenceLook(look) ? v3Fx : v1Fx);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLight }, 0f);
+        Assert.AreEqual(20f, v1Fx.HitLight.intensity, 1e-4f);
+
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLightReference }, 1f);
+        Assert.AreEqual(4f, v3Fx.HitLight.intensity, 1e-4f, "V3 데이터");
+        Assert.IsFalse(v1Fx.HitLight.enabled, "버전이 바뀌면 앞 인스턴스 라이트를 끈다");
+
+        player.Stop();
+        Assert.IsFalse(v3Fx.HitLight.enabled, "강제 리셋은 마지막으로 튼 인스턴스");
+    }
+
+    private InterruptHitLightLook CreateGradeLook()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+        _objects.Add(profile);
+        var so = new SerializedObject(look);
+        so.FindProperty("gradeProfile").objectReferenceValue = profile;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return look;
+    }
+
+    [Test]
+    public void 채도_Volume_가중치는_적중_순간_1에서_곡선대로_0()
+    {
+        InterruptHitLightLook look = CreateGradeLook();
+        Assert.AreEqual(1f, InterruptHitLightRules.GradeWeight(look, 0f), 1e-4f);
+        float mid = InterruptHitLightRules.GradeWeight(look, 0.45f);
+        Assert.Greater(mid, 0f);
+        Assert.Less(mid, 1f);
+        Assert.AreEqual(0f, InterruptHitLightRules.GradeWeight(look, 0.9f));
+        Assert.AreEqual(0f, InterruptHitLightRules.GradeWeight(CreateLook(false), 0f), "프로필 없음(V1·V2) = 0");
+        Assert.AreEqual(0f, InterruptHitLightRules.GradeWeight(null, 0f));
+
+        InterruptHitLightPlayer player = CreatePlayer(look, null);
+        player.Begin(new InterruptHitLightRequest { Look = InterruptSuccessLook.HitLightReference }, 10f);
+        Assert.AreEqual(1f, player.GradeWeight, 1e-4f);
+        Assert.AreEqual(0f, player.BloomWeight, "블룸 프로필 없음 = 블룸 없음(서로 독립)");
+        player.Tick(10.45f);
+        Assert.AreEqual(mid, player.GradeWeight, 1e-4f);
+        player.Tick(10.95f);
+        Assert.AreEqual(0f, player.GradeWeight);
+        Assert.IsFalse(player.IsPlaying);
+    }
+
+    [Test]
+    public void 색_보정_길이는_프로필이_있을_때만_진행기_길이에_든다()
+    {
+        InterruptHitLightLook look = CreateLook(false);
+        var so = new SerializedObject(look);
+        so.FindProperty("gradeDuration").floatValue = 2f;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.AreEqual(0.9f, InterruptHitLightRules.Duration(look), 1e-6f, "프로필 없음 = V1·V2 길이 그대로");
+
+        so.FindProperty("gradeProfile").objectReferenceValue = ScriptableObject.CreateInstance<VolumeProfile>();
+        _objects.Add(so.FindProperty("gradeProfile").objectReferenceValue);
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.AreEqual(2f, InterruptHitLightRules.Duration(look), 1e-6f);
+    }
+
+    [Test]
+    public void V3_에셋은_V1_V2_에셋과_값이_독립()
+    {
+        var v1 = AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>(InterruptHitLightAuthoring.LookPath);
+        var v3 = AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>(InterruptHitLightReferenceAuthoring.LookPath);
+        Assert.IsNotNull(v1);
+        Assert.IsNotNull(v3);
+        Assert.AreNotSame(v1, v3);
+
+        // V1·V2 값 보존(버전 보존 원칙).
+        Assert.AreEqual(20f, v1.LightIntensity, 1e-4f);
+        Assert.AreEqual(8f, v1.LightRange, 1e-4f);
+        Assert.AreEqual(0.85f, v1.SunDimDepth, 1e-4f);
+        Assert.AreEqual(0.7f, v1.AmbientDimDepth, 1e-4f);
+        Assert.AreEqual(3, v1.WhiteoutFrames);
+        Assert.IsNull(v1.GradeProfile, "V1·V2 는 색 보정 없음");
+
+        // V3 시작값.
+        Assert.AreEqual(4f, v3.LightIntensity, 1e-4f);
+        Assert.AreEqual(3f, v3.LightRange, 1e-4f);
+        Assert.Greater(v3.SunDimDepth, v1.SunDimDepth, "V3 가 더 어둡다");
+        Assert.Greater(v3.AmbientDimDepth, v1.AmbientDimDepth);
+        Assert.AreEqual(0, v3.WhiteoutFrames);
+        Assert.AreNotSame(v1.BloomProfile, v3.BloomProfile, "V3 전용 블룸");
+
+        Assert.IsTrue(v3.BloomProfile.TryGet(out UnityEngine.Rendering.Universal.Bloom bloom));
+        Assert.AreEqual(1.5f, bloom.threshold.value, 1e-4f);
+        Assert.AreEqual(1.5f, bloom.intensity.value, 1e-4f);
+        Assert.IsNotNull(v3.GradeProfile);
+        Assert.IsTrue(v3.GradeProfile.TryGet(out UnityEngine.Rendering.Universal.ColorAdjustments color));
+        Assert.IsTrue(color.saturation.overrideState);
+        Assert.Less(color.saturation.value, 0f, "채도 낮춤");
+        Assert.Greater(color.colorFilter.value.b, color.colorFilter.value.g, "보랏빛 색 필터");
+    }
+
+    [Test]
+    public void V3_프리팹은_중심_점_가로_빛줄_가는_불꽃_메시는_에셋()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(InterruptHitLightReferenceAuthoring.PrefabPath);
+        Assert.IsNotNull(prefab, InterruptHitLightReferenceAuthoring.PrefabPath);
+        Assert.IsNotNull(prefab.GetComponent<InterruptHitLightFx>());
+
+        foreach ((string child, string meshPath) in new[]
+                 {
+                     ("Core", InterruptHitLightReferenceAuthoring.CoreMeshPath),
+                     ("Streak", InterruptHitLightReferenceAuthoring.StreakMeshPath),
+                 })
+        {
+            Transform t = prefab.transform.Find(child);
+            Assert.IsNotNull(t, child);
+            Assert.IsFalse(t.GetComponent<ParticleSystem>().main.playOnAwake, child);
+            var renderer = t.GetComponent<ParticleSystemRenderer>();
+            Assert.AreEqual(ParticleSystemRenderMode.Mesh, renderer.renderMode, child);
+            Assert.AreEqual(ParticleSystemRenderSpace.View, renderer.alignment, child + " 카메라 정렬");
+            Assert.AreEqual(meshPath, AssetDatabase.GetAssetPath(renderer.mesh), child + " 메시는 에셋");
+            Assert.AreEqual("BeaverLobby/VFX/InterruptHitLightRays", renderer.sharedMaterial.shader.name, child + " 셰이더 재사용");
+        }
+
+        Assert.AreEqual(0f, prefab.transform.Find("Streak").GetComponent<ParticleSystem>().main.startRotation.constant, "빛줄은 늘 화면 가로");
+
+        ParticleSystem v1Sparks = PrefabSystem("Sparks");
+        ParticleSystem v3Sparks = prefab.transform.Find("Sparks").GetComponent<ParticleSystem>();
+        Assert.Less(v3Sparks.main.startSize.constantMax, v1Sparks.main.startSize.constantMin, "더 가늘게");
+        Assert.Greater(v3Sparks.GetComponent<ParticleSystemRenderer>().lengthScale, v1Sparks.GetComponent<ParticleSystemRenderer>().lengthScale, "더 길게");
+        Assert.Greater(v3Sparks.emission.GetBurst(0).minCount, v1Sparks.emission.GetBurst(0).maxCount, "더 많이");
+
+        ParticleSystem v1Rays = PrefabSystem("Rays");
+        ParticleSystem v3Rays = prefab.transform.Find("Rays").GetComponent<ParticleSystem>();
+        Assert.Less(v3Rays.main.startSize.constantMax, v1Rays.main.startSize.constantMin, "빛줄기는 보조로 작게");
+        Assert.Less(v3Rays.main.startColor.color.a, 1f, "알파 낮춤");
+    }
+
+    [Test]
+    public void NetworkManager_프리팹_디렉터에_V3_가_이어져_있고_기본은_V1_V2_그대로()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/Network/NetworkManager.prefab");
+        var director = prefab.GetComponent<InterruptProductionDirector>();
+        var so = new SerializedObject(director);
+        Assert.AreEqual(InterruptHitLightReferenceAuthoring.LookPath,
+            AssetDatabase.GetAssetPath(so.FindProperty("hitLightLookReference").objectReferenceValue));
+        Assert.AreEqual(InterruptHitLightReferenceAuthoring.PrefabPath,
+            AssetDatabase.GetAssetPath(so.FindProperty("hitLightVfxReference").objectReferenceValue));
+        Assert.AreEqual(InterruptTierFlash.HitLight, director.TierProfile(InterruptPresentationTier.Normal).flash, "기본 일반 = V1(사용자 비교 후 결정)");
+        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, director.TierProfile(InterruptPresentationTier.Dash).flash, "기본 대쉬 = V2");
+    }
 }

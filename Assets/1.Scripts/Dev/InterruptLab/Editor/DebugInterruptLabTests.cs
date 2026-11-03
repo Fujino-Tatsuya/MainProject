@@ -302,11 +302,11 @@ public sealed class DebugInterruptLabTests
     // ---- 194 — 적중 라이트 연출 버전 버튼 ----
 
     [Test]
-    public void 버전_버튼은_일반_대쉬_단계에_V0_V1_V2와_암순응_가_나()
+    public void 버전_버튼은_일반_대쉬_단계에_V0_V1_V2_V3와_암순응_가_나()
     {
         CollectionAssert.AreEqual(new[] { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash },
             DebugInterruptTierPreview.VersionTiers, "제압은 시퀀스 고정");
-        CollectionAssert.AreEqual(new[] { "V0", "V1", "V2" },
+        CollectionAssert.AreEqual(new[] { "V0", "V1", "V2", "V3" },
             System.Array.ConvertAll(DebugInterruptTierPreview.Versions, DebugInterruptTierPreview.VersionLabel));
         Assert.AreEqual(2, DebugInterruptTierPreview.DarkAdaptModes.Length);
         StringAssert.StartsWith("가", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.ScreenPass));
@@ -341,5 +341,21 @@ public sealed class DebugInterruptLabTests
         {
             Object.DestroyImmediate(go);
         }
+    }
+
+    [Test]
+    public void V3_버튼은_암순응을_나로_맞추고_다른_버전은_암순응을_그대로_둔다()
+    {
+        var profile = new InterruptTierProfile(false, InterruptTierFlash.HitLight, InterruptDarkAdaptMode.ScreenPass);
+
+        DebugInterruptTuningPanel.SelectVersion(profile, InterruptTierFlash.HitLightReference);
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, profile.flash);
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, profile.darkAdapt, "V3 기본 = 나");
+
+        profile.darkAdapt = InterruptDarkAdaptMode.ScreenPass; // 누른 뒤 가로 다시 고를 수 있다
+        DebugInterruptTuningPanel.SelectVersion(profile, InterruptTierFlash.HitLightWhiteout);
+        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, profile.flash);
+        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, profile.darkAdapt, "V0~V2 는 암순응을 안 바꾼다");
+        Assert.AreEqual("V3", DebugInterruptTierPreview.LookLabel(InterruptSuccessLook.HitLightReference));
     }
 }

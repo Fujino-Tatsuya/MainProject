@@ -14,7 +14,7 @@ internal static class InterruptHitLightAuthoring
     public const string LookPath = Folder + "/InterruptHitLightLook.asset";
     public const string PrefabPath = Folder + "/FX_InterruptHitLight.prefab";
     const string BloomProfilePath = "Assets/5.VFX/Interrupt/HitFlash/VP_InterruptHitFlash_Bloom.asset";
-    const string NetworkManagerPrefabPath = "Assets/2.Prefabs/Network/NetworkManager.prefab";
+    internal const string NetworkManagerPrefabPath ="Assets/2.Prefabs/Network/NetworkManager.prefab";
 
     [MenuItem("Tools/Interrupt/적중 라이트 연출 에셋 만들기 (194)")]
     public static void BuildAll()
@@ -77,10 +77,10 @@ internal static class InterruptHitLightAuthoring
 
     public const string RaysMeshPath = Folder + "/Mesh_InterruptHitLight_Rays.asset";
     public const string RaysMaterialPath = Folder + "/M_InterruptHitLight_Rays.mat";
-    const string RaysShaderName = "BeaverLobby/VFX/InterruptHitLightRays";
+    internal const string RaysShaderName = "BeaverLobby/VFX/InterruptHitLightRays";
     public const int RayBladeCount = 10;
 
-    static void BuildRays(Transform parent, Mesh mesh, Material material)
+    internal static ParticleSystem BuildRays(Transform parent, Mesh mesh, Material material)
     {
         ParticleSystem system = NewSystem(parent, "Rays");
         ParticleSystem.MainModule main = system.main;
@@ -117,11 +117,12 @@ internal static class InterruptHitLightAuthoring
         renderer.sharedMaterial = material;
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderer.receiveShadows = false;
+        return system;
     }
 
     // 날개 RayBladeCount 개 — 중심에서 XY 평면으로 뻗고 끝이 가늘어진다. 길이·폭·각도는 정해진 흔들림(다시 만들어도 같다).
     // UV.x = 날개 번호 + 가로(0~1), UV.y = 중심 0 → 끝 1 (셰이더 InterruptHitLightRays).
-    static Mesh EnsureRaysMesh()
+    internal static Mesh EnsureRaysMesh()
     {
         var vertices = new Vector3[RayBladeCount * 4];
         var uvs = new Vector2[RayBladeCount * 4];
@@ -179,13 +180,13 @@ internal static class InterruptHitLightAuthoring
     public const string DebrisMeshPath = Folder + "/Mesh_InterruptHitLight_Debris.asset";
     public const string SparkMaterialPath = Folder + "/M_InterruptHitLight_Spark.mat";
     public const string DebrisMaterialPath = Folder + "/M_InterruptHitLight_Debris.mat";
-    const string SparkShaderName = "BeaverLobby/VFX/InterruptHitFlash"; // 간파 적중 섬광의 가우시안 빛 덩어리(가산) — 늘이면 불꽃 줄기
+    internal const string SparkShaderName ="BeaverLobby/VFX/InterruptHitFlash"; // 간파 적중 섬광의 가우시안 빛 덩어리(가산) — 늘이면 불꽃 줄기
     const string DebrisShaderName = "Universal Render Pipeline/Particles/Unlit";
 
-    static readonly Color SparkHot = new Color(1f, 0.82f, 0.45f, 1f);
-    static readonly Color SparkOrange = new Color(1f, 0.45f, 0.1f, 1f);
+    internal static readonly Color SparkHot = new Color(1f, 0.82f, 0.45f, 1f);
+    internal static readonly Color SparkOrange = new Color(1f, 0.45f, 0.1f, 1f);
 
-    static ParticleSystem NewSystem(Transform parent, string name)
+    internal static ParticleSystem NewSystem(Transform parent, string name)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
@@ -205,7 +206,7 @@ internal static class InterruptHitLightAuthoring
         return system;
     }
 
-    static void BuildSparks(Transform parent, Material material)
+    internal static ParticleSystem BuildSparks(Transform parent, Material material)
     {
         ParticleSystem system = NewSystem(parent, "Sparks");
         ParticleSystem.MainModule main = system.main;
@@ -240,9 +241,10 @@ internal static class InterruptHitLightAuthoring
         renderer.sharedMaterial = material;
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderer.receiveShadows = false;
+        return system;
     }
 
-    static void BuildDebris(Transform parent, Mesh mesh, Material material)
+    internal static void BuildDebris(Transform parent, Mesh mesh, Material material)
     {
         ParticleSystem system = NewSystem(parent, "Debris");
         ParticleSystem.MainModule main = system.main;
@@ -305,7 +307,7 @@ internal static class InterruptHitLightAuthoring
     }
 
     // 작은 쇳조각 — 찌그러진 쌍뿔(6 꼭짓점) 플랫 셰이딩, 약 0.12m. 정해진 값이라 다시 만들어도 같다.
-    static Mesh EnsureDebrisMesh()
+    internal static Mesh EnsureDebrisMesh()
     {
         Vector3[] corners =
         {
@@ -351,7 +353,7 @@ internal static class InterruptHitLightAuthoring
         return material;
     }
 
-    static Material EnsureDebrisMaterial()
+    internal static Material EnsureDebrisMaterial()
     {
         Material material = EnsureMaterial(DebrisMaterialPath, DebrisShaderName);
         if (material == null)
@@ -361,7 +363,7 @@ internal static class InterruptHitLightAuthoring
         return material;
     }
 
-    static Material EnsureMaterial(string path, string shaderName)
+    internal static Material EnsureMaterial(string path, string shaderName)
     {
         var material = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (material != null)

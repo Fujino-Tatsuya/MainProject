@@ -188,7 +188,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             {
                 string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.VersionLabel(flash), profile.flash == flash);
                 if (GUILayout.Button(label))
-                    profile.flash = flash;
+                    SelectVersion(profile, flash);
             }
 
             foreach (InterruptDarkAdaptMode mode in DebugInterruptTierPreview.DarkAdaptModes)
@@ -209,6 +209,18 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
                 _tierPreview.Begin(director, tier, Time.unscaledTime);
             GUILayout.EndHorizontal();
         }
+    }
+
+    /// <summary>버전 버튼 — 섬광 종류를 바꾸고, V3 면 암순응도 그 기본(나)으로 맞춘다(194 후속, 누른 뒤 가로 다시 고를 수 있다).</summary>
+    public static void SelectVersion(InterruptTierProfile profile, InterruptTierFlash flash)
+    {
+        if (profile == null)
+            return;
+
+        profile.flash = flash;
+        InterruptDarkAdaptMode? darkAdapt = InterruptPresentationTierRules.DefaultDarkAdapt(flash);
+        if (darkAdapt.HasValue)
+            profile.darkAdapt = darkAdapt.Value;
     }
 
     // 제압 간파 섬광(179 후속 3) — A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).

@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// 적중 라이트 연출(V1·V2, 할 일 194) 수치 — 디렉터 칸 <c>hitLightLook</c> 이 가리키는 SO. 사건마다·프레임마다 읽는다(Play 중 바꾸면 다음 프레임부터).
+/// 적중 라이트 연출(V1·V2, 할 일 194) 수치 — 디렉터 칸 <c>hitLightLook</c> 이 가리키는 SO. V3(194 후속)는 같은 형식의 별도 에셋(<c>hitLightLookReference</c>)이라 V1·V2 값과 섞이지 않는다. 사건마다·프레임마다 읽는다(Play 중 바꾸면 다음 프레임부터).
 /// 시간은 전부 실시간(unscaled, Q8) — 슬로우·히트스톱과 무관. 데이터 테이블에는 내지 않는다(PLAN 194 §3 — 범위 밖).
 /// 문서: Docs/tech/interrupt-presentation.md §9.
 /// </summary>
@@ -30,6 +30,14 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [SerializeField, Min(0f)] private float bloomDuration = 0.9f;
     [Tooltip("블룸 가중치 곡선 — 가로 = 진행(0~1), 세로 = 가중치 [0, 1]")]
     [SerializeField] private AnimationCurve bloomCurve = Decay();
+
+    [Header("색 보정 — 채도·색 필터(모든 피어, V3 레퍼런스 맞춤)")]
+    [Tooltip("색 보정 Volume 프로필 — 간파 전용 ColorAdjustments(채도 낮춤·보랏빛 색 필터, VP_InterruptHitLight_V3_Grade). 블룸처럼 이 피어 전용 전역 Volume 의 가중치만 움직인다. 비면 색 보정 없음(V1·V2)")]
+    [SerializeField] private VolumeProfile gradeProfile;
+    [Tooltip("색 보정 시간(초, 실시간) — 적중 순간 가중치 최대, 이 동안 곡선대로 0")]
+    [SerializeField, Min(0f)] private float gradeDuration = 0.9f;
+    [Tooltip("색 보정 가중치 곡선 — 가로 = 진행(0~1), 세로 = 가중치 [0, 1]")]
+    [SerializeField] private AnimationCurve gradeCurve = Decay();
 
     [Header("암순응 가 — 화면 패스(어두운 픽셀만, 라이트·이펙트는 남음)")]
     [Tooltip("발동자 본인 화면 최대 어둡힘 [0, 1](Q9 — 오너 1)")]
@@ -66,6 +74,10 @@ public sealed class InterruptHitLightLook : ScriptableObject
     public VolumeProfile BloomProfile => bloomProfile;
     public float BloomDuration => bloomDuration;
     public AnimationCurve BloomCurve => bloomCurve;
+
+    public VolumeProfile GradeProfile => gradeProfile;
+    public float GradeDuration => gradeDuration;
+    public AnimationCurve GradeCurve => gradeCurve;
 
     public float DarkAdaptSelf => darkAdaptSelf;
     public float DarkAdaptOthers => darkAdaptOthers;
