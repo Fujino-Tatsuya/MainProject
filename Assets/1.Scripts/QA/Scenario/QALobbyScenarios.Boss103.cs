@@ -489,7 +489,7 @@ public static partial class QALobbyScenarios
     private static string LobbyStage103()
     {
         LobbyTrainingDirector d = LobbyTrainingDirector.Active;
-        return d != null ? $"stage={d.Stage}/{d.Phase}" : "stage=na";
+        return d != null ? $"stage={d.DescribeStep()}" : "stage=na";
     }
 
     private static string SortieState103(PartyGatherZone zone)
