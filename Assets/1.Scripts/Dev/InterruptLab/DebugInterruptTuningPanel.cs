@@ -172,7 +172,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         DrawTierVersions(director);
     }
 
-    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계마다 V0/V1/V2·암순응 가/나(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
+    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계마다 V0/V1/V2·암순응 가/나·월드 이펙트 위치 무기/대상(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
     // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
     void DrawTierVersions(InterruptProductionDirector director)
     {
@@ -196,6 +196,13 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
                 string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.DarkAdaptLabel(mode), profile.darkAdapt == mode);
                 if (GUILayout.Button(label))
                     profile.darkAdapt = mode;
+            }
+
+            foreach (InterruptHitLightOrigin origin in DebugInterruptTierPreview.Origins)
+            {
+                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.OriginLabel(origin), profile.hitLightOrigin == origin);
+                if (GUILayout.Button(label))
+                    profile.hitLightOrigin = origin;
             }
 
             if (GUILayout.Button("재생"))

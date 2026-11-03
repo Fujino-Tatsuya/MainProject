@@ -302,6 +302,127 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Dash));
     }
 
+    // ---- 194 후속 — 월드 이펙트 발생 위치 = 시전자 오른손 무기 ----
+
+    private static readonly Vector3 TargetPoint = new Vector3(5f, 1.2f, 0f);
+    private static readonly Vector3 WeaponPoint = new Vector3(-1f, 1.4f, 2f);
+
+    [Test]
+    public void 위치_선택_무기_대상_못찾음_대체()
+    {
+        Assert.AreEqual(WeaponPoint, InterruptHitLightRules.FxPoint(InterruptHitLightOrigin.CasterWeapon, TargetPoint, WeaponPoint));
+        Assert.AreEqual(TargetPoint, InterruptHitLightRules.FxPoint(InterruptHitLightOrigin.Target, TargetPoint, WeaponPoint), "대상 선택 = 무기 무시");
+        Assert.AreEqual(TargetPoint, InterruptHitLightRules.FxPoint(InterruptHitLightOrigin.CasterWeapon, TargetPoint, null), "무기 못 찾음 = 대상");
+    }
+
+    [Test]
+    public void 월드_이펙트는_요청의_시전자_무기_위치에서_나고_따라가지_않는다()
+    {
+        InterruptHitLightFx fx = CreateFx();
+        var asked = new List<ulong>();
+        Vector3 weapon = WeaponPoint;
+        var player = new InterruptHitLightPlayer(() => CreateLook(false), () => fx, casterWeapon: id =>
+        {
+            asked.Add(id);
+            return weapon;
+        });
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest
+        {
+            Point = TargetPoint, CasterClientId = 3, Origin = InterruptHitLightOrigin.CasterWeapon, Look = InterruptSuccessLook.HitLight,
+        }, 0f);
+
+        CollectionAssert.AreEqual(new[] { 3ul }, asked, "요청에 실린 시전자로 찾는다");
+        Assert.AreEqual(WeaponPoint, player.FxPoint);
+        Assert.AreEqual(WeaponPoint, fx.transform.position);
+
+        weapon = Vector3.zero; // 시전자가 움직여도
+        player.Tick(0.3f);
+        Assert.AreEqual(WeaponPoint, fx.transform.position, "성공 순간 위치에 남는다");
+        Assert.AreEqual(1, asked.Count, "무기 위치는 시작 때 한 번만 읽는다");
+    }
+
+    [Test]
+    public void 랩_허수아비_가상_시전자처럼_무기를_못_찾으면_대상_적중점()
+    {
+        InterruptHitLightFx fx = CreateFx();
+        var player = new InterruptHitLightPlayer(() => CreateLook(false), () => fx, casterWeapon: _ => null);
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest
+        {
+            Point = TargetPoint, CasterClientId = 99, Origin = InterruptHitLightOrigin.CasterWeapon, Look = InterruptSuccessLook.HitLight,
+        }, 0f);
+
+        Assert.AreEqual(TargetPoint, fx.transform.position);
+    }
+
+    [Test]
+    public void 위치_대상이면_무기를_찾지도_않는다()
+    {
+        int asked = 0;
+        var player = new InterruptHitLightPlayer(() => CreateLook(false), () => null, casterWeapon: _ =>
+        {
+            asked++;
+            return WeaponPoint;
+        });
+        _players.Add(player);
+
+        player.Begin(new InterruptHitLightRequest { Point = TargetPoint, Origin = InterruptHitLightOrigin.Target, Look = InterruptSuccessLook.HitLight }, 0f);
+
+        Assert.AreEqual(0, asked);
+        Assert.AreEqual(TargetPoint, player.FxPoint);
+    }
+
+    [Test]
+    public void 단계_발생_위치_기본은_오른손_무기()
+    {
+        Assert.AreEqual(InterruptHitLightOrigin.CasterWeapon, new InterruptTierProfile().hitLightOrigin);
+        var go = new GameObject("Director");
+        _objects.Add(go);
+        var director = go.AddComponent<InterruptProductionDirector>();
+        Assert.AreEqual(InterruptHitLightOrigin.CasterWeapon, director.TierProfile(InterruptPresentationTier.Normal).hitLightOrigin);
+        Assert.AreEqual(InterruptHitLightOrigin.CasterWeapon, director.TierProfile(InterruptPresentationTier.Dash).hitLightOrigin);
+    }
+
+    [Test]
+    public void 무기_기준점은_소켓_위치에_로컬_오프셋()
+    {
+        var go = new GameObject("Player");
+        _objects.Add(go);
+        var socket = new GameObject("R_WeaponSocket").transform;
+        socket.SetParent(go.transform, false);
+        socket.position = WeaponPoint;
+        var anchor = go.AddComponent<PlayerWeaponAnchor>();
+        Assert.IsFalse(anchor.TryGetRightWeaponPoint(out _), "칸 비면 없음");
+
+        var so = new SerializedObject(anchor);
+        so.FindProperty("rightWeapon").objectReferenceValue = socket;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Assert.IsTrue(anchor.TryGetRightWeaponPoint(out Vector3 point));
+        Assert.AreEqual(WeaponPoint, point);
+
+        so.FindProperty("localOffset").vector3Value = Vector3.up;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        anchor.TryGetRightWeaponPoint(out point);
+        Assert.AreEqual(WeaponPoint + Vector3.up, point);
+    }
+
+    [TestCase("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab", "R_WeaponSocket")]
+    [TestCase("Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab", "LaserGun")]
+    [TestCase("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab", "Dagger_Weapon_R")]
+    public void 캐릭터_Variant_루트에_오른손_무기_기준점(string path, string weapon)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.IsNotNull(prefab, path);
+        var anchor = prefab.GetComponent<PlayerWeaponAnchor>();
+        Assert.IsNotNull(anchor, "Variant 루트 PlayerWeaponAnchor");
+        Assert.IsNotNull(anchor.RightWeapon);
+        Assert.AreEqual(weapon, anchor.RightWeapon.name);
+        Assert.IsTrue(anchor.RightWeapon.IsChildOf(prefab.transform.Find("Armature")), "애니메이션으로 움직이는 Armature 안 본");
+    }
+
     // ---- 단계 6 — V2 화이트아웃 ----
 
     private sealed class FakeOverlay : IInterruptHitFlashOverlayOutput

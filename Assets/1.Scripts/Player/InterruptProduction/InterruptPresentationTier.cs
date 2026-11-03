@@ -49,6 +49,15 @@ public enum InterruptDarkAdaptMode : byte
     SceneLight = 1,
 }
 
+/// <summary>V1·V2 월드 이펙트(라이트·불꽃·파편·빛줄기) 발생 위치(할 일 194 후속). 화면 섬광·화이트아웃·제압 섬광 기준점은 늘 대상이다.</summary>
+public enum InterruptHitLightOrigin : byte
+{
+    /// <summary>기본 — 시전자 오른손 무기(<see cref="PlayerWeaponAnchor"/>). 못 찾으면 대상 적중점.</summary>
+    CasterWeapon = 0,
+    /// <summary>대상 적중점(대상 위치 + 높이) — 194 처음 방식.</summary>
+    Target = 1,
+}
+
 /// <summary>이번 성공에서 실제로 트는 섬광(할 일 194) — 단계 설정 + 칸·데이터 유무로 <see cref="InterruptPresentationTierRules.SelectSuccessLook"/> 가 고른다.</summary>
 public enum InterruptSuccessLook : byte
 {
@@ -74,6 +83,8 @@ public sealed class InterruptTierProfile
     public InterruptTierFlash flash = InterruptTierFlash.HitFlash;
     [Tooltip("V1·V2 의 암순응 방식(할 일 194 Q9) — 가 = 화면 패스(어두운 픽셀만) / 나 = 태양광·환경광 낮춤. V0·시퀀스에는 쓰지 않는다")]
     public InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass;
+    [Tooltip("V1·V2 월드 이펙트 발생 위치(할 일 194 후속) — 시전자 오른손 무기(못 찾으면 대상) / 대상 적중점. 성공 순간 위치에 남고 따라다니지 않는다")]
+    public InterruptHitLightOrigin hitLightOrigin = InterruptHitLightOrigin.CasterWeapon;
 
     public InterruptTierProfile() { }
 

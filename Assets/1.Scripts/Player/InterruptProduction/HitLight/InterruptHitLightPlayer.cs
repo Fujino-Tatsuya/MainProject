@@ -5,8 +5,12 @@ using UnityEngine.Rendering;
 /// <summary>적중 라이트 연출 한 번의 요청(할 일 194) — 디렉터가 성공 사건에서 만든다.</summary>
 public struct InterruptHitLightRequest
 {
-    /// <summary>섬광 중심(대상 위치 + 높이).</summary>
+    /// <summary>섬광 중심(대상 위치 + 높이) — 화이트아웃 기준·월드 이펙트 대체 위치.</summary>
     public Vector3 Point;
+    /// <summary>시전자(간파한 플레이어) — 월드 이펙트를 그 오른손 무기에서 낼 때 찾는다(194 후속).</summary>
+    public ulong CasterClientId;
+    /// <summary>월드 이펙트 발생 위치 — 시전자 오른손 무기(기본) / 대상.</summary>
+    public InterruptHitLightOrigin Origin;
     /// <summary>이 화면이 발동자 본인인가.</summary>
     public bool ViewerIsCaster;
     public InterruptSuccessLook Look;
@@ -16,7 +20,7 @@ public struct InterruptHitLightRequest
 /// <summary>
 /// 적중 라이트 연출 진행기(V1·V2, 할 일 194) — 성공 순간 시작해 매 프레임 실시간으로 진행한다(Q8). 값은 들지 않고 <see cref="InterruptHitLightLook"/> 을 프레임마다 읽는다.
 /// <list type="bullet">
-/// <item>월드 이펙트(<see cref="InterruptHitLightFx"/> — 라이트·불꽃·파편·빛줄기): 모든 피어. 시작 순간 한 번 튼다.</item>
+/// <item>월드 이펙트(<see cref="InterruptHitLightFx"/> — 라이트·불꽃·파편·빛줄기): 모든 피어. 시작 순간 한 번 튼다 — 위치 = 그 순간 시전자 오른손 무기(못 찾으면 대상), 따라다니지 않는다.</item>
 /// <item>블룸: 이 출력 소유의 전역 Volume(우선순위 <see cref="InterruptHitFlashOverlay.VolumePriority"/>) 가중치만 곡선대로 — 모든 피어.</item>
 /// <item>암순응 가(화면 패스): 기존 <see cref="InterruptDarkAdaptation"/> 에 프레임마다 어둡힘을 넣는다(본인 화면 강·팀원 화면 약, Q9).</item>
 /// <item>암순응 나(씬 조명): <see cref="SceneLightDim"/> 에 태양광·환경광 배율을 넣는다 — 23호 차징의 태양광 끄기와 배율 곱이라 복구 순서가 꼬이지 않는다.</item>
@@ -31,6 +35,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
     private readonly Func<ISuppressDarkAdaptOutput> _darkAdapt;
     private readonly SceneLightDim _sceneDim;
     private readonly IInterruptHitFlashOverlayOutput _whiteout;
+    private readonly Func<ulong, Vector3?> _casterWeapon;
 
     private GameObject _root;
     private Volume _bloomVolume;
@@ -46,15 +51,21 @@ public sealed class InterruptHitLightPlayer : IDisposable
     /// <param name="darkAdapt">암순응 가 출력(<see cref="InterruptDarkAdaptation"/>). null 이면 가 없음.</param>
     /// <param name="sceneDim">암순응 나 창구. null 이면 나 없음.</param>
     /// <param name="whiteout">V2 화이트아웃 출력(③ 그림만 그리는 적중 섬광 오버레이). null 이면 화이트아웃 없음.</param>
+    /// <param name="casterWeapon">시전자 → 지금 오른손 무기 위치(없으면 null). null 이면 월드 이펙트는 늘 대상 적중점.</param>
     public InterruptHitLightPlayer(Func<InterruptHitLightLook> look, Func<InterruptHitLightFx> fx,
-        Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null)
+        Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
+        Func<ulong, Vector3?> casterWeapon = null)
     {
         _look = look;
         _fx = fx;
         _darkAdapt = darkAdapt;
         _sceneDim = sceneDim;
         _whiteout = whiteout;
+        _casterWeapon = casterWeapon;
     }
+
+    /// <summary>마지막 연출의 월드 이펙트 위치 — 확인용.</summary>
+    public Vector3 FxPoint { get; private set; }
 
     /// <summary>지금 화이트아웃을 그리고 있다 — 확인용.</summary>
     public bool WhiteoutShown => _whiteoutShown;
@@ -77,9 +88,12 @@ public sealed class InterruptHitLightPlayer : IDisposable
         _whiteoutFrames = look != null ? InterruptPresentationTierRules.WhiteoutFrames(request.Look, request.ViewerIsCaster, look.WhiteoutFrames) : 0;
         IsPlaying = true;
 
+        // 무기 위치는 이 순간 한 번만 읽는다 — 이펙트는 월드에 남고 시전자를 따라가지 않는다.
+        Vector3? weapon = request.Origin == InterruptHitLightOrigin.CasterWeapon ? _casterWeapon?.Invoke(request.CasterClientId) : null;
+        FxPoint = InterruptHitLightRules.FxPoint(request.Origin, request.Point, weapon);
         InterruptHitLightFx fx = _fx?.Invoke();
         if (fx != null)
-            fx.Play(request.Point, look);
+            fx.Play(FxPoint, look);
 
         Tick(now, frame);
     }
@@ -270,6 +284,10 @@ public static class InterruptHitLightRules
     /// <summary>암순응 가 최대 어둡힘 — 본인 화면 = self, 팀원 화면 = others(Q9).</summary>
     public static float DarkAdaptPeak(bool viewerIsCaster, float self, float others) =>
         Mathf.Clamp01(viewerIsCaster ? self : others);
+
+    /// <summary>월드 이펙트 위치(194 후속) — 무기 선택이고 무기 위치가 있으면 무기, 아니면(대상 선택·무기 못 찾음) 대상 적중점.</summary>
+    public static Vector3 FxPoint(InterruptHitLightOrigin origin, Vector3 targetPoint, Vector3? weaponPoint) =>
+        origin == InterruptHitLightOrigin.CasterWeapon && weaponPoint.HasValue ? weaponPoint.Value : targetPoint;
 
     /// <summary>암순응 나 배율 — 1 − 낮춤 비율 × 곡선 값. [0, 1].</summary>
     public static float DimFactor(float depth, float envelope) =>

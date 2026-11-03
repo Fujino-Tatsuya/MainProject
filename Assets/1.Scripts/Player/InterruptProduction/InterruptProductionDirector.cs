@@ -390,7 +390,28 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>적중 라이트 연출 진행기(V1·V2) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
     public InterruptHitLightPlayer HitLight => _hitLight ??=
         new InterruptHitLightPlayer(() => hitLightLook, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared,
-            new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)));
+            new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)), FindCasterWeaponPoint);
+
+    // 194 후속 — 시전자 플레이어(이 피어에 스폰된 것)의 Variant 루트 PlayerWeaponAnchor 오른손 무기 위치. 못 찾으면 null(대상으로 대체).
+    // 찾는 방식은 FindLightGatherSocket 과 같다(스폰 목록에서 직접 — 성공은 드물어 매번 찾는다).
+    private Vector3? FindCasterWeaponPoint(ulong casterClientId)
+    {
+        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
+        if (spawnManager == null)
+            return null;
+
+        foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
+        {
+            if (networkObject == null || !networkObject.IsPlayerObject || networkObject.OwnerClientId != casterClientId)
+                continue;
+
+            if (networkObject.TryGetComponent(out PlayerWeaponAnchor anchor) && anchor.TryGetRightWeaponPoint(out Vector3 point))
+                return point;
+            return null;
+        }
+
+        return null;
+    }
 
     private InterruptHitLightFx EnsureHitLightFx()
     {
@@ -980,7 +1001,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     }
 
     // 적중 라이트 연출 시작(할 일 194, 모든 피어) — 성공 순간이 곧 섬광 순간이다: 오너 성공 단계를 끝내고(본인 화면, 암전 없는 단계라 덮개는 이미 0)
-    // 적중 지점에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면).
+    // 시전자 오른손 무기(단계 칸 hitLightOrigin — 못 찾으면 적중 지점)에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면 — 적중 지점 기준).
     private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look)
     {
         if (viewerIsCaster && _ownerPresentation != null)
@@ -990,6 +1011,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         HitLight.Begin(new InterruptHitLightRequest
         {
             Point = FlashPoint(e.TargetPosition),
+            CasterClientId = e.CasterClientId,
+            Origin = profile != null ? profile.hitLightOrigin : InterruptHitLightOrigin.CasterWeapon,
             ViewerIsCaster = viewerIsCaster,
             Look = look,
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,

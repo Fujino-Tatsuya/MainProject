@@ -2447,6 +2447,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1628016293793551911}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7982041418949874856}
     - targetCorrespondingSourceObject: {fileID: 8229189883948102995, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2600760496483148764}
@@ -2854,6 +2857,20 @@ MonoBehaviour:
   shareHealSwirlOffset: {x: 0, y: 0, z: 0}
   shareHealSwirlScale: 1
   shareHealRibbon: {fileID: 11400000, guid: dfb75a2a530b7f14eb9df80679c3c7e0, type: 2}
+--- !u!114 &7982041418949874856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5feab8bea9f7ac4ab279120142da2d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerWeaponAnchor
+  rightWeapon: {fileID: 6590991787825157118}
+  localOffset: {x: 0, y: 0, z: 0}
 --- !u!1001 &5683368051277706446
 PrefabInstance:
   m_ObjectHideFlags: 0

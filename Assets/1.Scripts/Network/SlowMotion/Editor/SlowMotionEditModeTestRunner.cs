@@ -31,6 +31,9 @@ internal static class SlowMotionEditModeTestRunner
         "^InterruptPresentationEffectTests$",      // 연출 켜기/끄기 칸 — 기본 암전만·그리기만 끔·섬광 순간 정상(할 일 132 §17)
         "^DebugInterruptLabTests$",                // 디버그 배속 합성·허수아비 회복·튜닝 패널(할 일 115 C5, 132 §17)
         "^SuppressFlashTests$",                    // 제압 간파 섬광 시간표·컷 전환·섬광 줄이기·서버 표식·Start 플래그·비트 7·에셋(할 일 179)
+        "^InterruptPresentationTierTests$",        // 간파 연출 4단계 선택·버전 선택(할 일 192·194)
+        "^InterruptHitLightTests$",                // 적중 라이트 연출 V1·V2·발생 위치(오른손 무기/대상/대체)·Variant 기준점(할 일 194)
+        "^SceneLightDimTests$",                    // 암순응 나 × 23호 차징 태양광 배율 공유(할 일 194)
     };
 
     const string Tag = "[SlowMotionTests]";
