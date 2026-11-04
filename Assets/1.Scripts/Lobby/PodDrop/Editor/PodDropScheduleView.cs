@@ -187,17 +187,28 @@ public static class PodDropScheduleView
         PodDropMapTimings map = settings.Map;
         PodDropMapTimeline t = settings.CreateMapTimeline();
         var sb = new StringBuilder("맵 — t=0 = 로딩 화면이 걷힌 순간");
-        sb.Append(t.FadeInSeconds > 0f
-            ? $"\n  도착 페이드인     0 ~ {t.FadeInSeconds:0.##}s (검은 화면 → 밝게, {t.FadeInEase}, 다른 단계와 겹침)"
-            : "\n  도착 페이드인     없음 (로딩 화면이 걷히자마자 맵이 보인다)");
-        sb.Append("\n  레터박스          진입 때부터 덮임 → 디졸브 시작에 걷힘");
-        sb.Append($"\n  카메라 지점       착지점 위 {t.HoverHeight + t.CameraStartHeightOffset:0.##}m 고정 → {t.BrakeAt:0.##}s 부터 포드 추적 → 디졸브 끝에 플레이어");
-        sb.Append($"\n  빠른 낙하         {t.FallAt:0.##} ~ {t.BrakeAt:0.##}s ({t.FallHeight:0.##}m → {t.BrakeHeight:0.##}m, {t.FallEase}) — 날개 펴진 채");
-        sb.Append($"\n  급감속            {t.BrakeAt:0.##} ~ {t.HoverAt:0.##}s ({t.BrakeHeight:0.##}m → {t.HoverHeight:0.##}m, {t.BrakeEase}) — 날개 접기·다리 펴기 동시 시작");
+        double deployed;
+        if (t.SkipApproach)
+        {
+            // 할 일 198 — 앞 구간(대기·빠른 낙하·급감속·접기/펴기)을 건너뛰고 접힘 끝 자세·연출 높이에서 시작.
+            deployed = 0d;
+            sb.Append($"\n  앞 구간 건너뛰기  켬 — 0s 에 연출 높이 {t.HoverHeight:0.##}m·날개 접힘/다리 펴짐 끝 자세로 시작 (대기·빠른 낙하·급감속 칸은 안 쓴다)");
+        }
+        else
+        {
+            sb.Append($"\n  카메라 지점       착지점 위 {t.HoverHeight + t.CameraStartHeightOffset:0.##}m 고정 → {t.BrakeAt:0.##}s 부터 포드 추적 → 디졸브 끝에 플레이어");
+            sb.Append($"\n  빠른 낙하         {t.FallAt:0.##} ~ {t.BrakeAt:0.##}s ({t.FallHeight:0.##}m → {t.BrakeHeight:0.##}m, {t.FallEase}) — 날개 펴진 채");
+            sb.Append($"\n  급감속            {t.BrakeAt:0.##} ~ {t.HoverAt:0.##}s ({t.BrakeHeight:0.##}m → {t.HoverHeight:0.##}m, {t.BrakeEase}) — 날개 접기·다리 펴기 동시 시작");
+            float deploy = MaxEvent(map.DeployStates, out string deployText);
+            deployed = t.BrakeAt + deploy;
+            sb.Append($"\n  날개 접기·다리 펴기 {t.BrakeAt:0.##} ~ ≈{deployed:0.##}s ({deployText})");
+        }
 
-        float deploy = MaxEvent(map.DeployStates, out string deployText);
-        double deployed = t.BrakeAt + deploy;
-        sb.Append($"\n  날개 접기·다리 펴기 {t.BrakeAt:0.##} ~ ≈{deployed:0.##}s ({deployText})");
+        double fadeFrom = t.EffectiveDeployedAt(deployed);
+        sb.Append(t.FadeInSeconds > 0f
+            ? $"\n  도착 페이드 인    ≈{fadeFrom:0.##} ~ {fadeFrom + t.FadeInSeconds:0.##}s (그 전 검은 화면 → 접기·펴기 끝부터 밝게, {t.FadeInEase}, 다른 단계와 겹침)"
+            : "\n  도착 페이드 인    없음 (로딩 화면이 걷히자마자 맵이 보인다)");
+        sb.Append("\n  레터박스          진입 때부터 덮임 → 디졸브 시작에 걷힘");
 
         double landStart = t.LandStartAt(deployed);
         double touchdown = t.TouchdownAt(deployed);

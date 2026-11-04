@@ -102,8 +102,8 @@ public struct PodDropMapTimings
     [Header("레터박스 · 카메라 (레터박스는 진입 때 이미 덮여 있다)")]
     [Tooltip("로딩 화면이 걷힌 순간 → 포드 낙하 시작(초)")]
     [Min(0f)] public float holdSeconds;
-    [Tooltip("로딩 화면이 걷힌 순간 검은 화면에서 밝아지기까지(초). 다른 단계와 겹쳐 흐른다(시각을 밀지 않는다). " +
-             "0 = 검은 화면 없이 곧바로 맵이 보인다(로딩 화면 자체는 페이드 없이 한 번에 사라진다)")]
+    [Tooltip("도착 페이드 인(초) — 검은 화면으로 시작해 날개 접기·다리 펴기 끝(이벤트 — 앞 구간 건너뛰기를 켜면 로딩이 걷힌 순간)부터 이 시간 동안 밝아진다(할 일 198). " +
+             "다른 단계와 겹쳐 흐른다(시각을 밀지 않는다). 0 = 검은 화면 없이 곧바로 맵이 보인다(로딩 화면 자체는 페이드 없이 한 번에 사라진다)")]
     [Min(0f)] public float fadeInSeconds;
     [Tooltip("도착 페이드인 이징(진행도 → 밝아진 비율). 기본 Linear = 일정한 속도")]
     public Ease fadeInEase;
@@ -121,6 +121,10 @@ public struct PodDropMapTimings
     public float cameraStartHeightOffset;
 
     [Header("빠른 낙하 → 급감속 (날개 접기·다리 펴기)")]
+    [Tooltip("앞 구간 건너뛰기(할 일 198 — 연출이 길다는 피드백). 켜면 대기·빠른 낙하·급감속·날개 접기/다리 펴기를 건너뛰고, " +
+             "로딩이 걷힌 순간 포드가 연출 높이에서 날개 접힘·다리 펴짐 끝 자세로 시작해 곧바로 페이드 인 → 자유낙하 → 착지 → 해치 → 디졸브. " +
+             "끄면 예전 흐름(아래 칸들이 다시 쓰인다 — 지우지 않고 남겨 둔 칸)")]
+    public bool skipApproach;
     [Tooltip("착지점 기준 낙하 시작 높이(m)")]
     [Min(0f)] public float fallHeight;
     [Tooltip("날개·다리 연출 높이 — 착지점 위(m). 급감속이 끝나는 높이이고, 날개 접기·다리 펴기 끝 이벤트가 아직이면 여기서 기다렸다 자유낙하한다")]
@@ -184,8 +188,9 @@ public struct PodDropMapTimings
 
     public static PodDropMapTimings Default => new PodDropMapTimings
     {
+        skipApproach = true, // 할 일 198 — 앞 구간 건너뛰기 기본 켬
         holdSeconds = 0.3f,
-        fadeInSeconds = 0f,
+        fadeInSeconds = 0.5f, // 할 일 198 — 날개 접기 끝(건너뛰기 켬 = 시작 순간)부터 0.5초
         fadeInEase = Ease.Linear,
         cameraStartDistance = 1.8f,
         cameraEndDistance = 1f,
@@ -424,12 +429,15 @@ public sealed class PodDropLobbyTimeline
 /// 경과 시간은 로딩 화면이 걷힌 시각 기준(음수 = 시작 전 — 로딩 화면 아래). 레터박스는 처음부터 덮여 있다(106 추가 2).
 /// 대기 → 빠른 낙하(날개 펴진 채) → 급감속(날개 접기·다리 펴기 시작) → 연출 높이 도착까지는 시각이 정해져 있고,
 /// 그 뒤는 서버가 받은 클립 이벤트 시각(접기·펴기 끝 <c>deployedAt</c>, 해치 열기 끝 <c>openedAt</c>)을 넣어 계산한다. 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
+/// 앞 구간 건너뛰기(<see cref="SkipApproach"/>, 할 일 198 기본 켬)면 t=0 = 접기·펴기 끝 상태(연출 높이) — 대기·낙하·급감속이 0 이고 도착 페이드 인이 t=0 부터.
 /// 접기·펴기 끝 → 추진력 없는 자유낙하(<see cref="PodDropTimeline.FreefallHeight"/>, 할 일 150) → 착지(해치 열기) → 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·실루엣·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·튜토리얼(<see cref="EndAt"/>).
 /// </summary>
 public sealed class PodDropMapTimeline
 {
+    /// <summary>앞 구간 건너뛰기(할 일 198) — 켜면 대기·빠른 낙하·급감속 길이 0, 낙하·급감속 높이 = 연출 높이, 접기·펴기 끝 = t=0.</summary>
+    public bool SkipApproach { get; }
     public float HoldSeconds { get; }
-    /// <summary>도착 페이드인 길이(초, t=0 시작) — 다른 단계와 겹쳐 흐른다. 0 = 검은 화면 없음.</summary>
+    /// <summary>도착 페이드 인 길이(초, 접기·펴기 끝부터 — 할 일 198) — 다른 단계와 겹쳐 흐른다. 0 = 검은 화면 없음.</summary>
     public float FadeInSeconds { get; }
     public Ease FadeInEase { get; }
     public float CameraStartDistance { get; }
@@ -496,10 +504,22 @@ public sealed class PodDropMapTimeline
         FallAt = HoldSeconds;
         BrakeAt = FallAt + FallSeconds;
         HoverAt = BrakeAt + BrakeSeconds;
+
+        // 앞 구간 건너뛰기(할 일 198) — 시각·높이 표가 날개 접힘 끝 상태(연출 높이, t=0)에서 시작한다. 칸 값은 그대로 두고 여기서만 0 으로 본다.
+        SkipApproach = timings.skipApproach;
+        if (SkipApproach)
+        {
+            HoldSeconds = FallSeconds = BrakeSeconds = 0f;
+            FallHeight = BrakeHeight = HoverHeight;
+            FallAt = BrakeAt = HoverAt = 0f;
+        }
     }
 
-    /// <summary>자유낙하 시작 = 접기·펴기 끝 이벤트와 연출 높이 도착 중 늦은 쪽(속도 0 에서 떨어진다). 이벤트 전이면 +∞.</summary>
-    public double LandStartAt(double deployedAt) => Math.Max(deployedAt, HoverAt);
+    /// <summary>접기·펴기 끝 경과 시각 — 건너뛰기를 켜면 복제 전이어도 t=0(전 피어가 같은 값, 클립은 끝 자세로 시작), 아니면 서버 복제 이벤트 시각 그대로.</summary>
+    public double EffectiveDeployedAt(double deployedAt) => SkipApproach ? Math.Min(deployedAt, 0d) : deployedAt;
+
+    /// <summary>자유낙하 시작 = 접기·펴기 끝 이벤트와 연출 높이 도착 중 늦은 쪽(속도 0 에서 떨어진다). 이벤트 전이면 +∞(건너뛰기 = t=0).</summary>
+    public double LandStartAt(double deployedAt) => Math.Max(EffectiveDeployedAt(deployedAt), HoverAt);
 
     /// <summary>지면에 닿는 시각 = 자유낙하 시작 + √(2h/g). 착지 이펙트·흔들림, 해치 열기 클립 시작. 이벤트 전이면 +∞.</summary>
     public double TouchdownAt(double deployedAt) => LandStartAt(deployedAt) + FreefallSeconds;
@@ -532,11 +552,11 @@ public sealed class PodDropMapTimeline
         1f - Easing.Evaluate(LetterboxOutEase, PodDropTimeline.Progress(elapsed, LetterboxOutAt(openedAt), LetterboxOutSeconds));
 
     /// <summary>
-    /// 도착 페이드인 검은 화면 알파(1 = 완전 암전, 0 = 투명). t=0 전 1(로딩 화면 아래), 페이드인 구간 1 → 0(<see cref="FadeInEase"/>), 그 뒤 0.
-    /// 길이 0 이면 늘 0 — 검은 화면 없이 로딩 화면이 걷히자마자 맵이 보인다.
+    /// 도착 페이드 인 검은 화면 알파(1 = 완전 암전, 0 = 투명, 할 일 198). 접기·펴기 끝(<paramref name="deployedAt"/>, 건너뛰기 = t=0) 전 1(로딩 화면 아래 포함),
+    /// 그로부터 페이드 인 구간 1 → 0(<see cref="FadeInEase"/>), 그 뒤 0. 길이 0 이면 늘 0 — 검은 화면 없이 로딩 화면이 걷히자마자 맵이 보인다.
     /// </summary>
-    public float FadeAlphaAt(double elapsed) =>
-        FadeInSeconds > 0f ? 1f - Easing.Evaluate(FadeInEase, PodDropTimeline.Progress(elapsed, 0f, FadeInSeconds)) : 0f;
+    public float FadeAlphaAt(double elapsed, double deployedAt) =>
+        FadeInSeconds > 0f ? 1f - Easing.Evaluate(FadeInEase, PodDropTimeline.Progress(elapsed, EffectiveDeployedAt(deployedAt), FadeInSeconds)) : 0f;
 
     /// <summary>카메라 거리(평소 거리 배율). 줌 시작 지연까지 시작 거리 → 줌 끝 끝 거리, 그 뒤 유지.</summary>
     public float CameraDistanceAt(double elapsed) =>

@@ -39,13 +39,14 @@ MonoBehaviour:
     hudRescanSeconds: 0.5
   map:
     holdSeconds: 0.3
-    fadeInSeconds: 0
+    fadeInSeconds: 0.5
     fadeInEase: 0
     cameraStartDistance: 1.8
     cameraEndDistance: 1
     cameraZoomDelaySeconds: 0
     cameraZoomSeconds: 2.6
     cameraZoomEase: 3
+    skipApproach: 1
     fallHeight: 30
     fallSeconds: 0.6
     fallEase: 0
