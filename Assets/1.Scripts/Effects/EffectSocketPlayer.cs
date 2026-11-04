@@ -80,6 +80,9 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     /// </summary>
     public void SetScale(float value) => scale = Mathf.Max(0.01f, value);
 
+    /// <summary>지금 배율(저작 값 또는 마지막 <see cref="SetScale"/>). 저작 값에 배수를 곱해 밀어 넣는 호출자가 처음 한 번 읽어 둔다.</summary>
+    public float Scale => scale;
+
     // 런타임 전용 — 저작 값이 아니라 호출자가 밀어 넣는 값이라 직렬화하지 않는다.
     float _playRate = 1f;
 

@@ -2752,6 +2752,7 @@ MonoBehaviour:
   - {fileID: 2395103477256472544}
   - {fileID: 8598537009228163081}
   transformedSlash: {fileID: 3931342188816061101}
+  enhancedSlash: {fileID: 667888552378741637}
   insightWindup: {fileID: 6282029894871603578}
   insightSlash: {fileID: 5827325434796818791}
   insightSuccess: {fileID: 9014081686492225755}
