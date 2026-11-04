@@ -57,18 +57,20 @@ public static class PlayerMotionSweep
         LayerMask obstacleMask,
         float skin,
         int maxIterations,
-        RaycastHit[] buffer)
+        RaycastHit[] buffer,
+        PlayerDashUnitPass unitPass = null)
     {
         if (capsule == null || buffer == null || desiredDelta.sqrMagnitude <= 1e-10f)
             return desiredDelta;
 
         return ResolveCore(capsule, capsule.transform, originOffset, desiredDelta, horizontalStepDelta, isGrounded,
-            stepOffset, maxWalkableAngle, obstacleMask, skin, maxIterations, buffer);
+            stepOffset, maxWalkableAngle, obstacleMask, skin, maxIterations, buffer, unitPass);
     }
 
     /// <summary>
     /// dir 로 distance 만큼 갈 때 가장 먼저 막는 것이 유닛(Enemy 또는 다른 플레이어 몸)인가. 벽·지형이 먼저면 false.
     /// 같은 캡슐·필터(<see cref="TryCast"/>)를 쓰므로 실제 이동 스윕과 판정이 어긋나지 않는다.
+    /// <paramref name="unitPass"/> 가 켜져 있으면(대시 중, 할 일 209) 통과하는 일반 몬스터는 막는 것으로 보지 않는다 — 이동 스윕과 같은 장부.
     /// </summary>
     public static bool IsBlockedByUnitFirst(
         CapsuleCollider capsule,
@@ -78,13 +80,14 @@ public static class PlayerMotionSweep
         float maxWalkableAngle,
         LayerMask obstacleMask,
         float skin,
-        RaycastHit[] buffer)
+        RaycastHit[] buffer,
+        PlayerDashUnitPass unitPass = null)
     {
         if (capsule == null || buffer == null || distance <= 0f || dir.sqrMagnitude <= 1e-8f)
             return false;
 
         if (!TryCast(capsule, capsule.transform, originOffset, dir.normalized, distance, maxWalkableAngle,
-                obstacleMask, skin, buffer, out RaycastHit hit, out _))
+                obstacleMask, skin, buffer, out RaycastHit hit, out _, unitPass))
         {
             return false;
         }
@@ -95,12 +98,14 @@ public static class PlayerMotionSweep
     /// <summary>
     /// 이미 겹친 유닛(Enemy·Player 몸)에서 빠져나갈 수평 관통 벡터의 합. 겹침이 없으면 0.
     /// 길이 제한·벽 스윕은 호출자가 한다(<see cref="PlayerUnitCollisionRules.ComputeSeparationStep"/>).
+    /// 이번 대시에서 이미 통과한 유닛(<paramref name="unitPass"/>, 할 일 209)은 뺀다 — 뚫고 지나가는 중에 옆으로 밀려나지 않게.
     /// </summary>
     public static Vector3 ComputeUnitPenetration(
         CapsuleCollider capsule,
         Vector3 originOffset,
         LayerMask unitMask,
-        Collider[] overlapBuffer)
+        Collider[] overlapBuffer,
+        PlayerDashUnitPass unitPass = null)
     {
         if (capsule == null || overlapBuffer == null || unitMask.value == 0)
             return Vector3.zero;
@@ -118,6 +123,8 @@ public static class PlayerMotionSweep
             if (other == null || other.transform == owner || other.transform.IsChildOf(owner))
                 continue;
             if (IgnoresUnitCollider(other))
+                continue;
+            if (IsDashPassedUnit(other, unitPass))
                 continue;
 
             Transform otherTransform = other.transform;
@@ -244,7 +251,8 @@ public static class PlayerMotionSweep
         LayerMask obstacleMask,
         float skin,
         int maxIterations,
-        RaycastHit[] buffer)
+        RaycastHit[] buffer,
+        PlayerDashUnitPass unitPass)
     {
         Vector3 regularDelta = ResolveMovement(
             capsule,
@@ -255,7 +263,8 @@ public static class PlayerMotionSweep
             obstacleMask,
             skin,
             maxIterations,
-            buffer);
+            buffer,
+            unitPass);
 
         Vector3 planarStepDelta = new Vector3(horizontalStepDelta.x, 0f, horizontalStepDelta.z);
         if (!isGrounded || stepOffset <= 0f || planarStepDelta.sqrMagnitude <= MovementEpsilon * MovementEpsilon)
@@ -274,6 +283,7 @@ public static class PlayerMotionSweep
                 skin,
                 maxIterations,
                 buffer,
+                unitPass,
                 out Vector3 stepDelta))
         {
             return regularDelta;
@@ -292,6 +302,7 @@ public static class PlayerMotionSweep
         float skin,
         int maxIterations,
         RaycastHit[] buffer,
+        PlayerDashUnitPass unitPass,
         bool constrainToHorizontal = false)
     {
         Vector3 accumulated = originOffset;
@@ -307,7 +318,7 @@ public static class PlayerMotionSweep
             Vector3 dir = remaining / dist;
 
             if (TryCast(capsule, owner, accumulated, dir, dist + skin, maxWalkableAngle, obstacleMask, skin, buffer,
-                    out RaycastHit hit, out float hitDistance))
+                    out RaycastHit hit, out float hitDistance, unitPass))
             {
                 bool walkableGround = IsWalkable(hit.normal, maxWalkableAngle);
                 // 지면 스냅/중력은 표면까지 정확히 가야 한다. 벽에는 기존 skin을 유지한다.
@@ -350,6 +361,7 @@ public static class PlayerMotionSweep
         float skin,
         int maxIterations,
         RaycastHit[] buffer,
+        PlayerDashUnitPass unitPass,
         out Vector3 resolvedStepDelta)
     {
         resolvedStepDelta = default;
@@ -369,7 +381,7 @@ public static class PlayerMotionSweep
                 skin,
                 buffer,
                 out RaycastHit blockingHit,
-                out _))
+                out _, unitPass))
         {
             return false;
         }
@@ -389,7 +401,7 @@ public static class PlayerMotionSweep
                 skin,
                 buffer,
                 out _,
-                out _))
+                out _, unitPass))
         {
             return false;
         }
@@ -405,6 +417,7 @@ public static class PlayerMotionSweep
             skin,
             maxIterations,
             buffer,
+            unitPass,
             constrainToHorizontal: true);
 
         Vector3 landingOrigin = raisedOffset + raisedHorizontalDelta;
@@ -419,7 +432,7 @@ public static class PlayerMotionSweep
                 skin,
                 buffer,
                 out RaycastHit landingHit,
-                out float landingDistance))
+                out float landingDistance, unitPass))
         {
             return false;
         }
@@ -447,7 +460,8 @@ public static class PlayerMotionSweep
                 obstacleMask,
                 skin,
                 maxIterations,
-                buffer);
+                buffer,
+                unitPass);
         }
 
         float regularProgress = Vector3.Dot(new Vector3(regularDelta.x, 0f, regularDelta.z), horizontalDirection);
@@ -480,10 +494,13 @@ public static class PlayerMotionSweep
         float skin,
         RaycastHit[] buffer,
         out RaycastHit best,
-        out float hitDistance)
+        out float hitDistance,
+        PlayerDashUnitPass unitPass = null)
     {
         best = default;
         hitDistance = 0f;
+        if (unitPass != null && !unitPass.IsActive)
+            unitPass = null;
 
         Vector3 lossy = owner.lossyScale;
         float radiusScale = Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
@@ -506,30 +523,41 @@ public static class PlayerMotionSweep
         int count = Physics.CapsuleCastNonAlloc(
             p1, p2, radius, dir, buffer, maxDistance + inset, obstacleMask, QueryTriggerInteraction.Ignore);
 
-        float nearest = float.PositiveInfinity;
         bool found = false;
-        for (int i = 0; i < count; i++)
+        // 대시 유닛 관통(할 일 209): 가장 가까운 막는 것이 통과 가능한 일반 몬스터면 장부에 올리고 그다음 가까운 것을 다시 고른다.
+        // 실제로 경로에서 가장 먼저 만난 몬스터만 센다 — 벽 너머 몬스터는 세지 않는다. 장부가 꺼져 있으면 한 번만 돈다.
+        for (int pick = 0; pick <= count; pick++)
         {
-            RaycastHit hit = buffer[i];
-            if (hit.collider == null)
-                continue;
-            if (hit.collider.transform == owner || hit.collider.transform.IsChildOf(owner))
-                continue;
-            if (IgnoresUnitCollider(hit.collider))
-                continue;
-            if (IsEscapingUnitOverlap(hit, capsule, owner, originOffset, dir))
-                continue;
-            // 걸을 수 있는 경사는 접선 이동에는 장애물이 아니지만, 중력/스냅처럼 표면 안쪽으로
-            // 향하는 이동은 막아야 kinematic 바디가 지면을 통과하지 않는다.
-            bool walkableGround = IsWalkable(hit.normal, maxWalkableAngle);
-            if (walkableGround && Vector3.Dot(dir, hit.normal) >= -0.0001f)
-                continue;
-            if (hit.distance < nearest)
+            float nearest = float.PositiveInfinity;
+            found = false;
+            for (int i = 0; i < count; i++)
             {
-                nearest = hit.distance;
-                best = hit;
-                found = true;
+                RaycastHit hit = buffer[i];
+                if (hit.collider == null)
+                    continue;
+                if (hit.collider.transform == owner || hit.collider.transform.IsChildOf(owner))
+                    continue;
+                if (IgnoresUnitCollider(hit.collider))
+                    continue;
+                if (IsDashPassedUnit(hit.collider, unitPass))
+                    continue;
+                if (IsEscapingUnitOverlap(hit, capsule, owner, originOffset, dir))
+                    continue;
+                // 걸을 수 있는 경사는 접선 이동에는 장애물이 아니지만, 중력/스냅처럼 표면 안쪽으로
+                // 향하는 이동은 막아야 kinematic 바디가 지면을 통과하지 않는다.
+                bool walkableGround = IsWalkable(hit.normal, maxWalkableAngle);
+                if (walkableGround && Vector3.Dot(dir, hit.normal) >= -0.0001f)
+                    continue;
+                if (hit.distance < nearest)
+                {
+                    nearest = hit.distance;
+                    best = hit;
+                    found = true;
+                }
             }
+
+            if (!found || !TryPassDashUnit(best.collider, unitPass))
+                break;
         }
 
         // 인셋 보정을 되돌려 원래 반경 기준 거리로 환산한다 → 호출부의 정지 지점(hit - skin)이 종전과 같다.
@@ -570,6 +598,41 @@ public static class PlayerMotionSweep
         if (s_playerLayer < 0 || collider.gameObject.layer != s_playerLayer)
             return false;
         return !collider.TryGetComponent(out PlayerMotor otherMotor) || !otherMotor.BlocksOtherUnits;
+    }
+
+    // ── 대시 유닛 관통(할 일 209) ──
+    // Enemy 레이어 콜라이더만 대상이다. 같은 몬스터의 콜라이더는 몬스터(MonsterBase) 하나로 센다 — 몬스터가 아닌 Enemy 몸은 콜라이더 단위(어차피 통과 불가).
+    // 통과 가능 = 일반 등급 몬스터(PlayerUnitCollisionRules.IsDashPassableUnit). 다른 플레이어 몸(Player 레이어)은 대상 밖 — 지금처럼 막는다.
+
+    private static bool IsDashPassedUnit(Collider collider, PlayerDashUnitPass unitPass)
+    {
+        if (unitPass == null || !unitPass.IsActive || unitPass.PassedCount == 0 || !IsEnemyLayer(collider.gameObject.layer))
+            return false;
+
+        ResolveDashUnit(collider, out int unitId, out _);
+        return unitPass.IsPassed(unitId);
+    }
+
+    private static bool TryPassDashUnit(Collider collider, PlayerDashUnitPass unitPass)
+    {
+        if (unitPass == null || !unitPass.IsActive || collider == null || !IsEnemyLayer(collider.gameObject.layer))
+            return false;
+
+        ResolveDashUnit(collider, out int unitId, out bool passable);
+        return unitPass.TryPass(unitId, passable);
+    }
+
+    private static void ResolveDashUnit(Collider collider, out int unitId, out bool passable)
+    {
+        MonsterBase monster = collider.GetComponentInParent<MonsterBase>();
+        unitId = monster != null ? monster.GetInstanceID() : collider.GetInstanceID();
+        passable = PlayerUnitCollisionRules.IsDashPassableUnit(monster != null, monster != null ? monster.Rank : MonsterRank.Normal);
+    }
+
+    private static bool IsEnemyLayer(int layer)
+    {
+        CacheUnitLayers();
+        return s_enemyLayer >= 0 && layer == s_enemyLayer;
     }
 
     private static bool IsEscapingUnitOverlap(RaycastHit hit, CapsuleCollider capsule, Transform owner,

@@ -16,6 +16,18 @@ public static class PlayerUnitCollisionRules
     /// <summary>대시 이동이 이만큼(m) 이상 깎였을 때만 "막혔다" 로 본다.</summary>
     public const float DashBlockedTolerance = 0.0005f;
 
+    /// <summary>
+    /// 일반 대시가 뚫고 지나가는 일반 몬스터 수(할 일 209, 전 캐릭터 공통). 이 수만큼 통과하고 그다음 일반 몬스터에서 멈춘다.
+    /// 보스·중간보스는 0번째부터 막는다(<see cref="IsDashPassableUnit"/>). xlsx 칸 없음 — 코드 상수가 원본.
+    /// </summary>
+    public const int DashSmallMonsterPassLimit = 2;
+
+    /// <summary>
+    /// 일반 대시가 통과할 수 있는 유닛인가(할 일 209) — 몬스터(<c>MonsterBase</c>)이고 등급이 일반일 때만.
+    /// 중간보스·보스·몬스터가 아닌 Enemy 레이어 몸(파일런·허수아비 등)·다른 플레이어는 지금처럼 막는다.
+    /// </summary>
+    public static bool IsDashPassableUnit(bool isMonster, MonsterRank rank) => isMonster && rank == MonsterRank.Normal;
+
     public static int ResolveObstacleMask(
         int baseMask,
         int playerBit,
@@ -170,5 +182,74 @@ public static class PlayerUnitCollisionRules
             return false;
 
         return appliedPlanar < requestedPlanar - DashBlockedTolerance;
+    }
+}
+
+/// <summary>
+/// 대시 한 번의 유닛 관통 장부(할 일 209) — 이번 대시에서 통과한 유닛 id 와 남은 통과 수. 물리·씬에 의존하지 않는다.
+/// <see cref="PlayerMotor"/> 가 대시 상태 동안 켜 두고 이동 스윕(<see cref="PlayerMotionSweep"/>)이 읽는다.
+/// 시뮬레이션하는 피어가 각자 로컬로 들고 복제하지 않는다(<see cref="PlayerMotor.PassThroughUnitsOverride"/> 와 같은 방식).
+/// </summary>
+public sealed class PlayerDashUnitPass
+{
+    private readonly System.Collections.Generic.HashSet<int> passed = new System.Collections.Generic.HashSet<int>();
+
+    /// <summary>대시 중이라 관통 규칙이 켜져 있다.</summary>
+    public bool IsActive { get; private set; }
+    /// <summary>이번 대시에서 통과할 수 있는 최대 유닛 수.</summary>
+    public int Limit { get; private set; }
+    /// <summary>이번 대시에서 이미 통과한 유닛 수.</summary>
+    public int PassedCount => passed.Count;
+
+    /// <summary>대시 시작 — 장부를 비우고 켠다.</summary>
+    public void Begin(int limit)
+    {
+        passed.Clear();
+        Limit = Mathf.Max(0, limit);
+        IsActive = true;
+    }
+
+    /// <summary>대시 끝 — 장부를 비우고 끈다.</summary>
+    public void End()
+    {
+        passed.Clear();
+        Limit = 0;
+        IsActive = false;
+    }
+
+    /// <summary>이번 대시에서 이미 통과한 유닛인가(그 유닛의 모든 콜라이더를 무시한다).</summary>
+    public bool IsPassed(int unitId) => IsActive && passed.Contains(unitId);
+
+    /// <summary>
+    /// 이동 경로에서 가장 먼저 만난 유닛을 통과할지 정한다. 이미 통과한 유닛이면 참, 통과 불가 유닛·남은 수 0 이면 거짓(막힘).
+    /// 통과하기로 하면 장부에 올린다 — 같은 유닛은 대시 내내 다시 세지 않는다.
+    /// </summary>
+    public bool TryPass(int unitId, bool passable)
+    {
+        if (!IsActive)
+            return false;
+        if (passed.Contains(unitId))
+            return true;
+        if (!passable || passed.Count >= Limit)
+            return false;
+
+        passed.Add(unitId);
+        return true;
+    }
+
+    /// <summary>다른 장부를 그대로 베낀다(대시 경로 예측이 진행 중 대시 장부를 건드리지 않고 이어 굴릴 때).</summary>
+    public void CopyFrom(PlayerDashUnitPass other)
+    {
+        passed.Clear();
+        if (other == null)
+        {
+            IsActive = false;
+            Limit = 0;
+            return;
+        }
+
+        passed.UnionWith(other.passed);
+        Limit = other.Limit;
+        IsActive = other.IsActive;
     }
 }

@@ -89,6 +89,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - **판정 = 오너 클라 1차, 서버 2차 검증**: 오너가 누른 시각 표본으로 `InterruptManager.Predict` → 판정 시각 표본이 쌓이면 `Judge` → 성공이면 신고 1회 → 서버가 같은 `Judge` 를 자기 이력으로 다시 돌려 승인·거부([interrupt-client-judge.md §4·§5](interrupt-client-judge.md#4-오너-판정-흐름)).
 - **판정 시각 = max(실제 대시 끝, 누른 시각 + Hit 지연)**. Hit 지연 = 클립 Hit 이벤트 시각 ÷ 지금 애니 속도.
 - **대시 끝 = 공용 스윕 `PlayerDashPath`** — `PlayerMotor` 의 실제 대시 이동과 같은 충돌 검사라, 벽·유닛에 막히면 막힌 자리에서 판정한다. 예전 '남은 대시 시간 × 속도 직선' 예측의 오발동(막힌 대시에서 강)이 없어졌다.
+  - **일반 몬스터 2마리 관통(할 일 209)**: 일반 대시는 일반 몬스터를 2마리까지 뚫고 지나가고 3번째에서 멈춘다(보스·중간보스·다른 플레이어는 처음부터 막힘). 예측도 같은 관통 장부(`PlayerDashUnitPass`)를 **베껴** 굴리므로 실제 대시와 같은 자리에서 끝난다 — 규칙 원본 [handoff-unit-collision.md §대시 관통](handoff-unit-collision.md#대시-관통--일반-몬스터-2마리-할-일-209).
 - **시도 슬로우**: 승인 순간 `OnServerStart` → `InterruptManager.TryPredictServerAttempt`(같은 `Predict`, 서버 이력·서버 창 시간표) → `ServerAttempt(예측 3상태)`. 한 번 정한 강·약은 대시 중 다시 보지 않는다.
 - **오너 연출**: 매니저 시도 cue(누른 순간 예측) → 판정 cue(성공/실패) — [interrupt-presentation.md §0.2](interrupt-presentation.md#02-흐름).
 - 대상 = 판정 앵커를 공격 방향(대쉬 = 대시 방향)으로 돌려 판정 위치에 놓은 형상에 닿는 등록 대상 + 대상 정면 허용각(`InterruptTargetGeometry.FacesAttacker` — 기존 판정값, 정면 판정 없으면 180).
@@ -129,7 +130,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 
 ## 7. 엣지 케이스
 
-- 유닛에 막혀 조기 종료 → 그 시점이 대시 끝 → 바로 Skill 전이, Hit 보류면 즉시 판정.
+- 유닛에 막혀 조기 종료 → 그 시점이 대시 끝 → 바로 Skill 전이, Hit 보류면 즉시 판정. 막는 유닛 = 관통 수(2)를 넘긴 일반 몬스터·보스·중간보스·다른 플레이어(할 일 209 — 통과 중인 일반 몬스터는 대시를 끝내지 않는다).
 - 대시 중 넉백·그랩·사망·CC·서버 취소(`EndDash`) → `PlayerDashState.Exit` 가 인수인계가 아니면 `HandleDashInterruptAborted`: 간파 `OnEnd(ForcedExitReason(다음 상태))`, 상체 레이어 취소, 서버면 `EndSkillClientRpc`. 쿨은 이미 소모(일반 간파 강제 종료와 같음, 환불 없음).
 - 대시에 실린 채 스킬이 먼저 끝남(`EndActiveSkillServer`, 데이터 누락 등) → 대시에서 내리고 상체 레이어만 취소, 0층(대시 포즈)은 되돌리지 않는다.
 - 서버 대시가 먼저 끝났는데 요청이 늦게 도착 → 서버 FSM 이 Dash 가 아니라 거부(`StateOrEffect`), 오너는 요청 대기 해제·피드백 없음, 대시는 정상 종료 → 일반 흐름.
@@ -141,6 +142,7 @@ Idle/Move ──Space──▶ Dash(대시 시작)
 - 원격 오너에서 `PlaySkillClientRpc` 가 오너 대시 끝 뒤에 오면 오너는 일반 Skill 로 0층 전신 클립을 처음부터 튼다 — 서버 판정 시각과 화면 클립 시각이 어긋날 수 있다.
 - ~~시도 예측 오프셋은 남은 대시 시간 기준 직선 이동~~ — 할 일 191 에서 공용 스윕(`PlayerDashPath`)으로 바뀌어 막힌 대시도 실제 끝을 쓴다.
 - 서버 검증의 시전자 위치는 오너 복제 이력이라 보간 지연만큼 늦다 — 대쉬 간파 끝에서 거부가 늘 수 있다(시각 여유 안에서만 따라잡음, [interrupt-client-judge.md §12](interrupt-client-judge.md#12-알려진-한계)).
+- **관통 장부는 서버가 모른다(할 일 209).** 오너 권위 이동에서 서버는 원격 플레이어 이동을 시뮬레이션하지 않아 장부가 비어 있다 — 서버의 대시 끝 예측은 누른 자리부터 2마리를 새로 센다. 누르기 전에 이미 1마리 이상 뚫었으면 서버 예측이 오너보다 한 마리 더 지나갈 수 있다(간파 신고 위치 허용 오차 안에서만 승인).
 - `PlayerDashData.dashInterruptBlend` 의 툴팁은 "Dodge → 간파 준비 클립 크로스페이드" 라고 적혀 있지만 실제 용도는 **상체 레이어 가중치 전환 시간 + 인수인계 0층 CrossFade 시간**이다(§6).
 - 이벤트 중복·레이어 블렌드 모양·관찰자 화면은 Play/MPPM 확인 전이다.
 

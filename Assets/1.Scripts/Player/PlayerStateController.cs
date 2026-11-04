@@ -1568,7 +1568,11 @@ public sealed class PlayerDashState : PlayerStateBase
         PlayerGroundingSensor sensor = Context.GroundingSensor;
         wasGrounded = sensor != null && sensor.IsGrounded;
         if (Context.Motor != null)
+        {
+            // 일반 몬스터는 정해진 수까지 뚫고 지나간다 — 그다음 일반 몬스터·보스·중간보스·다른 플레이어에서 멈춘다(할 일 209).
+            Context.Motor.BeginDashUnitPass(PlayerUnitCollisionRules.DashSmallMonsterPassLimit);
             Context.Motor.MovementResolved += OnMotorMovementResolved;
+        }
 
         Edit.Log(
             $"[Dash] 상태 진입 — 이전상태={previousState} 방향=({direction.x:F2}, {direction.z:F2}) " +
@@ -1740,6 +1744,8 @@ public sealed class PlayerDashState : PlayerStateBase
     public override void Exit(PlayerActionState nextState)
     {
         Context.Motor?.ClearDashMotion();
+        int passedUnits = Context.Motor != null ? Context.Motor.DashPassedUnitCount : 0;
+        Context.Motor?.EndDashUnitPass();
         if (Context.Motor != null)
             Context.Motor.MovementResolved -= OnMotorMovementResolved;
         // 대쉬 간파 인수인계면 0층은 곧 간파 상태가 이어받는다 — Dodge 끝 포즈로 덮지 않는다(할 일 115).
@@ -1769,7 +1775,7 @@ public sealed class PlayerDashState : PlayerStateBase
             $"[Dash] 종료: {verdict}{interruptedBy} | 다음상태={nextState} " +
             $"경과={elapsed:F3}s/{duration:F3}s tick={tickCount}회 " +
             $"요청이동={requestedDistance:F2}m 적용이동={appliedDistance:F2}m 실제이동={actualPlanarDistance:F2}m " +
-            $"막힌tick={blockedTickCount} 접지상실={lostGroundingDuringDash}";
+            $"막힌tick={blockedTickCount} 접지상실={lostGroundingDuringDash} 관통유닛={passedUnits}";
 
         if (expired)
             Edit.Log(body, Context.Player);
@@ -1825,7 +1831,8 @@ public sealed class PlayerDashState : PlayerStateBase
         requestedDistance += requested;
         appliedDistance += applied;
 
-        // 유닛(몬스터·다른 플레이어)은 대시로 통과하지 못한다 — 막힌 틱에 바로 대시를 끝내 직전에 멈춘다(기획 10-11).
+        // 막는 유닛(정해진 수를 넘긴 일반 몬스터·보스·중간보스·다른 플레이어)에 막힌 틱에 바로 대시를 끝내 직전에 멈춘다(기획 10-11 · 할 일 209).
+        // 통과 중인 일반 몬스터는 이동 스윕과 아래 검사가 같은 관통 장부로 무시하므로 여기 걸리지 않는다.
         // 벽·지형은 아래처럼 종전대로 종료시각까지 상태를 유지한다.
         if (Context.Motor != null &&
             PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(
