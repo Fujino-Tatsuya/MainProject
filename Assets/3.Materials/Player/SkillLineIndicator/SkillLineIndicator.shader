@@ -21,6 +21,10 @@ Shader "VeyTrace/Player/Skill Line Indicator"
         _WorldSize ("World Size", Vector) = (1, 1, 0, 0)
         [Toggle] _Arrow ("Arrow", Float) = 0
         _ArrowReferenceAlpha ("Arrow Full Visibility Alpha", Range(0.01, 1)) = 0.42
+        _LineFadeT ("Length Fade Points t (x, y, z)", Vector) = (0.5, 0.75, 0.9, 0)
+        _LineFadeAlpha ("Length Fade Alpha (x, y, z at points / w at far end)", Vector) = (0.9, 0.7, 0.5, 0.4)
+        [HideInInspector] _LineFadeOn ("Length Fade On (runtime)", Float) = 0
+        _DecalFade ("Distance Fade (att0, att1, att2)", Vector) = (1, 0, 0, 0)
     }
     SubShader
     {
@@ -38,7 +42,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
             #pragma fragment Frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             struct Attributes { float4 positionOS:POSITION; float2 uv:TEXCOORD0; };
-            struct Varyings { float4 positionHCS:SV_POSITION; float2 uv:TEXCOORD0; };
+            struct Varyings { float4 positionHCS:SV_POSITION; float2 uv:TEXCOORD0; float3 positionWS:TEXCOORD1; };
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
                 half4 _OutlineColor;
@@ -59,13 +63,32 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float4 _WorldSize;
                 half _Arrow;
                 half _ArrowReferenceAlpha;
+                float4 _LineFadeT;
+                half4 _LineFadeAlpha;
+                half _LineFadeOn;
+                float4 _DecalFade;
             CBUFFER_END
+            #include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
             Varyings Vert(Attributes input)
             {
                 Varyings output;
                 output.positionHCS=TransformObjectToHClip(input.positionOS.xyz);
                 output.uv=input.uv;
+                output.positionWS=TransformObjectToWorld(input.positionOS.xyz);
                 return output;
+            }
+            // 202: length-ratio fade (t = uv.y, caster end 0 -> far end 1). Piecewise linear through
+            // (0,1) (p.x,a.x) (p.y,a.y) (p.z,a.z) (1,a.w). C# mirror = SkillLineLengthFade.Evaluate.
+            float LineLengthFade(float t,float3 p,float4 a)
+            {
+                t=saturate(t);
+                float p1=saturate(p.x);
+                float p2=max(saturate(p.y),p1);
+                float p3=max(saturate(p.z),p2);
+                if(t<=p1)return lerp(1.0,a.x,t/max(p1,0.0001));
+                if(t<=p2)return lerp(a.x,a.y,(t-p1)/max(p2-p1,0.0001));
+                if(t<=p3)return lerp(a.y,a.z,(t-p2)/max(p3-p2,0.0001));
+                return lerp(a.z,a.w,(t-p3)/max(1.0-p3,0.0001));
             }
             float SegmentDistance(float2 p,float2 a,float2 b)
             {
@@ -181,7 +204,9 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float endDistance=(1.0-input.uv.y)*size.y;
                 half endBar=(1.0h-smoothstep(outerWidth-aa,outerWidth+aa,endDistance))*(1.0h-smoothstep(size.x*0.435,size.x*0.445,abs(samplePos.x)));
                 Over(result,_EndColor.rgb,endBar*_EndColor.a*rangeVisibility);
-                return half4(result.rgb/max(result.a,0.0001h),result.a*inside*_Color.a);
+                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(input.uv.y,_LineFadeT.xyz,_LineFadeAlpha)),saturate(_LineFadeOn));
+                half distanceFade=(half)DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz);
+                return half4(result.rgb/max(result.a,0.0001h),result.a*inside*_Color.a*lengthFade*distanceFade);
             }
             ENDHLSL
         }

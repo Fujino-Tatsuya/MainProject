@@ -37,6 +37,7 @@ Material:
     - _MarkerStart: 2.6
     - _FillOpacity: 0.232
     - _ReferenceAlpha: 0.28
+    - _LineFadeOn: 0
     m_Colors:
     - _OutlineColor: {r: 0.9882353, g: 0.9882353, b: 0.9882353, a: 0.95}
     - _InnerColor: {r: 0.5921569, g: 0.7882353, b: 0.7019608, a: 1}
@@ -44,5 +45,8 @@ Material:
     - _EndColor: {r: 0.9529412, g: 0.9568627, b: 0.8745098, a: 0.94}
     - _Color: {r: 0.7529412, g: 0.9607843, b: 0.8705882, a: 1}
     - _WorldSize: {r: 1, g: 1, b: 0, a: 0}
+    - _LineFadeT: {r: 0.5, g: 0.75, b: 0.9, a: 0}
+    - _LineFadeAlpha: {r: 0.9, g: 0.7, b: 0.5, a: 0.4}
+    - _DecalFade: {r: 1, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

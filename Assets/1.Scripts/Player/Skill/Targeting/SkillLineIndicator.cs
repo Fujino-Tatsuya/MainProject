@@ -8,6 +8,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
 {
     private static readonly int AlphaId = Shader.PropertyToID("_Alpha");
     private static readonly int WorldSizeId = Shader.PropertyToID("_WorldSize");
+    private static readonly int LengthFadeOnId = Shader.PropertyToID(SkillLineLengthFade.EnabledProperty);
 
     [Header("Quad 층")]
     [SerializeField] private Transform fillQuad;
@@ -87,7 +88,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
         SetRendererVisible(ghostRenderer, false);
         SetRendererVisible(arrowRenderer, false);
         DrawSegment(fillQuad, fillRenderer, origin, FlattenDirection(direction),
-            new SkillPreviewSegment(startOffset, length, width), fillAlpha, 0.004f);
+            new SkillPreviewSegment(startOffset, length, width), fillAlpha, 0.004f, lengthFade: true);
     }
 
     public void HideCharge()
@@ -148,7 +149,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
         Vector3 direction,
         SkillPreviewSegment segment,
         float alpha,
-        float layerOffset)
+        float layerOffset,
+        bool lengthFade = false)
     {
         if (quad == null || targetRenderer == null || !segment.IsVisible)
         {
@@ -168,6 +170,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
         propertyBlock.Clear();
         propertyBlock.SetFloat(AlphaId, alpha);
         propertyBlock.SetVector(WorldSizeId, new Vector4(segment.Width, segment.Length, 0f, 0f));
+        // 202: 차지(거너 Q 충전 레이저) 사각형만 길이 비율로 옅어진다. 점 값은 머티리얼 칸(SkillLineLengthFade).
+        propertyBlock.SetFloat(LengthFadeOnId, lengthFade ? 1f : 0f);
         targetRenderer.SetPropertyBlock(propertyBlock);
         SetRendererVisible(targetRenderer, true);
     }

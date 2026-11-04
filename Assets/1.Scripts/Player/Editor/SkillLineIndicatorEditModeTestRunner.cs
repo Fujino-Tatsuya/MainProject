@@ -19,7 +19,8 @@ internal static class SkillLineIndicatorEditModeTestRunner
         "^SkillPreviewShapeTests",
         "^PlayerMotionSweepStepTests",
         "^PlayerMovementSimulationTests",
-        "^GroundPointTargetingTests"
+        "^GroundPointTargetingTests",
+        "^SkillLineLengthFadeTests"
     };
 
     const string Tag = "[SkillLineIndicatorTests]";
