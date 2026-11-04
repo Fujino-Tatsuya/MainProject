@@ -192,6 +192,20 @@
 - `selectCamera` = 씬 `CharacterSelectStation/CharacterSelectCamera`(Priority 0 유지). 그 오브젝트의 Transform·렌즈 값은 열 때 덮어써져 의미 없다. 비우면 카메라 전환 없음(프리팹 원본은 비어 있고 씬 인스턴스가 덮어씀).
 - 다른 연출(`EnterCinematic`)이 열린 동안 카메라를 이어받으면, 닫을 때 `ExitCinematic` 이 무시돼 그 연출을 끊지 않는다.
 
+### 카메라 바라보기(할 일 199)
+- 열린 동안 내 캐릭터(추적 대상의 `PlayerMovement`, 오너만)가 선택 vcam 쪽 수평 방향(= 선택 FollowOffset 의 XZ)을 바라본다.
+- 경로 = `PlayerMovement.AcquireFacingLockSmooth`(기존 바라보기 잠금 `PlayerFacingLock` + `TurnToward` 와 같은 Update 회전). 잠금 동안 이동 시뮬레이션 회전이 막혀 덮어쓰지 않고, 입력은 패널 `UiModalBlocker` 가 막는다. 다른 피어는 기존 Armature NetworkTransform 으로 본다(새 RPC·NetworkVariable 없음).
+- 추적 대상이 바뀌면(캐릭터 교체 재스폰) 새 캐릭터에 다시 건다. 닫으면 잠금만 풀고 방향은 그대로(되돌리지 않음).
+- 칸 = `Camera (할 일 199)` > `faceCamera`(기본 켬)·`faceCameraTurnSpeed`(도/초, 기본 540, 0 = 즉시).
+
+### HUD·안내 숨김(할 일 199)
+- 열린 동안 숨기고 닫으면(파괴 포함) 숨기기 전 값으로 되돌린다 — `CharacterSelectHudHider`. 0.5초마다 다시 찾아 새로 생긴 HUD(재스폰)도 숨긴다. 표시만 바꾸고 튜토리얼 판정·서버 상태는 안 건드린다.
+- 화면 UI = 대상에 `CanvasGroup`(alpha 0·클릭 통과)를 얹는다(없으면 붙였다가 닫을 때 뗀다, 있으면 값 복원). SetActive·`Canvas.enabled` 는 그쪽 스크립트가 직접 쓰므로(AssassinHUD·GunnerHeatGauge·뷰의 root) 피한다.
+  - 최상위 캔버스째: `CombatHUD`·`AssassinHUD`·`GunnerHeatGauge`·`LobbyTutorialUI`(목표·대사)·`TutorialGuideUI`(목표·자막·강조). 패널을 품은 캔버스(로비 공용 `Canvas`)는 통째로 숨기지 않는다.
+  - 로비 공용 캔버스 안 안내 뷰는 자기 오브젝트만: `PartyGatherStatusView`(집결 n/m)·`LobbyWeaponCheckView`(무기 점검)·`LobbyTrainingCombatView`(일반 전투).
+- 월드 표식 = 렌더러 `forceRenderingOff`(`PlayerEncounterLock` 과 같은 방식, 원래 꺼져 있던 것은 기록 안 함): `LobbyFloorArrowPath`(튜토리얼 경로·옛 안내 경로)·`LobbyFloorArrowStrip`·`LobbyTutorialWallTarget`(벽 표식)·`LobbyGatherZoneBorders`(집결 테두리).
+- 숨기지 않는 것: 상호작용 문구(`InteractPrompt`)·플레이어 슬롯·지난 결과 버튼·결과 패널·게임 메뉴·머리 위 체력바(월드). 칸 = `Hide HUD (할 일 199)` > `hideHudWhileOpen`(기본 켬).
+
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |
 |---|---|

@@ -100,6 +100,15 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [SerializeField, Min(0f)] private float cameraEnterBlendSeconds = 0.5f;
     [Tooltip("닫을 때 선택 vcam → 게임 카메라 블렌드 시간(초). 0 = 컷.")]
     [SerializeField, Min(0f)] private float cameraExitBlendSeconds = 0.5f;
+    [Tooltip("열린 동안 내 캐릭터가 선택 카메라 쪽(수평)을 바라본다. 닫으면 평소 조작으로 돌아간다(원래 방향으로 되돌리지 않음).")]
+    [SerializeField] private bool faceCamera = true;
+    [Tooltip("카메라 쪽으로 도는 속도(도/초). 0 = 즉시.")]
+    [SerializeField, Min(0f)] private float faceCameraTurnSpeed = 540f;
+
+    // 할 일 199 — 열린 동안 전투 HUD·튜토리얼 안내 숨김(로컬 표시만).
+    [Header("Hide HUD (할 일 199)")]
+    [Tooltip("열린 동안 CombatHUD·캐릭터 HUD·로비 튜토리얼 UI·안내 UI·바닥 경로·벽 표식·집결 테두리를 숨기고, 닫으면 원래 상태로 되돌린다.")]
+    [SerializeField] private bool hideHudWhileOpen = true;
 
     private static int s_openCount;
     private static int s_escapeClaimedFrame = -1;
@@ -114,6 +123,11 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     private float _lockedPulseUntil = -1f;
     private int _ringCard = -1; // 테두리를 보여 주는 카드 — 이동 중엔 꺼지는 옛 가운데, 정착하면 새 가운데
     private Func<float> _previewClock;
+    private readonly CharacterSelectHudHider _hudHider = new CharacterSelectHudHider();
+    private Vector3 _selectFollowOffset; // 선택 vcam 의 월드 FollowOffset — 캐릭터가 바라볼 방향(수평 성분)
+    private bool _hasSelectFollowOffset;
+    private PlayerMovement _facingMovement; // 바라보기 잠금을 건 내 캐릭터
+    private Transform _facingSource; // _facingMovement 를 찾은 추적 대상(바뀌면 다시 찾는다)
 
     /// <summary>다른 캐릭터를 골랐다(캐릭터 id = 로스터 index). 곧이어 <see cref="Closed"/>(<see cref="CharacterSelectCloseReason.Chosen"/>).</summary>
     public event Action<int> CharacterChosen;
@@ -192,6 +206,10 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         SyncSelectCameraTarget();
         if (!Rules.IsOpen)
             return;
+
+        if (hideHudWhileOpen && Application.isPlaying)
+            _hudHider.Tick(transform, Time.unscaledTime); // 열린 동안 새로 생긴 HUD 도 주기적으로 다시 숨긴다
+        UpdateFacing();
 
         UpdateLockedPulse();
         UpdateMotion();
@@ -650,6 +668,58 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         if (s_openCount < 0)
             s_openCount = 0;
         ApplySelectCamera(open);
+        ApplyHudHidden(open);
+        if (!open)
+            ReleaseFacing();
+    }
+
+    private void ApplyHudHidden(bool open)
+    {
+        if (!Application.isPlaying)
+            return;
+        if (open && hideHudWhileOpen)
+            _hudHider.Tick(transform, Time.unscaledTime);
+        else
+            _hudHider.Restore(); // 숨긴 것만, 숨기기 전 값으로
+    }
+
+    // 내 캐릭터가 선택 카메라 쪽(수평)을 바라보게 — 오너 로컬에서 PlayerMovement 바라보기 잠금(이동 회전 차단 + 부드러운 회전).
+    // 다른 피어에는 기존 Armature NetworkTransform 동기화로 보인다(새 RPC 없음). 캐릭터가 바뀌면(재스폰) 새 캐릭터에 다시 건다.
+    private void UpdateFacing()
+    {
+        if (!faceCamera || !Application.isPlaying || selectCamera == null)
+            return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        Transform source = switcher != null ? switcher.CurrentFollowTarget : null;
+        if (source != _facingSource || _facingMovement == null)
+        {
+            _facingSource = source;
+            PlayerMovement movement = source != null ? source.GetComponentInParent<PlayerMovement>() : null;
+            Player player = movement != null ? movement.GetComponent<Player>() : null;
+            if (player != null && player.IsSpawned && !player.IsOwner)
+                movement = null; // 관전 대상 등 내 캐릭터가 아니면 돌리지 않는다
+            if (movement != _facingMovement)
+            {
+                ReleaseFacing();
+                _facingSource = source;
+                if (movement != null)
+                {
+                    Vector3 toCamera = _hasSelectFollowOffset
+                        ? _selectFollowOffset
+                        : selectCamera.transform.position - movement.transform.position;
+                    movement.AcquireFacingLockSmooth(this, toCamera, faceCameraTurnSpeed);
+                    _facingMovement = movement;
+                }
+            }
+        }
+    }
+
+    private void ReleaseFacing()
+    {
+        if (_facingMovement != null)
+            _facingMovement.ReleaseFacingLock(this); // 방향은 그대로 두고 평소 조작으로
+        _facingMovement = null;
+        _facingSource = null;
     }
 
     // 열림/닫힘이 바뀌는 곳은 SetCountedOpen 하나(Show·닫기 전부·OnDestroy) — 카메라도 여기서만 바꾼다.
@@ -686,6 +756,8 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         tracker.PositionDamping = damping;
         follow.TrackerSettings = tracker;
         follow.FollowOffset = baseOffset + cameraOffsetDelta;
+        _selectFollowOffset = follow.FollowOffset;
+        _hasSelectFollowOffset = true;
 
         selectCamera.Lens = lens;
         selectCamera.transform.rotation = Quaternion.Euler(baseRotation.eulerAngles + cameraAngleDelta);

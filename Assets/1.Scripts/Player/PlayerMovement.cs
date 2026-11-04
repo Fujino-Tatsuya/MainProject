@@ -229,6 +229,32 @@ public class PlayerMovement : MonoBehaviour
         RotateImmediately(direction);
     }
 
+    /// <summary>
+    /// <see cref="AcquireFacingLock"/> 와 같지만 스냅 대신 <paramref name="turnDegreesPerSecond"/>(도/초)로 돈다 — 회전은 <see cref="TurnToward"/> 와 같은 Update 경로.
+    /// 잠금 동안 이동 시뮬레이션 회전이 막혀(CanRotate) 덮어쓰지 않는다. 원격 화면은 기존 Armature NetworkTransform 으로 받는다(오너만 부를 것).
+    /// 0 이하면 즉시. 같은 원인으로 다시 부르면 방향만 바꾼다(캐릭터 선택 카메라 바라보기 — 할 일 199).
+    /// </summary>
+    public void AcquireFacingLockSmooth(object cause, Vector3 direction, float turnDegreesPerSecond)
+    {
+        facingLock.Acquire(cause);
+        if (armature == null)
+            return;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+        if (turnDegreesPerSecond <= 0f)
+        {
+            RotateImmediately(direction);
+            return;
+        }
+
+        turnSpeed = turnDegreesPerSecond;
+        turnTarget = Quaternion.LookRotation(direction.normalized);
+        isTurning = true;
+        hasRotate = false; // 이동 회전이 진행 중이었어도 여기서 넘겨받는다(Update 가 hasRotate 면 손을 뗀다)
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
+    }
+
     /// <summary>이 원인의 잠금만 푼다. 다른 원인이 남아 있으면 여전히 잠겨 있다.</summary>
     public void ReleaseFacingLock(object cause) => facingLock.Release(cause);
 
