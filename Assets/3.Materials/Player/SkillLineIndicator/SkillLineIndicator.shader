@@ -158,12 +158,31 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float innerWidth=max(0.0,_InnerPixels)*unit;
                 half outer=1.0h-smoothstep(outerWidth-aa,outerWidth+aa,sd);
                 half inner=smoothstep(innerStart-aa,innerStart+aa,sd)*(1.0h-smoothstep(innerStart+innerWidth-aa,innerStart+innerWidth+aa,sd));
-                half face=_MarkerColor.a*lerp(0.55h,1.0h,saturate(uv.y));
+                // 213: with the length fade on (assassin dash arrow) the face ramp (denser toward the tip) would
+                // cancel the fade, so the fade replaces it - same rule as the range rectangle (202).
+                half lengthFadeOn=saturate(_LineFadeOn);
+                half face=_MarkerColor.a*lerp(lerp(0.55h,1.0h,saturate(uv.y)),1.0h,lengthFadeOn);
                 half4 result=half4(_MarkerColor.rgb*face,face);
                 Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
                 Over(result,_InnerColor.rgb,inner*_InnerColor.a);
                 half visibility=saturate(_Alpha/max(_ArrowReferenceAlpha,0.01h));
-                return half4(result.rgb/max(result.a,0.0001h),result.a*shape*visibility*_Color.a);
+                float t=_LineFadeSpan.x+uv.y*_LineFadeSpan.y;
+                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(t)),lengthFadeOn);
+                half3 baseRgb=result.rgb/max(result.a,0.0001h);
+                half baseA=result.a*shape*visibility*_Color.a*lengthFade;
+                // 213: white edge line along the arrow silhouette (own curve), drawn on top.
+                if(_EdgeLineOn>0.5h)
+                {
+                    float edgeWidth=clamp(_EdgeLineWidth,0.0,bodyX);
+                    half edgeMask=edgeWidth>0.0?(1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,sd))*shape:0.0h;
+                    float2 edgeUv=float2(saturate(sd/max(edgeWidth,0.0001)),uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
+                    half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
+                    half edgeA=edgeMask*edgeTex.a*_EdgeLineColor.a*(half)saturate(EdgeLineFade(t));
+                    half outA=edgeA+baseA*(1.0h-edgeA);
+                    half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
+                    return half4(outRgb,outA);
+                }
+                return half4(baseRgb,baseA);
             }
             half4 Frag(Varyings input):SV_Target
             {

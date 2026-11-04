@@ -174,7 +174,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
         {
             Vector3 arrowDirection = forward * shape.ArrowDirection;
             DrawSegment(arrowQuad, arrowRenderer, origin, arrowDirection,
-                new SkillPreviewSegment(0f, shape.ArrowLength, arrowWidth), arrowAlpha, 0.006f);
+                new SkillPreviewSegment(0f, shape.ArrowLength, arrowWidth), arrowAlpha, 0.006f,
+                shape.LengthFade ? WholeSpan : (Vector4?)null);
         }
         else
         {

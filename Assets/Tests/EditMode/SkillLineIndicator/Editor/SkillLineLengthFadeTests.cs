@@ -145,6 +145,47 @@ public sealed class SkillLineLengthFadeTests
         Assert.AreEqual(0f, material.GetFloat(SkillLineLengthFade.EdgeEnabledProperty), Eps);
     }
 
+    // ── 213 어쌔신 대시 일격 화살표 ──────────────────────────────────────
+
+    [Test]
+    public void Arrow_LengthFadeIsOptIn()
+    {
+        Assert.IsFalse(SkillPreviewShapes.Arrow(-1f, 3f, 3f).LengthFade);   // 거너 쿨 백스텝 등 기존 화살표 그대로
+        SkillPreviewShape dash = SkillPreviewShapes.Arrow(1f, 8f, 5f, lengthFade: true);
+        Assert.IsTrue(dash.LengthFade);
+        Assert.IsTrue(dash.HasArrow);
+        Assert.AreEqual(5f, dash.ArrowLength, Eps);                          // 벽에 막힌 거리
+    }
+
+    [Test]
+    public void AssassinDashStrike_IsPreviewSource()
+    {
+        Assert.IsTrue(typeof(ISkillPreviewSource).IsAssignableFrom(typeof(AssassinDashStrikeSkill)));
+    }
+
+    [Test]
+    public void Shader_ArrowUsesLengthCurveAndEdgeLine()
+    {
+        string text = File.ReadAllText(ShaderPath);
+        int arrow = text.IndexOf("half4 ArrowC3(", System.StringComparison.Ordinal);
+        int frag = text.IndexOf("half4 Frag(", System.StringComparison.Ordinal);
+        Assert.That(arrow, Is.GreaterThan(0));
+        string body = text.Substring(arrow, frag - arrow);
+        StringAssert.Contains("LineLengthFade(t)", body);
+        StringAssert.Contains("EdgeLineFade(t)", body);
+        StringAssert.Contains("lerp(lerp(0.55h,1.0h,saturate(uv.y)),1.0h,lengthFadeOn)", body);
+    }
+
+    [Test]
+    public void ArrowMaterial_EdgeTextureIsWhite512()
+    {
+        var material = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/3.Materials/Player/SkillLineIndicator/SkillLineArrow.mat");
+        Assert.IsNotNull(material);
+        Texture edge = material.GetTexture("_EdgeTex");
+        Assert.IsNotNull(edge, "_EdgeTex");
+        Assert.AreEqual("white_512", edge.name);
+    }
+
     [Test]
     public void RangeMaterial_FadeOffByDefault()
     {
