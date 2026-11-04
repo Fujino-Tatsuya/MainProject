@@ -39,6 +39,7 @@ internal static class CombatEditModeTestRunner
         "^CinematicRules", // CinematicRulesTests — 연출 대사 한 줄 나누기·조각 스케줄·샷 타임라인·구도(PLAN-zone4-intro-cinematic)
         "^BossHealthIntroFill", // BossHealthIntroFillTests — 보스 HP바 등장 차오름(1/4 → 최대)
         "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
+        "^TelegraphDistanceFade", // TelegraphDistanceFadeTests — 데칼 거리 감쇠 식·기본값·바닥 섞임 설정(할 일 202)
         "^MonsterSkyStrike", // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
         "^MonsterOverheadHealthBar", // MonsterOverheadHealthBarVisibilityTests — 몬스터 발밑 체력바 표시·부착 판단
         "^MonsterInspectorCatalog", // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
