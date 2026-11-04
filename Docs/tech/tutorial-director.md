@@ -127,6 +127,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   - 프리팹 = 루트 `MapGateLaserView` + `Visual/Posts`(`50.Art/…/Lasers/Env_laser.fbx` — **메시 하나에 양 끝 발사대 둘**이 들어 있다) + `Visual/Beams/Beam`(`Env_laser_lay.fbx` 템플릿, 코드가 줄 수만큼 복제).
     이펙트 담당은 `Visual` 안만 바꾸고 뷰의 칸 두 개(발사대·빔 템플릿)만 다시 연결하면 된다. 조각 루트는 뷰 축(로컬 X = 폭)과 90° 단위로만 돌릴 것.
   - 맞춤 = 메시 bounds 로 잰다(FBX 축·피벗 하드코딩 없음): 발사대·빔의 긴 축 = 폭, 발사대는 바닥에 세움(기본 = FBX 높이 그대로 `keepPostHeight`), 빔 줄 수 = (높이 − 위아래 여유) ÷ 간격 + 1, 상한 칸(연출 전용 인스펙터 칸).
+  - 빔 칸(할 일 204, `MapGateLaser.prefab` 루트 `MapGateLaserView`, 모두 연출 전용·테이블 밖): `maxBeams` 상한 **3**(8 → 3) · `beamSpacing` 줄 사이(m, 기본 0.25 — 묶음 가운데는 그대로 두고 벌어진다) · `beamOffset` 묶음 전체 높이(m, + = 위, 기본 0 = 발사대 높이 가운데) · `beamMargin` 위아래 여유(줄 수 계산에만). 레이저는 런타임에 생기는 복제라 씬 인스턴스·오버라이드가 없다 — **프리팹 값만 고치면 8곳 전부** 바뀐다.
   - 폭 = **벽 사이 통로 폭** — 배리어 가로(복도 너비 + 양옆 0.3m)는 벽 속으로 파고들어 그대로 쓰면 발사대가 벽에 묻힌다. 게이트 가운데(바닥 + 1m)에서 Wall 레이어 레이캐스트로 양옆을 재고, 못 잡으면 배리어 가로 그대로. 지금 8곳 = 2.76m.
   - 머티리얼 = `3.Materials/Environment/MapScene/MA_MapGateLaser.mat`(셰이더 `50.Art/MapGen/MapObj/material/lay.shadergraph` 재사용 — 텍스처 `ray_basecolor` 가 빨강, 발광 ×4.82). 발사대는 FBX 기본 머티리얼.
   - 칸이 비면 예전 반투명 큐브(`barrierMaterial`)로 폴백 + 경고 한 줄. 개인 뒤 배리어(`BackBarrier_G*`)도 같은 프리팹(`BackLaser_G*`, 카브 없음).

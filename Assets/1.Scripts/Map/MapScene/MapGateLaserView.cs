@@ -21,13 +21,18 @@ public sealed class MapGateLaserView : MonoBehaviour
     [Tooltip("빔 줄 템플릿(Env_laser_lay). 줄 개수만큼 같은 부모 아래에 복제하고, 긴 축 = 게이트 폭.")]
     [SerializeField] private Transform beamTemplate;
 
-    [Tooltip("빔 줄 사이 높이(m) — 연출 전용.")]
+    [Tooltip("빔 줄 사이 높이(m) — 연출 전용. 키우면 줄끼리 위아래로 벌어진다(묶음 가운데는 그대로).")]
     [DataTableIgnore]
     [SerializeField, Min(0.05f)] private float beamSpacing = 0.25f;
 
-    [Tooltip("빔 줄 개수 상한 — 연출 전용.")]
+    [Tooltip("빔 줄 개수 상한 — 연출 전용(할 일 204: 3). 높이·간격으로 들어가는 수가 이보다 적으면 그 수.")]
     [DataTableIgnore]
-    [SerializeField, Min(1)] private int maxBeams = 8;
+    [SerializeField, Min(1)] private int maxBeams = 3;
+
+    [Tooltip("빔 묶음 전체 높이 오프셋(m, + = 위) — 연출 전용(할 일 204). 0 = 발사대(또는 게이트) 높이 가운데에 묶음 가운데를 맞춘다. " +
+             "간격·줄 수는 그대로 두고 모든 줄을 같이 옮긴다(발사대 높이를 넘어가도 막지 않는다).")]
+    [DataTableIgnore]
+    [SerializeField] private float beamOffset;
 
     [Tooltip("맨 아래·맨 위 줄과 바닥·꼭대기 사이 최소 여유(m) — 연출 전용.")]
     [DataTableIgnore]
@@ -72,7 +77,7 @@ public sealed class MapGateLaserView : MonoBehaviour
 
         Bounds tb = FitPiece(beamTemplate, _beamBaseScale, width, 0f);
         int n = BeamRows(visualHeight, beamSpacing, beamMargin, maxBeams);
-        float y0 = (visualHeight - (n - 1) * beamSpacing) * 0.5f;
+        float y0 = (visualHeight - (n - 1) * beamSpacing) * 0.5f + beamOffset;
         Vector3 templatePos = beamTemplate.localPosition;
         for (int i = 0; i < n; i++)
         {

@@ -48,7 +48,8 @@ MonoBehaviour:
   posts: {fileID: 7364967856390579274}
   beamTemplate: {fileID: 8642350562037210372}
   beamSpacing: 0.25
-  maxBeams: 8
+  maxBeams: 3
+  beamOffset: 0
   beamMargin: 0.3
   keepPostHeight: 1
 --- !u!1 &5174863202389251577

@@ -91,6 +91,30 @@ public sealed class MapGateLaserViewTests
     }
 
     [Test]
+    public void 프리팹_빔은_최대_3줄이다_204()
+    {
+        MapGateLaserView v = Spawn();
+        v.Fit(2.76f, 3f, false);
+        Assert.AreEqual(3, v.BeamCount, "maxBeams 3 — 발사대 높이엔 7줄이 들어가지만 상한 3");
+    }
+
+    [Test]
+    public void 오프셋은_간격_그대로_모든_줄을_같이_옮긴다_204()
+    {
+        MapGateLaserView a = Spawn();
+        MapGateLaserView b = Spawn();
+        var so = new SerializedObject(b);
+        so.FindProperty("beamOffset").floatValue = 0.2f;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        a.Fit(2.76f, 3f, false);
+        b.Fit(2.76f, 3f, false);
+
+        Assert.AreEqual(a.BeamCount, b.BeamCount);
+        for (int i = 0; i < a.BeamCount; i++)
+            Assert.AreEqual(Bounds(a.GetBeam(i)).center.y + 0.2f, Bounds(b.GetBeam(i)).center.y, 1e-3f, $"빔 {i}");
+    }
+
+    [Test]
     public void Open_빔만_즉시_꺼지고_발사대는_남는다_다시_맞춰도_꺼진_채()
     {
         MapGateLaserView v = Spawn();
