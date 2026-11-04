@@ -664,6 +664,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 6235178363960518833}
+  extraRoots: []
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: d1c47a06e3b8492fa5720c91e8b36d4f, type: 2}
   speedLines: {fileID: 0}
@@ -5942,16 +5943,44 @@ PrefabInstance:
       value: 816596077
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.size
       value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[1].time
+      value: 0.8500061
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[2].time
+      value: 0.8933319
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[3].time
+      value: 1.0010529
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[1].value
+      value: 0.884256
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[2].value
+      value: 0.030627444
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[3].value
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[1].time
-      value: 0.39086914
+      value: 0.7118988
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[2].time
-      value: 0.53804016
+      value: 0.87231445
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[3].time
@@ -5962,12 +5991,20 @@ PrefabInstance:
       value: 1.0214081
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[2].inSlope
+      value: -0.61414284
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[3].inSlope
+      value: -0.3767084
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[1].value
-      value: 0.85299146
+      value: 0.9689697
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[2].value
-      value: 0.058520496
+      value: 0.029559314
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[3].value
@@ -5976,6 +6013,22 @@ PrefabInstance:
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[4].value
       value: 0.38043824
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[2].outSlope
+      value: -0.61414284
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[3].inWeight
+      value: 0.509204
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[3].outSlope
+      value: -0.3767084
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: edgeLineCurve.m_Curve.Array.data[2].outWeight
+      value: 0.3325179
       objectReference: {fileID: 0}
     - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: lengthFadeCurve.m_Curve.Array.data[1].inSlope
@@ -6511,6 +6564,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 6235178363960518833}
+  extraRoots: []
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: 3b8f06d25a1e49c7ae04f31b96d2057c, type: 2}
   speedLines: {fileID: 807663423485243698}
