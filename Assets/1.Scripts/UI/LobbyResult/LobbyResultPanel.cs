@@ -52,6 +52,8 @@ public sealed class LobbyResultPanel : MonoBehaviour
     private readonly List<LobbyResultRankEntry> _ranking = new List<LobbyResultRankEntry>();
     private LobbyResultPanelRules _rules;
     private bool _countedOpen;
+    private LobbyResultPanelAnimator _animator;
+    private bool _animatorResolved;
 
     /// <summary>닫힐 때(버튼·ESC·자동·Hide) 한 번.</summary>
     public event Action<LobbyResultCloseReason> Closed;
@@ -68,6 +70,20 @@ public sealed class LobbyResultPanel : MonoBehaviour
     public static bool IsEscapeClaimed => s_openCount > 0 || s_escapeClaimedFrame == Time.frameCount;
 
     private LobbyResultPanelRules Rules => _rules ??= new LobbyResultPanelRules(autoCloseSeconds);
+
+    /// <summary>열고 닫기 연출(할 일 215) — <c>content</c> 에 붙은 것. 없으면 null(예전처럼 즉시 켜고 끈다).</summary>
+    private LobbyResultPanelAnimator Animator
+    {
+        get
+        {
+            if (!_animatorResolved)
+            {
+                _animatorResolved = true;
+                _animator = content != null ? content.GetComponent<LobbyResultPanelAnimator>() : null;
+            }
+            return _animator;
+        }
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -122,6 +138,9 @@ public sealed class LobbyResultPanel : MonoBehaviour
             content.SetActive(true);
         Refresh();
         SetCountedOpen(true);
+
+        if (Animator != null)
+            Animator.PlayOpen(); // 창 등장 + 숫자 카운트업(표시 전용)
     }
 
     /// <summary>닫는다(결과는 그대로 — 다시 Show 가능).</summary>
@@ -179,9 +198,23 @@ public sealed class LobbyResultPanel : MonoBehaviour
     private void ApplyClosed(LobbyResultCloseReason reason)
     {
         if (content != null)
-            content.SetActive(false); // UiModalBlocker.OnDisable 가 입력 차단을 푼다
+        {
+            // 연출이 있으면 사라진 뒤 끈다(입력 차단은 연출이 닫기 시작 때 바로 푼다). 없으면 즉시 —
+            // UiModalBlocker.OnDisable 가 입력 차단을 푼다. 열림 상태·Closed 이벤트는 어느 쪽이든 지금 바뀐다.
+            if (Animator != null)
+                Animator.PlayClose(HideContent);
+            else
+                HideContent();
+        }
         SetCountedOpen(false);
         Closed?.Invoke(reason);
+    }
+
+    private void HideContent()
+    {
+        // 닫힘 연출이 끝나기 전에 다시 열렸으면 끄지 않는다(PlayOpen 이 콜백을 버리지만 한 번 더 막는다).
+        if (content != null && !Rules.IsOpen)
+            content.SetActive(false);
     }
 
     private void SetCountedOpen(bool open)

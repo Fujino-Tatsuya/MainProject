@@ -30,6 +30,25 @@ public sealed class ResultPlayerRowView : MonoBehaviour
     [SerializeField] private string unknownCharacterLabel = "-";
 
     private bool _resolved;
+    private bool _bound;
+    private PlayerSessionStats _stats;
+
+    /// <summary>
+    /// 숫자 칸(피해·처치·간파·사망·회복·입은 피해)을 최종값 × <paramref name="progress"/>(0~1)로 쓴다 — 1 = 최종값.
+    /// 로비 결과창 카운트업(할 일 215, <see cref="LobbyResultPanelAnimator"/>)이 매 프레임 부른다. Bind 전이면 아무것도 안 한다.
+    /// </summary>
+    public void SetCountUpProgress(float progress)
+    {
+        if (!_bound)
+            return;
+
+        SetText(damageText, LobbyResultPanelAnimMath.CountUpValue(_stats.Damage, progress));
+        SetText(killsText, LobbyResultPanelAnimMath.CountUpValue(_stats.Kills, progress));
+        SetText(countersText, LobbyResultPanelAnimMath.CountUpValue(_stats.Counters, progress));
+        SetText(deathsText, LobbyResultPanelAnimMath.CountUpValue(_stats.Deaths, progress));
+        SetText(healingText, LobbyResultPanelAnimMath.CountUpValue(_stats.Healing, progress));
+        SetText(damageTakenText, LobbyResultPanelAnimMath.CountUpValue(_stats.DamageTaken, progress));
+    }
 
     public void Bind(int slotNumber, PlayerSessionStats stats, CharacterRoster.Entry character, bool isLocal)
     {
@@ -37,12 +56,9 @@ public sealed class ResultPlayerRowView : MonoBehaviour
 
         SetText(slotText, SlotText(slotNumber, slotFormat));
         SetText(characterText, character != null ? character.DisplayName : unknownCharacterLabel);
-        SetText(damageText, stats.Damage);
-        SetText(killsText, stats.Kills);
-        SetText(countersText, stats.Counters);
-        SetText(deathsText, stats.Deaths);
-        SetText(healingText, stats.Healing);
-        SetText(damageTakenText, stats.DamageTaken);
+        _stats = stats;
+        _bound = true;
+        SetCountUpProgress(1f); // 숫자는 최종값 — 카운트업은 로비 결과창 애니(할 일 215)만 덮어쓴다
         SetRank(0, false); // 순위를 매기는 쪽(로비 패널)만 SetRank 로 다시 채운다
 
         if (portraitImage != null)

@@ -78,6 +78,16 @@
 - 폰트 = `NotoSansKR-VariableFont_wght SDF`(원본 SeoulAlrimTTF-Heavy 없음) — 목업보다 얇다.
 - 탭 제목·열 제목·소요시간 라벨·닫기 글자 = `LocalizedText`(`UI.LobbyResult.*`, 목록 [LobbyResultUiStrings.cs](../../Assets/1.Scripts/UI/LobbyResult/LobbyResultUiStrings.cs)). 직렬화 글자 = 키 ko(시트에 행이 없을 때 폴백). 재생성 메뉴도 같은 키를 붙인다. 키 표는 [lobby-demo-flow.md §8](lobby-demo-flow.md#8-화면-문구-키-strings).
 
+## 열고 닫기·숫자 카운트업 연출 (할 일 215)
+- `Content` 의 `LobbyResultPanelAnimator`(표시 전용 — 열고 닫기 판단·`Closed`·ESC·네트워크 표시 계약은 그대로).
+  - 열기: 창(`Content/Panel`) 크기 `hiddenScale`(0.95)→1 · `Content` 투명도 0→1(Dim 포함), `openDuration` 0.22초.
+  - 닫기: 반대로 `closeDuration` 0.14초 뒤 `Content` 를 끈다. **입력 차단은 닫기 시작 때 바로 푼다**(`UiModalBlocker` 끔 + 클릭 막기 해제). `IsOpen`·`Closed` 도 즉시.
+  - 숫자: 플레이어 행 숫자(가한 피해·회복량·간파 성공·입은 피해·사망)가 열기 시작 `countUpDelay` 0.15초 뒤 `countUpDuration` 0.8초에 걸쳐 0→최종값.
+  - 곡선 3개(`openCurve`·`closeCurve`·`countUpCurve`)와 시간 = 인스펙터. 시간은 `Time.unscaledDeltaTime`(슬로모션 무관). 지속 0 = 즉시.
+  - CanvasGroup 은 프리팹에 없고 런타임에 붙인다. 컴포넌트가 없으면 패널은 예전처럼 즉시 켜고 끈다.
+- 계산 = `LobbyResultPanelAnimMath`(순수, 테스트 `Editor/LobbyResultPanelAnimMathTests.cs`). 카운트업 진입점 = `ResultStatsView.SetCountUpProgress` → `ResultPlayerRowView.SetCountUpProgress`(5.ResultScene 은 부르지 않음).
+- 연결 = `Tools/UI/로비 결과창 애니 연결` — 멱등(이미 붙어 있으면 저장 안 함, 튜닝값 보존). 프리팹 병합 충돌로 빠지면 다시 돌린다. 재생성 메뉴도 같이 붙인다.
+
 ## 다시 만들기·미리보기
 - `Tools/UI/Authoring/Lobby Result Panel` — 없는 프리팹만 만든다(있으면 손대지 않음, 다시 돌려도 바이트 동일).
 - `Tools/UI/Authoring/Lobby Result Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 열 폭·위치·색은 스크립트 상단 상수.
