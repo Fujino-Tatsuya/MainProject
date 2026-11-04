@@ -156,4 +156,107 @@ public sealed class PlayerUnitCollisionRulesTests
         Assert.That(PlayerUnitCollisionRules.ComputeSeparationStep(penetration, 0f, 0.02f), Is.EqualTo(Vector3.zero));
         Assert.That(PlayerUnitCollisionRules.ComputeSeparationStep(penetration, 5f, 0f), Is.EqualTo(Vector3.zero));
     }
+
+    // ── 대시 유닛 관통(할 일 209) ──
+
+    [Test]
+    public void DashPassable_OnlyNormalRankMonsters()
+    {
+        Assert.That(PlayerUnitCollisionRules.IsDashPassableUnit(true, MonsterRank.Normal), Is.True);
+        Assert.That(PlayerUnitCollisionRules.IsDashPassableUnit(true, MonsterRank.MidBoss), Is.False);
+        Assert.That(PlayerUnitCollisionRules.IsDashPassableUnit(true, MonsterRank.Boss), Is.False);
+        Assert.That(PlayerUnitCollisionRules.IsDashPassableUnit(false, MonsterRank.Normal), Is.False); // 파일런·허수아비 등 몬스터 아닌 Enemy 몸
+    }
+
+    [Test]
+    public void DashPassLimit_IsTwo()
+    {
+        Assert.That(PlayerUnitCollisionRules.DashSmallMonsterPassLimit, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void DashUnitPass_PassesTwoNormalMonsters_StopsAtThird()
+    {
+        var pass = new PlayerDashUnitPass();
+        pass.Begin(PlayerUnitCollisionRules.DashSmallMonsterPassLimit);
+
+        Assert.That(pass.TryPass(1, passable: true), Is.True);
+        Assert.That(pass.TryPass(2, passable: true), Is.True);
+        Assert.That(pass.TryPass(3, passable: true), Is.False);
+        Assert.That(pass.PassedCount, Is.EqualTo(2));
+        Assert.That(pass.IsPassed(3), Is.False);
+    }
+
+    [Test]
+    public void DashUnitPass_SameUnitCountsOnce()
+    {
+        var pass = new PlayerDashUnitPass();
+        pass.Begin(2);
+
+        Assert.That(pass.TryPass(7, true), Is.True);
+        Assert.That(pass.TryPass(7, true), Is.True);
+        Assert.That(pass.PassedCount, Is.EqualTo(1));
+        Assert.That(pass.IsPassed(7), Is.True);
+    }
+
+    [Test]
+    public void DashUnitPass_NonPassableBlocks_WithoutUsingBudget()
+    {
+        var pass = new PlayerDashUnitPass();
+        pass.Begin(2);
+
+        Assert.That(pass.TryPass(9, passable: false), Is.False); // 보스·중간보스
+        Assert.That(pass.PassedCount, Is.Zero);
+        Assert.That(pass.TryPass(1, true), Is.True);
+        Assert.That(pass.TryPass(2, true), Is.True);
+    }
+
+    [Test]
+    public void DashUnitPass_Inactive_PassesNothing()
+    {
+        var pass = new PlayerDashUnitPass();
+
+        Assert.That(pass.TryPass(1, true), Is.False);
+        Assert.That(pass.IsPassed(1), Is.False);
+
+        pass.Begin(2);
+        pass.TryPass(1, true);
+        pass.End();
+
+        Assert.That(pass.IsActive, Is.False);
+        Assert.That(pass.IsPassed(1), Is.False);
+        Assert.That(pass.PassedCount, Is.Zero);
+    }
+
+    [Test]
+    public void DashUnitPass_BeginResetsPreviousDash()
+    {
+        var pass = new PlayerDashUnitPass();
+        pass.Begin(2);
+        pass.TryPass(1, true);
+        pass.TryPass(2, true);
+
+        pass.Begin(2);
+
+        Assert.That(pass.PassedCount, Is.Zero);
+        Assert.That(pass.TryPass(3, true), Is.True);
+    }
+
+    [Test]
+    public void DashUnitPass_CopyIsIndependent()
+    {
+        var live = new PlayerDashUnitPass();
+        live.Begin(2);
+        live.TryPass(1, true);
+
+        var copy = new PlayerDashUnitPass();
+        copy.CopyFrom(live);
+        Assert.That(copy.IsActive, Is.True);
+        Assert.That(copy.IsPassed(1), Is.True);
+        Assert.That(copy.TryPass(2, true), Is.True);
+        Assert.That(copy.TryPass(3, true), Is.False);
+
+        Assert.That(live.PassedCount, Is.EqualTo(1)); // 예측이 진짜 장부를 건드리지 않는다
+        Assert.That(live.IsPassed(2), Is.False);
+    }
 }

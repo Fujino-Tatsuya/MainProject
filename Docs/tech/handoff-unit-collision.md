@@ -37,3 +37,43 @@
 - **웰즈(`Boss/Wells.prefab`)에는 Enemy 레이어 비트리거 몸 콜라이더가 없다** → 플레이어가 여전히 통과한다.
   이번엔 "m_Enabled 만" 범위라 콜라이더를 새로 달지 않았다. 웰즈도 막아야 하면 몸 캡슐(Enemy, 비트리거)을 달아 주거나 말해 달라.
 - Play 확인(사람): 일반 몹 6종·중간보스·23호에 플레이어가 막히는지, 몬스터끼리 뭉칠 때 튀거나 멈추는 현상이 없는지.
+
+## 대시 관통 — 일반 몬스터 2마리 (할 일 209)
+
+> 2026-11-04 · 은희 · 브랜치 `feature/DashPassThroughSmall`. 위 기획(10-11 "모두 통과 불가")에서 **일반 대시만** 예외를 둔다.
+> 몬스터 코드·프리팹은 손대지 않았다(플레이어 이동 스윕만).
+
+| 대상 | 일반 대시(Shift) |
+|---|---|
+| 일반 몬스터(`MonsterBase`, `MonsterDataSO.rank = Normal`) | **2마리까지 뚫고 지나간다**, 3번째에서 그 직전에 멈춘다(대시 종료) |
+| 중간보스(`rank = MidBoss` — Gauntlet·Spinner·Wall) · 보스(`rank = Boss` — 23호) | 처음부터 막힌다(종전 그대로) |
+| 몬스터가 아닌 Enemy 몸(보스방 파일런 등) · 다른 플레이어 몸 | 막힌다(종전 그대로) |
+| 벽·지형 | 종전 그대로 — 막혀도 대시 상태·무적은 종료 시각까지 유지 |
+
+- 전 캐릭터 공통. 관통 수 **2 = 코드 상수 `PlayerUnitCollisionRules.DashSmallMonsterPassLimit`**(xlsx 칸 없음). 통과 여부 = `IsDashPassableUnit`.
+- 어쌔신 Q·거너 간파 후폭풍처럼 유닛을 **전부** 통과하는 이동(`PassThroughUnitsOverride`)과는 별개다 — 그쪽은 Enemy·Player 를 마스크에서 빼고, 이쪽은 마스크는 그대로 두고 수를 센다.
+- 213 어쌔신 대시 화살표 미리보기(`GetGroundedPreviewDistance`)는 관통 장부를 받지 않는다 — 벽에서만 끊기는 미리보기라 무관.
+
+### 동작 (`Assets/1.Scripts/Player/`)
+
+- **장부 `PlayerDashUnitPass`**(`Motor/PlayerUnitCollisionRules.cs`) — 이번 대시에서 통과한 몬스터 id 와 남은 수. `PlayerDashState.Enter` 가 `PlayerMotor.BeginDashUnitPass(2)`, `Exit` 가 `EndDashUnitPass()`.
+- **이동 스윕 `PlayerMotionSweep.TryCast`** — 가장 가까운 막는 것이 Enemy 레이어 콜라이더면 그 몬스터(`GetComponentInParent<MonsterBase>`, 콜라이더 여러 개도 한 마리)를 장부에 올리고 다음으로 가까운 것을 다시 고른다.
+  실제 경로에서 **가장 먼저 만난** 몬스터만 센다(벽 너머 몬스터는 세지 않는다). 이미 통과한 몬스터의 콜라이더는 대시 내내 무시한다.
+- **유닛 막힘 검사(`IsUnitBlockingAhead`)·겹침 밀어내기(`ApplyUnitSeparation`)** 도 같은 장부를 읽는다 — 통과 중인 몬스터 때문에 대시가 끝나거나 옆으로 밀려나지 않는다.
+  대시가 몬스터와 겹친 채 끝나면(3번째에 막힌 경우 등) 장부가 꺼지는 다음 틱부터 기존 밀어내기가 빼낸다.
+- **대시 경로 예측(`PlayerMotor.PredictDashPath`, 간파 판정 191)** 은 진행 중 장부를 **베껴** 굴린다 — 실제 대시와 같은 자리에서 끝나고 진짜 장부는 건드리지 않는다.
+
+### 네트워크
+
+- 장부는 **시뮬레이션하는 피어가 각자 로컬로** 든다(복제 없음, 새 RPC 없음) — 오너 권위 이동에서는 오너만 센다. 서버 위치 보정 경로(`forceSnap` 등)는 바뀌지 않는다.
+- 서버 권위 이동(`UsesServerAuthoritativeMovement`)에서는 서버 관측 시뮬레이션도 같은 장부(서버 쪽 대시 상태가 켬)로 같은 결과를 낸다.
+- 오너 권위에서 서버의 대시 끝 예측은 빈 장부로 시작한다 — [dash-interrupt.md §8](dash-interrupt.md#8-알려진-한계).
+
+### Play 확인
+
+- **확인 씬 `Assets/0.Scenes/Debug/DebugDashPassLab.unity`**(빌드 목록 밖, 저작 메뉴 `Tools/Debug/209 대시 관통 테스트 씬 만들기` 로 다시 만듦 — `DebugInterruptLab` 복사 + 허수아비 제거 + 레인 A~E). 툴바 Dev Boot 씬 드롭다운 → `DebugDashPassLab` → ▶.
+  몬스터는 `DebugDashPassLab` 컴포넌트가 서버에서 스폰하고 FSM 을 멈춘다(`SetServerLogicSuspended`, 피격은 됨 · 패널 "몬스터 다시 놓기"). 각 레인 START 칸에 서서 W(+Z)를 누른 채 Shift. 대시 쿨 0·F1 캐릭터 순환·배속은 원본 랩 그대로. 23호 줄(E)은 인스펙터 `enabled` 로 끌 수 있다. NavMesh 는 없다(정지 몬스터라 무관 — 에이전트 경고는 날 수 있다).
+- 일반 몬스터 3마리를 일렬로 두고 대시 → 2마리를 뚫고 3번째 직전에서 멈추는지. 콘솔 `[Dash] 종료: … 관통유닛=2`.
+- 중간보스·23호에 대시 → 지금처럼 바로 앞에서 멈추는지(`관통유닛=0`).
+- 몬스터 1마리 뒤 벽 → 몬스터를 지나 벽 앞에서 멈추고 대시 시간 끝까지 상태 유지되는지.
+- MPPM 클라 오너: 뚫는 동안·끝난 뒤 위치가 튀거나 되돌아가지 않는지(관찰자 화면 포함).

@@ -105,6 +105,23 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     public bool PassThroughUnitsOverride { get; set; }
 
+    // 일반 대시 유닛 관통 장부(할 일 209) — 대시 상태가 켜고 끈다. 시뮬레이션하는 피어가 각자 로컬로 들고 복제하지 않는다.
+    private readonly PlayerDashUnitPass dashUnitPass = new PlayerDashUnitPass();
+
+    /// <summary>
+    /// [대시 상태 진입] 일반 몬스터를 <paramref name="limit"/> 마리까지 뚫고 지나가게 한다(할 일 209). 그다음 일반 몬스터·보스·중간보스·다른 플레이어에서는 지금처럼 막힌다.
+    /// 이동 스윕·유닛 막힘 검사·겹침 밀어내기가 같은 장부를 읽는다. <see cref="EndDashUnitPass"/> 로 끈다.
+    /// </summary>
+    public void BeginDashUnitPass(int limit) => dashUnitPass.Begin(limit);
+
+    /// <summary>[대시 상태 이탈] 관통 장부를 비우고 끈다 — 몬스터와 겹쳐 끝났으면 다음 틱부터 겹침 밀어내기가 빼낸다.</summary>
+    public void EndDashUnitPass() => dashUnitPass.End();
+
+    /// <summary>이번 대시에서 통과한 유닛 수(진단용). 대시 중이 아니면 0.</summary>
+    public int DashPassedUnitCount => dashUnitPass.PassedCount;
+
+    private PlayerDashUnitPass ActiveDashUnitPass => dashUnitPass.IsActive ? dashUnitPass : null;
+
     /// <summary>
     /// 다른 플레이어의 이동을 막는가. 사망 연출·완전 사망 중에는 막지 않는다(Soul 은 레이어가 Soul 이라 애초에 대상 밖).
     /// 다른 피어의 스윕이 이 플레이어 몸 캡슐을 만났을 때 읽는다.
@@ -157,16 +174,22 @@ public sealed class PlayerMotor : MonoBehaviour
             return false;
 
         return IsUnitBlockingAheadFrom(
-            simulationState.Position, direction, distance, CaptureSimulationSettings(simulationState.IsSoul));
+            simulationState.Position, direction, distance, CaptureSimulationSettings(simulationState.IsSoul), ActiveDashUnitPass);
     }
 
     /// <summary>
     /// [이 피어] 진행 중 대시의 끝 위치·시각 예측(할 일 191 간파 판정) — 씬 상태를 바꾸지 않는다.
     /// 실제 대시 이동과 같은 스윕(<see cref="SweepFrom"/>)·같은 유닛 막힘 검사(<see cref="IsUnitBlockingAheadFrom"/>)·지금 장애물 규칙(오버라이드 포함)을 쓴다.
+    /// 유닛 관통(할 일 209)은 진행 중 대시 장부를 베껴 이어 굴린다(진짜 장부는 건드리지 않는다). 대시 중이 아니면 빈 장부로 시작한다. 오너 권위의 서버처럼 이 피어가 원격 플레이어 이동을 시뮬레이션하지 않으면 장부가 비어 있어 누른 자리부터 새로 센다.
     /// </summary>
     public PlayerDashPathResult PredictDashPath(Vector3 start, Vector3 direction, float speed, float remaining)
     {
-        var sweep = new DashPathSweep(this, CaptureSimulationSettings(simulationState.IsSoul), simulationState.IsGrounded);
+        var unitPass = new PlayerDashUnitPass();
+        if (dashUnitPass.IsActive)
+            unitPass.CopyFrom(dashUnitPass);
+        else
+            unitPass.Begin(PlayerUnitCollisionRules.DashSmallMonsterPassLimit);
+        var sweep = new DashPathSweep(this, CaptureSimulationSettings(simulationState.IsSoul), simulationState.IsGrounded, unitPass);
         return PlayerDashPath.Simulate(sweep, start, direction, speed, remaining, Time.fixedDeltaTime);
     }
 
@@ -175,7 +198,8 @@ public sealed class PlayerMotor : MonoBehaviour
         Vector3 position,
         Vector3 direction,
         float distance,
-        PlayerSimulationSettings settings)
+        PlayerSimulationSettings settings,
+        PlayerDashUnitPass unitPass)
     {
         direction.y = 0f;
         Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
@@ -187,7 +211,8 @@ public sealed class PlayerMotor : MonoBehaviour
             settings.MaxWalkableSlopeAngle,
             settings.ObstacleMask,
             settings.CollisionSkin,
-            castBuffer);
+            castBuffer,
+            unitPass);
     }
 
     // 이동 시뮬레이션(RuntimeMotionResolver)과 대시 경로 예측(PredictDashPath)이 함께 부르는 최종 이동 스윕 — 같은 캡슐·레이어·스킨·반복 횟수.
@@ -196,7 +221,8 @@ public sealed class PlayerMotor : MonoBehaviour
         Vector3 desiredDelta,
         Vector3 horizontalStepDelta,
         bool isGrounded,
-        PlayerSimulationSettings settings)
+        PlayerSimulationSettings settings,
+        PlayerDashUnitPass unitPass)
     {
         Vector3 currentPosition = playerRigidbody != null
             ? playerRigidbody.position
@@ -212,7 +238,8 @@ public sealed class PlayerMotor : MonoBehaviour
             settings.ObstacleMask,
             settings.CollisionSkin,
             settings.MaxSweepIterations,
-            castBuffer);
+            castBuffer,
+            unitPass);
     }
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
@@ -976,7 +1003,7 @@ public sealed class PlayerMotor : MonoBehaviour
 
         Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
         Vector3 originOffset = state.Position - currentPosition;
-        Vector3 penetration = PlayerMotionSweep.ComputeUnitPenetration(capsule, originOffset, unitMask, overlapBuffer);
+        Vector3 penetration = PlayerMotionSweep.ComputeUnitPenetration(capsule, originOffset, unitMask, overlapBuffer, ActiveDashUnitPass);
         Vector3 step = PlayerUnitCollisionRules.ComputeSeparationStep(penetration, speed, deltaTime);
         if (step == Vector3.zero)
             return false;
@@ -1152,7 +1179,7 @@ public sealed class PlayerMotor : MonoBehaviour
             if (owner.capsule == null)
                 return desiredDelta;
 
-            return owner.SweepFrom(state.Position, desiredDelta, horizontalStepDelta, state.IsGrounded, settings);
+            return owner.SweepFrom(state.Position, desiredDelta, horizontalStepDelta, state.IsGrounded, settings, owner.ActiveDashUnitPass);
         }
     }
 
@@ -1162,12 +1189,14 @@ public sealed class PlayerMotor : MonoBehaviour
         private readonly PlayerMotor owner;
         private readonly PlayerSimulationSettings settings;
         private readonly bool isGrounded;
+        private readonly PlayerDashUnitPass unitPass;
 
-        public DashPathSweep(PlayerMotor owner, PlayerSimulationSettings settings, bool isGrounded)
+        public DashPathSweep(PlayerMotor owner, PlayerSimulationSettings settings, bool isGrounded, PlayerDashUnitPass unitPass)
         {
             this.owner = owner;
             this.settings = settings;
             this.isGrounded = isGrounded;
+            this.unitPass = unitPass;
         }
 
         public Vector3 Resolve(Vector3 position, Vector3 desiredDelta)
@@ -1176,10 +1205,10 @@ public sealed class PlayerMotor : MonoBehaviour
                 return desiredDelta;
 
             Vector3 planar = new Vector3(desiredDelta.x, 0f, desiredDelta.z);
-            return owner.SweepFrom(position, desiredDelta, planar, isGrounded, settings);
+            return owner.SweepFrom(position, desiredDelta, planar, isGrounded, settings, unitPass);
         }
 
         public bool IsUnitBlockingAhead(Vector3 position, Vector3 direction, float distance) =>
-            owner.capsule != null && owner.IsUnitBlockingAheadFrom(position, direction, distance, settings);
+            owner.capsule != null && owner.IsUnitBlockingAheadFrom(position, direction, distance, settings, unitPass);
     }
 }
