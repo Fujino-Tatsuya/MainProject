@@ -719,7 +719,7 @@ MonoBehaviour:
     en: Player
   - key: UI.LobbyResult.Header.Damage
     ko: "\uAC00\uD55C\uD53C\uD574"
-    en: Damage Dealt
+    en: Damage Deal
   - key: UI.LobbyResult.Header.Healing
     ko: "\uD68C\uBCF5\uB7C9"
     en: Healing
@@ -728,7 +728,7 @@ MonoBehaviour:
     en: Interrupts
   - key: UI.LobbyResult.Header.DamageTaken
     ko: "\uC785\uC740 \uD53C\uD574"
-    en: Damage Taken
+    en: Damage Take
   - key: UI.LobbyResult.Header.Deaths
     ko: "\uC0AC\uB9DD"
     en: Deaths
