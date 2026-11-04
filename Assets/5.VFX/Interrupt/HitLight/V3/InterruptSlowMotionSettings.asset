@@ -55,3 +55,6 @@ MonoBehaviour:
     exitDuration: 0.4
     failExitDuration: 0.1
   slowMotionZoomFactor: 0.85
+  cameraCenterMoveDuration: 0.08
+  cameraCenterRatio: 0.75
+  cameraCenterReturnDuration: 0.25
