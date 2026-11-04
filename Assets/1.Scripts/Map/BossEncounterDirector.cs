@@ -897,7 +897,11 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     private IntroMotion _motion;
 
     // 밀림 리액션 상태(캐릭터마다 있는 것 하나) / 끝난 뒤 복귀 상태. 없는 이름은 건너뛴다(Animator.HasState).
-    private static readonly string[] SkidReactionStates = { "SubSkillGuard", "Gunner_E_Backstep", "Dodge" };
+    // 🔴 이펙트 이벤트(StartEffect·PlayEffect)가 없는 상태만 쓴다 — 스킬 없이 클립만 틀므로 켜진 이펙트를 꺼 줄 곳이 없다.
+    //    팔라딘은 E 준비(SubSkillGuard)가 아니라 방어중 루프(SubSkillGuardIdle, 이벤트 없음). 준비 클립은 10-26 부터 0.9초에
+    //    'GuardianBarrier' 결계를 켜서 등장 연출 중 E 이펙트가 떴다(경석 11-04). 방어중 → 해제(SubSkillGuardEnd) 자동 전이는
+    //    exitTime 0.43 × 3.5초 ≈ 1.5초라 밀림(impactSkidDuration 0.35)+ReactionIdleDelay(0.35) 안에 Idle 로 먼저 돌아간다.
+    private static readonly string[] SkidReactionStates = { "SubSkillGuardIdle", "Gunner_E_Backstep", "Dodge" };
     private static readonly string[] IdleStates = { "Idle_Combat", "Idle" };
     private const float ReactionIdleDelay = 0.35f;
 
