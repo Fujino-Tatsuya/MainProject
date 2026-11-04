@@ -203,7 +203,9 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
             return false;
 
         // 보스 앞뒤 구분 꺼짐(BossDataSO.useFacingRules) — 판정이 없으니 표시도 없다.
-        if (_data != null && !_data.useFacingRules)
+        // 로비 훈련 상대는 앞뒤 구분(useFacingRules — 23호 데이터에서 꺼져 있다)이 아니라
+        // 간파 정면 판정(counterRequiresFront)을 따른다 — 그 판정이 곧 이 표식이 보여 주는 것이다.
+        if (_data != null && !(_trainingTarget ? _data.counterRequiresFront : _data.useFacingRules))
             return false;
 
         Transform boss = _boss != null ? _boss.transform : transform.parent;
@@ -213,6 +215,8 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         // 보스 자기 히트박스(Default 레이어)를 바닥으로 오인하지 않는다.
         if (!GroundProbe.TryFindGround(boss.position, extraGroundMask, out RaycastHit ground, out _))
             return false;
+
+        if (_trainingTarget && !_lobbyFloorTagged) TagLobbyFloorReceivers(boss.position);
 
         // 🔴 **명시적 억제** — 보스가 "착지 전에는 방향을 보여선 안 된다"고 알려 준 구간(2026-08-10).
         //    아래 높이 판정만으로는 부족하다: 도약 **준비(선딜)** 동안 보스는 아직 땅에 있어서
@@ -246,7 +250,47 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     BossDataSO ResolveData()
     {
         // BossDataSO 는 MonsterBase 의 protected 필드라 직접 못 읽는다 — 보스가 노출한 각도를 쓴다.
-        return _boss is TwentyThreeBoss boss ? boss.Data : null;
+        if (_boss is TwentyThreeBoss boss) return boss.Data;
+
+        // 로비 튜토리얼 훈련 상대(11-04 경석 — 튜토리얼에서 앞뒤 구분이 어렵다는 의견) — 판정과 같은 23호 데이터
+        // (counterRules → counterFrontAngle)를 읽는다. 안 읽으면 기본 ±60° 로 그려져 실제 판정(±90°)보다 좁게 보인다.
+        // 후방 호는 "백어택 구역"이 아니라 "간파 안 되는 쪽" 표시다 — 훈련 상대에는 위치 백어택이 없다.
+        if (_boss is TrainingSparringBot bot)
+        {
+            _trainingTarget = true;
+            return bot.CounterRules;
+        }
+        return null;
+    }
+
+    bool _trainingTarget;   // 훈련 상대인가 — 표시 여부를 useFacingRules 대신 counterRequiresFront 로 정한다
+    bool _lobbyFloorTagged;
+
+    /// <summary>로비 훈련장 바닥을 데칼 수신자로 표시하는 반경(m) — 넉백·밀림으로 상대가 움직여도 덮을 만큼.</summary>
+    const float LobbyFloorTagRadius = 15f;
+
+    /// <summary>
+    /// 🔴 로비 바닥은 데칼 수신자가 아니다(11-04 — 표식을 붙였는데 안 찍혔다). C3 데칼은 수신자 비트
+    /// (<see cref="DecalReceivers.Mask"/>, 렌더링 레이어 bit 1)가 있는 렌더러에만 칠해지는데, 그 표시는
+    /// 맵 존(<c>MapContentSpawner</c>)과 보스 아레나(<c>BossArenaDecalReceiverInstaller</c>)만 해 준다.
+    /// 로비 바닥 타일은 bit 0 만 있어서 표식·간파 예고 데칼이 전부 안 보였다.
+    /// 그래서 훈련 상대 주변 바닥 콜라이더를 처음 한 번 표시한다 — 비트 추가라 조명(bit 0)은 그대로고,
+    /// 데칼은 피어별 로컬 렌더링이라 피어마다 여기서 각자 표시한다. 유닛(플레이어 등) 콜라이더는 뺀다.
+    /// </summary>
+    void TagLobbyFloorReceivers(Vector3 center)
+    {
+        _lobbyFloorTagged = true;
+        int mask = extraGroundMask | LayerMask.GetMask("Default", "Ground");
+        Collider[] hits = Physics.OverlapSphere(center, LobbyFloorTagRadius, mask, QueryTriggerInteraction.Ignore);
+        int tagged = 0;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider c = hits[i];
+            if (c == null || c.GetComponentInParent<Unit>() != null) continue;
+            tagged += DecalReceivers.Tag(c.gameObject);
+        }
+        Debug.Log($"[Rendering] 훈련 상대 방향 표식 — 로비 바닥 데칼 수신자 {tagged}개 표시 " +
+                  $"(반경 {LobbyFloorTagRadius}m, mask 0x{DecalReceivers.Mask:X})", this);
     }
 
     // ─── 데칼 모드 ─────────────────────────────────────────────────────
