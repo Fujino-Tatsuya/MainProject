@@ -111,6 +111,11 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Assassin_Q_PierceLine { get; private set; }
     [field: SerializeField] public EffectEntry Assassin_Q_PierceBurst { get; private set; }
 
+    [Header("플레이어 — 어쌔신 특성 추격의 궤적(ASN_4_Q_TRAIL)")]
+    // 추가 피해 판정 순간(TraitSkillFx Activated) 지나온 선분에 한 번 — 바닥 그림자 자국 + 팡 터지는 베기 줄 + 파편(FX_PursuitTrail).
+    // +Z 1m 저작, Z 배율 = 선분 길이. AssassinSkillView.HandleTraitFx 가 재생한다(2026-11-04 민경).
+    [field: SerializeField] public EffectEntry Assassin_Q_PursuitTrail { get; private set; }
+
     [Header("플레이어 — 어쌔신 변신 Q(관통 돌진)")]
     // 돌진 동안 플레이어 루트를 따라가는 루프(FX_Assassin_StormSlash). 입자는 World + Rate over Distance 라
     // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).

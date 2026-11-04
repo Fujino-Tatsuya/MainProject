@@ -283,6 +283,38 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
             EndStormSlash();
     }
 
+    // ── 추격의 궤적(ASN_4_Q_TRAIL) ──
+
+    private void OnEnable() => TraitSkillFx.Raised += HandleTraitFx;
+
+    private void OnDisable() => TraitSkillFx.Raised -= HandleTraitFx;
+
+    // [전 피어] 추격의 궤적 추가 피해 판정 순간(서버가 Q 종료 + 지연 ÷ 공격속도 뒤 판정 → 공용 RPC, 빗나가도 옴) — 지나온 선분에
+    // FX_PursuitTrail(바닥 그림자 자국 + 경로 전체가 팡 터지는 베기 줄 + 파편) 한 번. +Z 1m 저작 → Z 배율 = 선분 길이(일반 Q 일섬과 같은 규칙).
+    // 일반·변신 Q, 그림자 회귀 왕복 각각 같은 연출. 대상별(Hit) 연출은 없다(피격 반응·피해 숫자).
+    private void HandleTraitFx(TraitFxEvent e)
+    {
+        if (e.Trait != TraitFxTrait.AssassinPursuitTrail || e.Kind != TraitFxKind.Activated)
+            return;
+        if (e.Caster == null || e.Caster != player)   // player = Awake 의 GetComponent<Player>()
+            return;
+        if (!EffectManager.TryGet(out EffectManager effects, this))
+            return;
+        EffectEntry entry = effects.Catalog.Assassin_Q_PursuitTrail;
+        if (entry == null)
+        {
+            Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_Q_PursuitTrail 이 비어 추격의 궤적 연출을 건너뛴다.", this);
+            return;
+        }
+
+        Vector3 span = e.EndPosition - e.Position;
+        span.y = 0f;
+        float length = span.magnitude;
+        if (length < AssassinTrailRules.MinLength)
+            return;
+        effects.Play(entry, e.Position, Quaternion.LookRotation(span / length, Vector3.up), new Vector3(1f, 1f, length));
+    }
+
     // 칼날의 영역(ASN_3_E_AREA) — 일반 E 강타 베기를 판정 사거리 배율만큼 균일하게 키운다(사거리·각도 배율이 같은 1.25 라 수평 범위가 판정과 맞는다).
     // 배율은 재생(대출) 시점에 확정되므로 클립 이벤트 전에 매 프레임 밀어 둔다. 특성 수치는 전 피어 같은 값.
     private void SyncEnhancedSlashScale()

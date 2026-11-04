@@ -45,6 +45,7 @@ MonoBehaviour:
   <Assassin_E_MultiSlashes>k__BackingField: {fileID: 11400000, guid: 2f4f9adcbad34c538e23cd1b03faf201, type: 2}
   <Assassin_Q_PierceLine>k__BackingField: {fileID: 11400000, guid: 236457abd41f407b9451008b80b26592, type: 2}
   <Assassin_Q_PierceBurst>k__BackingField: {fileID: 11400000, guid: 366e55861d2f4129b6309dcaa5517677, type: 2}
+  <Assassin_Q_PursuitTrail>k__BackingField: {fileID: 11400000, guid: 8692999ede4146fbaf12bf16c8f448a5, type: 2}
   <Assassin_Q_StormSlash>k__BackingField: {fileID: 11400000, guid: 1091d72097064b11812b86a97e520d97, type: 2}
   <Assassin_LClick_Slash>k__BackingField: {fileID: 11400000, guid: 53fefa5a6dca4c40bfe6ef5215a839cc, type: 2}
   <Assassin_LClick_Success>k__BackingField: {fileID: 11400000, guid: 2e7e68d5d7104a2db7930ed1a59fbda6, type: 2}
