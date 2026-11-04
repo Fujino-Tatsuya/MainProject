@@ -586,6 +586,8 @@ public static class TraitUiAuthoring
         so.FindProperty("keycapR").objectReferenceValue = CardArt("Keycap_R");
         so.FindProperty("inputLeftMouse").objectReferenceValue = CardArt("Input_LMB");
         so.FindProperty("inputRightMouse").objectReferenceValue = CardArt("Input_RMB");
+        // 할 일 208 — 설명 태그 이름 색 = 스킬 툴팁 칩 색 표(같은 에셋).
+        so.FindProperty("tagStyles").objectReferenceValue = AssetDatabase.LoadAssetAtPath<SkillTooltipTagStyles>(TagStylesPath);
         so.ApplyModifiedPropertiesWithoutUndo();
         EnsureBasicAttackSlot(cardView);
         EnsureSkillBackdrop(cardView);
@@ -594,6 +596,7 @@ public static class TraitUiAuthoring
     // ── 할 일 165 후속 — 기본 공격(LMB) 슬롯: 검 아이콘 + 보는 사람 캐릭터 색 ──
     private const string BasicAttackIconPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
+    private const string TagStylesPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/SkillTooltipTagStyles.asset";
 
     /// <summary>
     /// 지금 프리팹의 카드 템플릿에 <c>basicAttackIcon</c>(검)·<c>characterRoster</c> 칸만 잇는다 — 카드 배치·배경 블러·씬 오버라이드는 그대로.

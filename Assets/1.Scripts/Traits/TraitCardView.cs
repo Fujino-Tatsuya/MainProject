@@ -42,6 +42,13 @@ public sealed class TraitCardView : MonoBehaviour
     [Tooltip("보는 사람 캐릭터 색 출처(Entry.themeColor). 못 찾으면 흰색.")]
     [SerializeField] private CharacterRoster characterRoster;
 
+    [Header("태그 이름 색 (할 일 208)")]
+    [Tooltip("설명문의 태그 이름(넉백 등)을 칩 색으로 칠할 때 쓰는 색 표 — 스킬 툴팁과 같은 SkillTooltipTagStyles. 비우면 칠하지 않는다. 특성 호버 툴팁도 이 값을 쓴다.")]
+    [SerializeField] private SkillTooltipTagStyles tagStyles;
+
+    /// <summary>설명 태그 이름 색 표(<see cref="TraitSelectionView"/> 호버 툴팁이 카드 원본에서 빌린다).</summary>
+    public SkillTooltipTagStyles TagStyles => tagStyles;
+
     private int traitHash = TraitIdHash.None;
     private Action<int> clicked;
     private TraitDefinition boundTrait;
@@ -68,7 +75,7 @@ public sealed class TraitCardView : MonoBehaviour
     private void RefreshDescription(bool showValue)
     {
         shownValue = showValue;
-        description.text = DescriptionOf(boundTrait, boundViewer, this, showValue);
+        description.text = DescriptionOf(boundTrait, boundViewer, this, showValue, tagStyles);
     }
 
     /// <param name="viewer">카드를 보는 로컬 플레이어 — 설명 {dmg} 계산용(없으면 '-').</param>
@@ -175,13 +182,15 @@ public sealed class TraitCardView : MonoBehaviour
 
     /// <summary>카드·획득 툴팁 공용 설명 문구 — 본문 굵게(<see cref="TraitTooltip.Bold"/>). 실패하면 오류 표시 + 경고.</summary>
     /// <param name="showValue">{dmg} 계산 숫자(Shift 누르는 동안) / false = 퍼센트 글자.</param>
-    public static string DescriptionOf(TraitDefinition trait, Player viewer, UnityEngine.Object context, bool showValue)
+    /// <param name="tagStyles">태그 이름 색 표(할 일 208, <see cref="SkillTooltipTagHighlighter"/>) — null 이면 칠하지 않는다.</param>
+    public static string DescriptionOf(TraitDefinition trait, Player viewer, UnityEngine.Object context, bool showValue,
+        SkillTooltipTagStyles tagStyles = null)
     {
         if (trait == null)
             return string.Empty;
 
         if (TraitTooltip.FormatDescription(trait, viewer, showValue, out string text, out string error))
-            return TraitTooltip.Bold(text);
+            return TraitTooltip.Bold(SkillTooltipTagHighlighter.Highlight(text, tagStyles));
 
         Debug.LogWarning($"[Trait] '{trait.Id}' 설명 문구 오류 — {error}", context);
         return UiStrings.SkillTooltipError.Format(new System.Collections.Generic.Dictionary<string, string> { ["error"] = error });

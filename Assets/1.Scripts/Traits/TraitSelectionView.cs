@@ -736,7 +736,8 @@ public sealed class TraitSelectionView : MonoBehaviour
     {
         tooltipShowsValue = showValue;
         if (tooltipDescription != null)
-            tooltipDescription.text = TraitCardView.DescriptionOf(hoveredTrait, LocalPlayer(), this, showValue);
+            tooltipDescription.text = TraitCardView.DescriptionOf(hoveredTrait, LocalPlayer(), this, showValue,
+                cardTemplate != null ? cardTemplate.TagStyles : null); // 태그 이름 색(208) — 카드 원본의 색 표
     }
 
     // ── 유틸 ───────────────────────────────────────────────────────────────
