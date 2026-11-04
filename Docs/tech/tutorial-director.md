@@ -124,9 +124,10 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼·레이저 프리팹 참조 두 줄뿐.
 - **시각 = 레이저 게이트(할 일 160, 2026-10-30)**: 마커 칸 `gateLaserPrefab` = `2.Prefabs/Environment/MapScene/MapGateLaser.prefab`(`MapGateLaserView`, 비네트워크, 콜라이더 없음).
   `MapSceneBarriers.CreateGateLaser` 가 큐브의 **렌더러만 끄고** 레이저를 큐브의 형제(`MapSceneBarriers/Laser_G*`)로 만들어 `Fit(폭, 높이, 진행축)` 한다. 큐브의 Barrier 콜라이더(크기·위치·레이어)·`MonsterBlock_G*` 카브는 그대로.
-  - 프리팹 = 루트 `MapGateLaserView` + `Visual/Posts`(`50.Art/…/Lasers/Env_laser.fbx` — **메시 하나에 양 끝 발사대 둘**이 들어 있다) + `Visual/Beams/Beam`(`Env_laser_lay.fbx` 템플릿, 코드가 줄 수만큼 복제).
-    이펙트 담당은 `Visual` 안만 바꾸고 뷰의 칸 두 개(발사대·빔 템플릿)만 다시 연결하면 된다. 조각 루트는 뷰 축(로컬 X = 폭)과 90° 단위로만 돌릴 것.
-  - 맞춤 = 메시 bounds 로 잰다(FBX 축·피벗 하드코딩 없음): 발사대·빔의 긴 축 = 폭, 발사대는 바닥에 세움(기본 = FBX 높이 그대로 `keepPostHeight`), 빔 줄 수 = (높이 − 위아래 여유) ÷ 간격 + 1, 상한 칸(연출 전용 인스펙터 칸).
+  - 프리팹 = 루트 `MapGateLaserView` + `Visual/Posts`(`50.Art/…/Lasers/Env_laser.fbx` — **메시 하나에 양 끝 발사대 둘**이 들어 있다) + `Visual/Beams/Beam…`(`Env_laser_lay.fbx`, 프리팹에 놓은 줄 그대로 — 204).
+    이펙트 담당은 `Visual` 안만 바꾸고 뷰의 칸 두 개(발사대·빔 부모 `beamsRoot`)만 다시 연결하면 된다. 조각 루트는 뷰 축(로컬 X = 폭)과 90° 단위로만 돌릴 것.
+  - 맞춤 = 메시 bounds 로 잰다(FBX 축·피벗 하드코딩 없음): 발사대·빔의 긴 축 = 폭, 발사대는 바닥에 세움(기본 = FBX 높이 그대로 `keepPostHeight`), 빔 줄 = 아래 항목(204).
+  - 빔 줄(할 일 204, 사용자 배치): `Visual/Beams` 아래 자식(Beam·Beam (1)·Beam (2)) **그대로** 쓴다 — 복제·줄 수 계산 없음(옛 `beamTemplate`·`beamSpacing`·`maxBeams`·`beamMargin` 칸 삭제). 프리팹에 놓은 줄 높이·앞뒤 위치는 발사대 바닥·중심 기준으로, 길이는 (빔 길이 ÷ 발사대 폭) 비율로 유지하고 게이트 폭에만 맞춘다. 줄 추가·삭제·높이 조절 = 프리팹에서 Beam 을 복제·삭제·이동(Y). 레이저는 런타임 생성이라 씬 인스턴스·오버라이드 없음 — **프리팹만 고치면 8곳 전부**.
   - 폭 = **벽 사이 통로 폭** — 배리어 가로(복도 너비 + 양옆 0.3m)는 벽 속으로 파고들어 그대로 쓰면 발사대가 벽에 묻힌다. 게이트 가운데(바닥 + 1m)에서 Wall 레이어 레이캐스트로 양옆을 재고, 못 잡으면 배리어 가로 그대로. 지금 8곳 = 2.76m.
   - 머티리얼 = `3.Materials/Environment/MapScene/MA_MapGateLaser.mat`(셰이더 `50.Art/MapGen/MapObj/material/lay.shadergraph` 재사용 — 텍스처 `ray_basecolor` 가 빨강, 발광 ×4.82). 발사대는 FBX 기본 머티리얼.
   - 칸이 비면 예전 반투명 큐브(`barrierMaterial`)로 폴백 + 경고 한 줄. 개인 뒤 배리어(`BackBarrier_G*`)도 같은 프리팹(`BackLaser_G*`, 카브 없음).
