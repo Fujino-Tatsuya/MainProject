@@ -40,6 +40,10 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     [Tooltip("프리팹 저작 크기에 곱하는 배율.")]
     [SerializeField, Min(0.01f)] private float transformEffectScale = 1f;
 
+    /// <summary>변신 오라 오프셋·배율 — 캐릭터 선택 미리보기(할 일 199)가 같은 값으로 켠다.</summary>
+    public Vector3 TransformEffectOffset => transformEffectOffset;
+    public float TransformEffectScale => transformEffectScale;
+
     [Header("변신 E 원형 5타 — EffectCatalog.Assassin_E_MultiSlashes")]
     [Tooltip("배율 = 원 반경(m) × 이 값. 1 = 프리팹의 입자 생성 원(반경 1m 저작)이 바닥 원 표시와 같은 크기.\n" +
              "베기·바닥 자국 자체 크기 때문에 실제로 보이는 범위는 원보다 넓다 — 외곽을 원에 맞추려면 0.4~0.5.")]

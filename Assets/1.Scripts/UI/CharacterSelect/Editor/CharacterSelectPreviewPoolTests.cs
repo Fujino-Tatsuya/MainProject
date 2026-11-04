@@ -131,6 +131,8 @@ public sealed class CharacterSelectPreviewPoolTests
 
             if (animation.beamNormalizedTime >= 0f)
                 AssertPreviewHasBeamSocket(prefab);
+            if (animation.transformAura)
+                Assert.IsNotNull(prefab.GetComponentInChildren<AssassinSkillView>(true), $"{prefab.name}: 변신 오라 칸이 있는데 AssassinSkillView 가 없다");
             checkedCount++;
         }
 

@@ -226,7 +226,8 @@
   - 넘김 시점 = 그 클립의 **End 애니 이벤트**(평타 `HandleDefaultAttackEvent(End)`·스킬 `HandleSkillEvent(End)` — 게임이 동작 끝으로 보는 곳), 없으면 클립 끝 − 블렌드. 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡아 두 번 바뀌지 않게 한다.
   - 블렌드 = 등장끼리 `chainBlendSeconds`(기본 0.1초)·마지막 → 루프 `loopBlendSeconds`(항목별). 상태가 없으면 경고 후 건너뜀.
   - 거너 빔 = `beamNormalizedTime`(첫 등장 칸 정규화 시각, 음수 = 안 쏨 — `Gunner_Q_Fire` 클립에 발사 순간 이벤트가 없어 칸으로 둠)·`beamLength`(m, 복제본 앞). 프리팹 `GunnerBeamView` 의 Q 빔 소켓(`QBeamFx`, 총구 `BeamMuzzle`)의 복제본 쪽 `EffectSocketPlayer` 로 같은 이펙트를 로컬 재생, `GunnerBeamView.AimAndStretch` 로 겨눔·길이, 유지 = `chargeBeamHoldDuration`. 피해·RPC·서버 없음. 카드가 바뀌면 `Stop`, 패널이 닫히면 복제본이 꺼지며 `OnDisable` 로 풀 반납.
-  - 기본: 팔라딘 `Default_Attack0` → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → 2타 클립 끝 포즈로 멈춰 유지(`holdLastPose` 켬). 카드가 다시 오거나 패널을 다시 열면 처음부터.
+  - 어쌔신 변신 오라 = `transformAura` 켜면 미리보기가 보이는 동안 계속 — 게임 R 변신(`AssassinSkillView.HandleTransformChanged`)과 같은 `EffectCatalog.Assassin_R_BladeVortex` 를 `EffectManager.PlayLooping` 으로 복제본 루트에 붙임(오프셋·배율 = 프리팹 `AssassinSkillView` 값). 카드 교체·패널 닫힘 = `ReleaseImmediate`.
+  - 기본: 팔라딘 `Default_Attack0` → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → `Idle`(1.0) + 변신 오라. 카드가 다시 오거나 패널을 다시 열면 처음부터.
 - 닫힐 때(이유 무관·파괴 포함) 복제본을 끄고 진짜 캐릭터 렌더러를 되돌린다. 칸 `showPreview`(기본 켬).
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인

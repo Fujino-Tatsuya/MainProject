@@ -120,8 +120,8 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         new CharacterSelectPreviewAnimation("Player_Paladin", new[] { "Default_Attack0" }, "Idle", 0.9f),
         // 거너 = Q 발사(빔은 그 클립에 발사 순간 이벤트가 없어 칸 시각으로 — 게임도 이 상태로 넘기는 순간 빔을 켠다).
         new CharacterSelectPreviewAnimation("Player_Gunner", new[] { "Gunner_Q_Fire" }, "Idle", 0.3f) { beamNormalizedTime = 0.02f },
-        // 어쌔신 = 평타 1→2타 → 2타 클립 끝 포즈로 멈춰 유지(holdLastPose — 루프 Idle_Combat 은 쓰지 않음).
-        new CharacterSelectPreviewAnimation("Player_Assassin", new[] { "Default_Attack0", "Default_Attack1" }, "Idle_Combat", 0.4f) { holdLastPose = true },
+        // 어쌔신 = 평타 1→2타 → Idle 로 1초 블렌드, 보이는 동안 R 변신 오라.
+        new CharacterSelectPreviewAnimation("Player_Assassin", new[] { "Default_Attack0", "Default_Attack1" }, "Idle", 1f) { transformAura = true },
     };
 
     [Header("Confirm Wait (할 일 199 — 확정 뒤 교체 대기)")]

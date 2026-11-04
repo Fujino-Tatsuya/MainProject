@@ -29,6 +29,8 @@ public sealed class CharacterSelectPreviewAnimation
     public float beamNormalizedTime = -1f;
     [Tooltip("빔 길이(m) — 복제본 앞 방향으로.")]
     [Min(0.1f)] public float beamLength = 8f;
+    [Tooltip("켜면 미리보기가 보이는 동안 어쌔신 R 변신 오라(EffectCatalog.Assassin_R_BladeVortex)를 계속 켠다 — 오프셋·배율은 프리팹 AssassinSkillView 값.")]
+    public bool transformAura;
 
     public CharacterSelectPreviewAnimation(string prefabName, string[] entryStates, string loopState, float loopBlendSeconds = DefaultLoopBlendSeconds)
     {
@@ -88,6 +90,10 @@ public sealed class CharacterSelectPreviewPool
         public float BeamLength;
         public bool BeamFired;
         public float BeamStopAt;
+        public bool Aura;               // 어쌔신 R 변신 오라 — 보이는 동안 계속
+        public Vector3 AuraOffset;
+        public float AuraScale = 1f;
+        public EffectHandle AuraLoop;
     }
 
     private readonly List<Preview> _previews = new List<Preview>();
@@ -138,6 +144,7 @@ public sealed class CharacterSelectPreviewPool
             target.Root.transform.SetPositionAndRotation(position, rotation);
             target.Root.SetActive(true);
             PlayEntry(target);
+            StartAura(target);
             _shown = index;
         }
         else
@@ -151,9 +158,32 @@ public sealed class CharacterSelectPreviewPool
     public void HideAll()
     {
         for (int i = 0; i < _previews.Count; i++)
-            if (_previews[i] != null && _previews[i].Root != null && _previews[i].Root.activeSelf)
+        {
+            if (_previews[i] == null)
+                continue;
+            StopAura(_previews[i]);
+            if (_previews[i].Root != null && _previews[i].Root.activeSelf)
                 _previews[i].Root.SetActive(false);
+        }
         _shown = -1;
+    }
+
+    // 어쌔신 R 변신 오라 — 게임(AssassinSkillView.HandleTransformChanged)과 같은 엔트리·오프셋·배율로 복제본 루트를 따라간다.
+    private static void StartAura(Preview preview)
+    {
+        if (!preview.Aura || preview.AuraLoop.IsSet || !EffectManager.TryGet(out EffectManager effects))
+            return;
+        EffectEntry entry = effects.Catalog.Assassin_R_BladeVortex;
+        if (entry != null)
+            preview.AuraLoop = effects.PlayLooping(entry, preview.Root.transform, preview.AuraOffset, preview.AuraScale);
+    }
+
+    // 카드 교체·패널 닫힘 — 따라갈 복제본이 꺼지므로 outro 없이 바로 반납.
+    private static void StopAura(Preview preview)
+    {
+        if (preview.AuraLoop.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.ReleaseImmediate(preview.AuraLoop);
+        preview.AuraLoop = EffectHandle.None;
     }
 
     /// <summary>보이는 복제본의 등장 칸 넘김 → 루프(또는 홀드) + 빔. 매 프레임.</summary>
@@ -264,6 +294,7 @@ public sealed class CharacterSelectPreviewPool
 
     public void Dispose()
     {
+        HideAll();
         if (_container != null)
             UnityEngine.Object.Destroy(_container);
         _container = null;
@@ -377,6 +408,8 @@ public sealed class CharacterSelectPreviewPool
             preview.HoldLastPose = animation.holdLastPose;
             if (animation.beamNormalizedTime >= 0f)
                 BindBeam(preview, prefab, animation);
+            if (animation.transformAura)
+                BindAura(preview, prefab);
         }
         else
         {
@@ -407,6 +440,19 @@ public sealed class CharacterSelectPreviewPool
         preview.BeamHold = view.ChargeBeamHoldDuration;
         preview.BeamTime = animation.beamNormalizedTime;
         preview.BeamLength = animation.beamLength;
+    }
+
+    private static void BindAura(Preview preview, GameObject prefab)
+    {
+        AssassinSkillView view = prefab.GetComponentInChildren<AssassinSkillView>(true);
+        if (view == null)
+        {
+            Debug.LogWarning($"[CharacterSelectPreviewPool] {prefab.name} 에 AssassinSkillView 가 없다 — 변신 오라를 안 켠다.");
+            return;
+        }
+        preview.Aura = true;
+        preview.AuraOffset = view.TransformEffectOffset;
+        preview.AuraScale = view.TransformEffectScale;
     }
 
     private static string RelativePath(Transform root, Transform target)

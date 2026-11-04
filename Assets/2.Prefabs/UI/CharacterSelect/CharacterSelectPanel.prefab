@@ -1687,6 +1687,7 @@ MonoBehaviour:
     chainBlendSeconds: 0.1
     beamNormalizedTime: -1
     beamLength: 8
+    transformAura: 0
   - prefabName: Player_Gunner
     entryStates:
     - Gunner_Q_Fire
@@ -1696,16 +1697,18 @@ MonoBehaviour:
     chainBlendSeconds: 0.1
     beamNormalizedTime: 0.02
     beamLength: 8
+    transformAura: 0
   - prefabName: Player_Assassin
     entryStates:
     - Default_Attack0
     - Default_Attack1
-    loopState: Idle_Combat
-    holdLastPose: 1
-    loopBlendSeconds: 0.4
+    loopState: Idle
+    holdLastPose: 0
+    loopBlendSeconds: 1
     chainBlendSeconds: 0.1
     beamNormalizedTime: -1
     beamLength: 8
+    transformAura: 1
   choiceTimeoutSeconds: 6
   choiceFailNoticeSeconds: 2
   pendingTextColor: {r: 0.85, g: 0.9, b: 1, a: 1}
