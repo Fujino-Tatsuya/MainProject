@@ -123,6 +123,29 @@ public sealed class SkillLineLengthFadeTests
     }
 
     [Test]
+    public void Shader_SideEdgeLines_OwnCurve_OnTop()
+    {
+        string text = File.ReadAllText(ShaderPath);
+        StringAssert.Contains(SkillLineLengthFade.EdgeEnabledProperty, text);
+        StringAssert.Contains(SkillLineLengthFade.EdgeCurveProperty, text);
+        StringAssert.Contains(SkillLineLengthFade.EdgeWidthProperty, text);
+        StringAssert.Contains(SkillLineLengthFade.EdgeColorProperty, text);
+        StringAssert.Contains("float _EdgeLineCurve[LINE_FADE_SAMPLES];", text);
+        StringAssert.Contains("EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y)", text);
+    }
+
+    [Test]
+    public void RangeMaterial_EdgeTextureIsWhite512_AndEdgeOffByDefault()
+    {
+        var material = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+        Assert.IsNotNull(material, MaterialPath);
+        Texture edge = material.GetTexture("_EdgeTex");
+        Assert.IsNotNull(edge, "_EdgeTex");
+        Assert.AreEqual("white_512", edge.name);
+        Assert.AreEqual(0f, material.GetFloat(SkillLineLengthFade.EdgeEnabledProperty), Eps);
+    }
+
+    [Test]
     public void RangeMaterial_FadeOffByDefault()
     {
         var material = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);

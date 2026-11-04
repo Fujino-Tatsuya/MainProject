@@ -24,6 +24,10 @@ Shader "VeyTrace/Player/Skill Line Indicator"
         [HideInInspector] _LineFadeOn ("Length Fade On (runtime)", Float) = 0
         [HideInInspector] _LineFadeSpan ("Length Fade Span (runtime)", Vector) = (0, 1, 0, 0)
         _DecalFade ("Distance Fade (att0, att1, att2)", Vector) = (1, 0, 0, 0)
+        _EdgeTex ("Side Edge Line Texture", 2D) = "white" {}
+        [HideInInspector] _EdgeLineOn ("Side Edge Line On (runtime)", Float) = 0
+        [HideInInspector] _EdgeLineWidth ("Side Edge Line Width m (runtime)", Float) = 0.06
+        [HideInInspector] _EdgeLineColor ("Side Edge Line Color (runtime)", Color) = (1, 1, 1, 1)
     }
     SubShader
     {
@@ -65,6 +69,10 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 half _LineFadeOn;
                 float4 _LineFadeSpan;
                 float4 _DecalFade;
+                float4 _EdgeTex_ST;
+                half _EdgeLineOn;
+                float _EdgeLineWidth;
+                half4 _EdgeLineColor;
             CBUFFER_END
             #include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
             Varyings Vert(Attributes input)
@@ -82,11 +90,22 @@ Shader "VeyTrace/Player/Skill Line Indicator"
             // C# mirror = SkillLineLengthFade.Sample.
             #define LINE_FADE_SAMPLES 32
             float _LineFadeCurve[LINE_FADE_SAMPLES];
+            // 202: side edge lines (white_512) get their own curve, same 32-sample bake (_EdgeLineCurve).
+            float _EdgeLineCurve[LINE_FADE_SAMPLES];
+            TEXTURE2D(_EdgeTex);
+            SAMPLER(sampler_EdgeTex);
+            #define LINE_FADE_SAMPLE(curve,t,result) { float fx_=saturate(t)*(LINE_FADE_SAMPLES-1); int fi_=min((int)fx_,LINE_FADE_SAMPLES-2); result=lerp(curve[fi_],curve[fi_+1],fx_-fi_); }
             float LineLengthFade(float t)
             {
-                float x=saturate(t)*(LINE_FADE_SAMPLES-1);
-                int i=min((int)x,LINE_FADE_SAMPLES-2);
-                return lerp(_LineFadeCurve[i],_LineFadeCurve[i+1],x-i);
+                float v;
+                LINE_FADE_SAMPLE(_LineFadeCurve,t,v);
+                return v;
+            }
+            float EdgeLineFade(float t)
+            {
+                float v;
+                LINE_FADE_SAMPLE(_EdgeLineCurve,t,v);
+                return v;
             }
             float SegmentDistance(float2 p,float2 a,float2 b)
             {
@@ -207,7 +226,22 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 Over(result,_EndColor.rgb,endBar*_EndColor.a*rangeVisibility);
                 half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y)),lengthFadeOn);
                 half distanceFade=(half)DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz);
-                return half4(result.rgb/max(result.a,0.0001h),result.a*inside*_Color.a*lengthFade*distanceFade);
+                half3 baseRgb=result.rgb/max(result.a,0.0001h);
+                half baseA=result.a*inside*_Color.a*lengthFade*distanceFade;
+                // 202: white side edge lines on top (own curve, gunner Q only via _EdgeLineOn). Inside the quad width.
+                if(_EdgeLineOn>0.5h)
+                {
+                    float edgeWidth=clamp(_EdgeLineWidth,0.0,size.x*0.5);
+                    float fromSide=size.x*0.5-abs(samplePos.x);
+                    half edgeMask=edgeWidth>0.0?1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,fromSide):0.0h;
+                    float2 edgeUv=float2(saturate(fromSide/max(edgeWidth,0.0001)),input.uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
+                    half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
+                    half edgeA=edgeMask*inside*edgeTex.a*_EdgeLineColor.a*(half)saturate(EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y))*distanceFade;
+                    half outA=edgeA+baseA*(1.0h-edgeA);
+                    half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
+                    return half4(outRgb,outA);
+                }
+                return half4(baseRgb,baseA);
             }
             ENDHLSL
         }

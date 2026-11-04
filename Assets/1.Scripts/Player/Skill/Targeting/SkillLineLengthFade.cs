@@ -17,6 +17,12 @@ public static class SkillLineLengthFade
     public const string EnabledProperty = "_LineFadeOn";
     public const string SpanProperty = "_LineFadeSpan";
 
+    // 양옆 흰 라인(white_512) — 같은 32 샘플 굽기·속성 블록 방식, 커브는 따로(SkillLineIndicator.edgeLineCurve).
+    public const string EdgeEnabledProperty = "_EdgeLineOn";
+    public const string EdgeCurveProperty = "_EdgeLineCurve";
+    public const string EdgeWidthProperty = "_EdgeLineWidth";
+    public const string EdgeColorProperty = "_EdgeLineColor";
+
     /// <summary>셰이더 <c>LINE_FADE_SAMPLES</c> 와 같아야 한다.</summary>
     public const int SampleCount = 32;
 

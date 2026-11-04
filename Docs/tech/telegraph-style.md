@@ -163,5 +163,7 @@ Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드,
 - 커브 값은 **최종 알파 한 곳**에 곱한다 — 채움·외곽선·안쪽선·화살표 무늬·끝선(C3 Flat End)이 모두 합쳐진 뒤라 커브 0 인 곳은 전부 완전히 투명(블렌드 SrcAlpha/OneMinusSrcAlpha, 가산 아님). 고스트도 같은 커브·같은 t.
 - 커브 칸이 프리팹에 직렬화돼 있지 않으면 코드 기본 커브를 쓴다(11-04 기준 Player.prefab 은 기본 사용).
 - 채움 끝의 진하기 단차(채움 알파 0.28 vs 고스트 0.09, 흰 끝선)는 최소/최대 사거리 표시 디자인이라 그대로다 — 감쇠는 그 위에 곱해진다.
+- **양옆 흰 라인**(거너 Q 만): 같은 컴포넌트 헤더 "양옆 흰 라인 (202 — 거너 Q)" — **Edge Line Width**(m, 기본 0.06, 0 이면 안 그림)·**Edge Line Color**(흰색)·**Edge Line Curve**(길이 비율별 진하기, 기본 = 길이 감쇠 기본 커브, 끝 0). 텍스처는 `SkillLineRange.mat` 의 **Side Edge Line Texture** = `50.Art/TestAssets/Temp_Images/Images/white_512.png`(SVN). 같은 패스 안에서 기존 그림 **위에** 합성(별도 렌더러·패스 없음), 같은 32 샘플 굽기·속성 블록(`_EdgeLineCurve`·`_EdgeLineOn`·`_EdgeLineWidth`·`_EdgeLineColor`). 사각형 폭 안쪽에 그린다.
+- 사용자 튜닝 커브는 `Player_Gunner.prefab` 의 `SkillLineIndicator.lengthFadeCurve` 오버라이드(11-04). base `Player.prefab` 은 코드 기본값.
 - t 는 그려진 사각형 기준이라 벽에 잘려 짧아지면 잘린 끝이 t=1.
 - 코드: 셰이더 `LineLengthFade`(샘플 직선 보간) = C# `Player/Skill/Targeting/SkillLineLengthFade.cs` `Bake`·`Sample`(테스트 기준). 테스트: `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행` 의 `SkillLineLengthFadeTests`.

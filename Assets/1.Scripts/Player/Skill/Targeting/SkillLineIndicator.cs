@@ -11,6 +11,10 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private static readonly int LengthFadeOnId = Shader.PropertyToID(SkillLineLengthFade.EnabledProperty);
     private static readonly int LengthFadeSpanId = Shader.PropertyToID(SkillLineLengthFade.SpanProperty);
     private static readonly int LengthFadeCurveId = Shader.PropertyToID(SkillLineLengthFade.CurveProperty);
+    private static readonly int EdgeLineOnId = Shader.PropertyToID(SkillLineLengthFade.EdgeEnabledProperty);
+    private static readonly int EdgeLineCurveId = Shader.PropertyToID(SkillLineLengthFade.EdgeCurveProperty);
+    private static readonly int EdgeLineWidthId = Shader.PropertyToID(SkillLineLengthFade.EdgeWidthProperty);
+    private static readonly int EdgeLineColorId = Shader.PropertyToID(SkillLineLengthFade.EdgeColorProperty);
     private static readonly Vector4 WholeSpan = new(0f, 1f, 0f, 0f);
 
     [Header("Quad 층")]
@@ -29,6 +33,13 @@ public sealed class SkillLineIndicator : MonoBehaviour
     [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 진하기 배율. 거너 Q 충전·Q 미리보기에만 걸린다. Play 중 고쳐도 바로 반영.")]
     [SerializeField] private AnimationCurve lengthFadeCurve = SkillLineLengthFade.DefaultCurve();
 
+    [Header("양옆 흰 라인 (202 — 거너 Q)")]
+    [Tooltip("사각형 양옆 안쪽에 덧그리는 라인 두께(m). 0 이면 안 그림. 텍스처는 SkillLineRange.mat 의 Side Edge Line Texture(white_512).")]
+    [SerializeField, Min(0f)] private float edgeLineWidth = 0.06f;
+    [SerializeField] private Color edgeLineColor = Color.white;
+    [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 흰 라인 진하기 배율. 길이 감쇠 커브와 따로.")]
+    [SerializeField] private AnimationCurve edgeLineCurve = SkillLineLengthFade.DefaultCurve();
+
     // 필드 초기화에서 만들면 MonoBehaviour 생성자에서 CreateImpl 예외 — 처음 쓸 때 만든다.
     private MaterialPropertyBlock propertyBlock;
     private Player player;
@@ -40,6 +51,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private ISkillPreviewSource previewSource;
     private bool chargeVisible;
     private readonly float[] lengthFadeSamples = new float[SkillLineLengthFade.SampleCount];
+    private readonly float[] edgeLineSamples = new float[SkillLineLengthFade.SampleCount];
     private bool lengthFadeDirty = true;
 
     private void Awake()
@@ -206,10 +218,15 @@ public sealed class SkillLineIndicator : MonoBehaviour
             if (lengthFadeDirty)
             {
                 SkillLineLengthFade.Bake(lengthFadeCurve, lengthFadeSamples);
+                SkillLineLengthFade.Bake(edgeLineCurve, edgeLineSamples);
                 lengthFadeDirty = false;
             }
             propertyBlock.SetFloatArray(LengthFadeCurveId, lengthFadeSamples);
+            propertyBlock.SetFloatArray(EdgeLineCurveId, edgeLineSamples);
+            propertyBlock.SetFloat(EdgeLineWidthId, edgeLineWidth);
+            propertyBlock.SetColor(EdgeLineColorId, edgeLineColor);
         }
+        propertyBlock.SetFloat(EdgeLineOnId, lengthFadeSpan.HasValue && edgeLineWidth > 0f ? 1f : 0f);
         targetRenderer.SetPropertyBlock(propertyBlock);
         SetRendererVisible(targetRenderer, true);
     }
