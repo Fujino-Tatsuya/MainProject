@@ -26,6 +26,7 @@
 
 - 서버 판정(`ResolveHit` 오버랩·`ServerIsInterruptible`·창 소비·그로기·취약·`CombatStatsEvents`) — 예측 캐시는 판정에 쓰이지 않는다.
 - 카운터 창 길이·개폐 시점·텔레그래프·`_counterVisual` 조기 소등.
+  - ⚠️ 2026-11-04 정정: 조기 소등(`CounterVisualLeadSeconds` 0.15)은 삭제됐다 — 표시 = 판정 창, 판정이 닫히는 순간 같이 꺼진다([interrupt-client-judge.md §9.2](interrupt-client-judge.md)).
 - 섬광 RPC 발신 지점·속성.
 
 ## 4. 보이는 변화 — 맞은 쪽 섬광(E1) 꺼짐

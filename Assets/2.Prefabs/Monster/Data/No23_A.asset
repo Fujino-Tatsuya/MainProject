@@ -392,7 +392,7 @@ MonoBehaviour:
   comboStepInterval: 0.3
   comboChaseGrace: 1
   raidOpeningStepInterval: 1
-  comboDashWindup: 0.7
+  comboDashWindup: 1.5
   comboGrabTelegraph: 0.6
   comboGrabTelegraphAfterDash: 1
   comboHookFollowThrough: 0.3

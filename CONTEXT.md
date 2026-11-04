@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-04 · 경석(Claude) · **간파 표시(보라색) = 판정 창 일치**, 브랜치 `feature/SettingsDdol`) — ✅ 커밋·development 병합 · 컴파일 0 · Codex 검수 지적 0 · ✅ 경석 Play 확인(11-04)
+- 받기: development fast-forward `1720a428`(191 간파 클라 판정 포함) · SVN r583. 내 `GameData.xlsx`(현지화 A, r579 기반) → ✅ r583 위로 다시 넣음(내 변경 = Strings 145칸만, r580~583 = SlowMotion 만 — 겹침 0, 병합본 작업본에 반영, 백업 볼트 `_local/backup-l10nA-20261104/`). `StringTable 갱신` 다시 돌림 → 키 553·오류 0(경고 6 = 그림자 회귀 툴팁 키 주인 못 찾음, {필드} 검사만 생략) · 에셋이 xlsx 의 11-02 ko 교체(클리어·패시브·준비 중…)를 이제 반영.
+- 원인: 후속 돌진(HookHookDash 3타·JumpDash 2타)은 0.7초 창을 알렸지만 돌진 클립에 이벤트가 없어 대체값(≈1.5초)에서 발사 → 191 클라 판정이 0.7초 뒤 간파를 보라색인데 실패(신고 없음). 로그 10/10 재현.
+- 수정(보스 쪽만, 판정 코드 무변경): 23호 `ShowDashTelegraph` 후속 돌진도 준비 신호 즉시 → 발사 = `comboDashWindup` 단독. 값 = **1.5초**(경석: 0.7 은 시연회에서 못 친다 → 단타 돌진과 같은 1.5, `No23*.asset` 4개 · `DataTableIgnore` 라 xlsx 무관). 창이 돌진 행 창(1.5) 이상이면 후속 돌진도 준비동작(DashPrep)을 튼다(짧을 때만 건너뜀 — 안 그러면 클립이 0.57 을 지나 되감김). 은희 191 쪽 수정 불필요(창 기록 8개 보존·이력 1초는 누름~Hit 만 씀). 중간보스·스파링 봇 보라색 0.15초 조기 소등 삭제 — 판정 닫힘(`ServerReplicateCounterWindow(false)`)이 표시도 끈다. 문서 [interrupt-client-judge.md](Docs/tech/interrupt-client-judge.md) §9.1·§9.2.
+- 남은 것: 창 끝 사각(판정 = 간파 Hit 시각이라 보라색 끝 약 0.3초 안 입력은 실패) — 방향 미정((d) 간파 Hit 앞당기기 권장 / (a) "보라색 동안 입력 접수"는 은희 191 D2 변경). 허수아비(랩) 창 도중 길이 변경 시 시간표 미갱신(디버그).
+
 ## ▶▶ 작업 세션 (2026-11-03 · 경석(Claude) · **미커밋 정리 + development 받기**, 브랜치 `feature/SettingsDdol`) — ✅
 - 커밋: 사운드 문서 `70d170cc` · 로비 연습봇 사거리 밖 타깃 교체 `0157c12e` · 보스 등장 워크인 보정(RPC 가 회차 복제보다 먼저 와도 보관 + 정지 자리 스냅) `300856e4` — 둘 다 ⏳ MPPM 미확인 · development 27커밋 병합(AGENTS.md 인덱스 양쪽 유지) · SVN r579·핀 579.
 - 미커밋 유지: 아래 현지화·글꼴 작업(⏳ Play) — 🔴 커밋 전 `TraitWindowModelTests.TextTable_DefaultsMatchConstants…` 고칠 것(시트 행이 에셋보다 우선하게 바뀌어 '에셋 값 우선' 기대가 깨짐). 개발 도구 4개·`raid-23-phases.html` 은 의도적 미추적.

@@ -187,7 +187,7 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
         if (Counter == null) return;
 
         Counter.Open();
-        if (Counter.IsOpen) ServerSetCounterWindow(true, Counter.WindowDuration);   // 표시는 0.15초 먼저 꺼진다
+        if (Counter.IsOpen) ServerSetCounterWindow(true);   // 표시 = 판정 창(만료 때 같이 꺼진다)
     }
 
     /// <summary>
