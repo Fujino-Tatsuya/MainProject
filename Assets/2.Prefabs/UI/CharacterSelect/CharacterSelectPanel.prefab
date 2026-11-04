@@ -1701,7 +1701,7 @@ MonoBehaviour:
     - Default_Attack0
     - Default_Attack1
     loopState: Idle_Combat
-    holdLastPose: 0
+    holdLastPose: 1
     loopBlendSeconds: 0.4
     chainBlendSeconds: 0.1
     beamNormalizedTime: -1

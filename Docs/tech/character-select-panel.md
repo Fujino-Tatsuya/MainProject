@@ -222,11 +222,11 @@
   - 복제 = 꺼진 홀더 아래 Variant Instantiate(Awake 없음) → `Armature`·`PlayerWaeponSlot` 말고 자식 파괴, 루트는 Transform 만 → 남은 쪽에서 화이트리스트 밖 스크립트·NetworkTransform/NetworkAnimator·Collider·Rigidbody 제거, 파티클·트레일·오디오 끔, Animator 루트 모션 끔.
   - 남기는 스크립트 = `PlayerAnimationEventRelay`·`EffectAnimEventRelay`(애니 이벤트 수신자 — 부모가 없어 아무것도 안 함)·`WeaponTransformRelay`(팔라딘 칼·방패)·`SDArmTwist`·어쌔신 머리카락 4종·`DissolveOverlay`·`EffectSocketPlayer`(거너 Q 빔 — 미리보기 코드가 부를 때만). 거너 레이저건은 Armature 안 메시라 그대로 보인다.
 - 열린 동안 진짜 내 캐릭터(추적 대상의 오너 `Player`)는 렌더러 `forceRenderingOff` 로 이 화면에서만 감추고(`CharacterSelectRealPlayerHider`, 원래 꺼진 것은 기록 안 함) 그 자리·선택 카메라 쪽 수평 방향에 **포커스 캐릭터** 복제본을 세운다. 지금·잠긴 캐릭터도 복제본. 포커스가 바뀌면 즉시 교체. 다른 피어 화면은 진짜 캐릭터(카메라 바라보기 그대로).
-- 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — **`entryStates` 를 순서대로 1회씩 → 루프(`loopState`) 또는 마지막 포즈 홀드(`holdLastPose`, Animator 속도 0)**.
+- 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — **`entryStates` 를 순서대로 1회씩 → 루프(`loopState`) 또는 마지막 포즈 홀드(`holdLastPose` — 마지막 칸은 End 이벤트가 아니라 클립 끝 프레임(정규화 0.999, 1 이면 컨트롤러 끝 전이가 걸림)까지 재생 후 Animator 속도 0)**.
   - 넘김 시점 = 그 클립의 **End 애니 이벤트**(평타 `HandleDefaultAttackEvent(End)`·스킬 `HandleSkillEvent(End)` — 게임이 동작 끝으로 보는 곳), 없으면 클립 끝 − 블렌드. 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡아 두 번 바뀌지 않게 한다.
   - 블렌드 = 등장끼리 `chainBlendSeconds`(기본 0.1초)·마지막 → 루프 `loopBlendSeconds`(항목별). 상태가 없으면 경고 후 건너뜀.
   - 거너 빔 = `beamNormalizedTime`(첫 등장 칸 정규화 시각, 음수 = 안 쏨 — `Gunner_Q_Fire` 클립에 발사 순간 이벤트가 없어 칸으로 둠)·`beamLength`(m, 복제본 앞). 프리팹 `GunnerBeamView` 의 Q 빔 소켓(`QBeamFx`, 총구 `BeamMuzzle`)의 복제본 쪽 `EffectSocketPlayer` 로 같은 이펙트를 로컬 재생, `GunnerBeamView.AimAndStretch` 로 겨눔·길이, 유지 = `chargeBeamHoldDuration`. 피해·RPC·서버 없음. 카드가 바뀌면 `Stop`, 패널이 닫히면 복제본이 꺼지며 `OnDisable` 로 풀 반납.
-  - 기본: 팔라딘 `Default_Attack0` → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → `Idle_Combat`(0.4, 허리 숙인 전투 대기 루프 — 2타 End 포즈에서 멈추려면 `holdLastPose` 켬).
+  - 기본: 팔라딘 `Default_Attack0` → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → 2타 클립 끝 포즈로 멈춰 유지(`holdLastPose` 켬). 카드가 다시 오거나 패널을 다시 열면 처음부터.
 - 닫힐 때(이유 무관·파괴 포함) 복제본을 끄고 진짜 캐릭터 렌더러를 되돌린다. 칸 `showPreview`(기본 켬).
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인

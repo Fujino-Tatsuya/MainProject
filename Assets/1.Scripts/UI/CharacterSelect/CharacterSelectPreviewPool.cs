@@ -19,7 +19,7 @@ public sealed class CharacterSelectPreviewAnimation
     public List<string> entryStates = new List<string>();
     [Tooltip("등장이 끝난 뒤 반복할 Animator 상태 이름(0번 레이어). 비우면 Animator 기본 상태.")]
     public string loopState;
-    [Tooltip("켜면 루프로 넘기지 않고 마지막 등장 상태의 End 이벤트 포즈에서 멈춰 둔다(Animator 속도 0).")]
+    [Tooltip("켜면 루프로 넘기지 않고 마지막 등장 상태를 클립 끝 프레임까지 재생하고 그 포즈로 멈춰 둔다(Animator 속도 0, 루프·블렌드 없음).")]
     public bool holdLastPose;
     [Tooltip("등장 → 루프 크로스페이드 시간(초). End 이벤트(없으면 클립 끝 − 이 시간)에서 시작 — 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡는다.")]
     [Min(0f)] public float loopBlendSeconds = DefaultLoopBlendSeconds;
@@ -52,6 +52,7 @@ public sealed class CharacterSelectPreviewPool
 {
     public const string ArmatureName = "Armature";
     public const string WeaponSlotName = "PlayerWaeponSlot";
+    private const float HoldNormalizedTime = 0.999f; // 홀드 정지 위치 — 1 이면 컨트롤러 끝 전이가 걸린다
 
     // 남기는 MonoBehaviour — 같은 오브젝트·자식만 참조한다(진짜 플레이어 루트 의존 없음).
     private static readonly HashSet<Type> KeptBehaviours = new HashSet<Type>
@@ -174,6 +175,19 @@ public sealed class CharacterSelectPreviewPool
         }
 
         bool last = shown.Step == shown.EntryHashes.Length - 1;
+        if (last && shown.HoldLastPose)
+        {
+            // 홀드 = End 이벤트가 아니라 클립 끝 프레임까지 재생 후 정지. 컨트롤러 끝 전이(Exit Time 1 → Idle/Idle_Combat)가
+            // 1 을 넘는 순간 먼저 바꾸므로, 다음 프레임에 1 에 닿을 때 직전(0.999)에 세운다 — 끝 프레임과 구분 안 됨.
+            float step = Time.deltaTime * shown.Animator.speed * state.speed * state.speedMultiplier / Mathf.Max(state.length, 0.0001f);
+            if (state.normalizedTime + step < HoldNormalizedTime)
+                return;
+            shown.Step = -1;
+            shown.Animator.Play(state.shortNameHash, 0, HoldNormalizedTime);
+            shown.Animator.speed = 0f;
+            shown.Animator.Update(0f);
+            return;
+        }
         if (shown.StepEnd < 0f)
             shown.StepEnd = StepEndNormalized(shown.Animator, state, last ? shown.LoopBlend : shown.ChainBlend);
         // 컨트롤러 끝 전이(Exit Time 1, 0.05~0.1초 컷에 가까움)보다 먼저 잡는다 — 끝까지 기다리면 그 전이가 먼저 바꾸고
@@ -190,9 +204,7 @@ public sealed class CharacterSelectPreviewPool
         }
 
         shown.Step = -1;
-        if (shown.HoldLastPose)
-            shown.Animator.speed = 0f; // 마지막 칸 End 포즈에서 멈춤
-        else if (shown.LoopHash != 0)
+        if (shown.LoopHash != 0)
             shown.Animator.CrossFadeInFixedTime(shown.LoopHash, shown.LoopBlend, 0);
     }
 
