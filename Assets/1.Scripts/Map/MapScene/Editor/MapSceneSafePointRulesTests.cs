@@ -24,6 +24,54 @@ public sealed class MapSceneSafePointRulesTests
         return m;
     }
 
+    // ─── 판 도중 재합류 스폰 구간(할 일 205) ──────────────────────────────
+
+    static MapSceneArea Rejoin(MapSceneStep step, int gates, bool countdown = false, bool busy = false) =>
+        MapSceneSafePointRules.RejoinArea(MapSceneSafePointRules.ReturnPhase(true, step, countdown, busy), step, gates);
+
+    [Test]
+    public void RejoinArea_파티_진행_구간_단계와_열린_게이트_중_앞쪽()
+    {
+        Assert.AreEqual(MapSceneArea.Zone1, Rejoin(MapSceneStep.Zone1, 0));
+        Assert.AreEqual(MapSceneArea.Zone2, Rejoin(MapSceneStep.Zone2, Mask(MapSceneGate.G1_Corridor1Entry, MapSceneGate.G2_Zone2Entry)));
+        Assert.AreEqual(MapSceneArea.Corridor2, Rejoin(MapSceneStep.Corridor2,
+            Mask(MapSceneGate.G1_Corridor1Entry, MapSceneGate.G2_Zone2Entry, MapSceneGate.G3_Corridor2Entry)));
+        // 출구 게이트(G3)가 열렸어도 단계가 아직 존2 면 존2 — 다음 구간 첫 진입을 앞당기지 않는다(자동 부활과 같은 파티 구간).
+        Assert.AreEqual(MapSceneArea.Zone2, Rejoin(MapSceneStep.Zone2,
+            Mask(MapSceneGate.G1_Corridor1Entry, MapSceneGate.G2_Zone2Entry, MapSceneGate.G3_Corridor2Entry)));
+        // 단계가 앞서도 배리어로 못 가는 구간이면 갈 수 있는 가장 앞 구간.
+        Assert.AreEqual(MapSceneArea.Corridor1, Rejoin(MapSceneStep.Zone2, Mask(MapSceneGate.G1_Corridor1Entry)));
+    }
+
+    [Test]
+    public void RejoinArea_보스_진입_카운트다운은_보스진입_보스전과_밖은_None()
+    {
+        int all = MapSceneBackBarrierRules.AllBarrierMask | Mask(MapSceneGate.G5_SpinnerRealMode, MapSceneGate.G8_TimerStart);
+        Assert.AreEqual(MapSceneArea.Corridor4, Rejoin(MapSceneStep.BossEnter, all), "카운트다운 전 패드 단계 = 복도4");
+        Assert.AreEqual(MapSceneArea.BossEnter, Rejoin(MapSceneStep.BossEnter, all, countdown: true, busy: true), "보스방 이동 카운트다운");
+        Assert.AreEqual(MapSceneArea.None, Rejoin(MapSceneStep.BossEnter, all, busy: true), "엘리베이터 연출 중 = 기존(맵 시작)");
+        Assert.AreEqual(MapSceneArea.None, Rejoin(MapSceneStep.Finished, all), "보스전 = 보스방 모서리 규칙");
+        Assert.AreEqual(MapSceneArea.None,
+            MapSceneSafePointRules.RejoinArea(MapSceneSafePointRules.ReturnPhase(false, MapSceneStep.Zone2, false, false), MapSceneStep.Zone2, all),
+            "맵씬 진행 밖");
+    }
+
+    [Test]
+    public void RejoinArea_지난_배리어_기록은_그_구간이_최전방이고_앞_배리어는_비어_있다()
+    {
+        int gates = Mask(MapSceneGate.G1_Corridor1Entry, MapSceneGate.G2_Zone2Entry, MapSceneGate.G3_Corridor2Entry,
+                         MapSceneGate.G4_Zone3Entry, MapSceneGate.G5_SpinnerRealMode);
+        MapSceneArea area = Rejoin(MapSceneStep.Zone3Fight, gates);
+        Assert.AreEqual(MapSceneArea.Zone3, area);
+
+        int passed = MapSceneBackBarrierRules.MaskWithFrontmost(area);
+        Assert.AreEqual(MapSceneArea.Zone3, MapSceneBackBarrierRules.FrontmostPassedArea(passed));
+        Assert.IsTrue(MapSceneBackBarrierRules.Has(passed, MapSceneGate.G4_Zone3Entry), "들어온 배리어는 뒤에서 닫힌다");
+        Assert.IsFalse(MapSceneBackBarrierRules.Has(passed, MapSceneGate.G6_Corridor3Entry), "앞 배리어엔 갇히지 않는다");
+        Assert.IsTrue(MapSceneBackBarrierRules.IsAreaBehind(MapSceneArea.Zone2, passed));
+        Assert.IsFalse(MapSceneBackBarrierRules.IsAreaBehind(MapSceneArea.Zone3, passed));
+    }
+
     // ─── 감시 조건 ────────────────────────────────────────────────────────
 
     [Test]

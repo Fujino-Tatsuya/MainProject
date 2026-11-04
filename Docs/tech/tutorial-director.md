@@ -474,6 +474,16 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   몬스터·다른 플레이어가 근처에 있으면 기록 지점이 무효가 되고, 큐가 전부 막히면 스폰(씬 시작 지점)으로 폴백한다. 튜토리얼 중에는 고정 지점이 있으면 이 경로에 내려가지 않는다.
   큐(이동하며 갱신되는 기록 지점)와 일반 스테이지 동작은 의도대로 그대로 둔다.
 
+**판 도중 재합류 스폰(할 일 205, 2026-11-04 사용자 결정 "파티 진행도가 어디인지 파악하고 그 구간의 안전지역에 스폰")** —
+`NetworkLoadingFlowController.SpawnRejoiner` 가 보스 룸 밖이면 `MapSceneSafePoints.TryResolveRejoinSpawn` 을 먼저 묻는다.
+- 구간 = **파티** 진행(개인 기록 아님 — 재합류자는 뒤 배리어 기록이 없다): 순수 `MapSceneSafePointRules.RejoinArea(ReturnPhase, step, openedGateMask)` —
+  스텝 진행 = 단계 구간과 배리어 상한 중 앞쪽(`MapSceneRevivePointRules.ResolveStageArea(step, gates)`, 자동 부활과 같은 파티 구간) · 보스방 이동 카운트다운 = 보스 진입 · 보스전·엘리베이터 연출·맵씬 밖 = None.
+- 자리 = 위 낙사 복귀와 **같은 고정 지점**(`TryResolveFixedPoint` — 정적 장애물이면 주변 링, 지점 Y + `dropHeight`). 회전 = 맵 시작 스폰 회전.
+- 지난 배리어 기록: 찾았으면 디렉터에 구간을 적어 두고(`MapSceneDirector.NoteRejoinFrontServer`) 이어지는 PlayerRejoined 에서 그 사람의 마스크를
+  `MaskWithFrontmost(구간)` 으로 다시 쓴다(전멸 리스폰·스킵 이동과 같은 예외 — 들어온 배리어는 뒤에서 닫히고, 앞 배리어엔 안 갇힌다).
+- None·지점 미배치·`MapSceneSafePoints` 없음 = 기존 그대로(맵 첫 스폰 칸 + 마스크 0). 보스 룸 = 기존 모서리 규칙(`BossRoomRejoin`).
+- 로그: `[Tutorial] client n 재합류 → Zone3 안전 지점 …` · `[Rejoin] 재합류 스폰 … slot=- zone=Zone3 …` · `[Tutorial] 재합류 … 뒤 배리어 G1·…(최전방 Zone3)`.
+
 **로그(서버, `Edit.Log`)**: `[Tutorial] 안전 지점 켜짐 — 지점 9개 · 낙사 켬.` · `client n 낙사 → Zone2 안전 지점 …` · `client n 낙사 → Zone2 안전 지점 주변 빈자리 …` · `[Fall/진단] 고정 안전 지점으로 — …` ·
 경고 `client n 낙사 — Zone2 안전 지점이 장애물에 막히고 주변 빈자리도 없어 지점 위 … 에 그대로 내린다(겹침 허용).` ·
 경고 `client n 낙사 — Zone2 안전 지점이 없다(미배치). 기존 경로로 넘긴다.` ·

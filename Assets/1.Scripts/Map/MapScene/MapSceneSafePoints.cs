@@ -158,6 +158,30 @@ public sealed class MapSceneSafePoints : MonoBehaviour
         return TryResolveFixedPoint(wanted, clientId, "낙사", out Vector3 point) ? point : null;
     }
 
+    // ─── 판 도중 재합류(할 일 205) ───────────────────────────────────────
+
+    /// <summary>
+    /// [서버] 재합류 스폰 자리 — 파티 진행 구간(<see cref="MapSceneSafePointRules.RejoinArea"/>)의 고정 안전 지점(낙사 복귀와 같은 지점·링·높이).
+    /// 찾으면 그 구간을 디렉터에 적어 두고(<see cref="MapSceneDirector.NoteRejoinFrontServer"/> — 곧 이어지는 PlayerRejoined 에서 지난 배리어 기록을
+    /// 그 구간 기준으로 다시 쓴다) true. 맵씬 진행 밖·보스전·엘리베이터 연출 중·지점 미배치면 false(호출자는 기존 맵 시작 스폰).
+    /// </summary>
+    public static bool TryResolveRejoinSpawn(ulong clientId, out Vector3 point, out MapSceneArea area)
+    {
+        point = default;
+        area = MapSceneArea.None;
+        MapSceneSafePoints s = Active;
+        if (s == null || !TryGetServerDirector(out MapSceneDirector d)) return false;
+
+        int mask = 0;
+        for (int g = 0; g < MapSceneFlowModel.GateCount; g++)
+            if (d.IsGateOpen((MapSceneGate)g)) mask |= 1 << g;
+        area = MapSceneSafePointRules.RejoinArea(CurrentPhase(d), d.Step, mask);
+        if (area == MapSceneArea.None || !s.TryResolveFixedPoint(area, clientId, "재합류", out point)) return false;
+
+        d.NoteRejoinFrontServer(clientId, area);
+        return true;
+    }
+
     /// <summary>
     /// [서버] 구간 <paramref name="area"/> 고정 지점에서 내릴 자리 — 정적 장애물에 막혔으면 구간 안 주변 링 빈자리, 링도 실패하면 지점 그대로(겹침 허용),
     /// 높이 = 지점 Y + <see cref="dropHeight"/>. 그 구간에 지점이 없으면 false(호출자는 기존 경로). 보스방 이동 카운트다운 중 자동 부활도 쓴다.

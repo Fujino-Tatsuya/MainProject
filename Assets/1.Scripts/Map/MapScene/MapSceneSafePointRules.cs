@@ -120,6 +120,19 @@ public static class MapSceneSafePointRules
     }
 
     /// <summary>
+    /// 판 도중 재합류 스폰 구간(할 일 205) — <b>파티</b> 진행 기준(개인 기록 아님. 재합류자는 개인 뒤 배리어 기록이 없다).
+    /// 스텝 = 단계·열린 게이트로 정한 지금 단계 구간(<see cref="MapSceneRevivePointRules.ResolveStageArea(MapSceneStep, int)"/> — 자동 부활과 같은 파티 구간),
+    /// 보스방 이동 카운트다운 = 보스 진입. 보스전(보스방 모서리 규칙)·None(튜토리얼 밖·엘리베이터 연출 중) = None → 호출자는 기존 경로.
+    /// 재합류자의 지난 배리어 기록은 이 구간을 최전방으로(<see cref="MapSceneBackBarrierRules.MaskWithFrontmost"/>).
+    /// </summary>
+    public static MapSceneArea RejoinArea(MapSceneReturnPhase phase, MapSceneStep step, int openedGateMask) => phase switch
+    {
+        MapSceneReturnPhase.Step => MapSceneRevivePointRules.ResolveStageArea(step, openedGateMask),
+        MapSceneReturnPhase.BossCountdown => MapSceneArea.BossEnter,
+        _ => MapSceneArea.None,
+    };
+
+    /// <summary>
     /// 복귀 구간별 고정 지점 구간 — 스텝 = <paramref name="stepArea"/>, 보스방 이동 카운트다운 = 보스 진입 구간.
     /// 보스전(모서리)·None 은 구간 지점을 쓰지 않는다(None).
     /// </summary>

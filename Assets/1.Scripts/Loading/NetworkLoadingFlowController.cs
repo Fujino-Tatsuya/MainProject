@@ -855,6 +855,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     }
 
     // [서버] 맵 첫 스폰 지점(Q-A) — 처음 스폰과 같은 공식(RejoinSpawnPicker.SlotPose)의 빈 칸. 보스 룸이면 모서리 4지점 중 가장 먼 곳(R3c).
+    // 맵씬 진행 중(보스 룸 밖)이면 파티 진행 구간의 고정 안전 지점(할 일 205 — MapSceneSafePoints.TryResolveRejoinSpawn, 낙사 복귀와 같은 지점).
     // 프리팹은 선택 저장소(playerId 로 승인 때 복원).
     private void SpawnRejoiner(PendingRejoin entry)
     {
@@ -909,9 +910,16 @@ public class NetworkLoadingFlowController : MonoBehaviour
             _rejoinOtherPlayerPositions,
             _rejoinBossRoomCorners,
             _rejoinBossPositions));
+        // 할 일 205 — 맵씬 진행 중이면 파티 진행 구간 안전 지점(지난 배리어 기록도 그 구간 기준으로 — PlayerRejoined 에서). 없으면 위 결과(맵 시작).
+        var zonePoint = Vector3.zero;
+        var zoneArea = MapSceneArea.None;
+        var zoneSpawn = !inBossRoom && MapSceneSafePoints.TryResolveRejoinSpawn(entry.ClientId, out zonePoint, out zoneArea);
+        var spawnPose = zoneSpawn
+            ? new Pose(zonePoint, baseSpawnPoint != null ? baseSpawnPoint.rotation : Quaternion.identity)
+            : pick.Pose;
 
         var result = PlayerSpawnService.SpawnForClient(
-            _networkManager, entry.ClientId, characterRoster, defaultPlayerPrefab, pick.Pose,
+            _networkManager, entry.ClientId, characterRoster, defaultPlayerPrefab, spawnPose,
             SceneManager.GetSceneByName(targetSceneName));
         if (!result.Succeeded)
         {
@@ -922,10 +930,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         Debug.Log(
             $"[Rejoin] 재합류 스폰 clientId={entry.ClientId} playerId={entry.PlayerId} prefab={result.Prefab.name} " +
-            $"slot={pick.SlotIndex} others={_rejoinOtherPlayerPositions.Count} " +
+            $"slot={(zoneSpawn ? "-" : pick.SlotIndex.ToString())} zone={(zoneSpawn ? zoneArea.ToString() : "-(맵 시작)")} others={_rejoinOtherPlayerPositions.Count} " +
             $"bossRoom={inBossRoom}(phase={bossPhase}) corner={(pick.IsBossRoomCorner ? (cornersFromPrefab ? "prefab" : "fallback") : "-")} bosses={_rejoinBossPositions.Count} " +
             $"baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")} " +
-            $"position={pick.Pose.position} waited={Time.unscaledTime - entry.EnqueuedAt:F1}s");
+            $"position={spawnPose.position} waited={Time.unscaledTime - entry.EnqueuedAt:F1}s");
         BindRejoinedClient(entry, "spawn");
     }
 
