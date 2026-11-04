@@ -37,6 +37,11 @@
         "linearMarkerStart": 92,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -76,6 +81,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": false,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -115,6 +125,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -154,6 +169,11 @@
         "linearMarkerStart": 69,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -193,6 +213,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -232,6 +257,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -271,6 +301,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -310,6 +345,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -349,6 +389,11 @@
         "linearMarkerStart": 69,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -388,6 +433,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -427,6 +477,11 @@
         "linearMarkerStart": 69,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -466,6 +521,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -505,6 +565,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -544,6 +609,11 @@
         "linearMarkerStart": 74,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     },
     {
@@ -583,6 +653,11 @@
         "linearMarkerStart": 104,
         "upperShowMarkers": true,
         "smashShowMarkers": true
+      },
+      "distanceFade": {
+        "constant": 1,
+        "linear": 0,
+        "quadratic": 0
       }
     }
   ]

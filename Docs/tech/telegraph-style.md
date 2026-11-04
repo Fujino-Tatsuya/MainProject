@@ -123,3 +123,27 @@
 - 재질: `Assets/Resources/Telegraph/MA_TelegraphDecal.mat` · `MA_TelegraphQuad.mat` · `MA_EnemyC3Decal.mat` · `MA_EnemyC3Plate.mat`(코드가 불러 쓴다 — 지우지 말 것). `MA_TelegraphDecal` 은 C3 데칼 인스턴스의 그리기 순서(renderQueue·`_DrawOrder`) 출처로 계속 쓰인다.
 - 준비/검사 메뉴: `Tools/Monster/공격 예고 스타일 준비 (멱등)` · `Tools/Monster/공격 예고 셰이더 검사`.
 - 테스트: `Tools/Tests/전투 EditMode 테스트 실행` 의 `TelegraphStyleTests`(기본값 = 옛 화면 고정).
+
+## 8. 거리 감쇠 그라데이션 (할 일 202, 2026-11-04)
+
+로컬 플레이어(내 화면 기준)와 **가까운 곳은 원래 진하기, 멀어질수록 옅어지는** 그라데이션. 예고·표시의 모양·색은 그대로고 **알파에만** 곱한다.
+
+```
+감쇠 = 1 / (att0 + att1·d + att2·d²)      d = 픽셀 월드 위치 ↔ 로컬 플레이어, 바닥 평면(xz) 거리(m)
+```
+
+- 결과는 0~1 로 자른다(가까운 곳이 원래보다 진해지지 않음). 분모가 0·음수면 감쇠 1.
+- **기본 (1, 0, 0) = 감쇠 없음 = 202 이전 화면.** 예) (1, 0.1, 0) → 10m 에서 절반 · (1, 0, 0.01) → 10m 에서 절반(먼 쪽이 더 급하게 떨어짐).
+- 블룸은 보류(Emission 안 켬).
+
+| 대상 | 계수 칸 | 비고 |
+|---|---|---|
+| 적 예고 C3(23호·건틀렛·스피너·드론·박격포·전기 장판·점프 착지 등) | `Resources/Telegraph/EnemyC3Selected.json` 항목(id)마다 `distanceFade` = `constant`(att0)·`linear`(att1)·`quadratic`(att2) | 데칼 외곽선·채움(같은 예고는 같은 id)·바닥 판 모두. JSON 은 Play 마다 다시 읽는다 |
+| 플레이어 스킬 범위·대상 원 | 재질 `SkillRangeIndicator.mat`·`SelectedTargetCircleC.mat` 의 **Decal Fade**(x = att0, y = att1, z = att2) | 재질 칸이라 Play 중 바로 반영 |
+| 조준(데칼 그래프 `AimIndicator`) | 재질 `AimIndicator.mat` 의 **Decal Fade** | ⚠️ 이 재질은 보관용 프리팹(`Paladin_VFX`·Legacy)만 쓴다. 게임 중 조준 표시는 `Player.prefab` 의 쿼드(`AimIndicator3D.mat`, URP Lit 투명)라 **감쇠가 안 걸린다** |
+
+- **C3 띠 그라데이션과의 합성 = 곱.** 최종 알파 = (모양 × 띠 그라데이션 × 채움 × 마스크 × 색 알파) × 감쇠. 띠는 모양 안쪽 방향, 감쇠는 플레이어 거리 방향이라 둘 다 살아 있다.
+- 기준점: `DecalDistanceFadeDriver`(씬 배치 없이 스스로 생김)가 매 프레임 `Player.LocalPlayer` 위치를 전역 셰이더 값 `_DecalFadePlayerPos` 하나로 넣는다. 로컬 플레이어가 없으면 감쇠 1. 텍스처·메시 생성 없음. 피어마다 자기 플레이어 기준(네트워크 값 아님).
+- 코드: 식 `Rendering/Telegraph/DecalDistanceFade.hlsl`(셰이더) = `DecalDistanceFade.cs`(C#, 테스트 기준). 셰이더 쪽 재질 칸 이름은 전부 `_DecalFade`.
+- 한계: 스매시 09 원(미리 구운 sprite)·23호 차징 오라(`AoeTelegraph`)·보스 방향 표식은 id 가 없어 재질 기본값(1, 0, 0) = 감쇠 없음.
+- 테스트: `Tools/Tests/전투 EditMode 테스트 실행` 의 `TelegraphDistanceFadeTests`(식·기본값·분모 보호·단조 감소·JSON 기본값·재질 칸·그래프 설정).
