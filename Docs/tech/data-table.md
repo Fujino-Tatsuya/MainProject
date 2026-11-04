@@ -221,6 +221,7 @@ GameData.xlsx (SVN, 잠금)
 | 태그 ID 목록 | 코드 한 곳 `SkillTooltipTag`(`Assets/1.Scripts/Player/Skill/SkillTooltipTags.cs`): `Knockback`·`Stun`·`Vulnerable`·`Shield`·`Heal`·`Overheat`·`Unstoppable`·`Invulnerable` |
 | 오류 | 목록에 없는 ID·같은 태그 두 번·쉼표 사이 빈 칸 → 테이블 Play·빌드 검증 오류(셀 위치와 함께 멈춤). 인스펙터 모드는 아는 태그만 그리고 경고 한 번 |
 | 화면 이름 | Strings 키 `UI.SkillTooltip.Tag.<ID>`(예 `UI.SkillTooltip.Tag.Knockback`) — 행이 없으면 코드 ko(넉백 등). [localization.md §8](localization.md#8-l4b--코드에-박힌-ui-문구) |
+| 현재 값 | 할 일 208(SVN r593) — 플레이어 3종 스킬 14칸 채움(설명문·실제 상태 기준, 배정표 `_lane-artifacts/Work1/208/tag-plan.md`). 값은 xlsx 에만 있다 — SO 칸은 빈 채라 **인스펙터 모드 Play 에선 칩이 안 보인다**(테이블 모드·빌드만) |
 
 - 새 태그 = 프로그래머가 `SkillTooltipTag` 에 한 줄 + `SkillTooltipTags` ko 이름 한 줄 → 병합 Export 로 Strings 행이 생긴다. 색 줄은 아래 `UI` 시트(없으면 기본색 + 경고).
   칩 배경 = 둥근 사각형 9-slice `Assets/2.Prefabs/UI/Textures/SkillTooltipTagChip.png`(저작 메뉴가 한 번 구운 흰 PNG · 64px · 반지름 22px · 보더 24px · PPU 200, Image Type Sliced). 기획 이미지가 나오면 이 스프라이트만 바꾼다.
