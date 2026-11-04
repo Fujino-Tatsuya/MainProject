@@ -1,4 +1,36 @@
-# ▶▶▶ 계획 = **절제된 분노(ASN_2_RESTRAINT) VFX — 강화된 일반 Q·E 레이어 + 봉인 순간 + 단검 봉인 띠** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인(Crimson 선택) · ✅ 3차(MainProject 연결 — 봉인·단검 띠만) 승인 · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · 핸드오프 [handoff-restraint-vfx.md](Docs/tech/handoff-restraint-vfx.md))
+# ▶▶▶ 계획 = **그림자 회귀(ASN_2_RETURN) VFX — 출발점에 꽂힌 반투명 단검 표식** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인(**그림자 실루엣** 선택, 단검 크기·위치 민경 수정본 그대로) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · 핸드오프 [handoff-shadow-return-vfx.md](Docs/tech/handoff-shadow-return-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04). 판정·수치·네트워크 무변경, 새 RPC 없음.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 기획: Q 후 3초 안에 다시 누르면 처음 위치로 복귀 돌진(원래 Q 피해 60%), Q 쿨 +20%. 일반·변신 Q 모두. 출발점 = 첫 돌진 시작, 창 = 첫 돌진 끝부터 3초, R 전환·사망·씬 이동이면 폐기. 저장점 도착 보장 없음.
+- 구현 일치(`AssassinShadowReturnSkill`, 공용 후속 시전 장치). **각 피어가 출발점을 저장**(`AssassinDashStrikeSkill.LocalReturnOrigin`, 돌진 시작 위치) · 칸 열림은 복제(`PlayerSkillController.IsFollowUpOpen(Q)` — 만료·복귀 사용·R·사망에 닫힘) → 연출에 새 네트워크 불필요. 남은 시간은 복제 안 됨(각 피어가 창 길이로 근사).
+- 전용 연출 없음(복귀 돌진은 원래 Q 연출 그대로).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 모양(Q1) | 출발점 바닥에 **단검 하나를 꽂아 둠**(기존 `Dagger_Weapon_R` 모델, 칼끝 아래·살짝 기울임) |
+| 질감(Q2) | **원래 단검 텍스처 + 알파 ≈0.5**. 미리보기에서 그림자 실루엣안(어두운 보라 단색 + 옅은 테두리)도 키로 비교 |
+| 레이어(Q3) | 단검 + **바닥 그림자 웅덩이/링** + **남은 시간 — 마지막 1초 깜빡/흐려짐**. 나타날 때 연기는 뺌 |
+| 나타남(Q4) | 복귀 칸이 열린 게 보이는 순간(첫 Q 직후, 전 피어 같은 값), 저장된 출발점에 |
+| 사라짐(Q5) | 복귀 사용 = 복귀 돌진 시작 때 0.2초 페이드 · 만료·R·사망(칸 닫힘) = 0.4초 페이드 |
+| 누가(Q6) | 전 피어 |
+| 작업(Q7) | MyProject 빌더 + 미리보기(실제 어쌔신 Q → 표식 → 다시 Q 복귀) → 승인 → SVN `Player3/ShadowReturn/` + MainProject 연결 |
+
+## 작업 순서
+1. MyProject: 빌더 `Tools/VFX/Assassin Shadow Return (어쌔신 그림자 회귀) 빌드` — `FX_ShadowReturn_Marker`(단검 + 바닥 그림자) · 재질 2벌(원래 텍스처 반투명 / 그림자 실루엣) · 미리보기 씬.
+2. ⏸ 민경 확인·선택 → **승인**.
+3. MainProject: import · 연출 컴포넌트 `AssassinShadowReturnView`(Q 칸 후속 열림 + 원래 Q 의 출발점을 보고 표식 생성·페이드·마지막 1초 깜빡) · `Player_Assassin` 배선 · 랩 확인.
+4. 문서: handoff · `trait-effect-events.md` §3.1 · `CONTEXT.md`.
+
+## 완료 조건
+- 미리보기: 탑다운에서 출발점 단검이 읽힘 · 질감 선택(민경 승인).
+- MainProject: 그림자 회귀 보유 시 Q 후 출발점 표식 · 복귀 시작/만료에 사라짐 · 일반·변신 Q 모두 · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **절제된 분노(ASN_2_RESTRAINT) VFX — 강화된 일반 Q·E 레이어 + 봉인 순간 + 단검 봉인 띠** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인(Crimson 선택) · ✅ 3차(MainProject 연결 — 봉인·단검 띠만) 승인 · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · 핸드오프 [handoff-restraint-vfx.md](Docs/tech/handoff-restraint-vfx.md))
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04).
 > **1단계 = MyProject 제작(색 2벌) + 미리보기 씬 → 민경 비교·선택·승인. 2단계 = 고른 한 벌만 MainProject 연결.** 판정·수치 무변경, 새 RPC 없음.

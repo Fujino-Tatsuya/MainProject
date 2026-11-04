@@ -85,6 +85,7 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 
 - **수치만 바꾸는 특성**(피해·쿨·회복·스탯·스킬 수치 — 진격 강화·수호 재정비·불굴의 회복·고속 집속·출력 강화·집중 포화·광란/강타 강화·완전 해방·돌파 가속 등): 기존 스킬 연출 그대로라 사건 없음.
 - **모드 변경**(한계 돌파·축열 포격·정온 운용·집속 연사·관통 탄도·그림자 회귀·절제된 분노): 바뀐 동작이 원래 스킬 연출 경로(발수·과열 표시 등)를 그대로 탄다. 집속 연사는 발마다 Q 발사 연출이 이미 나고, 광폭 레이저와 함께면 발마다 위 Activated 가 난다.
+  - 그림자 회귀는 복귀 칸이 열린 동안 출발점에 그림자 단검 표식을 낸다 — 칸 열림(복제)과 각 피어가 저장한 출발점을 본다(`AssassinShadowReturnView`, [handoff-shadow-return-vfx.md](handoff-shadow-return-vfx.md)).
   - 절제된 분노는 이 이벤트 대신 상태(`AssassinState.IsRestrained`, 전 피어 같은 값)를 보는 전용 연출이 있다 — 켜지는 순간 봉인 + 양손 단검 띠(`AssassinRestraintView`, [handoff-restraint-vfx.md](handoff-restraint-vfx.md)).
 - **사건형 보조**(수호의 순환·불굴의 순환·사냥의 박자 쿨 환급, 수호의 잔광·불굴의 가호 보호막, 돌파의 여세): 보호막은 받는 쪽 `PlayerShieldVfx` 가 복제 목록으로 띄운다 — 수호의 잔광·불굴의 가호는 금색(`PlayerShieldVfxSet.holyTraitIds`, 2026-11-02 [handoff-shield-vfx.md](handoff-shield-vfx.md)), 그 외 흰색. 나머지는 눈에 보이는 공격이 아니다.
 - **밀치기·뇌진탕만 붙는 특성**(제압의 진격·충격 레이저·급소 파괴): 원래 공격 적중 연출 + 대상 넉백·기절 표시로 보인다 — 이번 범위에서 따로 사건을 두지 않았다. 필요하면 수호의 파동 Hit 처럼 공용 RPC 로 더한다.
