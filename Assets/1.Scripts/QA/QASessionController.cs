@@ -54,6 +54,10 @@ public sealed class QASessionController : MonoBehaviour
 
     private readonly QAResultFlow _resultFlow = new QAResultFlow();
 
+    // 10분 세션도 특성 복도에서 멈추지 않게 — 제시가 오면 시드로 1장 고른다(103 봇과 같은 헬퍼). 시드는 프로세스마다 다르고 선택 로그에 남는다.
+    private readonly QATraitAutoPicker _traits = new QATraitAutoPicker();
+    private readonly int _traitSeed = Environment.TickCount;
+
     private const string ConnectIp = "127.0.0.1";
     // 7777 은 다른 워크트리 에디터·빌드와 겹친다(10-08 포트 중복으로 실패) — QA 는 7778 을 호스트·클라 모두 명시해 쓴다.
     private const ushort ConnectPort = 7778;
@@ -117,12 +121,38 @@ public sealed class QASessionController : MonoBehaviour
 
     private void Update()
     {
+        TickTraits();
         if (!_running)
             return;
 
         float dt = Time.deltaTime;
         for (int i = 0; i < _detectors.Count; i++)
             _detectors[i].Tick(_recorder, dt);
+    }
+
+    /// <summary>
+    /// 로컬 플레이어 몫의 특성 제시·초기화 팝업에 답한다(<see cref="QATraitAutoPicker"/>). 특성 창은 입력을 잠그므로
+    /// 무작위 AI(QAAgent)만으로는 복도 출구가 안 열려 판이 멈췄다(11-04, 169/170 로 맵 도달 뒤 드러남).
+    /// </summary>
+    private void TickTraits()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsConnectedClient && !nm.IsServer)
+            return;
+        TraitDirector d = QATraitAutoPicker.Director;
+        if (d == null)
+            return;
+
+        if (_traits.TryAnswerReset(d, out int generation))
+            Debug.Log($"[QA] event=trait_reset_answer answer=no generation={generation}");
+
+        if (!_traits.TryPick(d, (n, offers) => QATraitAutoPicker.PickSeeded(_traitSeed, n, offers), out int nth, out int pick, out int seq))
+            return;
+        var ids = new List<string>();
+        foreach (int hash in _traits.LastOffers)
+            ids.Add(QATraitAutoPicker.IdOf(d, hash));
+        Debug.Log($"[QA] event=trait_pick client={nm.LocalClientId} nth={nth} round={d.Round} offerSeq={seq} seed={_traitSeed} " +
+                  $"offers={string.Join("+", ids)} id={QATraitAutoPicker.IdOf(d, pick)}");
     }
 
     private void OnLocalPlayerChanged(Player player)
