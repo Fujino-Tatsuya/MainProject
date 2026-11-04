@@ -13,7 +13,7 @@ using UnityEngine.UI;
 /// </para>
 /// <para>
 /// 할 일 165 — 카드 C1 아트는 <see cref="ApplyCardC1"/>(<c>카드 C1 아트 적용</c>)가 지금 프리팹의 카드 템플릿만 다시 만든다. 전체 생성도 같은 카드 빌더를 쓴다.
-/// 배경 블러 A안은 <see cref="ApplyBackdrop"/>(<c>배경 블러 연결</c>)가 창 앞 형제 RawImage 와 설정 에셋만 더한다.
+/// 배경 블러는 할 일 201 부터 공용 패널 블러 — <see cref="ApplyBackdrop"/>(<c>배경 블러 연결</c>)가 창에 <see cref="PanelBackdropBlurTarget"/> 만 붙인다.
 /// 기본 공격(LMB) 슬롯은 <see cref="ApplyBasicAttackSlot"/>(<c>기본 공격 슬롯 연결</c>)가 카드 템플릿의 검 아이콘·로스터 칸만 잇는다.
 /// </para>
 /// <para>
@@ -93,6 +93,7 @@ public static class TraitUiAuthoring
             RectTransform window = NewUi("Window", root.transform);
             Stretch(window, 0f);
             window.gameObject.AddComponent<UiModalBlocker>();
+            window.gameObject.AddComponent<PanelBackdropBlurTarget>(); // 201 배경 블러(옛 스냅샷 Backdrop 대체)
             Image dim = window.gameObject.AddComponent<Image>();
             dim.color = new Color(0f, 0f, 0f, 0.55f);
             dim.raycastTarget = true; // 창 밖 클릭이 뒤 UI 로 새지 않게
@@ -200,7 +201,6 @@ public static class TraitUiAuthoring
             so.FindProperty("placeholderIcon").objectReferenceValue = placeholder;
             so.FindProperty("texts").objectReferenceValue = texts;
             so.ApplyModifiedPropertiesWithoutUndo();
-            EnsureBackdrop(view, window);
 
             // 기본 꺼짐 — 창(UiModalBlocker)이 켜진 채 저장되면 씬에 두는 순간 입력이 막힌다.
             cardTemplate.gameObject.SetActive(false);
@@ -408,18 +408,14 @@ public static class TraitUiAuthoring
         }
     }
 
-    // ── 할 일 165 후속 — 배경 블러 A안 ──
-    private const string BackdropName = "Backdrop";
-    private const string BackdropSettingsPath = "Assets/9.ScriptableObject/Traits/TraitBackdropBlurSettings.asset";
-    private const string BlurShaderName = "Hidden/Rendering/MaskBlur";
-    private const string SaturationShaderName = "Hidden/Traits/TraitBackdropSaturate";
+    // ── 할 일 201 — 패널 배경 블러(공용). 옛 165 후속 스냅샷 Backdrop 은 폐기 ──
 
     /// <summary>
-    /// 지금 프리팹의 선택 창(<c>Window</c>) 바로 앞 형제로 전체화면 RawImage <c>Backdrop</c>(기본 꺼짐)을 두고 <c>backdrop</c>·<c>backdropSettings</c> 칸을 잇는다.
-    /// 설정 에셋이 없으면 기본값(MaskBlurSettings 블러 값 + 셰이더 참조)으로 만든다. 창·카드·씬 오버라이드는 건드리지 않는다. 이미 연결돼 있으면 저장하지 않는다(멱등).
-    /// 창 어둡게 막 알파(프리팹 0.55)는 블러가 없을 때의 값으로 그대로 두고, 블러 위 알파는 설정 칸 <c>dimAlpha</c>(0.25)가 정한다.
+    /// 지금 프리팹의 선택 창(<c>Window</c>)에 <see cref="PanelBackdropBlurTarget"/> 를 붙인다(할 일 201 — 창이 열린 동안 월드·HUD 를 실시간으로 흐림).
+    /// 블러 세기·어둡게는 공용 설정(PanelBackdropBlurSettings.asset, PC_Renderer 의 PanelBackdropBlurFeature)이 정한다. 이미 붙어 있으면 저장하지 않는다(멱등).
+    /// 옛 <c>Backdrop</c> RawImage 가 남아 있어도 아무도 켜지 않는다(꺼진 채 둔다).
     /// </summary>
-    [MenuItem("Tools/Tutorial/특성 선택 UI — 배경 블러 연결 (창 뒤 RawImage)")]
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 배경 블러 연결 (공용 패널 블러)")]
     public static void ApplyBackdrop()
     {
         GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
@@ -433,12 +429,13 @@ public static class TraitUiAuthoring
                 return;
             }
 
-            if (!EnsureBackdrop(view, (RectTransform)window.transform))
+            if (window.GetComponent<PanelBackdropBlurTarget>() != null)
             {
                 Debug.Log("[Trait] TraitUI.prefab — 배경 블러가 이미 연결돼 있다(저장 안 함).");
                 return;
             }
 
+            window.AddComponent<PanelBackdropBlurTarget>();
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Debug.Log($"[Trait] TraitUI.prefab — 배경 블러 연결 저장 ({PrefabPath})");
         }
@@ -446,70 +443,6 @@ public static class TraitUiAuthoring
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
-    }
-
-    // 창 바로 앞 형제 Backdrop(RawImage, 전체화면, 클릭 통과, 꺼짐) + 설정 에셋 연결. 바꾼 것이 있으면 true.
-    private static bool EnsureBackdrop(TraitSelectionView view, RectTransform window)
-    {
-        bool changed = false;
-        var so = new SerializedObject(view);
-        SerializedProperty backdropProp = so.FindProperty("backdrop");
-        SerializedProperty settingsProp = so.FindProperty("backdropSettings");
-
-        var backdrop = backdropProp.objectReferenceValue as RawImage;
-        if (backdrop == null)
-        {
-            RectTransform rect = NewUi(BackdropName, window.parent);
-            Stretch(rect, 0f);
-            backdrop = rect.gameObject.AddComponent<RawImage>();
-            backdrop.color = Color.white;
-            backdrop.raycastTarget = false;
-            rect.gameObject.SetActive(false);
-            backdropProp.objectReferenceValue = backdrop;
-            changed = true;
-        }
-
-        if (backdrop.transform.parent == window.parent && backdrop.transform.GetSiblingIndex() != window.GetSiblingIndex() - 1)
-        {
-            backdrop.transform.SetSiblingIndex(window.GetSiblingIndex());
-            changed = true;
-        }
-
-        TraitBackdropBlurSettings settings = EnsureBackdropSettings();
-        if (settingsProp.objectReferenceValue != settings)
-        {
-            settingsProp.objectReferenceValue = settings;
-            changed = true;
-        }
-
-        so.ApplyModifiedPropertiesWithoutUndo();
-        return changed;
-    }
-
-    /// <summary>배경 블러 설정 에셋 — 없으면 코드 기본값과 셰이더 참조(블러·채도)로 만든다. 있으면 그대로(튜닝값 보존, 셰이더만 비었으면 채움).</summary>
-    public static TraitBackdropBlurSettings EnsureBackdropSettings()
-    {
-        var settings = AssetDatabase.LoadAssetAtPath<TraitBackdropBlurSettings>(BackdropSettingsPath);
-        if (settings == null)
-        {
-            EnsureFolder(System.IO.Path.GetDirectoryName(BackdropSettingsPath).Replace('\\', '/'));
-            settings = ScriptableObject.CreateInstance<TraitBackdropBlurSettings>();
-            settings.blurShader = Shader.Find(BlurShaderName);
-            settings.saturationShader = Shader.Find(SaturationShaderName);
-            AssetDatabase.CreateAsset(settings, BackdropSettingsPath);
-            AssetDatabase.SaveAssets();
-        }
-        else if (settings.blurShader == null || settings.saturationShader == null)
-        {
-            if (settings.blurShader == null)
-                settings.blurShader = Shader.Find(BlurShaderName);
-            if (settings.saturationShader == null)
-                settings.saturationShader = Shader.Find(SaturationShaderName);
-            EditorUtility.SetDirty(settings);
-            AssetDatabase.SaveAssets();
-        }
-
-        return settings;
     }
 
     /// <summary>

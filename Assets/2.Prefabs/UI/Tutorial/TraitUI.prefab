@@ -2368,8 +2368,6 @@ MonoBehaviour:
   tooltip: {fileID: 4559036892113255017}
   tooltipName: {fileID: 902067480872474199}
   tooltipDescription: {fileID: 6495544317894355609}
-  backdrop: {fileID: 4504276973183067833}
-  backdropSettings: {fileID: 11400000, guid: 1b9148d4fecf0654980d1b6e0230620e, type: 2}
   texts: {fileID: 11400000, guid: d627a1a2780b77844b362dca6091b069, type: 2}
   placeholderIcon: {fileID: 21300000, guid: 4ea6c66ac22e520cb9e860eed24cbd1b, type: 3}
 --- !u!1 &4943032505396108700
@@ -2382,6 +2380,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2988619925709566184}
   - component: {fileID: 9072656413507570220}
+  - component: {fileID: 5920114485210334462}
   - component: {fileID: 935416717466378251}
   - component: {fileID: 5781828926531933767}
   m_Layer: 5
@@ -3974,3 +3973,15 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &5920114485210334462
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4943032505396108700}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0eedb11d499467c86e45263b0631907, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PanelBackdropBlurTarget

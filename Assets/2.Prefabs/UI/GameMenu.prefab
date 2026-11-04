@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5898678593617234976}
   - component: {fileID: 5482556251726860466}
   - component: {fileID: 5057170537800440230}
+  - component: {fileID: 3201450981226540117}
   m_Layer: 5
   m_Name: Content
   m_TagString: Untagged
@@ -521,3 +522,15 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 6750605510204014584, guid: c0beb73c2c0661949908875a94c42e84, type: 3}
   m_PrefabInstance: {fileID: 4031217455694823940}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &3201450981226540117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 527588022174483028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0eedb11d499467c86e45263b0631907, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PanelBackdropBlurTarget

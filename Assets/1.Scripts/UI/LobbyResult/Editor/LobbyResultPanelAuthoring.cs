@@ -303,6 +303,7 @@ public static class LobbyResultPanelAuthoring
             RectTransform content = NewRect("Content", root.transform);
             StretchWithOffset(content, 0f);
             content.gameObject.AddComponent<UiModalBlocker>();
+            content.gameObject.AddComponent<PanelBackdropBlurTarget>(); // 201 배경 블러
 
             // 뒤 화면 어둡게 + 클릭 막기(모달)
             RectTransform dim = NewRect("Dim", content);
