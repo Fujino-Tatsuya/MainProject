@@ -31,7 +31,7 @@
    panel.CharacterChosen += id => lobbySession.RequestCharacterServerRpc(id); // 🔴 서버 요청은 C12 가
    ```
 4. 준비 상태가 열린 채로 바뀌면 `panel.SetLocked(isReady)` 를 부른다(카운트다운 시작·Ready 토글 등).
-5. 서버가 교체를 거부해도 패널은 이미 닫혀 있다. 거부 피드백이 필요하면 C12 가 따로 띄운다.
+5. 확정하면 패널은 **닫히지 않고 대기**한다(할 일 199). 붙이는 쪽이 새 플레이어 등장 때 `CompleteChoice()`, 서버 거부 때 `FailChoice()` 를 부른다 — `LobbyInteractor` 가 요청 때 `LocalClient.PlayerObject` 를 기억해 다른 오브젝트가 나타나면 완료, `LobbySession.CharacterRequestRejected` 면 실패. 아래 "확정 대기".
 
 ## API (`CharacterSelectPanel`)
 | 멤버 | 동작 |
@@ -40,7 +40,8 @@
 | `void Hide()` | 닫는다(`Closed(Api)`). 닫혀 있으면 아무것도 안 한다 |
 | `void SetLocked(bool)` | 열린 채로 준비 상태 갱신 — 잠금 문구·확정 가능 여부. 닫혀 있으면 무시(다음 `Show` 값이 이긴다) |
 | `bool IsOpen` / `bool IsLocked` / `int FocusedCharacterId` | 상태 |
-| `event Action<int> CharacterChosen` | **다른** 캐릭터를 골랐다(id = 로스터 index). 곧이어 `Closed(Chosen)` |
+| `event Action<int> CharacterChosen` | **다른** 캐릭터를 골랐다(id = 로스터 index). 패널은 열린 채 대기 — `CompleteChoice` 때 `Closed(Chosen)` (할 일 199) |
+| `bool IsPending` / `void CompleteChoice()` / `void FailChoice()` | 확정 대기 중 · 교체 완료(닫힘, `Closed(Chosen)`) · 거부(열린 채 실패 안내). 대기가 아니면 둘 다 아무것도 안 함 (할 일 199) |
 | `event Action<CharacterSelectCloseReason> Closed` | 닫힐 때 한 번 — `Api`(호출 측 `Hide`)·`Button`(그냥 닫기 — 뒤로가기 또는 지금 캐릭터 재선택)·`Escape`·`Chosen` |
 | `static bool IsEscapeClaimed` | 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 | `void MoveFocus(int)` / `CharacterSelectConfirmResult Confirm()` | 키 입력과 같은 길(테스트·게임패드 연결용) |
@@ -53,7 +54,8 @@
 | 준비 중(잠금) | 거부 — 이벤트 없음, 잠금 문구가 0.6초 붉게 커졌다 돌아온다. 패널은 열린 채 |
 | 로스터 `Available=false` | 거부 — 이벤트 없음. 카드는 회색 + "선택 불가" |
 | 지금 캐릭터(`SameAsCurrent`) | `CharacterChosen` 없이 그냥 닫힘 — 뒤로가기와 같은 `Closed(Button)`(전용 사유 없음, 10-19 결정) |
-| 그 밖 | `CharacterChosen(id)` 한 번 → `Closed(Chosen)` |
+| 이미 대기 중(`Pending`, 할 일 199) | 아무것도 안 함 — 중복 요청 막기 |
+| 그 밖 | `CharacterChosen(id)` 한 번 → 열린 채 대기(`Chosen`) → `CompleteChoice` 때 `Closed(Chosen)` |
 
 ## 화면
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
@@ -209,6 +211,20 @@
 - 칸 = `Hide HUD (할 일 199)` > `hideHudWhileOpen`(기본 켬).
 - 알려진 한계: 숨긴 오브젝트의 기존 `CanvasGroup` 알파를 그쪽 스크립트가 매 프레임 쓰면 다시 보일 수 있다(지금 최상위 캔버스 오브젝트에 그런 것은 없음).
 
+### 확정 대기(할 일 199)
+- `Confirm` 이 `Chosen` 이면 `CharacterSelectPanelRules.IsPending`(`PendingId`) — 이동·확정·ESC·뒤로·팝업·카드 클릭은 무시, 호출 측 `Hide`(`Closed(Api)`)만 받는다. 잠금 문구 자리에 "캐릭터 변경 중…".
+- 끝: `CompleteChoice()` → `Closed(Chosen)`(닫히며 입력·카메라·HUD·미리보기 복구) / `FailChoice()` 또는 시간 초과(`choiceTimeoutSeconds`, 기본 6초) → 열린 채 "캐릭터를 바꾸지 못했습니다"(`choiceFailNoticeSeconds`, 기본 2초) 후 잠금 문구로, 다시 고를 수 있다.
+- 지금 캐릭터 재선택·뒤로·ESC 는 서버를 거치지 않아 대기 없이 같은 프레임에 복구 후 닫힌다.
+- 칸 = `Confirm Wait (할 일 199)`.
+
+### 포커스 캐릭터 미리보기(할 일 199)
+- 로비 씬 로딩 때(패널 `Start`, Play 만) 로스터 캐릭터마다 **표시용 복제본**을 만들어 꺼 둔다 — `CharacterSelectPreviewPool`, 패널과 같은 씬의 `CharacterSelectPreviewPool` 오브젝트 아래(로비가 내려가면 같이 사라짐). 스폰 아님·네트워크 무관·클라마다 로컬.
+  - 복제 = 꺼진 홀더 아래 Variant Instantiate(Awake 없음) → `Armature`·`PlayerWaeponSlot` 말고 자식 파괴, 루트는 Transform 만 → 남은 쪽에서 화이트리스트 밖 스크립트·NetworkTransform/NetworkAnimator·Collider·Rigidbody 제거, 파티클·트레일·오디오 끔, Animator 루트 모션 끔.
+  - 남기는 스크립트 = `PlayerAnimationEventRelay`·`EffectAnimEventRelay`(애니 이벤트 수신자 — 부모가 없어 아무것도 안 함)·`WeaponTransformRelay`(팔라딘 칼·방패)·`SDArmTwist`·어쌔신 머리카락 4종·`DissolveOverlay`. 거너 레이저건은 Armature 안 메시라 그대로 보인다.
+- 열린 동안 진짜 내 캐릭터(추적 대상의 오너 `Player`)는 렌더러 `forceRenderingOff` 로 이 화면에서만 감추고(`CharacterSelectRealPlayerHider`, 원래 꺼진 것은 기록 안 함) 그 자리·선택 카메라 쪽 수평 방향에 **포커스 캐릭터** 복제본을 세운다. 지금·잠긴 캐릭터도 복제본. 포커스가 바뀌면 즉시 교체. 다른 피어 화면은 진짜 캐릭터(카메라 바라보기 그대로).
+- 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — 등장 1회 → 끝나면(normalizedTime ≥ 1) 루프로 0.15초 크로스페이드. 상태가 없으면 경고 후 기본 상태. 기본: 팔라딘 `Default_Attack3`→`Idle` · 거너 `Gunner_ULT_Cast`→`Idle` · 어쌔신 `Assassin_E_Buff`→`Idle_Combat`.
+- 닫힐 때(이유 무관·파괴 포함) 복제본을 끄고 진짜 캐릭터 렌더러를 되돌린다. 칸 `showPreview`(기본 켬).
+
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |
 |---|---|
@@ -216,6 +232,8 @@
 | `UI.CharacterSelect.CurrentTag` | 현재 |
 | `UI.CharacterSelect.Unavailable` | 선택 불가 |
 | `UI.CharacterSelect.Hint` | W/S·방향키 이동   Enter 선택   Esc 뒤로 |
+| `UI.CharacterSelect.ChangingNotice` | 캐릭터 변경 중… (할 일 199 — 시트 행 없음, 코드 폴백) |
+| `UI.CharacterSelect.ChangeFailedNotice` | 캐릭터를 바꾸지 못했습니다 (할 일 199 — 시트 행 없음, 코드 폴백) |
 
 캐릭터 이름은 로스터 `Character.<프리팹>.Name`(기존 키).
 
