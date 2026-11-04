@@ -9,6 +9,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private static readonly int AlphaId = Shader.PropertyToID("_Alpha");
     private static readonly int WorldSizeId = Shader.PropertyToID("_WorldSize");
     private static readonly int LengthFadeOnId = Shader.PropertyToID(SkillLineLengthFade.EnabledProperty);
+    private static readonly int LengthFadeSpanId = Shader.PropertyToID(SkillLineLengthFade.SpanProperty);
+    private static readonly Vector4 WholeSpan = new(0f, 1f, 0f, 0f);
 
     [Header("Quad 층")]
     [SerializeField] private Transform fillQuad;
@@ -88,7 +90,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
         SetRendererVisible(ghostRenderer, false);
         SetRendererVisible(arrowRenderer, false);
         DrawSegment(fillQuad, fillRenderer, origin, FlattenDirection(direction),
-            new SkillPreviewSegment(startOffset, length, width), fillAlpha, 0.004f, lengthFade: true);
+            new SkillPreviewSegment(startOffset, length, width), fillAlpha, 0.004f, WholeSpan);
     }
 
     public void HideCharge()
@@ -123,10 +125,26 @@ public sealed class SkillLineIndicator : MonoBehaviour
 
     private void DrawPreview(Vector3 origin, Vector3 forward, SkillPreviewShape shape)
     {
-        DrawSegment(fillQuad, fillRenderer, origin, forward, shape.Fill, fillAlpha, 0.004f);
+        // 202: 거너 Q 미리보기는 채움(최소 사거리)·고스트(최대 사거리)를 한 사각형으로 보고 같은 길이 비율로 옅게.
+        Vector4? fillSpan = null;
+        Vector4? ghostSpan = null;
+        if (shape.LengthFade)
+        {
+            float start = shape.Fill.StartOffset;
+            float end = shape.Fill.StartOffset + shape.Fill.Length;
+            if (shape.HasGhost)
+            {
+                start = Mathf.Min(start, shape.Ghost.StartOffset);
+                end = Mathf.Max(end, shape.Ghost.StartOffset + shape.Ghost.Length);
+            }
+            fillSpan = SkillLineLengthFade.Span(shape.Fill, start, end);
+            ghostSpan = SkillLineLengthFade.Span(shape.Ghost, start, end);
+        }
+
+        DrawSegment(fillQuad, fillRenderer, origin, forward, shape.Fill, fillAlpha, 0.004f, fillSpan);
 
         if (shape.HasGhost)
-            DrawSegment(ghostQuad, ghostRenderer, origin, forward, shape.Ghost, ghostAlpha, 0.002f);
+            DrawSegment(ghostQuad, ghostRenderer, origin, forward, shape.Ghost, ghostAlpha, 0.002f, ghostSpan);
         else
             SetRendererVisible(ghostRenderer, false);
 
@@ -150,7 +168,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
         SkillPreviewSegment segment,
         float alpha,
         float layerOffset,
-        bool lengthFade = false)
+        Vector4? lengthFadeSpan = null)
     {
         if (quad == null || targetRenderer == null || !segment.IsVisible)
         {
@@ -170,8 +188,9 @@ public sealed class SkillLineIndicator : MonoBehaviour
         propertyBlock.Clear();
         propertyBlock.SetFloat(AlphaId, alpha);
         propertyBlock.SetVector(WorldSizeId, new Vector4(segment.Width, segment.Length, 0f, 0f));
-        // 202: 차지(거너 Q 충전 레이저) 사각형만 길이 비율로 옅어진다. 점 값은 머티리얼 칸(SkillLineLengthFade).
-        propertyBlock.SetFloat(LengthFadeOnId, lengthFade ? 1f : 0f);
+        // 202: 거너 Q(충전·미리보기)만 길이 비율로 옅어진다. 점 값은 머티리얼 칸(SkillLineLengthFade), 구간은 층마다.
+        propertyBlock.SetFloat(LengthFadeOnId, lengthFadeSpan.HasValue ? 1f : 0f);
+        propertyBlock.SetVector(LengthFadeSpanId, lengthFadeSpan ?? WholeSpan);
         targetRenderer.SetPropertyBlock(propertyBlock);
         SetRendererVisible(targetRenderer, true);
     }

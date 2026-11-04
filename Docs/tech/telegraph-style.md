@@ -153,7 +153,8 @@
 Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드, 재질 `3.Materials/Player/SkillLineIndicator/SkillLineRange.mat`, 셰이더 `VeyTrace/Player/Skill Line Indicator` — 데칼 아님, 투명 쿼드)은 **월드 거리 대신 사각형 길이 대비 비율 t**(시전자 쪽 끝 0 → 먼 끝 1)로 옅어진다. 위 감쇠식으로는 세 점(0.5→0.9·0.75→0.7·0.9→0.5)을 정확히 못 맞춰서 **구간 지정(점 보간)** 방식이다.
 
 ```
-점 (0, 1) → (p.x, a.x) → (p.y, a.y) → (p.z, a.z) → (1, a.w) 을 직선으로 잇는다(셰이더 안에서 계산, 텍스처 없음)
+점 (0, 1) → (p.x, a.x) → (p.y, a.y) → (p.z, a.z) → (1, a.w) 을 단조 3차 곡선(Fritsch–Butland)으로 부드럽게 잇는다
+(점을 정확히 지나고, 점 사이에서 튀지 않고, 점에서 꺾이지 않음 — 셰이더 안에서 계산, 텍스처 없음)
 ```
 
 | 칸 (`SkillLineRange.mat`) | 뜻 | 기본 |
@@ -162,7 +163,8 @@ Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드,
 | **Length Fade Alpha** `_LineFadeAlpha` | x·y·z = 그 점의 알파, **w = 먼 끝(t=1) 알파** | (0.9, 0.7, 0.5, 0.4) |
 | **Distance Fade** `_DecalFade` | 위 §8 거리 감쇠 계수(att0, att1, att2) — 길이 감쇠와 **곱** | (1, 0, 0) = 감쇠 없음 |
 
-- 켜기 `_LineFadeOn`(인스펙터에 숨김)은 **`SkillLineIndicator.ShowCharge`(= 거너 Q 충전)만** 속성 블록으로 1. HUD 슬롯 호버 미리보기·고스트·이동 화살표는 0 이라 기존 화면 그대로(같은 재질을 같이 쓴다).
+- 켜기 `_LineFadeOn`·구간 `_LineFadeSpan`(인스펙터에 숨김, 속성 블록)은 **거너 Q 만**: 충전 중 사각형(`ShowCharge`)과 HUD 슬롯 호버 미리보기(`SkillPreviewShapes.ChargeLaser` → `LengthFade`). 미리보기는 채움(최소 사거리)·고스트(최대 사거리)를 **한 사각형으로 보고 t 를 최대 사거리 끝 기준으로** 맞춘다(같은 월드 지점 = 같은 t). 다른 스킬 미리보기·이동 화살표는 기존 그대로.
+- 채움 끝의 진하기 단차(채움 알파 0.28 vs 고스트 0.09, 흰 끝선)는 최소/최대 사거리 표시 디자인이라 그대로다 — 감쇠는 그 위에 곱해진다.
 - 점 위치가 뒤섞여도(예: y < x) 앞 점으로 당겨 정렬해 계산 — NaN 없음. 결과는 0~1.
 - t 는 그려진 사각형 기준이라 벽에 잘려 짧아지면 잘린 끝이 t=1.
 - 코드: 셰이더 `LineLengthFade` = C# `Player/Skill/Targeting/SkillLineLengthFade.cs`(테스트 기준). 테스트: `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행` 의 `SkillLineLengthFadeTests`.

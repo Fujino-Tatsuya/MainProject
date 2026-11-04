@@ -23,11 +23,55 @@ public sealed class SkillLineLengthFadeTests
     }
 
     [Test]
-    public void Default_InterpolatesLinearlyBetweenPoints()
+    public void Default_StaysBetweenNeighbourPoints_NoOvershoot()
     {
-        Assert.AreEqual(0.95f, SkillLineLengthFade.Evaluate(0.25f), Eps);
-        Assert.AreEqual(0.8f, SkillLineLengthFade.Evaluate(0.625f), Eps);
-        Assert.AreEqual(0.45f, SkillLineLengthFade.Evaluate(0.95f), Eps);
+        float[] knots = { 0f, 0.5f, 0.75f, 0.9f, 1f };
+        float[] values = { 1f, 0.9f, 0.7f, 0.5f, 0.4f };
+        for (int k = 0; k < 4; k++)
+        for (int i = 1; i < 20; i++)
+        {
+            float t = Mathf.Lerp(knots[k], knots[k + 1], i / 20f);
+            float v = SkillLineLengthFade.Evaluate(t);
+            Assert.LessOrEqual(v, values[k] + Eps, $"t={t}");
+            Assert.GreaterOrEqual(v, values[k + 1] - Eps, $"t={t}");
+        }
+    }
+
+    [Test]
+    public void Default_IsSmoothAtInteriorPoints_NoKink()
+    {
+        // 점 왼쪽·오른쪽 기울기가 같아야 계단·꺾임으로 안 보인다(구간 직선이면 0.5 에서 -0.2 vs -0.8).
+        const float step = 0.001f;
+        foreach (float p in new[] { 0.5f, 0.75f, 0.9f })
+        {
+            float left = (SkillLineLengthFade.Evaluate(p) - SkillLineLengthFade.Evaluate(p - step)) / step;
+            float right = (SkillLineLengthFade.Evaluate(p + step) - SkillLineLengthFade.Evaluate(p)) / step;
+            Assert.AreEqual(left, right, 0.05f, $"p={p}");
+        }
+    }
+
+    [Test]
+    public void Span_MapsSegmentIntoWholeRectangle()
+    {
+        var fill = new SkillPreviewSegment(0f, 6f, 1f);
+        var ghost = new SkillPreviewSegment(0f, 8f, 1f);
+        Vector4 fillSpan = SkillLineLengthFade.Span(fill, 0f, 8f);
+        Vector4 ghostSpan = SkillLineLengthFade.Span(ghost, 0f, 8f);
+        Assert.AreEqual(0f, fillSpan.x, Eps);
+        Assert.AreEqual(0.75f, fillSpan.y, Eps);   // 채움 끝(uv.y=1) = 전체 t 0.75
+        Assert.AreEqual(0f, ghostSpan.x, Eps);
+        Assert.AreEqual(1f, ghostSpan.y, Eps);
+        // 같은 월드 지점 = 같은 t → 채움·고스트가 한 그라데이션.
+        float tFill = fillSpan.x + 0.5f * fillSpan.y;
+        float tGhost = ghostSpan.x + (3f / 8f) * ghostSpan.y;
+        Assert.AreEqual(tFill, tGhost, Eps);
+    }
+
+    [Test]
+    public void ChargeLaserPreview_OptsIntoLengthFade_OthersDoNot()
+    {
+        Assert.IsTrue(SkillPreviewShapes.ChargeLaser(6f, 8f, 1f, 6f, 8f).LengthFade);
+        Assert.IsFalse(SkillPreviewShapes.Hitbox(Vector3.forward, Vector3.one).LengthFade);
     }
 
     [Test]
@@ -77,6 +121,7 @@ public sealed class SkillLineLengthFadeTests
         StringAssert.Contains(SkillLineLengthFade.PointsProperty, text);
         StringAssert.Contains(SkillLineLengthFade.AlphaProperty, text);
         StringAssert.Contains(SkillLineLengthFade.EnabledProperty, text);
+        StringAssert.Contains(SkillLineLengthFade.SpanProperty, text);
         StringAssert.Contains("float LineLengthFade(", text);
         StringAssert.Contains("DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz)", text);
     }
