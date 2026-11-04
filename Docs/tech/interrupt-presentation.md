@@ -859,7 +859,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 - 스위치 A1 `hitStop`·A3 `ownerZoom` 은 디렉터에 남았다(bool, 테이블 밖).
 - **대쉬 시도 고르기**: 서버 시도 사건 `InterruptProductionEvent.Attempt(…, variant)` 에 대시에 실렸는가(`attachedToDash`)를 싣고 `InterruptProductionRules.SelectAttemptProfile(purpose, variant, settings)` 가 고른다. 목적(`Attempt`/`AttemptWeak`)은 근접과 같아 창 장부·오너 강약·빛 모임·줌이 그대로다. 새 RPC·바이트 없음 — 시도 Start 이벤트의 대쉬 비트는 여전히 성공에만 실린다(시도 슬로우는 프로필 7칸이 이미 실려 간다).
-- 동작 변화 0: 처음 값 = 이관 전 값(대쉬 = 복사). EditMode `InterruptProductionPrefabTests`(SO 값 = 옛 프리팹 값·프리팹 디렉터가 고르는 프로필 동일)·`InterruptProductionStageTests`(대쉬 시도 → 대쉬 프로필, 근접 → 기존)로 고정.
+- 동작 변화 0(이관 당시): 처음 값 = 이관 전 값(대쉬 = 복사). EditMode `InterruptProductionPrefabTests`(코드 기본값 = 이관 당시 값·에셋 값은 정리 범위 안·프리팹 디렉터가 SO 의 맞는 칸을 고름 — 에셋 숫자는 튜닝값이라 단언 안 함)·`InterruptProductionStageTests`(대쉬 시도 → 대쉬 프로필, 근접 → 기존)로 고정.
 - 대쉬 간파는 대시 남은 시간이 유지(hold) 구간을 먹는다(조사 `194-followup2-slowmo-dash-attempt.md` §2) — ① hold 를 따로 튜닝하는 자리. 체감은 🟧 Play 로 확인.
 
 #### ✅ 데이터 테이블 — 병합 Export 완료(SVN r580, 2026-11-03 — 버려진 값 26·새 42, 아래 목록과 정확히 같음)
@@ -877,6 +877,13 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
   - `NetworkManager` 열(구역 `#■ InterruptManager`, Order 3): 191 서버 검증 허용 오차·동시 성공 `verifyTimeSlack` 0.033 · `verifyDistanceSlack` 0.2 · `verifyAngleSlack` 5 · `simultaneousSeconds` 0.05 = **4** (지금 xlsx 에 이 구역이 아직 없다 — 행이 없어 프리팹 값으로 돌던 칸이 이번 Export 로 생긴다)
   - 구역 `#■ InterruptProductionDirector`·`#■ CameraTargetSwitcher` 는 사라진다(두 타입 모두 테이블 칸이 없어 `[DataTableSheet]` 를 뺐다).
 - **🔴 병합 ~ Export 사이 경고**: xlsx 에 옛 행이 남아 있는 동안 **테이블 모드 Play·빌드는 시작 전에 오류로 멈춘다**(`NetworkManager` 의 `interruptProfile.*` 등 = "어디에도 필드가 없다", `CameraSwitcher` 열 = "대상 없음", `revealRadius`·`revealSoftness` = "필드가 없다"). 인스펙터 모드 Play 는 영향 없음. 그래서 병합과 Export 를 같은 날 붙여서 한다.
+
+#### 에셋 중립값 — 슬로우·히트스톱·줌 사실상 끔 (2026-11-03 사용자 지시, 브랜치 `tune/InterruptSlowMoNeutral`)
+
+- 에셋의 프로필 5개 모두 `scale`·`hitStopScale` = 1, `hitStopDuration`·`enterDuration`·`holdDuration`·`exitDuration`·`failExitDuration` = 0, 줌 3칸(`interruptZoomFactor`·`interruptWeakZoomFactor`·`slowMotionZoomFactor`) = 1. 코드 기본값(새 SO·참조 빔)은 위 표 그대로다.
+- 동작: 서버는 시도·성공 슬로우를 그대로 발동하고 `Started` 이벤트도 전 피어에 그대로 난다(창 장부 닫힘·오너 성공 단계·빛 모임·성공 섬광은 그대로 돈다). 다만 타임라인은 길이 0 단계를 건너뛰어 **시작 즉시 유휴**라 `Time.timeScale`·줌은 안 바뀐다.
+- 알려진 차이: 빗나감 `ServerFail` 이 올 때 슬로우가 이미 유휴라 **`Failed` 이벤트가 나지 않는다**. 오너 암전은 오너 판정 cue(191 `JudgeFailed`)·스킬 끝(`LocalOwnerEnded`)이 걷어 영향 없지만, **팀원 화면 로컬 선착순 장부(`InterruptLocalWindowClaims.AttemptEnded`)가 그 강 시도로 닫은 창을 다시 열지 않는다** — 새 창이 열릴 때까지 팀원의 같은 창 입력 예측이 약(암전·섬광 없음)으로 내려간다. 서버 판정은 영향 없다(연출만).
+- 🔴 **xlsx `SlowMotion` 시트(SVN r580)는 옛 값**이다 — 테이블 모드 Play·빌드는 옛 슬로우로 돈다. 이 브랜치는 xlsx 를 건드리지 않았다. **development 병합 때 최신 dev 워크트리에서 병합 Export 로 xlsx 에 중립값을 옮겨야 한다**(옮기지 않으면 빌드는 옛 슬로우).
 
 ## 10. 카메라 대상 중심 (할 일 196)
 
