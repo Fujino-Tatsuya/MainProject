@@ -76,3 +76,23 @@ Add Renderer Feature → Decal
 - 활성화하면:
   - Decal Projector에 **`Rendering Layers`** 항목이 나타난다.
   - **DepthNormal prepass**가 추가된다. (성능 비용 발생)
+
+---
+
+## 데칼이 바닥과 안 섞이던 문제 (할 일 202, 2026-11-04)
+
+### 원인(코드 확인)
+- 맵 바닥(존·보스방 바닥 재질 `Generic_01_A`·`Generic_01_A_Wet`)은 SVN `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` = **URP Lit** 이다. DBuffer 데칼을 조명 **전에** 받으므로 조명·그림자·포그(화면 후처리)는 원래 데칼에도 걸린다.
+- 섞이지 않게 보인 주원인은 **데칼이 바닥 노멀을 덮어쓴 것**이다.
+  - 플레이어 `SkillRangeIndicator`·`AimIndicator` 그래프: NormalAlpha = 상수 1, NormalTS = 평평 → **투영 상자 전체**(투명한 부분까지)에서 바닥 노멀맵·하이라이트가 사라져 네모난 평평한 자국이 생겼다.
+  - 예고 4종(`SG_EnemyC3Decal`·`SG_TelegraphDecal`·`SG_DecalFloorOnly`·`SG_ColoredDecal`): 기본 bump(평평) 노멀 × 알파 × `Normal_Blend` 0.5 → 데칼이 찍힌 곳만 바닥 요철이 절반쯤 평평해져 스티커처럼 떠 보였다.
+- 색은 DBuffer 규칙상 **바닥 알베도와 lerp(덮기)** 만 된다 — 데칼 셰이더는 바닥 알베도를 읽을 수 없어서 곱·오버레이는 데칼 쪽에서 못 한다.
+- 참고: Flat Kit(`Assets/FlatKit/.../Lighting_DR.hlsl`)은 데칼을 **최종 셰이딩 색**에 lerp 하고 메인 라이트만 곱한다(텍스처·밴드·추가 광원이 빠짐). 맵 바닥은 Flat Kit 이 아니고 캐릭터는 수신자 비트가 없어 지금은 영향 없다.
+
+### 고친 것(데칼 쪽만 — 바닥·Flat Kit·SVN 셰이더 무수정)
+- 데칼 6종 그래프 모두 `affectsNormal` 끔(Albedo 만). 바닥 노멀맵·하이라이트가 데칼 아래에도 그대로 남는다. 재질의 `Normal_Blend` 칸은 남아 있지만 이제 쓰이지 않는다.
+- 플레이어 2종 그래프는 **Angle Fade** 를 켰다. 프로젝터 기본 180/180 이면 변화 없음 — 바닥 전용으로 쓰려면 `DecalReceivers.ConfigureFloorProjector` 와 같은 값을 넣는다.
+- 가장자리: C3 는 셰이더 AA·띠 그라데이션, 플레이어는 텍스처 알파 그대로 + 거리 감쇠(telegraph-style.md §8).
+
+### 남은 선택지(바닥 셰이더 수정 필요 — 하지 않음)
+- 데칼 색을 바닥 색과 **곱/오버레이**로 섞으려면 바닥 셰이더(`Generic_Standard.shadergraph`, SVN)가 DBuffer 를 직접 읽어 곱해야 한다(URP Lit 기본 적용 대신 커스텀). 필요하면 별도 할 일로.

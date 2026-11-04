@@ -24,6 +24,7 @@ Shader "Hidden/EnemyC3DecalCompare"
         _C3InnerLine ("C3 Inner Line", Vector) = (1, 1, 1, 1)
         _C3Band ("C3 Band", Vector) = (1, 1, 1, 0.25)
         _C3Markers ("C3 Markers", Vector) = (1, 1, 1, 0.42)
+        _DecalFade ("Distance fade (att0, att1, att2, -)", Vector) = (1, 0, 0, 0)
     }
 
     HLSLINCLUDE
@@ -35,6 +36,7 @@ Shader "Hidden/EnemyC3DecalCompare"
         float4 _MaskParams, _MaskOrigin, _MaskAxes, _MaskExtent;
         float4 _C3Shape, _C3Extent, _C3Path, _C3Geom, _C3Fins;
         float4 _C3Outline, _C3InnerLine, _C3Band, _C3Markers;
+        float4 _DecalFade;
     CBUFFER_END
     TEXTURE2D(_MaskTex); SAMPLER(sampler_MaskTex);
     TEXTURE2D(_OldTex); SAMPLER(sampler_OldTex);

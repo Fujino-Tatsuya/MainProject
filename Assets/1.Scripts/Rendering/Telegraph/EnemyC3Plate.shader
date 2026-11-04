@@ -15,6 +15,7 @@ Shader "Monster/EnemyC3Plate"
         _C3Band ("Band (gamma)", Vector) = (1, 1, 1, 0.25)
         _C3Fill ("Fill (gamma)", Vector) = (1, 1, 1, 0.232)
         _C3Markers ("Markers (gamma)", Vector) = (1, 1, 1, 0.42)
+        _DecalFade ("Distance fade (att0, att1, att2, -)", Vector) = (1, 0, 0, 0)
     }
 
     SubShader
@@ -42,9 +43,11 @@ Shader "Monster/EnemyC3Plate"
                 float4 _C3Band;
                 float4 _C3Fill;
                 float4 _C3Markers;
+                float4 _DecalFade;
             CBUFFER_END
 
             #include "EnemyC3Sdf.hlsl"
+            #include "DecalDistanceFade.hlsl"
 
             struct Attributes
             {
@@ -56,12 +59,14 @@ Shader "Monster/EnemyC3Plate"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
             };
 
             Varyings Vert(Attributes v)
             {
                 Varyings o;
-                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+                o.positionWS = TransformObjectToWorld(v.positionOS.xyz);
+                o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.uv = v.uv;
                 return o;
             }
@@ -90,7 +95,8 @@ Shader "Monster/EnemyC3Plate"
                 }
 
                 float3 rgb = EnemyC3ToOutput(c.rgb) * _Color.rgb;
-                float a = c.a * _Color.a;
+                // 할 일 202 — 로컬 플레이어 거리 감쇠(기본 계수면 1). 띠 그라데이션·채움을 합친 알파에 곱한다.
+                float a = c.a * _Color.a * DecalDistanceFadeAt(i.positionWS, _DecalFade.xyz);
                 return half4(rgb * a, a);   // 프리멀티(TelegraphQuad 와 같은 블렌드)
             }
             ENDHLSL

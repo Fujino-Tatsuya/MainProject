@@ -13,12 +13,14 @@
 //  _C3Geom    x = 바깥 외곽선 폭  y = 안쪽 선 폭  z = 간격  w = 띠 그라데이션 시작(%)
 //  _C3Fins    x = 쐐기 크기(%)  y = 간격  z = 시작
 //  _C3Outline·_C3InnerLine·_C3Band·_C3Markers = 감마 직선 알파 색(SetVector — SetColor 는 선형으로 바뀐다)
+//  _DecalFade  xyz = 거리 감쇠 계수 att0·att1·att2(할 일 202, DecalDistanceFade.hlsl) — 기본 (1, 0, 0) = 감쇠 없음
 // ----------------------------------------------------------------------------
 #ifndef ENEMY_C3_DECAL_INCLUDED
 #define ENEMY_C3_DECAL_INCLUDED
 
 #include "Assets/1.Scripts/Rendering/Telegraph/EnemyC3Sdf.hlsl"
 #include "Assets/1.Scripts/Rendering/Telegraph/TelegraphMask.hlsl"
+#include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
 
 // Bake.Decal 의 한 픽셀(감마, 직선 알파). uv = 데칼 UV(0~1, +V = 정면).
 float4 EnemyC3DecalGamma(float2 uv)
@@ -153,6 +155,8 @@ void EnemyC3DecalShade_float(float2 UV, float3 WorldPos, out float3 Color, out f
         baseRGBA = float4(EnemyC3ToOutput(c.rgb), c.a);
     }
     TelegraphShade_float(baseRGBA, WorldPos, Color, Alpha);
+    // 할 일 202 — 로컬 플레이어 거리 감쇠. 기존 모양·띠 그라데이션·채움·마스크를 합친 알파에 곱한다(기본 계수면 1).
+    Alpha *= DecalDistanceFadeAt(WorldPos, _DecalFade.xyz);
 }
 
 void EnemyC3DecalShade_half(half2 UV, half3 WorldPos, out half3 Color, out half Alpha)

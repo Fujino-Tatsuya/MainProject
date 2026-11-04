@@ -157,6 +157,10 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         _active = true;
 
         if (_builtC3Id != C3Id) { _builtC3Id=C3Id; InvalidateShapes(); }
+        // 할 일 202 — 채움도 외곽선(SetDecalProperties)과 같은 항목의 거리 감쇠 계수(_DecalFade)를 쓴다.
+        EnemyC3Visuals.SetDistanceFade(_coneFill.material, C3Id);
+        EnemyC3Visuals.SetDistanceFade(_bandFill.material, C3Id);
+        EnemyC3Visuals.SetDistanceFade(_unionFill.material, C3Id);
         float width = CurrentStyle.outlineWidth;
 
         // ── 끝점 부채꼴

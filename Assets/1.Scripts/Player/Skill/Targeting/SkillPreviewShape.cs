@@ -27,7 +27,8 @@ public readonly struct SkillPreviewShape
         bool hasGhost,
         float arrowDirection,
         float arrowLength,
-        bool hasArrow)
+        bool hasArrow,
+        bool lengthFade = false)
     {
         Fill = fill;
         Ghost = ghost;
@@ -35,6 +36,7 @@ public readonly struct SkillPreviewShape
         ArrowDirection = arrowDirection < 0f ? -1f : 1f;
         ArrowLength = Mathf.Max(0f, arrowLength);
         HasArrow = hasArrow && ArrowLength > 0.0001f;
+        LengthFade = lengthFade;
     }
 
     public SkillPreviewSegment Fill { get; }
@@ -44,6 +46,8 @@ public readonly struct SkillPreviewShape
     public float ArrowDirection { get; }
     public float ArrowLength { get; }
     public bool HasArrow { get; }
+    /// <summary>202: 채움·고스트를 한 사각형으로 보고 길이 비율로 옅게(거너 Q). <see cref="SkillLineLengthFade"/>.</summary>
+    public bool LengthFade { get; }
 }
 
 /// <summary>스킬별 표시 모양을 만드는 물리 없는 순수 계산.</summary>
@@ -67,7 +71,8 @@ public static class SkillPreviewShapes
             hasGhost: true,
             arrowDirection: 1f,
             arrowLength: 0f,
-            hasArrow: false);
+            hasArrow: false,
+            lengthFade: true);
     }
 
     public static SkillPreviewShape Hitbox(Vector3 localCenter, Vector3 localSize)

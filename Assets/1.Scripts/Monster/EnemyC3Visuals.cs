@@ -13,7 +13,9 @@ public static class EnemyC3Visuals
         public float linearMarkerScalePercent,linearMarkerSpacing,linearMarkerStart;
         public bool showMarkers,dashShowMarkers,upperShowMarkers,smashShowMarkers;
     }
-    [Serializable] public class Entry { public string id; public Elements elements; public Geometry geometry; }
+    /// <summary>Distance fade (할 일 202) — alpha × 1/(constant + linear·d + quadratic·d²), d = ground distance to the local player (DecalDistanceFade).</summary>
+    [Serializable] public class DistanceFadeCoefficients { public float constant=1,linear,quadratic; public Vector3 Value=>new Vector3(constant,linear,quadratic); }
+    [Serializable] public class Entry { public string id; public Elements elements; public Geometry geometry; public DistanceFadeCoefficients distanceFade; }
     [Serializable] class Preset { public Entry[] entries; }
     static Dictionary<string,Entry> entries;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -59,6 +61,10 @@ public static class EnemyC3Visuals
         return band?extent.x/(id=="04"||id=="05"||id=="11"?114f:200f):union?pathWidth/130f:coneRadius/165f;
     }
     public static Color FillColor(string id)=>Get(id).elements.fill.Value;
+    /// <summary>Distance fade coefficients (att0, att1, att2) of a preset entry. Missing in the JSON = DecalDistanceFade.Default (no fade).</summary>
+    public static Vector3 DistanceFade(string id)=>Get(id).distanceFade?.Value??DecalDistanceFade.Default;
+    /// <summary>Writes the entry's distance fade into a C3 decal material instance (_DecalFade) — outlines and fills of the same telegraph share it.</summary>
+    public static void SetDistanceFade(Material m,string id){if(m!=null)m.SetVector(DecalDistanceFade.MaterialPropertyId,DecalDistanceFade.ToVector(DistanceFade(id)));}
     // The CPU 384² Bake (Circle/Square/Decal) is editor-only: Monster/Editor/EnemyC3BakeReference.cs (pixel comparison
     // baseline and smash 09 sprite bake). The runtime below never creates textures.
     // Floor plates (12·14·15·16, jump 06·07) are drawn by the EnemyC3Plate shader — no runtime texture.
@@ -90,6 +96,7 @@ public static class EnemyC3Visuals
         block.SetVector(GeomId,new Vector4(g.outerWidth,g.innerWidth,g.gap,g.gradientStart));
         block.SetVector(OutlineId,e.outline.Value);block.SetVector(InnerLineId,e.innerLine.Value);
         block.SetVector(BandId,e.band.Value);block.SetVector(FillId,e.fill.Value);block.SetVector(MarkersId,e.markers.Value);
+        block.SetVector(DecalDistanceFade.MaterialPropertyId,DecalDistanceFade.ToVector(DistanceFade(id)));
     }
     internal static void PaintLayer(Renderer r,string id,bool square,bool fill,float alpha=1)
     {
@@ -141,6 +148,7 @@ public static class EnemyC3Visuals
         m.SetVector(FinsId,new Vector4(g.linearMarkerScalePercent,g.linearMarkerSpacing,g.linearMarkerStart,0));
         m.SetVector(OutlineId,e.outline.Value);m.SetVector(InnerLineId,e.innerLine.Value);
         m.SetVector(BandId,e.band.Value);m.SetVector(MarkersId,e.markers.Value);
+        SetDistanceFade(m,id);
     }
     // Attack decal fills (BossAttackConeTelegraph, S4a) — the same SG_EnemyC3Decal redraws the old 256² CPU fill textures
     // (BuildArcTexture / BuildRectTexture / BuildUnionTexture) in the shader. Progress changes only rewrite one vector.

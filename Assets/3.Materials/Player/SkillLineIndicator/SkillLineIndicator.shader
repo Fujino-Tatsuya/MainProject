@@ -21,6 +21,13 @@ Shader "VeyTrace/Player/Skill Line Indicator"
         _WorldSize ("World Size", Vector) = (1, 1, 0, 0)
         [Toggle] _Arrow ("Arrow", Float) = 0
         _ArrowReferenceAlpha ("Arrow Full Visibility Alpha", Range(0.01, 1)) = 0.42
+        [HideInInspector] _LineFadeOn ("Length Fade On (runtime)", Float) = 0
+        [HideInInspector] _LineFadeSpan ("Length Fade Span (runtime)", Vector) = (0, 1, 0, 0)
+        _DecalFade ("Distance Fade (att0, att1, att2)", Vector) = (1, 0, 0, 0)
+        _EdgeTex ("Side Edge Line Texture", 2D) = "white" {}
+        [HideInInspector] _EdgeLineOn ("Side Edge Line On (runtime)", Float) = 0
+        [HideInInspector] _EdgeLineWidth ("Side Edge Line Width m (runtime)", Float) = 0.06
+        [HideInInspector] _EdgeLineColor ("Side Edge Line Color (runtime)", Color) = (1, 1, 1, 1)
     }
     SubShader
     {
@@ -38,7 +45,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
             #pragma fragment Frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             struct Attributes { float4 positionOS:POSITION; float2 uv:TEXCOORD0; };
-            struct Varyings { float4 positionHCS:SV_POSITION; float2 uv:TEXCOORD0; };
+            struct Varyings { float4 positionHCS:SV_POSITION; float2 uv:TEXCOORD0; float3 positionWS:TEXCOORD1; };
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
                 half4 _OutlineColor;
@@ -59,13 +66,46 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float4 _WorldSize;
                 half _Arrow;
                 half _ArrowReferenceAlpha;
+                half _LineFadeOn;
+                float4 _LineFadeSpan;
+                float4 _DecalFade;
+                float4 _EdgeTex_ST;
+                half _EdgeLineOn;
+                float _EdgeLineWidth;
+                half4 _EdgeLineColor;
             CBUFFER_END
+            #include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
             Varyings Vert(Attributes input)
             {
                 Varyings output;
                 output.positionHCS=TransformObjectToHClip(input.positionOS.xyz);
                 output.uv=input.uv;
+                output.positionWS=TransformObjectToWorld(input.positionOS.xyz);
                 return output;
+            }
+            // 202: length-ratio fade. t = whole-rectangle ratio (caster end 0 -> far end 1) =
+            // _LineFadeSpan.x + uv.y * _LineFadeSpan.y. The curve is an AnimationCurve on SkillLineIndicator,
+            // baked to LINE_FADE_SAMPLES evenly spaced samples (MaterialPropertyBlock.SetFloatArray) and
+            // linearly interpolated here. Not a material property (arrays cannot be). No textures.
+            // C# mirror = SkillLineLengthFade.Sample.
+            #define LINE_FADE_SAMPLES 32
+            float _LineFadeCurve[LINE_FADE_SAMPLES];
+            // 202: side edge lines (white_512) get their own curve, same 32-sample bake (_EdgeLineCurve).
+            float _EdgeLineCurve[LINE_FADE_SAMPLES];
+            TEXTURE2D(_EdgeTex);
+            SAMPLER(sampler_EdgeTex);
+            #define LINE_FADE_SAMPLE(curve,t,result) { float fx_=saturate(t)*(LINE_FADE_SAMPLES-1); int fi_=min((int)fx_,LINE_FADE_SAMPLES-2); result=lerp(curve[fi_],curve[fi_+1],fx_-fi_); }
+            float LineLengthFade(float t)
+            {
+                float v;
+                LINE_FADE_SAMPLE(_LineFadeCurve,t,v);
+                return v;
+            }
+            float EdgeLineFade(float t)
+            {
+                float v;
+                LINE_FADE_SAMPLE(_EdgeLineCurve,t,v);
+                return v;
             }
             float SegmentDistance(float2 p,float2 a,float2 b)
             {
@@ -149,7 +189,10 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 half visibility=saturate(_Alpha/max(_ReferenceAlpha,0.01h));
                 half rangeVisibility=visibility*visibility;
                 half detailVisibility=rangeVisibility*visibility;
-                half face=_FillOpacity*lerp(0.04h/0.145h,1.0h,saturate(input.uv.y));
+                // C3 interior ramp gets denser toward the far end. 202: with the length fade on it would
+                // cancel the fade (ramp x fade ~ flat), so the fade replaces the ramp (interior = _FillOpacity x fade).
+                half lengthFadeOn=saturate(_LineFadeOn);
+                half face=_FillOpacity*lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn);
                 half4 result=half4(_Color.rgb*face,face);
                 Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
                 Over(result,_InnerColor.rgb,inner*_InnerColor.a);
@@ -181,7 +224,24 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float endDistance=(1.0-input.uv.y)*size.y;
                 half endBar=(1.0h-smoothstep(outerWidth-aa,outerWidth+aa,endDistance))*(1.0h-smoothstep(size.x*0.435,size.x*0.445,abs(samplePos.x)));
                 Over(result,_EndColor.rgb,endBar*_EndColor.a*rangeVisibility);
-                return half4(result.rgb/max(result.a,0.0001h),result.a*inside*_Color.a);
+                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y)),lengthFadeOn);
+                half distanceFade=(half)DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz);
+                half3 baseRgb=result.rgb/max(result.a,0.0001h);
+                half baseA=result.a*inside*_Color.a*lengthFade*distanceFade;
+                // 202: white side edge lines on top (own curve, gunner Q only via _EdgeLineOn). Inside the quad width.
+                if(_EdgeLineOn>0.5h)
+                {
+                    float edgeWidth=clamp(_EdgeLineWidth,0.0,size.x*0.5);
+                    float fromSide=size.x*0.5-abs(samplePos.x);
+                    half edgeMask=edgeWidth>0.0?1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,fromSide):0.0h;
+                    float2 edgeUv=float2(saturate(fromSide/max(edgeWidth,0.0001)),input.uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
+                    half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
+                    half edgeA=edgeMask*inside*edgeTex.a*_EdgeLineColor.a*(half)saturate(EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y))*distanceFade;
+                    half outA=edgeA+baseA*(1.0h-edgeA);
+                    half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
+                    return half4(outRgb,outA);
+                }
+                return half4(baseRgb,baseA);
             }
             ENDHLSL
         }

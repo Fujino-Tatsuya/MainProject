@@ -53,6 +53,9 @@
         },
         {
             "m_Id": "e9e2e18e570e45c7a48a490ebbd27661"
+        },
+        {
+            "m_Id": "47e91c47a42014a5d17f46ecb282ee55"
         }
     ],
     "m_Keywords": [],
@@ -1282,6 +1285,9 @@
         },
         {
             "m_Id": "e9e2e18e570e45c7a48a490ebbd27661"
+        },
+        {
+            "m_Id": "47e91c47a42014a5d17f46ecb282ee55"
         }
     ]
 }
@@ -1371,7 +1377,7 @@
     "m_DecalData": {
         "affectsAlbedo": true,
         "affectsNormalBlend": true,
-        "affectsNormal": true,
+        "affectsNormal": false,
         "affectsMAOS": false,
         "affectsEmission": false,
         "drawOrder": 0,
@@ -2038,4 +2044,32 @@
         "z": 0.0
     },
     "m_Labels": []
+}
+
+{
+    "m_SGVersion": 1,
+    "m_Type": "UnityEditor.ShaderGraph.Internal.Vector4ShaderProperty",
+    "m_DefaultRefNameVersion": 1,
+    "m_GeneratePropertyBlock": true,
+    "m_UseCustomSlotLabel": false,
+    "m_CustomSlotLabel": "",
+    "m_DismissedVersion": 0,
+    "m_Precision": 0,
+    "overrideHLSLDeclaration": false,
+    "hlslDeclarationOverride": 0,
+    "m_Hidden": false,
+    "m_ObjectId": "47e91c47a42014a5d17f46ecb282ee55",
+    "m_Guid": {
+        "m_GuidSerialized": "80c2d62d-072b-527e-0263-329c69726ef8"
+    },
+    "m_Name": "Decal Fade",
+    "m_RefNameGeneratedByDisplayName": "_DecalFade",
+    "m_DefaultReferenceName": "_DecalFade",
+    "m_OverrideReferenceName": "_DecalFade",
+    "m_Value": {
+        "x": 1,
+        "y": 0,
+        "z": 0,
+        "w": 0
+    }
 }

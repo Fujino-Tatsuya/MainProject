@@ -5941,6 +5941,78 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 816596077
       objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[1].time
+      value: 0.39086914
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[2].time
+      value: 0.53804016
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[3].time
+      value: 0.9928589
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[4].time
+      value: 1.0214081
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[1].value
+      value: 0.85299146
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[2].value
+      value: 0.058520496
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[3].value
+      value: -0.013208002
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[4].value
+      value: 0.38043824
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[1].inSlope
+      value: -0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[2].inSlope
+      value: -0.5757569
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[3].inSlope
+      value: 0.021656206
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[1].outSlope
+      value: -0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[2].outSlope
+      value: -0.5757569
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[3].inWeight
+      value: 0.9836032
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[3].outSlope
+      value: 0.021656206
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[1].outWeight
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2559422353221749455, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: lengthFadeCurve.m_Curve.Array.data[2].outWeight
+      value: 0.7384765
+      objectReference: {fileID: 0}
     - target: {fileID: 3401547853169930430, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: socket
       value: 

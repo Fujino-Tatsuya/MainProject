@@ -8,6 +8,14 @@ public sealed class SkillLineIndicator : MonoBehaviour
 {
     private static readonly int AlphaId = Shader.PropertyToID("_Alpha");
     private static readonly int WorldSizeId = Shader.PropertyToID("_WorldSize");
+    private static readonly int LengthFadeOnId = Shader.PropertyToID(SkillLineLengthFade.EnabledProperty);
+    private static readonly int LengthFadeSpanId = Shader.PropertyToID(SkillLineLengthFade.SpanProperty);
+    private static readonly int LengthFadeCurveId = Shader.PropertyToID(SkillLineLengthFade.CurveProperty);
+    private static readonly int EdgeLineOnId = Shader.PropertyToID(SkillLineLengthFade.EdgeEnabledProperty);
+    private static readonly int EdgeLineCurveId = Shader.PropertyToID(SkillLineLengthFade.EdgeCurveProperty);
+    private static readonly int EdgeLineWidthId = Shader.PropertyToID(SkillLineLengthFade.EdgeWidthProperty);
+    private static readonly int EdgeLineColorId = Shader.PropertyToID(SkillLineLengthFade.EdgeColorProperty);
+    private static readonly Vector4 WholeSpan = new(0f, 1f, 0f, 0f);
 
     [Header("Quad 층")]
     [SerializeField] private Transform fillQuad;
@@ -21,6 +29,17 @@ public sealed class SkillLineIndicator : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float ghostAlpha = 0.09f;
     [SerializeField, Range(0f, 1f)] private float arrowAlpha = 0.42f;
 
+    [Header("길이 감쇠 (202 — 거너 Q)")]
+    [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 진하기 배율. 거너 Q 충전·Q 미리보기에만 걸린다. Play 중 고쳐도 바로 반영.")]
+    [SerializeField] private AnimationCurve lengthFadeCurve = SkillLineLengthFade.DefaultCurve();
+
+    [Header("양옆 흰 라인 (202 — 거너 Q)")]
+    [Tooltip("사각형 양옆 안쪽에 덧그리는 라인 두께(m). 0 이면 안 그림. 텍스처는 SkillLineRange.mat 의 Side Edge Line Texture(white_512).")]
+    [SerializeField, Min(0f)] private float edgeLineWidth = 0.06f;
+    [SerializeField] private Color edgeLineColor = Color.white;
+    [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 흰 라인 진하기 배율. 길이 감쇠 커브와 따로.")]
+    [SerializeField] private AnimationCurve edgeLineCurve = SkillLineLengthFade.DefaultCurve();
+
     // 필드 초기화에서 만들면 MonoBehaviour 생성자에서 CreateImpl 예외 — 처음 쓸 때 만든다.
     private MaterialPropertyBlock propertyBlock;
     private Player player;
@@ -31,6 +50,9 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private Renderer arrowRenderer;
     private ISkillPreviewSource previewSource;
     private bool chargeVisible;
+    private readonly float[] lengthFadeSamples = new float[SkillLineLengthFade.SampleCount];
+    private readonly float[] edgeLineSamples = new float[SkillLineLengthFade.SampleCount];
+    private bool lengthFadeDirty = true;
 
     private void Awake()
     {
@@ -42,6 +64,9 @@ public sealed class SkillLineIndicator : MonoBehaviour
         arrowRenderer = ResolveRenderer(arrowQuad);
         HideVisuals();
     }
+
+    // 커브가 바뀔 때만 다시 굽는다(인스펙터·커브 창 편집 → OnValidate, Play 중 포함).
+    private void OnValidate() => lengthFadeDirty = true;
 
     private void LateUpdate()
     {
@@ -87,7 +112,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
         SetRendererVisible(ghostRenderer, false);
         SetRendererVisible(arrowRenderer, false);
         DrawSegment(fillQuad, fillRenderer, origin, FlattenDirection(direction),
-            new SkillPreviewSegment(startOffset, length, width), fillAlpha, 0.004f);
+            new SkillPreviewSegment(startOffset, length, width), fillAlpha, 0.004f, WholeSpan);
     }
 
     public void HideCharge()
@@ -122,10 +147,26 @@ public sealed class SkillLineIndicator : MonoBehaviour
 
     private void DrawPreview(Vector3 origin, Vector3 forward, SkillPreviewShape shape)
     {
-        DrawSegment(fillQuad, fillRenderer, origin, forward, shape.Fill, fillAlpha, 0.004f);
+        // 202: 거너 Q 미리보기는 채움(최소 사거리)·고스트(최대 사거리)를 한 사각형으로 보고 같은 길이 비율로 옅게.
+        Vector4? fillSpan = null;
+        Vector4? ghostSpan = null;
+        if (shape.LengthFade)
+        {
+            float start = shape.Fill.StartOffset;
+            float end = shape.Fill.StartOffset + shape.Fill.Length;
+            if (shape.HasGhost)
+            {
+                start = Mathf.Min(start, shape.Ghost.StartOffset);
+                end = Mathf.Max(end, shape.Ghost.StartOffset + shape.Ghost.Length);
+            }
+            fillSpan = SkillLineLengthFade.Span(shape.Fill, start, end);
+            ghostSpan = SkillLineLengthFade.Span(shape.Ghost, start, end);
+        }
+
+        DrawSegment(fillQuad, fillRenderer, origin, forward, shape.Fill, fillAlpha, 0.004f, fillSpan);
 
         if (shape.HasGhost)
-            DrawSegment(ghostQuad, ghostRenderer, origin, forward, shape.Ghost, ghostAlpha, 0.002f);
+            DrawSegment(ghostQuad, ghostRenderer, origin, forward, shape.Ghost, ghostAlpha, 0.002f, ghostSpan);
         else
             SetRendererVisible(ghostRenderer, false);
 
@@ -148,7 +189,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
         Vector3 direction,
         SkillPreviewSegment segment,
         float alpha,
-        float layerOffset)
+        float layerOffset,
+        Vector4? lengthFadeSpan = null)
     {
         if (quad == null || targetRenderer == null || !segment.IsVisible)
         {
@@ -168,6 +210,23 @@ public sealed class SkillLineIndicator : MonoBehaviour
         propertyBlock.Clear();
         propertyBlock.SetFloat(AlphaId, alpha);
         propertyBlock.SetVector(WorldSizeId, new Vector4(segment.Width, segment.Length, 0f, 0f));
+        // 202: 거너 Q(충전·미리보기)만 길이 비율로 옅어진다. 모양은 lengthFadeCurve 칸, 구간은 층마다.
+        propertyBlock.SetFloat(LengthFadeOnId, lengthFadeSpan.HasValue ? 1f : 0f);
+        propertyBlock.SetVector(LengthFadeSpanId, lengthFadeSpan ?? WholeSpan);
+        if (lengthFadeSpan.HasValue)
+        {
+            if (lengthFadeDirty)
+            {
+                SkillLineLengthFade.Bake(lengthFadeCurve, lengthFadeSamples);
+                SkillLineLengthFade.Bake(edgeLineCurve, edgeLineSamples);
+                lengthFadeDirty = false;
+            }
+            propertyBlock.SetFloatArray(LengthFadeCurveId, lengthFadeSamples);
+            propertyBlock.SetFloatArray(EdgeLineCurveId, edgeLineSamples);
+            propertyBlock.SetFloat(EdgeLineWidthId, edgeLineWidth);
+            propertyBlock.SetColor(EdgeLineColorId, edgeLineColor);
+        }
+        propertyBlock.SetFloat(EdgeLineOnId, lengthFadeSpan.HasValue && edgeLineWidth > 0f ? 1f : 0f);
         targetRenderer.SetPropertyBlock(propertyBlock);
         SetRendererVisible(targetRenderer, true);
     }
