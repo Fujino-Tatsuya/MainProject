@@ -68,10 +68,8 @@ MonoBehaviour:
     ko: "\uAD81\uADF9\uAE30"
     en: Ultimate
   - key: FirstMeleeUltimateSkillData/tooltip.description
-    ko: "\uC9C0\uC815\uD55C \uC704\uCE58\uC5D0 \uC2EC\uD310\uC758 \uC77C\uACA9\uC744
-      \uB0B4\uB824\uCCD0 {dmg}\uC758 \uAD11\uC5ED \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
-    en: Bring down a strike of judgment on the target location, dealing {dmg} area
-      damage.
+    ko: "\uC801 \uD558\uB098\uB97C \uC9C0\uC815\uD574 \uC2EC\uD310\uC758 \uC77C\uACA9\uC744 \uB0B4\uB824\uCCD0 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uC2DC\uC804 \uC911\uC5D0\uB294 \uBC00\uB824\uB098\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Target a single enemy and bring down a strike of judgment, dealing {dmg} damage. You can't be knocked back while casting.
   - key: GunnerHeatData/tooltip.displayName
     ko: "\uC784\uACC4 \uCD9C\uB825"
     en: Critical Output
