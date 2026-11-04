@@ -1676,6 +1676,20 @@ MonoBehaviour:
   lockedPulseScale: 1.12
   lockedTextColor: {r: 1, g: 0.78, b: 0.3, a: 1}
   lockedPulseColor: {r: 1, g: 0.38, b: 0.32, a: 1}
+  showPreview: 1
+  previewAnimations:
+  - prefabName: Player_Paladin
+    entryState: Default_Attack3
+    loopState: Idle
+  - prefabName: Player_Gunner
+    entryState: Gunner_ULT_Cast
+    loopState: Idle
+  - prefabName: Player_Assassin
+    entryState: Assassin_R_Transform
+    loopState: Idle_Combat
+  choiceTimeoutSeconds: 6
+  choiceFailNoticeSeconds: 2
+  pendingTextColor: {r: 0.85, g: 0.9, b: 1, a: 1}
 --- !u!1 &6462243657921780005
 GameObject:
   m_ObjectHideFlags: 0

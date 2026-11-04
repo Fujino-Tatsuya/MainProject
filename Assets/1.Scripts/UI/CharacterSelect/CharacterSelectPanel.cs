@@ -118,7 +118,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         new CharacterSelectPreviewAnimation("Player_Paladin", "Default_Attack3", "Idle"),
         new CharacterSelectPreviewAnimation("Player_Gunner", "Gunner_ULT_Cast", "Idle"),
-        new CharacterSelectPreviewAnimation("Player_Assassin", "Assassin_E_Buff", "Idle_Combat"),
+        new CharacterSelectPreviewAnimation("Player_Assassin", "Assassin_R_Transform", "Idle_Combat"), // Assassin_E_Buff 는 UpperBody 레이어라 0번에 없다
     };
 
     [Header("Confirm Wait (할 일 199 — 확정 뒤 교체 대기)")]

@@ -156,27 +156,31 @@ public sealed class CharacterSelectPreviewPool
     }
 
     /// <summary>
-    /// 복제본 하나 — 테스트도 이 경로를 쓴다. <paramref name="inactiveHolder"/>(꺼진 오브젝트) 아래에 복제해 어떤 스크립트도 Awake 하지 않게 하고,
-    /// Armature·무기 슬롯 말고 자식은 지우고, 루트 컴포넌트(NetworkObject·역할 스크립트·컨트롤러 등)는 Transform 만 남기고 지운 뒤
-    /// 꺼진 채 <paramref name="parent"/> 아래로 옮긴다. 새 GameObject 를 만들지 않는다(에디터 테스트가 열린 씬을 더럽히지 않게).
+    /// 복제본 하나 — 테스트도 이 경로를 쓴다. <paramref name="inactiveHolder"/>(비어 있는 꺼진 오브젝트) 아래에 Variant 를 복제해 어떤 스크립트도 Awake 하지 않게 하고,
+    /// Armature·무기 슬롯만 빈 새 루트로 옮긴 뒤 복제 루트는 GameObject 째 지운다.
+    /// 🔴 복제 루트의 컴포넌트를 하나씩 지우지 않는다 — PlayerMovement ⇄ PlayerInputReader 처럼 [RequireComponent] 가 서로 걸려 있어 지워지지 않고
+    /// PlayerInput·Motor·Rigidbody·CapsuleCollider 가 살아 남는다(복제본이 입력을 쥐고 진짜 플레이어를 밀어냄 — 199 Play 버그).
+    /// 새 루트 = 빈 홀더를 Instantiate(<paramref name="parent"/> 씬에 바로 생김·꺼진 채) — 에디터 테스트가 열린 씬을 더럽히지 않게 new GameObject 를 쓰지 않는다.
     /// </summary>
     public static GameObject CreatePreviewObject(GameObject variantPrefab, Transform inactiveHolder, Transform parent)
     {
+        GameObject root = UnityEngine.Object.Instantiate(inactiveHolder.gameObject, parent, false);
+        root.name = $"Preview_{variantPrefab.name}";
+
         GameObject clone = UnityEngine.Object.Instantiate(variantPrefab, inactiveHolder, false);
-        clone.name = $"Preview_{variantPrefab.name}";
+        MoveChild(clone.transform, ArmatureName, root.transform);
+        MoveChild(clone.transform, WeaponSlotName, root.transform);
+        DestroyNow(clone); // 남은 복제(NetworkObject·역할 스크립트·VFX)는 한 번도 켜지지 않은 채 사라진다
 
-        for (int i = clone.transform.childCount - 1; i >= 0; i--)
-        {
-            Transform child = clone.transform.GetChild(i);
-            if (child.name != ArmatureName && child.name != WeaponSlotName)
-                DestroyNow(child.gameObject); // 한 번도 켜지지 않은 채 사라진다(VFX·표시기·HUD 앵커 등)
-        }
-        RemoveComponents(clone, component => !(component is Transform));
-        Strip(clone);
+        Strip(root);
+        return root;
+    }
 
-        clone.SetActive(false);
-        clone.transform.SetParent(parent, false);
-        return clone;
+    private static void MoveChild(Transform from, string childName, Transform to)
+    {
+        Transform child = from.Find(childName);
+        if (child != null)
+            child.SetParent(to, false); // 원래 Variant 루트 기준 로컬 자세 그대로
     }
 
     /// <summary>남길 것만 남긴다 — 활성화 전에 부른다.</summary>
