@@ -1266,6 +1266,51 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 1739868544969375479, guid: 3165ec58b68db964182fcf0b6e2217cf, type: 3}
   m_PrefabInstance: {fileID: 745913706}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &754293697
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 754293699}
+  - component: {fileID: 754293698}
+  m_Layer: 0
+  m_Name: MaskBlurController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &754293698
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 754293697}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65474286be6ec4947ab1b8df035ae856, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MaskBlurController
+  settings: {fileID: 11400000, guid: 16f48ac8c4551f94ab503ce0735a5fc9, type: 2}
+--- !u!4 &754293699
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 754293697}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &804682546
 GameObject:
   m_ObjectHideFlags: 0
@@ -4152,7 +4197,6 @@ MonoBehaviour:
   podPrefab: {fileID: 6749872165798839983, guid: f4fe9ae51772b1445aaa3a4b77f624b8, type: 3}
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
   impactEffect: {fileID: 11400000, guid: 0340563727d84afcba38c82d12721a2f, type: 2}
-  letterboxHeight: 0.04
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -4163,3 +4207,4 @@ SceneRoots:
   - {fileID: 2141664684}
   - {fileID: 598600904}
   - {fileID: 1019541882}
+  - {fileID: 754293699}
