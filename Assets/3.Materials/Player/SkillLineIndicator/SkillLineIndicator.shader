@@ -26,9 +26,6 @@ Shader "VeyTrace/Player/Skill Line Indicator"
         [HideInInspector] _LineFadeOn ("Length Fade On (runtime)", Float) = 0
         [HideInInspector] _LineFadeSpan ("Length Fade Span (runtime)", Vector) = (0, 1, 0, 0)
         _DecalFade ("Distance Fade (att0, att1, att2)", Vector) = (1, 0, 0, 0)
-        [ToggleUI] _DiagPlain ("Diag: Plain Draw (no effects)", Float) = 0
-        [ToggleUI] _DiagPlainFade ("Diag: Plain + Length Fade", Float) = 0
-        _DiagPlainAlpha ("Diag: Plain Alpha", Range(0, 1)) = 0.5
     }
     SubShader
     {
@@ -72,9 +69,6 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 half _LineFadeOn;
                 float4 _LineFadeSpan;
                 float4 _DecalFade;
-                half _DiagPlain;
-                half _DiagPlainFade;
-                half _DiagPlainAlpha;
             CBUFFER_END
             #include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
             Varyings Vert(Attributes input)
@@ -185,15 +179,6 @@ Shader "VeyTrace/Player/Skill Line Indicator"
             {
                 // Movement-preview arrow keeps its quad, direction and _Alpha contract (.42 = full design).
                 if(_Arrow>0.5h)return ArrowC3(input.uv);
-                // 202 diagnostic: flat _Color rectangle, no ramp/outline/fins/end bar/_Alpha/_DecalFade.
-                // _DiagPlainFade re-enables only the length fade (still gated by runtime _LineFadeOn = gunner Q).
-                if(_DiagPlain>0.5h)
-                {
-                    half plainAlpha=_DiagPlainAlpha;
-                    if(_DiagPlainFade>0.5h)
-                        plainAlpha*=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y,_LineFadeT.xyz,_LineFadeAlpha)),saturate(_LineFadeOn));
-                    return half4(_Color.rgb,plainAlpha);
-                }
                 float2 size=max(_WorldSize.xy,float2(0.001,0.001));
                 float2 samplePos=float2((input.uv.x-0.5)*size.x,input.uv.y*size.y);
                 // Derivatives must use continuous coordinates, before the repeat wrap.

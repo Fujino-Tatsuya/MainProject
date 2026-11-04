@@ -38,9 +38,6 @@ Material:
     - _FillOpacity: 0.232
     - _ReferenceAlpha: 0.28
     - _LineFadeOn: 0
-    - _DiagPlain: 1
-    - _DiagPlainFade: 0
-    - _DiagPlainAlpha: 0.5
     m_Colors:
     - _OutlineColor: {r: 0.9882353, g: 0.9882353, b: 0.9882353, a: 0.95}
     - _InnerColor: {r: 0.5921569, g: 0.7882353, b: 0.7019608, a: 1}
