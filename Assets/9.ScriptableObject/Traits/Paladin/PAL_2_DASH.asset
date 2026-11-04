@@ -19,6 +19,7 @@ MonoBehaviour:
     {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uC801\uC744 \uB04C\uACE0
     \uAC00\uC9C0 \uC54A\uACE0 \uD55C \uBC88 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
   icon: {fileID: 21300000, guid: 432fae11b3d2549d85ef21874e35ec86, type: 3}
+  tags: Knockback
   effects:
   - rid: 7237886675317424403
   references:

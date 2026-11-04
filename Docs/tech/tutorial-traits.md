@@ -233,6 +233,11 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 분류·도움말 줄 추가 (배치 유지)` — 지금 프리팹에 빠진 줄만 더한다(글꼴은 옆 글자에서 복사, 이미 있으면 저장 안 함).
   전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다). 카드 아트만 바꿀 땐 아래 §11.1.1 메뉴.
 - 설명 = 템플릿 → `TraitTooltip.FormatDescription`(`SkillTooltipFormatter`). 실패하면 `[오류: …]`(`UI.SkillTooltip.Error`) + 경고 — 스킬 툴팁과 같은 관례. 획득 아이콘 호버 툴팁도 같은 문구.
+- **태그 칩(할 일 212)** = 분류 줄 아래 `TagRow`(카드 좌상단 기준 144,112 · 390x26) — 스킬 툴팁과 **같은 칩**(둥근 9-slice 배경 + 글자색 `Ring` 테두리 + 서울알림 Medium)·같은 색 표(`SkillTooltipTagStyles`, 카드 칸 `tagStyles` — 208 설명문 단어 색과 같은 에셋)·같은 이름 키(`UI.SkillTooltip.Tag.<ID>`).
+  - 데이터 = 정의 칸 `tags`(`TraitDefinition.TagIds`, `[DataTableText(Localize = false)]`·`[SkillTooltipTagList]`) ← xlsx **`Traits_<캐릭터>` 시트 `tags` 행**(3행, Strings 아님). 형식·오류는 스킬 툴팁 `tooltip.tags` 와 같다([data-table.md §9 태그 칩](data-table.md#태그-칩--tooltiptags-할-일-114)) — 쉼표 구분 ID, 빈 칸 = 칩 없음(줄 숨김), 없는 ID·중복 = 테이블 Play·빌드 오류, 인스펙터 모드는 아는 태그만 + 경고.
+  - 그리기 = `SkillTooltipTagChipRow`(스킬 툴팁 `SkillTooltipView` 에서 뽑아 공용 — 칩 복제·색·폭·줄바꿈 `SkillTooltipView.FlowTags`). 카드 `Bind` 마다 다시 그려 카드 재사용 때 남는 칩은 끈다. 획득 아이콘 호버 툴팁에는 칩 없음.
+  - 배정(SVN r594, 12개 — 근거표 `_lane-artifacts/Work1/208/tag-plan.md`): 팔라딘 `PAL_1_PASSIVE_HEAL` Heal · `PAL_2_DASH` Knockback · `PAL_2_SHARE_HEAL` Heal · `PAL_3_E_SHIELD` Shield · `PAL_3_Q_STUN` Stun · `PAL_4_E_PUSH` Knockback · `PAL_4_HEAL_SHIELD` Heal, Shield / 거너 `GUN_2_COOL_MODE`·`GUN_2_HEAT_SHOT`·`GUN_2_OVERDRIVE` Overheat · `GUN_3_Q_PUSH` Knockback / 어쌔신 `ASN_4_NORMAL_E_PUSH` Knockback. 나머지 24개 = 수치 강화만이라 칩 없음. 정의 에셋 `tags` 칸도 같은 값(인스펙터 모드용).
+  - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 태그 칩 줄 추가 (분류 아래)`(멱등 — 칩 원본 = `CombatHUD.prefab` 스킬 툴팁 `tagChipTemplate` 복제, 카드 칸 `tagRow`·`tagChipTemplate`·`tagStyles`). 카드 C1 아트 적용도 같은 함수를 부른다. 테스트 `TraitCardTagTests`(정의 tags 문법·프리팹 연결).
 - 획득 아이콘 호버 툴팁(`AcquiredTooltip`, 폭 380 · `ContentSizeFitter` 로 높이가 글자에 맞음 · 여백 14 상하 같음)의 `Name`·`Description` = `MidlineLeft`(할 일 177). 글자 칸 높이 = 글자 높이라 `Left`(Middle)는 `TopLeft` 와 똑같이 보여서, 글자 모양 기준 Midline 으로 상자 안 세로 가운데에 놓는다. 레이아웃(childAlignment UpperLeft·여백)은 그대로.
 
 #### 11.1.1 카드 C1 아트 (할 일 165)
@@ -319,7 +324,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - 연결 = 캐릭터 정의 하위 타입의 `[DataTableSheet(TraitSheets.X)]`(`Traits/<캐릭터>/<캐릭터>TraitDefinition.cs`). 기반 `TraitDefinition`(Legacy)은 테이블 대상이 아니다.
 - 데이터 테이블이 `[SerializeReference]` 효과 칸을 따라간다(`DataTableFields.Resolve(target, path)` — 실제 값의 런타임 타입으로 필드·`[Range]`·`[Min]`·`[DataTableIgnore]` 를 찾는다). 원소 이름표는 `effects[0] · TraitDamageEffect`.
 - ⑩ 스킬 수치 칸은 `effects[i].entries[j].value` 행으로 나간다(원소 안쪽 배열 — 할 일 133 에서 Export 누락 수정). 같은 행 이름도 특성(열)마다 뜻이 달라 칸의 `key`·`name` 은 인스펙터에서 본다. 133 행 변경 목록 = `_lane-artifacts/common/133/xlsx-columns-c.md`.
-- 문자열(`id`·이름·분류·설명)·enum 배열(공격 종류 거름 등)·bool 은 수치 시트에 나가지 않는다 — 문구는 Strings, 거름은 인스펙터.
+- 문자열(`id`·이름·분류·설명)·enum 배열(공격 종류 거름 등)·bool 은 수치 시트에 나가지 않는다 — 문구는 Strings, 거름은 인스펙터. 예외 = `tags`(카드 태그 칩 ID, `[DataTableText(Localize = false)]` — 할 일 212, §11.1)는 시트 3행으로 나간다.
 - **시트가 xlsx 에 없으면 아무것도 적용하지 않는다**(오류·경고 없음 → 인스펙터 값). 빈 표·머리글만 있는 표도 통과(`TraitSheetBindingTests`). 효과 칸 번호가 정의에 없으면(배열 밖) 오류 — 테이블은 효과를 늘리지 않는다.
 - 🔴 시트 추가·Export 는 **병합 때 메인이** 최신 development 워크트리에서 한다 — 이 브랜치 코드가 development 에 들어가기 전에 xlsx(SVN)에 시트가 생기면 다른 워크트리는 '시트 이름에 맞는 타입이 없다' 오류로 테이블 Play·빌드가 멈춘다.
 

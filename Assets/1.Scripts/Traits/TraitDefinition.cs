@@ -29,6 +29,11 @@ public class TraitDefinition : ScriptableObject, ITraitModifierContributor
     [SerializeField] private string description = "";
     [SerializeField] private Sprite icon;
 
+    // 할 일 212 — 카드 태그 칩(스킬 툴팁과 같은 칩·색 표). 원본 = xlsx Traits_<캐릭터> 시트 tags 행(Strings 아님).
+    [DataTableText(Localize = false), SkillTooltipTagList, SerializeField]
+    [Tooltip("태그 칩 ID 쉼표 구분(예 Knockback, Stun). 빈 칸 = 태그 없음. ID 목록 = SkillTooltipTag")]
+    private string tags = "";
+
     [Header("효과")]
     [Tooltip("효과 클래스 목록(할 일 125 3/5). 인스펙터 아래 '효과 추가' 로 넣는다.")]
     [SerializeReference] private List<TraitEffect> effects = new List<TraitEffect>();
@@ -46,6 +51,8 @@ public class TraitDefinition : ScriptableObject, ITraitModifierContributor
     public string InlineCategory => category;
     public string InlineDescription => description;
     public Sprite Icon => icon;
+    /// <summary>카드 태그 칩 ID 목록(쉼표 구분 — <see cref="SkillTooltipTags.TryParse"/>). 빈 값 = 태그 없음.</summary>
+    public string TagIds => tags ?? string.Empty;
 
     /// <summary>이 정의 타입의 캐릭터(하위 타입이 정한다). 기반 타입 = None(옛 에셋).</summary>
     public virtual TutorialCharacter Character => TutorialCharacter.None;

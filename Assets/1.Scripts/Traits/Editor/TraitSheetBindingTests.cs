@@ -214,7 +214,7 @@ public class TraitSheetBindingTests
         created.Add(def);
 
         List<string> paths = DataTableTemplate.CollectFields(def).Select(f => f.Path).ToList();
-        CollectionAssert.AreEqual(new[] { "effects[0].entries[0].value", "effects[0].entries[1].value" }, paths);
+        CollectionAssert.AreEqual(new[] { "tags", "effects[0].entries[0].value", "effects[0].entries[1].value" }, paths);
 
         var lookup = new MemoryLookup();
         lookup.Targets["GUN_1_CHARGE"] = def;

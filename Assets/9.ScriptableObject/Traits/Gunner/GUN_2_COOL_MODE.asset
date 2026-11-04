@@ -20,6 +20,7 @@ MonoBehaviour:
     \uAE30\uBCF8 \uACF5\uACA9 \uD53C\uD574\uAC00 {basicDamagePenalty:%} \uAC10\uC18C\uD558\uBA70,
     Q\uC640 R\uC758 \uACFC\uC5F4 \uBCF4\uB108\uC2A4\uB3C4 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4."
   icon: {fileID: 21300000, guid: 5f7b57c3855b5c1fb106f2766a04e4a8, type: 3}
+  tags: Overheat
   effects:
   - rid: 7237886675317424397
   references:

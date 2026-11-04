@@ -66,7 +66,7 @@ public class TraitSkillValueMergeTests
         }
 
         List<string> rows = DataTableTemplate.CollectFields(def).Select(f => f.Path).ToList();
-        CollectionAssert.AreEqual(Enumerable.Range(0, effect.Entries.Count).Select(j => $"effects[0].entries[{j}].value").ToList(), rows,
+        CollectionAssert.AreEqual(new[] { "tags" }.Concat(Enumerable.Range(0, effect.Entries.Count).Select(j => $"effects[0].entries[{j}].value")).ToList(), rows,
             "시트 Traits_<캐릭터> 행 = 칸마다 value");
     }
 

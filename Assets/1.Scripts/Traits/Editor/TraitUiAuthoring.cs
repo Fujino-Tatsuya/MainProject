@@ -591,6 +591,101 @@ public static class TraitUiAuthoring
         so.ApplyModifiedPropertiesWithoutUndo();
         EnsureBasicAttackSlot(cardView);
         EnsureSkillBackdrop(cardView);
+        EnsureTagChips(cardView);
+    }
+
+    // ── 할 일 212 — 태그 칩 줄(분류 아래) ──
+    private const string TagRowName = "TagRow";
+    private const string TagChipName = "TagChip";
+    private const string CombatHudPath = "Assets/2.Prefabs/UI/CombatHUD.prefab";
+
+    /// <summary>
+    /// 지금 프리팹의 카드 템플릿 분류 줄 아래에 태그 칩 줄 <c>TagRow</c>(144,112 · 390x26)와 꺼 둔 칩 원본 <c>TagChip</c> 을 두고
+    /// <c>tagRow</c>·<c>tagChipTemplate</c>·<c>tagStyles</c> 칸을 잇는다. 칩 원본 = CombatHUD 스킬 툴팁 칩 원본 복제(같은 둥근 9-slice·링·글꼴).
+    /// 카드 배치·배경 블러·씬 오버라이드는 그대로, 이미 있으면 저장 안 함(멱등).
+    /// </summary>
+    [MenuItem("Tools/Tutorial/특성 선택 UI — 태그 칩 줄 추가 (분류 아래)")]
+    public static void ApplyTagChips()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            TraitSelectionView view = root.GetComponent<TraitSelectionView>();
+            var cardView = new SerializedObject(view).FindProperty("cardTemplate").objectReferenceValue as TraitCardView;
+            if (cardView == null)
+            {
+                Debug.LogError("[Trait] TraitUI.prefab 에 카드 템플릿이 없다 — 전체 생성 메뉴를 쓸 것.");
+                return;
+            }
+
+            if (!EnsureTagChips(cardView))
+            {
+                Debug.Log("[Trait] TraitUI.prefab — 태그 칩 줄이 이미 연결돼 있다(저장 안 함).");
+                return;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[Trait] TraitUI.prefab — 태그 칩 줄 저장 ({PrefabPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 카드 템플릿의 태그 칩 줄 + 칸. 바꾼 것이 있으면 true.
+    private static bool EnsureTagChips(TraitCardView cardView)
+    {
+        var card = (RectTransform)cardView.transform;
+        bool changed = false;
+        var row = card.Find(TagRowName) as RectTransform;
+        if (row == null)
+        {
+            row = NewUi(TagRowName, card);
+            PlaceTopLeft(row, 144f, 112f, 390f, 26f); // 분류(84~106) 아래 · 설명 상자(170~) 위
+            changed = true;
+        }
+
+        var chip = row.Find(TagChipName) as RectTransform;
+        if (chip == null)
+        {
+            RectTransform source = HudTagChipTemplate();
+            if (source == null)
+            {
+                Debug.LogError($"[Trait] 태그 칩 — {CombatHudPath} 의 SkillTooltipView.tagChipTemplate 을 못 찾았다. 스킬 툴팁 구성 메뉴를 먼저 쓸 것.");
+                return changed;
+            }
+
+            chip = Object.Instantiate(source, row);
+            chip.name = TagChipName;
+            chip.anchorMin = chip.anchorMax = chip.pivot = new Vector2(0f, 1f);
+            chip.anchoredPosition = Vector2.zero;
+            chip.gameObject.SetActive(false);
+            changed = true;
+        }
+
+        var so = new SerializedObject(cardView);
+        var styles = AssetDatabase.LoadAssetAtPath<SkillTooltipTagStyles>(TagStylesPath);
+        changed |= SetIfDifferent(so.FindProperty("tagRow"), row);
+        changed |= SetIfDifferent(so.FindProperty("tagChipTemplate"), chip);
+        changed |= SetIfDifferent(so.FindProperty("tagStyles"), styles);
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return changed;
+    }
+
+    private static RectTransform HudTagChipTemplate()
+    {
+        var hud = AssetDatabase.LoadAssetAtPath<GameObject>(CombatHudPath);
+        SkillTooltipView tooltip = hud != null ? hud.GetComponentInChildren<SkillTooltipView>(true) : null;
+        return tooltip != null ? new SerializedObject(tooltip).FindProperty("tagChipTemplate").objectReferenceValue as RectTransform : null;
+    }
+
+    private static bool SetIfDifferent(SerializedProperty property, Object value)
+    {
+        if (property.objectReferenceValue == value)
+            return false;
+        property.objectReferenceValue = value;
+        return true;
     }
 
     // ── 할 일 165 후속 — 기본 공격(LMB) 슬롯: 검 아이콘 + 보는 사람 캐릭터 색 ──
