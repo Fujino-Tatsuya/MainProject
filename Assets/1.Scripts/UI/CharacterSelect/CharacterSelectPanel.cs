@@ -88,9 +88,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [SerializeField] private Color lockedPulseColor = new Color(1f, 0.38f, 0.32f, 1f);
 
     // 할 일 199 — 열린 동안 씬 vcam 으로 전환(CameraTargetSwitcher 연출 카메라 경로, 우선순위 200). 로컬 화면만.
+    // 선택 vcam 은 플레이어 vcam 과 같은 대상을 같은 방식(CinemachineFollow, World Space)으로 따라가고, 오프셋·각도만 아래 칸만큼 다르다.
     [Header("Camera (할 일 199)")]
-    [Tooltip("패널이 열린 동안 쓸 씬 vcam(3.LobbyScene 의 CharacterSelectCamera). 위치·각도·렌즈는 그 오브젝트에서 튜닝한다. 비면 카메라 전환 없음.")]
+    [Tooltip("패널이 열린 동안 쓸 씬 vcam(3.LobbyScene 의 CharacterSelectCamera). 추적 대상·FollowOffset·회전·렌즈는 열 때 이 패널이 플레이어 vcam 기준으로 채운다 — 그 오브젝트 값은 쓰지 않는다. 비면 카메라 전환 없음.")]
     [SerializeField] private CinemachineCamera selectCamera;
+    [Tooltip("플레이어 vcam FollowOffset(PlayerFollowCamera, 기본 (7,17,-7), 월드 기준)에 더하는 위치 차이. (0,0,0) = 플레이어 카메라와 같은 자리. 기본 = 같은 방향 절반 거리(줌인).")]
+    [SerializeField] private Vector3 cameraOffsetDelta = new Vector3(-3.5f, -8.5f, 3.5f);
+    [Tooltip("플레이어 vcam 고정 회전(오일러)에 더하는 각도 차이(도). x = 피치(+ 아래로), y = 요. (0,0,0) = 같은 각도.")]
+    [SerializeField] private Vector3 cameraAngleDelta = Vector3.zero;
     [Tooltip("열 때 게임 카메라 → 선택 vcam 블렌드 시간(초). 0 = 컷.")]
     [SerializeField, Min(0f)] private float cameraEnterBlendSeconds = 0.5f;
     [Tooltip("닫을 때 선택 vcam → 게임 카메라 블렌드 시간(초). 0 = 컷.")]
@@ -184,6 +189,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
     private void Update()
     {
+        SyncSelectCameraTarget();
         if (!Rules.IsOpen)
             return;
 
@@ -655,9 +661,49 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         if (switcher == null)
             return;
         if (open)
+        {
+            ConfigureSelectCamera(switcher);
             switcher.EnterCinematic(selectCamera, cameraEnterBlendSeconds);
+        }
         else
+        {
             switcher.ExitCinematic(selectCamera, cameraExitBlendSeconds); // 다른 연출이 이어받았으면 무시된다
+        }
+    }
+
+    // 플레이어 vcam 의 원래 팔로우 구성 + 차이 칸. 열 때마다 다시 읽으므로 Play 중 칸을 고치면 다음에 열 때 반영된다.
+    private void ConfigureSelectCamera(CameraTargetSwitcher switcher)
+    {
+        if (!switcher.TryGetGameplayFollowView(out Vector3 baseOffset, out Quaternion baseRotation, out LensSettings lens,
+                out Vector3 damping))
+            return;
+
+        CinemachineFollow follow = selectCamera.GetComponent<CinemachineFollow>();
+        if (follow == null)
+            follow = selectCamera.gameObject.AddComponent<CinemachineFollow>();
+        Unity.Cinemachine.TargetTracking.TrackerSettings tracker = follow.TrackerSettings;
+        tracker.BindingMode = Unity.Cinemachine.TargetTracking.BindingMode.WorldSpace;
+        tracker.PositionDamping = damping;
+        follow.TrackerSettings = tracker;
+        follow.FollowOffset = baseOffset + cameraOffsetDelta;
+
+        selectCamera.Lens = lens;
+        selectCamera.transform.rotation = Quaternion.Euler(baseRotation.eulerAngles + cameraAngleDelta);
+        selectCamera.Follow = switcher.CurrentFollowTarget;
+        selectCamera.PreviousStateIsValid = false; // 감쇠로 옛 자리에서 쓸고 오지 않게 — 부드러움은 브레인 블렌드가 맡는다
+    }
+
+    // 추적 대상 = 플레이어 vcam 의 지금 대상. 캐릭터 교체(재스폰)로 바뀌어도 따라간다 — 닫힌 뒤 복귀 블렌드 중에도.
+    private void SyncSelectCameraTarget()
+    {
+        if (selectCamera == null || !Application.isPlaying)
+            return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        if (switcher == null)
+            return;
+        Transform target = switcher.CurrentFollowTarget;
+        if (target != null && selectCamera.Follow != target)
+            selectCamera.Follow = target;
     }
 
     private static void DestroyCard(GameObject card)

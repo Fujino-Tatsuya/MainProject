@@ -181,10 +181,15 @@
 ## 선택 카메라(할 일 199)
 - 패널이 열리면 씬 vcam 으로 전환하고, 닫히면(어떤 이유든·파괴 포함) 게임 카메라로 돌아온다. 로컬 화면만 바뀐다.
 - 경로 = 보스 연출과 같은 `CameraTargetSwitcher.EnterCinematic/ExitCinematic`(연출 우선순위 200 > 플레이어·낙하 vcam 100, 블렌드 시간도 스위처가 넣음). 전환 지점은 `SetCountedOpen` 한 곳.
-- 튜닝 칸:
-  - **위치·각도·FOV** = `3.LobbyScene` > `CharacterSelectStation/CharacterSelectCamera`(CinemachineCamera, 고정 — Tracking Target 비움, Priority 0 유지). 기본값은 자리표시(로컬 (0,6,−6)·피치 45°·FOV 40).
-  - **블렌드 시간** = 씬의 `CharacterSelectPanel` 인스턴스 > `Camera (할 일 199)` > `cameraEnterBlendSeconds`·`cameraExitBlendSeconds`(기본 0.5초, 0 = 컷).
-  - `selectCamera` 를 비우면 카메라 전환 없음. 프리팹 원본에는 비어 있고 씬 인스턴스가 덮어쓴다.
+- 선택 vcam 은 **플레이어 vcam(PlayerFollowCamera)과 같은 대상을 같은 방식으로 따라간다** — 열 때 패널이 `CameraTargetSwitcher.TryGetGameplayFollowView`(줌·간파 중심 이동 전 원래 FollowOffset·고정 회전·렌즈·위치 감쇠)를 읽어
+  `CinemachineFollow`(World Space) 오프셋 = 원래 오프셋 + 차이, 회전 = 고정 회전 오일러 + 차이, 렌즈 = 같은 값으로 채운다(컴포넌트가 없으면 붙인다). 열 때 감쇠 기록을 지워(`PreviousStateIsValid = false`) 옛 자리에서 쓸고 오지 않는다.
+- 추적 대상 = `CameraTargetSwitcher.CurrentFollowTarget`. 패널 `Update` 가 매 프레임 맞춰 캐릭터 교체(재스폰)·닫은 뒤 복귀 블렌드 중에도 따라간다.
+- 튜닝 칸 = `CharacterSelectPanel`(프리팹 루트 또는 씬 인스턴스) > `Camera (할 일 199)`:
+  - **`cameraOffsetDelta`** — 플레이어 vcam FollowOffset(기본 (7,17,−7))에 더하는 위치 차이(월드). 기본 (−3.5,−8.5,3.5) = 같은 방향 절반 거리. (0,0,0) = 같은 자리.
+  - **`cameraAngleDelta`** — 고정 회전(피치 ≈60°·요 −45°)에 더하는 오일러 차이(도). 기본 0.
+  - **`cameraEnterBlendSeconds`·`cameraExitBlendSeconds`** — 기본 0.5초, 0 = 컷.
+  - 열 때마다 다시 읽으므로 Play 중 칸을 고치면 다음에 열 때 반영된다.
+- `selectCamera` = 씬 `CharacterSelectStation/CharacterSelectCamera`(Priority 0 유지). 그 오브젝트의 Transform·렌즈 값은 열 때 덮어써져 의미 없다. 비우면 카메라 전환 없음(프리팹 원본은 비어 있고 씬 인스턴스가 덮어씀).
 - 다른 연출(`EnterCinematic`)이 열린 동안 카메라를 이어받으면, 닫을 때 `ExitCinematic` 이 무시돼 그 연출을 끊지 않는다.
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
