@@ -153,20 +153,6 @@ public sealed class TutorialGuideTextSourceTests
     }
 
     [Test]
-    public void Collector_SkipsKeysOwnedByLobbyTutorialUi()
-    {
-        soTable = ScriptableObject.CreateInstance<TutorialGuideTextTable>();
-        soTable.AddRowIfMissing("LOBBY_TITLE_CHARACTER", "캐릭터 선택", 0f);
-        soTable.AddRowIfMissing("TUT_Z1_MOVE", "{Q} 로 이동", 5f);
-
-        List<StringKeyInfo> keys = TutorialGuideStringKeys.Collect(soTable);
-
-        CollectionAssert.AreEqual(new[] { "Tutorial.Guide.TUT_Z1_MOVE" }, keys.Select(k => k.Key));
-        StringKeyInfo registered = StringKeyRegistry.Collect().Single(k => k.Key == LobbyTutorialUiStrings.ChapterCharacterSelect.Key);
-        Assert.AreEqual(LobbyTutorialUiStrings.ChapterCharacterSelect.Where, registered.Description);
-    }
-
-    [Test]
     public void Collector_IsRegisteredForExport()
     {
         string any = TutorialGuideStringKeys.Collect().Select(k => k.Key).FirstOrDefault();

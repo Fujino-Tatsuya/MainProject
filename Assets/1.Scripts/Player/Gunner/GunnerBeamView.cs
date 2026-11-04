@@ -210,6 +210,17 @@ public class GunnerBeamView : BaseNetworkBehaviour
     [Tooltip("Q 빔을 켜 두는 시간(초)")]
     [SerializeField] private float chargeBeamHoldDuration = 0.5f;
 
+    /// <summary>Q 발사 빔 소켓 플레이어·1m 기준·유지 시간 — 캐릭터 선택 미리보기(할 일 199)가 같은 이펙트를 로컬로 틀 때 읽는다.</summary>
+    public EffectSocketPlayer ChargeBeamPlayer => chargeBeamPlayer;
+    public float ChargeBeamUnitLength => chargeBeamUnitLength;
+    public float ChargeBeamHoldDuration => chargeBeamHoldDuration;
+    /// <summary>Q 집중 연출(충전 루프·최대 충전 알림·과충전 루프·발사 배기)과 충전 크기 범위 — 미리보기 Q 흉내(할 일 199)용.</summary>
+    public EffectSocketPlayer ChargeLoopPlayer => chargeLoopPlayer;
+    public EffectSocketPlayer ChargeFullPlayer => chargeFullPlayer;
+    public EffectSocketPlayer OverchargePlayer => overchargePlayer;
+    public EffectSocketPlayer ChargeVentPlayer => chargeVentPlayer;
+    public Vector2 ChargeScaleRange => chargeScaleRange;
+
     // 🔴 집중 연출은 **최대 충전 상태로 저작**돼 있다. 코드가 루트 스케일을 이 범위로 몬다.
     //    EffectManager 의 scale 은 Rent 할 때 한 번만 먹으므로 쓸 수 없다 —
     //    빔과 같은 수법으로 GetInstances 해서 직접 쓴다. 추종 루프는 위치·회전만 복사하므로 살아남는다.
@@ -1340,10 +1351,10 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
     /// <summary>
     /// 소켓을 <paramref name="end"/> 로 겨누고, 그 거리에 맞춰 빔 몸통을 늘인다.
-    /// 좌클릭 빔과 Q 빔이 같은 규칙을 쓰므로 하나로 뽑았다 — 규칙이 둘이면 한쪽만 고치게 된다.
+    /// 좌클릭 빔과 Q 빔이 같은 규칙을 쓰므로 하나로 뽑았다 — 규칙이 둘이면 한쪽만 고치게 된다. 캐릭터 선택 미리보기(할 일 199)도 같은 규칙으로 쓴다 — 상태 없음.
     /// </summary>
     /// <returns>실제 거리(m). 너무 가까워 아무것도 안 했으면 -1.</returns>
-    private float AimAndStretch(EffectSocketPlayer player, Vector3 end, float unitLength)
+    public static float AimAndStretch(EffectSocketPlayer player, Vector3 end, float unitLength)
     {
         Transform socket = player.Socket;
         Vector3 delta = end - socket.position;
@@ -1356,7 +1367,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         return distance;
     }
 
-    private void StretchBeam(EffectSocketPlayer player, float sizeMultiplier, float length)
+    private static void StretchBeam(EffectSocketPlayer player, float sizeMultiplier, float length)
     {
         if (sizeMultiplier <= 0f || player == null)
             return;
@@ -1365,7 +1376,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     }
 
     // BeamInstances[0..count) 의 몸통을 늘인다 — 소켓 빔과 이중 출력 추가 발 빔(소켓 없는 원샷)이 같이 쓴다.
-    private void StretchInstances(int count, float sizeMultiplier, float length)
+    private static void StretchInstances(int count, float sizeMultiplier, float length)
     {
         if (sizeMultiplier <= 0f)
             return;

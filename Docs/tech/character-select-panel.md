@@ -31,7 +31,7 @@
    panel.CharacterChosen += id => lobbySession.RequestCharacterServerRpc(id); // 🔴 서버 요청은 C12 가
    ```
 4. 준비 상태가 열린 채로 바뀌면 `panel.SetLocked(isReady)` 를 부른다(카운트다운 시작·Ready 토글 등).
-5. 서버가 교체를 거부해도 패널은 이미 닫혀 있다. 거부 피드백이 필요하면 C12 가 따로 띄운다.
+5. 확정하면 패널은 **닫히지 않고 대기**한다(할 일 199). 붙이는 쪽이 새 플레이어 등장 때 `CompleteChoice()`, 서버 거부 때 `FailChoice()` 를 부른다 — `LobbyInteractor` 가 요청 때 `LocalClient.PlayerObject` 를 기억해 다른 오브젝트가 나타나면 완료, `LobbySession.CharacterRequestRejected` 면 실패. 아래 "확정 대기".
 
 ## API (`CharacterSelectPanel`)
 | 멤버 | 동작 |
@@ -40,7 +40,8 @@
 | `void Hide()` | 닫는다(`Closed(Api)`). 닫혀 있으면 아무것도 안 한다 |
 | `void SetLocked(bool)` | 열린 채로 준비 상태 갱신 — 잠금 문구·확정 가능 여부. 닫혀 있으면 무시(다음 `Show` 값이 이긴다) |
 | `bool IsOpen` / `bool IsLocked` / `int FocusedCharacterId` | 상태 |
-| `event Action<int> CharacterChosen` | **다른** 캐릭터를 골랐다(id = 로스터 index). 곧이어 `Closed(Chosen)` |
+| `event Action<int> CharacterChosen` | **다른** 캐릭터를 골랐다(id = 로스터 index). 패널은 열린 채 대기 — `CompleteChoice` 때 `Closed(Chosen)` (할 일 199) |
+| `bool IsPending` / `void CompleteChoice()` / `void FailChoice()` | 확정 대기 중 · 교체 완료(닫힘, `Closed(Chosen)`) · 거부(열린 채 실패 안내). 대기가 아니면 둘 다 아무것도 안 함 (할 일 199) |
 | `event Action<CharacterSelectCloseReason> Closed` | 닫힐 때 한 번 — `Api`(호출 측 `Hide`)·`Button`(그냥 닫기 — 뒤로가기 또는 지금 캐릭터 재선택)·`Escape`·`Chosen` |
 | `static bool IsEscapeClaimed` | 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 | `void MoveFocus(int)` / `CharacterSelectConfirmResult Confirm()` | 키 입력과 같은 길(테스트·게임패드 연결용) |
@@ -53,7 +54,8 @@
 | 준비 중(잠금) | 거부 — 이벤트 없음, 잠금 문구가 0.6초 붉게 커졌다 돌아온다. 패널은 열린 채 |
 | 로스터 `Available=false` | 거부 — 이벤트 없음. 카드는 회색 + "선택 불가" |
 | 지금 캐릭터(`SameAsCurrent`) | `CharacterChosen` 없이 그냥 닫힘 — 뒤로가기와 같은 `Closed(Button)`(전용 사유 없음, 10-19 결정) |
-| 그 밖 | `CharacterChosen(id)` 한 번 → `Closed(Chosen)` |
+| 이미 대기 중(`Pending`, 할 일 199) | 아무것도 안 함 — 중복 요청 막기 |
+| 그 밖 | `CharacterChosen(id)` 한 번 → 열린 채 대기(`Chosen`) → `CompleteChoice` 때 `Closed(Chosen)` |
 
 ## 화면
 - 오른쪽 비스듬한 세로 스택: **위 = 이전, 가운데(초록 큰 카드) = 포커스, 아래 = 다음**. 끝에서 순환한다.
@@ -178,6 +180,58 @@
 - 우선순위(할 일 162): 결과 패널(`LobbyResultPanel.IsEscapeClaimed`) → 기본/코어 팝업(팝업만 닫힘) → 선택 패널(닫힘). 팝업을 닫은 프레임도 선택 패널이 ESC 를 쓴 것으로 친다(`IsEscapeClaimed`).
   `closeWithEscape` 를 꺼도 팝업은 ESC 로 닫힌다. 팝업이 열린 프레임에는 이동 키 반복 상태를 비운다 — 닫은 뒤 눌려 있던 이동 키는 새로 눌러야 움직인다.
 
+## 선택 카메라(할 일 199)
+- 패널이 열리면 씬 vcam 으로 전환하고, 닫히면(어떤 이유든·파괴 포함) 게임 카메라로 돌아온다. 로컬 화면만 바뀐다.
+- 경로 = 보스 연출과 같은 `CameraTargetSwitcher.EnterCinematic/ExitCinematic`(연출 우선순위 200 > 플레이어·낙하 vcam 100, 블렌드 시간도 스위처가 넣음). 전환 지점은 `SetCountedOpen` 한 곳.
+- 선택 vcam 은 **플레이어 vcam(PlayerFollowCamera)과 같은 대상을 같은 방식으로 따라간다** — 열 때 패널이 `CameraTargetSwitcher.TryGetGameplayFollowView`(줌·간파 중심 이동 전 원래 FollowOffset·고정 회전·렌즈·위치 감쇠)를 읽어
+  `CinemachineFollow`(World Space) 오프셋 = 원래 오프셋 + 차이, 회전 = 고정 회전 오일러 + 차이, 렌즈 = 같은 값으로 채운다(컴포넌트가 없으면 붙인다). 열 때 감쇠 기록을 지워(`PreviousStateIsValid = false`) 옛 자리에서 쓸고 오지 않는다.
+- 추적 대상 = `CameraTargetSwitcher.CurrentFollowTarget`. 패널 `Update` 가 매 프레임 맞춰 캐릭터 교체(재스폰)·닫은 뒤 복귀 블렌드 중에도 따라간다.
+- 튜닝 칸 = `CharacterSelectPanel`(프리팹 루트 또는 씬 인스턴스) > `Camera (할 일 199)`:
+  - **`cameraOffsetDelta`** — 플레이어 vcam FollowOffset(기본 (7,17,−7))에 더하는 위치 차이(월드). 기본 (−2.8,−10,4.2) = 절반 거리 줌인 + 높이 1.5 낮춤 + 카메라 오른쪽(월드 (+0.7,0,+0.7))으로 1m → 캐릭터가 화면 왼쪽으로 조금 치우침. (0,0,0) = 같은 자리.
+  - **`cameraAngleDelta`** — 고정 회전(피치 ≈60°·요 −45°)에 더하는 오일러 차이(도). 기본 (−5,0,0) — 낮춘 높이만큼 피치 ≈55° 로 줄여 캐릭터를 화면 세로 가운데 근처에 둔다.
+  - **`cameraEnterBlendSeconds`·`cameraExitBlendSeconds`** — 기본 0.5초, 0 = 컷.
+  - 열 때마다 다시 읽으므로 Play 중 칸을 고치면 다음에 열 때 반영된다.
+- `selectCamera` = 씬 `CharacterSelectStation/CharacterSelectCamera`(Priority 0 유지). 그 오브젝트의 Transform·렌즈 값은 열 때 덮어써져 의미 없다. 비우면 카메라 전환 없음(프리팹 원본은 비어 있고 씬 인스턴스가 덮어씀).
+- 다른 연출(`EnterCinematic`)이 열린 동안 카메라를 이어받으면, 닫을 때 `ExitCinematic` 이 무시돼 그 연출을 끊지 않는다.
+
+### 카메라 바라보기(할 일 199)
+- 열린 동안 내 캐릭터(추적 대상의 `PlayerMovement`, 오너만)가 선택 vcam 쪽 수평 방향(= 선택 FollowOffset 의 XZ)을 바라본다.
+- 경로 = `PlayerMovement.AcquireFacingLockSmooth`(기존 바라보기 잠금 `PlayerFacingLock` + `TurnToward` 와 같은 Update 회전). 잠금 동안 이동 시뮬레이션 회전이 막혀 덮어쓰지 않고, 입력은 패널 `UiModalBlocker` 가 막는다. 다른 피어는 기존 Armature NetworkTransform 으로 본다(새 RPC·NetworkVariable 없음).
+- 추적 대상이 바뀌면(캐릭터 교체 재스폰) 새 캐릭터에 다시 건다. 닫으면 잠금만 풀고 방향은 그대로(되돌리지 않음).
+- 칸 = `Camera (할 일 199)` > `faceCamera`(기본 켬)·`faceCameraTurnSpeed`(도/초, 기본 540, 0 = 즉시).
+
+### 패널 밖 UI 전부 숨김(할 일 199)
+- 열린 동안 숨기고 닫으면(파괴 포함) 숨기기 전 값으로 되돌린다 — `CharacterSelectHudHider`. 0.5초마다 다시 찾아 새로 생긴 것(재스폰 HUD·런타임 캔버스)도 숨긴다. 표시만 바꾸고 튜토리얼 판정·서버 상태는 안 건드린다.
+- 캔버스(화면·월드 전부, 목록 하드코딩 없음) = 대상에 `CanvasGroup`(alpha 0·클릭 통과)를 얹는다(없으면 붙였다가 닫을 때 뗀다, 있으면 값 복원). SetActive·`Canvas.enabled` 는 그쪽 스크립트가 직접 쓰므로 피한다.
+  - 패널과 무관한 최상위 캔버스 = 통째로(CombatHUD·캐릭터 HUD·로비 튜토리얼 UI·TutorialGuideUI·머리 위 체력바 캔버스·피해 숫자·상호작용 문구·몬스터 월드 바 등).
+  - 패널을 품은 캔버스(로비 공용 `Canvas`) = 패널까지의 경로(`Slot_CharacterSelectPanel`)만 두고 그 형제(플레이어 슬롯·지난 결과 버튼·집결/무기 점검/일반 전투 표시·`Fade_Image` 등)를 숨긴다.
+  - 패널 아래(패널·기본/코어 팝업) = 안 건드림. 늘 남김 = 접속 오버레이(`DemoConnectionOverlay`)·로딩 화면(`NetworkLoadingScreenView`)·ESC 게임 메뉴(`GameMenuController` — 패널이 ESC 를 쥐어 열리지 않는다).
+  - 결과 패널은 숨김 대상 — 로비 진입 때·숨겨진 다시 보기 버튼으로만 열려 선택 패널과 겹칠 일이 없다.
+- 월드 표식 = 렌더러 `forceRenderingOff`(`PlayerEncounterLock` 과 같은 방식, 원래 꺼져 있던 것은 기록 안 함): `LobbyFloorArrowPath`·`LobbyFloorArrowStrip`·`LobbyTutorialWallTarget`·`LobbyGatherZoneBorders`·조준 쿼드(`PlayerAimIndicator.IndicatorTransform`)·`SkillRangeIndicator`·`SkillLineIndicator` — 팀원 것도.
+- 칸 = `Hide HUD (할 일 199)` > `hideHudWhileOpen`(기본 켬).
+- 알려진 한계: 숨긴 오브젝트의 기존 `CanvasGroup` 알파를 그쪽 스크립트가 매 프레임 쓰면 다시 보일 수 있다(지금 최상위 캔버스 오브젝트에 그런 것은 없음).
+
+### 확정 대기(할 일 199)
+- `Confirm` 이 `Chosen` 이면 `CharacterSelectPanelRules.IsPending`(`PendingId`) — 이동·확정·ESC·뒤로·팝업·카드 클릭은 무시, 호출 측 `Hide`(`Closed(Api)`)만 받는다. 잠금 문구 자리에 "캐릭터 변경 중…".
+- 끝: `CompleteChoice()` → `Closed(Chosen)`(닫히며 입력·카메라·HUD·미리보기 복구) / `FailChoice()` 또는 시간 초과(`choiceTimeoutSeconds`, 기본 6초) → 열린 채 "캐릭터를 바꾸지 못했습니다"(`choiceFailNoticeSeconds`, 기본 2초) 후 잠금 문구로, 다시 고를 수 있다.
+- 지금 캐릭터 재선택·뒤로·ESC 는 서버를 거치지 않아 대기 없이 같은 프레임에 복구 후 닫힌다.
+- 칸 = `Confirm Wait (할 일 199)`.
+
+### 포커스 캐릭터 미리보기(할 일 199)
+- 로비 씬 로딩 때(패널 `Start`, Play 만) 로스터 캐릭터마다 **표시용 복제본**을 만들어 꺼 둔다 — `CharacterSelectPreviewPool`, 패널과 같은 씬의 `CharacterSelectPreviewPool` 오브젝트 아래(로비가 내려가면 같이 사라짐). 스폰 아님·네트워크 무관·클라마다 로컬.
+  - 복제 = 꺼진 홀더 아래 Variant Instantiate(Awake 없음) → `Armature`·`PlayerWaeponSlot` 말고 자식 파괴, 루트는 Transform 만 → 남은 쪽에서 화이트리스트 밖 스크립트·NetworkTransform/NetworkAnimator·Collider·Rigidbody 제거, 파티클·트레일·오디오 끔, Animator 루트 모션 끔.
+  - 남기는 스크립트 = `PlayerAnimationEventRelay`·`EffectAnimEventRelay`(애니 이벤트 수신자 — 부모가 없어 아무것도 안 함)·`WeaponTransformRelay`(팔라딘 칼·방패)·`SDArmTwist`·어쌔신 머리카락 4종·`DissolveOverlay`·`EffectSocketPlayer`(거너 Q 빔 — 미리보기 코드가 부를 때만). 거너 레이저건은 Armature 안 메시라 그대로 보인다.
+- 열린 동안 진짜 내 캐릭터(추적 대상의 오너 `Player`)는 렌더러 `forceRenderingOff` 로 이 화면에서만 감추고(`CharacterSelectRealPlayerHider`, 원래 꺼진 것은 기록 안 함) 그 자리·선택 카메라 쪽 수평 방향에 **포커스 캐릭터** 복제본을 세운다. 지금·잠긴 캐릭터도 복제본. 포커스가 바뀌면 즉시 교체. 다른 피어 화면은 진짜 캐릭터(카메라 바라보기 그대로).
+- 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — **`entryStates` 를 순서대로 1회씩 → 루프(`loopState`) 또는 마지막 포즈 홀드(`holdLastPose` — 마지막 칸은 End 이벤트가 아니라 클립 끝 프레임(정규화 0.999, 1 이면 컨트롤러 끝 전이가 걸림)까지 재생 후 Animator 속도 0)**.
+  - 넘김 시점 = 그 클립의 **End 애니 이벤트**(평타 `HandleDefaultAttackEvent(End)`·스킬 `HandleSkillEvent(End)` — 게임이 동작 끝으로 보는 곳), 없으면 클립 끝 − 블렌드. 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡아 두 번 바뀌지 않게 한다.
+  - 블렌드 = 등장끼리 `chainBlendSeconds`(기본 0.1초)·마지막 → 루프 `loopBlendSeconds`(항목별). 상태가 없으면 경고 후 건너뜀.
+  - 거너 빔 = `beamNormalizedTime`(마지막 등장 칸(발사) 정규화 시각 — 크로스페이드 시작부터 셈, 음수 = 안 쏨 — `Gunner_Q_Fire` 클립에 발사 순간 이벤트가 없어 칸으로 둠)·`beamLength`(m, 복제본 앞). 프리팹 `GunnerBeamView` 의 Q 빔 소켓(`QBeamFx`, 총구 `BeamMuzzle`)의 복제본 쪽 `EffectSocketPlayer` 로 같은 이펙트를 로컬 재생, `GunnerBeamView.AimAndStretch` 로 겨눔·길이, 유지 = `chargeBeamHoldDuration`. 피해·RPC·서버 없음. 카드가 바뀌면 `Stop`, 패널이 닫히면 복제본이 꺼지며 `OnDisable` 로 풀 반납.
+  - 거너 Q 흉내 = 첫 등장 상태가 Q 데이터(`GunnerChargeLaserData`) `animatorStateName`(`Gunner_Q_Start`, 컨트롤러가 `Gunner_Q_Charge` 로 넘김)이면 그 칸은 이벤트가 아니라 게임 시간으로 넘긴다 — 충전 루프(`chargeLoopPlayer`, `chargeScaleRange` 만큼 키움) → `maxChargeTime` 에 알림(`chargeFullPlayer`)+과충전 루프(`overchargePlayer`) → `GunnerTraitRules.AutoFireDelay(maxChargeTime, autoFireHoldTime)`(특성 없음 = 1.2+0.8초)에 루프 즉시 걷고 배기(`chargeVentPlayer`) + 다음 칸(`Gunner_Q_Fire`). 실제 스킬·`GunnerBeamView` 는 네트워크 컴포넌트라 복제본에서 못 돌려 같은 소켓·같은 순서로 흉내. 범위 표시는 없음.
+  - 어쌔신 변신 오라 = `transformAura` 켜면 미리보기가 보이는 동안 계속 — 게임 R 변신(`AssassinSkillView.HandleTransformChanged`)과 같은 `EffectCatalog.Assassin_R_BladeVortex` 를 `EffectManager.PlayLooping` 으로 복제본 루트에 붙임(오프셋·배율 = 프리팹 `AssassinSkillView` 값). 카드 교체·패널 닫힘 = `ReleaseImmediate`.
+  - 전체 클립 재생 = `entryDurationSeconds` > 0 이면 등장 상태마다 End 이벤트에서 끊지 않고 클립 끝(정규화 0.999)까지, 전체가 그 시간에 끝나게 일정한 속도로(Animator 속도 = 클립 길이 ÷ (시간 × 상태 속도·속도 파라미터)). 넘길 때 속도 1 로 되돌린다.
+  - 기본: 팔라딘 `Garen_Ultimate_Skill`(전체 3초) → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Start`(Q 흉내) → `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → `Idle`(1.0) + 변신 오라. 카드가 다시 오거나 패널을 다시 열면 처음부터.
+- 닫힐 때(이유 무관·파괴 포함) 복제본을 끄고 진짜 캐릭터 렌더러를 되돌린다. 칸 `showPreview`(기본 켬).
+
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |
 |---|---|
@@ -185,6 +239,8 @@
 | `UI.CharacterSelect.CurrentTag` | 현재 |
 | `UI.CharacterSelect.Unavailable` | 선택 불가 |
 | `UI.CharacterSelect.Hint` | W/S·방향키 이동   Enter 선택   Esc 뒤로 |
+| `UI.CharacterSelect.ChangingNotice` | 캐릭터 변경 중… (할 일 199, SVN r596) |
+| `UI.CharacterSelect.ChangeFailedNotice` | 캐릭터를 바꾸지 못했습니다 (할 일 199, SVN r596) |
 
 캐릭터 이름은 로스터 `Character.<프리팹>.Name`(기존 키).
 

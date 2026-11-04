@@ -256,7 +256,7 @@ public sealed class LobbySession : NetworkBehaviour
         CharacterRequestRejectedClientRpc(reason, RpcTarget.Single(clientId, RpcTargetUse.Temp));
     }
 
-    // 거부 피드백 — 보낸 사람만. 지금은 로그 + 이벤트뿐(패널은 이미 닫혀 있다, character-select-panel.md "붙이는 법" 5).
+    // 거부 피드백 — 보낸 사람만. 로그 + 이벤트(LobbyInteractor 가 대기 중인 선택 패널을 열린 채 되돌리고 안내 — 할 일 199, character-select-panel.md "붙이는 법" 5).
     [Rpc(SendTo.SpecifiedInParams)]
     private void CharacterRequestRejectedClientRpc(LobbyCharacterChangeReject reason, RpcParams p = default)
     {

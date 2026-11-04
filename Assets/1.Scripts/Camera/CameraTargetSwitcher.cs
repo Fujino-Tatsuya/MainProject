@@ -160,6 +160,22 @@ public class CameraTargetSwitcher : MonoBehaviour
         return hasFixedCameraRotation;
     }
 
+    /// <summary>
+    /// 플레이어 vcam 의 <b>원래</b> 팔로우 구성(줌·중심 이동 전 FollowOffset·고정 회전·렌즈·팔로우 감쇠). 같은 대상을 다른 오프셋으로 따라가는
+    /// 연출 vcam(캐릭터 선택 카메라 — 할 일 199)이 기준으로 쓴다. 리그·팔로우가 없으면 false.
+    /// </summary>
+    public bool TryGetGameplayFollowView(out Vector3 followOffset, out Quaternion rotation, out LensSettings lens,
+        out Vector3 positionDamping)
+    {
+        EnsureCameraRig();
+        CacheFixedCameraRotation();
+        followOffset = basePlayerFollowOffset;
+        rotation = fixedCameraRotation;
+        lens = playerCamera != null ? playerCamera.Lens : LensSettings.Default;
+        positionDamping = playerCameraFollow != null ? playerCameraFollow.TrackerSettings.PositionDamping : Vector3.one;
+        return playerCameraFollow != null && hasFixedCameraRotation;
+    }
+
     /// <summary>연출 vcam 으로 전환한다. <paramref name="blendSeconds"/> 0 = 컷(암전 직후 등).</summary>
     public void EnterCinematic(CinemachineCamera camera, float blendSeconds)
     {

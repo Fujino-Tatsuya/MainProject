@@ -45,6 +45,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 | 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 **스폰 대상이 아니다** — 고쳐도 게임에 반영되지 않는다. (NGO 자동 생성으로 `DefaultNetworkPrefabs` 에는 **등록돼 있다** — 아래 행) |
 | 네트워크 목록 | `DefaultNetworkPrefabs` 는 **NGO 가 자동 생성**한다(`ProjectSettings/NetcodeForGameObjects.asset` `GenerateDefaultNetworkPrefabs: 1`) — NetworkObject 가 붙은 프리팹은 base·Legacy 포함 **전부 다시 들어온다**. 손으로 빼지 말 것. 스폰되지 않는 프리팹이 목록에 있는 건 무해(해시가 전부 다르다) |
 | 캐릭터 선택 UI / `ResolvePlayerPrefabForClient` | ✅ 2026-10-02 구현(§8.3). 로비 `Panel_CharacterSelect` → `CharacterRoster` id → Variant. 실패 시 `defaultPlayerPrefab` |
+| 캐릭터 선택 미리보기 복제본 | 선택 패널이 로비에서 Variant 마다 만드는 **표시용 복제본**(`CharacterSelectPreviewPool`, 할 일 199)은 **스폰이 아니다** — `Armature`·`PlayerWaeponSlot` 만 남기고 네트워크·물리·역할 스크립트를 지운 로컬 오브젝트. Armature 에 새 스크립트를 붙이면 미리보기에선 지워진다(남기려면 풀의 화이트리스트에 추가, [character-select-panel.md](character-select-panel.md)) |
 
 🔴 **Variant 해시 함정.** `SaveAsPrefabAsset` 만으로는 Variant 의 `NetworkObject.GlobalObjectIdHash` 오버라이드가
 YAML 에 **안 써져 base 해시를 상속**한다(에디터 메모리 값만 고유 → 빌드에서 충돌). 에셋의 NetworkObject 를

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TMPro;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -86,6 +87,50 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [SerializeField] private Color lockedTextColor = new Color(1f, 0.78f, 0.3f, 1f);
     [SerializeField] private Color lockedPulseColor = new Color(1f, 0.38f, 0.32f, 1f);
 
+    // 할 일 199 — 열린 동안 씬 vcam 으로 전환(CameraTargetSwitcher 연출 카메라 경로, 우선순위 200). 로컬 화면만.
+    // 선택 vcam 은 플레이어 vcam 과 같은 대상을 같은 방식(CinemachineFollow, World Space)으로 따라가고, 오프셋·각도만 아래 칸만큼 다르다.
+    [Header("Camera (할 일 199)")]
+    [Tooltip("패널이 열린 동안 쓸 씬 vcam(3.LobbyScene 의 CharacterSelectCamera). 추적 대상·FollowOffset·회전·렌즈는 열 때 이 패널이 플레이어 vcam 기준으로 채운다 — 그 오브젝트 값은 쓰지 않는다. 비면 카메라 전환 없음.")]
+    [SerializeField] private CinemachineCamera selectCamera;
+    [Tooltip("플레이어 vcam FollowOffset(PlayerFollowCamera, 기본 (7,17,-7), 월드 기준)에 더하는 위치 차이. (0,0,0) = 플레이어 카메라와 같은 자리. 기본 = 절반 거리 줌인 + 높이 1.5 낮춤 + 화면 오른쪽(카메라 오른쪽 = 월드 (+0.7,0,+0.7))으로 1m — 캐릭터가 화면 왼쪽으로 조금 치우친다.")]
+    [SerializeField] private Vector3 cameraOffsetDelta = new Vector3(-2.8f, -10f, 4.2f);
+    [Tooltip("플레이어 vcam 고정 회전(오일러)에 더하는 각도 차이(도). x = 피치(+ 아래로), y = 요. (0,0,0) = 같은 각도.")]
+    [SerializeField] private Vector3 cameraAngleDelta = new Vector3(-5f, 0f, 0f); // 낮춘 높이만큼 피치를 줄여(≈60°→55°) 캐릭터가 화면 세로 가운데 근처에 남게
+    [Tooltip("열 때 게임 카메라 → 선택 vcam 블렌드 시간(초). 0 = 컷.")]
+    [SerializeField, Min(0f)] private float cameraEnterBlendSeconds = 0.5f;
+    [Tooltip("닫을 때 선택 vcam → 게임 카메라 블렌드 시간(초). 0 = 컷.")]
+    [SerializeField, Min(0f)] private float cameraExitBlendSeconds = 0.5f;
+    [Tooltip("열린 동안 내 캐릭터가 선택 카메라 쪽(수평)을 바라본다. 닫으면 평소 조작으로 돌아간다(원래 방향으로 되돌리지 않음).")]
+    [SerializeField] private bool faceCamera = true;
+    [Tooltip("카메라 쪽으로 도는 속도(도/초). 0 = 즉시.")]
+    [SerializeField, Min(0f)] private float faceCameraTurnSpeed = 540f;
+
+    // 할 일 199 — 열린 동안 전투 HUD·튜토리얼 안내 숨김(로컬 표시만).
+    [Header("Hide HUD (할 일 199)")]
+    [Tooltip("열린 동안 패널 밖 UI 전부(화면·월드 캔버스, 바닥 경로·벽 표식·집결 테두리·조준·스킬 범위 표시)를 숨기고, 닫으면 원래 상태로 되돌린다. 접속·로딩·ESC 메뉴는 남김.")]
+    [SerializeField] private bool hideHudWhileOpen = true;
+
+    [Header("Preview (할 일 199 — 포커스 캐릭터 표시용 복제본, 로컬 전용)")]
+    [Tooltip("열린 동안 진짜 내 캐릭터를 이 화면에서만 감추고 그 자리에 포커스 캐릭터 복제본을 세운다. 다른 피어 화면은 그대로.")]
+    [SerializeField] private bool showPreview = true;
+    [Tooltip("캐릭터별 복제본 애니메이션 — 프리팹 이름 키, 등장 상태들 순서대로 1회씩 → 루프 또는 마지막 포즈 홀드(0번 레이어 상태 이름), 거너는 빔 시각·길이. 상태가 없으면 건너뜀.")]
+    [SerializeField] private List<CharacterSelectPreviewAnimation> previewAnimations = new List<CharacterSelectPreviewAnimation>
+    {
+        // 팔라딘 = R 궁 모션 클립 전체(5.67초)를 3초에 → Idle 로 길게 블렌드.
+        new CharacterSelectPreviewAnimation("Player_Paladin", new[] { "Garen_Ultimate_Skill" }, "Idle", 0.9f) { entryDurationSeconds = 3f },
+        // 거너 = Q 흉내: 집중(Q 데이터 animatorStateName) → 게임 자동 발사 시각(maxChargeTime + autoFireHoldTime)에 발사 + 빔(발사 칸 beamNormalizedTime).
+        new CharacterSelectPreviewAnimation("Player_Gunner", new[] { "Gunner_Q_Start", "Gunner_Q_Fire" }, "Idle", 0.3f) { beamNormalizedTime = 0.02f },
+        // 어쌔신 = 평타 1→2타 → Idle 로 1초 블렌드, 보이는 동안 R 변신 오라.
+        new CharacterSelectPreviewAnimation("Player_Assassin", new[] { "Default_Attack0", "Default_Attack1" }, "Idle", 1f) { transformAura = true },
+    };
+
+    [Header("Confirm Wait (할 일 199 — 확정 뒤 교체 대기)")]
+    [Tooltip("확정 뒤 새 플레이어가 이 시간 안에 나타나지 않으면 대기를 풀고 실패 안내(초, unscaled).")]
+    [SerializeField, Min(0.5f)] private float choiceTimeoutSeconds = 6f;
+    [Tooltip("교체 실패 안내를 보여 주는 시간(초, unscaled).")]
+    [SerializeField, Min(0f)] private float choiceFailNoticeSeconds = 2f;
+    [SerializeField] private Color pendingTextColor = new Color(0.85f, 0.9f, 1f, 1f);
+
     private static int s_openCount;
     private static int s_escapeClaimedFrame = -1;
 
@@ -99,8 +144,20 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     private float _lockedPulseUntil = -1f;
     private int _ringCard = -1; // 테두리를 보여 주는 카드 — 이동 중엔 꺼지는 옛 가운데, 정착하면 새 가운데
     private Func<float> _previewClock;
+    private readonly CharacterSelectHudHider _hudHider = new CharacterSelectHudHider();
+    private Vector3 _selectFollowOffset; // 선택 vcam 의 월드 FollowOffset — 캐릭터가 바라볼 방향(수평 성분)
+    private bool _hasSelectFollowOffset;
+    private PlayerMovement _facingMovement; // 바라보기 잠금을 건 내 캐릭터
+    private Transform _facingSource; // _facingMovement 를 찾은 추적 대상(바뀌면 다시 찾는다)
+    private readonly CharacterSelectPreviewPool _previewPool = new CharacterSelectPreviewPool();
+    private readonly CharacterSelectRealPlayerHider _realPlayerHider = new CharacterSelectRealPlayerHider();
+    private float _pendingUntil = -1f; // 확정 대기 시간 초과 시각(unscaled)
+    private float _failNoticeUntil = -1f; // 교체 실패 안내를 끌 시각(unscaled)
 
-    /// <summary>다른 캐릭터를 골랐다(캐릭터 id = 로스터 index). 곧이어 <see cref="Closed"/>(<see cref="CharacterSelectCloseReason.Chosen"/>).</summary>
+    /// <summary>
+    /// 다른 캐릭터를 골랐다(캐릭터 id = 로스터 index) — 호출 측이 서버에 요청한다. 패널은 열린 채 대기(<see cref="IsPending"/>)하다가
+    /// <see cref="CompleteChoice"/> 로 <see cref="Closed"/>(<see cref="CharacterSelectCloseReason.Chosen"/>), <see cref="FailChoice"/>·시간 초과면 열린 채 안내(할 일 199).
+    /// </summary>
     public event Action<int> CharacterChosen;
 
     /// <summary>닫힐 때 한 번(Api·Button·Escape·Chosen). 지금 캐릭터를 다시 고르면 Button.</summary>
@@ -109,6 +166,9 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     public bool IsOpen => Rules.IsOpen;
 
     public bool IsLocked => Rules.IsLocked;
+
+    /// <summary>확정해 교체를 기다리는 중(할 일 199) — 입력은 무시, <see cref="Hide"/> 만 받는다.</summary>
+    public bool IsPending => Rules.IsPending;
 
     /// <summary>포커스된 카드 index(= 캐릭터 id). 카드가 없으면 -1.</summary>
     public int FocusedCharacterId => Rules.Focus;
@@ -170,15 +230,31 @@ public sealed class CharacterSelectPanel : MonoBehaviour
             if (card != null)
                 card.Clicked -= OnCardClicked;
         SetCountedOpen(false);
+        _previewPool.Dispose();
+    }
+
+    // 로비 씬 로딩 때 표시용 복제본을 미리 만든다(Play 만, 할 일 199) — 패널과 같은 씬에 두어 로비가 내려가면 같이 사라진다.
+    private void Start()
+    {
+        if (Application.isPlaying && showPreview)
+            _previewPool.Build(roster, gameObject.scene, previewAnimations);
     }
 
     private void Update()
     {
+        SyncSelectCameraTarget();
         if (!Rules.IsOpen)
             return;
 
+        if (hideHudWhileOpen && Application.isPlaying)
+            _hudHider.Tick(transform, Time.unscaledTime); // 열린 동안 새로 생긴 HUD 도 주기적으로 다시 숨긴다
+        UpdateFacing();
+        UpdatePreview();
+
         UpdateLockedPulse();
         UpdateMotion();
+        if (UpdateChoiceWait())
+            return; // 대기 중 — 입력 무시(중복 요청 막기). 닫기는 호출 측 Hide 만.
 
         // 결과 패널이 위에 열려 있거나 이 프레임 ESC 로 닫혔다 — 키 입력은 그쪽 것.
         if (LobbyResultPanel.IsEscapeClaimed)
@@ -257,6 +333,8 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         BuildCards();
         Rules.Open(currentCharacterId, isLocked, _available);
         _lockedPulseUntil = -1f;
+        _pendingUntil = -1f;
+        _failNoticeUntil = -1f;
         _keyRepeat.Reset(); // 열 때 이미 눌려 있던 이동 키는 새로 누를 때까지 무시
 
         if (content != null)
@@ -305,15 +383,66 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         CharacterSelectConfirmResult result = Rules.Confirm();
         if (result == CharacterSelectConfirmResult.Chosen)
-            CharacterChosen?.Invoke(Rules.Focus);
+        {
+            // 다른 캐릭터 = 열린 채 대기 → 요청 한 번(할 일 199). 끝은 CompleteChoice / FailChoice / 시간 초과.
+            _pendingUntil = Time.unscaledTime + choiceTimeoutSeconds;
+            _failNoticeUntil = -1f;
+            _lockedPulseUntil = -1f;
+            _keyRepeat.Reset();
+            Redraw();
+            CharacterChosen?.Invoke(Rules.PendingId);
+        }
         else if (result == CharacterSelectConfirmResult.Locked)
+        {
             _lockedPulseUntil = Time.unscaledTime + lockedPulseSeconds;
+        }
 
-        // 다른 캐릭터 = Chosen, 지금 캐릭터 = Button(뒤로가기와 같은 그냥 닫기).
+        // 지금 캐릭터 = Button(뒤로가기와 같은 그냥 닫기).
         if (CharacterSelectPanelRules.TryGetCloseReason(result, out CharacterSelectCloseReason reason))
             ApplyClosed(reason);
 
         return result;
+    }
+
+    /// <summary>기다리던 교체가 끝났다(새 내 플레이어 등장) — 닫는다(Closed(Chosen)). 대기 중이 아니면 아무것도 안 한다.</summary>
+    public void CompleteChoice()
+    {
+        if (Rules.CompletePending())
+            ApplyClosed(CharacterSelectCloseReason.Chosen);
+    }
+
+    /// <summary>교체가 거부됐다(또는 시간 초과) — 열린 채 다시 고를 수 있게 하고 실패 안내를 잠깐 띄운다. 대기 중이 아니면 아무것도 안 한다.</summary>
+    public void FailChoice()
+    {
+        if (!Rules.FailPending())
+            return;
+        _pendingUntil = -1f;
+        _failNoticeUntil = Time.unscaledTime + choiceFailNoticeSeconds;
+        _keyRepeat.Reset(); // 대기 중 눌려 있던 이동 키는 새로 누를 때까지 무시
+        Redraw();
+    }
+
+    // 대기 시간 초과·실패 안내 끝을 본다. 대기 중이면 true(입력 무시).
+    private bool UpdateChoiceWait()
+    {
+        if (Rules.IsPending)
+        {
+            if (_pendingUntil >= 0f && Time.unscaledTime >= _pendingUntil)
+            {
+                Debug.LogWarning($"[CharacterSelectPanel] 캐릭터 교체 대기 {choiceTimeoutSeconds}초 초과 — 대기를 푼다.", this);
+                FailChoice();
+                return false;
+            }
+            _keyRepeat.Reset();
+            return true;
+        }
+
+        if (_failNoticeUntil >= 0f && Time.unscaledTime >= _failNoticeUntil)
+        {
+            _failNoticeUntil = -1f;
+            Redraw();
+        }
+        return false;
     }
 
     private void BuildCards()
@@ -395,17 +524,32 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         if (nameplateName != null)
             nameplateName.text = CharacterSelectUiStrings.CharacterName(focused);
 
+        // 상태 문구 한 자리 — 교체 대기 > 교체 실패 안내 > 잠금(할 일 199).
         if (lockedText != null)
         {
-            lockedText.gameObject.SetActive(Rules.IsLocked);
-            lockedText.text = CharacterSelectUiStrings.LockedNotice.TextOr(lockedText.text);
-            lockedText.color = lockedTextColor;
+            bool failNotice = _failNoticeUntil >= 0f;
+            lockedText.gameObject.SetActive(Rules.IsPending || failNotice || Rules.IsLocked);
+            if (Rules.IsPending)
+            {
+                lockedText.text = CharacterSelectUiStrings.ChangingNotice.Text;
+                lockedText.color = pendingTextColor;
+            }
+            else if (failNotice)
+            {
+                lockedText.text = CharacterSelectUiStrings.ChangeFailedNotice.Text;
+                lockedText.color = lockedPulseColor;
+            }
+            else
+            {
+                lockedText.text = CharacterSelectUiStrings.LockedNotice.Text; // 같은 칸을 대기·실패 문구가 쓰므로 직렬화 라벨 대신 코드 폴백
+                lockedText.color = lockedTextColor;
+            }
             lockedText.rectTransform.localScale = Vector3.one;
         }
 
         // 잠금 중엔 셰브론 hover 아웃라인을 끈다 — 버튼은 interactable 그대로(클릭 = Confirm → Locked → 잠금 문구 강조).
         if (confirmButton != null && confirmButton.TryGetComponent(out UiHoverOutline confirmHover))
-            confirmHover.Blocked = Rules.IsLocked;
+            confirmHover.Blocked = Rules.IsLocked || Rules.IsPending;
     }
 
     private void UpdateLockedPulse()
@@ -633,6 +777,169 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         s_openCount += open ? 1 : -1;
         if (s_openCount < 0)
             s_openCount = 0;
+        ApplySelectCamera(open);
+        ApplyHudHidden(open);
+        if (open)
+            UpdatePreview(); // 여는 프레임부터 복제본 — 진짜 캐릭터가 한 프레임 비치지 않게
+        else
+        {
+            ReleaseFacing();
+            ReleasePreview();
+        }
+    }
+
+    // 포커스 캐릭터 복제본을 진짜 내 캐릭터 자리에 세우고 진짜 캐릭터는 이 화면에서만 감춘다(할 일 199, 로컬).
+    // 캐릭터 교체로 내 플레이어가 바뀌면 새 플레이어를 다시 감춘다. 복제본이 없으면(빈 칸) 진짜 캐릭터를 그대로 보인다.
+    private void UpdatePreview()
+    {
+        if (!showPreview || !Application.isPlaying || !_previewPool.IsBuilt)
+            return;
+
+        Transform player = FindOwnPlayerRoot();
+        if (player == null)
+        {
+            ReleasePreview();
+            return;
+        }
+
+        Vector3 toCamera = _hasSelectFollowOffset
+            ? _selectFollowOffset
+            : selectCamera != null ? selectCamera.transform.position - player.position : player.forward;
+        toCamera.y = 0f;
+        Quaternion facing = toCamera.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(toCamera.normalized) : player.rotation;
+
+        if (_previewPool.Show(Rules.Focus, player.position, facing))
+        {
+            if (_realPlayerHider.Target != player.gameObject)
+                _realPlayerHider.Hide(player.gameObject);
+            _previewPool.Tick();
+        }
+        else
+        {
+            _realPlayerHider.Restore();
+        }
+    }
+
+    private void ReleasePreview()
+    {
+        _previewPool.HideAll();
+        _realPlayerHider.Restore(); // 감춘 렌더러만 — 원래 꺼져 있던 것은 그대로
+    }
+
+    // 카메라 추적 대상의 내(오너) 플레이어 루트. 관전 대상 등 남의 캐릭터면 null.
+    private static Transform FindOwnPlayerRoot()
+    {
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        Transform source = switcher != null ? switcher.CurrentFollowTarget : null;
+        Player player = source != null ? source.GetComponentInParent<Player>() : null;
+        if (player == null || (player.IsSpawned && !player.IsOwner))
+            return null;
+        return player.transform;
+    }
+
+    private void ApplyHudHidden(bool open)
+    {
+        if (!Application.isPlaying)
+            return;
+        if (open && hideHudWhileOpen)
+            _hudHider.Tick(transform, Time.unscaledTime);
+        else
+            _hudHider.Restore(); // 숨긴 것만, 숨기기 전 값으로
+    }
+
+    // 내 캐릭터가 선택 카메라 쪽(수평)을 바라보게 — 오너 로컬에서 PlayerMovement 바라보기 잠금(이동 회전 차단 + 부드러운 회전).
+    // 다른 피어에는 기존 Armature NetworkTransform 동기화로 보인다(새 RPC 없음). 캐릭터가 바뀌면(재스폰) 새 캐릭터에 다시 건다.
+    private void UpdateFacing()
+    {
+        if (!faceCamera || !Application.isPlaying || selectCamera == null)
+            return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        Transform source = switcher != null ? switcher.CurrentFollowTarget : null;
+        if (source != _facingSource || _facingMovement == null)
+        {
+            _facingSource = source;
+            PlayerMovement movement = source != null ? source.GetComponentInParent<PlayerMovement>() : null;
+            Player player = movement != null ? movement.GetComponent<Player>() : null;
+            if (player != null && player.IsSpawned && !player.IsOwner)
+                movement = null; // 관전 대상 등 내 캐릭터가 아니면 돌리지 않는다
+            if (movement != _facingMovement)
+            {
+                ReleaseFacing();
+                _facingSource = source;
+                if (movement != null)
+                {
+                    Vector3 toCamera = _hasSelectFollowOffset
+                        ? _selectFollowOffset
+                        : selectCamera.transform.position - movement.transform.position;
+                    movement.AcquireFacingLockSmooth(this, toCamera, faceCameraTurnSpeed);
+                    _facingMovement = movement;
+                }
+            }
+        }
+    }
+
+    private void ReleaseFacing()
+    {
+        if (_facingMovement != null)
+            _facingMovement.ReleaseFacingLock(this); // 방향은 그대로 두고 평소 조작으로
+        _facingMovement = null;
+        _facingSource = null;
+    }
+
+    // 열림/닫힘이 바뀌는 곳은 SetCountedOpen 하나(Show·닫기 전부·OnDestroy) — 카메라도 여기서만 바꾼다.
+    private void ApplySelectCamera(bool open)
+    {
+        if (!Application.isPlaying || selectCamera == null)
+            return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        if (switcher == null)
+            return;
+        if (open)
+        {
+            ConfigureSelectCamera(switcher);
+            switcher.EnterCinematic(selectCamera, cameraEnterBlendSeconds);
+        }
+        else
+        {
+            switcher.ExitCinematic(selectCamera, cameraExitBlendSeconds); // 다른 연출이 이어받았으면 무시된다
+        }
+    }
+
+    // 플레이어 vcam 의 원래 팔로우 구성 + 차이 칸. 열 때마다 다시 읽으므로 Play 중 칸을 고치면 다음에 열 때 반영된다.
+    private void ConfigureSelectCamera(CameraTargetSwitcher switcher)
+    {
+        if (!switcher.TryGetGameplayFollowView(out Vector3 baseOffset, out Quaternion baseRotation, out LensSettings lens,
+                out Vector3 damping))
+            return;
+
+        CinemachineFollow follow = selectCamera.GetComponent<CinemachineFollow>();
+        if (follow == null)
+            follow = selectCamera.gameObject.AddComponent<CinemachineFollow>();
+        Unity.Cinemachine.TargetTracking.TrackerSettings tracker = follow.TrackerSettings;
+        tracker.BindingMode = Unity.Cinemachine.TargetTracking.BindingMode.WorldSpace;
+        tracker.PositionDamping = damping;
+        follow.TrackerSettings = tracker;
+        follow.FollowOffset = baseOffset + cameraOffsetDelta;
+        _selectFollowOffset = follow.FollowOffset;
+        _hasSelectFollowOffset = true;
+
+        selectCamera.Lens = lens;
+        selectCamera.transform.rotation = Quaternion.Euler(baseRotation.eulerAngles + cameraAngleDelta);
+        selectCamera.Follow = switcher.CurrentFollowTarget;
+        selectCamera.PreviousStateIsValid = false; // 감쇠로 옛 자리에서 쓸고 오지 않게 — 부드러움은 브레인 블렌드가 맡는다
+    }
+
+    // 추적 대상 = 플레이어 vcam 의 지금 대상. 캐릭터 교체(재스폰)로 바뀌어도 따라간다 — 닫힌 뒤 복귀 블렌드 중에도.
+    private void SyncSelectCameraTarget()
+    {
+        if (selectCamera == null || !Application.isPlaying)
+            return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        if (switcher == null)
+            return;
+        Transform target = switcher.CurrentFollowTarget;
+        if (target != null && selectCamera.Follow != target)
+            selectCamera.Follow = target;
     }
 
     private static void DestroyCard(GameObject card)
