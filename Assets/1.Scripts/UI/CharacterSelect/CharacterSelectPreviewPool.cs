@@ -25,7 +25,7 @@ public sealed class CharacterSelectPreviewAnimation
     [Min(0f)] public float loopBlendSeconds = DefaultLoopBlendSeconds;
     [Tooltip("등장 상태끼리 넘어갈 때 크로스페이드 시간(초).")]
     [Min(0f)] public float chainBlendSeconds = DefaultChainBlendSeconds;
-    [Tooltip("첫 등장 상태의 이 정규화 시각에 무기 빔(거너 Q 레이저)을 로컬로 튼다. 음수 = 안 쏨. 그 클립에 발사 순간 애니 이벤트가 없어서 칸으로 둔다.")]
+    [Tooltip("마지막 등장 상태(발사)의 이 정규화 시각에 무기 빔(거너 Q 레이저)을 로컬로 튼다(그 상태로 넘어가는 크로스페이드 시작부터 셈). 음수 = 안 쏨. 그 클립에 발사 순간 애니 이벤트가 없어서 칸으로 둔다.")]
     public float beamNormalizedTime = -1f;
     [Tooltip("빔 길이(m) — 복제본 앞 방향으로.")]
     [Min(0.1f)] public float beamLength = 8f;
@@ -94,6 +94,13 @@ public sealed class CharacterSelectPreviewPool
         public float BeamStopAt;
         public float EntryDuration;     // >0 = 등장 칸마다 클립 전체를 이 시간(초)에
         public bool StepSpeedSet;
+        public bool Charge;             // 거너 Q 흉내 — 첫 칸 = 집중(시간으로 넘김), 다음 칸 = 발사
+        public float ChargeMax;
+        public float ChargeFireAt;
+        public float ChargeStart;
+        public bool ChargeFullPlayed;
+        public Vector2 ChargeScaleRange = new Vector2(0.25f, 1f);
+        public EffectSocketPlayer ChargeLoop, ChargeFull, Overcharge, ChargeVent;
         public bool Aura;               // 어쌔신 R 변신 오라 — 보이는 동안 계속
         public Vector3 AuraOffset;
         public float AuraScale = 1f;
@@ -198,6 +205,11 @@ public sealed class CharacterSelectPreviewPool
             return;
 
         TickBeam(shown);
+        if (shown.Charge && shown.Step == 0)
+        {
+            TickCharge(shown); // 집중 칸은 상태 이벤트가 아니라 게임 충전 시간으로 넘긴다(컨트롤러가 Start → Charge 로 넘겨도 계속)
+            return;
+        }
         if (shown.Step < 0 || shown.Animator.IsInTransition(0))
             return;
 
@@ -280,7 +292,79 @@ public sealed class CharacterSelectPreviewPool
         return state.length > 0f ? Mathf.Clamp01(1f - blendSeconds / state.length) : 1f;
     }
 
-    // 거너 Q 빔 — 첫 등장 칸의 BeamTime 에 켜고, 켜진 동안 복제본 앞으로 겨눠 늘이고, 유지 시간이 지나면 끈다.
+    // 거너 Q 미리보기 흉내(실제 GunnerChargeLaserSkill·GunnerBeamView 는 네트워크 컴포넌트라 복제본에 없다) —
+    // 집중 상태(Q 데이터 animatorStateName, 컨트롤러가 Start → Charge 로 넘김) 동안 충전 루프를 충전률만큼 키우고,
+    // 최대 충전(maxChargeTime)에 알림 + 과충전 루프, 자동 발사 시각(GunnerTraitRules.AutoFireDelay = maxChargeTime + autoFireHoldTime, 특성 없음)에
+    // 루프를 걷고 배기 원샷 + 다음 등장 칸(발사)으로. 빔은 발사 칸에서 TickBeam 이 켠다. 시간은 전부 게임 데이터 값.
+    private static void TickCharge(Preview shown)
+    {
+        float elapsed = Time.time - shown.ChargeStart;
+        float t = Mathf.Clamp01(elapsed / shown.ChargeMax);
+        if (!shown.ChargeFullPlayed && t >= 1f)
+        {
+            shown.ChargeFullPlayed = true;
+            if (FaceForward(shown, shown.ChargeFull))
+                shown.ChargeFull.PlayOnce();
+            if (FaceForward(shown, shown.Overcharge))
+                shown.Overcharge.Play();
+        }
+
+        if (shown.ChargeLoop != null)
+        {
+            float scale = Mathf.Lerp(shown.ChargeScaleRange.x, shown.ChargeScaleRange.y, t);
+            int count = shown.ChargeLoop.GetInstances(ChargeInstances);
+            for (int i = 0; i < count; i++)
+                ChargeInstances[i].transform.localScale = new Vector3(scale, scale, scale);
+        }
+
+        if (elapsed < shown.ChargeFireAt)
+            return;
+
+        StopCharge(shown);
+        if (FaceForward(shown, shown.ChargeVent))
+            shown.ChargeVent.PlayOnce();
+        shown.Step = 1;
+        shown.StepEnd = -1f;
+        shown.Animator.CrossFadeInFixedTime(shown.EntryHashes[1], shown.ChainBlend, 0);
+    }
+
+    private static readonly List<GameObject> ChargeInstances = new List<GameObject>();
+
+    private static void StartCharge(Preview shown)
+    {
+        shown.ChargeStart = Time.time;
+        shown.ChargeFullPlayed = false;
+        if (FaceForward(shown, shown.ChargeLoop))
+            shown.ChargeLoop.Play();
+    }
+
+    // 루프 둘을 즉시 걷는다(게임 EndCharge 처럼 입자까지 — 발사 빔과 겹쳐 보이지 않게).
+    private static void StopCharge(Preview shown)
+    {
+        foreach (EffectSocketPlayer loop in new[] { shown.ChargeLoop, shown.Overcharge })
+        {
+            if (loop == null || !loop.IsPlaying)
+                continue;
+            int count = loop.GetInstances(ChargeInstances);
+            for (int i = 0; i < count; i++)
+                foreach (ParticleSystem particles in ChargeInstances[i].GetComponentsInChildren<ParticleSystem>(true))
+                    particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            loop.Stop();
+        }
+    }
+
+    // 게임 GunnerBeamView.FaceForward 와 같다 — 소켓을 캐릭터 정면으로.
+    private static bool FaceForward(Preview shown, EffectSocketPlayer player)
+    {
+        if (player == null)
+            return false;
+        Transform socket = player.Socket;
+        if (socket != null && socket != player.transform)
+            socket.rotation = shown.Root.transform.rotation;
+        return true;
+    }
+
+    // 거너 Q 빔 — 마지막 등장 칸(발사)의 BeamTime 에 켜고, 켜진 동안 복제본 앞으로 겨눠 늘이고, 유지 시간이 지나면 끈다.
     // 끄기·풀 반납은 EffectSocketPlayer 가 한다(Stop, 복제본이 꺼지면 OnDisable).
     private static void TickBeam(Preview shown)
     {
@@ -289,12 +373,11 @@ public sealed class CharacterSelectPreviewPool
 
         if (!shown.BeamFired && shown.BeamTime >= 0f && shown.EntryHashes.Length > 0)
         {
+            int target = shown.EntryHashes[shown.EntryHashes.Length - 1];
             AnimatorStateInfo state = shown.Animator.GetCurrentAnimatorStateInfo(0);
-            if (state.shortNameHash != shown.EntryHashes[0])
-            {
-                shown.BeamFired = true; // 첫 칸을 지나쳤다 — 이번 회차는 안 쏜다
-            }
-            else if (state.normalizedTime >= shown.BeamTime)
+            if (state.shortNameHash != target && shown.Animator.IsInTransition(0))
+                state = shown.Animator.GetNextAnimatorStateInfo(0); // 발사 칸으로 넘어가는 중 — 크로스페이드 시작부터 센다
+            if (state.shortNameHash == target && state.normalizedTime >= shown.BeamTime)
             {
                 shown.BeamFired = true;
                 shown.Beam.Play();
@@ -462,6 +545,36 @@ public sealed class CharacterSelectPreviewPool
         preview.BeamHold = view.ChargeBeamHoldDuration;
         preview.BeamTime = animation.beamNormalizedTime;
         preview.BeamLength = animation.beamLength;
+        BindCharge(preview, prefab, view);
+    }
+
+    // 첫 등장 상태가 Q 데이터의 집중 상태(animatorStateName)이고 다음 칸(발사)이 있으면 Q 흉내 — 충전 시간은 그 데이터 값.
+    private static void BindCharge(Preview preview, GameObject prefab, GunnerBeamView view)
+    {
+        GunnerChargeLaserSkill skill = prefab.GetComponentInChildren<GunnerChargeLaserSkill>(true);
+        var data = skill != null ? skill.Data as GunnerChargeLaserData : null;
+        if (data == null || preview.EntryHashes.Length < 2 || string.IsNullOrEmpty(data.AnimatorStateName)
+            || preview.EntryHashes[0] != Animator.StringToHash(data.AnimatorStateName))
+            return;
+
+        preview.Charge = true;
+        preview.ChargeMax = Mathf.Max(0.01f, data.MaxChargeTime);
+        preview.ChargeFireAt = GunnerTraitRules.AutoFireDelay(data.MaxChargeTime, data.AutoFireHoldTime);
+        preview.ChargeScaleRange = view.ChargeScaleRange;
+        preview.ChargeLoop = FindCopy(preview, prefab, view.ChargeLoopPlayer);
+        preview.ChargeFull = FindCopy(preview, prefab, view.ChargeFullPlayer);
+        preview.Overcharge = FindCopy(preview, prefab, view.OverchargePlayer);
+        preview.ChargeVent = FindCopy(preview, prefab, view.ChargeVentPlayer);
+    }
+
+    // 프리팹 쪽 소켓 플레이어의 복제본 쪽 짝(같은 경로). Armature·무기 슬롯 밖이면 null.
+    private static EffectSocketPlayer FindCopy(Preview preview, GameObject prefab, EffectSocketPlayer source)
+    {
+        if (source == null)
+            return null;
+        string path = RelativePath(prefab.transform, source.transform);
+        Transform found = path != null ? preview.Root.transform.Find(path) : null;
+        return found != null ? found.GetComponent<EffectSocketPlayer>() : null;
     }
 
     private static void BindAura(Preview preview, GameObject prefab)
@@ -505,6 +618,8 @@ public sealed class CharacterSelectPreviewPool
         if (preview.Beam != null)
             preview.Beam.Stop();
         preview.BeamFired = false;
+        if (preview.Charge)
+            StopCharge(preview);
         if (preview.Animator == null)
             return;
         preview.Animator.speed = 1f; // 지난 회차 홀드 풀기
@@ -514,6 +629,8 @@ public sealed class CharacterSelectPreviewPool
         {
             preview.Animator.Play(preview.EntryHashes[0], 0, 0f);
             preview.Step = 0;
+            if (preview.Charge)
+                StartCharge(preview);
         }
         else
         {

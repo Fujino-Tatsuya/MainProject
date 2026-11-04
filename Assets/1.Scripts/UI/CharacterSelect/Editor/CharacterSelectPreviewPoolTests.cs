@@ -167,6 +167,39 @@ public sealed class CharacterSelectPreviewPoolTests
         Transform found = root.transform.Find(path);
         Assert.IsNotNull(found, $"{prefab.name}: 복제본에 빔 소켓 {path} 이 없다");
         Assert.IsNotNull(found.GetComponent<EffectSocketPlayer>(), $"{prefab.name}: 빔 EffectSocketPlayer 가 지워졌다");
+
+        // Q 흉내 집중 연출 소켓도 복제본에 남아야 한다(없으면 미리보기가 조용히 빠뜨린다).
+        foreach (EffectSocketPlayer source in new[] { view.ChargeLoopPlayer, view.ChargeFullPlayer, view.OverchargePlayer, view.ChargeVentPlayer })
+        {
+            if (source == null)
+                continue;
+            string chargePath = null;
+            for (Transform t = source.transform; t != prefab.transform; t = t.parent)
+                chargePath = chargePath == null ? t.name : $"{t.name}/{chargePath}";
+            Transform copy = root.transform.Find(chargePath);
+            Assert.IsNotNull(copy != null ? copy.GetComponent<EffectSocketPlayer>() : null, $"{prefab.name}: 복제본에 집중 연출 소켓 {chargePath} 이 없다");
+        }
+    }
+
+    [Test]
+    public void GunnerPreview_FirstEntryIsQDataFocusState()
+    {
+        var panelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterSelectPanelAuthoring.PanelPath);
+        var animations = (List<CharacterSelectPreviewAnimation>)typeof(CharacterSelectPanel)
+            .GetField("previewAnimations", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(panelPrefab.GetComponent<CharacterSelectPanel>());
+        foreach (GameObject prefab in RosterPrefabs())
+        {
+            GunnerChargeLaserSkill skill = prefab.GetComponentInChildren<GunnerChargeLaserSkill>(true);
+            if (skill == null)
+                continue;
+            var data = skill.Data as GunnerChargeLaserData;
+            Assert.IsNotNull(data, $"{prefab.name}: Q 데이터");
+            CharacterSelectPreviewAnimation animation = CharacterSelectPreviewPool.FindAnimation(animations, prefab.name);
+            Assert.GreaterOrEqual(animation.entryStates.Count, 2, $"{prefab.name}: 집중 → 발사 두 칸");
+            Assert.AreEqual(data.AnimatorStateName, animation.entryStates[0], $"{prefab.name}: 첫 칸이 Q 데이터 집중 상태여야 충전 시간으로 넘긴다");
+            return;
+        }
+        Assert.Fail("로스터에 거너가 없다");
     }
 
     // Animator.HasState 의 shortNameHash 는 하위 상태 기계 안 상태도 찾는다 — 같은 범위로 모은다.

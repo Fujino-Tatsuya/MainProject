@@ -214,6 +214,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
     public EffectSocketPlayer ChargeBeamPlayer => chargeBeamPlayer;
     public float ChargeBeamUnitLength => chargeBeamUnitLength;
     public float ChargeBeamHoldDuration => chargeBeamHoldDuration;
+    /// <summary>Q 집중 연출(충전 루프·최대 충전 알림·과충전 루프·발사 배기)과 충전 크기 범위 — 미리보기 Q 흉내(할 일 199)용.</summary>
+    public EffectSocketPlayer ChargeLoopPlayer => chargeLoopPlayer;
+    public EffectSocketPlayer ChargeFullPlayer => chargeFullPlayer;
+    public EffectSocketPlayer OverchargePlayer => overchargePlayer;
+    public EffectSocketPlayer ChargeVentPlayer => chargeVentPlayer;
+    public Vector2 ChargeScaleRange => chargeScaleRange;
 
     // 🔴 집중 연출은 **최대 충전 상태로 저작**돼 있다. 코드가 루트 스케일을 이 범위로 몬다.
     //    EffectManager 의 scale 은 Rent 할 때 한 번만 먹으므로 쓸 수 없다 —

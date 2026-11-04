@@ -118,8 +118,8 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     {
         // 팔라딘 = R 궁 모션 클립 전체(5.67초)를 3초에 → Idle 로 길게 블렌드.
         new CharacterSelectPreviewAnimation("Player_Paladin", new[] { "Garen_Ultimate_Skill" }, "Idle", 0.9f) { entryDurationSeconds = 3f },
-        // 거너 = Q 발사(빔은 그 클립에 발사 순간 이벤트가 없어 칸 시각으로 — 게임도 이 상태로 넘기는 순간 빔을 켠다).
-        new CharacterSelectPreviewAnimation("Player_Gunner", new[] { "Gunner_Q_Fire" }, "Idle", 0.3f) { beamNormalizedTime = 0.02f },
+        // 거너 = Q 흉내: 집중(Q 데이터 animatorStateName) → 게임 자동 발사 시각(maxChargeTime + autoFireHoldTime)에 발사 + 빔(발사 칸 beamNormalizedTime).
+        new CharacterSelectPreviewAnimation("Player_Gunner", new[] { "Gunner_Q_Start", "Gunner_Q_Fire" }, "Idle", 0.3f) { beamNormalizedTime = 0.02f },
         // 어쌔신 = 평타 1→2타 → Idle 로 1초 블렌드, 보이는 동안 R 변신 오라.
         new CharacterSelectPreviewAnimation("Player_Assassin", new[] { "Default_Attack0", "Default_Attack1" }, "Idle", 1f) { transformAura = true },
     };

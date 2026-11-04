@@ -1691,6 +1691,7 @@ MonoBehaviour:
     entryDurationSeconds: 3
   - prefabName: Player_Gunner
     entryStates:
+    - Gunner_Q_Start
     - Gunner_Q_Fire
     loopState: Idle
     holdLastPose: 0

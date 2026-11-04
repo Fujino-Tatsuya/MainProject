@@ -225,10 +225,11 @@
 - 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — **`entryStates` 를 순서대로 1회씩 → 루프(`loopState`) 또는 마지막 포즈 홀드(`holdLastPose` — 마지막 칸은 End 이벤트가 아니라 클립 끝 프레임(정규화 0.999, 1 이면 컨트롤러 끝 전이가 걸림)까지 재생 후 Animator 속도 0)**.
   - 넘김 시점 = 그 클립의 **End 애니 이벤트**(평타 `HandleDefaultAttackEvent(End)`·스킬 `HandleSkillEvent(End)` — 게임이 동작 끝으로 보는 곳), 없으면 클립 끝 − 블렌드. 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡아 두 번 바뀌지 않게 한다.
   - 블렌드 = 등장끼리 `chainBlendSeconds`(기본 0.1초)·마지막 → 루프 `loopBlendSeconds`(항목별). 상태가 없으면 경고 후 건너뜀.
-  - 거너 빔 = `beamNormalizedTime`(첫 등장 칸 정규화 시각, 음수 = 안 쏨 — `Gunner_Q_Fire` 클립에 발사 순간 이벤트가 없어 칸으로 둠)·`beamLength`(m, 복제본 앞). 프리팹 `GunnerBeamView` 의 Q 빔 소켓(`QBeamFx`, 총구 `BeamMuzzle`)의 복제본 쪽 `EffectSocketPlayer` 로 같은 이펙트를 로컬 재생, `GunnerBeamView.AimAndStretch` 로 겨눔·길이, 유지 = `chargeBeamHoldDuration`. 피해·RPC·서버 없음. 카드가 바뀌면 `Stop`, 패널이 닫히면 복제본이 꺼지며 `OnDisable` 로 풀 반납.
+  - 거너 빔 = `beamNormalizedTime`(마지막 등장 칸(발사) 정규화 시각 — 크로스페이드 시작부터 셈, 음수 = 안 쏨 — `Gunner_Q_Fire` 클립에 발사 순간 이벤트가 없어 칸으로 둠)·`beamLength`(m, 복제본 앞). 프리팹 `GunnerBeamView` 의 Q 빔 소켓(`QBeamFx`, 총구 `BeamMuzzle`)의 복제본 쪽 `EffectSocketPlayer` 로 같은 이펙트를 로컬 재생, `GunnerBeamView.AimAndStretch` 로 겨눔·길이, 유지 = `chargeBeamHoldDuration`. 피해·RPC·서버 없음. 카드가 바뀌면 `Stop`, 패널이 닫히면 복제본이 꺼지며 `OnDisable` 로 풀 반납.
+  - 거너 Q 흉내 = 첫 등장 상태가 Q 데이터(`GunnerChargeLaserData`) `animatorStateName`(`Gunner_Q_Start`, 컨트롤러가 `Gunner_Q_Charge` 로 넘김)이면 그 칸은 이벤트가 아니라 게임 시간으로 넘긴다 — 충전 루프(`chargeLoopPlayer`, `chargeScaleRange` 만큼 키움) → `maxChargeTime` 에 알림(`chargeFullPlayer`)+과충전 루프(`overchargePlayer`) → `GunnerTraitRules.AutoFireDelay(maxChargeTime, autoFireHoldTime)`(특성 없음 = 1.2+0.8초)에 루프 즉시 걷고 배기(`chargeVentPlayer`) + 다음 칸(`Gunner_Q_Fire`). 실제 스킬·`GunnerBeamView` 는 네트워크 컴포넌트라 복제본에서 못 돌려 같은 소켓·같은 순서로 흉내. 범위 표시는 없음.
   - 어쌔신 변신 오라 = `transformAura` 켜면 미리보기가 보이는 동안 계속 — 게임 R 변신(`AssassinSkillView.HandleTransformChanged`)과 같은 `EffectCatalog.Assassin_R_BladeVortex` 를 `EffectManager.PlayLooping` 으로 복제본 루트에 붙임(오프셋·배율 = 프리팹 `AssassinSkillView` 값). 카드 교체·패널 닫힘 = `ReleaseImmediate`.
   - 전체 클립 재생 = `entryDurationSeconds` > 0 이면 등장 상태마다 End 이벤트에서 끊지 않고 클립 끝(정규화 0.999)까지, 전체가 그 시간에 끝나게 일정한 속도로(Animator 속도 = 클립 길이 ÷ (시간 × 상태 속도·속도 파라미터)). 넘길 때 속도 1 로 되돌린다.
-  - 기본: 팔라딘 `Garen_Ultimate_Skill`(전체 3초) → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → `Idle`(1.0) + 변신 오라. 카드가 다시 오거나 패널을 다시 열면 처음부터.
+  - 기본: 팔라딘 `Garen_Ultimate_Skill`(전체 3초) → `Idle`(블렌드 0.9) · 거너 `Gunner_Q_Start`(Q 흉내) → `Gunner_Q_Fire`(빔 0.02) → `Idle`(0.3) · 어쌔신 `Default_Attack0`·`Default_Attack1` → `Idle`(1.0) + 변신 오라. 카드가 다시 오거나 패널을 다시 열면 처음부터.
 - 닫힐 때(이유 무관·파괴 포함) 복제본을 끄고 진짜 캐릭터 렌더러를 되돌린다. 칸 `showPreview`(기본 켬).
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
