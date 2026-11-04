@@ -33,11 +33,11 @@ public sealed class SkillLineIndicator : MonoBehaviour
     [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 진하기 배율. 거너 Q 충전·Q 미리보기에만 걸린다. Play 중 고쳐도 바로 반영.")]
     [SerializeField] private AnimationCurve lengthFadeCurve = SkillLineLengthFade.DefaultCurve();
 
-    [Header("양옆 흰 라인 (202 — 거너 Q)")]
-    [Tooltip("사각형 양옆 안쪽에 덧그리는 라인 두께(m). 0 이면 안 그림. 텍스처는 SkillLineRange.mat 의 Side Edge Line Texture(white_512).")]
+    [Header("흰 라인 (202 거너 Q 사각형 · 213 모든 화살표)")]
+    [Tooltip("거너 Q 사각형 양옆·모든 화살표 윤곽 안쪽에 덧그리는 라인 두께(m). 0 이면 안 그림. 텍스처는 SkillLineRange.mat / SkillLineArrow.mat 의 Side Edge Line Texture(white_512).")]
     [SerializeField, Min(0f)] private float edgeLineWidth = 0.06f;
     [SerializeField] private Color edgeLineColor = Color.white;
-    [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 흰 라인 진하기 배율. 길이 감쇠 커브와 따로.")]
+    [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 흰 라인 진하기 배율. 길이 감쇠 커브와 따로. 거너 Q 사각형만 — 화살표 흰 라인은 커브 없이 균일.")]
     [SerializeField] private AnimationCurve edgeLineCurve = SkillLineLengthFade.DefaultCurve();
 
     // 필드 초기화에서 만들면 MonoBehaviour 생성자에서 CreateImpl 예외 — 처음 쓸 때 만든다.
@@ -175,7 +175,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
             Vector3 arrowDirection = forward * shape.ArrowDirection;
             DrawSegment(arrowQuad, arrowRenderer, origin, arrowDirection,
                 new SkillPreviewSegment(0f, shape.ArrowLength, arrowWidth), arrowAlpha, 0.006f,
-                shape.LengthFade ? WholeSpan : (Vector4?)null);
+                null, edgeLineOnly: true);
         }
         else
         {
@@ -191,7 +191,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
         SkillPreviewSegment segment,
         float alpha,
         float layerOffset,
-        Vector4? lengthFadeSpan = null)
+        Vector4? lengthFadeSpan = null,
+        bool edgeLineOnly = false)
     {
         if (quad == null || targetRenderer == null || !segment.IsVisible)
         {
@@ -224,10 +225,15 @@ public sealed class SkillLineIndicator : MonoBehaviour
             }
             propertyBlock.SetFloatArray(LengthFadeCurveId, lengthFadeSamples);
             propertyBlock.SetFloatArray(EdgeLineCurveId, edgeLineSamples);
+        }
+        // 213: 화살표(전 캐릭터 이동·대시)는 커브 없이 균일한 흰 윤곽만(edgeLineOnly) — 화살표 자체는 끝까지 온전히.
+        bool edgeOn = (lengthFadeSpan.HasValue || edgeLineOnly) && edgeLineWidth > 0f;
+        if (edgeOn)
+        {
             propertyBlock.SetFloat(EdgeLineWidthId, edgeLineWidth);
             propertyBlock.SetColor(EdgeLineColorId, edgeLineColor);
         }
-        propertyBlock.SetFloat(EdgeLineOnId, lengthFadeSpan.HasValue && edgeLineWidth > 0f ? 1f : 0f);
+        propertyBlock.SetFloat(EdgeLineOnId, edgeOn ? 1f : 0f);
         targetRenderer.SetPropertyBlock(propertyBlock);
         SetRendererVisible(targetRenderer, true);
     }

@@ -568,7 +568,7 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
         float clipped = motor != null
             ? motor.GetGroundedPreviewDistance(forward * data.DashDistance, blockOtherPlayers: false, passThroughUnits: true)
             : data.DashDistance;
-        shape = SkillPreviewShapes.Arrow(1f, data.DashDistance, clipped, lengthFade: true);
+        shape = SkillPreviewShapes.Arrow(1f, data.DashDistance, clipped);
         return true;
     }
 

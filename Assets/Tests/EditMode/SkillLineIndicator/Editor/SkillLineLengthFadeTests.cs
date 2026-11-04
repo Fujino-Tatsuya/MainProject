@@ -148,11 +148,12 @@ public sealed class SkillLineLengthFadeTests
     // ── 213 어쌔신 대시 일격 화살표 ──────────────────────────────────────
 
     [Test]
-    public void Arrow_LengthFadeIsOptIn()
+    public void Arrow_NeverLengthFade()
     {
-        Assert.IsFalse(SkillPreviewShapes.Arrow(-1f, 3f, 3f).LengthFade);   // 거너 쿨 백스텝 등 기존 화살표 그대로
-        SkillPreviewShape dash = SkillPreviewShapes.Arrow(1f, 8f, 5f, lengthFade: true);
-        Assert.IsTrue(dash.LengthFade);
+        Assert.IsFalse(SkillPreviewShapes.Arrow(-1f, 3f, 3f).LengthFade);    // 거너 쿨 백스텝
+        Assert.IsFalse(SkillPreviewShapes.HitboxWithArrow(Vector3.zero, Vector3.one, -1f, 3f, 3f).LengthFade); // 거너 간파
+        SkillPreviewShape dash = SkillPreviewShapes.Arrow(1f, 8f, 5f);      // 어쌔신 대시 일격
+        Assert.IsFalse(dash.LengthFade);                                     // 화살표는 커브와 무관하게 끝까지 온전히
         Assert.IsTrue(dash.HasArrow);
         Assert.AreEqual(5f, dash.ArrowLength, Eps);                          // 벽에 막힌 거리
     }
@@ -164,16 +165,25 @@ public sealed class SkillLineLengthFadeTests
     }
 
     [Test]
-    public void Shader_ArrowUsesLengthCurveAndEdgeLine()
+    public void Shader_ArrowIsWhole_UniformEdgeLine_OriginalRamp()
     {
         string text = File.ReadAllText(ShaderPath);
         int arrow = text.IndexOf("half4 ArrowC3(", System.StringComparison.Ordinal);
         int frag = text.IndexOf("half4 Frag(", System.StringComparison.Ordinal);
         Assert.That(arrow, Is.GreaterThan(0));
         string body = text.Substring(arrow, frag - arrow);
-        StringAssert.Contains("LineLengthFade(t)", body);
-        StringAssert.Contains("EdgeLineFade(t)", body);
-        StringAssert.Contains("lerp(lerp(0.55h,1.0h,saturate(uv.y)),1.0h,lengthFadeOn)", body);
+        StringAssert.DoesNotContain("LineLengthFade(", body);              // 길이 커브 없음
+        StringAssert.DoesNotContain("EdgeLineFade(", body);                // 흰 윤곽도 균일
+        StringAssert.Contains("_MarkerColor.a*lerp(0.55h,1.0h,saturate(uv.y))", body); // 촉 쪽 진해지는 기존 그라데이션
+        StringAssert.Contains("_EdgeLineOn>0.5h", body);
+    }
+
+    [Test]
+    public void Indicator_EveryArrowGetsUniformEdgeLine_NoCurveSpan()
+    {
+        string text = File.ReadAllText("Assets/1.Scripts/Player/Skill/Targeting/SkillLineIndicator.cs");
+        StringAssert.Contains("null, edgeLineOnly: true);", text);         // 화살표 = 커브 구간 없음 + 흰 윤곽 항상
+        StringAssert.DoesNotContain("shape.LengthFade ? WholeSpan", text);
     }
 
     [Test]

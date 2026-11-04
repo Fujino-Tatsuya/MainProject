@@ -109,8 +109,7 @@ public static class SkillPreviewShapes
             hasArrow: true);
     }
 
-    /// <param name="lengthFade">202·213: 화살표도 길이 비율 커브·양옆 흰 라인(SkillLineIndicator 칸)으로 그린다 — 어쌔신 대시 일격.</param>
-    public static SkillPreviewShape Arrow(float arrowDirection, float arrowLength, float clippedArrowLength, bool lengthFade = false)
+    public static SkillPreviewShape Arrow(float arrowDirection, float arrowLength, float clippedArrowLength)
     {
         float clipped = Mathf.Clamp(clippedArrowLength, 0f, Mathf.Max(0f, arrowLength));
         return new SkillPreviewShape(
@@ -119,7 +118,6 @@ public static class SkillPreviewShapes
             hasGhost: false,
             arrowDirection,
             clipped,
-            hasArrow: true,
-            lengthFade: lengthFade);
+            hasArrow: true);
     }
 }
