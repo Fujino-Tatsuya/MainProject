@@ -1688,7 +1688,7 @@ MonoBehaviour:
     beamNormalizedTime: -1
     beamLength: 8
     transformAura: 0
-    entryDurationSeconds: 1.2
+    entryDurationSeconds: 3
   - prefabName: Player_Gunner
     entryStates:
     - Gunner_Q_Fire
