@@ -8,7 +8,8 @@ public sealed class DashCooldownHudTests
 {
     private const string PrefabPath = "Assets/2.Prefabs/UI/CombatHUD.prefab";
     private const string SlotPath = "Layer_Combat/SkillBar/Slot_Dash";
-    private const string CooldownOutlineMaterialPath = "Assets/2.Prefabs/UI/LiberationSans SDF - Cooldown Outline.mat";
+    // 2026-11-02 글꼴 통일(서울알림 Medium) — localization.md §10
+    private const string CooldownOutlineMaterialPath = "Assets/2.Prefabs/UI/SeoulAlrimTTF-Medium SDF - Cooldown Outline.mat";
 
     [Test]
     public void RemainingAndChargeFormatting_FollowsDashHudRules()

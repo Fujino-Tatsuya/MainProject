@@ -15,8 +15,14 @@ public sealed class UiStringsTests
         var keys = UiStrings.All.Select(s => s.Key).ToList();
 
         Assert.That(keys, Is.Unique);
+        // 튜토리얼 문구는 Tutorial.Guide.<행 id>(UPPER_SNAKE — 단계표·TutorialGuideTexts 의 id 그대로, localization.md §3 키 규칙)
         foreach (string key in keys)
-            Assert.That(Regex.IsMatch(key, @"^[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*){2,}$"), Is.True, key);
+        {
+            string pattern = key.StartsWith(LobbyTutorialUiStrings.GuidePrefix, System.StringComparison.Ordinal)
+                ? @"^Tutorial\.Guide\.[A-Z][A-Z0-9_]*$"
+                : @"^[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*){2,}$";
+            Assert.That(Regex.IsMatch(key, pattern), Is.True, key);
+        }
     }
 
     [Test]

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 /// 로비 튜토리얼 UI 문구 키(할 일 158) — 157 계약(handoff-lobby-tutorial-contract.md §4)과 같은 <c>Tutorial.Guide.LOBBY_*</c>
 /// (제목·지시문·설명·체크·진행·화자·대사) + 158 전용 <c>UI.Lobby.Tutorial.Tag*</c>(문구 안 <c>{tag:ID}</c> 표기).
 /// id = 157 단계표(<c>LobbyTutorialSteps.asset</c>) 칸 값 그대로 — 바인더는 <see cref="KeyOf"/> 로 접두를 붙여 넘긴다.
-/// Strings 시트 행은 아직 없다(ko 가 화면 폴백). <see cref="UiStrings.All"/> 이 모은다(157 TutorialGuideTexts 와 겹치는 키는 Export 가 처음 것만 남긴다).
+/// Strings 시트 행은 있으나 en 칸이 비어 있다(2026-11-02 — 초안은 localization-en-draft.md §로비 튜토리얼). <see cref="UiStrings.All"/> 이 모은다(157 TutorialGuideTexts 와 겹치는 키는 Export 가 처음 것만 남긴다).
 /// 문구 원본 = 명세 로비_튜토리얼_플로우.md §5.
 /// </summary>
 public static class LobbyTutorialUiStrings

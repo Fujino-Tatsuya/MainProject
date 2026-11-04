@@ -114,11 +114,44 @@ public static class TraitUiStrings
     /// <summary><see cref="DamagePercent"/> + 고정 추가 피해가 0 이 아닐 때.</summary>
     public static readonly UiString DamagePercentFlat = new UiString("UI.Trait.Card.DamagePercentFlat", "{flat} + 공격력의 {percent}", Where + "카드 설명 {dmg} 평소 표시 — 고정 추가 피해 있음({flat} = 고정값, {percent} = 계수)(코드)");
 
+    // 선택 창 고정 문구(할 일 15) — 화면 = 시트 행 → 없으면 TraitTexts.asset 행 → TraitTexts 상수(TraitTextTable.Resolve). ko = 상수.
+    public static readonly UiString Title = new UiString("UI.Trait.Title", TraitTexts.Title, Where + "창 제목(TUT_C1_TRAIT_TITLE)(코드)");
+    public static readonly UiString Intro = new UiString("UI.Trait.Intro", TraitTexts.Intro, Where + "창 상단 설명 — 복도1(TUT_C1_TRAIT_INTRO)(코드)");
+    public static readonly UiString LastNotice = new UiString("UI.Trait.LastNotice", TraitTexts.LastNotice, Where + "창 아래 한 줄 — 복도4(TUT_C4_TRAIT_LAST)(코드)");
+    public static readonly UiString Picked = new UiString("UI.Trait.Picked", TraitTexts.Picked, Where + "획득 토스트({location} = UI.Trait.PickedLocation)(코드)");
+    public static readonly UiString PickedLocation = new UiString("UI.Trait.PickedLocation", TraitTexts.PickedLocation, Where + "획득 토스트 — 다시 보기 위치(코드)");
+    public static readonly UiString ResetPrompt = new UiString("UI.Trait.Reset.Prompt", TraitTexts.ResetPromptTitle, Where + "전멸 뒤 특성 초기화 팝업 — 질문(코드)");
+    public static readonly UiString ResetYes = new UiString("UI.Trait.Reset.Yes", TraitTexts.ResetPromptYes, Where + "전멸 뒤 특성 초기화 팝업 — 예(코드)");
+    public static readonly UiString ResetNo = new UiString("UI.Trait.Reset.No", TraitTexts.ResetPromptNo, Where + "전멸 뒤 특성 초기화 팝업 — 아니오(코드)");
+
+    // 교착 방지 게이지(TraitDeadlineModel) — {time} = UI.Unit.Seconds 로 만든 남은 초
+    public static readonly UiString DeadlineSeconds = new UiString("UI.Trait.Deadline.Seconds", "{time} 뒤 자동 선택", Where + "마감 게이지 — 자동 선택까지 남은 시간({time} = UI.Unit.Seconds)(코드)");
+    public static readonly UiString DeadlineDone = new UiString("UI.Trait.Deadline.Done", "선택 완료 {done}/{total}", Where + "마감 게이지 — 선택 완료 인원({done}/{total})(코드)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         CardCategory, Help, ConflictDefault, ConflictConfirm, ConflictCancel, DamageUnknown, NameSeparator,
         DamagePercent, DamagePercentFlat,
+        Title, Intro, LastNotice, Picked, PickedLocation, ResetPrompt, ResetYes, ResetNo,
+        DeadlineSeconds, DeadlineDone,
     };
+
+    /// <summary>선택 창 문구 ID(<see cref="TraitTexts"/> 의 *Id) → 그 키. 모르는 ID 면 false.</summary>
+    public static bool TryGetText(string textId, out UiString text)
+    {
+        switch (textId)
+        {
+            case TraitTexts.TitleId: text = Title; return true;
+            case TraitTexts.IntroId: text = Intro; return true;
+            case TraitTexts.LastNoticeId: text = LastNotice; return true;
+            case TraitTexts.PickedId: text = Picked; return true;
+            case TraitTexts.PickedLocationId: text = PickedLocation; return true;
+            case TraitTexts.ResetPromptTitleId: text = ResetPrompt; return true;
+            case TraitTexts.ResetPromptYesId: text = ResetYes; return true;
+            case TraitTexts.ResetPromptNoId: text = ResetNo; return true;
+            default: text = default; return false;
+        }
+    }
 
     /// <summary>분류 줄 문구. 분류가 비면 빈 문자열(줄을 숨긴다).</summary>
     public static string FormatCategory(string category) =>

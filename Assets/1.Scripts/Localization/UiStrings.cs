@@ -145,7 +145,7 @@ public static class UiStrings
     public static readonly UiString PauseContinue = new UiString("UI.Pause.Continue", "계속하기", PauseWhere + "계속하기 버튼");
     public static readonly UiString PauseSettings = new UiString("UI.Pause.Settings", "설정", PauseWhere + "설정 버튼");
     public static readonly UiString PauseQuit = new UiString("UI.Pause.Quit", "그만두기", PauseWhere + "그만두기 버튼");
-    public static readonly UiString PausePressAnyButton = new UiString("UI.Pause.PressAnyButton", "Press Any Button", "1.TitleScene › 대기 화면 Press 캡슐(10-26 ESC 메뉴에서 옮김 — 키는 그대로)");
+    public static readonly UiString PausePressAnyButton = new UiString("UI.Pause.PressAnyButton", "아무 버튼이나 누르세요","1.TitleScene › 대기 화면 Press 캡슐(10-26 ESC 메뉴에서 옮김 — 키는 그대로)");
     public static readonly UiString ExitTitle = new UiString("UI.Exit.Title", "게임 종료", PauseWhere + "종료 확인 팝업 제목");
     public static readonly UiString ExitMessage = new UiString("UI.Exit.Message", "정말 종료하시겠습니까?", PauseWhere + "종료 확인 팝업 문구");
     public static readonly UiString ExitDesktop = new UiString("UI.Exit.Desktop", "바탕화면", PauseWhere + "종료 확인 — 바탕화면(게임 종료) 선택");
@@ -157,6 +157,8 @@ public static class UiStrings
     public static readonly UiString TitleExit = new UiString("UI.Title.Exit", "나가기", TitleWhere + "나가기 버튼");
 
     // 보스 등장 시네마틱(PLAN-boss-encounter-cutscene) — 스킵 버튼. en 초안 = Skip(localization-en-draft.md).
+    // 보스 처치 연출 타이포(BossVictoryPresentation) — 행이 없으면 BossVictoryConfig.typoText(BOSS DOWN)
+    public static readonly UiString BossVictoryTypo = new UiString("UI.BossVictory.Typo", "보스 격파", "BossVictoryPresentation — 보스 처치 타이포(행이 없으면 BossVictoryConfig.typoText)(코드)");
     public static readonly UiString BossIntroSkip = new UiString("UI.BossIntro.Skip", "건너뛰기", "보스 등장 연출 — 스킵 버튼 문구(Space 1초 홀드, BossIntroPresentation) · 타이틀 접근 Esc 건너뛰기(TitleSkipHint)도 같이 씀");
     // 그만두기 팝업(PLAN-settings-ddol, 경석 10-22) — 오른쪽 선택 = 타이틀(로비 자리). 호스트는 다른 플레이어도 끊긴다는 경고.
     public static readonly UiString ExitTitleChoice = new UiString("UI.Exit.ToTitle", "타이틀", PauseWhere + "종료 확인 — 타이틀(타이틀로 돌아가기) 선택");
@@ -219,6 +221,7 @@ public static class UiStrings
                                 ExitTitleChoice, ExitHostQuitWarning, ExitHostToTitleWarning,
                                 TitleStart, TitleSetting, TitleExit });
         all.Add(BossIntroSkip);
+        all.Add(BossVictoryTypo);
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
         all.AddRange(DemoConnectUiStrings.All); // 부스 데모 연결 오버레이(UI.DemoConnect.*)
         all.AddRange(LobbyUiStrings.All);       // 걷는 로비 상호작용·준비·카운트다운(UI.Lobby.*, 할 일 48 C10)
