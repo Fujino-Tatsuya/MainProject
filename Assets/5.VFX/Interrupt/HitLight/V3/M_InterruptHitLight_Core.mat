@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_InterruptHitLight_Core
+  m_Shader: {fileID: 4800000, guid: 07ddf618c599deb40b39a63308120ad2, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _CoreSharpness: 2
+    - _EdgeSoftness: 1
+    - _NoiseAmount: 0
+    - _NoiseFreq: 14
+    - _TipFade: 0
+    m_Colors:
+    - _CoreColor: {r: 16, g: 15, b: 14, a: 1}
+    - _EdgeColor: {r: 6, g: 2.4, b: 0.6, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

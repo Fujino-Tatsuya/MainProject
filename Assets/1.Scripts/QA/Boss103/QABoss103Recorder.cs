@@ -20,8 +20,7 @@ using Debug = UnityEngine.Debug;
 /// <item>공격 시간표(보스 상태 Attack 진입·공격 행 교체) — 클라 봇 굴림을 공격 id 로 잇는다. 전투 기록(<c>[23호/전투기록]</c> 로그, 없으면 보스 <c>_fightLog</c>)은 기믹 파싱용.</item>
 /// <item>C5 qa 브랜치 전용 게임 알림: 팔라딘 방어(<see cref="FirstMeleeSubSkill.QA103GuardAbsorbed"/>) · 23호 기믹 결과(<see cref="TwentyThreeBoss.QA103GimmickResult"/>, source=event —
 ///   전투 기록 파싱 행과 중복 제거, <see cref="QABoss103GimmickNotify.Merge"/>). 상세 Docs/tech/handoff-qa103-notify.md.</item>
-/// <item>할 일 140-4 — 북진 중 간파 판정(<see cref="PlayerInterruptSkillBase.ServerInterruptResolved"/>)마다 <c>event=pn_server_cast</c>: 서버가 본 위치·실제/AABB 표면 거리·정면각·앵커 겹침
-/// (할 일 164: + 0.2m 물림 겹침 <c>backoff</c>·상자 높이 <c>boxMinY/boxMaxY</c>·몸 방향 오차 <c>yawErrDeg</c>·형상 틈 <c>gapM</c>, 옛 <c>reachM</c> 삭제).</item>
+/// <item>할 일 140-4 — 북진 중 간파 판정(<see cref="PlayerInterruptSkillBase.ServerInterruptResolved"/>)마다 <c>event=pn_server_cast</c>: 서버가 본 위치·실제/AABB 표면 거리·정면각·앵커 겹침.</item>
 /// </list>
 /// </summary>
 public sealed class QABoss103Recorder : MonoBehaviour
@@ -242,8 +241,6 @@ public sealed class QABoss103Recorder : MonoBehaviour
     private static readonly FieldInfo GimmickStepField = typeof(TwentyThreeBoss).GetField("_gStep", AnyInst);
     private static readonly FieldInfo BossDataField = typeof(TwentyThreeBoss).GetField("_boss", AnyInst);
     private readonly Collider[] _anchorHits = new Collider[16];
-    /// <summary>pn_server_cast 형상 틈 탐색 한도(m) — 넘으면 na(사거리 밖 멀리서 누름).</summary>
-    private const float GapMaxM = 10f;
     private Player _lastInterruptSucceeded;
 
     /// <summary>같은 판정 안에서 <see cref="OnInterruptResolved"/> 보다 먼저 난다 — 성공 여부를 넘긴다.</summary>
@@ -274,17 +271,10 @@ public sealed class QABoss103Recorder : MonoBehaviour
             Bounds b = hurt.bounds;
             aabbSurf = QABoss103PushNorthCounter.AabbSurfaceDistance(pos.x, pos.z, b.min.x, b.min.z, b.max.x, b.max.z);
         }
-        // 할 일 164 — 판정 순간 앵커의 지금 형상(서버 OverlapHitboxAnchor 와 같은 값, 돌리지 않음)으로 겹침·0.2m 물림 겹침·높이 범위·몸 방향 오차·틈.
         PlayerSkillController skills = owner.GetComponent<PlayerSkillController>();
+        double reach = QABoss103CombatBot.CounterReach(owner, skills);
         ColliderInfo anchor = skills != null ? skills.GetSkill(PlayerSkillSlot.Interrupt)?.HitboxAnchor : null;
-        QABoss103CounterShape.Probe probe = QABoss103CounterShape.Probe.Invalid;
-        double gap = double.NaN;
-        if (hurt != null && HitboxAnchorShape.TryRead(anchor, out HitboxAnchorShape shape))
-        {
-            Vector3 toBoss = bossPos - pos;
-            probe = QABoss103CounterShape.ProbeShape(shape, toBoss, anchor.transform.forward, hurt, _anchorHits);
-            gap = QABoss103CounterShape.GapM(shape, toBoss, hurt, _anchorHits, GapMaxM);
-        }
+        string overlap = anchor == null || hurt == null ? "na" : AnchorTouches(anchor, hurt) ? "true" : "false";
 
         Vector3 to = pos - bossPos;
         Vector3 fwd = _boss.transform.forward;
@@ -296,7 +286,38 @@ public sealed class QABoss103Recorder : MonoBehaviour
         string bot = slot >= 0 ? ((QABoss103Character)slot).ToString() : "client" + owner.OwnerClientId;
         object step = GimmickStepField != null ? GimmickStepField.GetValue(_boss) : null;
         Debug.Log(QABoss103PushNorthCounter.FormatServerCastLine(Tag, bot, slot, step?.ToString(), _boss.CounterWindowOpen, resolvedCount, success,
-            pos.x, pos.z, bossPos.x, bossPos.z, trueSurf, aabbSurf, frontDeg, limit, QABoss103CounterShape.Format(probe), gap, Now));
+            pos.x, pos.z, bossPos.x, bossPos.z, trueSurf, aabbSurf, reach, frontDeg, limit, overlap, Now));
+    }
+
+    /// <summary>판정 앵커 형상(지금 월드 값)이 <paramref name="hurt"/> 에 겹치나 — 서버 판정(OverlapHitboxAnchor)과 같은 질의를 그 콜라이더 층으로만.</summary>
+    private bool AnchorTouches(ColliderInfo anchor, Collider hurt)
+    {
+        int mask = 1 << hurt.gameObject.layer;
+        int n;
+        switch (anchor.OverlapCollider)
+        {
+            case OverlapCollider.Box:
+                BoxColliderInfo box = default;
+                anchor.GetBoxColliderInfo(ref box);
+                n = Physics.OverlapBoxNonAlloc(box.center, box.halfExtents, _anchorHits, box.orientation, mask, QueryTriggerInteraction.Collide);
+                break;
+            case OverlapCollider.Sphere:
+                SphereColliderInfo sphere = default;
+                anchor.GetSphereColliderInfo(ref sphere);
+                n = Physics.OverlapSphereNonAlloc(sphere.center, sphere.radius, _anchorHits, mask, QueryTriggerInteraction.Collide);
+                break;
+            case OverlapCollider.Capsule:
+                CapsuleColliderInfo capsule = default;
+                anchor.GetCapsuleColliderInfo(ref capsule);
+                n = Physics.OverlapCapsuleNonAlloc(capsule.point0, capsule.point1, capsule.radius, _anchorHits, mask, QueryTriggerInteraction.Collide);
+                break;
+            default:
+                return false;
+        }
+        for (int i = 0; i < n; i++)
+            if (_anchorHits[i] == hurt)
+                return true;
+        return false;
     }
 
     private void OnSkillUsed(Player p, PlayerSkillSlot slot)

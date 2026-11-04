@@ -15,7 +15,7 @@ using static EffectCatalog;
 //   (오너→서버 직접 데미지 RPC 미사용.)
 // - 자산(NavMesh/Animator/디졸브)이 없어도 컴파일되고 예외로 죽지 않도록 전부 널가드.
 [RequireComponent(typeof(NetworkObject))]
-public class MonsterBase : Unit
+public class MonsterBase : Unit, IInterruptJudgeTarget
 {
     [Header("데이터")]
     [SerializeField] protected MonsterDataSO data;
@@ -275,6 +275,12 @@ public class MonsterBase : Unit
     /// 표시(<c>_counterVisual</c>)와 달리 조기 소등이 없다.
     /// </summary>
     protected bool CounterJudgeWindowReplica => _counterJudgeWindow.Value;
+
+    /// <summary>
+    /// [모든 피어] 간파 판정 스냅샷(할 일 191 <see cref="InterruptManager"/>)의 간파 불가 상태. 기본 = 중간보스 취약 복제값.
+    /// 23호·스파링 봇은 자기 취약·제압 규칙으로 덮는다.
+    /// </summary>
+    public virtual bool InterruptBlockedByState => _vulnerable.Value;
 
     /// <summary>[서버] <c>MonsterCounterWindow</c> 가 열고 닫을 때 부른다(할 일 132). 스폰 전·클라에선 아무것도 안 한다.</summary>
     internal void ServerReplicateCounterWindow(bool open)
@@ -2624,6 +2630,12 @@ public class MonsterBase : Unit
     /// 머리 위 기절 이펙트는 이 값이 아니라 그로기·Q 경직 때만이다(<c>MonsterStatusEffectVfxPresenter</c>).
     /// </summary>
     public bool IsMidBossVulnerable => Rank == MonsterRank.MidBoss && _vulnerable.Value;
+
+    /// <summary>
+    /// 머리 위 상태이상 이펙트(기절 별) 자리를 공용 높이(머리 뼈 위 0.4m + 표 offset)보다 더 올리는 몹별 값(m).
+    /// 기본 0 — 머리가 큰 모델만 덮어쓴다(<see cref="MonsterStatusEffectVfxPresenter"/>).
+    /// </summary>
+    public virtual float StatusVfxOverheadExtraHeight => 0f;
 
     // 중간보스 취약 색 — 23호 BossDataSO.vulnerableTint 기본값과 같은 색(팀장 10-26: 보스처럼 취약이 보여야 한다).
     static readonly Color MidBossVulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);

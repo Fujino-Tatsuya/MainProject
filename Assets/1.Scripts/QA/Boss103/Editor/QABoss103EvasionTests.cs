@@ -318,20 +318,5 @@ public sealed class QABoss103EvasionTests
         Assert.IsTrue(QABoss103Counter.IsFront(0f, 1f, 0f, 0f, 10f), "겹치면 정면");
     }
 
-    [Test]
-    public void 창_길이_추정은_최솟값_기본_800()
-    {
-        var w = new QABoss103WindowEstimate();
-        Assert.AreEqual(QABoss103Counter.DefaultWindowMs, w.EstimateMs(), 1e-9);
-        w.Add(1.5);
-        w.Add(0.6);
-        w.Add(9.0);    // 너무 김 — 버림
-        w.Add(-1.0);   // 버림
-        Assert.AreEqual(2, w.Count);
-        Assert.AreEqual(600.0, w.EstimateMs(), 1e-6);
-        for (int i = 0; i < QABoss103WindowEstimate.Capacity; i++)
-            w.Add(1.0);
-        Assert.AreEqual(1000.0, w.EstimateMs(), 1e-6, "최근 5개만");
-    }
 }
 #endif

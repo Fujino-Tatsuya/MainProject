@@ -320,6 +320,7 @@ public class Player : Unit
 
         ResetReconciliationObservation();
         BeginMovementDiagnostics();
+        InterruptManager.RegisterPlayer(this);   // 간파 판정 세계 스냅샷(할 일 191, 모든 피어)
 
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
@@ -369,6 +370,7 @@ public class Player : Unit
 
     public override void OnNetworkDespawn()
     {
+        InterruptManager.UnregisterPlayer(this);
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 

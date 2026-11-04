@@ -27,7 +27,9 @@ using UnityEngine;
 ///    집결 카운트다운(할 일 89)은 사망 순간 취소되므로 카운트다운 여부가 아니라 "보스방 도착 전 즉시 주문" 으로 가린다
 ///    (<see cref="MapSceneDeathRulesModel.RevivesAtBossEnterPoint"/>). 지점이 없거나 도착 뒤면 그 자리.
 ///  · 보스방 도착(<see cref="BossTeleportManager.AlivePlayersArrived"/>/<see cref="BossTeleportManager.ArrivalAborted"/>) 또는
-///    단계 <see cref="MapSceneStep.Finished"/> 이후 사망은 일반 규칙(자동 부활 없음). 남은 대기는 그 자리에서 끝낸다.
+///    단계 <see cref="MapSceneStep.Finished"/> 이후 사망은 같은 대기(3초) 뒤 <b>그 자리</b>에서 목숨 1개 차감 자동 부활(PLAN-auto-revive.md).
+///    공용 목숨 0 이면 사망 목적지가 PermanentDead(관전)라 부활하지 않는다 — 전멸이면 PartyWipeWatcher(기존).
+///    도착 순간 남아 있던 G11 전 대기는 그 자리에서 즉시 끝낸다.
 ///  · 연출 잠금(<see cref="PlayerEncounterLock.IsCinematicLocked"/>) 중이면 보류하고 경고 1회 — 풀리면 다음 프레임에 부활.
 ///  · 추락 생존 복구(존2 물 구멍)는 건드리지 않는다. 추락 사망도 사망이라 같은 규칙으로 부활한다.
 /// </summary>
@@ -158,6 +160,9 @@ public sealed class MapSceneDeathRules : MonoBehaviour
     private bool RulesActive =>
         !_finished && _director != null && _director.IsTutorialActive && _director.Step != MapSceneStep.Finished;
 
+    /// <summary>보스방 도착 뒤 규칙(그 자리·대기·차감 부활)으로 새 사망을 받는가.</summary>
+    private bool BossRoomRulesActive => _finished && _director != null && _director.IsTutorialActive;
+
     private bool KeepsSoul(ulong clientId) => _model != null && _model.IsPenaltyFree(clientId);
 
     private void Update()
@@ -183,7 +188,15 @@ public sealed class MapSceneDeathRules : MonoBehaviour
         // Alive → Soul 은 판 도중 재합류 생명 복원(할 일 48 C14 R5c — PlayerLifeCycleController.RestoreForRejoinServer)만 낸다.
         // 퇴장 때 대기 부활이 취소됐으므로(HandleClientDisconnected) 새 사망처럼 다시 걸어 Soul 에 갇히지 않게 한다.
         bool died = to == PlayerLifeState.DeadPresentation || to == PlayerLifeState.Soul;
-        if (from != PlayerLifeState.Alive || !died || !RulesActive) return;
+        if (from != PlayerLifeState.Alive || !died) return;
+
+        if (BossRoomRulesActive)
+        {
+            _model.RecordBossRoomDeath(clientId, _nm.ServerTime.Time);
+            Edit.Log($"[Tutorial] client {clientId} 사망(보스방) — {reviveDelaySeconds:0.#}초 뒤 그 자리 자동 부활(목숨 차감 1개, 0 이면 관전).", this);
+            return;
+        }
+        if (!RulesActive) return;
 
         bool bossRoomReached = MapSceneDeathRulesModel.IsLifeChargedAt(OpenedGateMask());
         _model.RecordDeath(clientId, _nm.ServerTime.Time, bossRoomReached);
@@ -238,7 +251,7 @@ public sealed class MapSceneDeathRules : MonoBehaviour
         if (_finished) return;
         _finished = true;
         int n = _model.ConvertAllToInPlace();
-        Edit.Log($"[Tutorial] 사망 규칙 종료({why}) — 이후 사망은 일반 규칙. 남은 자동 부활 {_model.PendingCount}건은 그 자리에서 마무리" +
+        Edit.Log($"[Tutorial] 사망 규칙 보스방 전환({why}) — 이후 사망은 {reviveDelaySeconds:0.#}초 뒤 그 자리 차감 부활. 남은 자동 부활 {_model.PendingCount}건은 그 자리에서 마무리" +
                  (n > 0 ? $"(안전 지점 → 그 자리 {n}건)." : "."), this);
     }
 

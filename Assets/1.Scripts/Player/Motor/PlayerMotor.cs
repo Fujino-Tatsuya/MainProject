@@ -157,17 +157,62 @@ public sealed class PlayerMotor : MonoBehaviour
         if (capsule == null)
             return false;
 
+        return IsUnitBlockingAheadFrom(
+            simulationState.Position, direction, distance, CaptureSimulationSettings(simulationState.IsSoul));
+    }
+
+    /// <summary>
+    /// [이 피어] 진행 중 대시의 끝 위치·시각 예측(할 일 191 간파 판정) — 씬 상태를 바꾸지 않는다.
+    /// 실제 대시 이동과 같은 스윕(<see cref="SweepFrom"/>)·같은 유닛 막힘 검사(<see cref="IsUnitBlockingAheadFrom"/>)·지금 장애물 규칙(오버라이드 포함)을 쓴다.
+    /// </summary>
+    public PlayerDashPathResult PredictDashPath(Vector3 start, Vector3 direction, float speed, float remaining)
+    {
+        var sweep = new DashPathSweep(this, CaptureSimulationSettings(simulationState.IsSoul), simulationState.IsGrounded);
+        return PlayerDashPath.Simulate(sweep, start, direction, speed, remaining, Time.fixedDeltaTime);
+    }
+
+    // 대시 이동(IsUnitBlockingAhead — 막힌 틱의 조기 종료)과 대시 경로 예측(PredictDashPath)이 함께 부르는 유닛 막힘 검사.
+    private bool IsUnitBlockingAheadFrom(
+        Vector3 position,
+        Vector3 direction,
+        float distance,
+        PlayerSimulationSettings settings)
+    {
         direction.y = 0f;
-        PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
         Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
         return PlayerMotionSweep.IsBlockedByUnitFirst(
             capsule,
-            simulationState.Position - currentPosition,
+            position - currentPosition,
             direction,
             distance + settings.CollisionSkin * 2f,
             settings.MaxWalkableSlopeAngle,
             settings.ObstacleMask,
             settings.CollisionSkin,
+            castBuffer);
+    }
+
+    // 이동 시뮬레이션(RuntimeMotionResolver)과 대시 경로 예측(PredictDashPath)이 함께 부르는 최종 이동 스윕 — 같은 캡슐·레이어·스킨·반복 횟수.
+    private Vector3 SweepFrom(
+        Vector3 position,
+        Vector3 desiredDelta,
+        Vector3 horizontalStepDelta,
+        bool isGrounded,
+        PlayerSimulationSettings settings)
+    {
+        Vector3 currentPosition = playerRigidbody != null
+            ? playerRigidbody.position
+            : transform.position;
+        return PlayerMotionSweep.Resolve(
+            capsule,
+            position - currentPosition,
+            desiredDelta,
+            horizontalStepDelta,
+            isGrounded,
+            settings.StepOffset,
+            settings.MaxWalkableSlopeAngle,
+            settings.ObstacleMask,
+            settings.CollisionSkin,
+            settings.MaxSweepIterations,
             castBuffer);
     }
 
@@ -1108,21 +1153,34 @@ public sealed class PlayerMotor : MonoBehaviour
             if (owner.capsule == null)
                 return desiredDelta;
 
-            Vector3 currentPosition = owner.playerRigidbody != null
-                ? owner.playerRigidbody.position
-                : owner.transform.position;
-            return PlayerMotionSweep.Resolve(
-                owner.capsule,
-                state.Position - currentPosition,
-                desiredDelta,
-                horizontalStepDelta,
-                state.IsGrounded,
-                settings.StepOffset,
-                settings.MaxWalkableSlopeAngle,
-                settings.ObstacleMask,
-                settings.CollisionSkin,
-                settings.MaxSweepIterations,
-                owner.castBuffer);
+            return owner.SweepFrom(state.Position, desiredDelta, horizontalStepDelta, state.IsGrounded, settings);
         }
+    }
+
+    // 대시 경로 예측용 — 예측 시작 때 잡은 설정·접지로 실제 이동과 같은 스윕·유닛 막힘 검사를 부른다.
+    private sealed class DashPathSweep : IPlayerDashSweep
+    {
+        private readonly PlayerMotor owner;
+        private readonly PlayerSimulationSettings settings;
+        private readonly bool isGrounded;
+
+        public DashPathSweep(PlayerMotor owner, PlayerSimulationSettings settings, bool isGrounded)
+        {
+            this.owner = owner;
+            this.settings = settings;
+            this.isGrounded = isGrounded;
+        }
+
+        public Vector3 Resolve(Vector3 position, Vector3 desiredDelta)
+        {
+            if (owner.capsule == null)
+                return desiredDelta;
+
+            Vector3 planar = new Vector3(desiredDelta.x, 0f, desiredDelta.z);
+            return owner.SweepFrom(position, desiredDelta, planar, isGrounded, settings);
+        }
+
+        public bool IsUnitBlockingAhead(Vector3 position, Vector3 direction, float distance) =>
+            owner.capsule != null && owner.IsUnitBlockingAheadFrom(position, direction, distance, settings);
     }
 }

@@ -10,12 +10,10 @@ public sealed class InterruptProductionChannelTests
 {
     private sealed class FakeDarkAdaptation : IInterruptDarkAdaptationOutput
     {
-        public readonly List<(bool viewerIsCaster, ulong casterClientId, Vector3 target)> Plays =
-            new List<(bool, ulong, Vector3)>();
+        public readonly List<bool> Plays = new List<bool>();
         public int Stops;
 
-        public void Play(bool viewerIsCaster, ulong casterClientId, Vector3 targetPosition) =>
-            Plays.Add((viewerIsCaster, casterClientId, targetPosition));
+        public void Play(bool viewerIsCaster) => Plays.Add(viewerIsCaster);
 
         public void Stop() => Stops++;
     }
@@ -68,9 +66,7 @@ public sealed class InterruptProductionChannelTests
         _settings.On.Add(InterruptProductionCue.DarkAdaptation);
         Started(SlowMotionPurpose.Success, viewerIsCaster: true);
         Assert.AreEqual(1, _dark.Plays.Count);
-        Assert.IsTrue(_dark.Plays[0].viewerIsCaster);
-        Assert.AreEqual(2ul, _dark.Plays[0].casterClientId);
-        Assert.AreEqual(Target, _dark.Plays[0].target);
+        Assert.IsTrue(_dark.Plays[0]);
     }
 
     [Test]
@@ -87,7 +83,7 @@ public sealed class InterruptProductionChannelTests
         _settings.On.Add(InterruptProductionCue.DarkAdaptation);
         Started(SlowMotionPurpose.Success, viewerIsCaster: false);
         Assert.AreEqual(1, _dark.Plays.Count);
-        Assert.IsFalse(_dark.Plays[0].viewerIsCaster);
+        Assert.IsFalse(_dark.Plays[0]);
     }
 
     [Test]

@@ -16,13 +16,12 @@ using UnityEngine;
 /// 마감 − 선딜 0.225 − 0.1초에 방어(<see cref="QABoss103HitTiming.GuardStartAt"/>, 홀드 = 첫 피해 + 0.4초까지).
 /// 대시 방향 설정(<see cref="UserInputConfig.DashDirection"/>)은 이 프로세스에서만 조준 방향(Cursor)으로 바꿔 두고(PlayerPrefs 저장 없음) 끝나면 되돌린다.
 /// 회피 뒤에는 그 위험이 끝날 때까지 다가가지 않는다. 오라(차징)는 켜진 동안 원 밖에 머문다.</para>
-/// <para><b>간파</b>: <see cref="TwentyThreeBoss.CounterWindowOpen"/>(복제) 상승 엣지 = 기회. 우클릭 쿨이고 사거리 + 2.5m 안이면 굴린다.
-/// C7e — 성공 굴림: 창 동안 새 평타·스킬을 시작하지 않고(홀드 놓음), 반응 지연 뒤부터 마감(추정 닫힘 − 판정 선딜 0.333 − 0.07초)까지
-/// 사거리·정면(앞 반원)·Idle/Move 가 맞을 때 누른다 — 안 맞으면 보스 정면 쪽으로 걸어 들어가고, 시전이 거부되면 다음 프레임에 다시 누른다.
-/// 추정 닫힘 = 돌진 창이면 돌진 출발(<see cref="QABoss103HitTiming.DashLaunchDelay"/>), 아니면 돌진 아닌 창 관측 최솟값.
-/// 실패 굴림 = 관측 닫힘 + 150ms 에 1회.
-/// 할 일 164 — "사거리" = 서버 판정과 같은 형상 겹침(<see cref="QABoss103CounterShape"/>: 보스 쪽으로 돌린 판정 앵커가 HurtBox 에 0.2m 물려도 닿나).
-/// 창 열림 포기 = 형상 틈 > 여유, 마감에 형상이 안 닿으면 누르지 않고 <c>reason=out_of_shape</c>.</para>
+/// <para><b>간파</b>(할 일 193 — 사람과 같은 경로): 기회 = <see cref="InterruptManager"/> 창 시간표 복제의 새 창(<see cref="QABoss103WindowWatch"/> — 창 id·열림·닫힘 예정·조기 닫힘).
+/// 우클릭 쿨이고 사거리 + 2.5m 안이면 굴린다. 봇은 입력만 낸다(<see cref="PlayerSkillController.ExecuteTargetedSkill"/> → 오너 Predict/Judge → 신고 → 서버 승인/거부).
+/// 성공 굴림: 창 동안 새 평타·스킬을 시작하지 않고(홀드 놓음), 반응 지연 뒤 <see cref="InterruptManager.Predict"/> 가 강이고 Idle/Move 면 누른다
+/// (<see cref="QABoss103InterruptPress.Decide"/> — 상자가 안 닿으면 보스 정면 쪽으로 걷고, 판정 시각에 창이 닫혀 있으면 포기). 시전이 거부되면 다음 프레임에 다시.
+/// 닫힘 예정 = 시간표의 닫힘 예정(길이 모름 = 마감 없음). 실패 굴림 = 시간표 닫힘 + 150ms 에 1회.
+/// 성공 여부는 봇이 정하지 않는다 — 결과는 191 QA 기록(<see cref="InterruptQaRecorder.RecordCompleted"/>)을 판 파일 <c>claim</c> 줄로 옮긴다.</para>
 /// <para>로그: <c>[QA103] event=threat</c>(위험 1건 1줄 — hitMs·deadMs·doMs 추가) · <c>event=counter_try</c> / <c>counter_skip</c>(창 1개 1줄).
 /// 결과(실제 피격·간파 성공)는 C4 가 서버 로그로 집계하고 C7e <c>event=bot_fidelity</c> 가 굴림과 잇는다.</para>
 /// </summary>
@@ -38,12 +37,12 @@ public sealed partial class QABoss103CombatBot
     private const double AvoidTailSeconds = 0.3;
     /// <summary>대시 방향 바닥 검사 후보(도) — 원래 방향부터.</summary>
     private static readonly float[] EscapeTurns = { 0f, 45f, -45f, 90f, -90f, 135f, -135f, 180f };
-    /// <summary>C7e — 간파 창이 열릴 때 판정 형상 틈(<see cref="QABoss103CounterShape.GapM"/>)이 이만큼(m) 안이면 굴린다(성공 굴림이면 걸어 들어간다).</summary>
+    /// <summary>사거리 앵커를 못 읽을 때 간파 사거리(보스 표면까지, m).</summary>
+    private const double CounterReachFallback = 2.5;
+    /// <summary>C7e — 간파 창이 열릴 때 사거리보다 이만큼(m) 멀어도 굴린다(성공 굴림이면 걸어 들어간다).</summary>
     private const double CounterApproachSlack = 2.5;
-    /// <summary>C7e — 간파하러 설 자리 = 보스 표면에서 이만큼(m) 앞(창마다 처음 값).</summary>
+    /// <summary>C7e — 간파하러 설 자리 = 보스 표면에서 이만큼(m) 앞.</summary>
     private const float CounterStandOff = 0.5f;
-    /// <summary>할 일 164 — 설 자리에 왔는데 형상 검사가 안 통하면 설 자리를 이만큼(m) 더 붙인다(0 까지).</summary>
-    private const float CounterStandOffStep = 0.25f;
 
     private sealed class PendingReaction
     {
@@ -78,21 +77,20 @@ public sealed partial class QABoss103CombatBot
     private int _lethalNoRoll, _lethalMismatch;
 
     // 간파
-    private readonly QABoss103WindowEstimate _window = new QABoss103WindowEstimate();
-    private bool _windowWas;
+    private readonly QABoss103WindowWatch _watch = new QABoss103WindowWatch();
     private double _windowOpenAt = -1.0;
     private int _counterWindows, _counterTries, _counterSkips, _counterRetries;
-    private bool _counterPending, _counterHit, _counterWaitClose, _counterIsDash;
+    private bool _counterPending, _counterHit, _counterWaitClose;
     private double _counterPressAt, _counterDeadline, _counterPlanMs, _counterEstMs;
-    // 할 일 164 — 형상 검사 버퍼 · 이번 창 설 자리(형상이 안 닿으면 줄어든다)
-    private readonly Collider[] _shapeHits = new Collider[16];
-    private float _counterStandOff = CounterStandOff;
+    /// <summary>할 일 193 — 마지막 예측(누름 로그용).</summary>
+    private InterruptJudgeResult _lastPredict;
 
     private void InitEvasion(int runSeed)
     {
         _dodgeRng = new System.Random(QABoss103Bot.Seed(runSeed, _slot, QABoss103Bot.Stream.Dodge));
         _counterRng = new System.Random(QABoss103Bot.Seed(runSeed, _slot, QABoss103Bot.Stream.Counter));
         string dash = ForceCursorDash();
+        InterruptQaRecorder.RecordCompleted += OnInterruptQaRecord;   // 할 일 193 — 간파 결과 = 191 QA 기록(OnDestroy 에서 끊는다)
         Debug.Log($"{Tag} event=bot_evasion character={_character} slot={_slot} dashMode={dash} guardHold={(UserInputConfig.GuardSkillHold ? "true" : "false")} " +
                   $"sensorMissing={_sensor.Missing} frontField={(BossDataField != null ? "ok" : "missing")}");
     }
@@ -557,7 +555,7 @@ public sealed partial class QABoss103CombatBot
             Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} reason=idle_{QABoss103Plan.Token(reason)}");
         }
         EndPnWindow(double.NaN, reason);
-        _windowWas = false;
+        _watch.Reset();
     }
 
     // ── 간파 ───────────────────────────────────────────────────
@@ -565,12 +563,21 @@ public sealed partial class QABoss103CombatBot
     private void TickCounter(Player me, Vector3 myPos, float surface, double now)
     {
         ObservePylonClear(now);   // 할 일 140-2 — 창 열림 판별보다 먼저(같은 틱에 탑 소멸·창 열림이 같이 보인다)
-        bool open = _boss.CounterWindowOpen;
-        if (open && !_windowWas)
-            OnCounterOpen(me, myPos, surface, now);
-        else if (!open && _windowWas)
-            OnCounterClose(now);
-        _windowWas = open;
+        // 할 일 193 — 창 열림·닫힘·닫힘 예정 = InterruptManager 창 시간표 복제(판정이 보는 것과 같은 기록).
+        InterruptManager manager = InterruptManager.Instance;
+        double serverNow = manager != null ? manager.ServerNow : double.NaN;
+        InterruptWindowRecord latest = default;
+        bool hasRecord = manager != null && _boss.IsSpawned && manager.TryGetLatestWindow(_boss.NetworkObjectId, out latest);
+        switch (_watch.Step(hasRecord, latest, serverNow, out InterruptWindowRecord closed))
+        {
+            case QABoss103WindowEdge.Opened:
+                OnCounterOpen(me, myPos, surface, now, serverNow, _watch.Current);
+                break;
+            case QABoss103WindowEdge.Closed:
+                OnCounterClose(now, closed);
+                break;
+        }
+        bool open = _watch.IsOpen;
 
         if (!_counterPending)
             return;
@@ -594,56 +601,58 @@ public sealed partial class QABoss103CombatBot
         // 할 일 140-2 — 북진 창: 걸어서 마감까지 못 닿으면 대쉬 간파.
         if (_pnWindow && TickPnDash(me, myPos, now))
             return;
-        // 성공 굴림 — 마감까지 조건(판정 형상·정면·Idle/Move)이 맞을 때 누르고, 거부되면 다시 누른다.
-        // 할 일 164 — 마감엔 형상이 닿을 때만 마지막 1회, 안 닿으면 누르지 않고 out_of_shape 로 기록(일반·북진 공용 Decide).
-        bool last = now >= _counterDeadline;
-        QABoss103CounterShape.Probe probe = CounterProbe(me, myPos);
-        // 할 일 140-4 — 북진 창은 끝자락이 아니라 여유 자리에 멈춘 뒤 누른다(PnPressDecision).
-        QABoss103PushNorthCounter.PressDecision d = _pnWindow
-            ? PnPressDecision(me, myPos, now, probe)
-            : QABoss103PushNorthCounter.Decide(now, _counterDeadline, CounterReady(me, myPos, probe), false, probe.Touches, 0.0);
-        if (d == QABoss103PushNorthCounter.PressDecision.Press)
-            PressCounter(me, myPos, now, open, last);
-        else if (d == QABoss103PushNorthCounter.PressDecision.OutOfShape)
-            SkipOutOfShape(me, myPos, now, probe);
+        // 성공 굴림(할 일 193) — 사람이 누를 때와 같은 예측(InterruptManager.Predict)이 강이고 시전 가능하면 누른다. 거부되면 다시 누른다.
+        // 판정 시각에 창이 닫혀 있다·지목자 아님 등이면 이 창은 포기(옛 '마감에 조건 없이 1회' 폐기 — 성공 여부는 오너 판정·서버 검증이 정한다).
+        QABoss103PressCall call = PredictCall(me, myPos);
+        if (call == QABoss103PressCall.GiveUp)
+        {
+            _counterPending = false;
+            _counterSkips++;
+            string reason = "predict_" + _lastPredict.FailReason;
+            if (_pnWindow)
+                _pnReason = reason;
+            Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} windowId={_watch.Current.WindowId} reason={reason}" +
+                      (_pnWindow ? " pushNorth=true" : ""));
+            return;
+        }
+        if (call != QABoss103PressCall.Press)
+            return;
+        // 할 일 140-4 — 북진 창은 멈춘 뒤 누른다(서버 이력의 시전자 위치가 따라오게).
+        if (_pnWindow && !PnShouldPress(now))
+            return;
+        PressCounter(me, myPos, now, open, false);
     }
 
-    /// <summary>C7e — 지금 눌러도 되나: 시전 가능 상태 + 판정 형상이 0.2m 물려도 보스에 닿음(할 일 164) + 정면.</summary>
-    private bool CounterReady(Player me, Vector3 myPos, QABoss103CounterShape.Probe probe) =>
-        CounterCastable(me) && probe.InSpot && CounterFront(myPos, out _, out _);
+    /// <summary>
+    /// 할 일 193 — 지금 눌렀다고 보고 <see cref="InterruptManager.Predict"/>(근접, 조준 = 보스 쪽 / 대쉬 = 진행 중 대시). 매니저·이력이 없으면 false.
+    /// 누른 시각 = 직전 샘플(<see cref="QABoss103InterruptPress.ProbeLocalTime"/>) — 매니저가 실제 누름을 예측할 때와 같은 표본.
+    /// </summary>
+    private bool TryPredictCounter(Player me, bool viaDash, Vector3 attackDirection, out InterruptJudgeResult prediction)
+    {
+        prediction = default;
+        InterruptManager manager = InterruptManager.Instance;
+        if (manager == null || me == null || !me.IsSpawned ||
+            !manager.TryBuildCastRequest(me, viaDash, attackDirection, Time.time, out InterruptCastRequest cast))
+            return false;
+        cast.PressTime = manager.ToServerTime(QABoss103InterruptPress.ProbeLocalTime(Time.timeAsDouble, Time.deltaTime));
+        if (!manager.TryGetActorAt(me.NetworkObjectId, cast.PressTime, out _))
+            return false;
+        prediction = manager.Predict(cast);
+        return true;
+    }
 
-    /// <summary>시전 가능 상태 — Idle/Move·다른 스킬 없음.</summary>
-    private static bool CounterCastable(Player me)
+    /// <summary>할 일 193 — 근접 간파 예측 → 이번 틱 할 일. 예측을 못 하면(매니저·이력 없음) 기다린다.</summary>
+    private QABoss103PressCall PredictCall(Player me, Vector3 myPos)
     {
         PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
-        bool idleMove = me.CurrentState == PlayerActionState.Idle || me.CurrentState == PlayerActionState.Move;
-        return skills != null && !skills.IsBusy && idleMove;
-    }
-
-    /// <summary>할 일 164 — 지금 자리에서 보스 쪽으로 돌린 간파 판정 형상 검사(서버 판정과 같은 형상·오버랩, <see cref="QABoss103CounterShape"/>).</summary>
-    private QABoss103CounterShape.Probe CounterProbe(Player me, Vector3 myPos) =>
-        _boss == null ? QABoss103CounterShape.Probe.Invalid
-            : QABoss103CounterShape.ProbeAt(me, myPos, _boss.transform.position, _bossHurt, _shapeHits);
-
-    /// <summary>할 일 164 — 판정 형상을 보스 쪽으로 몇 m 밀어야 닿나(지금 닿으면 0, <paramref name="maxM"/> 안에 없거나 못 읽으면 NaN).</summary>
-    private float CounterGap(Player me, Vector3 myPos, float maxM) =>
-        _boss == null ? float.NaN
-            : QABoss103CounterShape.GapAt(me, myPos, _boss.transform.position, _bossHurt, _shapeHits, maxM);
-
-    /// <summary>할 일 164 — 마감에 형상이 안 닿았다: 누르지 않고 기록만(실패 굴림 roll=miss 와 구분되는 reason=out_of_shape).</summary>
-    private void SkipOutOfShape(Player me, Vector3 myPos, double now, QABoss103CounterShape.Probe probe)
-    {
-        _counterPending = false;
-        _counterSkips++;
-        string shape = QABoss103CounterShape.Format(probe);
-        if (_pnWindow)
-        {
-            _pnReason = QABoss103PushNorthCounter.OutOfShapeReason;
-            _pnShape = shape;
-        }
-        Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} reason={QABoss103PushNorthCounter.OutOfShapeReason} " +
-                  $"pressMs={F0((now - _windowOpenAt) * 1000.0)} state={me.CurrentState} surfM={F2(TrueSurfaceDistance(myPos))} " +
-                  $"gapM={F2(CounterGap(me, myPos, (float)CounterApproachSlack))} {shape}" + (_pnWindow ? " pushNorth=true" : ""));
+        bool castable = skills != null && !skills.IsBusy &&
+                        (me.CurrentState == PlayerActionState.Idle || me.CurrentState == PlayerActionState.Move);
+        Vector3 aim = _boss.transform.position - myPos;
+        aim.y = 0f;
+        if (!TryPredictCounter(me, false, aim, out InterruptJudgeResult prediction))
+            return QABoss103PressCall.Wait;
+        _lastPredict = prediction;
+        return QABoss103InterruptPress.Decide(prediction, castable);
     }
 
     private bool CounterFront(Vector3 myPos, out double frontDeg, out float limit)
@@ -690,23 +699,19 @@ public sealed partial class QABoss103CombatBot
             _input.SetMove(Vector3.zero);
             return true;
         }
-        // 할 일 164 — 일반·북진 모두 판정 형상이 0.2m 물려도 닿는 자리까지 걷는다(북진은 좁힌 정면 한도, 140-4).
+        PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
+        double reach = CounterReach(me, skills);
+        // 할 일 193 — 다가갈지 = 예측에서 판정 상자가 보스에 닿나(InterruptManager.Predict — 범위·정면). 예측을 못 하면 다가간다.
+        // 설 자리(걷는 목표)만 봇이 고른다 — 북진은 누름 거리 절반(PnStandOff), 그 밖은 표면 + 0.5m.
         bool pnSpot = _pnWindow && _counterHit && !pre;
-        QABoss103CounterShape.Probe probe = CounterProbe(me, myPos);
-        bool inRange = probe.InSpot;
-        bool front = pnSpot ? PnFront(myPos) : CounterFront(myPos, out _, out _);
+        Vector3 aim = bossPos - myPos;
+        aim.y = 0f;
+        bool inReach = TryPredictCounter(me, false, aim, out InterruptJudgeResult prediction) && QABoss103InterruptPress.InReach(prediction);
         Vector3 move = Vector3.zero;
-        if (!inRange || !front)
+        if (!inReach)
         {
-            move = CounterSpot(myPos, _counterStandOff) - myPos;
+            move = CounterSpot(myPos, pnSpot ? PnStandOff(reach) : CounterStandOff) - myPos;
             move.y = 0f;
-            // 설 자리에 왔는데 정면은 맞고 형상만 안 닿는다 → 설 자리를 더 붙인다(검사가 통과할 때까지).
-            if (move.sqrMagnitude <= 0.04f && !inRange && front && _counterStandOff > 0f)
-            {
-                _counterStandOff = Mathf.Max(0f, _counterStandOff - CounterStandOffStep);
-                move = CounterSpot(myPos, _counterStandOff) - myPos;
-                move.y = 0f;
-            }
             move = move.sqrMagnitude > 0.04f ? move.normalized : Vector3.zero;
         }
         move = move != Vector3.zero && IsSafeStep(myPos, move) ? move : Vector3.zero;
@@ -737,53 +742,43 @@ public sealed partial class QABoss103CombatBot
         return bossPos + spotDir * (_bossRadius + standOff);
     }
 
-    private void OnCounterOpen(Player me, Vector3 myPos, float surface, double now)
+    /// <summary>할 일 193 — 시간표에 새 창. <paramref name="window"/> = 그 창 기록(닫힘 예정 +∞ = 길이 모름).</summary>
+    private void OnCounterOpen(Player me, Vector3 myPos, float surface, double now, double serverNow, in InterruptWindowRecord window)
     {
         _counterWindows++;
         _windowOpenAt = now;
         _counterPending = false;
         _counterRetries = 0;
-        QABoss103Threat dashThreat = ActiveDashThreat(now);
-        _counterIsDash = dashThreat != null;
-        // 할 일 140-2 — 활성 탑 소멸 직후 열린 창 = 북진 무력화 창(닫힘 = 무력화 시간, 포기 거리 = 마감까지 갈 수 있는 거리).
-        double pnCloseAt = BeginPnWindow(me, myPos, surface, now);
-        if (_pnWindow)
-            _counterIsDash = false;
+        _lastPredict = default;
+        // 닫힘 = 시간표의 닫힘 예정(서버 시각 → 봇 실시간). 길이 모름 = +∞(마감 없음 — 예측이 창 닫힘을 알려 줄 때까지 기다린다).
+        double scheduledCloseAt = QABoss103InterruptPress.CloseAtReal(now, serverNow, window.PlannedCloseTime);
+        // 할 일 140-2 — 활성 탑 소멸 직후 열린 창 = 북진 무력화 창(포기 거리 = 마감까지 갈 수 있는 거리).
+        double pnCloseAt = BeginPnWindow(me, myPos, surface, now, scheduledCloseAt);
 
         PlayerSkillController skills = me.GetComponent<PlayerSkillController>();
-        _counterStandOff = CounterStandOff;
         string skip = null;
+        double reach = CounterReach(me, skills);
         double slack = _pnWindow ? _pnSlack : CounterApproachSlack;
-        // 할 일 164 — 포기 거리 = 판정 형상 틈(보스 쪽으로 밀어야 닿는 거리)이 여유 밖. 형상을 못 읽으면 no_shape.
-        bool shapeOk = CounterProbe(me, myPos).Valid;
-        float gap = shapeOk ? CounterGap(me, myPos, (float)slack) : float.NaN;
-        if (_pnWindow)
-            _pnGap = gap;
         if (skills == null || skills.GetSkill(PlayerSkillSlot.Interrupt) == null)
             skip = "no_skill";
         else if (!skills.IsCooldownReady(PlayerSkillSlot.Interrupt))
             skip = "cooldown";
-        else if (!shapeOk)
-            skip = "no_shape";
-        else if (!(gap <= slack))
+        else if (surface > reach + slack)
             skip = "range";
         if (skip != null)
         {
             _counterSkips++;
             if (_pnWindow)
                 _pnReason = skip;
-            Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} reason={skip} surfM={F2(surface)} gapM={F2(gap)}" +
+            Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} windowId={window.WindowId} reason={skip} surfM={F2(surface)} reachM={F2(reach)}" +
                       (_pnWindow ? $" pushNorth=true slackM={F2(slack)}" : ""));
             return;
         }
 
         _counterHit = QABoss103Counter.RollHit(_counterRng, _profile.InterruptSuccessChance);
         _pnRolled = _pnWindow;
-        double closeAt = _pnWindow ? pnCloseAt
-            : dashThreat != null
-            ? dashThreat.DetectedAt + QABoss103HitTiming.DashLaunchDelay(dashThreat.LeadSeconds, dashThreat.GrowSeconds)
-            : now + _window.EstimateMs() / 1000.0;
-        _counterEstMs = (closeAt - now) * 1000.0;
+        double closeAt = _pnWindow ? pnCloseAt : scheduledCloseAt;
+        _counterEstMs = double.IsInfinity(closeAt) ? double.NaN : (closeAt - now) * 1000.0;
         _counterPending = true;
         if (_counterHit)
         {
@@ -807,25 +802,22 @@ public sealed partial class QABoss103CombatBot
         }
     }
 
-    /// <summary>방금(0.5초 안) 감지한 돌진 띠 — 그 창은 돌진 출발에 닫힌다.</summary>
-    private QABoss103Threat ActiveDashThreat(double now)
+    /// <summary>할 일 193 — 시간표의 창이 닫혔다(<paramref name="window"/> = 닫힌 창 — 조기·제때·늦은 닫힘).</summary>
+    private void OnCounterClose(double now, in InterruptWindowRecord window)
     {
-        foreach (QABoss103Threat t in _sensor.Threats)
-            if (t.Kind == QABoss103ThreatKind.Dash && t.Active && now - t.DetectedAt <= 0.5)
-                return t;
-        return null;
-    }
-
-    private void OnCounterClose(double now)
-    {
-        _counterStandOff = CounterStandOff;
-        if (_windowOpenAt >= 0.0 && !_counterIsDash)
-            _window.Add(now - _windowOpenAt);   // 돌진 창은 출발 시각으로 따로 안다 — 돌진 아닌 창만 모은다
         if (_counterPending && _counterWaitClose)
         {
             _counterWaitClose = false;
             _counterPressAt = now + QABoss103Counter.LatePressMs / 1000.0;
             _counterPlanMs = (_counterPressAt - _windowOpenAt) * 1000.0;
+        }
+        else if (_counterPending && _counterHit && !_pnWindow)
+        {
+            // 성공 굴림인데 못 누르고 닫혔다 — 닫힌 창에 누르지 않는다(옛 '마감 1회' 폐기).
+            _counterPending = false;
+            _counterSkips++;
+            Debug.Log($"{Tag} event=counter_skip bot={_character} slot={_slot} window={_counterWindows} windowId={window.WindowId} reason=closed_before_press " +
+                      $"closeKind={window.CloseKind} predict={QABoss103InterruptPress.Token(_lastPredict)}");
         }
         if (_pnWindow)
         {
@@ -846,6 +838,7 @@ public sealed partial class QABoss103CombatBot
         Vector3 bossPos = _boss.transform.position;
         bool front = CounterFront(myPos, out double frontDeg, out float limit);
         float surface = SurfaceDistance(myPos, bossPos);
+        double reach = CounterReach(me, skills);
 
         StopHold();
         _driver.ReleaseBasic();
@@ -861,8 +854,6 @@ public sealed partial class QABoss103CombatBot
         Vector3 face = aimAt - myPos;
         if (movement != null)
             movement.RotateToward(face, 1000f);
-        // 할 일 164 — 누르는 순간(몸을 돌린 뒤) 형상 검사 — 몸 방향 오차·상자 높이·겹침을 줄에 남긴다.
-        QABoss103CounterShape.Probe probe = CounterProbe(me, myPos);
         bool ok = skills != null && skills.ExecuteTargetedSkill(PlayerSkillSlot.Interrupt, whiff ? null : _boss, aimAt, true);
         if (!ok && !final)
         {
@@ -871,19 +862,46 @@ public sealed partial class QABoss103CombatBot
         }
         _counterPending = false;
         _counterTries++;
-        string shape = QABoss103CounterShape.Format(probe);
-        NotePnPress(ok, false, now, shape);
+        NotePnPress(ok, false, now);
 
         NetworkManager nm = NetworkManager.Singleton;
         double serverT = nm != null && nm.IsListening ? nm.ServerTime.Time : -1.0;
         Debug.Log($"{Tag} event=counter_try bot={_character} slot={_slot} tier={_profile.Tier} window={_counterWindows} roll={(_counterHit ? "hit" : "miss")} " +
                   $"pressMs={F0((now - _windowOpenAt) * 1000.0)} planMs={F0(_counterPlanMs)} deadlineMs={(_counterHit ? F0((_counterDeadline - _windowOpenAt) * 1000.0) : "na")} " +
-                  $"reactMs={F0(_profile.ReactionMs)} windowEstMs={F0(_counterEstMs)} dashWindow={(_counterIsDash ? "true" : "false")} retries={_counterRetries} " +
-                  $"windowSamples={_window.Count} openAtPress={(openNow ? "true" : "false")} front={(front ? "true" : "false")} frontDeg={F0(frontDeg)} frontLimit={F0(limit)} " +
-                  $"surfM={F2(surface)} state={me.CurrentState} cast={(ok ? "true" : "false")} serverT={F3(serverT)}" +
-                  $" trueSurfM={F2(TrueSurfaceDistance(myPos))} {shape}" +
-                  (_pnWindow ? $" pushNorth=true whiff={(whiff ? "true" : "false")} {PnPressDiag(now)}" : ""));
+                  $"reactMs={F0(_profile.ReactionMs)} windowPlanMs={F0(_counterEstMs)} windowId={_watch.Current.WindowId} retries={_counterRetries} " +
+                  $"predict={(_counterHit ? QABoss103InterruptPress.Token(_lastPredict) : "na")} openAtPress={(openNow ? "true" : "false")} front={(front ? "true" : "false")} frontDeg={F0(frontDeg)} frontLimit={F0(limit)} " +
+                  $"surfM={F2(surface)} reachM={F2(reach)} inRange={(surface <= reach ? "true" : "false")} state={me.CurrentState} cast={(ok ? "true" : "false")} serverT={F3(serverT)}" +
+                  $" trueSurfM={F2(TrueSurfaceDistance(myPos))}" +
+                  (_pnWindow ? $" pushNorth=true whiff={(whiff ? "true" : "false")} {PnPressDiag(reach, now)}" : ""));
         PartCounter(_counterHit, ok, serverT);
+    }
+
+    /// <summary>
+    /// 간파 사거리(보스 표면까지 수평 m) — 우클릭 판정 앵커를 어느 방향으로 돌려도 닿는 최대 거리(<see cref="InterruptOmniRangeModel"/>, 88 진단과 같은 계산).
+    /// 앵커를 못 읽으면 <see cref="CounterReachFallback"/>.
+    /// </summary>
+    internal static double CounterReach(Player me, PlayerSkillController skills)
+    {
+        ColliderInfo anchor = skills != null ? skills.GetSkill(PlayerSkillSlot.Interrupt)?.HitboxAnchor : null;
+        if (anchor == null)
+            return CounterReachFallback;
+        Vector3 pivot = me.transform.position;
+        switch (anchor.OverlapCollider)
+        {
+            case OverlapCollider.Box:
+                BoxColliderInfo box = default;
+                anchor.GetBoxColliderInfo(ref box);
+                return InterruptOmniRangeModel.BoxReach(pivot, box.center, box.halfExtents, box.orientation);
+            case OverlapCollider.Sphere:
+                SphereColliderInfo sphere = default;
+                anchor.GetSphereColliderInfo(ref sphere);
+                return InterruptOmniRangeModel.SphereReach(pivot, sphere.center, sphere.radius);
+            case OverlapCollider.Capsule:
+                CapsuleColliderInfo capsule = default;
+                anchor.GetCapsuleColliderInfo(ref capsule);
+                return InterruptOmniRangeModel.CapsuleReach(pivot, capsule.point0, capsule.point1, capsule.radius);
+        }
+        return CounterReachFallback;
     }
 
     // ── 로그 ───────────────────────────────────────────────────
@@ -891,7 +909,7 @@ public sealed partial class QABoss103CombatBot
     private string EvasionDiag() =>
         $"threats={_threatsSeen} dodgeRolls={_ledger.Dodges} takeRolls={_ledger.Takes} dashes={_dashes} dashRejects={_dashRejects} guards={_guards} walks={_walks} " +
         $"guardRejects={_guardRejects} noCharge={_noCharges} blocked={_blocks} late={_late} lethalNoRoll={_lethalNoRoll} lethalMismatch={_lethalMismatch} " +
-        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips} {PushNorthDiag()}";
+        $"counterWindows={_counterWindows} counterTries={_counterTries} counterSkips={_counterSkips} {ClaimDiag()} {PushNorthDiag()}";
 
     private static string F0(double v) => double.IsNaN(v) ? "na" : v.ToString("F0", CultureInfo.InvariantCulture);
     private static string F2(double v) => double.IsNaN(v) ? "na" : v.ToString("F2", CultureInfo.InvariantCulture);

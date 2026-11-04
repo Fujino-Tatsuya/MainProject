@@ -1,22 +1,9 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-using BeaverLobby.Player.Dash;
+using System.Collections.Generic;
 
-/// <summary>오너 입력 순간 캡처 한 건(할 일 139 단계 3) — 예측 입력·결과와 그때 대상까지 거리·각도.</summary>
-public struct InterruptCalibrationOwnerCapture
-{
-    public bool ViaDash;
-    public float PressAge;
-    public DashInterruptPredictInput Input;
-    public DashInterruptPrediction Prediction;
-    public float? TargetDistance;
-    public float? TargetAngle;
-}
-
-/// <summary>서버 판정 캡처 한 건(할 일 139 단계 3) — 결과·판정 시각과 판정 시점 허수아비 창 설정·실제 상태.</summary>
+/// <summary>오너 판정 순간 캡처 한 건(할 일 139 → 191 5단계) — 판정 시점 허수아비 창 설정·실제 상태와 판정 위치 → 대상 거리·각도.</summary>
 public struct InterruptCalibrationJudgeCapture
 {
-    public bool ViaDash;
-    public bool Succeeded;
     public float Time;      // 판정 시각(Time.time)
     public float RealTime;  // 판정 시각(Time.realtimeSinceStartup)
 
@@ -26,6 +13,9 @@ public struct InterruptCalibrationJudgeCapture
     public bool? ActualWindowOpen;
     public float? ActualOpenElapsed;
     public float? ActualRemaining;
+
+    public float? TargetDistance;
+    public float? TargetAngle;
 }
 
 /// <summary>
@@ -43,169 +33,76 @@ public readonly struct InterruptCalibrationCompleted
     }
 
     public InterruptCalibrationSample Sample { get; }
+    /// <summary>최종 성공(오너 판정 성공 ∧ 서버 승인).</summary>
     public bool Succeeded { get; }
     public float JudgeTime { get; }
     public float JudgeRealTime { get; }
 }
 
 /// <summary>
-/// 간파 시도 한 번 = 표본 하나 짝짓기(할 일 139 단계 3). 순수 C# — 캡처 컴포넌트(<see cref="InterruptCalibrationCapture"/>)가 값을 넣는다.
+/// 간파 보정 표본 짝짓기(할 일 139 → 191 5단계 용도 변경) — 순수 C#. 캡처 컴포넌트(<see cref="InterruptCalibrationCapture"/>)가 값을 넣는다.
 ///
-/// 🔴 규칙(2026-10-29 정함):
+/// 🔴 규칙(2026-11-02, 191 5단계):
 /// <list type="number">
-/// <item><b>시도 식별 = 대기 표본 하나.</b> 오너 요청에는 시전 번호가 없어(서버 슬로우 발동 번호는 서버 쪽에만 있다) 대기 중인 표본을 하나만 둔다.
-///       오너 예측·서버 예측은 들어온 순서와 상관없이 그 표본에 붙는다(솔로 호스트는 오너 → 서버 순, 뒤바뀌어도 같다).</item>
-/// <item><b>같은 쪽이 두 번 오면 새 시도.</b> 대기 표본에 이미 오너(또는 서버) 예측이 있는데 또 오면 앞 표본은 판정이 안 온 것으로 보고 버리고 새로 연다.</item>
-/// <item><b>판정 = 완성.</b> 서버 판정이 오면 대기 표본을 닫아 <c>OnJudged</c> 가 완성 표본을 돌려준다. 빠진 쪽(오너·서버 예측) 칸은 빈 칸.
-///       대기 표본 없이 온 판정(예측이 하나도 없었다)은 버린다.</item>
-/// <item><b>판정 누락 = 버림.</b> 대기 표본이 연 뒤 <see cref="PendingTimeout"/>(게임 시간, 기본 3초)이 지나도 판정이 안 오면 버린다(판정 전 종료·넉백 등).
-///       버린 수는 <see cref="DroppedCount"/>.</item>
-/// <item><b>재예측(할 일 139-2)은 대기 표본에 덧붙는다.</b> 같은 쪽 예측이 이미 붙은 대기 표본의 재예측 여부·최종 예측만 바꾸고 새 표본을 열지 않는다(원래 예측 칸 그대로).</item>
-/// <item><b>대쉬 간파만.</b> 근접 간파(viaDash = false)는 <see cref="IncludeMelee"/> 가 꺼져 있으면 셋 다 무시한다(대기 표본에 영향 없음).</item>
+/// <item><b>시도 식별 = QA 기록 한 줄.</b> 예측·판정·서버 결과의 짝짓기는 <see cref="InterruptQaTracker"/> 가 시전자 id·창 id 로 한다 — 옛 '대기 표본 하나' 규칙은 없앴다.</item>
+/// <item><b>판정 순간 캡처(<see cref="NoteJudged"/>)</b>는 시전자별로 들고 있다가, 그 시전자의 기록 줄이 닫히면(<see cref="OnRecord"/>) 붙여 표본을 만든다.
+///       서버 결과는 판정보다 늦게 오므로(승인·거부) 실제 창 상태는 판정 순간 값이다.</item>
+/// <item><b>판정까지 간 줄만 표본.</b> 판정 전 종료(끊김·버림·시전 거부)는 버리고 <see cref="DroppedCount"/> 로 센다.</item>
+/// <item><b>대쉬 간파만.</b> 근접 간파는 <see cref="IncludeMelee"/> 가 꺼져 있으면 무시한다(버림 수에도 안 넣는다).</item>
 /// </list>
-/// 시간은 호출측이 넘기는 게임 시간(Time.time) — 시도 슬로우·디버그 배속을 따라 늘어나므로 판정까지 걸리는 시간과 같은 축이다.
 /// </summary>
 public sealed class InterruptCalibrationPairing
 {
-    public const float DefaultPendingTimeout = 3f;
+    readonly Dictionary<ulong, InterruptCalibrationJudgeCapture> _judged = new Dictionary<ulong, InterruptCalibrationJudgeCapture>();
 
-    InterruptCalibrationSample _pending;
-    bool _hasOwner;
-    bool _hasServer;
-    float _openedAt;
-
-    /// <summary>근접 간파도 기록한다(기본 꺼짐 — 이번 범위는 대쉬 간파만).</summary>
+    /// <summary>근접 간파도 기록한다(기본 꺼짐 — 대쉬 간파만).</summary>
     public bool IncludeMelee { get; set; }
 
-    /// <summary>판정 없이 기다리는 최대 시간(게임 초).</summary>
-    public float PendingTimeout { get; set; } = DefaultPendingTimeout;
-
-    /// <summary>짝을 못 지어 버린 수 — 판정 누락 대기 표본 + 대기 표본 없이 온 판정.</summary>
+    /// <summary>판정 전에 끝나 표본이 되지 못한 줄 수.</summary>
     public int DroppedCount { get; private set; }
 
-    public bool HasPending => _pending != null;
+    /// <summary>[오너] 판정 순간 캡처 — 같은 시전자의 이전 캡처는 바꾼다.</summary>
+    public void NoteJudged(ulong actorId, in InterruptCalibrationJudgeCapture capture) => _judged[actorId] = capture;
 
-    /// <summary>[오너] 입력 순간 예측.</summary>
-    public void OnOwnerPredicted(in InterruptCalibrationOwnerCapture capture, float now)
-    {
-        if (!Accepts(capture.ViaDash))
-            return;
-
-        Tick(now);
-        if (_pending == null || _hasOwner)
-            Open(now);
-
-        _pending.PressAge = capture.PressAge;
-        _pending.SetOwnerPrediction(capture.Input, capture.Prediction);
-        _pending.TargetDistance = capture.TargetDistance;
-        _pending.TargetAngle = capture.TargetAngle;
-        _hasOwner = true;
-    }
-
-    /// <summary>[서버] 승인 시점 예측(시도 슬로우 강·약, 대상 없음 = 슬로우 없음).</summary>
-    public void OnServerPredicted(bool viaDash, InterruptAttemptForecast forecast, float now)
-    {
-        if (!Accepts(viaDash))
-            return;
-
-        Tick(now);
-        if (_pending == null || _hasServer)
-            Open(now);
-
-        _pending.SetServerPrediction(forecast);
-        _hasServer = true;
-    }
-
-    /// <summary>[오너] 대시 도중 재예측이 약 → 강으로 올렸다(할 일 139-2). 오너 예측이 붙은 대기 표본에만 — 원래 예측 칸은 그대로 둔다.</summary>
-    public void OnOwnerRepredicted(bool viaDash, InterruptAttemptForecast forecast, float now)
-    {
-        if (!Accepts(viaDash))
-            return;
-
-        Tick(now);
-        if (_pending == null || !_hasOwner)
-            return;
-
-        _pending.OwnerRepredicted = true;
-        _pending.OwnerFinalForecast = forecast;
-    }
-
-    /// <summary>[서버] 대시 도중 재예측이 약 → 강 시도 슬로우로 다시 걸었다(할 일 139-2). 서버 예측이 붙은 대기 표본에만.</summary>
-    public void OnServerRepredicted(bool viaDash, InterruptAttemptForecast forecast, float now)
-    {
-        if (!Accepts(viaDash))
-            return;
-
-        Tick(now);
-        if (_pending == null || !_hasServer)
-            return;
-
-        _pending.ServerRepredicted = true;
-        _pending.ServerFinalForecast = forecast;
-    }
-
-    /// <summary>[서버] 판정. 대기 표본이 있으면 닫아 완성 표본을 돌려준다.</summary>
-    public bool OnJudged(in InterruptCalibrationJudgeCapture capture, out InterruptCalibrationCompleted completed)
+    /// <summary>QA 기록 한 줄이 닫혔다. 판정까지 간 대쉬 간파(또는 근접 허용)면 표본을 만든다.</summary>
+    public bool OnRecord(InterruptQaRecord record, out InterruptCalibrationCompleted completed)
     {
         completed = default;
-        if (!Accepts(capture.ViaDash))
+        if (record == null || !Accepts(record.ViaDash))
             return false;
 
-        Tick(capture.Time);
-        if (_pending == null)
+        bool judged = record.Judge == InterruptQaJudge.Success || record.Judge == InterruptQaJudge.Failure ||
+                      record.Judge == InterruptQaJudge.NoTarget;
+        bool hasCapture = _judged.TryGetValue(record.ActorId, out InterruptCalibrationJudgeCapture capture);
+        _judged.Remove(record.ActorId);
+        if (!judged)
         {
             DroppedCount++;
             return false;
         }
 
-        InterruptCalibrationSample sample = _pending;
-        _pending = null;
+        var sample = new InterruptCalibrationSample { Record = record };
+        if (hasCapture)
+        {
+            sample.RealTime = capture.RealTime;
+            sample.WindowMode = capture.WindowMode;
+            sample.WindowOpenLength = capture.WindowOpenLength;
+            sample.WindowClosedLength = capture.WindowClosedLength;
+            sample.ActualWindowOpen = capture.ActualWindowOpen;
+            sample.ActualOpenElapsed = capture.ActualOpenElapsed;
+            sample.ActualRemaining = capture.ActualRemaining;
+            sample.TargetDistance = capture.TargetDistance;
+            sample.TargetAngle = capture.TargetAngle;
+        }
 
-        sample.RealTime = capture.RealTime;
-        sample.WindowMode = capture.WindowMode;
-        sample.WindowOpenLength = capture.WindowOpenLength;
-        sample.WindowClosedLength = capture.WindowClosedLength;
-        sample.ServerSucceeded = capture.Succeeded;
-        sample.ActualWindowOpen = capture.ActualWindowOpen;
-        sample.ActualOpenElapsed = capture.ActualOpenElapsed;
-        sample.ActualRemaining = capture.ActualRemaining;
-
-        completed = new InterruptCalibrationCompleted(sample, capture.Succeeded, capture.Time, capture.RealTime);
+        completed = new InterruptCalibrationCompleted(sample, record.FinalSuccess, capture.Time, capture.RealTime);
         return true;
     }
 
-    /// <summary>판정 누락 대기 표본을 버린다(매 프레임 불러도 된다).</summary>
-    public void Tick(float now)
-    {
-        if (_pending != null && now - _openedAt > PendingTimeout)
-            Drop();
-    }
-
-    /// <summary>대기 표본을 버린다(씬 나감·랩 끔). 버림 수에 넣는다.</summary>
-    public void Clear()
-    {
-        if (_pending != null)
-            Drop();
-    }
+    /// <summary>들고 있는 판정 캡처를 버린다(씬 나감·랩 끔).</summary>
+    public void Clear() => _judged.Clear();
 
     bool Accepts(bool viaDash) => viaDash || IncludeMelee;
-
-    void Open(float now)
-    {
-        if (_pending != null)
-            Drop();
-
-        _pending = new InterruptCalibrationSample();
-        _hasOwner = false;
-        _hasServer = false;
-        _openedAt = now;
-    }
-
-    void Drop()
-    {
-        _pending = null;
-        DroppedCount++;
-    }
 
     /// <summary>허수아비 창 모드 → 표본 열 값.</summary>
     public static CalibrationWindowMode ToCalibrationMode(DummyInterruptWindowMode mode) =>

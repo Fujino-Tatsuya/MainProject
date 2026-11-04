@@ -14,8 +14,9 @@ using UnityEngine;
 ///  · G7 열림 ∧ 존4 파티 첫 진입(순서 무관) → 단계 Zone4Lore · 타이머 HUD 표시 · 자막 TUT_Z4_LORE → TUT_Z4_TIMER_HINT(전원) · 존4 휴면 유지.
 ///  · 설정 자막 길이(<see cref="MapSceneBossApproachModel.DefaultLoreSeconds"/>) 뒤 = G8(<see cref="MapSceneDirector.StartBossTimerServer"/>) →
 ///    단계 Zone4Combat · 3초 뒤 존4 일반 몬스터 기상(중간보스 제외).
-///  · 다리 개통 완료(<see cref="ZoneBridgeGateManager.ServerBridgeOpened"/>) → TUT_Z4_BRIDGE · 중간보스 기상.
-///  · 존4 클리어(장부 — 중간보스 처치, G9 는 장부가 연다) → TUT_Z4_CLEAR → TUT_Z4_GO_BOSS. 타이머 만료 → TUT_TIMER_EXPIRED 1번.
+///  · 다리 개통 완료(<see cref="ZoneBridgeGateManager.ServerBridgeOpened"/> = 열림 진행도 1, 실제 통행 가능) → 무전 TUT_Z4_BRIDGE_OPEN · 중간보스 기상(기상 경고 없음).
+///  · 존4 클리어(장부 — 중간보스 처치, G9 는 장부가 연다) → G9 가 실제로 열린 순간 무전 TUT_Z4_EXIT_OPEN 1번(PLAN-main-radio-zone1-4 §4.4 —
+///    옛 자막 TUT_Z4_BRIDGE·TUT_Z4_CLEAR·TUT_Z4_GO_BOSS 는 대체. GO_BOSS 는 목표 줄로만 남는다). 타이머 만료 → TUT_TIMER_EXPIRED 1번.
 ///  · 패드 카운트다운 시작 → TUT_B_PAD_COUNT · 보스방 도착(<see cref="MapSceneDirector.BossRoomArrived"/>) 1초 뒤 → TUT_B_BOSS_FRONT_TIP(D19).
 /// </summary>
 [DisallowMultipleComponent]
@@ -189,22 +190,26 @@ public sealed class MapSceneBossApproachGuide : MonoBehaviour
             // 설정 자막 끝이든 디버그든 G8 이 열리는 모든 경로가 여기로 온다(타이머 시작은 디렉터가 G8 에서 이미 했다).
             if (_model.NotifyTimerStarted(Now, out bool skippedLore)) StartCombat(skippedLore);
         }
+        else if (gate == MapSceneGate.G9_Corridor4Entry)
+        {
+            // 처치가 먼저 확정돼도 문이 실제로 열린 이 순간에 낸다(명세 §4.10). 무전은 통행을 막지 않는다.
+            _director.PlayRadioServer(TutorialGuideIds.Z4ExitOpen);
+        }
     }
 
     private void HandleBridgeOpened(int slotId)
     {
         if (!_model.NotifyBridgeOpened()) return;
         Edit.Log($"[Tutorial] 존4 다리 개통(Slot {slotId}) — 중간보스 기상.", this);
-        _director.ShowSubtitleServer(TutorialGuideIds.Z4Bridge);
+        _director.PlayRadioServer(TutorialGuideIds.Z4BridgeOpen);
         _director.WakeZoneServer(MapSceneArea.Zone4, MapSceneMonsterFilter.KeyOnly);
     }
 
     private void HandleZoneCleared(MapSceneArea zone)
     {
         if (zone != MapSceneArea.Zone4 || !_model.NotifyCleared()) return;
-        // G9 는 디렉터(존 장부 → RequestGateServer)가 연다 — 여기서는 안내만.
-        _director.ShowSubtitleServer(TutorialGuideIds.Z4Clear);
-        _director.ShowSubtitleServer(TutorialGuideIds.Z4GoBoss);
+        // G9 는 디렉터(존 장부 → RequestGateServer)가 연다 — 문 개방 무전은 G9 열림(HandleGateOpened)에서. 처치 확인·안부 무전은 없다(명세 §4.10).
+        Edit.Log("[Tutorial] 존4 클리어(중간보스 처치) — G9 열림을 기다린다.", this);
     }
 
     private void HandleBossRoomArrived(IReadOnlyList<ulong> arrived)

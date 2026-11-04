@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11d0c82744cd79148b6b5757f03f03bf, type: 3}
+  m_Name: Zone2IntroCinematic
+  m_EditorClassIdentifier: 
+  introEnabled: 1
+  shots:
+  - moveSeconds: 1.2
+    holdSeconds: 5.4
+  returnBlendSeconds: 1
+  line:
+    lineId: TUT_MAIN_Z02_ENTER
+    shotIndex: 0
+    delaySeconds: 0.4
+    chunkSeconds: 2.2
+    gapSeconds: 0.2
+    holdUntilNextLine: 1
+  lineTailSeconds: 0.4
+  skipHoldSeconds: 1
+  skipReturnSeconds: 0.8
+  pitch: 55
+  fov: 40
+  fitMargin: 1.3
+  distanceRange: {x: 14, y: 40}
+  focusHeight: 1
+  fallbackRadius: 8

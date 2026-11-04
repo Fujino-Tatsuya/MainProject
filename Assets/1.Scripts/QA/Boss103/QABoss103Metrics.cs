@@ -109,6 +109,8 @@ public sealed class QABoss103CharStats
     public int CounterHitRolls, CounterHitSuccess;
     /// <summary>할 일 119 C2 — 툴팁 규칙 발동 횟수(판 파일 <c>rule</c>, 순서 = <see cref="QABoss103CharRules.Tokens"/>). 열은 그 규칙 캐릭터 행에만.</summary>
     public readonly int[] RuleCounts = new int[QABoss103CharRules.Count];
+    /// <summary>할 일 193 — 간파 신고 경로 결과(판 파일 <c>claim</c> = 191 QA 기록): 시도·오너 판정 성공·승인 첫/동시·거부 사유별·응답 없음. 판 파일이 없으면 열 비움.</summary>
+    public readonly QABoss103ClaimTally Claims = new QABoss103ClaimTally();
 
     internal bool Transformed;
     internal double TransformSince;
@@ -453,6 +455,10 @@ public sealed class QABoss103RunStats
                         HitRoll = Get(kv, "roll", "miss") == "hit",
                         Cast = cast,
                     });
+                    break;
+                case "claim":
+                    // 할 일 193 — 간파 1회의 오너 판정·서버 결과(191 QA 기록). 값 = enum 이름.
+                    c.Claims.Add(Get(kv, "judge", ""), Get(kv, "server", ""), Get(kv, "reject", ""));
                     break;
                 case "done":
                     c.PartDone = true;
@@ -801,6 +807,18 @@ public static class QABoss103Metrics
         "outcome_source",
     });
 
+    /// <summary>할 일 193 — 캐릭터 CSV 꼬리 열(<see cref="QABoss103ClaimTally"/>). 거부 사유 열 = <c>claim_reject_</c> + <see cref="QABoss103ClaimTally.RejectTokens"/>.</summary>
+    public static readonly string[] ClaimColumns = BuildClaimColumns();
+
+    private static string[] BuildClaimColumns()
+    {
+        var h = new List<string> { "claim_attempts", "claim_judge_success", "claim_approved_first", "claim_approved_simul", "claim_rejected" };
+        foreach (string t in QABoss103ClaimTally.RejectTokens)
+            h.Add("claim_reject_" + t);
+        h.Add("claim_no_response");
+        return h.ToArray();
+    }
+
     public static readonly string[] CharsHeader = BuildCharsHeader();
 
     public static readonly string[] PatternsHeader = Concat(KeyHeader, new[]
@@ -833,6 +851,8 @@ public static class QABoss103Metrics
         });
         // 할 일 119 C2 — 툴팁 규칙 발동 횟수(그 캐릭터 행만). 끝에 붙인다.
         h.AddRange(QABoss103CharRules.Tokens);
+        // 할 일 193 — 간파 신고 경로(시도·오너 판정 성공·승인 첫/동시·거부·거부 사유별·응답 없음). 끝에 붙인다.
+        h.AddRange(ClaimColumns);
         return h.ToArray();
     }
 
@@ -968,6 +988,15 @@ public static class QABoss103CsvRows
             r.Add(c.PartPresent ? I(c.LethalNoRoll) : "");
             for (int i = 0; i < QABoss103CharRules.Count; i++)
                 r.Add(c.PartPresent && QABoss103CharRules.Owner((QABoss103CharRule)i) == c.Character ? I(c.RuleCounts[i]) : "");
+            QABoss103ClaimTally k = c.Claims;
+            r.Add(c.PartPresent ? I(k.Attempts) : "");
+            r.Add(c.PartPresent ? I(k.JudgeSuccess) : "");
+            r.Add(c.PartPresent ? I(k.ApprovedFirst) : "");
+            r.Add(c.PartPresent ? I(k.ApprovedSimultaneous) : "");
+            r.Add(c.PartPresent ? I(k.Rejected) : "");
+            foreach (int n in k.RejectByReason)
+                r.Add(c.PartPresent ? I(n) : "");
+            r.Add(c.PartPresent ? I(k.NoResponse) : "");
             rows.Add(r.ToArray());
         }
         return rows;

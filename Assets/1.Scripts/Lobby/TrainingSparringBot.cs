@@ -22,7 +22,7 @@ using UnityEngine.AI;
 /// 진행기 연결(단계 알림·완료 보고·플레이어 리셋 호출)과 "새 시전" 판정(<see cref="LobbyCastWindow"/>)은 <see cref="LobbyTrainingSparring"/>. 이 상대는 서버 C# 이벤트만 낸다.
 /// </summary>
 [DataTableSheet("Lobby", Order = 0)]
-public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IOverheadHealthBarRule, IInterruptCueSink
+public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IOverheadHealthBarRule, IInterruptCueSink, IInterruptClaimTarget
 {
     const string Tag = "[TrainingSparring]";
 
@@ -141,6 +141,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
 
     bool IsVulnerable => _vulnerableUntil >= 0f && !_suppressed;
     bool CounterBlockedByState => IsVulnerable || _suppressed;
+
+    /// <summary>간파 판정 스냅샷(할 일 191) — 서버 = 판정 원본, 클라 = 취약·제압 복제값.</summary>
+    public override bool InterruptBlockedByState =>
+        IsServer ? CounterBlockedByState : _vulnerableVisual.Value || _suppressedVisual.Value;
     bool AllowsGauge => _model != null && _model.AllowsGaugeTransition;
     bool HoldsVulnerable => _model != null && _model.HoldsVulnerable;
     bool CrowdControlActive => _kbActive || _ccStun;
@@ -284,9 +288,17 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             return;
         }
 
-        Transform target = Target;
-        if (!MonsterTargeting.IsAttackable(target)) target = FindNearestPlayer();
-        if (target != null) AdoptTarget(target);
+        // 사거리 밖 타깃을 물고 있으면 사거리 안 최근접으로 갈아탄다 — 이동이 없어 그대로 두면 멀티에서 영원히 안 친다(base TrySwitchToInRangeTarget 은 이 틱에서 안 돈다).
+        Transform current = Target;
+        bool currentValid = MonsterTargeting.IsAttackable(current);
+        float currentDist = currentValid ? Vector3.Distance(transform.position, current.position) : float.MaxValue;
+        if (!currentValid || currentDist > data.attackRange)
+        {
+            Transform nearest = FindNearestPlayer();
+            float nearestDist = nearest != null ? Vector3.Distance(transform.position, nearest.position) : float.MaxValue;
+            if (!currentValid || TrainingSparringRules.ShouldSwitchToInRangeTarget(currentValid, currentDist, nearestDist, data.attackRange))
+                AdoptTarget(nearest);
+        }
         if (Target == null) return;
 
         FaceTarget();
@@ -352,7 +364,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
                                 palette: counterOpen ? BossAttackConeTelegraph.Palette.Interrupt : BossAttackConeTelegraph.Palette.Attack);
         if (counterOpen)
         {
-            Counter.Open();
+            Counter.Open(windup);   // 판정 타이머는 저작 길이 그대로(느리게 흘린다) — 시간표(할 일 191)에는 실제 닫힘인 예고 길이로 알린다
             if (Counter.IsOpen) ServerSetCounterWindow(true, windup);
         }
     }
@@ -414,7 +426,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         // 🔴 조건은 base 호출 전에 스냅샷한다 — base 가 상태를 바꿀 수 있다(23호와 같다).
         bool fromPlayer = IsFromPlayer(hitContext);
         bool interrupt = attackInfo.isInterruptAttack;
-        bool counter = IsServer && interrupt && _windupLeft > 0f && Counter != null && Counter.IsOpen
+        // 세션 중엔 성공을 피격으로 정하지 않는다 — 신고 승인(IInterruptClaimTarget, 할 일 191).
+        bool counter = IsServer && !InterruptManager.ServerVerifiesClaims && interrupt && _windupLeft > 0f && Counter != null && Counter.IsOpen
                        && !CounterBlockedByState && IsCounterFromFront(hitContext);
         // 취약 중 CC(할 일 157 ⑦): 간파 스킬 = 고정 거리 밀림, 넉백 세기 > 0 = 밀림(+ 경직 = 기절, 뇌진탕 = 밀림 끝 기절).
         // 넉백 없이 경직만 = 반응 없음(T32 결정 A — 실제 기절만 인정). T33 위치 복귀 중엔 새 CC 반응 없음.
@@ -493,6 +506,24 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         return TrainingSparringRules.IsFromFront(transform.forward, origin - transform.position,
             counterRules != null ? counterRules.counterFrontAngle : 0f, counterRules == null || counterRules.counterRequiresFront);
     }
+
+    // ─── 간파 신고 승인(할 일 191 — InterruptManager 가 검증한 뒤 부른다) ───
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) =>
+        IsServer && !_resetting && State != MonsterState.Dead && Counter != null;
+
+    // 창이 이미 닫혔어도(조기 닫힘 + 허용 오차, D7) 효과를 준다 — 열려 있으면 소비(닫힘 알림).
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster)
+    {
+        if (!IsServer || Counter == null) return;
+        Counter.TryConsumeInterrupt();
+        _interruptSuccessCount++;
+        EnterCounterSuccess();
+        PlayInterruptFlashRpc();
+        SyncModel();
+    }
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) =>
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, casterClientId);   // 결과 화면 통계 + 플레이어 성공 장부 — 동시 성공자 각자
 
     // 간파 성공 — 칸 감소(T34·T40) + 그로기 + 취약, 0 이면 제압. T31 은 그로기 + 취약만 — 이 순간 T31 완료, 취약은 T34 끝까지 유지된다.
     void EnterCounterSuccess()

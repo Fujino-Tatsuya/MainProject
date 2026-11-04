@@ -28,8 +28,23 @@ public sealed class SuppressHasteData : ScriptableObject
     [Tooltip("버프가 끝날 때 비네팅이 사라지는 시간(초).")]
     [SerializeField, Min(0f)] private float vignetteFadeOut = 0.3f;
 
+    [Header("화면 연출(3타 줌인, 할 일 174)")]
+    [Tooltip("내가 보스에게 맞힌 타격 이 횟수마다 내 화면만 짧게 줌인한다. 빗나감은 세지 않는다.")]
+    [SerializeField, Min(1)] private int hitZoomEveryHits = 3;
+    [Tooltip("줌인 때 카메라 거리 배율(0.9 = 10% 가까이). 1 = 줌 없음.")]
+    [SerializeField, Range(SuppressHasteHitZoom.MinZoomFactor, 1f)] private float hitZoomFactor = 0.9f;
+    [Tooltip("1 → 배율까지 들어가는 실시간(초).")]
+    [SerializeField, Min(0f)] private float hitZoomInSeconds = 0.02f;
+    [Tooltip("배율에 머무는 실시간(초).")]
+    [SerializeField, Min(0f)] private float hitZoomHoldSeconds = 0.11f;
+    [Tooltip("배율 → 1 로 돌아오는 실시간(초).")]
+    [SerializeField, Min(0f)] private float hitZoomReturnSeconds = 0.06f;
+
     public float VignetteFadeIn => vignetteFadeIn;
     public float VignetteFadeOut => vignetteFadeOut;
+
+    public SuppressHasteHitZoomValues HitZoomValues =>
+        new SuppressHasteHitZoomValues(hitZoomEveryHits, hitZoomFactor, hitZoomInSeconds, hitZoomHoldSeconds, hitZoomReturnSeconds);
 
     public SuppressHasteValues Values =>
         new SuppressHasteValues(moveSpeedMultiplier, attackSpeedMultiplier, cooldownRateMultiplier, durationOverride);

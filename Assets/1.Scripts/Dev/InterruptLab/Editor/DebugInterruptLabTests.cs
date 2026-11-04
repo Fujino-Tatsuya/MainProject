@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using UnityEditor;
+using UnityEngine;
 
 /// <summary>
 /// 간파 제작용 디버그 씬(할 일 115 C5)의 순수 규칙 — 배속 합성(<see cref="GlobalTimeScale"/>)과
@@ -244,5 +246,116 @@ public sealed class DebugInterruptLabTests
         {
             UnityEngine.Object.DestroyImmediate(go);
         }
+    }
+
+    // ---- 제압 간파 섬광 A6 토글(179) ----
+
+    [Test]
+    public void 제압_섬광_토글은_A6만_바꾼다()
+    {
+        var go = new UnityEngine.GameObject("Director");
+        var sequence = UnityEngine.ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            var so = new UnityEditor.SerializedObject(director);
+            so.FindProperty("suppressFlashSequence").objectReferenceValue = sequence;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            Assert.IsTrue(director.SuppressFlashEnabled, "기본 = A6 켬");
+            Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true));
+
+            director.SuppressFlashEnabled = false;
+            Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "끔 = 일반 간파 연출");
+            Assert.AreSame(sequence, director.SuppressFlashSequence, "끔은 컷 데이터를 그대로 둔다");
+
+            director.SuppressFlashEnabled = true;
+            Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "다시 켬");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+            UnityEngine.Object.DestroyImmediate(sequence);
+        }
+    }
+
+    [Test]
+    public void A7_섬광_범위_버튼은_상태를_표시한다()
+    {
+        Assert.AreNotEqual(DebugInterruptTuningPanel.TargetOnlyLabel(true), DebugInterruptTuningPanel.TargetOnlyLabel(false));
+        StringAssert.Contains("대상 내부만", DebugInterruptTuningPanel.TargetOnlyLabel(true));
+        StringAssert.Contains("전체 화면", DebugInterruptTuningPanel.TargetOnlyLabel(false));
+    }
+
+    [Test]
+    public void 제압_간파_재현은_꺼져_있으면_허수아비가_없어도_무해()
+    {
+        var repro = new DebugSuppressInterruptRepro();
+        Assert.IsFalse(repro.Enabled, "기본 끔 — 랩의 일반 간파 튜닝을 바꾸지 않는다");
+        repro.Refresh();
+        repro.Tick(0f);
+        Assert.AreEqual(0, repro.MarkedCount);
+        repro.Dispose();
+        Assert.AreEqual(0, repro.DummyCount);
+    }
+
+    // ---- 194 — 적중 라이트 연출 버전 버튼 ----
+
+    [Test]
+    public void 버전_버튼은_일반_대쉬_단계에_V0_V1_V2_V3와_암순응_가_나()
+    {
+        CollectionAssert.AreEqual(new[] { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash },
+            DebugInterruptTierPreview.VersionTiers, "제압은 시퀀스 고정");
+        CollectionAssert.AreEqual(new[] { "V0", "V1", "V2", "V3" },
+            System.Array.ConvertAll(DebugInterruptTierPreview.Versions, DebugInterruptTierPreview.VersionLabel));
+        Assert.AreEqual(2, DebugInterruptTierPreview.DarkAdaptModes.Length);
+        StringAssert.StartsWith("가", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.ScreenPass));
+        StringAssert.StartsWith("나", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.SceneLight));
+        Assert.AreEqual("[V1]", DebugInterruptTierPreview.Selected("V1", true));
+        Assert.AreEqual("V1", DebugInterruptTierPreview.Selected("V1", false));
+    }
+
+    [Test]
+    public void 버전_버튼으로_바꾼_단계_값이_다음_성공의_섬광을_고른다()
+    {
+        var go = new GameObject("Director");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            var so = new SerializedObject(director);
+            so.FindProperty("hitLightLook").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>("Assets/5.VFX/Interrupt/HitLight/InterruptHitLightLook.asset");
+            so.FindProperty("hitLightVfx").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<InterruptHitLightFx>("Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab");
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 패널 버튼과 같은 일 — 단계 설정 값을 바꾼다(런타임 값만).
+            director.TierProfile(InterruptPresentationTier.Normal).flash = InterruptTierFlash.HitLightWhiteout;
+            director.TierProfile(InterruptPresentationTier.Dash).flash = InterruptTierFlash.HitFlash;
+
+            Assert.AreEqual(InterruptSuccessLook.HitLightWhiteout, director.SuccessLook(InterruptPresentationTier.Normal));
+            Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Dash));
+            Assert.AreEqual("V2", DebugInterruptTierPreview.LookLabel(director.SuccessLook(InterruptPresentationTier.Normal)));
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
+    }
+
+    [Test]
+    public void V3_버튼은_암순응을_나로_맞추고_다른_버전은_암순응을_그대로_둔다()
+    {
+        var profile = new InterruptTierProfile(false, InterruptTierFlash.HitLight, InterruptDarkAdaptMode.ScreenPass);
+
+        DebugInterruptTuningPanel.SelectVersion(profile, InterruptTierFlash.HitLightReference);
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, profile.flash);
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, profile.darkAdapt, "V3 기본 = 나");
+
+        profile.darkAdapt = InterruptDarkAdaptMode.ScreenPass; // 누른 뒤 가로 다시 고를 수 있다
+        DebugInterruptTuningPanel.SelectVersion(profile, InterruptTierFlash.HitLightWhiteout);
+        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, profile.flash);
+        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, profile.darkAdapt, "V0~V2 는 암순응을 안 바꾼다");
+        Assert.AreEqual("V3", DebugInterruptTierPreview.LookLabel(InterruptSuccessLook.HitLightReference));
     }
 }

@@ -21,15 +21,8 @@
 public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 {
     [Header("연출")]
-    [Tooltip("조준 연출(낙뢰 + 칼날 전기) 전파 창구. 플레이어 루트의 PlayerSkillVfx 를 물린다. 비워두면 연출만 빠진다")]
-    [SerializeField] private PlayerSkillVfx skillVfx;
-
-    [Tooltip("슈퍼아머 구간 동안 몸에 덮을 오버레이. 'Paladin_Armature/tripo_part_0' 의 DissolveOverlay 를 물린다. 비워두면 연출만 빠진다")]
-    [SerializeField] private DissolveOverlay superArmorOverlay;
-
-    [Tooltip("클립 이벤트 PlayEffect(\"Stick\") 가 부르는 칼 꽂기 소켓('VFX/UltimateSkill/SwordStick', id Stick). 데이터의 이펙트 배율을 여기 넣는다.\n" +
-             "비워두면 Stick 만 저작 속도로 나온다")]
-    [SerializeField] private EffectSocketPlayer stickVfx;
+    [Tooltip("팔라딘 연출 창구(조준 낙뢰·칼날 전기·대상 표식·마무리 낙뢰·슈퍼아머 오버레이·칼 꽂기 배율). 플레이어 루트의 PaladinSkillView 를 물린다. 비워두면 연출만 빠진다")]
+    [SerializeField] private PaladinSkillView skillView;
 
     // Garen_Ultimate_Skill 상태 전용 속도 파라미터. 평타의 AttackSpeed 와 섞이지 않게 따로 둔다.
     private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
@@ -85,7 +78,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 여기는 서버에서만 돈다 — 그래서 창구를 거친다. 누구를 지목했는지는
         //    PlaySkillClientRpc 에 실려 가지 않아(SingleTarget 은 aimPoint 를 안 쓴다)
         //    리모트 클라가 알 방법이 없다.
-        skillVfx?.ServerPlayTargetFloor(lockedTarget, VfxPlayRate);
+        skillView?.ServerPlayTargetFloor(lockedTarget, VfxPlayRate);
 
         // 채널 동안 CC 면역. 채널은 이동 잠금(CanMoveWhileActive=false)만으로는 지킬 수 없다 —
         // 그건 내 입력을 막을 뿐이고, 남이 미는 것은 PlayerStateController.BeginKnockback 이
@@ -118,7 +111,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 RPC 가 필요 없다. 슈퍼아머를 거는 것은 OnServerStart(서버 전용)지만,
         //    그 '구간'은 스킬이 활성인 동안 그 자체라 OnClientPlay~OnEnd 로 정확히 같은 창을 그린다.
         //    두 콜백 모두 전 피어에서 돈다.
-        superArmorOverlay?.Show();
+        skillView?.ShowSuperArmor();
 
         // 🔴 여기도 전 피어다(서버는 TryStartSkillServer, 클라는 PlaySkillClientRpc → PlaySkillPresentation).
         //    방금 CrossFade 한 같은 프레임이라 첫 프레임부터 이 속도로 돈다. 원격 피어도 각자 같은 값을 넣는다.
@@ -128,20 +121,20 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             animator.SetFloat(UltimateSpeedHash, AnimationSpeed);
 
         // Stick 은 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.
-        stickVfx?.SetPlayRate(VfxPlayRate);
+        skillView?.SetStickPlayRate(VfxPlayRate);
     }
 
     /// <summary>[오너] R 을 눌러 조준에 들어갔다. 낙뢰를 바로 떨어뜨리고, 이어서 칼날에 전기가 흐른다.</summary>
     public override void OnOwnerAimStart()
     {
         // 오너 전용 경로라 로컬 재생만으로는 남에게 안 보인다 — 창구가 서버를 거쳐 나머지 피어에 뿌린다.
-        skillVfx?.OwnerPlayUltimateVfx(VfxPlayRate);
+        skillView?.OwnerPlayUltimateVfx(VfxPlayRate);
     }
 
     /// <summary>[오너] 시전까지 가지 못하고 조준이 물렸다. 연출을 걷는다.</summary>
     public override void OnOwnerAimCancelled()
     {
-        skillVfx?.OwnerStopUltimateVfx();
+        skillView?.OwnerStopUltimateVfx();
     }
 
     public override void OnTick()
@@ -162,7 +155,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 마무리 낙뢰. 애니 이벤트는 서버에서만 온다 — 그래서 창구(RPC)를 거친다.
         //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.
         if (eventType == SkillAnimationEventType.Custom0 && State == SkillState.Channeling && finalStrike.TryFire())
-            skillVfx?.ServerPlayTargetStrike(VfxPlayRate);
+            skillView?.ServerPlayTargetStrike(VfxPlayRate);
 
         // Hit = 피해(완주 판정) / End = 종료 — base 가 처리한다.
         base.OnAnimationEvent(eventType);
@@ -207,20 +200,20 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 여기는 RPC 가 필요 없다 — OnEnd 는 전 피어에서 돈다(서버는 EndActiveSkillServer,
         //    클라는 EndSkillClientRpc). 각 피어가 자기 몫을 걷으면 끝이다.
         //    조준만 하고 물린 경우는 이 경로를 타지 않는다 — 그쪽은 OnOwnerAimCancelled 가 받는다.
-        skillVfx?.StopUltimateVfxLocal();
-        skillVfx?.StopTargetFloorLocal();
+        skillView?.StopUltimateVfxLocal();
+        skillView?.StopTargetFloorLocal();
 
         // Custom0 에서 쏜 칼이 떨어지는 중에 완주 못 하고 끝났다 — 피해가 없으니 걷는다. 완주면 끝까지 재생한다.
         // 안전망 종료(MaxDurationReached)도 걷는다 — End 이벤트가 안 온 경우라 피해가 났어도 여기는 사유만 안다.
         if (FinalStrikeVfxSchedule.ShouldRecall(reason))
-            skillVfx?.StopTargetStrikeLocal();
+            skillView?.StopTargetStrikeLocal();
 
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)
             owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);
 
         // 🔴 종료 사유를 가리지 않는다 — 취소·사망·안전망 만료 어느 쪽으로 끝나도 오버레이가 남지 않는다.
-        superArmorOverlay?.Hide();
+        skillView?.HideSuperArmor();
     }
 
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.

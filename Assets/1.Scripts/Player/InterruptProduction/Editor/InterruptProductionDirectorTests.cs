@@ -118,8 +118,11 @@ public sealed class InterruptProductionDirectorTests
     public void 시도_목적별_프로필_선택()
     {
         var settings = new InterruptProductionStageTests.FakeSettings();
-        Assert.AreSame(settings.Attempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, settings));
-        Assert.AreSame(settings.Weak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, settings));
+        Assert.AreSame(settings.Attempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Normal, settings));
+        Assert.AreSame(settings.Weak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Normal, settings));
+        // 대쉬 간파 시도 = 대쉬 전용(194 후속 2)
+        Assert.AreSame(settings.DashAttempt, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.Attempt, InterruptVariant.Dash, settings));
+        Assert.AreSame(settings.DashWeak, InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Dash, settings));
     }
 
     [TestCase(SlowMotionPurpose.Attempt, 0.7f)]
@@ -130,42 +133,15 @@ public sealed class InterruptProductionDirectorTests
         Assert.AreEqual(expected, InterruptProductionRules.SelectOwnerZoomFactor(purpose, 0.7f, 0.93f, 0.85f));
     }
 
-    // 시도 예측 창 추정(InterruptLagMonitor.EstimateWindow 의 재료) — 열린 뒤 경과·추정 길이
-    [Test]
-    public void 창_기록_지금_열린_시각과_닫혀_있으면_없음()
-    {
-        var history = new InterruptWindowHistory();
-        history.Record(1.0, true);
-        history.Record(1.5, false);
-        history.Record(3.0, true);
-        Assert.IsTrue(history.TryGetOpenSince(3.2, out double since));
-        Assert.AreEqual(3.0, since, 1e-9);
-        Assert.IsFalse(history.TryGetOpenSince(2.0, out _), "닫힌 구간");
-        Assert.IsFalse(new InterruptWindowHistory().TryGetOpenSince(1.0, out _), "기록 없음");
-    }
-
-    [Test]
-    public void 창_추정_길이는_완결된_열림의_중앙값()
-    {
-        var history = new InterruptWindowHistory();
-        Assert.IsFalse(history.TryGetTypicalOpenDuration(out _));
-        history.Record(0.0, true);
-        history.Record(0.4, false);
-        history.Record(1.0, true);
-        history.Record(1.6, false);
-        history.Record(2.0, true);
-        history.Record(2.5, false);
-        history.Record(3.0, true); // 아직 열림 — 길이에 안 들어간다
-        Assert.IsTrue(history.TryGetTypicalOpenDuration(out double duration));
-        Assert.AreEqual(0.5, duration, 1e-9);
-    }
+    // 시도 예측 창 추정(InterruptLagMonitor.EstimateWindow — 열린 뒤 경과·관측 중앙값) 테스트는 할 일 191 5단계에서 추정과 함께 삭제했다.
 
     [Test]
     public void 새_디렉터_줌_배율_기본값_강_0_7_약_0_93()
     {
-        var so = new SerializedObject(CreateDirector());
-        Assert.AreEqual(0.7f, so.FindProperty("interruptZoomFactor").floatValue, 1e-6f);
-        Assert.AreEqual(0.93f, so.FindProperty("interruptWeakZoomFactor").floatValue, 1e-6f);
+        // 194 후속 2 — 줌 칸은 슬로우 SO 로 옮겼다. SO 가 빈 새 디렉터는 코드 기본값 인스턴스를 읽는다.
+        var director = CreateDirector();
+        Assert.AreEqual(0.7f, director.SlowMotion.InterruptZoomFactor, 1e-6f);
+        Assert.AreEqual(0.93f, director.SlowMotion.InterruptWeakZoomFactor, 1e-6f);
     }
 
     // ─── A1 히트스톱 ───

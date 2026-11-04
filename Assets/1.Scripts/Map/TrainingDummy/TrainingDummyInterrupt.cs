@@ -32,8 +32,8 @@ public interface ITrainingDummyWindowGate
     bool TickWindowOpen(float deltaTime, bool recovering);
 
     /// <summary>
-    /// 이 게이트가 여는 열림 하나의 길이(게임초, 할 일 139-6 — 간파 시도 예측의 창 길이). +∞ = 시간으로 닫히지 않음.
-    /// 서버 값이다 — 예측은 서버만 이 값을 쓴다(<see cref="InterruptWindowLengthResolver.ForTrainingDummy"/>).
+    /// 이 게이트가 여는 열림 하나의 길이(게임초). +∞ = 시간으로 닫히지 않음.
+    /// 서버 값이다 — 창이 열릴 때 InterruptManager 창 시간표의 닫힘 예정으로 알린다(할 일 191 5단계, 모든 피어에 복제).
     /// </summary>
     float OpenWindowLength { get; }
 }
@@ -59,7 +59,7 @@ public interface ITrainingDummyWindowGate
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TrainingDummy))]
 [DataTableSheet("Map", Order = 0)]
-public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink
+public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IInterruptJudgeTarget, IInterruptClaimTarget
 {
     [Header("순환")]
     [SerializeField, Min(0f), FormerlySerializedAs("groggyDuration")]
@@ -116,6 +116,18 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
     // 할 일 132 — 오너 클라 간파 시도 예측이 읽는 창 복제값(_state). 이미 복제되던 값이라 전송 추가 없음.
     bool IInterruptWindowReplica.ReplicatedWindowOpen => IsInterruptible;
 
+    // 간파 판정 스냅샷(할 일 191) — 취약 중엔 간파가 데미지만 들어간다(창 닫힘과 같은 뜻).
+    bool IInterruptJudgeTarget.InterruptBlockedByState => IsVulnerable;
+
+    // 간파 신고 승인(할 일 191) — 성공 효과 = 피격 경로와 같은 ServerTryInterrupt(창이 이미 닫혔으면 아무 일 없음 — 허수아비 창은 성공으로만 닫힌다).
+    // 개인 통계는 없다 — SessionStatsTracker 가 허수아비를 집계에서 뺀다.
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) => IsServer && _cycle != null;
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster) =>
+        ServerTryInterrupt(casterClientId, caster);
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) { }
+
     /// <summary>[서버] 인터럽트 성공. 취약 진입 직후에 한 번 발화한다.</summary>
     public event Action<TrainingDummyInterruptSuccess> ServerInterruptSucceeded;
 
@@ -147,6 +159,7 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
             _state.Value = _cycle.State;
             ServerRefreshSuperArmor();
             InterruptLagMonitor.RecordWindow(gameObject, IsInterruptible);   // 간파 지연 측정 — 시작 상태(이후는 OnStateChanged)
+            ServerReportWindowToManager(IsInterruptible);   // 간파 창 시간표(할 일 191)
         }
 
         _state.OnValueChanged += OnStateChanged;
@@ -233,8 +246,17 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMot
         ApplyTint(current);
         // 간파 지연 측정(측정만) — 서버에서만 기록된다(RecordWindow 가 거른다).
         InterruptLagMonitor.RecordWindow(gameObject, current == TrainingDummyInterruptState.Interruptible);
-        // 오너 클라 간파 시도 예측용 창 기록(할 일 132) — 클라에서만 기록된다(Record 가 거른다).
+        // 간파 창 시간표(할 일 191) — 서버에서만 기록·배포된다(ServerReportWindow 가 거른다).
+        ServerReportWindowToManager(current == TrainingDummyInterruptState.Interruptible);
+        // 복제 창 전이 — 로컬 선착순 장부 초기화(할 일 143-2, Record 가 세션 밖을 거른다).
         InterruptWindowReplicaTracker.Record(gameObject, current == TrainingDummyInterruptState.Interruptible);
+    }
+
+    // 무기한 창이라 기본은 길이 모름. 랩 게이트(주기 창, 할 일 139)가 걸려 있으면 그 열림 길이를 닫힘 예정으로 알린다(할 일 191 5단계 — 매니저 예측이 주기 창을 본다).
+    void ServerReportWindowToManager(bool open)
+    {
+        float length = open && _windowGate != null ? _windowGate.OpenWindowLength : -1f;
+        InterruptManager.ServerReportWindow(gameObject, open, length);
     }
 
     // BossCounterTelegraph 와 같은 방식 — 베이스 틴트로 넣어야 피격 플래시가 이 색 위에서 Lerp 하고 끝나도 돌아온다.

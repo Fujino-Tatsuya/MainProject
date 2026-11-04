@@ -67,6 +67,7 @@ internal static class LobbyTutorialUIAuthoring
             binderSo.ApplyModifiedPropertiesWithoutUndo();
 
             DisableRaycasts(root);
+            NormalizeBeforeSave(root);
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Debug.Log($"[LobbyTutorialUIAuthoring] {(exists ? "갱신" : "생성")}: {PrefabPath}");
         }
@@ -77,6 +78,19 @@ internal static class LobbyTutorialUIAuthoring
             else
                 Object.DestroyImmediate(root);
         }
+    }
+
+    /// <summary>
+    /// 할 일 181 — 저장 직전에 레이아웃·TMP 를 한 번 돌려, 씬이 올라와 캔버스가 갱신될 때 UGUI·TMP 가 바꿔 쓰는 값을
+    /// 프리팹에 미리 넣는다(레이아웃 그룹이 drive 하는 자식 RectTransform = 0, TMP <c>m_TextStyleHashCode</c> = Normal 해시).
+    /// 안 하면 그 차이가 씬 인스턴스 오버라이드로 남는다(Docs/tech/lobby-tutorial-ui.md).
+    /// </summary>
+    private static void NormalizeBeforeSave(GameObject root)
+    {
+        foreach (var group in root.GetComponentsInChildren<LayoutGroup>(true))
+            LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)group.transform);
+        foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
+            text.ForceMeshUpdate(true, true);
     }
 
     private static void BuildRoot(GameObject root)

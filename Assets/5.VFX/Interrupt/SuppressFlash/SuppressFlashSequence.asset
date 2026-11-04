@@ -1,0 +1,110 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d487a4927727fdb46bd673218b828849, type: 3}
+  m_Name: SuppressFlashSequence
+  m_EditorClassIdentifier: Assembly-CSharp::SuppressFlashSequence
+  frameRate: 24
+  holdFrames: 2
+  cuts:
+  - frames: 2
+    tone: 0
+    cross: 1
+    starSize: 1
+    speedLines: 0.5
+    aberration: 0.2
+    aberrationEnd: 0.2
+    hatching: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  - frames: 2
+    tone: 1
+    cross: 2
+    starSize: 0.45
+    speedLines: 0.2
+    aberration: 0.5
+    aberrationEnd: 0.5
+    hatching: 1
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  - frames: 2
+    tone: 0
+    cross: 1
+    starSize: 1.25
+    speedLines: 1
+    aberration: 0.3
+    aberrationEnd: 0.3
+    hatching: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  - frames: 2
+    tone: 1
+    cross: 1
+    starSize: 0.7
+    speedLines: 0.6
+    aberration: 1
+    aberrationEnd: 1
+    hatching: 1
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  - frames: 2
+    tone: 0
+    cross: 1
+    starSize: 1.9
+    speedLines: 1
+    aberration: 0.4
+    aberrationEnd: 0.4
+    hatching: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  - frames: 2
+    tone: 1
+    cross: 0
+    starSize: 0
+    speedLines: 0.15
+    aberration: 0.6
+    aberrationEnd: 0.6
+    hatching: 1
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  - frames: 3
+    tone: 2
+    cross: 0
+    starSize: 0
+    speedLines: 0
+    aberration: 0.8
+    aberrationEnd: 0
+    hatching: 0
+    dark: {r: 0.10980392, g: 0.09803922, b: 0.1882353, a: 1}
+    mid: {r: 0.49019608, g: 0.46666667, b: 0.627451, a: 1}
+    light: {r: 0.9254902, g: 0.9137255, b: 0.9647059, a: 1}
+  crossWidth: 0.07
+  crossTaper: 1.6
+  crossRoughness: 0.45
+  crossMinWidth: 0.008
+  gridCell: 0.32
+  gridStarRadius: 0.12
+  starRadius: 0.2
+  starSpikes: 11
+  speedLineCount: 72
+  radialBlur: 0.35
+  darkThreshold: 0.3
+  lightThreshold: 0.62
+  sceneExposure: 0.8
+  hatchPeriodPixels: 12
+  aberrationScale: 0.025
+  reducedContrast: 0.45

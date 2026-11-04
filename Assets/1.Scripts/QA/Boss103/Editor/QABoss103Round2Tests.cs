@@ -364,11 +364,15 @@ public sealed class QABoss103Round2Tests
     {
         string[] c = QABoss103Metrics.CharsHeader;
         int rules = QABoss103CharRules.Count;
-        Assert.AreEqual("qa_wall_escapes", c[c.Length - rules - 2]);
-        Assert.AreEqual("lethal_no_roll", c[c.Length - rules - 1]);
-        Assert.AreEqual("counter_roll_success", c[c.Length - rules - 3], "C7e 끝 열 뒤");
+        int claims = QABoss103Metrics.ClaimColumns.Length;   // 할 일 193 — 간파 신고 열이 규칙 열 뒤 맨 끝
+        int end = c.Length - claims;
+        Assert.AreEqual("qa_wall_escapes", c[end - rules - 2]);
+        Assert.AreEqual("lethal_no_roll", c[end - rules - 1]);
+        Assert.AreEqual("counter_roll_success", c[end - rules - 3], "C7e 끝 열 뒤");
         for (int i = 0; i < rules; i++)
-            Assert.AreEqual(QABoss103CharRules.Tokens[i], c[c.Length - rules + i], "C2 규칙 열이 맨 끝");
+            Assert.AreEqual(QABoss103CharRules.Tokens[i], c[end - rules + i], "C2 규칙 열 뒤에 193 열");
+        for (int i = 0; i < claims; i++)
+            Assert.AreEqual(QABoss103Metrics.ClaimColumns[i], c[end + i], "193 간파 신고 열이 맨 끝");
         string[] p = QABoss103Metrics.PatternsHeader;
         Assert.AreEqual("lethal_no_roll", p[p.Length - 1]);
         Assert.AreEqual("deaths", p[p.Length - 2]);

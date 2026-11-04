@@ -7,7 +7,7 @@ using VeyTrace.RuntimeSafety;
 
 // MapScene camera manager. It creates one render camera and two identical
 // Cinemachine cameras, then switches their priorities for normal/fall views.
-[DataTableSheet("SlowMotion", Order = 1)]
+// 테이블 칸 없음 — 성공 줌 배율(slowMotionZoomFactor)은 슬로우 SO(InterruptSlowMotionSettings)로 옮겼다(194 후속 2).
 public class CameraTargetSwitcher : MonoBehaviour
 {
     public static CameraTargetSwitcher Active { get; private set; }
@@ -23,13 +23,18 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     [SerializeField] private GameObject mainCameraPrefab;
     [SerializeField] private GameObject followCameraPrefab;
-    // 블렌드 길이는 카메라 연출 정렬 값이라 테이블에 내지 않는다 — 이 컴포넌트가 내는 건 슬로우 줌 배율뿐.
+    // 블렌드 길이는 카메라 연출 정렬 값이라 테이블에 내지 않는다.
     [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
     [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
-    [Tooltip("내가 일으킨 간파 성공 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10). 시도 강·약 배율은 InterruptProductionDirector 칸(할 일 132). 시도에서 이어진 성공은 둘 중 더 깊은 쪽(강 0.7 → 성공은 0.7 유지)")]
-    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = 0.85f;
+    [Tooltip("슬로우 SO(InterruptSlowMotionSettings) — 간파 적중 성공 줌 배율 slowMotionZoomFactor 를 매 프레임 읽는다(194 후속 2). 비면 0.85")]
+    [DataTableIgnore]
+    [SerializeField] private InterruptSlowMotionSettings slowMotionSettings;
+
+    // 성공 줌 배율 — 시도 강·약 배율은 같은 SO 를 디렉터가 읽는다(할 일 132). 시도에서 이어진 성공은 둘 중 더 깊은 쪽.
+    private float SlowMotionZoomFactor =>
+        slowMotionSettings != null ? slowMotionSettings.SlowMotionZoomFactor : InterruptSlowMotionSettings.DefaultSlowMotionZoomFactor;
 
     // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
     private GameObject mainCameraInstance;
@@ -47,6 +52,10 @@ public class CameraTargetSwitcher : MonoBehaviour
     private Vector3 basePlayerFollowOffset;
     private readonly SlowMotionOwnerZoom ownerSlowZoom = new();
     private float appliedZoomMultiplier = 1f;
+    // 제압 가속 3타 줌인(할 일 174). 수치는 SuppressHasteData 시트 칸 — 이 컴포넌트의 테이블 칸이 아니다.
+    private readonly SuppressHasteHitZoom suppressHasteHitZoom = new();
+    private SuppressHasteData suppressHasteData;
+    private bool suppressHasteDataLoaded;
     // 연출 카메라 거리 배율(로비 포드 강하 — 할 일 100). 슬로우 줌 배율과 곱한다. 1 = 평소.
     private float cinematicDistanceMultiplier = 1f;
     private Quaternion fixedCameraRotation;
@@ -322,7 +331,7 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         bool mine = slowActive && timeScale.CurrentTriggerClientId == networkManager.LocalClientId &&
                     !IsInFallView && !IsSpectatorMode;
-        // 내 간파 한 건(시도 → 성공) = 줌인 1·줌아웃 1(할 일 132). 강·약 시도 배율 = 디렉터 칸(A3), 성공 = 이 칸.
+        // 내 간파 한 건(시도 → 성공) = 줌인 1·줌아웃 1(할 일 132). 강·약 시도·성공 배율 = 슬로우 SO 칸(A3 켜기/끄기는 디렉터).
         // 강 시도 결론 전이면 시도 복귀 중에도 줌을 붙잡는다 — 디렉터 오너 상태를 묻기만 한다(GlobalTimeScale 직접 구독 없음).
         var input = new SlowMotionOwnerZoomInput { Mine = mine };
         if (mine)
@@ -332,12 +341,16 @@ public class CameraTargetSwitcher : MonoBehaviour
             input.Phase = timeScale.CurrentPhase;
             input.CurrentScale = timeScale.CurrentScale;
             input.ProfileScale = timeScale.CurrentProfileScale;
-            input.ZoomFactor = InterruptProductionDirector.OwnerZoomFactor(timeScale.CurrentPurpose, slowMotionZoomFactor);
+            input.ZoomFactor = InterruptProductionDirector.OwnerZoomFactor(timeScale.CurrentPurpose, SlowMotionZoomFactor);
             input.AwaitingStrongResult = InterruptProductionDirector.OwnerAwaitsStrongResult;
         }
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
-        float multiplier = ownerSlowZoom.Step(input, Time.unscaledDeltaTime) * cinematicDistanceMultiplier;
+        float slowMultiplier = ownerSlowZoom.Step(input, Time.unscaledDeltaTime);
+        // 제압 가속 3타 줌인 — 슬로우 줌이 걸린 프레임엔 건너뛴다(1). 두 줌이 동시에 1 이 아닌 경우는 없다(suppress-haste.md §2.2).
+        float hitZoomMultiplier = suppressHasteHitZoom.Step(IsLocalSuppressHasteActive(), slowMultiplier != 1f,
+            Time.unscaledDeltaTime, LoadHitZoomValues());
+        float multiplier = slowMultiplier * hitZoomMultiplier * cinematicDistanceMultiplier;
 
         // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
         if (multiplier == appliedZoomMultiplier)
@@ -348,6 +361,33 @@ public class CameraTargetSwitcher : MonoBehaviour
         // 원래 오프셋에서 다시 계산한다 — 복귀가 끝나면(배율 1) 정확히 원래 값으로 돌아온다.
         playerCameraFollow.FollowOffset = basePlayerFollowOffset * multiplier;
         appliedZoomMultiplier = multiplier;
+    }
+
+    /// <summary>
+    /// [로컬] 내가 보스에게 맞힌 타격 1회(<see cref="UnitCameraFeedbackReporter"/> 가 서버 확정 피해 RPC 마다 부른다).
+    /// 제압 가속 중이면 세어 N타마다 짧게 줌인한다(할 일 174). 낙하 뷰·관전 중엔 세지 않는다.
+    /// </summary>
+    public void ReportLocalBossHit()
+    {
+        if (IsInFallView || IsSpectatorMode)
+        {
+            return;
+        }
+
+        suppressHasteHitZoom.RegisterHit(IsLocalSuppressHasteActive(), LoadHitZoomValues().EveryHits);
+    }
+
+    private static bool IsLocalSuppressHasteActive() => SuppressHastePresence.IsActive(Player.LocalPlayer);
+
+    private SuppressHasteHitZoomValues LoadHitZoomValues()
+    {
+        if (!suppressHasteDataLoaded)
+        {
+            suppressHasteData = Resources.Load<SuppressHasteData>(SuppressHasteData.ResourcesPath);
+            suppressHasteDataLoaded = true;
+        }
+
+        return suppressHasteData != null ? suppressHasteData.HitZoomValues : SuppressHasteHitZoomValues.Default;
     }
 
     /// <summary>

@@ -194,6 +194,62 @@ public sealed class MapSceneDeathRulesTests
         Assert.That(o.InPlace, Is.True);
     }
 
+    // ─── 보스방 도착 뒤(PLAN-auto-revive.md) ─────────────────────────────
+
+    [Test]
+    public void 보스방_사망은_3초뒤_그자리_목숨1개_차감_부활()
+    {
+        var m = new MapSceneDeathRulesModel();
+        m.RecordBossRoomDeath(A, 10d);
+
+        Assert.That(m.IsPenaltyFree(A), Is.False, "사망 목적지는 공용 목숨으로 정한다(0 → 관전)");
+        Assert.That(Eval(m, A, 12.9d, PlayerLifeState.Soul, false, out _), Is.EqualTo(MapSceneReviveVerdict.Waiting), "그 자리여도 대기는 지킨다");
+        Assert.That(Eval(m, A, 13d, PlayerLifeState.Soul, false, out MapSceneReviveOrder o), Is.EqualTo(MapSceneReviveVerdict.Revive));
+        Assert.That(o.ConsumeLife, Is.True);
+        Assert.That(o.InPlace, Is.True);
+        Assert.That(MapSceneDeathRulesModel.RevivesAtBossEnterPoint(o, finished: true), Is.False, "보스 진입 고정 지점으로 끌려가지 않는다");
+    }
+
+    [Test]
+    public void 보스방_사망_목숨0_완전사망이면_기록을_버린다()
+    {
+        var m = new MapSceneDeathRulesModel();
+        m.RecordBossRoomDeath(A, 0d);
+        Assert.That(Eval(m, A, 1d, PlayerLifeState.PermanentDead, false, out _), Is.EqualTo(MapSceneReviveVerdict.Dropped));
+        Assert.That(m.HasPending(A), Is.False);
+    }
+
+    [Test]
+    public void 보스방_사망은_사망연출중이면_Soul을_기다리고_잠금이면_보류()
+    {
+        var m = new MapSceneDeathRulesModel();
+        m.RecordBossRoomDeath(A, 0d);
+        Assert.That(Eval(m, A, 3d, PlayerLifeState.DeadPresentation, false, out _), Is.EqualTo(MapSceneReviveVerdict.WaitingForSoul));
+        Assert.That(Eval(m, A, 4d, PlayerLifeState.Soul, true, out _), Is.EqualTo(MapSceneReviveVerdict.BlockedByCinematic));
+        Assert.That(Eval(m, A, 5d, PlayerLifeState.Soul, false, out MapSceneReviveOrder o), Is.EqualTo(MapSceneReviveVerdict.Revive));
+        Assert.That(o.WasBlocked, Is.True);
+        Assert.That(o.ConsumeLife, Is.True);
+    }
+
+    [Test]
+    public void 보스방_사망은_다른경로로_살아나면_기록을_버린다()
+    {
+        var m = new MapSceneDeathRulesModel();
+        m.RecordBossRoomDeath(A, 0d);
+        Assert.That(Eval(m, A, 1d, PlayerLifeState.Alive, false, out _), Is.EqualTo(MapSceneReviveVerdict.Dropped), "F10 등 — 이중 차감 없음");
+    }
+
+    [Test]
+    public void 이동시작이나_종료변환은_보스방_대기를_즉시로_바꾼다()
+    {
+        var m = new MapSceneDeathRulesModel();
+        m.RecordBossRoomDeath(A, 0d);
+        Assert.That(m.ConvertAllToInPlace(), Is.EqualTo(1), "그 자리지만 대기 중인 기록도 즉시로");
+        Assert.That(m.ConvertAllToInPlace(), Is.Zero);
+        Assert.That(Eval(m, A, 0.1d, PlayerLifeState.Soul, false, out MapSceneReviveOrder o), Is.EqualTo(MapSceneReviveVerdict.Revive));
+        Assert.That(o.ConsumeLife, Is.True);
+    }
+
     // ─── 연출 잠금 ───────────────────────────────────────────────────────
 
     [Test]

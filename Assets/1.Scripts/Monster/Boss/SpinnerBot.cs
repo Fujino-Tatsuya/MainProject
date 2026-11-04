@@ -20,7 +20,7 @@ using UnityEngine.AI;
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
 [DataTableSheet("MidBoss", Order = 1)]
-public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor
+public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindowReplica, IInterruptCueSink, IMonsterStateSuperArmor, IInterruptClaimTarget
 {
     // 할 일 134 — 취약 밖(공격 밖 평상 포함) 상시 슈퍼아머 = 밀치기·기절·뇌진탕 거부, 취약 = 허용(BossCrowdControlRules).
     // 튜토리얼 연습 개체(Override 주입)는 제외 — 자기 슈퍼아머를 직접 건다(TutorialSpinnerPractice).
@@ -343,6 +343,13 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
         base.TakeDamage(attackInfo);
 
         if (!IsServer || !attackInfo.isInterruptAttack) return;
+        // 세션 중엔 성공을 피격으로 정하지 않는다 — 신고 승인(IInterruptClaimTarget, 할 일 191). 창 밖 적중 알림만 남긴다.
+        if (InterruptManager.ServerVerifiesClaims)
+        {
+            if (Counter == null || !Counter.IsOpen)
+                Override?.NotifyInterruptHit(DamageAttackerClientId);
+            return;
+        }
         if (Counter == null || !Counter.TryConsumeInterrupt())
         {
             // 창 밖 간파 적중 — 튜토리얼(연계 연습)만 취약 밀치기로 쓴다. 구현체가 없으면 기존처럼 아무 일 없음.
@@ -354,6 +361,21 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
+
+    // ─── 간파 신고 승인(할 일 191) — 창이 이미 닫혔어도(조기 닫힘 + 허용 오차) 효과를 준다(D7) ───
+    bool IInterruptClaimTarget.ServerAcceptsInterruptClaim(ulong casterClientId) =>
+        IsServer && State != MonsterState.Dead && Counter != null;
+
+    void IInterruptClaimTarget.ServerApplyInterruptSuccessEffect(ulong casterClientId, Unit caster)
+    {
+        if (!IsServer || Counter == null) return;
+        Counter.TryConsumeInterrupt();   // 열려 있으면 소비(닫힘 알림), 닫혔으면 그대로
+        _interruptSuccessCount++;
+        CounterSucceeded();
+    }
+
+    void IInterruptClaimTarget.ServerRecordInterruptSuccess(ulong casterClientId) =>
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, casterClientId);
 
     // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
     int _interruptSuccessCount;   // 누적만 한다 — 값 자체가 아니라 타격 전후 비교용

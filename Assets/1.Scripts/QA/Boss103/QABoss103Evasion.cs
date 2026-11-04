@@ -448,39 +448,3 @@ public static class QABoss103Counter
         return Math.Acos(cos) * 180.0 / Math.PI <= limitDeg + 1e-6;
     }
 }
-
-/// <summary>
-/// 23호 간파 창 길이 추정(창 길이는 복제되지 않는다) — <c>QAInterruptBot88</c> 처럼 관측한 열림→닫힘 간격을 최근 <see cref="Capacity"/> 개 모은다.
-/// 88 은 최댓값을 쓰지만 103 은 창 종류(돌진·착지·레이드)가 섞여 <b>최솟값</b>을 쓴다 — 성공 굴림이 닫힘 뒤로 밀리지 않게 하는 보수 선택.
-/// </summary>
-public sealed class QABoss103WindowEstimate
-{
-    public const int Capacity = 5;
-    /// <summary>이보다 긴 관측(초)은 버린다 — 열림을 놓친 뒤 늦게 본 닫힘 등.</summary>
-    public const double MaxSampleSeconds = 6.0;
-
-    private readonly Queue<double> _samples = new Queue<double>();
-
-    public int Count => _samples.Count;
-
-    public void Add(double seconds)
-    {
-        if (!(seconds > 0.0) || seconds > MaxSampleSeconds)
-            return;
-        _samples.Enqueue(seconds);
-        while (_samples.Count > Capacity)
-            _samples.Dequeue();
-    }
-
-    /// <summary>추정 창 길이(ms) — 표본 최솟값, 없으면 <see cref="QABoss103Counter.DefaultWindowMs"/>.</summary>
-    public double EstimateMs()
-    {
-        if (_samples.Count == 0)
-            return QABoss103Counter.DefaultWindowMs;
-        double min = double.MaxValue;
-        foreach (double s in _samples)
-            if (s < min)
-                min = s;
-        return min * 1000.0;
-    }
-}

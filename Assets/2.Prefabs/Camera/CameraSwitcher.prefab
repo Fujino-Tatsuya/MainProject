@@ -46,3 +46,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CameraTargetSwitcher
   mainCameraPrefab: {fileID: 2081724482138444043, guid: f8697ce77f472cc4b991b6e682c75d40, type: 3}
   followCameraPrefab: {fileID: 4088614740118131497, guid: 7a242e4740ec7734192929508d927d93, type: 3}
+  slowMotionSettings: {fileID: 11400000, guid: 311d260bdd940f441b0c2cd45d1afe7f, type: 2}

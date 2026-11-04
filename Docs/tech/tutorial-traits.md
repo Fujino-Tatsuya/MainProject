@@ -233,6 +233,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 분류·도움말 줄 추가 (배치 유지)` — 지금 프리팹에 빠진 줄만 더한다(글꼴은 옆 글자에서 복사, 이미 있으면 저장 안 함).
   전체 재생성 메뉴(`특성 선택 UI 프리팹 생성`)는 손으로 다듬은 배치를 덮어쓰므로 쓰지 않는다(글꼴 경로는 서울알림으로 고쳐 두었다). 카드 아트만 바꿀 땐 아래 §11.1.1 메뉴.
 - 설명 = 템플릿 → `TraitTooltip.FormatDescription`(`SkillTooltipFormatter`). 실패하면 `[오류: …]`(`UI.SkillTooltip.Error`) + 경고 — 스킬 툴팁과 같은 관례. 획득 아이콘 호버 툴팁도 같은 문구.
+- 획득 아이콘 호버 툴팁(`AcquiredTooltip`, 폭 380 · `ContentSizeFitter` 로 높이가 글자에 맞음 · 여백 14 상하 같음)의 `Name`·`Description` = `MidlineLeft`(할 일 177). 글자 칸 높이 = 글자 높이라 `Left`(Middle)는 `TopLeft` 와 똑같이 보여서, 글자 모양 기준 Midline 으로 상자 안 세로 가운데에 놓는다. 레이아웃(childAlignment UpperLeft·여백)은 그대로.
 
 #### 11.1.1 카드 C1 아트 (할 일 165)
 
@@ -250,7 +251,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | `SkillMask` → `SkillIcon` | `TraitCard_C1_SkillMask` + `Mask`(마스크 그림 숨김), 안에 **강화하는 스킬 아이콘** 132x132(아래 출처 규칙) | 45, 182, 136x136 (아이콘 47, 184) |
 | `SkillFrame` | `TraitCard_C1_SkillFrame` — 프레임·마스크·아이콘 중심 (113, 250) 동일 | 37, 174, 152x152 |
 | `Keycap` | 키캡/마우스 하나 — 스프라이트만 바꿈(비율 유지 38x41 상자 → 키캡 38x40·마우스 30x41). 키 입력이 아닌 특성은 숨김 | 94, 335, 38x41 |
-| `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22 | 224, 170, 288x170 |
+| `Description` | 서울알림 Medium 22, 줄 높이 34px(글꼴 기본 줄 높이에서 `lineSpacing` 계산), 자동 축소 16~22, 왼쪽·**세로 가운데**(`Left` = Middle, 할 일 177) | 224, 170, 288x170 |
 
 - 키캡 판정 = `TraitKeycapRule.FromIconName`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): 아이콘 스프라이트 이름을 `_` 로 나눈 토큰 중 `Q`/`E`/`R`/`LMB`/`RMB` 와 **정확히 같은 첫 토큰**의 키. 키 뒤 접미사(`_Q_Change`·`_E_Trans`·`_R_Remove`)도 그 키, 키 토큰이 없으면(`Passive`·`Heat`·`Heat_Remove`·`Passive_Change`) `Blank` = **키캡 숨김**(피드백 1 — `Keycap_Blank` 는 카드에서 안 쓴다). 아이콘이 없으면 `Blank`.
 - 스킬 슬롯 그림 출처(피드백 1) = `TraitCardSkillRule.SourceOf(키캡)`(순수 함수 한 곳, 테스트 `TraitKeycapTests`): Q → `PlayerSkillSlot.Main`, E → `Sub`, R → `Ultimate`, RMB → `Interrupt`, `Blank` → 패시브, LMB → **기본 공격 아이콘**(`BasicAttack` — 카드 칸 `basicAttackIcon` = `Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png`, 흰색 검).
@@ -345,11 +346,14 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 - **진입** = 툴바 Dev Boot 드롭다운 → `DebugTraitLab` → Play. 빌드 목록에 없다(Dev Boot 가 Play 동안만 넣고 뺀다 — DebugInterruptLab 과 같다). 호스트 1인 기준.
 - **씬** = 원점 스폰 · 허수아비 일렬 3개(z 5·7·9, 관통·연사) + 따로 1개(6, 0, 4) · `TraitDirector.prefab`(4.MapScene 과 같은 프리팹) · 카메라·대시 검증·피해 숫자.
+- **아군 허수아비** `AllyDummy`(-4, 0, 2) = `DebugAllyDummy`(거너 모델 · 최대 1000 · 시작 50% · 안 맞음·자연 회복 없음) + `VFX/States/PlayerOneShotVfxPresenter`·`StatusEffectVfxPresenter`(몸 = `VFX/Body`) + `PlayerShieldVfx`(보호막 배리어). 스폰 때 `PlayerTraitEffects.DevShareRecipients`(개발 빌드 전용)에 등록돼 **나누는 불굴 후보**에 낀다 — 1인 랩에서 전이 리본·아군 힐 확인용. Dev Boot 는 MPPM 클론도 호스트로 띄워 클라가 이 랩에 붙지 않는다.
 - **왼쪽 OnGUI 패널**(`Dev/TraitLab/DebugTraitLab.cs`):
   - 캐릭터 = 팔라딘·거너·어쌔신 버튼 또는 **F1** 순환(`DebugCharacterCycle`, 같은 자리 재스폰). 바꾸기 직전 보유 특성을 비운다.
   - 지금 캐릭터 12개를 1~4차로 나열 — 버튼 = 넣기/빼기(■ 보유). **차수당 하나**(실게임과 같다): 같은 차수 다른 것을 넣으면 기존 것을 뺀다. `규칙 무시` 를 켜면 같은 차수 동시 보유.
   - `전부 빼기` · `차수별 랜덤`(차수마다 하나) · 보유 목록 · 2차 상충 경고(§11.3 등록부 규칙 — 막지 않고 "효과 없음" 만 표시).
   - 배속 슬라이더 0.05~2(`DebugTimeScale`) · `쿨 0`(`DebugZeroCooldown` — Q·E·R·간파·대시, 기본 꺼짐) · `허수아비 HP 리셋`.
+  - `플레이어 체력`(2026-11-02 민경) — 씬의 플레이어·아군 허수아비마다 `10%`·`30%`·`50%`·`만피`·`−10%`(서버 체력 설정, 최소 1 · 호스트만). 자연 회복은 그대로라 깎은 체력이 서서히 찬다.
+  - `플레이어 피격`(2026-11-02 민경) — 가장 가까운 허수아비를 공격자로 **내 플레이어**를 정식 피격 경로(`Player.ReceiveAttack`, 서버)로 때린다. `1회 공격` · `자동`(0.5/1/2초, 패널 접어도 계속) · 피해 = 최대 체력 5/10/30%(호스트만). E 방어(공격자 위치로 각도 판정 — 마우스를 허수아비 쪽으로)·수호의 잔광·불굴의 가호 보호막 소모·깨짐·피격 파문·패시브 피격 쿨감이 실게임과 같은 길로 돈다. 간파(우클릭)는 몬스터 공격 예고가 필요해 대상 밖.
   - `공격 범위 기즈모`(할 일 152, 기본 꺼짐, 에디터 전용 — `Dev/TraitLab/TraitLabAttackGizmos.cs`) — 씬의 모든 플레이어마다 지금 위치·바라보는 방향에서 판정 형상을 분류별 색(■ 기본공격 하늘 · 스킬 주황 · 특성 추가 공격 분홍)·이름 라벨로 그린다. 판정 도형 공격은 각 공격이 서버 판정에 넘기는 그 (도형, 포즈) 를 판정과 같은 공용 함수로 받아 `AttackShapeDrawing` 으로만 그린다(할 일 153 6단계 — 바닥 진하게·높이 범위 옅게·도넛 안쪽 고리, 특성 배율·반경·폭이 도형 값으로 바로 반영, 기즈모 쪽 수치 계산 없음). 도형이 아닌 판정(거너 평타 캡슐·R 추적 구·간파 앵커 상자)은 콜라이더 형상 + 라벨 '(도형 아님)'. Game 뷰는 Gizmos 버튼을 켜야 보이고, 특성 추가 공격(파생 명세가 서버 전용)·거너 R 은 호스트 창에서만 나온다. 공용 함수 목록·사용법은 [attack-shapes.md](attack-shapes.md) §7·§8 단계 6. 테스트 `TraitLabAttackShapeTests`.
 - **정식 경로**: 넣기/빼기는 `TraitDirector.ReplaceAcquiredServer`(획득 목록 교체 → 재합류와 같은 장부 맞추기) — 수치형은 `PlayerTraitModifiers` 가 획득 행으로, 이벤트형은 장부로 걸고 되돌린다. 뺐다 다시 넣으면 '획득 1회' 동작도 다시 돈다(처음 얻는 것과 같게). 순수 규칙 = `TraitLabModel`.
 - 클라 창은 보기 전용(버튼 비활성, 새 RPC 없음). 패널을 클릭하면 게임 입력(기본 공격)도 같이 들어갈 수 있다.
