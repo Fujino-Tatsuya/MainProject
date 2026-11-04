@@ -47,7 +47,7 @@
   - 카메라: 처음부터 포드 추적(급감속 시각 = 0), 줌은 t=0 부터 그대로. 레터박스는 처음부터 덮여 있다 디졸브 때 걷힌다.
   - 대기·낙하·급감속 칸(`holdSeconds`·`fallHeight`·`fallSeconds`·`brakeDistance`·`brakeSeconds` 등)은 지우지 않았다 — 스위치를 끄면 예전 흐름으로 돌아가고,
     그때 페이드 인은 접기·펴기 끝 이벤트부터(그 전 낙하 구간은 검다).
-- 새 복제 값·RPC 없음. xlsx Lobby 시트: `map.skipApproach` 새 행 + `map.fadeInSeconds` 0 → 0.5(병합 Export — 테이블 모드 Play 는 xlsx 값이 우선).
+- 새 복제 값·RPC 없음. xlsx Lobby 시트: `map.fadeInSeconds` 0 → 0.5(SVN r589 — 테이블 모드 Play 는 xlsx 값이 우선). `skipApproach` 는 bool 이라 데이터 테이블 대상이 아니다(숫자·문구만) — 테이블 모드에서도 SO(`PodDropSettings.asset`) 값을 쓴다.
 
 ## 4. SO 초가 정하는 구간 (이벤트로 못 옮김 — 클립이 안 도는 구간)
 
