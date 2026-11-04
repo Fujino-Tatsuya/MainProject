@@ -585,7 +585,7 @@ MonoBehaviour:
     ko: "\uADF8\uB9CC\uB450\uAE30"
     en: Quit
   - key: UI.Pause.PressAnyButton
-    ko: "\uC544\uBB34 \uBC84\uD2BC\uC774\uB098 \uB204\uB974\uC138\uC694"
+    ko: Press Any Button
     en: Press Any Button
   - key: UI.Exit.Title
     ko: "\uAC8C\uC784 \uC885\uB8CC"
@@ -2027,7 +2027,7 @@ MonoBehaviour:
       Q \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uC90D\uB2C8\uB2E4."
     en: Dash back toward your starting point, dealing part of the original Q damage.
   - key: UI.BossVictory.Typo
-    ko: "\uBCF4\uC2A4 \uACA9\uD30C"
+    ko: BOSS DOWN
     en: BOSS DOWN
   errors:
   - key: LOBBY_LAUNCHER_MISSING
