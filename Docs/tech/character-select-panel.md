@@ -178,6 +178,15 @@
 - 우선순위(할 일 162): 결과 패널(`LobbyResultPanel.IsEscapeClaimed`) → 기본/코어 팝업(팝업만 닫힘) → 선택 패널(닫힘). 팝업을 닫은 프레임도 선택 패널이 ESC 를 쓴 것으로 친다(`IsEscapeClaimed`).
   `closeWithEscape` 를 꺼도 팝업은 ESC 로 닫힌다. 팝업이 열린 프레임에는 이동 키 반복 상태를 비운다 — 닫은 뒤 눌려 있던 이동 키는 새로 눌러야 움직인다.
 
+## 선택 카메라(할 일 199)
+- 패널이 열리면 씬 vcam 으로 전환하고, 닫히면(어떤 이유든·파괴 포함) 게임 카메라로 돌아온다. 로컬 화면만 바뀐다.
+- 경로 = 보스 연출과 같은 `CameraTargetSwitcher.EnterCinematic/ExitCinematic`(연출 우선순위 200 > 플레이어·낙하 vcam 100, 블렌드 시간도 스위처가 넣음). 전환 지점은 `SetCountedOpen` 한 곳.
+- 튜닝 칸:
+  - **위치·각도·FOV** = `3.LobbyScene` > `CharacterSelectStation/CharacterSelectCamera`(CinemachineCamera, 고정 — Tracking Target 비움, Priority 0 유지). 기본값은 자리표시(로컬 (0,6,−6)·피치 45°·FOV 40).
+  - **블렌드 시간** = 씬의 `CharacterSelectPanel` 인스턴스 > `Camera (할 일 199)` > `cameraEnterBlendSeconds`·`cameraExitBlendSeconds`(기본 0.5초, 0 = 컷).
+  - `selectCamera` 를 비우면 카메라 전환 없음. 프리팹 원본에는 비어 있고 씬 인스턴스가 덮어쓴다.
+- 다른 연출(`EnterCinematic`)이 열린 동안 카메라를 이어받으면, 닫을 때 `ExitCinematic` 이 무시돼 그 연출을 끊지 않는다.
+
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |
 |---|---|

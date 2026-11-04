@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TMPro;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -85,6 +86,15 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [SerializeField] private float lockedPulseScale = 1.12f;
     [SerializeField] private Color lockedTextColor = new Color(1f, 0.78f, 0.3f, 1f);
     [SerializeField] private Color lockedPulseColor = new Color(1f, 0.38f, 0.32f, 1f);
+
+    // 할 일 199 — 열린 동안 씬 vcam 으로 전환(CameraTargetSwitcher 연출 카메라 경로, 우선순위 200). 로컬 화면만.
+    [Header("Camera (할 일 199)")]
+    [Tooltip("패널이 열린 동안 쓸 씬 vcam(3.LobbyScene 의 CharacterSelectCamera). 위치·각도·렌즈는 그 오브젝트에서 튜닝한다. 비면 카메라 전환 없음.")]
+    [SerializeField] private CinemachineCamera selectCamera;
+    [Tooltip("열 때 게임 카메라 → 선택 vcam 블렌드 시간(초). 0 = 컷.")]
+    [SerializeField, Min(0f)] private float cameraEnterBlendSeconds = 0.5f;
+    [Tooltip("닫을 때 선택 vcam → 게임 카메라 블렌드 시간(초). 0 = 컷.")]
+    [SerializeField, Min(0f)] private float cameraExitBlendSeconds = 0.5f;
 
     private static int s_openCount;
     private static int s_escapeClaimedFrame = -1;
@@ -633,6 +643,21 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         s_openCount += open ? 1 : -1;
         if (s_openCount < 0)
             s_openCount = 0;
+        ApplySelectCamera(open);
+    }
+
+    // 열림/닫힘이 바뀌는 곳은 SetCountedOpen 하나(Show·닫기 전부·OnDestroy) — 카메라도 여기서만 바꾼다.
+    private void ApplySelectCamera(bool open)
+    {
+        if (!Application.isPlaying || selectCamera == null)
+            return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        if (switcher == null)
+            return;
+        if (open)
+            switcher.EnterCinematic(selectCamera, cameraEnterBlendSeconds);
+        else
+            switcher.ExitCinematic(selectCamera, cameraExitBlendSeconds); // 다른 연출이 이어받았으면 무시된다
     }
 
     private static void DestroyCard(GameObject card)
