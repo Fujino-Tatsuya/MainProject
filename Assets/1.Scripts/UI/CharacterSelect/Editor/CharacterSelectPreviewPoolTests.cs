@@ -112,6 +112,7 @@ public sealed class CharacterSelectPreviewPoolTests
         {
             CharacterSelectPreviewAnimation animation = CharacterSelectPreviewPool.FindAnimation(animations, prefab.name);
             Assert.IsNotNull(animation, $"{prefab.name}: 미리보기 애니메이션 칸이 있어야 한다");
+            Assert.Greater(animation.loopBlendSeconds, 0f, $"{prefab.name}: 등장 → 루프 블렌드가 0 이면 뚝 끊긴다");
 
             Animator animator = prefab.GetComponentInChildren<Animator>(true);
             Assert.IsNotNull(animator, $"{prefab.name}: Animator");

@@ -13,9 +13,14 @@ public sealed class CharacterSelectPreviewAnimation
     public string entryState;
     [Tooltip("등장이 끝난 뒤 반복할 Animator 상태 이름(0번 레이어). 비우면 Animator 기본 상태.")]
     public string loopState;
+    [Tooltip("등장 → 루프 크로스페이드 시간(초). 등장 클립이 이만큼 남았을 때 시작한다 — 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡아 두 번 바뀌지 않게.")]
+    [Min(0f)] public float loopBlendSeconds = DefaultLoopBlendSeconds;
 
-    public CharacterSelectPreviewAnimation(string prefabName, string entryState, string loopState)
+    public const float DefaultLoopBlendSeconds = 0.25f;
+
+    public CharacterSelectPreviewAnimation(string prefabName, string entryState, string loopState, float loopBlendSeconds = DefaultLoopBlendSeconds)
     {
+        this.loopBlendSeconds = loopBlendSeconds;
         this.prefabName = prefabName;
         this.entryState = entryState;
         this.loopState = loopState;
@@ -35,7 +40,6 @@ public sealed class CharacterSelectPreviewPool
 {
     public const string ArmatureName = "Armature";
     public const string WeaponSlotName = "PlayerWaeponSlot";
-    private const float LoopCrossFadeSeconds = 0.15f;
 
     // 남기는 MonoBehaviour — 같은 오브젝트·자식만 참조한다(진짜 플레이어 루트 의존 없음).
     private static readonly HashSet<Type> KeptBehaviours = new HashSet<Type>
@@ -58,6 +62,7 @@ public sealed class CharacterSelectPreviewPool
         public string PrefabName;
         public int EntryHash;
         public int LoopHash;
+        public float LoopBlend;
         public bool InEntry;
     }
 
@@ -137,13 +142,21 @@ public sealed class CharacterSelectPreviewPool
         if (shown.Animator.IsInTransition(0))
             return;
         AnimatorStateInfo state = shown.Animator.GetCurrentAnimatorStateInfo(0);
-        if (state.shortNameHash == shown.EntryHash && state.normalizedTime < 1f)
+        if (state.shortNameHash != shown.EntryHash)
+        {
+            shown.InEntry = false; // 컨트롤러가 이미 넘겼다 — 다시 크로스페이드하면 두 번 바뀐다
+            return;
+        }
+
+        // 등장 클립이 블렌드 시간만큼 남았을 때 루프로 크로스페이드 — 컨트롤러 끝 전이(Exit Time 1, 0.05~0.1초 컷에 가까움)보다 먼저 잡는다.
+        // 끝까지 기다렸다 넘기면 그 전이가 먼저 바꾸고 코드가 한 번 더 바꿔(같은 루프 재시작) 뚝 끊겨 보였다(199 Play).
+        float remaining = (1f - state.normalizedTime) * state.length;
+        if (remaining > shown.LoopBlend)
             return;
 
-        // 등장이 끝났거나(또는 컨트롤러 자체 전이로 이미 다른 상태) — 루프로.
         shown.InEntry = false;
         if (shown.LoopHash != 0)
-            shown.Animator.CrossFadeInFixedTime(shown.LoopHash, LoopCrossFadeSeconds, 0);
+            shown.Animator.CrossFadeInFixedTime(shown.LoopHash, shown.LoopBlend, 0);
     }
 
     public void Dispose()
@@ -246,6 +259,7 @@ public sealed class CharacterSelectPreviewPool
         CharacterSelectPreviewAnimation animation = FindAnimation(animations, prefab.name);
         preview.EntryHash = ResolveState(preview.Animator, animation != null ? animation.entryState : null, prefab.name);
         preview.LoopHash = ResolveState(preview.Animator, animation != null ? animation.loopState : null, prefab.name);
+        preview.LoopBlend = animation != null ? Mathf.Max(0f, animation.loopBlendSeconds) : CharacterSelectPreviewAnimation.DefaultLoopBlendSeconds;
         root.SetActive(false);
         return preview;
     }

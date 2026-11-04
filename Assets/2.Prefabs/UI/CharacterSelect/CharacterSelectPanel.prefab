@@ -1681,12 +1681,15 @@ MonoBehaviour:
   - prefabName: Player_Paladin
     entryState: Default_Attack3
     loopState: Idle
+    loopBlendSeconds: 0.25
   - prefabName: Player_Gunner
     entryState: Gunner_ULT_Cast
     loopState: Idle
+    loopBlendSeconds: 0.25
   - prefabName: Player_Assassin
     entryState: Assassin_R_Transform
     loopState: Idle_Combat
+    loopBlendSeconds: 0.25
   choiceTimeoutSeconds: 6
   choiceFailNoticeSeconds: 2
   pendingTextColor: {r: 0.85, g: 0.9, b: 1, a: 1}

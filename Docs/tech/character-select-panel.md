@@ -222,7 +222,7 @@
   - 복제 = 꺼진 홀더 아래 Variant Instantiate(Awake 없음) → `Armature`·`PlayerWaeponSlot` 말고 자식 파괴, 루트는 Transform 만 → 남은 쪽에서 화이트리스트 밖 스크립트·NetworkTransform/NetworkAnimator·Collider·Rigidbody 제거, 파티클·트레일·오디오 끔, Animator 루트 모션 끔.
   - 남기는 스크립트 = `PlayerAnimationEventRelay`·`EffectAnimEventRelay`(애니 이벤트 수신자 — 부모가 없어 아무것도 안 함)·`WeaponTransformRelay`(팔라딘 칼·방패)·`SDArmTwist`·어쌔신 머리카락 4종·`DissolveOverlay`. 거너 레이저건은 Armature 안 메시라 그대로 보인다.
 - 열린 동안 진짜 내 캐릭터(추적 대상의 오너 `Player`)는 렌더러 `forceRenderingOff` 로 이 화면에서만 감추고(`CharacterSelectRealPlayerHider`, 원래 꺼진 것은 기록 안 함) 그 자리·선택 카메라 쪽 수평 방향에 **포커스 캐릭터** 복제본을 세운다. 지금·잠긴 캐릭터도 복제본. 포커스가 바뀌면 즉시 교체. 다른 피어 화면은 진짜 캐릭터(카메라 바라보기 그대로).
-- 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — 등장 1회 → 끝나면(normalizedTime ≥ 1) 루프로 0.15초 크로스페이드. 상태가 없으면 경고 후 기본 상태. 기본: 팔라딘 `Default_Attack3`→`Idle` · 거너 `Gunner_ULT_Cast`→`Idle` · 어쌔신 `Assassin_R_Transform`→`Idle_Combat`(`Assassin_E_Buff` 는 UpperBody 레이어라 못 씀).
+- 애니메이션 = 칸 `Preview` > `previewAnimations`(프리팹 이름 키, 0번 레이어 상태 이름) — 등장 1회 → 등장 클립이 `loopBlendSeconds`(항목별, 기본 0.25초) 남았을 때 루프로 크로스페이드(컨트롤러의 끝 전이 Exit Time 1 보다 먼저 잡아 두 번 바뀌지 않게, 클립이 그보다 짧으면 바로 넘어감). 상태가 없으면 경고 후 기본 상태. 기본: 팔라딘 `Default_Attack3`→`Idle` · 거너 `Gunner_ULT_Cast`→`Idle` · 어쌔신 `Assassin_R_Transform`→`Idle_Combat`(`Assassin_E_Buff` 는 UpperBody 레이어라 못 씀).
 - 닫힐 때(이유 무관·파괴 포함) 복제본을 끄고 진짜 캐릭터 렌더러를 되돌린다. 칸 `showPreview`(기본 켬).
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
