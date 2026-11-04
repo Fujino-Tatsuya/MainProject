@@ -96,12 +96,6 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     /// <summary>[모든 피어] 지금 쫓거나 때리는 대상의 NetworkObjectId(없으면 0). 표시 전용.</summary>
     public ulong AggroTargetId => _aggroTargetId.Value;
 
-    /// <summary>
-    /// 간파 표시를 판정 창보다 **이만큼 먼저** 끈다(초). 간파 스킬은 서버에서 시작하고 이 시간 뒤에 판정되므로
-    /// (<c>FirstMeleeInterruptSkillData.hitDelay</c> 0.15) "보일 때 누르면 성공"이 보장된다 — 팀장 09-28: 유예 없음, 표시만 일찍.
-    /// </summary>
-    public const float CounterVisualLeadSeconds = 0.15f;
-    float _counterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
 
     // 서버 전용 런타임 상태
     Vector3 _spawnPosition;
@@ -282,10 +276,17 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     /// </summary>
     public virtual bool InterruptBlockedByState => _vulnerable.Value;
 
-    /// <summary>[서버] <c>MonsterCounterWindow</c> 가 열고 닫을 때 부른다(할 일 132). 스폰 전·클라에선 아무것도 안 한다.</summary>
+    /// <summary>[서버] <c>MonsterCounterWindow</c> 가 열고 닫을 때 부른다(할 일 132). 스폰 전·클라에선 복제값을 건드리지 않는다.</summary>
     internal void ServerReplicateCounterWindow(bool open)
     {
-        if (!IsServer || !IsSpawned || _counterJudgeWindow.Value == open)
+        if (!IsServer)
+            return;
+
+        // 판정이 닫히는 순간 표시(보라색)도 같은 틱에 끈다 — 만료를 단계 타이머(Spinner·Wall BeginDash)가 따로 끄면 어긋날 수 있다.
+        if (!open)
+            SetCounterVisual(false);
+
+        if (!IsSpawned || _counterJudgeWindow.Value == open)
             return;
 
         _counterJudgeWindow.Value = open;
@@ -407,13 +408,6 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
 
         if (!IsServer || !_initialized || _isDead)
             return;
-
-        // 간파 표시 조기 소등 — 판정 창이 닫히기 CounterVisualLeadSeconds 전에 표시만 끈다.
-        if (_counterVisualOffAt >= 0f && Time.time >= _counterVisualOffAt)
-        {
-            _counterVisualOffAt = -1f;
-            SetCounterVisual(false);
-        }
 
         // 연출이 몸을 몰고 있는 동안에는 FSM 을 돌리지 않는다(SetServerLogicSuspended 주석 참조).
         // 휴면(SetDormantServer)도 같다 — 인지·추격·공격·넉백 이동(HandleKnockback Warp)이 모두 TickServer 안이다.
@@ -580,7 +574,6 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
             StopAgent();
             _target = null;
             _aimGate?.CancelAiming();   // 휴면 터렛 조준선 제거(점검 10-14)
-            _counterVisualOffAt = -1f;
             SetCounterVisual(false);
             SetState(MonsterState.Idle);
         }
@@ -1973,8 +1966,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         if (agent != null) agent.enabled = false;
         if (bodyCollider != null) bodyCollider.enabled = false;
 
-        // 간파 표시도 끈다 — 사망 후 Update 는 돌지 않아 조기 소등 예약이 남는다.
-        _counterVisualOffAt = -1f;
+        // 간파 표시도 끈다.
         SetCounterVisual(false);
 
         SetState(MonsterState.Dead);
@@ -2583,23 +2575,14 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     //    돌고 있는 스피너를 얼리면 오히려 고장난 것처럼 보이고, 피어별 정지 프레임 차이도 생긴다.
     //    자세 정지는 **그로기 클립이 없는 몹의 그로기 표현**에만 쓴다(Gauntlet).
 
-    /// <summary>카운터 창 표현(텔레그래프)을 켜고 끈다. 서버에서 부른다.</summary>
     /// <summary>
-    /// [서버] 간파 창 **표시**를 켜고 끈다. 판정은 <c>MonsterCounterWindow</c> 가 따로 한다.
+    /// [서버] 간파 창 **표시**(텔레그래프)를 켜고 끈다. 판정은 <c>MonsterCounterWindow</c> 가 따로 한다.
+    /// 🔴 표시 = 판정 창(경석 11-04, 23호 10-20 과 같은 규칙) — 예전 "판정 0.15초 전에 표시만 끄기"(09-28)를 없앴다.
+    /// 판정이 닫히는 순간은 <see cref="ServerReplicateCounterWindow"/> 가 표시도 같이 끈다(만료·소비·Close 전부).
     /// </summary>
-    /// <param name="windowDuration">
-    /// 열 때 넘기면 판정 창이 닫히기 <see cref="CounterVisualLeadSeconds"/> 전에 표시가 먼저 꺼진다.
-    /// 0 이하 = 조기 소등 없음(닫을 때 끈다).
-    /// </param>
-    protected void ServerSetCounterWindow(bool open, float windowDuration = -1f)
+    protected void ServerSetCounterWindow(bool open)
     {
         if (!IsServer) return;
-
-        _counterVisualOffAt = open && windowDuration > 0f
-            // 🔴 여유(0.15초)는 배율로 나누지 않는다 — 몬스터가 아니라 **플레이어 간파 스킬의 판정 지연**(hitDelay)을
-            //    보상하는 값이다. 나누면 공격속도 2 에서 "보일 때 눌렀는데 실패"가 생긴다(10-03 Codex 교차검증, 계획 뒤집음).
-            ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
-            : -1f;
         SetCounterVisual(open);
     }
 

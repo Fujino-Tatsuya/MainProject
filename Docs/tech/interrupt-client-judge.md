@@ -209,7 +209,7 @@ InterruptManager (서버)  InterruptClaimServer.Process
 |---|---|---|---|
 | 1 | `StartAttack` — 창 여는 공격(돌진 등, 잡기 제외) | 열림 | `CounterWindowDuration`(= 선딜 게이트 타이머) · 공격 시작 = StartAttack 시각 |
 | 1' | 같은 곳 — 창 안 여는 공격·취약/제압 중 | 닫힘 | — |
-| 2 | `TryReleaseCounterAttack` — 게이트(타이머 끝 ∧ 애니 Hit) 발사 | 닫힘 | 애니가 늦으면 **늦은 닫힘** 갱신 배포 |
+| 2 | `TryReleaseCounterAttack` — 게이트(타이머 끝 ∧ 애니 Hit) 발사 | 닫힘 | 애니가 늦으면 **늦은 닫힘** 갱신 배포. ⚠️ 늦은 닫힘은 실제로 닫힐 때야 배포돼, 그 전 클라 판정은 예정 시각으로 닫혔다고 본다(실패·신고 없음) — 그래서 돌진은 준비 신호를 열 때 세워 **타이머 단독 발사**로 둔다(일반 = prep 경로, 후속 돌진 = 11-04 수정) |
 | 3 | `ResetCounterWindup`(= `AbortAttackChain` — 상태 이탈·사망·체인 타임아웃·디스폰·간파 성공) | 닫힘 | 조기 |
 | 4 | `PerformAttackHit` — 잡기 외 공격의 히트 | 닫힘 | — |
 | 5 | `PlayStateAnimation` — 서버에서 Attack 을 벗어남 | 닫힘 | — |
@@ -236,6 +236,7 @@ InterruptManager (서버)  InterruptClaimServer.Process
 ### 9.2 중간보스 (`MonsterCounterWindow` — SpinnerBot·GauntletBot·WallBot)
 
 `MonsterCounterWindow.RecordTransition` 한 곳. 열림 = 저작 길이 ÷ 공격속도, 만료 = 제때, `TryConsumeInterrupt`·`Close` = 조기. 공격 시작 시각은 모른다(= 열림 시각).
+표시(보라색 `_counterVisual`)는 판정 창과 **같은 순간** 꺼진다 — 판정 닫힘(`ServerReplicateCounterWindow(false)`)이 표시도 끈다(경석 11-04, 예전 0.15초 조기 소등 `CounterVisualLeadSeconds` 삭제 · 23호 10-20 과 같은 규칙).
 
 ### 9.3 로비 스파링 봇 (`TrainingSparringBot`)
 
