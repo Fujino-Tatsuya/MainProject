@@ -19,6 +19,7 @@ MonoBehaviour:
     \uB300\uC2E0 \uC77C\uBC18 Q\uC640 E \uD53C\uD574\uAC00 {damageIncrease:%} \uC99D\uAC00\uD558\uACE0
     \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {cooldownReduction:%} \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
   icon: {fileID: 21300000, guid: 4dc7e5ec42e55f74a42021cd81da06c6, type: 3}
+  tags: 
   effects:
   - rid: 7237886673709695301
   - rid: 7237886673709695302

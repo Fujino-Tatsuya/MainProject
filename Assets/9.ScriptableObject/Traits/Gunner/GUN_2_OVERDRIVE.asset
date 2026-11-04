@@ -20,6 +20,7 @@ MonoBehaviour:
     \uAE30\uBCF8 \uACF5\uACA9\uC758 \uACFC\uC5F4 \uC99D\uAC00\uB7C9\uC774 {heatGainIncrease:%}
     \uB298\uC5B4\uB0A9\uB2C8\uB2E4."
   icon: {fileID: 21300000, guid: 5ae219218580501d80aaeb96299afb21, type: 3}
+  tags: Overheat
   effects:
   - rid: 7237886675317424399
   references:

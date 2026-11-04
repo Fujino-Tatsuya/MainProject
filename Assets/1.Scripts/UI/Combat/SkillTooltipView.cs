@@ -57,10 +57,7 @@ public sealed class SkillTooltipView : MonoBehaviour
     private bool loggedTagError;
     private string parsedTagIds;
     private readonly List<SkillTooltipTag> tags = new List<SkillTooltipTag>();
-    private readonly List<RectTransform> tagChips = new List<RectTransform>();
-    private readonly List<float> tagWidths = new List<float>();
-    private readonly List<Vector2> tagPositions = new List<Vector2>();
-    private readonly HashSet<SkillTooltipTag> warnedUnstyledTags = new HashSet<SkillTooltipTag>();
+    private readonly SkillTooltipTagChipRow tagChips = new SkillTooltipTagChipRow(); // 특성 카드와 공용(할 일 212)
 
     /// <summary>
     /// [오너 로컬] 툴팁이 지연 뒤 실제로 떴다. 인자 = 그 슬롯의 키 표기(displayKey) —
@@ -312,50 +309,8 @@ public sealed class SkillTooltipView : MonoBehaviour
             }
         }
 
-        while (tagChips.Count < tags.Count)
-        {
-            RectTransform chip = Instantiate(tagChipTemplate, tagRow);
-            chip.name = tagChipTemplate.name + "_" + tagChips.Count;
-            tagChips.Add(chip);
-        }
-
-        tagWidths.Clear();
-        for (int i = 0; i < tagChips.Count; i++)
-        {
-            bool used = i < tags.Count;
-            tagChips[i].gameObject.SetActive(used);
-            if (!used)
-                continue;
-
-            TMP_Text label = tagChips[i].GetComponentInChildren<TMP_Text>(true);
-            string text = SkillTooltipTags.Name(tags[i]).Text;
-            float width = tagChipPadding * 2f;
-            ChipColors(tags[i], out Color32 background, out Color32 foreground);
-            if (tagChips[i].TryGetComponent(out Image chipImage))
-                chipImage.color = background;
-            Transform ring = tagChips[i].Find(TagChipRingName); // 둥근 테두리 = 글자색 그대로
-            if (ring != null && ring.TryGetComponent(out Image ringImage))
-                ringImage.color = foreground;
-            if (label != null)
-            {
-                label.text = text;
-                label.color = foreground;
-                width += label.GetPreferredValues(text).x;
-            }
-            tagWidths.Add(width);
-        }
-
-        float rowHeight = tagChipTemplate.rect.height;
-        float height = FlowTags(tagWidths, tagRow.rect.width, tagSpacing, rowHeight, tagPositions);
-        for (int i = 0; i < tags.Count; i++)
-        {
-            RectTransform chip = tagChips[i];
-            chip.anchorMin = chip.anchorMax = chip.pivot = new Vector2(0f, 1f);
-            chip.anchoredPosition = tagPositions[i];
-            chip.sizeDelta = new Vector2(tagWidths[i], rowHeight);
-        }
-
-        tagRow.gameObject.SetActive(tags.Count > 0);
+        float height = tagChips.Refresh(tags, tagRow, tagChipTemplate, tagStyles, tagChipPadding, tagSpacing,
+            "[SkillTooltip]", "SkillTooltipView.tagStyles", this);
         if (headerLayout != null)
         {
             float tagBottom = -tagRow.anchoredPosition.y + height + headerBottomPadding;
@@ -363,24 +318,6 @@ public sealed class SkillTooltipView : MonoBehaviour
             headerLayout.minHeight = headerHeight;
             headerLayout.preferredHeight = headerHeight;
         }
-    }
-
-    // 색 표(SkillTooltipTagStyles)에서 칩 색. 표가 없거나 줄이 없으면 기본색 + 태그마다 경고 한 번(테이블 Play·빌드 검증도 경고한다).
-    private void ChipColors(SkillTooltipTag tag, out Color32 background, out Color32 foreground)
-    {
-        if (tagStyles != null)
-        {
-            if (tagStyles.TryGetColors(tag, out background, out foreground)) // 없으면 표의 기본색을 담아 false
-                return;
-        }
-        else
-        {
-            background = SkillTooltipTagStyles.FallbackBackground;
-            foreground = SkillTooltipTagStyles.FallbackText;
-        }
-
-        if (warnedUnstyledTags.Add(tag))
-            Debug.LogWarning($"[SkillTooltip] 태그 '{tag}' 의 색이 {(tagStyles != null ? tagStyles.name : "SkillTooltipView.tagStyles(비어 있음)")} 에 없다 — 기본색으로 그린다.", this);
     }
 
     /// <summary>툴팁 문구 오류 표시({error} = 포매터 오류 — 개발용 문장이라 번역하지 않는다).</summary>

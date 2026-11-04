@@ -12,6 +12,7 @@ using UnityEngine.UI;
 /// 키 입력이 아닌 특성(<see cref="TraitKeycap.Blank"/>)은 키캡을 숨긴다.
 /// 문구는 Strings 키(<see cref="TraitStringKeys"/>) → 정의 인라인 ko. 설명은 <see cref="TraitTooltip"/> 이 <c>{필드}</c>·<c>{dmg}</c> 를 푼다 —
 /// 실패하면 <see cref="UiStrings.SkillTooltipError"/>(개발용 표시) + 경고(스킬 툴팁과 같은 관례).
+/// 할 일 212 — 분류 줄 아래 태그 칩 줄(<see cref="SkillTooltipTagChipRow"/>, 스킬 툴팁과 같은 칩·색 표). 태그 = <see cref="TraitDefinition.TagIds"/>.
 /// </summary>
 public sealed class TraitCardView : MonoBehaviour
 {
@@ -46,9 +47,19 @@ public sealed class TraitCardView : MonoBehaviour
     [Tooltip("설명문의 태그 이름(넉백 등)을 칩 색으로 칠할 때 쓰는 색 표 — 스킬 툴팁과 같은 SkillTooltipTagStyles. 비우면 칠하지 않는다. 특성 호버 툴팁도 이 값을 쓴다.")]
     [SerializeField] private SkillTooltipTagStyles tagStyles;
 
+    [Header("태그 칩 (할 일 212)")]
+    [Tooltip("칩을 놓는 영역(왼쪽 위 기준, 분류 줄 아래). 가로 폭을 넘으면 다음 줄로 넘긴다. 태그 없는 특성은 숨긴다. 색 = 위 tagStyles")]
+    [SerializeField] private RectTransform tagRow;
+    [Tooltip("꺼 둔 칩 원본(Image + 자식 Ring Image·TMP) — 스킬 툴팁 칩과 같은 모양. 필요한 만큼 복제한다")]
+    [SerializeField] private RectTransform tagChipTemplate;
+    [SerializeField, Min(0f)] private float tagChipPadding = 12f;
+    [SerializeField, Min(0f)] private float tagSpacing = 6f;
+
     /// <summary>설명 태그 이름 색 표(<see cref="TraitSelectionView"/> 호버 툴팁이 카드 원본에서 빌린다).</summary>
     public SkillTooltipTagStyles TagStyles => tagStyles;
 
+    private readonly System.Collections.Generic.List<SkillTooltipTag> tags = new System.Collections.Generic.List<SkillTooltipTag>();
+    private readonly SkillTooltipTagChipRow tagChips = new SkillTooltipTagChipRow();
     private int traitHash = TraitIdHash.None;
     private Action<int> clicked;
     private TraitDefinition boundTrait;
@@ -122,6 +133,7 @@ public sealed class TraitCardView : MonoBehaviour
         boundViewer = viewer;
         if (description != null)
             RefreshDescription(TraitTooltip.IsValueHeld());
+        RefreshTags(trait);
 
         if (keycap != null)
         {
@@ -129,6 +141,20 @@ public sealed class TraitCardView : MonoBehaviour
             keycap.sprite = keySprite;
             keycap.gameObject.SetActive(keySprite != null);
         }
+    }
+
+    /// <summary>
+    /// 태그 칩(할 일 212) — 정의 <see cref="TraitDefinition.TagIds"/>(xlsx Traits_&lt;캐릭터&gt; <c>tags</c> 행)를 스킬 툴팁과 같은 칩으로.
+    /// 칸이 틀렸으면(인스펙터 모드 — 테이블 Play·빌드는 검증이 막는다) 아는 태그만 그리고 경고. 카드 재사용 시 남는 칩은 끈다.
+    /// </summary>
+    private void RefreshTags(TraitDefinition trait)
+    {
+        if (tagRow == null || tagChipTemplate == null)
+            return;
+
+        if (!SkillTooltipTags.TryParse(trait != null ? trait.TagIds : null, tags, out string error))
+            Debug.LogWarning($"[Trait] '{trait.Id}' 태그 칸 — {error}", trait);
+        tagChips.Refresh(tags, tagRow, tagChipTemplate, tagStyles, tagChipPadding, tagSpacing, "[Trait]", "TraitCardView.tagStyles", this);
     }
 
     /// <summary>
