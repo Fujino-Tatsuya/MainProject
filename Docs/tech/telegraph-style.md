@@ -150,23 +150,17 @@
 
 ### 8-1. 거너 Q 충전 레이저 조준 사각형 — 길이 비율 감쇠 (할 일 202 추가, 2026-11-04)
 
-Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드, 재질 `3.Materials/Player/SkillLineIndicator/SkillLineRange.mat`, 셰이더 `VeyTrace/Player/Skill Line Indicator` — 데칼 아님, 투명 쿼드)은 **월드 거리 대신 사각형 길이 대비 비율 t**(시전자 쪽 끝 0 → 먼 끝 1)로 옅어진다. 위 감쇠식으로는 세 점(0.5→0.9·0.75→0.7·0.9→0.5)을 정확히 못 맞춰서 **구간 지정(점 보간)** 방식이다.
+Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드, 재질 `3.Materials/Player/SkillLineIndicator/SkillLineRange.mat`, 셰이더 `VeyTrace/Player/Skill Line Indicator` — 데칼 아님, 투명 쿼드)은 **월드 거리 대신 사각형 길이 대비 비율 t**(시전자 쪽 끝 0 → 먼 끝 1)로 옅어진다. 모양은 **인스펙터 커브 그래프 하나**로 정한다.
 
-```
-점 (0, 1) → (p.x, a.x) → (p.y, a.y) → (p.z, a.z) → (1, a.w) 을 단조 3차 곡선(Fritsch–Butland)으로 부드럽게 잇는다
-(점을 정확히 지나고, 점 사이에서 튀지 않고, 점에서 꺾이지 않음 — 셰이더 안에서 계산, 텍스처 없음)
-```
+| 칸 | 위치 | 뜻 | 기본 |
+|---|---|---|---|
+| **Length Fade Curve** `lengthFadeCurve` | `Player.prefab` → 자식 `SkillLineIndicator` 컴포넌트, 헤더 "길이 감쇠 (202 — 거너 Q)" | x = 길이 비율 t, y = 진하기 배율(0~1 로 자름) | (0,1) (0.5,0.9) (0.75,0.7) (0.9,0.5) (1,0.4) 를 매끄럽게 |
+| **Distance Fade** `_DecalFade` | `SkillLineRange.mat` | 위 §8 거리 감쇠 계수(att0, att1, att2) — 길이 감쇠와 **곱** | (1, 0, 0) = 감쇠 없음 |
 
-| 칸 (`SkillLineRange.mat`) | 뜻 | 기본 |
-|---|---|---|
-| **Length Fade Points t** `_LineFadeT` | x·y·z = 점 위치 t | (0.5, 0.75, 0.9) |
-| **Length Fade Alpha** `_LineFadeAlpha` | x·y·z = 그 점의 알파, **w = 먼 끝(t=1) 알파** | (0.9, 0.7, 0.5, 0.4) |
-| **Distance Fade** `_DecalFade` | 위 §8 거리 감쇠 계수(att0, att1, att2) — 길이 감쇠와 **곱** | (1, 0, 0) = 감쇠 없음 |
-
+- 커브는 머티리얼에 둘 수 없어 컴포넌트 칸이다(Fill·Ghost 가 같은 컴포넌트라 같은 값). 커브가 바뀔 때만(`OnValidate` — 인스펙터·커브 창 편집, Play 중 포함) 32개 고른 간격 샘플로 구워 속성 블록 배열 `_LineFadeCurve`(`SetFloatArray`)로 넘기고, 셰이더가 샘플 사이를 직선 보간한다. 텍스처 생성·매 프레임 할당 없음. Play 중 씬의 플레이어 인스턴스 커브를 고치면 바로 보인다(Play 끝나면 되돌아가니 확정 값은 프리팹에).
 - 켜기 `_LineFadeOn`·구간 `_LineFadeSpan`(인스펙터에 숨김, 속성 블록)은 **거너 Q 만**: 충전 중 사각형(`ShowCharge`)과 HUD 슬롯 호버 미리보기(`SkillPreviewShapes.ChargeLaser` → `LengthFade`). 미리보기는 채움(최소 사거리)·고스트(최대 사거리)를 **한 사각형으로 보고 t 를 최대 사거리 끝 기준으로** 맞춘다(같은 월드 지점 = 같은 t). 다른 스킬 미리보기·이동 화살표는 기존 그대로.
 - 🔴 이 셰이더의 C3 채움은 원래 **먼 끝일수록 진해지는 램프**(시전자 쪽 0.04/0.145 배 → 끝 1배)가 있다. 감쇠와 곱하면 서로 상쇄돼 균일해 보였다(11-04 사용자 "끝까지 똑같음"). 감쇠가 켜지면 램프를 끄고 채움 = Interior Opacity × 감쇠. 그래서 시전자 쪽 채움은 예전보다 진하다 — 진하기는 **Interior Opacity**(0.232)로 조절.
-- 확인용: Length Fade Alpha 를 (0.9, 0.5, 0.2, 0.05) 처럼 극단값으로 두면 먼 끝이 거의 사라져야 정상.
+- 확인용: 커브 끝점을 0.05 처럼 극단값으로 내리면 먼 끝이 거의 사라져야 정상.
 - 채움 끝의 진하기 단차(채움 알파 0.28 vs 고스트 0.09, 흰 끝선)는 최소/최대 사거리 표시 디자인이라 그대로다 — 감쇠는 그 위에 곱해진다.
-- 점 위치가 뒤섞여도(예: y < x) 앞 점으로 당겨 정렬해 계산 — NaN 없음. 결과는 0~1.
 - t 는 그려진 사각형 기준이라 벽에 잘려 짧아지면 잘린 끝이 t=1.
-- 코드: 셰이더 `LineLengthFade` = C# `Player/Skill/Targeting/SkillLineLengthFade.cs`(테스트 기준). 테스트: `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행` 의 `SkillLineLengthFadeTests`.
+- 코드: 셰이더 `LineLengthFade`(샘플 직선 보간) = C# `Player/Skill/Targeting/SkillLineLengthFade.cs` `Bake`·`Sample`(테스트 기준). 테스트: `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행` 의 `SkillLineLengthFadeTests`.

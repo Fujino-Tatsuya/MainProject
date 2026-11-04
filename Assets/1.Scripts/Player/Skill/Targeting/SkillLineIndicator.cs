@@ -10,6 +10,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private static readonly int WorldSizeId = Shader.PropertyToID("_WorldSize");
     private static readonly int LengthFadeOnId = Shader.PropertyToID(SkillLineLengthFade.EnabledProperty);
     private static readonly int LengthFadeSpanId = Shader.PropertyToID(SkillLineLengthFade.SpanProperty);
+    private static readonly int LengthFadeCurveId = Shader.PropertyToID(SkillLineLengthFade.CurveProperty);
     private static readonly Vector4 WholeSpan = new(0f, 1f, 0f, 0f);
 
     [Header("Quad 층")]
@@ -24,6 +25,10 @@ public sealed class SkillLineIndicator : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float ghostAlpha = 0.09f;
     [SerializeField, Range(0f, 1f)] private float arrowAlpha = 0.42f;
 
+    [Header("길이 감쇠 (202 — 거너 Q)")]
+    [Tooltip("x = 사각형 길이 비율(0 플레이어 쪽 → 1 먼 끝), y = 진하기 배율. 거너 Q 충전·Q 미리보기에만 걸린다. Play 중 고쳐도 바로 반영.")]
+    [SerializeField] private AnimationCurve lengthFadeCurve = SkillLineLengthFade.DefaultCurve();
+
     // 필드 초기화에서 만들면 MonoBehaviour 생성자에서 CreateImpl 예외 — 처음 쓸 때 만든다.
     private MaterialPropertyBlock propertyBlock;
     private Player player;
@@ -34,6 +39,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private Renderer arrowRenderer;
     private ISkillPreviewSource previewSource;
     private bool chargeVisible;
+    private readonly float[] lengthFadeSamples = new float[SkillLineLengthFade.SampleCount];
+    private bool lengthFadeDirty = true;
 
     private void Awake()
     {
@@ -45,6 +52,9 @@ public sealed class SkillLineIndicator : MonoBehaviour
         arrowRenderer = ResolveRenderer(arrowQuad);
         HideVisuals();
     }
+
+    // 커브가 바뀔 때만 다시 굽는다(인스펙터·커브 창 편집 → OnValidate, Play 중 포함).
+    private void OnValidate() => lengthFadeDirty = true;
 
     private void LateUpdate()
     {
@@ -188,9 +198,18 @@ public sealed class SkillLineIndicator : MonoBehaviour
         propertyBlock.Clear();
         propertyBlock.SetFloat(AlphaId, alpha);
         propertyBlock.SetVector(WorldSizeId, new Vector4(segment.Width, segment.Length, 0f, 0f));
-        // 202: 거너 Q(충전·미리보기)만 길이 비율로 옅어진다. 점 값은 머티리얼 칸(SkillLineLengthFade), 구간은 층마다.
+        // 202: 거너 Q(충전·미리보기)만 길이 비율로 옅어진다. 모양은 lengthFadeCurve 칸, 구간은 층마다.
         propertyBlock.SetFloat(LengthFadeOnId, lengthFadeSpan.HasValue ? 1f : 0f);
         propertyBlock.SetVector(LengthFadeSpanId, lengthFadeSpan ?? WholeSpan);
+        if (lengthFadeSpan.HasValue)
+        {
+            if (lengthFadeDirty)
+            {
+                SkillLineLengthFade.Bake(lengthFadeCurve, lengthFadeSamples);
+                lengthFadeDirty = false;
+            }
+            propertyBlock.SetFloatArray(LengthFadeCurveId, lengthFadeSamples);
+        }
         targetRenderer.SetPropertyBlock(propertyBlock);
         SetRendererVisible(targetRenderer, true);
     }

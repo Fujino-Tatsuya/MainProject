@@ -3,8 +3,9 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 직선 스킬 사각형 길이 비율 감쇠(할 일 202 — 거너 Q 충전 레이저 조준).
-/// 식 = <see cref="SkillLineLengthFade.Evaluate(float, Vector3, Vector4)"/>(셰이더 LineLengthFade 와 같은 식).
+/// 직선 스킬 사각형 길이 비율 감쇠(할 일 202 — 거너 Q 충전 레이저 조준·Q 미리보기).
+/// 원본 = <see cref="SkillLineIndicator"/> AnimationCurve 칸, 셰이더에는 굽힌 샘플 배열 + 직선 보간
+/// (<see cref="SkillLineLengthFade.Bake"/>·<see cref="SkillLineLengthFade.Sample"/>).
 /// </summary>
 public sealed class SkillLineLengthFadeTests
 {
@@ -12,42 +13,69 @@ public sealed class SkillLineLengthFadeTests
     const string ShaderPath = "Assets/3.Materials/Player/SkillLineIndicator/SkillLineIndicator.shader";
     const string MaterialPath = "Assets/3.Materials/Player/SkillLineIndicator/SkillLineRange.mat";
 
+    static float[] BakedDefault()
+    {
+        var samples = new float[SkillLineLengthFade.SampleCount];
+        SkillLineLengthFade.Bake(SkillLineLengthFade.DefaultCurve(), samples);
+        return samples;
+    }
+
     [TestCase(0f, 1f)]
     [TestCase(0.5f, 0.9f)]
     [TestCase(0.75f, 0.7f)]
     [TestCase(0.9f, 0.5f)]
     [TestCase(1f, 0.4f)]
-    public void Default_PassesThroughRequestedPoints(float t, float expected)
+    public void DefaultCurve_PassesThroughRequestedPoints(float t, float expected)
     {
-        Assert.AreEqual(expected, SkillLineLengthFade.Evaluate(t), Eps);
+        Assert.AreEqual(expected, SkillLineLengthFade.DefaultCurve().Evaluate(t), Eps);
     }
 
     [Test]
-    public void Default_StaysBetweenNeighbourPoints_NoOvershoot()
+    public void DefaultCurve_NeverIncreasesTowardFarEnd()
     {
-        float[] knots = { 0f, 0.5f, 0.75f, 0.9f, 1f };
-        float[] values = { 1f, 0.9f, 0.7f, 0.5f, 0.4f };
-        for (int k = 0; k < 4; k++)
-        for (int i = 1; i < 20; i++)
+        AnimationCurve curve = SkillLineLengthFade.DefaultCurve();
+        float previous = curve.Evaluate(0f);
+        for (int i = 1; i <= 200; i++)
         {
-            float t = Mathf.Lerp(knots[k], knots[k + 1], i / 20f);
-            float v = SkillLineLengthFade.Evaluate(t);
-            Assert.LessOrEqual(v, values[k] + Eps, $"t={t}");
-            Assert.GreaterOrEqual(v, values[k + 1] - Eps, $"t={t}");
+            float current = curve.Evaluate(i / 200f);
+            Assert.LessOrEqual(current, previous + 1e-3f, $"t={i / 200f}");
+            previous = current;
         }
     }
 
     [Test]
-    public void Default_IsSmoothAtInteriorPoints_NoKink()
+    public void BakedSamples_MatchCurveClosely()
     {
-        // 점 왼쪽·오른쪽 기울기가 같아야 계단·꺾임으로 안 보인다(구간 직선이면 0.5 에서 -0.2 vs -0.8).
-        const float step = 0.001f;
-        foreach (float p in new[] { 0.5f, 0.75f, 0.9f })
+        AnimationCurve curve = SkillLineLengthFade.DefaultCurve();
+        float[] samples = BakedDefault();
+        for (int i = 0; i <= 100; i++)
         {
-            float left = (SkillLineLengthFade.Evaluate(p) - SkillLineLengthFade.Evaluate(p - step)) / step;
-            float right = (SkillLineLengthFade.Evaluate(p + step) - SkillLineLengthFade.Evaluate(p)) / step;
-            Assert.AreEqual(left, right, 0.05f, $"p={p}");
+            float t = i / 100f;
+            Assert.AreEqual(curve.Evaluate(t), SkillLineLengthFade.Sample(samples, t), 0.01f, $"t={t}");
         }
+        Assert.AreEqual(1f, samples[0], Eps);
+        Assert.AreEqual(0.4f, samples[samples.Length - 1], Eps);
+    }
+
+    [Test]
+    public void Sample_ClampsT()
+    {
+        float[] samples = BakedDefault();
+        Assert.AreEqual(1f, SkillLineLengthFade.Sample(samples, -1f), Eps);
+        Assert.AreEqual(0.4f, SkillLineLengthFade.Sample(samples, 2f), Eps);
+    }
+
+    [Test]
+    public void Bake_ClampsTo01_AndNullOrEmptyCurveMeansNoFade()
+    {
+        var samples = new float[SkillLineLengthFade.SampleCount];
+        SkillLineLengthFade.Bake(AnimationCurve.Linear(0f, 2f, 1f, -1f), samples);
+        foreach (float v in samples) Assert.That(v, Is.InRange(0f, 1f));
+
+        SkillLineLengthFade.Bake(null, samples);
+        foreach (float v in samples) Assert.AreEqual(1f, v, Eps);
+        SkillLineLengthFade.Bake(new AnimationCurve(), samples);
+        foreach (float v in samples) Assert.AreEqual(1f, v, Eps);
     }
 
     [Test]
@@ -75,71 +103,28 @@ public sealed class SkillLineLengthFadeTests
     }
 
     [Test]
-    public void Default_NeverIncreasesTowardFarEnd()
-    {
-        float previous = SkillLineLengthFade.Evaluate(0f);
-        for (int i = 1; i <= 100; i++)
-        {
-            float current = SkillLineLengthFade.Evaluate(i / 100f);
-            Assert.LessOrEqual(current, previous + Eps, $"t={i / 100f}");
-            previous = current;
-        }
-    }
-
-    [Test]
-    public void OutOfRangeT_IsClamped()
-    {
-        Assert.AreEqual(1f, SkillLineLengthFade.Evaluate(-1f), Eps);
-        Assert.AreEqual(0.4f, SkillLineLengthFade.Evaluate(2f), Eps);
-    }
-
-    [Test]
-    public void TunedEndValue_ChangesOnlyLastSegment()
-    {
-        var alpha = new Vector4(0.9f, 0.7f, 0.5f, 0.1f);
-        Assert.AreEqual(0.5f, SkillLineLengthFade.Evaluate(0.9f, SkillLineLengthFade.DefaultPoints, alpha), Eps);
-        Assert.AreEqual(0.1f, SkillLineLengthFade.Evaluate(1f, SkillLineLengthFade.DefaultPoints, alpha), Eps);
-        Assert.AreEqual(0.9f, SkillLineLengthFade.Evaluate(0.5f, SkillLineLengthFade.DefaultPoints, alpha), Eps);
-    }
-
-    [Test]
-    public void UnorderedOrCollapsedPoints_StayFiniteAndInRange()
-    {
-        var points = new Vector3(0.8f, 0.3f, 0.8f);
-        for (int i = 0; i <= 20; i++)
-        {
-            float v = SkillLineLengthFade.Evaluate(i / 20f, points, SkillLineLengthFade.DefaultAlpha);
-            Assert.IsFalse(float.IsNaN(v), $"t={i / 20f}");
-            Assert.That(v, Is.InRange(0f, 1f));
-        }
-    }
-
-    [Test]
-    public void Shader_DeclaresFieldsAndUsesLengthAndDistanceFade()
+    public void Shader_UsesSampledCurve_OneMechanism()
     {
         string text = File.ReadAllText(ShaderPath);
-        StringAssert.Contains(SkillLineLengthFade.PointsProperty, text);
-        StringAssert.Contains(SkillLineLengthFade.AlphaProperty, text);
+        StringAssert.Contains(SkillLineLengthFade.CurveProperty, text);
         StringAssert.Contains(SkillLineLengthFade.EnabledProperty, text);
         StringAssert.Contains(SkillLineLengthFade.SpanProperty, text);
-        StringAssert.Contains("float LineLengthFade(", text);
+        StringAssert.Contains($"#define LINE_FADE_SAMPLES {SkillLineLengthFade.SampleCount}", text);
         StringAssert.Contains("DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz)", text);
+        // 옛 점 칸·3차 보간·진단 토글은 없다.
+        StringAssert.DoesNotContain("_LineFadeT", text);
+        StringAssert.DoesNotContain("_LineFadeAlpha", text);
+        StringAssert.DoesNotContain("_DiagPlain", text);
         // 기존 C3 채움 램프(먼 끝일수록 진함)가 감쇠를 상쇄하지 않게 — 감쇠가 켜지면 램프 대신 감쇠만.
         StringAssert.Contains("lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn)", text);
     }
 
     [Test]
-    public void RangeMaterial_DefaultsMatchCSharp_AndFadeOffByDefault()
+    public void RangeMaterial_FadeOffByDefault()
     {
         var material = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
         Assert.IsNotNull(material, MaterialPath);
-        Vector4 points = material.GetVector(SkillLineLengthFade.PointsProperty);
-        Vector4 alpha = material.GetVector(SkillLineLengthFade.AlphaProperty);
-        Assert.AreEqual(SkillLineLengthFade.DefaultPoints.x, points.x, Eps);
-        Assert.AreEqual(SkillLineLengthFade.DefaultPoints.y, points.y, Eps);
-        Assert.AreEqual(SkillLineLengthFade.DefaultPoints.z, points.z, Eps);
-        Assert.AreEqual(SkillLineLengthFade.DefaultAlpha, alpha);
-        // 켜기는 차지 표시 속성 블록만 — HUD 호버 미리보기 등 다른 사용은 기존 화면 그대로.
+        // 켜기는 거너 Q 속성 블록만 — 다른 스킬 미리보기는 기존 화면 그대로.
         Assert.AreEqual(0f, material.GetFloat(SkillLineLengthFade.EnabledProperty), Eps);
     }
 }

@@ -21,8 +21,6 @@ Shader "VeyTrace/Player/Skill Line Indicator"
         _WorldSize ("World Size", Vector) = (1, 1, 0, 0)
         [Toggle] _Arrow ("Arrow", Float) = 0
         _ArrowReferenceAlpha ("Arrow Full Visibility Alpha", Range(0.01, 1)) = 0.42
-        _LineFadeT ("Length Fade Points t (x, y, z)", Vector) = (0.5, 0.75, 0.9, 0)
-        _LineFadeAlpha ("Length Fade Alpha (x, y, z at points / w at far end)", Vector) = (0.9, 0.7, 0.5, 0.4)
         [HideInInspector] _LineFadeOn ("Length Fade On (runtime)", Float) = 0
         [HideInInspector] _LineFadeSpan ("Length Fade Span (runtime)", Vector) = (0, 1, 0, 0)
         _DecalFade ("Distance Fade (att0, att1, att2)", Vector) = (1, 0, 0, 0)
@@ -64,8 +62,6 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float4 _WorldSize;
                 half _Arrow;
                 half _ArrowReferenceAlpha;
-                float4 _LineFadeT;
-                half4 _LineFadeAlpha;
                 half _LineFadeOn;
                 float4 _LineFadeSpan;
                 float4 _DecalFade;
@@ -80,42 +76,17 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 return output;
             }
             // 202: length-ratio fade. t = whole-rectangle ratio (caster end 0 -> far end 1) =
-            // _LineFadeSpan.x + uv.y * _LineFadeSpan.y. Monotone cubic (Fritsch-Butland) through
-            // (0,1) (p.x,a.x) (p.y,a.y) (p.z,a.z) (1,a.w): hits every point, no overshoot, no kinks.
-            // C# mirror = SkillLineLengthFade.Evaluate.
-            float LineFadeHermite(float t,float x0,float h,float y0,float y1,float m0,float m1)
+            // _LineFadeSpan.x + uv.y * _LineFadeSpan.y. The curve is an AnimationCurve on SkillLineIndicator,
+            // baked to LINE_FADE_SAMPLES evenly spaced samples (MaterialPropertyBlock.SetFloatArray) and
+            // linearly interpolated here. Not a material property (arrays cannot be). No textures.
+            // C# mirror = SkillLineLengthFade.Sample.
+            #define LINE_FADE_SAMPLES 32
+            float _LineFadeCurve[LINE_FADE_SAMPLES];
+            float LineLengthFade(float t)
             {
-                float s=saturate((t-x0)/h);
-                float s2=s*s;
-                float s3=s2*s;
-                return (2.0*s3-3.0*s2+1.0)*y0+(s3-2.0*s2+s)*h*m0+(-2.0*s3+3.0*s2)*y1+(s3-s2)*h*m1;
-            }
-            float LineLengthFade(float t,float3 p,float4 a)
-            {
-                t=saturate(t);
-                float x[5];
-                x[0]=0.0;
-                x[1]=saturate(p.x);
-                x[2]=max(saturate(p.y),x[1]);
-                x[3]=max(saturate(p.z),x[2]);
-                x[4]=1.0;
-                float y[5]={1.0,a.x,a.y,a.z,a.w};
-                float h[4];
-                float d[4];
-                [unroll]for(int i=0;i<4;i++){h[i]=max(x[i+1]-x[i],0.0001);d[i]=(y[i+1]-y[i])/h[i];}
-                float m[5];
-                m[0]=d[0];
-                m[4]=d[3];
-                [unroll]for(int j=1;j<4;j++)
-                {
-                    float d0=d[j-1];
-                    float d1=d[j];
-                    m[j]=d0*d1<=0.0?0.0:3.0*(h[j-1]+h[j])/((2.0*h[j]+h[j-1])/d0+(h[j]+2.0*h[j-1])/d1);
-                }
-                float result=y[4];
-                [unroll]for(int k=3;k>=0;k--)
-                    if(t<=x[k+1])result=LineFadeHermite(t,x[k],h[k],y[k],y[k+1],m[k],m[k+1]);
-                return saturate(result);
+                float x=saturate(t)*(LINE_FADE_SAMPLES-1);
+                int i=min((int)x,LINE_FADE_SAMPLES-2);
+                return lerp(_LineFadeCurve[i],_LineFadeCurve[i+1],x-i);
             }
             float SegmentDistance(float2 p,float2 a,float2 b)
             {
@@ -234,7 +205,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float endDistance=(1.0-input.uv.y)*size.y;
                 half endBar=(1.0h-smoothstep(outerWidth-aa,outerWidth+aa,endDistance))*(1.0h-smoothstep(size.x*0.435,size.x*0.445,abs(samplePos.x)));
                 Over(result,_EndColor.rgb,endBar*_EndColor.a*rangeVisibility);
-                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y,_LineFadeT.xyz,_LineFadeAlpha)),lengthFadeOn);
+                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y)),lengthFadeOn);
                 half distanceFade=(half)DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz);
                 return half4(result.rgb/max(result.a,0.0001h),result.a*inside*_Color.a*lengthFade*distanceFade);
             }
