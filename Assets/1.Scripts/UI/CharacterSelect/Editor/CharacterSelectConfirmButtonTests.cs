@@ -10,7 +10,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 선택 버튼 = SELECT 셰브론(할 일 109) — 실제 패널 프리팹을 프리뷰 씬에 올려 셰브론 클릭이 Space 와 같은 <see cref="CharacterSelectPanel.Confirm"/> 결과를 내는지 본다.
-/// 다른 캐릭터 = Chosen 한 번 · 잠금 = 거부(열린 채 잠금 강조) · 지금 캐릭터 = 그냥 닫힘.
+/// 다른 캐릭터 = Chosen 한 번 → 교체 대기(완료 = 닫힘, 거부 = 열린 채 — 할 일 199) · 잠금 = 거부(열린 채 잠금 강조) · 지금 캐릭터 = 그냥 닫힘.
 /// EditMode 에서는 Awake 가 돌지 않아 리스너 연결(Awake)을 직접 부른다 — 클릭은 Button.OnPointerClick(실제 마우스 클릭 경로).
 /// </summary>
 public sealed class CharacterSelectConfirmButtonTests
@@ -72,7 +72,7 @@ public sealed class CharacterSelectConfirmButtonTests
     }
 
     [Test]
-    public void Click_OtherCharacter_ChosenOnce_ThenClosed()
+    public void Click_OtherCharacter_ChosenOnce_WaitsThenClosedOnComplete()
     {
         _panel.Show(0, false);
         int other = OtherAvailableId(0);
@@ -81,12 +81,41 @@ public sealed class CharacterSelectConfirmButtonTests
         Click();
 
         CollectionAssert.AreEqual(new[] { other }, _chosen, "Space 와 같이 CharacterChosen 한 번");
+        Assert.IsEmpty(_closed, "확정 = 닫지 않고 교체 대기(할 일 199)");
+        Assert.IsTrue(_panel.IsOpen);
+        Assert.IsTrue(_panel.IsPending);
+
+        Click();
+        Assert.AreEqual(1, _chosen.Count, "대기 중 클릭은 아무것도 안 한다(중복 요청 막기)");
+
+        _panel.CompleteChoice(); // 새 플레이어 등장(LobbyInteractor)
         CollectionAssert.AreEqual(new[] { CharacterSelectCloseReason.Chosen }, _closed);
         Assert.IsFalse(_panel.IsOpen);
 
         Click();
         Assert.AreEqual(1, _chosen.Count, "닫힌 뒤 클릭은 아무것도 안 한다");
         Assert.AreEqual(1, _closed.Count);
+    }
+
+    [Test]
+    public void Click_OtherCharacter_FailChoice_StaysOpen_CanChooseAgain()
+    {
+        _panel.Show(0, false);
+        int other = OtherAvailableId(0);
+        _panel.MoveFocus(other);
+
+        Click();
+        _panel.FailChoice(); // 서버 거부(LobbySession.CharacterRequestRejected) 또는 시간 초과
+
+        Assert.IsEmpty(_closed, "거부 = 열린 채");
+        Assert.IsTrue(_panel.IsOpen);
+        Assert.IsFalse(_panel.IsPending);
+        float failUntil = (float)typeof(CharacterSelectPanel)
+            .GetField("_failNoticeUntil", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_panel);
+        Assert.GreaterOrEqual(failUntil, 0f, "실패 안내");
+
+        Click();
+        CollectionAssert.AreEqual(new[] { other, other }, _chosen, "다시 확정하면 다시 요청");
     }
 
     [Test]

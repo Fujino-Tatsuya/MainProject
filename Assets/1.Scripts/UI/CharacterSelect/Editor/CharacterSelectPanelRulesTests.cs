@@ -86,15 +86,93 @@ public sealed class CharacterSelectPanelRulesTests
     }
 
     [Test]
-    public void Confirm_OtherAvailableCharacter_ChosenAndCloses()
+    public void Confirm_OtherAvailableCharacter_ChosenAndWaitsOpen()
     {
         var rules = Opened(0);
         rules.MoveFocus(1);
 
         Assert.AreEqual(CharacterSelectConfirmResult.Chosen, rules.Confirm());
+        Assert.IsTrue(rules.IsOpen, "확정 = 닫지 않고 교체 대기(할 일 199)");
+        Assert.IsTrue(rules.IsPending);
+        Assert.AreEqual(1, rules.PendingId, "고른 id = 포커스");
+        Assert.AreEqual(CharacterSelectConfirmResult.Pending, rules.Confirm(), "대기 중엔 다시 고르지 않는다(중복 요청 막기)");
+    }
+
+    // ── 확정 대기(할 일 199) ──
+
+    [Test]
+    public void Pending_BlocksFocusEscapeBackPopup()
+    {
+        var rules = Opened(0);
+        rules.MoveFocus(1);
+        rules.Confirm();
+
+        Assert.IsFalse(rules.MoveFocus(1), "대기 중 이동 막힘");
+        Assert.IsFalse(rules.FocusCard(2), "대기 중 카드 클릭 막힘");
+        Assert.AreEqual(CharacterSelectEscapeResult.Ignored, rules.Escape(false), "대기 중 ESC 무시");
+        Assert.IsFalse(rules.HandleBackButton(), "대기 중 뒤로 무시");
+        Assert.IsFalse(rules.OpenInfoPopup(CharacterSelectInfoTab.Basic), "대기 중 팝업 막힘");
+        Assert.IsTrue(rules.IsOpen);
+        Assert.AreEqual(1, rules.Focus);
+    }
+
+    [Test]
+    public void Pending_Complete_Closes_Once()
+    {
+        var rules = Opened(0);
+        rules.MoveFocus(1);
+        rules.Confirm();
+
+        Assert.IsTrue(rules.CompletePending());
         Assert.IsFalse(rules.IsOpen);
-        Assert.AreEqual(1, rules.Focus, "고른 id = 포커스");
-        Assert.AreEqual(CharacterSelectConfirmResult.NotOpen, rules.Confirm(), "닫힌 뒤에는 다시 고르지 않는다");
+        Assert.IsFalse(rules.IsPending);
+        Assert.AreEqual(-1, rules.PendingId);
+        Assert.IsFalse(rules.CompletePending(), "두 번 닫히지 않는다");
+        Assert.AreEqual(CharacterSelectConfirmResult.NotOpen, rules.Confirm());
+    }
+
+    [Test]
+    public void Pending_Fail_StaysOpen_AndInputResumes()
+    {
+        var rules = Opened(0);
+        rules.MoveFocus(1);
+        rules.Confirm();
+
+        Assert.IsTrue(rules.FailPending());
+        Assert.IsFalse(rules.FailPending(), "대기가 아니면 false");
+        Assert.IsTrue(rules.IsOpen, "거부·시간 초과 = 열린 채");
+        Assert.IsFalse(rules.IsPending);
+        Assert.IsFalse(rules.CompletePending(), "대기가 풀린 뒤엔 교체 완료로 닫지 않는다");
+        Assert.IsTrue(rules.MoveFocus(1), "다시 조작 가능");
+        Assert.AreEqual(CharacterSelectConfirmResult.Chosen, rules.Confirm(), "다시 확정 가능");
+    }
+
+    [Test]
+    public void Pending_CloseApi_ClearsPending_ReopenFresh()
+    {
+        var rules = Opened(0);
+        rules.MoveFocus(1);
+        rules.Confirm();
+
+        Assert.IsTrue(rules.Close(), "호출 측 닫기(Api)는 대기 중에도 받는다");
+        Assert.IsFalse(rules.IsPending);
+        rules.Open(0, false, new[] { true, true, true });
+        Assert.IsFalse(rules.IsPending, "다시 열면 대기 없음");
+    }
+
+    [Test]
+    public void Pending_NotEnteredByOtherResults()
+    {
+        var rules = Opened(1);
+        Assert.AreEqual(CharacterSelectConfirmResult.SameAsCurrent, rules.Confirm());
+        Assert.IsFalse(rules.IsPending, "지금 캐릭터 = 그냥 닫힘");
+
+        var locked = new CharacterSelectPanelRules();
+        locked.Open(0, true, new[] { true, true, true });
+        locked.MoveFocus(1);
+        Assert.AreEqual(CharacterSelectConfirmResult.Locked, locked.Confirm());
+        Assert.IsFalse(locked.IsPending);
+        Assert.IsFalse(locked.FailPending());
     }
 
     [Test]
@@ -107,15 +185,14 @@ public sealed class CharacterSelectPanelRulesTests
     }
 
     [Test]
-    public void CloseReason_SameAsCurrentIsPlainClose_ChosenIsChosen()
+    public void CloseReason_SameAsCurrentIsPlainClose_ChosenWaits()
     {
         Assert.IsTrue(CharacterSelectPanelRules.TryGetCloseReason(CharacterSelectConfirmResult.SameAsCurrent, out var same));
         Assert.AreEqual(CharacterSelectCloseReason.Button, same, "지금 캐릭터 = 뒤로가기와 같은 그냥 닫기");
-        Assert.IsTrue(CharacterSelectPanelRules.TryGetCloseReason(CharacterSelectConfirmResult.Chosen, out var chosen));
-        Assert.AreEqual(CharacterSelectCloseReason.Chosen, chosen);
 
         foreach (var stays in new[] { CharacterSelectConfirmResult.NotOpen, CharacterSelectConfirmResult.Empty,
-                     CharacterSelectConfirmResult.Locked, CharacterSelectConfirmResult.Unavailable })
+                     CharacterSelectConfirmResult.Locked, CharacterSelectConfirmResult.Unavailable,
+                     CharacterSelectConfirmResult.Chosen, CharacterSelectConfirmResult.Pending }) // Chosen = 바로 닫지 않고 대기(할 일 199)
             Assert.IsFalse(CharacterSelectPanelRules.TryGetCloseReason(stays, out _), stays.ToString());
     }
 

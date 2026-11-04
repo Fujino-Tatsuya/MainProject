@@ -6,7 +6,7 @@ public enum CharacterSelectCloseReason
     Api = 0,       // 호출 측 Hide()
     Button = 1,    // 그냥 닫기 — 뒤로가기 버튼, 또는 지금 캐릭터를 다시 골랐다(CharacterChosen 없음)
     Escape = 2,    // ESC
-    Chosen = 3     // 다른 캐릭터를 골랐다(CharacterChosen 이 먼저 한 번 나간다)
+    Chosen = 3     // 다른 캐릭터로 바뀌었다 — 확정(CharacterChosen) 뒤 대기하다 새 플레이어가 나타났다(할 일 199)
 }
 
 /// <summary>선택 확정(Enter·Space·가운데 카드 클릭) 판단 결과.</summary>
@@ -17,8 +17,9 @@ public enum CharacterSelectConfirmResult
     Locked = 2,      // 준비 중 — 거부, 잠금 문구 강조
     Unavailable = 3, // 로스터 Available=false — 거부
     SameAsCurrent = 4, // 지금 캐릭터 — CharacterChosen 없이 그냥 닫는다(Closed(Button))
-    Chosen = 5,      // 다른 캐릭터 — CharacterChosen(id) 한 번 내고 닫는다
-    PopupOpen = 6    // 기본/코어 팝업이 위에 열려 있다 — 아무것도 안 한다(할 일 162)
+    Chosen = 5,      // 다른 캐릭터 — CharacterChosen(id) 한 번 내고 열린 채 대기(할 일 199 — 교체가 끝나면 Closed(Chosen))
+    PopupOpen = 6,   // 기본/코어 팝업이 위에 열려 있다 — 아무것도 안 한다(할 일 162)
+    Pending = 7      // 이미 확정해 교체를 기다리는 중 — 아무것도 안 한다(중복 요청 막기, 할 일 199)
 }
 
 /// <summary>오른쪽 위 정보 버튼(할 일 162). 지금은 둘 다 "미구현" 팝업만 띄운다.</summary>
@@ -64,6 +65,15 @@ public sealed class CharacterSelectPanelRules
     public bool IsPopupOpen => InfoPopup != CharacterSelectInfoTab.None;
 
     /// <summary>
+    /// 확정해 서버 교체를 기다리는 중(할 일 199). 이동·확정·ESC·뒤로·팝업은 무시되고 <see cref="Close"/>(호출 측)만 받는다.
+    /// 끝 = <see cref="CompletePending"/>(새 플레이어 등장 → 닫힘) 또는 <see cref="FailPending"/>(거부·시간 초과 → 열린 채 복귀).
+    /// </summary>
+    public bool IsPending { get; private set; }
+
+    /// <summary>기다리는 캐릭터 id. 대기 중이 아니면 -1.</summary>
+    public int PendingId { get; private set; } = -1;
+
+    /// <summary>
     /// 연다. 포커스 = 지금 캐릭터(없거나 범위 밖이면 0번). 이미 열려 있으면 값만 바꿔 다시 연 것으로 친다(팝업은 닫힌다).
     /// <paramref name="available"/> = 카드마다 고를 수 있는가(로스터 순서).
     /// </summary>
@@ -78,9 +88,10 @@ public sealed class CharacterSelectPanelRules
         CurrentId = currentId;
         Focus = InitialFocus(currentId, Count);
         InfoPopup = CharacterSelectInfoTab.None;
+        ClearPending();
     }
 
-    /// <summary>닫는다(팝업도). 열려 있었으면 true(닫힘 이벤트를 낼지 판단용).</summary>
+    /// <summary>닫는다(팝업·대기도). 열려 있었으면 true(닫힘 이벤트를 낼지 판단용).</summary>
     public bool Close()
     {
         if (!IsOpen)
@@ -88,13 +99,36 @@ public sealed class CharacterSelectPanelRules
 
         IsOpen = false;
         InfoPopup = CharacterSelectInfoTab.None;
+        ClearPending();
         return true;
     }
 
-    /// <summary>기본/코어 버튼 — 패널이 열려 있으면 그 팝업을 연다(이미 열려 있으면 바꾼다). 열었으면 true.</summary>
+    /// <summary>기다리던 교체가 끝났다(새 플레이어 등장) — 닫는다. 대기 중이었으면 true(Closed(Chosen) 를 낼지 판단용).</summary>
+    public bool CompletePending()
+    {
+        if (!IsOpen || !IsPending)
+            return false;
+
+        IsOpen = false;
+        InfoPopup = CharacterSelectInfoTab.None;
+        ClearPending();
+        return true;
+    }
+
+    /// <summary>교체가 거부됐거나 시간이 지났다 — 열린 채 다시 조작 가능. 대기 중이었으면 true.</summary>
+    public bool FailPending()
+    {
+        if (!IsPending)
+            return false;
+
+        ClearPending();
+        return true;
+    }
+
+    /// <summary>기본/코어 버튼 — 패널이 열려 있으면 그 팝업을 연다(이미 열려 있으면 바꾼다). 열었으면 true. 대기 중이면 무시.</summary>
     public bool OpenInfoPopup(CharacterSelectInfoTab tab)
     {
-        if (!IsOpen || tab == CharacterSelectInfoTab.None)
+        if (!IsOpen || IsPending || tab == CharacterSelectInfoTab.None)
             return false;
 
         InfoPopup = tab;
@@ -116,7 +150,7 @@ public sealed class CharacterSelectPanelRules
     /// </summary>
     public CharacterSelectEscapeResult Escape(bool claimedByOther)
     {
-        if (claimedByOther || !IsOpen)
+        if (claimedByOther || !IsOpen || IsPending)
             return CharacterSelectEscapeResult.Ignored;
         if (CloseInfoPopup())
             return CharacterSelectEscapeResult.ClosedPopup;
@@ -139,22 +173,22 @@ public sealed class CharacterSelectPanelRules
     /// </summary>
     public bool HandleEscape(bool claimedByOther) => Escape(claimedByOther) == CharacterSelectEscapeResult.ClosedPanel;
 
-    /// <summary>뒤로가기 버튼. 열려 있으면 닫고 true.</summary>
-    public bool HandleBackButton() => Close();
+    /// <summary>뒤로가기 버튼. 열려 있으면 닫고 true. 대기 중이면 무시.</summary>
+    public bool HandleBackButton() => !IsPending && Close();
 
-    /// <summary>포커스를 <paramref name="delta"/> 칸 옮긴다(끝에서 순환). 포커스가 바뀌었으면 true. 팝업이 열려 있으면 무시.</summary>
+    /// <summary>포커스를 <paramref name="delta"/> 칸 옮긴다(끝에서 순환). 포커스가 바뀌었으면 true. 팝업 열림·대기 중이면 무시.</summary>
     public bool MoveFocus(int delta)
     {
-        if (!IsOpen || IsPopupOpen || Count == 0 || delta == 0)
+        if (!IsOpen || IsPopupOpen || IsPending || Count == 0 || delta == 0)
             return false;
 
         return SetFocus(Wrap(Focus + delta, Count));
     }
 
-    /// <summary>포커스를 그 카드로(옆 카드 클릭). 범위 밖·팝업 열림이면 무시. 포커스가 바뀌었으면 true.</summary>
+    /// <summary>포커스를 그 카드로(옆 카드 클릭). 범위 밖·팝업 열림·대기 중이면 무시. 포커스가 바뀌었으면 true.</summary>
     public bool FocusCard(int index)
     {
-        if (!IsOpen || IsPopupOpen || index < 0 || index >= Count)
+        if (!IsOpen || IsPopupOpen || IsPending || index < 0 || index >= Count)
             return false;
 
         return SetFocus(index);
@@ -163,29 +197,37 @@ public sealed class CharacterSelectPanelRules
     public bool IsAvailable(int index) => index >= 0 && index < Count && _available[index];
 
     /// <summary>
-    /// 포커스된 카드로 확정. <see cref="CharacterSelectConfirmResult.Chosen"/>·<see cref="CharacterSelectConfirmResult.SameAsCurrent"/> 면 닫힌다.
-    /// 팝업이 열려 있으면 <see cref="CharacterSelectConfirmResult.PopupOpen"/>(아무것도 안 함).
+    /// 포커스된 카드로 확정. <see cref="CharacterSelectConfirmResult.SameAsCurrent"/> 면 닫히고,
+    /// <see cref="CharacterSelectConfirmResult.Chosen"/> 이면 열린 채 대기(<see cref="IsPending"/>, 할 일 199).
+    /// 팝업이 열려 있으면 <see cref="CharacterSelectConfirmResult.PopupOpen"/>, 대기 중이면 <see cref="CharacterSelectConfirmResult.Pending"/>(아무것도 안 함).
     /// </summary>
     public CharacterSelectConfirmResult Confirm()
     {
+        if (IsOpen && IsPending)
+            return CharacterSelectConfirmResult.Pending;
         if (IsOpen && IsPopupOpen)
             return CharacterSelectConfirmResult.PopupOpen;
         CharacterSelectConfirmResult result = Evaluate(IsOpen, Count, Focus, CurrentId, IsLocked, IsAvailable(Focus));
-        if (TryGetCloseReason(result, out _))
+        if (result == CharacterSelectConfirmResult.Chosen)
+        {
+            IsPending = true;
+            PendingId = Focus;
+        }
+        else if (TryGetCloseReason(result, out _))
+        {
             IsOpen = false;
+        }
         return result;
     }
 
     /// <summary>
-    /// 확정 결과가 패널을 닫으면 그 닫힘 사유. 다른 캐릭터 = Chosen, 지금 캐릭터 = Button(뒤로가기와 같은 그냥 닫기).
+    /// 확정 결과가 패널을 바로 닫으면 그 닫힘 사유 — 지금 캐릭터 = Button(뒤로가기와 같은 그냥 닫기).
+    /// 다른 캐릭터(Chosen)는 바로 닫지 않는다 — 교체를 기다렸다가 <see cref="CompletePending"/> 로 Closed(Chosen)(할 일 199).
     /// </summary>
     public static bool TryGetCloseReason(CharacterSelectConfirmResult result, out CharacterSelectCloseReason reason)
     {
         switch (result)
         {
-            case CharacterSelectConfirmResult.Chosen:
-                reason = CharacterSelectCloseReason.Chosen;
-                return true;
             case CharacterSelectConfirmResult.SameAsCurrent:
                 reason = CharacterSelectCloseReason.Button;
                 return true;
@@ -241,6 +283,12 @@ public sealed class CharacterSelectPanelRules
             return 0;
         int offset = Wrap(index - focus, count);
         return offset > count / 2 ? offset - count : offset;
+    }
+
+    private void ClearPending()
+    {
+        IsPending = false;
+        PendingId = -1;
     }
 
     private bool SetFocus(int index)

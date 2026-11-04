@@ -28,6 +28,7 @@ public sealed class LobbyInteractor : MonoBehaviour
     private readonly List<LobbyInteractable> _candidateTargets = new List<LobbyInteractable>();
     private InputAction _interactAction;
     private LobbyInteractable _current;
+    private NetworkObject _choiceFrom; // 캐릭터 요청 때의 내 PlayerObject — 다른 오브젝트가 나타나면 교체 끝(할 일 199)
 
     [Tooltip("캐릭터 선택 패널(씬의 CharacterSelectPanel.prefab 인스턴스, C12). 비우면 캐릭터 선택 오브젝트를 고르지 않는다.")]
     [SerializeField] private CharacterSelectPanel characterSelectPanel;
@@ -37,11 +38,13 @@ public sealed class LobbyInteractor : MonoBehaviour
         KeyBindingConfig.Changed += DisposeInteractAction;   // 다음 프레임에 새 키로 다시 만든다
         if (characterSelectPanel != null)
             characterSelectPanel.CharacterChosen += HandleCharacterChosen;
+        LobbySession.CharacterRequestRejected += HandleCharacterRequestRejected;
     }
 
     private void OnDisable()
     {
         KeyBindingConfig.Changed -= DisposeInteractAction;
+        LobbySession.CharacterRequestRejected -= HandleCharacterRequestRejected;
         if (characterSelectPanel != null)
         {
             characterSelectPanel.CharacterChosen -= HandleCharacterChosen;
@@ -138,14 +141,26 @@ public sealed class LobbyInteractor : MonoBehaviour
         }
 
         characterSelectPanel.SetLocked(IsCharacterLocked(session));
+
+        // 확정 대기(할 일 199) — 서버 교체로 내 PlayerObject 가 새 오브젝트로 바뀌면 닫는다(그때 입력도 풀린다).
+        if (characterSelectPanel.IsPending && TryGetLocalPlayer(out var player) && !ReferenceEquals(player, _choiceFrom))
+            characterSelectPanel.CompleteChoice();
     }
 
     private void HandleCharacterChosen(int characterId)
     {
         var session = LobbySession.Active;
+        TryGetLocalPlayer(out _choiceFrom);
         Debug.Log($"[SceneFlow] {Tag} 캐릭터 선택 → 서버 요청 {characterId} (session={(session != null)})", this);
         if (session != null)
             session.RequestCharacter(characterId);
+    }
+
+    // 서버가 교체를 거부했다(쿨다운·거리·잠금 등) — 대기 중인 패널을 열린 채 되돌리고 안내한다(할 일 199).
+    private void HandleCharacterRequestRejected(LobbyCharacterChangeReject reason)
+    {
+        if (characterSelectPanel != null && characterSelectPanel.IsPending)
+            characterSelectPanel.FailChoice();
     }
 
     // 서버 RPC 의 진행기 거부(LobbyTrainingDirector.CharacterChangeBlockFor)를 패널 잠금으로 미리 보여 준다(출격 카운트다운·출격 확정 뒤만 — 훈련 명단 잠금 없음, 157 ③).
