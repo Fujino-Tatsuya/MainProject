@@ -25,7 +25,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     [SerializeField] private PaladinSkillView skillView;
 
     // Garen_Ultimate_Skill 상태 전용 속도 파라미터. 평타의 AttackSpeed 와 섞이지 않게 따로 둔다.
-    private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
+    public const string AnimationSpeedParameter = "UltimateSpeed";
+    private static readonly int UltimateSpeedHash = Animator.StringToHash(AnimationSpeedParameter);
 
     // 슈퍼아머 만료 안전망 여유. 정상·강제 종료는 OnEnd 가 바로 걷는다 — 만료는 OnEnd 가 안 돈 경우만이다.
     // 지속 = 클립 실제 남은 길이(못 구하면 maxActiveDuration) + 이 여유.
@@ -119,7 +120,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
         // Hit 전 구간은 선딜 배율을 더 곱한다(할 일 210) — Hit 에서 OnLocalAnimationEvent 가 Hit 뒤 배율로 바꾼다.
         if (animator != null)
-            animator.SetFloat(UltimateSpeedHash, AnimationSpeed * BeforeHitSpeedMultiplier);
+            animator.SetFloat(UltimateSpeedHash, BeforeHitAnimationSpeed);
 
         // Stick 은 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.
         skillView?.SetStickPlayRate(VfxPlayRate);
@@ -166,7 +167,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     public override void OnLocalAnimationEvent(SkillAnimationEventType eventType)
     {
         if (eventType == SkillAnimationEventType.Hit && animator != null)
-            animator.SetFloat(UltimateSpeedHash, AnimationSpeed * AfterHitSpeedMultiplier);
+            animator.SetFloat(UltimateSpeedHash, AfterHitAnimationSpeed);
     }
 
     protected override void OnChannelCompleted()
@@ -221,6 +222,10 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;
     private float BeforeHitSpeedMultiplier => Data is FirstMeleeUltimateSkillData ult ? ult.BeforeHitSpeedMultiplier : 1f;
     private float AfterHitSpeedMultiplier => Data is FirstMeleeUltimateSkillData ult ? ult.AfterHitSpeedMultiplier : 1f;
+
+    /// <summary>UltimateSpeed 값 — Hit 전(선딜 배율 포함)·Hit 뒤. 캐릭터 선택 미리보기(할 일 199)도 같은 값으로 돌린다.</summary>
+    public float BeforeHitAnimationSpeed => AnimationSpeed * BeforeHitSpeedMultiplier;
+    public float AfterHitAnimationSpeed => AnimationSpeed * AfterHitSpeedMultiplier;
     private float VfxPlayRate => Data is FirstMeleeUltimateSkillData ult ? ult.VfxPlayRate : 1f;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;

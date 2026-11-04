@@ -116,8 +116,8 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Tooltip("캐릭터별 복제본 애니메이션 — 프리팹 이름 키, 등장 상태들 순서대로 1회씩 → 루프 또는 마지막 포즈 홀드(0번 레이어 상태 이름), 거너는 빔 시각·길이. 상태가 없으면 건너뜀.")]
     [SerializeField] private List<CharacterSelectPreviewAnimation> previewAnimations = new List<CharacterSelectPreviewAnimation>
     {
-        // 팔라딘 = 평타 1타 한 번 → Idle 로 길게 블렌드.
-        new CharacterSelectPreviewAnimation("Player_Paladin", new[] { "Default_Attack0" }, "Idle", 0.9f),
+        // 팔라딘 = R 궁 모션(속도 = 스킬과 같은 UltimateSpeed — Hit 전 선딜 배율·Hit 뒤 배율) → Idle 로 길게 블렌드.
+        new CharacterSelectPreviewAnimation("Player_Paladin", new[] { "Garen_Ultimate_Skill" }, "Idle", 0.9f),
         // 거너 = Q 발사(빔은 그 클립에 발사 순간 이벤트가 없어 칸 시각으로 — 게임도 이 상태로 넘기는 순간 빔을 켠다).
         new CharacterSelectPreviewAnimation("Player_Gunner", new[] { "Gunner_Q_Fire" }, "Idle", 0.3f) { beamNormalizedTime = 0.02f },
         // 어쌔신 = 평타 1→2타 → Idle 로 1초 블렌드, 보이는 동안 R 변신 오라.

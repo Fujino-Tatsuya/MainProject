@@ -94,6 +94,10 @@ public sealed class CharacterSelectPreviewPool
         public Vector3 AuraOffset;
         public float AuraScale = 1f;
         public EffectHandle AuraLoop;
+        public int SpeedParam;          // 팔라딘 R UltimateSpeed — 0 = 없음
+        public float SpeedBeforeHit = 1f;
+        public float SpeedAfterHit = 1f;
+        public bool SpeedAfterApplied;
     }
 
     private readonly List<Preview> _previews = new List<Preview>();
@@ -198,6 +202,7 @@ public sealed class CharacterSelectPreviewPool
             return;
 
         AnimatorStateInfo state = shown.Animator.GetCurrentAnimatorStateInfo(0);
+        TickSkillSpeed(shown, state);
         if (state.shortNameHash != shown.EntryHashes[shown.Step])
         {
             shown.Step = -1; // 컨트롤러가 이미 넘겼다 — 다시 크로스페이드하면 두 번 바뀐다
@@ -257,6 +262,31 @@ public sealed class CharacterSelectPreviewPool
             }
         }
         return state.length > 0f ? Mathf.Clamp01(1f - blendSeconds / state.length) : 1f;
+    }
+
+    // 팔라딘 R — 게임(FirstMeleeUltimateSkill)처럼 시작은 Hit 전 속도, 클립 Hit 이벤트를 지나면 Hit 뒤 속도.
+    private static void TickSkillSpeed(Preview shown, AnimatorStateInfo state)
+    {
+        if (shown.SpeedParam == 0 || shown.SpeedAfterApplied)
+            return;
+        float hit = EventNormalized(shown.Animator, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.Hit);
+        if (hit < 0f || state.normalizedTime < hit)
+            return;
+        shown.SpeedAfterApplied = true;
+        shown.Animator.SetFloat(shown.SpeedParam, shown.SpeedAfterHit);
+    }
+
+    // 지금 클립에서 그 애니 이벤트의 정규화 시각, 없으면 -1.
+    private static float EventNormalized(Animator animator, string functionName, int intParameter)
+    {
+        AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
+        AnimationClip clip = clips.Length > 0 ? clips[0].clip : null;
+        if (clip == null || clip.length <= 0f)
+            return -1f;
+        foreach (AnimationEvent e in clip.events)
+            if (e.functionName == functionName && e.intParameter == intParameter)
+                return e.time / clip.length;
+        return -1f;
     }
 
     // 거너 Q 빔 — 첫 등장 칸의 BeamTime 에 켜고, 켜진 동안 복제본 앞으로 겨눠 늘이고, 유지 시간이 지나면 끈다.
@@ -410,6 +440,7 @@ public sealed class CharacterSelectPreviewPool
                 BindBeam(preview, prefab, animation);
             if (animation.transformAura)
                 BindAura(preview, prefab);
+            BindSkillSpeed(preview, prefab);
         }
         else
         {
@@ -455,6 +486,23 @@ public sealed class CharacterSelectPreviewPool
         preview.AuraScale = view.TransformEffectScale;
     }
 
+    // 팔라딘 R 상태(Garen_Ultimate_Skill)는 속도 파라미터 UltimateSpeed 를 탄다 — 스킬이 시전 때 넣는 값을 미리보기도 넣는다(다른 상태는 영향 없음).
+    private static void BindSkillSpeed(Preview preview, GameObject prefab)
+    {
+        FirstMeleeUltimateSkill skill = prefab.GetComponentInChildren<FirstMeleeUltimateSkill>(true);
+        if (skill == null || preview.Animator == null)
+            return;
+        int hash = Animator.StringToHash(FirstMeleeUltimateSkill.AnimationSpeedParameter);
+        foreach (AnimatorControllerParameter parameter in preview.Animator.parameters)
+            if (parameter.nameHash == hash && parameter.type == AnimatorControllerParameterType.Float)
+            {
+                preview.SpeedParam = hash;
+                preview.SpeedBeforeHit = skill.BeforeHitAnimationSpeed;
+                preview.SpeedAfterHit = skill.AfterHitAnimationSpeed;
+                return;
+            }
+    }
+
     private static string RelativePath(Transform root, Transform target)
     {
         string path = null;
@@ -486,6 +534,11 @@ public sealed class CharacterSelectPreviewPool
         if (preview.Animator == null)
             return;
         preview.Animator.speed = 1f; // 지난 회차 홀드 풀기
+        if (preview.SpeedParam != 0)
+        {
+            preview.Animator.SetFloat(preview.SpeedParam, preview.SpeedBeforeHit);
+            preview.SpeedAfterApplied = false;
+        }
         preview.StepEnd = -1f;
         if (preview.EntryHashes.Length > 0)
         {

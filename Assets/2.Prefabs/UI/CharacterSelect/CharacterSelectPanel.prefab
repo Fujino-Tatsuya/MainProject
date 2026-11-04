@@ -1680,7 +1680,7 @@ MonoBehaviour:
   previewAnimations:
   - prefabName: Player_Paladin
     entryStates:
-    - Default_Attack0
+    - Garen_Ultimate_Skill
     loopState: Idle
     holdLastPose: 0
     loopBlendSeconds: 0.9
