@@ -232,8 +232,6 @@ MonoBehaviour:
   assassinInsightSuccess: 0
   targetFlash: 0
   darkAdaptation: 0
-  suppressFlash: 1
-  suppressFlashTargetOnly: 0
   ownerZoom: 1
   hideCombatUi: 1
   showOwnerDim: 1
@@ -265,9 +263,6 @@ MonoBehaviour:
   hitFlashWorldVfx: {fileID: 8395706668739561462, guid: 981c8f19f993db94999cadb9359e9117, type: 3}
   hitFlashWorldScale: 1
   hitFlashHeightOffset: 1
-  suppressFlashSequence: {fileID: 11400000, guid: b8afdaadf21203446b47d2397f53d7ae, type: 2}
-  suppressFlashMaterial: {fileID: 2100000, guid: 5903fe22bc43ce7448fbc80af146a40b, type: 2}
-  reduceFlash: 0
   hitLightLook: {fileID: 11400000, guid: 5d7ab4161f2c71748bb9fe1336f1be9b, type: 2}
   hitLightVfx: {fileID: 4308608783583396743, guid: 2209f576fb558f24485d5e1da46740f0, type: 3}
   hitLightLookReference: {fileID: 11400000, guid: 53628f711ee79cc4aaafda6dabce0400, type: 2}
@@ -277,19 +272,16 @@ MonoBehaviour:
     flash: 4
     darkAdapt: 1
     hitLightOrigin: 2
-    sequenceHitLight: 0
   dashTier:
     ownerDim: 0
     flash: 4
     darkAdapt: 1
     hitLightOrigin: 2
-    sequenceHitLight: 0
   suppressTier:
-    ownerDim: 1
-    flash: 1
-    darkAdapt: 0
+    ownerDim: 0
+    flash: 4
+    darkAdapt: 1
     hitLightOrigin: 2
-    sequenceHitLight: 4
 --- !u!114 &4191191191191191191
 MonoBehaviour:
   m_ObjectHideFlags: 0

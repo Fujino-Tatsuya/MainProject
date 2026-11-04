@@ -35,14 +35,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     private static void ResetStaticEvents()
     {
         LocalSucceeded = null;
-        DebugSuppressForecastOverride = null;
     }
-
-    /// <summary>
-    /// [디버그 — DebugInterruptLab 전용, 할 일 192] 대상의 제압 예측을 덮어쓴다(허수아비엔 제압 칸이 없어 '허수아비 간파 = 제압 간파' 재현 때 오너 암전 예측도 맞춘다).
-    /// true 를 돌려주면 제압으로 예측한다. null = 없음(런타임 기본). 랩 패널만 쓴다.
-    /// </summary>
-    public static System.Func<GameObject, bool> DebugSuppressForecastOverride;
 
     // 슬로우 3단계 수치(194 후속 2) — ① 대쉬 간파 시도 · ② 간파 준비 · ③ 간파 적중. 옛 이 자리 칸을 이름 그대로 옮겼다(테이블 대상 열 = SO 에셋).
     // 비면 코드 기본값(InterruptSlowMotionSettings.OrDefault).
@@ -72,12 +65,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("A2 암순응(= 팀원 암순응 켜기/끄기, 할 일 132 §17) — 섬광 순간 화면의 어두운 픽셀을 잠깐 낮춘다(InterruptDarkAdaptation). " +
              "다른 화면 = 약하게, 본인 화면 = 오너 화면 섬광이 안 돈 성공(약 예측)만 강하게")]
     [DataTableIgnore, SerializeField] private bool darkAdaptation;
-    [Tooltip("A6 제압 간파 섬광 시퀀스(할 일 179) — 켜면 제압 간파 성공 때 일반 성공 섬광 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). " +
-             "끄면 제압 간파도 일반 간파와 같은 연출(②~⑥·오너 암전 규칙 그대로). 성공 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 섬광 줄이기와 독립")]
-    [DataTableIgnore, SerializeField] private bool suppressFlash = true;
-    [Tooltip("A7 섬광 = 대상 내부만(179/192 후속) — 켜면 제압 간파 섬광 시퀀스를 간파 대상(보스·허수아비) 실루엣 안에만 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). " +
-             "끄면 전체 화면. 재생 시작 순간 읽는다 — 도는 시퀀스는 끝까지. 이 화면에서 대상을 못 찾으면 전체 화면")]
-    [DataTableIgnore, SerializeField] private bool suppressFlashTargetOnly;
+    // A6 제압 간파 섬광 시퀀스·A7 섬광 범위(할 일 179)는 11-04(할 일 211) 런타임에서 뺐다 — 제압 간파 = 일반·대쉬와 같은 적중 라이트(V3). 코드는 Legacy/SuppressFlash.
 
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
@@ -85,7 +73,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("카메라 대상 중심(할 일 196) — 내 간파(근접·대쉬) 클릭 즉시 카메라 중심을 간파 대상 쪽으로(강·약 예측, 대상 없음 = 그대로). " +
              "줌(A3)과 독립 — 중심만. 이동·비율·복귀 시간 = 슬로우 SO ④ 칸. 이 화면만(팀원 화면 그대로)")]
     [DataTableIgnore, SerializeField] private bool cameraCenter = true;
-    [Tooltip("A5 전투 표시 숨김(할 일 154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) + 제압 간파 섬광 시퀀스(팀원 화면 포함) 동안 " +
+    [Tooltip("A5 전투 표시 숨김(할 일 154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) 동안 " +
              "이 화면의 피해 숫자(보스 포함)·플레이어·몬스터·보스 머리 위 체력바·오너 조준 표시를 숨긴다(화면 고정 보스 HP 바는 그대로). 생성·수명·게이지 값은 그대로(가리기만), 끝나면 그대로 보인다")]
     [DataTableIgnore, SerializeField, FormerlySerializedAs("hideDamageNumbers")] private bool hideCombatUi = true;
 
@@ -161,19 +149,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("적중 지점(대상 발밑 위치)에서 섬광 중심까지 높이(m) — 월드 섬광·오버레이 중심 둘 다")]
     [DataTableIgnore, SerializeField] private float hitFlashHeightOffset = 1f;
 
-    // 제압 간파 섬광(할 일 179) — 제압 칸 마지막 1칸을 깎은 간파 성공이면 위 적중 섬광 ②~⑥ 대신 이 시퀀스를 모든 피어가 각자 화면에서 튼다.
-    // 오너 암전(132)은 그대로 오너만(시퀀스 시작 순간 걷힌다). 이 피어 값을 쓴다(사건마다·프레임마다 읽음). 문서: interrupt-presentation.md §7.
-    [Header("성공 — 제압 간파 섬광(할 일 179)")]
-    // 켜기/끄기 = 위 "성공 — 공용" 의 A6 칸(suppressFlash).
-    [Tooltip("컷 데이터(SuppressFlashSequence) — 컷마다 길이·명암·십자·별·집중선·색수차·빗금·3단 색. Play 중 바꾸면 다음 렌더 프레임부터. 비면 일반 섬광")]
-    [DataTableIgnore, SerializeField] private SuppressFlashSequence suppressFlashSequence;
-    [Tooltip("전체 화면 패스 재질(Hidden/Rendering/SuppressFlash). 비면 그리지 않는다(시간표는 돈다)")]
-    [DataTableIgnore, SerializeField] private Material suppressFlashMaterial;
-    [Tooltip("섬광 줄이기 기본값 — 켜면 반전 끔 + 대비 낮춤. PlayerPrefs '" + ReduceFlashPrefsKey + "' 가 있으면 그 값이 이긴다")]
-    [DataTableIgnore, SerializeField] private bool reduceFlash;
-    // 제압 암순응(할 일 192 Q7) = 섬광 시퀀스 복귀 뒤 컷 데이터의 '암순응 컷'(어두움 → 중간 → 원래 색)을 끊어서. 모든 피어 공용(Q8). 부드럽게 방식은 11-03 삭제.
-
-    // 적중 라이트 연출(할 일 194) — 단계 설정이 V1·V2 면 ②~⑥ 대신 성공 순간 바로 튼다(모든 피어, 실시간). 둘 중 하나라도 비면 V0 로 돌아간다.
+    // 적중 라이트 연출(할 일 194) — 단계 설정이 V1·V2·V3 면 ②~⑥ 대신 성공 순간 바로 튼다(모든 피어, 실시간). 둘 중 하나라도 비면 V0 로 돌아간다.
     // 이 피어 값을 쓴다(사건마다·프레임마다 읽음). 문서: interrupt-presentation.md §9.
     [Header("성공 — 적중 라이트(할 일 194)")]
     [Tooltip("수치 SO(InterruptHitLightLook) — 라이트·블룸·암순응·화이트아웃. 비면 V1·V2 대신 V0")]
@@ -196,12 +172,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("대쉬 간파 성공 — Q1 암전 없음, 섬광 기본 = V3 레퍼런스 맞춤·암순응 나(194 후속, 11-03 — V0~V2 는 랩 버튼으로)")]
     [DataTableIgnore, SerializeField] private InterruptTierProfile dashTier =
         new InterruptTierProfile(false, InterruptTierFlash.HitLightReference, InterruptDarkAdaptMode.SceneLight);
-    [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 오너 암전 + 섬광 시퀀스 + 강한 줌 + 제압 암순응, 시퀀스에 V3 적중 라이트를 더한다(194 후속, 11-03)")]
-    [DataTableIgnore, SerializeField] private InterruptTierProfile suppressTier = new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence,
-        InterruptDarkAdaptMode.ScreenPass, InterruptTierFlash.HitLightReference);
-
-    /// <summary>섬광 줄이기 저장 키(PlayerPrefs, 0/1). 새 설정 UI 는 없다 — 나중에 설정 화면이 이 키(<see cref="ReduceFlash"/>)를 쓰면 된다.</summary>
-    public const string ReduceFlashPrefsKey = "Interrupt.ReduceFlash";
+    [Tooltip("제압 간파 성공(근접·대쉬 무관, Q6) — 11-04(할 일 211) 일반·대쉬와 같은 V3·암순응 나, 오너 암전 없음(옛 섬광 시퀀스는 Legacy)")]
+    [DataTableIgnore, SerializeField] private InterruptTierProfile suppressTier =
+        new InterruptTierProfile(false, InterruptTierFlash.HitLightReference, InterruptDarkAdaptMode.SceneLight);
 
     /// <summary>슬로우 3단계 수치 SO(194 후속 2) — 비면 코드 기본값 인스턴스. 사건마다 읽는다.</summary>
     public InterruptSlowMotionSettings SlowMotion => InterruptSlowMotionSettings.OrDefault(slowMotionSettings);
@@ -237,13 +210,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     public VolumeProfile HitFlashAberrationProfile => hitFlashAberrationProfile;
     public VolumeProfile HitFlashBloomProfile => hitFlashBloomProfile;
 
-    /// <summary>A6 제압 간파 섬광 시퀀스 칸(할 일 179) — 런타임 값(저장하지 않음, 디버그·테스트). Play 중 바꾸면 다음 성공부터.</summary>
-    public bool SuppressFlashEnabled
-    {
-        get => suppressFlash;
-        set => suppressFlash = value;
-    }
-
     /// <summary>카메라 대상 중심 칸(할 일 196) — 런타임 값(저장하지 않음, 디버그·테스트). 다음 간파부터.</summary>
     public bool CameraCenterEnabled
     {
@@ -251,31 +217,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         set => cameraCenter = value;
     }
 
-    /// <summary>A7 섬광 = 대상 내부만(179/192 후속) — 런타임 값(저장하지 않음, 디버그·테스트). Play 중 바꾸면 다음 재생부터.</summary>
-    public bool SuppressFlashTargetOnly
-    {
-        get => suppressFlashTargetOnly;
-        set => suppressFlashTargetOnly = value;
-    }
-
-    /// <summary>
-    /// 이번 성공이 제압 간파 섬광 시퀀스인가(아니면 일반 ②~⑥). 성공 시작 순간 A6 칸·컷 데이터를 읽는다 — 섬광 줄이기와 무관.
-    /// </summary>
-    public bool PlaysSuppressFlash(SlowMotionPurpose purpose, bool suppressInterrupt) =>
-        PlaysSuppressFlash(purpose, InterruptPresentationTierRules.Select(true, InterruptVariant.Normal, suppressInterrupt));
-
-    /// <summary>이 단계의 성공이 제압 간파 섬광 시퀀스인가(할 일 192) — 단계 설정·A6 칸·컷 데이터.</summary>
-    public bool PlaysSuppressFlash(SlowMotionPurpose purpose, InterruptPresentationTier tier) =>
-        InterruptPresentationTierRules.PlaysSuppressSequence(purpose, TierProfile(tier), suppressFlash, suppressFlashSequence != null);
-
-    /// <summary>이 단계의 성공에서 트는 섬광(할 일 194) — 단계 설정·A6 칸·컷 데이터·적중 라이트 연출 유무. 사건마다 읽는다.</summary>
+    /// <summary>이 단계의 성공에서 트는 섬광(할 일 194) — 단계 설정·적중 라이트 연출 유무. 사건마다 읽는다. 제압 간파도 같다(11-04, 할 일 211).</summary>
     public InterruptSuccessLook SuccessLook(InterruptPresentationTier tier) =>
-        InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), suppressFlash, suppressFlashSequence != null, HasHitLight,
-            HasHitLightReference);
-
-    /// <summary>이 단계의 섬광 시퀀스에 더하는 적중 라이트(194 후속 — 제압 간파 V3). 더하지 않으면 <see cref="InterruptSuccessLook.HitFlash"/>.</summary>
-    public InterruptSuccessLook SequenceHitLight(InterruptPresentationTier tier) =>
-        InterruptPresentationTierRules.SelectSequenceHitLight(SuccessLook(tier), TierProfile(tier), HasHitLight, HasHitLightReference);
+        InterruptPresentationTierRules.SelectSuccessLook(TierProfile(tier), HasHitLight, HasHitLightReference);
 
     // 적중 라이트 연출(V1·V2)을 틀 수 있는가 — 수치 SO·월드 이펙트 프리팹 둘 다 있어야 한다.
     private bool HasHitLight => hitLightLook != null && hitLightVfx != null;
@@ -313,23 +257,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     // [오너] 입력 순간 예측한 성공 단계 — 판정 성공 때 섬광 종류를 고른다(서버 표식보다 먼저라서).
     private InterruptPresentationTier _ownerPredictedTier = InterruptPresentationTier.Normal;
-
-    public SuppressFlashSequence SuppressFlashSequence => suppressFlashSequence;
-    public Material SuppressFlashMaterial => suppressFlashMaterial;
-
-    /// <summary>
-    /// 섬광 줄이기(할 일 179) — PlayerPrefs 값이 있으면 그것, 없으면 디렉터 칸(기본 끔). 쓰면 칸과 PlayerPrefs 둘 다 바꾼다.
-    /// 재생 중에도 프레임마다 읽는다.
-    /// </summary>
-    public bool ReduceFlash
-    {
-        get => PlayerPrefs.HasKey(ReduceFlashPrefsKey) ? PlayerPrefs.GetInt(ReduceFlashPrefsKey) != 0 : reduceFlash;
-        set
-        {
-            reduceFlash = value;
-            PlayerPrefs.SetInt(ReduceFlashPrefsKey, value ? 1 : 0);
-        }
-    }
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
     private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
@@ -430,7 +357,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         return caster != null;
     }
 
-    // 틈 수직 — 적중점 근처 간파 대상(제압 섬광 실루엣과 같은 찾기)의 시전자 쪽 몸 표면.
+    // 틈 수직 — 적중점 근처 간파 대상의 시전자 쪽 몸 표면.
     bool IInterruptHitLightScene.TryGetTargetSurface(Vector3 targetPoint, Vector3 from, out Vector3 surface)
     {
         InterruptTargetRegistry.Entry entry = FindNearestTarget(targetPoint);
@@ -462,19 +389,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         return instance;
     }
 
-    // 제압 간파 섬광(할 일 179) — 출력은 Awake 에서 만든다(없으면 시간표만 돈다). 서버 표식은 같은 프레임 성공 사건이 소비한다.
-    private SuppressFlashScreenOutput _suppressFlashOutput;
-    private SuppressFlashPlayer _suppressFlash;
+    // 제압 간파 표식(할 일 179) — 서버 표식은 같은 프레임 성공 사건이 소비해 슬로우 Start 이벤트에 싣는다(연출 단계 = 제압, 11-04 부터 V3 — 할 일 211).
     private readonly SuppressInterruptMark _suppressMark = new SuppressInterruptMark();
-    private readonly List<GameObject> _suppressSubjects = new List<GameObject>();
-    private readonly List<GameObject> _suppressTargets = new List<GameObject>();
-    private readonly List<GameObject> _suppressMaskRoots = new List<GameObject>();
     private readonly List<InterruptTargetRegistry.Entry> _targetBuffer = new List<InterruptTargetRegistry.Entry>();
-
-    /// <summary>제압 간파 섬광 진행기 — 공용 성공 사건(제압 간파)에 시작, 매 프레임 실제 시간으로 진행.</summary>
-    public SuppressFlashPlayer SuppressFlash =>
-        _suppressFlash ??= new SuppressFlashPlayer(() => suppressFlashSequence, () => ReduceFlash, _suppressFlashOutput,
-            _darkAdaptation);
 
     // 피어 연출 — 슬로우 이벤트(Started/Failed/ForcedReset)의 유일한 구독자. 객체 참조만 들고 값은 들지 않는다.
     private GlobalTimeScale _timeScale;
@@ -496,7 +413,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerDimOutput = new InterruptOwnerDimOutput(this);
         _ownerLightGatherOutput = new InterruptLightGatherOwnerOutput(InterruptLightGatherOwnerOutput.FindSocket, KeepInOwnerDim);
         _hitFlashOverlay = new InterruptHitFlashOverlay(this);
-        _suppressFlashOutput = new SuppressFlashScreenOutput(() => suppressFlashMaterial);
     }
 
     private void OnEnable()
@@ -516,7 +432,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerPresentation?.Tick(Time.unscaledTime);
         _ownerGate?.Sync(); // 오너 암전 칸을 Play 중에 바꾸면 바로(§17)
         _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock), Time.frameCount);
-        _suppressFlash?.Tick(Time.unscaledTime); // 제압 간파 섬광 = 실제 시간(슬로우·히트스톱 무관, 할 일 179)
         _hitLight?.Tick(Time.unscaledTime, Time.frameCount); // 적중 라이트 연출 = 실제 시간(할 일 194 Q8), V2 화이트아웃 = 렌더 프레임 수
         TickCameraCenter(Time.unscaledTime); // 카메라 대상 중심 성공 복귀(할 일 196) = 내 성공 슬로우 복귀 구간
     }
@@ -526,7 +441,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerPresentation?.ForcedReset();
         _peerLightGather.EndAll();
         StopHitFlash();
-        _suppressFlash?.Stop();
         CancelCameraCenter();
 
         if (ReferenceEquals(_timeScale, null))
@@ -545,8 +459,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerDimOutput = null;
         _hitFlashOverlay?.Dispose();
         _hitFlashOverlay = null;
-        _suppressFlash?.Stop();
-        _suppressFlashOutput?.Hide();
         _hitLight?.Dispose();
         _hitLight = null;
 
@@ -665,14 +577,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// A5 — 이 화면에서 지금 전투 표시를 숨기는가(<see cref="InterruptProductionRules.ShouldHideCombatUi"/>).
     /// 읽는 곳 = 피해 숫자 스포너(캔버스)·머리 위 체력바(플레이어·몬스터·보스)·오너 조준 표시, 매 프레임(디렉터 → 표시 한 방향, 디렉터는 그들을 모른다).
     /// 상태에서 바로 나오는 값이라 따로 복원할 것이 없다 — 연출 끝·실패·강제 리셋·디렉터 꺼짐(인스턴스 없음 = false)이면 다음 프레임에 보인다.
-    /// 숨긴 렌더러는 그려지지 않으므로 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 남지 않는다.
+    /// 숨긴 렌더러는 그려지지 않으므로 암전 마스크(비트 4)에도 남지 않는다.
     /// </summary>
     public static bool CombatUiHidden =>
         Instance != null && InterruptProductionRules.ShouldHideCombatUi(Instance.hideCombatUi,
             Instance.OwnerStateForCombatUi,
             Instance._ownerPresentation != null ? Instance._ownerPresentation.DimIntensity : 0f,
-            Instance._hitFlash != null && Instance._hitFlash.OverlayActive,
-            Instance._suppressFlash != null && Instance._suppressFlash.IsPlaying);
+            Instance._hitFlash != null && Instance._hitFlash.OverlayActive);
 
     // A5 가 보는 오너 상태 — 암전 없는 강 시도(일반·대쉬 간파, 할 일 192 Q1)는 시도 중 숨기지 않는다(숨김 구간 = 암전·섬광).
     private InterruptOwnerPresentationState OwnerStateForCombatUi
@@ -712,11 +623,11 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     // ---- 오너 사건 (할 일 132 — 간파한 본인 화면만, 오너 연출 상태 기계로) ----
 
     /// <summary>
-    /// [오너] 간파(근접·대쉬) 입력 순간의 즉시 예측 — 강(성공 예측)이고 예측한 성공 단계가 암전 켬(기본 제압 간파만, 할 일 192 Q1)이면 오너 암전·빛 모임을 바로 켠다.
-    /// 일반·대쉬 간파 강 예측은 암전 없이 강 상태만(강한 줌·섬광 ②~⑥ 조건). 약은 아무것도 안 켠다(줌·슬로우는 서버 시도 슬로우가 처리, Q3),
+    /// [오너] 간파(근접·대쉬) 입력 순간의 즉시 예측 — 강(성공 예측)이고 예측한 성공 단계(일반·대쉬)가 암전 켬(기본 끔, 할 일 192 Q1)이면 오너 암전·빛 모임을 바로 켠다.
+    /// 제압은 예측하지 않는다(11-04 할 일 211 — 제압 간파도 암전 없이 V3, 제압 여부는 서버 성공 슬로우 표식으로만 안다).
+    /// 강 예측은 암전 없이 강 상태만(강한 줌·섬광 ②~⑥ 조건). 약은 아무것도 안 켠다(줌·슬로우는 서버 시도 슬로우가 처리, Q3),
     /// 대상 없음도 아무것도 안 켠다(정정1). 앞 시도가 결론나지 않았으면 중복 입력으로 무시한다.
     /// <paramref name="owner"/>·<paramref name="target"/> = 암전에 남길 오너 캐릭터(무기 이펙트 포함 하위 전부)·이번 시도 간파 대상(예측이 고른 캐시 대상).
-    /// 제압 여부는 대상의 <see cref="IInterruptSuppressForecast"/>(23호 = 복제된 남은 제압 칸)로 예측한다.
     /// <paramref name="attackDirection"/> = 근접은 요청에 싣는 시전 방향, 대쉬는 대시 방향 — 적중 섬광 ④ 스미어 방향(할 일 132 §16).
     /// 새 시도로 받아들였으면 true(인스턴스 없음·대상 없음·중복 입력 = false).
     /// </summary>
@@ -733,7 +644,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             return false;
 
         InterruptPresentationTier predicted = InterruptPresentationTierRules.Select(true,
-            InterruptPresentationTierRules.VariantOf(viaDash), PredictsSuppress(target));
+            InterruptPresentationTierRules.VariantOf(viaDash), false);
         bool dims = InterruptPresentationTierRules.AttemptDims(forecast, Instance.TierProfile(predicted));
         Instance._ownerPredictedTier = predicted;
         Instance.LastOwnerTier = forecast == BeaverLobby.Player.Dash.InterruptAttemptForecast.Strong ? predicted : InterruptPresentationTier.Fail;
@@ -741,11 +652,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         Instance._ownerDimOutput?.SetSubjects(owner, target);
         return presentation.Predict(forecast, skill, Time.unscaledTime, attackDirection, dims);
     }
-
-    /// <summary>[오너] 이 대상을 지금 간파하면 제압에 들어갈 것으로 보이는가(<see cref="IInterruptSuppressForecast"/>). 대상 없음 = false.</summary>
-    public static bool PredictsSuppress(GameObject target) =>
-        target != null && ((DebugSuppressForecastOverride != null && DebugSuppressForecastOverride(target)) ||
-                           (target.TryGetComponent(out IInterruptSuppressForecast forecast) && forecast.WouldSuppressOnInterrupt));
 
     /// <summary>
     /// [오너] 이번 오너 암전에 함께 남길 루트(빛 모임 VFX 등, 단계 4). 암전이 걷히면 빠진다 — 시도마다 다시 부른다.
@@ -842,24 +748,16 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         if (viewerIsCaster)
             LastOwnerTier = tier;
 
-        // 오너 판정 cue(191)가 판정 순간 이미 섬광을 틀었다 — 예측 단계의 섬광(시퀀스 / 적중 라이트 / ②~⑥, OwnerJudgeCues.cs).
+        // 오너 판정 cue(191)가 판정 순간 이미 섬광을 틀었다 — 예측 단계의 섬광(적중 라이트 / ②~⑥, OwnerJudgeCues.cs).
+        // 제압 간파도 같은 길(11-04 할 일 211 — 단계 설정이 V3, 섬광 시퀀스·오너 암전 없음).
         InterruptSuccessLook look = SuccessLook(tier);
-        bool playsSequence = look == InterruptSuccessLook.SuppressSequence;
-        bool ownerPlayedSequence = ownerCueHandled && _ownerJudgeCues != null && _ownerJudgeCues.LocalSuccessPlayedSuppress;
-        if (InterruptPresentationTierRules.StartsSuppressSequenceOnServerSuccess(playsSequence, ownerCueHandled, ownerPlayedSequence))
+        if (InterruptPresentationTierRules.UsesHitLight(look))
         {
-            // 예측은 제압 아님 → 서버는 제압: 판정 순간 튼 ②~⑥·적중 라이트를 걷고 시퀀스로(두 섬광이 겹치지 않게).
-            if (ownerCueHandled)
-                StopHitFlash();
-            BeginSuppressFlash(e, viewerIsCaster);
-        }
-        else if (InterruptPresentationTierRules.UsesHitLight(look))
-        {
-            // 적중 라이트 연출(할 일 194, V1·V2) — 성공 순간 바로(섬광 순간 예약 없음). 본인 화면은 판정 cue 가 이미 틀었으면 건너뛴다.
+            // 적중 라이트 연출(할 일 194, V1·V2·V3) — 성공 순간 바로(섬광 순간 예약 없음). 본인 화면은 판정 cue 가 이미 틀었으면 건너뛴다.
             if (!ownerCueHandled)
                 BeginHitLight(e, viewerIsCaster, look);
         }
-        else if (!playsSequence)
+        else
         {
             // 적중 섬광(할 일 132 §15·§17) — 히트스톱이 이 순간 시작하므로 ② 도 이 프레임(히트스톱 길이 0 이어도 같다).
             // 오너 화면 섬광(②~⑥) = 내 성공 ∧ 그 순간 오너 암전 상태가 켜져 있음(강 시도 — 암전 칸을 꺼도 상태는 돈다).
@@ -933,7 +831,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _ownerPresentation?.ForcedReset();
         _peerLightGather.EndAll();
         StopHitFlash();
-        _suppressFlash?.Stop();
         CameraCenterReturn(Time.unscaledTime); // 할 일 196
         SuccessStage.LocalForcedReset(_darkAdaptation);
     }
@@ -950,66 +847,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         SuccessStage.LocalFlash(moment, _networkManager != null ? _darkAdaptation : null);
     }
 
-    // 제압 간파 섬광 시작(할 일 179, 모든 피어) — 시퀀스 첫 프레임이 섬광 순간을 대신한다: 오너 암전 걷힘(본인 화면)·월드 섬광(모든 피어).
-    // 시퀀스 중엔 암순응을 틀지 않는다(화면을 통째로 3단 색으로 바꾼다). 시퀀스가 끝나면 제압 암순응 컷(할 일 192 Q7 — 진행기가 이어 튼다, 모든 피어).
-    // 실루엣 = 마스크 대상 목록(지금은 오너 + 간파 대상). A7 대상 내부만이면 마스크 = 간파 대상만(그 안에만 그린다).
-    private void BeginSuppressFlash(in InterruptProductionEvent e, bool viewerIsCaster)
-    {
-        Vector3 point = FlashPoint(e.TargetPosition);
-        CollectSuppressSubjects(e.CasterClientId, e.TargetPosition, _suppressSubjects, _suppressTargets);
-        SuppressFlashMaskMode mode = SuppressFlashRules.SelectMaskMode(suppressFlashTargetOnly, _suppressTargets.Count > 0);
-        SuppressFlashRules.SelectMaskRoots(mode, _suppressSubjects, _suppressTargets, _suppressMaskRoots);
-        SuppressFlash.Begin(Time.unscaledTime, point, _suppressMaskRoots, mode);
-
-        // 오너 암전 걷기 — 지금 성공 단계의 발동 번호(서버 성공 = 슬로우 번호, 오너 판정 cue = 로컬 번호)로.
-        if (viewerIsCaster && _ownerPresentation != null)
-            _ownerPresentation.SuccessFlashMoment(_ownerPresentation.SuccessTriggerId, Time.unscaledTime);
-        PlayWorldFlash(point);
-
-        // 194 후속 — 시퀀스에 적중 라이트(기본 V3)를 더한다(대체 아님). 암순응은 늘 나 — 가는 시퀀스 뒤 제압 암순응 컷과 같은 화면 패스라
-        // 먼저 끝나는 쪽이 다른 쪽을 지운다. 나(씬 조명 배율)·색 보정 Volume 은 시퀀스·암순응 컷과 출력이 달라 복구 순서가 엮이지 않는다.
-        InterruptSuccessLook layered = SequenceHitLight(e.Tier);
-        if (layered != InterruptSuccessLook.HitFlash)
-            BeginHitLight(e, viewerIsCaster, layered, InterruptPresentationTierRules.SequenceHitLightDarkAdapt);
-    }
-
-    /// <summary>
-    /// 제압 간파 섬광 실루엣 대상(할 일 179) — 발동자 플레이어 오브젝트 + 적중점에 가장 가까운 간파 대상(등록 캐시).
-    /// 191(간파 동시 성공) 이후 동시 성공자는 이 목록에 더하면 된다 — 출력은 목록만 받는다.
-    /// <paramref name="targets"/> = 그중 간파 대상만(A7 대상 내부만 마스크) — 동시 성공자는 여기에 넣지 않는다.
-    /// </summary>
-    private void CollectSuppressSubjects(ulong casterClientId, Vector3 targetPosition, List<GameObject> results,
-        List<GameObject> targets)
-    {
-        results.Clear();
-        targets.Clear();
-        NetworkSpawnManager spawnManager = _networkManager != null ? _networkManager.SpawnManager : null;
-        if (spawnManager != null)
-        {
-            foreach (NetworkObject networkObject in spawnManager.SpawnedObjectsList)
-            {
-                if (networkObject != null && networkObject.IsPlayerObject && networkObject.OwnerClientId == casterClientId)
-                {
-                    results.Add(networkObject.gameObject);
-                    break;
-                }
-            }
-        }
-
-        InterruptTargetRegistry.Entry nearest = FindNearestTarget(targetPosition);
-        if (nearest != null)
-        {
-            results.Add(nearest.Unit.gameObject);
-            targets.Add(nearest.Unit.gameObject);
-        }
-    }
-
     // 성공 기준 위치에 가장 가까운 등록 간파 대상(수평 거리, 허용 반경 안). 없으면 null.
     private InterruptTargetRegistry.Entry FindNearestTarget(Vector3 targetPosition)
     {
         InterruptTargetRegistry.CopyLiveTo(_targetBuffer);
         InterruptTargetRegistry.Entry nearest = null;
-        float best = SuppressFlashTargetSearchRadius * SuppressFlashTargetSearchRadius;
+        float best = TargetSearchRadius * TargetSearchRadius;
         for (int i = 0; i < _targetBuffer.Count; i++)
         {
             Vector3 delta = _targetBuffer[i].Unit.transform.position - targetPosition;
@@ -1026,7 +869,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     }
 
     // 성공 기준 위치(판정 순간 대상 위치)에서 이 피어의 대상까지 허용 거리 — 복제 지연으로 조금 어긋나도 찾는다.
-    private const float SuppressFlashTargetSearchRadius = 6f;
+    private const float TargetSearchRadius = 6f;
 
     private Vector3 FlashPoint(Vector3 targetPosition) => targetPosition + Vector3.up * hitFlashHeightOffset;
 
@@ -1060,9 +903,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     // 적중 라이트 연출 시작(할 일 194, 모든 피어) — 성공 순간이 곧 섬광 순간이다: 오너 성공 단계를 끝내고(본인 화면, 암전 없는 단계라 덮개는 이미 0)
     // 단계 칸 hitLightOrigin(틈 수직 기본 / 무기 / 대상) 위치·방향에 라이트·불꽃·파편·빛줄기 + 블룸·암순응(+V2 화이트아웃, 본인 화면 — 적중 지점 기준).
-    // darkAdapt 를 주면 단계 칸 대신 그 방식(시퀀스에 더한 적중 라이트 = 늘 나).
-    private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look,
-        InterruptDarkAdaptMode? darkAdapt = null)
+    private void BeginHitLight(in InterruptProductionEvent e, bool viewerIsCaster, InterruptSuccessLook look)
     {
         if (viewerIsCaster && _ownerPresentation != null)
             _ownerPresentation.SuccessFlashMoment(_ownerPresentation.SuccessTriggerId, Time.unscaledTime);
@@ -1075,7 +916,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             Origin = profile != null ? profile.hitLightOrigin : InterruptHitLightOrigin.Gap,
             ViewerIsCaster = viewerIsCaster,
             Look = look,
-            DarkAdapt = darkAdapt ?? (profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass),
+            DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
         }, Time.unscaledTime, Time.frameCount);
     }
 

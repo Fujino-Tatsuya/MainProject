@@ -9,10 +9,9 @@ using UnityEngine;
 ///       <see cref="InterruptProductionDirector.Set"/>). 프리팹·씬에 저장하지 않는다 — Play 를 끝내면 원래 값.</item>
 /// <item>배속은 같은 오브젝트의 <see cref="DebugTimeScale"/> 슬라이더 값을 쓴다 — 0.05~2, 성공 후 1배속 복귀 규칙도 그 컴포넌트 그대로.</item>
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
-/// <item>제압 간파 섬광 A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>)
-///       + A7 섬광 범위 버튼(전체 화면 ↔ 대상 내부만, 179/192 후속).</item>
+/// <item>허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>). A6·A7 섬광 시퀀스 칸은 11-04(할 일 211) 런타임에서 빠져 버튼도 뺐다.</item>
 /// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
-/// <item>카메라 대상 중심 토글(할 일 196) — 효과 줄 밑 한 줄. '전부 켬'·'암전만' 은 건드리지 않는다(A6 처럼 따로 둔 스위치).</item>
+/// <item>카메라 대상 중심 토글(할 일 196) — 효과 줄 밑 한 줄. '전부 켬'·'암전만' 은 건드리지 않는다(따로 둔 스위치).</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -96,15 +95,10 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     {
         float now = Time.unscaledTime;
         _suppressRepro.Tick(now);
-        _suppressRepro.SyncForecast();
         _tierPreview.Tick(InterruptProductionDirector.Instance, now);
     }
 
-    void OnDestroy()
-    {
-        _suppressRepro.Dispose();
-        InterruptProductionDirector.DebugSuppressForecastOverride = null;
-    }
+    void OnDestroy() => _suppressRepro.Dispose();
 
     void OnGUI()
     {
@@ -119,7 +113,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             DrawEffects();
             DrawCameraCenter();
             DrawTiers();
-            DrawSuppressFlash();
+            DrawSuppressRepro();
             DrawSpeed();
         }
 
@@ -191,7 +185,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         DrawTierVersions(director);
     }
 
-    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계마다 V0/V1/V2·암순응 가/나·월드 이펙트 위치 무기/대상(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
+    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압(11-04) 단계마다 V0~V3·암순응 가/나·월드 이펙트 위치 무기/대상(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
     // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
     void DrawTierVersions(InterruptProductionDirector director)
     {
@@ -242,39 +236,19 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             profile.darkAdapt = darkAdapt.Value;
     }
 
-    // 제압 간파 섬광(179 후속 3) — A6 토글 + 허수아비 간파를 제압 간파로 재현하는 토글(호스트에서만 효과).
-    // A6 를 켜면 재현도 켠다(허수아비엔 제압 칸이 없어 그대로는 시퀀스가 안 나온다). 끔은 재현을 건드리지 않는다.
-    void DrawSuppressFlash()
+    // 허수아비 간파 = 제압 간파 재현(179 후속 3, 호스트에서만 효과) — 제압 단계(11-04 부터 V3, 할 일 211)를 실제 서버 성공 경로로 본다.
+    void DrawSuppressRepro()
     {
-        InterruptProductionDirector director = InterruptProductionDirector.Instance;
-        if (director == null)
+        if (InterruptProductionDirector.Instance == null)
             return;
 
         GUILayout.Space(6f);
-        bool on = director.SuppressFlashEnabled;
-        bool next = GUILayout.Toggle(on, "제압 간파 섬광 (A6)");
-        if (next != on)
-        {
-            director.SuppressFlashEnabled = next;
-            if (next)
-                _suppressRepro.Enabled = true;
-        }
-
-        // A7 섬광 = 대상 내부만(179/192 후속) — 이 피어 런타임 값만, 다음 재생부터.
-        bool targetOnly = director.SuppressFlashTargetOnly;
-        if (GUILayout.Button(TargetOnlyLabel(targetOnly)))
-            director.SuppressFlashTargetOnly = !targetOnly;
-
         _suppressRepro.Enabled = GUILayout.Toggle(_suppressRepro.Enabled, "허수아비 간파 = 제압 간파(제압 직전)");
         if (_suppressRepro.Enabled && !DebugSuppressInterruptRepro.IsServer)
             GUILayout.Label("  ※ 호스트 화면에서만 효과(표식은 서버)");
         else if (_suppressRepro.Enabled)
             GUILayout.Label($"  허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
     }
-
-    /// <summary>A7 버튼 글자 — 지금 상태 표시(누르면 반대로).</summary>
-    public static string TargetOnlyLabel(bool targetOnly) =>
-        targetOnly ? "섬광 범위 (A7): 대상 내부만" : "섬광 범위 (A7): 전체 화면";
 
     void DrawSpeed()
     {

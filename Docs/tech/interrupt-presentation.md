@@ -8,12 +8,13 @@
 > ②③④ 길이 = **렌더 프레임 수**(기본 2·2·2, 섬광 순간 = 6 프레임째), ⑤⑥ = 초. DebugInterruptLab 씬 OnGUI **튜닝 패널** — [§0.6](#06-연출-켜기끄기-칸--튜닝-패널-17).
 > 🔹 할 일 143(2026-10-29, 브랜치 `feature/InterruptFirstComeOnly`): **선착순 한 명** — 한 창을 서버에서 먼저 성공시킨 1명만 정상 처리, 두 번째 이후는 피해만(반응·연출 없음) — [§0.10](#010-선착순-한-명-할-일-143).
 > 🔹 할 일 179(2026-11-02, 브랜치 `feature/SuppressInterruptFlash`): **제압 간파**(제압 칸 마지막 1칸 간파) 성공은 ②~⑥ 대신 **애니메이션 섬광 시퀀스**(모든 피어, 컷 SO·후처리 뒤 셰이더 1패스, 암전은 오너만, 섬광 줄이기 옵션) — [§7](#7-제압-간파-애니메이션-섬광-할-일-179).
+> 🔸 **할 일 211(2026-11-04, 브랜치 `feature/SuppressInterruptV3`)**: **제압 간파 = V3, 시퀀스는 Legacy.** 제압 간파 성공도 일반·대쉬와 같은 적중 라이트 V3(암순응 나)·**오너 암전 없음**. 섬광 시퀀스 코드·셰이더·SO·재질은 `Legacy/` 폴더로 옮기고(guid 유지) 런타임 연결(A6·A7·제압 예측·섬광 줄이기 PlayerPrefs)을 끊었다. 슬로우 Start 이벤트의 제압 비트·`ServerMarkSuppressInterrupt` 는 그대로 — 단계 판정(`Suppress`)과 랩 '받은 성공' 표시용. §7 은 기록용.
 > 🔹 **할 일 191(2026-11-02)**: 예측 입력이 **`InterruptManager.Predict`**(누른 시각 표본)로 바뀌고, 성공은 **오너 클라 판정 → 서버 검증**이다. 오너 연출은 매니저의 **오너 판정 cue**(시도·판정 성공/실패·서버 거부·CC 끊김·승인 목록)로 움직인다.
 > 옛 예측기·약 → 강 올리기(`LocalOwnerUpgrade`)는 삭제. 단일 원본 [interrupt-client-judge.md](interrupt-client-judge.md) — 이 문서는 [§0.2](#02-흐름)·[§6.2](#62-사건-흐름) 에 요약.
-> 🔹 **할 일 192(2026-11-02, 브랜치 `feature/InterruptTierPresentation`)**: 간파 연출을 **4단계(실패 / 간파 / 대쉬 간파 / 제압 간파)** 로 나눴다 — **오너 암전·빛 모임은 제압 간파만**, 일반·대쉬 간파는 암전 없이 강한 줌 + 기존 섬광, 제압 = 암전 + 섬광 시퀀스 + **제압 암순응 컷**. 단계표·누가 보나·스위치 [§8](#8-간파-연출-4단계-할-일-192).
+> 🔹 **할 일 192(2026-11-02, 브랜치 `feature/InterruptTierPresentation`)**: 간파 연출을 **4단계(실패 / 간파 / 대쉬 간파 / 제압 간파)** 로 나눴다 — **오너 암전·빛 모임은 제압 간파만**, 일반·대쉬 간파는 암전 없이 강한 줌 + 기존 섬광, 제압 = 암전 + 섬광 시퀀스 + **제압 암순응 컷**(→ 11-04 할 일 211: 제압도 암전 없이 V3). 단계표·누가 보나·스위치 [§8](#8-간파-연출-4단계-할-일-192).
 > 🔹 할 일 118: 간파 연출은 **간파 연출 디렉터 `InterruptProductionDirector`** 가 단일 진입점이다 — 사건 흐름·개인/공용 채널·스위치/프로필 위치는 [§6](#6-간파-연출-디렉터--interruptproductiondirector-할-일-118).
 > 🔹 **할 일 196(2026-11-03, 브랜치 `feature/InterruptCameraCenter`)**: 내 간파 클릭 즉시 **카메라 중심을 간파 대상 쪽으로**(오너만, 줌과 독립) — 실패 = 즉시 복귀, 성공 = 성공 슬로우 복귀 구간에 복귀 — [§10](#10-카메라-대상-중심-할-일-196).
-> 🔹 스위치 14칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 전투 표시 숨김(154·179 후속 2)·A6 제압 간파 섬광 시퀀스(179)·카메라 대상 중심(196) = 켬**, **A2 암순응·A7 섬광 = 대상 내부만(179/192 후속) = 꺼짐**(§17 기본값), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
+> 🔹 스위치 12칸(디렉터): **A1 히트스톱·A3 오너 줌·A4 성공 이펙트 칸·A5 전투 표시 숨김(154·179 후속 2)·카메라 대상 중심(196) = 켬**, **A2 암순응 = 꺼짐**(§17 기본값 — A6 섬광 시퀀스·A7 섬광 범위는 11-04 할 일 211 로 삭제), B·C·E(캐릭터별·맞은 쪽 섬광) = 꺼짐 — [§6.4](#64-스위치프로필-위치).
 >
 > 할 일 87(C1~C5)의 단일 사실 원본. 슬로우 모션 레이어 자체(시간 도메인·서버 권한·last-wins·컷신 리셋)는
 > [PLAN-interrupt-slowmo.md](../history/PLANS/PLAN-interrupt-slowmo.md) 가 원본이고, 여기서는 **간파에 얹은 연출**만 다룬다.
@@ -490,7 +491,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 ### 6.1 구조
 
 - **디렉터 = `NetworkManager.prefab` 루트의 MonoBehaviour 1개**(`GlobalTimeScale`·`InterruptDarkAdaptation` 옆). 코드 `Assets/1.Scripts/Player/InterruptProduction/`.
-  스위치 14칸(cue 10 + A5 전투 표시 숨김 + A6 제압 간파 섬광 시퀀스 + A7 섬광 = 대상 내부만 + 카메라 대상 중심(196)) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
+  스위치 12칸(cue 10 + A5 전투 표시 숨김 + 카메라 대상 중심(196) — A6·A7 은 11-04 할 일 211 로 삭제) + 강·약 시도/성공 슬로우 프로필 3개 + 132 오너 암전·적중 섬광 칸(§0.5)을 들고, 재생 지점은 **정적 API** 로 묻는다(인스턴스가 없으면 전부 꺼짐·no-op).
 - 간파 스킬(`PlayerInterruptSkillBase`)은 **사건 4개(시도·판정·성공·실패)만 알린다** — 슬로우 시작·실패·성공 재시작 코드는 스킬에 없다.
   판정·피해·카운터 창·그로기·통계는 그대로 스킬·대상(서버) 소관이고, 디렉터는 재생 여부와 슬로우 호출만 한다.
 - 단계마다 클래스가 따로 — `InterruptAttemptStage`·`InterruptResolveStage`·`InterruptSuccessStage`·`InterruptFailStage`.
@@ -559,9 +560,8 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | C1 | `assassinInsightAttempt` | 꺼짐 | 어쌔신 기 모으기·튀기기·올려치기(클립 `Attack_Up_01`) | `EffectAnimEvents.PlayEffect`·`StartEffect` → `Director.AllowsAnimEffect(id)` |
 | C2 | `assassinInsightSuccess` | 꺼짐 | 어쌔신 간파 성공 이펙트 | `AssassinSkillView.TryPlayInsightSuccess`(대기·올려치기 프레임 맞추기는 View) → `Director.PlayCue(AssassinInsightSuccess, …, this)` |
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |
-| A5 | `hideCombatUi`(옛 `hideDamageNumbers` — `FormerlySerializedAs`, 프리팹 줄 그대로) | **켬** | 전투 표시 숨김(154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) + **제압 간파 섬광 시퀀스 동안(모든 피어)** 이 화면의 **피해 숫자 캔버스(보스 포함)·머리 위 체력바(플레이어·몬스터·보스 모두 — 179 후속 4. 화면 고정 보스 HP 바 `BossHealthHUD` 는 그대로)·오너 조준 표시 쿼드(렌더러만 끔)** 를 숨긴다. 생성·수명·게이지 값은 그대로. 숨긴 조준 쿼드는 그려지지 않아 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도 안 남는다(전에는 플레이어 루트 태깅으로 비트를 받아 흰 사각형 실루엣). 일반 간파의 팀원 화면은 그대로(암전·②~⑥ 없음) | 상태에서 바로 읽는 값(pull) — `FloatingDamageSpawner`·`UnitOverheadHealthBar`·`PlayerAimIndicator` 의 `LateUpdate` → `Director.CombatUiHidden` = `InterruptProductionRules.ShouldHideCombatUi(칸, State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive ∨ 제압 섬광 IsPlaying)`. 따로 복원할 상태가 없어 끝·실패·강제 리셋·디렉터 꺼짐이면 다음 프레임에 보인다(조준 쿼드는 컴포넌트 OnDisable 에도 켬). cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideCombatUi` |
-| A6 | `suppressFlash`("성공 — 공용") | **켬** | 제압 간파 섬광 시퀀스(179, [§7](#7-제압-간파-애니메이션-섬광-할-일-179)) — 켜면 제압 간파 성공 때 ②~⑥ 대신 애니메이션 섬광 시퀀스(모든 피어). **끄면 제압 간파도 일반 간파와 같은 연출**(②~⑥·오너 암전 규칙 그대로). 표식 전달(슬로우 Start 이벤트 1바이트)은 칸과 무관하게 돈다. 섬광 줄이기(`reduceFlash`)와 독립 | 성공 `HandleStarted` 시작 순간 `Director.PlaysSuppressFlash(목적, 표식)` = `SuppressFlashRules.ShouldPlay(…, 칸, 컷 데이터 있음)` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashEnabled` |
-| A7 | `suppressFlashTargetOnly`("성공 — 공용") | 꺼짐 | 섬광 = 대상 내부만(179/192 후속, [§7.5](#75-렌더--셰이더-절차-생성만)) — 켜면 제압 간파 섬광 시퀀스를 **간파 대상(보스·허수아비) 실루엣 안에만** 그리고 바깥은 원래 화면(오너 암전 중이면 암전 그대로). 끄면 전체 화면(지금까지). 이 화면에서 대상을 못 찾으면 전체 화면 | `BeginSuppressFlash` 재생 시작 순간 `SuppressFlashRules.SelectMaskMode(칸, 대상 찾음)` → 마스크 루트 `SelectMaskRoots` — 도는 시퀀스는 끝까지. cue 아님 — 런타임 값은 `director.SuppressFlashTargetOnly` |
+| A5 | `hideCombatUi`(옛 `hideDamageNumbers` — `FormerlySerializedAs`, 프리팹 줄 그대로) | **켬** | 전투 표시 숨김(154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 이 화면의 **피해 숫자 캔버스(보스 포함)·머리 위 체력바(플레이어·몬스터·보스 모두 — 179 후속 4. 화면 고정 보스 HP 바 `BossHealthHUD` 는 그대로)·오너 조준 표시 쿼드(렌더러만 끔)** 를 숨긴다. 생성·수명·게이지 값은 그대로. 숨긴 조준 쿼드는 그려지지 않아 암전 마스크(비트 4)에도 안 남는다(전에는 플레이어 루트 태깅으로 비트를 받아 흰 사각형 실루엣). 일반 간파의 팀원 화면은 그대로(암전·②~⑥ 없음) | 상태에서 바로 읽는 값(pull) — `FloatingDamageSpawner`·`UnitOverheadHealthBar`·`PlayerAimIndicator` 의 `LateUpdate` → `Director.CombatUiHidden` = `InterruptProductionRules.ShouldHideCombatUi(칸, State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive)` (제압 섬광 시퀀스 항은 11-04 할 일 211 로 삭제). 따로 복원할 상태가 없어 끝·실패·강제 리셋·디렉터 꺼짐이면 다음 프레임에 보인다(조준 쿼드는 컴포넌트 OnDisable 에도 켬). cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideCombatUi` |
+| A6·A7 | (삭제 — 옛 `suppressFlash`·`suppressFlashTargetOnly`) | — | **11-04 할 일 211 로 삭제** — 제압 간파 = 일반·대쉬와 같은 적중 라이트 V3(`suppressTier`, §8.3). 섬광 시퀀스·섬광 범위는 Legacy([§7](#7-제압-간파-애니메이션-섬광-할-일-179) 기록용), 프리팹 줄도 지웠다 | — |
 | — | `cameraCenter`("성공 — 개인") | **켬**(코드 기본값) | 카메라 대상 중심(196, [§10](#10-카메라-대상-중심-할-일-196)) — 내 간파 클릭 즉시 카메라 중심을 간파 대상 쪽으로. 줌(A3)과 독립. 끄면 기존과 같음 | 시도 cue 순간 읽음(진행 중 이동은 끝까지) → `CameraTargetSwitcher` 가 `Director.OwnerCameraCenterShift` 로 이동량을 묻는다. cue 아님 — 런타임 값은 `director.CameraCenterEnabled` |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
@@ -578,7 +578,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 - **사건이 올 때마다 디렉터 필드를 읽는다(캐싱 없음).** Play 중 Hierarchy `DontDestroyOnLoad › NetworkManager › InterruptProductionDirector` 에서 바꾸면 다음 간파부터 바로 쓰인다.
   프리팹 에셋을 고치면 Play 중 인스턴스엔 안 닿는다(Unity 기본).
 - **슬로우 프로필·히트스톱(A1) = 호스트(서버) 인스턴스 값만.** 서버가 사건 순간 값을 이벤트에 실어 보내고 전 피어가 같은 닫힌 식으로 재생한다 — 클라 값은 무시. MPPM 에서는 호스트 에디터에서 바꾼다.
-- **나머지 13칸(A5·A6·A7·카메라 대상 중심 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
+- **나머지 11칸(A5·카메라 대상 중심 포함) = 각 피어 자기 인스턴스 값**(동기화 없음, 설계 Q8-a) → MPPM 가상 플레이어 화면은 호스트에서 바꿔도 안 바뀐다.
   줌 배율·오너 암전·섬광 칸(§0.5)도 각 피어 값이다.
 - 테이블 모드 Play 는 시작 때 프로필이 xlsx 값으로 덮인 뒤, 그 이후 인스펙터 변경은 Play 끝날 때까지 산다([data-table.md](data-table.md) §6).
 
@@ -609,11 +609,16 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 할 일 132 추가(같은 슬로우 모션 메뉴): `InterruptOwnerPresentationTests`(상태 기계) · `InterruptTargetRegistryTests`(캐시) · `InterruptOwnerDimTests`(마스크 암전·비트 4) ·
 `InterruptLightGatherTests` · `InterruptHitFlashTests` · `InterruptProductionDirectorTests` 의 프리팹 스위치 기본값(A1·A3·A4 켬) ·
 `InterruptPresentationEffectTests`(§17 효과 칸 기본값·프리팹·그리기만 끔·섬광 순간 정상) · `DebugInterruptLabTests`(튜닝 패널 줄·배속 버튼).
-할 일 154·179 후속 2·4: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬 · 제압 섬광 팀원 화면 숨김·끝 복원·강제 종료 복원·일반 강제 리셋 복원·머리 위 체력바 플레이어·몬스터 모두 숨김·끝 복원·조준 쿼드 렌더러 끔/켬).
+할 일 154·179 후속 2·4: `InterruptDamageNumberHideTests`(A5 — 강 시도 시작·성공 ⑥ 끝·실패 걷기 끝·약/대상 없음·오너 아님·칸 끔·기본값 켬 · 일반 강제 리셋 복원·머리 위 체력바 플레이어·몬스터 모두 숨김·끝 복원·조준 쿼드 렌더러 끔/켬).
 격리는 메뉴 밖 `DebugInterruptLabIsolationTests`. 대상 정면 판정은 Dash 어셈블리(`BeaverLobby.Player.Dash.EditModeTests` — `InterruptTargetGeometryTests`), 앵커 형상 대상 검사는 `HitboxAnchorShapeTests`(Assembly-CSharp-Editor).
 할 일 191: 예측·판정·검증·오너 판정 cue 는 `Tools/Tests/간파 판정·검증 EditMode 테스트 실행`(`InterruptOwnerJudgeCueTests` 등, [interrupt-client-judge.md §11](interrupt-client-judge.md#11-테스트)). 옛 `DashInterruptPredictionTests` 는 삭제.
 
 ## 7. 제압 간파 애니메이션 섬광 (할 일 179)
+
+> 🔸 **Legacy — 11-04(할 일 211) 제압 간파 = V3, 시퀀스는 Legacy.** 이 절은 기록용이다. 제압 간파 성공은 이제 일반·대쉬와 같은 적중 라이트(`suppressTier` 기본 V3·암순응 나, 오너 암전 없음 — [§8](#8-간파-연출-4단계-할-일-192)·[§9.7](#97-제압-간파--v3-할-일-211-2026-11-04)).
+> 옮긴 곳(git mv, `.meta` guid 그대로): 코드 `Player/InterruptProduction/Legacy/SuppressFlash/`(`SuppressFlashPlayer`·`SuppressFlashScreenOutput`·`SuppressFlashSequence`) · 셰이더·상태·렌더 패스 `Rendering/DarkAdaptation/Legacy/`(`SuppressFlash.shader`·`SuppressFlashState`·`SuppressFlashPass` — 렌더 기능에서 빼 단독 클래스) · SO·재질 `Assets/5.VFX/Interrupt/Legacy/SuppressFlash/` · 테스트 `Player/InterruptProduction/Editor/Legacy/SuppressFlashTests`(슬로우 모션 메뉴에서 뺌, 테스트 러너 전체 실행엔 남음).
+> 끊은 연결: 디렉터 A6 `suppressFlash`·A7 `suppressFlashTargetOnly`·`suppressFlashSequence`·`suppressFlashMaterial`·`reduceFlash` 칸(프리팹 줄도 삭제)·PlayerPrefs `Interrupt.ReduceFlash`·단계 칸 `sequenceHitLight`·오너 제압 예측 `IInterruptSuppressForecast`(23호 구현 포함)·`DarkAdaptationFeature` 의 섬광 패스·A5 의 시퀀스 항·랩 A6 토글/A7 버튼. 남긴 것: 표식(`SuppressInterruptMark` — 파일만 밖으로 분리)·슬로우 Start 이벤트 제압 비트·랩 '허수아비 간파 = 제압 간파' 토글.
+> 다시 켜려면 위 연결을 되살려야 한다(179 원본 = 211 이전 커밋). 아래 본문 경로·칸 이름은 179 당시 그대로다.
 
 > 사양: `_lane-artifacts/common/179-suppress-interrupt-flash/SPEC.md`(2026-11-02 grill 확정, 레포 밖). 레퍼런스 = `_lane-artifacts/references/interrupt/user-ref-2026-11-02-flash/`(참고만, 텍스처로 쓰지 않음).
 
@@ -701,7 +706,8 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 > 사용자 사양: 실패 = 약한 줌인, 끝 / 간파 = 강한 줌인 + 섬광(포인트라이트·환경광 끄기) / 대쉬 간파 = 강한 줌인 + 섬광(암순응) + 블룸 / 제압 간파 = 암전 + 애니메이션 섬광(암순응도 애니메이션) + 대쉬 간파.
 > 확정(grill Q1~Q8): 암전 = 제압만(Q1) · 슬로우 강/약 그대로(Q2) · 실패 규칙(Q3) · **Q4(일반 포인트라이트 섬광)·Q5(대쉬 암순응·블룸)는 보류 — 지금은 기존 ②~⑥** · 제압 = 대쉬 세트 포함(Q6) · 제압 암순응 컷(Q7) · 누가 보나(Q8).
-> 코드: `InterruptPresentationTier.cs`(단계·종류·단계 설정·규칙 순수 함수) · 디렉터 · `SuppressFlashPlayer`(암순응 컷) · 테스트 `InterruptPresentationTierTests`.
+> 코드: `InterruptPresentationTier.cs`(단계·종류·단계 설정·규칙 순수 함수) · 디렉터 · 테스트 `InterruptPresentationTierTests`.
+> 🔸 **11-04(할 일 211) 제압 간파 = V3, 시퀀스는 Legacy.** 제압 간파도 일반·대쉬와 같은 적중 라이트 V3·**암전 없음**(Q1 '암전 = 제압만' 은 폐기 — 지금은 어느 단계도 기본 암전이 없다). 아래 표·절은 211 기준으로 고쳤다. 제압 단계(`Suppress`)·표식 비트는 남아 단계 칸 `suppressTier` 로 따로 고를 수 있다.
 
 ### 8.1 단계표
 
@@ -710,32 +716,31 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | **실패** | 약 예측 / 강 예측의 판정 실패·끊김·서버 거부 | 약 예측 = 아무것도 안 켬(약한 줌만). 강 예측 판정 실패 = **그 순간 연출 종료**(191 D4) | 없음 | 약 = 약 시도 줌, 강 = 결론까지 강 줌 |
 | **간파**(근접) | 근접 간파 성공 | 암전·빛 모임 **없음** · 섬광 = 버전(§9, 기본 **V3 레퍼런스 맞춤**·암순응 나 — 11-03). V0 이면 강 예측 ②~⑥ · 약 예측 = 섬광 순간만 | V1~V3 = 월드 연출 전부(라이트·불꽃·파편·빛줄기·블룸·암순응). V0 = 월드 섬광·라이트·암순응(A2) | 강 |
 | **대쉬 간파** | 대시에 실린 간파 성공 | 간파와 같은 규칙, 섬광 기본 **V3**(11-03 — 전에는 V2) | 간파와 같음 | 강 |
-| **제압 간파** | 제압 칸 마지막 1칸을 깎은 성공(근접·대쉬 무관) | **강 시도부터 오너 암전 + 빛 모임** → 섬광 시퀀스(첫 프레임에 암전 걷힘) **+ V3 적중 라이트(같은 순간, 더하기 — §9.7)** → **제압 암순응** | 섬광 시퀀스 + V3 + 제압 암순응(공용) | 강 |
+| **제압 간파** | 제압 칸 마지막 1칸을 깎은 성공(근접·대쉬 무관) | 간파와 같은 규칙 — 암전·빛 모임 **없음**, 섬광 기본 **V3**·암순응 나(11-04 할 일 211 — 전에는 암전 + 섬광 시퀀스 + V3 + 제압 암순응 컷, §7 Legacy) | 간파와 같음 | 강 |
 
 - 슬로우·줌은 그대로(Q2) — 줌 세기는 슬로우 목적(강·약 시도 / 성공)이 고른다. 단계 설정에 줌 칸은 없다.
-- A5 전투 표시 숨김: 암전 없는 강 시도(일반·대쉬)는 시도 중 숨기지 않는다. 섬광 ②~⑥·제압 시퀀스 동안은 그대로 숨긴다(제압 암순응 컷 동안은 보인다).
+- A5 전투 표시 숨김: 암전 없는 강 시도는 시도 중 숨기지 않는다. 섬광 ②~⑥(V0) 동안은 그대로 숨긴다.
 
 ### 8.2 단계를 고르는 곳 — 새 RPC 없음
 
 - **사건 종류 `InterruptVariant`(Normal/Dash)**: 서버 성공 사건에 싣는다 — 세션 = 신고(`InterruptClaim.ViaDash`, 191 경로) → `ServerOnClaimVerdict(…, viaDash)`, 오프라인 = 시전 시작의 대쉬 여부(`castViaDash`).
 - **피어 전달**: 슬로우 Start 이벤트의 179 **표식 바이트 하나**에 비트로(비트 0 = 제압, 비트 1 = 대쉬 — `SlowMotionEvent.PackInterruptFlags`, 직렬화 크기 그대로). 디렉터 `HandleStarted` 가 `GlobalTimeScale.CurrentSuppressInterrupt`·`CurrentDashInterrupt` 를 읽어 `InterruptPresentationTierRules.Select`(실패 / 제압 &gt; 대쉬 &gt; 일반).
-- **오너 시도 암전(제압 예측)**: 판정 전에 알아야 해서 오너가 **대상의 제압 예측** `IInterruptSuppressForecast` 를 묻는다 — 23호 = 복제된 남은 제압 칸이 간파 한 번으로 0 이 되는가(`BossCounterProgress.ResolveSegments` 같은 계산). 입력 순간 예측 단계의 설정이 암전 켬이고 강 예측이면 `InterruptOwnerPresentation.Predict(…, dims: true)`.
-  예측 단계가 일반·대쉬면 `dims: false` — 강 상태(줌 붙잡기·②~⑥ 조건)만 남고 암전·빛 모임은 없다.
-- **오너 판정 성공(191 cue)**: 예측 단계의 섬광(`SuccessLook`)으로 — 제압이면 ②~⑥ 대신 **바로 섬광 시퀀스**(`JudgeSucceeded(…, InterruptSuccessLook.SuppressSequence, variant)` → `BeginSuppressFlash`), V1·V2 면 바로 적중 라이트 연출(§9). 뒤이은 내 서버 성공은 한 번 삼킨다.
+- **오너 시도 예측 = 일반·대쉬만**(11-04 할 일 211): 오너는 제압을 예측하지 않는다 — 옛 대상 제압 예측 `IInterruptSuppressForecast`(23호 구현 포함)·랩 `DebugSuppressForecastOverride` 는 삭제. 입력 순간 `Select(true, VariantOf(viaDash), false)` 의 단계 설정이 암전 켬이고 강 예측일 때만 `InterruptOwnerPresentation.Predict(…, dims: true)` — 기본 단계 설정은 모두 암전 끔이라 강 상태(줌 붙잡기·②~⑥ 조건)만 남는다.
+- **오너 판정 성공(191 cue)**: 예측 단계의 섬광(`SuccessLook`)으로 — V1~V3 면 바로 적중 라이트 연출(§9), V0 면 ②~⑥. 뒤이은 내 서버 성공은 한 번 삼킨다.
   사건에 근접/대쉬 종류(`variant`)를 싣는다 — 194 전에는 cue 경로 사건이 늘 Normal 이라 대쉬가 일반 단계로 계산됐다.
-  예측은 제압 아님 → 서버는 제압이면 서버 성공 순간 ②~⑥ 를 걷고 시퀀스로 바꾼다(`StartsSuppressSequenceOnServerSuccess`). 반대(예측 제압 → 서버 아님)는 이미 튼 시퀀스를 끝까지 둔다. 서버 거부면 시퀀스도 즉시 끈다.
+  서버가 제압이어도(예측은 일반·대쉬) 오너 화면은 판정 순간 튼 연출을 그대로 둔다 — 기본값은 단계 모두 V3 라 같은 연출이다(`suppressTier` 를 다르게 바꾸면 오너만 예측 단계 연출, 팀원은 제압 단계 연출). 서버 거부면 적중 라이트를 즉시 끈다.
 
-### 8.3 디렉터 칸 — "간파 연출 단계(할 일 192)"·"성공 — 제압 간파 섬광"
+### 8.3 디렉터 칸 — "간파 연출 단계(할 일 192)"
 
 | 칸 | 기본 | 뜻 |
 |---|---|---|
 | `normalTier` | 암전 끔 · 섬광 `HitLightReference`(V3) · 암순응 나 | 간파(근접) 성공(194 §9, 11-03 V1 → V3) |
 | `dashTier` | 암전 끔 · 섬광 `HitLightReference`(V3) · 암순응 나 | 대쉬 간파 성공(194 §9, 11-03 V2 → V3) |
-| `suppressTier` | 암전 켬 · 섬광 `SuppressSequence` · `sequenceHitLight` = `HitLightReference`(V3) | 제압 간파 성공 — 시퀀스 + V3(§9.7). A6 끔·컷 데이터 없음이면 ②~⑥ 로 돌아가고 V3 는 더하지 않는다 |
+| `suppressTier` | 암전 끔 · 섬광 `HitLightReference`(V3) · 암순응 나 | 제압 간파 성공(11-04 할 일 211 — 일반·대쉬와 같은 버전 선택, §9.7). 옛 `SuppressSequence`·`sequenceHitLight` 는 삭제(enum 값 1 은 비워 둠 — 들어 있으면 V0) |
 
-제압 암순응은 **컷 한 방식**(§8.4)이라 디렉터에 방식 칸이 없다 — '부드럽게(기존 암순응 곡선)' 방식은 2026-11-03 사용자 결정으로 삭제.
+### 8.4 제압 암순응 컷 (Q7) — Legacy (11-04 할 일 211)
 
-### 8.4 제압 암순응 컷 (Q7) — `SuppressFlashSequence.darkAdaptCuts`
+> 11-04 제압 간파 = V3, 시퀀스는 Legacy — 아래는 179·192 당시 기록이다. 컷 데이터·진행기는 `Legacy/SuppressFlash/` 에 남고 런타임에서 돌지 않는다. 암순응 출력 인터페이스 `ISuppressDarkAdaptOutput` 은 V1~V3 진행기가 계속 써서 밖(`InterruptProduction/`)으로 분리했다.
 
 - 섬광 시퀀스 **복귀 컷 뒤**에 이어서 컷마다 `duration`(초, 실제 시간 — 시퀀스 프레임 속도 무관)·`darkness`(암순응 렌더 강도 [0, 1])를 그대로 붙잡는다. 기본 = **어두움 1.0 · 0.15초 → 중간 0.5 · 0.15초 → 원래 색**. 비우면 컷 암순응 없음.
 - 렌더 = 기존 암순응(`InterruptDarkAdaptation` — 밝은 빛·이펙트는 남고 어두운 픽셀만 화면 전체에서 고르게 낮춤 — 대상 주변 원 없음(11-03 삭제), 임계 칸은 그 컴포넌트). 곡선(A2 팀원 암순응)은 멈추고 값만 붙잡는다(`ShowDarkAdaptCut`) — A2 칸·곡선 수치와는 무관.
@@ -745,11 +750,12 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 - **지금 단계 표시**: `내 마지막`(오너 — 시도 예측 단계 → 판정·서버 결과로 갱신, 실패면 실패) · `받은 성공`(이 화면이 마지막으로 받은 성공 단계, 남의 것 포함).
 - **재현 버튼 4개**(`실패`·`간파(근접)`·`대쉬 간파`·`제압 간파`): 이 화면에서만, 서버·슬로우·판정 없이 오너 연출을 판정 cue 경로 그대로 돌린다(시도 → 0.4초 → 결론, 대상 = 가장 가까운 간파 대상). **슬로우가 없어 줌은 안 보인다** — 줌·팀원 화면은 실제 간파로 본다.
-- 섬광 A6 토글·"허수아비 간파 = 제압 간파" 토글(§7.8) 유지. 토글이 켜져 있으면 오너 제압 예측도 허수아비를 제압 대상으로 본다(`DebugSuppressForecastOverride` — 랩 전용).
+- "허수아비 간파 = 제압 간파" 토글(§7.8) 유지 — 호스트에서 허수아비 성공을 제압 간파로 표식(받은 성공 = 제압 · `suppressTier` 연출 확인용). 섬광 A6 토글·A7 버튼과 오너 제압 예측 덮어쓰기는 11-04(할 일 211) 삭제.
 
 ### 8.6 알려진 한계
 
-- **기믹 중 23호**: 기믹 중 간파는 제압 칸을 깎지 않는데 기믹 여부는 서버만 안다 — 클라 오너는 기믹 중 마지막 칸이면 제압으로 예측해 암전을 켤 수 있다(성공 섬광 종류는 판정 순간 예측 → 서버 표식이 오면 일반이면 그대로 시퀀스가 끝까지). 호스트는 정확하다.
+- ~~**기믹 중 23호**: 클라 오너가 기믹 중 마지막 칸을 제압으로 잘못 예측해 암전을 켤 수 있다~~ → 11-04(할 일 211) 오너 제압 예측을 지워 없어졌다.
+- 오너 화면의 성공 연출은 예측 단계(일반·대쉬) 설정을 쓴다 — `suppressTier` 를 일반·대쉬와 다르게 바꾸면 제압 간파 성공자 본인 화면만 예측 단계 연출이다(기본값은 셋 다 V3 라 차이 없음).
 - 레이드 구출 성공(③ 새 가족)의 제압은 179 와 같이 제압 간파 표식을 내지 않는다(제압 칸 경로만).
 - ~~Q4·Q5 섬광(포인트라이트·환경광 끄기 / 암순응·블룸)은 미구현~~ → 194 적중 라이트 연출 V1·V2(§9).
 
@@ -759,7 +765,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 > 코드: `InterruptPresentationTier.cs`(버전 칸·선택 함수) · `HitLight/`(`InterruptHitLightLook` SO · `InterruptHitLightFx` 월드 이펙트 · `InterruptHitLightPlayer` 진행기 · `InterruptHitLightWhiteoutSettings`) ·
 > `Rendering/SceneLightDim.cs`(태양광·환경광 배율 공유) · 저작 메뉴 `Tools/Interrupt/적중 라이트 연출 에셋 만들기 (194)` · 테스트 `InterruptHitLightTests`·`SceneLightDimTests`·`InterruptPresentationTierTests`.
 
-### 9.1 버전표 — 단계(일반·대쉬)마다 고른다
+### 9.1 버전표 — 단계(일반·대쉬·제압)마다 고른다
 
 | 버전 | `InterruptTierFlash` | 무엇 | 누가 보나 |
 |---|---|---|---|
@@ -767,14 +773,14 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | **V1** | `HitLight` | 성공 순간 바로: 적중 포인트 라이트 + 암순응(가/나) + 블룸 + 불꽃 + 메시 파편 + 빛줄기 | **모든 피어**(암순응 가는 본인 1·팀원 0.35) |
 | **V2** | `HitLightWhiteout` | V1 + 적중 화이트아웃 3프레임(기존 ③ 그림 재사용, ③ 칸과 무관) | V1 + 화이트아웃은 **본인 화면만** |
 | **V3** | `HitLightReference` | 레퍼런스 맞춤(194 후속) — 전용 SO·프리팹(`InterruptHitLightLook_V3`·`FX_InterruptHitLight_V3`): 암순응 **나** 기본(태양광 −95%·환경광 −90%) + 채도 낮춤 색 보정 Volume + 약한 라이트(2·반경 3) + 중심만 번지는 블룸 + 작은 중심 점·가로 빛줄 + 가늘고 많은 불꽃 + 작은 빛줄기, 화이트아웃 없음 (§9.6) | **모든 피어** |
-| (제압) | `SuppressSequence` | §7 섬광 시퀀스 — 버전 선택 대상 아님. 대신 `sequenceHitLight` 칸으로 적중 라이트를 **더한다**(기본 V3, §9.7) | 모든 피어 |
+| ~~(제압)~~ | ~~`SuppressSequence`(값 1)~~ | 11-04(할 일 211) 삭제 — 제압도 위 V0~V3 에서 고른다(§9.7). 값 1 은 비워 둠(들어 있으면 V0) | — |
 
-- 기본 = **일반 V3 · 대쉬 V3 · 제압 = 시퀀스 + V3 · 암순응 나**(2026-11-03 사용자 결정 "V3 모든 인터럽트에 적용", 코드 기본값 = 프리팹 값). V0·V1·V2 는 지우지 않았다 — 랩 버튼(§9.4)으로 계속 고를 수 있다.
+- 기본 = **일반 V3 · 대쉬 V3 · 제압 V3 · 암순응 나**(제압은 11-04 할 일 211 — 전에는 시퀀스 + V3)(2026-11-03 사용자 결정 "V3 모든 인터럽트에 적용", 코드 기본값 = 프리팹 값). V0·V1·V2 는 지우지 않았다 — 랩 버튼(§9.4)으로 계속 고를 수 있다.
   디렉터 칸 `hitLightLook`(SO)·`hitLightVfx`(프리팹) 중 하나라도 비면 V1·V2 는, `hitLightLookReference`·`hitLightVfxReference` 중 하나라도 비면 V3 는 **V0 로 돌아간다**(`SelectSuccessLook`).
 - **틈 수직(기본, 194 후속 11-03)** — `hitLightOrigin = Gap`(enum 값 2를 뒤에 추가, 무기 0·대상 1 은 그대로·NetworkManager.prefab 단계 칸 값 2). 위치 = 오른손 무기(없으면 시전자 중심 = 발밑 + 섬광 높이)와 대상 몸 표면(등록 대상 콜라이더 `ClosestPoint`, 몸 → 트리거 순, 못 구하면 대상 적중점)의 중간점. 방향 = 시전자→대상 축(바닥 평면)의 수직선 — `Rays` 는 날개 2개 메시(`gapRaysMesh` = `Mesh_InterruptHitLight_Streak`)를 SO `gapRaySpread`(±20°)·`gapRayCount`(5) 부채로 양쪽, `Sparks` 는 수직선 양쪽 원뿔(`gapSparkSpread` 30°), V3 `Streak` 은 `gapStreakAxis`(수직선 기본 / 축 — 레퍼런스는 축 쪽) — 납작한 것은 렌더 정렬 Local + 카메라 쪽 기울임(`InterruptHitLightRules.ViewTilted`)이라 화면에서 늘 그 선 각도. `Core`·`Debris`·라이트는 위치만. 성공 순간 한 번 계산해 고정, 시전자를 못 찾거나 축이 없으면 방향 없음(처음 모습). 순수 함수 `InterruptHitLightRules.Place`·`ViewTilted`·`SparkDirection`, 프리팹 값은 재생 때만 바꾸고 무기·대상 모드는 처음 읽은 값으로 되돌린다.
-- **발생 위치 무기·대상**(194 후속, 단계 칸 `hitLightOrigin`) — 월드 이펙트(라이트·불꽃·파편·빛줄기)는 **시전자 오른손 무기**(Variant 루트 `PlayerWeaponAnchor.rightWeapon` = 팔라딘 `R_WeaponSocket` · 거너 `rig/artillery/LaserGun` · 암살자 `Dagger_Weapon_R`, 무기 로컬 `localOffset` 으로 칼끝 쪽 조정)의 성공 순간 위치에 남는다(따라가지 않음, 모든 피어가 자기 화면의 그 캐릭터 위치). 사건의 시전자(`CasterClientId`)로 찾고, 못 찾으면(앵커 없음·랩 가상 시전자) **대상 적중점**. `대상` 선택 = 194 처음 방식. 화이트아웃·V0 섬광·제압 섬광 기준점은 늘 대상.
+- **발생 위치 무기·대상**(194 후속, 단계 칸 `hitLightOrigin`) — 월드 이펙트(라이트·불꽃·파편·빛줄기)는 **시전자 오른손 무기**(Variant 루트 `PlayerWeaponAnchor.rightWeapon` = 팔라딘 `R_WeaponSocket` · 거너 `rig/artillery/LaserGun` · 암살자 `Dagger_Weapon_R`, 무기 로컬 `localOffset` 으로 칼끝 쪽 조정)의 성공 순간 위치에 남는다(따라가지 않음, 모든 피어가 자기 화면의 그 캐릭터 위치). 사건의 시전자(`CasterClientId`)로 찾고, 못 찾으면(앵커 없음·랩 가상 시전자) **대상 적중점**. `대상` 선택 = 194 처음 방식. 화이트아웃·V0 섬광 기준점은 늘 대상.
 - 전부 **실시간**(unscaled, Q8) — 슬로우·히트스톱 중에도 같은 빠르기. 줌은 지금처럼 오너만(슬로우 목적).
-- 섬광 순간 예약이 없다 — 성공 순간이 곧 섬광 순간(오너 성공 단계도 그때 끝낸다). 서버 거부·강제 리셋·제압 전환이면 즉시 끈다(`StopHitFlash` 한 곳).
+- 섬광 순간 예약이 없다 — 성공 순간이 곧 섬광 순간(오너 성공 단계도 그때 끝낸다). 서버 거부·강제 리셋이면 즉시 끈다(`StopHitFlash` 한 곳 — 제압 시퀀스 전환은 11-04 삭제).
 
 ### 9.2 구성 — `FX_InterruptHitLight.prefab`·`InterruptHitLightLook.asset` (`Assets/5.VFX/Interrupt/HitLight/`)
 
@@ -799,7 +805,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 ### 9.4 DebugInterruptLab 버튼 (튜닝 패널 "간파 단계" 아래)
 
-- `간파(근접) 버전 — 실제 V?` / `대쉬 간파 버전 — 실제 V?` 줄마다 `V0`·`V1`·`V2`·`V3`·`가 화면`·`나 씬 조명`·`위치 틈`·`위치 무기`·`위치 대상`·`재생`. 지금 값은 `[ ]` 로 표시, **실제** = 데이터 없음으로 V0 로 돌아간 것까지 반영.
+- `간파(근접) 버전 — 실제 V?` / `대쉬 간파 버전 — 실제 V?` / `제압 간파 버전 — 실제 V?`(11-04 할 일 211 추가) 줄마다 `V0`·`V1`·`V2`·`V3`·`가 화면`·`나 씬 조명`·`위치 틈`·`위치 무기`·`위치 대상`·`재생`. 지금 값은 `[ ]` 로 표시, **실제** = 데이터 없음으로 V0 로 돌아간 것까지 반영.
 - 이 피어 런타임 값만(저장 안 함), 다음 성공부터. `재생` = §8.5 단계 재현과 같은 경로(이 화면만, 슬로우·줌 없음).
 - 랩 블룸: 씬에 카메라·Volume 은 없고 `CameraSwitcher` 가 런타임에 `MainCamera.prefab`(후처리 켬 · Volume 마스크 Default)을 만든다 — 진행기의 블룸 Volume(Default 레이어)이 걸린다. 정적 구성 확인만 했고 화면 확인은 Play 필요.
 
@@ -815,7 +821,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 - 왜: V1·V2 는 블룸(threshold 0.8·intensity 6)·라이트(20·반경 8)가 세서 바닥까지 하얗게 날아가고 화면이 뿌옇다. 레퍼런스 2:34 적중 프레임(f30·f34)은 주변이 어둡고 보랏빛으로 채도가 낮고, 작고 강한 중심 점 + 가로 얇은 빛줄 + 맞닿은 가장자리만 주황 + 가늘고 긴 주황 불꽃.
 - **V1·V2 값은 그대로**(버전 보존) — V3 는 같은 형식의 별도 SO·프리팹·Volume 프로필. 디렉터 칸 `hitLightLookReference`·`hitLightVfxReference`, 둘 중 하나라도 비면 V3 → V0. 저작 메뉴 `Tools/Interrupt/적중 라이트 V3 레퍼런스 에셋 만들기 (194)`(SO·프로필·재질은 있으면 값 유지, 메시·프리팹은 같은 guid 로 다시 짓는다).
-- 기본값: 처음엔 안 바꿨다가(일반 V1·대쉬 V2) 사용자가 랩 비교 뒤 **11-03 일반·대쉬·제압 모두 V3** 로 결정(§9.1·§9.7). 랩 `V3` 버튼은 그 단계 암순응을 **나** 로 함께 맞춘다(`DefaultDarkAdapt`, 누른 뒤 가로 바꿀 수 있음).
+- 기본값: 처음엔 안 바꿨다가(일반 V1·대쉬 V2) 사용자가 랩 비교 뒤 **11-03 일반·대쉬·제압 모두 V3** 로 결정(§9.1·§9.7 — 제압은 11-04 할 일 211 부터 시퀀스 없이 V3 만). 랩 `V3` 버튼은 그 단계 암순응을 **나** 로 함께 맞춘다(`DefaultDarkAdapt`, 누른 뒤 가로 바꿀 수 있음).
 - **에셋 위치(11-03 정리)**: V3 전용은 `Assets/5.VFX/Interrupt/HitLight/V3/` — `InterruptHitLightLook_V3`·`VP_InterruptHitLight_V3_Bloom`·`VP_InterruptHitLight_V3_Grade`·`FX_InterruptHitLight_V3`·`M_InterruptHitLight_Core`·`M_InterruptHitLight_Streak`·`M_InterruptHitLight_Spark_V3`·`Mesh_InterruptHitLight_Core`.
   V1 과 함께 쓰는 것은 상위 `HitLight/` 에 남는다 — `Mesh_InterruptHitLight_Streak`(V1 틈 수직 `gapRaysMesh`)·`Mesh/M_InterruptHitLight_Rays`·`Mesh/M_InterruptHitLight_Debris`·셰이더 `InterruptHitLightRays`. 경로 상수 = `InterruptHitLightReferenceAuthoring`.
 - 아래 표는 **시작값**이다. 현재 값은 사용자가 에디터에서 직접 튜닝한 값(11-03 `3a95c486` — 라이트 10·반경 100·그림자, 블룸 threshold 0.19·intensity 5, 노출 −5·대비 55·채도 40·색 필터 흰색)이고, 테스트는 V3 절대값을 단언하지 않는다.
@@ -836,16 +842,12 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 - 4.MapScene(보스방 포함, 같은 씬) 기준: 태양광 0.75(실시간)·환경광 Trilight·전역 Volume `VP_CombatLevel_Toon`(노출 +0.25·채도 +8·대비 12·블룸 threshold 1.1/intensity 0.35·Neutral 톤매핑·비네트 0.22). V3 색 보정은 우선순위가 높아 가중치 1 에서 노출·채도·색 필터를 덮고(대비는 맵 값 유지), V3 블룸 threshold 2 는 맵(1.1)보다 높아 HDR 이펙트만 번진다. 랩(흰 체크 바닥·태양광 1·Volume 없음)보다 맵이 원래 어두워 V3 는 더 어둡게 보일 수 있다 — Play 로 확인.
 
-### 9.7 제압 간파 + V3 (194 후속, 2026-11-03)
+### 9.7 제압 간파 = V3 (할 일 211, 2026-11-04)
 
-- 제압 단계는 섬광이 `SuppressSequence` 라 V3 가 저절로 따라오지 않는다(버전 선택이 시퀀스 하나만 고른다). 그래서 단계 칸 **`sequenceHitLight`**(`InterruptTierFlash`, 기본 `HitFlash` = 더하지 않음, `suppressTier` 만 `HitLightReference`)를 두고,
-  시퀀스가 **실제로 틀 때만**(A6 켬·컷 데이터 있음) 그 버전의 적중 라이트를 같은 순간 더한다 — `InterruptPresentationTierRules.SelectSequenceHitLight` · 디렉터 `SequenceHitLight(tier)`.
-- 붙는 곳 = `BeginSuppressFlash` 끝 한 곳 → 서버 성공(`HandleStarted`)·오너 판정 cue(`OwnerJudgeSucceeded`)·랩 `제압 간파` 재현이 모두 지난다. 예측은 일반 → 서버는 제압이면 판정 순간 튼 V3 를 `StopHitFlash` 로 걷고 시퀀스 + V3 를 다시 튼다. 서버 거부면 시퀀스와 함께 끈다.
-- 시퀀스 보라·흰 7컷·오너 암전·제압 암순응 컷은 **그대로**(대체 아님). 시퀀스 대신 ②~⑥ 로 돌아가면(A6 끔) V3 도 더하지 않는다.
-- **암순응은 늘 나**(`SequenceHitLightDarkAdapt`, 단계 칸 `darkAdapt` 무시): 가(화면 패스)는 제압 암순응 컷과 같은 `InterruptDarkAdaptation` 출력이라 먼저 끝나는 쪽이 `ClearDarkAdapt` 로 다른 쪽을 지운다.
-  나는 `SceneLightDim` 배율 곱, V3 색 보정·블룸은 진행기 전용 Volume, 시퀀스는 후처리 뒤 셰이더 1패스 — 출력이 서로 달라 겹쳐도 복구 순서가 엮이지 않는다.
-  (V3 0.9초 곡선은 시퀀스 0.625초 + 암순응 컷 0.3초와 거의 같이 끝난다 — 겹친 화면은 Play 로 확인.)
-- 랩 버전 버튼 줄은 일반·대쉬만이다 — 제압의 더하는 버전은 인스펙터 `suppressTier.sequenceHitLight` 로 바꾼다.
+- **11-04 제압 간파 = V3, 시퀀스는 Legacy.** 제압 단계도 일반·대쉬와 **같은 버전 선택**(`suppressTier.flash`, 기본 `HitLightReference` = V3 · `darkAdapt` 나 · `ownerDim` 끔)이다 — `InterruptPresentationTierRules.SelectSuccessLook` 에 제압 분기가 없다.
+- 서버 성공(`HandleStarted`)은 사건 표식으로 고른 단계(`Suppress`)의 연출을 모든 피어가 튼다. 오너는 판정 순간 예측 단계(일반·대쉬)로 이미 틀었으므로 내 서버 성공은 다시 틀지 않는다(기본값 = 셋 다 V3 라 같은 화면).
+- 오너 암전·빛 모임·섬광 시퀀스·제압 암순응 컷 **없음**. 랩 버전 버튼 줄에 `제압 간파` 가 생겼다(§9.4) — 재현은 '제압 간파' 재현 버튼, 실제 표식은 '허수아비 간파 = 제압 간파' 토글(호스트).
+- 옛 194 후속(11-03) '시퀀스 + V3 더하기'(`sequenceHitLight`·`SelectSequenceHitLight`·`SequenceHitLightDarkAdapt`)는 삭제 — 시퀀스 자체가 Legacy(§7).
 
 ### 9.8 슬로우 3단계 SO — `InterruptSlowMotionSettings` (194 후속 2, 2026-11-03)
 

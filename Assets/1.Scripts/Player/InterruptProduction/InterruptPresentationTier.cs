@@ -22,16 +22,14 @@ public enum InterruptPresentationTier : byte
 }
 
 /// <summary>
-/// 성공 섬광 종류(할 일 192 → 194 버전). V0 = 기존 적중 섬광 ②~⑥ / 제압 간파 애니메이션 섬광 시퀀스(179) /
-/// V1 = 적중 라이트 연출(194 — 포인트 라이트·암순응·블룸·불꽃·파편·빛줄기, 모든 피어) / V2 = V1 + 적중 화이트아웃 몇 프레임(오너 화면).
-/// 값은 직렬화되므로 순서를 바꾸지 않는다.
+/// 성공 섬광 종류(할 일 192 → 194 버전). V0 = 기존 적중 섬광 ②~⑥ /
+/// V1 = 적중 라이트 연출(194 — 포인트 라이트·암순응·블룸·불꽃·파편·빛줄기, 모든 피어) / V2 = V1 + 적중 화이트아웃 몇 프레임(오너 화면) / V3 = 레퍼런스 맞춤.
+/// 값은 직렬화되므로 순서를 바꾸지 않는다. 값 1 = 옛 제압 간파 섬광 시퀀스(179) — 11-04(할 일 211) 런타임에서 빼고 코드는 Legacy 로 옮겼다. 1 은 다시 쓰지 않는다.
 /// </summary>
 public enum InterruptTierFlash : byte
 {
     /// <summary>V0 — 기존 적중 섬광 ②~⑥(오너 화면) + 섬광 순간 월드 섬광·암순응(132).</summary>
     HitFlash = 0,
-    /// <summary>제압 간파 애니메이션 섬광 시퀀스(179, 모든 피어) — A6 칸이 꺼졌거나 컷 데이터가 없으면 <see cref="HitFlash"/> 로 돌아간다.</summary>
-    SuppressSequence = 1,
     /// <summary>V1 — 적중 라이트 연출(할 일 194). 연출 데이터·프리팹이 없으면 <see cref="HitFlash"/> 로 돌아간다.</summary>
     HitLight = 2,
     /// <summary>V2 — V1 + 적중 화이트아웃 몇 프레임(할 일 194, 오너 화면). 연출 데이터·프리팹이 없으면 <see cref="HitFlash"/> 로 돌아간다.</summary>
@@ -52,7 +50,7 @@ public enum InterruptDarkAdaptMode : byte
 }
 
 /// <summary>
-/// V1·V2·V3 월드 이펙트(라이트·불꽃·파편·빛줄기·중심 점·가로 빛줄) 발생 위치(할 일 194 후속). 화면 섬광·화이트아웃·제압 섬광 기준점은 늘 대상이다.
+/// V1·V2·V3 월드 이펙트(라이트·불꽃·파편·빛줄기·중심 점·가로 빛줄) 발생 위치(할 일 194 후속). 화면 섬광·화이트아웃 기준점은 늘 대상이다.
 /// 값은 직렬화되므로(NetworkManager.prefab 단계 칸) 순서를 바꾸지 않는다 — 새 방식은 뒤에 붙인다.
 /// </summary>
 public enum InterruptHitLightOrigin : byte
@@ -68,13 +66,14 @@ public enum InterruptHitLightOrigin : byte
     Gap = 2,
 }
 
-/// <summary>이번 성공에서 실제로 트는 섬광(할 일 194) — 단계 설정 + 칸·데이터 유무로 <see cref="InterruptPresentationTierRules.SelectSuccessLook"/> 가 고른다.</summary>
+/// <summary>
+/// 이번 성공에서 실제로 트는 섬광(할 일 194) — 단계 설정 + 데이터 유무로 <see cref="InterruptPresentationTierRules.SelectSuccessLook"/> 가 고른다.
+/// 값 1 = 옛 제압 간파 섬광 시퀀스(179, 11-04 Legacy) — 비워 둔다.
+/// </summary>
 public enum InterruptSuccessLook : byte
 {
     /// <summary>V0 — 기존 적중 섬광 ②~⑥.</summary>
     HitFlash = 0,
-    /// <summary>제압 간파 섬광 시퀀스(179).</summary>
-    SuppressSequence = 1,
     /// <summary>V1 — 적중 라이트 연출.</summary>
     HitLight = 2,
     /// <summary>V2 — 적중 라이트 연출 + 화이트아웃.</summary>
@@ -89,28 +88,23 @@ public enum InterruptSuccessLook : byte
 [Serializable]
 public sealed class InterruptTierProfile
 {
-    [Tooltip("이 단계로 예측된 강 시도에서 오너 암전(+빛 모임)을 켠다(Q1 — 기본은 제압 간파만)")]
+    [Tooltip("이 단계로 예측된 강 시도에서 오너 암전(+빛 모임)을 켠다(Q1). 기본은 전부 끔 — 제압 간파 암전은 11-04(할 일 211) 뺐다(오너는 제압을 예측하지 않는다 — 시도 예측은 일반·대쉬만)")]
     public bool ownerDim;
-    [Tooltip("성공 섬광 종류 — V0 적중 섬광 ②~⑥ / 제압 간파 섬광 시퀀스 / V1 적중 라이트 연출 / V2 V1 + 화이트아웃(할 일 194) / V3 레퍼런스 맞춤(194 후속 — 암순응 나 권장)")]
+    [Tooltip("성공 섬광 종류 — V0 적중 섬광 ②~⑥ / V1 적중 라이트 연출 / V2 V1 + 화이트아웃(할 일 194) / V3 레퍼런스 맞춤(194 후속 — 암순응 나 권장)")]
     public InterruptTierFlash flash = InterruptTierFlash.HitFlash;
-    [Tooltip("V1·V2 의 암순응 방식(할 일 194 Q9) — 가 = 화면 패스(어두운 픽셀만) / 나 = 태양광·환경광 낮춤. V0·시퀀스에는 쓰지 않는다")]
+    [Tooltip("V1·V2·V3 의 암순응 방식(할 일 194 Q9) — 가 = 화면 패스(어두운 픽셀만) / 나 = 태양광·환경광 낮춤. V0 에는 쓰지 않는다")]
     public InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass;
     [Tooltip("V1·V2·V3 월드 이펙트 발생 위치(할 일 194 후속) — 시전자 오른손 무기(못 찾으면 대상) / 대상 적중점 / 틈 수직(기본 — 무기와 대상 표면 사이, 빛줄기·불꽃이 시전자→대상 축에 수직으로). 성공 순간 위치·방향에 남고 따라다니지 않는다")]
     public InterruptHitLightOrigin hitLightOrigin = InterruptHitLightOrigin.Gap;
-    [Tooltip("섬광 시퀀스와 함께 트는 적중 라이트(194 후속 — 더하기, 대체 아님). V1·V2·V3 만 쓰고 그 밖은 더하지 않는다. 시퀀스가 실제로 틀 때만. " +
-             "암순응은 늘 나(씬 조명) — 시퀀스 뒤 제압 암순응 컷과 같은 화면 패스를 나눠 쓰지 않게(위 암순응 칸은 무시)")]
-    public InterruptTierFlash sequenceHitLight = InterruptTierFlash.HitFlash;
 
     public InterruptTierProfile() { }
 
     public InterruptTierProfile(bool ownerDim, InterruptTierFlash flash,
-        InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass,
-        InterruptTierFlash sequenceHitLight = InterruptTierFlash.HitFlash)
+        InterruptDarkAdaptMode darkAdapt = InterruptDarkAdaptMode.ScreenPass)
     {
         this.ownerDim = ownerDim;
         this.flash = flash;
         this.darkAdapt = darkAdapt;
-        this.sequenceHitLight = sequenceHitLight;
     }
 }
 
@@ -138,34 +132,17 @@ public static class InterruptPresentationTierRules
         forecast == InterruptAttemptForecast.Strong && predictedTier != null && predictedTier.ownerDim;
 
     /// <summary>
-    /// 이번 성공이 제압 간파 섬광 시퀀스인가 — 성공 슬로우이고 단계 설정이 시퀀스이고 A6 칸이 켜져 있고 컷 데이터가 있을 때만(아니면 ②~⑥).
-    /// </summary>
-    public static bool PlaysSuppressSequence(SlowMotionPurpose purpose, InterruptTierProfile tier, bool suppressFlashOn, bool hasSequence) =>
-        purpose == SlowMotionPurpose.Success && tier != null && tier.flash == InterruptTierFlash.SuppressSequence &&
-        suppressFlashOn && hasSequence;
-
-    /// <summary>
-    /// [오너] 서버 성공 슬로우가 왔을 때 제압 섬광 시퀀스를 지금 시작하는가 — 오너 판정 cue 경로(191)가 판정 순간 이미 시퀀스를 틀었을 수 있다.
-    /// 시퀀스여야 하는데 그 화면이 아직 안 틀었으면(팀원 화면·cue 경로 아님·예측은 제압 아님 → 서버는 제압) 지금 튼다. 이미 틀었으면 다시 틀지 않는다.
-    /// </summary>
-    public static bool StartsSuppressSequenceOnServerSuccess(bool playsSequence, bool ownerCueHandled, bool ownerPlayedSequence) =>
-        playsSequence && !(ownerCueHandled && ownerPlayedSequence);
-
-    /// <summary>
-    /// 이번 성공에서 트는 섬광(할 일 194 — 단계 × 버전 선택표). 설정이 없으면 V0.
-    /// 시퀀스 = A6 칸이 켜져 있고 컷 데이터가 있을 때만, V1·V2 = 적중 라이트 연출(데이터·프리팹)이 있을 때만,
+    /// 이번 성공에서 트는 섬광(할 일 194 — 단계 × 버전 선택표). 설정이 없으면 V0. 제압 간파도 같은 표(11-04 할 일 211 — 기본 V3, 시퀀스 없음).
+    /// V1·V2 = 적중 라이트 연출(데이터·프리팹)이 있을 때만,
     /// V3 = V3 전용 데이터·프리팹(<paramref name="hasHitLightReference"/>)이 있을 때만 — 아니면 V0 로 돌아간다.
     /// </summary>
-    public static InterruptSuccessLook SelectSuccessLook(InterruptTierProfile tier, bool suppressFlashOn, bool hasSequence, bool hasHitLight,
-        bool hasHitLightReference = false)
+    public static InterruptSuccessLook SelectSuccessLook(InterruptTierProfile tier, bool hasHitLight, bool hasHitLightReference = false)
     {
         if (tier == null)
             return InterruptSuccessLook.HitFlash;
 
         switch (tier.flash)
         {
-            case InterruptTierFlash.SuppressSequence:
-                return suppressFlashOn && hasSequence ? InterruptSuccessLook.SuppressSequence : InterruptSuccessLook.HitFlash;
             case InterruptTierFlash.HitLight:
                 return hasHitLight ? InterruptSuccessLook.HitLight : InterruptSuccessLook.HitFlash;
             case InterruptTierFlash.HitLightWhiteout:
@@ -176,35 +153,6 @@ public static class InterruptPresentationTierRules
                 return InterruptSuccessLook.HitFlash;
         }
     }
-
-    /// <summary>
-    /// 섬광 시퀀스에 더하는 적중 라이트(194 후속 — 제압 간파에도 V3). 이번 섬광이 실제로 시퀀스이고 단계 칸
-    /// <see cref="InterruptTierProfile.sequenceHitLight"/> 가 V1·V2·V3 이고 그 데이터·프리팹이 있을 때만 — 아니면 <see cref="InterruptSuccessLook.HitFlash"/>(= 더하지 않음).
-    /// </summary>
-    public static InterruptSuccessLook SelectSequenceHitLight(InterruptSuccessLook look, InterruptTierProfile tier, bool hasHitLight,
-        bool hasHitLightReference)
-    {
-        if (look != InterruptSuccessLook.SuppressSequence || tier == null)
-            return InterruptSuccessLook.HitFlash;
-
-        switch (tier.sequenceHitLight)
-        {
-            case InterruptTierFlash.HitLight:
-                return hasHitLight ? InterruptSuccessLook.HitLight : InterruptSuccessLook.HitFlash;
-            case InterruptTierFlash.HitLightWhiteout:
-                return hasHitLight ? InterruptSuccessLook.HitLightWhiteout : InterruptSuccessLook.HitFlash;
-            case InterruptTierFlash.HitLightReference:
-                return hasHitLightReference ? InterruptSuccessLook.HitLightReference : InterruptSuccessLook.HitFlash;
-            default:
-                return InterruptSuccessLook.HitFlash;
-        }
-    }
-
-    /// <summary>
-    /// 시퀀스에 더한 적중 라이트의 암순응 — 늘 나(씬 조명). 가(화면 패스)는 제압 암순응 컷과 같은 출력이라 한쪽이 끝날 때 다른 쪽을 지운다.
-    /// 나는 <see cref="SceneLightDim"/> 배율 곱이라 시퀀스·암순응 컷과 복구 순서가 엮이지 않는다.
-    /// </summary>
-    public const InterruptDarkAdaptMode SequenceHitLightDarkAdapt = InterruptDarkAdaptMode.SceneLight;
 
     /// <summary>적중 라이트 연출(V1·V2·V3)인가 — ②~⑥ 진행기·섬광 순간 예약 대신 성공 순간 바로 튼다.</summary>
     public static bool UsesHitLight(InterruptSuccessLook look) =>
@@ -223,13 +171,4 @@ public static class InterruptPresentationTierRules
     /// <summary>V2 화이트아웃 프레임 수 — V2 이고 이 화면이 발동자 본인일 때만(화면 효과는 오너만, ②~⑥ 와 같다). 그 밖은 0.</summary>
     public static int WhiteoutFrames(InterruptSuccessLook look, bool viewerIsCaster, int frames) =>
         look == InterruptSuccessLook.HitLightWhiteout && viewerIsCaster ? Mathf.Max(0, frames) : 0;
-}
-
-/// <summary>
-/// [오너] 간파 대상이 이번 간파 성공으로 제압에 들어갈지 미리 알려 준다(할 일 192 — 시도 순간 오너 암전을 켜려면 판정 전에 알아야 한다).
-/// 23호 = 복제된 남은 제압 칸이 이번 간파 한 번으로 0 이 되는가. 예측일 뿐 — 실제 제압 여부는 서버가 성공 슬로우 표식으로 보낸다.
-/// </summary>
-public interface IInterruptSuppressForecast
-{
-    bool WouldSuppressOnInterrupt { get; }
 }

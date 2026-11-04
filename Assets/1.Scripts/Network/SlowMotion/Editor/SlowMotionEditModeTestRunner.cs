@@ -30,8 +30,8 @@ internal static class SlowMotionEditModeTestRunner
         "^InterruptHitFlashTests$",                // 적중 섬광 ②~⑥ 시간표·섬광 순간·오너/팀원 분기·Volume 복구·텍스처 칸·프리팹·렌더러(할 일 132 §15)
         "^InterruptPresentationEffectTests$",      // 연출 켜기/끄기 칸 — 기본 암전만·그리기만 끔·섬광 순간 정상(할 일 132 §17)
         "^DebugInterruptLabTests$",                // 디버그 배속 합성·허수아비 회복·튜닝 패널(할 일 115 C5, 132 §17)
-        "^SuppressFlashTests$",                    // 제압 간파 섬광 시간표·컷 전환·섬광 줄이기·서버 표식·Start 플래그·비트 7·에셋(할 일 179)
-        "^InterruptPresentationTierTests$",        // 간파 연출 4단계 선택·버전 선택(할 일 192·194)
+        // SuppressFlashTests(제압 간파 섬광 시퀀스, 179)는 11-04(할 일 211) Legacy — 런타임 연결이 없어 이 메뉴에서 뺐다(Test Runner 에서 직접).
+        "^InterruptPresentationTierTests$",        // 간파 연출 4단계 선택·버전 선택·제압 표식(할 일 192·194·211)
         "^InterruptHitLightTests$",                // 적중 라이트 연출 V1·V2·V3(레퍼런스 맞춤·채도 Volume)·발생 위치(틈 수직/오른손 무기/대상/대체)·Variant 기준점(할 일 194)
         "^SceneLightDimTests$",                    // 암순응 나 × 23호 차징 태양광 배율 공유(할 일 194)
     };

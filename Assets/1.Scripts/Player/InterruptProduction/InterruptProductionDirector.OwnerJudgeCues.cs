@@ -34,8 +34,8 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
         return LocalOwnerAttempt(cue.Skill, cue.Forecast, cue.Owner, cue.Target, cue.AttackDirection, cue.ViaDash);
     }
 
-    // 판정 성공(할 일 192) — 시도 순간 예측한 단계가 제압 간파면 ②~⑥ 대신 제압 섬광 시퀀스를 지금 튼다(암전은 시퀀스 첫 프레임에 걷힌다).
-    // 서버 표식은 성공 슬로우로 뒤에 온다 — 예측이 빗나가 서버가 제압이면 그때 시퀀스로 바꾼다(HandleStarted).
+    // 판정 성공(할 일 192) — 시도 순간 예측한 단계(일반·대쉬 — 제압은 예측하지 않는다, 11-04 할 일 211)의 섬광을 지금 튼다.
+    // 서버 표식은 성공 슬로우로 뒤에 온다 — 서버가 제압이어도 같은 V3 라 다시 틀지 않는다(HandleStarted).
     void IInterruptOwnerCueSink.OwnerJudgeSucceeded(in InterruptOwnerCue cue)
     {
         ulong viewer = _networkManager != null ? _networkManager.LocalClientId : 0;
@@ -45,21 +45,18 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
             Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, look, variant);
         LastOwnerTier = _ownerPredictedTier;
         CameraCenterSucceeded(Time.unscaledTime);
-        if (look == InterruptSuccessLook.SuppressSequence)
-            BeginSuppressFlash(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, true, variant), true);
-        else if (InterruptPresentationTierRules.UsesHitLight(look))
-            BeginHitLight(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition, false, variant), true, look);
+        // 제압 칸 = 예측 단계 그대로(랩 '제압 간파' 재현만 제압 — 그 단계 설정의 발생 위치·암순응을 쓰게).
+        if (InterruptPresentationTierRules.UsesHitLight(look))
+            BeginHitLight(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition,
+                _ownerPredictedTier == InterruptPresentationTier.Suppress, variant), true, look);
     }
 
     void IInterruptOwnerCueSink.OwnerEnded(InterruptOwnerEndReason reason)
     {
-        // 서버 거부는 이미 튼 제압 섬광 시퀀스까지 끈다(②~⑥ 와 같은 규칙). 판정 실패·끊김은 결론 전 시도만 걷는다(Q3 — 그 순간 종료).
-        if (reason == InterruptOwnerEndReason.ServerRejected && _ownerJudgeCues != null && _ownerJudgeCues.LocalSuccessPlayedSuppress)
-            _suppressFlash?.Stop();
-        // 적중 라이트 연출(할 일 194)도 같다 — 판정 순간 성공 단계를 이미 끝냈으므로 상태 기계의 거부 처리가 끄지 못한다.
-        // 시퀀스에 더한 적중 라이트(194 후속 — 제압 V3)도 같이 끈다.
+        // 서버 거부면 판정 순간 튼 적중 라이트 연출(할 일 194)을 끈다 — 판정 순간 성공 단계를 이미 끝냈으므로 상태 기계의 거부 처리가 끄지 못한다.
+        // 판정 실패·끊김은 결론 전 시도만 걷는다(Q3 — 그 순간 종료).
         if (reason == InterruptOwnerEndReason.ServerRejected && _ownerJudgeCues != null &&
-            (InterruptPresentationTierRules.UsesHitLight(_ownerJudgeCues.LocalSuccessLook) || _ownerJudgeCues.LocalSuccessPlayedSuppress))
+            InterruptPresentationTierRules.UsesHitLight(_ownerJudgeCues.LocalSuccessLook))
             _hitLight?.Stop();
         OwnerJudgeCues.Ended(reason, Time.unscaledTime);
         CameraCenterReturn(Time.unscaledTime); // 196 — 판정 실패·서버 거부·끊김·판정 버림 = 그 순간 복귀
@@ -82,7 +79,7 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
     // ---- 디버그 단계 재현(할 일 192 — DebugInterruptLab 버튼). 이 화면에서만, 서버·슬로우 없이 오너 연출만 판정 cue 경로 그대로 돌린다 ----
 
     /// <summary>
-    /// [디버그] 단계 재현 시도 — 실패 = 약 예측(약한 줌 자리, 이 재현은 슬로우가 없어 줌 없음), 그 밖 = 그 단계로 예측한 강 시도(제압이면 암전·빛 모임).
+    /// [디버그] 단계 재현 시도 — 실패 = 약 예측(약한 줌 자리, 이 재현은 슬로우가 없어 줌 없음), 그 밖 = 그 단계로 예측한 강 시도(단계 설정이 암전 켬이면 암전·빛 모임).
     /// 새 시도로 받아들였으면 true. 뒤이어 <see cref="DebugPreviewResolve"/> 를 부른다.
     /// </summary>
     public bool DebugPreviewAttempt(InterruptPresentationTier tier, PlayerInterruptSkillBase skill, GameObject owner, GameObject target,

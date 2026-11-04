@@ -274,44 +274,7 @@ public sealed class DebugInterruptLabTests
         }
     }
 
-    // ---- 제압 간파 섬광 A6 토글(179) ----
-
-    [Test]
-    public void 제압_섬광_토글은_A6만_바꾼다()
-    {
-        var go = new UnityEngine.GameObject("Director");
-        var sequence = UnityEngine.ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        try
-        {
-            var director = go.AddComponent<InterruptProductionDirector>();
-            var so = new UnityEditor.SerializedObject(director);
-            so.FindProperty("suppressFlashSequence").objectReferenceValue = sequence;
-            so.ApplyModifiedPropertiesWithoutUndo();
-
-            Assert.IsTrue(director.SuppressFlashEnabled, "기본 = A6 켬");
-            Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true));
-
-            director.SuppressFlashEnabled = false;
-            Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "끔 = 일반 간파 연출");
-            Assert.AreSame(sequence, director.SuppressFlashSequence, "끔은 컷 데이터를 그대로 둔다");
-
-            director.SuppressFlashEnabled = true;
-            Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "다시 켬");
-        }
-        finally
-        {
-            UnityEngine.Object.DestroyImmediate(go);
-            UnityEngine.Object.DestroyImmediate(sequence);
-        }
-    }
-
-    [Test]
-    public void A7_섬광_범위_버튼은_상태를_표시한다()
-    {
-        Assert.AreNotEqual(DebugInterruptTuningPanel.TargetOnlyLabel(true), DebugInterruptTuningPanel.TargetOnlyLabel(false));
-        StringAssert.Contains("대상 내부만", DebugInterruptTuningPanel.TargetOnlyLabel(true));
-        StringAssert.Contains("전체 화면", DebugInterruptTuningPanel.TargetOnlyLabel(false));
-    }
+    // ---- 허수아비 간파 = 제압 간파 재현(179 후속 3). A6·A7 토글은 11-04(할 일 211) 시퀀스와 함께 뺐다 ----
 
     [Test]
     public void 제압_간파_재현은_꺼져_있으면_허수아비가_없어도_무해()
@@ -328,10 +291,10 @@ public sealed class DebugInterruptLabTests
     // ---- 194 — 적중 라이트 연출 버전 버튼 ----
 
     [Test]
-    public void 버전_버튼은_일반_대쉬_단계에_V0_V1_V2_V3와_암순응_가_나()
+    public void 버전_버튼은_일반_대쉬_제압_단계에_V0_V1_V2_V3와_암순응_가_나()
     {
-        CollectionAssert.AreEqual(new[] { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash },
-            DebugInterruptTierPreview.VersionTiers, "제압은 시퀀스 고정");
+        CollectionAssert.AreEqual(new[] { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash, InterruptPresentationTier.Suppress },
+            DebugInterruptTierPreview.VersionTiers, "제압도 같은 버전 표(11-04 할 일 211)");
         CollectionAssert.AreEqual(new[] { "V0", "V1", "V2", "V3" },
             System.Array.ConvertAll(DebugInterruptTierPreview.Versions, DebugInterruptTierPreview.VersionLabel));
         Assert.AreEqual(2, DebugInterruptTierPreview.DarkAdaptModes.Length);
