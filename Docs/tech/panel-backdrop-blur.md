@@ -39,3 +39,13 @@ Screen Space Overlay UI 는 후처리 뒤에 그려져 렌더 피처가 못 건�
 ## 4. 비용
 
 열린 동안 매 프레임 1/4 해상도 가로·세로 블러 × 반복 3 + 풀 해상도 합성·복사 1회(추정 0.2~0.5ms, 미실측). 캔버스 전환 순간 캔버스 다시 그리기 1회. 닫혀 있으면 0.
+
+## 5. 직접 구동 — 타이틀 Press 대기 (할 일 218)
+
+`PanelBackdropBlur.Drive(owner, amount, look)` — `Acquire` 한 owner 가 세기를 0~1 로 **직접** 정한다(fadeSeconds 보간 무시, 바로 반영).
+구동 중엔 피처가 SO 의 세기·채도·어둡게 대신 `PanelBackdropBlurLook`(같은 뜻의 칸 + `scaleRadiusWithAmount` = 블러 반경도 세기에 비례)을 쓴다.
+`Release` 하면 구동이 풀리고 남은 세기는 평소처럼 fadeSeconds 로 0 이 된다. 셰이더·RT 는 그대로(새 텍스처 없음).
+
+- 쓰는 곳: `TitleFlowDirector` — Press 문구(`_pressAnyKeyRoot`)의 캔버스를 패널로 잡아 그 캔버스(문구·스킵 안내·페이드)는 선명, 월드만 블러 + 흑백(기본 세기 1.42·채도 0·어둡게 0·반경 비례).
+  아무 키 → 문구 끔 → `_restoreDuration`(1초, unscaled) 동안 세기 1→0 선형(블러·흑백 같이 원복) → 놓고 기존 카메라 진입(`EnterApproaching`). 원복 중 ESC 스킵 없음.
+- 문구 참조가 비면 블러를 건너뛴다(캔버스 없이 잡으면 모든 Overlay 가 흐려져 문구까지 흐려짐).

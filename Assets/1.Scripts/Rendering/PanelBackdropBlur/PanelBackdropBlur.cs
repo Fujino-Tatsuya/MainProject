@@ -43,6 +43,20 @@ public static class PanelBackdropBlur
             r.SetPanelCanvas(owner, root);
     }
 
+    /// <summary>
+    /// 직접 구동(할 일 218 타이틀 Press 대기) — 잡은 owner 가 세기를 0~1 로 직접 정한다(<see cref="PanelBackdropBlurSettings.fadeSeconds"/> 보간 대신).
+    /// 구동하는 동안 렌더 피처는 SO 의 세기·채도·어둡게 대신 <paramref name="look"/> 을 쓴다. 먼저 <see cref="Acquire"/> 해야 한다(아니면 무시).
+    /// <see cref="Release"/> 하면 구동이 풀리고, 남은 세기는 평소처럼 fadeSeconds 로 0 이 된다(0 까지 구동한 뒤 놓으면 바로 꺼짐).
+    /// </summary>
+    public static void Drive(object owner, float amount, PanelBackdropBlurLook look)
+    {
+        if (owner != null)
+            state.Drive(owner, amount, look);
+    }
+
+    /// <summary>구동 중이면 그 연출 값. 렌더 피처가 SO 값 대신 쓴다.</summary>
+    public static bool TryGetDrivenLook(out PanelBackdropBlurLook look) => state.TryGetDrivenLook(out look);
+
     /// <summary>패널이 닫혔다. 잡지 않은 owner 는 무시.</summary>
     public static void Release(object owner)
     {
@@ -228,6 +242,11 @@ public sealed class PanelBackdropBlurState
 {
     private readonly Dictionary<object, int> owners = new Dictionary<object, int>();
 
+    // 직접 구동(218) — 구동하는 owner 가 있으면 Amount = drivenAmount(보간 없음).
+    private object drivenOwner;
+    private float drivenAmount;
+    private PanelBackdropBlurLook drivenLook;
+
     /// <summary>블러 세기 0~1.</summary>
     public float Amount { get; private set; }
 
@@ -260,12 +279,43 @@ public sealed class PanelBackdropBlurState
         return added;
     }
 
-    /// <summary>놓는다. 잡고 있었으면 true.</summary>
-    public bool Release(object owner) => owners.Remove(owner);
+    /// <summary>놓는다. 잡고 있었으면 true. 구동하던 owner 면 구동도 풀린다.</summary>
+    public bool Release(object owner)
+    {
+        if (ReferenceEquals(owner, drivenOwner))
+            drivenOwner = null;
+        return owners.Remove(owner);
+    }
 
-    /// <summary>세기를 목표(열림 1 / 닫힘 0)로 <paramref name="fadeSeconds"/> 에 걸쳐 옮긴다. 0 이하면 바로 목표.</summary>
+    /// <summary>잡은 owner 가 세기를 직접 정한다(0~1 로 자름). 잡지 않은 owner 면 false. 세기는 바로 바뀐다.</summary>
+    public bool Drive(object owner, float amount, PanelBackdropBlurLook look)
+    {
+        if (!owners.ContainsKey(owner))
+            return false;
+
+        drivenOwner = owner;
+        drivenAmount = Mathf.Clamp01(amount);
+        drivenLook = look;
+        Amount = drivenAmount;
+        return true;
+    }
+
+    /// <summary>구동 중인가 + 그 연출 값.</summary>
+    public bool TryGetDrivenLook(out PanelBackdropBlurLook look)
+    {
+        look = drivenLook;
+        return drivenOwner != null;
+    }
+
+    /// <summary>세기를 목표(열림 1 / 닫힘 0)로 <paramref name="fadeSeconds"/> 에 걸쳐 옮긴다. 0 이하면 바로 목표. 구동 중이면 구동 값 그대로.</summary>
     public void Advance(float unscaledDeltaTime, float fadeSeconds)
     {
+        if (drivenOwner != null)
+        {
+            Amount = drivenAmount;
+            return;
+        }
+
         float target = owners.Count > 0 ? 1f : 0f;
         Amount = fadeSeconds <= 0f
             ? target
@@ -275,6 +325,7 @@ public sealed class PanelBackdropBlurState
     public void Reset()
     {
         owners.Clear();
+        drivenOwner = null;
         Amount = 0f;
     }
 
@@ -284,4 +335,32 @@ public sealed class PanelBackdropBlurState
     /// </summary>
     public static bool ShouldSwitch(bool isOverlay, bool isRoot, bool isPanelCanvas, int canvasSortingOrder, int topPanelOrder) =>
         isOverlay && isRoot && !isPanelCanvas && canvasSortingOrder < topPanelOrder;
+}
+
+/// <summary>
+/// 직접 구동(<see cref="PanelBackdropBlur.Drive"/>, 할 일 218) 때 SO 대신 쓰는 연출 값. 뜻은 <see cref="PanelBackdropBlurSettings"/> 의 같은 이름 칸과 같고,
+/// 셋 다 세기(Amount)와 함께 0 쪽으로 줄어든다 — 세기 1 = 이 값 그대로, 0 = 원본 화면.
+/// </summary>
+[System.Serializable]
+public struct PanelBackdropBlurLook
+{
+    [Tooltip("블러 세기(축소 해상도 텍셀 스텝 배율). PanelBackdropBlurSettings.blurStrength 와 같은 뜻.")]
+    [Range(0f, 4f)] public float blurStrength;
+
+    [Tooltip("채도. 0 = 완전 흑백, 1 = 원색. 세기가 0 으로 가면 원색으로 돌아온다.")]
+    [Range(0f, 1f)] public float saturation;
+
+    [Tooltip("어둡게. 0 = 그대로, 1 = 검정.")]
+    [Range(0f, 1f)] public float darken;
+
+    [Tooltip("켜면 블러 반경도 세기에 비례해 줄어든다(원본·블러 겹침 대신 실제로 덜 흐려지는 모양). 끄면 패널 블러와 같은 교차 섞기만.")]
+    public bool scaleRadiusWithAmount;
+
+    public PanelBackdropBlurLook(float blurStrength, float saturation, float darken, bool scaleRadiusWithAmount)
+    {
+        this.blurStrength = blurStrength;
+        this.saturation = saturation;
+        this.darken = darken;
+        this.scaleRadiusWithAmount = scaleRadiusWithAmount;
+    }
 }

@@ -6,12 +6,13 @@ using UnityEngine.InputSystem;
 public enum TitleFlowState
 {
     Idle,
+    Restoring,
     Approaching,
     Starting,
 }
 
 /// <summary>
-/// 타이틀 연출의 단일 진입점. Press 캡슐 → 아무 키 → 카메라가 모니터로 다가감 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비.
+/// 타이틀 연출의 단일 진입점. Press 문구(화면은 블러·흑백) → 아무 키 → 블러·흑백 원복(1초, 218) → 카메라가 모니터로 다가감 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비.
 /// 다가가는 중 ESC = 꺼짐 없이 바로 검정 페이드 → 로비.
 /// </summary>
 /// <remarks>
@@ -56,8 +57,20 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [SerializeField] private Vector2 _startBurst = new(0.35f, 0.1f);
 
     [Header("UI 루트")]
-    [Tooltip("Press 캡슐 — 화면 앞 오버레이(모니터 안이 아니다).")]
+    [Tooltip("Press Any Button 문구 — 화면 앞 오버레이(모니터 안이 아니다). 이 문구가 있는 캔버스는 대기 블러에서 빠져 선명하다.")]
     [SerializeField] private GameObject _pressAnyKeyRoot;
+
+    // 218 — Press 대기 동안 문구 캔버스 밖(월드)을 블러·흑백으로, 키 입력 뒤 선형으로 원복한 다음 카메라 진입.
+    // 블러는 201 공용 경로(PanelBackdropBlur.Drive → PC_Renderer PanelBackdropBlurFeature). 렌더러에 피처가 없으면 원복 시간만 기다린다.
+    [Header("Press 대기 블러·흑백 (218)")]
+    [Tooltip("끄면 블러·흑백 없이 예전처럼 키 입력 즉시 카메라 진입.")]
+    [SerializeField] private bool _idleBlurEnabled = true;
+
+    [Tooltip("대기 중 화면 모양. 채도 0 = 완전 흑백. 원복 동안 셋 다 원본 쪽으로 선형으로 줄어든다.")]
+    [SerializeField] private PanelBackdropBlurLook _idleBlurLook = new(1.42f, 0f, 0f, true);
+
+    [Tooltip("키 입력 뒤 블러 0·색 원복까지 걸리는 시간(초, unscaled, 선형). 끝나면 카메라 진입 연출.")]
+    [SerializeField, Min(0f)] private float _restoreDuration = 1f;
 
     [Header("오버레이 (전체화면)")]
     [Tooltip("우측 하단 'Esc 건너뛰기' 안내(TitleSkipHint — 보스 스킵 위젯 모양, 누르면 바로). 접근 구간에만 켠다.")]
@@ -80,6 +93,8 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
     private TitleFlowState _state = TitleFlowState.Idle;
     private float _approachElapsed;
+    private float _restoreElapsed;
+    private bool _blurHeld;
 
     public TitleFlowState State => _state;
 
@@ -114,7 +129,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
         {
             case TitleFlowState.Idle:
                 if (AnyStartInput())
-                    EnterApproaching();
+                    EnterRestoring();
+                break;
+
+            case TitleFlowState.Restoring:
+                TickRestoring();
                 break;
 
             case TitleFlowState.Approaching:
@@ -138,7 +157,39 @@ public sealed class TitleFlowDirector : MonoBehaviour
         if (_crtFx != null)
             _crtFx.AmbientBursts = true; // 로고·Press 캡슐이 지직거린다
 
+        HoldIdleBlur();
+
         Debug.Log("[TitleFlow] Idle");
+    }
+
+    // 키 입력 → Press 문구는 바로 끄고(예전 키 입력 순간과 같음), 블러·흑백을 _restoreDuration 동안 선형으로 0 까지 → 카메라 진입.
+    private void EnterRestoring()
+    {
+        SetActive(_pressAnyKeyRoot, false);
+
+        if (!_blurHeld || _restoreDuration <= 0f)
+        {
+            ReleaseIdleBlur();
+            EnterApproaching();
+            return;
+        }
+
+        _state = TitleFlowState.Restoring;
+        _restoreElapsed = 0f;
+        Debug.Log("[TitleFlow] Restoring");
+    }
+
+    private void TickRestoring()
+    {
+        _restoreElapsed += Time.unscaledDeltaTime;
+        float t = Mathf.Clamp01(_restoreElapsed / _restoreDuration);
+        PanelBackdropBlur.Drive(this, 1f - t, _idleBlurLook);
+
+        if (t >= 1f)
+        {
+            ReleaseIdleBlur();
+            EnterApproaching();
+        }
     }
 
     private void EnterApproaching()
@@ -216,6 +267,41 @@ public sealed class TitleFlowDirector : MonoBehaviour
     {
         yield return _monitorDisplay.PowerOff(_powerOffDuration);
         _sceneManager.StartGame();
+    }
+
+    // ── Press 대기 블러(218) ──────────────────────────────────────────────
+
+    // 문구가 있는 캔버스를 "패널"로 잡는다 → 그 캔버스(Overlay)는 후처리 뒤에 그려져 선명, 월드만 흐림·흑백.
+    private void HoldIdleBlur()
+    {
+        if (!_idleBlurEnabled || _blurHeld)
+            return;
+
+        Canvas sharpCanvas = _pressAnyKeyRoot != null ? _pressAnyKeyRoot.GetComponentInParent<Canvas>(true) : null;
+        if (sharpCanvas == null)
+        {
+            // 캔버스 없이 잡으면 모든 Overlay 캔버스가 흐림 대상이 된다 — 문구까지 흐려지니 블러를 건너뛴다.
+            Debug.LogWarning("[TitleFlow] Press 문구(_pressAnyKeyRoot)·캔버스가 없다 — 대기 블러 없이 진행.", this);
+            return;
+        }
+
+        PanelBackdropBlur.Acquire(this, sharpCanvas);
+        PanelBackdropBlur.Drive(this, 1f, _idleBlurLook);
+        _blurHeld = true;
+    }
+
+    private void ReleaseIdleBlur()
+    {
+        if (!_blurHeld)
+            return;
+
+        PanelBackdropBlur.Release(this);
+        _blurHeld = false;
+    }
+
+    private void OnDisable()
+    {
+        ReleaseIdleBlur();
     }
 
     // x = 세기, y = 길이(초) — 인스펙터 「전환 지직거림」.

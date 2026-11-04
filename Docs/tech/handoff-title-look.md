@@ -24,3 +24,4 @@
 
 - 0.BootStrapScene 에서 Play: 대기 → 3초 접근 → 메뉴(START/OPTION/EXIT 가독성) → 설정창 → START 다이브.
   - ⚠️ 정정(10-26): 메뉴·설정창·다이브는 없어졌다. 지금 = Press 캡슐 → 아무 키 → 3초 접근 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비(접근 중 ESC = 바로 페이드).
+  - ⚠️ 정정(11-04, 할 일 218): Press 캡슐은 없어지고 문구(`Text`)만 캔버스 바로 아래에 있다. 대기 중 문구 밖 화면은 블러 + 흑백, 아무 키 → 문구 꺼짐 + 1초 선형 원복 → 3초 접근 … (`TitleFlowDirector` 「Press 대기 블러·흑백 (218)」 칸, 블러 경로는 [panel-backdrop-blur.md §5](panel-backdrop-blur.md)).

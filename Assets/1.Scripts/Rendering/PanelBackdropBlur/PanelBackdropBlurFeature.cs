@@ -60,7 +60,14 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
         if (amount <= 0f)
             return;
 
-        _pass.Setup(_settings, amount);
+        // 직접 구동(218 타이틀) 중이면 SO 대신 구동 값. 반경 비례면 블러 세기에 Amount 를 곱한다.
+        PanelBackdropBlurLook look = PanelBackdropBlur.TryGetDrivenLook(out PanelBackdropBlurLook driven)
+            ? driven
+            : new PanelBackdropBlurLook(_settings.blurStrength, _settings.saturation, _settings.darken, false);
+        if (look.scaleRadiusWithAmount)
+            look.blurStrength *= amount;
+
+        _pass.Setup(_settings, amount, look);
         renderer.EnqueuePass(_pass);
     }
 
@@ -89,6 +96,7 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
         private readonly Material _material;
         private PanelBackdropBlurSettings _settings;
         private float _amount;
+        private PanelBackdropBlurLook _look;
 
         private class PassData
         {
@@ -103,10 +111,11 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
             profilingSampler = new ProfilingSampler("PanelBackdropBlur");
         }
 
-        public void Setup(PanelBackdropBlurSettings settings, float amount)
+        public void Setup(PanelBackdropBlurSettings settings, float amount, PanelBackdropBlurLook look)
         {
             _settings = settings;
             _amount = amount;
+            _look = look;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -134,9 +143,9 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
             blurDesc.height = Mathf.Max(1, fullDesc.height / divisor);
 
             _material.SetVector(IdStep, new Vector4(
-                _settings.blurStrength / Mathf.Max(1, blurDesc.width),
-                _settings.blurStrength / Mathf.Max(1, blurDesc.height), 0f, 0f));
-            _material.SetVector(IdParams, new Vector4(_amount, _settings.saturation, _settings.darken, 0f));
+                _look.blurStrength / Mathf.Max(1, blurDesc.width),
+                _look.blurStrength / Mathf.Max(1, blurDesc.height), 0f, 0f));
+            _material.SetVector(IdParams, new Vector4(_amount, _look.saturation, _look.darken, 0f));
 
             TextureHandle blurA = UniversalRenderer.CreateRenderGraphTexture(renderGraph, blurDesc, "_PanelBlurA", false, FilterMode.Bilinear);
             TextureHandle blurB = UniversalRenderer.CreateRenderGraphTexture(renderGraph, blurDesc, "_PanelBlurB", false, FilterMode.Bilinear);

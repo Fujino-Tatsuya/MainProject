@@ -1282,7 +1282,7 @@ MonoBehaviour:
   _crtFx: {fileID: 1471206462}
   _approachBurst: {x: 0.8, y: 0.25}
   _startBurst: {x: 0.35, y: 0.1}
-  _pressAnyKeyRoot: {fileID: 0}
+  _pressAnyKeyRoot: {fileID: 116234144}
   _skipHintRoot: {fileID: 694788603}
   _sceneManager: {fileID: 1084549395}
   _burstFx: {fileID: 1724701167}

@@ -53,6 +53,37 @@ public sealed class PanelBackdropBlurTests
     }
 
     [Test]
+    public void Drive_SetsAmountDirectly_IgnoresFade_UntilReleased()
+    {
+        var state = new PanelBackdropBlurState();
+        object title = new object();
+        var look = new PanelBackdropBlurLook(1.42f, 0f, 0f, true);
+
+        Assert.IsFalse(state.Drive(title, 1f, look), "잡지 않은 owner 는 구동 못 함");
+        Assert.IsFalse(state.TryGetDrivenLook(out _));
+
+        state.Acquire(title, 0);
+        Assert.IsTrue(state.Drive(title, 1f, look));
+        Assert.AreEqual(1f, state.Amount, 1e-4f, "구동 값은 바로 반영");
+        Assert.IsTrue(state.TryGetDrivenLook(out PanelBackdropBlurLook got));
+        Assert.AreEqual(0f, got.saturation);
+
+        state.Drive(title, 0.4f, look);
+        state.Advance(1f, 0.15f);
+        Assert.AreEqual(0.4f, state.Amount, 1e-4f, "구동 중에는 fade 보간이 덮지 않는다");
+
+        state.Drive(title, 2f, look);
+        Assert.AreEqual(1f, state.Amount, 1e-4f, "0~1 로 자른다");
+
+        state.Drive(title, 0f, look);
+        Assert.IsTrue(state.Release(title));
+        Assert.IsFalse(state.TryGetDrivenLook(out _), "놓으면 구동도 풀린다");
+        state.Advance(0.016f, 0.15f);
+        Assert.AreEqual(0f, state.Amount, 1e-4f);
+        Assert.IsFalse(state.WantsCanvasSwitch, "0 까지 구동한 뒤 놓으면 바로 꺼짐");
+    }
+
+    [Test]
     public void ShouldSwitch_OnlyOverlayRootsBelowTopPanel_NotPanelsThemselves()
     {
         const int top = 900;
