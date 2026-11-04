@@ -39,11 +39,11 @@ public sealed class MapGateLaserViewTests
     }
 
     [Test]
-    public void 프리팹은_발사대와_빔_템플릿이_있고_콜라이더가_없다()
+    public void 프리팹은_발사대와_빔_3줄이_있고_콜라이더가_없다()
     {
         MapGateLaserView p = Prefab();
         Assert.IsNotNull(p.Posts, "발사대 칸");
-        Assert.AreEqual(1, p.BeamCount, "빔 템플릿 하나");
+        Assert.AreEqual(3, p.BeamCount, "사용자 배치 빔 3줄(204)");
         Assert.AreEqual(0, p.GetComponentsInChildren<Collider>(true).Length, "막기는 배리어 큐브가 한다");
     }
 
