@@ -71,6 +71,8 @@
 
 ### Play 확인
 
+- **확인 씬 `Assets/0.Scenes/Debug/DebugDashPassLab.unity`**(빌드 목록 밖, 저작 메뉴 `Tools/Debug/209 대시 관통 테스트 씬 만들기` 로 다시 만듦 — `DebugInterruptLab` 복사 + 허수아비 제거 + 레인 A~E). 툴바 Dev Boot 씬 드롭다운 → `DebugDashPassLab` → ▶.
+  몬스터는 `DebugDashPassLab` 컴포넌트가 서버에서 스폰하고 FSM 을 멈춘다(`SetServerLogicSuspended`, 피격은 됨 · 패널 "몬스터 다시 놓기"). 각 레인 START 칸에 서서 W(+Z)를 누른 채 Shift. 대시 쿨 0·F1 캐릭터 순환·배속은 원본 랩 그대로. 23호 줄(E)은 인스펙터 `enabled` 로 끌 수 있다. NavMesh 는 없다(정지 몬스터라 무관 — 에이전트 경고는 날 수 있다).
 - 일반 몬스터 3마리를 일렬로 두고 대시 → 2마리를 뚫고 3번째 직전에서 멈추는지. 콘솔 `[Dash] 종료: … 관통유닛=2`.
 - 중간보스·23호에 대시 → 지금처럼 바로 앞에서 멈추는지(`관통유닛=0`).
 - 몬스터 1마리 뒤 벽 → 몬스터를 지나 벽 앞에서 멈추고 대시 시간 끝까지 상태 유지되는지.
