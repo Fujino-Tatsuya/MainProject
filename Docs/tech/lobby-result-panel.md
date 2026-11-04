@@ -86,6 +86,8 @@
   - 곡선 3개(`openCurve`·`closeCurve`·`countUpCurve`)와 시간 = 인스펙터. 시간은 `Time.unscaledDeltaTime`(슬로모션 무관). 지속 0 = 즉시.
   - CanvasGroup 은 프리팹에 없고 런타임에 붙인다. 컴포넌트가 없으면 패널은 예전처럼 즉시 켜고 끈다.
 - 계산 = `LobbyResultPanelAnimMath`(순수, 테스트 `Editor/LobbyResultPanelAnimMathTests.cs`). 카운트업 진입점 = `ResultStatsView.SetCountUpProgress` → `ResultPlayerRowView.SetCountUpProgress`(5.ResultScene 은 부르지 않음).
+- 테스트 씬 = `Assets/0.Scenes/Debug/DebugLobbyResultPanelLab.unity`(빌드 목록 없음, 씬 열고 그냥 ▶ — 네트워크 없음). 다시 만들기 = `Tools/Debug/215 로비 결과창 테스트 씬 만들기`.
+  가짜 결과(최대 1,234,567)로 바로 열린다. 키: 1/2/3 = 플레이어 수 바꿔 열기 · O 열기 · C 닫기 · ESC 패널 닫기 · R 닫는 도중 다시 열기 · V 값 바꿔 다시 열기 · T 슬로모션 0.1 토글. 배경 도형이 천천히 돌아 201 블러 확인에도 쓴다.
 - 연결 = `Tools/UI/로비 결과창 애니 연결` — 멱등(이미 붙어 있으면 저장 안 함, 튜닝값 보존). 프리팹 병합 충돌로 빠지면 다시 돌린다. 재생성 메뉴도 같이 붙인다.
 
 ## 다시 만들기·미리보기
