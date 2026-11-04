@@ -31,6 +31,8 @@ public sealed class CharacterSelectPreviewAnimation
     [Min(0.1f)] public float beamLength = 8f;
     [Tooltip("켜면 미리보기가 보이는 동안 어쌔신 R 변신 오라(EffectCatalog.Assassin_R_BladeVortex)를 계속 켠다 — 오프셋·배율은 프리팹 AssassinSkillView 값.")]
     public bool transformAura;
+    [Tooltip("0 보다 크면 등장 상태마다 End 이벤트에서 끊지 않고 클립 전체를 이 시간(초)에 일정한 속도로 재생한다(클립 길이 ÷ 이 값). 0 = 원래 속도·End 이벤트에서 넘김.")]
+    [Min(0f)] public float entryDurationSeconds;
 
     public CharacterSelectPreviewAnimation(string prefabName, string[] entryStates, string loopState, float loopBlendSeconds = DefaultLoopBlendSeconds)
     {
@@ -90,14 +92,12 @@ public sealed class CharacterSelectPreviewPool
         public float BeamLength;
         public bool BeamFired;
         public float BeamStopAt;
+        public float EntryDuration;     // >0 = 등장 칸마다 클립 전체를 이 시간(초)에
+        public bool StepSpeedSet;
         public bool Aura;               // 어쌔신 R 변신 오라 — 보이는 동안 계속
         public Vector3 AuraOffset;
         public float AuraScale = 1f;
         public EffectHandle AuraLoop;
-        public int SpeedParam;          // 팔라딘 R UltimateSpeed — 0 = 없음
-        public float SpeedBeforeHit = 1f;
-        public float SpeedAfterHit = 1f;
-        public bool SpeedAfterApplied;
     }
 
     private readonly List<Preview> _previews = new List<Preview>();
@@ -202,7 +202,6 @@ public sealed class CharacterSelectPreviewPool
             return;
 
         AnimatorStateInfo state = shown.Animator.GetCurrentAnimatorStateInfo(0);
-        TickSkillSpeed(shown, state);
         if (state.shortNameHash != shown.EntryHashes[shown.Step])
         {
             shown.Step = -1; // 컨트롤러가 이미 넘겼다 — 다시 크로스페이드하면 두 번 바뀐다
@@ -210,26 +209,43 @@ public sealed class CharacterSelectPreviewPool
         }
 
         bool last = shown.Step == shown.EntryHashes.Length - 1;
-        if (last && shown.HoldLastPose)
+        bool fullClip = shown.EntryDuration > 0f;
+        if (fullClip && !shown.StepSpeedSet)
         {
-            // 홀드 = End 이벤트가 아니라 클립 끝 프레임까지 재생 후 정지. 컨트롤러 끝 전이(Exit Time 1 → Idle/Idle_Combat)가
-            // 1 을 넘는 순간 먼저 바꾸므로, 다음 프레임에 1 에 닿을 때 직전(0.999)에 세운다 — 끝 프레임과 구분 안 됨.
+            // 클립 전체를 EntryDuration 초에 — 상태 속도·속도 파라미터(팔라딘 R UltimateSpeed 기본 1)까지 나눠 Animator 속도로 맞춘다.
+            float stateRate = Mathf.Max(Mathf.Abs(state.speed * state.speedMultiplier), 0.0001f);
+            shown.Animator.speed = state.length / (shown.EntryDuration * stateRate);
+            shown.StepSpeedSet = true;
+        }
+
+        if (fullClip || (last && shown.HoldLastPose))
+        {
+            // End 이벤트가 아니라 클립 끝 프레임까지. 컨트롤러 끝 전이(Exit Time 1 → Idle/Idle_Combat)가
+            // 1 을 넘는 순간 먼저 바꾸므로, 다음 프레임에 1 에 닿을 때 직전(0.999)에 넘긴다 — 끝 프레임과 구분 안 됨.
             float step = Time.deltaTime * shown.Animator.speed * state.speed * state.speedMultiplier / Mathf.Max(state.length, 0.0001f);
             if (state.normalizedTime + step < HoldNormalizedTime)
                 return;
-            shown.Step = -1;
-            shown.Animator.Play(state.shortNameHash, 0, HoldNormalizedTime);
-            shown.Animator.speed = 0f;
-            shown.Animator.Update(0f);
-            return;
+            if (last && shown.HoldLastPose)
+            {
+                shown.Step = -1;
+                shown.Animator.Play(state.shortNameHash, 0, HoldNormalizedTime);
+                shown.Animator.speed = 0f;
+                shown.Animator.Update(0f);
+                return;
+            }
         }
-        if (shown.StepEnd < 0f)
-            shown.StepEnd = StepEndNormalized(shown.Animator, state, last ? shown.LoopBlend : shown.ChainBlend);
-        // 컨트롤러 끝 전이(Exit Time 1, 0.05~0.1초 컷에 가까움)보다 먼저 잡는다 — 끝까지 기다리면 그 전이가 먼저 바꾸고
-        // 코드가 한 번 더 바꿔(같은 루프 재시작) 뚝 끊겨 보였다(199 Play).
-        if (state.normalizedTime < shown.StepEnd)
-            return;
+        else
+        {
+            if (shown.StepEnd < 0f)
+                shown.StepEnd = StepEndNormalized(shown.Animator, state, last ? shown.LoopBlend : shown.ChainBlend);
+            // 컨트롤러 끝 전이(Exit Time 1, 0.05~0.1초 컷에 가까움)보다 먼저 잡는다 — 끝까지 기다리면 그 전이가 먼저 바꾸고
+            // 코드가 한 번 더 바꿔(같은 루프 재시작) 뚝 끊겨 보였다(199 Play).
+            if (state.normalizedTime < shown.StepEnd)
+                return;
+        }
 
+        shown.Animator.speed = 1f; // 다음 칸·루프는 원래 속도(블렌드 동안 끝난 등장 클립은 끝 프레임에 머문다)
+        shown.StepSpeedSet = false;
         if (!last)
         {
             shown.Step++;
@@ -262,31 +278,6 @@ public sealed class CharacterSelectPreviewPool
             }
         }
         return state.length > 0f ? Mathf.Clamp01(1f - blendSeconds / state.length) : 1f;
-    }
-
-    // 팔라딘 R — 게임(FirstMeleeUltimateSkill)처럼 시작은 Hit 전 속도, 클립 Hit 이벤트를 지나면 Hit 뒤 속도.
-    private static void TickSkillSpeed(Preview shown, AnimatorStateInfo state)
-    {
-        if (shown.SpeedParam == 0 || shown.SpeedAfterApplied)
-            return;
-        float hit = EventNormalized(shown.Animator, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.Hit);
-        if (hit < 0f || state.normalizedTime < hit)
-            return;
-        shown.SpeedAfterApplied = true;
-        shown.Animator.SetFloat(shown.SpeedParam, shown.SpeedAfterHit);
-    }
-
-    // 지금 클립에서 그 애니 이벤트의 정규화 시각, 없으면 -1.
-    private static float EventNormalized(Animator animator, string functionName, int intParameter)
-    {
-        AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
-        AnimationClip clip = clips.Length > 0 ? clips[0].clip : null;
-        if (clip == null || clip.length <= 0f)
-            return -1f;
-        foreach (AnimationEvent e in clip.events)
-            if (e.functionName == functionName && e.intParameter == intParameter)
-                return e.time / clip.length;
-        return -1f;
     }
 
     // 거너 Q 빔 — 첫 등장 칸의 BeamTime 에 켜고, 켜진 동안 복제본 앞으로 겨눠 늘이고, 유지 시간이 지나면 끈다.
@@ -436,11 +427,11 @@ public sealed class CharacterSelectPreviewPool
             preview.LoopBlend = Mathf.Max(0f, animation.loopBlendSeconds);
             preview.ChainBlend = Mathf.Max(0f, animation.chainBlendSeconds);
             preview.HoldLastPose = animation.holdLastPose;
+            preview.EntryDuration = Mathf.Max(0f, animation.entryDurationSeconds);
             if (animation.beamNormalizedTime >= 0f)
                 BindBeam(preview, prefab, animation);
             if (animation.transformAura)
                 BindAura(preview, prefab);
-            BindSkillSpeed(preview, prefab);
         }
         else
         {
@@ -486,23 +477,6 @@ public sealed class CharacterSelectPreviewPool
         preview.AuraScale = view.TransformEffectScale;
     }
 
-    // 팔라딘 R 상태(Garen_Ultimate_Skill)는 속도 파라미터 UltimateSpeed 를 탄다 — 스킬이 시전 때 넣는 값을 미리보기도 넣는다(다른 상태는 영향 없음).
-    private static void BindSkillSpeed(Preview preview, GameObject prefab)
-    {
-        FirstMeleeUltimateSkill skill = prefab.GetComponentInChildren<FirstMeleeUltimateSkill>(true);
-        if (skill == null || preview.Animator == null)
-            return;
-        int hash = Animator.StringToHash(FirstMeleeUltimateSkill.AnimationSpeedParameter);
-        foreach (AnimatorControllerParameter parameter in preview.Animator.parameters)
-            if (parameter.nameHash == hash && parameter.type == AnimatorControllerParameterType.Float)
-            {
-                preview.SpeedParam = hash;
-                preview.SpeedBeforeHit = skill.BeforeHitAnimationSpeed;
-                preview.SpeedAfterHit = skill.AfterHitAnimationSpeed;
-                return;
-            }
-    }
-
     private static string RelativePath(Transform root, Transform target)
     {
         string path = null;
@@ -534,11 +508,7 @@ public sealed class CharacterSelectPreviewPool
         if (preview.Animator == null)
             return;
         preview.Animator.speed = 1f; // 지난 회차 홀드 풀기
-        if (preview.SpeedParam != 0)
-        {
-            preview.Animator.SetFloat(preview.SpeedParam, preview.SpeedBeforeHit);
-            preview.SpeedAfterApplied = false;
-        }
+        preview.StepSpeedSet = false;
         preview.StepEnd = -1f;
         if (preview.EntryHashes.Length > 0)
         {

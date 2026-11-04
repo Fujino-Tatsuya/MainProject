@@ -1688,6 +1688,7 @@ MonoBehaviour:
     beamNormalizedTime: -1
     beamLength: 8
     transformAura: 0
+    entryDurationSeconds: 1.2
   - prefabName: Player_Gunner
     entryStates:
     - Gunner_Q_Fire
@@ -1698,6 +1699,7 @@ MonoBehaviour:
     beamNormalizedTime: 0.02
     beamLength: 8
     transformAura: 0
+    entryDurationSeconds: 0
   - prefabName: Player_Assassin
     entryStates:
     - Default_Attack0
@@ -1709,6 +1711,7 @@ MonoBehaviour:
     beamNormalizedTime: -1
     beamLength: 8
     transformAura: 1
+    entryDurationSeconds: 0
   choiceTimeoutSeconds: 6
   choiceFailNoticeSeconds: 2
   pendingTextColor: {r: 0.85, g: 0.9, b: 1, a: 1}
