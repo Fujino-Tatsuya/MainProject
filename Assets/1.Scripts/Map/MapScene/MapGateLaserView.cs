@@ -8,9 +8,11 @@ using UnityEngine;
 /// · <see cref="MapSceneBarriers"/> 가 Barrier 콜라이더(큐브) 옆에 형제로 만들고 <see cref="Fit"/> 으로 게이트 크기에 맞춘다.
 ///   막기·카브는 큐브 쪽 그대로 — 이 프리팹엔 콜라이더가 없다.
 /// · 뷰 좌표 = 로컬 X 가 게이트 폭(가로), Y 가 위, Z 가 진행 방향. 원점 = 바닥 가운데.
-/// · 크기는 메시 bounds 로 잰다(FBX 의 긴 축·피벗을 하드코딩하지 않음). 조각(발사대·빔 템플릿)의 루트는 뷰 축과 90° 단위로만 돌려 둘 것.
+/// · 크기는 메시 bounds 로 잰다(FBX 의 긴 축·피벗을 하드코딩하지 않음). 조각(발사대·빔)의 루트는 뷰 축과 90° 단위로만 돌려 둘 것.
+/// · 빔 줄 = <c>Beams</c> 아래 자식 그대로(할 일 204 — 복제하지 않는다). 프리팹에 놓은 줄 수·높이·앞뒤 위치·(발사대 대비) 길이 비율을
+///   그대로 두고 게이트 폭에만 맞춘다. 줄을 늘리거나 옮기려면 프리팹에서 Beam 을 복제·이동하면 된다.
 /// · 열림 = 빔만 즉시 끈다(연출 없음). 발사대는 장식으로 남는다. 다시 닫히지 않는다.
-/// · 이펙트 담당은 <c>Visual</c> 아래만 바꾸면 된다 — 칸(발사대·빔 템플릿)만 다시 연결.
+/// · 이펙트 담당은 <c>Visual</c> 아래만 바꾸면 된다 — 칸(발사대·빔 부모)만 다시 연결.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class MapGateLaserView : MonoBehaviour
@@ -18,79 +20,75 @@ public sealed class MapGateLaserView : MonoBehaviour
     [Tooltip("발사대 몸체(Env_laser). 이 FBX 는 메시 하나에 양 끝 발사대 둘이 다 들어 있다 — 긴 축을 게이트 폭에 맞춰 늘인다.")]
     [SerializeField] private Transform posts;
 
-    [Tooltip("빔 줄 템플릿(Env_laser_lay). 줄 개수만큼 같은 부모 아래에 복제하고, 긴 축 = 게이트 폭.")]
-    [SerializeField] private Transform beamTemplate;
+    [Tooltip("빔 줄들의 부모(Visual/Beams). 바로 아래 자식 하나 = 빔 한 줄(Env_laser_lay). 프리팹에 놓은 배치 그대로 쓰고 복제하지 않는다 — " +
+             "줄 높이·앞뒤 위치는 발사대 기준으로 유지, 길이는 프리팹의 (빔 길이 ÷ 발사대 폭) 비율로 게이트 폭에 맞춘다.")]
+    [SerializeField] private Transform beamsRoot;
 
-    [Tooltip("빔 줄 사이 높이(m) — 연출 전용. 키우면 줄끼리 위아래로 벌어진다(묶음 가운데는 그대로).")]
-    [DataTableIgnore]
-    [SerializeField, Min(0.05f)] private float beamSpacing = 0.25f;
-
-    [Tooltip("빔 줄 개수 상한 — 연출 전용(할 일 204: 3). 높이·간격으로 들어가는 수가 이보다 적으면 그 수.")]
-    [DataTableIgnore]
-    [SerializeField, Min(1)] private int maxBeams = 3;
-
-    [Tooltip("빔 묶음 전체 높이 오프셋(m, + = 위) — 연출 전용(할 일 204). 0 = 발사대(또는 게이트) 높이 가운데에 묶음 가운데를 맞춘다. " +
-             "간격·줄 수는 그대로 두고 모든 줄을 같이 옮긴다(발사대 높이를 넘어가도 막지 않는다).")]
-    [DataTableIgnore]
-    [SerializeField] private float beamOffset;
-
-    [Tooltip("맨 아래·맨 위 줄과 바닥·꼭대기 사이 최소 여유(m) — 연출 전용.")]
-    [DataTableIgnore]
-    [SerializeField, Min(0f)] private float beamMargin = 0.3f;
-
-    [Tooltip("켜면 발사대는 FBX 높이 그대로 두고 빔은 그 높이 안에 깐다. 끄면 발사대를 게이트 높이로 늘린다.")]
+    [Tooltip("켜면 발사대는 FBX 높이 그대로 두고 빔 높이도 프리팹 그대로. 끄면 발사대를 게이트 높이로 늘리고 빔 높이도 같은 비율로 늘린다.")]
     [DataTableIgnore]
     [SerializeField] private bool keepPostHeight = true;
 
-    readonly List<GameObject> _clones = new List<GameObject>();
-    Vector3 _postsBaseScale, _beamBaseScale;
+    // 프리팹에 저작된 빔 한 줄 — 발사대 bounds 기준 상대 배치.
+    struct BeamLayout
+    {
+        public Transform t;
+        public Vector3 baseScale;
+        public float lengthRatio;   // 빔 뷰 X 길이 ÷ 발사대 뷰 X 폭
+        public float dx, dz;        // 빔 중심 − 발사대 중심(뷰 X·Z, m)
+        public float heightFrac;    // (빔 중심 y − 발사대 바닥) ÷ 발사대 높이
+        public float y;             // 발사대가 없을 때 쓰는 저작 높이(뷰 Y)
+    }
+
+    readonly List<BeamLayout> _beams = new List<BeamLayout>();
+    Vector3 _postsBaseScale;
     bool _baseCached;
     bool _open;
 
     public bool IsOpen => _open;
     public Transform Posts => posts;
 
-    /// <summary>빔 줄 수(템플릿 포함). 템플릿이 없으면 0.</summary>
-    public int BeamCount => beamTemplate != null ? 1 + _clones.Count : 0;
+    /// <summary>빔 줄 수(<c>Beams</c> 아래 메시가 있는 자식 수).</summary>
+    public int BeamCount
+    {
+        get
+        {
+            CacheBase();
+            return _beams.Count;
+        }
+    }
 
-    public GameObject GetBeam(int i) => i == 0 ? beamTemplate.gameObject : _clones[i - 1];
+    public GameObject GetBeam(int i)
+    {
+        CacheBase();
+        return _beams[i].t.gameObject;
+    }
 
     /// <summary>
-    /// 폭 <paramref name="width"/>(빔 줄 길이 = 발사대 사이 바깥 끝)·높이 <paramref name="height"/>·진행 축(<paramref name="alongX"/> = 월드 X)에 맞춘다.
-    /// 다시 불러도 된다(복제 줄은 지우고 새로). 열린 뒤에 불러도 빔은 꺼진 채다.
+    /// 폭 <paramref name="width"/>(발사대 바깥 끝)·높이 <paramref name="height"/>·진행 축(<paramref name="alongX"/> = 월드 X)에 맞춘다.
+    /// 다시 불러도 된다(프리팹 배치 기준으로 다시 계산). 열린 뒤에 불러도 빔은 꺼진 채다.
     /// </summary>
     public void Fit(float width, float height, bool alongX)
     {
-        CacheBaseScales();
+        CacheBase();
         transform.rotation = alongX ? Quaternion.Euler(0f, 90f, 0f) : Quaternion.identity;
 
-        float visualHeight = height;
-        if (posts != null)
+        Bounds pb = default;
+        bool hasPosts = posts != null && HasMesh(posts);
+        if (hasPosts)
         {
-            Bounds b = FitPiece(posts, _postsBaseScale, width, keepPostHeight ? 0f : height);
-            MoveTo(posts, b, new Vector3(0f, b.extents.y, 0f));   // 바닥에 세운다
-            if (keepPostHeight) visualHeight = b.size.y;
+            pb = FitPiece(posts, _postsBaseScale, width, keepPostHeight ? 0f : height);
+            MoveTo(posts, pb, new Vector3(0f, pb.extents.y, 0f));   // 바닥에 세운다
+            pb = MeasureLocal(posts);
         }
 
-        ClearClones();
-        if (beamTemplate == null) return;
-
-        Bounds tb = FitPiece(beamTemplate, _beamBaseScale, width, 0f);
-        int n = BeamRows(visualHeight, beamSpacing, beamMargin, maxBeams);
-        float y0 = (visualHeight - (n - 1) * beamSpacing) * 0.5f + beamOffset;
-        Vector3 templatePos = beamTemplate.localPosition;
-        for (int i = 0; i < n; i++)
+        foreach (BeamLayout l in _beams)
         {
-            Transform t = i == 0 ? beamTemplate : Instantiate(beamTemplate.gameObject, beamTemplate.parent).transform;
-            if (i > 0)
-            {
-                t.name = $"{beamTemplate.name}_{i}";
-                t.gameObject.hideFlags = beamTemplate.gameObject.hideFlags;
-                _clones.Add(t.gameObject);
-            }
-            t.localPosition = templatePos;
-            MoveTo(t, tb, new Vector3(0f, y0 + i * beamSpacing, 0f));
-            t.gameObject.SetActive(!_open);
+            Bounds tb = FitPiece(l.t, l.baseScale, width * (hasPosts ? l.lengthRatio : 1f), 0f);
+            Vector3 center = hasPosts
+                ? new Vector3(pb.center.x + l.dx, pb.min.y + l.heightFrac * pb.size.y, pb.center.z + l.dz)
+                : new Vector3(0f, l.y, 0f);
+            MoveTo(l.t, tb, center);
+            l.t.gameObject.SetActive(!_open);
         }
     }
 
@@ -98,35 +96,47 @@ public sealed class MapGateLaserView : MonoBehaviour
     public void Open()
     {
         _open = true;
-        if (beamTemplate != null) beamTemplate.gameObject.SetActive(false);
-        foreach (GameObject c in _clones)
-            if (c != null) c.SetActive(false);
+        CacheBase();
+        foreach (BeamLayout l in _beams)
+            if (l.t != null) l.t.gameObject.SetActive(false);
     }
 
-    /// <summary>높이 <paramref name="height"/> 안에 간격 <paramref name="spacing"/> 으로 들어가는 줄 수(위아래 여유 제외, 1 ~ 상한).</summary>
-    public static int BeamRows(float height, float spacing, float margin, int max)
-    {
-        int n = Mathf.FloorToInt((height - 2f * margin) / Mathf.Max(spacing, 0.01f)) + 1;
-        return Mathf.Clamp(n, 1, Mathf.Max(1, max));
-    }
-
-    void CacheBaseScales()
+    // 첫 맞춤 전 프리팹 배치(저작 상태)를 한 번 기록한다.
+    void CacheBase()
     {
         if (_baseCached) return;
         _baseCached = true;
-        if (posts != null) _postsBaseScale = posts.localScale;
-        if (beamTemplate != null) _beamBaseScale = beamTemplate.localScale;
+        Bounds pb = default;
+        bool hasPosts = posts != null && HasMesh(posts);
+        if (hasPosts)
+        {
+            _postsBaseScale = posts.localScale;
+            pb = MeasureLocal(posts);
+        }
+
+        if (beamsRoot == null) return;
+        foreach (Transform t in beamsRoot)
+        {
+            if (!HasMesh(t)) continue;
+            Bounds b = MeasureLocal(t);
+            _beams.Add(new BeamLayout
+            {
+                t = t,
+                baseScale = t.localScale,
+                lengthRatio = hasPosts && pb.size.x > 1e-4f ? b.size.x / pb.size.x : 1f,
+                dx = hasPosts ? b.center.x - pb.center.x : 0f,
+                dz = hasPosts ? b.center.z - pb.center.z : 0f,
+                heightFrac = hasPosts && pb.size.y > 1e-4f ? (b.center.y - pb.min.y) / pb.size.y : 0f,
+                y = b.center.y,
+            });
+        }
     }
 
-    void ClearClones()
+    static bool HasMesh(Transform t)
     {
-        foreach (GameObject c in _clones)
-        {
-            if (c == null) continue;
-            if (Application.isPlaying) Destroy(c);
-            else DestroyImmediate(c);
-        }
-        _clones.Clear();
+        foreach (MeshFilter mf in t.GetComponentsInChildren<MeshFilter>(true))
+            if (mf.sharedMesh != null) return true;
+        return false;
     }
 
     // 조각의 뷰 X 크기를 width 로, height > 0 이면 뷰 Y 크기를 height 로. 맞춘 뒤의 뷰 공간 bounds 를 돌려준다.

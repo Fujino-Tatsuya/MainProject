@@ -63,7 +63,7 @@ public sealed class MapGateLaserViewTests
         for (int i = 0; i < v.BeamCount; i++)
         {
             Bounds b = Bounds(v.GetBeam(i));
-            Assert.AreEqual(width, alongX ? b.size.z : b.size.x, Tol, $"빔 {i} 길이 = 폭");
+            Assert.LessOrEqual(alongX ? b.size.z : b.size.x, width + Tol, $"빔 {i} 길이 ≤ 폭(프리팹 비율 — 204)");
             Assert.Less(alongX ? b.size.x : b.size.z, 0.2f, "빔은 진행 방향으로 얇다");
             Assert.Greater(b.center.y, prevY, "줄은 아래→위");
             Assert.LessOrEqual(b.max.y, posts.max.y + Tol, "빔은 발사대 높이 안");
@@ -78,40 +78,45 @@ public sealed class MapGateLaserViewTests
         v.Fit(2.76f, 3f, false);
         int n = v.BeamCount;
         v.Fit(4.6f, 3f, true);
-        Assert.AreEqual(n, v.BeamCount, "폭이 달라도 개수는 높이 기준");
+        Assert.AreEqual(n, v.BeamCount, "폭이 달라도 개수는 프리팹 줄 수");
         Assert.AreEqual(n, v.GetBeam(0).transform.parent.childCount, "복제 줄이 남지 않는다");
     }
 
     [Test]
-    public void 줄_수는_높이와_간격으로_정하고_상한을_넘지_않는다()
-    {
-        Assert.AreEqual(7, MapGateLaserView.BeamRows(2.122f, 0.25f, 0.3f, 8));
-        Assert.AreEqual(3, MapGateLaserView.BeamRows(2.122f, 0.25f, 0.3f, 3));
-        Assert.AreEqual(1, MapGateLaserView.BeamRows(0.2f, 0.25f, 0.3f, 8), "낮아도 한 줄은 있다");
-    }
-
-    [Test]
-    public void 프리팹_빔은_최대_3줄이다_204()
+    public void 빔은_Beams_자식_그대로_쓰고_복제하지_않는다_204()
     {
         MapGateLaserView v = Spawn();
+        Transform beams = v.GetBeam(0).transform.parent;
+        int authored = beams.childCount;
         v.Fit(2.76f, 3f, false);
-        Assert.AreEqual(3, v.BeamCount, "maxBeams 3 — 발사대 높이엔 7줄이 들어가지만 상한 3");
+        Assert.AreEqual(3, v.BeamCount, "사용자 배치 Beam·Beam (1)·Beam (2)");
+        Assert.AreEqual(authored, beams.childCount, "복제 줄이 생기지 않는다");
     }
 
-    [Test]
-    public void 오프셋은_간격_그대로_모든_줄을_같이_옮긴다_204()
+    [TestCase(2.76f, false)]
+    [TestCase(4.6f, true)]
+    public void 맞춰도_줄_높이와_길이_비율은_프리팹_배치_그대로다_204(float width, bool alongX)
     {
-        MapGateLaserView a = Spawn();
-        MapGateLaserView b = Spawn();
-        var so = new SerializedObject(b);
-        so.FindProperty("beamOffset").floatValue = 0.2f;
-        so.ApplyModifiedPropertiesWithoutUndo();
-        a.Fit(2.76f, 3f, false);
-        b.Fit(2.76f, 3f, false);
+        MapGateLaserView v = Spawn();
+        Bounds p0 = Bounds(v.Posts.gameObject);
+        var rel = new float[v.BeamCount];
+        var ratio = new float[v.BeamCount];
+        for (int i = 0; i < v.BeamCount; i++)
+        {
+            Bounds b = Bounds(v.GetBeam(i));
+            rel[i] = b.center.y - p0.min.y;
+            ratio[i] = b.size.x / p0.size.x;
+        }
 
-        Assert.AreEqual(a.BeamCount, b.BeamCount);
-        for (int i = 0; i < a.BeamCount; i++)
-            Assert.AreEqual(Bounds(a.GetBeam(i)).center.y + 0.2f, Bounds(b.GetBeam(i)).center.y, 1e-3f, $"빔 {i}");
+        v.Fit(width, 3f, alongX);
+        Bounds p1 = Bounds(v.Posts.gameObject);
+        float pw = alongX ? p1.size.z : p1.size.x;
+        for (int i = 0; i < v.BeamCount; i++)
+        {
+            Bounds b = Bounds(v.GetBeam(i));
+            Assert.AreEqual(rel[i], b.center.y - p1.min.y, Tol, $"빔 {i} 높이(발사대 바닥 기준)");
+            Assert.AreEqual(ratio[i], (alongX ? b.size.z : b.size.x) / pw, Tol, $"빔 {i} 길이 ÷ 발사대 폭");
+        }
     }
 
     [Test]
@@ -143,8 +148,8 @@ public sealed class MapGateLaserViewTests
         Assert.Less(Vector3.Distance(new Vector3(0.4f, 3f, 4.6f), cube.transform.localScale), 1e-3f, "콜라이더 크기 그대로");
         Assert.AreSame(cube.transform.parent, laser.transform.parent, "큐브 형제");
 
-        // 벽이 없으면 배리어 가로(4.6m) 그대로, 가운데·바닥에 놓인다.
-        Bounds b = Bounds(laser.GetBeam(0));
+        // 벽이 없으면 배리어 가로(4.6m) 그대로(발사대 바깥 끝), 가운데·바닥에 놓인다.
+        Bounds b = Bounds(laser.Posts.gameObject);
         Assert.AreEqual(4.6f, b.size.z, Tol);
         Assert.AreEqual(5000.2f, laser.transform.position.x, 1e-3f);
         Assert.AreEqual(0f, laser.transform.position.z, 1e-3f);
