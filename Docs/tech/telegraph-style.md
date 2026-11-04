@@ -167,3 +167,10 @@ Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드,
 - 사용자 튜닝 커브는 `Player_Gunner.prefab` 의 `SkillLineIndicator.lengthFadeCurve` 오버라이드(11-04). base `Player.prefab` 은 코드 기본값.
 - t 는 그려진 사각형 기준이라 벽에 잘려 짧아지면 잘린 끝이 t=1.
 - 코드: 셰이더 `LineLengthFade`(샘플 직선 보간) = C# `Player/Skill/Targeting/SkillLineLengthFade.cs` `Bake`·`Sample`(테스트 기준). 테스트: `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행` 의 `SkillLineLengthFadeTests`.
+
+### 8-2. 어쌔신 대시 일격 화살표 미리보기 (할 일 213, 2026-11-04)
+
+- 어쌔신 Q 대시 일격(변신 Q 포함, `AssassinDashStrikeSkill` = `ISkillPreviewSource`)은 **HUD 슬롯 호버 미리보기**(거너 Q 미리보기와 같은 시점 — 대시는 조준 단계·충전이 없다)에 대시 거리만큼의 **화살표**를 그린다. 벽에 막히면 그 자리까지(`PlayerMotor.GetGroundedPreviewDistance`, 유닛 관통 = 실제 돌진과 같음). 그림자 회귀(복귀)는 앞 방향 대시가 아니라 미리보기 없음(기존과 같음).
+- 그리기 = `SkillLineIndicator` Arrow 쿼드(`SkillLineArrow.mat`, 셰이더 `ArrowC3`) — 기존 이동 미리보기 화살표와 같은 모양·같은 면 그라데이션(촉으로 갈수록 진함). **화살표 규칙(전 캐릭터 공통, 11-04 사용자)**: 모든 Arrow(어쌔신 대시 일격·변신 Q, 거너 쿨 백스텝, 거너 간파의 화살표)는 Length Fade Curve·Edge Line Curve 와 무관하게 몸통+촉 전체를 끝까지 온전히 그리고, 같은 컴포넌트의 **Edge Line Width/Color** 로 윤곽(몸통·머리) 안쪽에 흰 라인을 **길이 방향 페이드 없이 균일하게** 덧그린다(Width 0 이면 없음). 텍스처 `SkillLineArrow.mat` Side Edge Line Texture = white_512.
+- 커브 칸(Length Fade Curve·Edge Line Curve)은 거너 Q 사각형 전용 그대로(§8-1). `Player_Assassin.prefab` 에는 커브 오버라이드를 두지 않는다.
+- 화살표 폭 = `SkillLineIndicator.arrowWidth`(0.9). 거리 감쇠(`_DecalFade`)는 화살표에 걸지 않는다.

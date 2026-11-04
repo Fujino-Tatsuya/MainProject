@@ -24,7 +24,7 @@ using UnityEngine;
 /// 그림자 회귀(ASN_2_RETURN, 할 일 128 5b): 특성 보유 시 이 Q 사용이 후속 칸(<see cref="PlayerSkillBase.FollowUpSkill"/> = <see cref="AssassinShadowReturnSkill"/>)을 연다
 /// — 쿨은 복귀 사용·창 만료·강제 복귀 때 장치가 시작한다. 이 Q 는 돌진 시작 위치를 출발점으로 저장하고, 복귀 스킬이 같은 돌진 '단계' 코드를 방향·거리·피해만 바꿔 쓴다.
 /// </summary>
-public class AssassinDashStrikeSkill : PlayerSkillBase
+public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
 {
     private static readonly SkillAnimationEventType[] RequiredEvents =
         { SkillAnimationEventType.Custom0, SkillAnimationEventType.End };
@@ -547,6 +547,29 @@ public class AssassinDashStrikeSkill : PlayerSkillBase
         // 클라에서는 서버 쓰기 가드로 no-op
         if (owner != null && owner.StatusEffects != null)
             owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);
+    }
+
+    /// <summary>
+    /// 213: HUD 슬롯 호버 미리보기(거너 Q 와 같은 시점) — 대시 거리만큼의 화살표, 벽에 막히면 그 자리까지.
+    /// 202 길이 커브·양옆 흰 라인(SkillLineIndicator 칸)을 같이 쓴다. 변신 Q 는 데이터 거리만 다르다.
+    /// </summary>
+    public virtual bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        AssassinDashStrikeSkillData data = DashData;
+        if (data == null)
+        {
+            shape = default;
+            return false;
+        }
+
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+        // 실제 돌진과 같은 이동 규칙 — 유닛 관통(PassThroughUnitsOverride), 벽에서 멈춤.
+        float clipped = motor != null
+            ? motor.GetGroundedPreviewDistance(forward * data.DashDistance, blockOtherPlayers: false, passThroughUnits: true)
+            : data.DashDistance;
+        shape = SkillPreviewShapes.Arrow(1f, data.DashDistance, clipped);
+        return true;
     }
 
     private Vector3 Flatten(Vector3 direction)

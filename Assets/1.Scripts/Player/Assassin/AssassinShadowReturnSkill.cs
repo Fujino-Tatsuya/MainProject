@@ -21,6 +21,13 @@ public sealed class AssassinShadowReturnSkill : AssassinDashStrikeSkill
 
     protected override PlayerSkillBase CooldownRewardSkill => Source != null ? Source : this;
 
+    // 213: 복귀는 앞 방향 대시가 아니다(저장된 출발점으로) — 대시 화살표 미리보기를 쓰지 않는다(기존과 같음).
+    public override bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        shape = default;
+        return false;
+    }
+
     public override void Initialize(Player owner, PlayerSkillController controller)
     {
         base.Initialize(owner, controller);
