@@ -30,6 +30,18 @@ Update this file when a term becomes important enough that future agents or team
 - 증상: 취약 중 간파·Q 밀림으로 공격이 끊기면 클립 `StartEffect` 루프(23호 좌훅·우훅·어퍼 `Wind_L/R`, 건틀릿 펀치 6종 `Wind_L/R`)가 짝 `StopEffect` 를 못 받아 `safetyTimeout` 5초까지 남았다. 10-19 수정(`StopCutClipLoopsClientRpc`)은 콤보 즉시 연결 경로만 막았다. Codex 교차검증 일치.
 - 수정: `MonsterBase.OnStateChanged` 맨 앞 — Attack → 비Attack 이고 `StopClipLoopsOnAttackExit`(기본 false, 23호·건틀릿 true)면 각 피어가 현재·다음 클립의 `StartEffect` id 를 끈다(`StopCurrentClipLoops`, 애니메이터 바꾸기 전). 23호 RPC 는 같은 함수로 위임(Attack 유지한 채 클립만 끊는 경로 몫). 스피너 `StopSpinEffect`·월봇(클립 루프 없음) 무변경. 사망·23호 점프 착지는 대상 밖(0줄 자폭·착지 뒤 간파, 팀장).
 
+## ▶▶ 작업 세션 (2026-11-04 · 민경(Claude) · **추격의 궤적(ASN_4_Q_TRAIL) 경로 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 재제작 4(민경 수정본 — 바닥 자국 + 공중 베기 줄 + HDR 섬광) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN(`Player3/PursuitTrail/`) · 미커밋 · 핸드오프 [handoff-pursuit-trail-vfx.md](Docs/tech/handoff-pursuit-trail-vfx.md)
+- 수정 파일: `AssassinSkillView.cs`(TraitSkillFx 구독) · `EffectCatalog`(.cs·.asset). 판정·네트워크 무변경.
+
+## ▶▶ 반영 (2026-11-04 · 민경(Claude) · **칼날의 영역(ASN_3_E_AREA) — E 베기 VFX 를 판정 배율만큼 키움**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현(컴파일 0 · 랩: 강타 소켓 1→1.25→1, 변신 E 원 3→3.75→3) · ✅ 커밋 9492f0e4 · ⏳ 민경 Play
+- `AssassinSkillView`: 칸 `enhancedSlash`(강타 소켓) 배율 = 저작 × 사거리 배율(매 프레임, 재생 전) · `BeginCircleStrike` 배율 × 반경 배율. `EffectSocketPlayer.Scale` 읽기 추가. `Player_Assassin.prefab` 칸 연결 1줄. 새 아트 없음.
+
+## ▶▶ 작업 세션 (2026-11-04 · 민경(Claude) · **그림자 회귀(ASN_2_RETURN) 출발점 그림자 단검 표식 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 확인(그림자 실루엣) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ✅ 커밋 1c204eed · ⏳ 민경 Play·MPPM · ⏳ SVN(`Player3/ShadowReturn/`) · 핸드오프 [handoff-shadow-return-vfx.md](Docs/tech/handoff-shadow-return-vfx.md)
+- 수정 파일: 새 `AssassinShadowReturnView.cs` · `Player_Assassin.prefab`(`VFX/ShadowReturn` 자식) · `AssassinTraitRules.cs`(`AssassinShadowReturnOrigin` 에 `TryPeek`·`Version` — 은희 님 영역, 읽기 전용 추가). 판정·네트워크 무변경.
+
+## ▶▶ 작업 세션 (2026-11-04 · 민경(Claude) · **절제된 분노(ASN_2_RESTRAINT) 봉인 순간 + 단검 봉인 띠 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인(3차 = 봉인·띠만, Q·E 레이어 미연결) · ✅ MyProject Crimson 확인 · ✅ 연결(컴파일 0 · 랩 로그 확인) · ✅ 커밋 f840a19b · ⏳ 민경 Play·MPPM · ⏳ SVN(`Player3/Restraint/`) · 핸드오프 [handoff-restraint-vfx.md](Docs/tech/handoff-restraint-vfx.md)
+- 수정 파일: 새 `AssassinRestraintView.cs` · `EffectCatalog`(.cs·.asset) · `Player_Assassin.prefab`(`VFX/Restraint` 자식). 판정·네트워크 무변경.
+
 ## ▶▶ 작업 세션 (2026-11-03 · 민경(Claude) · **잔류 포격(GUN_4_ECHO_Q) 에너지 폭탄 VFX**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ MyProject 확인 · ✅ 연결(실험실 로그 확인) · ⏳ 민경 Play(실제 Q·MPPM) · ⏳ SVN(`Player2/Q_ChargeLaser/EchoBomb/`) · 핸드오프 [handoff-echo-bomb-vfx.md](Docs/tech/handoff-echo-bomb-vfx.md)
 - 수정 파일: `GunnerEchoBombVisuals.cs`(상태 칸 Stage·Fizzled, BodyPoint = 가운데) · `GunnerBeamView.cs` · `GunnerChargeLaserSkill.cs`(은희 영역 — 연출 인자만) · `EffectCatalog` · `Player_Gunner.prefab`.
 
