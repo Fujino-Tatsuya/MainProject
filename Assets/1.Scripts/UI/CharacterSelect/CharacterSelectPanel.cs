@@ -92,10 +92,10 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Header("Camera (할 일 199)")]
     [Tooltip("패널이 열린 동안 쓸 씬 vcam(3.LobbyScene 의 CharacterSelectCamera). 추적 대상·FollowOffset·회전·렌즈는 열 때 이 패널이 플레이어 vcam 기준으로 채운다 — 그 오브젝트 값은 쓰지 않는다. 비면 카메라 전환 없음.")]
     [SerializeField] private CinemachineCamera selectCamera;
-    [Tooltip("플레이어 vcam FollowOffset(PlayerFollowCamera, 기본 (7,17,-7), 월드 기준)에 더하는 위치 차이. (0,0,0) = 플레이어 카메라와 같은 자리. 기본 = 같은 방향 절반 거리(줌인).")]
-    [SerializeField] private Vector3 cameraOffsetDelta = new Vector3(-3.5f, -8.5f, 3.5f);
+    [Tooltip("플레이어 vcam FollowOffset(PlayerFollowCamera, 기본 (7,17,-7), 월드 기준)에 더하는 위치 차이. (0,0,0) = 플레이어 카메라와 같은 자리. 기본 = 절반 거리 줌인 + 높이 1.5 낮춤 + 화면 오른쪽(카메라 오른쪽 = 월드 (+0.7,0,+0.7))으로 1m — 캐릭터가 화면 왼쪽으로 조금 치우친다.")]
+    [SerializeField] private Vector3 cameraOffsetDelta = new Vector3(-2.8f, -10f, 4.2f);
     [Tooltip("플레이어 vcam 고정 회전(오일러)에 더하는 각도 차이(도). x = 피치(+ 아래로), y = 요. (0,0,0) = 같은 각도.")]
-    [SerializeField] private Vector3 cameraAngleDelta = Vector3.zero;
+    [SerializeField] private Vector3 cameraAngleDelta = new Vector3(-5f, 0f, 0f); // 낮춘 높이만큼 피치를 줄여(≈60°→55°) 캐릭터가 화면 세로 가운데 근처에 남게
     [Tooltip("열 때 게임 카메라 → 선택 vcam 블렌드 시간(초). 0 = 컷.")]
     [SerializeField, Min(0f)] private float cameraEnterBlendSeconds = 0.5f;
     [Tooltip("닫을 때 선택 vcam → 게임 카메라 블렌드 시간(초). 0 = 컷.")]
