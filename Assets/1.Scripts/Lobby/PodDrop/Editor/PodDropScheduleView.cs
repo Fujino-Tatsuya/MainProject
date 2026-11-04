@@ -94,23 +94,26 @@ public static class PodDropScheduleView
         double launchAt = t.LaunchAt(board);
         sb.Append($"\n                    (해치 이벤트 뒤, 빨라도 {t.WalkReadyAt:0.##}s · 수평 속도 {lobby.walkSpeed:0.##}m/s — 문턱 → 좌석 미끄러짐까지 같은 속도, 출발 간격 {t.WalkInterval:0.##}s, 가장 늦게 앉는 사람 ≈{launchAt:0.##}s)");
         sb.Append(LaunchLine(lobby, $"≈{launchAt:0.##}s"));
-        double launchEnd = launchAt + LaunchRealSeconds(lobby, out _);
-        sb.Append(EndLines(t, launchEnd, launchAt));
+        LaunchMarks marks = ReadLaunchMarks(lobby);
+        float RealAt(float clip) => LaunchRealSecondsTo(clip, marks.Fast, marks.FastFound, lobby.launchFastSpeed, marks.Fast2, marks.Fast2Found, lobby.launchFastSpeed2);
+        // 하강 시작 = 하강 이벤트 위치(실제 초), 없으면 발사 끝(예비, 할 일 198).
+        double descent = launchAt + RealAt(marks.DescentFound ? Mathf.Min(marks.Descent, marks.End) : marks.End);
+        sb.Append(EndLines(t, descent, launchAt, marks.DescentFound ? $"클립 {marks.Descent:0.##}s 하강 시작 이벤트" : "⚠ 하강 이벤트 없음 — 발사 끝으로 대신"));
         sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
-        sb.Append($"\n  총 ≈{t.LoadAt(launchEnd):0.##}초 → 로딩 화면 (발사 시작 기준 +{t.LoadAt(launchEnd) - launchAt:0.##}초)");
+        sb.Append($"\n  총 ≈{t.LoadAt(descent):0.##}초 → 로딩 화면 (발사 시작 기준 +{t.LoadAt(descent) - launchAt:0.##}초)");
         return sb.ToString();
     }
 
-    // 발사 클립 끝(서버 확정 시각) → 끝 대기 → 끝 페이드 아웃 → 로딩. 끝 시각을 모르면(경로 미지) 끝 기준 상대 초로만.
-    private static string EndLines(PodDropLobbyTimeline t, double? launchEnd, double? launchAt)
+    // 포드 하강 시작(발사 클립 이벤트 위치, 할 일 198) → 끝 대기 → 끝 페이드 아웃 → 로딩. 하강 시각을 모르면(경로 미지) 하강 기준 상대 초로만.
+    private static string EndLines(PodDropLobbyTimeline t, double? descentAt, double? launchAt, string source = null)
     {
-        if (launchEnd == null)
-            return $"\n  끝 대기·페이드     발사 끝 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LoadAfterLaunchEndSeconds:0.##}s 검게 → 로딩";
+        if (descentAt == null)
+            return $"\n  끝 대기·페이드     하강 시작 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LoadAfterLaunchEndSeconds:0.##}s 검게 → 로딩";
 
-        double end = launchEnd.Value;
+        double end = descentAt.Value;
         string fromLaunch = launchAt != null ? $", 발사 시작 기준 +{end - launchAt.Value:0.##}s" : "";
-        return $"\n  발사 끝           ≈{end:0.##}s (서버 확정·복제{fromLaunch})" +
-               $"\n  끝 대기           ≈{end:0.##} ~ {t.EndFadeAt(end):0.##}s ({t.LaunchEndWaitSeconds:0.##}s, 마지막 자세 그대로)" +
+        return $"\n  포드 하강 시작    ≈{end:0.##}s ({source}{fromLaunch})" +
+               $"\n  끝 대기           ≈{end:0.##} ~ {t.EndFadeAt(end):0.##}s ({t.LaunchEndWaitSeconds:0.##}s, 발사 클립은 계속 돈다)" +
                (t.LaunchEndFadeSeconds > 0f
                    ? $"\n  끝 페이드 아웃    ≈{t.EndFadeAt(end):0.##} ~ {t.LoadAt(end):0.##}s (검게, 선형 — 시작 암전과 같은 검은 화면)"
                    : "\n  끝 페이드 아웃    없음 (대기 끝에 곧바로 로딩)") +
@@ -120,14 +123,15 @@ public static class PodDropScheduleView
     /// <summary>발사 클립 시점(클립 초, 1배속) — 가속 1단계 · 2단계 · 끝 이벤트. 이벤트가 없는 가속 단계는 클립 끝(그 단계 없음).</summary>
     private struct LaunchMarks
     {
-        public float Fast, Fast2, End;
-        public bool FastFound, Fast2Found, EndFound;
+        public float Fast, Fast2, End, Descent;
+        public bool FastFound, Fast2Found, EndFound, DescentFound;
     }
 
     private static LaunchMarks ReadLaunchMarks(PodDropLobbyTimings lobby)
     {
         var m = new LaunchMarks();
         m.End = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.EndFound);
+        m.Descent = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.DescentFound, PodAnimEventRelay.KindDescent);
         m.Fast = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.FastFound, PodAnimEventRelay.KindSpeedUp);
         m.Fast2 = PodAnimEventAuthoring.EventSecondsOf(lobby.launchState, out m.Fast2Found, PodAnimEventRelay.KindSpeedUp2);
         return m;

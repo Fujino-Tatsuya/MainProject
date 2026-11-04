@@ -195,6 +195,38 @@ public sealed class PodAnimatorDriver
         ClipEvent?.Invoke(clipName, kind);
     }
 
+    /// <summary>
+    /// 상태(= 클립 이름) 클립의 첫 <see cref="PodAnimEventRelay.FunctionName"/> 이벤트(종류 <paramref name="kind"/>) 시각(클립 초, 할 일 198).
+    /// 재생하지 않아도 읽는다 — 이벤트 위치로 시각을 계산할 때. 클립·이벤트가 없으면 +∞.
+    /// </summary>
+    public static float ClipEventSeconds(Animator animator, string state, int kind)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrEmpty(state))
+            return float.PositiveInfinity;
+
+        foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+        {
+            if (clip != null && clip.name == state)
+                return FirstEventSeconds(clip.events, kind);
+        }
+
+        return float.PositiveInfinity;
+    }
+
+    /// <summary>이벤트 목록에서 <see cref="PodAnimEventRelay.FunctionName"/>·종류 <paramref name="kind"/> 의 가장 이른 시각(초). 없으면 +∞(순수).</summary>
+    public static float FirstEventSeconds(IEnumerable<AnimationEvent> events, int kind)
+    {
+        float best = float.PositiveInfinity;
+        if (events == null) return best;
+        foreach (AnimationEvent e in events)
+        {
+            if (e != null && e.functionName == PodAnimEventRelay.FunctionName && e.intParameter == kind && e.time < best)
+                best = e.time;
+        }
+
+        return best;
+    }
+
     private int TopLayerWith(int hash)
     {
         for (int layer = _animator.layerCount - 1; layer >= 0; layer--)

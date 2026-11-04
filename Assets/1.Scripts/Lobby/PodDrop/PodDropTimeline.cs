@@ -45,7 +45,7 @@ public struct PodDropLobbyTimings
              "이벤트 위치는 FBX 임포트 창 Animation 탭에서 옮긴다. 비우면 해치 애니 없이 곧바로 탑승")]
     public string hatchState;
     [Tooltip("발사 상태 이름(컨트롤러 Base Layer) — 해치 닫힘·갱도 문 열림·포드 하강이 한 클립. 가장 늦게 앉는 순간 처음부터 1배속으로 재생하고, " +
-             "끝 프레임 클립 이벤트(PodClipEvent)부터 끝 대기 → 끝 페이드 아웃(검게) 뒤 로딩 화면으로 넘어간다(할 일 121). 비우면 앉자마자 끝 대기부터")]
+             "포드 하강 시작 이벤트(PodClipEvent 정수 인자 3)부터 끝 대기 → 끝 페이드 아웃(검게) 뒤 로딩 화면으로 넘어간다(할 일 198 — 클립 끝을 기다리지 않는다). 비우면 앉자마자 끝 대기부터")]
     public string launchState;
     [Tooltip("발사 클립 가속 1단계 배율 — 발사 클립의 가속 1단계 이벤트(PodClipEvent 정수 인자 1, 기본 213프레임)부터 2단계 이벤트까지 이 배율로 재생한다(1 = 가속 없음). " +
              "전환 프레임은 FBX 임포트 창 Animation 탭에서 이벤트를 옮겨 튜닝한다. 호스트 이벤트 시각을 서버가 복제해 클라도 같은 시점에 가속한다")]
@@ -54,11 +54,12 @@ public struct PodDropLobbyTimings
              "전환 프레임은 FBX 임포트 창 Animation 탭에서 이벤트를 옮겨 튜닝한다. 호스트 이벤트 시각을 서버가 복제해 클라도 같은 시점에 바꾼다")]
     [Min(0.01f)] public float launchFastSpeed2;
 
-    [Header("발사 끝 → 로딩 (서버가 확정한 발사 클립 끝 시각 기준)")]
-    [Tooltip("발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초). 그동안 마지막 자세 그대로 보인다. 0 = 끝 이벤트 순간 곧바로 페이드")]
+    [Header("포드 하강 시작 → 로딩 (발사 클립의 하강 시작 이벤트 기준, 할 일 198)")]
+    [Tooltip("포드 하강 시작 이벤트(발사 클립 PodClipEvent 정수 인자 3 — 포드가 아래로 내려가기 시작하는 프레임) → 끝 페이드 아웃 시작(초, 실시간). " +
+             "0 = 하강 시작 순간 곧바로 페이드. 하강 이벤트 위치는 FBX 임포트 창 Animation 탭에서 옮긴다. 클립에 하강 이벤트가 없으면 발사 클립 끝(끝 이벤트)부터 잰다(경고)")]
     [Min(0f)] public float launchEndWaitSeconds;
-    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 순간 서버가 로딩을 건다(로딩 화면이 검은 화면 위에 뜬다). " +
-             "대기·페이드 둘 다 0 = 끝 이벤트 순간 곧바로 로딩(페이드 없음)")]
+    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 순간 서버가 로딩을 건다(로딩 화면이 검은 화면 위에 뜬다 — 발사 클립이 아직 돌고 있어도). " +
+             "대기·페이드 둘 다 0 = 하강 시작 순간 곧바로 로딩(페이드 없음)")]
     [Min(0f)] public float launchEndFadeSeconds;
 
     [Header("화면 UI")]
@@ -84,7 +85,7 @@ public struct PodDropLobbyTimings
         launchState = "DP_LaunchCycle",
         launchFastSpeed = 6f,
         launchFastSpeed2 = 1f,
-        launchEndWaitSeconds = 1f,
+        launchEndWaitSeconds = 0.5f, // 할 일 198 — 하강 시작 이벤트 뒤 0.5초
         launchEndFadeSeconds = 1f,
         hudRescanSeconds = 0.5f,
     };
@@ -230,7 +231,7 @@ public struct PodDropMapTimings
 /// <summary>
 /// 로비 포드 연출의 순수 시간표(할 일 100 C2 → 106) — 경과 시간 → 레터박스 알파·암전·카메라 거리·슬롯별 보행.
 /// 네트워크·씬을 모른다. 경과 시간은 시작 시각(출격 확정) 기준이라 늦게 본 피어도 같은 값을 얻는다(음수 = 시작 전).
-/// 클립 단계(해치 열림 → 탑승 → 발사 → 끝 대기·페이드 → 로딩)는 시각이 정해져 있지 않다 — 서버가 받은 클립 이벤트 시각(해치 열림, 발사 끝)을 넣어 계산한다.
+/// 클립 단계(해치 열림 → 탑승 → 발사 → 하강 시작 → 끝 대기·페이드 → 로딩)는 시각이 정해져 있지 않다 — 서버가 받은 클립 이벤트 시각(해치 열림)과 클립 이벤트 위치로 계산한 하강 시작 시각(할 일 198)을 넣는다.
 /// 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
 /// </summary>
 public sealed class PodDropLobbyTimeline
@@ -253,11 +254,11 @@ public sealed class PodDropLobbyTimeline
     public int WalkerCount => _walkSeconds.Length;
     /// <summary>다음 사람이 걷기 시작하는 간격(초).</summary>
     public float WalkInterval { get; }
-    /// <summary>발사 클립 끝 이벤트 → 끝 페이드 아웃 시작(초).</summary>
+    /// <summary>포드 하강 시작 이벤트 → 끝 페이드 아웃 시작(초, 할 일 198 — 예전엔 발사 클립 끝 기준).</summary>
     public float LaunchEndWaitSeconds { get; }
     /// <summary>끝 페이드 아웃 — 다 검어지기까지(초).</summary>
     public float LaunchEndFadeSeconds { get; }
-    /// <summary>발사 클립 끝 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
+    /// <summary>포드 하강 시작 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
     public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds;
 
     // 슬롯별 보행 시간(초, 걷기 시작 지점 → 좌석) — 수평 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
@@ -307,11 +308,11 @@ public sealed class PodDropLobbyTimeline
     /// <summary>발사 클립 재생 시작 = 가장 늦게 좌석에 도착한 순간. 탑승 전이면 +∞.</summary>
     public double LaunchAt(double boardAt) => boardAt + SeatedSeconds;
 
-    /// <summary>끝 페이드 아웃 시작 = 발사 클립 끝 이벤트 + 끝 대기. 이벤트 전이면 +∞.</summary>
-    public double EndFadeAt(double launchEndedAt) => launchEndedAt + LaunchEndWaitSeconds;
+    /// <summary>끝 페이드 아웃 시작 = 포드 하강 시작 + 끝 대기. 하강 시각을 아직 모르면 +∞.</summary>
+    public double EndFadeAt(double descentAt) => descentAt + LaunchEndWaitSeconds;
 
-    /// <summary>로딩 시작 = 끝 페이드가 다 검어진 순간(발사 클립 끝 이벤트 + 대기 + 페이드). 서버가 이 시각에 로딩을 건다. 이벤트 전이면 +∞.</summary>
-    public double LoadAt(double launchEndedAt) => launchEndedAt + LoadAfterLaunchEndSeconds;
+    /// <summary>로딩 시작 = 끝 페이드가 다 검어진 순간(하강 시작 + 대기 + 페이드). 서버가 이 시각에 로딩을 건다(발사 클립이 아직 돌아도). 하강 시각을 아직 모르면 +∞.</summary>
+    public double LoadAt(double descentAt) => descentAt + LoadAfterLaunchEndSeconds;
 
     /// <summary>슬롯(0 = P1)이 걷기 시작하는 경과 시각(초).</summary>
     public double WalkStartAt(int slot, double boardAt) => boardAt + Mathf.Max(0, slot) * WalkInterval;
@@ -345,6 +346,38 @@ public sealed class PodDropLobbyTimeline
         return (float)(clip + (from2 - from1) * fastSpeed + (elapsed - from2) * fast2Speed);
     }
 
+    /// <summary>
+    /// <see cref="LaunchClipSecondsAt"/> 의 역(할 일 198) — 발사 클립의 <paramref name="clipSeconds"/> 초 자세(예: 하강 시작 이벤트 위치)에 닿는 경과 시각.
+    /// 가속 시각(<paramref name="fastAt"/>·<paramref name="fast2At"/>, 서버 복제)이 아직 없으면 그 가속 이벤트의 클립 위치(<paramref name="fastClipSeconds"/>·<paramref name="fast2ClipSeconds"/>)를 본다 —
+    /// 목표보다 클립상 앞선 가속 이벤트가 아직 복제 안 됐으면 배율을 모르므로 <see cref="PodDropTimeline.NotYet"/>(추측하지 않는다), 목표가 그 앞이면 지금 배율로 계산한다.
+    /// 가속 이벤트가 클립에 없으면 클립 위치 = +∞. 발사 시작이 +∞ 면 +∞. 배율 0 이하는 1.
+    /// </summary>
+    public static double LaunchElapsedAtClipSeconds(float clipSeconds, double launchAt, double fastAt, float fastSpeed, float fastClipSeconds,
+        double fast2At = PodDropTimeline.NotYet, float fast2Speed = 1f, float fast2ClipSeconds = float.PositiveInfinity)
+    {
+        if (double.IsPositiveInfinity(launchAt)) return PodDropTimeline.NotYet;
+        if (fastSpeed <= 0f) fastSpeed = 1f;
+        if (fast2Speed <= 0f) fast2Speed = 1f;
+        double target = Math.Max(0f, clipSeconds);
+        double from2 = Math.Max(fast2At, launchAt);
+        double from1 = Math.Min(Math.Max(fastAt, launchAt), from2);
+
+        // 1배속 구간
+        if (double.IsPositiveInfinity(from1))
+            return Math.Min(fastClipSeconds, fast2ClipSeconds) < target ? PodDropTimeline.NotYet : launchAt + target;
+        double clip1 = from1 - launchAt;
+        if (target <= clip1) return launchAt + target;
+
+        // 가속 1단계 구간
+        if (double.IsPositiveInfinity(from2))
+            return fast2ClipSeconds < target ? PodDropTimeline.NotYet : from1 + (target - clip1) / fastSpeed;
+        double clip2 = clip1 + (from2 - from1) * fastSpeed;
+        if (target <= clip2) return from1 + (target - clip1) / fastSpeed;
+
+        // 가속 2단계 구간
+        return from2 + (target - clip2) / fast2Speed;
+    }
+
     /// <summary>수평 경로 길이(m) ÷ 걷는 속도(m/s) = 보행 시간(초). 길이·속도가 0 이하(또는 NaN)면 0 — 무한·NaN 시간표를 만들지 않는다.</summary>
     public static float WalkSecondsFor(float pathLength, float walkSpeed) =>
         pathLength > 0f && walkSpeed > 0f ? pathLength / walkSpeed : 0f;
@@ -375,15 +408,15 @@ public sealed class PodDropLobbyTimeline
     }
 
     /// <summary>
-    /// 끝 페이드 아웃 알파(할 일 121) — 발사 클립 끝 이벤트(<paramref name="launchEndedAt"/>, 서버 확정·복제) 뒤 대기 동안 0, 페이드 구간 0 → 1(선형), 그 뒤 1 유지
-    /// (로딩 화면이 그 위에 뜨고 로비 씬과 함께 사라진다). 이벤트 전(+∞)이면 0. 페이드 0 = 대기 끝 순간 곧바로 1.
+    /// 끝 페이드 아웃 알파(할 일 121 → 198) — 포드 하강 시작(<paramref name="descentAt"/>, 클립 이벤트 위치 + 복제 시각으로 전 피어가 같은 값) 뒤 대기 동안 0, 페이드 구간 0 → 1(선형), 그 뒤 1 유지
+    /// (로딩 화면이 그 위에 뜨고 로비 씬과 함께 사라진다). 하강 시각을 아직 모르면(+∞) 0. 페이드 0 = 대기 끝 순간 곧바로 1.
     /// </summary>
-    public float EndFadeAlphaAt(double elapsed, double launchEndedAt) =>
-        PodDropTimeline.Progress(elapsed, EndFadeAt(launchEndedAt), LaunchEndFadeSeconds);
+    public float EndFadeAlphaAt(double elapsed, double descentAt) =>
+        PodDropTimeline.Progress(elapsed, EndFadeAt(descentAt), LaunchEndFadeSeconds);
 
     /// <summary>검은 화면 알파 = 시작 암전·끝 페이드 중 큰 값 — 같은 검은 화면 한 장(<see cref="PodDropScreenOverlay"/>)에 넣는다.</summary>
-    public float ScreenFadeAlphaAt(double elapsed, double launchEndedAt) =>
-        Mathf.Max(BlackoutAlphaAt(elapsed), EndFadeAlphaAt(elapsed, launchEndedAt));
+    public float ScreenFadeAlphaAt(double elapsed, double descentAt) =>
+        Mathf.Max(BlackoutAlphaAt(elapsed), EndFadeAlphaAt(elapsed, descentAt));
 }
 
 /// <summary>

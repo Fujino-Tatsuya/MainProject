@@ -34,7 +34,7 @@ MonoBehaviour:
     fadeOutEase: 0
     launchFastSpeed: 6
     launchFastSpeed2: 1
-    launchEndWaitSeconds: 1
+    launchEndWaitSeconds: 0.5
     launchEndFadeSeconds: 1
     hudRescanSeconds: 0.5
   map:
