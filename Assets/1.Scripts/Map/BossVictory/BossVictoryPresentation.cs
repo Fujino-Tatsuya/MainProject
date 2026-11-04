@@ -428,6 +428,7 @@ public sealed class BossVictoryPresentation : MonoBehaviour
             (-1f, a.x, 0), (a.x, a.y, 1), (a.y, b.x, 0), (b.x, b.y, -1), (b.y, 2f, 0),
         };
 
+        string typo = UiStrings.BossVictoryTypo.TextOr(_cfg.typoText);   // 시트 행 → 없으면 설정 에셋 글자
         Bounds textBounds = default;
         for (int i = 0; i < slices.Length; i++)
         {
@@ -435,7 +436,7 @@ public sealed class BossVictoryPresentation : MonoBehaviour
             go.transform.SetParent(_typoRoot, false);
             TextMeshPro tmp = go.AddComponent<TextMeshPro>();
             tmp.font = font;
-            tmp.text = _cfg.typoText;
+            tmp.text = typo;
             tmp.fontSize = 10f;
             tmp.fontStyle = FontStyles.Italic;
             tmp.alignment = TextAlignmentOptions.Center;

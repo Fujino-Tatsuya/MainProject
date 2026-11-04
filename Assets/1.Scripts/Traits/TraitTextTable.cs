@@ -48,10 +48,11 @@ public sealed class TraitTextTable : ScriptableObject
         return false;
     }
 
-    /// <summary>테이블(없으면 null) → 상수 기본값 순으로 찾는다. 모르는 ID 는 빈 문자열.</summary>
+    /// <summary>Strings 시트 행(<see cref="TraitUiStrings.TryGetText"/>) → 테이블(없으면 null) → 상수 기본값 순으로 찾는다. 모르는 ID 는 빈 문자열.</summary>
     public static string Resolve(TraitTextTable table, string id)
     {
-        return table != null && table.TryGet(id, out string text) ? text : TraitTexts.Get(id);
+        string fallback = table != null && table.TryGet(id, out string text) ? text : TraitTexts.Get(id);
+        return TraitUiStrings.TryGetText(id, out UiString key) ? key.TextOr(fallback) : fallback;
     }
 }
 

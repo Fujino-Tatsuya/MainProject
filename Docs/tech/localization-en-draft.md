@@ -70,6 +70,118 @@
 - 용어: `취약` = **Vulnerable**, `저지불가` = **Unstoppable**, `열기` = **Heat**(HUD `Heat Lv.` 와 같은 단어), `반격`(팔라딘 E) = counterattack — 간파(Interrupt)와 다른 동작이라 단어를 나눴다.
 - 반영 뒤 `StringTable 갱신`: 키 156 · 오류 코드 35, 오류·경고 0. `Verify`: 오류·경고 0(수치 차이 정보 로그만).
 
+## 누락 점검 후속 (2026-11-02)
+
+> 전수 점검 보고서(세션 노트 `localization-audit-2026-11-02.md`)의 후속. **AI 초안 — 기획 검수 전.**
+> ✅ **xlsx 반영함(2026-11-02, 경석 지시)** — SVN r576 로 받은 뒤 `Strings` 시트만 고쳤다: ① en 52칸 · ② 새 행 18(아래 17 + `UI.BossVictory.Typo` 보스 격파/BOSS DOWN) · ③ ko 21칸 전부 제안대로.
+> Export 대신 셀만 채웠다(다른 시트·서식 변경 0, 셀 값 비교로 확인). **SVN 미커밋.** 문구가 바뀌면 이 표가 아니라 시트가 원본이다.
+> 검사: 90행 전부 ko↔en 자리표시자 집합·태그 수·줄바꿈 수 일치(일회성 스크립트), ① ③ 의 ko 는 2026-11-02 `StringTable.asset`(= xlsx) 값.
+
+### ① 키는 있는데 en 칸이 빈 행 (52행) — en 만 채운다
+
+| key | ko(시트) | en(초안) | 메모 |
+|---|---|---|---|
+| `UI.SkillTooltip.Tag.Knockback` | `넉백` | `Knockback` |  |
+| `UI.SkillTooltip.Tag.Stun` | `기절` | `Stun` |  |
+| `UI.SkillTooltip.Tag.Vulnerable` | `취약` | `Vulnerable` |  |
+| `UI.SkillTooltip.Tag.Shield` | `보호막` | `Shield` |  |
+| `UI.SkillTooltip.Tag.Heal` | `회복` | `Heal` |  |
+| `UI.SkillTooltip.Tag.Overheat` | `과열` | `Overheat` |  |
+| `UI.SkillTooltip.Tag.Unstoppable` | `저지불가` | `Unstoppable` |  |
+| `UI.SkillTooltip.Tag.Invulnerable` | `무적` | `Invulnerable` |  |
+| `Tutorial.Guide.LOBBY_TITLE_CHARACTER` | `캐릭터 선택` | `Character Select` |  |
+| `Tutorial.Guide.LOBBY_TITLE_PREP` | `훈련 준비` | `Training Prep` |  |
+| `Tutorial.Guide.LOBBY_TITLE_BASIC` | `기본 조작 훈련` | `Basic Controls` |  |
+| `Tutorial.Guide.LOBBY_TITLE_COMBAT` | `전투 훈련` | `Combat Training` |  |
+| `Tutorial.Guide.LOBBY_TITLE_COUNTER` | `간파 훈련` | `Interrupt Training` |  |
+| `Tutorial.Guide.LOBBY_TITLE_SUPPRESS` | `제압 훈련` | `Suppression Training` |  |
+| `Tutorial.Guide.LOBBY_TITLE_FREE` | `자유 연습` | `Free Practice` |  |
+| `Tutorial.Guide.LOBBY_TITLE_BRIEF` | `임무 브리핑` | `Mission Briefing` |  |
+| `Tutorial.Guide.LOBBY_TITLE_SORTIE` | `출격 준비` | `Sortie Prep` |  |
+| `Tutorial.Guide.LOBBY_OBJ_CHARACTER` | `캐릭터를 선택하세요` | `Choose your character` |  |
+| `Tutorial.Guide.LOBBY_OBJ_CENTRAL` | `중앙에 모이세요` | `Gather at the center` |  |
+| `Tutorial.Guide.LOBBY_OBJ_TRAINING_HALL` | `훈련장에 모이세요` | `Gather at the training hall` |  |
+| `Tutorial.Guide.LOBBY_OBJ_BASIC` | `기본 공격과 스킬을 사용하세요` | `Use your basic attack and skills` |  |
+| `Tutorial.Guide.LOBBY_OBJ_AREA` | `구역에 모이세요` | `Gather in the zone` |  |
+| `Tutorial.Guide.LOBBY_OBJ_COMBAT` | `훈련 상대를 모두 처치하세요` | `Defeat all training opponents` |  |
+| `Tutorial.Guide.LOBBY_OBJ_COUNTER` | `상대방의 몸에 보라빛이 나타나면 상대방의 정면에서 우클릭 스킬을 사용하세요` | `When the opponent glows purple, use your Right-Click Skill from in front of them` | `우클릭 스킬` = 툴팁 부제와 같은 단어. 키 토큰 후보 |
+| `Tutorial.Guide.LOBBY_OBJ_VULN_CC` | `취약 상태의 상대에게 {tag:Knockback} 또는 {tag:Stun} 속성이 있는 스킬을 사용하세요` | `Use a {tag:Knockback} or {tag:Stun} skill on a Vulnerable opponent` |  |
+| `Tutorial.Guide.LOBBY_OBJ_WALL` | `{tag:Knockback} 속성이 있는 스킬로 상대를 표시된 벽에 충돌시키세요` | `Slam the opponent into the marked wall with a {tag:Knockback} skill` |  |
+| `Tutorial.Guide.LOBBY_OBJ_SUPPRESS` | `제압된 상대를 처치하세요` | `Defeat the suppressed opponent` |  |
+| `Tutorial.Guide.LOBBY_OBJ_FREE` | `자유롭게 연습하세요` | `Practice freely` |  |
+| `Tutorial.Guide.LOBBY_OBJ_SORTIE_GATHER` | `출격 지점에 모이세요` | `Gather at the sortie point` | `LOBBY_OBJ_SORTIE` en 과 같은 문장 |
+| `Tutorial.Guide.LOBBY_BODY_VULN_1` | `타이밍에 맞춰 간파 스킬로 공격을 막아내면 상대방은 취약 상태가 됩니다.` | `Block an attack with your Interrupt skill at the right moment to make the opponent Vulnerable.` |  |
+| `Tutorial.Guide.LOBBY_BODY_VULN_2` | `취약 상태의 상대에게는 밀치거나 기절을 적용할 수 있습니다.` | `Vulnerable opponents can be knocked back or stunned.` |  |
+| `Tutorial.Guide.LOBBY_BODY_SUPPRESS` | `간파 또는 벽과 충돌시켜 상대의 {tag:Suppress} 칸을 모두 소진시키면 상대는 {tag:Suppress} 상태에 돌입하며, 캐릭터의 행동이 빨라집니다.` | `Use Interrupts or wall impacts to deplete the opponent's {tag:Suppress} segments and put them into {tag:Suppress}, which speeds up your character's actions.` | 🔸 ko "캐릭터의 행동이 빨라집니다" 의 주어(내 캐릭터인지)를 기획 확인 |
+| `Tutorial.Guide.LOBBY_BODY_FREE_EXIT` | `연습을 마치려면 입구로 이동하세요` | `Move to the entrance to finish practicing` |  |
+| `Tutorial.Guide.LOBBY_CHECK_BASIC_ATTACK` | `기본 공격 (LMB)` | `Basic Attack (LMB)` | 키 토큰 후보 |
+| `Tutorial.Guide.LOBBY_CHECK_Q` | `Q 스킬` | `Q Skill` |  |
+| `Tutorial.Guide.LOBBY_CHECK_E` | `E 스킬` | `E Skill` |  |
+| `Tutorial.Guide.LOBBY_CHECK_R` | `R 스킬` | `R Skill` |  |
+| `Tutorial.Guide.LOBBY_CHECK_RMB` | `우클릭 스킬 (RMB)` | `Right-Click Skill (RMB)` |  |
+| `Tutorial.Guide.LOBBY_CHECK_DASH` | `대시 (Space Bar)` | `Dash (Space Bar)` | 키 토큰 후보 |
+| `Tutorial.Guide.LOBBY_PROGRESS_GATHER` | `집결 {n}/{total}` | `Gathered {n}/{total}` | `UI.Lobby.GatherCount` en 과 같은 단어 |
+| `Tutorial.Guide.LOBBY_PROGRESS_PARTY_DONE` | `훈련 완료 {n}/{total}` | `Training done {n}/{total}` |  |
+| `Tutorial.Guide.LOBBY_PROGRESS_COUNTDOWN` | `시작까지 {n}` | `Starting in {n}` |  |
+| `Tutorial.Guide.LOBBY_SPEAKER_SUPERVISOR` | `감독관` | `Supervisor` |  |
+| `Tutorial.Guide.LOBBY_DLG_INTRO` | `이번에 새로 온 신입들인가? 좋아. 실력 좀 볼까. 훈련장으로 와.` | `So you're the new recruits? Good. Let's see what you've got. Come to the training hall.` |  |
+| `Tutorial.Guide.LOBBY_DLG_TRAINING` | `다 모였군. 기본기는 갖췄는지부터 볼까.` | `Everyone's here. Let's start with your fundamentals.` |  |
+| `Tutorial.Guide.LOBBY_BRIEF_EVAL` | `신입치고는 제법이군. 좋아. 이제 자네들이 맡을 일을 설명하지.` | `Not bad for rookies. Good. Now let me explain your assignment.` |  |
+| `Tutorial.Guide.LOBBY_BRIEF_FACTORY` | `이번 목적지는 웰즈의 연구 시설이다. 저곳에서 시작된 연구가 훗날 대규모 기계 반란으로 이어지지.` | `Our destination is Wells's research facility. The research that began there will one day lead to a full-scale machine uprising.` | `웰즈` = Wells(보스 코드 이름) |
+| `Tutorial.Guide.LOBBY_BRIEF_REBELLION` | `우리는 그 일이 벌어지기 전으로 들어간다. 이번에는 그 시작을 막는 거야.` | `We're going back to before it happens. This time, we stop it before it starts.` |  |
+| `Tutorial.Guide.LOBBY_BRIEF_SORTIE` | `설명은 여기까지다. 출격 지점으로 이동해.` | `That's all for the briefing. Head to the sortie point.` |  |
+| `UI.Lobby.Tutorial.TagKnockback` | `[넉백]` | `[Knockback]` |  |
+| `UI.Lobby.Tutorial.TagStun` | `[기절]` | `[Stun]` |  |
+| `UI.Lobby.Tutorial.TagSuppress` | `[제압]` | `[Suppress]` |  |
+
+### ② 새로 등록할 행 (17행) — 시트에 행 추가(ko·en)
+
+| key | ko | en(초안) | 메모 |
+|---|---|---|---|
+| `UI.Trait.Title` | `특성 선택` | `Choose a Trait` | TraitUI 창 제목 |
+| `UI.Trait.Intro` | `특성은 <b><color=#F2C14E>이번 작전 동안만</color></b> 유지되는 강화입니다. 구역을 돌파할 때마다 복도에서 하나씩 고를 수 있고, 작전이 끝나면 사라집니다.` | `Traits are upgrades that last <b><color=#F2C14E>only for this operation</color></b>. Each time you clear a zone, you pick one in the corridor; they disappear when the operation ends.` | 복도1 상단 설명 |
+| `UI.Trait.LastNotice` | `원흉과 싸우기 전 마지막 특성입니다. 게이지는 계속 차오릅니다.` | `This is your last trait before facing the mastermind. The gauge keeps filling.` | 복도4. 🔸 "게이지" 가 무엇인지(보스 타이머?) 기획 확인 |
+| `UI.Trait.Picked` | `특성을 얻었습니다. 획득한 특성은 {location}에서 다시 볼 수 있습니다.` | `Trait acquired. You can review it at the {location}.` | 획득 토스트 |
+| `UI.Trait.PickedLocation` | `화면 왼쪽 위` | `top left of the screen` | {location} 자리 |
+| `UI.Trait.Reset.Prompt` | `특성을 초기화하고 다시 선택할까요?` | `Reset your traits and choose again?` | 전멸 뒤 팝업 |
+| `UI.Trait.Reset.Yes` | `예` | `Yes` |  |
+| `UI.Trait.Reset.No` | `아니오` | `No` |  |
+| `UI.Trait.Deadline.Seconds` | `{time} 뒤 자동 선택` | `Auto-pick in {time}` | {time} = UI.Unit.Seconds(`10초`/`10s`) |
+| `UI.Trait.Deadline.Done` | `선택 완료 {done}/{total}` | `Picked {done}/{total}` |  |
+| `UI.CharacterSelect.InfoNotImplemented` | `미구현` | `Coming soon` | 기본/코어 정보 팝업(할 일 162) |
+| `AssassinShadowReturnSkillData/tooltip.displayName` | `그림자 회귀` | `Shadow Return` | 특성 `Trait.ASN_2_RETURN.Name` en 과 같은 이름 |
+| `AssassinShadowReturnSkillData/tooltip.subtitle` | `Q 후속 · 그림자 회귀` | `Q Follow-up · Shadow Return` |  |
+| `AssassinShadowReturnSkillData/tooltip.description` | `처음 위치를 향해 돌진하며 원래 Q 피해의 일부를 줍니다.` | `Dash back toward your starting point, dealing part of the original Q damage.` |  |
+| `AssassinTransformedShadowReturnSkillData/tooltip.displayName` | `그림자 회귀 (변신)` | `Shadow Return (Transformed)` |  |
+| `AssassinTransformedShadowReturnSkillData/tooltip.subtitle` | `Q 후속 · 그림자 회귀 · 변신` | `Q Follow-up · Shadow Return · Transformed` |  |
+| `AssassinTransformedShadowReturnSkillData/tooltip.description` | `처음 위치를 향해 돌진하며 원래 Q 피해의 일부를 줍니다.` | `Dash back toward your starting point, dealing part of the original Q damage.` |  |
+
+### ③ ko 칸도 영어인 행 (21행) — ko 칸 한국어 제안(결정은 기획)
+
+| key | 지금 ko = en | 제안 ko | 메모 |
+|---|---|---|---|
+| `UI.Loading.Preparing` | `Preparing...` | `준비 중...` |  |
+| `UI.Loading.Loading` | `Loading...` | `불러오는 중...` |  |
+| `UI.Loading.WaitingForPlayers` | `Waiting for players...` | `다른 플레이어를 기다리는 중...` |  |
+| `UI.Loading.Activating` | `Starting...` | `시작하는 중...` |  |
+| `UI.Loading.StandBy` | `Stand by...` | `잠시만 기다려 주세요...` |  |
+| `UI.Loading.Ready1` | `Enter...` | `입장 중...` |  |
+| `UI.Loading.Ready2` | `All players are ready.` | `모든 플레이어가 준비되었습니다.` |  |
+| `UI.Loading.Ready3` | `Starting...` | `곧 시작합니다...` |  |
+| `UI.Result.Cleared` | `CLEAR` | `클리어` | 연출상 영문 대문자가 의도면 그대로 |
+| `UI.Result.Failed` | `FAILED` | `실패` | 〃 |
+| `UI.Result.Aborted` | `ABORTED` | `중단` | 〃 |
+| `UI.SkillTooltip.PassiveBadge` | `Passive` | `패시브` |  |
+| `UI.Pause.PressAnyButton` | `Press Any Button` | `아무 버튼이나 누르세요` | 타이틀 대기 화면 — 영문 로고 연출이면 그대로 |
+| `UI.StatusEffect.SuperArmor` | `SuperArmor` | `슈퍼아머` |  |
+| `UI.StatusEffect.MoveSpeedModifier` | `MoveSpeed` | `이동 속도` | `#설명` 의 "이동 속도 증감" 에서 증감을 뺌 |
+| `UI.StatusEffect.AttackDamageModifier` | `AttackDamage` | `공격력` |  |
+| `UI.StatusEffect.AttackSpeedModifier` | `AttackSpeed` | `공격 속도` |  |
+| `UI.StatusEffect.DefenseModifier` | `Defense` | `방어력` |  |
+| `UI.StatusEffect.MaxHpModifier` | `MaxHp` | `최대 체력` |  |
+| `UI.StatusEffect.PassiveCharge` | `PassiveCharge` | `패시브 충전` |  |
+| `UI.StatusEffect.Focus` | `Focus` | `정신 집중` | 용어집 `집중도` = Focus |
+
 ## 용어집
 
 | ko | en | 근거·메모 |
@@ -88,6 +200,12 @@
 | 초 | s | 공용 `UI.Unit.Seconds` = `{sec}s`. 툴팁 설명 안에 박힌 `초` 도 `s` |
 | 조인코드 | join code | |
 | 호스트 · 클라이언트 | host · client | ko 의 `Host`·`Client` 표기도 en 은 소문자 일반명사 |
+| 제압 | Suppress / suppressed / suppression | 상태 = `Suppress`, 대상 = `suppressed opponent`, 칸 = `suppression gauge`(기존 `TRAIN_03_*` en) |
+| 넉백 · 밀치기 | Knockback · knock back | 태그 칩 `Knockback`, 문장 안 동사 `knock back` |
+| 기절 | Stun / stunned | 태그 칩 `Stun`, 상태이상 이름 `Stunned` |
+| 출격 · 출격 지점 | sortie · sortie point | 기존 `LOBBY_OBJ_SORTIE` en |
+| 감독관 | Supervisor | 로비 튜토리얼 화자 |
+| 특성 | trait | 기존 `TUT_C_*` en |
 
 ## 기획 결정 필요
 

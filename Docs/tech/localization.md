@@ -352,6 +352,13 @@ Export 가 ErrorCodes 시트에 없는 코드를 **ko = 지금 문구, `#분류`
 | `UI.Result.Survival` | 생존 시간  {time} | `{time}` = mm:ss | 〃 `SurvivalText` — 행이 없으면 씬 `survivalPrefix` + 시간 |
 | `UI.Result.PlayerSlot` | P{n} | `{n}` = 1부터 | `ResultPlayerRowView.SlotText` — 행이 없으면 프리팹 `slotFormat`(`P{0}`) |
 | `UI.TrainingDummy.Hp` | {hp} / {max} | `{hp}`·`{max}` | `TrainingDummyHealthBar.HpText` — 행이 없으면 프리팹 `textFormat`(`{0} / {1}`) |
+| `UI.Trait.Title` · `Intro` · `LastNotice` · `Picked` · `PickedLocation` · `Reset.Prompt/Yes/No` | 특성 선택 · … · 예 · 아니오 | `Picked` = `{location}` | 특성 선택 창(`TraitTextTable.Resolve`) — 행이 없으면 `TraitTexts.asset` 행 → `TraitTexts` 상수(2026-11-02) |
+| `UI.Trait.Deadline.Seconds` · `Deadline.Done` | {time} 뒤 자동 선택 · 선택 완료 {done}/{total} | `{time}` = `UI.Unit.Seconds` | `TraitDeadlineModel.FormatSeconds`·`FormatDone`(2026-11-02) |
+| `UI.CharacterSelect.InfoNotImplemented` | 미구현 | | `CharacterSelectPanel.prefab` › `Text_Body`(LocalizedText, 2026-11-02) |
+| `UI.BossVictory.Typo` | 보스 격파 (en BOSS DOWN) | | `BossVictoryPresentation` 타이포 — 행이 없으면 `BossVictoryConfig.typoText`(2026-11-02) |
+
+- 🔸 2026-11-02 시트 ko 칸 교체: 로딩 상태·준비 문구, `UI.Result.Cleared/Failed/Aborted`(클리어·실패·중단), `UI.SkillTooltip.PassiveBadge`(패시브), `UI.Pause.PressAnyButton`(아무 버튼이나 누르세요), 상태이상 8개(슈퍼아머·이동 속도…).
+  코드 ko(폴백)는 `PressAnyButton` 만 같이 바꿨다 — Heavy 글꼴 글자 집합이 코드 ko 에서 오기 때문(§10). 나머지는 시트 행이 있어 화면에 영향이 없다.
 
 - 상태이상 키는 enum 이 바뀌면 자동으로 따라간다(`UiStrings.TryGetStatusEffect`). enum 이름을 바꾸면 키가 바뀐다 — §5 자동 키와 같은 주의. 조합 값(플래그 여럿)은 키 없이 enum 이름.
   `#설명` 에 한국어 뜻(기절·둔화…)을 같이 적어 두었다 — ko 칸을 한국어로 채울지는 기획이 정한다.
@@ -435,6 +442,10 @@ en: Hold {key:Detail} for details
 - 테스트: `SettingsRulesTests`(언어 기본·전환·이름 비번역, 57키·영어 원문 중복·자리표시자, 라벨 역조회, 액션 이름) · `UiStringsFormatTests`(확인 창 초 단위·액션 이름 언어 전환) · `UiStringsAuthoringTests`(Linker 멱등·ko 폴백) · `UserLanguageConfigTests`(정수 저장값 이관).
 
 ## 10. 글꼴 — 서울알림체 Static 아틀라스
+
+> **글꼴 규칙(2026-11-02 경석)**: 화면 글자는 서울알림체 두 개만 쓴다 — **Heavy** = 설정창·ESC 메뉴·종료 확인·타이틀 `Press` 캡슐·특성 카드 이름·보스 처치 타이포, **그 밖 전부 Medium**.
+> LiberationSans·NotoSansKR 을 직접 지정하지 않는다(NotoSansKR 은 폴백 전용 — 바꾼 곳 목록은 [handoff-localization-fonts.md](handoff-localization-fonts.md)). 외곽선이 필요한 숫자는 `2.Prefabs/UI/SeoulAlrimTTF-Medium SDF - Cooldown Outline.mat`·`- Overhead Outline.mat`.
+> Heavy(`50.Art/UI/Fonts`, SVN)는 Refill 메뉴가 아니라 `Tools/UI/Settings/설정창 글꼴 에셋 만들기 (서울알림체)` 가 굽는다 — 글자 집합 = `UiStrings.All` 코드 ko + 설정 영어. Heavy 화면에 새 글자가 들어가면 코드 ko 도 맞추고 이 메뉴를 돌린다.
 
 기본 UI 글꼴(`TMP Settings` 기본) = `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`. **Static** 이다(2026-10-23 결정 a) —
 Dynamic 이면 Play 중 새 글자마다 에셋이 바뀌어 모든 워크트리에 병합 불가 충돌이 생긴다. 공유 요약은 [handoff-seoulalrim-static.md](handoff-seoulalrim-static.md).

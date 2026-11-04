@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
 
 /// <summary>
-/// 특성 선택 창의 교착 방지 게이지(할 일 15 후속) — Unity·NGO 비의존, EditMode 테스트 대상.
+/// 특성 선택 창의 교착 방지 게이지(할 일 15 후속) — NGO 비의존, EditMode 테스트 대상. 문구만 현지화 표(<see cref="Loc"/>)를 읽는다.
 /// 입력은 바깥(복도 흐름)이 넣는 스냅샷이다: 표시 여부·자동 진행까지 남은 초·교착 방지 전체 초·선택 완료 수·전체 인원.
 /// 스냅샷 사이에는 <see cref="Tick"/>(실제 시간)으로 남은 초를 로컬로 줄이고, 다음 <see cref="Sync"/> 가 서버 값으로 다시 맞춘다.
 /// 이 모듈은 튜토리얼 디렉터·게이트를 모른다 — 어떤 게이트를 기다리는지 판단은 넣는 쪽 몫.
@@ -10,9 +11,6 @@ public sealed class TraitDeadlineModel
 {
     /// <summary>이 초 이하로 남으면 강조색(게이지·텍스트).</summary>
     public const float UrgentSeconds = 10f;
-
-    public const string SecondsFormat = "{0}초 뒤 자동 선택";
-    public const string DoneFormat = "선택 완료 {0}/{1}";
 
     public bool Visible { get; private set; }
 
@@ -58,9 +56,13 @@ public sealed class TraitDeadlineModel
         Remaining = Math.Max(0f, Remaining - deltaSeconds);
     }
 
-    public string FormatSeconds() => string.Format(SecondsFormat, DisplaySeconds);
+    /// <summary>"10초 뒤 자동 선택" — 문구 <see cref="TraitUiStrings.DeadlineSeconds"/>, 초 단위 <see cref="UiStrings.Seconds"/>.</summary>
+    public string FormatSeconds() =>
+        TraitUiStrings.DeadlineSeconds.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(DisplaySeconds, "0") });
 
-    public string FormatDone() => string.Format(DoneFormat, Done, Count);
+    /// <summary>"선택 완료 2/3" — 문구 <see cref="TraitUiStrings.DeadlineDone"/>.</summary>
+    public string FormatDone() =>
+        TraitUiStrings.DeadlineDone.Format(new Dictionary<string, string> { ["done"] = Done.ToString(), ["total"] = Count.ToString() });
 
     private static float Clamp01(float v) => v < 0f ? 0f : v > 1f ? 1f : v;
 }

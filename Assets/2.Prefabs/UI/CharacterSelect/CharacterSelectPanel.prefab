@@ -2670,6 +2670,7 @@ GameObject:
   - component: {fileID: 4429431654490049690}
   - component: {fileID: 5970231564736236380}
   - component: {fileID: 281634296935938269}
+  - component: {fileID: 7312409561288734105}
   m_Layer: 5
   m_Name: Text_Body
   m_TagString: Untagged
@@ -2704,6 +2705,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8417376533517214709}
   m_CullTransparentMesh: 1
+--- !u!114 &7312409561288734105
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8417376533517214709}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62c92272593776f49aba7cd3bbfdefd5, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: UI.CharacterSelect.InfoNotImplemented
 --- !u!114 &281634296935938269
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2726,8 +2740,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uBBF8\uAD6C\uD604"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
-  m_sharedMaterial: {fileID: -7556226730295790334, guid: a69fbc6b9e60c37478175f3b46a262e4, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  m_sharedMaterial: {fileID: -8943234406925885916, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

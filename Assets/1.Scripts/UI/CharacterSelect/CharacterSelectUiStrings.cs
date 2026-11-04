@@ -13,7 +13,9 @@ public static class CharacterSelectUiStrings
     public static readonly UiString Unavailable = new UiString("UI.CharacterSelect.Unavailable", "선택 불가", Where + " › 카드 Text_Unavailable — 로스터 Available 꺼짐(코드)");
     public static readonly UiString Hint = new UiString("UI.CharacterSelect.Hint", "W/S·방향키 이동   Enter 선택   Esc 뒤로", Where + " › Text_Hint — 조작 안내(코드)");
 
-    public static readonly IReadOnlyList<UiString> All = new[] { LockedNotice, CurrentTag, Unavailable, Hint };
+    public static readonly UiString InfoNotImplemented = new UiString("UI.CharacterSelect.InfoNotImplemented", "미구현", Where + " › InfoPopup Text_Body — 기본/코어 정보 팝업 본문(LocalizedText, 할 일 162)");
+
+    public static readonly IReadOnlyList<UiString> All = new[] { LockedNotice, CurrentTag, Unavailable, Hint, InfoNotImplemented };
 
     /// <summary>플레이어 프리팹 이름 → 캐릭터 선택 화면 이름(고정 영어, 번역 안 함). 이 표가 유일한 출처.</summary>
     private static readonly Dictionary<string, string> EnglishNames = new Dictionary<string, string>
