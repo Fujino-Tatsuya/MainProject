@@ -199,7 +199,10 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 half visibility=saturate(_Alpha/max(_ReferenceAlpha,0.01h));
                 half rangeVisibility=visibility*visibility;
                 half detailVisibility=rangeVisibility*visibility;
-                half face=_FillOpacity*lerp(0.04h/0.145h,1.0h,saturate(input.uv.y));
+                // C3 interior ramp gets denser toward the far end. 202: with the length fade on it would
+                // cancel the fade (ramp x fade ~ flat), so the fade replaces the ramp (interior = _FillOpacity x fade).
+                half lengthFadeOn=saturate(_LineFadeOn);
+                half face=_FillOpacity*lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn);
                 half4 result=half4(_Color.rgb*face,face);
                 Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
                 Over(result,_InnerColor.rgb,inner*_InnerColor.a);
@@ -231,7 +234,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float endDistance=(1.0-input.uv.y)*size.y;
                 half endBar=(1.0h-smoothstep(outerWidth-aa,outerWidth+aa,endDistance))*(1.0h-smoothstep(size.x*0.435,size.x*0.445,abs(samplePos.x)));
                 Over(result,_EndColor.rgb,endBar*_EndColor.a*rangeVisibility);
-                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y,_LineFadeT.xyz,_LineFadeAlpha)),saturate(_LineFadeOn));
+                half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y,_LineFadeT.xyz,_LineFadeAlpha)),lengthFadeOn);
                 half distanceFade=(half)DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz);
                 return half4(result.rgb/max(result.a,0.0001h),result.a*inside*_Color.a*lengthFade*distanceFade);
             }

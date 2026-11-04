@@ -124,6 +124,8 @@ public sealed class SkillLineLengthFadeTests
         StringAssert.Contains(SkillLineLengthFade.SpanProperty, text);
         StringAssert.Contains("float LineLengthFade(", text);
         StringAssert.Contains("DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz)", text);
+        // 기존 C3 채움 램프(먼 끝일수록 진함)가 감쇠를 상쇄하지 않게 — 감쇠가 켜지면 램프 대신 감쇠만.
+        StringAssert.Contains("lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn)", text);
     }
 
     [Test]
