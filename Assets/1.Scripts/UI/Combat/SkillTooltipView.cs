@@ -229,7 +229,7 @@ public sealed class SkillTooltipView : MonoBehaviour
             out string error);
 
         if (description != null)
-            description.text = ok ? formatted : ErrorText(error);
+            description.text = ok ? SkillTooltipTagHighlighter.Highlight(formatted, tagStyles) : ErrorText(error); // 태그 이름 = 칩 색(208)
 
         if (!ok && !loggedError)
         {

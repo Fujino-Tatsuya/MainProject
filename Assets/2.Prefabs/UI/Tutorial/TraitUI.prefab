@@ -841,6 +841,7 @@ MonoBehaviour:
   basicAttackIcon: {fileID: 21300000, guid: 0c118daf3066ac341903f114e0b0d471, type: 3}
   skillBackdrop: {fileID: 7909248465053270257}
   characterRoster: {fileID: 11400000, guid: 040d4a8d1d7b29e40b40962b65eba5f4, type: 2}
+  tagStyles: {fileID: 11400000, guid: 476ad2309fdaf0c4fb3429876aaa9ea1, type: 2}
 --- !u!1 &1648728162414106526
 GameObject:
   m_ObjectHideFlags: 0
