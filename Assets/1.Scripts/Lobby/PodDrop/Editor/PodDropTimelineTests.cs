@@ -28,7 +28,19 @@ public sealed class PodDropTimelineTests
 
     static PodDropLobbyTimeline Lobby(int walkers = Walkers) => new PodDropLobbyTimeline(PodDropLobbyTimings.Default, Same(walkers, Walk));
     static PodDropLobbyTimeline Lobby(PodDropLobbyTimings s) => new PodDropLobbyTimeline(s, Same(Walkers, Walk));
-    static PodDropMapTimeline Map() => new PodDropMapTimeline(PodDropMapTimings.Default);
+    static PodDropMapTimeline Map() => new PodDropMapTimeline(LegacyMap);
+
+    // 할 일 198 이전 흐름(앞 구간 건너뛰기 끔·도착 페이드 인 없음) — 낙하·급감속 시각표 테스트는 이것으로 본다. 기본값(건너뛰기 켬)은 Map_Skip* 테스트.
+    static PodDropMapTimings LegacyMap
+    {
+        get
+        {
+            PodDropMapTimings m = PodDropMapTimings.Default;
+            m.skipApproach = false;
+            m.fadeInSeconds = 0f;
+            return m;
+        }
+    }
 
     // ─── 로비: 해치 이벤트 → 탑승 → 발사 ─────────────────────────────────
 
@@ -163,27 +175,27 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(0f, t.BlackoutAlphaAt(100d), Eps, "시작 암전은 다시 검어지지 않는다(끝 페이드는 따로)");
     }
 
-    // ─── 로비: 발사 끝 → 대기 → 끝 페이드 아웃 → 로딩 (할 일 121) ─────────────
+    // ─── 로비: 포드 하강 시작 → 대기 → 끝 페이드 아웃 → 로딩 (할 일 121 → 198) ─────────────
 
     [Test]
     public void Lobby_EndFade_WaitThenFadeThenLoad()
     {
         PodDropLobbyTimeline t = Lobby();
-        const double end = 20d; // 서버가 확정·복제한 발사 클립 끝(경과 초)
-        Assert.AreEqual(1f, t.LaunchEndWaitSeconds, Eps, "기본 대기 1초");
+        const double end = 20d; // 포드 하강 시작(경과 초 — 클립 이벤트 위치 + 복제 시각)
+        Assert.AreEqual(0.5f, t.LaunchEndWaitSeconds, Eps, "기본 대기 0.5초(할 일 198)");
         Assert.AreEqual(1f, t.LaunchEndFadeSeconds, Eps, "기본 페이드 1초");
-        Assert.AreEqual(2f, t.LoadAfterLaunchEndSeconds, Eps, "끝 → 로딩 2초");
-        Assert.AreEqual(21d, t.EndFadeAt(end), Eps, "페이드 시작 = 끝 + 대기");
-        Assert.AreEqual(22d, t.LoadAt(end), Eps, "로딩 = 끝 + 대기 + 페이드");
+        Assert.AreEqual(1.5f, t.LoadAfterLaunchEndSeconds, Eps, "하강 시작 → 로딩 1.5초");
+        Assert.AreEqual(20.5d, t.EndFadeAt(end), Eps, "페이드 시작 = 하강 + 대기");
+        Assert.AreEqual(21.5d, t.LoadAt(end), Eps, "로딩 = 하강 + 대기 + 페이드");
 
-        Assert.AreEqual(0f, t.EndFadeAlphaAt(end, end), Eps, "끝 순간 = 아직 밝다");
-        Assert.AreEqual(0f, t.EndFadeAlphaAt(20.99d, end), Eps, "대기 동안 0");
-        Assert.AreEqual(0.5f, t.EndFadeAlphaAt(21.5d, end), Eps, "페이드 — 선형");
+        Assert.AreEqual(0f, t.EndFadeAlphaAt(end, end), Eps, "하강 순간 = 아직 밝다");
+        Assert.AreEqual(0f, t.EndFadeAlphaAt(20.49d, end), Eps, "대기 동안 0");
+        Assert.AreEqual(0.5f, t.EndFadeAlphaAt(21d, end), Eps, "페이드 — 선형");
         Assert.AreEqual(1f, t.EndFadeAlphaAt(t.LoadAt(end), end), Eps, "로딩 순간 = 완전히 검다(깜빡임 없음)");
         Assert.AreEqual(1f, t.EndFadeAlphaAt(100d, end), Eps, "로딩 화면이 뜰 때까지 검은 채 유지");
 
-        Assert.IsTrue(double.IsPositiveInfinity(t.LoadAt(NotYet)), "끝 이벤트 전 = 로딩 없음");
-        Assert.AreEqual(0f, t.EndFadeAlphaAt(100d, NotYet), Eps, "끝 이벤트 전 = 끝 페이드 없음");
+        Assert.IsTrue(double.IsPositiveInfinity(t.LoadAt(NotYet)), "하강 시각 모름 = 로딩 없음");
+        Assert.AreEqual(0f, t.EndFadeAlphaAt(100d, NotYet), Eps, "하강 시각 모름 = 끝 페이드 없음");
     }
 
     [Test]
@@ -192,7 +204,7 @@ public sealed class PodDropTimelineTests
         PodDropLobbyTimeline t = Lobby();
         Assert.AreEqual(1f, t.ScreenFadeAlphaAt(t.TeleportAt, NotYet), Eps, "시작 암전 그대로");
         Assert.AreEqual(0f, t.ScreenFadeAlphaAt(10d, NotYet), Eps, "중간은 밝다");
-        Assert.AreEqual(0.5f, t.ScreenFadeAlphaAt(21.5d, 20d), Eps, "끝 페이드");
+        Assert.AreEqual(0.5f, t.ScreenFadeAlphaAt(21d, 20d), Eps, "끝 페이드");
 
         // 끝 이벤트가 시작 암전 중에 와도(발사대·보행 없음 극단) 큰 쪽.
         Assert.AreEqual(1f, t.ScreenFadeAlphaAt(t.TeleportAt, 0d), Eps);
@@ -218,6 +230,83 @@ public sealed class PodDropTimelineTests
         var tuned = Lobby(s);
         Assert.AreEqual(12.5d, tuned.LoadAt(10d), Eps);
         Assert.AreEqual(0.25f, tuned.EndFadeAlphaAt(11d, 10d), Eps, "0.5초 대기 뒤 2초 중 0.5초");
+    }
+
+    // ─── 로비: 하강 시작 이벤트 위치 → 경과 시각 (할 일 198) ─────────────────
+
+    const double Launch = 10d;
+    const float FastClip = 4f, Fast2Clip = 10f, FastSpeed = 6f, Fast2Speed = 1f;
+
+    static double DescentAt(float clip, double fastAt, double fast2At) =>
+        PodDropLobbyTimeline.LaunchElapsedAtClipSeconds(clip, Launch, fastAt, FastSpeed, FastClip, fast2At, Fast2Speed, Fast2Clip);
+
+    [Test]
+    public void LaunchElapsedAtClipSeconds_BeforeAnySpeedUp_IsOneToOne()
+    {
+        Assert.AreEqual(13d, DescentAt(3f, NotYet, NotYet), Eps, "가속 이벤트보다 앞 = 1배속, 가속 시각 몰라도 계산");
+        Assert.AreEqual(14d, DescentAt(4f, NotYet, NotYet), Eps, "가속 이벤트와 같은 위치 = 1배속 구간 끝");
+        Assert.IsTrue(double.IsPositiveInfinity(PodDropLobbyTimeline.LaunchElapsedAtClipSeconds(3f, NotYet, NotYet, FastSpeed, FastClip)), "발사 전 = 모름");
+    }
+
+    [Test]
+    public void LaunchElapsedAtClipSeconds_PastUnreplicatedSpeedUp_IsNotYet()
+    {
+        Assert.IsTrue(double.IsPositiveInfinity(DescentAt(6f, NotYet, NotYet)), "앞선 1단계 가속 시각이 아직 복제 안 됨 = 추측 안 함");
+        Assert.IsTrue(double.IsPositiveInfinity(DescentAt(12f, 14d, NotYet)), "앞선 2단계 가속 시각이 아직 = 모름");
+    }
+
+    [Test]
+    public void LaunchElapsedAtClipSeconds_InverseOfLaunchClipSecondsAt()
+    {
+        const double fastAt = 14d;                       // 클립 4초에 1단계
+        const double fast2At = fastAt + (Fast2Clip - FastClip) / FastSpeed; // 클립 10초에 2단계 = 15초
+        Assert.AreEqual(14.5d, DescentAt(7f, fastAt, NotYet), Eps, "1단계 구간 — 클립 3초 ÷ 6배");
+        Assert.AreEqual(14.5d, DescentAt(7f, fastAt, fast2At), Eps, "2단계 시각을 알아도 같은 값");
+        Assert.AreEqual(17d, DescentAt(12f, fastAt, fast2At), Eps, "2단계 구간 — 클립 2초 ÷ 1배");
+
+        foreach (double elapsed in new[] { 11d, 14d, 14.7d, 15d, 16.3d, 30d })
+        {
+            float clip = PodDropLobbyTimeline.LaunchClipSecondsAt(elapsed, Launch, fastAt, FastSpeed, fast2At, Fast2Speed);
+            Assert.AreEqual(elapsed, DescentAt(clip, fastAt, fast2At), 1e-3, $"경과 {elapsed} → 클립 {clip} → 다시 경과");
+        }
+    }
+
+    [Test]
+    public void LaunchElapsedAtClipSeconds_NoSpeedEventsInClip_OneToOne()
+    {
+        Assert.AreEqual(30d, PodDropLobbyTimeline.LaunchElapsedAtClipSeconds(20f, Launch, NotYet, FastSpeed, float.PositiveInfinity), Eps,
+            "가속 이벤트가 클립에 없으면 끝까지 1배속");
+        Assert.AreEqual(Launch, PodDropLobbyTimeline.LaunchElapsedAtClipSeconds(-1f, Launch, NotYet, FastSpeed, FastClip), Eps, "음수 위치 = 발사 순간");
+    }
+
+    // ─── 저작: 포드 높이 커브 → 하강 시작 프레임 (할 일 198) ─────────────────
+
+    [Test]
+    public void DescentStartFrame_LastFrameAtTopBeforeDrop()
+    {
+        var h = new[] { 0f, 0f, 0f, 0f, -0.1f, -1f, -3f, -3f };
+        Assert.AreEqual(3, PodAnimEventAuthoring.DescentStartFrame(h, 0.005f), "꼭대기에 마지막으로 있던 프레임");
+
+        var rise = new[] { 0f, 0.5f, 1f, 1f, 0.9f, -2f };
+        Assert.AreEqual(3, PodAnimEventAuthoring.DescentStartFrame(rise, 0.005f), "올라갔다 내려가면 꼭대기 기준");
+
+        Assert.AreEqual(-1, PodAnimEventAuthoring.DescentStartFrame(new[] { 0f, 0f, 0.001f, 0f }, 0.005f), "낙차 없음");
+        Assert.AreEqual(0, PodAnimEventAuthoring.DescentStartFrame(new[] { 0f, -1f }, 0.005f), "처음부터 내려감");
+    }
+
+    [Test]
+    public void PickDescentFrame_MajorityOfBigDroppers()
+    {
+        var pod = new[] { 0f, 0f, 0f, 0f, -1f, -5f };
+        var seat = new[] { 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -4.5f };
+        var hatch = new[] { 1f, 0.8f, 0.6f, 0.6f, -0.4f, -4.4f }; // 해치가 먼저 아래로 닫힘 — 낙차는 더 크지만 소수
+        var wall = new[] { 2f, 2f, 2f, 2f, 2f, 2f };
+        int frame = PodAnimEventAuthoring.PickDescentFrame(new[] { wall, pod, seat, hatch }, 0.005f, out int best, out float drop);
+        Assert.AreEqual(3, frame, "포드·좌석 다수결");
+        Assert.AreEqual(1, best, "그 프레임을 낸 첫 열 = 포드");
+        Assert.AreEqual(5.4f, drop, Eps, "최대 낙차");
+
+        Assert.AreEqual(-1, PodAnimEventAuthoring.PickDescentFrame(new[] { wall }, 0.005f, out _, out _), "아무것도 안 내려감");
     }
 
     [Test]
@@ -337,7 +426,7 @@ public sealed class PodDropTimelineTests
     public void Map_Default_StaticTimes()
     {
         PodDropMapTimeline t = Map();
-        PodDropMapTimings d = PodDropMapTimings.Default;
+        PodDropMapTimings d = LegacyMap;
         Assert.AreEqual(0.3f, t.FallAt, Eps, "낙하 = 대기 끝(레터박스 인 없음)");
         Assert.AreEqual(0.9f, t.BrakeAt, Eps, "급감속 = 낙하 + 0.6");
         Assert.AreEqual(1.7f, t.HoverAt, Eps, "연출 높이 도착 = 급감속 + 0.8");
@@ -429,7 +518,7 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Map_Freefall_GravityChangesDuration()
     {
-        PodDropMapTimings s = PodDropMapTimings.Default;
+        PodDropMapTimings s = LegacyMap;
         s.freefallGravity = 40f;
         var hard = new PodDropMapTimeline(s);
         Assert.AreEqual(0.5f, hard.FreefallSeconds, Eps, "√(2·5/40) = 0.5초");
@@ -454,19 +543,19 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Map_HoverAndBrake_Clamped()
     {
-        PodDropMapTimings s = PodDropMapTimings.Default;
+        PodDropMapTimings s = LegacyMap;
         s.hoverHeight = 40f;
         var high = new PodDropMapTimeline(s);
         Assert.AreEqual(30f, high.HoverHeight, Eps, "연출 높이는 낙하 시작보다 높지 않다");
         Assert.AreEqual(30f, high.BrakeHeight, Eps, "급감속 높이도 낙하 시작까지");
 
-        s = PodDropMapTimings.Default;
+        s = LegacyMap;
         s.brakeDistance = 100f;
         Assert.AreEqual(30f, new PodDropMapTimeline(s).BrakeHeight, Eps);
         s.brakeDistance = -1f;
         Assert.AreEqual(5f, new PodDropMapTimeline(s).BrakeHeight, Eps, "급감속 거리 음수 → 0 → 연출 높이에서 바로");
 
-        s = PodDropMapTimings.Default;
+        s = LegacyMap;
         s.hoverHeight = -1f;
         var ground = new PodDropMapTimeline(s);
         Assert.AreEqual(0f, ground.HoverHeight, Eps);
@@ -534,13 +623,13 @@ public sealed class PodDropTimelineTests
             }
         }
 
-        PodDropMapTimings s = PodDropMapTimings.Default;
+        PodDropMapTimings s = LegacyMap;
         s.letterboxOutSeconds = 3f;
         var longOut = new PodDropMapTimeline(s);
         Assert.AreEqual(opened + 2d, longOut.ReleaseAt(opened), Eps, "조작은 디졸브 끝");
         Assert.AreEqual(opened + 4d, longOut.EndAt(opened), Eps, "연출 끝은 레터박스가 더 길면 그 끝");
 
-        s = PodDropMapTimings.Default;
+        s = LegacyMap;
         s.letterboxOutSeconds = 0f;
         s.dissolveSeconds = 0f;
         s.dissolveDelaySeconds = 0f;
@@ -552,24 +641,65 @@ public sealed class PodDropTimelineTests
     [Test]
     public void Map_FadeIn_And_ZoomDelay()
     {
-        PodDropMapTimings s = PodDropMapTimings.Default;
-        Assert.AreEqual(0f, new PodDropMapTimeline(s).FadeAlphaAt(0d), Eps, "도착 페이드인 기본 없음");
+        PodDropMapTimings s = LegacyMap;
+        Assert.AreEqual(0f, new PodDropMapTimeline(s).FadeAlphaAt(0d, NotYet), Eps, "도착 페이드 인 길이 0 = 없음(검은 화면 안 깐다)");
 
         s.fadeInSeconds = 0.8f;
         s.cameraZoomDelaySeconds = 0.5f;
         var t = new PodDropMapTimeline(s);
-        Assert.AreEqual(1f, t.FadeAlphaAt(-1d), Eps, "시작 전(로딩 화면 아래) 검다");
-        Assert.AreEqual(0.5f, t.FadeAlphaAt(0.4d), Eps, "페이드인 — 선형");
-        Assert.AreEqual(0f, t.FadeAlphaAt(0.8d), Eps);
+        Assert.AreEqual(1f, t.FadeAlphaAt(-1d, NotYet), Eps, "시작 전(로딩 화면 아래) 검다");
+        Assert.AreEqual(1f, t.FadeAlphaAt(2.9d, 3d), Eps, "건너뛰기 끔 — 접기·펴기 끝 전엔 검다(할 일 198)");
+        Assert.AreEqual(0.5f, t.FadeAlphaAt(3.4d, 3d), Eps, "접기·펴기 끝부터 페이드 인 — 선형");
+        Assert.AreEqual(0f, t.FadeAlphaAt(3.8d, 3d), Eps);
         Assert.AreEqual(1.8f, t.CameraDistanceAt(0.5d), Eps, "지연 동안 시작 거리");
         Assert.AreEqual(1f, t.CameraDistanceAt(0.5d + 2.6d), Eps);
         Assert.AreEqual(Map().HoverAt, t.HoverAt, Eps, "페이드·줌은 시각을 밀지 않는다");
     }
 
+    // ─── 맵: 앞 구간 건너뛰기 · 접기 끝부터 페이드 인 (할 일 198) ─────────────
+
+    [Test]
+    public void Map_Skip_DefaultOn_StartsAtDeployedState()
+    {
+        var t = new PodDropMapTimeline(PodDropMapTimings.Default);
+        Assert.IsTrue(t.SkipApproach, "기본 켬");
+        Assert.AreEqual(0f, t.FallAt, Eps);
+        Assert.AreEqual(0f, t.BrakeAt, Eps, "급감속(=카메라 포드 추적) 처음부터");
+        Assert.AreEqual(0f, t.HoverAt, Eps);
+        Assert.AreEqual(5f, t.FallHeight, Eps, "시작 높이 = 연출 높이");
+        Assert.AreEqual(5f, t.BrakeHeight, Eps);
+        Assert.AreEqual(5f, t.PodHeightAt(-1d, NotYet), Eps, "로딩 아래에서도 연출 높이");
+        Assert.AreEqual(0d, t.EffectiveDeployedAt(NotYet), Eps, "접기·펴기 끝 = t=0(복제 전이어도)");
+        Assert.AreEqual(0d, t.LandStartAt(NotYet), Eps, "곧바로 자유낙하");
+        Assert.AreEqual(DefaultFreefallSeconds, t.TouchdownAt(NotYet), Eps, "착지 ≈ 1.01초 — 체감 연출이 짧아진다");
+        Assert.AreEqual(t.TouchdownAt(0d), t.TouchdownAt(NotYet), Eps, "서버가 시작 시각으로 확정해도 같은 값");
+        Assert.AreEqual(5f - 0.5f * 9.81f * 0.25f, t.PodHeightAt(0.5d, NotYet), 1e-3f, "자유낙하 h − ½·g·t²");
+
+        // 칸 값은 남아 있다 — 끄면 예전 시각표.
+        PodDropMapTimings off = PodDropMapTimings.Default;
+        off.skipApproach = false;
+        var legacy = new PodDropMapTimeline(off);
+        Assert.AreEqual(0.9f, legacy.BrakeAt, Eps);
+        Assert.AreEqual(30f, legacy.FallHeight, Eps);
+        Assert.IsTrue(double.IsPositiveInfinity(legacy.TouchdownAt(NotYet)), "끔 = 접기·펴기 끝 이벤트를 기다린다");
+    }
+
+    [Test]
+    public void Map_Skip_FadeInFromStart()
+    {
+        var t = new PodDropMapTimeline(PodDropMapTimings.Default);
+        Assert.AreEqual(0.5f, t.FadeInSeconds, Eps, "기본 0.5초");
+        Assert.AreEqual(1f, t.FadeAlphaAt(-1d, NotYet), Eps, "로딩 아래 검다");
+        Assert.AreEqual(1f, t.FadeAlphaAt(0d, NotYet), Eps, "로딩이 걷힌 순간 = 검다(검은 화면 시간이 늘지 않는다)");
+        Assert.AreEqual(0.5f, t.FadeAlphaAt(0.25d, NotYet), Eps, "곧바로 밝아짐");
+        Assert.AreEqual(0f, t.FadeAlphaAt(0.5d, NotYet), Eps);
+        Assert.AreEqual(0.5f, t.FadeAlphaAt(0.25d, 0d), Eps, "서버 확정(0) 뒤에도 같은 값");
+    }
+
     [Test]
     public void Map_NegativeValues_ClampedToZero()
     {
-        PodDropMapTimings s = PodDropMapTimings.Default;
+        PodDropMapTimings s = LegacyMap;
         s.holdSeconds = -1f;
         s.fallSeconds = -1f;
         s.brakeSeconds = -1f;
@@ -641,7 +771,7 @@ public sealed class PodDropTimelineTests
         try
         {
             Assert.AreEqual(Lobby().SeatedSeconds, settings.CreateLobbyTimeline(Same(Walkers, Walk)).SeatedSeconds, Eps);
-            Assert.AreEqual(Map().HoverAt, settings.CreateMapTimeline().HoverAt, Eps);
+            Assert.AreEqual(new PodDropMapTimeline(PodDropMapTimings.Default).HoverAt, settings.CreateMapTimeline().HoverAt, Eps);
             Assert.AreEqual(2f, settings.WalkSecondsFor(9f), Eps, "기본 걷는 속도 4.5m/s");
             Assert.AreEqual(0.04f, settings.LetterboxHeight, Eps);
             Assert.AreEqual(120f, settings.Map.startTimeoutSeconds, Eps);
@@ -669,8 +799,8 @@ public sealed class PodDropTimelineTests
         // 106 추가 2 — 새 칸은 기본값, 시작 높이는 에셋에서 30 으로 고침.
         Assert.AreEqual(d.launchFastSpeed, asset.Lobby.launchFastSpeed, Eps);
         Assert.AreEqual(d.launchFastSpeed2, asset.Lobby.launchFastSpeed2, Eps, "할 일 121 — 가속 2단계 배율(에셋에도 1)");
-        // 할 일 121 — 끝 대기·끝 페이드(에셋에도 1·1).
-        Assert.AreEqual(1f, asset.Lobby.launchEndWaitSeconds, Eps);
+        // 할 일 121 — 끝 대기·끝 페이드(에셋 0.5·1 — 198 부터 대기 = 하강 시작 뒤 0.5초).
+        Assert.AreEqual(0.5f, asset.Lobby.launchEndWaitSeconds, Eps);
         Assert.AreEqual(1f, asset.Lobby.launchEndFadeSeconds, Eps);
         Assert.AreEqual(m.brakeDistance, map.brakeDistance, Eps);
         Assert.AreEqual(m.brakeSeconds, map.brakeSeconds, Eps);
@@ -678,6 +808,8 @@ public sealed class PodDropTimelineTests
         Assert.AreEqual(m.cameraStartHeightOffset, map.cameraStartHeightOffset, Eps);
         Assert.AreEqual(m.podGroundClearance, map.podGroundClearance, Eps);
         Assert.AreEqual(30f, map.fallHeight, Eps);
+        Assert.IsTrue(map.skipApproach, "할 일 198 — 앞 구간 건너뛰기 켬");
+        Assert.AreEqual(0.5f, map.fadeInSeconds, Eps, "할 일 198 — 접기 끝부터 페이드 인 0.5초");
         CollectionAssert.AreEqual(m.DeployStates, map.DeployStates);
         CollectionAssert.AreEqual(m.OpenStates, map.OpenStates);
     }

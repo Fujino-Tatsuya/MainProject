@@ -17,6 +17,7 @@ using UnityEngine.SceneManagement;
 /// 이벤트가 빠진 클립은 끝까지 돈 것으로 대신하고 경고한다. 연출 중 끊긴 사람은 건너뛰고 남은 인원으로 계속. 착지점을 못 찾거나 시작 시각이 오지 않으면 즉시 해제(폴백, 경고 로그).</item>
 /// <item>전 피어(로컬 표시): 레터박스(진입 때부터 덮임 → 디졸브 시작에 걷힘)·UI 숨김(<see cref="PodDropScreenOverlay"/>, 매 프레임 다시 찾음),
 /// 카메라 거리 배율 줌 + 임시 추적(연출 높이 약간 위 고정 지점 → 급감속부터 포드 → 디졸브 끝에 플레이어), 디졸브 끝까지 플레이어 실루엣 끔(<see cref="PlayerSilhouetteTag.SetSuppressed"/>),
+/// 앞 구간 건너뛰기(할 일 198, 기본 켬)면 검은 화면 아래 포드가 연출 높이·날개 접힘/다리 펴짐 끝 자세로 시작해 곧바로 도착 페이드 인 → 자유낙하(끄면 아래 예전 흐름, 페이드 인은 접기·펴기 끝부터).
 /// 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 날개 펴진 채 빠른 낙하 → 급감속하며 날개 접기·다리 펴기 → 연출 높이(기본 5m)
 /// → 추진력 없는 자유낙하로 내리꽂힘(이펙트·흔들림) → 해치 열기 → 1초 뒤 디졸브(<see cref="PodDissolve"/>) → 포드 제거. 클립은 1배속 재생(<see cref="PodAnimatorDriver"/>) —
 /// 클라 포드는 재생만 하고 자기 이벤트로 단계를 넘기지 않는다.</item>
@@ -181,7 +182,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         _armed.Value = true;
         TryResolveLandingServer(null);
 
-        Debug.Log($"[SceneFlow] {Tag} 연출 켜짐(진입 {entryKind}) — 로딩이 걷히면 시작. 낙하 {_serverTimeline.FallHeight:0.##}m +{_serverTimeline.FallAt:0.##}s, " +
+        Debug.Log($"[SceneFlow] {Tag} 연출 켜짐(진입 {entryKind}) — 로딩이 걷히면 시작. 앞 구간 건너뛰기 {(_serverTimeline.SkipApproach ? "켬(연출 높이·접힘 끝 자세에서 시작)" : "끔")}, 페이드 인 {_serverTimeline.FadeInSeconds:0.##}s(접기·펴기 끝부터). 낙하 {_serverTimeline.FallHeight:0.##}m +{_serverTimeline.FallAt:0.##}s, " +
                   $"급감속 {_serverTimeline.BrakeHeight:0.##}m +{_serverTimeline.BrakeAt:0.##}s 에 [{string.Join(",", _deployGate.States)}] → 연출 높이 {_serverTimeline.HoverHeight:0.##}m +{_serverTimeline.HoverAt:0.##}s " +
                   $"→ 끝 이벤트 → 자유낙하 g {_serverTimeline.FreefallGravity:0.##} {_serverTimeline.FreefallSeconds:0.##}s(착지 {_serverTimeline.TouchdownSpeed:0.#}m/s) → [{string.Join(",", _openGate.States)}] → 끝 이벤트 → 디졸브 +{_serverTimeline.DissolveDelaySeconds:0.##}s → 조작 해제 +{_serverTimeline.ReleaseAfterOpenSeconds:0.##}s");
     }
@@ -305,9 +306,10 @@ public sealed class MapPodArrival : NetworkBehaviour
 
         if (_deployedAt.Value <= 0d)
         {
-            if (elapsed >= timeline.BrakeAt && GateOpen(_deployGate, "접기·펴기"))
+            // 앞 구간 건너뛰기(할 일 198) — 클립은 끝 자세로 시작하므로 이벤트를 기다리지 않고 시작 순간(t=0)으로 확정한다.
+            if (elapsed >= timeline.BrakeAt && (timeline.SkipApproach || GateOpen(_deployGate, "접기·펴기")))
             {
-                _deployedAt.Value = ServerNow;
+                _deployedAt.Value = timeline.SkipApproach ? _startAt.Value : ServerNow;
                 Debug.Log($"[SceneFlow] {Tag} 날개 접기·다리 펴기 끝 +{elapsed:0.##}s — 자유낙하 +{timeline.LandStartAt(elapsed):0.##}s 부터 {timeline.FreefallSeconds:0.##}s, 착지 +{timeline.TouchdownAt(elapsed):0.##}s");
             }
             return;
@@ -428,7 +430,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         }
 
         _localActive = true;
-        UpdateOverlay(timeline, elapsed, opened);
+        UpdateOverlay(timeline, elapsed, deployed, opened);
         UpdateCamera(timeline, elapsed, deployed);
         if (!_releasedLocal)
             SuppressSilhouettes();
@@ -437,14 +439,14 @@ public sealed class MapPodArrival : NetworkBehaviour
             UpdateStagesServer(timeline, elapsed, deployed);
     }
 
-    private void UpdateOverlay(PodDropMapTimeline timeline, double elapsed, double opened)
+    private void UpdateOverlay(PodDropMapTimeline timeline, double elapsed, double deployed, double opened)
     {
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         // 기본 0 = 매 프레임 — 로딩이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게(연출 몇 초 동안만).
         _overlay.HudRescanInterval = settings.Map.hudRescanSeconds;
-        // 검은 화면 = 도착 페이드인(기본 0 = 없음). 시작 전엔 로딩 화면(정렬 1000) 아래에 깔려 있다가 걷히는 순간부터 밝아진다.
+        // 검은 화면 = 도착 페이드 인(할 일 198 — 접기·펴기 끝부터, 앞 구간 건너뛰기면 로딩이 걷힌 순간부터). 그 전엔 검고(로딩 화면(정렬 1000) 아래 포함), 길이 0 이면 없다.
         // 레터박스는 시작 전부터 덮여 있다 — 로딩 화면이 걷히는 순간 이미 덮인 화면이 보인다.
-        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed, opened) * settings.LetterboxHeight, timeline.FadeAlphaAt(elapsed), true);
+        _overlay.Apply(timeline.LetterboxAlphaAt(elapsed, opened) * settings.LetterboxHeight, timeline.FadeAlphaAt(elapsed, deployed), true);
     }
 
     // 거리 배율 줌은 연출 끝까지. 임시 추적은 디졸브 끝(조작 복귀)까지 — 지점은 급감속 전 고정(연출 높이 + 오프셋), 급감속부터 포드 높이(착지 여유 포함).
@@ -584,18 +586,26 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (PodArrivalRules.ShouldHoldHatchClosed(started, elapsed, touchdown))
             _podAnimator.HoldAtStart(map.hatchOpenState, -1);
 
-        if (!started || elapsed < timeline.BrakeAt)
+        if (timeline.SkipApproach)
+        {
+            // 앞 구간 건너뛰기(할 일 198) — 로딩 아래에서부터 날개 접힘·다리 펴짐 끝 자세(클립 끝을 넘긴 시각 = 끝 자세로 남는다).
+            _podAnimator.Play(map.wingFoldState, -1, float.PositiveInfinity);
+            _podAnimator.Play(map.gearDeployState, -1, float.PositiveInfinity);
+        }
+        else if (!started || elapsed < timeline.BrakeAt)
         {
             _podAnimator.PoseStart(map.wingFoldState, -1);
             _podAnimator.PoseStart(map.gearDeployState, -1);
             return;
         }
+        else
+        {
+            float sinceBrake = (float)(elapsed - timeline.BrakeAt);
+            _podAnimator.Play(map.wingFoldState, -1, sinceBrake);
+            _podAnimator.Play(map.gearDeployState, -1, sinceBrake);
+        }
 
-        float sinceBrake = (float)(elapsed - timeline.BrakeAt);
-        _podAnimator.Play(map.wingFoldState, -1, sinceBrake);
-        _podAnimator.Play(map.gearDeployState, -1, sinceBrake);
-
-        if (elapsed < touchdown)
+        if (!started || elapsed < touchdown)
             return;
 
         _podAnimator.Play(map.hatchOpenState, -1, (float)(elapsed - touchdown));

@@ -7,14 +7,14 @@ using UnityEngine.Serialization;
 
 /// <summary>
 /// 로비 포드 탑승·강하 연출(할 일 100 C2, 3.LobbyScene — <see cref="LobbyTrainingDirector"/> 와 같은 씬 상주 NetworkObject 에 붙는다).
-/// 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 맵 로딩 대신 <see cref="TryBeginServer"/> 에 넘긴다 → 발사 클립 끝 이벤트 → 끝 대기 → 끝 페이드 아웃(검게) → 그 콜백으로 로딩(할 일 121).
+/// 출격 집결 확정 → <see cref="LobbyTrainingDirector"/> 가 맵 로딩 대신 <see cref="TryBeginServer"/> 에 넘긴다 → 발사 클립의 포드 하강 시작 이벤트 → 끝 대기 → 끝 페이드 아웃(검게) → 그 콜백으로 로딩(할 일 121 → 198).
 /// <list type="bullet">
 /// <item>복제: 시작 시각(서버시간), 참가 명단(플레이어 NetworkObjectId, 보행 슬롯 순서), 슬롯별 보행 시간(서버가 경로 길이 ÷ 걷는 속도로 계산),
 /// 해치 열림 시각(서버시간 — 호스트 발사대의 해치 클립 이벤트, 할 일 106), 발사 클립 가속 시각(호스트 가속 이벤트 — 그 뒤 발사 클립 배율 재생, 106 추가 2),
 /// 발사 클립 끝 시각(호스트 끝 이벤트 — 그 뒤 끝 대기·페이드 아웃, 할 일 121). 모든 피어가 이 값으로 <see cref="PodDropLobbyTimeline"/> 을 같이 계산한다. RPC 없음.</item>
 /// <item>서버: 시작 순간 참가자 연출 잠금(<see cref="PlayerEncounterLock.BeginCinematicServer"/> — 입력·피해·낙사·사망 기록 차단),
 /// 호스트 발사대 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 단계를 확정한다 — 해치 이벤트 → 해치 열림 시각 복제(탑승 시작),
-/// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), 발사 클립 끝 이벤트 → 끝 시각 복제 → 끝 시각 + 대기 + 페이드에 콜백(로딩).
+/// 슬롯마다 포드 안 도착 시각에 숨김(<see cref="PlayerEncounterLock.SetCinematicHiddenServer"/>), 포드 하강 시작(발사 클립 하강 이벤트 위치 + 복제 시각 — 전 피어 같은 계산, 할 일 198) + 대기 + 페이드에 콜백(로딩). 발사 클립 끝 시각은 하강 이벤트가 없는 클립의 예비 기준으로만 복제한다.
 /// 이벤트가 빠진 클립은 끝까지 돈 것으로 대신하고 경고한다. 연출 중 끊긴 사람은 건너뛰고 계속한다. 잠금·숨김은 로딩이 플레이어를 디스폰할 때 같이 사라진다.</item>
 /// <item>오너: 시작 직후 짧은 암전의 유지 구간 한가운데(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
 /// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 해치가 열리면(복제) 자기 슬롯 보행 구간 동안 그 자리 → 개인 경로점(슬롯 entryPath) → 공용 경로점(walkPath, 슬롯 합류 번호부터 리스트 순서)을
@@ -102,7 +102,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // 발사 클립 끝 시각(서버시간) — 호스트 발사대의 발사 클립 끝 이벤트를 서버가 확정한 순간. 0 = 아직(할 일 121).
-    // 모든 피어가 이 시각 + 끝 대기부터 끝 페이드 아웃을 그리고(<see cref="PodDropLobbyTimeline.EndFadeAlphaAt"/>), 서버는 + 대기 + 페이드에 로딩을 건다. 서버 write / 모두 read.
+    // 할 일 198 부터 끝 페이드·로딩 기준은 하강 시작(DescentElapsed) — 이 값은 클립에 하강 이벤트가 없을 때의 예비 기준이고, 하강 시각의 상한이다. 서버 write / 모두 read.
     private readonly NetworkVariable<double> _launchEndedAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -133,6 +133,13 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private PodAnimatorDriver _launcherDriver;
     private bool _hatchHeldOnBoard;
     private int _launchFastStage; // 지금 발사 클립 가속 단계(0 = 1배속, 1·2 = 가속 단계)
+
+    // 발사 클립 이벤트 위치(클립 초, 할 일 198) — 컨트롤러 클립에서 한 번 읽는다. 없는 이벤트 = +∞.
+    private bool _launchCuesRead;
+    private float _descentClipSeconds = float.PositiveInfinity;
+    private float _fastClipSeconds = float.PositiveInfinity;
+    private float _fast2ClipSeconds = float.PositiveInfinity;
+    private bool _warnedNoDescent;
 
     // 오너 보행
     private struct OwnerWalk
@@ -207,7 +214,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     // ---------------- 서버 ----------------
 
     /// <summary>
-    /// [서버] 포드 연출 시작 — 발사 클립 끝 이벤트 + 끝 대기 + 끝 페이드 뒤(다 검어진 순간) <paramref name="onDone"/>(맵 로딩)을 부른다. 설정·좌석·참가자가 없으면 false(호출자가 곧바로 로딩).
+    /// [서버] 포드 연출 시작 — 포드 하강 시작(발사 클립 이벤트) + 끝 대기 + 끝 페이드 뒤(다 검어진 순간) <paramref name="onDone"/>(맵 로딩)을 부른다. 설정·좌석·참가자가 없으면 false(호출자가 곧바로 로딩).
     /// 참가자 기록·시작 시각 복제·연출 잠금은 이 호출 안(같은 프레임)에서 끝낸다.
     /// </summary>
     public bool TryBeginServer(Action onDone)
@@ -268,7 +275,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
                   $"순간이동·해치 클립 +{timeline.TeleportAt:0.##}s(암전 {timeline.BlackoutFadeInSeconds:0.##}/{timeline.BlackoutHoldSeconds:0.##}/{timeline.BlackoutFadeOutSeconds:0.##}s), " +
                   $"탑승은 해치 이벤트 뒤(빨라도 +{timeline.WalkReadyAt:0.##}s, 간격 {timeline.WalkInterval:0.##}s, " +
                   $"속도 {lobby.walkSpeed:0.##}m/s, 각자 좌석까지 [{string.Join(",", Array.ConvertAll(walkSeconds, s => s.ToString("0.##")))}]s → 다 앉기 +{timeline.SeatedSeconds:0.##}s), " +
-                  $"발사 클립 '{lobby.launchState}' 끝 이벤트 + 대기 {timeline.LaunchEndWaitSeconds:0.##}s + 페이드 {timeline.LaunchEndFadeSeconds:0.##}s 에 로딩");
+                  $"발사 클립 '{lobby.launchState}' 하강 시작 이벤트 + 대기 {timeline.LaunchEndWaitSeconds:0.##}s + 페이드 {timeline.LaunchEndFadeSeconds:0.##}s 에 로딩");
         return true;
     }
 
@@ -304,24 +311,22 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             HideParticipant(run.Participants[slot]);
         }
 
-        // 3) 발사 — 가장 늦게 앉은 순간 클립 시작(전 피어 UpdateLauncher), 끝 이벤트 → 끝 시각 복제(전 피어가 대기 뒤 페이드 아웃).
-        if (_launchEndedAt.Value <= 0d)
+        // 3) 발사 — 가장 늦게 앉은 순간 클립 시작(전 피어 UpdateLauncher). 끝 이벤트 → 끝 시각 복제(하강 이벤트가 없는 클립의 예비 기준).
+        if (_launchEndedAt.Value <= 0d && elapsed >= timeline.LaunchAt(board) && GateOpen(run.LaunchGate, "발사"))
         {
-            if (elapsed < timeline.LaunchAt(board) || !GateOpen(run.LaunchGate, "발사"))
-                return;
-
             _launchEndedAt.Value = ServerNow;
-            Debug.Log($"[SceneFlow] {Tag} 발사 클립 끝 +{elapsed:0.##}s — 대기 {timeline.LaunchEndWaitSeconds:0.##}s → 페이드 {timeline.LaunchEndFadeSeconds:0.##}s 뒤 로딩");
+            Debug.Log($"[SceneFlow] {Tag} 발사 클립 끝 +{elapsed:0.##}s");
         }
 
-        // 4) 끝 페이드가 다 검어진 순간 로딩 — 로딩 화면(정렬 1000)이 검은 화면(500) 위에 뜬다.
-        double loadAt = timeline.LoadAt(PodDropTimeline.EventElapsed(_launchEndedAt.Value, run.Start));
+        // 4) 포드 하강 시작(클립 이벤트 위치 + 복제 시각, 할 일 198) + 대기 → 끝 페이드가 다 검어진 순간 로딩 — 로딩 화면(정렬 1000)이 검은 화면(500) 위에 뜬다.
+        double descentAt = DescentElapsed(timeline, run.Start, board);
+        double loadAt = timeline.LoadAt(descentAt);
         if (elapsed < loadAt)
             return;
 
         _run = null;
         _loadIssued = true;
-        Debug.Log($"[SceneFlow] {Tag} 끝 페이드 완료 +{elapsed:0.##}s — 맵 로딩 시작");
+        Debug.Log($"[SceneFlow] {Tag} 끝 페이드 완료 +{elapsed:0.##}s(하강 시작 +{descentAt:0.##}s) — 맵 로딩 시작");
         run.OnDone?.Invoke();
     }
 
@@ -338,6 +343,43 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             Debug.LogWarning($"{Tag} {label} 클립 [{string.Join(",", fallbacks)}] 에 '{PodAnimEventRelay.FunctionName}' 이벤트가 없어 클립 끝에서 넘어간다 — " +
                              "FBX 임포트 창(Animation 탭) 또는 Tools/Lobby/포드 애니 이벤트 메뉴로 넣을 것.", this);
         return true;
+    }
+
+    /// <summary>
+    /// [전 피어] 포드 하강 시작 경과 시각(할 일 198) — 발사 클립의 하강 이벤트(<see cref="PodAnimEventRelay.KindDescent"/>) 위치를
+    /// 복제된 발사 시작(탑승 + 다 앉기)·가속 1·2단계 시각으로 경과 시각으로 바꾼다(새 복제 값 없음 — 늦게 본 피어도 같은 값).
+    /// 아직 모르면 +∞. 클립에 하강 이벤트가 없거나 발사대가 없으면 발사 클립 끝(서버 복제)으로 대신한다(경고 1회). 클립 끝보다 늦지 않다.
+    /// </summary>
+    private double DescentElapsed(PodDropLobbyTimeline timeline, double start, double board)
+    {
+        double launchEnded = PodDropTimeline.EventElapsed(_launchEndedAt.Value, start);
+        if (launcher == null || settings == null || timeline == null)
+            return launchEnded;
+
+        PodDropLobbyTimings lobby = settings.Lobby;
+        if (!_launchCuesRead)
+        {
+            _launchCuesRead = true;
+            _descentClipSeconds = PodAnimatorDriver.ClipEventSeconds(launcher, lobby.launchState, PodAnimEventRelay.KindDescent);
+            _fastClipSeconds = PodAnimatorDriver.ClipEventSeconds(launcher, lobby.launchState, PodAnimEventRelay.KindSpeedUp);
+            _fast2ClipSeconds = PodAnimatorDriver.ClipEventSeconds(launcher, lobby.launchState, PodAnimEventRelay.KindSpeedUp2);
+        }
+
+        if (float.IsPositiveInfinity(_descentClipSeconds))
+        {
+            if (!_warnedNoDescent && !string.IsNullOrEmpty(lobby.launchState))
+            {
+                _warnedNoDescent = true;
+                Debug.LogWarning($"{Tag} 발사 클립 '{lobby.launchState}' 에 하강 시작 이벤트('{PodAnimEventRelay.FunctionName}' 정수 인자 {PodAnimEventRelay.KindDescent})가 없어 " +
+                                 "클립 끝부터 끝 대기·페이드를 잰다 — FBX 임포트 창(Animation 탭) 또는 Tools/Lobby/포드 애니 이벤트 메뉴로 넣을 것.", this);
+            }
+            return launchEnded;
+        }
+
+        double descent = PodDropLobbyTimeline.LaunchElapsedAtClipSeconds(_descentClipSeconds, timeline.LaunchAt(board),
+            PodDropTimeline.EventElapsed(_launchFastAt.Value, start), lobby.launchFastSpeed, _fastClipSeconds,
+            PodDropTimeline.EventElapsed(_launchFast2At.Value, start), lobby.launchFastSpeed2, _fast2ClipSeconds);
+        return Math.Min(descent, launchEnded);
     }
 
     // [전 피어] 발사대 클립 이벤트. 해치 이벤트는 모든 피어에서 그 자세로 멈추게 한다(표시). 단계 확정은 서버만.
@@ -365,6 +407,10 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             }
             return;
         }
+
+        // 하강 시작(종류 3)은 콜백으로 아무것도 안 한다 — 클립의 이벤트 위치로 계산한다(DescentElapsed). 단계 문에 넣으면 발사 끝으로 잘못 친다.
+        if (kind != PodAnimEventRelay.KindStage)
+            return;
 
         if (clipName == lobby.hatchState && !_launcherDriver.HasStarted(lobby.launchState))
             _launcherDriver.Hold();
@@ -478,10 +524,11 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         _overlay.HudRescanInterval = settings.Lobby.hudRescanSeconds;
-        // 시작 암전과 끝 페이드 아웃(발사 클립 끝 + 대기 뒤, 복제 시각 기준)이 같은 검은 화면을 쓴다. 다 검어진 채 유지되다 서버가 건 로딩 화면(정렬 1000, 숨김 예외)이
+        // 시작 암전과 끝 페이드 아웃(포드 하강 시작 + 대기 뒤 — 클립 이벤트 위치 + 복제 시각, 할 일 198)이 같은 검은 화면을 쓴다. 다 검어진 채 유지되다 서버가 건 로딩 화면(정렬 1000, 숨김 예외)이
         // 이 화면(500) 위에 뜨고, 검은 화면·레터박스는 로비 씬과 함께 사라진다 — 로딩 화면이 걷힌 뒤는 맵 도착 페이드인(PodDropMapTimings.fadeInSeconds)이 잇는다.
-        double launchEndedAt = PodDropTimeline.EventElapsed(_launchEndedAt.Value, start);
-        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed, launchEndedAt), true);
+        double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));
+        double descentAt = DescentElapsed(_timeline, start, board);
+        _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed, descentAt), true);
     }
 
     // Base Layer(0) 에 전신 클립을 이어 재생한다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.

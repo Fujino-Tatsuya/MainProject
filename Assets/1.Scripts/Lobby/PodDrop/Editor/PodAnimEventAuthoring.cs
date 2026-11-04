@@ -9,7 +9,8 @@ using UnityEngine;
 /// 처음 위치: 로비 해치(DP_HatchLobbyOpenClose) = 103프레임(다 열린 자세에서 멈추고 탑승), 나머지 = 끝 프레임(다음 단계).
 /// 단계 이벤트는 정수 인자 0(<see cref="PodAnimEventRelay.KindStage"/>). 로비 발사(DP_LaunchCycle)에는 가속 이벤트가 둘 더 있다 —
 /// 1단계(정수 인자 1 — <see cref="PodAnimEventRelay.KindSpeedUp"/>) 처음 위치 213프레임부터 PodDropSettings launchFastSpeed(할 일 106 추가 2, 할 일 121 = 294 → 213),
-/// 2단계(정수 인자 2 — <see cref="PodAnimEventRelay.KindSpeedUp2"/>) 처음 위치 553프레임부터 launchFastSpeed2(할 일 121).
+/// 2단계(정수 인자 2 — <see cref="PodAnimEventRelay.KindSpeedUp2"/>) 처음 위치 553프레임부터 launchFastSpeed2(할 일 121),
+/// 포드 하강 시작(정수 인자 3 — <see cref="PodAnimEventRelay.KindDescent"/>, 할 일 198) 처음 위치 = 포드 높이 커브로 찾은 프레임(<see cref="FindDescentFrame"/>) — 여기 + launchEndWaitSeconds 뒤 끝 페이드.
 /// 이벤트를 FBX 에 두는 이유: 사용자가 FBX 임포트 창 Animation 탭에서 끌어 옮겨 튜닝하고, 코드·SO 에 클립 시각을 흉내 내는 숫자를 두지 않으려고.
 ///
 /// 🔴 재실행해도 <b>이미 있는 이벤트는 옮기지 않는다</b> — 사용자가 옮긴 위치를 지킨다. 빠진 이벤트만 채운다. 처음 위치로 되돌리려면 "기본 위치로 재설정".
@@ -29,6 +30,15 @@ public static class PodAnimEventAuthoring
 
     /// <summary>로비 발사 가속 2단계 이벤트 처음 위치(클립 프레임) — 여기부터 2단계 배율(할 일 121).</summary>
     internal const int LobbyLaunchFast2Frame = 553;
+
+    /// <summary>
+    /// 로비 포드 하강 시작 이벤트(종류 3, 할 일 198) 처음 위치 표시 — 고정 프레임이 아니라 저작 때 발사 클립을 샘플링해
+    /// 포드가 아래로 내려가기 시작하는 프레임을 찾는다(<see cref="FindDescentFrame"/>).
+    /// </summary>
+    internal const int AutoDescentFrame = -2;
+
+    /// <summary>하강 시작 판정 — 꼭대기 높이에서 이만큼(m) 내려간 첫 프레임의 직전 프레임.</summary>
+    internal const float DescentEpsilon = 0.005f;
 
     /// <summary>클립 하나에 넣을 이벤트 하나 — <c>Frame</c> &lt; 0 = 끝 프레임. <c>Kind</c> = 이벤트 정수 인자(종류).</summary>
     internal readonly struct Spec
@@ -54,7 +64,7 @@ public static class PodAnimEventAuthoring
     public static void AuthorReset()
     {
         if (!EditorUtility.DisplayDialog("포드 애니 이벤트 재설정",
-                "옮겨 둔 PodClipEvent 이벤트를 처음 위치(로비 해치 103프레임, 로비 발사 가속 1단계 213프레임·2단계 553프레임, 나머지 끝 프레임)로 되돌린다. 계속할까?", "재설정", "취소"))
+                "옮겨 둔 PodClipEvent 이벤트를 처음 위치(로비 해치 103프레임, 로비 발사 가속 1단계 213프레임·2단계 553프레임·하강 시작 = 포드 커브로 찾은 프레임, 나머지 끝 프레임)로 되돌린다. 계속할까?", "재설정", "취소"))
             return;
         Author(resetExisting: true);
     }
@@ -81,7 +91,8 @@ public static class PodAnimEventAuthoring
         Add(specs, lobby.hatchState, LobbyHatchOpenFrame, stage, "로비 해치 열림 → 멈춤·탑승");
         Add(specs, lobby.launchState, LobbyLaunchFastFrame, PodAnimEventRelay.KindSpeedUp, $"로비 발사 가속 1단계 → ×{lobby.launchFastSpeed:0.##}");
         Add(specs, lobby.launchState, LobbyLaunchFast2Frame, PodAnimEventRelay.KindSpeedUp2, $"로비 발사 가속 2단계 → ×{lobby.launchFastSpeed2:0.##}");
-        Add(specs, lobby.launchState, -1, stage, $"로비 발사 끝 → 대기 {lobby.launchEndWaitSeconds:0.##}s · 페이드 {lobby.launchEndFadeSeconds:0.##}s → 로딩");
+        Add(specs, lobby.launchState, AutoDescentFrame, PodAnimEventRelay.KindDescent, $"로비 포드 하강 시작 → 대기 {lobby.launchEndWaitSeconds:0.##}s · 페이드 {lobby.launchEndFadeSeconds:0.##}s → 로딩");
+        Add(specs, lobby.launchState, -1, stage, "로비 발사 끝 (하강 이벤트가 없을 때의 예비 기준)");
         // 맵 날개 펴기(wingDeployState)는 할 일 150 부터 안 쓴다 — 클립에 남은 이벤트는 그대로 둔다(스펙에서 빼면 저작이 지우지 않는다).
         Add(specs, map.wingFoldState, -1, stage, "맵 날개 접기 끝");
         Add(specs, map.gearDeployState, -1, stage, "맵 다리 펴기 끝 (둘 다 → 자유낙하)");
@@ -126,10 +137,31 @@ public static class PodAnimEventAuthoring
             }
 
             ModelImporterClipAnimation clipAnimation = clipAnimations[index];
-            float time = ToNormalized(spec.Frame, clipAnimation.firstFrame, clipAnimation.lastFrame);
+            int frame = spec.Frame;
+            string found = "";
+            if (frame == AutoDescentFrame)
+            {
+                // 이미 있고 재설정이 아니면 찾을 필요 없다(Merge 가 그대로 둔다).
+                bool exists = System.Array.Exists(clipAnimation.events ?? System.Array.Empty<AnimationEvent>(),
+                    e => e.functionName == PodAnimEventRelay.FunctionName && e.intParameter == spec.Kind);
+                if (exists && !resetExisting)
+                {
+                    log.AppendLine($"  {spec.Clip} [종류 {spec.Kind}] — {spec.Meaning}: 이미 있음 → 그대로");
+                    continue;
+                }
+
+                frame = FindDescentFrame(spec.Clip, out found);
+                if (frame < 0)
+                {
+                    Debug.LogError($"{Tag} '{spec.Clip}' 에서 포드가 내려가기 시작하는 프레임을 못 찾았다 — {found}. 이벤트(종류 {spec.Kind})를 임포트 창에서 직접 넣을 것.");
+                    continue;
+                }
+            }
+
+            float time = ToNormalized(frame, clipAnimation.firstFrame, clipAnimation.lastFrame);
             AnimationEvent[] merged = AnimEventTiming.Merge(clipAnimation.events, PodAnimEventRelay.FunctionName,
                 new List<(int type, float time)> { (spec.Kind, time) }, resetExisting, out int added, out int moved);
-            string frameText = spec.Frame < 0 ? $"끝 {clipAnimation.lastFrame:0}" : spec.Frame.ToString();
+            string frameText = frame < 0 ? $"끝 {clipAnimation.lastFrame:0}" : string.IsNullOrEmpty(found) ? frame.ToString() : $"{frame} ({found})";
             log.AppendLine($"  {spec.Clip} [종류 {spec.Kind}] — {spec.Meaning}: 프레임 {frameText} (정규화 {time:0.####}) → 추가 {added}, 재설정 {moved}");
             if (added == 0 && moved == 0)
                 continue;
@@ -159,6 +191,137 @@ public static class PodAnimEventAuthoring
         ValidateMenu();
     }
 
+    /// <summary>
+    /// 발사 클립에서 포드가 아래로 내려가기 시작하는 프레임(할 일 198) — FBX 모델을 잠깐 만들어 클립을 프레임마다 샘플링하고(월드 높이),
+    /// 가장 크게 떨어지는 Transform 들(최대 낙차의 90% 이상 — 포드 선체와 그 안 부품)의 하강 시작 프레임 중 가장 많은 것(같으면 늦은 것)을 고른다.
+    /// 해치처럼 포드에 붙어 먼저 아래로 닫히는 부품 하나가 앞당기지 않게 다수결이다. 못 찾으면 −1, <paramref name="detail"/> = 근거·이유.
+    /// </summary>
+    internal static int FindDescentFrame(string clipName, out string detail)
+    {
+        AnimationClip clip = LoadClip(clipName);
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
+        if (clip == null || model == null)
+        {
+            detail = clip == null ? $"클립 '{clipName}' 없음" : "모델 없음";
+            return -1;
+        }
+
+        GameObject go = Object.Instantiate(model);
+        go.hideFlags = HideFlags.HideAndDontSave;
+        try
+        {
+            Transform[] transforms = go.GetComponentsInChildren<Transform>(true);
+            float rate = clip.frameRate > 0f ? clip.frameRate : 30f;
+            int frames = Mathf.Max(1, Mathf.RoundToInt(clip.length * rate)) + 1;
+            var heights = new float[transforms.Length][];
+            for (int i = 0; i < transforms.Length; i++) heights[i] = new float[frames];
+            for (int f = 0; f < frames; f++)
+            {
+                clip.SampleAnimation(go, Mathf.Min(f / rate, clip.length));
+                for (int i = 0; i < transforms.Length; i++) heights[i][f] = transforms[i].position.y;
+            }
+
+            int frame = PickDescentFrame(heights, DescentEpsilon, out int best, out float drop);
+            return frame >= 0 ? Found(frame, transforms[best], heights[best], drop, out detail) : NotFound(drop, out detail);
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
+    }
+
+    static int Found(int frame, Transform t, float[] h, float drop, out string detail)
+    {
+        detail = $"'{t.name}' 월드 높이 {h[frame]:0.###}m → 최저 {h[frame] - drop:0.###}m(낙차 {drop:0.##}m) — 프레임 {frame} 다음부터 내려감";
+        return frame;
+    }
+
+    static int NotFound(float drop, out string detail)
+    {
+        detail = $"내려가는 Transform 없음(최대 낙차 {drop:0.###}m)";
+        return -1;
+    }
+
+    /// <summary>
+    /// Transform 별 높이 열(프레임 순) → 하강 시작 프레임(순수). 최대 낙차의 90% 이상인 열들의 <see cref="DescentStartFrame"/> 다수결(같으면 늦은 프레임).
+    /// <paramref name="best"/> = 고른 프레임을 낸 첫 열, <paramref name="drop"/> = 최대 낙차. 없으면 −1.
+    /// </summary>
+    internal static int PickDescentFrame(IReadOnlyList<float[]> heights, float epsilon, out int best, out float drop)
+    {
+        best = -1;
+        drop = 0f;
+        if (heights == null) return -1;
+        var drops = new float[heights.Count];
+        for (int i = 0; i < heights.Count; i++)
+        {
+            drops[i] = Drop(heights[i]);
+            drop = Mathf.Max(drop, drops[i]);
+        }
+
+        if (drop < epsilon) return -1;
+        var votes = new Dictionary<int, int>();
+        var firstColumn = new Dictionary<int, int>();
+        for (int i = 0; i < heights.Count; i++)
+        {
+            if (drops[i] < drop * 0.9f) continue;
+            int frame = DescentStartFrame(heights[i], epsilon);
+            if (frame < 0) continue;
+            votes[frame] = votes.TryGetValue(frame, out int n) ? n + 1 : 1;
+            if (!firstColumn.ContainsKey(frame)) firstColumn[frame] = i;
+        }
+
+        int result = -1, most = 0;
+        foreach (KeyValuePair<int, int> v in votes)
+        {
+            if (v.Value > most || (v.Value == most && v.Key > result))
+            {
+                result = v.Key;
+                most = v.Value;
+            }
+        }
+
+        if (result >= 0) best = firstColumn[result];
+        return result;
+    }
+
+    // 최저점 전 최고 높이 − 최저 높이(m).
+    static float Drop(IReadOnlyList<float> h)
+    {
+        if (h == null || h.Count == 0) return 0f;
+        int iMin = ArgMin(h);
+        float top = float.NegativeInfinity;
+        for (int i = 0; i <= iMin; i++) top = Mathf.Max(top, h[i]);
+        return top - h[iMin];
+    }
+
+    static int ArgMin(IReadOnlyList<float> h)
+    {
+        int iMin = 0;
+        for (int i = 1; i < h.Count; i++)
+            if (h[i] < h[iMin]) iMin = i;
+        return iMin;
+    }
+
+    /// <summary>
+    /// 높이 열(프레임 순) 하나의 하강 시작 프레임(순수) — 최저점 전 꼭대기(0.1mm 안 마지막 프레임 — 멈춰 있다 떨어지는 순간)에서
+    /// <paramref name="epsilon"/> 보다 더 내려간 첫 프레임의 직전 프레임(= 마지막으로 꼭대기에 있던 프레임). 낙차가 <paramref name="epsilon"/> 미만이면 −1.
+    /// </summary>
+    internal static int DescentStartFrame(IReadOnlyList<float> heights, float epsilon)
+    {
+        if (heights == null || heights.Count < 2) return -1;
+        int iMin = ArgMin(heights);
+        float top = float.NegativeInfinity;
+        for (int i = 0; i <= iMin; i++) top = Mathf.Max(top, heights[i]);
+        if (top - heights[iMin] < epsilon) return -1;
+
+        int iTop = 0;
+        for (int i = 0; i <= iMin; i++)
+            if (heights[i] >= top - 1e-4f) iTop = i;
+        for (int i = iTop; i <= iMin; i++)
+            if (heights[i] < top - epsilon) return Mathf.Max(iTop, i - 1);
+        return -1;
+    }
+
     /// <summary>스펙 클립마다 PodClipEvent 가 있는지 — 없는 수. 보고에 클립 시각(초)을 적는다.</summary>
     internal static int Validate(out string report)
     {
@@ -177,6 +340,7 @@ public static class PodAnimEventAuthoring
             float seconds = EventSeconds(clip, spec.Kind, out bool found);
             string missingText = spec.Kind == PodAnimEventRelay.KindSpeedUp ? "1단계 가속 없음 — 2단계 이벤트까지 1배속"
                 : spec.Kind == PodAnimEventRelay.KindSpeedUp2 ? "2단계 없음 — 1단계 배율로 끝까지 돈다"
+                : spec.Kind == PodAnimEventRelay.KindDescent ? $"하강 시작 없음 — 발사 끝 {clip.length:0.###}s 부터 끝 대기·페이드"
                 : $"클립 끝 {clip.length:0.###}s 에서 넘어간다";
             sb.AppendLine(found
                 ? $"  ✓ {spec.Clip} — {spec.Meaning}: {seconds:0.###}s / {clip.length:0.###}s"
