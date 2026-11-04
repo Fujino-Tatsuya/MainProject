@@ -1,4 +1,59 @@
-# ▶▶▶ 계획 = **잔류 포격(GUN_4_ECHO_Q) VFX — 몸에 붙는 에너지 폭탄 구체 + 전용 폭발** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 확인 · ✅ MainProject 연결 · ⏳ 민경 Play)
+# ▶▶▶ 계획 = **절제된 분노(ASN_2_RESTRAINT) VFX — 강화된 일반 Q·E 레이어 + 봉인 순간 + 단검 봉인 띠** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인(Crimson 선택) · ✅ 3차(MainProject 연결 — 봉인·단검 띠만) 승인 · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · 핸드오프 [handoff-restraint-vfx.md](Docs/tech/handoff-restraint-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04).
+> **1단계 = MyProject 제작(색 2벌) + 미리보기 씬 → 민경 비교·선택·승인. 2단계 = 고른 한 벌만 MainProject 연결.** 판정·수치 무변경, 새 RPC 없음.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 기획: R·변신·분노 없음 → 일반 Q·E 피해 +35%·재사용 −25%, 백어택 유지, 변신 중 고르면 안전 종료 뒤 적용. 구현 일치(`AssassinState.IsRestrained` = 모드 스위치, 전 피어 같은 획득 행 · 서버 종료 요청·분노 0 · HUD R 칸·머리 위 분노 게이지 숨김).
+- 연출: **전용 VFX·사건 없음**(trait-effect-events §3.1 "모드 변경").
+- 연결 지점: 일반 Q = `AssassinSkillView.EndPierce`(PierceLine 축별 배율 Z = 길이 · PierceBurst 끝점) · E 강타 = 클립 이벤트 `EffectAnimEvents.Played(id)`(강타 베기 id) · 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura`(E 오라와 같은 곳).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 무엇을(Q1) | (a) 강화된 일반 Q·E 레이어 + (c) 봉인 순간 원샷 + (b) 상시 표시(몸 오라 아님) |
+| 레이어 지점(Q4) | Q 관통 선 + 관통 폭발 · E 강타 베기. E 차지·오라는 그대로(준비 표시 — 강타와 대비) |
+| 방식(Q5) | **기존 그대로 + 레이어 추가**(같은 자리·같은 크기 규칙으로 동시 재생) |
+| 봉인 순간(Q6) | `IsRestrained` false → true 순간, 변신 중이면 변신 끝나는 순간 · 늦은 합류·재접속은 안 냄(상시 표시만) · **전 피어**, 새 RPC 없음 |
+| 상시 표시(Q7) | **단검 봉인 띠** — 양손 단검 손잡이 근처 은빛 띠·사슬 고리, 은은하게 + 가끔 반짝, 무기를 따라감. 작아서 안 보이면 머리 위 봉인 표식 보조 검토 |
+| 색(Q2·Q8) | 두 벌 제작·비교: **`_Crimson`** = 억눌린 분노(검붉은 심 + 은백 테두리·잔상) / **`_Violet`** = 차가운 봉인(청보라 + 은색). MyProject 미리보기에서 키로 전환 → **고른 한 벌만** MainProject |
+| 작업(Q3) | 이전과 같음 — MyProject 빌더 → 미리보기 → 승인 → SVN `Player3/Restraint/` |
+
+### 2차 결정(11-04 민경 피드백)
+- 관통 선 레이어 삭제 → **원본 일반 Q 를 색만 바꿔**(색상 교체 + 채도 배율 — 은빛) 낸다. 관통 폭발 레이어는 유지.
+- 사슬 = **블렌더로 만든 서로 꿰인 사슬 한 바퀴 메시**(`SM_Restraint_ChainRing.fbx`)를 메시 입자로, **은색** — 봉인·관통 폭발 같은 사슬.
+- 봉인: 바닥 문양 삭제 · **R 소용돌이를 같이 켜고 사슬이 다 조인 순간 끊고 `_End`**(R 이 갇히는 연출) · 사슬 3줄 엇갈려 얽힘.
+- E 강타 레이어: 기하 호 삭제 → **원본 강타를 은색으로 복제**해 1.1배로 겹침.
+- 미리보기: **실제 어쌔신 모델·애니메이터·원본 Q/E/R 연출**(MainProject 에서 MyProject 로 복사, guid 유지 — 원본 VFX 프리팹은 MainProject 최신본으로 동기화, MyProject 옛 파일은 scratchpad 백업).
+
+### 3차 결정(11-04 민경 — MainProject 연결 범위, ✅ 승인)
+- **가져오는 것 = Crimson 의 `FX_Restraint_Seal` · `FX_Restraint_DaggerBand_R/_L` 만.** Q·E 레이어(관통 폭발·강타 은색 복제·원본 Q 색 바꾸기)는 이번에 연결하지 않는다.
+  SVN `Assets/50.Art/VFX/Common/Players/Player3/Restraint/`(색 하위 폴더 없음) — 프리팹 + 쓰는 재질·텍스처·메시(사슬 고리 FBX, 나선 R/L). 새 파일 추가만(교체 없음).
+- **단검 띠 = MeshRenderer**(파티클 아님 — 남은 건 사슬 메시 하나, 민경이 Core·Glow 끄고 Twinkle 지움). 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura` 의 **자식**으로 붙여 단검 배율(1.25)을 그대로 받는다 → 나선 메시는 배율 없는 소켓 공간으로 다시 굽는다(MyProject 미리보기도 자식으로).
+- **페이드 = 알파**(URP Unlit 반투명, 알파 1 이면 지금처럼 불투명하게 보임) — 나타남 0.4초 · 사라짐 0.4초(인스펙터 칸).
+- **띠가 나타나는 시점 = 봉인 오라가 터지는 순간(0.58초, `SealBurstTime`)부터 페이드 인** — 몸을 조이던 사슬이 터지며 단검으로 옮겨 감기는 느낌(인스펙터 칸).
+- 봉인 = `IsRestrained` false → true 를 본 순간(변신 중이면 변신 끝나는 순간) · 플레이어 발밑 · **R 소용돌이(`Assassin_R_BladeVortex`)를 같이 켜고 0.42초(`SealLockTime`)에 해제 → outro(_End)**. 전 피어 각자 판단, 새 RPC 없음.
+- 늦은 합류·재접속·Armature 재활성 = 봉인 없이 띠만 바로(페이드 없이) 표시. 특성 해제 → 페이드 아웃. 디스폰 → 즉시 제거. 사망·다운은 그대로 둔다(특성 유지).
+
+## 작업 순서(3차 — MainProject 연결)
+1. MyProject 빌더: 띠 = MeshRenderer + URP Unlit 반투명 재질 · 나선 메시 배율 없는 소켓 공간 · 미리보기 테스터가 띠를 소켓 자식으로·봉인 0.58초 뒤 페이드 인(민경 확인).
+2. MainProject: SVN 폴더로 복사(.meta 포함, guid 유지) · 엔트리 `FX_Restraint_Seal_Entry` + `EffectCatalog.Assassin_Restraint_Seal` · 컴포넌트 `AssassinRestraintView`(봉인·R 소용돌이·띠 R/L 생성과 알파 페이드) · `Player_Assassin` 배선.
+3. 확인: 컴파일 0 · DebugTraitLab 에서 특성 부여 → 봉인 → 띠 페이드 인 · 해제 → 페이드 아웃(로그) · ⏳ 민경 Play·MPPM.
+4. 문서: `handoff-restraint-vfx.md` · `trait-effect-events.md` §3.1 · `CONTEXT.md`.
+
+## 작업 순서(1·2차)
+1. MyProject: 빌더 `Tools/VFX/Assassin Restraint (어쌔신 절제된 분노) 빌드` — 색 세트 2개 × (`FX_Restraint_PierceLine` · `_PierceBurst` · `_ESlash` · `_Seal` · `_DaggerBand`) · 미리보기 씬(일반 Q 돌진·E 강타·봉인 순간·단검 띠, 키로 색 전환).
+2. ⏸ 민경 비교·선택 → 수정 → **승인**.
+3. MainProject: 고른 벌 import · 엔트리·`EffectCatalog` · 연출 컴포넌트(`AssassinRestraintView` — `IsRestrained` 를 보고 Q/E 레이어·봉인·띠를 켬) · `Player_Assassin` 배선.
+4. 문서: handoff · `trait-effect-events.md` §3.1 · `CONTEXT.md`.
+
+## 완료 조건
+- 미리보기: 두 색 비교 · Q/E 레이어가 기존 연출 위에 겹쳐 강해 보임 · 봉인 순간 · 띠가 탑다운에서 읽힘(민경 선택·승인).
+- MainProject: 절제된 분노일 때만 레이어·띠 · 봉인 순간 1회 · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **잔류 포격(GUN_4_ECHO_Q) VFX — 몸에 붙는 에너지 폭탄 구체 + 전용 폭발** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 확인 · ✅ MainProject 연결 · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안).
 > **1단계 = MyProject 제작 + 미리보기 씬 → 민경 확인·승인. 2단계 = MainProject import·연결.** 판정·피해 무변경.

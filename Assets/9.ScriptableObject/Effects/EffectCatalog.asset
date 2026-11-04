@@ -41,6 +41,7 @@ MonoBehaviour:
   <Ultimate_TargetFloor>k__BackingField: {fileID: 11400000, guid: e1de5968507b07640a38c8d75341dc58, type: 2}
   <Ultimate_Strike>k__BackingField: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
   <Assassin_R_BladeVortex>k__BackingField: {fileID: 11400000, guid: 431b57f705084510a2c34ee8a4c2c887, type: 2}
+  <Assassin_Restraint_Seal>k__BackingField: {fileID: 11400000, guid: 96db04fad0cc46839b044f282040d411, type: 2}
   <Assassin_E_MultiSlashes>k__BackingField: {fileID: 11400000, guid: 2f4f9adcbad34c538e23cd1b03faf201, type: 2}
   <Assassin_Q_PierceLine>k__BackingField: {fileID: 11400000, guid: 236457abd41f407b9451008b80b26592, type: 2}
   <Assassin_Q_PierceBurst>k__BackingField: {fileID: 11400000, guid: 366e55861d2f4129b6309dcaa5517677, type: 2}
