@@ -21,10 +21,10 @@ public sealed class SkillLineLengthFadeTests
     }
 
     [TestCase(0f, 1f)]
-    [TestCase(0.5f, 0.9f)]
-    [TestCase(0.75f, 0.7f)]
-    [TestCase(0.9f, 0.5f)]
-    [TestCase(1f, 0.4f)]
+    [TestCase(0.5f, 0.85f)]
+    [TestCase(0.75f, 0.55f)]
+    [TestCase(0.9f, 0.2f)]
+    [TestCase(1f, 0f)]
     public void DefaultCurve_PassesThroughRequestedPoints(float t, float expected)
     {
         Assert.AreEqual(expected, SkillLineLengthFade.DefaultCurve().Evaluate(t), Eps);
@@ -54,7 +54,7 @@ public sealed class SkillLineLengthFadeTests
             Assert.AreEqual(curve.Evaluate(t), SkillLineLengthFade.Sample(samples, t), 0.01f, $"t={t}");
         }
         Assert.AreEqual(1f, samples[0], Eps);
-        Assert.AreEqual(0.4f, samples[samples.Length - 1], Eps);
+        Assert.AreEqual(0f, samples[samples.Length - 1], Eps);   // 먼 끝 = 완전히 투명
     }
 
     [Test]
@@ -62,7 +62,7 @@ public sealed class SkillLineLengthFadeTests
     {
         float[] samples = BakedDefault();
         Assert.AreEqual(1f, SkillLineLengthFade.Sample(samples, -1f), Eps);
-        Assert.AreEqual(0.4f, SkillLineLengthFade.Sample(samples, 2f), Eps);
+        Assert.AreEqual(0f, SkillLineLengthFade.Sample(samples, 2f), Eps);
     }
 
     [Test]
@@ -115,6 +115,9 @@ public sealed class SkillLineLengthFadeTests
         StringAssert.DoesNotContain("_LineFadeT", text);
         StringAssert.DoesNotContain("_LineFadeAlpha", text);
         StringAssert.DoesNotContain("_DiagPlain", text);
+        // 감쇠는 최종 알파 한 곳에 곱한다 — 채움·외곽선·안쪽선·화살표 무늬·끝선이 모두 result 안에 합쳐진 뒤라 커브 0 = 완전 투명.
+        StringAssert.Contains("result.a*inside*_Color.a*lengthFade*distanceFade", text);
+        StringAssert.Contains("Blend SrcAlpha OneMinusSrcAlpha", text);
         // 기존 C3 채움 램프(먼 끝일수록 진함)가 감쇠를 상쇄하지 않게 — 감쇠가 켜지면 램프 대신 감쇠만.
         StringAssert.Contains("lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn)", text);
     }

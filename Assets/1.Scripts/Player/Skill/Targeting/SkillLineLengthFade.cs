@@ -20,11 +20,11 @@ public static class SkillLineLengthFade
     /// <summary>셰이더 <c>LINE_FADE_SAMPLES</c> 와 같아야 한다.</summary>
     public const int SampleCount = 32;
 
-    /// <summary>202 기본 모양 — (0,1) (0.5,0.9) (0.75,0.7) (0.9,0.5) (1,0.4) 를 매끄럽게 잇는다.</summary>
+    /// <summary>202 기본 모양 — (0,1) (0.5,0.85) (0.75,0.55) (0.9,0.2) (1,0) 를 매끄럽게 잇는다. 먼 끝 = 완전히 투명(11-04 사용자).</summary>
     public static AnimationCurve DefaultCurve()
     {
         float[] x = { 0f, 0.5f, 0.75f, 0.9f, 1f };
-        float[] y = { 1f, 0.9f, 0.7f, 0.5f, 0.4f };
+        float[] y = { 1f, 0.85f, 0.55f, 0.2f, 0f };
         var keys = new Keyframe[x.Length];
         for (int i = 0; i < x.Length; i++)
         {
