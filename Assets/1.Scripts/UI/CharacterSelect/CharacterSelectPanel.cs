@@ -107,7 +107,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
 
     // 할 일 199 — 열린 동안 전투 HUD·튜토리얼 안내 숨김(로컬 표시만).
     [Header("Hide HUD (할 일 199)")]
-    [Tooltip("열린 동안 CombatHUD·캐릭터 HUD·로비 튜토리얼 UI·안내 UI·바닥 경로·벽 표식·집결 테두리를 숨기고, 닫으면 원래 상태로 되돌린다.")]
+    [Tooltip("열린 동안 패널 밖 UI 전부(화면·월드 캔버스, 바닥 경로·벽 표식·집결 테두리·조준·스킬 범위 표시)를 숨기고, 닫으면 원래 상태로 되돌린다. 접속·로딩·ESC 메뉴는 남김.")]
     [SerializeField] private bool hideHudWhileOpen = true;
 
     private static int s_openCount;

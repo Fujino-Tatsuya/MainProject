@@ -198,13 +198,16 @@
 - 추적 대상이 바뀌면(캐릭터 교체 재스폰) 새 캐릭터에 다시 건다. 닫으면 잠금만 풀고 방향은 그대로(되돌리지 않음).
 - 칸 = `Camera (할 일 199)` > `faceCamera`(기본 켬)·`faceCameraTurnSpeed`(도/초, 기본 540, 0 = 즉시).
 
-### HUD·안내 숨김(할 일 199)
-- 열린 동안 숨기고 닫으면(파괴 포함) 숨기기 전 값으로 되돌린다 — `CharacterSelectHudHider`. 0.5초마다 다시 찾아 새로 생긴 HUD(재스폰)도 숨긴다. 표시만 바꾸고 튜토리얼 판정·서버 상태는 안 건드린다.
-- 화면 UI = 대상에 `CanvasGroup`(alpha 0·클릭 통과)를 얹는다(없으면 붙였다가 닫을 때 뗀다, 있으면 값 복원). SetActive·`Canvas.enabled` 는 그쪽 스크립트가 직접 쓰므로(AssassinHUD·GunnerHeatGauge·뷰의 root) 피한다.
-  - 최상위 캔버스째: `CombatHUD`·`AssassinHUD`·`GunnerHeatGauge`·`LobbyTutorialUI`(목표·대사)·`TutorialGuideUI`(목표·자막·강조). 패널을 품은 캔버스(로비 공용 `Canvas`)는 통째로 숨기지 않는다.
-  - 로비 공용 캔버스 안 안내 뷰는 자기 오브젝트만: `PartyGatherStatusView`(집결 n/m)·`LobbyWeaponCheckView`(무기 점검)·`LobbyTrainingCombatView`(일반 전투).
-- 월드 표식 = 렌더러 `forceRenderingOff`(`PlayerEncounterLock` 과 같은 방식, 원래 꺼져 있던 것은 기록 안 함): `LobbyFloorArrowPath`(튜토리얼 경로·옛 안내 경로)·`LobbyFloorArrowStrip`·`LobbyTutorialWallTarget`(벽 표식)·`LobbyGatherZoneBorders`(집결 테두리).
-- 숨기지 않는 것: 상호작용 문구(`InteractPrompt`)·플레이어 슬롯·지난 결과 버튼·결과 패널·게임 메뉴·머리 위 체력바(월드). 칸 = `Hide HUD (할 일 199)` > `hideHudWhileOpen`(기본 켬).
+### 패널 밖 UI 전부 숨김(할 일 199)
+- 열린 동안 숨기고 닫으면(파괴 포함) 숨기기 전 값으로 되돌린다 — `CharacterSelectHudHider`. 0.5초마다 다시 찾아 새로 생긴 것(재스폰 HUD·런타임 캔버스)도 숨긴다. 표시만 바꾸고 튜토리얼 판정·서버 상태는 안 건드린다.
+- 캔버스(화면·월드 전부, 목록 하드코딩 없음) = 대상에 `CanvasGroup`(alpha 0·클릭 통과)를 얹는다(없으면 붙였다가 닫을 때 뗀다, 있으면 값 복원). SetActive·`Canvas.enabled` 는 그쪽 스크립트가 직접 쓰므로 피한다.
+  - 패널과 무관한 최상위 캔버스 = 통째로(CombatHUD·캐릭터 HUD·로비 튜토리얼 UI·TutorialGuideUI·머리 위 체력바 캔버스·피해 숫자·상호작용 문구·몬스터 월드 바 등).
+  - 패널을 품은 캔버스(로비 공용 `Canvas`) = 패널까지의 경로(`Slot_CharacterSelectPanel`)만 두고 그 형제(플레이어 슬롯·지난 결과 버튼·집결/무기 점검/일반 전투 표시·`Fade_Image` 등)를 숨긴다.
+  - 패널 아래(패널·기본/코어 팝업) = 안 건드림. 늘 남김 = 접속 오버레이(`DemoConnectionOverlay`)·로딩 화면(`NetworkLoadingScreenView`)·ESC 게임 메뉴(`GameMenuController` — 패널이 ESC 를 쥐어 열리지 않는다).
+  - 결과 패널은 숨김 대상 — 로비 진입 때·숨겨진 다시 보기 버튼으로만 열려 선택 패널과 겹칠 일이 없다.
+- 월드 표식 = 렌더러 `forceRenderingOff`(`PlayerEncounterLock` 과 같은 방식, 원래 꺼져 있던 것은 기록 안 함): `LobbyFloorArrowPath`·`LobbyFloorArrowStrip`·`LobbyTutorialWallTarget`·`LobbyGatherZoneBorders`·조준 쿼드(`PlayerAimIndicator.IndicatorTransform`)·`SkillRangeIndicator`·`SkillLineIndicator` — 팀원 것도.
+- 칸 = `Hide HUD (할 일 199)` > `hideHudWhileOpen`(기본 켬).
+- 알려진 한계: 숨긴 오브젝트의 기존 `CanvasGroup` 알파를 그쪽 스크립트가 매 프레임 쓰면 다시 보일 수 있다(지금 최상위 캔버스 오브젝트에 그런 것은 없음).
 
 ## 문구 키(`UI.CharacterSelect.*`) — xlsx Strings 시트 반영은 병합 뒤 메인
 | 키 | ko |

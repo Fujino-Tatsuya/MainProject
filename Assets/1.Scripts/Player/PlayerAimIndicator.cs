@@ -34,6 +34,9 @@ public class PlayerAimIndicator : NetworkBehaviour
     private Color indicatorBaseColor;
     private bool? lastDashDimmed;
 
+    /// <summary>조준 쿼드 오브젝트(렌더러가 이 아래). 다른 화면이 잠깐 감출 때 쓴다(캐릭터 선택 — 할 일 199, forceRenderingOff).</summary>
+    public Transform IndicatorTransform => indicator;
+
     public Vector3 AimDirection { get; private set; }
 
     // 마우스 아래 지면 히트 지점(월드). 타겟팅 컨트롤러가 GroundPoint 조준·사거리 판정에 재사용한다.
