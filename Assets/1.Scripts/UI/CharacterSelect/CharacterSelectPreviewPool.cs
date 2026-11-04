@@ -3,27 +3,39 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>캐릭터 선택 미리보기 애니메이션 칸(할 일 199) — 프리팹 이름(예: Player_Paladin)마다 등장 1회 → 루프.</summary>
+/// <summary>
+/// 캐릭터 선택 미리보기 애니메이션 칸(할 일 199) — 프리팹 이름(예: Player_Paladin)마다 등장 상태들을 순서대로 1회씩 → 루프(또는 마지막 포즈 홀드).
+/// 상태 넘김 시점 = 그 클립의 End 애니 이벤트(평타 <c>HandleDefaultAttackEvent(End)</c>·스킬 <c>HandleSkillEvent(End)</c>), 없으면 클립 끝 − 블렌드.
+/// </summary>
 [Serializable]
 public sealed class CharacterSelectPreviewAnimation
 {
+    public const float DefaultLoopBlendSeconds = 0.25f;
+    public const float DefaultChainBlendSeconds = 0.1f;
+
     [Tooltip("플레이어 프리팹 이름(CharacterRoster 의 Player Prefab 이름, 예: Player_Paladin).")]
     public string prefabName;
-    [Tooltip("복제본이 나타날 때 한 번 재생할 Animator 상태 이름(0번 레이어). 비우면 바로 루프.")]
-    public string entryState;
+    [Tooltip("복제본이 나타날 때 순서대로 한 번씩 재생할 Animator 상태 이름(0번 레이어). 비우면 바로 루프.")]
+    public List<string> entryStates = new List<string>();
     [Tooltip("등장이 끝난 뒤 반복할 Animator 상태 이름(0번 레이어). 비우면 Animator 기본 상태.")]
     public string loopState;
-    [Tooltip("등장 → 루프 크로스페이드 시간(초). 등장 클립이 이만큼 남았을 때 시작한다 — 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡아 두 번 바뀌지 않게.")]
+    [Tooltip("켜면 루프로 넘기지 않고 마지막 등장 상태의 End 이벤트 포즈에서 멈춰 둔다(Animator 속도 0).")]
+    public bool holdLastPose;
+    [Tooltip("등장 → 루프 크로스페이드 시간(초). End 이벤트(없으면 클립 끝 − 이 시간)에서 시작 — 컨트롤러의 끝 전이(Exit Time 1)보다 먼저 잡는다.")]
     [Min(0f)] public float loopBlendSeconds = DefaultLoopBlendSeconds;
+    [Tooltip("등장 상태끼리 넘어갈 때 크로스페이드 시간(초).")]
+    [Min(0f)] public float chainBlendSeconds = DefaultChainBlendSeconds;
+    [Tooltip("첫 등장 상태의 이 정규화 시각에 무기 빔(거너 Q 레이저)을 로컬로 튼다. 음수 = 안 쏨. 그 클립에 발사 순간 애니 이벤트가 없어서 칸으로 둔다.")]
+    public float beamNormalizedTime = -1f;
+    [Tooltip("빔 길이(m) — 복제본 앞 방향으로.")]
+    [Min(0.1f)] public float beamLength = 8f;
 
-    public const float DefaultLoopBlendSeconds = 0.25f;
-
-    public CharacterSelectPreviewAnimation(string prefabName, string entryState, string loopState, float loopBlendSeconds = DefaultLoopBlendSeconds)
+    public CharacterSelectPreviewAnimation(string prefabName, string[] entryStates, string loopState, float loopBlendSeconds = DefaultLoopBlendSeconds)
     {
-        this.loopBlendSeconds = loopBlendSeconds;
         this.prefabName = prefabName;
-        this.entryState = entryState;
+        this.entryStates = new List<string>(entryStates ?? Array.Empty<string>());
         this.loopState = loopState;
+        this.loopBlendSeconds = loopBlendSeconds;
     }
 }
 
@@ -32,7 +44,7 @@ public sealed class CharacterSelectPreviewAnimation
 /// 로스터 캐릭터마다 Variant 프리팹에서 <c>Armature</c>·<c>PlayerWaeponSlot</c> 만 떼어 Animator·렌더러·화이트리스트 스크립트만 남긴다.
 /// <list type="bullet">
 /// <item>만들기 = 꺼진 홀더 아래 Variant 전체 Instantiate(Awake 없음) → 두 자식 말고 자식 파괴·루트 컴포넌트는 Transform 만(같은 복제라 무기 ↔ 소켓 참조 유지) → 꺼진 채 컨테이너로.</item>
-/// <item>남기는 스크립트 = 애니 이벤트 수신자(부모가 없어 아무 일도 안 함 — "no receiver" 오류 방지)·무기 따라가기·팔 비틀기·어쌔신 머리카락·디졸브 오버레이. 네트워크 컴포넌트·콜라이더·리지드바디는 지운다. 파티클·트레일은 끈다.</item>
+/// <item>남기는 스크립트 = 애니 이벤트 수신자(부모가 없어 아무 일도 안 함 — "no receiver" 오류 방지)·무기 따라가기·팔 비틀기·어쌔신 머리카락·디졸브 오버레이·이펙트 소켓(거너 Q 빔 — 코드가 부를 때만). 네트워크 컴포넌트·콜라이더·리지드바디는 지운다. 파티클·트레일은 끈다.</item>
 /// <item>컨테이너는 넘겨받은 씬(로비)에 둔다 — 씬이 내려가면 같이 사라진다.</item>
 /// </list>
 /// </summary>
@@ -53,6 +65,7 @@ public sealed class CharacterSelectPreviewPool
         typeof(AssassinActionHairAnimation),
         typeof(AssassinDiveHairAnimation),
         typeof(DissolveOverlay),
+        typeof(EffectSocketPlayer), // 거너 Q 빔 미리보기 — 이벤트 중계(EffectAnimEvents)는 지워져 코드가 부를 때만 켜진다
     };
 
     private sealed class Preview
@@ -60,10 +73,20 @@ public sealed class CharacterSelectPreviewPool
         public GameObject Root;
         public Animator Animator;
         public string PrefabName;
-        public int EntryHash;
+        public int[] EntryHashes = Array.Empty<int>();
         public int LoopHash;
         public float LoopBlend;
-        public bool InEntry;
+        public float ChainBlend;
+        public bool HoldLastPose;
+        public int Step = -1;           // 재생 중인 등장 칸, -1 = 등장 끝(루프·홀드)
+        public float StepEnd = -1f;     // 그 칸에서 넘길 정규화 시각, -1 = 아직 안 읽음
+        public EffectSocketPlayer Beam; // 거너 Q 빔 소켓(복제본 안) — 없으면 null
+        public float BeamUnitLength = 1f;
+        public float BeamHold;
+        public float BeamTime = -1f;
+        public float BeamLength;
+        public bool BeamFired;
+        public float BeamStopAt;
     }
 
     private readonly List<Preview> _previews = new List<Preview>();
@@ -132,31 +155,99 @@ public sealed class CharacterSelectPreviewPool
         _shown = -1;
     }
 
-    /// <summary>보이는 복제본의 등장 → 루프 넘김. 매 프레임.</summary>
+    /// <summary>보이는 복제본의 등장 칸 넘김 → 루프(또는 홀드) + 빔. 매 프레임.</summary>
     public void Tick()
     {
         Preview shown = _shown >= 0 && _shown < _previews.Count ? _previews[_shown] : null;
-        if (shown == null || !shown.InEntry || shown.Animator == null)
+        if (shown == null || shown.Animator == null)
             return;
 
-        if (shown.Animator.IsInTransition(0))
+        TickBeam(shown);
+        if (shown.Step < 0 || shown.Animator.IsInTransition(0))
             return;
+
         AnimatorStateInfo state = shown.Animator.GetCurrentAnimatorStateInfo(0);
-        if (state.shortNameHash != shown.EntryHash)
+        if (state.shortNameHash != shown.EntryHashes[shown.Step])
         {
-            shown.InEntry = false; // 컨트롤러가 이미 넘겼다 — 다시 크로스페이드하면 두 번 바뀐다
+            shown.Step = -1; // 컨트롤러가 이미 넘겼다 — 다시 크로스페이드하면 두 번 바뀐다
             return;
         }
 
-        // 등장 클립이 블렌드 시간만큼 남았을 때 루프로 크로스페이드 — 컨트롤러 끝 전이(Exit Time 1, 0.05~0.1초 컷에 가까움)보다 먼저 잡는다.
-        // 끝까지 기다렸다 넘기면 그 전이가 먼저 바꾸고 코드가 한 번 더 바꿔(같은 루프 재시작) 뚝 끊겨 보였다(199 Play).
-        float remaining = (1f - state.normalizedTime) * state.length;
-        if (remaining > shown.LoopBlend)
+        bool last = shown.Step == shown.EntryHashes.Length - 1;
+        if (shown.StepEnd < 0f)
+            shown.StepEnd = StepEndNormalized(shown.Animator, state, last ? shown.LoopBlend : shown.ChainBlend);
+        // 컨트롤러 끝 전이(Exit Time 1, 0.05~0.1초 컷에 가까움)보다 먼저 잡는다 — 끝까지 기다리면 그 전이가 먼저 바꾸고
+        // 코드가 한 번 더 바꿔(같은 루프 재시작) 뚝 끊겨 보였다(199 Play).
+        if (state.normalizedTime < shown.StepEnd)
             return;
 
-        shown.InEntry = false;
-        if (shown.LoopHash != 0)
+        if (!last)
+        {
+            shown.Step++;
+            shown.StepEnd = -1f;
+            shown.Animator.CrossFadeInFixedTime(shown.EntryHashes[shown.Step], shown.ChainBlend, 0);
+            return;
+        }
+
+        shown.Step = -1;
+        if (shown.HoldLastPose)
+            shown.Animator.speed = 0f; // 마지막 칸 End 포즈에서 멈춤
+        else if (shown.LoopHash != 0)
             shown.Animator.CrossFadeInFixedTime(shown.LoopHash, shown.LoopBlend, 0);
+    }
+
+    /// <summary>
+    /// 지금 칸에서 다음으로 넘길 정규화 시각 = 그 클립의 End 애니 이벤트(평타 <c>HandleDefaultAttackEvent(End)</c>·스킬 <c>HandleSkillEvent(End)</c>) —
+    /// 게임에서 그 동작이 끝났다고 보는 곳(후딜 시작). 없으면 클립 끝 − 블렌드.
+    /// </summary>
+    private static float StepEndNormalized(Animator animator, AnimatorStateInfo state, float blendSeconds)
+    {
+        AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
+        AnimationClip clip = clips.Length > 0 ? clips[0].clip : null;
+        if (clip != null && clip.length > 0f)
+        {
+            foreach (AnimationEvent e in clip.events)
+            {
+                bool end = (e.functionName == nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent) && e.intParameter == (int)DefaultAttackAnimationEventType.End)
+                    || (e.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) && e.intParameter == (int)SkillAnimationEventType.End);
+                if (end)
+                    return e.time / clip.length;
+            }
+        }
+        return state.length > 0f ? Mathf.Clamp01(1f - blendSeconds / state.length) : 1f;
+    }
+
+    // 거너 Q 빔 — 첫 등장 칸의 BeamTime 에 켜고, 켜진 동안 복제본 앞으로 겨눠 늘이고, 유지 시간이 지나면 끈다.
+    // 끄기·풀 반납은 EffectSocketPlayer 가 한다(Stop, 복제본이 꺼지면 OnDisable).
+    private static void TickBeam(Preview shown)
+    {
+        if (shown.Beam == null)
+            return;
+
+        if (!shown.BeamFired && shown.BeamTime >= 0f && shown.EntryHashes.Length > 0)
+        {
+            AnimatorStateInfo state = shown.Animator.GetCurrentAnimatorStateInfo(0);
+            if (state.shortNameHash != shown.EntryHashes[0])
+            {
+                shown.BeamFired = true; // 첫 칸을 지나쳤다 — 이번 회차는 안 쏜다
+            }
+            else if (state.normalizedTime >= shown.BeamTime)
+            {
+                shown.BeamFired = true;
+                shown.Beam.Play();
+                shown.BeamStopAt = Time.time + shown.BeamHold;
+            }
+        }
+
+        if (!shown.Beam.IsPlaying)
+            return;
+        if (Time.time >= shown.BeamStopAt)
+        {
+            shown.Beam.Stop();
+            return;
+        }
+        Transform root = shown.Root.transform;
+        GunnerBeamView.AimAndStretch(shown.Beam, shown.Beam.Socket.position + root.forward * shown.BeamLength, shown.BeamUnitLength);
     }
 
     public void Dispose()
@@ -257,11 +348,65 @@ public sealed class CharacterSelectPreviewPool
         // 한 번 켜서 남긴 스크립트·Animator 를 초기화하고 끈다(첫 열기 끊김 줄이기).
         root.SetActive(true);
         CharacterSelectPreviewAnimation animation = FindAnimation(animations, prefab.name);
-        preview.EntryHash = ResolveState(preview.Animator, animation != null ? animation.entryState : null, prefab.name);
-        preview.LoopHash = ResolveState(preview.Animator, animation != null ? animation.loopState : null, prefab.name);
-        preview.LoopBlend = animation != null ? Mathf.Max(0f, animation.loopBlendSeconds) : CharacterSelectPreviewAnimation.DefaultLoopBlendSeconds;
+        if (animation != null)
+        {
+            var hashes = new List<int>();
+            if (animation.entryStates != null)
+                foreach (string stateName in animation.entryStates)
+                {
+                    int hash = ResolveState(preview.Animator, stateName, prefab.name);
+                    if (hash != 0)
+                        hashes.Add(hash);
+                }
+            preview.EntryHashes = hashes.ToArray();
+            preview.LoopHash = ResolveState(preview.Animator, animation.loopState, prefab.name);
+            preview.LoopBlend = Mathf.Max(0f, animation.loopBlendSeconds);
+            preview.ChainBlend = Mathf.Max(0f, animation.chainBlendSeconds);
+            preview.HoldLastPose = animation.holdLastPose;
+            if (animation.beamNormalizedTime >= 0f)
+                BindBeam(preview, prefab, animation);
+        }
+        else
+        {
+            preview.LoopBlend = CharacterSelectPreviewAnimation.DefaultLoopBlendSeconds;
+        }
         root.SetActive(false);
         return preview;
+    }
+
+    // 거너 빔 소켓 = 프리팹 GunnerBeamView 가 쓰는 Q 빔 EffectSocketPlayer 의 복제본 쪽 짝(같은 경로 — Armature 아래 총구).
+    private static void BindBeam(Preview preview, GameObject prefab, CharacterSelectPreviewAnimation animation)
+    {
+        GunnerBeamView view = prefab.GetComponentInChildren<GunnerBeamView>(true);
+        if (view == null || view.ChargeBeamPlayer == null)
+        {
+            Debug.LogWarning($"[CharacterSelectPreviewPool] {prefab.name} 에 GunnerBeamView Q 빔 소켓이 없다 — 미리보기 빔을 안 쏜다.");
+            return;
+        }
+        string path = RelativePath(prefab.transform, view.ChargeBeamPlayer.transform);
+        Transform found = path != null ? preview.Root.transform.Find(path) : null;
+        preview.Beam = found != null ? found.GetComponent<EffectSocketPlayer>() : null;
+        if (preview.Beam == null)
+        {
+            Debug.LogWarning($"[CharacterSelectPreviewPool] {prefab.name} 미리보기에 빔 소켓 {path} 이 없다(Armature·무기 슬롯 밖) — 빔을 안 쏜다.");
+            return;
+        }
+        preview.BeamUnitLength = view.ChargeBeamUnitLength;
+        preview.BeamHold = view.ChargeBeamHoldDuration;
+        preview.BeamTime = animation.beamNormalizedTime;
+        preview.BeamLength = animation.beamLength;
+    }
+
+    private static string RelativePath(Transform root, Transform target)
+    {
+        string path = null;
+        for (Transform t = target; t != null; t = t.parent)
+        {
+            if (t == root)
+                return path;
+            path = path == null ? t.name : $"{t.name}/{path}";
+        }
+        return null;
     }
 
     private static int ResolveState(Animator animator, string stateName, string owner)
@@ -277,17 +422,23 @@ public sealed class CharacterSelectPreviewPool
 
     private static void PlayEntry(Preview preview)
     {
+        if (preview.Beam != null)
+            preview.Beam.Stop();
+        preview.BeamFired = false;
         if (preview.Animator == null)
             return;
-        if (preview.EntryHash != 0)
+        preview.Animator.speed = 1f; // 지난 회차 홀드 풀기
+        preview.StepEnd = -1f;
+        if (preview.EntryHashes.Length > 0)
         {
-            preview.Animator.Play(preview.EntryHash, 0, 0f);
-            preview.InEntry = true;
+            preview.Animator.Play(preview.EntryHashes[0], 0, 0f);
+            preview.Step = 0;
         }
-        else if (preview.LoopHash != 0)
+        else
         {
-            preview.Animator.Play(preview.LoopHash, 0, 0f);
-            preview.InEntry = false;
+            preview.Step = -1;
+            if (preview.LoopHash != 0)
+                preview.Animator.Play(preview.LoopHash, 0, 0f);
         }
         preview.Animator.Update(0f); // 켜진 첫 프레임에 이전 포즈가 비치지 않게
     }

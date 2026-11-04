@@ -124,9 +124,13 @@ public sealed class CharacterSelectPreviewPoolTests
 
             var states = new HashSet<string>();
             CollectStates(controller.layers[0].stateMachine, states);
-            foreach (string state in new[] { animation.entryState, animation.loopState })
+            var names = new List<string>(animation.entryStates) { animation.loopState };
+            foreach (string state in names)
                 if (!string.IsNullOrEmpty(state))
                     Assert.IsTrue(states.Contains(state), $"{prefab.name}: 0번 레이어에 '{state}' 상태가 없다");
+
+            if (animation.beamNormalizedTime >= 0f)
+                AssertPreviewHasBeamSocket(prefab);
             checkedCount++;
         }
 
@@ -136,11 +140,31 @@ public sealed class CharacterSelectPreviewPoolTests
     [Test]
     public void FindAnimation_ByPrefabName_NullSafe()
     {
-        var list = new List<CharacterSelectPreviewAnimation> { new CharacterSelectPreviewAnimation("Player_A", "Enter", "Loop") };
-        Assert.AreEqual("Enter", CharacterSelectPreviewPool.FindAnimation(list, "Player_A").entryState);
+        var list = new List<CharacterSelectPreviewAnimation> { new CharacterSelectPreviewAnimation("Player_A", new[] { "Enter", "Enter2" }, "Loop") };
+        CollectionAssert.AreEqual(new[] { "Enter", "Enter2" }, CharacterSelectPreviewPool.FindAnimation(list, "Player_A").entryStates);
         Assert.IsNull(CharacterSelectPreviewPool.FindAnimation(list, "Player_B"));
         Assert.IsNull(CharacterSelectPreviewPool.FindAnimation(null, "Player_A"));
         Assert.IsNull(CharacterSelectPreviewPool.FindAnimation(list, null));
+    }
+
+    // 빔 미리보기 = 프리팹 GunnerBeamView 의 Q 빔 소켓이 복제본 안 같은 경로에 남아 있어야 한다(Armature 아래 총구).
+    void AssertPreviewHasBeamSocket(GameObject prefab)
+    {
+        GunnerBeamView view = prefab.GetComponentInChildren<GunnerBeamView>(true);
+        Assert.IsNotNull(view, $"{prefab.name}: 빔 칸이 있는데 GunnerBeamView 가 없다");
+        Assert.IsNotNull(view.ChargeBeamPlayer, $"{prefab.name}: Q 빔 소켓 미배선");
+
+        string path = null;
+        for (Transform t = view.ChargeBeamPlayer.transform; t != prefab.transform; t = t.parent)
+        {
+            Assert.IsNotNull(t, $"{prefab.name}: Q 빔 소켓이 프리팹 밖");
+            path = path == null ? t.name : $"{t.name}/{path}";
+        }
+
+        GameObject root = CharacterSelectPreviewPool.CreatePreviewObject(prefab, _holder.transform, _parent.transform);
+        Transform found = root.transform.Find(path);
+        Assert.IsNotNull(found, $"{prefab.name}: 복제본에 빔 소켓 {path} 이 없다");
+        Assert.IsNotNull(found.GetComponent<EffectSocketPlayer>(), $"{prefab.name}: 빔 EffectSocketPlayer 가 지워졌다");
     }
 
     // Animator.HasState 의 shortNameHash 는 하위 상태 기계 안 상태도 찾는다 — 같은 범위로 모은다.

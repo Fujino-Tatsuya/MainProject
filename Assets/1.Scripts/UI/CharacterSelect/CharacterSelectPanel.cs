@@ -113,12 +113,15 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [Header("Preview (할 일 199 — 포커스 캐릭터 표시용 복제본, 로컬 전용)")]
     [Tooltip("열린 동안 진짜 내 캐릭터를 이 화면에서만 감추고 그 자리에 포커스 캐릭터 복제본을 세운다. 다른 피어 화면은 그대로.")]
     [SerializeField] private bool showPreview = true;
-    [Tooltip("캐릭터별 복제본 애니메이션 — 프리팹 이름 키, 등장 1회 → 루프(0번 레이어 상태 이름). 상태가 없으면 기본 상태.")]
+    [Tooltip("캐릭터별 복제본 애니메이션 — 프리팹 이름 키, 등장 상태들 순서대로 1회씩 → 루프 또는 마지막 포즈 홀드(0번 레이어 상태 이름), 거너는 빔 시각·길이. 상태가 없으면 건너뜀.")]
     [SerializeField] private List<CharacterSelectPreviewAnimation> previewAnimations = new List<CharacterSelectPreviewAnimation>
     {
-        new CharacterSelectPreviewAnimation("Player_Paladin", "Default_Attack3", "Idle"),
-        new CharacterSelectPreviewAnimation("Player_Gunner", "Gunner_ULT_Cast", "Idle"),
-        new CharacterSelectPreviewAnimation("Player_Assassin", "Assassin_R_Transform", "Idle_Combat"), // Assassin_E_Buff 는 UpperBody 레이어라 0번에 없다
+        // 팔라딘 = 평타 1타 한 번 → Idle 로 길게 블렌드.
+        new CharacterSelectPreviewAnimation("Player_Paladin", new[] { "Default_Attack0" }, "Idle", 0.9f),
+        // 거너 = Q 발사(빔은 그 클립에 발사 순간 이벤트가 없어 칸 시각으로 — 게임도 이 상태로 넘기는 순간 빔을 켠다).
+        new CharacterSelectPreviewAnimation("Player_Gunner", new[] { "Gunner_Q_Fire" }, "Idle", 0.3f) { beamNormalizedTime = 0.02f },
+        // 어쌔신 = 평타 1→2타 → 허리 숙인 전투 대기(Idle_Combat) 루프.
+        new CharacterSelectPreviewAnimation("Player_Assassin", new[] { "Default_Attack0", "Default_Attack1" }, "Idle_Combat", 0.4f),
     };
 
     [Header("Confirm Wait (할 일 199 — 확정 뒤 교체 대기)")]
