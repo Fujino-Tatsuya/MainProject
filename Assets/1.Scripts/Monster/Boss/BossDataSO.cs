@@ -278,8 +278,8 @@ public class BossDataSO : MonsterDataSO
     [Min(0f)] public float raidOpeningStepInterval = 1f;
 
     // ─── 콤보 즉시 연결(PLAN-boss-combo-chain, 팀장 10-19) — chainOnHit 콤보의 **후속 타에만** 적용. 단타 길이는 그대로 ───
-    [Tooltip("즉시 연결 콤보의 후속 돌진 준비 = 간파 창 길이(초). 단타 돌진은 행의 counterWindowDuration(1.3) 그대로.\n" +
-             "후속 돌진은 준비동작 클립을 건너뛰고 돌진 클립 첫 자세에서 이 시간만큼 멈췄다 나간다.")]
+    [Tooltip("즉시 연결 콤보의 후속 돌진 준비 = 간파 창 길이 = 발사 시각(초). 단타 돌진은 행의 counterWindowDuration 그대로.\n" +
+             "돌진 행 창보다 짧으면 준비동작 클립을 건너뛰고(돌진 클립 처음부터), 같거나 길면 단타처럼 준비동작을 튼다(경석 11-04 — 에셋 1.5).")]
     [DataTableIgnore] [Range(0.1f, 2f)] public float comboDashWindup = 0.7f;
 
     [Tooltip("즉시 연결 콤보의 후속 잡기 예고(초). 단타 잡기는 행의 telegraphDuration(0.7) 그대로. 돌진 다음 잡기는 아래 칸.\n" +

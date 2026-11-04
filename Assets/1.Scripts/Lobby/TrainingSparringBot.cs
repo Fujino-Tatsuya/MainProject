@@ -365,7 +365,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         if (counterOpen)
         {
             Counter.Open(windup);   // 판정 타이머는 저작 길이 그대로(느리게 흘린다) — 시간표(할 일 191)에는 실제 닫힘인 예고 길이로 알린다
-            if (Counter.IsOpen) ServerSetCounterWindow(true, windup);
+            if (Counter.IsOpen) ServerSetCounterWindow(true);
         }
     }
 

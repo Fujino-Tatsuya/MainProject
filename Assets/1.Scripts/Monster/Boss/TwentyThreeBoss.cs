@@ -39,8 +39,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    // 간파 창 **표시** — 판정(_counterWindow)과 분리. 판정 창이 닫히기 CounterVisualLeadSeconds(0.15초) 전에
-    // 먼저 꺼진다 → "보일 때 누르면 성공"(팀장 09-28: 유예 없음, 표시만 일찍). 텔레그래프는 이쪽을 본다.
+    // 간파 창 **표시** — 텔레그래프는 이쪽을 본다. 판정(_counterWindow)과 같은 순간에 켜지고 꺼진다(경석 10-20,
+    // SetCounterWindow — 09-28 "표시만 0.15초 일찍"을 뒤집음).
     readonly NetworkVariable<bool> _counterVisual = new NetworkVariable<bool>(
         false,
         NetworkVariableReadPermission.Everyone,
@@ -2103,11 +2103,21 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         // [G2-P] 돌진 준비동작(2026-09-23). 돌진은 `telegraphDuration: 0` 이라 BeginTelegraph 를
         //    타지 않으므로 여기가 prep 을 트는 유일한 자리다.
-        // 🔴 즉시 연결의 후속 돌진은 prep 을 틀지 않는다(PLAN-boss-combo-chain C4). 창이 comboDashWindup(0.7)으로
-        //    짧아 1.5초짜리 prep 이 중간에 끊긴다. 대신 prep 이전 방식 — 돌진 클립의 OnAttackHit(0.15초)에서
-        //    자세를 멈추고(NotifyAttackHit → SetCounterPoseHeld) 창이 끝나면 나간다. prep 속도를 바꾸지 않는 이유:
-        //    자세 홀드가 "걸 때의 속도"를 저장·복원해서, 빨리 돌린 속도가 돌진 본체까지 남는다.
-        if (string.IsNullOrEmpty(e.prepStateName) || _chainedAttack) return;
+        if (string.IsNullOrEmpty(e.prepStateName)) return;
+
+        // 🔴 즉시 연결의 후속 돌진 — 창(comboDashWindup)이 돌진 행 창(counterWindowDuration = prep 길이 1.5초)보다
+        //    **짧을 때만** prep 을 건너뛴다(PLAN-boss-combo-chain C4 — 짧으면 prep 이 중간에 끊긴다). 그때는 돌진 클립(DashAttack)이
+        //    처음부터 돌고 발사 때 BeginDash 가 0.57 로 넘긴다. 같거나 길면 아래 일반 돌진과 같은 prep 경로(끝 자세에서 멈춰 기다림).
+        //    (prep 없이 1.5초 넘게 두면 클립이 0.57 을 지나 제자리 돌진 모션을 하다 발사 때 되감긴다.)
+        // 🔴 어느 쪽이든 준비 신호는 **지금 세운다** — 발사 = 창 타이머 단독(경석 11-04, 지금 값 1.5).
+        //    예전 주석은 "돌진 클립 OnAttackHit(0.15초)에서 멈춘다"였지만 지금 클립(Boss_23_dash.001)엔 이벤트가 없어,
+        //    준비가 대체값(0.57 ≈ 1.5초)에서야 서서 0.7초라고 알린 창이 매번 1.5초 넘게 열려 있었다(Play 로그 10/10).
+        //    클라 간파 판정(할 일 191)은 알린 0.7초로 닫혔다고 봐서 0.7~1.5초 간파가 보라색인데 실패했다.
+        if (_chainedAttack && CounterWindowDuration < e.counterWindowDuration)
+        {
+            _counterWindup.MarkAnimationReady();
+            return;
+        }
 
         PlayPrepPoseClientRpc(CurrentAttackSlot);
 

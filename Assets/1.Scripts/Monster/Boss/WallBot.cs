@@ -173,7 +173,7 @@ public class WallBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWindow
         if (UsesAttackSuperArmor && status != null)   // 중간보스 취약 중엔 안 건다(팀장 10-26)
             status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
 
-        ServerSetCounterWindow(true, Counter.WindowDuration);   // 표시는 0.15초 먼저 꺼진다
+        ServerSetCounterWindow(true);   // 표시 = 판정 창(만료 때 같이 꺼진다)
 
         // 방패를 다 모은 자세에서 정지 — 클립이 루프라 자동으로 멈추지 않는다(파일 상단 ⚠️ 정정 참조).
         ServerHoldActionPoseAtClipEnd(gatherStateName);
