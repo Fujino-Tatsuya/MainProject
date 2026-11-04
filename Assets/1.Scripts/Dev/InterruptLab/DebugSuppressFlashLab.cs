@@ -7,6 +7,7 @@ using UnityEngine;
 /// 켜 두면 허수아비의 서버 간파 성공(<see cref="TrainingDummyInterrupt.ServerInterruptSucceeded"/> — 같은 판정 호출 안, 성공 사건 바로 앞)에서
 /// 23호 칸 0 분기와 같은 <see cref="InterruptProductionDirector.ServerMarkSuppressInterrupt"/> 를 부른다.
 /// 허수아비·판정 코드 무수정(구독만). 표식은 호스트에서만 의미가 있다 — 클라 화면의 토글은 아무것도 안 한다.
+/// 11-04(할 일 211)부터 제압 간파도 단계 설정(<c>suppressTier</c>, 기본 V3) 연출이라 이 토글은 '받은 성공 = 제압 간파' 표시·제압 단계 설정 확인용이다.
 /// </summary>
 public sealed class DebugSuppressInterruptRepro
 {
@@ -71,18 +72,6 @@ public sealed class DebugSuppressInterruptRepro
         InterruptProductionDirector.ServerMarkSuppressInterrupt();
         MarkedCount++;
     }
-
-    /// <summary>
-    /// 오너 시도 암전 예측도 맞춘다(할 일 192) — 켜져 있으면 허수아비를 제압 대상으로 예측(<see cref="InterruptProductionDirector.DebugSuppressForecastOverride"/>).
-    /// 매 프레임 부른다. 끄면 덮어쓰기를 지운다.
-    /// </summary>
-    public void SyncForecast()
-    {
-        InterruptProductionDirector.DebugSuppressForecastOverride = Enabled ? IsDummy : null;
-    }
-
-    private static readonly System.Func<GameObject, bool> IsDummy =
-        target => target != null && target.GetComponentInChildren<TrainingDummyInterrupt>() != null;
 }
 
 /// <summary>
@@ -117,10 +106,11 @@ public sealed class DebugInterruptTierPreview
         _ => "제압 간파",
     };
 
-    // ---- 적중 라이트 연출 버전(할 일 194) — 일반·대쉬 단계별 V0/V1/V2·암순응 가/나 ----
+    // ---- 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압 단계별 V0/V1/V2/V3·암순응 가/나 ----
 
-    /// <summary>버전을 고를 수 있는 단계(제압은 시퀀스 고정).</summary>
-    public static readonly InterruptPresentationTier[] VersionTiers = { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash };
+    /// <summary>버전을 고를 수 있는 단계 — 제압도 11-04(할 일 211)부터 같은 버전 표(옛 섬광 시퀀스는 Legacy).</summary>
+    public static readonly InterruptPresentationTier[] VersionTiers =
+        { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash, InterruptPresentationTier.Suppress };
 
     /// <summary>버튼 순서 = V0 / V1 / V2 / V3(194 후속 레퍼런스 맞춤).</summary>
     public static readonly InterruptTierFlash[] Versions =
@@ -134,7 +124,7 @@ public sealed class DebugInterruptTierPreview
         InterruptTierFlash.HitLight => "V1",
         InterruptTierFlash.HitLightWhiteout => "V2",
         InterruptTierFlash.HitLightReference => "V3",
-        _ => "시퀀스",
+        _ => "?",
     };
 
     public static string LookLabel(InterruptSuccessLook look) => look switch
@@ -143,7 +133,7 @@ public sealed class DebugInterruptTierPreview
         InterruptSuccessLook.HitLight => "V1",
         InterruptSuccessLook.HitLightWhiteout => "V2",
         InterruptSuccessLook.HitLightReference => "V3",
-        _ => "시퀀스",
+        _ => "?",
     };
 
     public static string DarkAdaptLabel(InterruptDarkAdaptMode mode) => mode == InterruptDarkAdaptMode.SceneLight ? "나 씬 조명" : "가 화면";

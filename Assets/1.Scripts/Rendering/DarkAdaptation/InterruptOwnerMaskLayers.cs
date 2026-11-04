@@ -46,7 +46,7 @@ public sealed class InterruptOwnerMaskTagger
     private readonly List<Renderer> _buffer = new List<Renderer>();
     private readonly uint _mask;
 
-    /// <param name="mask">붙일 렌더링 레이어 비트 — 기본 = 오너 암전 비트 4. 제압 간파 섬광 실루엣(할 일 179)은 <see cref="SuppressFlashMaskLayers.Mask"/>.</param>
+    /// <param name="mask">붙일 렌더링 레이어 비트 — 기본 = 오너 암전 비트 4. 제압 간파 섬광 실루엣(할 일 179, 11-04 Legacy)은 <see cref="SuppressFlashMaskLayers.Mask"/>.</param>
     public InterruptOwnerMaskTagger(uint mask = InterruptOwnerMaskLayers.Mask)
     {
         _mask = mask;

@@ -969,7 +969,7 @@ public sealed class InterruptHitLightTests
     public void V3_선택표는_V3_전용_데이터가_있을_때만(bool hasReference, bool hasHitLight, InterruptSuccessLook expected)
     {
         var tier = new InterruptTierProfile(false, InterruptTierFlash.HitLightReference);
-        Assert.AreEqual(expected, InterruptPresentationTierRules.SelectSuccessLook(tier, true, true, hasHitLight, hasReference));
+        Assert.AreEqual(expected, InterruptPresentationTierRules.SelectSuccessLook(tier, hasHitLight, hasReference));
     }
 
     [Test]
@@ -986,7 +986,7 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(4, (int)InterruptSuccessLook.HitLightReference);
         // V1 선택은 V3 칸 유무와 무관하다.
         var v1 = new InterruptTierProfile(false, InterruptTierFlash.HitLight);
-        Assert.AreEqual(InterruptSuccessLook.HitLight, InterruptPresentationTierRules.SelectSuccessLook(v1, true, true, true, false));
+        Assert.AreEqual(InterruptSuccessLook.HitLight, InterruptPresentationTierRules.SelectSuccessLook(v1, true, false));
     }
 
     [Test]
@@ -1166,36 +1166,30 @@ public sealed class InterruptHitLightTests
         Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Normal).darkAdapt, "V3 암순응 = 나");
         Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Dash).darkAdapt, "V3 암순응 = 나");
 
-        // 제압 = 섬광 시퀀스 그대로 + V3 적중 라이트를 더한다(대체 아님).
-        Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash);
-        Assert.AreEqual(InterruptSuccessLook.SuppressSequence, director.SuccessLook(InterruptPresentationTier.Suppress), "제압 시퀀스 유지");
-        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SequenceHitLight(InterruptPresentationTier.Suppress), "제압 + V3");
-        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Normal), "일반은 더하지 않음(본 섬광이 V3)");
-        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Fail), "실패 = 연출 없음");
+        // 제압 = 일반·대쉬와 같은 V3·암순응 나, 오너 암전 없음(11-04 할 일 211 — 옛 섬광 시퀀스는 Legacy).
+        InterruptTierProfile suppress = director.TierProfile(InterruptPresentationTier.Suppress);
+        Assert.AreEqual(InterruptTierFlash.HitLightReference, suppress.flash, "기본 제압 = V3");
+        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, suppress.darkAdapt, "V3 암순응 = 나");
+        Assert.IsFalse(suppress.ownerDim, "제압 암전 없음");
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Suppress), "제압 = V3");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Fail), "실패 = 연출 없음");
+        Assert.IsNull(so.FindProperty("suppressFlashSequence"), "옛 시퀀스 칸은 디렉터에 없다");
     }
 
     [Test]
-    public void 디렉터_제압_V3_는_시퀀스가_틀고_V3_데이터가_있을_때만()
+    public void 디렉터_제압은_일반과_같이_V3_데이터가_있을_때만_V3()
     {
         var go = new GameObject("Director");
         _objects.Add(go);
         var director = go.AddComponent<InterruptProductionDirector>();
-        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        _objects.Add(sequence);
-        var so = new SerializedObject(director);
-        so.FindProperty("suppressFlashSequence").objectReferenceValue = sequence;
-        so.ApplyModifiedPropertiesWithoutUndo();
-        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Suppress), "V3 칸 비면 더하지 않음");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Suppress), "V3 칸 비면 V0(일반과 같은 규칙)");
 
+        var so = new SerializedObject(director);
         so.FindProperty("hitLightLookReference").objectReferenceValue = CreateLook(false);
         so.FindProperty("hitLightVfxReference").objectReferenceValue = CreateFx();
         so.ApplyModifiedPropertiesWithoutUndo();
-        Assert.AreEqual(InterruptSuccessLook.SuppressSequence, director.SuccessLook(InterruptPresentationTier.Suppress));
-        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SequenceHitLight(InterruptPresentationTier.Suppress));
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Suppress), "코드 기본 제압 = V3");
         Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Normal), "코드 기본 일반 = V3");
         Assert.AreEqual(InterruptSuccessLook.HitLightReference, director.SuccessLook(InterruptPresentationTier.Dash), "코드 기본 대쉬 = V3");
-
-        director.SuppressFlashEnabled = false;
-        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SequenceHitLight(InterruptPresentationTier.Suppress), "A6 끔 = 시퀀스 없음 → 더하지 않음(②~⑥)");
     }
 }

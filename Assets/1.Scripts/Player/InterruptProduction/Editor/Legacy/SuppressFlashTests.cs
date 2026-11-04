@@ -1,22 +1,20 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using Unity.Collections;
-using Unity.Netcode;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// 제압 간파 섬광(할 일 179) — 사양 표 기본값, 실제 시간 → 프레임(24) → 컷·2프레임 홀드 계단, 컷 전환·종료, 섬광 줄이기(반전 끔·대비),
-/// SO 값 Play 중 반영, 디렉터 프로필 선택(A6 칸 켬/끔·섬광 줄이기와 독립),서버 표식(같은 프레임만), 슬로우 Start 이벤트 플래그 직렬화, 실루엣 비트 7 태깅·원복, 에셋·프리팹 연결.
+/// [Legacy — 11-04 할 일 211] 제압 간파 섬광 시퀀스(할 일 179) — 런타임 연결은 끊겼고 코드·에셋은 Legacy 폴더에 보관한다. 슬로우 모션 테스트 메뉴에서 뺐다(Test Runner 에서 직접 돌릴 수 있다).
+/// 사양 표 기본값, 실제 시간 → 프레임(24) → 컷·2프레임 홀드 계단, 컷 전환·종료, 섬광 줄이기(반전 끔·대비), SO 값 Play 중 반영, 프로필 선택 규칙,
+/// 실루엣 비트 7 태깅·원복, A7 범위 규칙, 제압 암순응 컷(192 Q7), 에셋. 디렉터 연결(A6·A7·프리팹) 테스트는 지웠다 — 디렉터에 칸이 없다.
 /// </summary>
 public sealed class SuppressFlashTests
 {
     private const float Frame = 1f / 24f;
-    private const string SequencePath = "Assets/5.VFX/Interrupt/SuppressFlash/SuppressFlashSequence.asset";
-    private const string MaterialPath = "Assets/5.VFX/Interrupt/SuppressFlash/M_SuppressFlash.mat";
+    private const string SequencePath = "Assets/5.VFX/Interrupt/Legacy/SuppressFlash/SuppressFlashSequence.asset";
+    private const string MaterialPath = "Assets/5.VFX/Interrupt/Legacy/SuppressFlash/M_SuppressFlash.mat";
     private const string ShaderName = "Hidden/Rendering/SuppressFlash";
-    private const string NetworkManagerPath = "Assets/2.Prefabs/Network/NetworkManager.prefab";
 
     private sealed class FakeOutput : ISuppressFlashOutput
     {
@@ -268,126 +266,6 @@ public sealed class SuppressFlashTests
     public bool 제압_간파_프로필_선택(SlowMotionPurpose purpose, bool suppress, bool enabled, bool hasSequence) =>
         SuppressFlashRules.ShouldPlay(purpose, suppress, enabled, hasSequence);
 
-    // ---- A6 제압 간파 섬광 시퀀스 칸 ----
-
-    private InterruptProductionDirector CreateDirectorWithSequence()
-    {
-        var go = new GameObject("Director");
-        _objects.Add(go);
-        var director = go.AddComponent<InterruptProductionDirector>();
-        var so = new SerializedObject(director);
-        so.FindProperty("suppressFlashSequence").objectReferenceValue = _sequence;
-        so.ApplyModifiedPropertiesWithoutUndo();
-        return director;
-    }
-
-    [Test]
-    public void A6_켬이면_제압_간파는_시퀀스_끔이면_일반_섬광()
-    {
-        InterruptProductionDirector director = CreateDirectorWithSequence();
-        Assert.IsTrue(director.SuppressFlashEnabled, "코드 기본값 켬");
-        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "켬 = 시퀀스");
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, false), "일반 간파는 늘 ②~⑥");
-
-        director.SuppressFlashEnabled = false;
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "끔 = ②~⑥ 경로");
-        // ②~⑥ 경로의 오너 화면 섬광 조건은 제압 표식을 보지 않는다 — 일반 간파와 같은 흐름(강 시도 암전 켜짐이면 오버레이).
-        Assert.IsTrue(InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, true, true));
-        Assert.IsFalse(InterruptHitFlashRules.ShouldPlayOwnerOverlay(SlowMotionPurpose.Success, false, true), "팀원 화면은 오버레이 없음");
-
-        director.SuppressFlashEnabled = true;
-        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "Play 중 다시 켜면 다음 성공부터 시퀀스");
-    }
-
-    [TestCase(false, false)]
-    [TestCase(false, true)]
-    [TestCase(true, false)]
-    [TestCase(true, true)]
-    public void A6_칸과_섬광_줄이기는_서로_독립(bool suppressFlash, bool reduceFlash)
-    {
-        InterruptProductionDirector director = CreateDirectorWithSequence();
-        var so = new SerializedObject(director);
-        so.FindProperty("reduceFlash").boolValue = reduceFlash;
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        director.SuppressFlashEnabled = suppressFlash;
-        Assert.AreEqual(suppressFlash, director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "섬광 줄이기는 시퀀스 선택을 바꾸지 않는다");
-
-        so.Update();
-        Assert.AreEqual(reduceFlash, so.FindProperty("reduceFlash").boolValue, "A6 칸은 섬광 줄이기 칸을 바꾸지 않는다");
-        Assert.AreEqual(suppressFlash, so.FindProperty("suppressFlash").boolValue);
-    }
-
-    [Test]
-    public void A6_칸_켬이어도_컷_데이터가_없으면_일반_섬광()
-    {
-        var go = new GameObject("Director");
-        _objects.Add(go);
-        var director = go.AddComponent<InterruptProductionDirector>();
-        Assert.IsTrue(director.SuppressFlashEnabled);
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true));
-    }
-
-    [Test]
-    public void 서버_표식은_같은_프레임에_한_번만()
-    {
-        var mark = new SuppressInterruptMark();
-        Assert.IsFalse(mark.Consume(10));
-
-        mark.Mark(10);
-        Assert.IsTrue(mark.Consume(10));
-        Assert.IsFalse(mark.Consume(10), "읽으면 비운다");
-
-        mark.Mark(10);
-        Assert.IsFalse(mark.Consume(11), "다른 프레임에 남은 표식은 버린다");
-        Assert.IsFalse(mark.Consume(10));
-    }
-
-    [Test]
-    public void 성공_사건_사본은_제압_간파_칸만_바꾼다()
-    {
-        var e = InterruptProductionEvent.Success(3, null, null, true, new Vector3(1, 2, 3), new Vector3(4, 5, 6));
-        InterruptProductionEvent marked = e.WithSuppressInterrupt(true);
-
-        Assert.IsFalse(e.SuppressInterrupt);
-        Assert.IsTrue(marked.SuppressInterrupt);
-        Assert.AreEqual(InterruptProductionPhase.Success, marked.Phase);
-        Assert.AreEqual(3ul, marked.CasterClientId);
-        Assert.IsTrue(marked.HasTarget);
-        Assert.AreEqual(new Vector3(1, 2, 3), marked.TargetPosition);
-        Assert.AreEqual(new Vector3(4, 5, 6), marked.CasterPosition);
-        Assert.IsTrue(InterruptProductionEvent.LocalSuccess(1, 2, Vector3.zero, true).SuppressInterrupt);
-    }
-
-    // ---- 전송(새 RPC 없음 — 슬로우 Start 이벤트 1바이트) ----
-
-    [TestCase(false)]
-    [TestCase(true)]
-    public void 슬로우_Start_이벤트는_제압_간파_칸을_싣고_세션이_기억한다(bool suppress)
-    {
-        var profile = new SlowMotionProfile { scale = 0.25f, holdDuration = 1f, enterDuration = 0.05f, exitDuration = 0.4f };
-        SlowMotionEvent e = GlobalTimeScale.CreateStartEvent(5, 10.0, 2, profile, SlowMotionPurpose.Success, Vector3.one, true, suppress);
-
-        SlowMotionEvent read;
-        using (var writer = new FastBufferWriter(SlowMotionEvent.SerializedSize, Allocator.Temp))
-        {
-            e.Write(writer);
-            Assert.AreEqual(SlowMotionEvent.SerializedSize, writer.Length, "직렬화 크기 상수 = 실제 쓴 바이트");
-            using (var reader = new FastBufferReader(writer, Allocator.Temp))
-                read = SlowMotionEvent.Read(reader);
-        }
-
-        Assert.AreEqual(suppress, read.SuppressInterrupt);
-        Assert.AreEqual(SlowMotionPurpose.Success, read.Purpose);
-        Assert.AreEqual(Vector3.one, read.TargetPosition);
-
-        var session = new SlowMotionSession();
-        Assert.AreEqual(SlowMotionApplyResult.Started, session.Apply(read));
-        Assert.AreEqual(suppress, session.CurrentSuppressInterrupt);
-        session.Clear();
-        Assert.IsFalse(session.CurrentSuppressInterrupt);
-    }
-
     // ---- 렌더 출력 ----
 
     [Test]
@@ -483,19 +361,6 @@ public sealed class SuppressFlashTests
     }
 
     [Test]
-    public void A7_칸_기본_끔_런타임_값만_바꾼다()
-    {
-        InterruptProductionDirector director = CreateDirectorWithSequence();
-        Assert.IsFalse(director.SuppressFlashTargetOnly, "기본 = 전체 화면");
-        director.SuppressFlashTargetOnly = true;
-        Assert.IsTrue(director.SuppressFlashTargetOnly);
-        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, true), "A7 은 시퀀스 선택(A6)을 바꾸지 않는다");
-        var so = new SerializedObject(director);
-        Assert.IsTrue(so.FindProperty("suppressFlashTargetOnly").boolValue);
-        Assert.IsTrue(so.FindProperty("suppressFlash").boolValue);
-    }
-
-    [Test]
     public void 실루엣_태거는_비트_7만_붙이고_원복한다()
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -547,6 +412,108 @@ public sealed class SuppressFlashTests
         Assert.AreSame(other, player.Playing, "다음 성공부터 새 칸");
     }
 
+    // ---- 3. 제압 암순응 컷(Q7) ----
+
+    private sealed class FakeFlashOutput : ISuppressFlashOutput
+    {
+        public int Hides;
+        public void SetSubjects(IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode) { }
+        public void Show(in SuppressFlashFrame frame, Vector3 worldCenter, SuppressFlashSequence sequence) { }
+        public void Hide() => Hides++;
+    }
+
+    private sealed class FakeDarkAdapt : ISuppressDarkAdaptOutput
+    {
+        public readonly List<float> Cuts = new List<float>();
+        public int Clears;
+        public void ShowDarkAdaptCut(float darkness) => Cuts.Add(darkness);
+        public void ClearDarkAdapt() => Clears++;
+    }
+
+    [Test]
+    public void 암순응_컷_기본값은_어두움_중간_두_컷()
+    {
+        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        _objects.Add(sequence);
+        Assert.AreEqual(2, sequence.darkAdaptCuts.Count);
+        Assert.AreEqual(1f, sequence.darkAdaptCuts[0].darkness);
+        Assert.AreEqual(0.5f, sequence.darkAdaptCuts[1].darkness);
+    }
+
+    [Test]
+    public void 암순응_컷_시간표()
+    {
+        var cuts = new List<SuppressDarkAdaptCut> { new SuppressDarkAdaptCut(0.1f, 1f), new SuppressDarkAdaptCut(0.2f, 0.4f) };
+
+        Assert.IsTrue(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, 0f, out int i, out float d));
+        Assert.AreEqual(0, i);
+        Assert.AreEqual(1f, d);
+        Assert.IsTrue(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, 0.15f, out i, out d));
+        Assert.AreEqual(1, i);
+        Assert.AreEqual(0.4f, d, 1e-5f);
+        Assert.IsFalse(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, 0.31f, out _, out _), "끝 = 원래 색");
+        Assert.IsFalse(SuppressFlashRules.TryEvaluateDarkAdapt(null, 0f, out _, out _));
+        Assert.IsFalse(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, -0.01f, out _, out _));
+    }
+
+    [Test]
+    public void 제압_암순응은_시퀀스_끝_뒤_어두움_중간_원래_색으로_끊어_진행()
+    {
+        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        _objects.Add(sequence);
+        float end = sequence.TotalFrames / sequence.frameRate;
+        var flash = new FakeFlashOutput();
+        var dark = new FakeDarkAdapt();
+        var player = new SuppressFlashPlayer(() => sequence, () => false, flash, dark);
+
+        player.Begin(0f, Vector3.zero, null);
+        player.Tick(end - 0.01f);
+        Assert.IsTrue(player.IsPlaying);
+        Assert.IsFalse(player.DarkAdaptActive);
+        Assert.AreEqual(0, dark.Cuts.Count, "시퀀스 중엔 암순응 없음");
+
+        player.Tick(end + 0.05f);
+        Assert.IsFalse(player.IsPlaying, "시퀀스 끝");
+        Assert.AreEqual(1, flash.Hides);
+        Assert.IsTrue(player.DarkAdaptActive);
+        Assert.AreEqual(0, player.DarkAdaptCutIndex);
+        CollectionAssert.AreEqual(new[] { 1f }, dark.Cuts, "어두움");
+
+        player.Tick(end + 0.1f);
+        Assert.AreEqual(1, dark.Cuts.Count, "같은 컷이면 다시 안 보낸다");
+
+        player.Tick(end + 0.2f);
+        Assert.AreEqual(1, player.DarkAdaptCutIndex);
+        CollectionAssert.AreEqual(new[] { 1f, 0.5f }, dark.Cuts, "중간");
+
+        player.Tick(end + 0.31f);
+        Assert.IsFalse(player.DarkAdaptActive, "원래 색");
+        Assert.AreEqual(1, dark.Clears);
+    }
+
+    [Test]
+    public void 암순응_컷_중_멈춤_새_성공은_즉시_걷는다()
+    {
+        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
+        _objects.Add(sequence);
+        float end = sequence.TotalFrames / sequence.frameRate;
+        var dark = new FakeDarkAdapt();
+        var player = new SuppressFlashPlayer(() => sequence, () => false, new FakeFlashOutput(), dark);
+
+        player.Begin(0f, Vector3.zero, null);
+        player.Tick(end + 0.05f);
+        Assert.IsTrue(player.DarkAdaptActive);
+        player.Stop();
+        Assert.IsFalse(player.DarkAdaptActive);
+        Assert.AreEqual(1, dark.Clears);
+
+        player.Begin(10f, Vector3.zero, null);
+        player.Tick(10f + end + 0.05f);
+        player.Begin(20f, Vector3.zero, null);
+        Assert.AreEqual(2, dark.Clears, "새 성공 = 남은 암순응 컷을 걷고 처음부터");
+        Assert.IsTrue(player.IsPlaying);
+    }
+
     // ---- 에셋·프리팹 연결 ----
 
     [Test]
@@ -561,20 +528,5 @@ public sealed class SuppressFlashTests
         Assert.IsNotNull(material, MaterialPath);
         Assert.AreEqual(ShaderName, material.shader.name);
         Assert.AreEqual(2, material.shader.passCount, "합성 + 실루엣 마스크");
-    }
-
-    [Test]
-    public void 디렉터_프리팹은_제압_간파_칸_켬_섬광_줄이기_끔_에셋_연결()
-    {
-        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPath);
-        var director = prefab.GetComponent<InterruptProductionDirector>();
-        Assert.IsNotNull(director);
-        Assert.IsTrue(director.SuppressFlashEnabled);
-        Assert.IsFalse(director.SuppressFlashTargetOnly, "A7 대상 내부만 기본 끔(전체 화면)");
-        Assert.AreEqual(AssetDatabase.LoadAssetAtPath<SuppressFlashSequence>(SequencePath), director.SuppressFlashSequence);
-        Assert.AreEqual(AssetDatabase.LoadAssetAtPath<Material>(MaterialPath), director.SuppressFlashMaterial);
-
-        var serialized = new SerializedObject(director);
-        Assert.IsFalse(serialized.FindProperty("reduceFlash").boolValue, "섬광 줄이기 기본 끔");
     }
 }

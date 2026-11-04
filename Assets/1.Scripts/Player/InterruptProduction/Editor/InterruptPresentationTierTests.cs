@@ -3,13 +3,13 @@ using BeaverLobby.Player.Dash;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
-using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// 간파 연출 4단계(할 일 192) — 단계 선택표, 슬로우 Start 이벤트 표식 바이트(제압·대쉬), 서버 성공 사건의 대쉬 칸,
-/// 오너 암전 = 제압 간파만(Q1)·실패 = 약한 줌만(Q3), 제압 섬광 시퀀스 시작 규칙, 제압 암순응 컷 진행(Q7), 피해 판정 선착순(5a).
+/// 간파 연출 4단계(할 일 192) — 단계 선택표, 슬로우 Start 이벤트 표식 바이트(제압·대쉬), 서버 제압 표식(같은 프레임만), 서버 성공 사건의 대쉬 칸,
+/// 오너 암전 = 단계 설정이 켬일 때만(기본 전부 끔 — 11-04 할 일 211 로 제압 암전도 뺐다)·실패 = 약한 줌만(Q3), 제압 = 일반·대쉬와 같은 V3(211), 피해 판정 선착순(5a).
+/// 옛 제압 섬광 시퀀스·제압 암순응 컷 테스트는 Editor/Legacy/SuppressFlashTests.
 /// </summary>
 public sealed class InterruptPresentationTierTests
 {
@@ -46,6 +46,66 @@ public sealed class InterruptPresentationTierTests
         Assert.AreEqual(InterruptVariant.Dash,
             InterruptProductionEvent.Success(5, null, null, true, Vector3.one, Vector3.zero, InterruptVariant.Dash)
                 .WithSuppressInterrupt(true).Variant, "제압 칸을 바꿔도 종류는 그대로");
+    }
+
+    [Test]
+    public void 서버_표식은_같은_프레임에_한_번만()
+    {
+        var mark = new SuppressInterruptMark();
+        Assert.IsFalse(mark.Consume(10));
+
+        mark.Mark(10);
+        Assert.IsTrue(mark.Consume(10));
+        Assert.IsFalse(mark.Consume(10), "읽으면 비운다");
+
+        mark.Mark(10);
+        Assert.IsFalse(mark.Consume(11), "다른 프레임에 남은 표식은 버린다");
+        Assert.IsFalse(mark.Consume(10));
+    }
+
+    [Test]
+    public void 성공_사건_사본은_제압_간파_칸만_바꾼다()
+    {
+        var e = InterruptProductionEvent.Success(3, null, null, true, new Vector3(1, 2, 3), new Vector3(4, 5, 6));
+        InterruptProductionEvent marked = e.WithSuppressInterrupt(true);
+
+        Assert.IsFalse(e.SuppressInterrupt);
+        Assert.IsTrue(marked.SuppressInterrupt);
+        Assert.AreEqual(InterruptProductionPhase.Success, marked.Phase);
+        Assert.AreEqual(3ul, marked.CasterClientId);
+        Assert.IsTrue(marked.HasTarget);
+        Assert.AreEqual(new Vector3(1, 2, 3), marked.TargetPosition);
+        Assert.AreEqual(new Vector3(4, 5, 6), marked.CasterPosition);
+        Assert.IsTrue(InterruptProductionEvent.LocalSuccess(1, 2, Vector3.zero, true).SuppressInterrupt);
+    }
+
+    // ---- 전송(새 RPC 없음 — 슬로우 Start 이벤트 1바이트) ----
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void 슬로우_Start_이벤트는_제압_간파_칸을_싣고_세션이_기억한다(bool suppress)
+    {
+        var profile = new SlowMotionProfile { scale = 0.25f, holdDuration = 1f, enterDuration = 0.05f, exitDuration = 0.4f };
+        SlowMotionEvent e = GlobalTimeScale.CreateStartEvent(5, 10.0, 2, profile, SlowMotionPurpose.Success, Vector3.one, true, suppress);
+
+        SlowMotionEvent read;
+        using (var writer = new FastBufferWriter(SlowMotionEvent.SerializedSize, Allocator.Temp))
+        {
+            e.Write(writer);
+            Assert.AreEqual(SlowMotionEvent.SerializedSize, writer.Length, "직렬화 크기 상수 = 실제 쓴 바이트");
+            using (var reader = new FastBufferReader(writer, Allocator.Temp))
+                read = SlowMotionEvent.Read(reader);
+        }
+
+        Assert.AreEqual(suppress, read.SuppressInterrupt);
+        Assert.AreEqual(SlowMotionPurpose.Success, read.Purpose);
+        Assert.AreEqual(Vector3.one, read.TargetPosition);
+
+        var session = new SlowMotionSession();
+        Assert.AreEqual(SlowMotionApplyResult.Started, session.Apply(read));
+        Assert.AreEqual(suppress, session.CurrentSuppressInterrupt);
+        session.Clear();
+        Assert.IsFalse(session.CurrentSuppressInterrupt);
     }
 
     // ---- 1. 표식 바이트(새 RPC 없음 — 179 바이트에 비트 하나) ----
@@ -106,7 +166,7 @@ public sealed class InterruptPresentationTierTests
         CollectionAssert.AreEqual(new[] { false, false }, port.SuppressFlags);
     }
 
-    // ---- 2. 오너 암전 = 제압 간파만(Q1) · 실패 = 약한 줌만(Q3) ----
+    // ---- 2. 오너 암전 = 단계 설정이 켬일 때만(Q1, 기본 전부 끔) · 실패 = 약한 줌만(Q3) ----
 
     private sealed class Timing : IInterruptOwnerPresentationSettings
     {
@@ -124,71 +184,68 @@ public sealed class InterruptPresentationTierTests
     [Test]
     public void 실패_단계는_설정이_없어_암전하지_않는다()
     {
-        InterruptProductionDirector director = CreateDirector(null);
+        InterruptProductionDirector director = CreateDirector();
         Assert.IsNull(director.TierProfile(InterruptPresentationTier.Fail));
         Assert.IsFalse(InterruptPresentationTierRules.AttemptDims(InterruptAttemptForecast.Strong,
             director.TierProfile(InterruptPresentationTier.Fail)));
     }
 
     [Test]
-    public void 디렉터_기본_단계_설정은_제압만_암전과_시퀀스()
+    public void 디렉터_기본_단계_설정은_암전_없이_모두_V3()
     {
-        InterruptProductionDirector director = CreateDirector(null);
-        Assert.IsFalse(director.TierProfile(InterruptPresentationTier.Normal).ownerDim, "Q1 일반 = 암전 없음");
-        Assert.IsFalse(director.TierProfile(InterruptPresentationTier.Dash).ownerDim, "Q1 대쉬 = 암전 없음");
-        Assert.IsTrue(director.TierProfile(InterruptPresentationTier.Suppress).ownerDim, "Q1 제압 = 오너 암전");
-        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Normal).flash, "194 후속 일반 = V3");
-        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Dash).flash, "194 후속 대쉬 = V3");
-        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Normal).darkAdapt, "V3 암순응 = 나");
-        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, director.TierProfile(InterruptPresentationTier.Dash).darkAdapt, "V3 암순응 = 나");
-        Assert.AreEqual(InterruptTierFlash.SuppressSequence, director.TierProfile(InterruptPresentationTier.Suppress).flash, "제압 = 시퀀스 유지");
-        Assert.AreEqual(InterruptTierFlash.HitLightReference, director.TierProfile(InterruptPresentationTier.Suppress).sequenceHitLight,
-            "제압 = 시퀀스 + V3");
-        Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Normal).sequenceHitLight);
-        Assert.AreEqual(InterruptTierFlash.HitFlash, director.TierProfile(InterruptPresentationTier.Dash).sequenceHitLight);
+        InterruptProductionDirector director = CreateDirector();
+        foreach (InterruptPresentationTier tier in new[]
+                     { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash, InterruptPresentationTier.Suppress })
+        {
+            InterruptTierProfile profile = director.TierProfile(tier);
+            Assert.IsFalse(profile.ownerDim, $"{tier} = 암전 없음(제압도 11-04 할 일 211)");
+            Assert.AreEqual(InterruptTierFlash.HitLightReference, profile.flash, $"{tier} = V3");
+            Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, profile.darkAdapt, $"{tier} = V3 암순응 나");
+        }
     }
 
-    // ---- 194 후속. 섬광 시퀀스에 더하는 적중 라이트(제압 V3) ----
-
-    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLightReference, true, true, ExpectedResult = InterruptSuccessLook.HitLightReference)]
-    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLightReference, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)] // V3 데이터 없음
-    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLight, true, false, ExpectedResult = InterruptSuccessLook.HitLight)]
-    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitLightWhiteout, false, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
-    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.HitFlash, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]        // 더하지 않음
-    [TestCase(InterruptSuccessLook.SuppressSequence, InterruptTierFlash.SuppressSequence, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
-    [TestCase(InterruptSuccessLook.HitFlash, InterruptTierFlash.HitLightReference, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]      // 시퀀스가 안 틀면(A6 끔·컷 없음) 더하지 않음
-    [TestCase(InterruptSuccessLook.HitLightReference, InterruptTierFlash.HitLightReference, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
-    public InterruptSuccessLook 시퀀스에_더하는_적중_라이트는_시퀀스일_때만(InterruptSuccessLook look, InterruptTierFlash layer, bool hasHitLight,
-        bool hasReference) =>
-        InterruptPresentationTierRules.SelectSequenceHitLight(look,
-            new InterruptTierProfile(true, InterruptTierFlash.SuppressSequence, InterruptDarkAdaptMode.ScreenPass, layer), hasHitLight, hasReference);
+    [Test]
+    public void 제압_단계도_일반과_같은_적중_라이트_선택()
+    {
+        // 211 — 제압 간파 = 시퀀스 대신 일반·대쉬와 같은 버전 표(근접·대쉬 무관, Q6).
+        InterruptProductionDirector director = CreateDirector();
+        Assert.AreEqual(InterruptPresentationTier.Suppress, InterruptPresentationTierRules.Select(true, InterruptVariant.Dash, true));
+        InterruptSuccessLook suppress = InterruptPresentationTierRules.SelectSuccessLook(
+            director.TierProfile(InterruptPresentationTier.Suppress), true, true);
+        Assert.AreEqual(InterruptSuccessLook.HitLightReference, suppress);
+        Assert.AreEqual(InterruptPresentationTierRules.SelectSuccessLook(director.TierProfile(InterruptPresentationTier.Normal), true, true),
+            suppress, "제압 = 일반과 같은 섬광");
+        Assert.IsTrue(InterruptPresentationTierRules.UsesHitLight(suppress), "성공 순간 바로 — ②~⑥ 예약 없음");
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, director.SuccessLook(InterruptPresentationTier.Suppress),
+            "V3 데이터·프리팹 없는 디렉터 = V0 로 돌아간다(일반과 같은 규칙)");
+    }
 
     [Test]
-    public void 시퀀스에_더한_적중_라이트_암순응은_나()
+    public void 오너는_제압을_예측하지_않는다()
     {
-        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, InterruptPresentationTierRules.SequenceHitLightDarkAdapt,
-            "가(화면 패스)는 제압 암순응 컷과 같은 출력이라 쓰지 않는다");
-        Assert.AreEqual(InterruptSuccessLook.HitFlash,
-            InterruptPresentationTierRules.SelectSequenceHitLight(InterruptSuccessLook.SuppressSequence, null, true, true), "설정 없음 = 더하지 않음");
+        // 211 — 시도 순간 예측 단계는 일반·대쉬만(제압 예측·암전 제거). 제압은 서버 성공 슬로우 표식으로만.
+        InterruptProductionDirector director = CreateDirector();
+        Assert.IsFalse(InterruptPresentationTierRules.AttemptDims(InterruptAttemptForecast.Strong,
+            director.TierProfile(InterruptPresentationTier.Suppress)), "제압 단계 설정도 암전 끔");
     }
 
     // ---- 194. 단계 × 버전 선택표 ----
 
-    [TestCase(InterruptTierFlash.HitFlash, true, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
-    [TestCase(InterruptTierFlash.HitLight, true, true, true, ExpectedResult = InterruptSuccessLook.HitLight)]
-    [TestCase(InterruptTierFlash.HitLight, true, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)]   // 연출 없음 → V0
-    [TestCase(InterruptTierFlash.HitLightWhiteout, false, false, true, ExpectedResult = InterruptSuccessLook.HitLightWhiteout)]
-    [TestCase(InterruptTierFlash.HitLightWhiteout, true, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)]
-    [TestCase(InterruptTierFlash.SuppressSequence, true, true, false, ExpectedResult = InterruptSuccessLook.SuppressSequence)]
-    [TestCase(InterruptTierFlash.SuppressSequence, false, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)] // A6 끔
-    [TestCase(InterruptTierFlash.SuppressSequence, true, false, true, ExpectedResult = InterruptSuccessLook.HitFlash)] // 컷 없음
-    public InterruptSuccessLook 버전_선택표(InterruptTierFlash flash, bool suppressOn, bool hasSequence, bool hasHitLight) =>
-        InterruptPresentationTierRules.SelectSuccessLook(new InterruptTierProfile(false, flash), suppressOn, hasSequence, hasHitLight);
+    [TestCase(InterruptTierFlash.HitFlash, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    [TestCase(InterruptTierFlash.HitLight, true, false, ExpectedResult = InterruptSuccessLook.HitLight)]
+    [TestCase(InterruptTierFlash.HitLight, false, true, ExpectedResult = InterruptSuccessLook.HitFlash)]   // 연출 없음 → V0
+    [TestCase(InterruptTierFlash.HitLightWhiteout, true, false, ExpectedResult = InterruptSuccessLook.HitLightWhiteout)]
+    [TestCase(InterruptTierFlash.HitLightWhiteout, false, true, ExpectedResult = InterruptSuccessLook.HitFlash)]
+    [TestCase(InterruptTierFlash.HitLightReference, false, true, ExpectedResult = InterruptSuccessLook.HitLightReference)]
+    [TestCase(InterruptTierFlash.HitLightReference, true, false, ExpectedResult = InterruptSuccessLook.HitFlash)] // V3 데이터 없음 → V0
+    [TestCase((InterruptTierFlash)1, true, true, ExpectedResult = InterruptSuccessLook.HitFlash)]                // 옛 시퀀스 값(Legacy) → V0
+    public InterruptSuccessLook 버전_선택표(InterruptTierFlash flash, bool hasHitLight, bool hasReference) =>
+        InterruptPresentationTierRules.SelectSuccessLook(new InterruptTierProfile(false, flash), hasHitLight, hasReference);
 
     [Test]
     public void 설정이_없으면_V0()
     {
-        Assert.AreEqual(InterruptSuccessLook.HitFlash, InterruptPresentationTierRules.SelectSuccessLook(null, true, true, true));
+        Assert.AreEqual(InterruptSuccessLook.HitFlash, InterruptPresentationTierRules.SelectSuccessLook(null, true, true));
     }
 
     [TestCase(InterruptSuccessLook.HitLightWhiteout, true, 3, ExpectedResult = 3)]
@@ -200,8 +257,8 @@ public sealed class InterruptPresentationTierTests
 
     [TestCase(InterruptSuccessLook.HitLight, ExpectedResult = true)]
     [TestCase(InterruptSuccessLook.HitLightWhiteout, ExpectedResult = true)]
+    [TestCase(InterruptSuccessLook.HitLightReference, ExpectedResult = true)]
     [TestCase(InterruptSuccessLook.HitFlash, ExpectedResult = false)]
-    [TestCase(InterruptSuccessLook.SuppressSequence, ExpectedResult = false)]
     public bool 적중_라이트_버전(InterruptSuccessLook look) => InterruptPresentationTierRules.UsesHitLight(look);
 
     [Test]
@@ -240,7 +297,6 @@ public sealed class InterruptPresentationTierTests
 
         Assert.AreNotEqual(0u, id);
         Assert.AreEqual(0, flashAsked, "②~⑥ 진행기를 건드리지 않는다");
-        Assert.IsFalse(cues.LocalSuccessPlayedSuppress);
         Assert.AreEqual(InterruptSuccessLook.HitLight, cues.LocalSuccessLook);
         Assert.IsTrue(cues.ConsumeServerStarted(SlowMotionPurpose.Success), "뒤이은 내 서버 성공은 한 번 삼킨다");
     }
@@ -266,7 +322,7 @@ public sealed class InterruptPresentationTierTests
     }
 
     [Test]
-    public void 제압_예측_강_시도는_암전과_빛모임을_켜고_섬광_순간에_끈다()
+    public void 암전_켬_단계로_예측한_강_시도는_암전과_빛모임을_켜고_섬광_순간에_끈다()
     {
         var sm = new InterruptOwnerPresentation(new Timing());
         sm.Predict(InterruptAttemptForecast.Strong, null, 10f, Vector3.forward, dims: true);
@@ -299,162 +355,8 @@ public sealed class InterruptPresentationTierTests
     public void 암전_없는_강_시도는_전투_표시를_숨기지_않는다()
     {
         // 디렉터 A5 는 '암전 없는 강 시도'를 None 으로 넘긴다(OwnerStateForCombatUi) — 규칙 자체는 그대로.
-        Assert.IsFalse(InterruptProductionRules.ShouldHideCombatUi(true, InterruptOwnerPresentationState.None, 0f, false, false));
-        Assert.IsTrue(InterruptProductionRules.ShouldHideCombatUi(true, InterruptOwnerPresentationState.AttemptStrong, 0f, false, false));
-    }
-
-    // ---- 2. 오너 판정 성공 = 제압 예측이면 ②~⑥ 대신 시퀀스 ----
-
-    [Test]
-    public void 판정_성공이_시퀀스면_섬광_예약_없이_로컬_발동_번호를_돌려준다()
-    {
-        var sm = new InterruptOwnerPresentation(new Timing());
-        sm.Predict(InterruptAttemptForecast.Strong, null, 0f, Vector3.forward, dims: true);
-        int flashAsked = 0;
-        var cues = new InterruptOwnerJudgeCuePlayer(() => sm, () =>
-        {
-            flashAsked++;
-            return null;
-        }, null);
-        cues.Attempted();
-
-        uint id = cues.JudgeSucceeded(1, Vector3.up, Vector3.zero, 0.1f, 0.1f, 1, InterruptSuccessLook.SuppressSequence);
-
-        Assert.AreNotEqual(0u, id);
-        Assert.AreEqual(id, sm.SuccessTriggerId);
-        Assert.AreEqual(0, flashAsked, "②~⑥ 진행기를 건드리지 않는다");
-        Assert.IsTrue(cues.LocalSuccessPlayedSuppress);
-        Assert.IsTrue(cues.ConsumeServerStarted(SlowMotionPurpose.Success), "뒤이은 내 서버 성공은 한 번 삼킨다");
-    }
-
-    [TestCase(true, false, false, ExpectedResult = true)]   // 팀원 화면·cue 경로 아님
-    [TestCase(true, true, false, ExpectedResult = true)]    // 오너: 예측은 제압 아님 → 서버 제압 = 지금 시퀀스로
-    [TestCase(true, true, true, ExpectedResult = false)]    // 오너: 판정 순간 이미 시퀀스
-    [TestCase(false, true, true, ExpectedResult = false)]   // 서버는 제압 아님 — 이미 튼 시퀀스는 끝까지
-    [TestCase(false, false, false, ExpectedResult = false)]
-    public bool 서버_성공에서_시퀀스_시작(bool playsSequence, bool ownerCueHandled, bool ownerPlayed) =>
-        InterruptPresentationTierRules.StartsSuppressSequenceOnServerSuccess(playsSequence, ownerCueHandled, ownerPlayed);
-
-    // ---- 3. 제압 = 대쉬 세트 포함(Q6) · 시퀀스 선택 ----
-
-    [Test]
-    public void 시퀀스는_제압_단계만_근접_대쉬_무관()
-    {
-        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        _objects.Add(sequence);
-        InterruptProductionDirector director = CreateDirector(sequence);
-
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, InterruptPresentationTier.Normal));
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, InterruptPresentationTier.Dash));
-        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success, InterruptPresentationTier.Suppress));
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, InterruptPresentationTier.Fail));
-        Assert.IsTrue(director.PlaysSuppressFlash(SlowMotionPurpose.Success,
-            InterruptPresentationTierRules.Select(true, InterruptVariant.Dash, true)), "대쉬 + 제압 = 제압");
-
-        director.SuppressFlashEnabled = false;
-        Assert.IsFalse(director.PlaysSuppressFlash(SlowMotionPurpose.Success, InterruptPresentationTier.Suppress), "A6 끔 = ②~⑥");
-    }
-
-    // ---- 3. 제압 암순응 컷(Q7) ----
-
-    private sealed class FakeFlashOutput : ISuppressFlashOutput
-    {
-        public int Hides;
-        public void SetSubjects(IReadOnlyList<GameObject> subjects, SuppressFlashMaskMode mode) { }
-        public void Show(in SuppressFlashFrame frame, Vector3 worldCenter, SuppressFlashSequence sequence) { }
-        public void Hide() => Hides++;
-    }
-
-    private sealed class FakeDarkAdapt : ISuppressDarkAdaptOutput
-    {
-        public readonly List<float> Cuts = new List<float>();
-        public int Clears;
-        public void ShowDarkAdaptCut(float darkness) => Cuts.Add(darkness);
-        public void ClearDarkAdapt() => Clears++;
-    }
-
-    [Test]
-    public void 암순응_컷_기본값은_어두움_중간_두_컷()
-    {
-        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        _objects.Add(sequence);
-        Assert.AreEqual(2, sequence.darkAdaptCuts.Count);
-        Assert.AreEqual(1f, sequence.darkAdaptCuts[0].darkness);
-        Assert.AreEqual(0.5f, sequence.darkAdaptCuts[1].darkness);
-    }
-
-    [Test]
-    public void 암순응_컷_시간표()
-    {
-        var cuts = new List<SuppressDarkAdaptCut> { new SuppressDarkAdaptCut(0.1f, 1f), new SuppressDarkAdaptCut(0.2f, 0.4f) };
-
-        Assert.IsTrue(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, 0f, out int i, out float d));
-        Assert.AreEqual(0, i);
-        Assert.AreEqual(1f, d);
-        Assert.IsTrue(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, 0.15f, out i, out d));
-        Assert.AreEqual(1, i);
-        Assert.AreEqual(0.4f, d, 1e-5f);
-        Assert.IsFalse(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, 0.31f, out _, out _), "끝 = 원래 색");
-        Assert.IsFalse(SuppressFlashRules.TryEvaluateDarkAdapt(null, 0f, out _, out _));
-        Assert.IsFalse(SuppressFlashRules.TryEvaluateDarkAdapt(cuts, -0.01f, out _, out _));
-    }
-
-    [Test]
-    public void 제압_암순응은_시퀀스_끝_뒤_어두움_중간_원래_색으로_끊어_진행()
-    {
-        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        _objects.Add(sequence);
-        float end = sequence.TotalFrames / sequence.frameRate;
-        var flash = new FakeFlashOutput();
-        var dark = new FakeDarkAdapt();
-        var player = new SuppressFlashPlayer(() => sequence, () => false, flash, dark);
-
-        player.Begin(0f, Vector3.zero, null);
-        player.Tick(end - 0.01f);
-        Assert.IsTrue(player.IsPlaying);
-        Assert.IsFalse(player.DarkAdaptActive);
-        Assert.AreEqual(0, dark.Cuts.Count, "시퀀스 중엔 암순응 없음");
-
-        player.Tick(end + 0.05f);
-        Assert.IsFalse(player.IsPlaying, "시퀀스 끝");
-        Assert.AreEqual(1, flash.Hides);
-        Assert.IsTrue(player.DarkAdaptActive);
-        Assert.AreEqual(0, player.DarkAdaptCutIndex);
-        CollectionAssert.AreEqual(new[] { 1f }, dark.Cuts, "어두움");
-
-        player.Tick(end + 0.1f);
-        Assert.AreEqual(1, dark.Cuts.Count, "같은 컷이면 다시 안 보낸다");
-
-        player.Tick(end + 0.2f);
-        Assert.AreEqual(1, player.DarkAdaptCutIndex);
-        CollectionAssert.AreEqual(new[] { 1f, 0.5f }, dark.Cuts, "중간");
-
-        player.Tick(end + 0.31f);
-        Assert.IsFalse(player.DarkAdaptActive, "원래 색");
-        Assert.AreEqual(1, dark.Clears);
-    }
-
-    [Test]
-    public void 암순응_컷_중_멈춤_새_성공은_즉시_걷는다()
-    {
-        var sequence = ScriptableObject.CreateInstance<SuppressFlashSequence>();
-        _objects.Add(sequence);
-        float end = sequence.TotalFrames / sequence.frameRate;
-        var dark = new FakeDarkAdapt();
-        var player = new SuppressFlashPlayer(() => sequence, () => false, new FakeFlashOutput(), dark);
-
-        player.Begin(0f, Vector3.zero, null);
-        player.Tick(end + 0.05f);
-        Assert.IsTrue(player.DarkAdaptActive);
-        player.Stop();
-        Assert.IsFalse(player.DarkAdaptActive);
-        Assert.AreEqual(1, dark.Clears);
-
-        player.Begin(10f, Vector3.zero, null);
-        player.Tick(10f + end + 0.05f);
-        player.Begin(20f, Vector3.zero, null);
-        Assert.AreEqual(2, dark.Clears, "새 성공 = 남은 암순응 컷을 걷고 처음부터");
-        Assert.IsTrue(player.IsPlaying);
+        Assert.IsFalse(InterruptProductionRules.ShouldHideCombatUi(true, InterruptOwnerPresentationState.None, 0f, false));
+        Assert.IsTrue(InterruptProductionRules.ShouldHideCombatUi(true, InterruptOwnerPresentationState.AttemptStrong, 0f, false));
     }
 
     // ---- 5a. 피해 판정 선착순(매니저 승인 장부) ----
@@ -480,18 +382,10 @@ public sealed class InterruptPresentationTierTests
 
     // ---- 도우미 ----
 
-    private InterruptProductionDirector CreateDirector(SuppressFlashSequence sequence)
+    private InterruptProductionDirector CreateDirector()
     {
         var go = new GameObject("Director");
         _objects.Add(go);
-        var director = go.AddComponent<InterruptProductionDirector>();
-        if (sequence != null)
-        {
-            var so = new SerializedObject(director);
-            so.FindProperty("suppressFlashSequence").objectReferenceValue = sequence;
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        return director;
+        return go.AddComponent<InterruptProductionDirector>();
     }
 }

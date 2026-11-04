@@ -214,25 +214,6 @@ public static class SuppressFlashRules
     }
 }
 
-/// <summary>
-/// [서버] 제압 간파 표식(할 일 179) — 대상(23호)이 간파 성공으로 제압 칸 0 에 닿은 순간 <see cref="Mark"/>, 같은 판정 호출의 성공 사건이 <see cref="Consume"/>.
-/// 대상 수신과 성공 사건은 같은 프레임 같은 호출 안이라 프레임 번호로 묶는다 — 다른 프레임에 남은 표식은 버린다(판정 코드 무수정).
-/// </summary>
-public sealed class SuppressInterruptMark
-{
-    private int _frame = int.MinValue;
-
-    public void Mark(int frame) => _frame = frame;
-
-    /// <summary>이 프레임에 표식이 있었는가 — 읽으면 비운다.</summary>
-    public bool Consume(int frame)
-    {
-        bool marked = _frame == frame;
-        _frame = int.MinValue;
-        return marked;
-    }
-}
-
 /// <summary>제압 간파 섬광을 그리는 범위(179/192 후속 A7).</summary>
 public enum SuppressFlashMaskMode
 {
@@ -256,18 +237,6 @@ public interface ISuppressFlashOutput
 
     /// <summary>끝·강제 리셋 — 즉시 원복(실루엣 비트 포함).</summary>
     void Hide();
-}
-
-/// <summary>
-/// 제압 암순응 출력(할 일 192 Q7) — 렌더 출력은 <see cref="InterruptDarkAdaptation"/>, 테스트는 가짜. 모든 피어 같은 값(Q8 공용).
-/// </summary>
-public interface ISuppressDarkAdaptOutput
-{
-    /// <summary>이 어둡힘을 그대로 붙잡는다(곡선 없음). 컷이 바뀔 때마다 부른다.</summary>
-    void ShowDarkAdaptCut(float darkness);
-
-    /// <summary>즉시 0(컷 끝·강제 리셋).</summary>
-    void ClearDarkAdapt();
 }
 
 /// <summary>
