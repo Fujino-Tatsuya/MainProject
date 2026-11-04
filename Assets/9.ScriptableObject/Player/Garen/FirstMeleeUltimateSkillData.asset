@@ -46,3 +46,5 @@ MonoBehaviour:
   snapRotationOnStart: 1
   animationSpeed: 1.2
   vfxPlayRate: 1.2
+  afterHitSpeedMultiplier: 3
+  beforeHitSpeedMultiplier: 1.43

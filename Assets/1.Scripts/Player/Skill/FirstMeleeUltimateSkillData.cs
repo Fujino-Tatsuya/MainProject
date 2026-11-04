@@ -29,7 +29,15 @@ public class FirstMeleeUltimateSkillData : PlayerSkillData
              "Hit 에서 UltimateSpeed 를 animationSpeed × 이 값으로 바꾼다 — End 도 그만큼 일찍 온다(안전망은 시작 때 길이라 먼저 끊지 않는다)")]
     [SerializeField, Min(0.1f), DataTableIgnore] private float afterHitSpeedMultiplier = 3f;
 
+    // 할 일 210 — R 선딜(시전 → 피해) 튜닝 칸. 테이블(Paladin 시트)에 내보낸다.
+    [Header("선딜")]
+    [Tooltip("피해(Hit) 이벤트 전 구간 애니메이션 속도 배율. 1 = 그대로, 1.43 = Hit 까지 시간 약 30% 단축(1 ÷ 1.43 ≈ 0.7).\n" +
+             "시전 순간 UltimateSpeed 를 animationSpeed × 이 값으로 넣고, Hit 에서 animationSpeed × afterHitSpeedMultiplier 로 바꾼다.\n" +
+             "서버 피해 판정도 서버 애니메이터의 Hit 이벤트라 같이 당겨진다. 마무리 낙뢰(Custom0)·칼 꽂기(Stick)도 이 구간이라 같이 당겨진다")]
+    [SerializeField, Min(0.1f)] private float beforeHitSpeedMultiplier = 1.43f;
+
     public float AnimationSpeed => animationSpeed;
+    public float BeforeHitSpeedMultiplier => beforeHitSpeedMultiplier;
     public float AfterHitSpeedMultiplier => afterHitSpeedMultiplier;
     public float VfxPlayRate => vfxPlayRate;
 }

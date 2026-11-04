@@ -117,8 +117,9 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         //    방금 CrossFade 한 같은 프레임이라 첫 프레임부터 이 속도로 돈다. 원격 피어도 각자 같은 값을 넣는다.
         //    Animator 는 시전마다 찾는다 — 캐릭터 교체로 Armature 가 바뀔 수 있다.
         animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
+        // Hit 전 구간은 선딜 배율을 더 곱한다(할 일 210) — Hit 에서 OnLocalAnimationEvent 가 Hit 뒤 배율로 바꾼다.
         if (animator != null)
-            animator.SetFloat(UltimateSpeedHash, AnimationSpeed);
+            animator.SetFloat(UltimateSpeedHash, AnimationSpeed * BeforeHitSpeedMultiplier);
 
         // Stick 은 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.
         skillView?.SetStickPlayRate(VfxPlayRate);
@@ -218,6 +219,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.
     private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;
+    private float BeforeHitSpeedMultiplier => Data is FirstMeleeUltimateSkillData ult ? ult.BeforeHitSpeedMultiplier : 1f;
     private float AfterHitSpeedMultiplier => Data is FirstMeleeUltimateSkillData ult ? ult.AfterHitSpeedMultiplier : 1f;
     private float VfxPlayRate => Data is FirstMeleeUltimateSkillData ult ? ult.VfxPlayRate : 1f;
 

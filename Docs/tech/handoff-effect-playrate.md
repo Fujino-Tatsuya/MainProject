@@ -56,3 +56,10 @@ R 은 이벤트 방식이다(요구 이벤트 Hit·End·Custom0 — `PlayerSkill
 `maxActiveDuration`(1.5) 이 아니라 **클립 실제 재생 시간** = 한 번 재생(Loop Time 꺼짐) 클립 길이 5.667 ÷ (상태 speed 1 × `UltimateSpeed` 1.2) = 4.722초 (+ 안전망 0.1 / 슈퍼아머 0.25).
 컨트롤러가 상태 진입 뒤 런타임 `AnimatorStateInfo`·`AnimatorClipInfo` 로 읽는다(`PlayerSkillSafetyNet`). 그래서 **End 를 클립 안 어디로 옮겨도
 안전망이 먼저 끊지 않는다**(예전엔 1.6초에 끊겨 낙뢰가 걷혔다). 이벤트를 옮길 때 이펙트 쪽에서 바꿀 것은 없다.
+
+### R 선딜 배율 (할 일 210, 2026-11-04)
+`FirstMeleeUltimateSkillData.beforeHitSpeedMultiplier`(기본 1.43, **테이블 Paladin 시트에 내보냄** — 병합 Export 전까지 SO 값) —
+Hit 전 구간 `UltimateSpeed` = `animationSpeed` × 이 값, Hit 에서 `animationSpeed` × `afterHitSpeedMultiplier`(3) 로 바뀐다.
+클립 Hit 1.367초 기준 실제 Hit = 1.367 ÷ 1.2 = 1.139초 → 1.367 ÷ (1.2×1.43) ≈ 0.797초(약 30% 단축). 서버 피해 판정도 서버 애니메이터 Hit 이벤트라 같이 당겨진다.
+Custom0(마무리 낙뢰 발사)·Stick 도 Hit 전이라 같이 당겨져 Custom0→Hit 간격이 0.167초 → 0.117초로 줄어든다 — 하늘 칼이 피해보다 늦게 닿아 보이면
+`vfxPlayRate` 를 올리거나 클립 Custom0 을 앞으로 옮긴다. 안전망은 컨트롤러가 재생 중 계속 다시 읽어 늘리기만 하므로 배율과 무관하게 먼저 끊지 않는다.
