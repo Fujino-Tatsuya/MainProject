@@ -248,6 +248,32 @@ public sealed class DebugInterruptLabTests
         }
     }
 
+    // ---- 카메라 대상 중심 토글(196) ----
+
+    [Test]
+    public void 카메라_대상_중심_토글은_일괄_버튼과_따로()
+    {
+        var go = new UnityEngine.GameObject("Director");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            Assert.IsTrue(director.CameraCenterEnabled, "기본 = 켬");
+            Assert.IsFalse(string.IsNullOrEmpty(DebugInterruptTuningPanel.CameraCenterLabel));
+
+            director.CameraCenterEnabled = false;
+            DebugInterruptTuningPanel.SetAll(director, true);
+            Assert.IsFalse(director.CameraCenterEnabled, "전부 켬 = 카메라 대상 중심은 건드리지 않음");
+
+            director.CameraCenterEnabled = true;
+            DebugInterruptTuningPanel.SetDefaults(director);
+            Assert.IsTrue(director.CameraCenterEnabled, "암전만 = 카메라 대상 중심은 건드리지 않음");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+    }
+
     // ---- 제압 간파 섬광 A6 토글(179) ----
 
     [Test]

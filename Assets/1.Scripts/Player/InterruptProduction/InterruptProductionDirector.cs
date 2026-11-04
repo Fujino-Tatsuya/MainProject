@@ -82,6 +82,9 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Header("성공 — 개인")]
     [Tooltip("A3 오너 줌 — 내가 일으킨 슬로우 동안 카메라가 다가간다(CameraTargetSwitcher). 끄면 배율 1")]
     [DataTableIgnore, SerializeField] private bool ownerZoom;
+    [Tooltip("카메라 대상 중심(할 일 196) — 내 간파(근접·대쉬) 클릭 즉시 카메라 중심을 간파 대상 쪽으로(강·약 예측, 대상 없음 = 그대로). " +
+             "줌(A3)과 독립 — 중심만. 이동·비율·복귀 시간 = 슬로우 SO ④ 칸. 이 화면만(팀원 화면 그대로)")]
+    [DataTableIgnore, SerializeField] private bool cameraCenter = true;
     [Tooltip("A5 전투 표시 숨김(할 일 154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 끝(실패면 암전 걷기 끝) + 제압 간파 섬광 시퀀스(팀원 화면 포함) 동안 " +
              "이 화면의 피해 숫자(보스 포함)·플레이어·몬스터·보스 머리 위 체력바·오너 조준 표시를 숨긴다(화면 고정 보스 HP 바는 그대로). 생성·수명·게이지 값은 그대로(가리기만), 끝나면 그대로 보인다")]
     [DataTableIgnore, SerializeField, FormerlySerializedAs("hideDamageNumbers")] private bool hideCombatUi = true;
@@ -239,6 +242,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     {
         get => suppressFlash;
         set => suppressFlash = value;
+    }
+
+    /// <summary>카메라 대상 중심 칸(할 일 196) — 런타임 값(저장하지 않음, 디버그·테스트). 다음 간파부터.</summary>
+    public bool CameraCenterEnabled
+    {
+        get => cameraCenter;
+        set => cameraCenter = value;
     }
 
     /// <summary>A7 섬광 = 대상 내부만(179/192 후속) — 런타임 값(저장하지 않음, 디버그·테스트). Play 중 바꾸면 다음 재생부터.</summary>
@@ -508,6 +518,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _hitFlash?.Tick(InterruptEffectTime.Now(_hitFlash.Clock), Time.frameCount);
         _suppressFlash?.Tick(Time.unscaledTime); // 제압 간파 섬광 = 실제 시간(슬로우·히트스톱 무관, 할 일 179)
         _hitLight?.Tick(Time.unscaledTime, Time.frameCount); // 적중 라이트 연출 = 실제 시간(할 일 194 Q8), V2 화이트아웃 = 렌더 프레임 수
+        TickCameraCenter(Time.unscaledTime); // 카메라 대상 중심 성공 복귀(할 일 196) = 내 성공 슬로우 복귀 구간
     }
 
     private void OnDisable()
@@ -516,6 +527,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _peerLightGather.EndAll();
         StopHitFlash();
         _suppressFlash?.Stop();
+        CancelCameraCenter();
 
         if (ReferenceEquals(_timeScale, null))
             return;
@@ -765,8 +777,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>[오너] 판정 전 종료·서버 거부 — 결론이 없으면 실패처럼 걷는다.</summary>
     public static void LocalOwnerEnded()
     {
-        if (Instance != null)
-            Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
+        if (Instance == null)
+            return;
+
+        Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
+        // 카메라 대상 중심(할 일 196) — cue 없는 종료(시전 거부 등)도 복귀. 성공 슬로우 복귀를 기다리는 중이면 그대로 둔다.
+        Instance._cameraCenter.ReturnUnlessSucceeded(Time.unscaledTime);
     }
 
     /// <summary>
@@ -918,6 +934,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         _peerLightGather.EndAll();
         StopHitFlash();
         _suppressFlash?.Stop();
+        CameraCenterReturn(Time.unscaledTime); // 할 일 196
         SuccessStage.LocalForcedReset(_darkAdaptation);
     }
 
